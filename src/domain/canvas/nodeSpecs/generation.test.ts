@@ -111,6 +111,57 @@ describe('生成节点规格 / 输入收集（M6-12）', () => {
     )
     expect(getSpec('generation')!.collectInputs({ node: g.nodes[0]!, graph: g })).toEqual([])
   })
+
+  it('★★ 品牌套件素材进入真实图片输入，Logo 在前且与上游重复时不重复发送', () => {
+    const g = graph(
+      [
+        node({
+          id: 'down',
+          type: 'generation',
+          data: {
+            mode: 'image',
+            contextAssets: [
+              { hash: 'logo', mime: 'image/png', role: 'logo', name: 'Sogami Logo' },
+              { hash: 'ref', mime: 'image/jpeg', role: 'reference', name: '目录参考' },
+            ],
+          } as never,
+        }),
+        node({ id: 'up', type: 'generation', data: { assetHash: 'logo' } as never }),
+      ],
+      [{ id: 'e1', projectId: 'p1', source: 'up', target: 'down' }],
+    )
+    expect(getSpec('generation')!.collectInputs({ node: g.nodes[0]!, graph: g })).toEqual([
+      { kind: 'asset', nodeId: 'context-kit:logo', assetHash: 'logo', mime: 'image/png' },
+      { kind: 'asset', nodeId: 'context-kit:ref', assetHash: 'ref', mime: 'image/jpeg' },
+    ])
+  })
+
+  it('★★ 生成提示词明确要求第 1 张品牌 Logo 不得重画', () => {
+    const g = graph([
+      node({
+        id: 'n',
+        type: 'generation',
+        data: {
+          mode: 'image',
+          channelId: 'c',
+          model: 'm',
+          prompt: '为 Sogami 做车载宠物窝目录页',
+          contextAssets: [
+            { hash: 'logo', mime: 'image/png', role: 'logo', name: 'Sogami Logo' },
+            { hash: 'ref', mime: 'image/png', role: 'reference', name: '目录参考' },
+          ],
+        } as never,
+      }),
+    ])
+    const req = getSpec('generation')!.toRunRequest!({
+      node: g.nodes[0]!,
+      inputs: getSpec('generation')!.collectInputs({ node: g.nodes[0]!, graph: g }),
+      params: g.nodes[0]!.data,
+      graph: g,
+    })
+    expect(req?.prompt).toContain('第 1 张随附图片是品牌 Logo「Sogami Logo」')
+    expect(req?.prompt).toContain('不得重画或改成相似字样')
+  })
 })
 
 /**

@@ -1,5 +1,11 @@
 import type { GraphSnapshot } from '../../../domain/canvas/model/graph'
-import type { GenerationData, NodeData, NodeSnapshot, NodeType } from '../../../domain/canvas/model/node'
+import type {
+  GenerationContextAsset,
+  GenerationData,
+  NodeData,
+  NodeSnapshot,
+  NodeType,
+} from '../../../domain/canvas/model/node'
 import { GENERATION_ASSET_MIME } from '../../../domain/canvas/model/node'
 import type { NodeInput } from '../../../domain/shared/execution/types'
 import type { RunMode, RunScope } from '../../../domain/canvas/model/runRecord'
@@ -152,6 +158,22 @@ function collectDownstream(nodeId: string, graph: GraphSnapshot): string[] {
   return ids
 }
 
+function mergeContextAssets(
+  existing: readonly GenerationContextAsset[] | undefined,
+  incoming: readonly GenerationContextAsset[],
+): GenerationContextAsset[] {
+  const byHash = new Map<string, GenerationContextAsset>()
+  for (const asset of [...(existing ?? []), ...incoming]) {
+    const hash = asset.hash.trim()
+    if (!hash || !asset.mime.startsWith('image/') || byHash.has(hash)) continue
+    byHash.set(hash, { ...asset, hash })
+  }
+  return [...byHash.values()].sort((left, right) => {
+    if (left.role === right.role) return 0
+    return left.role === 'logo' ? -1 : 1
+  })
+}
+
 /**
  * 执行计划（架构 §5.5）。纯函数：不读时间、不产生副作用、可脱离 React 单测。
  *
@@ -178,6 +200,8 @@ export function buildRunPlan(
     reuseOriginNode?: boolean
     /** 正在被其他计划写入的节点不能再次作为空槽复用。 */
     reservedNodeIds?: ReadonlySet<string>
+    /** Agent 本轮绑定的项目套件素材；仅用于这次请求，不改写手动创建的节点。 */
+    contextAssets?: readonly GenerationContextAsset[]
   } = {},
 ): RunPlan {
   const newDownstream = mode === 'single-alt'
@@ -266,16 +290,29 @@ export function buildRunPlan(
   let slotCursor = 0
   ordered.forEach((node) => {
     const spec = getSpec(node.type)!
+    const effectiveNode =
+      node.type === 'generation' && (opts.contextAssets?.length ?? 0) > 0
+        ? {
+            ...node,
+            data: {
+              ...node.data,
+              contextAssets: mergeContextAssets(
+                (node.data as GenerationData).contextAssets,
+                opts.contextAssets ?? [],
+              ),
+            },
+          }
+        : node
     /**
      * 分组（不做生成）在这一步照常拿到空输入；真正的"不能跑"由下面 `toRunRequest` 的缺失决定 ——
      * 组没有那个入口，于是在这里被跳过。**别用分支特判类型**：能力在哪就断在哪。
      */
-    const inputs = spec.collectInputs({ node, graph: working })
+    const inputs = spec.collectInputs({ node: effectiveNode, graph: working })
     const expansions = expandInputs(inputs)
 
     expansions.forEach((expansion, seq) => {
       const request = spec.toRunRequest?.({
-        node,
+        node: effectiveNode,
         inputs: expansion.inputs,
         params: node.data,
         graph: working,
@@ -421,7 +458,7 @@ export function buildRunPlan(
         const materialTitle = firstAssetInput
           ? (index.get(firstAssetInput.nodeId)?.title ?? '')
           : ''
-        const sourceGeneration = node.data as GenerationData
+        const sourceGeneration = effectiveNode.data as GenerationData
         const presetName = presetById(sourceGeneration.preset)?.name ?? ''
 
         const task: CanvasRunTask = {
@@ -441,8 +478,8 @@ export function buildRunPlan(
           slot,
           // 指纹包含完整集合（未展开）：集合内容变了才算输入变了，
           // 逐项 task 共用同一指纹，陈旧判定与「一次生成」语义一致。
-          fingerprint: fingerprintOf(node, inputs),
-          params: node.data,
+          fingerprint: fingerprintOf(effectiveNode, inputs),
+          params: effectiveNode.data,
           sourceType: node.type,
           callCount: expansions.length,
           containerKind: containerKindOf(node, index) ?? subContainer,

@@ -123,6 +123,9 @@ describe('ContextBundle', () => {
     })
     expect(bundle.kitVersionRefs).toEqual([{ kitId: 'kit-brand', version: 1 }])
     expect(bundle.assetHashes).toEqual(['asset-logo'])
+    expect(bundle.assets).toEqual([
+      { hash: 'asset-logo', role: 'logo', name: '主 Logo' },
+    ])
     expect(bundle.hardConstraints.join('\n')).toContain('深绿')
     expect(bundle.hardConstraints.join('\n')).toContain('颜色 主色：#14532d')
     expect(bundle.hardConstraints.join('\n')).toContain('字体 思源黑体：标题 700')
@@ -171,6 +174,9 @@ describe('ContextBundle', () => {
       { kitId: customKit.id, version: 1 },
     ])
     expect(bundle.assetHashes).toEqual(['role-reference'])
+    expect(bundle.assets).toEqual([
+      { hash: 'role-reference', role: 'reference', name: '小满定妆图' },
+    ])
     expect(bundle.hardConstraints.join('\n')).toContain('橙色雨衣')
     expect(bundle.hardConstraints.join('\n')).toContain('左侧大留白')
   })
@@ -256,6 +262,8 @@ describe('ContextBundle', () => {
     expect(text).toContain('不要使用霓虹色')
     expect(text).toContain('品牌 A v1')
     expect(text).toContain('先分析主色')
+    expect(text).toContain('第 1 张是品牌 Logo「主 Logo」')
+    expect(text).toContain('必须按原图保留字形、比例、颜色和标志结构')
   })
 
   it('★★ 记忆按会话、项目、工作台和全局分层，并且过期项不进入上下文', () => {

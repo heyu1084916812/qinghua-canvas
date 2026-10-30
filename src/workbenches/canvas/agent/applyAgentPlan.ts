@@ -5,6 +5,7 @@ import {
 } from '../../../domain/agent/landing'
 import type { AgentPlan } from '../../../domain/agent/plan'
 import type { GraphSnapshot } from '../../../domain/canvas/model/graph'
+import type { GenerationContextAsset } from '../../../domain/canvas/model/node'
 import { toWorldRectInGraph } from '../../../domain/canvas/geometry/coords'
 import { createId } from '../../../shared/id'
 import type { CanvasStore } from '../../../state/workbenches/canvas/store'
@@ -81,6 +82,10 @@ export function applyAgentPlan(
       type: AgentPlan['nodes'][number]['type'],
       node: AgentPlan['nodes'][number],
     ) => Record<string, unknown>
+    contextAssetsFor?: (
+      type: AgentPlan['nodes'][number]['type'],
+      node: AgentPlan['nodes'][number],
+    ) => readonly GenerationContextAsset[] | undefined
     viewportWorld?: Rect
   },
 ): ApplyAgentPlanResult {
@@ -95,6 +100,7 @@ export function applyAgentPlan(
     newId: () => createId('node'),
     ...(opts?.dataFor ? { dataFor: opts.dataFor } : {}),
     ...(opts?.explicitFor ? { explicitFor: opts.explicitFor } : {}),
+    ...(opts?.contextAssetsFor ? { contextAssetsFor: opts.contextAssetsFor } : {}),
   })
 
   // 一次 dispatch = 一个 standalone 事务 = 一次撤销全回退

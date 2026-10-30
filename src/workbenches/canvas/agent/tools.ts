@@ -9,6 +9,7 @@ import {
 import type { ToolDeclaration } from '../../../domain/shared/execution/types'
 import type { CanvasStore } from '../../../state/workbenches/canvas/store'
 import type { GraphSnapshot } from '../../../domain/canvas/model/graph'
+import type { GenerationContextAsset } from '../../../domain/canvas/model/node'
 import type { Rect } from '../../../domain/agent/landing'
 import { downstreamOf } from '../../../domain/canvas/graph/upstreamOf'
 import { canBuildRequest } from '../../../features/canvas/execution/buildRunPlan'
@@ -877,6 +878,11 @@ export interface AgentToolContext {
     type: AgentNodeType,
     node: { data: Record<string, unknown> },
   ) => { channelId: string; model: string } | undefined
+  /** 当前项目套件里带角色的图片；只写入新建生成节点，供最终生图模型直接读取。 */
+  contextAssetsForGenerated?: (
+    type: AgentNodeType,
+    node: { data: Record<string, unknown> },
+  ) => readonly GenerationContextAsset[] | undefined
   /**
    * 逻辑模型 → 能提供它的渠道。`updateNode` 只接受用户点选的模型，
    * 渠道必须和创建面板一样由系统反查，不能让模型自己填。
@@ -1613,6 +1619,12 @@ export async function executeConfirmedTool(
                 const picked = ctx.explicitRecipeForGenerated?.(type, node)
                 return picked ? { channelId: picked.channelId, model: picked.model } : {}
               },
+            }
+          : {}),
+        ...(ctx.contextAssetsForGenerated
+          ? {
+              contextAssetsFor: (type: AgentNodeType, node: AgentPlan['nodes'][number]) =>
+                ctx.contextAssetsForGenerated?.(type, node),
             }
           : {}),
         ...(ctx.viewportWorld ? { viewportWorld: ctx.viewportWorld } : {}),

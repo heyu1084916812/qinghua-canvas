@@ -324,6 +324,9 @@ describe('context repository', () => {
       { kitId: custom.kit.id, version: 1 },
     ])
     expect(bundle.assetHashes).toEqual(['role-main'])
+    expect(bundle.assets).toEqual([
+      { hash: 'role-main', role: 'logo', name: '角色定妆图' },
+    ])
     expect(bundle.hardConstraints.join('\n')).toContain('橙色雨衣')
     expect(bundle.hardConstraints.join('\n')).toContain('左侧留白')
   })

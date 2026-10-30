@@ -93,6 +93,7 @@ import { SkillMenu } from './SkillMenu'
 import { MentionRichText } from './MentionRichText'
 import { runWaves } from '../../../../domain/canvas/graph/runWaves'
 import type { RunRecord } from '../../../../domain/canvas/model/runRecord'
+import type { GenerationContextAsset } from '../../../../domain/canvas/model/node'
 import { parseSkillMarkdown } from '../../../../domain/prompt/skill'
 import { useCanvasExecution } from '../../execution/CanvasExecutionProvider'
 import { useCanvasStore, useGraph, useSelection } from '../../storeContext'
@@ -680,7 +681,7 @@ export function AgentPanel({
         digest: string
         memoryRefs: { id: string; revision: number }[]
         kitVersionRefs: { kitId: string; version: number }[]
-        assetRefs: { hash: string; mime: string }[]
+        assetRefs: (GenerationContextAsset & { mime: string })[]
         brief?: string
       }
     >(),
@@ -1143,6 +1144,9 @@ export function AgentPanel({
           problem.includes('无法运行：')
             ? problem.slice(problem.indexOf('无法运行：') + '无法运行：'.length)
             : problem
+        const contextAssets = (
+          contextTraceRef.current.get(sessionId)?.assetRefs ?? []
+        ).filter((asset) => asset.mime.startsWith('image/'))
         const waves = runWaves(ids, store.getSnapshot().edges)
         setRunTasksFor(
           sessionId,
@@ -1201,6 +1205,7 @@ export function AgentPanel({
                 await execution.runNode(id, {
                   signal:
                     signal ?? abortRefs.current.get(sessionId)?.signal,
+                  ...(contextAssets.length > 0 ? { contextAssets } : {}),
                 })
                 setRunTasksFor(sessionId, (current) =>
                   finishAgentRunTask(current, id, { ok: true }),
@@ -1357,6 +1362,11 @@ export function AgentPanel({
         if (!model) return undefined
         const channelId = channelIdForLogical(enabled, model, current?.channelId)
         return { channelId: channelId ?? '', model }
+      },
+      contextAssetsForGenerated: (type) => {
+        if (type !== 'generation') return undefined
+        const assets = contextTraceRef.current.get(sessionId)?.assetRefs ?? []
+        return assets.filter((asset) => asset.mime.startsWith('image/'))
       },
       channelIdForModel: (model) => channelIdForLogical(enabled, model),
       /**
@@ -2213,13 +2223,20 @@ export function AgentPanel({
         kitVersionRefs: bundle.kitVersionRefs,
         assetRefs: (
           await Promise.all(
-            bundle.assetHashes.map(async (hash) => {
-              const payload = await platform.assets.read(hash).catch(() => null)
-              return payload ? { hash, mime: payload.mime } : null
+            bundle.assets.map(async (asset) => {
+              const payload = await platform.assets.read(asset.hash).catch(() => null)
+              return payload
+                ? {
+                    hash: asset.hash,
+                    mime: payload.mime,
+                    role: asset.role,
+                    name: asset.name,
+                  }
+                : null
             }),
           )
         ).filter(
-          (asset): asset is { hash: string; mime: string } => asset !== null,
+          (asset): asset is GenerationContextAsset => asset !== null,
         ),
       })
       if (bundle.conflicts.length > 0) {

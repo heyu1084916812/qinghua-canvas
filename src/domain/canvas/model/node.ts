@@ -62,8 +62,23 @@ export interface PromptData {
  */
 export const GENERATION_ASSET_MIME = 'image/png'
 
+/**
+ * 项目套件里随生成节点一起保存的视觉输入。
+ *
+ * 它必须落在节点数据里，而不是只放在 Agent 的对话上下文里：对话模型看过 Logo，
+ * 不代表最终生图模型也收到了 Logo。保存 hash 后，后续点节点自身生成仍会带上同一批素材。
+ */
+export interface GenerationContextAsset {
+  hash: string
+  mime: string
+  role: 'logo' | 'reference'
+  name: string
+}
+
 export interface GenerationData {
   mode: 'image' | 'video'
+  /** 项目品牌 / 产品套件素材；按 Logo 优先、再 Reference 的顺序进入图片输入。 */
+  contextAssets?: GenerationContextAsset[]
   assetHash?: string
   /**
    * 节点当前产物的真实 MIME。

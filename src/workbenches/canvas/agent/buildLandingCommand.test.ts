@@ -56,6 +56,33 @@ describe('buildLandingCommand', () => {
     expect(r.command.nodes[0]!.title).toBeTruthy()
   })
 
+  it('★ 品牌套件图片写入新建生成节点，不写提示词节点', () => {
+    seq = 0
+    const plan: AgentPlan = {
+      summary: '品牌目录页',
+      nodes: [
+        { localId: 'p1', type: 'prompt', data: { text: '车载宠物窝目录页' }, order: 0 },
+        { localId: 'g1', type: 'generation', data: {}, order: 1 },
+      ],
+      edges: [{ source: 'p1', target: 'g1' }],
+    }
+    const contextAssets = [
+      { hash: 'logo-hash', mime: 'image/png', role: 'logo' as const, name: 'Sogami Logo' },
+      { hash: 'ref-hash', mime: 'image/jpeg', role: 'reference' as const, name: '目录参考' },
+    ]
+    const r = buildLandingCommand({
+      plan,
+      graph: graph(),
+      origin: { x: 0, y: 0 },
+      newId,
+      contextAssetsFor: (type) => (type === 'generation' ? contextAssets : undefined),
+    })
+    const prompt = r.command.nodes.find((node) => node.type === 'prompt')
+    const generation = r.command.nodes.find((node) => node.type === 'generation')
+    expect(prompt?.data).not.toHaveProperty('contextAssets')
+    expect(generation?.data).toMatchObject({ contextAssets })
+  })
+
   it('纯新建计划按当前视口的世界包围盒居中', () => {
     seq = 0
     const plan: AgentPlan = {

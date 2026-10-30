@@ -137,6 +137,8 @@ export interface ContextBundle {
   kitVersionRefs: { kitId: string; version: number }[]
   /** 当前项目绑定版本引用的素材；字节仍在 assets，由执行层读取。 */
   assetHashes: string[]
+  /** 带 Logo / Reference 角色的素材顺序；生图请求按这个顺序附参考图。 */
+  assets: ContextKitAsset[]
   budget: {
     maxMemoryChars: number
     usedMemoryChars: number
@@ -530,6 +532,24 @@ export function assembleContextBundle(input: {
   const procedures = input.skill?.content.trim()
     ? [`技能：${input.skill.name}\n${input.skill.content.trim()}`]
     : []
+  const assets: ContextKitAsset[] = []
+  const seenAssetHashes = new Set<string>()
+  for (const version of selectedVersions) {
+    for (const resource of version.resources) {
+      if (!resource.hash || seenAssetHashes.has(resource.hash)) continue
+      seenAssetHashes.add(resource.hash)
+      assets.push(resource)
+    }
+    for (const hash of version.assetHashes) {
+      if (!hash || seenAssetHashes.has(hash)) continue
+      seenAssetHashes.add(hash)
+      assets.push({ hash, role: 'reference', name: '' })
+    }
+  }
+  assets.sort((left, right) => {
+    if (left.role === right.role) return 0
+    return left.role === 'logo' ? -1 : 1
+  })
   const stable = {
     request: input.request.trim(),
     scope: input.scope,
@@ -549,6 +569,7 @@ export function assembleContextBundle(input: {
     assetHashes: [
       ...new Set(selectedVersions.flatMap((version) => version.assetHashes)),
     ],
+    assets,
     budget: {
       maxMemoryChars,
       usedMemoryChars,
@@ -582,11 +603,18 @@ export function formatContextBundleForPrompt(bundle: ContextBundle): string {
     parts.push(['## 工作流程', ...bundle.procedures].join('\n'))
   }
   if (bundle.assetHashes.length > 0) {
+    const assetLines = bundle.assets.map((asset, index) => {
+      const label = asset.name.trim() ? `「${asset.name.trim()}」` : ''
+      return asset.role === 'logo'
+        ? `- 第 ${index + 1} 张是品牌 Logo${label}，生成时必须按原图保留字形、比例、颜色和标志结构。`
+        : `- 第 ${index + 1} 张是品牌参考素材${label}，只用于核对视觉规范，不复制无关内容。`
+    })
     parts.push(
       [
         '## 套件参考素材',
         `本轮附带 ${bundle.assetHashes.length} 张品牌 / 产品 / 角色 / 自定义套件素材。`,
         '先用这些素材核对标志、产品结构、角色身份和视觉规范，再写生成提示词。',
+        ...assetLines,
       ].join('\n'),
     )
   }

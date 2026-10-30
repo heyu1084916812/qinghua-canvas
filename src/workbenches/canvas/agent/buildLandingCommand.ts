@@ -7,7 +7,11 @@ import {
   type Rect,
 } from '../../../domain/agent/landing'
 import type { AgentNodeType, AgentPlan } from '../../../domain/agent/plan'
-import type { NodeData, NodeSnapshot } from '../../../domain/canvas/model/node'
+import type {
+  GenerationContextAsset,
+  NodeData,
+  NodeSnapshot,
+} from '../../../domain/canvas/model/node'
 import { getSpec } from '../../../domain/canvas/nodeSpecs/registry'
 import { toWorldRectInGraph } from '../../../domain/canvas/geometry/coords'
 import { RECIPE_TRACKED_KEYS } from '../../../domain/project/generationPreset'
@@ -73,6 +77,14 @@ export interface BuildLandingInput {
     type: AgentNodeType,
     node: AgentPlan['nodes'][number],
   ) => Record<string, unknown>
+  /**
+   * 当前项目套件素材。只写进新建的生成节点，不修改 attach 复用的旧节点。
+   * 这是系统级视觉约束，必须压过模型计划里的同名字段。
+   */
+  contextAssetsFor?: (
+    type: AgentNodeType,
+    node: AgentPlan['nodes'][number],
+  ) => readonly GenerationContextAsset[] | undefined
 }
 
 export interface LandingPayload {
@@ -333,6 +345,12 @@ export function buildLandingCommand(input: BuildLandingInput): LandingPayload {
         ...recipeFromAttached({ plan, graph, node }),
         ...nonEmptyPlannedData(node.data),
         ...(input.explicitFor?.(node.type, node) ?? {}),
+        ...(node.type === 'generation'
+          ? (() => {
+              const contextAssets = input.contextAssetsFor?.(node.type, node)
+              return contextAssets && contextAssets.length > 0 ? { contextAssets } : {}
+            })()
+          : {}),
       } as NodeData,
     })
   }

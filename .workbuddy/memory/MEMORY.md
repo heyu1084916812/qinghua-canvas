@@ -10570,3 +10570,16 @@ React 端口 → `invoke` → Rust `check_update` → updater 插件读配置 �
   被最大化的窗口 / 收起侧栏，不是页面回归。
 - **0.1.11 产物**：`release/0.1.11/qinghua_0.1.11_x64-setup.exe`，`43,770,231 B`，
   SHA-256 `B0A041DF87D90C3C4062ACD59617AEBE46B3403B81F27DEBD965A48AE15C1046`。
+
+### Agent 短提示词高度与品牌 Logo 生图链路（2026-10-30，对账 #830）
+
+- **自动增高只保底一行**：contenteditable 的 `min-height: 1lh`，面板和提示词分区都不能再有固定
+  360px / 72px 下限。否则短提示词下面会出现一整块看起来像输入框错误的高度。
+- **品牌套件不能只给 Agent 看**：`ContextBundle.assets` 必须保留 `logo / reference` 角色。
+  对话视觉输入和最终生图输入是两条请求；只在 Agent 侧附图，生图模型仍会按文字重画近似 Logo。
+- **两类节点分开处理**：新 Agent 节点把快照写进 `GenerationData.contextAssets`，之后重跑沿用；
+  旧 Agent 节点由当前 Agent 回合通过 `buildRunPlan.contextAssets` 临时注入。手建节点直接运行
+  仍保持不在无条件下发套件图片的产品边界。
+- **请求顺序是 Logo 优先、再 Reference、再用户上游图**，hash 去重；最终提示词显式要求 Logo
+  保留原字形、比例、颜色和标志结构。全量 Vitest **3645 passed / 1 skipped**。真实浏览器四组几何通过：
+  `1440×900 / 1024×700`、明暗主题，单行编辑器设计高 32px（屏幕 24px），无页面异常。

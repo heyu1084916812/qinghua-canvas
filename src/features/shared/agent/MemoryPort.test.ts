@@ -17,6 +17,7 @@ const bundle: ContextBundle = {
   memoryRefs: [],
   kitVersionRefs: [],
   assetHashes: [],
+  assets: [],
   budget: {
     maxMemoryChars: 12000,
     usedMemoryChars: 0,

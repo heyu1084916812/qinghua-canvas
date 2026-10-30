@@ -25,6 +25,11 @@
   user-select: text;
 }
 
+/* 自动增高模式只保底一行；不能沿用对话窗固定 44px 的点击区。 */
+.editor[data-auto-grow='true'] {
+  min-height: 1lh;
+}
+
 /*
  * contenteditable 没有 placeholder，用伪元素顶一个。
  *

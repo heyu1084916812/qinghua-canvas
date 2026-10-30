@@ -10,6 +10,37 @@ import { generationParams } from './params'
 import { presetPromptSuffix } from '../layout/presets'
 import { nodeContentUsable } from '../execution/disabledNode'
 
+function contextAssetInputs(data: GenerationData): NodeInput[] {
+  return (data.contextAssets ?? []).flatMap((asset) => {
+    const hash = asset.hash.trim()
+    if (!hash || !asset.mime.startsWith('image/')) return []
+    return [{
+      kind: 'asset' as const,
+      nodeId: `context-kit:${hash}`,
+      assetHash: hash,
+      mime: asset.mime,
+    }]
+  })
+}
+
+function contextAssetPrompt(data: GenerationData): string {
+  const assets = (data.contextAssets ?? []).filter(
+    (asset) => asset.hash.trim() && asset.mime.startsWith('image/'),
+  )
+  if (assets.length === 0) return ''
+  const logoIndex = assets.findIndex((asset) => asset.role === 'logo')
+  const lines = [
+    '品牌素材约束：',
+    logoIndex >= 0
+      ? `第 ${logoIndex + 1} 张随附图片是品牌 Logo${
+          assets[logoIndex]!.name.trim() ? `「${assets[logoIndex]!.name.trim()}」` : ''
+        }，必须按原图保留字形、比例、颜色和标志结构，不得重画或改成相似字样。`
+      : '随附品牌素材中的标志必须按原图使用，不得重画或改成相似字样。',
+    '其余随附品牌素材用于核对颜色、字体气质、版式语言和画面规范，不要照抄无关内容。',
+  ]
+  return lines.join('\n')
+}
+
 /**
  * 生成节点规格。
  *
@@ -47,6 +78,16 @@ export const generationSpec: NodeSpec<GenerationData> = {
     const index = indexNodes(graph.nodes)
     const hidden = new Set(node.data.upstreamHidden ?? [])
     const inputs: NodeInput[] = []
+    const seenAssetHashes = new Set<string>()
+    /**
+     * 套件素材必须是生图请求的真实图片输入，并排在用户上游素材之前：
+     * Logo 正确性不能只靠文字描述，否则模型会照着名字重画一个近似标志。
+     */
+    for (const input of contextAssetInputs(node.data)) {
+      if (input.kind !== 'asset' || seenAssetHashes.has(input.assetHash)) continue
+      seenAssetHashes.add(input.assetHash)
+      inputs.push(input)
+    }
     for (const id of directUpstream(node.id, graph.edges)) {
       if (hidden.has(id)) continue
       const upstream = index.get(id)
@@ -84,6 +125,8 @@ export const generationSpec: NodeSpec<GenerationData> = {
           inputs.push({ kind: 'text', nodeId: upstream.id, text: round.__roundPrompt })
         }
         for (const hash of round.__roundAssets ?? []) {
+          if (seenAssetHashes.has(hash)) continue
+          seenAssetHashes.add(hash)
           inputs.push({ kind: 'asset', nodeId: upstream.id, assetHash: hash, mime: GENERATION_ASSET_MIME })
         }
         continue
@@ -95,6 +138,8 @@ export const generationSpec: NodeSpec<GenerationData> = {
       const upData = upstream.data as GenerationData
       const hash = upData.assetHash
       if (hash) {
+        if (seenAssetHashes.has(hash)) continue
+        seenAssetHashes.add(hash)
         inputs.push({
           kind: 'asset',
           nodeId: upstream.id,
@@ -134,7 +179,11 @@ export const generationSpec: NodeSpec<GenerationData> = {
      * 先描述画面，再给输出规格 —— 与批量节点「统一要求在尾部」同一条读法。
      * 拼接规则只有 `presets.ts` 一处，三种生成节点类型共用。
      */
-    const prompt = [data.prompt.trim() || upstreamText.trim(), presetPromptSuffix(data)]
+    const prompt = [
+      data.prompt.trim() || upstreamText.trim(),
+      presetPromptSuffix(data),
+      contextAssetPrompt(data),
+    ]
       .filter(Boolean)
       .join('\n')
     if (!prompt) return null

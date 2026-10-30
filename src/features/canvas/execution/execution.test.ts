@@ -150,6 +150,34 @@ describe('buildRunPlan（单点生成）', () => {
     expect(plan.tasks[0]!.slot).toEqual({ kind: 'reuse', nodeId: genId })
   })
 
+  it('★★ Agent 临时品牌素材进入旧生成节点请求，Logo 作为第 1 张图并附硬约束', () => {
+    const { store, promptId, genId } = setup()
+    const contextAssets = [
+      { hash: 'logo-hash', mime: 'image/png', role: 'logo' as const, name: 'Sogami Logo' },
+      { hash: 'ref-hash', mime: 'image/jpeg', role: 'reference' as const, name: '目录参考' },
+    ]
+    const plan = buildRunPlan(
+      'node',
+      { originNodeId: promptId },
+      store.getSnapshot(),
+      'single',
+      { contextAssets },
+    )
+    expect(plan.tasks).toHaveLength(1)
+    expect(plan.tasks[0]!.request.inputs.slice(0, 2)).toEqual([
+      { kind: 'asset', nodeId: 'context-kit:logo-hash', assetHash: 'logo-hash', mime: 'image/png' },
+      { kind: 'asset', nodeId: 'context-kit:ref-hash', assetHash: 'ref-hash', mime: 'image/jpeg' },
+    ])
+    expect(plan.tasks[0]!.request.inputs.at(-1)).toMatchObject({
+      kind: 'text',
+      nodeId: 'n-prompt',
+      text: PROMPT_TEXT,
+    })
+    expect(plan.tasks[0]!.request.prompt).toContain('第 1 张随附图片是品牌 Logo「Sogami Logo」')
+    expect(plan.tasks[0]!.request.prompt).toContain('不得重画或改成相似字样')
+    expect(dataOf(store, genId)).not.toHaveProperty('contextAssets')
+  })
+
   it('★ 已运行中的空下游节点不再被第二条计划复用', () => {
     const { store, promptId, genId } = setup()
     const plan = buildRunPlan(

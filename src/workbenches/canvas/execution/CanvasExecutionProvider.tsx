@@ -30,7 +30,10 @@ import {
 import type { LoopData } from '../../../domain/canvas/model/node'
 import { directDownstream } from '../../../domain/canvas/graph/upstreamOf'
 import type { GraphSnapshot } from '../../../domain/canvas/model/graph'
-import type { NodeSnapshot } from '../../../domain/canvas/model/node'
+import type {
+  GenerationContextAsset,
+  NodeSnapshot,
+} from '../../../domain/canvas/model/node'
 import { generatedNodeTitle } from '../../../domain/canvas/naming/autoTitle'
 import { createCanvasPlacement } from '../../../features/canvas/execution/canvasPlacement'
 import { fuseNode } from '../../../features/canvas/execution/fuseNode'
@@ -110,7 +113,12 @@ export interface CanvasExecutionApi {
    */
   runNode(
     nodeId: string,
-    opts?: { alt?: boolean; inPlace?: boolean; signal?: AbortSignal },
+    opts?: {
+      alt?: boolean
+      inPlace?: boolean
+      signal?: AbortSignal
+      contextAssets?: readonly GenerationContextAsset[]
+    },
   ): Promise<void>
   /** 把一个分组的成员作为一个子图规划并运行；不会逐节点绕过上游依赖。 */
   runGroup(memberIds: readonly string[]): Promise<void>
@@ -912,7 +920,11 @@ export function CanvasExecutionProvider({
    *    报错也难定位。停下来并如实说明。
    */
   const runLoop = useCallback(
-    async (loopNode: NodeSnapshot<LoopData>, graph: GraphSnapshot) => {
+    async (
+      loopNode: NodeSnapshot<LoopData>,
+      graph: GraphSnapshot,
+      contextAssets?: readonly GenerationContextAsset[],
+    ) => {
       const rounds = planLoopRounds(
         loopNode,
         loopUpstreamAssets(loopNode, graph),
@@ -998,6 +1010,7 @@ export function CanvasExecutionProvider({
              */
             const plan = buildRunPlan('node', { originNodeId: nodeId }, fresh, 'single-alt', {
               reservedNodeIds: activeRunNodeIds(),
+              ...(contextAssets?.length ? { contextAssets } : {}),
             })
             if (plan.tasks.length === 0) continue
             allTasks.push(...plan.tasks)
@@ -1353,7 +1366,12 @@ export function CanvasExecutionProvider({
   const runNode = useCallback(
     async (
       nodeId: string,
-      opts?: { alt?: boolean; inPlace?: boolean; signal?: AbortSignal },
+      opts?: {
+        alt?: boolean
+        inPlace?: boolean
+        signal?: AbortSignal
+        contextAssets?: readonly GenerationContextAsset[]
+      },
     ) => {
       let graph = store.getSnapshot()
       const node = graph.nodes.find((n) => n.id === nodeId)
@@ -1372,7 +1390,11 @@ export function CanvasExecutionProvider({
        *  - 串行天然成立（一轮 await 完再下一轮）。
        */
       if (node?.type === 'loop') {
-        await runLoop(node as NodeSnapshot<LoopData>, graph)
+        await runLoop(
+          node as NodeSnapshot<LoopData>,
+          graph,
+          opts?.contextAssets,
+        )
         return
       }
 
@@ -1536,7 +1558,10 @@ export function CanvasExecutionProvider({
             { originNodeId: target.id },
             graph,
             'single',
-            { reservedNodeIds: activeRunNodeIds() },
+            {
+              reservedNodeIds: activeRunNodeIds(),
+              ...(opts?.contextAssets?.length ? { contextAssets: opts.contextAssets } : {}),
+            },
           )
           if (plan.tasks.length === 0) {
             explainEmptyPlan(target.id)
@@ -1555,6 +1580,7 @@ export function CanvasExecutionProvider({
         {
           reuseOriginNode: opts?.inPlace === true,
           reservedNodeIds: activeRunNodeIds(),
+          ...(opts?.contextAssets?.length ? { contextAssets: opts.contextAssets } : {}),
         },
       )
       if (plan.tasks.length === 0) {

@@ -504,6 +504,7 @@ export const MentionEditor = forwardRef<
       role="textbox"
       aria-multiline="true"
       aria-label={label}
+      data-auto-grow={autoGrow ? 'true' : undefined}
       data-placeholder={placeholder}
       {...anchorAttr}
       onBlur={onBlur}

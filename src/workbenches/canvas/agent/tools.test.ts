@@ -1,6 +1,6 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest'
 import { registerAllSpecs } from '../../../domain/canvas/nodeSpecs'
-import type { AgentPlan } from '../../../domain/agent/plan'
+import type { AgentNodeType, AgentPlan } from '../../../domain/agent/plan'
 import { AGENT_TOOL_DEFINITIONS } from '../../../domain/agent/toolRegistry'
 import { createMemoryPlatform } from '../../../platform/memory'
 import { createCanvasStore, type CanvasStore } from '../../../state/workbenches/canvas/store'
@@ -584,6 +584,47 @@ describe('写 / 花钱的工具（只由确认后调用）', () => {
     expect(gen.channelId).toBe('ch-1')
     expect(gen.model).toBe('relay-img')
     expect(gen.ratio).toBe('16:9')
+  })
+
+  it('★★ 品牌套件素材随 applyPlan 写进生成节点，最终请求可直接读取', async () => {
+    const { store } = setup()
+    const contextAssets = [
+      { hash: 'logo-hash', mime: 'image/png', role: 'logo' as const, name: 'Sogami Logo' },
+      { hash: 'ref-hash', mime: 'image/jpeg', role: 'reference' as const, name: '目录参考' },
+    ]
+    const ctx: AgentToolContext = {
+      store,
+      origin: { x: 0, y: 0 },
+      runNodes: vi.fn(async () => []),
+      defaultsForNewNode: vi.fn(async () => ({
+        generation: { channelId: 'ch-1', model: 'relay-img' },
+      })),
+      contextAssetsForGenerated: (type: AgentNodeType) =>
+        type === 'generation' ? contextAssets : undefined,
+    } as unknown as AgentToolContext
+
+    const result = (await executeConfirmedTool(
+      'applyPlan',
+      {
+        summary: 'Sogami 品牌目录页',
+        nodes: [
+          {
+            localId: 'g1',
+            type: 'generation',
+            data: { mode: 'image', prompt: '为 Sogami 设计目录页' },
+            order: 0,
+          },
+        ],
+        edges: [],
+      },
+      ctx,
+    )) as { ok: boolean }
+
+    expect(result.ok).toBe(true)
+    const generation = store
+      .getSnapshot()
+      .nodes.find((node) => node.type === 'generation')
+    expect(generation?.data).toMatchObject({ contextAssets })
   })
 
   /**
