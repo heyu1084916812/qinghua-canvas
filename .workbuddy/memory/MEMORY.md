@@ -10565,6 +10565,8 @@ React 端口 → `invoke` → Rust `check_update` → updater 插件读配置 �
   必须先正常退出托盘进程，再验证 `1420 / 18765 / 18766` 无监听。
 - **最终门禁口径**：Vitest **3640 passed / 1 skipped**、shared-store Rust **41 passed**、
   src-tauri Rust **53 passed**、`npm run check` / `npm run build` / `git diff --check` 全过；
-  release 壳隔离真机自检 **11/11**，签名 Ed25519 真验签通过。
+  release 壳隔离真机自检 **11/11**，真实 Tauri WebView 三视口 UI-freeze 几何与运行时全过，
+  签名 Ed25519 真验签通过。UI-freeze 必须先准备精确视口和项目树行，否则失败反映的是
+  被最大化的窗口 / 收起侧栏，不是页面回归。
 - **0.1.11 产物**：`release/0.1.11/qinghua_0.1.11_x64-setup.exe`，`43,770,231 B`，
   SHA-256 `B0A041DF87D90C3C4062ACD59617AEBE46B3403B81F27DEBD965A48AE15C1046`。
