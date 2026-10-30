@@ -1144,7 +1144,7 @@ fn handle(backends: Arc<RwLock<Arc<dyn StoreBackend>>>, mut request: Request) {
             return Ok(json!({
                 "ok": true,
                 "service": "qinghua-shared-store",
-                "version": 7,
+                "version": 8,
                 "backend": store.kind(),
                 "maintenance": store.in_maintenance(),
                 "dataDir": store.root().to_string_lossy(),
@@ -1583,6 +1583,30 @@ mod tests {
                 vec![row]
             );
         }
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn agent_message_table_filters_by_session() {
+        let root = temp_root("agent-messages");
+        let row = json!({
+            "id": "chat-1::message::000000",
+            "projectId": "p1",
+            "sessionId": "chat-1",
+            "sequence": 0,
+            "message": { "role": "user", "content": "hello" },
+            "updatedAt": 1
+        });
+        write_row(&root, "agentMessages", &row).unwrap();
+        assert_eq!(
+            query_rows(
+                &root,
+                "agentMessages",
+                &Map::from_iter([("sessionId".to_string(), Value::String("chat-1".to_string()))])
+            )
+            .unwrap(),
+            vec![row]
+        );
         let _ = fs::remove_dir_all(root);
     }
 

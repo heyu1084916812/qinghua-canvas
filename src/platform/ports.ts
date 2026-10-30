@@ -35,6 +35,12 @@ export type TableName =
    * 那是 UI 偏好表，而会话历史会一直增长，混进去会把偏好表撑大。
    */
   | 'agentSessions'
+  /**
+   * Agent 消息正文。与 `agentSessions` 的元数据分表，列表页不再携带整段历史。
+   *
+   * 一行 = 一条消息；`sessionId` + `sequence` 是稳定排序键。
+   */
+  | 'agentMessages'
   /** Agent 任务生命周期；与消息历史分开，避免用会话行冒充任务状态机。 */
   | 'agentJobs'
   /** Agent 任务不可变事件流水；按 jobId + seq 追加。 */
@@ -92,6 +98,8 @@ export type TableName =
    * 预览图与视频始终走原始外链（用户明确说过「同步本地太大了，因为里面还有视频」）。
    */
   | 'inspirationCache'
+  /** 数据层一次性迁移完成标记；不参与备份和项目级联。 */
+  | 'storageMigrations'
 
 export interface Row {
   id: string

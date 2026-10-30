@@ -39,6 +39,7 @@ export interface ContextRepository {
     key?: string
     expiresAt?: number
     source?: ContextMemorySource
+    sourceSessionId?: string
     confidence?: number
     replaceMemoryId?: string
   }): Promise<ContextMemory>
@@ -54,12 +55,18 @@ export interface ContextRepository {
       key?: string | null
       expiresAt?: number | null
       source?: ContextMemorySource
+      sourceSessionId?: string | null
       confidence?: number
     },
   ): Promise<ContextMemory | null>
   setMemoryEnabled(id: string, enabled: boolean): Promise<ContextMemory | null>
   removeMemory(id: string): Promise<void>
   purgeExpiredMemories(now?: number): Promise<number>
+  /** 记录记忆被真实注入上下文的次数；不产生正文修订。 */
+  recordMemoryUsage(
+    refs: readonly { id: string; revision: number }[],
+    usedAt?: number,
+  ): Promise<void>
   listKits(kind?: ContextKitKind): Promise<ContextKit[]>
   createKit(input: {
     kind: ContextKitKind
@@ -219,6 +226,12 @@ function memoryOf(row: RowOf<'contextMemories'>): ContextMemory {
   const expiresAt = finiteNumber(row.expiresAt)
   const source = row.source === 'agent' ? 'agent' : 'user'
   const confidence = confidenceOf(row.confidence)
+  const sourceSessionId = textOf(row.sourceSessionId)
+  const useCount =
+    typeof row.useCount === 'number' && Number.isFinite(row.useCount) && row.useCount > 0
+      ? Math.trunc(row.useCount)
+      : 0
+  const lastUsedAt = finiteNumber(row.lastUsedAt)
   return {
     id: String(row.id),
     kind: normalizeContextMemoryKind(row.kind),
@@ -229,7 +242,10 @@ function memoryOf(row: RowOf<'contextMemories'>): ContextMemory {
       : {}),
     ...(expiresAt !== undefined && expiresAt > 0 ? { expiresAt } : {}),
     source,
+    ...(sourceSessionId ? { sourceSessionId } : {}),
     confidence,
+    ...(useCount > 0 ? { useCount } : {}),
+    ...(lastUsedAt !== undefined && lastUsedAt > 0 ? { lastUsedAt } : {}),
     enabled: row.enabled !== false,
     currentRevision:
       typeof row.currentRevision === 'number' && row.currentRevision > 0
@@ -259,6 +275,9 @@ function memoryRevisionOf(
       : {}),
     ...(expiresAt !== undefined && expiresAt > 0 ? { expiresAt } : {}),
     source: row.source === 'agent' ? 'agent' : 'user',
+    ...(textOf(row.sourceSessionId)
+      ? { sourceSessionId: textOf(row.sourceSessionId) }
+      : {}),
     confidence: confidenceOf(row.confidence),
     createdAt: Number(row.createdAt ?? 0),
   }
@@ -461,6 +480,11 @@ export function createContextRepository(storage: StoragePort): ContextRepository
               : { expiresAt: undefined }
             : {}),
           ...(patch.source ? { source: patch.source } : {}),
+          ...(patch.sourceSessionId !== undefined
+            ? patch.sourceSessionId
+              ? { sourceSessionId: patch.sourceSessionId }
+              : { sourceSessionId: undefined }
+            : {}),
           ...(patch.confidence !== undefined
             ? { confidence: confidenceOf(patch.confidence) }
             : {}),
@@ -490,6 +514,7 @@ export function createContextRepository(storage: StoragePort): ContextRepository
           ...(next.key ? { key: next.key } : {}),
           ...(next.expiresAt ? { expiresAt: next.expiresAt } : {}),
           source: next.source ?? 'user',
+          ...(next.sourceSessionId ? { sourceSessionId: next.sourceSessionId } : {}),
           confidence: next.confidence ?? 1,
           createdAt: next.updatedAt,
         }
@@ -533,6 +558,7 @@ export function createContextRepository(storage: StoragePort): ContextRepository
           key,
           ...(input.expiresAt !== undefined ? { expiresAt: input.expiresAt } : {}),
           source: input.source ?? 'user',
+          ...(input.sourceSessionId ? { sourceSessionId: input.sourceSessionId } : {}),
           confidence: confidenceOf(input.confidence),
         })
         if (!replaced) throw new Error('要替换的记忆已不存在')
@@ -547,6 +573,7 @@ export function createContextRepository(storage: StoragePort): ContextRepository
         key,
         ...(input.expiresAt !== undefined ? { expiresAt: input.expiresAt } : {}),
         source: input.source ?? 'user',
+        ...(input.sourceSessionId ? { sourceSessionId: input.sourceSessionId } : {}),
         confidence: confidenceOf(input.confidence),
       })
       if (!replaced) throw new Error('要替换的记忆已不存在')
@@ -563,6 +590,7 @@ export function createContextRepository(storage: StoragePort): ContextRepository
         ? { expiresAt: Math.trunc(input.expiresAt) }
         : {}),
       source: input.source ?? 'user',
+      ...(input.sourceSessionId ? { sourceSessionId: input.sourceSessionId } : {}),
       confidence: confidenceOf(input.confidence),
       enabled: true,
       currentRevision: 1,
@@ -579,6 +607,7 @@ export function createContextRepository(storage: StoragePort): ContextRepository
       ...(memory.key ? { key: memory.key } : {}),
       ...(memory.expiresAt ? { expiresAt: memory.expiresAt } : {}),
       source: memory.source ?? 'user',
+      ...(memory.sourceSessionId ? { sourceSessionId: memory.sourceSessionId } : {}),
       confidence: memory.confidence ?? 1,
       createdAt: at,
     }
@@ -592,12 +621,33 @@ export function createContextRepository(storage: StoragePort): ContextRepository
     return memory
   }
 
+  const recordMemoryUsage: ContextRepository['recordMemoryUsage'] = async (
+    refs,
+    usedAt = Date.now(),
+  ) => {
+    if (refs.length === 0) return
+    const revisions = new Map(refs.map((ref) => [ref.id, ref.revision]))
+    const memories = await storage.query('contextMemories', {})
+    for (const row of memories) {
+      const expectedRevision = revisions.get(String(row.id))
+      if (expectedRevision === undefined) continue
+      const current = memoryOf(row)
+      if (current.currentRevision !== expectedRevision) continue
+      await storage.put('contextMemories', {
+        ...current,
+        useCount: (current.useCount ?? 0) + 1,
+        lastUsedAt: usedAt,
+      } as never)
+    }
+  }
+
   return {
     listMemories,
     listMemoryRevisions,
     listKits,
     listKitVersions,
     listProjectBindings,
+    recordMemoryUsage,
 
     createMemory: createMemoryImpl,
 
@@ -818,7 +868,7 @@ export function createContextRepository(storage: StoragePort): ContextRepository
             .map((kit) => listKitVersions(kit.id)),
         )
       ).flat()
-      return assembleContextBundle({
+      const bundle = assembleContextBundle({
         request: input.request,
         scope: {
           workbench: input.workbench,
@@ -836,6 +886,8 @@ export function createContextRepository(storage: StoragePort): ContextRepository
           ? { memoryCharBudget: input.memoryCharBudget }
           : {}),
       })
+      await recordMemoryUsage(bundle.memoryRefs).catch(() => undefined)
+      return bundle
     },
   }
 }

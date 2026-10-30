@@ -129,9 +129,16 @@ export interface AgentSession {
 export const AGENT_CONTEXT_WINDOW = 20
 
 export interface AgentSessionStore {
-  /** 列某个项目的会话（新的在前） */
+  /**
+   * 列某个项目的会话。`messages` 在这里固定为空，列表页不再读取消息正文。
+   * 打开会话时用 `get` / `messagesFor` 按会话读取。
+   */
   list(projectId: string): Promise<AgentSession[]>
   get(id: string): Promise<AgentSession | null>
+  /** 按稳定 sequence 读取某个会话的全部消息。 */
+  messagesFor(id: string): Promise<ChatMessage[]>
+  /** 把旧版 `agentSessions.messages` 一次性拆到 `agentMessages`。 */
+  migrateLegacyMessages(): Promise<void>
   create(input: {
     projectId: string
     channelId: string
@@ -215,9 +222,58 @@ export interface AgentSessionStore {
 }
 
 const asMessages = (v: unknown): ChatMessage[] => (Array.isArray(v) ? (v as ChatMessage[]) : [])
+const MESSAGE_SPLIT_MIGRATION_ID = 'agent-messages.split.v1'
+const splitReady = new WeakMap<StoragePort, Promise<void>>()
+
+interface AgentMessageRow extends Record<string, unknown> {
+  id: string
+  sessionId: string
+  projectId: string
+  sequence: number
+  createdAt: number
+  updatedAt: number
+  message: ChatMessage
+}
+
+function messageRow(
+  sessionId: string,
+  projectId: string,
+  sequence: number,
+  message: ChatMessage,
+  now = Date.now(),
+): AgentMessageRow {
+  const createdAt = message.createdAt ?? now
+  return {
+    id: `${sessionId}::message::${String(sequence).padStart(6, '0')}`,
+    sessionId,
+    projectId,
+    sequence,
+    createdAt,
+    updatedAt: createdAt,
+    message,
+  }
+}
+
+function messageOf(row: RowOf<'agentMessages'>): ChatMessage | null {
+  const message = row.message
+  if (!message || typeof message !== 'object') return null
+  const candidate = message as Partial<ChatMessage>
+  if (
+    candidate.role !== 'system' &&
+    candidate.role !== 'user' &&
+    candidate.role !== 'assistant' &&
+    candidate.role !== 'tool'
+  ) {
+    return null
+  }
+  return typeof candidate.content === 'string' ? (candidate as ChatMessage) : null
+}
 
 export function createAgentSessionStore(storage: StoragePort): AgentSessionStore {
-  const toSession = (row: RowOf<'agentSessions'>): AgentSession => {
+  const toSession = (
+    row: RowOf<'agentSessions'>,
+    messages: ChatMessage[] = [],
+  ): AgentSession => {
     const taskPlan = normalizeStoredTaskPlan(row.taskPlan)
     return {
     id: String(row.id),
@@ -280,26 +336,160 @@ export function createAgentSessionStore(storage: StoragePort): AgentSessionStore
         }
       : {}),
     ...(taskPlan ? { taskPlan } : {}),
-    messages: asMessages(row.messages),
+    messages,
     createdAt: Number(row.createdAt ?? 0),
     updatedAt: Number(row.updatedAt ?? 0),
     }
   }
 
+  const sessionRow = (
+    session: AgentSession,
+    updatedAt = Date.now(),
+  ): RowOf<'agentSessions'> => {
+    const { messages: _messages, ...metadata } = session
+    return { ...metadata, updatedAt } as unknown as RowOf<'agentSessions'>
+  }
+
+  const replaceMessages = async (
+    target: StoragePort,
+    sessionId: string,
+    projectId: string,
+    messages: readonly ChatMessage[],
+    now = Date.now(),
+  ): Promise<void> => {
+    const previous = await target.query('agentMessages', { sessionId })
+    for (const row of previous) await target.delete('agentMessages', row.id)
+    if (messages.length === 0) return
+    await target.bulkPut(
+      'agentMessages',
+      messages.map((message, sequence) =>
+        messageRow(sessionId, projectId, sequence, message, now),
+      ) as unknown as RowOf<'agentMessages'>[],
+    )
+  }
+
+  const loadMessages = async (
+    target: StoragePort,
+    id: string,
+  ): Promise<ChatMessage[]> => {
+    const rows = await target.query('agentMessages', { sessionId: id })
+    return rows
+      .sort(
+        (left, right) =>
+          Number(left.sequence ?? 0) - Number(right.sequence ?? 0) ||
+          String(left.id).localeCompare(String(right.id)),
+      )
+      .map(messageOf)
+      .filter((message): message is ChatMessage => message !== null)
+  }
+
+  const loadSession = async (
+    target: StoragePort,
+    id: string,
+  ): Promise<AgentSession | null> => {
+    const rows = await target.query('agentSessions', { id })
+    if (!rows[0]) return null
+    const messages = await loadMessages(target, id)
+    if (rows[0].messages === undefined) {
+      return toSession(rows[0], messages)
+    }
+    const legacyMessages = asMessages(rows[0].messages)
+    const session = toSession(rows[0])
+    await replaceMessages(
+      target,
+      session.id,
+      session.projectId,
+      legacyMessages,
+      session.updatedAt || Date.now(),
+    )
+    await target.put('agentSessions', sessionRow(session, session.updatedAt))
+    return toSession(sessionRow(session, session.updatedAt), legacyMessages)
+  }
+
+  const migrateLegacyMessages = async (): Promise<void> => {
+    const completed = await storage.query('storageMigrations', {
+      id: MESSAGE_SPLIT_MIGRATION_ID,
+    })
+    if (completed[0]?.status === 'complete') return
+
+    await storage.transaction(
+      ['agentSessions', 'agentMessages', 'storageMigrations'],
+      async (tx) => {
+        const marker = await tx.query('storageMigrations', {
+          id: MESSAGE_SPLIT_MIGRATION_ID,
+        })
+        if (marker[0]?.status === 'complete') return
+
+        const sessions = await tx.query('agentSessions', {})
+        let expectedMessages = 0
+        for (const row of sessions) {
+          const session = toSession(row)
+          const messages = asMessages(row.messages)
+          expectedMessages += messages.length
+          await replaceMessages(
+            tx,
+            session.id,
+            session.projectId,
+            messages,
+            session.updatedAt || Date.now(),
+          )
+          await tx.put('agentSessions', sessionRow(session, session.updatedAt))
+        }
+
+        const storedSessions = await tx.query('agentSessions', {})
+        const storedMessages = await tx.query('agentMessages', {})
+        if (storedSessions.some((row) => row.messages !== undefined)) {
+          throw new Error('Agent 消息拆表校验失败：仍有会话携带 messages')
+        }
+        if (storedMessages.length !== expectedMessages) {
+          throw new Error(
+            `Agent 消息拆表校验失败：应为 ${expectedMessages} 条，实际 ${storedMessages.length} 条`,
+          )
+        }
+        await tx.put('storageMigrations', {
+          id: MESSAGE_SPLIT_MIGRATION_ID,
+          status: 'complete',
+          sessionCount: storedSessions.length,
+          messageCount: storedMessages.length,
+          completedAt: Date.now(),
+        } as never)
+      },
+    )
+  }
+
+  const ensureSplit = (): Promise<void> => {
+    const current = splitReady.get(storage)
+    if (current) return current
+    const pending = migrateLegacyMessages().catch((error) => {
+      splitReady.delete(storage)
+      throw error
+    })
+    splitReady.set(storage, pending)
+    return pending
+  }
+
   const find = async (id: string): Promise<AgentSession | null> => {
-    const rows = await storage.query('agentSessions', { id })
-    return rows[0] ? toSession(rows[0]) : null
+    await ensureSplit()
+    return loadSession(storage, id)
   }
 
   return {
     get: find,
+    migrateLegacyMessages: ensureSplit,
+
+    async messagesFor(id) {
+      await ensureSplit()
+      return (await loadSession(storage, id))?.messages ?? []
+    },
 
     async list(projectId) {
+      await ensureSplit()
       const rows = await storage.query('agentSessions', { projectId })
-      return rows.map(toSession).sort((a, b) => b.updatedAt - a.updatedAt)
+      return rows.map((row) => toSession(row)).sort((a, b) => b.updatedAt - a.updatedAt)
     },
 
     async create({ projectId, channelId, model, title, imageModel, videoModel, skillId }) {
+      await ensureSplit()
       const now = Date.now()
       const session: AgentSession = {
         id: createId('chat'),
@@ -316,35 +506,56 @@ export function createAgentSessionStore(storage: StoragePort): AgentSessionStore
         createdAt: now,
         updatedAt: now,
       }
-      await storage.put('agentSessions', session as unknown as RowOf<'agentSessions'>)
+      await storage.put('agentSessions', sessionRow(session, now))
       return session
     },
 
     async save(session) {
-      await storage.put(
-        'agentSessions',
-        { ...session, updatedAt: Date.now() } as unknown as RowOf<'agentSessions'>,
+      await ensureSplit()
+      const now = Date.now()
+      await storage.transaction(
+        ['agentSessions', 'agentMessages'],
+        async (tx) => {
+          await tx.put('agentSessions', sessionRow(session, now))
+          await replaceMessages(
+            tx,
+            session.id,
+            session.projectId,
+            session.messages,
+            now,
+          )
+        },
       )
     },
 
     async updateFields(id, patch) {
-      return storage.transaction(['agentSessions'], async (tx) => {
-        const rows = await tx.query('agentSessions', { id })
-        if (!rows[0]) return null
-        const next = { ...toSession(rows[0]), ...patch, updatedAt: Date.now() }
-        await tx.put('agentSessions', next as unknown as RowOf<'agentSessions'>)
+      await ensureSplit()
+      return storage.transaction(
+        ['agentSessions', 'agentMessages'],
+        async (tx) => {
+        const latest = await loadSession(tx, id)
+        if (!latest) return null
+        const next = { ...latest, ...patch, updatedAt: Date.now() }
+        await tx.put('agentSessions', sessionRow(next, next.updatedAt))
         return next
-      })
+        },
+      )
     },
 
     async saveMessages(id, messages) {
-      return storage.transaction(['agentSessions'], async (tx) => {
+      await ensureSplit()
+      return storage.transaction(
+        ['agentSessions', 'agentMessages'],
+        async (tx) => {
         const rows = await tx.query('agentSessions', { id })
         if (!rows[0]) return null
-        const next = { ...toSession(rows[0]), messages, updatedAt: Date.now() }
-        await tx.put('agentSessions', next as unknown as RowOf<'agentSessions'>)
+        const now = Date.now()
+        const next = { ...toSession(rows[0]), messages, updatedAt: now }
+        await tx.put('agentSessions', sessionRow(next, now))
+        await replaceMessages(tx, id, next.projectId, messages, now)
         return next
-      })
+        },
+      )
     },
 
     async clearPendingAssetIds(id, assetIds) {
@@ -357,7 +568,7 @@ export function createAgentSessionStore(storage: StoragePort): AgentSessionStore
         ...(pending.length > 0 ? { pendingAssetIds: pending } : { pendingAssetIds: undefined }),
         updatedAt: Date.now(),
       }
-      await storage.put('agentSessions', next as unknown as RowOf<'agentSessions'>)
+      await storage.put('agentSessions', sessionRow(next, next.updatedAt))
       return next
     },
 
@@ -367,7 +578,7 @@ export function createAgentSessionStore(storage: StoragePort): AgentSessionStore
       const queued = enqueueAgentTurn(latest.queuedTurns, turn)
       if (!queued.ok) return { ok: false, reason: queued.reason }
       const next = { ...latest, queuedTurns: queued.turns, updatedAt: Date.now() }
-      await storage.put('agentSessions', next as unknown as RowOf<'agentSessions'>)
+      await storage.put('agentSessions', sessionRow(next, next.updatedAt))
       return { ok: true, session: next }
     },
 
@@ -379,31 +590,36 @@ export function createAgentSessionStore(storage: StoragePort): AgentSessionStore
         queuedTurns: removeAgentTurn(latest.queuedTurns, turnId),
         updatedAt: Date.now(),
       }
-      await storage.put('agentSessions', next as unknown as RowOf<'agentSessions'>)
+      await storage.put('agentSessions', sessionRow(next, next.updatedAt))
       return next
     },
 
     async updateQueuedTurnText(id, turnId, text) {
       if (!text.trim()) return find(id)
-      return storage.transaction(['agentSessions'], async (tx) => {
-        const rows = await tx.query('agentSessions', { id })
-        if (!rows[0]) return null
-        const latest = toSession(rows[0])
+      await ensureSplit()
+      return storage.transaction(
+        ['agentSessions', 'agentMessages'],
+        async (tx) => {
+        const latest = await loadSession(tx, id)
+        if (!latest) return null
         const next = {
           ...latest,
           queuedTurns: updateAgentTurnText(latest.queuedTurns, turnId, text),
           updatedAt: Date.now(),
         }
-        await tx.put('agentSessions', next as unknown as RowOf<'agentSessions'>)
+        await tx.put('agentSessions', sessionRow(next, next.updatedAt))
         return next
-      })
+        },
+      )
     },
 
     async promoteQueuedTurnToSteer(id, turnId, steerId) {
-      return storage.transaction(['agentSessions'], async (tx) => {
-        const rows = await tx.query('agentSessions', { id })
-        if (!rows[0]) return { ok: false as const, reason: 'missing' as const }
-        const latest = toSession(rows[0])
+      await ensureSplit()
+      return storage.transaction(
+        ['agentSessions', 'agentMessages'],
+        async (tx) => {
+        const latest = await loadSession(tx, id)
+        if (!latest) return { ok: false as const, reason: 'missing' as const }
         if (latest.pendingConfirmation) {
           return { ok: false as const, reason: 'awaiting_confirmation' as const }
         }
@@ -426,16 +642,19 @@ export function createAgentSessionStore(storage: StoragePort): AgentSessionStore
           queuedTurns: removeAgentTurn(latest.queuedTurns, turnId),
           updatedAt: Date.now(),
         }
-        await tx.put('agentSessions', next as unknown as RowOf<'agentSessions'>)
+        await tx.put('agentSessions', sessionRow(next, next.updatedAt))
         return { ok: true as const, session: next }
-      })
+        },
+      )
     },
 
     async repairConfirmationSteerCollision(id) {
-      return storage.transaction(['agentSessions'], async (tx) => {
-        const rows = await tx.query('agentSessions', { id })
-        if (!rows[0]) return null
-        const latest = toSession(rows[0])
+      await ensureSplit()
+      return storage.transaction(
+        ['agentSessions', 'agentMessages'],
+        async (tx) => {
+        const latest = await loadSession(tx, id)
+        if (!latest) return null
         if (!latest.pendingConfirmation || latest.pendingSteers.length === 0) {
           return null
         }
@@ -486,9 +705,17 @@ export function createAgentSessionStore(storage: StoragePort): AgentSessionStore
           activeTurnStartedAt: undefined,
           updatedAt: Date.now(),
         }
-        await tx.put('agentSessions', next as unknown as RowOf<'agentSessions'>)
+        await tx.put('agentSessions', sessionRow(next, next.updatedAt))
+        await replaceMessages(
+          tx,
+          next.id,
+          next.projectId,
+          next.messages,
+          next.updatedAt,
+        )
         return next
-      })
+        },
+      )
     },
 
     async enqueueSteer(id, steer) {
@@ -501,7 +728,7 @@ export function createAgentSessionStore(storage: StoragePort): AgentSessionStore
         pendingSteers: queued.steers,
         updatedAt: Date.now(),
       }
-      await storage.put('agentSessions', next as unknown as RowOf<'agentSessions'>)
+      await storage.put('agentSessions', sessionRow(next, next.updatedAt))
       return { ok: true, session: next }
     },
 
@@ -513,15 +740,17 @@ export function createAgentSessionStore(storage: StoragePort): AgentSessionStore
         pendingSteers: removeAgentSteers(latest.pendingSteers, steerIds),
         updatedAt: Date.now(),
       }
-      await storage.put('agentSessions', next as unknown as RowOf<'agentSessions'>)
+      await storage.put('agentSessions', sessionRow(next, next.updatedAt))
       return next
     },
 
     async claimNextQueuedTurn(id) {
-      return storage.transaction(['agentSessions'], async (tx) => {
-        const rows = await tx.query('agentSessions', { id })
-        if (!rows[0]) return null
-        const latest = toSession(rows[0])
+      await ensureSplit()
+      return storage.transaction(
+        ['agentSessions', 'agentMessages'],
+        async (tx) => {
+        const latest = await loadSession(tx, id)
+        if (!latest) return null
         if (latest.activeTurnId) return null
         const turn = takeNextAgentTurn(latest.queuedTurns).turn
         if (!turn) return null
@@ -531,16 +760,19 @@ export function createAgentSessionStore(storage: StoragePort): AgentSessionStore
           activeTurnStartedAt: Date.now(),
           updatedAt: Date.now(),
         }
-        await tx.put('agentSessions', session as unknown as RowOf<'agentSessions'>)
+        await tx.put('agentSessions', sessionRow(session, session.updatedAt))
         return { session, turn }
-      })
+        },
+      )
     },
 
     async finishActiveQueuedTurn(id, turnId, completed) {
-      return storage.transaction(['agentSessions'], async (tx) => {
-        const rows = await tx.query('agentSessions', { id })
-        if (!rows[0]) return null
-        const latest = toSession(rows[0])
+      await ensureSplit()
+      return storage.transaction(
+        ['agentSessions', 'agentMessages'],
+        async (tx) => {
+        const latest = await loadSession(tx, id)
+        if (!latest) return null
         if (latest.activeTurnId !== turnId) return latest
         const next = {
           ...latest,
@@ -551,9 +783,10 @@ export function createAgentSessionStore(storage: StoragePort): AgentSessionStore
           activeTurnStartedAt: undefined,
           updatedAt: Date.now(),
         }
-        await tx.put('agentSessions', next as unknown as RowOf<'agentSessions'>)
+        await tx.put('agentSessions', sessionRow(next, next.updatedAt))
         return next
-      })
+        },
+      )
     },
 
     async releaseActiveTurn(id) {
@@ -565,25 +798,27 @@ export function createAgentSessionStore(storage: StoragePort): AgentSessionStore
         activeTurnStartedAt: undefined,
         updatedAt: Date.now(),
       }
-      await storage.put('agentSessions', next as unknown as RowOf<'agentSessions'>)
+      await storage.put('agentSessions', sessionRow(next, next.updatedAt))
       return next
     },
 
     async rename(id, title) {
       const s = await find(id)
       if (!s) return
-      await storage.put(
-        'agentSessions',
-        { ...s, title: title.trim() || s.title, updatedAt: Date.now() } as unknown as RowOf<'agentSessions'>,
-      )
+      const next = { ...s, title: title.trim() || s.title, updatedAt: Date.now() }
+      await storage.put('agentSessions', sessionRow(next, next.updatedAt))
     },
 
     async remove(id) {
       await storage.transaction(
-        ['agentSessions', 'agentJobs', 'agentEvents'],
+        ['agentSessions', 'agentMessages', 'agentJobs', 'agentEvents'],
         async (tx) => {
+          const messages = await tx.query('agentMessages', { sessionId: id })
           const jobs = await tx.query('agentJobs', { sessionId: id })
           const events = await tx.query('agentEvents', { sessionId: id })
+          for (const message of messages) {
+            await tx.delete('agentMessages', message.id)
+          }
           for (const event of events) await tx.delete('agentEvents', event.id)
           for (const job of jobs) await tx.delete('agentJobs', job.id)
           await tx.delete('agentSessions', id)
@@ -592,10 +827,35 @@ export function createAgentSessionStore(storage: StoragePort): AgentSessionStore
     },
 
     async contextFor(id, window = AGENT_CONTEXT_WINDOW) {
-      const s = await find(id)
-      if (!s) return []
-      // 窗口从**尾部**取：最近说的话最要紧（§4.3）
-      return s.messages.slice(Math.max(0, s.messages.length - window))
+      await ensureSplit()
+      const sessions = await storage.query('agentSessions', { id })
+      if (!sessions[0]) return []
+      const limit = Math.max(0, Math.trunc(window))
+      if (limit === 0) return []
+      if (!storage.queryPage) {
+        return (await loadMessages(storage, id)).slice(-limit)
+      }
+      const page = await storage.queryPage(
+        'agentMessages',
+        { sessionId: id },
+        {
+          orderBy: { field: 'sequence', direction: 'desc' },
+          limit,
+        },
+      )
+      if (page.total === 0 && Array.isArray(sessions[0].messages)) {
+        return asMessages(sessions[0].messages).slice(-limit)
+      }
+      const rows = page.rows
+      return rows
+        .sort(
+          (left, right) =>
+            Number(left.sequence ?? 0) - Number(right.sequence ?? 0) ||
+            String(left.id).localeCompare(String(right.id)),
+        )
+        .slice(-limit)
+        .map(messageOf)
+        .filter((message): message is ChatMessage => message !== null)
     },
   }
 }

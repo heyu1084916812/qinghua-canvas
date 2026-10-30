@@ -86,6 +86,7 @@ const PROJECT_CASCADE_TABLES: TableName[] = [
   'tasks',
   'runRecords',
   'agentSessions',
+  'agentMessages',
   'agentJobs',
   'agentEvents',
   /* 漫剧文档（对账 #382）：脱离项目就没有意义，彻底删除时一起清 */

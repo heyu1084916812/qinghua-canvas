@@ -893,8 +893,9 @@ export function AgentPanel({
           setCurrent(resolved)
           setMessages(resolved.messages)
         } else {
-          setCurrent(head)
-          setMessages(head.messages)
+          const loaded = (await sessions.get(head.id).catch(() => null)) ?? head
+          setCurrent(loaded)
+          setMessages(loaded.messages)
         }
         return
       }
@@ -1023,9 +1024,10 @@ export function AgentPanel({
 
   const switchTo = useCallback(
     async (session: AgentSession) => {
-      setCurrent(session)
+      const loaded = (await sessions.get(session.id).catch(() => null)) ?? session
+      setCurrent(loaded)
       // 记忆隔离：切会话就是**换一整套上下文**，不是接着上一个聊（§8.2）
-      setMessages(session.messages)
+      setMessages(loaded.messages)
       setMessageReveal(null)
       setShowJumpToLatest(false)
       stickToLatestRef.current = true
@@ -3525,7 +3527,11 @@ export function AgentPanel({
     await sessions.rename(current.id, title)
     const rows = await refresh()
     const hit = rows.find((s) => s.id === current.id)
-    if (hit) setCurrent(hit)
+    if (hit) {
+      setCurrent((previous) =>
+        previous?.id === hit.id ? { ...previous, ...hit, messages: previous.messages } : hit,
+      )
+    }
   }, [current, titleDraft, sessions, refresh])
 
   /**

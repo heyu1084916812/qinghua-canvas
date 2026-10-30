@@ -19,7 +19,12 @@ export interface ContextMemory {
   key?: string
   expiresAt?: number
   source?: ContextMemorySource
+  /** 首次提出这条记忆的会话；项目级记忆也能追溯来源。 */
+  sourceSessionId?: string
   confidence?: number
+  /** 记忆真正进入过 ContextBundle 的次数与最近时间。 */
+  useCount?: number
+  lastUsedAt?: number
   enabled: boolean
   currentRevision: number
   createdAt: number
@@ -39,6 +44,7 @@ export interface ContextMemoryRevision {
   key?: string
   expiresAt?: number
   source: ContextMemorySource
+  sourceSessionId?: string
   confidence: number
   createdAt: number
 }

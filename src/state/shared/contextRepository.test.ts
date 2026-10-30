@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { createMemoryPlatform } from '../../platform/memory'
 import { createContextRepository } from './contextRepository'
 
@@ -99,6 +99,64 @@ describe('context repository', () => {
       source: 'agent',
       confidence: 0.86,
     })
+  })
+
+  it('记忆进入上下文后记录来源会话、使用次数和最近使用时间', async () => {
+    const platform = createMemoryPlatform()
+    const repo = createContextRepository(platform.storage)
+    const memory = await repo.createMemory({
+      kind: 'constraint',
+      text: '品牌主色统一用深绿',
+      scope: 'project',
+      projectId: 'p1',
+      sourceSessionId: 'chat-1',
+      source: 'agent',
+      confidence: 0.9,
+    })
+    const bundle = await repo.bundleForProject({
+      projectId: 'p1',
+      workbench: 'canvas',
+      sessionId: 'chat-1',
+      request: '做一张品牌主图',
+    })
+    expect(bundle.hardConstraints).toContain('品牌主色统一用深绿')
+    const used = (await repo.listMemories()).find((item) => item.id === memory.id)
+    expect(used).toMatchObject({
+      sourceSessionId: 'chat-1',
+      useCount: 1,
+    })
+    expect(used?.lastUsedAt).toEqual(expect.any(Number))
+
+    await repo.bundleForProject({
+      projectId: 'p1',
+      workbench: 'canvas',
+      sessionId: 'chat-1',
+      request: '继续做主图',
+    })
+    expect(
+      (await repo.listMemories()).find((item) => item.id === memory.id)?.useCount,
+    ).toBe(2)
+    expect(await repo.listMemoryRevisions(memory.id)).toHaveLength(1)
+  })
+
+  it('使用次数写失败时仍返回已读取的记忆上下文', async () => {
+    const platform = createMemoryPlatform()
+    const repo = createContextRepository(platform.storage)
+    await repo.createMemory({
+      kind: 'constraint',
+      text: '必须保留安全边距',
+      scope: 'project',
+      projectId: 'p1',
+    })
+    vi.spyOn(platform.storage, 'put').mockRejectedValueOnce(new Error('usage write failed'))
+
+    const bundle = await repo.bundleForProject({
+      projectId: 'p1',
+      workbench: 'canvas',
+      request: '做一张主图',
+    })
+    expect(bundle.hardConstraints).toContain('必须保留安全边距')
+    expect(bundle.memoryRefs).toHaveLength(1)
   })
 
   it('★★ 密钥、令牌、密码和 Cookie 不能写进记忆', async () => {

@@ -56,16 +56,17 @@ pub fn verify_v2_root(root: &Path) -> Result<V2Verification, String> {
     if manifest.get("formatVersion").and_then(Value::as_u64) != Some(2) {
         return Err("manifest.json formatVersion is not 2".into());
     }
-    if manifest.get("schemaVersion").and_then(Value::as_u64) != Some(SCHEMA_VERSION as u64) {
-        return Err(format!(
-            "manifest.json schemaVersion does not match {SCHEMA_VERSION}"
-        ));
-    }
     if !canonical.join("manifest.sqlite").is_file() || !canonical.join("media").is_dir() {
         return Err("V2 root is missing manifest.sqlite or media".into());
     }
 
     let store = SqliteStore::open(&canonical)?;
+    let manifest = read_json(&manifest_path)?;
+    if manifest.get("schemaVersion").and_then(Value::as_u64) != Some(SCHEMA_VERSION as u64) {
+        return Err(format!(
+            "manifest.json schemaVersion does not match {SCHEMA_VERSION}"
+        ));
+    }
     let mut report = V2Verification {
         ok: false,
         root: canonical.to_string_lossy().to_string(),

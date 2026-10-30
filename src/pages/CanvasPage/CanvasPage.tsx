@@ -12,6 +12,7 @@ import { fitCanvasView, focusCanvasNode } from '../../workbenches/canvas/surface
 import { CanvasExecutionProvider } from '../../workbenches/canvas/execution/CanvasExecutionProvider'
 import { LogPanel } from '../../workbenches/canvas/panels/LogPanel'
 import { AgentDock } from '../../workbenches/canvas/panels/AgentPanel/AgentDock'
+import { CanvasGatewayBridge } from '../../workbenches/canvas/agent/CanvasGatewayBridge'
 import { CanvasToolbar } from '../../workbenches/canvas/toolbar/CanvasToolbar'
 import { LightboxLayer } from '../../workbenches/canvas/lightbox/LightboxLayer'
 import { TextEditorLayer } from '../../workbenches/canvas/text/TextEditorLayer'
@@ -400,6 +401,7 @@ function CanvasProject({ projectId }: { projectId: string }) {
 
   return (
     <CanvasStoreProvider store={store}>
+      <CanvasGatewayBridge store={store} channels={channels} />
       {/* 执行宿主上提一层包住整页：顶栏的「仅刷新陈旧 / 全图重跑」需要与画布共用同一份
           执行状态（原先只包住 Surface，顶栏拿不到 useCanvasExecution）。 */}
       <CanvasExecutionProvider>

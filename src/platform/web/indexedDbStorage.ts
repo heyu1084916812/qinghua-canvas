@@ -63,6 +63,8 @@ class QinghuaDB extends Dexie {
   ecommerceCanvasItems!: Table<Row, string>
   /** 灵感库的索引缓存（一行 = 一个来源；只存索引、不存媒体，见 `TableName` 的说明） */
   inspirationCache!: Table<Row, string>
+  agentMessages!: Table<Row, string>
+  storageMigrations!: Table<Row, string>
 
   constructor(name = 'qinghua') {
     super(name)
@@ -244,6 +246,16 @@ class QinghuaDB extends Dexie {
       contextMemoryRevisions:
         'id, memoryId, revision, scope, kind, workbench, projectId, sessionId, createdAt, [memoryId+revision]',
     })
+    /**
+     * v21：Agent 消息正文从会话 JSON 中拆出。
+     *
+     * 复合索引按 `[sessionId+sequence]` 取尾页，避免打开长会话时先读完整段历史。
+     */
+    this.version(21).stores({
+      agentMessages:
+        'id, sessionId, projectId, sequence, createdAt, [sessionId+sequence]',
+      storageMigrations: 'id, completedAt',
+    })
   }
 }
 
@@ -322,6 +334,16 @@ export function createIndexedDbStorage(dbName?: string): StoragePort {
       let collection: Collection<Row, string>
 
       if (
+        options.orderBy?.field === 'sequence' &&
+        filter.sessionId !== undefined
+      ) {
+        collection = target
+          .where('[sessionId+sequence]')
+          .between(
+            [filter.sessionId, Dexie.minKey],
+            [filter.sessionId, Dexie.maxKey],
+          )
+      } else if (
         options.orderBy?.field === 'createdAt' &&
         filter.projectId !== undefined &&
         filter.workbench !== undefined

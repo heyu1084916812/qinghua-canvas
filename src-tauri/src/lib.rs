@@ -23,6 +23,8 @@ use tauri_plugin_fs::FsExt;
 use tauri_plugin_opener::OpenerExt;
 use tauri_plugin_updater::UpdaterExt;
 
+mod canvas_gateway;
+
 /// 「选一个目录当素材文件夹」：弹系统目录选择框 → 把该目录**递归**加进 fs 作用域 → 返回绝对路径。
 ///
 /// 为什么授权要在 Rust 侧做：前端没有扩展 fs 作用域的接口，而"用户选过的目录"正是授权的唯一依据。
@@ -319,20 +321,7 @@ fn preferred_business_data_dir(
 /// packaging used a nested `app` directory, so keep that layout supported.
 fn business_data_base_dir(exe: &Path) -> Option<PathBuf> {
     let exe_dir = exe.parent()?;
-    let is_dev_output = exe_dir
-        .file_name()
-        .is_some_and(|name| name == "debug" || name == "release")
-        && exe_dir
-            .parent()
-            .and_then(Path::file_name)
-            .is_some_and(|name| name == "target")
-        && exe_dir
-            .parent()
-            .and_then(Path::parent)
-            .and_then(Path::file_name)
-            .is_some_and(|name| name == "src-tauri");
-
-    let app_root = if is_dev_output {
+    let app_root = if is_development_output(exe) {
         // .../<project>/src-tauri/target/debug/qinghua.exe → .../<project>/data
         return Some(exe_dir.parent()?.parent()?.parent()?.join("data"));
     } else if exe_dir.file_name().is_some_and(|name| name == "app") {
@@ -342,6 +331,28 @@ fn business_data_base_dir(exe: &Path) -> Option<PathBuf> {
     };
     app_root.parent()?;
     Some(app_root.join("data"))
+}
+
+pub(crate) fn is_development_output(exe: &Path) -> bool {
+    let Some(exe_dir) = exe.parent() else {
+        return false;
+    };
+    let Some(build_profile) = exe_dir.file_name() else {
+        return false;
+    };
+    if build_profile != "debug" && build_profile != "release" {
+        return false;
+    }
+    let Some(target_dir) = exe_dir.parent() else {
+        return false;
+    };
+    if target_dir.file_name().is_none_or(|name| name != "target") {
+        return false;
+    }
+    target_dir
+        .parent()
+        .and_then(Path::file_name)
+        .is_some_and(|name| name == "src-tauri")
 }
 
 fn push_unique_path(paths: &mut Vec<PathBuf>, path: PathBuf) {
@@ -620,6 +631,7 @@ const CACHE_DIR_NAMES: [&str; 8] = [
 ];
 
 const DATA_DIR_CONFIG_NAME: &str = "storage-location.json";
+const DEVELOPMENT_DATA_DIR_CONFIG_NAME: &str = "storage-location.dev.json";
 const MISSING_DATA_DIR_ENV: &str = "QINGHUA_MISSING_DATA_DIR";
 const RELEASE_GATE_ENV: &str = "QINGHUA_RELEASE_GATE";
 const RELEASE_GATE_DATA_DIR_ENV: &str = "QINGHUA_RELEASE_GATE_DATA_DIR";
@@ -810,11 +822,20 @@ fn set_storage_backend_env(path: &Path) {
     std::env::set_var("QINGHUA_STORE_BACKEND", backend_for_storage_root(path));
 }
 
+fn data_dir_config_name(exe: &Path) -> &'static str {
+    if is_development_output(exe) {
+        DEVELOPMENT_DATA_DIR_CONFIG_NAME
+    } else {
+        DATA_DIR_CONFIG_NAME
+    }
+}
+
 fn data_dir_config_path(app: &tauri::AppHandle) -> Option<PathBuf> {
+    let exe = std::env::current_exe().ok()?;
     app.path()
         .app_local_data_dir()
         .ok()
-        .map(|root| root.join(DATA_DIR_CONFIG_NAME))
+        .map(|root| root.join(data_dir_config_name(&exe)))
 }
 
 fn parse_data_dir_config(raw: &str) -> Option<PathBuf> {
@@ -3266,7 +3287,9 @@ pub fn run() {
             cli_read_out,
             cli_write_out,
             rh_set_api_key,
-            ui_heartbeat
+            ui_heartbeat,
+            canvas_gateway::canvas_gateway_info,
+            canvas_gateway::canvas_gateway_respond
         ])
         .setup(|app| {
             apply_data_dir_config(app.handle());
@@ -3275,6 +3298,9 @@ pub fn run() {
              * 调试壳、release 壳和浏览器都连同一个本地服务与同一份文件库。
              */
             qinghua_shared_store::start_in_background();
+            if let Err(error) = canvas_gateway::start(app.handle().clone()) {
+                eprintln!("[canvas-gateway] 启动失败：{error}");
+            }
             /*
              * 窗口在这里**手动建**（`tauri.conf.json` 那条窗口配了 `"create": false`），
              * 唯一原因就是要赶在 webview 创建**之前**把它的数据目录指过去 ——
@@ -3423,6 +3449,20 @@ mod data_dir_tests {
                 &always,
             ),
             Some(PathBuf::from("E:\\work\\qinghua\\data"))
+        );
+    }
+
+    #[test]
+    fn development_output_uses_a_separate_storage_config() {
+        assert_eq!(
+            data_dir_config_name(Path::new(
+                "E:\\work\\qinghua\\src-tauri\\target\\debug\\qinghua.exe"
+            )),
+            "storage-location.dev.json"
+        );
+        assert_eq!(
+            data_dir_config_name(Path::new("E:\\apps\\轻画\\qinghua.exe")),
+            "storage-location.json"
         );
     }
 

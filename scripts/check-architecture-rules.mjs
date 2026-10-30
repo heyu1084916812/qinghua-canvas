@@ -1,6 +1,6 @@
 import { spawnSync } from 'node:child_process'
 import { createRequire } from 'node:module'
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 
@@ -87,6 +87,44 @@ try {
   console.log(
     `architecture rule reverse-check passed: ${expectedRules.join(', ')}`,
   )
+
+  const ports = readFileSync(path.join(root, 'src/platform/ports.ts'), 'utf8')
+  const tableBlock = ports.slice(
+    ports.indexOf('export type TableName ='),
+    ports.indexOf('export interface Row'),
+  )
+  const tsTables = [...tableBlock.matchAll(/\|\s*'([^']+)'/g)].map(
+    (match) => match[1],
+  )
+  const sqlite = readFileSync(
+    path.join(root, 'shared-store/src/sqlite.rs'),
+    'utf8',
+  )
+  const rustBlock = sqlite.match(
+    /pub const TABLE_NAMES: \[&str; (\d+)\] = \[([\s\S]*?)\];/,
+  )
+  if (!rustBlock) throw new Error('找不到 Rust TABLE_NAMES 白名单')
+  const rustTables = [...rustBlock[2].matchAll(/"([^"]+)"/g)].map(
+    (match) => match[1],
+  )
+  const declaredCount = Number(rustBlock[1])
+  if (declaredCount !== rustTables.length) {
+    throw new Error(
+      `Rust TABLE_NAMES 声明 ${declaredCount} 张，实际 ${rustTables.length} 张`,
+    )
+  }
+  const tsSet = new Set(tsTables)
+  const rustSet = new Set(rustTables)
+  const missingInRust = tsTables.filter((table) => !rustSet.has(table))
+  const missingInTs = rustTables.filter((table) => !tsSet.has(table))
+  if (missingInRust.length || missingInTs.length) {
+    throw new Error(
+      `共享存储表名不一致：Rust 缺 ${missingInRust.join(', ') || '无'}；TS 缺 ${
+        missingInTs.join(', ') || '无'
+      }`,
+    )
+  }
+  console.log(`storage table parity passed: ${tsTables.length} tables`)
 } finally {
   rmSync(temp, { recursive: true, force: true })
 }

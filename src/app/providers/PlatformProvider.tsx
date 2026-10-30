@@ -3,6 +3,7 @@ import type { ReactNode } from 'react'
 import type { PlatformKit } from '../../platform/ports'
 import { createPlatform, detectRuntime, type RuntimeId } from '../../platform'
 import { AssetPlatformProvider } from '../../features/shared/assets/AssetPlatformContext'
+import { createAgentSessionStore } from '../../state/agent/sessionStore'
 
 /**
  * 平台注入（架构 §5.6）：业务代码只接触 PlatformKit 端口，
@@ -38,6 +39,20 @@ export function PlatformProvider({
     if (typeof document === 'undefined') return
     document.documentElement.dataset.platform = resolved
   }, [resolved])
+  useEffect(() => {
+    let cancelled = false
+    void platform.storage
+      .open()
+      .then(() => createAgentSessionStore(platform.storage).migrateLegacyMessages())
+      .catch((error) => {
+        if (!cancelled) {
+          console.error('[storage] Agent 消息拆表失败', error)
+        }
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [platform])
   return (
     <PlatformContext.Provider value={platform}>
       <AssetPlatformProvider platform={platform}>{children}</AssetPlatformProvider>

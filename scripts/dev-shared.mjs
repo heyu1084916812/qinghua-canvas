@@ -8,13 +8,17 @@ const cargo = process.platform === 'win32' ? 'cargo.exe' : 'cargo'
 const viteEntry = path.join(root, 'node_modules', 'vite', 'bin', 'vite.js')
 
 /**
- * 桌面壳把自定义数据目录写在壳配置区；浏览器开发库也读同一份配置。
- * 没有配置或配置损坏时继续使用 shared-store 的系统默认目录。
+ * 桌面开发壳把自定义数据目录写在独立的开发配置中；浏览器开发库读同一份。
+ * 正式版使用 storage-location.json，两者互不覆盖。
  */
 function configuredDataDir() {
   const localAppData = process.env.LOCALAPPDATA
   if (!localAppData) return null
-  const configPath = path.join(localAppData, 'com.qinghua.canvas', 'storage-location.json')
+  const configPath = path.join(
+    localAppData,
+    'com.qinghua.canvas',
+    'storage-location.dev.json',
+  )
   if (!existsSync(configPath)) return null
   try {
     const value = JSON.parse(readFileSync(configPath, 'utf8'))?.dataDir
@@ -38,13 +42,26 @@ function backendForDataDir(dataDir) {
   }
 }
 
-/** 桌面壳未写自定义配置时，开发版主库跟随项目根目录的 `data/`。 */
-const developmentDataDir = path.join(root, 'data')
+/** Desktop development follows the V2 root created by the legacy migration. */
+const developmentDataDirs = [path.join(root, 'data-v2'), path.join(root, 'data')]
+
+function defaultDevelopmentDataDir() {
+  return (
+    developmentDataDirs.find((dataDir) => backendForDataDir(dataDir) === 'v2') ??
+    developmentDataDirs[1]
+  )
+}
 
 async function healthy() {
   try {
     const response = await fetch('http://127.0.0.1:18765/health')
-    return response.ok
+    if (!response.ok) return false
+    const health = await response.json()
+    return (
+      health?.service === 'qinghua-shared-store' &&
+      typeof health?.version === 'number' &&
+      health.version >= 8
+    )
   } catch {
     return false
   }
@@ -64,7 +81,7 @@ if (!(await healthy())) {
     'debug',
     process.platform === 'win32' ? 'qinghua-store.exe' : 'qinghua-store',
   )
-  const dataDir = configuredDataDir() ?? developmentDataDir
+  const dataDir = configuredDataDir() ?? defaultDevelopmentDataDir()
   storage = spawn(binary, [], {
     cwd: root,
     stdio: 'inherit',

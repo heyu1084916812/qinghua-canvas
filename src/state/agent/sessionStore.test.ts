@@ -71,6 +71,137 @@ describe('Agent 会话 · 基本 CRUD', () => {
   })
 })
 
+describe('Agent 会话 · 消息拆表', () => {
+  it('列表只读会话元数据，消息稳定写入 agentMessages', async () => {
+    const storage = createMemoryPlatform().storage
+    const s = createAgentSessionStore(storage)
+    const session = await s.create({
+      projectId: 'p1',
+      channelId: 'c1',
+      model: 'm1',
+    })
+
+    await s.saveMessages(session.id, [
+      { role: 'user', content: '第一条' },
+      { role: 'assistant', content: '第二条' },
+      { role: 'tool', content: '第三条', toolCallId: 'call-1', toolName: 'readGraph' },
+    ])
+
+    const sessionRow = (await storage.query('agentSessions', { id: session.id }))[0]
+    expect(sessionRow?.messages).toBeUndefined()
+    const list = await s.list('p1')
+    expect(list[0]?.id).toBe(session.id)
+    expect(list[0]?.messages).toEqual([])
+
+    const rows = await storage.query('agentMessages', { sessionId: session.id })
+    expect(rows.map((row) => row.sequence)).toEqual([0, 1, 2])
+    expect(await s.messagesFor(session.id)).toMatchObject([
+      { role: 'user', content: '第一条' },
+      { role: 'assistant', content: '第二条' },
+      { role: 'tool', content: '第三条', toolName: 'readGraph' },
+    ])
+    expect((await s.get(session.id))?.messages).toHaveLength(3)
+  })
+
+  it('旧会话首次打开时按序迁移，重复创建 store 不会重复消息', async () => {
+    const storage = createMemoryPlatform().storage
+
+    // 用真实表名种旧数据，避免测试替身替我们改写形状。
+    await storage.put('agentSessions', {
+      id: 'chat-old',
+      projectId: 'p1',
+      title: '旧会话',
+      channelId: 'c1',
+      model: 'm1',
+      queuedTurns: [],
+      pendingSteers: [],
+      messages: [
+        { role: 'user', content: '旧问题' },
+        { role: 'assistant', content: '旧回答' },
+      ],
+      createdAt: 1,
+      updatedAt: 2,
+    })
+    await storage.put('agentSessions', {
+      id: 'chat-empty',
+      projectId: 'p1',
+      title: '空会话',
+      channelId: 'c1',
+      model: 'm1',
+      queuedTurns: [],
+      pendingSteers: [],
+      messages: [],
+      createdAt: 1,
+      updatedAt: 1,
+    })
+
+    const first = createAgentSessionStore(storage)
+    expect(await first.list('p1')).toHaveLength(2)
+    expect(await storage.query('agentMessages', { sessionId: 'chat-old' })).toHaveLength(2)
+    expect(
+      (await storage.query('storageMigrations', {
+        id: 'agent-messages.split.v1',
+      }))[0],
+    ).toMatchObject({
+      status: 'complete',
+      sessionCount: 2,
+      messageCount: 2,
+    })
+    expect((await storage.query('agentSessions', { id: 'chat-old' }))[0]?.messages)
+      .toBeUndefined()
+
+    const reopened = createAgentSessionStore(storage)
+    expect((await reopened.get('chat-old'))?.messages).toMatchObject([
+      { role: 'user', content: '旧问题' },
+      { role: 'assistant', content: '旧回答' },
+    ])
+    expect(await storage.query('agentMessages', { sessionId: 'chat-old' })).toHaveLength(2)
+  })
+
+  it('删除会话同时删除消息，字段更新不会丢失正文', async () => {
+    const storage = createMemoryPlatform().storage
+    const s = createAgentSessionStore(storage)
+    const session = await s.create({
+      projectId: 'p1',
+      channelId: 'c1',
+      model: 'm1',
+    })
+    await s.saveMessages(session.id, [{ role: 'user', content: '保留我' }])
+
+    const updated = await s.updateFields(session.id, { model: 'm2' })
+    expect(updated?.messages).toMatchObject([{ role: 'user', content: '保留我' }])
+
+    await s.remove(session.id)
+    expect(await storage.query('agentMessages', { sessionId: session.id })).toEqual([])
+  })
+
+  it('迁移标记完成后又出现旧式消息时，读取会先补拆表，元数据更新不丢正文', async () => {
+    const storage = createMemoryPlatform().storage
+    const s = createAgentSessionStore(storage)
+    await s.list('p1')
+    await storage.put('agentSessions', {
+      id: 'chat-late-legacy',
+      projectId: 'p1',
+      title: '旧字段会话',
+      channelId: 'c1',
+      model: 'm1',
+      queuedTurns: [],
+      pendingSteers: [],
+      messages: [{ role: 'user', content: '不能丢' }],
+      createdAt: 1,
+      updatedAt: 2,
+    })
+
+    const updated = await s.updateFields('chat-late-legacy', { title: '已更新' })
+    expect(updated?.messages).toMatchObject([{ role: 'user', content: '不能丢' }])
+    expect(await s.messagesFor('chat-late-legacy')).toMatchObject([
+      { role: 'user', content: '不能丢' },
+    ])
+    expect((await storage.query('agentSessions', { id: 'chat-late-legacy' }))[0]?.messages)
+      .toBeUndefined()
+  })
+})
+
 describe('Agent 会话 · 隔离（最容易出错的地方）', () => {
   it('★★ 会话按项目过滤：A 项目的会话不会出现在 B 项目里', async () => {
     const s = store()

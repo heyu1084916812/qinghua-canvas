@@ -37,6 +37,9 @@ export function createAgentMemoryPort(
           ? { replaceMemoryId: candidate.replaceMemoryId }
           : {}),
         source: 'agent',
+        ...(candidate.sourceSessionId
+          ? { sourceSessionId: candidate.sourceSessionId }
+          : {}),
         confidence: candidate.confidence,
       })
     },

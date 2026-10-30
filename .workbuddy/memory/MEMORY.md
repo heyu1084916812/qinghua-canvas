@@ -1,5 +1,31 @@
 # CanvasFlow（轻画）项目记忆
 
+### 0.1.11 数据目录、Agent 消息拆表与 Canvas MCP（2026-10-30，对账 #829）
+
+- **正式/开发配置文件名必须分开**：正式版 `storage-location.json`，开发版
+  `storage-location.dev.json`。本机当前正式库 `E:\软件\轻画\data-v2`，开发库
+  `E:\软件\无限画布\轻画\data-v2`；不要再让开发启动读取正式配置。
+- **会话升级不等于消息拆表**：只改版本号/会话对象不会迁移旧数据。真正拆表要同时有新逻辑表、
+  SQLite `session_id/message_sequence` 索引、IndexedDB v21 复合索引、事务迁移、完成标记、
+  删除级联和备份排除。
+- **列表不读正文**：`agentSessions` 只保留元数据；`agentMessages.sessionId + sequence`
+  排序。`contextFor` 用 `queryPage(sequence desc, limit)` 取尾窗，不能先 `get()` 全量再切。
+- **迁移要可验证**：开发库实迁 106 个会话 / 1,266 条消息后，`agentSessions.messages`
+  必须为 0，完成标记写 `messageCount` 与 `sessionCount`；不是“启动没报错”就算成功。
+- **schema 升级要同步 manifest**：SQLite `SCHEMA_VERSION=3` 时，打开旧 V2 根必须同步
+  `manifest.json` 与 `.migration-state.json`；否则 `verify_v2_root` 仍会按 schema 2 拒绝。
+- **共享存储协议版本是 8**：新增 `agentMessages/storageMigrations` 后，旧 `version:7` 进程
+  必须被前端和开发脚本拒绝。只看 `/health` 的 200 会再次踩到“旧进程不认识新表”。
+- **旧消息二次出现不能丢**：即使迁移标记已完成，只要某行又带 `messages`，读取时要先拆表再改元数据。
+- **表名要跨语言对账**：TS `TableName` 与 Rust `TABLE_NAMES` 现有 32 张，架构门禁自动比较。
+- **Canvas MCP 只有一条工具实现**：HTTP → Tauri event → `CanvasGatewayBridge` →
+  现有 `tools.ts`。MCP stdio 只代理 HTTP；外部首版拒绝删除、改节点、付费生成和记忆写入。
+- **网关必须 loopback + token**：`127.0.0.1:18766`，错误 token 401；画布未打开时失败，
+  不得直接写数据库冒充工具执行。配置文件在 `%LOCALAPPDATA%\com.qinghua.canvas\canvas-gateway.json`。
+- **只锁写，不锁读**：外部读工具可并发，写工具串行；端口绑定失败不能留下看似可用的 token。
+- **记忆 usage 不是 revision**：进入 ContextBundle 后只增加 `useCount/lastUsedAt`；
+  正文变化才增加 `currentRevision` 并写修订。
+
 ### 画布性能审计（2026-10-30，对账 #827，待修复）
 
 - **不要再说“图片全量同时解码”**：release WebView2 实测中，现有 42 张真实缩略图循环生成 100 / 300 / 600 个节点，
@@ -10528,3 +10554,17 @@ React 端口 → `invoke` → Rust `check_update` → updater 插件读配置 �
   让每行按自身文字高度排布，再由容器滚动。
 - **证据**：全量 Vitest **3613 passed / 1 skipped**；G769 过程位置、默认收起、展开行数、
   SVG 图标数与行几何均通过。同组既有“关闭重开恢复草稿 / 活动块即时出现”仍有 smoke 时序波动。
+
+### 0.1.11 发布门禁与双版本配置隔离（2026-10-30，对账 #829）
+
+- **配置文件不止主库一份**：Canvas 网关 token 也必须区分 `canvas-gateway.json` 与
+  `canvas-gateway.dev.json`。两者共用时，开发版抢不到 `18766` 会清掉正式版 token，
+  看起来像正式版 MCP 突然失效；现在端口绑定失败只清当前版本自己的配置。
+- **自检前必须确认共享存储端口空闲**：正式版托盘常驻时会继续占用 `18765` 和
+  `18766`，关闭窗口不等于退出。release 自检若在这时启动，临时壳可能连到正式库；
+  必须先正常退出托盘进程，再验证 `1420 / 18765 / 18766` 无监听。
+- **最终门禁口径**：Vitest **3640 passed / 1 skipped**、shared-store Rust **41 passed**、
+  src-tauri Rust **53 passed**、`npm run check` / `npm run build` / `git diff --check` 全过；
+  release 壳隔离真机自检 **11/11**，签名 Ed25519 真验签通过。
+- **0.1.11 产物**：`release/0.1.11/qinghua_0.1.11_x64-setup.exe`，`43,770,231 B`，
+  SHA-256 `B0A041DF87D90C3C4062ACD59617AEBE46B3403B81F27DEBD965A48AE15C1046`。

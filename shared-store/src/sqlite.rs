@@ -12,11 +12,11 @@ use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
 
-pub const SCHEMA_VERSION: i64 = 2;
+pub const SCHEMA_VERSION: i64 = 3;
 
 static TEMP_SEQUENCE: AtomicU64 = AtomicU64::new(1);
 
-pub const TABLE_NAMES: [&str; 30] = [
+pub const TABLE_NAMES: [&str; 32] = [
     "projects",
     "projectFolders",
     "nodes",
@@ -32,6 +32,7 @@ pub const TABLE_NAMES: [&str; 30] = [
     "builtinSkills",
     "skills",
     "agentSessions",
+    "agentMessages",
     "agentJobs",
     "agentEvents",
     "fonts",
@@ -47,6 +48,7 @@ pub const TABLE_NAMES: [&str; 30] = [
     "contextKits",
     "contextKitVersions",
     "projectContextBindings",
+    "storageMigrations",
 ];
 
 #[derive(Clone)]
@@ -74,6 +76,7 @@ impl SqliteStore {
         };
         let conn = store.connection()?;
         initialize_schema(&conn)?;
+        sync_manifest_schema(root)?;
         Ok(store)
     }
 
@@ -426,6 +429,8 @@ fn initialize_schema(conn: &Connection) -> Result<(), String> {
            operation_id TEXT,
            parent_run_id TEXT,
            scope_version INTEGER,
+           session_id TEXT,
+           message_sequence INTEGER,
            payload_json TEXT NOT NULL,
            PRIMARY KEY (table_name, id)
          );
@@ -463,6 +468,8 @@ fn initialize_schema(conn: &Connection) -> Result<(), String> {
         ("operation_id", "TEXT"),
         ("parent_run_id", "TEXT"),
         ("scope_version", "INTEGER"),
+        ("session_id", "TEXT"),
+        ("message_sequence", "INTEGER"),
     ] {
         ensure_column(conn, "rows", column, declaration)?;
     }
@@ -498,9 +505,21 @@ fn initialize_schema(conn: &Connection) -> Result<(), String> {
            WHERE table_name = 'runRecords';
          CREATE INDEX IF NOT EXISTS rows_run_scope_idx
            ON rows(table_name, project_id, scope_id, subject_id, operation_id)
-           WHERE table_name = 'runRecords';",
+           WHERE table_name = 'runRecords';
+         CREATE INDEX IF NOT EXISTS rows_agent_message_session_sequence_idx
+           ON rows(table_name, session_id, message_sequence)
+           WHERE table_name = 'agentMessages';",
     )
-    .map_err(|err| format!("initialize run record indexes: {err}"))?;
+    .map_err(|err| format!("initialize row indexes: {err}"))?;
+    conn.execute(
+        "UPDATE rows
+         SET session_id = json_extract(payload_json, '$.sessionId'),
+             message_sequence = json_extract(payload_json, '$.sequence')
+         WHERE table_name = 'agentMessages'
+           AND (session_id IS NULL OR message_sequence IS NULL)",
+        [],
+    )
+    .map_err(|err| format!("backfill agent message indexes: {err}"))?;
 
     let existing = conn
         .query_row(
@@ -524,7 +543,7 @@ fn initialize_schema(conn: &Connection) -> Result<(), String> {
             params![SCHEMA_VERSION.to_string()],
         )
         .map_err(|err| format!("write schema version: {err}"))?;
-    } else if version == 1 && SCHEMA_VERSION == 2 {
+    } else if version < SCHEMA_VERSION {
         conn.execute(
             "UPDATE schema_meta SET value = ?1 WHERE key = 'schema_version'",
             params![SCHEMA_VERSION.to_string()],
@@ -534,6 +553,81 @@ fn initialize_schema(conn: &Connection) -> Result<(), String> {
         return Err(format!(
             "unsupported sqlite schema version {version}, expected {SCHEMA_VERSION}"
         ));
+    }
+    Ok(())
+}
+
+fn sync_manifest_schema(root: &Path) -> Result<(), String> {
+    let path = root.join("manifest.json");
+    if path.is_file() {
+        let raw = fs::read_to_string(&path)
+            .map_err(|error| format!("read {}: {error}", path.display()))?;
+        let mut manifest: Value = serde_json::from_str(&raw)
+            .map_err(|error| format!("parse {}: {error}", path.display()))?;
+        if manifest.get("formatVersion").and_then(Value::as_u64) == Some(2) {
+            let current = manifest
+                .get("schemaVersion")
+                .and_then(Value::as_u64)
+                .unwrap_or(0) as i64;
+            if current < SCHEMA_VERSION {
+                let object = manifest
+                    .as_object_mut()
+                    .ok_or_else(|| "manifest.json must be an object".to_string())?;
+                object.insert("schemaVersion".into(), json!(SCHEMA_VERSION));
+                write_json_atomic(&path, &manifest)?;
+            }
+        }
+    }
+    sync_schema_version_file(&root.join(".migration-state.json"))?;
+    Ok(())
+}
+
+fn sync_schema_version_file(path: &Path) -> Result<(), String> {
+    if !path.is_file() {
+        return Ok(());
+    }
+    let raw =
+        fs::read_to_string(path).map_err(|error| format!("read {}: {error}", path.display()))?;
+    let mut value: Value =
+        serde_json::from_str(&raw).map_err(|error| format!("parse {}: {error}", path.display()))?;
+    let current = value
+        .get("schemaVersion")
+        .and_then(Value::as_u64)
+        .unwrap_or(0) as i64;
+    if current >= SCHEMA_VERSION {
+        return Ok(());
+    }
+    let object = value
+        .as_object_mut()
+        .ok_or_else(|| format!("{} must be an object", path.display()))?;
+    object.insert("schemaVersion".into(), json!(SCHEMA_VERSION));
+    write_json_atomic(path, &value)
+}
+
+fn write_json_atomic(path: &Path, value: &Value) -> Result<(), String> {
+    let body = serde_json::to_vec_pretty(value)
+        .map_err(|error| format!("encode {}: {error}", path.display()))?;
+    let parent = path
+        .parent()
+        .ok_or_else(|| format!("{} has no parent directory", path.display()))?;
+    let sequence = TEMP_SEQUENCE.fetch_add(1, Ordering::Relaxed);
+    let temporary = parent.join(format!(
+        ".{}.{sequence}.tmp",
+        path.file_name()
+            .and_then(|name| name.to_str())
+            .unwrap_or("state.json")
+    ));
+    fs::write(&temporary, body)
+        .map_err(|error| format!("write {}: {error}", temporary.display()))?;
+    if let Err(rename_error) = fs::rename(&temporary, path) {
+        fs::copy(&temporary, path).map_err(|copy_error| {
+            let _ = fs::remove_file(&temporary);
+            format!(
+                "replace {}: rename failed ({rename_error}), copy failed ({copy_error})",
+                path.display()
+            )
+        })?;
+        let _ = fs::remove_file(&temporary);
     }
     Ok(())
 }
@@ -601,14 +695,16 @@ fn put_on(conn: &Connection, root: &Path, table: &str, row: &Value) -> Result<()
     let operation_id = row.get("operationId").and_then(Value::as_str);
     let parent_run_id = row.get("parentRunId").and_then(Value::as_str);
     let scope_version = row.get("scopeVersion").and_then(Value::as_i64);
+    let session_id = row.get("sessionId").and_then(Value::as_str);
+    let message_sequence = row.get("sequence").and_then(Value::as_i64);
     let payload = serde_json::to_string(row).map_err(|err| format!("encode row: {err}"))?;
     conn.execute(
         "INSERT INTO rows (
            table_name, id, project_id, updated_at,
            workbench, run_status, action, subject_id, scope_id, operation_id,
-           parent_run_id, scope_version, payload_json
+           parent_run_id, scope_version, session_id, message_sequence, payload_json
          )
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15)
          ON CONFLICT(table_name, id) DO UPDATE SET
            project_id = excluded.project_id,
            updated_at = excluded.updated_at,
@@ -620,6 +716,8 @@ fn put_on(conn: &Connection, root: &Path, table: &str, row: &Value) -> Result<()
            operation_id = excluded.operation_id,
            parent_run_id = excluded.parent_run_id,
            scope_version = excluded.scope_version,
+           session_id = excluded.session_id,
+           message_sequence = excluded.message_sequence,
            payload_json = excluded.payload_json",
         params![
             table,
@@ -634,6 +732,8 @@ fn put_on(conn: &Connection, root: &Path, table: &str, row: &Value) -> Result<()
             operation_id,
             parent_run_id,
             scope_version,
+            session_id,
+            message_sequence,
             payload
         ],
     )
@@ -667,15 +767,20 @@ fn query_rows(
              WHERE table_name = ?1
                AND (?2 IS NULL OR id = ?2)
                AND (?3 IS NULL OR project_id = ?3)
+               AND (?4 IS NULL OR session_id = ?4)
+               AND (?5 IS NULL OR message_sequence = ?5)
              ORDER BY id",
         )
         .map_err(|err| format!("prepare query: {err}"))?;
     let id = filter.get("id").and_then(Value::as_str);
     let project_id = filter.get("projectId").and_then(Value::as_str);
+    let session_id = filter.get("sessionId").and_then(Value::as_str);
+    let message_sequence = filter.get("sequence").and_then(Value::as_i64);
     let rows = stmt
-        .query_map(params![table, id, project_id], |row| {
-            row.get::<_, String>(0)
-        })
+        .query_map(
+            params![table, id, project_id, session_id, message_sequence],
+            |row| row.get::<_, String>(0),
+        )
         .map_err(|err| format!("query rows: {err}"))?
         .map(|value| {
             let raw = value.map_err(|err| format!("decode row: {err}"))?;
@@ -708,6 +813,8 @@ fn page_field_expression(field: &str) -> Result<String, String> {
         "operationId" => "operation_id".into(),
         "parentRunId" => "parent_run_id".into(),
         "scopeVersion" => "scope_version".into(),
+        "sessionId" => "session_id".into(),
+        "sequence" => "message_sequence".into(),
         _ => format!("json_extract(payload_json, '$.{field}')"),
     })
 }
@@ -1665,6 +1772,94 @@ mod tests {
             )
             .unwrap();
         assert_eq!(version, SCHEMA_VERSION.to_string());
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn schema_v2_upgrade_adds_agent_message_columns_and_query() {
+        let root = temp_root("schema-v2-agent-messages");
+        fs::create_dir_all(&root).unwrap();
+        let db = root.join("manifest.sqlite");
+        let conn = Connection::open(&db).unwrap();
+        conn.execute_batch(
+            "CREATE TABLE schema_meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+             INSERT INTO schema_meta (key, value) VALUES ('schema_version', '2');
+             CREATE TABLE rows (
+               table_name TEXT NOT NULL,
+               id TEXT NOT NULL,
+               project_id TEXT,
+               updated_at INTEGER,
+               payload_json TEXT NOT NULL,
+               PRIMARY KEY (table_name, id)
+             );",
+        )
+        .unwrap();
+        drop(conn);
+
+        let store = SqliteStore::open(&root).unwrap();
+        store
+            .put(
+                "agentMessages",
+                &json!({
+                    "id":"m1",
+                    "projectId":"p1",
+                    "sessionId":"s1",
+                    "sequence":2,
+                    "message":{"role":"user","content":"hello"},
+                    "updatedAt":2
+                }),
+            )
+            .unwrap();
+        let rows = store
+            .query(
+                "agentMessages",
+                &Map::from_iter([
+                    ("sessionId".into(), json!("s1")),
+                    ("sequence".into(), json!(2)),
+                ]),
+                true,
+                None,
+            )
+            .unwrap();
+        assert_eq!(rows.len(), 1);
+        let version: String = store
+            .connection()
+            .unwrap()
+            .query_row(
+                "SELECT value FROM schema_meta WHERE key = 'schema_version'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(version, SCHEMA_VERSION.to_string());
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn opening_old_v2_root_updates_manifest_schema_version() {
+        let root = temp_root("manifest-schema-sync");
+        fs::create_dir_all(&root).unwrap();
+        fs::write(
+            root.join("manifest.json"),
+            br#"{"formatVersion":2,"schemaVersion":2,"status":"complete"}"#,
+        )
+        .unwrap();
+        fs::write(
+            root.join(".migration-state.json"),
+            br#"{"status":"complete","schemaVersion":2}"#,
+        )
+        .unwrap();
+
+        let _store = SqliteStore::open(&root).unwrap();
+        let manifest: Value =
+            serde_json::from_slice(&fs::read(root.join("manifest.json")).unwrap()).unwrap();
+        assert_eq!(manifest["formatVersion"], json!(2));
+        assert_eq!(manifest["schemaVersion"], json!(SCHEMA_VERSION));
+        assert_eq!(manifest["status"], json!("complete"));
+        let state: Value =
+            serde_json::from_slice(&fs::read(root.join(".migration-state.json")).unwrap())
+                .unwrap();
+        assert_eq!(state["schemaVersion"], json!(SCHEMA_VERSION));
         let _ = fs::remove_dir_all(root);
     }
 }

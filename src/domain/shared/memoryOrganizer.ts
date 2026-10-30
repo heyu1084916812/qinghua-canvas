@@ -17,6 +17,7 @@ export interface MemoryCandidate {
   key?: string
   expiresAt?: number
   replaceMemoryId?: string
+  sourceSessionId?: string
   confidence: number
   reason: string
 }
@@ -192,6 +193,7 @@ export function normalizeMemoryCandidate(
     ...(typeof value.replaceMemoryId === 'string' && value.replaceMemoryId.trim()
       ? { replaceMemoryId: value.replaceMemoryId.trim() }
       : {}),
+    ...(sessionId ? { sourceSessionId: sessionId } : {}),
     confidence,
     reason: 'Agent 提议的记忆',
   }
