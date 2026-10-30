@@ -1,7 +1,10 @@
 use std::path::{Path, PathBuf};
+use std::sync::atomic::AtomicBool;
 use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::Arc;
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
+use tauri::ipc::Channel;
 use tauri::menu::{Menu, MenuItem};
 use tauri::path::BaseDirectory;
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
@@ -1549,6 +1552,169 @@ struct FetchedText {
     headers: std::collections::HashMap<String, String>,
     text: String,
     body_base64: String,
+}
+
+#[derive(Default)]
+struct FetchStreamCancels(Mutex<std::collections::HashMap<String, Arc<AtomicBool>>>);
+
+#[derive(Clone, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+struct FetchStreamEvent {
+    kind: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    text: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    status: Option<u16>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    message: Option<String>,
+}
+
+fn emit_stream_text(
+    on_event: &Channel<FetchStreamEvent>,
+    bytes: &[u8],
+    pending: &mut Vec<u8>,
+) -> Result<(), String> {
+    pending.extend_from_slice(bytes);
+    let Some(last_newline) = pending.iter().rposition(|byte| *byte == b'\n') else {
+        return Ok(());
+    };
+    let complete = pending.drain(..=last_newline).collect::<Vec<_>>();
+    on_event
+        .send(FetchStreamEvent {
+            kind: "chunk".into(),
+            text: Some(String::from_utf8_lossy(&complete).to_string()),
+            status: None,
+            message: None,
+        })
+        .map_err(|err| err.to_string())
+}
+
+#[tauri::command]
+async fn cancel_fetch_stream(
+    stream_id: String,
+    state: State<'_, FetchStreamCancels>,
+) -> Result<(), String> {
+    let cancelled = state
+        .0
+        .lock()
+        .map_err(|_| "流式请求状态锁已损坏".to_string())?
+        .get(&stream_id)
+        .cloned();
+    if let Some(flag) = cancelled {
+        flag.store(true, Ordering::Relaxed);
+    }
+    Ok(())
+}
+
+#[tauri::command]
+async fn fetch_stream(
+    stream_id: String,
+    url: String,
+    method: Option<String>,
+    headers: Option<std::collections::HashMap<String, String>>,
+    body: Option<String>,
+    timeout_ms: Option<u64>,
+    on_event: Channel<FetchStreamEvent>,
+    state: State<'_, FetchStreamCancels>,
+) -> Result<(), String> {
+    if !(url.starts_with("https://") || url.starts_with("http://")) {
+        return Err("只支持 http / https 地址".into());
+    }
+    let cancelled = Arc::new(AtomicBool::new(false));
+    state
+        .0
+        .lock()
+        .map_err(|_| "流式请求状态锁已损坏".to_string())?
+        .insert(stream_id.clone(), cancelled.clone());
+
+    let client = reqwest::Client::builder()
+        .timeout(Duration::from_millis(timeout_ms.unwrap_or(180_000)))
+        .build()
+        .map_err(|err| err.to_string())?;
+    let verb = method.unwrap_or_else(|| "POST".into()).to_uppercase();
+    let mut req = match verb.as_str() {
+        "GET" => client.get(&url),
+        "POST" => client.post(&url),
+        other => return Err(format!("流式请求不支持的方法：{other}")),
+    };
+    if let Some(map) = headers {
+        for (key, value) in map {
+            req = req.header(key, value);
+        }
+    }
+    if let Some(payload) = body.filter(|value| !value.is_empty()) {
+        req = req.body(payload);
+    }
+
+    let result = async {
+        let mut response = req.send().await.map_err(|err| err.to_string())?;
+        let status = response.status().as_u16();
+        if !response.status().is_success() {
+            let text = response.text().await.unwrap_or_default();
+            on_event
+                .send(FetchStreamEvent {
+                    kind: "error".into(),
+                    text: Some(text.chars().take(500).collect()),
+                    status: Some(status),
+                    message: None,
+                })
+                .map_err(|err| err.to_string())?;
+            return Ok(());
+        }
+
+        let mut pending = Vec::<u8>::new();
+        loop {
+            if cancelled.load(Ordering::Relaxed) {
+                return Ok(());
+            }
+            let next = tokio::select! {
+                _ = tokio::time::sleep(Duration::from_millis(100)) => continue,
+                next = response.chunk() => next,
+            };
+            match next {
+                Ok(Some(bytes)) => emit_stream_text(&on_event, &bytes, &mut pending)?,
+                Ok(None) => break,
+                Err(err) => {
+                    if cancelled.load(Ordering::Relaxed) {
+                        return Ok(());
+                    }
+                    on_event
+                        .send(FetchStreamEvent {
+                            kind: "error".into(),
+                            text: None,
+                            status: None,
+                            message: Some(err.to_string()),
+                        })
+                        .map_err(|err| err.to_string())?;
+                    return Ok(());
+                }
+            }
+        }
+        if !pending.is_empty() {
+            on_event
+                .send(FetchStreamEvent {
+                    kind: "chunk".into(),
+                    text: Some(String::from_utf8_lossy(&pending).to_string()),
+                    status: None,
+                    message: None,
+                })
+                .map_err(|err| err.to_string())?;
+        }
+        on_event
+            .send(FetchStreamEvent {
+                kind: "done".into(),
+                text: None,
+                status: None,
+                message: None,
+            })
+            .map_err(|err| err.to_string())
+    }
+    .await;
+
+    if let Ok(mut map) = state.0.lock() {
+        map.remove(&stream_id);
+    }
+    result
 }
 
 #[derive(serde::Deserialize)]
@@ -3218,6 +3384,7 @@ pub fn run() {
          * 进的是 `AppHandle` 的受管状态，所以 `cli_run` 与 `cli_kill` 看到的是同一张表。
          */
         .manage(CliRegistry::default())
+        .manage(FetchStreamCancels::default())
         /*
          * 窗口几何的自动记盘（用户 2026-10-06 第 11 批第 7 条："记住上次窗口尺寸和位置"）。
          *
@@ -3279,6 +3446,8 @@ pub fn run() {
             profile_backup_info,
             fetch_bytes,
             fetch_text,
+            fetch_stream,
+            cancel_fetch_stream,
             cli_which,
             cli_run,
             cli_kill,

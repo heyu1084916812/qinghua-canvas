@@ -132,6 +132,8 @@ export interface ChatMessage {
    * 用户写的那几个矩形框。一份数据两个用途，只能分开存。
    */
   display?: string
+  /** Internal deterministic control message; never rendered as a user bubble. */
+  hiddenFromConversation?: boolean
   /**
    * 渠道公开返回的过程摘要（OpenAI 兼容 `reasoning_content` / Gemini thought parts）。
    * 只用于时间线展示，发回模型前必须剥离。

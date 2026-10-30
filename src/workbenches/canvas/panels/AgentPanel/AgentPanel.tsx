@@ -39,6 +39,7 @@ import {
   confirmationSettlementMessages,
 } from '../../../../domain/agent/confirmation'
 import {
+  advanceAgentTaskPlanAfterReview,
   agentTaskPlanProgress,
   normalizeTaskPlanProposal,
   taskPlanPrompt,
@@ -155,6 +156,11 @@ import {
   subscribeAgentDeliveryMode,
 } from '../../../../state/ui/agentDelivery'
 import {
+  getAgentReviewModel,
+  setAgentReviewModel,
+  subscribeAgentReviewModel,
+} from '../../../../state/ui/agentReviewModel'
+import {
   IconAuto,
   IconArrowUp,
   IconCheck,
@@ -187,6 +193,7 @@ import {
   preferredGeneratedModel,
 } from './mediaMentions'
 import { TaskPlanCard } from './TaskPlanCard'
+import { isAdvanceTaskCommand, latestProcessLine } from './agentProcessText'
 import {
   AGENT_COMPOSER_HEIGHT_KEY,
   AGENT_COMPOSER_HEIGHT_MIN,
@@ -407,6 +414,24 @@ export function AgentPanel({
       return next
     })
   }, [])
+  const appendLiveProcessFor = useCallback(
+    (sessionId: string, delta: string) => {
+      if (!delta) return
+      setLiveProcessBySession((prev) => ({
+        ...prev,
+        [sessionId]: `${prev[sessionId] ?? ''}${delta}`,
+      }))
+    },
+    [],
+  )
+  const clearLiveProcessFor = useCallback((sessionId: string) => {
+    setLiveProcessBySession((prev) => {
+      if (!(sessionId in prev)) return prev
+      const next = { ...prev }
+      delete next[sessionId]
+      return next
+    })
+  }, [])
   const controller = useMemo(
     () =>
       createAgentController({
@@ -470,14 +495,23 @@ export function AgentPanel({
   const [liveActivitiesBySession, setLiveActivitiesBySession] = useState<
     Record<string, AgentLoopActivity[]>
   >({})
+  const [liveProcessBySession, setLiveProcessBySession] = useState<
+    Record<string, string>
+  >({})
   const runTasks = current ? runTasksBySession[current.id] : undefined
   const liveActivities = current
     ? liveActivitiesBySession[current.id] ?? []
     : []
+  const liveProcess = current ? liveProcessBySession[current.id] ?? '' : ''
   const deliveryMode = useSyncExternalStore(
     subscribeAgentDeliveryMode,
     getAgentDeliveryMode,
     getAgentDeliveryMode,
+  )
+  const reviewModel = useSyncExternalStore(
+    subscribeAgentReviewModel,
+    getAgentReviewModel,
+    getAgentReviewModel,
   )
   const queuePumpingRef = useRef(new Set<string>())
   const confirmingRef = useRef(new Set<string>())
@@ -534,6 +568,7 @@ export function AgentPanel({
     setQueueMenuPosition(null)
     setEditingQueueId(null)
     setEditingQueueText('')
+    setAdvancingTaskPlan(false)
   }, [current?.id])
   useEffect(() => {
     let alive = true
@@ -618,6 +653,7 @@ export function AgentPanel({
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
   /** 刚复制过哪一条助手回复：图标短暂换成对勾，给用户一个「确实复制了」的回执 */
   const [copiedKey, setCopiedKey] = useState<number | null>(null)
+  const [advancingTaskPlan, setAdvancingTaskPlan] = useState(false)
   /**
    * 当前展开的参数浮层（模型 / 技能 / 参数三选一）。
    *
@@ -701,9 +737,13 @@ export function AgentPanel({
   )
   const routeExecution = useMemo(
     () =>
-      createRouteExecutionPort((request) =>
-        channels.completeWithTools(request),
-      ),
+      createRouteExecutionPort((request) => {
+        const { onStream, ...rest } = request
+        return channels.completeWithTools({
+          ...rest,
+          ...(onStream ? { onChunk: onStream } : {}),
+        })
+      }),
     [channels],
   )
 
@@ -884,7 +924,9 @@ export function AgentPanel({
       await channels.load()
       const rows = await refresh()
       const defaultSkillId = await presets.loadAgentDefaultSkill()
+      const savedReviewModel = await presets.loadAgentReviewModel()
       if (!alive) return
+      setAgentReviewModel(savedReviewModel ?? '')
       if (rows.length > 0) {
         const head = rows[0]!
         if (!head.skillId && defaultSkillId) {
@@ -1585,13 +1627,13 @@ export function AgentPanel({
         const requestedIds = [
           ...new Set(review.nodeIds.map((id) => aliases?.get(id) ?? id)),
         ]
-        const targetNodeIds = requestedIds.slice(0, 8)
+        const targetNodeIds = requestedIds.slice(0, 4)
         const limitations: string[] = []
         if (requestedIds.length > targetNodeIds.length) {
           limitations.push(
-            `本次只验收前 ${targetNodeIds.length} 张，另有 ${
+            `本次快速验收先看前 ${targetNodeIds.length} 张，另有 ${
               requestedIds.length - targetNodeIds.length
-            } 张未提交。`,
+            } 张未提交；需要全量验收时再单独发起。`,
           )
         }
         if (!route) {
@@ -1606,6 +1648,77 @@ export function AgentPanel({
             limitations: [...limitations, '请确认对话模型已配置并且支持图片输入'],
           }
         }
+        let reviewRoute = route
+        if (reviewModel.trim()) {
+          const logicalModel =
+            toLogicalName(allChannels, reviewModel) || reviewModel.trim()
+          const capability = capabilityOfLogical(allChannels, logicalModel)
+          if (!capability?.inputTypes.includes('image')) {
+            return {
+              ok: false,
+              verdict: 'unreviewable',
+              summary: `视觉验收模型「${logicalModel}」不支持图片输入，请重新选择`,
+              issues: [],
+              targetNodeIds,
+              referenceAssetCount: 0,
+              suiteContextAvailable: false,
+              limitations,
+            }
+          }
+          const planned = await modelRoute.plan({
+            capability: 'chat',
+            logicalModel,
+          })
+          if (!planned.ok) {
+            return {
+              ok: false,
+              verdict: 'unreviewable',
+              summary: `视觉验收模型「${logicalModel}」当前没有可路由的已启用渠道`,
+              issues: [],
+              targetNodeIds,
+              referenceAssetCount: 0,
+              suiteContextAvailable: false,
+              limitations,
+            }
+          }
+          const candidates = runRouteCandidatesOf(planned.plan)
+          const first = candidates[0]
+          if (!first) {
+            return {
+              ok: false,
+              verdict: 'unreviewable',
+              summary: `视觉验收模型「${logicalModel}」当前没有可路由的已启用渠道`,
+              issues: [],
+              targetNodeIds,
+              referenceAssetCount: 0,
+              suiteContextAvailable: false,
+              limitations,
+            }
+          }
+          reviewRoute = {
+            channelId: first.channelId,
+            ...(first.credentialGroupId
+              ? { credentialGroupId: first.credentialGroupId }
+              : {}),
+            logicalModel,
+            upstreamModel: first.model,
+            routePlanId: `${planned.plan.logicalModel}:${planned.plan.capability}:${planned.plan.strategy}`,
+            candidates,
+          }
+        } else if (
+          !capabilityOfLogical(allChannels, route.logicalModel)?.inputTypes.includes('image')
+        ) {
+          return {
+            ok: false,
+            verdict: 'unreviewable',
+            summary: `主模型「${route.logicalModel}」不支持图片输入，请先为视觉验收单独选择模型`,
+            issues: [],
+            targetNodeIds,
+            referenceAssetCount: 0,
+            suiteContextAvailable: false,
+            limitations,
+          }
+        }
 
         const trace = contextTraceRef.current.get(session.id)
         const prepared = await prepareVisualReviewImages({
@@ -1613,6 +1726,8 @@ export function AgentPanel({
           nodeIds: targetNodeIds,
           contextAssets: trace?.assetRefs,
           readAsset: (hash) => platform.assets.read(hash),
+          maxTargets: 4,
+          maxReferences: 4,
         })
         limitations.push(...prepared.limitations)
         const suiteContextAvailable =
@@ -1644,8 +1759,8 @@ export function AgentPanel({
         const reviewInputs = [...prepared.targetInputs, ...prepared.contextInputs]
         try {
           const reviewed = await routeExecution.execute({
-            channelId: route.channelId,
-            model: route.upstreamModel,
+            channelId: reviewRoute.channelId,
+            model: reviewRoute.upstreamModel,
             modelIsUpstream: true,
             tools: [],
             messages: [
@@ -1656,8 +1771,8 @@ export function AgentPanel({
             signal:
               abortRefs.current.get(session.id)?.signal ??
               new AbortController().signal,
-            routeCandidates: route.candidates,
-            routePlanId: route.routePlanId,
+            routeCandidates: reviewRoute.candidates,
+            routePlanId: reviewRoute.routePlanId,
             trace: directTextTrace({
               projectId: graph.projectId,
               workbench: 'canvas',
@@ -1665,8 +1780,8 @@ export function AgentPanel({
               scopeId: `session:${session.id}`,
               operationId,
               purpose: 'agent-visual-review',
-              channelId: route.channelId,
-              model: route.upstreamModel,
+              channelId: reviewRoute.channelId,
+              model: reviewRoute.upstreamModel,
               prompt,
               inputs: reviewInputs,
               params: {
@@ -1677,7 +1792,6 @@ export function AgentPanel({
               },
             }),
             onRecordWarning,
-            onRouteSucceeded,
           })
           const parsed = parseVisualReviewText(reviewed.text, prepared.targets)
           const finalized = finalizeVisualReviewResult(parsed, {
@@ -1722,6 +1836,51 @@ export function AgentPanel({
               onRecordWarning,
               ...(route ? { onRouteSucceeded } : {}),
             }),
+        },
+        streamModel: (
+          req: TextRunRequest,
+          signal: AbortSignal,
+          onProcess: (chunk: {
+            kind: 'reasoning' | 'content' | 'tool'
+            text: string
+          }) => void,
+        ) =>
+          routeExecution.execute({
+            channelId: route?.channelId ?? req.channelId,
+            model: route?.upstreamModel ?? req.model,
+            modelIsUpstream: Boolean(route),
+            tools: req.tools ?? (toolMode === 'native' ? AGENT_TOOLS : []),
+            messages: req.messages ?? [],
+            inputs: req.inputs,
+            signal,
+            ...(route
+              ? {
+                  routeCandidates: route.candidates,
+                  routePlanId: route.routePlanId,
+                }
+              : {}),
+            trace: traceOf(req, 'agent'),
+            onRecordWarning,
+            ...(route ? { onRouteSucceeded } : {}),
+            onStream: (chunk) => {
+              if (chunk.reasoning) {
+                onProcess({ kind: 'reasoning', text: chunk.reasoning })
+              }
+              if (chunk.text) {
+                onProcess({ kind: 'content', text: chunk.text })
+              }
+              for (const delta of chunk.toolCallDeltas ?? []) {
+                if (delta.name) {
+                  onProcess({ kind: 'tool', text: `准备调用 ${delta.name}` })
+                }
+              }
+            },
+          }),
+        onProcess: (kind: 'reasoning' | 'content' | 'tool', text: string) => {
+          appendLiveProcessFor(session.id, text)
+          if (kind === 'reasoning' || kind === 'content') {
+            setStatusFor(session.id, { kind: 'thinking' })
+          }
         },
         channelId: route?.channelId ?? '',
         model: logicalModel,
@@ -1859,6 +2018,8 @@ export function AgentPanel({
       allChannels,
       channels,
       cachedChatRoute,
+      modelRoute,
+      reviewModel,
       viewport,
       toolCtx,
       store,
@@ -1866,6 +2027,7 @@ export function AgentPanel({
       jobs,
       executeToolWithLedger,
       routeExecution,
+      appendLiveProcessFor,
       setLiveActivityFor,
       setRunTasksFor,
       setStatusFor,
@@ -1886,6 +2048,7 @@ export function AgentPanel({
         !outcomeController.signal.aborted
       if (!outcomeIsCurrent()) return
       clearLiveActivitiesFor(session.id)
+      clearLiveProcessFor(session.id)
       clearRunTasksFor(session.id)
       /**
        * 消息只写回**它自己那个会话的界面**：用户可能已经切走去看别的会话了，
@@ -2065,6 +2228,7 @@ export function AgentPanel({
     },
     [
       clearLiveActivitiesFor,
+      clearLiveProcessFor,
       clearRunTasksFor,
       jobs,
       persist,
@@ -2168,6 +2332,7 @@ export function AgentPanel({
     session: AgentSession,
     queuedSession?: AgentSession,
     turnId?: string,
+    internalControl = false,
   ) => {
     if (!session.model) {
       setStatusFor(session.id, { kind: 'error', message: '还没选模型：先在上面选一个对话模型' })
@@ -2204,6 +2369,7 @@ export function AgentPanel({
     const controller = new AbortController()
     abortRefs.current.set(session.id, controller)
     clearLiveActivitiesFor(session.id)
+    clearLiveProcessFor(session.id)
     clearRunTasksFor(session.id)
     setStatusFor(session.id, { kind: 'thinking' })
     autoRunRef.current.set(session.id, session.autoRun === true)
@@ -2494,6 +2660,7 @@ export function AgentPanel({
         content: stripMentionMarkup(text),
         display: text,
         createdAt: Date.now(),
+        ...(internalControl ? { hiddenFromConversation: true } : {}),
         imageNodeIds: [...new Set([
           ...sentAssetIds,
           ...mentions
@@ -2567,7 +2734,11 @@ export function AgentPanel({
   const sendText = useCallback(async (
     raw: string,
     queuedSession?: AgentSession,
-    opts: { preclaimed?: boolean; queueTurnId?: string } = {},
+    opts: {
+      preclaimed?: boolean
+      queueTurnId?: string
+      internalControl?: boolean
+    } = {},
   ) => {
     const text = raw.trim()
     const session = queuedSession ?? current
@@ -2584,6 +2755,7 @@ export function AgentPanel({
         session,
         queuedSession,
         opts.queueTurnId,
+        opts.internalControl === true,
       )
       if (!outcome) {
         if (opts.queueTurnId) {
@@ -2620,6 +2792,7 @@ export function AgentPanel({
         error instanceof AgentToolEffectBlockedError ? error : null
       deliveredSteersRef.current.delete(session.id)
       clearLiveActivitiesFor(session.id)
+      clearLiveProcessFor(session.id)
       clearRunTasksFor(session.id)
       await transitionSessionJob(
         session.id,
@@ -2653,6 +2826,7 @@ export function AgentPanel({
   }, [
     applySessionSnapshot,
     clearLiveActivitiesFor,
+    clearLiveProcessFor,
     clearRunTasksFor,
     controller,
     current,
@@ -2909,6 +3083,7 @@ export function AgentPanel({
         setMessages(settledMessages)
       }
       clearLiveActivitiesFor(session.id)
+      clearLiveProcessFor(session.id)
       clearRunTasksFor(session.id)
       setStatusFor(session.id, IDLE_STATUS)
       return latest
@@ -2916,6 +3091,7 @@ export function AgentPanel({
     [
       applySessionSnapshot,
       clearLiveActivitiesFor,
+      clearLiveProcessFor,
       clearRunTasksFor,
       messages,
       sessions,
@@ -3006,6 +3182,89 @@ export function AgentPanel({
   ])
 
   /**
+   * “直接下一步”是控制命令，不是聊天内容。先中止当前验收请求，再原子地
+   * 验收当前步骤、启动下一步，最后用隐藏控制消息继续执行。
+   */
+  const advanceTaskPlan = useCallback(async (session?: AgentSession) => {
+    const target = session ?? current
+    if (!target?.taskPlan) {
+      store.notify('当前没有可推进的任务计划', 'info')
+      return false
+    }
+    const currentStep = target.taskPlan.steps.find(
+      (step) => step.id === target.taskPlan?.currentStepId,
+    )
+    const advanced = advanceAgentTaskPlanAfterReview(
+      target.taskPlan,
+      currentStep?.id,
+      Date.now(),
+    )
+    if (!advanced.ok) {
+      store.notify(advanced.problems.join('；'), 'error')
+      return false
+    }
+
+    const pendingConfirmation =
+      status.kind === 'awaitingConfirm' ? status.request : target.pendingConfirmation
+    abortRefs.current.get(target.id)?.abort()
+    if (pendingConfirmation) {
+      await settleInterruptedSession(target, pendingConfirmation, 'canceled')
+    } else {
+      for (let attempt = 0; attempt < 60; attempt += 1) {
+        if (!isSessionActivityActive(target.id)) break
+        await new Promise((resolve) => window.setTimeout(resolve, 100))
+      }
+    }
+    if (isSessionActivityActive(target.id)) {
+      store.notify('旧验收仍在收尾，请稍后再点一次', 'error')
+      return false
+    }
+
+    clearLiveActivitiesFor(target.id)
+    clearLiveProcessFor(target.id)
+    clearRunTasksFor(target.id)
+    setStatusFor(target.id, IDLE_STATUS)
+    const updated = await sessions.updateFields(target.id, {
+      taskPlan: advanced.plan,
+      pendingConfirmation: undefined,
+      continuation: undefined,
+    })
+    const resolved = updated ?? { ...target, taskPlan: advanced.plan }
+    applySessionSnapshot(resolved)
+
+    const closed = currentStep?.title ?? '当前步骤'
+    const next = advanced.plan.steps.find(
+      (step) => step.id === advanced.plan.currentStepId,
+    )
+    if (!next) {
+      store.notify(`已完成「${closed}」，整个计划已结束`, 'info')
+      return true
+    }
+    store.notify(`已跳过「${closed}」验收，进入「${next.title}」`, 'info')
+    await sendText(
+      `系统控制：用户已跳过「${closed}」的验收并确认直接进入下一步。` +
+        `现在开始执行计划步骤「${next.title}」。` +
+        `请沿用计划目标、已有画布产物和约束继续，不要再次询问是否进入下一步，` +
+        `也不要把这句控制指令当成新的业务需求。`,
+      resolved,
+      { internalControl: true },
+    )
+    return true
+  }, [
+    applySessionSnapshot,
+    clearLiveActivitiesFor,
+    clearLiveProcessFor,
+    clearRunTasksFor,
+    current,
+    sendText,
+    sessions,
+    setStatusFor,
+    settleInterruptedSession,
+    status,
+    store,
+  ])
+
+  /**
    * 输入框里的“引导”：直接把当前草稿投进正在运行的回合。
    *
    * 普通运行中走 pendingSteers；停在确认卡时先取消未执行动作，再把这条消息
@@ -3072,6 +3331,12 @@ export function AgentPanel({
   const send = useCallback(
     (requestedMode: AgentDeliveryMode = deliveryMode) => {
       if (!draft.trim()) return
+      if (current?.taskPlan && isAdvanceTaskCommand(draft)) {
+        setDraft('')
+        saveAgentDraft(current.id, '')
+        void advanceTaskPlan(current)
+        return
+      }
       if (
         statusIsBusy(status) ||
         (current && isSessionActivityActive(current.id))
@@ -3085,7 +3350,16 @@ export function AgentPanel({
       }
       void sendText(draft)
     },
-    [current, deliveryMode, draft, guideDraft, queueText, sendText, status],
+    [
+      advanceTaskPlan,
+      current,
+      deliveryMode,
+      draft,
+      guideDraft,
+      queueText,
+      sendText,
+      status,
+    ],
   )
 
   /**
@@ -4239,27 +4513,38 @@ export function AgentPanel({
       </header>
 
       <div className={styles.contentWrap} data-agent-scroll-wrap>
+      {current?.taskPlan && (
+        <div className={styles.planDock} data-agent-task-plan-dock>
+          <TaskPlanCard
+            plan={current.taskPlan}
+            pendingConfirmationStepId={pendingTaskStepId}
+            advancing={advancingTaskPlan}
+            onAdvanceToNext={() => {
+              if (advancingTaskPlan) return
+              setAdvancingTaskPlan(true)
+              void advanceTaskPlan(current).finally(() => {
+                setAdvancingTaskPlan(false)
+              })
+            }}
+            currentActivity={
+              statusIsBusy(status) && current.taskPlan.currentStepId
+                ? {
+                    running: true,
+                    text:
+                      latestProcessLine(liveProcess) ||
+                      activityTextOf(status, 0, items, liveActivities),
+                  }
+                : undefined
+            }
+          />
+        </div>
+      )}
       <div
         className={styles.content}
         ref={scrollRef}
         data-agent-content
         onScroll={onConversationScroll}
       >
-      {current?.taskPlan && (
-        <TaskPlanCard
-          plan={current.taskPlan}
-          pendingConfirmationStepId={pendingTaskStepId}
-          currentActivity={
-            statusIsBusy(status) && current.taskPlan.currentStepId
-              ? {
-                  running: true,
-                  text: activityTextOf(status, 0, items, liveActivities),
-                }
-              : undefined
-          }
-        />
-      )}
-
       <div className={styles.messages} data-agent-messages>
         {visibleItems.length === 0 && (
           <p className={styles.hint}>
@@ -4316,6 +4601,7 @@ export function AgentPanel({
                 items={items}
                 activities={live ? liveActivities : []}
                 history={item.entries}
+                processText={live ? liveProcess : ''}
                 startedAt={item.startedAt}
                 finishedAt={item.finishedAt}
                 live={live}
@@ -4510,6 +4796,7 @@ export function AgentPanel({
           items={items}
           activities={liveActivities}
           history={[]}
+          processText={liveProcess}
           startedAt={latestUserStartedAt}
           live
         />
@@ -5493,6 +5780,7 @@ function AgentActivityStrip({
   items,
   activities,
   history,
+  processText,
   startedAt,
   finishedAt,
   live,
@@ -5501,6 +5789,7 @@ function AgentActivityStrip({
   items: readonly ConversationItem[]
   activities: readonly AgentLoopActivity[]
   history: readonly ConversationProcessEntry[]
+  processText: string
   startedAt?: number
   finishedAt?: number
   live: boolean
@@ -5520,8 +5809,8 @@ function AgentActivityStrip({
         activity.status === 'running' && activity.detail?.trim(),
     )?.detail?.trim()
   const latestHistory = reasoningHistory.at(-1) ?? history.at(-1)
-  const earlierHistory = reasoningHistory.slice(0, -1)
-  const canExpand = earlierHistory.length > 0
+  const processHistory = reasoningHistory
+  const canExpand = Boolean(processText.trim()) || processHistory.length > 0
   const generationTool = status.kind === 'executing' ? status.tool : undefined
 
   useEffect(() => {
@@ -5556,10 +5845,10 @@ function AgentActivityStrip({
     live && status.kind === 'executing' &&
     (status.tool === 'runNode' || status.tool === 'runFrom')
   const visibleText = !live
-    ? latestHistory?.text ?? ''
+    ? latestProcessLine(processText || latestHistory?.text || '')
     : isGeneration
       ? currentText
-      : liveDetail || latestHistory?.text || currentText
+      : latestProcessLine(processText) || liveDetail || latestProcessLine(latestHistory?.text || '') || currentText
   const elapsedEnd =
     live
       ? now
@@ -5625,13 +5914,20 @@ function AgentActivityStrip({
       ) : null}
       {expanded && canExpand ? (
         <div className={styles.activityList} data-agent-activity-list>
-          {earlierHistory.map((step) => (
+          {processText.trim() ? (
+            <div className={styles.activityProcessBody} data-agent-process-live-body>
+              <MarkdownBlocks source={processText} />
+            </div>
+          ) : null}
+          {processHistory.map((step) => (
             <div
               key={step.id}
               className={styles.activityRow}
               data-agent-process-row={step.id}
             >
-              <span className={styles.activityStepName}>{step.text}</span>
+              <div className={styles.activityStepName}>
+                <MarkdownBlocks source={step.text} />
+              </div>
               {step.createdAt ? (
                 <time
                   className={styles.activityStepTime}

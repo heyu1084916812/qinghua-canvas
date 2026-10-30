@@ -6,8 +6,15 @@ import {
   type KeyboardEvent as ReactKeyboardEvent,
 } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useChannels } from '../../app/providers/ChannelStoreProvider'
 import { usePlatform } from '../../app/providers/PlatformProvider'
 import { useSkillsOptional } from '../../app/providers/SkillStoreProvider'
+import {
+  capabilityOfLogical,
+  channelIdForLogical,
+  panelModelOptions,
+  toLogicalName,
+} from '../../domain/project/modelCatalog'
 import type { AgentDeliveryMode } from '../../domain/agent/delivery'
 import {
   AGENT_TOOL_GROUP_LABELS,
@@ -25,7 +32,13 @@ import {
   setAgentDeliveryMode,
   subscribeAgentDeliveryMode,
 } from '../../state/ui/agentDelivery'
+import {
+  getAgentReviewModel,
+  setAgentReviewModel,
+  subscribeAgentReviewModel,
+} from '../../state/ui/agentReviewModel'
 import { AgentMemoryPanel } from './AgentMemoryPanel'
+import { ChoicePicker } from '../shared/choicePicker/ChoicePicker'
 import styles from './AgentSettingsPanel.module.css'
 
 const TABS: readonly { id: AgentSettingsTab; label: string }[] = [
@@ -126,6 +139,91 @@ function DeliverySettings() {
   )
 }
 
+function ReviewModelSettings() {
+  const platform = usePlatform()
+  const channels = useChannels()
+  const presets = useMemo(() => createPresetStore(platform.storage), [platform])
+  const reviewModel = useSyncExternalStore(
+    subscribeAgentReviewModel,
+    getAgentReviewModel,
+    getAgentReviewModel,
+  )
+  const channelRows = useSyncExternalStore(
+    channels.subscribe,
+    () => channels.getState().channels,
+    () => channels.getState().channels,
+  )
+  const [status, setStatus] = useState('')
+
+  useEffect(() => {
+    let alive = true
+    void presets
+      .loadAgentReviewModel()
+      .then((saved) => {
+        if (!alive) return
+        const logical = saved ? toLogicalName(channelRows, saved) : ''
+        setAgentReviewModel(logical)
+      })
+      .catch(() => {
+        if (alive) setStatus('读取失败，当前沿用 Agent 主模型')
+      })
+    return () => {
+      alive = false
+    }
+  }, [channelRows, presets])
+
+  const options = useMemo(() => {
+    const enabled = channelRows.filter((channel) => channel.enabled)
+    return panelModelOptions('chat').filter((model) => {
+      if (!channelIdForLogical(enabled, model)) return false
+      return capabilityOfLogical(channelRows, model)?.inputTypes.includes('image') === true
+    })
+  }, [channelRows])
+
+  const choose = async (next: string) => {
+    setAgentReviewModel(next)
+    setStatus('')
+    try {
+      await presets.saveAgentReviewModel(next || null)
+      setStatus(next ? '已保存，下一次视觉验收生效' : '已改为沿用 Agent 主模型')
+    } catch {
+      setStatus('保存失败，本次仍按当前选择生效')
+    }
+  }
+
+  return (
+    <section className={styles.section} data-agent-settings-review-model>
+      <div className={styles.sectionHead}>
+        <h3>视觉验收模型</h3>
+        <p>验收单独选一个能看图的对话模型，不再占用主 Agent 模型的回合。</p>
+      </div>
+      <label className={styles.field}>
+        <span className={styles.fieldLabel}>验收模型</span>
+        <ChoicePicker
+          name="agent-review-model"
+          className={styles.select}
+          value={reviewModel}
+          ariaLabel="视觉验收模型"
+          placeholder="沿用 Agent 主模型（需支持看图）"
+          options={[
+            { value: '', label: '沿用 Agent 主模型' },
+            ...options.map((model) => ({ value: model, label: model })),
+          ]}
+          onChange={(next) => void choose(next)}
+        />
+      </label>
+      <p className={styles.hint}>
+        只列出已启用且支持图片输入的对话模型。未配置时，主模型支持看图才会执行验收。
+      </p>
+      {status ? (
+        <p className={styles.status} role="status">
+          {status}
+        </p>
+      ) : null}
+    </section>
+  )
+}
+
 export function AgentSettingsPanel({
   tab,
   onTabChange,
@@ -207,6 +305,7 @@ export function AgentSettingsPanel({
                 <dd>只使用已启用渠道和已勾选 Key 分组</dd>
               </div>
             </dl>
+            <ReviewModelSettings />
             <button
               type="button"
               className={styles.inlineButton}

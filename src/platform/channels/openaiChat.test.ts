@@ -3,6 +3,7 @@ import { createOpenAiChatAdapter } from './openaiChat'
 import { createMemoryNetwork, createMemoryPlatform } from '../../platform/memory'
 import type { ResolvedChannelConfig } from './registry'
 import { ChannelError, type TextRunRequest } from './types'
+import type { StreamChunk } from '../ports'
 
 function resp(status: number, obj: unknown) {
   return {
@@ -101,6 +102,58 @@ describe('openaiChat adapter / 基础契约', () => {
     const result = await adapter.completeText(request([]), signal)
     expect(result.text).toBe('重试成功')
     expect(calls).toBe(2)
+  })
+
+  it('streamChat 发送 stream=true，并原样转发正文、推理和工具参数分片', async () => {
+    let body: Record<string, unknown> | null = null
+    const net = createMemoryNetwork({ handler: async () => resp(200, {}) })
+    const streamNet = {
+      ...net,
+      async *stream(
+        req: Parameters<typeof net.stream>[0],
+        _streamSignal: AbortSignal,
+      ): AsyncIterable<StreamChunk> {
+        body = req.body as Record<string, unknown>
+        yield { type: 'delta', reasoning: '先看图' }
+        yield { type: 'delta', text: '开始规划' }
+        yield {
+          type: 'tool_call',
+          toolCallDeltas: [{
+            index: 0,
+            id: 'call_1',
+            name: 'applyPlan',
+            arguments: '{"nodes":',
+          }],
+        }
+        yield { type: 'done' }
+      },
+    }
+    const adapter = createOpenAiChatAdapter(cfg, {
+      network: streamNet,
+      assets: platformWith([]).assets,
+    })
+    const chunks = []
+    for await (const chunk of adapter.streamChat!(request([]), signal)) {
+      chunks.push(chunk)
+    }
+    expect(body).toMatchObject({
+      model: 'gpt-4o',
+      stream: true,
+    })
+    expect(chunks).toEqual([
+      { type: 'delta', reasoning: '先看图' },
+      { type: 'delta', text: '开始规划' },
+      {
+        type: 'tool_call',
+        toolCallDeltas: [{
+          index: 0,
+          id: 'call_1',
+          name: 'applyPlan',
+          arguments: '{"nodes":',
+        }],
+      },
+      { type: 'done' },
+    ])
   })
 })
 

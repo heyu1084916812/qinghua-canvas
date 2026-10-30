@@ -44,6 +44,7 @@ const ROUTE_STRATEGY_ROW_ID = 'routing:strategy'
 const AGENT_DEFAULT_ROW_ID = 'agent:default'
 const AGENT_DEFAULT_SKILL_ROW_ID = 'agent:skill'
 const AGENT_DELIVERY_ROW_ID = 'agent:delivery'
+const AGENT_REVIEW_MODEL_ROW_ID = 'agent:review-model'
 
 /**
  * **技能收藏**的保留行 id（用户 2026-10-03：对话窗的技能菜单要按参考产品分成
@@ -107,6 +108,9 @@ export interface PresetStore {
   loadAgentDeliveryMode(): Promise<AgentDeliveryMode>
   /** 写入 Agent 运行中发送偏好。 */
   saveAgentDeliveryMode(mode: AgentDeliveryMode): Promise<void>
+  /** 仅用于视觉验收的逻辑对话模型；空值表示沿用 Agent 主模型。 */
+  loadAgentReviewModel(): Promise<string | null>
+  saveAgentReviewModel(model: string | null): Promise<void>
   /** 读技能收藏（技能 id 列表）；没收藏过返回空数组 */
   loadSkillFavorites(): Promise<string[]>
   /** 写技能收藏（整份覆盖） */
@@ -247,6 +251,25 @@ export function createPresetStore(storage: StoragePort): PresetStore {
         )
       } catch {
         // 偏好写不进去不该打断对话；当前会话仍按内存里的选择生效
+      }
+    },
+    async loadAgentReviewModel() {
+      try {
+        const rows = await storage.query('presets', { id: AGENT_REVIEW_MODEL_ROW_ID })
+        const model = (rows[0] as { model?: unknown } | undefined)?.model
+        return typeof model === 'string' && model.trim() ? model.trim() : null
+      } catch {
+        return null
+      }
+    },
+    async saveAgentReviewModel(model) {
+      try {
+        await storage.put(
+          'presets',
+          { id: AGENT_REVIEW_MODEL_ROW_ID, model: model?.trim() || null } as never,
+        )
+      } catch {
+        // 偏好写入失败不能影响主对话；下次仍沿用旧值。
       }
     },
     async loadSkillFavorites() {

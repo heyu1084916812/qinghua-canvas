@@ -207,7 +207,19 @@ export interface NetworkResponse {
 export interface StreamChunk {
   type: 'delta' | 'tool_call' | 'done' | 'error'
   text?: string
+  /** Provider-returned public reasoning summary. Never synthesized locally. */
+  reasoning?: string
   toolCall?: { name: string; args: unknown }
+  /**
+   * OpenAI-compatible streams split one logical tool call across many events.
+   * Keep the raw delta here and let the adapter accumulate it.
+   */
+  toolCallDeltas?: {
+    index: number
+    id?: string
+    name?: string
+    arguments?: string
+  }[]
   error?: AppError
 }
 
@@ -682,6 +694,11 @@ export interface RemoteBytesPort {
    * 同样只有桌面壳给得出；浏览器里缺席时网络层照旧走 `fetch`，失败即如实报跨域。
    */
   request?(req: RemoteTextRequest): Promise<RemoteTextResponse>
+  /**
+   * Desktop-native SSE bridge. Browser fetch often cannot see cross-origin
+   * event streams, so the shell owns this path when available.
+   */
+  stream?(req: RemoteTextRequest, signal: AbortSignal): AsyncIterable<StreamChunk>
 }
 
 /** 通用 HTTP 的请求（形状与 `NetworkRequest` 对齐，省去一层转换） */

@@ -17,6 +17,8 @@ export function TaskPlanCard({
   plan,
   pendingConfirmationStepId,
   currentActivity,
+  onAdvanceToNext,
+  advancing = false,
 }: {
   plan: AgentTaskPlan
   pendingConfirmationStepId?: string
@@ -24,6 +26,8 @@ export function TaskPlanCard({
     running: boolean
     text: string
   }
+  onAdvanceToNext?: () => void
+  advancing?: boolean
 }) {
   const [expanded, setExpanded] = useState(true)
   const progress = agentTaskPlanProgress(plan)
@@ -101,6 +105,24 @@ export function TaskPlanCard({
           ))}
         </ol>
       )}
+      {onAdvanceToNext &&
+      progress.status === 'active' &&
+      progress.current &&
+      (Boolean(progress.current.resultsReadyAt) ||
+        pendingConfirmationStepId === progress.current.id) ? (
+        <div className={styles.actions}>
+          <button
+            type="button"
+            className={styles.advanceButton}
+            disabled={advancing}
+            onClick={onAdvanceToNext}
+            data-agent-task-plan-next
+          >
+            <span>{advancing ? '正在进入下一步' : '直接下一步'}</span>
+            <IconChevronDown size={14} className={styles.advanceIcon} />
+          </button>
+        </div>
+      ) : null}
     </section>
   )
 }

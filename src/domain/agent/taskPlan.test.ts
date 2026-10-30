@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  advanceAgentTaskPlanAfterReview,
   agentTaskPlanProgress,
   approveAgentTaskPlanReview,
   normalizeStoredTaskPlan,
@@ -9,6 +10,42 @@ import {
 } from './taskPlan'
 
 describe('Agent 任务计划', () => {
+  it('直接下一步会验收当前步骤并只启动下一步', () => {
+    const created = normalizeTaskPlanProposal(
+      {
+        title: '品牌交付',
+        steps: [
+          { id: 'logo', title: '生成 Logo', requiresConfirmation: true },
+          { id: 'vi', title: '建立 VI' },
+          { id: 'assets', title: '输出物料' },
+        ],
+      },
+      { id: 'plan-direct', now: 100 },
+    )
+    if (!created.ok) throw new Error('plan')
+    const ready = {
+      ...created.plan,
+      steps: created.plan.steps.map((step) =>
+        step.id === 'logo' ? { ...step, resultsReadyAt: 140 } : step,
+      ),
+    }
+    const advanced = advanceAgentTaskPlanAfterReview(ready, 'logo', 160)
+    expect(advanced.ok).toBe(true)
+    if (!advanced.ok) return
+    expect(advanced.plan.currentStepId).toBe('vi')
+    expect(advanced.plan.steps.map((step) => step.status)).toEqual([
+      'done',
+      'in_progress',
+      'pending',
+    ])
+    expect(advanced.plan.steps[0]).toMatchObject({
+      reviewApprovedAt: 160,
+      resultsReadyAt: 140,
+      finishedAt: 160,
+    })
+    expect(advanced.plan.steps[1]?.startedAt).toBe(160)
+  })
+
   it('计划至少两步，批准后第一步自动成为当前步骤', () => {
     const result = normalizeTaskPlanProposal(
       {

@@ -630,6 +630,7 @@ export function toConversation(
 
   for (const [messageIndex, m] of messages.entries()) {
     if (m.role === 'system') continue
+    if (m.hiddenFromConversation) continue
 
     if (m.role === 'user') {
       finishProcess()

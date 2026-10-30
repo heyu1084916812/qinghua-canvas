@@ -88,6 +88,18 @@ export type AgentLoopOutcome =
 
 export interface AgentLoopDeps {
   adapter: Pick<ChannelAdapter, 'completeText'>
+  streamModel?: (
+    request: Parameters<ChannelAdapter['completeText']>[0],
+    signal: AbortSignal,
+    onChunk: (chunk: {
+      kind: 'reasoning' | 'content' | 'tool'
+      text: string
+    }) => void,
+  ) => ReturnType<ChannelAdapter['completeText']>
+  onProcess?: (
+    kind: 'reasoning' | 'content' | 'tool',
+    text: string,
+  ) => void
   channelId: string
   model: string
   tools: readonly ToolDeclaration[]
@@ -160,25 +172,27 @@ const callFingerprint = (name: string, args: unknown): string =>
   `${name}:${JSON.stringify(args ?? {})}`
 
 async function askModel(history: ChatMessage[], deps: AgentLoopDeps) {
-  return deps.adapter.completeText(
-    {
-      kind: 'text',
-      channelId: deps.channelId,
-      model: deps.model,
-      // 给了 messages 就以它为准；prompt 只是老路径的兜底，这里留空
-      prompt: '',
-      inputs: [...(deps.inputs ?? [])],
-      params: {},
-      tools: deps.toolMode === 'json' ? [] : deps.tools,
-      messages: history.map((message) => {
-        const protocolMessage = { ...message }
-        delete protocolMessage.createdAt
-        delete protocolMessage.reasoning
-        return protocolMessage
-      }),
-    },
-    deps.signal,
-  )
+  const request = {
+    kind: 'text' as const,
+    channelId: deps.channelId,
+    model: deps.model,
+    // 给了 messages 就以它为准；prompt 只是老路径的兜底，这里留空
+    prompt: '',
+    inputs: [...(deps.inputs ?? [])],
+    params: {},
+    tools: deps.toolMode === 'json' ? [] : deps.tools,
+    messages: history.map((message) => {
+      const protocolMessage = { ...message }
+      delete protocolMessage.createdAt
+      delete protocolMessage.reasoning
+      delete protocolMessage.hiddenFromConversation
+      return protocolMessage
+    }),
+  }
+  if (!deps.streamModel) return deps.adapter.completeText(request, deps.signal)
+  return deps.streamModel(request, deps.signal, (chunk) => {
+    deps.onProcess?.(chunk.kind, chunk.text)
+  })
 }
 
 /** 跑一轮（可能是多步工具调用）：要么给出回答、要么要求确认、要么停下 */

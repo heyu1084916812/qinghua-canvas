@@ -101,6 +101,17 @@ describe('Agent 默认模型 · UI 偏好', () => {
       expect(await createPresetStore(platform.storage).loadAgentDeliveryMode()).toBe('steer')
     }
   })
+
+  it('视觉验收模型按逻辑模型名保存，清空后回到主模型', async () => {
+    const platform = createMemoryPlatform()
+    const s = createPresetStore(platform.storage)
+    expect(await s.loadAgentReviewModel()).toBeNull()
+    await s.saveAgentReviewModel('  Gemini 3.8 Flash  ')
+    expect(await createPresetStore(platform.storage).loadAgentReviewModel())
+      .toBe('Gemini 3.8 Flash')
+    await s.saveAgentReviewModel(null)
+    expect(await createPresetStore(platform.storage).loadAgentReviewModel()).toBeNull()
+  })
 })
 
 /**

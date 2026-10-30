@@ -1,5 +1,21 @@
 # CanvasFlow（轻画）项目记忆
 
+### Agent 长任务流式过程与确定性“直接下一步”（2026-10-30，对账 #831）
+
+- **计划卡必须在消息滚动区外**：`planDock` 是 `contentWrap` 的固定子项，`content` 只滚消息；
+  不要把 `TaskPlanCard` 再塞回 `[data-agent-content]`。
+- **流式只展示供应商真实公开字段**：OpenAI `delta.content / reasoning_content /
+  reasoning / thinking / analysis` 和工具参数分片可以显示；不得把私有思维链补写成假文本。
+  收起行只取最新完整句，累计正文放在折叠区。
+- **桌面流式必须走壳**：跨域中转常没有 CORS，`RemoteBytesPort.stream` → Tauri
+  `fetch_stream` 是主路径；浏览器 `fetch` 只是回退。取消必须调用 `cancel_fetch_stream`。
+- **已经吐字的流不能换渠道重试**：`GenerationClient.streamText` 在出现过任何输出后，
+  把后续错误收口为 `execution/accepted`；否则用户会被重复扣费。
+- **“直接下一步”不是引导消息**：走 `advanceAgentTaskPlanAfterReview()`，先取消当前验收，
+  完成当前步骤并启动下一步；内部指令带 `hiddenFromConversation`，不显示成用户气泡。
+- **视觉验收模型单独选**：`agent:review-model` 保存前端逻辑模型名，运行时重新选路；
+  只允许图片输入的聊天模型。默认快速验收 4 张目标 + 4 张参考，避免长任务拖沓。
+
 ### 0.1.11 数据目录、Agent 消息拆表与 Canvas MCP（2026-10-30，对账 #829）
 
 - **正式/开发配置文件名必须分开**：正式版 `storage-location.json`，开发版

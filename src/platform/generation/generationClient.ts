@@ -6,7 +6,7 @@ import {
 import { resolveUpstreamModel } from '../../domain/project/modelMapping'
 import { upstreamAliasesOf } from '../../domain/project/modelPresets'
 import type { ProtocolCatalog } from '../../domain/project/protocol'
-import type { PlatformKit } from '../ports'
+import type { PlatformKit, StreamChunk } from '../ports'
 import type {
   ChannelAdapter,
   GeneratedAsset,
@@ -91,6 +91,16 @@ export interface GenerationClient {
       hints?: GenerationHints
     },
     signal: AbortSignal,
+  ): Promise<TextResult>
+  streamText(
+    args: {
+      channel: Channel
+      model: string
+      request: Omit<TextRunRequest, 'channelId' | 'model'>
+      hints?: GenerationHints
+    },
+    signal: AbortSignal,
+    onChunk: (chunk: StreamChunk) => void,
   ): Promise<TextResult>
   generateImage(
     args: {
@@ -426,6 +436,164 @@ export function createGenerationClient(
     }
   }
 
+  const streamText: GenerationClient['streamText'] = async (
+    args,
+    signal,
+    onChunk,
+  ) => {
+    const startedAt = now()
+    let target: ResolvedGenerationTarget | null = null
+    let hadOutput = false
+    try {
+      target = await resolve({
+        channel: args.channel,
+        request: { model: args.model },
+        ...(args.hints ? { hints: args.hints } : {}),
+        kind: 'text',
+      })
+      if (signal.aborted) {
+        throw signal.reason instanceof Error
+          ? signal.reason
+          : new DOMException('Aborted', 'AbortError')
+      }
+
+      const request: TextRunRequest = {
+        ...args.request,
+        kind: 'text',
+        channelId: target.channelId,
+        model: target.upstreamModel,
+      }
+      if (!target.adapter.streamChat) {
+        const result = await target.adapter.completeText(request, signal)
+        if (result.reasoning) {
+          hadOutput = true
+          onChunk({ type: 'delta', reasoning: result.reasoning })
+        }
+        if (result.text) {
+          hadOutput = true
+          onChunk({ type: 'delta', text: result.text })
+        }
+        onChunk({ type: 'done' })
+        const finishedAt = now()
+        safeEmit(deps.onAttempt, {
+          ...(args.hints?.operationId
+            ? { operationId: args.hints.operationId }
+            : {}),
+          kind: 'text',
+          channelId: target.channelId,
+          channelName: target.channelName,
+          ...(target.credentialGroupId
+            ? { credentialGroupId: target.credentialGroupId }
+            : {}),
+          requestedModel: args.model,
+          sentModel: target.upstreamModel,
+          startedAt,
+          finishedAt,
+          durationMs: Math.max(0, finishedAt - startedAt),
+          status: 'succeeded',
+          outputCount: 1,
+        })
+        return result
+      }
+
+      let text = ''
+      let reasoning = ''
+      const calls = new Map<number, { id: string; name: string; args: string }>()
+      for await (const chunk of target.adapter.streamChat(request, signal)) {
+        if (chunk.type === 'error') {
+          throw new ChannelError(
+            chunk.error ?? { kind: 'network', detail: 'dns', sendPhase: 'unknown' },
+          )
+        }
+        if (chunk.text || chunk.reasoning || chunk.toolCallDeltas?.length || chunk.toolCall) {
+          hadOutput = true
+        }
+        text += chunk.text ?? ''
+        reasoning += chunk.reasoning ?? ''
+        for (const delta of chunk.toolCallDeltas ?? []) {
+          const current = calls.get(delta.index) ?? { id: '', name: '', args: '' }
+          calls.set(delta.index, {
+            id: delta.id || current.id,
+            name: current.name + (delta.name ?? ''),
+            args: current.args + (delta.arguments ?? ''),
+          })
+        }
+        if (chunk.toolCall) {
+          const index = calls.size
+          calls.set(index, {
+            id: `stream-tool-${index}`,
+            name: chunk.toolCall.name,
+            args: typeof chunk.toolCall.args === 'string'
+              ? chunk.toolCall.args
+              : JSON.stringify(chunk.toolCall.args ?? {}),
+          })
+        }
+        onChunk(chunk)
+        if (chunk.type === 'done') break
+      }
+      const toolCalls = [...calls.entries()]
+        .sort(([a], [b]) => a - b)
+        .flatMap(([index, call]) => call.name
+          ? [{
+              id: call.id || `stream-tool-${index}`,
+              name: call.name,
+              args: call.args || '{}',
+            }]
+          : [])
+      if (!text.trim() && !reasoning.trim() && toolCalls.length === 0) {
+        throw new ChannelError({ kind: 'parse', raw: '流式响应结束，但没有正文或工具调用' })
+      }
+      const finishedAt = now()
+      safeEmit(deps.onAttempt, {
+        ...(args.hints?.operationId
+          ? { operationId: args.hints.operationId }
+          : {}),
+        kind: 'text',
+        channelId: target.channelId,
+        channelName: target.channelName,
+        ...(target.credentialGroupId
+          ? { credentialGroupId: target.credentialGroupId }
+          : {}),
+        requestedModel: args.model,
+        sentModel: target.upstreamModel,
+        startedAt,
+        finishedAt,
+        durationMs: Math.max(0, finishedAt - startedAt),
+        status: 'succeeded',
+        outputCount: 1,
+      })
+      return {
+        text,
+        ...(reasoning.trim() ? { reasoning: reasoning.trim() } : {}),
+        ...(toolCalls.length > 0 ? { toolCalls } : {}),
+        ...(toolCalls.length > 0 ? { finishReason: 'tool_calls' as const } : {}),
+      }
+    } catch (error) {
+      const finishedAt = now()
+      safeEmit(deps.onAttempt, {
+        ...(args.hints?.operationId
+          ? { operationId: args.hints.operationId }
+          : {}),
+        kind: 'text',
+        channelId: args.channel.id,
+        channelName: args.channel.name,
+        ...(target?.credentialGroupId
+          ? { credentialGroupId: target.credentialGroupId }
+          : {}),
+        requestedModel: args.model,
+        sentModel: target?.upstreamModel ?? args.model,
+        startedAt,
+        finishedAt,
+        durationMs: Math.max(0, finishedAt - startedAt),
+        status: 'failed',
+        ...(asAppError(error) ? { error: asAppError(error)! } : {}),
+        errorText: errorTextOf(error),
+      })
+      if (hadOutput) throw new ChannelError({ kind: 'execution', detail: 'accepted' })
+      throw error
+    }
+  }
+
   return {
     resolve,
     completeText: (args, signal) =>
@@ -449,6 +617,7 @@ export function createGenerationClient(
           ),
         () => 1,
       ),
+    streamText,
     generateImage: (args, signal) =>
       attempt(
         {

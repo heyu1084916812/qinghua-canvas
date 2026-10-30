@@ -11,6 +11,7 @@ import type {
 } from '../channels/types'
 import { ChannelError } from '../channels/types'
 import { createMemoryPlatform } from '../memory'
+import type { StreamChunk } from '../ports'
 import {
   createGenerationClient,
   type GenerationAttemptEvent,
@@ -77,6 +78,7 @@ function stubAdapter(args: {
   onImage?: (request: ImageRunRequest) => void
   onVideo?: (request: VideoRunRequest) => void
   onSpeech?: (request: SpeechRunRequest) => void
+  onStream?: (request: TextRunRequest) => AsyncIterable<StreamChunk>
   videoError?: unknown
 } = {}): ChannelAdapter {
   return {
@@ -100,6 +102,9 @@ function stubAdapter(args: {
       args.onText?.(request)
       return { text: 'ok' }
     },
+    ...(args.onStream
+      ? { streamChat: (request) => args.onStream!(request) }
+      : {}),
     async generateSpeech(request) {
       args.onSpeech?.(request)
       return asset('audio/wav')
@@ -408,5 +413,75 @@ describe('公共 GenerationClient', () => {
       appError: { kind: 'channel', detail: 'missingKey' },
     })
     expect(adapterCalls).toBe(0)
+  })
+
+  it('streamText 合并正文、推理和工具参数分片，并把分片立即交给界面', async () => {
+    const client = createGenerationClient({
+      platform: createMemoryPlatform(),
+      catalog: () => BUILTIN_CATALOG,
+      loadToken: async () => 'token',
+      createAdapter: () => stubAdapter({
+        onStream: async function* () {
+          yield { type: 'delta', reasoning: '先核对参考图。' }
+          yield { type: 'delta', text: '开始建立计划。' }
+          yield {
+            type: 'tool_call',
+            toolCallDeltas: [{ index: 0, id: 'call_1', name: 'applyPlan', arguments: '{"nodes":' }],
+          }
+          yield {
+            type: 'tool_call',
+            toolCallDeltas: [{ index: 0, arguments: '[]}' }],
+          }
+          yield { type: 'done' }
+        },
+      }),
+    })
+    const updates: StreamChunk[] = []
+    const result = await client.streamText(
+      {
+        channel: channel(),
+        model: 'chat-model',
+        request: { kind: 'text', prompt: '', inputs: [], params: {} },
+      },
+      new AbortController().signal,
+      (chunk) => updates.push(chunk),
+    )
+    expect(updates).toHaveLength(5)
+    expect(result).toMatchObject({
+      text: '开始建立计划。',
+      reasoning: '先核对参考图。',
+      finishReason: 'tool_calls',
+      toolCalls: [{ id: 'call_1', name: 'applyPlan', args: '{"nodes":[]}' }],
+    })
+  })
+
+  it('流式请求一旦已经吐出内容，后续错误不会再触发另一条渠道', async () => {
+    let calls = 0
+    const client = createGenerationClient({
+      platform: createMemoryPlatform(),
+      catalog: () => BUILTIN_CATALOG,
+      loadToken: async () => 'token',
+      createAdapter: () => {
+        calls += 1
+        return stubAdapter({
+          onStream: async function* () {
+            yield { type: 'delta', text: '已经开始处理' }
+            throw new Error('connection lost')
+          },
+        })
+      },
+    })
+    await expect(client.streamText(
+      {
+        channel: channel(),
+        model: 'chat-model',
+        request: { kind: 'text', prompt: '', inputs: [], params: {} },
+      },
+      new AbortController().signal,
+      () => undefined,
+    )).rejects.toMatchObject({
+      appError: { kind: 'execution', detail: 'accepted' },
+    })
+    expect(calls).toBe(1)
   })
 })

@@ -457,6 +457,119 @@ export function createOpenAiChatAdapter(config: OpenAiChatConfig, deps: ChannelD
     return parts
   }
 
+  const streamChat: NonNullable<ChannelAdapter['streamChat']> = async function* (
+    request,
+    signal,
+  ) {
+    const parts = await imageParts(request)
+    const toolNames = new Map<string, string>()
+    for (const message of request.messages ?? []) {
+      for (const call of message.toolCalls ?? []) {
+        if (call.id && call.name) toolNames.set(call.id, call.name)
+      }
+    }
+    const lastUserIndex = request.messages
+      ? [...request.messages].reduce((acc, message, index) => (
+          message.role === 'user' ? index : acc
+        ), -1)
+      : -1
+    const messages = request.messages
+      ? request.messages.map((message, index) => {
+          if (message.role === 'tool') {
+            const toolName = message.toolName || (
+              message.toolCallId ? toolNames.get(message.toolCallId) : undefined
+            )
+            return {
+              role: 'tool',
+              tool_call_id: message.toolCallId ?? '',
+              ...(toolName ? { name: toolName } : {}),
+              content: message.content,
+            }
+          }
+          if (message.role === 'assistant' && message.toolCalls?.length) {
+            return {
+              role: 'assistant',
+              content: message.content || null,
+              tool_calls: message.toolCalls.map((call) => ({
+                id: call.id,
+                type: 'function',
+                function: { name: call.name, arguments: call.args },
+              })),
+            }
+          }
+          if (
+            message.role === 'user' &&
+            (index === lastUserIndex || (message.imageNodeIds?.length ?? 0) > 0) &&
+            parts.length > 0
+          ) {
+            return {
+              role: 'user',
+              content: [{ type: 'text', text: message.content }, ...parts],
+            }
+          }
+          return { role: message.role, content: message.content }
+        })
+      : [{
+          role: 'user',
+          content: parts.length > 0
+            ? [{ type: 'text', text: request.prompt }, ...parts]
+            : request.prompt,
+        }]
+
+    for await (const chunk of deps.network.stream(
+      {
+        url: chatUrl,
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          accept: 'text/event-stream',
+          ...authHeader(config.apiKey),
+        },
+        body: {
+          model: request.model,
+          messages,
+          stream: true,
+          ...(request.tools?.length
+            ? {
+                tools: request.tools.map((tool) => ({
+                  type: 'function',
+                  function: {
+                    name: tool.name,
+                    ...(tool.description ? { description: tool.description } : {}),
+                    parameters: tool.parameters,
+                  },
+                })),
+                tool_choice: 'auto',
+              }
+            : {}),
+        },
+        timeoutMs: request.timeoutMs ?? CHAT_TIMEOUT_MS,
+      },
+      signal,
+    )) {
+      if (chunk.type === 'error') {
+        const appError = chunk.error
+        if (
+          !request.tools?.length &&
+          /gemini/i.test(request.model) &&
+          appError?.kind === 'http' &&
+          geminiNativeRequired(appError.status, appError.body ?? '')
+        ) {
+          const result = await completeText(request, signal)
+          if (result.reasoning) yield { type: 'delta', reasoning: result.reasoning }
+          if (result.text) yield { type: 'delta', text: result.text }
+          yield { type: 'done' }
+          return
+        }
+        throw new ChannelError(
+          appError ?? { kind: 'network', detail: 'dns', sendPhase: 'unknown' },
+        )
+      }
+      yield chunk
+      if (chunk.type === 'done') return
+    }
+  }
+
   const completeText: ChannelAdapter['completeText'] = async (
     request: TextRunRequest,
     signal,
@@ -703,5 +816,6 @@ export function createOpenAiChatAdapter(config: OpenAiChatConfig, deps: ChannelD
       throw new ChannelError({ kind: 'channel', detail: 'unsupported' })
     },
     completeText,
+    streamChat,
   }
 }

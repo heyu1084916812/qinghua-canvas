@@ -1,6 +1,12 @@
-import { invoke } from '@tauri-apps/api/core'
+import { Channel, invoke } from '@tauri-apps/api/core'
 import { base64ToBytes } from '../../domain/shared/base64'
-import type { RemoteBytesPort, RemoteTextRequest, RemoteTextResponse } from '../ports'
+import type {
+  RemoteBytesPort,
+  RemoteTextRequest,
+  RemoteTextResponse,
+  StreamChunk,
+} from '../ports'
+import { createLineSplitter, parseSSELine } from '../sse'
 
 /**
  * Rust `fetch_bytes` 的返回形状（见 `src-tauri/src/lib.rs` 同名命令）。
@@ -20,6 +26,13 @@ interface RawFetchedText {
   headers: Record<string, string>
   text: string
   bodyBase64?: string
+}
+
+interface RawFetchStreamEvent {
+  kind: 'chunk' | 'error' | 'done'
+  text?: string
+  status?: number
+  message?: string
 }
 
 /**
@@ -68,6 +81,103 @@ export function createTauriRemoteBytes(): RemoteBytesPort {
         headers: raw.headers ?? {},
         text: raw.text ?? '',
         ...(raw.bodyBase64 ? { bodyBase64: raw.bodyBase64 } : {}),
+      }
+    },
+    stream: async function* (
+      req: RemoteTextRequest,
+      signal: AbortSignal,
+    ): AsyncIterable<StreamChunk> {
+      const streamId = crypto.randomUUID()
+      const queue: StreamChunk[] = []
+      const splitter = createLineSplitter()
+      let ended = false
+      let wake: (() => void) | null = null
+      const notify = () => {
+        wake?.()
+        wake = null
+      }
+      const onEvent = new Channel<RawFetchStreamEvent>()
+      onEvent.onmessage = (event) => {
+        if (event.kind === 'chunk') {
+          for (const line of splitter(event.text ?? '')) {
+            const chunk = parseSSELine(line)
+            if (chunk) queue.push(chunk)
+          }
+          notify()
+          return
+        }
+        if (event.kind === 'error') {
+          queue.push(event.status
+            ? {
+                type: 'error',
+                error: {
+                  kind: 'http',
+                  status: event.status,
+                  body: event.message ?? event.text ?? '',
+                },
+              }
+            : {
+                type: 'error',
+                error: { kind: 'network', detail: 'dns', sendPhase: 'unknown' },
+              })
+          ended = true
+          notify()
+          return
+        }
+        ended = true
+        notify()
+      }
+      const cancel = () => {
+        void invoke('cancel_fetch_stream', { streamId }).catch(() => undefined)
+        notify()
+      }
+      signal.addEventListener('abort', cancel, { once: true })
+      const command = invoke('fetch_stream', {
+        streamId,
+        url: req.url,
+        method: req.method ?? 'POST',
+        headers: req.headers ?? {},
+        body: req.body ?? '',
+        timeoutMs: req.timeoutMs,
+        onEvent,
+      })
+      command.catch((error) => {
+        if (ended) return
+        queue.push({
+          type: 'error',
+          error: {
+            kind: 'network',
+            detail: 'dns',
+            sendPhase: 'unknown',
+          },
+        })
+        ended = true
+        notify()
+        console.debug('[agent-stream] shell stream failed', error)
+      })
+      try {
+        while (true) {
+          if (signal.aborted) {
+            yield { type: 'done' }
+            return
+          }
+          const next = queue.shift()
+          if (next) {
+            yield next
+            if (next.type === 'done' || next.type === 'error') return
+            continue
+          }
+          if (ended) return
+          await new Promise<void>((resolve) => {
+            wake = resolve
+          })
+        }
+      } finally {
+        signal.removeEventListener('abort', cancel)
+        if (!ended) {
+          void invoke('cancel_fetch_stream', { streamId }).catch(() => undefined)
+        }
+        onEvent.onmessage = () => undefined
       }
     },
   }

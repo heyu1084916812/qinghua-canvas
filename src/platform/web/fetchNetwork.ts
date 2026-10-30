@@ -180,6 +180,7 @@ async function shellBodyOf(
 
 export function createFetchNetwork(remote?: {
   request?: NonNullable<RemoteBytesPort['request']>
+  stream?: NonNullable<RemoteBytesPort['stream']>
 }): NetworkPort {
   const shellRequest = remote?.request
   /** 走壳的原生 HTTP 打一次（不带 signal：Rust 侧自带超时） */
@@ -256,6 +257,25 @@ export function createFetchNetwork(remote?: {
     },
 
     async *stream(req: NetworkRequest, signal: AbortSignal): AsyncIterable<StreamChunk> {
+      if (remote?.stream) {
+        for await (const chunk of remote.stream(
+          {
+            url: req.url,
+            method: req.method ?? 'POST',
+            headers: req.headers,
+            ...(typeof req.body === 'string' || req.body instanceof URLSearchParams
+              ? { body: String(req.body) }
+              : req.body === undefined
+                ? {}
+                : { body: JSON.stringify(req.body) }),
+            timeoutMs: req.timeoutMs,
+          },
+          signal,
+        )) {
+          yield chunk
+        }
+        return
+      }
       let reader: ReadableStreamDefaultReader<Uint8Array> | null = null
       try {
         const res = await fetch(req.url, {

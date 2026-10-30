@@ -5,6 +5,12 @@
 
 ## Agent · 过程与落位
 
+- **计划卡固定在滚动区外**：`TaskPlanCard` 放在 `planDock`，不能作为 `[data-agent-content]` 的子项。
+- **流式过程不造内容**：只显示供应商公开返回的 reasoning/content/tool delta；收起行只保留最新一句。
+- **已有输出的流不换渠道**：出现首个 delta 后任何错误都收口为 `execution/accepted`。
+- **“直接下一步”走状态机**：调用 `advanceAgentTaskPlanAfterReview()`，内部指令必须 `hiddenFromConversation`。
+- **视觉验收模型独立选路**：只保存逻辑模型名，运行时重新 RoutePlan；未配置且主模型不支持图片时明确拒绝。
+
 - **子边分类必须复用节点索引**：不能在每处理一条边时重新 `indexNodes()`；子边集合按图缓存，视口变化只改路径坐标。
 - **画布性能门禁看生产构建**：300/600/1000 节点需记录 DOM、端口 hit 数、长任务、p95 帧时间与堆占用；
   开发版帧率只能作为回归烟雾，不能当用户体验指标。

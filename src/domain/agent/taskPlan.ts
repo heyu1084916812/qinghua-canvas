@@ -436,6 +436,74 @@ export function approveAgentTaskPlanReview(
   }
 }
 
+/**
+ * Deterministic "advance now" control used by the UI. Unlike a normal chat
+ * steer, this does not wait for the model and never becomes a fresh user
+ * requirement. It closes the current step, approves its review gate, and
+ * starts exactly one next step.
+ */
+export function advanceAgentTaskPlanAfterReview(
+  plan: AgentTaskPlan,
+  stepId: string | undefined,
+  now: number,
+): AgentTaskPlanResult {
+  const current =
+    plan.steps.find(
+      (step) =>
+        step.id === stepId &&
+        step.status !== 'done' &&
+        step.status !== 'failed' &&
+        step.status !== 'skipped',
+    ) ??
+    plan.steps.find((step) => step.id === plan.currentStepId) ??
+    plan.steps.find((step) => step.status === 'in_progress')
+  if (!current) {
+    return { ok: false, problems: ['当前没有可以推进的计划步骤'] }
+  }
+  if (current.status !== 'in_progress') {
+    return {
+      ok: false,
+      problems: [`步骤「${current.title}」尚未开始，不能直接跳到下一步`],
+    }
+  }
+  const currentIndex = plan.steps.findIndex((step) => step.id === current.id)
+  const next = plan.steps
+    .slice(currentIndex + 1)
+    .find((step) => step.status === 'pending')
+  const steps = plan.steps.map((step, index) => {
+    if (index === currentIndex) {
+      return {
+        ...step,
+        status: 'done' as const,
+        resultsReadyAt: step.resultsReadyAt ?? now,
+        reviewApprovedAt: now,
+        finishedAt: now,
+        note: step.note || '用户跳过本步验收，直接进入下一步',
+      }
+    }
+    if (next && step.id === next.id) {
+      return {
+        ...step,
+        status: 'in_progress' as const,
+        startedAt: now,
+        reviewApprovedAt: undefined,
+        resultsReadyAt: undefined,
+        finishedAt: undefined,
+      }
+    }
+    return step
+  })
+  return {
+    ok: true,
+    plan: {
+      ...plan,
+      steps,
+      ...(next ? { currentStepId: next.id } : { currentStepId: undefined }),
+      updatedAt: now,
+    },
+  }
+}
+
 /** 当前步骤已有可验收结果；此后必须等用户验收，不能再开下一阶段。 */
 export function markAgentTaskPlanResultsReady(
   plan: AgentTaskPlan,

@@ -225,6 +225,47 @@
   overflow-wrap: anywhere;
 }
 
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  padding-top: var(--space-1);
+  border-top: 1px solid var(--stroke);
+}
+
+.advanceButton {
+  min-height: 30px;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 0 var(--space-3);
+  border: 1px solid var(--stroke);
+  border-radius: var(--radius-control);
+  background: var(--bg-surface);
+  color: var(--text-1);
+  font: inherit;
+  font-size: var(--fs-chip);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.advanceButton:hover:not(:disabled) {
+  background: var(--bg-hover);
+}
+
+.advanceButton:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.advanceButton:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.advanceIcon {
+  transform: rotate(-90deg);
+}
+
 .confirmTag,
 .softTag {
   align-self: start;

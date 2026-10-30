@@ -4,6 +4,7 @@ import type {
   ToolDeclaration,
 } from '../../../domain/shared/execution/types'
 import type { TextResult } from '../../../platform/channels/types'
+import type { StreamChunk } from '../../../platform/ports'
 import type {
   DirectRunRouteCandidate,
   DirectRunTraceInput,
@@ -23,6 +24,7 @@ export interface AgentRouteExecutionRequest {
   trace: DirectRunTraceInput
   onRecordWarning?: (warning: string) => void
   onRouteSucceeded?: (route: DirectRunRouteCandidate) => void
+  onStream?: (chunk: StreamChunk) => void
 }
 
 export interface RouteExecutionPort {

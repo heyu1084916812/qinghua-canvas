@@ -1,5 +1,5 @@
 import { createStore as createVanilla } from 'zustand/vanilla'
-import type { PlatformKit } from '../../platform/ports'
+import type { PlatformKit, StreamChunk } from '../../platform/ports'
 import type { Channel, CreateChannelInput } from '../../domain/project/channel'
 import type { ChannelCredentialGroup } from '../../domain/project/channel'
 import {
@@ -329,6 +329,8 @@ export interface ChannelStoreActions {
     onRecordWarning?: (warning: string) => void
     /** 候选降级成功后回报真实命中的目标，下一轮先把同一个目标放到首位。 */
     onRouteSucceeded?: (route: DirectRunRouteCandidate) => void
+    /** When provided, the selected channel streams provider-returned public deltas. */
+    onChunk?: (chunk: StreamChunk) => void
   }): Promise<TextResult>
   /** 单次 TTS：文本 → 音频字节；调用方负责把产物写进 assets。 */
   generateSpeech(
@@ -1447,6 +1449,7 @@ export function createChannelStore(
     trace,
     onRecordWarning,
     onRouteSucceeded,
+    onChunk,
   }) => {
     const traceParams =
       trace?.params && typeof trace.params === 'object'
@@ -1552,32 +1555,32 @@ export function createChannelStore(
       const selected = route ?? candidates[0]!
       const ch = store.getState().channels.find((channel) => channel.id === selected.channelId)
       if (!ch) throw new ChannelError({ kind: 'channel', detail: 'missingChannel' })
-      return generation.completeText(
-        {
-          channel: ch,
-          model: selected.model,
-          request: {
-            kind: 'text',
-            prompt: '',
-            inputs: outboundInputs,
-            params: {},
-            tools,
-            messages: outboundMessages,
-            /** 调用方不给就用 Agent 的默认上限；探测会显式传一个更短的 */
-            timeoutMs: timeoutMs ?? AGENT_CHAT_TIMEOUT_MS,
-          },
-          hints: {
-            modelIsUpstream: isFrozenRoute(route) || modelIsUpstream,
-            ...(selected.credentialGroupId
-              ? { credentialGroupId: selected.credentialGroupId }
-              : {}),
-            operationId:
-              effectiveTrace?.operationId ??
-              `text:${selected.channelId}:${selected.model}`,
-          },
+      const args = {
+        channel: ch,
+        model: selected.model,
+        request: {
+          kind: 'text' as const,
+          prompt: '',
+          inputs: outboundInputs,
+          params: {},
+          tools,
+          messages: outboundMessages,
+          /** 调用方不给就用 Agent 的默认上限；探测会显式传一个更短的 */
+          timeoutMs: timeoutMs ?? AGENT_CHAT_TIMEOUT_MS,
         },
-        callSignal,
-      )
+        hints: {
+          modelIsUpstream: isFrozenRoute(route) || modelIsUpstream,
+          ...(selected.credentialGroupId
+            ? { credentialGroupId: selected.credentialGroupId }
+            : {}),
+          operationId:
+            effectiveTrace?.operationId ??
+            `text:${selected.channelId}:${selected.model}`,
+        },
+      }
+      return onChunk
+        ? generation.streamText(args, callSignal, onChunk)
+        : generation.completeText(args, callSignal)
     }
     if (!effectiveTrace) return call(signal, candidates[0])
     const firstCandidate = candidates[0]!
