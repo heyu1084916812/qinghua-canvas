@@ -3,6 +3,7 @@ import {
   PORT_HIT_SIZE,
   PORT_PRECISE_HIT_RADIUS,
   portHitAcceptsPointer,
+  portHitsInView,
   portHitsOf,
   portInverseScale,
 } from './portHits'
@@ -57,6 +58,16 @@ describe('端点命中层几何', () => {
     expect(hits.map((h) => h.edgeX)).toEqual([100, 340])
     // 命中方块按世界单位给；视图层用反向缩放把它固定为屏幕像素尺寸
     expect(hits[0].size).toBe(PORT_HIT_SIZE)
+  })
+
+  it('culls offscreen port DOM while keeping the warm-up margin', () => {
+    const hits = portHitsOf(
+      graphOf([node('near', 1300, 0, 160, 80), node('far', 5000, 5000, 160, 80)]),
+    )
+    const visible = portHitsInView(hits, { x: 0, y: 0, zoom: 1 }, 1280, 800)
+
+    expect(visible.some((hit) => hit.nodeId === 'near')).toBe(true)
+    expect(visible.some((hit) => hit.nodeId === 'far')).toBe(false)
   })
 
   /**

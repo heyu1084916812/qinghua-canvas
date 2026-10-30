@@ -32,8 +32,6 @@ const CORNER_CLASS: Record<ResizeCorner, string> = {
 export interface NodeFrameProps {
   node: NodeSnapshot
   selected: boolean
-  /** 当前视口缩放，缩放手柄的屏幕位移需折算回世界单位 */
-  scale: number
   minSize: { w: number; h: number }
   /**
    * 缩放锁比（§6.16），由装配层经 `resizeLockOf` 注入（视图层不算比例）：
@@ -114,7 +112,7 @@ export interface NodeFrameProps {
  * 将来嵌入选区型内容）。节点内的 `<img>` 本来就都是 `draggable={false}`。
  */
 export function NodeFrame(props: NodeFrameProps) {
-  const { node, selected, scale, minSize } = props
+  const { node, selected, minSize } = props
   /**
    * 节点的**最新快照**（每次渲染刷新）。
    *
@@ -181,6 +179,7 @@ export function NodeFrame(props: NodeFrameProps) {
     e.stopPropagation()
     const startX = e.clientX
     const startY = e.clientY
+    const scale = Math.max(0.01, store.getViewport().zoom)
     const base: Rect = { x: node.x, y: node.y, w: node.w, h: node.h }
     /** 最后一帧的矩形——收尾（'end'）必须提交它，见下方 up() 的注释 */
     let latest: Rect = base

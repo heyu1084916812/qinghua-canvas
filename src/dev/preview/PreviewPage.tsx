@@ -127,7 +127,6 @@ function Card({
         <NodeFrame
           node={node}
           selected={!!selected}
-          scale={1}
           minSize={def.sizing.min}
           onFramePointerDown={() => {}}
           onResize={() => {}}
@@ -151,7 +150,6 @@ function Card({
                       key={child.id}
                       node={{ ...child, x: 0, y: 0 }}
                       selected={false}
-                      scale={1}
                       minSize={getNodeDefinition(child.type).sizing.min}
                       onFramePointerDown={() => {}}
                       onResize={() => {}}

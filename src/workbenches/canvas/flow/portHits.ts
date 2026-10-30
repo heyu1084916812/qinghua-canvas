@@ -8,6 +8,7 @@ import {
   PORT_SIZE,
 } from '../../../domain/canvas/geometry/portReveal'
 import { toWorldRectInGraph } from '../../../domain/canvas/geometry/coords'
+import { visibleWorldRect } from '../../../domain/canvas/layout/culling'
 
 /**
  * 端点的**命中尺寸**（世界单位）：与老表面 `NodeFrame` 的端口同一口径 ——
@@ -169,4 +170,23 @@ export function portHitsOf(
     }
   }
   return out
+}
+
+export function portHitsInView(
+  hits: readonly PortHit[],
+  viewport: { x: number; y: number; zoom: number },
+  surfaceW: number,
+  surfaceH: number,
+): PortHit[] {
+  if (surfaceW <= 0 || surfaceH <= 0) return hits.slice()
+  const view = visibleWorldRect(viewport, surfaceW, surfaceH)
+  const right = view.x + view.w
+  const bottom = view.y + view.h
+  return hits.filter(
+    (hit) =>
+      hit.nodeRight >= view.x &&
+      hit.nodeLeft <= right &&
+      hit.nodeBottom >= view.y &&
+      hit.nodeTop <= bottom,
+  )
 }

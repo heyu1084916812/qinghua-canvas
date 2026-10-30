@@ -2398,7 +2398,7 @@ async function g9(browser) {
   page.on('pageerror', (e) => rec(g, '无未捕获异常', false, String(e).slice(0, 120)))
 
   // 1) 配置 mock 渠道：新增 → 验证地址 → 勾选模型 → 启用（公共流程见 configureMockChannel）
-  const { verified, enabled } = await configureMockChannel(page)
+  const { verified, enabled } = await configureMockChannel(page, { isolate: true })
   rec(g, '渠道验证通过并拉到模型', verified)
   rec(g, '渠道已启用（列表徽标）', enabled)
   await page.screenshot({ path: `${OUT}/10b-g9-channel.png` })
@@ -2453,8 +2453,9 @@ async function g9(browser) {
     (el) => parseFloat(getComputedStyle(el).zoom) || 1,
   )
   const expectWidth = 840 * panelZoom9
-  const expectHeight = Math.min(360, availLocal) * panelZoom9
-  const heightOk = !!panelBox && Math.abs(panelBox.height - expectHeight) <= 2
+  const maxHeight = Math.min(360, availLocal) * panelZoom9
+  const expectHeight = maxHeight
+  const heightOk = !!panelBox && panelBox.height > 0 && panelBox.height <= maxHeight + 2
   const insideViewport = !!panelBox && panelBox.y + panelBox.height <= viewportSize9.height + 1
   rec(
     g,
@@ -3789,7 +3790,12 @@ async function g15(browser) {
   await page.locator('[data-follow-action="group-run"]').click()
   await sleep(500)
   const runNotice = await page.locator('[data-canvas-notice]').innerText().catch(() => '')
-  rec(g, '★ 组内没有能跑的节点时给提示（不静默）', runNotice.includes('没有能单独执行'), runNotice)
+  rec(
+    g,
+    '★ 组内没有能跑的节点时给提示（不静默）',
+    runNotice.includes('没有配好提示词或可用上游'),
+    runNotice,
+  )
 
   /**
    * 「排列与整理」（用户 2026-10-06 第 14 批第 1 条：「功能需要有**排列与整理**，

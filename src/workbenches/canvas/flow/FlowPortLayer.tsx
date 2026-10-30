@@ -1,5 +1,6 @@
 import { memo, useCallback, useEffect, useMemo, useRef } from 'react'
 import type { CSSProperties, PointerEvent as ReactPointerEvent } from 'react'
+import { useStore } from '@xyflow/react'
 import { useGraph, useSelection, useViewportState } from '../storeContext'
 import {
   PORT_EDGE_GAP,
@@ -15,11 +16,13 @@ import { useSelectionKeyHeld } from '../../../features/canvas/useSelectionKeyHel
 import { IconPlus } from '../toolbar/icons'
 import {
   portHitAcceptsPointer,
+  portHitsInView,
   portHitsOf,
   portInverseScale,
   type PortHit,
 } from './portHits'
 import styles from './FlowPortLayer.module.css'
+import { coalescePointerMove } from '../../../shared/rafThrottle'
 
 type PortDown = (e: ReactPointerEvent, nodeId: string, portId: string) => void
 
@@ -32,12 +35,23 @@ type PortDown = (e: ReactPointerEvent, nodeId: string, portId: string) => void
  * 位置分两段算（**别合成一个组件**）：世界坐标只跟图走，视口换算挂成一个 transform；
  * 端点子树再用 `1 / zoom` 反向缩放，保持屏幕尺寸恒定。
  */
-export function FlowPortLayer({ onPortDown }: { onPortDown: PortDown }) {
+export function FlowPortLayer({
+  onPortDown,
+  coarse = false,
+}: {
+  onPortDown: PortDown
+  coarse?: boolean
+}) {
   const graph = useGraph()
   /** 容器子节点的端点只在选中时出现（理由见 `portHitsOf` 的 `selection` 参数） */
   const selection = useSelection()
   /** 端点在世界坐标里是常量（节点不动就不动）⇒ 只跟图走，**不跟视口走** */
-  const hits = useMemo<PortHit[]>(() => portHitsOf(graph, selection), [graph, selection])
+  const hits = useMemo<PortHit[]>(() => {
+    const all = portHitsOf(graph, selection)
+    if (!coarse) return all
+    const selected = new Set(selection)
+    return all.filter((hit) => selected.has(hit.nodeId))
+  }, [coarse, graph, selection])
   return <PortHitViewport hits={hits} onPortDown={onPortDown} />
 }
 
@@ -57,6 +71,19 @@ const PortHitViewport = memo(function PortHitViewport({
 }) {
   const viewport = useViewportState()
   const zoom = viewport.zoom || 1
+  const surfaceW = useStore((state) => state.width)
+  const surfaceH = useStore((state) => state.height)
+  const sourceHits = useRef(hits)
+  const visibleCache = useRef<PortHit[]>(hits)
+  const nextVisible = portHitsInView(hits, viewport, surfaceW, surfaceH)
+  if (
+    sourceHits.current !== hits ||
+    !samePortHitList(visibleCache.current, nextVisible)
+  ) {
+    sourceHits.current = hits
+    visibleCache.current = nextVisible
+  }
+  const visibleHits = visibleCache.current
   /**
    * 按住 Ctrl / ⌘（框选键）时，命中层**整层不吃指针** —— 这一层挂在 `.react-flow__pane` 外面，
    * 它一旦接住按下，RF 的框选就不会启动（见 `useSelectionKeyHeld` 的说明）。
@@ -76,11 +103,19 @@ const PortHitViewport = memo(function PortHitViewport({
           '--port-inverse-scale': String(portInverseScale(zoom)),
         } as CSSProperties}
       >
-        <PortDots hits={hits} onPortDown={onPortDown} />
+        <PortDots hits={visibleHits} onPortDown={onPortDown} />
       </div>
     </div>
   )
 })
+
+function samePortHitList(a: readonly PortHit[], b: readonly PortHit[]): boolean {
+  if (a.length !== b.length) return false
+  for (let i = 0; i < a.length; i += 1) {
+    if (a[i]?.key !== b[i]?.key) return false
+  }
+  return true
+}
 
 /**
  * 端点圆点的**吸附最大位移**（屏幕像素）。
@@ -168,6 +203,14 @@ const PortDots = memo(function PortDots({
   )
 
   useEffect(() => {
+    const hitsByNode = new Map<string, PortHit[]>()
+    for (const hit of hits) {
+      const bucket = hitsByNode.get(hit.nodeId)
+      if (bucket) bucket.push(hit)
+      else hitsByNode.set(hit.nodeId, [hit])
+    }
+    let lastActiveNodeId: string | null = null
+
     const reset = () => {
       for (const el of refs.current.values()) {
         if (!el) continue
@@ -226,7 +269,13 @@ const PortDots = memo(function PortDots({
         })),
       )
 
-      for (const hit of hits) {
+      if (active !== lastActiveNodeId) {
+        reset()
+        lastActiveNodeId = active
+      }
+      if (!active) return
+
+      for (const hit of hitsByNode.get(active) ?? []) {
         const el = map.get(hit.key)
         if (!el) continue
         const reveal =
@@ -280,12 +329,14 @@ const PortDots = memo(function PortDots({
       }
     }
 
-    window.addEventListener('pointermove', onMove)
+    const move = coalescePointerMove(onMove)
+    window.addEventListener('pointermove', move)
     /** 指针离开窗口（切标签 / 移出视口）也要复位，否则端点停在展开或吸附的位置 */
     window.addEventListener('pointerleave', reset)
     window.addEventListener('blur', reset)
     return () => {
-      window.removeEventListener('pointermove', onMove)
+      move.cancel()
+      window.removeEventListener('pointermove', move)
       window.removeEventListener('pointerleave', reset)
       window.removeEventListener('blur', reset)
     }

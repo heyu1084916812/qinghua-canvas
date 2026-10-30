@@ -44,7 +44,6 @@ function renderFrame({
       createElement(NodeFrame, {
         node,
         selected: false,
-        scale: 1,
         minSize: { w: 200, h: 160 },
         ...(corners ? { resizeCorners: corners } : {}),
         onFramePointerDown: () => {},

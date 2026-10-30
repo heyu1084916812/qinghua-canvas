@@ -42,8 +42,18 @@
 - **记忆 usage 不是 revision**：进入 ContextBundle 后只增加 `useCount/lastUsedAt`；
   正文变化才增加 `currentRevision` 并写修订。
 
-### 画布性能审计（2026-10-30，对账 #827，待修复）
+### 画布性能审计与低倍率摘要层（2026-10-31，对账 #827 / #832，已交付）
 
+- **视口不能每帧回灌 React Flow**：`FlowSurface` 已不再订阅 viewport；`FlowViewportController` 只同步
+  小地图、复位、键盘等外部命令。重新把 `viewport={...}` 放回受控主面会让 600 节点每帧重渲染。
+- **zoom 不进入节点 data**：`NodeFrame` 在 resize pointerdown 时从 store 读当前倍率；
+  不要把 `zoom` 再加回 `FlowNodeData` 或 `nodes` useMemo 依赖。
+- **低倍率使用摘要层**：`detailMode.ts` 在 18% 进入、28% 退出，带滞回防抖。低于阈值时节点只画轻量矩形，
+  主边走 `FlowCoarseEdgeLayer` 的世界坐标 SVG（父层只改 transform，路径子树 memo）。高倍率恢复完整节点和 RF 边。
+- **低倍率端点只给选中节点**：全图 1200 个端口 hit 块会盖住缩略节点并拖慢交互；粗粒度层只保留当前选中节点端点。
+- **端 pointermove 必须 rAF 且只写当前节点**：不要恢复“每次指针移动遍历全图并写 1200 个 span”。
+- **#832 证据**：600 张真实缩略图 / 1000 连线，开发版 DOM 5,090，加载约 6.8s；
+  平移 p50 7ms / p95 28ms / 0 长任务，缩放 p50 7ms / p95 14ms。日常先用 100 节点真实缩略图探针快速回归。
 - **不要再说“图片全量同时解码”**：release WebView2 实测中，现有 42 张真实缩略图循环生成 100 / 300 / 600 个节点，
   Chrome Tracing 都只记录到约 30 次 Decode Image（约 0.17-0.20s）。浏览器会复用相同 URL 并按需解码。
   图片会增加加载和 PaintImage，但不能把主要卡顿归因于“全部图片同时解码”。

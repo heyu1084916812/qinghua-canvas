@@ -13,6 +13,7 @@ import type { NodeViewEvent } from '../nodes/registry'
 import type { InputPortAsset } from '../nodes/registry'
 import type { NodeInput } from '../../../domain/shared/execution/types'
 import type { Rect } from '../../../domain/canvas/geometry/rect'
+import coarseStyles from './FlowCoarseNode.module.css'
 
 /**
  * React Flow 的自定义节点（引擎替换 P0）。
@@ -46,7 +47,6 @@ export interface FlowNodeData extends FlowNodeDerivedProps, Record<string, unkno
    */
   resize: (rect: Rect, phase: 'begin' | 'move' | 'end') => void
   /** 当前视口缩放：`NodeFrame` 要用它把屏幕位移换算回世界单位（缩放跟手 / 矢量内容按比例放大） */
-  zoom: number
   /** 容器（分组 / 批量）的子节点：沿用老表面那套 —— 由容器本体按网格渲染 */
   childNodes?: NodeSnapshot[]
   renderChild?: (child: NodeSnapshot) => ReactNode
@@ -57,7 +57,7 @@ function handlePosition(side: 'left' | 'right') {
 }
 
 function FlowNodeInner({ data, selected }: NodeProps) {
-  const { node, running, error, runMode, emit, resize, zoom, childNodes, renderChild, ...derived } =
+  const { node, running, error, runMode, emit, resize, childNodes, renderChild, ...derived } =
     data as unknown as FlowNodeData
   const def = getNodeDefinition(node.type)
   /**
@@ -137,7 +137,6 @@ function FlowNodeInner({ data, selected }: NodeProps) {
       node={node}
       selfPositioned={false}
       selected={!!selected}
-      scale={zoom}
       minSize={minSize}
       resizeLock={resizeLockOf(node)}
       /**
@@ -175,6 +174,37 @@ function FlowNodeInner({ data, selected }: NodeProps) {
 
 export const FlowFlowNode = memo(FlowNodeInner)
 
+export const FlowCoarseNode = memo(function FlowCoarseNode({
+  data,
+  selected,
+}: NodeProps) {
+  const node = (data as unknown as FlowNodeData).node
+  const className = [
+    coarseStyles.node,
+    isContainerType(node.type) ? coarseStyles.group : '',
+    selected ? coarseStyles.selected : '',
+    node.disabled ? coarseStyles.disabled : '',
+  ]
+    .filter(Boolean)
+    .join(' ')
+
+  return (
+    <div
+      className={className}
+      data-node-id={node.id}
+      data-node-type={node.type}
+      data-node-selected={selected ? '' : undefined}
+      data-node-disabled={node.disabled ? 'true' : undefined}
+      data-node-model={
+        typeof (node.data as { model?: unknown }).model === 'string'
+          ? ((node.data as { model?: string }).model ?? '')
+          : undefined
+      }
+      data-coarse-node
+    />
+  )
+})
+
 /**
  * 容器（分组 / 批量）里的子节点：与顶层节点**共用同一个 `NodeFrame` + `def.View`**，
  * 只有两条差别 —— 坐标由容器网格决定（归零）、端点隐藏（§6.11「组内节点端点隐藏」）。
@@ -191,7 +221,6 @@ export function FlowChildFrame({
   runMode,
   emit,
   resize,
-  zoom,
   onFramePointerDown,
   derived,
 }: {
@@ -202,7 +231,6 @@ export function FlowChildFrame({
   runMode: RunMode
   emit: (event: NodeViewEvent) => void
   resize: (rect: Rect, phase: 'begin' | 'move' | 'end') => void
-  zoom: number
   /**
    * 子节点按下：**容器子节点不是 React Flow 的节点**（由容器 View 按网格渲染），
    * React Flow 拖不动它们，所以"拖动子节点"这条链路要自己接
@@ -218,7 +246,6 @@ export function FlowChildFrame({
       node={child}
       selfPositioned={false}
       selected={selected}
-      scale={zoom}
       minSize={def.sizing.min}
       resizeLock={resizeLockOf(child)}
       heightFromContent={heightFromContentOf(child)}
@@ -229,7 +256,7 @@ export function FlowChildFrame({
       <def.View
         node={child}
         size={{ w: child.w, h: child.h }}
-        scale={zoom}
+        scale={1}
         selected={selected}
         running={running}
         globalRunning={false}

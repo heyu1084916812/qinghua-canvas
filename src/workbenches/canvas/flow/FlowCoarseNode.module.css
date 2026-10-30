@@ -1,0 +1,23 @@
+.node {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box;
+  border: 1px solid var(--node-border);
+  border-radius: var(--radius-node);
+  background: var(--node-fill);
+}
+
+.group {
+  border-style: dashed;
+  background: var(--group-bg-fill, var(--bg-subtle));
+}
+
+.selected {
+  outline: 1px solid var(--stroke-focus);
+  outline-offset: 0;
+}
+
+.disabled {
+  opacity: 0.55;
+}

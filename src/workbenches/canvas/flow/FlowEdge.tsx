@@ -85,3 +85,29 @@ function QhEdgeInner(props: EdgeProps) {
 }
 
 export const QhEdge = memo(QhEdgeInner)
+
+export const QhCoarseEdge = memo(function QhCoarseEdge(props: EdgeProps) {
+  const data = props.data as QhEdgeData | undefined
+  const [path] = getBezierPath({
+    sourceX: props.sourceX,
+    sourceY: props.sourceY,
+    sourcePosition: props.sourcePosition,
+    targetX: props.targetX,
+    targetY: props.targetY,
+    targetPosition: props.targetPosition,
+  })
+  const active = !!props.selected || !!data?.related
+  return (
+    <path
+      className={active ? `${styles.edge} ${styles.edgeActive}` : styles.edge}
+      d={path}
+      vectorEffect="non-scaling-stroke"
+      data-edge={props.id}
+      data-edge-source={props.source}
+      data-edge-target={props.target}
+      data-edge-source-port={data?.sourcePort}
+      data-edge-target-port={data?.targetPort}
+      data-coarse-edge
+    />
+  )
+})

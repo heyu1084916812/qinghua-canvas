@@ -15,6 +15,7 @@ import {
   ReactFlow,
   ReactFlowProvider,
   SelectionMode,
+  useReactFlow,
   useViewport,
   useUpdateNodeInternals,
   type Edge as RFEdge,
@@ -33,7 +34,12 @@ import {
 } from '../storeContext'
 import { useCanvasExecution } from '../execution/CanvasExecutionProvider'
 import { useCanvasPageEvents } from '../../../features/canvas/useCanvasPageEvents'
-import { FlowChildFrame, FlowFlowNode, type FlowNodeData } from './FlowNode'
+import {
+  FlowChildFrame,
+  FlowCoarseNode,
+  FlowFlowNode,
+  type FlowNodeData,
+} from './FlowNode'
 import {
   childrenByParent,
   isContainerType,
@@ -47,10 +53,11 @@ import type { RunMode } from '../../../domain/canvas/model/runRecord'
 import type { NodeViewEvent } from '../nodes/registry'
 import { useNodeDerivedMaps } from '../useNodeDerivedMaps'
 import type { FlowNodeDerivedProps } from './FlowNode'
-import { QhEdge, type QhEdgeData } from './FlowEdge'
+import { QhCoarseEdge, QhEdge, type QhEdgeData } from './FlowEdge'
 import { FlowChildEdgeLayer } from './FlowChildEdgeLayer'
+import { FlowCoarseEdgeLayer } from './FlowCoarseEdgeLayer'
 import { FlowGroupBoardLayer } from './FlowGroupBoardLayer'
-import { isChildEdge } from './childEdges'
+import { childEdgeIdSet } from './childEdges'
 import { FlowPortLayer } from './FlowPortLayer'
 import { FlowDraftLayer } from './FlowDraftLayer'
 import { FlowSnapLayer } from './FlowSnapLayer'
@@ -58,7 +65,11 @@ import { EmptyCanvasGuide } from '../surface/EmptyCanvasGuide'
 import { MultiSelectBar } from '../toolbar/MultiSelectBar'
 import { sourcePortOf, targetPortOf } from '../../../domain/canvas/model/edge'
 import { describeError } from '../../../shared/result'
-import { flowViewportToStore, storeViewportToFlow } from './viewportBridge'
+import {
+  flowViewportToStore,
+  storeViewportToFlow,
+  type FlowViewport,
+} from './viewportBridge'
 import { usePlatform } from '../../../app/providers/PlatformProvider'
 import { useCanvasStyle } from '../../../app/providers/CanvasStyleProvider'
 import { useTheme } from '../../../app/ThemeProvider'
@@ -101,6 +112,10 @@ import { LinkMenu } from '../menu/LinkMenu'
 import { CanvasNotice } from '../surface/CanvasNotice'
 import { Minimap } from '../surface/Minimap'
 import { UndoBar } from '../surface/UndoBar'
+import {
+  nextCanvasDetailMode,
+  type CanvasDetailMode,
+} from './detailMode'
 
 /**
  * 引擎替换 P0：用 React Flow 渲染**真实图**。
@@ -130,9 +145,52 @@ export function FlowSurface({
   )
 }
 
-const NODE_TYPES = { qh: FlowFlowNode }
-const EDGE_TYPES = { qh: QhEdge }
+const NODE_TYPES = { qh: FlowFlowNode, coarse: FlowCoarseNode }
+const EDGE_TYPES = { qh: QhEdge, coarse: QhCoarseEdge }
 const EDGE_OPTIONS = { type: 'default' } as const
+const VIEWPORT_EPSILON = 0.01
+
+function sameFlowViewport(a: FlowViewport, b: FlowViewport): boolean {
+  return (
+    Math.abs(a.x - b.x) < VIEWPORT_EPSILON &&
+    Math.abs(a.y - b.y) < VIEWPORT_EPSILON &&
+    Math.abs(a.zoom - b.zoom) < VIEWPORT_EPSILON
+  )
+}
+
+function FlowViewportController() {
+  const viewport = useViewportState()
+  const flow = useReactFlow()
+
+  useEffect(() => {
+    const target = storeViewportToFlow(viewport)
+    if (sameFlowViewport(flow.getViewport(), target)) return
+    void flow.setViewport(target)
+  }, [flow, viewport])
+
+  return null
+}
+
+function useCanvasDetailMode(store: CanvasStore): CanvasDetailMode {
+  const [mode, setMode] = useState<CanvasDetailMode>(() =>
+    nextCanvasDetailMode('full', store.getViewport().zoom),
+  )
+  const modeRef = useRef(mode)
+  modeRef.current = mode
+
+  useEffect(
+    () =>
+      store.subscribe(() => {
+        const next = nextCanvasDetailMode(modeRef.current, store.getViewport().zoom)
+        if (next === modeRef.current) return
+        modeRef.current = next
+        setMode(next)
+      }),
+    [store],
+  )
+
+  return mode
+}
 
 /**
  * 「点空白清选中」的**豁免名单**（浮在画布上、不属于画布空白的东西）。
@@ -250,13 +308,28 @@ function FlowSurfaceInner({
   onOpenSkills?: () => void
 }) {
   const store = useCanvasStore()
+  const detailMode = useCanvasDetailMode(store)
   const graph = useGraph()
   const selection = useSelection()
   /** 选中的连线（§6.14）：选中态由 store 决定，RF 只是它的视图 */
   const edgeSelection = useEdgeSelection()
-  const viewport = useViewportState()
+  const initialFlowViewport = useRef(storeViewportToFlow(store.getViewport())).current
+  const handleViewportChange = useCallback(
+    (next: FlowViewport) => {
+      const nextStore = flowViewportToStore(next)
+      const current = store.getViewport()
+      if (
+        Math.abs(current.x - nextStore.x) < VIEWPORT_EPSILON &&
+        Math.abs(current.y - nextStore.y) < VIEWPORT_EPSILON &&
+        Math.abs(current.zoom - nextStore.zoom) < VIEWPORT_EPSILON
+      ) {
+        return
+      }
+      store.setViewport(nextStore)
+    },
+    [store],
+  )
   /** 两套视口语义不同，必须显式换算（见 viewportBridge.ts；1:1 同步会让新节点落到视野外） */
-  const flowViewport = useMemo(() => storeViewportToFlow(viewport), [viewport])
   const exec = useCanvasExecution()
   const { emitNodeEvent } = useCanvasPageEvents(store, onOpenSettings)
   const platform = usePlatform()
@@ -687,13 +760,12 @@ function FlowSurfaceInner({
           runMode={runMode}
           emit={makeEmit(child.id)}
           resize={(rect, phase) => store.dispatch({ kind: 'node.resize', id: child.id, rect, phase })}
-          zoom={viewport.zoom}
           onFramePointerDown={(e) => onChildPointerDown(e, child.id)}
           derived={derivedFor(child.id)}
         />
       )
     },
-    [exec, selection, makeEmit, derivedFor, store, viewport.zoom, onChildPointerDown],
+    [exec, selection, makeEmit, derivedFor, store, onChildPointerDown],
   )
 
   const nodes = useMemo<RFNode<FlowNodeData>[]>(
@@ -709,7 +781,7 @@ function FlowSurfaceInner({
               : 'idle'
           return {
             id: n.id,
-            type: 'qh',
+            type: detailMode === 'coarse' ? 'coarse' : 'qh',
             position: { x: n.x, y: n.y },
             /*
              * 尺寸按官方文档写在**节点对象**上（`width`/`height`），省掉一次测量。
@@ -728,7 +800,6 @@ function FlowSurfaceInner({
               runMode,
               emit: makeEmit(n.id),
               resize: (rect, phase) => store.dispatch({ kind: 'node.resize', id: n.id, rect, phase }),
-              zoom: viewport.zoom,
               ...derivedFor(n.id),
               /*
                * 容器（分组 / 批量）：把子节点连同渲染函数一起交给容器本体 ——
@@ -744,22 +815,23 @@ function FlowSurfaceInner({
             } satisfies FlowNodeData,
           }
         }),
-    [graph, selection, exec, makeEmit, childIndex, renderFlowChild, derivedFor, store, viewport.zoom],
+    [graph, selection, exec, makeEmit, childIndex, renderFlowChild, derivedFor, store, detailMode],
   )
 
   const edges = useMemo(
     () => {
       const selectedNodes = new Set(selection)
+      const childEdgeIds = childEdgeIdSet(graph)
       const list = graph.edges
         /**
          * 牵涉容器子节点的边**摘出去**交给 `FlowChildEdgeLayer` 画：
          * RF 按 `source / target` 找它自己的节点，子节点不在其中 ⇒ 这类边在 RF 里
          * 找不到端点、会静默消失（图上连着、屏幕上看不见）。
          */
-        .filter((e) => !isChildEdge(graph, e))
+        .filter((e) => !childEdgeIds.has(e.id))
         .map((e) => ({
           id: e.id,
-          type: 'qh',
+          type: detailMode === 'coarse' ? 'coarse' : 'qh',
           source: e.source,
           target: e.target,
           sourceHandle: sourcePortOf(e),
@@ -774,7 +846,7 @@ function FlowSurfaceInner({
             onDelete: (id: string) => store.dispatch({ kind: 'edge.remove', id }),
           } satisfies QhEdgeData,
         }))
-      return list
+      return detailMode === 'coarse' ? [] : list
     },
     /*
      * ⚠️ 依赖里必须是**整个 `graph`**，不能只写 `graph.edges`：
@@ -785,7 +857,7 @@ function FlowSurfaceInner({
      *（第 16 批 #7 探针实测：拖出后 `list.length = 0`、`childEdges = 2`；
      *  点一下空白才变成 `2 / 0` —— 差的就是这一次重算）。
      */
-    [graph, selection, edgeSelection, store],
+    [graph, selection, edgeSelection, store, detailMode],
   )
 
   /**
@@ -1322,11 +1394,13 @@ function FlowSurfaceInner({
         分组节点自己是透明的，见 `FlowGroupBoardLayer` 里的说明。
       */}
       <FlowGroupBoardLayer />
+      <FlowViewportController />
       {/*
         牵涉容器子节点的边（视觉层）：与 RF 自带边同一层序（节点之下），
         命中区在下面单独再画一层（`hitOnly`）。
       */}
       <FlowChildEdgeLayer />
+      {detailMode === 'coarse' ? <FlowCoarseEdgeLayer /> : null}
       <FlowDraftLayer draft={edgeDrag.draft} />
       {/* 吸附提示（对账 #257）：参考线 + 间距数字。屏幕空间、不吃指针，拖动结束即消失 */}
       <FlowSnapLayer />
@@ -1374,8 +1448,8 @@ function FlowSurfaceInner({
         autoPanOnSelection={false}
         onSelectionStart={onSelectionStart}
         onSelectionEnd={onSelectionEnd}
-        viewport={flowViewport}
-        onViewportChange={(next) => store.setViewport(flowViewportToStore(next))}
+        defaultViewport={initialFlowViewport}
+        onViewportChange={handleViewportChange}
         onNodesChange={onNodesChange}
         onNodeDragStart={onNodeDragStart}
         onNodeDragStop={onNodeDragStop}
@@ -1460,7 +1534,7 @@ function FlowSurfaceInner({
       {/* 小地图显示开关（本机偏好）：关掉只是少一个导航控件，画布本身不受影响 */}
       {appearance.showMinimap ? <Minimap /> : null}
       {/* 端点命中层：在所有节点之上收拖线手势（见 FlowPortLayer 里的长注释） */}
-      <FlowPortLayer onPortDown={beginEdgeDrag} />
+      <FlowPortLayer onPortDown={beginEdgeDrag} coarse={detailMode === 'coarse'} />
       {/* 子节点连线的**命中区**（双击删线）：必须在最上层才收得到指针，视觉是透明的 */}
       <FlowChildEdgeLayer hitOnly />
     </div>

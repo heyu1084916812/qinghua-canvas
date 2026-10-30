@@ -40,8 +40,24 @@ export function isChildEdge(
   e: { source: string; target: string },
 ): boolean {
   const index = indexNodes(graph.nodes)
+  return isChildEdgeInIndex(index, e)
+}
+
+function isChildEdgeInIndex(
+  index: Map<string, GraphSnapshot['nodes'][number]>,
+  e: { source: string; target: string },
+): boolean {
   const child = (id: string) => !!index.get(id)?.parentId
   return child(e.source) || child(e.target)
+}
+
+export function childEdgeIdSet(graph: GraphSnapshot): Set<string> {
+  const index = indexNodes(graph.nodes)
+  const out = new Set<string>()
+  for (const edge of graph.edges) {
+    if (isChildEdgeInIndex(index, edge)) out.add(edge.id)
+  }
+  return out
 }
 
 export function childEdgePaths(
@@ -54,7 +70,7 @@ export function childEdgePaths(
   const out: ChildEdgePath[] = []
 
   for (const e of graph.edges as readonly Edge[]) {
-    if (!isChildEdge(graph, e)) continue
+    if (!isChildEdgeInIndex(index, e)) continue
     const src = index.get(e.source)
     const tgt = index.get(e.target)
     if (!src || !tgt) continue
