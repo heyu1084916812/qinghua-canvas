@@ -679,6 +679,7 @@ export function buildAgentSystemPromptWithContext(
       for (const m of models) lines.push(`- ${m.label}`)
     }
     lines.push(
+      '用户已经用 @ 明确指定了节点；不要再问“是哪张图 / 哪个节点”，直接使用上面给出的 id。',
       '要复用它就在 attach 里指到那个节点 id，不要重复建同名的节点。',
       '被引用的模型 = 这次就用它（与工具条上挑的那个冲突时，以他引用的为准）。',
       /**

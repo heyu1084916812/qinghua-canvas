@@ -321,6 +321,7 @@ describe('引用段', () => {
     })
     expect(p).toContain('## 用户在这句话里 @ 引用到的（他指的是这些东西）')
     expect(p).toContain('- node_a1（小猫钓鱼）')
+    expect(p).toContain('不要再问“是哪张图 / 哪个节点”')
     expect(p).toContain('不要重复建同名的节点')
   })
 
