@@ -1,8 +1,8 @@
 # 轻画：路由、Agent Runtime、记忆与套件统一规划
 
-> **2026-10-29 范围更新（对账 #809）**：DeepSeek Harness Worker 集成已撤回，当前不再
-> 引入 ACP/MCP sidecar、DSH 资源包或 Harness 专用安装流程。路由、Agent 工具与记忆章节
-> 中面向现有应用的端口和边界仍有效，涉及 Harness 的段落按历史方案阅读。
+> **Harness 范围取消（对账 #809，2026-10-31 再次确认）**：不实施 DeepSeek Harness Worker、
+> Harness runtime、ACP/MCP sidecar、DSH 资源包或专用安装流程，也不替换现有画布 Agent
+> 推理循环。路由、Agent 工具与记忆章节中服务现有 `agentLoop` 的端口和边界继续有效。
 
 > 状态：v1.9，2026-10-29。阶段 1 持久队列完成；阶段 2 生成路由闭环完成（策略 UI、
 > Key 分组候选、三宿主接入、尝试审计与删除边界）；阶段 3 完成 AgentJob/AgentEvent、
@@ -10,21 +10,17 @@
 > 阶段 4 完成个人记忆、品牌/产品套件、项目版本绑定与 ContextBundle；个人记忆已补
 > global / workbench / project / session 四类作用域、Agent 提议确认、冲突、过期、
 > 忘记和字符预算。阶段 5–6 的代码路径已完成；GitHub push / Release 仍需用户逐次批准。
-> 2026-10-29 用户确认：画布 Agent 永久替换为 Harness，并改为应用壳右侧面板；
-> 电商与漫剧 Agent 范围不变。实施计划见《轻画-Agent设计文档.md》§17–§21。
-> 同日 H1a / H4 UI 已交付：壳层 portal、360–720px 拖宽、浮球独立坐标、六页签 Agent 设置
-> 与记忆迁移完成；G735 14/14、G769 28/28。`AgentController` 已抽出会话/JOB 恢复，
-> `MemoryPort` 已成为 Agent 唯一记忆入口，全部 Agent 工具已接持久幂等账本，文本发送已统一走
-> RouteExecutionPort；完整队列/确认生命周期与 Harness Worker 仍未实施；ToolRegistry、
-> ModelRoutePort 与 401 安全降级已完成。
+> 应用壳右侧面板、六页签 Agent 设置与记忆迁移已经交付；它们服务现有 `agentLoop`，
+> 不依赖外部 Agent runtime。`AgentController`、`MemoryPort`、ToolRegistry、ModelRoutePort
+> 与 RouteExecutionPort 继续保留。
 > 性质：专项设计。冲突时仍以《轻画-功能对账清单.md》为准。
 > 目标：在保留三个独立工作台、现有 runEngine 和现有数据真相的前提下，建立共享路由、
 > Agent Runtime、个人记忆与品牌套件的统一边界。
 
 ## 1. 结论
 
-1. **画布 Agent 永久替换成 Harness**，但不把 Agent 改写成多个自由聊天窗口；不保留
-   面向用户的“旧 Agent / Harness”切换。电商与漫剧仍使用各自现有能力，不随画布升级。
+1. **画布 Agent 继续使用现有 `agentLoop`**，不接入 DeepSeek Harness Worker，也不替换
+   现有推理循环。电商与漫剧仍使用各自现有能力。
 2. 先建立“任务”这一层：一个会话同一时刻只允许一个活动任务，后续消息默认排队。
 3. 路由、任务队列、记忆解析是公共能力；画布、电商、漫剧各自拥有业务 Planner 与
    Placement，不能共享业务大脑。
@@ -199,23 +195,22 @@ RouteCandidate = 渠道 × Key 分组 × 前端逻辑模型 × 能力类型
 
 每次尝试都要记录渠道、分组、上游模型、阶段、HTTP 状态、耗时和降级原因。
 
-### 5.4 Harness 接入边界
+### 5.4 现有 Agent 接入边界
 
-Harness 是画布 Agent 的推理与工具循环 runtime，不是新的渠道系统：
+画布 Agent 继续使用现有 `agentLoop`，路由只通过现有宿主端口接入：
 
 ```text
 AgentController
-  -> HarnessRuntimePort -> session-scoped Worker
-  -> ModelRoutePort -> 合成 provider(qinghua-local)
+  -> agentLoop
+  -> ModelRoutePort
        -> 现有 RouteResolver / RouteExecution / ChannelStore
 ```
 
-- Harness 只看到一个合成 provider `qinghua-local`，模型名仍是轻画固定前端名。
-- Harness 不拥有 provider / key / base URL / 代理设置；模型服务页仍是唯一渠道入口。
+- Agent 不拥有 provider / key / base URL / 代理设置；模型服务页仍是唯一渠道入口。
 - 路由设置只列已启用渠道和用户勾选的 Key 分组。用户若只配置一个请求地址，仍可在该渠道
   内使用多 Key 分组；RoutePlan 需要跨候选时按已确认策略排序，显式锁渠道则不得跨渠道。
-- Harness 原生 retry 关闭；`RouteExecution` 是唯一发送入口。401 / 403 / 429 / 5xx
-  的安全降级与 timeout / 408 / 响应丢失的不重发规则不变。
+- `RouteExecution` 是唯一发送入口。401 / 403 / 429 / 5xx 的安全降级与
+  timeout / 408 / 响应丢失的不重发规则不变。
 - 工具按 `(jobId, stepId, toolCallId)` 幂等，付费任务按
   `(operationId, runPlanId, taskId, attempt)` 幂等。
 
@@ -350,7 +345,7 @@ project memory evolution、session memory reclaim、memory audit 和独立记忆
 | 4 | 个人记忆、品牌/产品套件、ContextBundle | 版本固定；冲突可解释；旧项目不变 |
 | 5 | ✅ 角色/自定义套件、视觉验收与只读子代理 | 子代理不能写画布；验收读取真实图片并输出结构化问题清单 |
 | 6 | ✅ 总日志扩展、完整 UI、迁移和发布门禁 | 四类日志不重复；单测、检查、构建、真实页面验收通过；push 单独授权 |
-| 7 | 画布 Harness、应用壳面板、Agent 设置与记忆迁移 | 🧩 **壳层 / 设置 UI、会话恢复控制器、MemoryPort、RouteExecutionPort 与全部工具持久账本已交付**；Harness Worker 与完整 Controller 待完成；详见《轻画-Agent设计文档.md》§20 |
+| 7 | 应用壳 Agent 面板、Agent 设置与记忆迁移 | ✅ **壳层 / 设置 UI、会话恢复控制器、MemoryPort、RouteExecutionPort、AgentController 与全部工具持久账本已交付**；Harness Worker 已取消，不属于计划 |
 
 阶段 2 的路由纯函数和阶段 4 的领域模型可并行；Agent Runtime 必须等队列与 RoutePlan
 契约稳定后再改。
@@ -382,10 +377,10 @@ project memory evolution、session memory reclaim、memory audit 和独立记忆
 
 ## 11. 明确不做
 
-- 不保留用户可见的“旧 Agent / Harness”二选一；画布旧循环在等价验收后删除。
+- 不引入 Harness Worker/runtime，不替换现有画布 Agent 推理循环。
 - 不让多个 Agent 同时直接写同一画布。
 - 不把渠道库存、路由策略和 Key 分组混成同一个布尔配置。
-- 不让 Harness 拥有第二套 provider / key / base URL 或长期记忆库。
+- 不让任何外部 Agent runtime 拥有第二套 provider / key / base URL 或长期记忆库。
 - 不把权重随机命名为轮询。
 - 不把个人记忆当作品牌事实。
 - 不把品牌 Markdown 当作精确色值/尺寸的唯一来源。
@@ -400,8 +395,6 @@ project memory evolution、session memory reclaim、memory audit 和独立记忆
 | Agent 队列纯领域规则 | `src/domain/agent/queuedTurn.ts` |
 | Agent 会话持久化 | `src/state/agent/sessionStore.ts` |
 | Agent 编排控制器（目标） | `src/features/shared/agent/AgentController.ts` |
-| Harness Runtime 端口（目标） | `src/features/shared/agent/harness/HarnessRuntimePort.ts` |
-| Harness Worker 平台适配（目标） | `src/platform/agent/harnessWorkerClient.ts` |
 | 工具注册表（目标） | `src/features/shared/agent/ToolRegistry.ts` |
 | Agent 路由端口（目标） | `src/features/shared/agent/ModelRoutePort.ts` |
 | 应用壳面板宿主（目标） | `src/app/AgentShellSlot.tsx` + `src/pages/CanvasPage/AgentShellHost.tsx` |

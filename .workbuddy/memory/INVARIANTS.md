@@ -5,6 +5,9 @@
 
 ## Agent · 过程与落位
 
+- **Harness runtime 不属于产品范围**：画布 Agent 必须继续使用现有 `agentLoop`；不接
+  DeepSeek Harness Worker、ACP/MCP sidecar、外部 runtime 或签名资源包，也不替换主循环。
+  已完成的 Agent 面板、Controller、工具、路由和记忆端口只服务当前循环。
 - **计划卡固定在滚动区外**：`TaskPlanCard` 放在 `planDock`，不能作为 `[data-agent-content]` 的子项。
 - **流式过程不造内容**：只显示供应商公开返回的 reasoning/content/tool delta；收起行只保留最新一句。
 - **已有输出的流不换渠道**：出现首个 delta 后任何错误都收口为 `execution/accepted`。

@@ -1,5 +1,14 @@
 # CanvasFlow（轻画）项目记忆
 
+### Harness runtime 永久取消（2026-10-31，对账 #809）
+
+- **不做外部 Agent runtime**：不接 DeepSeek Harness Worker、ACP/MCP sidecar、签名资源包，
+  也不“永久替换现有 Agent 推理循环”。画布 Agent 继续使用现有 `agentLoop`。
+- **保留的是现有 Agent 基础设施**：`AgentShellSlot` / 右侧面板、`AgentController`、
+  `ToolRegistry`、`ModelRoutePort`、`RouteExecutionPort` 与 `MemoryPort` 继续服务现有循环。
+- **不要再把 Harness 写成目标态、灰度项或待实施项**。以后若有人重新提出，必须先得到用户
+  对范围的明确重新确认。
+
 ### Agent 画布巡检按需工具（2026-10-31，对账 #837）
 
 - **默认关闭，开关只控制工具可用性**：`agent:canvas-review` 保存偏好；开启后才把
