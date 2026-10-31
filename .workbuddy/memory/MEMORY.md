@@ -60,13 +60,17 @@
 
 ### Agent applyPlan 空新建计划（2026-10-31，对账 #839）
 
-- **全 attach 不等于可落地计划**：`planProblems` 必须在命令层之前确认至少有一个未 attach 的
-  新节点。只复用原图、没有新节点的计划要回填“新建生成节点 + attach 原图”，不能留给
-  `agent.applyPlan` 抛“计划里没有要建的节点”。
+- **先修正别名冲突，再判断空计划**：模型会把 `attach.localId` 误写成新生成节点自己的
+  `localId`，导致系统把新节点全当成 attach 旧节点。落前归一化必须改成独立参考别名
+  `ref1 / ref2...`，补 `ref → 新节点` 连线，并保留原新节点 localId 创建。
+- **回归源头是上下文裁剪**：#836 (`97c1205`) 的轻量档没有带完整 applyPlan 字段契约，
+  模型丢失“attach 别名必须独立”的约束。轻量档现在必须保留这条短契约，不能连落地协议一起裁。
+- **全 attach 仍不等于可落地计划**：修正别名后如果确实只有旧节点、没有新节点，仍要在命令层
+  之前回填“新建生成节点 + attach 原图”，不能留给 `agent.applyPlan` 抛空命令错误。
 - **命令层保留第二道防御**：`applyAgentPlan` 发现 `command.nodes.length === 0` 时直接返回
   可读问题，不 dispatch 空命令。
 - **证据**：`planProblems` / `applyAgentPlan` / Agent 工具链定向回归通过；全量
-  **3735 passed / 1 skipped**，`npm run check` / build 通过。
+  **3738 passed / 1 skipped**，`npm run check` / build 通过。
 
 ### Agent 首轮快速路径背景（2026-10-31，已由 #836 交付）
 
