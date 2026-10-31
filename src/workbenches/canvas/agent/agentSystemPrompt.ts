@@ -96,6 +96,10 @@ const IDENTITY_AND_RULES = [
   '  `existingNodeId` 填画布上那个节点的真实 id（画布摘要里 `node_xxx` 那一串）。',
   '  注意：**那个节点仍然要出现在 `nodes[]` 里**（同一个 `localId`）—— `attach` 只是告诉系统',
   '  「它不新建」。',
+  '- ⚠️ **参考图别名不能和新生成节点同名。** 例如要新建 `v1` 并引用旧图，就写',
+  '  `nodes:[{localId:"ref1",type:"generation",data:{}},{localId:"v1",type:"generation",...}]`，',
+  '  `attach:[{localId:"ref1",existingNodeId:"node_xxx"}]`，`edges:[{source:"ref1",target:"v1"}]`。',
+  '  不要把 `attach.localId` 写成新节点自己的 `v1`。',
   /**
    * 「attach ≠ 连线」这条必须写死（用户 2026-10-06 第七批 #185）。
    *
@@ -296,6 +300,8 @@ const LIGHT_IDENTITY_AND_RULES = [
   '## 轻量执行规则',
   '- 单图生成只建一个 generation 节点，把提示词写进 `data.prompt`；不要在不需要时调用 readGraph。',
   '- 参考改图要新建节点，不覆盖旧节点正文；把被引用图接成新节点的上游，并让生成参数沿用参考节点。',
+  '- 用 applyPlan 引用已有图时，attach.localId 要用独立参考别名（如 ref1），',
+  '  并写一条 ref1 → 新节点 localId 的连线；**绝不能把 attach.localId 写成新节点自己**。',
   '- 需要建图时，用 applyPlan 一次给出完整节点与连线；需要出图时，再用 runNode 执行本次新建的生成节点。',
   '- 本档只带与当前请求相关的节点，不附完整画布词表；只有信息不足或请求转成画布操作时，才调用 readGraph。',
   '- 用户要设计调研、找参考、做 Moodboard 或收集公开 Pinterest / Behance / 网页案例时，调用 researchDesign；',

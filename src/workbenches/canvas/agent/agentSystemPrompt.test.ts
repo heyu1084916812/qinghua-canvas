@@ -160,6 +160,17 @@ describe('组装', () => {
     expect(full).toContain('## 画布上有哪些节点（唯一合法的类型清单）')
   })
 
+  it('参考改图轻量档仍保留 attach 别名契约', () => {
+    const light = buildAgentSystemPromptWithContext(
+      { nodes: [], edges: [] },
+      undefined,
+      { requestMode: 'reference_edit', promptProfile: 'light' },
+    )
+    expect(light).toContain('attach.localId 要用独立参考别名')
+    expect(light).toContain('ref1 → 新节点 localId')
+    expect(light).toContain('绝不能把 attach.localId 写成新节点自己')
+  })
+
   it('设计调研使用轻量档并明确公开来源边界', () => {
     const light = buildAgentSystemPromptWithContext(
       { nodes: [], edges: [] },
@@ -220,6 +231,9 @@ describe('素材段与技能段', () => {
     expect(p).toContain('resolvedNodes[{localId,nodeId}]')
     expect(p).toContain('不要把 `localId`')
     expect(p).toContain('node_xxx')
+    expect(p).toContain('参考图别名不能和新生成节点同名')
+    expect(p).toContain('ref1')
+    expect(p).toContain('v1')
   })
 
   it('★★ JSON 模式把工具声明与调用格式写进提示词（不支持 tools 的模型也有路可走）', () => {

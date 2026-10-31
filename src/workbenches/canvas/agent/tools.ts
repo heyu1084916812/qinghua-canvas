@@ -169,7 +169,9 @@ export const AGENT_TOOLS: readonly ToolDeclaration[] = [
           description:
             '把计划里的某个节点**接到画布上已有的节点**（复用用户先放好的素材图，不重复建）。' +
             '写法：localId = 计划里那个节点的临时 id；existingNodeId = 画布上那个节点的真实 id' +
-            '（就是画布摘要里 `- node_xxx｜...` 那一串）。',
+            '（就是画布摘要里 `- node_xxx｜...` 那一串）。' +
+            '参考别名必须和新生成节点的 localId 不同；例如旧图用 ref1，新节点用 v1，' +
+            '再写 ref1 → v1 的连线。',
           items: {
             type: 'object',
             properties: {
@@ -1165,11 +1167,72 @@ export async function executeReadTool(
  * 现在**建图根本不问**（见 `agentLoop` 的 `WRITE_TOOLS`），失败也直接以
  * 步骤卡的形式露在对话里。
  */
+function disambiguateAttachAliases(raw: unknown): unknown {
+  const row = asRecord(raw)
+  if (!Array.isArray(row.nodes) || !Array.isArray(row.attach) || row.attach.length === 0) {
+    return raw
+  }
+  const nodes = row.nodes.map(asRecord)
+  const nodeByLocalId = new Map(
+    nodes.flatMap((node) =>
+      typeof node.localId === 'string' && node.localId
+        ? [[node.localId, node] as const]
+        : [],
+    ),
+  )
+  const usedLocalIds = new Set(nodeByLocalId.keys())
+  const aliasOf = new Map<string, string>()
+  const extraNodes: Record<string, unknown>[] = []
+  const attach = row.attach.map((item, index) => {
+    const entry = asRecord(item)
+    const localId = typeof entry.localId === 'string' ? entry.localId : ''
+    const node = nodeByLocalId.get(localId)
+    const data = asRecord(node?.data)
+    const prompt = typeof data.prompt === 'string' ? data.prompt.trim() : ''
+    const collidesWithNewGeneration =
+      Boolean(node) && node?.type === 'generation' && Boolean(prompt)
+    if (!collidesWithNewGeneration) return entry
+
+    let referenceId = `${localId}__reference`
+    while (usedLocalIds.has(referenceId)) referenceId += '_'
+    usedLocalIds.add(referenceId)
+    aliasOf.set(localId, referenceId)
+    extraNodes.push({
+      localId: referenceId,
+      type: node?.type,
+      title: '参考图',
+      data: {},
+      order: typeof node?.order === 'number' ? node.order : index,
+    })
+    return { ...entry, localId: referenceId }
+  })
+  if (extraNodes.length === 0) return raw
+
+  const edges = (Array.isArray(row.edges) ? row.edges : []).map((item) => {
+    const edge = asRecord(item)
+    return {
+      ...edge,
+      ...(typeof edge.source === 'string' && aliasOf.has(edge.source)
+        ? { source: aliasOf.get(edge.source)! }
+        : {}),
+      ...(typeof edge.target === 'string' && aliasOf.has(edge.target)
+        ? { target: aliasOf.get(edge.target)! }
+        : {}),
+    }
+  })
+  for (const [target, referenceId] of aliasOf) {
+    if (!edges.some((edge) => edge.source === referenceId && edge.target === target)) {
+      edges.push({ source: referenceId, target })
+    }
+  }
+  return { ...row, nodes: [...row.nodes, ...extraNodes], edges, attach }
+}
+
 export function planProblems(
   args: unknown,
   existingNodeIds: readonly string[],
 ): { problems: string[]; plan: AgentPlan | null } {
-  const { plan } = normalizeAgentPlan(args)
+  const { plan } = normalizeAgentPlan(disambiguateAttachAliases(args))
   const checked = validateAgentPlan(plan, existingNodeIds)
   if (!checked.ok) return { problems: checked.errors, plan: null }
   const attachedLocalIds = new Set((checked.plan.attach ?? []).map((item) => item.localId))

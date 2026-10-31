@@ -536,6 +536,40 @@ describe('写 / 花钱的工具（只由确认后调用）', () => {
     expect(store.getSnapshot().edges).toHaveLength(2)
   })
 
+  it('★★ 模型把新节点与 attach 写成同名时，仍然新建节点并接回原图', async () => {
+    const { store, ctx } = setup()
+    const source = addNode(store, 'generation', {
+      mode: 'image',
+      prompt: '原海报',
+      assetHash: 'hash-ref',
+    })
+    const r = (await executeConfirmedTool(
+      'applyPlan',
+      {
+        summary: '参考原海报，重做一个新排版',
+        nodes: [
+          {
+            localId: 'v1',
+            type: 'generation',
+            data: { mode: 'image', prompt: '保留原海报内容，改成瑞士网格排版' },
+            order: 0,
+          },
+        ],
+        attach: [{ localId: 'v1', existingNodeId: source }],
+        edges: [],
+      },
+      ctx,
+    )) as { ok: boolean; createdNodeIds: string[] }
+
+    expect(r.ok).toBe(true)
+    expect(r.createdNodeIds).toHaveLength(1)
+    const graph = store.getSnapshot()
+    expect(graph.nodes).toHaveLength(2)
+    expect(graph.edges).toContainEqual(
+      expect.objectContaining({ source, target: r.createdNodeIds[0] }),
+    )
+  })
+
   /**
    * ★★ 用户 2026-10-04 第 4 条：「我用 agent 生图的时候卡在了没有写提示词在流程里面，
    * 单独生成图片应该是直接一个生成节点就可以了，然后把提示词输入进去再向我确认生成，
@@ -1099,6 +1133,38 @@ describe('planProblems · 跑不起来的生成节点', () => {
     expect(r.plan).toBeNull()
     expect(r.problems.join(' ')).toContain('没有任何要新建的节点')
     expect(r.problems.join(' ')).toContain('至少新建一个生成节点')
+  })
+
+  it('★★ 新生成节点与 attach 复用同名 → 自动拆成参考别名并保留新节点', () => {
+    const r = planProblems(
+      {
+        ...plan([
+          {
+            localId: 'v1',
+            type: 'generation',
+            data: {
+              mode: 'image',
+              prompt: '参考原海报，重做一套瑞士网格排版',
+            },
+            order: 0,
+          },
+        ]),
+        attach: [{ localId: 'v1', existingNodeId: 'node_ref' }],
+      },
+      ['node_ref'],
+    )
+
+    expect(r.problems).toEqual([])
+    expect(r.plan).not.toBeNull()
+    expect(r.plan?.nodes.find((node) => node.localId === 'v1')).toMatchObject({
+      type: 'generation',
+      data: expect.objectContaining({ prompt: expect.stringContaining('瑞士网格') }),
+    })
+    expect(r.plan?.attach?.[0]?.localId).toBe('v1__reference')
+    expect(r.plan?.edges).toContainEqual({
+      source: 'v1__reference',
+      target: 'v1',
+    })
   })
 
   it('★ 上游接着提示词节点（模板形态，正文在上游）→ 放行', () => {
