@@ -125,10 +125,13 @@
   --assets-row-h: 60px;
 }
 
-/*
- * 所有创作面板统一使用完整工作台高度：没有素材、没有提示词时也不能缩成一条，
- * 否则同一位置的面板会随内容忽高忽低。可用空间不足时以 --panel-available-h 为上限。
- */
-.panelComfort {
+/* 创作面板只有默认工作高度和用户主动展开两档，内容不能自行撑出第三档。 */
+.panelStandard {
+  height: min(360px, var(--panel-available-h, 480px));
+  min-height: min(360px, var(--panel-available-h, 480px));
+}
+
+.panelExpanded {
+  height: min(640px, var(--panel-available-h, 480px));
   min-height: min(360px, var(--panel-available-h, 480px));
 }

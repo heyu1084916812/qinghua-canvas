@@ -42,7 +42,9 @@ import {
 } from '../../../domain/project/modelCatalog'
 import { ModelIcon } from '../../../features/shared/modelIcon/ModelIcon'
 import {
+  IconCollapse,
   IconClose,
+  IconExpand,
   IconPrompt,
   IconPreset,
   IconSpinner,
@@ -474,6 +476,8 @@ export function CreationPanel(props: CreationPanelProps) {
   const shownChannelId = ownedChannelId || fallback?.channelId || ''
   const shownModel = ownedModel || fallback?.model || ''
   const [dragIndex, setDragIndex] = useState<number | null>(null)
+  const [expandedNodeId, setExpandedNodeId] = useState<string | null>(null)
+  const promptExpanded = nodeId !== '' && expandedNodeId === nodeId
   /**
    * 当前展开的参数浮层（§6.8「同一时刻只允许一个面板打开，开新关旧」）。
    *
@@ -1476,8 +1480,9 @@ export function CreationPanel(props: CreationPanelProps) {
 
   return (
     <div
-      className={`${shell.panel} ${shell.panelComfort}`}
+      className={`${shell.panel} ${promptExpanded ? shell.panelExpanded : shell.panelStandard}`}
       data-creation-panel
+      data-panel-expanded={promptExpanded ? 'true' : 'false'}
       data-panel-comfort="fixed"
       onPointerDown={(e) => e.stopPropagation()}
       onKeyDown={(e) => {
@@ -1639,7 +1644,8 @@ export function CreationPanel(props: CreationPanelProps) {
             className={`${styles.prompt} ${styles.promptEditor} ${styles.promptEditorComfort}`}
             anchorAttr={{ 'data-panel-prompt': '' }}
             label={promptMode ? '提示词节点正文' : '生成提示词'}
-            autoGrow
+            /** 面板高度由默认/展开两档决定，编辑区只吃剩余空间并在内部滚动。 */
+            autoGrow={false}
             value={promptValue}
             placeholder={
               /**
@@ -1679,6 +1685,22 @@ export function CreationPanel(props: CreationPanelProps) {
               onEvent({ type: 'setPrompt', text: promptDraft })
             }}
           />
+          <button
+            type="button"
+            className={styles.promptExpand}
+            data-panel-prompt-expand
+            aria-label={promptExpanded ? '收起编辑区' : '展开编辑区'}
+            aria-pressed={promptExpanded}
+            title={promptExpanded ? '收起编辑区' : '展开编辑区'}
+            onClick={() => {
+              setOpenPicker(null)
+              setMentionOpen(false)
+              closePresetMenus()
+              setExpandedNodeId((current) => (current === nodeId ? null : nodeId))
+            }}
+          >
+            {promptExpanded ? <IconCollapse size={18} /> : <IconExpand size={18} />}
+          </button>
           {mentionOpen && (
             <div
               className={styles.mentionMenu}

@@ -110,8 +110,12 @@ describe('CreationPanel · 面板舒适高度', () => {
     })
 
     expect(compact).toContain('data-panel-comfort="fixed"')
+    expect(compact).toContain('data-panel-expanded="false"')
+    expect(compact).toContain('data-panel-prompt-expand')
+    expect(compact).toContain('aria-label="展开编辑区"')
     expect(compact).toContain('data-panel-prompt-comfort="fixed"')
     expect(withAssets).toContain('data-panel-comfort="fixed"')
+    expect(withAssets).toContain('data-panel-expanded="false"')
     expect(withAssets).toContain('data-panel-prompt-comfort="fixed"')
   })
 })

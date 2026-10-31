@@ -21,7 +21,7 @@
 }
 
 .promptSectionComfort {
-  flex: 1 0 auto;
+  flex: 1 1 auto;
   min-height: 54px;
 }
 
@@ -562,6 +562,41 @@
   flex: 1 1 auto;
 }
 
+.promptExpand {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  z-index: 2;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--text-3);
+  cursor: pointer;
+  opacity: 0.72;
+  transition:
+    color var(--dur-hover) var(--ease-out),
+    background var(--dur-hover) var(--ease-out),
+    opacity var(--dur-hover) var(--ease-out);
+}
+
+.promptExpand:hover,
+.promptExpand:focus-visible {
+  background: var(--bg-hover);
+  color: var(--text-1);
+  opacity: 1;
+}
+
+.promptExpand:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 1px;
+}
+
 /*
  * 候选菜单：面板**内部**的浮层（绝对定位，不跟着画布缩放）。
  * 不用原生 select —— 它的展开层由浏览器绘制，既不受 `zoom: 0.75` 约束、
@@ -677,7 +712,7 @@
     420px,
     calc(var(--panel-available-h, 480px) - 160px)
   );
-  padding: 0 6px 0 var(--space-1);
+  padding: 0 42px 0 var(--space-1);
   /* 屏幕 15px（与 `.prompt` 同一条口径：面板 0.75 缩放，设计值写 20） */
   font-size: 20px;
   line-height: var(--lh-body);
@@ -687,7 +722,7 @@
 }
 
 .promptEditorComfort {
-  flex: 1 1 auto;
+  flex: 1 1 0;
   min-height: 72px;
 }
 

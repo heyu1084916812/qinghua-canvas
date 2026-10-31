@@ -441,6 +441,17 @@ export function IconExpand(props: IconProps) {
   )
 }
 
+export function IconCollapse(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path d="M9 4v4a1 1 0 0 1-1 1H4" />
+      <path d="M15 4v4a1 1 0 0 0 1 1h4" />
+      <path d="M9 20v-4a1 1 0 0 0-1-1H4" />
+      <path d="M15 20v-4a1 1 0 0 1 1-1h4" />
+    </Svg>
+  )
+}
+
 /**
  * 新建节点：**加号**（用户 2026-09-22）。
  *
