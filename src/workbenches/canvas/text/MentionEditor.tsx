@@ -197,6 +197,13 @@ export interface MentionEditorHandle {
   insertMention(token: string): void
 }
 
+export function syncMentionEditorHeight(
+  el: Pick<HTMLDivElement, 'style' | 'scrollHeight'>,
+): void {
+  el.style.height = 'auto'
+  el.style.height = `${el.scrollHeight}px`
+}
+
 export const MentionEditor = forwardRef<
   MentionEditorHandle,
   {
@@ -281,8 +288,7 @@ export const MentionEditor = forwardRef<
   useEffect(() => {
     const el = ref.current
     if (!el || !autoGrow) return
-    el.style.height = 'auto'
-    el.style.height = `${el.scrollHeight}px`
+    syncMentionEditorHeight(el)
   }, [value, autoGrow])
 
   useEffect(() => {
@@ -290,6 +296,11 @@ export const MentionEditor = forwardRef<
     if (!el || el.childNodes.length > 0) return
     el.replaceChildren(buildFragment(value, document))
     currentRef.current = value
+    /*
+     * 初次挂载时上面的 autoGrow effect 会先跑：那时 DOM 还是空的，只能量到一行。
+     * 内容填进去后必须再量一次，否则“点空白收起、再点回来”会把长提示词面板缩回去。
+     */
+    if (autoGrow) syncMentionEditorHeight(el)
     // 仅在挂载时执行：后续同步由上面那个 effect 负责（与 TokenEditor 同一写法）
   }, [])
 
