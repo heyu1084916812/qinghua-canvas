@@ -41,6 +41,7 @@ for (const viewport of viewports) {
     await page.locator('[data-new-workbench="canvas"]').click()
     await page.waitForURL(/\/canvas\//)
     await page.locator('[data-empty-template="batch-img"]').click()
+    await page.waitForTimeout(2200)
 
     if (theme === 'dark') {
       const current = await page.locator('html').getAttribute('data-theme')
@@ -55,6 +56,7 @@ for (const viewport of viewports) {
     await node.click({ position: { x: 30, y: 30 } })
     const panel = page.locator('[data-creation-panel]')
     await panel.waitFor({ state: 'visible' })
+    await page.waitForTimeout(1200)
     const editor = panel.locator('[data-panel-prompt]')
     await editor.waitFor({ state: 'visible' })
 

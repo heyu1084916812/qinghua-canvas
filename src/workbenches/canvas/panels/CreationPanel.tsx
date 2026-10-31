@@ -226,8 +226,12 @@ export function withFollowRatio(ratios: readonly string[], withFollowSource: boo
   return [...ratios, RATIO_FOLLOW_SOURCE]
 }
 
-export function promptNeedsExpand(scrollHeight: number, clientHeight: number): boolean {
-  return scrollHeight > clientHeight + 1
+export function promptNeedsExpand(
+  scrollHeight: number,
+  clientHeight: number,
+  reservedHeight = 0,
+): boolean {
+  return scrollHeight > clientHeight + reservedHeight + 1
 }
 
 export interface CreationPanelProps {
@@ -582,7 +586,18 @@ export function CreationPanel(props: CreationPanelProps) {
     const editor = promptBoxRef.current?.querySelector<HTMLElement>('[data-panel-prompt]')
     if (!editor) return
     const measure = () => {
-      const overflowing = promptNeedsExpand(editor.scrollHeight, editor.clientHeight)
+      const bar = promptBoxRef.current?.querySelector<HTMLElement>(
+        '[data-panel-prompt-expand-bar]',
+      )
+      const boxGap = promptBoxRef.current
+        ? Number.parseFloat(getComputedStyle(promptBoxRef.current).rowGap) || 0
+        : 0
+      const reservedHeight = bar ? bar.offsetHeight + boxGap : 0
+      const overflowing = promptNeedsExpand(
+        editor.scrollHeight,
+        editor.clientHeight,
+        reservedHeight,
+      )
       setPromptOverflow((current) => (current === overflowing ? current : overflowing))
     }
     measure()

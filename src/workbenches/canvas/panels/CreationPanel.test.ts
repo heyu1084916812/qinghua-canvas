@@ -128,6 +128,9 @@ describe('CreationPanel · 面板舒适高度', () => {
     expect(promptNeedsExpand(120, 120)).toBe(false)
     expect(promptNeedsExpand(121, 120)).toBe(false)
     expect(promptNeedsExpand(122, 120)).toBe(true)
+    expect(promptNeedsExpand(148, 120, 28)).toBe(false)
+    expect(promptNeedsExpand(149, 120, 28)).toBe(false)
+    expect(promptNeedsExpand(150, 120, 28)).toBe(true)
   })
 })
 
