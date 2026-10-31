@@ -63,6 +63,7 @@ for (const viewport of viewports) {
     const readState = () =>
       page.evaluate(() => {
         const panel = document.querySelector('[data-creation-panel]')
+        const box = panel?.querySelector('[data-panel-prompt-box]')
         const editor = panel?.querySelector('[data-panel-prompt]')
         const bar = panel?.querySelector('[data-panel-prompt-expand-bar]')
         const button = panel?.querySelector('[data-panel-prompt-expand]')
@@ -85,6 +86,7 @@ for (const viewport of viewports) {
           theme: document.documentElement.dataset.theme,
           expanded: panel?.getAttribute('data-panel-expanded'),
           panel: panelBox,
+          box: rect(box),
           editor: rect(editor),
           bar: rect(bar),
           button: rect(button),
@@ -92,6 +94,8 @@ for (const viewport of viewports) {
           iconPath: path?.getAttribute('d') ?? '',
           editorClientHeight: editor?.clientHeight ?? 0,
           editorScrollHeight: editor?.scrollHeight ?? 0,
+          paddingLeft: editor ? getComputedStyle(editor).paddingLeft : '',
+          paddingRight: editor ? getComputedStyle(editor).paddingRight : '',
           overflowX: document.documentElement.scrollWidth - document.documentElement.clientWidth,
           viewport: { width: innerWidth, height: innerHeight },
         }
@@ -136,10 +140,16 @@ for (const viewport of viewports) {
       state.panel.y >= 0 &&
       state.panel.right <= state.viewport.width &&
       state.panel.bottom <= state.viewport.height
-    const buttonAboveEditor =
-      Boolean(collapsedLong.bar && collapsedLong.button && collapsedLong.editor) &&
-      collapsedLong.bar.bottom <= collapsedLong.editor.y + 1 &&
-      collapsedLong.button.bottom <= collapsedLong.editor.y + 1
+    const buttonSharesScrollbarRail =
+      Boolean(collapsedLong.button && collapsedLong.editor) &&
+      Math.abs(collapsedLong.button.y - collapsedLong.editor.y) <= 1 &&
+      collapsedLong.button.x >= collapsedLong.editor.right - 20 &&
+      collapsedLong.button.right <= collapsedLong.editor.right + 4
+    const equalSidePadding =
+      Math.abs(
+        Number.parseFloat(collapsedLong.paddingLeft) -
+          Number.parseFloat(collapsedLong.paddingRight),
+      ) <= 1
 
     results.push({
       viewport,
@@ -157,8 +167,13 @@ for (const viewport of viewports) {
           !short.button && !short.bar && short.editorScrollHeight <= short.editorClientHeight + 1,
         longOverflows:
           collapsedLong.editorScrollHeight > collapsedLong.editorClientHeight + 1,
-        longShowsButton: Boolean(collapsedLong.button && collapsedLong.bar),
-        buttonAboveEditor,
+        longShowsButton: Boolean(collapsedLong.button && !collapsedLong.bar),
+        noTopBand: !collapsedLong.bar && !expanded.bar,
+        textStartsAtSameTop:
+          Math.abs(collapsedLong.editor.y - short.editor.y) <= 1 &&
+          Math.abs(expanded.editor.y - short.editor.y) <= 1,
+        buttonSharesScrollbarRail,
+        equalSidePadding,
         collapsedArrowUp: collapsedLong.iconPath === 'm6 14.5 6-6 6 6',
         expandedArrowDown: expanded.iconPath === 'm6 9.5 6 6 6-6',
         expandedLabel: expanded.buttonLabel === '收起编辑区',

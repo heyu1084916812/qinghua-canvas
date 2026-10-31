@@ -562,18 +562,13 @@
   flex: 1 1 auto;
 }
 
-.promptExpandBar {
-  flex: 0 0 auto;
-  min-height: 22px;
-  display: flex;
-  justify-content: flex-end;
-  align-items: flex-start;
-  padding-right: 1px;
-}
-
 .promptExpand {
-  width: 24px;
-  height: 22px;
+  position: absolute;
+  top: 0;
+  right: -4px;
+  z-index: 3;
+  width: 14px;
+  height: 20px;
   padding: 0;
   display: inline-flex;
   align-items: center;
@@ -586,13 +581,11 @@
   opacity: 0.72;
   transition:
     color var(--dur-hover) var(--ease-out),
-    background var(--dur-hover) var(--ease-out),
     opacity var(--dur-hover) var(--ease-out);
 }
 
 .promptExpand:hover,
 .promptExpand:focus-visible {
-  background: var(--bg-hover);
   color: var(--text-1);
   opacity: 1;
 }
@@ -717,7 +710,8 @@
     420px,
     calc(var(--panel-available-h, 480px) - 160px)
   );
-  padding: 0 42px 0 var(--space-1);
+  /** 左右留等宽窄边；右侧多出的宽度只来自 6px 原生滚动条。 */
+  padding: 0 10px;
   /* 屏幕 15px（与 `.prompt` 同一条口径：面板 0.75 缩放，设计值写 20） */
   font-size: 20px;
   line-height: var(--lh-body);
@@ -759,6 +753,24 @@
  *   Chromium 系是主目标；两套混写会互相打断，只能选一套。）
  */
 .prompt::-webkit-scrollbar-button {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+/**
+ * 展开按钮与原生滚动条共用右侧窄栏：
+ * 只保留滚动条顶部的透明起始格，让轨道从按钮下方开始；
+ * 底部格继续隐藏。这里不增加横向宽度，也不抬高文字区域。
+ */
+.prompt::-webkit-scrollbar-button:single-button:vertical:decrement {
+  display: block;
+  width: 6px;
+  height: 20px;
+  background: transparent;
+}
+
+.prompt::-webkit-scrollbar-button:single-button:vertical:increment {
   display: none;
   width: 0;
   height: 0;

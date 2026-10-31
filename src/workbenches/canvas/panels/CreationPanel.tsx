@@ -229,9 +229,8 @@ export function withFollowRatio(ratios: readonly string[], withFollowSource: boo
 export function promptNeedsExpand(
   scrollHeight: number,
   clientHeight: number,
-  reservedHeight = 0,
 ): boolean {
-  return scrollHeight > clientHeight + reservedHeight + 1
+  return scrollHeight > clientHeight + 1
 }
 
 export interface CreationPanelProps {
@@ -586,17 +585,9 @@ export function CreationPanel(props: CreationPanelProps) {
     const editor = promptBoxRef.current?.querySelector<HTMLElement>('[data-panel-prompt]')
     if (!editor) return
     const measure = () => {
-      const bar = promptBoxRef.current?.querySelector<HTMLElement>(
-        '[data-panel-prompt-expand-bar]',
-      )
-      const boxGap = promptBoxRef.current
-        ? Number.parseFloat(getComputedStyle(promptBoxRef.current).rowGap) || 0
-        : 0
-      const reservedHeight = bar ? bar.offsetHeight + boxGap : 0
       const overflowing = promptNeedsExpand(
         editor.scrollHeight,
         editor.clientHeight,
-        reservedHeight,
       )
       setPromptOverflow((current) => (current === overflowing ? current : overflowing))
     }
@@ -1682,24 +1673,22 @@ export function CreationPanel(props: CreationPanelProps) {
             data-panel-prompt-box
           >
           {promptExpanded || promptOverflow ? (
-            <div className={styles.promptExpandBar} data-panel-prompt-expand-bar>
-              <button
-                type="button"
-                className={styles.promptExpand}
-                data-panel-prompt-expand
-                aria-label={promptExpanded ? '收起编辑区' : '展开编辑区'}
-                aria-pressed={promptExpanded}
-                title={promptExpanded ? '收起编辑区' : '展开编辑区'}
-                onClick={() => {
-                  setOpenPicker(null)
-                  setMentionOpen(false)
-                  closePresetMenus()
-                  setExpandedNodeId((current) => (current === nodeId ? null : nodeId))
-                }}
-              >
-                {promptExpanded ? <IconChevronDown size={18} /> : <IconChevronUp size={18} />}
-              </button>
-            </div>
+            <button
+              type="button"
+              className={styles.promptExpand}
+              data-panel-prompt-expand
+              aria-label={promptExpanded ? '收起编辑区' : '展开编辑区'}
+              aria-pressed={promptExpanded}
+              title={promptExpanded ? '收起编辑区' : '展开编辑区'}
+              onClick={() => {
+                setOpenPicker(null)
+                setMentionOpen(false)
+                closePresetMenus()
+                setExpandedNodeId((current) => (current === nodeId ? null : nodeId))
+              }}
+            >
+              {promptExpanded ? <IconChevronDown size={14} /> : <IconChevronUp size={14} />}
+            </button>
           ) : null}
           {/*
             提示词框 = 带引用的富文本框（用户 2026-10-05 第 15 条）。
