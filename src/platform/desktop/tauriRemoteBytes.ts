@@ -26,6 +26,7 @@ interface RawFetchedText {
   headers: Record<string, string>
   text: string
   bodyBase64?: string
+  finalUrl?: string
 }
 
 interface RawFetchStreamEvent {
@@ -92,6 +93,7 @@ export function createTauriRemoteBytes(): RemoteBytesPort {
           status: raw.status,
           headers: raw.headers ?? {},
           text: raw.text ?? '',
+          ...(raw.finalUrl ? { finalUrl: raw.finalUrl } : {}),
           ...(raw.bodyBase64 ? { bodyBase64: raw.bodyBase64 } : {}),
         }
       } finally {

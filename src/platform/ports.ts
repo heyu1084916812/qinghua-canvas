@@ -203,6 +203,8 @@ export interface NetworkRequest {
 export interface NetworkResponse {
   status: number
   headers: Record<string, string>
+  /** 自动或手动跟随重定向后的最终地址；相对 URL 必须基于它解析。 */
+  finalUrl?: string
   text(): Promise<string>
   json<T = unknown>(): Promise<T>
   arrayBuffer(): Promise<ArrayBuffer>
@@ -734,6 +736,7 @@ export interface RemoteTextResponse {
   status: number
   headers: Record<string, string>
   text: string
+  finalUrl?: string
   /**
    * 原始响应字节的 base64。文本调用方继续用 `text`；
    * 图片 / 视频等二进制必须走这份，不能把 `text` 再编码回字节。

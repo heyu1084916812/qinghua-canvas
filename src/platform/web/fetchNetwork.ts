@@ -75,11 +75,17 @@ function toAppError(e: unknown, signal: AbortSignal): AppError {
   return { kind: 'network', detail: 'dns', sendPhase: 'unknown' }
 }
 
-function toResponse(status: number, headers: Record<string, string>, buffer: ArrayBuffer): NetworkResponse {
+function toResponse(
+  status: number,
+  headers: Record<string, string>,
+  buffer: ArrayBuffer,
+  finalUrl?: string,
+): NetworkResponse {
   const text = new TextDecoder().decode(buffer)
   return {
     status,
     headers,
+    ...(finalUrl ? { finalUrl } : {}),
     async text() {
       return text
     },
@@ -213,7 +219,7 @@ export function createFetchNetwork(remote?: {
     const buffer = res.bodyBase64
       ? base64ToBytes(res.bodyBase64).buffer
       : new TextEncoder().encode(res.text).buffer
-    return toResponse(res.status, res.headers ?? {}, buffer as ArrayBuffer)
+    return toResponse(res.status, res.headers ?? {}, buffer as ArrayBuffer, res.finalUrl)
   }
 
   return {
@@ -232,7 +238,18 @@ export function createFetchNetwork(remote?: {
           sendPhase: 'not-sent',
         } satisfies AppError
       }
-      if (req.publicOnly && shellRequest) {
+      if (req.publicOnly) {
+        /**
+         * 浏览器无法固定 DNS，也无法阻止重定向后重新解析到内网。
+         * 没有桌面壳时只能失败关闭，不能把“字面量看起来公开”当成安全边界。
+         */
+        if (!shellRequest) {
+          throw {
+            kind: 'network',
+            detail: 'blocked',
+            sendPhase: 'not-sent',
+          } satisfies AppError
+        }
         try {
           return await viaShell(req, signal)
         } catch (error) {
@@ -266,7 +283,7 @@ export function createFetchNetwork(remote?: {
         res.headers.forEach((value, key) => {
           responseHeaders[key] = value
         })
-        return toResponse(res.status, responseHeaders, buffer)
+        return toResponse(res.status, responseHeaders, buffer, res.url)
       } catch (e) {
         /** 浏览器这一层过不去（多为 CORS）且壳有原生 HTTP ⇒ 换一条路再试一次 */
         if (shellRequest && !signal.aborted && canFallbackToShell(req, toAppError(e, signal))) {

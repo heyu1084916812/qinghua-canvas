@@ -46,4 +46,22 @@ describe('createFetchNetwork publicOnly', () => {
       expect.any(AbortSignal),
     )
   })
+
+  it('fails closed when a public request has no desktop validator', async () => {
+    const network = createFetchNetwork()
+
+    await expect(
+      network.request(
+        {
+          url: 'https://example.com/project',
+          publicOnly: true,
+        },
+        new AbortController().signal,
+      ),
+    ).rejects.toMatchObject({
+      kind: 'network',
+      detail: 'blocked',
+      sendPhase: 'not-sent',
+    })
+  })
 })

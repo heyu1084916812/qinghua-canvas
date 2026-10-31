@@ -87,6 +87,36 @@ describe('runDesignResearch', () => {
     expect(result.warnings[0]).toContain('offline')
   })
 
+  it('uses the final redirect URL to resolve relative image metadata', async () => {
+    const network: NetworkPort = {
+      async request() {
+        return {
+          status: 200,
+          headers: { 'content-type': 'text/html' },
+          finalUrl: 'https://final.example.com/campaign/',
+          text: async () =>
+            '<title>Redirected project</title><meta property="og:image" content="cover.jpg">',
+          json: async <T,>() => ({}) as T,
+          arrayBuffer: async () => new ArrayBuffer(0),
+        }
+      },
+      async *stream() {},
+    }
+    const result = await runDesignResearch(
+      {
+        topic: 'redirected',
+        urls: ['https://short.example.com/start'],
+      },
+      { network },
+      new AbortController().signal,
+    )
+
+    expect(result.items[0]).toMatchObject({
+      url: 'https://final.example.com/campaign/',
+      imageUrl: 'https://final.example.com/campaign/cover.jpg',
+    })
+  })
+
   it('skips private URLs without issuing a network request', async () => {
     const request = vi.fn<NetworkPort['request']>()
     const result = await runDesignResearch(

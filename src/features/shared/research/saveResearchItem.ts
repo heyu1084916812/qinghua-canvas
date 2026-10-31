@@ -1,10 +1,14 @@
 import type { DesignResearchItem } from '../../../domain/inspiration/designResearch'
-import { DESIGN_RESEARCH_RIGHTS_NOTE } from '../../../domain/inspiration/designResearch'
+import {
+  DESIGN_RESEARCH_MAX_IMAGE_PIXELS,
+  DESIGN_RESEARCH_RIGHTS_NOTE,
+} from '../../../domain/inspiration/designResearch'
 import { fingerprintBytes } from '../../../domain/shared/hash'
 import { imageMimeFromBytes } from '../../../domain/shared/imageMime'
 import { imageSizeFromHeader } from '../../../domain/shared/imageSize'
 import { isPublicHttpUrl } from '../../../domain/shared/publicUrl'
 import type { NetworkPort, StoragePort } from '../../../platform/ports'
+import { errorTextOf } from '../../../shared/result'
 import {
   ASSET_LIBRARY_TAGS_KEY,
   createAssetLibraryRepository,
@@ -52,6 +56,7 @@ export async function saveDesignResearchItem(
       return { ok: false, message: `图片读取失败：HTTP ${response.status}` }
     }
     const bytes = new Uint8Array(await response.arrayBuffer())
+    if (signal.aborted) return { ok: false, message: '保存已取消' }
     if (bytes.length === 0) return { ok: false, message: '图片字节为空' }
     const hash = await fingerprintBytes(bytes)
     const contentTypeHeader = Object.entries(response.headers).find(
@@ -73,12 +78,17 @@ export async function saveDesignResearchItem(
       return { ok: false, message: '图片响应头与实际文件格式不一致' }
     }
     const size = imageSizeFromHeader(bytes)
-    if (!size && detectedMime !== 'image/svg+xml') {
+    if (!size) {
       return { ok: false, message: '无法读取图片尺寸，文件可能已损坏' }
+    }
+    if (size.width * size.height > DESIGN_RESEARCH_MAX_IMAGE_PIXELS) {
+      return { ok: false, message: '图片超过 2000 万像素，已拒绝保存' }
     }
     const savedAt = Date.now()
     const host = sourceHost(item.url)
+    if (signal.aborted) return { ok: false, message: '保存已取消' }
     await deps.storage.transaction(['assets', 'assetLibrary', 'presets'], async (tx) => {
+      if (signal.aborted) throw new DOMException('保存已取消', 'AbortError')
       await tx.put('assets', {
         id: hash,
         hash,
@@ -86,22 +96,27 @@ export async function saveDesignResearchItem(
         bytes,
         createdAt: savedAt,
         projectId: 'inspiration-library',
-        ...(size ? { width: size.width, height: size.height } : {}),
+        width: size.width,
+        height: size.height,
       } as never)
+      if (signal.aborted) throw new DOMException('保存已取消', 'AbortError')
       const library = createAssetLibraryRepository(tx)
       await library.save({
         hash,
         mime: detectedMime,
         bytes: bytes.length,
-        ...(size ? { width: size.width, height: size.height } : {}),
+        width: size.width,
+        height: size.height,
         savedAt,
         projectId: 'inspiration-library',
         prompt: `${item.title}\n来源：${item.url}\n${DESIGN_RESEARCH_RIGHTS_NOTE}`,
       })
+      if (signal.aborted) throw new DOMException('保存已取消', 'AbortError')
       await library.setTags(
         hash,
         ['设计调研', sourceTag(item.source), ...(host ? [host] : [])],
       )
+      if (signal.aborted) throw new DOMException('保存已取消', 'AbortError')
       const assetRows = await tx.query('assets', { id: hash })
       const libraryRows = await tx.query('assetLibrary', { id: hash })
       if (assetRows.length !== 1 || libraryRows.length !== 1) {
@@ -137,12 +152,13 @@ export async function saveDesignResearchItem(
       if (!storedTags.includes('设计调研') || !storedTags.includes(sourceTag(item.source))) {
         throw new Error('素材标签回读校验失败')
       }
+      if (signal.aborted) throw new DOMException('保存已取消', 'AbortError')
     })
     return { ok: true, message: '已保存到素材库' }
   } catch (cause) {
     return {
       ok: false,
-      message: cause instanceof Error ? cause.message : String(cause),
+      message: errorTextOf(cause),
     }
   }
 }

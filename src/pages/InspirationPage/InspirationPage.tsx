@@ -406,14 +406,14 @@ export function InspirationPage() {
   }, [])
 
   const saveResearchItem = useCallback(
-    async (item: DesignResearchItem) =>
+    async (item: DesignResearchItem, signal: AbortSignal) =>
       saveDesignResearchItem(
         item,
         {
           network: platform.network,
           storage: platform.storage,
         },
-        new AbortController().signal,
+        signal,
       ),
     [platform],
   )

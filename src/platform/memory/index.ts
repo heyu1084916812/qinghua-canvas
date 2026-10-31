@@ -68,8 +68,24 @@ export function createMemoryStorage(seed: MemorySeed = {}): StoragePort {
     async open() {
       /* 内存实现无需打开 */
     },
-    async transaction(_tables, fn) {
-      return fn(port)
+    async transaction(transactionTables, fn) {
+      const snapshots = new Map<TableName, Map<string, Row> | null>()
+      for (const table of transactionTables) {
+        const current = tables.get(table)
+        snapshots.set(
+          table,
+          current ? new Map([...current].map(([id, row]) => [id, { ...row }])) : null,
+        )
+      }
+      try {
+        return await fn(port)
+      } catch (error) {
+        for (const [table, snapshot] of snapshots) {
+          if (snapshot) tables.set(table, snapshot)
+          else tables.delete(table)
+        }
+        throw error
+      }
     },
     async put(table, row) {
       tableOf(table).set(row.id, { ...row })

@@ -172,7 +172,7 @@ export async function runDesignResearch(
       if (html.length > 8 * 1024 * 1024) {
         throw new Error('公开页面超过 8MB，已跳过')
       }
-      return pageItems(html, url)
+      return pageItems(html, response.finalUrl ?? url)
     }),
   )
 

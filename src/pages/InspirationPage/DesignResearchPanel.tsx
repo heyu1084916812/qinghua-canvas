@@ -1,9 +1,12 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { isTauri } from '@tauri-apps/api/core'
 import { openUrl } from '@tauri-apps/plugin-opener'
 import { usePlatform } from '../../app/providers/PlatformProvider'
 import type { InspirationCase } from '../../domain/inspiration/cases'
-import type { DesignResearchItem } from '../../domain/inspiration/designResearch'
+import {
+  DESIGN_RESEARCH_MAX_IMAGE_PIXELS,
+  type DesignResearchItem,
+} from '../../domain/inspiration/designResearch'
 import { isPublicHttpUrl } from '../../domain/shared/publicUrl'
 import { imageMimeFromBytes } from '../../domain/shared/imageMime'
 import { imageSizeFromHeader } from '../../domain/shared/imageSize'
@@ -15,7 +18,6 @@ import styles from './DesignResearchPanel.module.css'
 
 const LAST_RESEARCH_KEY = 'inspiration:research:last'
 const MAX_CONCURRENT_IMAGES = 3
-const MAX_RESEARCH_IMAGE_PIXELS = 20_000_000
 let activeImageLoads = 0
 const imageLoadQueue: Array<() => void> = []
 
@@ -132,7 +134,7 @@ function ResearchImage({ imageUrl }: { imageUrl: string }) {
         const size = imageSizeFromHeader(bytes)
         if (
           !size ||
-          size.width * size.height > MAX_RESEARCH_IMAGE_PIXELS
+          size.width * size.height > DESIGN_RESEARCH_MAX_IMAGE_PIXELS
         ) {
           setFailed(true)
           return
@@ -179,7 +181,10 @@ export function DesignResearchPanel({
 }: {
   libraryCases: readonly InspirationCase[]
   onClose: () => void
-  onSave: (item: DesignResearchItem) => Promise<{ ok: boolean; message: string }>
+  onSave: (
+    item: DesignResearchItem,
+    signal: AbortSignal,
+  ) => Promise<{ ok: boolean; message: string }>
 }) {
   const platform = usePlatform()
   const [topic, setTopic] = useState('')
@@ -192,7 +197,13 @@ export function DesignResearchPanel({
   const [saveStatus, setSaveStatus] = useState<Record<string, string>>({})
   const [reportNotice, setReportNotice] = useState('')
   const controllerRef = useRef<AbortController | null>(null)
+  const saveControllerRef = useRef<AbortController | null>(null)
   const operationRef = useRef(0)
+  const closePanel = useCallback(() => {
+    saveControllerRef.current?.abort()
+    saveControllerRef.current = null
+    onClose()
+  }, [onClose])
 
   const imageItems = useMemo(
     () =>
@@ -234,15 +245,16 @@ export function DesignResearchPanel({
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape' && !loading) onClose()
+      if (event.key === 'Escape' && !loading) closePanel()
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [loading, onClose])
+  }, [loading, closePanel])
 
   useEffect(
     () => () => {
       controllerRef.current?.abort()
+      saveControllerRef.current?.abort()
     },
     [],
   )
@@ -253,6 +265,9 @@ export function DesignResearchPanel({
       setError('先填写这次要调研的主题。')
       return
     }
+    saveControllerRef.current?.abort()
+    saveControllerRef.current = null
+    setSaving(false)
     controllerRef.current?.abort()
     const controller = new AbortController()
     const operation = ++operationRef.current
@@ -322,23 +337,36 @@ export function DesignResearchPanel({
       setError('先选择要保存的参考图。')
       return
     }
+    saveControllerRef.current?.abort()
+    const controller = new AbortController()
+    saveControllerRef.current = controller
     setSaving(true)
     setError('')
-    for (const item of targets) {
-      const result = await onSave(item)
-      setSaveStatus((current) => ({
-        ...current,
-        [item.id]: result.message,
-      }))
-      if (result.ok) {
-        setSelected((current) => {
-          const next = new Set(current)
-          next.delete(item.id)
-          return next
-        })
+    try {
+      for (const item of targets) {
+        if (controller.signal.aborted) break
+        const result = await onSave(item, controller.signal)
+        if (controller.signal.aborted) break
+        setSaveStatus((current) => ({
+          ...current,
+          [item.id]: result.message,
+        }))
+        if (result.ok) {
+          setSelected((current) => {
+            const next = new Set(current)
+            next.delete(item.id)
+            return next
+          })
+        }
       }
+    } catch (cause) {
+      if (!controller.signal.aborted) {
+        setError(cause instanceof Error ? cause.message : String(cause))
+      }
+    } finally {
+      if (saveControllerRef.current === controller) saveControllerRef.current = null
+      if (!controller.signal.aborted) setSaving(false)
     }
-    setSaving(false)
   }
 
   return (
@@ -346,7 +374,7 @@ export function DesignResearchPanel({
       className={styles.scrim}
       data-design-research-panel
       onPointerDown={(event) => {
-        if (event.target === event.currentTarget && !loading) onClose()
+        if (event.target === event.currentTarget && !loading) closePanel()
       }}
     >
       <section
@@ -360,7 +388,7 @@ export function DesignResearchPanel({
             <h2>设计调研</h2>
             <p>检索本地灵感库，并读取你提供的公开 Pinterest、Behance 或网页页面。</p>
           </div>
-          <button type="button" className={styles.close} onClick={onClose} disabled={loading}>
+          <button type="button" className={styles.close} onClick={closePanel} disabled={loading}>
             关闭
           </button>
         </header>

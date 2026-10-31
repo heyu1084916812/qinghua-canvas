@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { registerAllSpecs } from '../../../domain/canvas/nodeSpecs'
 import { createMemoryPlatform } from '../../../platform/memory'
+import type { StoragePort } from '../../../platform/ports'
 import { createAssetLibraryRepository } from '../../../state/project/assetLibraryRepository'
 import { saveDesignResearchItem } from './saveResearchItem'
 
@@ -13,6 +14,14 @@ const PNG = Uint8Array.from([
   0x08, 0x06, 0x00, 0x00, 0x00, 0x1f, 0x15, 0xc4,
   0x89,
 ])
+
+function pngOfSize(width: number, height: number): Uint8Array {
+  const bytes = PNG.slice()
+  const view = new DataView(bytes.buffer)
+  view.setUint32(16, width)
+  view.setUint32(20, height)
+  return bytes
+}
 
 describe('saveDesignResearchItem', () => {
   it('stores image bytes and a frozen asset-library row', async () => {
@@ -138,6 +147,208 @@ describe('saveDesignResearchItem', () => {
     )
 
     expect(result).toEqual({ ok: false, message: '来源返回的不是图片' })
+    expect(await platform.storage.query('assets', {})).toEqual([])
+    expect(await library.list()).toEqual([])
+  })
+
+  it('rejects decoded images above the shared research pixel limit', async () => {
+    const platform = createMemoryPlatform()
+    const library = createAssetLibraryRepository(platform.storage)
+    const oversized = pngOfSize(5000, 5000)
+    const network = {
+      async request() {
+        return {
+          status: 200,
+          headers: { 'content-type': 'image/png' },
+          text: async () => '',
+          json: async <T,>() => ({}) as T,
+          arrayBuffer: async () => Uint8Array.from(oversized).buffer,
+        }
+      },
+      async *stream() {},
+    }
+    const result = await saveDesignResearchItem(
+      {
+        id: 'web:huge',
+        source: 'web',
+        title: 'Huge image',
+        url: 'https://example.com/page',
+        imageUrl: 'https://example.com/huge.png',
+      },
+      { network, storage: platform.storage },
+      new AbortController().signal,
+    )
+
+    expect(result).toEqual({ ok: false, message: '图片超过 2000 万像素，已拒绝保存' })
+    expect(await platform.storage.query('assets', {})).toEqual([])
+    expect(await library.list()).toEqual([])
+  })
+
+  it('reports a readable message when public transport is unavailable', async () => {
+    const platform = createMemoryPlatform()
+    const network = {
+      async request() {
+        throw { kind: 'network', detail: 'blocked', sendPhase: 'not-sent' }
+      },
+      async *stream() {},
+    }
+    const result = await saveDesignResearchItem(
+      {
+        id: 'web:blocked',
+        source: 'web',
+        title: 'Blocked',
+        url: 'https://example.com/page',
+        imageUrl: 'https://example.com/image.png',
+      },
+      { network, storage: platform.storage },
+      new AbortController().signal,
+    )
+
+    expect(result).toEqual({
+      ok: false,
+      message: '连不上：不允许访问本机、内网或链路本地地址',
+    })
+  })
+
+  it('does not write after aborting once image bytes have arrived', async () => {
+    const platform = createMemoryPlatform()
+    const library = createAssetLibraryRepository(platform.storage)
+    const controller = new AbortController()
+    const network = {
+      async request() {
+        return {
+          status: 200,
+          headers: { 'content-type': 'image/png' },
+          text: async () => '',
+          json: async <T,>() => ({}) as T,
+          arrayBuffer: async () => {
+            controller.abort()
+            return Uint8Array.from(PNG).buffer
+          },
+        }
+      },
+      async *stream() {},
+    }
+    const result = await saveDesignResearchItem(
+      {
+        id: 'web:late-abort',
+        source: 'web',
+        title: 'Late abort',
+        url: 'https://example.com/page',
+        imageUrl: 'https://example.com/image.png',
+      },
+      { network, storage: platform.storage },
+      controller.signal,
+    )
+
+    expect(result).toEqual({ ok: false, message: '保存已取消' })
+    expect(await platform.storage.query('assets', {})).toEqual([])
+    expect(await library.list()).toEqual([])
+  })
+
+  it('rolls back when aborted after the first asset-library write', async () => {
+    const platform = createMemoryPlatform()
+    const library = createAssetLibraryRepository(platform.storage)
+    const controller = new AbortController()
+    const original = platform.storage
+    const storage: StoragePort = {
+      ...original,
+      transaction: (tables, run) =>
+        original.transaction(tables, async (tx) => {
+          const wrapped = new Proxy(tx, {
+            get(target, property) {
+              if (property === 'put') {
+                return async (table: string, row: unknown) => {
+                  await target.put(table as never, row as never)
+                  if (table === 'assetLibrary') controller.abort()
+                }
+              }
+              const value = Reflect.get(target, property, target)
+              return typeof value === 'function' ? value.bind(target) : value
+            },
+          })
+          return run(wrapped)
+        }),
+    }
+    const network = {
+      async request() {
+        return {
+          status: 200,
+          headers: { 'content-type': 'image/png' },
+          text: async () => '',
+          json: async <T,>() => ({}) as T,
+          arrayBuffer: async () => Uint8Array.from(PNG).buffer,
+        }
+      },
+      async *stream() {},
+    }
+    const result = await saveDesignResearchItem(
+      {
+        id: 'web:mid-transaction-abort',
+        source: 'web',
+        title: 'Mid transaction abort',
+        url: 'https://example.com/page',
+        imageUrl: 'https://example.com/image.png',
+      },
+      { network, storage },
+      controller.signal,
+    )
+
+    expect(result.ok).toBe(false)
+    expect(await platform.storage.query('assets', {})).toEqual([])
+    expect(await library.list()).toEqual([])
+  })
+
+  it('rolls back when aborted during the final tag read', async () => {
+    const platform = createMemoryPlatform()
+    const library = createAssetLibraryRepository(platform.storage)
+    const controller = new AbortController()
+    const original = platform.storage
+    const storage: StoragePort = {
+      ...original,
+      transaction: (tables, run) =>
+        original.transaction(tables, async (tx) => {
+          const wrapped = new Proxy(tx, {
+            get(target, property) {
+              if (property === 'query') {
+                return async (table: string, filter: unknown) => {
+                  const result = await target.query(table as never, filter as never)
+                  if (table === 'presets') controller.abort()
+                  return result
+                }
+              }
+              const value = Reflect.get(target, property, target)
+              return typeof value === 'function' ? value.bind(target) : value
+            },
+          })
+          return run(wrapped)
+        }),
+    }
+    const network = {
+      async request() {
+        return {
+          status: 200,
+          headers: { 'content-type': 'image/png' },
+          text: async () => '',
+          json: async <T,>() => ({}) as T,
+          arrayBuffer: async () => Uint8Array.from(PNG).buffer,
+        }
+      },
+      async *stream() {},
+    }
+    const result = await saveDesignResearchItem(
+      {
+        id: 'web:final-read-abort',
+        source: 'web',
+        title: 'Final read abort',
+        url: 'https://example.com/page',
+        imageUrl: 'https://example.com/image.png',
+      },
+      { network, storage },
+      controller.signal,
+    )
+
+    expect(result.ok).toBe(false)
     expect(await platform.storage.query('assets', {})).toEqual([])
     expect(await library.list()).toEqual([])
   })

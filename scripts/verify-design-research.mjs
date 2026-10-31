@@ -25,29 +25,6 @@ for (const viewport of viewports) {
     page.on('console', (message) => {
       if (message.type() === 'error') errors.push(message.text())
     })
-    await page.route('https://example.com/research-page', async (route) => {
-      await route.fulfill({
-        status: 200,
-        contentType: 'text/html',
-        body: [
-          '<html><head>',
-          '<title>Bakery identity</title>',
-          '<meta property="og:title" content="Warm minimal bakery">',
-          '<meta property="og:image" content="https://cdn.example.com/mock.svg">',
-          '</head><body></body></html>',
-        ].join(''),
-      })
-    })
-    await page.route('https://cdn.example.com/mock.svg', async (route) => {
-      await route.fulfill({
-        status: 200,
-        contentType: 'image/png',
-        body: Buffer.from(
-          'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAFgwJ/lY7W7QAAAABJRU5ErkJggg==',
-          'base64',
-        ),
-      })
-    })
 
     await page.goto(`${BASE}/inspiration`, {
       waitUntil: 'domcontentloaded',
@@ -59,6 +36,11 @@ for (const viewport of viewports) {
       await onboarding.click()
     }
     await page.waitForSelector('[data-inspiration-research-open]', { timeout: 30_000 })
+    await page.waitForFunction(
+      () => document.querySelectorAll('[data-inspiration-card]').length > 0,
+      undefined,
+      { timeout: 30_000 },
+    )
 
     if (theme === 'dark') {
       const current = await page.locator('html').getAttribute('data-theme')
@@ -69,8 +51,8 @@ for (const viewport of viewports) {
     }
 
     await page.click('[data-inspiration-research-open]')
-    await page.fill('[data-design-research-topic]', 'bakery identity')
-    await page.fill('[data-design-research-urls]', 'https://example.com/research-page')
+    await page.fill('[data-design-research-topic]', 'minimal')
+    await page.fill('[data-design-research-urls]', '')
     await page.click('[data-design-research-run]')
     await page.waitForSelector('[data-design-research-results]', { timeout: 30_000 })
     await page.waitForTimeout(250)

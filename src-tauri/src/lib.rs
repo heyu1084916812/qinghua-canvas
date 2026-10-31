@@ -1555,6 +1555,7 @@ struct FetchedText {
     headers: std::collections::HashMap<String, String>,
     text: String,
     body_base64: String,
+    final_url: String,
 }
 
 #[derive(Default)]
@@ -2110,6 +2111,7 @@ async fn collect_fetched_text(
     Ok(FetchedText {
         status,
         headers: out_headers,
+        final_url: response.url().to_string(),
         // 文本响应完整解码；二进制只留前 64KB 供 HTTP 错误文案使用，
         // 不把几十 MB 的图片再复制成一份无意义字符串。
         text: if textual {

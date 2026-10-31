@@ -4,6 +4,7 @@ export const DEFAULT_RESEARCH_MAX_RESULTS = 24
 export const MIN_RESEARCH_MAX_RESULTS = 1
 export const MAX_RESEARCH_MAX_RESULTS = 100
 export const MAX_RESEARCH_URLS = 8
+export const DESIGN_RESEARCH_MAX_IMAGE_PIXELS = 20_000_000
 
 export const DESIGN_RESEARCH_RIGHTS_NOTE =
   '仅收集公开页面元数据与来源链接。图片权利归原作者所有，保存或商用前请核对来源许可。'
