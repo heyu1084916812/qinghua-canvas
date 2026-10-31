@@ -40,8 +40,15 @@ for (const viewport of viewports) {
     await page.locator('[data-new-card]').click()
     await page.locator('[data-new-workbench="canvas"]').click()
     await page.waitForURL(/\/canvas\//)
-    await page.locator('[data-empty-template="batch-img"]').click()
-    await page.waitForTimeout(2200)
+    await page.locator('[data-canvas-toolbar]').waitFor({ state: 'visible' })
+    await page.locator('[data-toolbar-add]').click()
+    await page.locator('[data-toolbar-menu-item="generation"]').click()
+    await page.waitForFunction(
+      () => document.querySelectorAll('[data-node-type="generation"]').length > 0,
+      undefined,
+      { timeout: 30_000 },
+    )
+    await page.waitForTimeout(1000)
 
     if (theme === 'dark') {
       const current = await page.locator('html').getAttribute('data-theme')
@@ -82,18 +89,48 @@ for (const viewport of viewports) {
             : null
         }
         const panelBox = rect(panel)
+        const editorStyle = editor ? getComputedStyle(editor) : null
+        const scale =
+          editor && editor.offsetWidth > 0
+            ? editor.getBoundingClientRect().width / editor.offsetWidth
+            : 1
+        const borderRight = editorStyle
+          ? Number.parseFloat(editorStyle.borderRightWidth) || 0
+          : 0
+        const scrollbarWidth =
+          editor && editorStyle
+            ? Math.max(0, editor.offsetWidth - editor.clientWidth)
+            : 0
+        const scrollbarSizeCss = editorStyle
+          ? Number.parseFloat(
+              editorStyle.getPropertyValue('--prompt-scrollbar-size'),
+            ) || 6
+          : 6
+        const editorRect = rect(editor)
+        const buttonRect = rect(button)
         return {
           theme: document.documentElement.dataset.theme,
           expanded: panel?.getAttribute('data-panel-expanded'),
           panel: panelBox,
           box: rect(box),
-          editor: rect(editor),
+          editor: editorRect,
           bar: rect(bar),
-          button: rect(button),
+          button: buttonRect,
           buttonLabel: button?.getAttribute('aria-label') ?? '',
           iconPath: path?.getAttribute('d') ?? '',
           editorClientHeight: editor?.clientHeight ?? 0,
           editorScrollHeight: editor?.scrollHeight ?? 0,
+          editorScrollTop: editor?.scrollTop ?? 0,
+          scrollbarWidth,
+          scrollbarSizeCss,
+          scrollbarCenter:
+            editorRect !== null
+              ? editorRect.right -
+                borderRight * scale -
+                (scrollbarSizeCss * scale) / 2
+              : null,
+          buttonCenter:
+            buttonRect !== null ? buttonRect.x + buttonRect.width / 2 : null,
           paddingLeft: editor ? getComputedStyle(editor).paddingLeft : '',
           paddingRight: editor ? getComputedStyle(editor).paddingRight : '',
           overflowX: document.documentElement.scrollWidth - document.documentElement.clientWidth,
@@ -112,7 +149,12 @@ for (const viewport of viewports) {
       state: 'visible',
       timeout: 10_000,
     })
-    await page.waitForTimeout(250)
+    await editor.evaluate((node) => {
+      node.scrollTop = Math.min(96, node.scrollHeight - node.clientHeight)
+      node.dispatchEvent(new Event('scroll'))
+      node.dataset.scrollActive = 'true'
+    })
+    await page.waitForTimeout(80)
     const collapsedLong = await readState()
     const longShot = `${OUT}/prompt-expander-${viewport.name}-${theme}-long.png`
     await page.screenshot({ path: longShot })
@@ -145,11 +187,16 @@ for (const viewport of viewports) {
       Math.abs(collapsedLong.button.y - collapsedLong.editor.y) <= 1 &&
       collapsedLong.button.x >= collapsedLong.editor.right - 20 &&
       collapsedLong.button.right <= collapsedLong.editor.right + 4
-    const equalSidePadding =
+    const opticalSidePadding =
       Math.abs(
         Number.parseFloat(collapsedLong.paddingLeft) -
-          Number.parseFloat(collapsedLong.paddingRight),
+          (Number.parseFloat(collapsedLong.paddingRight) +
+            collapsedLong.scrollbarSizeCss),
       ) <= 1
+    const buttonCenteredOnScrollbar =
+      collapsedLong.buttonCenter !== null &&
+      collapsedLong.scrollbarCenter !== null &&
+      Math.abs(collapsedLong.buttonCenter - collapsedLong.scrollbarCenter) <= 1
 
     results.push({
       viewport,
@@ -173,7 +220,8 @@ for (const viewport of viewports) {
           Math.abs(collapsedLong.editor.y - short.editor.y) <= 1 &&
           Math.abs(expanded.editor.y - short.editor.y) <= 1,
         buttonSharesScrollbarRail,
-        equalSidePadding,
+        buttonCenteredOnScrollbar,
+        opticalSidePadding,
         collapsedArrowUp: collapsedLong.iconPath === 'm6 14.5 6-6 6 6',
         expandedArrowDown: expanded.iconPath === 'm6 9.5 6 6 6-6',
         expandedLabel: expanded.buttonLabel === '收起编辑区',

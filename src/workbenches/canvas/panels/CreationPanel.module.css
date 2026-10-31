@@ -449,6 +449,7 @@
 }
 
 .prompt {
+  --prompt-scrollbar-size: 6px;
   width: 100%;
   /**
    * **高度跟着内容长**（用户 2026-09-24 第 1 条）。
@@ -568,7 +569,7 @@
   right: -4px;
   z-index: 3;
   width: 14px;
-  height: 20px;
+  height: 16px;
   padding: 0;
   display: inline-flex;
   align-items: center;
@@ -710,8 +711,11 @@
     420px,
     calc(var(--panel-available-h, 480px) - 160px)
   );
-  /** 左右留等宽窄边；右侧多出的宽度只来自 6px 原生滚动条。 */
-  padding: 0 10px;
+  /**
+   * 左边 10px、右边 4px：滚动条自己占 6px，
+   * 合计后文字到两侧的视觉间距接近相等，不再多出右侧空带。
+   */
+  padding: 0 4px 0 10px;
   /* 屏幕 15px（与 `.prompt` 同一条口径：面板 0.75 缩放，设计值写 20） */
   font-size: 20px;
   line-height: var(--lh-body);
@@ -736,8 +740,8 @@
    * 其余滚动条（节点本体、日志面板、设置页…）一律走全局 4px，不要在这里各写一份。
    */
 .prompt::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: var(--prompt-scrollbar-size);
+  height: var(--prompt-scrollbar-size);
 }
 
 /**
@@ -765,8 +769,8 @@
  */
 .prompt::-webkit-scrollbar-button:single-button:vertical:decrement {
   display: block;
-  width: 6px;
-  height: 20px;
+  width: var(--prompt-scrollbar-size);
+  height: 16px;
   background: transparent;
 }
 
