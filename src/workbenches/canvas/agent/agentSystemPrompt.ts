@@ -404,6 +404,8 @@ export function buildAgentSystemPrompt(
 }
 
 export interface AgentPromptExtras {
+  /** 画布巡检是否允许由 Agent 主动调用；false 时必须在提示词里明确禁止。 */
+  canvasReviewEnabled?: boolean
   /**
    * 用户这句话是不是「只改一处、其余保持」那一类（见 `looksLikePreserveRequest`）。
    *
@@ -501,6 +503,24 @@ export function buildAgentSystemPromptWithContext(
   extras: AgentPromptExtras = {},
 ): string {
   const parts = [buildAgentSystemPrompt(summary, inherited)]
+
+  if (extras.canvasReviewEnabled === true) {
+    parts.push(
+      [
+        '## 本轮画布巡检按需可用',
+        '只有用户在当前消息里明确要求「巡检画布 / 检查作品 / 验收一致性」时，才可调用 `visualReview`。',
+        '不要因为刚生成完图片就自动巡检，也不要把巡检当成持久化后台任务。',
+      ].join('\n'),
+    )
+  } else if (extras.canvasReviewEnabled === false) {
+    parts.push(
+      [
+        '## 本轮画布巡检已关闭',
+        '不要调用 `visualReview`，也不要声称已经完成画布巡检。',
+        '如果用户明确要求检查，请说明需要先在 Agent 设置 → 工具中开启画布巡检。',
+      ].join('\n'),
+    )
+  }
 
   if (extras.contextBundle?.trim()) {
     parts.push(extras.contextBundle.trim())

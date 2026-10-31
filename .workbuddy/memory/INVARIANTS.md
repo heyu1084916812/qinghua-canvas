@@ -10,6 +10,9 @@
 - **已有输出的流不换渠道**：出现首个 delta 后任何错误都收口为 `execution/accepted`。
 - **“直接下一步”走状态机**：调用 `advanceAgentTaskPlanAfterReview()`，内部指令必须 `hiddenFromConversation`。
 - **视觉验收模型独立选路**：只保存逻辑模型名，运行时重新 RoutePlan；未配置且主模型不支持图片时明确拒绝。
+- **画布巡检默认关闭且按需触发**：`agent:canvas-review` 只保存开关偏好；开启才向模型提供
+  `visualReview`，且只在当前消息明确要求巡检时调用。关闭时 native / JSON 工具声明和
+  `AgentToolContext.visualReview` 必须同时移除；不得创建定时器、后台任务或离开页面后继续巡检。
 
 - **子边分类必须复用节点索引**：不能在每处理一条边时重新 `indexNodes()`；子边集合按图缓存，视口变化只改路径坐标。
 - **创作面板只有默认 / 展开两档**：`panelStandard` 固定 360px 设计值，`panelExpanded`

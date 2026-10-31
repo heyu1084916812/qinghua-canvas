@@ -6,6 +6,7 @@ import { createMemoryPlatform } from '../../../platform/memory'
 import { createCanvasStore, type CanvasStore } from '../../../state/workbenches/canvas/store'
 import {
   AGENT_TOOLS,
+  agentToolsForCapabilities,
   executeConfirmedTool,
   executeReadTool,
   planProblems,
@@ -80,6 +81,12 @@ describe('工具声明', () => {
     expect(AGENT_TOOLS.map((tool) => tool.name).sort()).toEqual(
       AGENT_TOOL_DEFINITIONS.map((tool) => tool.name).sort(),
     )
+  })
+
+  it('关闭画布巡检时不再向模型暴露 visualReview', () => {
+    const tools = agentToolsForCapabilities({ canvasReview: false })
+    expect(tools.some((tool) => tool.name === 'visualReview')).toBe(false)
+    expect(agentToolsForCapabilities({ canvasReview: true })).toBe(AGENT_TOOLS)
   })
 
   it('★ rememberMemory 把当前项目 / 会话补进候选并交给记忆存储', async () => {

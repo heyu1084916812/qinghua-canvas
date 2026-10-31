@@ -45,6 +45,7 @@ const AGENT_DEFAULT_ROW_ID = 'agent:default'
 const AGENT_DEFAULT_SKILL_ROW_ID = 'agent:skill'
 const AGENT_DELIVERY_ROW_ID = 'agent:delivery'
 const AGENT_REVIEW_MODEL_ROW_ID = 'agent:review-model'
+const AGENT_CANVAS_REVIEW_ROW_ID = 'agent:canvas-review'
 
 /**
  * **技能收藏**的保留行 id（用户 2026-10-03：对话窗的技能菜单要按参考产品分成
@@ -111,6 +112,9 @@ export interface PresetStore {
   /** 仅用于视觉验收的逻辑对话模型；空值表示沿用 Agent 主模型。 */
   loadAgentReviewModel(): Promise<string | null>
   saveAgentReviewModel(model: string | null): Promise<void>
+  /** 是否允许本轮向模型提供画布巡检工具；缺行默认关闭。 */
+  loadAgentCanvasReview(): Promise<boolean>
+  saveAgentCanvasReview(enabled: boolean): Promise<void>
   /** 读技能收藏（技能 id 列表）；没收藏过返回空数组 */
   loadSkillFavorites(): Promise<string[]>
   /** 写技能收藏（整份覆盖） */
@@ -270,6 +274,25 @@ export function createPresetStore(storage: StoragePort): PresetStore {
         )
       } catch {
         // 偏好写入失败不能影响主对话；下次仍沿用旧值。
+      }
+    },
+    async loadAgentCanvasReview() {
+      try {
+        const rows = await storage.query('presets', { id: AGENT_CANVAS_REVIEW_ROW_ID })
+        const enabled = (rows[0] as { enabled?: unknown } | undefined)?.enabled
+        return typeof enabled === 'boolean' ? enabled : false
+      } catch {
+        return false
+      }
+    },
+    async saveAgentCanvasReview(enabled) {
+      try {
+        await storage.put(
+          'presets',
+          { id: AGENT_CANVAS_REVIEW_ROW_ID, enabled } as never,
+        )
+      } catch {
+        // 偏好写入失败不影响当前会话；下次仍沿用旧值。
       }
     },
     async loadSkillFavorites() {

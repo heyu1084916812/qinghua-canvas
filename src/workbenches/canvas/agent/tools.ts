@@ -514,6 +514,15 @@ export const AGENT_TOOLS: readonly ToolDeclaration[] = [
   },
 ]
 
+export function agentToolsForCapabilities({
+  canvasReview,
+}: {
+  canvasReview: boolean
+}): readonly ToolDeclaration[] {
+  if (canvasReview) return AGENT_TOOLS
+  return AGENT_TOOLS.filter((tool) => tool.name !== 'visualReview')
+}
+
 /** 画布现状摘要 —— 结构与设计文档 §4.2 的回填格式一致 */
 export interface GraphSummary {
   /**

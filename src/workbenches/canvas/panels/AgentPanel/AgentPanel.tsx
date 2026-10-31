@@ -118,6 +118,7 @@ import {
 } from '../../agent/agentSystemPrompt'
 import {
   AGENT_TOOLS,
+  agentToolsForCapabilities,
   executeConfirmedTool,
   executeReadTool,
   readGraphSummary,
@@ -160,6 +161,11 @@ import {
   setAgentReviewModel,
   subscribeAgentReviewModel,
 } from '../../../../state/ui/agentReviewModel'
+import {
+  getAgentCanvasReview,
+  setAgentCanvasReview,
+  subscribeAgentCanvasReview,
+} from '../../../../state/ui/agentCanvasReview'
 import {
   IconAuto,
   IconArrowUp,
@@ -512,6 +518,15 @@ export function AgentPanel({
     subscribeAgentReviewModel,
     getAgentReviewModel,
     getAgentReviewModel,
+  )
+  const canvasReviewEnabled = useSyncExternalStore(
+    subscribeAgentCanvasReview,
+    getAgentCanvasReview,
+    getAgentCanvasReview,
+  )
+  const activeAgentTools = useMemo(
+    () => agentToolsForCapabilities({ canvasReview: canvasReviewEnabled }),
+    [canvasReviewEnabled],
   )
   const queuePumpingRef = useRef(new Set<string>())
   const confirmingRef = useRef(new Set<string>())
@@ -925,8 +940,10 @@ export function AgentPanel({
       const rows = await refresh()
       const defaultSkillId = await presets.loadAgentDefaultSkill()
       const savedReviewModel = await presets.loadAgentReviewModel()
+      const savedCanvasReview = await presets.loadAgentCanvasReview()
       if (!alive) return
       setAgentReviewModel(savedReviewModel ?? '')
+      setAgentCanvasReview(savedCanvasReview)
       if (rows.length > 0) {
         const head = rows[0]!
         if (!head.skillId && defaultSkillId) {
@@ -1822,7 +1839,7 @@ export function AgentPanel({
               channelId: route?.channelId ?? req.channelId,
               model: route?.upstreamModel ?? req.model,
               modelIsUpstream: Boolean(route),
-              tools: req.tools ?? (toolMode === 'native' ? AGENT_TOOLS : []),
+              tools: req.tools ?? (toolMode === 'native' ? activeAgentTools : []),
               messages: req.messages ?? [],
               inputs: req.inputs,
               signal,
@@ -1849,7 +1866,7 @@ export function AgentPanel({
             channelId: route?.channelId ?? req.channelId,
             model: route?.upstreamModel ?? req.model,
             modelIsUpstream: Boolean(route),
-            tools: req.tools ?? (toolMode === 'native' ? AGENT_TOOLS : []),
+            tools: req.tools ?? (toolMode === 'native' ? activeAgentTools : []),
             messages: req.messages ?? [],
             inputs: req.inputs,
             signal,
@@ -1884,7 +1901,7 @@ export function AgentPanel({
         },
         channelId: route?.channelId ?? '',
         model: logicalModel,
-        tools: toolMode === 'native' ? AGENT_TOOLS : [],
+        tools: toolMode === 'native' ? activeAgentTools : [],
         toolMode,
         inputs,
       /**
@@ -1969,7 +1986,9 @@ export function AgentPanel({
         return executeToolWithLedger(session, { callId, name, args }, () =>
           executeReadTool(name, args, {
             ...base,
-            ...(name === 'visualReview' ? { visualReview: runVisualReview } : {}),
+            ...(name === 'visualReview' && canvasReviewEnabled
+              ? { visualReview: runVisualReview }
+              : {}),
           }),
         )
       },
@@ -2020,6 +2039,8 @@ export function AgentPanel({
       cachedChatRoute,
       modelRoute,
       reviewModel,
+      canvasReviewEnabled,
+      activeAgentTools,
       viewport,
       toolCtx,
       store,
@@ -2604,6 +2625,7 @@ export function AgentPanel({
       summary,
       { model: chatRoute.logicalModel },
       {
+        canvasReviewEnabled,
         /**
          * 用户说了「其他保持不变 / 只改 X」→ 给这次规划加一段**硬约束**
          * （用户 2026-10-05 第五批第 2 条：那句要求只留在对话里，没进提示词）。
@@ -2622,7 +2644,7 @@ export function AgentPanel({
         ...(contextPrompt ? { contextBundle: contextPrompt } : {}),
         ...(session.taskPlan ? { taskPlan: taskPlanPrompt(session.taskPlan) } : {}),
         /** JSON 降级时要把工具声明列进提示词，模型才知道 tool 能填什么（路线 B） */
-        ...(toolMode === 'json' ? { jsonToolFallback: true, tools: AGENT_TOOLS } : {}),
+        ...(toolMode === 'json' ? { jsonToolFallback: true, tools: activeAgentTools } : {}),
       },
     )
     /**
@@ -2720,6 +2742,8 @@ export function AgentPanel({
     setStatusFor,
     allSkills,
     toolCtx,
+    canvasReviewEnabled,
+    activeAgentTools,
     viewport,
     routeExecution,
     prepareChatRoute,

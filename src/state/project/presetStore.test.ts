@@ -112,6 +112,16 @@ describe('Agent 默认模型 · UI 偏好', () => {
     await s.saveAgentReviewModel(null)
     expect(await createPresetStore(platform.storage).loadAgentReviewModel()).toBeNull()
   })
+
+  it('canvas review defaults off and persists an explicit on', async () => {
+    const platform = createMemoryPlatform()
+    const s = createPresetStore(platform.storage)
+    await s.saveAgentCanvasReview(true)
+    expect(await createPresetStore(platform.storage).loadAgentCanvasReview()).toBe(true)
+    await s.saveAgentCanvasReview(false)
+    expect(await createPresetStore(platform.storage).loadAgentCanvasReview()).toBe(false)
+    expect(await createPresetStore(createMemoryPlatform().storage).loadAgentCanvasReview()).toBe(false)
+  })
 })
 
 /**

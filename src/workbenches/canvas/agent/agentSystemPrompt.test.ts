@@ -152,6 +152,25 @@ describe('组装', () => {
 describe('素材段与技能段', () => {
   const empty = { nodes: [], edges: [] }
 
+  it('关闭画布巡检时追加明确禁令，避免模型按旧规则凭空调用', () => {
+    const p = buildAgentSystemPromptWithContext(empty, undefined, {
+      canvasReviewEnabled: false,
+    })
+    expect(p).toContain('## 本轮画布巡检已关闭')
+    expect(p).toContain('不要调用 `visualReview`')
+    expect(p).toContain('Agent 设置 → 工具')
+  })
+
+  it('开启画布巡检也只允许用户当前消息明确要求时调用工具', () => {
+    const p = buildAgentSystemPromptWithContext(empty, undefined, {
+      canvasReviewEnabled: true,
+    })
+    expect(p).toContain('## 本轮画布巡检按需可用')
+    expect(p).toContain('只有用户在当前消息里明确要求')
+    expect(p).toContain('不要因为刚生成完图片就自动巡检')
+    expect(p).toContain('不要把巡检当成持久化后台任务')
+  })
+
   it('★★ 选了技能 → 名字与正文真的进了系统提示词（不是只存在选择框里）', () => {
     const p = buildAgentSystemPromptWithContext(empty, undefined, {
       skill: { name: '电商详情页策划', content: '第一步：提炼卖点\n第二步：排布信息' },

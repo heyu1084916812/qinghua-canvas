@@ -37,8 +37,14 @@ import {
   setAgentReviewModel,
   subscribeAgentReviewModel,
 } from '../../state/ui/agentReviewModel'
+import {
+  getAgentCanvasReview,
+  setAgentCanvasReview,
+  subscribeAgentCanvasReview,
+} from '../../state/ui/agentCanvasReview'
 import { AgentMemoryPanel } from './AgentMemoryPanel'
 import { ChoicePicker } from '../shared/choicePicker/ChoicePicker'
+import { SettingsRow } from './SettingsRow'
 import styles from './AgentSettingsPanel.module.css'
 
 const TABS: readonly { id: AgentSettingsTab; label: string }[] = [
@@ -64,6 +70,79 @@ const TOOL_GROUPS = (
   detail: TOOL_GROUP_DETAILS[category],
   tools: agentToolsInCategory(category),
 }))
+
+function CanvasReviewSettings() {
+  const platform = usePlatform()
+  const presets = useMemo(() => createPresetStore(platform.storage), [platform])
+  const enabled = useSyncExternalStore(
+    subscribeAgentCanvasReview,
+    getAgentCanvasReview,
+    getAgentCanvasReview,
+  )
+  const [status, setStatus] = useState('')
+
+  useEffect(() => {
+    let alive = true
+    void presets
+      .loadAgentCanvasReview()
+      .then((saved) => {
+        if (alive) setAgentCanvasReview(saved)
+      })
+      .catch(() => {
+        if (alive) setStatus('读取失败，当前保持关闭')
+      })
+    return () => {
+      alive = false
+    }
+  }, [presets])
+
+  const toggle = async () => {
+    const next = !enabled
+    setAgentCanvasReview(next)
+    setStatus('')
+    try {
+      await presets.saveAgentCanvasReview(next)
+      setStatus(
+        next
+          ? '已开启。只有你明确要求巡检时，Agent 才会调用这个工具。'
+          : '已关闭。Agent 不再获得画布巡检工具。',
+      )
+    } catch {
+      setStatus('保存失败，本次选择仍会立即生效')
+    }
+  }
+
+  return (
+    <section className={styles.capability} data-agent-canvas-review-setting>
+      <div className={styles.capabilityHead}>
+        <h4>主动能力</h4>
+        <p>开启只表示允许工具调用，不会定时扫描，也不会在后台持续巡检。</p>
+      </div>
+      <SettingsRow
+        label="画布巡检"
+        description="开启后，只有你在当前消息中明确要求检查作品或验收一致性时，Agent 才会调用 visualReview。"
+        control={
+          <button
+            type="button"
+            role="switch"
+            aria-label="允许 Agent 在用户明确要求时巡检画布"
+            aria-checked={enabled}
+            className={enabled ? `${styles.toggle} ${styles.toggleOn}` : styles.toggle}
+            data-agent-canvas-review-toggle
+            onClick={() => void toggle()}
+          >
+            <span className={styles.knob} />
+          </button>
+        }
+      />
+      {status ? (
+        <p className={styles.settingStatus} role="status">
+          {status}
+        </p>
+      ) : null}
+    </section>
+  )
+}
 
 function DeliverySettings() {
   const platform = usePlatform()
@@ -233,6 +312,21 @@ export function AgentSettingsPanel({
 }) {
   const navigate = useNavigate()
   const skills = useSkillsOptional()
+  const canvasReviewEnabled = useSyncExternalStore(
+    subscribeAgentCanvasReview,
+    getAgentCanvasReview,
+    getAgentCanvasReview,
+  )
+  const visibleToolGroups = useMemo(
+    () =>
+      TOOL_GROUPS.map((group) => ({
+        ...group,
+        tools: group.tools.filter(
+          (tool) => tool !== 'visualReview' || canvasReviewEnabled,
+        ),
+      })),
+    [canvasReviewEnabled],
+  )
 
   const onTabKeyDown = (
     event: ReactKeyboardEvent<HTMLButtonElement>,
@@ -322,8 +416,9 @@ export function AgentSettingsPanel({
               <h3>工具权限</h3>
               <p>工具按来源分组；所有调用都经过 ToolRegistry 的权限与确认检查。</p>
             </div>
+            <CanvasReviewSettings />
             <div className={styles.toolGroups}>
-              {TOOL_GROUPS.map((group) => (
+              {visibleToolGroups.map((group) => (
                 <section key={group.title} className={styles.toolGroup}>
                   <div className={styles.toolHead}>
                     <h4>{group.title}</h4>

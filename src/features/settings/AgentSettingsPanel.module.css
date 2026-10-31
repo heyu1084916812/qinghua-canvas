@@ -212,6 +212,79 @@
   gap: var(--space-2);
 }
 
+.capability {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: 1px solid var(--stroke);
+  border-radius: var(--radius-control);
+  background: var(--bg-surface);
+}
+
+.capabilityHead {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.capabilityHead h4 {
+  margin: 0;
+  color: var(--text-1);
+  font-size: var(--fs-nav);
+  font-weight: 600;
+}
+
+.capabilityHead p {
+  margin: 0;
+  color: var(--text-2);
+  font-size: var(--fs-label);
+  line-height: 1.55;
+}
+
+.settingStatus {
+  margin: 0;
+  color: var(--text-2);
+  font-size: var(--fs-label);
+  line-height: 1.55;
+}
+
+.toggle {
+  position: relative;
+  width: 40px;
+  height: 22px;
+  flex: 0 0 40px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: var(--bg-hover);
+  cursor: pointer;
+}
+
+.toggleOn {
+  background: var(--accent);
+}
+
+.knob {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--bg-surface);
+  transition: left var(--dur-hover) var(--ease-out);
+}
+
+.toggleOn .knob {
+  left: 21px;
+}
+
+.toggle:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
 .toolGroups {
   display: flex;
   flex-direction: column;
@@ -273,5 +346,11 @@
   .preferenceRow {
     align-items: flex-start;
     flex-direction: column;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .knob {
+    transition: none;
   }
 }
