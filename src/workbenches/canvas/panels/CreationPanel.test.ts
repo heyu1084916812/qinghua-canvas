@@ -63,6 +63,7 @@ function render(
   showCategoryToggle = false,
   /** §6.7：提示词节点面板与生成节点共用本组件，但第三部分的规则不同 */
   mode?: 'generation' | 'prompt',
+  model: PanelModel = emptyModel,
 ): string {
   return renderToString(
     createElement(
@@ -78,7 +79,7 @@ function render(
         { value: emptySkills },
         createElement(CreationPanel, {
         data,
-        model: emptyModel,
+        model,
         running: false,
         globalRunning: false,
         error: null,
@@ -91,6 +92,29 @@ function render(
     ),
   )
 }
+
+describe('CreationPanel · 面板舒适高度', () => {
+  it('空面板和有参考素材的面板使用同一完整高度', async () => {
+    const channels = await channelStore([])
+    const compact = render(channels)
+    const withAssets = render(channels, generationSpec.createDefaultData(), false, undefined, {
+      ...emptyModel,
+      collections: [
+        {
+          id: 'batch-a',
+          count: 3,
+          kind: 'media',
+          visible: true,
+        },
+      ],
+    })
+
+    expect(compact).toContain('data-panel-comfort="fixed"')
+    expect(compact).toContain('data-panel-prompt-comfort="fixed"')
+    expect(withAssets).toContain('data-panel-comfort="fixed"')
+    expect(withAssets).toContain('data-panel-prompt-comfort="fixed"')
+  })
+})
 
 /** 内存渠道表：[] 表示从没配过；enabled 决定它是否出现在画布 */
 async function channelStore(

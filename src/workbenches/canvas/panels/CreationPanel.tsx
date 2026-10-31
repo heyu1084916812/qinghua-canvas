@@ -1476,8 +1476,9 @@ export function CreationPanel(props: CreationPanelProps) {
 
   return (
     <div
-      className={shell.panel}
+      className={`${shell.panel} ${shell.panelComfort}`}
       data-creation-panel
+      data-panel-comfort="fixed"
       onPointerDown={(e) => e.stopPropagation()}
       onKeyDown={(e) => {
         if (e.key !== 'Escape') return
@@ -1588,7 +1589,11 @@ export function CreationPanel(props: CreationPanelProps) {
       </section>
 
       {/* 第二部分：提示词 */}
-      <section className={`${styles.section} ${styles.promptSection}`} data-panel-part="prompt">
+      <section
+        className={`${styles.section} ${styles.promptSection} ${styles.promptSectionComfort}`}
+        data-panel-part="prompt"
+        data-panel-prompt-comfort="fixed"
+      >
         <div className={styles.promptRow}>
           {/*
             提示词那一行的头：只剩「上游已链接提示词节点」这个胶囊。
@@ -1616,7 +1621,11 @@ export function CreationPanel(props: CreationPanelProps) {
 
             容器只负责「chip 与正文在同一块输入区里」，本身不画边框（与输入区一贯的无框口径一致）。
           */}
-          <div className={styles.promptBox} ref={promptBoxRef} data-panel-prompt-box>
+          <div
+            className={`${styles.promptBox} ${styles.promptBoxComfort}`}
+            ref={promptBoxRef}
+            data-panel-prompt-box
+          >
           {/*
             提示词框 = 带引用的富文本框（用户 2026-10-05 第 15 条）。
 
@@ -1627,7 +1636,7 @@ export function CreationPanel(props: CreationPanelProps) {
           */}
           <MentionEditor
             ref={promptEditorRef}
-            className={`${styles.prompt} ${styles.promptEditor}`}
+            className={`${styles.prompt} ${styles.promptEditor} ${styles.promptEditorComfort}`}
             anchorAttr={{ 'data-panel-prompt': '' }}
             label={promptMode ? '提示词节点正文' : '生成提示词'}
             autoGrow

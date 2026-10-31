@@ -1,5 +1,14 @@
 # CanvasFlow（轻画）项目记忆
 
+### 参考素材面板的舒适高度（2026-10-31，对账 #833）
+
+- **所有创作面板不能只按内容高度**：有素材、没素材必须同一高度，否则面板会随内容忽高忽低。
+  `PanelShell.panelComfort` 与 CreationPanel 的三层伸展规则必须始终启用，只受可用高度封顶。
+- **提示词区要一起伸展**：只给外壳加 `min-height` 会在面板底部留死白；
+  `promptSectionComfort / promptBoxComfort / promptEditorComfort` 三层共同吸收剩余空间。
+- **证据**：空素材与有素材面板在 1440 同为 270px、在 1024 同为 220px；修复前有素材仅 190px。
+  明暗四组均在视口内、横向溢出 0。
+
 ### Agent 长任务流式过程与确定性“直接下一步”（2026-10-30，对账 #831）
 
 - **计划卡必须在消息滚动区外**：`planDock` 是 `contentWrap` 的固定子项，`content` 只滚消息；

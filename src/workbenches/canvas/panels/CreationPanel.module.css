@@ -20,6 +20,11 @@
   min-height: 0;
 }
 
+.promptSectionComfort {
+  flex: 1 0 auto;
+  min-height: 54px;
+}
+
 /*
  * 素材行与参数行是**固定内容**，不允许被压缩：面板钉死 360px 后，若它们可收缩，
  * `flex-shrink` 会按比例把这两行也挤小（实测素材按钮从 48px 被压到 36px，
@@ -553,6 +558,10 @@
   min-height: 0;
 }
 
+.promptBoxComfort {
+  flex: 1 1 auto;
+}
+
 /*
  * 候选菜单：面板**内部**的浮层（绝对定位，不跟着画布缩放）。
  * 不用原生 select —— 它的展开层由浏览器绘制，既不受 `zoom: 0.75` 约束、
@@ -675,6 +684,11 @@
   overflow-y: auto;
   /* contenteditable 默认 `overflow: visible`：不写这条，超出上限的内容会画到面板外 */
   overscroll-behavior: contain;
+}
+
+.promptEditorComfort {
+  flex: 1 1 auto;
+  min-height: 72px;
 }
 
   /**
