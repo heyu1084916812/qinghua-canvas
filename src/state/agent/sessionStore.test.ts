@@ -485,6 +485,7 @@ describe('Agent 会话 · 待执行任务队列', () => {
     const a = await s.create({ projectId: 'p1', channelId: 'c1', model: 'm1' })
     await s.updateFields(a.id, {
       pendingConfirmation: { callId: 'call-1', name: 'runNode', args: { nodeIds: ['n1'] } },
+      allowedToolNames: ['readGraph', 'applyPlan', 'runNode', 'readResult'],
     })
     const reopened = createAgentSessionStore(storage)
     expect((await reopened.get(a.id))?.pendingConfirmation).toEqual({
@@ -492,6 +493,12 @@ describe('Agent 会话 · 待执行任务队列', () => {
       name: 'runNode',
       args: { nodeIds: ['n1'] },
     })
+    expect((await reopened.get(a.id))?.allowedToolNames).toEqual([
+      'readGraph',
+      'applyPlan',
+      'runNode',
+      'readResult',
+    ])
   })
 
   it('用户停止后清掉确认卡和检查点，重开不会复活旧任务', async () => {
@@ -509,16 +516,19 @@ describe('Agent 会话 · 待执行任务队列', () => {
         maxSteps: 8,
         createdAt: 1,
       },
+      allowedToolNames: ['readGraph', 'applyPlan', 'runNode', 'readResult'],
     })
 
     await s.updateFields(a.id, {
       pendingConfirmation: undefined,
       continuation: undefined,
+      allowedToolNames: undefined,
     })
 
     const reopened = createAgentSessionStore(storage)
     expect((await reopened.get(a.id))?.pendingConfirmation).toBeUndefined()
     expect((await reopened.get(a.id))?.continuation).toBeUndefined()
+    expect((await reopened.get(a.id))?.allowedToolNames).toBeUndefined()
   })
 
   it('任务计划随会话持久化，重开后仍是同一个当前步骤', async () => {

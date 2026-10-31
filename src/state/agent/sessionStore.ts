@@ -20,6 +20,10 @@ import {
   type AgentTaskPlan,
 } from '../../domain/agent/taskPlan'
 import { confirmationSettlementMessages } from '../../domain/agent/confirmation'
+import {
+  isAgentToolName,
+  type AgentToolName,
+} from '../../domain/agent/toolRegistry'
 
 /**
  * Agent 会话存储（设计文档 §8 / §12）。
@@ -104,6 +108,11 @@ export interface AgentSession {
     name: string
     args: unknown
   }
+  /**
+   * 与 pendingConfirmation / continuation 同寿命的本轮工具白名单。
+   * 面板重载后必须先恢复这份名单；缺失时失败关闭，不能回退到全量工具。
+   */
+  allowedToolNames?: AgentToolName[]
   /** 当前会话最近一次获批的多阶段执行计划。 */
   taskPlan?: AgentTaskPlan
   /**
@@ -309,6 +318,14 @@ export function createAgentSessionStore(storage: StoragePort): AgentSessionStore
             name: String((row.pendingConfirmation as { name: string }).name),
             args: (row.pendingConfirmation as { args?: unknown }).args,
           },
+        }
+      : {}),
+    ...(Array.isArray(row.allowedToolNames)
+      ? {
+          allowedToolNames: row.allowedToolNames.filter(
+            (name): name is AgentToolName =>
+              typeof name === 'string' && isAgentToolName(name),
+          ),
         }
       : {}),
     ...(row.continuation &&
@@ -701,6 +718,7 @@ export function createAgentSessionStore(storage: StoragePort): AgentSessionStore
           pendingSteers: [],
           pendingConfirmation: undefined,
           continuation: undefined,
+          allowedToolNames: undefined,
           activeTurnId: undefined,
           activeTurnStartedAt: undefined,
           updatedAt: Date.now(),

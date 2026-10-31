@@ -202,6 +202,7 @@ export async function runAgentTurn(
 ): Promise<AgentLoopOutcome> {
   const messages = [...history]
   const maxSteps = deps.maxSteps ?? AGENT_DEFAULT_MAX_STEPS
+  const allowedToolNames = new Set(deps.tools.map((tool) => tool.name))
   const seenCalls = new Map<string, number>()
   let visualReviewRan = false
   const emitProgress = () => deps.onProgress?.([...messages])
@@ -344,6 +345,15 @@ export async function runAgentTurn(
     emitProgress()
 
     for (const call of calls) {
+      if (!allowedToolNames.has(call.name)) {
+        messages.push(
+          toolResult(call.id, call.name, {
+            ok: false,
+            error: `本轮未提供工具 ${call.name}，请只使用当前声明里的工具`,
+          }),
+        )
+        continue
+      }
       const args = parseArgs(call.args)
       if (args === PARSE_FAILED) {
         messages.push(

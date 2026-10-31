@@ -24,6 +24,7 @@ import {
   visualReviewGenerationBriefs,
   type VisualReviewResult,
 } from '../../../../domain/agent/visualReview'
+import { isAgentToolName } from '../../../../domain/agent/toolRegistry'
 import { prepareVisualReviewImages } from '../../../../features/shared/agent/visualReviewRunner'
 import { memoryCandidateFromText } from '../../../../domain/shared/memoryOrganizer'
 import {
@@ -728,6 +729,20 @@ export function AgentPanel({
   const abortRefs = useRef(new Map<string, AbortController>())
   /** 每个会话这个回合走的是原生 tools 还是 JSON 降级；确认后续跑要沿用同一条 */
   const toolModeRef = useRef(new Map<string, 'native' | 'json'>())
+  const turnToolsRef = useRef(
+    new Map<string, readonly ToolDeclaration[]>(),
+  )
+  const turnToolsForSession = useCallback(
+    (session: AgentSession): readonly ToolDeclaration[] => {
+      const known = turnToolsRef.current.get(session.id)
+      if (known) return known
+      const allowed = new Set<string>(session.allowedToolNames ?? [])
+      const restored = activeAgentTools.filter((tool) => allowed.has(tool.name))
+      turnToolsRef.current.set(session.id, restored)
+      return restored
+    },
+    [activeAgentTools],
+  )
   const planAliasesRef = useRef(new Map<string, Map<string, string>>())
   /** 自动生成是“实时开关”：用户在本轮运行中切换，已经发出的这一轮也要立刻认新值 */
   const autoRunRef = useRef(new Map<string, boolean>())
@@ -1951,7 +1966,7 @@ export function AgentPanel({
         },
         channelId: route?.channelId ?? '',
         model: logicalModel,
-        tools: toolMode === 'native' ? turnTools : [],
+        tools: turnTools,
         toolMode,
         inputs,
       /**
@@ -2155,6 +2170,7 @@ export function AgentPanel({
           .updateFields(session.id, {
             pendingConfirmation: undefined,
             continuation: undefined,
+            allowedToolNames: undefined,
           })
           .catch(() => null)
       }
@@ -2198,9 +2214,17 @@ export function AgentPanel({
                 : {}),
             }
           : undefined
+      const persistTurnTools =
+        outcome.kind === 'confirm' ||
+        (outcome.kind === 'stopped' && Boolean(outcome.checkpoint))
       let latest = await sessions.updateFields(session.id, {
         pendingConfirmation,
         continuation,
+        allowedToolNames: persistTurnTools
+          ? (turnToolsRef.current.get(session.id) ?? [])
+              .map((tool) => tool.name)
+              .filter(isAgentToolName)
+          : undefined,
       })
       if (!outcomeIsCurrent()) {
         await settleStaleOutcome()
@@ -2690,6 +2714,7 @@ export function AgentPanel({
     const turnAgentTools = agentToolsForRequestMode(requestMode, {
       canvasReview: canvasReviewEnabled,
     })
+    turnToolsRef.current.set(session.id, turnAgentTools)
     const referenceRootIds =
       requestMode === 'reference_edit'
         ? mentionedImageIds.length > 0
@@ -3130,6 +3155,7 @@ export function AgentPanel({
           (await sessions.updateFields(session.id, {
             pendingConfirmation: undefined,
             continuation: undefined,
+            allowedToolNames: undefined,
           })) ?? latest
       })
       await attempt(async () => {
@@ -3331,6 +3357,7 @@ export function AgentPanel({
       taskPlan: advanced.plan,
       pendingConfirmation: undefined,
       continuation: undefined,
+      allowedToolNames: undefined,
     })
     const resolved = updated ?? { ...target, taskPlan: advanced.plan }
     applySessionSnapshot(resolved)
@@ -3497,6 +3524,8 @@ export function AgentPanel({
         createId('op'),
         toolModeRef.current.get(current.id) ?? 'native',
         imageNodeIds,
+        undefined,
+        turnToolsForSession(current),
       )
       if (confirmationRunsGeneration(request.name)) {
         await controller.finishConfirmedTool(current.id, request)
@@ -3558,6 +3587,7 @@ export function AgentPanel({
     setStatusFor,
     transitionSessionJob,
     continueAutoConfirmations,
+    turnToolsForSession,
   ])
 
   /**
@@ -3611,6 +3641,8 @@ export function AgentPanel({
       createId('op'),
       toolModeRef.current.get(current.id) ?? 'native',
       imageNodeIds,
+      undefined,
+      turnToolsForSession(current),
     )
     await transitionSessionJob(
       current.id,
@@ -3648,6 +3680,7 @@ export function AgentPanel({
     settleSessionOutcome,
     transitionSessionJob,
     continueAutoConfirmations,
+    turnToolsForSession,
   ])
 
   const stop = useCallback(async () => {

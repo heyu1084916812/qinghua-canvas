@@ -3,6 +3,7 @@ import type { AgentToolEffect } from '../../../domain/agent/job'
 import type { ChatMessage } from '../../../domain/shared/execution/types'
 import { AgentToolEffectBlockedError } from '../../../features/shared/agent/AgentToolEffectLedger'
 import { AGENT_DEFAULT_MAX_STEPS, errText, resumeAgentTurn, runAgentTurn } from './agentLoop'
+import { AGENT_TOOLS } from './tools'
 
 /**
  * Agent 循环（设计文档 §4）。
@@ -11,7 +12,7 @@ import { AGENT_DEFAULT_MAX_STEPS, errText, resumeAgentTurn, runAgentTurn } from 
  * 打转要刹车、参数解析失败要把错误回填而不是炸掉。
  */
 
-const tools = [{ name: 'readGraph', parameters: { type: 'object' } }]
+const tools = AGENT_TOOLS
 const signal = new AbortController().signal
 
 /**
@@ -127,6 +128,31 @@ describe('runAgentTurn · 确认之前的预检', () => {
 })
 
 describe('runAgentTurn · 基本往复', () => {
+  it('★★ 执行层拒绝本轮未声明的工具，不能只靠提示词约束', async () => {
+    const { deps, executeWrite, adapter } = depsWith([
+      {
+        toolCalls: [
+          {
+            id: 'not-declared',
+            name: 'moveNodes',
+            args: '{"moves":[{"nodeId":"n1","x":1,"y":2}]}',
+          },
+        ],
+      },
+      { text: '本轮没有移动节点权限，我改用可用工具。' },
+    ])
+    const r = await runAgentTurn(user('做一张简单的品牌主视觉'), {
+      ...deps,
+      tools: tools.filter((tool) => tool.name === 'readGraph'),
+    })
+
+    expect(executeWrite).not.toHaveBeenCalled()
+    expect(adapter.completeText).toHaveBeenCalledTimes(2)
+    expect(r.kind).toBe('message')
+    const toolMsg = r.messages.find((message) => message.toolCallId === 'not-declared')
+    expect(String(toolMsg?.content)).toContain('本轮未提供工具 moveNodes')
+  })
+
   it('★ 模型直接回答 → message，历史里多一条 assistant', async () => {
     const { deps } = depsWith([{ text: '好，我来建' }])
     const r = await runAgentTurn(user('建个流程'), deps)
@@ -658,6 +684,23 @@ describe('runAgentTurn · JSON 工具调用降级（路线 B）', () => {
     const r = await runAgentTurn(user('建个流程'), { ...deps, toolMode: 'json' })
     expect(r.kind).toBe('error')
     if (r.kind === 'error') expect(r.message).toContain('JSON')
+  })
+
+  it('JSON 降级同样受本轮工具白名单约束', async () => {
+    const { deps, executeWrite } = depsWith([
+      { text: '{"tool":"moveNodes","args":{"moves":[]}}' },
+      { text: '{"tool":"final","args":{"message":"没有执行移动"}}' },
+    ])
+    const r = await runAgentTurn(user('做一张简单主视觉'), {
+      ...deps,
+      toolMode: 'json',
+      tools: tools.filter((tool) => tool.name === 'applyPlan'),
+    })
+
+    expect(executeWrite).not.toHaveBeenCalled()
+    expect(r.kind).toBe('message')
+    const toolMsg = r.messages.find((message) => message.toolName === 'moveNodes')
+    expect(String(toolMsg?.content)).toContain('本轮未提供工具 moveNodes')
   })
 })
 
