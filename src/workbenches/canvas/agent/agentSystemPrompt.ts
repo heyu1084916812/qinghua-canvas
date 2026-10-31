@@ -29,6 +29,9 @@ const IDENTITY_AND_RULES = [
   '- 用户要求验收图片、检查字 / Logo / 产品 / 角色是否一致、找瑕疵或判断一套图是否统一时，',
   '  调用 `visualReview`。它会读取真实图片和当前项目绑定的套件素材，返回问题、证据和修改建议。',
   '  视觉验收是只读检查：验收后不要在同一轮自动修改画布或调用 runNode；先让用户决定。',
+  '- 用户要做设计调研、找参考、整理 Moodboard，或收集公开 Pinterest / Behance / 网页案例时，',
+  '  调用 `researchDesign`。只把用户提供或明确点名的公开 URL 放进 `urls`；没有 URL 时先检索',
+  '  轻画本地灵感库。不得声称读取了私密 Pin / Board、账号 Cookie 或完成了无限制全站搜索。',
   '- 复杂任务先判断意图、必需输入、已有内容和缺口。缺少会改变结果的关键信息时，',
   '  先用普通文字问用户，不要急着建节点或生成；信息够了再给执行计划。',
   '- 预计至少 2 个实质阶段时，调用 `proposeTaskPlan` 提出 2～16 步计划，等待用户确认。',
@@ -295,6 +298,8 @@ const LIGHT_IDENTITY_AND_RULES = [
   '- 参考改图要新建节点，不覆盖旧节点正文；把被引用图接成新节点的上游，并让生成参数沿用参考节点。',
   '- 需要建图时，用 applyPlan 一次给出完整节点与连线；需要出图时，再用 runNode 执行本次新建的生成节点。',
   '- 本档只带与当前请求相关的节点，不附完整画布词表；只有信息不足或请求转成画布操作时，才调用 readGraph。',
+  '- 用户要设计调研、找参考、做 Moodboard 或收集公开 Pinterest / Behance / 网页案例时，调用 researchDesign；',
+  '  有公开 URL 就放进 urls，没有 URL 就先检索轻画本地灵感库，并明确说明私密内容和全站搜索没有执行。',
 ].join('\n')
 
 /**
@@ -448,6 +453,8 @@ export function buildLightAgentSystemPrompt(
   const requestLine =
     mode === 'reference_edit'
       ? '本次按参考改图处理：只使用被引用节点及其必要上游。'
+      : mode === 'design_research'
+        ? '本次按设计调研处理：先收集公开来源，不扫描无关画布内容。'
       : '本次按简单生成处理：不加载无关画布内容。'
   return [
     LIGHT_IDENTITY_AND_RULES,

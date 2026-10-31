@@ -82,6 +82,7 @@ const TOOL_LABEL: Record<string, string> = {
   readGraph: '已看画布',
   readAsset: '已读素材',
   readResult: '已读结果',
+  researchDesign: '设计调研完成',
   visualReview: '视觉验收完成',
   proposeTaskPlan: '执行计划已确认',
   updateTaskStep: '计划进度已更新',
@@ -104,6 +105,7 @@ const TOOL_RUNNING_LABEL: Record<string, string> = {
   readGraph: '正在读取画布',
   readAsset: '正在读取素材',
   readResult: '正在读取结果',
+  researchDesign: '正在做设计调研',
   visualReview: '正在视觉验收',
   proposeTaskPlan: '正在整理任务计划',
   updateTaskStep: '正在更新任务进度',
@@ -134,6 +136,7 @@ const TOOL_LABEL_FAILED: Record<string, string> = {
   readGraph: '看画布失败',
   readAsset: '读素材失败',
   readResult: '读结果失败',
+  researchDesign: '设计调研没完成',
   visualReview: '视觉验收没完成',
   proposeTaskPlan: '执行计划未确认',
   updateTaskStep: '计划进度没更新',
@@ -296,6 +299,19 @@ export function describeToolResult(
         ),
         nodeIds: results.filter((x) => x.status === 'ok').map((x) => String(x.nodeId)),
         failed: false,
+      }
+    }
+    case 'researchDesign': {
+      const items = asArray(r.items).map(asRecord)
+      const sources = asArray(r.sources).map(asRecord)
+      const warnings = asArray(r.warnings).map((item) => clean(item))
+      return {
+        lines: [
+          `找到 ${items.length} 条参考，覆盖 ${sources.length} 个来源`,
+          ...warnings.slice(0, 2),
+        ],
+        nodeIds: [],
+        failed: r.ok === false,
       }
     }
     case 'visualReview': {

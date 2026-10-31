@@ -2,6 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { usePlatform } from '../../app/providers/PlatformProvider'
 import { useAsset } from '../../features/shared/assets/index'
 import { filterCases, tagCounts, type InspirationCase } from '../../domain/inspiration/cases'
+import type { DesignResearchItem } from '../../domain/inspiration/designResearch'
+import { saveDesignResearchItem } from '../../features/shared/research/saveResearchItem'
 import { createInspirationRepository } from '../../state/project/inspirationRepository'
 import {
   addCustomInspirationSource,
@@ -13,6 +15,7 @@ import {
   type StoredInspirationSource,
 } from '../../state/project/inspirationSourceStore'
 import { InspirationDetail } from './InspirationDetail'
+import { DesignResearchPanel } from './DesignResearchPanel'
 import {
   InspirationSourcesPanel,
   type NewInspirationSourceInput,
@@ -111,6 +114,7 @@ export function InspirationPage() {
   const [refreshing, setRefreshing] = useState(false)
   const [refreshingIds, setRefreshingIds] = useState<Set<string>>(new Set())
   const [sourcesOpen, setSourcesOpen] = useState(false)
+  const [researchOpen, setResearchOpen] = useState(false)
   const [query, setQuery] = useState('')
   const [sourceId, setSourceId] = useState<string | null>(null)
   const [modelCategory, setModelCategory] = useState<string | null>(null)
@@ -401,6 +405,19 @@ export function InspirationPage() {
       .catch(() => {})
   }, [])
 
+  const saveResearchItem = useCallback(
+    async (item: DesignResearchItem) =>
+      saveDesignResearchItem(
+        item,
+        {
+          network: platform.network,
+          storage: platform.storage,
+        },
+        new AbortController().signal,
+      ),
+    [platform],
+  )
+
   return (
     <div className={styles.page} data-inspiration-page>
       <header className={styles.head}>
@@ -456,6 +473,14 @@ export function InspirationPage() {
           {filtered.length} 个结果
         </span>
         <div className={styles.toolbarActions}>
+          <button
+            type="button"
+            className={styles.refresh}
+            data-inspiration-research-open
+            onClick={() => setResearchOpen(true)}
+          >
+            设计调研
+          </button>
           <button
             type="button"
             className={styles.refresh}
@@ -701,6 +726,13 @@ export function InspirationPage() {
           onToggle={toggleSource}
           onMove={moveSource}
           onRefresh={refreshSource}
+        />
+      )}
+      {researchOpen && (
+        <DesignResearchPanel
+          libraryCases={activeCases}
+          onClose={() => setResearchOpen(false)}
+          onSave={saveResearchItem}
         />
       )}
       {detail && (

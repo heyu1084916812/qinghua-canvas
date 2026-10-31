@@ -53,7 +53,7 @@ export interface AssetLibraryRepository {
 
 /** 收藏关系 + 独立标签映射 */
 const TABLES: TableName[] = ['assetLibrary', 'presets', 'runRecords']
-const TAGS_KEY = 'assetTags:v1'
+export const ASSET_LIBRARY_TAGS_KEY = 'assetTags:v1'
 const HIDDEN_KEY = 'assetRecordsHidden:v1'
 
 export function createAssetLibraryRepository(storage: StoragePort): AssetLibraryRepository {
@@ -64,7 +64,7 @@ export function createAssetLibraryRepository(storage: StoragePort): AssetLibrary
    * 之后所有读写都只认它；这样未收藏的生成记录也能打标签，取消收藏也不会误删整理结果。
    */
   const loadTagMap = async (): Promise<Map<string, string[]>> => {
-    const saved = (await storage.query('presets', { id: TAGS_KEY })) as unknown as {
+    const saved = (await storage.query('presets', { id: ASSET_LIBRARY_TAGS_KEY })) as unknown as {
       tags?: unknown
     }[]
     if (saved[0] && saved[0].tags && typeof saved[0].tags === 'object') {
@@ -86,12 +86,12 @@ export function createAssetLibraryRepository(storage: StoragePort): AssetLibrary
       const tags = normalizeTags(row.tags)
       if (hash && tags.length > 0) migrated.set(hash, tags)
     }
-    await storage.put('presets', { id: TAGS_KEY, tags: Object.fromEntries(migrated) })
+    await storage.put('presets', { id: ASSET_LIBRARY_TAGS_KEY, tags: Object.fromEntries(migrated) })
     return migrated
   }
 
   const saveTagMap = (map: Map<string, string[]>) =>
-    storage.put('presets', { id: TAGS_KEY, tags: Object.fromEntries(map) })
+    storage.put('presets', { id: ASSET_LIBRARY_TAGS_KEY, tags: Object.fromEntries(map) })
 
   const hiddenFrom = (row: unknown): Set<string> => {
     const hashes = (row as { hashes?: unknown } | undefined)?.hashes

@@ -1,5 +1,27 @@
 # CanvasFlow（轻画）项目记忆
 
+### Agent 首轮上下文分档与设计调研（2026-10-31，对账 #836 / #838）
+
+- **请求先分类再拼上下文**：`simple_generate` 不扫画布；`reference_edit` 只取引用节点及必要上游；
+  `design_research` 不扫画布；`canvas_operation / complex_plan` 才用全量摘要和完整词表。
+  工具声明同样按档位裁剪，简单出图只保留
+  `readGraph / applyPlan / runNode / readResult / rememberMemory`。
+- **默认技能不能偷偷生效**：新会话和旧会话加载都不把 presets 默认技能写进 `skillId`。
+  只有当前正文里有 skill chip 才注入；技能库“交给 Agent”通过模块级交接插入 chip。
+- **Design Research 只做公开来源**：`researchDesign` 检索已启用本地灵感源，并读取用户提供的
+  公开 Pinterest / Behance / 网页 URL。解析 Pin / OG 图片、去重、生成检索词和 Moodboard；
+  不读取 Cookie、私密 Board，也不把公开页面解析说成 Pinterest 全站搜索。
+- **公网请求必须走 `publicOnly`**：TS 先拦截字面量 localhost / 私网 / `.internal` /
+  IPv4-mapped IPv6；桌面壳强制走 Rust，发请求前解析 DNS、要求全部地址公开，并手动逐跳验证
+  最多 5 次重定向。页面里的 OG 图片也必须过滤并走同一出站层，不能直接挂远程 URL。
+- **保存参考进入素材库**：调研结果先校验文件头 MIME / 尺寸与响应头一致，再在同一事务里写
+  `assets + assetLibrary + presets(assetTags)`，事务内回读 hash、MIME、字节、标签；失败不伪造收藏。
+- **报告可恢复**：最后一次有结果的调研报告写 `presets`，关闭重开面板恢复；加载/运行用序号防覆盖，
+  持久化失败会明示。URL 先规范化去重再封顶 8 个，不提前截断原始文本。
+- **证据**：全量 Vitest **3724 passed / 1 skipped**、Tauri Rust **55/55**；设计调研面板在
+  1440×900、1024×700 明暗四组均在视口内、横向溢出 0，关闭重开后结果可恢复；
+  `npm run check` 与构建通过。
+
 ### Harness runtime 永久取消（2026-10-31，对账 #809）
 
 - **不做外部 Agent runtime**：不接 DeepSeek Harness Worker、ACP/MCP sidecar、签名资源包，
@@ -26,18 +48,19 @@
   `panelExpanded` 取 640px 与可用高度的较小值。切换节点或重新打开回到默认档。
 - **编辑区负责消化内容**：CreationPanel 的 `MentionEditor` 必须 `autoGrow=false`；
   提示词区、容器、编辑器三层可收缩，长文本只在编辑器内部滚动，底部参数行和生成按钮不能被挤出。
+- **展开按钮只在溢出时出现**：按钮放在编辑器滚动区上方的占位栏内，让滚动条从按钮下方开始；
+  收起态向上、展开态向下。短文本不渲染按钮，也不预留展开栏。
 - **证据**：1440 默认 270px / 展开 426px，长文本默认仍 270px，重选回 270px；
   1024 默认与展开均为可用高度 226px。明暗四组 `runInside=true`、无横向溢出。
 
-### Agent 首轮快速路径（2026-10-31，对账 #836，方案已定待实施）
+### Agent 首轮快速路径背景（2026-10-31，已由 #836 交付）
 
-- **默认技能不能偷偷生效**：新会话读取 `presets.agent:skill` 后写进 `skillId`，
-  即使输入框没有 `skill:` chip 也会注入正文。正确边界是“有 chip 才注入”。产品文档旧口径
-  “技能仍保存在会话并照常进入提示词”已被用户本次反馈推翻。
+- **默认技能不能偷偷生效**：旧实现会读取 `presets.agent:skill` 并写进 `skillId`，
+  即使输入框没有 `skill:` chip 也会注入正文。现在已撤销这条路径，正确边界是“有 chip 才注入”。
 - **画布摘要不是零成本**：`readGraphSummary(store, 'all', selection)` 每轮都算全图；
   系统提示词带节点总数、最多 40 个节点、每个正文前 160 字，以及完整词表和工具规则。
   它看到的是全图级摘要，不是 100 个节点的完整正文，但对简单单图仍然过重。
-- **快速路径**：单图新建只带本条需求与参数；引用改图只带被引用节点和必要上游；
+- **已落地快速路径**：单图新建只带本条需求与参数；引用改图只带被引用节点和必要上游；
   画布操作先给选中区 / 视口紧凑索引；复杂多阶段任务才加载技能、计划和全图。
 - **计时边界**：2 分 25 秒是整轮总耗时，图片生成可能占主要部分。必须拆成
   “模型理解 / 画布写入 / 图片生成 / 验收”四段，不能把生成耗时说成 Agent 思考。

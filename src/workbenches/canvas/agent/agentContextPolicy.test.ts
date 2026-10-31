@@ -73,6 +73,36 @@ describe('Agent request classification', () => {
     ).toBe('canvas_operation')
   })
 
+  it('classifies design research separately and keeps it out of canvas scanning', () => {
+    expect(
+      classifyAgentRequest({
+        ...noSignals,
+        text: '做一次品牌设计调研，收集 Pinterest 和 Behance 的公开参考',
+      }),
+    ).toBe('design_research')
+    expect(
+      classifyAgentRequest({
+        ...noSignals,
+        text: '帮我收集一些 P 站参考',
+      }),
+    ).toBe('design_research')
+    expect(
+      classifyAgentRequest({
+        ...noSignals,
+        text: '用这张 Pinterest 参考图生成一个改版',
+        hasMentionedImage: true,
+      }),
+    ).toBe('reference_edit')
+    expect(promptProfileForMode('design_research')).toBe('light')
+    expect(summaryForAgentRequest(
+      {
+        nodes: [node('unrelated', 'generation', { assetHash: 'hash' })],
+        edges: [],
+      },
+      'design_research',
+    )).toEqual({ nodes: [], edges: [] })
+  })
+
   it('uses selected nodes to resolve a short canvas command', () => {
     expect(
       classifyAgentRequest({

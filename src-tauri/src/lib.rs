@@ -1,8 +1,11 @@
+use std::collections::HashSet;
+use std::net::{IpAddr, SocketAddr, ToSocketAddrs};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::AtomicBool;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::sync::Mutex;
+use std::sync::OnceLock;
 use std::time::{Duration, Instant};
 use tauri::ipc::Channel;
 use tauri::menu::{Menu, MenuItem};
@@ -1788,6 +1791,145 @@ fn is_textual_content_type(value: Option<&str>) -> bool {
         || lower.contains("x-www-form-urlencoded")
 }
 
+static CANCELLED_FETCH_TEXTS: OnceLock<Mutex<HashSet<String>>> = OnceLock::new();
+
+fn cancelled_fetch_texts() -> &'static Mutex<HashSet<String>> {
+    CANCELLED_FETCH_TEXTS.get_or_init(|| Mutex::new(HashSet::new()))
+}
+
+fn fetch_text_is_cancelled(request_id: &str) -> bool {
+    cancelled_fetch_texts()
+        .lock()
+        .map(|items| items.contains(request_id))
+        .unwrap_or(false)
+}
+
+#[tauri::command]
+fn cancel_fetch_text(request_id: String) {
+    if let Ok(mut items) = cancelled_fetch_texts().lock() {
+        items.insert(request_id);
+    }
+}
+
+struct FetchTextCancelGuard(Option<String>);
+
+impl Drop for FetchTextCancelGuard {
+    fn drop(&mut self) {
+        if let Some(request_id) = self.0.as_ref() {
+            if let Ok(mut items) = cancelled_fetch_texts().lock() {
+                items.remove(request_id);
+            }
+        }
+    }
+}
+
+async fn wait_for_fetch_cancel(request_id: &str) {
+    loop {
+        if fetch_text_is_cancelled(request_id) {
+            return;
+        }
+        tokio::time::sleep(Duration::from_millis(80)).await;
+    }
+}
+
+async fn send_fetch_request(
+    request: reqwest::RequestBuilder,
+    request_id: Option<&str>,
+) -> Result<reqwest::Response, String> {
+    if let Some(request_id) = request_id {
+        if fetch_text_is_cancelled(request_id) {
+            return Err("请求已取消".into());
+        }
+        tokio::select! {
+            result = request.send() => result.map_err(|error| error.to_string()),
+            _ = wait_for_fetch_cancel(request_id) => Err("请求已取消".into()),
+        }
+    } else {
+        request.send().await.map_err(|error| error.to_string())
+    }
+}
+
+fn is_public_ip(ip: IpAddr) -> bool {
+    match ip {
+        IpAddr::V4(value) => {
+            let octets = value.octets();
+            let shared = octets[0] == 100 && (64..=127).contains(&octets[1]);
+            let reserved = octets[0] >= 240;
+            !(octets[0] == 0
+                || value.is_unspecified()
+                || value.is_private()
+                || value.is_loopback()
+                || value.is_link_local()
+                || value.is_broadcast()
+                || value.is_documentation()
+                || value.is_multicast()
+                || shared
+                || reserved
+                || (octets[0] == 198 && (octets[1] == 18 || octets[1] == 19))
+                || (octets[0] == 192 && octets[1] == 0 && octets[2] == 0))
+        }
+        IpAddr::V6(value) => {
+            if let Some(mapped) = value.to_ipv4_mapped() {
+                return is_public_ip(IpAddr::V4(mapped));
+            }
+            let first = value.segments()[0];
+            !(value.is_unspecified()
+                || value.is_loopback()
+                || value.is_multicast()
+                || value.is_unicast_link_local()
+                || (first == 0x2001 && value.segments()[1] == 0x0db8)
+                || (first & 0xfe00) == 0xfc00)
+        }
+    }
+}
+
+async fn validate_public_url(raw: &str) -> Result<(String, Vec<SocketAddr>), String> {
+    let parsed = reqwest::Url::parse(raw).map_err(|error| error.to_string())?;
+    if parsed.scheme() != "http" && parsed.scheme() != "https" {
+        return Err("只支持 http / https 地址".into());
+    }
+    let host = parsed
+        .host_str()
+        .ok_or_else(|| "地址缺少主机名".to_string())?
+        .trim_end_matches('.')
+        .to_ascii_lowercase();
+    if host.is_empty()
+        || host == "localhost"
+        || host.ends_with(".localhost")
+        || host.ends_with(".local")
+        || host.ends_with(".internal")
+        || host.ends_with(".home.arpa")
+    {
+        return Err("设计调研只允许公开互联网地址".into());
+    }
+    let port = parsed
+        .port_or_known_default()
+        .ok_or_else(|| "无法确定目标端口".to_string())?;
+    if let Ok(ip) = host.parse::<IpAddr>() {
+        return if is_public_ip(ip) {
+            Ok((host, vec![SocketAddr::new(ip, port)]))
+        } else {
+            Err("设计调研拒绝本机、内网或链路本地地址".into())
+        };
+    }
+    let lookup_host = host.clone();
+    let addresses = tauri::async_runtime::spawn_blocking(move || {
+        (lookup_host.as_str(), port)
+            .to_socket_addrs()
+            .map(|items| items.collect::<Vec<_>>())
+    })
+    .await
+    .map_err(|error| error.to_string())?
+    .map_err(|error| error.to_string())?;
+    if addresses.is_empty() {
+        return Err("目标域名没有解析到地址".into());
+    }
+    if addresses.iter().any(|address| !is_public_ip(address.ip())) {
+        return Err("目标域名解析到了本机、内网或链路本地地址".into());
+    }
+    Ok((host, addresses))
+}
+
 #[tauri::command]
 async fn fetch_text(
     url: String,
@@ -1798,17 +1940,84 @@ async fn fetch_text(
     content_type: Option<String>,
     multipart: Option<Vec<FetchMultipartPart>>,
     timeout_ms: Option<u64>,
+    public_only: Option<bool>,
+    max_response_bytes: Option<u64>,
+    request_id: Option<String>,
 ) -> Result<FetchedText, String> {
     if !(url.starts_with("https://") || url.starts_with("http://")) {
         return Err("只支持 http / https 地址".into());
     }
     let verb = method.unwrap_or_else(|| "GET".into()).to_uppercase();
+    let _cancel_guard = FetchTextCancelGuard(request_id.clone());
+    if request_id.as_deref().is_some_and(fetch_text_is_cancelled) {
+        return Err("请求已取消".into());
+    }
+    let public_only = public_only.unwrap_or(false);
+    if public_only && verb != "GET" && verb != "HEAD" {
+        return Err("公开互联网请求只允许 GET / HEAD".into());
+    }
     let client = reqwest::Client::builder()
         .timeout(std::time::Duration::from_millis(
             timeout_ms.unwrap_or(10000),
         ))
+        .redirect(if public_only {
+            reqwest::redirect::Policy::none()
+        } else {
+            reqwest::redirect::Policy::default()
+        })
         .build()
         .map_err(|err| err.to_string())?;
+
+    if public_only {
+        let mut current = url.clone();
+        let mut response = None;
+        for _ in 0..=5 {
+            let (host, addresses) = if let Some(request_id) = request_id.as_deref() {
+                tokio::select! {
+                    resolved = validate_public_url(&current) => resolved?,
+                    _ = wait_for_fetch_cancel(request_id) => return Err("请求已取消".into()),
+                }
+            } else {
+                validate_public_url(&current).await?
+            };
+            let builder = reqwest::Client::builder()
+                .timeout(std::time::Duration::from_millis(
+                    timeout_ms.unwrap_or(10000),
+                ))
+                .redirect(reqwest::redirect::Policy::none())
+                .no_proxy()
+                .resolve_to_addrs(&host, &addresses);
+            let hop_client = builder.build().map_err(|err| err.to_string())?;
+            let mut request = if verb == "HEAD" {
+                hop_client.head(&current)
+            } else {
+                hop_client.get(&current)
+            };
+            if let Some(map) = headers.as_ref() {
+                for (key, value) in map {
+                    request = request.header(key, value);
+                }
+            }
+            let next = send_fetch_request(request, request_id.as_deref()).await?;
+            if next.status().is_redirection() {
+                let location = next
+                    .headers()
+                    .get(reqwest::header::LOCATION)
+                    .and_then(|value| value.to_str().ok())
+                    .ok_or_else(|| "公开页面重定向缺少 Location".to_string())?;
+                let base = reqwest::Url::parse(&current).map_err(|err| err.to_string())?;
+                current = base
+                    .join(location)
+                    .map_err(|err| err.to_string())?
+                    .to_string();
+                continue;
+            }
+            response = Some(next);
+            break;
+        }
+        let response = response.ok_or_else(|| "公开页面重定向次数过多".to_string())?;
+        return collect_fetched_text(response, max_response_bytes, request_id.as_deref()).await;
+    }
 
     let mut req = match verb.as_str() {
         "GET" => client.get(&url),
@@ -1842,7 +2051,15 @@ async fn fetch_text(
         }
     }
 
-    let response = req.send().await.map_err(|err| err.to_string())?;
+    let response = send_fetch_request(req, request_id.as_deref()).await?;
+    collect_fetched_text(response, max_response_bytes, request_id.as_deref()).await
+}
+
+async fn collect_fetched_text(
+    mut response: reqwest::Response,
+    max_response_bytes: Option<u64>,
+    request_id: Option<&str>,
+) -> Result<FetchedText, String> {
     let status = response.status().as_u16();
     let mut out_headers = std::collections::HashMap::new();
     for (name, value) in response.headers().iter() {
@@ -1855,13 +2072,35 @@ async fn fetch_text(
         .cloned()
         .or_else(|| out_headers.get("Content-Type").cloned());
     let textual = is_textual_content_type(content_type.as_deref());
-    let bytes = response.bytes().await.map_err(|err| err.to_string())?;
-    let limit = if textual {
+    let hard_limit = if textual {
         8 * 1024 * 1024
     } else {
         64 * 1024 * 1024
     };
-    if bytes.len() > limit {
+    let limit = max_response_bytes
+        .map(|value| (value as usize).min(hard_limit))
+        .unwrap_or(hard_limit);
+    let mut bytes = Vec::new();
+    loop {
+        let chunk = if let Some(request_id) = request_id {
+            tokio::select! {
+                chunk = response.chunk() => chunk.map_err(|error| error.to_string())?,
+                _ = wait_for_fetch_cancel(request_id) => return Err("请求已取消".into()),
+            }
+        } else {
+            response.chunk().await.map_err(|err| err.to_string())?
+        };
+        let Some(chunk) = chunk else { break };
+        if bytes.len().saturating_add(chunk.len()) > limit {
+            return Err(if textual {
+                format!("响应太大（文本上限 {} bytes）", limit)
+            } else {
+                format!("响应太大（二进制上限 {} bytes）", limit)
+            });
+        }
+        bytes.extend_from_slice(&chunk);
+    }
+    if bytes.len() > hard_limit {
         return Err(if textual {
             "响应太大（文本超过 8MB）".into()
         } else {
@@ -1896,6 +2135,41 @@ async fn fetch_text(
  */
 #[cfg(test)]
 mod fetch_text_tests {
+    use super::{cancel_fetch_text, fetch_text_is_cancelled, is_public_ip, FetchTextCancelGuard};
+    use std::net::IpAddr;
+
+    #[test]
+    fn public_only_ip_guard_rejects_local_and_private_ranges() {
+        let public: IpAddr = "8.8.8.8".parse().unwrap();
+        let private: IpAddr = "192.168.1.20".parse().unwrap();
+        let loopback: IpAddr = "127.0.0.1".parse().unwrap();
+        let link_local: IpAddr = "169.254.169.254".parse().unwrap();
+        let mapped: IpAddr = "::ffff:7f00:1".parse().unwrap();
+        let zero_network: IpAddr = "0.1.2.3".parse().unwrap();
+        let shared: IpAddr = "100.64.0.1".parse().unwrap();
+        let benchmark: IpAddr = "198.18.0.1".parse().unwrap();
+
+        assert!(is_public_ip(public));
+        assert!(!is_public_ip(private));
+        assert!(!is_public_ip(loopback));
+        assert!(!is_public_ip(link_local));
+        assert!(!is_public_ip(mapped));
+        assert!(!is_public_ip(zero_network));
+        assert!(!is_public_ip(shared));
+        assert!(!is_public_ip(benchmark));
+    }
+
+    #[test]
+    fn fetch_text_cancel_guard_clears_the_request_id() {
+        let id = "cancel-test-request".to_string();
+        cancel_fetch_text(id.clone());
+        assert!(fetch_text_is_cancelled(&id));
+        {
+            let _guard = FetchTextCancelGuard(Some(id.clone()));
+        }
+        assert!(!fetch_text_is_cancelled(&id));
+    }
+
     #[test]
     fn rejects_non_http_url() {
         assert!(!"ftp://x/y".starts_with("http://") && !"ftp://x/y".starts_with("https://"));
@@ -3446,6 +3720,7 @@ pub fn run() {
             profile_backup_info,
             fetch_bytes,
             fetch_text,
+            cancel_fetch_text,
             fetch_stream,
             cancel_fetch_stream,
             cli_which,

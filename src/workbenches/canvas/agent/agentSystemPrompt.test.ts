@@ -132,6 +132,7 @@ describe('组装', () => {
       'updateTaskStep',
       'requestTaskConfirmation',
       'visualReview',
+      'researchDesign',
     ]) {
       expect(p).toContain(tool)
     }
@@ -157,6 +158,17 @@ describe('组装', () => {
     expect(light).not.toContain('## 画布上有哪些节点（唯一合法的类型清单）')
     expect(light).toContain('## 本次相关画布上下文')
     expect(full).toContain('## 画布上有哪些节点（唯一合法的类型清单）')
+  })
+
+  it('设计调研使用轻量档并明确公开来源边界', () => {
+    const light = buildAgentSystemPromptWithContext(
+      { nodes: [], edges: [] },
+      undefined,
+      { requestMode: 'design_research', promptProfile: 'light' },
+    )
+    expect(light).toContain('researchDesign')
+    expect(light).toContain('公开 URL')
+    expect(light).not.toContain('## 画布上有哪些节点（唯一合法的类型清单）')
   })
 })
 

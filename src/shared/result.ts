@@ -6,7 +6,7 @@ export type RequestSendPhase = 'not-sent' | 'unknown'
 export type AppError =
   | {
       kind: 'network'
-      detail: 'dns' | 'tls' | 'cors' | 'timeout' | 'aborted'
+      detail: 'dns' | 'tls' | 'cors' | 'timeout' | 'aborted' | 'blocked'
       /**
        * Missing means `unknown` for backward compatibility. Only an explicit
        * `not-sent` value may be treated as safe for a paid request resubmit.
@@ -123,12 +123,16 @@ export function isOk<T>(r: Result<T>): r is { ok: true; value: T } {
  * 维护纪律：`AppError` 新增一个 kind / detail 时，**这里必须同时加一行**；
  * `result.test.ts` 有一条「一条都不许漏」的断言（遍历全部取值、逐个断言译文非空且不含英文标识符）。
  */
-const NETWORK_TEXT: Record<'dns' | 'tls' | 'cors' | 'timeout' | 'aborted', string> = {
+const NETWORK_TEXT: Record<
+  'dns' | 'tls' | 'cors' | 'timeout' | 'aborted' | 'blocked',
+  string
+> = {
   dns: '解析不了对方的地址（检查网络或代理）',
   tls: '安全连接建不起来（证书 / TLS 被拒）',
   cors: '被对方的跨域策略挡下了（网页直连不被允许）',
   timeout: '等太久，超时了',
   aborted: '请求被取消',
+  blocked: '不允许访问本机、内网或链路本地地址',
 }
 
 const STORAGE_TEXT: Record<'quota' | 'corrupt' | 'permission', string> = {

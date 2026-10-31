@@ -10,6 +10,7 @@ import type {
 import type { AppError } from '../../shared/result'
 import { parseSSELine, createLineSplitter } from '../sse'
 import { base64ToBytes, bytesToBase64 } from '../../domain/shared/base64'
+import { isPublicHttpUrl } from '../../domain/shared/publicUrl'
 
 /**
  * 请求体是否「原样上传」的形态（M6-12）。
@@ -184,16 +185,24 @@ export function createFetchNetwork(remote?: {
 }): NetworkPort {
   const shellRequest = remote?.request
   /** 走壳的原生 HTTP 打一次（不带 signal：Rust 侧自带超时） */
-  const viaShell = async (req: NetworkRequest): Promise<NetworkResponse> => {
+  const viaShell = async (
+    req: NetworkRequest,
+    signal?: AbortSignal,
+  ): Promise<NetworkResponse> => {
     const { headers, body } = requestInit(req)
     const bodyFields = body ? await shellBodyOf(body) : {}
-    const res = await shellRequest!({
-      url: req.url,
-      method: req.method ?? 'GET',
-      headers,
-      ...(typeof body === 'string' ? { body } : bodyFields),
-      timeoutMs: req.timeoutMs,
-    })
+    const res = await shellRequest!(
+      {
+        url: req.url,
+        method: req.method ?? 'GET',
+        headers,
+        ...(typeof body === 'string' ? { body } : bodyFields),
+        timeoutMs: req.timeoutMs,
+        ...(req.publicOnly ? { publicOnly: true } : {}),
+        ...(req.maxResponseBytes ? { maxResponseBytes: req.maxResponseBytes } : {}),
+      },
+      signal,
+    )
     if (res.status < 200 || res.status >= 300) {
       throw { kind: 'http', status: res.status, body: res.text.slice(0, 500) } satisfies AppError
     }
@@ -215,6 +224,20 @@ export function createFetchNetwork(remote?: {
           detail: 'aborted',
           sendPhase: 'not-sent',
         } satisfies AppError
+      }
+      if (req.publicOnly && !isPublicHttpUrl(req.url)) {
+        throw {
+          kind: 'network',
+          detail: 'blocked',
+          sendPhase: 'not-sent',
+        } satisfies AppError
+      }
+      if (req.publicOnly && shellRequest) {
+        try {
+          return await viaShell(req, signal)
+        } catch (error) {
+          throw toAppError(error, signal)
+        }
       }
       const controller = new AbortController()
       const onAbort = (): void => controller.abort()
@@ -247,7 +270,7 @@ export function createFetchNetwork(remote?: {
       } catch (e) {
         /** 浏览器这一层过不去（多为 CORS）且壳有原生 HTTP ⇒ 换一条路再试一次 */
         if (shellRequest && !signal.aborted && canFallbackToShell(req, toAppError(e, signal))) {
-          return await viaShell(req)
+          return await viaShell(req, signal)
         }
         throw toAppError(e, signal)
       } finally {

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { usePlatform } from '../../app/providers/PlatformProvider'
 import { usePresetText } from '../../app/providers/PresetTextProvider'
 import { useSkills } from '../../app/providers/SkillStoreProvider'
+import { sendSkillToAgent } from '../../features/canvas/agentSkillHandoff'
 import { presetTextEntries } from '../../domain/prompt/presetText'
 import type { BuiltinSkill, UserSkill } from '../../domain/prompt/skill'
 import {
@@ -127,8 +128,11 @@ export function SkillsPage() {
           agentSkillId = created.id
         }
       }
-      await presets.saveAgentDefaultSkill(agentSkillId)
-      setNotice({ kind: 'ok', text: `已将「${pick.skill.name}」设为 Agent 技能。` })
+      sendSkillToAgent(agentSkillId)
+      setNotice({
+        kind: 'ok',
+        text: `已将「${pick.skill.name}」交给 Agent，打开画布对话后会作为技能 chip 加入。`,
+      })
     } catch (error) {
       setNotice({
         kind: 'error',

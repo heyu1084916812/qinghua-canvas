@@ -72,6 +72,10 @@ import { cropAsset, extractSelection } from '../../../../features/canvas/extract
 import { splitNodeToGrid } from '../../../../features/canvas/splitToGrid'
 import { subscribeAgentHandoff, takeAgentHandoff } from '../../../../features/canvas/agentHandoff'
 import {
+  subscribeAgentSkillHandoff,
+  takeAgentSkillHandoff,
+} from '../../../../features/canvas/agentSkillHandoff'
+import {
   activeQueueTurnOf,
   claimSessionActivity,
   clearQueueDrain,
@@ -90,6 +94,9 @@ import {
 import { AssetMenu } from '../AssetMenu'
 import { createAssetLibraryRepository } from '../../../../state/project/assetLibraryRepository'
 import { createAssetLibraryStore } from '../../../../state/project/assetLibraryStore'
+import { createInspirationRepository } from '../../../../state/project/inspirationRepository'
+import { loadInspirationSources } from '../../../../state/project/inspirationSourceStore'
+import { runDesignResearch } from '../../../../features/shared/research/designResearchRunner'
 import { SkillMenu } from './SkillMenu'
 import { MentionRichText } from './MentionRichText'
 import { runWaves } from '../../../../domain/canvas/graph/runWaves'
@@ -101,6 +108,7 @@ import { useCanvasStore, useGraph, useSelection } from '../../storeContext'
 import { useViewportState } from '../../storeContext'
 import type { CanvasStore } from '../../../../state/workbenches/canvas/store'
 import type { TextRunRequest } from '../../../../platform/channels/types'
+import type { ToolDeclaration } from '../../../../domain/shared/execution/types'
 import {
   resumeAgentTurn,
   runAgentTurn,
@@ -124,8 +132,8 @@ import {
   summaryForAgentRequest,
 } from '../../agent/agentContextPolicy'
 import {
-  AGENT_TOOLS,
   agentToolsForCapabilities,
+  agentToolsForRequestMode,
   executeConfirmedTool,
   executeReadTool,
   runFromNodeIds,
@@ -488,6 +496,10 @@ export function AgentPanel({
    */
   const library = useMemo(
     () => createAssetLibraryStore(createAssetLibraryRepository(platform.storage)),
+    [platform],
+  )
+  const inspirationRepository = useMemo(
+    () => createInspirationRepository(platform.storage, platform.network),
     [platform],
   )
   const libraryAssets = useSyncExternalStore(
@@ -910,6 +922,26 @@ export function AgentPanel({
     if (!id) return '技能'
     return allSkills.find((s) => s.id === id)?.name ?? '技能'
   }, [current?.skillId, allSkills])
+
+  useEffect(() => {
+    const consumePendingSkill = () => {
+      if (!current) return
+      const skillId = takeAgentSkillHandoff()
+      if (!skillId) return
+      const skill = allSkills.find((item) => item.id === skillId)
+      if (!skill) return
+      setDraft((previous) => {
+        const already = parseMentions(previous).some(
+          (mention) => mention.kind === 'skill' && mention.id === skill.id,
+        )
+        if (already) return previous
+        const marker = mentionToken('skill', skill.id, skill.name)
+        return previous.trim() ? `${previous.replace(/\s+$/, '')} ${marker} ` : `${marker} `
+      })
+    }
+    consumePendingSkill()
+    return subscribeAgentSkillHandoff(() => consumePendingSkill())
+  }, [allSkills, current])
 
   /**
    * 新会话该用哪个模型：默认模型 → 该渠道第一个对话模型。
@@ -1455,6 +1487,26 @@ export function AgentPanel({
           }
         }
       },
+      researchDesign: async (input) => {
+        const [cachedSources, configuredSources] = await Promise.all([
+          inspirationRepository.readAll().catch(() => []),
+          loadInspirationSources(platform.storage).catch(() => []),
+        ])
+        const enabledIds = new Set(
+          configuredSources.filter((source) => source.enabled).map((source) => source.id),
+        )
+        const libraryCases = cachedSources
+          .filter((source) => enabledIds.has(source.sourceId))
+          .flatMap((source) => source.cases)
+        return runDesignResearch(
+          input,
+          {
+            network: platform.network,
+            libraryCases,
+          },
+          abortRefs.current.get(sessionId)?.signal ?? new AbortController().signal,
+        )
+      },
     }),
     [
       store,
@@ -1467,6 +1519,7 @@ export function AgentPanel({
       selectedModelOf,
       sessions,
       platform,
+      inspirationRepository,
       memory,
       viewport,
     ],
@@ -1543,6 +1596,7 @@ export function AgentPanel({
       toolMode: 'native' | 'json' = 'native',
       visualNodeIds: readonly string[] = [],
       onProgress?: (messages: readonly ChatMessage[]) => void,
+      turnTools: readonly ToolDeclaration[] = activeAgentTools,
     ) => {
       const route = cachedChatRoute(session)
       const logicalModel =
@@ -1835,7 +1889,7 @@ export function AgentPanel({
               channelId: route?.channelId ?? req.channelId,
               model: route?.upstreamModel ?? req.model,
               modelIsUpstream: Boolean(route),
-              tools: req.tools ?? (toolMode === 'native' ? activeAgentTools : []),
+              tools: req.tools ?? (toolMode === 'native' ? turnTools : []),
               messages: req.messages ?? [],
               inputs: req.inputs,
               signal,
@@ -1862,7 +1916,7 @@ export function AgentPanel({
             channelId: route?.channelId ?? req.channelId,
             model: route?.upstreamModel ?? req.model,
             modelIsUpstream: Boolean(route),
-            tools: req.tools ?? (toolMode === 'native' ? activeAgentTools : []),
+            tools: req.tools ?? (toolMode === 'native' ? turnTools : []),
             messages: req.messages ?? [],
             inputs: req.inputs,
             signal,
@@ -1897,7 +1951,7 @@ export function AgentPanel({
         },
         channelId: route?.channelId ?? '',
         model: logicalModel,
-        tools: toolMode === 'native' ? activeAgentTools : [],
+        tools: toolMode === 'native' ? turnTools : [],
         toolMode,
         inputs,
       /**
@@ -2484,7 +2538,7 @@ export function AgentPanel({
             channelId: chatRoute.channelId,
             model: chatRoute.upstreamModel,
             modelIsUpstream: true,
-            tools: req.tools ?? AGENT_TOOLS,
+            tools: req.tools ?? activeAgentTools,
             messages: req.messages ?? [],
             signal,
             routeCandidates: chatRoute.candidates,
@@ -2633,6 +2687,9 @@ export function AgentPanel({
       hasTaskPlan: Boolean(activeTaskPlan),
     })
     const promptProfile = promptProfileForMode(requestMode)
+    const turnAgentTools = agentToolsForRequestMode(requestMode, {
+      canvasReview: canvasReviewEnabled,
+    })
     const referenceRootIds =
       requestMode === 'reference_edit'
         ? mentionedImageIds.length > 0
@@ -2665,7 +2722,7 @@ export function AgentPanel({
         ...(contextPrompt ? { contextBundle: contextPrompt } : {}),
         ...(activeTaskPlan ? { taskPlan: taskPlanPrompt(activeTaskPlan) } : {}),
         /** JSON 降级时要把工具声明列进提示词，模型才知道 tool 能填什么（路线 B） */
-        ...(toolMode === 'json' ? { jsonToolFallback: true, tools: activeAgentTools } : {}),
+        ...(toolMode === 'json' ? { jsonToolFallback: true, tools: turnAgentTools } : {}),
       },
     )
     /**
@@ -2742,6 +2799,7 @@ export function AgentPanel({
         setMessageReveal(null)
         setMessages(withHidden(next))
       },
+      turnAgentTools,
     )
     const initial = await runAgentTurn(withSystem, currentLoopDeps)
     const outcome = await continueAutoConfirmations(

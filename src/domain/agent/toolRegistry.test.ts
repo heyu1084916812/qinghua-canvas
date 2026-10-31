@@ -14,7 +14,7 @@ describe('Agent tool registry', () => {
   it('registers every tool exactly once', () => {
     const names = AGENT_TOOL_DEFINITIONS.map((tool) => tool.name)
     expect(new Set(names).size).toBe(names.length)
-    expect(names).toHaveLength(20)
+    expect(names).toHaveLength(21)
     expect([...AGENT_READ_TOOL_NAMES, ...AGENT_WRITE_TOOL_NAMES, ...AGENT_CONFIRM_TOOL_NAMES].sort()).toEqual(
       [...names].sort(),
     )
@@ -46,7 +46,10 @@ describe('Agent tool registry', () => {
       'updateTaskStep',
       'requestTaskConfirmation',
     ])
-    expect(agentToolsInCategory('host-service')).toEqual(['rememberMemory'])
+    expect(agentToolsInCategory('host-service')).toEqual([
+      'researchDesign',
+      'rememberMemory',
+    ])
     expect(agentToolsInCategory('canvas')).toContain('readGraph')
     expect(agentToolsInCategory('canvas')).toContain('splitGrid')
   })

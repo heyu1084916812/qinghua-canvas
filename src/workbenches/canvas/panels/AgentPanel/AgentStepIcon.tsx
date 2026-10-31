@@ -61,6 +61,15 @@ export function AgentStepIcon({ tool, size = 14 }: { tool: string; size?: number
           <rect x="8" y="2" width="14" height="14" rx="2" />
         </Glyph>
       )
+    case 'researchDesign':
+      return (
+        <Glyph tool={tool} size={size}>
+          <circle cx="11" cy="11" r="8" />
+          <path d="m21 21-4.3-4.3" />
+          <path d="M8 10h6" />
+          <path d="M8 14h4" />
+        </Glyph>
+      )
     case 'visualReview':
       return (
         <Glyph tool={tool} size={size}>

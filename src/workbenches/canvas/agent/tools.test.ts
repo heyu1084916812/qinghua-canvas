@@ -7,6 +7,7 @@ import { createCanvasStore, type CanvasStore } from '../../../state/workbenches/
 import {
   AGENT_TOOLS,
   agentToolsForCapabilities,
+  agentToolsForRequestMode,
   executeConfirmedTool,
   executeReadTool,
   planProblems,
@@ -65,6 +66,7 @@ describe('工具声明', () => {
       'readResult',
       'rememberMemory',
       'requestTaskConfirmation',
+      'researchDesign',
       'resizeNodes',
       'runFrom',
       'runNode',
@@ -87,6 +89,55 @@ describe('工具声明', () => {
     const tools = agentToolsForCapabilities({ canvasReview: false })
     expect(tools.some((tool) => tool.name === 'visualReview')).toBe(false)
     expect(agentToolsForCapabilities({ canvasReview: true })).toBe(AGENT_TOOLS)
+  })
+
+  it('★ 按请求档位裁剪工具，简单出图不再拿到全量工具', () => {
+    const simple = agentToolsForRequestMode('simple_generate', {
+      canvasReview: false,
+    }).map((tool) => tool.name)
+    expect(simple.sort()).toEqual([
+      'applyPlan',
+      'readGraph',
+      'readResult',
+      'rememberMemory',
+      'runNode',
+    ])
+
+    const research = agentToolsForRequestMode('design_research', {
+      canvasReview: false,
+    }).map((tool) => tool.name)
+    expect(research).toContain('researchDesign')
+    expect(research).not.toContain('moveNodes')
+
+    const operation = agentToolsForRequestMode('canvas_operation', {
+      canvasReview: false,
+    }).map((tool) => tool.name)
+    expect(operation).toContain('moveNodes')
+    expect(operation).toContain('rememberMemory')
+    expect(operation).not.toContain('researchDesign')
+  })
+
+  it('设计调研读工具把规范化参数交给宿主服务', async () => {
+    const researchDesign = vi.fn(async () => ({ ok: true, items: [] }))
+    const result = await executeReadTool(
+      'researchDesign',
+      {
+        topic: '  bakery identity  ',
+        urls: ['https://www.pinterest.com/pin/42/', 'not-a-url'],
+        maxResults: 99,
+      },
+      {
+        ...setup().ctx,
+        researchDesign,
+      },
+    )
+
+    expect(result).toEqual({ ok: true, items: [] })
+    expect(researchDesign).toHaveBeenCalledWith({
+      topic: 'bakery identity',
+      urls: ['https://www.pinterest.com/pin/42/'],
+      maxResults: 24,
+    })
   })
 
   it('★ rememberMemory 把当前项目 / 会话补进候选并交给记忆存储', async () => {

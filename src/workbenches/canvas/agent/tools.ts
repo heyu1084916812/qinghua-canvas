@@ -72,6 +72,36 @@ export const AGENT_TOOLS: readonly ToolDeclaration[] = [
     },
   },
   {
+    name: 'researchDesign',
+    description:
+      '做设计调研：检索轻画灵感库，并可从用户提供的公开网页、Pinterest Pin / Board 或 Behance 页面提取参考图与出处。' +
+      '只读取公开页面，不使用任何账号 Cookie，不声称完成私密内容或无限制全站搜索。' +
+      '结果用于形成 Moodboard、来源报告和设计方向；图片只作为参考，保留原链接与权利状态。',
+    parameters: {
+      type: 'object',
+      properties: {
+        topic: {
+          type: 'string',
+          description: '这次要研究的设计主题、风格、品类或用户目标。',
+        },
+        urls: {
+          type: 'array',
+          maxItems: 8,
+          items: { type: 'string' },
+          description:
+            '用户提供或明确点名的公开页面 URL。没有 URL 时仍可检索本地灵感库。',
+        },
+        maxResults: {
+          type: 'integer',
+          minimum: 1,
+          maximum: 24,
+          description: '最多返回多少条参考，默认 12。',
+        },
+      },
+      required: ['topic'],
+    },
+  },
+  {
     name: 'applyPlan',
     description:
       '把一份工作流建到画布上：给出要建的节点与连线，一次性落地。' +
@@ -523,6 +553,67 @@ export function agentToolsForCapabilities({
   return AGENT_TOOLS.filter((tool) => tool.name !== 'visualReview')
 }
 
+const SIMPLE_GENERATE_TOOLS = new Set([
+  'readGraph',
+  'applyPlan',
+  'runNode',
+  'readResult',
+  'rememberMemory',
+])
+
+const REFERENCE_EDIT_TOOLS = new Set([
+  'readGraph',
+  'readAsset',
+  'applyPlan',
+  'runNode',
+  'readResult',
+  'rememberMemory',
+])
+
+const DESIGN_RESEARCH_TOOLS = new Set([
+  'readGraph',
+  'researchDesign',
+  'applyPlan',
+  'runNode',
+  'readResult',
+  'rememberMemory',
+])
+
+const CANVAS_OPERATION_TOOLS = new Set([
+  'readGraph',
+  'readAsset',
+  'readResult',
+  'visualReview',
+  'updateNode',
+  'runNode',
+  'runFrom',
+  'moveNodes',
+  'resizeNodes',
+  'deleteNodes',
+  'arrangeNodes',
+  'deleteEdges',
+  'compareNodes',
+  'sliceImage',
+  'splitGrid',
+  'rememberMemory',
+])
+
+export function agentToolsForRequestMode(
+  mode: 'simple_generate' | 'reference_edit' | 'design_research' | 'canvas_operation' | 'complex_plan',
+  capabilities: { canvasReview: boolean },
+): readonly ToolDeclaration[] {
+  if (mode === 'complex_plan') return agentToolsForCapabilities(capabilities)
+  const allowed =
+    mode === 'simple_generate'
+      ? SIMPLE_GENERATE_TOOLS
+      : mode === 'reference_edit'
+        ? REFERENCE_EDIT_TOOLS
+        : mode === 'design_research'
+          ? DESIGN_RESEARCH_TOOLS
+          : CANVAS_OPERATION_TOOLS
+  return agentToolsForCapabilities(capabilities).filter((tool) => allowed.has(tool.name))
+}
+
 /** 画布现状摘要 —— 结构与设计文档 §4.2 的回填格式一致 */
 export interface GraphSummary {
   /**
@@ -937,6 +1028,12 @@ export interface AgentToolContext {
     nodeIds: readonly string[]
     checklist?: string
   }) => Promise<VisualReviewResult>
+  /** 设计调研；由界面层注入网络与灵感库读取能力。 */
+  researchDesign?: (input: {
+    topic: string
+    urls?: readonly string[]
+    maxResults?: number
+  }) => Promise<unknown>
 }
 
 /**
@@ -1005,6 +1102,26 @@ export async function executeReadTool(
       return { assets: readAssetInfo(ctx.store, a.nodeIds) }
     case 'readResult':
       return { results: readResults(ctx.store, a.nodeIds) }
+    case 'researchDesign': {
+      const topic = typeof a.topic === 'string' ? a.topic.trim() : ''
+      if (!topic) return { ok: false, error: '设计调研缺少 topic' }
+      if (!ctx.researchDesign) {
+        return { ok: false, error: '当前会话没有接入设计调研服务' }
+      }
+      const urls = asStringArray(a.urls)
+        .map((url) => url.trim())
+        .filter((url) => /^https?:\/\//i.test(url))
+        .slice(0, 8)
+      const maxResults =
+        typeof a.maxResults === 'number' && Number.isFinite(a.maxResults)
+          ? Math.min(24, Math.max(1, Math.round(a.maxResults)))
+          : undefined
+      return ctx.researchDesign({
+        topic,
+        ...(urls.length > 0 ? { urls } : {}),
+        ...(maxResults ? { maxResults } : {}),
+      })
+    }
     case 'visualReview': {
       const rawIds = asStringArray(a.nodeIds)
       const nodeIds = ctx.resolveNodeIds ? ctx.resolveNodeIds(rawIds) : rawIds

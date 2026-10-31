@@ -65,22 +65,37 @@ export function createTauriRemoteBytes(): RemoteBytesPort {
      * 同样不做任何判断 —— 状态码、响应头、正文原样回给调用方，
      * "这个响应算不算一份模型列表"归渠道层判（与 `get` 那条"不校验是不是图片"同一条口径）。
      */
-    request: async (req: RemoteTextRequest): Promise<RemoteTextResponse> => {
-      const raw = await invoke<RawFetchedText>('fetch_text', {
-        url: req.url,
-        method: req.method ?? 'GET',
-        headers: req.headers ?? {},
-        body: req.body ?? '',
-        bodyBase64: req.bodyBase64 ?? '',
-        contentType: req.contentType ?? '',
-        multipart: req.multipart ?? [],
-        timeoutMs: req.timeoutMs,
-      })
-      return {
-        status: raw.status,
-        headers: raw.headers ?? {},
-        text: raw.text ?? '',
-        ...(raw.bodyBase64 ? { bodyBase64: raw.bodyBase64 } : {}),
+    request: async (
+      req: RemoteTextRequest,
+      signal?: AbortSignal,
+    ): Promise<RemoteTextResponse> => {
+      const requestId = signal ? crypto.randomUUID() : ''
+      const onAbort = () => {
+        if (requestId) void invoke('cancel_fetch_text', { requestId }).catch(() => {})
+      }
+      signal?.addEventListener('abort', onAbort, { once: true })
+      try {
+        const raw = await invoke<RawFetchedText>('fetch_text', {
+          url: req.url,
+          method: req.method ?? 'GET',
+          headers: req.headers ?? {},
+          body: req.body ?? '',
+          bodyBase64: req.bodyBase64 ?? '',
+          contentType: req.contentType ?? '',
+          multipart: req.multipart ?? [],
+          timeoutMs: req.timeoutMs,
+          ...(req.publicOnly ? { publicOnly: true } : {}),
+          ...(req.maxResponseBytes ? { maxResponseBytes: req.maxResponseBytes } : {}),
+          ...(requestId ? { requestId } : {}),
+        })
+        return {
+          status: raw.status,
+          headers: raw.headers ?? {},
+          text: raw.text ?? '',
+          ...(raw.bodyBase64 ? { bodyBase64: raw.bodyBase64 } : {}),
+        }
+      } finally {
+        signal?.removeEventListener('abort', onAbort)
       }
     },
     stream: async function* (

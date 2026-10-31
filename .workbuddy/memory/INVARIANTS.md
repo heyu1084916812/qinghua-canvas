@@ -5,6 +5,20 @@
 
 ## Agent · 过程与落位
 
+- **请求分档决定摘要与工具**：`simple_generate` 不扫描全图；`reference_edit` 只带引用节点和
+  必要上游；`design_research` 不扫描画布；`canvas_operation / complex_plan` 才加载全量。
+  工具声明必须用 `agentToolsForRequestMode()` 同步裁剪，不能只裁提示词。
+- **技能只认当前正文 chip**：presets 默认技能和旧会话 `skillId` 不得自动注入。技能库交接
+  也必须落成正文 chip，不能靠隐藏默认值生效。
+- **设计调研不越权**：只检索已启用本地灵感源和用户提供的公开 URL；不读取 Cookie / 私密
+  Board，不把公开页面解析宣称为全站搜索。保存参考时先验证图片 MIME，再写 assets 与素材库。
+- **调研出站必须 `publicOnly`**：字面量 URL 先过共享公网守卫；桌面请求必须由 Rust 解析 DNS
+  并逐跳检查重定向，图片 URL 也走同一路径。每一跳必须绑定本次解析出的全部公开地址、禁用系统
+  代理，图片离开视口后还要取消请求并释放 object URL。浏览器无壳时才允许普通 fetch，且仍执行
+  字面量守卫。
+- **调研保存必须原子并回读**：`assets + assetLibrary + assetTags` 在一个事务里完成，回读
+  hash / MIME / 字节 / 标签；任何一步失败不能留下半份收藏。最后报告可持久化，加载与新一轮运行
+  之间必须用操作序号防旧数据回写。
 - **Harness runtime 不属于产品范围**：画布 Agent 必须继续使用现有 `agentLoop`；不接
   DeepSeek Harness Worker、ACP/MCP sidecar、外部 runtime 或签名资源包，也不替换主循环。
   已完成的 Agent 面板、Controller、工具、路由和记忆端口只服务当前循环。
@@ -22,6 +36,8 @@
   取 640px 与 `--panel-available-h` 的较小值；内容不能撑出第三档，切节点 / 重开回默认档。
 - **固定面板里的编辑器不能 autoGrow**：CreationPanel 使用 `autoGrow=false`，提示词区、
   提示词框、编辑器共同吃掉剩余高度，长文本只在编辑器内滚动，底部参数和生成按钮不得被挤出。
+- **展开按钮与滚动条分层**：只有编辑器内容超出默认可视高度时才显示上下箭头；按钮占用编辑器
+  上方的窄栏，滚动条从按钮下方开始。短文本不渲染按钮，也不保留空栏。
 - **通用 MentionEditor 重挂载仍要补量**：需要 autoGrow 的编辑器必须先填内容，
   再按 `scrollHeight` 补一次高度；autoGrow 只依赖 value 变化会量到空编辑器的一行高度。
 - **画布性能门禁看生产构建**：300/600/1000 节点需记录 DOM、端口 hit 数、长任务、p95 帧时间与堆占用；

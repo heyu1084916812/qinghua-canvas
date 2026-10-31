@@ -194,6 +194,10 @@ export interface NetworkRequest {
   headers?: Record<string, string>
   body?: unknown
   timeoutMs?: number
+  /** 强约束只访问公开互联网；桌面壳会同时校验 DNS 与重定向。 */
+  publicOnly?: boolean
+  /** 响应字节上限；桌面壳按流式读取，不会先完整缓冲再判断。 */
+  maxResponseBytes?: number
 }
 
 export interface NetworkResponse {
@@ -693,7 +697,7 @@ export interface RemoteBytesPort {
    * 于是要能 POST `/v1/chat/completions`、要能读回 JSON，而不只是抓一张图标。
    * 同样只有桌面壳给得出；浏览器里缺席时网络层照旧走 `fetch`，失败即如实报跨域。
    */
-  request?(req: RemoteTextRequest): Promise<RemoteTextResponse>
+  request?(req: RemoteTextRequest, signal?: AbortSignal): Promise<RemoteTextResponse>
   /**
    * Desktop-native SSE bridge. Browser fetch often cannot see cross-origin
    * event streams, so the shell owns this path when available.
@@ -714,6 +718,8 @@ export interface RemoteTextRequest {
   /** FormData 的结构化投影；字段顺序与原始 FormData 一致。 */
   multipart?: RemoteMultipartPart[]
   timeoutMs?: number
+  publicOnly?: boolean
+  maxResponseBytes?: number
 }
 
 export interface RemoteMultipartPart {

@@ -48,6 +48,11 @@
 > 推理循环。`agentLoop` 是当前且继续使用的实现。应用壳 Agent 面板、AgentController、
 > ToolRegistry、ModelRoutePort、RouteExecutionPort 与 MemoryPort 仅服务现有 Agent。
 
+> **2026-10-31 首轮上下文分档与设计调研（对账 #836 / #838）**：请求分为简单生成、参考改图、
+> 设计调研、画布操作和复杂计划。前三种使用轻量提示词，不加载完整画布词表；工具声明同步裁剪。
+> 技能只由正文 skill chip 触发，默认技能不再自动注入。`researchDesign` 只读取本地已启用灵感源
+> 和用户提供的公开 URL，不读取 Cookie / 私密 Board，也不声称完成无限制全站搜索。
+
 > **2026-10-29 Agent 生成失败原因（对账 #813）**：Agent 运行节点时必须在执行层调用前
 > 再做一次渠道/模型/凭据预检；节点自身能说出的“渠道已停用”等阻塞，Agent 也必须拿到同一句话。
 > 没有新 RunRecord 只代表执行层未落地，不能覆盖更具体的前置原因。暂停中的 AgentJob 在恢复时

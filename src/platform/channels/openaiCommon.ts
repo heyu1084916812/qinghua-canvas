@@ -70,12 +70,16 @@ export function openAiBaseUrl(config: {
 }
 
 /** 网络细节 → 用户能据以自查的文案。光说「网络错误」等于没说，得点到地址/证书/CORS */
-export const NETWORK_MESSAGE: Record<'dns' | 'tls' | 'cors' | 'timeout' | 'aborted', string> = {
+export const NETWORK_MESSAGE: Record<
+  'dns' | 'tls' | 'cors' | 'timeout' | 'aborted' | 'blocked',
+  string
+> = {
   dns: '连不上这个地址（域名解析失败或连接被拒绝）——核对地址、确认中继可达',
   tls: 'TLS 证书错误（证书不受信任）',
   cors: '跨域被拦截，中继需开放 CORS',
   timeout: '请求超时，服务无响应',
   aborted: '请求已取消',
+  blocked: '不允许访问本机、内网或链路本地地址',
 }
 
 export function httpMessage(status: number): string {

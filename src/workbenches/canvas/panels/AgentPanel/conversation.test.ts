@@ -209,7 +209,25 @@ describe('工具结果 → 人话', () => {
 
   it('★ 没登记的工具给兜底标题，不假装认识', () => {
     expect(toolLabel('runNode')).toBe('已运行生成')
+    expect(toolLabel('researchDesign')).toBe('设计调研完成')
     expect(toolLabel('someFutureTool')).toContain('someFutureTool')
+  })
+
+  it('设计调研步骤只汇总参考和来源数量，不把整份报告塞进步骤卡', () => {
+    const d = describeToolResult(
+      'researchDesign',
+      JSON.stringify({
+        ok: true,
+        items: [{ id: 'pinterest:1' }, { id: 'web:1' }],
+        sources: [{ name: 'pinterest.com' }, { name: 'example.com' }],
+        warnings: ['没有提供公开页面 URL；本次只检索了轻画本地灵感库。'],
+      }),
+    )
+    expect(d.failed).toBe(false)
+    expect(d.lines).toEqual([
+      '找到 2 条参考，覆盖 2 个来源',
+      '没有提供公开页面 URL；本次只检索了轻画本地灵感库。',
+    ])
   })
 
   it('★ 计划工具由进度卡承接，不重复刷一屏步骤', () => {
