@@ -3,6 +3,7 @@ import { allSpecs, registerAllSpecs } from '../../../domain/canvas/nodeSpecs'
 import {
   buildAgentSystemPrompt,
   buildAgentSystemPromptWithContext,
+  buildLightAgentSystemPrompt,
   buildCanvasVocabulary,
   buildCurrentState,
   looksLikePreserveRequest,
@@ -140,6 +141,22 @@ describe('组装', () => {
     expect(p).toContain('一次只推进一个步骤')
     expect(p).toContain('purpose')
     expect(p).toContain('用户确认前不能写')
+  })
+
+  it('轻量提示词不加载完整画布词表，完整档仍保留词表', () => {
+    const light = buildLightAgentSystemPrompt(
+      { nodes: [], edges: [] },
+      undefined,
+      'simple_generate',
+    )
+    const full = buildAgentSystemPromptWithContext(
+      { nodes: [], edges: [] },
+      undefined,
+      { requestMode: 'complex_plan', promptProfile: 'full' },
+    )
+    expect(light).not.toContain('## 画布上有哪些节点（唯一合法的类型清单）')
+    expect(light).toContain('## 本次相关画布上下文')
+    expect(full).toContain('## 画布上有哪些节点（唯一合法的类型清单）')
   })
 })
 

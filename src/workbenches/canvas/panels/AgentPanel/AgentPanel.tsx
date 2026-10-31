@@ -117,11 +117,17 @@ import {
   expectsPerImageFlows,
 } from '../../agent/agentSystemPrompt'
 import {
+  classifyAgentRequest,
+  imageNodeIdsAmong,
+  promptProfileForMode,
+  resolveAgentSkillForTurn,
+  summaryForAgentRequest,
+} from '../../agent/agentContextPolicy'
+import {
   AGENT_TOOLS,
   agentToolsForCapabilities,
   executeConfirmedTool,
   executeReadTool,
-  readGraphSummary,
   runFromNodeIds,
   type AgentToolContext,
 } from '../../agent/tools'
@@ -938,7 +944,6 @@ export function AgentPanel({
        */
       await channels.load()
       const rows = await refresh()
-      const defaultSkillId = await presets.loadAgentDefaultSkill()
       const savedReviewModel = await presets.loadAgentReviewModel()
       const savedCanvasReview = await presets.loadAgentCanvasReview()
       if (!alive) return
@@ -946,17 +951,9 @@ export function AgentPanel({
       setAgentCanvasReview(savedCanvasReview)
       if (rows.length > 0) {
         const head = rows[0]!
-        if (!head.skillId && defaultSkillId) {
-          const next = await sessions.updateFields(head.id, { skillId: defaultSkillId })
-          const resolved = next ?? { ...head, skillId: defaultSkillId }
-          setList([resolved, ...rows.slice(1)])
-          setCurrent(resolved)
-          setMessages(resolved.messages)
-        } else {
-          const loaded = (await sessions.get(head.id).catch(() => null)) ?? head
-          setCurrent(loaded)
-          setMessages(loaded.messages)
-        }
+        const loaded = (await sessions.get(head.id).catch(() => null)) ?? head
+        setCurrent(loaded)
+        setMessages(loaded.messages)
         return
       }
       /**
@@ -979,7 +976,6 @@ export function AgentPanel({
         model: defaultModelFor(liveModelOptions, savedModel),
         imageModel: livePick('image')[0] ?? '',
         videoModel: livePick('video')[0] ?? '',
-        skillId: defaultSkillId || undefined,
       })
       if (!alive) return
       setList([created])
@@ -2557,18 +2553,25 @@ export function AgentPanel({
       }
     }
 
-    const summary = readGraphSummary(store, 'all', selection)
     /**
-     * 系统提示词（设计文档 §4.1 / §8 / §14 M4）= 通用三段 + 随对话给的素材 + 本会话启用的技能。
+     * 系统提示词（设计文档 §4.1 / §8 / §14 M4）= 按本轮请求裁剪的通用规则
+     * + 随对话给的素材 + 当前正文里明确带上的技能。
      *
      * 技能负责「怎么做」，agent 负责「真的去做」—— 所以不是让技能自己执行，
      * 而是把它当作**这次规划的规范**：技能里的阶段就是 agent 要建到画布上的步骤。
-     * 按 id 现取正文，技能改了这里跟着变（与画布节点上的 `skillId` 同一口径）。
+     * 技能只认当前正文里的 skill chip；旧会话/default 残留的 skillId 不能偷偷注入。
      *
      * 拼接本身放在 `buildAgentSystemPromptWithContext` 里，不在这儿现拼：
      * 「技能正文到底进没进提示词」只能靠发出去的消息证明，抽成纯函数才有单测。
      */
-    const skill = session.skillId ? allSkills.find((s) => s.id === session.skillId) : undefined
+    const liveGraph = store.getSnapshot()
+    const plainText = stripMentionMarkup(text)
+    const rawMentions = parseMentions(text)
+    const skillChipIds = rawMentions
+      .filter((mention) => mention.kind === 'skill')
+      .map((mention) => mention.id)
+    const skillId = resolveAgentSkillForTurn(skillChipIds, session.skillId)
+    const skill = skillId ? allSkills.find((item) => item.id === skillId) : undefined
     /**
      * 这句话里 @ 引用了什么（节点 / 模型）。空数组就不加那一段。
      *
@@ -2576,8 +2579,7 @@ export function AgentPanel({
      * 那一段（正文 + 名字）负责讲清楚；再当成引用报一遍，模型会在同一句话里读到
      * 两份同样的东西。正文里那个 token 也会被 `stripMentionMarkup` 还原成技能名。
      */
-    const plainText = stripMentionMarkup(text)
-    const mentions = parseMentions(text)
+    const mentions = rawMentions
       .filter((m): m is MentionRef & { kind: 'node' | 'model' } => m.kind !== 'skill')
       /**
        * 被 @ 的节点**连它上面的提示词一起报给模型**（用户 2026-10-05 第六批：
@@ -2588,7 +2590,7 @@ export function AgentPanel({
        */
       .map((m) => {
         if (m.kind !== 'node') return m
-        const n = graph.nodes.find((x) => x.id === m.id)
+        const n = liveGraph.nodes.find((x) => x.id === m.id)
         const d = (n?.data ?? {}) as { prompt?: unknown; text?: unknown }
         const raw = typeof d.prompt === 'string' ? d.prompt : d.text
         const prompt = typeof raw === 'string' ? raw.trim().slice(0, 160) : ''
@@ -2611,20 +2613,39 @@ export function AgentPanel({
      * 单张图无所谓拆不拆，所以判据是「≥2 张、且他没说合并 / 融合」。
      * 算好存进 ref：工具执行可能发生在用户点「批准」之后，那时这里已经出栈了。
      */
-    const mentionedImageCount = mentions.filter(
-      (m) =>
-        m.kind === 'node' &&
-        Boolean(
-          (graph.nodes.find((n) => n.id === m.id)?.data as { assetHash?: string } | undefined)
-            ?.assetHash,
-        ),
-    ).length
+    const mentionedImageIds = imageNodeIdsAmong(
+      liveGraph.nodes,
+      mentions.filter((m) => m.kind === 'node').map((m) => m.id),
+    )
+    const selectedImageIds = imageNodeIdsAmong(liveGraph.nodes, selection)
+    const mentionedImageCount = mentionedImageIds.length
     const perImage = expectsPerImageFlows(plainText, mentionedImageCount)
     perImageRef.current = perImage
+    const activeTaskPlan =
+      session.taskPlan && agentTaskPlanProgress(session.taskPlan).status === 'active'
+        ? session.taskPlan
+        : undefined
+    const requestMode = classifyAgentRequest({
+      text: plainText,
+      hasMentionedImage: mentionedImageCount > 0,
+      hasSelectedNodes: selection.length > 0,
+      hasSelectedImage: selectedImageIds.length > 0,
+      hasTaskPlan: Boolean(activeTaskPlan),
+    })
+    const promptProfile = promptProfileForMode(requestMode)
+    const referenceRootIds =
+      requestMode === 'reference_edit'
+        ? mentionedImageIds.length > 0
+          ? mentionedImageIds
+          : selectedImageIds
+        : []
+    const summary = summaryForAgentRequest(liveGraph, requestMode, referenceRootIds)
     const system = buildAgentSystemPromptWithContext(
       summary,
       { model: chatRoute.logicalModel },
       {
+        requestMode,
+        promptProfile,
         canvasReviewEnabled,
         /**
          * 用户说了「其他保持不变 / 只改 X」→ 给这次规划加一段**硬约束**
@@ -2642,7 +2663,7 @@ export function AgentPanel({
         ...(Object.keys(mediaModels).length > 0 ? { mediaModels } : {}),
         generationAvailability,
         ...(contextPrompt ? { contextBundle: contextPrompt } : {}),
-        ...(session.taskPlan ? { taskPlan: taskPlanPrompt(session.taskPlan) } : {}),
+        ...(activeTaskPlan ? { taskPlan: taskPlanPrompt(activeTaskPlan) } : {}),
         /** JSON 降级时要把工具声明列进提示词，模型才知道 tool 能填什么（路线 B） */
         ...(toolMode === 'json' ? { jsonToolFallback: true, tools: activeAgentTools } : {}),
       },
@@ -3590,7 +3611,6 @@ export function AgentPanel({
 
   const newSession = useCallback(async () => {
     const saved = await presets.loadAgentDefault()
-    const defaultSkillId = await presets.loadAgentDefaultSkill()
     const savedModel = toLogicalName(allChannels, saved?.model ?? '')
     const created = await sessions.create({
       projectId,
@@ -3602,7 +3622,6 @@ export function AgentPanel({
        */
       imageModel: selectedModelOf('image') || modelOptionsByKind.image[0] || '',
       videoModel: selectedModelOf('video') || modelOptionsByKind.video[0] || '',
-      skillId: defaultSkillId || undefined,
     })
     await refresh()
     await switchTo(created)

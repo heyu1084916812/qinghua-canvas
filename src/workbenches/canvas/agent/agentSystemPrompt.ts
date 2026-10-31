@@ -4,6 +4,7 @@ import { allSpecs } from '../../../domain/canvas/nodeSpecs/registry'
 import { summarizeGraph, type GraphSummary } from './tools'
 import type { ToolDeclaration } from '../../../domain/shared/execution/types'
 import type { GenerationAvailability } from '../../../domain/project/generationRouting'
+import type { AgentPromptProfile, AgentRequestMode } from './agentContextPolicy'
 
 /**
  * Agent 的系统提示词（设计文档 §4.1 的四段）。
@@ -286,6 +287,16 @@ const IDENTITY_AND_RULES = [
   '- 用户没要求的不要顺手建。宁可少建，也不要塞一堆他用不上的节点。',
 ].join('\n')
 
+const LIGHT_IDENTITY_AND_RULES = [
+  '你是「轻画」无限画布上的助理。本次请求已判定为轻量生成或参考改图，优先用最少步骤完成。',
+  '',
+  '## 轻量执行规则',
+  '- 单图生成只建一个 generation 节点，把提示词写进 `data.prompt`；不要在不需要时调用 readGraph。',
+  '- 参考改图要新建节点，不覆盖旧节点正文；把被引用图接成新节点的上游，并让生成参数沿用参考节点。',
+  '- 需要建图时，用 applyPlan 一次给出完整节点与连线；需要出图时，再用 runNode 执行本次新建的生成节点。',
+  '- 本档只带与当前请求相关的节点，不附完整画布词表；只有信息不足或请求转成画布操作时，才调用 readGraph。',
+].join('\n')
+
 /**
  * ③ 画布词表：从 `nodeSpecs` 生成。
  *
@@ -393,6 +404,32 @@ export function buildCurrentState(
   return lines.join('\n')
 }
 
+function buildLightCurrentState(
+  summary: GraphSummary,
+  inherited: { ratio?: string; count?: number; model?: string } = {},
+): string {
+  const lines: string[] = ['## 本次相关画布上下文']
+  if (summary.nodes.length === 0) {
+    lines.push('本次没有附带画布节点；单图生成不依赖整张画布。')
+  } else {
+    lines.push(`本次只附带 ${summary.nodes.length} 个相关节点、${summary.edges.length} 条连线：`)
+    for (const node of summary.nodes.slice(0, 12)) {
+      lines.push(
+        `- ${node.id}｜${node.type}${node.title ? `｜${node.title}` : ''}${node.hasOutput ? '｜已出图' : ''}${
+          node.prompt ? `｜提示词：${node.prompt}` : ''
+        }`,
+      )
+    }
+  }
+
+  const pairs = Object.entries(inherited).filter(([, value]) => value !== undefined && value !== '')
+  if (pairs.length > 0) {
+    lines.push('', '## 用户之前用过的参数（他这次说了就以他说的为准）')
+    for (const [key, value] of pairs) lines.push(`- ${key}: ${String(value)}`)
+  }
+  return lines.join('\n')
+}
+
 /** 组装系统提示词。④ 段每次请求重算，①②③ 固定 */
 export function buildAgentSystemPrompt(
   summary: GraphSummary,
@@ -403,7 +440,27 @@ export function buildAgentSystemPrompt(
   )
 }
 
+export function buildLightAgentSystemPrompt(
+  summary: GraphSummary,
+  inherited?: { ratio?: string; count?: number; model?: string },
+  mode?: AgentRequestMode,
+): string {
+  const requestLine =
+    mode === 'reference_edit'
+      ? '本次按参考改图处理：只使用被引用节点及其必要上游。'
+      : '本次按简单生成处理：不加载无关画布内容。'
+  return [
+    LIGHT_IDENTITY_AND_RULES,
+    requestLine,
+    buildLightCurrentState(summary, inherited),
+  ].join('\n\n')
+}
+
 export interface AgentPromptExtras {
+  /** 本轮请求分类；轻量档只用于 simple_generate / reference_edit。 */
+  requestMode?: AgentRequestMode
+  /** full 保留完整规则和词表；light 只带本次相关节点。 */
+  promptProfile?: AgentPromptProfile
   /** 画布巡检是否允许由 Agent 主动调用；false 时必须在提示词里明确禁止。 */
   canvasReviewEnabled?: boolean
   /**
@@ -502,7 +559,11 @@ export function buildAgentSystemPromptWithContext(
   inherited?: { ratio?: string; count?: number; model?: string },
   extras: AgentPromptExtras = {},
 ): string {
-  const parts = [buildAgentSystemPrompt(summary, inherited)]
+  const parts = [
+    extras.promptProfile === 'light'
+      ? buildLightAgentSystemPrompt(summary, inherited, extras.requestMode)
+      : buildAgentSystemPrompt(summary, inherited),
+  ]
 
   if (extras.canvasReviewEnabled === true) {
     parts.push(
