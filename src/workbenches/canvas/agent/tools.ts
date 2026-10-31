@@ -1172,6 +1172,16 @@ export function planProblems(
   const { plan } = normalizeAgentPlan(args)
   const checked = validateAgentPlan(plan, existingNodeIds)
   if (!checked.ok) return { problems: checked.errors, plan: null }
+  const attachedLocalIds = new Set((checked.plan.attach ?? []).map((item) => item.localId))
+  if (checked.plan.nodes.every((node) => attachedLocalIds.has(node.localId))) {
+    return {
+      problems: [
+        '这份计划只复用了画布上已有的节点，没有任何要新建的节点。',
+        '如果要在 @ 的图片基础上继续设计，请至少新建一个生成节点，并把节点 id 放进 attach 对应到现有图片；不要提交一份只有 attach 的空计划。',
+      ],
+      plan: null,
+    }
+  }
   /**
    * 过形状这一关之后再看一眼**内容**：有没有节点按定义就永远跑不起来。
    *

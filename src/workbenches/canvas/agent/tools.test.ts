@@ -1080,6 +1080,27 @@ describe('planProblems · 跑不起来的生成节点', () => {
     expect(r.problems.join()).toContain('data.prompt')
   })
 
+  it('★★ 只有 attach、没有新建节点 → 在落地前拦下，避免空命令', () => {
+    const r = planProblems(
+      {
+        ...plan([
+          {
+            localId: 'ref',
+            type: 'generation',
+            data: { mode: 'image', assetHash: 'hash-ref' },
+            order: 0,
+          },
+        ]),
+        attach: [{ localId: 'ref', existingNodeId: 'node_ref' }],
+      },
+      ['node_ref'],
+    )
+
+    expect(r.plan).toBeNull()
+    expect(r.problems.join(' ')).toContain('没有任何要新建的节点')
+    expect(r.problems.join(' ')).toContain('至少新建一个生成节点')
+  })
+
   it('★ 上游接着提示词节点（模板形态，正文在上游）→ 放行', () => {
     const r = planProblems(
       plan(

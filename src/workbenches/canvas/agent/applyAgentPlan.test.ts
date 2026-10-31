@@ -93,6 +93,33 @@ describe('applyAgentPlan · 落地并自检', () => {
     })
   })
 
+  it('★★ 只有复用节点、没有新节点 → 在命令层前返回可读问题，不触发空命令', () => {
+    const s = store()
+    s.dispatch({
+      kind: 'node.create',
+      projectId: 'p1',
+      type: 'generation',
+      at: { x: 0, y: 0 },
+      data: { mode: 'image' },
+    })
+    const sourceId = s.getSnapshot().nodes[0]!.id
+    const plan: AgentPlan = {
+      summary: '只复用原图',
+      nodes: [{ localId: 'ref', type: 'generation', data: { mode: 'image' }, order: 0 }],
+      edges: [],
+      attach: [{ localId: 'ref', existingNodeId: sourceId }],
+    }
+
+    const r = applyAgentPlan(s, plan, { x: 400, y: 0 })
+
+    expect(r.ok).toBe(false)
+    expect(r.problems.join(' ')).toContain('没有产生任何新建节点')
+    expect(r.resolvedNodes).toEqual([
+      expect.objectContaining({ localId: 'ref', nodeId: sourceId, created: false }),
+    ])
+    expect(s.getSnapshot().nodes).toHaveLength(1)
+  })
+
   it('★ 非法连线（连到自己 / 类型不允许）→ 命令抛错，画布不被改脏', () => {
     const s = store()
     const bad: AgentPlan = {

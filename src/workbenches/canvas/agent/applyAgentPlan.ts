@@ -102,6 +102,30 @@ export function applyAgentPlan(
     ...(opts?.explicitFor ? { explicitFor: opts.explicitFor } : {}),
     ...(opts?.contextAssetsFor ? { contextAssetsFor: opts.contextAssetsFor } : {}),
   })
+  if (command.nodes.length === 0) {
+    return {
+      ok: false,
+      problems: [
+        '这份计划没有产生任何新建节点。',
+        '如果要在已有参考图上继续设计，请至少新建一个生成节点，并在 attach 中引用原图；不要提交只有复用节点的空计划。',
+      ],
+      createdNodeIds: [],
+      resolvedNodes: plan.nodes.flatMap((node) => {
+        const nodeId = idOf[node.localId]
+        return nodeId
+          ? [
+              {
+                localId: node.localId,
+                nodeId,
+                type: node.type,
+                ...(node.title ? { title: node.title } : {}),
+                created: false,
+              },
+            ]
+          : []
+      }),
+    }
+  }
 
   // 一次 dispatch = 一个 standalone 事务 = 一次撤销全回退
   store.dispatch(command)
