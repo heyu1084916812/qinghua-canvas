@@ -485,6 +485,23 @@ export function assembleContextBundle(input: {
     }
     selectedVersions.push(version)
   }
+  const kindRank: Record<ContextKitKind, number> = {
+    brand: 0,
+    product: 1,
+    role: 2,
+    custom: 3,
+  }
+  selectedVersions.sort((left, right) => {
+    const leftKit = kitById.get(left.kitId)
+    const rightKit = kitById.get(right.kitId)
+    const leftRank = kindRank[leftKit?.kind ?? 'custom']
+    const rightRank = kindRank[rightKit?.kind ?? 'custom']
+    if (leftRank !== rightRank) return leftRank - rightRank
+    const nameOrder = (leftKit?.name ?? left.kitId).localeCompare(
+      rightKit?.name ?? right.kitId,
+    )
+    return nameOrder || left.version - right.version
+  })
 
   for (const version of selectedVersions) {
     const kit = kitById.get(version.kitId)
