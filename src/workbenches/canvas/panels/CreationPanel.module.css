@@ -562,13 +562,18 @@
   flex: 1 1 auto;
 }
 
+.promptExpandBar {
+  flex: 0 0 auto;
+  min-height: 22px;
+  display: flex;
+  justify-content: flex-end;
+  align-items: flex-start;
+  padding-right: 1px;
+}
+
 .promptExpand {
-  position: absolute;
-  top: 2px;
-  right: 2px;
-  z-index: 2;
-  width: 36px;
-  height: 36px;
+  width: 24px;
+  height: 22px;
   padding: 0;
   display: inline-flex;
   align-items: center;

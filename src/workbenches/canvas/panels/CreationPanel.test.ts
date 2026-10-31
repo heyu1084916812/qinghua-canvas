@@ -6,7 +6,13 @@ import { SkillStoreContext } from '../../../app/providers/SkillStoreProvider'
 import { createMemoryPlatform } from '../../../platform/memory'
 import { createChannelStore, type ChannelStore } from '../../../state/channel/channelStore'
 import { generationSpec } from '../../../domain/canvas/nodeSpecs/generation'
-import { CreationPanel, ratiosOf, resolutionsOf, withFollowRatio } from './CreationPanel'
+import {
+  CreationPanel,
+  promptNeedsExpand,
+  ratiosOf,
+  resolutionsOf,
+  withFollowRatio,
+} from './CreationPanel'
 import type { PanelModel } from './panelModel'
 
 /**
@@ -111,12 +117,17 @@ describe('CreationPanel · 面板舒适高度', () => {
 
     expect(compact).toContain('data-panel-comfort="fixed"')
     expect(compact).toContain('data-panel-expanded="false"')
-    expect(compact).toContain('data-panel-prompt-expand')
-    expect(compact).toContain('aria-label="展开编辑区"')
+    expect(compact).not.toContain('data-panel-prompt-expand')
     expect(compact).toContain('data-panel-prompt-comfort="fixed"')
     expect(withAssets).toContain('data-panel-comfort="fixed"')
     expect(withAssets).toContain('data-panel-expanded="false"')
     expect(withAssets).toContain('data-panel-prompt-comfort="fixed"')
+  })
+
+  it('只有内容超过初始可视高度时才开放上下展开按钮', () => {
+    expect(promptNeedsExpand(120, 120)).toBe(false)
+    expect(promptNeedsExpand(121, 120)).toBe(false)
+    expect(promptNeedsExpand(122, 120)).toBe(true)
   })
 })
 

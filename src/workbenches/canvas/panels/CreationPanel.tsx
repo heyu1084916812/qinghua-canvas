@@ -1,4 +1,12 @@
-import { useCallback, useEffect, useMemo, useRef, useSyncExternalStore, useState } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useSyncExternalStore,
+  useState,
+} from 'react'
 import { clampDuration, type ModelCapability } from '../../../domain/shared/capability'
 import type { GenerationData } from '../../../domain/canvas/model/node'
 import type { PanelCollection, PanelModel, PanelThumb, RecipeSnapshot } from './panelModel'
@@ -42,9 +50,9 @@ import {
 } from '../../../domain/project/modelCatalog'
 import { ModelIcon } from '../../../features/shared/modelIcon/ModelIcon'
 import {
-  IconCollapse,
+  IconChevronDown,
+  IconChevronUp,
   IconClose,
-  IconExpand,
   IconPrompt,
   IconPreset,
   IconSpinner,
@@ -216,6 +224,10 @@ export function ratiosOf(cap?: ModelCapability, withFollowSource = false): strin
 export function withFollowRatio(ratios: readonly string[], withFollowSource: boolean): string[] {
   if (!withFollowSource || ratios.includes(RATIO_FOLLOW_SOURCE)) return [...ratios]
   return [...ratios, RATIO_FOLLOW_SOURCE]
+}
+
+export function promptNeedsExpand(scrollHeight: number, clientHeight: number): boolean {
+  return scrollHeight > clientHeight + 1
 }
 
 export interface CreationPanelProps {
@@ -562,7 +574,30 @@ export function CreationPanel(props: CreationPanelProps) {
    */
   const [mentionPos, setMentionPos] = useState<{ left: number; top: number } | null>(null)
   const promptBoxRef = useRef<HTMLDivElement | null>(null)
+  const [promptOverflow, setPromptOverflow] = useState(false)
   const mentionCandidates = model.mentionCandidates
+
+  useLayoutEffect(() => {
+    if (promptExpanded) return
+    const editor = promptBoxRef.current?.querySelector<HTMLElement>('[data-panel-prompt]')
+    if (!editor) return
+    const measure = () => {
+      const overflowing = promptNeedsExpand(editor.scrollHeight, editor.clientHeight)
+      setPromptOverflow((current) => (current === overflowing ? current : overflowing))
+    }
+    measure()
+    const frame = requestAnimationFrame(measure)
+    const observer =
+      typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(measure)
+    observer?.observe(editor)
+    window.addEventListener('resize', measure)
+    return () => {
+      cancelAnimationFrame(frame)
+      observer?.disconnect()
+      window.removeEventListener('resize', measure)
+    }
+  }, [nodeId, promptDraft, promptExpanded])
+
   /** 候选节点 → 素材 hash（面板模型已经算过上游缩略图，这里不再扫一遍图） */
   const mentionHashOf = useMemo(() => {
     const map = new Map<string, string>()
@@ -1631,6 +1666,26 @@ export function CreationPanel(props: CreationPanelProps) {
             ref={promptBoxRef}
             data-panel-prompt-box
           >
+          {promptExpanded || promptOverflow ? (
+            <div className={styles.promptExpandBar} data-panel-prompt-expand-bar>
+              <button
+                type="button"
+                className={styles.promptExpand}
+                data-panel-prompt-expand
+                aria-label={promptExpanded ? '收起编辑区' : '展开编辑区'}
+                aria-pressed={promptExpanded}
+                title={promptExpanded ? '收起编辑区' : '展开编辑区'}
+                onClick={() => {
+                  setOpenPicker(null)
+                  setMentionOpen(false)
+                  closePresetMenus()
+                  setExpandedNodeId((current) => (current === nodeId ? null : nodeId))
+                }}
+              >
+                {promptExpanded ? <IconChevronDown size={18} /> : <IconChevronUp size={18} />}
+              </button>
+            </div>
+          ) : null}
           {/*
             提示词框 = 带引用的富文本框（用户 2026-10-05 第 15 条）。
 
@@ -1685,22 +1740,6 @@ export function CreationPanel(props: CreationPanelProps) {
               onEvent({ type: 'setPrompt', text: promptDraft })
             }}
           />
-          <button
-            type="button"
-            className={styles.promptExpand}
-            data-panel-prompt-expand
-            aria-label={promptExpanded ? '收起编辑区' : '展开编辑区'}
-            aria-pressed={promptExpanded}
-            title={promptExpanded ? '收起编辑区' : '展开编辑区'}
-            onClick={() => {
-              setOpenPicker(null)
-              setMentionOpen(false)
-              closePresetMenus()
-              setExpandedNodeId((current) => (current === nodeId ? null : nodeId))
-            }}
-          >
-            {promptExpanded ? <IconCollapse size={18} /> : <IconExpand size={18} />}
-          </button>
           {mentionOpen && (
             <div
               className={styles.mentionMenu}

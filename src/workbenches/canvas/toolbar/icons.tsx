@@ -568,6 +568,15 @@ export function IconChevronDown(props: IconProps) {
   )
 }
 
+/** 向上展开：与向下折角同一套线性重量 */
+export function IconChevronUp(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path d="m6 14.5 6-6 6 6" />
+    </Svg>
+  )
+}
+
 /** 灯箱上一张 / 下一张：与展开箭头同一套线性重量 */
 export function IconChevronLeft(props: IconProps) {
   return (
