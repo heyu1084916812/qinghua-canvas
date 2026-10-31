@@ -6,6 +6,8 @@
   `design_research` 不扫画布；`canvas_operation / complex_plan` 才用全量摘要和完整词表。
   工具声明同样按档位裁剪，简单出图只保留
   `readGraph / applyPlan / runNode / readResult / rememberMemory`。
+  执行层也会拒绝本轮未声明的工具；JSON 降级、人工确认续跑和轮数继续沿用同一份工具集。
+  待确认或可继续任务会把允许工具名随会话落库；重载后找不到名单时失败关闭，不回退全量。
 - **默认技能不能偷偷生效**：新会话和旧会话加载都不把 presets 默认技能写进 `skillId`。
   只有当前正文里有 skill chip 才注入；技能库“交给 Agent”通过模块级交接插入 chip。
 - **Design Research 只做公开来源**：`researchDesign` 检索已启用本地灵感源，并读取用户提供的
@@ -13,12 +15,15 @@
   不读取 Cookie、私密 Board，也不把公开页面解析说成 Pinterest 全站搜索。
 - **公网请求必须走 `publicOnly`**：TS 先拦截字面量 localhost / 私网 / `.internal` /
   IPv4-mapped IPv6；桌面壳强制走 Rust，发请求前解析 DNS、要求全部地址公开，并手动逐跳验证
-  最多 5 次重定向。页面里的 OG 图片也必须过滤并走同一出站层，不能直接挂远程 URL。
+  最多 5 次重定向。每一跳绑定全部公开地址并禁用系统代理；浏览器没有桌面校验时失败关闭。
+  最终重定向 URL 要回传给页面解析相对图片地址。页面里的 OG 图片也必须过滤并走同一出站层。
 - **保存参考进入素材库**：调研结果先校验文件头 MIME / 尺寸与响应头一致，再在同一事务里写
   `assets + assetLibrary + presets(assetTags)`，事务内回读 hash、MIME、字节、标签；失败不伪造收藏。
+  预览与保存共用 2000 万像素上限；关闭面板会 abort 保存，字节到达后、事务前和每个事务写点
+  都再次检查取消，取消抛错会回滚整个事务。
 - **报告可恢复**：最后一次有结果的调研报告写 `presets`，关闭重开面板恢复；加载/运行用序号防覆盖，
   持久化失败会明示。URL 先规范化去重再封顶 8 个，不提前截断原始文本。
-- **证据**：全量 Vitest **3724 passed / 1 skipped**、Tauri Rust **55/55**；设计调研面板在
+- **证据**：全量 Vitest **3735 passed / 1 skipped**、Tauri Rust **55/55**；设计调研面板在
   1440×900、1024×700 明暗四组均在视口内、横向溢出 0，关闭重开后结果可恢复；
   `npm run check` 与构建通过。
 
@@ -52,6 +57,16 @@
   收起态向上、展开态向下。短文本不渲染按钮，也不预留展开栏。
 - **证据**：1440 默认 270px / 展开 426px，长文本默认仍 270px，重选回 270px；
   1024 默认与展开均为可用高度 226px。明暗四组 `runInside=true`、无横向溢出。
+
+### Agent applyPlan 空新建计划（2026-10-31，对账 #839）
+
+- **全 attach 不等于可落地计划**：`planProblems` 必须在命令层之前确认至少有一个未 attach 的
+  新节点。只复用原图、没有新节点的计划要回填“新建生成节点 + attach 原图”，不能留给
+  `agent.applyPlan` 抛“计划里没有要建的节点”。
+- **命令层保留第二道防御**：`applyAgentPlan` 发现 `command.nodes.length === 0` 时直接返回
+  可读问题，不 dispatch 空命令。
+- **证据**：`planProblems` / `applyAgentPlan` / Agent 工具链定向回归通过；全量
+  **3735 passed / 1 skipped**，`npm run check` / build 通过。
 
 ### Agent 首轮快速路径背景（2026-10-31，已由 #836 交付）
 
