@@ -25,6 +25,22 @@ export function activeQueueTurnOf(sessionId: string): string | undefined {
   return activeSessions.get(sessionId)?.queueTurnId
 }
 
+/**
+ * 队列项先占会话锁、再从存储里领取是必要的；领取成功后必须把真实 turnId
+ * 绑回同一把锁，否则确认/暂停后的收尾找不到要销掉的队列项。
+ */
+export function bindQueueTurnToSessionActivity(
+  sessionId: string,
+  queueTurnId: string,
+): boolean {
+  const active = activeSessions.get(sessionId)
+  if (!active) return false
+  if (active.queueTurnId === queueTurnId) return true
+  if (active.queueTurnId) return false
+  active.queueTurnId = queueTurnId
+  return true
+}
+
 export function releaseSessionActivity(sessionId: string, queueTurnId?: string): void {
   const active = activeSessions.get(sessionId)
   if (!active) return

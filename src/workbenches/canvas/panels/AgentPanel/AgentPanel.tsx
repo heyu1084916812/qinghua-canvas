@@ -78,6 +78,7 @@ import {
 } from '../../../../features/canvas/agentSkillHandoff'
 import {
   activeQueueTurnOf,
+  bindQueueTurnToSessionActivity,
   claimSessionActivity,
   clearQueueDrain,
   isSessionActivityActive,
@@ -3040,12 +3041,25 @@ export function AgentPanel({
   const pumpQueuedTurn = useCallback(async (sessionId: string) => {
     if (queuePumpingRef.current.has(sessionId)) return
     queuePumpingRef.current.add(sessionId)
+    let claimedTurnId: string | undefined
     try {
       if (!claimSessionActivity(sessionId)) return
       const next = await controller.claimNextQueuedTurn(sessionId)
       if (!next) {
         clearQueueDrain(sessionId)
         releaseSessionActivity(sessionId)
+        return
+      }
+      claimedTurnId = next.turn.id
+      if (!bindQueueTurnToSessionActivity(sessionId, claimedTurnId)) {
+        const released = await controller.finishQueuedTurn(
+          sessionId,
+          claimedTurnId,
+          false,
+        )
+        if (released) applySessionSnapshot(released)
+        clearQueueDrain(sessionId)
+        releaseSessionActivity(sessionId, claimedTurnId)
         return
       }
       applySessionSnapshot(next.session)
@@ -3057,7 +3071,13 @@ export function AgentPanel({
         { preclaimed: true, queueTurnId: next.turn.id },
       )
     } catch (error) {
-      releaseSessionActivity(sessionId)
+      if (claimedTurnId) {
+        const released = await controller
+          .finishQueuedTurn(sessionId, claimedTurnId, false)
+          .catch(() => null)
+        if (released) applySessionSnapshot(released)
+      }
+      releaseSessionActivity(sessionId, claimedTurnId)
       setStatusFor(sessionId, { kind: 'error', message: errText(error) })
     } finally {
       queuePumpingRef.current.delete(sessionId)
@@ -3071,9 +3091,17 @@ export function AgentPanel({
 
   const resumeQueue = useCallback(() => {
     if (!current) return
-    requestQueueDrain(current.id)
-    void pumpQueuedTurn(current.id)
-  }, [current, pumpQueuedTurn])
+    void (async () => {
+      try {
+        await refresh()
+      } catch (error) {
+        setStatusFor(current.id, { kind: 'error', message: errText(error) })
+        return
+      }
+      requestQueueDrain(current.id)
+      void pumpQueuedTurn(current.id)
+    })()
+  }, [current, pumpQueuedTurn, refresh, setStatusFor])
 
   const settleSessionOutcome = useCallback(async (
     sessionId: string,

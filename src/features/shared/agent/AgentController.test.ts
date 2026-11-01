@@ -26,10 +26,12 @@ describe('AgentController', () => {
       get: vi.fn(),
       repairConfirmationSteerCollision: vi.fn(),
       releaseActiveTurn: vi.fn(async () => null),
+      finishActiveQueuedTurn: vi.fn(),
     }
     const jobs = {
       active: vi.fn(),
       transition: vi.fn(),
+      forTurn: vi.fn(async () => null),
       recoverSession: vi.fn(async () => {}),
     }
     const controller = createAgentController({
@@ -51,6 +53,112 @@ describe('AgentController', () => {
     expect(jobs.recoverSession).toHaveBeenCalledWith('s1')
   })
 
+  it('does not requeue a completed turn left active by an old queue bug', async () => {
+    const stale = session({
+      activeTurnId: 'turn-1',
+      queuedTurns: [
+        {
+          id: 'turn-1',
+          text: '已经完成的排队任务',
+          createdAt: 1,
+          channelId: 'c1',
+          model: 'm1',
+        },
+      ],
+    })
+    const settled = session({ activeTurnId: undefined, queuedTurns: [] })
+    const sessions = {
+      list: vi.fn(async () => [stale]),
+      get: vi.fn(),
+      repairConfirmationSteerCollision: vi.fn(),
+      releaseActiveTurn: vi.fn(),
+      finishActiveQueuedTurn: vi.fn(async () => settled),
+    }
+    const jobs = {
+      active: vi.fn(),
+      transition: vi.fn(),
+      forTurn: vi.fn(async () => ({
+        id: 'job-1',
+        status: 'completed',
+      })),
+      recoverSession: vi.fn(async () => []),
+    }
+    const controller = createAgentController({
+      projectId: 'p1',
+      sessions: sessions as never,
+      jobs: jobs as never,
+      hooks: {
+        isSessionActivityActive: () => false,
+        onPendingConfirmation: vi.fn(),
+        onContinuation: vi.fn(),
+        onNeedsAttention: vi.fn(),
+        onIdle: vi.fn(),
+        notify: vi.fn(),
+      },
+    })
+
+    await controller.refresh()
+    expect(jobs.forTurn).toHaveBeenCalledWith('s1', 'turn-1')
+    expect(sessions.finishActiveQueuedTurn).toHaveBeenCalledWith(
+      's1',
+      'turn-1',
+      true,
+    )
+    expect(sessions.releaseActiveTurn).not.toHaveBeenCalled()
+  })
+
+  it.each(['failed', 'canceled'] as const)(
+    'releases a %s queued turn without dropping the prompt',
+    async (status) => {
+      const stale = session({
+        activeTurnId: 'turn-1',
+        queuedTurns: [
+          {
+            id: 'turn-1',
+            text: '需要用户手动决定是否重试',
+            createdAt: 1,
+            channelId: 'c1',
+            model: 'm1',
+          },
+        ],
+      })
+      const sessions = {
+        list: vi.fn(async () => [stale]),
+        get: vi.fn(),
+        repairConfirmationSteerCollision: vi.fn(),
+        releaseActiveTurn: vi.fn(),
+        finishActiveQueuedTurn: vi.fn(async () => stale),
+      }
+      const jobs = {
+        active: vi.fn(),
+        transition: vi.fn(),
+        forTurn: vi.fn(async () => ({ id: 'job-1', status })),
+        recoverSession: vi.fn(async () => []),
+      }
+      const controller = createAgentController({
+        projectId: 'p1',
+        sessions: sessions as never,
+        jobs: jobs as never,
+        hooks: {
+          isSessionActivityActive: () => false,
+          onPendingConfirmation: vi.fn(),
+          onContinuation: vi.fn(),
+          onNeedsAttention: vi.fn(),
+          onIdle: vi.fn(),
+          notify: vi.fn(),
+        },
+      })
+
+      await controller.refresh()
+      expect(sessions.finishActiveQueuedTurn).toHaveBeenCalledWith(
+        's1',
+        'turn-1',
+        false,
+      )
+      expect(sessions.releaseActiveTurn).not.toHaveBeenCalled()
+    },
+  )
+
   it('repairs confirmation/steer collisions and cancels the stale job', async () => {
     const repaired = session({ pendingConfirmation: { callId: 'c1', name: 'runNode', args: {} } })
     const sessions = {
@@ -58,10 +166,12 @@ describe('AgentController', () => {
       get: vi.fn(),
       repairConfirmationSteerCollision: vi.fn(async () => repaired),
       releaseActiveTurn: vi.fn(),
+      finishActiveQueuedTurn: vi.fn(),
     }
     const jobs = {
       active: vi.fn(async () => ({ id: 'job-1' })),
       transition: vi.fn(async () => null),
+      forTurn: vi.fn(async () => null),
       recoverSession: vi.fn(async () => {}),
     }
     const hooks = {
@@ -119,10 +229,12 @@ describe('AgentController', () => {
         get: vi.fn(),
         repairConfirmationSteerCollision: vi.fn(),
         releaseActiveTurn: vi.fn(),
+        finishActiveQueuedTurn: vi.fn(),
       } as never,
       jobs: {
         active: vi.fn(),
         transition: vi.fn(),
+        forTurn: vi.fn(async () => null),
         recoverSession: vi.fn(async () => {}),
       } as never,
       hooks,
@@ -152,10 +264,12 @@ describe('AgentController', () => {
         get: vi.fn(),
         repairConfirmationSteerCollision: vi.fn(),
         releaseActiveTurn: vi.fn(),
+        finishActiveQueuedTurn: vi.fn(),
       } as never,
       jobs: {
         active: vi.fn(),
         transition: vi.fn(),
+        forTurn: vi.fn(async () => null),
         recoverSession: vi.fn(async () => [
           {
             id: 'job-1',

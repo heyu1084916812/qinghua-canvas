@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import {
   activeQueueTurnOf,
+  bindQueueTurnToSessionActivity,
   claimSessionActivity,
   clearQueueDrain,
   isSessionActivityActive,
@@ -33,6 +34,15 @@ describe('Agent session activity', () => {
     expect(isSessionActivityActive('chat-a')).toBe(true)
     releaseSessionActivity('chat-a', 'turn-1')
     expect(isSessionActivityActive('chat-a')).toBe(false)
+  })
+
+  it('队列任务领取后把真实 turnId 绑回活动锁', () => {
+    expect(claimSessionActivity('chat-a')).toBe(true)
+    expect(bindQueueTurnToSessionActivity('chat-a', 'turn-1')).toBe(true)
+    expect(activeQueueTurnOf('chat-a')).toBe('turn-1')
+    expect(bindQueueTurnToSessionActivity('chat-a', 'turn-1')).toBe(true)
+    expect(bindQueueTurnToSessionActivity('chat-a', 'turn-2')).toBe(false)
+    expect(activeQueueTurnOf('chat-a')).toBe('turn-1')
   })
 
   it('排队继续意图跨面板重挂保留', () => {

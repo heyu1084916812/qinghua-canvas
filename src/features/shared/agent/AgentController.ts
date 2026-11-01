@@ -261,7 +261,35 @@ export function createAgentController(input: {
         }
       }
       if (row.activeTurnId && !liveHere) {
-        await sessions.releaseActiveTurn(row.id)
+        const activeTurnId = row.activeTurnId
+        const turnJob = await jobs
+          .forTurn(row.id, activeTurnId)
+          .catch(() => null)
+        if (turnJob?.status === 'completed') {
+          /**
+           * 已完成的任务不能重新排队：旧版本在确认/暂停后可能只完成了任务，
+           * 却把 activeTurnId 和队首一起留在会话里。这里直接销掉这条记录。
+           */
+          row =
+            (await sessions.finishActiveQueuedTurn(
+              row.id,
+              activeTurnId,
+              true,
+            )) ?? row
+        } else if (
+          turnJob?.status === 'failed' ||
+          turnJob?.status === 'canceled'
+        ) {
+          // 失败记录不自动重跑；释放阻塞，把队首保留给用户手动继续或删除。
+          row =
+            (await sessions.finishActiveQueuedTurn(
+              row.id,
+              activeTurnId,
+              false,
+            )) ?? row
+        } else {
+          row = (await sessions.releaseActiveTurn(row.id)) ?? row
+        }
       }
       const recovered = (!liveHere ? await jobs.recoverSession(row.id) : []) ?? []
       const attention = recovered.find(

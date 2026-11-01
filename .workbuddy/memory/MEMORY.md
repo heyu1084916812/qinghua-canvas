@@ -1,5 +1,19 @@
 # CanvasFlow（轻画）项目记忆
 
+### Agent 排队完成态与恢复对账（2026-11-02，对账 #848）
+
+- **队列锁要带真实 turnId**：`pumpQueuedTurn()` 可以先 `claimSessionActivity(sessionId)` 占住会话，
+  但存储领取成功后必须立刻 `bindQueueTurnToSessionActivity(sessionId, next.turn.id)`。
+  只占锁不绑定，平时直接完成仍可能靠 `sendText({ queueTurnId })` 收尾；一旦中途经过确认或八步暂停，
+  后续结算走 `activeQueueTurnOf()`，拿不到 ID，就会留下 `activeTurnId + 同一条 queuedTurns`。
+- **完成态绝不能重跑**：`AgentController.refresh()` 发现无本地活动但会话仍有 `activeTurnId` 时，
+  必须先查 `jobs.forTurn()`。`completed` 用 `finishActiveQueuedTurn(..., true)` 销队首并清活动标记；
+  `failed / canceled` 用 `false` 只解除阻塞并保留消息，交给用户决定；无终态再走 `recoverSession()`。
+  “继续排队”按钮必须先调用 `refresh()` 做同一次对账，再尝试领取下一条，当前会话才能当场自愈。
+- **证据**：`sessionActivity` / `AgentController` / `sessionStore` 定向 **42/42**；
+  全量 Vitest **3765 passed / 1 skipped**；`npm run check`、`npm run build` 通过；当前实机会话重载并
+  重新打开 Agent 后，`activeTurnId` 与 `queuedTurns` 均已清空。
+
 ### 协议下载另存为与 SquareFaceIcon（2026-11-02，对账 #847）
 
 - **下载不再静默进默认目录**：`FilePort.saveFileWithResult()` 在桌面壳弹系统“另存为”，
