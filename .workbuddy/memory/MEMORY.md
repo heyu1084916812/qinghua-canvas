@@ -1,10 +1,12 @@
 # CanvasFlow（轻画）项目记忆
 
-### 站点协议下载、移除与恢复（2026-11-01，对账 #846）
+### 站点协议下拉内管理（2026-11-01，对账 #846）
 
-- **只管理站点协议**：`managedBuiltinProtocols` 只收 `kind === 'station'`，例如玉玉、灵境、
-  SoonStudio；Mock、OpenAI 兼容、ModelScope、火山 Ark 等基础 / 公开模板不混进管理区，
-  但要完整出现在“内置协议（只读）”区，且那里不能渲染下载或删除动作。
+- **只管理站点协议**：`ChoicePicker` 选项的 `actions` 只为 `kind === 'station'` 的站点项
+  提供下载 / 删除，例如玉玉、灵境、SoonStudio；Mock、OpenAI 兼容、ModelScope、火山 Ark
+  等基础 / 公开项仍出现在同一个下拉里，但没有动作按钮。
+- **不再额外铺长列表**：删除页面下方的站点、只读、自添协议管理区；恢复入口移回“导入 AI
+  协议”旁的紧凑按钮，只有存在隐藏站点时才出现。
 - **下载格式必须分流**：自定义协议导出可再次导入的 `qinghua.protocol/v1`；内置协议导出
   `qinghua.protocol-reference/v1` 只读说明文件。后者故意不可导入，避免把 SoonStudio、
   RunningHub 等代码级分支伪装成通用 recipe。
@@ -15,7 +17,8 @@
 - **证据**：协议 / 导出 / channelStore 定向 **90/90**；全量 Vitest
   **3761 passed / 1 skipped**；G88 明暗各 **15/15**；真实站点下载文件名
   `yuli.protocol-reference.json`、failure=null；1440×900 / 1024×700 明暗四组无横向溢出，
-  9 条站点管理行可操作、4 条内置只读行动作数 0；`npm run check`、`npm run build` 通过。
+  下拉内 9 条站点各有 2 个动作、基础项动作数 0，独立管理列表数为 0；
+  `npm run check`、`npm run build` 通过。
 
 ### 导入协议管理与导出（2026-11-01，对账 #845）
 

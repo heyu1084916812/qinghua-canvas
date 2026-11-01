@@ -466,11 +466,6 @@ export function SettingsPage({ embedded = false }: { embedded?: boolean } = {}) 
     () => channels.getState().detect,
     () => channels.getState().detect,
   )
-  const customProtocols = useSyncExternalStore(
-    channels.subscribe,
-    () => channels.getState().customProtocols,
-    () => channels.getState().customProtocols,
-  )
   const hiddenBuiltinProtocolIds = useSyncExternalStore(
     channels.subscribe,
     () => channels.getState().hiddenBuiltinProtocolIds,
@@ -695,14 +690,6 @@ export function SettingsPage({ embedded = false }: { embedded?: boolean } = {}) 
   /** 抓站点图标要原生 HTTP（对账 #396）：浏览器里跨域读不到，按钮据此如实禁用 */
   /** 下拉里的全部协议（含 pending：它们显示为“待支持”且不可选，见协议区渲染） */
   const protocolOptions = catalog.all
-  const managedBuiltinProtocols = protocolOptions.filter(
-    (item) =>
-      item.kind === 'station' &&
-      !hiddenBuiltinProtocolSet.has(item.id),
-  )
-  const readonlyBuiltinProtocols = protocolOptions.filter(
-    (item) => item.kind === 'offline' || item.kind === 'public',
-  )
   /** 当前所选协议的说明（CLI 网关等有前提的协议必须显示出来，否则用户会填错地址） */
   const selectedProtocolNote = protocolById(protocol, catalog)?.note ?? ''
   /**
@@ -2100,6 +2087,26 @@ export function SettingsPage({ embedded = false }: { embedded?: boolean } = {}) 
                               label: `${item.name}${item.status !== 'ready' ? '（待支持）' : ''}`,
                               group: label,
                               disabled: item.status !== 'ready',
+                              actions:
+                                item.kind === 'station' || item.kind === 'custom'
+                                  ? [
+                                      {
+                                        key: 'download',
+                                        label: `下载协议 ${item.name}`,
+                                        title: '下载协议',
+                                        icon: <IconDownload size={14} />,
+                                        onSelect: () => downloadProtocol(item),
+                                      },
+                                      {
+                                        key: 'delete',
+                                        label: `删除协议 ${item.name}`,
+                                        title: '删除协议',
+                                        icon: <IconDelete size={14} />,
+                                        danger: true,
+                                        onSelect: () => void handleRemoveProtocol(item),
+                                      },
+                                    ]
+                                  : undefined,
                             })),
                         ),
                       ]}
@@ -2141,6 +2148,16 @@ export function SettingsPage({ embedded = false }: { embedded?: boolean } = {}) 
                   >
                     {newProtoOpen ? '收起 AI 协议导入' : '导入 AI 协议'}
                   </button>
+                  {hiddenBuiltinProtocolIds.length > 0 && (
+                    <button
+                      type="button"
+                      className={styles.ghostBtn}
+                      data-proto-restore
+                      onClick={() => void handleRestoreBuiltinProtocols()}
+                    >
+                      恢复已移除（{hiddenBuiltinProtocolIds.length}）
+                    </button>
+                  )}
                   {npNotice && <span className={styles.saved}>{npNotice}</span>}
                 </div>
 
@@ -2219,129 +2236,6 @@ export function SettingsPage({ embedded = false }: { embedded?: boolean } = {}) 
                         保存并选中
                       </button>
                     </div>
-                  </div>
-                )}
-
-                {managedBuiltinProtocols.length > 0 && (
-                  <div className={styles.protoMine} data-proto-builtins>
-                    <div className={styles.protoMineHead}>
-                      <span className={styles.label}>站点协议</span>
-                      <div className={styles.protoMineHeadActions}>
-                        <span className={styles.cardSub}>玉玉这类站点可下载或移除，删除后可恢复</span>
-                        {hiddenBuiltinProtocolIds.length > 0 && (
-                          <button
-                            type="button"
-                            className={styles.protoRestoreBtn}
-                            data-proto-restore
-                            onClick={() => void handleRestoreBuiltinProtocols()}
-                          >
-                            恢复已移除（{hiddenBuiltinProtocolIds.length}）
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                    {managedBuiltinProtocols.map((p) => (
-                      <div
-                        key={p.id}
-                        className={styles.protoMineRow}
-                        data-proto-manage-row={p.id}
-                      >
-                        <span className={styles.protoMineName}>
-                          <strong>{p.name}</strong>
-                          <span>{p.status === 'ready' ? p.short : '待支持'}</span>
-                        </span>
-                        <div className={styles.protoMineActions}>
-                          <button
-                            type="button"
-                            className={styles.protoIconBtn}
-                            data-proto-download={p.id}
-                            data-proto-source="builtin"
-                            aria-label={`下载协议 ${p.name}`}
-                            title="下载只读协议说明"
-                            onClick={() => downloadProtocol(p)}
-                          >
-                            <IconDownload size={15} />
-                          </button>
-                          <button
-                            type="button"
-                            className={`${styles.protoIconBtn} ${styles.protoIconDanger}`}
-                            data-proto-remove={p.id}
-                            data-proto-source="builtin"
-                            aria-label={`删除协议 ${p.name}`}
-                            title="删除内置协议"
-                            onClick={() => void handleRemoveProtocol(p)}
-                          >
-                            <IconDelete size={15} />
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                {readonlyBuiltinProtocols.length > 0 && (
-                  <div className={styles.protoMine} data-proto-readonly>
-                    <div className={styles.protoMineHead}>
-                      <span className={styles.label}>内置协议（只读）</span>
-                      <span className={styles.cardSub}>这里只展示，不提供下载和删除</span>
-                    </div>
-                    {readonlyBuiltinProtocols.map((p) => (
-                      <div
-                        key={p.id}
-                        className={styles.protoMineRow}
-                        data-proto-readonly-row={p.id}
-                      >
-                        <span className={styles.protoMineName}>
-                          <strong>{p.name}</strong>
-                          <span>{p.status === 'ready' ? p.short : '待支持'}</span>
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                {customProtocols.length > 0 && (
-                  <div className={styles.protoMine} data-proto-mine>
-                    <div className={styles.protoMineHead}>
-                      <span className={styles.label}>我添加的协议</span>
-                      <span className={styles.cardSub}>导入协议可下载后再次导入，也可删除</span>
-                    </div>
-                    {customProtocols.map((p) => (
-                      <div
-                        key={p.id}
-                        className={styles.protoMineRow}
-                        data-proto-manage-row={p.id}
-                      >
-                        <span className={styles.protoMineName}>
-                          <strong>{p.name}</strong>
-                          <span>{p.short}</span>
-                        </span>
-                        <div className={styles.protoMineActions}>
-                          <button
-                            type="button"
-                            className={styles.protoIconBtn}
-                            data-proto-download={p.id}
-                            data-proto-source="custom"
-                            aria-label={`下载协议 ${p.name}`}
-                            title="下载协议"
-                            onClick={() => downloadProtocol(p)}
-                          >
-                            <IconDownload size={15} />
-                          </button>
-                          <button
-                            type="button"
-                            className={`${styles.protoIconBtn} ${styles.protoIconDanger}`}
-                            data-proto-remove={p.id}
-                            data-proto-source="custom"
-                            aria-label={`删除协议 ${p.name}`}
-                            title="删除协议"
-                            onClick={() => void handleRemoveProtocol(p)}
-                          >
-                            <IconDelete size={15} />
-                          </button>
-                        </div>
-                      </div>
-                    ))}
                   </div>
                 )}
 

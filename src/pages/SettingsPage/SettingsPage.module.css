@@ -1765,38 +1765,6 @@
   flex-direction: column;
   gap: var(--space-2);
 }
-.protoMineHead {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: var(--space-2);
-  flex-wrap: wrap;
-}
-.protoMineHeadActions {
-  min-width: 0;
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: var(--space-2);
-  flex-wrap: wrap;
-}
-.protoRestoreBtn {
-  border: 0;
-  border-radius: 6px;
-  padding: 4px 6px;
-  background: transparent;
-  color: var(--text-2);
-  font-size: var(--fs-chip);
-  cursor: pointer;
-}
-.protoRestoreBtn:hover {
-  background: var(--bg-hover);
-  color: var(--text-1);
-}
-.protoRestoreBtn:focus-visible {
-  outline: none;
-  box-shadow: 0 0 0 2px var(--focus-ring);
-}
 .protoMineRow {
   display: flex;
   align-items: center;
@@ -1824,36 +1792,6 @@
   flex: 0 0 auto;
   color: var(--text-3);
   font-size: var(--fs-chip);
-}
-.protoMineActions {
-  flex: 0 0 auto;
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-1);
-}
-.protoIconBtn {
-  width: 28px;
-  height: 28px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0;
-  border: 0;
-  border-radius: 6px;
-  background: transparent;
-  color: var(--text-2);
-  cursor: pointer;
-}
-.protoIconBtn:hover {
-  background: var(--bg-hover);
-  color: var(--text-1);
-}
-.protoIconBtn:focus-visible {
-  outline: none;
-  box-shadow: 0 0 0 2px var(--focus-ring);
-}
-.protoIconDanger:hover {
-  color: var(--danger);
 }
 .protoManageFeedback {
   display: flex;

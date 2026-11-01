@@ -132,6 +132,53 @@
   cursor: not-allowed;
 }
 
+.optionRow {
+  position: relative;
+}
+
+.optionWithActions {
+  padding-right: 64px;
+}
+
+.optionActions {
+  position: absolute;
+  top: 50%;
+  right: 6px;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  transform: translateY(-50%);
+}
+
+.optionAction {
+  width: 26px;
+  height: 26px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-3);
+  cursor: pointer;
+}
+
+.optionAction:hover {
+  background: var(--bg-app);
+  color: var(--text-1);
+}
+
+.optionAction:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--focus-ring);
+}
+
+.optionActionDanger:hover {
+  color: var(--danger);
+}
+
 .optionText {
   min-width: 0;
   display: flex;

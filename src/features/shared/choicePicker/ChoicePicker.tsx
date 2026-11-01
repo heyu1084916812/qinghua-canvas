@@ -7,6 +7,16 @@ export interface ChoiceOption {
   hint?: string
   disabled?: boolean
   group?: string
+  actions?: readonly ChoiceOptionAction[]
+}
+
+export interface ChoiceOptionAction {
+  key: string
+  label: string
+  title?: string
+  icon: ReactNode
+  danger?: boolean
+  onSelect: () => void
 }
 
 export interface ChoicePickerProps {
@@ -137,15 +147,18 @@ export function ChoicePicker({
           {options.map((option, index) => {
             const previousGroup = index > 0 ? options[index - 1]?.group : undefined
             const showGroup = option.group && option.group !== previousGroup
+            const hasActions = Boolean(option.actions?.length)
             return (
               <div key={`${option.group ?? ''}:${option.value}`}>
                 {showGroup ? <div className={styles.groupLabel}>{option.group}</div> : null}
-                <button
+                <div className={styles.optionRow}>
+                  <button
                   type="button"
                   role="option"
                   aria-selected={option.value === value}
                   className={[
                     styles.option,
+                    hasActions ? styles.optionWithActions : '',
                     option.value === value ? styles.optionOn : '',
                   ]
                     .filter(Boolean)
@@ -167,7 +180,33 @@ export function ChoicePicker({
                       ✓
                     </span>
                   ) : null}
-                </button>
+                  </button>
+                  {hasActions ? (
+                    <span className={styles.optionActions}>
+                      {option.actions!.map((action) => (
+                        <button
+                          key={action.key}
+                          type="button"
+                          className={[
+                            styles.optionAction,
+                            action.danger ? styles.optionActionDanger : '',
+                          ]
+                            .filter(Boolean)
+                            .join(' ')}
+                          data-choice-action={`${option.value}:${action.key}`}
+                          aria-label={action.label}
+                          title={action.title ?? action.label}
+                          onClick={(event) => {
+                            event.stopPropagation()
+                            action.onSelect()
+                          }}
+                        >
+                          {action.icon}
+                        </button>
+                      ))}
+                    </span>
+                  ) : null}
+                </div>
               </div>
             )
           })}
