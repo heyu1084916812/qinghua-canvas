@@ -20,9 +20,15 @@ import {
 import {
   CAPABILITY_LABEL,
   protocolById,
+  type CustomProtocolInput,
   type ProtocolCapability,
   type ProtocolKind,
 } from '../../domain/project/protocol'
+import {
+  DECLARATIVE_PROTOCOL_TEMPLATE,
+  parseDeclarativeProtocol,
+  type DeclarativeProtocolPackage,
+} from '../../domain/project/protocolRecipe'
 import {
   applySelection,
   CATEGORY_FILTERS,
@@ -700,10 +706,12 @@ export function SettingsPage({ embedded = false }: { embedded?: boolean } = {}) 
 
   // —— 添加自定义协议（用户 2026-09-28）：只开放 OpenAI 兼容族的对话 / 生图声明 ——
   const [newProtoOpen, setNewProtoOpen] = useState(false)
+  const [newProtoMode, setNewProtoMode] = useState<'manual' | 'import'>('manual')
   const [npName, setNpName] = useState('')
   const [npCaps, setNpCaps] = useState<ProtocolCapability[]>(['chat', 'image'])
   const [npVersionPath, setNpVersionPath] = useState('/v1')
-  const [npDocUrl, setNpDocUrl] = useState('')
+  const [npImportText, setNpImportText] = useState('')
+  const [npImported, setNpImported] = useState<DeclarativeProtocolPackage | null>(null)
   const [npError, setNpError] = useState('')
   const [npNotice, setNpNotice] = useState('')
   const [protoRemoveError, setProtoRemoveError] = useState('')
@@ -1232,26 +1240,12 @@ export function SettingsPage({ embedded = false }: { embedded?: boolean } = {}) 
     }
   }
 
-  /**
-   * 添加自定义协议：走 store 的校验 + 落库，成功后把这条自动选中。
-   *
-   * 为什么不允许用户自建「异步任务 / CLI 网关」：那两族需要后端或本机命令，
-   * 纯浏览器应用里填个地址也发不出去——放出来只会让用户配一条看着像配好了、
-   * 实际跑不通的渠道。可自建的只有 OpenAI 兼容这一族的声明。
-   */
-  const handleCreateProtocol = async () => {
-    setNpError('')
-    setNpNotice('')
+  const createProtocolWithUniqueId = async (
+    draft: Omit<CustomProtocolInput, 'id'> & { idHint?: string },
+  ) => {
     const existingIds = new Set(catalog.all.map((item) => item.id))
-    let id = customProtocolIdForName(npName, existingIds)
-    let res = await channels.createCustomProtocol({
-      id,
-      name: npName,
-      short: customProtocolShortForName(npName),
-      capabilities: npCaps,
-      versionPath: npVersionPath.trim() || protocolVersionForBaseUrl(baseUrl),
-      docUrl: npDocUrl,
-    })
+    let id = customProtocolIdForName(draft.idHint ?? draft.name, existingIds)
+    let res = await channels.createCustomProtocol({ ...draft, id })
     for (
       let attempt = 0;
       !res.ok &&
@@ -1261,20 +1255,13 @@ export function SettingsPage({ embedded = false }: { embedded?: boolean } = {}) 
       attempt += 1
     ) {
       existingIds.add(id)
-      id = customProtocolIdForName(npName, existingIds)
-      res = await channels.createCustomProtocol({
-        id,
-        name: npName,
-        short: customProtocolShortForName(npName),
-        capabilities: npCaps,
-        versionPath: npVersionPath.trim() || protocolVersionForBaseUrl(baseUrl),
-        docUrl: npDocUrl,
-      })
+      id = customProtocolIdForName(draft.idHint ?? draft.name, existingIds)
+      res = await channels.createCustomProtocol({ ...draft, id })
     }
-    if (!res.ok) {
-      setNpError(res.reason)
-      return
-    }
+    return res
+  }
+
+  const bindCreatedProtocol = async (res: Extract<Awaited<ReturnType<typeof createProtocolWithUniqueId>>, { ok: true }>) => {
     setCatalogVersion((v) => v + 1)
     setProtocol(res.value.id)
     if (selectedId) {
@@ -1284,18 +1271,110 @@ export function SettingsPage({ embedded = false }: { embedded?: boolean } = {}) 
       })
     }
     if (!baseUrl.trim() && res.value.defaultBaseUrl) setBaseUrl(res.value.defaultBaseUrl)
+  }
+
+  /**
+   * 手动创建只用于 OpenAI 兼容声明。真正不同的请求形态走“导入 AI 协议”，
+   * 由受控 recipe 执行，不再靠界面拼私有字段。
+   */
+  const handleCreateProtocol = async () => {
+    setNpError('')
+    setNpNotice('')
+    const res = await createProtocolWithUniqueId({
+      name: npName,
+      short: customProtocolShortForName(npName),
+      capabilities: npCaps,
+      versionPath: npVersionPath.trim() || protocolVersionForBaseUrl(baseUrl),
+    })
+    if (!res.ok) {
+      setNpError(res.reason)
+      return
+    }
+    await bindCreatedProtocol(res)
     setNpName('')
     setNpCaps(['chat', 'image'])
     setNpVersionPath(protocolVersionForBaseUrl(baseUrl))
-    setNpDocUrl('')
     setNewProtoOpen(false)
     setNpNotice(`已添加「${res.value.name}」`)
+  }
+
+  const checkImportedProtocol = () => {
+    setNpError('')
+    setNpNotice('')
+    const parsed = parseDeclarativeProtocol(npImportText)
+    if (!parsed.ok) {
+      setNpImported(null)
+      setNpError(parsed.reason)
+      return null
+    }
+    setNpImported(parsed.value)
+    return parsed.value
+  }
+
+  const handleImportProtocolFile = async (file: File | undefined) => {
+    if (!file) return
+    const text = await file.text()
+    setNpImportText(text)
+    setNpImported(null)
+    setNpError('')
+    const parsed = parseDeclarativeProtocol(text)
+    if (!parsed.ok) {
+      setNpError(parsed.reason)
+      return
+    }
+    setNpImported(parsed.value)
+  }
+
+  const handleSaveImportedProtocol = async () => {
+    const imported = npImported ?? checkImportedProtocol()
+    if (!imported) return
+    setNpError('')
+    setNpNotice('')
+    const res = await createProtocolWithUniqueId({
+      idHint: imported.id ?? imported.name,
+      name: imported.name,
+      short: imported.short || customProtocolShortForName(imported.name),
+      capabilities: imported.capabilities,
+      versionPath: imported.versionPath ?? protocolVersionForBaseUrl(baseUrl),
+      docUrl: imported.docUrl,
+      recipe: imported.recipe,
+    })
+    if (!res.ok) {
+      setNpError(res.reason)
+      return
+    }
+    await bindCreatedProtocol(res)
+    setNpImportText('')
+    setNpImported(null)
+    setNewProtoOpen(false)
+    setNpNotice(`已导入并选中「${res.value.name}」`)
+  }
+
+  const downloadProtocolTemplate = () => {
+    const blob = new Blob([DECLARATIVE_PROTOCOL_TEMPLATE], {
+      type: 'text/plain;charset=utf-8',
+    })
+    const url = URL.createObjectURL(blob)
+    const anchor = document.createElement('a')
+    anchor.href = url
+    anchor.download = '轻画-自定义协议模板.txt'
+    document.body.append(anchor)
+    anchor.click()
+    anchor.remove()
+    window.setTimeout(() => URL.revokeObjectURL(url), 0)
   }
 
   const toggleNewProtocol = () => {
     const next = !newProtoOpen
     setNewProtoOpen(next)
-    if (next) setNpVersionPath(protocolVersionForBaseUrl(baseUrl))
+    if (next) {
+      setNewProtoMode('manual')
+      setNpVersionPath(protocolVersionForBaseUrl(baseUrl))
+      setNpImportText('')
+      setNpImported(null)
+      setNpError('')
+      setNpNotice('')
+    }
   }
 
   /** 删除自建协议：仍被渠道引用时 store 会抛错，界面原样展示原因 */
@@ -1996,77 +2075,171 @@ export function SettingsPage({ embedded = false }: { embedded?: boolean } = {}) 
                 {newProtoOpen && (
                   <div className={styles.protoForm} data-proto-form>
                     <p className={styles.protoLead}>
-                      普通中转站不用创建，直接选「OpenAI 兼容」并填写上方的接口地址。
+                      普通中转站直接选「OpenAI 兼容」。只有接口格式不同才需要创建或导入协议。
                     </p>
-                    <details className={styles.protoDetails} data-proto-guide>
-                      <summary>怎么判断是否需要自定义协议？</summary>
-                      <p>
-                        只有站点文档明确写了不同的接口版本或请求格式时才需要。接口地址和
-                        API Key 继续填在当前渠道上方，这里不会重复保存。
-                      </p>
-                    </details>
-                    <div className={styles.protoRow}>
-                      <label className={`${styles.field} ${styles.grow}`}>
-                        <span className={styles.label}>名称</span>
-                        <input
-                          className={styles.input}
-                          data-proto-field="name"
-                          placeholder="例如：某站点"
-                          value={npName}
-                          onChange={(e) => setNpName(e.target.value)}
-                        />
-                      </label>
-                      <div className={styles.field}>
-                        <span className={styles.label}>能力</span>
-                        <div className={styles.capRow}>
-                          {(['chat', 'image'] as ProtocolCapability[]).map((c) => (
-                            <label key={c} className={styles.capBox}>
-                              <input
-                                type="checkbox"
-                                data-proto-cap={c}
-                                checked={npCaps.includes(c)}
-                                onChange={(e) => toggleNewCap(c, e.target.checked)}
-                              />
-                              <span>{CAPABILITY_LABEL[c]}</span>
-                            </label>
-                          ))}
-                        </div>
-                      </div>
+                    <div className={styles.protoModeRow} role="tablist" aria-label="协议创建方式">
+                      <button
+                        type="button"
+                        role="tab"
+                        aria-selected={newProtoMode === 'manual'}
+                        className={
+                          newProtoMode === 'manual'
+                            ? styles.protoModeOn
+                            : styles.protoMode
+                        }
+                        data-proto-mode="manual"
+                        onClick={() => {
+                          setNewProtoMode('manual')
+                          setNpError('')
+                        }}
+                      >
+                        手动创建
+                      </button>
+                      <button
+                        type="button"
+                        role="tab"
+                        aria-selected={newProtoMode === 'import'}
+                        className={
+                          newProtoMode === 'import'
+                            ? styles.protoModeOn
+                            : styles.protoMode
+                        }
+                        data-proto-mode="import"
+                        onClick={() => {
+                          setNewProtoMode('import')
+                          setNpError('')
+                        }}
+                      >
+                        导入 AI 协议
+                      </button>
                     </div>
-                    <details className={styles.protoDetails} data-proto-advanced>
-                      <summary>高级设置</summary>
-                      <div className={styles.protoRow}>
-                        <label className={styles.field}>
-                          <span className={styles.label}>接口版本</span>
-                          <input
-                            className={styles.input}
-                            data-proto-field="version"
-                            placeholder="/v1"
-                            value={npVersionPath}
-                            onChange={(e) => setNpVersionPath(e.target.value)}
-                          />
-                        </label>
-                        <label className={`${styles.field} ${styles.grow}`}>
-                          <span className={styles.label}>文档地址</span>
-                          <input
-                            className={styles.input}
-                            data-proto-field="doc"
-                            placeholder="选填"
-                            value={npDocUrl}
-                            onChange={(e) => setNpDocUrl(e.target.value)}
-                          />
-                        </label>
-                      </div>
-                    </details>
+                    {newProtoMode === 'manual' ? (
+                      <>
+                        <div className={styles.protoRow}>
+                          <label className={`${styles.field} ${styles.grow}`}>
+                            <span className={styles.label}>名称</span>
+                            <input
+                              className={styles.input}
+                              data-proto-field="name"
+                              placeholder="例如：某站点"
+                              value={npName}
+                              onChange={(e) => setNpName(e.target.value)}
+                            />
+                          </label>
+                          <div className={styles.field}>
+                            <span className={styles.label}>能力</span>
+                            <div className={styles.capRow}>
+                              {(['chat', 'image'] as ProtocolCapability[]).map((c) => (
+                                <label key={c} className={styles.capBox}>
+                                  <input
+                                    type="checkbox"
+                                    data-proto-cap={c}
+                                    checked={npCaps.includes(c)}
+                                    onChange={(e) => toggleNewCap(c, e.target.checked)}
+                                  />
+                                  <span>{CAPABILITY_LABEL[c]}</span>
+                                </label>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                        <details className={styles.protoDetails} data-proto-advanced>
+                          <summary>高级设置（一般不用改）</summary>
+                          <div className={styles.protoRow}>
+                            <label className={styles.field}>
+                              <span className={styles.label}>接口版本</span>
+                              <input
+                                className={styles.input}
+                                data-proto-field="version"
+                                placeholder="/v1"
+                                value={npVersionPath}
+                                onChange={(e) => setNpVersionPath(e.target.value)}
+                              />
+                            </label>
+                          </div>
+                        </details>
+                      </>
+                    ) : (
+                      <>
+                        <p className={styles.protoLead}>
+                          下载模板后，把模板和站点 API 文档一起交给 AI。AI 只输出协议 JSON，
+                          这里负责校验和保存。
+                        </p>
+                        <div className={styles.protoImportActions}>
+                          <button
+                            type="button"
+                            className={styles.ghostBtn}
+                            data-proto-template-download
+                            onClick={downloadProtocolTemplate}
+                          >
+                            下载协议模板
+                          </button>
+                          <label className={styles.ghostBtn} data-proto-file-label>
+                            选择 .txt / .json
+                            <input
+                              type="file"
+                              accept=".txt,.json,text/plain,application/json"
+                              hidden
+                              data-proto-file
+                              onChange={(event) => {
+                                void handleImportProtocolFile(event.target.files?.[0])
+                                event.target.value = ''
+                              }}
+                            />
+                          </label>
+                        </div>
+                        <textarea
+                          className={styles.protoImportText}
+                          data-proto-import-text
+                          placeholder="粘贴 AI 生成的协议内容"
+                          value={npImportText}
+                          onChange={(event) => {
+                            setNpImportText(event.target.value)
+                            setNpImported(null)
+                            setNpError('')
+                          }}
+                        />
+                        {npImported && (
+                          <div className={styles.protoPreview} data-proto-preview>
+                            <strong>{npImported.name}</strong>
+                            <span>
+                              {npImported.capabilities
+                                .map((capability) => CAPABILITY_LABEL[capability])
+                                .join(' / ')}
+                            </span>
+                            <span>{npImported.recipe.auth.type} 鉴权</span>
+                          </div>
+                        )}
+                      </>
+                    )}
                     {npError && (
                       <p className={styles.protoError} data-proto-error>
                         {npError}
                       </p>
                     )}
                     <div className={styles.protoFoot}>
-                      <button className={styles.primary} data-proto-create onClick={handleCreateProtocol}>
-                        保存并选中
-                      </button>
+                      {newProtoMode === 'manual' ? (
+                        <button className={styles.primary} data-proto-create onClick={handleCreateProtocol}>
+                          保存并选中
+                        </button>
+                      ) : (
+                        <>
+                          <button
+                            className={styles.ghostBtn}
+                            data-proto-check
+                            onClick={checkImportedProtocol}
+                          >
+                            检查协议
+                          </button>
+                          <button
+                            className={styles.primary}
+                            data-proto-import-save
+                            onClick={handleSaveImportedProtocol}
+                          >
+                            保存并选中
+                          </button>
+                        </>
+                      )}
                     </div>
                   </div>
                 )}

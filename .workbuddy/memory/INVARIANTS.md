@@ -76,6 +76,12 @@
 
 ## 渠道 · 模型选路
 
+- **导入协议不能变成任意代码执行**：`qinghua.protocol/v1` 只允许固定鉴权、请求方法、
+  相对路径、白名单模板变量和简化 JSONPath；禁止脚本、OAuth、WebSocket、跨域路径。
+  `declarative-http` 适配器发送前必须再次拒绝绝对 URL 与 `..` 路径。提交付费请求后的
+  网络超时 / 5xx 只能 `execution/accepted`，不得自动重发。
+- **recipe 必须随自建协议持久化**：route 组装读取 `ProtocolDefinition.recipe`；reload、
+  backup 或 catalog rebuild 丢失 recipe 会把已导入协议降成空的 OpenAI 兼容声明。
 - **SoonStudio 异步错误要读内层**：`status=completed` 的响应仍可能在
   `response.body.error` 里给协议或分组错误。只有明确出现
   `gemini_native_request_required / Use POST /v1beta/models/...` 时，Gemini 图片才允许

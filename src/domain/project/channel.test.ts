@@ -12,7 +12,7 @@ import {
   SUPPORTED_PROTOCOLS,
   tokenTailOf,
 } from './channel'
-import { BUILTIN_CATALOG } from './protocol'
+import { BUILTIN_CATALOG, buildProtocolCatalog } from './protocol'
 
 describe('createChannel', () => {
   /**
@@ -80,6 +80,35 @@ describe('protocolNeedsNoToken（谁不需要令牌）· 对账 #308', () => {
     // 别把特例放大：普通 HTTP 协议一律要令牌
     expect(protocolNeedsNoToken('openai-compatible', true)).toBe(false)
     expect(protocolNeedsNoToken('不存在的协议', true)).toBe(false)
+  })
+
+  it('导入协议声明 auth=none 时允许无令牌', () => {
+    const catalog = buildProtocolCatalog([
+      {
+        id: 'public-protocol',
+        name: '公开协议',
+        short: 'PUB',
+        family: 'declarative-http',
+        kind: 'custom',
+        status: 'ready',
+        capabilities: ['chat'],
+        recipe: {
+          version: 1,
+          auth: { type: 'none' },
+          models: {
+            request: { method: 'GET', path: '/models' },
+            items: '$.data[*]',
+            id: '$.id',
+            category: 'chat',
+          },
+          chat: {
+            request: { method: 'POST', path: '/chat' },
+            response: { text: '$.text' },
+          },
+        },
+      },
+    ])
+    expect(protocolNeedsNoToken('public-protocol', false, catalog)).toBe(true)
   })
 })
 

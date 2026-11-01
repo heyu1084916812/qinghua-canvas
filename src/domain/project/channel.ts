@@ -201,7 +201,12 @@ export function protocolNeedsNoToken(
   catalog: ProtocolCatalog = BUILTIN_CATALOG,
 ): boolean {
   if (OFFLINE_PROTOCOLS.includes(protocol)) return true
-  return hasLocalCli && protocolById(protocol, catalog)?.family === 'cli-gateway'
+  const definition = protocolById(protocol, catalog)
+  if (hasLocalCli && definition?.family === 'cli-gateway') return true
+  return (
+    definition?.family === 'declarative-http' &&
+    definition.recipe?.auth.type === 'none'
+  )
 }
 
 /**

@@ -272,4 +272,38 @@ describe('validateCustomProtocol', () => {
       expect('versionPath' in res.value).toBe(false)
     }
   })
+
+  it('导入 recipe 时进入可执行 declarative-http 族并按 recipe 推导能力', () => {
+    const res = validateCustomProtocol({
+      ...base,
+      id: 'imported-relay',
+      capabilities: [],
+      recipe: {
+        version: 1,
+        auth: { type: 'bearer' },
+        models: {
+          request: { method: 'GET', path: '/models' },
+          items: '$.data[*]',
+          id: '$.id',
+          category: 'chat',
+        },
+        image: {
+          request: { method: 'POST', path: '/images' },
+          result: ['$.data[*].url'],
+        },
+        video: {
+          request: { method: 'POST', path: '/videos' },
+          result: ['$.data[*].url'],
+        },
+      },
+    })
+    expect(res.ok).toBe(true)
+    if (res.ok) {
+      expect(res.value).toMatchObject({
+        family: 'declarative-http',
+        capabilities: ['image', 'video'],
+      })
+      expect(res.value.recipe?.auth.type).toBe('bearer')
+    }
+  })
 })

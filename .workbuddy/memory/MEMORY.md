@@ -1,5 +1,23 @@
 # CanvasFlow（轻画）项目记忆
 
+### AI 自定义协议导入与通用 HTTP 执行（2026-11-01，对账 #842）
+
+- **导入的是受控声明，不是代码**：`qinghua.protocol/v1` 只接受固定鉴权、请求、轮询和
+  简化 JSONPath。禁止任意脚本、OAuth、WebSocket、跨域 URL、`..` 路径和未知模板变量。
+- **协议执行走新 `declarative-http` 族**：`ProtocolDefinition.recipe` 随
+  `customProtocols` 持久化；`createChannelAdapter()` 按 recipe 创建通用适配器。
+  没有 recipe 的旧自建协议继续走 OpenAI 兼容，不能升级时改坏老渠道。
+- **AI 协作流程**：设置页下载 `.txt` 模板，用户把模板和站点文档交给 AI；AI 只输出一份
+  JSON。软件可粘贴或读取 `.txt/.json`，先校验并摘要，再保存和绑定当前渠道。协议页不填
+  API 地址、Key，也不做无意义试连接；这些仍在渠道层。
+- **通用执行器边界**：覆盖模型目录、非流式对话 / 工具调用、同步图片 / 视频、异步提交轮询、
+  JSON / multipart、多参考图、URL / Data URI / Base64。对话流式、OAuth、签名算法仍需专用
+  代码适配器。
+- **付费安全**：提交网络超时或 5xx 只报 `execution/accepted`，不自动重发 POST；外部 CDN
+  下载不带渠道 Key，同源媒体才附认证。
+- **证据**：定向 **133/133**；全量 Vitest **3756 passed / 1 skipped**；G88 明暗各 **15/15**；
+  模板真实下载成功；1440×900 / 1024×700 明暗四组横向溢出 0。
+
 ### 自定义协议表单收口（2026-11-01，对账 #841）
 
 - **地址只属于渠道**：自定义协议不再保存 `defaultBaseUrl`，接口地址和 API Key 继续填当前渠道；

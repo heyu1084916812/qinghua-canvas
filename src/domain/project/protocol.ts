@@ -28,6 +28,7 @@
  */
 
 import { capabilitiesOfTool, defaultToolForProtocol } from '../shared/cliTools'
+import type { DeclarativeProtocolRecipe } from './protocolRecipe'
 
 /** 协议能力：与 `ModelCapability.category` 同字面，新增能力必须两处同步 */
 export type ProtocolCapability = 'chat' | 'image' | 'video' | 'audio'
@@ -63,10 +64,16 @@ function cliCapabilities(protocolId: string): ProtocolCapability[] {
  *   `/images/generations`），绝大多数中转站与官方平台都是这一族，只是版本段不同。
  * - `async-task`：提交任务 + 轮询取结果（APIMART / RunningHub 这一类的形态）。
  * - `cli-gateway`：本机 CLI 或专用网关包装。
+ * - `declarative-http`：用户导入的受控 HTTP 声明，按 JSON 请求 / 轮询 / 取值规则执行。
  *
  * 后两族目前**只有 pending 条目**：适配器未实现，注册表里故意不注册。
  */
-export type ProtocolFamily = 'mock' | 'openai-compatible' | 'async-task' | 'cli-gateway'
+export type ProtocolFamily =
+  | 'mock'
+  | 'openai-compatible'
+  | 'async-task'
+  | 'cli-gateway'
+  | 'declarative-http'
 
 /**
  * 协议来源分类，只影响界面分组，不影响行为：
@@ -128,6 +135,8 @@ export interface ProtocolDefinition {
   docUrl?: string
   /** 待实现 / 局限说明，原样展示给用户（不写就表示这条协议没有已知限制） */
   note?: string
+  /** 用户导入的受控 HTTP 协议；只允许声明请求 / 轮询 / 取值，不允许脚本。 */
+  recipe?: DeclarativeProtocolRecipe
   /**
    * 这条协议要**几把钥匙**（用户第 22 批：RunningHub 的币 Key 与金额 Key）。
   /**
@@ -656,11 +665,16 @@ export interface CustomProtocolInput {
   baseUrl?: string
   versionPath?: string
   docUrl?: string
+  recipe?: DeclarativeProtocolRecipe
 }
 
 export type CustomProtocolValidation =
   | { ok: true; value: ProtocolDefinition }
-  | { ok: false; field: 'id' | 'name' | 'short' | 'capabilities' | 'versionPath' | 'baseUrl'; reason: string }
+  | {
+      ok: false
+      field: 'id' | 'name' | 'short' | 'capabilities' | 'versionPath' | 'baseUrl' | 'recipe'
+      reason: string
+    }
 
 /** 自建协议 id 的合法形态：小写字母数字开头，可含 `-` / `_`，2–31 位 */
 const CUSTOM_ID_RE = /^[a-z0-9][a-z0-9_-]{1,31}$/
@@ -690,13 +704,28 @@ export function validateCustomProtocol(
   const short = input.short.trim()
   if (!short) return { ok: false, field: 'short', reason: '短标签不能为空' }
   if (short.length > 8) return { ok: false, field: 'short', reason: '短标签最多 8 个字符' }
-  // 只开放 OpenAI 兼容族真正有适配器的对话 / 生图 / 配音。
-  // 视频仍由内置协议定义（不同站点的异步任务形态不同），3D 尚无领域能力。
-  const capabilities = CAPABILITY_ORDER.filter(
-    (c) => c !== 'video' && input.capabilities.includes(c),
-  )
+  const declarativeCapabilities: ProtocolCapability[] = input.recipe
+    ? CAPABILITY_ORDER.filter(
+        (capability) =>
+          (capability === 'chat' && Boolean(input.recipe?.chat)) ||
+          (capability === 'image' && Boolean(input.recipe?.image)) ||
+          (capability === 'video' && Boolean(input.recipe?.video)),
+      )
+    : []
+  const capabilities = input.recipe
+    ? declarativeCapabilities
+    : CAPABILITY_ORDER.filter(
+        (capability) =>
+          capability !== 'video' && input.capabilities.includes(capability),
+      )
   if (capabilities.length === 0) {
-    return { ok: false, field: 'capabilities', reason: '至少选择一种能力（对话 / 生图 / 配音）' }
+    return {
+      ok: false,
+      field: 'capabilities',
+      reason: input.recipe
+        ? '导入协议至少需要 chat / image / video 中的一种能力'
+        : '至少选择一种能力（对话 / 生图 / 配音）',
+    }
   }
   const versionPath = input.versionPath?.trim()
   if (versionPath && !VERSION_PATH_RE.test(versionPath)) {
@@ -712,13 +741,19 @@ export function validateCustomProtocol(
       id,
       name,
       short,
-      family: 'openai-compatible',
+      family: input.recipe ? 'declarative-http' : 'openai-compatible',
       kind: 'custom',
       status: 'ready',
       capabilities,
       ...(baseUrl ? { defaultBaseUrl: baseUrl } : {}),
       ...(versionPath ? { versionPath } : {}),
       ...(input.docUrl?.trim() ? { docUrl: input.docUrl.trim() } : {}),
+      ...(input.recipe
+        ? {
+            recipe: input.recipe,
+            note: '导入的声明式 HTTP 协议：不支持任意脚本、OAuth、WebSocket 或签名算法。',
+          }
+        : {}),
     },
   }
 }

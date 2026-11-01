@@ -416,17 +416,22 @@ export function createChannelStore(
     const capabilities = Array.isArray(row.capabilities)
       ? (row.capabilities.filter((c) => c === 'chat' || c === 'image' || c === 'video') as ProtocolDefinition['capabilities'])
       : []
+    const recipe =
+      row.recipe && typeof row.recipe === 'object'
+        ? (row.recipe as ProtocolDefinition['recipe'])
+        : undefined
     return {
       id: row.id,
       name: typeof row.name === 'string' ? row.name : row.id,
       short: typeof row.short === 'string' ? row.short : row.id,
-      family: 'openai-compatible',
+      family: recipe ? 'declarative-http' : 'openai-compatible',
       kind: 'custom',
       status: 'ready',
       capabilities,
       ...(typeof row.defaultBaseUrl === 'string' ? { defaultBaseUrl: row.defaultBaseUrl } : {}),
       ...(typeof row.versionPath === 'string' ? { versionPath: row.versionPath } : {}),
       ...(typeof row.docUrl === 'string' ? { docUrl: row.docUrl } : {}),
+      ...(recipe ? { recipe } : {}),
     }
   }
 

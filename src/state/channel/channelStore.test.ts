@@ -1156,6 +1156,45 @@ describe('channelStore · 自建协议', () => {
     expect(store.getState().channels.find((c) => c.id === ch.id)!.protocol).toBe('my-relay')
   })
 
+  it('导入 recipe 后 reload 仍保留 declarative-http 执行力', async () => {
+    const p = createMemoryPlatform()
+    const store = createChannelStore(p)
+    await store.load()
+    const result = await store.createCustomProtocol({
+      id: 'imported-relay',
+      name: '导入中转',
+      short: 'IMP',
+      capabilities: [],
+      recipe: {
+        version: 1,
+        auth: { type: 'bearer' },
+        models: {
+          request: { method: 'GET', path: '/catalog' },
+          items: '$.models[*]',
+          id: '$.name',
+          category: 'chat',
+        },
+        chat: {
+          request: {
+            method: 'POST',
+            path: '/talk',
+            body: { model: '{{model}}', messages: { $var: 'messages' } },
+          },
+          response: { text: '$.answer' },
+        },
+      },
+    })
+    expect(result.ok).toBe(true)
+    await store.load()
+    expect(
+      store.protocolCatalog().all.find((protocol) => protocol.id === 'imported-relay'),
+    ).toMatchObject({
+      family: 'declarative-http',
+      capabilities: ['chat'],
+      recipe: { auth: { type: 'bearer' } },
+    })
+  })
+
   it('拒绝与内置协议撞名（撞名会把老渠道悄悄改指到另一份定义）', async () => {
     const p = createMemoryPlatform()
     const store = createChannelStore(p)

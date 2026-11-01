@@ -77,6 +77,50 @@ describe('channel registry', () => {
     expect(a.protocol).toBe('apimart')
   })
 
+  it('declarative-http 族分派到导入协议适配器', () => {
+    const a = createChannelAdapter(
+      {
+        ...base,
+        protocol: 'imported-relay',
+        baseUrl: 'https://relay.test',
+        apiKey: 'k',
+        protocolDefinition: {
+          id: 'imported-relay',
+          name: '导入中转',
+          short: 'IMP',
+          family: 'declarative-http',
+          kind: 'custom',
+          status: 'ready',
+          capabilities: ['chat'],
+          versionPath: '/v1',
+          recipe: {
+            version: 1,
+            auth: { type: 'bearer' },
+            models: {
+              request: { method: 'GET', path: '/models' },
+              items: '$.data[*]',
+              id: '$.id',
+              category: 'chat',
+            },
+            chat: {
+              request: {
+                method: 'POST',
+                path: '/chat/completions',
+                body: {
+                  model: '{{model}}',
+                  messages: { $var: 'messages' },
+                },
+              },
+              response: { text: '$.choices[0].message.content' },
+            },
+          },
+        },
+      },
+      createMemoryPlatform(),
+    )
+    expect(a.protocol).toBe('imported-relay')
+  })
+
   it('async-task 族里 RunningHub 走自己的适配器（端点清单带 endpoint: 前缀）', async () => {
     const platform = createMemoryPlatform({
       handler: async () => resp(200, { code: 0, data: { records: [] } }),

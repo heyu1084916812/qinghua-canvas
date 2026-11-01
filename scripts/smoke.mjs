@@ -17124,7 +17124,8 @@ async function g87(browser) {
  *  ① 站点协议「选中即填地址」：选中玉玉 → 地址自动补成 https://yuli.host；
  *     用户手填过的地址则不被后续切协议覆盖。
  *  ② 自建协议：只填名称与能力 → 技术字段自动生成 → 添加 → 下拉自动选中。
- *  ③ 被渠道引用的自建协议不能删；把渠道改回 mock 后可以删掉。
+ *  ③ AI 协议导入：模板入口 → 粘贴 JSON → 校验预览 → 保存并绑定渠道。
+ *  ④ 被渠道引用的自建协议不能删；把渠道改回 mock 后可以删掉。
  */
 async function g88(browser) {
   const g = 'G88 一站一协议与自建协议'
@@ -17208,8 +17209,93 @@ async function g88(browser) {
     (await page.locator(`[data-proto-remove="${afterAdd}"]`).count()) === 0,
   )
 
+  // ④ 导入 AI 协议：只校验声明，不在这里重复填地址 / Key / 试连接
+  await page.locator('[data-proto-add-toggle]').click()
+  await page.locator('[data-proto-mode="import"]').click()
+  rec(
+    g,
+    '★ 导入模式提供协议模板下载',
+    (await page.locator('[data-proto-template-download]').count()) === 1,
+  )
+  const importedProtocol = JSON.stringify({
+    schema: 'qinghua.protocol/v1',
+    name: '导入中转',
+    short: 'IMP',
+    versionPath: '/v1',
+    auth: { type: 'bearer' },
+    models: {
+      request: { method: 'GET', path: '/models' },
+      items: '$.data[*]',
+      id: '$.id',
+      category: 'chat',
+    },
+    chat: {
+      request: {
+        method: 'POST',
+        path: '/chat/completions',
+        body: {
+          model: '{{model}}',
+          messages: { $var: 'messages' },
+        },
+      },
+      response: { text: '$.choices[0].message.content' },
+    },
+    image: {
+      request: {
+        method: 'POST',
+        path: '/images/generations',
+        body: {
+          model: '{{model}}',
+          prompt: '{{prompt}}',
+        },
+      },
+      result: ['$.data[*].url'],
+    },
+  })
+  await page.locator('[data-proto-import-text]').fill(importedProtocol)
+  await page.locator('[data-proto-check]').click()
+  await page.locator('[data-proto-preview]').waitFor({ state: 'visible', timeout: 3000 })
+  const previewText = await page.locator('[data-proto-preview]').innerText()
+  rec(g, '★ 导入协议可校验并摘要', previewText.includes('导入中转') && previewText.includes('对话 / 生图'), previewText)
+  await page.locator('[data-proto-import-save]').click()
+  await sleep(500)
+  const importedValue = (await selectedProtocol()) ?? ''
+  rec(g, '★ 导入协议保存后绑定当前渠道', /^custom-[a-z0-9]+(?:-\d+)?$/.test(importedValue), importedValue)
+  rec(
+    g,
+    '★ 导入协议进入「我添加的协议」',
+    (await page.locator(`[data-proto-remove="${importedValue}"]`).count()) === 1,
+  )
+  await chooseProtocol('mock')
+  await sleep(400)
+  await page.locator(`[data-proto-remove="${importedValue}"]`).click()
+  await sleep(400)
+  rec(
+    g,
+    '★ 导入协议移出渠道后可删除',
+    (await page.locator(`[data-proto-remove="${importedValue}"]`).count()) === 0,
+  )
+
   await page.screenshot({ path: `${OUT}/103-g88-custom-protocol.png` })
   rec(g, '无未捕获异常', pageErrors.length === 0, pageErrors.join(' | '))
+  const testChannelId = await page
+    .locator('[data-channel-selected]')
+    .getAttribute('data-channel-id')
+  let testChannelDeleted = false
+  if (testChannelId) {
+    const cleanup = await fetch(`${STORE_BASE}/delete`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ table: 'channels', id: testChannelId }),
+    }).catch(() => null)
+    testChannelDeleted = cleanup?.ok === true
+  }
+  rec(
+    g,
+    '测试渠道已清理',
+    !testChannelId || testChannelDeleted,
+    testChannelId ?? '',
+  )
   await ctx.close()
 }
 
