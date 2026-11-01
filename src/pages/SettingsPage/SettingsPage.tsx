@@ -64,6 +64,11 @@ import {
   IconChannels,
 } from '../../app/SettingsIcons'
 import { hasChannelBrandIcon } from '../../features/shared/channelIcon/ChannelIcon'
+import {
+  customProtocolIdForName,
+  customProtocolShortForName,
+  protocolVersionForBaseUrl,
+} from './customProtocolDraft'
 
 /**
  * 模型映射区的**五个筛选**（用户 2026-10-08 第 1 条：「图一这个模型映射的地方换成五个筛选吧，
@@ -696,10 +701,7 @@ export function SettingsPage({ embedded = false }: { embedded?: boolean } = {}) 
   // —— 添加自定义协议（用户 2026-09-28）：只开放 OpenAI 兼容族的对话 / 生图声明 ——
   const [newProtoOpen, setNewProtoOpen] = useState(false)
   const [npName, setNpName] = useState('')
-  const [npShort, setNpShort] = useState('')
-  const [npId, setNpId] = useState('')
   const [npCaps, setNpCaps] = useState<ProtocolCapability[]>(['chat', 'image'])
-  const [npBaseUrl, setNpBaseUrl] = useState('')
   const [npVersionPath, setNpVersionPath] = useState('/v1')
   const [npDocUrl, setNpDocUrl] = useState('')
   const [npError, setNpError] = useState('')
@@ -1240,31 +1242,60 @@ export function SettingsPage({ embedded = false }: { embedded?: boolean } = {}) 
   const handleCreateProtocol = async () => {
     setNpError('')
     setNpNotice('')
-    const res = await channels.createCustomProtocol({
-      id: npId,
+    const existingIds = new Set(catalog.all.map((item) => item.id))
+    let id = customProtocolIdForName(npName, existingIds)
+    let res = await channels.createCustomProtocol({
+      id,
       name: npName,
-      short: npShort,
+      short: customProtocolShortForName(npName),
       capabilities: npCaps,
-      baseUrl: npBaseUrl,
-      versionPath: npVersionPath,
+      versionPath: npVersionPath.trim() || protocolVersionForBaseUrl(baseUrl),
       docUrl: npDocUrl,
     })
+    for (
+      let attempt = 0;
+      !res.ok &&
+      res.field === 'id' &&
+      res.reason.includes('已被占用') &&
+      attempt < 20;
+      attempt += 1
+    ) {
+      existingIds.add(id)
+      id = customProtocolIdForName(npName, existingIds)
+      res = await channels.createCustomProtocol({
+        id,
+        name: npName,
+        short: customProtocolShortForName(npName),
+        capabilities: npCaps,
+        versionPath: npVersionPath.trim() || protocolVersionForBaseUrl(baseUrl),
+        docUrl: npDocUrl,
+      })
+    }
     if (!res.ok) {
       setNpError(res.reason)
       return
     }
     setCatalogVersion((v) => v + 1)
     setProtocol(res.value.id)
+    if (selectedId) {
+      await channels.update(selectedId, {
+        protocol: res.value.id,
+        baseUrl: baseUrl.trim(),
+      })
+    }
     if (!baseUrl.trim() && res.value.defaultBaseUrl) setBaseUrl(res.value.defaultBaseUrl)
     setNpName('')
-    setNpShort('')
-    setNpId('')
     setNpCaps(['chat', 'image'])
-    setNpBaseUrl('')
-    setNpVersionPath('/v1')
+    setNpVersionPath(protocolVersionForBaseUrl(baseUrl))
     setNpDocUrl('')
     setNewProtoOpen(false)
     setNpNotice(`已添加「${res.value.name}」`)
+  }
+
+  const toggleNewProtocol = () => {
+    const next = !newProtoOpen
+    setNewProtoOpen(next)
+    if (next) setNpVersionPath(protocolVersionForBaseUrl(baseUrl))
   }
 
   /** 删除自建协议：仍被渠道引用时 store 会抛错，界面原样展示原因 */
@@ -1955,44 +1986,25 @@ export function SettingsPage({ embedded = false }: { embedded?: boolean } = {}) 
                   <button
                     className={styles.ghostBtn}
                     data-proto-add-toggle
-                    onClick={() => setNewProtoOpen((v) => !v)}
+                    onClick={toggleNewProtocol}
                   >
-                    {newProtoOpen ? '收起' : '添加自定义协议'}
+                    {newProtoOpen ? '收起自定义协议' : '创建自定义协议'}
                   </button>
                   {npNotice && <span className={styles.saved}>{npNotice}</span>}
                 </div>
 
                 {newProtoOpen && (
                   <div className={styles.protoForm} data-proto-form>
-                    <p className={styles.protoHint}>
-                      只支持 OpenAI 兼容形态（对话 / 生图）。输入异步任务、CLI 一类需要专用程序抓取的协议，
-                      请先用内置协议；自建渠道的地址、版本段、能力都可按站点文档填。
+                    <p className={styles.protoLead}>
+                      普通中转站不用创建，直接选「OpenAI 兼容」并填写上方的接口地址。
                     </p>
-                    {/*
-                      用户问「里面的东西从什么地方获取」（2026-09-29）。
-                      表单原本只给占位提示，没说这些值从哪来 —— 于是「自定义协议」对
-                      非技术用户等于不可用的入口。这里把四个字段的来源一次说清，
-                      并给一条最短路径：先试「OpenAI 兼容」，只有确定站点的版本段与
-                      能力不符合时才需要自建。
-                    */}
-                    <p className={styles.protoHint} data-proto-guide>
-                      <strong>从哪找这些值：</strong>
-                      <br />
-                      ① <b>地址</b>：站点文档里的「API 基址 / Base URL」，<b>不要带</b>结尾的 <code>/v1</code>
-                      （版本段单独填下一格）。例：<code>https://api.xxx.com</code>。
-                      <br />
-                      ② <b>版本段</b>：文档里基址结尾那一段，多数是 <code>/v1</code>；火山方舟是{' '}
-                      <code>/api/v3</code>。填错的表现是验证报 404。
-                      <br />
-                      ③ <b>能力</b>：看站点提供哪些接口 —— 有 <code>/chat/completions</code> 勾「对话」，
-                      有 <code>/images/generations</code> 勾「生图」。
-                      <br />
-                      ④ <b>标识 / 名称 / 短标签</b>：自己起，只用于界面显示，不影响请求；标识只能用小写字母、数字、
-                      <code>-</code>、<code>_</code>。
-                      <br />
-                      <strong>最短路径</strong>：大多数中转站不用自建 —— 直接选「OpenAI 兼容」填地址即可；
-                      只有当这个站的版本段或接口形态与通用模板不一致时才需要建一条。
-                    </p>
+                    <details className={styles.protoDetails} data-proto-guide>
+                      <summary>怎么判断是否需要自定义协议？</summary>
+                      <p>
+                        只有站点文档明确写了不同的接口版本或请求格式时才需要。接口地址和
+                        API Key 继续填在当前渠道上方，这里不会重复保存。
+                      </p>
+                    </details>
                     <div className={styles.protoRow}>
                       <label className={`${styles.field} ${styles.grow}`}>
                         <span className={styles.label}>名称</span>
@@ -2002,28 +2014,6 @@ export function SettingsPage({ embedded = false }: { embedded?: boolean } = {}) 
                           placeholder="例如：某站点"
                           value={npName}
                           onChange={(e) => setNpName(e.target.value)}
-                        />
-                      </label>
-                      <label className={styles.field}>
-                        <span className={styles.label}>短标签</span>
-                        <input
-                          className={styles.input}
-                          data-proto-field="short"
-                          placeholder="最多 8 字"
-                          value={npShort}
-                          onChange={(e) => setNpShort(e.target.value)}
-                        />
-                      </label>
-                    </div>
-                    <div className={styles.protoRow}>
-                      <label className={`${styles.field} ${styles.grow}`}>
-                        <span className={styles.label}>协议标识</span>
-                        <input
-                          className={styles.input}
-                          data-proto-field="id"
-                          placeholder="小写字母 / 数字 / - / _"
-                          value={npId}
-                          onChange={(e) => setNpId(e.target.value)}
                         />
                       </label>
                       <div className={styles.field}>
@@ -2043,38 +2033,31 @@ export function SettingsPage({ embedded = false }: { embedded?: boolean } = {}) 
                         </div>
                       </div>
                     </div>
-                    <div className={styles.protoRow}>
-                      <label className={`${styles.field} ${styles.grow}`}>
-                        <span className={styles.label}>默认地址</span>
-                        <input
-                          className={styles.input}
-                          data-proto-field="baseurl"
-                          placeholder="https://your-site.com（可留空，渠道里再填）"
-                          value={npBaseUrl}
-                          onChange={(e) => setNpBaseUrl(e.target.value)}
-                        />
-                      </label>
-                      <label className={styles.field}>
-                        <span className={styles.label}>版本段</span>
-                        <input
-                          className={styles.input}
-                          data-proto-field="version"
-                          placeholder="/v1"
-                          value={npVersionPath}
-                          onChange={(e) => setNpVersionPath(e.target.value)}
-                        />
-                      </label>
-                    </div>
-                    <label className={styles.field}>
-                      <span className={styles.label}>文档地址（可选）</span>
-                      <input
-                        className={styles.input}
-                        data-proto-field="doc"
-                        placeholder="https://站点文档"
-                        value={npDocUrl}
-                        onChange={(e) => setNpDocUrl(e.target.value)}
-                      />
-                    </label>
+                    <details className={styles.protoDetails} data-proto-advanced>
+                      <summary>高级设置</summary>
+                      <div className={styles.protoRow}>
+                        <label className={styles.field}>
+                          <span className={styles.label}>接口版本</span>
+                          <input
+                            className={styles.input}
+                            data-proto-field="version"
+                            placeholder="/v1"
+                            value={npVersionPath}
+                            onChange={(e) => setNpVersionPath(e.target.value)}
+                          />
+                        </label>
+                        <label className={`${styles.field} ${styles.grow}`}>
+                          <span className={styles.label}>文档地址</span>
+                          <input
+                            className={styles.input}
+                            data-proto-field="doc"
+                            placeholder="选填"
+                            value={npDocUrl}
+                            onChange={(e) => setNpDocUrl(e.target.value)}
+                          />
+                        </label>
+                      </div>
+                    </details>
                     {npError && (
                       <p className={styles.protoError} data-proto-error>
                         {npError}
@@ -2082,7 +2065,7 @@ export function SettingsPage({ embedded = false }: { embedded?: boolean } = {}) 
                     )}
                     <div className={styles.protoFoot}>
                       <button className={styles.primary} data-proto-create onClick={handleCreateProtocol}>
-                        添加
+                        保存并选中
                       </button>
                     </div>
                   </div>

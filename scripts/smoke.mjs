@@ -17123,7 +17123,7 @@ async function g87(browser) {
  *
  *  ① 站点协议「选中即填地址」：选中玉玉 → 地址自动补成 https://yuli.host；
  *     用户手填过的地址则不被后续切协议覆盖。
- *  ② 自建协议：填名称 / 短标签 / 标识 / 能力 / 地址 / 版本段 → 添加 → 下拉自动选中。
+ *  ② 自建协议：只填名称与能力 → 技术字段自动生成 → 添加 → 下拉自动选中。
  *  ③ 被渠道引用的自建协议不能删；把渠道改回 mock 后可以删掉。
  */
 async function g88(browser) {
@@ -17139,16 +17139,27 @@ async function g88(browser) {
   await sleep(400)
   await page.getByText('新建服务').first().click()
   await sleep(300)
+  const chooseProtocol = async (value) => {
+    const picker = page.locator('[data-choice-picker="settings-protocol"]')
+    await picker.locator('button').click()
+    await picker.locator(`[data-choice-option="${value}"]`).click()
+  }
+  const selectedProtocol = () =>
+    page
+      .locator('[data-choice-picker="settings-protocol"]')
+      .getAttribute('data-choice-value')
 
   // ① 站点协议 → 默认地址
   await page.locator('[data-settings-baseurl]').fill('')
-  await page.locator('[data-settings-protocol]').selectOption('yuli')
-  await sleep(200)
+  await page.locator('[data-settings-baseurl]').blur()
+  await sleep(150)
+  await chooseProtocol('yuli')
+  await sleep(500)
   const yuliUrl = await page.locator('[data-settings-baseurl]').inputValue()
   rec(g, '★ 选中站点协议自动填默认地址', yuliUrl === 'https://yuli.host', yuliUrl)
 
   await page.locator('[data-settings-baseurl]').fill('http://my-own.test')
-  await page.locator('[data-settings-protocol]').selectOption('apistudio')
+  await chooseProtocol('apistudio')
   await sleep(200)
   const keptUrl = await page.locator('[data-settings-baseurl]').inputValue()
   rec(g, '★ 切协议不覆盖用户手填地址', keptUrl === 'http://my-own.test', keptUrl)
@@ -17157,28 +17168,28 @@ async function g88(browser) {
   await page.locator('[data-proto-add-toggle]').click()
   await page.locator('[data-proto-form]').waitFor({ state: 'visible', timeout: 4000 })
   await page.locator('[data-proto-field="name"]').fill('私有站')
-  await page.locator('[data-proto-field="short"]').fill('MY')
-  await page.locator('[data-proto-field="id"]').fill('my-private')
-  await page.locator('[data-proto-field="baseurl"]').fill('http://my-private.test')
-  await page.locator('[data-proto-field="version"]').fill('/v1')
   await page.locator('[data-proto-create]').click()
   await sleep(300)
-  const afterAdd = await page.locator('[data-settings-protocol]').inputValue()
-  rec(g, '★ 添加自建协议后下拉自动选中', afterAdd === 'my-private', afterAdd)
+  const createError = await page
+    .locator('[data-proto-error]')
+    .innerText()
+    .catch(() => '')
+  rec(g, '自定义协议创建无错误', !createError, createError)
+  const afterAdd = (await selectedProtocol()) ?? ''
+  rec(g, '★ 添加自建协议后下拉自动选中', /^custom-[a-z0-9]+(?:-\d+)?$/.test(afterAdd), afterAdd)
   rec(
     g,
     '★ 自建协议出现在「我添加的协议」',
-    (await page.locator('[data-proto-remove="my-private"]').count()) === 1,
+    (await page.locator(`[data-proto-remove="${afterAdd}"]`).count()) === 1,
   )
 
   // ③ 保存渠道 → 左栏短标签显示自建协议 → 引用中的协议删不掉
-  await page.locator('[data-settings-save]').click()
-  await sleep(400)
+  await sleep(500)
   /* 同 G8：必须问「正在编辑的那一行」，`.first()` 是内置的 ModelScope（MS） */
   const shortTag = ((await page.locator('[data-channel-selected]').first().getAttribute('data-channel-proto')) ?? '').trim()
-  rec(g, '★ 渠道短标签显示自建协议', shortTag === 'MY', shortTag)
+  rec(g, '★ 渠道短标签显示自建协议', shortTag === '私有站', shortTag)
 
-  await page.locator('[data-proto-remove="my-private"]').click()
+  await page.locator(`[data-proto-remove="${afterAdd}"]`).click()
   await sleep(300)
   const blocked = await page
     .locator('[data-proto-remove-error]')
@@ -17187,15 +17198,14 @@ async function g88(browser) {
   rec(g, '★ 被渠道引用的自建协议拒绝删除并给出原因', blocked.includes('仍在用') || blocked.includes('使用该协议'), blocked)
 
   // ④ 改回 mock 后可删
-  await page.locator('[data-settings-protocol]').selectOption('mock')
-  await page.locator('[data-settings-save]').click()
-  await sleep(400)
-  await page.locator('[data-proto-remove="my-private"]').click()
+  await chooseProtocol('mock')
+  await sleep(500)
+  await page.locator(`[data-proto-remove="${afterAdd}"]`).click()
   await sleep(400)
   rec(
     g,
     '★ 无渠道引用后自建协议可删除',
-    (await page.locator('[data-proto-remove="my-private"]').count()) === 0,
+    (await page.locator(`[data-proto-remove="${afterAdd}"]`).count()) === 0,
   )
 
   await page.screenshot({ path: `${OUT}/103-g88-custom-protocol.png` })

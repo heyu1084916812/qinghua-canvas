@@ -1685,15 +1685,37 @@
   background: var(--bg-surface);
   padding: var(--space-3);
 }
-.protoHint {
+.protoLead {
   margin: 0;
   font-size: var(--fs-label);
-  line-height: 1.7;
+  line-height: 1.6;
+  color: var(--text-2);
+}
+.protoDetails {
+  font-size: var(--fs-label);
   color: var(--text-3);
+}
+.protoDetails > summary {
+  width: fit-content;
+  color: var(--text-2);
+  cursor: pointer;
+  user-select: none;
+}
+.protoDetails > summary:hover {
+  color: var(--text-1);
+}
+.protoDetails[open] > summary {
+  margin-bottom: var(--space-2);
+}
+.protoDetails p {
+  max-width: 70ch;
+  margin: 0;
+  line-height: 1.65;
 }
 .protoRow {
   display: flex;
   align-items: flex-end;
+  flex-wrap: wrap;
   gap: var(--space-2);
 }
 .protoFoot {
