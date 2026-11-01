@@ -1,5 +1,20 @@
 # CanvasFlow（轻画）项目记忆
 
+### SoonStudio Gemini 异步内层协议错误（2026-11-01，对账 #840）
+
+- **外层 completed 也可能是错误信封**：SoonStudio 异步轮询响应不能只看顶层 `status`。
+  `response.body.error` 可能带 `gemini_native_request_required`；若不读取它，就会因为没有
+  内层 `task_id` 被误报成“请求可能已被接收”。
+- **只在明确要求时切原生协议**：仅当错误文本包含 `gemini_native_request_required`、
+  `Use POST /v1beta/models/...` 或 `generateContent` 时，才给 `gemini-3-pro-image` 补发一次
+  原生 `generateContent`。不得重发 `/v1/images/generations`，避免重复付费下单。
+- **其他内层错误保留原文**：`model_not_allowed` 等协议/分组错误按 HTTP 400 原文抛出，
+  不能包装成 `execution/accepted`。
+- **Gemini 不混发 GPT 像素字段**：异步请求只发 `aspect_ratio / image_size`；`size` 只给
+  GPT Image 等 OpenAI 像素口径。`nano-banana-pro*` 与 `gemini-3-pro-image*` 共用能力表。
+- **证据**：`openaiImages + imageParams` 定向 **90/90**；全量 Vitest
+  **3740 passed / 1 skipped**；`npm run check`、`npm run build` 通过。
+
 ### Agent 首轮上下文分档与设计调研（2026-10-31，对账 #836 / #838）
 
 - **请求先分类再拼上下文**：`simple_generate` 不扫画布；`reference_edit` 只取引用节点及必要上游；

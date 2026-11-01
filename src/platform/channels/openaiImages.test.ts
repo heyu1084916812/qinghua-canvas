@@ -586,6 +586,159 @@ describe('openaiImages adapter / 基础契约', () => {
     expect(assets[0]!.bytes).toEqual(tiny)
   })
 
+  it('SoonStudio completed Gemini job can explicitly require native generateContent', async () => {
+    const calls: { url: string; body: unknown }[] = []
+    const soonCfg: ResolvedChannelConfig = {
+      ...cfg,
+      protocol: 'soonstudio',
+      baseUrl: 'https://soonstudio.ai',
+    }
+    const a = createOpenAiImagesAdapter(soonCfg, {
+      network: createMemoryNetwork({
+        handler: async (req) => {
+          calls.push({ url: req.url, body: req.body })
+          if (req.url === 'https://soonstudio.ai/v1/images/generations?async=true') {
+            return resp(200, {
+              studioAsync: true,
+              jobId: 'outer_gemini_native',
+              status: 'running',
+              pollUrl: '/api/studio/async-responses/outer_gemini_native',
+            })
+          }
+          if (
+            req.url ===
+            'https://soonstudio.ai/api/studio/async-responses/outer_gemini_native'
+          ) {
+            return resp(200, {
+              studioAsync: true,
+              jobId: 'outer_gemini_native',
+              status: 'completed',
+              response: {
+                status: 400,
+                body: {
+                  error: {
+                    code: 'gemini_native_request_required',
+                    type: 'invalid_request_error',
+                    message: 'Use POST /v1beta/models/gemini-3-pro-image:generateContent',
+                  },
+                },
+              },
+            })
+          }
+          if (
+            req.url ===
+            'https://soonstudio.ai/v1beta/models/gemini-3-pro-image:generateContent'
+          ) {
+            return resp(200, {
+              candidates: [
+                {
+                  content: {
+                    parts: [
+                      {
+                        inlineData: {
+                          mimeType: 'image/png',
+                          data: btoa('native-image'),
+                        },
+                      },
+                    ],
+                  },
+                },
+              ],
+            })
+          }
+          return resp(404, {})
+        },
+      }),
+      assets: platformWithAssets([]).assets,
+    })
+
+    const assets = await a.generateImage(
+      {
+        ...request([], 1, { ratio: '1:1', resolution: '2k' }),
+        model: 'gemini-3-pro-image',
+      },
+      signal,
+    )
+
+    expect(calls.map((call) => call.url)).toEqual([
+      'https://soonstudio.ai/v1/images/generations?async=true',
+      'https://soonstudio.ai/api/studio/async-responses/outer_gemini_native',
+      'https://soonstudio.ai/v1beta/models/gemini-3-pro-image:generateContent',
+    ])
+    expect(calls[0]!.body).toMatchObject({
+      model: 'gemini-3-pro-image',
+      aspect_ratio: '1:1',
+      image_size: '2K',
+    })
+    expect(calls[0]!.body).not.toHaveProperty('size')
+    expect(calls[2]!.body).toMatchObject({
+      contents: [{ parts: [{ text: 'a cat' }] }],
+      generationConfig: {
+        responseModalities: ['TEXT', 'IMAGE'],
+        imageConfig: { aspectRatio: '1:1', imageSize: '2K' },
+      },
+    })
+    expect(new TextDecoder().decode(assets[0]!.bytes)).toBe('native-image')
+  })
+
+  it('SoonStudio completed response preserves a nested upstream error instead of accepting it', async () => {
+    const soonCfg: ResolvedChannelConfig = {
+      ...cfg,
+      protocol: 'soonstudio',
+      baseUrl: 'https://soonstudio.ai',
+    }
+    const a = createOpenAiImagesAdapter(soonCfg, {
+      network: createMemoryNetwork({
+        handler: async (req) => {
+          if (req.url === 'https://soonstudio.ai/v1/images/generations?async=true') {
+            return resp(200, {
+              studioAsync: true,
+              jobId: 'outer_upstream_error',
+              status: 'running',
+              pollUrl: '/api/studio/async-responses/outer_upstream_error',
+            })
+          }
+          if (
+            req.url ===
+            'https://soonstudio.ai/api/studio/async-responses/outer_upstream_error'
+          ) {
+            return resp(200, {
+              status: 'completed',
+              response: {
+                status: 403,
+                body: {
+                  error: {
+                    code: 'model_not_allowed',
+                    message: 'This model is not enabled for the current group',
+                  },
+                },
+              },
+            })
+          }
+          return resp(404, {})
+        },
+      }),
+      assets: platformWithAssets([]).assets,
+    })
+
+    await expect(
+      a.generateImage(
+        {
+          ...request([], 1),
+          model: 'gpt-image-2',
+        },
+        signal,
+      ),
+    ).rejects.toMatchObject({
+      appError: {
+        kind: 'http',
+        status: 400,
+        verbatim: true,
+        body: expect.stringContaining('model_not_allowed'),
+      },
+    })
+  })
+
   it.each(['cors', 'dns', 'tls', 'timeout'] as const)(
     'SoonStudio submission %s sends one POST and ends as accepted',
     async (detail) => {

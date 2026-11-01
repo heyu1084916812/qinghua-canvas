@@ -384,6 +384,9 @@ export function imageParamsFor(model: string): ImageParamSpec | undefined {
    * 逐个列举迟早漏，漏了就退回通用档位、又变成「通用设置」。
    */
   if (/^gemini-3-pro-image/.test(name)) return IMAGE_PARAM_SPECS['gemini-3-pro-image']
+  if (/^nano-banana-pro(?:-|$)/.test(name)) {
+    return IMAGE_PARAM_SPECS['gemini-3-pro-image']
+  }
   if (/^gemini-nano-banana-2\.1/.test(name)) {
     return IMAGE_PARAM_SPECS['gemini-nano-banana-2.1']
   }

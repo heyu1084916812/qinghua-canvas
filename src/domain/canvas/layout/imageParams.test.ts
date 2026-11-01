@@ -144,6 +144,8 @@ describe('imageParamsFor · 图片模型各自的参数能力', () => {
 
   it('★ 同一族的变体 ID（-2k / -4k / -preview）按前缀归一到同一份 gemini 规格', () => {
     for (const name of [
+      'nano-banana-pro',
+      'nano-banana-pro-2k',
       'gemini-3-pro-image-2k',
       'gemini-3-pro-image-4k',
       'gemini-nano-banana-2.1-preview',

@@ -76,6 +76,11 @@
 
 ## 渠道 · 模型选路
 
+- **SoonStudio 异步错误要读内层**：`status=completed` 的响应仍可能在
+  `response.body.error` 里给协议或分组错误。只有明确出现
+  `gemini_native_request_required / Use POST /v1beta/models/...` 时，Gemini 图片才允许
+  补发一次原生 `generateContent`；不得重发 `/images/generations`。其他错误直接保留原文，
+  不能伪装成 `execution/accepted`。Gemini 异步请求不混发 GPT Image 的像素 `size`。
 - **模型验证超时不能冒充生图超时**：`VERIFY_TIMEOUT_MS = 10s` 只给 verify / listModels；
   异步生图提交走 `IMAGE_GENERATE_TIMEOUT_MS`，单次任务查询走
   `IMAGE_TASK_POLL_TIMEOUT_MS`。提交请求超时只能显示“可能已被上游接收”，不得

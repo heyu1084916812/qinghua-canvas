@@ -567,6 +567,47 @@ function soonStudioStatusIn(value: unknown): string {
   return String(root.status ?? data?.status ?? '').trim().toUpperCase()
 }
 
+function soonStudioErrorText(value: unknown): string | null {
+  if (typeof value === 'string' && value.trim()) return value.trim()
+  if (!value || typeof value !== 'object') return null
+  const row = value as Record<string, unknown>
+  const parts = [row.code, row.type, row.message, row.detail]
+    .map(textField)
+    .filter((part): part is string => Boolean(part))
+  return parts.length > 0 ? [...new Set(parts)].join(': ') : null
+}
+
+function soonStudioUpstreamErrorIn(value: unknown): string | null {
+  if (!value || typeof value !== 'object') return null
+  const seen = new Set<unknown>()
+  const visit = (node: unknown, depth: number): string | null => {
+    if (!node || typeof node !== 'object' || depth > 6 || seen.has(node)) return null
+    seen.add(node)
+    if (Array.isArray(node)) {
+      for (const item of node) {
+        const found = visit(item, depth + 1)
+        if (found) return found
+      }
+      return null
+    }
+    const row = node as Record<string, unknown>
+    const ownError = soonStudioErrorText(row.error)
+    if (ownError) return ownError
+    for (const key of ['response', 'body', 'data', 'result', 'results', 'error']) {
+      const found = visit(row[key], depth + 1)
+      if (found) return found
+    }
+    return null
+  }
+  return visit(value, 0)
+}
+
+function isGeminiNativeRequestRequired(value: string): boolean {
+  return /gemini_native_request_required|Use POST \/v1beta\/models\/|generateContent/i.test(
+    value,
+  )
+}
+
 function soonStudioFailureIn(value: unknown): string | null {
   if (!value || typeof value !== 'object') return null
   const root = value as Record<string, unknown>
@@ -576,7 +617,11 @@ function soonStudioFailureIn(value: unknown): string | null {
   const status = String(data.status ?? root.status ?? '').toUpperCase()
   if (status !== 'FAILURE' && status !== 'FAILED' && status !== 'ERROR') return null
   const reason = data.fail_reason ?? data.failReason ?? data.error ?? root.fail_reason ?? root.error
-  return typeof reason === 'string' && reason.trim() ? reason.trim() : '生成失败'
+  return (
+    soonStudioErrorText(reason) ??
+    soonStudioUpstreamErrorIn(value) ??
+    '生成失败'
+  )
 }
 
 function transportTextOf(error: unknown): string {
@@ -913,12 +958,13 @@ export function createOpenAiImagesAdapter(
   ): Promise<GeneratedAsset[]> => {
     const resolution =
       typeof request.params.resolution === 'string' ? request.params.resolution.trim() : ''
+    const spec = imageParamsFor(request.model)
+    const isGemini = spec?.dialect === 'gemini'
     const requested = sizeToDimensions(
       size ?? customImageSize(resolution) ?? openAiImageSize(request.params.ratio, resolution),
     )
     let res: NetworkResponse
     try {
-      const isGemini = imageParamsFor(request.model)?.dialect === 'gemini'
       const ratio =
         isGemini && typeof request.params.ratio === 'string'
           ? request.params.ratio.trim()
@@ -937,7 +983,7 @@ export function createOpenAiImagesAdapter(
         form.append('prompt', request.prompt)
         form.append('n', String(count))
         form.append('response_format', 'url')
-        if (size) form.append('size', size)
+        if (size && !isGemini) form.append('size', size)
         if (quality) form.append('quality', quality)
         if (background) form.append('background', background)
         for (const [key, value] of Object.entries(geminiFields)) form.append(key, value)
@@ -961,7 +1007,7 @@ export function createOpenAiImagesAdapter(
               prompt: request.prompt,
               n: count,
               response_format: 'url',
-              ...(size ? { size } : {}),
+              ...(size && !isGemini ? { size } : {}),
               ...(quality ? { quality } : {}),
               ...(background ? { background } : {}),
               ...geminiFields,
@@ -992,6 +1038,19 @@ export function createOpenAiImagesAdapter(
       created = JSON.parse(createdRaw) as unknown
     } catch {
       throw acceptedAfterSubmit(`生图任务已提交，但响应无法解析：${createdRaw.slice(0, 300)}`)
+    }
+    const createdError = soonStudioUpstreamErrorIn(created)
+    if (createdError) {
+      if (isGemini && spec && isGeminiNativeRequestRequired(createdError)) {
+        const nativeAssets = await generateGeminiNativeImage(request, spec, signal)
+        if (nativeAssets) return nativeAssets
+      }
+      throw new ChannelError({
+        kind: 'http',
+        status: 400,
+        body: createdError,
+        verbatim: true,
+      })
     }
     const immediate = imageItemsIn(created)
     if (immediate.length > 0) return assetsFromItems(immediate, requested, signal)
@@ -1043,7 +1102,24 @@ export function createOpenAiImagesAdapter(
       lastResponse = raw
       const failure = soonStudioFailureIn(body)
       if (failure) {
+        if (isGemini && spec && isGeminiNativeRequestRequired(failure)) {
+          const nativeAssets = await generateGeminiNativeImage(request, spec, signal)
+          if (nativeAssets) return nativeAssets
+        }
         throw acceptedAfterSubmit(`生图任务 ${taskId} 已提交但失败：${failure}`)
+      }
+      const upstreamError = soonStudioUpstreamErrorIn(body)
+      if (upstreamError) {
+        if (isGemini && spec && isGeminiNativeRequestRequired(upstreamError)) {
+          const nativeAssets = await generateGeminiNativeImage(request, spec, signal)
+          if (nativeAssets) return nativeAssets
+        }
+        throw new ChannelError({
+          kind: 'http',
+          status: 400,
+          body: upstreamError,
+          verbatim: true,
+        })
       }
       const items = imageItemsIn(body)
       if (items.length > 0) return assetsFromItems(items, requested, signal)
@@ -1123,6 +1199,113 @@ export function createOpenAiImagesAdapter(
       })
     }
     return out
+  }
+
+  /**
+   * One native Gemini attempt for the SoonStudio async fallback. The async
+   * endpoint is still the default because it survives long 4K jobs, but a
+   * gateway can explicitly require this native shape inside an otherwise
+   * completed async response.
+   */
+  async function generateGeminiNativeImage(
+    request: ImageRunRequest,
+    spec: ImageParamSpec,
+    signal: AbortSignal,
+  ): Promise<GeneratedAsset[] | null> {
+    const wantedRatio = typeof request.params.ratio === 'string' ? request.params.ratio : ''
+    const ratio = spec.ratios.includes(wantedRatio) ? wantedRatio : GEMINI_DEFAULT_RATIO
+    const sendRatio = ratio === GEMINI_DEFAULT_RATIO ? null : ratio
+    const wantedSize = String(request.params.resolution ?? '').toUpperCase()
+    const imageSize =
+      spec.sizes.find((candidate) => candidate.toUpperCase() === wantedSize) ??
+      spec.sizes[0]
+    const root = base.replace(/\/v1$/, '')
+    const inlineImages = await toInlineImages(request)
+    const res = await submitNetwork('Gemini 生图提交', signal, () =>
+      deps.network.request(
+        {
+          url: `${root}/v1beta/models/${encodeURIComponent(request.model)}:generateContent`,
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', ...authHeader(config.apiKey) },
+          body: {
+            contents: [
+              {
+                parts: [
+                  { text: request.prompt },
+                  ...inlineImages.map((image) => ({ inlineData: image })),
+                ],
+              },
+            ],
+            generationConfig: {
+              responseModalities: ['TEXT', 'IMAGE'],
+              ...(sendRatio || imageSize
+                ? {
+                    imageConfig: {
+                      ...(sendRatio ? { aspectRatio: sendRatio } : {}),
+                      ...(imageSize ? { imageSize } : {}),
+                    },
+                  }
+                : {}),
+            },
+          },
+          timeoutMs: IMAGE_GENERATE_TIMEOUT_MS,
+        },
+        signal,
+      ),
+    )
+    const detail =
+      res.status < 200 || res.status >= 300
+        ? await res.text().catch(() => '')
+        : ''
+    const unsupportedPath =
+      res.status === 404 ||
+      (res.status === 503 &&
+        /unsupported|not\s+support|不支持.*(?:API|接口|路径)|api\s+path/i.test(detail))
+    if (unsupportedPath) return null
+    if (res.status < 200 || res.status >= 300) {
+      if (res.status === 408 || res.status === 429 || res.status >= 500) {
+        throw acceptedAfterSubmit(`Gemini 生图提交结果未知：HTTP ${res.status} ${detail}`)
+      }
+      const { error } = classifyError(null, res.status, detail)
+      throw new ChannelError(error)
+    }
+
+    const responseBody = await res.json<unknown>()
+    const image = findGeminiImage(responseBody)
+    if (!image) {
+      throw new ChannelError({
+        kind: 'parse',
+        raw: `Gemini 没有返回图片：${geminiNoImageReason(responseBody)}`,
+      })
+    }
+    let bytes: Uint8Array
+    let mimeType = image.mimeType
+    if (image.kind === 'inline') {
+      bytes = Uint8Array.from(atob(image.data), (character) => character.charCodeAt(0))
+    } else {
+      const download = await deps.network.request(
+        {
+          url: image.url,
+          method: 'GET',
+          headers: authHeader(config.apiKey),
+          timeoutMs: IMAGE_ASSET_DOWNLOAD_TIMEOUT_MS,
+        },
+        signal,
+      )
+      if (download.status < 200 || download.status >= 300) {
+        const downloadDetail = await download.text().catch(() => '')
+        throw acceptedAfterSubmit(
+          `Gemini 图片已生成，但下载失败：HTTP ${download.status} ${downloadDetail}`.trim(),
+        )
+      }
+      bytes = new Uint8Array(await download.arrayBuffer())
+      mimeType =
+        download.headers['content-type']?.split(';')[0]?.trim() ||
+        mimeType ||
+        'image/png'
+    }
+    const hash = await fingerprintBytes(bytes)
+    return [toAsset(hash, mimeType || 'image/png', bytes, {})]
   }
 
   /**
