@@ -17119,16 +17119,15 @@ async function g87(browser) {
 }
 
 /**
- * G88 一站一协议 + 用户自建协议（用户 2026-09-28）。
+ * G88 一站一协议 + AI 自定义协议导入。
  *
  *  ① 站点协议「选中即填地址」：选中玉玉 → 地址自动补成 https://yuli.host；
  *     用户手填过的地址则不被后续切协议覆盖。
- *  ② 自建协议：只填名称与能力 → 技术字段自动生成 → 添加 → 下拉自动选中。
- *  ③ AI 协议导入：模板入口 → 粘贴 JSON → 校验预览 → 保存并绑定渠道。
- *  ④ 被渠道引用的自建协议不能删；把渠道改回 mock 后可以删掉。
+ *  ② 自定义协议只保留导入：模板入口 → 粘贴 JSON → 校验预览 → 保存并绑定渠道。
+ *  ③ 被渠道引用的协议不能删；把渠道改回 mock 后可以删掉。
  */
 async function g88(browser) {
-  const g = 'G88 一站一协议与自建协议'
+  const g = 'G88 一站一协议与 AI 协议导入'
   const ctx = await newCtx(browser)
   const page = await ctx.newPage()
   const pageErrors = []
@@ -17165,57 +17164,15 @@ async function g88(browser) {
   const keptUrl = await page.locator('[data-settings-baseurl]').inputValue()
   rec(g, '★ 切协议不覆盖用户手填地址', keptUrl === 'http://my-own.test', keptUrl)
 
-  // ② 自建协议
+  // ② 只保留导入 AI 协议：不再提供容易混淆的手动自定义协议。
   await page.locator('[data-proto-add-toggle]').click()
   await page.locator('[data-proto-form]').waitFor({ state: 'visible', timeout: 4000 })
-  await page.locator('[data-proto-field="name"]').fill('私有站')
-  await page.locator('[data-proto-create]').click()
-  await sleep(300)
-  const createError = await page
-    .locator('[data-proto-error]')
-    .innerText()
-    .catch(() => '')
-  rec(g, '自定义协议创建无错误', !createError, createError)
-  const afterAdd = (await selectedProtocol()) ?? ''
-  rec(g, '★ 添加自建协议后下拉自动选中', /^custom-[a-z0-9]+(?:-\d+)?$/.test(afterAdd), afterAdd)
   rec(
     g,
-    '★ 自建协议出现在「我添加的协议」',
-    (await page.locator(`[data-proto-remove="${afterAdd}"]`).count()) === 1,
-  )
-
-  // ③ 保存渠道 → 左栏短标签显示自建协议 → 引用中的协议删不掉
-  await sleep(500)
-  /* 同 G8：必须问「正在编辑的那一行」，`.first()` 是内置的 ModelScope（MS） */
-  const shortTag = ((await page.locator('[data-channel-selected]').first().getAttribute('data-channel-proto')) ?? '').trim()
-  rec(g, '★ 渠道短标签显示自建协议', shortTag === '私有站', shortTag)
-
-  await page.locator(`[data-proto-remove="${afterAdd}"]`).click()
-  await sleep(300)
-  const blocked = await page
-    .locator('[data-proto-remove-error]')
-    .innerText()
-    .catch(() => '')
-  rec(g, '★ 被渠道引用的自建协议拒绝删除并给出原因', blocked.includes('仍在用') || blocked.includes('使用该协议'), blocked)
-
-  // ④ 改回 mock 后可删
-  await chooseProtocol('mock')
-  await sleep(500)
-  await page.locator(`[data-proto-remove="${afterAdd}"]`).click()
-  await sleep(400)
-  rec(
-    g,
-    '★ 无渠道引用后自建协议可删除',
-    (await page.locator(`[data-proto-remove="${afterAdd}"]`).count()) === 0,
-  )
-
-  // ④ 导入 AI 协议：只校验声明，不在这里重复填地址 / Key / 试连接
-  await page.locator('[data-proto-add-toggle]').click()
-  await page.locator('[data-proto-mode="import"]').click()
-  rec(
-    g,
-    '★ 导入模式提供协议模板下载',
-    (await page.locator('[data-proto-template-download]').count()) === 1,
+    '★ 自定义协议只保留导入方式',
+    (await page.locator('[data-proto-template-download]').count()) === 1 &&
+      (await page.locator('[data-proto-mode]').count()) === 0 &&
+      (await page.locator('[data-proto-field="name"]').count()) === 0,
   )
   const importedProtocol = JSON.stringify({
     schema: 'qinghua.protocol/v1',
@@ -17266,6 +17223,16 @@ async function g88(browser) {
     '★ 导入协议进入「我添加的协议」',
     (await page.locator(`[data-proto-remove="${importedValue}"]`).count()) === 1,
   )
+  const protocolDownloadPromise = page.waitForEvent('download')
+  await page.locator(`[data-proto-download="${importedValue}"]`).click()
+  const protocolDownload = await protocolDownloadPromise
+  rec(
+    g,
+    '★ 我添加的协议可以下载',
+    protocolDownload.suggestedFilename() === `${importedValue}.qinghua.json` &&
+      (await protocolDownload.failure()) === null,
+    protocolDownload.suggestedFilename(),
+  )
   await chooseProtocol('mock')
   await sleep(400)
   await page.locator(`[data-proto-remove="${importedValue}"]`).click()
@@ -17277,8 +17244,9 @@ async function g88(browser) {
   )
 
   await page.setViewportSize({ width: 741, height: 504 })
+  await chooseProtocol('mock')
+  await sleep(400)
   await page.locator('[data-proto-add-toggle]').click()
-  await page.locator('[data-proto-mode="import"]').click()
   await page.locator('[data-proto-form]').scrollIntoViewIfNeeded()
   await sleep(250)
   const narrowLayout = await page.evaluate(() => {
@@ -17286,11 +17254,6 @@ async function g88(browser) {
     const editor = document.querySelector('[data-settings-editor]')
     const formRect = form?.getBoundingClientRect()
     const editorRect = editor?.getBoundingClientRect()
-    const modes = [...document.querySelectorAll('[data-proto-mode]')].map((node) => ({
-      width: node.getBoundingClientRect().width,
-      overflow: node.scrollWidth > node.clientWidth + 1,
-      centered: getComputedStyle(node).justifyContent === 'center',
-    }))
     return {
       horizontalOverflow: document.documentElement.scrollWidth > document.documentElement.clientWidth,
       formInsideEditor:
@@ -17298,19 +17261,17 @@ async function g88(browser) {
         formRect.bottom <= editorRect.bottom + 1 &&
         formRect.left >= editorRect.left - 1 &&
         formRect.right <= editorRect.right + 1,
-      equalModeWidths: modes.length === 2 && Math.abs(modes[0].width - modes[1].width) <= 1,
-      modesCentered: modes.every((mode) => mode.centered),
-      modeOverflow: modes.some((mode) => mode.overflow),
+      legacyManualFields: document.querySelectorAll(
+        '[data-proto-field="name"], [data-proto-mode], [data-proto-create]',
+      ).length,
     }
   })
   rec(
     g,
-    '★ 741×504 自定义协议面板不裁切、页签等宽居中',
+    '★ 741×504 导入面板不裁切，旧手动创建入口已移除',
     !narrowLayout.horizontalOverflow &&
       narrowLayout.formInsideEditor &&
-      narrowLayout.equalModeWidths &&
-      narrowLayout.modesCentered &&
-      !narrowLayout.modeOverflow,
+      narrowLayout.legacyManualFields === 0,
     JSON.stringify(narrowLayout),
   )
 

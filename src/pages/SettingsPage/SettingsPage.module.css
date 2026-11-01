@@ -1695,38 +1695,6 @@
   line-height: 1.6;
   color: var(--text-2);
 }
-.protoModeRow {
-  display: flex;
-  align-items: center;
-  width: 100%;
-  padding: 2px;
-  border-radius: var(--radius-control);
-  background: var(--bg-surface);
-}
-.protoMode,
-.protoModeOn {
-  flex: 1 1 0;
-  min-width: 88px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border: 0;
-  border-radius: calc(var(--radius-control) - 2px);
-  padding: 6px 12px;
-  background: transparent;
-  color: var(--text-2);
-  font-size: var(--fs-label);
-  cursor: pointer;
-}
-.protoModeOn {
-  background: var(--bg-hover);
-  color: var(--text-1);
-}
-.protoMode:focus-visible,
-.protoModeOn:focus-visible {
-  outline: none;
-  box-shadow: 0 0 0 2px var(--focus-ring);
-}
 .protoImportActions {
   display: flex;
   align-items: center;
@@ -1779,59 +1747,12 @@
   color: var(--text-1);
   font-weight: 600;
 }
-.protoDetails {
-  font-size: var(--fs-label);
-  color: var(--text-3);
-}
-.protoDetails > summary {
-  width: fit-content;
-  color: var(--text-2);
-  cursor: pointer;
-  user-select: none;
-}
-.protoDetails > summary:hover {
-  color: var(--text-1);
-}
-.protoDetails[open] > summary {
-  margin-bottom: var(--space-2);
-}
-.protoDetails p {
-  max-width: 70ch;
-  margin: 0;
-  line-height: 1.65;
-}
-.protoRow {
-  display: flex;
-  align-items: flex-end;
-  flex-wrap: wrap;
-  gap: var(--space-2);
-}
-.protoRow > .field {
-  min-width: 0;
-}
-.protoRow > .grow {
-  flex: 1 1 220px;
-}
 .protoFoot {
   display: flex;
   justify-content: flex-end;
   align-items: center;
   flex-wrap: wrap;
   gap: var(--space-2);
-}
-.capRow {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  min-height: 36px;
-}
-.capBox {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-1);
-  font-size: var(--fs-label);
-  color: var(--text-2);
-  cursor: pointer;
 }
 .protoError {
   margin: 0;
@@ -1844,15 +1765,70 @@
   flex-direction: column;
   gap: var(--space-2);
 }
+.protoMineHead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
 .protoMineRow {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: var(--space-2);
+  min-width: 0;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-control);
+  background: var(--bg-surface);
 }
 .protoMineName {
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
   font-size: var(--fs-label);
   color: var(--text-1);
+  overflow-wrap: anywhere;
+}
+.protoMineName strong {
+  min-width: 0;
+  font-weight: 600;
+}
+.protoMineName span {
+  flex: 0 0 auto;
+  color: var(--text-3);
+  font-size: var(--fs-chip);
+}
+.protoMineActions {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+.protoIconBtn {
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-2);
+  cursor: pointer;
+}
+.protoIconBtn:hover {
+  background: var(--bg-hover);
+  color: var(--text-1);
+}
+.protoIconBtn:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--focus-ring);
+}
+.protoIconDanger:hover {
+  color: var(--danger);
 }
 /*
  * 待支持协议的原因文案。

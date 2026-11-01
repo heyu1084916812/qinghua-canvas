@@ -227,6 +227,16 @@ export function IconDelete({ size = 16 }: IconProps) {
   )
 }
 
+/** 下载用户导入的协议文件。 */
+export function IconDownload({ size = 16 }: IconProps) {
+  return (
+    <svg {...BASE} width={size} height={size} viewBox="0 0 24 24">
+      <path d="M12 3v11M8 10l4 4 4-4" />
+      <path d="M5 18.5h14" />
+    </svg>
+  )
+}
+
 /** 打开服务行菜单。 */
 export function IconMoreVertical({ size = 16 }: IconProps) {
   return (
