@@ -1,5 +1,16 @@
 # CanvasFlow（轻画）项目记忆
 
+### 协议下载另存为与 SquareFaceIcon（2026-11-02，对账 #847）
+
+- **下载不再静默进默认目录**：`FilePort.saveFileWithResult()` 在桌面壳弹系统“另存为”，
+  返回 `saved / cancelled`；取消不写盘、不提示成功。协议模板、站点说明、导入协议共用。
+- **SquareFaceIcon 不需要新适配器**：`https://api.squarefaceicon.org` 是 New API，
+  手动选择内置 `openai-compatible` 即可保存渠道。`/v1/models` 无有效 Key 返回标准 401；
+  公开价格接口确认 44 个 OpenAI 模型、7 个 image-generation 模型。
+- **导入样本**：`设计稿/SquareFaceIcon.qinghua.json`，已实机完成导入、下载、删除。
+- **证据**：平台定向 **20/20**；全量 Vitest **3761 passed / 1 skipped**；G88 明暗各
+  **16/16**；`npm run check`、build 通过。
+
 ### 站点协议下拉内管理（2026-11-01，对账 #846）
 
 - **只管理站点协议**：`ChoicePicker` 选项的 `actions` 只为 `kind === 'station'` 的站点项

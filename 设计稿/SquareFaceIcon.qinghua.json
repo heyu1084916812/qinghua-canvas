@@ -1,0 +1,61 @@
+{
+  "schema": "qinghua.protocol/v1",
+  "id": "squarefaceicon",
+  "name": "SquareFaceIcon",
+  "short": "SFI",
+  "versionPath": "/v1",
+  "docUrl": "https://api.squarefaceicon.org",
+  "capabilities": [
+    "chat",
+    "image"
+  ],
+  "auth": {
+    "type": "bearer"
+  },
+  "models": {
+    "request": {
+      "method": "GET",
+      "path": "/models"
+    },
+    "items": "$.data[*]",
+    "id": "$.id",
+    "category": "unknown"
+  },
+  "chat": {
+    "request": {
+      "method": "POST",
+      "path": "/chat/completions",
+      "body": {
+        "model": "{{model}}",
+        "messages": {
+          "$var": "messages"
+        },
+        "tools": {
+          "$var": "tools"
+        }
+      }
+    },
+    "response": {
+      "text": "$.choices[0].message.content",
+      "reasoning": "$.choices[0].message.reasoning_content",
+      "finishReason": "$.choices[0].finish_reason",
+      "toolCalls": "$.choices[0].message.tool_calls[*]"
+    }
+  },
+  "image": {
+    "request": {
+      "method": "POST",
+      "path": "/images/generations",
+      "body": {
+        "model": "{{model}}",
+        "prompt": "{{prompt}}",
+        "n": "{{count}}",
+        "size": "{{size}}"
+      }
+    },
+    "result": [
+      "$.data[*].url",
+      "$.data[*].b64_json"
+    ]
+  }
+}

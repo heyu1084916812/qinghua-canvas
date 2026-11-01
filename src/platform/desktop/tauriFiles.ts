@@ -38,15 +38,16 @@ function mimeOf(name: string): string {
 
 export function createTauriFiles(): FilePort {
   /** 已有 Blob 的落盘：两条入口（本地字节 / 远端取回字节）共用一份 */
-  async function saveBlob(name: string, blob: Blob): Promise<void> {
+  async function saveBlob(name: string, blob: Blob): Promise<'saved' | 'cancelled'> {
     const ext = name.includes('.') ? name.slice(name.lastIndexOf('.') + 1) : ''
     const path = await invoke<string | null>('save_file_dialog', {
       name,
       extensions: ext ? [ext] : [],
     })
     // 用户在保存框里点了取消：不写盘、也不报错（与浏览器侧点掉"另存为"同一口径）
-    if (!path) return
+    if (!path) return 'cancelled'
     await writeFile(path, new Uint8Array(await blob.arrayBuffer()))
+    return 'saved'
   }
 
   return {
@@ -68,6 +69,10 @@ export function createTauriFiles(): FilePort {
 
     async saveFile(name, blob) {
       await saveBlob(name, blob)
+    },
+
+    async saveFileWithResult(name, blob) {
+      return saveBlob(name, blob)
     },
 
     /**

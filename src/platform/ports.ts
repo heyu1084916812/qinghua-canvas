@@ -295,6 +295,8 @@ export interface PickedFile {
 export interface FilePort {
   pickFile(accept?: string): Promise<PickedFile | null>
   saveFile(name: string, blob: Blob): Promise<void>
+  /** Like saveFile, but lets the caller distinguish a completed save from a cancelled dialog. */
+  saveFileWithResult?(name: string, blob: Blob): Promise<'saved' | 'cancelled'>
   /**
    * 把**远端地址**存成本地文件（用户 2026-10-03：节点下载按钮对视频成片无效）。
    *

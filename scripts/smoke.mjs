@@ -17240,19 +17240,25 @@ async function g88(browser) {
   )
   rec(
     g,
-    '导入协议的下拉行直接提供下载和删除',
+    '导入协议的下拉行直接提供下载，当前被引用时删除禁用',
     (await importedDownloadAction.count()) === 1 &&
-      (await importedDeleteAction.count()) === 1,
+      (await importedDeleteAction.count()) === 1 &&
+      (await importedDeleteAction.isDisabled()),
   )
   const protocolDownloadPromise = page.waitForEvent('download')
   await importedDownloadAction.click()
   const protocolDownload = await protocolDownloadPromise
+  const downloadNotice = await page
+    .locator('[data-proto-manage-notice]')
+    .innerText()
+    .catch(() => '')
   rec(
     g,
     '★ 我添加的协议可以下载',
     protocolDownload.suggestedFilename() === `${importedValue}.qinghua.json` &&
-      (await protocolDownload.failure()) === null,
-    protocolDownload.suggestedFilename(),
+      (await protocolDownload.failure()) === null &&
+      downloadNotice.includes('已下载'),
+    `${protocolDownload.suggestedFilename()} / ${downloadNotice}`,
   )
   const yuliDownloadAction = page.locator('[data-choice-action="yuli:download"]')
   const yuliDeleteAction = page.locator('[data-choice-action="yuli:delete"]')
@@ -17306,6 +17312,11 @@ async function g88(browser) {
   await sleep(400)
   await protocolPicker.locator('button').first().click()
   await sleep(200)
+  rec(
+    g,
+    '渠道切换协议后，原协议删除按钮恢复可用',
+    !(await importedDeleteAction.isDisabled()),
+  )
   await importedDeleteAction.click()
   await page
     .locator(`[data-choice-option="${importedValue}"]`)

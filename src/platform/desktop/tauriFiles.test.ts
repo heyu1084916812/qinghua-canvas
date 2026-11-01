@@ -62,7 +62,9 @@ describe('文件读写（桌面壳）', () => {
   it('另存为：先弹保存框（带建议文件名），再按返回路径写字节', async () => {
     const files = createTauriFiles()
     mocks.invoke.mockResolvedValueOnce('D:\\导出\\项目.flow.json')
-    await files.saveFile('项目.flow.json', new Blob([new Uint8Array([7])]))
+    expect(
+      await files.saveFileWithResult!('项目.flow.json', new Blob([new Uint8Array([7])])),
+    ).toBe('saved')
     expect(mocks.invoke).toHaveBeenCalledWith('save_file_dialog', {
       name: '项目.flow.json',
       extensions: ['json'],
@@ -75,7 +77,7 @@ describe('文件读写（桌面壳）', () => {
   it('保存框里点取消（null）→ 不写盘、也不报错', async () => {
     const files = createTauriFiles()
     mocks.invoke.mockResolvedValueOnce(null)
-    await files.saveFile('a.png', new Blob(['x']))
+    expect(await files.saveFileWithResult!('a.png', new Blob(['x']))).toBe('cancelled')
     expect(mocks.writeFile).not.toHaveBeenCalled()
   })
 

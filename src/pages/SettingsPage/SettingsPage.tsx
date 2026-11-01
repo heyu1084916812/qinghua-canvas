@@ -475,6 +475,10 @@ export function SettingsPage({ embedded = false }: { embedded?: boolean } = {}) 
     () => new Set(hiddenBuiltinProtocolIds),
     [hiddenBuiltinProtocolIds],
   )
+  const referencedProtocolIds = useMemo(
+    () => new Set(channelsList.map((channel) => channel.protocol)),
+    [channelsList],
+  )
   /** 全局路由策略：与选中的渠道无关，跨三个工作台共用。 */
   const routingPolicy = useSyncExternalStore(
     channels.subscribe,
@@ -732,6 +736,12 @@ export function SettingsPage({ embedded = false }: { embedded?: boolean } = {}) 
   useEffect(() => {
     void channels.load()
   }, [channels])
+
+  useEffect(() => {
+    if (!protoManageNotice) return
+    const timer = window.setTimeout(() => setProtoManageNotice(''), 2600)
+    return () => window.clearTimeout(timer)
+  }, [protoManageNotice])
 
   const selected = useMemo(
     () => channelsList.find((c) => c.id === selectedId) ?? null,
@@ -1342,21 +1352,46 @@ export function SettingsPage({ embedded = false }: { embedded?: boolean } = {}) 
     setNpNotice(`已导入并选中「${res.value.name}」`)
   }
 
-  const downloadProtocolTemplate = () => {
+  const saveDownload = async (
+    content: string,
+    filename: string,
+  ): Promise<'saved' | 'cancelled'> => {
+    const blob = new Blob([content], { type: 'application/json;charset=utf-8' })
+    try {
+      if (platform.files.saveFileWithResult) {
+        return await platform.files.saveFileWithResult(filename, blob)
+      }
+      await platform.files.saveFile(filename, blob)
+      return 'saved'
+    } catch (error) {
+      setProtoRemoveError(error instanceof Error ? error.message : String(error))
+      return 'cancelled'
+    }
+  }
+
+  const downloadProtocolTemplate = async () => {
     const blob = new Blob([DECLARATIVE_PROTOCOL_TEMPLATE], {
       type: 'text/plain;charset=utf-8',
     })
-    const url = URL.createObjectURL(blob)
-    const anchor = document.createElement('a')
-    anchor.href = url
-    anchor.download = '轻画-自定义协议模板.txt'
-    document.body.append(anchor)
-    anchor.click()
-    anchor.remove()
-    window.setTimeout(() => URL.revokeObjectURL(url), 0)
+    setProtoRemoveError('')
+    setProtoManageNotice('')
+    try {
+      if (platform.files.saveFileWithResult) {
+        const outcome = await platform.files.saveFileWithResult(
+          '轻画-自定义协议模板.txt',
+          blob,
+        )
+        if (outcome === 'cancelled') return
+      } else {
+        await platform.files.saveFile('轻画-自定义协议模板.txt', blob)
+      }
+      setProtoManageNotice('已下载协议模板')
+    } catch (error) {
+      setProtoRemoveError(error instanceof Error ? error.message : String(error))
+    }
   }
 
-  const downloadProtocol = (definition: ProtocolDefinition) => {
+  const downloadProtocol = async (definition: ProtocolDefinition) => {
     setProtoRemoveError('')
     setProtoManageNotice('')
     if (definition.kind !== 'custom') {
@@ -1365,17 +1400,12 @@ export function SettingsPage({ embedded = false }: { embedded?: boolean } = {}) 
         setProtoRemoveError('这条站点协议没有可导出的说明内容')
         return
       }
-      const blob = new Blob([serializeBuiltinProtocolReference(reference)], {
-        type: 'application/json;charset=utf-8',
-      })
-      const url = URL.createObjectURL(blob)
-      const anchor = document.createElement('a')
-      anchor.href = url
-      anchor.download = `${definition.id}.protocol-reference.json`
-      document.body.append(anchor)
-      anchor.click()
-      anchor.remove()
-      window.setTimeout(() => URL.revokeObjectURL(url), 0)
+      const outcome = await saveDownload(
+        serializeBuiltinProtocolReference(reference),
+        `${definition.id}.protocol-reference.json`,
+      )
+      if (outcome === 'cancelled') return
+      setProtoManageNotice(`已下载「${definition.name}」协议说明`)
       return
     }
     const pkg = protocolPackageForExport(definition)
@@ -1383,17 +1413,12 @@ export function SettingsPage({ embedded = false }: { embedded?: boolean } = {}) 
       setProtoRemoveError('这条旧协议没有可导出的声明内容')
       return
     }
-    const blob = new Blob([serializeProtocolPackage(pkg)], {
-      type: 'application/json;charset=utf-8',
-    })
-    const url = URL.createObjectURL(blob)
-    const anchor = document.createElement('a')
-    anchor.href = url
-    anchor.download = `${definition.id}.qinghua.json`
-    document.body.append(anchor)
-    anchor.click()
-    anchor.remove()
-    window.setTimeout(() => URL.revokeObjectURL(url), 0)
+    const outcome = await saveDownload(
+      serializeProtocolPackage(pkg),
+      `${definition.id}.qinghua.json`,
+    )
+    if (outcome === 'cancelled') return
+    setProtoManageNotice(`已下载「${definition.name}」协议文件`)
   }
 
   const toggleNewProtocol = () => {
@@ -2100,9 +2125,12 @@ export function SettingsPage({ embedded = false }: { embedded?: boolean } = {}) 
                                       {
                                         key: 'delete',
                                         label: `删除协议 ${item.name}`,
-                                        title: '删除协议',
+                                        title: referencedProtocolIds.has(item.id)
+                                          ? '仍有渠道使用，先切换渠道协议再删除'
+                                          : '删除协议',
                                         icon: <IconDelete size={14} />,
                                         danger: true,
+                                        disabled: referencedProtocolIds.has(item.id),
                                         onSelect: () => void handleRemoveProtocol(item),
                                       },
                                     ]
@@ -2159,6 +2187,16 @@ export function SettingsPage({ embedded = false }: { embedded?: boolean } = {}) 
                     </button>
                   )}
                   {npNotice && <span className={styles.saved}>{npNotice}</span>}
+                  {protoManageNotice && (
+                    <span className={styles.saved} data-proto-manage-notice>
+                      {protoManageNotice}
+                    </span>
+                  )}
+                  {protoRemoveError && (
+                    <span className={styles.protoInlineError} data-proto-remove-error>
+                      {protoRemoveError}
+                    </span>
+                  )}
                 </div>
 
                 {newProtoOpen && (
@@ -2236,21 +2274,6 @@ export function SettingsPage({ embedded = false }: { embedded?: boolean } = {}) 
                         保存并选中
                       </button>
                     </div>
-                  </div>
-                )}
-
-                {(protoRemoveError || protoManageNotice) && (
-                  <div className={styles.protoManageFeedback}>
-                    {protoRemoveError && (
-                      <p className={styles.protoError} data-proto-remove-error>
-                        {protoRemoveError}
-                      </p>
-                    )}
-                    {protoManageNotice && (
-                      <p className={styles.protocolManageNotice} data-proto-manage-notice>
-                        {protoManageNotice}
-                      </p>
-                    )}
                   </div>
                 )}
 

@@ -72,14 +72,14 @@ function useInputFallback(accept?: string): Promise<PickedFile | null> {
 /** File System Access API 优先，不支持或出错时退回 <input type=file> */
 export function createFileAccessFiles(): FilePort {
   /** 已有 Blob 的落盘：两条入口（本地字节 / 远端取回字节）共用一份 */
-  async function saveBlob(name: string, blob: Blob): Promise<void> {
+  async function saveBlob(name: string, blob: Blob): Promise<'saved'> {
     const w = window as FilePickerWindow
     if (w.showSaveFilePicker) {
       const handle = await w.showSaveFilePicker({ suggestedName: name })
       const writable = await handle.createWritable()
       await writable.write(blob)
       await writable.close()
-      return
+      return 'saved'
     }
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
@@ -87,6 +87,7 @@ export function createFileAccessFiles(): FilePort {
     a.download = name
     a.click()
     URL.revokeObjectURL(url)
+    return 'saved'
   }
 
   return {
@@ -112,6 +113,15 @@ export function createFileAccessFiles(): FilePort {
 
     async saveFile(name, blob) {
       await saveBlob(name, blob)
+    },
+
+    async saveFileWithResult(name, blob) {
+      try {
+        return await saveBlob(name, blob)
+      } catch (error) {
+        if (isUserCancel(error)) return 'cancelled'
+        throw error
+      }
     },
 
     /**

@@ -16,6 +16,7 @@ export interface ChoiceOptionAction {
   title?: string
   icon: ReactNode
   danger?: boolean
+  disabled?: boolean
   onSelect: () => void
 }
 
@@ -196,8 +197,10 @@ export function ChoicePicker({
                           data-choice-action={`${option.value}:${action.key}`}
                           aria-label={action.label}
                           title={action.title ?? action.label}
+                          disabled={action.disabled}
                           onClick={(event) => {
                             event.stopPropagation()
+                            if (action.disabled) return
                             action.onSelect()
                           }}
                         >

@@ -179,6 +179,13 @@
   color: var(--danger);
 }
 
+.optionAction:disabled {
+  background: transparent;
+  color: var(--text-3);
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
 .optionText {
   min-width: 0;
   display: flex;

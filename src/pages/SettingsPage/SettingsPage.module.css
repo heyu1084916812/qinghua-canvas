@@ -1793,15 +1793,9 @@
   color: var(--text-3);
   font-size: var(--fs-chip);
 }
-.protoManageFeedback {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
-}
-.protocolManageNotice {
-  margin: 0;
+.protoInlineError {
   font-size: var(--fs-label);
-  color: var(--success);
+  color: var(--danger);
 }
 /*
  * 待支持协议的原因文案。
