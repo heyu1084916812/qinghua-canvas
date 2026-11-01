@@ -17276,6 +17276,44 @@ async function g88(browser) {
     (await page.locator(`[data-proto-remove="${importedValue}"]`).count()) === 0,
   )
 
+  await page.setViewportSize({ width: 741, height: 504 })
+  await page.locator('[data-proto-add-toggle]').click()
+  await page.locator('[data-proto-mode="import"]').click()
+  await page.locator('[data-proto-form]').scrollIntoViewIfNeeded()
+  await sleep(250)
+  const narrowLayout = await page.evaluate(() => {
+    const form = document.querySelector('[data-proto-form]')
+    const editor = document.querySelector('[data-settings-editor]')
+    const formRect = form?.getBoundingClientRect()
+    const editorRect = editor?.getBoundingClientRect()
+    const modes = [...document.querySelectorAll('[data-proto-mode]')].map((node) => ({
+      width: node.getBoundingClientRect().width,
+      overflow: node.scrollWidth > node.clientWidth + 1,
+      centered: getComputedStyle(node).justifyContent === 'center',
+    }))
+    return {
+      horizontalOverflow: document.documentElement.scrollWidth > document.documentElement.clientWidth,
+      formInsideEditor:
+        Boolean(formRect && editorRect) &&
+        formRect.bottom <= editorRect.bottom + 1 &&
+        formRect.left >= editorRect.left - 1 &&
+        formRect.right <= editorRect.right + 1,
+      equalModeWidths: modes.length === 2 && Math.abs(modes[0].width - modes[1].width) <= 1,
+      modesCentered: modes.every((mode) => mode.centered),
+      modeOverflow: modes.some((mode) => mode.overflow),
+    }
+  })
+  rec(
+    g,
+    '★ 741×504 自定义协议面板不裁切、页签等宽居中',
+    !narrowLayout.horizontalOverflow &&
+      narrowLayout.formInsideEditor &&
+      narrowLayout.equalModeWidths &&
+      narrowLayout.modesCentered &&
+      !narrowLayout.modeOverflow,
+    JSON.stringify(narrowLayout),
+  )
+
   await page.screenshot({ path: `${OUT}/103-g88-custom-protocol.png` })
   rec(g, '无未捕获异常', pageErrors.length === 0, pageErrors.join(' | '))
   const testChannelId = await page

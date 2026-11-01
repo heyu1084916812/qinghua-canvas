@@ -1677,6 +1677,10 @@
   flex-wrap: wrap;
 }
 .protoForm {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
@@ -1692,15 +1696,20 @@
   color: var(--text-2);
 }
 .protoModeRow {
-  display: inline-flex;
+  display: flex;
   align-items: center;
-  width: fit-content;
+  width: 100%;
   padding: 2px;
   border-radius: var(--radius-control);
   background: var(--bg-surface);
 }
 .protoMode,
 .protoModeOn {
+  flex: 1 1 0;
+  min-width: 88px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   border: 0;
   border-radius: calc(var(--radius-control) - 2px);
   padding: 6px 12px;
@@ -1724,11 +1733,19 @@
   gap: var(--space-2);
   flex-wrap: wrap;
 }
+.protoImportActions .ghostBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+}
 .protoImportActions label {
   cursor: pointer;
 }
 .protoImportText {
   width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
   min-height: 132px;
   resize: vertical;
   border: var(--border);
@@ -1746,6 +1763,7 @@
   box-shadow: 0 0 0 2px var(--focus-ring);
 }
 .protoPreview {
+  min-width: 0;
   display: flex;
   align-items: center;
   gap: var(--space-3);
@@ -1755,6 +1773,7 @@
   background: var(--bg-surface);
   color: var(--text-2);
   font-size: var(--fs-label);
+  overflow-wrap: anywhere;
 }
 .protoPreview strong {
   color: var(--text-1);
@@ -1787,9 +1806,18 @@
   flex-wrap: wrap;
   gap: var(--space-2);
 }
+.protoRow > .field {
+  min-width: 0;
+}
+.protoRow > .grow {
+  flex: 1 1 220px;
+}
 .protoFoot {
   display: flex;
   justify-content: flex-end;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
 }
 .capRow {
   display: flex;
@@ -1838,6 +1866,16 @@
   line-height: 1.6;
   color: var(--text-3);
   text-align: right;
+}
+
+@media (max-width: 900px) {
+  .protoForm {
+    gap: var(--space-1);
+    padding: 6px;
+  }
+  .protoImportText {
+    min-height: 96px;
+  }
 }
 
 /* 删除渠道（§7.2）：与「+ 新增渠道」同在左栏底部，二次确认就地展开——不弹窗、

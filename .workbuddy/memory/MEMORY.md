@@ -1,5 +1,19 @@
 # CanvasFlow（轻画）项目记忆
 
+### 自定义协议窄屏与外部实现对照（2026-11-01，对账 #843）
+
+- **窄屏不是横向溢出，而是编辑区高度不足**：741×504 下 `protoForm` 本身在父容器内，
+  但完整表单比编辑区高，打开时底部操作区会被首屏裁掉。900px 以下必须收紧 gap / padding，
+  文本域降到 96px，保证表单滚动到可见位置时整体落在 `[data-settings-editor]` 内。
+- **页签必须等宽居中**：`手动创建 / 导入 AI 协议` 不能按文字宽度各占一块；用同一 flex
+  基线和 `justify-content:center`，避免文字看起来偏左或按钮宽窄不一。
+- **Cherry Studio 的做法**：其自定义 Provider 只开放固定端点类型（OpenAI Chat / Responses、
+  Anthropic Messages、Gemini generateContent、OpenAI 图片生成 / 编辑）和多个 Base URL；
+  用 schema 校验深链导入，不允许用户写任意请求脚本。轻画的声明式协议更通用，应继续定位为
+  高级导入；普通站点仍优先 OpenAI 兼容，避免用户被复杂格式绑架。
+- **证据**：G88 明暗各 **16/16**；741×504 断言 `formInsideEditor=true`、页签等宽居中、
+  无溢出；1440×900 / 1024×700 / 800×600 / 741×504 均无横向溢出。
+
 ### AI 自定义协议导入与通用 HTTP 执行（2026-11-01，对账 #842）
 
 - **导入的是受控声明，不是代码**：`qinghua.protocol/v1` 只接受固定鉴权、请求、轮询和
