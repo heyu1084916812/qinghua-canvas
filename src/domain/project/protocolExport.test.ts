@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import type { ProtocolDefinition } from './protocol'
-import { protocolPackageForExport, serializeProtocolPackage } from './protocolExport'
+import {
+  builtinProtocolReferenceForExport,
+  protocolPackageForExport,
+  serializeBuiltinProtocolReference,
+  serializeProtocolPackage,
+} from './protocolExport'
 import { parseDeclarativeProtocol } from './protocolRecipe'
 
 describe('protocolPackageForExport', () => {
@@ -79,5 +84,31 @@ describe('protocolPackageForExport', () => {
         capabilities: ['chat', 'image'],
       }),
     ).toBeNull()
+  })
+
+  it('exports built-in protocols as read-only reference documents', () => {
+    const reference = builtinProtocolReferenceForExport({
+      id: 'soonstudio',
+      name: 'SoonStudio',
+      short: 'SOON',
+      family: 'openai-compatible',
+      kind: 'station',
+      status: 'ready',
+      capabilities: ['chat', 'image', 'video'],
+      defaultBaseUrl: 'https://soonstudio.ai',
+      versionPath: '/v1',
+      docUrl: 'https://soonstudio.ai/docs',
+      credentials: [{ id: 'main', label: 'API Key', required: true }],
+    })
+    expect(reference).toMatchObject({
+      schema: 'qinghua.protocol-reference/v1',
+      id: 'soonstudio',
+      kind: 'station',
+      family: 'openai-compatible',
+      credentials: [{ id: 'main', label: 'API Key', required: true }],
+    })
+    const text = serializeBuiltinProtocolReference(reference!)
+    expect(text).not.toContain('apiKey')
+    expect(parseDeclarativeProtocol(text).ok).toBe(false)
   })
 })

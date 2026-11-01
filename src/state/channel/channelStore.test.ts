@@ -1238,6 +1238,32 @@ describe('channelStore · 自建协议', () => {
     expect(store.protocolCatalog().all.some((d) => d.id === 'in-use')).toBe(true)
   })
 
+  it('hides unused station protocols, keeps runtime definitions, and restores', async () => {
+    const p = createMemoryPlatform()
+    const store = createChannelStore(p, { seedBuiltins: false })
+    await store.load()
+
+    await store.removeBuiltinProtocol('yuli')
+    expect(store.getState().hiddenBuiltinProtocolIds).toEqual(['yuli'])
+    expect(store.protocolCatalog().all.some((protocol) => protocol.id === 'yuli')).toBe(true)
+
+    const reloaded = createChannelStore(p, { seedBuiltins: false })
+    await reloaded.load()
+    expect(reloaded.getState().hiddenBuiltinProtocolIds).toEqual(['yuli'])
+
+    await expect(reloaded.removeBuiltinProtocol('mock')).rejects.toThrow()
+    expect(reloaded.getState().hiddenBuiltinProtocolIds).toEqual(['yuli'])
+    await reloaded.restoreBuiltinProtocols()
+    expect(reloaded.getState().hiddenBuiltinProtocolIds).toEqual([])
+
+    await reloaded.create({
+      name: 'Yuli in use',
+      protocol: 'yuli',
+      baseUrl: 'https://yuli.host',
+    })
+    await expect(reloaded.removeBuiltinProtocol('yuli')).rejects.toThrow()
+  })
+
   it('remove synchronously leaves the routing table before credential cleanup', async () => {
     const base = createMemoryPlatform()
     const events: string[] = []

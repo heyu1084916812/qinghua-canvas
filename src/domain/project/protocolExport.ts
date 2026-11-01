@@ -125,3 +125,59 @@ export function serializeProtocolPackage(value: DeclarativeProtocolPackage): str
   }
   return `${JSON.stringify(document, null, 2)}\n`
 }
+
+export interface BuiltinProtocolReference {
+  schema: 'qinghua.protocol-reference/v1'
+  id: string
+  name: string
+  short: string
+  family: ProtocolDefinition['family']
+  kind: ProtocolDefinition['kind']
+  status: ProtocolDefinition['status']
+  capabilities: ProtocolDefinition['capabilities']
+  defaultBaseUrl?: string
+  alternateBaseUrls?: string[]
+  endpointBaseUrls?: ProtocolDefinition['endpointBaseUrls']
+  versionPath?: string
+  docUrl?: string
+  note?: string
+  credentials?: ProtocolDefinition['credentials']
+}
+
+/**
+ * Built-in protocols may contain provider-specific runtime branches. Export a
+ * readable reference document rather than an importable recipe that would
+ * silently lose those branches.
+ */
+export function builtinProtocolReferenceForExport(
+  definition: ProtocolDefinition,
+): BuiltinProtocolReference | null {
+  if (definition.kind === 'custom') return null
+  return {
+    schema: 'qinghua.protocol-reference/v1',
+    id: definition.id,
+    name: definition.name,
+    short: definition.short,
+    family: definition.family,
+    kind: definition.kind,
+    status: definition.status,
+    capabilities: definition.capabilities,
+    ...(definition.defaultBaseUrl ? { defaultBaseUrl: definition.defaultBaseUrl } : {}),
+    ...(definition.alternateBaseUrls
+      ? { alternateBaseUrls: [...definition.alternateBaseUrls] }
+      : {}),
+    ...(definition.endpointBaseUrls
+      ? { endpointBaseUrls: definition.endpointBaseUrls }
+      : {}),
+    ...(definition.versionPath ? { versionPath: definition.versionPath } : {}),
+    ...(definition.docUrl ? { docUrl: definition.docUrl } : {}),
+    ...(definition.note ? { note: definition.note } : {}),
+    ...(definition.credentials ? { credentials: definition.credentials } : {}),
+  }
+}
+
+export function serializeBuiltinProtocolReference(
+  value: BuiltinProtocolReference,
+): string {
+  return `${JSON.stringify(value, null, 2)}\n`
+}

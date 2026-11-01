@@ -1772,6 +1772,31 @@
   gap: var(--space-2);
   flex-wrap: wrap;
 }
+.protoMineHeadActions {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+.protoRestoreBtn {
+  border: 0;
+  border-radius: 6px;
+  padding: 4px 6px;
+  background: transparent;
+  color: var(--text-2);
+  font-size: var(--fs-chip);
+  cursor: pointer;
+}
+.protoRestoreBtn:hover {
+  background: var(--bg-hover);
+  color: var(--text-1);
+}
+.protoRestoreBtn:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--focus-ring);
+}
 .protoMineRow {
   display: flex;
   align-items: center;
@@ -1829,6 +1854,16 @@
 }
 .protoIconDanger:hover {
   color: var(--danger);
+}
+.protoManageFeedback {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+.protocolManageNotice {
+  margin: 0;
+  font-size: var(--fs-label);
+  color: var(--success);
 }
 /*
  * 待支持协议的原因文案。

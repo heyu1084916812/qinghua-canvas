@@ -17142,7 +17142,18 @@ async function g88(browser) {
   const chooseProtocol = async (value) => {
     const picker = page.locator('[data-choice-picker="settings-protocol"]')
     await picker.locator('button').click()
-    await picker.locator(`[data-choice-option="${value}"]`).click()
+    const option = picker.locator(`[data-choice-option="${value}"]`)
+    await option.waitFor({ state: 'visible', timeout: 3000 })
+    await sleep(250)
+    await option.click()
+    await page.waitForFunction(
+      (next) =>
+        document
+          .querySelector('[data-choice-picker="settings-protocol"]')
+          ?.getAttribute('data-choice-value') === next,
+      value,
+      { timeout: 3000 },
+    )
   }
   const selectedProtocol = () =>
     page
@@ -17233,14 +17244,67 @@ async function g88(browser) {
       (await protocolDownload.failure()) === null,
     protocolDownload.suggestedFilename(),
   )
+  const builtinRow = page.locator('[data-proto-manage-row="yuli"]')
+  rec(
+    g,
+    '站点协议有下载和删除入口，基础协议不混入管理区',
+    (await builtinRow.count()) === 1 &&
+      (await builtinRow.locator('[data-proto-download]').count()) === 1 &&
+      (await builtinRow.locator('[data-proto-remove]').count()) === 1 &&
+      (await page.locator('[data-proto-remove="mock"]').count()) === 0 &&
+      (await page.locator('[data-proto-remove="openai-compatible"]').count()) === 0 &&
+      (await page.locator('[data-proto-readonly-row="mock"]').count()) === 1 &&
+      (await page.locator('[data-proto-readonly-row="openai-compatible"]').count()) === 1 &&
+      (await page.locator('[data-proto-readonly] [data-proto-download], [data-proto-readonly] [data-proto-remove]').count()) === 0,
+  )
+  const builtinDownloadPromise = page.waitForEvent('download')
+  await page.locator('[data-proto-download="yuli"]').click()
+  const builtinDownload = await builtinDownloadPromise
+  rec(
+    g,
+    '站点协议可以下载只读说明文件',
+    builtinDownload.suggestedFilename() === 'yuli.protocol-reference.json' &&
+      (await builtinDownload.failure()) === null,
+    builtinDownload.suggestedFilename(),
+  )
+  await page.locator('[data-proto-remove="yuli"]').click()
+  await page
+    .locator('[data-proto-manage-row="yuli"]')
+    .waitFor({ state: 'detached', timeout: 5000 })
+    .catch(() => {})
+  rec(
+    g,
+    '未引用的站点协议可移除',
+    (await page.locator('[data-proto-manage-row="yuli"]').count()) === 0 &&
+      (await page.locator('[data-proto-restore]').count()) === 1,
+  )
+  await page.locator('[data-proto-restore]').click()
+  await page
+    .locator('[data-proto-manage-row="yuli"]')
+    .waitFor({ state: 'visible', timeout: 5000 })
+    .catch(() => {})
+  rec(
+    g,
+    '站点协议移除后可以恢复',
+    (await page.locator('[data-proto-manage-row="yuli"]').count()) === 1 &&
+      (await page.locator('[data-proto-restore]').count()) === 0,
+  )
   await chooseProtocol('mock')
   await sleep(400)
   await page.locator(`[data-proto-remove="${importedValue}"]`).click()
-  await sleep(400)
+  await page
+    .locator(`[data-proto-remove="${importedValue}"]`)
+    .waitFor({ state: 'detached', timeout: 5000 })
+    .catch(() => {})
+  const deleteError = await page
+    .locator('[data-proto-remove-error]')
+    .innerText()
+    .catch(() => '')
   rec(
     g,
     '★ 导入协议移出渠道后可删除',
     (await page.locator(`[data-proto-remove="${importedValue}"]`).count()) === 0,
+    `choice=${await selectedProtocol()} error=${deleteError}`,
   )
 
   await page.setViewportSize({ width: 741, height: 504 })

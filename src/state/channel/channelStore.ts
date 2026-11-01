@@ -9,6 +9,7 @@ import {
   tokenTailOf,
 } from '../../domain/project/channel'
 import {
+  BUILTIN_PROTOCOLS,
   buildProtocolCatalog,
   protocolById,
   stationProtocolForUrl,
@@ -149,6 +150,8 @@ export interface ChannelStoreState {
   recipeMemory: boolean
   /** 用户自建协议（内置协议不在这里，见 domain/project/protocol 的目录） */
   customProtocols: ProtocolDefinition[]
+  /** Built-in station protocols hidden from the protocol picker by the user. */
+  hiddenBuiltinProtocolIds: string[]
   /** 用户新增的全局前端模型；内置 `PRESET_MODELS` 不允许删除。 */
   customModels: PresetModel[]
   /** 标为“不常用”的前端逻辑名；画布 / Agent / 默认参数不消费。 */
@@ -167,6 +170,10 @@ export interface ChannelStoreActions {
   createCustomProtocol(input: CustomProtocolInput): Promise<CustomProtocolValidation>
   /** 删除自建协议；仍被渠道引用时抛错（不静默改指） */
   removeCustomProtocol(id: string): Promise<void>
+  /** Hide an unused built-in station protocol from the protocol picker. */
+  removeBuiltinProtocol(id: string): Promise<void>
+  /** Restore every hidden built-in protocol. */
+  restoreBuiltinProtocols(): Promise<void>
   create(input: CreateChannelInput): Promise<Channel>
   update(id: string, patch: Partial<Channel>): Promise<Channel>
   remove(id: string): Promise<void>
@@ -398,6 +405,7 @@ export function createChannelStore(
     routingPolicy: normalizeRoutePolicy(undefined),
     recipeMemory: true,
     customProtocols: [],
+    hiddenBuiltinProtocolIds: [],
     customModels: [],
     uncommonModelIds: [],
     loaded: false,
@@ -443,6 +451,7 @@ export function createChannelStore(
     const [
       loadedChannels,
       customRows,
+      storedHiddenBuiltinProtocolIds,
       customModels,
       uncommonModelIds,
       routeStrategy,
@@ -456,6 +465,7 @@ export function createChannelStore(
        */
       seedBuiltins ? repo.seedBuiltins() : repo.list(),
       platform.storage.query('customProtocols', {}),
+      presets.loadHiddenBuiltinProtocols(),
       presets.loadCustomModels(),
       presets.loadUncommonModels(),
       presets.loadRoutingStrategy(),
@@ -493,9 +503,13 @@ export function createChannelStore(
     const customProtocols = customRows
       .map((r) => toCustomDefinition(r as Record<string, unknown>))
       .filter((p): p is ProtocolDefinition => p !== null)
+    const hiddenBuiltinProtocolIds = storedHiddenBuiltinProtocolIds.filter((id) =>
+      BUILTIN_PROTOCOLS.some((protocol) => protocol.id === id && protocol.kind === 'station'),
+    )
     store.setState({
       channels,
       customProtocols,
+      hiddenBuiltinProtocolIds,
       customModels,
       uncommonModelIds,
       routeStrategy,
@@ -520,6 +534,26 @@ export function createChannelStore(
     }
     await platform.storage.delete('customProtocols', id)
     store.setState((s) => ({ customProtocols: s.customProtocols.filter((p) => p.id !== id) }))
+  }
+
+  const removeBuiltinProtocol: ChannelStoreActions['removeBuiltinProtocol'] = async (id) => {
+    const definition = BUILTIN_PROTOCOLS.find((protocol) => protocol.id === id)
+    if (!definition) throw new Error('这条协议不是内置协议，不能按内置协议移除')
+    if (definition.kind !== 'station') {
+      throw new Error('这里只能移除站点协议，基础协议和公开模板不在管理范围')
+    }
+    const usedBy = store.getState().channels.filter((channel) => channel.protocol === id)
+    if (usedBy.length > 0) {
+      throw new Error(`仍有 ${usedBy.length} 条渠道在使用该协议，请先改协议或删除渠道`)
+    }
+    const next = [...new Set([...store.getState().hiddenBuiltinProtocolIds, id])]
+    await presets.saveHiddenBuiltinProtocols(next)
+    store.setState({ hiddenBuiltinProtocolIds: next })
+  }
+
+  const restoreBuiltinProtocols: ChannelStoreActions['restoreBuiltinProtocols'] = async () => {
+    await presets.saveHiddenBuiltinProtocols([])
+    store.setState({ hiddenBuiltinProtocolIds: [] })
   }
 
   const create: ChannelStoreActions['create'] = async (input) => {
@@ -1726,6 +1760,8 @@ export function createChannelStore(
     protocolCatalog: catalog,
     createCustomProtocol,
     removeCustomProtocol,
+    removeBuiltinProtocol,
+    restoreBuiltinProtocols,
     create,
     update,
     remove,

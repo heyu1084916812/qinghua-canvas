@@ -21,6 +21,7 @@ import {
   CAPABILITY_LABEL,
   protocolById,
   type CustomProtocolInput,
+  type ProtocolDefinition,
   type ProtocolKind,
 } from '../../domain/project/protocol'
 import {
@@ -29,7 +30,9 @@ import {
   type DeclarativeProtocolPackage,
 } from '../../domain/project/protocolRecipe'
 import {
+  builtinProtocolReferenceForExport,
   protocolPackageForExport,
+  serializeBuiltinProtocolReference,
   serializeProtocolPackage,
 } from '../../domain/project/protocolExport'
 import {
@@ -468,6 +471,15 @@ export function SettingsPage({ embedded = false }: { embedded?: boolean } = {}) 
     () => channels.getState().customProtocols,
     () => channels.getState().customProtocols,
   )
+  const hiddenBuiltinProtocolIds = useSyncExternalStore(
+    channels.subscribe,
+    () => channels.getState().hiddenBuiltinProtocolIds,
+    () => channels.getState().hiddenBuiltinProtocolIds,
+  )
+  const hiddenBuiltinProtocolSet = useMemo(
+    () => new Set(hiddenBuiltinProtocolIds),
+    [hiddenBuiltinProtocolIds],
+  )
   /** 全局路由策略：与选中的渠道无关，跨三个工作台共用。 */
   const routingPolicy = useSyncExternalStore(
     channels.subscribe,
@@ -683,6 +695,14 @@ export function SettingsPage({ embedded = false }: { embedded?: boolean } = {}) 
   /** 抓站点图标要原生 HTTP（对账 #396）：浏览器里跨域读不到，按钮据此如实禁用 */
   /** 下拉里的全部协议（含 pending：它们显示为“待支持”且不可选，见协议区渲染） */
   const protocolOptions = catalog.all
+  const managedBuiltinProtocols = protocolOptions.filter(
+    (item) =>
+      item.kind === 'station' &&
+      !hiddenBuiltinProtocolSet.has(item.id),
+  )
+  const readonlyBuiltinProtocols = protocolOptions.filter(
+    (item) => item.kind === 'offline' || item.kind === 'public',
+  )
   /** 当前所选协议的说明（CLI 网关等有前提的协议必须显示出来，否则用户会填错地址） */
   const selectedProtocolNote = protocolById(protocol, catalog)?.note ?? ''
   /**
@@ -698,14 +718,19 @@ export function SettingsPage({ embedded = false }: { embedded?: boolean } = {}) 
      * 新渠道的下拉里不再出现；但**当前渠道正在用的那条**仍要留着 ——
      * 否则老渠道一打开下拉就是空白，用户以为协议丢了。
      */
-    (p) => (p.kind !== 'legacy' && p.kind !== 'hidden') || p.id === protocol,
+    (p) =>
+      ((p.kind !== 'legacy' && p.kind !== 'hidden') || p.id === protocol) &&
+      (!hiddenBuiltinProtocolSet.has(p.id) || p.id === protocol),
   )
   /**
    * 还留在**渠道下拉**里的待支持协议。`hidden` 的不算 —— 它们已经搬到
    * 「全局设置 → CLI」（对账 #308），再在这儿列一遍就成了两个说法。
    */
   const pendingProtocols = protocolOptions.filter(
-    (p) => p.status === 'pending' && p.kind !== 'hidden',
+    (p) =>
+      p.status === 'pending' &&
+      p.kind !== 'hidden' &&
+      !hiddenBuiltinProtocolSet.has(p.id),
   )
 
   // —— 添加自定义协议（用户 2026-09-28）：只开放 OpenAI 兼容族的对话 / 生图声明 ——
@@ -715,6 +740,7 @@ export function SettingsPage({ embedded = false }: { embedded?: boolean } = {}) 
   const [npError, setNpError] = useState('')
   const [npNotice, setNpNotice] = useState('')
   const [protoRemoveError, setProtoRemoveError] = useState('')
+  const [protoManageNotice, setProtoManageNotice] = useState('')
 
   useEffect(() => {
     void channels.load()
@@ -868,7 +894,19 @@ export function SettingsPage({ embedded = false }: { embedded?: boolean } = {}) 
   )
 
   const handleCreate = async () => {
-    const ch = await channels.create({ name: '新建服务', protocol: 'mock', baseUrl: '' })
+    const fallbackProtocol =
+      protocolOptions.find(
+        (item) =>
+          item.status === 'ready' &&
+          !hiddenBuiltinProtocolSet.has(item.id) &&
+          item.kind !== 'legacy' &&
+          item.kind !== 'hidden',
+      )?.id ?? 'mock'
+    const ch = await channels.create({
+      name: '新建服务',
+      protocol: fallbackProtocol,
+      baseUrl: '',
+    })
     setChannelFilter('all')
     setChannelSearch('')
     setSelectedId(ch.id)
@@ -1331,8 +1369,28 @@ export function SettingsPage({ embedded = false }: { embedded?: boolean } = {}) 
     window.setTimeout(() => URL.revokeObjectURL(url), 0)
   }
 
-  const downloadCustomProtocol = (definition: (typeof customProtocols)[number]) => {
+  const downloadProtocol = (definition: ProtocolDefinition) => {
     setProtoRemoveError('')
+    setProtoManageNotice('')
+    if (definition.kind !== 'custom') {
+      const reference = builtinProtocolReferenceForExport(definition)
+      if (!reference) {
+        setProtoRemoveError('这条站点协议没有可导出的说明内容')
+        return
+      }
+      const blob = new Blob([serializeBuiltinProtocolReference(reference)], {
+        type: 'application/json;charset=utf-8',
+      })
+      const url = URL.createObjectURL(blob)
+      const anchor = document.createElement('a')
+      anchor.href = url
+      anchor.download = `${definition.id}.protocol-reference.json`
+      document.body.append(anchor)
+      anchor.click()
+      anchor.remove()
+      window.setTimeout(() => URL.revokeObjectURL(url), 0)
+      return
+    }
     const pkg = protocolPackageForExport(definition)
     if (!pkg) {
       setProtoRemoveError('这条旧协议没有可导出的声明内容')
@@ -1363,10 +1421,27 @@ export function SettingsPage({ embedded = false }: { embedded?: boolean } = {}) 
   }
 
   /** 删除自建协议：仍被渠道引用时 store 会抛错，界面原样展示原因 */
-  const handleRemoveProtocol = async (id: string) => {
+  const handleRemoveProtocol = async (definition: ProtocolDefinition) => {
     setProtoRemoveError('')
+    setProtoManageNotice('')
     try {
-      await channels.removeCustomProtocol(id)
+      /*
+       * Protocol switching persists in the background. Flush the current
+       * channel first so an immediate delete cannot race against the old value.
+       */
+      if (selectedId) {
+        await channels.update(selectedId, {
+          protocol,
+          baseUrl: baseUrl.trim(),
+        })
+      }
+      if (definition.kind === 'custom') {
+        await channels.removeCustomProtocol(definition.id)
+        setProtoManageNotice(`已删除「${definition.name}」`)
+      } else {
+        await channels.removeBuiltinProtocol(definition.id)
+        setProtoManageNotice(`已移除「${definition.name}」，可从恢复入口找回`)
+      }
       setCatalogVersion((v) => v + 1)
     } catch (e) {
       setProtoRemoveError(e instanceof Error ? e.message : String(e))
@@ -1375,6 +1450,18 @@ export function SettingsPage({ embedded = false }: { embedded?: boolean } = {}) 
 
   // 状态行只对「本次选中的渠道 + 本渠道最近一次动作」负责，避免 A 渠道的结论
   // 挂到 B 渠道头上（store 里的三份结果都是全局单份）。
+  const handleRestoreBuiltinProtocols = async () => {
+    setProtoRemoveError('')
+    setProtoManageNotice('')
+    try {
+      await channels.restoreBuiltinProtocols()
+      setCatalogVersion((v) => v + 1)
+      setProtoManageNotice('已恢复全部站点协议')
+    } catch (e) {
+      setProtoRemoveError(e instanceof Error ? e.message : String(e))
+    }
+  }
+
   const action = verifiedFor?.channelId === selectedId ? verifiedFor.source : null
 
   /**
@@ -2135,14 +2222,96 @@ export function SettingsPage({ embedded = false }: { embedded?: boolean } = {}) 
                   </div>
                 )}
 
+                {managedBuiltinProtocols.length > 0 && (
+                  <div className={styles.protoMine} data-proto-builtins>
+                    <div className={styles.protoMineHead}>
+                      <span className={styles.label}>站点协议</span>
+                      <div className={styles.protoMineHeadActions}>
+                        <span className={styles.cardSub}>玉玉这类站点可下载或移除，删除后可恢复</span>
+                        {hiddenBuiltinProtocolIds.length > 0 && (
+                          <button
+                            type="button"
+                            className={styles.protoRestoreBtn}
+                            data-proto-restore
+                            onClick={() => void handleRestoreBuiltinProtocols()}
+                          >
+                            恢复已移除（{hiddenBuiltinProtocolIds.length}）
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                    {managedBuiltinProtocols.map((p) => (
+                      <div
+                        key={p.id}
+                        className={styles.protoMineRow}
+                        data-proto-manage-row={p.id}
+                      >
+                        <span className={styles.protoMineName}>
+                          <strong>{p.name}</strong>
+                          <span>{p.status === 'ready' ? p.short : '待支持'}</span>
+                        </span>
+                        <div className={styles.protoMineActions}>
+                          <button
+                            type="button"
+                            className={styles.protoIconBtn}
+                            data-proto-download={p.id}
+                            data-proto-source="builtin"
+                            aria-label={`下载协议 ${p.name}`}
+                            title="下载只读协议说明"
+                            onClick={() => downloadProtocol(p)}
+                          >
+                            <IconDownload size={15} />
+                          </button>
+                          <button
+                            type="button"
+                            className={`${styles.protoIconBtn} ${styles.protoIconDanger}`}
+                            data-proto-remove={p.id}
+                            data-proto-source="builtin"
+                            aria-label={`删除协议 ${p.name}`}
+                            title="删除内置协议"
+                            onClick={() => void handleRemoveProtocol(p)}
+                          >
+                            <IconDelete size={15} />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {readonlyBuiltinProtocols.length > 0 && (
+                  <div className={styles.protoMine} data-proto-readonly>
+                    <div className={styles.protoMineHead}>
+                      <span className={styles.label}>内置协议（只读）</span>
+                      <span className={styles.cardSub}>这里只展示，不提供下载和删除</span>
+                    </div>
+                    {readonlyBuiltinProtocols.map((p) => (
+                      <div
+                        key={p.id}
+                        className={styles.protoMineRow}
+                        data-proto-readonly-row={p.id}
+                      >
+                        <span className={styles.protoMineName}>
+                          <strong>{p.name}</strong>
+                          <span>{p.status === 'ready' ? p.short : '待支持'}</span>
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
                 {customProtocols.length > 0 && (
                   <div className={styles.protoMine} data-proto-mine>
                     <div className={styles.protoMineHead}>
                       <span className={styles.label}>我添加的协议</span>
-                      <span className={styles.cardSub}>内置协议只读，这里可以下载或删除</span>
+                      <span className={styles.cardSub}>导入协议可下载后再次导入，也可删除</span>
                     </div>
                     {customProtocols.map((p) => (
-                      <div key={p.id} className={styles.protoMineRow}>
+                      <div
+                        key={p.id}
+                        className={styles.protoMineRow}
+                        data-proto-manage-row={p.id}
+                      >
                         <span className={styles.protoMineName}>
                           <strong>{p.name}</strong>
                           <span>{p.short}</span>
@@ -2152,9 +2321,10 @@ export function SettingsPage({ embedded = false }: { embedded?: boolean } = {}) 
                             type="button"
                             className={styles.protoIconBtn}
                             data-proto-download={p.id}
+                            data-proto-source="custom"
                             aria-label={`下载协议 ${p.name}`}
                             title="下载协议"
-                            onClick={() => downloadCustomProtocol(p)}
+                            onClick={() => downloadProtocol(p)}
                           >
                             <IconDownload size={15} />
                           </button>
@@ -2162,18 +2332,29 @@ export function SettingsPage({ embedded = false }: { embedded?: boolean } = {}) 
                             type="button"
                             className={`${styles.protoIconBtn} ${styles.protoIconDanger}`}
                             data-proto-remove={p.id}
+                            data-proto-source="custom"
                             aria-label={`删除协议 ${p.name}`}
                             title="删除协议"
-                            onClick={() => void handleRemoveProtocol(p.id)}
+                            onClick={() => void handleRemoveProtocol(p)}
                           >
                             <IconDelete size={15} />
                           </button>
                         </div>
                       </div>
                     ))}
-                {protoRemoveError && (
+                  </div>
+                )}
+
+                {(protoRemoveError || protoManageNotice) && (
+                  <div className={styles.protoManageFeedback}>
+                    {protoRemoveError && (
                       <p className={styles.protoError} data-proto-remove-error>
                         {protoRemoveError}
+                      </p>
+                    )}
+                    {protoManageNotice && (
+                      <p className={styles.protocolManageNotice} data-proto-manage-notice>
+                        {protoManageNotice}
                       </p>
                     )}
                   </div>

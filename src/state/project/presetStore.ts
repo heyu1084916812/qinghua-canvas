@@ -70,6 +70,7 @@ const SKILL_FAVORITES_ROW_ID = 'skill:favorites'
 const RECIPE_MEMORY_ROW_ID = 'ui:recipeMemory'
 const CUSTOM_MODELS_ROW_ID = 'models:custom'
 const UNCOMMON_MODELS_ROW_ID = 'models:uncommon'
+const HIDDEN_BUILTIN_PROTOCOLS_ROW_ID = 'protocol:hiddenBuiltins'
 
 export interface AgentDefaultModel {
   channelId: string
@@ -124,6 +125,9 @@ export interface PresetStore {
   /** 前端模型里标记为“不常用”的逻辑名；画布默认不消费这些模型。 */
   loadUncommonModels(): Promise<string[]>
   saveUncommonModels(names: readonly string[]): Promise<void>
+  /** IDs of built-in station protocols removed from the channel protocol picker. */
+  loadHiddenBuiltinProtocols(): Promise<string[]>
+  saveHiddenBuiltinProtocols(ids: readonly string[]): Promise<void>
 }
 
 export function createPresetStore(storage: StoragePort): PresetStore {
@@ -365,6 +369,29 @@ export function createPresetStore(storage: StoragePort): PresetStore {
       } catch {
         // 偏好写不进去不阻断生成；最坏情况只是下次仍显示为常用
       }
+    },
+    async loadHiddenBuiltinProtocols() {
+      try {
+        const rows = await storage.query('presets', {
+          id: HIDDEN_BUILTIN_PROTOCOLS_ROW_ID,
+        })
+        const ids = (rows[0] as { ids?: unknown } | undefined)?.ids
+        if (!Array.isArray(ids)) return []
+        return [...new Set(ids.filter((id): id is string => typeof id === 'string' && !!id))]
+      } catch {
+        return []
+      }
+    },
+    async saveHiddenBuiltinProtocols(ids) {
+      const clean = [...new Set(ids.filter((id) => typeof id === 'string' && id !== ''))]
+      /*
+       * This is an explicit user action, so a failed write must surface instead
+       * of silently restoring the protocol on the next launch.
+       */
+      await storage.put(
+        'presets',
+        { id: HIDDEN_BUILTIN_PROTOCOLS_ROW_ID, ids: clean } as never,
+      )
     },
   }
 }

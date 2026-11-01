@@ -1,5 +1,22 @@
 # CanvasFlow（轻画）项目记忆
 
+### 站点协议下载、移除与恢复（2026-11-01，对账 #846）
+
+- **只管理站点协议**：`managedBuiltinProtocols` 只收 `kind === 'station'`，例如玉玉、灵境、
+  SoonStudio；Mock、OpenAI 兼容、ModelScope、火山 Ark 等基础 / 公开模板不混进管理区，
+  但要完整出现在“内置协议（只读）”区，且那里不能渲染下载或删除动作。
+- **下载格式必须分流**：自定义协议导出可再次导入的 `qinghua.protocol/v1`；内置协议导出
+  `qinghua.protocol-reference/v1` 只读说明文件。后者故意不可导入，避免把 SoonStudio、
+  RunningHub 等代码级分支伪装成通用 recipe。
+- **删除是持久隐藏，不是改代码**：被移除的 id 写入 `presets` 的
+  `protocol:hiddenBuiltins`，重启后仍保持；`恢复已移除（N）` 一次清空隐藏列表。
+- **安全边界**：仍有渠道引用的站点协议拒绝移除；未引用站点都能隐藏并在之后恢复。
+  运行目录仍保留内置定义，只有协议选择器过滤隐藏站点；新建渠道优先选首个未隐藏项。
+- **证据**：协议 / 导出 / channelStore 定向 **90/90**；全量 Vitest
+  **3761 passed / 1 skipped**；G88 明暗各 **15/15**；真实站点下载文件名
+  `yuli.protocol-reference.json`、failure=null；1440×900 / 1024×700 明暗四组无横向溢出，
+  9 条站点管理行可操作、4 条内置只读行动作数 0；`npm run check`、`npm run build` 通过。
+
 ### 导入协议管理与导出（2026-11-01，对账 #845）
 
 - **用户协议可管理**：`我添加的协议` 行固定展示名称 / 短标签，并提供下载、删除两个图标动作；
@@ -7,7 +24,7 @@
 - **下载必须可再导入**：`protocolPackageForExport()` 把内部 `recipe` 重新投影成
   `qinghua.protocol/v1` 顶层文档，再经 parser round-trip；文件绝不包含 API Key。
 - **旧手动协议可迁移**：没有 recipe 的旧自定义 OpenAI 兼容协议在下载时转换为等价声明；
-  内置站点协议含代码级分支，必须拒绝导出并保持只读，不能给用户一个不能执行的假协议文件。
+  内置站点协议仍拒绝伪装成可导入 recipe，后续 #846 改为下载只读说明文件。
 - **证据**：导出定向 **7/7**；全量 Vitest **3759 passed / 1 skipped**；G88 明暗各
   **11/11**；真实下载文件名 `custom-o0gwkb.qinghua.json`、failure=null；
   `npm run check`、`npm run build` 通过；测试数据已清理。
