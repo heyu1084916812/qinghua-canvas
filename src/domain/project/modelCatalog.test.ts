@@ -370,6 +370,14 @@ describe('channelIdForLogical', () => {
     expect(channelIdForLogical(channels, 'shared-model', 'B')).toBe('B')
   })
 
+  it('★★ 渠道优先度更高时，旧的在用渠道不能让路', () => {
+    const channels = [
+      ch({ id: 'soon', priority: 0, models: [cap('shared-model')] }),
+      ch({ id: 'chat2api', priority: 10, models: [cap('shared-model')] }),
+    ]
+    expect(channelIdForLogical(channels, 'shared-model', 'soon')).toBe('chat2api')
+  })
+
   it('已勾选模型不为空时，拉取缓存里的别名不能抢走选路', () => {
     const channels = [
       ch({

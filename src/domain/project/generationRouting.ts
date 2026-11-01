@@ -232,7 +232,8 @@ function directTarget(
  * - 用户选了一个逻辑模型时，只允许真实渠道里的同模型候选参与；
  *   只要存在能跑这一类媒体的真实渠道，就绝不回落到 smoke mock。
  * - 仅在隔离测试库「只有 mock 可用」时保留 mock 兜底，避免把冒烟逼成假绿。
- * - 显式渠道仍优先，但依然要满足媒体类别、启用和可路由条件。
+ * - 只要节点选了逻辑模型，就按全局渠道优先度选路；节点里遗留的旧 `channelId`
+ *   不能把更高优先级的渠道挡在外面。没有模型时才用渠道取该类别的默认模型。
  */
 export function resolveGenerationTarget(opts: {
   channels: readonly Channel[]
@@ -264,15 +265,6 @@ export function resolveGenerationTarget(opts: {
   if (pool.length === 0) return null
 
   const requestedModel = logicalModel?.trim() ?? ''
-  if (channelId) {
-    const explicit = pool.find((channel) => channel.id === channelId)
-    if (explicit) {
-      const model = requestedModel || firstLogicalModel(explicit, category, recipe ?? undefined)
-      const target = model ? directTarget(explicit, model) : null
-      if (target) return target
-    }
-  }
-
   if (requestedModel) {
     const route = resolveRouteFor(
       pool.map(sourceOf),
@@ -293,6 +285,15 @@ export function resolveGenerationTarget(opts: {
           usedMock: pool.find((channel) => channel.id === route.channelId)?.protocol === 'mock',
         }
       : null
+  }
+
+  if (channelId) {
+    const explicit = pool.find((channel) => channel.id === channelId)
+    if (explicit) {
+      const model = firstLogicalModel(explicit, category, recipe ?? undefined)
+      const target = model ? directTarget(explicit, model) : null
+      if (target) return target
+    }
   }
 
   const recipeModel = recipe?.model?.trim() ?? ''

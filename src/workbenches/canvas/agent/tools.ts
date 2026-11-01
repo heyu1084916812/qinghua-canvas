@@ -1173,6 +1173,7 @@ function disambiguateAttachAliases(raw: unknown): unknown {
     return raw
   }
   const nodes = row.nodes.map(asRecord)
+  const rawEdges = (Array.isArray(row.edges) ? row.edges : []).map(asRecord)
   const nodeByLocalId = new Map(
     nodes.flatMap((node) =>
       typeof node.localId === 'string' && node.localId
@@ -1189,8 +1190,12 @@ function disambiguateAttachAliases(raw: unknown): unknown {
     const node = nodeByLocalId.get(localId)
     const data = asRecord(node?.data)
     const prompt = typeof data.prompt === 'string' ? data.prompt.trim() : ''
+    const usedAsUpstream = rawEdges.some((edge) => edge.source === localId)
     const collidesWithNewGeneration =
-      Boolean(node) && node?.type === 'generation' && Boolean(prompt)
+      Boolean(node) &&
+      node?.type === 'generation' &&
+      Boolean(prompt) &&
+      !usedAsUpstream
     if (!collidesWithNewGeneration) return entry
 
     let referenceId = `${localId}__reference`
@@ -1829,27 +1834,43 @@ export async function executeConfirmedTool(
         ...(ctx.viewportWorld ? { viewportWorld: ctx.viewportWorld } : {}),
       })
       const attachedLocalIds = new Set((finalPlan.attach ?? []).map((item) => item.localId))
-      const explicitProblems = finalPlan.nodes.flatMap((node) => {
+      const landingProblems = finalPlan.nodes.flatMap((node) => {
         if (node.type !== 'generation' || attachedLocalIds.has(node.localId)) return []
         const expected = ctx.explicitRecipeForGenerated?.(node.type, node)
-        if (!expected) return []
         const resolved = applied.resolvedNodes.find((item) => item.localId === node.localId)
-        const actual = resolved
+        const actualData = resolved
           ? (ctx.store.getSnapshot().nodes.find((item) => item.id === resolved.nodeId)?.data as
-              | { model?: unknown }
-              | undefined)?.model
+              | { model?: unknown; mode?: unknown }
+              | undefined)
           : undefined
-        return typeof actual === 'string' && actual === expected.model
-          ? []
-          : [
+        const actualModel = actualData?.model
+        const problems: string[] = []
+        if (
+          typeof actualModel === 'string' &&
+          ctx.categoryOfModel?.(actualModel) === 'chat'
+        ) {
+          problems.push(
+            `节点「${node.title ?? node.localId}」是生成节点，却写入了对话模型 ${actualModel}。`,
+          )
+        }
+        if (
+          expected &&
+          !(
+            typeof actualModel === 'string' &&
+            actualModel === expected.model
+          )
+        ) {
+          problems.push(
               `节点「${node.title ?? node.localId}」明确要求使用 ${expected.model}，` +
-                `实际写入的是 ${typeof actual === 'string' && actual ? actual : '(空)'}。`,
-            ]
+                `实际写入的是 ${typeof actualModel === 'string' && actualModel ? actualModel : '(空)'}。`,
+          )
+        }
+        return problems
       })
       // 自检结果整份回填：模型要靠它决定补连线还是改图（§6.1）
       return {
-        ok: applied.ok && explicitProblems.length === 0,
-        problems: [...applied.problems, ...explicitProblems],
+        ok: applied.ok && landingProblems.length === 0,
+        problems: [...applied.problems, ...landingProblems],
         createdNodeIds: applied.createdNodeIds,
         ...(aligned.notes.length > 0 ? { notes: aligned.notes } : {}),
       }

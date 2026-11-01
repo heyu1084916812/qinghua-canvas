@@ -142,6 +142,54 @@ describe('buildLandingCommand', () => {
     expect(r.idOf.src).toBe('old-1')
   })
 
+  it('★★ 只从真实媒体上游继承配方，提示词节点的对话模型不能污染生成节点', () => {
+    seq = 0
+    const plan: AgentPlan = {
+      summary: '视觉规范 + 图片参考 → 新首屏',
+      nodes: [
+        { localId: 'spec', type: 'prompt', data: { text: '视觉规范' }, order: 0 },
+        { localId: 'ref', type: 'generation', data: {}, order: 1 },
+        {
+          localId: 'hero',
+          type: 'generation',
+          data: { mode: 'image', prompt: '首屏主视觉' },
+          order: 2,
+        },
+      ],
+      edges: [
+        { source: 'spec', target: 'hero' },
+        { source: 'ref', target: 'hero' },
+      ],
+      attach: [
+        { localId: 'spec', existingNodeId: 'prompt-old' },
+        { localId: 'ref', existingNodeId: 'image-old' },
+      ],
+    }
+    const r = buildLandingCommand({
+      plan,
+      graph: graph([
+        {
+          ...existing('prompt-old', 'prompt'),
+          data: { text: '视觉规范', channelId: 'soon', model: 'Deepseek 4.1 Flash' },
+        } as unknown as NodeSnapshot,
+        {
+          ...existing('image-old', 'generation'),
+          data: { mode: 'image', assetHash: 'image-hash', channelId: 'chat2api', model: 'GPT Image 2' },
+        } as unknown as NodeSnapshot,
+      ]),
+      origin: { x: 0, y: 0 },
+      newId,
+      dataFor: () => ({ channelId: 'default', model: 'GPT Image 2' }),
+    })
+
+    const hero = r.command.nodes.find((node) => node.id === r.idOf.hero)
+    expect(hero?.data).toMatchObject({
+      channelId: 'chat2api',
+      model: 'GPT Image 2',
+      mode: 'image',
+    })
+  })
+
   it('★ 计划没给的字段用 spec 默认值补齐（不建半残节点）', () => {
     seq = 0
     const plan: AgentPlan = {

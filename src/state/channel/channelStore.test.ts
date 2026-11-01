@@ -247,7 +247,7 @@ describe('channelStore', () => {
     })
   })
 
-  it('★ 显式渠道只在自身 Key 分组内选路，勾选范围不匹配时明确拒绝', async () => {
+  it('★ 路由白名单决定候选，节点旧 channelId 不再额外收窄范围', async () => {
     const p = createMemoryPlatform()
     const store = createChannelStore(p, { seedBuiltins: false })
     const a = await store.create({ name: 'A', protocol: 'mock', baseUrl: '' })
@@ -276,12 +276,44 @@ describe('channelStore', () => {
     if (!explicit.ok) return
     expect(explicit.plan.candidates.map((candidate) => candidate.channelId)).toEqual([a.id])
 
-    await expect(store.planGenerationRoute({
+    const fromOtherLegacyChannel = await store.planGenerationRoute({
       category: 'image',
       logicalModel: model.id,
       explicitChannelId: b.id,
-    })).resolves.toEqual({ ok: false, reason: 'policy_excluded' })
+    })
+    expect(fromOtherLegacyChannel.ok).toBe(true)
+    if (fromOtherLegacyChannel.ok) {
+      expect(fromOtherLegacyChannel.plan.candidates.map((candidate) => candidate.channelId)).toEqual(
+        [a.id],
+      )
+    }
   })
+
+  it('★★ 节点遗留低优先渠道时，生成路由仍把高优先渠道排在第一位', async () => {
+    const p = createMemoryPlatform()
+    const store = createChannelStore(p, { seedBuiltins: false })
+    const soon = await store.create({ name: 'Soon', protocol: 'mock', baseUrl: '' })
+    const chat2api = await store.create({ name: 'Chat2api', protocol: 'mock', baseUrl: '' })
+    const model: ModelCapability = {
+      id: 'gpt-image-shared',
+      category: 'image',
+      inputTypes: ['text'],
+    }
+    await store.setModels(soon.id, [model])
+    await store.setModels(chat2api.id, [model])
+    await store.setRouteTuning(soon.id, { priority: 0 })
+    await store.setRouteTuning(chat2api.id, { priority: 10 })
+
+    const route = await store.planGenerationRoute({
+      category: 'image',
+      logicalModel: model.id,
+      explicitChannelId: soon.id,
+    })
+    expect(route.ok).toBe(true)
+    if (!route.ok) return
+    expect(route.plan.candidates[0]?.channelId).toBe(chat2api.id)
+  })
+
 
   it('★ 文本 Agent 使用同一 RoutePlan，并按同一 round_robin 游标轮换', async () => {
     const p = createMemoryPlatform()

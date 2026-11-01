@@ -562,7 +562,8 @@ export function CanvasExecutionProvider({
           random: Math.random(),
           /**
            * 画布前端已经没有“选渠道”这一档，`channelId` 是创建时的内部值。
-           * 它仍然优先；只有它缺 Key / 停用 / 不支持模型而别处有可用提供者时才改走路由。
+           * 这里只先得到一个可读的初始候选；真正执行顺序由下面的全局
+           * `planGenerationRoute` 按渠道优先度冻结，旧 channelId 不能把高优先渠道挡住。
            */
           fallbackFromExplicit: true,
         })

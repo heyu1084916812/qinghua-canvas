@@ -24,6 +24,8 @@ import {
 export interface CatalogChannelLike {
   id: string
   enabled: boolean
+  /** 用户设置的渠道优先度；同一模型多条渠道都能提供时，数值大的先选。 */
+  priority?: number
   /** 用户勾选的（画布下拉的数据源） */
   models: readonly ModelCapability[]
   /** 拉取回来的全部 */
@@ -136,9 +138,11 @@ function findProvider(
 ): { channelId: string; capability: ModelCapability } | undefined {
   const name = logicalName.trim()
   if (!name) return undefined
-  const ordered = channelId
-    ? [...channels].sort((a, b) => (a.id === channelId ? -1 : b.id === channelId ? 1 : 0))
-    : channels
+  const ordered = [...channels].sort(
+    (a, b) =>
+      (b.priority ?? 0) - (a.priority ?? 0) ||
+      (a.id === channelId ? -1 : b.id === channelId ? 1 : 0),
+  )
   for (const c of ordered) {
     const upstream = resolveUpstreamModel(c.modelMap, name)
     if (!upstream) continue
@@ -207,8 +211,8 @@ export function capabilityOfLogical(
  * 各写一份的话，会出现「这个模型在下拉里选得出来、渠道却找不到」的幽灵项，
  * 表现是发消息报看不懂的渠道错误。
  *
- * `preferChannelId`：当前会话已经在用的渠道若能提供它，就**不要换** ——
- * 换渠道会让同一个模型突然走另一条线，用户没有要求这件事。
+ * `preferChannelId`：只在**优先度相同**时作为同档内的稳定偏好；
+ * 优先度更高的渠道必须先选，否则节点会把旧渠道继续带进生成。
  */
 export function channelIdForLogical(
   channels: readonly CatalogChannelLike[],

@@ -140,11 +140,22 @@ function recipeFromAttached(input: {
   const attach = input.plan.attach ?? []
   if (attach.length === 0) return {}
   const existingIdOf = new Map(attach.map((a) => [a.localId, a.existingNodeId]))
+  const recipeSourceLocalIds = new Set(
+    attach
+      .filter((item) => {
+        const node = input.graph.nodes.find((candidate) => candidate.id === item.existingNodeId)
+        return node?.type === 'generation' || node?.type === 'batch'
+      })
+      .map((item) => item.localId),
+  )
   const upstreamAttached = input.plan.edges
     .filter((e) => e.target === input.node.localId)
     .map((e) => e.source)
-    .find((source) => existingIdOf.has(source))
-  const pick = upstreamAttached ?? attach[0]!.localId
+    .find((source) => recipeSourceLocalIds.has(source))
+  const pick =
+    upstreamAttached ??
+    attach.find((item) => recipeSourceLocalIds.has(item.localId))?.localId
+  if (!pick) return {}
   const existingId = existingIdOf.get(pick)
   if (!existingId) return {}
   const existing = input.graph.nodes.find((n) => n.id === existingId)

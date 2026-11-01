@@ -1,5 +1,21 @@
 # CanvasFlow（轻画）项目记忆
 
+### Agent 媒体配方、attach 复用与全局选路（2026-11-02，对账 #849）
+
+- **提示词节点的对话模型不能污染生成节点**：`recipeFromAttached()` 只从 `generation / batch`
+  媒体节点继承配方。先通过 attach 的提示词节点也会写 `model/channelId`，但那是文本 LLM，
+  不是生图模型。
+- **已作为上游的 attach 节点不能拆别名**：`disambiguateAttachAliases()` 只有在该 localId
+  完全没有出边时才处理“新生成节点与参考复用同名”的冲突。否则会把真实参考图误造成孤立生成节点。
+- **生成路由先看逻辑模型和渠道优先度**：`planGenerationRoute()` 不再按节点遗留 `channelId`
+  收窄全局候选；`allowedCandidates` 才是硬白名单。高优先 Chat2api 应先于低优先 SoonStudio。
+- **生成节点只能拿图片 / 视频模型**：`alignGenerationMode()` 发现 chat 模型时移除模型和旧渠道；
+  applyPlan 落地后再查一次，防止显示与实际分叉。
+- **画布日志不显示对话调用**：`shouldShowInCanvasLog()` 过滤 `params.kind='text'`，Agent 探测、
+  提示词优化 / 翻译 / 反推仍保留在底层总审计记录里。
+- **证据**：8 个相关测试文件 **285/285**；全量 Vitest **3772 passed / 1 skipped**；
+  `npm run check`、`npm run build` 通过；当前 A+ 首屏节点已纠正为 Chat2api + GPT Image 2。
+
 ### Agent 排队完成态与恢复对账（2026-11-02，对账 #848）
 
 - **队列锁要带真实 turnId**：`pumpQueuedTurn()` 可以先 `claimSessionActivity(sessionId)` 占住会话，

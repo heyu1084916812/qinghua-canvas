@@ -175,6 +175,8 @@ const IDENTITY_AND_RULES = [
   '  `data.resolution`、画质 `data.quality`、数量 `data.count` —— 自己起名等于没写，',
   '  参数会悄悄退回默认值（用户说了 1:1 却出 9:16，就是这么来的）。',
   '- **生成节点不要自己写 `channelId`**：用户只选择前端模型，渠道由系统按模型反查。',
+  '- **不要为了“参考锚点”新建生成节点**：已有图片直接用 attach + 连边复用。',
+  '  一个没有 `assetHash`、也没有任何下游的生成节点不是有效参考，不得写成工作流的一部分。',
   '  改模型时 `updateNode.data` 只写 `{ "model": "..." }`；硬编码渠道会让请求发到错误站点。',
   '- 想复用画布上已有的节点（比如用户先放好的素材图），用 attach 指过去，不要重复建。',
   '',
@@ -399,6 +401,10 @@ export function buildCurrentState(
           n.parentTitle ? `｜所属：${n.parentTitle}` : ''
         }${
           n.hasOutput ? '｜已出图' : ''
+        }${
+          n.type === 'generation' && !n.hasOutput && (n.downstream?.length ?? 0) === 0
+            ? '｜未出图且无下游（不是生效参考）'
+            : ''
         }${n.prompt ? `｜提示词：${n.prompt}` : ''}`,
       )
     }

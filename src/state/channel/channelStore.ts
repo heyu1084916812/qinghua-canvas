@@ -1065,12 +1065,8 @@ export function createChannelStore(
 
   const planGenerationRoute: ChannelStoreActions['planGenerationRoute'] = async (opts) => {
     const state = store.getState()
-    const explicitChannelId = opts.explicitChannelId?.trim() ?? ''
-    const sourceChannels = explicitChannelId
-      ? state.channels.filter((channel) => channel.id === explicitChannelId)
-      : state.channels
     const hasLocalCli = platform.cli != null
-    const channels = sourceChannels.map((channel) => {
+    const channels = state.channels.map((channel) => {
       const tokenless = protocolNeedsNoToken(channel.protocol, hasLocalCli)
       return {
         ...channel,

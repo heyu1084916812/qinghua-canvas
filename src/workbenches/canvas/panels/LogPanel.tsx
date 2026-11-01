@@ -18,6 +18,15 @@ import styles from './LogPanel.module.css'
 
 export { routeAttemptSummary }
 
+/** 画布日志只展示生成 / 本地合成；Agent 与提示词工具的对话模型调用留在总审计里。 */
+export function shouldShowInCanvasLog(record: { params: unknown }): boolean {
+  const params =
+    record.params && typeof record.params === 'object' && !Array.isArray(record.params)
+      ? (record.params as Record<string, unknown>)
+      : {}
+  return params.kind !== 'text'
+}
+
 /** 只有点在遮罩本身才收起；点在面板内部（事件已冒泡）不能误关。 */
 export function isLogBackdropPointerDown(
   target: EventTarget | null,
@@ -51,7 +60,11 @@ export function LogPanel({ onClose }: { onClose: () => void }) {
       workbench: 'canvas',
       limit: Number.MAX_SAFE_INTEGER,
     })
-    setRecords(page.entries.map((entry) => entry.record as RunRecord))
+    setRecords(
+      page.entries
+        .map((entry) => entry.record as RunRecord)
+        .filter(shouldShowInCanvasLog),
+    )
   }, [projectId, runLogs])
 
   useEffect(() => {

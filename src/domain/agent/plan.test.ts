@@ -677,7 +677,13 @@ describe('summarizeTitle', () => {
  */
 describe('alignGenerationMode · mode 跟着模型走', () => {
   const categoryOf = (m: string) =>
-    m.includes('Video') ? ('video' as const) : m.includes('Image') ? ('image' as const) : undefined
+    m.includes('Video')
+      ? ('video' as const)
+      : m.includes('Image')
+        ? ('image' as const)
+        : m.includes('Deepseek')
+          ? ('chat' as const)
+          : undefined
   const plan = (mode: string, model: string): AgentPlan => ({
     summary: 's',
     nodes: [{ localId: 'g1', type: 'generation', data: { mode, model }, order: 0 }],
@@ -699,6 +705,26 @@ describe('alignGenerationMode · mode 跟着模型走', () => {
     const { plan: out, notes } = alignGenerationMode(plan('image', '某站的私有模型'), categoryOf)
     expect(out.nodes[0]!.data.mode).toBe('image')
     expect(notes).toEqual([])
+  })
+
+  it('★★ 生成节点误填对话模型 → 移除模型与旧渠道，交给图片默认配方', () => {
+    const withChannel: AgentPlan = {
+      ...plan('image', 'Deepseek 4.1 Flash'),
+      nodes: [
+        {
+          ...plan('image', 'Deepseek 4.1 Flash').nodes[0]!,
+          data: {
+            ...plan('image', 'Deepseek 4.1 Flash').nodes[0]!.data,
+            channelId: 'soon',
+          },
+        },
+      ],
+    }
+    const { plan: out, notes } = alignGenerationMode(withChannel, categoryOf)
+    expect(out.nodes[0]!.data).not.toHaveProperty('model')
+    expect(out.nodes[0]!.data).not.toHaveProperty('channelId')
+    expect(out.nodes[0]!.data.mode).toBe('image')
+    expect(notes[0]).toContain('对话模型')
   })
 })
 

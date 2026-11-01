@@ -161,6 +161,36 @@ describe('resolveGenerationTarget', () => {
     })
   })
 
+  it('★★ 节点遗留低优先渠道时，逻辑模型仍走全局最高优先渠道', () => {
+    const target = resolveGenerationTarget({
+      channels: [
+        channel({
+          id: 'soon',
+          protocol: 'openai-compatible',
+          priority: 0,
+          models: [image('gpt-image-2')],
+          modelMap: { 'GPT Image 2': 'gpt-image-2' },
+        }),
+        channel({
+          id: 'chat2api',
+          protocol: 'openai-compatible',
+          priority: 10,
+          models: [image('gpt-image-2')],
+          modelMap: { 'GPT Image 2': 'gpt-image-2' },
+        }),
+      ],
+      category: 'image',
+      catalog: BUILTIN_CATALOG,
+      logicalModel: 'GPT Image 2',
+      channelId: 'soon',
+    })
+
+    expect(target).toMatchObject({
+      channelId: 'chat2api',
+      logicalModel: 'GPT Image 2',
+    })
+  })
+
   it('默认配方来自 mock 时，有真实渠道就改用真实渠道同类别模型', () => {
     const target = resolveGenerationTarget({
       channels: [

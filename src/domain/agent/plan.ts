@@ -495,6 +495,15 @@ export function alignGenerationMode(
     const model = typeof data.model === 'string' ? data.model.trim() : ''
     if (!model) return n
     const category = categoryOf(model)
+    if (category === 'chat') {
+      const rest = { ...data }
+      delete rest.model
+      delete rest.channelId
+      notes.push(
+        `节点「${n.title || n.localId}」是生成节点，已移除误填的对话模型 ${model}，改用图片 / 视频模型。`,
+      )
+      return { ...n, data: rest }
+    }
     if (category !== 'video' && category !== 'image') return n
     const want = category === 'video' ? 'video' : 'image'
     if (data.mode === want) return n

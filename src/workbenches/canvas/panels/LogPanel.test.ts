@@ -3,6 +3,7 @@ import {
   formatLogTime,
   isLogBackdropPointerDown,
   routeAttemptSummary,
+  shouldShowInCanvasLog,
   statusLabel,
 } from './LogPanel'
 
@@ -78,5 +79,11 @@ describe('LogPanel / 展示逻辑', () => {
     expect(summary?.title).toContain('primary')
     expect(summary?.title).toContain('HTTP 403')
     expect(summary?.title).toContain('backup')
+  })
+
+  it('画布日志过滤对话模型调用，只保留生成与本地合成', () => {
+    expect(shouldShowInCanvasLog({ params: { kind: 'text', model: 'Deepseek' } })).toBe(false)
+    expect(shouldShowInCanvasLog({ params: { mode: 'image', model: 'GPT Image 2' } })).toBe(true)
+    expect(shouldShowInCanvasLog({ params: {} })).toBe(true)
   })
 })

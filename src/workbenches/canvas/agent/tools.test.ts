@@ -1167,6 +1167,36 @@ describe('planProblems · 跑不起来的生成节点', () => {
     })
   })
 
+  it('★★ attach 节点已经在作上游时，不能再被误拆成新生成节点', () => {
+    const r = planProblems(
+      {
+        ...plan(
+          [
+            {
+              localId: 'ref1',
+              type: 'generation',
+              data: { mode: 'image', prompt: '已复用图上的说明文字' },
+              order: 0,
+            },
+            {
+              localId: 'hero',
+              type: 'generation',
+              data: { mode: 'image', prompt: '基于参考图生成首屏' },
+              order: 1,
+            },
+          ],
+          [{ source: 'ref1', target: 'hero' }],
+        ),
+        attach: [{ localId: 'ref1', existingNodeId: 'node_ref' }],
+      },
+      ['node_ref'],
+    )
+
+    expect(r.problems).toEqual([])
+    expect(r.plan?.attach?.[0]?.localId).toBe('ref1')
+    expect(r.plan?.nodes.map((node) => node.localId)).toEqual(['ref1', 'hero'])
+  })
+
   it('★ 上游接着提示词节点（模板形态，正文在上游）→ 放行', () => {
     const r = planProblems(
       plan(
