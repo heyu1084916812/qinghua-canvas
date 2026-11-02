@@ -27,7 +27,8 @@
   `nodeRunStates` 与 `execution.nodeStates` 同构（失败态是 AppError），`readResult` 持久失败优先。
   `applyPlan` 工具结果必须返回 `applied.resolvedNodes`，`agentLoopDeps` 只从这份真实
   localId → nodeId 映射写别名；不得按标题猜测。测试必须同时钉住工具返回字段和别名表写回，
-  真实回合碰巧用真实 nodeId 成功不构成别名契约证明。
+  真实回合碰巧用真实 nodeId 成功不构成别名契约证明。已由 `a25c767` 补链，并用真实工具消息
+  `alias_probe → node_ebdbf0a9…1098e` + 同回合 runNode 同 id 验收。
   `onRouteReady` 只在路由成功后触发，由宿主创建 planning Job。它承接上下文、工具探测 / JSON 降级、
   技能 chip、媒体模型、每图拆分、请求分类、工具裁剪和系统提示词，但不得持有 React refs、运行模型循环、
   执行确认或处理结果。`AgentPanel` 继续是 per-session abort / toolMode / turnTools / autoRun /

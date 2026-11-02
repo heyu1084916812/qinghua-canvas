@@ -20,7 +20,9 @@
   Chat2api GPT Image 2 真图均通过。确认执行、停止 / 继续和 AgentHost 仍是后续债。
 - **#860 已补回真实数据链**：`executeConfirmedTool('applyPlan')` 现在返回 `applied.resolvedNodes`；
   `agentLoopDeps` 继续只用这个字段写 localId → nodeId 别名，不按标题猜 id。聚焦 **80/80**、Agent
-  相关目录 **412/412**、全量 **3884 passed / 1 skipped**；仍需质量线从真实工具消息确认字段存在。
+  相关目录 **412/412**、全量 **3884 passed / 1 skipped**。质量线真实工具消息确认
+  `alias_probe → node_ebdbf0a9…1098e`，同回合 runNode 使用同一 nodeId；Chat2api asset
+  `b4cbf28dc44a4e56`，PNG 1254×1254，Tauri hash `DC0EBD…5A7F7`。
 - **#861 仍待补**：outcome 整份历史写库的 controller / turn CAS 与 queue settlement 绑定仍未完成，
   不能因为 #860 或真实回合成功就宣称恢复链路闭环。
 
