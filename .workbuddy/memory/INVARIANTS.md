@@ -5,6 +5,14 @@
 
 ## Agent · 过程与落位
 
+- **工具 schema 只有一份**：`toolCatalog.ts` 是工具声明、能力发现和请求裁剪的唯一来源；
+  `tools.ts` 只能 re-export 和单向 import，不能为了兼容复制 schema 或 capability 关键词。
+- **只读结果只有一份**：画布摘要、素材 MIME、readResult 失败状态和 `asRecord / asStringArray`
+  由 `canvasReadTools.ts` 提供；执行层可依赖它，它不得反向依赖 `tools.ts`。
+- **展示拆分不得改行为**：活动、生成任务、状态、排队列表迁到独立组件后，`data-agent-*`、className、
+  文案、按钮顺序、portal 和键盘行为必须原样；不能借搬家重写交互。
+- **release gate 才可绕过单实例**：仅 `QINGHUA_RELEASE_GATE=1` 跳过 single-instance 并使用独立端口；
+  正常用户启动固定 18765、保留单实例。gate 的 store、maintenance、WebView、health 和安装器端口必须一致。
 - **关闭 Agent 面板不能卸载运行宿主**：收起只给 `AgentDock` 的宿主加 `hidden`；状态、AbortController、
   队列、确认、草稿继续存在。壳层展开动画由独立 active 状态驱动，不能靠重新挂载制造首帧。
 - **用户消息按 sessionId 先落库**：路由与模型请求之前保存；后台会话从自己的 `agentMessages` 读历史。

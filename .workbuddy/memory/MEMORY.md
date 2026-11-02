@@ -1,5 +1,20 @@
 # CanvasFlow（轻画）项目记忆
 
+### Agent 0.1.13 第一批拆分与 release 隔离（2026-11-02，对账 #852）
+
+- **工具目录只放 schema**：`toolCatalog.ts` 持有工具声明、能力发现和请求模式裁剪，不依赖 Store、
+  AgentLoop 或执行器。`tools.ts` 单向引用它并 re-export，旧调用路径不能出现第二份 schema。
+- **只读结果独立**：画布摘要、素材 MIME、readResult 失败判断和通用 JSON 字段归一化在
+  `canvasReadTools.ts`；执行层 import 其辅助函数，不能复制 `asRecord / asStringArray`。
+- **展示层可搬，行为不能变**：活动/生成任务/状态在 `AgentActivityViews.tsx`，排队在 `AgentQueuePanel.tsx`；
+  搬文件时 DOM 锚点、className、按钮顺序、aria/title 和事件顺序必须原样。
+- **当前拆分账**：`tools.ts` 2380→1299 行；`AgentPanel.tsx` 约 6400→5846 行。仍不能宣称 AgentHost 已完成。
+- **release gate 必须独立**：只有 `QINGHUA_RELEASE_GATE=1` 才跳过单实例并使用独立 shared-store 端口；
+  正常启动仍然 18765 + single-instance。Rust store、maintenance、WebView、自检、安装器必须同端口。
+- **证据**：全量 Vitest **3818 passed / 1 skipped**；`npm run check`、shared-store Rust **43/43**、
+  Tauri Rust **58/58**；G735 明暗各 **35/35**；G769 明暗各 **39/39**；release 壳正式构建 **11/11**，
+  开发壳 18765/18766 无需关闭。0.1.13 SHA-256 `0926CEF3BE9D1FF4AC38CBDF831895F987925914189089ED90B81E1FAEBE3C74`。
+
 ### Agent 运行宿主、会话事实与工具闭环（2026-11-02，对账 #851）
 
 - **关闭面板只能隐藏宿主**：`AgentDock` 收起后保留 `AgentPanel` 挂载，运行态、AbortController、
