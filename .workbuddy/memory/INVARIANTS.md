@@ -5,10 +5,12 @@
 
 ## Agent · 过程与落位
 
-- **结果收口只认 controller 身份**：`agentOutcomeCoordinator.ts` 用 outcome 创建时的同一个
-  `AbortController` 对象与当前 map 值比较，不能按界面当前 session 猜。非当前界面只落库，不写
-  `messages / messageReveal`；同一 controller 已 abort 的迟到 confirm 仍补 interrupted 工具结果并清
-  `pendingConfirmation / continuation / allowedToolNames`，但不写 UI、不迁移 Job 成功。
+- **结果收口只认 controller 身份**：发送、确认执行、检查点继续必须在创建回合时把同一个
+  `AbortController` 显式传给 outcome；hook 不得在迟到时从 `abortRefs` 临时取。非当前界面只落库，
+  不写 `messages / messageReveal`。迟到 confirm 必须走
+  `settleInterruptedConfirmation()` 原子读取最新历史，只给仍存在的 tool call 补 interrupted /
+  notStarted，结果插回原 assistant 工具批次；只有旧 `callId` 仍匹配时才清
+  `pendingConfirmation / continuation / allowedToolNames`，不写 UI、不迁移 Job 成功。
 - **结果收口职责单一**：纯协调器负责消息合并、确认 / 检查点持久化、steer 清理、Job / status 与
   abort 生命周期；`useAgentOutcomeCoordinator` 只装配 refs、SessionStore 和 React 回调。
   只有 message / error / 无 checkpoint stopped 删除 abort，confirm / paused 保留；delivered steers

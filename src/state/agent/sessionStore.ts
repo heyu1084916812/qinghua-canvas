@@ -19,7 +19,10 @@ import {
   normalizeStoredTaskPlan,
   type AgentTaskPlan,
 } from '../../domain/agent/taskPlan'
-import { confirmationSettlementMessages } from '../../domain/agent/confirmation'
+import {
+  confirmationSettlementMessages,
+  type ConfirmationRequestRef,
+} from '../../domain/agent/confirmation'
 import {
   isAgentToolName,
   type AgentToolName,
@@ -173,6 +176,17 @@ export interface AgentSessionStore {
    * 后入队的任务会被悄悄抹掉。所有后台写回都走这里，只改自己拥有的字段。
    */
   saveMessages(id: string, messages: ChatMessage[]): Promise<AgentSession | null>
+  /**
+   * 迟到确认的原子补救。
+   *
+   * 只基于库里的最新消息补缺失的 interrupted 工具结果；只有当前确认卡仍属于
+   * 同一个 `callId` 时才清 pendingConfirmation / continuation / allowedToolNames。
+   * 这样旧回合的迟到结果不会覆盖后来新回合的消息或确认卡。
+   */
+  settleInterruptedConfirmation(
+    id: string,
+    request: ConfirmationRequestRef,
+  ): Promise<AgentSession | null>
   clearPendingAssetIds(id: string, assetIds: readonly string[]): Promise<AgentSession | null>
   enqueueTurn(
     id: string,
@@ -571,6 +585,61 @@ export function createAgentSessionStore(storage: StoragePort): AgentSessionStore
         await tx.put('agentSessions', sessionRow(next, now))
         await replaceMessages(tx, id, next.projectId, messages, now)
         return next
+        },
+      )
+    },
+
+    async settleInterruptedConfirmation(id, request) {
+      await ensureSplit()
+      return storage.transaction(
+        ['agentSessions', 'agentMessages'],
+        async (tx) => {
+          const latest = await loadSession(tx, id)
+          if (!latest) return null
+          const hasRequest = latest.messages.some(
+            (message) =>
+              message.role === 'assistant' &&
+              message.toolCalls?.some(
+                (call) => call.id === request.callId,
+              ),
+          )
+          const messages = hasRequest
+            ? confirmationSettlementMessages(
+                latest.messages,
+                request,
+                'interrupted',
+              )
+            : latest.messages
+          const pendingMatches =
+            latest.pendingConfirmation?.callId === request.callId
+          const messagesChanged =
+            messages.length !== latest.messages.length
+          if (!messagesChanged && !pendingMatches) return latest
+
+          const now = Date.now()
+          const next: AgentSession = {
+            ...latest,
+            messages,
+            ...(pendingMatches
+              ? {
+                  pendingConfirmation: undefined,
+                  continuation: undefined,
+                  allowedToolNames: undefined,
+                }
+              : {}),
+            updatedAt: now,
+          }
+          await tx.put('agentSessions', sessionRow(next, now))
+          if (messagesChanged) {
+            await replaceMessages(
+              tx,
+              id,
+              next.projectId,
+              messages,
+              now,
+            )
+          }
+          return next
         },
       )
     },

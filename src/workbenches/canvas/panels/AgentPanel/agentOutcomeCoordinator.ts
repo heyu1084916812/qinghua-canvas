@@ -1,6 +1,6 @@
 import type { ChatMessage } from '../../../../domain/shared/execution/types'
-import {
-  confirmationSettlementMessages,
+import type {
+  ConfirmationRequestRef,
 } from '../../../../domain/agent/confirmation'
 import type { AgentToolName } from '../../../../domain/agent/toolRegistry'
 import type { AgentController } from '../../../../features/shared/agent/AgentController'
@@ -27,10 +27,10 @@ export interface AgentOutcomeSessionPort {
     session: AgentSession,
     messages: readonly ChatMessage[],
   ) => Promise<void>
-  /** 迟到确认的补救结果只需要按目标会话落库，不刷新界面。 */
-  saveMessages: (
+  /** 迟到确认只在存储层原子合并缺失结果，不刷新界面。 */
+  settleInterruptedConfirmation: (
     sessionId: string,
-    messages: readonly ChatMessage[],
+    request: ConfirmationRequestRef,
   ) => Promise<unknown>
   updateFields: AgentSessionStore['updateFields']
   removeSteers: AgentSessionStore['removeSteers']
@@ -94,30 +94,19 @@ export async function coordinateAgentOutcome(
     outcomeController !== undefined &&
     !outcomeController.signal.aborted
 
-  if (!sameController()) return 'ignored'
   const full = persistedTurn
     ? composeAgentOutcomeMessages(persistedTurn, outcome.messages)
     : outcome.messages
   const settleStaleOutcome = async () => {
     if (outcome.kind === 'confirm') {
       await input.sessions
-        .saveMessages(
+        .settleInterruptedConfirmation(
           session.id,
-          confirmationSettlementMessages(
-            full,
-            outcome.request,
-            'interrupted',
-          ),
+          outcome.request,
         )
         .catch(() => null)
+      return
     }
-    await input.sessions
-      .updateFields(session.id, {
-        pendingConfirmation: undefined,
-        continuation: undefined,
-        allowedToolNames: undefined,
-      })
-      .catch(() => null)
   }
 
   if (!outcomeIsCurrent()) {

@@ -1,15 +1,30 @@
 # CanvasFlow（轻画）项目记忆
 
+### Agent 结果收口身份与迟到确认补救（2026-11-03，对账 #858）
+
+- **controller 必须由回合创建处显式传入**：初次发送、确认执行、检查点继续各创建 `AbortController` 后，
+  把同一个对象传给 `handleOutcome`。hook / 纯协调器不能在 outcome 到达时再从 `abortRefs` 取，否则新
+  controller 已替换旧值时会误把旧 outcome 当当前回合。
+- **迟到 confirm 只能原子补救**：`AgentSessionStore.settleInterruptedConfirmation()` 在存储事务中读最新
+  历史，只给仍存在的 assistant tool call 补 `interrupted / notStarted`；只有旧 `callId` 仍匹配
+  pendingConfirmation 时才清 continuation / allowedToolNames。新回合确认卡不能被旧结果清掉。
+- **工具结果要插回原批次**：迟到工具结果不能统一追加到会话末尾，否则会落到后续用户消息之后。
+  `confirmationSettlementMessages()` 在对应 assistant 的已有 tool 结果组后插入。
+- **旧 message outcome 不补**：controller 已替换时仍直接 ignored；迟到 confirm 才做持久补救，且不写
+  当前 UI、不迁 Job 为成功。
+- **证据**：聚焦 **49/49**、AgentPanel **132/132**、全量 Vitest **3864 passed / 1 skipped**；
+  tsc/check/build/diff-check 通过。无 UI 改动，未跑 G769/Tauri；AgentHost 未实现。
+
 ### Agent 结果收口拆分（2026-11-03，对账 #857）
 
 - **纯协调 + 薄 hook**：`agentOutcomeCoordinator.ts` 只接收端口与回调，负责消息合并、当前界面写回、
   持久确认 / 检查点、steer 清理、Job / status 与 abort 生命周期；`useAgentOutcomeCoordinator.ts`
   只做 refs、SessionStore、React setter 装配。不要把 223 行原逻辑塞回主面板或新巨型 hook。
 - **current 只认同一个 AbortController 身份**：用 outcome 创建时拿到的 controller 与当前 map 值做对象比较，
-  不能根据当前界面会话猜。非当前 controller 不写当前界面；目标 `sessionId` 仍照常落库。
-- **迟到 confirm 必须收口**：同一 controller 已 abort 时，confirm 仍用
-  `confirmationSettlementMessages(..., 'interrupted')` 补 tool 结果并清
-  `pendingConfirmation / continuation / allowedToolNames`，但不写 UI、不迁移 Job 成功。
+  不能根据当前界面会话猜。#858 进一步把 controller 改为调用方显式传入，禁止 hook 在迟到时临时取。
+- **迟到 confirm 必须收口**：同一 controller 已 abort 时，confirm 仍补
+  `confirmationSettlementMessages(..., 'interrupted')`；#858 改为存储层原子读取最新历史、只清匹配
+  `callId` 的字段，不写 UI、不迁移 Job 成功。
 - **当前确认 / 暂停语义**：confirm 持久 pending + allowedToolNames 并转 `waiting_confirmation`；
   paused checkpoint 持久 continuation + allowedToolNames 并转 `paused`。message / error / 无 checkpoint
   stopped 才删除 AbortController，confirm / paused 保留；delivered steers 只在当前 outcome 收口后删除。

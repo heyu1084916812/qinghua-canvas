@@ -90,6 +90,7 @@ export function confirmationSettlementMessages(
     ),
   )
   let requestMessage: ChatMessage | undefined
+  let requestMessageIndex = -1
   for (let index = messages.length - 1; index >= 0; index -= 1) {
     const message = messages[index]!
     if (
@@ -97,6 +98,7 @@ export function confirmationSettlementMessages(
       message.toolCalls?.some((call) => call.id === request.callId)
     ) {
       requestMessage = message
+      requestMessageIndex = index
       break
     }
   }
@@ -152,5 +154,23 @@ export function confirmationSettlementMessages(
     }
   }
 
-  return extras.length > 0 ? [...messages, ...extras] : [...messages]
+  if (extras.length === 0) return [...messages]
+
+  /**
+   * 迟到确认可能发生在后续用户回合之后。工具结果必须回到对应
+   * assistant(tool_calls) 与已有 tool 结果之后，不能一律追加到会话末尾，
+   * 否则下一条用户消息会被夹在 tool_call 和 tool 结果之间。
+   */
+  let insertAt = messages.length
+  if (requestMessageIndex >= 0) {
+    insertAt = requestMessageIndex + 1
+    while (insertAt < messages.length && messages[insertAt]?.role === 'tool') {
+      insertAt += 1
+    }
+  }
+  return [
+    ...messages.slice(0, insertAt),
+    ...extras,
+    ...messages.slice(insertAt),
+  ]
 }

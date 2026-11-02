@@ -156,4 +156,44 @@ describe('Agent 确认卡', () => {
       confirmationSettlementMessages(messages, request, 'interrupted'),
     ).toEqual(messages)
   })
+
+  it('★★ 迟到结果插回对应工具批次，不落到后续用户消息之后', () => {
+    const messages: ChatMessage[] = [
+      { role: 'user', content: '旧任务' },
+      {
+        role: 'assistant',
+        content: '',
+        toolCalls: [
+          { id: 'call-1', name: 'deleteNodes', args: '{"nodeIds":["n1"]}' },
+        ],
+      },
+      { role: 'user', content: '新任务' },
+      {
+        role: 'assistant',
+        content: '',
+        toolCalls: [
+          { id: 'call-2', name: 'runNode', args: '{"nodeIds":["n2"]}' },
+        ],
+      },
+    ]
+
+    const settled = confirmationSettlementMessages(
+      messages,
+      { callId: 'call-1', name: 'deleteNodes' },
+      'interrupted',
+    )
+
+    expect(settled.map((message) => message.role)).toEqual([
+      'user',
+      'assistant',
+      'tool',
+      'user',
+      'assistant',
+    ])
+    expect(settled[2]).toMatchObject({
+      role: 'tool',
+      toolCallId: 'call-1',
+    })
+    expect(settled[3]).toEqual({ role: 'user', content: '新任务' })
+  })
 })

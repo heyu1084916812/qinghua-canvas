@@ -1933,7 +1933,7 @@ export function AgentPanel({
         }
       },
     )
-    await handleOutcome(session, outcome, persistedUserTurn)
+    await handleOutcome(session, outcome, persistedUserTurn, turnAbort)
     return outcome
   }, [
     store,
@@ -2407,7 +2407,8 @@ export function AgentPanel({
     confirmingRef.current.add(current.id)
     const { request } = status
     try {
-      abortRefs.current.set(current.id, new AbortController())
+      const confirmationAbort = new AbortController()
+      abortRefs.current.set(current.id, confirmationAbort)
       inFlightConfirmationRef.current.set(current.id, request)
       await controller.beginConfirmation(current.id, request)
       setStatusFor(current.id, { kind: 'executing', tool: request.name })
@@ -2442,7 +2443,7 @@ export function AgentPanel({
           if (currentIdRef.current === current.id) setMessages(next)
         },
       )
-      await handleOutcome(current, outcome)
+      await handleOutcome(current, outcome, undefined, confirmationAbort)
       await settleSessionOutcome(current.id, outcome)
     } catch (error) {
       if (abortRefs.current.get(current.id)?.signal.aborted) return
@@ -2531,7 +2532,8 @@ export function AgentPanel({
     const imageNodeIds = [...messages]
       .reverse()
       .find((message) => message.role === 'user')?.imageNodeIds ?? []
-    abortRefs.current.set(current.id, new AbortController())
+    const continuationAbort = new AbortController()
+    abortRefs.current.set(current.id, continuationAbort)
     const currentLoopDeps = loopDeps(
       current,
       createId('op'),
@@ -2558,7 +2560,7 @@ export function AgentPanel({
           if (currentIdRef.current === current.id) setMessages(next)
         },
       )
-      await handleOutcome(current, outcome)
+      await handleOutcome(current, outcome, undefined, continuationAbort)
       await settleSessionOutcome(current.id, outcome)
     } catch (error) {
       setStatusFor(current.id, { kind: 'error', message: errText(error) })

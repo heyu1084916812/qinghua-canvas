@@ -599,6 +599,138 @@ describe('Agent 会话 · 待执行任务队列', () => {
     expect((await reopened.get(a.id))?.allowedToolNames).toBeUndefined()
   })
 
+  it('★★ 迟到确认按最新历史原子补 interrupted，并只清同一个 callId', async () => {
+    const s = store()
+    const a = await s.create({
+      projectId: 'p1',
+      channelId: 'c1',
+      model: 'm1',
+    })
+    await s.saveMessages(a.id, [
+      {
+        role: 'assistant',
+        content: '',
+        toolCalls: [
+          {
+            id: 'call-old',
+            name: 'deleteNodes',
+            args: '{"nodeIds":["n1"]}',
+          },
+          {
+            id: 'call-later',
+            name: 'runNode',
+            args: '{"nodeIds":["n1"]}',
+          },
+        ],
+      },
+    ])
+    await s.updateFields(a.id, {
+      pendingConfirmation: {
+        callId: 'call-old',
+        name: 'deleteNodes',
+        args: { nodeIds: ['n1'] },
+      },
+      continuation: {
+        reason: 'max_steps',
+        maxSteps: 8,
+        createdAt: 1,
+      },
+      allowedToolNames: ['deleteNodes', 'runNode'],
+    })
+
+    const settled = await s.settleInterruptedConfirmation(a.id, {
+      callId: 'call-old',
+      name: 'deleteNodes',
+    })
+    expect(settled?.pendingConfirmation).toBeUndefined()
+    expect(settled?.continuation).toBeUndefined()
+    expect(settled?.allowedToolNames).toBeUndefined()
+    expect(settled?.messages.slice(1)).toMatchObject([
+      {
+        role: 'tool',
+        toolCallId: 'call-old',
+        toolName: 'deleteNodes',
+      },
+      {
+        role: 'tool',
+        toolCallId: 'call-later',
+        toolName: 'runNode',
+      },
+    ])
+    expect(settled?.messages[1]?.content).toContain(
+      '"interrupted":true',
+    )
+    expect(settled?.messages[2]?.content).toContain(
+      '"notStarted":true',
+    )
+
+    const again = await s.settleInterruptedConfirmation(a.id, {
+      callId: 'call-old',
+      name: 'deleteNodes',
+    })
+    expect(again?.messages).toHaveLength(3)
+  })
+
+  it('★★ 旧确认迟到时不得清掉新回合的确认卡与工具白名单', async () => {
+    const s = store()
+    const a = await s.create({
+      projectId: 'p1',
+      channelId: 'c1',
+      model: 'm1',
+    })
+    await s.saveMessages(a.id, [
+      {
+        role: 'assistant',
+        content: '',
+        toolCalls: [
+          {
+            id: 'call-old',
+            name: 'deleteNodes',
+            args: '{"nodeIds":["old"]}',
+          },
+        ],
+      },
+      { role: 'user', content: '新回合' },
+    ])
+    await s.updateFields(a.id, {
+      pendingConfirmation: {
+        callId: 'call-new',
+        name: 'runNode',
+        args: { nodeIds: ['new'] },
+      },
+      continuation: {
+        reason: 'max_steps',
+        maxSteps: 8,
+        createdAt: 2,
+      },
+      allowedToolNames: ['readGraph', 'runNode'],
+    })
+
+    const settled = await s.settleInterruptedConfirmation(a.id, {
+      callId: 'call-old',
+      name: 'deleteNodes',
+    })
+    expect(settled?.messages[1]).toMatchObject({
+      role: 'tool',
+      toolCallId: 'call-old',
+      toolName: 'deleteNodes',
+    })
+    expect(settled?.messages[2]).toEqual({
+      role: 'user',
+      content: '新回合',
+    })
+    expect(settled?.pendingConfirmation).toEqual({
+      callId: 'call-new',
+      name: 'runNode',
+      args: { nodeIds: ['new'] },
+    })
+    expect(settled?.continuation?.createdAt).toBe(2)
+    expect(settled?.allowedToolNames).toEqual([
+      'readGraph',
+      'runNode',
+    ])
+  })
+
   it('任务计划随会话持久化，重开后仍是同一个当前步骤', async () => {
     const storage = createMemoryPlatform().storage
     const s = createAgentSessionStore(storage)

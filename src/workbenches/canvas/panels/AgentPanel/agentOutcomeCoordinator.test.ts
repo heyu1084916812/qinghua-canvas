@@ -1,7 +1,4 @@
 import { describe, expect, it, vi } from 'vitest'
-import type {
-  ChatMessage,
-} from '../../../../domain/shared/execution/types'
 import type { AgentController } from '../../../../features/shared/agent/AgentController'
 import type { AgentToolName } from '../../../../domain/agent/toolRegistry'
 import type { AgentSession } from '../../../../state/agent/sessionStore'
@@ -37,10 +34,13 @@ function harness(args: {
 }) {
   const controller = args.controller ?? new AbortController()
   let currentController = controller
-  const saveMessages = vi.fn(
+  const settleInterruptedConfirmation = vi.fn(
     async (
       _sessionId: string,
-      _messages: readonly ChatMessage[],
+      _request: {
+        callId: string
+        name: string
+      },
     ) => null,
   )
   const removeSteers = vi.fn(async () => ({ ...SESSION }))
@@ -64,7 +64,7 @@ function harness(args: {
     currentSessionId: () => args.currentSessionId ?? SESSION.id,
     sessions: {
       persistMessages: vi.fn(async () => {}),
-      saveMessages,
+      settleInterruptedConfirmation,
       updateFields,
       removeSteers,
     },
@@ -92,7 +92,7 @@ function harness(args: {
     setCurrentController: (next: AbortController | undefined) => {
       currentController = next as AbortController
     },
-    saveMessages,
+    settleInterruptedConfirmation,
     removeSteers,
     updateFields,
     transitionSessionJob: transitionMock,
@@ -101,6 +101,8 @@ function harness(args: {
     applySessionSnapshot:
       input.applySessionSnapshot as ReturnType<typeof vi.fn>,
     setStatusFor: input.setStatusFor as ReturnType<typeof vi.fn>,
+    persistMessages:
+      input.sessions.persistMessages as ReturnType<typeof vi.fn>,
     deleteAbortController:
       input.deleteAbortController as ReturnType<typeof vi.fn>,
     clearDeliveredSteers:
@@ -109,6 +111,55 @@ function harness(args: {
 }
 
 describe('coordinateAgentOutcome', () => {
+  it('★★ controller 已被新回合替换时，旧 outcome 不得写消息或 Job', async () => {
+    const outcome: AgentLoopOutcome = {
+      kind: 'message',
+      text: '旧回合迟到',
+      messages: [{ role: 'assistant', content: '旧回合迟到' }],
+    }
+    const oldController = new AbortController()
+    const h = harness({
+      outcome,
+      controller: oldController,
+      currentController: () => new AbortController(),
+    })
+
+    const result = await coordinateAgentOutcome(h.input)
+
+    expect(result).toBe('ignored')
+    expect(h.persistMessages).not.toHaveBeenCalled()
+    expect(h.updateFields).not.toHaveBeenCalled()
+    expect(h.transitionSessionJob).not.toHaveBeenCalled()
+    expect(h.setStatusFor).not.toHaveBeenCalled()
+  })
+
+  it('★★ controller 已被删除时，旧 confirm 仍原子补中断且不覆盖当前历史', async () => {
+    const outcome: AgentLoopOutcome = {
+      kind: 'confirm',
+      request: {
+        callId: 'call-old',
+        name: 'runNode',
+        args: { nodeIds: ['node-old'] },
+      },
+      messages: [{ role: 'assistant', content: '旧确认' }],
+    }
+    const h = harness({
+      outcome,
+      currentController: () => undefined,
+    })
+
+    const result = await coordinateAgentOutcome(h.input)
+
+    expect(result).toBe('stale_settled')
+    expect(h.settleInterruptedConfirmation).toHaveBeenCalledWith(
+      SESSION.id,
+      outcome.request,
+    )
+    expect(h.persistMessages).not.toHaveBeenCalled()
+    expect(h.updateFields).not.toHaveBeenCalled()
+    expect(h.transitionSessionJob).not.toHaveBeenCalled()
+  })
+
   it('★★ 当前 confirm 持久化 pending、工具白名单、Job 与状态', async () => {
     const outcome: AgentLoopOutcome = {
       kind: 'confirm',
@@ -204,19 +255,12 @@ describe('coordinateAgentOutcome', () => {
     const result = await coordinateAgentOutcome(h.input)
 
     expect(result).toBe('stale_settled')
-    expect(h.saveMessages).toHaveBeenCalledTimes(1)
-    const settled = h.saveMessages.mock.calls[0]?.[1] as ChatMessage[]
-    expect(settled.at(-1)).toMatchObject({
-      role: 'tool',
-      toolCallId: 'call-stale',
-      toolName: 'deleteNodes',
-    })
-    expect(settled.at(-1)?.content).toContain('"interrupted":true')
-    expect(h.updateFields).toHaveBeenCalledWith(SESSION.id, {
-      pendingConfirmation: undefined,
-      continuation: undefined,
-      allowedToolNames: undefined,
-    })
+    expect(h.settleInterruptedConfirmation).toHaveBeenCalledWith(
+      SESSION.id,
+      outcome.request,
+    )
+    expect(h.persistMessages).not.toHaveBeenCalled()
+    expect(h.updateFields).not.toHaveBeenCalled()
     expect(h.transitionSessionJob).not.toHaveBeenCalled()
     expect(h.setMessages).not.toHaveBeenCalled()
     expect(h.setStatusFor).not.toHaveBeenCalled()

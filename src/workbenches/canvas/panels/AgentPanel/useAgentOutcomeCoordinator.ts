@@ -73,21 +73,25 @@ export function useAgentOutcomeCoordinator(
     async (
       session: AgentSession,
       outcome: AgentLoopOutcome,
-      persistedTurn?: PersistedAgentUserTurn,
+      persistedTurn: PersistedAgentUserTurn | undefined,
+      outcomeController: AbortController,
     ) =>
       coordinateAgentOutcome({
         session,
         outcome,
         persistedTurn,
-        outcomeController: abortRefs.current.get(session.id),
+        outcomeController,
         currentOutcomeController: () =>
           abortRefs.current.get(session.id),
         currentSessionId: () => currentIdRef.current,
         sessions: {
           persistMessages: (target, messages) =>
             persist(target, [...messages]),
-          saveMessages: (sessionId, messages) =>
-            sessions.saveMessages(sessionId, [...messages]),
+          settleInterruptedConfirmation: (sessionId, request) =>
+            sessions.settleInterruptedConfirmation(
+              sessionId,
+              request,
+            ),
           updateFields: sessions.updateFields,
           removeSteers: sessions.removeSteers,
         },
