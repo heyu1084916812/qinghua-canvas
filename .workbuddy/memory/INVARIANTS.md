@@ -25,6 +25,8 @@
   候选提升是纯函数，选中项没有 `credentialGroupId` 时必须删除旧分组。`loopDeps` 的
   `turnController` 必须由入口（初次发送 / 确认 / 检查点继续）显式传入，不得按 sessionId 现取。
   `nodeRunStates` 与 `execution.nodeStates` 同构（失败态是 AppError），`readResult` 持久失败优先。
+  `applyPlan` 当前实际不返回 `resolvedNodes`，所以 localId → nodeId 别名写回仍断链（#860）；
+  修好前不得把 `runNode(localId)` 当成已闭环契约，真实回合碰巧用真实 nodeId 成功也不构成证明。
   `onRouteReady` 只在路由成功后触发，由宿主创建 planning Job。它承接上下文、工具探测 / JSON 降级、
   技能 chip、媒体模型、每图拆分、请求分类、工具裁剪和系统提示词，但不得持有 React refs、运行模型循环、
   执行确认或处理结果。`AgentPanel` 继续是 per-session abort / toolMode / turnTools / autoRun /
