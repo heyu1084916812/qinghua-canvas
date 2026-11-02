@@ -71,15 +71,27 @@ export async function runAgentSendFlow({
   if (!preclaimed && !claimSessionActivity(session.id, queueTurnId)) {
     return undefined
   }
+  /**
+   * 已经领取了活动锁：除 confirm / checkpoint 这两种等待后续动作的状态外，
+   * 任何成功或失败出口都必须从 finally 释放。
+   */
+  let finishQueueAttempted = false
+  let finishQueueError: unknown
+  let retainActivity = false
   let outcome: AgentLoopOutcome | undefined
   const finishQueue = async (completed: boolean) => {
-    if (!queueTurnId) return
-    const next = await controller.finishQueuedTurn(
-      session.id,
-      queueTurnId,
-      completed,
-    )
-    if (next) applySessionSnapshot(next)
+    if (!queueTurnId || finishQueueAttempted) return
+    finishQueueAttempted = true
+    try {
+      const next = await controller.finishQueuedTurn(
+        session.id,
+        queueTurnId,
+        completed,
+      )
+      if (next) applySessionSnapshot(next)
+    } catch (error) {
+      finishQueueError = error
+    }
   }
 
   try {
@@ -92,17 +104,30 @@ export async function runAgentSendFlow({
     if (!outcome) {
       await finishQueue(false)
       abortRefs.current.delete(session.id)
-      releaseSessionActivity(session.id, queueTurnId)
+      if (finishQueueError) {
+        setStatusFor(session.id, {
+          kind: 'error',
+          message: errText(finishQueueError),
+        })
+      }
       return undefined
     }
     const paused =
       outcome.kind === 'stopped' && outcome.checkpoint !== undefined
-    if (outcome.kind !== 'confirm' && !paused) {
-      await finishQueue(outcome.kind === 'message')
-      releaseSessionActivity(session.id, queueTurnId)
-      if (outcome.kind === 'message' && shouldDrainQueue(session.id)) {
-        queueMicrotask(() => queuePump(session.id))
-      }
+    if (outcome.kind === 'confirm' || paused) {
+      retainActivity = true
+      return outcome
+    }
+    await finishQueue(outcome.kind === 'message')
+    if (finishQueueError) {
+      setStatusFor(session.id, {
+        kind: 'error',
+        message: errText(finishQueueError),
+      })
+      return outcome
+    }
+    if (outcome.kind === 'message' && shouldDrainQueue(session.id)) {
+      queueMicrotask(() => queuePump(session.id))
     }
   } catch (error) {
     const aborted = abortRefs.current.get(session.id)?.signal.aborted === true
@@ -112,26 +137,38 @@ export async function runAgentSendFlow({
     clearLiveActivitiesFor(session.id)
     clearLiveProcessFor(session.id)
     clearRunTasksFor(session.id)
-    await transitionSessionJob(
-      session.id,
-      aborted ? 'canceled' : blocked?.status ?? 'failed',
-      aborted ? 'interrupted' : blocked ? 'tool_failed' : 'failed',
-      aborted
-        ? {}
-        : {
-            lastError: errText(error),
-            ...(blocked?.status === 'needs_attention'
-              ? { pendingCallId: blocked.outcome.effect.toolCallId }
-              : {}),
-          },
-      { phase: 'run_send_text' },
-    )
+    let transitionError: unknown
+    try {
+      await transitionSessionJob(
+        session.id,
+        aborted ? 'canceled' : blocked?.status ?? 'failed',
+        aborted ? 'interrupted' : blocked ? 'tool_failed' : 'failed',
+        aborted
+          ? {}
+          : {
+              lastError: errText(error),
+              ...(blocked?.status === 'needs_attention'
+                ? { pendingCallId: blocked.outcome.effect.toolCallId }
+                : {}),
+            },
+        { phase: 'run_send_text' },
+      )
+    } catch (error) {
+      transitionError = error
+    }
+    await finishQueue(false)
+    const cleanupError = transitionError ?? finishQueueError
     setStatusFor(
       session.id,
-      aborted ? IDLE_STATUS : { kind: 'error', message: errText(error) },
+      cleanupError
+        ? { kind: 'error', message: errText(cleanupError) }
+        : aborted
+          ? IDLE_STATUS
+          : { kind: 'error', message: errText(error) },
     )
-    await finishQueue(false)
-    releaseSessionActivity(session.id, queueTurnId)
+    return undefined
+  } finally {
+    if (!retainActivity) releaseSessionActivity(session.id, queueTurnId)
   }
   return outcome
 }

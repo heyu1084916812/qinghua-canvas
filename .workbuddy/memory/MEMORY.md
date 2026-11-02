@@ -1,5 +1,13 @@
 # CanvasFlow（轻画）项目记忆
 
+### Agent 发送清理二次失败安全（2026-11-03，对账 #855）
+
+- **活动锁由 finally 收口**：`agentSendFlow` 普通成功、空结果、业务异常、Job transition 异常和
+  `finishQueuedTurn` 异常都必须释放活动锁；`confirm / checkpoint` 是唯二保留锁的出口。
+- **队列销项幂等**：`finishQueuedTurn` 每次发送最多尝试一次，任何二次失败不能再次调用。
+- **清理错误可见但不制造未处理 Promise**：清理失败写入会话错误态，不向 `void sendText()` 抛未处理 rejection。
+- **证据**：`agentSendFlow.test.ts` 覆盖 transition/finish 抛错和 confirm/paused 保锁，定向 **7/7**，tsc 通过。
+
 ### AgentPanel 发送主链拆分（2026-11-03，对账 #854）
 
 - **发送锁只在一处收尾**：`agentSendFlow.ts` 管活动锁、preclaimed/queueTurnId 结算和异常状态；
