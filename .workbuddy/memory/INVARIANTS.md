@@ -15,7 +15,8 @@
   `applyAgentOutcome()` 按 expected revision 同事务写消息 / 确认字段 / steer 删除；冲突不得写 UI 或 Job。
   stop/cancel 必须用 `settleInterruptedSession()` 基于最新历史结算，并推进停止屏障 revision。
   `settleSessionOutcome` 必须绑定 originating queueTurnId + turnId，`sessionActivity` 也只允许完全匹配
-  的旧 flow 释放锁；不能把入口 controller 检查当成整个异步写事务安全。
+  的旧 flow 释放锁。旧 send flow catch 若活动锁已被新回合接管，不得删除 delivered steer、清 live
+  状态或覆盖新状态；不能把入口 controller 检查当成整个异步写事务安全。
 - **结果收口职责单一**：纯协调器负责消息合并、确认 / 检查点持久化、steer 清理、Job / status 与
   abort 生命周期；`useAgentOutcomeCoordinator` 只装配 refs、SessionStore 和 React 回调。
   只有 message / error / 无 checkpoint stopped 删除 abort，confirm / paused 保留；delivered steers

@@ -13,7 +13,9 @@
   不能销掉新队首。send flow 的 abort 判断使用自己的 controller，不依赖 map 里是否还留着。
 - **证据**：聚焦 **80/80**、Agent 相关 **434/434**、全量 **3895 passed / 1 skipped**；
   tsc/check/build/diff-check 通过。故障测试覆盖过期 revision、延迟 conflict、旧 stop 保留新字段、
-  直接/队列 token 和 abort 后 map 删除。尚未独立 G769/Tauri 验收。
+  直接/队列 token 和 abort 后 map 删除。独立 Tauri 中旧慢响应 15 秒后仍未覆盖新回合，revision
+  1→2→4、旧 Job canceled / 新 Job completed；G769 明暗各 **39/39**。当前 release hash
+  `5951726F…15AD6`。成功 Chat2api 证据来自父提交 `3709a63`（asset `bfe29915c6c2f282`）。
 
 ### AgentLoop 依赖装配拆分（2026-11-03，对账 #859）
 
