@@ -30,7 +30,8 @@ function harness(args: {
   toolNames?: readonly AgentToolName[]
   deliveredSteers?: readonly string[]
   activeQueuedTurnId?: string
-  updateFields?: CoordinateAgentOutcomeInput['sessions']['updateFields']
+  applyOutcome?: CoordinateAgentOutcomeInput['sessions']['applyOutcome']
+  turnOrigin?: CoordinateAgentOutcomeInput['turnOrigin']
 }) {
   const controller = args.controller ?? new AbortController()
   let currentController = controller
@@ -43,12 +44,11 @@ function harness(args: {
       },
     ) => null,
   )
-  const removeSteers = vi.fn(async () => ({ ...SESSION }))
-  const updateFields =
-    args.updateFields ??
-    vi.fn(async (_id: string, patch: Partial<AgentSession>) => ({
-      ...SESSION,
-      ...patch,
+  const applyOutcome =
+    args.applyOutcome ??
+    vi.fn(async () => ({
+      ok: true as const,
+      session: { ...SESSION },
     }))
   const transitionMock = vi.fn(
     async () => null,
@@ -57,16 +57,16 @@ function harness(args: {
     session: SESSION,
     outcome: args.outcome,
     outcomeController: controller,
+    turnOrigin: args.turnOrigin ?? {},
     currentOutcomeController: () =>
       args.currentController
         ? args.currentController()
         : currentController,
     currentSessionId: () => args.currentSessionId ?? SESSION.id,
     sessions: {
-      persistMessages: vi.fn(async () => {}),
+      applyOutcome,
       settleInterruptedConfirmation,
-      updateFields,
-      removeSteers,
+      refreshSession: vi.fn(async () => {}),
     },
     transitionSessionJob:
       transitionMock as unknown as AgentController['transition'],
@@ -93,16 +93,13 @@ function harness(args: {
       currentController = next as AbortController
     },
     settleInterruptedConfirmation,
-    removeSteers,
-    updateFields,
+    applyOutcome,
     transitionSessionJob: transitionMock,
     setMessageReveal: input.setMessageReveal as ReturnType<typeof vi.fn>,
     setMessages: input.setMessages as ReturnType<typeof vi.fn>,
     applySessionSnapshot:
       input.applySessionSnapshot as ReturnType<typeof vi.fn>,
     setStatusFor: input.setStatusFor as ReturnType<typeof vi.fn>,
-    persistMessages:
-      input.sessions.persistMessages as ReturnType<typeof vi.fn>,
     deleteAbortController:
       input.deleteAbortController as ReturnType<typeof vi.fn>,
     clearDeliveredSteers:
@@ -127,8 +124,7 @@ describe('coordinateAgentOutcome', () => {
     const result = await coordinateAgentOutcome(h.input)
 
     expect(result).toBe('ignored')
-    expect(h.persistMessages).not.toHaveBeenCalled()
-    expect(h.updateFields).not.toHaveBeenCalled()
+    expect(h.applyOutcome).not.toHaveBeenCalled()
     expect(h.transitionSessionJob).not.toHaveBeenCalled()
     expect(h.setStatusFor).not.toHaveBeenCalled()
   })
@@ -155,9 +151,63 @@ describe('coordinateAgentOutcome', () => {
       SESSION.id,
       outcome.request,
     )
-    expect(h.persistMessages).not.toHaveBeenCalled()
-    expect(h.updateFields).not.toHaveBeenCalled()
+    expect(h.applyOutcome).not.toHaveBeenCalled()
     expect(h.transitionSessionJob).not.toHaveBeenCalled()
+  })
+
+  it('★★ revision 冲突时旧 outcome 不写 UI、不迁 Job、不清 steer', async () => {
+    const outcome: AgentLoopOutcome = {
+      kind: 'message',
+      text: '旧回合迟到',
+      messages: [{ role: 'assistant', content: '旧回合迟到' }],
+    }
+    let resolveApply:
+      | ((result: {
+          ok: false
+          reason: 'conflict'
+        }) => void)
+      | undefined
+    const applyOutcome = vi.fn(
+      () =>
+        new Promise<{
+          ok: false
+          reason: 'conflict'
+        }>((resolve) => {
+          resolveApply = resolve
+        }),
+    )
+    const h = harness({
+      outcome,
+      deliveredSteers: ['steer-old'],
+      turnOrigin: {
+        turnId: 'turn-old',
+        messageRevision: 7,
+      },
+      applyOutcome,
+    })
+
+    const pending = coordinateAgentOutcome(h.input)
+    expect(resolveApply).toBeTypeOf('function')
+    resolveApply!({
+      ok: false,
+      reason: 'conflict',
+    })
+    const result = await pending
+
+    expect(result).toBe('conflict')
+    expect(applyOutcome).toHaveBeenCalledWith(
+      SESSION.id,
+      expect.objectContaining({
+        expectedRevision: 7,
+        removeSteerIds: ['steer-old'],
+      }),
+    )
+    expect(h.transitionSessionJob).not.toHaveBeenCalled()
+    expect(h.setMessages).not.toHaveBeenCalled()
+    expect(h.setStatusFor).not.toHaveBeenCalled()
+    expect(h.applySessionSnapshot).not.toHaveBeenCalled()
+    expect(h.clearDeliveredSteers).not.toHaveBeenCalled()
+    expect(h.deleteAbortController).not.toHaveBeenCalled()
   })
 
   it('★★ 当前 confirm 持久化 pending、工具白名单、Job 与状态', async () => {
@@ -170,26 +220,40 @@ describe('coordinateAgentOutcome', () => {
       },
       messages: [{ role: 'user', content: '运行这张图' }],
     }
-    const h = harness({ outcome })
+    const h = harness({
+      outcome,
+      turnOrigin: {
+        turnId: 'turn-confirm',
+        messageRevision: 4,
+      },
+    })
 
     const result = await coordinateAgentOutcome(h.input)
 
     expect(result).toBe('applied')
-    expect(h.updateFields).toHaveBeenCalledWith(SESSION.id, {
-      pendingConfirmation: {
-        callId: 'call-confirm',
-        name: 'runNode',
-        args: { nodeIds: ['node-1'] },
-      },
-      continuation: undefined,
-      allowedToolNames: ['runNode'],
-    })
+    expect(h.applyOutcome).toHaveBeenCalledWith(
+      SESSION.id,
+      expect.objectContaining({
+        expectedRevision: 4,
+        pendingConfirmation: {
+          callId: 'call-confirm',
+          name: 'runNode',
+          args: { nodeIds: ['node-1'] },
+        },
+        continuation: undefined,
+        allowedToolNames: ['runNode'],
+      }),
+    )
     expect(h.transitionSessionJob).toHaveBeenCalledWith(
       SESSION.id,
       'waiting_confirmation',
       'confirmation_requested',
       { pendingCallId: 'call-confirm' },
       { tool: 'runNode' },
+      {
+        turnId: 'turn-confirm',
+        messageRevision: 4,
+      },
     )
     expect(h.setStatusFor).toHaveBeenCalledWith(SESSION.id, {
       kind: 'awaitingConfirm',
@@ -216,13 +280,19 @@ describe('coordinateAgentOutcome', () => {
       SESSION.id,
       'completed',
       'completed',
+      undefined,
+      undefined,
+      {},
     )
     expect(h.setStatusFor).toHaveBeenCalledWith(SESSION.id, IDLE_STATUS)
     expect(h.deleteAbortController).toHaveBeenCalledWith(
       SESSION.id,
       h.controller,
     )
-    expect(h.removeSteers).toHaveBeenCalledWith(SESSION.id, ['steer-1'])
+    expect(h.applyOutcome).toHaveBeenCalledWith(
+      SESSION.id,
+      expect.objectContaining({ removeSteerIds: ['steer-1'] }),
+    )
     expect(h.clearDeliveredSteers).toHaveBeenCalledTimes(1)
   })
 
@@ -259,8 +329,7 @@ describe('coordinateAgentOutcome', () => {
       SESSION.id,
       outcome.request,
     )
-    expect(h.persistMessages).not.toHaveBeenCalled()
-    expect(h.updateFields).not.toHaveBeenCalled()
+    expect(h.applyOutcome).not.toHaveBeenCalled()
     expect(h.transitionSessionJob).not.toHaveBeenCalled()
     expect(h.setMessages).not.toHaveBeenCalled()
     expect(h.setStatusFor).not.toHaveBeenCalled()
@@ -282,7 +351,7 @@ describe('coordinateAgentOutcome', () => {
     const result = await coordinateAgentOutcome(h.input)
 
     expect(result).toBe('applied')
-    expect(h.input.sessions.persistMessages).toHaveBeenCalledTimes(1)
+    expect(h.applyOutcome).toHaveBeenCalledTimes(1)
     expect(h.setMessages).not.toHaveBeenCalled()
     expect(h.setMessageReveal).not.toHaveBeenCalled()
     expect(h.applySessionSnapshot).toHaveBeenCalledTimes(1)
@@ -308,16 +377,19 @@ describe('coordinateAgentOutcome', () => {
     const result = await coordinateAgentOutcome(h.input)
 
     expect(result).toBe('applied')
-    expect(h.updateFields).toHaveBeenCalledWith(SESSION.id, {
-      pendingConfirmation: undefined,
-      continuation: {
-        reason: 'max_steps',
-        maxSteps: 8,
-        createdAt: 1234,
-        queuedTurnId: 'queued-1',
-      },
-      allowedToolNames: ['readGraph', 'runNode'],
-    })
+    expect(h.applyOutcome).toHaveBeenCalledWith(
+      SESSION.id,
+      expect.objectContaining({
+        pendingConfirmation: undefined,
+        continuation: {
+          reason: 'max_steps',
+          maxSteps: 8,
+          createdAt: 1234,
+          queuedTurnId: 'queued-1',
+        },
+        allowedToolNames: ['readGraph', 'runNode'],
+      }),
+    )
     expect(h.transitionSessionJob).toHaveBeenCalledWith(
       SESSION.id,
       'paused',
@@ -330,6 +402,8 @@ describe('coordinateAgentOutcome', () => {
           savedAt: 1234,
         },
       },
+      undefined,
+      {},
     )
     expect(h.setStatusFor).toHaveBeenCalledWith(SESSION.id, {
       kind: 'paused',

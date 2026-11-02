@@ -14,6 +14,14 @@ import {
 } from '../../../domain/agent/confirmation'
 import type { QueuedAgentTurn } from '../../../domain/agent/queuedTurn'
 
+/** 一个回合的身份；迟到的 Job / 存储写入必须绑定它，不能按 sessionId 猜。 */
+export interface AgentTurnOrigin {
+  jobId?: string
+  turnId?: string
+  queueTurnId?: string
+  messageRevision?: number
+}
+
 export interface AgentControllerHooks {
   isSessionActivityActive: (sessionId: string) => boolean
   onPendingConfirmation: (sessionId: string, request: AgentToolRequest) => void
@@ -34,6 +42,7 @@ export interface AgentController {
     eventType?: AgentEventType,
     patch?: AgentJobPatch,
     payload?: Record<string, unknown>,
+    origin?: AgentTurnOrigin,
   ) => Promise<{ job: AgentJob; event: import('../../../domain/agent/job').AgentEvent } | null>
   /**
    * 模型请求发出前的统一失败收口。
@@ -48,15 +57,18 @@ export interface AgentController {
       phase: string
       aborted?: boolean
       pendingCallId?: string
+      origin?: AgentTurnOrigin
     },
   ) => Promise<void>
   beginConfirmation: (
     sessionId: string,
     request: ConfirmationRequestRef,
+    origin?: AgentTurnOrigin,
   ) => Promise<void>
   finishConfirmedTool: (
     sessionId: string,
     request: ConfirmationRequestRef,
+    origin?: AgentTurnOrigin,
   ) => Promise<void>
   enqueueTurn: (
     sessionId: string,
@@ -146,20 +158,36 @@ export function createAgentController(input: {
     eventType = 'status_changed',
     patch = {},
     payload = {},
+    origin,
   ) => {
-    let id = jobIds.get(sessionId)
-    if (!id) {
-      const active = await jobs.active(sessionId)
-      if (active) {
-        id = active.id
-        jobIds.set(sessionId, id)
+    let id: string | undefined
+    if (origin?.jobId || origin?.turnId) {
+      const explicit = origin.jobId
+        ? await jobs.get(origin.jobId)
+        : null
+      if (explicit && explicit.sessionId !== sessionId) return null
+      const byTurn = origin.turnId
+        ? await jobs.forTurn(sessionId, origin.turnId)
+        : null
+      id = explicit?.id ?? byTurn?.id
+      const owned = explicit ?? (id ? await jobs.get(id) : null)
+      if (!id || !owned || owned.sessionId !== sessionId) return null
+    } else {
+      id = jobIds.get(sessionId)
+      if (!id) {
+        const active = await jobs.active(sessionId)
+        if (active) {
+          id = active.id
+          jobIds.set(sessionId, id)
+        }
       }
     }
     if (!id) return null
     const result = await jobs.transition(id, to, eventType, patch, payload)
     if (
       result &&
-      (to === 'completed' || to === 'failed' || to === 'canceled')
+      (to === 'completed' || to === 'failed' || to === 'canceled') &&
+      jobIds.get(sessionId) === id
     ) {
       jobIds.delete(sessionId)
     }
@@ -169,6 +197,7 @@ export function createAgentController(input: {
   const beginConfirmation: AgentController['beginConfirmation'] = async (
     sessionId,
     request,
+    origin,
   ) => {
     await sessions.updateFields(sessionId, { pendingConfirmation: undefined })
     for (const step of confirmationApprovalSteps(request)) {
@@ -178,6 +207,7 @@ export function createAgentController(input: {
         step.eventType,
         step.patch,
         { tool: request.name, approved: true },
+        origin,
       )
     }
   }
@@ -201,13 +231,21 @@ export function createAgentController(input: {
         reason: input.reason,
         aborted: input.aborted === true,
       },
+      input.origin,
     )
-    if (!failed) jobIds.delete(sessionId)
+    if (
+      !failed &&
+      (!input.origin?.jobId ||
+        jobIds.get(sessionId) === input.origin.jobId)
+    ) {
+      jobIds.delete(sessionId)
+    }
   }
 
   const finishConfirmedTool: AgentController['finishConfirmedTool'] = async (
     sessionId,
     request,
+    origin,
   ) => {
     if (!confirmationRunsGeneration(request.name)) return
     await transition(
@@ -216,6 +254,7 @@ export function createAgentController(input: {
       'generation_finished',
       { pendingCallId: undefined },
       { tool: request.name },
+      origin,
     )
   }
 

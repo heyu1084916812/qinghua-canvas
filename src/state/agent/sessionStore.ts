@@ -133,6 +133,8 @@ export interface AgentSession {
   }
   /** **全部历史**（展示与回溯）。发给模型的是它的窗口，见 `contextFor` */
   messages: ChatMessage[]
+  /** 每次真正替换消息正文时递增；旧数据缺省为 0。 */
+  messageRevision?: number
   createdAt: number
   updatedAt: number
 }
@@ -176,6 +178,18 @@ export interface AgentSessionStore {
    * 后入队的任务会被悄悄抹掉。所有后台写回都走这里，只改自己拥有的字段。
    */
   saveMessages(id: string, messages: ChatMessage[]): Promise<AgentSession | null>
+  /** 普通 outcome 的消息与同寿命字段在同一事务按 revision CAS 写入。 */
+  applyAgentOutcome(
+    id: string,
+    input: {
+      expectedRevision?: number
+      messages: readonly ChatMessage[]
+      pendingConfirmation?: AgentSession['pendingConfirmation']
+      continuation?: AgentSession['continuation']
+      allowedToolNames?: readonly AgentToolName[]
+      removeSteerIds?: readonly string[]
+    },
+  ): Promise<{ ok: true; session: AgentSession } | { ok: false; reason: 'missing' | 'conflict' }>
   /**
    * 迟到确认的原子补救。
    *
@@ -186,6 +200,13 @@ export interface AgentSessionStore {
   settleInterruptedConfirmation(
     id: string,
     request: ConfirmationRequestRef,
+  ): Promise<AgentSession | null>
+  /** stop / cancel 基于存储最新历史原子补结果，只清仍匹配的旧确认字段。 */
+  settleInterruptedSession(
+    id: string,
+    request: ConfirmationRequestRef | undefined,
+    result: 'canceled' | 'interrupted',
+    expectedRevision?: number,
   ): Promise<AgentSession | null>
   clearPendingAssetIds(id: string, assetIds: readonly string[]): Promise<AgentSession | null>
   enqueueTurn(
@@ -368,6 +389,10 @@ export function createAgentSessionStore(storage: StoragePort): AgentSessionStore
       : {}),
     ...(taskPlan ? { taskPlan } : {}),
     messages,
+    messageRevision: Math.max(
+      0,
+      Math.trunc(Number(row.messageRevision ?? 0)) || 0,
+    ),
     createdAt: Number(row.createdAt ?? 0),
     updatedAt: Number(row.updatedAt ?? 0),
     }
@@ -534,6 +559,7 @@ export function createAgentSessionStore(storage: StoragePort): AgentSessionStore
         queuedTurns: [],
         pendingSteers: [],
         messages: [],
+        messageRevision: 0,
         createdAt: now,
         updatedAt: now,
       }
@@ -547,7 +573,17 @@ export function createAgentSessionStore(storage: StoragePort): AgentSessionStore
       await storage.transaction(
         ['agentSessions', 'agentMessages'],
         async (tx) => {
-          await tx.put('agentSessions', sessionRow(session, now))
+          const stored = await loadSession(tx, session.id)
+          await tx.put(
+            'agentSessions',
+            sessionRow(
+              {
+                ...session,
+                messageRevision: (stored?.messageRevision ?? 0) + 1,
+              },
+              now,
+            ),
+          )
           await replaceMessages(
             tx,
             session.id,
@@ -578,13 +614,54 @@ export function createAgentSessionStore(storage: StoragePort): AgentSessionStore
       return storage.transaction(
         ['agentSessions', 'agentMessages'],
         async (tx) => {
-        const rows = await tx.query('agentSessions', { id })
-        if (!rows[0]) return null
+        const latest = await loadSession(tx, id)
+        if (!latest) return null
         const now = Date.now()
-        const next = { ...toSession(rows[0]), messages, updatedAt: now }
+        const next = {
+          ...latest,
+          messages,
+          messageRevision: (latest.messageRevision ?? 0) + 1,
+          updatedAt: now,
+        }
         await tx.put('agentSessions', sessionRow(next, now))
         await replaceMessages(tx, id, next.projectId, messages, now)
         return next
+        },
+      )
+    },
+
+    async applyAgentOutcome(id, apply) {
+      await ensureSplit()
+      return storage.transaction(
+        ['agentSessions', 'agentMessages'],
+        async (tx) => {
+          const latest = await loadSession(tx, id)
+          if (!latest) return { ok: false as const, reason: 'missing' as const }
+          if (
+            (latest.messageRevision ?? 0) !==
+            (apply.expectedRevision ?? 0)
+          ) {
+            return { ok: false as const, reason: 'conflict' as const }
+          }
+          const now = Date.now()
+          const next: AgentSession = {
+            ...latest,
+            messages: [...apply.messages],
+            pendingConfirmation: apply.pendingConfirmation,
+            continuation: apply.continuation,
+            allowedToolNames: apply.allowedToolNames
+              ? [...apply.allowedToolNames]
+              : undefined,
+            pendingSteers: removeAgentSteers(
+              latest.pendingSteers,
+              apply.removeSteerIds ?? [],
+            ),
+            messageRevision: (latest.messageRevision ?? 0) + 1,
+            updatedAt: now,
+          }
+          await tx.put('agentSessions', sessionRow(next, now))
+          await replaceMessages(tx, id, next.projectId, next.messages, now)
+          return { ok: true as const, session: next }
         },
       )
     },
@@ -620,6 +697,7 @@ export function createAgentSessionStore(storage: StoragePort): AgentSessionStore
           const next: AgentSession = {
             ...latest,
             messages,
+            messageRevision: (latest.messageRevision ?? 0) + 1,
             ...(pendingMatches
               ? {
                   pendingConfirmation: undefined,
@@ -638,6 +716,72 @@ export function createAgentSessionStore(storage: StoragePort): AgentSessionStore
               messages,
               now,
             )
+          }
+          return next
+        },
+      )
+    },
+
+    async settleInterruptedSession(
+      id,
+      request,
+      result,
+      expectedRevision,
+    ) {
+      await ensureSplit()
+      return storage.transaction(
+        ['agentSessions', 'agentMessages'],
+        async (tx) => {
+          const latest = await loadSession(tx, id)
+          if (!latest) return null
+          if (
+            expectedRevision !== undefined &&
+            (latest.messageRevision ?? 0) !== expectedRevision
+          ) {
+            return latest
+          }
+          const hasRequest =
+            request !== undefined &&
+            latest.messages.some(
+              (message) =>
+                message.role === 'assistant' &&
+                message.toolCalls?.some(
+                  (call) => call.id === request.callId,
+                ),
+            )
+          const messages = hasRequest
+            ? confirmationSettlementMessages(
+                latest.messages,
+                request!,
+                result,
+              )
+            : latest.messages
+          const pendingMatches =
+            request !== undefined &&
+            latest.pendingConfirmation?.callId === request.callId
+          const shouldClear = request !== undefined
+            ? pendingMatches
+            : latest.pendingConfirmation !== undefined ||
+              latest.continuation !== undefined ||
+              latest.allowedToolNames !== undefined
+          const messagesChanged = messages.length !== latest.messages.length
+          const now = Date.now()
+          const next: AgentSession = {
+            ...latest,
+            messages,
+            messageRevision: (latest.messageRevision ?? 0) + 1,
+            ...(shouldClear
+              ? {
+                  pendingConfirmation: undefined,
+                  continuation: undefined,
+                  allowedToolNames: undefined,
+                }
+              : {}),
+            updatedAt: now,
+          }
+          await tx.put('agentSessions', sessionRow(next, now))
+          if (messagesChanged) {
+            await replaceMessages(tx, id, next.projectId, messages, now)
           }
           return next
         },
@@ -819,6 +963,7 @@ export function createAgentSessionStore(storage: StoragePort): AgentSessionStore
             latest.pendingConfirmation,
             'canceled',
           ),
+          messageRevision: (latest.messageRevision ?? 0) + 1,
           queuedTurns,
           pendingSteers: [],
           pendingConfirmation: undefined,

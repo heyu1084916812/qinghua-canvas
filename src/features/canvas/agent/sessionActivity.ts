@@ -4,15 +4,23 @@
  * 放在组件外，是因为画布页按 projectId 卸载重挂；锁若跟着组件销毁，
  * 旧异步回合仍在跑、新面板却会认为会话空闲并启动第二次调用。
  */
-const activeSessions = new Map<string, { startedAt: number; queueTurnId?: string }>()
+const activeSessions = new Map<
+  string,
+  { startedAt: number; queueTurnId?: string; turnId?: string }
+>()
 const autoDrainSessions = new Set<string>()
 const releaseListeners = new Set<(sessionId: string) => void>()
 
-export function claimSessionActivity(sessionId: string, queueTurnId?: string): boolean {
+export function claimSessionActivity(
+  sessionId: string,
+  queueTurnId?: string,
+  turnId?: string,
+): boolean {
   if (activeSessions.has(sessionId)) return false
   activeSessions.set(sessionId, {
     startedAt: Date.now(),
     ...(queueTurnId ? { queueTurnId } : {}),
+    ...(turnId ? { turnId } : {}),
   })
   return true
 }
@@ -23,6 +31,30 @@ export function isSessionActivityActive(sessionId: string): boolean {
 
 export function activeQueueTurnOf(sessionId: string): string | undefined {
   return activeSessions.get(sessionId)?.queueTurnId
+}
+
+/** 当前活动锁是否仍由本回合 queueTurnId 持有；无队列回合必须传 undefined。 */
+export function queueTurnMatchesSessionActivity(
+  sessionId: string,
+  queueTurnId: string | undefined,
+): boolean {
+  const active = activeSessions.get(sessionId)
+  if (!active) return false
+  return active.queueTurnId === queueTurnId
+}
+
+/** 同时校验队列回合与直接回合 token，防止旧的直接回合释放新回合。 */
+export function turnMatchesSessionActivity(
+  sessionId: string,
+  queueTurnId: string | undefined,
+  turnId: string | undefined,
+): boolean {
+  const active = activeSessions.get(sessionId)
+  if (!active) return false
+  return (
+    active.queueTurnId === queueTurnId &&
+    active.turnId === turnId
+  )
 }
 
 /**
@@ -41,10 +73,27 @@ export function bindQueueTurnToSessionActivity(
   return true
 }
 
-export function releaseSessionActivity(sessionId: string, queueTurnId?: string): void {
+export function bindTurnToSessionActivity(
+  sessionId: string,
+  turnId: string,
+): boolean {
+  const active = activeSessions.get(sessionId)
+  if (!active) return false
+  if (active.turnId === turnId) return true
+  if (active.turnId) return false
+  active.turnId = turnId
+  return true
+}
+
+export function releaseSessionActivity(
+  sessionId: string,
+  queueTurnId?: string,
+  turnId?: string,
+): void {
   const active = activeSessions.get(sessionId)
   if (!active) return
-  if (queueTurnId && active.queueTurnId && active.queueTurnId !== queueTurnId) return
+  if (queueTurnId !== undefined && active.queueTurnId !== queueTurnId) return
+  if (turnId !== undefined && active.turnId !== turnId) return
   activeSessions.delete(sessionId)
   for (const listener of releaseListeners) listener(sessionId)
 }

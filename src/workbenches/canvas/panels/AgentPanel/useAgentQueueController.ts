@@ -12,9 +12,11 @@ import {
   sessionForQueuedTurn,
   type QueuedAgentTurn,
 } from '../../../../domain/agent/queuedTurn'
-import type { AgentController } from '../../../../features/shared/agent/AgentController'
+import type {
+  AgentController,
+  AgentTurnOrigin,
+} from '../../../../features/shared/agent/AgentController'
 import {
-  activeQueueTurnOf,
   bindQueueTurnToSessionActivity,
   claimSessionActivity,
   clearQueueDrain,
@@ -22,6 +24,7 @@ import {
   requestQueueDrain,
   shouldDrainQueue,
   subscribeSessionRelease,
+  turnMatchesSessionActivity,
 } from '../../../../features/canvas/agent/sessionActivity'
 import { createId } from '../../../../shared/id'
 import type {
@@ -270,11 +273,21 @@ export function useAgentQueueController({
     async (
       sessionId: string,
       outcome: AgentLoopOutcome | { kind: 'error' },
+      origin: AgentTurnOrigin = {},
     ) => {
       const kind = outcome.kind
       if (kind === 'confirm') return
       if (kind === 'stopped' && outcome.checkpoint) return
-      const queueTurnId = activeQueueTurnOf(sessionId)
+      const queueTurnId = origin.queueTurnId
+      if (
+        !turnMatchesSessionActivity(
+          sessionId,
+          queueTurnId,
+          origin.turnId,
+        )
+      ) {
+        return
+      }
       if (queueTurnId) {
         const next = await controller.finishQueuedTurn(
           sessionId,
@@ -283,7 +296,11 @@ export function useAgentQueueController({
         )
         if (next) applySessionSnapshot(next)
       }
-      releaseSessionActivity(sessionId, queueTurnId)
+      releaseSessionActivity(
+        sessionId,
+        queueTurnId,
+        origin.turnId,
+      )
       if (kind === 'message' && shouldDrainQueue(sessionId)) {
         queueMicrotask(() => queuePumpRef.current(sessionId))
       }

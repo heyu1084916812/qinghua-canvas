@@ -255,6 +255,186 @@ describe('Agent 会话 · 隔离（最容易出错的地方）', () => {
   })
 })
 
+describe('Agent 会话 · 回合版本门禁', () => {
+  it('★★ 旧 outcome 使用过期 revision 时必须 conflict，不能覆盖新用户消息', async () => {
+    const s = store()
+    const a = await s.create({
+      projectId: 'p1',
+      channelId: 'c1',
+      model: 'm1',
+    })
+    const firstUser = {
+      role: 'user' as const,
+      content: '旧回合',
+    }
+    const first = await s.saveMessages(a.id, [firstUser])
+    expect(first?.messageRevision).toBe(1)
+    await s.enqueueSteer(a.id, {
+      id: 'steer-old',
+      text: '旧引导',
+      createdAt: 1,
+    })
+
+    const applied = await s.applyAgentOutcome(a.id, {
+      expectedRevision: 1,
+      messages: [
+        firstUser,
+        { role: 'assistant', content: '旧回答' },
+      ],
+      pendingConfirmation: {
+        callId: 'old-call',
+        name: 'runNode',
+        args: { nodeIds: ['old'] },
+      },
+      allowedToolNames: ['runNode'],
+      removeSteerIds: ['steer-old'],
+    })
+    expect(applied.ok).toBe(true)
+    if (!applied.ok) throw new Error('预期当前 revision 可写')
+    expect(applied.session.messageRevision).toBe(2)
+    expect(applied.session.pendingSteers).toEqual([])
+
+    const newer = await s.saveMessages(a.id, [
+      firstUser,
+      { role: 'assistant', content: '旧回答' },
+      { role: 'user', content: '新回合不能丢' },
+    ])
+    expect(newer?.messageRevision).toBe(3)
+    await s.updateFields(a.id, {
+      pendingConfirmation: {
+        callId: 'new-call',
+        name: 'runNode',
+        args: { nodeIds: ['new'] },
+      },
+      allowedToolNames: ['readGraph', 'runNode'],
+    })
+
+    const stale = await s.applyAgentOutcome(a.id, {
+      expectedRevision: 1,
+      messages: [firstUser],
+      pendingConfirmation: undefined,
+      allowedToolNames: undefined,
+    })
+    expect(stale).toEqual({ ok: false, reason: 'conflict' })
+    const current = await s.get(a.id)
+    expect(current?.messageRevision).toBe(3)
+    expect(current?.messages.at(-1)).toEqual({
+      role: 'user',
+      content: '新回合不能丢',
+    })
+    expect(current?.pendingConfirmation?.callId).toBe('new-call')
+    expect(current?.allowedToolNames).toEqual([
+      'readGraph',
+      'runNode',
+    ])
+  })
+
+  it('★ 无确认卡的 stop 仍清检查点，不拿旧 React 消息覆盖历史', async () => {
+    const s = store()
+    const a = await s.create({
+      projectId: 'p1',
+      channelId: 'c1',
+      model: 'm1',
+    })
+    const saved = await s.saveMessages(a.id, [
+      { role: 'user', content: '暂停中的任务' },
+    ])
+    await s.updateFields(a.id, {
+      continuation: {
+        reason: 'max_steps',
+        maxSteps: 8,
+        createdAt: 1,
+      },
+      allowedToolNames: ['readGraph', 'runNode'],
+    })
+
+    const staleStop = await s.settleInterruptedSession(
+      a.id,
+      undefined,
+      'interrupted',
+      (saved?.messageRevision ?? 0) - 1,
+    )
+    expect(staleStop?.messageRevision).toBe(saved?.messageRevision)
+    expect(staleStop?.continuation?.createdAt).toBe(1)
+
+    const stopped = await s.settleInterruptedSession(
+      a.id,
+      undefined,
+      'interrupted',
+      saved?.messageRevision,
+    )
+    expect(stopped?.messages).toEqual(saved?.messages)
+    expect(stopped?.messageRevision).toBe(
+      (saved?.messageRevision ?? 0) + 1,
+    )
+    expect(stopped?.continuation).toBeUndefined()
+    expect(stopped?.allowedToolNames).toBeUndefined()
+
+    const late = await s.applyAgentOutcome(a.id, {
+      expectedRevision: saved?.messageRevision,
+      messages: [
+        { role: 'user', content: '停止后迟到的旧回答' },
+      ],
+    })
+    expect(late).toEqual({ ok: false, reason: 'conflict' })
+    expect((await s.get(a.id))?.messages).toEqual(saved?.messages)
+  })
+
+  it('★★ 迟到 stop 只补旧工具批次，不清新回合确认卡', async () => {
+    const s = store()
+    const a = await s.create({
+      projectId: 'p1',
+      channelId: 'c1',
+      model: 'm1',
+    })
+    await s.saveMessages(a.id, [
+      {
+        role: 'assistant',
+        content: '',
+        toolCalls: [
+          {
+            id: 'old-call',
+            name: 'runNode',
+            args: '{"nodeIds":["old"]}',
+          },
+        ],
+      },
+      { role: 'user', content: '新回合' },
+    ])
+    await s.updateFields(a.id, {
+      pendingConfirmation: {
+        callId: 'new-call',
+        name: 'deleteNodes',
+        args: { nodeIds: ['new'] },
+      },
+      continuation: {
+        reason: 'max_steps',
+        maxSteps: 8,
+        createdAt: 2,
+      },
+      allowedToolNames: ['deleteNodes'],
+    })
+
+    const settled = await s.settleInterruptedSession(
+      a.id,
+      { callId: 'old-call', name: 'runNode' },
+      'interrupted',
+    )
+    expect(settled?.messages.map((message) => message.role)).toEqual([
+      'assistant',
+      'tool',
+      'user',
+    ])
+    expect(settled?.messages[1]).toMatchObject({
+      role: 'tool',
+      toolCallId: 'old-call',
+    })
+    expect(settled?.pendingConfirmation?.callId).toBe('new-call')
+    expect(settled?.continuation?.createdAt).toBe(2)
+    expect(settled?.allowedToolNames).toEqual(['deleteNodes'])
+  })
+})
+
 describe('Agent 会话 · 待执行任务队列', () => {
   const turn = (id: string, text = `任务 ${id}`): QueuedAgentTurn => ({
     id,

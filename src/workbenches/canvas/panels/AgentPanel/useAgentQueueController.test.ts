@@ -1,8 +1,13 @@
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { AgentController } from '../../../../features/shared/agent/AgentController'
 import type { AgentSession } from '../../../../state/agent/sessionStore'
+import {
+  claimSessionActivity,
+  isSessionActivityActive,
+  releaseSessionActivity,
+} from '../../../../features/canvas/agent/sessionActivity'
 import {
   useAgentQueueController,
   type AgentQueueControllerInput,
@@ -58,6 +63,10 @@ function input(
 }
 
 describe('useAgentQueueController', () => {
+  afterEach(() => {
+    releaseSessionActivity(session.id)
+  })
+
   it('排队时冻结会话模型与附件快照', async () => {
     let api: ReturnType<typeof useAgentQueueController> | null = null
     const props = input()
@@ -105,5 +114,71 @@ describe('useAgentQueueController', () => {
       message: '还没选模型：先在上面选一个对话模型',
     })
     expect(props.controller.enqueueTurn).not.toHaveBeenCalled()
+  })
+
+  it('★★ 旧回合 settlement 不得销掉新队列或释放新活动锁', async () => {
+    let api: ReturnType<typeof useAgentQueueController> | null = null
+    const finishQueuedTurn = vi.fn(async () => session)
+    const props = input({
+      controller: {
+        finishQueuedTurn,
+      } as unknown as AgentController,
+    })
+
+    function Probe() {
+      api = useAgentQueueController(props)
+      return createElement('span', null, 'ok')
+    }
+
+    renderToStaticMarkup(createElement(Probe))
+    expect(
+      claimSessionActivity(session.id, 'turn-new', 'turn-new'),
+    ).toBe(true)
+
+    await api!.settleSessionOutcome(
+      session.id,
+      { kind: 'message', text: '完成', messages: [] },
+      { queueTurnId: 'turn-old', turnId: 'turn-old' },
+    )
+
+    expect(finishQueuedTurn).not.toHaveBeenCalled()
+    expect(isSessionActivityActive(session.id)).toBe(true)
+  })
+
+  it('★ originating queue + turn 完全匹配时才销队并释放', async () => {
+    let api: ReturnType<typeof useAgentQueueController> | null = null
+    const next = { ...session, queuedTurns: [] }
+    const finishQueuedTurn = vi.fn(async () => next)
+    const applySessionSnapshot = vi.fn()
+    const props = input({
+      controller: {
+        finishQueuedTurn,
+      } as unknown as AgentController,
+      applySessionSnapshot,
+    })
+
+    function Probe() {
+      api = useAgentQueueController(props)
+      return createElement('span', null, 'ok')
+    }
+
+    renderToStaticMarkup(createElement(Probe))
+    expect(
+      claimSessionActivity(session.id, 'turn-1', 'turn-1'),
+    ).toBe(true)
+
+    await api!.settleSessionOutcome(
+      session.id,
+      { kind: 'message', text: '完成', messages: [] },
+      { queueTurnId: 'turn-1', turnId: 'turn-1' },
+    )
+
+    expect(finishQueuedTurn).toHaveBeenCalledWith(
+      session.id,
+      'turn-1',
+      true,
+    )
+    expect(applySessionSnapshot).toHaveBeenCalledWith(next)
+    expect(isSessionActivityActive(session.id)).toBe(false)
   })
 })

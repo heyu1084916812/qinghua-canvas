@@ -4,9 +4,11 @@
 import type { AgentLoopOutcome } from '../../agent/agentLoop'
 import { errText } from '../../agent/agentLoop'
 import {
+  bindTurnToSessionActivity,
   claimSessionActivity,
   releaseSessionActivity,
   shouldDrainQueue,
+  turnMatchesSessionActivity,
 } from '../../../../features/canvas/agent/sessionActivity'
 import { AgentToolEffectBlockedError } from '../../../../features/shared/agent/AgentToolEffectLedger'
 import type { AgentController } from '../../../../features/shared/agent/AgentController'
@@ -22,6 +24,8 @@ export interface AgentSendFlowInput {
   preclaimed?: boolean
   queueTurnId?: string
   internalControl?: boolean
+  turnId: string
+  turnAbort: AbortController
   runTurn: (
     text: string,
     session: AgentSession,
@@ -59,6 +63,8 @@ export async function runAgentSendFlow({
   preclaimed = false,
   queueTurnId,
   internalControl = false,
+  turnId,
+  turnAbort,
   runTurn,
   applySessionSnapshot,
   clearLiveActivitiesFor,
@@ -68,7 +74,13 @@ export async function runAgentSendFlow({
   transitionSessionJob,
   queuePump,
 }: AgentSendFlowInput): Promise<AgentLoopOutcome | undefined> {
-  if (!preclaimed && !claimSessionActivity(session.id, queueTurnId)) {
+  if (preclaimed) {
+    if (!bindTurnToSessionActivity(session.id, turnId)) {
+      return undefined
+    }
+  } else if (
+    !claimSessionActivity(session.id, queueTurnId, turnId)
+  ) {
     return undefined
   }
   /**
@@ -82,6 +94,15 @@ export async function runAgentSendFlow({
   const finishQueue = async (completed: boolean) => {
     if (!queueTurnId || finishQueueAttempted) return
     finishQueueAttempted = true
+    if (
+      !turnMatchesSessionActivity(
+        session.id,
+        queueTurnId,
+        turnId,
+      )
+    ) {
+      return
+    }
     try {
       const next = await controller.finishQueuedTurn(
         session.id,
@@ -103,7 +124,9 @@ export async function runAgentSendFlow({
     )
     if (!outcome) {
       await finishQueue(false)
-      abortRefs.current.delete(session.id)
+      if (abortRefs.current.get(session.id) === turnAbort) {
+        abortRefs.current.delete(session.id)
+      }
       if (finishQueueError) {
         setStatusFor(session.id, {
           kind: 'error',
@@ -130,7 +153,7 @@ export async function runAgentSendFlow({
       queueMicrotask(() => queuePump(session.id))
     }
   } catch (error) {
-    const aborted = abortRefs.current.get(session.id)?.signal.aborted === true
+    const aborted = turnAbort.signal.aborted
     const blocked =
       error instanceof AgentToolEffectBlockedError ? error : null
     deliveredSteersRef.current.delete(session.id)
@@ -152,6 +175,7 @@ export async function runAgentSendFlow({
                 : {}),
             },
         { phase: 'run_send_text' },
+        { turnId, queueTurnId },
       )
     } catch (error) {
       transitionError = error
@@ -168,7 +192,9 @@ export async function runAgentSendFlow({
     )
     return undefined
   } finally {
-    if (!retainActivity) releaseSessionActivity(session.id, queueTurnId)
+    if (!retainActivity) {
+      releaseSessionActivity(session.id, queueTurnId, turnId)
+    }
   }
   return outcome
 }

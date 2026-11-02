@@ -32,6 +32,8 @@ export interface PersistedAgentUserTurn {
    */
   outcomeTailIndex: number
   saved: AgentSession
+  /** 本次用户消息写入后的 revision；outcome CAS 必须基于它。 */
+  messageRevision: number
 }
 
 /**
@@ -82,6 +84,7 @@ export async function persistAgentUserTurnBeforeRequest(
     historyMessages,
     outcomeTailIndex: 1 + modelWindow.length + 1,
     saved,
+    messageRevision: saved.messageRevision ?? 0,
   }
 }
 

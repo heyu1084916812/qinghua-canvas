@@ -41,6 +41,8 @@ describe('runAgentSendFlow', () => {
       deliveredSteersRef: { current: new Map() },
       preclaimed: true,
       queueTurnId: 'turn-1',
+      turnId: 'turn-1',
+      turnAbort: new AbortController(),
       runTurn: async () => ({
         kind: 'message',
         text: '已完成',
@@ -79,6 +81,8 @@ describe('runAgentSendFlow', () => {
       deliveredSteersRef: { current: new Map() },
       preclaimed: true,
       queueTurnId: 'turn-fail',
+      turnId: 'turn-fail',
+      turnAbort: new AbortController(),
       runTurn: async () => undefined,
       applySessionSnapshot: vi.fn(),
       clearLiveActivitiesFor: vi.fn(),
@@ -102,6 +106,8 @@ describe('runAgentSendFlow', () => {
       controller: {} as never,
       abortRefs: { current: new Map() },
       deliveredSteersRef: { current: new Map() },
+      turnId: 'turn-error',
+      turnAbort: new AbortController(),
       runTurn: () => Promise.reject(new Error('原业务失败')),
       applySessionSnapshot: vi.fn(),
       clearLiveActivitiesFor: vi.fn(),
@@ -134,6 +140,8 @@ describe('runAgentSendFlow', () => {
       abortRefs: { current: new Map() },
       deliveredSteersRef: { current: new Map() },
       queueTurnId: 'turn-finish-fails',
+      turnId: 'turn-finish-fails',
+      turnAbort: new AbortController(),
       runTurn: async () => ({
         kind: 'message',
         text: '业务已完成',
@@ -154,6 +162,88 @@ describe('runAgentSendFlow', () => {
     expect(finishQueuedTurn).toHaveBeenCalledTimes(1)
     expect(isSessionActivityActive(local.id)).toBe(false)
     expect(status).toMatchObject({ kind: 'error', message: '队列销项失败' })
+  })
+
+  it('★★ 旧直接回合结束不得释放新的直接回合活动锁', async () => {
+    const local = { ...session, id: 'session-direct-token' }
+    await runAgentSendFlow({
+      session: local,
+      text: '旧回合',
+      controller: {} as never,
+      abortRefs: { current: new Map() },
+      deliveredSteersRef: { current: new Map() },
+      turnId: 'turn-old',
+      turnAbort: new AbortController(),
+      runTurn: async () => {
+        releaseSessionActivity(
+          local.id,
+          undefined,
+          'turn-old',
+        )
+        expect(
+          claimSessionActivity(
+            local.id,
+            undefined,
+            'turn-new',
+          ),
+        ).toBe(true)
+        throw new Error('旧回合迟到失败')
+      },
+      applySessionSnapshot: vi.fn(),
+      clearLiveActivitiesFor: vi.fn(),
+      clearLiveProcessFor: vi.fn(),
+      clearRunTasksFor: vi.fn(),
+      setStatusFor: vi.fn(),
+      transitionSessionJob: vi.fn() as AgentController['transition'],
+      queuePump: vi.fn(),
+    })
+
+    expect(isSessionActivityActive(local.id)).toBe(true)
+    releaseSessionActivity(
+      local.id,
+      undefined,
+      'turn-new',
+    )
+  })
+
+  it('★★ abort 后 map 已删仍按本回合 controller 收口为 canceled', async () => {
+    const local = { ...session, id: 'session-abort-token' }
+    const turnAbort = new AbortController()
+    turnAbort.abort()
+    let status: unknown
+    const transitionSessionJob =
+      vi.fn() as AgentController['transition']
+    await runAgentSendFlow({
+      session: local,
+      text: '已停止回合',
+      controller: {} as never,
+      abortRefs: { current: new Map() },
+      deliveredSteersRef: { current: new Map() },
+      turnId: 'turn-aborted',
+      turnAbort,
+      runTurn: async () => {
+        throw new Error('aborted')
+      },
+      applySessionSnapshot: vi.fn(),
+      clearLiveActivitiesFor: vi.fn(),
+      clearLiveProcessFor: vi.fn(),
+      clearRunTasksFor: vi.fn(),
+      setStatusFor: vi.fn((_id, next) => {
+        status = next
+      }),
+      transitionSessionJob,
+      queuePump: vi.fn(),
+    })
+
+    expect(status).toEqual({ kind: 'idle' })
+    expect(transitionSessionJob).toHaveBeenCalledWith(
+      local.id,
+      'canceled',
+      'interrupted',
+      {},
+      { phase: 'run_send_text' },
+      { turnId: 'turn-aborted', queueTurnId: undefined },
+    )
   })
 
   it('confirm / paused 仍保留活动锁，等待既有后续流程', async () => {
@@ -184,6 +274,8 @@ describe('runAgentSendFlow', () => {
         controller: {} as never,
         abortRefs: { current: new Map() },
         deliveredSteersRef: { current: new Map() },
+        turnId: item.id,
+        turnAbort: new AbortController(),
         runTurn: async () => item.outcome,
         applySessionSnapshot: vi.fn(),
         clearLiveActivitiesFor: vi.fn(),

@@ -41,6 +41,10 @@ describe('persistAgentUserTurnBeforeRequest', () => {
     expect((await sessions.get(session.id))?.messages).toEqual(
       persisted.historyMessages,
     )
+    expect(persisted.messageRevision).toBe(
+      persisted.saved.messageRevision,
+    )
+    expect(persisted.messageRevision).toBeGreaterThan(0)
   })
 
   it('保持回读窗口不变，同时把窗口外历史留在持久化消息里', async () => {

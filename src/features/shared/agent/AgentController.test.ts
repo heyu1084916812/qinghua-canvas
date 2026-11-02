@@ -448,6 +448,71 @@ describe('AgentController', () => {
     expect(controller.jobId('s1')).toBeUndefined()
   })
 
+  it('★★ 带 origin 的迟到收口只迁本回合 Job，不碰新活动 Job', async () => {
+    const oldJob = {
+      id: 'job-old',
+      sessionId: 's1',
+      projectId: 'p1',
+      turnId: 'turn-old',
+      status: 'planning' as const,
+      revision: 1,
+      createdAt: 1,
+      updatedAt: 1,
+    }
+    const newJob = {
+      ...oldJob,
+      id: 'job-new',
+      turnId: 'turn-new',
+    }
+    const jobs = {
+      get: vi.fn(async (id: string) =>
+        id === 'job-old'
+          ? oldJob
+          : id === 'job-new'
+            ? newJob
+            : null,
+      ),
+      active: vi.fn(async () => newJob),
+      forTurn: vi.fn(async () => null),
+      transition: vi.fn(async (_id, status: string) => ({
+        job: { ...oldJob, status },
+        event: { id: 'event' },
+      })),
+    }
+    const controller = createAgentController({
+      projectId: 'p1',
+      sessions: {} as never,
+      jobs: jobs as never,
+      hooks: {
+        isSessionActivityActive: () => false,
+        onPendingConfirmation: vi.fn(),
+        onContinuation: vi.fn(),
+        onNeedsAttention: vi.fn(),
+        onIdle: vi.fn(),
+        notify: vi.fn(),
+      },
+    })
+
+    await controller.transition(
+      's1',
+      'completed',
+      'completed',
+      undefined,
+      undefined,
+      { jobId: 'job-old', turnId: 'turn-old' },
+    )
+
+    expect(jobs.get).toHaveBeenCalledWith('job-old')
+    expect(jobs.active).not.toHaveBeenCalled()
+    expect(jobs.transition).toHaveBeenCalledWith(
+      'job-old',
+      'completed',
+      'completed',
+      {},
+      {},
+    )
+  })
+
   it('owns queue insertion, queued-job cancellation, and message editing', async () => {
     const queuedSession = session({ queuedTurns: [] })
     const jobs = {

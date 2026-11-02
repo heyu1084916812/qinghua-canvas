@@ -1,5 +1,20 @@
 # CanvasFlow（轻画）项目记忆
 
+### Agent outcome 回合版本门禁与恢复（2026-11-03，对账 #861）
+
+- **身份检查不是写库事务**：入口 controller 相等后，旧 outcome 仍可能在 async 写库期间遇到新回合。
+  `AgentSession.messageRevision` 每次真正替换消息递增；`applyAgentOutcome()` 用 expected revision
+  在同一事务写消息、pendingConfirmation、continuation、allowedToolNames 和 steer 删除。冲突返回
+  `conflict`，不写 UI、不迁 Job、不清 delivered steer。
+- **stop / cancel 是停止屏障**：`settleInterruptedSession()` 基于最新历史补 canceled/interrupted/
+  notStarted，只清匹配旧 callId 的字段；即使消息没变也递增 revision，让已经挂起的旧 outcome CAS 失败。
+- **Job 与活动锁都绑定具体回合**：`AgentTurnOrigin` 携带 jobId / turnId / queueTurnId；
+  `sessionActivity` 同时记录 queueTurnId + turnId，旧 flow 只能释放完全匹配的锁，旧 queue settlement
+  不能销掉新队首。send flow 的 abort 判断使用自己的 controller，不依赖 map 里是否还留着。
+- **证据**：聚焦 **80/80**、Agent 相关 **434/434**、全量 **3895 passed / 1 skipped**；
+  tsc/check/build/diff-check 通过。故障测试覆盖过期 revision、延迟 conflict、旧 stop 保留新字段、
+  直接/队列 token 和 abort 后 map 删除。尚未独立 G769/Tauri 验收。
+
 ### AgentLoop 依赖装配拆分（2026-11-03，对账 #859）
 
 - **三个边界，不是一个巨型 hook**：`agentLoopInputs.ts` 只收集视觉素材并按节点 id / hash 去重；
@@ -23,8 +38,8 @@
   相关目录 **412/412**、全量 **3884 passed / 1 skipped**。质量线真实工具消息确认
   `alias_probe → node_ebdbf0a9…1098e`，同回合 runNode 使用同一 nodeId；Chat2api asset
   `b4cbf28dc44a4e56`，PNG 1254×1254，Tauri hash `DC0EBD…5A7F7`。
-- **#861 仍待补**：outcome 整份历史写库的 controller / turn CAS 与 queue settlement 绑定仍未完成，
-  不能因为 #860 或真实回合成功就宣称恢复链路闭环。
+- **#861 已本地实现**：outcome 写库改为 messageRevision CAS，stop/cancel 改为最新历史原子结算，
+  Job 与活动锁绑定 turn origin；仍需质量线独立全量和真实 Tauri 交错验收。
 
 ### Agent 结果收口身份与迟到确认补救（2026-11-03，对账 #858）
 
@@ -42,9 +57,9 @@
   tsc/check/build/diff-check 通过；质量线独立 G769 明暗各 **39/39**；Tauri hash
   `8F478E…8658DA`；workbuddy 文本回合 completed；Chat2api 锁定 `GPT Image 2 -> gpt-image-2`
   后 RunRecord succeeded，asset `23e495ff7c83ba8e`，PNG 1254×1254。AgentHost 未实现。
-- **下一步必须补的恢复测试**：普通 outcome 的整份历史写入尚未做 controller CAS；queue settlement 仍按
-  sessionId；stop/cancel 仍用 React messages 快照整份落库。测试必须覆盖“旧写挂起 → 新回合落库 →
-  旧写释放”，不能只看 controller 在入口时是否匹配。
+- **恢复测试已补到 #861**：普通 outcome 改为 revision CAS；queue settlement 绑定 turn/queue token；
+  stop/cancel 不再拿 React messages 快照整份覆盖。已覆盖过期 revision、延迟 conflict、旧 stop 保留
+  新字段和 abort 后 map 已删；仍需独立真机交错验收。
 
 ### Agent 结果收口拆分（2026-11-03，对账 #857）
 

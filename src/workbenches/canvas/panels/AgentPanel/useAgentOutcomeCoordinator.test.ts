@@ -23,7 +23,7 @@ const session: AgentSession = {
 
 function captureHook(input: {
   abortRefs: Map<string, AbortController>
-  persist: AgentOutcomeCoordinatorHookInput['persist']
+  applyOutcome: AgentController['sessions']['applyAgentOutcome']
   transition: AgentOutcomeCoordinatorHookInput['transitionSessionJob']
   setMessages: AgentOutcomeCoordinatorHookInput['setMessages']
   setStatusFor: AgentOutcomeCoordinatorHookInput['setStatusFor']
@@ -42,12 +42,11 @@ function captureHook(input: {
       deliveredSteersRef: { current: new Map() },
       turnToolsRef: { current: new Map() },
       sessions: {
+        applyAgentOutcome: input.applyOutcome,
         settleInterruptedConfirmation:
           input.settleInterruptedConfirmation,
-        updateFields: vi.fn(async () => null),
-        removeSteers: vi.fn(async () => null),
       } as unknown as AgentController['sessions'],
-      persist: input.persist,
+      refresh: vi.fn(async () => []),
       transitionSessionJob: input.transition as AgentController['transition'],
       clearLiveActivitiesFor: vi.fn(),
       clearLiveProcessFor: vi.fn(),
@@ -56,6 +55,7 @@ function captureHook(input: {
       setMessages: input.setMessages,
       applySessionSnapshot: vi.fn(),
       setStatusFor: input.setStatusFor,
+      turnOriginFor: () => ({}),
     }))
     return createElement('span', null, 'ok')
   }
@@ -80,7 +80,10 @@ describe('useAgentOutcomeCoordinator', () => {
   it('★★ 使用回合创建时的 controller，拒绝被新 controller 替换后的旧 outcome', async () => {
     const oldController = new AbortController()
     const newController = new AbortController()
-    const persist = vi.fn(async () => {})
+    const applyOutcome = vi.fn(async () => ({
+      ok: true as const,
+      session,
+    }))
     const transition = vi.fn(async () => null)
     const setMessages = vi.fn()
     const setStatusFor = vi.fn()
@@ -89,7 +92,7 @@ describe('useAgentOutcomeCoordinator', () => {
     )
     const handle = captureHook({
       abortRefs: new Map([[session.id, newController]]),
-      persist,
+      applyOutcome,
       transition,
       setMessages,
       setStatusFor,
@@ -107,7 +110,7 @@ describe('useAgentOutcomeCoordinator', () => {
       oldController,
     )
 
-    expect(persist).not.toHaveBeenCalled()
+    expect(applyOutcome).not.toHaveBeenCalled()
     expect(transition).not.toHaveBeenCalled()
     expect(setMessages).not.toHaveBeenCalled()
     expect(setStatusFor).not.toHaveBeenCalled()
@@ -115,7 +118,10 @@ describe('useAgentOutcomeCoordinator', () => {
 
   it('当前 controller 身份一致时正常收口', async () => {
     const controller = new AbortController()
-    const persist = vi.fn(async () => {})
+    const applyOutcome = vi.fn(async () => ({
+      ok: true as const,
+      session,
+    }))
     const transition = vi.fn(async () => null)
     const setMessages = vi.fn()
     const setStatusFor = vi.fn()
@@ -124,7 +130,7 @@ describe('useAgentOutcomeCoordinator', () => {
     )
     const handle = captureHook({
       abortRefs: new Map([[session.id, controller]]),
-      persist,
+      applyOutcome,
       transition,
       setMessages,
       setStatusFor,
@@ -142,11 +148,14 @@ describe('useAgentOutcomeCoordinator', () => {
       controller,
     )
 
-    expect(persist).toHaveBeenCalledTimes(1)
+    expect(applyOutcome).toHaveBeenCalledTimes(1)
     expect(transition).toHaveBeenCalledWith(
       session.id,
       'completed',
       'completed',
+      undefined,
+      undefined,
+      {},
     )
     expect(setMessages).toHaveBeenCalledTimes(1)
     expect(setStatusFor).toHaveBeenCalledWith(session.id, { kind: 'idle' })

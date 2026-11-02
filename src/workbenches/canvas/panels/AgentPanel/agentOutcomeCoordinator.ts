@@ -3,11 +3,11 @@ import type {
   ConfirmationRequestRef,
 } from '../../../../domain/agent/confirmation'
 import type { AgentToolName } from '../../../../domain/agent/toolRegistry'
-import type { AgentController } from '../../../../features/shared/agent/AgentController'
 import type {
-  AgentSession,
-  AgentSessionStore,
-} from '../../../../state/agent/sessionStore'
+  AgentController,
+  AgentTurnOrigin,
+} from '../../../../features/shared/agent/AgentController'
+import type { AgentSession } from '../../../../state/agent/sessionStore'
 import type { AgentLoopOutcome } from '../../agent/agentLoop'
 import {
   composeAgentOutcomeMessages,
@@ -22,18 +22,27 @@ export interface AgentOutcomeMessageReveal {
 }
 
 export interface AgentOutcomeSessionPort {
-  /** 正常 outcome 的完整历史落库；可由装配层追加会话列表刷新。 */
-  persistMessages: (
-    session: AgentSession,
-    messages: readonly ChatMessage[],
-  ) => Promise<void>
+  /** 消息与确认 / 检查点 / steer 在同一事务按 revision CAS 写入。 */
+  applyOutcome: (
+    sessionId: string,
+    input: {
+      expectedRevision?: number
+      messages: readonly ChatMessage[]
+      pendingConfirmation?: AgentSession['pendingConfirmation']
+      continuation?: AgentSession['continuation']
+      allowedToolNames?: readonly AgentToolName[]
+      removeSteerIds?: readonly string[]
+    },
+  ) => Promise<
+    | { ok: true; session: AgentSession }
+    | { ok: false; reason: 'missing' | 'conflict' }
+  >
   /** 迟到确认只在存储层原子合并缺失结果，不刷新界面。 */
   settleInterruptedConfirmation: (
     sessionId: string,
     request: ConfirmationRequestRef,
   ) => Promise<unknown>
-  updateFields: AgentSessionStore['updateFields']
-  removeSteers: AgentSessionStore['removeSteers']
+  refreshSession: () => Promise<void>
 }
 
 export interface CoordinateAgentOutcomeInput {
@@ -42,6 +51,8 @@ export interface CoordinateAgentOutcomeInput {
   persistedTurn?: PersistedAgentUserTurn
   /** 本 outcome 创建时拿到的 controller；身份比较必须一直用它。 */
   outcomeController: AbortController | undefined
+  /** 本回合创建时的 Job / turn / queue / revision 身份。 */
+  turnOrigin: AgentTurnOrigin
   currentOutcomeController: () => AbortController | undefined
   currentSessionId: () => string | null
   sessions: AgentOutcomeSessionPort
@@ -69,6 +80,7 @@ export interface CoordinateAgentOutcomeInput {
 export type AgentOutcomeCoordinationResult =
   | 'ignored'
   | 'stale_settled'
+  | 'conflict'
   | 'applied'
 
 /**
@@ -115,32 +127,6 @@ export async function coordinateAgentOutcome(
     return 'stale_settled'
   }
 
-  input.clearLiveActivities()
-  input.clearLiveProcess()
-  input.clearRunTasks()
-
-  if (input.currentSessionId() === session.id) {
-    if (
-      outcome.kind === 'message' &&
-      outcome.text.trim() &&
-      !input.prefersReducedMotion()
-    ) {
-      input.setMessageReveal({
-        sessionId: session.id,
-        fullText: outcome.text.trim(),
-        visibleLength: 0,
-      })
-    } else {
-      input.setMessageReveal(null)
-    }
-    input.setMessages(full)
-  }
-  await input.sessions.persistMessages(session, full)
-  if (!outcomeIsCurrent()) {
-    await settleStaleOutcome()
-    return 'stale_settled'
-  }
-
   const pendingConfirmation =
     outcome.kind === 'confirm'
       ? {
@@ -164,25 +150,49 @@ export async function coordinateAgentOutcome(
   const persistTurnTools =
     outcome.kind === 'confirm' ||
     (outcome.kind === 'stopped' && Boolean(outcome.checkpoint))
-  let latest = await input.sessions.updateFields(session.id, {
+  const deliveredSteerIds = [...input.deliveredSteerIds()]
+  const applied = await input.sessions.applyOutcome(session.id, {
+    expectedRevision: input.turnOrigin.messageRevision,
+    messages: full,
     pendingConfirmation,
     continuation,
     allowedToolNames: persistTurnTools
       ? [...input.turnToolNames()]
       : undefined,
+    ...(deliveredSteerIds.length > 0
+      ? { removeSteerIds: deliveredSteerIds }
+      : {}),
   })
+  if (!applied.ok) {
+    await settleStaleOutcome()
+    return applied.reason === 'conflict' ? 'conflict' : 'ignored'
+  }
+  const latest = applied.session
+  input.clearDeliveredSteers()
+
+  input.clearLiveActivities()
+  input.clearLiveProcess()
+  input.clearRunTasks()
+  if (input.currentSessionId() === session.id) {
+    if (
+      outcome.kind === 'message' &&
+      outcome.text.trim() &&
+      !input.prefersReducedMotion()
+    ) {
+      input.setMessageReveal({
+        sessionId: session.id,
+        fullText: outcome.text.trim(),
+        visibleLength: 0,
+      })
+    } else {
+      input.setMessageReveal(null)
+    }
+    input.setMessages(full)
+  }
+  await input.sessions.refreshSession()
   if (!outcomeIsCurrent()) {
     await settleStaleOutcome()
     return 'stale_settled'
-  }
-
-  const deliveredSteerIds = [...input.deliveredSteerIds()]
-  if (deliveredSteerIds.length > 0) {
-    latest = await input.sessions.removeSteers(
-      session.id,
-      deliveredSteerIds,
-    )
-    input.clearDeliveredSteers()
   }
 
   if (outcome.kind === 'confirm') {
@@ -192,6 +202,7 @@ export async function coordinateAgentOutcome(
       'confirmation_requested',
       { pendingCallId: outcome.request.callId },
       { tool: outcome.request.name },
+      input.turnOrigin,
     )
   } else if (outcome.kind === 'stopped' && outcome.checkpoint) {
     await input.transitionSessionJob(
@@ -206,6 +217,8 @@ export async function coordinateAgentOutcome(
           savedAt: now(),
         },
       },
+      undefined,
+      input.turnOrigin,
     )
   } else if (outcome.kind === 'error' && outcome.needsAttention) {
     await input.transitionSessionJob(
@@ -222,12 +235,16 @@ export async function coordinateAgentOutcome(
         phase: 'tool_effect_pending',
         reason: outcome.needsAttention.reason,
       },
+      input.turnOrigin,
     )
   } else if (outcome.kind === 'message') {
     await input.transitionSessionJob(
       session.id,
       'completed',
       'completed',
+      undefined,
+      undefined,
+      input.turnOrigin,
     )
   } else {
     const reason =
@@ -238,6 +255,7 @@ export async function coordinateAgentOutcome(
       'failed',
       { lastError: reason },
       { reason },
+      input.turnOrigin,
     )
   }
   if (!outcomeIsCurrent()) {
@@ -254,7 +272,7 @@ export async function coordinateAgentOutcome(
       input.deleteAbortController(session.id, outcomeController)
     }
   }
-  if (latest) input.applySessionSnapshot(latest)
+  input.applySessionSnapshot(latest)
 
   if (outcome.kind === 'message') {
     input.setStatusFor(session.id, input.idleStatus)

@@ -11,9 +11,11 @@
   `settleInterruptedConfirmation()` 原子读取最新历史，只给仍存在的 tool call 补 interrupted /
   notStarted，结果插回原 assistant 工具批次；只有旧 `callId` 仍匹配时才清
   `pendingConfirmation / continuation / allowedToolNames`，不写 UI、不迁移 Job 成功。
-- **整份历史写库仍要补版本门禁**：当前普通 outcome 的 `saveMessages(full)`、stop/cancel 的 React
-  messages 快照，以及 `settleSessionOutcome` 的 sessionId 队列释放都还没有 controller / turn CAS。
-  下一批恢复测试必须覆盖“旧写挂起 → 新回合落库 → 旧写释放”，不能把入口身份检查当成整个事务安全。
+- **整份历史写库必须有版本门禁**：`messageRevision` 每次真正替换消息递增，普通 outcome 只能通过
+  `applyAgentOutcome()` 按 expected revision 同事务写消息 / 确认字段 / steer 删除；冲突不得写 UI 或 Job。
+  stop/cancel 必须用 `settleInterruptedSession()` 基于最新历史结算，并推进停止屏障 revision。
+  `settleSessionOutcome` 必须绑定 originating queueTurnId + turnId，`sessionActivity` 也只允许完全匹配
+  的旧 flow 释放锁；不能把入口 controller 检查当成整个异步写事务安全。
 - **结果收口职责单一**：纯协调器负责消息合并、确认 / 检查点持久化、steer 清理、Job / status 与
   abort 生命周期；`useAgentOutcomeCoordinator` 只装配 refs、SessionStore 和 React 回调。
   只有 message / error / 无 checkpoint stopped 删除 abort，confirm / paused 保留；delivered steers

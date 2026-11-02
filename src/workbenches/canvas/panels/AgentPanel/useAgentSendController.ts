@@ -1,5 +1,6 @@
 import { useCallback, type MutableRefObject } from 'react'
 import type { AgentSession } from '../../../../state/agent/sessionStore'
+import { createId } from '../../../../shared/id'
 import { beforeAgentSendFlow, runAgentSendFlow } from './agentSendFlow'
 import type { AgentSendText } from './useAgentQueueController'
 
@@ -16,6 +17,8 @@ export interface AgentSendControllerInput {
     session: AgentSession,
     turnId?: string,
     internalControl?: boolean,
+    actualTurnId?: string,
+    turnAbort?: AbortController,
   ) => ReturnType<Parameters<typeof runAgentSendFlow>[0]['runTurn']>
   applySessionSnapshot: (session: AgentSession) => void
   clearLiveActivitiesFor: (sessionId: string) => void
@@ -60,6 +63,8 @@ export function useAgentSendController({
       const text = raw.trim()
       const session = queuedSession ?? current
       if (!text || !session) return undefined
+      const actualTurnId = opts.queueTurnId ?? createId('turnmsg')
+      const turnAbort = new AbortController()
       beforeAgentSendFlow(
         session.id,
         currentIdRef.current,
@@ -77,7 +82,17 @@ export function useAgentSendController({
         preclaimed: opts.preclaimed,
         queueTurnId: opts.queueTurnId,
         internalControl: opts.internalControl,
-        runTurn: runSendText,
+        turnId: actualTurnId,
+        turnAbort,
+        runTurn: (text, session, queueTurnId, internalControl) =>
+          runSendText(
+            text,
+            session,
+            queueTurnId,
+            internalControl,
+            actualTurnId,
+            turnAbort,
+          ),
         applySessionSnapshot,
         clearLiveActivitiesFor,
         clearLiveProcessFor,

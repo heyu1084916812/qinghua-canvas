@@ -8,6 +8,7 @@ import type {
 } from '../../../../domain/shared/execution/types'
 import { isAgentToolName } from '../../../../domain/agent/toolRegistry'
 import type { AgentController } from '../../../../features/shared/agent/AgentController'
+import type { AgentTurnOrigin } from '../../../../features/shared/agent/AgentController'
 import type { AgentSession } from '../../../../state/agent/sessionStore'
 import type { AgentLoopOutcome } from '../../agent/agentLoop'
 import {
@@ -29,10 +30,7 @@ export interface AgentOutcomeCoordinatorHookInput {
     Map<string, readonly ToolDeclaration[]>
   >
   sessions: AgentController['sessions']
-  persist: (
-    session: AgentSession,
-    messages: ChatMessage[],
-  ) => Promise<void>
+  refresh(): Promise<unknown>
   transitionSessionJob: AgentController['transition']
   clearLiveActivitiesFor: (sessionId: string) => void
   clearLiveProcessFor: (sessionId: string) => void
@@ -43,6 +41,10 @@ export interface AgentOutcomeCoordinatorHookInput {
   setMessages: (messages: ChatMessage[]) => void
   applySessionSnapshot: (session: AgentSession) => void
   setStatusFor: (sessionId: string, status: AgentPanelStatus) => void
+  turnOriginFor: (
+    session: AgentSession,
+    persistedTurn: PersistedAgentUserTurn | undefined,
+  ) => AgentTurnOrigin
 }
 
 /**
@@ -58,7 +60,7 @@ export function useAgentOutcomeCoordinator(
     deliveredSteersRef,
     turnToolsRef,
     sessions,
-    persist,
+    refresh,
     transitionSessionJob,
     clearLiveActivitiesFor,
     clearLiveProcessFor,
@@ -67,6 +69,7 @@ export function useAgentOutcomeCoordinator(
     setMessages,
     applySessionSnapshot,
     setStatusFor,
+    turnOriginFor,
   } = input
 
   return useCallback(
@@ -81,19 +84,21 @@ export function useAgentOutcomeCoordinator(
         outcome,
         persistedTurn,
         outcomeController,
+        turnOrigin: turnOriginFor(session, persistedTurn),
         currentOutcomeController: () =>
           abortRefs.current.get(session.id),
         currentSessionId: () => currentIdRef.current,
         sessions: {
-          persistMessages: (target, messages) =>
-            persist(target, [...messages]),
+          applyOutcome: (sessionId, apply) =>
+            sessions.applyAgentOutcome(sessionId, apply),
           settleInterruptedConfirmation: (sessionId, request) =>
             sessions.settleInterruptedConfirmation(
               sessionId,
               request,
             ),
-          updateFields: sessions.updateFields,
-          removeSteers: sessions.removeSteers,
+          refreshSession: async () => {
+            await refresh()
+          },
         },
         transitionSessionJob,
         clearLiveActivities: () =>
@@ -127,18 +132,19 @@ export function useAgentOutcomeCoordinator(
       }),
     [
       abortRefs,
+      refresh,
       applySessionSnapshot,
       clearLiveActivitiesFor,
       clearLiveProcessFor,
       clearRunTasksFor,
       currentIdRef,
       deliveredSteersRef,
-      persist,
       sessions,
       setMessageReveal,
       setMessages,
       setStatusFor,
       transitionSessionJob,
+      turnOriginFor,
       turnToolsRef,
     ],
   )

@@ -23,7 +23,6 @@ import type { AgentDeliveryMode } from '../../../../domain/agent/delivery'
 import {
   confirmationRequiresExplicitApproval,
   confirmationRunsGeneration,
-  confirmationSettlementMessages,
 } from '../../../../domain/agent/confirmation'
 import {
   advanceAgentTaskPlanAfterReview,
@@ -56,10 +55,13 @@ import {
 } from '../../../../features/canvas/agentSkillHandoff'
 import {
   activeQueueTurnOf,
+  bindTurnToSessionActivity,
   claimSessionActivity,
   clearQueueDrain,
   isSessionActivityActive,
+  queueTurnMatchesSessionActivity,
   releaseSessionActivity,
+  turnMatchesSessionActivity,
 } from '../../../../features/canvas/agent/sessionActivity'
 import {
   createAssetNode,
@@ -91,7 +93,10 @@ import {
 } from '../../agent/tools'
 import { createModelRoutePort } from '../../../../features/shared/agent/ModelRoutePort'
 import { createRouteExecutionPort } from '../../../../features/shared/agent/RouteExecutionPort'
-import { createAgentController } from '../../../../features/shared/agent/AgentController'
+import {
+  createAgentController,
+  type AgentTurnOrigin,
+} from '../../../../features/shared/agent/AgentController'
 import { createAgentMemoryPort } from '../../../../features/shared/agent/MemoryPort'
 import {
   AgentToolEffectBlockedError,
@@ -516,6 +521,9 @@ export function AgentPanel({
   const turnToolsRef = useRef(
     new Map<string, readonly ToolDeclaration[]>(),
   )
+  const currentTurnIdRef = useRef(new Map<string, string>())
+  const currentTurnJobIdRef = useRef(new Map<string, string>())
+  const currentTurnRevisionRef = useRef(new Map<string, number>())
   const turnToolsForSession = useCallback(
     (session: AgentSession): readonly ToolDeclaration[] => {
       const known = turnToolsRef.current.get(session.id)
@@ -891,14 +899,6 @@ export function AgentPanel({
         : 'smooth',
     })
   }
-
-  const persist = useCallback(
-    async (session: AgentSession, next: ChatMessage[]) => {
-      await sessions.saveMessages(session.id, next)
-      await refresh()
-    },
-    [sessions, refresh],
-  )
 
   const switchTo = useCallback(
     async (session: AgentSession) => {
@@ -1327,6 +1327,12 @@ export function AgentPanel({
   )
 
   const applySessionSnapshot = useCallback((next: AgentSession) => {
+    if (next.messageRevision !== undefined) {
+      currentTurnRevisionRef.current.set(
+        next.id,
+        next.messageRevision,
+      )
+    }
     setList((prev) => prev.map((item) => (item.id === next.id ? next : item)))
     if (currentIdRef.current === next.id) setCurrent(next)
   }, [])
@@ -1337,7 +1343,6 @@ export function AgentPanel({
     deliveredSteersRef,
     turnToolsRef,
     sessions,
-    persist,
     transitionSessionJob,
     clearLiveActivitiesFor,
     clearLiveProcessFor,
@@ -1346,6 +1351,20 @@ export function AgentPanel({
     setMessages,
     applySessionSnapshot,
     setStatusFor,
+    refresh,
+    turnOriginFor: (session, persistedTurn) => {
+      const queueTurnId = activeQueueTurnOf(session.id)
+      return {
+        jobId:
+          currentTurnJobIdRef.current.get(session.id) ??
+          controller.jobId(session.id),
+        turnId: queueTurnId ?? currentTurnIdRef.current.get(session.id),
+        queueTurnId,
+        messageRevision: persistedTurn?.messageRevision ??
+          session.messageRevision ??
+          currentTurnRevisionRef.current.get(session.id),
+      }
+    },
   })
 
   /**
@@ -1378,6 +1397,15 @@ export function AgentPanel({
       autoSteps < AUTO_RUN_LIMIT
     ) {
       autoSteps += 1
+      const turnOrigin: AgentTurnOrigin = {
+        jobId:
+          currentTurnJobIdRef.current.get(session.id) ??
+          controller.jobId(session.id),
+        turnId:
+          activeQueueTurnOf(session.id) ??
+          currentTurnIdRef.current.get(session.id),
+        queueTurnId: activeQueueTurnOf(session.id),
+      }
       const runsGeneration = confirmationRunsGeneration(outcome.request.name)
       if (runsGeneration) {
         await transitionSessionJob(
@@ -1386,13 +1414,18 @@ export function AgentPanel({
           'generation_started',
           { pendingCallId: outcome.request.callId },
           { tool: outcome.request.name, auto: true },
+          turnOrigin,
         )
       }
       setStatusFor(session.id, { kind: 'executing', tool: outcome.request.name })
       const done = await executeConfirmedToolWithLedger(session, outcome.request)
       onMessages(outcome.messages)
       if (runsGeneration) {
-        await controller.finishConfirmedTool(session.id, outcome.request)
+        await controller.finishConfirmedTool(
+          session.id,
+          outcome.request,
+          turnOrigin,
+        )
       }
       outcome = await resumeAgentTurn(
         outcome.messages,
@@ -1437,7 +1470,14 @@ export function AgentPanel({
     session: AgentSession,
     turnId?: string,
     internalControl = false,
+    actualTurnId = createId('turnmsg'),
+    turnAbort = new AbortController(),
   ) => {
+    const turnOrigin: AgentTurnOrigin = {
+      turnId: actualTurnId,
+      queueTurnId: turnId,
+    }
+    currentTurnJobIdRef.current.delete(session.id)
     if (
       session.taskPlan &&
       agentTaskPlanProgress(session.taskPlan).status !== 'active'
@@ -1453,13 +1493,13 @@ export function AgentPanel({
       }
     }
 
-    const turnAbort = new AbortController()
     let routeReady = false
     const failBeforeModel = async (message: string, phase: string) => {
       await controller.failTurn(session.id, {
         reason: message,
         phase,
         aborted: turnAbort.signal.aborted,
+        origin: turnOrigin,
       })
       clearLiveActivitiesFor(session.id)
       clearLiveProcessFor(session.id)
@@ -1504,6 +1544,20 @@ export function AgentPanel({
           ),
         onPersisted: (turn) => {
           const saved = turn.saved
+          if (
+            !bindTurnToSessionActivity(
+              saved.id,
+              actualTurnId,
+            )
+          ) {
+            throw new Error('会话活动锁已被其他回合占用')
+          }
+          turnOrigin.messageRevision = turn.messageRevision
+          currentTurnIdRef.current.set(session.id, actualTurnId)
+          currentTurnRevisionRef.current.set(
+            session.id,
+            turn.messageRevision,
+          )
           setList((prev) =>
             prev.map((item) => (item.id === saved.id ? saved : item)),
           )
@@ -1522,12 +1576,16 @@ export function AgentPanel({
         },
         onRouteReady: async (operationId) => {
           routeReady = true
-          await ensureAgentJob(session, turnId ?? createId('turnmsg'))
+          const job = await ensureAgentJob(session, actualTurnId)
+          currentTurnJobIdRef.current.set(session.id, job.id)
+          turnOrigin.jobId = job.id
           await transitionSessionJob(
             session.id,
             'planning',
             'status_changed',
             { operationId },
+            undefined,
+            turnOrigin,
           )
         },
       })
@@ -1714,14 +1772,33 @@ export function AgentPanel({
       result: 'canceled' | 'interrupted',
     ): Promise<AgentSession | null> => {
       const queueTurnId = activeQueueTurnOf(session.id)
-      const settledMessages = request
-        ? confirmationSettlementMessages(messages, request, result)
-        : messages
-      let latest: AgentSession | null = null
+      const settled: { latest: AgentSession | null } = {
+        latest: null,
+      }
       let cleanupError: unknown
+      const turnOrigin: AgentTurnOrigin = {
+        jobId:
+          currentTurnJobIdRef.current.get(session.id) ??
+          controller.jobId(session.id),
+        turnId: queueTurnId ??
+          currentTurnIdRef.current.get(session.id),
+        queueTurnId,
+        messageRevision:
+          session.messageRevision ??
+          currentTurnRevisionRef.current.get(session.id),
+      }
 
-      abortRefs.current.get(session.id)?.abort()
-      clearQueueDrain(session.id)
+      if (
+        !isSessionActivityActive(session.id) ||
+        turnMatchesSessionActivity(
+          session.id,
+          queueTurnId,
+          turnOrigin.turnId,
+        )
+      ) {
+        abortRefs.current.get(session.id)?.abort()
+        clearQueueDrain(session.id)
+      }
 
       const attempt = async (work: () => Promise<void>) => {
         try {
@@ -1732,12 +1809,12 @@ export function AgentPanel({
       }
 
       await attempt(async () => {
-        latest =
-          (await sessions.updateFields(session.id, {
-            pendingConfirmation: undefined,
-            continuation: undefined,
-            allowedToolNames: undefined,
-          })) ?? latest
+        settled.latest = await sessions.settleInterruptedSession(
+          session.id,
+          request,
+          result,
+          turnOrigin.messageRevision,
+        )
       })
       await attempt(async () => {
         await transitionSessionJob(
@@ -1751,31 +1828,29 @@ export function AgentPanel({
                 ? 'user_canceled_confirmation'
                 : 'user_stopped',
           },
+          turnOrigin,
         )
       })
       await attempt(async () => {
-        if (request) {
-          latest =
-            (await sessions.saveMessages(session.id, settledMessages)) ?? latest
-        }
-      })
-      await attempt(async () => {
         if (session.pendingSteers.length > 0) {
-          latest =
+          settled.latest =
             (await sessions.removeSteers(
               session.id,
               session.pendingSteers.map((steer) => steer.id),
-            )) ?? latest
+            )) ?? settled.latest
         }
       })
       await attempt(async () => {
-        if (queueTurnId) {
-          latest =
+        if (
+          queueTurnId &&
+          queueTurnMatchesSessionActivity(session.id, queueTurnId)
+        ) {
+          settled.latest =
             (await controller.finishQueuedTurn(
               session.id,
               queueTurnId,
               false,
-            )) ?? latest
+            )) ?? settled.latest
         }
       })
       if (cleanupError) {
@@ -1784,26 +1859,46 @@ export function AgentPanel({
           'error',
         )
       }
-      releaseSessionActivity(session.id, queueTurnId)
-      abortRefs.current.delete(session.id)
-      deliveredSteersRef.current.delete(session.id)
-      inFlightConfirmationRef.current.delete(session.id)
-      if (latest) applySessionSnapshot(latest)
-      if (currentIdRef.current === session.id) {
-        setMessages(settledMessages)
+      const ownsUiState =
+        !isSessionActivityActive(session.id) ||
+        turnMatchesSessionActivity(
+          session.id,
+          queueTurnId,
+          turnOrigin.turnId,
+        )
+      releaseSessionActivity(
+        session.id,
+        queueTurnId,
+        turnOrigin.turnId,
+      )
+      if (ownsUiState) {
+        abortRefs.current.delete(session.id)
+        deliveredSteersRef.current.delete(session.id)
+        inFlightConfirmationRef.current.delete(session.id)
+        currentTurnIdRef.current.delete(session.id)
+        currentTurnJobIdRef.current.delete(session.id)
+        currentTurnRevisionRef.current.delete(session.id)
       }
-      clearLiveActivitiesFor(session.id)
-      clearLiveProcessFor(session.id)
-      clearRunTasksFor(session.id)
-      setStatusFor(session.id, IDLE_STATUS)
-      return latest
+      if (ownsUiState && settled.latest !== null) {
+        applySessionSnapshot(settled.latest)
+        if (currentIdRef.current === session.id) {
+          setMessages(settled.latest.messages)
+        }
+      }
+      if (ownsUiState) {
+        clearLiveActivitiesFor(session.id)
+        clearLiveProcessFor(session.id)
+        clearRunTasksFor(session.id)
+        setStatusFor(session.id, IDLE_STATUS)
+      }
+      return settled.latest
     },
     [
       applySessionSnapshot,
       clearLiveActivitiesFor,
       clearLiveProcessFor,
       clearRunTasksFor,
-      messages,
+      controller,
       sessions,
       setStatusFor,
       store,
@@ -2091,11 +2186,27 @@ export function AgentPanel({
     if (confirmingRef.current.has(current.id)) return
     confirmingRef.current.add(current.id)
     const { request } = status
+    const confirmationOrigin: AgentTurnOrigin = {
+      jobId:
+        currentTurnJobIdRef.current.get(current.id) ??
+        controller.jobId(current.id),
+      turnId:
+        activeQueueTurnOf(current.id) ??
+        currentTurnIdRef.current.get(current.id),
+      queueTurnId: activeQueueTurnOf(current.id),
+      messageRevision:
+        current.messageRevision ??
+        currentTurnRevisionRef.current.get(current.id),
+    }
+    const confirmationAbort = new AbortController()
     try {
-      const confirmationAbort = new AbortController()
       abortRefs.current.set(current.id, confirmationAbort)
       inFlightConfirmationRef.current.set(current.id, request)
-      await controller.beginConfirmation(current.id, request)
+      await controller.beginConfirmation(
+        current.id,
+        request,
+        confirmationOrigin,
+      )
       setStatusFor(current.id, { kind: 'executing', tool: request.name })
       const result = await executeConfirmedToolWithLedger(current, request)
       const imageNodeIds = [...new Set(
@@ -2110,7 +2221,11 @@ export function AgentPanel({
         turnController: confirmationAbort,
       })
       if (confirmationRunsGeneration(request.name)) {
-        await controller.finishConfirmedTool(current.id, request)
+        await controller.finishConfirmedTool(
+          current.id,
+          request,
+          confirmationOrigin,
+        )
       }
       setStatusFor(current.id, { kind: 'thinking' })
       const resumed = await resumeAgentTurn(
@@ -2128,10 +2243,27 @@ export function AgentPanel({
           if (currentIdRef.current === current.id) setMessages(next)
         },
       )
-      await handleOutcome(current, outcome, undefined, confirmationAbort)
-      await settleSessionOutcome(current.id, outcome)
+      const applied = await handleOutcome(
+        current,
+        outcome,
+        undefined,
+        confirmationAbort,
+      )
+      if (applied === 'conflict') {
+        await settleSessionOutcome(
+          current.id,
+          outcome,
+          confirmationOrigin,
+        )
+        return
+      }
+      await settleSessionOutcome(
+        current.id,
+        outcome,
+        confirmationOrigin,
+      )
     } catch (error) {
-      if (abortRefs.current.get(current.id)?.signal.aborted) return
+      if (confirmationAbort.signal.aborted) return
       const blocked =
         error instanceof AgentToolEffectBlockedError ? error : null
       setStatusFor(current.id, { kind: 'error', message: errText(error) })
@@ -2146,8 +2278,13 @@ export function AgentPanel({
             : {}),
         },
         { phase: 'confirmed_tool' },
+        confirmationOrigin,
       )
-      await settleSessionOutcome(current.id, { kind: 'error' })
+      await settleSessionOutcome(
+        current.id,
+        { kind: 'error' },
+        confirmationOrigin,
+      )
     } finally {
       confirmingRef.current.delete(current.id)
       if (
@@ -2201,6 +2338,10 @@ export function AgentPanel({
     if (!current || status.kind !== 'paused') return
     let queueTurnId =
       activeQueueTurnOf(current.id) ?? current.continuation?.queuedTurnId
+    const continuationTurnId =
+      queueTurnId ??
+      currentTurnIdRef.current.get(current.id) ??
+      createId('turnmsg')
     if (!isSessionActivityActive(current.id)) {
       if (
         queueTurnId &&
@@ -2212,7 +2353,25 @@ export function AgentPanel({
       } else {
         queueTurnId = undefined
       }
-      if (!claimSessionActivity(current.id, queueTurnId)) return
+      if (
+        !claimSessionActivity(
+          current.id,
+          queueTurnId,
+          continuationTurnId,
+        )
+      ) {
+        return
+      }
+    }
+    const continuationOrigin: AgentTurnOrigin = {
+      jobId:
+        currentTurnJobIdRef.current.get(current.id) ??
+        controller.jobId(current.id),
+      turnId: continuationTurnId,
+      queueTurnId,
+      messageRevision:
+        current.messageRevision ??
+        currentTurnRevisionRef.current.get(current.id),
     }
     const imageNodeIds = [...messages]
       .reverse()
@@ -2233,6 +2392,7 @@ export function AgentPanel({
       'status_changed',
       { pendingCallId: undefined },
       { resumedFromCheckpoint: true },
+      continuationOrigin,
     )
     setStatusFor(current.id, { kind: 'thinking' })
     try {
@@ -2245,11 +2405,33 @@ export function AgentPanel({
           if (currentIdRef.current === current.id) setMessages(next)
         },
       )
-      await handleOutcome(current, outcome, undefined, continuationAbort)
-      await settleSessionOutcome(current.id, outcome)
+      const applied = await handleOutcome(
+        current,
+        outcome,
+        undefined,
+        continuationAbort,
+      )
+      if (applied === 'conflict') {
+        await settleSessionOutcome(
+          current.id,
+          outcome,
+          continuationOrigin,
+        )
+        return
+      }
+      await settleSessionOutcome(
+        current.id,
+        outcome,
+        continuationOrigin,
+      )
     } catch (error) {
+      if (continuationAbort.signal.aborted) return
       setStatusFor(current.id, { kind: 'error', message: errText(error) })
-      await settleSessionOutcome(current.id, { kind: 'error' })
+      await settleSessionOutcome(
+        current.id,
+        { kind: 'error' },
+        continuationOrigin,
+      )
     }
   }, [
     current,

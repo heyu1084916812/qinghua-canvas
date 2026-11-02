@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import {
   activeQueueTurnOf,
   bindQueueTurnToSessionActivity,
+  bindTurnToSessionActivity,
   claimSessionActivity,
   clearQueueDrain,
   isSessionActivityActive,
@@ -9,6 +10,7 @@ import {
   requestQueueDrain,
   shouldDrainQueue,
   subscribeSessionRelease,
+  turnMatchesSessionActivity,
 } from './sessionActivity'
 
 describe('Agent session activity', () => {
@@ -43,6 +45,38 @@ describe('Agent session activity', () => {
     expect(bindQueueTurnToSessionActivity('chat-a', 'turn-1')).toBe(true)
     expect(bindQueueTurnToSessionActivity('chat-a', 'turn-2')).toBe(false)
     expect(activeQueueTurnOf('chat-a')).toBe('turn-1')
+  })
+
+  it('★★ 直接回合按 turnId 释放，旧回合不能解锁新回合', () => {
+    expect(
+      claimSessionActivity('chat-a', undefined, 'turn-1'),
+    ).toBe(true)
+    expect(
+      turnMatchesSessionActivity('chat-a', undefined, 'turn-1'),
+    ).toBe(true)
+    expect(
+      turnMatchesSessionActivity('chat-a', undefined, 'turn-2'),
+    ).toBe(false)
+    releaseSessionActivity('chat-a', undefined, 'turn-2')
+    expect(isSessionActivityActive('chat-a')).toBe(true)
+    releaseSessionActivity('chat-a', undefined, 'turn-1')
+    expect(isSessionActivityActive('chat-a')).toBe(false)
+  })
+
+  it('★★ 队列领取后绑定 turnId，queue + turn 两者都匹配才可收口', () => {
+    expect(claimSessionActivity('chat-a')).toBe(true)
+    expect(bindQueueTurnToSessionActivity('chat-a', 'turn-1')).toBe(true)
+    expect(bindTurnToSessionActivity('chat-a', 'turn-1')).toBe(true)
+    expect(
+      turnMatchesSessionActivity('chat-a', 'turn-1', 'turn-1'),
+    ).toBe(true)
+    expect(
+      turnMatchesSessionActivity('chat-a', 'turn-1', 'turn-2'),
+    ).toBe(false)
+    releaseSessionActivity('chat-a', 'turn-1', 'turn-2')
+    expect(isSessionActivityActive('chat-a')).toBe(true)
+    releaseSessionActivity('chat-a', 'turn-1', 'turn-1')
+    expect(isSessionActivityActive('chat-a')).toBe(false)
   })
 
   it('排队继续意图跨面板重挂保留', () => {
