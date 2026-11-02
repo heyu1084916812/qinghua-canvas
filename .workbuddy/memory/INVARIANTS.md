@@ -5,6 +5,11 @@
 
 ## Agent · 过程与落位
 
+- **自动确认循环只收端口**：`agentAutoConfirmations.ts` 不读取 React refs/state；手动模式或
+  显式批准工具原样返回 confirm。自动路径顺序固定为 transition（仅生成类）→ setStatus → execute →
+  onMessages → finish（仅生成类）→ resume，resume 必须沿用同一 `AgentLoopDeps`。turnOrigin 每次通过
+  provider 取当前回合 jobId / turnId / queueTurnId，不能按 session 现找新 Job；execute 抛错原样上抛，
+  不吞、不 onMessages、不 resume。达到 maxSteps 返回原 `max_steps` checkpoint 文案。
 - **结果收口只认 controller 身份**：发送、确认执行、检查点继续必须在创建回合时把同一个
   `AbortController` 显式传给 outcome；hook 不得在迟到时从 `abortRefs` 临时取。非当前界面只落库，
   不写 `messages / messageReveal`。迟到 confirm 必须走

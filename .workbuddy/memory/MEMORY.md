@@ -1,5 +1,20 @@
 # CanvasFlow（轻画）项目记忆
 
+### Agent 自动确认循环拆分（2026-11-03，对账 #862）
+
+- **自动循环只收端口**：`agentAutoConfirmations.ts` 接收 session、initial outcome、同一
+  `AgentLoopDeps`、实时 autoRun getter、maxSteps、turnOrigin provider、Job / 工具执行 /
+  onMessages / setStatus / resume 回调；不读取 React refs/state，也不复制 AgentLoop。
+- **顺序不能变**：自动工具按生成类 transition → setStatus → execute → onMessages → finish（仅生成类）
+  → resume。手动模式和显式批准工具原样返回 confirm；`requestTaskConfirmation(review)` 等非生成自动工具
+  不转 `waiting_generation`、也不 finish。execute 抛错必须原样抛出，不 onMessages、不 resume。
+- **origin 每次由 provider 取**：turnOrigin 必须来自当前回合的 jobId / turnId / queueTurnId，
+  不能按 session 到 AgentController 现取新 Job。AUTO_RUN_LIMIT 的 stopped checkpoint 文案和
+  `max_steps` checkpoint 保持原文。
+- **证据**：`AgentPanel.tsx` **3414→3364 行**（减少 50）；聚焦 **6/6**、Agent 相关 **260/260**；
+  全量 `npm test` **3901 passed / 1 skipped**，tsc/check/diff-check 通过。
+  纯架构拆分，未跑 G769 / Tauri；确认执行、停止 / 继续和 AgentHost 仍是后续债。
+
 ### Agent outcome 回合版本门禁与恢复（2026-11-03，对账 #861）
 
 - **身份检查不是写库事务**：入口 controller 相等后，旧 outcome 仍可能在 async 写库期间遇到新回合。

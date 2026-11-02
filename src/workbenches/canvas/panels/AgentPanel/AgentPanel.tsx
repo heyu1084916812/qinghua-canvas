@@ -179,6 +179,7 @@ import { useAgentQueueController } from './useAgentQueueController'
 import { useAgentSendController } from './useAgentSendController'
 import { useAgentOutcomeCoordinator } from './useAgentOutcomeCoordinator'
 import { assembleAgentLoopDeps } from './agentLoopDeps'
+import { continueAgentAutoConfirmations } from './agentAutoConfirmations'
 import { runAgentCanvasNodes } from './agentCanvasRun'
 import { useAgentRunPresentation } from './useAgentRunPresentation'
 import {
@@ -1384,20 +1385,14 @@ export function AgentPanel({
     initial: AgentLoopOutcome,
     currentLoopDeps: AgentLoopDeps,
     onMessages: (next: ChatMessage[]) => void,
-  ): Promise<AgentLoopOutcome> => {
-    let outcome = initial
-    let autoSteps = 0
-    while (
-      outcome.kind === 'confirm' &&
-      autoRunRef.current.get(session.id) === true &&
-      !confirmationRequiresExplicitApproval(
-        outcome.request.name,
-        outcome.request.args,
-      ) &&
-      autoSteps < AUTO_RUN_LIMIT
-    ) {
-      autoSteps += 1
-      const turnOrigin: AgentTurnOrigin = {
+  ): Promise<AgentLoopOutcome> =>
+    continueAgentAutoConfirmations({
+      session,
+      initial,
+      loopDeps: currentLoopDeps,
+      autoRun: () => autoRunRef.current.get(session.id) === true,
+      maxSteps: AUTO_RUN_LIMIT,
+      turnOrigin: () => ({
         jobId:
           currentTurnJobIdRef.current.get(session.id) ??
           controller.jobId(session.id),
@@ -1405,65 +1400,20 @@ export function AgentPanel({
           activeQueueTurnOf(session.id) ??
           currentTurnIdRef.current.get(session.id),
         queueTurnId: activeQueueTurnOf(session.id),
-      }
-      const runsGeneration = confirmationRunsGeneration(outcome.request.name)
-      if (runsGeneration) {
-        await transitionSessionJob(
-          session.id,
-          'waiting_generation',
-          'generation_started',
-          { pendingCallId: outcome.request.callId },
-          { tool: outcome.request.name, auto: true },
-          turnOrigin,
-        )
-      }
-      setStatusFor(session.id, { kind: 'executing', tool: outcome.request.name })
-      const done = await executeConfirmedToolWithLedger(session, outcome.request)
-      onMessages(outcome.messages)
-      if (runsGeneration) {
-        await controller.finishConfirmedTool(
-          session.id,
-          outcome.request,
-          turnOrigin,
-        )
-      }
-      outcome = await resumeAgentTurn(
-        outcome.messages,
-        outcome.request.callId,
-        done,
-        currentLoopDeps,
-        outcome.request.name,
-      )
-    }
-    if (
-      outcome.kind === 'confirm' &&
-      autoRunRef.current.get(session.id) === true &&
-      autoSteps >= AUTO_RUN_LIMIT &&
-      !confirmationRequiresExplicitApproval(
-        outcome.request.name,
-        outcome.request.args,
-      )
-    ) {
-      outcome = {
-        kind: 'stopped',
-        reason:
-          `自动执行已连续完成 ${AUTO_RUN_LIMIT} 个动作，已安全暂停；` +
-          '点击“继续任务”可接着执行，不会把下一步变成新的付费确认卡。',
-        messages: outcome.messages,
-        checkpoint: {
-          kind: 'max_steps',
-          maxSteps: AUTO_RUN_LIMIT,
-          completedSteps: AUTO_RUN_LIMIT,
-        },
-      }
-    }
-    return outcome
-  }, [
-    controller,
-    executeConfirmedToolWithLedger,
-    setStatusFor,
-    transitionSessionJob,
-  ])
+      }),
+      transitionSessionJob,
+      executeConfirmedTool: executeConfirmedToolWithLedger,
+      finishConfirmedTool: controller.finishConfirmedTool,
+      onMessages,
+      setStatus: setStatusFor,
+      resumeAgentTurn,
+    }),
+    [
+      controller,
+      executeConfirmedToolWithLedger,
+      setStatusFor,
+      transitionSessionJob,
+    ])
 
   const runSendText = useCallback(async (
     text: string,
