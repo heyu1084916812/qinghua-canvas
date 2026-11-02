@@ -1,5 +1,23 @@
 # CanvasFlow（轻画）项目记忆
 
+### AgentLoop 依赖装配拆分（2026-11-03，对账 #859）
+
+- **三个边界，不是一个巨型 hook**：`agentLoopInputs.ts` 只收集视觉素材并按节点 id / hash 去重；
+  `agentLoopTrace.ts` 只做 trace 参数与候选提升（候选提升是**纯函数**，旧 `credentialGroupId`
+  在选中项没有分组时必须删除）；`agentLoopDeps.ts` 是无 React 装配器，只接收端口与回调。
+- **route 以缓存为准，不要靠闭包旧对象**：`onRouteSucceeded` 命中后写回会话路由缓存，
+  `executeText` / visualReview 每次回读缓存，否则成功换渠道后本轮后续请求仍会走旧 channel / model。
+- **controller 由入口显式传**：初次发送 / 确认 / 检查点继续各自创建 `AbortController` 后显式传给
+  `loopDeps`；新增入口也必须传，不能回退成按 sessionId 从 map 现取。
+- **失败态保持 AppError**：`nodeRunStates` 与 `execution.nodeStates` 同构，失败态是
+  `{ kind:'failed', error: AppError }`，不要放宽成字符串；`readResult` 仍是持久失败优先、执行层兜底。
+- **行为沿用**：`runFrom` 解析后再预检、`proposeTaskPlan` 归一化校验、能力发现写回 `turnTools`、
+  steering delivered 去重 + `steer_applied` 事件、状态与过程上报全部保持原语义。
+- **证据**：`AgentPanel.tsx` **3547→3232 行**（减少 315）；聚焦 **19/19**
+  （inputs 5 / trace 4 / deps 10）；全量 Vitest **3883 passed / 1 skipped**、
+  AgentPanel **151/151**；tsc/check/diff-check 通过。纯架构拆分，未跑 G769 / Tauri，
+  确认执行、停止 / 继续和 AgentHost 仍是后续债。
+
 ### Agent 结果收口身份与迟到确认补救（2026-11-03，对账 #858）
 
 - **controller 必须由回合创建处显式传入**：初次发送、确认执行、检查点继续各创建 `AbortController` 后，

@@ -19,6 +19,12 @@
   只有 message / error / 无 checkpoint stopped 删除 abort，confirm / paused 保留；delivered steers
   只在当前 outcome 收口后移除。确认 / 停止 / 继续执行 UI 不属于该模块。
 - **请求准备只产出快照**：`agentTurnRequest.ts` 先落库目标会话用户消息，再准备路由；
+- **AgentLoop 依赖装配只能收端口**：`agentLoopInputs.ts` / `agentLoopTrace.ts` /
+  `agentLoopDeps.ts` 不持有 React state，不复制 Controller / SessionStore / AgentLoop。
+  路由以会话路由缓存为准：`onRouteSucceeded` 后写回缓存并立即生效，不能复用装配闭包里的旧 route 对象；
+  候选提升是纯函数，选中项没有 `credentialGroupId` 时必须删除旧分组。`loopDeps` 的
+  `turnController` 必须由入口（初次发送 / 确认 / 检查点继续）显式传入，不得按 sessionId 现取。
+  `nodeRunStates` 与 `execution.nodeStates` 同构（失败态是 AppError），`readResult` 持久失败优先。
   `onRouteReady` 只在路由成功后触发，由宿主创建 planning Job。它承接上下文、工具探测 / JSON 降级、
   技能 chip、媒体模型、每图拆分、请求分类、工具裁剪和系统提示词，但不得持有 React refs、运行模型循环、
   执行确认或处理结果。`AgentPanel` 继续是 per-session abort / toolMode / turnTools / autoRun /

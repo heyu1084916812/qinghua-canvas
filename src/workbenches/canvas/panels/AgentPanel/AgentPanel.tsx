@@ -13,7 +13,7 @@ import { useNavigate } from 'react-router-dom'
 import { usePlatform } from '../../../../app/providers/PlatformProvider'
 import { useChannels } from '../../../../app/providers/ChannelStoreProvider'
 import { useSkillsOptional } from '../../../../app/providers/SkillStoreProvider'
-import type { ChatMessage, NodeInput } from '../../../../domain/shared/execution/types'
+import type { ChatMessage } from '../../../../domain/shared/execution/types'
 import {
   createAgentSessionStore,
   type AgentSession,
@@ -28,7 +28,6 @@ import {
 import {
   advanceAgentTaskPlanAfterReview,
   agentTaskPlanProgress,
-  normalizeTaskPlanProposal,
 } from '../../../../domain/agent/taskPlan'
 import { createPresetStore } from '../../../../state/project/presetStore'
 import { assetNodeSize } from '../../../../domain/canvas/layout/assetNodeSize'
@@ -77,25 +76,19 @@ import { parseSkillMarkdown } from '../../../../domain/prompt/skill'
 import { useCanvasExecution } from '../../execution/CanvasExecutionProvider'
 import { useCanvasStore, useGraph, useSelection } from '../../storeContext'
 import { useViewportState } from '../../storeContext'
-import type { TextRunRequest } from '../../../../platform/channels/types'
 import type { ToolDeclaration } from '../../../../domain/shared/execution/types'
 import {
   resumeAgentTurn,
   runAgentTurn,
-  type AgentLoopActivity,
   type AgentLoopDeps,
   type AgentLoopOutcome,
   type AgentToolRequest,
 } from '../../agent/agentLoop'
 import {
   agentToolsForCapabilities,
-  discoverAgentTools,
   executeConfirmedTool,
-  executeReadTool,
-  runFromNodeIds,
   type AgentToolContext,
 } from '../../agent/tools'
-import { runPreflightProblems } from '../../agent/runPreflight'
 import { createModelRoutePort } from '../../../../features/shared/agent/ModelRoutePort'
 import { createRouteExecutionPort } from '../../../../features/shared/agent/RouteExecutionPort'
 import { createAgentController } from '../../../../features/shared/agent/AgentController'
@@ -104,10 +97,6 @@ import {
   AgentToolEffectBlockedError,
   createAgentToolEffectLedger,
 } from '../../../../features/shared/agent/AgentToolEffectLedger'
-import {
-  directTextTrace,
-  type DirectRunRouteCandidate,
-} from '../../../../state/shared/directRun'
 import { createContextRepository } from '../../../../state/shared/contextRepository'
 import { createId } from '../../../../shared/id'
 import {
@@ -161,7 +150,6 @@ import {
   saveAgentDraft,
 } from './agentDraft'
 import { AgentSessionRuntimeState } from './agentSessionRuntime'
-import { latestRunFailuresForNodes } from './agentRunState'
 import {
   buildAgentModelMessages,
   composeAgentOutcomeMessages,
@@ -185,13 +173,13 @@ import { AgentPanelHeader } from './AgentPanelHeader'
 import { useAgentQueueController } from './useAgentQueueController'
 import { useAgentSendController } from './useAgentSendController'
 import { useAgentOutcomeCoordinator } from './useAgentOutcomeCoordinator'
+import { assembleAgentLoopDeps } from './agentLoopDeps'
 import { runAgentCanvasNodes } from './agentCanvasRun'
 import { useAgentRunPresentation } from './useAgentRunPresentation'
 import {
   type AgentChatRoute,
   type ChatRoutePreparation,
 } from './agentChatRoute'
-import { runAgentVisualReview } from './agentVisualReview'
 import { previewOf } from './agentConfirmationPreview'
 import { originOf, viewportWorldOf } from './agentPanelViewHelpers'
 import {
@@ -1244,384 +1232,79 @@ export function AgentPanel({
     [executeToolWithLedger, toolCtx, viewport],
   )
 
+  /**
+   * AgentLoop 依赖的装配入口。
+   *
+   * 纯组装在 `agentLoopDeps.ts`；这里只把 store / channels / 会话 / Job / 工具执行器
+   * 和 per-session refs 接成端口。回合创建时的 controller 必须由调用方显式传入。
+   */
   const loopDeps = useCallback(
-    (
-      session: AgentSession,
-      operationId: string,
-      toolMode: 'native' | 'json' = 'native',
-      visualNodeIds: readonly string[] = [],
-      onProgress?: (messages: readonly ChatMessage[]) => void,
-      turnTools: readonly ToolDeclaration[] = activeAgentTools,
-    ) => {
-      const route = cachedChatRoute(session)
-      const logicalModel =
-        route?.logicalModel ?? (toLogicalName(allChannels, session.model) || session.model)
-      const imageNodeIds = [...new Set(visualNodeIds)]
-      const inputs = imageNodeIds.flatMap((nodeId): NodeInput[] => {
-        const node = store.getSnapshot().nodes.find((item) => item.id === nodeId)
-        const data = node?.data as {
-          assetHash?: unknown
-          assetMime?: unknown
-          naturalSize?: { width: number; height: number }
-        }
-        if (!node || typeof data?.assetHash !== 'string') return []
-        return [{
-          kind: 'asset',
-          nodeId: node.id,
-          assetHash: data.assetHash,
-          mime: typeof data.assetMime === 'string' ? data.assetMime : 'image/png',
-          ...(data.naturalSize ? { naturalSize: data.naturalSize } : {}),
-        }]
-      })
-      const contextAssets =
-        contextTraceRef.current.get(session.id)?.assetRefs ?? []
-      const existingAssetHashes = new Set(
-        inputs.flatMap((input) =>
-          input.kind === 'asset' ? [input.assetHash] : [],
-        ),
+    (args: {
+      session: AgentSession
+      operationId: string
+      toolMode?: 'native' | 'json'
+      visualNodeIds?: readonly string[]
+      onProgress?: (messages: readonly ChatMessage[]) => void
+      turnTools?: readonly ToolDeclaration[]
+      turnController?: AbortController
+    }): AgentLoopDeps => {
+      const { session } = args
+      return assembleAgentLoopDeps(
+        {
+          store,
+          channels,
+          platform: { storage: platform.storage, assets: platform.assets },
+          modelRoute,
+          routeExecution,
+          sessions,
+          jobs,
+          reviewModel,
+          canvasReviewEnabled,
+          viewport,
+          executeToolWithLedger,
+          toolCtx,
+          nodeRunStates: execution.nodeStates,
+          abortSignalFor: (sessionId) =>
+            abortRefs.current.get(sessionId)?.signal,
+          cachedChatRoute,
+          updateChatRoute: (sessionId, route) => {
+            chatRouteRef.current.set(sessionId, route)
+          },
+          contextTraceFor: (sessionId) =>
+            contextTraceRef.current.get(sessionId),
+          planAliasesFor: (sessionId) =>
+            planAliasesRef.current.get(sessionId),
+          setPlanAliases: (sessionId, aliases) => {
+            planAliasesRef.current.set(sessionId, aliases)
+          },
+          turnToolsFor: (sessionId) =>
+            turnToolsRef.current.get(sessionId),
+          setTurnTools: (sessionId, tools) => {
+            turnToolsRef.current.set(sessionId, tools)
+          },
+          deliveredSteersFor: (sessionId) =>
+            deliveredSteersRef.current.get(sessionId) ?? new Set<string>(),
+          setDeliveredSteers: (sessionId, ids) => {
+            deliveredSteersRef.current.set(sessionId, ids)
+          },
+          appendLiveProcessFor,
+          setLiveActivityFor,
+          setStatusFor,
+        },
+        {
+          session,
+          operationId: args.operationId,
+          toolMode: args.toolMode ?? 'native',
+          visualNodeIds: args.visualNodeIds ?? [],
+          onProgress: args.onProgress,
+          turnTools: args.turnTools ?? activeAgentTools,
+          turnController: args.turnController,
+          abortSignalFor: (sessionId) =>
+            abortRefs.current.get(sessionId)?.signal,
+        },
       )
-      for (const asset of contextAssets) {
-        if (existingAssetHashes.has(asset.hash)) continue
-        existingAssetHashes.add(asset.hash)
-        inputs.push({
-          kind: 'asset',
-          nodeId: `context-kit:${asset.hash}`,
-          assetHash: asset.hash,
-          mime: asset.mime,
-        })
-      }
-      const traceOf = (
-        req: TextRunRequest,
-        purpose: 'agent' | 'agent-tool-probe',
-      ) => {
-        const context = contextTraceRef.current.get(session.id)
-        return directTextTrace({
-          projectId: store.getSnapshot().projectId,
-          workbench: 'canvas',
-          subjectId: session.id,
-          scopeId: `session:${session.id}`,
-          operationId,
-          purpose,
-          channelId: req.channelId,
-          model: req.model,
-          prompt: req.prompt,
-          inputs: req.inputs,
-          params: {
-            toolMode,
-            messageCount: req.messages?.length ?? 0,
-            ...(context
-              ? {
-                  contextDigest: context.digest,
-                  memoryRefs: context.memoryRefs,
-                  kitVersionRefs: context.kitVersionRefs,
-                }
-              : {}),
-          },
-        })
-      }
-      const onRecordWarning = (warning: string) =>
-        store.notify(`结果已返回，但运行记录写入失败：${warning}`, 'error')
-      const onRouteSucceeded = (selected: DirectRunRouteCandidate) => {
-        if (!route) return
-        route.channelId = selected.channelId
-        route.upstreamModel = selected.model
-        if (selected.credentialGroupId) {
-          route.credentialGroupId = selected.credentialGroupId
-        } else {
-          delete route.credentialGroupId
-        }
-        route.candidates = [
-          selected,
-          ...route.candidates.filter(
-            (candidate) =>
-              candidate.channelId !== selected.channelId ||
-              candidate.credentialGroupId !== selected.credentialGroupId ||
-              candidate.model !== selected.model,
-          ),
-        ]
-      }
-      const runVisualReview = (review: {
-        nodeIds: readonly string[]
-        checklist?: string
-      }) => {
-        const aliases = planAliasesRef.current.get(session.id)
-        const contextTrace = contextTraceRef.current.get(session.id)
-        const signal = abortRefs.current.get(session.id)?.signal
-        return runAgentVisualReview(
-          {
-            store,
-            allChannels,
-            modelRoute,
-            routeExecution,
-            platform,
-            onRecordWarning,
-          },
-          {
-            sessionId: session.id,
-            operationId,
-            route,
-            reviewModel,
-            ...(aliases ? { aliases } : {}),
-            ...(contextTrace ? { contextTrace } : {}),
-            ...(signal ? { signal } : {}),
-            review,
-          },
-        )
-      }
-      return {
-        adapter: {
-          completeText: (req: TextRunRequest, signal: AbortSignal) =>
-            routeExecution.execute({
-              channelId: route?.channelId ?? req.channelId,
-              model: route?.upstreamModel ?? req.model,
-              modelIsUpstream: Boolean(route),
-              tools: req.tools ?? (toolMode === 'native' ? turnTools : []),
-              messages: req.messages ?? [],
-              inputs: req.inputs,
-              signal,
-              ...(route
-                ? {
-                    routeCandidates: route.candidates,
-                    routePlanId: route.routePlanId,
-                  }
-                : {}),
-              trace: traceOf(req, 'agent'),
-              onRecordWarning,
-              ...(route ? { onRouteSucceeded } : {}),
-            }),
-        },
-        streamModel: (
-          req: TextRunRequest,
-          signal: AbortSignal,
-          onProcess: (chunk: {
-            kind: 'reasoning' | 'content' | 'tool'
-            text: string
-          }) => void,
-        ) =>
-          routeExecution.execute({
-            channelId: route?.channelId ?? req.channelId,
-            model: route?.upstreamModel ?? req.model,
-            modelIsUpstream: Boolean(route),
-            tools: req.tools ?? (toolMode === 'native' ? turnTools : []),
-            messages: req.messages ?? [],
-            inputs: req.inputs,
-            signal,
-            ...(route
-              ? {
-                  routeCandidates: route.candidates,
-                  routePlanId: route.routePlanId,
-                }
-              : {}),
-            trace: traceOf(req, 'agent'),
-            onRecordWarning,
-            ...(route ? { onRouteSucceeded } : {}),
-            onStream: (chunk) => {
-              if (chunk.reasoning) {
-                onProcess({ kind: 'reasoning', text: chunk.reasoning })
-              }
-              if (chunk.text) {
-                onProcess({ kind: 'content', text: chunk.text })
-              }
-              for (const delta of chunk.toolCallDeltas ?? []) {
-                if (delta.name) {
-                  onProcess({ kind: 'tool', text: `准备调用 ${delta.name}` })
-                }
-              }
-            },
-          }),
-        onProcess: (kind: 'reasoning' | 'content' | 'tool', text: string) => {
-          appendLiveProcessFor(session.id, text)
-          if (kind === 'reasoning' || kind === 'content') {
-            setStatusFor(session.id, { kind: 'thinking' })
-          }
-        },
-        channelId: route?.channelId ?? '',
-        model: logicalModel,
-        tools: turnTools,
-        discoverCapabilities: async (args: unknown) => {
-          const query =
-            args && typeof args === 'object' && !Array.isArray(args)
-              ? String((args as { query?: unknown }).query ?? '')
-              : ''
-          const discovered = discoverAgentTools(
-            query,
-            agentToolsForCapabilities({
-              canvasReview: canvasReviewEnabled,
-            }),
-          )
-          const loaded = [...(turnToolsRef.current.get(session.id) ?? turnTools)]
-          const names = new Set(loaded.map((tool) => tool.name))
-          for (const tool of discovered.tools) {
-            if (names.has(tool.name)) continue
-            names.add(tool.name)
-            loaded.push(tool)
-          }
-          turnToolsRef.current.set(session.id, loaded)
-          return discovered
-        },
-        toolMode,
-        inputs,
-      /**
-       * 确认**之前**的预检（用户 2026-10-02：「重复让我确认新建工作流，重复了三次，
-       * 但是我的画布中没有」）。计划本身落不了地时，别让用户白点一次确认 ——
-       * 直接把问题回给模型，让它在同一轮里自己改；同一轮里它要是还发同一版，
-       * 循环自己的指纹刹车会把这一轮停下来。
-       */
-      precheck: (name: string, args: unknown) => {
-        if (name === 'proposeTaskPlan') {
-          const normalized = normalizeTaskPlanProposal(args, {
-            id: 'precheck-plan',
-            now: Date.now(),
-          })
-          return normalized.ok
-            ? { ok: true as const }
-            : {
-                ok: false as const,
-                result: { ok: false, problems: normalized.problems },
-              }
-        }
-        if (name !== 'runNode' && name !== 'runFrom') return { ok: true as const }
-        /** 节点不在画布、没渠道 / 模型 / 提示词时，别让用户点「批准运行」 */
-        const args2 = (args ?? {}) as { nodeIds?: unknown }
-        const aliases = planAliasesRef.current.get(session.id)
-        const requested = (Array.isArray(args2.nodeIds) ? args2.nodeIds.map(String) : []).map(
-          (id) => aliases?.get(id) ?? id,
-        )
-        const graph = store.getSnapshot()
-        let targets = requested
-        if (name === 'runFrom') {
-          const resolved = runFromNodeIds(store, requested)
-          if (!resolved.ok) return { ok: false as const, result: resolved }
-          targets = resolved.ids
-        }
-        const problems = runPreflightProblems(
-          targets,
-          graph,
-          channels.getState().channels,
-          channels.protocolCatalog(),
-        )
-        return problems.length > 0
-          ? { ok: false as const, result: { ok: false, problems } }
-          : { ok: true as const }
-      },
-      /**
-       * 建图类（applyPlan）**直接落地**，不等确认 —— 用户 2026-10-02 的口径：
-       * 「他直接给我新建进去，但是生成与否需要让我确认，取消后也不会撤回
-       * 已经新建到画布中的工作流」。
-       */
-      executeWrite: async (name: string, args: unknown, callId: string) => {
-        const result = await executeToolWithLedger(
-          session.id,
-          { callId, name, args },
-          () =>
-            executeConfirmedTool(
-              name,
-              args,
-              toolCtx(originOf(viewport), session),
-            ),
-        )
-        if (name === 'applyPlan') {
-          const resolved = (result as { resolvedNodes?: { localId?: unknown; nodeId?: unknown }[] })
-            .resolvedNodes
-          if (Array.isArray(resolved)) {
-            planAliasesRef.current.set(
-              session.id,
-              new Map(
-                resolved.flatMap((node) =>
-                  typeof node.localId === 'string' && typeof node.nodeId === 'string'
-                    ? [[node.localId, node.nodeId] as const]
-                    : [],
-                ),
-              ),
-            )
-          }
-        }
-        return result
-      },
-      executeRead: async (name: string, args: unknown, callId: string) => {
-        const base = toolCtx(originOf(viewport), session)
-        const requestedNodeIds =
-          name === 'readResult' &&
-          args &&
-          typeof args === 'object' &&
-          !Array.isArray(args) &&
-          Array.isArray((args as { nodeIds?: unknown }).nodeIds)
-            ? (args as { nodeIds: unknown[] }).nodeIds.filter(
-                (nodeId): nodeId is string => typeof nodeId === 'string',
-              )
-            : []
-        const persistedFailures =
-          name === 'readResult'
-            ? await latestRunFailuresForNodes(
-                platform.storage,
-                store.getSnapshot().projectId,
-                requestedNodeIds,
-              ).catch(() => new Map())
-            : new Map()
-        return executeToolWithLedger(session.id, { callId, name, args }, () =>
-          executeReadTool(name, args, {
-            ...base,
-            ...(name === 'visualReview' && canvasReviewEnabled
-              ? { visualReview: runVisualReview }
-              : {}),
-            ...(name === 'readResult'
-              ? {
-                  nodeRunStateOf: (nodeId: string) => {
-                    const persisted = persistedFailures.get(nodeId)
-                    if (persisted) return persisted
-                    const state = execution.nodeStates.get(nodeId)
-                    return state?.kind === 'failed'
-                      ? { kind: 'failed' as const, error: state.error }
-                      : undefined
-                  },
-                }
-              : {}),
-          }),
-        )
-      },
-      onActivity: (activity: AgentLoopActivity) => {
-        setLiveActivityFor(session.id, activity)
-        if (activity.phase === 'thinking') {
-          setStatusFor(session.id, { kind: 'thinking' })
-        } else if (activity.status === 'running') {
-          setStatusFor(session.id, { kind: 'toolRunning' })
-        }
-      },
-      ...(onProgress ? { onProgress } : {}),
-      takeSteering: async () => {
-        try {
-          const latest = await sessions.get(session.id)
-          const delivered =
-            deliveredSteersRef.current.get(session.id) ?? new Set<string>()
-          const pending = (latest?.pendingSteers ?? []).filter(
-            (steer) => !delivered.has(steer.id),
-          )
-          if (pending.length === 0) return []
-          const active = await jobs.active(session.id).catch(() => null)
-          if (active) {
-            await Promise.all(
-              pending.map((steer) =>
-                jobs
-                  .appendEvent(active.id, 'steer_applied', {
-                    steerId: steer.id,
-                    textLength: steer.text.length,
-                  })
-                  .catch(() => null),
-              ),
-            )
-          }
-          for (const steer of pending) delivered.add(steer.id)
-          deliveredSteersRef.current.set(session.id, delivered)
-          return steerMessagesOf(pending, stripMentionMarkup)
-        } catch {
-          return []
-        }
-      },
-        signal: abortRefs.current.get(session.id)?.signal ?? new AbortController().signal,
-      }
     },
     [
-      allChannels,
       channels,
       cachedChatRoute,
       modelRoute,
@@ -1631,13 +1314,14 @@ export function AgentPanel({
       viewport,
       toolCtx,
       store,
+      platform,
       sessions,
       jobs,
+      execution,
       executeToolWithLedger,
       routeExecution,
       appendLiveProcessFor,
       setLiveActivityFor,
-      setRunTasksFor,
       setStatusFor,
     ],
   )
@@ -1910,18 +1594,19 @@ export function AgentPanel({
       prepared.systemPrompt,
       persistedUserTurn,
     )
-    const currentLoopDeps = loopDeps(
+    const currentLoopDeps = loopDeps({
       session,
       operationId,
       toolMode,
-      prepared.visualNodeIds,
-      (next) => {
+      visualNodeIds: prepared.visualNodeIds,
+      onProgress: (next) => {
         if (currentIdRef.current !== session.id) return
         setMessageReveal(null)
         setMessages(withFullHistory(next))
       },
-      turnAgentTools,
-    )
+      turnTools: turnAgentTools,
+      turnController: turnAbort,
+    })
     const initial = await runAgentTurn(withSystem, currentLoopDeps)
     const outcome = await continueAutoConfirmations(
       session,
@@ -2416,14 +2101,14 @@ export function AgentPanel({
       const imageNodeIds = [...new Set(
         [...messages].reverse().find((message) => message.role === 'user')?.imageNodeIds ?? [],
       )]
-      const currentLoopDeps = loopDeps(
-        current,
-        createId('op'),
-        toolModeRef.current.get(current.id) ?? 'native',
-        imageNodeIds,
-        undefined,
-        turnToolsForSession(current),
-      )
+      const currentLoopDeps = loopDeps({
+        session: current,
+        operationId: createId('op'),
+        toolMode: toolModeRef.current.get(current.id) ?? 'native',
+        visualNodeIds: imageNodeIds,
+        turnTools: turnToolsForSession(current),
+        turnController: confirmationAbort,
+      })
       if (confirmationRunsGeneration(request.name)) {
         await controller.finishConfirmedTool(current.id, request)
       }
@@ -2534,14 +2219,14 @@ export function AgentPanel({
       .find((message) => message.role === 'user')?.imageNodeIds ?? []
     const continuationAbort = new AbortController()
     abortRefs.current.set(current.id, continuationAbort)
-    const currentLoopDeps = loopDeps(
-      current,
-      createId('op'),
-      toolModeRef.current.get(current.id) ?? 'native',
-      imageNodeIds,
-      undefined,
-      turnToolsForSession(current),
-    )
+    const currentLoopDeps = loopDeps({
+      session: current,
+      operationId: createId('op'),
+      toolMode: toolModeRef.current.get(current.id) ?? 'native',
+      visualNodeIds: imageNodeIds,
+      turnTools: turnToolsForSession(current),
+      turnController: continuationAbort,
+    })
     await transitionSessionJob(
       current.id,
       'planning',
