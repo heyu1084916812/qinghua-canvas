@@ -12,8 +12,11 @@
   不能按 session 到 AgentController 现取新 Job。AUTO_RUN_LIMIT 的 stopped checkpoint 文案和
   `max_steps` checkpoint 保持原文。
 - **证据**：`AgentPanel.tsx` **3414→3364 行**（减少 50）；聚焦 **6/6**、Agent 相关 **260/260**；
-  全量 `npm test` **3901 passed / 1 skipped**，tsc/check/diff-check 通过。
-  纯架构拆分，未跑 G769 / Tauri；确认执行、停止 / 继续和 AgentHost 仍是后续债。
+  全量 `npm test` **3901 passed / 1 skipped**，tsc/check/diff-check 通过。质量线独立复跑 Agent
+  相关 **440/440**、G769 明暗各 **39/39**；真实 Chat2api 自动模式 0 确认、1 次 runNode，Job
+  waiting_generation→completed，asset `17c962cf53011360`，exe hash `649E3CC4…94A75`。
+  默认 tauri build 的 MSI light.exe 与 NSIS 签名链仍非零退出，不能当可发布安装器。
+  确认执行、停止 / 继续和 AgentHost 仍是后续债。
 
 ### Agent outcome 回合版本门禁与恢复（2026-11-03，对账 #861）
 
