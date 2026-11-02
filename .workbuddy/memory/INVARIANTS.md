@@ -5,6 +5,9 @@
 
 ## Agent · 过程与落位
 
+- **发送协调不能复制会话真相**：`agentSendFlow` 只负责活动锁、队列结算与异常收口，
+  `useAgentSendController` 只装配当前会话、滚动和已有 ports/refs；不得新建第二份 Session、队列或工具执行状态。
+  用户消息按目标 `sessionId` 先落库；preclaimed/queueTurnId 成功、空结果或异常结束都必须按原语义释放活动锁。
 - **工具 schema 只有一份**：`toolCatalog.ts` 是工具声明、能力发现和请求裁剪的唯一来源；
   `tools.ts` 只能 re-export 和单向 import，不能为了兼容复制 schema 或 capability 关键词。
 - **只读结果只有一份**：画布摘要、素材 MIME、readResult 失败状态和 `asRecord / asStringArray`

@@ -1,5 +1,16 @@
 # CanvasFlow（轻画）项目记忆
 
+### AgentPanel 发送主链拆分（2026-11-03，对账 #854）
+
+- **发送锁只在一处收尾**：`agentSendFlow.ts` 管活动锁、preclaimed/queueTurnId 结算和异常状态；
+  `useAgentSendController.ts` 只装配当前会话与滚动表现，主面板不再复制发送外层收尾。
+- **发送顺序不能反**：用户消息按目标 `sessionId` 先落库，再准备路由；路由失败保留消息、不建 planning Job。
+  后台 A/B 会话各自读历史，per-session refs 仍隔离；窗口只裁模型输入，完整历史继续落库。
+- **复用，不复制**：继续使用 `agentTurnPersistence`、`AgentController`、`agentCanvasRun`、
+  `agentVisualReview`、`AgentToolEffectLedger`。不要把 `agentCanvasRun.ts` 误写成不存在的 `runAgentCanvasNodes.ts`。
+- **证据**：`AgentPanel.tsx` **4079→3994 行**；AgentPanel 定向 **114/114**，`npx tsc --noEmit` 通过。
+  确认、停止/继续和部分会话配置仍待拆；独立 AgentHost 未实现。
+
 ### AgentPanel 第二批拆分（2026-11-02，对账 #853）
 
 - **主面板只做组装**：`AgentPanel.tsx` **5846 → 4078 行**。头部、会话/计划/队列区、Composer 是纯视图壳；

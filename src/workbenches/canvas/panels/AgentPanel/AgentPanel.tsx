@@ -65,7 +65,6 @@ import {
   clearQueueDrain,
   isSessionActivityActive,
   releaseSessionActivity,
-  shouldDrainQueue,
 } from '../../../../features/canvas/agent/sessionActivity'
 import {
   createAssetNode,
@@ -206,6 +205,7 @@ import { AgentConversationPane } from './AgentConversationPane'
 import { AgentComposerPane } from './AgentComposerPane'
 import { AgentPanelHeader } from './AgentPanelHeader'
 import { useAgentQueueController } from './useAgentQueueController'
+import { useAgentSendController } from './useAgentSendController'
 import { runAgentCanvasNodes } from './agentCanvasRun'
 import { useAgentRunPresentation } from './useAgentRunPresentation'
 import {
@@ -2408,108 +2408,23 @@ export function AgentPanel({
     controller,
   ])
 
-  const sendText = useCallback(async (
-    raw: string,
-    queuedSession?: AgentSession,
-    opts: {
-      preclaimed?: boolean
-      queueTurnId?: string
-      internalControl?: boolean
-    } = {},
-  ) => {
-    const text = raw.trim()
-    const session = queuedSession ?? current
-    if (!text || !session) return undefined
-    if (currentIdRef.current === session.id) {
-      stickToLatestRef.current = true
-      setShowJumpToLatest(false)
-    }
-    if (!opts.preclaimed && !claimSessionActivity(session.id, opts.queueTurnId)) return undefined
-    let outcome: AgentLoopOutcome | undefined
-    try {
-      outcome = await runSendText(
-        text,
-        session,
-        opts.queueTurnId,
-        opts.internalControl === true,
-      )
-      if (!outcome) {
-        if (opts.queueTurnId) {
-          const next = await controller.finishQueuedTurn(
-            session.id,
-            opts.queueTurnId,
-            false,
-          )
-          if (next) applySessionSnapshot(next)
-        }
-        abortRefs.current.delete(session.id)
-        releaseSessionActivity(session.id, opts.queueTurnId)
-        return undefined
-      }
-      const paused =
-        outcome.kind === 'stopped' && outcome.checkpoint !== undefined
-      if (outcome.kind !== 'confirm' && !paused) {
-        if (opts.queueTurnId) {
-          const next = await controller.finishQueuedTurn(
-            session.id,
-            opts.queueTurnId,
-            outcome.kind === 'message',
-          )
-          if (next) applySessionSnapshot(next)
-        }
-        releaseSessionActivity(session.id, opts.queueTurnId)
-        if (outcome.kind === 'message' && shouldDrainQueue(session.id)) {
-          queueMicrotask(() => queuePumpRef.current(session.id))
-        }
-      }
-    } catch (error) {
-      const aborted = abortRefs.current.get(session.id)?.signal.aborted === true
-      const blocked =
-        error instanceof AgentToolEffectBlockedError ? error : null
-      deliveredSteersRef.current.delete(session.id)
-      clearLiveActivitiesFor(session.id)
-      clearLiveProcessFor(session.id)
-      clearRunTasksFor(session.id)
-      await transitionSessionJob(
-        session.id,
-        aborted ? 'canceled' : blocked?.status ?? 'failed',
-        aborted ? 'interrupted' : blocked ? 'tool_failed' : 'failed',
-        aborted
-          ? {}
-          : {
-              lastError: errText(error),
-              ...(blocked?.status === 'needs_attention'
-                ? { pendingCallId: blocked.outcome.effect.toolCallId }
-                : {}),
-            },
-        { phase: 'run_send_text' },
-      )
-      setStatusFor(
-        session.id,
-        aborted ? IDLE_STATUS : { kind: 'error', message: errText(error) },
-      )
-      if (opts.queueTurnId) {
-        const next = await controller.finishQueuedTurn(
-          session.id,
-          opts.queueTurnId,
-          false,
-        )
-        if (next) applySessionSnapshot(next)
-      }
-      releaseSessionActivity(session.id, opts.queueTurnId)
-    }
-    return outcome
-  }, [
+  const sendText = useAgentSendController({
+    current,
+    currentIdRef,
+    stickToLatestRef,
+    setShowJumpToLatest,
+    controller,
+    abortRefs,
+    deliveredSteersRef,
+    runSendText,
     applySessionSnapshot,
     clearLiveActivitiesFor,
     clearLiveProcessFor,
     clearRunTasksFor,
-    controller,
-    current,
-    runSendText,
     setStatusFor,
     transitionSessionJob,
-  ])
+    queuePumpRef,
+  })
 
   const {
     queueText,
