@@ -1,12 +1,25 @@
 # 轻画 · Agent 设计文档（画布 Agent）
 
+> **2026-11-03 Agent 结果收口独立（对账 #857）**：`AgentPanel.tsx` 从 **3737 行降到 3545 行**。
+> 新增无 React 的 `agentOutcomeCoordinator.ts` 和薄装配 `useAgentOutcomeCoordinator.ts`。收口始终用
+> outcome 创建时的同一个 AbortController 身份判定迟到；当前界面才写消息 / reveal，目标会话始终落库并
+> 用 `composeAgentOutcomeMessages` 合并完整历史。同一 controller 已 abort 的迟到 confirm 补 interrupted
+> tool 结果并清 pendingConfirmation / continuation / allowedToolNames，不写 UI、不迁移 Job 成功。
+> 当前 confirm 持久化 pending / allowedToolNames 并转 `waiting_confirmation`；paused checkpoint 持久化
+> continuation / allowedToolNames 并转 `paused`。message / error / 无 checkpoint stopped 与 needs_attention
+> 的 Job / status 保持原语义；只有线性终态删除 AbortController，confirm / paused 保留。delivered steers
+> 只在当前 outcome 收口后移除。**验证**：全量 Vitest **3857 passed / 1 skipped**；AgentPanel 定向
+> **128/128**、结果协调器聚焦 **5/5**；tsc、check、diff-check 通过。**边界**：没有改 confirmation / stop /
+> continue 执行 UI，也没有实现 AgentHost；未跑 G769 / Tauri 真机。
+
 > **2026-11-03 Agent 请求准备独立（对账 #856）**：`AgentPanel.tsx` 从 **3994 行降到 3737 行**。
 > 新增 `agentTurnRequest.ts`，顺序固定为目标 `sessionId` 用户消息先落库 → `onPersisted` → 路由 →
 > `onRouteReady` 创建 planning Job → ContextBundle / 工具探测 / JSON 降级 → 返回请求快照。
 > 该模块承接正文与 mention、附件 / 视觉节点 id、引用提示词、技能 chip、显式媒体模型、每图拆分、
 > 请求分类、工具裁剪和系统提示词；不持有 React refs、不运行模型循环、不处理确认 / 停止 / 结果。
 > `AgentPanel` 继续持有 per-session abort / toolMode / turnTools / autoRun / explicitMediaModels /
-> contextTrace，并继续调用 `buildAgentModelMessages`、`runAgentTurn`、自动确认续跑和 `handleOutcome`。
+> contextTrace，并继续调用 `buildAgentModelMessages`、`runAgentTurn` 和自动确认续跑；结果收口后由
+> #857 移到 `agentOutcomeCoordinator`。
 > **验证**：全量 Vitest **3852 passed / 1 skipped**；AgentPanel 定向 **123/123**；
 > `npx tsc --noEmit`、`npm run check`、`git diff --check` 通过。
 > **剩余债**：执行循环、确认执行、停止 / 继续和部分会话配置仍在主面板；独立 AgentHost 未实现。
@@ -395,6 +408,11 @@ interface AgentPlan {
 不直接写 React refs；`AgentPanel` 收到 `ready` 后再写入 per-session 状态并进入模型循环。
 路由失败返回 `route_failed`，不会调用 Job-ready 回调；上下文冲突和探测失败返回 `failed`，
 由面板沿用现有 `failBeforeModel` 收口。
+
+结果收口由 `agentOutcomeCoordinator.ts` 负责，React hook 只装配 refs、SessionStore 和 UI 回调。
+它先比较本轮创建时的同一个 AbortController；非当前 controller 不写当前界面。同一 controller 已 abort
+的迟到 confirm 仍需补 interrupted 工具结果并清持久确认字段。当前 confirm / paused 的持久字段、Job
+迁移与状态映射集中在协调器，停止 / 继续的执行 UI 不在该模块。
 
 ### 4.2 工具结果怎么回填
 
@@ -821,7 +839,7 @@ agent 只负责「建对图」，调度交给既有引擎——这是画布本�
 另外一个」）。§8.2 讲的是**记忆**隔离，这里补的是**运行态**隔离：`status`（思考中 /
 等确认 / 执行中 / 报错）与中止用的 `AbortController` 原先都是**组件级单份** ——
 会话 A 在跑时切到 B，B 的输入区也变成「停止」，只能等 A 跑完；在 B 点发送还会把 A 的
-控制器覆盖掉，A 从此停不下来。现在两份都按 `sessionId` 各存一份，并且 `handleOutcome`
+控制器覆盖掉，A 从此停不下来。现在两份都按 `sessionId` 各存一份，并且结果协调器
 只把消息写回**它自己那个会话**（用 `currentIdRef` 判断用户是否已经切走 —— 落库照旧，
 界面不串味）。
 
@@ -939,6 +957,7 @@ Agent 设置入口只在面板右上方，不新增一级导航。齿轮打开�
 | 应用壳宿主 | `app/AgentShellSlot.tsx` + `pages/CanvasPage/AgentShellHost.tsx` | AppShell 只提供 portal 目标；画布页把自己的面板内容和浮球入口 portal 进去 | `AppShell` 不反向 import 画布工作台私有实现 |
 | 界面 | `workbenches/canvas/panels/AgentPanel/` | 对话窗视图（§8）；迁移完成后不再持有循环与付费确认编排 | 属画布工作台私有视图 |
 | 请求准备 | `workbenches/canvas/panels/AgentPanel/agentTurnRequest.ts` | 先落库用户消息、路由顺序、ContextBundle、工具探测 / JSON 降级、技能 / 媒体 / 分工 / 工具 / 系统提示词 | 请求快照可单测；不拥有 refs、循环、确认或结果处理 |
+| 结果收口 | `workbenches/canvas/panels/AgentPanel/agentOutcomeCoordinator.ts` + `useAgentOutcomeCoordinator.ts` | 消息合并、当前界面写回、迟到 confirm 补救、确认 / 检查点持久化、steer / abort / Job / status | 协调逻辑无 React；hook 只装配端口与回调，不包含确认执行 UI |
 | 平台 | `platform/channels/` | `tools` 透传与解析（`openaiChat` + `mock` 会演 agent） | 渠道能力属平台层 |
 
 > `domain/agent` **不许** import 画布私有层（`domain/canvas/nodeSpecs` 之类）。
@@ -1187,7 +1206,7 @@ Harness Worker、等价切换、删除旧循环、资源包签名与发布门禁
 | 维度 | 分数 | 大白话判断 |
 | --- | ---: | --- |
 | 可用性 | 7.5/10 | 建图、出图确认、排队、停止、读结果、验收这些主流程已经顺手；离开画布页仍会停。 |
-| 代码结构 | 7/10 | 已有 Controller、ToolRegistry、账本、独立视图壳、队列 hook、画布执行模块和请求准备模块；`AgentPanel.tsx` 降到 **3737 行**，但模型循环、确认执行、停止 / 继续仍在面板内。 |
+| 代码结构 | 7.5/10 | 已有 Controller、ToolRegistry、账本、独立视图壳、队列 hook、画布执行、请求准备和结果收口模块；`AgentPanel.tsx` 降到 **3545 行**，但模型循环、确认执行、停止 / 继续仍在面板内。 |
 | 可插拔 | 5/10 | 工具有注册表和统一 schema，新增工具比硬编码好；但这不是 Harness 那种可装卸第三方插件。 |
 | 视觉 | 8/10 | 右侧壳层、浮球、计划卡、过程线和确认卡的视觉语言统一；本轮明暗与双视口回归通过。 |
 | 用户感受 | 7/10 | 改完后“关掉再开还在、后台不串会话、危险操作不乱点”更可信；未知结果仍需要更直观的恢复入口。 |

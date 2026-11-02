@@ -5,6 +5,14 @@
 
 ## Agent · 过程与落位
 
+- **结果收口只认 controller 身份**：`agentOutcomeCoordinator.ts` 用 outcome 创建时的同一个
+  `AbortController` 对象与当前 map 值比较，不能按界面当前 session 猜。非当前界面只落库，不写
+  `messages / messageReveal`；同一 controller 已 abort 的迟到 confirm 仍补 interrupted 工具结果并清
+  `pendingConfirmation / continuation / allowedToolNames`，但不写 UI、不迁移 Job 成功。
+- **结果收口职责单一**：纯协调器负责消息合并、确认 / 检查点持久化、steer 清理、Job / status 与
+  abort 生命周期；`useAgentOutcomeCoordinator` 只装配 refs、SessionStore 和 React 回调。
+  只有 message / error / 无 checkpoint stopped 删除 abort，confirm / paused 保留；delivered steers
+  只在当前 outcome 收口后移除。确认 / 停止 / 继续执行 UI 不属于该模块。
 - **请求准备只产出快照**：`agentTurnRequest.ts` 先落库目标会话用户消息，再准备路由；
   `onRouteReady` 只在路由成功后触发，由宿主创建 planning Job。它承接上下文、工具探测 / JSON 降级、
   技能 chip、媒体模型、每图拆分、请求分类、工具裁剪和系统提示词，但不得持有 React refs、运行模型循环、
@@ -229,7 +237,7 @@
   `resumeAgentTurn`，否则模型会换方案继续建节点。
 - **停止是一次完整收口**：先 abort，再清 `pendingConfirmation / continuation / pendingSteers`、
   取消 Job、结束队列活动锁；重开 Agent 或刷新后旧确认卡不能复活。
-- **迟到回写必须有身份校验**：`handleOutcome` 只接受创建本轮时的同一个 AbortController；
+- **迟到回写必须有身份校验**：结果协调器（原 `handleOutcome`）只接受创建本轮时的同一个 AbortController；
   停止后的旧结果不能重新写确认卡、检查点或运行态。
 
 ## 全局设置 · 模型服务

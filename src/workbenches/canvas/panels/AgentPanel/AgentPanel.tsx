@@ -14,7 +14,6 @@ import { usePlatform } from '../../../../app/providers/PlatformProvider'
 import { useChannels } from '../../../../app/providers/ChannelStoreProvider'
 import { useSkillsOptional } from '../../../../app/providers/SkillStoreProvider'
 import type { ChatMessage, NodeInput } from '../../../../domain/shared/execution/types'
-import { isAgentToolName } from '../../../../domain/agent/toolRegistry'
 import {
   createAgentSessionStore,
   type AgentSession,
@@ -166,7 +165,6 @@ import { latestRunFailuresForNodes } from './agentRunState'
 import {
   buildAgentModelMessages,
   composeAgentOutcomeMessages,
-  type PersistedAgentUserTurn,
 } from './agentTurnPersistence'
 import {
   prepareAgentTurnRequest,
@@ -186,6 +184,7 @@ import { AgentComposerPane } from './AgentComposerPane'
 import { AgentPanelHeader } from './AgentPanelHeader'
 import { useAgentQueueController } from './useAgentQueueController'
 import { useAgentSendController } from './useAgentSendController'
+import { useAgentOutcomeCoordinator } from './useAgentOutcomeCoordinator'
 import { runAgentCanvasNodes } from './agentCanvasRun'
 import { useAgentRunPresentation } from './useAgentRunPresentation'
 import {
@@ -1643,218 +1642,27 @@ export function AgentPanel({
     ],
   )
 
-  /** 把循环的结果落到界面上：回答就显示，要确认就出预览卡，刹车/报错就说清楚 */
-  const handleOutcome = useCallback(
-    async (
-      session: AgentSession,
-      outcome: AgentLoopOutcome,
-      persistedTurn?: PersistedAgentUserTurn,
-    ) => {
-      const outcomeController = abortRefs.current.get(session.id)
-      const outcomeIsCurrent = () =>
-        outcomeController !== undefined &&
-        abortRefs.current.get(session.id) === outcomeController &&
-        !outcomeController.signal.aborted
-      if (!outcomeIsCurrent()) return
-      clearLiveActivitiesFor(session.id)
-      clearLiveProcessFor(session.id)
-      clearRunTasksFor(session.id)
-      /**
-       * 消息只写回**它自己那个会话的界面**：用户可能已经切走去看别的会话了，
-       * 这时候把 A 的消息盖到 B 的对话流上就是串味（§8.2）。
-       * 落库（`persist`）与是否切走无关，一律照做。
-       *
-       * 模型只看窗口，但界面与落库必须是完整历史。以发送前已落库的
-       * `historyMessages` 为底，只追加本轮用户消息之后新增的 assistant/tool 消息。
-       * 这同时保留窗口外前缀和 `trimOrphanToolMessages()` 去掉的边界消息。
-       */
-      const full = persistedTurn
-        ? composeAgentOutcomeMessages(persistedTurn, outcome.messages)
-        : outcome.messages
-      const settleStaleOutcome = async () => {
-        if (outcome.kind === 'confirm') {
-          await sessions
-            .saveMessages(
-              session.id,
-              confirmationSettlementMessages(
-                full,
-                outcome.request,
-                'interrupted',
-              ),
-            )
-            .catch(() => null)
-        }
-        await sessions
-          .updateFields(session.id, {
-            pendingConfirmation: undefined,
-            continuation: undefined,
-            allowedToolNames: undefined,
-          })
-          .catch(() => null)
-      }
-      if (currentIdRef.current === session.id) {
-        if (
-          outcome.kind === 'message' &&
-          outcome.text.trim() &&
-          !window.matchMedia('(prefers-reduced-motion: reduce)').matches
-        ) {
-          setMessageReveal({
-            sessionId: session.id,
-            fullText: outcome.text.trim(),
-            visibleLength: 0,
-          })
-        } else {
-          setMessageReveal(null)
-        }
-        setMessages(full)
-      }
-      await persist(session, full)
-      if (!outcomeIsCurrent()) {
-        await settleStaleOutcome()
-        return
-      }
-      const pendingConfirmation =
-        outcome.kind === 'confirm'
-          ? {
-              callId: outcome.request.callId,
-              name: outcome.request.name,
-              args: outcome.request.args,
-            }
-          : undefined
-      const continuation =
-        outcome.kind === 'stopped' && outcome.checkpoint
-          ? {
-              reason: outcome.checkpoint.kind,
-              maxSteps: outcome.checkpoint.maxSteps,
-              createdAt: Date.now(),
-              ...(activeQueueTurnOf(session.id)
-                ? { queuedTurnId: activeQueueTurnOf(session.id) }
-                : {}),
-            }
-          : undefined
-      const persistTurnTools =
-        outcome.kind === 'confirm' ||
-        (outcome.kind === 'stopped' && Boolean(outcome.checkpoint))
-      let latest = await sessions.updateFields(session.id, {
-        pendingConfirmation,
-        continuation,
-        allowedToolNames: persistTurnTools
-          ? (turnToolsRef.current.get(session.id) ?? [])
-              .map((tool) => tool.name)
-              .filter(isAgentToolName)
-          : undefined,
-      })
-      if (!outcomeIsCurrent()) {
-        await settleStaleOutcome()
-        return
-      }
-      const deliveredSteerIds = [
-        ...(deliveredSteersRef.current.get(session.id) ?? []),
-      ]
-      if (deliveredSteerIds.length > 0) {
-        latest = await sessions.removeSteers(session.id, deliveredSteerIds)
-        deliveredSteersRef.current.delete(session.id)
-      }
-      if (outcome.kind === 'confirm') {
-        await transitionSessionJob(
-          session.id,
-          'waiting_confirmation',
-          'confirmation_requested',
-          { pendingCallId: outcome.request.callId },
-          { tool: outcome.request.name },
-        )
-      } else if (outcome.kind === 'stopped' && outcome.checkpoint) {
-        await transitionSessionJob(
-          session.id,
-          'paused',
-          'checkpoint_saved',
-          {
-            checkpoint: {
-              kind: outcome.checkpoint.kind,
-              maxSteps: outcome.checkpoint.maxSteps,
-              completedSteps: outcome.checkpoint.completedSteps,
-              savedAt: Date.now(),
-            },
-          },
-        )
-      } else if (outcome.kind === 'error' && outcome.needsAttention) {
-        await transitionSessionJob(
-          session.id,
-          'needs_attention',
-          'tool_failed',
-          {
-            lastError: outcome.needsAttention.reason,
-            ...(outcome.needsAttention.toolCallId
-              ? { pendingCallId: outcome.needsAttention.toolCallId }
-              : {}),
-          },
-          {
-            phase: 'tool_effect_pending',
-            reason: outcome.needsAttention.reason,
-          },
-        )
-      } else if (outcome.kind === 'message') {
-        await transitionSessionJob(session.id, 'completed', 'completed')
-      } else {
-        await transitionSessionJob(
-          session.id,
-          'failed',
-          'failed',
-          {
-            lastError:
-              outcome.kind === 'error' ? outcome.message : outcome.reason,
-          },
-          {
-            reason:
-              outcome.kind === 'error' ? outcome.message : outcome.reason,
-          },
-        )
-      }
-      if (!outcomeIsCurrent()) {
-        await settleStaleOutcome()
-        return
-      }
-      if (
-        outcome.kind === 'message' ||
-        outcome.kind === 'error' ||
-        (outcome.kind === 'stopped' && !outcome.checkpoint)
-      ) {
-        abortRefs.current.delete(session.id)
-      }
-      if (latest) {
-        setList((prev) => prev.map((item) => (item.id === latest.id ? latest : item)))
-        if (currentIdRef.current === latest.id) setCurrent(latest)
-      }
-      if (outcome.kind === 'message') {
-        setStatusFor(session.id, IDLE_STATUS)
-      }
-      else if (outcome.kind === 'confirm') {
-        setStatusFor(session.id, { kind: 'awaitingConfirm', request: outcome.request })
-      } else if (outcome.kind === 'stopped' && outcome.checkpoint) {
-        setStatusFor(session.id, {
-          kind: 'paused',
-          message: `已完成 ${outcome.checkpoint.maxSteps} 步，可继续`,
-        })
-      } else if (outcome.kind === 'stopped') {
-        setStatusFor(session.id, { kind: 'error', message: outcome.reason })
-      } else setStatusFor(session.id, { kind: 'error', message: outcome.message })
-    },
-    [
-      clearLiveActivitiesFor,
-      clearLiveProcessFor,
-      clearRunTasksFor,
-      jobs,
-      persist,
-      sessions,
-      setStatusFor,
-      transitionSessionJob,
-    ],
-  )
-
   const applySessionSnapshot = useCallback((next: AgentSession) => {
     setList((prev) => prev.map((item) => (item.id === next.id ? next : item)))
     if (currentIdRef.current === next.id) setCurrent(next)
   }, [])
+
+  const handleOutcome = useAgentOutcomeCoordinator({
+    currentIdRef,
+    abortRefs,
+    deliveredSteersRef,
+    turnToolsRef,
+    sessions,
+    persist,
+    transitionSessionJob,
+    clearLiveActivitiesFor,
+    clearLiveProcessFor,
+    clearRunTasksFor,
+    setMessageReveal,
+    setMessages,
+    applySessionSnapshot,
+    setStatusFor,
+  })
 
   /**
    * 真正干活的那一段：**接收正文本身**，不读 `draft`。

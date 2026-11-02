@@ -1,5 +1,25 @@
 # CanvasFlow（轻画）项目记忆
 
+### Agent 结果收口拆分（2026-11-03，对账 #857）
+
+- **纯协调 + 薄 hook**：`agentOutcomeCoordinator.ts` 只接收端口与回调，负责消息合并、当前界面写回、
+  持久确认 / 检查点、steer 清理、Job / status 与 abort 生命周期；`useAgentOutcomeCoordinator.ts`
+  只做 refs、SessionStore、React setter 装配。不要把 223 行原逻辑塞回主面板或新巨型 hook。
+- **current 只认同一个 AbortController 身份**：用 outcome 创建时拿到的 controller 与当前 map 值做对象比较，
+  不能根据当前界面会话猜。非当前 controller 不写当前界面；目标 `sessionId` 仍照常落库。
+- **迟到 confirm 必须收口**：同一 controller 已 abort 时，confirm 仍用
+  `confirmationSettlementMessages(..., 'interrupted')` 补 tool 结果并清
+  `pendingConfirmation / continuation / allowedToolNames`，但不写 UI、不迁移 Job 成功。
+- **当前确认 / 暂停语义**：confirm 持久 pending + allowedToolNames 并转 `waiting_confirmation`；
+  paused checkpoint 持久 continuation + allowedToolNames 并转 `paused`。message / error / 无 checkpoint
+  stopped 才删除 AbortController，confirm / paused 保留；delivered steers 只在当前 outcome 收口后删除。
+- **非当前界面隔离**：后台会话只更新自己的持久消息与 per-session status，不调用
+  `setMessages / setMessageReveal` 覆盖当前界面。
+- **证据**：`AgentPanel.tsx` **3737→3545 行**（减少 192）；全量 Vitest
+  **3857 passed / 1 skipped**，AgentPanel **128/128**，结果协调器聚焦 **5/5**；
+  tsc、`npm run check`、`git diff --check` 通过。未改 confirmation / stop / continue 执行 UI，
+  AgentHost 仍未实现。
+
 ### Agent 请求准备拆分（2026-11-03，对账 #856）
 
 - **请求快照独立**：`agentTurnRequest.ts` 承接 mention 解析、附件 / 视觉节点 id、ContextBundle、
@@ -10,8 +30,8 @@
   `onRouteReady`；路由失败时 `onRouteReady` 零调用。上下文冲突 / 探测失败由面板
   `failBeforeModel` 收口。后台会话仍只读目标 `sessionId` 历史，窗口裁剪不改完整历史。
 - **面板仍是运行态所有者**：`AgentPanel` 继续持有 per-session abort、toolMode、turnTools、
-  autoRun、explicitMediaModels、contextTrace，以及 `runAgentTurn`、自动确认续跑和
-  `handleOutcome`。不要把这些搬进请求准备模块。
+  autoRun、explicitMediaModels、contextTrace，以及 `runAgentTurn` 和自动确认续跑；
+  结果收口后由 #857 移到 `agentOutcomeCoordinator`。不要把这些搬进请求准备模块。
 - **测试边界**：新增 `agentTurnRequest.test.ts` 钉住技能 chip-only、多图分类 / 工具裁剪 /
   JSON 降级、后台会话隔离、路由失败不触发 Job-ready、素材与任务计划进入系统提示词。
 - **证据**：`AgentPanel.tsx` **3994→3737 行**；全量 Vitest **3852 passed / 1 skipped**，
