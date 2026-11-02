@@ -8,6 +8,7 @@ import {
   AGENT_TOOLS,
   agentToolsForCapabilities,
   agentToolsForRequestMode,
+  discoverAgentTools,
   executeConfirmedTool,
   executeReadTool,
   planProblems,
@@ -62,6 +63,7 @@ describe('工具声明', () => {
       'moveNodes',
       'proposeTaskPlan',
       'readAsset',
+      'readCapabilities',
       'readGraph',
       'readResult',
       'rememberMemory',
@@ -97,6 +99,7 @@ describe('工具声明', () => {
     }).map((tool) => tool.name)
     expect(simple.sort()).toEqual([
       'applyPlan',
+      'readCapabilities',
       'readGraph',
       'readResult',
       'rememberMemory',
@@ -115,6 +118,22 @@ describe('工具声明', () => {
     expect(operation).toContain('moveNodes')
     expect(operation).toContain('rememberMemory')
     expect(operation).not.toContain('researchDesign')
+  })
+
+  it('★★ 能力索引先返回说明与 schema，再允许本轮加载匹配工具', () => {
+    const found = discoverAgentTools(
+      '把刚生成的 16 个节点拖动并摆放成一排，放到空位置',
+      agentToolsForCapabilities({ canvasReview: false }),
+    )
+    expect(found.result.loaded).toEqual(
+      expect.arrayContaining(['moveNodes', 'arrangeNodes']),
+    )
+    expect(found.tools.map((tool) => tool.name)).toEqual(
+      expect.arrayContaining(['moveNodes', 'arrangeNodes']),
+    )
+    expect(found.tools.find((tool) => tool.name === 'arrangeNodes')?.parameters).toMatchObject({
+      type: 'object',
+    })
   })
 
   it('设计调研读工具把规范化参数交给宿主服务', async () => {

@@ -104,6 +104,14 @@ export interface AgentLoopDeps {
   model: string
   tools: readonly ToolDeclaration[]
   /**
+   * 渐进式能力披露：`readCapabilities` 命中后，同一轮后续模型调用立即拿到
+   * 匹配工具的完整 schema。返回的仍是普通工具声明，权限与确认逻辑不绕过。
+   */
+  discoverCapabilities?: (args: unknown) => Promise<{
+    result: unknown
+    tools: readonly ToolDeclaration[]
+  }>
+  /**
    * `native`：渠道支持 OpenAI `tools` / `tool_calls`（默认）。
    * `json`：渠道不返回 tool_calls，走设计文档 §7 路线 B ——
    * 提示词要求模型每次只输出一个 `{"tool":"...","args":{...}}`，系统解析后执行。
@@ -171,7 +179,16 @@ const failedToolValue = (value: unknown): boolean => {
 const callFingerprint = (name: string, args: unknown): string =>
   `${name}:${JSON.stringify(args ?? {})}`
 
-async function askModel(history: ChatMessage[], deps: AgentLoopDeps) {
+const claimsMissingCapability = (text: string): boolean =>
+  /(?:没有|不具备|不支持|无法|没法).{0,40}(?:能力|功能|操作|移动|排列|摆放|拖动|调整|删除)/.test(
+    text,
+  ) || /(?:我|这一步|这个|目前).{0,8}做不到/.test(text)
+
+async function askModel(
+  history: ChatMessage[],
+  deps: AgentLoopDeps,
+  tools: readonly ToolDeclaration[],
+) {
   const request = {
     kind: 'text' as const,
     channelId: deps.channelId,
@@ -180,7 +197,7 @@ async function askModel(history: ChatMessage[], deps: AgentLoopDeps) {
     prompt: '',
     inputs: [...(deps.inputs ?? [])],
     params: {},
-    tools: deps.toolMode === 'json' ? [] : deps.tools,
+    tools: deps.toolMode === 'json' ? [] : tools,
     messages: history.map((message) => {
       const protocolMessage = { ...message }
       delete protocolMessage.createdAt
@@ -202,9 +219,11 @@ export async function runAgentTurn(
 ): Promise<AgentLoopOutcome> {
   const messages = [...history]
   const maxSteps = deps.maxSteps ?? AGENT_DEFAULT_MAX_STEPS
-  const allowedToolNames = new Set(deps.tools.map((tool) => tool.name))
+  let activeTools = [...deps.tools]
+  const allowedToolNames = new Set(activeTools.map((tool) => tool.name))
   const seenCalls = new Map<string, number>()
   let visualReviewRan = false
+  let capabilityDiscoveryRan = false
   const emitProgress = () => deps.onProgress?.([...messages])
   const pullSteering = async (): Promise<number> => {
     if (!deps.takeSteering) return 0
@@ -223,13 +242,83 @@ export async function runAgentTurn(
   const emitActivity = (activity: AgentLoopActivity) => {
     deps.onActivity?.(activity)
   }
+  const loadDiscoveredTools = (
+    discovered: Awaited<ReturnType<NonNullable<AgentLoopDeps['discoverCapabilities']>>>,
+  ): readonly string[] => {
+    const known = new Set(activeTools.map((tool) => tool.name))
+    const added = discovered.tools.filter((tool) => !known.has(tool.name))
+    if (added.length === 0) return []
+    activeTools = [...activeTools, ...added]
+    for (const tool of added) allowedToolNames.add(tool.name)
+    return added.map((tool) => tool.name)
+  }
+  /**
+   * 模型没先查能力目录就直接下“做不到”的结论时，执行层先补查一次。
+   * 这里只加载 schema，业务动作仍由模型按普通权限与确认流程发起。
+   */
+  const discoverBeforeCapabilityDenial = async (
+    text: string,
+    step: number,
+  ): Promise<boolean> => {
+    if (
+      capabilityDiscoveryRan ||
+      !deps.discoverCapabilities ||
+      !claimsMissingCapability(text)
+    ) {
+      return false
+    }
+    capabilityDiscoveryRan = true
+    const lastUserRequest =
+      [...messages].reverse().find((message) => message.role === 'user')?.content ?? ''
+    const query = `${lastUserRequest}\n${text}`.trim().slice(0, 2000)
+    emitActivity({
+      id: `capability-gate-${step}`,
+      phase: 'tool',
+      status: 'running',
+      tool: 'readCapabilities',
+    })
+    try {
+      const discovered = await deps.discoverCapabilities({ query })
+      const loaded = loadDiscoveredTools(discovered)
+      emitActivity({
+        id: `capability-gate-${step}`,
+        phase: 'tool',
+        status: failedToolValue(discovered.result) ? 'failed' : 'done',
+        tool: 'readCapabilities',
+      })
+      messages.push({
+        role: 'system',
+        content:
+          '执行层已自动读取能力目录，禁止在未检查该结果时继续断言“没有能力”。\n' +
+          `本轮新加载工具：${loaded.length > 0 ? loaded.join('、') : '无'}\n` +
+          `能力目录：${JSON.stringify(discovered.result)}`,
+        createdAt: Date.now(),
+      })
+    } catch (error) {
+      emitActivity({
+        id: `capability-gate-${step}`,
+        phase: 'tool',
+        status: 'failed',
+        tool: 'readCapabilities',
+      })
+      messages.push({
+        role: 'system',
+        content:
+          '能力目录读取失败；这是目录读取故障，不能据此断言某项能力不存在。' +
+          `错误：${error instanceof Error ? error.message : errText(error)}`,
+        createdAt: Date.now(),
+      })
+    }
+    emitProgress()
+    return true
+  }
 
   for (let step = 0; step < maxSteps; step += 1) {
     await pullSteering()
     emitActivity({ id: `thinking-${step}`, phase: 'thinking', status: 'running' })
     let result: Awaited<ReturnType<typeof askModel>>
     try {
-      result = await askModel(messages, deps)
+      result = await askModel(messages, deps, activeTools)
     } catch (e) {
       // 渠道错误（401 / 限流）**不回填**：那是配置问题，模型改不了（§4）
       return { kind: 'error', message: e instanceof Error ? e.message : errText(e), messages }
@@ -259,6 +348,7 @@ export async function runAgentTurn(
           typeof (action.args as { message?: unknown }).message === 'string'
             ? String((action.args as { message: string }).message)
             : result.text
+        if (await discoverBeforeCapabilityDenial(message, step)) continue
         messages.push({
           role: 'assistant',
           content: message,
@@ -292,6 +382,7 @@ export async function runAgentTurn(
     }
     if (calls.length === 0) {
       if ((await pullSteering()) > 0) continue
+      if (await discoverBeforeCapabilityDenial(result.text, step)) continue
       messages.push({
         role: 'assistant',
         content: result.text,
@@ -362,6 +453,41 @@ export async function runAgentTurn(
             error: 'arguments 不是合法 JSON，请重新发一次',
           }),
         )
+        continue
+      }
+
+      if (call.name === 'readCapabilities' && deps.discoverCapabilities) {
+        capabilityDiscoveryRan = true
+        emitActivity({
+          id: call.id,
+          phase: 'tool',
+          status: 'running',
+          tool: call.name,
+        })
+        try {
+          const discovered = await deps.discoverCapabilities(args)
+          loadDiscoveredTools(discovered)
+          emitActivity({
+            id: call.id,
+            phase: 'tool',
+            status: failedToolValue(discovered.result) ? 'failed' : 'done',
+            tool: call.name,
+          })
+          messages.push(toolResult(call.id, call.name, discovered.result))
+        } catch (error) {
+          emitActivity({
+            id: call.id,
+            phase: 'tool',
+            status: 'failed',
+            tool: call.name,
+          })
+          messages.push(
+            toolResult(call.id, call.name, {
+              ok: false,
+              error: error instanceof Error ? error.message : errText(error),
+            }),
+          )
+        }
         continue
       }
 

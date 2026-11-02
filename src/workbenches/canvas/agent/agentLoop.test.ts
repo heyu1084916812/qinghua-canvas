@@ -420,6 +420,90 @@ describe('runAgentTurn · 基本往复', () => {
     expect(r.kind).toBe('message')
   })
 
+  it('★★ readCapabilities 可在同一轮加载匹配工具，随后真正执行移动', async () => {
+    const capabilityTool = AGENT_TOOLS.find((tool) => tool.name === 'readCapabilities')!
+    const moveTool = AGENT_TOOLS.find((tool) => tool.name === 'moveNodes')!
+    const { deps, executeWrite } = depsWith([
+      {
+        toolCalls: [
+          {
+            id: 'discover',
+            name: 'readCapabilities',
+            args: '{"query":"排列节点到空位置"}',
+          },
+        ],
+      },
+      {
+        toolCalls: [
+          {
+            id: 'move',
+            name: 'moveNodes',
+            args: '{"nodeIds":["n1"],"dx":20,"dy":10}',
+          },
+        ],
+      },
+      { text: '已经移动好了' },
+    ])
+
+    const r = await runAgentTurn(user('把节点排到空位置'), {
+      ...deps,
+      tools: [capabilityTool],
+      discoverCapabilities: async () => ({
+        result: { ok: true, loaded: ['moveNodes'] },
+        tools: [moveTool],
+      }),
+    })
+
+    expect(executeWrite).toHaveBeenCalledWith(
+      'moveNodes',
+      { nodeIds: ['n1'], dx: 20, dy: 10 },
+      'move',
+    )
+    expect(r.kind).toBe('message')
+  })
+
+  it('★★ 模型跳过能力目录直接说“做不到”时，执行层先补查再继续', async () => {
+    const capabilityTool = AGENT_TOOLS.find((tool) => tool.name === 'readCapabilities')!
+    const readGraphTool = AGENT_TOOLS.find((tool) => tool.name === 'readGraph')!
+    const moveTool = AGENT_TOOLS.find((tool) => tool.name === 'moveNodes')!
+    const discoverCapabilities = vi.fn(async () => ({
+      result: { ok: true, loaded: ['moveNodes'] },
+      tools: [moveTool],
+    }))
+    const { deps, executeWrite, adapter } = depsWith([
+      { text: '我没有移动或排列已有节点的能力。' },
+      {
+        toolCalls: [
+          {
+            id: 'move',
+            name: 'moveNodes',
+            args: '{"nodeIds":["n1"],"dx":20,"dy":10}',
+          },
+        ],
+      },
+      { text: '已经移动好了' },
+    ])
+
+    const r = await runAgentTurn(user('把已有节点拖动并摆放成一排'), {
+      ...deps,
+      tools: [readGraphTool, capabilityTool],
+      discoverCapabilities,
+    })
+
+    expect(discoverCapabilities).toHaveBeenCalledOnce()
+    expect(discoverCapabilities).toHaveBeenCalledWith({
+      query: expect.stringContaining('把已有节点拖动并摆放成一排'),
+    })
+    expect(executeWrite).toHaveBeenCalledWith(
+      'moveNodes',
+      { nodeIds: ['n1'], dx: 20, dy: 10 },
+      'move',
+    )
+    expect(adapter.completeText).toHaveBeenCalledTimes(3)
+    expect(r.kind).toBe('message')
+    if (r.kind === 'message') expect(r.text).toBe('已经移动好了')
+  })
+
   it('★ 实时活动只上报公开阶段与真实工具开始/结束', async () => {
     const { deps } = depsWith([
       {

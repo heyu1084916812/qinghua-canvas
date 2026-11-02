@@ -32,6 +32,10 @@ import {
 } from '../../../domain/shared/memoryOrganizer'
 import type { VisualReviewResult } from '../../../domain/agent/visualReview'
 import {
+  agentToolDefinitionOf,
+  type AgentToolName,
+} from '../../../domain/agent/toolRegistry'
+import {
   AGENT_TASK_STEP_STATUSES,
   approveAgentTaskPlanReview,
   markAgentTaskPlanResultsReady,
@@ -51,6 +55,21 @@ import {
 
 /** 给模型看的工具声明。参数 schema 与设计文档 §5.1 一一对应 */
 export const AGENT_TOOLS: readonly ToolDeclaration[] = [
+  {
+    name: 'readCapabilities',
+    description:
+      '读取 Agent 当前可用的能力目录。当你拿不准能否移动、排列、调整、生成、对比或筛选画布时，先调用它，不要直接回答“做不到”。query 写用户这次要做的动作；匹配到的工具会在本轮继续加载。',
+    parameters: {
+      type: 'object',
+      properties: {
+        query: {
+          type: 'string',
+          description: '用户这次想完成的能力，例如“移动并排列节点”“对比两张图”。',
+        },
+      },
+      required: ['query'],
+    },
+  },
   {
     name: 'readGraph',
     description: '看当前画布上有什么节点、怎么连的、哪些已经出过图。问「现在有什么」时用它。',
@@ -555,6 +574,152 @@ export function agentToolsForCapabilities({
   return AGENT_TOOLS.filter((tool) => tool.name !== 'visualReview')
 }
 
+const CAPABILITY_QUERY_GROUPS: readonly {
+  terms: readonly string[]
+  names: readonly AgentToolName[]
+}[] = [
+  {
+    terms: [
+      '移动',
+      '挪动',
+      '拖动',
+      '拖到',
+      '摆放',
+      '排列',
+      '排成',
+      '重排',
+      '位移',
+      '整理',
+      '对齐',
+      '布局',
+      '空位置',
+      '空白处',
+    ],
+    names: ['moveNodes', 'arrangeNodes', 'resizeNodes'],
+  },
+  {
+    terms: ['尺寸', '缩放', '大小', '加高', '加宽'],
+    names: ['resizeNodes'],
+  },
+  {
+    terms: ['生成', '出图', '视频', '重跑', '运行', '继续跑'],
+    names: ['runNode', 'runFrom', 'readResult'],
+  },
+  {
+    terms: ['新建', '建节点', '工作流', '计划'],
+    names: ['applyPlan', 'proposeTaskPlan'],
+  },
+  {
+    terms: ['修改', '参数', '模型', '提示词', '改名'],
+    names: ['updateNode'],
+  },
+  {
+    terms: ['删除', '移除', '断线', '取消连线'],
+    names: ['deleteNodes', 'deleteEdges'],
+  },
+  {
+    terms: ['看图', '素材', '画布', '节点信息', '结果'],
+    names: ['readGraph', 'readAsset', 'readResult'],
+  },
+  {
+    terms: ['对比', '比较'],
+    names: ['compareNodes'],
+  },
+  {
+    terms: ['裁剪', '提取', '切图', '宫格', '切分'],
+    names: ['sliceImage', 'splitGrid'],
+  },
+  {
+    terms: ['调研', '参考', '灵感', 'moodboard'],
+    names: ['researchDesign'],
+  },
+  {
+    terms: ['验收', '检查', '巡检'],
+    names: ['visualReview'],
+  },
+  {
+    terms: ['记忆', '记住', '偏好'],
+    names: ['rememberMemory'],
+  },
+  {
+    terms: ['计划', '步骤', '确认'],
+    names: ['proposeTaskPlan', 'updateTaskStep', 'requestTaskConfirmation'],
+  },
+]
+
+export interface AgentCapabilityDiscovery {
+  result: Record<string, unknown>
+  tools: readonly ToolDeclaration[]
+}
+
+/**
+ * 渐进式能力披露：先给能力索引，再把匹配工具的完整 schema 加载到本轮。
+ * 这里只做确定性的关键词/名称匹配，不执行任何工具，也不绕过权限或确认流程。
+ */
+export function discoverAgentTools(
+  query: string,
+  available: readonly ToolDeclaration[] = AGENT_TOOLS,
+): AgentCapabilityDiscovery {
+  const normalized = query.trim().toLowerCase().replace(/\s+/g, '')
+  const candidates = available.filter((tool) => tool.name !== 'readCapabilities')
+  if (!normalized) {
+    return {
+      result: {
+        ok: false,
+        error: 'query 不能为空',
+        available: candidates.map((tool) => tool.name),
+      },
+      tools: [],
+    }
+  }
+
+  const wanted = new Set<string>()
+  for (const tool of candidates) {
+    if (normalized.includes(tool.name.toLowerCase())) wanted.add(tool.name)
+  }
+  for (const group of CAPABILITY_QUERY_GROUPS) {
+    if (group.terms.some((term) => normalized.includes(term))) {
+      for (const name of group.names) wanted.add(name)
+    }
+  }
+  if (wanted.size === 0) {
+    for (const tool of candidates) {
+      if (
+        normalized.length >= 2 &&
+        tool.description?.toLowerCase().includes(normalized)
+      ) {
+        wanted.add(tool.name)
+      }
+    }
+  }
+
+  const tools = candidates.filter((tool) => wanted.has(tool.name))
+  return {
+    result: {
+      ok: tools.length > 0,
+      query,
+      loaded: tools.map((tool) => tool.name),
+      capabilities: tools.map((tool) => {
+        const definition = agentToolDefinitionOf(tool.name)
+        return {
+          name: tool.name,
+          description: tool.description,
+          category: definition?.category ?? 'canvas',
+          access: definition?.access ?? 'read',
+          parameters: tool.parameters,
+        }
+      }),
+      ...(tools.length === 0
+        ? {
+            error: '没有匹配到能力；可换一个动作词，或从 available 里选择工具名。',
+            available: candidates.map((tool) => tool.name),
+          }
+        : {}),
+    },
+    tools,
+  }
+}
+
 const SIMPLE_GENERATE_TOOLS = new Set([
   'readGraph',
   'applyPlan',
@@ -613,7 +778,15 @@ export function agentToolsForRequestMode(
         : mode === 'design_research'
           ? DESIGN_RESEARCH_TOOLS
           : CANVAS_OPERATION_TOOLS
-  return agentToolsForCapabilities(capabilities).filter((tool) => allowed.has(tool.name))
+  const tools = agentToolsForCapabilities(capabilities).filter((tool) => allowed.has(tool.name))
+  return tools.some((tool) => tool.name === 'readCapabilities')
+    ? tools
+    : [
+        agentToolsForCapabilities(capabilities).find(
+          (tool) => tool.name === 'readCapabilities',
+        )!,
+        ...tools,
+      ]
 }
 
 /** 画布现状摘要 —— 结构与设计文档 §4.2 的回填格式一致 */
@@ -1098,6 +1271,10 @@ export async function executeReadTool(
 ): Promise<unknown> {
   const a = asRecord(args)
   switch (name) {
+    case 'readCapabilities':
+      return discoverAgentTools(
+        typeof a.query === 'string' ? a.query : '',
+      ).result
     case 'readGraph':
       return readGraphSummary(ctx.store, a.scope, ctx.selectedIds?.() ?? [])
     case 'readAsset':

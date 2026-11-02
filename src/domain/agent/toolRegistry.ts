@@ -1,6 +1,7 @@
 export type AgentToolCategory = 'agent-internal' | 'canvas' | 'host-service'
 export type AgentToolAccess = 'read' | 'write' | 'confirm'
 export type AgentToolName =
+  | 'readCapabilities'
   | 'readGraph'
   | 'readAsset'
   | 'researchDesign'
@@ -40,6 +41,12 @@ export const AGENT_TOOL_GROUP_LABELS: Record<AgentToolCategory, string> = {
 }
 
 export const AGENT_TOOL_DEFINITIONS: readonly AgentToolDefinition[] = [
+  {
+    name: 'readCapabilities',
+    category: 'agent-internal',
+    access: 'read',
+    sideEffect: 'none',
+  },
   { name: 'readGraph', category: 'canvas', access: 'read', sideEffect: 'none' },
   { name: 'readAsset', category: 'canvas', access: 'read', sideEffect: 'none' },
   { name: 'readResult', category: 'canvas', access: 'read', sideEffect: 'none' },

@@ -136,6 +136,7 @@ import {
 import {
   agentToolsForCapabilities,
   agentToolsForRequestMode,
+  discoverAgentTools,
   executeConfirmedTool,
   executeReadTool,
   runFromNodeIds,
@@ -1968,6 +1969,27 @@ export function AgentPanel({
         channelId: route?.channelId ?? '',
         model: logicalModel,
         tools: turnTools,
+        discoverCapabilities: async (args: unknown) => {
+          const query =
+            args && typeof args === 'object' && !Array.isArray(args)
+              ? String((args as { query?: unknown }).query ?? '')
+              : ''
+          const discovered = discoverAgentTools(
+            query,
+            agentToolsForCapabilities({
+              canvasReview: canvasReviewEnabled,
+            }),
+          )
+          const loaded = [...(turnToolsRef.current.get(session.id) ?? turnTools)]
+          const names = new Set(loaded.map((tool) => tool.name))
+          for (const tool of discovered.tools) {
+            if (names.has(tool.name)) continue
+            names.add(tool.name)
+            loaded.push(tool)
+          }
+          turnToolsRef.current.set(session.id, loaded)
+          return discovered
+        },
         toolMode,
         inputs,
       /**
