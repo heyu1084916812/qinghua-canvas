@@ -35,6 +35,13 @@ const CANVAS_ACTION_PATTERN =
 
 const CANVAS_OBJECT_PATTERN = /节点|图片|图像|画布|连线|选中/
 
+/** 明确是画布布局，即使正文省略了「节点 / 图片」名词。 */
+const IMPLICIT_CANVAS_LAYOUT_PATTERN =
+  /(?:排列|排成|整理|移动|挪动|拖到|放到|放在).{0,20}(?:一排|一行|整齐|对齐|空位置|空白处|空白区域|布局)/
+
+const GENERATION_THEN_LAYOUT_PATTERN =
+  /\d+\s*张|生成(?:后|完)|先.{0,12}(?:生成|出图|绘制)/
+
 const SHORT_CANVAS_ACTION_PATTERN =
   /^(?:帮我)?(?:移动|挪一下|排一下|排列|对齐|布局|整理|缩放|缩一下|调整大小|居中)(?:一下|下|好|整齐)?$/
 
@@ -54,6 +61,13 @@ export function classifyAgentRequest(signals: AgentRequestSignals): AgentRequest
     return 'design_research'
   }
   if (
+    IMPLICIT_CANVAS_LAYOUT_PATTERN.test(text) &&
+    GENERATION_THEN_LAYOUT_PATTERN.test(text)
+  ) {
+    return 'complex_plan'
+  }
+  if (
+    IMPLICIT_CANVAS_LAYOUT_PATTERN.test(text) ||
     (CANVAS_ACTION_PATTERN.test(text) && CANVAS_OBJECT_PATTERN.test(text)) ||
     (signals.hasSelectedNodes && SHORT_CANVAS_ACTION_PATTERN.test(text))
   ) {

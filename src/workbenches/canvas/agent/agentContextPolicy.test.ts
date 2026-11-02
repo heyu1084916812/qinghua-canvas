@@ -73,6 +73,24 @@ describe('Agent request classification', () => {
     ).toBe('canvas_operation')
   })
 
+  it('★★ 「排列成一排 / 放在空位置」省略名词时仍识别为画布操作', () => {
+    expect(
+      classifyAgentRequest({ ...noSignals, text: '完成后给我排列成一排' }),
+    ).toBe('canvas_operation')
+    expect(
+      classifyAgentRequest({
+        ...noSignals,
+        text: '那你帮我把刚刚生成的整理一下，放在空位置去',
+      }),
+    ).toBe('canvas_operation')
+  })
+
+  it('★★ 同一条消息既要生成又要排列时使用完整工具集', () => {
+    expect(
+      classifyAgentRequest({ ...noSignals, text: '生成 16 张风格图，完成后排列成一排' }),
+    ).toBe('complex_plan')
+  })
+
   it('classifies design research separately and keeps it out of canvas scanning', () => {
     expect(
       classifyAgentRequest({
