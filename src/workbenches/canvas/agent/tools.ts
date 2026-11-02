@@ -205,7 +205,7 @@ export interface AgentToolContext {
  *   `runNode` 直接触发那个分发器。
  */
 export function runFromNodeIds(
-  store: CanvasStore,
+  store: Pick<CanvasStore, 'getSnapshot'>,
   nodeIds: unknown,
 ): { ok: true; ids: string[] } | { ok: false; problems: string[] } {
   const graph = store.getSnapshot()

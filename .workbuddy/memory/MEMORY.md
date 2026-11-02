@@ -1,5 +1,21 @@
 # CanvasFlow（轻画）项目记忆
 
+### AgentPanel 第二批拆分（2026-11-02，对账 #853）
+
+- **主面板只做组装**：`AgentPanel.tsx` **5846 → 4078 行**。头部、会话/计划/队列区、Composer 是纯视图壳；
+  确认预览、模型图标/视口、可视运行态、队列控制、画布执行和视觉验收各有独立模块。
+- **视图壳不碰 SessionStore**：`AgentPanelHeader.tsx`、`AgentConversationPane.tsx`、`AgentComposerPane.tsx`
+  只接收只读数据与回调；改名、删除两步确认、滚动 ref、浮层唯一 key 和 Composer 高度仍由 AgentPanel 协调。
+- **队列真相不搬家**：`useAgentQueueController.ts` 只做 React 适配；Session/Controller 仍是队列真相，
+  活动锁必须绑定真实 `turnId`，附件快照在入队时冻结并消费，不能因为拆 hook 另存一份队列。
+- **画布执行顺序固定**：`agentCanvasRun.ts` 必须保持 preflight → 同波并发 → `store.flush()` → RunRecord 对账；
+  “查不到新记录”只能报错/重试读取，不能重发付费请求。`agentVisualReview.ts` 无路由或无图时明确不可验收。
+- **当前拆分账**：AgentPanel 仍约 4.1k 行；发送主链、确认执行、停止/继续和部分会话配置仍在主面板。
+  AgentHost、跨路由常驻运行和插件运行时都未完成，不能把这一批说成拆分终点。
+- **证据**：全量 Vitest **3841 passed / 1 skipped**；`npm run check`、`npm run build`、`git diff --check` 通过；
+  G769 浅色/深色各 **39/39**，覆盖 1440×900、1024×700、关闭重开、确认取消、队列编辑/引导、
+  Composer 拖高、长计划滚动和菜单层级。
+
 ### Agent 0.1.13 第一批拆分与 release 隔离（2026-11-02，对账 #852）
 
 - **工具目录只放 schema**：`toolCatalog.ts` 持有工具声明、能力发现和请求模式裁剪，不依赖 Store、

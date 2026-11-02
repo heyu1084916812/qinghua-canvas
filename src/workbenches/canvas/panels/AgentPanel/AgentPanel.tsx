@@ -15,19 +15,9 @@ import { useChannels } from '../../../../app/providers/ChannelStoreProvider'
 import { useSkillsOptional } from '../../../../app/providers/SkillStoreProvider'
 import type { ChatMessage, NodeInput } from '../../../../domain/shared/execution/types'
 import { formatContextBundleForPrompt } from '../../../../domain/shared/context'
-import {
-  VISUAL_REVIEW_SYSTEM_PROMPT,
-  buildVisualReviewPrompt,
-  finalizeVisualReviewResult,
-  parseVisualReviewText,
-  visualReviewGenerationBriefs,
-  type VisualReviewResult,
-} from '../../../../domain/agent/visualReview'
 import { isAgentToolName } from '../../../../domain/agent/toolRegistry'
-import { prepareVisualReviewImages } from '../../../../features/shared/agent/visualReviewRunner'
 import { memoryCandidateFromText } from '../../../../domain/shared/memoryOrganizer'
 import {
-  AGENT_CONTEXT_WINDOW,
   createAgentSessionStore,
   type AgentSession,
 } from '../../../../state/agent/sessionStore'
@@ -49,20 +39,14 @@ import { assetNodeSize } from '../../../../domain/canvas/layout/assetNodeSize'
 import {
   centeredNodeOrigin,
   findFreeRect,
-  type Rect,
 } from '../../../../domain/agent/landing'
 import type { AgentNodeType } from '../../../../domain/agent/plan'
 import {
   channelIdForLogical,
   capabilityOfLogical,
   panelModelOptions,
-  presetOf,
   toLogicalName,
 } from '../../../../domain/project/modelCatalog'
-import {
-  type RoutedChatTarget,
-} from '../../../../domain/shared/chatTarget'
-import type { PresetVendor } from '../../../../domain/project/modelPresets'
 import {
   generationAvailabilityOf,
   runRouteCandidatesOf,
@@ -77,14 +61,11 @@ import {
 } from '../../../../features/canvas/agentSkillHandoff'
 import {
   activeQueueTurnOf,
-  bindQueueTurnToSessionActivity,
   claimSessionActivity,
   clearQueueDrain,
   isSessionActivityActive,
   releaseSessionActivity,
-  requestQueueDrain,
   shouldDrainQueue,
-  subscribeSessionRelease,
 } from '../../../../features/canvas/agent/sessionActivity'
 import {
   createAssetNode,
@@ -92,22 +73,16 @@ import {
   isImportableMedia,
   type ImportedAsset,
 } from '../../../../features/canvas/importAsset'
-import { AssetMenu } from '../AssetMenu'
 import { createAssetLibraryRepository } from '../../../../state/project/assetLibraryRepository'
 import { createAssetLibraryStore } from '../../../../state/project/assetLibraryStore'
 import { createInspirationRepository } from '../../../../state/project/inspirationRepository'
 import { loadInspirationSources } from '../../../../state/project/inspirationSourceStore'
 import { runDesignResearch } from '../../../../features/shared/research/designResearchRunner'
-import { SkillMenu } from './SkillMenu'
-import { MentionRichText } from './MentionRichText'
-import { runWaves } from '../../../../domain/canvas/graph/runWaves'
-import type { RunRecord } from '../../../../domain/canvas/model/runRecord'
 import type { GenerationContextAsset } from '../../../../domain/canvas/model/node'
 import { parseSkillMarkdown } from '../../../../domain/prompt/skill'
 import { useCanvasExecution } from '../../execution/CanvasExecutionProvider'
 import { useCanvasStore, useGraph, useSelection } from '../../storeContext'
 import { useViewportState } from '../../storeContext'
-import type { CanvasStore } from '../../../../state/workbenches/canvas/store'
 import type { TextRunRequest } from '../../../../platform/channels/types'
 import type { ToolDeclaration } from '../../../../domain/shared/execution/types'
 import {
@@ -140,7 +115,6 @@ import {
   runFromNodeIds,
   type AgentToolContext,
 } from '../../agent/tools'
-import { agentRunOutcomeOf } from '../../agent/runOutcome'
 import { runPreflightProblems } from '../../agent/runPreflight'
 import {
   decideToolMode,
@@ -180,35 +154,12 @@ import {
   setAgentCanvasReview,
   subscribeAgentCanvasReview,
 } from '../../../../state/ui/agentCanvasReview'
-import {
-  IconAuto,
-  IconArrowUp,
-  IconCheck,
-  IconChevronDown,
-  IconClose,
-  IconCopyText,
-  IconDelete,
-  IconChat,
-  IconLoop,
-  IconManual,
-  IconMention,
-  IconModelCube,
-  IconPlus,
-  IconRename,
-  IconSettings,
-  IconSkill,
-} from '../../toolbar/icons'
-import {
-  processBefore,
-  readableConfirmationLines,
-  toConversation,
-} from './conversation'
+import { toConversation } from './conversation'
 import {
   explicitMediaModelsFromMentions,
   preferredGeneratedModel,
 } from './mediaMentions'
-import { TaskPlanCard } from './TaskPlanCard'
-import { isAdvanceTaskCommand, latestProcessLine } from './agentProcessText'
+import { isAdvanceTaskCommand } from './agentProcessText'
 import {
   AGENT_COMPOSER_HEIGHT_KEY,
   AGENT_COMPOSER_HEIGHT_MIN,
@@ -234,13 +185,6 @@ import {
   pendingAssetIdsAfterDraft,
   saveAgentDraft,
 } from './agentDraft'
-import {
-  createAgentRunTasks,
-  finishAgentRunTask,
-  formatAgentRunElapsed,
-  startAgentRunWave,
-  type AgentRunTask,
-} from './agentRunTasks'
 import { AgentSessionRuntimeState } from './agentSessionRuntime'
 import { latestRunFailuresForNodes } from './agentRunState'
 import {
@@ -251,43 +195,33 @@ import {
 } from './agentTurnPersistence'
 import { errText } from '../../agent/agentLoop'
 import { loadAssetUrl } from '../../../../features/shared/assets/index'
-import { ModelIcon } from '../../../../features/shared/modelIcon/ModelIcon'
 import {
-  AgentActivityStrip,
-  AgentGenerationTasks,
   IDLE_STATUS,
-  LibraryThumb,
-  STATUS_LABEL,
-  StepThumb,
-  activityTextOf,
-  messageTimeText,
   statusCanSteer,
   statusIsBusy,
   type AgentPanelStatus as Status,
 } from './AgentActivityViews'
+import type { AgentQueueMenuPosition } from './AgentQueuePanel'
+import { AgentConversationPane } from './AgentConversationPane'
+import { AgentComposerPane } from './AgentComposerPane'
+import { AgentPanelHeader } from './AgentPanelHeader'
+import { useAgentQueueController } from './useAgentQueueController'
+import { runAgentCanvasNodes } from './agentCanvasRun'
+import { useAgentRunPresentation } from './useAgentRunPresentation'
 import {
-  AgentQueuePanel,
-  type AgentQueueMenuPosition,
-} from './AgentQueuePanel'
-/**
- * 参数控件与档位表**与创作面板共用同一份**（不各写一套）。
- *
- * 这正是两条老教训：① 档位各写一份的话，用户在生成节点上看到 21:9、
- * 到对话窗发现没有这一档，就会以为功能坏了；② 原生 `<select>` 的展开层由浏览器
- * 绘制，既不受画布浮层规范约束、也点不动（用户 2026-10-02：「太简陋了」）——
- * 所以对话窗直接复用 `ParamPicker` 那套「chip + 浮层」。
- */
-import { ParamPicker } from '../ParamPicker'
+  type AgentChatRoute,
+  type ChatRoutePreparation,
+} from './agentChatRoute'
+import { runAgentVisualReview } from './agentVisualReview'
+import { previewOf } from './agentConfirmationPreview'
+import { originOf, viewportWorldOf } from './agentPanelViewHelpers'
 import {
-  MentionEditor,
   mentionToken,
   parseMentions,
   stripMentionMarkup,
   type MentionEditorHandle,
   type MentionRef,
 } from '../../text/MentionEditor'
-import { MarkdownBlocks } from '../../text/MarkdownBlocks'
-import { AgentStepIcon } from './AgentStepIcon'
 import styles from './AgentPanel.module.css'
 
 /**
@@ -307,7 +241,6 @@ function readStoredComposerHeight(): number {
     return AGENT_COMPOSER_HEIGHT_MIN
   }
 }
-
 function storeComposerHeight(height: number): void {
   try {
     localStorage.setItem(AGENT_COMPOSER_HEIGHT_KEY, String(height))
@@ -316,21 +249,11 @@ function storeComposerHeight(height: number): void {
   }
 }
 
-interface AgentChatRoute extends RoutedChatTarget {
-  credentialGroupId?: string
-  routePlanId: string
-  candidates: DirectRunRouteCandidate[]
-}
-
 interface AgentMessageReveal {
   sessionId: string
   fullText: string
   visibleLength: number
 }
-
-type ChatRoutePreparation =
-  | { ok: true; route: AgentChatRoute }
-  | { ok: false; message: string }
 
 /**
  * 自动模式下**一轮对话最多自动执行几次**。
@@ -357,73 +280,17 @@ export function AgentPanel({
   const execution = useCanvasExecution()
   const skills = useSkillsOptional()
 
-  const [statusBySession, setStatusBySession] = useState<Record<string, Status>>({})
-  const setStatusFor = useCallback((sessionId: string, next: Status) => {
-    setStatusBySession((prev) => ({ ...prev, [sessionId]: next }))
-  }, [])
-  const setRunTasksFor = useCallback(
-    (
-      sessionId: string,
-      update: AgentRunTask[] | ((current: AgentRunTask[]) => AgentRunTask[]),
-    ) => {
-      setRunTasksBySession((prev) => {
-        const current = prev[sessionId] ?? []
-        const next = typeof update === 'function' ? update(current) : update
-        return { ...prev, [sessionId]: next }
-      })
-    },
-    [],
-  )
-  const clearRunTasksFor = useCallback((sessionId: string) => {
-    setRunTasksBySession((prev) => {
-      if (!(sessionId in prev)) return prev
-      const next = { ...prev }
-      delete next[sessionId]
-      return next
-    })
-  }, [])
-  const setLiveActivityFor = useCallback(
-    (sessionId: string, activity: AgentLoopActivity) => {
-      setLiveActivitiesBySession((prev) => {
-        const current = prev[sessionId] ?? []
-        const retained =
-          activity.phase === 'thinking'
-            ? current.filter((item) => item.phase !== 'thinking')
-            : current.filter((item) => item.id !== activity.id)
-        return {
-          ...prev,
-          [sessionId]: [...retained, activity].slice(-8),
-        }
-      })
-    },
-    [],
-  )
-  const clearLiveActivitiesFor = useCallback((sessionId: string) => {
-    setLiveActivitiesBySession((prev) => {
-      if (!(sessionId in prev)) return prev
-      const next = { ...prev }
-      delete next[sessionId]
-      return next
-    })
-  }, [])
-  const appendLiveProcessFor = useCallback(
-    (sessionId: string, delta: string) => {
-      if (!delta) return
-      setLiveProcessBySession((prev) => ({
-        ...prev,
-        [sessionId]: `${prev[sessionId] ?? ''}${delta}`,
-      }))
-    },
-    [],
-  )
-  const clearLiveProcessFor = useCallback((sessionId: string) => {
-    setLiveProcessBySession((prev) => {
-      if (!(sessionId in prev)) return prev
-      const next = { ...prev }
-      delete next[sessionId]
-      return next
-    })
-  }, [])
+  const runPresentation = useAgentRunPresentation()
+  const {
+    setStatusFor,
+    setRunTasksFor,
+    clearRunTasksFor,
+    setLiveActivityFor,
+    clearLiveActivitiesFor,
+    appendLiveProcessFor,
+    clearLiveProcessFor,
+  } = runPresentation
+
   const controller = useMemo(
     () =>
       createAgentController({
@@ -484,21 +351,18 @@ export function AgentPanel({
   const [current, setCurrent] = useState<AgentSession | null>(null)
   const [messages, setMessages] = useState<ChatMessage[]>([])
   /** 当前会话那一份运行态（别的会话在跑不影响这里） */
-  const status: Status = (current && statusBySession[current.id]) || IDLE_STATUS
-  const [runTasksBySession, setRunTasksBySession] = useState<
-    Record<string, AgentRunTask[]>
-  >({})
-  const [liveActivitiesBySession, setLiveActivitiesBySession] = useState<
-    Record<string, AgentLoopActivity[]>
-  >({})
-  const [liveProcessBySession, setLiveProcessBySession] = useState<
-    Record<string, string>
-  >({})
-  const runTasks = current ? runTasksBySession[current.id] : undefined
+  const status: Status = current
+    ? runPresentation.statusFor(current.id)
+    : IDLE_STATUS
+  const runTasks = current
+    ? runPresentation.runTasksFor(current.id)
+    : undefined
   const liveActivities = current
-    ? liveActivitiesBySession[current.id] ?? []
+    ? runPresentation.liveActivitiesFor(current.id)
     : []
-  const liveProcess = current ? liveProcessBySession[current.id] ?? '' : ''
+  const liveProcess = current
+    ? runPresentation.liveProcessFor(current.id)
+    : ''
   const deliveryMode = useSyncExternalStore(
     subscribeAgentDeliveryMode,
     getAgentDeliveryMode,
@@ -553,13 +417,9 @@ export function AgentPanel({
   const [queueMenuId, setQueueMenuId] = useState<string | null>(null)
   const [queueMenuPosition, setQueueMenuPosition] =
     useState<AgentQueueMenuPosition | null>(null)
-  const [editingQueueId, setEditingQueueId] = useState<string | null>(null)
-  const [editingQueueText, setEditingQueueText] = useState('')
   useEffect(() => {
     setQueueMenuId(null)
     setQueueMenuPosition(null)
-    setEditingQueueId(null)
-    setEditingQueueText('')
     setAdvancingTaskPlan(false)
   }, [current?.id])
   useEffect(() => {
@@ -1177,174 +1037,26 @@ export function AgentPanel({
         const aliases = planAliasesRef.current.get(sessionId)
         return ids.map((id) => aliases?.get(id) ?? id)
       },
-      runNodes: async (ids, signal) => {
-        /**
-         * **互不依赖的节点同时跑**（用户 2026-10-05 第 2 条：「我并行的要求没有给我实现，
-         * 应该是同时生成的，但是他是先生成一个再生成另外一个」）。
-         *
-         * 原先是 `for (const id of ids) await …` —— 一次 `runNode([A, B])` 就算 A、B
-         * 毫无关系也要排成一条队，出两张图花两倍时间。现在按依赖切波：同一波 `Promise.all`
-         * 并发发请求，下一波等上一波（`A 出图 → B 优化` 这种真依赖仍然保序）。
-         */
-        /**
-         * 节点 id → 名字。面板与模型都该看到「作品集总封面」而不是
-         * `node_0544f492-…`（用户 2026-10-14）。查不到就返回空串，
-         * 由展示侧退回 id，绝不编造名字。
-         */
-        const titleOf = (id: string): string => {
-          const node = store.getSnapshot().nodes.find((n) => n.id === id)
-          const data = (node?.data ?? {}) as { title?: unknown }
-          return (
-            (node?.title ?? '').trim() ||
-            (typeof data.title === 'string' ? data.title.trim() : '')
-          )
-        }
-        const preflightFailureText = (problem: string): string =>
-          problem.includes('无法运行：')
-            ? problem.slice(problem.indexOf('无法运行：') + '无法运行：'.length)
-            : problem
-        const contextAssets = (
-          contextTraceRef.current.get(sessionId)?.assetRefs ?? []
-        ).filter((asset) => asset.mime.startsWith('image/'))
-        const waves = runWaves(ids, store.getSnapshot().edges)
-        setRunTasksFor(
-          sessionId,
-          createAgentRunTasks(
-            ids.map((id) => ({
-              nodeId: id,
-              title: titleOf(id) || id,
-            })),
-          ),
-        )
-        const out: Awaited<ReturnType<AgentToolContext['runNodes']>> = []
-        for (const wave of waves) {
-          setRunTasksFor(sessionId, (current) =>
-            startAgentRunWave(current, wave),
-          )
-          /**
-           * 执行层跑完会清理节点状态，`execution.nodeStates` 里看不见失败；
-           * 唯一可靠的真源是 `runRecords`。跑前记下已有记录 id，跑后只认这批新记录。
-           *
-           * 同一波内的节点**全部同时发起**：每条 `runNode` 都是独立 API 请求，
-           * 渠道本身支持并发，不能在这里擅自限流。
-           */
-          const projectId = store.getSnapshot().projectId
-          const beforeRows = (await platform.storage.query('runRecords', {
-            projectId,
-          })) as unknown as RunRecord[]
-          const beforeIds = new Set(beforeRows.map((record) => record.id))
-          const thrown = await Promise.all(
-            wave.map(async (id) => {
-              /**
-               * 确认卡与真正执行之间可能隔着用户操作：期间渠道被停用、
-               * 凭据被移除或节点被改了。执行前必须再跑同一份 preflight，
-               * 否则 execution 会直接返回、没有 RunRecord，Agent 只能误报
-               * “没有留下记录”。这里与节点自身使用完全相同的阻塞原因。
-               */
-              const problem = runPreflightProblems(
-                [id],
-                store.getSnapshot(),
-                channels.getState().channels,
-                channels.protocolCatalog(),
-              )[0]
-              if (problem) {
-                setRunTasksFor(sessionId, (current) =>
-                  finishAgentRunTask(current, id, {
-                    ok: false,
-                    error: preflightFailureText(problem),
-                  }),
-                )
-                return {
-                  nodeId: id,
-                  ok: false,
-                  error: preflightFailureText(problem),
-                }
-              }
-              try {
-                await execution.runNode(id, {
-                  signal:
-                    signal ?? abortRefs.current.get(sessionId)?.signal,
-                  ...(contextAssets.length > 0 ? { contextAssets } : {}),
-                })
-                setRunTasksFor(sessionId, (current) =>
-                  finishAgentRunTask(current, id, { ok: true }),
-                )
-                return null
-              } catch (e) {
-                setRunTasksFor(sessionId, (current) =>
-                  finishAgentRunTask(current, id, {
-                    ok: false,
-                    error: e instanceof Error ? e.message : errText(e),
-                  }),
-                )
-                return {
-                  nodeId: id,
-                  ok: false,
-                  error: e instanceof Error ? e.message : errText(e),
-                }
-              }
-            }),
-          )
-          // 运行记录与资产写入可能仍在画布 store 的防抖队列里；先等同一批落库，
-          // 再按新记录对账，避免把已经出图的节点误报成“没有留下记录”。
-          await store.flush()
-          /**
-           * flush 之后通常第一轮就能读到全部新记录。保留短重试只兜底外部存储
-           * 的提交可见性延迟，不重发任何付费请求。
-           * 这里只等**本次新记录**，不会重发任何付费请求。
-           */
-          let outcomes: ReturnType<typeof agentRunOutcomeOf>[] = []
-          for (let attempt = 0; attempt < 6; attempt += 1) {
-            const afterRows = (await platform.storage.query('runRecords', {
-              projectId,
-            })) as unknown as RunRecord[]
-            outcomes = wave.map((id, index) => {
-              const failure = thrown[index]
-              const fallbackProblem = failure
-                ? undefined
-                : runPreflightProblems(
-                    [id],
-                    store.getSnapshot(),
-                    channels.getState().channels,
-                    channels.protocolCatalog(),
-                  )[0]
-              const base =
-                failure ??
-                agentRunOutcomeOf(
-                  afterRows,
-                  id,
-                  beforeIds,
-                  fallbackProblem
-                    ? preflightFailureText(fallbackProblem)
-                    : undefined,
-                )
-              const title = titleOf(id)
-              return title ? { ...base, title } : base
-            })
-            if (!outcomes.some((outcome) => outcome.error?.includes('没有留下记录'))) break
-            await new Promise((resolve) => setTimeout(resolve, 200))
-          }
-          for (const outcome of outcomes) {
-            setRunTasksFor(sessionId, (current) =>
-              finishAgentRunTask(
-                current,
-                outcome.nodeId,
-                {
-                  ok: outcome.ok,
-                  ...(outcome.error ? { error: outcome.error } : {}),
-                },
-              ),
-            )
-          }
-          out.push(...outcomes)
-        }
-        return out
-      },
+      runNodes: (ids, signal) =>
+        runAgentCanvasNodes(
+          {
+            store,
+            execution,
+            channels,
+            platform,
+            contextAssets: (
+              contextTraceRef.current.get(sessionId)?.assetRefs ?? []
+            ).filter((asset) => asset.mime.startsWith('image/')),
+            setRunTasksFor,
+          },
+          {
+            sessionId,
+            nodeIds: ids,
+            ...(signal ? { signal } : {}),
+          },
+        ),
       /**
-       * agent 建的节点要和**手建的**用同一套默认值（渠道 + 模型 + 生成参数）。
-       *
-       * 共用一个 `resolveDefaults`，不是抄一份逻辑：抄的那份迟早漂移，
-       * 而这条漂移的后果（agent 建的生成节点点了没反应）正是用户会当成 bug 报的。
+       * agent 建的节点要和手建的节点使用同一套默认值。
        */
       defaultsForNewNode: async (types) => {
         const out: Partial<Record<AgentNodeType, Record<string, unknown>>> = {}
@@ -1659,202 +1371,33 @@ export function AgentPanel({
           ),
         ]
       }
-      const runVisualReview = async (review: {
+      const runVisualReview = (review: {
         nodeIds: readonly string[]
         checklist?: string
-      }): Promise<VisualReviewResult> => {
-        const graph = store.getSnapshot()
+      }) => {
         const aliases = planAliasesRef.current.get(session.id)
-        const requestedIds = [
-          ...new Set(review.nodeIds.map((id) => aliases?.get(id) ?? id)),
-        ]
-        const targetNodeIds = requestedIds.slice(0, 4)
-        const limitations: string[] = []
-        if (requestedIds.length > targetNodeIds.length) {
-          limitations.push(
-            `本次快速验收先看前 ${targetNodeIds.length} 张，另有 ${
-              requestedIds.length - targetNodeIds.length
-            } 张未提交；需要全量验收时再单独发起。`,
-          )
-        }
-        if (!route) {
-          return {
-            ok: false,
-            verdict: 'unreviewable',
-            summary: '当前回合没有可用的视觉验收模型路由',
-            issues: [],
-            targetNodeIds,
-            referenceAssetCount: 0,
-            suiteContextAvailable: false,
-            limitations: [...limitations, '请确认对话模型已配置并且支持图片输入'],
-          }
-        }
-        let reviewRoute = route
-        if (reviewModel.trim()) {
-          const logicalModel =
-            toLogicalName(allChannels, reviewModel) || reviewModel.trim()
-          const capability = capabilityOfLogical(allChannels, logicalModel)
-          if (!capability?.inputTypes.includes('image')) {
-            return {
-              ok: false,
-              verdict: 'unreviewable',
-              summary: `视觉验收模型「${logicalModel}」不支持图片输入，请重新选择`,
-              issues: [],
-              targetNodeIds,
-              referenceAssetCount: 0,
-              suiteContextAvailable: false,
-              limitations,
-            }
-          }
-          const planned = await modelRoute.plan({
-            capability: 'chat',
-            logicalModel,
-          })
-          if (!planned.ok) {
-            return {
-              ok: false,
-              verdict: 'unreviewable',
-              summary: `视觉验收模型「${logicalModel}」当前没有可路由的已启用渠道`,
-              issues: [],
-              targetNodeIds,
-              referenceAssetCount: 0,
-              suiteContextAvailable: false,
-              limitations,
-            }
-          }
-          const candidates = runRouteCandidatesOf(planned.plan)
-          const first = candidates[0]
-          if (!first) {
-            return {
-              ok: false,
-              verdict: 'unreviewable',
-              summary: `视觉验收模型「${logicalModel}」当前没有可路由的已启用渠道`,
-              issues: [],
-              targetNodeIds,
-              referenceAssetCount: 0,
-              suiteContextAvailable: false,
-              limitations,
-            }
-          }
-          reviewRoute = {
-            channelId: first.channelId,
-            ...(first.credentialGroupId
-              ? { credentialGroupId: first.credentialGroupId }
-              : {}),
-            logicalModel,
-            upstreamModel: first.model,
-            routePlanId: `${planned.plan.logicalModel}:${planned.plan.capability}:${planned.plan.strategy}`,
-            candidates,
-          }
-        } else if (
-          !capabilityOfLogical(allChannels, route.logicalModel)?.inputTypes.includes('image')
-        ) {
-          return {
-            ok: false,
-            verdict: 'unreviewable',
-            summary: `主模型「${route.logicalModel}」不支持图片输入，请先为视觉验收单独选择模型`,
-            issues: [],
-            targetNodeIds,
-            referenceAssetCount: 0,
-            suiteContextAvailable: false,
-            limitations,
-          }
-        }
-
-        const trace = contextTraceRef.current.get(session.id)
-        const prepared = await prepareVisualReviewImages({
-          graph,
-          nodeIds: targetNodeIds,
-          contextAssets: trace?.assetRefs,
-          readAsset: (hash) => platform.assets.read(hash),
-          maxTargets: 4,
-          maxReferences: 4,
-        })
-        limitations.push(...prepared.limitations)
-        const suiteContextAvailable =
-          (trace?.kitVersionRefs.length ?? 0) > 0 ||
-          prepared.referenceAssetCount > 0
-
-        if (prepared.targets.length === 0) {
-          return {
-            ok: false,
-            verdict: 'unreviewable',
-            summary: '没有可读取的目标图片，未执行视觉验收',
-            issues: [],
-            targetNodeIds,
-            referenceAssetCount: prepared.referenceAssetCount,
-            suiteContextAvailable,
-            limitations,
-          }
-        }
-
-        const generationBriefs = visualReviewGenerationBriefs(graph, targetNodeIds)
-        const prompt = buildVisualReviewPrompt({
-          targets: prepared.targets,
-          ...(generationBriefs ? { targetBriefs: generationBriefs } : {}),
-          ...(review.checklist ? { checklist: review.checklist } : {}),
-          ...(trace?.brief ? { context: trace.brief } : {}),
-          referenceAssetCount: prepared.referenceAssetCount,
-          suiteContextAvailable,
-        })
-        const reviewInputs = [...prepared.targetInputs, ...prepared.contextInputs]
-        try {
-          const reviewed = await routeExecution.execute({
-            channelId: reviewRoute.channelId,
-            model: reviewRoute.upstreamModel,
-            modelIsUpstream: true,
-            tools: [],
-            messages: [
-              { role: 'system', content: VISUAL_REVIEW_SYSTEM_PROMPT },
-              { role: 'user', content: prompt },
-            ],
-            inputs: reviewInputs,
-            signal:
-              abortRefs.current.get(session.id)?.signal ??
-              new AbortController().signal,
-            routeCandidates: reviewRoute.candidates,
-            routePlanId: reviewRoute.routePlanId,
-            trace: directTextTrace({
-              projectId: graph.projectId,
-              workbench: 'canvas',
-              subjectId: session.id,
-              scopeId: `session:${session.id}`,
-              operationId,
-              purpose: 'agent-visual-review',
-              channelId: reviewRoute.channelId,
-              model: reviewRoute.upstreamModel,
-              prompt,
-              inputs: reviewInputs,
-              params: {
-                targetNodeIds,
-                referenceAssetCount: prepared.referenceAssetCount,
-                generationBriefs,
-                checklist: review.checklist ?? '',
-              },
-            }),
+        const contextTrace = contextTraceRef.current.get(session.id)
+        const signal = abortRefs.current.get(session.id)?.signal
+        return runAgentVisualReview(
+          {
+            store,
+            allChannels,
+            modelRoute,
+            routeExecution,
+            platform,
             onRecordWarning,
-          })
-          const parsed = parseVisualReviewText(reviewed.text, prepared.targets)
-          const finalized = finalizeVisualReviewResult(parsed, {
-            suiteContextAvailable,
-          })
-          return {
-            ...finalized,
-            referenceAssetCount: prepared.referenceAssetCount,
-            limitations: [...limitations, ...finalized.limitations],
-          }
-        } catch (error) {
-          return {
-            ok: false,
-            verdict: 'unreviewable',
-            summary: `视觉验收请求失败：${errText(error)}`,
-            issues: [],
-            targetNodeIds,
-            referenceAssetCount: prepared.referenceAssetCount,
-            suiteContextAvailable,
-            limitations,
-          }
-        }
+          },
+          {
+            sessionId: session.id,
+            operationId,
+            route,
+            reviewModel,
+            ...(aliases ? { aliases } : {}),
+            ...(contextTrace ? { contextTrace } : {}),
+            ...(signal ? { signal } : {}),
+            review,
+          },
+        )
       }
       return {
         adapter: {
@@ -2968,180 +2511,33 @@ export function AgentPanel({
     transitionSessionJob,
   ])
 
-  const queueText = useCallback(async (raw: string) => {
-    if (!current) return false
-    const text = raw.trim()
-    if (!text) return false
-    const latest =
-      (await sessions.get(current.id).catch(() => null)) ?? current
-    if (!latest.model) {
-      setStatusFor(current.id, { kind: 'error', message: '还没选模型：先在上面选一个对话模型' })
-      return false
-    }
-    const turn: QueuedAgentTurn = {
-      id: createId('turn'),
-      text,
-      createdAt: Date.now(),
-      channelId: latest.channelId,
-      model: latest.model,
-      ...(latest.imageModel ? { imageModel: latest.imageModel } : {}),
-      ...(latest.videoModel ? { videoModel: latest.videoModel } : {}),
-      ...(latest.skillId ? { skillId: latest.skillId } : {}),
-      ...(latest.autoRun === true ? { autoRun: true } : {}),
-      ...(latest.pendingAssetIds?.length
-        ? { pendingAssetIds: [...latest.pendingAssetIds] }
-        : {}),
-    }
-    const queued = await controller.enqueueTurn(current.id, turn)
-    if (!queued.ok) {
-      if (queued.reason === 'full') {
-        store.notify('排队任务已达上限，请先处理或删除队列中的任务', 'error')
-      }
-      return false
-    }
-    requestQueueDrain(current.id)
-    applySessionSnapshot(queued.session)
-    if (currentIdRef.current === current.id) {
-      setDraft((value) => {
-        const next = value.trim() === text ? '' : value
-        if (next !== value) saveAgentDraft(current.id, next)
-        return next
-      })
-    }
-    return true
-  }, [applySessionSnapshot, controller, current, sessions, setStatusFor, store])
-
-  const removeQueued = useCallback(async (turnId: string) => {
-    if (!current) return
-    const next = await controller.removeQueuedTurn(current.id, turnId)
-    if (next) applySessionSnapshot(next)
-    setQueueMenuId((id) => (id === turnId ? null : id))
-  }, [applySessionSnapshot, controller, current])
-
-  const beginQueueEdit = (turn: QueuedAgentTurn) => {
-    setQueueMenuId(null)
-    setEditingQueueId(turn.id)
-    setEditingQueueText(turn.text)
-  }
-
-  const commitQueueEdit = useCallback(async () => {
-    if (!current || !editingQueueId) return
-    const text = editingQueueText.trim()
-    if (!text) {
-      store.notify('消息不能为空', 'error')
-      return
-    }
-    const next = await controller.editQueuedTurn(current.id, editingQueueId, text)
-    if (next) applySessionSnapshot(next)
-    setEditingQueueId(null)
-    setEditingQueueText('')
-  }, [
-    applySessionSnapshot,
-    controller,
-    current,
+  const {
+    queueText,
+    removeQueued,
+    beginQueueEdit,
+    commitQueueEdit,
+    resumeQueue,
+    settleSessionOutcome,
     editingQueueId,
     editingQueueText,
-    store,
-  ])
-
-  const pumpQueuedTurn = useCallback(async (sessionId: string) => {
-    if (queuePumpingRef.current.has(sessionId)) return
-    queuePumpingRef.current.add(sessionId)
-    let claimedTurnId: string | undefined
-    try {
-      if (!claimSessionActivity(sessionId)) return
-      const next = await controller.claimNextQueuedTurn(sessionId)
-      if (!next) {
-        clearQueueDrain(sessionId)
-        releaseSessionActivity(sessionId)
-        return
-      }
-      claimedTurnId = next.turn.id
-      if (!bindQueueTurnToSessionActivity(sessionId, claimedTurnId)) {
-        const released = await controller.finishQueuedTurn(
-          sessionId,
-          claimedTurnId,
-          false,
-        )
-        if (released) applySessionSnapshot(released)
-        clearQueueDrain(sessionId)
-        releaseSessionActivity(sessionId, claimedTurnId)
-        return
-      }
-      applySessionSnapshot(next.session)
-      if (next.session.queuedTurns.length > 0) requestQueueDrain(sessionId)
-      else clearQueueDrain(sessionId)
-      await sendText(
-        next.turn.text,
-        sessionForQueuedTurn(next.session, next.turn),
-        { preclaimed: true, queueTurnId: next.turn.id },
-      )
-    } catch (error) {
-      if (claimedTurnId) {
-        const released = await controller
-          .finishQueuedTurn(sessionId, claimedTurnId, false)
-          .catch(() => null)
-        if (released) applySessionSnapshot(released)
-      }
-      releaseSessionActivity(sessionId, claimedTurnId)
-      setStatusFor(sessionId, { kind: 'error', message: errText(error) })
-    } finally {
-      queuePumpingRef.current.delete(sessionId)
-    }
-  }, [applySessionSnapshot, controller, sendText, setStatusFor])
-
-  queuePumpRef.current = (sessionId) => {
-    if (!shouldDrainQueue(sessionId)) return
-    void pumpQueuedTurn(sessionId)
-  }
-
-  const resumeQueue = useCallback(() => {
-    if (!current) return
-    void (async () => {
-      try {
-        await refresh()
-      } catch (error) {
-        setStatusFor(current.id, { kind: 'error', message: errText(error) })
-        return
-      }
-      requestQueueDrain(current.id)
-      void pumpQueuedTurn(current.id)
-    })()
-  }, [current, pumpQueuedTurn, refresh, setStatusFor])
-
-  const settleSessionOutcome = useCallback(async (
-    sessionId: string,
-    outcome: AgentLoopOutcome | { kind: 'error' },
-  ) => {
-    const kind = outcome.kind
-    if (kind === 'confirm') return
-    if (kind === 'stopped' && outcome.checkpoint) return
-    const queueTurnId = activeQueueTurnOf(sessionId)
-    if (queueTurnId) {
-      const next = await controller.finishQueuedTurn(
-        sessionId,
-        queueTurnId,
-        kind === 'message',
-      )
-      if (next) applySessionSnapshot(next)
-    }
-    releaseSessionActivity(sessionId, queueTurnId)
-    if (kind === 'message' && shouldDrainQueue(sessionId)) {
-      queueMicrotask(() => queuePumpRef.current(sessionId))
-    }
-  }, [applySessionSnapshot, controller])
-
-  useEffect(() => {
-    if (!current || status.kind !== 'idle') return
-    if (!shouldDrainQueue(current.id)) return
-    void pumpQueuedTurn(current.id)
-  }, [current, status.kind, pumpQueuedTurn])
-
-  useEffect(() => subscribeSessionRelease((sessionId) => {
-    if (currentIdRef.current === sessionId && shouldDrainQueue(sessionId)) {
-      void pumpQueuedTurn(sessionId)
-    }
-  }), [pumpQueuedTurn])
+    setEditingQueueId,
+    setEditingQueueText,
+  } = useAgentQueueController({
+    current,
+    currentIdRef,
+    status,
+    sessions,
+    controller,
+    sendText,
+    applySessionSnapshot,
+    setStatusFor,
+    setDraft,
+    setQueueMenuId,
+    refresh,
+    notify: store.notify,
+    queuePumpingRef,
+    queuePumpRef,
+  })
 
   /** 复制一条助手回复；剪贴板被拒时静默 —— 不弹一个用户看不懂的错误 */
   const copyReply = useCallback(async (key: number, text: string) => {
@@ -4552,1295 +3948,132 @@ export function AgentPanel({
         本面板不到 400px 宽，四项文字按钮一排会把会话名挤到看不清 ——
         图标 + title 提示，鼠标停上去才知道是什么，这点与画布工具栏同一口径。
       */}
-      <header className={styles.head} data-agent-header>
-        {renaming ? (
-          <>
-            <input
-              className={styles.titleInput}
-              value={titleDraft}
-              autoFocus
-              onFocus={(e) => e.currentTarget.select()}
-              onChange={(e) => setTitleDraft(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') void commitRename()
-                if (e.key === 'Escape') setRenaming(false)
-              }}
-              data-agent-title-input
-            />
-            <button
-              type="button"
-              className={styles.iconBtn}
-              onClick={() => void commitRename()}
-              title="保存名字"
-              data-agent-rename-save
-            >
-              <IconCheck size={16} />
-            </button>
-            <button
-              type="button"
-              className={styles.iconBtn}
-              onClick={() => setRenaming(false)}
-              title="放弃改名"
-              data-agent-rename-cancel
-            >
-              <IconClose size={16} />
-            </button>
-          </>
-        ) : (
-          <>
-            {/*
-              会话选择器 = **项目里那套参数菜单**（用户 2026-10-05 第 8 条：「agent 的记录
-              下拉的 ui 不是我项目中通用的那种，不好看，参考参数的菜单」）。
-
-              原生 `<select>` 的展开层由浏览器绘制，样式不归我们管 —— 与创作面板的模型 /
-              比例菜单摆在一起就显得是两个世界。换成 `ParamPicker` 之后，行高、悬停底色、
-              勾选态、点外关闭全都和参数菜单同一套。
-            */}
-            <span className={styles.sessionPick} data-agent-session-count={list.length}>
-              <ParamPicker
-                name="agent-session"
-                ariaLabel={`切换对话（共 ${list.length} 条）`}
-                label={current?.title ?? '新对话'}
-                size="compact"
-                closeOnSelect
-                sections={[
-                  {
-                    name: 'session',
-                    label: '对话',
-                    variant: 'list',
-                    /** 一屏 8 条，多的在里面滚（与模型面板同一条口径） */
-                    maxRows: 8,
-                    options: list.map((s) => ({ value: s.id, label: s.title })),
-                    value: current?.id ?? '',
-                    onSelect: (id) => {
-                      const hit = list.find((s) => s.id === id)
-                      if (hit) void switchTo(hit)
-                    },
-                  },
-                ]}
-                open={openPicker === 'agent-session'}
-                onToggle={() =>
-                  setOpenPicker(openPicker === 'agent-session' ? null : 'agent-session')
-                }
-                onClose={() => setOpenPicker(null)}
-              />
-            </span>
-            <button
-              type="button"
-              className={styles.iconBtn}
-              onClick={() => void newSession()}
-              title="新建对话"
-              data-agent-new
-            >
-              <IconPlus size={16} />
-            </button>
-            {/*
-              「设为默认模型」**整个撤掉**（用户 2026-10-05 第 9 条：「agent 最上方的
-              默认按钮目前是没有用的，删掉」）。
-
-              它做的事（把当前模型写进 `agentDefault` 供**以后新建**会话用）用户看不出来
-              —— 建好的会话不跟着变、当前会话也不变，按下去像没反应，正是「点了没用」的
-              那种按钮。存量偏好仍然沿读路径生效（`loadAgentDefault`，新建会话时用它）。
-            */}
-            <button
-              type="button"
-              className={styles.iconBtn}
-              onClick={startRename}
-              disabled={!current}
-              title="给这条对话改名"
-              data-agent-rename
-            >
-              <IconRename size={16} />
-            </button>
-            <button
-              type="button"
-              className={styles.iconBtn}
-              onClick={() => void deleteSession()}
-              disabled={!current}
-              title={confirmDelete ? '再点一次就删掉' : '删除这条对话'}
-              data-agent-delete
-            >
-              {confirmDelete ? <span className={styles.confirmText}>确认删除</span> : <IconDelete size={16} />}
-            </button>
-            <button
-              type="button"
-              className={styles.iconBtn}
-              onClick={onOpenSettings}
-              title="Agent 设置"
-              aria-label="打开 Agent 设置"
-              data-agent-settings
-            >
-              <IconSettings size={16} />
-            </button>
-            <button
-              type="button"
-              className={styles.iconBtn}
-              onClick={onClose}
-              title="收起 Agent 面板"
-              data-agent-close
-            >
-              <IconClose size={16} />
-            </button>
-          </>
-        )}
-      </header>
-
-      <div className={styles.contentWrap} data-agent-scroll-wrap>
-      {current?.taskPlan && (
-        <div className={styles.planDock} data-agent-task-plan-dock>
-          <TaskPlanCard
-            plan={current.taskPlan}
-            pendingConfirmationStepId={pendingTaskStepId}
-            advancing={advancingTaskPlan}
-            onAdvanceToNext={() => {
-              if (advancingTaskPlan) return
-              setAdvancingTaskPlan(true)
-              void advanceTaskPlan(current).finally(() => {
-                setAdvancingTaskPlan(false)
-              })
-            }}
-            currentActivity={
-              statusIsBusy(status) && current.taskPlan.currentStepId
-                ? {
-                    running: true,
-                    text:
-                      latestProcessLine(liveProcess) ||
-                      activityTextOf(status, 0, items, liveActivities),
-                  }
-                : undefined
-            }
-          />
-        </div>
-      )}
-      <div
-        className={styles.content}
-        ref={scrollRef}
-        data-agent-content
-        onScroll={onConversationScroll}
-      >
-      <div className={styles.messages} data-agent-messages>
-        {visibleItems.length === 0 && (
-          <p className={styles.hint}>
-            说一句你想要什么，我会把它建成画布上的工作流。
-          </p>
-        )}
-        {visibleItems.map((item, i) => {
-          if (item.kind === 'user') {
-            const copied = copiedKey === i
-            return (
-              <div
-                key={i}
-                className={`${styles.msgTurn} ${styles.msgTurnUser}`}
-                data-agent-message="user"
-              >
-                <div className={styles.msgUser} data-agent-bubble="user">
-                  {/* 引用 chip 要**长得和输入框里一样**（用户 2026-10-05 第 5 条） */}
-                  <MentionRichText text={item.text} thumbOf={thumbOf} />
-                </div>
-                <div
-                  className={`${styles.msgMeta} ${styles.msgMetaUser}`}
-                  data-agent-message-meta="user"
-                >
-                  {item.createdAt ? (
-                    <time
-                      className={styles.msgTime}
-                      dateTime={new Date(item.createdAt).toISOString()}
-                      title={new Date(item.createdAt).toLocaleString('zh-CN')}
-                      data-agent-message-time
-                    >
-                      {messageTimeText(item.createdAt)}
-                    </time>
-                  ) : null}
-                  <button
-                    type="button"
-                    className={styles.msgAction}
-                    data-agent-user-copy
-                    title={copied ? '已复制' : '复制这条消息'}
-                    aria-label={copied ? '已复制' : '复制这条消息'}
-                    onClick={() => void copyReply(i, item.text)}
-                  >
-                    {copied ? <IconCheck size={14} /> : <IconCopyText size={14} />}
-                  </button>
-                </div>
-              </div>
-            )
-          }
-          if (item.kind === 'process') {
-            const live = i === latestProcessIndex && statusIsBusy(status)
-            return (
-              <AgentActivityStrip
-                key={i}
-                status={status}
-                items={items}
-                activities={live ? liveActivities : []}
-                history={item.entries}
-                processText={live ? liveProcess : ''}
-                startedAt={item.startedAt}
-                finishedAt={item.finishedAt}
-                live={live}
-              />
-            )
-          }
-          if (item.kind === 'text') {
-            const copied = copiedKey === i
-            const streaming = i === streamingTextIndex
-            const currentProcess = processBefore(visibleItems, i)
-            const runtimeEnd = currentProcess
-              ? Math.max(
-                  item.createdAt ?? 0,
-                  currentProcess.finishedAt ?? 0,
-                  ...currentProcess.entries.map((entry) => entry.createdAt ?? 0),
-                ) || undefined
-              : item.createdAt
-            const runtime =
-              !streaming &&
-              currentProcess?.startedAt !== undefined &&
-              runtimeEnd !== undefined &&
-              runtimeEnd >= currentProcess.startedAt
-                ? `已处理 ${formatAgentRunElapsed(
-                    (runtimeEnd - currentProcess.startedAt) / 1_000,
-                  )}`
-                : ''
-            return (
-              <div
-                key={i}
-                className={`${styles.msgTurn} ${styles.msgTurnBot}`}
-                data-agent-message="assistant"
-                data-agent-streaming={streaming ? 'true' : undefined}
-              >
-                {runtime ? (
-                  <div className={styles.msgRuntime} data-agent-message-duration>
-                    {runtime}
-                  </div>
-                ) : null}
-                <div className={styles.msgBot} data-agent-bubble="assistant">
-                {/*
-                  助手回复走 Markdown 渲染（用户 2026-10-02：模型回的
-                  `- **看看画布现状**` 把星号和杠原样打在界面上）。
-                  与提示词节点**共用同一个渲染器** —— 见 `MarkdownBlocks` 的说明。
-                */}
-                <div className={styles.markdownBody}>
-                  <MarkdownBlocks source={item.text} />
-                </div>
-                {streaming && (
-                  <span className={styles.streamCaret} aria-hidden="true" />
-                )}
-                </div>
-                <div className={styles.msgMeta} data-agent-message-meta="assistant">
-                  {item.createdAt ? (
-                    <time
-                      className={styles.msgTime}
-                      dateTime={new Date(item.createdAt).toISOString()}
-                      title={new Date(item.createdAt).toLocaleString('zh-CN')}
-                      data-agent-message-time
-                    >
-                      {messageTimeText(item.createdAt)}
-                    </time>
-                  ) : null}
-                  {/* 复制 / 重试（用户 2026-10-14 第 1 条） */}
-                  {!streaming ? (
-                    <div className={styles.msgActions}>
-                      <button
-                        type="button"
-                        className={styles.msgAction}
-                        data-agent-copy
-                        title={copied ? '已复制' : '复制这条回复'}
-                        aria-label={copied ? '已复制' : '复制这条回复'}
-                        onClick={() => void copyReply(i, item.text)}
-                      >
-                        {copied ? <IconCheck size={14} /> : <IconCopyText size={14} />}
-                      </button>
-                      <button
-                        type="button"
-                        className={styles.msgAction}
-                        data-agent-retry
-                        title="重新问一遍（重发上一条消息）"
-                        aria-label="重新问一遍"
-                        onClick={retry}
-                      >
-                        <IconLoop size={14} />
-                      </button>
-                    </div>
-                  ) : null}
-                </div>
-              </div>
-            )
-          }
-          /** 步骤卡：一行标题 + 可展开的明细；涉及到的节点把产物缩略图直接嵌进来 */
-          const thumbs = (item.failed ? [] : item.nodeIds)
-            .map((id) => ({ id, hash: hashOfNode.get(id) }))
-            .filter((x): x is { id: string; hash: string } => Boolean(x.hash))
-          const isOpen = expanded.has(item.id)
-          const hasDetail = item.lines.length > 0 || thumbs.length > 0
-          return (
-            <div
-              key={i}
-              className={item.failed ? styles.stepFailed : styles.step}
-              data-agent-step={item.tool}
-              /* 失败与否不能只靠 CSS 类名 —— 那是哈希过的，断言不到 */
-              {...(item.failed ? { 'data-agent-step-failed': '' } : {})}
-            >
-              <button
-                type="button"
-                className={styles.stepHead}
-                data-agent-step-detail={item.tool}
-                onClick={() => hasDetail && toggleStep(item.id)}
-                title={hasDetail ? (isOpen ? '收起细节' : '看这一步的细节') : item.label}
-                aria-expanded={hasDetail ? isOpen : undefined}
-                aria-controls={hasDetail ? `agent-step-detail-${item.id}` : undefined}
-              >
-                <span className={styles.stepIcon} aria-hidden="true">
-                  <AgentStepIcon tool={item.tool} size={16} />
-                </span>
-                <span className={styles.stepLabel}>{item.label}</span>
-                {hasDetail && (
-                  <span className={isOpen ? styles.chevronUp : styles.chevronDown}>
-                    <IconChevronDown size={14} />
-                  </span>
-                )}
-              </button>
-              {!isOpen && item.summaryLines && item.summaryLines.length > 0 ? (
-                <div className={styles.stepSummary} data-agent-step-summary={item.tool}>
-                  {item.summaryLines.map((line, lineIndex) => (
-                    <p key={lineIndex}>{line}</p>
-                  ))}
-                </div>
-              ) : null}
-              {/*
-                **失败的那一条不折叠**：原因藏在折叠层里等于没报 —— 用户会以为是
-                「它又问了我一遍」而不是「这件事被拒了，因为……」（2026-10-02 报的
-                那个「重复确认」的现象里，被拒的理由就一直没露出来过）。
-              */}
-              {hasDetail ? (
-                <div
-                  id={`agent-step-detail-${item.id}`}
-                  className={
-                    isOpen || item.failed
-                      ? `${styles.stepReveal} ${styles.stepRevealOpen}`
-                      : styles.stepReveal
-                  }
-                  data-agent-step-reveal={isOpen || item.failed ? 'open' : 'closed'}
-                  aria-hidden={!(isOpen || item.failed)}
-                >
-                  <div className={styles.stepRevealInner}>
-                    {item.lines.length > 0 ? (
-                      <ul className={styles.stepLines}>
-                        {item.lines.map((l, k) => (
-                          <li key={k}>{l}</li>
-                        ))}
-                      </ul>
-                    ) : null}
-                    {(isOpen || item.failed) && thumbs.length > 0 ? (
-                      <div className={styles.thumbs}>
-                        {thumbs.map((t) => (
-                          <span key={t.id} className={styles.thumb} data-agent-thumb={t.id}>
-                            <StepThumb hash={t.hash} />
-                          </span>
-                        ))}
-                      </div>
-                    ) : null}
-                  </div>
-                </div>
-              ) : null}
-            </div>
+      <AgentPanelHeader
+        sessions={list}
+        current={current}
+        renaming={renaming}
+        titleDraft={titleDraft}
+        pickerOpen={openPicker === 'agent-session'}
+        confirmDelete={confirmDelete}
+        onTitleDraftChange={setTitleDraft}
+        onCommitRename={() => void commitRename()}
+        onCancelRename={() => setRenaming(false)}
+        onToggleSessionPicker={() =>
+          setOpenPicker(
+            openPicker === 'agent-session' ? null : 'agent-session',
           )
-        })}
-      </div>
-
-      {runTasks &&
-        runTasks.length > 0 &&
-        status.kind === 'executing' &&
-        (status.tool === 'runNode' || status.tool === 'runFrom') && (
-          <AgentGenerationTasks tasks={runTasks} />
-        )}
-
-      {(status.kind === 'error' || status.kind === 'paused') && (
-        <div className={styles.statusLine} data-agent-status-line={status.kind}>
-          {STATUS_LABEL[status.kind]}：{status.message}
-        </div>
-      )}
-      {!currentTurnHasProcess &&
-      (status.kind === 'thinking' ||
-        status.kind === 'toolRunning' ||
-        status.kind === 'executing' ||
-        status.kind === 'awaitingConfirm') ? (
-        <AgentActivityStrip
-          status={status}
-          items={items}
-          activities={liveActivities}
-          history={[]}
-          processText={liveProcess}
-          startedAt={latestUserStartedAt}
-          live
-        />
-      ) : null}
-
-      {status.kind === 'paused' && current?.continuation && (
-        <div className={styles.step} data-agent-continuation>
-          <div className={styles.stepHead}>
-            <span className={styles.stepLabel}>任务检查点</span>
-          </div>
-          <p className={styles.continuationText}>
-            已完成 {current.continuation.maxSteps} 步，工具结果已保存。继续时从检查点接着执行。
-          </p>
-          <div className={styles.row}>
-            <button
-              type="button"
-              className={styles.primary}
-              onClick={() => void continueTask()}
-              data-agent-continue
-            >
-              继续任务
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/*
-        确认卡：**放在对话流里、当一条步骤**，而不是贴在输入框上方的独立弹层。
-        参考产品（liblib.tv）就是把「是否运行节点「小猫钓鱼」生成图片？」
-        这条确认当成对话时间线的一部分，批准动作也是时间线里的一个小按钮 ——
-        确认过之后它留在原地（能看到「批准过」），而不是整个消失。
-      */}
-      {pendingPlan && (
-        <div
-          className={`${styles.step} ${styles.previewCard}`}
-          data-agent-preview={pendingPlan.tool}
-        >
-          <div className={styles.stepHead}>
-            <span className={styles.stepLabel}>{pendingPlan.title}</span>
-          </div>
-          <ul className={styles.stepLines}>
-            {pendingPlan.lines.map((l, i) => (
-              <li key={i}>{l}</li>
-            ))}
-          </ul>
-          <div className={styles.row}>
-            <button type="button" className={styles.primary} onClick={() => void confirm()} data-agent-confirm>
-              {pendingPlan.action}
-            </button>
-            <button type="button" className={styles.smallBtn} onClick={() => void cancel()} data-agent-cancel>
-              取消
-            </button>
-          </div>
-        </div>
-      )}
-
-      {current && current.pendingSteers.length > 0 && (
-        <div className={styles.steerPending} data-agent-steer-pending={current.pendingSteers.length}>
-          <span>{current.pendingSteers.length} 条引导将在下一步生效</span>
-        </div>
-      )}
-
-      <AgentQueuePanel
-        turns={current?.queuedTurns ?? []}
-        status={status}
-        menuId={queueMenuId}
-        menuPosition={queueMenuPosition}
-        editingId={editingQueueId}
-        editingTurn={editingQueueTurn}
-        editingText={editingQueueText}
-        onGuide={(turn) => void guideQueuedTurn(turn)}
-        onRemove={(turnId) => void removeQueued(turnId)}
-        onMenuIdChange={setQueueMenuId}
-        onMenuPositionChange={setQueueMenuPosition}
-        onBeginEdit={beginQueueEdit}
-        onCommitEdit={() => void commitQueueEdit()}
-        onEditingIdChange={setEditingQueueId}
-        onEditingTextChange={setEditingQueueText}
-        onResume={resumeQueue}
+        }
+        onClosePicker={() => setOpenPicker(null)}
+        onSwitchSession={(session) => void switchTo(session)}
+        onNewSession={() => void newSession()}
+        onStartRename={startRename}
+        onDeleteSession={() => void deleteSession()}
+        onOpenSettings={onOpenSettings}
+        onClose={onClose}
       />
-      </div>
-      {showJumpToLatest && (
-        <button
-          type="button"
-          className={styles.jumpLatest}
-          onClick={jumpToLatest}
-          data-agent-jump-latest
-        >
-          <IconChevronDown size={14} />
-          跳至最新
-        </button>
-      )}
-      </div>
 
-      {/*
-        对话模型 = **agent 自己的 LLM**，单独一处（用户 2026-10-02：「对话模型是
-        agent 的 llm，需要单独放在一个地方」）。
-
-        为什么不跟「图片 / 视频」挤在同一个面板里：那两个决定 agent **建出来的
-        生成节点**用谁，这一个决定**跟谁说话** —— 混在一起时，用户以为换的是
-        画布上的模型，实际把对话模型也换掉了。
-      */}
-      <div className={styles.llmRow} data-agent-llm-row>
-        <ParamPicker
-          name="agent-chat-model"
-          ariaLabel={`对话模型（agent 自己的 LLM，当前：${shownModel || '未选'}）`}
-          label={shownModel || '选择对话模型'}
-          triggerIcon={<IconChat size={14} />}
-          size="compact"
-          options={withModelIcons(chatModelOptions)}
-          value={shownModel}
-          variant="list"
-          emptyHint="没有可用的对话模型：去后台设置里勾选"
-          open={openPicker === 'agent-chat-model'}
-          onToggle={() =>
-            setOpenPicker(openPicker === 'agent-chat-model' ? null : 'agent-chat-model')
-          }
-          onClose={() => setOpenPicker(null)}
-          onSelect={(v) => void pickModel(v)}
-        />
-      </div>
-
-      {/*
-        输入区：一个圆角盒子，**上正文、下工具条**（参考产品 liblib.tv 的对话框形态）。
-
-        正文用 `MentionEditor`（contenteditable）而不是 `textarea`：用户 2026-10-02
-        要「@ 引用的节点 / 模型在输入框里呈现为一个矩形、作为文本内容的一部分」，
-        而 `textarea` 只能显示纯文本，做不到「一个矩形夹在文字中间」。
-        素材标签也收在盒子里 —— 它们是「这次要说出去的东西」，不是面板参数。
-      */}
-      <div
-        ref={composerRef}
-        id="canvas-agent-composer"
-        className={styles.composer}
-        data-agent-composer
-        data-agent-composer-height={composerHeight}
-        data-agent-composer-resizing={composerResizing ? 'true' : 'false'}
-        data-agent-delivery-mode={deliveryMode}
-        style={{
-          ['--agent-composer-height' as string]: `${composerHeight}px`,
+      <AgentConversationPane
+        current={current}
+        status={status}
+        items={items}
+        visibleItems={visibleItems}
+        latestProcessIndex={latestProcessIndex}
+        streamingTextIndex={streamingTextIndex}
+        liveActivities={liveActivities}
+        liveProcess={liveProcess}
+        runTasks={runTasks}
+        copiedKey={copiedKey}
+        expanded={expanded}
+        hashOfNode={hashOfNode}
+        thumbOf={thumbOf}
+        currentTurnHasProcess={currentTurnHasProcess}
+        latestUserStartedAt={latestUserStartedAt}
+        pendingPlan={pendingPlan}
+        pendingTaskStepId={pendingTaskStepId}
+        advancingTaskPlan={advancingTaskPlan}
+        scrollRef={scrollRef}
+        showJumpToLatest={showJumpToLatest}
+        queueMenuId={queueMenuId}
+        queueMenuPosition={queueMenuPosition}
+        editingQueueId={editingQueueId}
+        editingQueueTurn={editingQueueTurn}
+        editingQueueText={editingQueueText}
+        onConversationScroll={onConversationScroll}
+        onCopyReply={(key, text) => void copyReply(key, text)}
+        onRetry={retry}
+        onToggleStep={toggleStep}
+        onAdvanceToNext={() => {
+          if (!current) return
+          if (advancingTaskPlan) return
+          setAdvancingTaskPlan(true)
+          void advanceTaskPlan(current).finally(() => {
+            setAdvancingTaskPlan(false)
+          })
         }}
-      >
-        <button
-          type="button"
-          className={styles.composerResizeHandle}
-          role="separator"
-          aria-orientation="horizontal"
-          aria-controls="canvas-agent-composer-editor"
-          aria-label="调整 Agent 输入框高度"
-          aria-valuemin={AGENT_COMPOSER_HEIGHT_MIN}
-          aria-valuemax={agentComposerMaxHeight(composerAvailableHeight())}
-          aria-valuenow={composerHeight}
-          title="向上拖动加高输入框；方向键微调"
-          data-agent-composer-resize
-          onPointerDown={beginComposerResize}
-          onKeyDown={resizeComposerWithKeyboard}
-        />
-        {/*
-          **没有独立的 chip 行了**（用户 2026-10-02：「agent 的 skill 选择后不要出现在
-          图三的地方……点击节点后出现的把选中的节点当作此次的素材的时候都会出现在那里，
-          我需要全部出现在正文里面，全部保持和艾特的出现的地方一样」）。
+        onContinueTask={() => void continueTask()}
+        onConfirm={() => void confirm()}
+        onCancel={() => void cancel()}
+        onJumpToLatest={jumpToLatest}
+        onGuideQueuedTurn={(turn) => void guideQueuedTurn(turn)}
+        onRemoveQueued={(turnId) => void removeQueued(turnId)}
+        onQueueMenuIdChange={setQueueMenuId}
+        onQueueMenuPositionChange={setQueueMenuPosition}
+        onBeginQueueEdit={beginQueueEdit}
+        onCommitQueueEdit={() => void commitQueueEdit()}
+        onEditingQueueIdChange={setEditingQueueId}
+        onEditingQueueTextChange={setEditingQueueText}
+        onResumeQueue={resumeQueue}
+      />
 
-          技能 / 生成模型 / 取选中素材现在**一律落成正文里的引用 chip**（`skill:` /
-          `model:` / `node:` 三种 token），与 @ 引用同一套锚点与呈现：
-          · 插入：`insertMention(...)`（见上面各处的 onSelect / attachFiles）；
-          · 会话字段仍然照写（技能、图片 / 视频模型、素材 id），因为提示词与落地配方
-            读的是它们 —— 正文是**看得见的记录**，会话行是**真正生效的设置**；
-          · 进一个会话时只把素材 chip 补回正文（见下面那个 `restoredSessionRef` 的
-            effect）；技能设置照常生效，但必须由用户主动选择后才显示 chip。
-        */}
-
-        <MentionEditor
-          ref={editorRef}
-          value={draft}
-          onChange={replaceDraft}
-          className={styles.composerEditor}
-          /** 语义锚点：冒烟按 `[data-agent-input]` 定位这个输入框 */
-          anchorAttr={{
-            'data-agent-input': '',
-            id: 'canvas-agent-composer-editor',
-          }}
-          placeholder="开始你的创作，或者 @ 引用工作流 / 节点 / 资源"
-          onEnter={(modifiers) => {
-            const opposite = deliveryMode === 'queue' ? 'steer' : 'queue'
-            void send(
-              modifiers.ctrlKey || modifiers.metaKey ? opposite : deliveryMode,
-            )
-          }}
-          /** 刚打出 `@` → 直接开引用菜单（参考产品就是「打 @ 就出」） */
-          onMentionTrigger={() => setOpenPicker('agent-mention')}
-          /** 节点引用的缩略图：宿主取图，编辑器就地补进 chip 的槽位 */
-          thumbOf={thumbOf}
-          thumbVersion={thumbVersion}
-        />
-
-        <div className={styles.bar}>
-          <div className={styles.barPills}>
-            {/*
-              加素材：**两条路**（用户 2026-10-03：「加素材是要的，他分两个功能，
-              点击后本地上传和素材库添加，也是要有图标」）。
-
-              菜单复用画布既有的 `AssetMenu`（图标 + 文案）—— 与节点素材右上角那个
-              是同一个组件，只是这次朝**上**展开（工具条在面板底部）。
-            */}
-            <span className={styles.addWrap}>
-              <button
-                type="button"
-                className={styles.iconBtn}
-                onClick={() => setOpenPicker(openPicker === 'agent-asset' ? null : 'agent-asset')}
-                title="加素材（本地上传 / 素材库）"
-                data-agent-add-asset
-              >
-                <IconPlus size={16} />
-              </button>
-              {openPicker === 'agent-asset' && (
-                <AssetMenu
-                  anchor="above"
-                  onClose={() => setOpenPicker(null)}
-                  items={[
-                    {
-                      id: 'upload',
-                      label: '本地上传',
-                      hint: '从这台电脑选图片或视频',
-                      icon: 'upload',
-                      onSelect: () => fileRef.current?.click(),
-                    },
-                    {
-                      id: 'library',
-                      label: '素材库添加',
-                      hint: '从「我的素材」里挑一个',
-                      icon: 'library',
-                      onSelect: () => {
-                        setOpenPicker('agent-library')
-                        void library.load()
-                      },
-                    },
-                  ]}
-                />
-              )}
-              {openPicker === 'agent-library' && (
-                <div
-                  className={styles.library}
-                  data-agent-library
-                  role="dialog"
-                  aria-label="从素材库添加"
-                >
-                  {libraryAssets.length === 0 ? (
-                    <span className={styles.libraryEmpty}>
-                      素材库还是空的：去「我的素材」收藏几张再用
-                    </span>
-                  ) : (
-                    libraryAssets.map((a) => (
-                      <button
-                        key={a.hash}
-                        type="button"
-                        className={styles.libraryItem}
-                        title={a.prompt ?? a.mime}
-                        data-agent-library-item={a.hash}
-                        onClick={() => {
-                          void addFromLibrary(a.hash)
-                          setOpenPicker(null)
-                        }}
-                      >
-                        <LibraryThumb hash={a.hash} />
-                      </button>
-                    ))
-                  )}
-                  <button
-                    type="button"
-                    className={styles.libraryClose}
-                    onClick={() => setOpenPicker(null)}
-                    aria-label="关闭素材库"
-                    data-agent-library-close
-                  >
-                    <IconClose size={12} />
-                  </button>
-                </div>
-              )}
-            </span>
-            {/*
-              工具条剩下的四件事（用户 2026-10-02 第二轮）：
-              **@ 引用 / 模型 / 技能 / 手动·自动**。
-
-              三处形态上的决定都是用户点名的：
-              ① 「模型用一个 3d 建模的图标展示，立体的方形」「skill 也是用一个图标展示」
-                 ⇒ 这两枚 chip **只显示图标、不写字**（`triggerIcon` + `label=""`），
-                 名字进 `aria-label`（悬停 / 读屏可见），列表里照旧带名字与厂商 logo；
-              ② 「参数去掉，只保留模型的选项」⇒ 比例 / 画质 / 质量那一枚**整个撤掉**
-                 （会话字段与提示词那段仍留着，见 §8：入口先撤、口径不撤，
-                 免得下次要加回来时又得从提示词一路重接）；
-              ③ 「手动和自动用图标进行替换，选中能替换」⇒ 图标本身跟着**当前档位**换
-                 （手 / 循环箭头），不是只在菜单里高亮。
-            */}
-
-            {/*
-              @ 引用：一个浮层里三段 —— **节点**（这张画布上的）/ **图片** / **视频**
-              （后两段只列前端固定清单，见下面各段自己的说明）。
-              选完插进输入框成为一颗矩形 chip，是文本内容的一部分（`MentionEditor`）。
-            */}
-            <ParamPicker
-              name="agent-mention"
-              ariaLabel="引用画布里的节点或模型"
-              label=""
-              triggerIcon={<IconMention size={16} />}
-              size="compact"
-              closeOnSelect
-              sections={[
-                {
-                  name: 'node',
-                  label: '节点',
-                  variant: 'list',
-                  /**
-                   * 只先摆 5 条 + 「加载更多」（用户 2026-10-02 参考产品图二：
-                   * 「不用显示全部可以艾特的节点，下方有省略，点击之后才会显示所有的」）。
-                   * 画布上几十个节点时，这一层不折叠会把模型那一段挤到看不见。
-                   */
-                  collapsedCount: 5,
-                  options: graph.nodes.map((n) => ({
-                    value: `node:${n.id}`,
-                    label: (n.title ?? '').trim() || n.type,
-                    hint: n.type,
-                  })),
-                  value: '',
-                  emptyHint: '这张画布上还没有节点',
-                  onSelect: (v) => {
-                    const id = v.slice('node:'.length)
-                    const hit = graph.nodes.find((n) => n.id === id)
-                    insertMention('node', id, (hit?.title ?? '').trim() || id)
-                  },
-                },
-                /**
-                 * **@ 里的模型 = 生图 / 生视频模型**（用户 2026-10-04：
-                 * 「艾特按钮我要能图片模型和视频模型，就是前端的那几个，
-                 *   千万不要把渠道拉取的模型放上去」）。
-                 *
-                 * 三条口径写死在这里：
-                 * ① **只用前端固定清单**（`presetModelsOf`）—— 不用 `panelModelOptions`，
-                 *    因为后者会把「渠道里勾选的模型」也并进来（中转站一次拉回几百个，
-                 *    全塞进 @ 面板就是灾难，而且那些名字不是用户在创作面板上认识的名字）；
-                 * ② **不含对话模型** —— agent 自己的 LLM 由工具条上那枚模型按钮管，
-                 *    @ 里的模型是「这次用哪些模型去生成」（用户 2026-10-04 第 3 条）；
-                 * ③ 选一枚 = **往正文里插一枚 chip**（与创作面板的模型 chip 同一套），
-                 *    可以连着插多枚 —— 那就是「多个模型参与的流程」的输入方式。
-                 */
-                {
-                  name: 'image',
-                  label: '图片',
-                  variant: 'list',
-                  /** 一屏 5 条，多的在里面滚（与模型面板同一口径） */
-                  maxRows: 5,
-                  options: withModelIcons(
-                    globalImageModels,
-                    undefined,
-                    channels.globalModelOf,
-                  ),
-                  value: '',
-                  emptyHint: '还没有图片模型',
-                  onSelect: (v) => insertMention('model', v, v),
-                },
-                {
-                  name: 'video',
-                  label: '视频',
-                  variant: 'list',
-                  maxRows: 5,
-                  options: withModelIcons(
-                    globalVideoModels,
-                    undefined,
-                    channels.globalModelOf,
-                  ),
-                  value: '',
-                  emptyHint: '还没有视频模型',
-                  onSelect: (v) => insertMention('model', v, v),
-                },
-              ]}
-              open={openPicker === 'agent-mention'}
-              onToggle={() => setOpenPicker(openPicker === 'agent-mention' ? null : 'agent-mention')}
-              onClose={() => setOpenPicker(null)}
-            />
-
-            {/*
-              模型面板 = 「**这次用哪些模型去生成**」（用户 2026-10-04 第 3 条：
-              「不是默认用这两个模型的意思，是把模型放在对话框中，意思是用这些模型
-                进行生成，能组成多个模型参与的流程」）。
-
-              与旧口径的差别只有一处，但很要紧：**✓ 表示「已放进这次对话」**，
-              不表示「这是默认模型」。所以：
-                · 点一枚 = 往正文插一枚 `model` chip（与 @ 模型同一条路）+ 顺手把它
-                  记成该类的默认值（用户一枚都没 @ 时，新节点仍要有模型可用）；
-                · 勾选状态读**正文里的引用**（`mentionedModels`），可以同时勾好几枚；
-                · 图片 / 视频两段的清单仍是「前端固定清单 + 渠道已勾选模型的归一显示名」，
-                  与创作面板同源。
-              清单与创作面板**同一份数据源**（`panelModelOptions`），再按「有没有渠道真能提供它」筛一道。
-            */}
-            <ParamPicker
-              name="agent-model"
-              ariaLabel={`这次用哪些模型生成（已放进对话 ${mentionedModels.size} 枚）`}
-              label=""
-              triggerIcon={<IconModelCube size={16} />}
-              size="compact"
-              closeOnSelect
-              jumpMode="filter"
-              /**
-               * 顶部两枚跳转（用户 2026-10-02：「上方需要有两个选项，分别是图片、视频，
-               * 点击按钮可以进行跳转到下面的选项，例如选图片就从图片的开头开始」）。
-               */
-              jumps={[
-                { section: 'image', label: '图片' },
-                { section: 'video', label: '视频' },
-              ]}
-              sections={[
-                {
-                  name: 'image',
-                  label: '图片',
-                  variant: 'list',
-                  /** 一屏只摆 5 条，多的在里面滚（用户 2026-10-02：「太高了」） */
-                  maxRows: 5,
-                  /** 高亮 = 「已放进这次对话」（见 `mentionedModels`），不是会话默认值 */
-                  options: withModelIcons(modelOptionsByKind.image, mentionedModels),
-                  value: '',
-                  emptyHint: '没有可用的图片模型',
-                  onSelect: (v) => {
-                    void setModelKind('imageModel', v)
-                    /**
-                     * 生成模型也进**正文**（用户 2026-10-02：「选择模型后也是要加入到
-                     * 对话框中参与对话（和艾特模型的功能一样）」）—— 与 @ 模型同一套 chip。
-                     */
-                    if (v) insertMention('model', v, v)
-                  },
-                },
-                {
-                  name: 'video',
-                  label: '视频',
-                  variant: 'list',
-                  maxRows: 5,
-                  options: withModelIcons(modelOptionsByKind.video, mentionedModels),
-                  value: '',
-                  emptyHint: '没有可用的视频模型',
-                  onSelect: (v) => {
-                    void setModelKind('videoModel', v)
-                    if (v) insertMention('model', v, v)
-                  },
-                },
-              ]}
-              open={openPicker === 'agent-model'}
-              onToggle={() => setOpenPicker(openPicker === 'agent-model' ? null : 'agent-model')}
-              onClose={() => setOpenPicker(null)}
-            />
-
-            {/*
-              技能：图标按钮 + **技能菜单**（用户 2026-10-03，参考产品图三 / 图四）。
-              菜单里能按「通用 / 我的」分类、搜索、创建、导入（.md 或文件夹）；
-              「全部」去技能库那一页。
-            */}
-            <span className={styles.addWrap}>
-              <button
-                type="button"
-                className={styles.iconBtn}
-                title={current?.skillId ? `技能：${skillLabel}` : '选择技能'}
-                aria-label={`这份技能决定 agent 把哪些阶段建到画布上（当前：${skillLabel}）`}
-                data-agent-skill-open
-                onClick={() => setOpenPicker(openPicker === 'agent-skill' ? null : 'agent-skill')}
-              >
-                <IconSkill size={16} />
-              </button>
-              {openPicker === 'agent-skill' && (
-                <SkillMenu
-                  builtin={skills.builtinSkills}
-                  user={skills.userSkills}
-                  favorites={skillFavs}
-                  activeId={current?.skillId ?? null}
-                  onSelect={(id) => {
-                    void setSkill(id ?? '')
-                    /**
-                     * 技能也落成**正文里的一枚 chip**（用户 2026-10-02：「agent 的 skill
-                     * 选择后不要出现在图三的地方……我需要全部出现在正文里面，全部保持和
-                     * 艾特的出现的地方一样」）。取消选择时把那枚 chip 一并抹掉。
-                     */
-                    if (id) {
-                      const hit = allSkills.find((s) => s.id === id)
-                      insertMention('skill', id, hit?.name ?? '技能')
-                    } else {
-                      setDraft((prev) => prev.replace(/\s*@\[[^\]]*\]\(skill:[^)]*\)/g, '').trim())
-                    }
-                    setOpenPicker(null)
-                  }}
-                  onToggleFavorite={(id) => void toggleSkillFavorite(id)}
-                  onCreateNew={openSkillLibrary}
-                  onImportFiles={() => skillFileRef.current?.click()}
-                  onImportFolder={() => skillDirRef.current?.click()}
-                  onClose={() => setOpenPicker(null)}
-                />
-              )}
-              <input
-                ref={skillFileRef}
-                type="file"
-                accept=".md,.markdown,.txt,text/markdown"
-                multiple
-                hidden
-                data-agent-skill-file
-                onChange={(e) => {
-                  void importSkills(e.target.files)
-                  e.target.value = ''
-                }}
-              />
-              {/*
-                文件夹导入用 `webkitdirectory`：它与 `accept` 互斥（设了它就只能选目录），
-                所以和上面那个文件输入**分成两个**，而不是硬塞进一个。
-              */}
-              <input
-                ref={skillDirRef}
-                type="file"
-                multiple
-                hidden
-                data-agent-skill-dir
-                {...({ webkitdirectory: '' } as Record<string, string>)}
-                onChange={(e) => {
-                  void importSkills(e.target.files)
-                  e.target.value = ''
-                }}
-              />
-            </span>
-
-            {/*
-              回读轮数（用户 2026-10-14 参考产品图二）：发给模型的**上下文窗口**。
-              只影响「这一次给模型看多少」—— 更早的历史仍全量留在库里与界面上，
-              省掉的那段在结果回来时拼回去（见 `sendText` 的 `hidden`）。
-            */}
-            <ParamPicker
-              name="agent-context"
-              ariaLabel={`回读 ${current?.contextWindow ?? AGENT_CONTEXT_WINDOW} 条`}
-              label=""
-              triggerIcon={<IconSettings size={16} />}
-              size="compact"
-              variant="list"
-              options={[3, 5, 10, 20, 50, 100, 150, 200].map((n) => ({
-                value: String(n),
-                label: `回读 ${n} 条`,
-              }))}
-              value={String(current?.contextWindow ?? AGENT_CONTEXT_WINDOW)}
-              open={openPicker === 'agent-context'}
-              onToggle={() =>
-                setOpenPicker(openPicker === 'agent-context' ? null : 'agent-context')
-              }
-              onClose={() => setOpenPicker(null)}
-              onSelect={(v) => void patchSession({ contextWindow: Number(v) })}
-            />
-
-            {/*
-              手动 / 自动生成（参考产品图一那一档）：两个候选各带一句后果说明。
-              图标跟着当前档位换 —— 「选中能替换」指的就是这一枚。
-            */}
-            <ParamPicker
-              name="agent-autorun"
-              ariaLabel={
-                current?.autoRun
-                  ? '自动生成：不再逐步询问'
-                  : '手动生成：每次生成前问你一句'
-              }
-              label=""
-              triggerIcon={current?.autoRun ? <IconAuto size={16} /> : <IconManual size={16} />}
-              size="compact"
-              variant="list"
-              options={[
-                {
-                  value: 'manual',
-                  label: '手动生成',
-                  hint: '每次生成前询问',
-                  icon: <IconManual size={16} />,
-                },
-                {
-                  value: 'auto',
-                  label: '自动生成',
-                  hint: '直接消耗积分',
-                  icon: <IconAuto size={16} />,
-                },
-              ]}
-              value={current?.autoRun ? 'auto' : 'manual'}
-              open={openPicker === 'agent-autorun'}
-              onToggle={() =>
-                setOpenPicker(openPicker === 'agent-autorun' ? null : 'agent-autorun')
-              }
-              onClose={() => setOpenPicker(null)}
-              onSelect={(v) => void setAutoRun(v === 'auto')}
-            />
-          </div>
-
-          {/*
-            发送钮的形态与**内容**有关（像参考产品：没写字就只是个圆点，写了才是可点的上箭头），
-            与「是否在执行」无关 —— 执行中它变成停止，这一层含义独立表达。
-          */}
-          {(status.kind === 'thinking' ||
-            status.kind === 'toolRunning' ||
-            status.kind === 'executing') && (
-            <button
-              type="button"
-              className={`${styles.send} ${styles.sendBusy}`}
-              onClick={() => void stop()}
-              title="停止"
-              data-agent-stop
-            >
-              <IconClose size={16} />
-            </button>
-          )}
-          {draft.trim() ? (
-            <button
-              type="button"
-              className={`${styles.send} ${styles.sendActive}`}
-              onClick={() => void send(deliveryMode)}
-              title={
-                statusIsBusy(status)
-                  ? deliveryMode === 'steer'
-                    ? '引导当前任务'
-                    : '加入队列'
-                  : '发送'
-              }
-              data-agent-send
-            >
-              <IconArrowUp size={16} />
-            </button>
-          ) : !statusIsBusy(status) ? (
-            <span className={styles.sendIdle} data-agent-send-idle aria-hidden="true" />
-          ) : null}
-        </div>
-
-        <input
-          ref={fileRef}
-          type="file"
-          accept="image/*,video/*"
-          multiple
-          hidden
-          data-agent-file
-          onChange={(e) => {
-            void attachFiles(e.target.files)
-            e.target.value = ''
-          }}
-        />
-      </div>
+      <AgentComposerPane
+        current={current}
+        status={status}
+        deliveryMode={deliveryMode}
+        draft={draft}
+        composerHeight={composerHeight}
+        composerResizing={composerResizing}
+        openPicker={openPicker}
+        shownModel={shownModel}
+        chatModelOptions={chatModelOptions}
+        modelOptionsByKind={modelOptionsByKind}
+        globalImageModels={globalImageModels}
+        globalVideoModels={globalVideoModels}
+        mentionedModels={mentionedModels}
+        graph={graph}
+        libraryAssets={libraryAssets}
+        allSkills={allSkills}
+        skillLabel={skillLabel}
+        skillFavs={skillFavs}
+        skills={skills}
+        thumbVersion={thumbVersion}
+        editorRef={editorRef}
+        composerRef={composerRef}
+        fileRef={fileRef}
+        skillFileRef={skillFileRef}
+        skillDirRef={skillDirRef}
+        composerAvailableHeight={composerAvailableHeight}
+        beginComposerResize={beginComposerResize}
+        resizeComposerWithKeyboard={resizeComposerWithKeyboard}
+        replaceDraft={replaceDraft}
+        send={send}
+        stop={() => void stop()}
+        attachFiles={(files) => void attachFiles(files)}
+        addFromLibrary={(hash) => void addFromLibrary(hash)}
+        pickModel={(name) => void pickModel(name)}
+        setModelKind={(kind, value) => void setModelKind(kind, value)}
+        setSkill={(id) => void setSkill(id)}
+        toggleSkillFavorite={(id) => void toggleSkillFavorite(id)}
+        openSkillLibrary={openSkillLibrary}
+        importSkills={(files) => void importSkills(files)}
+        patchSession={(patch) => void patchSession(patch)}
+        setAutoRun={(value) => void setAutoRun(value)}
+        insertMention={insertMention}
+        setDraft={setDraft}
+        setOpenPicker={setOpenPicker}
+        thumbOf={thumbOf}
+        channels={channels}
+        library={library}
+      />
     </aside>
   )
-}
-
-/**
- * 模型候选 → 带厂商图标的选项（固定清单里的那些才有图标）。
- *
- * 与创作面板同源：两处都只调 `presetOf` + `ModelIcon`，不各画一套 logo。
- *
- * `selected`（已放进这次对话的模型集合）是可选的：对话窗那两段要按
- * 「这枚模型是否已经在正文里」勾选（用户 2026-10-04 第 3 条），
- * 而 @ 面板那两段不需要高亮 —— 插进去就成了正文里的 chip，正文自己就是反馈。
- */
-function withModelIcons(
-  names: readonly string[],
-  selected?: ReadonlySet<string>,
-  modelOf: (name: string) => { vendor: PresetVendor } | undefined = presetOf,
-) {
-  return names.map((n) => {
-    const preset = modelOf(n)
-    return {
-      value: n,
-      label: n,
-      ...(preset ? { icon: <ModelIcon vendor={preset.vendor} /> } : {}),
-      ...(selected ? { selected: selected.has(n) } : {}),
-    }
-  })
-}
-
-/** 新节点落在视口中心偏左 —— 你正在看的地方，建出来的东西才在你眼前（§6） */
-function originOf(vp: { x: number; y: number }): { x: number; y: number } {
-  return { x: vp.x + 120, y: vp.y + 120 }
-}
-
-function viewportWorldOf(vp: { x: number; y: number; zoom: number }): Rect {
-  const surface = document.querySelector<HTMLElement>('[data-canvas-surface]')
-  const width = surface?.clientWidth ?? window.innerWidth
-  const height = surface?.clientHeight ?? window.innerHeight
-  return {
-    x: vp.x,
-    y: vp.y,
-    w: width / Math.max(0.01, vp.zoom),
-    h: height / Math.max(0.01, vp.zoom),
-  }
-}
-
-/** 确认卡里要显示什么 —— 让用户**在花钱之前**看清将要发生什么（§9） */
-function previewOf(
-  status: Status,
-  store: CanvasStore,
-): { tool: string; title: string; lines: string[]; action: string } | null {
-  if (status.kind !== 'awaitingConfirm') return null
-  const { name, args } = status.request
-  const a = (args ?? {}) as Record<string, unknown>
-  if (name === 'proposeTaskPlan') {
-    const title = typeof a.title === 'string' ? a.title.trim() : '执行计划'
-    const summary = typeof a.summary === 'string' ? a.summary.trim() : ''
-    const assumptions = Array.isArray(a.assumptions)
-      ? a.assumptions
-          .filter((value): value is string => typeof value === 'string')
-          .flatMap((value) => readableConfirmationLines(value))
-      : []
-    const steps = Array.isArray(a.steps)
-      ? a.steps.flatMap((value, index) => {
-          if (!value || typeof value !== 'object') return []
-          const row = value as Record<string, unknown>
-          const stepTitle = typeof row.title === 'string' ? row.title.trim() : ''
-          if (!stepTitle) return []
-          const detail = typeof row.detail === 'string' ? row.detail.trim() : ''
-          return [
-            `${index + 1}. ${stepTitle}${
-              row.requiresConfirmation !== false ? '（完成需验收）' : ''
-            }`,
-            ...(detail
-              ? readableConfirmationLines(detail).map((line) => `   产出：${line}`)
-              : []),
-          ]
-        })
-      : []
-    return {
-      tool: name,
-      title: '确认这套执行计划？',
-      lines: [
-        title,
-        ...(summary ? [summary] : []),
-        ...(assumptions.length > 0
-          ? ['计划前提（请核对）：', ...assumptions.map((line) => `· ${line}`)]
-          : []),
-        ...steps,
-        '确认后才会开始执行；每一步完成后都会停下来等你验收。',
-      ],
-      action: '确认计划',
-    }
-  }
-  if (name === 'requestTaskConfirmation') {
-    const question =
-      typeof a.question === 'string' && a.question.trim()
-        ? a.question.trim()
-        : '这一步需要你确认'
-    const detail = typeof a.detail === 'string' ? a.detail.trim() : ''
-    return {
-      tool: name,
-      title: question,
-      lines: readableConfirmationLines(detail),
-      action: a.purpose === 'review' ? '结果满意，继续' : '确认并继续',
-    }
-  }
-  /**
-   * ⚠️ 这里**没有 `applyPlan` 分支**：建图已经不等确认了（`agentLoop` 的
-   * `WRITE_TOOLS`），所以那种确认卡根本不会出现。别为了「万一」把它加回来 ——
-   * 一张永远走不到的分支，下次改这里的人会以为它还在生效。
-   */
-  if (name === 'runNode') {
-    const ids = Array.isArray(a.nodeIds) ? a.nodeIds.length : 0
-    /**
-     * 要跑的是哪**一个**节点时，把它的名字报出来（参考产品的问法就是
-     * 「是否运行节点「小猫钓鱼」生成图片？」—— 用户认的是名字，不是 id）。
-     */
-    const nodeId = Array.isArray(a.nodeIds) && typeof a.nodeIds[0] === 'string' ? a.nodeIds[0] : ''
-    const node = store.getSnapshot().nodes.find((n) => n.id === nodeId)
-    return {
-      tool: name,
-      title: node ? `是否运行节点「${node.title ?? '未命名'}」生成图片？` : '要开始生成',
-      lines: [`跑 ${ids} 个节点（会花钱）`],
-      action: '批准运行',
-    }
-  }
-  if (name === 'runFrom') {
-    const resolved = runFromNodeIds(store, a.nodeIds)
-    if (!resolved.ok) {
-      return { tool: name, title: '这条下游链不能运行', lines: resolved.problems, action: '知道了' }
-    }
-    const names = resolved.ids.map((id) => {
-      const node = store.getSnapshot().nodes.find((n) => n.id === id)
-      return node?.title || id
-    })
-    return {
-      tool: name,
-      title: '要把这条下游流程跑完？',
-      lines: [`将运行 ${resolved.ids.length} 个节点：${names.join(' → ')}`, '会花钱'],
-      action: '批准运行',
-    }
-  }
-  if (name === 'rememberMemory') {
-    const kindLabels: Record<string, string> = {
-      preference: '偏好',
-      fact: '事实',
-      constraint: '硬约束',
-      decision: '已确认决定',
-    }
-    const scopeLabels: Record<string, string> = {
-      global: '全部工作台',
-      workbench: '当前工作台',
-      project: '当前项目',
-      session: '当前会话',
-    }
-    const text = typeof a.text === 'string' ? a.text : ''
-    return {
-      tool: name,
-      title: '要把这条内容记成长期记忆？',
-      lines: [
-        text,
-        `类型：${kindLabels[String(a.kind)] ?? String(a.kind)}`,
-        `作用范围：${scopeLabels[String(a.scope)] ?? String(a.scope)}`,
-        ...(typeof a.key === 'string' && a.key ? [`主题：${a.key}`] : []),
-        '一次性要求不会被保存；以后可在“全局设置 → Agent 与记忆”修改或忘记。',
-      ].filter(Boolean),
-      action: '保存记忆',
-    }
-  }
-  if (name === 'updateNode') {
-    const nodeIds = Array.isArray(a.nodeIds)
-      ? a.nodeIds.filter((id): id is string => typeof id === 'string')
-      : typeof a.nodeId === 'string'
-        ? [a.nodeId]
-        : []
-    const names = nodeIds.map(
-      (id) => store.getSnapshot().nodes.find((node) => node.id === id)?.title || id,
-    )
-    return {
-      tool: name,
-      title: '要改节点参数',
-      lines: [
-        names.length > 0 ? `节点：${names.join('、')}` : '没有指定节点',
-        ...Object.keys((a.data ?? {}) as object).map((k) => `改 ${k}`),
-      ],
-      action: '应用改动',
-    }
-  }
-  if (name === 'deleteEdges') {
-    const graph = store.getSnapshot()
-    const ids = Array.isArray(a.edgeIds)
-      ? a.edgeIds.filter((id): id is string => typeof id === 'string')
-      : []
-    const pairs = Array.isArray(a.pairs)
-      ? a.pairs.flatMap((pair) => {
-          if (!pair || typeof pair !== 'object') return []
-          const row = pair as Record<string, unknown>
-          return typeof row.source === 'string' && typeof row.target === 'string'
-            ? [{ source: row.source, target: row.target }]
-            : []
-        })
-      : []
-    const edges = graph.edges.filter(
-      (edge) =>
-        ids.includes(edge.id) ||
-        pairs.some((pair) => pair.source === edge.source && pair.target === edge.target),
-    )
-    const titleOf = (id: string) =>
-      graph.nodes.find((node) => node.id === id)?.title || id
-    return {
-      tool: name,
-      title: `要取消 ${edges.length} 条连线？`,
-      lines:
-        edges.length > 0
-          ? edges.map((edge) => `${titleOf(edge.source)} → ${titleOf(edge.target)}`)
-          : ['没有找到可取消的连线'],
-      action: '取消这些连线',
-    }
-  }
-  if (name === 'deleteNodes') {
-    const ids = Array.isArray(a.nodeIds)
-      ? a.nodeIds.filter((id): id is string => typeof id === 'string')
-      : []
-    const graph = store.getSnapshot()
-    const names = ids.map(
-      (id) => graph.nodes.find((node) => node.id === id)?.title || id,
-    )
-    return {
-      tool: name,
-      title: `要删除 ${names.length} 个节点？`,
-      lines: [...names, '关联连线会一并删除，素材库里的图片文件不受影响。'],
-      action: '删除这些节点',
-    }
-  }
-  return { tool: name, title: name, lines: [], action: '执行' }
 }

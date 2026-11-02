@@ -11,6 +11,14 @@
   由 `canvasReadTools.ts` 提供；执行层可依赖它，它不得反向依赖 `tools.ts`。
 - **展示拆分不得改行为**：活动、生成任务、状态、排队列表迁到独立组件后，`data-agent-*`、className、
   文案、按钮顺序、portal 和键盘行为必须原样；不能借搬家重写交互。
+- **AgentPanel 三块视图壳只渲染**：`AgentPanelHeader`、`AgentConversationPane`、`AgentComposerPane`
+  不得直接调用 SessionStore、队列 pump、工具执行或持久化；只接收状态与回调。重命名、两步删除、
+  共享 `openPicker`、滚动 ref、Composer 高度和发送/停止互斥仍由 `AgentPanel` 协调。
+- **队列 hook 不拥有队列真相**：`useAgentQueueController` 只做 React 适配；Session/Controller 是唯一真相，
+  队列领取后必须绑定真实 `turnId`，附件在入队事务内冻结并消费，不能因为拆 hook 产生第二份队列。
+- **画布执行模块不能重试付费请求**：`agentCanvasRun` 必须保持 preflight → 同波并发 → `store.flush()`
+  → RunRecord 对账；“没有留下记录”只允许延迟读取/报错，不能重发 runNode。`agentVisualReview`
+  无路由、读图失败或无目标图时必须返回不可验收，不能伪造通过。
 - **release gate 才可绕过单实例**：仅 `QINGHUA_RELEASE_GATE=1` 跳过 single-instance 并使用独立端口；
   正常用户启动固定 18765、保留单实例。gate 的 store、maintenance、WebView、health 和安装器端口必须一致。
 - **关闭 Agent 面板不能卸载运行宿主**：收起只给 `AgentDock` 的宿主加 `hidden`；状态、AbortController、
