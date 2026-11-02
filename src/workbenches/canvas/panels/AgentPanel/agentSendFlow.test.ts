@@ -166,6 +166,7 @@ describe('runAgentSendFlow', () => {
 
   it('★★ 旧直接回合结束不得释放新的直接回合活动锁', async () => {
     const local = { ...session, id: 'session-direct-token' }
+    const setStatusFor = vi.fn()
     await runAgentSendFlow({
       session: local,
       text: '旧回合',
@@ -193,12 +194,13 @@ describe('runAgentSendFlow', () => {
       clearLiveActivitiesFor: vi.fn(),
       clearLiveProcessFor: vi.fn(),
       clearRunTasksFor: vi.fn(),
-      setStatusFor: vi.fn(),
+      setStatusFor,
       transitionSessionJob: vi.fn() as AgentController['transition'],
       queuePump: vi.fn(),
     })
 
     expect(isSessionActivityActive(local.id)).toBe(true)
+    expect(setStatusFor).not.toHaveBeenCalled()
     releaseSessionActivity(
       local.id,
       undefined,

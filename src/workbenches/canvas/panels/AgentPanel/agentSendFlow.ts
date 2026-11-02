@@ -154,12 +154,19 @@ export async function runAgentSendFlow({
     }
   } catch (error) {
     const aborted = turnAbort.signal.aborted
+    const ownsActivity = turnMatchesSessionActivity(
+      session.id,
+      queueTurnId,
+      turnId,
+    )
     const blocked =
       error instanceof AgentToolEffectBlockedError ? error : null
-    deliveredSteersRef.current.delete(session.id)
-    clearLiveActivitiesFor(session.id)
-    clearLiveProcessFor(session.id)
-    clearRunTasksFor(session.id)
+    if (ownsActivity) {
+      deliveredSteersRef.current.delete(session.id)
+      clearLiveActivitiesFor(session.id)
+      clearLiveProcessFor(session.id)
+      clearRunTasksFor(session.id)
+    }
     let transitionError: unknown
     try {
       await transitionSessionJob(
@@ -182,14 +189,16 @@ export async function runAgentSendFlow({
     }
     await finishQueue(false)
     const cleanupError = transitionError ?? finishQueueError
-    setStatusFor(
-      session.id,
-      cleanupError
-        ? { kind: 'error', message: errText(cleanupError) }
-        : aborted
-          ? IDLE_STATUS
-          : { kind: 'error', message: errText(error) },
-    )
+    if (ownsActivity) {
+      setStatusFor(
+        session.id,
+        cleanupError
+          ? { kind: 'error', message: errText(cleanupError) }
+          : aborted
+            ? IDLE_STATUS
+            : { kind: 'error', message: errText(error) },
+      )
+    }
     return undefined
   } finally {
     if (!retainActivity) {
