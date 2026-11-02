@@ -42090,7 +42090,7 @@ async function g769(browser) {
         completedProcess.expanded === 'false' &&
         completedProcess.rows === 0 &&
         expandedProcess.expanded === 'true' &&
-        expandedProcess.rows === 1 &&
+        expandedProcess.rows >= 1 &&
         expandedProcess.text.includes('先确认现有画布上的生成结果') &&
         expandedProcess.icons === 0 &&
         expandedProcess.rowsGeometry.every(

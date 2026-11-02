@@ -9,7 +9,6 @@ import {
   type PointerEvent as ReactPointerEvent,
 } from 'react'
 import { useSyncExternalStore } from 'react'
-import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
 import { usePlatform } from '../../../../app/providers/PlatformProvider'
 import { useChannels } from '../../../../app/providers/ChannelStoreProvider'
@@ -162,7 +161,6 @@ import {
 import { createContextRepository } from '../../../../state/shared/contextRepository'
 import { createId } from '../../../../shared/id'
 import {
-  queuedTurnPreview,
   sessionForQueuedTurn,
   type QueuedAgentTurn,
 } from '../../../../domain/agent/queuedTurn'
@@ -194,21 +192,16 @@ import {
   IconLoop,
   IconManual,
   IconMention,
-  IconMore,
   IconModelCube,
   IconPlus,
   IconRename,
   IconSettings,
   IconSkill,
-  IconSteer,
 } from '../../toolbar/icons'
 import {
   processBefore,
   readableConfirmationLines,
   toConversation,
-  toolRunningLabel,
-  type ConversationItem,
-  type ConversationProcessEntry,
 } from './conversation'
 import {
   explicitMediaModelsFromMentions,
@@ -230,10 +223,6 @@ import {
   agentScrollTopAfterShrink,
 } from './agentConversationScroll'
 import {
-  conciseAgentRequest,
-  agentToolActivitySummary,
-} from './agentActivitySummary'
-import {
   AGENT_REVEAL_TICK_MS,
   agentRevealCharacters,
   nextAgentRevealLength,
@@ -246,8 +235,6 @@ import {
   saveAgentDraft,
 } from './agentDraft'
 import {
-  agentRunTaskCounts,
-  agentRunTaskTitle,
   createAgentRunTasks,
   finishAgentRunTask,
   formatAgentRunElapsed,
@@ -263,8 +250,25 @@ import {
   type PersistedAgentUserTurn,
 } from './agentTurnPersistence'
 import { errText } from '../../agent/agentLoop'
-import { loadAssetUrl, useAsset } from '../../../../features/shared/assets/index'
+import { loadAssetUrl } from '../../../../features/shared/assets/index'
 import { ModelIcon } from '../../../../features/shared/modelIcon/ModelIcon'
+import {
+  AgentActivityStrip,
+  AgentGenerationTasks,
+  IDLE_STATUS,
+  LibraryThumb,
+  STATUS_LABEL,
+  StepThumb,
+  activityTextOf,
+  messageTimeText,
+  statusCanSteer,
+  statusIsBusy,
+  type AgentPanelStatus as Status,
+} from './AgentActivityViews'
+import {
+  AgentQueuePanel,
+  type AgentQueueMenuPosition,
+} from './AgentQueuePanel'
 /**
  * 参数控件与档位表**与创作面板共用同一份**（不各写一套）。
  *
@@ -293,35 +297,6 @@ import styles from './AgentPanel.module.css'
  * 只有一个转圈的话，用户分不清它是**在想**、**在建**、还是**在等他点确认**。
  */
 
-type Status =
-  | { kind: 'idle' }
-  | { kind: 'thinking' }
-  | { kind: 'toolRunning' }
-  | { kind: 'awaitingConfirm'; request: AgentToolRequest }
-  | { kind: 'paused'; message: string }
-  | { kind: 'executing'; tool?: string }
-  | { kind: 'error'; message: string }
-
-/** 单例的空闲态：按会话取状态时的兜底值，**必须是同一个对象**（否则每次都换引用，依赖数组炸） */
-const IDLE_STATUS: Status = { kind: 'idle' }
-
-const STATUS_LABEL: Record<Status['kind'], string> = {
-  idle: '',
-  thinking: '思考中',
-  toolRunning: '正在看画布',
-  awaitingConfirm: '等你确认',
-  paused: '本轮已暂停',
-  executing: '正在执行',
-  error: '出错',
-}
-
-const GENERATION_ACTIVITY_PHRASES = [
-  '别急，图马上出来',
-  '正在把画面整理好',
-  '生成任务正在推进',
-  '快好了，正在检查结果',
-] as const
-
 function readStoredComposerHeight(): number {
   try {
     return parseAgentComposerHeight(
@@ -339,19 +314,6 @@ function storeComposerHeight(height: number): void {
   } catch {
     // Storage can be blocked; resizing still works for this session.
   }
-}
-
-function statusIsBusy(status: Status): boolean {
-  return status.kind !== 'idle' && status.kind !== 'error'
-}
-
-function statusCanSteer(status: Status): boolean {
-  return (
-    status.kind === 'thinking' ||
-    status.kind === 'toolRunning' ||
-    status.kind === 'awaitingConfirm' ||
-    status.kind === 'executing'
-  )
 }
 
 interface AgentChatRoute extends RoutedChatTarget {
@@ -589,10 +551,8 @@ export function AgentPanel({
   const stickToLatestRef = useRef(true)
   const composerRef = useRef<HTMLDivElement | null>(null)
   const [queueMenuId, setQueueMenuId] = useState<string | null>(null)
-  const [queueMenuPosition, setQueueMenuPosition] = useState<{
-    right: number
-    bottom: number
-  } | null>(null)
+  const [queueMenuPosition, setQueueMenuPosition] =
+    useState<AgentQueueMenuPosition | null>(null)
   const [editingQueueId, setEditingQueueId] = useState<string | null>(null)
   const [editingQueueText, setEditingQueueText] = useState('')
   useEffect(() => {
@@ -5072,160 +5032,24 @@ export function AgentPanel({
         </div>
       )}
 
-      {current && current.queuedTurns.length > 0 && (
-        <div
-          className={styles.queue}
-          data-agent-queue
-          data-agent-queue-count={current.queuedTurns.length}
-        >
-          <div className={styles.queueList}>
-            {current.queuedTurns.map((turn, index) => (
-              <div key={turn.id} className={styles.queueItem} data-agent-queue-item={turn.id}>
-                <span className={styles.queueIndex}>{index + 1}</span>
-                <span className={styles.queueText}>{queuedTurnPreview(turn.text)}</span>
-                <div className={styles.queueActions}>
-                  <button
-                    type="button"
-                    className={styles.queueSteer}
-                    onClick={() => void guideQueuedTurn(turn)}
-                    disabled={
-                      !statusCanSteer(status) ||
-                      (turn.pendingAssetIds?.length ?? 0) > 0
-                    }
-                    title={
-                      (turn.pendingAssetIds?.length ?? 0) > 0
-                        ? '带新素材的消息只能排队'
-                        : statusCanSteer(status)
-                          ? '直接引导当前任务'
-                          : '当前没有可引导的任务'
-                    }
-                    aria-label="直接引导"
-                    data-agent-queue-steer
-                  >
-                    <IconSteer size={14} />
-                    <span>引导</span>
-                  </button>
-                  <button
-                    type="button"
-                    className={styles.queueAction}
-                    onClick={() => void removeQueued(turn.id)}
-                    title="删除消息"
-                    aria-label="删除消息"
-                    data-agent-queue-remove
-                  >
-                    <IconDelete size={14} />
-                  </button>
-                  <button
-                    type="button"
-                    className={styles.queueAction}
-                    onClick={(event) => {
-                      if (queueMenuId === turn.id) {
-                        setQueueMenuId(null)
-                        setQueueMenuPosition(null)
-                        return
-                      }
-                      const rect = event.currentTarget.getBoundingClientRect()
-                      setQueueMenuPosition({
-                        right: Math.max(8, window.innerWidth - rect.right),
-                        bottom: Math.max(8, window.innerHeight - rect.top + 6),
-                      })
-                      setQueueMenuId(turn.id)
-                    }}
-                    title="更多"
-                    aria-label="更多"
-                    aria-haspopup="menu"
-                    aria-expanded={queueMenuId === turn.id}
-                    data-agent-queue-more={turn.id}
-                  >
-                    <IconMore size={15} />
-                  </button>
-                </div>
-                {queueMenuId === turn.id &&
-                  queueMenuPosition &&
-                  editingQueueId !== turn.id &&
-                  createPortal(
-                    <div
-                      className={styles.queueMenu}
-                      role="menu"
-                      data-agent-queue-menu={turn.id}
-                      style={{
-                        right: queueMenuPosition.right,
-                        bottom: queueMenuPosition.bottom,
-                      }}
-                    >
-                      <button
-                        type="button"
-                        className={styles.queueMenuItem}
-                        role="menuitem"
-                        onClick={() => beginQueueEdit(turn)}
-                        data-agent-queue-edit
-                      >
-                        <IconRename size={14} />
-                        编辑消息
-                      </button>
-                    </div>,
-                    document.body,
-                  )}
-              </div>
-            ))}
-          </div>
-          {(status.kind === 'idle' || status.kind === 'error') && (
-            <button
-              type="button"
-              className={styles.queueResume}
-              onClick={resumeQueue}
-              data-agent-queue-resume
-            >
-              继续排队
-            </button>
-          )}
-          {editingQueueTurn && (
-            <div className={styles.queueEditPopover}>
-              <textarea
-                className={styles.queueEditInput}
-                value={editingQueueText}
-                rows={3}
-                autoFocus
-                aria-label="编辑排队消息"
-                onChange={(event) => setEditingQueueText(event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key === 'Escape') {
-                    setEditingQueueId(null)
-                    setEditingQueueText('')
-                  }
-                  if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') {
-                    event.preventDefault()
-                    void commitQueueEdit()
-                  }
-                }}
-                data-agent-queue-edit-input
-              />
-              <div className={styles.queueEditActions}>
-                <button
-                  type="button"
-                  className={styles.queueEditSave}
-                  onClick={() => void commitQueueEdit()}
-                  disabled={!editingQueueText.trim()}
-                  data-agent-queue-edit-save
-                >
-                  <IconCheck size={13} />
-                  保存
-                </button>
-                <button
-                  type="button"
-                  className={styles.queueEditCancel}
-                  onClick={() => {
-                    setEditingQueueId(null)
-                    setEditingQueueText('')
-                  }}
-                >
-                  取消
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
-      )}
+      <AgentQueuePanel
+        turns={current?.queuedTurns ?? []}
+        status={status}
+        menuId={queueMenuId}
+        menuPosition={queueMenuPosition}
+        editingId={editingQueueId}
+        editingTurn={editingQueueTurn}
+        editingText={editingQueueText}
+        onGuide={(turn) => void guideQueuedTurn(turn)}
+        onRemove={(turnId) => void removeQueued(turnId)}
+        onMenuIdChange={setQueueMenuId}
+        onMenuPositionChange={setQueueMenuPosition}
+        onBeginEdit={beginQueueEdit}
+        onCommitEdit={() => void commitQueueEdit()}
+        onEditingIdChange={setEditingQueueId}
+        onEditingTextChange={setEditingQueueText}
+        onResume={resumeQueue}
+      />
       </div>
       {showJumpToLatest && (
         <button
@@ -5787,402 +5611,6 @@ export function AgentPanel({
   )
 }
 
-function activityTextOf(
-  status: Status,
-  generationPhraseIndex: number,
-  items: readonly ConversationItem[],
-  activities: readonly AgentLoopActivity[],
-): string {
-  if (status.kind === 'executing') {
-    if (status.tool === 'runNode' || status.tool === 'runFrom') {
-      return GENERATION_ACTIVITY_PHRASES[
-        generationPhraseIndex % GENERATION_ACTIVITY_PHRASES.length
-      ]!
-    }
-    return '正在执行这一步操作'
-  }
-  if (status.kind === 'thinking') {
-    const lastUser = [...items].reverse().find((item) => item.kind === 'user')
-    const request = conciseAgentRequest(lastUser?.kind === 'user' ? lastUser.text : '')
-    return request ? `正在理解你的要求：${request}` : '正在理解你的要求'
-  }
-  if (status.kind === 'toolRunning') {
-    const latest = [...activities]
-      .reverse()
-      .find((activity) => activity.status === 'running')
-    return agentToolActivitySummary(
-      latest?.phase === 'thinking'
-        ? '正在理解你的要求'
-        : toolRunningLabel(latest?.tool),
-    )
-  }
-  if (status.kind === 'awaitingConfirm') return '这一步需要你确认'
-  return STATUS_LABEL[status.kind]
-}
-
-function AgentGenerationTasks({ tasks }: { tasks: readonly AgentRunTask[] }) {
-  const counts = agentRunTaskCounts(tasks)
-  const active = counts.running > 0 || counts.queued > 0
-  const [now, setNow] = useState(() => Date.now())
-
-  useEffect(() => {
-    setNow(Date.now())
-    if (!active) return
-    const timer = window.setInterval(() => setNow(Date.now()), 1_000)
-    return () => window.clearInterval(timer)
-  }, [active])
-
-  return (
-    <section
-      className={styles.runTasks}
-      data-agent-run-tasks
-      data-agent-run-task-count={tasks.length}
-      aria-label={agentRunTaskTitle(tasks)}
-    >
-      <div className={styles.runTasksHead}>
-        <span
-          className={active ? styles.runTasksDotActive : styles.runTasksDot}
-          aria-hidden="true"
-        />
-        <span className={styles.runTasksTitle} aria-live="polite">
-          {agentRunTaskTitle(tasks)}
-        </span>
-        <span className={styles.runTasksCount}>
-          {counts.done + counts.failed}/{counts.total}
-        </span>
-      </div>
-      <div className={styles.runTaskList}>
-        {tasks.map((task) => {
-          const startedAt = task.startedAt
-          const finishedAt = task.finishedAt ?? (task.status === 'running' ? now : undefined)
-          const elapsed =
-            startedAt !== undefined && finishedAt !== undefined
-              ? formatAgentRunElapsed((finishedAt - startedAt) / 1_000)
-              : ''
-          const statusLabel =
-            task.status === 'queued'
-              ? '排队中'
-              : task.status === 'running'
-                ? '生成中'
-                : task.status === 'done'
-                  ? '已完成'
-                  : '失败'
-          return (
-            <div
-              key={task.nodeId}
-              className={styles.runTaskRow}
-              data-agent-run-task-node={task.nodeId}
-              data-agent-run-task-status={task.status}
-              title={task.error || task.title}
-            >
-              <span className={styles.runTaskIcon} aria-hidden="true">
-                {task.status === 'running' ? (
-                  <span className={styles.runTaskSpinner} />
-                ) : task.status === 'failed' ? (
-                  <IconClose size={12} />
-                ) : task.status === 'done' ? (
-                  <IconCheck size={12} />
-                ) : (
-                  <span className={styles.runTaskQueuedDot} />
-                )}
-              </span>
-              <span className={styles.runTaskName}>{task.title}</span>
-              <span className={styles.runTaskStatus}>{statusLabel}</span>
-              <span className={styles.runTaskElapsed}>
-                {elapsed
-                  ? task.status === 'running'
-                    ? `已处理 ${elapsed}`
-                    : `用时 ${elapsed}`
-                  : ''}
-              </span>
-            </div>
-          )
-        })}
-      </div>
-    </section>
-  )
-}
-
-function TypewriterActivity({
-  text,
-  live,
-  textKey,
-  current = false,
-  markdown = false,
-}: {
-  text: string
-  live: boolean
-  textKey: string
-  current?: boolean
-  markdown?: boolean
-}) {
-  const [visible, setVisible] = useState(text)
-  const [typing, setTyping] = useState(false)
-  const visibleRef = useRef(text)
-
-  useEffect(() => {
-    visibleRef.current = visible
-  }, [visible])
-
-  useEffect(() => {
-    const reduceMotion =
-      typeof window !== 'undefined' &&
-      window.matchMedia('(prefers-reduced-motion: reduce)').matches
-    if (!live || reduceMotion || text.length === 0) {
-      setVisible(text)
-      setTyping(false)
-      return
-    }
-
-    const current = visibleRef.current
-    const characters = agentRevealCharacters(text)
-    const currentCharacters = agentRevealCharacters(current)
-    const canContinue =
-      current.length > 0 &&
-      characters.slice(0, currentCharacters.length).join('') === current
-    if (!canContinue) {
-      setVisible('')
-      visibleRef.current = ''
-    }
-    setTyping(true)
-    let index = canContinue ? currentCharacters.length : 0
-    const interval = Math.max(18, Math.min(55, Math.floor(800 / text.length)))
-    const timer = window.setInterval(() => {
-      index += 1
-      const next = characters.slice(0, index).join('')
-      setVisible(next)
-      visibleRef.current = next
-      if (index >= characters.length) {
-        window.clearInterval(timer)
-        setTyping(false)
-      }
-    }, interval)
-    return () => window.clearInterval(timer)
-  }, [live, text, textKey])
-
-  if (markdown && !typing) {
-    return (
-      <div
-        className={`${styles.activityMarkdown} ${styles.markdownBody}`}
-        aria-live="polite"
-        data-agent-process-text
-      >
-        <MarkdownBlocks source={text} />
-      </div>
-    )
-  }
-
-  return (
-    <span
-      className={styles.activityCopy}
-      aria-live="polite"
-      data-agent-process-text
-      {...(current ? { 'data-agent-process-current': '' } : {})}
-    >
-      <span aria-hidden="true">
-        {visible}
-        {typing ? <span className={styles.activityCursor} /> : null}
-      </span>
-      <span className={styles.srOnly}>{text}</span>
-    </span>
-  )
-}
-
-function AgentActivityStrip({
-  status,
-  items,
-  activities,
-  history,
-  processText,
-  startedAt,
-  finishedAt,
-  live,
-}: {
-  status: Status
-  items: readonly ConversationItem[]
-  activities: readonly AgentLoopActivity[]
-  history: readonly ConversationProcessEntry[]
-  processText: string
-  startedAt?: number
-  finishedAt?: number
-  live: boolean
-}) {
-  const [expanded, setExpanded] = useState(false)
-  const [generationPhraseIndex, setGenerationPhraseIndex] = useState(0)
-  const [now, setNow] = useState(() => Date.now())
-  const busy = live && statusIsBusy(status)
-  const reasoningHistory = history.filter((entry) => entry.source !== 'intent')
-  const intent =
-    history.find((entry) => entry.source === 'intent') ??
-    (history[0]?.source ? undefined : history[0])
-  const liveDetail = [...activities]
-    .reverse()
-    .find(
-      (activity) =>
-        activity.status === 'running' && activity.detail?.trim(),
-    )?.detail?.trim()
-  const latestHistory = reasoningHistory.at(-1) ?? history.at(-1)
-  const processHistory = reasoningHistory
-  const canExpand = Boolean(processText.trim()) || processHistory.length > 0
-  const generationTool = status.kind === 'executing' ? status.tool : undefined
-
-  useEffect(() => {
-    setNow(Date.now())
-    if (!live || !startedAt) return
-    const timer = window.setInterval(() => setNow(Date.now()), 1_000)
-    return () => window.clearInterval(timer)
-  }, [live, startedAt])
-
-  useEffect(() => {
-    if (
-      !live ||
-      status.kind !== 'executing' ||
-      (generationTool !== 'runNode' && generationTool !== 'runFrom')
-    ) {
-      setGenerationPhraseIndex(0)
-      return
-    }
-    const timer = window.setInterval(() => {
-      setGenerationPhraseIndex((current) => current + 1)
-    }, 4_000)
-    return () => window.clearInterval(timer)
-  }, [generationTool, live, status.kind])
-
-  const currentText = activityTextOf(
-    status,
-    generationPhraseIndex,
-    items,
-    activities,
-  )
-  const isGeneration =
-    live && status.kind === 'executing' &&
-    (status.tool === 'runNode' || status.tool === 'runFrom')
-  const visibleText = !live
-    ? latestProcessLine(processText || latestHistory?.text || '')
-    : isGeneration
-      ? currentText
-      : latestProcessLine(processText) || liveDetail || latestProcessLine(latestHistory?.text || '') || currentText
-  const elapsedEnd =
-    live
-      ? now
-      : finishedAt ?? history.at(-1)?.createdAt
-  const elapsedText =
-    startedAt && elapsedEnd && elapsedEnd >= startedAt
-      ? formatAgentRunElapsed((elapsedEnd - startedAt) / 1_000)
-      : ''
-  const showCurrentLine = Boolean(visibleText && visibleText !== intent?.text)
-
-  return (
-    <section
-      className={expanded ? `${styles.activity} ${styles.activityOpen}` : styles.activity}
-      data-agent-activity
-      data-agent-activity-expanded={expanded ? 'true' : 'false'}
-      data-agent-activity-running={busy ? 'true' : 'false'}
-      data-agent-status={status.kind}
-      data-agent-process-history={history.length}
-    >
-      {elapsedText ? (
-        <div className={styles.activityDuration} data-agent-process-duration>
-          已处理 {elapsedText}
-        </div>
-      ) : null}
-      {intent ? (
-        <div className={styles.activityIntent} data-agent-process-intent>
-          <TypewriterActivity
-            text={intent.text}
-            live={live}
-            textKey={intent.id}
-            markdown
-          />
-        </div>
-      ) : null}
-      {showCurrentLine || canExpand ? (
-        <div className={styles.activityHead}>
-          {showCurrentLine ? (
-            <TypewriterActivity
-              text={visibleText}
-              live={live}
-              textKey={latestHistory?.id ?? `${status.kind}-${generationPhraseIndex}`}
-              current
-            />
-          ) : (
-            <span className={styles.activityCopy} />
-          )}
-          {canExpand ? (
-            <button
-              type="button"
-              className={styles.activityToggle}
-              data-agent-activity-toggle
-              aria-expanded={expanded}
-              aria-label={expanded ? '收起较早步骤' : '展开全部执行步骤'}
-              title={expanded ? '收起较早步骤' : '展开全部执行步骤'}
-              onClick={() => setExpanded((current) => !current)}
-            >
-              <span className={styles.activityToggleIcon}>
-                <IconChevronDown size={14} />
-              </span>
-            </button>
-          ) : null}
-        </div>
-      ) : null}
-      {expanded && canExpand ? (
-        <div className={styles.activityList} data-agent-activity-list>
-          {processText.trim() ? (
-            <div className={styles.activityProcessBody} data-agent-process-live-body>
-              <MarkdownBlocks source={processText} />
-            </div>
-          ) : null}
-          {processHistory.map((step) => (
-            <div
-              key={step.id}
-              className={styles.activityRow}
-              data-agent-process-row={step.id}
-            >
-              <div className={styles.activityStepName}>
-                <MarkdownBlocks source={step.text} />
-              </div>
-              {step.createdAt ? (
-                <time
-                  className={styles.activityStepTime}
-                  dateTime={new Date(step.createdAt).toISOString()}
-                >
-                  {messageTimeText(step.createdAt)}
-                </time>
-              ) : null}
-            </div>
-          ))}
-        </div>
-      ) : null}
-    </section>
-  )
-}
-
-/** 步骤卡里嵌的一张小图：直接用画布那套「按 hash 取素材」的钩子，不另写一条取图链路 */
-function StepThumb({ hash }: { hash: string }) {
-  const url = useAsset(hash)
-  const store = useCanvasStore()
-  if (!url) return <span className={styles.thumbEmpty} />
-  return (
-    <button
-      type="button"
-      className={styles.thumbButton}
-      onClick={() => store.openLightbox(hash)}
-      title="放大查看这张图"
-      aria-label="放大查看这张图"
-      data-agent-thumb-open={hash}
-    >
-      <img className={styles.thumbImg} src={url} alt="这一步的产物" />
-    </button>
-  )
-}
-
-/** 素材库里的一个缩略图：同样走 `useAsset`，不另写一条取图链路 */
-function LibraryThumb({ hash }: { hash: string }) {
-  const url = useAsset(hash)
-  if (!url) return <span className={styles.libraryPlaceholder} />
-  return <img className={styles.libraryImg} src={url} alt="" />
-}
-
 /**
  * 模型候选 → 带厂商图标的选项（固定清单里的那些才有图标）。
  *
@@ -6415,12 +5843,4 @@ function previewOf(
     }
   }
   return { tool: name, title: name, lines: [], action: '执行' }
-}
-
-function messageTimeText(createdAt: number): string {
-  return new Date(createdAt).toLocaleTimeString('zh-CN', {
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-  })
 }

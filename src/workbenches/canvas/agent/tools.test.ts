@@ -15,10 +15,13 @@ import {
   readAssetInfo,
   readGraphSummary,
   readResults,
+  summarizeGraph,
   runFromNodeIds,
   type AgentToolContext,
 } from './tools'
 import { buildAgentSystemPrompt } from './agentSystemPrompt'
+import * as toolCatalog from './toolCatalog'
+import * as canvasReadTools from './canvasReadTools'
 
 /**
  * 工具集（设计文档 §5）。
@@ -53,6 +56,20 @@ const addNode = (
 }
 
 describe('工具声明', () => {
+  it('目录拆分后从 tools.ts 导出的仍是同一份目录实现', () => {
+    expect(AGENT_TOOLS).toBe(toolCatalog.AGENT_TOOLS)
+    expect(agentToolsForCapabilities).toBe(toolCatalog.agentToolsForCapabilities)
+    expect(agentToolsForRequestMode).toBe(toolCatalog.agentToolsForRequestMode)
+    expect(discoverAgentTools).toBe(toolCatalog.discoverAgentTools)
+  })
+
+  it('只读结果拆分后 tools.ts 继续导出同一份实现', () => {
+    expect(summarizeGraph).toBe(canvasReadTools.summarizeGraph)
+    expect(readGraphSummary).toBe(canvasReadTools.readGraphSummary)
+    expect(readAssetInfo).toBe(canvasReadTools.readAssetInfo)
+    expect(readResults).toBe(canvasReadTools.readResults)
+  })
+
   it('★ 读图、运行、空间操作和现有图像能力都在，且都带参数 schema', () => {
     expect(AGENT_TOOLS.map((t) => t.name).sort()).toEqual([
       'applyPlan',
