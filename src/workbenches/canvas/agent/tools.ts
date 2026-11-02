@@ -11,6 +11,7 @@ import type { CanvasStore } from '../../../state/workbenches/canvas/store'
 import type { GraphSnapshot } from '../../../domain/canvas/model/graph'
 import type { GenerationContextAsset } from '../../../domain/canvas/model/node'
 import type { Rect } from '../../../domain/agent/landing'
+import { describeError, type AppError } from '../../../shared/result'
 import { downstreamOf } from '../../../domain/canvas/graph/upstreamOf'
 import { canBuildRequest } from '../../../features/canvas/execution/buildRunPlan'
 import { applyAgentPlan } from './applyAgentPlan'
@@ -24,7 +25,6 @@ import {
   placeNodeWithoutOverlap,
   snapshotRects,
 } from './agentGeometry'
-import { lockedResize } from '../../../domain/canvas/nodeSpecs/resizeLock'
 import {
   memoryCandidateProblems,
   normalizeMemoryCandidate,
@@ -1001,6 +1001,19 @@ export function readGraphSummary(
  * 不去猜、也不为它去解码字节 —— agent 问它是为了判断「能不能当参考图」，
  * 一个编出来的尺寸会直接导致它做出错误判断。
  */
+type NodeLike = { type: string; data: unknown } | undefined
+
+function assetMimeOf(node: NodeLike): string {
+  if (!node) return 'unknown'
+  const data = asRecord(node.data)
+  const mime = data.assetMime
+  if (typeof mime === 'string' && mime.trim()) return mime
+  if (node.type === 'generation' || node.type === 'batch') {
+    return data.mode === 'video' ? 'video/mp4' : 'image/png'
+  }
+  return 'unknown'
+}
+
 export function readAssetInfo(store: CanvasStore, nodeIds: unknown) {
   const graph = store.getSnapshot()
   const out: { nodeId: string; title?: string; mime: string; width?: number; height?: number }[] = []
@@ -1018,7 +1031,7 @@ export function readAssetInfo(store: CanvasStore, nodeIds: unknown) {
     out.push({
       nodeId: id,
       ...(title ? { title } : {}),
-      mime: node.type === 'generation' && data.mode === 'video' ? 'video/mp4' : 'image/png',
+      mime: assetMimeOf(node),
       ...(w && h ? { width: w, height: h } : {}),
     })
   }
@@ -1031,7 +1044,13 @@ export function readAssetInfo(store: CanvasStore, nodeIds: unknown) {
  * 数据源是**节点自己记着的产物字段**（画布上显示的就是它），不是执行留痕表 ——
  * agent 关心的是「这个节点现在有什么」，而不是「历史上跑过几次」。
  */
-export function readResults(store: CanvasStore, nodeIds: unknown) {
+export function readResults(
+  store: CanvasStore,
+  nodeIds: unknown,
+  nodeRunStateOf?: (
+    nodeId: string,
+  ) => { kind: 'failed'; error?: AppError; reason?: string } | undefined,
+) {
   const graph = store.getSnapshot()
   /**
    * **承载节点**：批量 / 循环展开时，除第一次之外的产物落在**新建的承载节点**上，
@@ -1061,12 +1080,49 @@ export function readResults(store: CanvasStore, nodeIds: unknown) {
       const hash = carrier ? asRecord(carrier.data).assetHash : undefined
       if (typeof hash === 'string') hashes.push(hash)
     }
+    const state = nodeRunStateOf?.(id)
+    const failedReason =
+      state?.kind === 'failed'
+        ? state.reason ?? (state.error ? describeError(state.error) : undefined)
+        : undefined
+    if (failedReason) {
+      return {
+        nodeId: id,
+        ...(title ? { title } : {}),
+        status: 'failed' as const,
+        reason: failedReason,
+        ...(hashes.length > 0
+          ? {
+              outputs: hashes.map((hash) => ({
+                hash,
+                mime: assetMimeOf(
+                  hash === own
+                    ? node
+                    : graph.nodes.find(
+                        (carrier) => asRecord(carrier.data).assetHash === hash,
+                      ),
+                ),
+              })),
+              note: '这些是之前成功留下的产物，不是最近一次失败运行的新结果。',
+            }
+          : {}),
+      }
+    }
     return hashes.length > 0
       ? {
           nodeId: id,
           ...(title ? { title } : {}),
           status: 'ok' as const,
-          outputs: hashes.map((hash) => ({ hash, mime: 'image/png' })),
+          outputs: hashes.map((hash) => ({
+            hash,
+            mime: assetMimeOf(
+              hash === own
+                ? node
+                : graph.nodes.find(
+                    (carrier) => asRecord(carrier.data).assetHash === hash,
+                  ),
+            ),
+          })),
           /** 产物散在哪些节点上 —— 模型据此知道该去改哪一张，而不是再来问一遍 */
           ...(carrierIds.length > 0 ? { carrierNodeIds: carrierIds } : {}),
         }
@@ -1079,7 +1135,9 @@ export function readResults(store: CanvasStore, nodeIds: unknown) {
            * 承载节点上（它们此刻也还没图，或者已经被用户挪走）。把这句话带给模型，
            * 免得它把「源节点空」直接读成「没出图」再重复提交一次。
            */
-          ...(carrierIds.length > 0 ? { note: '该节点是分发器（批量/循环），产物在承载节点上', carrierNodeIds: carrierIds } : {}),
+          ...(carrierIds.length > 0
+            ? { note: '该节点是分发器（批量/循环），产物在承载节点上', carrierNodeIds: carrierIds }
+            : {}),
         }
   })
 }
@@ -1203,6 +1261,13 @@ export interface AgentToolContext {
     nodeIds: readonly string[]
     checklist?: string
   }) => Promise<VisualReviewResult>
+  /**
+   * 节点当前运行状态；由执行宿主注入。`readResult` 用它区分“从没跑过”
+   * 与“跑过但失败”，并把已知失败原因还给模型。
+   */
+  nodeRunStateOf?: (
+    nodeId: string,
+  ) => { kind: 'failed'; error?: AppError; reason?: string } | undefined
   /** 设计调研；由界面层注入网络与灵感库读取能力。 */
   researchDesign?: (input: {
     topic: string
@@ -1280,7 +1345,7 @@ export async function executeReadTool(
     case 'readAsset':
       return { assets: readAssetInfo(ctx.store, a.nodeIds) }
     case 'readResult':
-      return { results: readResults(ctx.store, a.nodeIds) }
+      return { results: readResults(ctx.store, a.nodeIds, ctx.nodeRunStateOf) }
     case 'researchDesign': {
       const topic = typeof a.topic === 'string' ? a.topic.trim() : ''
       if (!topic) return { ok: false, error: '设计调研缺少 topic' }
@@ -1670,8 +1735,12 @@ async function resizeNodesInStore(store: CanvasStore, args: Record<string, unkno
   const scaled = Number.isFinite(scale) && scale > 0
   const uniformWidth = Number.isFinite(width) && width > 0
   const uniformHeight = Number.isFinite(height) && height > 0
-  if (Number(scaled) + Number(uniformWidth) + Number(uniformHeight) !== 1) {
+  const specified = Number(scaled) + Number(uniformWidth) + Number(uniformHeight)
+  if (specified > 1) {
     return { ok: false, problems: ['width / height / scale 只能指定其中一项'] }
+  }
+  if (specified === 0 && args.useMax !== true) {
+    return { ok: false, problems: ['请提供 width / height / scale，或 useMax:true'] }
   }
   const useMax = args.useMax === true
   const uniformW = uniformWidth
@@ -1703,10 +1772,22 @@ async function resizeNodesInStore(store: CanvasStore, args: Record<string, unkno
       w = uniformH * ratio
     }
     const min = nodeMinSize(node)
-    return {
-      node,
-      rect: lockedResize({ x: node.x, y: node.y, w, h }, 0, 0, min, w / h),
+    /**
+     * 最小尺寸也必须等比放大。分别对宽高取 max 会把 16:10 变成 1.25:1，
+     * 用户看到的是图片被拉伸，和工具承诺的“保持原始宽高比”冲突。
+     */
+    const minScale = Math.max(
+      1,
+      min.w / Math.max(1, w),
+      min.h / Math.max(1, h),
+    )
+    const rect = {
+      x: node.x,
+      y: node.y,
+      w: w * minScale,
+      h: h * minScale,
     }
+    return { node, rect }
   })
   const graph = store.getSnapshot()
   store.beginPlan(`agent-resize:${createId('plan')}`, 'Agent 调整节点尺寸')
@@ -2052,6 +2133,11 @@ export async function executeConfirmedTool(
         }
         return problems
       })
+      /**
+       * 落地成功不等于已经安全：外层工具账本马上会把结果记成 finished。
+       * 必须在它之前等画布持久化屏障，否则进程崩溃后会出现“账本成功、画布丢失”。
+       */
+      await ctx.store.flush()
       // 自检结果整份回填：模型要靠它决定补连线还是改图（§6.1）
       return {
         ok: applied.ok && landingProblems.length === 0,
@@ -2163,6 +2249,7 @@ export async function executeConfirmedTool(
         }
       }
       for (const id of ids) ctx.store.dispatch({ kind: 'node.updateData', id, patch: routedPatch })
+      await ctx.store.flush()
       return { ok: true }
     }
     case 'runNode': {
@@ -2250,6 +2337,7 @@ export async function executeConfirmedTool(
         if (result.ok && result.nodeId) {
           const created = ctx.store.getSnapshot().nodes.find((item) => item.id === result.nodeId)
           if (created) placeNodeWithoutOverlap(ctx.store, created.id, created)
+          await ctx.store.flush()
         }
         return result
       }
@@ -2282,6 +2370,7 @@ export async function executeConfirmedTool(
           const created = ctx.store.getSnapshot().nodes.find((item) => item.id === id)
           if (created) placeNodeWithoutOverlap(ctx.store, created.id, created)
         }
+        await ctx.store.flush()
       }
       return result
     }

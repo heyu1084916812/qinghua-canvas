@@ -34,6 +34,13 @@ export interface AgentToolDefinition {
   terminalAfter?: boolean
 }
 
+/**
+ * 自动模式可以静默完成的关键：它必须是明确的生成类动作（扣费），
+ * 且不是删除 / 改已有节点这类破坏性画布操作，也不是记忆写入。
+ * 靠“不是少数几个例外的都算”已经造成过误判；这里反向收口成白名单。
+ */
+const AUTO_CONFIRM_ALLOWED = new Set<AgentToolName>(['runNode', 'runFrom'])
+
 export const AGENT_TOOL_GROUP_LABELS: Record<AgentToolCategory, string> = {
   'agent-internal': 'Agent 内部',
   canvas: '画布',
@@ -121,6 +128,12 @@ export function agentToolDefinitionOf(name: string): AgentToolDefinition | null 
 
 export function isAgentToolName(name: string): name is AgentToolName {
   return BY_NAME.has(name as AgentToolName)
+}
+
+/** 自动模式下可以免人工确认的生成类动作白名单。 */
+export function toolRunsGenerationInAutoMode(name: string): boolean {
+  const definition = agentToolDefinitionOf(name)
+  return definition?.access === 'confirm' && AUTO_CONFIRM_ALLOWED.has(definition.name)
 }
 
 export function agentToolsInCategory(category: AgentToolCategory): readonly AgentToolName[] {

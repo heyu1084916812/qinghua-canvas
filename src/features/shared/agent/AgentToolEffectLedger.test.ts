@@ -96,7 +96,7 @@ describe('AgentToolEffectLedger', () => {
     expect(execute).not.toHaveBeenCalled()
   })
 
-  it('persists a real execution error and never claims success', async () => {
+  it('有副作用的工具执行抛错时停在待核对，不自动重试', async () => {
     const { job, ledger } = await setup()
     const input = {
       jobId: job.id,
@@ -113,16 +113,74 @@ describe('AgentToolEffectLedger', () => {
         },
       }),
     ).resolves.toMatchObject({
+      kind: 'pending',
+      reason: expect.stringContaining('无法确认是否已经生效'),
+    })
+    await expect(
+      ledger.run({ ...input, execute: vi.fn() }),
+    ).resolves.toMatchObject({
+      kind: 'pending',
+      reason: expect.stringContaining('不会自动重发'),
+    })
+  })
+
+  it('纯读工具的真实执行错误仍可记 failed 并回放', async () => {
+    const { job, ledger } = await setup()
+    const input = {
+      jobId: job.id,
+      stepId: 'step-1',
+      toolCallId: 'read-1',
+      toolName: 'readGraph',
+      args: {},
+    }
+    await expect(
+      ledger.run({
+        ...input,
+        execute: async () => {
+          throw new Error('画布读取失败')
+        },
+      }),
+    ).resolves.toMatchObject({
       kind: 'failed',
-      error: '渠道超时，结果未知',
+      error: '画布读取失败',
       replayed: false,
     })
     await expect(
       ledger.run({ ...input, execute: vi.fn() }),
     ).resolves.toMatchObject({
       kind: 'failed',
-      error: '渠道超时，结果未知',
+      error: '画布读取失败',
       replayed: true,
     })
+  })
+
+  it('工具已执行但完成账本写失败时进入待核对，绝不改写成可重试失败', async () => {
+    const { jobs, job } = await setup()
+    const completeError = vi
+      .spyOn(jobs, 'completeToolEffect')
+      .mockRejectedValueOnce(new Error('账本磁盘已满'))
+    const ledger = createAgentToolEffectLedger(jobs)
+    const execute = vi.fn(async () => ({ ok: true, createdNodeIds: ['n1'] }))
+    const input = {
+      jobId: job.id,
+      stepId: 'step-1',
+      toolCallId: 'call-ledger',
+      toolName: 'applyPlan',
+      args: {},
+      execute,
+    }
+
+    await expect(ledger.run(input)).resolves.toMatchObject({
+      kind: 'pending',
+      reason: expect.stringContaining('完成结果写入账本失败'),
+    })
+    expect(execute).toHaveBeenCalledTimes(1)
+    await expect(
+      ledger.run({ ...input, execute: vi.fn() }),
+    ).resolves.toMatchObject({
+      kind: 'pending',
+      reason: expect.stringContaining('不会自动重发'),
+    })
+    completeError.mockRestore()
   })
 })

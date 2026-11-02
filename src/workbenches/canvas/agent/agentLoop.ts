@@ -435,6 +435,44 @@ export async function runAgentTurn(
     })
     emitProgress()
 
+    /**
+     * 一次模型返回可能带多个 tool_calls。循环里任何“提前返回”都必须先给
+     * 未执行的调用补上明确的未执行结果，否则下一轮模型请求会出现悬空 tool_call。
+     */
+    const finishWithUnexecutedResults = (
+      outcome: AgentLoopOutcome,
+      handledCallIds: ReadonlySet<string>,
+      startCallId: string,
+      currentResult?: ChatMessage,
+    ): AgentLoopOutcome => {
+      const startIndex = calls.findIndex((call) => call.id === startCallId)
+      const from = startIndex >= 0 ? startIndex : calls.length
+      const extras: ChatMessage[] = currentResult ? [currentResult] : []
+      for (let index = from; index < calls.length; index += 1) {
+        const call = calls[index]!
+        if (handledCallIds.has(call.id) || call.id === currentResult?.toolCallId) {
+          continue
+        }
+        extras.push(
+          toolResult(call.id, call.name, {
+            ok: false,
+            canceled: outcome.kind === 'confirm',
+            notStarted: true,
+            error:
+              outcome.kind === 'confirm'
+                ? '前面的工具在等待用户确认，这次调用没有开始执行。'
+                : '任务在这一步停止，这次调用没有开始执行。',
+          }),
+        )
+      }
+      if (extras.length === 0) return outcome
+      return {
+        ...outcome,
+        messages: [...outcome.messages, ...extras],
+      }
+    }
+
+    const handledCallIds = new Set<string>()
     for (const call of calls) {
       if (!allowedToolNames.has(call.name)) {
         messages.push(
@@ -443,6 +481,7 @@ export async function runAgentTurn(
             error: `本轮未提供工具 ${call.name}，请只使用当前声明里的工具`,
           }),
         )
+        handledCallIds.add(call.id)
         continue
       }
       const args = parseArgs(call.args)
@@ -453,6 +492,7 @@ export async function runAgentTurn(
             error: 'arguments 不是合法 JSON，请重新发一次',
           }),
         )
+        handledCallIds.add(call.id)
         continue
       }
 
@@ -488,6 +528,7 @@ export async function runAgentTurn(
             }),
           )
         }
+        handledCallIds.add(call.id)
         continue
       }
 
@@ -499,7 +540,8 @@ export async function runAgentTurn(
       const times = (seenCalls.get(fp) ?? 0) + 1
       seenCalls.set(fp, times)
       if (times >= 3) {
-        return {
+        return finishWithUnexecutedResults(
+          {
           kind: 'stopped',
           /**
            * 用户 2026-10-06 第七批 #189：「我换了一个 llm 之后规划就非常清晰的，基本上没有出错，
@@ -511,7 +553,10 @@ export async function runAgentTurn(
             `反复调用同一个工具（${call.name}）且参数相同，已停下 —— ` +
             '这个对话模型这几轮没能给出可用的计划。换一个更擅长规划的对话模型（面板顶部那枚模型）再试一次通常就通了。',
           messages,
-        }
+          },
+          handledCallIds,
+          call.id,
+        )
       }
       if (times === 2) {
         messages.push(
@@ -520,6 +565,7 @@ export async function runAgentTurn(
             error: `你刚做过同样的 ${call.name}，换个做法或直接给结论`,
           }),
         )
+        handledCallIds.add(call.id)
         continue
       }
 
@@ -531,10 +577,20 @@ export async function runAgentTurn(
         const pre = deps.precheck?.(call.name, args)
         if (pre && pre.ok === false) {
           messages.push(toolResult(call.id, call.name, pre.result))
+          handledCallIds.add(call.id)
           continue
         }
         // 写 / 花钱：跳出循环，交界面等确认（§9）
-        return { kind: 'confirm', request: { callId: call.id, name: call.name, args }, messages }
+        /**
+         * 当前调用要等用户批准，后面同批调用也还没有开始。
+         * 这里先不补结果：批准时由 `resumeAgentTurn` 按 call 顺序补
+         * “当前真实结果 + 后续 notStarted”，取消时由确认结算一次补齐。
+         */
+        return {
+          kind: 'confirm',
+          request: { callId: call.id, name: call.name, args },
+          messages,
+        }
       }
       /**
        * 建图类：**直接执行**（不问用户），把自检结果回填 ——
@@ -558,7 +614,8 @@ export async function runAgentTurn(
               status: 'failed',
               tool: call.name,
             })
-            return {
+            return finishWithUnexecutedResults(
+              {
               kind: 'error',
               message: e.message,
               messages,
@@ -570,7 +627,15 @@ export async function runAgentTurn(
                     },
                   }
                 : {}),
-            }
+              },
+              handledCallIds,
+              call.id,
+              toolResult(call.id, call.name, {
+                ok: false,
+                error: e.message,
+                ...(e.status === 'needs_attention' ? { needsAttention: true } : {}),
+              }),
+            )
           }
           wrote = { ok: false, problems: [e instanceof Error ? e.message : errText(e)] }
         }
@@ -581,6 +646,7 @@ export async function runAgentTurn(
           tool: call.name,
         })
         messages.push(toolResult(call.id, call.name, wrote))
+        handledCallIds.add(call.id)
         continue
       }
       if (!READ_TOOLS.has(call.name)) {
@@ -593,6 +659,7 @@ export async function runAgentTurn(
         messages.push(
           toolResult(call.id, call.name, { ok: false, error: `没有这个工具：${call.name}` }),
         )
+        handledCallIds.add(call.id)
         continue
       }
 
@@ -613,7 +680,8 @@ export async function runAgentTurn(
             status: 'failed',
             tool: call.name,
           })
-          return {
+          return finishWithUnexecutedResults(
+            {
             kind: 'error',
             message: e.message,
             messages,
@@ -625,7 +693,15 @@ export async function runAgentTurn(
                   },
                 }
               : {}),
-          }
+            },
+            handledCallIds,
+            call.id,
+            toolResult(call.id, call.name, {
+              ok: false,
+              error: e.message,
+              ...(e.status === 'needs_attention' ? { needsAttention: true } : {}),
+            }),
+          )
         }
         outcome = { ok: false, error: e instanceof Error ? e.message : errText(e) }
       }
@@ -635,6 +711,7 @@ export async function runAgentTurn(
         status: failedToolValue(outcome) ? 'failed' : 'done',
         tool: call.name,
       })
+      handledCallIds.add(call.id)
       messages.push(toolResult(call.id, call.name, outcome))
       if (agentToolDefinitionOf(call.name)?.terminalAfter) visualReviewRan = true
     }
@@ -682,7 +759,48 @@ export async function resumeAgentTurn(
   deps: AgentLoopDeps,
   toolName?: string,
 ): Promise<AgentLoopOutcome> {
-  return runAgentTurn([...history, toolResult(callId, toolName ?? '', payload)], deps)
+  const messages = [...history]
+  const existingResultIds = new Set(
+    messages.flatMap((message) =>
+      message.role === 'tool' && message.toolCallId ? [message.toolCallId] : [],
+    ),
+  )
+  const requestMessage = [...messages]
+    .reverse()
+    .find(
+      (message) =>
+        message.role === 'assistant' &&
+        message.toolCalls?.some((call) => call.id === callId),
+    )
+  const requestIndex =
+    requestMessage?.toolCalls?.findIndex((call) => call.id === callId) ?? -1
+
+  if (!existingResultIds.has(callId)) {
+    messages.push(toolResult(callId, toolName ?? '', payload))
+    existingResultIds.add(callId)
+  }
+
+  /**
+   * 用户确认前，同一批 tool_calls 里排在前面的调用可以已经执行，后面的调用
+   * 则明确没有开始。确认后要先把当前真实结果补上，再按原顺序补后续 notStarted；
+   * 不能把结果提前塞在确认之前，否则模型会同时看到“未执行”和“真实结果”。
+   */
+  if (requestMessage?.toolCalls && requestIndex >= 0) {
+    for (const later of requestMessage.toolCalls.slice(requestIndex + 1)) {
+      if (existingResultIds.has(later.id)) continue
+      messages.push(
+        toolResult(later.id, later.name, {
+          ok: false,
+          canceled: false,
+          notStarted: true,
+          error: '前面的工具在等待用户确认，这次调用没有开始执行。',
+        }),
+      )
+      existingResultIds.add(later.id)
+    }
+  }
+
+  return runAgentTurn(messages, deps)
 }
 
 /**

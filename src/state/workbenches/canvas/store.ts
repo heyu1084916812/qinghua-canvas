@@ -459,11 +459,11 @@ function createPersister(platform: PlatformKit, debounceMs: number) {
     pending.tables = [...new Set([...pending.tables, ...p.tables])]
   }
 
-  /** 真正写一次：取走当前 pending 并落库（失败只记日志，绝不让 dispatch 挂掉） */
-  const writeOnce = async () => {
+  /** 真正写一次：取走当前 pending 并落库；失败恢复本批并把错误交给 flush 调用者。 */
+  const writeOnce = async (): Promise<unknown | null> => {
     const plan = pending
     pending = { tables: [], upserts: [], deletes: [] }
-    if (!plan.upserts.length && !plan.deletes.length) return
+    if (!plan.upserts.length && !plan.deletes.length) return null
     /** 素材行：**落库成功后**再镜像到素材文件夹（把写盘塞进 DB 事务里是错的语义） */
     const assetRows: Row[] = []
     const freshThumbs = new Map<string, Uint8Array>()
@@ -490,9 +490,17 @@ function createPersister(platform: PlatformKit, debounceMs: number) {
         for (const d of plan.deletes) for (const id of d.ids) await tx.delete(d.table, id)
       })
     } catch (err) {
-      // 落库失败是数据问题（配额 / 表损坏），不该让交互链路抛异常
+      /**
+       * 普通交互仍然不抛：这里会把失败标记在 pendingFlushError，
+       * UI / Agent 在需要持久化屏障时显式等待并抛出。
+       */
       console.error('[persist] flush failed', err)
-      return
+      // 失败期间可能又来了新改动。先恢复旧批，再合并新批，保持“后写覆盖先写”。
+      const newer = pending
+      pending = { tables: [], upserts: [], deletes: [] }
+      merge(plan)
+      merge(newer)
+      return err
     }
     if (assetRows.length > 0) {
       /**
@@ -511,6 +519,7 @@ function createPersister(platform: PlatformKit, debounceMs: number) {
         if (needsPreview(row)) void ensureAssetPreview(platform, row, blob)
       }
     }
+    return null
   }
 
   const flush = (): Promise<void> => {
@@ -518,19 +527,25 @@ function createPersister(platform: PlatformKit, debounceMs: number) {
       clearTimeout(timer)
       timer = null
     }
-    chain = chain.then(writeOnce)
-    return chain
+    const run = async () => {
+      const error = await writeOnce()
+      if (error) throw error
+    }
+    const result = chain.then(run, run)
+    // 单次失败只反馈给这次调用者，不能让后续持久化链永久 rejected。
+    chain = result.catch(() => undefined)
+    return result
   }
 
   const schedule = (p: PersistPlan) => {
     merge(p)
     // 素材插队：立刻把已合并的一切（含本条）落库，不再排 800ms
     if (isUrgent(p)) {
-      void flush()
+      void flush().catch(() => undefined)
       return
     }
     if (timer) clearTimeout(timer)
-    timer = setTimeout(() => void flush(), debounceMs)
+    timer = setTimeout(() => void flush().catch(() => undefined), debounceMs)
   }
 
   return { schedule, flush }
@@ -853,6 +868,6 @@ export function createCanvasStore(opts: CanvasStoreOptions): CanvasStore {
     endPlan: () => {
       activePlan = null
     },
-    dispose: () => void persister.flush(),
+    dispose: () => void persister.flush().catch(() => undefined),
   }
 }

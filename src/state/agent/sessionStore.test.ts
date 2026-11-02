@@ -300,6 +300,7 @@ describe('Agent 会话 · 待执行任务队列', () => {
       { id: 'steer-1', text: '改成横版', createdAt: expect.any(Number) },
     ])
 
+    await s.save({ ...a, pendingAssetIds: ['asset-1'] })
     await s.enqueueTurn(a.id, {
       ...turn('2', '带图修改'),
       pendingAssetIds: ['asset-1'],
@@ -307,6 +308,41 @@ describe('Agent 会话 · 待执行任务队列', () => {
     expect(
       await s.promoteQueuedTurnToSteer(a.id, '2', 'steer-2'),
     ).toEqual({ ok: false, reason: 'has_assets' })
+  })
+
+  it('★★ 排队时冻结并消费附件，连续排队不会重复携带', async () => {
+    const s = store()
+    const a = await s.create({ projectId: 'p1', channelId: 'c1', model: 'm1' })
+    await s.save({ ...a, pendingAssetIds: ['asset-a', 'asset-b'] })
+
+    const first = await s.enqueueTurn(a.id, {
+      ...turn('1'),
+      pendingAssetIds: ['asset-a', 'asset-b'],
+    })
+    expect(first).toMatchObject({
+      ok: true,
+      session: {
+        pendingAssetIds: undefined,
+        queuedTurns: [
+          expect.objectContaining({ pendingAssetIds: ['asset-a', 'asset-b'] }),
+        ],
+      },
+    })
+
+    const second = await s.enqueueTurn(a.id, {
+      ...turn('2'),
+      pendingAssetIds: ['asset-a', 'asset-b'],
+    })
+    expect(second).toMatchObject({
+      ok: true,
+      session: {
+        queuedTurns: [
+          expect.objectContaining({ pendingAssetIds: ['asset-a', 'asset-b'] }),
+          expect.not.objectContaining({ pendingAssetIds: expect.anything() }),
+        ],
+      },
+    })
+    expect((await s.get(a.id))?.pendingAssetIds).toBeUndefined()
   })
 
   it('★ 有确认卡时不允许把排队消息写成下一步引导', async () => {
@@ -416,6 +452,38 @@ describe('Agent 会话 · 待执行任务队列', () => {
     const saved = await s.saveMessages(a.id, [{ role: 'user', content: '正在执行的回合' }])
     expect(saved?.messages.map((message) => message.content)).toEqual(['正在执行的回合'])
     expect(saved?.queuedTurns.map((item) => item.id)).toEqual(['1'])
+  })
+
+  it('★★ 模型请求前落库的用户消息在回合中断后仍可恢复，且保留附件引用', async () => {
+    const storage = createMemoryPlatform().storage
+    const s = createAgentSessionStore(storage)
+    const a = await s.create({ projectId: 'p1', channelId: 'c1', model: 'm1' })
+    const pendingMessages = [
+      { role: 'assistant' as const, content: '上一轮回答' },
+      {
+        role: 'user' as const,
+        content: '把这两张图做成海报',
+        display: '把 @[产品图](node:img-1) @[模特图](node:img-2) 做成海报',
+        createdAt: 10,
+        imageNodeIds: ['img-1', 'img-2'],
+      },
+    ]
+
+    await s.saveMessages(a.id, pendingMessages)
+    await s.updateFields(a.id, {
+      pendingConfirmation: undefined,
+      continuation: undefined,
+      activeTurnId: undefined,
+    })
+
+    const reopened = createAgentSessionStore(storage)
+    const recovered = await reopened.get(a.id)
+    expect(recovered?.messages).toEqual(pendingMessages)
+    expect(recovered?.messages.at(-1)).toMatchObject({
+      role: 'user',
+      content: '把这两张图做成海报',
+      imageNodeIds: ['img-1', 'img-2'],
+    })
   })
 
   it('FIFO 原子领取队首；完成前任务仍在库里', async () => {

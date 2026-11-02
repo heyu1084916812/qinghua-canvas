@@ -454,6 +454,73 @@ describe('读类工具', () => {
     expect(out[0]).toMatchObject({ title: '三视图设定' })
   })
 
+  it('readAsset/readResult 使用真实 assetMime，readResult 返回已知失败原因', () => {
+    const { store } = setup()
+    const video = addNode(store, 'generation', {
+      mode: 'video',
+      assetHash: 'h-video',
+      assetMime: 'video/webm',
+    })
+    const unknownMime = addNode(store, 'generation', {
+      mode: 'image',
+      assetHash: 'h-unknown',
+      assetMime: 'audio/x-old',
+    })
+    const failed = addNode(store, 'generation', { mode: 'image' })
+
+    const assets = readAssetInfo(store, [video, unknownMime])
+    expect(assets[0]).toMatchObject({ mime: 'video/webm' })
+    expect(assets[1]).toMatchObject({ mime: 'audio/x-old' })
+
+    const results = readResults(store, [video, unknownMime, failed], (nodeId) =>
+      nodeId === failed
+        ? { kind: 'failed', error: { kind: 'channel', detail: 'missingModel' } }
+        : undefined,
+    )
+    expect((results[0] as { outputs?: { mime: string }[] }).outputs?.[0]).toMatchObject({ mime: 'video/webm' })
+    expect((results[1] as { outputs?: { mime: string }[] }).outputs?.[0]).toMatchObject({ mime: 'audio/x-old' })
+    expect(results[2]).toMatchObject({
+      status: 'failed',
+      reason: expect.stringContaining('模型'),
+    })
+  })
+
+  it('resizeNodes 允许单独传 useMax', async () => {
+    const { store, ctx } = setup()
+    const a = addNode(store, 'generation', { mode: 'image' })
+    const b = addNode(store, 'generation', { mode: 'image' })
+    store.dispatch({
+      kind: 'node.create',
+      projectId: 'p1',
+      type: 'generation',
+      id: b,
+      at: { x: 400, y: 0 },
+      data: { mode: 'image' },
+    })
+    const out = await executeConfirmedTool('resizeNodes', { nodeIds: [a, b], useMax: true }, ctx)
+    expect(out).toMatchObject({ ok: true })
+    const nodes = store.getSnapshot().nodes.filter((node) => [a, b].includes(node.id))
+    expect(nodes.every((node) => Number.isFinite(node.w))).toBe(true)
+    expect(new Set(nodes.map((node) => node.w)).size).toBe(1)
+  })
+
+  it('★★ resizeNodes 撞到最小尺寸时仍保持原始宽高比', async () => {
+    const { store, ctx } = setup()
+    const id = addNode(store, 'generation', { mode: 'image' })
+    store.dispatch({
+      kind: 'node.resize',
+      id,
+      rect: { x: 0, y: 0, w: 320, h: 200 },
+      phase: 'end',
+    })
+
+    await executeConfirmedTool('resizeNodes', { nodeIds: [id], height: 50 }, ctx)
+    const node = store.getSnapshot().nodes.find((item) => item.id === id)!
+    expect(node.w / node.h).toBeCloseTo(320 / 200, 6)
+    expect(node.w).toBeGreaterThanOrEqual(240)
+    expect(node.h).toBeGreaterThanOrEqual(192)
+  })
+
   it('★★ visualReview 只调用只读子代理，不改画布，并解析应用层给的节点别名', async () => {
     const { store, ctx } = setup()
     const visualReview = vi.fn(async () => ({
@@ -521,6 +588,25 @@ describe('读类工具', () => {
     const summary = readGraphSummary(store, 'all')
     expect(summary.nodes.find((n) => n.id === batch)?.hasOutput).toBe(true)
   })
+
+  it('★★ readResult 遇到最近一次失败时，旧产物不能被伪报成本次成功', () => {
+    const { store } = setup()
+    const id = addNode(store, 'generation', {
+      mode: 'image',
+      assetHash: 'old-success',
+    })
+    const out = readResults(store, [id], (nodeId) =>
+      nodeId === id
+        ? { kind: 'failed', reason: '最近一次生成超时' }
+        : undefined,
+    )
+    expect(out[0]).toMatchObject({
+      status: 'failed',
+      reason: '最近一次生成超时',
+      outputs: [{ hash: 'old-success' }],
+      note: expect.stringContaining('不是最近一次失败运行'),
+    })
+  })
 })
 
 describe('写 / 花钱的工具（只由确认后调用）', () => {
@@ -553,6 +639,29 @@ describe('写 / 花钱的工具（只由确认后调用）', () => {
     expect(r.createdNodeIds).toHaveLength(3)
     expect(store.getSnapshot().nodes).toHaveLength(3)
     expect(store.getSnapshot().edges).toHaveLength(2)
+  })
+
+  it('★★ applyPlan 在回填成功前必须等画布持久化屏障', async () => {
+    const { store, ctx } = setup()
+    vi.spyOn(store, 'flush').mockRejectedValueOnce(new Error('画布落库失败'))
+    await expect(
+      executeConfirmedTool(
+        'applyPlan',
+        {
+          summary: '单节点',
+          nodes: [
+            {
+              localId: 'g1',
+              type: 'generation',
+              data: { mode: 'image', prompt: '测试' },
+              order: 0,
+            },
+          ],
+          edges: [],
+        },
+        ctx,
+      ),
+    ).rejects.toThrow('画布落库失败')
   })
 
   it('★★ 模型把新节点与 attach 写成同名时，仍然新建节点并接回原图', async () => {

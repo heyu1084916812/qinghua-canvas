@@ -128,6 +128,116 @@ describe('runAgentTurn · 确认之前的预检', () => {
 })
 
 describe('runAgentTurn · 基本往复', () => {
+  it('★★ 多个 tool_calls 遇确认时不提前补结果，批准后按调用顺序唯一配对', async () => {
+    const { deps } = depsWith([
+      {
+        toolCalls: [
+          { id: 'read-1', name: 'readGraph', args: '{"scope":"all"}' },
+          { id: 'paid-1', name: 'runNode', args: '{"nodeIds":["n1"]}' },
+          { id: 'delete-1', name: 'deleteNodes', args: '{"nodeIds":["n2"]}' },
+        ],
+      },
+      { text: '本轮先停在这里。' },
+    ])
+
+    const pending = await runAgentTurn(user('先看一下再生成'), deps)
+    expect(pending.kind).toBe('confirm')
+    if (pending.kind !== 'confirm') throw new Error('expected confirmation')
+    expect(
+      pending.messages
+        .filter((message) => message.role === 'tool')
+        .map((message) => message.toolCallId),
+    ).toEqual(['read-1'])
+
+    const resumed = await resumeAgentTurn(
+      pending.messages,
+      'paid-1',
+      { ok: true, outcomes: [] },
+      deps,
+      'runNode',
+    )
+    const toolIds = resumed.messages
+      .filter((message) => message.role === 'tool')
+      .map((message) => message.toolCallId)
+    expect(toolIds).toEqual(['read-1', 'paid-1', 'delete-1'])
+    expect(new Set(toolIds).size).toBe(toolIds.length)
+    expect(JSON.parse(
+      resumed.messages.find((message) => message.toolCallId === 'delete-1')!.content,
+    )).toMatchObject({ notStarted: true })
+  })
+
+  it('★★ 参数错误已经配对后，再遇确认不得在退出时补第二条结果', async () => {
+    const { deps } = depsWith([
+      {
+        toolCalls: [
+          { id: 'bad-json', name: 'readGraph', args: '{bad' },
+          { id: 'paid-1', name: 'runNode', args: '{"nodeIds":["n1"]}' },
+        ],
+      },
+      { text: '参数错误已回填。' },
+    ])
+
+    const pending = await runAgentTurn(user('看一下再生成'), deps)
+    expect(pending.kind).toBe('confirm')
+    if (pending.kind !== 'confirm') throw new Error('expected confirmation')
+    expect(
+      pending.messages.filter((message) => message.toolCallId === 'bad-json'),
+    ).toHaveLength(1)
+
+    const resumed = await resumeAgentTurn(
+      pending.messages,
+      'paid-1',
+      { ok: true },
+      deps,
+      'runNode',
+    )
+    expect(
+      resumed.messages.filter((message) => message.toolCallId === 'bad-json'),
+    ).toHaveLength(1)
+  })
+
+  it('★★ 有副作用的当前工具结果未知时，当前调用记 needsAttention，后续才记未开始', async () => {
+    const effect: AgentToolEffect = {
+      effectKey: 'effect-1',
+      stepId: 'unplanned',
+      toolCallId: 'write-1',
+      toolName: 'applyPlan',
+      argsDigest: 'digest',
+      state: 'started',
+      startedAt: 1,
+    }
+    const executeWrite = vi.fn(async () => {
+      throw new AgentToolEffectBlockedError(
+        '画布写完后持久化失败，结果未知',
+        'needs_attention',
+        { kind: 'pending', reason: '结果未知', effect },
+      )
+    })
+    const { deps } = depsWith(
+      [
+        {
+          toolCalls: [
+            { id: 'write-1', name: 'applyPlan', args: '{"nodes":[]}' },
+            { id: 'delete-1', name: 'deleteNodes', args: '{"nodeIds":["n2"]}' },
+          ],
+        },
+      ],
+      vi.fn(async () => ({ nodes: [] })),
+      executeWrite,
+    )
+
+    const result = await runAgentTurn(user('建图'), deps)
+    expect(result.kind).toBe('error')
+    const writeResult = result.messages.find((message) => message.toolCallId === 'write-1')
+    const laterResult = result.messages.find((message) => message.toolCallId === 'delete-1')
+    expect(JSON.parse(writeResult!.content)).toMatchObject({
+      ok: false,
+      needsAttention: true,
+    })
+    expect(JSON.parse(writeResult!.content)).not.toHaveProperty('notStarted')
+    expect(JSON.parse(laterResult!.content)).toMatchObject({ notStarted: true })
+  })
+
   it('★★ 执行层拒绝本轮未声明的工具，不能只靠提示词约束', async () => {
     const { deps, executeWrite, adapter } = depsWith([
       {

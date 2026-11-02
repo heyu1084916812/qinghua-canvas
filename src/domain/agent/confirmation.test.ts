@@ -77,6 +77,16 @@ describe('Agent 确认卡', () => {
     expect(confirmationRequiresExplicitApproval('runNode')).toBe(false)
   })
 
+  it('危险画布操作与记忆确认不进入生成状态，且自动模式必须人工批准', () => {
+    for (const name of ['updateNode', 'deleteNodes', 'deleteEdges', 'rememberMemory']) {
+      expect(confirmationRunsGeneration(name)).toBe(false)
+      expect(confirmationApprovalSteps({ ...request, name })).toHaveLength(1)
+      expect(confirmationRequiresExplicitApproval(name)).toBe(true)
+    }
+    expect(confirmationRequiresExplicitApproval('runNode')).toBe(false)
+    expect(confirmationRequiresExplicitApproval('runFrom')).toBe(false)
+  })
+
   it('取消只补齐配对的工具结果，不产生下一次模型回复', () => {
     const messages: ChatMessage[] = [
       { role: 'user', content: '换一个风格' },
@@ -99,6 +109,38 @@ describe('Agent 确认卡', () => {
       canceled: true,
     })
     expect(settled.at(-1)?.role).toBe('tool')
+  })
+
+  it('★★ 多工具批次被取消时，当前调用记 canceled，后续调用按顺序记未开始', () => {
+    const messages: ChatMessage[] = [
+      { role: 'user', content: '运行并删除旧图' },
+      {
+        role: 'assistant',
+        content: '',
+        toolCalls: [
+          { id: 'read-1', name: 'readGraph', args: '{}' },
+          { id: 'call-1', name: 'runNode', args: '{"nodeIds":["n1"]}' },
+          { id: 'later-1', name: 'deleteNodes', args: '{"nodeIds":["n2"]}' },
+        ],
+      },
+      {
+        role: 'tool',
+        toolCallId: 'read-1',
+        toolName: 'readGraph',
+        content: '{"ok":true}',
+      },
+    ]
+
+    const settled = confirmationSettlementMessages(messages, request, 'canceled')
+    expect(
+      settled
+        .filter((message) => message.role === 'tool')
+        .map((message) => message.toolCallId),
+    ).toEqual(['read-1', 'call-1', 'later-1'])
+    expect(JSON.parse(settled.at(-1)!.content)).toMatchObject({
+      canceled: true,
+      notStarted: true,
+    })
   })
 
   it('同一调用已有结果时不会补第二条', () => {

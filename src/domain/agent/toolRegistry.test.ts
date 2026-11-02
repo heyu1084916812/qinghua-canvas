@@ -8,6 +8,7 @@ import {
   agentToolIdempotencyKey,
   agentToolsInCategory,
   isAgentToolName,
+  toolRunsGenerationInAutoMode,
 } from './toolRegistry'
 
 describe('Agent tool registry', () => {
@@ -65,5 +66,13 @@ describe('Agent tool registry', () => {
         toolCallId: 'call-3',
       }),
     ).toBe('agent:job-1:step-2:call-3')
+  })
+
+  it('allows only paid generation confirmations to auto-complete', () => {
+    expect(toolRunsGenerationInAutoMode('runNode')).toBe(true)
+    expect(toolRunsGenerationInAutoMode('runFrom')).toBe(true)
+    for (const name of ['updateNode', 'deleteNodes', 'deleteEdges', 'rememberMemory']) {
+      expect(toolRunsGenerationInAutoMode(name)).toBe(false)
+    }
   })
 })

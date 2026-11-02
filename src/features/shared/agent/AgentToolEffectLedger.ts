@@ -1,5 +1,8 @@
 import type { AgentToolEffect } from '../../../domain/agent/job'
-import { agentToolIdempotencyKey } from '../../../domain/agent/toolRegistry'
+import {
+  agentToolDefinitionOf,
+  agentToolIdempotencyKey,
+} from '../../../domain/agent/toolRegistry'
 import { fingerprintHex } from '../../../domain/shared/hash'
 import type { AgentJobStore } from '../../../state/agent/jobStore'
 import { errorTextOf } from '../../../shared/result'
@@ -93,15 +96,54 @@ export function createAgentToolEffectLedger(
         }
       }
 
+      let result: unknown
       try {
-        const result = await input.execute()
+        result = await input.execute()
+      } catch (error) {
+        const message = errorTextOf(error)
+        /**
+         * 付费、画布、记忆写入一旦开始，抛错并不等于“确定没发生”。
+         * 只有纯读工具可以落到 failed；有副作用的工具必须停在 needs_attention，
+         * 让用户核对现场，不能换一个 callId 自动重做。
+         */
+        if (agentToolDefinitionOf(input.toolName)?.sideEffect !== 'none') {
+          return {
+            kind: 'pending',
+            reason:
+              `${input.toolName} 执行时出错，无法确认是否已经生效：${message}` +
+              '。为避免重复写画布或重复扣费，本次不会自动重试。',
+            effect: claim.effect,
+          }
+        }
+        const failed = await jobs
+          .failToolEffect({
+            jobId: input.jobId,
+            effectKey,
+            error: message,
+          })
+          .catch(() => null)
+        return {
+          kind: 'failed',
+          error: message,
+          replayed: false,
+          effect: failed ?? claim.effect,
+        }
+      }
+
+      try {
         const completed = await jobs.completeToolEffect({
           jobId: input.jobId,
           effectKey,
           result,
         })
         if (!completed) {
-          throw new Error('工具已执行，但完成结果未能写入持久账本')
+          return {
+            kind: 'pending',
+            reason:
+              '工具已执行，但完成结果没有写入持久账本。' +
+              '为避免重复写画布或重复扣费，本次不会自动重试，请先核对画布和运行记录。',
+            effect: claim.effect,
+          }
         }
         return {
           kind: 'completed',
@@ -110,17 +152,12 @@ export function createAgentToolEffectLedger(
           effect: completed,
         }
       } catch (error) {
-        const message = errorTextOf(error)
-        const failed = await jobs.failToolEffect({
-          jobId: input.jobId,
-          effectKey,
-          error: message,
-        })
         return {
-          kind: 'failed',
-          error: message,
-          replayed: false,
-          effect: failed ?? claim.effect,
+          kind: 'pending',
+          reason:
+            `工具已执行，但完成结果写入账本失败：${errorTextOf(error)}。` +
+            '为避免重复写画布或重复扣费，本次不会自动重试，请先核对画布和运行记录。',
+          effect: claim.effect,
         }
       }
     },

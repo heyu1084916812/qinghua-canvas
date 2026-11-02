@@ -35,6 +35,21 @@ export interface AgentController {
     patch?: AgentJobPatch,
     payload?: Record<string, unknown>,
   ) => Promise<{ job: AgentJob; event: import('../../../domain/agent/job').AgentEvent } | null>
+  /**
+   * 模型请求发出前的统一失败收口。
+   *
+   * 只要 Job 已经进入 planning，路由、能力探测或上下文准备失败都不能直接 return；
+   * 必须走这里转终态，否则刷新后会被恢复成 paused 并继续占住会话。
+   */
+  failTurn: (
+    sessionId: string,
+    input: {
+      reason: string
+      phase: string
+      aborted?: boolean
+      pendingCallId?: string
+    },
+  ) => Promise<void>
   beginConfirmation: (
     sessionId: string,
     request: ConfirmationRequestRef,
@@ -165,6 +180,29 @@ export function createAgentController(input: {
         { tool: request.name, approved: true },
       )
     }
+  }
+
+  const failTurn: AgentController['failTurn'] = async (
+    sessionId,
+    input,
+  ) => {
+    const failed = await transition(
+      sessionId,
+      input.aborted ? 'canceled' : 'failed',
+      input.aborted ? 'interrupted' : 'failed',
+      {
+        ...(input.pendingCallId
+          ? { pendingCallId: input.pendingCallId }
+          : {}),
+        ...(input.aborted ? {} : { lastError: input.reason }),
+      },
+      {
+        phase: input.phase,
+        reason: input.reason,
+        aborted: input.aborted === true,
+      },
+    )
+    if (!failed) jobIds.delete(sessionId)
   }
 
   const finishConfirmedTool: AgentController['finishConfirmedTool'] = async (
@@ -316,6 +354,7 @@ export function createAgentController(input: {
     jobId,
     ensureJob,
     transition,
+    failTurn,
     beginConfirmation,
     finishConfirmedTool,
     enqueueTurn,

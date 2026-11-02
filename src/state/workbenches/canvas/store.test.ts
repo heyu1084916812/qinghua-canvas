@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { createCanvasStore } from './store'
 import { createMemoryPlatform } from '../../../platform/memory'
 import { registerAllSpecs, resetSpecs } from '../../../domain/canvas/nodeSpecs'
@@ -22,6 +22,25 @@ describe('canvas store / 基本变更', () => {
     await store.flush()
     const rows = await platform.storage.query('nodes', {})
     expect(rows).toHaveLength(1)
+  })
+
+  it('★★ 一次 flush 失败要报给调用者，但失败批次和后续串行链都必须能恢复', async () => {
+    const store = createCanvasStore({ platform, projectId: 'p1' })
+    store.dispatch({
+      kind: 'node.create',
+      projectId: 'p1',
+      type: 'prompt',
+      at: { x: 0, y: 0 },
+    })
+    const errorLog = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    vi.spyOn(platform.storage, 'transaction').mockRejectedValueOnce(new Error('磁盘写入失败'))
+
+    await expect(store.flush()).rejects.toThrow('磁盘写入失败')
+    expect(await platform.storage.query('nodes', {})).toHaveLength(0)
+
+    await expect(store.flush()).resolves.toBeUndefined()
+    expect(await platform.storage.query('nodes', {})).toHaveLength(1)
+    errorLog.mockRestore()
   })
 })
 

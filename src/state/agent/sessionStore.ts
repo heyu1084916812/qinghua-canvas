@@ -590,13 +590,49 @@ export function createAgentSessionStore(storage: StoragePort): AgentSessionStore
     },
 
     async enqueueTurn(id, turn) {
-      const latest = await find(id)
-      if (!latest) return { ok: false, reason: 'missing' }
-      const queued = enqueueAgentTurn(latest.queuedTurns, turn)
-      if (!queued.ok) return { ok: false, reason: queued.reason }
-      const next = { ...latest, queuedTurns: queued.turns, updatedAt: Date.now() }
-      await storage.put('agentSessions', sessionRow(next, next.updatedAt))
-      return { ok: true, session: next }
+      await ensureSplit()
+      return storage.transaction(
+        ['agentSessions', 'agentMessages'],
+        async (tx) => {
+          const latest = await loadSession(tx, id)
+          if (!latest) return { ok: false as const, reason: 'missing' as const }
+          /**
+           * 队列项冻结的是“此刻仍待发送”的附件。入队与消费在同一事务里完成：
+           * 连续排队时第二次只能拿到剩余附件，不会再把首条已冻结的图片复制一遍。
+           */
+          const pending = new Set(latest.pendingAssetIds ?? [])
+          const frozenAssetIds = [
+            ...new Set(
+              (turn.pendingAssetIds ?? []).filter((assetId) =>
+                pending.has(assetId),
+              ),
+            ),
+          ]
+          const queued = enqueueAgentTurn(latest.queuedTurns, {
+            ...turn,
+            ...(frozenAssetIds.length > 0
+              ? { pendingAssetIds: frozenAssetIds }
+              : { pendingAssetIds: undefined }),
+          })
+          if (!queued.ok) {
+            return { ok: false as const, reason: queued.reason }
+          }
+          const frozen = new Set(frozenAssetIds)
+          const remaining = (latest.pendingAssetIds ?? []).filter(
+            (assetId) => !frozen.has(assetId),
+          )
+          const next: AgentSession = {
+            ...latest,
+            queuedTurns: queued.turns,
+            ...(remaining.length > 0
+              ? { pendingAssetIds: remaining }
+              : { pendingAssetIds: undefined }),
+            updatedAt: Date.now(),
+          }
+          await tx.put('agentSessions', sessionRow(next, next.updatedAt))
+          return { ok: true as const, session: next }
+        },
+      )
     },
 
     async removeQueuedTurn(id, turnId) {

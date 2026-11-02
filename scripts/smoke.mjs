@@ -20410,11 +20410,14 @@ async function g95(browser) {
   /** 关掉面板 ⇒ Agent 按钮**回来**（用户：「关掉 agent 后再出现」）；随后重开，继续后面那串交互 */
   await page.locator('[data-agent-close]').click()
   await sleep(400)
+  const closedPanel = page.locator('[data-agent-panel]')
   rec(
     g,
-    '★★ 关掉面板后 Agent 按钮回来（不是一去不回）',
-    (await agentBtn.count()) === 1 && (await panel.count()) === 0,
-    `agent=${await agentBtn.count()} panel=${await panel.count()}`,
+    '★★ 关掉面板后 Agent 按钮回来，运行宿主只隐藏不卸载',
+    (await agentBtn.count()) === 1 &&
+      (await closedPanel.count()) === 1 &&
+      !(await closedPanel.isVisible()),
+    `agent=${await agentBtn.count()} panel=${await closedPanel.count()} visible=${await closedPanel.isVisible().catch(() => false)}`,
   )
   await agentBtn.click()
   await sleep(500)
@@ -22076,7 +22079,11 @@ async function g95(browser) {
 
   await page.locator('[data-agent-close]').click()
   await sleep(400)
-  rec(g, '★ 能收起，收起后入口还在', (await panel.count()) === 0)
+  rec(
+    g,
+    '★ 能收起，收起后入口还在且运行宿主保持挂载',
+    (await panel.count()) === 1 && !(await panel.isVisible()),
+  )
 
   rec(g, '无未捕获异常', pageErrors.length === 0, pageErrors.join(' | '))
   await page.screenshot({ path: `${OUT}/111-g95-agent.png` })
@@ -40595,11 +40602,22 @@ async function g735(browser) {
   await page.mouse.up()
   const orbDragged = await orb.boundingBox()
   const workspaceBeforeOpen = await page.locator('[data-canvas-surface]').boundingBox()
+  await page.evaluate(() => {
+    const slot = document.querySelector('[data-agent-shell-slot]')
+    window.__agentShellWidthSamples = []
+    if (!slot) return
+    let left = 80
+    const sample = () => {
+      window.__agentShellWidthSamples.push(slot.getBoundingClientRect().width)
+      left -= 1
+      if (left >= 0) window.requestAnimationFrame(sample)
+    }
+    sample()
+  })
   await orb.click()
   const floating = page.locator('[data-agent-floating-panel]')
   if ((await orb.getAttribute('data-agent-expanded')) !== 'true') await orb.click()
   await floating.waitFor({ state: 'visible', timeout: 5000 })
-  const panelImmediate = await floating.boundingBox()
   await sleep(300)
   const panelBox = await floating.boundingBox()
   const workspaceAfterOpen = await page.locator('[data-canvas-surface]').boundingBox()
@@ -40607,6 +40625,9 @@ async function g735(browser) {
     const rect = node.getBoundingClientRect()
     return { x: rect.x, y: rect.y, width: rect.width, height: rect.height }
   })
+  const shellWidthSamples = await page.evaluate(
+    () => window.__agentShellWidthSamples ?? [],
+  )
   const workspaceShrink = workspaceBeforeOpen.width - workspaceAfterOpen.width
   const workspaceGap = panelBox.x - (workspaceAfterOpen.x + workspaceAfterOpen.width)
   rec(
@@ -40668,9 +40689,10 @@ async function g735(browser) {
   rec(
     g,
     '打开时右侧栏平滑展开',
-    !!panelImmediate &&
-      panelImmediate.width < panelBox.width - 20,
-    `首帧宽=${Math.round(panelImmediate?.width ?? -1)} 稳定宽=${Math.round(panelBox.width)}`,
+    shellWidthSamples.some(
+      (width) => width > 0 && width < shellSlotBox.width - 20,
+    ),
+    `采样最小=${Math.round(Math.min(...shellWidthSamples))} 采样最大=${Math.round(Math.max(...shellWidthSamples))} 稳定宽=${Math.round(shellSlotBox.width)}`,
   )
   const scrollbarChrome = await page.evaluate(() => {
     const root = document.documentElement
@@ -41533,6 +41555,13 @@ async function g769(browser) {
     await page.screenshot({ path: `${OUT}/769-agent-queue-1440.png` })
     await page.locator('[data-agent-close]').click()
     await page.locator('[data-canvas-agent]').waitFor({ state: 'visible', timeout: 5000 })
+    await sleep(350)
+    rec(
+      g,
+      '★★ 关闭面板时 AgentPanel 保持挂载，仅隐藏宿主',
+      (await page.locator('[data-agent-panel]').count()) === 1 &&
+        !(await page.locator('[data-agent-panel]').isVisible()),
+    )
     await page.locator('[data-canvas-agent]').click()
     await page.locator('[data-agent-queue]').waitFor({ state: 'visible', timeout: 10000 })
     rec(

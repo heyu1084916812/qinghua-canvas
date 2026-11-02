@@ -119,7 +119,6 @@ import {
   type AgentLoopOutcome,
   type AgentToolRequest,
 } from '../../agent/agentLoop'
-import { trimOrphanToolMessages } from '../../agent/historyWindow'
 import {
   buildAgentSystemPromptWithContext,
   looksLikePreserveRequest,
@@ -255,6 +254,14 @@ import {
   startAgentRunWave,
   type AgentRunTask,
 } from './agentRunTasks'
+import { AgentSessionRuntimeState } from './agentSessionRuntime'
+import { latestRunFailuresForNodes } from './agentRunState'
+import {
+  buildAgentModelMessages,
+  composeAgentOutcomeMessages,
+  persistAgentUserTurnBeforeRoute,
+  type PersistedAgentUserTurn,
+} from './agentTurnPersistence'
 import { errText } from '../../agent/agentLoop'
 import { loadAssetUrl, useAsset } from '../../../../features/shared/assets/index'
 import { ModelIcon } from '../../../../features/shared/modelIcon/ModelIcon'
@@ -563,22 +570,11 @@ export function AgentPanel({
    */
   const currentIdRef = useRef<string | null>(null)
   /**
-   * 这次用户的话是不是「多张图各自一条流程」（`expectsPerImageFlows`）。
+   * 不参与渲染、但要跨确认 / 暂停续跑的瞬时状态。
    *
-   * 在**发消息那一刻**算好，留给工具执行时读 —— 工具执行可能发生在用户点「批准」之后，
-   * 那时闭包里已经拿不到当时的正文了（见 `toolCtx` 里那段说明）。
+   * 所有字段按 sessionId 分桶：A 会话多图拆分、上次模型都不能串到并行运行的 B。
    */
-  const perImageRef = useRef(false)
-  /**
-   * **这一轮会话「上次用过的模型」**（用户 2026-10-16：「我连续的迭代需求的话就用我上一个对话的，
-   * 例如一开始我给对话框输入了 gpt2 模型的话，后续如果我没有另外输入模型的话基本上就会都是 gpt2，
-   * 如果后面我输入了香蕉模型的话就用香蕉模型」）。
-   *
-   * 用 ref 而不是只读会话里的 `imageModel`：那个字段要等一次落库 + 刷新才回来，
-   * 而「连续迭代」是同一条会话里的**下一轮**就要生效。落库那份照样写（跨会话/重开还在），
-   * 这份只负责**本轮立刻生效**。
-   */
-  const stickyModelRef = useRef<{ image?: string; video?: string }>({})
+  const sessionRuntimeRef = useRef(new AgentSessionRuntimeState())
   currentIdRef.current = current?.id ?? null
   const [draft, setDraft] = useState('')
   const draftNodeIdsRef = useRef<{ sessionId: string; ids: string[] }>({
@@ -1141,11 +1137,6 @@ export function AgentPanel({
       // 换了会话，之前「准备好删了」的那个状态不该跟过来
       setRenaming(false)
       setConfirmDelete(false)
-      /**
-       * **「上次用过的模型」也要跟着换会话重置**：那是**这段对话**的记忆，
-       * 带过来的话新会话第一次建节点就会莫名沿用上一段对话选的模型。
-       */
-      stickyModelRef.current = {}
     },
     [],
   )
@@ -1179,45 +1170,49 @@ export function AgentPanel({
   const toolCtx = useCallback(
     (
       origin: { x: number; y: number },
-      sessionId: string = current?.id ?? '',
-    ): AgentToolContext => ({
-      store,
-      viewportWorld: viewportWorldOf(viewport),
-      memoryContext: {
-        workbench: 'canvas',
-        projectId: store.getSnapshot().projectId,
-        ...(sessionId ? { sessionId } : {}),
-      },
-      ...(sessionId
-        ? {
-            taskPlan: {
-              get: async () => (await sessions.get(sessionId))?.taskPlan,
-              save: async (plan) => {
-                const next = await sessions.updateFields(sessionId, {
-                  taskPlan: plan,
-                })
-                if (next) {
-                  setList((prev) =>
-                    prev.map((item) => (item.id === next.id ? next : item)),
-                  )
-                  if (currentIdRef.current === next.id) setCurrent(next)
-                }
-                return next?.taskPlan ?? null
+      session: AgentSession | undefined = current ?? undefined,
+    ): AgentToolContext => {
+      const sessionId = session?.id ?? ''
+      return {
+        store,
+        viewportWorld: viewportWorldOf(viewport),
+        memoryContext: {
+          workbench: 'canvas',
+          projectId: store.getSnapshot().projectId,
+          ...(sessionId ? { sessionId } : {}),
+        },
+        ...(sessionId
+          ? {
+              taskPlan: {
+                get: async () => (await sessions.get(sessionId))?.taskPlan,
+                save: async (plan) => {
+                  const next = await sessions.updateFields(sessionId, {
+                    taskPlan: plan,
+                  })
+                  if (next) {
+                    setList((prev) =>
+                      prev.map((item) => (item.id === next.id ? next : item)),
+                    )
+                    if (currentIdRef.current === next.id) setCurrent(next)
+                  }
+                  return next?.taskPlan ?? null
+                },
               },
-            },
-          }
-        : {}),
-      origin,
-      selectedIds: () => selection,
-      selectedModelOf,
-      ...(abortRefs.current.get(sessionId)?.signal
-        ? { signal: abortRefs.current.get(sessionId)!.signal }
-        : {}),
-      /**
-       * 用 **ref** 而不是闭包变量：这个回调在发消息那一刻创建、在用户点「批准」时才真正执行
-       * （中间隔着一次确认），闭包里的旧值必然过期。ref 读的是**最新一次发消息**算出来的判断。
-       */
-      ...(perImageRef.current ? { perImage: true } : {}),
+            }
+          : {}),
+        origin,
+        selectedIds: () => selection,
+        selectedModelOf,
+        ...(abortRefs.current.get(sessionId)?.signal
+          ? { signal: abortRefs.current.get(sessionId)!.signal }
+          : {}),
+        /**
+         * 用 ref 而不是闭包变量：这个回调在发消息那一刻创建、在用户点「批准」时才真正执行
+         * （中间隔着一次确认），ref 读的是**最新一次发消息**算出来的判断。
+         */
+        ...(sessionRuntimeRef.current.isPerImage(sessionId)
+          ? { perImage: true }
+          : {}),
       resolveNodeIds: (ids) => {
         const aliases = planAliasesRef.current.get(sessionId)
         return ids.map((id) => aliases?.get(id) ?? id)
@@ -1432,8 +1427,9 @@ export function AgentPanel({
          * 不该因为中途点选了别的节点而自己换掉。③ 又高于 ④，用户当轮改了会话模型时要立刻生效。
          */
         const explicit = explicitMediaModelsRef.current.get(sessionId)?.[kind]
-        const sessionPicked = kind === 'video' ? current?.videoModel : current?.imageModel
-        const stored = stickyModelRef.current[kind]
+        const sessionPicked =
+          kind === 'video' ? session?.videoModel : session?.imageModel
+        const stored = sessionRuntimeRef.current.stickyModelsFor(sessionId)[kind]
         const model = preferredGeneratedModel({
           explicit,
           planned,
@@ -1442,17 +1438,17 @@ export function AgentPanel({
           selected: selectedModelOf(kind),
         })
         if (!model) return undefined
-        const channelId = channelIdForLogical(enabled, model, current?.channelId)
+        const channelId = channelIdForLogical(enabled, model, session?.channelId)
         if (!channelId) return undefined
         /**
          * 这次真正用上的模型记下来：ref 管本轮下一轮立刻生效，落库那份管重开还在。
          * 只在**真的变了**时才写，免得每建一次节点就落一次库。
          */
         if (model !== stored) {
-          stickyModelRef.current[kind] = model
-          if (current) {
+          sessionRuntimeRef.current.rememberStickyModel(sessionId, kind, model)
+          if (session) {
             void sessions.updateFields(
-              current.id,
+              session.id,
               kind === 'video' ? { videoModel: model } : { imageModel: model },
             )
           }
@@ -1464,7 +1460,7 @@ export function AgentPanel({
         const kind = node.data.mode === 'video' ? 'video' : 'image'
         const model = explicitMediaModelsRef.current.get(sessionId)?.[kind]
         if (!model) return undefined
-        const channelId = channelIdForLogical(enabled, model, current?.channelId)
+        const channelId = channelIdForLogical(enabled, model, session?.channelId)
         return { channelId: channelId ?? '', model }
       },
       contextAssetsForGenerated: (type) => {
@@ -1524,7 +1520,8 @@ export function AgentPanel({
           abortRefs.current.get(sessionId)?.signal ?? new AbortController().signal,
         )
       },
-    }),
+      }
+    },
     [
       store,
       selection,
@@ -1552,18 +1549,18 @@ export function AgentPanel({
    */
   const executeToolWithLedger = useCallback(
     async (
-      session: AgentSession,
+      sessionId: string,
       request: AgentToolRequest,
       execute: () => Promise<unknown>,
     ): Promise<unknown> => {
       const jobId =
-        controller.jobId(session.id) ??
-        (await jobs.active(session.id))?.id
+        controller.jobId(sessionId) ??
+        (await jobs.active(sessionId))?.id
       if (!jobId) {
         return execute()
       }
-      const latest = (await sessions.get(session.id)) ?? session
-      const stepId = latest.taskPlan?.currentStepId ?? 'unplanned'
+      const latest = await sessions.get(sessionId)
+      const stepId = latest?.taskPlan?.currentStepId ?? 'unplanned'
       const outcome = await toolEffects.run({
         jobId,
         stepId,
@@ -1596,11 +1593,11 @@ export function AgentPanel({
 
   const executeConfirmedToolWithLedger = useCallback(
     (session: AgentSession, request: AgentToolRequest): Promise<unknown> =>
-      executeToolWithLedger(session, request, () =>
+      executeToolWithLedger(session.id, request, () =>
         executeConfirmedTool(
           request.name,
           request.args,
-          toolCtx(originOf(viewport), session.id),
+          toolCtx(originOf(viewport), session),
         ),
       ),
     [executeToolWithLedger, toolCtx, viewport],
@@ -2042,13 +2039,13 @@ export function AgentPanel({
        */
       executeWrite: async (name: string, args: unknown, callId: string) => {
         const result = await executeToolWithLedger(
-          session,
+          session.id,
           { callId, name, args },
           () =>
             executeConfirmedTool(
               name,
               args,
-              toolCtx(originOf(viewport), session.id),
+              toolCtx(originOf(viewport), session),
             ),
         )
         if (name === 'applyPlan') {
@@ -2069,13 +2066,43 @@ export function AgentPanel({
         }
         return result
       },
-      executeRead: (name: string, args: unknown, callId: string) => {
-        const base = toolCtx(originOf(viewport), session.id)
-        return executeToolWithLedger(session, { callId, name, args }, () =>
+      executeRead: async (name: string, args: unknown, callId: string) => {
+        const base = toolCtx(originOf(viewport), session)
+        const requestedNodeIds =
+          name === 'readResult' &&
+          args &&
+          typeof args === 'object' &&
+          !Array.isArray(args) &&
+          Array.isArray((args as { nodeIds?: unknown }).nodeIds)
+            ? (args as { nodeIds: unknown[] }).nodeIds.filter(
+                (nodeId): nodeId is string => typeof nodeId === 'string',
+              )
+            : []
+        const persistedFailures =
+          name === 'readResult'
+            ? await latestRunFailuresForNodes(
+                platform.storage,
+                store.getSnapshot().projectId,
+                requestedNodeIds,
+              ).catch(() => new Map())
+            : new Map()
+        return executeToolWithLedger(session.id, { callId, name, args }, () =>
           executeReadTool(name, args, {
             ...base,
             ...(name === 'visualReview' && canvasReviewEnabled
               ? { visualReview: runVisualReview }
+              : {}),
+            ...(name === 'readResult'
+              ? {
+                  nodeRunStateOf: (nodeId: string) => {
+                    const persisted = persistedFailures.get(nodeId)
+                    if (persisted) return persisted
+                    const state = execution.nodeStates.get(nodeId)
+                    return state?.kind === 'failed'
+                      ? { kind: 'failed' as const, error: state.error }
+                      : undefined
+                  },
+                }
               : {}),
           }),
         )
@@ -2148,7 +2175,7 @@ export function AgentPanel({
     async (
       session: AgentSession,
       outcome: AgentLoopOutcome,
-      hidden: readonly ChatMessage[] = [],
+      persistedTurn?: PersistedAgentUserTurn,
     ) => {
       const outcomeController = abortRefs.current.get(session.id)
       const outcomeIsCurrent = () =>
@@ -2164,18 +2191,13 @@ export function AgentPanel({
        * 这时候把 A 的消息盖到 B 的对话流上就是串味（§8.2）。
        * 落库（`persist`）与是否切走无关，一律照做。
        *
-       * `hidden` = 这次**没发给模型**的那段更早历史（回读窗口之外，用户 2026-10-14）。
-       * 界面与落库都要把它拼回去 —— 窗口只约束「模型看多少」，
-       * 不该让用户回看时缺一段。
+       * 模型只看窗口，但界面与落库必须是完整历史。以发送前已落库的
+       * `historyMessages` 为底，只追加本轮用户消息之后新增的 assistant/tool 消息。
+       * 这同时保留窗口外前缀和 `trimOrphanToolMessages()` 去掉的边界消息。
        */
-      const full: ChatMessage[] =
-        hidden.length > 0
-          ? [
-              ...(outcome.messages[0] ? [outcome.messages[0]] : []),
-              ...hidden,
-              ...outcome.messages.slice(1),
-            ]
-          : outcome.messages
+      const full = persistedTurn
+        ? composeAgentOutcomeMessages(persistedTurn, outcome.messages)
+        : outcome.messages
       const settleStaleOutcome = async () => {
         if (outcome.kind === 'confirm') {
           await sessions
@@ -2448,14 +2470,9 @@ export function AgentPanel({
   const runSendText = useCallback(async (
     text: string,
     session: AgentSession,
-    queuedSession?: AgentSession,
     turnId?: string,
     internalControl = false,
   ) => {
-    if (!session.model) {
-      setStatusFor(session.id, { kind: 'error', message: '还没选模型：先在上面选一个对话模型' })
-      return
-    }
     if (
       session.taskPlan &&
       agentTaskPlanProgress(session.taskPlan).status !== 'active'
@@ -2470,11 +2487,98 @@ export function AgentPanel({
         if (currentIdRef.current === cleared.id) setCurrent(cleared)
       }
     }
-    const prepared = await prepareChatRoute(session, true)
+
+    /**
+     * 用户消息必须在**路由准备与任何模型请求之前**落库。
+     *
+     * 不能等 handleOutcome：普通思考阶段点停止、请求被取消或应用崩溃时，
+     * outcome 永远不会回来；只有先保存这条消息，重开后才还能看到用户说了什么。
+     * `imageNodeIds` 是附件引用的持久快照，后续清空待发送附件也不会把它抹掉。
+     *
+     * 后台处理 A 时界面可能显示 B，因此历史只能从目标 sessionId 读取。
+     */
+    const liveGraph = store.getSnapshot()
+    const plainText = stripMentionMarkup(text)
+    const rawMentions = parseMentions(text)
+    const sentAssetIds = [...new Set(session.pendingAssetIds ?? [])]
+    const mentions = rawMentions
+      .filter((m): m is MentionRef & { kind: 'node' | 'model' } => m.kind !== 'skill')
+      .map((m) => {
+        if (m.kind !== 'node') return m
+        const node = liveGraph.nodes.find((item) => item.id === m.id)
+        const data = (node?.data ?? {}) as { prompt?: unknown; text?: unknown }
+        const raw = typeof data.prompt === 'string' ? data.prompt : data.text
+        const prompt = typeof raw === 'string' ? raw.trim().slice(0, 160) : ''
+        return { ...m, ...(prompt ? { prompt } : {}) }
+      })
+    const visualNodeIds = [
+      ...new Set([
+        ...sentAssetIds,
+        ...mentions
+          .filter(
+            (mention): mention is MentionRef & { kind: 'node' } =>
+              mention.kind === 'node',
+          )
+          .map((mention) => mention.id),
+      ]),
+    ]
+    let persistedRoute:
+      | {
+          turn: PersistedAgentUserTurn
+          route: ChatRoutePreparation
+        }
+      | undefined
+    let activeTurnAbort: AbortController | undefined
+    try {
+      persistedRoute = await persistAgentUserTurnBeforeRoute(
+        sessions,
+        session.id,
+        {
+          content: plainText,
+          display: text,
+          imageNodeIds: visualNodeIds,
+          ...(session.contextWindow
+            ? { contextWindow: session.contextWindow }
+            : {}),
+          internalControl,
+        },
+        () => prepareChatRoute(session, true),
+        (turn) => {
+          const saved = turn.saved
+          setList((prev) =>
+            prev.map((item) => (item.id === saved.id ? saved : item)),
+          )
+          if (currentIdRef.current === saved.id) {
+            setCurrent(saved)
+            setDraft('')
+            saveAgentDraft(session.id, '')
+            setMessages(turn.historyMessages)
+          }
+          clearLiveActivitiesFor(session.id)
+          clearLiveProcessFor(session.id)
+          clearRunTasksFor(session.id)
+          activeTurnAbort = new AbortController()
+          abortRefs.current.set(session.id, activeTurnAbort)
+          setStatusFor(session.id, { kind: 'thinking' })
+          autoRunRef.current.set(session.id, session.autoRun === true)
+        },
+      )
+    } catch (error) {
+      if (activeTurnAbort?.signal.aborted) return
+      setStatusFor(session.id, {
+        kind: 'error',
+        message: `用户消息或路由准备失败：${errText(error)}`,
+      })
+      return
+    }
+    const turnAbort = activeTurnAbort
+    if (!turnAbort || turnAbort.signal.aborted) return
+    const prepared = persistedRoute.route
     if (!prepared.ok) {
       setStatusFor(session.id, { kind: 'error', message: prepared.message })
       return
     }
+    const persistedUserTurn = persistedRoute.turn
     const chatRoute = prepared.route
     const operationId = createId('op')
     await ensureAgentJob(session, turnId ?? createId('turnmsg'))
@@ -2484,13 +2588,22 @@ export function AgentPanel({
       'status_changed',
       { operationId },
     )
-    const controller = new AbortController()
-    abortRefs.current.set(session.id, controller)
-    clearLiveActivitiesFor(session.id)
-    clearLiveProcessFor(session.id)
-    clearRunTasksFor(session.id)
-    setStatusFor(session.id, { kind: 'thinking' })
-    autoRunRef.current.set(session.id, session.autoRun === true)
+    const failBeforeModel = async (message: string, phase: string) => {
+      await controller.failTurn(session.id, {
+        reason: message,
+        phase,
+        aborted: turnAbort.signal.aborted,
+      })
+      clearLiveActivitiesFor(session.id)
+      clearLiveProcessFor(session.id)
+      clearRunTasksFor(session.id)
+      setStatusFor(
+        session.id,
+        turnAbort.signal.aborted
+          ? IDLE_STATUS
+          : { kind: 'error', message },
+      )
+    }
 
     let contextPrompt = ''
     const cleanRequest = stripMentionMarkup(text)
@@ -2527,14 +2640,7 @@ export function AgentPanel({
         const message = `上下文有冲突，请先处理：${bundle.conflicts
           .map((conflict) => conflict.message)
           .join('；')}`
-        await transitionSessionJob(
-          session.id,
-          'failed',
-          'failed',
-          { lastError: message },
-          { phase: 'context_conflict' },
-        )
-        setStatusFor(session.id, { kind: 'error', message })
+        await failBeforeModel(message, 'context_conflict')
         return
       }
       contextPrompt = formatContextBundleForPrompt(bundle)
@@ -2631,12 +2737,15 @@ export function AgentPanel({
           }),
       },
       { channelId: chatRoute.channelId, model: chatRoute.logicalModel },
-      controller.signal,
+      turnAbort.signal,
     )
-    if (controller.signal.aborted) return
+    if (turnAbort.signal.aborted) {
+      await failBeforeModel('用户已停止当前回合', 'tool_probe')
+      return
+    }
     const decision = decideToolMode(support)
     if (decision.kind === 'error') {
-      setStatusFor(session.id, { kind: 'error', message: decision.message })
+      await failBeforeModel(decision.message, 'tool_probe')
       return
     }
     /**
@@ -2645,7 +2754,6 @@ export function AgentPanel({
      */
     const toolMode = decision.mode
     toolModeRef.current.set(session.id, toolMode)
-    const sentAssetIds = session.pendingAssetIds ?? []
     if (sentAssetIds.length > 0) {
       const cleared = await sessions.clearPendingAssetIds(session.id, sentAssetIds)
       if (cleared) {
@@ -2665,38 +2773,11 @@ export function AgentPanel({
      * 拼接本身放在 `buildAgentSystemPromptWithContext` 里，不在这儿现拼：
      * 「技能正文到底进没进提示词」只能靠发出去的消息证明，抽成纯函数才有单测。
      */
-    const liveGraph = store.getSnapshot()
-    const plainText = stripMentionMarkup(text)
-    const rawMentions = parseMentions(text)
     const skillChipIds = rawMentions
       .filter((mention) => mention.kind === 'skill')
       .map((mention) => mention.id)
     const skillId = resolveAgentSkillForTurn(skillChipIds, session.skillId)
     const skill = skillId ? allSkills.find((item) => item.id === skillId) : undefined
-    /**
-     * 这句话里 @ 引用了什么（节点 / 模型）。空数组就不加那一段。
-     *
-     * **技能那枚 chip 不算「引用」**：它说的是「这次用哪条技能」，由下面 `skill`
-     * 那一段（正文 + 名字）负责讲清楚；再当成引用报一遍，模型会在同一句话里读到
-     * 两份同样的东西。正文里那个 token 也会被 `stripMentionMarkup` 还原成技能名。
-     */
-    const mentions = rawMentions
-      .filter((m): m is MentionRef & { kind: 'node' | 'model' } => m.kind !== 'skill')
-      /**
-       * 被 @ 的节点**连它上面的提示词一起报给模型**（用户 2026-10-05 第六批：
-       * 「换成 3d 风格，但是他前面给我加了前置词小猫钓鱼，结果把内容也换成小猫了」）。
-       *
-       * 只给节点名的话，模型手里唯一的文字就是那个短名，换风格时就只能拿它当内容 ——
-       * 于是「只换风格」变成「重画一只钓鱼的小猫」。带上正文，它才有东西可以「保留」。
-       */
-      .map((m) => {
-        if (m.kind !== 'node') return m
-        const n = liveGraph.nodes.find((x) => x.id === m.id)
-        const d = (n?.data ?? {}) as { prompt?: unknown; text?: unknown }
-        const raw = typeof d.prompt === 'string' ? d.prompt : d.text
-        const prompt = typeof raw === 'string' ? raw.trim().slice(0, 160) : ''
-        return { ...m, ...(prompt ? { prompt } : {}) }
-      })
     const explicitMediaModels = explicitMediaModelsFromMentions(
       mentions,
       (model) => capabilityOfLogical(allChannels, model)?.category,
@@ -2721,7 +2802,7 @@ export function AgentPanel({
     const selectedImageIds = imageNodeIdsAmong(liveGraph.nodes, selection)
     const mentionedImageCount = mentionedImageIds.length
     const perImage = expectsPerImageFlows(plainText, mentionedImageCount)
-    perImageRef.current = perImage
+    sessionRuntimeRef.current.setPerImage(session.id, perImage)
     const activeTaskPlan =
       session.taskPlan && agentTaskPlanProgress(session.taskPlan).status === 'active'
         ? session.taskPlan
@@ -2773,70 +2854,10 @@ export function AgentPanel({
         ...(toolMode === 'json' ? { jsonToolFallback: true, tools: turnAgentTools } : {}),
       },
     )
-    /**
-     * **回读窗口**（用户 2026-10-14 参考产品图二「回读轮数」）。
-     *
-     * 状态里的 `messages` 始终是全量，这里只决定「这次给模型看多少」：窗口之外那段
-     * 先扣下来（`hidden`），结果回来时再拼回界面与库里（见 `handleOutcome` 的 `hidden`）。
-     *
-     * ⚠️ 这条窗口**早就写在 `sessionStore.contextFor` 里**，但面板从来没调用过 ——
-     * 所以在此之前发出去的其实是**全部历史**，历史越长请求越重。
-     */
-    const history = (queuedSession?.messages ?? messages).filter((m) => m.role !== 'system')
-    const windowSize = session.contextWindow ?? AGENT_CONTEXT_WINDOW
-    const cut = Math.max(0, history.length - windowSize)
-    const hidden = history.slice(0, cut)
-    const visible = trimOrphanToolMessages(history.slice(cut))
-    /** 模型窗口版 → 界面 / 落库用的全量版（把窗口外那段补回 system 之后） */
-    const withHidden = (list: readonly ChatMessage[]): ChatMessage[] =>
-      hidden.length > 0
-        ? [...(list[0] ? [list[0]] : []), ...hidden, ...list.slice(1)]
-        : [...list]
-    const withSystem: ChatMessage[] = [
-      { role: 'system', content: system },
-      ...visible,
-      /**
-       * 发给模型的是**去掉存储形态**的正文：`@[小猫钓鱼](node:node_x)` → `@小猫钓鱼`。
-       * 引用指向谁由上面那段 mentions 讲清楚（带 id），正文里不必再夹一串括号。
-       *
-       * `display` 存的是**用户写的那份原文**（带 chip 标记）：回看这条消息时要还原成
-       * 那几个矩形框（用户 2026-10-05 第 5 条）。一份数据两个用途，必须分开存
-       * —— 拿 `content` 去渲染，框就没了；拿原文去发请求，模型会读到一串机器标记。
-       */
-      {
-        role: 'user',
-        content: stripMentionMarkup(text),
-        display: text,
-        createdAt: Date.now(),
-        ...(internalControl ? { hiddenFromConversation: true } : {}),
-        imageNodeIds: [...new Set([
-          ...sentAssetIds,
-          ...mentions
-            .filter((mention): mention is MentionRef & { kind: 'node' } => mention.kind === 'node')
-            .map((mention) => mention.id),
-        ])],
-      },
-    ]
-    if (currentIdRef.current === session.id) {
-      setDraft('')
-      saveAgentDraft(session.id, '')
-      setMessages(withSystem)
-    }
-    const clearedAssets = await sessions.updateFields(session.id, {
-      pendingAssetIds: [],
-    })
-    if (clearedAssets) {
-      setList((prev) =>
-        prev.map((item) => (item.id === clearedAssets.id ? clearedAssets : item)),
-      )
-      if (currentIdRef.current === clearedAssets.id) setCurrent(clearedAssets)
-    }
-    const visualNodeIds = [...new Set([
-      ...sentAssetIds,
-      ...mentions
-        .filter((mention): mention is MentionRef & { kind: 'node' } => mention.kind === 'node')
-        .map((mention) => mention.id),
-    ])]
+    /** 模型窗口版 → 完整界面 / 落库版，只追加本轮 user 之后的新消息。 */
+    const withFullHistory = (list: readonly ChatMessage[]): ChatMessage[] =>
+      composeAgentOutcomeMessages(persistedUserTurn, list)
+    const withSystem = buildAgentModelMessages(system, persistedUserTurn)
     const currentLoopDeps = loopDeps(
       session,
       operationId,
@@ -2845,7 +2866,7 @@ export function AgentPanel({
       (next) => {
         if (currentIdRef.current !== session.id) return
         setMessageReveal(null)
-        setMessages(withHidden(next))
+        setMessages(withFullHistory(next))
       },
       turnAgentTools,
     )
@@ -2855,13 +2876,14 @@ export function AgentPanel({
       initial,
       currentLoopDeps,
       (next) => {
-        if (currentIdRef.current === session.id) setMessages(withHidden(next))
+        if (currentIdRef.current === session.id) {
+          setMessages(withFullHistory(next))
+        }
       },
     )
-    await handleOutcome(session, outcome, hidden)
+    await handleOutcome(session, outcome, persistedUserTurn)
     return outcome
   }, [
-    messages,
     store,
     selection,
     loopDeps,
@@ -2880,6 +2902,7 @@ export function AgentPanel({
     ensureAgentJob,
     transitionSessionJob,
     continueAutoConfirmations,
+    controller,
   ])
 
   const sendText = useCallback(async (
@@ -2904,7 +2927,6 @@ export function AgentPanel({
       outcome = await runSendText(
         text,
         session,
-        queuedSession,
         opts.queueTurnId,
         opts.internalControl === true,
       )
@@ -2990,7 +3012,9 @@ export function AgentPanel({
     if (!current) return false
     const text = raw.trim()
     if (!text) return false
-    if (!current.model) {
+    const latest =
+      (await sessions.get(current.id).catch(() => null)) ?? current
+    if (!latest.model) {
       setStatusFor(current.id, { kind: 'error', message: '还没选模型：先在上面选一个对话模型' })
       return false
     }
@@ -2998,14 +3022,14 @@ export function AgentPanel({
       id: createId('turn'),
       text,
       createdAt: Date.now(),
-      channelId: current.channelId,
-      model: current.model,
-      ...(current.imageModel ? { imageModel: current.imageModel } : {}),
-      ...(current.videoModel ? { videoModel: current.videoModel } : {}),
-      ...(current.skillId ? { skillId: current.skillId } : {}),
-      ...(current.autoRun === true ? { autoRun: true } : {}),
-      ...(current.pendingAssetIds?.length
-        ? { pendingAssetIds: [...current.pendingAssetIds] }
+      channelId: latest.channelId,
+      model: latest.model,
+      ...(latest.imageModel ? { imageModel: latest.imageModel } : {}),
+      ...(latest.videoModel ? { videoModel: latest.videoModel } : {}),
+      ...(latest.skillId ? { skillId: latest.skillId } : {}),
+      ...(latest.autoRun === true ? { autoRun: true } : {}),
+      ...(latest.pendingAssetIds?.length
+        ? { pendingAssetIds: [...latest.pendingAssetIds] }
         : {}),
     }
     const queued = await controller.enqueueTurn(current.id, turn)
@@ -3025,7 +3049,7 @@ export function AgentPanel({
       })
     }
     return true
-  }, [applySessionSnapshot, controller, current, setStatusFor, store])
+  }, [applySessionSnapshot, controller, current, sessions, setStatusFor, store])
 
   const removeQueued = useCallback(async (turnId: string) => {
     if (!current) return
@@ -3903,7 +3927,11 @@ export function AgentPanel({
        * 用户在面板上亲手选的模型，也要进「上次用过的」那一份 ——
        * 否则下一轮 agent 又会按旧值去建节点，用户看到的是「我明明换了模型它还用旧的」。
        */
-      stickyModelRef.current[key === 'videoModel' ? 'video' : 'image'] = model
+      sessionRuntimeRef.current.rememberStickyModel(
+        current!.id,
+        key === 'videoModel' ? 'video' : 'image',
+        model,
+      )
       await patchSession({ [key]: model })
     },
     [patchSession],
@@ -4033,6 +4061,7 @@ export function AgentPanel({
     }
     setConfirmDelete(false)
     clearAgentDraft(current.id)
+    sessionRuntimeRef.current.clearSession(current.id)
     await sessions.remove(current.id)
     const rows = await refresh()
     if (rows.length > 0) await switchTo(rows[0]!)

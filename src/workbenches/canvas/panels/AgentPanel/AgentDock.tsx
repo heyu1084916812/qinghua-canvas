@@ -101,6 +101,7 @@ export function AgentDock({
   onOpenChange: (open: boolean) => void
 }) {
   const [mounted, setMounted] = useState(open)
+  const [panelHidden, setPanelHidden] = useState(!open)
   const [shellAnimatedOpen, setShellAnimatedOpen] = useState(open)
   const [shell, setShell] = useState<AgentShellState | null>(null)
   const [dragging, setDragging] = useState<DragState['kind'] | null>(null)
@@ -187,23 +188,39 @@ export function AgentDock({
   useLayoutEffect(() => {
     if (!open) return
     setMounted(true)
+    setPanelHidden(false)
     let secondFrame = 0
+    let thirdFrame = 0
     const firstFrame = window.requestAnimationFrame(() => {
-      secondFrame = window.requestAnimationFrame(() => setShellAnimatedOpen(true))
+      secondFrame = window.requestAnimationFrame(() => {
+        /**
+         * 面板保持挂载后，卸载/重挂不再天然提供“第一帧宽度为 0”。
+         * 再等一帧，让浏览器先提交收起宽度，再开启壳层宽度过渡；
+         * 这样运行态不丢，展开动画也仍然存在。
+         */
+        thirdFrame = window.requestAnimationFrame(() => setShellAnimatedOpen(true))
+      })
     })
     return () => {
       window.cancelAnimationFrame(firstFrame)
       window.cancelAnimationFrame(secondFrame)
+      window.cancelAnimationFrame(thirdFrame)
     }
   }, [open])
 
   useLayoutEffect(() => {
     if (open) return
     setShellAnimatedOpen(false)
-    if (!mounted) return
-    const timer = window.setTimeout(() => setMounted(false), 260)
+    if (!mounted || panelHidden) return
+    /**
+     * 收起态只隐藏宿主，不卸载 AgentPanel。
+     *
+     * 模型循环、AbortController、会话状态和队列泵都活在 AgentPanel 内；
+     * 关闭面板时卸载会让正在运行的任务失去停止能力与思考态。
+     */
+    const timer = window.setTimeout(() => setPanelHidden(true), 260)
     return () => window.clearTimeout(timer)
-  }, [mounted, open])
+  }, [mounted, open, panelHidden])
 
   const beginDrag = (event: ReactPointerEvent<HTMLElement>, next: DragState) => {
     if (event.button !== 0) return
@@ -347,6 +364,7 @@ export function AgentDock({
             data-agent-shell-panel-width={shell.width}
             data-agent-shell-open={open ? 'true' : 'false'}
             data-agent-dragging={dragging ?? undefined}
+            hidden={panelHidden}
             role="region"
             aria-label="Agent 面板"
           >

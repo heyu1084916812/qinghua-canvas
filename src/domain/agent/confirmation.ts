@@ -1,4 +1,5 @@
 import type { ChatMessage } from '../shared/execution/types'
+import { toolRunsGenerationInAutoMode } from './toolRegistry'
 import type {
   AgentEventType,
   AgentJobPatch,
@@ -16,15 +17,9 @@ export interface ConfirmationJobStep {
   patch: AgentJobPatch
 }
 
-const PLANNING_ONLY_CONFIRMATIONS = new Set([
-  'rememberMemory',
-  'proposeTaskPlan',
-  'requestTaskConfirmation',
-])
-
-/** 这些确认只推进工作流本身，不进入“等待生成”状态。 */
+/** 基于工具注册表语义：只有明确允许的生成类确认才进入“等待生成”。 */
 export function confirmationRunsGeneration(name: string): boolean {
-  return !PLANNING_ONLY_CONFIRMATIONS.has(name)
+  return toolRunsGenerationInAutoMode(name)
 }
 
 /**
@@ -37,13 +32,19 @@ export function confirmationRequiresExplicitApproval(
   name: string,
   args?: unknown,
 ): boolean {
-  if (name === 'proposeTaskPlan') return true
-  if (name !== 'requestTaskConfirmation') return false
-  const purpose =
-    args && typeof args === 'object'
-      ? (args as { purpose?: unknown }).purpose
-      : undefined
-  return purpose !== 'review'
+  /**
+   * 自动模式只允许白名单里的付费生成免人工确认。
+   * “不进入 waiting_generation”不等于“用户已经批准”：删除、改节点、写记忆
+   * 即使不扣费，也必须在确认卡上由用户亲自点。
+   */
+  if (name === 'requestTaskConfirmation') {
+    const purpose =
+      args && typeof args === 'object'
+        ? (args as { purpose?: unknown }).purpose
+        : undefined
+    if (purpose === 'review') return false
+  }
+  return !toolRunsGenerationInAutoMode(name)
 }
 
 /**
@@ -83,17 +84,27 @@ export function confirmationSettlementMessages(
   request: ConfirmationRequestRef,
   result: 'canceled' | 'interrupted',
 ): ChatMessage[] {
-  if (
-    messages.some(
-      (message) =>
-        message.role === 'tool' && message.toolCallId === request.callId,
-    )
-  ) {
-    return [...messages]
+  const existingResultIds = new Set(
+    messages.flatMap((message) =>
+      message.role === 'tool' && message.toolCallId ? [message.toolCallId] : [],
+    ),
+  )
+  let requestMessage: ChatMessage | undefined
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    const message = messages[index]!
+    if (
+      message.role === 'assistant' &&
+      message.toolCalls?.some((call) => call.id === request.callId)
+    ) {
+      requestMessage = message
+      break
+    }
   }
-  return [
-    ...messages,
-    {
+  const requestIndex =
+    requestMessage?.toolCalls?.findIndex((call) => call.id === request.callId) ?? -1
+  const extras: ChatMessage[] = []
+  if (!existingResultIds.has(request.callId)) {
+    extras.push({
       role: 'tool',
       toolCallId: request.callId,
       toolName: request.name,
@@ -110,6 +121,36 @@ export function confirmationSettlementMessages(
               error: '用户停止了当前任务；不继续调用模型，也不自动重试。',
             },
       ),
-    },
-  ]
+    })
+    existingResultIds.add(request.callId)
+  }
+
+  /**
+   * 一次模型返回可能带多个 tool_calls。用户取消或中断的是整批，
+   * 当前调用补 canceled / interrupted，它后面的调用补 notStarted；
+   * 这样下一条用户消息不会带着悬空 tool_call 进入模型请求。
+   */
+  if (requestMessage?.toolCalls && requestIndex >= 0) {
+    for (const later of requestMessage.toolCalls.slice(requestIndex + 1)) {
+      if (existingResultIds.has(later.id)) continue
+      extras.push({
+        role: 'tool',
+        toolCallId: later.id,
+        toolName: later.name,
+        content: JSON.stringify({
+          ok: false,
+          canceled: true,
+          notStarted: true,
+          interrupted: result === 'interrupted',
+          error:
+            result === 'canceled'
+              ? '用户取消了这次任务；排在前面的工具没有执行完，这次调用也没有开始。'
+              : '用户停止了当前任务；排在前面的工具没有执行完，这次调用也没有开始。',
+        }),
+      })
+      existingResultIds.add(later.id)
+    }
+  }
+
+  return extras.length > 0 ? [...messages, ...extras] : [...messages]
 }

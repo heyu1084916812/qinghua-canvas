@@ -389,6 +389,65 @@ describe('AgentController', () => {
     )
   })
 
+  it('★★ 模型请求前失败会把 planning Job 转成终态，而不是留在活动状态', async () => {
+    const job = {
+      id: 'job-fail',
+      sessionId: 's1',
+      projectId: 'p1',
+      turnId: 'turn-1',
+      status: 'planning' as const,
+      revision: 1,
+      createdAt: 1,
+      updatedAt: 1,
+    }
+    const jobs = {
+      get: vi.fn(async () => job),
+      forTurn: vi.fn(async () => null),
+      active: vi.fn(async () => null),
+      create: vi.fn(async () => ({
+        job,
+        event: { id: 'created' },
+        created: true,
+      })),
+      transition: vi.fn(async (_id, status: string) => ({
+        job: { ...job, status },
+        event: { id: 'event' },
+      })),
+    }
+    const controller = createAgentController({
+      projectId: 'p1',
+      sessions: {} as never,
+      jobs: jobs as never,
+      hooks: {
+        isSessionActivityActive: () => true,
+        onPendingConfirmation: vi.fn(),
+        onContinuation: vi.fn(),
+        onNeedsAttention: vi.fn(),
+        onIdle: vi.fn(),
+        notify: vi.fn(),
+      },
+    })
+
+    await controller.ensureJob(session(), 'turn-1')
+    await controller.failTurn('s1', {
+      reason: '工具能力探测失败',
+      phase: 'tool_probe',
+    })
+
+    expect(jobs.transition).toHaveBeenCalledWith(
+      'job-fail',
+      'failed',
+      'failed',
+      { lastError: '工具能力探测失败' },
+      {
+        phase: 'tool_probe',
+        reason: '工具能力探测失败',
+        aborted: false,
+      },
+    )
+    expect(controller.jobId('s1')).toBeUndefined()
+  })
+
   it('owns queue insertion, queued-job cancellation, and message editing', async () => {
     const queuedSession = session({ queuedTurns: [] })
     const jobs = {

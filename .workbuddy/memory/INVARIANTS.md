@@ -5,6 +5,16 @@
 
 ## Agent · 过程与落位
 
+- **关闭 Agent 面板不能卸载运行宿主**：收起只给 `AgentDock` 的宿主加 `hidden`；状态、AbortController、
+  队列、确认、草稿继续存在。壳层展开动画由独立 active 状态驱动，不能靠重新挂载制造首帧。
+- **用户消息按 sessionId 先落库**：路由与模型请求之前保存；后台会话从自己的 `agentMessages` 读历史。
+  路由失败仍保留消息，但不创建 Job。模型窗口裁剪不得改写完整历史。
+- **工具调用必须唯一有序配对**：每个 `callId` 恰好一条 tool result。确认前当前调用不写结果；批准后按原顺序
+  补当前真实结果和后续 `notStarted`；取消/中断一次补齐。任何已落结果分支都要登记 handled。
+- **自动确认只认生成白名单**：只有 `runNode / runFrom` 可在自动模式免人工确认；删除、改节点、记忆写入必须人工点。
+- **画布副作用先过持久化屏障**：applyPlan / updateNode / slice / split 等先 `store.flush()`，再完成工具账本。
+  flush 失败保留待写批次；副作用结果未知时转 `needs_attention`，不能记成可重试 failed。
+- **readResult 以 RunRecord 最近状态为准**：瞬时 `execution.nodeStates` 只兜底；最近失败必须优先于旧产物。
 - **请求分档决定摘要与工具**：`simple_generate` 不扫描全图；`reference_edit` 只带引用节点和
   必要上游；`design_research` 不扫描画布；`canvas_operation / complex_plan` 才加载全量。
   工具声明必须用 `agentToolsForRequestMode()` 同步裁剪，不能只裁提示词。
