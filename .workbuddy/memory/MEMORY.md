@@ -13,7 +13,12 @@
 - **旧 message outcome 不补**：controller 已替换时仍直接 ignored；迟到 confirm 才做持久补救，且不写
   当前 UI、不迁 Job 为成功。
 - **证据**：聚焦 **49/49**、AgentPanel **132/132**、全量 Vitest **3864 passed / 1 skipped**；
-  tsc/check/build/diff-check 通过。无 UI 改动，未跑 G769/Tauri；AgentHost 未实现。
+  tsc/check/build/diff-check 通过；质量线独立 G769 明暗各 **39/39**；Tauri hash
+  `8F478E…8658DA`；workbuddy 文本回合 completed；Chat2api 锁定 `GPT Image 2 -> gpt-image-2`
+  后 RunRecord succeeded，asset `23e495ff7c83ba8e`，PNG 1254×1254。AgentHost 未实现。
+- **下一步必须补的恢复测试**：普通 outcome 的整份历史写入尚未做 controller CAS；queue settlement 仍按
+  sessionId；stop/cancel 仍用 React messages 快照整份落库。测试必须覆盖“旧写挂起 → 新回合落库 →
+  旧写释放”，不能只看 controller 在入口时是否匹配。
 
 ### Agent 结果收口拆分（2026-11-03，对账 #857）
 
