@@ -14,9 +14,7 @@ import { usePlatform } from '../../../../app/providers/PlatformProvider'
 import { useChannels } from '../../../../app/providers/ChannelStoreProvider'
 import { useSkillsOptional } from '../../../../app/providers/SkillStoreProvider'
 import type { ChatMessage, NodeInput } from '../../../../domain/shared/execution/types'
-import { formatContextBundleForPrompt } from '../../../../domain/shared/context'
 import { isAgentToolName } from '../../../../domain/agent/toolRegistry'
-import { memoryCandidateFromText } from '../../../../domain/shared/memoryOrganizer'
 import {
   createAgentSessionStore,
   type AgentSession,
@@ -32,7 +30,6 @@ import {
   advanceAgentTaskPlanAfterReview,
   agentTaskPlanProgress,
   normalizeTaskPlanProposal,
-  taskPlanPrompt,
 } from '../../../../domain/agent/taskPlan'
 import { createPresetStore } from '../../../../state/project/presetStore'
 import { assetNodeSize } from '../../../../domain/canvas/layout/assetNodeSize'
@@ -77,7 +74,6 @@ import { createAssetLibraryStore } from '../../../../state/project/assetLibraryS
 import { createInspirationRepository } from '../../../../state/project/inspirationRepository'
 import { loadInspirationSources } from '../../../../state/project/inspirationSourceStore'
 import { runDesignResearch } from '../../../../features/shared/research/designResearchRunner'
-import type { GenerationContextAsset } from '../../../../domain/canvas/model/node'
 import { parseSkillMarkdown } from '../../../../domain/prompt/skill'
 import { useCanvasExecution } from '../../execution/CanvasExecutionProvider'
 import { useCanvasStore, useGraph, useSelection } from '../../storeContext'
@@ -93,21 +89,7 @@ import {
   type AgentToolRequest,
 } from '../../agent/agentLoop'
 import {
-  buildAgentSystemPromptWithContext,
-  looksLikePreserveRequest,
-  looksLikeStyleOnlyRequest,
-  expectsPerImageFlows,
-} from '../../agent/agentSystemPrompt'
-import {
-  classifyAgentRequest,
-  imageNodeIdsAmong,
-  promptProfileForMode,
-  resolveAgentSkillForTurn,
-  summaryForAgentRequest,
-} from '../../agent/agentContextPolicy'
-import {
   agentToolsForCapabilities,
-  agentToolsForRequestMode,
   discoverAgentTools,
   executeConfirmedTool,
   executeReadTool,
@@ -115,10 +97,6 @@ import {
   type AgentToolContext,
 } from '../../agent/tools'
 import { runPreflightProblems } from '../../agent/runPreflight'
-import {
-  decideToolMode,
-  ensureToolSupport,
-} from '../../../../features/shared/agent/toolSupport'
 import { createModelRoutePort } from '../../../../features/shared/agent/ModelRoutePort'
 import { createRouteExecutionPort } from '../../../../features/shared/agent/RouteExecutionPort'
 import { createAgentController } from '../../../../features/shared/agent/AgentController'
@@ -155,7 +133,6 @@ import {
 } from '../../../../state/ui/agentCanvasReview'
 import { toConversation } from './conversation'
 import {
-  explicitMediaModelsFromMentions,
   preferredGeneratedModel,
 } from './mediaMentions'
 import { isAdvanceTaskCommand } from './agentProcessText'
@@ -189,9 +166,12 @@ import { latestRunFailuresForNodes } from './agentRunState'
 import {
   buildAgentModelMessages,
   composeAgentOutcomeMessages,
-  persistAgentUserTurnBeforeRoute,
   type PersistedAgentUserTurn,
 } from './agentTurnPersistence'
+import {
+  prepareAgentTurnRequest,
+  type AgentTurnContextTrace,
+} from './agentTurnRequest'
 import { errText } from '../../agent/agentLoop'
 import { loadAssetUrl } from '../../../../features/shared/assets/index'
 import {
@@ -220,7 +200,6 @@ import {
   parseMentions,
   stripMentionMarkup,
   type MentionEditorHandle,
-  type MentionRef,
 } from '../../text/MentionEditor'
 import styles from './AgentPanel.module.css'
 
@@ -577,16 +556,7 @@ export function AgentPanel({
   const chatRouteRef = useRef(new Map<string, AgentChatRoute>())
   const deliveredSteersRef = useRef(new Map<string, Set<string>>())
   const contextTraceRef = useRef(
-    new Map<
-      string,
-      {
-        digest: string
-        memoryRefs: { id: string; revision: number }[]
-        kitVersionRefs: { kitId: string; version: number }[]
-        assetRefs: (GenerationContextAsset & { mime: string })[]
-        brief?: string
-      }
-    >(),
+    new Map<string, AgentTurnContextTrace>(),
   )
   const scrollRef = useRef<HTMLDivElement | null>(null)
   const conversationViewportRef = useRef<{
@@ -1991,106 +1961,8 @@ export function AgentPanel({
       }
     }
 
-    /**
-     * 用户消息必须在**路由准备与任何模型请求之前**落库。
-     *
-     * 不能等 handleOutcome：普通思考阶段点停止、请求被取消或应用崩溃时，
-     * outcome 永远不会回来；只有先保存这条消息，重开后才还能看到用户说了什么。
-     * `imageNodeIds` 是附件引用的持久快照，后续清空待发送附件也不会把它抹掉。
-     *
-     * 后台处理 A 时界面可能显示 B，因此历史只能从目标 sessionId 读取。
-     */
-    const liveGraph = store.getSnapshot()
-    const plainText = stripMentionMarkup(text)
-    const rawMentions = parseMentions(text)
-    const sentAssetIds = [...new Set(session.pendingAssetIds ?? [])]
-    const mentions = rawMentions
-      .filter((m): m is MentionRef & { kind: 'node' | 'model' } => m.kind !== 'skill')
-      .map((m) => {
-        if (m.kind !== 'node') return m
-        const node = liveGraph.nodes.find((item) => item.id === m.id)
-        const data = (node?.data ?? {}) as { prompt?: unknown; text?: unknown }
-        const raw = typeof data.prompt === 'string' ? data.prompt : data.text
-        const prompt = typeof raw === 'string' ? raw.trim().slice(0, 160) : ''
-        return { ...m, ...(prompt ? { prompt } : {}) }
-      })
-    const visualNodeIds = [
-      ...new Set([
-        ...sentAssetIds,
-        ...mentions
-          .filter(
-            (mention): mention is MentionRef & { kind: 'node' } =>
-              mention.kind === 'node',
-          )
-          .map((mention) => mention.id),
-      ]),
-    ]
-    let persistedRoute:
-      | {
-          turn: PersistedAgentUserTurn
-          route: ChatRoutePreparation
-        }
-      | undefined
-    let activeTurnAbort: AbortController | undefined
-    try {
-      persistedRoute = await persistAgentUserTurnBeforeRoute(
-        sessions,
-        session.id,
-        {
-          content: plainText,
-          display: text,
-          imageNodeIds: visualNodeIds,
-          ...(session.contextWindow
-            ? { contextWindow: session.contextWindow }
-            : {}),
-          internalControl,
-        },
-        () => prepareChatRoute(session, true),
-        (turn) => {
-          const saved = turn.saved
-          setList((prev) =>
-            prev.map((item) => (item.id === saved.id ? saved : item)),
-          )
-          if (currentIdRef.current === saved.id) {
-            setCurrent(saved)
-            setDraft('')
-            saveAgentDraft(session.id, '')
-            setMessages(turn.historyMessages)
-          }
-          clearLiveActivitiesFor(session.id)
-          clearLiveProcessFor(session.id)
-          clearRunTasksFor(session.id)
-          activeTurnAbort = new AbortController()
-          abortRefs.current.set(session.id, activeTurnAbort)
-          setStatusFor(session.id, { kind: 'thinking' })
-          autoRunRef.current.set(session.id, session.autoRun === true)
-        },
-      )
-    } catch (error) {
-      if (activeTurnAbort?.signal.aborted) return
-      setStatusFor(session.id, {
-        kind: 'error',
-        message: `用户消息或路由准备失败：${errText(error)}`,
-      })
-      return
-    }
-    const turnAbort = activeTurnAbort
-    if (!turnAbort || turnAbort.signal.aborted) return
-    const prepared = persistedRoute.route
-    if (!prepared.ok) {
-      setStatusFor(session.id, { kind: 'error', message: prepared.message })
-      return
-    }
-    const persistedUserTurn = persistedRoute.turn
-    const chatRoute = prepared.route
-    const operationId = createId('op')
-    await ensureAgentJob(session, turnId ?? createId('turnmsg'))
-    await transitionSessionJob(
-      session.id,
-      'planning',
-      'status_changed',
-      { operationId },
-    )
+    const turnAbort = new AbortController()
+    let routeReady = false
     const failBeforeModel = async (message: string, phase: string) => {
       await controller.failTurn(session.id, {
         reason: message,
@@ -2107,265 +1979,134 @@ export function AgentPanel({
           : { kind: 'error', message },
       )
     }
-
-    let contextPrompt = ''
-    const cleanRequest = stripMentionMarkup(text)
+    let requestPreparation: Awaited<
+      ReturnType<typeof prepareAgentTurnRequest>
+    >
     try {
-      const bundle = await memory.read({
+      requestPreparation = await prepareAgentTurnRequest({
+        session,
+        text,
+        internalControl,
+        graph: store.getSnapshot(),
+        selection,
+        sessions,
+        prepareRoute: () => prepareChatRoute(session, true),
+        signal: turnAbort.signal,
+        memory,
         projectId: store.getSnapshot().projectId,
-        workbench: 'canvas',
-        request: cleanRequest,
-        sessionId: session.id,
-      })
-      contextTraceRef.current.set(session.id, {
-        digest: bundle.digest,
-        memoryRefs: bundle.memoryRefs,
-        kitVersionRefs: bundle.kitVersionRefs,
-        assetRefs: (
-          await Promise.all(
-            bundle.assets.map(async (asset) => {
-              const payload = await platform.assets.read(asset.hash).catch(() => null)
-              return payload
-                ? {
-                    hash: asset.hash,
-                    mime: payload.mime,
-                    role: asset.role,
-                    name: asset.name,
-                  }
-                : null
-            }),
-          )
-        ).filter(
-          (asset): asset is GenerationContextAsset => asset !== null,
-        ),
-      })
-      if (bundle.conflicts.length > 0) {
-        const message = `上下文有冲突，请先处理：${bundle.conflicts
-          .map((conflict) => conflict.message)
-          .join('；')}`
-        await failBeforeModel(message, 'context_conflict')
-        return
-      }
-      contextPrompt = formatContextBundleForPrompt(bundle)
-      const trace = contextTraceRef.current.get(session.id)
-      if (trace) trace.brief = contextPrompt
-      const memoryCandidate = memoryCandidateFromText(cleanRequest, {
-        workbench: 'canvas',
-        projectId: store.getSnapshot().projectId,
-        sessionId: session.id,
-      })
-      if (memoryCandidate) {
-        contextPrompt +=
-          `\n\n## 检测到长期记忆候选\n` +
-          `用户本轮可能要求长期记住以下内容。若要保存，必须调用 rememberMemory 交给系统确认，不能直接在回复里声称已记住。\n` +
-          JSON.stringify({
-            text: memoryCandidate.text,
-            kind: memoryCandidate.kind,
-            scope: memoryCandidate.scope,
-            ...(memoryCandidate.key ? { key: memoryCandidate.key } : {}),
-            ...(memoryCandidate.expiresAt
-              ? { expiresInDays: Math.max(1, Math.ceil((memoryCandidate.expiresAt - Date.now()) / 86_400_000)) }
-              : {}),
-          })
-      }
-    } catch (error) {
-      contextTraceRef.current.delete(session.id)
-      store.notify(
-        `读取个人记忆或项目套件失败：${errText(error)}`,
-        'error',
-      )
-    }
-
-    /**
-     * 发消息前先问一次「这个对话模型到底会不会 tool_calls」。
-     *
-     * 项目里早有 `probeToolCalling`，但它一直没接到这条路上：模型收到 tools 却不调，
-     * 只回一句「我无法调用工具」，Agent 就把这句当最终回答（用户 2026-10-13 截图）。
-     * 这里按「渠道 + 模型」探测一次并缓存，结果分三种：
-     * - 支持原生 tools → 走多轮 tool_calls；
-     * - 模型只是不返回 tool_calls（部分中转 / 对话模型）→ 自动降级到 JSON 工具调用
-     *   （设计文档 §7 路线 B），不再要求用户换模型 —— 「对话模型也能调用 agent」是默认预期；
-     * - 探测请求本身失败（渠道 / 鉴权 / 限流）→ 如实报错，这种降级也救不了。
-     */
-    const support = await ensureToolSupport(
-      {
-        completeText: (req: TextRunRequest, signal: AbortSignal) =>
-          routeExecution.execute({
-            channelId: chatRoute.channelId,
-            model: chatRoute.upstreamModel,
-            modelIsUpstream: true,
-            tools: req.tools ?? activeAgentTools,
-            messages: req.messages ?? [],
-            signal,
-            routeCandidates: chatRoute.candidates,
-            routePlanId: chatRoute.routePlanId,
-            trace: directTextTrace({
-              projectId: store.getSnapshot().projectId,
-              workbench: 'canvas',
-              subjectId: session.id,
-              scopeId: `session:${session.id}`,
-              operationId,
-              purpose: 'agent-tool-probe',
-              channelId: chatRoute.channelId,
-              model: chatRoute.upstreamModel,
-              prompt: req.prompt,
-              inputs: req.inputs,
-              params: {
-                messageCount: req.messages?.length ?? 0,
-                toolMode: 'probe',
-              },
-            }),
-            onRecordWarning: (warning) =>
-              store.notify(`结果已返回，但运行记录写入失败：${warning}`, 'error'),
-            onRouteSucceeded: (selected) => {
-              chatRoute.channelId = selected.channelId
-              chatRoute.upstreamModel = selected.model
-              if (selected.credentialGroupId) {
-                chatRoute.credentialGroupId = selected.credentialGroupId
-              } else {
-                delete chatRoute.credentialGroupId
-              }
-              chatRoute.candidates = [
-                selected,
-                ...chatRoute.candidates.filter(
-                  (candidate) =>
-                    candidate.channelId !== selected.channelId ||
-                    candidate.credentialGroupId !== selected.credentialGroupId ||
-                    candidate.model !== selected.model,
-                ),
-              ]
-            },
-            /** 探测自带一个更短的等待上限（见 `PROBE_TIMEOUT_MS`） */
-            ...(req.timeoutMs ? { timeoutMs: req.timeoutMs } : {}),
-          }),
-      },
-      { channelId: chatRoute.channelId, model: chatRoute.logicalModel },
-      turnAbort.signal,
-    )
-    if (turnAbort.signal.aborted) {
-      await failBeforeModel('用户已停止当前回合', 'tool_probe')
-      return
-    }
-    const decision = decideToolMode(support)
-    if (decision.kind === 'error') {
-      await failBeforeModel(decision.message, 'tool_probe')
-      return
-    }
-    /**
-     * 模式按会话记住：后续用户点「确认」或自动生成续跑时都得沿用同一条，
-     * 不能因为探测缓存已命中就中途切回原生 tools（那样模型又会「无法调用工具」）。
-     */
-    const toolMode = decision.mode
-    toolModeRef.current.set(session.id, toolMode)
-    if (sentAssetIds.length > 0) {
-      const cleared = await sessions.clearPendingAssetIds(session.id, sentAssetIds)
-      if (cleared) {
-        setList((prev) => prev.map((item) => (item.id === cleared.id ? cleared : item)))
-        if (currentIdRef.current === cleared.id) setCurrent(cleared)
-      }
-    }
-
-    /**
-     * 系统提示词（设计文档 §4.1 / §8 / §14 M4）= 按本轮请求裁剪的通用规则
-     * + 随对话给的素材 + 当前正文里明确带上的技能。
-     *
-     * 技能负责「怎么做」，agent 负责「真的去做」—— 所以不是让技能自己执行，
-     * 而是把它当作**这次规划的规范**：技能里的阶段就是 agent 要建到画布上的步骤。
-     * 技能只认当前正文里的 skill chip；旧会话/default 残留的 skillId 不能偷偷注入。
-     *
-     * 拼接本身放在 `buildAgentSystemPromptWithContext` 里，不在这儿现拼：
-     * 「技能正文到底进没进提示词」只能靠发出去的消息证明，抽成纯函数才有单测。
-     */
-    const skillChipIds = rawMentions
-      .filter((mention) => mention.kind === 'skill')
-      .map((mention) => mention.id)
-    const skillId = resolveAgentSkillForTurn(skillChipIds, session.skillId)
-    const skill = skillId ? allSkills.find((item) => item.id === skillId) : undefined
-    const explicitMediaModels = explicitMediaModelsFromMentions(
-      mentions,
-      (model) => capabilityOfLogical(allChannels, model)?.category,
-    )
-    explicitMediaModelsRef.current.set(session.id, explicitMediaModels)
-    /** 用户点选的三档模型里的图片 / 视频那两个（对话模型由 `inherited` 报） */
-    const mediaModels = {
-      ...(session.imageModel ? { image: session.imageModel } : {}),
-      ...(session.videoModel ? { video: session.videoModel } : {}),
-    }
-    /**
-     * 这次 @ 到了几张**有图**的节点 —— 「该不该一张图一条流程」要看**图数**
-     * （用户 2026-10-06 第七批 #183：「明明是单独的两个需求他给我替换成了一个需求」）。
-     *
-     * 单张图无所谓拆不拆，所以判据是「≥2 张、且他没说合并 / 融合」。
-     * 算好存进 ref：工具执行可能发生在用户点「批准」之后，那时这里已经出栈了。
-     */
-    const mentionedImageIds = imageNodeIdsAmong(
-      liveGraph.nodes,
-      mentions.filter((m) => m.kind === 'node').map((m) => m.id),
-    )
-    const selectedImageIds = imageNodeIdsAmong(liveGraph.nodes, selection)
-    const mentionedImageCount = mentionedImageIds.length
-    const perImage = expectsPerImageFlows(plainText, mentionedImageCount)
-    sessionRuntimeRef.current.setPerImage(session.id, perImage)
-    const activeTaskPlan =
-      session.taskPlan && agentTaskPlanProgress(session.taskPlan).status === 'active'
-        ? session.taskPlan
-        : undefined
-    const requestMode = classifyAgentRequest({
-      text: plainText,
-      hasMentionedImage: mentionedImageCount > 0,
-      hasSelectedNodes: selection.length > 0,
-      hasSelectedImage: selectedImageIds.length > 0,
-      hasTaskPlan: Boolean(activeTaskPlan),
-    })
-    const promptProfile = promptProfileForMode(requestMode)
-    const turnAgentTools = agentToolsForRequestMode(requestMode, {
-      canvasReview: canvasReviewEnabled,
-    })
-    turnToolsRef.current.set(session.id, turnAgentTools)
-    const referenceRootIds =
-      requestMode === 'reference_edit'
-        ? mentionedImageIds.length > 0
-          ? mentionedImageIds
-          : selectedImageIds
-        : []
-    const summary = summaryForAgentRequest(liveGraph, requestMode, referenceRootIds)
-    const system = buildAgentSystemPromptWithContext(
-      summary,
-      { model: chatRoute.logicalModel },
-      {
-        requestMode,
-        promptProfile,
+        readAssetMime: async (hash) =>
+          (await platform.assets.read(hash).catch(() => null))?.mime ??
+          null,
+        notifyContextError: (message) =>
+          store.notify(message, 'error'),
+        skills: allSkills,
+        channels: allChannels,
         canvasReviewEnabled,
-        /**
-         * 用户说了「其他保持不变 / 只改 X」→ 给这次规划加一段**硬约束**
-         * （用户 2026-10-05 第五批第 2 条：那句要求只留在对话里，没进提示词）。
-         * 判据取**去掉引用标记之后**的原文，免得 `@[名字](node:id)` 这类机器标记干扰匹配。
-         */
-        ...(looksLikePreserveRequest(plainText) ? { preserve: true } : {}),
-        /** 「换成 3D / 写实 / 卡通」= 只改风格：内容必须沿用原来的提示词（第六批） */
-        ...(looksLikeStyleOnlyRequest(plainText) ? { styleOnly: true } : {}),
-        /** 多张图且没说合成 → 每张各自一条流程（第七批 #183） */
-        ...(perImage ? { perImage: true } : {}),
-        assetIds: sentAssetIds,
-        ...(skill ? { skill: { name: skill.name, content: skill.content } } : {}),
-        ...(mentions.length > 0 ? { mentions } : {}),
-        ...(Object.keys(mediaModels).length > 0 ? { mediaModels } : {}),
+        activeAgentTools,
         generationAvailability,
-        ...(contextPrompt ? { contextBundle: contextPrompt } : {}),
-        ...(activeTaskPlan ? { taskPlan: taskPlanPrompt(activeTaskPlan) } : {}),
-        /** JSON 降级时要把工具声明列进提示词，模型才知道 tool 能填什么（路线 B） */
-        ...(toolMode === 'json' ? { jsonToolFallback: true, tools: turnAgentTools } : {}),
-      },
+        routeExecution,
+        notifyRecordWarning: (warning) =>
+          store.notify(
+            `结果已返回，但运行记录写入失败：${warning}`,
+            'error',
+          ),
+        onPersisted: (turn) => {
+          const saved = turn.saved
+          setList((prev) =>
+            prev.map((item) => (item.id === saved.id ? saved : item)),
+          )
+          if (currentIdRef.current === saved.id) {
+            setCurrent(saved)
+            setDraft('')
+            saveAgentDraft(session.id, '')
+            setMessages(turn.historyMessages)
+          }
+          clearLiveActivitiesFor(session.id)
+          clearLiveProcessFor(session.id)
+          clearRunTasksFor(session.id)
+          abortRefs.current.set(session.id, turnAbort)
+          setStatusFor(session.id, { kind: 'thinking' })
+          autoRunRef.current.set(session.id, session.autoRun === true)
+        },
+        onRouteReady: async (operationId) => {
+          routeReady = true
+          await ensureAgentJob(session, turnId ?? createId('turnmsg'))
+          await transitionSessionJob(
+            session.id,
+            'planning',
+            'status_changed',
+            { operationId },
+          )
+        },
+      })
+    } catch (error) {
+      if (routeReady) throw error
+      if (turnAbort.signal.aborted) return
+      setStatusFor(session.id, {
+        kind: 'error',
+        message: `用户消息或路由准备失败：${errText(error)}`,
+      })
+      return
+    }
+    if (requestPreparation.kind === 'aborted_before_job') return
+    if (requestPreparation.kind === 'route_failed') {
+      setStatusFor(session.id, {
+        kind: 'error',
+        message: requestPreparation.message,
+      })
+      return
+    }
+    if (requestPreparation.kind === 'failed') {
+      if (requestPreparation.contextTrace) {
+        contextTraceRef.current.set(
+          session.id,
+          requestPreparation.contextTrace,
+        )
+      } else {
+        contextTraceRef.current.delete(session.id)
+      }
+      await failBeforeModel(
+        requestPreparation.message,
+        requestPreparation.phase,
+      )
+      return
+    }
+
+    const prepared = requestPreparation
+    const persistedUserTurn = prepared.persistedTurn
+    const operationId = prepared.operationId
+    const toolMode = prepared.toolMode
+    const turnAgentTools = prepared.turnTools
+    if (prepared.contextTrace) {
+      contextTraceRef.current.set(session.id, prepared.contextTrace)
+    } else {
+      contextTraceRef.current.delete(session.id)
+    }
+    toolModeRef.current.set(session.id, toolMode)
+    explicitMediaModelsRef.current.set(
+      session.id,
+      prepared.explicitMediaModels,
     )
-    /** 模型窗口版 → 完整界面 / 落库版，只追加本轮 user 之后的新消息。 */
+    sessionRuntimeRef.current.setPerImage(session.id, prepared.perImage)
+    turnToolsRef.current.set(session.id, turnAgentTools)
+    if (prepared.clearedPendingAssets) {
+      const cleared = prepared.clearedPendingAssets
+      setList((prev) =>
+        prev.map((item) => (item.id === cleared.id ? cleared : item)),
+      )
+      if (currentIdRef.current === cleared.id) setCurrent(cleared)
+    }
     const withFullHistory = (list: readonly ChatMessage[]): ChatMessage[] =>
       composeAgentOutcomeMessages(persistedUserTurn, list)
-    const withSystem = buildAgentModelMessages(system, persistedUserTurn)
+    const withSystem = buildAgentModelMessages(
+      prepared.systemPrompt,
+      persistedUserTurn,
+    )
     const currentLoopDeps = loopDeps(
       session,
       operationId,
       toolMode,
-      visualNodeIds,
+      prepared.visualNodeIds,
       (next) => {
         if (currentIdRef.current !== session.id) return
         setMessageReveal(null)
@@ -2388,6 +2129,8 @@ export function AgentPanel({
     return outcome
   }, [
     store,
+    platform,
+    allChannels,
     selection,
     loopDeps,
     handleOutcome,

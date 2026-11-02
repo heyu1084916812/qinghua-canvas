@@ -1,5 +1,23 @@
 # CanvasFlow（轻画）项目记忆
 
+### Agent 请求准备拆分（2026-11-03，对账 #856）
+
+- **请求快照独立**：`agentTurnRequest.ts` 承接 mention 解析、附件 / 视觉节点 id、ContextBundle、
+  技能 chip、显式媒体模型、每图拆分、请求分类、工具裁剪、系统提示词、路由准备和工具探测。
+  它返回显式 `ready / aborted_before_job / route_failed / failed` 结果，不持有 React refs，
+  也不运行模型循环。
+- **Job 只在路由成功后创建**：模块先调用 `persistAgentUserTurnBeforeRoute`，再调用
+  `onRouteReady`；路由失败时 `onRouteReady` 零调用。上下文冲突 / 探测失败由面板
+  `failBeforeModel` 收口。后台会话仍只读目标 `sessionId` 历史，窗口裁剪不改完整历史。
+- **面板仍是运行态所有者**：`AgentPanel` 继续持有 per-session abort、toolMode、turnTools、
+  autoRun、explicitMediaModels、contextTrace，以及 `runAgentTurn`、自动确认续跑和
+  `handleOutcome`。不要把这些搬进请求准备模块。
+- **测试边界**：新增 `agentTurnRequest.test.ts` 钉住技能 chip-only、多图分类 / 工具裁剪 /
+  JSON 降级、后台会话隔离、路由失败不触发 Job-ready、素材与任务计划进入系统提示词。
+- **证据**：`AgentPanel.tsx` **3994→3737 行**；全量 Vitest **3852 passed / 1 skipped**，
+  AgentPanel 定向 **123/123**，`npx tsc --noEmit`、`npm run check`、`git diff --check` 通过。
+  执行循环、确认执行、停止 / 继续和独立 AgentHost 仍是后续债。
+
 ### Agent 发送清理二次失败安全（2026-11-03，对账 #855）
 
 - **活动锁由 finally 收口**：`agentSendFlow` 普通成功、空结果、业务异常、Job transition 异常和

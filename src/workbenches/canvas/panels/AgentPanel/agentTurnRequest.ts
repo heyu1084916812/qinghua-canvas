@@ -1,0 +1,514 @@
+import type { GraphSnapshot } from '../../../../domain/canvas/model/graph'
+import type { GenerationContextAsset } from '../../../../domain/canvas/model/node'
+import type { Channel } from '../../../../domain/project/channel'
+import type { GenerationAvailability } from '../../../../domain/project/generationRouting'
+import type { Skill } from '../../../../domain/prompt/skill'
+import type {
+  MentionRef,
+} from '../../text/MentionEditor'
+import {
+  parseMentions,
+  stripMentionMarkup,
+} from '../../text/MentionEditor'
+import type {
+  ToolDeclaration,
+} from '../../../../domain/shared/execution/types'
+import type { TextRunRequest } from '../../../../platform/channels/types'
+import {
+  formatContextBundleForPrompt,
+} from '../../../../domain/shared/context'
+import { memoryCandidateFromText } from '../../../../domain/shared/memoryOrganizer'
+import {
+  agentTaskPlanProgress,
+  taskPlanPrompt,
+} from '../../../../domain/agent/taskPlan'
+import { capabilityOfLogical } from '../../../../domain/project/modelCatalog'
+import type { AgentToolMode } from '../../../../features/shared/agent/toolSupport'
+import {
+  decideToolMode,
+  ensureToolSupport,
+} from '../../../../features/shared/agent/toolSupport'
+import type { AgentMemoryPort } from '../../../../features/shared/agent/MemoryPort'
+import type { RouteExecutionPort } from '../../../../features/shared/agent/RouteExecutionPort'
+import { directTextTrace } from '../../../../state/shared/directRun'
+import type {
+  AgentSession,
+  AgentSessionStore,
+} from '../../../../state/agent/sessionStore'
+import { createId } from '../../../../shared/id'
+import {
+  classifyAgentRequest,
+  imageNodeIdsAmong,
+  promptProfileForMode,
+  resolveAgentSkillForTurn,
+  summaryForAgentRequest,
+  type AgentPromptProfile,
+  type AgentRequestMode,
+} from '../../agent/agentContextPolicy'
+import {
+  buildAgentSystemPromptWithContext,
+  expectsPerImageFlows,
+  looksLikePreserveRequest,
+  looksLikeStyleOnlyRequest,
+} from '../../agent/agentSystemPrompt'
+import { agentToolsForRequestMode } from '../../agent/tools'
+import { errText } from '../../agent/agentLoop'
+import type {
+  AgentChatRoute,
+  ChatRoutePreparation,
+} from './agentChatRoute'
+import {
+  persistAgentUserTurnBeforeRoute,
+  type PersistedAgentUserTurn,
+} from './agentTurnPersistence'
+import {
+  explicitMediaModelsFromMentions,
+  type ExplicitMediaModels,
+} from './mediaMentions'
+
+export interface AgentTurnContextTrace {
+  digest: string
+  memoryRefs: { id: string; revision: number }[]
+  kitVersionRefs: { kitId: string; version: number }[]
+  assetRefs: (GenerationContextAsset & { mime: string })[]
+  brief?: string
+}
+
+export type AgentTurnMention = MentionRef & {
+  kind: 'node' | 'model'
+  prompt?: string
+}
+
+export interface PrepareAgentTurnRequestInput {
+  session: AgentSession
+  text: string
+  internalControl?: boolean
+  graph: GraphSnapshot
+  selection: readonly string[]
+  sessions: Pick<
+    AgentSessionStore,
+    'messagesFor' | 'saveMessages' | 'clearPendingAssetIds'
+  >
+  prepareRoute: () => Promise<ChatRoutePreparation>
+  onPersisted: (turn: PersistedAgentUserTurn) => void
+  onRouteReady: (operationId: string) => Promise<void>
+  memory: Pick<AgentMemoryPort, 'read'>
+  projectId: string
+  readAssetMime: (hash: string) => Promise<string | null>
+  notifyContextError: (message: string) => void
+  skills: readonly Skill[]
+  channels: readonly Channel[]
+  canvasReviewEnabled: boolean
+  activeAgentTools: readonly ToolDeclaration[]
+  generationAvailability: {
+    image?: GenerationAvailability
+    video?: GenerationAvailability
+  }
+  routeExecution: RouteExecutionPort
+  signal: AbortSignal
+  notifyRecordWarning: (message: string) => void
+}
+
+export interface PreparedAgentTurnRequest {
+  kind: 'ready'
+  operationId: string
+  persistedTurn: PersistedAgentUserTurn
+  chatRoute: AgentChatRoute
+  plainText: string
+  mentions: AgentTurnMention[]
+  visualNodeIds: string[]
+  sentAssetIds: string[]
+  contextPrompt: string
+  contextTrace: AgentTurnContextTrace | null
+  skill?: Skill
+  explicitMediaModels: ExplicitMediaModels
+  perImage: boolean
+  requestMode: AgentRequestMode
+  promptProfile: AgentPromptProfile
+  toolMode: AgentToolMode
+  turnTools: ToolDeclaration[]
+  systemPrompt: string
+  clearedPendingAssets?: AgentSession
+}
+
+export type AgentTurnRequestPreparation =
+  | PreparedAgentTurnRequest
+  | {
+      kind: 'aborted_before_job'
+      persistedTurn: PersistedAgentUserTurn
+    }
+  | {
+      kind: 'route_failed'
+      persistedTurn: PersistedAgentUserTurn
+      message: string
+    }
+  | {
+      kind: 'failed'
+      persistedTurn: PersistedAgentUserTurn
+      phase: 'context_conflict' | 'tool_probe'
+      message: string
+      contextTrace: AgentTurnContextTrace | null
+    }
+
+/**
+ * Prepare one persisted Agent turn and everything the model loop needs.
+ *
+ * The user turn is saved before route preparation. `onRouteReady` is called only
+ * after a route exists, so the caller can create the planning Job without ever
+ * leaking one from a failed route. The returned refs are values, not mutations:
+ * AgentPanel remains the owner of its per-session React refs.
+ */
+export async function prepareAgentTurnRequest(
+  input: PrepareAgentTurnRequestInput,
+): Promise<AgentTurnRequestPreparation> {
+  const plainText = stripMentionMarkup(input.text)
+  const rawMentions = parseMentions(input.text)
+  const sentAssetIds = [...new Set(input.session.pendingAssetIds ?? [])]
+  const mentions = rawMentions
+    .filter(
+      (mention): mention is MentionRef & { kind: 'node' | 'model' } =>
+        mention.kind !== 'skill',
+    )
+    .map((mention): AgentTurnMention => {
+      if (mention.kind !== 'node') return mention
+      const node = input.graph.nodes.find((item) => item.id === mention.id)
+      const data = (node?.data ?? {}) as {
+        prompt?: unknown
+        text?: unknown
+      }
+      const raw =
+        typeof data.prompt === 'string' ? data.prompt : data.text
+      const prompt =
+        typeof raw === 'string' ? raw.trim().slice(0, 160) : ''
+      return { ...mention, ...(prompt ? { prompt } : {}) }
+    })
+  const visualNodeIds = [
+    ...new Set([
+      ...sentAssetIds,
+      ...mentions
+        .filter(
+          (mention): mention is AgentTurnMention & { kind: 'node' } =>
+            mention.kind === 'node',
+        )
+        .map((mention) => mention.id),
+    ]),
+  ]
+
+  const persistedRoute = await persistAgentUserTurnBeforeRoute(
+    input.sessions,
+    input.session.id,
+    {
+      content: plainText,
+      display: input.text,
+      imageNodeIds: visualNodeIds,
+      ...(input.session.contextWindow
+        ? { contextWindow: input.session.contextWindow }
+        : {}),
+      internalControl: input.internalControl === true,
+    },
+    input.prepareRoute,
+    input.onPersisted,
+  )
+  const persistedTurn = persistedRoute.turn
+  if (input.signal.aborted) {
+    return { kind: 'aborted_before_job', persistedTurn }
+  }
+  if (!persistedRoute.route.ok) {
+    return {
+      kind: 'route_failed',
+      persistedTurn,
+      message: persistedRoute.route.message,
+    }
+  }
+
+  const chatRoute = persistedRoute.route.route
+  const operationId = createId('op')
+  await input.onRouteReady(operationId)
+
+  let contextPrompt = ''
+  let contextTrace: AgentTurnContextTrace | null = null
+  try {
+    const bundle = await input.memory.read({
+      projectId: input.projectId,
+      workbench: 'canvas',
+      request: plainText,
+      sessionId: input.session.id,
+    })
+    contextTrace = {
+      digest: bundle.digest,
+      memoryRefs: bundle.memoryRefs,
+      kitVersionRefs: bundle.kitVersionRefs,
+      assetRefs: (
+        await Promise.all(
+          bundle.assets.map(async (asset) => {
+            const mime = await input
+              .readAssetMime(asset.hash)
+              .catch(() => null)
+            return mime
+              ? {
+                  hash: asset.hash,
+                  mime,
+                  role: asset.role,
+                  name: asset.name,
+                }
+              : null
+          }),
+        )
+      ).filter(
+        (asset): asset is GenerationContextAsset & { mime: string } =>
+          asset !== null,
+      ),
+    }
+    if (bundle.conflicts.length > 0) {
+      return {
+        kind: 'failed',
+        persistedTurn,
+        phase: 'context_conflict',
+        message: `上下文有冲突，请先处理：${bundle.conflicts
+          .map((conflict) => conflict.message)
+          .join('；')}`,
+        contextTrace,
+      }
+    }
+    contextPrompt = formatContextBundleForPrompt(bundle)
+    contextTrace.brief = contextPrompt
+    const memoryCandidate = memoryCandidateFromText(plainText, {
+      workbench: 'canvas',
+      projectId: input.projectId,
+      sessionId: input.session.id,
+    })
+    if (memoryCandidate) {
+      contextPrompt +=
+        `\n\n## 检测到长期记忆候选\n` +
+        `用户本轮可能要求长期记住以下内容。若要保存，必须调用 rememberMemory 交给系统确认，不能直接在回复里声称已记住。\n` +
+        JSON.stringify({
+          text: memoryCandidate.text,
+          kind: memoryCandidate.kind,
+          scope: memoryCandidate.scope,
+          ...(memoryCandidate.key
+            ? { key: memoryCandidate.key }
+            : {}),
+          ...(memoryCandidate.expiresAt
+            ? {
+                expiresInDays: Math.max(
+                  1,
+                  Math.ceil(
+                    (memoryCandidate.expiresAt - Date.now()) / 86_400_000,
+                  ),
+                ),
+              }
+            : {}),
+        })
+    }
+  } catch (error) {
+    contextTrace = null
+    input.notifyContextError(
+      `读取个人记忆或项目套件失败：${errText(error)}`,
+    )
+  }
+
+  const support = await ensureToolSupport(
+    {
+      completeText: (request: TextRunRequest, signal: AbortSignal) =>
+        input.routeExecution.execute({
+          channelId: chatRoute.channelId,
+          model: chatRoute.upstreamModel,
+          modelIsUpstream: true,
+          tools: request.tools ?? input.activeAgentTools,
+          messages: request.messages ?? [],
+          signal,
+          routeCandidates: chatRoute.candidates,
+          routePlanId: chatRoute.routePlanId,
+          trace: directTextTrace({
+            projectId: input.projectId,
+            workbench: 'canvas',
+            subjectId: input.session.id,
+            scopeId: `session:${input.session.id}`,
+            operationId,
+            purpose: 'agent-tool-probe',
+            channelId: chatRoute.channelId,
+            model: chatRoute.upstreamModel,
+            prompt: request.prompt,
+            inputs: request.inputs,
+            params: {
+              messageCount: request.messages?.length ?? 0,
+              toolMode: 'probe',
+            },
+          }),
+          onRecordWarning: input.notifyRecordWarning,
+          onRouteSucceeded: (selected) => {
+            chatRoute.channelId = selected.channelId
+            chatRoute.upstreamModel = selected.model
+            if (selected.credentialGroupId) {
+              chatRoute.credentialGroupId = selected.credentialGroupId
+            } else {
+              delete chatRoute.credentialGroupId
+            }
+            chatRoute.candidates = [
+              selected,
+              ...chatRoute.candidates.filter(
+                (candidate) =>
+                  candidate.channelId !== selected.channelId ||
+                  candidate.credentialGroupId !==
+                    selected.credentialGroupId ||
+                  candidate.model !== selected.model,
+              ),
+            ]
+          },
+          ...(request.timeoutMs
+            ? { timeoutMs: request.timeoutMs }
+            : {}),
+        }),
+    },
+    {
+      channelId: chatRoute.channelId,
+      model: chatRoute.logicalModel,
+    },
+    input.signal,
+  )
+  if (input.signal.aborted) {
+    return {
+      kind: 'failed',
+      persistedTurn,
+      phase: 'tool_probe',
+      message: '用户已停止当前回合',
+      contextTrace,
+    }
+  }
+  const decision = decideToolMode(support)
+  if (decision.kind === 'error') {
+    return {
+      kind: 'failed',
+      persistedTurn,
+      phase: 'tool_probe',
+      message: decision.message,
+      contextTrace,
+    }
+  }
+
+  const clearedPendingAssets =
+    sentAssetIds.length > 0
+      ? (await input.sessions.clearPendingAssetIds(
+          input.session.id,
+          sentAssetIds,
+        )) ?? undefined
+      : undefined
+
+  const skillChipIds = rawMentions
+    .filter((mention) => mention.kind === 'skill')
+    .map((mention) => mention.id)
+  const skillId = resolveAgentSkillForTurn(
+    skillChipIds,
+    input.session.skillId,
+  )
+  const skill = skillId
+    ? input.skills.find((item) => item.id === skillId)
+    : undefined
+  const explicitMediaModels = explicitMediaModelsFromMentions(
+    mentions,
+    (model) => capabilityOfLogical(input.channels, model)?.category,
+  )
+  const mediaModels = {
+    ...(input.session.imageModel
+      ? { image: input.session.imageModel }
+      : {}),
+    ...(input.session.videoModel
+      ? { video: input.session.videoModel }
+      : {}),
+  }
+  const mentionedImageIds = imageNodeIdsAmong(
+    input.graph.nodes,
+    mentions
+      .filter((mention) => mention.kind === 'node')
+      .map((mention) => mention.id),
+  )
+  const selectedImageIds = imageNodeIdsAmong(
+    input.graph.nodes,
+    input.selection,
+  )
+  const perImage = expectsPerImageFlows(
+    plainText,
+    mentionedImageIds.length,
+  )
+  const activeTaskPlan =
+    input.session.taskPlan &&
+    agentTaskPlanProgress(input.session.taskPlan).status === 'active'
+      ? input.session.taskPlan
+      : undefined
+  const requestMode = classifyAgentRequest({
+    text: plainText,
+    hasMentionedImage: mentionedImageIds.length > 0,
+    hasSelectedNodes: input.selection.length > 0,
+    hasSelectedImage: selectedImageIds.length > 0,
+    hasTaskPlan: Boolean(activeTaskPlan),
+  })
+  const promptProfile = promptProfileForMode(requestMode)
+  const turnTools = [
+    ...agentToolsForRequestMode(requestMode, {
+      canvasReview: input.canvasReviewEnabled,
+    }),
+  ]
+  const referenceRootIds =
+    requestMode === 'reference_edit'
+      ? mentionedImageIds.length > 0
+        ? mentionedImageIds
+        : selectedImageIds
+      : []
+  const summary = summaryForAgentRequest(
+    input.graph,
+    requestMode,
+    referenceRootIds,
+  )
+  const systemPrompt = buildAgentSystemPromptWithContext(
+    summary,
+    { model: chatRoute.logicalModel },
+    {
+      requestMode,
+      promptProfile,
+      canvasReviewEnabled: input.canvasReviewEnabled,
+      ...(looksLikePreserveRequest(plainText)
+        ? { preserve: true }
+        : {}),
+      ...(looksLikeStyleOnlyRequest(plainText)
+        ? { styleOnly: true }
+        : {}),
+      ...(perImage ? { perImage: true } : {}),
+      assetIds: sentAssetIds,
+      ...(skill
+        ? { skill: { name: skill.name, content: skill.content } }
+        : {}),
+      ...(mentions.length > 0 ? { mentions } : {}),
+      ...(Object.keys(mediaModels).length > 0 ? { mediaModels } : {}),
+      generationAvailability: input.generationAvailability,
+      ...(contextPrompt ? { contextBundle: contextPrompt } : {}),
+      ...(activeTaskPlan
+        ? { taskPlan: taskPlanPrompt(activeTaskPlan) }
+        : {}),
+      ...(decision.mode === 'json'
+        ? { jsonToolFallback: true, tools: turnTools }
+        : {}),
+    },
+  )
+
+  return {
+    kind: 'ready',
+    operationId,
+    persistedTurn,
+    chatRoute,
+    plainText,
+    mentions,
+    visualNodeIds,
+    sentAssetIds,
+    contextPrompt,
+    contextTrace,
+    ...(skill ? { skill } : {}),
+    explicitMediaModels,
+    perImage,
+    requestMode,
+    promptProfile,
+    toolMode: decision.mode,
+    turnTools,
+    systemPrompt,
+    ...(clearedPendingAssets ? { clearedPendingAssets } : {}),
+  }
+}

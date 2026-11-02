@@ -1,5 +1,16 @@
 # 轻画 · Agent 设计文档（画布 Agent）
 
+> **2026-11-03 Agent 请求准备独立（对账 #856）**：`AgentPanel.tsx` 从 **3994 行降到 3737 行**。
+> 新增 `agentTurnRequest.ts`，顺序固定为目标 `sessionId` 用户消息先落库 → `onPersisted` → 路由 →
+> `onRouteReady` 创建 planning Job → ContextBundle / 工具探测 / JSON 降级 → 返回请求快照。
+> 该模块承接正文与 mention、附件 / 视觉节点 id、引用提示词、技能 chip、显式媒体模型、每图拆分、
+> 请求分类、工具裁剪和系统提示词；不持有 React refs、不运行模型循环、不处理确认 / 停止 / 结果。
+> `AgentPanel` 继续持有 per-session abort / toolMode / turnTools / autoRun / explicitMediaModels /
+> contextTrace，并继续调用 `buildAgentModelMessages`、`runAgentTurn`、自动确认续跑和 `handleOutcome`。
+> **验证**：全量 Vitest **3852 passed / 1 skipped**；AgentPanel 定向 **123/123**；
+> `npx tsc --noEmit`、`npm run check`、`git diff --check` 通过。
+> **剩余债**：执行循环、确认执行、停止 / 继续和部分会话配置仍在主面板；独立 AgentHost 未实现。
+
 > **2026-11-03 AgentPanel 发送主链拆分（对账 #854）**：主面板从 **4079 行降到 3994 行**。
 > `agentSendFlow.ts` 只做发送锁、队列结算和异常收口；`useAgentSendController.ts` 只做依赖装配。
 > 原有发送主链不是改写成新的 Agent runtime：目标会话用户消息先落库，路由失败不建 planning Job，
@@ -379,6 +390,11 @@ interface AgentPlan {
 > ③ 与 ④ 都进提示词而不是靠工具现查：**每轮都先 `readGraph` 会让最基础的
 > 「我这张画布上有什么」多花一次往返**，而它几乎每轮都要用。工具保留给「更深的问题」
 > （比如「那张图多大尺寸」）。
+
+请求准备由 `panels/AgentPanel/agentTurnRequest.ts` 统一组装。它只返回该轮显式快照，
+不直接写 React refs；`AgentPanel` 收到 `ready` 后再写入 per-session 状态并进入模型循环。
+路由失败返回 `route_failed`，不会调用 Job-ready 回调；上下文冲突和探测失败返回 `failed`，
+由面板沿用现有 `failBeforeModel` 收口。
 
 ### 4.2 工具结果怎么回填
 
@@ -922,6 +938,7 @@ Agent 设置入口只在面板右上方，不新增一级导航。齿轮打开�
 | 状态 | `state/agent/` | 会话存储（§12 那张表） | 与既有 store 同层 |
 | 应用壳宿主 | `app/AgentShellSlot.tsx` + `pages/CanvasPage/AgentShellHost.tsx` | AppShell 只提供 portal 目标；画布页把自己的面板内容和浮球入口 portal 进去 | `AppShell` 不反向 import 画布工作台私有实现 |
 | 界面 | `workbenches/canvas/panels/AgentPanel/` | 对话窗视图（§8）；迁移完成后不再持有循环与付费确认编排 | 属画布工作台私有视图 |
+| 请求准备 | `workbenches/canvas/panels/AgentPanel/agentTurnRequest.ts` | 先落库用户消息、路由顺序、ContextBundle、工具探测 / JSON 降级、技能 / 媒体 / 分工 / 工具 / 系统提示词 | 请求快照可单测；不拥有 refs、循环、确认或结果处理 |
 | 平台 | `platform/channels/` | `tools` 透传与解析（`openaiChat` + `mock` 会演 agent） | 渠道能力属平台层 |
 
 > `domain/agent` **不许** import 画布私有层（`domain/canvas/nodeSpecs` 之类）。
@@ -1170,7 +1187,7 @@ Harness Worker、等价切换、删除旧循环、资源包签名与发布门禁
 | 维度 | 分数 | 大白话判断 |
 | --- | ---: | --- |
 | 可用性 | 7.5/10 | 建图、出图确认、排队、停止、读结果、验收这些主流程已经顺手；离开画布页仍会停。 |
-| 代码结构 | 6.5/10 | 已有 Controller、ToolRegistry、账本、独立视图壳、队列 hook 和画布执行模块；但 `AgentPanel.tsx` 仍约 4.1k 行，发送/确认主链还挤在面板内。 |
+| 代码结构 | 7/10 | 已有 Controller、ToolRegistry、账本、独立视图壳、队列 hook、画布执行模块和请求准备模块；`AgentPanel.tsx` 降到 **3737 行**，但模型循环、确认执行、停止 / 继续仍在面板内。 |
 | 可插拔 | 5/10 | 工具有注册表和统一 schema，新增工具比硬编码好；但这不是 Harness 那种可装卸第三方插件。 |
 | 视觉 | 8/10 | 右侧壳层、浮球、计划卡、过程线和确认卡的视觉语言统一；本轮明暗与双视口回归通过。 |
 | 用户感受 | 7/10 | 改完后“关掉再开还在、后台不串会话、危险操作不乱点”更可信；未知结果仍需要更直观的恢复入口。 |
@@ -1178,8 +1195,8 @@ Harness Worker、等价切换、删除旧循环、资源包签名与发布门禁
 | 长任务可靠性 | 6.5/10 | 面板关闭保活、消息先落库、账本防重已补齐；跨路由常驻、完整任务恢复、失败人工处置仍不足。 |
 | 可恢复与审计 | 7/10 | RunRecord、Job、tool effect 三条记录都在；但用户界面还没有把“确定失败 / 可能已执行”做成一套清晰操作。 |
 
-产品升级顺序应是：① 独立 AgentHost，解决离开画布页继续运行；② 继续拆 `AgentPanel`，把发送主链、
-确认执行、停止/继续和纯视图分开；③ 拆 `tools.ts`，按画布读、画布写、生成、计划、记忆分模块；④ 给确认卡和待核对状态做
+产品升级顺序应是：① 独立 AgentHost，解决离开画布页继续运行；② 继续拆 `AgentPanel`，把模型循环、
+确认执行、停止 / 继续和纯视图分开；③ 拆 `tools.ts`，按画布读、画布写、生成、计划、记忆分模块；④ 给确认卡和待核对状态做
 统一恢复操作；⑤ 最后才考虑插件接口。顺序反了会把现在的稳定主流程重新打散。
 
 ## 23. DeepSeek Harness 对照

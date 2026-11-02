@@ -5,6 +5,11 @@
 
 ## Agent · 过程与落位
 
+- **请求准备只产出快照**：`agentTurnRequest.ts` 先落库目标会话用户消息，再准备路由；
+  `onRouteReady` 只在路由成功后触发，由宿主创建 planning Job。它承接上下文、工具探测 / JSON 降级、
+  技能 chip、媒体模型、每图拆分、请求分类、工具裁剪和系统提示词，但不得持有 React refs、运行模型循环、
+  执行确认或处理结果。`AgentPanel` 继续是 per-session abort / toolMode / turnTools / autoRun /
+  explicitMediaModels / contextTrace 的所有者。
 - **发送协调不能复制会话真相**：`agentSendFlow` 只负责活动锁、队列结算与异常收口，
   `useAgentSendController` 只装配当前会话、滚动和已有 ports/refs；不得新建第二份 Session、队列或工具执行状态。
   用户消息按目标 `sessionId` 先落库；preclaimed/queueTurnId 成功、空结果或异常结束都必须按原语义释放活动锁。
