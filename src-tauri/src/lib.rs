@@ -641,6 +641,13 @@ const DEVELOPMENT_DATA_DIR_CONFIG_NAME: &str = "storage-location.dev.json";
 const MISSING_DATA_DIR_ENV: &str = "QINGHUA_MISSING_DATA_DIR";
 const RELEASE_GATE_ENV: &str = "QINGHUA_RELEASE_GATE";
 const RELEASE_GATE_DATA_DIR_ENV: &str = "QINGHUA_RELEASE_GATE_DATA_DIR";
+const SHARED_STORE_PORT_ENV: &str = qinghua_shared_store::PORT_ENV;
+const RELEASE_GATE_DEFAULT_SHARED_STORE_PORT: u16 = 18767;
+
+#[derive(Clone, Copy)]
+struct SharedStoreRuntime {
+    port: u16,
+}
 
 #[derive(serde::Deserialize, serde::Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -865,8 +872,26 @@ fn missing_data_dir() -> Option<PathBuf> {
         .map(PathBuf::from)
 }
 
+fn release_gate_enabled(raw: Option<&str>) -> bool {
+    raw == Some("1")
+}
+
+fn parse_shared_store_port(enabled: Option<&str>, raw: Option<&str>) -> Result<u16, String> {
+    if !release_gate_enabled(enabled) {
+        return Ok(qinghua_shared_store::PORT);
+    }
+    qinghua_shared_store::parse_port(raw, RELEASE_GATE_DEFAULT_SHARED_STORE_PORT)
+}
+
+fn configured_shared_store_port() -> Result<u16, String> {
+    parse_shared_store_port(
+        std::env::var(RELEASE_GATE_ENV).ok().as_deref(),
+        std::env::var(SHARED_STORE_PORT_ENV).ok().as_deref(),
+    )
+}
+
 fn parse_release_gate_data_dir(enabled: Option<&str>, raw: Option<&str>) -> Option<PathBuf> {
-    if enabled != Some("1") {
+    if !release_gate_enabled(enabled) {
         return None;
     }
     let path = PathBuf::from(raw?.trim());
@@ -1144,7 +1169,7 @@ async fn auto_upgrade_storage(app: tauri::AppHandle) -> Result<StorageUpgradeRes
     }
     let source = PathBuf::from(state.source_root.ok_or("缺少 V1 源目录")?);
     let target = PathBuf::from(state.target_root.ok_or("缺少 V2 目标目录")?);
-    set_storage_maintenance(true).await?;
+    set_storage_maintenance(&app, true).await?;
     let outcome: Result<StorageUpgradeResult, String> = async {
         let target_info = storage_root_info(&target)?;
         let (migration, verification) = if target_info.kind == "v2" {
@@ -1193,7 +1218,7 @@ async fn auto_upgrade_storage(app: tauri::AppHandle) -> Result<StorageUpgradeRes
     }
     .await;
     if outcome.is_err() {
-        let _ = set_storage_maintenance(false).await;
+        let _ = set_storage_maintenance(&app, false).await;
     }
     outcome
 }
@@ -1203,14 +1228,14 @@ async fn finalize_storage_upgrade(
     app: tauri::AppHandle,
 ) -> Result<qinghua_shared_store::v2_admin::V2Verification, String> {
     let root = current_data_dir(&app).ok_or_else(|| "无法定位当前资源目录".to_string())?;
-    set_storage_maintenance(true).await?;
+    set_storage_maintenance(&app, true).await?;
     let verification = tauri::async_runtime::spawn_blocking({
         let root = root.clone();
         move || qinghua_shared_store::v2_admin::finalize_v1_cleanup(&root)
     })
     .await
     .map_err(|error| format!("V1 清理任务异常结束：{error}"))?;
-    let release = set_storage_maintenance(false).await;
+    let release = set_storage_maintenance(&app, false).await;
     let verification = verification?;
     release?;
     Ok(verification)
@@ -1229,7 +1254,7 @@ async fn replace_storage_root(
     if let Some(missing) = missing_data_dir() {
         let recovery_root =
             current_data_dir(&app).ok_or_else(|| "无法定位恢复模式目录".to_string())?;
-        set_storage_maintenance(true).await?;
+        set_storage_maintenance(&app, true).await?;
         let outcome: Result<StorageReplaceResult, String> = async {
             let verification = tauri::async_runtime::spawn_blocking({
                 let target = target.clone();
@@ -1252,7 +1277,7 @@ async fn replace_storage_root(
         }
         .await;
         if outcome.is_err() {
-            let _ = set_storage_maintenance(false).await;
+            let _ = set_storage_maintenance(&app, false).await;
         }
         return outcome;
     }
@@ -1262,7 +1287,7 @@ async fn replace_storage_root(
     if source_info.kind != "v2" || !source_info.ready {
         return Err("只有完整 V2 资源根可以更换位置".into());
     }
-    set_storage_maintenance(true).await?;
+    set_storage_maintenance(&app, true).await?;
     let outcome: Result<StorageReplaceResult, String> = async {
         let copy = tauri::async_runtime::spawn_blocking({
             let source = source.clone();
@@ -1293,7 +1318,7 @@ async fn replace_storage_root(
     }
     .await;
     if outcome.is_err() {
-        let _ = set_storage_maintenance(false).await;
+        let _ = set_storage_maintenance(&app, false).await;
     }
     outcome
 }
@@ -1301,11 +1326,12 @@ async fn replace_storage_root(
 /// V1 → V2 迁移是大文件 IO 与哈希计算，必须离开 Tauri 主线程。
 #[tauri::command]
 async fn migrate_data_dir(
+    app: tauri::AppHandle,
     source: String,
     target: String,
     dry_run: bool,
 ) -> Result<qinghua_shared_store::migration::MigrationReport, String> {
-    set_storage_maintenance(true).await?;
+    set_storage_maintenance(&app, true).await?;
     let migration = tauri::async_runtime::spawn_blocking(move || {
         qinghua_shared_store::migration::migrate_v1_to_v2(
             &PathBuf::from(source),
@@ -1314,19 +1340,17 @@ async fn migrate_data_dir(
         )
     })
     .await;
-    let release = set_storage_maintenance(false).await;
+    let release = set_storage_maintenance(&app, false).await;
     let report = migration.map_err(|error| format!("迁移任务异常结束：{error}"))??;
     release?;
     Ok(report)
 }
 
-async fn set_storage_maintenance(enabled: bool) -> Result<(), String> {
+async fn set_storage_maintenance(app: &tauri::AppHandle, enabled: bool) -> Result<(), String> {
     let action = if enabled { "begin" } else { "end" };
+    let port = app.state::<SharedStoreRuntime>().port;
     let response = reqwest::Client::new()
-        .post(format!(
-            "http://127.0.0.1:{}/maintenance/{action}",
-            qinghua_shared_store::PORT
-        ))
+        .post(format!("http://127.0.0.1:{port}/maintenance/{action}"))
         .send()
         .await
         .map_err(|error| format!("无法暂停共享存储写入：{error}"))?;
@@ -3630,14 +3654,27 @@ mod bundled_program_tests {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    tauri::Builder::default()
-        /*
-         * 必须放在其他插件之前。第二实例启动时不再起一套窗口，而是恢复已有窗口、
-         * 取消最小化并聚焦 —— 这正是“进程还在，但用户以为应用挂了”的兜底。
-         */
-        .plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
+    let release_gate = release_gate_enabled(std::env::var(RELEASE_GATE_ENV).ok().as_deref());
+    let shared_store_port = configured_shared_store_port().unwrap_or_else(|error| {
+        eprintln!("[shared-store] 启动端口配置无效，拒绝启动：{error}");
+        std::process::exit(1);
+    });
+    let builder = tauri::Builder::default();
+    /*
+     * 正常运行必须保留单实例插件。release gate 使用独立的进程、端口和数据目录，
+     * 只有显式哨兵开启时才跳过它，否则开发壳占着单实例锁会让正式包直接退出。
+     */
+    let builder = if release_gate {
+        builder
+    } else {
+        builder.plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
             reveal_existing_window(app);
         }))
+    };
+    builder
+        .manage(SharedStoreRuntime {
+            port: shared_store_port,
+        })
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_opener::init())
@@ -3737,13 +3774,18 @@ pub fn run() {
             canvas_gateway::canvas_gateway_info,
             canvas_gateway::canvas_gateway_respond
         ])
-        .setup(|app| {
+        .setup(move |app| {
             apply_data_dir_config(app.handle());
             /*
              * 权威数据从这里开始不再属于某个 WebView origin。
              * 调试壳、release 壳和浏览器都连同一个本地服务与同一份文件库。
              */
-            qinghua_shared_store::start_in_background();
+            qinghua_shared_store::start_in_background_on(shared_store_port);
+            if release_gate {
+                eprintln!(
+                    "[shared-store] release gate 使用隔离端口 {shared_store_port}，单实例插件已跳过"
+                );
+            }
             if let Err(error) = canvas_gateway::start(app.handle().clone()) {
                 eprintln!("[canvas-gateway] 启动失败：{error}");
             }
@@ -3782,6 +3824,11 @@ pub fn run() {
                         tauri::WebviewUrl::default(),
                     ),
                 };
+                if release_gate {
+                    builder = builder.initialization_script(format!(
+                        "Object.defineProperty(window, '__QINGHUA_SHARED_STORE_PORT__', {{ value: {shared_store_port}, configurable: false }});"
+                    ));
+                }
                 if let Some(dir) = dir {
                     builder = builder.data_directory(dir);
                 }
@@ -3884,6 +3931,37 @@ mod data_dir_tests {
             parse_release_gate_data_dir(None, Some("D:\\gate\\data-v2")),
             None
         );
+    }
+
+    #[test]
+    fn shared_store_port_keeps_normal_default_and_ignores_override_without_gate() {
+        assert_eq!(
+            parse_shared_store_port(None, Some("19876")),
+            Ok(qinghua_shared_store::PORT)
+        );
+        assert_eq!(
+            parse_shared_store_port(Some("0"), Some("19876")),
+            Ok(qinghua_shared_store::PORT)
+        );
+    }
+
+    #[test]
+    fn shared_store_port_uses_gate_default_and_explicit_override() {
+        assert_eq!(
+            parse_shared_store_port(Some("1"), None),
+            Ok(RELEASE_GATE_DEFAULT_SHARED_STORE_PORT)
+        );
+        assert_eq!(
+            parse_shared_store_port(Some("1"), Some(" 19877 ")),
+            Ok(19877)
+        );
+    }
+
+    #[test]
+    fn shared_store_port_rejects_invalid_gate_override() {
+        assert!(parse_shared_store_port(Some("1"), Some("0")).is_err());
+        assert!(parse_shared_store_port(Some("1"), Some("65536")).is_err());
+        assert!(parse_shared_store_port(Some("1"), Some("not-a-port")).is_err());
     }
 
     #[test]

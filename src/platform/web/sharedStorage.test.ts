@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { createSharedStorage } from './sharedStorage'
+import { createSharedStorage, resolveSharedStoreUrl } from './sharedStorage'
 
 function response(value: unknown) {
   return {
@@ -14,6 +14,21 @@ afterEach(() => {
 })
 
 describe('shared storage', () => {
+  it('release gate 的运行时端口优先于构建时 URL', () => {
+    expect(resolveSharedStoreUrl(19877, 'http://127.0.0.1:18765')).toBe(
+      'http://127.0.0.1:19877',
+    )
+    expect(resolveSharedStoreUrl('19878', '')).toBe('http://127.0.0.1:19878')
+  })
+
+  it('没有运行时端口时保持构建 URL，否则回退默认端口', () => {
+    expect(resolveSharedStoreUrl(undefined, 'http://127.0.0.1:19000/')).toBe(
+      'http://127.0.0.1:19000',
+    )
+    expect(resolveSharedStoreUrl(undefined, '')).toBe('http://127.0.0.1:18765')
+    expect(resolveSharedStoreUrl('0', '')).toBe('http://127.0.0.1:18765')
+  })
+
   it('open 接受当前共享存储协议', async () => {
     vi.stubGlobal(
       'fetch',

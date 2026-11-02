@@ -7,10 +7,33 @@ import type {
   TableName,
 } from '../ports'
 
-const DEFAULT_BASE_URL = 'http://127.0.0.1:18765'
+const DEFAULT_STORE_PORT = 18765
+const DEFAULT_BASE_URL = `http://127.0.0.1:${DEFAULT_STORE_PORT}`
 const REQUIRED_STORE_VERSION = 8
-export const SHARED_STORE_URL =
-  String(import.meta.env.VITE_SHARED_STORE_URL ?? '').trim() || DEFAULT_BASE_URL
+
+function validPort(value: unknown): number | null {
+  if (typeof value !== 'number' && typeof value !== 'string') return null
+  const port = Number(value)
+  return Number.isInteger(port) && port >= 1 && port <= 65535 ? port : null
+}
+
+export function resolveSharedStoreUrl(runtimePort: unknown, configuredUrl: unknown): string {
+  const port = validPort(runtimePort)
+  if (port !== null) return `http://127.0.0.1:${port}`
+  const explicit = String(configuredUrl ?? '').trim().replace(/\/+$/, '')
+  return explicit || DEFAULT_BASE_URL
+}
+
+const runtimeStorePort =
+  typeof window === 'undefined'
+    ? undefined
+    : (window as Window & { __QINGHUA_SHARED_STORE_PORT__?: unknown })
+        .__QINGHUA_SHARED_STORE_PORT__
+
+export const SHARED_STORE_URL = resolveSharedStoreUrl(
+  runtimeStorePort,
+  import.meta.env.VITE_SHARED_STORE_URL,
+)
 
 class StaleSharedStoreError extends Error {}
 

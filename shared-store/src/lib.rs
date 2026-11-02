@@ -15,6 +15,24 @@ pub mod sqlite;
 pub mod v2_admin;
 
 pub const PORT: u16 = 18765;
+pub const PORT_ENV: &str = "QINGHUA_SHARED_STORE_PORT";
+
+/// 解析显式端口；空值回退到默认值，`0` 和无符号范围外的值直接拒绝。
+///
+/// release gate 的调用方会传入自己的默认端口，因此这里不把 18765 写死到所有入口。
+pub fn parse_port(raw: Option<&str>, fallback: u16) -> Result<u16, String> {
+    let value = raw.map(str::trim).filter(|value| !value.is_empty());
+    let port = match value {
+        Some(value) => value
+            .parse::<u16>()
+            .map_err(|error| format!("invalid shared-store port {value:?}: {error}"))?,
+        None => fallback,
+    };
+    if port == 0 {
+        return Err("shared-store port must be between 1 and 65535".to_string());
+    }
+    Ok(port)
+}
 
 static STARTED: OnceLock<()> = OnceLock::new();
 static TEMP_SEQUENCE: AtomicU64 = AtomicU64::new(1);
@@ -1316,11 +1334,15 @@ pub fn start(data_dir: &Path, port: u16) -> Result<(), String> {
 }
 
 pub fn start_in_background() {
+    start_in_background_on(PORT);
+}
+
+pub fn start_in_background_on(port: u16) {
     let _ = STARTED.get_or_init(|| {
         let data_dir = default_data_dir();
-        match start(&data_dir, PORT) {
+        match start(&data_dir, port) {
             Ok(()) => eprintln!(
-                "[shared-store] http://127.0.0.1:{PORT} {}",
+                "[shared-store] http://127.0.0.1:{port} {}",
                 data_dir.display()
             ),
             Err(error) => eprintln!("[shared-store] {error}"),
@@ -1347,6 +1369,20 @@ mod tests {
                 .unwrap()
                 .as_nanos()
         ))
+    }
+
+    #[test]
+    fn parse_port_uses_fallback_and_accepts_explicit_override() {
+        assert_eq!(parse_port(None, PORT), Ok(PORT));
+        assert_eq!(parse_port(Some("  "), 19876), Ok(19876));
+        assert_eq!(parse_port(Some(" 19877 "), PORT), Ok(19877));
+    }
+
+    #[test]
+    fn parse_port_rejects_zero_and_out_of_range_values() {
+        assert!(parse_port(Some("0"), PORT).is_err());
+        assert!(parse_port(Some("65536"), PORT).is_err());
+        assert!(parse_port(Some("not-a-port"), PORT).is_err());
     }
 
     fn exercise_backend_contract(backend: Arc<dyn StoreBackend>) {

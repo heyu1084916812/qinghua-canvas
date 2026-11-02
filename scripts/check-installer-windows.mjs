@@ -64,11 +64,24 @@ const STORAGE_CONFIG_BACKUP = USER_STORAGE_CONFIG
   ? `${USER_STORAGE_CONFIG}.installer-gate-${process.pid}.bak`
   : null
 const PORT = Number(process.env.QH_CDP_PORT ?? 9446)
+const SHARED_STORE_PORT = Number(process.env.QINGHUA_SHARED_STORE_PORT ?? 18767)
 const REMEMBER_KEY = 'HKCU\\Software\\qinghua\\轻画'
 const UNINSTALL_KEY = 'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\轻画'
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 const sha256 = (file) => createHash('sha256').update(readFileSync(file)).digest('hex')
 let storageConfigMoved = false
+
+if (
+  !Number.isInteger(SHARED_STORE_PORT) ||
+  SHARED_STORE_PORT < 1 ||
+  SHARED_STORE_PORT > 65535 ||
+  SHARED_STORE_PORT === 18765
+) {
+  console.error(
+    `release gate 必须使用独立共享存储端口（当前 ${SHARED_STORE_PORT}，正常端口 18765 不允许复用）`,
+  )
+  process.exit(1)
+}
 
 function restoreStorageConfig() {
   if (
@@ -193,6 +206,7 @@ async function launchAndRead(exe) {
       WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS: `--remote-debugging-port=${PORT}`,
       QINGHUA_RELEASE_GATE: '1',
       QINGHUA_RELEASE_GATE_DATA_DIR: DATA,
+      QINGHUA_SHARED_STORE_PORT: String(SHARED_STORE_PORT),
     },
     stdio: 'ignore',
   })
@@ -233,7 +247,7 @@ async function launchAndRead(exe) {
         .catch(() => {})
       projects = await page.locator('[data-project-workbench]').count().catch(() => -1)
     }
-    const health = await fetch('http://127.0.0.1:18765/health')
+    const health = await fetch(`http://127.0.0.1:${SHARED_STORE_PORT}/health`)
       .then((res) => (res.ok ? res.json() : null))
       .catch(() => null)
     out = home ? { ...home, projects, health } : null

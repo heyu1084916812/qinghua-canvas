@@ -41,6 +41,7 @@ const ROOT = process.cwd()
 const EXE_SRC = process.env.QH_RELEASE_EXE ?? path.join(ROOT, 'src-tauri/target/release/qinghua.exe')
 const RESOURCE_SRC = path.join(path.dirname(EXE_SRC), 'resources')
 const PORT = Number(process.env.QH_CDP_PORT ?? 9444)
+const SHARED_STORE_PORT = Number(process.env.QINGHUA_SHARED_STORE_PORT ?? 18767)
 const KEEP_PROFILE = process.env.QH_KEEP_PROFILE === '1'
 const PKG_VERSION = JSON.parse(readFileSync(path.join(ROOT, 'package.json'), 'utf8')).version
 const USER_LOCAL_APPDATA = process.env.LOCALAPPDATA
@@ -88,6 +89,18 @@ const WASM_REF = [
   path.join(ROOT, 'public/mediapipe/wasm/vision_wasm_internal.wasm'),
 ].find((p) => existsSync(p))
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
+
+if (
+  !Number.isInteger(SHARED_STORE_PORT) ||
+  SHARED_STORE_PORT < 1 ||
+  SHARED_STORE_PORT > 65535 ||
+  SHARED_STORE_PORT === 18765
+) {
+  console.error(
+    `release gate 必须使用独立共享存储端口（当前 ${SHARED_STORE_PORT}，正常端口 18765 不允许复用）`,
+  )
+  process.exit(1)
+}
 
 if (!existsSync(EXE_SRC)) {
   console.error(`找不到 ${EXE_SRC}（先 npm run tauri build 或 node scripts/release-desktop.mjs）`)
@@ -137,12 +150,14 @@ const app = spawn(exePath, [], {
     WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS: `--remote-debugging-port=${PORT}`,
     QINGHUA_RELEASE_GATE: '1',
     QINGHUA_RELEASE_GATE_DATA_DIR: dataDir,
+    QINGHUA_SHARED_STORE_PORT: String(SHARED_STORE_PORT),
   },
   stdio: ['ignore', 'pipe', 'pipe'],
 })
 app.stdout.on('data', (b) => logFile.write(b))
 app.stderr.on('data', (b) => logFile.write(b))
 console.log(`已启动（pid=${app.pid}，调试端口 ${PORT}）`)
+console.log(`隔离 shared-store 端口：${SHARED_STORE_PORT}`)
 await sleep(1200)
 console.log(
   `启动后用户存储配置${USER_STORAGE_CONFIG && existsSync(USER_STORAGE_CONFIG) ? '被重新创建' : '仍处于隔离状态'}`,
@@ -352,16 +367,20 @@ check(
 )
 
 // ⑦ 产品文件夹内的独立 data-v2\ 必须真的启动，且不能连回用户真实库
-const health = await fetch('http://127.0.0.1:18765/health')
+const health = await fetch(`http://127.0.0.1:${SHARED_STORE_PORT}/health`)
   .then((res) => (res.ok ? res.json() : null))
   .catch(() => null)
+const runtimeStorePort = await page.evaluate(
+  () => window.__QINGHUA_SHARED_STORE_PORT__ ?? null,
+)
 check(
   '产品文件夹内的隔离 V2 shared-store 已启动',
   existsSync(dataDir) &&
     health?.ok === true &&
     health?.backend === 'sqlite-v2' &&
+    runtimeStorePort === SHARED_STORE_PORT &&
     path.resolve(String(health?.dataDir ?? '')) === path.resolve(dataDir),
-  `health=${JSON.stringify(health)} 期望目录=${dataDir}`,
+  `port=${SHARED_STORE_PORT} frontendPort=${runtimeStorePort} health=${JSON.stringify(health)} 期望目录=${dataDir}`,
 )
 
 // ⑦ 生产构建不该有运行时错误
