@@ -10,10 +10,10 @@
 - **生成路由先看逻辑模型和渠道优先度**：`planGenerationRoute()` 不再按节点遗留 `channelId`
   收窄全局候选；`allowedCandidates` 才是硬白名单。高优先 Chat2api 应先于低优先 SoonStudio。
 - **生成节点只能拿图片 / 视频模型**：`alignGenerationMode()` 发现 chat 模型时移除模型和旧渠道；
-  applyPlan 落地后再查一次，防止显示与实际分叉。
+  applyPlan 落地后再查一次，Agent `updateNode` 也按节点类型与 mode 校验模型类别，混批整批拒绝。
 - **画布日志不显示对话调用**：`shouldShowInCanvasLog()` 过滤 `params.kind='text'`，Agent 探测、
   提示词优化 / 翻译 / 反推仍保留在底层总审计记录里。
-- **证据**：8 个相关测试文件 **285/285**；全量 Vitest **3772 passed / 1 skipped**；
+- **证据**：相关测试定向 **241/241**；全量 Vitest **3773 passed / 1 skipped**；
   `npm run check`、`npm run build` 通过；当前 A+ 首屏节点已纠正为 Chat2api + GPT Image 2。
 
 ### Agent 排队完成态与恢复对账（2026-11-02，对账 #848）

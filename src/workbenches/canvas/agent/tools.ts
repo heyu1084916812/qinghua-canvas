@@ -1308,6 +1308,14 @@ export function promptlessGenerationProblems(plan: AgentPlan): string[] {
   return out
 }
 
+function expectedModelCategoryOfNode(
+  node: { type: string; data: unknown },
+): 'image' | 'video' | 'chat' | undefined {
+  if (node.type === 'prompt') return 'chat'
+  if (node.type !== 'generation' && node.type !== 'batch') return undefined
+  return asRecord(node.data).mode === 'video' ? 'video' : 'image'
+}
+
 function selectedNodes(store: CanvasStore, ids: readonly string[]) {
   const graph = store.getSnapshot()
   const unique = [...new Set(ids)]
@@ -1904,6 +1912,30 @@ export async function executeConfirmedTool(
       delete patch.channelId
       const requestedModel =
         typeof patch.model === 'string' ? patch.model.trim() : undefined
+      const requestedCategory = requestedModel
+        ? ctx.categoryOfModel?.(requestedModel)
+        : undefined
+      if (requestedCategory) {
+        const targets = graph.nodes.filter((node) => ids.includes(node.id))
+        const incompatible = targets.filter((node) => {
+          const expected = expectedModelCategoryOfNode(node)
+          return expected !== undefined && expected !== requestedCategory
+        })
+        if (incompatible.length > 0) {
+          return {
+            ok: false,
+            problems: [
+              `模型「${requestedModel}」属于 ${requestedCategory} 类别，不能写到这些节点：` +
+                incompatible
+                  .map((node) => {
+                    const expected = expectedModelCategoryOfNode(node)
+                    return `「${node.title ?? node.id}」需要 ${expected} 模型`
+                  })
+                  .join('、'),
+            ],
+          }
+        }
+      }
       const routedPatch =
         requestedModel === undefined
           ? patch

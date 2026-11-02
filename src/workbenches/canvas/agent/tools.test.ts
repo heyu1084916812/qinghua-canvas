@@ -953,6 +953,32 @@ describe('写 / 花钱的工具（只由确认后调用）', () => {
     })
   })
 
+  it('★★ 生成节点不允许通过 updateNode 写入对话模型', async () => {
+    const { store, ctx } = setup()
+    const generation = addNode(store, 'generation', {
+      mode: 'image',
+      channelId: 'ch-image',
+      model: 'GPT Image 2',
+    })
+    const routed = {
+      ...ctx,
+      categoryOfModel: (model: string) =>
+        model.includes('Deepseek') ? ('chat' as const) : ('image' as const),
+      channelIdForModel: vi.fn(() => 'ch-chat'),
+    } satisfies AgentToolContext
+
+    const result = await executeConfirmedTool(
+      'updateNode',
+      { nodeId: generation, data: { model: 'Deepseek 4.1 Flash' } },
+      routed,
+    )
+    expect(result).toMatchObject({ ok: false })
+    expect(store.getSnapshot().nodes.find((node) => node.id === generation)!.data).toMatchObject({
+      channelId: 'ch-image',
+      model: 'GPT Image 2',
+    })
+  })
+
   /**
    * ★★ **出过图的节点，正文不许覆盖**（用户 2026-10-05 第五批第 4 条：
    * 「agent 提出的需求应该先新建节点，然后把提示词放在新建节点上，而不是把提示词覆盖原有的节点，
