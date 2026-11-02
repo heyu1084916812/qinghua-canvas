@@ -649,11 +649,30 @@ describe('写 / 花钱的工具（只由确认后调用）', () => {
         ],
       },
       ctx,
-    )) as { ok: boolean; problems: string[]; createdNodeIds: string[] }
+    )) as {
+      ok: boolean
+      problems: string[]
+      createdNodeIds: string[]
+      resolvedNodes: {
+        localId: string
+        nodeId: string
+        type: string
+        created: boolean
+      }[]
+    }
 
     expect(r.ok).toBe(true)
     expect(r.problems).toEqual([])
     expect(r.createdNodeIds).toHaveLength(3)
+    expect(r.resolvedNodes.map((node) => node.localId)).toEqual([
+      'p1',
+      'g1',
+      'g2',
+    ])
+    expect(r.resolvedNodes.every((node) => node.created)).toBe(true)
+    expect(r.resolvedNodes.map((node) => node.nodeId)).toEqual(
+      expect.arrayContaining(r.createdNodeIds),
+    )
     expect(store.getSnapshot().nodes).toHaveLength(3)
     expect(store.getSnapshot().edges).toHaveLength(2)
   })

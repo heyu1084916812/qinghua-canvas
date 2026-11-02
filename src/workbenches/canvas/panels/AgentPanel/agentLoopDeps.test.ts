@@ -55,6 +55,7 @@ function harness(args: {
   nodeRunStates?: Map<string, { kind: 'failed'; error: unknown }>
   delivered?: Set<string>
   runLatestFailures?: Map<string, unknown>
+  applyPlanResult?: unknown
 }) {
   const executions: Record<string, unknown>[] = []
   const statusUpdates: unknown[] = []
@@ -62,6 +63,9 @@ function harness(args: {
   const routeCache = new Map<string, AgentChatRoute>()
   const deliveredStore = new Map<string, Set<string>>()
   if (args.delivered) deliveredStore.set(session.id, args.delivered)
+  const planAliasesStore = new Map<string, ReadonlyMap<string, string>>([
+    [session.id, new Map([['ref1', 'node-9']])],
+  ])
   const turnToolsStore = new Map<string, readonly ToolDeclaration[]>()
   const executed: { name: string; args: unknown; callId: string }[] = []
   const readResults: unknown[] = []
@@ -149,6 +153,13 @@ function harness(args: {
         execute: () => Promise<unknown>,
       ) => {
         executed.push(request)
+        if (
+          request.name === 'applyPlan' &&
+          args.applyPlanResult !== undefined
+        ) {
+          readResults.push(args.applyPlanResult)
+          return args.applyPlanResult
+        }
         const result = await execute()
         readResults.push(result)
         return result
@@ -169,8 +180,14 @@ function harness(args: {
       },
     ) as never,
     contextTraceFor: () => undefined,
-    planAliasesFor: () => new Map([['ref1', 'node-9']]),
-    setPlanAliases: vi.fn(),
+    planAliasesFor: (sessionId: string) =>
+      planAliasesStore.get(sessionId),
+    setPlanAliases: (
+      sessionId: string,
+      aliases: ReadonlyMap<string, string>,
+    ) => {
+      planAliasesStore.set(sessionId, aliases)
+    },
     turnToolsFor: (sessionId: string) =>
       turnToolsStore.get(sessionId),
     setTurnTools: (sessionId: string, tools: readonly ToolDeclaration[]) => {
@@ -209,6 +226,7 @@ function harness(args: {
     readResults,
     routeCache,
     deliveredStore,
+    planAliasesStore,
     turnToolsStore,
   }
 }
@@ -303,6 +321,34 @@ describe('assembleAgentLoopDeps', () => {
     })
     expect(plan?.ok).toBe(false)
     expect(h.deps.precheck?.('readGraph', {})).toEqual({ ok: true })
+  })
+
+  it('★★ applyPlan 返回的 resolvedNodes 会写回 localId → nodeId 别名', async () => {
+    const h = harness({
+      applyPlanResult: {
+        ok: true,
+        problems: [],
+        createdNodeIds: ['node-real'],
+        resolvedNodes: [
+          {
+            localId: 'v1',
+            nodeId: 'node-real',
+            type: 'generation',
+            created: true,
+          },
+        ],
+      },
+    })
+
+    await h.deps.executeWrite(
+      'applyPlan',
+      { summary: '一个节点', nodes: [], edges: [] },
+      'call-apply',
+    )
+
+    expect(h.planAliasesStore.get(session.id)).toEqual(
+      new Map([['v1', 'node-real']]),
+    )
   })
 
   it('★★ readResult 执行层失败会被转成可读失败原因', async () => {

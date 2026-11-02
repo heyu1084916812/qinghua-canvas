@@ -1062,6 +1062,7 @@ export async function executeConfirmedTool(
         ok: applied.ok && landingProblems.length === 0,
         problems: [...applied.problems, ...landingProblems],
         createdNodeIds: applied.createdNodeIds,
+        resolvedNodes: applied.resolvedNodes,
         ...(aligned.notes.length > 0 ? { notes: aligned.notes } : {}),
       }
     }

@@ -18,9 +18,11 @@
   AgentPanel **151/151**；tsc/check/build/diff-check 通过。质量线独立复跑 AgentPanel + canvas agent +
   shared agent **411/411**、G769 明暗各 **39/39**；Tauri hash `552C11…69B0E7`；workbuddy 文本与
   Chat2api GPT Image 2 真图均通过。确认执行、停止 / 继续和 AgentHost 仍是后续债。
-- **新发现的契约债**：`executeWrite('applyPlan')` 读取 `resolvedNodes`，但 `executeConfirmedTool`
-  实际不返回该字段，localId → nodeId 别名写回是死路径（#860）；outcome 整份历史写库的 controller /
-  turn CAS 与 queue settlement 绑定仍待补（#861）。不要因为真实回合成功就宣称这两条链路已闭环。
+- **#860 已补回真实数据链**：`executeConfirmedTool('applyPlan')` 现在返回 `applied.resolvedNodes`；
+  `agentLoopDeps` 继续只用这个字段写 localId → nodeId 别名，不按标题猜 id。聚焦 **80/80**、Agent
+  相关目录 **412/412**、全量 **3884 passed / 1 skipped**；仍需质量线从真实工具消息确认字段存在。
+- **#861 仍待补**：outcome 整份历史写库的 controller / turn CAS 与 queue settlement 绑定仍未完成，
+  不能因为 #860 或真实回合成功就宣称恢复链路闭环。
 
 ### Agent 结果收口身份与迟到确认补救（2026-11-03，对账 #858）
 
