@@ -4,6 +4,7 @@ import {
 } from './runRegistry'
 import {
   createTaskLifecycle,
+  type TaskLifecycleCloseAttempt,
   type TaskLifecycle,
 } from '../lifecycle/taskLifecycle'
 
@@ -23,9 +24,13 @@ export interface ExecutionRuntime {
   getRunningPlanIds(): readonly string[]
   isRunning(): boolean
   subscribe(listener: () => void): () => void
-  beginClose(): void
+  beginClose(): TaskLifecycleCloseAttempt
   waitForIdle(timeoutMs?: number): Promise<void>
-  finalizeClose(): void
+  whenIdle(): Promise<void>
+  canReopen(attempt: TaskLifecycleCloseAttempt): boolean
+  reopenIfIdle(attempt: TaskLifecycleCloseAttempt): boolean
+  canFinalize(attempt: TaskLifecycleCloseAttempt): boolean
+  finalizeClose(attempt?: TaskLifecycleCloseAttempt): boolean
   dispose(timeoutMs?: number): Promise<void>
 }
 
@@ -40,15 +45,25 @@ export function createExecutionRuntime(): ExecutionRuntime {
     for (const listener of listeners) listener()
   }
   const beginClose = () => {
-    lifecycle.beginClose()
+    const attempt = lifecycle.beginClose()
     for (const controller of controllers.ids().map((id) => controllers.get(id))) {
       controller?.abort()
     }
+    return attempt
   }
-  const finalizeClose = () => {
+  const finalizeClose = (attempt?: TaskLifecycleCloseAttempt) => {
+    const current = attempt ?? null
+    if (
+      current &&
+      !lifecycle.finalizeClose(current)
+    ) {
+      return false
+    }
+    if (!current && lifecycle.state === 'draining') return false
     for (const id of controllers.ids()) controllers.remove(id)
     publish()
     listeners.clear()
+    return true
   }
 
   return {
@@ -78,11 +93,15 @@ export function createExecutionRuntime(): ExecutionRuntime {
     },
     beginClose,
     waitForIdle: lifecycle.waitForIdle,
+    whenIdle: lifecycle.whenIdle,
+    canReopen: lifecycle.canReopen,
+    reopenIfIdle: lifecycle.reopenIfIdle,
+    canFinalize: lifecycle.canFinalize,
     finalizeClose,
     async dispose(timeoutMs) {
-      beginClose()
+      const attempt = beginClose()
       await lifecycle.waitForIdle(timeoutMs)
-      finalizeClose()
+      finalizeClose(attempt)
     },
   }
 }

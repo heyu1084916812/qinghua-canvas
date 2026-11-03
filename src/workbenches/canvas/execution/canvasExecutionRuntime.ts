@@ -159,7 +159,11 @@ export function nextCanvasExecutionVersion(
 
 export interface CanvasExecutionRuntimeShutdown {
   waitForIdle(timeoutMs?: number): Promise<void>
-  finalize(): void
+  whenIdle(): Promise<void>
+  canReopen(): boolean
+  reopenIfIdle(): boolean
+  canFinalize(): boolean
+  finalize(): boolean
 }
 
 /**
@@ -170,33 +174,77 @@ export interface CanvasExecutionRuntimeShutdown {
  */
 export function beginCanvasExecutionRuntimeShutdown(
   projectId: string,
-): CanvasExecutionRuntimeShutdown | null {
+): CanvasExecutionRuntimeShutdown {
   closedProjectIds.add(projectId)
   const runtime = runtimes.get(projectId)
-  if (!runtime) return null
+  if (!runtime) {
+    let reopened = false
+    return {
+      waitForIdle: async () => undefined,
+      whenIdle: async () => undefined,
+      canReopen: () => !reopened && runtimes.get(projectId) === undefined,
+      reopenIfIdle() {
+        if (reopened || runtimes.get(projectId) !== undefined) return false
+        reopened = true
+        closedProjectIds.delete(projectId)
+        return true
+      },
+      canFinalize: () => !reopened,
+      finalize() {
+        if (reopened) return false
+        closedProjectIds.add(projectId)
+        return true
+      },
+    }
+  }
   runtime.closed = true
-  runtime.operations.beginClose()
-  runtime.engine.beginClose()
+  const operationsAttempt = runtime.operations.beginClose()
+  const engineAttempt = runtime.engine.beginClose()
   let finalized = false
+  const canReopen = () =>
+    !finalized &&
+    runtime.operations.canReopen(operationsAttempt) &&
+    runtime.engine.canReopen(engineAttempt)
+  const canFinalize = () =>
+    !finalized &&
+    runtime.operations.canFinalize(operationsAttempt) &&
+    runtime.engine.canFinalize(engineAttempt)
   return {
     waitForIdle: (timeoutMs = DEFAULT_TASK_SHUTDOWN_TIMEOUT_MS) =>
       Promise.all([
         runtime.operations.waitForIdle(timeoutMs),
         runtime.engine.waitForIdle(timeoutMs),
       ]).then(() => undefined),
+    whenIdle: () =>
+      Promise.all([
+        runtime.operations.whenIdle(),
+        runtime.engine.whenIdle(),
+      ]).then(() => undefined),
+    canReopen,
+    reopenIfIdle() {
+      if (!canReopen()) return false
+      runtime.operations.reopenIfIdle(operationsAttempt)
+      runtime.engine.reopenIfIdle(engineAttempt)
+      runtime.closed = false
+      closedProjectIds.delete(projectId)
+      return true
+    },
+    canFinalize,
     finalize() {
-      if (finalized) return
+      if (!canFinalize()) return false
       finalized = true
-      runtime.engine.finalizeClose()
+      runtime.operations.finalizeClose(operationsAttempt)
+      runtime.engine.finalizeClose(engineAttempt)
       runtime.adapterMaps.clear()
       runtime.taskToNodeMaps.clear()
       runtime.channelInterruptedPlans.clear()
       runtime.preparingPrompt.clear()
       runtime.planProgress.clear()
       runtime.versionMax.clear()
-      if (runtimes.get(projectId) !== runtime) return
+      if (runtimes.get(projectId) !== runtime) return true
       clearCanvasRunStates(projectId)
       runtimes.delete(projectId)
+      return true
     },
   }
 }
@@ -206,9 +254,10 @@ export async function disposeCanvasExecutionRuntime(
   timeoutMs = DEFAULT_TASK_SHUTDOWN_TIMEOUT_MS,
 ): Promise<void> {
   const shutdown = beginCanvasExecutionRuntimeShutdown(projectId)
-  if (!shutdown) return
   await shutdown.waitForIdle(timeoutMs)
-  shutdown.finalize()
+  if (!shutdown.finalize()) {
+    throw new Error(`项目 ${projectId} 的执行运行时未能安全关闭`)
+  }
 }
 
 export async function disposeAllCanvasExecutionRuntimes(): Promise<void> {

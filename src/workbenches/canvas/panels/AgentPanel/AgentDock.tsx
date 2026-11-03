@@ -30,6 +30,7 @@ import {
   type AgentWorkArea,
 } from './agentShellLayout'
 import styles from './AgentDock.module.css'
+import type { TaskShutdownControl } from '../../../../features/shared/lifecycle/taskLifecycle'
 
 type DragState =
   | {
@@ -131,7 +132,7 @@ export function AgentDock({
   open: boolean
   onOpenChange: (open: boolean) => void
   onDisposeReady?: (
-    dispose: () => Promise<void>,
+    beginShutdown: () => TaskShutdownControl,
   ) => (() => void) | void
 }) {
   const [mounted, setMounted] = useState(open)

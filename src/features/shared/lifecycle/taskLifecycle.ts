@@ -1,5 +1,46 @@
 export const DEFAULT_TASK_SHUTDOWN_TIMEOUT_MS = 5_000
 
+export type TaskLifecycleState = 'open' | 'draining' | 'closed'
+
+export interface TaskLifecycleCloseAttempt {
+  readonly id: number
+}
+
+export interface TaskShutdownControl {
+  waitForIdle(): Promise<void>
+  whenIdle(): Promise<void>
+  canReopen(): boolean
+  reopenIfIdle(): boolean
+  canFinalize(): boolean
+  finalize(): boolean
+}
+
+export function combineTaskShutdownControls(
+  controls: readonly (TaskShutdownControl | null | undefined)[],
+): TaskShutdownControl {
+  const active = controls.filter(
+    (control): control is TaskShutdownControl => !!control,
+  )
+  return {
+    async waitForIdle() {
+      await Promise.all(active.map((control) => control.waitForIdle()))
+    },
+    async whenIdle() {
+      await Promise.all(active.map((control) => control.whenIdle()))
+    },
+    canReopen: () => active.every((control) => control.canReopen()),
+    reopenIfIdle() {
+      if (!active.every((control) => control.canReopen())) return false
+      return active.every((control) => control.reopenIfIdle())
+    },
+    canFinalize: () => active.every((control) => control.canFinalize()),
+    finalize() {
+      if (!active.every((control) => control.canFinalize())) return false
+      return active.every((control) => control.finalize())
+    },
+  }
+}
+
 export class TaskLifecycleClosedError extends Error {
   constructor() {
     super('任务生命周期已关闭，不再接受新工作')
@@ -20,11 +61,19 @@ export class TaskLifecycleTimeoutError extends Error {
 }
 
 export interface TaskLifecycle {
+  readonly state: TaskLifecycleState
   readonly closing: boolean
   assertOpen(): void
+  runSync<T>(work: () => T): T
   track<T>(work: () => Promise<T>): Promise<T>
-  beginClose(): void
+  beginClose(): TaskLifecycleCloseAttempt
   waitForIdle(timeoutMs?: number): Promise<void>
+  whenIdle(): Promise<void>
+  canReopen(attempt: TaskLifecycleCloseAttempt): boolean
+  reopenIfIdle(attempt: TaskLifecycleCloseAttempt): boolean
+  reopenWhenIdle(attempt: TaskLifecycleCloseAttempt): Promise<boolean>
+  canFinalize(attempt: TaskLifecycleCloseAttempt): boolean
+  finalizeClose(attempt: TaskLifecycleCloseAttempt): boolean
 }
 
 /**
@@ -35,17 +84,47 @@ export interface TaskLifecycle {
  */
 export function createTaskLifecycle(): TaskLifecycle {
   const inFlight = new Set<Promise<unknown>>()
-  let closing = false
+  let state: TaskLifecycleState = 'open'
+  let currentAttempt: TaskLifecycleCloseAttempt | null = null
+  let nextAttemptId = 1
 
   const assertOpen = () => {
-    if (closing) throw new TaskLifecycleClosedError()
+    if (state !== 'open') throw new TaskLifecycleClosedError()
+  }
+  const whenIdle = async () => {
+    while (inFlight.size > 0) {
+      await Promise.allSettled([...inFlight])
+    }
+  }
+  const matchesIdleAttempt = (attempt: TaskLifecycleCloseAttempt) =>
+    state === 'draining' &&
+    currentAttempt?.id === attempt.id &&
+    inFlight.size === 0
+  const reopenIfIdle = (attempt: TaskLifecycleCloseAttempt) => {
+    if (!matchesIdleAttempt(attempt)) return false
+    state = 'open'
+    currentAttempt = null
+    return true
+  }
+  const finalizeClose = (attempt: TaskLifecycleCloseAttempt) => {
+    if (!matchesIdleAttempt(attempt)) return false
+    state = 'closed'
+    currentAttempt = null
+    return true
   }
 
   return {
+    get state() {
+      return state
+    },
     get closing() {
-      return closing
+      return state !== 'open'
     },
     assertOpen,
+    runSync<T>(work: () => T): T {
+      assertOpen()
+      return work()
+    },
     track<T>(work: () => Promise<T>): Promise<T> {
       try {
         assertOpen()
@@ -66,11 +145,13 @@ export function createTaskLifecycle(): TaskLifecycle {
       return tracked
     },
     beginClose() {
-      closing = true
+      if (state === 'closed') throw new TaskLifecycleClosedError()
+      state = 'draining'
+      currentAttempt = { id: nextAttemptId++ }
+      return currentAttempt
     },
     async waitForIdle(timeoutMs = DEFAULT_TASK_SHUTDOWN_TIMEOUT_MS) {
       if (inFlight.size === 0) return
-      const pending = [...inFlight]
       let timer: ReturnType<typeof setTimeout> | undefined
       const timeout = new Promise<never>((_, reject) => {
         timer = setTimeout(() => {
@@ -79,7 +160,7 @@ export function createTaskLifecycle(): TaskLifecycle {
       })
       try {
         await Promise.race([
-          Promise.allSettled(pending),
+          whenIdle(),
           timeout,
         ])
       } finally {
@@ -89,5 +170,14 @@ export function createTaskLifecycle(): TaskLifecycle {
         throw new TaskLifecycleTimeoutError(inFlight.size, timeoutMs)
       }
     },
+    whenIdle,
+    canReopen: matchesIdleAttempt,
+    reopenIfIdle,
+    async reopenWhenIdle(attempt) {
+      await whenIdle()
+      return reopenIfIdle(attempt)
+    },
+    canFinalize: matchesIdleAttempt,
+    finalizeClose,
   }
 }

@@ -103,8 +103,10 @@ import {
 } from '../../../../features/shared/agent/AgentToolEffectLedger'
 import {
   DEFAULT_TASK_SHUTDOWN_TIMEOUT_MS,
+  TaskLifecycleClosedError,
   createTaskLifecycle,
   type TaskLifecycle,
+  type TaskShutdownControl,
 } from '../../../../features/shared/lifecycle/taskLifecycle'
 import { createContextRepository } from '../../../../state/shared/contextRepository'
 import { createId } from '../../../../shared/id'
@@ -260,7 +262,7 @@ export function AgentPanel({
   onClose: () => void
   onOpenSettings: () => void
   onDisposeReady?: (
-    dispose: () => Promise<void>,
+    beginShutdown: () => TaskShutdownControl,
   ) => (() => void) | void
 }) {
   const platform = usePlatform()
@@ -543,8 +545,66 @@ export function AgentPanel({
     lifecycleRef.current = createTaskLifecycle()
   }
   const lifecycle = lifecycleRef.current
+  /**
+   * AgentPanel 的持久写门禁只有这一份：
+   * - 异步 SessionStore / Controller / preset / store 写必须走 trackRun；
+   * - 同步 draft / composer 本地写必须走 runSync；
+   * - 脱离点击等待链的 Promise 必须同时走 runTrackedDetached 或显式 catch。
+   * 内部再嵌套一次 track 是允许的；关闭后内层会先失败并收口外层。
+   */
   const trackRun = useCallback<TaskLifecycle['track']>(
     (work) => lifecycle.track(work),
+    [lifecycle],
+  )
+  const runPromiseDetached = useCallback(
+    (work: Promise<unknown>, failureMessage: string) => {
+      void work.catch((error) => {
+        if (error instanceof TaskLifecycleClosedError) return
+        store.notify(`${failureMessage}：${errText(error)}`, 'error')
+      })
+    },
+    [store],
+  )
+  const runTrackedDetached = useCallback(
+    (work: () => Promise<unknown>, failureMessage: string) => {
+      runPromiseDetached(trackRun(work), failureMessage)
+    },
+    [runPromiseDetached, trackRun],
+  )
+  const writeDraft = useCallback(
+    (sessionId: string, text: string) => {
+      try {
+        lifecycle.runSync(() => saveAgentDraft(sessionId, text))
+        return true
+      } catch (error) {
+        if (error instanceof TaskLifecycleClosedError) return false
+        throw error
+      }
+    },
+    [lifecycle],
+  )
+  const clearDraft = useCallback(
+    (sessionId: string) => {
+      try {
+        lifecycle.runSync(() => clearAgentDraft(sessionId))
+        return true
+      } catch (error) {
+        if (error instanceof TaskLifecycleClosedError) return false
+        throw error
+      }
+    },
+    [lifecycle],
+  )
+  const writeComposerHeight = useCallback(
+    (height: number) => {
+      try {
+        lifecycle.runSync(() => storeComposerHeight(height))
+        return true
+      } catch (error) {
+        if (error instanceof TaskLifecycleClosedError) return false
+        throw error
+      }
+    },
     [lifecycle],
   )
   /** 每个会话这个回合走的是原生 tools 还是 JSON 降级；确认后续跑要沿用同一条 */
@@ -587,43 +647,60 @@ export function AgentPanel({
 
   useEffect(() => {
     if (!onDisposeReady) return
-    const dispose = async () => {
-      lifecycle.beginClose()
-      const sessionIds = new Set([
-        ...abortRefs.current.keys(),
-        ...listRef.current.map((session) => session.id),
-      ])
+    const beginShutdown = (): TaskShutdownControl => {
+      const attempt = lifecycle.beginClose()
+      if (pendingAssetSyncTimerRef.current) {
+        clearTimeout(pendingAssetSyncTimerRef.current)
+        pendingAssetSyncTimerRef.current = null
+      }
       for (const controller of abortRefs.current.values()) {
         controller.abort()
       }
-      await lifecycle.waitForIdle(AGENT_PANEL_DISPOSE_TIMEOUT_MS)
-      await store.flush()
-      for (const sessionId of sessionIds) {
-        clearQueueDrain(sessionId)
-        releaseSessionActivity(sessionId)
-        sessionRuntimeRef.current.clearSession(sessionId)
-        clearLiveActivitiesFor(sessionId)
-        clearLiveProcessFor(sessionId)
-        clearRunTasksFor(sessionId)
+
+      return {
+        waitForIdle: async () => {
+          await lifecycle.waitForIdle(AGENT_PANEL_DISPOSE_TIMEOUT_MS)
+          await store.flush()
+        },
+        whenIdle: lifecycle.whenIdle,
+        canReopen: () => lifecycle.canReopen(attempt),
+        reopenIfIdle: () => lifecycle.reopenIfIdle(attempt),
+        canFinalize: () => lifecycle.canFinalize(attempt),
+        finalize() {
+          if (!lifecycle.finalizeClose(attempt)) return false
+          const sessionIds = new Set([
+            ...abortRefs.current.keys(),
+            ...listRef.current.map((session) => session.id),
+          ])
+          for (const sessionId of sessionIds) {
+            clearQueueDrain(sessionId)
+            releaseSessionActivity(sessionId)
+            sessionRuntimeRef.current.clearSession(sessionId)
+            clearLiveActivitiesFor(sessionId)
+            clearLiveProcessFor(sessionId)
+            clearRunTasksFor(sessionId)
+          }
+          queuePumpingRef.current.clear()
+          confirmingRef.current.clear()
+          stoppingRef.current.clear()
+          abortRefs.current.clear()
+          deliveredSteersRef.current.clear()
+          toolModeRef.current.clear()
+          turnToolsRef.current.clear()
+          currentTurnIdRef.current.clear()
+          currentTurnJobIdRef.current.clear()
+          currentTurnRevisionRef.current.clear()
+          planAliasesRef.current.clear()
+          autoRunRef.current.clear()
+          explicitMediaModelsRef.current.clear()
+          chatRouteRef.current.clear()
+          contextTraceRef.current.clear()
+          inFlightConfirmationRef.current.clear()
+          return true
+        },
       }
-      queuePumpingRef.current.clear()
-      confirmingRef.current.clear()
-      stoppingRef.current.clear()
-      abortRefs.current.clear()
-      deliveredSteersRef.current.clear()
-      toolModeRef.current.clear()
-      turnToolsRef.current.clear()
-      currentTurnIdRef.current.clear()
-      currentTurnJobIdRef.current.clear()
-      currentTurnRevisionRef.current.clear()
-      planAliasesRef.current.clear()
-      autoRunRef.current.clear()
-      explicitMediaModelsRef.current.clear()
-      chatRouteRef.current.clear()
-      contextTraceRef.current.clear()
-      inFlightConfirmationRef.current.clear()
     }
-    return onDisposeReady(dispose)
+    return onDisposeReady(beginShutdown)
   }, [
     clearLiveActivitiesFor,
     clearLiveProcessFor,
@@ -838,15 +915,19 @@ export function AgentPanel({
   )
 
   /** 载入会话列表；没有就按默认模型建一个（设计文档 §8「新建会话用默认模型」） */
-  const refresh = useCallback(async () => {
-    const rows = await controller.refresh()
-    setList(rows)
-    return rows
-  }, [controller])
+  const refresh = useCallback(
+    () =>
+      trackRun(async () => {
+        const rows = await controller.refresh()
+        setList(rows)
+        return rows
+      }),
+    [controller, trackRun],
+  )
 
   useEffect(() => {
     let alive = true
-    void (async () => {
+    void trackRun(async () => {
       /**
        * 渠道 store 是应用级单例、挂载时统一 load；但**新建画布页**这条路径
        * 可能先于 load 完成就读 enabledChannels —— 那一刻 enabled 为空，
@@ -892,13 +973,20 @@ export function AgentPanel({
       setList([created])
       setCurrent(created)
       setMessages([])
-    })()
+    }).catch((error) => {
+      if (
+        alive &&
+        !(error instanceof TaskLifecycleClosedError)
+      ) {
+        store.notify(`Agent 会话读取失败：${errText(error)}`, 'error')
+      }
+    })
     return () => {
       alive = false
     }
     // 依赖只列 projectId：这里做的是「项目换了就重建会话列表」，
     // 把 refresh / sessions 列进来会让它在每次保存后重跑，把正在进行的对话打断
-  }, [projectId])
+  }, [projectId, trackRun])
 
   useEffect(() => {
     if (!messageReveal) return
@@ -1043,18 +1131,19 @@ export function AgentPanel({
           ? {
               taskPlan: {
                 get: async () => (await sessions.get(sessionId))?.taskPlan,
-                save: async (plan) => {
-                  const next = await sessions.updateFields(sessionId, {
-                    taskPlan: plan,
-                  })
-                  if (next) {
-                    setList((prev) =>
-                      prev.map((item) => (item.id === next.id ? next : item)),
-                    )
-                    if (currentIdRef.current === next.id) setCurrent(next)
-                  }
-                  return next?.taskPlan ?? null
-                },
+                save: (plan) =>
+                  trackRun(async () => {
+                    const next = await sessions.updateFields(sessionId, {
+                      taskPlan: plan,
+                    })
+                    if (next) {
+                      setList((prev) =>
+                        prev.map((item) => (item.id === next.id ? next : item)),
+                      )
+                      if (currentIdRef.current === next.id) setCurrent(next)
+                    }
+                    return next?.taskPlan ?? null
+                  }),
               },
             }
           : {}),
@@ -1157,9 +1246,15 @@ export function AgentPanel({
         if (model !== stored) {
           sessionRuntimeRef.current.rememberStickyModel(sessionId, kind, model)
           if (session) {
-            void sessions.updateFields(
-              session.id,
-              kind === 'video' ? { videoModel: model } : { imageModel: model },
+            runTrackedDetached(
+              () =>
+                sessions.updateFields(
+                  session.id,
+                  kind === 'video'
+                    ? { videoModel: model }
+                    : { imageModel: model },
+                ),
+              '保存生成模型失败',
             )
           }
         }
@@ -1516,9 +1611,11 @@ export function AgentPanel({
       session.taskPlan &&
       agentTaskPlanProgress(session.taskPlan).status !== 'active'
     ) {
-      const cleared = await sessions.updateFields(session.id, {
-        taskPlan: undefined,
-      })
+      const cleared = await trackRun(() =>
+        sessions.updateFields(session.id, {
+          taskPlan: undefined,
+        }),
+      )
       if (cleared) {
         setList((prev) =>
           prev.map((item) => (item.id === cleared.id ? cleared : item)),
@@ -1598,7 +1695,7 @@ export function AgentPanel({
           if (currentIdRef.current === saved.id) {
             setCurrent(saved)
             setDraft('')
-            saveAgentDraft(session.id, '')
+            writeDraft(session.id, '')
             setMessages(turn.historyMessages)
           }
           clearLiveActivitiesFor(session.id)
@@ -1781,6 +1878,8 @@ export function AgentPanel({
     notify: store.notify,
     queuePumpingRef,
     queuePumpRef,
+    trackRun,
+    saveDraft: writeDraft,
   })
 
   /** 复制一条助手回复；剪贴板被拒时静默 —— 不弹一个用户看不懂的错误 */
@@ -1891,72 +1990,75 @@ export function AgentPanel({
    * 已经发出；普通文字则立即进入当前任务。若正停在确认卡，先取消这次待执行动作，
    * 再把消息作为新的用户回合发出去，避免旧动作先执行、引导最后才看到。
    */
-  const guideQueuedTurn = useCallback(async (turn: QueuedAgentTurn) => {
-    if (!current || !statusCanSteer(status)) return
-    if (turn.pendingAssetIds?.length) {
-      store.notify('带新素材的消息不能中途引导，请等它按队列发送', 'error')
-      return
-    }
-    const queuedJob = await jobs.forTurn(current.id, turn.id)
+  const guideQueuedTurn = useCallback(
+    (turn: QueuedAgentTurn) =>
+      trackRun(async () => {
+        if (!current || !statusCanSteer(status)) return
+        if (turn.pendingAssetIds?.length) {
+          store.notify('带新素材的消息不能中途引导，请等它按队列发送', 'error')
+          return
+        }
+        const queuedJob = await jobs.forTurn(current.id, turn.id)
 
-    const pendingConfirmation =
-      status.kind === 'awaitingConfirm' ? status.request : current.pendingConfirmation
-    if (pendingConfirmation) {
-      const withoutTurn = await sessions.removeQueuedTurn(current.id, turn.id)
-      if (!withoutTurn) return
-      applySessionSnapshot(withoutTurn)
-      if (queuedJob?.status === 'queued') {
-        await jobs.transition(
-          queuedJob.id,
-          'canceled',
-          'canceled',
-          {},
-          { reason: 'promoted_to_steer' },
+        const pendingConfirmation =
+          status.kind === 'awaitingConfirm' ? status.request : current.pendingConfirmation
+        if (pendingConfirmation) {
+          const withoutTurn = await sessions.removeQueuedTurn(current.id, turn.id)
+          if (!withoutTurn) return
+          applySessionSnapshot(withoutTurn)
+          if (queuedJob?.status === 'queued') {
+            await jobs.transition(
+              queuedJob.id,
+              'canceled',
+              'canceled',
+              {},
+              { reason: 'promoted_to_steer' },
+            )
+          }
+          const settled = await settleInterruptedSession(
+            withoutTurn,
+            pendingConfirmation,
+            'canceled',
+          )
+          if (settled.cleanupError) return
+          const target = settled.session ?? withoutTurn
+          store.notify('已取消等待中的动作，并立即发送这条引导', 'info')
+          await sendText(turn.text, sessionForQueuedTurn(target, turn))
+          return
+        }
+
+        const promoted = await sessions.promoteQueuedTurnToSteer(
+          current.id,
+          turn.id,
+          createId('steer'),
         )
-      }
-      const settled = await settleInterruptedSession(
-        withoutTurn,
-        pendingConfirmation,
-        'canceled',
-      )
-      if (settled.cleanupError) return
-      const target = settled.session ?? withoutTurn
-      store.notify('已取消等待中的动作，并立即发送这条引导', 'info')
-      await sendText(turn.text, sessionForQueuedTurn(target, turn))
-      return
-    }
-
-    const promoted = await sessions.promoteQueuedTurnToSteer(
-      current.id,
-      turn.id,
-      createId('steer'),
-    )
-    if (!promoted.ok) {
-      store.notify(
-        promoted.reason === 'has_assets'
-          ? '带新素材的消息不能中途引导，请等它按队列发送'
-          : promoted.reason === 'steer_full'
-            ? '当前任务的引导已达上限'
-            : promoted.reason === 'awaiting_confirmation'
-              ? 'Agent 正在等待确认，请重新点击引导'
-            : '这条排队消息已经不存在',
-        'error',
-      )
-      return
-    }
-    applySessionSnapshot(promoted.session)
-    if (queuedJob?.status === 'queued') {
-      await jobs.transition(
-        queuedJob.id,
-        'canceled',
-        'canceled',
-        {},
-        { reason: 'promoted_to_steer' },
-      )
-    }
-    setQueueMenuId(null)
-    store.notify('已转为引导，将在 Agent 下一次动作前应用', 'info')
-  }, [
+        if (!promoted.ok) {
+          store.notify(
+            promoted.reason === 'has_assets'
+              ? '带新素材的消息不能中途引导，请等它按队列发送'
+              : promoted.reason === 'steer_full'
+                ? '当前任务的引导已达上限'
+                : promoted.reason === 'awaiting_confirmation'
+                  ? 'Agent 正在等待确认，请重新点击引导'
+                : '这条排队消息已经不存在',
+            'error',
+          )
+          return
+        }
+        applySessionSnapshot(promoted.session)
+        if (queuedJob?.status === 'queued') {
+          await jobs.transition(
+            queuedJob.id,
+            'canceled',
+            'canceled',
+            {},
+            { reason: 'promoted_to_steer' },
+          )
+        }
+        setQueueMenuId(null)
+        store.notify('已转为引导，将在 Agent 下一次动作前应用', 'info')
+      }),
+    [
     applySessionSnapshot,
     current,
     jobs,
@@ -1965,84 +2067,88 @@ export function AgentPanel({
     settleInterruptedSession,
     status,
     store,
+    trackRun,
   ])
 
   /**
    * “直接下一步”是控制命令，不是聊天内容。先中止当前验收请求，再原子地
    * 验收当前步骤、启动下一步，最后用隐藏控制消息继续执行。
    */
-  const advanceTaskPlan = useCallback(async (session?: AgentSession) => {
-    const target = session ?? current
-    if (!target?.taskPlan) {
-      store.notify('当前没有可推进的任务计划', 'info')
-      return false
-    }
-    const currentStep = target.taskPlan.steps.find(
-      (step) => step.id === target.taskPlan?.currentStepId,
-    )
-    const advanced = advanceAgentTaskPlanAfterReview(
-      target.taskPlan,
-      currentStep?.id,
-      Date.now(),
-    )
-    if (!advanced.ok) {
-      store.notify(advanced.problems.join('；'), 'error')
-      return false
-    }
+  const advanceTaskPlan = useCallback(
+    (session?: AgentSession) =>
+      trackRun(async () => {
+        const target = session ?? current
+        if (!target?.taskPlan) {
+          store.notify('当前没有可推进的任务计划', 'info')
+          return false
+        }
+        const currentStep = target.taskPlan.steps.find(
+          (step) => step.id === target.taskPlan?.currentStepId,
+        )
+        const advanced = advanceAgentTaskPlanAfterReview(
+          target.taskPlan,
+          currentStep?.id,
+          Date.now(),
+        )
+        if (!advanced.ok) {
+          store.notify(advanced.problems.join('；'), 'error')
+          return false
+        }
 
-    const pendingConfirmation =
-      status.kind === 'awaitingConfirm' ? status.request : target.pendingConfirmation
-    abortRefs.current.get(target.id)?.abort()
-    if (pendingConfirmation) {
-      const settled = await settleInterruptedSession(
-        target,
-        pendingConfirmation,
-        'canceled',
-      )
-      if (settled.cleanupError) return false
-    } else {
-      for (let attempt = 0; attempt < 60; attempt += 1) {
-        if (!isSessionActivityActive(target.id)) break
-        await new Promise((resolve) => window.setTimeout(resolve, 100))
-      }
-    }
-    if (isSessionActivityActive(target.id)) {
-      store.notify('旧验收仍在收尾，请稍后再点一次', 'error')
-      return false
-    }
+        const pendingConfirmation =
+          status.kind === 'awaitingConfirm' ? status.request : target.pendingConfirmation
+        abortRefs.current.get(target.id)?.abort()
+        if (pendingConfirmation) {
+          const settled = await settleInterruptedSession(
+            target,
+            pendingConfirmation,
+            'canceled',
+          )
+          if (settled.cleanupError) return false
+        } else {
+          for (let attempt = 0; attempt < 60; attempt += 1) {
+            if (!isSessionActivityActive(target.id)) break
+            await new Promise((resolve) => window.setTimeout(resolve, 100))
+          }
+        }
+        if (isSessionActivityActive(target.id)) {
+          store.notify('旧验收仍在收尾，请稍后再点一次', 'error')
+          return false
+        }
 
-    clearLiveActivitiesFor(target.id)
-    clearLiveProcessFor(target.id)
-    clearRunTasksFor(target.id)
-    setStatusFor(target.id, IDLE_STATUS)
-    const updated = await sessions.updateFields(target.id, {
-      taskPlan: advanced.plan,
-      pendingConfirmation: undefined,
-      continuation: undefined,
-      allowedToolNames: undefined,
-    })
-    const resolved = updated ?? { ...target, taskPlan: advanced.plan }
-    applySessionSnapshot(resolved)
+        clearLiveActivitiesFor(target.id)
+        clearLiveProcessFor(target.id)
+        clearRunTasksFor(target.id)
+        setStatusFor(target.id, IDLE_STATUS)
+        const updated = await sessions.updateFields(target.id, {
+          taskPlan: advanced.plan,
+          pendingConfirmation: undefined,
+          continuation: undefined,
+          allowedToolNames: undefined,
+        })
+        const resolved = updated ?? { ...target, taskPlan: advanced.plan }
+        applySessionSnapshot(resolved)
 
-    const closed = currentStep?.title ?? '当前步骤'
-    const next = advanced.plan.steps.find(
-      (step) => step.id === advanced.plan.currentStepId,
-    )
-    if (!next) {
-      store.notify(`已完成「${closed}」，整个计划已结束`, 'info')
-      return true
-    }
-    store.notify(`已跳过「${closed}」验收，进入「${next.title}」`, 'info')
-    await sendText(
-      `系统控制：用户已跳过「${closed}」的验收并确认直接进入下一步。` +
-        `现在开始执行计划步骤「${next.title}」。` +
-        `请沿用计划目标、已有画布产物和约束继续，不要再次询问是否进入下一步，` +
-        `也不要把这句控制指令当成新的业务需求。`,
-      resolved,
-      { internalControl: true },
-    )
-    return true
-  }, [
+        const closed = currentStep?.title ?? '当前步骤'
+        const next = advanced.plan.steps.find(
+          (step) => step.id === advanced.plan.currentStepId,
+        )
+        if (!next) {
+          store.notify(`已完成「${closed}」，整个计划已结束`, 'info')
+          return true
+        }
+        store.notify(`已跳过「${closed}」验收，进入「${next.title}」`, 'info')
+        await sendText(
+          `系统控制：用户已跳过「${closed}」的验收并确认直接进入下一步。` +
+            `现在开始执行计划步骤「${next.title}」。` +
+            `请沿用计划目标、已有画布产物和约束继续，不要再次询问是否进入下一步，` +
+            `也不要把这句控制指令当成新的业务需求。`,
+          resolved,
+          { internalControl: true },
+        )
+        return true
+      }),
+    [
     applySessionSnapshot,
     clearLiveActivitiesFor,
     clearLiveProcessFor,
@@ -2054,6 +2160,7 @@ export function AgentPanel({
     settleInterruptedSession,
     status,
     store,
+    trackRun,
   ])
 
   /**
@@ -2062,54 +2169,57 @@ export function AgentPanel({
    * 普通运行中走 pendingSteers；停在确认卡时先取消未执行动作，再把这条消息
    * 作为新用户回合发起，避免用户还得先排队、展开列表、再点一次引导。
    */
-  const guideDraft = useCallback(async (raw: string) => {
-    const text = raw.trim()
-    if (!text || !current) return false
-    if (current.pendingAssetIds?.length) {
-      store.notify('带新素材的消息不能中途引导，已改为排队发送', 'info')
-      return queueText(text)
-    }
+  const guideDraft = useCallback(
+    (raw: string) =>
+      trackRun(async () => {
+        const text = raw.trim()
+        if (!text || !current) return false
+        if (current.pendingAssetIds?.length) {
+          store.notify('带新素材的消息不能中途引导，已改为排队发送', 'info')
+          return queueText(text)
+        }
 
-    const pendingConfirmation =
-      status.kind === 'awaitingConfirm' ? status.request : current.pendingConfirmation
-    if (pendingConfirmation) {
-      const settled = await settleInterruptedSession(
-        current,
-        pendingConfirmation,
-        'canceled',
-      )
-      if (settled.cleanupError) return false
-      const target = settled.session ?? current
-      store.notify('已取消等待中的动作，并立即发送这条引导', 'info')
-      await sendText(text, target)
-      return true
-    }
+        const pendingConfirmation =
+          status.kind === 'awaitingConfirm' ? status.request : current.pendingConfirmation
+        if (pendingConfirmation) {
+          const settled = await settleInterruptedSession(
+            current,
+            pendingConfirmation,
+            'canceled',
+          )
+          if (settled.cleanupError) return false
+          const target = settled.session ?? current
+          store.notify('已取消等待中的动作，并立即发送这条引导', 'info')
+          await sendText(text, target)
+          return true
+        }
 
-    const steered = await sessions.enqueueSteer(current.id, {
-      id: createId('steer'),
-      text,
-      createdAt: Date.now(),
-    })
-    if (!steered.ok) {
-      store.notify(
-        steered.reason === 'full'
-          ? '当前任务的引导已达上限'
-          : '引导发送失败，请稍后重试',
-        'error',
-      )
-      return false
-    }
-    applySessionSnapshot(steered.session)
-    if (currentIdRef.current === current.id) {
-      setDraft((value) => {
-        const next = value.trim() === text ? '' : value
-        if (next !== value) saveAgentDraft(current.id, next)
-        return next
-      })
-    }
-    store.notify('已作为引导发送，将在 Agent 下一次动作前应用', 'info')
-    return true
-  }, [
+        const steered = await sessions.enqueueSteer(current.id, {
+          id: createId('steer'),
+          text,
+          createdAt: Date.now(),
+        })
+        if (!steered.ok) {
+          store.notify(
+            steered.reason === 'full'
+              ? '当前任务的引导已达上限'
+              : '引导发送失败，请稍后重试',
+            'error',
+          )
+          return false
+        }
+        applySessionSnapshot(steered.session)
+        if (currentIdRef.current === current.id) {
+          setDraft((value) => {
+            const next = value.trim() === text ? '' : value
+            if (next !== value) writeDraft(current.id, next)
+            return next
+          })
+        }
+        store.notify('已作为引导发送，将在 Agent 下一次动作前应用', 'info')
+        return true
+      }),
+    [
     applySessionSnapshot,
     current,
     queueText,
@@ -2118,6 +2228,8 @@ export function AgentPanel({
     settleInterruptedSession,
     status,
     store,
+    trackRun,
+    writeDraft,
   ])
 
   /** 输入框发送：空闲直接跑；忙碌时按当前“排队 / 引导”模式投递。 */
@@ -2126,8 +2238,11 @@ export function AgentPanel({
       if (!draft.trim()) return
       if (current?.taskPlan && isAdvanceTaskCommand(draft)) {
         setDraft('')
-        saveAgentDraft(current.id, '')
-        void advanceTaskPlan(current)
+        writeDraft(current.id, '')
+        runPromiseDetached(
+          advanceTaskPlan(current),
+          '推进任务计划失败',
+        )
         return
       }
       if (
@@ -2135,13 +2250,13 @@ export function AgentPanel({
         (current && isSessionActivityActive(current.id))
       ) {
         if (requestedMode === 'steer' && statusCanSteer(status)) {
-          void guideDraft(draft)
+          runPromiseDetached(guideDraft(draft), '发送引导失败')
         } else {
-          void queueText(draft)
+          runPromiseDetached(queueText(draft), '排队失败')
         }
         return
       }
-      void sendText(draft)
+      runPromiseDetached(sendText(draft), '发送失败')
     },
     [
       advanceTaskPlan,
@@ -2150,6 +2265,7 @@ export function AgentPanel({
       draft,
       guideDraft,
       queueText,
+      runPromiseDetached,
       sendText,
       status,
     ],
@@ -2164,9 +2280,18 @@ export function AgentPanel({
     if (!lastUser) return
     const text = lastUser.display ?? lastUser.content
     if (statusIsBusy(status) || (current && isSessionActivityActive(current.id))) {
-      void queueText(text)
-    } else void sendText(text)
-  }, [current, messages, queueText, sendText, status])
+      runPromiseDetached(queueText(text), '排队失败')
+    } else {
+      runPromiseDetached(sendText(text), '发送失败')
+    }
+  }, [
+    current,
+    messages,
+    queueText,
+    runPromiseDetached,
+    sendText,
+    status,
+  ])
 
   const confirm = useCallback(() => {
     if (status.kind !== 'awaitingConfirm' || !current) return Promise.resolve()
@@ -2358,23 +2483,26 @@ export function AgentPanel({
     })
   }, [current, settleInterruptedSession, status, store, trackRun])
 
-  const newSession = useCallback(async () => {
-    const saved = await presets.loadAgentDefault()
-    const savedModel = toLogicalName(allChannels, saved?.model ?? '')
-    const created = await sessions.create({
-      projectId,
-      channelId: '',
-      model: defaultModelFor(chatModelOptions, savedModel),
-      /**
-       * 「跟随选中」也覆盖**会话开局**这一档：用户先选中一张香蕉 2 的图再打开对话，
-       * 面板上显示的就该是香蕉 2，而不是模型清单的第一个（见 `selectedModelOf`）。
-       */
-      imageModel: selectedModelOf('image') || modelOptionsByKind.image[0] || '',
-      videoModel: selectedModelOf('video') || modelOptionsByKind.video[0] || '',
-    })
-    await refresh()
-    await switchTo(created)
-  }, [
+  const newSession = useCallback(
+    () =>
+      trackRun(async () => {
+        const saved = await presets.loadAgentDefault()
+        const savedModel = toLogicalName(allChannels, saved?.model ?? '')
+        const created = await sessions.create({
+          projectId,
+          channelId: '',
+          model: defaultModelFor(chatModelOptions, savedModel),
+          /**
+           * 「跟随选中」也覆盖**会话开局**这一档：用户先选中一张香蕉 2 的图再打开对话，
+           * 面板上显示的就该是香蕉 2，而不是模型清单的第一个（见 `selectedModelOf`）。
+           */
+          imageModel: selectedModelOf('image') || modelOptionsByKind.image[0] || '',
+          videoModel: selectedModelOf('video') || modelOptionsByKind.video[0] || '',
+        })
+        await refresh()
+        await switchTo(created)
+      }),
+    [
     presets,
     sessions,
     projectId,
@@ -2385,6 +2513,7 @@ export function AgentPanel({
     chatModelOptions,
     modelOptionsByKind,
     selectedModelOf,
+    trackRun,
   ])
 
   /**
@@ -2396,18 +2525,28 @@ export function AgentPanel({
    * 整份写回去，把库里的新值也冲掉。
    */
   const patchSession = useCallback(
-    async (
+    (
       patch: Partial<
         Omit<AgentSession, 'id' | 'projectId' | 'messages' | 'queuedTurns' | 'createdAt'>
       >,
-    ) => {
-      if (!current) return
-      const next = await sessions.updateFields(current.id, patch)
-      if (!next) return
-      setCurrent(next)
-      setList((prev) => prev.map((s) => (s.id === next.id ? next : s)))
+    ) =>
+      trackRun(async () => {
+        if (!current) return
+        const next = await sessions.updateFields(current.id, patch)
+        if (!next) return
+        setCurrent(next)
+        setList((prev) => prev.map((s) => (s.id === next.id ? next : s)))
+      }),
+    [current, sessions, trackRun],
+  )
+  const patchSessionDetached = useCallback(
+    (patch: Parameters<typeof patchSession>[0]) => {
+      void patchSession(patch).catch((error) => {
+        if (error instanceof TaskLifecycleClosedError) return
+        store.notify(`保存会话设置失败：${errText(error)}`, 'error')
+      })
     },
-    [current, sessions],
+    [patchSession, store],
   )
 
   /**
@@ -2418,7 +2557,7 @@ export function AgentPanel({
     (next: string) => {
       setDraft(next)
       if (!current) return
-      saveAgentDraft(current.id, next)
+      writeDraft(current.id, next)
       /**
        * 会话字段可能比正文晚一拍（尤其是刚重载或并发更新时）。
        * 把“上一版正文里真实出现过的 node chip”一并算进来，删掉 chip 时一定能触发清库。
@@ -2440,7 +2579,7 @@ export function AgentPanel({
         before.length !== after.length ||
         before.some((id, index) => id !== after[index])
       ) {
-        void patchSession({ pendingAssetIds: after })
+        patchSessionDetached({ pendingAssetIds: after })
       }
       /**
        * 再补一条按正文为真相的短防抖同步：
@@ -2451,18 +2590,28 @@ export function AgentPanel({
         if (pendingAssetSyncTimerRef.current) {
           clearTimeout(pendingAssetSyncTimerRef.current)
         }
-        pendingAssetSyncTimerRef.current = setTimeout(() => {
+        const timer = setTimeout(() => {
+          if (pendingAssetSyncTimerRef.current !== timer) return
           pendingAssetSyncTimerRef.current = null
-          void sessions
-            .updateFields(current.id, { pendingAssetIds: [] })
-            .then((nextSession) => {
-              if (nextSession) applySessionSnapshot(nextSession)
-            })
-            .catch(() => null)
+          runTrackedDetached(async () => {
+            const nextSession = await sessions.updateFields(
+              current.id,
+              { pendingAssetIds: [] },
+            )
+            if (nextSession) applySessionSnapshot(nextSession)
+          }, '同步待发送图片失败')
         }, 160)
+        pendingAssetSyncTimerRef.current = timer
       }
     },
-    [applySessionSnapshot, current, draft, patchSession, sessions],
+    [
+      applySessionSnapshot,
+      current,
+      draft,
+      patchSessionDetached,
+      runTrackedDetached,
+      sessions,
+    ],
   )
 
   useEffect(() => {
@@ -2606,20 +2755,26 @@ export function AgentPanel({
    * 空标题**不改**（回到原名）：允许存成空串的话，会话列表里会出现一行看不见的条目 ——
    * 那种「东西还在但认不出它是谁」的状态比拒绝一次输入糟得多。
    */
-  const commitRename = useCallback(async () => {
-    if (!current) return
-    const title = titleDraft.trim()
-    setRenaming(false)
-    if (!title || title === current.title) return
-    await sessions.rename(current.id, title)
-    const rows = await refresh()
-    const hit = rows.find((s) => s.id === current.id)
-    if (hit) {
-      setCurrent((previous) =>
-        previous?.id === hit.id ? { ...previous, ...hit, messages: previous.messages } : hit,
-      )
-    }
-  }, [current, titleDraft, sessions, refresh])
+  const commitRename = useCallback(
+    () =>
+      trackRun(async () => {
+        if (!current) return
+        const title = titleDraft.trim()
+        setRenaming(false)
+        if (!title || title === current.title) return
+        await sessions.rename(current.id, title)
+        const rows = await refresh()
+        const hit = rows.find((s) => s.id === current.id)
+        if (hit) {
+          setCurrent((previous) =>
+            previous?.id === hit.id
+              ? { ...previous, ...hit, messages: previous.messages }
+              : hit,
+          )
+        }
+      }),
+    [current, titleDraft, sessions, refresh, trackRun],
+  )
 
   /**
    * 删除会话（两步确认）。
@@ -2628,29 +2783,43 @@ export function AgentPanel({
    * 界面上会继续显示它、下一句话还会往它的 id 上写 —— 那是最难查的一类不一致。
    * 一条都不剩时直接开一条新的，保证「至少有一个会话」这条不变式。
    */
-  const deleteSession = useCallback(async () => {
-    if (!current) return
-    if (!confirmDelete) {
-      setConfirmDelete(true)
-      return
-    }
-    if (
-      isSessionActivityActive(current.id) ||
-      queuePumpingRef.current.has(current.id) ||
-      confirmingRef.current.has(current.id)
-    ) {
-      setConfirmDelete(false)
-      store.notify('当前会话还有任务在运行，请先停止后再删除', 'error')
-      return
-    }
-    setConfirmDelete(false)
-    clearAgentDraft(current.id)
-    sessionRuntimeRef.current.clearSession(current.id)
-    await sessions.remove(current.id)
-    const rows = await refresh()
-    if (rows.length > 0) await switchTo(rows[0]!)
-    else await newSession()
-  }, [current, confirmDelete, sessions, refresh, switchTo, newSession, store])
+  const deleteSession = useCallback(
+    () =>
+      trackRun(async () => {
+        if (!current) return
+        if (!confirmDelete) {
+          setConfirmDelete(true)
+          return
+        }
+        if (
+          isSessionActivityActive(current.id) ||
+          queuePumpingRef.current.has(current.id) ||
+          confirmingRef.current.has(current.id)
+        ) {
+          setConfirmDelete(false)
+          store.notify('当前会话还有任务在运行，请先停止后再删除', 'error')
+          return
+        }
+        setConfirmDelete(false)
+        clearDraft(current.id)
+        sessionRuntimeRef.current.clearSession(current.id)
+        await sessions.remove(current.id)
+        const rows = await refresh()
+        if (rows.length > 0) await switchTo(rows[0]!)
+        else await newSession()
+      }),
+    [
+      current,
+      confirmDelete,
+      sessions,
+      refresh,
+      switchTo,
+      newSession,
+      store,
+      clearDraft,
+      trackRun,
+    ],
+  )
 
   /**
    * 把**画布上选中的节点**当素材给这次对话（设计文档 §8「输入：文字 + 可选图片」）。
@@ -2680,7 +2849,7 @@ export function AgentPanel({
     handoffRef.current = []
     if (picked.length === 0) return
     for (const id of picked) insertMention('node', id, nodeLabelOf(id))
-    void patchSession({
+    patchSessionDetached({
       pendingAssetIds: [...new Set([...(current.pendingAssetIds ?? []), ...picked])],
     })
   }, [current, store, insertMention, nodeLabelOf, patchSession])
@@ -2719,37 +2888,38 @@ export function AgentPanel({
    * 一处都没另写。逐个独立成败：一个文件格式不对，不该让同批的其余几个也失败。
    */
   const importSkills = useCallback(
-    async (files: FileList | null) => {
-      if (!files || files.length === 0) return
-      let ok = 0
-      const failed: string[] = []
-      for (const file of Array.from(files)) {
-        if (!/\.(md|markdown|txt)$/i.test(file.name)) continue
-        try {
-          const parsed = parseSkillMarkdown(
-            await file.text(),
-            file.name.replace(/\.(md|markdown|txt)$/i, ''),
-          )
-          if (!parsed.ok) {
-            failed.push(`${file.name}：${parsed.error}`)
-            continue
+    (files: FileList | null) =>
+      trackRun(async () => {
+        if (!files || files.length === 0) return
+        let ok = 0
+        const failed: string[] = []
+        for (const file of Array.from(files)) {
+          if (!/\.(md|markdown|txt)$/i.test(file.name)) continue
+          try {
+            const parsed = parseSkillMarkdown(
+              await file.text(),
+              file.name.replace(/\.(md|markdown|txt)$/i, ''),
+            )
+            if (!parsed.ok) {
+              failed.push(`${file.name}：${parsed.error}`)
+              continue
+            }
+            await skills.create(parsed.skill)
+            ok += 1
+          } catch (e) {
+            failed.push(`${file.name}：${e instanceof Error ? e.message : errText(e)}`)
           }
-          await skills.create(parsed.skill)
-          ok += 1
-        } catch (e) {
-          failed.push(`${file.name}：${e instanceof Error ? e.message : errText(e)}`)
         }
-      }
-      await skills.reload()
-      setOpenPicker(null)
-      store.notify(
-        failed.length === 0
-          ? `已导入 ${ok} 条技能`
-          : `导入 ${ok} 条，${failed.length} 条失败：${failed[0]}`,
-        failed.length === 0 ? 'info' : 'error',
-      )
-    },
-    [skills, store],
+        await skills.reload()
+        setOpenPicker(null)
+        store.notify(
+          failed.length === 0
+            ? `已导入 ${ok} 条技能`
+            : `导入 ${ok} 条，${failed.length} 条失败：${failed[0]}`,
+          failed.length === 0 ? 'info' : 'error',
+        )
+      }),
+    [skills, store, trackRun],
   )
 
   /**
@@ -2782,14 +2952,15 @@ export function AgentPanel({
    * 等一次 IndexedDB 往返再打星会让人以为没点上；落库失败最坏也只是下次没记住。
    */
   const toggleSkillFavorite = useCallback(
-    async (id: string) => {
-      const next = skillFavs.includes(id)
-        ? skillFavs.filter((x) => x !== id)
-        : [...skillFavs, id]
-      setSkillFavs(next)
-      await presets.saveSkillFavorites(next)
-    },
-    [skillFavs, presets],
+    (id: string) =>
+      trackRun(async () => {
+        const next = skillFavs.includes(id)
+          ? skillFavs.filter((x) => x !== id)
+          : [...skillFavs, id]
+        setSkillFavs(next)
+        await presets.saveSkillFavorites(next)
+      }),
+    [skillFavs, presets, trackRun],
   )
 
   /**
@@ -2820,21 +2991,30 @@ export function AgentPanel({
    * 对 agent 来说两者没有区别，都是「画布上那个素材节点」，用 attach 复用即可。
    */
   const addFromLibrary = useCallback(
-    async (hash: string) => {
-      const asset = library.getState().assets.find((a) => a.hash === hash)
-      if (!current || !asset) return
-      const id = placeAsset({
-        hash: asset.hash,
-        mime: asset.mime,
-        width: asset.width,
-        height: asset.height,
-      })
-      if (!id) return
-      /** 同样落成正文里的引用 chip（与「取选中」同一条路） */
-      insertMention('node', id, nodeLabelOf(id))
-      await patchSession({ pendingAssetIds: [...(current.pendingAssetIds ?? []), id] })
-    },
-    [current, library, patchSession, placeAsset, insertMention, nodeLabelOf],
+    (hash: string) =>
+      trackRun(async () => {
+        const asset = library.getState().assets.find((a) => a.hash === hash)
+        if (!current || !asset) return
+        const id = placeAsset({
+          hash: asset.hash,
+          mime: asset.mime,
+          width: asset.width,
+          height: asset.height,
+        })
+        if (!id) return
+        /** 同样落成正文里的引用 chip（与「取选中」同一条路） */
+        insertMention('node', id, nodeLabelOf(id))
+        await patchSession({ pendingAssetIds: [...(current.pendingAssetIds ?? []), id] })
+      }),
+    [
+      current,
+      library,
+      patchSession,
+      placeAsset,
+      insertMention,
+      nodeLabelOf,
+      trackRun,
+    ],
   )
 
   /**
@@ -2845,24 +3025,35 @@ export function AgentPanel({
    * 却指不到画布上的任何东西，最后还是自己再建一个 —— 那就重复了。
    */
   const attachFiles = useCallback(
-    async (files: FileList | null) => {
-      if (!files || files.length === 0 || !current) return
-      const deps = { platform, store, projectId }
-      const added: string[] = []
-      for (const file of Array.from(files)) {
-        if (!isImportableMedia(file.type)) continue
-        const asset = await importAssetFile(deps, file)
-        if (!asset) continue
-        const id = placeAsset(asset)
-        if (id) added.push(id)
-      }
-      if (added.length === 0) return
-      for (const id of added) insertMention('node', id, nodeLabelOf(id))
-      await patchSession({
-        pendingAssetIds: [...(current.pendingAssetIds ?? []), ...added],
-      })
-    },
-    [current, platform, store, projectId, patchSession, placeAsset, insertMention, nodeLabelOf],
+    (files: FileList | null) =>
+      trackRun(async () => {
+        if (!files || files.length === 0 || !current) return
+        const deps = { platform, store, projectId }
+        const added: string[] = []
+        for (const file of Array.from(files)) {
+          if (!isImportableMedia(file.type)) continue
+          const asset = await importAssetFile(deps, file)
+          if (!asset) continue
+          const id = placeAsset(asset)
+          if (id) added.push(id)
+        }
+        if (added.length === 0) return
+        for (const id of added) insertMention('node', id, nodeLabelOf(id))
+        await patchSession({
+          pendingAssetIds: [...(current.pendingAssetIds ?? []), ...added],
+        })
+      }),
+    [
+      current,
+      platform,
+      store,
+      projectId,
+      patchSession,
+      placeAsset,
+      insertMention,
+      nodeLabelOf,
+      trackRun,
+    ],
   )
 
   /**
@@ -3024,7 +3215,7 @@ export function AgentPanel({
         before.length !== after.length ||
         before.some((id, index) => id !== after[index])
       ) {
-        void patchSession({ pendingAssetIds: after })
+        patchSessionDetached({ pendingAssetIds: after })
       }
       return
     }
@@ -3035,7 +3226,7 @@ export function AgentPanel({
     if (tokens.length > 0) {
       const next = tokens.join('')
       setDraft(next)
-      saveAgentDraft(current.id, next)
+      writeDraft(current.id, next)
     }
   }, [current, draft, nodeLabelOf, patchSession])
 
@@ -3071,9 +3262,17 @@ export function AgentPanel({
       prev.skillId === skillId &&
       prev.seen &&
       !seen
-    if (removed) void setSkill('')
+    if (removed) {
+      runPromiseDetached(setSkill(''), '清除技能设置失败')
+    }
     seenSkillChipRef.current = { sessionId: current.id, skillId, seen }
-  }, [draft, current?.id, current?.skillId, setSkill])
+  }, [
+    draft,
+    current?.id,
+    current?.skillId,
+    runPromiseDetached,
+    setSkill,
+  ])
 
   /** 卸载时把建出来的 objectURL 回收掉（不回收就是一路泄漏） */
   useEffect(
@@ -3119,7 +3318,7 @@ export function AgentPanel({
       window.removeEventListener('pointerup', finish)
       window.removeEventListener('pointercancel', finish)
       setComposerResizing(false)
-      storeComposerHeight(latestHeight)
+      writeComposerHeight(latestHeight)
     }
 
     window.addEventListener('pointermove', onMove)
@@ -3140,7 +3339,7 @@ export function AgentPanel({
     event.preventDefault()
     const clamped = clampAgentComposerHeight(next, composerAvailableHeight())
     setComposerHeight(clamped)
-    storeComposerHeight(clamped)
+    writeComposerHeight(clamped)
   }
 
   return (
@@ -3167,7 +3366,10 @@ export function AgentPanel({
       onDragOver={(e) => e.preventDefault()}
       onDrop={(e) => {
         e.preventDefault()
-        void attachFiles(e.dataTransfer?.files ?? null)
+        runPromiseDetached(
+          attachFiles(e.dataTransfer?.files ?? null),
+          '添加素材失败',
+        )
       }}
     >
       {/*
@@ -3185,7 +3387,8 @@ export function AgentPanel({
         pickerOpen={openPicker === 'agent-session'}
         confirmDelete={confirmDelete}
         onTitleDraftChange={setTitleDraft}
-        onCommitRename={() => void commitRename()}
+        onCommitRename={() =>
+          runPromiseDetached(commitRename(), '重命名失败')}
         onCancelRename={() => setRenaming(false)}
         onToggleSessionPicker={() =>
           setOpenPicker(
@@ -3194,9 +3397,11 @@ export function AgentPanel({
         }
         onClosePicker={() => setOpenPicker(null)}
         onSwitchSession={(session) => void switchTo(session)}
-        onNewSession={() => void newSession()}
+        onNewSession={() =>
+          runPromiseDetached(newSession(), '新建会话失败')}
         onStartRename={startRename}
-        onDeleteSession={() => void deleteSession()}
+        onDeleteSession={() =>
+          runPromiseDetached(deleteSession(), '删除会话失败')}
         onOpenSettings={onOpenSettings}
         onClose={onClose}
       />
@@ -3235,23 +3440,33 @@ export function AgentPanel({
           if (!current) return
           if (advancingTaskPlan) return
           setAdvancingTaskPlan(true)
-          void advanceTaskPlan(current).finally(() => {
-            setAdvancingTaskPlan(false)
-          })
+          runPromiseDetached(
+            advanceTaskPlan(current).finally(() => {
+              setAdvancingTaskPlan(false)
+            }),
+            '推进任务计划失败',
+          )
         }}
-        onContinueTask={() => void continueTask()}
-        onConfirm={() => void confirm()}
-        onCancel={() => void cancel()}
+        onContinueTask={() =>
+          runPromiseDetached(continueTask(), '继续任务失败')}
+        onConfirm={() =>
+          runPromiseDetached(confirm(), '确认执行失败')}
+        onCancel={() =>
+          runPromiseDetached(cancel(), '取消任务失败')}
         onJumpToLatest={jumpToLatest}
-        onGuideQueuedTurn={(turn) => void guideQueuedTurn(turn)}
-        onRemoveQueued={(turnId) => void removeQueued(turnId)}
+        onGuideQueuedTurn={(turn) =>
+          runPromiseDetached(guideQueuedTurn(turn), '转为引导失败')}
+        onRemoveQueued={(turnId) =>
+          runPromiseDetached(removeQueued(turnId), '移出队列失败')}
         onQueueMenuIdChange={setQueueMenuId}
         onQueueMenuPositionChange={setQueueMenuPosition}
         onBeginQueueEdit={beginQueueEdit}
-        onCommitQueueEdit={() => void commitQueueEdit()}
+        onCommitQueueEdit={() =>
+          runPromiseDetached(commitQueueEdit(), '保存队列编辑失败')}
         onEditingQueueIdChange={setEditingQueueId}
         onEditingQueueTextChange={setEditingQueueText}
-        onResumeQueue={resumeQueue}
+        onResumeQueue={() =>
+          runPromiseDetached(resumeQueue(), '恢复队列失败')}
       />
 
       <AgentComposerPane
@@ -3285,17 +3500,31 @@ export function AgentPanel({
         resizeComposerWithKeyboard={resizeComposerWithKeyboard}
         replaceDraft={replaceDraft}
         send={send}
-        stop={() => void stop()}
-        attachFiles={(files) => void attachFiles(files)}
-        addFromLibrary={(hash) => void addFromLibrary(hash)}
-        pickModel={(name) => void pickModel(name)}
-        setModelKind={(kind, value) => void setModelKind(kind, value)}
-        setSkill={(id) => void setSkill(id)}
-        toggleSkillFavorite={(id) => void toggleSkillFavorite(id)}
+        stop={() => runPromiseDetached(stop(), '停止任务失败')}
+        attachFiles={(files) =>
+          runPromiseDetached(attachFiles(files), '添加素材失败')}
+        addFromLibrary={(hash) =>
+          runPromiseDetached(addFromLibrary(hash), '添加素材失败')}
+        pickModel={(name) =>
+          runPromiseDetached(pickModel(name), '保存模型设置失败')}
+        setModelKind={(kind, value) =>
+          runPromiseDetached(
+            setModelKind(kind, value),
+            '保存模型设置失败',
+          )}
+        setSkill={(id) =>
+          runPromiseDetached(setSkill(id), '保存技能设置失败')}
+        toggleSkillFavorite={(id) =>
+          runPromiseDetached(
+            toggleSkillFavorite(id),
+            '保存技能收藏失败',
+          )}
         openSkillLibrary={openSkillLibrary}
-        importSkills={(files) => void importSkills(files)}
-        patchSession={(patch) => void patchSession(patch)}
-        setAutoRun={(value) => void setAutoRun(value)}
+        importSkills={(files) =>
+          runPromiseDetached(importSkills(files), '导入技能失败')}
+        patchSession={patchSessionDetached}
+        setAutoRun={(value) =>
+          runPromiseDetached(setAutoRun(value), '保存自动执行设置失败')}
         insertMention={insertMention}
         setDraft={setDraft}
         setOpenPicker={setOpenPicker}

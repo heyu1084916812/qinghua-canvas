@@ -211,4 +211,26 @@ describe('canvas per-project execution runtime', () => {
     expect(oldRuntime.closed).toBe(true)
     expect(nextRuntime.closed).toBe(false)
   })
+
+  it('删除失败时可重开 idle runtime；有在途操作时不得假装重开', async () => {
+    const runtime = canvasExecutionRuntimeFor('p1')
+    const gate = deferred<void>()
+    runtime.engine.begin('plan-open', new AbortController())
+    const work = runtime.engine.track(async () => {
+      await gate.promise
+      runtime.engine.finish('plan-open')
+    })
+    const shutdown = beginCanvasExecutionRuntimeShutdown('p1')
+
+    expect(shutdown.canReopen()).toBe(false)
+    expect(shutdown.reopenIfIdle()).toBe(false)
+    gate.resolve()
+    await work
+    expect(shutdown.canReopen()).toBe(true)
+    expect(shutdown.reopenIfIdle()).toBe(true)
+    expect(runtime.closed).toBe(false)
+    await expect(
+      runtime.operations.track(async () => 'send-again'),
+    ).resolves.toBe('send-again')
+  })
 })

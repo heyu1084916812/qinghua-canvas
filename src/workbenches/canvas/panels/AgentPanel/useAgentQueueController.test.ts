@@ -12,6 +12,11 @@ import {
   useAgentQueueController,
   type AgentQueueControllerInput,
 } from './useAgentQueueController'
+import {
+  TaskLifecycleClosedError,
+  TaskLifecycleTimeoutError,
+  createTaskLifecycle,
+} from '../../../../features/shared/lifecycle/taskLifecycle'
 
 const session: AgentSession = {
   id: 'session-1',
@@ -32,6 +37,7 @@ const session: AgentSession = {
 function input(
   patch: Partial<AgentQueueControllerInput> = {},
 ): AgentQueueControllerInput {
+  const lifecycle = createTaskLifecycle()
   return {
     current: session,
     currentIdRef: { current: session.id },
@@ -58,6 +64,8 @@ function input(
     notify: vi.fn(),
     queuePumpingRef: { current: new Set<string>() },
     queuePumpRef: { current: vi.fn() },
+    trackRun: (work) => lifecycle.track(work),
+    saveDraft: vi.fn(),
     ...patch,
   }
 }
@@ -180,5 +188,78 @@ describe('useAgentQueueController', () => {
     )
     expect(applySessionSnapshot).toHaveBeenCalledWith(next)
     expect(isSessionActivityActive(session.id)).toBe(false)
+  })
+
+  it('queueText 的全段读写进 lifecycle，关闭后拒绝新入队', async () => {
+    let releaseRead!: () => void
+    const readGate = new Promise<void>((resolve) => {
+      releaseRead = resolve
+    })
+    let releaseWrite!: () => void
+    const writeGate = new Promise<void>((resolve) => {
+      releaseWrite = resolve
+    })
+    const lifecycle = createTaskLifecycle()
+    const sessionsGet = vi.fn(async () => {
+      await readGate
+      return session
+    })
+    const enqueueTurn = vi.fn(async () => {
+      await writeGate
+      return { ok: true as const, session }
+    })
+    const props = input({
+      sessions: {
+        get: sessionsGet,
+      } as unknown as AgentQueueControllerInput['sessions'],
+      controller: {
+        enqueueTurn,
+      } as unknown as AgentController,
+      trackRun: (work) => lifecycle.track(work),
+    })
+    let api: ReturnType<typeof useAgentQueueController> | null = null
+    function Probe() {
+      api = useAgentQueueController(props)
+      return createElement('span', null, 'ok')
+    }
+    renderToStaticMarkup(createElement(Probe))
+
+    const queued = api!.queueText('延迟写入')
+    lifecycle.beginClose()
+    await expect(
+      lifecycle.waitForIdle(5),
+    ).rejects.toBeInstanceOf(TaskLifecycleTimeoutError)
+    await expect(
+      api!.queueText('关闭后'),
+    ).rejects.toBeInstanceOf(TaskLifecycleClosedError)
+    expect(enqueueTurn).not.toHaveBeenCalled()
+
+    releaseRead()
+    releaseWrite()
+    await queued
+    await lifecycle.waitForIdle(100)
+    expect(enqueueTurn).toHaveBeenCalledOnce()
+  })
+
+  it('关闭后 queue pump 不领取新队首', async () => {
+    const lifecycle = createTaskLifecycle()
+    const claimNextQueuedTurn = vi.fn(async () => null)
+    const props = input({
+      controller: {
+        claimNextQueuedTurn,
+      } as unknown as AgentController,
+      trackRun: (work) => lifecycle.track(work),
+    })
+    function Probe() {
+      useAgentQueueController(props)
+      return createElement('span', null, 'ok')
+    }
+    renderToStaticMarkup(createElement(Probe))
+
+    claimSessionActivity(session.id, 'turn-active', 'turn-active')
+    lifecycle.beginClose()
+    props.queuePumpRef.current(session.id)
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    expect(claimNextQueuedTurn).not.toHaveBeenCalled()
   })
 })
