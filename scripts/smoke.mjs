@@ -618,6 +618,32 @@ async function sharedRow(page, table, id) {
   )
 }
 
+/** 按字段过滤共享库行，避免固定夹具被超过一页的历史记录淹没。 */
+async function sharedQueryRows(page, table, filter, limit = 1000) {
+  return page.evaluate(
+    async ({ table, filter, limit }) => {
+      try {
+        const response = await fetch(`${STORE_BASE}/query`, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({
+            table,
+            filter,
+            includePayload: false,
+            limit,
+          }),
+        })
+        if (!response.ok) return []
+        const body = await response.json()
+        return body.rows ?? []
+      } catch {
+        return []
+      }
+    },
+    { table, filter, limit },
+  )
+}
+
 /** 向共享库写入/覆盖一行（冒烟脚本内部测试夹具）。 */
 async function sharedPut(page, table, row) {
   return page.evaluate(
@@ -41413,6 +41439,39 @@ async function g769(browser) {
     await page.evaluate(() => window.localStorage.clear())
     priorDeliveryRow = await sharedRow(page, 'presets', 'agent:delivery')
     await sharedPut(page, 'presets', { id: 'agent:delivery', mode: 'steer' })
+    /**
+     * 偏好 store 在模块加载时就缓存了旧 row。写回 steer 后必须重新加载，
+     * 否则上一组留下的 queue 会让后续 G769 断言连锁失败。
+     */
+    await page.goto(`${BASE}/projects`, { waitUntil: 'domcontentloaded' })
+    for (const row of await sharedQueryRows(
+      page,
+      'agentSessions',
+      { projectId },
+    )) {
+      await sharedDelete(page, 'agentSessions', row.id)
+    }
+    for (const row of await sharedQueryRows(
+      page,
+      'agentMessages',
+      { projectId },
+    )) {
+      await sharedDelete(page, 'agentMessages', row.id)
+    }
+    for (const row of await sharedQueryRows(
+      page,
+      'agentJobs',
+      { projectId },
+    )) {
+      await sharedDelete(page, 'agentJobs', row.id)
+    }
+    for (const row of await sharedQueryRows(
+      page,
+      'agentEvents',
+      { projectId },
+    )) {
+      await sharedDelete(page, 'agentEvents', row.id)
+    }
     await sharedPut(page, 'projects', {
       id: projectId,
       name: 'Agent 队列验证',
@@ -41499,6 +41558,11 @@ async function g769(browser) {
     await page.goto(`${BASE}/canvas/${projectId}`, { waitUntil: 'domcontentloaded' })
     await page.locator('[data-canvas-hydrated="true"]').waitFor({ state: 'attached', timeout: 20000 })
     await page.locator('[data-canvas-agent]').click()
+    await page.locator('[data-param-chip="agent-session"]').click()
+    const persistedSession = page.locator(
+      `[data-param-popup="agent-session"] [data-param-option="${sessionId}"]`,
+    )
+    if (await persistedSession.count()) await persistedSession.click()
     await page.locator('[data-agent-queue]').waitFor({ state: 'visible', timeout: 10000 })
     rec(
       g,
@@ -43308,6 +43372,8 @@ async function g865(browser) {
   const projectA = `smoke_g865_a_${stamp}`
   const projectB = `smoke_g865_b_${stamp}`
   let projectC = ''
+  let projectD = ''
+  let sessionCId = ''
   const sessionId = `chat_smoke_g865_${stamp}`
   const queueId = `queue_smoke_g865_${stamp}`
   const callId = `call_smoke_g865_${stamp}`
@@ -43631,6 +43697,21 @@ async function g865(browser) {
       const created = await repo.create({ name: 'G865 当前画布删除' })
       return created.id
     })
+    sessionCId = `chat_smoke_g865_c_${stamp}`
+    const sessionCNow = Date.now()
+    await sharedPut(page, 'agentSessions', {
+      id: sessionCId,
+      projectId: projectC,
+      title: '删除失败后继续执行',
+      channelId: 'ch_smoke_mock',
+      model: 'GPT-6 Astra',
+      imageModel: 'GPT Image 2',
+      queuedTurns: [],
+      pendingSteers: [],
+      messageRevision: 0,
+      createdAt: sessionCNow,
+      updatedAt: sessionCNow,
+    })
     await page.goto(`${BASE}/canvas/${projectC}`, {
       waitUntil: 'domcontentloaded',
     })
@@ -43639,6 +43720,19 @@ async function g865(browser) {
       timeout: 20_000,
     })
     await page.locator('[data-agent-orb]').click()
+    const projectCPanel = page.locator(
+      '[data-agent-shell-panel][data-agent-host-active="true"]',
+    )
+    await projectCPanel.waitFor({
+      state: 'visible',
+      timeout: 20_000,
+    })
+    await projectCPanel.evaluate((node) => {
+      node.setAttribute('data-instance-probe', 'g865-c')
+    })
+    await projectCPanel
+      .locator('[data-agent-session-count="1"]')
+      .waitFor({ state: 'attached', timeout: 20_000 })
     await ensureSidebarOpen(page)
     const currentRow = page.locator(
       `[data-project-tree-item="${projectC}"]`,
@@ -43652,19 +43746,31 @@ async function g865(browser) {
           name.includes('/src/app/ProjectRuntimeRegistry.ts')))
     await page.evaluate(async ({ id, url }) => {
       const { registerProjectRuntime } = await import(url)
+      let disposeAttempts = 0
+      let releaseFailure
+      const failureGate = new Promise((resolve) => {
+        releaseFailure = resolve
+      })
+      window.__g865ReleaseDeleteFailure = () => releaseFailure?.()
       registerProjectRuntime({
         projectId: id,
         key: 'forced-delete-failure',
-        beginDispose: () => ({
-          waitForIdle: async () => {
-            throw new Error('forced delete failure')
-          },
-          whenIdle: async () => undefined,
-          canReopen: () => true,
-          reopenIfIdle: () => true,
-          canFinalize: () => true,
-          finalize: () => true,
-        }),
+        beginDispose: () => {
+          disposeAttempts += 1
+          const shouldFail = disposeAttempts === 1
+          return {
+            waitForIdle: async () => {
+              if (!shouldFail) return
+              await failureGate
+              throw new Error('forced delete failure')
+            },
+            whenIdle: async () => undefined,
+            canReopen: () => true,
+            reopenIfIdle: () => true,
+            canFinalize: () => true,
+            finalize: () => true,
+          }
+        },
       })
     }, { id: projectC, url: registryUrl })
     await currentRow
@@ -43675,6 +43781,78 @@ async function g865(browser) {
       .filter({ hasText: '删除' })
       .click()
     await page.getByRole('button', { name: '确认删除' }).click()
+    const treeBusy = page.locator(
+      '[data-project-tree-confirm-delete]',
+    )
+    await treeBusy.waitFor({ state: 'visible', timeout: 10_000 })
+    await page.waitForFunction(() => {
+      const button = document.querySelector(
+        '[data-project-tree-confirm-delete]',
+      )
+      return Boolean(
+        button &&
+        button.disabled &&
+        button.textContent?.includes('收尾中'),
+      )
+    })
+    const treeBusyGeometry = await treeBusy.evaluate((button) => {
+      const dialog = button.closest('[role="alertdialog"]')
+      const rect = button.getBoundingClientRect()
+      const dialogRect = dialog?.getBoundingClientRect()
+      const style = getComputedStyle(button)
+      return {
+        disabled: button.disabled,
+        text: button.textContent?.trim(),
+        opacity: style.opacity,
+        color: style.color,
+        width: rect.width,
+        height: rect.height,
+        dialogWidth: dialogRect?.width ?? 0,
+        overflow:
+          document.documentElement.scrollWidth >
+          document.documentElement.clientWidth,
+      }
+    })
+    rec(
+      g,
+      '★★ 项目树删除收尾期间确认按钮禁用且文案可见',
+      treeBusyGeometry.disabled &&
+        treeBusyGeometry.text === '收尾中…' &&
+        treeBusyGeometry.opacity === '1' &&
+        treeBusyGeometry.width > 0 &&
+        treeBusyGeometry.dialogWidth > 0 &&
+        !treeBusyGeometry.overflow,
+      JSON.stringify(treeBusyGeometry),
+    )
+    await page.evaluate(() => {
+      if (document.documentElement.dataset.theme !== 'light') {
+        document.querySelector('[data-theme-toggle]')?.click()
+      }
+    })
+    await page.waitForTimeout(250)
+    await page.screenshot({
+      path: `${OUT}/agent-host-865-project-tree-busy-1440-light.png`,
+    })
+    await page.setViewportSize({ width: 1024, height: 700 })
+    await page.evaluate(() => {
+      if (document.documentElement.dataset.theme !== 'dark') {
+        document.querySelector('[data-theme-toggle]')?.click()
+      }
+    })
+    await page.waitForTimeout(350)
+    await page.screenshot({
+      path: `${OUT}/agent-host-865-project-tree-busy-1024-dark.png`,
+    })
+    await page.setViewportSize({ width: 1440, height: 900 })
+    await page.evaluate(() => {
+      if (document.documentElement.dataset.theme !== 'light') {
+        document.querySelector('[data-theme-toggle]')?.click()
+      }
+    })
+    await page.waitForTimeout(350)
+    await page.evaluate(() => {
+      window.__g865ReleaseDeleteFailure?.()
+    })
     await page
       .locator('[role="alert"]')
       .filter({ hasText: 'forced delete failure' })
@@ -43689,6 +43867,9 @@ async function g865(browser) {
         hostExists: Boolean(host),
         hostActive: host?.getAttribute('data-agent-host-active') ?? null,
         orb: Boolean(document.querySelector('[data-agent-orb]')),
+        instanceProbe: Boolean(
+          document.querySelector('[data-instance-probe="g865-c"]'),
+        ),
       }
     }, projectC)
     rec(
@@ -43697,19 +43878,101 @@ async function g865(browser) {
       failedDelete.path === `/canvas/${projectC}` &&
         failedDelete.hostExists &&
         failedDelete.hostActive === 'true' &&
-        failedDelete.orb,
+        failedDelete.orb &&
+        failedDelete.instanceProbe,
       JSON.stringify(failedDelete),
     )
     await page.screenshot({
       path: `${OUT}/agent-host-865-delete-failed.png`,
     })
+    await page
+      .locator('[role="alertdialog"]')
+      .getByRole('button', { name: '取消', exact: true })
+      .click()
 
-    await page.reload({ waitUntil: 'domcontentloaded' })
-    await page.locator('[data-canvas-surface]').waitFor({
-      state: 'visible',
-      timeout: 20_000,
+    /**
+     * 删除失败后**不刷新页面**，在同一 host / 同一 AgentPanel DOM 上再跑一轮：
+     * 建会话 → 模型走到 runNode 确认 → 取消。随后直接重试删除。
+     *
+     * 这条是 #865 的关键证据：路由仍挂着不代表运行态真的恢复；只有同一实例
+     * 仍能启动并收口任务，才证明 rollback 恢复的是可用 host，而不是只留一个壳。
+     */
+    const sameInstancePanel = page.locator(
+      '[data-instance-probe="g865-c"]',
+    )
+    await sameInstancePanel
+      .locator('[data-agent-input]')
+      .fill('帮我建一个提示词到生成的流程')
+    await sameInstancePanel.locator('[data-agent-send]').click()
+    try {
+      await sameInstancePanel
+        .locator('[data-agent-confirm]')
+        .waitFor({ state: 'visible', timeout: 30_000 })
+    } catch (error) {
+      await page.screenshot({
+        path: `${OUT}/agent-host-865-same-instance-timeout.png`,
+      })
+      console.error(
+        '[G865 same-instance debug]',
+        JSON.stringify({
+          text: (await sameInstancePanel.innerText()).slice(0, 1200),
+          sessions: (await sharedRows(page, 'agentSessions'))
+            .filter((row) => row.projectId === projectC),
+          jobs: (await sharedRows(page, 'agentJobs'))
+            .filter((row) => row.projectId === projectC),
+        }),
+      )
+      throw error
+    }
+    await sameInstancePanel.locator('[data-agent-cancel]').click()
+    await sameInstancePanel
+      .locator('[data-agent-confirm]')
+      .waitFor({ state: 'detached', timeout: 20_000 })
+
+    let recoveredTurnId = 'missing-session'
+    for (let i = 0; i < 40; i += 1) {
+      const sessions = await sharedRows(page, 'agentSessions')
+      const projectSessions = sessions.filter(
+        (row) => row.projectId === projectC,
+      )
+      if (projectSessions.length > 0) {
+        recoveredTurnId = String(projectSessions[0].activeTurnId ?? '')
+        if (!recoveredTurnId) break
+      }
+      await sleep(250)
+    }
+    const sameInstance = await page.evaluate((id) => {
+      const probe = document.querySelector(
+        '[data-instance-probe="g865-c"]',
+      )
+      const host = document.querySelector(
+        `[data-agent-host-record="canvas-agent:${id}"]`,
+      )
+      return {
+        path: window.location.pathname,
+        probeExists: Boolean(probe),
+        hostActive: host?.getAttribute('data-agent-host-active') ?? null,
+        sessionCount: probe
+          ?.querySelector('[data-agent-session-count]')
+          ?.getAttribute('data-agent-session-count'),
+        confirm: Boolean(probe?.querySelector('[data-agent-confirm]')),
+      }
+    }, projectC)
+    rec(
+      g,
+      '★★ 删除失败后不刷新，同一 AgentPanel DOM 仍能启动并取消一轮 Agent 任务',
+      sameInstance.path === `/canvas/${projectC}` &&
+        sameInstance.probeExists &&
+        sameInstance.hostActive === 'true' &&
+        sameInstance.sessionCount === '1' &&
+        !sameInstance.confirm &&
+        recoveredTurnId === '',
+      JSON.stringify({ ...sameInstance, recoveredTurnId }),
+    )
+    await page.screenshot({
+      path: `${OUT}/agent-host-865-same-instance-recovered.png`,
     })
-    await page.locator('[data-agent-orb]').click()
+
     await ensureSidebarOpen(page)
     await page
       .locator(`[data-project-tree-item="${projectC}"]`)
@@ -43753,6 +44016,128 @@ async function g865(browser) {
     await page.screenshot({
       path: `${OUT}/agent-host-865-returned.png`,
     })
+
+    projectD = await page.evaluate(async () => {
+      const { createWebPlatform } =
+        await import('/src/platform/web/index.ts')
+      const { createProjectRepository } =
+        await import('/src/state/project/repository.ts')
+      const repo = createProjectRepository(createWebPlatform().storage)
+      const created = await repo.create({ name: 'G865 项目卡片收尾态' })
+      return created.id
+    })
+    await page.reload({ waitUntil: 'domcontentloaded' })
+    const projectDCard = page.locator(
+      `[data-project-card="${projectD}"]`,
+    )
+    await projectDCard.waitFor({ state: 'visible', timeout: 20_000 })
+    await page.evaluate(async ({ id, url }) => {
+      const { registerProjectRuntime } = await import(url)
+      let release
+      let idle = false
+      const gate = new Promise((resolve) => {
+        release = () => {
+          idle = true
+          resolve()
+        }
+      })
+      window.__g865ReleaseProjectCardBusy = () => release?.()
+      registerProjectRuntime({
+        projectId: id,
+        key: 'forced-project-card-busy',
+        beginDispose: () => ({
+          waitForIdle: () => gate,
+          whenIdle: () => gate,
+          canReopen: () => idle,
+          reopenIfIdle: () => idle,
+          canFinalize: () => idle,
+          finalize: () => idle,
+        }),
+      })
+    }, { id: projectD, url: registryUrl })
+    await projectDCard
+      .locator('button[aria-label="项目菜单"]')
+      .click()
+    await projectDCard
+      .locator('[role="menuitem"]')
+      .filter({ hasText: '删除' })
+      .click()
+    await page
+      .locator('[data-project-card-confirm-delete]')
+      .click()
+    const cardBusy = page.locator(
+      '[data-project-card-confirm-delete]',
+    )
+    await page.waitForFunction(() => {
+      const button = document.querySelector(
+        '[data-project-card-confirm-delete]',
+      )
+      return Boolean(
+        button &&
+        button.disabled &&
+        button.textContent?.includes('收尾中'),
+      )
+    })
+    const cardBusyGeometry = await cardBusy.evaluate((button) => {
+      const card = button.closest('[data-project-card]')
+      const rect = button.getBoundingClientRect()
+      const cardRect = card?.getBoundingClientRect()
+      const style = getComputedStyle(button)
+      return {
+        disabled: button.disabled,
+        text: button.textContent?.trim(),
+        opacity: style.opacity,
+        color: style.color,
+        width: rect.width,
+        height: rect.height,
+        cardWidth: cardRect?.width ?? 0,
+        overflow:
+          document.documentElement.scrollWidth >
+          document.documentElement.clientWidth,
+      }
+    })
+    rec(
+      g,
+      '★★ 项目页删除收尾期间确认按钮禁用且卡片不横向溢出',
+      cardBusyGeometry.disabled &&
+        cardBusyGeometry.text === '收尾中…' &&
+        cardBusyGeometry.opacity === '1' &&
+        cardBusyGeometry.width > 0 &&
+        cardBusyGeometry.cardWidth > 0 &&
+        !cardBusyGeometry.overflow,
+      JSON.stringify(cardBusyGeometry),
+    )
+    await page.evaluate(() => {
+      if (document.documentElement.dataset.theme !== 'light') {
+        document.querySelector('[data-theme-toggle]')?.click()
+      }
+    })
+    await page.waitForTimeout(250)
+    await page.screenshot({
+      path: `${OUT}/agent-host-865-project-card-busy-1440-light.png`,
+    })
+    await page.setViewportSize({ width: 1024, height: 700 })
+    await page.evaluate(() => {
+      if (document.documentElement.dataset.theme !== 'dark') {
+        document.querySelector('[data-theme-toggle]')?.click()
+      }
+    })
+    await page.waitForTimeout(350)
+    await page.screenshot({
+      path: `${OUT}/agent-host-865-project-card-busy-1024-dark.png`,
+    })
+    await page.setViewportSize({ width: 1440, height: 900 })
+    await page.evaluate(() => {
+      if (document.documentElement.dataset.theme !== 'light') {
+        document.querySelector('[data-theme-toggle]')?.click()
+      }
+    })
+    await page.waitForTimeout(350)
+    await page.evaluate(() => {
+      window.__g865ReleaseProjectCardBusy?.()
+    })
+    await projectDCard.waitFor({ state: 'detached', timeout: 20_000 })
+
     rec(
       g,
       '无未捕获异常',
@@ -43760,7 +44145,7 @@ async function g865(browser) {
       pageErrors.join(' | '),
     )
   } finally {
-    await page.evaluate(async ({ projectA, projectB, projectC }) => {
+    await page.evaluate(async ({ projectA, projectB, projectC, projectD }) => {
       const { createWebPlatform } =
         await import('/src/platform/web/index.ts')
       const { createProjectRepository } =
@@ -43769,7 +44154,8 @@ async function g865(browser) {
       await repo.purge(projectA)
       await repo.purge(projectB)
       if (projectC) await repo.purge(projectC)
-    }, { projectA, projectB, projectC }).catch(() => {})
+      if (projectD) await repo.purge(projectD)
+    }, { projectA, projectB, projectC, projectD }).catch(() => {})
     for (const row of channelSnapshot) {
       const current = await sharedRow(page, 'channels', row.id)
       if (!current || current.enabled === row.enabled) continue

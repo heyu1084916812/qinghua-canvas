@@ -23,13 +23,26 @@
   finalize / purge。失败 rollback；有在途时不能假开，idle 后 flush / 仓储失败恢复同一 host，超时则真实
   idle 后自动恢复。成功后清 activeCanvas / 两类 handoff / store 并 replace `/projects`；失败保留原路由。
   runtime tombstone 禁止旧 runNode / 生成入口复活；只有合法 CanvasPage 激活能建新代际。
+- **项目锁必须一次 claim 全部 ID**：`ProjectRuntimeRegistry` 先检查所有 projectId，任一已持锁就整体抛
+  `ProjectRuntimeBusyError`，不能先关 p1 再发现 p2 Busy。锁保留到 commit，或 rollback 后所有 participant
+  真正 idle 并重开；超时只失败本次 prepare，不能覆盖旧 attempt。
+- **shutdown 中的注册只能复用或加入**：同 project/key 返回旧 generation，绝不覆盖 map；新 key 立即
+  beginDispose 并加入同一操作。commit 要循环吸收 prepare / work 期间出现的迟到 generation，等待其 idle
+  后一起 finalize；work 已成功时清理提交异常只能报告清理失败，不能反向把数据库删除说成失败。
+- **flush 属于关闭屏障，不是超时后的尾活**：AgentPanel 用 `agentPanelShutdown` 把 lifecycle idle 与
+  `store.flush()` 合成一个 Promise、一个 timeout。flush pending 时 `canReopen / canFinalize` 必须为 false；
+  timeout 不取消 flush，resolve / reject 后才允许重开、删除或重试。
 - **注册表按代际条件删除**：AgentHostRegistry 与 ProjectRuntimeRegistry 都带 generation。HMR 先同步失效
   旧代际，旧 disposer 晚到不得删除新记录。StrictMode cleanup 只 deactivate；host 初始化/重新激活要按
   当前可见 surface clamp，但普通面板开合不能推动已有浮球。
-- **证据**：全量 `npm test` **3975 passed / 1 skipped**；tsc/check/build/diff-check 通过。G865 **10/10**
-  （含 1024 返回 clamp、当前画布删除失败仍 active、重试成功与最终离场）、G735 **35/35**、G769 **39/39**。
-  真实 `AgentSessionStore` 延迟写 / flush 失败测试证明未 idle 不 purge、恢复后同 lifecycle 继续写。
-  1440×900 / 1024×700、明暗四组截图几何与改动前一致；删除失败截图确认错误可见且无横向溢出。
+- **固定 ID 的冒烟夹具必须先按 projectId 清理**：共享库累计超过一页后，`/rows` 首页扫描会漏掉旧
+  `agentSessions / agentJobs / agentEvents`，再写固定 session 会让面板恢复旧会话而看不到新队列。
+  G769 用 `/query` 按 `projectId` 过滤清理，并在打开面板后显式选中种子会话；不能依赖记录总数只有几条。
+- **证据**：全量 `npm test` **3985 passed / 1 skipped**；tsc/check/build/diff-check 通过。G865 **13/13**
+  （含 1024 返回 clamp、删除失败不刷新后同实例启动 / 取消 Agent 回合并直接重试成功、Busy 按钮禁用）、
+  G735 **35/35**、G769 **39/39**。真实 `AgentSessionStore` 延迟写、延迟 flush / flush 失败测试证明未
+  idle 不 purge、flush pending 不 reopen、恢复后同 lifecycle 继续写。1440×900 / 1024×700、明暗忙碌态
+  截图确认文字可读且无横向溢出。
   **未跑真实 Tauri 跨路由任务，待质量线独立验收。**
 
 ### Agent 确认执行与检查点继续拆分（2026-11-03，对账 #864）

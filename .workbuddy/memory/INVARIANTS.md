@@ -100,8 +100,9 @@
 - **关闭先拒新工作，再 abort，再等完整 Promise**：共享 `taskLifecycle` 标记 closing 必须先于 abort。
   ExecutionRuntime 同时等待 engine 与画布 operations；AgentPanel 还等待 queue enqueue/remove/edit/claim/
   finish/pump、Session create/rename/delete/patch、任务计划、引导、附件、技能、收藏与 sticky 模型写。
-  draft / composer 同步写走 `runSync`；fire-and-forget 必须注册并 catch。超时保留注册并让删除失败，
-  不能继续 flush 清理或 purge。
+  draft / composer 同步写走 `runSync`；fire-and-forget 必须注册并 catch。lifecycle idle 与最终 flush
+  必须合成同一个关闭屏障和同一个 timeout：flush pending 时不能 reopen / finalize，超时也不取消 flush。
+  AgentPanel 使用 `agentPanelShutdown`，不得再写成“先 lifecycle 超时、后屏障外 flush”。
 - **slot 只能有一个 owner**：只有 active host 能写 `data-agent-shell-active`、宽度和 resize 属性；
   inactive host / 旧 cleanup 不得删除或覆盖新 owner。离开画布后 slot 宽必须回到 0；A/B 项目并存时
   未打开 Agent 的 active host 也让 slot 保持 0。
@@ -113,8 +114,12 @@
 - **handoff 与 panel id 按项目隔离**：`agentHandoff` / `agentSkillHandoff` 必须带 projectId 分桶，
   panel id 必须 project-scoped。多 host 并存时，后台 Agent 不能消费当前项目的节点引用或技能交接。
 - **项目删除必须 prepare → 仓储 → commit**：prepare 先同步阻断并等待 idle；只有仓储成功才 finalize /
-  purge。失败 rollback；有在途 Promise 时不能假装重开，idle 后 flush / 仓储失败恢复同一 host，超时则在
-  真正 idle 后自动恢复。成功后清 activeCanvas / handoff / store；当前画布 replace `/projects`，失败保留原路由。
+  purge。调用前必须一次性 claim 全部 projectId；任一已持锁时整体抛 `ProjectRuntimeBusyError`，不允许
+  部分项目进入 draining。失败 rollback；有在途 Promise / flush 时不能假装重开，真正 idle 并恢复后才释放
+  项目锁。成功后清 activeCanvas / handoff / store；当前画布 replace `/projects`，失败保留原路由。
+- **shutdown 中的注册只能复用或加入**：同 project/key 的 `registerProjectRuntime` 必须返回现有旧 generation，
+  绝不能覆盖 map；不同 key 注册也必须立即加入同一 shutdown 并被 commit 扫描。commit 要循环吸收迟到
+  generation、等待 idle 后一起 finalize。work 成功后清理异常不得让 UI 反向误报仓储删除失败。
 - **注册表按代际条件删除**：AgentHostRegistry 与 ProjectRuntimeRegistry 都带 generation。HMR 先同步失效
   旧代际，再异步等待；旧 cleanup 只能在 capture token 仍匹配时删除。新代际不能被迟到 dispose 抹掉。
 - **激活重 clamp，面板开合不推球**：`active false -> true`、当前可见 surface 挂载与视口变化时按真实
