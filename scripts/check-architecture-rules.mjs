@@ -32,6 +32,10 @@ try {
     'src/features/shared/probe.ts',
     "import '../../workbenches/canvas/probe'\n",
   )
+  write(
+    'src/app/AppShell.tsx',
+    "import '../workbenches/canvas/probe'\n",
+  )
   write('src/domain/canvas/probe.ts', 'export const canvasProbe = true\n')
   write('src/workbenches/canvas/probe.ts', 'export const canvasProbe = true\n')
   write(
@@ -70,6 +74,7 @@ try {
   )
   const output = `${run.stdout}\n${run.stderr}`
   const expectedRules = [
+    'app-shell-no-workbench',
     'storyboard-no-canvas-runtime',
     'storyboard-no-app-host',
     'ecommerce-no-canvas-runtime',

@@ -23,6 +23,14 @@ module.exports = {
       to: { path: '^src/(workbenches|pages|features)' },
     },
     {
+      name: 'app-shell-no-workbench',
+      severity: 'error',
+      comment:
+        'AppShell 只能挂通用 AgentHostOutlet；工作台 renderer 由工作台模块注册，不能反向 import workbenches',
+      from: { path: '^src/app/AppShell\\.tsx$' },
+      to: { path: '^src/workbenches/' },
+    },
+    {
       // 口径：只约束「节点实现目录 → 另一个节点实现目录的模块代码」。
       // 排除：① nodes/index.ts（唯一聚合入口）② nodes/registry.ts ③ 同目录内的 css / 资源。
       // 已知限制：同目录内拆多个 .ts 文件仍会告警，届时应把共享部分上浮到 registry 或 ui。
