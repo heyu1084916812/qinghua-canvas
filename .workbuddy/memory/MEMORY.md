@@ -29,20 +29,33 @@
 - **shutdown 中的注册只能复用或加入**：同 project/key 返回旧 generation，绝不覆盖 map；新 key 立即
   beginDispose 并加入同一操作。commit 要循环吸收 prepare / work 期间出现的迟到 generation，等待其 idle
   后一起 finalize；work 已成功时清理提交异常只能报告清理失败，不能反向把数据库删除说成失败。
+- **cleanup 是第二份独立结果**：`commit()` 必须返回 `cleanup_complete / cleanup_failed`，不能用 boolean
+  把仓储 work 与 runtime cleanup 混成一个事实。cleanup 失败时保留 registration、项目锁、未完成 finalize
+  状态；`ProjectRuntimeCleanupError` 标明 work 已提交且可重试。同一 projectId 集合再次操作只重试 cleanup，
+  并返回第一次 work 的结果，绝不能重跑仓储删除。项目页/侧栏必须显示真实状态和“重试清理”，不能报成
+  仓储删除失败。
+- **late control 的真实状态必须保留**：每个 prepared control 记录 `idle / finalized / lastError`；
+  prepare、recovery、commit 的等待都受统一 shutdown timeout 约束。late runtime resolve 后才能 finalize；
+  reject 或永久 pending/timeout 都进入 cleanup_failed，不 finalize、不删注册、不释放锁，之后仍可重试。
 - **flush 属于关闭屏障，不是超时后的尾活**：AgentPanel 用 `agentPanelShutdown` 把 lifecycle idle 与
   `store.flush()` 合成一个 Promise、一个 timeout。flush pending 时 `canReopen / canFinalize` 必须为 false；
   timeout 不取消 flush，resolve / reject 后才允许重开、删除或重试。
 - **注册表按代际条件删除**：AgentHostRegistry 与 ProjectRuntimeRegistry 都带 generation。HMR 先同步失效
   旧代际，旧 disposer 晚到不得删除新记录。StrictMode cleanup 只 deactivate；host 初始化/重新激活要按
   当前可见 surface clamp，但普通面板开合不能推动已有浮球。
+- **shutdown 中冻结 host generation**：项目操作一开始就 freeze 当前 host token；HMR / bridge 重挂载只能
+  更新 payload，不能换 generation。若部分 finalize 成功、另一 runtime 失败，冻结保持到整个操作结束；
+  此时 upsert 返回不落表的冻结句柄，不能重新长出 host。整体 commit 成功后才 `releaseFinalized()`；
+  rollback 正常重开时也释放冻结。StrictMode 仍只 deactivate，不进入冻结。
 - **固定 ID 的冒烟夹具必须先按 projectId 清理**：共享库累计超过一页后，`/rows` 首页扫描会漏掉旧
   `agentSessions / agentJobs / agentEvents`，再写固定 session 会让面板恢复旧会话而看不到新队列。
   G769 用 `/query` 按 `projectId` 过滤清理，并在打开面板后显式选中种子会话；不能依赖记录总数只有几条。
-- **证据**：全量 `npm test` **3985 passed / 1 skipped**；tsc/check/build/diff-check 通过。G865 **13/13**
+- **证据**：全量 `npm test` **3997 passed / 1 skipped**；tsc/check/build/diff-check 通过。G865 **17/17**
   （含 1024 返回 clamp、删除失败不刷新后同实例启动 / 取消 Agent 回合并直接重试成功、Busy 按钮禁用）、
   G735 **35/35**、G769 **39/39**。真实 `AgentSessionStore` 延迟写、延迟 flush / flush 失败测试证明未
-  idle 不 purge、flush pending 不 reopen、恢复后同 lifecycle 继续写。1440×900 / 1024×700、明暗忙碌态
-  截图确认文字可读且无横向溢出。
+  idle 不 purge、flush pending 不 reopen、恢复后同 lifecycle 继续写。新增 cleanup 失败后的真实状态与
+  “重试清理”只重试 cleanup；1440×900 / 1024×700、明暗忙碌态与 cleanup 状态截图确认文字可读、按钮可见、
+  无横向溢出。侧栏状态必须放在项目树滚动区外，否则长列表下错误虽然存在但用户看不到。
   **未跑真实 Tauri 跨路由任务，待质量线独立验收。**
 
 ### Agent 确认执行与检查点继续拆分（2026-11-03，对账 #864）

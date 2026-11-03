@@ -116,12 +116,21 @@
 - **项目删除必须 prepare → 仓储 → commit**：prepare 先同步阻断并等待 idle；只有仓储成功才 finalize /
   purge。调用前必须一次性 claim 全部 projectId；任一已持锁时整体抛 `ProjectRuntimeBusyError`，不允许
   部分项目进入 draining。失败 rollback；有在途 Promise / flush 时不能假装重开，真正 idle 并恢复后才释放
-  项目锁。成功后清 activeCanvas / handoff / store；当前画布 replace `/projects`，失败保留原路由。
+  项目锁。`commit()` 必须返回 `cleanup_complete / cleanup_failed` 结构化结果；仓储 work 成功而 cleanup
+  失败时保留 registration、项目锁与未完成 finalize，抛 `ProjectRuntimeCleanupError`，禁止当普通成功，
+  也禁止说成仓储删除失败。同一 projectId 集合再次操作只重试 cleanup，返回先前 work 结果，不重复删除。
+  成功后清 activeCanvas / handoff / store；当前画布 replace `/projects`，失败保留原路由。
 - **shutdown 中的注册只能复用或加入**：同 project/key 的 `registerProjectRuntime` 必须返回现有旧 generation，
   绝不能覆盖 map；不同 key 注册也必须立即加入同一 shutdown 并被 commit 扫描。commit 要循环吸收迟到
   generation、等待 idle 后一起 finalize。work 成功后清理异常不得让 UI 反向误报仓储删除失败。
+- **late control 要有真实状态与边界**：每个 prepared control 记录 idle / finalized / error；
+  prepare、recovery、commit 的等待全部经过统一 shutdown timeout。resolve 后才允许 finalize；reject 或
+  pending/timeout 一律 cleanup_failed，不得 finalize、删注册或释放锁，之后仍可用同一 disposal 重试。
 - **注册表按代际条件删除**：AgentHostRegistry 与 ProjectRuntimeRegistry 都带 generation。HMR 先同步失效
   旧代际，再异步等待；旧 cleanup 只能在 capture token 仍匹配时删除。新代际不能被迟到 dispose 抹掉。
+- **shutdown 期间冻结 host generation**：项目操作开始即 freeze 当前 token；HMR 和 bridge 重挂载只能更新
+  payload，不能换 generation。部分 finalize 成功但整体 cleanup 失败时，upsert 必须返回不落表的冻结句柄，
+  不得重新长出 host；整体 commit 成功后才释放冻结，rollback 重开时也释放。StrictMode 只 deactivate。
 - **激活重 clamp，面板开合不推球**：`active false -> true`、当前可见 surface 挂载与视口变化时按真实
   surface 重新 clamp；普通面板打开/收起只扩缩 shell，不能推动已有浮球坐标。
 - **关闭 Agent 面板不能卸载运行宿主**：收起只给 `AgentDock` 的宿主加 `hidden`；状态、AbortController、
