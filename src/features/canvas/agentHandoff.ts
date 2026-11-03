@@ -11,14 +11,23 @@
  * - `AgentPanel`：把 ids 收进当前会话的 `pendingAssetIds` 并补成正文 chip。
  */
 
-let pending: string[] = []
-const listeners = new Set<(ids: readonly string[]) => void>()
+const pendingByProject = new Map<string, string[]>()
+const listenersByProject = new Map<
+  string,
+  Set<(ids: readonly string[]) => void>
+>()
 
 /** 画布侧调用：把选中的节点交给 agent（多次调用会累积） */
-export function sendSelectionToAgent(ids: readonly string[]): void {
-  if (ids.length === 0) return
-  pending = [...new Set([...pending, ...ids])]
-  for (const fn of listeners) fn(pending)
+export function sendSelectionToAgent(
+  projectId: string,
+  ids: readonly string[],
+): void {
+  if (!projectId || ids.length === 0) return
+  const pending = [
+    ...new Set([...pendingByProject.get(projectId) ?? [], ...ids]),
+  ]
+  pendingByProject.set(projectId, pending)
+  for (const fn of listenersByProject.get(projectId) ?? []) fn(pending)
 }
 
 /**
@@ -27,15 +36,24 @@ export function sendSelectionToAgent(ids: readonly string[]): void {
  * 必须取走而不是读：否则每次切会话 / 重渲染都会再收一遍同一批节点，
  * 正文里就会冒出重复的 chip。
  */
-export function takeAgentHandoff(): string[] {
-  const out = pending
-  pending = []
+export function takeAgentHandoff(projectId: string): string[] {
+  const out = pendingByProject.get(projectId) ?? []
+  pendingByProject.delete(projectId)
   return out
 }
 
-export function subscribeAgentHandoff(fn: (ids: readonly string[]) => void): () => void {
+export function subscribeAgentHandoff(
+  projectId: string,
+  fn: (ids: readonly string[]) => void,
+): () => void {
+  let listeners = listenersByProject.get(projectId)
+  if (!listeners) {
+    listeners = new Set()
+    listenersByProject.set(projectId, listeners)
+  }
   listeners.add(fn)
   return () => {
     listeners.delete(fn)
+    if (listeners.size === 0) listenersByProject.delete(projectId)
   }
 }

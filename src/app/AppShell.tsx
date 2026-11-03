@@ -17,6 +17,7 @@ import styles from './AppShell.module.css'
 import { usePlatform } from './providers/PlatformProvider'
 import { useAutoSnapshot } from '../state/project/useAutoSnapshot'
 import { startUiHeartbeat } from './uiHeartbeat'
+import { AgentHostOutlet } from './AgentHostOutlet'
 
 /**
  * 应用壳（产品文档 §2.1 / §2.2；架构文档 §5.10）。
@@ -92,6 +93,8 @@ export function AppShell({ children }: { children: ReactNode }) {
         */}
         <div className={styles.railSlot} data-rail-slot aria-hidden="true" />
         <AppSidebar />
+        {/* 工作台自行注册 renderer；AppShell 只按不透明 host record 渲染。 */}
+        <AgentHostOutlet />
         {/*
           工作区。`min-width: 0` 是关键 —— flex 子项的默认 `min-width: auto`
           会让内容把这一块顶宽，于是侧栏展开时右侧不是变窄，
@@ -101,7 +104,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           {children}
         </main>
         {/*
-          Agent 壳层插槽：画布页通过 portal 把自己的 AgentPanel 放到这里。
+          Agent 壳层插槽：常驻 renderer 把 AgentPanel portal 到这里。
           AppShell 只提供一个稳定目标，不 import 画布工作台；插槽是工作区右侧的
           flex 兄弟，打开时挤压工作区，关闭时让出空间。
         */}

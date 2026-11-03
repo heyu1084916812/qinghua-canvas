@@ -491,7 +491,11 @@ function NodeActions({
         action="agent"
         icon={<IconMention />}
         label="添加到 agent"
-        onClick={() => sendSelectionToAgent([node.id])}
+        onClick={() =>
+          sendSelectionToAgent(
+            store.getSnapshot().projectId,
+            [node.id],
+          )}
       />
       {!assetMode && (
         <FollowButton

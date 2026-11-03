@@ -11,7 +11,7 @@ import { FlowSurface } from '../../workbenches/canvas/flow/FlowSurface'
 import { fitCanvasView, focusCanvasNode } from '../../workbenches/canvas/surface/fitView'
 import { CanvasExecutionProvider } from '../../workbenches/canvas/execution/CanvasExecutionProvider'
 import { LogPanel } from '../../workbenches/canvas/panels/LogPanel'
-import { AgentDock } from '../../workbenches/canvas/panels/AgentPanel/AgentDock'
+import { CanvasAgentHostBridge } from '../../workbenches/canvas/panels/AgentPanel/CanvasAgentHost'
 import { CanvasGatewayBridge } from '../../workbenches/canvas/agent/CanvasGatewayBridge'
 import { CanvasToolbar } from '../../workbenches/canvas/toolbar/CanvasToolbar'
 import { LightboxLayer } from '../../workbenches/canvas/lightbox/LightboxLayer'
@@ -24,7 +24,6 @@ import { useChannels } from '../../app/providers/ChannelStoreProvider'
 import { useCanvasStyle } from '../../app/providers/CanvasStyleProvider'
 import { nodeDensityFactor } from '../../domain/project/canvasStyle'
 import { createAssetNode, importAssetFile, isImportableMedia } from '../../features/canvas/importAsset'
-import { subscribeAgentHandoff } from '../../features/canvas/agentHandoff'
 import { seedTemplate, type TemplateId } from '../../state/project/templates'
 import type { NodeSnapshot, NodeType } from '../../domain/canvas/model/node'
 import type { Edge } from '../../domain/canvas/model/edge'
@@ -106,7 +105,6 @@ function CanvasProject({ projectId }: { projectId: string }) {
   const seededRef = useRef(false)
   const [externalEdit, setExternalEdit] = useState(false)
   const [logOpen, setLogOpen] = useState(false)
-  const [agentOpen, setAgentOpen] = useState(false)
   /**
    * 水合完成的计数（只用来**触发重跑**，值本身没意义）。
    *
@@ -154,14 +152,6 @@ function CanvasProject({ projectId }: { projectId: string }) {
   useEffect(() => {
     store.setNodeScale(nodeDensityFactor(canvasStyle.density))
   }, [store, canvasStyle.density])
-
-  /**
-   * 「画布多选 → 添加到 agent 作为素材」（用户 2026-10-05 第 11 条第六个动作）。
-   *
-   * 这一层只负责**把对话窗打开**；ids 由对话窗自己取走（见 `agentHandoff` 的说明）——
-   * 两件事分开，用户点按钮时面板一定会弹出来，而收素材那一步不会因为面板没挂载而丢。
-   */
-  useEffect(() => subscribeAgentHandoff(() => setAgentOpen(true)), [])
 
   // 从 IndexedDB 读回图数据（demo 不需要）；读回后若是模板新建的项目，套用模板预置节点
   useEffect(() => {
@@ -405,6 +395,7 @@ function CanvasProject({ projectId }: { projectId: string }) {
       {/* 执行宿主上提一层包住整页：顶栏的「仅刷新陈旧 / 全图重跑」需要与画布共用同一份
           执行状态（原先只包住 Surface，顶栏拿不到 useCanvasExecution）。 */}
       <CanvasExecutionProvider>
+        <CanvasAgentHostBridge projectId={projectId} />
         {/*
           水合完成标记（冒烟 / 探针用）。
 
@@ -479,7 +470,6 @@ function CanvasProject({ projectId }: { projectId: string }) {
             onImportAsset={() => void importAssetAtCenter()}
           />
           {logOpen && <LogPanel onClose={() => setLogOpen(false)} />}
-          <AgentDock projectId={projectId} open={agentOpen} onOpenChange={setAgentOpen} />
           {/* 素材灯箱（§6.17）挂在页面级：它的触发方有画布表面与日志面板两处，
               挂在任一子树里另一处都够不着；状态在 store，故放哪都能读 */}
           <LightboxLayer />

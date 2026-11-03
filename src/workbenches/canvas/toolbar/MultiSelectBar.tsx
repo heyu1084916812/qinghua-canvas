@@ -254,7 +254,11 @@ export function MultiSelectBar({
           action="agent"
           label="添加到 agent"
           icon={<IconMention size={16} />}
-          onClick={() => sendSelectionToAgent(nodes.map((n) => n.id))}
+          onClick={() =>
+            sendSelectionToAgent(
+              store.getSnapshot().projectId,
+              nodes.map((n) => n.id),
+            )}
         />
         {menuOpen && (
           <div className={styles.arrangeMenu} data-multi-arrange-menu>

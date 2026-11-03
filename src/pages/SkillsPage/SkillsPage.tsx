@@ -15,6 +15,7 @@ import {
 import { noticeA11y } from '../../domain/ui/notice'
 import { createPresetStore } from '../../state/project/presetStore'
 import { loadLibtvSkillFiles } from '../../state/project/libtvSkillCatalog'
+import { activeCanvasId } from '../../state/project/activeCanvas'
 import { PresetTextSection } from './PresetTextSection'
 import { SkillDetailDialog, type SkillDetailSource } from './SkillDetailDialog'
 import { SkillEditor } from './SkillEditor'
@@ -128,7 +129,15 @@ export function SkillsPage() {
           agentSkillId = created.id
         }
       }
-      sendSkillToAgent(agentSkillId)
+      const projectId = activeCanvasId()
+      if (!projectId) {
+        setNotice({
+          kind: 'error',
+          text: '还没有可接收技能的画布，请先打开一个画布项目。',
+        })
+        return
+      }
+      sendSkillToAgent(projectId, agentSkillId)
       setNotice({
         kind: 'ok',
         text: `已将「${pick.skill.name}」交给 Agent，打开画布对话后会作为技能 chip 加入。`,

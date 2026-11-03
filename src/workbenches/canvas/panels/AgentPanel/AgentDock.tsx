@@ -51,7 +51,9 @@ function measureCanvasWorkArea(): AgentWorkArea {
   const surface = document.querySelector<HTMLElement>('[data-canvas-surface]')
   const rect = surface?.getBoundingClientRect()
   if (rect && rect.width > 0 && rect.height > 0) {
-    const panel = document.querySelector<HTMLElement>('[data-agent-shell-panel]')
+    const panel = document.querySelector<HTMLElement>(
+      '[data-agent-shell-panel][data-agent-host-active="true"]',
+    )
     const panelRect = panel?.getBoundingClientRect()
     const right =
       panelRect && panelRect.width > 0 ? Math.max(rect.right, panelRect.right) : rect.right
@@ -92,13 +94,21 @@ function storeShellState(state: AgentShellState): void {
  * 开关面板、拖宽面板都不会回写球位，也不会改变画布尺寸。
  */
 export function AgentDock({
+  hostId,
   projectId,
+  active,
   open,
   onOpenChange,
+  onDisposeReady,
 }: {
+  hostId: string
   projectId: string
+  active: boolean
   open: boolean
   onOpenChange: (open: boolean) => void
+  onDisposeReady?: (
+    dispose: () => Promise<void>,
+  ) => (() => void) | void
 }) {
   const [mounted, setMounted] = useState(open)
   const [panelHidden, setPanelHidden] = useState(!open)
@@ -116,17 +126,20 @@ export function AgentDock({
   }, [])
 
   useLayoutEffect(() => {
+    if (!active) return
     const area = measureCanvasWorkArea()
     const availableWidth = measureAgentAvailableWidth()
-    const stored = readStoredShellState()
-    applyShell(
-      stored
-        ? clampAgentShellState(stored, area, availableWidth)
-        : {
-            ...defaultAgentShellState(area),
-            width: agentShellWidth(AGENT_SHELL_WIDTH_DEFAULT, availableWidth),
-          },
-    )
+    if (!shellRef.current) {
+      const stored = readStoredShellState()
+      applyShell(
+        stored
+          ? clampAgentShellState(stored, area, availableWidth)
+          : {
+              ...defaultAgentShellState(area),
+              width: agentShellWidth(AGENT_SHELL_WIDTH_DEFAULT, availableWidth),
+            },
+      )
+    }
 
     const onAreaChange = () => {
       const nextArea = measureCanvasWorkArea()
@@ -152,7 +165,7 @@ export function AgentDock({
       observer?.disconnect()
       window.removeEventListener('resize', onAreaChange)
     }
-  }, [applyShell])
+  }, [active, applyShell])
 
   useLayoutEffect(() => {
     const target = document.querySelector<HTMLElement>('[data-agent-shell-slot]')
@@ -160,33 +173,76 @@ export function AgentDock({
   }, [])
 
   useLayoutEffect(() => {
-    if (!portalTarget) return
+    if (!portalTarget || !active) return
+    portalTarget.setAttribute('data-agent-shell-owner', hostId)
+    return () => {
+      if (portalTarget.getAttribute('data-agent-shell-owner') === hostId) {
+        portalTarget.removeAttribute('data-agent-shell-owner')
+        portalTarget.removeAttribute('data-agent-shell-active')
+        portalTarget.removeAttribute('data-agent-shell-resizing')
+        portalTarget.style.removeProperty('--agent-shell-width')
+      }
+    }
+  }, [active, hostId, portalTarget])
+
+  useLayoutEffect(() => {
+    if (
+      !portalTarget ||
+      !active ||
+      portalTarget.getAttribute('data-agent-shell-owner') !== hostId
+    ) {
+      return
+    }
     if (shellAnimatedOpen) portalTarget.setAttribute('data-agent-shell-active', 'true')
     else portalTarget.removeAttribute('data-agent-shell-active')
     return () => {
-      portalTarget.removeAttribute('data-agent-shell-active')
+      if (portalTarget.getAttribute('data-agent-shell-owner') === hostId) {
+        portalTarget.removeAttribute('data-agent-shell-active')
+      }
     }
-  }, [portalTarget, shellAnimatedOpen])
+  }, [active, hostId, portalTarget, shellAnimatedOpen])
 
   useLayoutEffect(() => {
-    if (!portalTarget || !shell) return
+    if (
+      !portalTarget ||
+      !active ||
+      !shell ||
+      portalTarget.getAttribute('data-agent-shell-owner') !== hostId
+    ) {
+      return
+    }
     portalTarget.style.setProperty('--agent-shell-width', `${shell.width}px`)
-  }, [portalTarget, shell])
+    return () => {
+      if (portalTarget.getAttribute('data-agent-shell-owner') !== hostId) return
+      portalTarget.style.removeProperty('--agent-shell-width')
+    }
+  }, [active, hostId, portalTarget, shell])
 
   useLayoutEffect(() => {
-    if (!portalTarget) return
+    if (
+      !portalTarget ||
+      !active ||
+      portalTarget.getAttribute('data-agent-shell-owner') !== hostId
+    ) {
+      return
+    }
     if (dragging === 'resize') {
       portalTarget.setAttribute('data-agent-shell-resizing', 'true')
     } else {
       portalTarget.removeAttribute('data-agent-shell-resizing')
     }
     return () => {
-      portalTarget.removeAttribute('data-agent-shell-resizing')
+      if (portalTarget.getAttribute('data-agent-shell-owner') === hostId) {
+        portalTarget.removeAttribute('data-agent-shell-resizing')
+      }
     }
-  }, [dragging, portalTarget])
+  }, [active, dragging, hostId, portalTarget])
 
   useLayoutEffect(() => {
-    if (!open) return
+    if (!active || !open) {
+      setShellAnimatedOpen(false)
+      return
+    }
     setMounted(true)
     setPanelHidden(false)
     let secondFrame = 0
@@ -206,7 +262,7 @@ export function AgentDock({
       window.cancelAnimationFrame(secondFrame)
       window.cancelAnimationFrame(thirdFrame)
     }
-  }, [open])
+  }, [active, open])
 
   useLayoutEffect(() => {
     if (open) return
@@ -353,26 +409,36 @@ export function AgentDock({
     }
   }
 
+  const panelId =
+    `canvas-agent-panel-${projectId.replace(/[^a-zA-Z0-9_-]/g, '-')}`
   const panel =
     mounted && portalTarget && shell
       ? createPortal(
           <div
-            id="canvas-agent-panel"
+            id={panelId}
             className={styles.panelFrame}
-            data-agent-floating-panel
-            data-agent-shell-panel
+            data-agent-floating-panel={active ? true : undefined}
+            data-agent-shell-panel={active ? true : undefined}
+            data-agent-host-control={active ? undefined : true}
+            data-agent-host-id={hostId}
+            data-agent-host-active={active ? 'true' : 'false'}
             data-agent-shell-panel-width={shell.width}
             data-agent-shell-open={open ? 'true' : 'false'}
             data-agent-dragging={dragging ?? undefined}
-            hidden={panelHidden}
+            hidden={!active || panelHidden}
             role="region"
             aria-label="Agent 面板"
           >
-            <div className={styles.panelSurface} data-agent-shell-surface>
+            <div
+              className={styles.panelSurface}
+              data-agent-shell-surface={active ? true : undefined}
+            >
               <AgentPanel
                 projectId={projectId}
+                active={active}
                 onClose={() => onOpenChange(false)}
                 onOpenSettings={() => openAgentSettings('basic')}
+                onDisposeReady={onDisposeReady}
               />
             </div>
             <button
@@ -381,7 +447,7 @@ export function AgentDock({
               data-agent-resize
               role="separator"
               aria-orientation="vertical"
-              aria-controls="canvas-agent-panel"
+              aria-controls={panelId}
               aria-label="调整 Agent 面板宽度"
               aria-valuemin={AGENT_SHELL_WIDTH_MIN}
               aria-valuemax={agentShellMaxWidth(measureAgentAvailableWidth())}
@@ -397,32 +463,34 @@ export function AgentDock({
 
   return (
     <>
-      <button
-        type="button"
-        className={styles.orb}
-        style={shell ? { left: shell.orb.x, top: shell.orb.y } : undefined}
-        data-canvas-agent
-        data-agent-orb
-        data-agent-expanded={open ? 'true' : 'false'}
-        aria-label={open ? '收起 Agent' : '打开 Agent'}
-        aria-controls="canvas-agent-panel"
-        aria-expanded={open}
-        title={open ? '收起 Agent' : 'Agent'}
-        onPointerDown={onOrbPointerDown}
-        onClick={() => {
-          if (suppressOrbClickRef.current) {
-            suppressOrbClickRef.current = false
-            return
-          }
-          onOpenChange(!open)
-        }}
-      >
-        <span className={styles.orbSwirl} aria-hidden="true" />
-        <span className={styles.orbGlint} aria-hidden="true" />
-        <span className={styles.orbLabel} aria-hidden="true">
-          {open ? '收起 Agent' : 'Agent'}
-        </span>
-      </button>
+      {active ? (
+        <button
+          type="button"
+          className={styles.orb}
+          style={shell ? { left: shell.orb.x, top: shell.orb.y } : undefined}
+          data-canvas-agent
+          data-agent-orb
+          data-agent-expanded={open ? 'true' : 'false'}
+          aria-label={open ? '收起 Agent' : '打开 Agent'}
+          aria-controls={panelId}
+          aria-expanded={open}
+          title={open ? '收起 Agent' : 'Agent'}
+          onPointerDown={onOrbPointerDown}
+          onClick={() => {
+            if (suppressOrbClickRef.current) {
+              suppressOrbClickRef.current = false
+              return
+            }
+            onOpenChange(!open)
+          }}
+        >
+          <span className={styles.orbSwirl} aria-hidden="true" />
+          <span className={styles.orbGlint} aria-hidden="true" />
+          <span className={styles.orbLabel} aria-hidden="true">
+            {open ? '收起 Agent' : 'Agent'}
+          </span>
+        </button>
+      ) : null}
       {panel}
     </>
   )

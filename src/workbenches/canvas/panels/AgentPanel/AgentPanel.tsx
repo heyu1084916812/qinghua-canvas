@@ -242,12 +242,19 @@ const AUTO_RUN_LIMIT = 32
 
 export function AgentPanel({
   projectId,
+  active = true,
   onClose,
   onOpenSettings,
+  onDisposeReady,
 }: {
   projectId: string
+  /** 常驻宿主仍可处于后台；只有当前可见画布才接收一次性 handoff。 */
+  active?: boolean
   onClose: () => void
   onOpenSettings: () => void
+  onDisposeReady?: (
+    dispose: () => Promise<void>,
+  ) => (() => void) | void
 }) {
   const platform = usePlatform()
   const channels = useChannels()
@@ -325,6 +332,8 @@ export function AgentPanel({
   )
 
   const [list, setList] = useState<AgentSession[]>([])
+  const listRef = useRef<AgentSession[]>([])
+  listRef.current = list
   const [current, setCurrent] = useState<AgentSession | null>(null)
   const [messages, setMessages] = useState<ChatMessage[]>([])
   /** 当前会话那一份运行态（别的会话在跑不影响这里） */
@@ -559,6 +568,52 @@ export function AgentPanel({
   const contextTraceRef = useRef(
     new Map<string, AgentTurnContextTrace>(),
   )
+
+  useEffect(() => {
+    if (!onDisposeReady) return
+    const dispose = async () => {
+      const sessionIds = new Set([
+        ...abortRefs.current.keys(),
+        ...listRef.current.map((session) => session.id),
+      ])
+      for (const controller of abortRefs.current.values()) {
+        controller.abort()
+      }
+      for (const sessionId of sessionIds) {
+        clearQueueDrain(sessionId)
+        releaseSessionActivity(sessionId)
+        sessionRuntimeRef.current.clearSession(sessionId)
+        clearLiveActivitiesFor(sessionId)
+        clearLiveProcessFor(sessionId)
+        clearRunTasksFor(sessionId)
+      }
+      queuePumpingRef.current.clear()
+      confirmingRef.current.clear()
+      stoppingRef.current.clear()
+      abortRefs.current.clear()
+      deliveredSteersRef.current.clear()
+      toolModeRef.current.clear()
+      turnToolsRef.current.clear()
+      currentTurnIdRef.current.clear()
+      currentTurnJobIdRef.current.clear()
+      currentTurnRevisionRef.current.clear()
+      planAliasesRef.current.clear()
+      autoRunRef.current.clear()
+      explicitMediaModelsRef.current.clear()
+      chatRouteRef.current.clear()
+      contextTraceRef.current.clear()
+      inFlightConfirmationRef.current.clear()
+      await store.flush()
+    }
+    return onDisposeReady(dispose)
+  }, [
+    clearLiveActivitiesFor,
+    clearLiveProcessFor,
+    clearRunTasksFor,
+    onDisposeReady,
+    store,
+  ])
+
   const scrollRef = useRef<HTMLDivElement | null>(null)
   const conversationViewportRef = useRef<{
     clientHeight: number
@@ -728,9 +783,10 @@ export function AgentPanel({
   }, [current?.skillId, allSkills])
 
   useEffect(() => {
+    if (!active) return
     const consumePendingSkill = () => {
       if (!current) return
-      const skillId = takeAgentSkillHandoff()
+      const skillId = takeAgentSkillHandoff(projectId)
       if (!skillId) return
       const skill = allSkills.find((item) => item.id === skillId)
       if (!skill) return
@@ -744,8 +800,8 @@ export function AgentPanel({
       })
     }
     consumePendingSkill()
-    return subscribeAgentSkillHandoff(() => consumePendingSkill())
-  }, [allSkills, current])
+    return subscribeAgentSkillHandoff(projectId, () => consumePendingSkill())
+  }, [active, allSkills, current, projectId])
 
   /**
    * 新会话该用哪个模型：默认模型 → 该渠道第一个对话模型。
@@ -2599,14 +2655,15 @@ export function AgentPanel({
   }, [current, store, insertMention, nodeLabelOf, patchSession])
 
   useEffect(() => {
+    if (!active) return
     const queue = (ids: readonly string[]) => {
       handoffRef.current = [...new Set([...handoffRef.current, ...ids])]
       flushHandoff()
     }
     /** 面板可能是**后**挂载的（点按钮才打开），先把单例里存着的那批收下 */
-    queue(takeAgentHandoff())
-    return subscribeAgentHandoff(queue)
-  }, [flushHandoff])
+    queue(takeAgentHandoff(projectId))
+    return subscribeAgentHandoff(projectId, queue)
+  }, [active, flushHandoff, projectId])
 
   /**
    * 本会话启用的技能（设计文档 §14 M4）。
