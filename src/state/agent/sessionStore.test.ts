@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { createMemoryPlatform } from '../../platform/memory'
 import type { QueuedAgentTurn } from '../../domain/agent/queuedTurn'
 import { AGENT_CONTEXT_WINDOW, createAgentSessionStore } from './sessionStore'
@@ -256,6 +256,80 @@ describe('Agent 会话 · 隔离（最容易出错的地方）', () => {
 })
 
 describe('Agent 会话 · 回合版本门禁', () => {
+  it('★★ 旧 outcome 写库挂起期间新回合落库，释放后返回 conflict', async () => {
+    const s = store()
+    const a = await s.create({
+      projectId: 'p1',
+      channelId: 'c1',
+      model: 'm1',
+    })
+    const b = await s.create({
+      projectId: 'p1',
+      channelId: 'c1',
+      model: 'm1',
+    })
+    const first = await s.saveMessages(a.id, [
+      { role: 'user', content: '旧回合' },
+    ])
+    const revision = first?.messageRevision ?? 0
+    let releaseOldWrite: (() => void) | undefined
+    const deferred = new Promise<void>((resolve) => {
+      releaseOldWrite = resolve
+    })
+    const oldWrite = s.applyAgentOutcome(a.id, {
+      expectedRevision: revision,
+      deferred,
+      messages: [
+        { role: 'user', content: '旧回合' },
+        { role: 'assistant', content: '旧回答' },
+      ],
+      pendingConfirmation: {
+        callId: 'old-call',
+        name: 'runNode',
+        args: { nodeIds: ['old'] },
+      },
+      allowedToolNames: ['runNode'],
+    })
+    await vi.waitFor(() => expect(releaseOldWrite).toBeTypeOf('function'))
+    const newer = await s.saveMessages(a.id, [
+      { role: 'user', content: '新回合不能丢' },
+    ])
+    await s.updateFields(a.id, {
+      pendingConfirmation: {
+        callId: 'new-call',
+        name: 'runNode',
+        args: { nodeIds: ['new'] },
+      },
+      continuation: {
+        reason: 'max_steps',
+        maxSteps: 8,
+        createdAt: 2,
+      },
+      allowedToolNames: ['readGraph'],
+    })
+    await s.saveMessages(b.id, [
+      { role: 'user', content: 'B 会话独立历史' },
+    ])
+    releaseOldWrite!()
+    await expect(oldWrite).resolves.toEqual({
+      ok: false,
+      reason: 'conflict',
+    })
+    const currentA = await s.get(a.id)
+    expect(currentA?.messageRevision).toBe(
+      (newer?.messageRevision ?? 0),
+    )
+    expect(currentA?.messages).toEqual([
+      { role: 'user', content: '新回合不能丢' },
+    ])
+    expect(currentA?.pendingConfirmation?.callId).toBe('new-call')
+    expect(currentA?.continuation?.createdAt).toBe(2)
+    expect(currentA?.allowedToolNames).toEqual(['readGraph'])
+    expect((await s.get(b.id))?.messages).toEqual([
+      { role: 'user', content: 'B 会话独立历史' },
+    ])
+  })
+
   it('★★ 旧 outcome 使用过期 revision 时必须 conflict，不能覆盖新用户消息', async () => {
     const s = store()
     const a = await s.create({

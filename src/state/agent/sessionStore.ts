@@ -183,6 +183,7 @@ export interface AgentSessionStore {
     id: string,
     input: {
       expectedRevision?: number
+      deferred?: Promise<void>
       messages: readonly ChatMessage[]
       pendingConfirmation?: AgentSession['pendingConfirmation']
       continuation?: AgentSession['continuation']
@@ -640,6 +641,15 @@ export function createAgentSessionStore(storage: StoragePort): AgentSessionStore
           if (
             (latest.messageRevision ?? 0) !==
             (apply.expectedRevision ?? 0)
+          ) {
+            return { ok: false as const, reason: 'conflict' as const }
+          }
+          await apply.deferred
+          const raced = await loadSession(tx, id)
+          if (
+            !raced ||
+            (raced.messageRevision ?? 0) !==
+              (apply.expectedRevision ?? 0)
           ) {
             return { ok: false as const, reason: 'conflict' as const }
           }

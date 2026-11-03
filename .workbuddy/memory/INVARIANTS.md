@@ -5,6 +5,12 @@
 
 ## Agent · 过程与落位
 
+- **deferred outcome 必须事务内二次 CAS**：`applyAgentOutcome()` 即使入口 expected revision 匹配，
+  也必须在同一事务写入前重读当前 `messageRevision`。故障注入可通过可选 `deferred` Promise 让旧写挂起，
+  期间新回合 `saveMessages()` 先递增版本；旧写释放后只能返回 `conflict`，不得覆盖新消息、
+  `pendingConfirmation / continuation / allowedToolNames` 或另一会话历史。生产调用不得传 `deferred`，
+  正常 CAS 仍一次完成消息、确认/检查点字段和 steer 删除；冲突不写 UI、不迁 Job。
+
 - **中断收口必须 owner-only**：`agentInterruptSettlement.ts` 只在活动锁仍属于本回合时 abort /
   clear drain；最终再判定一次 owner，只有 owner 才删除 per-session refs、应用 snapshot、setMessages、
   清 live 和置 idle。store 的 revision 屏障、原 turnOrigin Job 和 queue token 匹配必须保留。
