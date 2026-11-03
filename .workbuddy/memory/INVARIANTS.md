@@ -86,6 +86,11 @@
 - **AgentPanel 三块视图壳只渲染**：`AgentPanelHeader`、`AgentConversationPane`、`AgentComposerPane`
   不得直接调用 SessionStore、队列 pump、工具执行或持久化；只接收状态与回调。重命名、两步删除、
   共享 `openPicker`、滚动 ref、Composer 高度和发送/停止互斥仍由 `AgentPanel` 协调。
+- **AgentConversationController 不拥有业务真相**：`useAgentConversationController` 只管理 reveal、
+  步骤展开、滚动跟随、jump reset 和 `visibleItems` 派生；不得 import SessionStore / AgentController /
+  ToolRegistry / 队列实现，不得请求模型、改 Job、落库或推进确认。定时与滚动算法只调用
+  `agentOutputReveal.ts` / `agentConversationScroll.ts`，迁移不得改 JSX、DOM、data 属性、className、
+  文案、布局或 CSS。
 - **队列 hook 不拥有队列真相**：`useAgentQueueController` 只做 React 适配；Session/Controller 是唯一真相，
   队列领取后必须绑定真实 `turnId`，附件在入队事务内冻结并消费，不能因为拆 hook 产生第二份队列。
 - **画布执行模块不能重试付费请求**：`agentCanvasRun` 必须保持 preflight → 同波并发 → `store.flush()`

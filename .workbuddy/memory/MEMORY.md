@@ -1,6 +1,20 @@
 # CanvasFlow（轻画）项目记忆
 
+### AgentConversationController（2026-11-04，对账 #866，待独立验收）
+
+- `useAgentConversationController` 只做 React 视图适配：reveal、步骤展开、滚动跟随、jump-to-latest、
+  会话切换 reset 和 `visibleItems` 派生；不读 SessionStore / AgentController / 队列 / Job 真相。
+- 流式与滚动算法继续调用 `agentOutputReveal.ts` / `agentConversationScroll.ts`，Hook 不复制公式；
+  `AgentPanel` 只负责装配业务回调和把结果传给 `AgentConversationPane`。
+- 本批不改 JSX、DOM、data 属性、className、文案、布局或 CSS。`AgentPanel.tsx` **3531 → 3433 行**；
+  Hook **7/7**、AgentPanel 目录 **211/211**、G769 **39/39**、G865 **24/24**、G735 **35/35**，
+  全量 **4028 passed / 1 skipped**。
+
 ### 独立 AgentHost 六项收口（2026-11-03，对账 #865，待独立验收）
+
+- **质量线真实证据（2026-11-04）**：Release/Tauri mock 跨路由 **11/11**，同实例穿越 `/settings`、A/B host、
+  暂停检查点、队列和 slot 收放通过；真实 Workbuddy 文本返回“验收通过”。真实 Chat2api 生图已发到上游，
+  但 `https://image.xssr.org/v1` 网络失败，未产生成功 asset，发布门禁仍阻断。
 
 - **portal 不是 owner**：`AgentDock` 把面板 portal 到 AppShell 只改变 DOM 位置，React owner 仍可能在
   `CanvasPage`。现在 `AppShell` 只渲染通用 `AgentHostOutlet`；画布模块注册 renderer，并按 projectId
