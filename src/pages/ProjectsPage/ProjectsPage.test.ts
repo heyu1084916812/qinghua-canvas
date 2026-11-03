@@ -11,6 +11,10 @@ import { createMemoryPlatform } from '../../platform/memory'
 import { createProjectRepository } from '../../state/project/repository'
 import { resetCanvasStoreCache } from '../../state/workbenches/canvas/storeCache'
 import { ProjectsPage } from './ProjectsPage'
+import {
+  createTaskLifecycle,
+  type TaskShutdownControl,
+} from '../../features/shared/lifecycle/taskLifecycle'
 
 const reactActEnvironment = globalThis as typeof globalThis & {
   IS_REACT_ACT_ENVIRONMENT?: boolean
@@ -35,6 +39,20 @@ function textOf(node: TestRenderer.ReactTestInstance): string {
       typeof child === 'string' ? child : '',
     )
     .join('')
+}
+
+function lifecycleControl(
+  lifecycle = createTaskLifecycle(),
+): TaskShutdownControl {
+  const attempt = lifecycle.beginClose()
+  return {
+    waitForIdle: () => lifecycle.waitForIdle(100),
+    whenIdle: lifecycle.whenIdle,
+    canReopen: () => lifecycle.canReopen(attempt),
+    reopenIfIdle: () => lifecycle.reopenIfIdle(attempt),
+    canFinalize: () => lifecycle.canFinalize(attempt),
+    finalize: () => lifecycle.finalizeClose(attempt),
+  }
 }
 
 async function renderProjectsPage(platform: ReturnType<typeof createMemoryPlatform>) {
@@ -62,13 +80,20 @@ describe('ProjectsPage delete failure', () => {
     const repo = createProjectRepository(platform.storage)
     await platform.storage.open()
     const project = await repo.create({ name: '保留项目' })
-    const dispose = vi.fn(async () => {
-      throw new Error('flush timeout')
-    })
+    const beginDispose = vi.fn((): TaskShutdownControl => ({
+      waitForIdle: async () => {
+        throw new Error('flush timeout')
+      },
+      whenIdle: async () => undefined,
+      canReopen: () => true,
+      reopenIfIdle: () => true,
+      canFinalize: () => true,
+      finalize: () => true,
+    }))
     registerProjectRuntime({
       projectId: project.id,
       key: 'canvas-agent',
-      dispose,
+      beginDispose,
     })
     const root = await renderProjectsPage(platform)
 
@@ -98,7 +123,7 @@ describe('ProjectsPage delete failure', () => {
       ).props.onClick()
     })
 
-    expect(dispose).toHaveBeenCalledOnce()
+    expect(beginDispose).toHaveBeenCalledOnce()
     expect(
       root.root.findAll(
         (node) => node.props['data-project-card'] === project.id,
@@ -129,9 +154,16 @@ describe('ProjectsPage delete failure', () => {
     registerProjectRuntime({
       projectId: project.id,
       key: 'canvas-agent',
-      dispose: async () => {
-        throw new Error('dispose pending')
-      },
+      beginDispose: () => ({
+        waitForIdle: async () => {
+          throw new Error('dispose pending')
+        },
+        whenIdle: async () => undefined,
+        canReopen: () => true,
+        reopenIfIdle: () => true,
+        canFinalize: () => true,
+        finalize: () => true,
+      }),
     })
     const root = await renderProjectsPage(platform)
 
@@ -168,6 +200,80 @@ describe('ProjectsPage delete failure', () => {
     ).toBe('error')
     expect((await repo.get(project.id))?.deletedAt).toBeUndefined()
 
+    act(() => root.unmount())
+  })
+
+  it('仓储失败回滚 draining runtime，确认框保留且可再次删除', async () => {
+    const platform = createMemoryPlatform()
+    const repo = createProjectRepository(platform.storage)
+    await platform.storage.open()
+    const project = await repo.create({ name: '仓储恢复' })
+    const lifecycle = createTaskLifecycle()
+    registerProjectRuntime({
+      projectId: project.id,
+      key: 'canvas-agent',
+      beginDispose: () => lifecycleControl(lifecycle),
+    })
+    const root = await renderProjectsPage(platform)
+    const card = root.root.find(
+      (node) => node.props['data-project-card'] === project.id,
+    )
+
+    const originalPut = platform.storage.put.bind(platform.storage)
+    const put = vi.spyOn(platform.storage, 'put').mockImplementation(
+      async (table, row) => {
+        if (
+          table === 'projects' &&
+          typeof row.deletedAt === 'number'
+        ) {
+          throw new Error('disk full')
+        }
+        return originalPut(table, row)
+      },
+    )
+
+    act(() => {
+      card.find(
+        (node) =>
+          node.type === 'button' &&
+          node.props['aria-label'] === '项目菜单',
+      ).props.onClick()
+    })
+    act(() => {
+      card.find(
+        (node) =>
+          node.type === 'button' &&
+          node.props.role === 'menuitem' &&
+          textOf(node) === '删除',
+      ).props.onClick({ stopPropagation: vi.fn() })
+    })
+    await act(async () => {
+      await card.find(
+        (node) =>
+          node.type === 'button' &&
+          textOf(node) === '确认',
+      ).props.onClick()
+    })
+
+    expect(lifecycle.state).toBe('open')
+    expect((await repo.get(project.id))?.deletedAt).toBeUndefined()
+    expect(
+      textOf(
+        root.root.find(
+          (node) => node.props['data-status-tone'] !== undefined,
+        ),
+      ),
+    ).toContain('disk full')
+
+    put.mockRestore()
+    await act(async () => {
+      await root.root.find(
+        (node) =>
+          node.type === 'button' &&
+          textOf(node) === '确认',
+      ).props.onClick()
+    })
+    expect((await repo.get(project.id))?.deletedAt).toBeTypeOf('number')
     act(() => root.unmount())
   })
 })

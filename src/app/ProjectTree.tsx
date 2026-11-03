@@ -28,7 +28,7 @@ import {
 } from '../state/project/projectEvents'
 import { buildProjectTree, projectGroupWindow } from './projectTreeModel'
 import { projectMenuPosition, type ProjectMenuFrame } from './projectMenuPosition'
-import { disposeProjectRuntimes } from './ProjectRuntimeRegistry'
+import { withPreparedProjectRuntimes } from './ProjectRuntimeRegistry'
 import {
   clearDeletedProjectState,
   leaveDeletedCanvasRoute,
@@ -481,8 +481,10 @@ export function ProjectTree({ open, activeProjectId }: ProjectTreeProps) {
     try {
       if (confirmTarget.kind === 'folder') await repo.removeFolder(confirmTarget.id)
       else {
-        await disposeProjectRuntimes([confirmTarget.id])
-        await repo.remove(confirmTarget.id)
+        await withPreparedProjectRuntimes(
+          [confirmTarget.id],
+          () => repo.remove(confirmTarget.id),
+        )
         clearDeletedProjectState(confirmTarget.id)
         leaveDeletedCanvasRoute(
           locationPathRef.current,

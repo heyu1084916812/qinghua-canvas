@@ -1,4 +1,5 @@
 import type { ComponentType } from 'react'
+import type { TaskShutdownControl } from '../features/shared/lifecycle/taskLifecycle'
 
 /**
  * 应用壳常驻宿主的通用注册表。
@@ -33,7 +34,10 @@ export interface AgentHostRegistration {
 const renderers = new Map<string, AgentHostRenderer>()
 const disposers = new Map<
   string,
-  { generation: number; dispose: () => Promise<void> }
+  {
+    generation: number
+    beginShutdown: () => TaskShutdownControl
+  }
 >()
 let recordsById = new Map<string, AgentHostRecord>()
 let snapshot: readonly AgentHostRecord[] = []
@@ -169,15 +173,37 @@ export function removeAgentHost(
 
 export function setAgentHostDisposer(
   id: string,
-  dispose: () => Promise<void>,
+  beginShutdown: () => TaskShutdownControl,
   generation = recordsById.get(id)?.generation,
 ): () => void {
   if (generation === undefined) return () => undefined
   const key = disposeKey(id, generation)
-  disposers.set(key, { generation, dispose })
+  disposers.set(key, { generation, beginShutdown })
   return () => {
-    if (disposers.get(key)?.dispose === dispose) disposers.delete(key)
+    if (disposers.get(key)?.beginShutdown === beginShutdown) {
+      disposers.delete(key)
+    }
   }
+}
+
+export function beginAgentHostDispose(
+  id: string,
+  generation = recordsById.get(id)?.generation,
+): TaskShutdownControl | null {
+  if (generation === undefined) return null
+  const key = disposeKey(id, generation)
+  const entry = disposers.get(key)
+  return entry?.beginShutdown() ?? null
+}
+
+export function finalizeAgentHostDispose(
+  id: string,
+  generation = recordsById.get(id)?.generation,
+): boolean {
+  if (generation === undefined) return false
+  const key = disposeKey(id, generation)
+  if (disposers.has(key)) disposers.delete(key)
+  return true
 }
 
 /** 只等待宿主自身 abort + flush；项目删除协调器在全部成功后才会移除 record。 */
@@ -185,12 +211,16 @@ export async function waitForAgentHostDispose(
   id: string,
   generation = recordsById.get(id)?.generation,
 ): Promise<void> {
-  if (generation === undefined) return
-  const key = disposeKey(id, generation)
-  const entry = disposers.get(key)
-  if (!entry) return
-  await entry.dispose()
-  if (disposers.get(key) === entry) disposers.delete(key)
+  const control = beginAgentHostDispose(id, generation)
+  if (!control) return
+  try {
+    await control.waitForIdle()
+  } catch (error) {
+    if (!control.reopenIfIdle()) {
+      void control.whenIdle().then(() => control.reopenIfIdle())
+    }
+    throw error
+  }
 }
 
 /** 项目删除 / 测试用：先 abort + flush，再按代际条件移除常驻 record。 */
@@ -198,7 +228,23 @@ export async function disposeAgentHost(
   id: string,
   generation = recordsById.get(id)?.generation,
 ): Promise<void> {
-  await waitForAgentHostDispose(id, generation)
+  const control = beginAgentHostDispose(id, generation)
+  if (!control) {
+    removeAgentHost(id, generation)
+    return
+  }
+  try {
+    await control.waitForIdle()
+  } catch (error) {
+    if (!control.reopenIfIdle()) {
+      void control.whenIdle().then(() => control.reopenIfIdle())
+    }
+    throw error
+  }
+  if (!control.finalize()) {
+    throw new Error(`AgentHost ${id} 未能安全关闭`)
+  }
+  finalizeAgentHostDispose(id, generation)
   removeAgentHost(id, generation)
 }
 

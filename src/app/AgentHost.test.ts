@@ -10,6 +10,7 @@ import {
 import TestRenderer, { act } from 'react-test-renderer'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
+  beginAgentHostDispose,
   disposeAgentHost,
   getAgentHosts,
   invalidateAgentHostsForHmr,
@@ -22,6 +23,11 @@ import {
   type AgentHostRendererProps,
 } from './AgentHostRegistry'
 import { AgentHostOutlet } from './AgentHostOutlet'
+import {
+  createTaskLifecycle,
+  type TaskLifecycleCloseAttempt,
+  type TaskShutdownControl,
+} from '../features/shared/lifecycle/taskLifecycle'
 
 const reactActEnvironment = globalThis as typeof globalThis & {
   IS_REACT_ACT_ENVIRONMENT?: boolean
@@ -31,6 +37,24 @@ reactActEnvironment.IS_REACT_ACT_ENVIRONMENT = true
 afterEach(() => {
   resetAgentHostsForTests()
 })
+
+function shutdownControl(
+  waitForIdle: () => Promise<void>,
+  reopenable = true,
+): TaskShutdownControl {
+  let finalized = false
+  return {
+    waitForIdle,
+    whenIdle: () => waitForIdle().catch(() => undefined),
+    canReopen: () => reopenable && !finalized,
+    reopenIfIdle: () => reopenable && !finalized,
+    canFinalize: () => !finalized,
+    finalize() {
+      finalized = true
+      return true
+    },
+  }
+}
 
 describe('AgentHost registry / outlet', () => {
   it('StrictMode 注册幂等，只保留一条 project host record', () => {
@@ -152,10 +176,11 @@ describe('AgentHost registry / outlet', () => {
     })
 
     let disposed = false
-    setAgentHostDisposer('canvas:p1', async () => {
-      await Promise.resolve()
-      disposed = true
-    })
+    setAgentHostDisposer('canvas:p1', () =>
+      shutdownControl(async () => {
+        await Promise.resolve()
+        disposed = true
+      }))
     act(() => setAgentHostActive('canvas:p1', false))
     expect(disposed).toBe(false)
 
@@ -194,7 +219,7 @@ describe('AgentHost registry / outlet', () => {
     })
     setAgentHostDisposer(
       first.id,
-      async () => gate,
+      () => shutdownControl(async () => gate),
       first.generation,
     )
 
@@ -228,10 +253,15 @@ describe('AgentHost registry / outlet', () => {
       kind: 'probe',
       payload: {},
     })
-    const dispose = vi.fn(async () => {
-      throw new Error('flush failed')
-    })
-    setAgentHostDisposer(host.id, dispose, host.generation)
+    const beginShutdown = vi.fn(() =>
+      shutdownControl(async () => {
+        throw new Error('flush failed')
+      }))
+    setAgentHostDisposer(
+      host.id,
+      beginShutdown,
+      host.generation,
+    )
 
     await expect(
       disposeAgentHost(host.id, host.generation),
@@ -241,6 +271,40 @@ describe('AgentHost registry / outlet', () => {
     await expect(
       disposeAgentHost(host.id, host.generation),
     ).rejects.toThrow('flush failed')
-    expect(dispose).toHaveBeenCalledTimes(2)
+    expect(beginShutdown).toHaveBeenCalledTimes(2)
+  })
+
+  it('idle 后删除失败会恢复同一 host lifecycle，不留下 closed 僵尸', async () => {
+    const host = upsertAgentHost({
+      id: 'canvas:p1',
+      kind: 'probe',
+      payload: {},
+    })
+    const lifecycle = createTaskLifecycle()
+    let attempt!: TaskLifecycleCloseAttempt
+    setAgentHostDisposer(
+      host.id,
+      () => {
+        attempt = lifecycle.beginClose()
+        return {
+          waitForIdle: () => lifecycle.waitForIdle(100),
+          whenIdle: lifecycle.whenIdle,
+          canReopen: () => lifecycle.canReopen(attempt),
+          reopenIfIdle: () => lifecycle.reopenIfIdle(attempt),
+          canFinalize: () => lifecycle.canFinalize(attempt),
+          finalize: () => lifecycle.finalizeClose(attempt),
+        }
+      },
+      host.generation,
+    )
+
+    const control = beginAgentHostDispose(host.id, host.generation)
+    await control!.waitForIdle()
+    expect(control!.reopenIfIdle()).toBe(true)
+    expect(lifecycle.state).toBe('open')
+    await expect(
+      lifecycle.track(async () => 'send-again'),
+    ).resolves.toBe('send-again')
+    expect(getAgentHosts()).toHaveLength(1)
   })
 })

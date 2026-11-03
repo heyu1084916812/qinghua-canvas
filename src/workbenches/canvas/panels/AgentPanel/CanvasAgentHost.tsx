@@ -6,14 +6,15 @@ import {
   useRef,
 } from 'react'
 import {
+  beginAgentHostDispose,
   deactivateAgentHost,
+  finalizeAgentHostDispose,
   invalidateAgentHostsForHmr,
   registerAgentHostRenderer,
   removeAgentHost,
   setAgentHostDisposer,
   setAgentHostOpen,
   upsertAgentHost,
-  waitForAgentHostDispose,
   type AgentHostRendererProps,
 } from '../../../../app/AgentHostRegistry'
 import {
@@ -21,6 +22,10 @@ import {
   registerProjectRuntime,
 } from '../../../../app/ProjectRuntimeRegistry'
 import { subscribeAgentHandoff } from '../../../../features/canvas/agentHandoff'
+import {
+  combineTaskShutdownControls,
+  type TaskShutdownControl,
+} from '../../../../features/shared/lifecycle/taskLifecycle'
 import type { CanvasStore } from '../../../../state/workbenches/canvas/store'
 import {
   CanvasExecutionValueProvider,
@@ -68,8 +73,8 @@ export function CanvasAgentHostRenderer({
   host,
 }: AgentHostRendererProps) {
   const registerDispose = useCallback(
-    (dispose: () => Promise<void>) =>
-      setAgentHostDisposer(host.id, dispose, host.generation),
+    (beginShutdown: () => TaskShutdownControl) =>
+      setAgentHostDisposer(host.id, beginShutdown, host.generation),
     [host.generation, host.id],
   )
   const payload = host.payload
@@ -151,21 +156,25 @@ export function CanvasAgentHostBridge({
     registerProjectRuntime({
       projectId,
       key: CANVAS_AGENT_HOST_KIND,
-      dispose: async () => {
+      beginDispose: () => {
         const shutdown = beginCanvasExecutionRuntimeShutdown(projectId)
-        const results = await Promise.allSettled([
-          waitForAgentHostDispose(hostId, host.generation),
-          shutdown?.waitForIdle() ?? Promise.resolve(),
-        ])
-        const failure = results.find(
-          (result): result is PromiseRejectedResult =>
-            result.status === 'rejected',
+        const hostShutdown = beginAgentHostDispose(
+          hostId,
+          host.generation,
         )
-        if (failure) {
-          throw failure.reason
+        const combined = combineTaskShutdownControls([
+          hostShutdown,
+          shutdown,
+        ])
+        return {
+          ...combined,
+          finalize() {
+            if (!combined.finalize()) return false
+            finalizeAgentHostDispose(hostId, host.generation)
+            removeAgentHost(hostId, host.generation)
+            return true
+          },
         }
-        shutdown?.finalize()
-        removeAgentHost(hostId, host.generation)
       },
     })
   }, [hostId, payload, projectId])

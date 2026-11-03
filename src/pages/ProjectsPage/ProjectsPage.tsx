@@ -27,7 +27,7 @@ import {
 import styles from './ProjectsPage.module.css'
 import { ChoicePicker } from '../../features/shared/choicePicker/ChoicePicker'
 import { useAssetMeta } from '../../features/shared/assets/index'
-import { disposeProjectRuntimes } from '../../app/ProjectRuntimeRegistry'
+import { withPreparedProjectRuntimes } from '../../app/ProjectRuntimeRegistry'
 import {
   clearDeletedProjectState,
   clearDeletedProjectsState,
@@ -174,8 +174,10 @@ export function ProjectsPage() {
 
   const handleDelete = async (id: string) => {
     try {
-      await disposeProjectRuntimes([id])
-      await store.remove(id)
+      await withPreparedProjectRuntimes(
+        [id],
+        () => store.remove(id),
+      )
       clearDeletedProjectState(id)
       setConfirmId(null)
       setMenuId(null)
@@ -244,8 +246,10 @@ export function ProjectsPage() {
     if (trashBusy) return
     setTrashBusy(true)
     try {
-      await disposeProjectRuntimes([id])
-      await store.purge(id)
+      await withPreparedProjectRuntimes(
+        [id],
+        () => store.purge(id),
+      )
       clearDeletedProjectState(id)
       await refreshTrash()
       setStatus('已彻底删除（不可恢复）')
@@ -262,10 +266,10 @@ export function ProjectsPage() {
     setTrashBusy(true)
     setTrashConfirmClear(false)
     try {
-      await disposeProjectRuntimes(
+      const n = await withPreparedProjectRuntimes(
         trashItems.map((project) => project.id),
+        () => store.purgeAll(),
       )
-      const n = await store.purgeAll()
       clearDeletedProjectsState(
         trashItems.map((project) => project.id),
       )
@@ -339,8 +343,10 @@ export function ProjectsPage() {
     setTrashConfirmBulk(false)
     const selected = [...trashSelectedIds]
     try {
-      await disposeProjectRuntimes(selected)
-      const n = await store.purgeMany(selected)
+      const n = await withPreparedProjectRuntimes(
+        selected,
+        () => store.purgeMany(selected),
+      )
       clearDeletedProjectsState(selected)
       await refreshTrash()
       setTrashSelectedIds(new Set())
@@ -368,7 +374,7 @@ export function ProjectsPage() {
     setTrashBusy(true)
     setTrashConfirmOld(false)
     try {
-      await disposeProjectRuntimes(
+      const n = await withPreparedProjectRuntimes(
         trashItems
           .filter(
             (project) =>
@@ -377,8 +383,8 @@ export function ProjectsPage() {
                 Date.now() - TRASH_KEEP_DAYS * 86_400_000,
           )
           .map((project) => project.id),
+        () => store.purgeOlderThan(TRASH_KEEP_DAYS),
       )
-      const n = await store.purgeOlderThan(TRASH_KEEP_DAYS)
       const cutoff = Date.now() - TRASH_KEEP_DAYS * 86_400_000
       clearDeletedProjectsState(
         trashItems
@@ -451,8 +457,10 @@ export function ProjectsPage() {
     if (selectedCount === 0) return
     const ids = [...selectedIds]
     try {
-      await disposeProjectRuntimes(ids)
-      await store.removeMany(ids)
+      await withPreparedProjectRuntimes(
+        ids,
+        () => store.removeMany(ids),
+      )
       clearDeletedProjectsState(ids)
       setMenuId(null)
       setConfirmId(null)

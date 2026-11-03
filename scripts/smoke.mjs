@@ -43644,7 +43644,78 @@ async function g865(browser) {
       `[data-project-tree-item="${projectC}"]`,
     )
     await currentRow.waitFor({ state: 'visible', timeout: 20_000 })
+    const registryUrl = await page.evaluate(() =>
+      performance
+        .getEntriesByType('resource')
+        .map((entry) => entry.name)
+        .find((name) =>
+          name.includes('/src/app/ProjectRuntimeRegistry.ts')))
+    await page.evaluate(async ({ id, url }) => {
+      const { registerProjectRuntime } = await import(url)
+      registerProjectRuntime({
+        projectId: id,
+        key: 'forced-delete-failure',
+        beginDispose: () => ({
+          waitForIdle: async () => {
+            throw new Error('forced delete failure')
+          },
+          whenIdle: async () => undefined,
+          canReopen: () => true,
+          reopenIfIdle: () => true,
+          canFinalize: () => true,
+          finalize: () => true,
+        }),
+      })
+    }, { id: projectC, url: registryUrl })
     await currentRow
+      .locator('button[aria-label="更多"]')
+      .click({ force: true })
+    await page
+      .locator('[data-project-menu] [role="menuitem"]')
+      .filter({ hasText: '删除' })
+      .click()
+    await page.getByRole('button', { name: '确认删除' }).click()
+    await page
+      .locator('[role="alert"]')
+      .filter({ hasText: 'forced delete failure' })
+      .waitFor({ state: 'visible', timeout: 10_000 })
+    await page.waitForTimeout(300)
+    const failedDelete = await page.evaluate((id) => {
+      const host = document.querySelector(
+        `[data-agent-host-record="canvas-agent:${id}"]`,
+      )
+      return {
+        path: window.location.pathname,
+        hostExists: Boolean(host),
+        hostActive: host?.getAttribute('data-agent-host-active') ?? null,
+        orb: Boolean(document.querySelector('[data-agent-orb]')),
+      }
+    }, projectC)
+    rec(
+      g,
+      '★★ 删除失败不 purge，也不把当前画布留成 closed host',
+      failedDelete.path === `/canvas/${projectC}` &&
+        failedDelete.hostExists &&
+        failedDelete.hostActive === 'true' &&
+        failedDelete.orb,
+      JSON.stringify(failedDelete),
+    )
+    await page.screenshot({
+      path: `${OUT}/agent-host-865-delete-failed.png`,
+    })
+
+    await page.reload({ waitUntil: 'domcontentloaded' })
+    await page.locator('[data-canvas-surface]').waitFor({
+      state: 'visible',
+      timeout: 20_000,
+    })
+    await page.locator('[data-agent-orb]').click()
+    await ensureSidebarOpen(page)
+    await page
+      .locator(`[data-project-tree-item="${projectC}"]`)
+      .waitFor({ state: 'visible', timeout: 20_000 })
+    await page
+      .locator(`[data-project-tree-item="${projectC}"]`)
       .locator('button[aria-label="更多"]')
       .click({ force: true })
     await page
