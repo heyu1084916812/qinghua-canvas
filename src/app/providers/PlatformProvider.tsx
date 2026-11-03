@@ -4,6 +4,7 @@ import type { PlatformKit } from '../../platform/ports'
 import { createPlatform, detectRuntime, type RuntimeId } from '../../platform'
 import { AssetPlatformProvider } from '../../features/shared/assets/AssetPlatformContext'
 import { createAgentSessionStore } from '../../state/agent/sessionStore'
+import { retryAgentMessageMigration } from './agentMessageMigration'
 
 /**
  * 平台注入（架构 §5.6）：业务代码只接触 PlatformKit 端口，
@@ -43,7 +44,11 @@ export function PlatformProvider({
     let cancelled = false
     void platform.storage
       .open()
-      .then(() => createAgentSessionStore(platform.storage).migrateLegacyMessages())
+      .then(() =>
+        retryAgentMessageMigration(() =>
+          createAgentSessionStore(platform.storage).migrateLegacyMessages(),
+        ),
+      )
       .catch((error) => {
         if (!cancelled) {
           console.error('[storage] Agent 消息拆表失败', error)
