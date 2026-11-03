@@ -1,6 +1,6 @@
 # CanvasFlow（轻画）项目记忆
 
-### AgentSessionLifecycle（2026-11-04，对账 #868，🚧 待独立验收，`17b349e`）
+### AgentSessionLifecycle（2026-11-04，对账 #868，✅ 已独立验收，`17b349e`）
 
 - `useAgentSessionLifecycle` 只持有会话 React 投影：`list / current / messages / listRef / currentIdRef`；
   SessionStore 和 AgentController 仍是唯一真相。Hook 只经 controller refresh、session get/messages/update/
