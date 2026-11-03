@@ -1,6 +1,6 @@
 # CanvasFlow（轻画）项目记忆
 
-### AgentComposerController（2026-11-04，对账 #867，待独立验收）
+### AgentComposerController（2026-11-04，对账 #867，✅ 已独立验收，`029fe7d`）
 
 - `useAgentComposerController` 只做输入区 React 适配：draft、mention 去重、picker 唯一开关、composer 高度
   与指针/键盘 resize；待发送素材只经 `onPendingAssetsChange` 端口回 AgentPanel。发送、队列、确认、
