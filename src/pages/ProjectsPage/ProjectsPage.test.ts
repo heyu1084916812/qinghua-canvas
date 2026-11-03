@@ -4,6 +4,7 @@ import TestRenderer, { act } from 'react-test-renderer'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { PlatformProvider } from '../../app/providers/PlatformProvider'
 import {
+  prepareProjectRuntimes,
   registerProjectRuntime,
   resetProjectRuntimesForTests,
 } from '../../app/ProjectRuntimeRegistry'
@@ -75,6 +76,124 @@ async function renderProjectsPage(platform: ReturnType<typeof createMemoryPlatfo
 }
 
 describe('ProjectsPage delete failure', () => {
+  it('运行时收尾期间确认按钮禁用，结束后才移除项目', async () => {
+    const platform = createMemoryPlatform()
+    const repo = createProjectRepository(platform.storage)
+    await platform.storage.open()
+    const project = await repo.create({ name: '收尾中' })
+    let release!: () => void
+    const gate = new Promise<void>((resolve) => {
+      release = resolve
+    })
+    let idle = false
+    void gate.then(() => {
+      idle = true
+    })
+    registerProjectRuntime({
+      projectId: project.id,
+      key: 'canvas-agent',
+      beginDispose: () => ({
+        waitForIdle: () => gate,
+        whenIdle: () => gate,
+        canReopen: () => idle,
+        reopenIfIdle: () => idle,
+        canFinalize: () => idle,
+        finalize: () => idle,
+      }),
+    })
+    const root = await renderProjectsPage(platform)
+    const card = root.root.find(
+      (node) => node.props['data-project-card'] === project.id,
+    )
+
+    act(() => {
+      card.find(
+        (node) =>
+          node.type === 'button' &&
+          node.props['aria-label'] === '项目菜单',
+      ).props.onClick()
+    })
+    act(() => {
+      card.find(
+        (node) =>
+          node.type === 'button' &&
+          node.props.role === 'menuitem' &&
+          textOf(node) === '删除',
+      ).props.onClick({ stopPropagation: vi.fn() })
+    })
+    const confirm = card.find(
+      (node) =>
+        node.type === 'button' &&
+        textOf(node) === '确认',
+    )
+    act(() => {
+      confirm.props.onClick()
+    })
+
+    expect(confirm.props.disabled).toBe(true)
+    expect((await repo.get(project.id))?.deletedAt).toBeUndefined()
+
+    release()
+    await settle()
+    expect((await repo.get(project.id))?.deletedAt).toBeTypeOf('number')
+    act(() => root.unmount())
+  })
+
+  it('外部项目操作已持锁时显示可行动的收尾提示并保留确认框', async () => {
+    const platform = createMemoryPlatform()
+    const repo = createProjectRepository(platform.storage)
+    await platform.storage.open()
+    const project = await repo.create({ name: '忙碌项目' })
+    const root = await renderProjectsPage(platform)
+    const claim = await prepareProjectRuntimes([project.id])
+    const card = root.root.find(
+      (node) => node.props['data-project-card'] === project.id,
+    )
+
+    act(() => {
+      card.find(
+        (node) =>
+          node.type === 'button' &&
+          node.props['aria-label'] === '项目菜单',
+      ).props.onClick()
+    })
+    act(() => {
+      card.find(
+        (node) =>
+          node.type === 'button' &&
+          node.props.role === 'menuitem' &&
+          textOf(node) === '删除',
+      ).props.onClick({ stopPropagation: vi.fn() })
+    })
+    await act(async () => {
+      await card.find(
+        (node) =>
+          node.type === 'button' &&
+          textOf(node) === '确认',
+      ).props.onClick()
+    })
+    await settle()
+
+    expect(
+      card.find(
+        (node) =>
+          node.type === 'button' &&
+          textOf(node) === '确认',
+      ),
+    ).toBeDefined()
+    expect(
+      textOf(
+        root.root.find(
+          (node) => node.props['data-status-tone'] !== undefined,
+        ),
+      ),
+    ).toContain('正在收尾，稍后重试')
+    expect((await repo.get(project.id))?.deletedAt).toBeUndefined()
+
+    await claim.commit()
+    act(() => root.unmount())
+  })
+
   it('单删 dispose 失败时保留确认框、项目与真实错误', async () => {
     const platform = createMemoryPlatform()
     const repo = createProjectRepository(platform.storage)

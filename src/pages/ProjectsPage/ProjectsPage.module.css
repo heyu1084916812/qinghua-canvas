@@ -649,6 +649,12 @@
 .confirmNo:hover {
   background: var(--bg-hover);
 }
+.confirmYes:disabled,
+.confirmNo:disabled {
+  opacity: 1;
+  color: var(--text-2);
+  cursor: wait;
+}
 
 /* 模板库卡片 */
 .tplCard {
@@ -769,6 +775,11 @@
 }
 .bulkDanger:hover {
   background: var(--bg-hover);
+}
+.bulkDanger:disabled {
+  opacity: 1;
+  color: var(--text-2);
+  cursor: wait;
 }
 
 /*

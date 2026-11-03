@@ -90,6 +90,37 @@ interface ProjectTreeProps {
   activeProjectId: string | null
 }
 
+export function ProjectDeleteConfirmActions({
+  deleting,
+  onCancel,
+  onConfirm,
+}: {
+  deleting: boolean
+  onCancel: () => void
+  onConfirm: () => void
+}) {
+  return (
+    <>
+      <button
+        type="button"
+        disabled={deleting}
+        onClick={onCancel}
+      >
+        取消
+      </button>
+      <button
+        type="button"
+        className={styles.dangerButton}
+        disabled={deleting}
+        data-project-tree-confirm-delete
+        onClick={onConfirm}
+      >
+        {deleting ? '收尾中…' : '确认删除'}
+      </button>
+    </>
+  )
+}
+
 const PROJECT_ICON: Record<WorkbenchId, (props: { size?: number }) => JSX.Element> = {
   canvas: IconCanvas,
   ecommerce: IconEcommerce,
@@ -144,6 +175,7 @@ export function ProjectTree({ open, activeProjectId }: ProjectTreeProps) {
   const [moveMenuOpen, setMoveMenuOpen] = useState(false)
   const [renameTarget, setRenameTarget] = useState<RenameTarget | null>(null)
   const [confirmTarget, setConfirmTarget] = useState<ConfirmTarget | null>(null)
+  const [deleteBusy, setDeleteBusy] = useState(false)
   const [status, setStatus] = useState<StatusState | null>(null)
   const renameInputRef = useRef<HTMLInputElement | null>(null)
   const menuRef = useRef<HTMLDivElement | null>(null)
@@ -193,13 +225,14 @@ export function ProjectTree({ open, activeProjectId }: ProjectTreeProps) {
     if (!menu && !renameTarget && !confirmTarget) return
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key !== 'Escape') return
+      if (deleteBusy) return
       setMenu(null)
       setRenameTarget(null)
       setConfirmTarget(null)
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [confirmTarget, menu, renameTarget])
+  }, [confirmTarget, deleteBusy, menu, renameTarget])
 
   const tree = useMemo(() => buildProjectTree(projects, folders), [folders, projects])
 
@@ -477,7 +510,8 @@ export function ProjectTree({ open, activeProjectId }: ProjectTreeProps) {
   }
 
   const confirmDelete = async () => {
-    if (!confirmTarget) return
+    if (!confirmTarget || deleteBusy) return
+    setDeleteBusy(true)
     try {
       if (confirmTarget.kind === 'folder') await repo.removeFolder(confirmTarget.id)
       else {
@@ -505,6 +539,8 @@ export function ProjectTree({ open, activeProjectId }: ProjectTreeProps) {
         text: `删除失败：${error instanceof Error ? error.message : String(error)}`,
         tone: 'error',
       })
+    } finally {
+      setDeleteBusy(false)
     }
   }
 
@@ -913,11 +949,16 @@ export function ProjectTree({ open, activeProjectId }: ProjectTreeProps) {
 
       {confirmTarget &&
         createPortal(
-          <ModalLayer onClose={() => setConfirmTarget(null)}>
+          <ModalLayer
+            onClose={() => {
+              if (!deleteBusy) setConfirmTarget(null)
+            }}
+          >
             <div
               className={styles.dialog}
               role="alertdialog"
               aria-modal="true"
+              aria-busy={deleteBusy || undefined}
               aria-labelledby="project-tree-confirm-title"
             >
               <h2 id="project-tree-confirm-title">
@@ -929,16 +970,11 @@ export function ProjectTree({ open, activeProjectId }: ProjectTreeProps) {
                   : `「${confirmTarget.name}」会移到回收站，可在项目页恢复。`}
               </p>
               <div className={styles.dialogActions}>
-                <button type="button" onClick={() => setConfirmTarget(null)}>
-                  取消
-                </button>
-                <button
-                  type="button"
-                  className={styles.dangerButton}
-                  onClick={() => void confirmDelete()}
-                >
-                  确认删除
-                </button>
+                <ProjectDeleteConfirmActions
+                  deleting={deleteBusy}
+                  onCancel={() => setConfirmTarget(null)}
+                  onConfirm={() => void confirmDelete()}
+                />
               </div>
             </div>
           </ModalLayer>,

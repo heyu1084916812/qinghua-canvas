@@ -522,6 +522,13 @@
   color: var(--control-inverse-text);
 }
 
+.dialogActions .dangerButton:disabled {
+  opacity: 1;
+  background: color-mix(in srgb, var(--danger) 72%, var(--bg-canvas));
+  color: var(--text-1);
+  cursor: wait;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .chevron,
   .rowActions {

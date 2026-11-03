@@ -211,6 +211,7 @@ function HomeCard({
           selecting={false}
           selected={false}
           confirming={confirming}
+          deleting={false}
           menuOpen={menuOpen}
           renaming={renaming}
           renameValue={renameValue}

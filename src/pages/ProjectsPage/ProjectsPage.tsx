@@ -95,6 +95,8 @@ export function ProjectsPage() {
   const [renamingId, setRenamingId] = useState<string | null>(null)
   const [renameValue, setRenameValue] = useState('')
   const [busy, setBusy] = useState(false)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [bulkDeleting, setBulkDeleting] = useState(false)
   const [status, setStatusText] = useState('')
   /** 这一条状态是"正常结果"还是"失败"（产品文档 §4.5：失败要 `role=alert` 念给屏幕阅读器） */
   const [statusTone, setStatusTone] = useState<NoticeTone>('info')
@@ -173,6 +175,8 @@ export function ProjectsPage() {
   }
 
   const handleDelete = async (id: string) => {
+    if (deletingId) return
+    setDeletingId(id)
     try {
       await withPreparedProjectRuntimes(
         [id],
@@ -186,6 +190,8 @@ export function ProjectsPage() {
         `删除失败：${error instanceof Error ? error.message : String(error)}`,
         'error',
       )
+    } finally {
+      setDeletingId((current) => current === id ? null : current)
     }
   }
 
@@ -454,8 +460,9 @@ export function ProjectsPage() {
   }
 
   const handleBulkDelete = async () => {
-    if (selectedCount === 0) return
+    if (selectedCount === 0 || bulkDeleting) return
     const ids = [...selectedIds]
+    setBulkDeleting(true)
     try {
       await withPreparedProjectRuntimes(
         ids,
@@ -471,6 +478,8 @@ export function ProjectsPage() {
         `批量删除失败：${error instanceof Error ? error.message : String(error)}`,
         'error',
       )
+    } finally {
+      setBulkDeleting(false)
     }
   }
 
@@ -887,6 +896,7 @@ export function ProjectsPage() {
                   selecting={selecting}
                   selected={selectedIds.has(p.id)}
                   confirming={confirmId === p.id}
+                  deleting={deletingId === p.id}
                   menuOpen={menuId === p.id}
                   renaming={renamingId === p.id}
                   renameValue={renameValue}
@@ -937,12 +947,18 @@ export function ProjectsPage() {
                 className={styles.bulkDanger}
                 type="button"
                 data-project-bulk-confirm
+                disabled={bulkDeleting}
                 onClick={() => void handleBulkDelete()}
               >
                 <IconTrash />
-                确认删除
+                {bulkDeleting ? '收尾中…' : '确认删除'}
               </button>
-              <button className={styles.bulkBtn} type="button" onClick={() => setBulkConfirm(false)}>
+              <button
+                className={styles.bulkBtn}
+                type="button"
+                disabled={bulkDeleting}
+                onClick={() => setBulkConfirm(false)}
+              >
                 取消
               </button>
             </>
@@ -1093,6 +1109,7 @@ export function ProjectCard(props: {
   selecting: boolean
   selected: boolean
   confirming: boolean
+  deleting: boolean
   menuOpen: boolean
   renaming: boolean
   renameValue: string
@@ -1112,7 +1129,7 @@ export function ProjectCard(props: {
   onExportWithAssets: () => void
 }) {
   const {
-    project, selecting, selected, confirming, menuOpen, renaming, renameValue,
+    project, selecting, selected, confirming, deleting, menuOpen, renaming, renameValue,
     onOpen, onRenameChange, onRenameCommit, onCancelRename,
     onRequestDelete, onConfirmDelete, onCancelDelete,
     onToggleMenu, onStartRename, onDuplicate, onExport, onExportWithAssets,
@@ -1187,10 +1204,19 @@ export function ProjectCard(props: {
         {confirming ? (
           <div className={styles.confirm}>
             <span className={styles.confirmText}>删除？</span>
-            <button className={styles.confirmYes} onClick={onConfirmDelete}>
-              确认
+            <button
+              className={styles.confirmYes}
+              data-project-card-confirm-delete
+              disabled={deleting}
+              onClick={onConfirmDelete}
+            >
+              {deleting ? '收尾中…' : '确认'}
             </button>
-            <button className={styles.confirmNo} onClick={onCancelDelete}>
+            <button
+              className={styles.confirmNo}
+              disabled={deleting}
+              onClick={onCancelDelete}
+            >
               取消
             </button>
           </div>
