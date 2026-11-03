@@ -96,8 +96,9 @@
   读写 CanvasStore / AgentSession；handoff 必须先缓冲、过滤已不存在节点、去重后补引用；本地文件与素材库
   必须走同一落位链路；缩略图 objectURL 必须 unmount 回收。不得发送消息、请求模型或修改 Job。
 - **AgentSessionActionsController 不绕过 lifecycle**：新建会话创建后必须走 `switchTo`，禁止直接
-  `setCurrent`；改名晚返回只在目标仍是当前时合并；两步删除必须保留活动/队列/确认中门禁，无剩余会话时
-  走新建兜底。Hook 只持有编辑态，不得复制 SessionStore / AgentController / Job 真相。
+  `setCurrent`；改名和删除晚返回只在目标仍是当前时自动切换。两步删除必须保留活动/队列/确认中门禁；
+  `sessions.remove` 成功前不得清 draft/runtime，删除落库后的 refresh / switch / fallback 失败必须清失效选择
+  并准确提示一次；无剩余会话时走新建兜底。Hook 只持有编辑态，不得复制 SessionStore / AgentController / Job 真相。
 - **AgentComposerController 不拥有业务真相**：`useAgentComposerController` 只管理 draft、mention、
   picker、composer 高度以及 pendingAsset 同步端口；不得 import SessionStore / AgentController /
   ToolRegistry / 队列实现，不得发送消息、请求模型、推进确认或修改 Job。160ms 待发送素材 timer
@@ -109,11 +110,16 @@
   `agentOutputReveal.ts` / `agentConversationScroll.ts`，迁移不得改 JSX、DOM、data 属性、className、
   文案、布局或 CSS。
 - **AgentSessionLifecycle 不拥有会话真相**：`useAgentSessionLifecycle` 只持有一套 React 投影
-  `list / current / messages / listRef / currentIdRef`；SessionStore 与 AgentController 仍是唯一真相，
-  AgentPanel 不得再保留第二套同名 state/ref。`switchTo` 必须用 latest-request 序号拒绝慢返回旧结果，
-  `refresh` 只更新列表、不改当前选择，`currentIdRef` 必须同步，patch/snapshot 必须同时更新 list/current。
-  切会话先清 Composer 旧输入与 timer，再按新会话 `pendingAssetIds` 恢复已存草稿；异步改名、保存、切换
-  晚返回都不得把用户当前选择强行切回旧会话。
+  `list / current / messages / listRef / currentIdRef / selectionVersionRef`；SessionStore 与 AgentController
+  仍是唯一真相，AgentPanel 不得再保留第二套同名 state/ref。`refresh` 必须返回 `{ rows, applied }`，只有最新
+  refresh 能写 list；旧 rows 不得驱动 current/自动切换。`switchTo` 必须用 latest-request 序号拒绝慢返回旧结果，
+  成功删除写 discarded tombstone，refresh / setList / applySessionSnapshot / pending switch 都不得复活已删行。
+  patch/snapshot 必须同步 list/current；切会话先清 Composer 旧输入与 timer，再按新会话 `pendingAssetIds`
+  恢复已存草稿；异步改名、保存、切换晚返回都不得把用户当前选择强行切回旧会话。
+- **agentInitialLoad 只在仍拥有选择时提交**：初始会话恢复由 `agentInitialLoad.ts` 协调，必须以 selection
+  version + `currentIdRef` 在 channels/presets/sessions.get/兜底创建各异步恢复点校验所有权；失去 ownership
+  后不得写 list/current/messages。已创建但未展示的初始 session 必须经 lifecycle remove 清理并写 tombstone；
+  清理持续失败只允许保留 `cleanupError` + warn，不得伪造成功。
 - **队列 hook 不拥有队列真相**：`useAgentQueueController` 只做 React 适配；Session/Controller 是唯一真相，
   队列领取后必须绑定真实 `turnId`，附件在入队事务内冻结并消费，不能因为拆 hook 产生第二份队列。
 - **画布执行模块不能重试付费请求**：`agentCanvasRun` 必须保持 preflight → 同波并发 → `store.flush()`
