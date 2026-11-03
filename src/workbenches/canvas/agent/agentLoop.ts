@@ -307,7 +307,7 @@ export async function runAgentTurn(
         role: 'system',
         content:
           '能力目录读取失败；这是目录读取故障，不能据此断言某项能力不存在。' +
-          `错误：${error instanceof Error ? error.message : errText(error)}`,
+          `错误：${errText(error)}`,
         createdAt: Date.now(),
       })
     }
@@ -323,7 +323,7 @@ export async function runAgentTurn(
       result = await askModel(messages, deps, activeTools)
     } catch (e) {
       // 渠道错误（401 / 限流）**不回填**：那是配置问题，模型改不了（§4）
-      return { kind: 'error', message: e instanceof Error ? e.message : errText(e), messages }
+      return { kind: 'error', message: errText(e), messages }
     }
     if (result.reasoning?.trim()) {
       emitActivity({
@@ -526,7 +526,7 @@ export async function runAgentTurn(
           messages.push(
             toolResult(call.id, call.name, {
               ok: false,
-              error: error instanceof Error ? error.message : errText(error),
+              error: errText(error),
             }),
           )
         }
@@ -639,7 +639,7 @@ export async function runAgentTurn(
               }),
             )
           }
-          wrote = { ok: false, problems: [e instanceof Error ? e.message : errText(e)] }
+          wrote = { ok: false, problems: [errText(e)] }
         }
         emitActivity({
           id: call.id,
@@ -705,7 +705,7 @@ export async function runAgentTurn(
             }),
           )
         }
-        outcome = { ok: false, error: e instanceof Error ? e.message : errText(e) }
+        outcome = { ok: false, error: errText(e) }
       }
       emitActivity({
         id: call.id,

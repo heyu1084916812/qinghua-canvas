@@ -8,7 +8,10 @@ use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use tauri::{AppHandle, Emitter, Manager};
 use tiny_http::{Header, Method, Request, Response, Server, StatusCode};
 
-const PORT: u16 = 18766;
+const DEFAULT_PORT: u16 = 18766;
+const RELEASE_GATE_PORT: u16 = 18768;
+const PORT_ENV: &str = "QINGHUA_CANVAS_GATEWAY_PORT";
+const RELEASE_GATE_ENV: &str = "QINGHUA_RELEASE_GATE";
 const REQUEST_TIMEOUT: Duration = Duration::from_secs(30);
 const MAX_LOG_ENTRIES: usize = 200;
 
@@ -42,6 +45,7 @@ struct GatewayState {
 }
 
 static GATEWAY: OnceLock<Arc<Mutex<GatewayState>>> = OnceLock::new();
+static GATEWAY_PORT: OnceLock<u16> = OnceLock::new();
 
 #[derive(Deserialize)]
 struct ActionRequest {
@@ -64,12 +68,14 @@ pub fn start(app: AppHandle) -> Result<(), String> {
     if GATEWAY.get().is_some() {
         return Ok(());
     }
+    let port = configured_port()?;
+    let _ = GATEWAY_PORT.set(port);
     let token = token();
-    let server = match Server::http(("127.0.0.1", PORT)) {
+    let server = match Server::http(("127.0.0.1", port)) {
         Ok(server) => Arc::new(server),
         Err(error) => {
             clear_info(&app);
-            return Err(format!("start canvas gateway on {PORT}: {error}"));
+            return Err(format!("start canvas gateway on {port}: {error}"));
         }
     };
     let state = Arc::new(Mutex::new(GatewayState {
@@ -90,7 +96,7 @@ pub fn start(app: AppHandle) -> Result<(), String> {
             }
         });
     }
-    eprintln!("[canvas-gateway] http://127.0.0.1:{PORT}");
+    eprintln!("[canvas-gateway] http://127.0.0.1:{port}");
     Ok(())
 }
 
@@ -101,7 +107,7 @@ pub fn canvas_gateway_info() -> Result<GatewayInfo, String> {
         .ok_or_else(|| "Canvas 网关尚未启动".to_string())?
         .lock()
         .map_err(|_| "Canvas 网关状态锁已损坏".to_string())?;
-    let url = format!("http://127.0.0.1:{PORT}");
+    let url = format!("http://127.0.0.1:{}", gateway_port());
     let token = state.token.clone();
     let mcp_command = format!(
         "QINGHUA_CANVAS_URL={url} QINGHUA_CANVAS_TOKEN={token} node scripts/canvas-mcp.mjs"
@@ -169,12 +175,44 @@ fn persist_info(app: &AppHandle, token: &str) -> Result<(), String> {
     std::fs::create_dir_all(dir)
         .map_err(|error| format!("create canvas gateway config dir: {error}"))?;
     let content = serde_json::to_vec_pretty(&json!({
-        "url": format!("http://127.0.0.1:{PORT}"),
+        "url": format!("http://127.0.0.1:{}", gateway_port()),
         "token": token,
         "protocolVersion": 1
     }))
     .map_err(|error| format!("encode canvas gateway config: {error}"))?;
     std::fs::write(&path, content).map_err(|error| format!("write {}: {error}", path.display()))
+}
+
+fn gateway_port() -> u16 {
+    GATEWAY_PORT.get().copied().unwrap_or(DEFAULT_PORT)
+}
+
+fn configured_port() -> Result<u16, String> {
+    let release_gate = std::env::var(RELEASE_GATE_ENV)
+        .ok()
+        .as_deref()
+        == Some("1");
+    resolve_port(
+        release_gate,
+        std::env::var(PORT_ENV).ok().as_deref(),
+    )
+}
+
+fn resolve_port(release_gate: bool, raw: Option<&str>) -> Result<u16, String> {
+    if let Some(raw) = raw.map(str::trim).filter(|value| !value.is_empty()) {
+        let port = raw
+            .parse::<u16>()
+            .map_err(|_| format!("{PORT_ENV} 必须是 1-65535 的端口号：{raw}"))?;
+        if port == 0 {
+            return Err(format!("{PORT_ENV} 不能是 0"));
+        }
+        return Ok(port);
+    }
+    Ok(if release_gate {
+        RELEASE_GATE_PORT
+    } else {
+        DEFAULT_PORT
+    })
 }
 
 fn gateway_config_path(app: &AppHandle) -> Result<std::path::PathBuf, String> {
@@ -554,8 +592,22 @@ mod tests {
 
     #[test]
     fn gateway_info_keeps_loopback_url() {
-        let url = format!("http://127.0.0.1:{PORT}");
+        let url = format!("http://127.0.0.1:{DEFAULT_PORT}");
         assert!(url.starts_with("http://127.0.0.1:"));
+    }
+
+    #[test]
+    fn release_gate_uses_isolated_gateway_port() {
+        assert_eq!(resolve_port(false, None).unwrap(), 18766);
+        assert_eq!(resolve_port(true, None).unwrap(), 18768);
+        assert_eq!(resolve_port(true, Some("19001")).unwrap(), 19001);
+    }
+
+    #[test]
+    fn gateway_port_override_rejects_invalid_or_zero() {
+        assert!(resolve_port(false, Some("abc")).is_err());
+        assert!(resolve_port(false, Some("0")).is_err());
+        assert!(resolve_port(false, Some("65535")).is_ok());
     }
 
     #[test]

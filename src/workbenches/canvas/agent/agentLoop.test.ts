@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import type { AgentToolEffect } from '../../../domain/agent/job'
 import type { ChatMessage } from '../../../domain/shared/execution/types'
 import { AgentToolEffectBlockedError } from '../../../features/shared/agent/AgentToolEffectLedger'
+import { ChannelError } from '../../../platform/channels/types'
 import { AGENT_DEFAULT_MAX_STEPS, errText, resumeAgentTurn, runAgentTurn } from './agentLoop'
 import { AGENT_TOOLS } from './tools'
 
@@ -33,6 +34,19 @@ describe('errText · 报错给人话', () => {
   it('★ 没有可读字段的未知对象 → 也带中文前缀（不是裸 JSON）', () => {
     const t = errText({ foo: 1 })
     expect(t).toContain('没预料到')
+  })
+
+  it('★★ ChannelError 不能用调试串遮住真实 HTTP 502 原因', () => {
+    const t = errText(
+      new ChannelError({
+        kind: 'execution',
+        detail: 'accepted',
+        message: '生图提交结果未知：HTTP 502，上游模型暂不可用',
+      }),
+    )
+    expect(t).toContain('HTTP 502')
+    expect(t).toContain('上游模型暂不可用')
+    expect(t).not.toContain('[channel] http')
   })
 })
 
@@ -128,6 +142,50 @@ describe('runAgentTurn · 确认之前的预检', () => {
 })
 
 describe('runAgentTurn · 基本往复', () => {
+  it('★★ 工具执行返回 ChannelError 时，工具结果保留真实 502 原因', async () => {
+    const failure = new ChannelError({
+      kind: 'execution',
+      detail: 'accepted',
+      message: '生图提交结果未知：HTTP 502，上游模型暂不可用',
+    })
+    const executeRead = vi.fn(async () => {
+      throw failure
+    })
+    const { deps } = depsWith(
+      [
+        { toolCalls: [{ id: 'read-failed', name: 'readGraph', args: '{"scope":"all"}' }] },
+        { text: '读图失败，我先停下。' },
+      ],
+      executeRead,
+    )
+
+    const result = await runAgentTurn(user('读一下画布'), deps)
+    const toolMessage = result.messages.find(
+      (message) => message.toolCallId === 'read-failed',
+    )
+    expect(String(toolMessage?.content)).toContain('HTTP 502')
+    expect(String(toolMessage?.content)).toContain('上游模型暂不可用')
+    expect(String(toolMessage?.content)).not.toContain('[channel] http')
+  })
+
+  it('★★ 模型请求返回 ChannelError 时，任务错误保留真实 502 原因', async () => {
+    const failure = new ChannelError({
+      kind: 'execution',
+      detail: 'accepted',
+      message: '模型请求结果未知：HTTP 502，上游模型暂不可用',
+    })
+    const { deps } = depsWith([{ text: '不会被用到' }])
+    deps.adapter.completeText.mockRejectedValueOnce(failure)
+
+    const result = await runAgentTurn(user('开始'), deps)
+    expect(result.kind).toBe('error')
+    if (result.kind === 'error') {
+      expect(result.message).toContain('HTTP 502')
+      expect(result.message).toContain('上游模型暂不可用')
+      expect(result.message).not.toContain('[channel] http')
+    }
+  })
+
   it('★★ 多个 tool_calls 遇确认时不提前补结果，批准后按调用顺序唯一配对', async () => {
     const { deps } = depsWith([
       {
