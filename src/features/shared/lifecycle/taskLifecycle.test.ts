@@ -135,4 +135,34 @@ describe('taskLifecycle', () => {
     expect(a.state).toBe('open')
     expect(b.state).toBe('open')
   })
+
+  it('组合控制只在全部 finalize 后释放提交期资源', () => {
+    const releaseA = vi.fn()
+    const releaseB = vi.fn()
+    const combined = combineTaskShutdownControls([
+      {
+        waitForIdle: async () => undefined,
+        whenIdle: async () => undefined,
+        canReopen: () => true,
+        reopenIfIdle: () => true,
+        canFinalize: () => true,
+        finalize: () => true,
+        releaseFinalized: releaseA,
+      },
+      {
+        waitForIdle: async () => undefined,
+        whenIdle: async () => undefined,
+        canReopen: () => true,
+        reopenIfIdle: () => true,
+        canFinalize: () => true,
+        finalize: () => true,
+        releaseFinalized: releaseB,
+      },
+    ])
+
+    expect(releaseA).not.toHaveBeenCalled()
+    combined.releaseFinalized?.()
+    expect(releaseA).toHaveBeenCalledOnce()
+    expect(releaseB).toHaveBeenCalledOnce()
+  })
 })

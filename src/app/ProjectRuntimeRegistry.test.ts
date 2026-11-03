@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { TaskShutdownControl } from '../features/shared/lifecycle/taskLifecycle'
 import {
   ProjectRuntimeBusyError,
+  ProjectRuntimeCleanupError,
   disposeProjectRuntimes,
   prepareProjectRuntimes,
   registerProjectRuntime,
@@ -71,7 +72,9 @@ describe('ProjectRuntimeRegistry', () => {
 
     const disposal = await prepareProjectRuntimes(['p1'])
     order.push('database')
-    await expect(disposal.commit()).resolves.toBe(true)
+    await expect(disposal.commit()).resolves.toEqual({
+      status: 'cleanup_complete',
+    })
     order.push('purge-agent-tables')
 
     expect(order).toEqual([
@@ -229,7 +232,9 @@ describe('ProjectRuntimeRegistry', () => {
     await gate
     await new Promise((resolve) => setTimeout(resolve, 0))
     const disposal = await prepareProjectRuntimes(['p1'])
-    expect(await disposal.commit()).toBe(true)
+    await expect(disposal.commit()).resolves.toEqual({
+      status: 'cleanup_complete',
+    })
     expect(begins).toBe(2)
   })
 
@@ -253,9 +258,13 @@ describe('ProjectRuntimeRegistry', () => {
       prepareProjectRuntimes(['p1', 'p2']),
     ).rejects.toBeInstanceOf(ProjectRuntimeBusyError)
 
-    await expect(first.commit()).resolves.toBe(true)
+    await expect(first.commit()).resolves.toEqual({
+      status: 'cleanup_complete',
+    })
     const p2 = await prepareProjectRuntimes(['p2'])
-    await expect(p2.commit()).resolves.toBe(true)
+    await expect(p2.commit()).resolves.toEqual({
+      status: 'cleanup_complete',
+    })
   })
 
   it('work 期间同 project/key 重注册必须复用旧 registration，commit 后无残留', async () => {
@@ -336,23 +345,199 @@ describe('ProjectRuntimeRegistry', () => {
     await disposeProjectRuntimes(['p1'])
   })
 
-  it('work 已成功时 commit 清理异常不反向误报数据库失败', async () => {
+  it.each([
+    ['canFinalize 为 false', 'blocked'],
+    ['finalize 返回 false', 'false'],
+    ['finalize 抛错', 'throw'],
+  ] as const)(
+    '%s 时保留锁与注册，修正后只重试 cleanup',
+    async (_label, failure) => {
+      let ready = false
+      let begins = 0
+      registerProjectRuntime({
+        projectId: 'p1',
+        key: 'canvas-agent',
+        beginDispose: () => {
+          begins += 1
+          let finalized = false
+          return {
+            waitForIdle: async () => undefined,
+            whenIdle: async () => undefined,
+            canReopen: () => ready,
+            reopenIfIdle: () => ready,
+            canFinalize: () =>
+              ready || failure !== 'blocked',
+            finalize() {
+              if (!ready && failure === 'false') return false
+              if (!ready && failure === 'throw') {
+                throw new Error('host cleanup failed')
+              }
+              finalized = true
+              return finalized
+            },
+          }
+        },
+      })
+      const work = vi.fn(async () => 'database removed')
+
+      await expect(
+        withPreparedProjectRuntimes(['p1'], work),
+      ).rejects.toBeInstanceOf(ProjectRuntimeCleanupError)
+      expect(work).toHaveBeenCalledOnce()
+      await expect(
+        prepareProjectRuntimes(['p1']),
+      ).rejects.toBeInstanceOf(ProjectRuntimeBusyError)
+
+      ready = true
+      await expect(
+        withPreparedProjectRuntimes(['p1'], work),
+      ).resolves.toBe('database removed')
+      expect(work).toHaveBeenCalledOnce()
+      expect(begins).toBe(1)
+      await expect(
+        disposeProjectRuntimes(['p1']),
+      ).resolves.toBeUndefined()
+    },
+  )
+
+  it('仓储 work 抛错时只 rollback，不 finalize', async () => {
+    const finalize = vi.fn(() => true)
     registerProjectRuntime({
       projectId: 'p1',
       key: 'canvas-agent',
       beginDispose: () => ({
         ...control(async () => undefined),
-        finalize() {
-          throw new Error('host cleanup failed')
-        },
+        finalize,
       }),
     })
-    const work = vi.fn(async () => 'database removed')
 
     await expect(
-      withPreparedProjectRuntimes(['p1'], work),
-    ).resolves.toBe('database removed')
-    expect(work).toHaveBeenCalledOnce()
+      withPreparedProjectRuntimes(['p1'], async () => {
+        throw new Error('database remove failed')
+      }),
+    ).rejects.toThrow('database remove failed')
+    expect(finalize).not.toHaveBeenCalled()
+  })
+
+  it('late runtime resolve 后才允许 commit', async () => {
+    let release!: () => void
+    const gate = new Promise<void>((resolve) => {
+      release = resolve
+    })
+    registerProjectRuntime({
+      projectId: 'p1',
+      key: 'canvas-agent',
+      beginDispose: () => control(async () => undefined),
+    })
+    const disposal = await prepareProjectRuntimes(['p1'])
+    registerProjectRuntime({
+      projectId: 'p1',
+      key: 'late-runtime',
+      beginDispose: () => ({
+        waitForIdle: () => gate,
+        whenIdle: () => gate,
+        canReopen: () => true,
+        reopenIfIdle: () => true,
+        canFinalize: () => true,
+        finalize: () => true,
+      }),
+    })
+
+    let settled = false
+    const committing = disposal.commit().then((result) => {
+      settled = true
+      return result
+    })
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    expect(settled).toBe(false)
+
+    release()
+    await expect(committing).resolves.toMatchObject({
+      status: 'cleanup_complete',
+    })
+  })
+
+  it('late runtime reject 保留锁与注册，重试可清理', async () => {
+    let attempts = 0
+    registerProjectRuntime({
+      projectId: 'p1',
+      key: 'canvas-agent',
+      beginDispose: () => control(async () => undefined),
+    })
+    const disposal = await prepareProjectRuntimes(['p1'])
+    registerProjectRuntime({
+      projectId: 'p1',
+      key: 'late-runtime',
+      beginDispose: () => ({
+        waitForIdle: async () => {
+          attempts += 1
+          if (attempts === 1) throw new Error('late idle failed')
+        },
+        whenIdle: async () => undefined,
+        canReopen: () => true,
+        reopenIfIdle: () => true,
+        canFinalize: () => true,
+        finalize: () => true,
+      }),
+    })
+
+    await expect(disposal.commit()).resolves.toMatchObject({
+      status: 'cleanup_failed',
+      error: expect.objectContaining({
+        message: expect.stringContaining('late idle failed'),
+      }),
+    })
+    await expect(
+      prepareProjectRuntimes(['p1']),
+    ).rejects.toBeInstanceOf(ProjectRuntimeBusyError)
+    await expect(disposal.commit()).resolves.toMatchObject({
+      status: 'cleanup_complete',
+    })
+    expect(attempts).toBe(2)
+  })
+
+  it('late runtime 永久 pending 会超时，之后仍可再次清理', async () => {
+    let attempts = 0
+    registerProjectRuntime({
+      projectId: 'p1',
+      key: 'canvas-agent',
+      beginDispose: () => control(async () => undefined),
+    })
+    const disposal = await prepareProjectRuntimes(['p1'], {
+      shutdownTimeoutMs: 5,
+    })
+    registerProjectRuntime({
+      projectId: 'p1',
+      key: 'late-runtime',
+      beginDispose: () => ({
+        waitForIdle: () => {
+          attempts += 1
+          return attempts === 1
+            ? new Promise<void>(() => undefined)
+            : Promise.resolve()
+        },
+        whenIdle: () => new Promise<void>(() => undefined),
+        canReopen: () => true,
+        reopenIfIdle: () => true,
+        canFinalize: () => true,
+        finalize: () => true,
+      }),
+    })
+
+    await expect(disposal.commit()).resolves.toMatchObject({
+      status: 'cleanup_failed',
+      error: expect.objectContaining({
+        name: 'ProjectRuntimeCleanupError',
+        reason: expect.stringContaining('超时'),
+      }),
+    })
+    await expect(
+      prepareProjectRuntimes(['p1']),
+    ).rejects.toBeInstanceOf(ProjectRuntimeBusyError)
+    await expect(disposal.commit()).resolves.toMatchObject({
+      status: 'cleanup_complete',
+    })
+    expect(attempts).toBe(2)
   })
 
   it('超时恢复尚未 idle 时锁保持，第二次 prepare 不能覆盖 attempt', async () => {
@@ -389,6 +574,8 @@ describe('ProjectRuntimeRegistry', () => {
     await gate
     await new Promise((resolve) => setTimeout(resolve, 0))
     const retry = await prepareProjectRuntimes(['p1'])
-    await expect(retry.commit()).resolves.toBe(true)
+    await expect(retry.commit()).resolves.toEqual({
+      status: 'cleanup_complete',
+    })
   })
 })

@@ -13,6 +13,8 @@ export interface TaskShutdownControl {
   reopenIfIdle(): boolean
   canFinalize(): boolean
   finalize(): boolean
+  /** 全部 participant 都 finalize 成功后释放跨 runtime 的提交期资源。 */
+  releaseFinalized?(): void
 }
 
 export function combineTaskShutdownControls(
@@ -37,6 +39,9 @@ export function combineTaskShutdownControls(
     finalize() {
       if (!active.every((control) => control.canFinalize())) return false
       return active.every((control) => control.finalize())
+    },
+    releaseFinalized() {
+      active.forEach((control) => control.releaseFinalized?.())
     },
   }
 }

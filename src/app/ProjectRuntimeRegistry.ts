@@ -1,4 +1,8 @@
-import type { TaskShutdownControl } from '../features/shared/lifecycle/taskLifecycle'
+import {
+  DEFAULT_TASK_SHUTDOWN_TIMEOUT_MS,
+  TaskLifecycleTimeoutError,
+  type TaskShutdownControl,
+} from '../features/shared/lifecycle/taskLifecycle'
 
 interface ProjectRuntimeRegistration {
   key: string
@@ -17,14 +21,27 @@ export interface ProjectRuntimeRegistrationHandle {
 interface PreparedRuntime {
   runtime: ProjectRuntimeRegistration
   control: TaskShutdownControl
-  settled: boolean
+  idle: boolean
+  finalized: boolean
+  lastError: string | null
 }
+
+export interface ProjectRuntimePrepareOptions {
+  shutdownTimeoutMs?: number
+}
+
+export type ProjectRuntimeCommitResult =
+  | { status: 'cleanup_complete' }
+  | {
+      status: 'cleanup_failed'
+      error: ProjectRuntimeCleanupError
+    }
 
 export interface ProjectRuntimeDisposal {
   /** 数据库操作失败时恢复仍保留的全部 runtime / host。 */
   rollback(): boolean
   /** 数据库成功后提交清理；调用前不能 purge / 移出 UI。 */
-  commit(): Promise<boolean>
+  commit(workResult?: unknown): Promise<ProjectRuntimeCommitResult>
 }
 
 const registrations = new Map<
@@ -37,6 +54,10 @@ let nextGeneration = 1
 interface ProjectOperation {
   readonly projectIds: ReadonlySet<string>
   readonly prepared: PreparedRuntime[]
+  readonly shutdownTimeoutMs: number
+  phase: 'preparing' | 'prepared' | 'committing' | 'cleanup_failed' | 'cleanup_complete'
+  recoveryError: ProjectRuntimeCleanupError | null
+  workResult: unknown
   released: boolean
 }
 
@@ -50,8 +71,46 @@ export class ProjectRuntimeBusyError extends Error {
   }
 }
 
+export class ProjectRuntimeCleanupError extends Error {
+  readonly projectIds: readonly string[]
+  readonly reason: string
+  readonly workCommitted = true
+  readonly retryable = true
+
+  constructor(projectIds: readonly string[], error: unknown) {
+    const reason =
+      error instanceof Error ? error.message : String(error)
+    super(
+      `项目数据已删除，但运行态清理失败，可重试清理：${reason}`,
+    )
+    this.name = 'ProjectRuntimeCleanupError'
+    this.projectIds = [...new Set(projectIds)]
+    this.reason = reason
+  }
+}
+
+function errorText(error: unknown): string {
+  return error instanceof Error ? error.message : String(error)
+}
+
+function waitWithTimeout<T>(
+  promise: Promise<T>,
+  timeoutMs: number,
+): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => {
+      reject(new TaskLifecycleTimeoutError(1, timeoutMs))
+    }, timeoutMs)
+  })
+  return Promise.race([promise, timeout]).finally(() => {
+    if (timer !== undefined) clearTimeout(timer)
+  })
+}
+
 function claimProjects(
   projectIds: readonly string[],
+  options: ProjectRuntimePrepareOptions,
 ): ProjectOperation {
   const ids = [...new Set(projectIds)]
   const busy = ids.filter((projectId) =>
@@ -63,6 +122,12 @@ function claimProjects(
   const operation: ProjectOperation = {
     projectIds: new Set(ids),
     prepared: [],
+    shutdownTimeoutMs:
+      options.shutdownTimeoutMs ??
+      DEFAULT_TASK_SHUTDOWN_TIMEOUT_MS,
+    phase: 'preparing',
+    recoveryError: null,
+    workResult: undefined,
     released: false,
   }
   for (const projectId of ids) {
@@ -116,7 +181,9 @@ function beginPreparedRuntime(
   const item: PreparedRuntime = {
     runtime,
     control,
-    settled: false,
+    idle: false,
+    finalized: false,
+    lastError: null,
   }
   operation.prepared.push(item)
   return item
@@ -146,11 +213,23 @@ async function waitForPreparedIdle(
     const batch = operation.prepared.slice(cursor)
     cursor = operation.prepared.length
     await Promise.all(
-      batch.map((item) => item.control.waitForIdle()),
+      batch
+        .filter((item) => !item.idle)
+        .map(async (item) => {
+          try {
+            await waitWithTimeout(
+              item.control.waitForIdle(),
+              operation.shutdownTimeoutMs,
+            )
+            item.idle = true
+            item.lastError = null
+          } catch (error) {
+            item.idle = false
+            item.lastError = errorText(error)
+            throw error
+          }
+        }),
     )
-    batch.forEach((item) => {
-      item.settled = true
-    })
     collectLateRuntimes(operation)
   }
 }
@@ -162,43 +241,146 @@ async function settlePrepared(
   while (cursor < operation.prepared.length) {
     const batch = operation.prepared.slice(cursor)
     cursor = operation.prepared.length
-    await Promise.allSettled(
+    await Promise.all(
       batch
-        .filter((item) => !item.settled)
-        .map((item) => item.control.whenIdle()),
+        .filter((item) => !item.idle)
+        .map(async (item) => {
+          try {
+            await waitWithTimeout(
+              item.control.whenIdle(),
+              operation.shutdownTimeoutMs,
+            )
+            item.idle = true
+            item.lastError = null
+          } catch (error) {
+            item.idle = false
+            item.lastError = errorText(error)
+            throw error
+          }
+        }),
     )
-    batch.forEach((item) => {
-      item.settled = true
-    })
     collectLateRuntimes(operation)
   }
 }
 
 function recoverPrepared(operation: ProjectOperation): boolean {
+  const reopenAll = (): boolean => {
+    while (collectLateRuntimes(operation)) {
+      // New registrations join the same recovery before reopening.
+    }
+    const current = controlsOf(operation.prepared)
+    if (!current.every((control) => control.canReopen())) {
+      return false
+    }
+    if (!current.every((control) => control.reopenIfIdle())) {
+      return false
+    }
+    operation.prepared.forEach((item) => {
+      item.runtime.active = true
+    })
+    operation.recoveryError = null
+    releaseProjectOperation(operation)
+    return true
+  }
+
   collectLateRuntimes(operation)
   const controls = controlsOf(operation.prepared)
   if (controls.every((control) => control.canReopen())) {
-    const reopened = controls.every((control) => control.reopenIfIdle())
-    if (reopened) {
-      for (const item of operation.prepared) item.runtime.active = true
-      releaseProjectOperation(operation)
-    }
-    return reopened
+    return reopenAll()
   }
-  void settlePrepared(operation).then(() => {
-    let current = controlsOf(operation.prepared)
-    while (collectLateRuntimes(operation)) {
-      current = controlsOf(operation.prepared)
-    }
-    if (current.every((control) => control.canReopen())) {
-      current.forEach((control) => control.reopenIfIdle())
-      operation.prepared.forEach((item) => {
-        item.runtime.active = true
-      })
-      releaseProjectOperation(operation)
-    }
-  })
+  void settlePrepared(operation).then(
+    () => {
+      reopenAll()
+    },
+    (error) => {
+      operation.recoveryError = new ProjectRuntimeCleanupError(
+        [...operation.projectIds],
+        error,
+      )
+      reopenAll()
+    },
+  )
   return false
+}
+
+function pendingCleanupOperation(
+  projectIds: readonly string[],
+): ProjectOperation | null {
+  const ids = [...new Set(projectIds)]
+  let operation: ProjectOperation | null = null
+  for (const projectId of ids) {
+    const current = projectOperations.get(projectId)
+    if (!current || current.phase !== 'cleanup_failed') return null
+    if (operation && operation !== current) return null
+    operation = current
+  }
+  if (!operation || operation.projectIds.size !== ids.length) {
+    return null
+  }
+  return operation
+}
+
+async function commitOperation(
+  operation: ProjectOperation,
+): Promise<ProjectRuntimeCommitResult> {
+  if (operation.phase === 'cleanup_complete') {
+    return { status: 'cleanup_complete' }
+  }
+  operation.phase = 'committing'
+  try {
+    while (true) {
+      collectLateRuntimes(operation)
+      await waitForPreparedIdle(operation)
+      if (!collectLateRuntimes(operation)) break
+    }
+
+    const pending = operation.prepared.filter(
+      (item) => !item.finalized,
+    )
+    for (const item of pending) {
+      if (!item.control.canFinalize()) {
+        throw new Error(
+          `${item.runtime.projectId}/${item.runtime.key} 尚未达到可提交状态`,
+        )
+      }
+    }
+    for (const item of pending) {
+      let finalized = false
+      try {
+        finalized = item.control.finalize()
+      } catch (error) {
+        item.lastError = errorText(error)
+        throw error
+      }
+      if (!finalized) {
+        throw new Error(
+          `${item.runtime.projectId}/${item.runtime.key} finalize 返回 false`,
+        )
+      }
+      item.finalized = true
+      item.idle = false
+      item.lastError = null
+    }
+  } catch (error) {
+    operation.phase = 'cleanup_failed'
+    return {
+      status: 'cleanup_failed',
+      error: new ProjectRuntimeCleanupError(
+        [...operation.projectIds],
+        error,
+      ),
+    }
+  }
+
+  operation.prepared.forEach((item) => {
+    item.control.releaseFinalized?.()
+  })
+  operation.phase = 'cleanup_complete'
+  for (const projectId of operation.projectIds) {
+    registrations.delete(projectId)
+  }
+  releaseProjectOperation(operation)
+  return { status: 'cleanup_complete' }
 }
 
 /**
@@ -255,9 +437,9 @@ export function registerProjectRuntime(
  */
 export async function prepareProjectRuntimes(
   projectIds: readonly string[],
+  options: ProjectRuntimePrepareOptions = {},
 ): Promise<ProjectRuntimeDisposal> {
-  const operation = claimProjects(projectIds)
-  let committed = false
+  const operation = claimProjects(projectIds, options)
   try {
     for (const projectId of operation.projectIds) {
       const project = registrations.get(projectId)
@@ -278,37 +460,12 @@ export async function prepareProjectRuntimes(
 
   const disposal: ProjectRuntimeDisposal = {
     rollback() {
-      if (committed) return false
+      if (operation.phase === 'cleanup_complete') return false
       return recoverPrepared(operation)
     },
-    async commit() {
-      if (committed) return false
-      let finalized = true
-      try {
-        while (true) {
-          collectLateRuntimes(operation)
-          await settlePrepared(operation)
-          if (!collectLateRuntimes(operation)) break
-        }
-        const controls = controlsOf(operation.prepared)
-        for (const control of controls) {
-          try {
-            if (!control.canFinalize() || !control.finalize()) {
-              finalized = false
-            }
-          } catch {
-            finalized = false
-          }
-        }
-      } catch {
-        finalized = false
-      }
-      committed = true
-      for (const projectId of operation.projectIds) {
-        registrations.delete(projectId)
-      }
-      releaseProjectOperation(operation)
-      return finalized
+    commit(workResult?: unknown) {
+      operation.workResult = workResult
+      return commitOperation(operation)
     },
   }
 
@@ -318,33 +475,62 @@ export async function prepareProjectRuntimes(
     recoverPrepared(operation)
     throw error
   }
+  operation.phase = 'prepared'
   return disposal
 }
 
 export async function withPreparedProjectRuntimes<T>(
   projectIds: readonly string[],
   work: () => Promise<T>,
+  options: ProjectRuntimePrepareOptions = {},
 ): Promise<T> {
-  const disposal = await prepareProjectRuntimes(projectIds)
+  const pending = pendingCleanupOperation(projectIds)
+  if (pending) {
+    const retried = await commitOperation(pending)
+    if (retried.status === 'cleanup_failed') throw retried.error
+    return pending.workResult as T
+  }
+
+  const disposal = await prepareProjectRuntimes(projectIds, options)
+  let result: T
   try {
-    const result = await work()
-    const committed = await disposal.commit()
-    if (!committed) {
-      console.error('[project-runtime] 数据库写入成功，但运行时清理未能提交')
-    }
-    return result
+    result = await work()
   } catch (error) {
     disposal.rollback()
     throw error
   }
+  const committed = await disposal.commit(result)
+  if (committed.status === 'cleanup_failed') {
+    throw committed.error
+  }
+  return result
 }
 
 export async function disposeProjectRuntimes(
   projectIds: readonly string[],
+  options: ProjectRuntimePrepareOptions = {},
 ): Promise<void> {
-  const disposal = await prepareProjectRuntimes(projectIds)
-  if (!(await disposal.commit())) {
-    throw new Error('项目运行时未能安全完成清理')
+  const pending = pendingCleanupOperation(projectIds)
+  if (pending) {
+    const retried = await commitOperation(pending)
+    if (retried.status === 'cleanup_failed') throw retried.error
+    return
+  }
+  const disposal = await prepareProjectRuntimes(projectIds, options)
+  const committed = await disposal.commit()
+  if (committed.status === 'cleanup_failed') {
+    throw committed.error
+  }
+}
+
+export async function retryProjectRuntimeCleanup(
+  projectIds: readonly string[],
+): Promise<void> {
+  const pending = pendingCleanupOperation(projectIds)
+  if (!pending) return
+  const result = await commitOperation(pending)
+  if (result.status === 'cleanup_failed') {
+    throw result.error
   }
 }
 
