@@ -4,7 +4,6 @@ import {
   useContext,
   useEffect,
   useMemo,
-  useRef,
   useSyncExternalStore,
   type ReactNode,
 } from 'react'
@@ -90,8 +89,19 @@ import {
 } from '../../../domain/project/modelRouting'
 import { resolveUpstreamModel } from '../../../domain/project/modelMapping'
 import { buildGroupRunPlan } from '../../../features/canvas/execution/groupRunPlan'
-import { createNodeScopedRunCancellation } from '../../../features/canvas/execution/nodeScopedRunCancellation'
 import { resolveTextRoute } from './textRoute'
+import {
+  canvasRunIsRunning,
+  canvasRunStatesOf,
+  subscribeCanvasRunStates,
+  updateCanvasRunStates,
+} from './canvasRunState'
+import {
+  canvasExecutionRuntimeFor,
+  initializeCanvasExecutionVersions,
+  nextCanvasExecutionVersion,
+  trackCanvasExecutionVersion,
+} from './canvasExecutionRuntime'
 
 /**
  * 画布执行宿主（架构 §4.7 / §5.5）：把 `useExecution` 接到画布 store + 渠道解析器。
@@ -160,6 +170,48 @@ export interface CanvasExecutionApi {
 
 const Ctx = createContext<CanvasExecutionApi | null>(null)
 
+/**
+ * 常驻宿主使用的稳定 API 视图。
+ *
+ * 方法闭包捕获自仍然存活的 provider 实例；运行态读取则每次访问项目级 live store，
+ * 所以 CanvasExecutionProvider 随路由卸载后，nodeStates / isRunning 仍会更新。
+ */
+export function createCanvasExecutionHostAdapter(
+  projectId: string,
+  api: CanvasExecutionApi,
+): CanvasExecutionApi {
+  return {
+    runNode: api.runNode,
+    runGroup: api.runGroup,
+    cancel: api.cancel,
+    appendRecord: api.appendRecord,
+    completeText: api.completeText,
+    get nodeStates() {
+      return canvasRunStatesOf(projectId)
+    },
+    nodeStateOf(nodeId) {
+      return canvasRunStatesOf(projectId).get(nodeId)
+    },
+    get isRunning() {
+      return (
+        canvasExecutionRuntimeFor(projectId).engine.isRunning() ||
+        canvasRunIsRunning(projectId)
+      )
+    },
+  }
+}
+
+/** 只注入既有 API 值，不创建第二套执行引擎。 */
+export function CanvasExecutionValueProvider({
+  value,
+  children,
+}: {
+  value: CanvasExecutionApi
+  children: ReactNode
+}) {
+  return <Ctx.Provider value={value}>{children}</Ctx.Provider>
+}
+
 function adapterKey(
   channelId: string,
   credentialGroupId: string | undefined,
@@ -185,38 +237,6 @@ function adapterKey(
  * 旧实例里的回调照常更新它（闭包里那个 projectId 是同一个），新挂载的 provider 订阅收到。
  * 配套的另一半在 `CanvasPage`：画布 store 也按项目缓存，否则结果仍会写进一个没人看的实例。
  */
-const runStatesByProject = new Map<string, Map<string, RunTaskState>>()
-const runStateListeners = new Map<string, Set<() => void>>()
-
-function runStatesOf(projectId: string): Map<string, RunTaskState> {
-  const hit = runStatesByProject.get(projectId)
-  if (hit) return hit
-  const fresh = new Map<string, RunTaskState>()
-  runStatesByProject.set(projectId, fresh)
-  return fresh
-}
-
-/** 改一份状态并**换新 Map 引用**（`useSyncExternalStore` 靠引用比较判断要不要重渲） */
-function updateRunStates(
-  projectId: string,
-  update: (prev: Map<string, RunTaskState>) => Map<string, RunTaskState>,
-): void {
-  runStatesByProject.set(projectId, update(runStatesOf(projectId)))
-  for (const listener of runStateListeners.get(projectId) ?? []) listener()
-}
-
-function subscribeRunStates(projectId: string, listener: () => void): () => void {
-  let set = runStateListeners.get(projectId)
-  if (!set) {
-    set = new Set()
-    runStateListeners.set(projectId, set)
-  }
-  set.add(listener)
-  return () => {
-    set.delete(listener)
-  }
-}
-
 export function CanvasExecutionProvider({
   children,
   workbench = 'canvas',
@@ -253,6 +273,11 @@ export function CanvasExecutionProvider({
       }),
     [channels, platform, repo],
   )
+  const projectId = store.getSnapshot().projectId
+  const runtime = useMemo(
+    () => canvasExecutionRuntimeFor(projectId),
+    [projectId],
+  )
 
   /**
    * 并发运行各自的适配器表：planId → (channelId → adapter)。
@@ -260,12 +285,6 @@ export function CanvasExecutionProvider({
    * 不能只存一份全局 map —— 第二条链路启动时会覆盖第一条的解析结果，
    * 第一条的 `channelResolver` 就会拿到错渠道或直接抛「未解析到渠道适配器」。
    */
-  const adapterMapsRef = useRef<Map<string, Map<string, ChannelAdapter>>>(new Map())
-  /** 并发运行各自的 task → node 反查表；按 planId 分开，避免后发计划覆盖先发计划 */
-  const taskToNodeMapsRef = useRef<Map<string, Map<string, string>>>(new Map())
-  const nodeScopedRunCancellationRef = useRef(createNodeScopedRunCancellation())
-  /** 被渠道删除中止的计划：收口时必须保留明确原因，不能被通用的“已取消”覆盖。 */
-  const channelInterruptedPlansRef = useRef<Set<string>>(new Set())
   /**
    * 提示词节点「生成正文」阶段的并发闸门。
    *
@@ -273,43 +292,40 @@ export function CanvasExecutionProvider({
    * 不在这里挡住，用户连点两次会发两次请求（= 两次扣费），而且后一次的结果
    * 可能覆盖前一次。同时把节点标成 running，让等待期间有可见反馈。
    */
-  const preparingPromptRef = useRef<Set<string>>(new Set())
+  const preparingPrompt = runtime.preparingPrompt
   /**
-   * 「正在跑」状态从**按项目**的那份读（见文件顶部 `runStatesByProject` 的说明）。
+   * 「正在跑」状态从**按项目**的 `canvasRunState` 读。
    *
    * 用 `useSyncExternalStore` 而不是 `useState`：切走再回来时，负责这次运行的是**旧实例**
    * 里的回调 —— 它只会更新模块级那份，新挂载的 provider 必须能收到，否则转圈照样不显示。
    */
-  const projectId = store.getSnapshot().projectId
   const nodeStates = useSyncExternalStore(
-    useCallback((listener: () => void) => subscribeRunStates(projectId, listener), [projectId]),
-    () => runStatesOf(projectId),
-    () => runStatesOf(projectId),
+    useCallback((listener: () => void) => subscribeCanvasRunStates(projectId, listener), [projectId]),
+    () => canvasRunStatesOf(projectId),
+    () => canvasRunStatesOf(projectId),
   )
 
   /**
    * 当前所有活动计划已经占用的“运行席位”。
    *
    * `runStates` 只回答 UI 可见状态；任务在渠道解析阶段时目标节点还没写进去。
-   * `taskToNodeMapsRef` 会在落点确定后立刻把真实承载节点补进来。两者取并集，
+   * `runtime.taskToNodeMaps` 会在落点确定后立刻把真实承载节点补进来。两者取并集，
    * 才能阻止连续点击把同一个空节点当成两个计划的共同落点。
    */
   const activeRunNodeIds = useCallback((): ReadonlySet<string> => {
     const ids = new Set<string>()
-    for (const [nodeId, state] of runStatesOf(projectId)) {
+    for (const [nodeId, state] of canvasRunStatesOf(projectId)) {
       if (state.kind === 'queued' || state.kind === 'running') ids.add(nodeId)
     }
-    for (const taskToNode of taskToNodeMapsRef.current.values()) {
+    for (const taskToNode of runtime.taskToNodeMaps.values()) {
       for (const nodeId of taskToNode.values()) ids.add(nodeId)
     }
     return ids
-  }, [projectId])
+  }, [projectId, runtime])
 
   // 版本计数（§6.21「每次执行的版本号」）：nodeId → 已知最大 version。
   // 挂载时从 runRecords 表初始化；runEngine 经 nextVersion 递增；
   // 引擎之外的写入方（版本恢复）经 appendRecord 递增，保证计数与库一致。
-  const versionMaxRef = useRef<Map<string, number>>(new Map())
-
   /**
    * 递增某节点的版本号，并**立刻**记进计数表（§6.21）。
    *
@@ -318,10 +334,8 @@ export function CanvasExecutionProvider({
    * 的唯一依据，漂了就是日志里两条记录同号。
    */
   const bumpVersion = useCallback((nodeId: string): number => {
-    const next = (versionMaxRef.current.get(nodeId) ?? 0) + 1
-    versionMaxRef.current.set(nodeId, next)
-    return next
-  }, [])
+    return nextCanvasExecutionVersion(projectId, nodeId)
+  }, [projectId])
 
   /**
    * 批量进度计数（对账 #386 的 E5），按 planId 分开记。
@@ -330,31 +344,28 @@ export function CanvasExecutionProvider({
    * 而且**最后一个任务不再报进度** —— 收口那一句由 `onFinish` 的完成 / 失败通知说，
    * 两条挨着弹只会让提示位把前一条盖掉。
    */
-  const planProgressRef = useRef<Map<string, { done: number; total: number }>>(new Map())
+  const planProgress = runtime.planProgress
 
   // 挂载时读回历史：初始化版本计数（RunRecord 是日志面板的数据源）
   useEffect(() => {
-    let alive = true
-    void (async () => {
-      const rows = await platform.storage.query('runRecords', { projectId: store.getSnapshot().projectId })
-      if (!alive) return
-      const byNode = new Map<string, RunRecord[]>()
-      for (const r of rows as unknown as RunRecord[]) {
-        const list = byNode.get(r.nodeId)
-        if (list) list.push(r)
-        else byNode.set(r.nodeId, [r])
-      }
-      const versions = versionMaxRef.current
-      for (const [nodeId, recs] of byNode) {
-        let max = 0
-        for (const r of recs) if (r.version > max) max = r.version
-        versions.set(nodeId, Math.max(versions.get(nodeId) ?? 0, max))
-      }
-    })()
-    return () => {
-      alive = false
-    }
-  }, [platform, store])
+    void initializeCanvasExecutionVersions(
+      projectId,
+      async () => {
+        const rows = await platform.storage.query(
+          'runRecords',
+          { projectId },
+        )
+        const byNode = new Map<string, number>()
+        for (const row of rows as unknown as RunRecord[]) {
+          byNode.set(
+            row.nodeId,
+            Math.max(byNode.get(row.nodeId) ?? 0, row.version),
+          )
+        }
+        return byNode
+      },
+    ).catch(() => undefined)
+  }, [platform, projectId])
 
   const host = useMemo(
     () => ({
@@ -372,7 +383,7 @@ export function CanvasExecutionProvider({
             ? ids[Math.min(request.routingAttempt ?? 0, ids.length - 1)]
             : request.credentialGroupId)
         const channelId = routeCandidate?.channelId ?? request.channelId
-        const a = adapterMapsRef.current
+        const a = runtime.adapterMaps
           .get(runPlanId)
           ?.get(adapterKey(channelId, groupId, request.kind))
         if (!a) throw new Error(`[execution] 未解析到渠道适配器：${channelId}`)
@@ -404,17 +415,17 @@ export function CanvasExecutionProvider({
          * 于是 queued/running/succeeded 的后续更新全部写丢，
          * 表现为「图出来了但一直转圈」（2026-09-16 截图反馈）。
          */
-        const m = taskToNodeMapsRef.current.get(planId)
+        const m = runtime.taskToNodeMaps.get(planId)
         const nodeId = m?.get(taskId)
         if (nodeId) {
-          updateRunStates(store.getSnapshot().projectId, (prev) => new Map(prev).set(nodeId, state))
+          updateCanvasRunStates(store.getSnapshot().projectId, (prev) => new Map(prev).set(nodeId, state))
         }
         /**
          * 批量进度（对账 #386 的 E5）：只数**已经收口**的任务
          * （succeeded / failed / canceled），queued / running 不算数。
          */
         if (state.kind !== 'queued' && state.kind !== 'running') {
-          const progress = planProgressRef.current.get(planId)
+          const progress = planProgress.get(planId)
           if (progress) {
             progress.done += 1
             const notice = progressNotice(progress.done, progress.total)
@@ -435,11 +446,11 @@ export function CanvasExecutionProvider({
          * （或上一轮残留计划还没清掉时）会改到**别的**计划的那一份，
          * 本计划的没改到 → 清理时对不上 → queued/running 残留（转圈不停）。
          */
-        const m = taskToNodeMapsRef.current.get(planId)
+        const m = runtime.taskToNodeMaps.get(planId)
         if (m && m.has(taskId)) {
           const from = m.get(taskId)!
           m.set(taskId, targetId)
-          nodeScopedRunCancellationRef.current.addTarget(planId, targetId)
+          runtime.nodeScopedRunCancellation.addTarget(planId, targetId)
           /**
            * 状态一律**只挂在真正收产物的节点**上。
            *
@@ -452,7 +463,7 @@ export function CanvasExecutionProvider({
            *    等 `onTaskUpdate` 送来 running 才突然开始转圈，开头那段是空的。
            */
           if (from !== targetId) {
-            updateRunStates(store.getSnapshot().projectId, (prev) => {
+            updateCanvasRunStates(store.getSnapshot().projectId, (prev) => {
               const next = new Map(prev)
               const st = next.get(from)
               next.set(targetId, st ?? { kind: 'queued' })
@@ -464,8 +475,8 @@ export function CanvasExecutionProvider({
       },
       onFinish: (summary: RunSummary) => {
         void store.flush()
-        planProgressRef.current.delete(summary.runPlanId)
-        if (channelInterruptedPlansRef.current.delete(summary.runPlanId)) {
+        planProgress.delete(summary.runPlanId)
+        if (runtime.channelInterruptedPlans.delete(summary.runPlanId)) {
           store.notify('渠道已删除，相关生成已停止；请重新选择平台后再生成', 'error')
           return
         }
@@ -489,7 +500,10 @@ export function CanvasExecutionProvider({
     [bumpVersion, recordScopeOverride, store, workbench],
   )
 
-  const { startRun, cancelRun, isRunning } = useExecution<CanvasRunTask, Command>(host)
+  const { startRun, cancelRun, isRunning } = useExecution<CanvasRunTask, Command>(
+    host,
+    runtime.engine,
+  )
 
   /** 渠道预解析 + 状态注入 + 派发执行计划 + 启动运行 */
   const launch = useCallback(
@@ -586,7 +600,7 @@ export function CanvasExecutionProvider({
            * 渠道类失败必须停在规划阶段：不置 queued / running、不发网络请求。
            * 同时把失败写回节点状态，用户能看到原因，不必只靠一闪而过的 toast 猜。
            */
-          updateRunStates(store.getSnapshot().projectId, (prev) =>
+          updateCanvasRunStates(store.getSnapshot().projectId, (prev) =>
             new Map(prev).set(task.nodeId, {
               kind: 'failed',
               error: failure,
@@ -728,7 +742,7 @@ export function CanvasExecutionProvider({
       if (vanished.length > 0) {
         const projectId = store.getSnapshot().projectId
         const vanishedNodeIds = new Set(vanished.map((task) => task.nodeId))
-        updateRunStates(projectId, (prev) => {
+        updateCanvasRunStates(projectId, (prev) => {
           const states = new Map(prev)
           for (const nodeId of vanishedNodeIds) {
             states.set(nodeId, {
@@ -743,7 +757,7 @@ export function CanvasExecutionProvider({
         return
       }
 
-      adapterMapsRef.current.set(plan.id, map)
+      runtime.adapterMaps.set(plan.id, map)
       const taskToNode = new Map(plan.tasks.map((task) => [task.id, task.nodeId]))
       const taskChannels = new Map(
         plan.tasks.map((task) => [
@@ -753,8 +767,8 @@ export function CanvasExecutionProvider({
             : task.request.channelId,
         ]),
       )
-      taskToNodeMapsRef.current.set(plan.id, taskToNode)
-      nodeScopedRunCancellationRef.current.trackPlan(plan.id, [
+      runtime.taskToNodeMaps.set(plan.id, taskToNode)
+      runtime.nodeScopedRunCancellation.trackPlan(plan.id, [
         ...(originNodeId ? [originNodeId] : []),
         ...plan.tasks.map((task) => task.nodeId),
       ])
@@ -763,8 +777,8 @@ export function CanvasExecutionProvider({
         taskChannels,
         cancel: () => cancelRun(plan.id),
         onInterrupted: (affected) => {
-          channelInterruptedPlansRef.current.add(plan.id)
-          updateRunStates(projectId, (prev) => {
+          runtime.channelInterruptedPlans.add(plan.id)
+          updateCanvasRunStates(projectId, (prev) => {
             const states = new Map(prev)
             for (const { taskId } of affected) {
               const nodeId = taskToNode.get(taskId)
@@ -796,7 +810,7 @@ export function CanvasExecutionProvider({
        * 这样源节点再也不会平白进入生成态。
        */
       try {
-      updateRunStates(store.getSnapshot().projectId, (prev) => {
+      updateCanvasRunStates(store.getSnapshot().projectId, (prev) => {
         const n = new Map(prev)
         for (const t of plan.tasks) {
           if (t.slot.kind === 'reuse' && (t.seq ?? 0) === 0) n.set(t.nodeId, { kind: 'queued' })
@@ -824,7 +838,7 @@ export function CanvasExecutionProvider({
       })
 
       // 批量进度的分母：这条计划有几个任务（单任务时 progressNotice 会自己闭嘴）
-      planProgressRef.current.set(plan.id, { done: 0, total: plan.tasks.length })
+      planProgress.set(plan.id, { done: 0, total: plan.tasks.length })
 
       const unbindAbort = bindAbortToCancel(signal, () => cancelRun(plan.id))
       try {
@@ -850,7 +864,7 @@ export function CanvasExecutionProvider({
        * 下次很容易被当成修复对象加回来；这里说明它是**有意去掉的**。
        */
 
-      updateRunStates(store.getSnapshot().projectId, (prev) => {
+      updateCanvasRunStates(store.getSnapshot().projectId, (prev) => {
         const n = new Map(prev)
         /**
          * 清理本计划挂在节点上的状态。
@@ -863,9 +877,9 @@ export function CanvasExecutionProvider({
          * 故按本计划**触达过的全部节点**（源节点 + 承载节点）清理；
          * 并发跑同一节点时，别的 plan 仍占用的节点不能抹。
          */
-        const touched = [...(taskToNodeMapsRef.current.get(plan.id)?.values() ?? [])]
+        const touched = [...(runtime.taskToNodeMaps.get(plan.id)?.values() ?? [])]
         const stillRunning = new Set(
-          [...taskToNodeMapsRef.current.entries()]
+          [...runtime.taskToNodeMaps.entries()]
             .filter(([id]) => id !== plan.id)
             .flatMap(([, m]) => [...m.values()]),
         )
@@ -874,9 +888,9 @@ export function CanvasExecutionProvider({
       })
       } finally {
         unregisterGuardedChannelRun(plan.id)
-        nodeScopedRunCancellationRef.current.release(plan.id)
-        adapterMapsRef.current.delete(plan.id)
-        taskToNodeMapsRef.current.delete(plan.id)
+        runtime.nodeScopedRunCancellation.release(plan.id)
+        runtime.adapterMaps.delete(plan.id)
+        runtime.taskToNodeMaps.delete(plan.id)
       }
     },
     [store, channels, repo, platform, generation, startRun, cancelRun],
@@ -1350,12 +1364,15 @@ export function CanvasExecutionProvider({
    * 追加一条 RunRecord（**引擎之外**的写入方）并同步版本计数（§6.21）。
    *
    * 抽成具名回调是因为它现在有两个调用方：版本恢复、以及**融合**（对账 #554）。
-   * 写两遍必然漏掉 `versionMaxRef` 的同步，而那份计数是 version 递增的唯一依据。
+   * 写两遍必然漏掉 `runtime.versionMax` 的同步，而那份计数是 version 递增的唯一依据。
    */
   const appendRecord = useCallback(
     async (record: RunRecord) => {
-      const map = versionMaxRef.current
-      map.set(record.nodeId, Math.max(map.get(record.nodeId) ?? 0, record.version))
+      trackCanvasExecutionVersion(
+        projectId,
+        record.nodeId,
+        record.version,
+      )
       store.dispatch({ kind: 'node.runRecord.append', nodeId: record.nodeId, record })
       // append 走 800ms 防抖落库；日志面板实时读库，flush 完成后再返回
       await store.flush()
@@ -1497,9 +1514,9 @@ export function CanvasExecutionProvider({
           !(promptNode.data.text ?? '').trim() &&
           !!(promptNode.data.draft ?? '').trim()
         if (needsSkill || needsCompose) {
-          if (preparingPromptRef.current.has(nodeId)) return
-          preparingPromptRef.current.add(nodeId)
-          updateRunStates(projectId, (prev) =>
+          if (preparingPrompt.has(nodeId)) return
+          preparingPrompt.add(nodeId)
+          updateCanvasRunStates(projectId, (prev) =>
             new Map(prev).set(nodeId, { kind: 'running', startedAt: Date.now() }),
           )
           try {
@@ -1514,12 +1531,12 @@ export function CanvasExecutionProvider({
               if (composed === 'applied') graph = store.getSnapshot()
             }
           } finally {
-            preparingPromptRef.current.delete(nodeId)
+            preparingPrompt.delete(nodeId)
             /**
              * 清掉「准备中」这条状态。不清的话提示词节点会一直转圈：
              * 引擎随后只给真正收产物的下游节点写状态，不会替它收尾。
              */
-            updateRunStates(projectId, (prev) => {
+            updateCanvasRunStates(projectId, (prev) => {
               const next = new Map(prev)
               next.delete(nodeId)
               return next
@@ -1625,7 +1642,7 @@ export function CanvasExecutionProvider({
 
   const cancel = useCallback(
     (nodeId: string) => {
-      nodeScopedRunCancellationRef.current.cancelForNode(nodeId, cancelRun)
+      runtime.nodeScopedRunCancellation.cancelForNode(nodeId, cancelRun)
     },
     [cancelRun],
   )
@@ -1654,11 +1671,11 @@ export function CanvasExecutionProvider({
   )
 
   return (
-    <Ctx.Provider value={api}>
+    <CanvasExecutionValueProvider value={api}>
       {children}
       {/* 执行模式快捷键（R / Alt+R / P / Shift+R / Ctrl+Enter，§6.20） */}
       <RunHotkeys />
-    </Ctx.Provider>
+    </CanvasExecutionValueProvider>
   )
 }
 

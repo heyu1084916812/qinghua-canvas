@@ -1,4 +1,9 @@
-import { useCallback, useRef, useState } from 'react'
+import {
+  useCallback,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from 'react'
 import type { RunPlan, RunTask } from '../../../domain/shared/execution/plan'
 import type { RunRequest } from '../../../domain/shared/execution/types'
 import type { RunRecordScope } from '../../../domain/shared/execution/runRecord'
@@ -6,7 +11,10 @@ import type { ChannelAdapter } from '../../../platform/channels/types'
 import type { TransactionBoundary } from '../../../state/shared/types'
 import type { ExecutionPlacement } from './placement'
 import { runEngine, type RunPolicy, type RunSummary, type RunTaskState } from './runEngine'
-import { createRunRegistry } from './runRegistry'
+import {
+  createExecutionRuntime,
+  type ExecutionRuntime,
+} from './executionRuntime'
 
 /**
  * 执行宿主（架构 §5.5）。**跨工作台共享**（本文件位于 features/shared/execution）。
@@ -55,13 +63,14 @@ export interface UseExecution<TTask extends RunTask = RunTask> {
   startRun(plan: RunPlan<TTask>): Promise<RunSummary>
   cancelRun(runPlanId: string): void
   runningPlanId: string | null
-  runningPlanIds: string[]
+  runningPlanIds: readonly string[]
   taskStates: Map<string, RunTaskState>
   isRunning: boolean
 }
 
 export function useExecution<TTask extends RunTask, TCommand>(
   host: ExecutionHost<TTask, TCommand>,
+  runtime?: ExecutionRuntime,
 ): UseExecution<TTask> {
   /**
    * 并发运行表：planId → AbortController。
@@ -71,16 +80,23 @@ export function useExecution<TTask extends RunTask, TCommand>(
    * 归零时机被后发计划改写。画布上「一个节点在生成时另一个节点生成不了」正是
    * 这条单槽位留下的症状。改为按 planId 建表后，多条链路各自独立可取消、互不覆盖。
    */
-  const controllersRef = useRef(createRunRegistry<AbortController>())
-  const [runningPlanIds, setRunningPlanIds] = useState<string[]>([])
+  const localRuntimeRef = useRef<ExecutionRuntime | null>(null)
+  if (!localRuntimeRef.current) {
+    localRuntimeRef.current = createExecutionRuntime()
+  }
+  const activeRuntime = runtime ?? localRuntimeRef.current
+  const runningPlanIds = useSyncExternalStore(
+    activeRuntime.subscribe,
+    activeRuntime.getRunningPlanIds,
+    activeRuntime.getRunningPlanIds,
+  )
   const [taskStates, setTaskStates] = useState<Map<string, RunTaskState>>(() => new Map())
   const hostRef = useRef(host)
   hostRef.current = host
 
   const startRun = useCallback(async (plan: RunPlan<TTask>): Promise<RunSummary> => {
     const controller = new AbortController()
-    controllersRef.current.add(plan.id, controller)
-    setRunningPlanIds((prev) => (prev.includes(plan.id) ? prev : [...prev, plan.id]))
+    activeRuntime.begin(plan.id, controller)
 
     try {
       const summary = await runEngine<TTask, TCommand>(plan, {
@@ -113,14 +129,13 @@ export function useExecution<TTask extends RunTask, TCommand>(
         hostRef.current.onFinish?.(summary)
       return summary
     } finally {
-      controllersRef.current.remove(plan.id)
-      setRunningPlanIds((prev) => prev.filter((id) => id !== plan.id))
+      activeRuntime.finish(plan.id)
     }
-  }, [])
+  }, [activeRuntime])
 
   const cancelRun = useCallback((runPlanId: string) => {
-    controllersRef.current.get(runPlanId)?.abort()
-  }, [])
+    activeRuntime.cancel(runPlanId)
+  }, [activeRuntime])
 
   return {
     startRun,
