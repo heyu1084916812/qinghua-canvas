@@ -1,5 +1,21 @@
 # CanvasFlow（轻画）项目记忆
 
+### Agent 中断收口拆分（2026-11-03，对账 #863）
+
+- **停止协调器只收端口**：`agentInterruptSettlement.ts` 接收 session/request/result、turnOrigin、
+  activity ownership、abortController、store settle、Job、steer、queue、release、refs 与 UI 回调。
+  不读取 React refs/state，不按 session 现找新 Job。
+- **两次 ownership 判定**：只有开始仍属于本回合时才 abort/clear drain；cleanup 结束后再判定 owner，
+  只有 owner 才删除 per-session refs、apply snapshot、setMessages、清 live、置 idle。旧迟到结算
+  不能覆盖新回合。
+- **revision 与 queue token**：store 的 `settleInterruptedSession()` 仍以 turnOrigin.messageRevision
+  作为停止屏障；finishQueuedTurn 只在 queueTurnId 仍匹配时执行。Job 迁移始终携带原 turnOrigin。
+- **分步清理不互相阻断**：store、transition、removeSteers、finishQueuedTurn 各自 try/catch，保留首个
+  cleanup 错误并继续后续步骤；结束后 notify 汇总。execute/confirm 等业务异常不在这里吞。
+- **证据**：`AgentPanel.tsx` **3364→3304 行**（减少 60）；聚焦 **9/9**、Agent 相关 **269/269**；
+  全量 `npm test` **3910 passed / 1 skipped**；tsc/check/build/diff-check 通过。
+  纯架构 + 可靠性拆分，未跑 G769 / Tauri；确认执行、继续入口、AgentHost 仍是后续债。
+
 ### Agent 自动确认循环拆分（2026-11-03，对账 #862）
 
 - **自动循环只收端口**：`agentAutoConfirmations.ts` 接收 session、initial outcome、同一

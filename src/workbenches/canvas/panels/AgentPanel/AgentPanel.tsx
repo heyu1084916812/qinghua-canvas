@@ -180,6 +180,7 @@ import { useAgentSendController } from './useAgentSendController'
 import { useAgentOutcomeCoordinator } from './useAgentOutcomeCoordinator'
 import { assembleAgentLoopDeps } from './agentLoopDeps'
 import { continueAgentAutoConfirmations } from './agentAutoConfirmations'
+import { settleAgentInterruption } from './agentInterruptSettlement'
 import { runAgentCanvasNodes } from './agentCanvasRun'
 import { useAgentRunPresentation } from './useAgentRunPresentation'
 import {
@@ -1722,10 +1723,6 @@ export function AgentPanel({
       result: 'canceled' | 'interrupted',
     ): Promise<AgentSession | null> => {
       const queueTurnId = activeQueueTurnOf(session.id)
-      const settled: { latest: AgentSession | null } = {
-        latest: null,
-      }
-      let cleanupError: unknown
       const turnOrigin: AgentTurnOrigin = {
         jobId:
           currentTurnJobIdRef.current.get(session.id) ??
@@ -1737,111 +1734,54 @@ export function AgentPanel({
           session.messageRevision ??
           currentTurnRevisionRef.current.get(session.id),
       }
-
-      if (
-        !isSessionActivityActive(session.id) ||
-        turnMatchesSessionActivity(
-          session.id,
-          queueTurnId,
-          turnOrigin.turnId,
-        )
-      ) {
-        abortRefs.current.get(session.id)?.abort()
-        clearQueueDrain(session.id)
-      }
-
-      const attempt = async (work: () => Promise<void>) => {
-        try {
-          await work()
-        } catch (error) {
-          cleanupError ??= error
-        }
-      }
-
-      await attempt(async () => {
-        settled.latest = await sessions.settleInterruptedSession(
-          session.id,
-          request,
-          result,
-          turnOrigin.messageRevision,
-        )
+      return settleAgentInterruption({
+        session,
+        request,
+        result,
+        turnOrigin,
+        abortController: abortRefs.current.get(session.id),
+        isActivityActive: () =>
+          isSessionActivityActive(session.id),
+        turnMatchesActivity: (queueId, turnId) =>
+          turnMatchesSessionActivity(
+            session.id,
+            queueId,
+            turnId,
+          ),
+        queueTurnMatchesActivity: (queueId) =>
+          queueTurnMatchesSessionActivity(session.id, queueId),
+        clearQueueDrain: () => clearQueueDrain(session.id),
+        settleSession: sessions.settleInterruptedSession,
+        transitionSessionJob,
+        removeSteers: sessions.removeSteers,
+        finishQueuedTurn: controller.finishQueuedTurn,
+        releaseActivity: (queueId, turnId) =>
+          releaseSessionActivity(
+            session.id,
+            queueId,
+            turnId,
+          ),
+        isCurrentSession: () =>
+          currentIdRef.current === session.id,
+        notify: store.notify,
+        deletePerSessionRefs: (sessionId) => {
+          abortRefs.current.delete(sessionId)
+          deliveredSteersRef.current.delete(sessionId)
+          inFlightConfirmationRef.current.delete(sessionId)
+          currentTurnIdRef.current.delete(sessionId)
+          currentTurnJobIdRef.current.delete(sessionId)
+          currentTurnRevisionRef.current.delete(sessionId)
+        },
+        applySessionSnapshot,
+        setMessages,
+        clearLiveActivities: () =>
+          clearLiveActivitiesFor(session.id),
+        clearLiveProcess: () =>
+          clearLiveProcessFor(session.id),
+        clearRunTasks: () => clearRunTasksFor(session.id),
+        setStatus: setStatusFor,
+        errorText: errText,
       })
-      await attempt(async () => {
-        await transitionSessionJob(
-          session.id,
-          'canceled',
-          'interrupted',
-          { pendingCallId: undefined },
-          {
-            reason:
-              result === 'canceled'
-                ? 'user_canceled_confirmation'
-                : 'user_stopped',
-          },
-          turnOrigin,
-        )
-      })
-      await attempt(async () => {
-        if (session.pendingSteers.length > 0) {
-          settled.latest =
-            (await sessions.removeSteers(
-              session.id,
-              session.pendingSteers.map((steer) => steer.id),
-            )) ?? settled.latest
-        }
-      })
-      await attempt(async () => {
-        if (
-          queueTurnId &&
-          queueTurnMatchesSessionActivity(session.id, queueTurnId)
-        ) {
-          settled.latest =
-            (await controller.finishQueuedTurn(
-              session.id,
-              queueTurnId,
-              false,
-            )) ?? settled.latest
-        }
-      })
-      if (cleanupError) {
-        store.notify(
-          `停止任务时清理状态失败：${errText(cleanupError)}`,
-          'error',
-        )
-      }
-      const ownsUiState =
-        !isSessionActivityActive(session.id) ||
-        turnMatchesSessionActivity(
-          session.id,
-          queueTurnId,
-          turnOrigin.turnId,
-        )
-      releaseSessionActivity(
-        session.id,
-        queueTurnId,
-        turnOrigin.turnId,
-      )
-      if (ownsUiState) {
-        abortRefs.current.delete(session.id)
-        deliveredSteersRef.current.delete(session.id)
-        inFlightConfirmationRef.current.delete(session.id)
-        currentTurnIdRef.current.delete(session.id)
-        currentTurnJobIdRef.current.delete(session.id)
-        currentTurnRevisionRef.current.delete(session.id)
-      }
-      if (ownsUiState && settled.latest !== null) {
-        applySessionSnapshot(settled.latest)
-        if (currentIdRef.current === session.id) {
-          setMessages(settled.latest.messages)
-        }
-      }
-      if (ownsUiState) {
-        clearLiveActivitiesFor(session.id)
-        clearLiveProcessFor(session.id)
-        clearRunTasksFor(session.id)
-        setStatusFor(session.id, IDLE_STATUS)
-      }
-      return settled.latest
     },
     [
       applySessionSnapshot,
