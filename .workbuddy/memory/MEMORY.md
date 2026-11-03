@@ -1,5 +1,14 @@
 # CanvasFlow（轻画）项目记忆
 
+### AgentSessionActionsController（2026-11-04，对账 #875，🚧 待独立验收，`9fec68f`）
+
+- `useAgentSessionActionsController` 只管理会话动作与编辑态：new / rename / two-step delete /
+  `renaming / titleDraft / confirmDelete`。SessionStore / AgentController 仍是唯一真相。
+- 新建后创建结果必须走 lifecycle `switchTo`，不能直接 `setCurrent` 绕过 latest-switch 守卫；改名晚返回
+  只在目标行仍是当前时合并；删除保留活动/队列/确认中忙碌门禁，无剩余会话时新建兜底。
+- `AgentPanel.tsx` **2877 → 2799 行**（净减少 78 行）；Hook **5/5**、AgentPanel 目录 **243/243**、
+  G735 **35/35**、G769 **39/39**、G865 **24/24**，全量 **4064 passed / 1 skipped**。
+
 ### AgentAttachmentsController（2026-11-04，对账 #874，✅ 已独立验收，`fcb60c6`）
 
 - `useAgentAttachmentsController` 只做附件 React 适配：handoff、本地文件、素材库添加、pendingAssetIds

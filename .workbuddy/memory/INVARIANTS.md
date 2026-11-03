@@ -95,6 +95,9 @@
 - **AgentAttachmentsController 不拥有节点或附件真相**：`useAgentAttachmentsController` 只能经显式端口
   读写 CanvasStore / AgentSession；handoff 必须先缓冲、过滤已不存在节点、去重后补引用；本地文件与素材库
   必须走同一落位链路；缩略图 objectURL 必须 unmount 回收。不得发送消息、请求模型或修改 Job。
+- **AgentSessionActionsController 不绕过 lifecycle**：新建会话创建后必须走 `switchTo`，禁止直接
+  `setCurrent`；改名晚返回只在目标仍是当前时合并；两步删除必须保留活动/队列/确认中门禁，无剩余会话时
+  走新建兜底。Hook 只持有编辑态，不得复制 SessionStore / AgentController / Job 真相。
 - **AgentComposerController 不拥有业务真相**：`useAgentComposerController` 只管理 draft、mention、
   picker、composer 高度以及 pendingAsset 同步端口；不得 import SessionStore / AgentController /
   ToolRegistry / 队列实现，不得发送消息、请求模型、推进确认或修改 Job。160ms 待发送素材 timer
