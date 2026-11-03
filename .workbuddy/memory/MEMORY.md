@@ -13,19 +13,24 @@
 - **slot 单 owner**：只有 active project 能写 `data-agent-shell-active`、width、resize；inactive host 只
   隐藏 panel。离开画布时 slot 必须回 0，切 A/B 时旧 owner cleanup 不能删掉新 owner 的属性。
 - **关闭必须先拒绝新工作**：共享 `taskLifecycle` 先标 closing，再 abort，再等待完整 Promise。
-  ExecutionRuntime 同时追踪 engine 与画布 operations；AgentPanel 追踪 send / confirm / continue /
-  cancel / stop。5 秒超时必须抛错并保留 host/runtime 注册，不能继续 flush 清理或 purge。
+  ExecutionRuntime 同时追踪 engine 与画布 operations；AgentPanel 还追踪 queue enqueue/remove/edit/claim/
+  finish/pump、Session create/rename/delete/patch、任务计划、引导、附件、技能、收藏与 sticky 模型写。
+  同步 draft / composer 写走 `runSync`；所有 fire-and-forget 必须注册并 catch。5 秒超时保留注册，
+  不能继续 flush 清理或 purge。
 - **handoff / id 必须按项目隔离**：`agentHandoff` 与 `agentSkillHandoff` 都按 projectId 分桶；panel id 为
   `canvas-agent-panel-${projectId}`。否则多 host 并存时后台项目会抢走当前项目的引用或技能。
-- **删除当前画布必须离场**：数据库删除成功后清 activeCanvas、两类 handoff、store，再 replace 到
-  `/projects`。runtime tombstone 禁止旧 runNode / 生成入口复活；只有合法 CanvasPage 激活能建新代际。
+- **项目删除用 prepare → 仓储 → commit**：prepare 先同步阻断并等待 idle；只有仓储成功才 commit /
+  finalize / purge。失败 rollback；有在途时不能假开，idle 后 flush / 仓储失败恢复同一 host，超时则真实
+  idle 后自动恢复。成功后清 activeCanvas / 两类 handoff / store 并 replace `/projects`；失败保留原路由。
+  runtime tombstone 禁止旧 runNode / 生成入口复活；只有合法 CanvasPage 激活能建新代际。
 - **注册表按代际条件删除**：AgentHostRegistry 与 ProjectRuntimeRegistry 都带 generation。HMR 先同步失效
   旧代际，旧 disposer 晚到不得删除新记录。StrictMode cleanup 只 deactivate；host 初始化/重新激活要按
   当前可见 surface clamp，但普通面板开合不能推动已有浮球。
-- **证据**：全量 `npm test` **3963 passed / 1 skipped**；tsc/check/build/diff-check 通过。G865 **9/9**
-  （含 1024 返回 clamp、删除当前画布离场）、G735 **35/35**、G769 **39/39**。1440×900 / 1024×700、
-  明暗四组截图几何与改动前一致；删除失败注入测试覆盖单删/批删保留确认框，四组真实浏览器截图确认
-  错误可见且无横向溢出。**未跑真实 Tauri 跨路由任务，待质量线独立验收。**
+- **证据**：全量 `npm test` **3975 passed / 1 skipped**；tsc/check/build/diff-check 通过。G865 **10/10**
+  （含 1024 返回 clamp、当前画布删除失败仍 active、重试成功与最终离场）、G735 **35/35**、G769 **39/39**。
+  真实 `AgentSessionStore` 延迟写 / flush 失败测试证明未 idle 不 purge、恢复后同 lifecycle 继续写。
+  1440×900 / 1024×700、明暗四组截图几何与改动前一致；删除失败截图确认错误可见且无横向溢出。
+  **未跑真实 Tauri 跨路由任务，待质量线独立验收。**
 
 ### Agent 确认执行与检查点继续拆分（2026-11-03，对账 #864）
 
