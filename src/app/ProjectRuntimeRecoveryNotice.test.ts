@@ -165,4 +165,91 @@ describe('ProjectRuntimeRecoveryNotice', () => {
     expect(getProjectRuntimePendingSnapshot()).toEqual([])
     act(() => notice.unmount())
   })
+
+  it('committing 时全局按钮禁用并显示清理中，不提前清空待办', async () => {
+    let finalizeAttempts = 0
+    registerProjectRuntime({
+      projectId: 'p3',
+      key: 'canvas-agent',
+      beginDispose: () => ({
+        waitForIdle: async () => undefined,
+        whenIdle: async () => undefined,
+        canReopen: () => true,
+        reopenIfIdle: () => true,
+        canFinalize: () => true,
+        finalize: () => {
+          finalizeAttempts += 1
+          return finalizeAttempts > 1
+        },
+      }),
+    })
+    await expect(
+      withPreparedProjectRuntimes(['p3'], async () => 'deleted'),
+    ).rejects.toBeInstanceOf(ProjectRuntimeCleanupError)
+
+    let releaseLate!: () => void
+    const lateGate = new Promise<void>((resolve) => {
+      releaseLate = resolve
+    })
+    registerProjectRuntime({
+      projectId: 'p3',
+      key: 'late-runtime',
+      beginDispose: () => ({
+        waitForIdle: () => lateGate,
+        whenIdle: () => lateGate,
+        canReopen: () => true,
+        reopenIfIdle: () => true,
+        canFinalize: () => true,
+        finalize: () => true,
+      }),
+    })
+
+    let notice!: TestRenderer.ReactTestRenderer
+    act(() => {
+      notice = TestRenderer.create(
+        createElement(ProjectRuntimeRecoveryNotice),
+      )
+    })
+    const retry = notice.root.find(
+      (node) =>
+        node.type === 'button' &&
+        node.props['data-project-runtime-retry'] !== undefined,
+    )
+    act(() => {
+      retry.props.onClick()
+    })
+    await act(async () => {
+      await Promise.resolve()
+    })
+
+    try {
+      expect(getProjectRuntimePendingSnapshot()[0]).toMatchObject({
+        status: 'committing',
+        retryable: false,
+      })
+      const committing = notice.root.find(
+        (node) =>
+          node.type === 'button' &&
+          node.props['data-project-runtime-retry'] !== undefined,
+      )
+      expect(committing.props.disabled).toBe(true)
+      expect(textOf(committing)).toBe('清理中…')
+    } finally {
+      releaseLate()
+      await act(async () => {
+        await Promise.resolve()
+      })
+    }
+
+    expect(getProjectRuntimePendingSnapshot()).toEqual([])
+    act(() => notice.unmount())
+  })
 })
+
+function textOf(node: TestRenderer.ReactTestInstance): string {
+  return node.children
+    .map((child) =>
+      typeof child === 'string' ? child : '',
+    )
+    .join('')
+}

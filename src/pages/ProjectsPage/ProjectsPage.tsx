@@ -34,10 +34,6 @@ import {
   subscribeProjectRuntimePending,
   withPreparedProjectRuntimes,
 } from '../../app/ProjectRuntimeRegistry'
-import {
-  clearDeletedProjectState,
-  clearDeletedProjectsState,
-} from '../../app/deletedProjectState'
 
 /**
  * 回收站的"保留天数"（对账 #409）：超过这些天的项目会出现在「清理 N 天前」按钮上。
@@ -110,11 +106,16 @@ export function ProjectsPage() {
   const [bulkDeleting, setBulkDeleting] = useState(false)
   const [cleanupOperationId, setCleanupOperationId] =
     useState<number | null>(null)
-  const cleanupPending = pendingRuntimeOperations.find(
+  const cleanupRuntimeOperation = pendingRuntimeOperations.find(
     (operation) =>
-      operation.id === cleanupOperationId &&
-      operation.status === 'cleanup_failed',
+      operation.id === cleanupOperationId,
   )
+  const cleanupPending =
+    cleanupRuntimeOperation?.status === 'cleanup_failed'
+      ? cleanupRuntimeOperation
+      : null
+  const cleanupCommitting =
+    cleanupRuntimeOperation?.status === 'committing'
   const [status, setStatusText] = useState('')
   /** 这一条状态是"正常结果"还是"失败"（产品文档 §4.5：失败要 `role=alert` 念给屏幕阅读器） */
   const [statusTone, setStatusTone] = useState<NoticeTone>('info')
@@ -214,7 +215,6 @@ export function ProjectsPage() {
         [id],
         () => store.remove(id),
       )
-      clearDeletedProjectState(id)
       setCleanupOperationId(null)
       setConfirmId(null)
       setMenuId(null)
@@ -265,12 +265,11 @@ export function ProjectsPage() {
   }
 
   const retryRuntimeCleanup = async () => {
-    if (!cleanupPending || busy) return
+    if (!cleanupPending || busy || cleanupCommitting) return
     setBusy(true)
     try {
       const projectIds = cleanupPending.projectIds
       await retryProjectRuntimeCleanup(projectIds)
-      projectIds.forEach(clearDeletedProjectState)
       await store.load()
       if (trashOpen) await refreshTrash()
       setCleanupOperationId(null)
@@ -321,7 +320,6 @@ export function ProjectsPage() {
         [id],
         () => store.purge(id),
       )
-      clearDeletedProjectState(id)
       await refreshTrash()
       setCleanupOperationId(null)
       setStatus('已彻底删除（不可恢复）')
@@ -342,9 +340,6 @@ export function ProjectsPage() {
       const n = await withPreparedProjectRuntimes(
         trashItems.map((project) => project.id),
         () => store.purgeAll(),
-      )
-      clearDeletedProjectsState(
-        trashItems.map((project) => project.id),
       )
       await refreshTrash()
       setCleanupOperationId(null)
@@ -421,7 +416,6 @@ export function ProjectsPage() {
         selected,
         () => store.purgeMany(selected),
       )
-      clearDeletedProjectsState(selected)
       await refreshTrash()
       setTrashSelectedIds(new Set())
       setTrashSelectionAnchor(null)
@@ -459,16 +453,6 @@ export function ProjectsPage() {
           )
           .map((project) => project.id),
         () => store.purgeOlderThan(TRASH_KEEP_DAYS),
-      )
-      const cutoff = Date.now() - TRASH_KEEP_DAYS * 86_400_000
-      clearDeletedProjectsState(
-        trashItems
-          .filter(
-            (project) =>
-              typeof project.deletedAt === 'number' &&
-              project.deletedAt < cutoff,
-          )
-          .map((project) => project.id),
       )
       await refreshTrash()
       setCleanupOperationId(null)
@@ -538,7 +522,6 @@ export function ProjectsPage() {
         ids,
         () => store.removeMany(ids),
       )
-      clearDeletedProjectsState(ids)
       setMenuId(null)
       setConfirmId(null)
       exitSelection()
@@ -1002,15 +985,15 @@ export function ProjectsPage() {
       {/* 语气 → role / aria-live：一处决定（`domain/ui/notice.ts`）；data-status-tone 给冒烟读 */}
       <div className={styles.status} data-status-tone={statusTone} {...noticeA11y(statusTone)}>
         {status}
-        {cleanupPending && (
+        {(cleanupPending || cleanupCommitting) && (
           <button
             type="button"
             className={styles.statusRetry}
             data-project-cleanup-retry
-            disabled={busy}
+            disabled={!cleanupPending || busy || cleanupCommitting}
             onClick={() => void retryRuntimeCleanup()}
           >
-            {busy ? '清理中…' : '重试清理'}
+            {cleanupCommitting || busy ? '清理中…' : '重试清理'}
           </button>
         )}
       </div>

@@ -35,10 +35,6 @@ import {
   subscribeProjectRuntimePending,
   withPreparedProjectRuntimes,
 } from './ProjectRuntimeRegistry'
-import {
-  clearDeletedProjectState,
-  leaveDeletedCanvasRoute,
-} from './deletedProjectState'
 import { usePlatform } from './providers/PlatformProvider'
 import {
   IconCanvas,
@@ -190,15 +186,18 @@ export function ProjectTree({ open, activeProjectId }: ProjectTreeProps) {
     getProjectRuntimePendingSnapshot,
     getProjectRuntimePendingSnapshot,
   )
-  const cleanupPending = pendingRuntimeOperations.find(
+  const cleanupRuntimeOperation = pendingRuntimeOperations.find(
     (operation) =>
-      operation.id === cleanupOperationId &&
-      operation.status === 'cleanup_failed',
+      operation.id === cleanupOperationId,
   )
+  const cleanupPending =
+    cleanupRuntimeOperation?.status === 'cleanup_failed'
+      ? cleanupRuntimeOperation
+      : null
+  const cleanupCommitting =
+    cleanupRuntimeOperation?.status === 'committing'
   const renameInputRef = useRef<HTMLInputElement | null>(null)
   const menuRef = useRef<HTMLDivElement | null>(null)
-  const locationPathRef = useRef(location.pathname)
-  locationPathRef.current = location.pathname
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -537,12 +536,6 @@ export function ProjectTree({ open, activeProjectId }: ProjectTreeProps) {
           [confirmTarget.id],
           () => repo.remove(confirmTarget.id),
         )
-        clearDeletedProjectState(confirmTarget.id)
-        leaveDeletedCanvasRoute(
-          locationPathRef.current,
-          confirmTarget.id,
-          navigate,
-        )
       }
       setStatus({
         text:
@@ -574,19 +567,11 @@ export function ProjectTree({ open, activeProjectId }: ProjectTreeProps) {
   }
 
   const retryRuntimeCleanup = async () => {
-    if (!cleanupPending || deleteBusy) return
+    if (!cleanupPending || deleteBusy || cleanupCommitting) return
     setDeleteBusy(true)
     try {
       const retriedIds = cleanupPending.projectIds
       await retryProjectRuntimeCleanup(retriedIds)
-      for (const id of retriedIds) {
-        clearDeletedProjectState(id)
-        leaveDeletedCanvasRoute(
-          locationPathRef.current,
-          id,
-          navigate,
-        )
-      }
       await load()
       setCleanupOperationId(null)
       setStatus({
@@ -808,15 +793,15 @@ export function ProjectTree({ open, activeProjectId }: ProjectTreeProps) {
           role={status.tone === 'error' ? 'alert' : 'status'}
         >
           {status.text}
-          {cleanupPending && (
+          {(cleanupPending || cleanupCommitting) && (
             <button
               type="button"
               className={styles.statusRetry}
               data-project-tree-cleanup-retry
-              disabled={deleteBusy}
+              disabled={!cleanupPending || deleteBusy || cleanupCommitting}
               onClick={() => void retryRuntimeCleanup()}
             >
-              {deleteBusy ? '清理中…' : '重试清理'}
+              {cleanupCommitting || deleteBusy ? '清理中…' : '重试清理'}
             </button>
           )}
         </div>

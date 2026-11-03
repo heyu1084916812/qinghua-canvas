@@ -45,3 +45,27 @@ export function leaveDeletedCanvasRoute(
   navigate('/projects', { replace: true })
   return true
 }
+
+/**
+ * 数据库 work 已提交且 runtime cleanup 全部成功后的唯一收尾。
+ *
+ * AppShell 只订阅一次完成事件；页面不再各自清内存或导航，避免局部与全局
+ * 重试各清一遍。只有当前路径正好属于被删画布时才 replace。
+ */
+export function finalizeCommittedProjectRuntimes(
+  projectIds: readonly string[],
+  pathname: string,
+  navigate: NavigateFunction,
+): boolean {
+  const ids = [...new Set(projectIds)]
+  clearDeletedProjectsState(ids)
+  if (
+    !ids.some((projectId) =>
+      isCanvasProjectPath(pathname, projectId),
+    )
+  ) {
+    return false
+  }
+  navigate('/projects', { replace: true })
+  return true
+}

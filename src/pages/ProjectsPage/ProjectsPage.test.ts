@@ -4,6 +4,7 @@ import TestRenderer, { act } from 'react-test-renderer'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { PlatformProvider } from '../../app/providers/PlatformProvider'
 import {
+  getProjectRuntimePendingSnapshot,
   prepareProjectRuntimes,
   registerProjectRuntime,
   resetProjectRuntimesForTests,
@@ -266,14 +267,49 @@ describe('ProjectsPage delete failure', () => {
     expect((await repo.get(project.id))?.deletedAt).toBeTypeOf('number')
     expect(projectDeletes).toBe(1)
 
-    await act(async () => {
-      await root.root.find(
+    let releaseLate!: () => void
+    const lateGate = new Promise<void>((resolve) => {
+      releaseLate = resolve
+    })
+    registerProjectRuntime({
+      projectId: project.id,
+      key: 'late-runtime',
+      beginDispose: () => ({
+        waitForIdle: () => lateGate,
+        whenIdle: () => lateGate,
+        canReopen: () => true,
+        reopenIfIdle: () => true,
+        canFinalize: () => true,
+        finalize: () => true,
+      }),
+    })
+
+    act(() => {
+      root.root.find(
         (node) =>
           node.type === 'button' &&
           node.props['data-project-cleanup-retry'] !== undefined,
       ).props.onClick()
     })
     await settle()
+
+    expect(getProjectRuntimePendingSnapshot()[0]).toMatchObject({
+      status: 'committing',
+      retryable: false,
+    })
+    const committing = root.root.find(
+      (node) =>
+        node.type === 'button' &&
+        node.props['data-project-cleanup-retry'] !== undefined,
+    )
+    expect(committing.props.disabled).toBe(true)
+    expect(textOf(committing)).toBe('清理中…')
+
+    releaseLate()
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0))
+      await Promise.resolve()
+    })
 
     expect(finalizeAttempts).toBe(2)
     expect(projectDeletes).toBe(1)

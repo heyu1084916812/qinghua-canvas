@@ -8,6 +8,9 @@ import {
 import styles from './ProjectRuntimeRecoveryNotice.module.css'
 
 function titleOf(operation: ProjectRuntimePendingOperation): string {
+  if (operation.status === 'committing') {
+    return '正在清理项目运行态'
+  }
   if (operation.status === 'cleanup_failed') {
     return operation.workCommitted
       ? '项目已删除，运行态待清理'
@@ -17,6 +20,16 @@ function titleOf(operation: ProjectRuntimePendingOperation): string {
     return '项目操作未提交，运行态待恢复'
   }
   return '正在恢复项目运行态'
+}
+
+function actionLabelOf(
+  operation: ProjectRuntimePendingOperation,
+  retrying: number | null,
+): string {
+  if (operation.status === 'committing') return '清理中…'
+  if (!operation.retryable) return '恢复中…'
+  if (retrying === operation.id) return '重试中…'
+  return '重试恢复'
 }
 
 export function ProjectRuntimeRecoveryNotice() {
@@ -72,11 +85,7 @@ export function ProjectRuntimeRecoveryNotice() {
               disabled={!operation.retryable || retrying !== null}
               onClick={() => void retry(operation)}
             >
-              {!operation.retryable
-                ? '恢复中…'
-                : retrying === operation.id
-                  ? '重试中…'
-                  : '重试恢复'}
+              {actionLabelOf(operation, retrying)}
             </button>
           </div>
         ))}

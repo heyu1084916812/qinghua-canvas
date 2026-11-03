@@ -1,4 +1,10 @@
-import { useEffect, useSyncExternalStore, type ReactNode } from 'react'
+import {
+  useEffect,
+  useRef,
+  useSyncExternalStore,
+  type ReactNode,
+} from 'react'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { AppSidebar } from './AppSidebar'
 import { GlobalSettingsOverlay } from './GlobalSettingsOverlay'
 import { StorageUpgradeGate } from './StorageUpgradeGate'
@@ -19,6 +25,8 @@ import { useAutoSnapshot } from '../state/project/useAutoSnapshot'
 import { startUiHeartbeat } from './uiHeartbeat'
 import { AgentHostOutlet } from './AgentHostOutlet'
 import { ProjectRuntimeRecoveryNotice } from './ProjectRuntimeRecoveryNotice'
+import { subscribeProjectRuntimeCompleted } from './ProjectRuntimeRegistry'
+import { finalizeCommittedProjectRuntimes } from './deletedProjectState'
 
 /**
  * 应用壳（产品文档 §2.1 / §2.2；架构文档 §5.10）。
@@ -34,7 +42,25 @@ import { ProjectRuntimeRecoveryNotice } from './ProjectRuntimeRecoveryNotice'
  * 若在壳层里手动「开合时通知画布重算」，反而会漏掉过渡动画中间那几帧。
  */
 export function AppShell({ children }: { children: ReactNode }) {
+  const navigate = useNavigate()
+  const location = useLocation()
+  const pathnameRef = useRef(location.pathname)
+  pathnameRef.current = location.pathname
+
   useEffect(() => startUiHeartbeat(), [])
+
+  useEffect(
+    () =>
+      subscribeProjectRuntimeCompleted((completion) => {
+        if (!completion.workCommitted) return
+        finalizeCommittedProjectRuntimes(
+          completion.projectIds,
+          pathnameRef.current,
+          navigate,
+        )
+      }),
+    [navigate],
+  )
 
   /**
    * 自动快照（对账 #378 A4）：应用启动时跑一次，由规则层决定哪些项目真需要拍。

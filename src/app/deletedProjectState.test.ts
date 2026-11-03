@@ -10,7 +10,13 @@ import { clearAgentHandoff, sendSelectionToAgent, takeAgentHandoff } from '../fe
 import { clearAgentSkillHandoff, sendSkillToAgent, subscribeAgentSkillHandoff, takeAgentSkillHandoff } from '../features/canvas/agentSkillHandoff'
 import { activeCanvasId, forgetActiveCanvas, rememberActiveCanvas } from '../state/project/activeCanvas'
 import {
+  canvasStoreCacheSize,
+  canvasStoreFor,
+  resetCanvasStoreCache,
+} from '../state/workbenches/canvas/storeCache'
+import {
   clearDeletedProjectState,
+  finalizeCommittedProjectRuntimes,
   isCanvasProjectPath,
   leaveDeletedCanvasRoute,
 } from './deletedProjectState'
@@ -24,6 +30,7 @@ afterEach(() => {
   forgetActiveCanvas()
   clearAgentHandoff('p1')
   clearAgentSkillHandoff('p1')
+  resetCanvasStoreCache()
 })
 
 describe('deletedProjectState', () => {
@@ -90,5 +97,56 @@ describe('deletedProjectState', () => {
     clearDeletedProjectState('p1')
     sendSkillToAgent('p1', 'after')
     expect(listener).toHaveBeenCalledTimes(1)
+  })
+
+  it('共享完成收尾只在当前画布路径导航，并清理全部内存状态', () => {
+    rememberActiveCanvas('p1')
+    sendSelectionToAgent('p1', ['node-1'])
+    sendSkillToAgent('p1', 'skill-1')
+    canvasStoreFor('p1', () => ({}) as never)
+    const navigate = vi.fn()
+
+    expect(
+      finalizeCommittedProjectRuntimes(
+        ['p1'],
+        '/canvas/p1',
+        navigate,
+      ),
+    ).toBe(true)
+    expect(navigate).toHaveBeenCalledWith('/projects', {
+      replace: true,
+    })
+    expect(activeCanvasId()).toBeNull()
+    expect(takeAgentHandoff('p1')).toEqual([])
+    expect(takeAgentSkillHandoff('p1')).toBeNull()
+    expect(canvasStoreCacheSize()).toBe(0)
+
+    expect(
+      finalizeCommittedProjectRuntimes(
+        ['p1'],
+        '/projects',
+        navigate,
+      ),
+    ).toBe(false)
+    expect(navigate).toHaveBeenCalledOnce()
+  })
+
+  it('共享完成收尾在设置页清状态但不导航', () => {
+    rememberActiveCanvas('p1')
+    sendSkillToAgent('p1', 'skill-1')
+    canvasStoreFor('p1', () => ({}) as never)
+    const navigate = vi.fn()
+
+    expect(
+      finalizeCommittedProjectRuntimes(
+        ['p1'],
+        '/settings',
+        navigate,
+      ),
+    ).toBe(false)
+    expect(navigate).not.toHaveBeenCalled()
+    expect(activeCanvasId()).toBeNull()
+    expect(takeAgentSkillHandoff('p1')).toBeNull()
+    expect(canvasStoreCacheSize()).toBe(0)
   })
 })
