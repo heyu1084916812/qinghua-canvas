@@ -22,7 +22,6 @@ import { createAgentJobStore } from '../../../../state/agent/jobStore'
 import type { AgentDeliveryMode } from '../../../../domain/agent/delivery'
 import {
   confirmationRequiresExplicitApproval,
-  confirmationRunsGeneration,
 } from '../../../../domain/agent/confirmation'
 import {
   advanceAgentTaskPlanAfterReview,
@@ -180,6 +179,8 @@ import { useAgentSendController } from './useAgentSendController'
 import { useAgentOutcomeCoordinator } from './useAgentOutcomeCoordinator'
 import { assembleAgentLoopDeps } from './agentLoopDeps'
 import { continueAgentAutoConfirmations } from './agentAutoConfirmations'
+import { runAgentConfirmation } from './agentConfirmationRun'
+import { runAgentContinuation } from './agentContinuationRun'
 import {
   settleAgentInterruption,
   type AgentInterruptionSettlementResult,
@@ -2091,105 +2092,43 @@ export function AgentPanel({
     if (confirmingRef.current.has(current.id)) return
     confirmingRef.current.add(current.id)
     const { request } = status
-    const confirmationOrigin: AgentTurnOrigin = {
-      jobId:
-        currentTurnJobIdRef.current.get(current.id) ??
-        controller.jobId(current.id),
-      turnId:
-        activeQueueTurnOf(current.id) ??
-        currentTurnIdRef.current.get(current.id),
-      queueTurnId: activeQueueTurnOf(current.id),
-      messageRevision:
-        current.messageRevision ??
-        currentTurnRevisionRef.current.get(current.id),
-    }
-    const confirmationAbort = new AbortController()
     try {
-      abortRefs.current.set(current.id, confirmationAbort)
       inFlightConfirmationRef.current.set(current.id, request)
-      await controller.beginConfirmation(
-        current.id,
-        request,
-        confirmationOrigin,
-      )
-      setStatusFor(current.id, { kind: 'executing', tool: request.name })
-      const result = await executeConfirmedToolWithLedger(current, request)
-      const imageNodeIds = [...new Set(
-        [...messages].reverse().find((message) => message.role === 'user')?.imageNodeIds ?? [],
-      )]
-      const currentLoopDeps = loopDeps({
+      await runAgentConfirmation({
         session: current,
-        operationId: createId('op'),
-        toolMode: toolModeRef.current.get(current.id) ?? 'native',
-        visualNodeIds: imageNodeIds,
-        turnTools: turnToolsForSession(current),
-        turnController: confirmationAbort,
-      })
-      if (confirmationRunsGeneration(request.name)) {
-        await controller.finishConfirmedTool(
-          current.id,
-          request,
-          confirmationOrigin,
-        )
-      }
-      setStatusFor(current.id, { kind: 'thinking' })
-      const resumed = await resumeAgentTurn(
+        request,
         messages,
-        request.callId,
-        result,
-        currentLoopDeps,
-        request.name,
-      )
-      const outcome = await continueAutoConfirmations(
-        current,
-        resumed,
-        currentLoopDeps,
-        (next) => {
-          if (currentIdRef.current === current.id) setMessages(next)
+        turnOrigin: () => ({
+          jobId:
+            currentTurnJobIdRef.current.get(current.id) ??
+            controller.jobId(current.id),
+          turnId:
+            activeQueueTurnOf(current.id) ??
+            currentTurnIdRef.current.get(current.id),
+          queueTurnId: activeQueueTurnOf(current.id),
+          messageRevision:
+            current.messageRevision ??
+            currentTurnRevisionRef.current.get(current.id),
+        }),
+        beginConfirmation: controller.beginConfirmation,
+        finishConfirmedTool: controller.finishConfirmedTool,
+        executeConfirmedTool: executeConfirmedToolWithLedger,
+        createLoopDeps: (args) => loopDeps(args),
+        toolMode: () =>
+          toolModeRef.current.get(current.id) ?? 'native',
+        turnTools: () => turnToolsForSession(current),
+        resumeAgentTurn,
+        continueAutoConfirmations,
+        handleOutcome,
+        settleSessionOutcome,
+        transitionSessionJob,
+        setAbortController: (confirmationAbort) => {
+          abortRefs.current.set(current.id, confirmationAbort)
         },
-      )
-      const applied = await handleOutcome(
-        current,
-        outcome,
-        undefined,
-        confirmationAbort,
-      )
-      if (applied === 'conflict') {
-        await settleSessionOutcome(
-          current.id,
-          outcome,
-          confirmationOrigin,
-        )
-        return
-      }
-      await settleSessionOutcome(
-        current.id,
-        outcome,
-        confirmationOrigin,
-      )
-    } catch (error) {
-      if (confirmationAbort.signal.aborted) return
-      const blocked =
-        error instanceof AgentToolEffectBlockedError ? error : null
-      setStatusFor(current.id, { kind: 'error', message: errText(error) })
-      await transitionSessionJob(
-        current.id,
-        blocked?.status ?? 'failed',
-        blocked ? 'tool_failed' : 'failed',
-        {
-          lastError: errText(error),
-          ...(blocked?.status === 'needs_attention'
-            ? { pendingCallId: blocked.outcome.effect.toolCallId }
-            : {}),
-        },
-        { phase: 'confirmed_tool' },
-        confirmationOrigin,
-      )
-      await settleSessionOutcome(
-        current.id,
-        { kind: 'error' },
-        confirmationOrigin,
-      )
+        setStatus: (next) => setStatusFor(current.id, next),
+        isCurrentSession: () => currentIdRef.current === current.id,
+        setMessages,
+      })
     } finally {
       confirmingRef.current.delete(current.id)
       if (
@@ -2207,7 +2146,6 @@ export function AgentPanel({
     loopDeps,
     handleOutcome,
     settleSessionOutcome,
-    sessions,
     setStatusFor,
     transitionSessionJob,
     continueAutoConfirmations,
@@ -2247,108 +2185,46 @@ export function AgentPanel({
   /** 轮数预算暂停后继续；工具结果已在 messages 中，不会重放已完成的调用。 */
   const continueTask = useCallback(async () => {
     if (!current || status.kind !== 'paused') return
-    let queueTurnId =
-      activeQueueTurnOf(current.id) ?? current.continuation?.queuedTurnId
-    const continuationTurnId =
-      queueTurnId ??
-      currentTurnIdRef.current.get(current.id) ??
-      createId('turnmsg')
-    if (!isSessionActivityActive(current.id)) {
-      if (
-        queueTurnId &&
-        current.queuedTurns[0]?.id === queueTurnId
-      ) {
-        const claimed = await controller.claimNextQueuedTurn(current.id)
-        if (claimed?.session) applySessionSnapshot(claimed.session)
-        queueTurnId = claimed?.turn.id
-      } else {
-        queueTurnId = undefined
-      }
-      if (
-        !claimSessionActivity(
-          current.id,
-          queueTurnId,
-          continuationTurnId,
-        )
-      ) {
-        return
-      }
-    }
-    const continuationOrigin: AgentTurnOrigin = {
-      jobId:
-        currentTurnJobIdRef.current.get(current.id) ??
-        controller.jobId(current.id),
-      turnId: continuationTurnId,
-      queueTurnId,
-      messageRevision:
-        current.messageRevision ??
-        currentTurnRevisionRef.current.get(current.id),
-    }
-    const imageNodeIds = [...messages]
-      .reverse()
-      .find((message) => message.role === 'user')?.imageNodeIds ?? []
-    const continuationAbort = new AbortController()
-    abortRefs.current.set(current.id, continuationAbort)
-    const currentLoopDeps = loopDeps({
+    await runAgentContinuation({
       session: current,
-      operationId: createId('op'),
-      toolMode: toolModeRef.current.get(current.id) ?? 'native',
-      visualNodeIds: imageNodeIds,
-      turnTools: turnToolsForSession(current),
-      turnController: continuationAbort,
+      messages,
+      activeQueueTurnId: () => activeQueueTurnOf(current.id),
+      currentTurnId: () => currentTurnIdRef.current.get(current.id),
+      turnOrigin: (turnId, queueTurnId) => ({
+        jobId:
+          currentTurnJobIdRef.current.get(current.id) ??
+          controller.jobId(current.id),
+        turnId,
+        queueTurnId,
+        messageRevision:
+          current.messageRevision ??
+          currentTurnRevisionRef.current.get(current.id),
+      }),
+      isActivityActive: () => isSessionActivityActive(current.id),
+      claimNextQueuedTurn: controller.claimNextQueuedTurn,
+      claimActivity: (sessionId, queueTurnId, turnId) =>
+        claimSessionActivity(sessionId, queueTurnId, turnId),
+      applySessionSnapshot,
+      createLoopDeps: (args) => loopDeps(args),
+      toolMode: () => toolModeRef.current.get(current.id) ?? 'native',
+      turnTools: () => turnToolsForSession(current),
+      transitionSessionJob,
+      setAbortController: (continuationAbort) => {
+        abortRefs.current.set(current.id, continuationAbort)
+      },
+      setStatus: (next) => setStatusFor(current.id, next),
+      runAgentTurn,
+      continueAutoConfirmations,
+      handleOutcome,
+      settleSessionOutcome,
+      isCurrentSession: () => currentIdRef.current === current.id,
+      setMessages,
     })
-    await transitionSessionJob(
-      current.id,
-      'planning',
-      'status_changed',
-      { pendingCallId: undefined },
-      { resumedFromCheckpoint: true },
-      continuationOrigin,
-    )
-    setStatusFor(current.id, { kind: 'thinking' })
-    try {
-      const initial = await runAgentTurn(messages, currentLoopDeps)
-      const outcome = await continueAutoConfirmations(
-        current,
-        initial,
-        currentLoopDeps,
-        (next) => {
-          if (currentIdRef.current === current.id) setMessages(next)
-        },
-      )
-      const applied = await handleOutcome(
-        current,
-        outcome,
-        undefined,
-        continuationAbort,
-      )
-      if (applied === 'conflict') {
-        await settleSessionOutcome(
-          current.id,
-          outcome,
-          continuationOrigin,
-        )
-        return
-      }
-      await settleSessionOutcome(
-        current.id,
-        outcome,
-        continuationOrigin,
-      )
-    } catch (error) {
-      if (continuationAbort.signal.aborted) return
-      setStatusFor(current.id, { kind: 'error', message: errText(error) })
-      await settleSessionOutcome(
-        current.id,
-        { kind: 'error' },
-        continuationOrigin,
-      )
-    }
   }, [
     current,
     status,
     messages,
-    sessions,
+    controller,
     applySessionSnapshot,
     loopDeps,
     setStatusFor,

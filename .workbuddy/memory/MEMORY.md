@@ -1,5 +1,25 @@
 # CanvasFlow（轻画）项目记忆
 
+### Agent 确认执行与检查点继续拆分（2026-11-03，对账 #864）
+
+- **确认执行只收端口**：`agentConfirmationRun.ts` 不读取 React state/refs，承接 begin、账本工具执行、
+  同一 `AgentLoopDeps`、生成类 finish、resume、自动确认、outcome 与 queue / activity 结算。每次运行
+  创建自己的 `AbortController`，begin / finish / settle 共用本回合 jobId / turnId / queueTurnId /
+  messageRevision origin；abort 只看本地 controller，不能按 session 现取。
+- **失败分支不能丢语义**：`AgentToolEffectBlockedError` 为 `needs_attention` 时保留 pendingCallId 和
+  错误 UI，普通异常才落 failed。message outcome 的 revision 冲突仍按原 origin 尝试结算；活动锁不匹配时
+  交给 `settleSessionOutcome` 的 queue + turn 双 token 门禁跳过。
+- **检查点继续独立**：`agentContinuationRun.ts` 先复用已有活动锁；需要领取时只有原 continuation queue
+  token 等于队首才 claim，并把真实 turnId 同时绑进 queueTurnId + turnId。origin 固定后再迁 planning，
+  模型、自动确认、outcome 与错误 settlement 全部沿用该 origin。
+- **UI 写回只看当前会话**：自动过程消息只在 `isCurrentSession()` 为真时 setMessages；后台会话仍通过
+  持久 outcome 落库。继续 abort 时不补错误态或结算，交给 stop / cancel 协调器。
+- **宿主保持薄装配**：`AgentPanel` 继续拥有 confirmingRef、inFlightConfirmationRef、abortRefs、
+  per-session refs 和 UI 回调；本轮 diff 净减少 **124 行**，不涉及 DOM / CSS / 文案。
+- **证据**：新增聚焦 **14/14**、AgentPanel **186/186**、扩展 Agent 定向 **284/284**、全量
+  `npm test` **3925 passed / 1 skipped**；tsc、定向 ESLint、check、build、diff-check 通过。端口 mock
+  未覆盖真实桌面交错或付费渠道，本轮未跑 G769 / Tauri；确认和继续入口已完成，AgentHost 仍是后续债。
+
 ### Agent outcome 延迟写库测试屏障（2026-11-03，对账 #861a）
 
 - **生产接口不藏测试钩子**：`applyAgentOutcome()` 只在消息事务内按 expected `messageRevision` CAS，

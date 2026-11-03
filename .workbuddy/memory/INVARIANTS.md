@@ -16,6 +16,15 @@
   store / transition / removeSteers / finishQueuedTurn 任一步失败都不能阻断后续 cleanup，协调器返回
   `{session, cleanupError}`。调用方有 cleanupError 时不得再发“已取消/已停止”成功提示，也不能继续
   引导或直接下一步；否则用户实际看不到失败。Tauri 复验要求 error notice 至少 2 秒仍可见。
+- **确认执行只收端口**：`agentConfirmationRun.ts` 自己创建本回合 `AbortController`，begin / finish /
+  settlement 必须共用开始时固定的 jobId / turnId / queueTurnId / messageRevision origin；abort 只看
+  本地 controller，不能按 session 现找。执行顺序固定为 begin → executing → 账本执行 → 同一
+  loopDeps → 生成类 finish → thinking → resume → 自动确认 → outcome → settle。工具副作用未决必须保留
+  `needs_attention + pendingCallId`；revision 冲突只能按原 queue + turn token 尝试结算，不能碰新回合。
+- **检查点继续只收端口**：`agentContinuationRun.ts` 先复用已有活动锁；需要领取时只有原
+  continuation queue token 等于队首才 claim，领取成功后必须用真实 turnId 同时绑定 queueTurnId +
+  turnId。origin 固定后再迁 planning，模型、自动确认、outcome 与错误 settlement 全部沿用该 origin。
+  自动过程消息只在 `isCurrentSession()` 时写当前 `messages`；中止时不得补错误态或结算。
 - **自动确认循环只收端口**：`agentAutoConfirmations.ts` 不读取 React refs/state；手动模式或
   显式批准工具原样返回 confirm。自动路径顺序固定为 transition（仅生成类）→ setStatus → execute →
   onMessages → finish（仅生成类）→ resume，resume 必须沿用同一 `AgentLoopDeps`。turnOrigin 每次通过
