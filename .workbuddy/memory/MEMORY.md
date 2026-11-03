@@ -1,6 +1,6 @@
 # CanvasFlow（轻画）项目记忆
 
-### AgentAttachmentsController（2026-11-04，对账 #874，🚧 待独立验收，`fcb60c6`）
+### AgentAttachmentsController（2026-11-04，对账 #874，✅ 已独立验收，`fcb60c6`）
 
 - `useAgentAttachmentsController` 只做附件 React 适配：handoff、本地文件、素材库添加、pendingAssetIds
   同步、引用缩略图与 objectURL 生命周期。节点真相仍在 CanvasStore，附件真相仍在 AgentSession。
