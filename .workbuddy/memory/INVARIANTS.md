@@ -100,6 +100,11 @@
   cache；`commitChatRoute` 必须同时校验 expected route 对象身份与 allChannels source。缓存项必须保存
   `{route, source}` 并在读取时对同步更新的 source ref 比较，禁止依赖 passive effect 清理来防止旧渠道命中。
   `useLayoutEffect` 只做清场，模型切换、shutdown、渠道变化后的旧 prepare/onRouteSucceeded 均不得复活。
+- **AgentTaskPlanController 只拥有直接下一步的 in-flight**：`useAgentTaskPlanController` 只持 per-session
+  advancing Set / Promise Map，不复制 Session/Job/Canvas 真相。同一 session 重复调用必须复用同一 Promise；
+  确认卡必须用 `statusFor(target.id)` + target，A/B busy 隔离。活动等待最多 60×100ms；`trackRun` 同步 throw
+  必须清 advancing 并返回 rejected Promise。`updateSessionFields` 返回 null 时不得 fallback、提前清成功或发送
+  隐藏控制消息；只有落库成功后才清 live/status 并 sendText。切会话不取消旧目标，unmount 后停止后续写/发送。
 - **AgentSessionActionsController 不绕过 lifecycle**：新建会话创建后必须走 `switchTo`，禁止直接
   `setCurrent`；改名和删除晚返回只在目标仍是当前时自动切换。两步删除必须保留活动/队列/确认中门禁；
   `sessions.remove` 成功前不得清 draft/runtime，删除落库后的 refresh / switch / fallback 失败必须清失效选择

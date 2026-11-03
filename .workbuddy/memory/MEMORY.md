@@ -1,5 +1,19 @@
 # CanvasFlow（轻画）项目记忆
 
+### AgentTaskPlanController（2026-11-04，对账 #877，✅ 已独立验收，`076190b`）
+
+- `useAgentTaskPlanController` 只拥有“直接下一步”的 per-session advancing Set 与 in-flight Promise Map；
+  SessionStore / AgentController / Job / CanvasStore 仍是业务真相，button 与输入框“下一步”共用同一入口。
+- 同一 session 重复调用必须复用同一 Promise，只执行一次 abort / settle / update / send；A/B busy 按 sessionId
+  隔离。确认卡必须从 `statusFor(target.id)` + target 获取，不能读当前会话闭包。
+- 活动锁仍最多 60×100ms；unmount 后停止轮询，但切会话不取消旧目标。`trackRun` 同步 throw 必须清 advancing
+  并返回 rejected Promise，不能同步抛给 `runPromiseDetached`。
+- `updateSessionFields` 返回 null 时不得从旧 target 伪造 plan，不得提前清运行态或发隐藏控制消息；只有落库成功
+  后才能 apply snapshot、clear live/status、notify、sendText。
+- `AgentPanel.tsx` **2744 → 2669 行**（净减少 75）；定向 **10/10**、AgentPanel **278/278**、
+  G735 **35/35**、G769 明暗 **39/39 ×2**、G865 **24/24**、全量 **4089 passed / 1 skipped**。
+- 真实页面验证按钮、文字命令、双击去重、A/B busy 隔离；1440×900 / 1024×700 明暗 ready/advancing 8 图通过。
+
 ### AgentChatRouting（2026-11-04，对账 #876，✅ 已独立验收，`801f618`）
 
 - `useAgentChatRouting` 只持有 route cache、per-session prepare id 与 channel source epoch；SessionStore /
