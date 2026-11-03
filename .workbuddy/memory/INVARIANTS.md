@@ -61,7 +61,8 @@
   路由以会话路由缓存为准：`onRouteSucceeded` 后写回缓存并立即生效，不能复用装配闭包里的旧 route 对象；
   候选提升是纯函数，选中项没有 `credentialGroupId` 时必须删除旧分组。`loopDeps` 的
   `turnController` 必须由入口（初次发送 / 确认 / 检查点继续）显式传入，不得按 sessionId 现取。
-  `nodeRunStates` 与 `execution.nodeStates` 同构（失败态是 AppError），`readResult` 持久失败优先。
+  `nodeRunStates()` 必须每次读取当前 `execution.nodeStates`（失败态是 AppError），不能捕获 render Map；
+  `readResult` 持久失败优先，旧 loopDeps 和 Provider 卸载后仍要看到 live 失败态。
   `applyPlan` 工具结果必须返回 `applied.resolvedNodes`，`agentLoopDeps` 只从这份真实
   localId → nodeId 映射写别名；不得按标题猜测。测试必须同时钉住工具返回字段和别名表写回，
   真实回合碰巧用真实 nodeId 成功不构成别名契约证明。已由 `a25c767` 补链，并用真实工具消息
@@ -96,17 +97,26 @@
   `workbenches/canvas/*`。每 projectId 一个 stable host record；CanvasPage bridge 卸载时只 deactivate，
   非活动 panel 仅 `hidden`，不能 remove / 卸载 AgentPanel。StrictMode cleanup 同样只 deactivate；HMR 才
   显式 abort/dispose 全部项目 runtime。
+- **关闭先拒新工作，再 abort，再等完整 Promise**：共享 `taskLifecycle` 标记 closing 必须先于 abort。
+  ExecutionRuntime 同时等待 engine 与画布 operations；AgentPanel 等待 send / confirm / continue /
+  cancel / stop。超时必须保留 host/runtime 注册并让删除失败，不能继续 flush 清理或 purge。
 - **slot 只能有一个 owner**：只有 active host 能写 `data-agent-shell-active`、宽度和 resize 属性；
   inactive host / 旧 cleanup 不得删除或覆盖新 owner。离开画布后 slot 宽必须回到 0；A/B 项目并存时
   未打开 Agent 的 active host 也让 slot 保持 0。
 - **执行 runtime 不跟 Provider ref 死**：`useExecution` 的 controller registry、running plans、取消索引
   和 version baseline 由项目级 runtime 持有。常驻 host 的 execution adapter 可复用捕获闭包，但
   `nodeStates / nodeStateOf / isRunning` 必须每次读 live state；禁止把 render 快照冻结后跨路由使用，
-  否则后台失败态、取消和版本连续性都会失效。
+  否则后台失败态、取消和版本连续性都会失效。runtime tombstone 阻止旧 runNode / 生成入口复活；
+  只有合法 CanvasPage 激活能建立新代际。
 - **handoff 与 panel id 按项目隔离**：`agentHandoff` / `agentSkillHandoff` 必须带 projectId 分桶，
   panel id 必须 project-scoped。多 host 并存时，后台 Agent 不能消费当前项目的节点引用或技能交接。
 - **项目删除先 dispose runtime**：软删 / 永久删除必须先 await host abort + flush、execution dispose，
-  之后才可 purge Agent 表；成功后 `forgetCanvasStore`。dispose 失败时不得继续删除，也不得先忘 store。
+  之后才可 purge Agent 表；成功后清 activeCanvas / 两类 handoff / store。删除当前画布还要 replace 到
+  `/projects`。dispose 失败时不得继续删除，也不得先忘 store。
+- **注册表按代际条件删除**：AgentHostRegistry 与 ProjectRuntimeRegistry 都带 generation。HMR 先同步失效
+  旧代际，再异步等待；旧 cleanup 只能在 capture token 仍匹配时删除。新代际不能被迟到 dispose 抹掉。
+- **激活重 clamp，面板开合不推球**：`active false -> true`、当前可见 surface 挂载与视口变化时按真实
+  surface 重新 clamp；普通面板打开/收起只扩缩 shell，不能推动已有浮球坐标。
 - **关闭 Agent 面板不能卸载运行宿主**：收起只给 `AgentDock` 的宿主加 `hidden`；状态、AbortController、
   队列、确认、草稿继续存在。壳层展开动画由独立 active 状态驱动，不能靠重新挂载制造首帧。
 - **用户消息按 sessionId 先落库**：路由与模型请求之前保存；后台会话从自己的 `agentMessages` 读历史。
