@@ -15,7 +15,7 @@
   清 live 和置 idle。store 的 revision 屏障、原 turnOrigin Job 和 queue token 匹配必须保留。
   store / transition / removeSteers / finishQueuedTurn 任一步失败都不能阻断后续 cleanup，协调器返回
   `{session, cleanupError}`。调用方有 cleanupError 时不得再发“已取消/已停止”成功提示，也不能继续
-  引导或直接下一步；否则用户实际看不到失败。
+  引导或直接下一步；否则用户实际看不到失败。Tauri 复验要求 error notice 至少 2 秒仍可见。
 - **自动确认循环只收端口**：`agentAutoConfirmations.ts` 不读取 React refs/state；手动模式或
   显式批准工具原样返回 confirm。自动路径顺序固定为 transition（仅生成类）→ setStatus → execute →
   onMessages → finish（仅生成类）→ resume，resume 必须沿用同一 `AgentLoopDeps`。turnOrigin 每次通过
