@@ -74,6 +74,8 @@ export type AgentLoopOutcome =
       kind: 'error'
       message: string
       messages: ChatMessage[]
+      /** 模型请求前的结构化失败阶段；用于 Job 事件定位，不进入对话正文。 */
+      phase?: string
       /** 工具副作用可能已发生；界面必须转 needs_attention，不能当普通失败重试。 */
       needsAttention?: { toolCallId?: string; reason: string }
     }

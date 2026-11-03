@@ -15,12 +15,18 @@
 - **重载后必须先重解路由**：会话路由缓存只在当前页面进程内有效，持久 paused checkpoint 重载后必然为空。
   继续入口必须先用 `ensureRoute(session)` 重新解析；路由失败按原 origin 落 failed +
   `phase: continuation_route`，不能创建 loopDeps、发空 channel 请求或留下活动锁。
+- **重载还要恢复 Job 身份**：`AgentController.refresh()` 命中持久 paused / waiting-confirmation 时，
+  必须按会话 UI 状态精确匹配后把 jobId + turnId 绑回控制器：确认找 waiting_confirmation，检查点找
+  paused，有 queuedTurnId 时优先匹配该 turn，不能取 `recovered[0]`；否则 queued Job 会抢走映射，
+  原 Job 找不到并留在活动态。路由失败必须复用 error outcome 原子清 `continuation / allowedToolNames`；
+  明确 jobId 却未完成 Job 转态时必须抛“AgentJob 收口失败”，不能静默 applied。
 - **UI 写回只看当前会话**：自动过程消息只在 `isCurrentSession()` 为真时 setMessages；后台会话仍通过
   持久 outcome 落库。继续 abort 时不补错误态或结算，交给 stop / cancel 协调器。
 - **宿主保持薄装配**：`AgentPanel` 继续拥有 confirmingRef、inFlightConfirmationRef、abortRefs、
   per-session refs 和 UI 回调；本轮 diff 净减少 **124 行**，不涉及 DOM / CSS / 文案。
-- **证据**：质量线发现重载后空路由缺口，修复后确认/继续聚焦 **16/16**、Agent 定向 **494/494**、全量
-  `npm test` **3927 passed / 1 skipped**；tsc、定向 ESLint、check、build、diff-check 通过。真实
+- **证据**：质量线发现重载后空路由缺口，一致性审查又复现 direct checkpoint 丢 Job 身份和失败后假 paused；
+  修复后 Job 身份 / 继续 / outcome 聚焦 **35/35**、Agent 定向 **498/498**、全量 `npm test`
+  **3931 passed / 1 skipped**；tsc、定向 ESLint、check、build、diff-check 通过。真实
   Chat2api 人工确认回合已通过；continuation 的 Tauri 重载续跑仍待独立复验，AgentHost 仍是后续债。
 
 ### Agent outcome 延迟写库测试屏障（2026-11-03，对账 #861a）

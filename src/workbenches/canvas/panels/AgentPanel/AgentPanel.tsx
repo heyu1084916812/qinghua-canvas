@@ -1364,7 +1364,10 @@ export function AgentPanel({
         jobId:
           currentTurnJobIdRef.current.get(session.id) ??
           controller.jobId(session.id),
-        turnId: queueTurnId ?? currentTurnIdRef.current.get(session.id),
+        turnId:
+          queueTurnId ??
+          currentTurnIdRef.current.get(session.id) ??
+          controller.turnId(session.id),
         queueTurnId,
         messageRevision: persistedTurn?.messageRevision ??
           session.messageRevision ??
@@ -1403,7 +1406,8 @@ export function AgentPanel({
           controller.jobId(session.id),
         turnId:
           activeQueueTurnOf(session.id) ??
-          currentTurnIdRef.current.get(session.id),
+          currentTurnIdRef.current.get(session.id) ??
+          controller.turnId(session.id),
         queueTurnId: activeQueueTurnOf(session.id),
       }),
       transitionSessionJob,
@@ -1732,7 +1736,8 @@ export function AgentPanel({
           currentTurnJobIdRef.current.get(session.id) ??
           controller.jobId(session.id),
         turnId: queueTurnId ??
-          currentTurnIdRef.current.get(session.id),
+          currentTurnIdRef.current.get(session.id) ??
+          controller.turnId(session.id),
         queueTurnId,
         messageRevision:
           session.messageRevision ??
@@ -2104,7 +2109,8 @@ export function AgentPanel({
             controller.jobId(current.id),
           turnId:
             activeQueueTurnOf(current.id) ??
-            currentTurnIdRef.current.get(current.id),
+            currentTurnIdRef.current.get(current.id) ??
+            controller.turnId(current.id),
           queueTurnId: activeQueueTurnOf(current.id),
           messageRevision:
             current.messageRevision ??
@@ -2189,12 +2195,16 @@ export function AgentPanel({
       session: current,
       messages,
       activeQueueTurnId: () => activeQueueTurnOf(current.id),
-      currentTurnId: () => currentTurnIdRef.current.get(current.id),
+      currentTurnId: () =>
+        currentTurnIdRef.current.get(current.id) ??
+        controller.turnId(current.id),
       turnOrigin: (turnId, queueTurnId) => ({
         jobId:
           currentTurnJobIdRef.current.get(current.id) ??
           controller.jobId(current.id),
-        turnId,
+        turnId:
+          turnId ??
+          controller.turnId(current.id),
         queueTurnId,
         messageRevision:
           current.messageRevision ??

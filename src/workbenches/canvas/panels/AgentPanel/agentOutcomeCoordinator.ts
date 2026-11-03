@@ -105,6 +105,15 @@ export async function coordinateAgentOutcome(
     sameController() &&
     outcomeController !== undefined &&
     !outcomeController.signal.aborted
+  const transitionOutcomeJob = async (
+    ...args: Parameters<AgentController['transition']>
+  ) => {
+    const transitioned = await input.transitionSessionJob(...args)
+    if (!transitioned && input.turnOrigin.jobId) {
+      throw new Error(`AgentJob 收口失败：${args[1]}`)
+    }
+    return transitioned
+  }
 
   const full = persistedTurn
     ? composeAgentOutcomeMessages(persistedTurn, outcome.messages)
@@ -196,7 +205,7 @@ export async function coordinateAgentOutcome(
   }
 
   if (outcome.kind === 'confirm') {
-    await input.transitionSessionJob(
+    await transitionOutcomeJob(
       session.id,
       'waiting_confirmation',
       'confirmation_requested',
@@ -205,7 +214,7 @@ export async function coordinateAgentOutcome(
       input.turnOrigin,
     )
   } else if (outcome.kind === 'stopped' && outcome.checkpoint) {
-    await input.transitionSessionJob(
+    await transitionOutcomeJob(
       session.id,
       'paused',
       'checkpoint_saved',
@@ -221,7 +230,7 @@ export async function coordinateAgentOutcome(
       input.turnOrigin,
     )
   } else if (outcome.kind === 'error' && outcome.needsAttention) {
-    await input.transitionSessionJob(
+    await transitionOutcomeJob(
       session.id,
       'needs_attention',
       'tool_failed',
@@ -238,7 +247,7 @@ export async function coordinateAgentOutcome(
       input.turnOrigin,
     )
   } else if (outcome.kind === 'message') {
-    await input.transitionSessionJob(
+    await transitionOutcomeJob(
       session.id,
       'completed',
       'completed',
@@ -249,12 +258,17 @@ export async function coordinateAgentOutcome(
   } else {
     const reason =
       outcome.kind === 'error' ? outcome.message : outcome.reason
-    await input.transitionSessionJob(
+    await transitionOutcomeJob(
       session.id,
       'failed',
       'failed',
       { lastError: reason },
-      { reason },
+      {
+        reason,
+        ...(outcome.kind === 'error' && outcome.phase
+          ? { phase: outcome.phase }
+          : {}),
+      },
       input.turnOrigin,
     )
   }

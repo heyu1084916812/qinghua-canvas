@@ -296,6 +296,69 @@ describe('coordinateAgentOutcome', () => {
     expect(h.clearDeliveredSteers).toHaveBeenCalledTimes(1)
   })
 
+  it('★★ error 收口清持久检查点、Job 落 failed 并删除 abort', async () => {
+    const outcome: AgentLoopOutcome = {
+      kind: 'error',
+      message: '路由已失效',
+      messages: [{ role: 'user', content: '继续任务' }],
+      phase: 'continuation_route',
+    }
+    const h = harness({ outcome })
+
+    const result = await coordinateAgentOutcome(h.input)
+
+    expect(result).toBe('applied')
+    expect(h.applyOutcome).toHaveBeenCalledWith(
+      SESSION.id,
+      expect.objectContaining({
+        pendingConfirmation: undefined,
+        continuation: undefined,
+        allowedToolNames: undefined,
+      }),
+    )
+    expect(h.transitionSessionJob).toHaveBeenCalledWith(
+      SESSION.id,
+      'failed',
+      'failed',
+      { lastError: '路由已失效' },
+      {
+        reason: '路由已失效',
+        phase: 'continuation_route',
+      },
+      {},
+    )
+    expect(h.setStatusFor).toHaveBeenCalledWith(SESSION.id, {
+      kind: 'error',
+      message: '路由已失效',
+    })
+    expect(h.deleteAbortController).toHaveBeenCalledWith(
+      SESSION.id,
+      h.controller,
+    )
+  })
+
+  it('★★ 有明确 jobId 但 Job 未转态时不能报 applied', async () => {
+    const outcome: AgentLoopOutcome = {
+      kind: 'error',
+      message: '路由已失效',
+      messages: [{ role: 'user', content: '继续任务' }],
+    }
+    const h = harness({
+      outcome,
+      turnOrigin: {
+        jobId: 'job-1',
+        turnId: 'turn-1',
+        messageRevision: 0,
+      },
+    })
+
+    await expect(
+      coordinateAgentOutcome(h.input),
+    ).rejects.toThrow('AgentJob 收口失败：failed')
+    expect(h.setStatusFor).not.toHaveBeenCalled()
+    expect(h.deleteAbortController).not.toHaveBeenCalled()
+  })
+
   it('★★ 同一 controller 已 abort 的迟到 confirm 补 interrupted 并清持久卡，不写 UI/Job 成功', async () => {
     const outcome: AgentLoopOutcome = {
       kind: 'confirm',

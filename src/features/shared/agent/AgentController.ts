@@ -35,6 +35,7 @@ export interface AgentController {
   sessions: AgentSessionStore
   jobs: AgentJobStore
   jobId: (sessionId: string) => string | undefined
+  turnId: (sessionId: string) => string | undefined
   ensureJob: (session: AgentSession, turnId: string) => Promise<AgentJob>
   transition: (
     sessionId: string,
@@ -110,9 +111,12 @@ export function createAgentController(input: {
 }): AgentController {
   const { projectId, sessions, jobs, hooks } = input
   const jobIds = new Map<string, string>()
+  const turnIds = new Map<string, string>()
 
   const jobId = (sessionId: string): string | undefined =>
     jobIds.get(sessionId)
+  const turnId = (sessionId: string): string | undefined =>
+    turnIds.get(sessionId)
 
   const ensureJob = async (
     session: AgentSession,
@@ -121,8 +125,12 @@ export function createAgentController(input: {
     const mappedId = jobIds.get(session.id)
     if (mappedId) {
       const mapped = await jobs.get(mappedId)
-      if (mapped) return mapped
+      if (mapped) {
+        turnIds.set(session.id, mapped.turnId)
+        return mapped
+      }
       jobIds.delete(session.id)
+      turnIds.delete(session.id)
     }
     let existing = await jobs.forTurn(session.id, turnId)
     if (!existing) {
@@ -149,6 +157,7 @@ export function createAgentController(input: {
         turnId,
       })).job
     jobIds.set(session.id, job.id)
+    turnIds.set(session.id, job.turnId)
     return job
   }
 
@@ -190,6 +199,7 @@ export function createAgentController(input: {
       jobIds.get(sessionId) === id
     ) {
       jobIds.delete(sessionId)
+      turnIds.delete(sessionId)
     }
     return result
   }
@@ -369,6 +379,32 @@ export function createAgentController(input: {
         }
       }
       const recovered = (!liveHere ? await jobs.recoverSession(row.id) : []) ?? []
+      if (!liveHere) {
+        const recoveredJob = row.pendingConfirmation
+          ? recovered.find(
+              (job) =>
+                job.status === 'waiting_confirmation' &&
+                job.pendingCallId === row.pendingConfirmation?.callId,
+            ) ??
+            recovered.find(
+              (job) => job.status === 'waiting_confirmation',
+            )
+          : row.continuation
+            ? recovered.find(
+                (job) =>
+                  job.status === 'paused' &&
+                  (!row.continuation?.queuedTurnId ||
+                    job.turnId === row.continuation.queuedTurnId),
+              ) ?? recovered.find((job) => job.status === 'paused')
+            : undefined
+        if (recoveredJob) {
+          jobIds.set(row.id, recoveredJob.id)
+          turnIds.set(row.id, recoveredJob.turnId)
+        } else {
+          jobIds.delete(row.id)
+          turnIds.delete(row.id)
+        }
+      }
       const attention = recovered.find(
         (job) => job.status === 'needs_attention',
       )
@@ -391,6 +427,7 @@ export function createAgentController(input: {
     sessions,
     jobs,
     jobId,
+    turnId,
     ensureJob,
     transition,
     failTurn,

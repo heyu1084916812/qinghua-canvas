@@ -235,13 +235,66 @@ describe('AgentController', () => {
         active: vi.fn(),
         transition: vi.fn(),
         forTurn: vi.fn(async () => null),
-        recoverSession: vi.fn(async () => {}),
+        recoverSession: vi.fn(async (sessionId: string) =>
+          sessionId === 'paused'
+            ? [
+                {
+                  id: 'job-queued-first',
+                  sessionId: 'paused',
+                  projectId: 'p1',
+                  turnId: 'turn-queued-first',
+                  status: 'queued',
+                  revision: 1,
+                  createdAt: 1,
+                  updatedAt: 2,
+                },
+                {
+                  id: 'job-paused',
+                  sessionId: 'paused',
+                  projectId: 'p1',
+                  turnId: 'turn-paused',
+                  status: 'paused',
+                  revision: 1,
+                  createdAt: 1,
+                  updatedAt: 2,
+                },
+              ]
+            : sessionId === 'confirm'
+              ? [
+                  {
+                    id: 'job-queued-confirm',
+                    sessionId: 'confirm',
+                    projectId: 'p1',
+                    turnId: 'turn-queued-confirm',
+                    status: 'queued',
+                    revision: 1,
+                    createdAt: 1,
+                    updatedAt: 2,
+                  },
+                  {
+                    id: 'job-confirm',
+                    sessionId: 'confirm',
+                    projectId: 'p1',
+                    turnId: 'turn-confirm',
+                    status: 'waiting_confirmation',
+                    pendingCallId: 'c1',
+                    revision: 1,
+                    createdAt: 1,
+                    updatedAt: 2,
+                  },
+                ]
+            : [],
+        ),
       } as never,
       hooks,
     })
 
     await controller.refresh()
     expect(hooks.onContinuation).toHaveBeenCalledWith('paused', 8)
+    expect(controller.jobId('paused')).toBe('job-paused')
+    expect(controller.turnId('paused')).toBe('turn-paused')
+    expect(controller.jobId('confirm')).toBe('job-confirm')
+    expect(controller.turnId('confirm')).toBe('turn-confirm')
     expect(hooks.onPendingConfirmation).toHaveBeenCalledWith(
       'confirm',
       rows[1]!.pendingConfirmation,
@@ -342,6 +395,7 @@ describe('AgentController', () => {
 
     await expect(controller.ensureJob(session(), 'turn-1')).resolves.toBe(job)
     expect(controller.jobId('s1')).toBe('job-1')
+    expect(controller.turnId('s1')).toBe('turn-1')
     await expect(
       controller.transition('s1', 'planning'),
     ).resolves.toMatchObject({ job: { status: 'planning' } })

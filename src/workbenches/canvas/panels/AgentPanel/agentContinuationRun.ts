@@ -153,21 +153,60 @@ export async function runAgentContinuation(
     input.createAbortController?.() ?? new AbortController()
   input.setAbortController(continuationAbort)
   const failRoute = async (message: string) => {
-    input.setStatus({ kind: 'error', message })
-    await input.transitionSessionJob(
-      input.session.id,
-      'failed',
-      'failed',
-      { lastError: message },
-      { phase: 'continuation_route' },
-      continuationOrigin,
-    ).catch(() => null)
-    await input.settleSessionOutcome(
-      input.session.id,
-      { kind: 'error' },
-      continuationOrigin,
-    )
-    return 'failed' as const
+    const outcome: AgentLoopOutcome = {
+      kind: 'error',
+      message,
+      messages: [...input.messages],
+      phase: 'continuation_route',
+    }
+    let applied: AgentOutcomeCoordinationResult = 'ignored'
+    let cleanupError: string | undefined
+    try {
+      applied = await input.handleOutcome(
+        input.session,
+        outcome,
+        undefined,
+        continuationAbort,
+      )
+    } catch (error) {
+      cleanupError = errText(error)
+    }
+    if (cleanupError) {
+      try {
+        const transitioned = await input.transitionSessionJob(
+          input.session.id,
+          'failed',
+          'failed',
+          { lastError: message },
+          { phase: 'continuation_route' },
+          continuationOrigin,
+        )
+        if (!transitioned) {
+          cleanupError = `${cleanupError}；Job 转态未命中`
+        }
+      } catch (error) {
+        cleanupError = `${cleanupError}；Job 失败收口：${errText(error)}`
+      }
+      input.setStatus({
+        kind: 'error',
+        message: `${message}；检查点收口失败：${cleanupError}`,
+      })
+    }
+    try {
+      await input.settleSessionOutcome(
+        input.session.id,
+        outcome,
+        continuationOrigin,
+      )
+    } catch (error) {
+      input.setStatus({
+        kind: 'error',
+        message: `${message}；活动锁收口失败：${errText(error)}`,
+      })
+      return 'failed'
+    }
+    if (cleanupError) return 'failed'
+    return applied === 'applied' ? 'failed' : applied
   }
   let route: Awaited<ReturnType<AgentContinuationRunInput['ensureRoute']>>
   try {

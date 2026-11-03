@@ -28,6 +28,12 @@
   loopDeps、请求模型或遗留活动锁。路由成功后才迁 planning，后续模型、自动确认、outcome 与错误
   settlement 全部沿用该 origin。自动过程消息只在 `isCurrentSession()` 时写当前 `messages`；
   中止时不得补错误态或结算。
+- **重载恢复必须有 Job 身份**：`AgentController.refresh()` 看到仍可恢复的 paused /
+  waiting-confirmation 会话时，必须从 `recoverSession()` 按 UI 状态精确回填 jobId + turnId：
+  pendingConfirmation 只认 waiting_confirmation，continuation 只认 paused，有 queuedTurnId 时优先
+  匹配该 turn，禁止取 `recovered[0]`。direct checkpoint 不得生成一个查不到原 Job 的新 turn。路由失败
+  统一走 error outcome，原子清持久 continuation / 工具白名单、迁 Job、清 UI 与活动锁；明确 jobId 但
+  `transition()` 返回 null 时必须显式失败，不能把静默漏迁当 applied。
 - **自动确认循环只收端口**：`agentAutoConfirmations.ts` 不读取 React refs/state；手动模式或
   显式批准工具原样返回 confirm。自动路径顺序固定为 transition（仅生成类）→ setStatus → execute →
   onMessages → finish（仅生成类）→ resume，resume 必须沿用同一 `AgentLoopDeps`。turnOrigin 每次通过
