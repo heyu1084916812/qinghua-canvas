@@ -122,6 +122,7 @@ import {
 import { useAgentComposerController } from './useAgentComposerController'
 import { useAgentAttachmentsController } from './useAgentAttachmentsController'
 import { useAgentSessionLifecycle } from './useAgentSessionLifecycle'
+import { useAgentSessionActionsController } from './useAgentSessionActionsController'
 import { useAgentSkillsController } from './useAgentSkillsController'
 import { AgentSessionRuntimeState } from './agentSessionRuntime'
 import {
@@ -295,11 +296,11 @@ export function AgentPanel({
   const conversationResetForSessionRef = useRef<(sessionId: string) => void>(
     () => {},
   )
+  const sessionActionsResetRef = useRef<() => void>(() => {})
   const onSessionSwitched = useCallback((session: AgentSession) => {
     composerResetForSessionRef.current(session.id)
     conversationResetForSessionRef.current(session.id)
-    setRenaming(false)
-    setConfirmDelete(false)
+    sessionActionsResetRef.current()
   }, [])
   const {
     list,
@@ -457,11 +458,6 @@ export function AgentPanel({
     () => channels.globalModelsOf('video').map((model) => model.id),
     [channels, customModels, uncommonModelIds],
   )
-  /** 会话改名：就地编辑，Enter 提交 / Esc 取消（不弹原生 prompt —— 那会打断画布操作） */
-  const [renaming, setRenaming] = useState(false)
-  const [titleDraft, setTitleDraft] = useState('')
-  /** 删除会话走两步：第一次点只是「准备好」，第二次点才真删（对齐库里其他删除入口） */
-  const [confirmDelete, setConfirmDelete] = useState(false)
   /** 「已设默认」的提示框只闪一次，用完即收 */
   /** 展开看细节的步骤（工具调用 id 集合）。默认全收起 —— 对话流先保持干净 */
   /** 刚复制过哪一条助手回复：图标短暂换成对勾，给用户一个「确实复制了」的回执 */
@@ -902,6 +898,45 @@ export function AgentPanel({
     },
     [selection, store, allChannels],
   )
+
+  const sessionActions = useAgentSessionActionsController({
+    current,
+    projectId,
+    chatModelOptions,
+    imageModelOptions: modelOptionsByKind.image,
+    videoModelOptions: modelOptionsByKind.video,
+    trackRun,
+    createSession: sessions.create,
+    loadAgentDefault: presets.loadAgentDefault,
+    logicalModelOf: (model) => toLogicalName(allChannels, model),
+    defaultModelFor,
+    selectedModelOf,
+    refresh,
+    switchTo,
+    setCurrent,
+    renameSession,
+    removeSession,
+    clearDraftForSession,
+    clearSessionRuntime: (sessionId) =>
+      sessionRuntimeRef.current.clearSession(sessionId),
+    isDeleteBlocked: (sessionId) =>
+      isSessionActivityActive(sessionId) ||
+      queuePumpingRef.current.has(sessionId) ||
+      confirmingRef.current.has(sessionId),
+    notify: store.notify,
+  })
+  sessionActionsResetRef.current = sessionActions.resetForSessionSwitch
+  const {
+    renaming,
+    titleDraft,
+    confirmDelete,
+    setTitleDraft,
+    cancelRename,
+    startRename,
+    commitRename,
+    deleteSession,
+    newSession,
+  } = sessionActions
 
   const toolCtx = useCallback(
     (
@@ -2344,39 +2379,6 @@ export function AgentPanel({
     })
   }, [current, settleInterruptedSession, status, store, trackRun])
 
-  const newSession = useCallback(
-    () =>
-      trackRun(async () => {
-        const saved = await presets.loadAgentDefault()
-        const savedModel = toLogicalName(allChannels, saved?.model ?? '')
-        const created = await sessions.create({
-          projectId,
-          channelId: '',
-          model: defaultModelFor(chatModelOptions, savedModel),
-          /**
-           * 「跟随选中」也覆盖**会话开局**这一档：用户先选中一张香蕉 2 的图再打开对话，
-           * 面板上显示的就该是香蕉 2，而不是模型清单的第一个（见 `selectedModelOf`）。
-           */
-          imageModel: selectedModelOf('image') || modelOptionsByKind.image[0] || '',
-          videoModel: selectedModelOf('video') || modelOptionsByKind.video[0] || '',
-        })
-        await refresh()
-        await switchTo(created)
-      }),
-    [
-    presets,
-    sessions,
-    projectId,
-    allChannels,
-    refresh,
-    switchTo,
-    defaultModelFor,
-    chatModelOptions,
-    modelOptionsByKind,
-    selectedModelOf,
-    trackRun,
-  ])
-
   /**
    * 存会话上的任意字段：模型、技能、素材标签、比例 / 画质 / 质量都走这一条。
    *
@@ -2509,86 +2511,6 @@ export function AgentPanel({
       return (hit?.title ?? '').trim() || '素材'
     },
     [store],
-  )
-
-  /** 开始改名：把当前标题放进草稿，选中整段方便直接覆盖 */
-  const startRename = useCallback(() => {
-    if (!current) return
-    setTitleDraft(current.title)
-    setRenaming(true)
-    setConfirmDelete(false)
-  }, [current])
-
-  /**
-   * 提交改名。
-   *
-   * 空标题**不改**（回到原名）：允许存成空串的话，会话列表里会出现一行看不见的条目 ——
-   * 那种「东西还在但认不出它是谁」的状态比拒绝一次输入糟得多。
-   */
-  const commitRename = useCallback(
-    () =>
-      trackRun(async () => {
-        if (!current) return
-        const title = titleDraft.trim()
-        setRenaming(false)
-        if (!title || title === current.title) return
-        await renameSession(current.id, title)
-        const rows = await refresh()
-        const hit = rows.find((s) => s.id === current.id)
-        if (hit) {
-          setCurrent((previous) =>
-            previous?.id === hit.id
-              ? { ...previous, ...hit, messages: previous.messages }
-              : previous,
-          )
-        }
-      }),
-    [current, titleDraft, renameSession, refresh, trackRun],
-  )
-
-  /**
-   * 删除会话（两步确认）。
-   *
-   * 删掉的正好是当前会话时，必须**当场换一个**：留着 current 指向一条已不存在的记录，
-   * 界面上会继续显示它、下一句话还会往它的 id 上写 —— 那是最难查的一类不一致。
-   * 一条都不剩时直接开一条新的，保证「至少有一个会话」这条不变式。
-   */
-  const deleteSession = useCallback(
-    () =>
-      trackRun(async () => {
-        if (!current) return
-        if (!confirmDelete) {
-          setConfirmDelete(true)
-          return
-        }
-        if (
-          isSessionActivityActive(current.id) ||
-          queuePumpingRef.current.has(current.id) ||
-          confirmingRef.current.has(current.id)
-        ) {
-          setConfirmDelete(false)
-          store.notify('当前会话还有任务在运行，请先停止后再删除', 'error')
-          return
-        }
-        setConfirmDelete(false)
-        clearDraftForSession(current.id)
-        sessionRuntimeRef.current.clearSession(current.id)
-        await removeSession(current.id)
-        const rows = await refresh()
-        if (rows.length > 0) await switchTo(rows[0]!)
-        else await newSession()
-      }),
-    [
-      current,
-      confirmDelete,
-      removeSession,
-      refresh,
-      switchTo,
-      newSession,
-      store,
-      clearDraftForSession,
-      trackRun,
-    ],
   )
 
   const latestUserIndex = visibleItems.reduce(
@@ -2729,7 +2651,7 @@ export function AgentPanel({
         onTitleDraftChange: setTitleDraft,
         onCommitRename: () =>
           runPromiseDetached(commitRename(), '重命名失败'),
-        onCancelRename: () => setRenaming(false),
+        onCancelRename: cancelRename,
         onToggleSessionPicker: () =>
           setOpenPicker(
             openPicker === 'agent-session' ? null : 'agent-session',
