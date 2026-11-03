@@ -43375,6 +43375,7 @@ async function g865(browser) {
   let projectD = ''
   let projectE = ''
   let projectF = ''
+  let projectG = ''
   let sessionCId = ''
   const sessionId = `chat_smoke_g865_${stamp}`
   const queueId = `queue_smoke_g865_${stamp}`
@@ -44242,17 +44243,87 @@ async function g865(browser) {
       }
     })
     await page.waitForTimeout(350)
-    await cardCleanupRetry.click()
-    await cardCleanupRetry.waitFor({
+    await page.evaluate(() => {
+      history.pushState({}, '', '/settings')
+      dispatchEvent(new PopStateEvent('popstate'))
+    })
+    const globalCleanupRetry = page.locator(
+      '[data-project-runtime-retry]',
+    )
+    await globalCleanupRetry.waitFor({
+      state: 'visible',
+      timeout: 20_000,
+    })
+    const globalCleanupState = await page.evaluate(() => {
+      const notice = document.querySelector(
+        '[data-project-runtime-recovery-notice]',
+      )
+      const pending = document.querySelector(
+        '[data-project-runtime-pending]',
+      )
+      return {
+        path: window.location.pathname,
+        text: notice?.textContent?.trim() ?? '',
+        workCommitted:
+          pending?.getAttribute(
+            'data-project-runtime-work-committed',
+          ) ?? null,
+        overflow:
+          document.documentElement.scrollWidth >
+          document.documentElement.clientWidth,
+      }
+    })
+    rec(
+      g,
+      '★★ cleanup 失败后切换路由，AppShell 全局入口仍可重试',
+      globalCleanupState.path === '/settings' &&
+        globalCleanupState.text.includes('项目已删除，运行态待清理') &&
+        globalCleanupState.text.includes('重试恢复') &&
+        globalCleanupState.workCommitted === 'true' &&
+        !globalCleanupState.overflow,
+      JSON.stringify(globalCleanupState),
+    )
+    await page.screenshot({
+      path: `${OUT}/agent-host-865-global-recovery-1440-light.png`,
+    })
+    await page.evaluate(() => {
+      if (document.documentElement.dataset.theme !== 'dark') {
+        document.querySelector('[data-theme-toggle]')?.click()
+      }
+    })
+    await page.setViewportSize({ width: 1024, height: 700 })
+    await page.waitForTimeout(350)
+    await page.screenshot({
+      path: `${OUT}/agent-host-865-global-recovery-1024-dark.png`,
+    })
+    await page.setViewportSize({ width: 1440, height: 900 })
+    await page.evaluate(() => {
+      if (document.documentElement.dataset.theme !== 'light') {
+        document.querySelector('[data-theme-toggle]')?.click()
+      }
+    })
+    await page.waitForTimeout(350)
+    await globalCleanupRetry.click()
+    await globalCleanupRetry.waitFor({
+      state: 'detached',
+      timeout: 20_000,
+    })
+    const globalNotice = page.locator(
+      '[data-project-runtime-recovery-notice]',
+    )
+    await globalNotice.waitFor({
       state: 'detached',
       timeout: 20_000,
     })
     rec(
       g,
-      '★★ 项目页重试 cleanup 不重复删除数据并清除待清理状态',
-      (await page.locator('[data-status-tone="info"]').innerText())
-        .includes('项目运行态清理完成'),
+      '★★ 全局入口重试 cleanup 后快照清空，不重复删除数据',
+      (await globalNotice.count()) === 0,
     )
+    await page.evaluate(() => {
+      history.pushState({}, '', '/projects')
+      dispatchEvent(new PopStateEvent('popstate'))
+    })
 
     projectF = await page.evaluate(async () => {
       const { createWebPlatform } =
@@ -44363,6 +44434,150 @@ async function g865(browser) {
       new URL(page.url()).pathname === '/projects',
     )
 
+    projectG = await page.evaluate(async () => {
+      const { createWebPlatform } =
+        await import('/src/platform/web/index.ts')
+      const { createProjectRepository } =
+        await import('/src/state/project/repository.ts')
+      const repo = createProjectRepository(createWebPlatform().storage)
+      const created = await repo.create({ name: 'G865 未提交恢复' })
+      return created.id
+    })
+    await page.reload({ waitUntil: 'domcontentloaded' })
+    const projectGCard = page.locator(
+      `[data-project-card="${projectG}"]`,
+    )
+    await projectGCard.waitFor({ state: 'visible', timeout: 20_000 })
+    await page.evaluate(async ({ id, url }) => {
+      const { registerProjectRuntime } = await import(url)
+      let idle = false
+      let release
+      const gate = new Promise((resolve) => {
+        release = () => {
+          idle = true
+          resolve()
+        }
+      })
+      window.__g865ReleaseRecovery = () => release?.()
+      registerProjectRuntime({
+        projectId: id,
+        key: 'forced-recovery-failure',
+        beginDispose: () => ({
+          waitForIdle: async () => {
+            if (!idle) throw new Error('initial idle failed')
+          },
+          whenIdle: () => (idle ? Promise.resolve() : gate),
+          canReopen: () => idle,
+          reopenIfIdle: () => idle,
+          canFinalize: () => idle,
+          finalize: () => idle,
+        }),
+      })
+    }, { id: projectG, url: registryUrl })
+    await projectGCard
+      .locator('button[aria-label="项目菜单"]')
+      .click()
+    await projectGCard
+      .locator('[role="menuitem"]')
+      .filter({ hasText: '删除' })
+      .click()
+    await page
+      .locator('[data-project-card-confirm-delete]')
+      .click()
+    await page.waitForFunction(() => {
+      const notice = document.querySelector(
+        '[data-project-runtime-recovery-notice]',
+      )
+      return Boolean(
+        notice &&
+        notice.textContent?.includes(
+          '项目操作未提交，运行态待恢复',
+        ),
+      )
+    }, undefined, { timeout: 12_000 })
+    const recoveryFailure = await page.evaluate(async (id) => {
+      const { createWebPlatform } =
+        await import('/src/platform/web/index.ts')
+      const { createProjectRepository } =
+        await import('/src/state/project/repository.ts')
+      const repo = createProjectRepository(createWebPlatform().storage)
+      const project = await repo.get(id)
+      const pending = document.querySelector(
+        '[data-project-runtime-pending]',
+      )
+      return {
+        title:
+          document
+            .querySelector('[data-project-runtime-recovery-notice]')
+            ?.textContent?.trim() ?? '',
+        workCommitted:
+          pending?.getAttribute(
+            'data-project-runtime-work-committed',
+          ) ?? null,
+        stillExists: Boolean(project && !project.deletedAt),
+        overflow:
+          document.documentElement.scrollWidth >
+          document.documentElement.clientWidth,
+      }
+    }, projectG)
+    rec(
+      g,
+      '★★ recovery 失败显示 workCommitted=false，项目数据未被删除',
+      recoveryFailure.title.includes('项目操作未提交，运行态待恢复') &&
+        recoveryFailure.title.includes('重试恢复') &&
+        recoveryFailure.workCommitted === 'false' &&
+        recoveryFailure.stillExists &&
+        !recoveryFailure.overflow,
+      JSON.stringify(recoveryFailure),
+    )
+    await page.evaluate(() => {
+      if (document.documentElement.dataset.theme !== 'light') {
+        document.querySelector('[data-theme-toggle]')?.click()
+      }
+    })
+    await page.waitForTimeout(250)
+    await page.screenshot({
+      path: `${OUT}/agent-host-865-global-recovery-uncommitted-1440-light.png`,
+    })
+    await page.evaluate(() => {
+      if (document.documentElement.dataset.theme !== 'dark') {
+        document.querySelector('[data-theme-toggle]')?.click()
+      }
+    })
+    await page.setViewportSize({ width: 1024, height: 700 })
+    await page.waitForTimeout(350)
+    await page.screenshot({
+      path: `${OUT}/agent-host-865-global-recovery-uncommitted-1024-dark.png`,
+    })
+    await page.setViewportSize({ width: 1440, height: 900 })
+    await page.evaluate(() => {
+      if (document.documentElement.dataset.theme !== 'light') {
+        document.querySelector('[data-theme-toggle]')?.click()
+      }
+      window.__g865ReleaseRecovery?.()
+    })
+    await page.waitForTimeout(250)
+    await page
+      .locator('[data-project-runtime-retry]')
+      .click()
+    await page
+      .locator('[data-project-runtime-recovery-notice]')
+      .waitFor({ state: 'detached', timeout: 20_000 })
+    rec(
+      g,
+      '★★ 未提交 recovery 重试成功后项目仍保留，可重新执行删除',
+      await page.evaluate(async (id) => {
+        const { createWebPlatform } =
+          await import('/src/platform/web/index.ts')
+        const { createProjectRepository } =
+          await import('/src/state/project/repository.ts')
+        const repo = createProjectRepository(createWebPlatform().storage)
+        const project = await repo.get(id)
+        if (project) await repo.purge(id)
+        return Boolean(project && !project.deletedAt)
+      }, projectG),
+    )
+
     rec(
       g,
       '无未捕获异常',
@@ -44370,7 +44585,7 @@ async function g865(browser) {
       pageErrors.join(' | '),
     )
   } finally {
-    await page.evaluate(async ({ projectA, projectB, projectC, projectD, projectE, projectF }) => {
+    await page.evaluate(async ({ projectA, projectB, projectC, projectD, projectE, projectF, projectG }) => {
       const { createWebPlatform } =
         await import('/src/platform/web/index.ts')
       const { createProjectRepository } =
@@ -44382,7 +44597,8 @@ async function g865(browser) {
       if (projectD) await repo.purge(projectD)
       if (projectE) await repo.purge(projectE)
       if (projectF) await repo.purge(projectF)
-    }, { projectA, projectB, projectC, projectD, projectE, projectF }).catch(() => {})
+      if (projectG) await repo.purge(projectG)
+    }, { projectA, projectB, projectC, projectD, projectE, projectF, projectG }).catch(() => {})
     for (const row of channelSnapshot) {
       const current = await sharedRow(page, 'channels', row.id)
       if (!current || current.enabled === row.enabled) continue

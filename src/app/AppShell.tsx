@@ -18,6 +18,7 @@ import { usePlatform } from './providers/PlatformProvider'
 import { useAutoSnapshot } from '../state/project/useAutoSnapshot'
 import { startUiHeartbeat } from './uiHeartbeat'
 import { AgentHostOutlet } from './AgentHostOutlet'
+import { ProjectRuntimeRecoveryNotice } from './ProjectRuntimeRecoveryNotice'
 
 /**
  * 应用壳（产品文档 §2.1 / §2.2；架构文档 §5.10）。
@@ -119,6 +120,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       <GettingStarted />
       {/* 存量素材缩略图的一次性补图（对账 #232）：没有界面，进画布自动让路 */}
       <ThumbBackfill />
+      <ProjectRuntimeRecoveryNotice />
       <GlobalTooltip />
     </div>
   )

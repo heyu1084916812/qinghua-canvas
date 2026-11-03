@@ -29,8 +29,10 @@ import {
 import { buildProjectTree, projectGroupWindow } from './projectTreeModel'
 import { projectMenuPosition, type ProjectMenuFrame } from './projectMenuPosition'
 import {
+  getProjectRuntimePendingSnapshot,
   ProjectRuntimeCleanupError,
   retryProjectRuntimeCleanup,
+  subscribeProjectRuntimePending,
   withPreparedProjectRuntimes,
 } from './ProjectRuntimeRegistry'
 import {
@@ -180,9 +182,19 @@ export function ProjectTree({ open, activeProjectId }: ProjectTreeProps) {
   const [renameTarget, setRenameTarget] = useState<RenameTarget | null>(null)
   const [confirmTarget, setConfirmTarget] = useState<ConfirmTarget | null>(null)
   const [deleteBusy, setDeleteBusy] = useState(false)
-  const [cleanupRetryIds, setCleanupRetryIds] =
-    useState<readonly string[] | null>(null)
+  const [cleanupOperationId, setCleanupOperationId] =
+    useState<number | null>(null)
   const [status, setStatus] = useState<StatusState | null>(null)
+  const pendingRuntimeOperations = useSyncExternalStore(
+    subscribeProjectRuntimePending,
+    getProjectRuntimePendingSnapshot,
+    getProjectRuntimePendingSnapshot,
+  )
+  const cleanupPending = pendingRuntimeOperations.find(
+    (operation) =>
+      operation.id === cleanupOperationId &&
+      operation.status === 'cleanup_failed',
+  )
   const renameInputRef = useRef<HTMLInputElement | null>(null)
   const menuRef = useRef<HTMLDivElement | null>(null)
   const locationPathRef = useRef(location.pathname)
@@ -539,11 +551,11 @@ export function ProjectTree({ open, activeProjectId }: ProjectTreeProps) {
             : '项目已移到回收站',
         tone: 'info',
       })
-      setCleanupRetryIds(null)
+      setCleanupOperationId(null)
       setConfirmTarget(null)
     } catch (error) {
       if (error instanceof ProjectRuntimeCleanupError) {
-        setCleanupRetryIds(error.projectIds)
+        setCleanupOperationId(error.operationId ?? null)
         setConfirmTarget(null)
         setMenu(null)
         setStatus({
@@ -562,10 +574,10 @@ export function ProjectTree({ open, activeProjectId }: ProjectTreeProps) {
   }
 
   const retryRuntimeCleanup = async () => {
-    if (!cleanupRetryIds || deleteBusy) return
+    if (!cleanupPending || deleteBusy) return
     setDeleteBusy(true)
     try {
-      const retriedIds = cleanupRetryIds
+      const retriedIds = cleanupPending.projectIds
       await retryProjectRuntimeCleanup(retriedIds)
       for (const id of retriedIds) {
         clearDeletedProjectState(id)
@@ -576,14 +588,14 @@ export function ProjectTree({ open, activeProjectId }: ProjectTreeProps) {
         )
       }
       await load()
-      setCleanupRetryIds(null)
+      setCleanupOperationId(null)
       setStatus({
         text: '项目运行态清理完成',
         tone: 'info',
       })
     } catch (error) {
       if (error instanceof ProjectRuntimeCleanupError) {
-        setCleanupRetryIds(error.projectIds)
+        setCleanupOperationId(error.operationId ?? null)
         setStatus({
           text: error.message,
           tone: 'error',
@@ -598,6 +610,25 @@ export function ProjectTree({ open, activeProjectId }: ProjectTreeProps) {
       setDeleteBusy(false)
     }
   }
+
+  useEffect(() => {
+    if (cleanupOperationId === null) return
+    if (
+      pendingRuntimeOperations.some(
+        (operation) => operation.id === cleanupOperationId,
+      )
+    ) {
+      return
+    }
+    setCleanupOperationId(null)
+    setStatus({
+      text: '项目运行态清理完成',
+      tone: 'info',
+    })
+  }, [
+    cleanupOperationId,
+    pendingRuntimeOperations,
+  ])
 
   const menuProject =
     menu?.kind === 'project'
@@ -777,7 +808,7 @@ export function ProjectTree({ open, activeProjectId }: ProjectTreeProps) {
           role={status.tone === 'error' ? 'alert' : 'status'}
         >
           {status.text}
-          {cleanupRetryIds && (
+          {cleanupPending && (
             <button
               type="button"
               className={styles.statusRetry}

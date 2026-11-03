@@ -28,8 +28,10 @@ import styles from './ProjectsPage.module.css'
 import { ChoicePicker } from '../../features/shared/choicePicker/ChoicePicker'
 import { useAssetMeta } from '../../features/shared/assets/index'
 import {
+  getProjectRuntimePendingSnapshot,
   ProjectRuntimeCleanupError,
   retryProjectRuntimeCleanup,
+  subscribeProjectRuntimePending,
   withPreparedProjectRuntimes,
 } from '../../app/ProjectRuntimeRegistry'
 import {
@@ -92,6 +94,11 @@ export function ProjectsPage() {
   const loading = useSyncExternalStore(store.subscribe, () => store.getState().loading, () => store.getState().loading)
   const sort = useSyncExternalStore(store.subscribe, () => store.getState().sort, () => store.getState().sort)
   const query = useSyncExternalStore(store.subscribe, () => store.getState().query, () => store.getState().query)
+  const pendingRuntimeOperations = useSyncExternalStore(
+    subscribeProjectRuntimePending,
+    getProjectRuntimePendingSnapshot,
+    getProjectRuntimePendingSnapshot,
+  )
 
   // 交互态
   const [confirmId, setConfirmId] = useState<string | null>(null)
@@ -101,8 +108,13 @@ export function ProjectsPage() {
   const [busy, setBusy] = useState(false)
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [bulkDeleting, setBulkDeleting] = useState(false)
-  const [cleanupRetryIds, setCleanupRetryIds] =
-    useState<readonly string[] | null>(null)
+  const [cleanupOperationId, setCleanupOperationId] =
+    useState<number | null>(null)
+  const cleanupPending = pendingRuntimeOperations.find(
+    (operation) =>
+      operation.id === cleanupOperationId &&
+      operation.status === 'cleanup_failed',
+  )
   const [status, setStatusText] = useState('')
   /** 这一条状态是"正常结果"还是"失败"（产品文档 §4.5：失败要 `role=alert` 念给屏幕阅读器） */
   const [statusTone, setStatusTone] = useState<NoticeTone>('info')
@@ -119,7 +131,7 @@ export function ProjectsPage() {
   const reportDeleteFailure = useCallback(
     (error: unknown, prefix: string) => {
       if (error instanceof ProjectRuntimeCleanupError) {
-        setCleanupRetryIds(error.projectIds)
+        setCleanupOperationId(error.operationId ?? null)
         setStatus(error.message, 'error')
         return
       }
@@ -203,7 +215,7 @@ export function ProjectsPage() {
         () => store.remove(id),
       )
       clearDeletedProjectState(id)
-      setCleanupRetryIds(null)
+      setCleanupOperationId(null)
       setConfirmId(null)
       setMenuId(null)
     } catch (error) {
@@ -253,14 +265,15 @@ export function ProjectsPage() {
   }
 
   const retryRuntimeCleanup = async () => {
-    if (!cleanupRetryIds || busy) return
+    if (!cleanupPending || busy) return
     setBusy(true)
     try {
-      await retryProjectRuntimeCleanup(cleanupRetryIds)
-      cleanupRetryIds.forEach(clearDeletedProjectState)
+      const projectIds = cleanupPending.projectIds
+      await retryProjectRuntimeCleanup(projectIds)
+      projectIds.forEach(clearDeletedProjectState)
       await store.load()
       if (trashOpen) await refreshTrash()
-      setCleanupRetryIds(null)
+      setCleanupOperationId(null)
       setStatus('项目运行态清理完成')
     } catch (error) {
       reportDeleteFailure(error, '运行态清理失败')
@@ -268,6 +281,23 @@ export function ProjectsPage() {
       setBusy(false)
     }
   }
+
+  useEffect(() => {
+    if (cleanupOperationId === null) return
+    if (
+      pendingRuntimeOperations.some(
+        (operation) => operation.id === cleanupOperationId,
+      )
+    ) {
+      return
+    }
+    setCleanupOperationId(null)
+    setStatus('项目运行态清理完成')
+  }, [
+    cleanupOperationId,
+    pendingRuntimeOperations,
+    setStatus,
+  ])
 
   const handleRestore = async (id: string) => {
     if (trashBusy) return
@@ -293,7 +323,7 @@ export function ProjectsPage() {
       )
       clearDeletedProjectState(id)
       await refreshTrash()
-      setCleanupRetryIds(null)
+      setCleanupOperationId(null)
       setStatus('已彻底删除（不可恢复）')
     } catch (error) {
       reportDeleteFailure(error, '彻底删除失败')
@@ -317,7 +347,7 @@ export function ProjectsPage() {
         trashItems.map((project) => project.id),
       )
       await refreshTrash()
-      setCleanupRetryIds(null)
+      setCleanupOperationId(null)
       setStatus(`已清空回收站（${n} / ${total} 个项目）`)
     } catch (error) {
       reportDeleteFailure(
@@ -395,7 +425,7 @@ export function ProjectsPage() {
       await refreshTrash()
       setTrashSelectedIds(new Set())
       setTrashSelectionAnchor(null)
-      setCleanupRetryIds(null)
+      setCleanupOperationId(null)
       setStatus(`已彻底删除 ${n} 个项目（不可恢复）`)
     } catch (error) {
       reportDeleteFailure(
@@ -441,7 +471,7 @@ export function ProjectsPage() {
           .map((project) => project.id),
       )
       await refreshTrash()
-      setCleanupRetryIds(null)
+      setCleanupOperationId(null)
       setStatus(
         n > 0 ? `已清理 ${n} 个 ${TRASH_KEEP_DAYS} 天前的项目（不可恢复）` : `没有超过 ${TRASH_KEEP_DAYS} 天的项目`,
       )
@@ -512,7 +542,7 @@ export function ProjectsPage() {
       setMenuId(null)
       setConfirmId(null)
       exitSelection()
-      setCleanupRetryIds(null)
+      setCleanupOperationId(null)
       setStatus(`已删除 ${selectedCount} 个项目`)
     } catch (error) {
       reportDeleteFailure(error, '批量删除失败')
@@ -972,7 +1002,7 @@ export function ProjectsPage() {
       {/* 语气 → role / aria-live：一处决定（`domain/ui/notice.ts`）；data-status-tone 给冒烟读 */}
       <div className={styles.status} data-status-tone={statusTone} {...noticeA11y(statusTone)}>
         {status}
-        {cleanupRetryIds && (
+        {cleanupPending && (
           <button
             type="button"
             className={styles.statusRetry}
