@@ -6,7 +6,6 @@ import {
   useState,
 } from 'react'
 import { useSyncExternalStore } from 'react'
-import { useNavigate } from 'react-router-dom'
 import { usePlatform } from '../../../../app/providers/PlatformProvider'
 import { useChannels } from '../../../../app/providers/ChannelStoreProvider'
 import { useSkillsOptional } from '../../../../app/providers/SkillStoreProvider'
@@ -46,10 +45,6 @@ import { cropAsset, extractSelection } from '../../../../features/canvas/extract
 import { splitNodeToGrid } from '../../../../features/canvas/splitToGrid'
 import { subscribeAgentHandoff, takeAgentHandoff } from '../../../../features/canvas/agentHandoff'
 import {
-  subscribeAgentSkillHandoff,
-  takeAgentSkillHandoff,
-} from '../../../../features/canvas/agentSkillHandoff'
-import {
   activeQueueTurnOf,
   bindTurnToSessionActivity,
   claimSessionActivity,
@@ -70,7 +65,6 @@ import { createAssetLibraryStore } from '../../../../state/project/assetLibraryS
 import { createInspirationRepository } from '../../../../state/project/inspirationRepository'
 import { loadInspirationSources } from '../../../../state/project/inspirationSourceStore'
 import { runDesignResearch } from '../../../../features/shared/research/designResearchRunner'
-import { parseSkillMarkdown } from '../../../../domain/prompt/skill'
 import { useCanvasExecution } from '../../execution/CanvasExecutionProvider'
 import { useCanvasStore, useGraph, useSelection } from '../../storeContext'
 import { useViewportState } from '../../storeContext'
@@ -139,6 +133,7 @@ import {
 } from './useAgentConversationController'
 import { useAgentComposerController } from './useAgentComposerController'
 import { useAgentSessionLifecycle } from './useAgentSessionLifecycle'
+import { useAgentSkillsController } from './useAgentSkillsController'
 import { AgentSessionRuntimeState } from './agentSessionRuntime'
 import {
   buildAgentModelMessages,
@@ -157,9 +152,7 @@ import {
   type AgentPanelStatus as Status,
 } from './AgentActivityViews'
 import type { AgentQueueMenuPosition } from './AgentQueuePanel'
-import { AgentConversationPane } from './AgentConversationPane'
-import { AgentComposerPane } from './AgentComposerPane'
-import { AgentPanelHeader } from './AgentPanelHeader'
+import { AgentPanelView } from './AgentPanelView'
 import { useAgentQueueController } from './useAgentQueueController'
 import { useAgentSendController } from './useAgentSendController'
 import { useAgentOutcomeCoordinator } from './useAgentOutcomeCoordinator'
@@ -180,11 +173,9 @@ import {
 import { previewOf } from './agentConfirmationPreview'
 import { originOf, viewportWorldOf } from './agentPanelViewHelpers'
 import {
-  mentionToken,
   parseMentions,
   stripMentionMarkup,
 } from '../../text/MentionEditor'
-import styles from './AgentPanel.module.css'
 
 /**
  * 画布右侧的 Agent 对话窗（设计文档 §7 / §8）。
@@ -494,12 +485,7 @@ export function AgentPanel({
    * 「开新关旧」由这一个 key 保证，与创作面板同一条口径 —— 各管各的 boolean
    * 会出现两个浮层同时挂在屏幕上、点哪个都不对。
    */
-  /** 技能收藏（用户 2026-10-03：技能菜单分「通用 / 收藏 / 我的」） */
-  const [skillFavs, setSkillFavs] = useState<readonly string[]>([])
   const fileRef = useRef<HTMLInputElement | null>(null)
-  /** 技能导入的两个输入：**.md 文件**与**文件夹**（浏览器只允许二选一，故分成两个） */
-  const skillFileRef = useRef<HTMLInputElement | null>(null)
-  const skillDirRef = useRef<HTMLInputElement | null>(null)
   /**
    * 中止用的控制器**按会话各存一个**（与 `statusBySession` 同一口径）。
    *
@@ -823,39 +809,6 @@ export function AgentPanel({
     },
     [allChannels, cachedChatRoute, modelRoute],
   )
-
-  /**
-   * 技能 chip 的文案：只进 `aria-label`（悬停 / 读屏可见）。
-   *
-   * 工具条上那两枚按用户 2026-10-02 的要求是**只有图标**的按钮，
-   * 名字不占地方，但无障碍名不能跟着省。
-   */
-  const skillLabel = useMemo(() => {
-    const id = current?.skillId
-    if (!id) return '技能'
-    return allSkills.find((s) => s.id === id)?.name ?? '技能'
-  }, [current?.skillId, allSkills])
-
-  useEffect(() => {
-    if (!active) return
-    const consumePendingSkill = () => {
-      if (!current) return
-      const skillId = takeAgentSkillHandoff(projectId)
-      if (!skillId) return
-      const skill = allSkills.find((item) => item.id === skillId)
-      if (!skill) return
-      setDraft((previous) => {
-        const already = parseMentions(previous).some(
-          (mention) => mention.kind === 'skill' && mention.id === skill.id,
-        )
-        if (already) return previous
-        const marker = mentionToken('skill', skill.id, skill.name)
-        return previous.trim() ? `${previous.replace(/\s+$/, '')} ${marker} ` : `${marker} `
-      })
-    }
-    consumePendingSkill()
-    return subscribeAgentSkillHandoff(projectId, () => consumePendingSkill())
-  }, [active, allSkills, current, projectId])
 
   /**
    * 新会话该用哪个模型：默认模型 → 该渠道第一个对话模型。
@@ -2462,6 +2415,29 @@ export function AgentPanel({
   )
   patchSessionDetachedRef.current = patchSessionDetached
 
+  const {
+    skillFavs,
+    skillLabel,
+    skillFileRef,
+    skillDirRef,
+    setSkill,
+    importSkills,
+    openSkillLibrary,
+    toggleSkillFavorite,
+  } = useAgentSkillsController({
+    active,
+    projectId,
+    current,
+    allSkills,
+    setDraft,
+    patchSession,
+    setOpenPicker,
+    skills,
+    presets,
+    notify: store.notify,
+    trackRun,
+  })
+
   /**
    * 选模型：只保存固定的前端逻辑名。
    *
@@ -2670,104 +2646,6 @@ export function AgentPanel({
     queue(takeAgentHandoff(projectId))
     return subscribeAgentHandoff(projectId, queue)
   }, [active, flushHandoff, projectId])
-
-  /**
-   * 本会话启用的技能（设计文档 §14 M4）。
-   *
-   * 存 **id** 不存正文：技能在库里改了，会话跟着用新版 ——
-   * 与画布节点上的 `skillId` 同一口径（存正文等于把那一刻冻结住）。
-   */
-  const setSkill = useCallback(
-    async (skillId: string) => {
-      await patchSession({ skillId: skillId || undefined })
-    },
-    [patchSession],
-  )
-
-  const navigate = useNavigate()
-
-  /**
-   * 导入技能（用户 2026-10-03：「导入已有 skill（通过设定好的 skill 流程去解析 md
-   * 文件或者文件夹）」）。
-   *
-   * 解析与落库**复用技能库那一页同一套**（`parseSkillMarkdown` + `skills.create`），
-   * 一处都没另写。逐个独立成败：一个文件格式不对，不该让同批的其余几个也失败。
-   */
-  const importSkills = useCallback(
-    (files: FileList | null) =>
-      trackRun(async () => {
-        if (!files || files.length === 0) return
-        let ok = 0
-        const failed: string[] = []
-        for (const file of Array.from(files)) {
-          if (!/\.(md|markdown|txt)$/i.test(file.name)) continue
-          try {
-            const parsed = parseSkillMarkdown(
-              await file.text(),
-              file.name.replace(/\.(md|markdown|txt)$/i, ''),
-            )
-            if (!parsed.ok) {
-              failed.push(`${file.name}：${parsed.error}`)
-              continue
-            }
-            await skills.create(parsed.skill)
-            ok += 1
-          } catch (e) {
-            failed.push(`${file.name}：${e instanceof Error ? e.message : errText(e)}`)
-          }
-        }
-        await skills.reload()
-        setOpenPicker(null)
-        store.notify(
-          failed.length === 0
-            ? `已导入 ${ok} 条技能`
-            : `导入 ${ok} 条，${failed.length} 条失败：${failed[0]}`,
-          failed.length === 0 ? 'info' : 'error',
-        )
-      }),
-    [skills, store, trackRun],
-  )
-
-  /**
-   * 去技能库。
-   *
-   * 「创建新的 Skill」与「全部」都走这里：**编辑一份技能**（写正文、改名字、
-   * 复制内置）只有在技能库那一页才有完整界面，在这里再搭一个编辑器是重复建设。
-   */
-  const openSkillLibrary = useCallback(() => {
-    setOpenPicker(null)
-    navigate('/skills')
-  }, [navigate])
-
-  /** 一进面板就把收藏读回来（它是 UI 偏好，住 `presets`，与 Agent 默认模型同一套） */
-  useEffect(() => {
-    let alive = true
-    void (async () => {
-      const ids = await presets.loadSkillFavorites()
-      if (alive) setSkillFavs(ids)
-    })()
-    return () => {
-      alive = false
-    }
-  }, [presets])
-
-  /**
-   * 切换收藏。
-   *
-   * **先改界面、再落库**（与素材库取消收藏同一手法）：收藏是瞬时的视觉反馈，
-   * 等一次 IndexedDB 往返再打星会让人以为没点上；落库失败最坏也只是下次没记住。
-   */
-  const toggleSkillFavorite = useCallback(
-    (id: string) =>
-      trackRun(async () => {
-        const next = skillFavs.includes(id)
-          ? skillFavs.filter((x) => x !== id)
-          : [...skillFavs, id]
-        setSkillFavs(next)
-        await presets.saveSkillFavorites(next)
-      }),
-    [skillFavs, presets, trackRun],
-  )
 
   /**
    * 把一份素材落到画布上，**避开已有节点**。
@@ -3024,100 +2902,65 @@ export function AgentPanel({
       : undefined
 
   return (
-    <aside
-      className={styles.panel}
-      data-agent-panel
-      data-agent-session-id={current?.id}
-      /**
-       * Esc **先关参数浮层**（与创作面板同一条口径：想收起下拉，结果把整块面板
-       * 一起关掉是最容易踩的那一脚）。
-       *
-       * 两条纪律，都是从创作面板那边学来的：
-       * ① 浮层开着的 Esc 只关浮层，**不关对话窗** —— 对话窗是常驻面板，
-       *    在输入框里按 Esc 本意多半是「算了」，不该把整块面板收走；
-       * ② 消费掉就 `preventDefault()` 声明出来。`NodeFollowBar` 挂在 window 上
-       *    监听 Esc 并清空选中，不声明的话一次 Esc 会做两件事。
-       */
-      onKeyDown={(e) => {
-        if (e.key !== 'Escape' || !openPicker) return
-        e.preventDefault()
-        setOpenPicker(null)
-      }}
-      /* 拖图进来就是「给 agent 一张素材」（设计文档 §8） */
-      onDragOver={(e) => e.preventDefault()}
-      onDrop={(e) => {
-        e.preventDefault()
-        runPromiseDetached(
-          attachFiles(e.dataTransfer?.files ?? null),
-          '添加素材失败',
-        )
-      }}
-    >
-      {/*
-        头部：会话名 + 一排图标钮（新建 / 改名 / 删除 / 收起）。
-
-        参考产品（liblib.tv）就是这么排的：标题占左，动作收成图标。
-        本面板不到 400px 宽，四项文字按钮一排会把会话名挤到看不清 ——
-        图标 + title 提示，鼠标停上去才知道是什么，这点与画布工具栏同一口径。
-      */}
-      <AgentPanelHeader
-        sessions={list}
-        current={current}
-        renaming={renaming}
-        titleDraft={titleDraft}
-        pickerOpen={openPicker === 'agent-session'}
-        confirmDelete={confirmDelete}
-        onTitleDraftChange={setTitleDraft}
-        onCommitRename={() =>
-          runPromiseDetached(commitRename(), '重命名失败')}
-        onCancelRename={() => setRenaming(false)}
-        onToggleSessionPicker={() =>
+    <AgentPanelView
+      current={current}
+      openPicker={openPicker}
+      headerProps={{
+        sessions: list,
+        current,
+        renaming,
+        titleDraft,
+        pickerOpen: openPicker === 'agent-session',
+        confirmDelete,
+        onTitleDraftChange: setTitleDraft,
+        onCommitRename: () =>
+          runPromiseDetached(commitRename(), '重命名失败'),
+        onCancelRename: () => setRenaming(false),
+        onToggleSessionPicker: () =>
           setOpenPicker(
             openPicker === 'agent-session' ? null : 'agent-session',
-          )
-        }
-        onClosePicker={() => setOpenPicker(null)}
-        onSwitchSession={(session) => void switchTo(session)}
-        onNewSession={() =>
-          runPromiseDetached(newSession(), '新建会话失败')}
-        onStartRename={startRename}
-        onDeleteSession={() =>
-          runPromiseDetached(deleteSession(), '删除会话失败')}
-        onOpenSettings={onOpenSettings}
-        onClose={onClose}
-      />
-
-      <AgentConversationPane
-        current={current}
-        status={status}
-        items={items}
-        visibleItems={visibleItems}
-        latestProcessIndex={latestProcessIndex}
-        streamingTextIndex={streamingTextIndex}
-        liveActivities={liveActivities}
-        liveProcess={liveProcess}
-        runTasks={runTasks}
-        copiedKey={copiedKey}
-        expanded={expanded}
-        hashOfNode={hashOfNode}
-        thumbOf={thumbOf}
-        currentTurnHasProcess={currentTurnHasProcess}
-        latestUserStartedAt={latestUserStartedAt}
-        pendingPlan={pendingPlan}
-        pendingTaskStepId={pendingTaskStepId}
-        advancingTaskPlan={advancingTaskPlan}
-        scrollRef={scrollRef}
-        showJumpToLatest={showJumpToLatest}
-        queueMenuId={queueMenuId}
-        queueMenuPosition={queueMenuPosition}
-        editingQueueId={editingQueueId}
-        editingQueueTurn={editingQueueTurn}
-        editingQueueText={editingQueueText}
-        onConversationScroll={onConversationScroll}
-        onCopyReply={(key, text) => void copyReply(key, text)}
-        onRetry={retry}
-        onToggleStep={toggleStep}
-        onAdvanceToNext={() => {
+          ),
+        onClosePicker: () => setOpenPicker(null),
+        onSwitchSession: (session) => void switchTo(session),
+        onNewSession: () =>
+          runPromiseDetached(newSession(), '新建会话失败'),
+        onStartRename: startRename,
+        onDeleteSession: () =>
+          runPromiseDetached(deleteSession(), '删除会话失败'),
+        onOpenSettings,
+        onClose,
+      }}
+      conversationProps={{
+        current,
+        status,
+        items,
+        visibleItems,
+        latestProcessIndex,
+        streamingTextIndex,
+        liveActivities,
+        liveProcess,
+        runTasks,
+        copiedKey,
+        expanded,
+        hashOfNode,
+        thumbOf,
+        currentTurnHasProcess,
+        latestUserStartedAt,
+        pendingPlan,
+        pendingTaskStepId,
+        advancingTaskPlan,
+        scrollRef,
+        showJumpToLatest,
+        queueMenuId,
+        queueMenuPosition,
+        editingQueueId,
+        editingQueueTurn,
+        editingQueueText,
+        onConversationScroll,
+        onCopyReply: (key, text) => void copyReply(key, text),
+        onRetry: retry,
+        onToggleStep: toggleStep,
+        onAdvanceToNext: () => {
           if (!current) return
           if (advancingTaskPlan) return
           setAdvancingTaskPlan(true)
@@ -3127,92 +2970,94 @@ export function AgentPanel({
             }),
             '推进任务计划失败',
           )
-        }}
-        onContinueTask={() =>
-          runPromiseDetached(continueTask(), '继续任务失败')}
-        onConfirm={() =>
-          runPromiseDetached(confirm(), '确认执行失败')}
-        onCancel={() =>
-          runPromiseDetached(cancel(), '取消任务失败')}
-        onJumpToLatest={jumpToLatest}
-        onGuideQueuedTurn={(turn) =>
-          runPromiseDetached(guideQueuedTurn(turn), '转为引导失败')}
-        onRemoveQueued={(turnId) =>
-          runPromiseDetached(removeQueued(turnId), '移出队列失败')}
-        onQueueMenuIdChange={setQueueMenuId}
-        onQueueMenuPositionChange={setQueueMenuPosition}
-        onBeginQueueEdit={beginQueueEdit}
-        onCommitQueueEdit={() =>
-          runPromiseDetached(commitQueueEdit(), '保存队列编辑失败')}
-        onEditingQueueIdChange={setEditingQueueId}
-        onEditingQueueTextChange={setEditingQueueText}
-        onResumeQueue={() =>
-          runPromiseDetached(resumeQueue(), '恢复队列失败')}
-      />
-
-      <AgentComposerPane
-        current={current}
-        status={status}
-        deliveryMode={deliveryMode}
-        draft={draft}
-        composerHeight={composerHeight}
-        composerResizing={composerResizing}
-        openPicker={openPicker}
-        shownModel={shownModel}
-        chatModelOptions={chatModelOptions}
-        modelOptionsByKind={modelOptionsByKind}
-        globalImageModels={globalImageModels}
-        globalVideoModels={globalVideoModels}
-        mentionedModels={mentionedModels}
-        graph={graph}
-        libraryAssets={libraryAssets}
-        allSkills={allSkills}
-        skillLabel={skillLabel}
-        skillFavs={skillFavs}
-        skills={skills}
-        thumbVersion={thumbVersion}
-        editorRef={editorRef}
-        composerRef={composerRef}
-        fileRef={fileRef}
-        skillFileRef={skillFileRef}
-        skillDirRef={skillDirRef}
-        composerAvailableHeight={composerAvailableHeight}
-        beginComposerResize={beginComposerResize}
-        resizeComposerWithKeyboard={resizeComposerWithKeyboard}
-        replaceDraft={replaceDraft}
-        send={send}
-        stop={() => runPromiseDetached(stop(), '停止任务失败')}
-        attachFiles={(files) =>
-          runPromiseDetached(attachFiles(files), '添加素材失败')}
-        addFromLibrary={(hash) =>
-          runPromiseDetached(addFromLibrary(hash), '添加素材失败')}
-        pickModel={(name) =>
-          runPromiseDetached(pickModel(name), '保存模型设置失败')}
-        setModelKind={(kind, value) =>
+        },
+        onContinueTask: () =>
+          runPromiseDetached(continueTask(), '继续任务失败'),
+        onConfirm: () =>
+          runPromiseDetached(confirm(), '确认执行失败'),
+        onCancel: () =>
+          runPromiseDetached(cancel(), '取消任务失败'),
+        onJumpToLatest: jumpToLatest,
+        onGuideQueuedTurn: (turn) =>
+          runPromiseDetached(guideQueuedTurn(turn), '转为引导失败'),
+        onRemoveQueued: (turnId) =>
+          runPromiseDetached(removeQueued(turnId), '移出队列失败'),
+        onQueueMenuIdChange: setQueueMenuId,
+        onQueueMenuPositionChange: setQueueMenuPosition,
+        onBeginQueueEdit: beginQueueEdit,
+        onCommitQueueEdit: () =>
+          runPromiseDetached(commitQueueEdit(), '保存队列编辑失败'),
+        onEditingQueueIdChange: setEditingQueueId,
+        onEditingQueueTextChange: setEditingQueueText,
+        onResumeQueue: () =>
+          runPromiseDetached(resumeQueue(), '恢复队列失败'),
+      }}
+      composerProps={{
+        current,
+        status,
+        deliveryMode,
+        draft,
+        composerHeight,
+        composerResizing,
+        openPicker,
+        shownModel,
+        chatModelOptions,
+        modelOptionsByKind,
+        globalImageModels,
+        globalVideoModels,
+        mentionedModels,
+        graph,
+        libraryAssets,
+        allSkills,
+        skillLabel,
+        skillFavs,
+        skills,
+        thumbVersion,
+        editorRef,
+        composerRef,
+        fileRef,
+        skillFileRef,
+        skillDirRef,
+        composerAvailableHeight,
+        beginComposerResize,
+        resizeComposerWithKeyboard,
+        replaceDraft,
+        send,
+        stop: () => runPromiseDetached(stop(), '停止任务失败'),
+        attachFiles: (files) =>
+          runPromiseDetached(attachFiles(files), '添加素材失败'),
+        addFromLibrary: (hash) =>
+          runPromiseDetached(addFromLibrary(hash), '添加素材失败'),
+        pickModel: (name) =>
+          runPromiseDetached(pickModel(name), '保存模型设置失败'),
+        setModelKind: (kind, value) =>
           runPromiseDetached(
             setModelKind(kind, value),
             '保存模型设置失败',
-          )}
-        setSkill={(id) =>
-          runPromiseDetached(setSkill(id), '保存技能设置失败')}
-        toggleSkillFavorite={(id) =>
+          ),
+        setSkill: (id) =>
+          runPromiseDetached(setSkill(id), '保存技能设置失败'),
+        toggleSkillFavorite: (id) =>
           runPromiseDetached(
             toggleSkillFavorite(id),
             '保存技能收藏失败',
-          )}
-        openSkillLibrary={openSkillLibrary}
-        importSkills={(files) =>
-          runPromiseDetached(importSkills(files), '导入技能失败')}
-        patchSession={patchSessionDetached}
-        setAutoRun={(value) =>
-          runPromiseDetached(setAutoRun(value), '保存自动执行设置失败')}
-        insertMention={insertMention}
-        setDraft={setDraft}
-        setOpenPicker={setOpenPicker}
-        thumbOf={thumbOf}
-        channels={channels}
-        library={library}
-      />
-    </aside>
+          ),
+        openSkillLibrary,
+        importSkills: (files) =>
+          runPromiseDetached(importSkills(files), '导入技能失败'),
+        patchSession: patchSessionDetached,
+        setAutoRun: (value) =>
+          runPromiseDetached(setAutoRun(value), '保存自动执行设置失败'),
+        insertMention,
+        setDraft,
+        setOpenPicker,
+        thumbOf,
+        channels,
+        library,
+      }}
+      onDismissPicker={() => setOpenPicker(null)}
+      onDropFiles={(files) =>
+        runPromiseDetached(attachFiles(files), '添加素材失败')}
+    />
   )
 }
