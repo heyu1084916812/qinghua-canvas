@@ -20,7 +20,6 @@ import {
   confirmationRequiresExplicitApproval,
 } from '../../../../domain/agent/confirmation'
 import {
-  advanceAgentTaskPlanAfterReview,
   agentTaskPlanProgress,
 } from '../../../../domain/agent/taskPlan'
 import { createPresetStore } from '../../../../state/project/presetStore'
@@ -121,6 +120,7 @@ import { useAgentAttachmentsController } from './useAgentAttachmentsController'
 import { useAgentChatRouting } from './useAgentChatRouting'
 import { useAgentSessionLifecycle } from './useAgentSessionLifecycle'
 import { useAgentSessionActionsController } from './useAgentSessionActionsController'
+import { useAgentTaskPlanController } from './useAgentTaskPlanController'
 import { runAgentInitialLoad } from './agentInitialLoad'
 import { useAgentSkillsController } from './useAgentSkillsController'
 import { AgentSessionRuntimeState } from './agentSessionRuntime'
@@ -379,7 +379,6 @@ export function AgentPanel({
   useEffect(() => {
     setQueueMenuId(null)
     setQueueMenuPosition(null)
-    setAdvancingTaskPlan(false)
   }, [current?.id])
   useEffect(() => {
     let alive = true
@@ -467,7 +466,6 @@ export function AgentPanel({
   /** 展开看细节的步骤（工具调用 id 集合）。默认全收起 —— 对话流先保持干净 */
   /** 刚复制过哪一条助手回复：图标短暂换成对勾，给用户一个「确实复制了」的回执 */
   const [copiedKey, setCopiedKey] = useState<number | null>(null)
-  const [advancingTaskPlan, setAdvancingTaskPlan] = useState(false)
   /**
    * 当前展开的参数浮层（模型 / 技能 / 参数三选一）。
    *
@@ -1912,98 +1910,26 @@ export function AgentPanel({
     trackRun,
   ])
 
-  /**
-   * “直接下一步”是控制命令，不是聊天内容。先中止当前验收请求，再原子地
-   * 验收当前步骤、启动下一步，最后用隐藏控制消息继续执行。
-   */
-  const advanceTaskPlan = useCallback(
-    (session?: AgentSession) =>
-      trackRun(async () => {
-        const target = session ?? current
-        if (!target?.taskPlan) {
-          store.notify('当前没有可推进的任务计划', 'info')
-          return false
-        }
-        const currentStep = target.taskPlan.steps.find(
-          (step) => step.id === target.taskPlan?.currentStepId,
-        )
-        const advanced = advanceAgentTaskPlanAfterReview(
-          target.taskPlan,
-          currentStep?.id,
-          Date.now(),
-        )
-        if (!advanced.ok) {
-          store.notify(advanced.problems.join('；'), 'error')
-          return false
-        }
-
-        const pendingConfirmation =
-          status.kind === 'awaitingConfirm' ? status.request : target.pendingConfirmation
-        abortRefs.current.get(target.id)?.abort()
-        if (pendingConfirmation) {
-          const settled = await settleInterruptedSession(
-            target,
-            pendingConfirmation,
-            'canceled',
-          )
-          if (settled.cleanupError) return false
-        } else {
-          for (let attempt = 0; attempt < 60; attempt += 1) {
-            if (!isSessionActivityActive(target.id)) break
-            await new Promise((resolve) => window.setTimeout(resolve, 100))
-          }
-        }
-        if (isSessionActivityActive(target.id)) {
-          store.notify('旧验收仍在收尾，请稍后再点一次', 'error')
-          return false
-        }
-
-        clearLiveActivitiesFor(target.id)
-        clearLiveProcessFor(target.id)
-        clearRunTasksFor(target.id)
-        setStatusFor(target.id, IDLE_STATUS)
-        const updated = await sessions.updateFields(target.id, {
-          taskPlan: advanced.plan,
-          pendingConfirmation: undefined,
-          continuation: undefined,
-          allowedToolNames: undefined,
-        })
-        const resolved = updated ?? { ...target, taskPlan: advanced.plan }
-        applySessionSnapshot(resolved)
-
-        const closed = currentStep?.title ?? '当前步骤'
-        const next = advanced.plan.steps.find(
-          (step) => step.id === advanced.plan.currentStepId,
-        )
-        if (!next) {
-          store.notify(`已完成「${closed}」，整个计划已结束`, 'info')
-          return true
-        }
-        store.notify(`已跳过「${closed}」验收，进入「${next.title}」`, 'info')
-        await sendText(
-          `系统控制：用户已跳过「${closed}」的验收并确认直接进入下一步。` +
-            `现在开始执行计划步骤「${next.title}」。` +
-            `请沿用计划目标、已有画布产物和约束继续，不要再次询问是否进入下一步，` +
-            `也不要把这句控制指令当成新的业务需求。`,
-          resolved,
-          { internalControl: true },
-        )
-        return true
-      }),
-    [
-    applySessionSnapshot,
-    clearLiveActivitiesFor,
-    clearLiveProcessFor,
-    clearRunTasksFor,
-    current,
-    sendText,
-    sessions,
-    setStatusFor,
-    settleInterruptedSession,
-    status,
-    store,
-    trackRun,
-  ])
+  const { advanceTaskPlan, isAdvancingTaskPlan } =
+    useAgentTaskPlanController({
+      statusFor: runPresentation.statusFor,
+      trackRun,
+      abortSession: (sessionId) => {
+        abortRefs.current.get(sessionId)?.abort()
+      },
+      isActivityActive: isSessionActivityActive,
+      clearRunPresentationFor: (sessionId) => {
+        clearLiveActivitiesFor(sessionId)
+        clearLiveProcessFor(sessionId)
+        clearRunTasksFor(sessionId)
+      },
+      setStatusFor,
+      updateSessionFields: sessions.updateFields,
+      applySessionSnapshot,
+      settleInterruptedSession,
+      sendText,
+      notify: store.notify,
+    })
 
   /**
    * 输入框里的“引导”：直接把当前草稿投进正在运行的回合。
@@ -2572,6 +2498,9 @@ export function AgentPanel({
   ])
 
   const pendingPlan = previewOf(status, store)
+  const advancingTaskPlan = current
+    ? isAdvancingTaskPlan(current.id)
+    : false
   const editingQueueTurn =
     current?.queuedTurns.find((turn) => turn.id === editingQueueId) ?? null
   const pendingTaskStepId =
@@ -2644,12 +2573,8 @@ export function AgentPanel({
         onToggleStep: toggleStep,
         onAdvanceToNext: () => {
           if (!current) return
-          if (advancingTaskPlan) return
-          setAdvancingTaskPlan(true)
           runPromiseDetached(
-            advanceTaskPlan(current).finally(() => {
-              setAdvancingTaskPlan(false)
-            }),
+            advanceTaskPlan(current),
             '推进任务计划失败',
           )
         },
