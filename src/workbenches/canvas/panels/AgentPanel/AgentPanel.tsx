@@ -1,7 +1,6 @@
 import {
   useCallback,
   useEffect,
-  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -145,15 +144,9 @@ import {
   resizedAgentComposerHeight,
 } from './agentComposerLayout'
 import {
-  agentShouldFollowLatest,
-  agentShouldShowJumpLatest,
-  agentScrollTopAfterShrink,
-} from './agentConversationScroll'
-import {
-  AGENT_REVEAL_TICK_MS,
-  agentRevealCharacters,
-  nextAgentRevealLength,
-} from './agentOutputReveal'
+  useAgentConversationController,
+  type AgentMessageReveal,
+} from './useAgentConversationController'
 import {
   clearAgentDraft,
   draftNodeIds,
@@ -232,12 +225,6 @@ function storeComposerHeight(height: number): void {
   } catch {
     // Storage can be blocked; resizing still works for this session.
   }
-}
-
-interface AgentMessageReveal {
-  sessionId: string
-  fullText: string
-  visibleLength: number
 }
 
 /**
@@ -406,9 +393,6 @@ export function AgentPanel({
   const pendingAssetSyncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [composerHeight, setComposerHeight] = useState(readStoredComposerHeight)
   const [composerResizing, setComposerResizing] = useState(false)
-  const [messageReveal, setMessageReveal] = useState<AgentMessageReveal | null>(null)
-  const [showJumpToLatest, setShowJumpToLatest] = useState(false)
-  const stickToLatestRef = useRef(true)
   const composerRef = useRef<HTMLDivElement | null>(null)
   const [queueMenuId, setQueueMenuId] = useState<string | null>(null)
   const [queueMenuPosition, setQueueMenuPosition] =
@@ -498,7 +482,6 @@ export function AgentPanel({
   const [confirmDelete, setConfirmDelete] = useState(false)
   /** 「已设默认」的提示框只闪一次，用完即收 */
   /** 展开看细节的步骤（工具调用 id 集合）。默认全收起 —— 对话流先保持干净 */
-  const [expanded, setExpanded] = useState<Set<string>>(new Set())
   /** 刚复制过哪一条助手回复：图标短暂换成对勾，给用户一个「确实复制了」的回执 */
   const [copiedKey, setCopiedKey] = useState<number | null>(null)
   const [advancingTaskPlan, setAdvancingTaskPlan] = useState(false)
@@ -704,12 +687,6 @@ export function AgentPanel({
     store,
   ])
 
-  const scrollRef = useRef<HTMLDivElement | null>(null)
-  const conversationViewportRef = useRef<{
-    clientHeight: number
-    scrollHeight: number
-    scrollTop: number
-  } | null>(null)
   const modelRoute = useMemo(
     () =>
       createModelRoutePort((request) =>
@@ -982,96 +959,13 @@ export function AgentPanel({
     // 把 refresh / sessions 列进来会让它在每次保存后重跑，把正在进行的对话打断
   }, [projectId, trackRun])
 
-  useEffect(() => {
-    if (!messageReveal) return
-    const characters = agentRevealCharacters(messageReveal.fullText)
-    if (messageReveal.visibleLength >= characters.length) {
-      setMessageReveal(null)
-      return
-    }
-    const timer = window.setTimeout(() => {
-      setMessageReveal((current) => {
-        if (
-          !current ||
-          current.sessionId !== messageReveal.sessionId ||
-          current.fullText !== messageReveal.fullText
-        ) {
-          return current
-        }
-        return {
-          ...current,
-          visibleLength: nextAgentRevealLength(
-            current.visibleLength,
-            characters.length,
-          ),
-        }
-      })
-    }, AGENT_REVEAL_TICK_MS)
-    return () => window.clearTimeout(timer)
-  }, [messageReveal])
-
-  useLayoutEffect(() => {
-    const el = scrollRef.current
-    if (!el) return
-    const previous = conversationViewportRef.current
-    const wasFollowing = previous
-      ? agentShouldFollowLatest(previous)
-      : stickToLatestRef.current
-    if (previous && previous.clientHeight > el.clientHeight) {
-      el.scrollTop = agentScrollTopAfterShrink(previous, el.clientHeight)
-    }
-    if (wasFollowing) el.scrollTop = el.scrollHeight
-    stickToLatestRef.current = agentShouldFollowLatest(el)
-    setShowJumpToLatest(agentShouldShowJumpLatest(el))
-    conversationViewportRef.current = {
-      clientHeight: el.clientHeight,
-      scrollHeight: el.scrollHeight,
-      scrollTop: el.scrollTop,
-    }
-  }, [
-    messages,
-    status,
-    current?.taskPlan,
-    current?.queuedTurns.length,
-    current?.pendingSteers.length,
-    messageReveal?.visibleLength,
-    composerHeight,
-  ])
-
-  const onConversationScroll = () => {
-    const el = scrollRef.current
-    if (!el) return
-    stickToLatestRef.current = agentShouldFollowLatest(el)
-    setShowJumpToLatest(agentShouldShowJumpLatest(el))
-    conversationViewportRef.current = {
-      clientHeight: el.clientHeight,
-      scrollHeight: el.scrollHeight,
-      scrollTop: el.scrollTop,
-    }
-  }
-
-  const jumpToLatest = () => {
-    const el = scrollRef.current
-    if (!el) return
-    stickToLatestRef.current = true
-    setShowJumpToLatest(false)
-    el.scrollTo({
-      top: el.scrollHeight,
-      behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches
-        ? 'auto'
-        : 'smooth',
-    })
-  }
-
   const switchTo = useCallback(
     async (session: AgentSession) => {
       const loaded = (await sessions.get(session.id).catch(() => null)) ?? session
       setCurrent(loaded)
       // 记忆隔离：切会话就是**换一整套上下文**，不是接着上一个聊（§8.2）
       setMessages(loaded.messages)
-      setMessageReveal(null)
-      setShowJumpToLatest(false)
-      stickToLatestRef.current = true
+      resetForSessionSwitch()
       /** 不再重置 status：每个会话有自己的运行态，切过去看到的是**它自己**那一份 */
       setDraft('')
       // 换了会话，之前「准备好删了」的那个状态不该跟过来
@@ -1507,6 +1401,77 @@ export function AgentPanel({
     if (currentIdRef.current === next.id) setCurrent(next)
   }, [])
 
+  const graph = useGraph()
+  const nodeTitles = useMemo(
+    () =>
+      new Map(
+        graph.nodes.map((node) => [
+          node.id,
+          node.title?.trim() || '未命名节点',
+        ]),
+      ),
+    [graph.nodes],
+  )
+  const items = useMemo(
+    () =>
+      toConversation(
+        [
+          ...messages,
+          ...steerMessagesOf(
+            current?.pendingSteers ?? [],
+            stripMentionMarkup,
+          ),
+        ],
+        nodeTitles,
+      ),
+    [current?.pendingSteers, messages, nodeTitles],
+  )
+  const scrollRef = useRef<HTMLDivElement | null>(null)
+  const conversationViewportRef = useRef<{
+    clientHeight: number
+    scrollHeight: number
+    scrollTop: number
+  } | null>(null)
+  const {
+    beginReveal,
+    clearReveal,
+    expanded,
+    toggleStep,
+    showJumpToLatest,
+    setShowJumpToLatest,
+    stickToLatestRef,
+    onConversationScroll,
+    jumpToLatest,
+    resetForSessionSwitch,
+    streamingTextIndex,
+    visibleItems,
+  } = useAgentConversationController({
+    items,
+    sessionId: current?.id ?? null,
+    messages,
+    status,
+    taskPlan: current?.taskPlan,
+    queuedCount: current?.queuedTurns.length ?? 0,
+    pendingCount: current?.pendingSteers.length ?? 0,
+    composerHeight,
+    scrollRef,
+    conversationViewportRef,
+  })
+  const setMessageReveal = useCallback(
+    (reveal: AgentMessageReveal | null) => {
+      if (reveal) {
+        beginReveal(
+          reveal.sessionId,
+          reveal.fullText,
+          reveal.visibleLength,
+        )
+      } else {
+        clearReveal()
+      }
+    },
+    [beginReveal, clearReveal],
+  )
+
   const handleOutcome = useAgentOutcomeCoordinator({
     currentIdRef,
     abortRefs,
@@ -1784,7 +1749,7 @@ export function AgentPanel({
       visualNodeIds: prepared.visualNodeIds,
       onProgress: (next) => {
         if (currentIdRef.current !== session.id) return
-        setMessageReveal(null)
+        clearReveal()
         setMessages(withFullHistory(next))
       },
       turnTools: turnAgentTools,
@@ -2733,16 +2698,6 @@ export function AgentPanel({
     setConfirmDelete(false)
   }, [current])
 
-  /** 切某一步的展开态（参考产品的「图片节点已创建 ⌄」——细节默认收起） */
-  const toggleStep = useCallback((id: string) => {
-    setExpanded((prev) => {
-      const next = new Set(prev)
-      if (next.has(id)) next.delete(id)
-      else next.add(id)
-      return next
-    })
-  }, [])
-
   /**
    * 提交改名。
    *
@@ -3050,55 +3005,6 @@ export function AgentPanel({
     ],
   )
 
-  /**
-   * 对话流：把原始消息翻成「气泡 / 正文 / 步骤卡」三种条目。
-   *
-   * 不直接用 `messages.filter(role !== 'system')` 渲染 —— 那样 `tool` 消息会把
-   * 一整屏 JSON 打给用户。翻成人话这件事放在 `conversation.ts` 的纯函数里，
-   * 因为「哪一步该说什么」是产品口径，得能断言。
-   */
-  const graph = useGraph()
-  const nodeTitles = useMemo(
-    () =>
-      new Map(
-        graph.nodes.map((node) => [
-          node.id,
-          node.title?.trim() || '未命名节点',
-        ]),
-      ),
-    [graph.nodes],
-  )
-  const items = useMemo(
-    () =>
-      toConversation(
-        [
-          ...messages,
-          ...steerMessagesOf(current?.pendingSteers ?? [], stripMentionMarkup),
-        ],
-        nodeTitles,
-      ),
-    [current?.pendingSteers, messages, nodeTitles],
-  )
-  const streamingTextIndex = useMemo(() => {
-    if (!messageReveal || messageReveal.sessionId !== current?.id) return -1
-    for (let index = items.length - 1; index >= 0; index -= 1) {
-      const item = items[index]
-      if (item?.kind === 'text' && item.text === messageReveal.fullText) return index
-    }
-    return -1
-  }, [current?.id, items, messageReveal])
-  const visibleItems = useMemo(() => {
-    if (!messageReveal || streamingTextIndex < 0) return items
-    const characters = agentRevealCharacters(messageReveal.fullText)
-    const visibleText = characters
-      .slice(0, messageReveal.visibleLength)
-      .join('')
-    return items.map((item, index) =>
-      index === streamingTextIndex && item.kind === 'text'
-        ? { ...item, text: visibleText }
-        : item,
-    )
-  }, [items, messageReveal, streamingTextIndex])
   const latestUserIndex = visibleItems.reduce(
     (at, item, index) => (item.kind === 'user' ? index : at),
     -1,
