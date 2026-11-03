@@ -15,24 +15,73 @@ export interface ProjectRuntimeRegistrationHandle {
 }
 
 interface PreparedRuntime {
-  project: Map<string, ProjectRuntimeRegistration>
-  key: string
   runtime: ProjectRuntimeRegistration
   control: TaskShutdownControl
+  settled: boolean
 }
 
 export interface ProjectRuntimeDisposal {
   /** 数据库操作失败时恢复仍保留的全部 runtime / host。 */
   rollback(): boolean
   /** 数据库成功后提交清理；调用前不能 purge / 移出 UI。 */
-  commit(): boolean
+  commit(): Promise<boolean>
 }
 
 const registrations = new Map<
   string,
   Map<string, ProjectRuntimeRegistration>
 >()
+const projectOperations = new Map<string, ProjectOperation>()
 let nextGeneration = 1
+
+interface ProjectOperation {
+  readonly projectIds: ReadonlySet<string>
+  readonly prepared: PreparedRuntime[]
+  released: boolean
+}
+
+export class ProjectRuntimeBusyError extends Error {
+  readonly projectIds: readonly string[]
+
+  constructor(projectIds: readonly string[]) {
+    super('项目运行态正在收尾，稍后重试')
+    this.name = 'ProjectRuntimeBusyError'
+    this.projectIds = [...new Set(projectIds)]
+  }
+}
+
+function claimProjects(
+  projectIds: readonly string[],
+): ProjectOperation {
+  const ids = [...new Set(projectIds)]
+  const busy = ids.filter((projectId) =>
+    projectOperations.has(projectId),
+  )
+  if (busy.length > 0) {
+    throw new ProjectRuntimeBusyError(busy)
+  }
+  const operation: ProjectOperation = {
+    projectIds: new Set(ids),
+    prepared: [],
+    released: false,
+  }
+  for (const projectId of ids) {
+    projectOperations.set(projectId, operation)
+  }
+  return operation
+}
+
+function releaseProjectOperation(
+  operation: ProjectOperation,
+): void {
+  if (operation.released) return
+  operation.released = true
+  for (const projectId of operation.projectIds) {
+    if (projectOperations.get(projectId) === operation) {
+      projectOperations.delete(projectId)
+    }
+  }
+}
 
 function controlsOf(
   prepared: readonly PreparedRuntime[],
@@ -40,16 +89,113 @@ function controlsOf(
   return prepared.map((item) => item.control)
 }
 
-function recoverPrepared(prepared: readonly PreparedRuntime[]): boolean {
-  const controls = controlsOf(prepared)
-  if (controls.every((control) => control.canReopen())) {
-    return controls.every((control) => control.reopenIfIdle())
+function preparedRuntimeOf(
+  operation: ProjectOperation,
+  runtime: ProjectRuntimeRegistration,
+): PreparedRuntime | undefined {
+  return operation.prepared.find((item) => item.runtime === runtime)
+}
+
+function beginPreparedRuntime(
+  operation: ProjectOperation,
+  project: Map<string, ProjectRuntimeRegistration>,
+  key: string,
+  runtime: ProjectRuntimeRegistration,
+): PreparedRuntime {
+  const existing = preparedRuntimeOf(operation, runtime)
+  if (existing) return existing
+  runtime.active = false
+  let control: TaskShutdownControl
+  try {
+    control = runtime.beginDispose()
+  } catch (error) {
+    runtime.active = true
+    if (project.get(key) === runtime) project.delete(key)
+    throw error
   }
-  void Promise.allSettled(
-    controls.map((control) => control.whenIdle()),
-  ).then(() => {
-    if (controls.every((control) => control.canReopen())) {
-      controls.forEach((control) => control.reopenIfIdle())
+  const item: PreparedRuntime = {
+    runtime,
+    control,
+    settled: false,
+  }
+  operation.prepared.push(item)
+  return item
+}
+
+function collectLateRuntimes(
+  operation: ProjectOperation,
+): boolean {
+  let added = false
+  for (const projectId of operation.projectIds) {
+    const project = registrations.get(projectId)
+    if (!project) continue
+    for (const [key, runtime] of project) {
+      if (preparedRuntimeOf(operation, runtime)) continue
+      beginPreparedRuntime(operation, project, key, runtime)
+      added = true
+    }
+  }
+  return added
+}
+
+async function waitForPreparedIdle(
+  operation: ProjectOperation,
+): Promise<void> {
+  let cursor = 0
+  while (cursor < operation.prepared.length) {
+    const batch = operation.prepared.slice(cursor)
+    cursor = operation.prepared.length
+    await Promise.all(
+      batch.map((item) => item.control.waitForIdle()),
+    )
+    batch.forEach((item) => {
+      item.settled = true
+    })
+    collectLateRuntimes(operation)
+  }
+}
+
+async function settlePrepared(
+  operation: ProjectOperation,
+): Promise<void> {
+  let cursor = 0
+  while (cursor < operation.prepared.length) {
+    const batch = operation.prepared.slice(cursor)
+    cursor = operation.prepared.length
+    await Promise.allSettled(
+      batch
+        .filter((item) => !item.settled)
+        .map((item) => item.control.whenIdle()),
+    )
+    batch.forEach((item) => {
+      item.settled = true
+    })
+    collectLateRuntimes(operation)
+  }
+}
+
+function recoverPrepared(operation: ProjectOperation): boolean {
+  collectLateRuntimes(operation)
+  const controls = controlsOf(operation.prepared)
+  if (controls.every((control) => control.canReopen())) {
+    const reopened = controls.every((control) => control.reopenIfIdle())
+    if (reopened) {
+      for (const item of operation.prepared) item.runtime.active = true
+      releaseProjectOperation(operation)
+    }
+    return reopened
+  }
+  void settlePrepared(operation).then(() => {
+    let current = controlsOf(operation.prepared)
+    while (collectLateRuntimes(operation)) {
+      current = controlsOf(operation.prepared)
+    }
+    if (current.every((control) => control.canReopen())) {
+      current.forEach((control) => control.reopenIfIdle())
+      operation.prepared.forEach((item) => {
+        item.runtime.active = true
+      })
+      releaseProjectOperation(operation)
     }
   })
   return false
@@ -64,10 +210,21 @@ function recoverPrepared(prepared: readonly PreparedRuntime[]): boolean {
 export function registerProjectRuntime(
   input: Omit<ProjectRuntimeRegistration, 'generation' | 'active'>,
 ): ProjectRuntimeRegistrationHandle {
+  const operation = projectOperations.get(input.projectId)
+  if (operation) {
+    const current = registrations.get(input.projectId)?.get(input.key)
+    if (current) {
+      return {
+        key: current.key,
+        projectId: current.projectId,
+        generation: current.generation,
+      }
+    }
+  }
   const registration: ProjectRuntimeRegistration = {
     ...input,
     generation: nextGeneration++,
-    active: true,
+    active: !operation,
   }
   let project = registrations.get(input.projectId)
   if (!project) {
@@ -75,6 +232,14 @@ export function registerProjectRuntime(
     registrations.set(input.projectId, project)
   }
   project.set(input.key, registration)
+  if (operation) {
+    beginPreparedRuntime(
+      operation,
+      project,
+      input.key,
+      registration,
+    )
+  }
   return {
     key: registration.key,
     projectId: registration.projectId,
@@ -91,60 +256,66 @@ export function registerProjectRuntime(
 export async function prepareProjectRuntimes(
   projectIds: readonly string[],
 ): Promise<ProjectRuntimeDisposal> {
-  const prepared: PreparedRuntime[] = []
+  const operation = claimProjects(projectIds)
+  let committed = false
   try {
-    for (const projectId of [...new Set(projectIds)]) {
+    for (const projectId of operation.projectIds) {
       const project = registrations.get(projectId)
       if (!project) continue
       for (const [key, runtime] of [...project.entries()]) {
-        runtime.active = false
-        prepared.push({
+        beginPreparedRuntime(
+          operation,
           project,
           key,
           runtime,
-          control: runtime.beginDispose(),
-        })
+        )
       }
     }
   } catch (error) {
-    recoverPrepared(prepared)
+    recoverPrepared(operation)
     throw error
   }
 
-  let committed = false
   const disposal: ProjectRuntimeDisposal = {
     rollback() {
       if (committed) return false
-      return recoverPrepared(prepared)
+      return recoverPrepared(operation)
     },
-    commit() {
+    async commit() {
       if (committed) return false
-      const controls = controlsOf(prepared)
-      if (!controls.every((control) => control.canFinalize())) {
-        return false
-      }
-      if (!controls.every((control) => control.finalize())) {
-        return false
+      let finalized = true
+      try {
+        while (true) {
+          collectLateRuntimes(operation)
+          await settlePrepared(operation)
+          if (!collectLateRuntimes(operation)) break
+        }
+        const controls = controlsOf(operation.prepared)
+        for (const control of controls) {
+          try {
+            if (!control.canFinalize() || !control.finalize()) {
+              finalized = false
+            }
+          } catch {
+            finalized = false
+          }
+        }
+      } catch {
+        finalized = false
       }
       committed = true
-      for (const { project, key, runtime } of prepared) {
-        if (project.get(key) === runtime) project.delete(key)
+      for (const projectId of operation.projectIds) {
+        registrations.delete(projectId)
       }
-      for (const projectId of [...new Set(projectIds)]) {
-        if (registrations.get(projectId)?.size === 0) {
-          registrations.delete(projectId)
-        }
-      }
-      return true
+      releaseProjectOperation(operation)
+      return finalized
     },
   }
 
   try {
-    await Promise.all(
-      prepared.map((item) => item.control.waitForIdle()),
-    )
+    await waitForPreparedIdle(operation)
   } catch (error) {
-    recoverPrepared(prepared)
+    recoverPrepared(operation)
     throw error
   }
   return disposal
@@ -157,8 +328,9 @@ export async function withPreparedProjectRuntimes<T>(
   const disposal = await prepareProjectRuntimes(projectIds)
   try {
     const result = await work()
-    if (!disposal.commit()) {
-      throw new Error('项目运行时未能安全提交清理')
+    const committed = await disposal.commit()
+    if (!committed) {
+      console.error('[project-runtime] 数据库写入成功，但运行时清理未能提交')
     }
     return result
   } catch (error) {
@@ -171,7 +343,7 @@ export async function disposeProjectRuntimes(
   projectIds: readonly string[],
 ): Promise<void> {
   const disposal = await prepareProjectRuntimes(projectIds)
-  if (!disposal.commit()) {
+  if (!(await disposal.commit())) {
     throw new Error('项目运行时未能安全完成清理')
   }
 }
@@ -182,5 +354,6 @@ export async function disposeAllProjectRuntimes(): Promise<void> {
 
 export function resetProjectRuntimesForTests(): void {
   registrations.clear()
+  projectOperations.clear()
   nextGeneration = 1
 }

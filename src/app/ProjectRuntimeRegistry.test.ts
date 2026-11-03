@@ -1,6 +1,7 @@
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { TaskShutdownControl } from '../features/shared/lifecycle/taskLifecycle'
 import {
+  ProjectRuntimeBusyError,
   disposeProjectRuntimes,
   prepareProjectRuntimes,
   registerProjectRuntime,
@@ -70,7 +71,7 @@ describe('ProjectRuntimeRegistry', () => {
 
     const disposal = await prepareProjectRuntimes(['p1'])
     order.push('database')
-    expect(disposal.commit()).toBe(true)
+    await expect(disposal.commit()).resolves.toBe(true)
     order.push('purge-agent-tables')
 
     expect(order).toEqual([
@@ -180,41 +181,214 @@ describe('ProjectRuntimeRegistry', () => {
     expect(attempts).toBe(2)
   })
 
-  it('旧代际延迟清理不得删除同 key 的新注册', async () => {
+  it('同 key 重注册沿用旧代际，超时恢复后解除项目锁', async () => {
+    let idle = false
     let release!: () => void
     const gate = new Promise<void>((resolve) => {
       release = resolve
     })
-    let oldBegun = 0
-    let newBegun = 0
+    let begins = 0
     const oldRegistration = registerProjectRuntime({
       projectId: 'p1',
       key: 'canvas-agent',
       beginDispose: () => {
-        oldBegun += 1
-        return control(() => gate)
+        begins += 1
+        return {
+          waitForIdle: async () => {
+            if (!idle) throw new Error('still busy')
+          },
+          whenIdle: async () => {
+            await gate
+            idle = true
+          },
+          canReopen: () => idle,
+          reopenIfIdle: () => idle,
+          canFinalize: () => idle,
+          finalize: () => idle,
+        }
       },
     })
 
-    const preparing = prepareProjectRuntimes(['p1'])
+    await expect(
+      prepareProjectRuntimes(['p1']),
+    ).rejects.toThrow('still busy')
     const newRegistration = registerProjectRuntime({
       projectId: 'p1',
       key: 'canvas-agent',
       beginDispose: () => {
-        newBegun += 1
+        begins += 1
         return control(async () => undefined)
       },
     })
-    expect(newRegistration.generation).not.toBe(
-      oldRegistration.generation,
-    )
+    expect(newRegistration.generation).toBe(oldRegistration.generation)
+    await expect(
+      prepareProjectRuntimes(['p1']),
+    ).rejects.toBeInstanceOf(ProjectRuntimeBusyError)
 
     release()
-    const disposal = await preparing
-    expect(disposal.commit()).toBe(true)
-    await disposeProjectRuntimes(['p1'])
+    await gate
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    const disposal = await prepareProjectRuntimes(['p1'])
+    expect(await disposal.commit()).toBe(true)
+    expect(begins).toBe(2)
+  })
 
-    expect(oldBegun).toBe(1)
-    expect(newBegun).toBe(1)
+  it('同项目并发 prepare 原子失败为 Busy，直到 commit 释放锁', async () => {
+    registerProjectRuntime({
+      projectId: 'p1',
+      key: 'canvas-agent',
+      beginDispose: () => control(async () => undefined),
+    })
+    registerProjectRuntime({
+      projectId: 'p2',
+      key: 'canvas-agent',
+      beginDispose: () => control(async () => undefined),
+    })
+
+    const first = await prepareProjectRuntimes(['p1'])
+    await expect(
+      prepareProjectRuntimes(['p1']),
+    ).rejects.toBeInstanceOf(ProjectRuntimeBusyError)
+    await expect(
+      prepareProjectRuntimes(['p1', 'p2']),
+    ).rejects.toBeInstanceOf(ProjectRuntimeBusyError)
+
+    await expect(first.commit()).resolves.toBe(true)
+    const p2 = await prepareProjectRuntimes(['p2'])
+    await expect(p2.commit()).resolves.toBe(true)
+  })
+
+  it('work 期间同 project/key 重注册必须复用旧 registration，commit 后无残留', async () => {
+    let oldBegins = 0
+    let lateBegins = 0
+    const old = registerProjectRuntime({
+      projectId: 'p1',
+      key: 'canvas-agent',
+      beginDispose: () => {
+        oldBegins += 1
+        return control(async () => undefined)
+      },
+    })
+
+    await withPreparedProjectRuntimes(['p1'], async () => {
+      const late = registerProjectRuntime({
+        projectId: 'p1',
+        key: 'canvas-agent',
+        beginDispose: () => {
+          lateBegins += 1
+          return control(async () => undefined)
+        },
+      })
+      expect(late.generation).toBe(old.generation)
+    })
+
+    await disposeProjectRuntimes(['p1'])
+    expect(oldBegins).toBe(1)
+    expect(lateBegins).toBe(0)
+  })
+
+  it('work 期间新增不同 key 也纳入 commit 等待，不留下第二份 runtime', async () => {
+    let releaseLate!: () => void
+    const lateGate = new Promise<void>((resolve) => {
+      releaseLate = resolve
+    })
+    let lateBegun = false
+    let lateFinalized = false
+    registerProjectRuntime({
+      projectId: 'p1',
+      key: 'canvas-agent',
+      beginDispose: () => control(async () => undefined),
+    })
+
+    let finished = false
+    const removing = withPreparedProjectRuntimes(['p1'], async () => {
+      registerProjectRuntime({
+        projectId: 'p1',
+        key: 'late-runtime',
+        beginDispose: () => {
+          lateBegun = true
+          return {
+            waitForIdle: () => lateGate,
+            whenIdle: () => lateGate,
+            canReopen: () => true,
+            reopenIfIdle: () => true,
+            canFinalize: () => true,
+            finalize: () => {
+              lateFinalized = true
+              return true
+            },
+          }
+        },
+      })
+    }).then(() => {
+      finished = true
+    })
+
+    for (let i = 0; i < 10 && !lateBegun; i += 1) {
+      await new Promise((resolve) => setTimeout(resolve, 0))
+    }
+    expect(lateBegun).toBe(true)
+    expect(finished).toBe(false)
+    releaseLate()
+    await removing
+
+    expect(lateFinalized).toBe(true)
+    await disposeProjectRuntimes(['p1'])
+  })
+
+  it('work 已成功时 commit 清理异常不反向误报数据库失败', async () => {
+    registerProjectRuntime({
+      projectId: 'p1',
+      key: 'canvas-agent',
+      beginDispose: () => ({
+        ...control(async () => undefined),
+        finalize() {
+          throw new Error('host cleanup failed')
+        },
+      }),
+    })
+    const work = vi.fn(async () => 'database removed')
+
+    await expect(
+      withPreparedProjectRuntimes(['p1'], work),
+    ).resolves.toBe('database removed')
+    expect(work).toHaveBeenCalledOnce()
+  })
+
+  it('超时恢复尚未 idle 时锁保持，第二次 prepare 不能覆盖 attempt', async () => {
+    let idle = false
+    let release!: () => void
+    const gate = new Promise<void>((resolve) => {
+      release = resolve
+      })
+    registerProjectRuntime({
+      projectId: 'p1',
+      key: 'canvas-agent',
+      beginDispose: () => ({
+        waitForIdle: async () => {
+          if (!idle) throw new Error('still busy')
+        },
+        whenIdle: async () => {
+          await gate
+          idle = true
+        },
+        canReopen: () => idle,
+        reopenIfIdle: () => idle,
+        canFinalize: () => idle,
+        finalize: () => idle,
+      }),
+    })
+
+    await expect(
+      prepareProjectRuntimes(['p1']),
+    ).rejects.toThrow('still busy')
+    await expect(
+      prepareProjectRuntimes(['p1']),
+    ).rejects.toBeInstanceOf(ProjectRuntimeBusyError)
+    release()
+    await gate
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    const retry = await prepareProjectRuntimes(['p1'])
+    await expect(retry.commit()).resolves.toBe(true)
   })
 })
