@@ -24,11 +24,6 @@ import {
   agentTaskPlanProgress,
 } from '../../../../domain/agent/taskPlan'
 import { createPresetStore } from '../../../../state/project/presetStore'
-import { assetNodeSize } from '../../../../domain/canvas/layout/assetNodeSize'
-import {
-  centeredNodeOrigin,
-  findFreeRect,
-} from '../../../../domain/agent/landing'
 import type { AgentNodeType } from '../../../../domain/agent/plan'
 import {
   channelIdForLogical,
@@ -43,7 +38,6 @@ import {
 import { resolveDefaults } from '../../../../features/canvas/createNodeWithDefaults'
 import { cropAsset, extractSelection } from '../../../../features/canvas/extractSelection'
 import { splitNodeToGrid } from '../../../../features/canvas/splitToGrid'
-import { subscribeAgentHandoff, takeAgentHandoff } from '../../../../features/canvas/agentHandoff'
 import {
   activeQueueTurnOf,
   bindTurnToSessionActivity,
@@ -54,12 +48,6 @@ import {
   releaseSessionActivity,
   turnMatchesSessionActivity,
 } from '../../../../features/canvas/agent/sessionActivity'
-import {
-  createAssetNode,
-  importAssetFile,
-  isImportableMedia,
-  type ImportedAsset,
-} from '../../../../features/canvas/importAsset'
 import { createAssetLibraryRepository } from '../../../../state/project/assetLibraryRepository'
 import { createAssetLibraryStore } from '../../../../state/project/assetLibraryStore'
 import { createInspirationRepository } from '../../../../state/project/inspirationRepository'
@@ -132,6 +120,7 @@ import {
   type AgentMessageReveal,
 } from './useAgentConversationController'
 import { useAgentComposerController } from './useAgentComposerController'
+import { useAgentAttachmentsController } from './useAgentAttachmentsController'
 import { useAgentSessionLifecycle } from './useAgentSessionLifecycle'
 import { useAgentSkillsController } from './useAgentSkillsController'
 import { AgentSessionRuntimeState } from './agentSessionRuntime'
@@ -144,7 +133,6 @@ import {
   type AgentTurnContextTrace,
 } from './agentTurnRequest'
 import { errText } from '../../agent/agentLoop'
-import { loadAssetUrl } from '../../../../features/shared/assets/index'
 import {
   IDLE_STATUS,
   statusCanSteer,
@@ -2603,143 +2591,6 @@ export function AgentPanel({
     ],
   )
 
-  /**
-   * 把**画布上选中的节点**当素材给这次对话（设计文档 §8「输入：文字 + 可选图片」）。
-   *
-   * 与拖图不同：这些节点早就落库了，不需要再导一次，直接把 id 记进会话 ——
-   * agent 会用同一套 `attach` 复用它们。
-   */
-  /**
-   * 多选浮层上那枚「添加到 agent」（用户 2026-10-05 第 11 条，参考图四第六个动作）。
-   *
-   * 画布侧与对话窗是**兄弟组件**，两边靠 `agentHandoff` 那个模块级单例交接（说明见
-   * 那个文件）。这里做两件事，顺序不能反：
-   * ① 先把 ids 落进**当前会话**（`pendingAssetIds`）并补成正文 chip —— 与
-   *    用户看到的引用与普通 @ 节点保持同一种形态；
-   * ② 取走即清空（`takeAgentHandoff`），否则每次切会话 / 重渲染都会再收一遍。
-   *
-   * 为什么用 ref 缓冲而不是直接消费：面板刚打开时 `current` 可能还没就绪
-   * （会话是异步读回来的），那一拍消费掉就等于**用户点了按钮却什么都没发生**。
-   * 所以 ids 先进 ref，能落会话了就落（`flushHandoff` 在 `current` 变好之后也会被
-   * 这个 effect 重新跑一次）。
-   */
-  const handoffRef = useRef<string[]>([])
-  const flushHandoff = useCallback(() => {
-    if (!current || handoffRef.current.length === 0) return
-    const exist = new Set(store.getSnapshot().nodes.map((n) => n.id))
-    const picked = handoffRef.current.filter((id) => exist.has(id))
-    handoffRef.current = []
-    if (picked.length === 0) return
-    for (const id of picked) insertMention('node', id, nodeLabelOf(id))
-    patchSessionDetached({
-      pendingAssetIds: [...new Set([...(current.pendingAssetIds ?? []), ...picked])],
-    })
-  }, [current, store, insertMention, nodeLabelOf, patchSession])
-
-  useEffect(() => {
-    if (!active) return
-    const queue = (ids: readonly string[]) => {
-      handoffRef.current = [...new Set([...handoffRef.current, ...ids])]
-      flushHandoff()
-    }
-    /** 面板可能是**后**挂载的（点按钮才打开），先把单例里存着的那批收下 */
-    queue(takeAgentHandoff(projectId))
-    return subscribeAgentHandoff(projectId, queue)
-  }, [active, flushHandoff, projectId])
-
-  /**
-   * 把一份素材落到画布上，**避开已有节点**。
-   *
-   * 抽出来是因为现在有**两条**入口：本地上传（`attachFiles`）与素材库添加
-   * （`addFromLibrary`）。两处各写一遍落位与建节点，迟早有一条忘了避让、
-   * 把新素材压在别人节点上 —— 那种「两张图叠一起」2026-10-01 实测踩过一次。
-   */
-  const placeAsset = useCallback(
-    (asset: ImportedAsset): string | null => {
-      const size = assetNodeSize({ width: asset.width, height: asset.height })
-      const existing = store
-        .getSnapshot()
-        .nodes.map((n) => ({ x: n.x, y: n.y, w: n.w, h: n.h }))
-      const centered = centeredNodeOrigin(size, viewportWorldOf(viewport))
-      const spot = findFreeRect({ ...size, ...centered }, existing)
-      return createAssetNode({ platform, store, projectId }, asset, { x: spot.x, y: spot.y })
-    },
-    [platform, store, projectId, viewport],
-  )
-
-  /**
-   * 从**素材库**挑一个加进这次对话（用户 2026-10-03：「加素材…分两个功能，
-   * 点击后本地上传和素材库添加」）。
-   *
-   * 与本地导入走**同一条落位链路**（`placeAsset`），也记进 `pendingAssetIds` ——
-   * 对 agent 来说两者没有区别，都是「画布上那个素材节点」，用 attach 复用即可。
-   */
-  const addFromLibrary = useCallback(
-    (hash: string) =>
-      trackRun(async () => {
-        const asset = library.getState().assets.find((a) => a.hash === hash)
-        if (!current || !asset) return
-        const id = placeAsset({
-          hash: asset.hash,
-          mime: asset.mime,
-          width: asset.width,
-          height: asset.height,
-        })
-        if (!id) return
-        /** 同样落成正文里的引用 chip（与「取选中」同一条路） */
-        insertMention('node', id, nodeLabelOf(id))
-        await patchSession({ pendingAssetIds: [...(current.pendingAssetIds ?? []), id] })
-      }),
-    [
-      current,
-      library,
-      patchSession,
-      placeAsset,
-      insertMention,
-      nodeLabelOf,
-      trackRun,
-    ],
-  )
-
-  /**
-   * 用户给素材：**先落成画布上的节点**，再记进会话（设计文档 §8）。
-   *
-   * 为什么不把图片塞进对话上下文：agent 要用它时得能 `attach` 到那个节点上
-   * （复用、不重复建）。只塞上下文的话，模型只能「知道有这么一张图」，
-   * 却指不到画布上的任何东西，最后还是自己再建一个 —— 那就重复了。
-   */
-  const attachFiles = useCallback(
-    (files: FileList | null) =>
-      trackRun(async () => {
-        if (!files || files.length === 0 || !current) return
-        const deps = { platform, store, projectId }
-        const added: string[] = []
-        for (const file of Array.from(files)) {
-          if (!isImportableMedia(file.type)) continue
-          const asset = await importAssetFile(deps, file)
-          if (!asset) continue
-          const id = placeAsset(asset)
-          if (id) added.push(id)
-        }
-        if (added.length === 0) return
-        for (const id of added) insertMention('node', id, nodeLabelOf(id))
-        await patchSession({
-          pendingAssetIds: [...(current.pendingAssetIds ?? []), ...added],
-        })
-      }),
-    [
-      current,
-      platform,
-      store,
-      projectId,
-      patchSession,
-      placeAsset,
-      insertMention,
-      nodeLabelOf,
-      trackRun,
-    ],
-  )
-
   const latestUserIndex = visibleItems.reduce(
     (at, item, index) => (item.kind === 'user' ? index : at),
     -1,
@@ -2766,56 +2617,28 @@ export function AgentPanel({
     return map
   }, [graph])
 
-  /**
-   * @ 引用里的**节点缩略图**（用户 2026-10-03，参考产品图六：chip 上要看得见那张图）。
-   *
-   * 编辑器是**命令式建的 DOM**、拿不到 `useAsset` 这类 hook，所以图在这里取：
-   * 按草稿里出现过的节点 id 去 `assets` 表读一次，缓存成 `nodeId → objectURL`，
-   * 再用版本号通知编辑器**就地**把图补进槽位。
-   */
-  const thumbCacheRef = useRef(new Map<string, string>())
-  const [thumbVersion, setThumbVersion] = useState(0)
-  const thumbOf = useCallback(
-    (nodeId: string) => thumbCacheRef.current.get(nodeId) ?? null,
-    [],
-  )
-
-  useEffect(() => {
-    /**
-     * 取图的两种来源：正文里的 @ 引用，以及「取选中当素材」挂上的标签。
-     *
-     * 后者原先不取图 ⇒ 标签上只能写 `node_xxx`（用户 2026-10-02 报的那一条）。
-     */
-    const refs = [
-      ...parseMentions(draft).filter((m) => m.kind === 'node'),
-      ...(current?.pendingAssetIds ?? []).map((id) => ({ kind: 'node' as const, id })),
-      /**
-       * **历史消息里的引用也要取图**：用户消息现在按 chip 渲染（见 `MentionRichText`），
-       * 回看时要能看见当时引用的那张缩略图 —— 只按草稿取图的话，发出去就变回纯图标。
-       */
-      ...messages.flatMap((m) =>
-        parseMentions(m.display ?? m.content).filter((x) => x.kind === 'node'),
-      ),
-    ]
-    if (refs.length === 0) return
-    let alive = true
-    void (async () => {
-      let added = false
-      for (const r of refs) {
-        if (thumbCacheRef.current.has(r.id)) continue
-        const hash = hashOfNode.get(r.id)
-        if (!hash) continue
-        const meta = await loadAssetUrl(platform, hash)
-        if (!alive || !meta.url) continue
-        thumbCacheRef.current.set(r.id, meta.url)
-        added = true
-      }
-      if (added && alive) setThumbVersion((v) => v + 1)
-    })()
-    return () => {
-      alive = false
-    }
-  }, [draft, hashOfNode, platform, current?.pendingAssetIds, messages])
+  const {
+    addFromLibrary,
+    attachFiles,
+    thumbOf,
+    thumbVersion,
+  } = useAgentAttachmentsController({
+    active,
+    projectId,
+    current,
+    draft,
+    messages,
+    nodeHashes: hashOfNode,
+    platform,
+    store,
+    viewport,
+    library,
+    insertMention,
+    nodeLabelOf,
+    patchSession,
+    patchSessionDetached,
+    trackRun,
+  })
 
   /**
    * 会话字段 → **正文 chip**（用户 2026-10-02：「我需要全部出现在正文里面，全部保持
@@ -2879,15 +2702,6 @@ export function AgentPanel({
     runPromiseDetached,
     setSkill,
   ])
-
-  /** 卸载时把建出来的 objectURL 回收掉（不回收就是一路泄漏） */
-  useEffect(
-    () => () => {
-      for (const url of thumbCacheRef.current.values()) URL.revokeObjectURL(url)
-      thumbCacheRef.current.clear()
-    },
-    [],
-  )
 
   const pendingPlan = previewOf(status, store)
   const editingQueueTurn =
