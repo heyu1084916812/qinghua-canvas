@@ -20,28 +20,65 @@ export interface TaskShutdownControl {
 export function combineTaskShutdownControls(
   controls: readonly (TaskShutdownControl | null | undefined)[],
 ): TaskShutdownControl {
-  const active = controls.filter(
-    (control): control is TaskShutdownControl => !!control,
-  )
+  const active = controls
+    .filter(
+      (control): control is TaskShutdownControl => !!control,
+    )
+    .map((control) => ({
+      control,
+      finalized: false,
+    }))
   return {
     async waitForIdle() {
-      await Promise.all(active.map((control) => control.waitForIdle()))
+      await Promise.all(
+        active.map((item) => item.control.waitForIdle()),
+      )
     },
     async whenIdle() {
-      await Promise.all(active.map((control) => control.whenIdle()))
+      await Promise.all(
+        active.map((item) => item.control.whenIdle()),
+      )
     },
-    canReopen: () => active.every((control) => control.canReopen()),
+    canReopen: () =>
+      active.every(
+        (item) =>
+          !item.finalized && item.control.canReopen(),
+      ),
     reopenIfIdle() {
-      if (!active.every((control) => control.canReopen())) return false
-      return active.every((control) => control.reopenIfIdle())
+      if (!active.every(
+        (item) =>
+          !item.finalized && item.control.canReopen(),
+      )) {
+        return false
+      }
+      return active.every((item) => item.control.reopenIfIdle())
     },
-    canFinalize: () => active.every((control) => control.canFinalize()),
+    canFinalize: () =>
+      active.every(
+        (item) =>
+          item.finalized || item.control.canFinalize(),
+      ),
     finalize() {
-      if (!active.every((control) => control.canFinalize())) return false
-      return active.every((control) => control.finalize())
+      if (!active.every(
+        (item) =>
+          item.finalized || item.control.canFinalize(),
+      )) {
+        return false
+      }
+      for (const item of active) {
+        if (item.finalized) continue
+        if (!item.control.finalize()) return false
+        item.finalized = true
+      }
+      return true
     },
     releaseFinalized() {
-      active.forEach((control) => control.releaseFinalized?.())
+      if (!active.every((item) => item.finalized)) {
+        throw new Error('全部 participant finalize 前不能释放资源')
+      }
+      active.forEach((item) =>
+        item.control.releaseFinalized?.(),
+      )
     },
   }
 }

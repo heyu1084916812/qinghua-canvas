@@ -161,8 +161,84 @@ describe('taskLifecycle', () => {
     ])
 
     expect(releaseA).not.toHaveBeenCalled()
+    expect(combined.finalize()).toBe(true)
     combined.releaseFinalized?.()
     expect(releaseA).toHaveBeenCalledOnce()
     expect(releaseB).toHaveBeenCalledOnce()
+  })
+
+  it('部分 child finalize 后只重试尚未完成的 child', () => {
+    let hostFinalized = false
+    let executionAttempts = 0
+    const hostFinalize = vi.fn(() => {
+      hostFinalized = true
+      return true
+    })
+    const executionFinalize = vi.fn(() => {
+      executionAttempts += 1
+      return executionAttempts > 1
+    })
+    const combined = combineTaskShutdownControls([
+      {
+        waitForIdle: async () => undefined,
+        whenIdle: async () => undefined,
+        canReopen: () => !hostFinalized,
+        reopenIfIdle: () => !hostFinalized,
+        canFinalize: () => !hostFinalized,
+        finalize: hostFinalize,
+      },
+      {
+        waitForIdle: async () => undefined,
+        whenIdle: async () => undefined,
+        canReopen: () => true,
+        reopenIfIdle: () => true,
+        canFinalize: () => true,
+        finalize: executionFinalize,
+      },
+    ])
+
+    expect(combined.finalize()).toBe(false)
+    expect(hostFinalize).toHaveBeenCalledOnce()
+    expect(executionFinalize).toHaveBeenCalledOnce()
+
+    expect(combined.canFinalize()).toBe(true)
+    expect(combined.finalize()).toBe(true)
+    expect(hostFinalize).toHaveBeenCalledOnce()
+    expect(executionFinalize).toHaveBeenCalledTimes(2)
+  })
+
+  it('child finalize 抛错后保留已完成项，第二次可继续', () => {
+    let completed = false
+    let attempts = 0
+    const combined = combineTaskShutdownControls([
+      {
+        waitForIdle: async () => undefined,
+        whenIdle: async () => undefined,
+        canReopen: () => !completed,
+        reopenIfIdle: () => !completed,
+        canFinalize: () => !completed,
+        finalize: () => {
+          completed = true
+          return true
+        },
+      },
+      {
+        waitForIdle: async () => undefined,
+        whenIdle: async () => undefined,
+        canReopen: () => true,
+        reopenIfIdle: () => true,
+        canFinalize: () => true,
+        finalize: () => {
+          attempts += 1
+          if (attempts === 1) throw new Error('execution finalize failed')
+          return true
+        },
+      },
+    ])
+
+    expect(() => combined.finalize()).toThrow('execution finalize failed')
+    expect(completed).toBe(true)
+    expect(combined.finalize()).toBe(true)
+    expect(attempts).toBe(2)
   })
 })
