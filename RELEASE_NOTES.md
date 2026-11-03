@@ -5,6 +5,43 @@
 
 ---
 
+## 0.1.14 · Agent 生命周期、可靠性与代码拆分（2026-11-04）
+
+> 本版从 `0.1.13` 升级到 `0.1.14`，继续使用原更新私钥签名。
+
+**Agent 生命周期**
+
+- AgentHost 跨画布路由常驻：离开画布到设置页、A/B 项目切换后，正在跑的回合、确认卡、队列、草稿和
+  取消能力不再因 Provider 或页面卸载而丢失。
+- 项目删除增加 prepare / commit / cleanup 两阶段契约、全局恢复入口和逐项幂等释放；仓储已删除但
+  运行态清理失败时会显示真实“重试清理”，不会误报数据库删除失败，也不会重复删除项目数据。
+
+**Agent 可靠性与工具契约**
+
+- 结果收口按 `jobId / turnId / queueTurnId / messageRevision` 绑定原始回合，迟到响应不能覆盖新回合；
+  写入冲突不伪造成功，Job 状态和队列结算保持可追踪。
+- 确认执行、检查点继续、停止 / 引导 / 队列推进分别收口；取消或中断会补齐工具结果，不留下悬空 tool call。
+- 自动模式只放行明确的生成类动作；删除、改节点、连线变更和记忆写入仍需人工确认。
+- 画布写入在工具账本完成前等待持久化屏障；生成类请求不因 UI 超时自动重发，避免重复扣费。
+
+**代码拆分**
+
+- `AgentConversationController` 只负责 reveal、步骤展开、滚动跟随和可见消息派生。
+- `AgentComposerController` 只负责草稿、mention、picker 与输入框高度；切会话按新会话恢复草稿，
+  旧会话 timer 不串写。
+- `AgentSessionLifecycle` 成为会话投影的唯一 React 入口；SessionStore / AgentController 仍是
+  会话与 Job 唯一真相，慢切换旧结果不能覆盖新选择。
+- `AgentPanelView` 只组合 Header / Conversation / Composer；`AgentSkillsController` 独立承接技能
+  handoff、导入、收藏和技能库导航。`AgentPanel.tsx` 从 3531 行降到 3062 行。
+
+**验证**
+
+- 全量 Vitest：**4049 passed / 1 skipped**；`npm run check`、`npm run build`、`git diff --check` 通过。
+- AgentPanel 目录 **233/233**；真实浏览器 G735 **35/35**、G769 **39/39**、G865 **24/24**。
+- Tauri release、真实 Workbuddy / Chat2api 和安装包哈希在发布门禁完成后补充。
+
+---
+
 ## 0.1.13 · Agent 代码拆分与可隔离发布门禁（2026-11-02）
 
 > 本版从 `0.1.12` 升级到 `0.1.13`。`0.1.12` 是本地可靠性回滚点，未发布。
