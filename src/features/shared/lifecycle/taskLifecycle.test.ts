@@ -167,6 +167,51 @@ describe('taskLifecycle', () => {
     expect(releaseB).toHaveBeenCalledOnce()
   })
 
+  it('组合控制逐 child 幂等 release，部分失败后只重试未释放项', () => {
+    const releaseA = vi.fn()
+    let releaseBAttempts = 0
+    const releaseB = vi.fn(() => {
+      releaseBAttempts += 1
+      if (releaseBAttempts === 1) {
+        throw new Error('release B failed')
+      }
+    })
+    const combined = combineTaskShutdownControls([
+      {
+        waitForIdle: async () => undefined,
+        whenIdle: async () => undefined,
+        canReopen: () => true,
+        reopenIfIdle: () => true,
+        canFinalize: () => true,
+        finalize: () => true,
+        releaseFinalized: releaseA,
+      },
+      {
+        waitForIdle: async () => undefined,
+        whenIdle: async () => undefined,
+        canReopen: () => true,
+        reopenIfIdle: () => true,
+        canFinalize: () => true,
+        finalize: () => true,
+        releaseFinalized: releaseB,
+      },
+    ])
+
+    expect(combined.finalize()).toBe(true)
+    expect(() => combined.releaseFinalized?.()).toThrow(
+      'release B failed',
+    )
+    expect(releaseA).toHaveBeenCalledOnce()
+    expect(releaseB).toHaveBeenCalledOnce()
+
+    expect(() => combined.releaseFinalized?.()).not.toThrow()
+    expect(releaseA).toHaveBeenCalledOnce()
+    expect(releaseB).toHaveBeenCalledTimes(2)
+    expect(() => combined.releaseFinalized?.()).not.toThrow()
+    expect(releaseA).toHaveBeenCalledOnce()
+    expect(releaseB).toHaveBeenCalledTimes(2)
+  })
+
   it('部分 child finalize 后只重试尚未完成的 child', () => {
     let hostFinalized = false
     let executionAttempts = 0

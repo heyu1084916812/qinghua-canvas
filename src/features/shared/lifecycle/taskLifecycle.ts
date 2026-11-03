@@ -27,6 +27,7 @@ export function combineTaskShutdownControls(
     .map((control) => ({
       control,
       finalized: false,
+      released: false,
     }))
   return {
     async waitForIdle() {
@@ -76,9 +77,11 @@ export function combineTaskShutdownControls(
       if (!active.every((item) => item.finalized)) {
         throw new Error('全部 participant finalize 前不能释放资源')
       }
-      active.forEach((item) =>
-        item.control.releaseFinalized?.(),
-      )
+      for (const item of active) {
+        if (item.released) continue
+        item.control.releaseFinalized?.()
+        item.released = true
+      }
     },
   }
 }

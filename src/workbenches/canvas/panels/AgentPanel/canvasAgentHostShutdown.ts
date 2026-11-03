@@ -41,7 +41,10 @@ export function createCanvasAgentHostShutdownControl({
         releaseGeneration()
         return true
       },
-      releaseFinalized: releaseGeneration,
+      releaseFinalized() {
+        combined.releaseFinalized?.()
+        releaseGeneration()
+      },
       finalize() {
         if (!combined.finalize()) return false
         finalizeAgentHostDispose(hostId, generation)

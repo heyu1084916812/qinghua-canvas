@@ -31,6 +31,7 @@ afterEach(() => {
 
 function childControl(
   finalize: () => boolean,
+  releaseFinalized?: () => void,
 ): TaskShutdownControl {
   let finalized = false
   return {
@@ -45,11 +46,16 @@ function childControl(
       finalized = result
       return result
     },
+    releaseFinalized,
   }
 }
 
 async function prepareCombined(
   finalize: () => boolean,
+  releases: {
+    host?: () => void
+    execution?: () => void
+  } = {},
 ) {
   const host = upsertAgentHost({
     id: 'canvas-agent:combined',
@@ -60,11 +66,11 @@ async function prepareCombined(
   const hostFinalize = vi.fn(() => true)
   setAgentHostDisposer(
     host.id,
-    () => childControl(hostFinalize),
+    () => childControl(hostFinalize, releases.host),
     host.generation,
   )
   executionRuntime.beginShutdown.mockReturnValue(
-    childControl(finalize),
+    childControl(finalize, releases.execution),
   )
   registerProjectRuntime({
     projectId: 'combined',
@@ -126,6 +132,40 @@ describe('Canvas AgentHost combined cleanup', () => {
     })
     expect(hostFinalize).toHaveBeenCalledOnce()
     expect(executionAttempts).toBe(2)
+    expect(getAgentHosts()).toEqual([])
+  })
+
+  it('release 部分成功后只重试尚未释放的 child', async () => {
+    const releaseHost = vi.fn()
+    let releaseExecutionAttempts = 0
+    const releaseExecution = vi.fn(() => {
+      releaseExecutionAttempts += 1
+      if (releaseExecutionAttempts === 1) {
+        throw new Error('execution release failed')
+      }
+    })
+    const { disposal } = await prepareCombined(
+      () => true,
+      {
+        host: releaseHost,
+        execution: releaseExecution,
+      },
+    )
+
+    await expect(disposal.commit()).resolves.toMatchObject({
+      status: 'cleanup_failed',
+      error: expect.objectContaining({
+        reason: expect.stringContaining('execution release failed'),
+      }),
+    })
+    expect(releaseHost).toHaveBeenCalledOnce()
+    expect(releaseExecution).toHaveBeenCalledOnce()
+
+    await expect(disposal.commit()).resolves.toEqual({
+      status: 'cleanup_complete',
+    })
+    expect(releaseHost).toHaveBeenCalledOnce()
+    expect(releaseExecution).toHaveBeenCalledTimes(2)
     expect(getAgentHosts()).toEqual([])
   })
 })

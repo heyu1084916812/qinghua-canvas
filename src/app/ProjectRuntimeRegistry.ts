@@ -23,6 +23,7 @@ interface PreparedRuntime {
   control: TaskShutdownControl
   idle: boolean
   finalized: boolean
+  released: boolean
   lastError: string | null
 }
 
@@ -48,7 +49,24 @@ export interface ProjectRuntimeDisposal {
   /** 数据库操作失败时恢复仍保留的全部 runtime / host。 */
   rollback(cause?: unknown): ProjectRuntimeRollbackResult
   /** 数据库成功后提交清理；调用前不能 purge / 移出 UI。 */
-  commit(workResult?: unknown): Promise<ProjectRuntimeCommitResult>
+  commit(
+    workResult?: unknown,
+    options?: ProjectRuntimeCommitOptions,
+  ): Promise<ProjectRuntimeCommitResult>
+}
+
+export interface ProjectRuntimeCommitOptions {
+  /**
+   * 普通删除为 true；HMR 等只关闭 runtime 的路径为 false。
+   * 一旦开始提交，后续重试沿用首次选择的语义。
+   */
+  markWorkCommitted?: boolean
+}
+
+export interface ProjectRuntimeCompletion {
+  operationId: number
+  projectIds: readonly string[]
+  workCommitted: boolean
 }
 
 const registrations = new Map<
@@ -59,21 +77,28 @@ const projectOperations = new Map<string, ProjectOperation>()
 let nextGeneration = 1
 let nextOperationId = 1
 const pendingListeners = new Set<() => void>()
+const completionListeners = new Set<
+  (completion: ProjectRuntimeCompletion) => void
+>()
 let pendingSnapshot: readonly ProjectRuntimePendingOperation[] = []
+
+export type ProjectRuntimeOperationPhase =
+  | 'preparing'
+  | 'prepared'
+  | 'committing'
+  | 'recovering'
+  | 'recovery_failed'
+  | 'cleanup_failed'
+  | 'cleanup_complete'
 
 interface ProjectOperation {
   readonly id: number
   readonly projectIds: ReadonlySet<string>
   readonly prepared: PreparedRuntime[]
   readonly shutdownTimeoutMs: number
-  phase:
-    | 'preparing'
-    | 'prepared'
-    | 'committing'
-    | 'recovering'
-    | 'recovery_failed'
-    | 'cleanup_failed'
-    | 'cleanup_complete'
+  phase: ProjectRuntimeOperationPhase
+  commitPromise: Promise<ProjectRuntimeCommitResult> | null
+  commitMarksWork: boolean | null
   recoveryPromise: Promise<boolean> | null
   recoveryError: ProjectRuntimeRecoveryError | null
   triggerReason: string | null
@@ -85,6 +110,7 @@ interface ProjectOperation {
 }
 
 export type ProjectRuntimePendingStatus =
+  | 'committing'
   | 'recovering'
   | 'recovery_failed'
   | 'cleanup_failed'
@@ -131,6 +157,23 @@ export class ProjectRuntimeCleanupError extends Error {
     this.operationId = operationId
     this.projectIds = [...new Set(projectIds)]
     this.reason = reason
+  }
+}
+
+export class ProjectRuntimeCommitStateError extends Error {
+  readonly operationId: number
+  readonly projectIds: readonly string[]
+  readonly phase: ProjectRuntimeOperationPhase
+  readonly workCommitted = false
+
+  constructor(operation: ProjectOperation) {
+    super(
+      `项目运行态当前处于 ${operation.phase}，不能进入清理提交`,
+    )
+    this.name = 'ProjectRuntimeCommitStateError'
+    this.operationId = operation.id
+    this.projectIds = [...operation.projectIds]
+    this.phase = operation.phase
   }
 }
 
@@ -212,7 +255,9 @@ function pendingOperationSnapshot(
   operation: ProjectOperation,
 ): ProjectRuntimePendingOperation | null {
   let status: ProjectRuntimePendingStatus
-  if (operation.phase === 'cleanup_failed') {
+  if (operation.phase === 'committing') {
+    status = 'committing'
+  } else if (operation.phase === 'cleanup_failed') {
     status = 'cleanup_failed'
   } else if (operation.phase === 'recovering') {
     status = 'recovering'
@@ -222,7 +267,9 @@ function pendingOperationSnapshot(
     return null
   }
   const reason =
-    status === 'cleanup_failed'
+    status === 'committing'
+      ? '正在清理项目运行态'
+      : status === 'cleanup_failed'
       ? operation.triggerReason ?? '运行态清理失败'
       : [
           operation.workReason
@@ -239,7 +286,9 @@ function pendingOperationSnapshot(
     projectIds: [...operation.projectIds],
     status,
     workCommitted: operation.workCommitted,
-    retryable: status !== 'recovering',
+    retryable:
+      status === 'cleanup_failed' ||
+      status === 'recovery_failed',
     reason,
     workReason: operation.workReason,
     recoveryReason: operation.recoveryReason,
@@ -289,6 +338,33 @@ export function getProjectRuntimePendingSnapshot():
   return pendingSnapshot
 }
 
+export function subscribeProjectRuntimeCompleted(
+  listener: (completion: ProjectRuntimeCompletion) => void,
+): () => void {
+  completionListeners.add(listener)
+  return () => {
+    completionListeners.delete(listener)
+  }
+}
+
+function emitProjectRuntimeCompleted(
+  operation: ProjectOperation,
+): void {
+  if (!operation.workCommitted) return
+  const completion: ProjectRuntimeCompletion = {
+    operationId: operation.id,
+    projectIds: [...operation.projectIds],
+    workCommitted: true,
+  }
+  for (const listener of [...completionListeners]) {
+    try {
+      listener(completion)
+    } catch {
+      // 运行态已经清理成功；订阅方的界面收尾异常不能反转提交结果。
+    }
+  }
+}
+
 function claimProjects(
   projectIds: readonly string[],
   options: ProjectRuntimePrepareOptions,
@@ -308,6 +384,8 @@ function claimProjects(
       options.shutdownTimeoutMs ??
       DEFAULT_TASK_SHUTDOWN_TIMEOUT_MS,
     phase: 'preparing',
+    commitPromise: null,
+    commitMarksWork: null,
     recoveryPromise: null,
     recoveryError: null,
     triggerReason: null,
@@ -371,6 +449,7 @@ function beginPreparedRuntime(
     control,
     idle: false,
     finalized: false,
+    released: false,
     lastError: null,
   }
   operation.prepared.push(item)
@@ -586,14 +665,9 @@ function relatedOperations(
   )
 }
 
-async function commitOperation(
+async function performCommitOperation(
   operation: ProjectOperation,
 ): Promise<ProjectRuntimeCommitResult> {
-  if (operation.phase === 'cleanup_complete') {
-    return { status: 'cleanup_complete' }
-  }
-  operation.workCommitted = true
-  operation.phase = 'committing'
   try {
     while (true) {
       collectLateRuntimes(operation)
@@ -628,9 +702,11 @@ async function commitOperation(
       item.idle = false
       item.lastError = null
     }
-    operation.prepared.forEach((item) => {
+    for (const item of operation.prepared) {
+      if (item.released) continue
       item.control.releaseFinalized?.()
-    })
+      item.released = true
+    }
   } catch (error) {
     operation.phase = 'cleanup_failed'
     operation.triggerReason = errorText(error)
@@ -644,14 +720,62 @@ async function commitOperation(
         operation.id,
       ),
     }
+  } finally {
+    operation.commitPromise = null
   }
 
   operation.phase = 'cleanup_complete'
   for (const projectId of operation.projectIds) {
-    registrations.delete(projectId)
+    const project = registrations.get(projectId)
+    if (!project) continue
+    for (const item of operation.prepared) {
+      if (
+        item.runtime.projectId === projectId &&
+        project.get(item.runtime.key) === item.runtime
+      ) {
+        project.delete(item.runtime.key)
+      }
+    }
+    if (project.size === 0) registrations.delete(projectId)
   }
   releaseProjectOperation(operation)
+  emitProjectRuntimeCompleted(operation)
   return { status: 'cleanup_complete' }
+}
+
+function commitOperation(
+  operation: ProjectOperation,
+  workResult?: unknown,
+  options: ProjectRuntimeCommitOptions = {},
+): Promise<ProjectRuntimeCommitResult> {
+  if (operation.phase === 'cleanup_complete') {
+    return Promise.resolve({ status: 'cleanup_complete' })
+  }
+  if (operation.phase === 'committing') {
+    if (operation.commitPromise) return operation.commitPromise
+    return Promise.reject(
+      new ProjectRuntimeCommitStateError(operation),
+    )
+  }
+  if (
+    operation.phase !== 'prepared' &&
+    operation.phase !== 'cleanup_failed'
+  ) {
+    return Promise.reject(
+      new ProjectRuntimeCommitStateError(operation),
+    )
+  }
+  if (operation.commitMarksWork === null) {
+    operation.commitMarksWork =
+      options.markWorkCommitted ?? true
+    operation.workResult = workResult
+  }
+  operation.workCommitted = operation.commitMarksWork
+  operation.phase = 'committing'
+  refreshPendingSnapshot()
+  const committing = performCommitOperation(operation)
+  operation.commitPromise = committing
+  return committing
 }
 
 /**
@@ -737,9 +861,15 @@ export async function prepareProjectRuntimes(
       }
       return beginRecovery(operation, cause, true)
     },
-    commit(workResult?: unknown) {
-      operation.workResult = workResult
-      return commitOperation(operation)
+    commit(
+      workResult?: unknown,
+      commitOptions?: ProjectRuntimeCommitOptions,
+    ) {
+      return commitOperation(
+        operation,
+        workResult,
+        commitOptions,
+      )
     },
   }
 
@@ -813,7 +943,9 @@ export async function disposeProjectRuntimes(
     }
   }
   const disposal = await prepareProjectRuntimes(projectIds, options)
-  const committed = await disposal.commit()
+  const committed = await disposal.commit(undefined, {
+    markWorkCommitted: false,
+  })
   if (committed.status === 'cleanup_failed') {
     throw committed.error
   }

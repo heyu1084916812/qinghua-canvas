@@ -3,6 +3,7 @@ import type { TaskShutdownControl } from '../features/shared/lifecycle/taskLifec
 import {
   ProjectRuntimeBusyError,
   ProjectRuntimeCleanupError,
+  ProjectRuntimeCommitStateError,
   ProjectRuntimeRecoveryError,
   ProjectRuntimeRetryScopeError,
   disposeProjectRuntimes,
@@ -12,6 +13,7 @@ import {
   resetProjectRuntimesForTests,
   retryProjectRuntimeCleanup,
   retryProjectRuntimeOperation,
+  subscribeProjectRuntimeCompleted,
   subscribeProjectRuntimePending,
   withPreparedProjectRuntimes,
 } from './ProjectRuntimeRegistry'
@@ -602,6 +604,258 @@ describe('ProjectRuntimeRegistry', () => {
       status: 'cleanup_complete',
     })
     expect(releaseAttempts).toBe(2)
+  })
+
+  it('rollback 返回 recovery_pending 后 commit 拒绝且不改变锁与快照', async () => {
+    const reopenable = false
+    const finalize = vi.fn(() => true)
+    const releaseFinalized = vi.fn()
+    registerProjectRuntime({
+      projectId: 'p1',
+      key: 'canvas-agent',
+      beginDispose: () => ({
+        waitForIdle: async () => undefined,
+        whenIdle: async () => undefined,
+        canReopen: () => reopenable,
+        reopenIfIdle: () => reopenable,
+        canFinalize: () => true,
+        finalize,
+        releaseFinalized,
+      }),
+    })
+    const disposal = await prepareProjectRuntimes(['p1'])
+
+    const rollback = disposal.rollback(new Error('work failed'))
+    expect(rollback.status).toBe('recovery_pending')
+    const pending = await waitForPending(
+      (snapshot) => snapshot[0]?.status === 'recovery_failed',
+    )
+
+    await expect(disposal.commit('must not commit')).rejects.toMatchObject({
+      name: 'ProjectRuntimeCommitStateError',
+      operationId: pending[0]?.id,
+      workCommitted: false,
+    })
+    await expect(disposal.commit('must not commit')).rejects.toBeInstanceOf(
+      ProjectRuntimeCommitStateError,
+    )
+
+    expect(getProjectRuntimePendingSnapshot()).toEqual(pending)
+    expect(finalize).not.toHaveBeenCalled()
+    expect(releaseFinalized).not.toHaveBeenCalled()
+    await expect(
+      prepareProjectRuntimes(['p1']),
+    ).rejects.toBeInstanceOf(ProjectRuntimeBusyError)
+  })
+
+  it('并发 commit 共享同一 Promise，finalize 与 release 只执行一次', async () => {
+    let openLateGate!: () => void
+    const lateGate = new Promise<void>((resolve) => {
+      openLateGate = resolve
+    })
+    const releaseBase = vi.fn()
+    const releaseLate = vi.fn()
+    registerProjectRuntime({
+      projectId: 'p1',
+      key: 'canvas-agent',
+      beginDispose: () => ({
+        ...control(async () => undefined),
+        releaseFinalized: releaseBase,
+      }),
+    })
+    const disposal = await prepareProjectRuntimes(['p1'])
+    let lateFinalized = false
+    registerProjectRuntime({
+      projectId: 'p1',
+      key: 'late-runtime',
+      beginDispose: () => ({
+        waitForIdle: () => lateGate,
+        whenIdle: () => lateGate,
+        canReopen: () => true,
+        reopenIfIdle: () => true,
+        canFinalize: () => true,
+        finalize: () => {
+          lateFinalized = true
+          return true
+        },
+        releaseFinalized: releaseLate,
+      }),
+    })
+
+    const first = disposal.commit('deleted')
+    const second = disposal.commit('must not overwrite')
+    expect(second).toBe(first)
+
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    openLateGate()
+    await expect(first).resolves.toEqual({
+      status: 'cleanup_complete',
+    })
+    await expect(second).resolves.toEqual({
+      status: 'cleanup_complete',
+    })
+    expect(lateFinalized).toBe(true)
+    expect(releaseBase).toHaveBeenCalledOnce()
+    expect(releaseLate).toHaveBeenCalledOnce()
+  })
+
+  it('committing 快照不可重试，并显示清理中状态', async () => {
+    let releaseLate!: () => void
+    const lateGate = new Promise<void>((resolve) => {
+      releaseLate = resolve
+    })
+    registerProjectRuntime({
+      projectId: 'p1',
+      key: 'canvas-agent',
+      beginDispose: () => control(async () => undefined),
+    })
+    const disposal = await prepareProjectRuntimes(['p1'])
+    registerProjectRuntime({
+      projectId: 'p1',
+      key: 'late-runtime',
+      beginDispose: () => ({
+        waitForIdle: () => lateGate,
+        whenIdle: () => lateGate,
+        canReopen: () => true,
+        reopenIfIdle: () => true,
+        canFinalize: () => true,
+        finalize: () => true,
+      }),
+    })
+
+    const committing = disposal.commit('deleted')
+    const pending = await waitForPending(
+      (snapshot) => snapshot[0]?.status === 'committing',
+    )
+    expect(pending[0]).toMatchObject({
+      projectIds: ['p1'],
+      status: 'committing',
+      workCommitted: true,
+      retryable: false,
+      reason: '正在清理项目运行态',
+    })
+
+    releaseLate()
+    await expect(committing).resolves.toEqual({
+      status: 'cleanup_complete',
+    })
+    expect(getProjectRuntimePendingSnapshot()).toEqual([])
+  })
+
+  it('releaseFinalized 部分成功后只重试尚未释放的 runtime', async () => {
+    const releaseA = vi.fn()
+    let releaseBAttempts = 0
+    const releaseB = vi.fn(() => {
+      releaseBAttempts += 1
+      if (releaseBAttempts === 1) {
+        throw new Error('release B failed')
+      }
+    })
+    registerProjectRuntime({
+      projectId: 'p1',
+      key: 'runtime-a',
+      beginDispose: () => ({
+        ...control(async () => undefined),
+        releaseFinalized: releaseA,
+      }),
+    })
+    registerProjectRuntime({
+      projectId: 'p1',
+      key: 'runtime-b',
+      beginDispose: () => ({
+        ...control(async () => undefined),
+        releaseFinalized: releaseB,
+      }),
+    })
+    const disposal = await prepareProjectRuntimes(['p1'])
+
+    await expect(disposal.commit()).resolves.toMatchObject({
+      status: 'cleanup_failed',
+      error: expect.objectContaining({
+        reason: expect.stringContaining('release B failed'),
+      }),
+    })
+    expect(releaseA).toHaveBeenCalledOnce()
+    expect(releaseB).toHaveBeenCalledOnce()
+
+    await expect(disposal.commit()).resolves.toEqual({
+      status: 'cleanup_complete',
+    })
+    expect(releaseA).toHaveBeenCalledOnce()
+    expect(releaseB).toHaveBeenCalledTimes(2)
+  })
+
+  it('成功提交后才发出完成事件，且此时待办快照已清空', async () => {
+    const completed = vi.fn(() => {
+      expect(getProjectRuntimePendingSnapshot()).toEqual([])
+    })
+    const unsubscribe =
+      subscribeProjectRuntimeCompleted(completed)
+    registerProjectRuntime({
+      projectId: 'p1',
+      key: 'canvas-agent',
+      beginDispose: () => control(async () => undefined),
+    })
+    const disposal = await prepareProjectRuntimes(['p1'])
+    await expect(disposal.commit('deleted')).resolves.toEqual({
+      status: 'cleanup_complete',
+    })
+    expect(completed).toHaveBeenCalledTimes(1)
+    expect(completed).toHaveBeenCalledWith({
+      operationId: expect.any(Number),
+      projectIds: ['p1'],
+      workCommitted: true,
+    })
+    unsubscribe()
+  })
+
+  it('work 未提交的恢复成功不发出完成事件', async () => {
+    const completed = vi.fn()
+    const unsubscribe =
+      subscribeProjectRuntimeCompleted(completed)
+    let idle = false
+    registerProjectRuntime({
+      projectId: 'p1',
+      key: 'canvas-agent',
+      beginDispose: () => ({
+        waitForIdle: async () => {
+          if (!idle) throw new Error('still busy')
+        },
+        whenIdle: async () => undefined,
+        canReopen: () => idle,
+        reopenIfIdle: () => idle,
+        canFinalize: () => idle,
+        finalize: () => idle,
+      }),
+    })
+
+    await expect(
+      prepareProjectRuntimes(['p1']),
+    ).rejects.toBeInstanceOf(ProjectRuntimeRecoveryError)
+    const pending = await waitForPending(
+      (snapshot) => snapshot[0]?.status === 'recovery_failed',
+    )
+    idle = true
+    await retryProjectRuntimeOperation(pending[0]!.id)
+
+    expect(completed).not.toHaveBeenCalled()
+    unsubscribe()
+  })
+
+  it('HMR 式 runtime-only dispose 成功不发出项目完成事件', async () => {
+    const completed = vi.fn()
+    const unsubscribe =
+      subscribeProjectRuntimeCompleted(completed)
+    registerProjectRuntime({
+      projectId: 'p1',
+      key: 'canvas-agent',
+      beginDispose: () => control(async () => undefined),
+    })
+
+    await disposeProjectRuntimes(['p1'])
+
+    expect(completed).not.toHaveBeenCalled()
+    unsubscribe()
   })
 
   it('初始 prepare 连续两次超时后进入可重试 recovery，最终可重新删除', async () => {
