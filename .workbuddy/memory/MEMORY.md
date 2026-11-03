@@ -1,5 +1,18 @@
 # CanvasFlow（轻画）项目记忆
 
+### AgentChatRouting（2026-11-04，对账 #876，✅ 已独立验收，`801f618`）
+
+- `useAgentChatRouting` 只持有 route cache、per-session prepare id 与 channel source epoch；SessionStore /
+  AgentController / Job / CanvasStore 仍是业务真相，AgentPanel 只做显式端口装配。
+- fresh 计划必须每 session 单调；A 慢/B 快时 A 可以返回自己的 route 给本回合，但只有 B 能写 cache。
+  `clearChatRoute`、`pickModel`、shutdown、渠道变化后旧 prepare 不得写回。
+- route success 用对象身份 + allChannels source CAS；缓存项保存 `{route, source}`，读取时经常量 ref 立即比较，
+  不能依赖 passive effect。`useLayoutEffect` 只是清场防线，不是正确性前提。
+- `AgentPanel.tsx` **2827 → 2744 行**（净减少 83）；定向 **22/22**、AgentPanel **268/268**、
+  G735 **35/35**、G769 明暗 **39/39 ×2**、G865 **24/24**、全量 **4089 passed / 1 skipped**。
+- 真实 Workbuddy 文本 completed；`no_token / model_missing / policy_excluded` 展示 3/3。Workbuddy 端点缺 CORS，
+  真实路由证据仅关闭测试浏览器 web security；产品代码未改，Tauri HTTP 不受 CORS 限制。
+
 ### AgentSessionActionsController（2026-11-04，对账 #875，✅ 已独立验收，`9fec68f` + `44763aa`）
 
 - `useAgentSessionActionsController` 只管理会话动作与编辑态：new / rename / two-step delete /

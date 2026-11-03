@@ -95,6 +95,11 @@
 - **AgentAttachmentsController 不拥有节点或附件真相**：`useAgentAttachmentsController` 只能经显式端口
   读写 CanvasStore / AgentSession；handoff 必须先缓冲、过滤已不存在节点、去重后补引用；本地文件与素材库
   必须走同一落位链路；缩略图 objectURL 必须 unmount 回收。不得发送消息、请求模型或修改 Job。
+- **AgentChatRouting 只拥有回合内路由派生状态**：`useAgentChatRouting` 不得 import/复制 SessionStore、
+  AgentController、JobStore 或 CanvasStore。fresh 计划必须 per-session 单调，旧计划只能返回自身结果，不能写
+  cache；`commitChatRoute` 必须同时校验 expected route 对象身份与 allChannels source。缓存项必须保存
+  `{route, source}` 并在读取时对同步更新的 source ref 比较，禁止依赖 passive effect 清理来防止旧渠道命中。
+  `useLayoutEffect` 只做清场，模型切换、shutdown、渠道变化后的旧 prepare/onRouteSucceeded 均不得复活。
 - **AgentSessionActionsController 不绕过 lifecycle**：新建会话创建后必须走 `switchTo`，禁止直接
   `setCurrent`；改名和删除晚返回只在目标仍是当前时自动切换。两步删除必须保留活动/队列/确认中门禁；
   `sessions.remove` 成功前不得清 draft/runtime，删除落库后的 refresh / switch / fallback 失败必须清失效选择
