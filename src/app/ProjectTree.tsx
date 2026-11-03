@@ -28,6 +28,8 @@ import {
 } from '../state/project/projectEvents'
 import { buildProjectTree, projectGroupWindow } from './projectTreeModel'
 import { projectMenuPosition, type ProjectMenuFrame } from './projectMenuPosition'
+import { disposeProjectRuntimes } from './ProjectRuntimeRegistry'
+import { forgetCanvasStore } from '../state/workbenches/canvas/storeCache'
 import { usePlatform } from './providers/PlatformProvider'
 import {
   IconCanvas,
@@ -473,7 +475,11 @@ export function ProjectTree({ open, activeProjectId }: ProjectTreeProps) {
     if (!confirmTarget) return
     try {
       if (confirmTarget.kind === 'folder') await repo.removeFolder(confirmTarget.id)
-      else await repo.remove(confirmTarget.id)
+      else {
+        await disposeProjectRuntimes([confirmTarget.id])
+        await repo.remove(confirmTarget.id)
+        forgetCanvasStore(confirmTarget.id)
+      }
       setStatus({
         text:
           confirmTarget.kind === 'folder'
