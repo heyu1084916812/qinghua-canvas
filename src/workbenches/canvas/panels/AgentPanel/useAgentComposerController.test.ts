@@ -108,6 +108,38 @@ describe('useAgentComposerController', () => {
     expect(viewRef.current?.draft).toBe('')
   })
 
+  it('切到新会话后不串旧草稿，并恢复新会话已存草稿', () => {
+    saveAgentDraft('s2', '新会话草稿', draftStorage)
+    const viewRef: { current: Hook | null } = { current: null }
+    let root!: TestRenderer.ReactTestRenderer
+    function Probe({ current }: { current: AgentSession }) {
+      viewRef.current = useAgentComposerController(
+        input({
+          session: current,
+          pendingAssetIds: current.pendingAssetIds ?? [],
+        }),
+      )
+      return null
+    }
+    act(() => {
+      root = TestRenderer.create(
+        createElement(Probe, { current: session }),
+      )
+    })
+
+    act(() => {
+      viewRef.current?.replaceDraft('旧会话草稿')
+      viewRef.current?.resetForSession('s2')
+      root.update(
+        createElement(Probe, {
+          current: { ...session, id: 's2', title: '会话二' },
+        }),
+      )
+    })
+
+    expect(viewRef.current?.draft).toBe('新会话草稿')
+  })
+
   it('mention 插入去重且由 editorRef 承担光标位置', () => {
     const viewRef: { current: Hook | null } = { current: null }
     function Probe() {

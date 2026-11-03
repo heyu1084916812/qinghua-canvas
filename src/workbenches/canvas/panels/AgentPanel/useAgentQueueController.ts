@@ -58,7 +58,7 @@ export interface AgentQueueControllerInput {
   setStatusFor(sessionId: string, status: AgentPanelStatus): void
   setDraft: Dispatch<SetStateAction<string>>
   setQueueMenuId: Dispatch<SetStateAction<string | null>>
-  refresh(): Promise<AgentSession[]>
+  refresh(): Promise<readonly AgentSession[]>
   notify(message: string, tone?: 'info' | 'error'): void
   queuePumpingRef: MutableRefObject<Set<string>>
   queuePumpRef: MutableRefObject<(sessionId: string) => void>

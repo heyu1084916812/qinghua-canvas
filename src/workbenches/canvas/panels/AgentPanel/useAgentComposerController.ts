@@ -236,7 +236,8 @@ export function useAgentComposerController(
     setDraftState('')
     draftNodeIdsRef.current = { sessionId, ids: [] }
     draftRef.current.seen = new Set()
-    restoredSessionRef.current = sessionId
+    // 让紧随其后的 session effect 用新会话的 pendingAssetIds 恢复已存草稿。
+    restoredSessionRef.current = ''
   }, [])
 
   const cancelPendingAssetSync = useCallback(() => {

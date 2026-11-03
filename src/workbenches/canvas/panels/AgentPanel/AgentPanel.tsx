@@ -138,6 +138,7 @@ import {
   type AgentMessageReveal,
 } from './useAgentConversationController'
 import { useAgentComposerController } from './useAgentComposerController'
+import { useAgentSessionLifecycle } from './useAgentSessionLifecycle'
 import { AgentSessionRuntimeState } from './agentSessionRuntime'
 import {
   buildAgentModelMessages,
@@ -300,11 +301,52 @@ export function AgentPanel({
     () => library.getState().assets,
   )
 
-  const [list, setList] = useState<AgentSession[]>([])
-  const listRef = useRef<AgentSession[]>([])
-  listRef.current = list
-  const [current, setCurrent] = useState<AgentSession | null>(null)
-  const [messages, setMessages] = useState<ChatMessage[]>([])
+  const lifecycleRef = useRef<TaskLifecycle | null>(null)
+  if (!lifecycleRef.current) {
+    lifecycleRef.current = createTaskLifecycle()
+  }
+  const lifecycle = lifecycleRef.current
+  const trackRun = useCallback<TaskLifecycle['track']>(
+    (work) => lifecycle.track(work),
+    [lifecycle],
+  )
+  const composerResetForSessionRef = useRef<(sessionId: string) => void>(
+    () => {},
+  )
+  const conversationResetForSessionRef = useRef<(sessionId: string) => void>(
+    () => {},
+  )
+  const onSessionSwitched = useCallback((session: AgentSession) => {
+    composerResetForSessionRef.current(session.id)
+    conversationResetForSessionRef.current(session.id)
+    setRenaming(false)
+    setConfirmDelete(false)
+  }, [])
+  const {
+    list,
+    current,
+    messages,
+    setList,
+    setCurrent,
+    setMessages,
+    listRef,
+    currentIdRef,
+    refresh,
+    switchTo,
+    applySessionSnapshot: applySessionLifecycleSnapshot,
+    patchSession: patchSessionFields,
+    renameSession,
+    removeSession,
+  } = useAgentSessionLifecycle({
+    track: trackRun,
+    controllerRefresh: controller.refresh,
+    sessionsGet: sessions.get,
+    sessionsMessagesFor: sessions.messagesFor,
+    sessionsUpdateFields: sessions.updateFields,
+    sessionsRename: sessions.rename,
+    sessionsRemove: sessions.remove,
+    onSwitched: onSessionSwitched,
+  })
   /** 当前会话那一份运行态（别的会话在跑不影响这里） */
   const status: Status = current
     ? runPresentation.statusFor(current.id)
@@ -349,14 +391,12 @@ export function AgentPanel({
    * 异步回调（一个回合跑完 / 报错）**不能直接用 `current`** —— A 的回合结束时用户可能
    * 已经切到 B 去看别的了，那一份消息盖上去就把 B 的对话流冲掉了（§8.2 记忆隔离）。
    */
-  const currentIdRef = useRef<string | null>(null)
   /**
    * 不参与渲染、但要跨确认 / 暂停续跑的瞬时状态。
    *
    * 所有字段按 sessionId 分桶：A 会话多图拆分、上次模型都不能串到并行运行的 B。
    */
   const sessionRuntimeRef = useRef(new AgentSessionRuntimeState())
-  currentIdRef.current = current?.id ?? null
   const [queueMenuId, setQueueMenuId] = useState<string | null>(null)
   const [queueMenuPosition, setQueueMenuPosition] =
     useState<AgentQueueMenuPosition | null>(null)
@@ -467,11 +507,6 @@ export function AgentPanel({
    * 反过来「停止」也只停得到最后发出去的那一条。两个会话各跑各的，控制器也得各是各的。
    */
   const abortRefs = useRef(new Map<string, AbortController>())
-  const lifecycleRef = useRef<TaskLifecycle | null>(null)
-  if (!lifecycleRef.current) {
-    lifecycleRef.current = createTaskLifecycle()
-  }
-  const lifecycle = lifecycleRef.current
   /**
    * AgentPanel 的持久写门禁只有这一份：
    * - 异步 SessionStore / Controller / preset / store 写必须走 trackRun；
@@ -479,10 +514,6 @@ export function AgentPanel({
    * - 脱离点击等待链的 Promise 必须同时走 runTrackedDetached 或显式 catch。
    * 内部再嵌套一次 track 是允许的；关闭后内层会先失败并收口外层。
    */
-  const trackRun = useCallback<TaskLifecycle['track']>(
-    (work) => lifecycle.track(work),
-    [lifecycle],
-  )
   const runPromiseDetached = useCallback(
     (work: Promise<unknown>, failureMessage: string) => {
       void work.catch((error) => {
@@ -548,6 +579,7 @@ export function AgentPanel({
     writeDraftForSession,
     clearDraftForSession,
   } = composerController
+  composerResetForSessionRef.current = composerController.resetForSession
   /** 每个会话这个回合走的是原生 tools 还是 JSON 降级；确认后续跑要沿用同一条 */
   const toolModeRef = useRef(new Map<string, 'native' | 'json'>())
   const turnToolsRef = useRef(
@@ -841,16 +873,6 @@ export function AgentPanel({
   )
 
   /** 载入会话列表；没有就按默认模型建一个（设计文档 §8「新建会话用默认模型」） */
-  const refresh = useCallback(
-    () =>
-      trackRun(async () => {
-        const rows = await controller.refresh()
-        setList(rows)
-        return rows
-      }),
-    [controller, trackRun],
-  )
-
   useEffect(() => {
     let alive = true
     void trackRun(async () => {
@@ -913,22 +935,6 @@ export function AgentPanel({
     // 依赖只列 projectId：这里做的是「项目换了就重建会话列表」，
     // 把 refresh / sessions 列进来会让它在每次保存后重跑，把正在进行的对话打断
   }, [projectId, trackRun])
-
-  const switchTo = useCallback(
-    async (session: AgentSession) => {
-      const loaded = (await sessions.get(session.id).catch(() => null)) ?? session
-      setCurrent(loaded)
-      // 记忆隔离：切会话就是**换一整套上下文**，不是接着上一个聊（§8.2）
-      setMessages(loaded.messages)
-      resetForSessionSwitch()
-      /** 不再重置 status：每个会话有自己的运行态，切过去看到的是**它自己**那一份 */
-      setDraft('')
-      // 换了会话，之前「准备好删了」的那个状态不该跟过来
-      setRenaming(false)
-      setConfirmDelete(false)
-    },
-    [],
-  )
 
   /**
    * **agent 建节点时「跟随选中」**（用户 2026-10-16：「改成跟随选中」）。
@@ -1352,9 +1358,8 @@ export function AgentPanel({
         next.messageRevision,
       )
     }
-    setList((prev) => prev.map((item) => (item.id === next.id ? next : item)))
-    if (currentIdRef.current === next.id) setCurrent(next)
-  }, [])
+    applySessionLifecycleSnapshot(next)
+  }, [applySessionLifecycleSnapshot])
 
   const graph = useGraph()
   const nodeTitles = useMemo(
@@ -1412,6 +1417,7 @@ export function AgentPanel({
     scrollRef,
     conversationViewportRef,
   })
+  conversationResetForSessionRef.current = resetForSessionSwitch
   const setMessageReveal = useCallback(
     (reveal: AgentMessageReveal | null) => {
       if (reveal) {
@@ -2439,15 +2445,11 @@ export function AgentPanel({
    * 整份写回去，把库里的新值也冲掉。
    */
   const patchSession = useCallback(
-    (patch: AgentSessionPatch) =>
-      trackRun(async () => {
-        if (!current) return
-        const next = await sessions.updateFields(current.id, patch)
-        if (!next) return
-        setCurrent(next)
-        setList((prev) => prev.map((s) => (s.id === next.id ? next : s)))
-      }),
-    [current, sessions, trackRun],
+    async (patch: AgentSessionPatch) => {
+      if (!current) return
+      await patchSessionFields(current.id, patch)
+    },
+    [current, patchSessionFields],
   )
   const patchSessionDetached = useCallback(
     (patch: Parameters<typeof patchSession>[0]) => {
@@ -2566,18 +2568,18 @@ export function AgentPanel({
         const title = titleDraft.trim()
         setRenaming(false)
         if (!title || title === current.title) return
-        await sessions.rename(current.id, title)
+        await renameSession(current.id, title)
         const rows = await refresh()
         const hit = rows.find((s) => s.id === current.id)
         if (hit) {
           setCurrent((previous) =>
             previous?.id === hit.id
               ? { ...previous, ...hit, messages: previous.messages }
-              : hit,
+              : previous,
           )
         }
       }),
-    [current, titleDraft, sessions, refresh, trackRun],
+    [current, titleDraft, renameSession, refresh, trackRun],
   )
 
   /**
@@ -2607,7 +2609,7 @@ export function AgentPanel({
         setConfirmDelete(false)
         clearDraftForSession(current.id)
         sessionRuntimeRef.current.clearSession(current.id)
-        await sessions.remove(current.id)
+        await removeSession(current.id)
         const rows = await refresh()
         if (rows.length > 0) await switchTo(rows[0]!)
         else await newSession()
@@ -2615,7 +2617,7 @@ export function AgentPanel({
     [
       current,
       confirmDelete,
-      sessions,
+      removeSession,
       refresh,
       switchTo,
       newSession,
