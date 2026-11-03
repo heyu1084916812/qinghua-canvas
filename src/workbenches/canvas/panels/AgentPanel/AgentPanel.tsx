@@ -4,8 +4,6 @@ import {
   useMemo,
   useRef,
   useState,
-  type KeyboardEvent as ReactKeyboardEvent,
-  type PointerEvent as ReactPointerEvent,
 } from 'react'
 import { useSyncExternalStore } from 'react'
 import { useNavigate } from 'react-router-dom'
@@ -136,24 +134,10 @@ import {
 } from './mediaMentions'
 import { isAdvanceTaskCommand } from './agentProcessText'
 import {
-  AGENT_COMPOSER_HEIGHT_KEY,
-  AGENT_COMPOSER_HEIGHT_MIN,
-  agentComposerMaxHeight,
-  clampAgentComposerHeight,
-  parseAgentComposerHeight,
-  resizedAgentComposerHeight,
-} from './agentComposerLayout'
-import {
   useAgentConversationController,
   type AgentMessageReveal,
 } from './useAgentConversationController'
-import {
-  clearAgentDraft,
-  draftNodeIds,
-  loadAgentDraft,
-  pendingAssetIdsAfterDraft,
-  saveAgentDraft,
-} from './agentDraft'
+import { useAgentComposerController } from './useAgentComposerController'
 import { AgentSessionRuntimeState } from './agentSessionRuntime'
 import {
   buildAgentModelMessages,
@@ -198,7 +182,6 @@ import {
   mentionToken,
   parseMentions,
   stripMentionMarkup,
-  type MentionEditorHandle,
 } from '../../text/MentionEditor'
 import styles from './AgentPanel.module.css'
 
@@ -209,24 +192,6 @@ import styles from './AgentPanel.module.css'
  * 只有一个转圈的话，用户分不清它是**在想**、**在建**、还是**在等他点确认**。
  */
 
-function readStoredComposerHeight(): number {
-  try {
-    return parseAgentComposerHeight(
-      localStorage.getItem(AGENT_COMPOSER_HEIGHT_KEY),
-      window.innerHeight,
-    )
-  } catch {
-    return AGENT_COMPOSER_HEIGHT_MIN
-  }
-}
-function storeComposerHeight(height: number): void {
-  try {
-    localStorage.setItem(AGENT_COMPOSER_HEIGHT_KEY, String(height))
-  } catch {
-    // Storage can be blocked; resizing still works for this session.
-  }
-}
-
 /**
  * 自动模式下**一轮对话最多自动执行几次**。
  *
@@ -236,6 +201,13 @@ function storeComposerHeight(height: number): void {
 const AUTO_RUN_LIMIT = 32
 const AGENT_PANEL_DISPOSE_TIMEOUT_MS =
   DEFAULT_TASK_SHUTDOWN_TIMEOUT_MS
+
+type AgentSessionPatch = Partial<
+  Omit<
+    AgentSession,
+    'id' | 'projectId' | 'messages' | 'queuedTurns' | 'createdAt'
+  >
+>
 
 export function AgentPanel({
   projectId,
@@ -385,15 +357,6 @@ export function AgentPanel({
    */
   const sessionRuntimeRef = useRef(new AgentSessionRuntimeState())
   currentIdRef.current = current?.id ?? null
-  const [draft, setDraft] = useState('')
-  const draftNodeIdsRef = useRef<{ sessionId: string; ids: string[] }>({
-    sessionId: '',
-    ids: [],
-  })
-  const pendingAssetSyncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const [composerHeight, setComposerHeight] = useState(readStoredComposerHeight)
-  const [composerResizing, setComposerResizing] = useState(false)
-  const composerRef = useRef<HTMLDivElement | null>(null)
   const [queueMenuId, setQueueMenuId] = useState<string | null>(null)
   const [queueMenuPosition, setQueueMenuPosition] =
     useState<AgentQueueMenuPosition | null>(null)
@@ -491,32 +454,12 @@ export function AgentPanel({
    * 「开新关旧」由这一个 key 保证，与创作面板同一条口径 —— 各管各的 boolean
    * 会出现两个浮层同时挂在屏幕上、点哪个都不对。
    */
-  const [openPicker, setOpenPicker] = useState<string | null>(null)
   /** 技能收藏（用户 2026-10-03：技能菜单分「通用 / 收藏 / 我的」） */
   const [skillFavs, setSkillFavs] = useState<readonly string[]>([])
   const fileRef = useRef<HTMLInputElement | null>(null)
   /** 技能导入的两个输入：**.md 文件**与**文件夹**（浏览器只允许二选一，故分成两个） */
   const skillFileRef = useRef<HTMLInputElement | null>(null)
   const skillDirRef = useRef<HTMLInputElement | null>(null)
-  const editorRef = useRef<MentionEditorHandle | null>(null)
-
-  const composerAvailableHeight = () => {
-    const panel = composerRef.current?.closest<HTMLElement>('[data-agent-panel]')
-    return panel?.getBoundingClientRect().height ?? window.innerHeight
-  }
-
-  useEffect(() => {
-    const panel = composerRef.current?.closest<HTMLElement>('[data-agent-panel]')
-    if (!panel || typeof ResizeObserver !== 'function') return
-    const observer = new ResizeObserver(() => {
-      const availableHeight = panel.getBoundingClientRect().height
-      setComposerHeight((height) =>
-        clampAgentComposerHeight(height, availableHeight),
-      )
-    })
-    observer.observe(panel)
-    return () => observer.disconnect()
-  }, [])
   /**
    * 中止用的控制器**按会话各存一个**（与 `statusBySession` 同一口径）。
    *
@@ -555,42 +498,56 @@ export function AgentPanel({
     },
     [runPromiseDetached, trackRun],
   )
-  const writeDraft = useCallback(
-    (sessionId: string, text: string) => {
-      try {
-        lifecycle.runSync(() => saveAgentDraft(sessionId, text))
-        return true
-      } catch (error) {
-        if (error instanceof TaskLifecycleClosedError) return false
-        throw error
-      }
-    },
+  const runSync = useCallback(
+    <T,>(work: () => T) => lifecycle.runSync(work),
     [lifecycle],
   )
-  const clearDraft = useCallback(
-    (sessionId: string) => {
-      try {
-        lifecycle.runSync(() => clearAgentDraft(sessionId))
-        return true
-      } catch (error) {
-        if (error instanceof TaskLifecycleClosedError) return false
-        throw error
-      }
+  const composerPanelRef = useRef<HTMLElement | null>(null)
+  const patchSessionDetachedRef = useRef<
+    (patch: AgentSessionPatch) => void
+  >(() => {})
+  const onComposerPendingAssetsChange = useCallback(
+    (sessionId: string, pendingAssetIds: readonly string[]) => {
+      if (currentIdRef.current !== sessionId) return
+      patchSessionDetachedRef.current({
+        pendingAssetIds: [...pendingAssetIds],
+      })
     },
-    [lifecycle],
+    [],
   )
-  const writeComposerHeight = useCallback(
-    (height: number) => {
-      try {
-        lifecycle.runSync(() => storeComposerHeight(height))
-        return true
-      } catch (error) {
-        if (error instanceof TaskLifecycleClosedError) return false
-        throw error
-      }
-    },
-    [lifecycle],
-  )
+  const composerDraftStorage = useMemo(() => {
+    try {
+      return typeof window === 'undefined' ? null : window.localStorage
+    } catch {
+      return null
+    }
+  }, [])
+  const composerController = useAgentComposerController({
+    session: current,
+    draftStorage: composerDraftStorage,
+    pendingAssetIds: current?.pendingAssetIds ?? [],
+    onPendingAssetsChange: onComposerPendingAssetsChange,
+    panelRef: composerPanelRef,
+    trackRunSync: runSync,
+  })
+  const {
+    draft,
+    setDraft,
+    replaceDraft,
+    openPicker,
+    setOpenPicker,
+    editorRef,
+    composerRef,
+    composerHeight,
+    composerResizing,
+    composerAvailableHeight,
+    beginComposerResize,
+    resizeComposerWithKeyboard,
+    insertMention,
+    cancelPendingAssetSync,
+    writeDraftForSession,
+    clearDraftForSession,
+  } = composerController
   /** 每个会话这个回合走的是原生 tools 还是 JSON 降级；确认后续跑要沿用同一条 */
   const toolModeRef = useRef(new Map<string, 'native' | 'json'>())
   const turnToolsRef = useRef(
@@ -633,6 +590,7 @@ export function AgentPanel({
     if (!onDisposeReady) return
     const beginShutdown = (): TaskShutdownControl => {
       const finalize = () => {
+        cancelPendingAssetSync()
         const sessionIds = new Set([
           ...abortRefs.current.keys(),
           ...listRef.current.map((session) => session.id),
@@ -668,10 +626,6 @@ export function AgentPanel({
         timeoutMs: AGENT_PANEL_DISPOSE_TIMEOUT_MS,
         onFinalize: finalize,
       })
-      if (pendingAssetSyncTimerRef.current) {
-        clearTimeout(pendingAssetSyncTimerRef.current)
-        pendingAssetSyncTimerRef.current = null
-      }
       for (const controller of abortRefs.current.values()) {
         controller.abort()
       }
@@ -682,6 +636,7 @@ export function AgentPanel({
     clearLiveActivitiesFor,
     clearLiveProcessFor,
     clearRunTasksFor,
+    cancelPendingAssetSync,
     lifecycle,
     onDisposeReady,
     store,
@@ -1654,7 +1609,7 @@ export function AgentPanel({
           if (currentIdRef.current === saved.id) {
             setCurrent(saved)
             setDraft('')
-            writeDraft(session.id, '')
+            writeDraftForSession(session.id, '')
             setMessages(turn.historyMessages)
           }
           clearLiveActivitiesFor(session.id)
@@ -1838,7 +1793,7 @@ export function AgentPanel({
     queuePumpingRef,
     queuePumpRef,
     trackRun,
-    saveDraft: writeDraft,
+    saveDraft: writeDraftForSession,
   })
 
   /** 复制一条助手回复；剪贴板被拒时静默 —— 不弹一个用户看不懂的错误 */
@@ -2171,7 +2126,7 @@ export function AgentPanel({
         if (currentIdRef.current === current.id) {
           setDraft((value) => {
             const next = value.trim() === text ? '' : value
-            if (next !== value) writeDraft(current.id, next)
+            if (next !== value) writeDraftForSession(current.id, next)
             return next
           })
         }
@@ -2188,7 +2143,7 @@ export function AgentPanel({
     status,
     store,
     trackRun,
-    writeDraft,
+    writeDraftForSession,
   ])
 
   /** 输入框发送：空闲直接跑；忙碌时按当前“排队 / 引导”模式投递。 */
@@ -2197,7 +2152,7 @@ export function AgentPanel({
       if (!draft.trim()) return
       if (current?.taskPlan && isAdvanceTaskCommand(draft)) {
         setDraft('')
-        writeDraft(current.id, '')
+        writeDraftForSession(current.id, '')
         runPromiseDetached(
           advanceTaskPlan(current),
           '推进任务计划失败',
@@ -2484,11 +2439,7 @@ export function AgentPanel({
    * 整份写回去，把库里的新值也冲掉。
    */
   const patchSession = useCallback(
-    (
-      patch: Partial<
-        Omit<AgentSession, 'id' | 'projectId' | 'messages' | 'queuedTurns' | 'createdAt'>
-      >,
-    ) =>
+    (patch: AgentSessionPatch) =>
       trackRun(async () => {
         if (!current) return
         const next = await sessions.updateFields(current.id, patch)
@@ -2507,89 +2458,7 @@ export function AgentPanel({
     },
     [patchSession, store],
   )
-
-  /**
-   * 草稿和“本次待发送图片”是一个整体：正文里删掉 chip，就不能再从会话字段里
-   * 把旧图片补回来。文本按会话持久化到本地，图片集合按正文里的 node 引用反向校正。
-   */
-  const replaceDraft = useCallback(
-    (next: string) => {
-      setDraft(next)
-      if (!current) return
-      writeDraft(current.id, next)
-      /**
-       * 会话字段可能比正文晚一拍（尤其是刚重载或并发更新时）。
-       * 把“上一版正文里真实出现过的 node chip”一并算进来，删掉 chip 时一定能触发清库。
-       */
-      const before = [
-        ...new Set([
-          ...(current.pendingAssetIds ?? []),
-          ...(draftNodeIdsRef.current.sessionId === current.id
-            ? draftNodeIdsRef.current.ids
-            : draftNodeIds(draft)),
-        ]),
-      ]
-      const after = pendingAssetIdsAfterDraft(before, next)
-      draftNodeIdsRef.current = {
-        sessionId: current.id,
-        ids: draftNodeIds(next),
-      }
-      if (
-        before.length !== after.length ||
-        before.some((id, index) => id !== after[index])
-      ) {
-        patchSessionDetached({ pendingAssetIds: after })
-      }
-      /**
-       * 再补一条按正文为真相的短防抖同步：
-       * 旧会话/并发刷新时，“会话字段里有、正文里已经删掉”的图片可能晚一拍才被看见。
-       * 正文没有 node chip 时，稳定输入 160ms 后直接清空数据库里的待发送图片。
-       */
-      if (draftNodeIds(next).length === 0) {
-        if (pendingAssetSyncTimerRef.current) {
-          clearTimeout(pendingAssetSyncTimerRef.current)
-        }
-        const timer = setTimeout(() => {
-          if (pendingAssetSyncTimerRef.current !== timer) return
-          pendingAssetSyncTimerRef.current = null
-          runTrackedDetached(async () => {
-            const nextSession = await sessions.updateFields(
-              current.id,
-              { pendingAssetIds: [] },
-            )
-            if (nextSession) applySessionSnapshot(nextSession)
-          }, '同步待发送图片失败')
-        }, 160)
-        pendingAssetSyncTimerRef.current = timer
-      }
-    },
-    [
-      applySessionSnapshot,
-      current,
-      draft,
-      patchSessionDetached,
-      runTrackedDetached,
-      sessions,
-    ],
-  )
-
-  useEffect(() => {
-    if (!current) return
-    draftNodeIdsRef.current = {
-      sessionId: current.id,
-      ids: draftNodeIds(draft),
-    }
-  }, [current?.id, draft])
-
-  useEffect(
-    () => () => {
-      if (pendingAssetSyncTimerRef.current) {
-        clearTimeout(pendingAssetSyncTimerRef.current)
-        pendingAssetSyncTimerRef.current = null
-      }
-    },
-    [],
-  )
+  patchSessionDetachedRef.current = patchSessionDetached
 
   /**
    * 选模型：只保存固定的前端逻辑名。
@@ -2667,20 +2536,6 @@ export function AgentPanel({
    * 走编辑器自己的 `insertMention`，而不是往 `draft` 里拼字符串：
    * 引用要落在**光标处**、要带 chip 的存储形态，这两件事只有编辑器知道。
    */
-  const insertMention = useCallback(
-    (kind: 'node' | 'model' | 'skill', id: string, label: string) => {
-      /**
-       * 同一枚（kind + id）已经在正文里就**不再插第二枚**。
-       *
-       * 进会话时会按会话行把素材 chip 补回正文，用户再点一次
-       * 同一项就会出现两枚一模一样的 chip —— 那不是「又用了一次」，是重复。
-       */
-      if (parseMentions(draft).some((m) => m.kind === kind && m.id === id)) return
-      editorRef.current?.insertMention(mentionToken(kind, id, label))
-    },
-    [draft],
-  )
-
   /** 节点在正文里显示成什么名字（没起名就写「素材」，不露 `node_xxx`） */
   const nodeLabelOf = useCallback(
     (id: string) => {
@@ -2750,7 +2605,7 @@ export function AgentPanel({
           return
         }
         setConfirmDelete(false)
-        clearDraft(current.id)
+        clearDraftForSession(current.id)
         sessionRuntimeRef.current.clearSession(current.id)
         await sessions.remove(current.id)
         const rows = await refresh()
@@ -2765,7 +2620,7 @@ export function AgentPanel({
       switchTo,
       newSession,
       store,
-      clearDraft,
+      clearDraftForSession,
       trackRun,
     ],
   )
@@ -3101,35 +2956,6 @@ export function AgentPanel({
    * 补进正文的副作用是每开一次会话就凭空多两枚 `model` chip，看起来像用户自己写的；
    * 用户主动点模型时仍然会插 chip（那一次是「我这次要用它」），设置本身也照旧生效。
    */
-  const restoredSessionRef = useRef('')
-  useEffect(() => {
-    if (!current || restoredSessionRef.current === current.id) return
-    restoredSessionRef.current = current.id
-    if (draft.trim()) return
-    const saved = loadAgentDraft(current.id)
-    if (saved !== null) {
-      setDraft(saved)
-      const before = current.pendingAssetIds ?? []
-      const after = pendingAssetIdsAfterDraft(before, saved)
-      if (
-        before.length !== after.length ||
-        before.some((id, index) => id !== after[index])
-      ) {
-        patchSessionDetached({ pendingAssetIds: after })
-      }
-      return
-    }
-    const tokens: string[] = []
-    for (const id of current.pendingAssetIds ?? []) {
-      tokens.push(mentionToken('node', id, nodeLabelOf(id)))
-    }
-    if (tokens.length > 0) {
-      const next = tokens.join('')
-      setDraft(next)
-      writeDraft(current.id, next)
-    }
-  }, [current, draft, nodeLabelOf, patchSession])
-
   /**
    * 正文 chip → 会话字段（反向）：用户把主动插入的技能 chip 删掉 = **这次不用这个技能**。
    *
@@ -3194,53 +3020,6 @@ export function AgentPanel({
           return typeof args.stepId === 'string' ? args.stepId : undefined
         })()
       : undefined
-
-  const beginComposerResize = (event: ReactPointerEvent<HTMLButtonElement>) => {
-    if (event.button !== 0) return
-    event.preventDefault()
-    event.currentTarget.focus()
-    const startY = event.clientY
-    const originHeight = composerHeight
-    let latestHeight = originHeight
-    setComposerResizing(true)
-
-    const onMove = (moveEvent: PointerEvent) => {
-      latestHeight = resizedAgentComposerHeight(
-        originHeight,
-        startY,
-        moveEvent.clientY,
-        composerAvailableHeight(),
-      )
-      setComposerHeight(latestHeight)
-    }
-    const finish = () => {
-      window.removeEventListener('pointermove', onMove)
-      window.removeEventListener('pointerup', finish)
-      window.removeEventListener('pointercancel', finish)
-      setComposerResizing(false)
-      writeComposerHeight(latestHeight)
-    }
-
-    window.addEventListener('pointermove', onMove)
-    window.addEventListener('pointerup', finish)
-    window.addEventListener('pointercancel', finish)
-  }
-
-  const resizeComposerWithKeyboard = (
-    event: ReactKeyboardEvent<HTMLButtonElement>,
-  ) => {
-    const maximum = agentComposerMaxHeight(composerAvailableHeight())
-    let next = composerHeight
-    if (event.key === 'ArrowUp') next += 16
-    else if (event.key === 'ArrowDown') next -= 16
-    else if (event.key === 'Home') next = AGENT_COMPOSER_HEIGHT_MIN
-    else if (event.key === 'End') next = maximum
-    else return
-    event.preventDefault()
-    const clamped = clampAgentComposerHeight(next, composerAvailableHeight())
-    setComposerHeight(clamped)
-    writeComposerHeight(clamped)
-  }
 
   return (
     <aside
