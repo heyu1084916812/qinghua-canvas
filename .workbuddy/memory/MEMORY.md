@@ -27,7 +27,9 @@
 - **证据**：质量线发现重载后空路由缺口，一致性审查又复现 direct checkpoint 丢 Job 身份和失败后假 paused；
   修复后 Job 身份 / 继续 / outcome 聚焦 **35/35**、Agent 定向 **498/498**、全量 `npm test`
   **3931 passed / 1 skipped**；tsc、定向 ESLint、check、build、diff-check 通过。真实
-  Chat2api 人工确认回合已通过；continuation 的 Tauri 重载续跑仍待独立复验，AgentHost 仍是后续债。
+  Chat2api 人工确认回合已通过；独立 Tauri continuation **25/25**、G769 明暗各 **39/39**，queued Job
+  查询在前仍推进原 paused Job，route failure 后检查点清除且新回合不复用旧 Job；exe
+  `4E3C7252…5F36CA`。abort 后 HTTP socket 未观察到立即关闭是传输层残余风险，AgentHost 仍是后续债。
 
 ### Agent outcome 延迟写库测试屏障（2026-11-03，对账 #861a）
 
