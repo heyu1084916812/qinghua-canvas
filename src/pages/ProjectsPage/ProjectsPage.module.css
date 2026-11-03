@@ -605,6 +605,10 @@
   box-sizing: border-box;
   /* 它是 `.page` 这一列 flex 里的固定一行：不参与伸缩，永远可见（对账 #287 顺带） */
   flex: none;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
   min-height: var(--space-5);
   padding: 0 var(--space-6) var(--space-6);
   font-size: var(--fs-label);
@@ -612,6 +616,20 @@
 }
 .status:empty {
   display: none;
+}
+.statusRetry {
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--danger);
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}
+.statusRetry:disabled {
+  opacity: 1;
+  color: var(--text-2);
+  cursor: wait;
 }
 
 .confirm {

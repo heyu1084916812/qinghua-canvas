@@ -27,7 +27,11 @@ import {
 import styles from './ProjectsPage.module.css'
 import { ChoicePicker } from '../../features/shared/choicePicker/ChoicePicker'
 import { useAssetMeta } from '../../features/shared/assets/index'
-import { withPreparedProjectRuntimes } from '../../app/ProjectRuntimeRegistry'
+import {
+  ProjectRuntimeCleanupError,
+  retryProjectRuntimeCleanup,
+  withPreparedProjectRuntimes,
+} from '../../app/ProjectRuntimeRegistry'
 import {
   clearDeletedProjectState,
   clearDeletedProjectsState,
@@ -97,6 +101,8 @@ export function ProjectsPage() {
   const [busy, setBusy] = useState(false)
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [bulkDeleting, setBulkDeleting] = useState(false)
+  const [cleanupRetryIds, setCleanupRetryIds] =
+    useState<readonly string[] | null>(null)
   const [status, setStatusText] = useState('')
   /** 这一条状态是"正常结果"还是"失败"（产品文档 §4.5：失败要 `role=alert` 念给屏幕阅读器） */
   const [statusTone, setStatusTone] = useState<NoticeTone>('info')
@@ -110,6 +116,20 @@ export function ProjectsPage() {
     setStatusText(text)
     setStatusTone(tone)
   }, [])
+  const reportDeleteFailure = useCallback(
+    (error: unknown, prefix: string) => {
+      if (error instanceof ProjectRuntimeCleanupError) {
+        setCleanupRetryIds(error.projectIds)
+        setStatus(error.message, 'error')
+        return
+      }
+      setStatus(
+        `${prefix}：${error instanceof Error ? error.message : String(error)}`,
+        'error',
+      )
+    },
+    [setStatus],
+  )
   /** 正拖着文件停在这一页上（决定要不要显那层「松开即导入」的提示） */
   const [dragging, setDragging] = useState(false)
   /** 项目多选模式（用户 2026-09-28）：选择态下卡片点击不再进入画布 */
@@ -183,13 +203,11 @@ export function ProjectsPage() {
         () => store.remove(id),
       )
       clearDeletedProjectState(id)
+      setCleanupRetryIds(null)
       setConfirmId(null)
       setMenuId(null)
     } catch (error) {
-      setStatus(
-        `删除失败：${error instanceof Error ? error.message : String(error)}`,
-        'error',
-      )
+      reportDeleteFailure(error, '删除失败')
     } finally {
       setDeletingId((current) => current === id ? null : current)
     }
@@ -234,6 +252,23 @@ export function ProjectsPage() {
     }
   }
 
+  const retryRuntimeCleanup = async () => {
+    if (!cleanupRetryIds || busy) return
+    setBusy(true)
+    try {
+      await retryProjectRuntimeCleanup(cleanupRetryIds)
+      cleanupRetryIds.forEach(clearDeletedProjectState)
+      await store.load()
+      if (trashOpen) await refreshTrash()
+      setCleanupRetryIds(null)
+      setStatus('项目运行态清理完成')
+    } catch (error) {
+      reportDeleteFailure(error, '运行态清理失败')
+    } finally {
+      setBusy(false)
+    }
+  }
+
   const handleRestore = async (id: string) => {
     if (trashBusy) return
     setTrashBusy(true)
@@ -258,9 +293,11 @@ export function ProjectsPage() {
       )
       clearDeletedProjectState(id)
       await refreshTrash()
+      setCleanupRetryIds(null)
       setStatus('已彻底删除（不可恢复）')
     } catch (error) {
-      setStatus(`彻底删除失败：${error instanceof Error ? error.message : String(error)}`, 'error')
+      reportDeleteFailure(error, '彻底删除失败')
+      await refreshTrash()
     } finally {
       setTrashBusy(false)
     }
@@ -280,11 +317,12 @@ export function ProjectsPage() {
         trashItems.map((project) => project.id),
       )
       await refreshTrash()
+      setCleanupRetryIds(null)
       setStatus(`已清空回收站（${n} / ${total} 个项目）`)
     } catch (error) {
-      setStatus(
-        `清空回收站失败，未完成的项目仍保留：${error instanceof Error ? error.message : String(error)}`,
-        'error',
+      reportDeleteFailure(
+        error,
+        '清空回收站失败，未完成的项目仍保留',
       )
       await refreshTrash()
     } finally {
@@ -357,11 +395,12 @@ export function ProjectsPage() {
       await refreshTrash()
       setTrashSelectedIds(new Set())
       setTrashSelectionAnchor(null)
+      setCleanupRetryIds(null)
       setStatus(`已彻底删除 ${n} 个项目（不可恢复）`)
     } catch (error) {
-      setStatus(
-        `批量彻底删除失败，未完成的项目仍保留：${error instanceof Error ? error.message : String(error)}`,
-        'error',
+      reportDeleteFailure(
+        error,
+        '批量彻底删除失败，未完成的项目仍保留',
       )
       await refreshTrash()
     } finally {
@@ -402,11 +441,12 @@ export function ProjectsPage() {
           .map((project) => project.id),
       )
       await refreshTrash()
+      setCleanupRetryIds(null)
       setStatus(
         n > 0 ? `已清理 ${n} 个 ${TRASH_KEEP_DAYS} 天前的项目（不可恢复）` : `没有超过 ${TRASH_KEEP_DAYS} 天的项目`,
       )
     } catch (error) {
-      setStatus(`清理旧项目失败：${error instanceof Error ? error.message : String(error)}`, 'error')
+      reportDeleteFailure(error, '清理旧项目失败')
       await refreshTrash()
     } finally {
       setTrashBusy(false)
@@ -472,12 +512,10 @@ export function ProjectsPage() {
       setMenuId(null)
       setConfirmId(null)
       exitSelection()
+      setCleanupRetryIds(null)
       setStatus(`已删除 ${selectedCount} 个项目`)
     } catch (error) {
-      setStatus(
-        `批量删除失败：${error instanceof Error ? error.message : String(error)}`,
-        'error',
-      )
+      reportDeleteFailure(error, '批量删除失败')
     } finally {
       setBulkDeleting(false)
     }
@@ -934,6 +972,17 @@ export function ProjectsPage() {
       {/* 语气 → role / aria-live：一处决定（`domain/ui/notice.ts`）；data-status-tone 给冒烟读 */}
       <div className={styles.status} data-status-tone={statusTone} {...noticeA11y(statusTone)}>
         {status}
+        {cleanupRetryIds && (
+          <button
+            type="button"
+            className={styles.statusRetry}
+            data-project-cleanup-retry
+            disabled={busy}
+            onClick={() => void retryRuntimeCleanup()}
+          >
+            {busy ? '清理中…' : '重试清理'}
+          </button>
+        )}
       </div>
 
       {selecting && (

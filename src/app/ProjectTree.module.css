@@ -301,6 +301,10 @@
 }
 
 .status {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px var(--space-2);
   margin: 8px var(--space-2) 0;
   padding: 7px 8px;
   border-radius: calc(var(--radius-control) - 2px);
@@ -312,6 +316,20 @@
 
 .statusError {
   color: var(--danger);
+}
+.statusRetry {
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--danger);
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}
+.statusRetry:disabled {
+  opacity: 1;
+  color: var(--text-2);
+  cursor: wait;
 }
 
 .menuLayer,

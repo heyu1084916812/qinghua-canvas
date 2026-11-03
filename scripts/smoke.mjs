@@ -43373,6 +43373,8 @@ async function g865(browser) {
   const projectB = `smoke_g865_b_${stamp}`
   let projectC = ''
   let projectD = ''
+  let projectE = ''
+  let projectF = ''
   let sessionCId = ''
   const sessionId = `chat_smoke_g865_${stamp}`
   const queueId = `queue_smoke_g865_${stamp}`
@@ -44138,6 +44140,229 @@ async function g865(browser) {
     })
     await projectDCard.waitFor({ state: 'detached', timeout: 20_000 })
 
+    projectE = await page.evaluate(async () => {
+      const { createWebPlatform } =
+        await import('/src/platform/web/index.ts')
+      const { createProjectRepository } =
+        await import('/src/state/project/repository.ts')
+      const repo = createProjectRepository(createWebPlatform().storage)
+      const created = await repo.create({ name: 'G865 cleanup 重试' })
+      return created.id
+    })
+    await page.reload({ waitUntil: 'domcontentloaded' })
+    const projectECard = page.locator(
+      `[data-project-card="${projectE}"]`,
+    )
+    await projectECard.waitFor({ state: 'visible', timeout: 20_000 })
+    await page.evaluate(async ({ id, url }) => {
+      const { registerProjectRuntime } = await import(url)
+      let finalizeAttempts = 0
+      registerProjectRuntime({
+        projectId: id,
+        key: 'forced-cleanup-failure',
+        beginDispose: () => ({
+          waitForIdle: async () => undefined,
+          whenIdle: async () => undefined,
+          canReopen: () => true,
+          reopenIfIdle: () => true,
+          canFinalize: () => true,
+          finalize: () => {
+            finalizeAttempts += 1
+            return finalizeAttempts > 1
+          },
+        }),
+      })
+    }, { id: projectE, url: registryUrl })
+    await projectECard
+      .locator('button[aria-label="项目菜单"]')
+      .click()
+    await projectECard
+      .locator('[role="menuitem"]')
+      .filter({ hasText: '删除' })
+      .click()
+    await page
+      .locator('[data-project-card-confirm-delete]')
+      .click()
+    const cardCleanupRetry = page.locator(
+      '[data-project-cleanup-retry]',
+    )
+    await cardCleanupRetry.waitFor({
+      state: 'visible',
+      timeout: 20_000,
+    })
+    const cardCleanupFailure = await page.evaluate(() => {
+      const retry = document.querySelector(
+        '[data-project-cleanup-retry]',
+      )
+      const status = document.querySelector('[data-status-tone]')
+      const retryRect = retry?.getBoundingClientRect()
+      const statusRect = status?.getBoundingClientRect()
+      return {
+        text: status?.textContent?.trim() ?? '',
+        retryText: retry?.textContent?.trim() ?? '',
+        inside:
+          Boolean(retryRect && statusRect) &&
+          retryRect.left >= statusRect.left - 1 &&
+          retryRect.right <= statusRect.right + 1 &&
+          retryRect.top >= statusRect.top - 1 &&
+          retryRect.bottom <= statusRect.bottom + 1,
+        overflow:
+          document.documentElement.scrollWidth >
+          document.documentElement.clientWidth,
+      }
+    })
+    rec(
+      g,
+      '★★ 项目数据已删除但 cleanup 失败时显示真实状态与重试入口',
+      cardCleanupFailure.text.includes('项目数据已删除') &&
+        cardCleanupFailure.text.includes('可重试清理') &&
+        !cardCleanupFailure.text.includes('删除失败') &&
+        cardCleanupFailure.retryText === '重试清理' &&
+        cardCleanupFailure.inside &&
+        !cardCleanupFailure.overflow,
+      JSON.stringify(cardCleanupFailure),
+    )
+    await page.screenshot({
+      path: `${OUT}/agent-host-865-project-cleanup-retry-1440-light.png`,
+    })
+    await page.evaluate(() => {
+      if (document.documentElement.dataset.theme !== 'dark') {
+        document.querySelector('[data-theme-toggle]')?.click()
+      }
+    })
+    await page.setViewportSize({ width: 1024, height: 700 })
+    await page.waitForTimeout(350)
+    await page.screenshot({
+      path: `${OUT}/agent-host-865-project-cleanup-retry-1024-dark.png`,
+    })
+    await page.setViewportSize({ width: 1440, height: 900 })
+    await page.evaluate(() => {
+      if (document.documentElement.dataset.theme !== 'light') {
+        document.querySelector('[data-theme-toggle]')?.click()
+      }
+    })
+    await page.waitForTimeout(350)
+    await cardCleanupRetry.click()
+    await cardCleanupRetry.waitFor({
+      state: 'detached',
+      timeout: 20_000,
+    })
+    rec(
+      g,
+      '★★ 项目页重试 cleanup 不重复删除数据并清除待清理状态',
+      (await page.locator('[data-status-tone="info"]').innerText())
+        .includes('项目运行态清理完成'),
+    )
+
+    projectF = await page.evaluate(async () => {
+      const { createWebPlatform } =
+        await import('/src/platform/web/index.ts')
+      const { createProjectRepository } =
+        await import('/src/state/project/repository.ts')
+      const repo = createProjectRepository(createWebPlatform().storage)
+      const created = await repo.create({ name: 'G865 侧栏 cleanup 重试' })
+      return created.id
+    })
+    await page.goto(`${BASE}/canvas/${projectF}`, {
+      waitUntil: 'domcontentloaded',
+    })
+    await page.locator('[data-canvas-surface]').waitFor({
+      state: 'visible',
+      timeout: 20_000,
+    })
+    await ensureSidebarOpen(page)
+    const projectFRow = page.locator(
+      `[data-project-tree-item="${projectF}"]`,
+    )
+    await projectFRow.waitFor({ state: 'visible', timeout: 20_000 })
+    await page.evaluate(async ({ id, url }) => {
+      const { registerProjectRuntime } = await import(url)
+      let finalizeAttempts = 0
+      registerProjectRuntime({
+        projectId: id,
+        key: 'forced-tree-cleanup-failure',
+        beginDispose: () => ({
+          waitForIdle: async () => undefined,
+          whenIdle: async () => undefined,
+          canReopen: () => true,
+          reopenIfIdle: () => true,
+          canFinalize: () => true,
+          finalize: () => {
+            finalizeAttempts += 1
+            return finalizeAttempts > 1
+          },
+        }),
+      })
+    }, { id: projectF, url: registryUrl })
+    await projectFRow
+      .locator('button[aria-label="更多"]')
+      .click({ force: true })
+    await page
+      .locator('[data-project-menu] [role="menuitem"]')
+      .filter({ hasText: '删除' })
+      .click()
+    await page.getByRole('button', { name: '确认删除' }).click()
+    const treeCleanupRetry = page.locator(
+      '[data-project-tree-cleanup-retry]',
+    )
+    await treeCleanupRetry.waitFor({
+      state: 'visible',
+      timeout: 20_000,
+    })
+    const treeCleanupFailure = await page.evaluate(() => ({
+      path: window.location.pathname,
+      dialog: Boolean(document.querySelector('[role="alertdialog"]')),
+      text:
+        document
+          .querySelector('[data-sidebar-project-tree] [role="alert"]')
+          ?.textContent?.trim() ?? '',
+      retryText:
+        document
+          .querySelector('[data-project-tree-cleanup-retry]')
+          ?.textContent?.trim() ?? '',
+      overflow:
+        document.documentElement.scrollWidth >
+        document.documentElement.clientWidth,
+    }))
+    rec(
+      g,
+      '★★ 侧栏 cleanup 失败关闭旧确认框，保留真实状态与重试入口',
+      treeCleanupFailure.path === `/canvas/${projectF}` &&
+        !treeCleanupFailure.dialog &&
+        treeCleanupFailure.text.includes('项目数据已删除') &&
+        treeCleanupFailure.text.includes('可重试清理') &&
+        treeCleanupFailure.retryText === '重试清理' &&
+        !treeCleanupFailure.overflow,
+      JSON.stringify(treeCleanupFailure),
+    )
+    await page.screenshot({
+      path: `${OUT}/agent-host-865-tree-cleanup-retry-1440-light.png`,
+    })
+    await page.evaluate(() => {
+      if (document.documentElement.dataset.theme !== 'dark') {
+        document.querySelector('[data-theme-toggle]')?.click()
+      }
+    })
+    await page.setViewportSize({ width: 1024, height: 700 })
+    await page.waitForTimeout(350)
+    await page.screenshot({
+      path: `${OUT}/agent-host-865-tree-cleanup-retry-1024-dark.png`,
+    })
+    await page.setViewportSize({ width: 1440, height: 900 })
+    await page.evaluate(() => {
+      if (document.documentElement.dataset.theme !== 'light') {
+        document.querySelector('[data-theme-toggle]')?.click()
+      }
+    })
+    await page.waitForTimeout(350)
+    await treeCleanupRetry.click()
+    await page.waitForURL(`${BASE}/projects`, { timeout: 20_000 })
+    rec(
+      g,
+      '★★ 侧栏重试 cleanup 成功后离开已删除画布',
+      new URL(page.url()).pathname === '/projects',
+    )
+
     rec(
       g,
       '无未捕获异常',
@@ -44145,7 +44370,7 @@ async function g865(browser) {
       pageErrors.join(' | '),
     )
   } finally {
-    await page.evaluate(async ({ projectA, projectB, projectC, projectD }) => {
+    await page.evaluate(async ({ projectA, projectB, projectC, projectD, projectE, projectF }) => {
       const { createWebPlatform } =
         await import('/src/platform/web/index.ts')
       const { createProjectRepository } =
@@ -44155,7 +44380,9 @@ async function g865(browser) {
       await repo.purge(projectB)
       if (projectC) await repo.purge(projectC)
       if (projectD) await repo.purge(projectD)
-    }, { projectA, projectB, projectC, projectD }).catch(() => {})
+      if (projectE) await repo.purge(projectE)
+      if (projectF) await repo.purge(projectF)
+    }, { projectA, projectB, projectC, projectD, projectE, projectF }).catch(() => {})
     for (const row of channelSnapshot) {
       const current = await sharedRow(page, 'channels', row.id)
       if (!current || current.enabled === row.enabled) continue

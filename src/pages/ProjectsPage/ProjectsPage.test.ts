@@ -194,6 +194,106 @@ describe('ProjectsPage delete failure', () => {
     act(() => root.unmount())
   })
 
+  it('数据已删除但 cleanup 失败时显示真实状态，可只重试清理', async () => {
+    const platform = createMemoryPlatform()
+    const repo = createProjectRepository(platform.storage)
+    await platform.storage.open()
+    const project = await repo.create({ name: '清理失败项目' })
+    let finalizeAttempts = 0
+    registerProjectRuntime({
+      projectId: project.id,
+      key: 'canvas-agent',
+      beginDispose: () => ({
+        waitForIdle: async () => undefined,
+        whenIdle: async () => undefined,
+        canReopen: () => true,
+        reopenIfIdle: () => true,
+        canFinalize: () => true,
+        finalize() {
+          finalizeAttempts += 1
+          return finalizeAttempts > 1
+        },
+      }),
+    })
+    const root = await renderProjectsPage(platform)
+    const card = root.root.find(
+      (node) => node.props['data-project-card'] === project.id,
+    )
+    const originalPut = platform.storage.put.bind(platform.storage)
+    let projectDeletes = 0
+    vi.spyOn(platform.storage, 'put').mockImplementation(
+      async (table, row) => {
+        if (
+          table === 'projects' &&
+          typeof row.deletedAt === 'number'
+        ) {
+          projectDeletes += 1
+        }
+        return originalPut(table, row)
+      },
+    )
+
+    act(() => {
+      card.find(
+        (node) =>
+          node.type === 'button' &&
+          node.props['aria-label'] === '项目菜单',
+      ).props.onClick()
+    })
+    act(() => {
+      card.find(
+        (node) =>
+          node.type === 'button' &&
+          node.props.role === 'menuitem' &&
+          textOf(node) === '删除',
+      ).props.onClick({ stopPropagation: vi.fn() })
+    })
+    await act(async () => {
+      await card.find(
+        (node) =>
+          node.type === 'button' &&
+          textOf(node) === '确认',
+      ).props.onClick()
+    })
+    await settle()
+
+    const status = root.root.find(
+      (node) => node.props['data-status-tone'] !== undefined,
+    )
+    expect(textOf(status)).toContain('项目数据已删除')
+    expect(textOf(status)).toContain('可重试清理')
+    expect(textOf(status)).not.toContain('删除失败')
+    expect((await repo.get(project.id))?.deletedAt).toBeTypeOf('number')
+    expect(projectDeletes).toBe(1)
+
+    await act(async () => {
+      await root.root.find(
+        (node) =>
+          node.type === 'button' &&
+          node.props['data-project-cleanup-retry'] !== undefined,
+      ).props.onClick()
+    })
+    await settle()
+
+    expect(finalizeAttempts).toBe(2)
+    expect(projectDeletes).toBe(1)
+    expect(
+      root.root.findAll(
+        (node) =>
+          node.props['data-project-cleanup-retry'] !== undefined,
+      ),
+    ).toHaveLength(0)
+    expect(
+      textOf(
+        root.root.find(
+          (node) => node.props['data-status-tone'] !== undefined,
+        ),
+      ),
+    ).toContain('运行态清理完成')
+
+    act(() => root.unmount())
+  })
+
   it('单删 dispose 失败时保留确认框、项目与真实错误', async () => {
     const platform = createMemoryPlatform()
     const repo = createProjectRepository(platform.storage)

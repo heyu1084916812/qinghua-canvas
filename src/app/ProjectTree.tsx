@@ -28,7 +28,11 @@ import {
 } from '../state/project/projectEvents'
 import { buildProjectTree, projectGroupWindow } from './projectTreeModel'
 import { projectMenuPosition, type ProjectMenuFrame } from './projectMenuPosition'
-import { withPreparedProjectRuntimes } from './ProjectRuntimeRegistry'
+import {
+  ProjectRuntimeCleanupError,
+  retryProjectRuntimeCleanup,
+  withPreparedProjectRuntimes,
+} from './ProjectRuntimeRegistry'
 import {
   clearDeletedProjectState,
   leaveDeletedCanvasRoute,
@@ -176,6 +180,8 @@ export function ProjectTree({ open, activeProjectId }: ProjectTreeProps) {
   const [renameTarget, setRenameTarget] = useState<RenameTarget | null>(null)
   const [confirmTarget, setConfirmTarget] = useState<ConfirmTarget | null>(null)
   const [deleteBusy, setDeleteBusy] = useState(false)
+  const [cleanupRetryIds, setCleanupRetryIds] =
+    useState<readonly string[] | null>(null)
   const [status, setStatus] = useState<StatusState | null>(null)
   const renameInputRef = useRef<HTMLInputElement | null>(null)
   const menuRef = useRef<HTMLDivElement | null>(null)
@@ -533,12 +539,61 @@ export function ProjectTree({ open, activeProjectId }: ProjectTreeProps) {
             : '项目已移到回收站',
         tone: 'info',
       })
+      setCleanupRetryIds(null)
       setConfirmTarget(null)
     } catch (error) {
+      if (error instanceof ProjectRuntimeCleanupError) {
+        setCleanupRetryIds(error.projectIds)
+        setConfirmTarget(null)
+        setMenu(null)
+        setStatus({
+          text: error.message,
+          tone: 'error',
+        })
+        return
+      }
       setStatus({
         text: `删除失败：${error instanceof Error ? error.message : String(error)}`,
         tone: 'error',
       })
+    } finally {
+      setDeleteBusy(false)
+    }
+  }
+
+  const retryRuntimeCleanup = async () => {
+    if (!cleanupRetryIds || deleteBusy) return
+    setDeleteBusy(true)
+    try {
+      const retriedIds = cleanupRetryIds
+      await retryProjectRuntimeCleanup(retriedIds)
+      for (const id of retriedIds) {
+        clearDeletedProjectState(id)
+        leaveDeletedCanvasRoute(
+          locationPathRef.current,
+          id,
+          navigate,
+        )
+      }
+      await load()
+      setCleanupRetryIds(null)
+      setStatus({
+        text: '项目运行态清理完成',
+        tone: 'info',
+      })
+    } catch (error) {
+      if (error instanceof ProjectRuntimeCleanupError) {
+        setCleanupRetryIds(error.projectIds)
+        setStatus({
+          text: error.message,
+          tone: 'error',
+        })
+      } else {
+        setStatus({
+          text: `运行态清理失败：${error instanceof Error ? error.message : String(error)}`,
+          tone: 'error',
+        })
+      }
     } finally {
       setDeleteBusy(false)
     }
@@ -710,20 +765,31 @@ export function ProjectTree({ open, activeProjectId }: ProjectTreeProps) {
             })}
           </>
         )}
-
-        {status && (
-          <div
-            className={
-              status.tone === 'error'
-                ? `${styles.status} ${styles.statusError}`
-                : styles.status
-            }
-            role={status.tone === 'error' ? 'alert' : 'status'}
-          >
-            {status.text}
-          </div>
-        )}
       </div>
+
+      {status && (
+        <div
+          className={
+            status.tone === 'error'
+              ? `${styles.status} ${styles.statusError}`
+              : styles.status
+          }
+          role={status.tone === 'error' ? 'alert' : 'status'}
+        >
+          {status.text}
+          {cleanupRetryIds && (
+            <button
+              type="button"
+              className={styles.statusRetry}
+              data-project-tree-cleanup-retry
+              disabled={deleteBusy}
+              onClick={() => void retryRuntimeCleanup()}
+            >
+              {deleteBusy ? '清理中…' : '重试清理'}
+            </button>
+          )}
+        </div>
+      )}
 
       {menu &&
         createPortal(
