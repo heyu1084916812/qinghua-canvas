@@ -41,7 +41,6 @@ export interface AgentInterruptSettlementInput {
     turnId: string | undefined,
   ) => void
   isCurrentSession: () => boolean
-  notify: (message: string, tone: 'error') => void
   deletePerSessionRefs: (sessionId: string) => void
   applySessionSnapshot: (session: AgentSession) => void
   setMessages: (messages: AgentSession['messages']) => void
@@ -52,7 +51,11 @@ export interface AgentInterruptSettlementInput {
     sessionId: string,
     status: { kind: 'idle' },
   ) => void
-  errorText: (error: unknown) => string
+}
+
+export interface AgentInterruptionSettlementResult {
+  session: AgentSession | null
+  cleanupError: unknown
 }
 
 /**
@@ -64,7 +67,7 @@ export interface AgentInterruptSettlementInput {
  */
 export async function settleAgentInterruption(
   input: AgentInterruptSettlementInput,
-): Promise<AgentSession | null> {
+): Promise<AgentInterruptionSettlementResult> {
   const { session, request, result, turnOrigin } = input
   const queueTurnId = turnOrigin.queueTurnId
   const ownsActivity = () =>
@@ -132,12 +135,6 @@ export async function settleAgentInterruption(
     }
   })
 
-  if (cleanupError) {
-    input.notify(
-      `停止任务时清理状态失败：${input.errorText(cleanupError)}`,
-      'error',
-    )
-  }
   const ownsUiState = ownsActivity()
   input.releaseActivity(queueTurnId, turnOrigin.turnId)
   if (ownsUiState) {
@@ -156,5 +153,8 @@ export async function settleAgentInterruption(
     input.clearRunTasks()
     input.setStatus(session.id, { kind: 'idle' })
   }
-  return settledSession
+  return {
+    session: settledSession,
+    cleanupError,
+  }
 }

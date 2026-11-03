@@ -180,7 +180,10 @@ import { useAgentSendController } from './useAgentSendController'
 import { useAgentOutcomeCoordinator } from './useAgentOutcomeCoordinator'
 import { assembleAgentLoopDeps } from './agentLoopDeps'
 import { continueAgentAutoConfirmations } from './agentAutoConfirmations'
-import { settleAgentInterruption } from './agentInterruptSettlement'
+import {
+  settleAgentInterruption,
+  type AgentInterruptionSettlementResult,
+} from './agentInterruptSettlement'
 import { runAgentCanvasNodes } from './agentCanvasRun'
 import { useAgentRunPresentation } from './useAgentRunPresentation'
 import {
@@ -1721,7 +1724,7 @@ export function AgentPanel({
       session: AgentSession,
       request: AgentToolRequest | undefined,
       result: 'canceled' | 'interrupted',
-    ): Promise<AgentSession | null> => {
+    ): Promise<AgentInterruptionSettlementResult> => {
       const queueTurnId = activeQueueTurnOf(session.id)
       const turnOrigin: AgentTurnOrigin = {
         jobId:
@@ -1734,7 +1737,7 @@ export function AgentPanel({
           session.messageRevision ??
           currentTurnRevisionRef.current.get(session.id),
       }
-      return settleAgentInterruption({
+      const settlement = await settleAgentInterruption({
         session,
         request,
         result,
@@ -1763,7 +1766,6 @@ export function AgentPanel({
           ),
         isCurrentSession: () =>
           currentIdRef.current === session.id,
-        notify: store.notify,
         deletePerSessionRefs: (sessionId) => {
           abortRefs.current.delete(sessionId)
           deliveredSteersRef.current.delete(sessionId)
@@ -1780,8 +1782,14 @@ export function AgentPanel({
           clearLiveProcessFor(session.id),
         clearRunTasks: () => clearRunTasksFor(session.id),
         setStatus: setStatusFor,
-        errorText: errText,
       })
+      if (settlement.cleanupError) {
+        store.notify(
+          `停止任务时清理状态失败：${errText(settlement.cleanupError)}`,
+          'error',
+        )
+      }
+      return settlement
     },
     [
       applySessionSnapshot,
@@ -1829,7 +1837,8 @@ export function AgentPanel({
         pendingConfirmation,
         'canceled',
       )
-      const target = settled ?? withoutTurn
+      if (settled.cleanupError) return
+      const target = settled.session ?? withoutTurn
       store.notify('已取消等待中的动作，并立即发送这条引导', 'info')
       await sendText(turn.text, sessionForQueuedTurn(target, turn))
       return
@@ -1903,7 +1912,12 @@ export function AgentPanel({
       status.kind === 'awaitingConfirm' ? status.request : target.pendingConfirmation
     abortRefs.current.get(target.id)?.abort()
     if (pendingConfirmation) {
-      await settleInterruptedSession(target, pendingConfirmation, 'canceled')
+      const settled = await settleInterruptedSession(
+        target,
+        pendingConfirmation,
+        'canceled',
+      )
+      if (settled.cleanupError) return false
     } else {
       for (let attempt = 0; attempt < 60; attempt += 1) {
         if (!isSessionActivityActive(target.id)) break
@@ -1982,7 +1996,8 @@ export function AgentPanel({
         pendingConfirmation,
         'canceled',
       )
-      const target = settled ?? current
+      if (settled.cleanupError) return false
+      const target = settled.session ?? current
       store.notify('已取消等待中的动作，并立即发送这条引导', 'info')
       await sendText(text, target)
       return true
@@ -2211,8 +2226,14 @@ export function AgentPanel({
     confirmingRef.current.add(current.id)
     const { request } = status
     try {
-      await settleInterruptedSession(current, request, 'canceled')
-      store.notify('已取消；本次没有执行工具，也不会自动新增节点', 'info')
+      const settled = await settleInterruptedSession(
+        current,
+        request,
+        'canceled',
+      )
+      if (!settled.cleanupError) {
+        store.notify('已取消；本次没有执行工具，也不会自动新增节点', 'info')
+      }
     } finally {
       confirmingRef.current.delete(current.id)
     }
@@ -2346,8 +2367,15 @@ export function AgentPanel({
       inFlightConfirmationRef.current.get(session.id) ??
       (status.kind === 'awaitingConfirm' ? status.request : undefined)
     try {
-      await settleInterruptedSession(session, request, 'interrupted')
-      if ((session.queuedTurns?.length ?? 0) > 0) {
+      const settled = await settleInterruptedSession(
+        session,
+        request,
+        'interrupted',
+      )
+      if (
+        !settled.cleanupError &&
+        (session.queuedTurns?.length ?? 0) > 0
+      ) {
         store.notify('当前回合已停止，排队任务保留；可从队列手动继续', 'info')
       }
     } finally {

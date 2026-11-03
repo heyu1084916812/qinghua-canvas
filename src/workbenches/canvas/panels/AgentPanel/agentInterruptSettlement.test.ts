@@ -63,7 +63,6 @@ function input(
     })),
     releaseActivity: vi.fn(),
     isCurrentSession: () => true,
-    notify: vi.fn(),
     deletePerSessionRefs: vi.fn(),
     applySessionSnapshot: vi.fn(),
     setMessages: vi.fn(),
@@ -71,8 +70,6 @@ function input(
     clearLiveProcess: vi.fn(),
     clearRunTasks: vi.fn(),
     setStatus: vi.fn(),
-    errorText: (error) =>
-      error instanceof Error ? error.message : String(error),
     ...overrides,
   }
 }
@@ -80,7 +77,8 @@ function input(
 describe('settleAgentInterruption', () => {
   it('★★ 当前回合 stop：abort、revision 屏障、Job、steer、queue、UI 全收口', async () => {
     const h = input()
-    const latest = await settleAgentInterruption(h)
+    const settlement = await settleAgentInterruption(h)
+    const latest = settlement.session
     expect(h.abortController?.signal.aborted).toBe(true)
     expect(h.clearQueueDrain).toHaveBeenCalledTimes(1)
     expect(h.settleSession).toHaveBeenCalledWith(
@@ -121,6 +119,7 @@ describe('settleAgentInterruption', () => {
     expect(h.setStatus).toHaveBeenCalledWith(session.id, {
       kind: 'idle',
     })
+    expect(settlement.cleanupError).toBeUndefined()
   })
 
   it('★★ 旧回合已被新 activity 接管：不 abort、不碰 UI/refs', async () => {
@@ -156,7 +155,8 @@ describe('settleAgentInterruption', () => {
       finishQueuedTurn: vi.fn(async () => latest),
     })
     const result = await settleAgentInterruption(h)
-    expect(result).toBe(latest)
+    expect(result.session).toBe(latest)
+    expect(result.cleanupError).toBeUndefined()
     expect(h.setMessages).toHaveBeenCalledWith(latest.messages)
     expect(h.applySessionSnapshot).toHaveBeenCalledWith(latest)
   })
@@ -173,52 +173,43 @@ describe('settleAgentInterruption', () => {
     )
   })
 
-  it('★★ transition 抛错仍继续 remove / finish / UI 收口并 notify', async () => {
+  it('★★ transition 抛错仍继续 remove / finish / UI 收口并返回 cleanupError', async () => {
     const h = input({
       transitionSessionJob: vi.fn(async () => {
         throw new Error('Job 迁移失败')
       }),
     })
-    await settleAgentInterruption(h)
+    const result = await settleAgentInterruption(h)
     expect(h.removeSteers).toHaveBeenCalledTimes(1)
     expect(h.finishQueuedTurn).toHaveBeenCalledTimes(1)
     expect(h.applySessionSnapshot).toHaveBeenCalledTimes(1)
-    expect(h.notify).toHaveBeenCalledWith(
-      '停止任务时清理状态失败：Job 迁移失败',
-      'error',
-    )
+    expect(result.cleanupError).toEqual(new Error('Job 迁移失败'))
   })
 
-  it('★★ remove steers 抛错仍继续 finish / UI 收口并 notify', async () => {
+  it('★★ remove steers 抛错仍继续 finish / UI 收口并返回 cleanupError', async () => {
     const h = input({
       removeSteers: vi.fn(async () => {
         throw new Error('steer 清理失败')
       }),
     })
-    await settleAgentInterruption(h)
+    const result = await settleAgentInterruption(h)
     expect(h.finishQueuedTurn).toHaveBeenCalledTimes(1)
     expect(h.applySessionSnapshot).toHaveBeenCalledTimes(1)
-    expect(h.notify).toHaveBeenCalledWith(
-      '停止任务时清理状态失败：steer 清理失败',
-      'error',
-    )
+    expect(result.cleanupError).toEqual(new Error('steer 清理失败'))
   })
 
-  it('★★ finish queue 抛错仍更新 UI/refs 并 notify', async () => {
+  it('★★ finish queue 抛错仍更新 UI/refs 并返回 cleanupError', async () => {
     const h = input({
       finishQueuedTurn: vi.fn(async () => {
         throw new Error('队列销项失败')
       }),
     })
-    await settleAgentInterruption(h)
+    const result = await settleAgentInterruption(h)
     expect(h.deletePerSessionRefs).toHaveBeenCalledTimes(1)
     expect(h.setStatus).toHaveBeenCalledWith(session.id, {
       kind: 'idle',
     })
-    expect(h.notify).toHaveBeenCalledWith(
-      '停止任务时清理状态失败：队列销项失败',
-      'error',
-    )
+    expect(result.cleanupError).toEqual(new Error('队列销项失败'))
   })
 
   it('★★ 非当前界面不 setMessages，但 owner 仍更新 refs / snapshot / status', async () => {
@@ -254,7 +245,8 @@ describe('settleAgentInterruption', () => {
       finishQueuedTurn: vi.fn(async () => finished),
     })
     const result = await settleAgentInterruption(h)
-    expect(result).toBe(finished)
+    expect(result.session).toBe(finished)
+    expect(result.cleanupError).toBeUndefined()
     expect(h.applySessionSnapshot).toHaveBeenCalledWith(finished)
   })
 })

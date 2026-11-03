@@ -23,10 +23,12 @@
 - **revision 与 queue token**：store 的 `settleInterruptedSession()` 仍以 turnOrigin.messageRevision
   作为停止屏障；finishQueuedTurn 只在 queueTurnId 仍匹配时执行。Job 迁移始终携带原 turnOrigin。
 - **分步清理不互相阻断**：store、transition、removeSteers、finishQueuedTurn 各自 try/catch，保留首个
-  cleanup 错误并继续后续步骤；结束后 notify 汇总。execute/confirm 等业务异常不在这里吞。
+  cleanup 错误并继续后续步骤；协调器返回 `{session, cleanupError}`，调用方负责显示。失败时不再发
+  “已取消/已停止”成功提示，引导 / 直接下一步也不继续。execute/confirm 等业务异常不在这里吞。
 - **证据**：`AgentPanel.tsx` **3364→3304 行**（减少 60）；聚焦 **9/9**、Agent 相关 **269/269**；
-  全量 `npm test` **3910 passed / 1 skipped**；tsc/check/build/diff-check 通过。
-  纯架构 + 可靠性拆分，未跑 G769 / Tauri；确认执行、继续入口、AgentHost 仍是后续债。
+  全量 `npm test` **3910 passed / 1 skipped**；tsc/check/build/diff-check 通过。质量线首次真机验收
+  发现 cleanup error toast 被固定成功提示覆盖；修复后全量 **3911 passed / 1 skipped**，仍需复验错误
+  toast 实际可见。确认执行、继续入口、AgentHost 仍是后续债。
 
 ### Agent 自动确认循环拆分（2026-11-03，对账 #862）
 
