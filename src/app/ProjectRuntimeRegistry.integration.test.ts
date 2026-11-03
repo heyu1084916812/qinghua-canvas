@@ -6,6 +6,7 @@ import {
 import { createMemoryPlatform } from '../platform/memory'
 import { createAgentSessionStore } from '../state/agent/sessionStore'
 import {
+  ProjectRuntimeRecoveryError,
   registerProjectRuntime,
   resetProjectRuntimesForTests,
   withPreparedProjectRuntimes,
@@ -74,7 +75,7 @@ describe('ProjectRuntimeRegistry real SessionStore shutdown', () => {
     const purge = vi.fn(() => sessions.remove(session.id))
     await expect(
       withPreparedProjectRuntimes(['p1'], purge),
-    ).rejects.toThrow('超时')
+    ).rejects.toBeInstanceOf(ProjectRuntimeRecoveryError)
     expect(purge).not.toHaveBeenCalled()
     expect((await sessions.get(session.id))?.title).not.toBe('late write')
 

@@ -37,9 +37,16 @@ export type ProjectRuntimeCommitResult =
       error: ProjectRuntimeCleanupError
     }
 
+export type ProjectRuntimeRollbackResult =
+  | { status: 'rolled_back' }
+  | {
+      status: 'recovery_pending'
+      error: ProjectRuntimeRecoveryError
+    }
+
 export interface ProjectRuntimeDisposal {
   /** 数据库操作失败时恢复仍保留的全部 runtime / host。 */
-  rollback(): boolean
+  rollback(cause?: unknown): ProjectRuntimeRollbackResult
   /** 数据库成功后提交清理；调用前不能 purge / 移出 UI。 */
   commit(workResult?: unknown): Promise<ProjectRuntimeCommitResult>
 }
@@ -50,15 +57,47 @@ const registrations = new Map<
 >()
 const projectOperations = new Map<string, ProjectOperation>()
 let nextGeneration = 1
+let nextOperationId = 1
+const pendingListeners = new Set<() => void>()
+let pendingSnapshot: readonly ProjectRuntimePendingOperation[] = []
 
 interface ProjectOperation {
+  readonly id: number
   readonly projectIds: ReadonlySet<string>
   readonly prepared: PreparedRuntime[]
   readonly shutdownTimeoutMs: number
-  phase: 'preparing' | 'prepared' | 'committing' | 'cleanup_failed' | 'cleanup_complete'
-  recoveryError: ProjectRuntimeCleanupError | null
+  phase:
+    | 'preparing'
+    | 'prepared'
+    | 'committing'
+    | 'recovering'
+    | 'recovery_failed'
+    | 'cleanup_failed'
+    | 'cleanup_complete'
+  recoveryPromise: Promise<boolean> | null
+  recoveryError: ProjectRuntimeRecoveryError | null
+  triggerReason: string | null
+  workReason: string | null
+  recoveryReason: string | null
+  workCommitted: boolean
   workResult: unknown
   released: boolean
+}
+
+export type ProjectRuntimePendingStatus =
+  | 'recovering'
+  | 'recovery_failed'
+  | 'cleanup_failed'
+
+export interface ProjectRuntimePendingOperation {
+  id: number
+  projectIds: readonly string[]
+  status: ProjectRuntimePendingStatus
+  workCommitted: boolean
+  retryable: boolean
+  reason: string
+  workReason: string | null
+  recoveryReason: string | null
 }
 
 export class ProjectRuntimeBusyError extends Error {
@@ -72,20 +111,77 @@ export class ProjectRuntimeBusyError extends Error {
 }
 
 export class ProjectRuntimeCleanupError extends Error {
+  readonly operationId?: number
   readonly projectIds: readonly string[]
   readonly reason: string
   readonly workCommitted = true
   readonly retryable = true
 
-  constructor(projectIds: readonly string[], error: unknown) {
+  constructor(
+    projectIds: readonly string[],
+    error: unknown,
+    operationId?: number,
+  ) {
     const reason =
       error instanceof Error ? error.message : String(error)
     super(
       `项目数据已删除，但运行态清理失败，可重试清理：${reason}`,
     )
     this.name = 'ProjectRuntimeCleanupError'
+    this.operationId = operationId
     this.projectIds = [...new Set(projectIds)]
     this.reason = reason
+  }
+}
+
+export class ProjectRuntimeRecoveryError extends Error {
+  readonly operationId: number
+  readonly projectIds: readonly string[]
+  readonly workCommitted = false
+  readonly retryable = true
+  readonly triggerReason: string
+  readonly workReason: string | null
+  readonly recoveryReason: string
+
+  constructor(
+    operationId: number,
+    projectIds: readonly string[],
+    {
+      triggerReason,
+      workReason,
+      recoveryReason,
+    }: {
+      triggerReason: string
+      workReason: string | null
+      recoveryReason: string
+    },
+  ) {
+    const operationReason =
+      workReason ?? triggerReason
+    super(
+      `项目操作未提交，但运行态恢复未完成，可重试恢复。原操作：${operationReason}；恢复：${recoveryReason}`,
+    )
+    this.name = 'ProjectRuntimeRecoveryError'
+    this.operationId = operationId
+    this.projectIds = [...new Set(projectIds)]
+    this.triggerReason = triggerReason
+    this.workReason = workReason
+    this.recoveryReason = recoveryReason
+  }
+}
+
+export class ProjectRuntimeRetryScopeError extends Error {
+  readonly projectIds: readonly string[]
+  readonly pendingProjectIds: readonly string[]
+
+  constructor(
+    projectIds: readonly string[],
+    pendingProjectIds: readonly string[],
+  ) {
+    super('重试集合与待处理项目不一致，未执行任何清理')
+    this.name = 'ProjectRuntimeRetryScopeError'
+    this.projectIds = [...new Set(projectIds)]
+    this.pendingProjectIds = [...new Set(pendingProjectIds)]
   }
 }
 
@@ -108,6 +204,91 @@ function waitWithTimeout<T>(
   })
 }
 
+function uniqueOperations(): ProjectOperation[] {
+  return [...new Set(projectOperations.values())]
+}
+
+function pendingOperationSnapshot(
+  operation: ProjectOperation,
+): ProjectRuntimePendingOperation | null {
+  let status: ProjectRuntimePendingStatus
+  if (operation.phase === 'cleanup_failed') {
+    status = 'cleanup_failed'
+  } else if (operation.phase === 'recovering') {
+    status = 'recovering'
+  } else if (operation.phase === 'recovery_failed') {
+    status = 'recovery_failed'
+  } else {
+    return null
+  }
+  const reason =
+    status === 'cleanup_failed'
+      ? operation.triggerReason ?? '运行态清理失败'
+      : [
+          operation.workReason
+            ? `原操作：${operation.workReason}`
+            : null,
+          operation.recoveryReason
+            ? `恢复：${operation.recoveryReason}`
+            : '恢复：等待运行态恢复',
+        ]
+          .filter(Boolean)
+          .join('；')
+  return {
+    id: operation.id,
+    projectIds: [...operation.projectIds],
+    status,
+    workCommitted: operation.workCommitted,
+    retryable: status !== 'recovering',
+    reason,
+    workReason: operation.workReason,
+    recoveryReason: operation.recoveryReason,
+  }
+}
+
+function refreshPendingSnapshot(): void {
+  const next = uniqueOperations()
+    .map(pendingOperationSnapshot)
+    .filter(
+      (item): item is ProjectRuntimePendingOperation => !!item,
+    )
+    .sort((left, right) => left.id - right.id)
+  const unchanged =
+    next.length === pendingSnapshot.length &&
+    next.every((item, index) => {
+      const current = pendingSnapshot[index]
+      return (
+        current?.id === item.id &&
+        current.status === item.status &&
+        current.reason === item.reason &&
+        current.workCommitted === item.workCommitted &&
+        current.retryable === item.retryable &&
+        current.workReason === item.workReason &&
+        current.recoveryReason === item.recoveryReason &&
+        current.projectIds.length === item.projectIds.length &&
+        current.projectIds.every(
+          (projectId, projectIndex) =>
+            projectId === item.projectIds[projectIndex],
+        )
+      )
+    })
+  if (unchanged) return
+  pendingSnapshot = next
+  pendingListeners.forEach((listener) => listener())
+}
+
+export function subscribeProjectRuntimePending(
+  listener: () => void,
+): () => void {
+  pendingListeners.add(listener)
+  return () => pendingListeners.delete(listener)
+}
+
+export function getProjectRuntimePendingSnapshot():
+  readonly ProjectRuntimePendingOperation[] {
+  return pendingSnapshot
+}
+
 function claimProjects(
   projectIds: readonly string[],
   options: ProjectRuntimePrepareOptions,
@@ -120,13 +301,19 @@ function claimProjects(
     throw new ProjectRuntimeBusyError(busy)
   }
   const operation: ProjectOperation = {
+    id: nextOperationId++,
     projectIds: new Set(ids),
     prepared: [],
     shutdownTimeoutMs:
       options.shutdownTimeoutMs ??
       DEFAULT_TASK_SHUTDOWN_TIMEOUT_MS,
     phase: 'preparing',
+    recoveryPromise: null,
     recoveryError: null,
+    triggerReason: null,
+    workReason: null,
+    recoveryReason: null,
+    workCommitted: false,
     workResult: undefined,
     released: false,
   }
@@ -146,6 +333,7 @@ function releaseProjectOperation(
       projectOperations.delete(projectId)
     }
   }
+  refreshPendingSnapshot()
 }
 
 function controlsOf(
@@ -214,7 +402,7 @@ async function waitForPreparedIdle(
     cursor = operation.prepared.length
     await Promise.all(
       batch
-        .filter((item) => !item.idle)
+        .filter((item) => !item.idle && !item.finalized)
         .map(async (item) => {
           try {
             await waitWithTimeout(
@@ -243,7 +431,7 @@ async function settlePrepared(
     cursor = operation.prepared.length
     await Promise.all(
       batch
-        .filter((item) => !item.idle)
+        .filter((item) => !item.idle && !item.finalized)
         .map(async (item) => {
           try {
             await waitWithTimeout(
@@ -263,54 +451,119 @@ async function settlePrepared(
   }
 }
 
-function recoverPrepared(operation: ProjectOperation): boolean {
-  const reopenAll = (): boolean => {
-    while (collectLateRuntimes(operation)) {
-      // New registrations join the same recovery before reopening.
-    }
-    const current = controlsOf(operation.prepared)
-    if (!current.every((control) => control.canReopen())) {
-      return false
-    }
-    if (!current.every((control) => control.reopenIfIdle())) {
-      return false
-    }
-    operation.prepared.forEach((item) => {
-      item.runtime.active = true
-    })
-    operation.recoveryError = null
-    releaseProjectOperation(operation)
-    return true
+function tryReopenPrepared(operation: ProjectOperation): boolean {
+  if (operation.prepared.some((item) => item.finalized)) {
+    return false
   }
-
-  collectLateRuntimes(operation)
-  const controls = controlsOf(operation.prepared)
-  if (controls.every((control) => control.canReopen())) {
-    return reopenAll()
+  while (collectLateRuntimes(operation)) {
+    // New registrations join the same recovery before reopening.
   }
-  void settlePrepared(operation).then(
-    () => {
-      reopenAll()
-    },
-    (error) => {
-      operation.recoveryError = new ProjectRuntimeCleanupError(
-        [...operation.projectIds],
-        error,
-      )
-      reopenAll()
-    },
-  )
-  return false
+  const current = controlsOf(operation.prepared)
+  if (!current.every((control) => control.canReopen())) {
+    return false
+  }
+  if (!current.every((control) => control.reopenIfIdle())) {
+    return false
+  }
+  operation.prepared.forEach((item) => {
+    item.runtime.active = true
+  })
+  operation.recoveryError = null
+  operation.recoveryReason = null
+  operation.recoveryPromise = null
+  releaseProjectOperation(operation)
+  return true
 }
 
-function pendingCleanupOperation(
+function recoveryErrorFor(
+  operation: ProjectOperation,
+): ProjectRuntimeRecoveryError {
+  const triggerReason =
+    operation.triggerReason ?? '运行态关闭未完成'
+  const recoveryReason =
+    operation.recoveryReason ?? '等待运行态达到可恢复状态'
+  const error = new ProjectRuntimeRecoveryError(
+    operation.id,
+    [...operation.projectIds],
+    {
+      triggerReason,
+      workReason: operation.workReason,
+      recoveryReason,
+    },
+  )
+  operation.recoveryError = error
+  return error
+}
+
+async function runRecovery(
+  operation: ProjectOperation,
+): Promise<boolean> {
+  try {
+    await settlePrepared(operation)
+    if (!tryReopenPrepared(operation)) {
+      throw new Error('运行态仍未达到可恢复状态')
+    }
+    operation.recoveryError = null
+    operation.recoveryReason = null
+    return true
+  } catch (error) {
+    if (tryReopenPrepared(operation)) {
+      return true
+    }
+    operation.phase = 'recovery_failed'
+    operation.recoveryReason = errorText(error)
+    recoveryErrorFor(operation)
+    refreshPendingSnapshot()
+    return false
+  } finally {
+    operation.recoveryPromise = null
+  }
+}
+
+function beginRecovery(
+  operation: ProjectOperation,
+  cause: unknown,
+  fromWork: boolean,
+): ProjectRuntimeRollbackResult {
+  operation.triggerReason = errorText(cause)
+  if (fromWork) operation.workReason = errorText(cause)
+  if (tryReopenPrepared(operation)) {
+    return { status: 'rolled_back' }
+  }
+  if (!operation.recoveryPromise) {
+    operation.phase = 'recovering'
+    operation.recoveryReason = '等待运行态达到可恢复状态'
+    refreshPendingSnapshot()
+    operation.recoveryPromise = runRecovery(operation)
+  }
+  return {
+    status: 'recovery_pending',
+    error: recoveryErrorFor(operation),
+  }
+}
+
+async function retryOperationRecovery(
+  operation: ProjectOperation,
+): Promise<boolean> {
+  if (tryReopenPrepared(operation)) return true
+  if (operation.recoveryPromise) {
+    return operation.recoveryPromise
+  }
+  operation.phase = 'recovering'
+  operation.recoveryReason = '正在重试运行态恢复'
+  refreshPendingSnapshot()
+  operation.recoveryPromise = runRecovery(operation)
+  return operation.recoveryPromise
+}
+
+function operationForExactIds(
   projectIds: readonly string[],
 ): ProjectOperation | null {
   const ids = [...new Set(projectIds)]
   let operation: ProjectOperation | null = null
   for (const projectId of ids) {
     const current = projectOperations.get(projectId)
-    if (!current || current.phase !== 'cleanup_failed') return null
+    if (!current) return null
     if (operation && operation !== current) return null
     operation = current
   }
@@ -320,12 +573,26 @@ function pendingCleanupOperation(
   return operation
 }
 
+function relatedOperations(
+  projectIds: readonly string[],
+): ProjectOperation[] {
+  const ids = new Set(projectIds)
+  return uniqueOperations().filter(
+    (operation) =>
+      pendingOperationSnapshot(operation) !== null &&
+      [...operation.projectIds].some((projectId) =>
+        ids.has(projectId),
+      ),
+  )
+}
+
 async function commitOperation(
   operation: ProjectOperation,
 ): Promise<ProjectRuntimeCommitResult> {
   if (operation.phase === 'cleanup_complete') {
     return { status: 'cleanup_complete' }
   }
+  operation.workCommitted = true
   operation.phase = 'committing'
   try {
     while (true) {
@@ -361,20 +628,24 @@ async function commitOperation(
       item.idle = false
       item.lastError = null
     }
+    operation.prepared.forEach((item) => {
+      item.control.releaseFinalized?.()
+    })
   } catch (error) {
     operation.phase = 'cleanup_failed'
+    operation.triggerReason = errorText(error)
+    operation.recoveryReason = null
+    refreshPendingSnapshot()
     return {
       status: 'cleanup_failed',
       error: new ProjectRuntimeCleanupError(
         [...operation.projectIds],
         error,
+        operation.id,
       ),
     }
   }
 
-  operation.prepared.forEach((item) => {
-    item.control.releaseFinalized?.()
-  })
   operation.phase = 'cleanup_complete'
   for (const projectId of operation.projectIds) {
     registrations.delete(projectId)
@@ -454,14 +725,17 @@ export async function prepareProjectRuntimes(
       }
     }
   } catch (error) {
-    recoverPrepared(operation)
-    throw error
+    const recovery = beginRecovery(operation, error, false)
+    if (recovery.status === 'rolled_back') throw error
+    throw recovery.error
   }
 
   const disposal: ProjectRuntimeDisposal = {
-    rollback() {
-      if (operation.phase === 'cleanup_complete') return false
-      return recoverPrepared(operation)
+    rollback(cause: unknown = new Error('项目操作已取消')) {
+      if (operation.phase === 'cleanup_complete') {
+        return { status: 'rolled_back' }
+      }
+      return beginRecovery(operation, cause, true)
     },
     commit(workResult?: unknown) {
       operation.workResult = workResult
@@ -472,8 +746,9 @@ export async function prepareProjectRuntimes(
   try {
     await waitForPreparedIdle(operation)
   } catch (error) {
-    recoverPrepared(operation)
-    throw error
+    const recovery = beginRecovery(operation, error, false)
+    if (recovery.status === 'rolled_back') throw error
+    throw recovery.error
   }
   operation.phase = 'prepared'
   return disposal
@@ -484,11 +759,20 @@ export async function withPreparedProjectRuntimes<T>(
   work: () => Promise<T>,
   options: ProjectRuntimePrepareOptions = {},
 ): Promise<T> {
-  const pending = pendingCleanupOperation(projectIds)
-  if (pending) {
+  const pending = operationForExactIds(projectIds)
+  if (pending?.phase === 'cleanup_failed') {
     const retried = await commitOperation(pending)
     if (retried.status === 'cleanup_failed') throw retried.error
     return pending.workResult as T
+  }
+  if (
+    pending?.phase === 'recovering' ||
+    pending?.phase === 'recovery_failed'
+  ) {
+    const recovered = await retryOperationRecovery(pending)
+    if (!recovered) {
+      throw pending.recoveryError ?? recoveryErrorFor(pending)
+    }
   }
 
   const disposal = await prepareProjectRuntimes(projectIds, options)
@@ -496,7 +780,10 @@ export async function withPreparedProjectRuntimes<T>(
   try {
     result = await work()
   } catch (error) {
-    disposal.rollback()
+    const recovery = disposal.rollback(error)
+    if (recovery.status === 'recovery_pending') {
+      throw recovery.error
+    }
     throw error
   }
   const committed = await disposal.commit(result)
@@ -510,11 +797,20 @@ export async function disposeProjectRuntimes(
   projectIds: readonly string[],
   options: ProjectRuntimePrepareOptions = {},
 ): Promise<void> {
-  const pending = pendingCleanupOperation(projectIds)
-  if (pending) {
+  const pending = operationForExactIds(projectIds)
+  if (pending?.phase === 'cleanup_failed') {
     const retried = await commitOperation(pending)
     if (retried.status === 'cleanup_failed') throw retried.error
     return
+  }
+  if (
+    pending?.phase === 'recovering' ||
+    pending?.phase === 'recovery_failed'
+  ) {
+    const recovered = await retryOperationRecovery(pending)
+    if (!recovered) {
+      throw pending.recoveryError ?? recoveryErrorFor(pending)
+    }
   }
   const disposal = await prepareProjectRuntimes(projectIds, options)
   const committed = await disposal.commit()
@@ -526,11 +822,48 @@ export async function disposeProjectRuntimes(
 export async function retryProjectRuntimeCleanup(
   projectIds: readonly string[],
 ): Promise<void> {
-  const pending = pendingCleanupOperation(projectIds)
-  if (!pending) return
+  const ids = [...new Set(projectIds)]
+  const related = relatedOperations(ids)
+  if (related.length === 0) return
+  const pending = related[0]
+  const exact =
+    related.length === 1 &&
+    !!pending &&
+    pending.phase === 'cleanup_failed' &&
+    pending.projectIds.size === ids.length &&
+    ids.every((projectId) => pending.projectIds.has(projectId))
+  if (!exact) {
+    throw new ProjectRuntimeRetryScopeError(
+      ids,
+      related.flatMap((operation) => [...operation.projectIds]),
+    )
+  }
   const result = await commitOperation(pending)
   if (result.status === 'cleanup_failed') {
     throw result.error
+  }
+}
+
+export async function retryProjectRuntimeOperation(
+  operationId: number,
+): Promise<void> {
+  const operation = uniqueOperations().find(
+    (item) => item.id === operationId,
+  )
+  if (!operation) return
+  if (operation.phase === 'cleanup_failed') {
+    const result = await commitOperation(operation)
+    if (result.status === 'cleanup_failed') throw result.error
+    return
+  }
+  if (
+    operation.phase === 'recovering' ||
+    operation.phase === 'recovery_failed'
+  ) {
+    const recovered = await retryOperationRecovery(operation)
+    if (!recovered) {
+      throw operation.recoveryError ?? recoveryErrorFor(operation)
+    }
   }
 }
 
@@ -542,4 +875,7 @@ export function resetProjectRuntimesForTests(): void {
   registrations.clear()
   projectOperations.clear()
   nextGeneration = 1
+  nextOperationId = 1
+  pendingSnapshot = []
+  pendingListeners.forEach((listener) => listener())
 }

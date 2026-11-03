@@ -71,7 +71,9 @@ describe('Canvas AgentHost shutdown generation', () => {
     })
     const disposal = await prepareProjectRuntimes(['p2'])
 
-    expect(disposal.rollback()).toBe(true)
+    await expect(disposal.rollback()).toEqual({
+      status: 'rolled_back',
+    })
     invalidateAgentHostsForHmr('canvas-agent')
     const remounted = upsertAgentHost({
       id: host.id,

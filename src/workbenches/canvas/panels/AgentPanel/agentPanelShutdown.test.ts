@@ -1,6 +1,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   ProjectRuntimeBusyError,
+  ProjectRuntimeRecoveryError,
+  prepareProjectRuntimes,
   registerProjectRuntime,
   resetProjectRuntimesForTests,
   withPreparedProjectRuntimes,
@@ -60,13 +62,16 @@ describe('AgentPanel shutdown barrier', () => {
 
     await expect(
       withPreparedProjectRuntimes(['p1'], purge),
-    ).rejects.toMatchObject({ name: 'TaskLifecycleTimeoutError' })
+    ).rejects.toMatchObject({
+      name: 'ProjectRuntimeRecoveryError',
+      triggerReason: expect.stringContaining('超时'),
+    })
     expect(purge).not.toHaveBeenCalled()
     expect(lifecycle.state).toBe('draining')
     expect(shutdown.canReopen()).toBe(false)
     expect(shutdown.canFinalize()).toBe(false)
     await expect(
-      withPreparedProjectRuntimes(['p1'], purge),
+      prepareProjectRuntimes(['p1']),
     ).rejects.toBeInstanceOf(ProjectRuntimeBusyError)
 
     flushGate.resolve()
@@ -102,7 +107,7 @@ describe('AgentPanel shutdown barrier', () => {
 
     await expect(
       withPreparedProjectRuntimes(['p1'], purge),
-    ).rejects.toMatchObject({ name: 'TaskLifecycleTimeoutError' })
+    ).rejects.toBeInstanceOf(ProjectRuntimeRecoveryError)
     expect(purge).not.toHaveBeenCalled()
     expect(lifecycle.state).toBe('draining')
 
