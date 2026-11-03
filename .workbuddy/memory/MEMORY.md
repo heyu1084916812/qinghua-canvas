@@ -1,12 +1,10 @@
 # CanvasFlow（轻画）项目记忆
 
-### Agent outcome 延迟写库屏障（2026-11-03，对账 #861a）
+### Agent outcome 延迟写库测试屏障（2026-11-03，对账 #861a）
 
-- **入口身份不够，事务内也要重读 revision**：`applyAgentOutcome()` 在 expected revision 通过后，
-  必须允许测试用 `deferred` 把旧写挂在同一存储事务内；等待结束再次读取最新 `messageRevision`，
-  若期间新回合 `saveMessages()` 已落库，旧写只能返回 `conflict`，绝不能写整份旧历史或新回合字段。
-- **生产路径不依赖测试钩子**：生产调用不传 `deferred`；正常 outcome 仍在同一事务一次写消息、
-  `pendingConfirmation / continuation / allowedToolNames` 和已投递 steer 删除。冲突不写 UI、不迁 Job。
+- **生产接口不藏测试钩子**：`applyAgentOutcome()` 只在消息事务内按 expected `messageRevision` CAS，
+  不接受 `deferred` 或其它测试字段。确定性并发测试在测试侧包装 `StoragePort.transaction`，让旧写先
+  挂起在事务入口；期间新回合落库，随后放行旧写，旧写只能返回 `conflict`。
 - **故障注入必须同时看跨会话**：补测在旧写挂起期间给 A 落新用户消息与新确认字段、给 B 独立落库；
   释放旧写后断言 A 的新历史 / revision / 字段不变，B 历史不受影响。
 - **证据**：聚焦 **91/91**；全量 `npm test` **3911 passed / 1 skipped**；tsc/check/build/diff-check

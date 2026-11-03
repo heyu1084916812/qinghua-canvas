@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import { createMemoryPlatform } from '../../platform/memory'
 import type { QueuedAgentTurn } from '../../domain/agent/queuedTurn'
 import { AGENT_CONTEXT_WINDOW, createAgentSessionStore } from './sessionStore'
@@ -257,7 +257,38 @@ describe('Agent 会话 · 隔离（最容易出错的地方）', () => {
 
 describe('Agent 会话 · 回合版本门禁', () => {
   it('★★ 旧 outcome 写库挂起期间新回合落库，释放后返回 conflict', async () => {
-    const s = store()
+    const base = createMemoryPlatform().storage
+    let blockNextTransaction = false
+    let markEntered!: () => void
+    let releaseOldWrite!: () => void
+    const entered = new Promise<void>((resolve) => {
+      markEntered = resolve
+    })
+    const gate = new Promise<void>((resolve) => {
+      releaseOldWrite = resolve
+    })
+    const storage = new Proxy(base, {
+      get(target, property) {
+        if (property === 'transaction') {
+          return async (
+            tables: Parameters<typeof target.transaction>[0],
+            work: Parameters<typeof target.transaction>[1],
+          ) => {
+            if (blockNextTransaction) {
+              blockNextTransaction = false
+              markEntered()
+              await gate
+            }
+            return target.transaction(tables, work)
+          }
+        }
+        const value = Reflect.get(target, property, target)
+        return typeof value === 'function'
+          ? value.bind(target)
+          : value
+      },
+    }) as typeof base
+    const s = createAgentSessionStore(storage)
     const a = await s.create({
       projectId: 'p1',
       channelId: 'c1',
@@ -272,13 +303,9 @@ describe('Agent 会话 · 回合版本门禁', () => {
       { role: 'user', content: '旧回合' },
     ])
     const revision = first?.messageRevision ?? 0
-    let releaseOldWrite: (() => void) | undefined
-    const deferred = new Promise<void>((resolve) => {
-      releaseOldWrite = resolve
-    })
+    blockNextTransaction = true
     const oldWrite = s.applyAgentOutcome(a.id, {
       expectedRevision: revision,
-      deferred,
       messages: [
         { role: 'user', content: '旧回合' },
         { role: 'assistant', content: '旧回答' },
@@ -290,7 +317,7 @@ describe('Agent 会话 · 回合版本门禁', () => {
       },
       allowedToolNames: ['runNode'],
     })
-    await vi.waitFor(() => expect(releaseOldWrite).toBeTypeOf('function'))
+    await entered
     const newer = await s.saveMessages(a.id, [
       { role: 'user', content: '新回合不能丢' },
     ])
@@ -310,7 +337,7 @@ describe('Agent 会话 · 回合版本门禁', () => {
     await s.saveMessages(b.id, [
       { role: 'user', content: 'B 会话独立历史' },
     ])
-    releaseOldWrite!()
+    releaseOldWrite()
     await expect(oldWrite).resolves.toEqual({
       ok: false,
       reason: 'conflict',

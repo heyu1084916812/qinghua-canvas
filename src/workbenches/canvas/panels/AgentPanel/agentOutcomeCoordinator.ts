@@ -27,7 +27,6 @@ export interface AgentOutcomeSessionPort {
     sessionId: string,
     input: {
       expectedRevision?: number
-      deferred?: Promise<void>
       messages: readonly ChatMessage[]
       pendingConfirmation?: AgentSession['pendingConfirmation']
       continuation?: AgentSession['continuation']
