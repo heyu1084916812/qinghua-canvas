@@ -178,9 +178,15 @@ function harness(args: {
     cachedChatRoute: vi.fn((target: AgentSession) =>
       routeCache.get(target.id) ?? null,
     ) as never,
-    updateChatRoute: vi.fn(
-      (sessionId: string, route: AgentChatRoute) => {
+    commitChatRoute: vi.fn(
+      (
+        sessionId: string,
+        expectedRoute: AgentChatRoute,
+        route: AgentChatRoute,
+      ) => {
+        if (routeCache.get(sessionId) !== expectedRoute) return false
         routeCache.set(sessionId, route)
+        return true
       },
     ) as never,
     contextTraceFor: () => undefined,

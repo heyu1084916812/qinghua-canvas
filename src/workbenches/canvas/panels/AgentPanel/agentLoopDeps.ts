@@ -73,10 +73,11 @@ export interface AgentLoopAssemblyPorts {
   cachedChatRoute: (
     session: AgentSession,
   ) => AgentChatRoute | null
-  updateChatRoute: (
+  commitChatRoute: (
     sessionId: string,
-    route: AgentChatRoute,
-  ) => void
+    expectedRoute: AgentChatRoute,
+    nextRoute: AgentChatRoute,
+  ) => boolean
   contextTraceFor: (
     sessionId: string,
   ) => AgentTurnContextTrace | undefined
@@ -166,19 +167,21 @@ export function assembleAgentLoopDeps(
       `结果已返回，但运行记录写入失败：${warning}`,
       'error',
     )
-  const onRouteSucceeded = (
-    selected: Parameters<RouteExecutionPort['execute']>[0] extends {
-      onRouteSucceeded?: (route: infer T) => void
+  const onRouteSucceeded =
+    (baseRoute: AgentChatRoute) =>
+    (
+      selected: Parameters<RouteExecutionPort['execute']>[0] extends {
+        onRouteSucceeded?: (route: infer T) => void
+      }
+        ? T
+        : never,
+    ) => {
+      ports.commitChatRoute(
+        session.id,
+        baseRoute,
+        promoteAgentChatRouteCandidate(baseRoute, selected),
+      )
     }
-      ? T
-      : never,
-  ) => {
-    if (!route) return
-    ports.updateChatRoute(
-      session.id,
-      promoteAgentChatRouteCandidate(route, selected),
-    )
-  }
   const signalOf = () =>
     input.turnController?.signal ??
     ports.abortSignalFor(session.id) ??
@@ -234,7 +237,9 @@ export function assembleAgentLoopDeps(
         : {}),
       trace: traceOf(request),
       onRecordWarning,
-      ...(liveRoute ? { onRouteSucceeded } : {}),
+      ...(liveRoute
+        ? { onRouteSucceeded: onRouteSucceeded(liveRoute) }
+        : {}),
       ...(onStream ? { onStream } : {}),
     })
   }

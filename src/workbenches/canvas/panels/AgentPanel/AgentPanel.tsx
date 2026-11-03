@@ -33,7 +33,6 @@ import {
 } from '../../../../domain/project/modelCatalog'
 import {
   generationAvailabilityOf,
-  runRouteCandidatesOf,
 } from '../../../../domain/project/generationRouting'
 import { resolveDefaults } from '../../../../features/canvas/createNodeWithDefaults'
 import { cropAsset, extractSelection } from '../../../../features/canvas/extractSelection'
@@ -69,8 +68,6 @@ import {
   executeConfirmedTool,
   type AgentToolContext,
 } from '../../agent/tools'
-import { createModelRoutePort } from '../../../../features/shared/agent/ModelRoutePort'
-import { createRouteExecutionPort } from '../../../../features/shared/agent/RouteExecutionPort'
 import {
   createAgentController,
   type AgentTurnOrigin,
@@ -121,6 +118,7 @@ import {
 } from './useAgentConversationController'
 import { useAgentComposerController } from './useAgentComposerController'
 import { useAgentAttachmentsController } from './useAgentAttachmentsController'
+import { useAgentChatRouting } from './useAgentChatRouting'
 import { useAgentSessionLifecycle } from './useAgentSessionLifecycle'
 import { useAgentSessionActionsController } from './useAgentSessionActionsController'
 import { runAgentInitialLoad } from './agentInitialLoad'
@@ -156,10 +154,6 @@ import {
 } from './agentInterruptSettlement'
 import { runAgentCanvasNodes } from './agentCanvasRun'
 import { useAgentRunPresentation } from './useAgentRunPresentation'
-import {
-  type AgentChatRoute,
-  type ChatRoutePreparation,
-} from './agentChatRoute'
 import { previewOf } from './agentConfirmationPreview'
 import { originOf, viewportWorldOf } from './agentPanelViewHelpers'
 import {
@@ -442,6 +436,15 @@ export function AgentPanel({
     () => channels.getState().channels,
     () => channels.getState().channels,
   )
+  const {
+    modelRoute,
+    routeExecution,
+    cachedChatRoute,
+    prepareChatRoute,
+    commitChatRoute,
+    clearChatRoute,
+    clearChatRoutes,
+  } = useAgentChatRouting({ channels, allChannels })
   const customModels = useSyncExternalStore(
     channels.subscribe,
     () => channels.getState().customModels,
@@ -578,13 +581,6 @@ export function AgentPanel({
   const explicitMediaModelsRef = useRef(
     new Map<string, { image?: string; video?: string }>(),
   )
-  /**
-   * 一次用户回合解析出的实际渠道。
-   *
-   * 确认与自动执行会把同一回合拆成多次模型调用，这些调用必须继续走同一条渠道；
-   * 下一次真正发送新消息时再按全局策略重新选路。
-   */
-  const chatRouteRef = useRef(new Map<string, AgentChatRoute>())
   const deliveredSteersRef = useRef(new Map<string, Set<string>>())
   const contextTraceRef = useRef(
     new Map<string, AgentTurnContextTrace>(),
@@ -620,7 +616,7 @@ export function AgentPanel({
         planAliasesRef.current.clear()
         autoRunRef.current.clear()
         explicitMediaModelsRef.current.clear()
-        chatRouteRef.current.clear()
+        clearChatRoutes()
         contextTraceRef.current.clear()
         inFlightConfirmationRef.current.clear()
       }
@@ -640,30 +636,12 @@ export function AgentPanel({
     clearLiveActivitiesFor,
     clearLiveProcessFor,
     clearRunTasksFor,
+    clearChatRoutes,
     cancelPendingAssetSync,
     lifecycle,
     onDisposeReady,
     store,
   ])
-
-  const modelRoute = useMemo(
-    () =>
-      createModelRoutePort((request) =>
-        channels.planGenerationRoute(request),
-      ),
-    [channels],
-  )
-  const routeExecution = useMemo(
-    () =>
-      createRouteExecutionPort((request) => {
-        const { onStream, ...rest } = request
-        return channels.completeWithTools({
-          ...rest,
-          ...(onStream ? { onChunk: onStream } : {}),
-        })
-      }),
-    [channels],
-  )
 
   /**
    * 已启用渠道。`useMemo` 不是为了省那一次 filter，而是为了让**依赖它的
@@ -736,66 +714,6 @@ export function AgentPanel({
     () => toLogicalName(allChannels, current?.model ?? ''),
     [allChannels, current?.model],
   )
-  /**
-   * 取本轮路由：同一会话、同一逻辑模型在本轮内复用；换模型或开始新消息时重新选。
-   * UI 只保存逻辑名，渠道始终是后台实现细节。
-   */
-  const cachedChatRoute = useCallback((session: AgentSession): AgentChatRoute | null => {
-    const logicalModel =
-      toLogicalName(allChannels, session.model) || session.model.trim()
-    const cached = chatRouteRef.current.get(session.id)
-    return cached?.logicalModel === logicalModel ? cached : null
-  }, [allChannels])
-
-  const prepareChatRoute = useCallback(
-    async (
-      session: AgentSession,
-      fresh = false,
-    ): Promise<ChatRoutePreparation> => {
-      const logicalModel =
-        toLogicalName(allChannels, session.model) || session.model.trim()
-      if (!logicalModel) {
-        return { ok: false, message: '还没选模型：先在上面选一个对话模型' }
-      }
-      const cached = cachedChatRoute(session)
-      if (!fresh && cached) return { ok: true, route: cached }
-      const planned = await modelRoute.plan({
-        capability: 'chat',
-        logicalModel,
-      })
-      if (!planned.ok) {
-        const message =
-          planned.reason === 'no_token'
-            ? `「${logicalModel}」的 Key 还未配置`
-            : planned.reason === 'policy_excluded'
-              ? `「${logicalModel}」已被当前路由范围排除`
-              : `没有可用的模型服务提供「${logicalModel}」：请在模型服务里勾选该模型或补好模型映射`
-        return { ok: false, message }
-      }
-      const candidates = runRouteCandidatesOf(planned.plan)
-      const first = candidates[0]
-      if (!first) {
-        return {
-          ok: false,
-          message: `没有可用的模型服务提供「${logicalModel}」`,
-        }
-      }
-      const route: AgentChatRoute = {
-        channelId: first.channelId,
-        ...(first.credentialGroupId
-          ? { credentialGroupId: first.credentialGroupId }
-          : {}),
-        logicalModel,
-        upstreamModel: first.model,
-        routePlanId: `${planned.plan.logicalModel}:${planned.plan.capability}:${planned.plan.strategy}`,
-        candidates,
-      }
-      chatRouteRef.current.set(session.id, route)
-      return { ok: true, route }
-    },
-    [allChannels, cachedChatRoute, modelRoute],
-  )
-
   /**
    * 新会话该用哪个模型：默认模型 → 该渠道第一个对话模型。
    *
@@ -1297,9 +1215,7 @@ export function AgentPanel({
           abortSignalFor: (sessionId) =>
             abortRefs.current.get(sessionId)?.signal,
           cachedChatRoute,
-          updateChatRoute: (sessionId, route) => {
-            chatRouteRef.current.set(sessionId, route)
-          },
+          commitChatRoute,
           contextTraceFor: (sessionId) =>
             contextTraceRef.current.get(sessionId),
           planAliasesFor: (sessionId) =>
@@ -1337,6 +1253,7 @@ export function AgentPanel({
     [
       channels,
       cachedChatRoute,
+      commitChatRoute,
       modelRoute,
       reviewModel,
       canvasReviewEnabled,
@@ -2466,10 +2383,10 @@ export function AgentPanel({
   const pickModel = useCallback(
     async (model: string) => {
       if (!current) return
-      chatRouteRef.current.delete(current.id)
+      clearChatRoute(current.id)
       await patchSession({ model, channelId: '' })
     },
-    [current, patchSession],
+    [clearChatRoute, current, patchSession],
   )
 
   /**
