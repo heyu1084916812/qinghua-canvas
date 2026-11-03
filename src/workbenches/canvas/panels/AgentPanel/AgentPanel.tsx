@@ -1103,7 +1103,7 @@ export function AgentPanel({
         } catch (error) {
           return {
             ok: false,
-            reason: error instanceof Error ? error.message : errText(error),
+            reason: errText(error),
           }
         }
       },

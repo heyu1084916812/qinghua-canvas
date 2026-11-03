@@ -30,6 +30,10 @@ export interface AgentCanvasRunDeps {
   ): void
 }
 
+export function agentCanvasFailureText(error: unknown): string {
+  return errText(error)
+}
+
 type AgentRunNodesResult = Awaited<ReturnType<AgentToolContext['runNodes']>>
 
 /**
@@ -112,8 +116,7 @@ export async function runAgentCanvasNodes(
           )
           return null
         } catch (error) {
-          const message =
-            error instanceof Error ? error.message : errText(error)
+          const message = agentCanvasFailureText(error)
           setRunTasksFor(sessionId, (current) =>
             finishAgentRunTask(current, id, {
               ok: false,

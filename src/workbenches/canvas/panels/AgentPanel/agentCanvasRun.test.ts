@@ -2,7 +2,11 @@ import { describe, expect, it, vi } from 'vitest'
 import type { CanvasStore } from '../../../../state/workbenches/canvas/store'
 import type { ChannelStore } from '../../../../state/channel/channelStore'
 import type { PlatformKit } from '../../../../platform/ports'
-import { runAgentCanvasNodes } from './agentCanvasRun'
+import { ChannelError } from '../../../../platform/channels/types'
+import {
+  agentCanvasFailureText,
+  runAgentCanvasNodes,
+} from './agentCanvasRun'
 
 const graph = {
   projectId: 'project-1',
@@ -11,6 +15,19 @@ const graph = {
 } as unknown as ReturnType<CanvasStore['getSnapshot']>
 
 describe('runAgentCanvasNodes', () => {
+  it('渠道错误保留真实 HTTP 原因，不泄漏调试串', () => {
+    const text = agentCanvasFailureText(
+      new ChannelError({
+        kind: 'http',
+        status: 502,
+        body: '{"error":{"message":"上游模型暂不可用"}}',
+      }),
+    )
+    expect(text).toContain('HTTP 502')
+    expect(text).toContain('上游模型暂不可用')
+    expect(text).not.toContain('[channel] http')
+  })
+
   it('执行前 preflight 失败时不发付费请求，并把失败写回任务行', async () => {
     const setRunTasksFor = vi.fn()
     const runNode = vi.fn(async () => undefined)
