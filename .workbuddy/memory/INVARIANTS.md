@@ -96,6 +96,12 @@
   ToolRegistry / 队列实现，不得请求模型、改 Job、落库或推进确认。定时与滚动算法只调用
   `agentOutputReveal.ts` / `agentConversationScroll.ts`，迁移不得改 JSX、DOM、data 属性、className、
   文案、布局或 CSS。
+- **AgentSessionLifecycle 不拥有会话真相**：`useAgentSessionLifecycle` 只持有一套 React 投影
+  `list / current / messages / listRef / currentIdRef`；SessionStore 与 AgentController 仍是唯一真相，
+  AgentPanel 不得再保留第二套同名 state/ref。`switchTo` 必须用 latest-request 序号拒绝慢返回旧结果，
+  `refresh` 只更新列表、不改当前选择，`currentIdRef` 必须同步，patch/snapshot 必须同时更新 list/current。
+  切会话先清 Composer 旧输入与 timer，再按新会话 `pendingAssetIds` 恢复已存草稿；异步改名、保存、切换
+  晚返回都不得把用户当前选择强行切回旧会话。
 - **队列 hook 不拥有队列真相**：`useAgentQueueController` 只做 React 适配；Session/Controller 是唯一真相，
   队列领取后必须绑定真实 `turnId`，附件在入队事务内冻结并消费，不能因为拆 hook 产生第二份队列。
 - **画布执行模块不能重试付费请求**：`agentCanvasRun` 必须保持 preflight → 同波并发 → `store.flush()`

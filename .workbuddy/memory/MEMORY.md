@@ -1,5 +1,17 @@
 # CanvasFlow（轻画）项目记忆
 
+### AgentSessionLifecycle（2026-11-04，对账 #868，🚧 待独立验收，`17b349e`）
+
+- `useAgentSessionLifecycle` 只持有会话 React 投影：`list / current / messages / listRef / currentIdRef`；
+  SessionStore 和 AgentController 仍是唯一真相。Hook 只经 controller refresh、session get/messages/update/
+  rename/remove 显式端口，不得 import 或另存队列、Job、发送、确认业务状态。
+- `switchTo` 必须有 latest-request 序号，慢返回旧会话不能覆盖后选会话；`refresh` 只更新列表、不擅自切当前
+  会话；`currentIdRef` 必须同步；patch 与 snapshot 同时更新 list/current。切会话时 Composer 先清旧输入，
+  再按新会话 `pendingAssetIds` 恢复已存草稿，旧会话 timer 不得串写。改名/异步保存晚返回不得强切回旧会话。
+- 本批不改 JSX/DOM/data 属性/className/文案/布局/CSS。`AgentPanel.tsx` **3216 → 3217 行**（接线净增 1 行）；
+  Hook **6/6**、AgentPanel 目录 **224/224**、G735 **35/35**、G769 **39/39**、G865 **24/24**，全量
+  **4040 passed / 1 skipped**。
+
 ### AgentComposerController（2026-11-04，对账 #867，✅ 已独立验收，`029fe7d`）
 
 - `useAgentComposerController` 只做输入区 React 适配：draft、mention 去重、picker 唯一开关、composer 高度
