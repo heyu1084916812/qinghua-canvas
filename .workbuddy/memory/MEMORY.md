@@ -1,5 +1,16 @@
 # CanvasFlow（轻画）项目记忆
 
+### AgentComposerController（2026-11-04，对账 #867，待独立验收）
+
+- `useAgentComposerController` 只做输入区 React 适配：draft、mention 去重、picker 唯一开关、composer 高度
+  与指针/键盘 resize；待发送素材只经 `onPendingAssetsChange` 端口回 AgentPanel。发送、队列、确认、
+  SessionStore、AgentController、Job 均未迁出。
+- `agentDraft.ts` / `agentComposerLayout.ts` 仍是纯算法来源；160ms pendingAsset 同步 timer 必须在切会话和
+  unmount 清理，旧会话不得写新会话。
+- 本批不改 JSX/DOM/data 属性/className/文案/布局/CSS。`AgentPanel.tsx` **3433 → 3216 行**；
+  Hook **5/5**、AgentPanel 目录 **217/217**、G735 **35/35**、G769 **39/39**、G865 **24/24**，
+  全量 **4033 passed / 1 skipped**。
+
 ### AgentConversationController（2026-11-04，对账 #866，✅ 已独立验收，`57b1651`）
 
 - `useAgentConversationController` 只做 React 视图适配：reveal、步骤展开、滚动跟随、jump-to-latest、

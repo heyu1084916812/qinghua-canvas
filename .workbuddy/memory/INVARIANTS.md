@@ -86,6 +86,11 @@
 - **AgentPanel 三块视图壳只渲染**：`AgentPanelHeader`、`AgentConversationPane`、`AgentComposerPane`
   不得直接调用 SessionStore、队列 pump、工具执行或持久化；只接收状态与回调。重命名、两步删除、
   共享 `openPicker`、滚动 ref、Composer 高度和发送/停止互斥仍由 `AgentPanel` 协调。
+- **AgentComposerController 不拥有业务真相**：`useAgentComposerController` 只管理 draft、mention、
+  picker、composer 高度以及 pendingAsset 同步端口；不得 import SessionStore / AgentController /
+  ToolRegistry / 队列实现，不得发送消息、请求模型、推进确认或修改 Job。160ms 待发送素材 timer
+  必须在切会话和 unmount 清理，旧会话 timer 不得写新会话；draft 与高度算法继续复用
+  `agentDraft.ts` / `agentComposerLayout.ts`。
 - **AgentConversationController 不拥有业务真相**：`useAgentConversationController` 只管理 reveal、
   步骤展开、滚动跟随、jump reset 和 `visibleItems` 派生；不得 import SessionStore / AgentController /
   ToolRegistry / 队列实现，不得请求模型、改 Job、落库或推进确认。定时与滚动算法只调用
