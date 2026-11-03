@@ -86,6 +86,12 @@
 - **AgentPanel 三块视图壳只渲染**：`AgentPanelHeader`、`AgentConversationPane`、`AgentComposerPane`
   不得直接调用 SessionStore、队列 pump、工具执行或持久化；只接收状态与回调。重命名、两步删除、
   共享 `openPicker`、滚动 ref、Composer 高度和发送/停止互斥仍由 `AgentPanel` 协调。
+- **AgentPanelView 只组合视图壳**：`AgentPanelView` 只保留外层 `aside`、`data-agent-panel`、Esc 浮层关闭、
+  drag/drop 和 Header / Conversation / Composer 顺序；不得读 Store、执行工具、请求模型或持有业务 state。
+  props 必须由 AgentPanel 装配，迁移不得改 JSX 结构、className、文案、布局或 CSS。
+- **AgentSkillsController 不拥有技能正文或 Job**：`useAgentSkillsController` 只接收显式端口；
+  handoff 必须复用 `parseMentions` / `mentionToken`，导入复用 `parseSkillMarkdown` + SkillStore，
+  SkillStore 仍是技能正文真相。收藏落库失败不得伪造成功；不得请求模型、修改 Job/队列/确认。
 - **AgentComposerController 不拥有业务真相**：`useAgentComposerController` 只管理 draft、mention、
   picker、composer 高度以及 pendingAsset 同步端口；不得 import SessionStore / AgentController /
   ToolRegistry / 队列实现，不得发送消息、请求模型、推进确认或修改 Job。160ms 待发送素材 timer

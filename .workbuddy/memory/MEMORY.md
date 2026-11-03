@@ -1,5 +1,16 @@
 # CanvasFlow（轻画）项目记忆
 
+### AgentPanelView + AgentSkillsController（2026-11-04，对账 #869/#870，🚧 待独立验收，`74623ad`）
+
+- `AgentPanelView` 只负责 Agent 面板外层 DOM 与三个视图壳组合：保留 `aside`、`data-agent-panel`、
+  Esc 浮层关闭、拖入素材和子视图顺序；不读 Store、不执行工具、不发请求。
+- `useAgentSkillsController` 只接收 current/allSkills/draft setter/patchSession/SkillStore/PresetStore/
+  notify/trackRun 显式端口；handoff 必须复用 `parseMentions` / `mentionToken`，导入复用
+  `parseSkillMarkdown` + SkillStore，收藏先反馈再落库，导航前收浮层。不请求模型、不改 Job/队列/确认。
+- 两项合计 `AgentPanel.tsx` **3217 → 3062 行**（净减少 155 行）；View **4/4**、SkillsController **5/5**、
+  AgentPanel 目录 **233/233**、G735 **35/35**、G769 **39/39**、G865 **24/24**，全量
+  **4049 passed / 1 skipped**。
+
 ### AgentSessionLifecycle（2026-11-04，对账 #868，✅ 已独立验收，`17b349e`）
 
 - `useAgentSessionLifecycle` 只持有会话 React 投影：`list / current / messages / listRef / currentIdRef`；
