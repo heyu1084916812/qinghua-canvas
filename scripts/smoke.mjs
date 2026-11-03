@@ -43376,6 +43376,7 @@ async function g865(browser) {
   let projectE = ''
   let projectF = ''
   let projectG = ''
+  let projectH = ''
   let sessionCId = ''
   const sessionId = `chat_smoke_g865_${stamp}`
   const queueId = `queue_smoke_g865_${stamp}`
@@ -43741,12 +43742,22 @@ async function g865(browser) {
       `[data-project-tree-item="${projectC}"]`,
     )
     await currentRow.waitFor({ state: 'visible', timeout: 20_000 })
-    const registryUrl = await page.evaluate(() =>
-      performance
+    const moduleUrls = await page.evaluate(() => {
+      const resources = performance
         .getEntriesByType('resource')
         .map((entry) => entry.name)
-        .find((name) =>
-          name.includes('/src/app/ProjectRuntimeRegistry.ts')))
+      const find = (segment) =>
+        resources.find((name) => name.includes(segment))
+      return {
+        registry: find('/src/app/ProjectRuntimeRegistry.ts'),
+        handoff: find('/src/features/canvas/agentHandoff.ts'),
+        skill: find('/src/features/canvas/agentSkillHandoff.ts'),
+        storeCache: find(
+          '/src/state/workbenches/canvas/storeCache.ts',
+        ),
+      }
+    })
+    const registryUrl = moduleUrls.registry
     await page.evaluate(async ({ id, url }) => {
       const { registerProjectRuntime } = await import(url)
       let disposeAttempts = 0
@@ -44243,6 +44254,28 @@ async function g865(browser) {
       }
     })
     await page.waitForTimeout(350)
+    await page.evaluate(async ({
+      id,
+      handoffUrl,
+      skillUrl,
+    }) => {
+      const { rememberActiveCanvas } = await import(
+        '/src/state/project/activeCanvas.ts'
+      )
+      const { sendSelectionToAgent } = await import(
+        handoffUrl
+      )
+      const { sendSkillToAgent } = await import(
+        skillUrl
+      )
+      rememberActiveCanvas(id)
+      sendSelectionToAgent(id, ['g865-settings-handoff'])
+      sendSkillToAgent(id, 'g865-settings-skill')
+    }, {
+      id: projectE,
+      handoffUrl: moduleUrls.handoff,
+      skillUrl: moduleUrls.skill,
+    })
     await page.evaluate(() => {
       history.pushState({}, '', '/settings')
       dispatchEvent(new PopStateEvent('popstate'))
@@ -44315,10 +44348,43 @@ async function g865(browser) {
       state: 'detached',
       timeout: 20_000,
     })
+    const settingsCleanupState = await page.evaluate(async ({
+      id,
+      handoffUrl,
+      skillUrl,
+    }) => {
+      const { takeAgentHandoff } = await import(
+        handoffUrl
+      )
+      const { takeAgentSkillHandoff } = await import(
+        skillUrl
+      )
+      return {
+        path: window.location.pathname,
+        activeCanvas: sessionStorage.getItem(
+          'qinghua:active-workbench:canvas',
+        ),
+        legacyActiveCanvas: sessionStorage.getItem(
+          'qinghua:active-canvas-id',
+        ),
+        handoff: takeAgentHandoff(id),
+        skill: takeAgentSkillHandoff(id),
+      }
+    }, {
+      id: projectE,
+      handoffUrl: moduleUrls.handoff,
+      skillUrl: moduleUrls.skill,
+    })
     rec(
       g,
-      '★★ 全局入口重试 cleanup 后快照清空，不重复删除数据',
-      (await globalNotice.count()) === 0,
+      '★★ /settings 全局重试 cleanup 后清状态但不错误导航',
+      (await globalNotice.count()) === 0 &&
+        settingsCleanupState.path === '/settings' &&
+        settingsCleanupState.activeCanvas === null &&
+        settingsCleanupState.legacyActiveCanvas === null &&
+        settingsCleanupState.handoff.length === 0 &&
+        settingsCleanupState.skill === null,
+      JSON.stringify(settingsCleanupState),
     )
     await page.evaluate(() => {
       history.pushState({}, '', '/projects')
@@ -44426,12 +44492,334 @@ async function g865(browser) {
       }
     })
     await page.waitForTimeout(350)
+    await page.evaluate(async ({ id, url }) => {
+      const { registerProjectRuntime } = await import(url)
+      let release
+      const gate = new Promise((resolve) => {
+        release = resolve
+      })
+      window.__g865ReleaseTreeCleanupCommit = () => release?.()
+      registerProjectRuntime({
+        projectId: id,
+        key: 'tree-cleanup-commit-gate',
+        beginDispose: () => ({
+          waitForIdle: () => gate,
+          whenIdle: () => gate,
+          canReopen: () => true,
+          reopenIfIdle: () => true,
+          canFinalize: () => true,
+          finalize: () => true,
+        }),
+      })
+    }, { id: projectF, url: registryUrl })
     await treeCleanupRetry.click()
+    await page.waitForFunction(() => {
+      const local = document.querySelector(
+        '[data-project-tree-cleanup-retry]',
+      )
+      const global = document.querySelector(
+        '[data-project-runtime-retry]',
+      )
+      return Boolean(
+        local &&
+        local.disabled &&
+        local.textContent?.trim() === '清理中…' &&
+        global &&
+        global.disabled &&
+        global.textContent?.trim() === '清理中…',
+      )
+    })
+    const treeCommitting = await page.evaluate(() => {
+      const local = document.querySelector(
+        '[data-project-tree-cleanup-retry]',
+      )
+      const global = document.querySelector(
+        '[data-project-runtime-retry]',
+      )
+      const localRect = local?.getBoundingClientRect()
+      const globalRect = global?.getBoundingClientRect()
+      return {
+        path: window.location.pathname,
+        localText: local?.textContent?.trim() ?? '',
+        globalText: global?.textContent?.trim() ?? '',
+        localDisabled: Boolean(local?.disabled),
+        globalDisabled: Boolean(global?.disabled),
+        localVisible:
+          Boolean(localRect) &&
+          localRect.width > 0 &&
+          localRect.height > 0,
+        globalVisible:
+          Boolean(globalRect) &&
+          globalRect.width > 0 &&
+          globalRect.height > 0,
+        overflow:
+          document.documentElement.scrollWidth >
+          document.documentElement.clientWidth,
+      }
+    })
+    rec(
+      g,
+      '★★ committing 时侧栏与全局按钮均禁用并显示清理中',
+      treeCommitting.path === `/canvas/${projectF}` &&
+        treeCommitting.localDisabled &&
+        treeCommitting.globalDisabled &&
+        treeCommitting.localText === '清理中…' &&
+        treeCommitting.globalText === '清理中…' &&
+        treeCommitting.localVisible &&
+        treeCommitting.globalVisible &&
+        !treeCommitting.overflow,
+      JSON.stringify(treeCommitting),
+    )
+    await page.screenshot({
+      path: `${OUT}/agent-host-865-tree-committing-1440-light.png`,
+    })
+    await page.setViewportSize({ width: 1024, height: 700 })
+    await page.evaluate(() => {
+      if (document.documentElement.dataset.theme !== 'dark') {
+        document.querySelector('[data-theme-toggle]')?.click()
+      }
+    })
+    await page.waitForTimeout(350)
+    await page.screenshot({
+      path: `${OUT}/agent-host-865-tree-committing-1024-dark.png`,
+    })
+    const compactTreeCommitting = await page.evaluate(() => {
+      const local = document.querySelector(
+        '[data-project-tree-cleanup-retry]',
+      )
+      const global = document.querySelector(
+        '[data-project-runtime-retry]',
+      )
+      const localRect = local?.getBoundingClientRect()
+      const globalRect = global?.getBoundingClientRect()
+      return {
+        localText: local?.textContent?.trim() ?? '',
+        globalText: global?.textContent?.trim() ?? '',
+        localVisible:
+          Boolean(localRect) &&
+          localRect.width > 0 &&
+          localRect.height > 0,
+        globalVisible:
+          Boolean(globalRect) &&
+          globalRect.width > 0 &&
+          globalRect.height > 0,
+        overflow:
+          document.documentElement.scrollWidth >
+          document.documentElement.clientWidth,
+      }
+    })
+    rec(
+      g,
+      '★★ 1024 深色 committing 文字与按钮可见且无横向溢出',
+      compactTreeCommitting.localText === '清理中…' &&
+        compactTreeCommitting.globalText === '清理中…' &&
+        compactTreeCommitting.localVisible &&
+        compactTreeCommitting.globalVisible &&
+        !compactTreeCommitting.overflow,
+      JSON.stringify(compactTreeCommitting),
+    )
+    await page.setViewportSize({ width: 1440, height: 900 })
+    await page.evaluate(() => {
+      if (document.documentElement.dataset.theme !== 'light') {
+        document.querySelector('[data-theme-toggle]')?.click()
+      }
+      window.__g865ReleaseTreeCleanupCommit?.()
+    })
     await page.waitForURL(`${BASE}/projects`, { timeout: 20_000 })
     rec(
       g,
-      '★★ 侧栏重试 cleanup 成功后离开已删除画布',
-      new URL(page.url()).pathname === '/projects',
+      '★★ 侧栏局部重试 cleanup 成功后统一离场并清活动画布',
+      new URL(page.url()).pathname === '/projects' &&
+        (await page.evaluate(() => ({
+          activeCanvas: sessionStorage.getItem(
+            'qinghua:active-workbench:canvas',
+          ),
+          legacyActiveCanvas: sessionStorage.getItem(
+            'qinghua:active-canvas-id',
+          ),
+        }))).activeCanvas === null &&
+        (await page.evaluate(() =>
+          sessionStorage.getItem('qinghua:active-canvas-id'),
+        )) === null,
+    )
+
+    projectH = await page.evaluate(async () => {
+      const { createWebPlatform } =
+        await import('/src/platform/web/index.ts')
+      const { createProjectRepository } =
+        await import('/src/state/project/repository.ts')
+      const repo = createProjectRepository(createWebPlatform().storage)
+      const created = await repo.create({
+        name: 'G865 当前画布全局清理',
+      })
+      return created.id
+    })
+    await page.goto(`${BASE}/canvas/${projectH}`, {
+      waitUntil: 'domcontentloaded',
+    })
+    await page.locator('[data-canvas-surface]').waitFor({
+      state: 'visible',
+      timeout: 20_000,
+    })
+    await page.evaluate(async ({ id, url }) => {
+      const { registerProjectRuntime } = await import(url)
+      let finalizeAttempts = 0
+      registerProjectRuntime({
+        projectId: id,
+        key: 'forced-current-global-cleanup-failure',
+        beginDispose: () => ({
+          waitForIdle: async () => undefined,
+          whenIdle: async () => undefined,
+          canReopen: () => true,
+          reopenIfIdle: () => true,
+          canFinalize: () => true,
+          finalize: () => {
+            finalizeAttempts += 1
+            return finalizeAttempts > 1
+          },
+        }),
+      })
+    }, { id: projectH, url: registryUrl })
+    await ensureSidebarOpen(page)
+    const projectHRow = page.locator(
+      `[data-project-tree-item="${projectH}"]`,
+    )
+    await projectHRow.waitFor({ state: 'visible', timeout: 20_000 })
+    await projectHRow
+      .locator('button[aria-label="更多"]')
+      .click({ force: true })
+    await page
+      .locator('[data-project-menu] [role="menuitem"]')
+      .filter({ hasText: '删除' })
+      .click()
+    await page.getByRole('button', { name: '确认删除' }).click()
+    await page.waitForFunction(
+      (id) =>
+        window.location.pathname === `/canvas/${id}` &&
+        Boolean(
+          document.querySelector(
+            '[data-project-runtime-pending][data-project-runtime-work-committed="true"]',
+          ),
+        ),
+      projectH,
+      { timeout: 20_000 },
+    )
+    const currentCleanupFailure = await page.evaluate(() => {
+      return {
+        path: window.location.pathname,
+        notice:
+          document
+            .querySelector('[data-project-runtime-recovery-notice]')
+            ?.textContent?.trim() ?? '',
+      }
+    })
+    rec(
+      g,
+      '★★ 当前画布 cleanup 失败时保留路由，交给全局入口重试',
+      currentCleanupFailure.path === `/canvas/${projectH}` &&
+        currentCleanupFailure.notice.includes(
+          '项目已删除，运行态待清理',
+        ) &&
+        currentCleanupFailure.notice.includes('重试恢复'),
+      JSON.stringify(currentCleanupFailure),
+    )
+
+    await page.evaluate(async ({
+      id,
+      handoffUrl,
+      skillUrl,
+    }) => {
+      const { sendSelectionToAgent, takeAgentHandoff } = await import(
+        handoffUrl
+      )
+      const {
+        sendSkillToAgent,
+        takeAgentSkillHandoff,
+      } = await import(
+        skillUrl
+      )
+      sendSelectionToAgent(id, ['g865-current-global-handoff'])
+      const firstHandoff = takeAgentHandoff(id)
+      sendSelectionToAgent(id, ['g865-current-global-handoff'])
+      sendSkillToAgent(id, 'g865-current-global-skill')
+      const firstSkill = takeAgentSkillHandoff(id)
+      sendSkillToAgent(id, 'g865-current-global-skill')
+      if (
+        firstHandoff.length !== 1 ||
+        firstSkill !== 'g865-current-global-skill'
+      ) {
+        throw new Error('G865 handoff probe failed')
+      }
+      document
+        .querySelector('[data-project-runtime-retry]')
+        ?.click()
+    }, {
+      id: projectH,
+      handoffUrl: moduleUrls.handoff,
+      skillUrl: moduleUrls.skill,
+    })
+    await page.waitForURL(`${BASE}/projects`, { timeout: 20_000 })
+    await page
+      .locator('[data-project-runtime-recovery-notice]')
+      .waitFor({ state: 'detached', timeout: 20_000 })
+    const currentGlobalCleanup = await page.evaluate(async ({
+      id,
+      handoffUrl,
+      skillUrl,
+      storeCacheUrl,
+    }) => {
+      const { takeAgentHandoff } = await import(
+        handoffUrl
+      )
+      const { takeAgentSkillHandoff } = await import(
+        skillUrl
+      )
+      const { canvasStoreFor } = await import(
+        storeCacheUrl
+      )
+      let storeRecreated = false
+      canvasStoreFor(id, () => {
+        storeRecreated = true
+        return {}
+      })
+      return {
+        path: window.location.pathname,
+        pending: document.querySelectorAll(
+          '[data-project-runtime-pending]',
+        ).length,
+        hostExists: Boolean(
+          document.querySelector(
+            `[data-agent-host-record="canvas-agent:${id}"]`,
+          ),
+        ),
+        activeCanvas: sessionStorage.getItem(
+          'qinghua:active-workbench:canvas',
+        ),
+        legacyActiveCanvas: sessionStorage.getItem(
+          'qinghua:active-canvas-id',
+        ),
+        handoff: takeAgentHandoff(id),
+        skill: takeAgentSkillHandoff(id),
+        storeRecreated,
+      }
+    }, {
+      id: projectH,
+      handoffUrl: moduleUrls.handoff,
+      skillUrl: moduleUrls.skill,
+      storeCacheUrl: moduleUrls.storeCache,
+    })
+    rec(
+      g,
+      '★★ 当前画布全局重试成功后离场并清 host、activeCanvas、handoff 与 store',
+      currentGlobalCleanup.path === '/projects' &&
+        currentGlobalCleanup.pending === 0 &&
+        !currentGlobalCleanup.hostExists &&
+        currentGlobalCleanup.activeCanvas === null &&
+        currentGlobalCleanup.legacyActiveCanvas === null &&
+        currentGlobalCleanup.handoff.length === 0 &&
+        currentGlobalCleanup.skill === null &&
+        currentGlobalCleanup.storeRecreated,
+      JSON.stringify(currentGlobalCleanup),
     )
 
     projectG = await page.evaluate(async () => {
@@ -44585,7 +44973,7 @@ async function g865(browser) {
       pageErrors.join(' | '),
     )
   } finally {
-    await page.evaluate(async ({ projectA, projectB, projectC, projectD, projectE, projectF, projectG }) => {
+    await page.evaluate(async ({ projectA, projectB, projectC, projectD, projectE, projectF, projectG, projectH }) => {
       const { createWebPlatform } =
         await import('/src/platform/web/index.ts')
       const { createProjectRepository } =
@@ -44598,7 +44986,8 @@ async function g865(browser) {
       if (projectE) await repo.purge(projectE)
       if (projectF) await repo.purge(projectF)
       if (projectG) await repo.purge(projectG)
-    }, { projectA, projectB, projectC, projectD, projectE, projectF, projectG }).catch(() => {})
+      if (projectH) await repo.purge(projectH)
+    }, { projectA, projectB, projectC, projectD, projectE, projectF, projectG, projectH }).catch(() => {})
     for (const row of channelSnapshot) {
       const current = await sharedRow(page, 'channels', row.id)
       if (!current || current.enabled === row.enabled) continue

@@ -134,9 +134,19 @@
   operationId、projectIds、status、workCommitted、retryable、work/recovery reason。页面不得自行保存
   projectIds 作为重试真相。子集、混合集合或包含其他 active operation 的 retry 抛
   `ProjectRuntimeRetryScopeError`，完全不相关集合才 no-op。
+- **commit 阶段门不可绕过**：只有 `prepared / cleanup_failed / 同一 commitPromise 的 committing`
+  可进入 commit。`preparing / recovering / recovery_failed` 抛 `ProjectRuntimeCommitStateError`，
+  不得改 phase、`workCommitted`、锁、注册或 pending。并发 commit 必须返回同一 Promise，finalize /
+  release / 注册移除各一次。`committing` 快照为 `retryable=false`，所有入口显示“清理中…”且禁用。
 - **combined child 逐项 finalize**：组合控制必须记录每个 child 的 finalized 位，canFinalize/finalize
   只看未完成 child。部分失败后第二次只重试未完成项；全部成功后才能 releaseFinalized。releaseFinalized
-  抛错进入 cleanup_failed 仍可重试，已经 finalized 的 child 不再 wait。
+  也必须逐 child 记录 released 位，抛错进入 cleanup_failed 后跳过已释放项。ProjectRuntimeRegistry 的
+  prepared runtime 使用同一 released 契约，A 已成功不能因 B 失败而重复 release。
+- **项目状态只由 cleanup completion 收尾**：registry 在 finalize / release / 注册移除 / 锁释放 /
+  pending 清空后发出唯一 completion。AppShell 用最新 pathname 调
+  `finalizeCommittedProjectRuntimes`，清 activeCanvas、两类 handoff、canvas store，仅当前路由正好是
+  被删画布才 `replace('/projects')`。`workCommitted=false` 的 recovery 成功和 HMR runtime-only
+  dispose 不触发破坏性清理；页面与全局重试不得各清一遍。
 - **注册表按代际条件删除**：AgentHostRegistry 与 ProjectRuntimeRegistry 都带 generation。HMR 先同步失效
   旧代际，再异步等待；旧 cleanup 只能在 capture token 仍匹配时删除。新代际不能被迟到 dispose 抹掉。
 - **shutdown 期间冻结 host generation**：项目操作开始即 freeze 当前 token；HMR 和 bridge 重挂载只能更新

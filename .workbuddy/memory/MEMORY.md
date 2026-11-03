@@ -34,6 +34,13 @@
   状态；`ProjectRuntimeCleanupError` 标明 work 已提交且可重试。同一 projectId 集合再次操作只重试 cleanup，
   并返回第一次 work 的结果，绝不能重跑仓储删除。项目页/侧栏必须显示真实状态和“重试清理”，不能报成
   仓储删除失败。
+- **commit 只能从合法阶段进入**：只有 `prepared / cleanup_failed / 同一 commitPromise 的 committing`
+  可以继续；`preparing / recovering / recovery_failed` 必须抛结构化 `ProjectRuntimeCommitStateError`，
+  且不能改 phase、`workCommitted`、锁、注册或 pending。并发 commit 共享同一 Promise，不能让第二调用
+  重跑 finalize / release / 注册移除。
+- **committing 是可见且不可重试的状态**：pending 快照必须包含 `committing / retryable=false`；全局与
+  项目页/侧栏按钮统一显示“清理中…”并禁用。页面局部 effect 不能因为 operation 暂时不在快照里就清掉
+  operationId 或提前报成功。
 - **late control 的真实状态必须保留**：每个 prepared control 记录 `idle / finalized / lastError`；
   prepare、recovery、commit 的等待都受统一 shutdown timeout 约束。late runtime resolve 后才能 finalize；
   reject 或永久 pending/timeout 都进入 cleanup_failed，不 finalize、不删注册、不释放锁，之后仍可重试。
@@ -57,18 +64,27 @@
   rollback 正常重开时也释放冻结。StrictMode 仍只 deactivate，不进入冻结。
 - **combined child 必须逐项记账**：`combineTaskShutdownControls` 为每个 child 保存 finalized 位；
   canFinalize/finalize 只看未完成项。host 成功而 execution false/throw 时第二次只重试 execution；
-  `releaseFinalized` 只能在全部 child 成功后执行，若它抛错要回到 cleanup_failed，已 finalize 的 child
-  不再重复 wait/finalize。
+  `releaseFinalized` 同时为每个 child 保存 released 位，只在全部 child finalize 成功后逐项释放，某 child
+  release 抛错要回到 cleanup_failed，重试跳过已释放项。ProjectRuntimeRegistry 的 prepared runtime 同样
+  使用 released 位，A 成功后不能因 B 失败而在下一次 commit 中重复 release A。
+- **项目状态只在 cleanup completion 后统一收尾**：registry 在 finalize / release / 注册移除 / 锁释放 /
+  pending 清空后发出一次 completion；AppShell 单点订阅并调用 `finalizeCommittedProjectRuntimes`，清
+  activeCanvas、两类 handoff、canvas store，仅当前路由正好是删除的画布才 `replace('/projects')`。
+  `workCommitted=false` 的 recovery 成功和 HMR runtime-only dispose 不触发这条破坏性收尾，页面局部与
+  全局重试也不得各清一遍。
 - **固定 ID 的冒烟夹具必须先按 projectId 清理**：共享库累计超过一页后，`/rows` 首页扫描会漏掉旧
   `agentSessions / agentJobs / agentEvents`，再写固定 session 会让面板恢复旧会话而看不到新队列。
   G769 用 `/query` 按 `projectId` 过滤清理，并在打开面板后显式选中种子会话；不能依赖记录总数只有几条。
-- **证据**：全量 `npm test` **4009 passed / 1 skipped**；tsc/check/build/diff-check 通过。G865 **20/20**
+- **证据**：全量 `npm test` **4021 passed / 1 skipped**；tsc/check/build/diff-check 通过。G865 **24/24**
   （含 1024 返回 clamp、删除失败不刷新后同实例启动 / 取消 Agent 回合并直接重试成功、Busy 按钮禁用）、
   G735 **35/35**、G769 **39/39**。真实 `AgentSessionStore` 延迟写、延迟 flush / flush 失败测试证明未
   idle 不 purge、flush pending 不 reopen、恢复后同 lifecycle 继续写。新增两次 recovery timeout、
   work 失败 + late pending、combined child 部分 finalize、releaseFinalized throw、子集/混合重试和
-  pending 快照订阅。全局入口在 `/settings` 路由仍可见并可重试；1440×900 / 1024×700、明暗截图确认
-  文字可读、按钮可见、无横向溢出。侧栏状态必须放在项目树滚动区外，否则长列表下错误虽然存在但用户看不到。
+  pending 快照订阅；第三次复审再补非法阶段 commit、并发 commit、committing 禁用、release 部分失败、
+  completion 单点收尾和当前画布全局重试。全局入口在 `/settings` 路由仍可见并可重试，且重试后只清状态
+  不导航；当前 `/canvas/:id` 全局重试会清 pending / host / activeCanvas / handoff / store 并离场。
+  1440×900 / 1024×700、明暗截图确认文字可读、按钮可见、无横向溢出。侧栏状态必须放在项目树滚动区外，
+  否则长列表下错误虽然存在但用户看不到。
   **未跑真实 Tauri 跨路由任务，待质量线独立验收。**
 
 ### Agent 确认执行与检查点继续拆分（2026-11-03，对账 #864）
