@@ -126,6 +126,17 @@
 - **late control 要有真实状态与边界**：每个 prepared control 记录 idle / finalized / error；
   prepare、recovery、commit 的等待全部经过统一 shutdown timeout。resolve 后才允许 finalize；reject 或
   pending/timeout 一律 cleanup_failed，不得 finalize、删注册或释放锁，之后仍可用同一 disposal 重试。
+- **recovery 不得冒充 cleanup**：prepare / rollback 失败进入 `recovering / recovery_failed`，对应
+  `workCommitted=false`。恢复失败保留锁与 registration，但重新执行删除时必须先 reopen 旧 runtime，
+  再重新跑 prepare 与仓储 work。只有仓储 work 已成功后的 finalize 失败才是 `cleanup_failed` /
+  `workCommitted=true`。
+- **pending 快照只能由 registry 产生**：AppShell 全局入口和页面局部按钮都从同一可订阅快照读取
+  operationId、projectIds、status、workCommitted、retryable、work/recovery reason。页面不得自行保存
+  projectIds 作为重试真相。子集、混合集合或包含其他 active operation 的 retry 抛
+  `ProjectRuntimeRetryScopeError`，完全不相关集合才 no-op。
+- **combined child 逐项 finalize**：组合控制必须记录每个 child 的 finalized 位，canFinalize/finalize
+  只看未完成 child。部分失败后第二次只重试未完成项；全部成功后才能 releaseFinalized。releaseFinalized
+  抛错进入 cleanup_failed 仍可重试，已经 finalized 的 child 不再 wait。
 - **注册表按代际条件删除**：AgentHostRegistry 与 ProjectRuntimeRegistry 都带 generation。HMR 先同步失效
   旧代际，再异步等待；旧 cleanup 只能在 capture token 仍匹配时删除。新代际不能被迟到 dispose 抹掉。
 - **shutdown 期间冻结 host generation**：项目操作开始即 freeze 当前 token；HMR 和 bridge 重挂载只能更新
