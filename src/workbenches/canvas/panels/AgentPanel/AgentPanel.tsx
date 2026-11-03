@@ -114,6 +114,7 @@ import {
   sessionForQueuedTurn,
   type QueuedAgentTurn,
 } from '../../../../domain/agent/queuedTurn'
+import { createAgentPanelShutdownControl } from './agentPanelShutdown'
 import { steerMessagesOf } from '../../../../domain/agent/steering'
 import {
   getAgentDeliveryMode,
@@ -648,7 +649,42 @@ export function AgentPanel({
   useEffect(() => {
     if (!onDisposeReady) return
     const beginShutdown = (): TaskShutdownControl => {
-      const attempt = lifecycle.beginClose()
+      const finalize = () => {
+        const sessionIds = new Set([
+          ...abortRefs.current.keys(),
+          ...listRef.current.map((session) => session.id),
+        ])
+        for (const sessionId of sessionIds) {
+          clearQueueDrain(sessionId)
+          releaseSessionActivity(sessionId)
+          sessionRuntimeRef.current.clearSession(sessionId)
+          clearLiveActivitiesFor(sessionId)
+          clearLiveProcessFor(sessionId)
+          clearRunTasksFor(sessionId)
+        }
+        queuePumpingRef.current.clear()
+        confirmingRef.current.clear()
+        stoppingRef.current.clear()
+        abortRefs.current.clear()
+        deliveredSteersRef.current.clear()
+        toolModeRef.current.clear()
+        turnToolsRef.current.clear()
+        currentTurnIdRef.current.clear()
+        currentTurnJobIdRef.current.clear()
+        currentTurnRevisionRef.current.clear()
+        planAliasesRef.current.clear()
+        autoRunRef.current.clear()
+        explicitMediaModelsRef.current.clear()
+        chatRouteRef.current.clear()
+        contextTraceRef.current.clear()
+        inFlightConfirmationRef.current.clear()
+      }
+      const shutdown = createAgentPanelShutdownControl({
+        lifecycle,
+        flush: () => store.flush(),
+        timeoutMs: AGENT_PANEL_DISPOSE_TIMEOUT_MS,
+        onFinalize: finalize,
+      })
       if (pendingAssetSyncTimerRef.current) {
         clearTimeout(pendingAssetSyncTimerRef.current)
         pendingAssetSyncTimerRef.current = null
@@ -656,49 +692,7 @@ export function AgentPanel({
       for (const controller of abortRefs.current.values()) {
         controller.abort()
       }
-
-      return {
-        waitForIdle: async () => {
-          await lifecycle.waitForIdle(AGENT_PANEL_DISPOSE_TIMEOUT_MS)
-          await store.flush()
-        },
-        whenIdle: lifecycle.whenIdle,
-        canReopen: () => lifecycle.canReopen(attempt),
-        reopenIfIdle: () => lifecycle.reopenIfIdle(attempt),
-        canFinalize: () => lifecycle.canFinalize(attempt),
-        finalize() {
-          if (!lifecycle.finalizeClose(attempt)) return false
-          const sessionIds = new Set([
-            ...abortRefs.current.keys(),
-            ...listRef.current.map((session) => session.id),
-          ])
-          for (const sessionId of sessionIds) {
-            clearQueueDrain(sessionId)
-            releaseSessionActivity(sessionId)
-            sessionRuntimeRef.current.clearSession(sessionId)
-            clearLiveActivitiesFor(sessionId)
-            clearLiveProcessFor(sessionId)
-            clearRunTasksFor(sessionId)
-          }
-          queuePumpingRef.current.clear()
-          confirmingRef.current.clear()
-          stoppingRef.current.clear()
-          abortRefs.current.clear()
-          deliveredSteersRef.current.clear()
-          toolModeRef.current.clear()
-          turnToolsRef.current.clear()
-          currentTurnIdRef.current.clear()
-          currentTurnJobIdRef.current.clear()
-          currentTurnRevisionRef.current.clear()
-          planAliasesRef.current.clear()
-          autoRunRef.current.clear()
-          explicitMediaModelsRef.current.clear()
-          chatRouteRef.current.clear()
-          contextTraceRef.current.clear()
-          inFlightConfirmationRef.current.clear()
-          return true
-        },
-      }
+      return shutdown
     }
     return onDisposeReady(beginShutdown)
   }, [
