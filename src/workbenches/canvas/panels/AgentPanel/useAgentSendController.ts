@@ -1,6 +1,7 @@
 import { useCallback, type MutableRefObject } from 'react'
 import type { AgentSession } from '../../../../state/agent/sessionStore'
 import { createId } from '../../../../shared/id'
+import type { TaskLifecycle } from '../../../../features/shared/lifecycle/taskLifecycle'
 import { beforeAgentSendFlow, runAgentSendFlow } from './agentSendFlow'
 import type { AgentSendText } from './useAgentQueueController'
 
@@ -27,6 +28,7 @@ export interface AgentSendControllerInput {
   setStatusFor: Parameters<typeof runAgentSendFlow>[0]['setStatusFor']
   transitionSessionJob: Parameters<typeof runAgentSendFlow>[0]['transitionSessionJob']
   queuePumpRef: MutableRefObject<(sessionId: string) => void>
+  trackRun: TaskLifecycle['track']
 }
 
 /**
@@ -49,9 +51,10 @@ export function useAgentSendController({
   setStatusFor,
   transitionSessionJob,
   queuePumpRef,
+  trackRun,
 }: AgentSendControllerInput): AgentSendText {
   return useCallback(
-    async (
+    (
       raw: string,
       queuedSession?: AgentSession,
       opts: {
@@ -60,46 +63,48 @@ export function useAgentSendController({
         internalControl?: boolean
       } = {},
     ) => {
-      const text = raw.trim()
-      const session = queuedSession ?? current
-      if (!text || !session) return undefined
-      const actualTurnId = opts.queueTurnId ?? createId('turnmsg')
-      const turnAbort = new AbortController()
-      beforeAgentSendFlow(
-        session.id,
-        currentIdRef.current,
-        () => {
-          stickToLatestRef.current = true
-          setShowJumpToLatest(false)
-        },
-      )
-      return runAgentSendFlow({
-        session,
-        text,
-        controller,
-        abortRefs,
-        deliveredSteersRef,
-        preclaimed: opts.preclaimed,
-        queueTurnId: opts.queueTurnId,
-        internalControl: opts.internalControl,
-        turnId: actualTurnId,
-        turnAbort,
-        runTurn: (text, session, queueTurnId, internalControl) =>
-          runSendText(
-            text,
-            session,
-            queueTurnId,
-            internalControl,
-            actualTurnId,
-            turnAbort,
-          ),
-        applySessionSnapshot,
-        clearLiveActivitiesFor,
-        clearLiveProcessFor,
-        clearRunTasksFor,
-        setStatusFor,
-        transitionSessionJob,
-        queuePump: (sessionId) => queuePumpRef.current(sessionId),
+      return trackRun(async () => {
+        const text = raw.trim()
+        const session = queuedSession ?? current
+        if (!text || !session) return undefined
+        const actualTurnId = opts.queueTurnId ?? createId('turnmsg')
+        const turnAbort = new AbortController()
+        beforeAgentSendFlow(
+          session.id,
+          currentIdRef.current,
+          () => {
+            stickToLatestRef.current = true
+            setShowJumpToLatest(false)
+          },
+        )
+        return runAgentSendFlow({
+          session,
+          text,
+          controller,
+          abortRefs,
+          deliveredSteersRef,
+          preclaimed: opts.preclaimed,
+          queueTurnId: opts.queueTurnId,
+          internalControl: opts.internalControl,
+          turnId: actualTurnId,
+          turnAbort,
+          runTurn: (text, session, queueTurnId, internalControl) =>
+            runSendText(
+              text,
+              session,
+              queueTurnId,
+              internalControl,
+              actualTurnId,
+              turnAbort,
+            ),
+          applySessionSnapshot,
+          clearLiveActivitiesFor,
+          clearLiveProcessFor,
+          clearRunTasksFor,
+          setStatusFor,
+          transitionSessionJob,
+          queuePump: (sessionId) => queuePumpRef.current(sessionId),
+        })
       })
     },
     [
@@ -117,6 +122,7 @@ export function useAgentSendController({
       setShowJumpToLatest,
       setStatusFor,
       stickToLatestRef,
+      trackRun,
       transitionSessionJob,
     ],
   )

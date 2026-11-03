@@ -18,10 +18,19 @@ import {
   type CanvasExecutionApi,
 } from './CanvasExecutionProvider'
 import {
+  TaskLifecycleClosedError,
+} from '../../../features/shared/lifecycle/taskLifecycle'
+import {
+  CanvasExecutionRuntimeClosedError,
+  activateCanvasExecutionRuntime,
+  beginCanvasExecutionRuntimeShutdown,
   canvasExecutionRuntimeFor,
+  canvasExecutionRuntimeProjectIds,
   disposeAllCanvasExecutionRuntimes,
+  disposeCanvasExecutionRuntime,
   initializeCanvasExecutionVersions,
   nextCanvasExecutionVersion,
+  resetCanvasExecutionRuntimesForTests,
 } from './canvasExecutionRuntime'
 import {
   resetCanvasRunStatesForTests,
@@ -36,8 +45,17 @@ reactActEnvironment.IS_REACT_ACT_ENVIRONMENT = true
 afterEach(async () => {
   resetCanvasRunStatesForTests()
   await disposeAllCanvasExecutionRuntimes()
+  resetCanvasExecutionRuntimesForTests()
   vi.unstubAllGlobals()
 })
+
+function deferred<T>() {
+  let resolve!: (value: T | PromiseLike<T>) => void
+  const promise = new Promise<T>((res) => {
+    resolve = res
+  })
+  return { promise, resolve }
+}
 
 describe('canvas per-project execution runtime', () => {
   it('provider 卸载后 live nodeStates / isRunning 仍更新，旧 cancel 仍能中止计划', async () => {
@@ -123,6 +141,10 @@ describe('canvas per-project execution runtime', () => {
     adapter!.cancel('node-old')
     expect(controller.signal.aborted).toBe(true)
 
+    await disposeCanvasExecutionRuntime('p1', 100)
+    await expect(
+      adapter!.runNode('node-old'),
+    ).rejects.toBeInstanceOf(TaskLifecycleClosedError)
     store.dispose()
   })
 
@@ -140,5 +162,53 @@ describe('canvas per-project execution runtime', () => {
       async () => new Map([['node-1', 0]]),
     )
     expect(nextCanvasExecutionVersion('p1', 'node-1')).toBe(8)
+  })
+
+  it('关闭等待完整任务；超时保留登记，成功 finalize 后墓碑拒绝生成入口', async () => {
+    const runtime = canvasExecutionRuntimeFor('p1')
+    const controller = new AbortController()
+    const gate = deferred<void>()
+    const records: string[] = []
+    runtime.engine.begin('plan-a', controller)
+    const run = runtime.engine.track(async () => {
+      await gate.promise
+      records.push('record-before-purge')
+      runtime.engine.finish('plan-a')
+    })
+
+    const shutdown = beginCanvasExecutionRuntimeShutdown('p1')
+    expect(shutdown).not.toBeNull()
+    expect(controller.signal.aborted).toBe(true)
+    expect(runtime.closed).toBe(true)
+    expect(() => nextCanvasExecutionVersion('p1', 'node-1')).toThrow(
+      CanvasExecutionRuntimeClosedError,
+    )
+    await expect(
+      shutdown!.waitForIdle(5),
+    ).rejects.toMatchObject({
+      name: 'TaskLifecycleTimeoutError',
+    })
+    expect(canvasExecutionRuntimeProjectIds()).toContain('p1')
+    expect(records).toEqual([])
+
+    gate.resolve()
+    await run
+    await shutdown!.waitForIdle(100)
+    shutdown!.finalize()
+    expect(records).toEqual(['record-before-purge'])
+    expect(canvasExecutionRuntimeProjectIds()).not.toContain('p1')
+    expect(() => canvasExecutionRuntimeFor('p1')).toThrow(
+      CanvasExecutionRuntimeClosedError,
+    )
+  })
+
+  it('显式页面激活建立新代际，旧 runtime 闭包仍保持关闭', async () => {
+    const oldRuntime = canvasExecutionRuntimeFor('p1')
+    await disposeAllCanvasExecutionRuntimes()
+    const nextRuntime = activateCanvasExecutionRuntime('p1')
+
+    expect(nextRuntime).not.toBe(oldRuntime)
+    expect(oldRuntime.closed).toBe(true)
+    expect(nextRuntime.closed).toBe(false)
   })
 })

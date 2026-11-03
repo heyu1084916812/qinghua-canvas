@@ -97,9 +97,10 @@ import {
   updateCanvasRunStates,
 } from './canvasRunState'
 import {
-  canvasExecutionRuntimeFor,
+  activateCanvasExecutionRuntime,
   initializeCanvasExecutionVersions,
   nextCanvasExecutionVersion,
+  peekCanvasExecutionRuntime,
   trackCanvasExecutionVersion,
 } from './canvasExecutionRuntime'
 
@@ -194,7 +195,7 @@ export function createCanvasExecutionHostAdapter(
     },
     get isRunning() {
       return (
-        canvasExecutionRuntimeFor(projectId).engine.isRunning() ||
+        peekCanvasExecutionRuntime(projectId)?.engine.isRunning() ||
         canvasRunIsRunning(projectId)
       )
     },
@@ -275,7 +276,7 @@ export function CanvasExecutionProvider({
   )
   const projectId = store.getSnapshot().projectId
   const runtime = useMemo(
-    () => canvasExecutionRuntimeFor(projectId),
+    () => activateCanvasExecutionRuntime(projectId),
     [projectId],
   )
 
@@ -1144,7 +1145,7 @@ export function CanvasExecutionProvider({
    * runNode 依赖 api」的循环。抽成独立值后两边都只是引用它。
    */
   const completeText = useCallback(
-    async ({
+    ({
       channelId,
       model,
       subjectId,
@@ -1162,8 +1163,9 @@ export function CanvasExecutionProvider({
       text: string
       inputs?: NodeInput[]
       signal: AbortSignal
-    }): Promise<string> => {
-      const all = channels.getState().channels
+    }): Promise<string> =>
+      runtime.operations.track(async () => {
+        const all = channels.getState().channels
       /**
        * 提示词工具只有“模型”这一个用户可见选择，`channelId` 是节点上的内部解析值。
        * 旧节点可能保留着当时渠道，后来用户在设置里改了该渠道的勾选模型；
@@ -1176,7 +1178,7 @@ export function CanvasExecutionProvider({
       const prompt = system ? `${system}\n\n${text}` : text
       const sentModel = resolveUpstreamModel(ch.modelMap, route.model) ?? route.model
       const operationId = createId('op')
-      return runDirectText({
+        return runDirectText({
         storage: platform.storage,
         trace: directTextTrace({
           projectId: store.getSnapshot().projectId,
@@ -1212,9 +1214,9 @@ export function CanvasExecutionProvider({
         },
         onRecordWarning: (warning) =>
           store.notify(`结果已返回，但运行日志写入失败：${warning}`, 'error'),
-      })
-    },
-    [channels, generation, platform.storage, store, workbench],
+        })
+      }),
+    [channels, generation, platform.storage, runtime, store, workbench],
   )
 
   /**
@@ -1367,22 +1369,23 @@ export function CanvasExecutionProvider({
    * 写两遍必然漏掉 `runtime.versionMax` 的同步，而那份计数是 version 递增的唯一依据。
    */
   const appendRecord = useCallback(
-    async (record: RunRecord) => {
-      trackCanvasExecutionVersion(
-        projectId,
-        record.nodeId,
-        record.version,
-      )
-      store.dispatch({ kind: 'node.runRecord.append', nodeId: record.nodeId, record })
-      // append 走 800ms 防抖落库；日志面板实时读库，flush 完成后再返回
-      await store.flush()
-      emitRunRecordChanged()
-    },
-    [store],
+    (record: RunRecord) =>
+      runtime.operations.track(async () => {
+        trackCanvasExecutionVersion(
+          projectId,
+          record.nodeId,
+          record.version,
+        )
+        store.dispatch({ kind: 'node.runRecord.append', nodeId: record.nodeId, record })
+        // append 走 800ms 防抖落库；日志面板实时读库，flush 完成后再返回
+        await store.flush()
+        emitRunRecordChanged()
+      }),
+    [runtime, store],
   )
 
   const runNode = useCallback(
-    async (
+    (
       nodeId: string,
       opts?: {
         alt?: boolean
@@ -1390,8 +1393,9 @@ export function CanvasExecutionProvider({
         signal?: AbortSignal
         contextAssets?: readonly GenerationContextAsset[]
       },
-    ) => {
-      let graph = store.getSnapshot()
+    ) =>
+      runtime.operations.track(async () => {
+        let graph = store.getSnapshot()
       const node = graph.nodes.find((n) => n.id === nodeId)
 
       /**
@@ -1605,8 +1609,8 @@ export function CanvasExecutionProvider({
         explainEmptyPlan(nodeId)
         return
       }
-      await launch(plan, nodeId, opts?.signal)
-    },
+        await launch(plan, nodeId, opts?.signal)
+      }),
     [
       store,
       launch,
@@ -1618,33 +1622,35 @@ export function CanvasExecutionProvider({
       bumpVersion,
       platform,
       activeRunNodeIds,
+      runtime,
     ],
   )
 
   const runGroup = useCallback(
-    async (memberIds: readonly string[]) => {
-      const graph = store.getSnapshot()
-      const known = new Set(graph.nodes.map((node) => node.id))
-      const ids = memberIds.filter((id) => known.has(id))
-      if (ids.length === 0) {
-        store.notify('分组里没有可运行的节点', 'error')
-        return
-      }
-      const plan = buildGroupRunPlan(graph, ids)
-      if (plan.tasks.length === 0) {
-        store.notify('组内没有配好提示词或可用上游的生成节点', 'error')
-        return
-      }
-      await launch(plan, plan.tasks[0]?.nodeId)
-    },
-    [launch, store],
+    (memberIds: readonly string[]) =>
+      runtime.operations.track(async () => {
+        const graph = store.getSnapshot()
+        const known = new Set(graph.nodes.map((node) => node.id))
+        const ids = memberIds.filter((id) => known.has(id))
+        if (ids.length === 0) {
+          store.notify('分组里没有可运行的节点', 'error')
+          return
+        }
+        const plan = buildGroupRunPlan(graph, ids)
+        if (plan.tasks.length === 0) {
+          store.notify('组内没有配好提示词或可用上游的生成节点', 'error')
+          return
+        }
+        await launch(plan, plan.tasks[0]?.nodeId)
+      }),
+    [launch, runtime, store],
   )
 
   const cancel = useCallback(
     (nodeId: string) => {
       runtime.nodeScopedRunCancellation.cancelForNode(nodeId, cancelRun)
     },
-    [cancelRun],
+    [cancelRun, runtime],
   )
 
   const api: CanvasExecutionApi = useMemo(
