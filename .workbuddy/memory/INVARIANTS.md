@@ -92,6 +92,9 @@
 - **AgentSkillsController 不拥有技能正文或 Job**：`useAgentSkillsController` 只接收显式端口；
   handoff 必须复用 `parseMentions` / `mentionToken`，导入复用 `parseSkillMarkdown` + SkillStore，
   SkillStore 仍是技能正文真相。收藏落库失败不得伪造成功；不得请求模型、修改 Job/队列/确认。
+- **AgentAttachmentsController 不拥有节点或附件真相**：`useAgentAttachmentsController` 只能经显式端口
+  读写 CanvasStore / AgentSession；handoff 必须先缓冲、过滤已不存在节点、去重后补引用；本地文件与素材库
+  必须走同一落位链路；缩略图 objectURL 必须 unmount 回收。不得发送消息、请求模型或修改 Job。
 - **AgentComposerController 不拥有业务真相**：`useAgentComposerController` 只管理 draft、mention、
   picker、composer 高度以及 pendingAsset 同步端口；不得 import SessionStore / AgentController /
   ToolRegistry / 队列实现，不得发送消息、请求模型、推进确认或修改 Job。160ms 待发送素材 timer

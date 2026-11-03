@@ -1,5 +1,15 @@
 # CanvasFlow（轻画）项目记忆
 
+### AgentAttachmentsController（2026-11-04，对账 #874，🚧 待独立验收，`fcb60c6`）
+
+- `useAgentAttachmentsController` 只做附件 React 适配：handoff、本地文件、素材库添加、pendingAssetIds
+  同步、引用缩略图与 objectURL 生命周期。节点真相仍在 CanvasStore，附件真相仍在 AgentSession。
+- handoff 必须先缓冲、过滤已不存在节点、去重后再补正文引用；本地文件和素材库必须走同一
+  `placeAsset → createAssetNode` 链路；缩略图按草稿 / pendingAssetIds / 历史消息取一次，unmount 回收。
+- 本批不改 JSX/DOM/data 属性/className/文案/布局/CSS。`AgentPanel.tsx` **3062 → 2877 行**；
+  Hook **4/4**、AgentPanel 目录 **238/238**、G735 **35/35**、G769 **39/39**、G865 **24/24**，
+  全量 **4059 passed / 1 skipped**。
+
 ### Agent 错误透明化、release gate 隔离与启动迁移重试（2026-11-04，对账 #871/#872/#873，✅ 已独立验收）
 
 - ChannelError 必须先读结构化 `appError`，不能因为它是 `Error` 就展示 `e.message`。AgentLoop 的能力目录、
