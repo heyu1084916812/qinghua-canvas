@@ -13,6 +13,7 @@
   release-shell **11/11**。最终 `0.1.14` 包 SHA-256
   `D5BE3A7A695009FC40B00FA18512B7BD42BF0C060538F4110B97AD9574C9C033`。真实 Workbuddy 通过；
   Chat2api 仍因上游 HTTP 500/中转 502 阻断，无 asset。
+  安装器真装/卸载/覆盖升级门禁未跑：本机已有 `0.1.10` 正式安装版，脚本按安全规则拒绝覆盖。
 
 ### AgentPanelView + AgentSkillsController（2026-11-04，对账 #869/#870，✅ 已独立验收，`74623ad`）
 
