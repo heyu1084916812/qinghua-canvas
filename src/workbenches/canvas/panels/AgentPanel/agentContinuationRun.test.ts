@@ -73,6 +73,10 @@ function harness(overrides: Partial<AgentContinuationRunInput> = {}) {
     claimNextQueuedTurn: vi.fn(async () => null),
     claimActivity: vi.fn(() => true),
     applySessionSnapshot: vi.fn(),
+    ensureRoute: vi.fn(async () => ({
+      ok: true as const,
+      route: {} as never,
+    })),
     createLoopDeps: vi.fn(() => loopDeps),
     toolMode: () => 'native',
     turnTools: () => [],
@@ -106,9 +110,74 @@ describe('runAgentContinuation', () => {
     expect(result).toBe('applied')
     expect(h.input.claimNextQueuedTurn).not.toHaveBeenCalled()
     expect(h.input.claimActivity).not.toHaveBeenCalled()
+    expect(h.input.ensureRoute).toHaveBeenCalledWith(session)
     expect(h.input.turnOrigin).toHaveBeenCalledWith(
       'queue-live',
       'queue-live',
+    )
+  })
+
+  it('★★ 重载后检查点继续先重新准备路由，失败时不创建 loopDeps/请求模型', async () => {
+    const h = harness({
+      ensureRoute: vi.fn(async () => ({
+        ok: false as const,
+        message: '没有可用的模型服务提供「chat-model」',
+      })),
+    })
+
+    const result = await runAgentContinuation(h.input)
+
+    expect(result).toBe('failed')
+    expect(h.input.ensureRoute).toHaveBeenCalledWith(session)
+    expect(h.input.createLoopDeps).not.toHaveBeenCalled()
+    expect(h.input.runAgentTurn).not.toHaveBeenCalled()
+    expect(h.input.setStatus).toHaveBeenCalledWith({
+      kind: 'error',
+      message: '没有可用的模型服务提供「chat-model」',
+    })
+    expect(h.input.transitionSessionJob).toHaveBeenCalledWith(
+      session.id,
+      'failed',
+      'failed',
+      { lastError: '没有可用的模型服务提供「chat-model」' },
+      { phase: 'continuation_route' },
+      expect.objectContaining({ messageRevision: 8 }),
+    )
+    expect(h.input.settleSessionOutcome).toHaveBeenCalledWith(
+      session.id,
+      { kind: 'error' },
+      expect.objectContaining({ messageRevision: 8 }),
+    )
+  })
+
+  it('★★ 路由准备抛错时按原 origin 失败，不创建 loopDeps/请求模型', async () => {
+    const h = harness({
+      ensureRoute: vi.fn(async () => {
+        throw new Error('路由端口异常')
+      }),
+    })
+
+    const result = await runAgentContinuation(h.input)
+
+    expect(result).toBe('failed')
+    expect(h.input.createLoopDeps).not.toHaveBeenCalled()
+    expect(h.input.runAgentTurn).not.toHaveBeenCalled()
+    expect(h.input.setStatus).toHaveBeenCalledWith({
+      kind: 'error',
+      message: '路由端口异常',
+    })
+    expect(h.input.transitionSessionJob).toHaveBeenCalledWith(
+      session.id,
+      'failed',
+      'failed',
+      { lastError: '路由端口异常' },
+      { phase: 'continuation_route' },
+      expect.objectContaining({ messageRevision: 8 }),
+    )
+    expect(h.input.settleSessionOutcome).toHaveBeenCalledWith(
+      session.id,
+      { kind: 'error' },
+      expect.objectContaining({ messageRevision: 8 }),
     )
   })
 

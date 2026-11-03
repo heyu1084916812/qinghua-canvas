@@ -6,6 +6,7 @@ import type {
 import type { QueuedAgentTurn } from '../../../../domain/agent/queuedTurn'
 import { createId } from '../../../../shared/id'
 import type { AgentSession } from '../../../../state/agent/sessionStore'
+import type { ChatRoutePreparation } from './agentChatRoute'
 import {
   errText,
   type AgentLoopDeps,
@@ -50,6 +51,7 @@ export interface AgentContinuationRunInput {
     turnId: string,
   ) => boolean
   applySessionSnapshot: (session: AgentSession) => void
+  ensureRoute: (session: AgentSession) => Promise<ChatRoutePreparation>
   createLoopDeps: (
     input: AgentContinuationLoopDepsInput,
   ) => AgentLoopDeps
@@ -150,6 +152,30 @@ export async function runAgentContinuation(
   const continuationAbort =
     input.createAbortController?.() ?? new AbortController()
   input.setAbortController(continuationAbort)
+  const failRoute = async (message: string) => {
+    input.setStatus({ kind: 'error', message })
+    await input.transitionSessionJob(
+      input.session.id,
+      'failed',
+      'failed',
+      { lastError: message },
+      { phase: 'continuation_route' },
+      continuationOrigin,
+    ).catch(() => null)
+    await input.settleSessionOutcome(
+      input.session.id,
+      { kind: 'error' },
+      continuationOrigin,
+    )
+    return 'failed' as const
+  }
+  let route: Awaited<ReturnType<AgentContinuationRunInput['ensureRoute']>>
+  try {
+    route = await input.ensureRoute(input.session)
+  } catch (error) {
+    return failRoute(errText(error))
+  }
+  if (!route.ok) return failRoute(route.message)
   const currentLoopDeps = input.createLoopDeps({
     session: input.session,
     operationId: createId('op'),

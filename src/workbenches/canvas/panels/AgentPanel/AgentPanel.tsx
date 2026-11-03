@@ -2205,6 +2205,7 @@ export function AgentPanel({
       claimActivity: (sessionId, queueTurnId, turnId) =>
         claimSessionActivity(sessionId, queueTurnId, turnId),
       applySessionSnapshot,
+      ensureRoute: (session) => prepareChatRoute(session),
       createLoopDeps: (args) => loopDeps(args),
       toolMode: () => toolModeRef.current.get(current.id) ?? 'native',
       turnTools: () => turnToolsForSession(current),
@@ -2226,6 +2227,7 @@ export function AgentPanel({
     messages,
     controller,
     applySessionSnapshot,
+    prepareChatRoute,
     loopDeps,
     setStatusFor,
     handleOutcome,

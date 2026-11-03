@@ -23,8 +23,11 @@
   `needs_attention + pendingCallId`；revision 冲突只能按原 queue + turn token 尝试结算，不能碰新回合。
 - **检查点继续只收端口**：`agentContinuationRun.ts` 先复用已有活动锁；需要领取时只有原
   continuation queue token 等于队首才 claim，领取成功后必须用真实 turnId 同时绑定 queueTurnId +
-  turnId。origin 固定后再迁 planning，模型、自动确认、outcome 与错误 settlement 全部沿用该 origin。
-  自动过程消息只在 `isCurrentSession()` 时写当前 `messages`；中止时不得补错误态或结算。
+  turnId。origin 固定后必须先 `ensureRoute(session)`，页面重载后的空内存缓存不能直接进 loopDeps；
+  路由失败或抛错时显示真实原因，按原 origin 落 failed + `phase: continuation_route`，不得创建
+  loopDeps、请求模型或遗留活动锁。路由成功后才迁 planning，后续模型、自动确认、outcome 与错误
+  settlement 全部沿用该 origin。自动过程消息只在 `isCurrentSession()` 时写当前 `messages`；
+  中止时不得补错误态或结算。
 - **自动确认循环只收端口**：`agentAutoConfirmations.ts` 不读取 React refs/state；手动模式或
   显式批准工具原样返回 confirm。自动路径顺序固定为 transition（仅生成类）→ setStatus → execute →
   onMessages → finish（仅生成类）→ resume，resume 必须沿用同一 `AgentLoopDeps`。turnOrigin 每次通过

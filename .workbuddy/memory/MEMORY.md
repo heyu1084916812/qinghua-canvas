@@ -12,13 +12,16 @@
 - **检查点继续独立**：`agentContinuationRun.ts` 先复用已有活动锁；需要领取时只有原 continuation queue
   token 等于队首才 claim，并把真实 turnId 同时绑进 queueTurnId + turnId。origin 固定后再迁 planning，
   模型、自动确认、outcome 与错误 settlement 全部沿用该 origin。
+- **重载后必须先重解路由**：会话路由缓存只在当前页面进程内有效，持久 paused checkpoint 重载后必然为空。
+  继续入口必须先用 `ensureRoute(session)` 重新解析；路由失败按原 origin 落 failed +
+  `phase: continuation_route`，不能创建 loopDeps、发空 channel 请求或留下活动锁。
 - **UI 写回只看当前会话**：自动过程消息只在 `isCurrentSession()` 为真时 setMessages；后台会话仍通过
   持久 outcome 落库。继续 abort 时不补错误态或结算，交给 stop / cancel 协调器。
 - **宿主保持薄装配**：`AgentPanel` 继续拥有 confirmingRef、inFlightConfirmationRef、abortRefs、
   per-session refs 和 UI 回调；本轮 diff 净减少 **124 行**，不涉及 DOM / CSS / 文案。
-- **证据**：新增聚焦 **14/14**、AgentPanel **186/186**、扩展 Agent 定向 **284/284**、全量
-  `npm test` **3925 passed / 1 skipped**；tsc、定向 ESLint、check、build、diff-check 通过。端口 mock
-  未覆盖真实桌面交错或付费渠道，本轮未跑 G769 / Tauri；确认和继续入口已完成，AgentHost 仍是后续债。
+- **证据**：质量线发现重载后空路由缺口，修复后确认/继续聚焦 **16/16**、Agent 定向 **494/494**、全量
+  `npm test` **3927 passed / 1 skipped**；tsc、定向 ESLint、check、build、diff-check 通过。真实
+  Chat2api 人工确认回合已通过；continuation 的 Tauri 重载续跑仍待独立复验，AgentHost 仍是后续债。
 
 ### Agent outcome 延迟写库测试屏障（2026-11-03，对账 #861a）
 
