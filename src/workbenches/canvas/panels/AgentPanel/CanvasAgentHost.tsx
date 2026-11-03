@@ -6,12 +6,9 @@ import {
   useRef,
 } from 'react'
 import {
-  beginAgentHostDispose,
   deactivateAgentHost,
-  finalizeAgentHostDispose,
   invalidateAgentHostsForHmr,
   registerAgentHostRenderer,
-  removeAgentHost,
   setAgentHostDisposer,
   setAgentHostOpen,
   upsertAgentHost,
@@ -23,7 +20,6 @@ import {
 } from '../../../../app/ProjectRuntimeRegistry'
 import { subscribeAgentHandoff } from '../../../../features/canvas/agentHandoff'
 import {
-  combineTaskShutdownControls,
   type TaskShutdownControl,
 } from '../../../../features/shared/lifecycle/taskLifecycle'
 import type { CanvasStore } from '../../../../state/workbenches/canvas/store'
@@ -34,7 +30,6 @@ import {
   type CanvasExecutionApi,
 } from '../../execution/CanvasExecutionProvider'
 import {
-  beginCanvasExecutionRuntimeShutdown,
   isCanvasExecutionRuntimeClosed,
 } from '../../execution/canvasExecutionRuntime'
 import {
@@ -42,6 +37,7 @@ import {
   useCanvasStore,
 } from '../../storeContext'
 import { AgentDock } from './AgentDock'
+import { createCanvasAgentHostShutdownControl } from './canvasAgentHostShutdown'
 
 export const CANVAS_AGENT_HOST_KIND = 'canvas-agent'
 
@@ -156,26 +152,12 @@ export function CanvasAgentHostBridge({
     registerProjectRuntime({
       projectId,
       key: CANVAS_AGENT_HOST_KIND,
-      beginDispose: () => {
-        const shutdown = beginCanvasExecutionRuntimeShutdown(projectId)
-        const hostShutdown = beginAgentHostDispose(
+      beginDispose: () =>
+        createCanvasAgentHostShutdownControl({
+          projectId,
           hostId,
-          host.generation,
-        )
-        const combined = combineTaskShutdownControls([
-          hostShutdown,
-          shutdown,
-        ])
-        return {
-          ...combined,
-          finalize() {
-            if (!combined.finalize()) return false
-            finalizeAgentHostDispose(hostId, host.generation)
-            removeAgentHost(hostId, host.generation)
-            return true
-          },
-        }
-      },
+          generation: host.generation,
+        }),
     })
   }, [hostId, payload, projectId])
 

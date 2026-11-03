@@ -12,6 +12,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   beginAgentHostDispose,
   disposeAgentHost,
+  freezeAgentHostGeneration,
   getAgentHosts,
   invalidateAgentHostsForHmr,
   registerAgentHostRenderer,
@@ -245,6 +246,39 @@ describe('AgentHost registry / outlet', () => {
       payload: { generation: 'new' },
       active: true,
     })
+  })
+
+  it('冻结代际期间 HMR 与重复 upsert 不产生新 host generation', () => {
+    const first = upsertAgentHost({
+      id: 'canvas:p1',
+      kind: 'probe',
+      payload: { revision: 1 },
+      active: true,
+    })
+    const release = freezeAgentHostGeneration(
+      first.id,
+      first.generation,
+    )
+
+    invalidateAgentHostsForHmr('probe')
+    const frozen = upsertAgentHost({
+      id: first.id,
+      kind: 'probe',
+      payload: { revision: 2 },
+      active: true,
+    })
+    expect(frozen.generation).toBe(first.generation)
+    expect(frozen.payload).toEqual({ revision: 2 })
+
+    release()
+    invalidateAgentHostsForHmr('probe')
+    const next = upsertAgentHost({
+      id: first.id,
+      kind: 'probe',
+      payload: { revision: 3 },
+      active: true,
+    })
+    expect(next.generation).not.toBe(first.generation)
   })
 
   it('宿主 dispose 失败时保留 record，删除流程可重试', async () => {

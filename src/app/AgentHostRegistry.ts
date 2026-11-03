@@ -39,6 +39,13 @@ const disposers = new Map<
     beginShutdown: () => TaskShutdownControl
   }
 >()
+const generationFreezes = new Map<
+  string,
+  {
+    generation: number
+    owners: Set<symbol>
+  }
+>()
 let recordsById = new Map<string, AgentHostRecord>()
 let snapshot: readonly AgentHostRecord[] = []
 const listeners = new Set<() => void>()
@@ -104,10 +111,24 @@ export function upsertAgentHost(
       `AgentHost ${input.id} 已注册为 ${current.kind}，不能改成 ${input.kind}`,
     )
   }
+  const frozen = generationFreezes.get(input.id)
+  if (frozen && !current) {
+    return {
+      id: input.id,
+      kind: input.kind,
+      generation: frozen.generation,
+      active: false,
+      open: false,
+      payload: input.payload,
+    }
+  }
   const next: AgentHostRecord = {
     id: input.id,
     kind: input.kind,
-    generation: current?.generation ?? nextGeneration++,
+    generation:
+      frozen?.generation ??
+      current?.generation ??
+      nextGeneration++,
     active: input.active ?? current?.active ?? false,
     open: input.open ?? current?.open ?? false,
     payload: input.payload,
@@ -122,6 +143,39 @@ export function upsertAgentHost(
   }
   commit(new Map(recordsById).set(input.id, next))
   return next
+}
+
+/**
+ * shutdown 期间锁住 host generation。
+ *
+ * HMR / bridge 重挂载仍可更新 payload，但必须复用同一个 record token，
+ * 否则旧 disposal 清理完旧代际后会留下新 host。
+ */
+export function freezeAgentHostGeneration(
+  id: string,
+  generation: number,
+): () => void {
+  const owner = Symbol(id)
+  const current = generationFreezes.get(id)
+  if (current) {
+    current.owners.add(owner)
+  } else {
+    generationFreezes.set(id, {
+      generation,
+      owners: new Set([owner]),
+    })
+  }
+  let released = false
+  return () => {
+    if (released) return
+    released = true
+    const freeze = generationFreezes.get(id)
+    if (!freeze) return
+    freeze.owners.delete(owner)
+    if (freeze.owners.size === 0) {
+      generationFreezes.delete(id)
+    }
+  }
 }
 
 export function setAgentHostActive(
@@ -262,6 +316,10 @@ export function invalidateAgentHostsForHmr(
   for (const [id, current] of recordsById) {
     if (current.kind !== kind) continue
     invalidated.push(current)
+    if (generationFreezes.has(id)) {
+      next.set(id, current)
+      continue
+    }
     next.set(id, {
       ...current,
       generation: nextGeneration++,
@@ -277,6 +335,7 @@ export function resetAgentHostsForTests(): void {
   snapshot = []
   renderers.clear()
   disposers.clear()
+  generationFreezes.clear()
   nextGeneration = 1
   notify()
 }
