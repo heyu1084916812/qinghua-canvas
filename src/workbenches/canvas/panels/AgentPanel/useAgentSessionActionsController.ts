@@ -6,6 +6,7 @@ import {
 } from 'react'
 import type { AgentSession } from '../../../../state/agent/sessionStore'
 import type { TaskLifecycle } from '../../../../features/shared/lifecycle/taskLifecycle'
+import type { AgentSessionRefreshResult } from './useAgentSessionLifecycle'
 
 interface AgentSessionCreateInput {
   projectId: string
@@ -30,14 +31,17 @@ export interface AgentSessionActionsControllerInput {
     saved?: string,
   ) => string
   selectedModelOf: (kind: 'image' | 'video') => string
-  refresh: () => Promise<readonly AgentSession[]>
+  refresh: () => Promise<AgentSessionRefreshResult>
   switchTo: (session: AgentSession) => Promise<void>
   setCurrent: Dispatch<SetStateAction<AgentSession | null>>
+  clearInvalidCurrent: (sessionId: string) => void
   renameSession: (sessionId: string, title: string) => Promise<void>
   removeSession: (sessionId: string) => Promise<void>
   clearDraftForSession: (sessionId: string) => void
   clearSessionRuntime: (sessionId: string) => void
+  isCurrentSession: (sessionId: string) => boolean
   isDeleteBlocked: (sessionId: string) => boolean
+  describeError: (error: unknown) => string
   notify: (message: string, tone?: 'info' | 'error') => void
 }
 
@@ -130,8 +134,12 @@ export function useAgentSessionActionsController(
         setRenaming(false)
         if (!title || title === target.title) return
         await input.renameSession(target.id, title)
-        const rows = await input.refresh()
-        const hit = rows.find((session) => session.id === target.id)
+        const refreshed = await input.refresh()
+        if (!refreshed.applied) return
+        if (!input.isCurrentSession(target.id)) return
+        const hit = refreshed.rows.find(
+          (session) => session.id === target.id,
+        )
         if (!hit) return
         input.setCurrent((previous) =>
           previous?.id === hit.id
@@ -141,6 +149,7 @@ export function useAgentSessionActionsController(
       }),
     [
       input.current,
+      input.isCurrentSession,
       input.refresh,
       input.renameSession,
       input.setCurrent,
@@ -167,18 +176,58 @@ export function useAgentSessionActionsController(
           return
         }
         setConfirmDelete(false)
+        await input.removeSession(target.id)
         input.clearDraftForSession(target.id)
         input.clearSessionRuntime(target.id)
-        await input.removeSession(target.id)
-        const rows = await input.refresh()
-        if (rows.length > 0) await input.switchTo(rows[0]!)
-        else await newSession()
+        const failAfterDelete = (message: string, error: unknown) => {
+          input.clearInvalidCurrent(target.id)
+          input.notify(
+            `${message}：${input.describeError(error)}`,
+            'error',
+          )
+        }
+        let refreshed: AgentSessionRefreshResult
+        try {
+          refreshed = await input.refresh()
+        } catch (error) {
+          failAfterDelete('会话已删除，但刷新会话列表失败', error)
+          return
+        }
+        if (!refreshed.applied) {
+          input.clearInvalidCurrent(target.id)
+          return
+        }
+        if (!input.isCurrentSession(target.id)) return
+        const rows = refreshed.rows
+        if (rows.length > 0) {
+          try {
+            await input.switchTo(rows[0]!)
+          } catch (error) {
+            failAfterDelete(
+              '会话已删除，但自动切换会话失败，请手动选择会话',
+              error,
+            )
+          }
+          return
+        }
+        input.clearInvalidCurrent(target.id)
+        try {
+          await newSession()
+        } catch (error) {
+          input.notify(
+            `会话已删除，但自动新建会话失败，请手动新建会话：${input.describeError(error)}`,
+            'error',
+          )
+        }
       }),
     [
       confirmDelete,
       input.clearDraftForSession,
+      input.clearInvalidCurrent,
       input.clearSessionRuntime,
       input.current,
+      input.describeError,
+      input.isCurrentSession,
       input.isDeleteBlocked,
       input.notify,
       input.refresh,

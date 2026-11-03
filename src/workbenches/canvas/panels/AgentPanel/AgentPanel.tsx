@@ -123,6 +123,7 @@ import { useAgentComposerController } from './useAgentComposerController'
 import { useAgentAttachmentsController } from './useAgentAttachmentsController'
 import { useAgentSessionLifecycle } from './useAgentSessionLifecycle'
 import { useAgentSessionActionsController } from './useAgentSessionActionsController'
+import { runAgentInitialLoad } from './agentInitialLoad'
 import { useAgentSkillsController } from './useAgentSkillsController'
 import { AgentSessionRuntimeState } from './agentSessionRuntime'
 import {
@@ -311,6 +312,7 @@ export function AgentPanel({
     setMessages,
     listRef,
     currentIdRef,
+    selectionVersionRef,
     refresh,
     switchTo,
     applySessionSnapshot: applySessionLifecycleSnapshot,
@@ -819,45 +821,62 @@ export function AgentPanel({
        * 新会话会带着空渠道开出来，第一句话就报「还没选模型」。
        * 这里补一次 await load（幂等），把时序缝上。
        */
+      const versionBeforeLoad = selectionVersionRef.current
       await channels.load()
-      const rows = await refresh()
-      const savedReviewModel = await presets.loadAgentReviewModel()
-      const savedCanvasReview = await presets.loadAgentCanvasReview()
-      if (!alive) return
-      setAgentReviewModel(savedReviewModel ?? '')
-      setAgentCanvasReview(savedCanvasReview)
-      if (rows.length > 0) {
-        const head = rows[0]!
-        const loaded = (await sessions.get(head.id).catch(() => null)) ?? head
-        setCurrent(loaded)
-        setMessages(loaded.messages)
+      if (
+        !alive ||
+        currentIdRef.current !== null ||
+        selectionVersionRef.current !== versionBeforeLoad
+      ) {
         return
       }
-      /**
-       * 用**刚刚读到的**渠道，而不是本次渲染闭包里的 `enabled`：effect 只在
-       * projectId 变化时跑，那个 `enabled` 可能是挂载那一帧的快照 ——
-       * 渠道还没 load 完时它就是空的，新会话会带着空模型开出来。
-       */
-      const liveChannels = channels.getState().channels
-      const liveEnabled = liveChannels.filter((c) => c.enabled)
-      const livePick = (category: 'image' | 'video' | 'chat') =>
-        panelModelOptions(category).filter(
-          (n) => channelIdForLogical(liveEnabled, n) !== undefined,
-        )
-      const liveModelOptions = panelModelOptions('chat')
-      const saved = await presets.loadAgentDefault()
-      const savedModel = toLogicalName(liveChannels, saved?.model ?? '')
-      const created = await sessions.create({
-        projectId,
-        channelId: '',
-        model: defaultModelFor(liveModelOptions, savedModel),
-        imageModel: livePick('image')[0] ?? '',
-        videoModel: livePick('video')[0] ?? '',
+      const outcome = await runAgentInitialLoad({
+        isAlive: () => alive,
+        currentIdRef,
+        selectionVersionRef,
+        refresh,
+        loadReviewModel: () => presets.loadAgentReviewModel(),
+        loadCanvasReview: () => presets.loadAgentCanvasReview(),
+        setReviewModel: setAgentReviewModel,
+        setCanvasReview: setAgentCanvasReview,
+        getSession: sessions.get,
+        createSession: async (canCommit) => {
+          /**
+           * 用**刚刚读到的**渠道，而不是本次渲染闭包里的 `enabled`。
+           */
+          const liveChannels = channels.getState().channels
+          const liveEnabled = liveChannels.filter((c) => c.enabled)
+          const livePick = (category: 'image' | 'video' | 'chat') =>
+            panelModelOptions(category).filter(
+              (n) => channelIdForLogical(liveEnabled, n) !== undefined,
+            )
+          const liveModelOptions = panelModelOptions('chat')
+          const saved = await presets.loadAgentDefault()
+          if (!canCommit()) return null
+          const savedModel = toLogicalName(liveChannels, saved?.model ?? '')
+          return sessions.create({
+            projectId,
+            channelId: '',
+            model: defaultModelFor(liveModelOptions, savedModel),
+            imageModel: livePick('image')[0] ?? '',
+            videoModel: livePick('video')[0] ?? '',
+          })
+        },
+        removeSession,
+        setList,
+        setCurrent: (session) => setCurrent(session),
+        setMessages,
       })
-      if (!alive) return
-      setList([created])
-      setCurrent(created)
-      setMessages([])
+      if (outcome.kind === 'stale' && outcome.cleanupError) {
+        platform.logger.log(
+          'warn',
+          '[agent] initial session cleanup failed',
+          {
+            sessionId: outcome.discardedSessionId,
+            error: errText(outcome.cleanupError),
+          },
+        )
+      }
     }).catch((error) => {
       if (
         alive &&
@@ -914,6 +933,14 @@ export function AgentPanel({
     refresh,
     switchTo,
     setCurrent,
+    clearInvalidCurrent: (sessionId) => {
+      setList((previous) =>
+        previous.filter((session) => session.id !== sessionId),
+      )
+      if (currentIdRef.current !== sessionId) return
+      setCurrent(null)
+      setMessages([])
+    },
     renameSession,
     removeSession,
     clearDraftForSession,
@@ -923,6 +950,8 @@ export function AgentPanel({
       isSessionActivityActive(sessionId) ||
       queuePumpingRef.current.has(sessionId) ||
       confirmingRef.current.has(sessionId),
+    isCurrentSession: (sessionId) => currentIdRef.current === sessionId,
+    describeError: errText,
     notify: store.notify,
   })
   sessionActionsResetRef.current = sessionActions.resetForSessionSwitch

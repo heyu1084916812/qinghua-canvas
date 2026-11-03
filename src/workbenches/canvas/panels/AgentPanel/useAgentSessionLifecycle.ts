@@ -30,6 +30,11 @@ export interface AgentSessionLifecycleInput {
   onSwitched: (session: AgentSession) => void
 }
 
+export interface AgentSessionRefreshResult {
+  rows: readonly AgentSession[]
+  applied: boolean
+}
+
 export interface AgentSessionLifecycle {
   list: readonly AgentSession[]
   current: AgentSession | null
@@ -39,7 +44,8 @@ export interface AgentSessionLifecycle {
   setMessages: Dispatch<SetStateAction<ChatMessage[]>>
   listRef: MutableRefObject<AgentSession[]>
   currentIdRef: MutableRefObject<string | null>
-  refresh: () => Promise<readonly AgentSession[]>
+  selectionVersionRef: MutableRefObject<number>
+  refresh: () => Promise<AgentSessionRefreshResult>
   switchTo: (session: AgentSession) => Promise<void>
   applySessionSnapshot: (next: AgentSession) => void
   patchSession: (
@@ -58,21 +64,47 @@ export function useAgentSessionLifecycle(
   input: AgentSessionLifecycleInput,
 ): AgentSessionLifecycle {
   const { track } = input
-  const [list, setList] = useState<AgentSession[]>([])
+  const [list, setListState] = useState<AgentSession[]>([])
   const [current, setCurrentState] = useState<AgentSession | null>(null)
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const listRef = useRef<AgentSession[]>([])
   listRef.current = list
+  const discardedSessionIdsRef = useRef(new Set<string>())
+  const selectionVersionRef = useRef(0)
+  const refreshRequestRef = useRef(0)
   const switchRequestRef = useRef(0)
   const currentRef = useRef<AgentSession | null>(null)
   const currentIdRef = useRef<string | null>(null)
   currentRef.current = current
   currentIdRef.current = current?.id ?? null
 
+  const filterDiscarded = useCallback(
+    (rows: readonly AgentSession[]) => {
+      if (discardedSessionIdsRef.current.size === 0) return [...rows]
+      return rows.filter(
+        (session) => !discardedSessionIdsRef.current.has(session.id),
+      )
+    },
+    [],
+  )
+
+  const setList = useCallback(
+    (value: SetStateAction<AgentSession[]>) => {
+      selectionVersionRef.current += 1
+      setListState((previous) => {
+        const next =
+          typeof value === 'function' ? value(previous) : value
+        return filterDiscarded(next)
+      })
+    },
+    [filterDiscarded],
+  )
+
   const setCurrent = useCallback(
     (value: SetStateAction<AgentSession | null>) => {
       const next =
         typeof value === 'function' ? value(currentRef.current) : value
+      selectionVersionRef.current += 1
       currentRef.current = next
       currentIdRef.current = next?.id ?? null
       setCurrentState(next)
@@ -83,21 +115,26 @@ export function useAgentSessionLifecycle(
   const refresh = useCallback(
     () =>
       track(async () => {
-        const rows = await input.controllerRefresh()
-        setList(rows)
-        return rows
+        const requestId = ++refreshRequestRef.current
+        const rows = filterDiscarded(await input.controllerRefresh())
+        const applied = requestId === refreshRequestRef.current
+        if (applied) setList(rows)
+        return { rows, applied }
       }),
-    [input.controllerRefresh, track],
+    [filterDiscarded, input.controllerRefresh, setList, track],
   )
 
   const switchTo = useCallback(
     (session: AgentSession) =>
       track(async () => {
+        if (discardedSessionIdsRef.current.has(session.id)) return
         const requestId = ++switchRequestRef.current
         const loaded =
           (await input.sessionsGet(session.id).catch(() => null)) ?? session
         const loadedMessages = await input.sessionsMessagesFor(loaded.id)
         if (requestId !== switchRequestRef.current) return
+        if (discardedSessionIdsRef.current.has(loaded.id)) return
+        selectionVersionRef.current += 1
         currentRef.current = loaded
         currentIdRef.current = loaded.id
         setCurrentState(loaded)
@@ -114,12 +151,13 @@ export function useAgentSessionLifecycle(
 
   const applySessionSnapshot = useCallback(
     (next: AgentSession) => {
+      if (discardedSessionIdsRef.current.has(next.id)) return
       setList((previous) =>
         previous.map((item) => (item.id === next.id ? next : item)),
       )
       if (currentIdRef.current === next.id) setCurrent(next)
     },
-    [setCurrent],
+    [setCurrent, setList],
   )
 
   const patchSession = useCallback(
@@ -133,7 +171,7 @@ export function useAgentSessionLifecycle(
         if (currentIdRef.current === next.id) setCurrent(next)
         return next
       }),
-    [input.sessionsUpdateFields, setCurrent, track],
+    [input.sessionsUpdateFields, setCurrent, setList, track],
   )
 
   const renameSession = useCallback(
@@ -148,8 +186,12 @@ export function useAgentSessionLifecycle(
     (sessionId: string) =>
       track(async () => {
         await input.sessionsRemove(sessionId)
+        discardedSessionIdsRef.current.add(sessionId)
+        setList((previous) =>
+          previous.filter((session) => session.id !== sessionId),
+        )
       }),
-    [input.sessionsRemove, track],
+    [input.sessionsRemove, setList, track],
   )
 
   return {
@@ -161,6 +203,7 @@ export function useAgentSessionLifecycle(
     setMessages,
     listRef,
     currentIdRef,
+    selectionVersionRef,
     refresh,
     switchTo,
     applySessionSnapshot,

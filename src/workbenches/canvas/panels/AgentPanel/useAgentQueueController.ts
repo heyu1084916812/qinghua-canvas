@@ -36,6 +36,7 @@ import {
   type TaskLifecycle,
 } from '../../../../features/shared/lifecycle/taskLifecycle'
 import type { AgentPanelStatus } from './AgentActivityViews'
+import type { AgentSessionRefreshResult } from './useAgentSessionLifecycle'
 
 export type AgentSendText = (
   raw: string,
@@ -58,7 +59,7 @@ export interface AgentQueueControllerInput {
   setStatusFor(sessionId: string, status: AgentPanelStatus): void
   setDraft: Dispatch<SetStateAction<string>>
   setQueueMenuId: Dispatch<SetStateAction<string | null>>
-  refresh(): Promise<readonly AgentSession[]>
+  refresh(): Promise<AgentSessionRefreshResult>
   notify(message: string, tone?: 'info' | 'error'): void
   queuePumpingRef: MutableRefObject<Set<string>>
   queuePumpRef: MutableRefObject<(sessionId: string) => void>

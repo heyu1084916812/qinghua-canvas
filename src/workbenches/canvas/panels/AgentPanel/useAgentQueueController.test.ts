@@ -60,7 +60,7 @@ function input(
     setStatusFor: vi.fn(),
     setDraft: vi.fn(),
     setQueueMenuId: vi.fn(),
-    refresh: vi.fn(async () => [session]),
+    refresh: vi.fn(async () => ({ rows: [session], applied: true })),
     notify: vi.fn(),
     queuePumpingRef: { current: new Set<string>() },
     queuePumpRef: { current: vi.fn() },
