@@ -43281,7 +43281,307 @@ async function g800(browser) {
   }
 }
 
-const ALL_GROUPS = [g1, g2, g3, g4, g5, g6, g7, g8, g9, g10, g11, g12, g13, g14, g15, g16, g17, g18, g19, g23, g24, g37, g42, g43, g44, g45, g46, g47, g48, g49, g51, g52, g53, g55, g56, g57, g58, g59, g60, g61, g62, g63, g64, g65, g66, g67, g68, g69, g70, g71, g72, g73, g74, g75, g76, g77, g78, g79, g80, g81, g82, g83, g84, g85, g86, g87, g88, g89, g90, g91, g92, g93, g94, g95, g96, g97, g98, g99, g100, g101, g102, g103, g104, g105, g106, g107, g108, g109, g110, g111, g112, g113, g114, g115, g116, g117, g118, g119, g120, g121, g122, g123, g125, g126, g127, g128, g129, g130, g131, g132, g133, g134, g135, g136, g137, g138, g139, g140, g141, g142, g143, g144, g145, g146, g147, g148, g149, g150, g151, g152, g153, g154, g155, g156, g157, g158, g159, g160, g161, g162, g164, g165, g166, g167, g168, g735, g769, g795, g798, g800]
+/**
+ * G865：AgentHost 脱离画布路由仍存活。
+ *
+ * 这条必须走真实导航，不能用“卸载后 Promise 仍完成”代替：
+ * 它要证明同一 AgentPanel DOM、确认卡和队列跨 `/settings`、A/B 项目切换仍存在，
+ * 且只有 active project 能写 shell slot。队列恢复再用持久
+ * `activeTurnId` 证明 queue pump 真的启动，而不只是 UI 里还挂着一行。
+ */
+async function g865(browser) {
+  const g = 'G865 AgentHost 常驻生命周期'
+  const ctx = await newCtx(browser, {
+    viewport: { width: 1440, height: 900 },
+  })
+  const page = await ctx.newPage()
+  const pageErrors = []
+  page.on('pageerror', (error) =>
+    pageErrors.push(String(error).slice(0, 200)))
+  const stamp = Date.now().toString(36)
+  const projectA = `smoke_g865_a_${stamp}`
+  const projectB = `smoke_g865_b_${stamp}`
+  const sessionId = `chat_smoke_g865_${stamp}`
+  const queueId = `queue_smoke_g865_${stamp}`
+  const callId = `call_smoke_g865_${stamp}`
+  let channelSnapshot = []
+
+  try {
+    await page.goto(BASE, { waitUntil: 'domcontentloaded' })
+    channelSnapshot = await sharedRows(page, 'channels')
+    let mock = channelSnapshot.find((row) => row.id === 'ch_smoke_mock')
+    if (!mock) {
+      await configureMockChannel(page, { isolate: true })
+      channelSnapshot = await sharedRows(page, 'channels')
+      mock = channelSnapshot.find((row) => row.id === 'ch_smoke_mock')
+    }
+    rec(g, '测试渠道可用', Boolean(mock?.modelMap?.['GPT-6 Astra']))
+    for (const row of channelSnapshot) {
+      const enabled = row.id === 'ch_smoke_mock'
+      if (row.enabled === enabled) continue
+      await sharedPut(page, 'channels', { ...row, enabled })
+    }
+
+    const now = Date.now()
+    await sharedPut(page, 'agentSessions', {
+      id: sessionId,
+      projectId: projectA,
+      title: 'Host lifecycle',
+      channelId: 'ch_smoke_mock',
+      model: 'GPT-6 Astra',
+      imageModel: 'GPT Image 2',
+      queuedTurns: [{
+        id: queueId,
+        text: '继续生成第二张',
+        createdAt: now,
+        channelId: 'ch_smoke_mock',
+        model: 'GPT-6 Astra',
+        imageModel: 'GPT Image 2',
+      }],
+      pendingSteers: [],
+      pendingConfirmation: {
+        callId,
+        name: 'runNode',
+        args: { nodeIds: ['missing-node'] },
+      },
+      allowedToolNames: ['runNode'],
+      messageRevision: 1,
+      createdAt: now,
+      updatedAt: now,
+    })
+    await sharedPut(page, 'agentMessages', {
+      id: `${sessionId}::message::000000`,
+      sessionId,
+      projectId: projectA,
+      sequence: 0,
+      createdAt: now,
+      updatedAt: now,
+      message: {
+        role: 'user',
+        content: '生成一张测试图',
+        createdAt: now,
+      },
+    })
+    await sharedPut(page, 'agentMessages', {
+      id: `${sessionId}::message::000001`,
+      sessionId,
+      projectId: projectA,
+      sequence: 1,
+      createdAt: now + 1,
+      updatedAt: now + 1,
+      message: {
+        role: 'assistant',
+        content: '',
+        createdAt: now + 1,
+        toolCalls: [{
+          id: callId,
+          name: 'runNode',
+          args: JSON.stringify({ nodeIds: ['missing-node'] }),
+        }],
+      },
+    })
+
+    await page.goto(`${BASE}/canvas/${projectA}`, {
+      waitUntil: 'domcontentloaded',
+    })
+    await page.locator('[data-canvas-surface]').waitFor({
+      state: 'visible',
+      timeout: 30_000,
+    })
+    await page.locator('[data-agent-orb]').click()
+    await page
+      .locator('[data-agent-session-count="1"]')
+      .waitFor({ state: 'attached', timeout: 20_000 })
+    await page.locator('[data-agent-confirm]').waitFor({
+      state: 'visible',
+      timeout: 10_000,
+    })
+    const panel = page.locator('[data-agent-floating-panel]')
+    await panel.evaluate((node) => {
+      node.setAttribute('data-instance-probe', 'g865-a')
+    })
+    const before = await page.evaluate(() => ({
+      hosts: [...document.querySelectorAll('[data-agent-host-record]')]
+        .map((node) => [
+          node.getAttribute('data-agent-host-record'),
+          node.getAttribute('data-agent-host-active'),
+        ]),
+      queue: document
+        .querySelector('[data-agent-queue]')
+        ?.getAttribute('data-agent-queue-count'),
+      owner: document
+        .querySelector('[data-agent-shell-slot]')
+        ?.getAttribute('data-agent-shell-owner'),
+      slotWidth: document
+        .querySelector('[data-agent-shell-slot]')
+        ?.getBoundingClientRect().width,
+    }))
+    rec(
+      g,
+      '★★ 活动画布有唯一 host，确认卡与队列可见，slot 由 A 持有',
+      before.hosts.length === 1 &&
+        before.hosts[0][1] === 'true' &&
+        before.queue === '1' &&
+        before.owner === `canvas-agent:${projectA}` &&
+        before.slotWidth >= 400,
+      JSON.stringify(before),
+    )
+
+    await page.evaluate(() => {
+      history.pushState({}, '', '/settings')
+      dispatchEvent(new PopStateEvent('popstate'))
+    })
+    await page.waitForTimeout(700)
+    const left = await page.evaluate(() => {
+      const probe = document.querySelector('[data-instance-probe="g865-a"]')
+      const slot = document.querySelector('[data-agent-shell-slot]')
+      return {
+        probeExists: Boolean(probe),
+        panelHidden: probe?.hasAttribute('hidden') ?? false,
+        active: document
+          .querySelector('[data-agent-host-record]')
+          ?.getAttribute('data-agent-host-active'),
+        owner: slot?.getAttribute('data-agent-shell-owner'),
+        slotWidth: slot?.getBoundingClientRect().width,
+      }
+    })
+    rec(
+      g,
+      '★★ 离开画布到设置后 AgentPanel 同一 DOM 仍挂载，只隐藏并释放 slot',
+      left.probeExists &&
+        left.panelHidden &&
+        left.active === 'false' &&
+        left.owner === null &&
+        left.slotWidth === 0,
+      JSON.stringify(left),
+    )
+
+    await page.evaluate((path) => {
+      history.pushState({}, '', path)
+      dispatchEvent(new PopStateEvent('popstate'))
+    }, `/canvas/${projectB}`)
+    await page.locator('[data-canvas-surface]').waitFor({
+      state: 'visible',
+      timeout: 20_000,
+    })
+    await page.waitForTimeout(500)
+    const switched = await page.evaluate(() => {
+      const slot = document.querySelector('[data-agent-shell-slot]')
+      return {
+        hosts: [...document.querySelectorAll('[data-agent-host-record]')]
+          .map((node) => [
+            node.getAttribute('data-agent-host-record'),
+            node.getAttribute('data-agent-host-active'),
+          ]),
+        probeExists: Boolean(
+          document.querySelector('[data-instance-probe="g865-a"]'),
+        ),
+        owner: slot?.getAttribute('data-agent-shell-owner'),
+        slotWidth: slot?.getBoundingClientRect().width,
+      }
+    })
+    rec(
+      g,
+      '★★ 切到 B 项目不卸载 A；B 未打开 Agent 时 slot 宽 0 且只由 B owner',
+      switched.hosts.length === 2 &&
+        switched.hosts.some(
+          ([id, active]) =>
+            id === `canvas-agent:${projectA}` && active === 'false',
+        ) &&
+        switched.hosts.some(
+          ([id, active]) =>
+            id === `canvas-agent:${projectB}` && active === 'true',
+        ) &&
+        switched.probeExists &&
+        switched.owner === `canvas-agent:${projectB}` &&
+        switched.slotWidth === 0,
+      JSON.stringify(switched),
+    )
+
+    await page.evaluate((path) => {
+      history.pushState({}, '', path)
+      dispatchEvent(new PopStateEvent('popstate'))
+    }, `/canvas/${projectA}`)
+    await page.locator('[data-canvas-surface]').waitFor({
+      state: 'visible',
+      timeout: 20_000,
+    })
+    await page.waitForTimeout(700)
+    const returned = await page.evaluate(() => {
+      const probe = document.querySelector('[data-instance-probe="g865-a"]')
+      const slot = document.querySelector('[data-agent-shell-slot]')
+      return {
+        probeExists: Boolean(probe),
+        panelHidden: probe?.hasAttribute('hidden') ?? false,
+        confirm: Boolean(document.querySelector('[data-agent-confirm]')),
+        queue: document
+          .querySelector('[data-agent-queue]')
+          ?.getAttribute('data-agent-queue-count'),
+        panelId: probe?.getAttribute('id'),
+        owner: slot?.getAttribute('data-agent-shell-owner'),
+        slotWidth: slot?.getBoundingClientRect().width,
+      }
+    })
+    rec(
+      g,
+      '★★ 回 A 恢复同一实例、确认卡与队列，panel id 按项目隔离',
+      returned.probeExists &&
+        !returned.panelHidden &&
+        returned.confirm &&
+        returned.queue === '1' &&
+        returned.panelId ===
+          `canvas-agent-panel-${projectA}` &&
+        returned.owner === `canvas-agent:${projectA}` &&
+        returned.slotWidth >= 400,
+      JSON.stringify(returned),
+    )
+
+    await page.locator('[data-agent-cancel]').click()
+    await page.waitForTimeout(700)
+    await page.locator('[data-agent-queue-resume]').click()
+    let activeTurnId = ''
+    for (let i = 0; i < 40; i += 1) {
+      const row = await sharedRow(page, 'agentSessions', sessionId)
+      activeTurnId = String(row?.activeTurnId ?? '')
+      if (activeTurnId === queueId) break
+      await sleep(250)
+    }
+    rec(
+      g,
+      '★★ 取消后 queue pump 从常驻实例继续领取原队首',
+      activeTurnId === queueId,
+      `activeTurnId=${activeTurnId || 'none'} queue=${queueId}`,
+    )
+
+    await page.screenshot({
+      path: `${OUT}/agent-host-865-returned.png`,
+    })
+    rec(
+      g,
+      '无未捕获异常',
+      pageErrors.length === 0,
+      pageErrors.join(' | '),
+    )
+  } finally {
+    await page.evaluate(async ({ projectA, projectB }) => {
+      const { createWebPlatform } =
+        await import('/src/platform/web/index.ts')
+      const { createProjectRepository } =
+        await import('/src/state/project/repository.ts')
+      const repo = createProjectRepository(createWebPlatform().storage)
+      await repo.purge(projectA)
+      await repo.purge(projectB)
+    }, { projectA, projectB }).catch(() => {})
+    for (const row of channelSnapshot) {
+      const current = await sharedRow(page, 'channels', row.id)
+      if (!current || current.enabled === row.enabled) continue
+      await sharedPut(page, 'channels', { ...current, enabled: row.enabled })
+    }
+    await ctx.close()
+  }
+}
+
+const ALL_GROUPS = [g1, g2, g3, g4, g5, g6, g7, g8, g9, g10, g11, g12, g13, g14, g15, g16, g17, g18, g19, g23, g24, g37, g42, g43, g44, g45, g46, g47, g48, g49, g51, g52, g53, g55, g56, g57, g58, g59, g60, g61, g62, g63, g64, g65, g66, g67, g68, g69, g70, g71, g72, g73, g74, g75, g76, g77, g78, g79, g80, g81, g82, g83, g84, g85, g86, g87, g88, g89, g90, g91, g92, g93, g94, g95, g96, g97, g98, g99, g100, g101, g102, g103, g104, g105, g106, g107, g108, g109, g110, g111, g112, g113, g114, g115, g116, g117, g118, g119, g120, g121, g122, g123, g125, g126, g127, g128, g129, g130, g131, g132, g133, g134, g135, g136, g137, g138, g139, g140, g141, g142, g143, g144, g145, g146, g147, g148, g149, g150, g151, g152, g153, g154, g155, g156, g157, g158, g159, g160, g161, g162, g164, g165, g166, g167, g168, g735, g769, g795, g798, g800, g865]
 const skippedGroups = new Set(
   [
     String(process.env.SMOKE_SKIP ?? ''),

@@ -92,6 +92,21 @@
   无路由、读图失败或无目标图时必须返回不可验收，不能伪造通过。
 - **release gate 才可绕过单实例**：仅 `QINGHUA_RELEASE_GATE=1` 跳过 single-instance 并使用独立端口；
   正常用户启动固定 18765、保留单实例。gate 的 store、maintenance、WebView、health 和安装器端口必须一致。
+- **AgentHost 必须跨路由常驻**：AppShell 只能渲染通用 `AgentHostOutlet`，不得 import
+  `workbenches/canvas/*`。每 projectId 一个 stable host record；CanvasPage bridge 卸载时只 deactivate，
+  非活动 panel 仅 `hidden`，不能 remove / 卸载 AgentPanel。StrictMode cleanup 同样只 deactivate；HMR 才
+  显式 abort/dispose 全部项目 runtime。
+- **slot 只能有一个 owner**：只有 active host 能写 `data-agent-shell-active`、宽度和 resize 属性；
+  inactive host / 旧 cleanup 不得删除或覆盖新 owner。离开画布后 slot 宽必须回到 0；A/B 项目并存时
+  未打开 Agent 的 active host 也让 slot 保持 0。
+- **执行 runtime 不跟 Provider ref 死**：`useExecution` 的 controller registry、running plans、取消索引
+  和 version baseline 由项目级 runtime 持有。常驻 host 的 execution adapter 可复用捕获闭包，但
+  `nodeStates / nodeStateOf / isRunning` 必须每次读 live state；禁止把 render 快照冻结后跨路由使用，
+  否则后台失败态、取消和版本连续性都会失效。
+- **handoff 与 panel id 按项目隔离**：`agentHandoff` / `agentSkillHandoff` 必须带 projectId 分桶，
+  panel id 必须 project-scoped。多 host 并存时，后台 Agent 不能消费当前项目的节点引用或技能交接。
+- **项目删除先 dispose runtime**：软删 / 永久删除必须先 await host abort + flush、execution dispose，
+  之后才可 purge Agent 表；成功后 `forgetCanvasStore`。dispose 失败时不得继续删除，也不得先忘 store。
 - **关闭 Agent 面板不能卸载运行宿主**：收起只给 `AgentDock` 的宿主加 `hidden`；状态、AbortController、
   队列、确认、草稿继续存在。壳层展开动画由独立 active 状态驱动，不能靠重新挂载制造首帧。
 - **用户消息按 sessionId 先落库**：路由与模型请求之前保存；后台会话从自己的 `agentMessages` 读历史。

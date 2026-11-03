@@ -1,5 +1,26 @@
 # CanvasFlow（轻画）项目记忆
 
+### 独立 AgentHost 第一刀（2026-11-03，对账 #865，待独立验收）
+
+- **portal 不是 owner**：`AgentDock` 把面板 portal 到 AppShell 只改变 DOM 位置，React owner 仍可能在
+  `CanvasPage`。现在 `AppShell` 只渲染通用 `AgentHostOutlet`；画布模块注册 renderer，并按 projectId
+  维护稳定 host record。路由卸载只 deactivate，host / AgentPanel / refs / controller 继续存在。
+- **每项目执行 runtime 必须离开 Provider ref**：`useExecution` 的 controller registry、running plan、
+  task→node / 取消索引和 version baseline 都由 `canvasExecutionRuntime` 持有。常驻 host 用
+  `CanvasExecutionValueProvider` 注入 adapter；方法复用捕获闭包，`nodeStates / nodeStateOf / isRunning`
+  每次读 live state。只冻结 `CanvasExecutionApi` 渲染快照会让后台失败态永远看不到。
+- **slot 单 owner**：只有 active project 能写 `data-agent-shell-active`、width、resize；inactive host 只
+  隐藏 panel。离开画布时 slot 必须回 0，切 A/B 时旧 owner cleanup 不能删掉新 owner 的属性。
+- **handoff / id 必须按项目隔离**：`agentHandoff` 与 `agentSkillHandoff` 都按 projectId 分桶；panel id 为
+  `canvas-agent-panel-${projectId}`。否则多 host 并存时后台项目会抢走当前项目的引用或技能。
+- **删除与 HMR**：项目软删/永久删除先 await host disposer（abort + store.flush）和 execution dispose，
+  再 purge Agent 表；成功后 `forgetCanvasStore`。StrictMode effect cleanup 只 deactivate；HMR 显式
+  `disposeAllProjectRuntimes()`，第一刀不承诺 in-flight Promise 无损。
+- **证据**：聚焦 **214/214**、全量 `npm test` **3941 passed / 1 skipped**；tsc/check/build/diff-check
+  通过。真实浏览器 G865 **7/7**：A 的确认卡/队列跨 `/settings` 和 A/B 切换保持同一 DOM，取消后
+  queue pump 领取原队首，slot 不抢占；G735 **35/35**、G769 复跑 **39/39**。1440×900 / 1024×700、
+  明暗四组截图几何与改动前一致。**未跑真实 Tauri 跨路由任务，待质量线独立验收。**
+
 ### Agent 确认执行与检查点继续拆分（2026-11-03，对账 #864）
 
 - **确认执行只收端口**：`agentConfirmationRun.ts` 不读取 React state/refs，承接 begin、账本工具执行、
