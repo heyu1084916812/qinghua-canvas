@@ -1,5 +1,19 @@
 # CanvasFlow（轻画）项目记忆
 
+### Agent 错误透明化、release gate 隔离与启动迁移重试（2026-11-04，对账 #871/#872/#873，✅ 已独立验收）
+
+- ChannelError 必须先读结构化 `appError`，不能因为它是 `Error` 就展示 `e.message`。AgentLoop 的能力目录、
+  模型、写读工具，以及画布 Agent 运行和记忆写入均走 `errText`；真实 Chat2api 502 现在显示
+  HTTP 状态和 `/backend-api/conversation` 上游原文，不再只有 `[channel] http`。
+- release gate 的 Canvas 网关正常版仍 18766，gate 默认 18768，支持 `QINGHUA_CANVAS_GATEWAY_PORT`；
+  配置、info 和 MCP command 必须共用同一端口。这样 gate 可与开发壳并行而不抢 18766。
+- 共享库刚启动时 Agent 消息拆表迁移最多重试 3 次（250/500ms），最终失败仍原样抛出并记录；
+  不能吞错，也不能无限重试。最终 Tauri `pageErrors=[]`、`consoleErrors=[]`。
+- 验证：全量 **4055 passed / 1 skipped**、Rust **60/60**、Tauri AgentHost **16/16**、
+  release-shell **11/11**。最终 `0.1.14` 包 SHA-256
+  `D5BE3A7A695009FC40B00FA18512B7BD42BF0C060538F4110B97AD9574C9C033`。真实 Workbuddy 通过；
+  Chat2api 仍因上游 HTTP 500/中转 502 阻断，无 asset。
+
 ### AgentPanelView + AgentSkillsController（2026-11-04，对账 #869/#870，✅ 已独立验收，`74623ad`）
 
 - `AgentPanelView` 只负责 Agent 面板外层 DOM 与三个视图壳组合：保留 `aside`、`data-agent-panel`、
@@ -44,11 +58,12 @@
   Hook **7/7**、AgentPanel 目录 **212/212**、G769 **39/39**、G865 **24/24**、G735 **35/35**，
   全量 **4028 passed / 1 skipped**。
 
-### 独立 AgentHost 六项收口（2026-11-03，对账 #865，待独立验收）
+### 独立 AgentHost 六项收口（2026-11-03，对账 #865，Tauri/Workbuddy 已过，Chat2api 上游阻断）
 
-- **质量线真实证据（2026-11-04）**：Release/Tauri mock 跨路由 **11/11**，同实例穿越 `/settings`、A/B host、
-  暂停检查点、队列和 slot 收放通过；真实 Workbuddy 文本返回“验收通过”。真实 Chat2api 生图已发到上游，
-  但 `https://image.xssr.org/v1` 网络失败，未产生成功 asset，发布门禁仍阻断。
+- **质量线真实证据（2026-11-04，最终 0.1.14 候选）**：Tauri AgentHost 跨路由 **16/16**，
+  `pageErrors=[] / consoleErrors=[]`，release-shell **11/11**，Canvas 网关独立在 18768；
+  真实 Workbuddy Job completed、文本“验收通过”。真实 Chat2api `/backend-api/conversation`
+  返回 HTTP 500（中转 502），Job failed、无 asset；产品已如实显示完整原因，发布门禁仍阻断。
 
 - **portal 不是 owner**：`AgentDock` 把面板 portal 到 AppShell 只改变 DOM 位置，React owner 仍可能在
   `CanvasPage`。现在 `AppShell` 只渲染通用 `AgentHostOutlet`；画布模块注册 renderer，并按 projectId

@@ -23,6 +23,8 @@
 - 确认执行、检查点继续、停止 / 引导 / 队列推进分别收口；取消或中断会补齐工具结果，不留下悬空 tool call。
 - 自动模式只放行明确的生成类动作；删除、改节点、连线变更和记忆写入仍需人工确认。
 - 画布写入在工具账本完成前等待持久化屏障；生成类请求不因 UI 超时自动重发，避免重复扣费。
+- 渠道错误优先读取结构化 `appError`：不再用 `[channel] http` 调试串遮住真实的 HTTP 状态和服务端原因。
+- 启动时 Agent 消息拆表迁移对共享库短暂未就绪做 3 次有界重试，最终失败仍如实记录。
 
 **代码拆分**
 
@@ -36,9 +38,21 @@
 
 **验证**
 
-- 全量 Vitest：**4049 passed / 1 skipped**；`npm run check`、`npm run build`、`git diff --check` 通过。
-- AgentPanel 目录 **233/233**；真实浏览器 G735 **35/35**、G769 **39/39**、G865 **24/24**。
-- Tauri release、真实 Workbuddy / Chat2api 和安装包哈希在发布门禁完成后补充。
+- 全量 Vitest：**4055 passed / 1 skipped**；Tauri Rust **60/60**；`npm run check`、`npm run build`、
+  `git diff --check` 通过。
+- Tauri release：AgentHost 跨路由 **16/16**，`pageErrors=[]`、`consoleErrors=[]`；release-shell **11/11**。
+- 真实 Workbuddy 文本返回“验收通过”，Job 为 `completed`。
+- 安装包 `43,861,132 B`，SHA-256
+  `D5BE3A7A695009FC40B00FA18512B7BD42BF0C060538F4110B97AD9574C9C033`；Ed25519 签名 keyid
+  `7cec98e1251b82bf`。
+
+**已知阻断**
+
+- 真实 Chat2api 生图仍被上游阻断：本机请求已发出，上游
+  `/backend-api/conversation` 返回 HTTP 500（中转回 502），Job 失败且无 asset。产品现在会如实显示
+  “服务端返回错误（HTTP 502）”，不再只显示 `[channel] http`。
+- 因此 `0.1.14` 安装包已经生成并完成本地真机自检，但在 Chat2api 上游恢复并补一次成功生图前，
+  不作为正式发布版上传。
 
 ---
 

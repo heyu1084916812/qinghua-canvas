@@ -113,8 +113,15 @@
 - **画布执行模块不能重试付费请求**：`agentCanvasRun` 必须保持 preflight → 同波并发 → `store.flush()`
   → RunRecord 对账；“没有留下记录”只允许延迟读取/报错，不能重发 runNode。`agentVisualReview`
   无路由、读图失败或无目标图时必须返回不可验收，不能伪造通过。
+- **ChannelError 不得先取 Error.message**：渠道错误是带结构化 `appError` 的 Error；AgentLoop、画布 Agent
+  运行、记忆写入和所有错误展示必须走 `errText` / `asAppError`，先翻 HTTP status + body，禁止把
+  `[channel] http` 调试串泄漏到 Job 或 UI。
 - **release gate 才可绕过单实例**：仅 `QINGHUA_RELEASE_GATE=1` 跳过 single-instance 并使用独立端口；
   正常用户启动固定 18765、保留单实例。gate 的 store、maintenance、WebView、health 和安装器端口必须一致。
+  Canvas 网关正常版固定 18766；gate 默认 18768，并支持 `QINGHUA_CANVAS_GATEWAY_PORT`，配置/info/MCP
+  命令必须读取同一端口。
+- **启动迁移只能有界重试**：共享库刚启动时 Agent 消息拆表迁移可短重试 3 次（250/500ms），最终失败必须
+  原样抛出并记录；不得无限重试或把真实存储错误吞成成功。
 - **AgentHost 必须跨路由常驻**：AppShell 只能渲染通用 `AgentHostOutlet`，不得 import
   `workbenches/canvas/*`。每 projectId 一个 stable host record；CanvasPage bridge 卸载时只 deactivate，
   非活动 panel 仅 `hidden`，不能 remove / 卸载 AgentPanel。StrictMode cleanup 同样只 deactivate；HMR 才
