@@ -28,7 +28,10 @@ import styles from './ProjectsPage.module.css'
 import { ChoicePicker } from '../../features/shared/choicePicker/ChoicePicker'
 import { useAssetMeta } from '../../features/shared/assets/index'
 import { disposeProjectRuntimes } from '../../app/ProjectRuntimeRegistry'
-import { forgetCanvasStore } from '../../state/workbenches/canvas/storeCache'
+import {
+  clearDeletedProjectState,
+  clearDeletedProjectsState,
+} from '../../app/deletedProjectState'
 
 /**
  * 回收站的"保留天数"（对账 #409）：超过这些天的项目会出现在「清理 N 天前」按钮上。
@@ -170,11 +173,18 @@ export function ProjectsPage() {
   }
 
   const handleDelete = async (id: string) => {
-    await disposeProjectRuntimes([id])
-    await store.remove(id)
-    forgetCanvasStore(id)
-    setConfirmId(null)
-    setMenuId(null)
+    try {
+      await disposeProjectRuntimes([id])
+      await store.remove(id)
+      clearDeletedProjectState(id)
+      setConfirmId(null)
+      setMenuId(null)
+    } catch (error) {
+      setStatus(
+        `删除失败：${error instanceof Error ? error.message : String(error)}`,
+        'error',
+      )
+    }
   }
 
   /** 打开 / 收起回收站：打开时现读一次，保证看到的是最新的一批 */
@@ -236,7 +246,7 @@ export function ProjectsPage() {
     try {
       await disposeProjectRuntimes([id])
       await store.purge(id)
-      forgetCanvasStore(id)
+      clearDeletedProjectState(id)
       await refreshTrash()
       setStatus('已彻底删除（不可恢复）')
     } catch (error) {
@@ -256,7 +266,9 @@ export function ProjectsPage() {
         trashItems.map((project) => project.id),
       )
       const n = await store.purgeAll()
-      for (const project of trashItems) forgetCanvasStore(project.id)
+      clearDeletedProjectsState(
+        trashItems.map((project) => project.id),
+      )
       await refreshTrash()
       setStatus(`已清空回收站（${n} / ${total} 个项目）`)
     } catch (error) {
@@ -329,7 +341,7 @@ export function ProjectsPage() {
     try {
       await disposeProjectRuntimes(selected)
       const n = await store.purgeMany(selected)
-      for (const id of selected) forgetCanvasStore(id)
+      clearDeletedProjectsState(selected)
       await refreshTrash()
       setTrashSelectedIds(new Set())
       setTrashSelectionAnchor(null)
@@ -368,14 +380,15 @@ export function ProjectsPage() {
       )
       const n = await store.purgeOlderThan(TRASH_KEEP_DAYS)
       const cutoff = Date.now() - TRASH_KEEP_DAYS * 86_400_000
-      for (const project of trashItems) {
-        if (
-          typeof project.deletedAt === 'number' &&
-          project.deletedAt < cutoff
-        ) {
-          forgetCanvasStore(project.id)
-        }
-      }
+      clearDeletedProjectsState(
+        trashItems
+          .filter(
+            (project) =>
+              typeof project.deletedAt === 'number' &&
+              project.deletedAt < cutoff,
+          )
+          .map((project) => project.id),
+      )
       await refreshTrash()
       setStatus(
         n > 0 ? `已清理 ${n} 个 ${TRASH_KEEP_DAYS} 天前的项目（不可恢复）` : `没有超过 ${TRASH_KEEP_DAYS} 天的项目`,
@@ -437,13 +450,20 @@ export function ProjectsPage() {
   const handleBulkDelete = async () => {
     if (selectedCount === 0) return
     const ids = [...selectedIds]
-    await disposeProjectRuntimes(ids)
-    await store.removeMany(ids)
-    for (const id of ids) forgetCanvasStore(id)
-    setMenuId(null)
-    setConfirmId(null)
-    exitSelection()
-    setStatus(`已删除 ${selectedCount} 个项目`)
+    try {
+      await disposeProjectRuntimes(ids)
+      await store.removeMany(ids)
+      clearDeletedProjectsState(ids)
+      setMenuId(null)
+      setConfirmId(null)
+      exitSelection()
+      setStatus(`已删除 ${selectedCount} 个项目`)
+    } catch (error) {
+      setStatus(
+        `批量删除失败：${error instanceof Error ? error.message : String(error)}`,
+        'error',
+      )
+    }
   }
 
   const handleImport = async () => {

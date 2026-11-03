@@ -8,10 +8,11 @@ import {
   type SetStateAction,
 } from 'react'
 import TestRenderer, { act } from 'react-test-renderer'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   disposeAgentHost,
   getAgentHosts,
+  invalidateAgentHostsForHmr,
   registerAgentHostRenderer,
   removeAgentHost,
   resetAgentHostsForTests,
@@ -170,7 +171,76 @@ describe('AgentHost registry / outlet', () => {
       kind: 'probe',
       payload: {},
     })
-    act(() => removeAgentHost('canvas:p2'))
+    act(() => {
+      removeAgentHost('canvas:p2')
+    })
     expect(getAgentHosts()).toEqual([])
+  })
+
+  it('旧代际异步 dispose 不得删除 HMR 后注册的新 host', async () => {
+    registerAgentHostRenderer(
+      'probe',
+      ({ host }: AgentHostRendererProps) =>
+        createElement('span', null, host.id),
+    )
+    const first = upsertAgentHost({
+      id: 'canvas:p1',
+      kind: 'probe',
+      payload: { generation: 'old' },
+    })
+    let release!: () => void
+    const gate = new Promise<void>((resolve) => {
+      release = resolve
+    })
+    setAgentHostDisposer(
+      first.id,
+      async () => gate,
+      first.generation,
+    )
+
+    const disposingOld = disposeAgentHost(
+      first.id,
+      first.generation,
+    )
+    invalidateAgentHostsForHmr('probe')
+    const second = upsertAgentHost({
+      id: 'canvas:p1',
+      kind: 'probe',
+      payload: { generation: 'new' },
+      active: true,
+    })
+    expect(second.generation).not.toBe(first.generation)
+
+    release()
+    await disposingOld
+
+    expect(getAgentHosts()).toHaveLength(1)
+    expect(getAgentHosts()[0]).toMatchObject({
+      generation: second.generation,
+      payload: { generation: 'new' },
+      active: true,
+    })
+  })
+
+  it('宿主 dispose 失败时保留 record，删除流程可重试', async () => {
+    const host = upsertAgentHost({
+      id: 'canvas:p1',
+      kind: 'probe',
+      payload: {},
+    })
+    const dispose = vi.fn(async () => {
+      throw new Error('flush failed')
+    })
+    setAgentHostDisposer(host.id, dispose, host.generation)
+
+    await expect(
+      disposeAgentHost(host.id, host.generation),
+    ).rejects.toThrow('flush failed')
+    expect(getAgentHosts()).toHaveLength(1)
+
+    await expect(
+      disposeAgentHost(host.id, host.generation),
+    ).rejects.toThrow('flush failed')
+    expect(dispose).toHaveBeenCalledTimes(2)
   })
 })

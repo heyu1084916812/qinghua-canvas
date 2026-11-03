@@ -38,3 +38,9 @@ export function subscribeAgentSkillHandoff(
     if (listeners.size === 0) listenersByProject.delete(projectId)
   }
 }
+
+/** 已删除项目的技能交接不得继续投递给残留订阅者。 */
+export function clearAgentSkillHandoff(projectId: string): void {
+  pendingByProject.delete(projectId)
+  listenersByProject.delete(projectId)
+}

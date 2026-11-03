@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import {
+  clearAgentHandoff,
   sendSelectionToAgent,
   subscribeAgentHandoff,
   takeAgentHandoff,
@@ -23,5 +24,16 @@ describe('agentHandoff', () => {
 
     offA()
     offB()
+  })
+
+  it('删除项目后清掉待消费节点与陈旧监听', () => {
+    const listener = vi.fn()
+    subscribeAgentHandoff('p1', listener)
+    sendSelectionToAgent('p1', ['node-1'])
+    clearAgentHandoff('p1')
+
+    expect(takeAgentHandoff('p1')).toEqual([])
+    sendSelectionToAgent('p1', ['node-2'])
+    expect(listener).toHaveBeenCalledTimes(1)
   })
 })

@@ -9,6 +9,8 @@ import type { ComponentType } from 'react'
 export interface AgentHostRecord {
   id: string
   kind: string
+  /** 同一项目重挂保留；HMR 先失效旧代际，旧 cleanup 不得删除新记录。 */
+  generation: number
   active: boolean
   open: boolean
   payload: unknown
@@ -29,10 +31,18 @@ export interface AgentHostRegistration {
 }
 
 const renderers = new Map<string, AgentHostRenderer>()
-const disposers = new Map<string, () => Promise<void>>()
+const disposers = new Map<
+  string,
+  { generation: number; dispose: () => Promise<void> }
+>()
 let recordsById = new Map<string, AgentHostRecord>()
 let snapshot: readonly AgentHostRecord[] = []
 const listeners = new Set<() => void>()
+let nextGeneration = 1
+
+function disposeKey(id: string, generation: number): string {
+  return `${id}\u0000${generation}`
+}
 
 function notify(): void {
   for (const listener of listeners) listener()
@@ -93,6 +103,7 @@ export function upsertAgentHost(
   const next: AgentHostRecord = {
     id: input.id,
     kind: input.kind,
+    generation: current?.generation ?? nextGeneration++,
     active: input.active ?? current?.active ?? false,
     open: input.open ?? current?.open ?? false,
     payload: input.payload,
@@ -137,29 +148,81 @@ export function setAgentHostOpen(
   commit(new Map(recordsById).set(id, { ...current, open }))
 }
 
-export function removeAgentHost(id: string): void {
-  if (!recordsById.has(id)) return
-  disposers.delete(id)
+export function removeAgentHost(
+  id: string,
+  expectedGeneration?: number,
+): boolean {
+  const current = recordsById.get(id)
+  if (!current) return false
+  if (
+    expectedGeneration !== undefined &&
+    current.generation !== expectedGeneration
+  ) {
+    return false
+  }
+  disposers.delete(disposeKey(id, current.generation))
   const next = new Map(recordsById)
   next.delete(id)
   commit(next)
+  return true
 }
 
 export function setAgentHostDisposer(
   id: string,
   dispose: () => Promise<void>,
+  generation = recordsById.get(id)?.generation,
 ): () => void {
-  disposers.set(id, dispose)
+  if (generation === undefined) return () => undefined
+  const key = disposeKey(id, generation)
+  disposers.set(key, { generation, dispose })
   return () => {
-    if (disposers.get(id) === dispose) disposers.delete(id)
+    if (disposers.get(key)?.dispose === dispose) disposers.delete(key)
   }
 }
 
-/** 项目删除 / HMR 用：先 abort + flush，再移除常驻 record。 */
-export async function disposeAgentHost(id: string): Promise<void> {
-  const dispose = disposers.get(id)
-  if (dispose) await dispose()
-  removeAgentHost(id)
+/** 只等待宿主自身 abort + flush；项目删除协调器在全部成功后才会移除 record。 */
+export async function waitForAgentHostDispose(
+  id: string,
+  generation = recordsById.get(id)?.generation,
+): Promise<void> {
+  if (generation === undefined) return
+  const key = disposeKey(id, generation)
+  const entry = disposers.get(key)
+  if (!entry) return
+  await entry.dispose()
+  if (disposers.get(key) === entry) disposers.delete(key)
+}
+
+/** 项目删除 / 测试用：先 abort + flush，再按代际条件移除常驻 record。 */
+export async function disposeAgentHost(
+  id: string,
+  generation = recordsById.get(id)?.generation,
+): Promise<void> {
+  await waitForAgentHostDispose(id, generation)
+  removeAgentHost(id, generation)
+}
+
+/**
+ * HMR 同步失效当前代际，但不 notify 旧 renderer。
+ *
+ * recordsById 已经换到新代际，旧 disposer / cleanup 即使晚到也只能命中旧 token；
+ * 随后新模块 upsert 时沿用这个新代际并发布，不会恢复旧异步清理的所有权。
+ */
+export function invalidateAgentHostsForHmr(
+  kind: string,
+): AgentHostRecord[] {
+  const invalidated: AgentHostRecord[] = []
+  const next = new Map(recordsById)
+  for (const [id, current] of recordsById) {
+    if (current.kind !== kind) continue
+    invalidated.push(current)
+    next.set(id, {
+      ...current,
+      generation: nextGeneration++,
+    })
+  }
+  recordsById = next
+  return invalidated
 }
 
 /** 仅测试使用：清空记录和 renderer，验证删除与 StrictMode 行为。 */
@@ -168,5 +231,6 @@ export function resetAgentHostsForTests(): void {
   snapshot = []
   renderers.clear()
   disposers.clear()
+  nextGeneration = 1
   notify()
 }

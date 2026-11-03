@@ -1,13 +1,22 @@
 interface ProjectRuntimeRegistration {
   key: string
   projectId: string
+  generation: number
+  active: boolean
   dispose: () => Promise<void>
+}
+
+export interface ProjectRuntimeRegistrationHandle {
+  key: string
+  projectId: string
+  generation: number
 }
 
 const registrations = new Map<
   string,
   Map<string, ProjectRuntimeRegistration>
 >()
+let nextGeneration = 1
 
 /**
  * 每项目运行时清理入口。
@@ -16,14 +25,24 @@ const registrations = new Map<
  * deactivate host，不能提前 dispose。真正删除 / HMR 由显式调用触发。
  */
 export function registerProjectRuntime(
-  input: ProjectRuntimeRegistration,
-): void {
+  input: Omit<ProjectRuntimeRegistration, 'generation' | 'active'>,
+): ProjectRuntimeRegistrationHandle {
+  const registration: ProjectRuntimeRegistration = {
+    ...input,
+    generation: nextGeneration++,
+    active: true,
+  }
   let project = registrations.get(input.projectId)
   if (!project) {
     project = new Map()
     registrations.set(input.projectId, project)
   }
-  project.set(input.key, input)
+  project.set(input.key, registration)
+  return {
+    key: registration.key,
+    projectId: registration.projectId,
+    generation: registration.generation,
+  }
 }
 
 export async function disposeProjectRuntimes(
@@ -33,10 +52,12 @@ export async function disposeProjectRuntimes(
   for (const projectId of [...new Set(projectIds)]) {
     const project = registrations.get(projectId)
     if (!project) continue
-    for (const [key, runtime] of project) {
+    const captured = [...project.entries()]
+    for (const [, runtime] of captured) runtime.active = false
+    for (const [key, runtime] of captured) {
       try {
         await runtime.dispose()
-        project.delete(key)
+        if (project.get(key) === runtime) project.delete(key)
       } catch (error) {
         firstError ??= error
       }
@@ -52,4 +73,5 @@ export async function disposeAllProjectRuntimes(): Promise<void> {
 
 export function resetProjectRuntimesForTests(): void {
   registrations.clear()
+  nextGeneration = 1
 }

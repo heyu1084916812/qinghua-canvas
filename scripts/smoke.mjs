@@ -41311,12 +41311,18 @@ async function g735(browser) {
   await page.locator('[data-ecommerce-create]').click()
   await page.waitForURL(/\/ecommerce\/proj_/)
   await page.locator('[data-ecommerce-form]').waitFor({ state: 'visible', timeout: 20_000 })
-  await page.locator('[data-ecommerce-model]').click()
-  const ecommerceModels = await page
-    .locator('[data-ecommerce-menu="generate-model"] [data-ecommerce-select-option]')
-    .evaluateAll((els) =>
-      els.map((el) => el.getAttribute('data-ecommerce-select-option')).filter(Boolean),
-    )
+  let ecommerceModels = []
+  for (let attempt = 0; attempt < 12; attempt += 1) {
+    await page.locator('[data-ecommerce-model]').click()
+    ecommerceModels = await page
+      .locator('[data-ecommerce-menu="generate-model"] [data-ecommerce-select-option]')
+      .evaluateAll((els) =>
+        els.map((el) => el.getAttribute('data-ecommerce-select-option')).filter(Boolean),
+      )
+    if (!ecommerceModels.includes(hiddenModel)) break
+    await page.keyboard.press('Escape')
+    await sleep(250)
+  }
   rec(
     g,
     '电商页模型下拉隐藏不常用模型',
@@ -43301,6 +43307,7 @@ async function g865(browser) {
   const stamp = Date.now().toString(36)
   const projectA = `smoke_g865_a_${stamp}`
   const projectB = `smoke_g865_b_${stamp}`
+  let projectC = ''
   const sessionId = `chat_smoke_g865_${stamp}`
   const queueId = `queue_smoke_g865_${stamp}`
   const callId = `call_smoke_g865_${stamp}`
@@ -43308,6 +43315,10 @@ async function g865(browser) {
 
   try {
     await page.goto(BASE, { waitUntil: 'domcontentloaded' })
+    await page.evaluate(() => {
+      localStorage.removeItem('qinghua.canvas.agentShell.v2')
+      localStorage.removeItem('qinghua.canvas.agentDock.v1')
+    })
     channelSnapshot = await sharedRows(page, 'channels')
     let mock = channelSnapshot.find((row) => row.id === 'ch_smoke_mock')
     if (!mock) {
@@ -43536,6 +43547,64 @@ async function g865(browser) {
       JSON.stringify(returned),
     )
 
+    await page.evaluate(() => {
+      history.pushState({}, '', '/settings')
+      dispatchEvent(new PopStateEvent('popstate'))
+    })
+    await page.setViewportSize({ width: 1024, height: 700 })
+    await page.evaluate((path) => {
+      history.pushState({}, '', path)
+      dispatchEvent(new PopStateEvent('popstate'))
+    }, `/canvas/${projectA}`)
+    await page.locator('[data-canvas-surface]').waitFor({
+      state: 'visible',
+      timeout: 20_000,
+    })
+    await page.waitForTimeout(700)
+    const reactivated = await page.evaluate(() => {
+      const surface = document
+        .querySelector('[data-canvas-surface]')
+        ?.getBoundingClientRect()
+      const orb = document
+        .querySelector('[data-agent-orb]')
+        ?.getBoundingClientRect()
+      const panel = document
+        .querySelector('[data-agent-shell-panel][data-agent-host-active="true"]')
+        ?.getBoundingClientRect()
+      return {
+        surface: surface
+          ? { left: surface.left, top: surface.top, right: surface.right, bottom: surface.bottom }
+          : null,
+        orb: orb
+          ? { left: orb.left, top: orb.top, right: orb.right, bottom: orb.bottom }
+          : null,
+        panel: panel
+          ? { left: panel.left, right: panel.right, width: panel.width }
+          : null,
+        viewportWidth: window.innerWidth,
+      }
+    })
+    rec(
+      g,
+      '★★ 1440 离开画布、1024 返回后 orb 与面板重新 clamp 到当前 surface',
+      Boolean(reactivated.surface) &&
+        Boolean(reactivated.orb) &&
+        Boolean(reactivated.panel) &&
+        reactivated.orb.left >= reactivated.surface.left - 1 &&
+        reactivated.orb.right <= reactivated.surface.right + 1 &&
+        reactivated.orb.top >= reactivated.surface.top - 1 &&
+        reactivated.orb.bottom <= reactivated.surface.bottom + 1 &&
+        reactivated.panel.left >= 0 &&
+        reactivated.panel.right <= reactivated.viewportWidth + 1 &&
+        reactivated.panel.width >= 320,
+      JSON.stringify(reactivated),
+    )
+    await page.screenshot({
+      path: `${OUT}/agent-host-865-reactivated-1024.png`,
+    })
+    await page.setViewportSize({ width: 1440, height: 900 })
+    await page.waitForTimeout(500)
+
     await page.locator('[data-agent-cancel]').click()
     await page.waitForTimeout(700)
     await page.locator('[data-agent-queue-resume]').click()
@@ -43553,6 +43622,63 @@ async function g865(browser) {
       `activeTurnId=${activeTurnId || 'none'} queue=${queueId}`,
     )
 
+    projectC = await page.evaluate(async () => {
+      const { createWebPlatform } =
+        await import('/src/platform/web/index.ts')
+      const { createProjectRepository } =
+        await import('/src/state/project/repository.ts')
+      const repo = createProjectRepository(createWebPlatform().storage)
+      const created = await repo.create({ name: 'G865 当前画布删除' })
+      return created.id
+    })
+    await page.goto(`${BASE}/canvas/${projectC}`, {
+      waitUntil: 'domcontentloaded',
+    })
+    await page.locator('[data-canvas-surface]').waitFor({
+      state: 'visible',
+      timeout: 20_000,
+    })
+    await page.locator('[data-agent-orb]').click()
+    await ensureSidebarOpen(page)
+    const currentRow = page.locator(
+      `[data-project-tree-item="${projectC}"]`,
+    )
+    await currentRow.waitFor({ state: 'visible', timeout: 20_000 })
+    await currentRow
+      .locator('button[aria-label="更多"]')
+      .click({ force: true })
+    await page
+      .locator('[data-project-menu] [role="menuitem"]')
+      .filter({ hasText: '删除' })
+      .click()
+    await page.getByRole('button', { name: '确认删除' }).click()
+    await page.waitForURL(`${BASE}/projects`, { timeout: 20_000 })
+    await page.waitForTimeout(500)
+    const deletedCurrent = await page.evaluate((id) => ({
+      path: window.location.pathname,
+      host: Boolean(
+        document.querySelector(`[data-agent-host-record="canvas-agent:${id}"]`),
+      ),
+      hostActive: document
+        .querySelector(`[data-agent-host-record="canvas-agent:${id}"]`)
+        ?.getAttribute('data-agent-host-active') ?? null,
+      activeCanvas: sessionStorage.getItem(
+        'qinghua:active-workbench:canvas',
+      ),
+      legacyActiveCanvas: sessionStorage.getItem(
+        'qinghua:active-canvas-id',
+      ),
+    }), projectC)
+    rec(
+      g,
+      '★★ 删除当前画布后离开 /canvas/:id，并清活动画布与已关闭 host',
+      deletedCurrent.path === '/projects' &&
+        !deletedCurrent.host &&
+        deletedCurrent.activeCanvas === null &&
+        deletedCurrent.legacyActiveCanvas === null,
+      JSON.stringify(deletedCurrent),
+    )
+
     await page.screenshot({
       path: `${OUT}/agent-host-865-returned.png`,
     })
@@ -43563,7 +43689,7 @@ async function g865(browser) {
       pageErrors.join(' | '),
     )
   } finally {
-    await page.evaluate(async ({ projectA, projectB }) => {
+    await page.evaluate(async ({ projectA, projectB, projectC }) => {
       const { createWebPlatform } =
         await import('/src/platform/web/index.ts')
       const { createProjectRepository } =
@@ -43571,7 +43697,8 @@ async function g865(browser) {
       const repo = createProjectRepository(createWebPlatform().storage)
       await repo.purge(projectA)
       await repo.purge(projectB)
-    }, { projectA, projectB }).catch(() => {})
+      if (projectC) await repo.purge(projectC)
+    }, { projectA, projectB, projectC }).catch(() => {})
     for (const row of channelSnapshot) {
       const current = await sharedRow(page, 'channels', row.id)
       if (!current || current.enabled === row.enabled) continue

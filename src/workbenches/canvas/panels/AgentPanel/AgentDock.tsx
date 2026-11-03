@@ -16,6 +16,7 @@ import {
   AGENT_SHELL_WIDTH_MIN,
   agentShellAvailableWidth,
   agentShellMaxWidth,
+  agentShellStateForActivation,
   dampAgentShellWidth,
   agentShellWidth,
   clampAgentOrb,
@@ -47,17 +48,40 @@ type DragState =
       moved: boolean
     }
 
-function measureCanvasWorkArea(): AgentWorkArea {
-  const surface = document.querySelector<HTMLElement>('[data-canvas-surface]')
+function visibleCanvasSurface(): HTMLElement | null {
+  return [...document.querySelectorAll<HTMLElement>('[data-canvas-surface]')]
+    .find((surface) => {
+      const rect = surface.getBoundingClientRect()
+      return rect.width > 0 && rect.height > 0
+    }) ?? null
+}
+
+function measureCanvasWorkArea(includePanel = true): AgentWorkArea {
+  const surface = visibleCanvasSurface()
   const rect = surface?.getBoundingClientRect()
   if (rect && rect.width > 0 && rect.height > 0) {
+    if (!includePanel) {
+      return {
+        x: rect.left,
+        y: rect.top,
+        width: rect.width,
+        height: rect.height,
+      }
+    }
     const panel = document.querySelector<HTMLElement>(
       '[data-agent-shell-panel][data-agent-host-active="true"]',
     )
     const panelRect = panel?.getBoundingClientRect()
     const right =
-      panelRect && panelRect.width > 0 ? Math.max(rect.right, panelRect.right) : rect.right
-    return { x: rect.left, y: rect.top, width: right - rect.left, height: rect.height }
+      panelRect && panelRect.width > 0
+        ? Math.max(rect.right, panelRect.right)
+        : rect.right
+    return {
+      x: rect.left,
+      y: rect.top,
+      width: right - rect.left,
+      height: rect.height,
+    }
   }
   return { x: 0, y: 0, width: window.innerWidth, height: window.innerHeight }
 }
@@ -127,19 +151,16 @@ export function AgentDock({
 
   useLayoutEffect(() => {
     if (!active) return
-    const area = measureCanvasWorkArea()
+    const area = measureCanvasWorkArea(false)
     const availableWidth = measureAgentAvailableWidth()
-    if (!shellRef.current) {
-      const stored = readStoredShellState()
-      applyShell(
-        stored
-          ? clampAgentShellState(stored, area, availableWidth)
-          : {
-              ...defaultAgentShellState(area),
-              width: agentShellWidth(AGENT_SHELL_WIDTH_DEFAULT, availableWidth),
-            },
-      )
-    }
+    applyShell(
+      agentShellStateForActivation(
+        shellRef.current,
+        shellRef.current ? null : readStoredShellState(),
+        area,
+        availableWidth,
+      ),
+    )
 
     const onAreaChange = () => {
       const nextArea = measureCanvasWorkArea()
@@ -154,16 +175,57 @@ export function AgentDock({
             },
       )
     }
-    const surface = document.querySelector<HTMLElement>('[data-canvas-surface]')
+    const clampToSurface = () => {
+      applyShell(
+        agentShellStateForActivation(
+          shellRef.current,
+          null,
+          measureCanvasWorkArea(false),
+          measureAgentAvailableWidth(),
+        ),
+      )
+    }
     const observer =
-      typeof ResizeObserver === 'function' && surface
+      typeof ResizeObserver === 'function'
         ? new ResizeObserver(onAreaChange)
         : null
-    if (surface && observer) observer.observe(surface)
-    window.addEventListener('resize', onAreaChange)
-    return () => {
+    let observedSurface: HTMLElement | null = null
+    const attachSurface = () => {
+      const surface = visibleCanvasSurface()
+      if (!surface || surface === observedSurface) return
       observer?.disconnect()
-      window.removeEventListener('resize', onAreaChange)
+      observedSurface = surface
+      observer?.observe(surface)
+      clampToSurface()
+    }
+    const mutationObserver =
+      typeof MutationObserver === 'function' && document.documentElement
+        ? new MutationObserver(attachSurface)
+        : null
+    mutationObserver?.observe(document.documentElement, {
+      childList: true,
+      subtree: true,
+    })
+    attachSurface()
+    window.addEventListener('resize', clampToSurface)
+    /**
+     * 路由切换时 surface 会在 bridge 激活后的下一次提交 / 布局才落定。
+     * 首帧先按已有 surface 夹一次，再等两帧重新量当前真实 surface；
+     * 否则 1440 的浮球会在 1024 返回时停在 panel 区域。
+     */
+    let firstFrame = 0
+    let secondFrame = 0
+    firstFrame = window.requestAnimationFrame(() => {
+      secondFrame = window.requestAnimationFrame(clampToSurface)
+    })
+    const settleTimer = window.setTimeout(clampToSurface, 360)
+    return () => {
+      mutationObserver?.disconnect()
+      observer?.disconnect()
+      window.removeEventListener('resize', clampToSurface)
+      window.clearTimeout(settleTimer)
+      window.cancelAnimationFrame(firstFrame)
+      window.cancelAnimationFrame(secondFrame)
     }
   }, [active, applyShell])
 

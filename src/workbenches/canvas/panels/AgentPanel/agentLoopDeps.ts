@@ -65,8 +65,11 @@ export interface AgentLoopAssemblyPorts {
     origin: { x: number; y: number },
     session: AgentSession,
   ) => AgentToolContext
-  /** 与 `execution.nodeStates` 同构：失败态携带 AppError，不是字符串。 */
-  nodeRunStates: ReadonlyMap<string, RunTaskState>
+  /**
+   * 每次读取当前项目运行态，不能捕获某次 render 的 Map 快照。
+   * 失败态携带 AppError，不是字符串。
+   */
+  nodeRunStates: () => ReadonlyMap<string, RunTaskState>
   cachedChatRoute: (
     session: AgentSession,
   ) => AgentChatRoute | null
@@ -404,7 +407,7 @@ export function assembleAgentLoopDeps(
                   nodeRunStateOf: (nodeId: string) => {
                     const persisted = persistedFailures.get(nodeId)
                     if (persisted) return persisted
-                    const state = ports.nodeRunStates.get(nodeId)
+                    const state = ports.nodeRunStates().get(nodeId)
                     return state?.kind === 'failed'
                       ? {
                           kind: 'failed' as const,

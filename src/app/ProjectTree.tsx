@@ -29,7 +29,10 @@ import {
 import { buildProjectTree, projectGroupWindow } from './projectTreeModel'
 import { projectMenuPosition, type ProjectMenuFrame } from './projectMenuPosition'
 import { disposeProjectRuntimes } from './ProjectRuntimeRegistry'
-import { forgetCanvasStore } from '../state/workbenches/canvas/storeCache'
+import {
+  clearDeletedProjectState,
+  leaveDeletedCanvasRoute,
+} from './deletedProjectState'
 import { usePlatform } from './providers/PlatformProvider'
 import {
   IconCanvas,
@@ -144,6 +147,8 @@ export function ProjectTree({ open, activeProjectId }: ProjectTreeProps) {
   const [status, setStatus] = useState<StatusState | null>(null)
   const renameInputRef = useRef<HTMLInputElement | null>(null)
   const menuRef = useRef<HTMLDivElement | null>(null)
+  const locationPathRef = useRef(location.pathname)
+  locationPathRef.current = location.pathname
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -478,7 +483,12 @@ export function ProjectTree({ open, activeProjectId }: ProjectTreeProps) {
       else {
         await disposeProjectRuntimes([confirmTarget.id])
         await repo.remove(confirmTarget.id)
-        forgetCanvasStore(confirmTarget.id)
+        clearDeletedProjectState(confirmTarget.id)
+        leaveDeletedCanvasRoute(
+          locationPathRef.current,
+          confirmTarget.id,
+          navigate,
+        )
       }
       setStatus({
         text:

@@ -52,7 +52,9 @@ function harness(args: {
   toolMode?: 'native' | 'json'
   controller?: AbortController
   route?: AgentChatRoute | null
-  nodeRunStates?: Map<string, { kind: 'failed'; error: unknown }>
+  nodeRunStates?:
+    | ReadonlyMap<string, { kind: 'failed'; error: unknown }>
+    | (() => ReadonlyMap<string, { kind: 'failed'; error: unknown }>)
   delivered?: Set<string>
   runLatestFailures?: Map<string, unknown>
   applyPlanResult?: unknown
@@ -170,7 +172,9 @@ function harness(args: {
     ) as never,
     abortSignalFor: () => undefined,
     nodeRunStates:
-      (args.nodeRunStates as never) ?? (new Map() as never),
+      (typeof args.nodeRunStates === 'function'
+        ? args.nodeRunStates
+        : () => args.nodeRunStates ?? new Map()) as never,
     cachedChatRoute: vi.fn((target: AgentSession) =>
       routeCache.get(target.id) ?? null,
     ) as never,
@@ -388,6 +392,38 @@ describe('assembleAgentLoopDeps', () => {
     }
     expect(results.results[0]?.status).toBe('ok')
     expect(results.results[0]?.reason).toBeUndefined()
+  })
+
+  it('★★ 旧 loopDeps 仍读取最新 nodeRunStates，不冻结 render 快照', async () => {
+    let live = new Map<string, { kind: 'failed'; error: unknown }>()
+    const h = harness({
+      nodeRunStates: () => live,
+    })
+
+    live = new Map([[
+      'img-1',
+      {
+        kind: 'failed',
+        error: {
+          kind: 'http',
+          status: 500,
+          body: '后台失败',
+        },
+      },
+    ]])
+    await h.deps.executeRead(
+      'readResult',
+      { nodeIds: ['img-1'] },
+      'call-live',
+    )
+
+    const results = h.readResults[0] as {
+      results: { status: string; reason?: string }[]
+    }
+    expect(results.results[0]).toMatchObject({
+      status: 'failed',
+      reason: expect.stringContaining('500'),
+    })
   })
 
   it('★★ takeSteering 按已投递去重、写回并追加事件', async () => {

@@ -59,4 +59,35 @@ describe('ProjectRuntimeRegistry', () => {
     ).rejects.toThrow('flush failed')
     expect(dispose).toHaveBeenCalledTimes(2)
   })
+
+  it('旧代际延迟清理不得删除同 key 的新注册', async () => {
+    let release!: () => void
+    const gate = new Promise<void>((resolve) => {
+      release = resolve
+    })
+    const oldDispose = vi.fn(async () => gate)
+    const newDispose = vi.fn(async () => undefined)
+    const oldRegistration = registerProjectRuntime({
+      projectId: 'p1',
+      key: 'canvas-agent',
+      dispose: oldDispose,
+    })
+
+    const disposing = disposeProjectRuntimes(['p1'])
+    const newRegistration = registerProjectRuntime({
+      projectId: 'p1',
+      key: 'canvas-agent',
+      dispose: newDispose,
+    })
+    expect(newRegistration.generation).not.toBe(
+      oldRegistration.generation,
+    )
+
+    release()
+    await disposing
+    await disposeProjectRuntimes(['p1'])
+
+    expect(oldDispose).toHaveBeenCalledOnce()
+    expect(newDispose).toHaveBeenCalledOnce()
+  })
 })

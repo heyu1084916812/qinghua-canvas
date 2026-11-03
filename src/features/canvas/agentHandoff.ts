@@ -57,3 +57,9 @@ export function subscribeAgentHandoff(
     if (listeners.size === 0) listenersByProject.delete(projectId)
   }
 }
+
+/** 项目删除后同时清掉未消费交接与陈旧订阅，恢复项目时会重新注册。 */
+export function clearAgentHandoff(projectId: string): void {
+  pendingByProject.delete(projectId)
+  listenersByProject.delete(projectId)
+}

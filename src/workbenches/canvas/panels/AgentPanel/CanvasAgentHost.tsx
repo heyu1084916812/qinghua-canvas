@@ -7,11 +7,13 @@ import {
 } from 'react'
 import {
   deactivateAgentHost,
-  disposeAgentHost,
+  invalidateAgentHostsForHmr,
   registerAgentHostRenderer,
+  removeAgentHost,
   setAgentHostDisposer,
   setAgentHostOpen,
   upsertAgentHost,
+  waitForAgentHostDispose,
   type AgentHostRendererProps,
 } from '../../../../app/AgentHostRegistry'
 import {
@@ -20,14 +22,16 @@ import {
 } from '../../../../app/ProjectRuntimeRegistry'
 import { subscribeAgentHandoff } from '../../../../features/canvas/agentHandoff'
 import type { CanvasStore } from '../../../../state/workbenches/canvas/store'
-import { forgetCanvasStore } from '../../../../state/workbenches/canvas/storeCache'
 import {
   CanvasExecutionValueProvider,
   createCanvasExecutionHostAdapter,
   useCanvasExecution,
   type CanvasExecutionApi,
 } from '../../execution/CanvasExecutionProvider'
-import { disposeCanvasExecutionRuntime } from '../../execution/canvasExecutionRuntime'
+import {
+  beginCanvasExecutionRuntimeShutdown,
+  isCanvasExecutionRuntimeClosed,
+} from '../../execution/canvasExecutionRuntime'
 import {
   CanvasStoreProvider,
   useCanvasStore,
@@ -65,8 +69,8 @@ export function CanvasAgentHostRenderer({
 }: AgentHostRendererProps) {
   const registerDispose = useCallback(
     (dispose: () => Promise<void>) =>
-      setAgentHostDisposer(host.id, dispose),
-    [host.id],
+      setAgentHostDisposer(host.id, dispose, host.generation),
+    [host.generation, host.id],
   )
   const payload = host.payload
   if (!isCanvasAgentHostPayload(payload)) return null
@@ -103,6 +107,7 @@ ensureCanvasAgentHostRenderer()
 
 if (import.meta.hot) {
   import.meta.hot.dispose(() => {
+    invalidateAgentHostsForHmr(CANVAS_AGENT_HOST_KIND)
     void disposeAllProjectRuntimes().catch((error) => {
       console.error('[agent-host] HMR dispose failed', error)
     })
@@ -136,35 +141,34 @@ export function CanvasAgentHostBridge({
 
   useLayoutEffect(() => {
     ensureCanvasAgentHostRenderer()
-    upsertAgentHost({
+    if (isCanvasExecutionRuntimeClosed(projectId)) return
+    const host = upsertAgentHost({
       id: hostId,
       kind: CANVAS_AGENT_HOST_KIND,
       payload,
       active: true,
     })
-  }, [hostId, payload])
-
-  useLayoutEffect(() => {
     registerProjectRuntime({
       projectId,
       key: CANVAS_AGENT_HOST_KIND,
       dispose: async () => {
-        let cleanupError: unknown
-        try {
-          await disposeAgentHost(hostId)
-        } catch (error) {
-          cleanupError = error
+        const shutdown = beginCanvasExecutionRuntimeShutdown(projectId)
+        const results = await Promise.allSettled([
+          waitForAgentHostDispose(hostId, host.generation),
+          shutdown?.waitForIdle() ?? Promise.resolve(),
+        ])
+        const failure = results.find(
+          (result): result is PromiseRejectedResult =>
+            result.status === 'rejected',
+        )
+        if (failure) {
+          throw failure.reason
         }
-        try {
-          await disposeCanvasExecutionRuntime(projectId)
-        } catch (error) {
-          cleanupError ??= error
-        }
-        if (cleanupError) throw cleanupError
-        forgetCanvasStore(projectId)
+        shutdown?.finalize()
+        removeAgentHost(hostId, host.generation)
       },
     })
-  }, [hostId, projectId])
+  }, [hostId, payload, projectId])
 
   useLayoutEffect(
     () => () => deactivateAgentHost(hostId, payloadRef.current),

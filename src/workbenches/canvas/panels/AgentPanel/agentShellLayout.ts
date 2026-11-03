@@ -136,6 +136,30 @@ export function clampAgentShellState(
   }
 }
 
+/**
+ * 每次画布 host 重新激活都从当前 surface 重新量一次。
+ *
+ * `current` 是同一常驻面板上一次的布局；即使它已经存在，也不能跳过 clamp，
+ * 否则 1440 拖到右下角的浮球会在 1024 返回时仍停在旧视口外。
+ */
+export function agentShellStateForActivation(
+  current: AgentShellState | null,
+  stored: AgentShellState | null,
+  area: AgentWorkArea,
+  availableWidth: number,
+): AgentShellState {
+  if (current) {
+    return clampAgentShellState(current, area, availableWidth)
+  }
+  if (stored) {
+    return clampAgentShellState(stored, area, availableWidth)
+  }
+  return {
+    ...defaultAgentShellState(area),
+    width: agentShellWidth(AGENT_SHELL_WIDTH_DEFAULT, availableWidth),
+  }
+}
+
 export function resizedAgentShellWidth(
   originWidth: number,
   startX: number,

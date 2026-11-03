@@ -8,6 +8,7 @@ import {
   agentShellMaxWidth,
   agentShellAvailableWidth,
   agentShellSnapWidths,
+  agentShellStateForActivation,
   agentShellWidth,
   clampAgentOrb,
   clampAgentShellState,
@@ -69,6 +70,46 @@ describe('Agent shell layout', () => {
     expect(state.orb.x + AGENT_ORB_SIZE).toBeLessThanOrEqual(AREA.x + AREA.width - AGENT_SHELL_GAP)
     expect(state.orb.y).toBe(AREA.y + AGENT_SHELL_GAP)
     expect(state.width).toBe(994)
+  })
+
+  it('重新激活时对既有 shell 按 1024 surface 重新 clamp', () => {
+    const wide: AgentWorkArea = {
+      x: 64,
+      y: 0,
+      width: 1376,
+      height: 900,
+    }
+    const narrow: AgentWorkArea = {
+      x: 64,
+      y: 0,
+      width: 510,
+      height: 670,
+    }
+    const fromWide = {
+      orb: { x: 1310, y: 810 },
+      width: 420,
+    }
+    expect(
+      clampAgentShellState(
+        fromWide,
+        wide,
+        agentShellAvailableWidth(1440, 64),
+      ),
+    ).toEqual(fromWide)
+
+    const reactivated = agentShellStateForActivation(
+      fromWide,
+      null,
+      narrow,
+      agentShellAvailableWidth(1024, 64),
+    )
+    expect(reactivated.orb.x + AGENT_ORB_SIZE).toBeLessThanOrEqual(
+      narrow.x + narrow.width - AGENT_SHELL_GAP,
+    )
+    expect(reactivated.orb.y + AGENT_ORB_SIZE).toBeLessThanOrEqual(
+      narrow.y + narrow.height - AGENT_SHELL_GAP,
+    )
+    expect(reactivated.width).toBe(420)
   })
 
   it('restores v2 state and migrates only the orb from v1', () => {

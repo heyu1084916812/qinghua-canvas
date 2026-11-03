@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import {
+  clearAgentSkillHandoff,
   sendSkillToAgent,
   subscribeAgentSkillHandoff,
   takeAgentSkillHandoff,
@@ -38,5 +39,16 @@ describe('agentSkillHandoff', () => {
 
     offA()
     offB()
+  })
+
+  it('deleted projects cannot deliver a stale skill handoff', () => {
+    const listener = vi.fn()
+    subscribeAgentSkillHandoff('p1', listener)
+    sendSkillToAgent('p1', 'skill_deleted')
+    clearAgentSkillHandoff('p1')
+
+    expect(takeAgentSkillHandoff('p1')).toBeNull()
+    sendSkillToAgent('p1', 'skill_after_delete')
+    expect(listener).toHaveBeenCalledTimes(1)
   })
 })
