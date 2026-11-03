@@ -1,6 +1,6 @@
 # CanvasFlow（轻画）项目记忆
 
-### AgentPanelView + AgentSkillsController（2026-11-04，对账 #869/#870，🚧 待独立验收，`74623ad`）
+### AgentPanelView + AgentSkillsController（2026-11-04，对账 #869/#870，✅ 已独立验收，`74623ad`）
 
 - `AgentPanelView` 只负责 Agent 面板外层 DOM 与三个视图壳组合：保留 `aside`、`data-agent-panel`、
   Esc 浮层关闭、拖入素材和子视图顺序；不读 Store、不执行工具、不发请求。
