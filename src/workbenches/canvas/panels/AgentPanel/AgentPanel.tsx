@@ -69,7 +69,6 @@ import {
   type TaskShutdownControl,
 } from '../../../../features/shared/lifecycle/taskLifecycle'
 import { createContextRepository } from '../../../../state/shared/contextRepository'
-import { createId } from '../../../../shared/id'
 import { createAgentPanelShutdownControl } from './agentPanelShutdown'
 import { steerMessagesOf } from '../../../../domain/agent/steering'
 import {
@@ -91,11 +90,8 @@ import { toConversation } from './conversation'
 import { createAgentToolRecipeContext } from './agentToolRecipeContext'
 import { createAgentToolExecution } from './agentToolExecution'
 import { isAdvanceTaskCommand } from './agentProcessText'
-import {
-  failureStatus,
-  failureTurnPayload,
-  sendTurnSeed,
-} from './agentSendTurnPlan'
+import { useAgentSendTurnController } from './useAgentSendTurnController'
+import type { AgentPrepareArgs } from './agentSendTurnRun'
 import {
   useAgentConversationController,
   type AgentMessageReveal,
@@ -112,10 +108,6 @@ import { useAgentTaskPlanController } from './useAgentTaskPlanController'
 import { runAgentInitialLoad } from './agentInitialLoad'
 import { useAgentSkillsController } from './useAgentSkillsController'
 import { AgentSessionRuntimeState } from './agentSessionRuntime'
-import {
-  buildAgentModelMessages,
-  composeAgentOutcomeMessages,
-} from './agentTurnPersistence'
 import {
   prepareAgentTurnRequest,
   type AgentTurnContextTrace,
@@ -1270,59 +1262,15 @@ export function AgentPanel({
       transitionSessionJob,
     ])
 
-  const runSendText = useCallback(async (
-    text: string,
-    session: AgentSession,
-    turnId?: string,
-    internalControl = false,
-    actualTurnId = createId('turnmsg'),
-    turnAbort = new AbortController(),
-  ) => {
-    const { turnOrigin, clearTaskPlan } = sendTurnSeed({
-      session,
-      text,
-      actualTurnId,
-      queueTurnId: turnId,
-    })
-    currentTurnJobIdRef.current.delete(session.id)
-    if (clearTaskPlan) {
-      const cleared = await trackRun(() =>
-        sessions.updateFields(session.id, {
-          taskPlan: undefined,
-        }),
-      )
-      if (cleared) {
-        setList((prev) =>
-          prev.map((item) => (item.id === cleared.id ? cleared : item)),
-        )
-        if (currentIdRef.current === cleared.id) setCurrent(cleared)
-      }
-    }
-
-    let routeReady = false
-    const failBeforeModel = async (message: string, phase: string) => {
-      await controller.failTurn(
-        session.id,
-        failureTurnPayload({
-          message,
-          phase,
-          aborted: turnAbort.signal.aborted,
-          origin: turnOrigin,
-        }),
-      )
-      clearLiveActivitiesFor(session.id)
-      clearLiveProcessFor(session.id)
-      clearRunTasksFor(session.id)
-      setStatusFor(
-        session.id,
-        failureStatus(turnAbort.signal.aborted, message),
-      )
-    }
-    let requestPreparation: Awaited<
-      ReturnType<typeof prepareAgentTurnRequest>
-    >
-    try {
-      requestPreparation = await prepareAgentTurnRequest({
+  /**
+   * 把 `prepareAgentTurnRequest` 的静态入参接好；两个顺序回调由发送主体提供。
+   *
+   * 这一块留在宿主，是因为入参全是面板自己的数据接线（graph / selection /
+   * memory / skills / channels …）；搬进 hook 只会把同样的依赖再抄一遍。
+   */
+  const prepareTurn = useCallback(
+    ({ session, text, internalControl, signal, hooks }: AgentPrepareArgs) =>
+      prepareAgentTurnRequest({
         session,
         text,
         internalControl,
@@ -1330,7 +1278,7 @@ export function AgentPanel({
         selection,
         sessions,
         prepareRoute: () => prepareChatRoute(session, true),
-        signal: turnAbort.signal,
+        signal,
         memory,
         projectId: store.getSnapshot().projectId,
         readAssetMime: async (hash) =>
@@ -1349,165 +1297,59 @@ export function AgentPanel({
             `结果已返回，但运行记录写入失败：${warning}`,
             'error',
           ),
-        onPersisted: (turn) => {
-          const saved = turn.saved
-          if (
-            !bindTurnToSessionActivity(
-              saved.id,
-              actualTurnId,
-            )
-          ) {
-            throw new Error('会话活动锁已被其他回合占用')
-          }
-          turnOrigin.messageRevision = turn.messageRevision
-          currentTurnIdRef.current.set(session.id, actualTurnId)
-          currentTurnRevisionRef.current.set(
-            session.id,
-            turn.messageRevision,
-          )
-          setList((prev) =>
-            prev.map((item) => (item.id === saved.id ? saved : item)),
-          )
-          if (currentIdRef.current === saved.id) {
-            setCurrent(saved)
-            setDraft('')
-            writeDraftForSession(session.id, '')
-            setMessages(turn.historyMessages)
-          }
-          clearLiveActivitiesFor(session.id)
-          clearLiveProcessFor(session.id)
-          clearRunTasksFor(session.id)
-          abortRefs.current.set(session.id, turnAbort)
-          setStatusFor(session.id, { kind: 'thinking' })
-          syncAutoRunFromSession(session)
-        },
-        onRouteReady: async (operationId) => {
-          routeReady = true
-          const job = await ensureAgentJob(session, actualTurnId)
-          currentTurnJobIdRef.current.set(session.id, job.id)
-          turnOrigin.jobId = job.id
-          await transitionSessionJob(
-            session.id,
-            'planning',
-            'status_changed',
-            { operationId },
-            undefined,
-            turnOrigin,
-          )
-        },
-      })
-    } catch (error) {
-      if (routeReady) throw error
-      if (turnAbort.signal.aborted) return
-      setStatusFor(session.id, {
-        kind: 'error',
-        message: `用户消息或路由准备失败：${errText(error)}`,
-      })
-      return
-    }
-    if (requestPreparation.kind === 'aborted_before_job') return
-    if (requestPreparation.kind === 'route_failed') {
-      setStatusFor(session.id, {
-        kind: 'error',
-        message: requestPreparation.message,
-      })
-      return
-    }
-    if (requestPreparation.kind === 'failed') {
-      if (requestPreparation.contextTrace) {
-        contextTraceRef.current.set(
-          session.id,
-          requestPreparation.contextTrace,
-        )
-      } else {
-        contextTraceRef.current.delete(session.id)
-      }
-      await failBeforeModel(
-        requestPreparation.message,
-        requestPreparation.phase,
-      )
-      return
-    }
+        onPersisted: hooks.onPersisted,
+        onRouteReady: hooks.onRouteReady,
+      }),
+    [
+      activeAgentTools,
+      allChannels,
+      allSkills,
+      canvasReviewEnabled,
+      generationAvailability,
+      memory,
+      platform,
+      prepareChatRoute,
+      routeExecution,
+      selection,
+      sessions,
+      store,
+    ],
+  )
 
-    const prepared = requestPreparation
-    const persistedUserTurn = prepared.persistedTurn
-    const operationId = prepared.operationId
-    const toolMode = prepared.toolMode
-    const turnAgentTools = prepared.turnTools
-    if (prepared.contextTrace) {
-      contextTraceRef.current.set(session.id, prepared.contextTrace)
-    } else {
-      contextTraceRef.current.delete(session.id)
-    }
-    toolModeRef.current.set(session.id, toolMode)
-    explicitMediaModelsRef.current.set(
-      session.id,
-      prepared.explicitMediaModels,
-    )
-    sessionRuntimeRef.current.setPerImage(session.id, prepared.perImage)
-    turnToolsRef.current.set(session.id, turnAgentTools)
-    if (prepared.clearedPendingAssets) {
-      const cleared = prepared.clearedPendingAssets
-      setList((prev) =>
-        prev.map((item) => (item.id === cleared.id ? cleared : item)),
-      )
-      if (currentIdRef.current === cleared.id) setCurrent(cleared)
-    }
-    const withFullHistory = (list: readonly ChatMessage[]): ChatMessage[] =>
-      composeAgentOutcomeMessages(persistedUserTurn, list)
-    const withSystem = buildAgentModelMessages(
-      prepared.systemPrompt,
-      persistedUserTurn,
-    )
-    const currentLoopDeps = loopDeps({
-      session,
-      operationId,
-      toolMode,
-      visualNodeIds: prepared.visualNodeIds,
-      onProgress: (next) => {
-        if (currentIdRef.current !== session.id) return
-        clearReveal()
-        setMessages(withFullHistory(next))
-      },
-      turnTools: turnAgentTools,
-      turnController: turnAbort,
-    })
-    const initial = await runAgentTurn(withSystem, currentLoopDeps)
-    const outcome = await continueAutoConfirmations(
-      session,
-      initial,
-      currentLoopDeps,
-      (next) => {
-        if (currentIdRef.current === session.id) {
-          setMessages(withFullHistory(next))
-        }
-      },
-    )
-    await handleOutcome(session, outcome, persistedUserTurn, turnAbort)
-    return outcome
-  }, [
-    store,
-    platform,
-    allChannels,
-    selection,
-    loopDeps,
-    handleOutcome,
+  const runSendText = useAgentSendTurnController({
+    currentTurnJobIdRef,
+    currentTurnIdRef,
+    currentTurnRevisionRef,
+    abortRefs,
+    contextTraceRef,
+    toolModeRef,
+    explicitMediaModelsRef,
+    turnToolsRef,
+    currentIdRef,
+    sessionRuntime: sessionRuntimeRef,
+    setList,
+    setCurrent,
+    setDraft,
+    writeDraftForSession,
+    setMessages,
     setStatusFor,
-    allSkills,
-    toolCtx,
-    canvasReviewEnabled,
-    activeAgentTools,
-    viewport,
-    routeExecution,
-    prepareChatRoute,
-    sessions,
-    memory,
-    generationAvailability,
-    ensureAgentJob,
+    clearLiveActivitiesFor,
+    clearLiveProcessFor,
+    clearRunTasksFor,
+    clearReveal,
+    trackRun,
+    updateSessionFields: sessions.updateFields,
+    failTurn: controller.failTurn,
+    ensureJob: ensureAgentJob,
     transitionSessionJob,
+    loopDeps,
+    runAgentTurn,
     continueAutoConfirmations,
-    controller,
-  ])
+    handleOutcome,
+    bindTurnToSessionActivity,
+    syncAutoRunFromSession,
+    prepareTurn,
+  })
 
   const sendText = useAgentSendController({
     current,

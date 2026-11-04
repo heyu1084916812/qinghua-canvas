@@ -20,7 +20,7 @@ import { describe, expect, it } from 'vitest'
  * 不是永久上限。A2 落完后按「该刀实测 + 40」重新定值，之后每刀同理——阈值始终贴着
  * 实测走，留出的 40 行只够接一刀，不够养回一个胖文件。
  */
-const AGENT_PANEL_MAX_LINES = 2260
+const AGENT_PANEL_MAX_LINES = 2140
 
 /**
  * `.ts` 下沉模块里允许出现的 hook 调用（模块名 → 理由）。
