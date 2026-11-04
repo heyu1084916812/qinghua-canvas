@@ -10,6 +10,13 @@
   最终模型变化时才写（先 remember 到 ref 再落库）；上下文素材只留 `image/*`。`toolCtx()` 必须每次重建，
   任何 per-session 缓存都会让「批准后才执行」的工具看到发消息那一刻的旧快照。
 
+- **`prepareTurn` 的快照口径**：`session/text/internalControl/signal` 点击瞬间值；`graph/projectId` 每次现取
+  （一次调用会取两次快照）；其余依赖是渲染快照；`prepareRoute` 必须 `fresh=true`。
+- **浮球 clamp 只允许拖动时看到"含面板的 area"**：激活 / 重新激活 / window resize / ResizeObserver 一律用纯 surface；
+  面板开合必须保持 orb 同一引用（`toBe` 断言）。窄视口遮住浮球是设计，不是 bug。
+- **拆表后 `session.messages` 恒为空**（`sessionStore.ts:147`）：比对必须走 `messagesFor(sessionId)`，
+  并且要反向断言列表行确实为空。
+
 - **初始加载三个守卫**：`alive` / `currentIdRef` / `selectionVersionRef` 必须在 `await loadChannels()` **之后**重判；
   `createSession` 必须用实时渠道（渲染闭包里的渠道可能是空的）；effect 依赖只能 `[projectId, trackRun]`。
 - **smoke 截图判定不许用文件名差集**：固定文件名覆盖会让差集永远为空，必须按 mtime/hash 比对或跑前清空目录。

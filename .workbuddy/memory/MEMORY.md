@@ -1,5 +1,21 @@
 # CanvasFlow（轻画）项目记忆
 
+### prepareTurn 快照口径 + 浮球 clamp 真相 + 真实渠道验收（2026-11-04，#899/#900/M-REAL）
+
+- **`prepareTurn` 的快照口径（改之前先看这张表）**：`session` / `text` / `internalControl` / `signal` 是**点击瞬间值**；
+  `graph` / `projectId` **每次调用现取**（一次调用会 `getSnapshot()` 两次）；`selection` / `sessions` / `memory` /
+  `skills` / `channels` / `canvasReviewEnabled` / `activeAgentTools` / `generationAvailability` / `routeExecution` /
+  `prepareChatRoute` / `platform` / `store` 是**渲染快照**。`prepareRoute` 必须 **`fresh=true`**，退化成缓存就会拿旧路由。
+- **浮球 clamp 的真实规则（别再猜）**：5 条路径里只有**拖动**喂"含面板的 area"（放宽 X 上限，允许球拖到面板下面）；
+  激活 / 重新激活 / window resize / surface ResizeObserver 全用纯 surface 或干脆不传。所以
+  **面板开合不改浮球坐标**，窄视口下遮住浮球是**设计**，要改需单独决策。
+- **拆表之后 `session.messages` 不是真相源**：列表行 `messages` 恒为 `[]`（`sessionStore.ts:147`），
+  正确比对是 `agentMessages` 行 ↔ `messagesFor(sessionId)` 读回结果，外加"列表行必须为空"。
+- **门禁里的红项先分类**：判据错 / 环境错 / 产品错。今天两条都踩过——`session.messages` 判据错、
+  18768 被遗留 debug 实例占用（环境错）。**红线优先于判据原文**：端口被占不杀别人进程，用环境变量改端口并在结论里写明偏离与复跑条件。
+- **`sendPhase=accepted` 不等于生成成功**：那只是传输/路由层记录。生图失败要看 `job.status`、`lastError`、
+  `assetHash` / `outputHashes` 是否为空。
+
 ### 初始加载收口 + 里程碑 A 档（2026-11-04，对账 #897/#898/M-A，`5a3311d` + `c1fdae7`）
 
 - **初始加载的三重守卫必须在 `await loadChannels()` 之后重新判**：`alive` / `currentIdRef` / `selectionVersionRef`。
