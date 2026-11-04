@@ -5,6 +5,7 @@ import {
   channelIdForLogical,
 } from '../../../../domain/project/modelCatalog'
 import type { AgentNodeType } from '../../../../domain/agent/plan'
+import { imageContextAssets } from './agentToolContextAssets'
 import { preferredGeneratedModel } from './mediaMentions'
 
 export interface AgentToolRecipeSession {
@@ -110,9 +111,7 @@ export function createAgentToolRecipeContext(
     },
     contextAssetsForGenerated: (type) => {
       if (type !== 'generation') return undefined
-      return input
-        .getContextAssets()
-        .filter((asset) => asset.mime.startsWith('image/'))
+      return imageContextAssets(input.getContextAssets())
     },
     categoryOfModel: (model) => {
       const category = capabilityOfLogical(
