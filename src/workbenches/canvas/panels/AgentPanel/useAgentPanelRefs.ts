@@ -12,7 +12,7 @@ import type { AgentTurnContextTrace } from './agentTurnRequest'
  * A 写的 B 读不到 —— 表现为「停止按钮停不掉」「切换会话后引导丢了」这类最难的 bug。
  *
  * 所以：本文件是唯一的创建处，三个领域 hook 只**接收引用**、不重新创建。
- * `useAgentPanelArchitecture.test.ts` 会钉住这一点（`new Map(` / `new Set(` 只许出现在这里）。
+ * `agentPanelArchitecture.test.ts` 会钉住这一点（`new Map(` / `new Set(` 只许出现在这里）。
  */
 export function useAgentPanelRefs() {
   /** 队列泵：一个会话同时只允许一个在跑 */

@@ -198,6 +198,29 @@ const moduleSources = (): Map<string, string> =>
       .map(([path, source]) => [NAME_ONLY(path), source]),
   )
 
+/**
+ * 取出源码里所有「看起来是 deps 数组」的方括号块，展开成条目清单。
+ *
+ * 口径故意做窄：块内只允许**标识符 / 属性路径**用逗号分隔（`[store, current?.id]`）。
+ * 于是 `[...abortRefs.current.keys()]`、`[['a', 'b']]`、`[() => 1]` 这些运行时数组
+ * 与函数实参（`createAgentToolRecipeContext({ session })` 根本没有方括号）都不会被误伤；
+ * 代价是「deps 数组里混了别的表达式」时会漏检 —— 这可以接受，这条规则要抓的是
+ * 「有人图省事写 `[session]`」这一种写法。
+ */
+const depsItemsOf = (source: string): string[] => {
+  const items: string[] = []
+  for (const match of source.matchAll(/\[([^[\]]*)\]/g)) {
+    const inner = match[1] ?? ''
+    if (!/^[\s\w$?.,]*$/.test(inner)) continue
+    const parts = inner
+      .split(',')
+      .map((part) => part.trim())
+      .filter(Boolean)
+    items.push(...parts)
+  }
+  return items
+}
+
 describe('AgentPanel 结构护栏', () => {
   it('行数口径自检：收尾换行不算一行', () => {
     // 度量本身也要被钉住，否则「口径写错」会让棘轮悄悄失效。
@@ -631,5 +654,37 @@ describe('三个领域模型的单一宿主', () => {
         false,
       )
     }
+  })
+
+  /**
+   * deps 数组里**不许出现裸 `session`**。
+   *
+   * `session` 是 hook 的入参对象 / 回调形参，每次渲染都是**新引用**：谁写一次 `[session]`，
+   * 那条 `useCallback` / `useMemo` 就每帧失效，下游跟着每帧重建 —— 而且**不会报错**，
+   * 只会表现为「怎么突然这么卡」。要依赖就逐字段写（`session.current`、`session.id`）。
+   */
+  it('deps 数组里不许出现裸 session', () => {
+    const offenders = Object.entries(CONTROLLER_MODULES)
+      .filter(([path]) => !isTestFile(path))
+      .filter(([path]) => NAME_ONLY(path).startsWith('useAgentPanel'))
+      .flatMap(([path, source]) =>
+        depsItemsOf(source)
+          .filter((item) => item === 'session')
+          .map(() => NAME_ONLY(path)),
+      )
+
+    expect(offenders).toEqual([])
+    // 非空转自检：真的从这几个文件里扫出了依赖项（否则「没违规」是假绿）
+    expect(depsItemsOf(TURN_MODEL_SOURCE)).toContain('activeAgentTools')
+    expect(depsItemsOf(TOOL_MODEL_SOURCE)).toContain('selectedModelOf')
+    // 自检：认得真写法，也不误伤函数实参 / 属性路径
+    expect(
+      depsItemsOf('useCallback(() => session, [session, other])'),
+    ).toContain('session')
+    expect(depsItemsOf('createAgentToolRecipeContext({ session })')).toEqual([])
+    expect(depsItemsOf('useMemo(() => 1, [session.id])')).toEqual([
+      'session.id',
+    ])
+    expect(depsItemsOf('const ids = [...abortRefs.current.keys()]')).toEqual([])
   })
 })
