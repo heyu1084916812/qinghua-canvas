@@ -1,5 +1,18 @@
 # CanvasFlow（轻画）项目记忆
 
+### 覆盖率门禁 + "地板不是目标"（2026-11-04，M-COVERAGE）
+
+- **覆盖率只统计 `AgentPanel/`**：`npm run test:coverage`，报告落 `.playwright-verify/coverage/`。
+  阈值是**地板**（63/54/59/65），**只挡回退**；每次抬阈值前必须先有行为断言垫着。
+- **补覆盖的正确姿势**：先看**分支**不看行；只补"写错会让用户吃亏"的分支
+  （队列删改、花钱前的确认预览、停止后不再发请求），**不补文案变体、不补 getter、不补纯端口透传**。
+- **单点防线不值钱，双闸才值钱**：`queuePumpingRef`（快路径）单独删掉，用例**不会红**；
+  真正的硬闸是 `claimSessionActivity`，**两道一起删**才红。写用例时要问"我删的这一行真是最后一道闸吗"。
+- **`agentConfirmationPreview` 的坑**：`runFrom` 起点不存在时，预览必须显示"不能运行"
+  **且不能同时出现"会花钱"**——否则用户是在矛盾信息下点批准。`deleteEdges` 的 ids∪pairs 必须去重后再计数。
+- **`agentTurnRequest` 的两条钱线**：`signal.aborted`（停止后不再发请求，否则继续扣费）、
+  `bundle.conflicts.length > 0`（冲突在探测前就拒发，且用户消息不丢）。
+
 ### `npm install --no-save` 会顺手升级整棵树（2026-11-04，事故 + 复原）
 
 - **事故**：为了跑覆盖率，执行了 `npm install --no-save @vitest/coverage-v8@5.0.0`。
