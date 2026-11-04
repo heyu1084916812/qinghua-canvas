@@ -27,8 +27,6 @@ import type { AgentNodeType } from '../../../../domain/agent/plan'
 import {
   channelIdForLogical,
   capabilityOfLogical,
-  panelModelOptions,
-  toLogicalName,
 } from '../../../../domain/project/modelCatalog'
 import {
   generationAvailabilityOf,
@@ -118,6 +116,7 @@ import {
 import { useAgentComposerController } from './useAgentComposerController'
 import { useAgentAttachmentsController } from './useAgentAttachmentsController'
 import { useAgentChatRouting } from './useAgentChatRouting'
+import { useAgentModelSelectionController } from './useAgentModelSelectionController'
 import { useAgentSessionLifecycle } from './useAgentSessionLifecycle'
 import { useAgentSessionActionsController } from './useAgentSessionActionsController'
 import { useAgentTaskPlanController } from './useAgentTaskPlanController'
@@ -444,24 +443,6 @@ export function AgentPanel({
     clearChatRoute,
     clearChatRoutes,
   } = useAgentChatRouting({ channels, allChannels })
-  const customModels = useSyncExternalStore(
-    channels.subscribe,
-    () => channels.getState().customModels,
-    () => [],
-  )
-  const uncommonModelIds = useSyncExternalStore(
-    channels.subscribe,
-    () => channels.getState().uncommonModelIds,
-    () => [],
-  )
-  const globalImageModels = useMemo(
-    () => channels.globalModelsOf('image').map((model) => model.id),
-    [channels, customModels, uncommonModelIds],
-  )
-  const globalVideoModels = useMemo(
-    () => channels.globalModelsOf('video').map((model) => model.id),
-    [channels, customModels, uncommonModelIds],
-  )
   /** 「已设默认」的提示框只闪一次，用完即收 */
   /** 展开看细节的步骤（工具调用 id 集合）。默认全收起 —— 对话流先保持干净 */
   /** 刚复制过哪一条助手回复：图标短暂换成对勾，给用户一个「确实复制了」的回执 */
@@ -553,6 +534,35 @@ export function AgentPanel({
     clearDraftForSession,
   } = composerController
   composerResetForSessionRef.current = composerController.resetForSession
+  const {
+    globalImageModels,
+    globalVideoModels,
+    modelOptionsByKind,
+    chatModelOptions,
+    mentionedModels,
+    shownModel,
+    defaultModelFor,
+    logicalModelOf,
+    selectedModelOf,
+    fallbackModelOptionsForChannels,
+    pickModel,
+    setModelKind,
+  } = useAgentModelSelectionController({
+    current,
+    draft,
+    channels,
+    allChannels,
+    selection,
+    getCanvasNodes: () => store.getSnapshot().nodes,
+    patchSession: patchSessionFields,
+    clearChatRoute,
+    rememberStickyModel: (sessionId, kind, model) =>
+      sessionRuntimeRef.current.rememberStickyModel(
+        sessionId,
+        kind,
+        model,
+      ),
+  })
   /** 每个会话这个回合走的是原生 tools 还是 JSON 降级；确认后续跑要沿用同一条 */
   const toolModeRef = useRef(new Map<string, 'native' | 'json'>())
   const turnToolsRef = useRef(
@@ -659,74 +669,6 @@ export function AgentPanel({
     () => [...skills.builtinSkills, ...skills.userSkills],
     [skills.builtinSkills, skills.userSkills],
   )
-  /**
-   * 对话模型下拉的**数据源**：与创作面板同一套「前端显示名」（§7.4.1 / modelCatalog）。
-   *
-   * 为什么不用「渠道里勾选的原始 ID」：用户在面板上看到的是「GPT-6 Astra」
-   * 「Agnes 2.5 Pro」这类显示名；这里要是一串 `agnes-2.5-pro`、`mock-chat-1`，
-   * 同一个模型就变成两个名字，还得让用户记住哪个 ID 对应哪条渠道 —— 这不是选模型，
-   * 是考古。`panelModelOptions` 本身就是「固定清单显示名在前 + 渠道勾选模型的
-   * 归一显示名在后」，与生成节点那侧完全同源。
-   */
-  /**
-   * 对话窗的模型清单：固定前端名，不按渠道当前是否可路由增删。
-   * 没有真实对话渠道提供所选名称时，发送前的 `resolveRoutedChatTarget()`
-   * 会立即返回空并给出明确错误，不会把请求发出去等超时。
-   */
-  const modelOptionsByKind = useMemo(() => {
-    /**
-     * 生成模型（图片 / 视频）：**前端有什么就列什么**。
-     *
-     * 用户 2026-10-02 第四轮：「图一当中模型的选择面板，把前端所有的模型写上去，
-     * 除了对话模型」—— 这里与创作面板**同一份清单**（`panelModelOptions`：
-     * 只有前端显示名，渠道模型不进这个列表，见对账 #371），
-     * 不再按「当下有没有渠道能提供」筛一道。
-     *
-     * 为什么改回来：筛过之后，用户还没配映射的那些固定显示名会**整个消失**，
-     * 面板看起来像「我的模型不见了」；而真正跑不动时执行层会报明确原因
-     * （渠道 / 映射那句），比「列表里没有」好排查得多。对话模型不在这里 ——
-     * 它是单独一行（agent 自己的 LLM）。
-     */
-    const pick = (category: 'image' | 'video') =>
-      category === 'image' ? globalImageModels : globalVideoModels
-    /** 对话模型也保持固定的前端清单，不按渠道能力增删。 */
-    const chat = panelModelOptions('chat', uncommonModelIds)
-    return { image: pick('image'), video: pick('video'), chat }
-  }, [globalImageModels, globalVideoModels, uncommonModelIds])
-  const chatModelOptions = modelOptionsByKind.chat
-  /**
-   * **已经放进这次对话的模型**（正文里的 `model` chip）。
-   *
-   * 用户 2026-10-04 第 3 条把图一那枚 ✓ 的含义说清楚了：「不是默认用这两个模型的
-   * 意思，是把模型放在对话框中，意思是用这些模型进行生成，能组成多个模型参与的流程」。
-   * 所以模型面板里的高亮要跟着**正文里的引用**走，而不是跟着会话的默认模型走 ——
-   * 后者看起来就是「默认值」，正是用户否掉的那种读法。
-   * （会话那两个默认字段仍然保留：用户一枚都没 @ 时，新节点还得有个可用的模型。）
-   */
-  const mentionedModels = useMemo(
-    () => new Set(parseMentions(draft).filter((m) => m.kind === 'model').map((m) => m.id)),
-    [draft],
-  )
-  /** 会话存的模型名 → 逻辑显示名（老会话存过上游 ID 的在这里归一） */
-  const shownModel = useMemo(
-    () => toLogicalName(allChannels, current?.model ?? ''),
-    [allChannels, current?.model],
-  )
-  /**
-   * 新会话该用哪个模型：默认模型 → 该渠道第一个对话模型。
-   *
-   * **必须有这层回落**：只存了「默认模型」而没选过时，新会话会带着空模型开出来，
-   * 用户第一句话就被「还没选模型」挡住 —— 开箱即不能用。冒烟 G95 抓到过这一条。
-   *
-   * 存的是**逻辑显示名**：发请求前由渠道映射翻译成上游 ID（channelStore 已接）。
-   * 显示名不在选项里（渠道模型被删 / 名单变了）才退到第一个选项。
-   */
-  const defaultModelFor = useCallback(
-    (options: readonly string[], saved?: string) =>
-      saved && options.includes(saved) ? saved : (options[0] ?? ''),
-    [],
-  )
-
   /** 载入会话列表；没有就按默认模型建一个（设计文档 §8「新建会话用默认模型」） */
   useEffect(() => {
     let alive = true
@@ -761,21 +703,20 @@ export function AgentPanel({
            * 用**刚刚读到的**渠道，而不是本次渲染闭包里的 `enabled`。
            */
           const liveChannels = channels.getState().channels
-          const liveEnabled = liveChannels.filter((c) => c.enabled)
-          const livePick = (category: 'image' | 'video' | 'chat') =>
-            panelModelOptions(category).filter(
-              (n) => channelIdForLogical(liveEnabled, n) !== undefined,
-            )
-          const liveModelOptions = panelModelOptions('chat')
+          const liveOptions =
+            fallbackModelOptionsForChannels(liveChannels)
           const saved = await presets.loadAgentDefault()
           if (!canCommit()) return null
-          const savedModel = toLogicalName(liveChannels, saved?.model ?? '')
+          const savedModel = logicalModelOf(
+            saved?.model ?? '',
+            liveChannels,
+          )
           return sessions.create({
             projectId,
             channelId: '',
-            model: defaultModelFor(liveModelOptions, savedModel),
-            imageModel: livePick('image')[0] ?? '',
-            videoModel: livePick('video')[0] ?? '',
+            model: defaultModelFor(liveOptions.chat, savedModel),
+            imageModel: liveOptions.image[0] ?? '',
+            videoModel: liveOptions.video[0] ?? '',
           })
         },
         removeSession,
@@ -808,32 +749,6 @@ export function AgentPanel({
     // 把 refresh / sessions 列进来会让它在每次保存后重跑，把正在进行的对话打断
   }, [projectId, trackRun])
 
-  /**
-   * **agent 建节点时「跟随选中」**（用户 2026-10-16：「改成跟随选中」）。
-   *
-   * 先在画布上选中一张香蕉 2 的图、再说「照这个再出五张」，agent 就该用香蕉 2 ——
-   * 而不是 Agent 面板里那个「模型清单第一个」的默认值。真机上就是这一步错成
-   * GPT Image 2.5 的（用户看到的是「它给我建的工作流模型不对」）。
-   *
-   * 按类别取：选中视频节点时不要把它当图片模型用（图片的 `mode` + 视频的 `model`
-   * 这种组合发出去只会得到一句看不懂的报错）。
-   */
-  const selectedModelOf = useCallback(
-    (kind: 'image' | 'video'): string => {
-      for (const id of selection) {
-        const n = store.getSnapshot().nodes.find((x) => x.id === id)
-        if (!n) continue
-        const d = n.data as { model?: unknown }
-        const m = typeof d.model === 'string' ? d.model.trim() : ''
-        if (!m) continue
-        const category = capabilityOfLogical(allChannels, m)?.category
-        if (kind === 'video' ? category === 'video' : category !== 'video') return m
-      }
-      return ''
-    },
-    [selection, store, allChannels],
-  )
-
   const sessionActions = useAgentSessionActionsController({
     current,
     projectId,
@@ -843,7 +758,7 @@ export function AgentPanel({
     trackRun,
     createSession: sessions.create,
     loadAgentDefault: presets.loadAgentDefault,
-    logicalModelOf: (model) => toLogicalName(allChannels, model),
+    logicalModelOf,
     defaultModelFor,
     selectedModelOf,
     refresh,
@@ -2299,44 +2214,6 @@ export function AgentPanel({
     notify: store.notify,
     trackRun,
   })
-
-  /**
-   * 选模型：只保存固定的前端逻辑名。
-   *
-   * 渠道由下一次真实发送时的 `resolveRoutedChatTarget()` 按全局策略解析，
-   * 不写进会话。旧会话留下的 `channelId` 在这一刻清掉，避免继续沿用历史绑定。
-   */
-  const pickModel = useCallback(
-    async (model: string) => {
-      if (!current) return
-      clearChatRoute(current.id)
-      await patchSession({ model, channelId: '' })
-    },
-    [clearChatRoute, current, patchSession],
-  )
-
-  /**
-   * 图片 / 视频模型的点选（用户 2026-10-03：「我创作面板有什么模型就用什么模型，
-   * 分了图片和视频…也就是说模型有三个选项」）。
-   *
-   * 只改会话上对应那一档 —— **对话模型不受影响**（那是 agent 自己跑的 LLM，
-   * 与「建出来的生成节点用哪个模型」是两件事）。
-   */
-  const setModelKind = useCallback(
-    async (key: 'imageModel' | 'videoModel', model: string) => {
-      /**
-       * 用户在面板上亲手选的模型，也要进「上次用过的」那一份 ——
-       * 否则下一轮 agent 又会按旧值去建节点，用户看到的是「我明明换了模型它还用旧的」。
-       */
-      sessionRuntimeRef.current.rememberStickyModel(
-        current!.id,
-        key === 'videoModel' ? 'video' : 'image',
-        model,
-      )
-      await patchSession({ [key]: model })
-    },
-    [patchSession],
-  )
 
   /**
    * 手动 / 自动生成（用户 2026-10-02，参考产品图一那一档）。
