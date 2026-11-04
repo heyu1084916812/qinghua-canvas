@@ -22,10 +22,6 @@ import {
 import { createPresetStore } from '../../../../state/project/presetStore'
 import type { AgentNodeType } from '../../../../domain/agent/plan'
 import {
-  channelIdForLogical,
-  capabilityOfLogical,
-} from '../../../../domain/project/modelCatalog'
-import {
   generationAvailabilityOf,
 } from '../../../../domain/project/generationRouting'
 import { resolveDefaults } from '../../../../features/canvas/createNodeWithDefaults'
@@ -98,9 +94,7 @@ import {
   subscribeAgentCanvasReview,
 } from '../../../../state/ui/agentCanvasReview'
 import { toConversation } from './conversation'
-import {
-  preferredGeneratedModel,
-} from './mediaMentions'
+import { createAgentToolRecipeContext } from './agentToolRecipeContext'
 import { isAdvanceTaskCommand } from './agentProcessText'
 import {
   useAgentConversationController,
@@ -814,6 +808,40 @@ export function AgentPanel({
       session: AgentSession | undefined = current ?? undefined,
     ): AgentToolContext => {
       const sessionId = session?.id ?? ''
+      /**
+       * 生成配方的取值逻辑（模型优先级 + 渠道反查 + 上下文素材过滤）整体搬到
+       * `agentToolRecipeContext` 里，这里只负责把「此刻最新」的状态以 getter 形式接进去。
+       *
+       * 必须逐次调用创建：`sessionId` / `session` 是这一次工具调用的作用域，
+       * 而且 getter 要读 ref，才能保证批准后才执行的工具看到的是最新值。
+       */
+      const recipeContext = createAgentToolRecipeContext({
+        sessionId,
+        session,
+        getExplicitMediaModels: () =>
+          explicitMediaModelsRef.current.get(sessionId),
+        getStickyModels: () =>
+          sessionRuntimeRef.current.stickyModelsFor(sessionId),
+        selectedModelOf,
+        allChannels,
+        enabledChannels: enabled,
+        getContextAssets: () =>
+          contextTraceRef.current.get(sessionId)?.assetRefs ?? [],
+        rememberStickyModel: (targetId, kind, model) =>
+          sessionRuntimeRef.current.rememberStickyModel(targetId, kind, model),
+        persistStickyModel: (targetId, kind, model) => {
+          runTrackedDetached(
+            () =>
+              sessions.updateFields(
+                targetId,
+                kind === 'video'
+                  ? { videoModel: model }
+                  : { imageModel: model },
+              ),
+            '保存生成模型失败',
+          )
+        },
+      })
       return {
         store,
         viewportWorld: viewportWorldOf(viewport),
@@ -885,100 +913,7 @@ export function AgentPanel({
         for (const type of types) out[type] = await resolveDefaults({ channels, type })
         return out
       },
-      /**
-       * 生成节点用哪个模型：按计划里那个节点的 `data.mode` 选图片档还是视频档。
-       *
-       * 渠道由模型名**反查**（`channelIdForLogical`）—— 换了模型就得跟着换渠道，
-       * 否则会发出「A 渠道 + B 渠道的模型」这种请求，报错还看不懂。
-       */
-      recipeForGenerated: (type, node) => {
-        if (type !== 'generation') return undefined
-        const kind = node.data.mode === 'video' ? 'video' : 'image'
-        /**
-         * ⚠️ **渠道必须跟着「最终那个模型」走**。
-         *
-         * 用户 2026-10-03 报：「我选了模型，它就该用那个模型」——但 agent 建的节点
-         * 落成了 `model: "Agnes Video 2.0"` + `channelId: Comfy-gpt`，请求被中转站
-         * 转发到 Agnes，回的是 Agnes 的「预扣费不足」，画布上什么都拿不到。
-         *
-         * 根因就在这一行：原来只看**面板里选的那一档**（那次是空的，于是拿默认配方
-         * 的渠道），而**计划里模型自己写了 model** —— 计划数据在 `buildLandingCommand`
-         * 里最后压上去，于是「模型是计划的、渠道是默认的」，两半拼出一个不存在的组合。
-         *
-         * 现在：计划里写了模型就以它为准去**反查渠道**；没写才用面板里选的那一档。
-         */
-        const planned = typeof node.data.model === 'string' ? node.data.model.trim() : ''
-        /**
-         * 优先级（用户 2026-10-16 定的口径）：
-         *   ① 本轮正文里的模型 chip —— 明确选择最高优先；
-         *   ② 计划自己写的模型；
-         *   ③ 本会话当前图片 / 视频模型；
-         *   ④ 本会话上次用过的那个模型 —— 连续迭代时沿用；
-         *   ⑤ 画布上选中的节点模型 —— 会话还没有历史时的起点；
-         *   ⑥ `undefined` —— 保持渠道默认配方不动。
-         *
-         * ④ 在 ⑤ 之上是有意的：同一段对话里用户已经交代过一次模型，后面没说就是「还用那个」，
-         * 不该因为中途点选了别的节点而自己换掉。③ 又高于 ④，用户当轮改了会话模型时要立刻生效。
-         */
-        const explicit = explicitMediaModelsRef.current.get(sessionId)?.[kind]
-        const sessionPicked =
-          kind === 'video' ? session?.videoModel : session?.imageModel
-        const stored = sessionRuntimeRef.current.stickyModelsFor(sessionId)[kind]
-        const model = preferredGeneratedModel({
-          explicit,
-          planned,
-          sessionPicked,
-          sticky: stored,
-          selected: selectedModelOf(kind),
-        })
-        if (!model) return undefined
-        const channelId = channelIdForLogical(enabled, model, session?.channelId)
-        if (!channelId) return undefined
-        /**
-         * 这次真正用上的模型记下来：ref 管本轮下一轮立刻生效，落库那份管重开还在。
-         * 只在**真的变了**时才写，免得每建一次节点就落一次库。
-         */
-        if (model !== stored) {
-          sessionRuntimeRef.current.rememberStickyModel(sessionId, kind, model)
-          if (session) {
-            runTrackedDetached(
-              () =>
-                sessions.updateFields(
-                  session.id,
-                  kind === 'video'
-                    ? { videoModel: model }
-                    : { imageModel: model },
-                ),
-              '保存生成模型失败',
-            )
-          }
-        }
-        return { channelId, model }
-      },
-      explicitRecipeForGenerated: (type, node) => {
-        if (type !== 'generation') return undefined
-        const kind = node.data.mode === 'video' ? 'video' : 'image'
-        const model = explicitMediaModelsRef.current.get(sessionId)?.[kind]
-        if (!model) return undefined
-        const channelId = channelIdForLogical(enabled, model, session?.channelId)
-        return { channelId: channelId ?? '', model }
-      },
-      contextAssetsForGenerated: (type) => {
-        if (type !== 'generation') return undefined
-        const assets = contextTraceRef.current.get(sessionId)?.assetRefs ?? []
-        return assets.filter((asset) => asset.mime.startsWith('image/'))
-      },
-      channelIdForModel: (model) => channelIdForLogical(enabled, model),
-      /**
-       * 模型名 → 类别：给 `applyPlan` 纠正 `mode` 用（见 `alignGenerationMode`）。
-       *
-       * 真模型会把视频节点写成 `mode:"image"`，只写对 `model`；执行层按 `mode` 分链，
-       * 不纠正就是「点了生成一个请求都不发」。
-       */
-      categoryOfModel: (model) => {
-        const category = capabilityOfLogical(allChannels, model)?.category
-        return category === 'audio' || category === 'unknown' ? undefined : category
-      },
+      ...recipeContext,
       sliceImage: (nodeId, mode, rect, ratio) => {
         const run = mode === 'crop' ? cropAsset : extractSelection
         return run({ platform, store }, { nodeId, rect, ...(ratio ? { ratio } : {}) })
