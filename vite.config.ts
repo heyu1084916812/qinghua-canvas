@@ -31,5 +31,27 @@ export default defineConfig({
   test: {
     environment: 'node',
     include: ['src/**/*.test.ts', 'scripts/**/*.test.mjs'],
+    /*
+     * 覆盖率只统计 AgentPanel 目录：那是这次重构的战场，也是回归最容易发生的地方。
+     * 报告落到 `.playwright-verify/`（已被忽略），**不在仓库根产生 `coverage/`**。
+     * 阈值是**地板不是目标**：用来挡住"改回去"，不是逼着刷数字。
+     */
+    coverage: {
+      provider: 'v8',
+      include: ['src/workbenches/canvas/panels/AgentPanel/**/*.{ts,tsx}'],
+      exclude: ['**/*.test.*'],
+      reporter: ['text-summary'],
+      reportsDirectory: '.playwright-verify/coverage',
+      /*
+       * 地板值（2026-11-04 实测：语句 64.0% / 分支 54.4% / 函数 59.5% / 行 66.0%）。
+       * 定在实测略下方：**只挡回退，不逼刷分**。真要往上提，先补行为断言再抬阈值。
+       */
+      thresholds: {
+        statements: 60,
+        branches: 50,
+        functions: 55,
+        lines: 62,
+      },
+    },
   },
 })
