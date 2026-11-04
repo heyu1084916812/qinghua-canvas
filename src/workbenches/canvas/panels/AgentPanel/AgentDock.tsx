@@ -20,12 +20,13 @@ import {
   dampAgentShellWidth,
   agentShellWidth,
   clampAgentOrb,
-  clampAgentShellState,
   defaultAgentShellState,
   nearestAgentShellSnap,
   parseAgentShellState,
   parseLegacyAgentShellState,
   resizedAgentShellWidth,
+  resizeAgentShellForAreaChange,
+  shouldClampAgentOrbToSurface,
   type AgentShellState,
   type AgentWorkArea,
 } from './agentShellLayout'
@@ -144,6 +145,7 @@ export function AgentDock({
   const shellRef = useRef<AgentShellState | null>(null)
   const dragRef = useRef<DragState | null>(null)
   const suppressOrbClickRef = useRef(false)
+  const lastViewportWidthRef = useRef<number | null>(null)
 
   const applyShell = useCallback((next: AgentShellState) => {
     shellRef.current = next
@@ -152,15 +154,24 @@ export function AgentDock({
 
   useLayoutEffect(() => {
     if (!active) return
+    const activationViewportWidth = window.innerWidth
+    const shouldClampFinal = shouldClampAgentOrbToSurface(
+      lastViewportWidthRef.current,
+      activationViewportWidth,
+    )
+    lastViewportWidthRef.current = activationViewportWidth
     const area = measureCanvasWorkArea(false)
     const availableWidth = measureAgentAvailableWidth()
+    const current = shellRef.current
     applyShell(
-      agentShellStateForActivation(
-        shellRef.current,
-        shellRef.current ? null : readStoredShellState(),
-        area,
-        availableWidth,
-      ),
+      shouldClampFinal || !current
+        ? agentShellStateForActivation(
+            current,
+            current ? null : readStoredShellState(),
+            area,
+            availableWidth,
+          )
+        : resizeAgentShellForAreaChange(current, availableWidth),
     )
 
     const onAreaChange = () => {
@@ -169,7 +180,10 @@ export function AgentDock({
       const current = shellRef.current
       applyShell(
         current
-          ? clampAgentShellState(current, nextArea, nextAvailableWidth)
+          ? resizeAgentShellForAreaChange(
+              current,
+              nextAvailableWidth,
+            )
           : {
               ...defaultAgentShellState(nextArea),
               width: agentShellWidth(AGENT_SHELL_WIDTH_DEFAULT, nextAvailableWidth),
@@ -177,11 +191,29 @@ export function AgentDock({
       )
     }
     const clampToSurface = () => {
+      const viewportWidth = window.innerWidth
+      const current = shellRef.current
+      if (
+        shouldClampAgentOrbToSurface(
+          lastViewportWidthRef.current,
+          viewportWidth,
+        )
+      ) {
+        lastViewportWidthRef.current = viewportWidth
+        applyShell(
+          agentShellStateForActivation(
+            current,
+            null,
+            measureCanvasWorkArea(false),
+            measureAgentAvailableWidth(),
+          ),
+        )
+        return
+      }
+      if (!current) return
       applyShell(
-        agentShellStateForActivation(
-          shellRef.current,
-          null,
-          measureCanvasWorkArea(false),
+        resizeAgentShellForAreaChange(
+          current,
           measureAgentAvailableWidth(),
         ),
       )
@@ -219,7 +251,32 @@ export function AgentDock({
     firstFrame = window.requestAnimationFrame(() => {
       secondFrame = window.requestAnimationFrame(clampToSurface)
     })
-    const settleTimer = window.setTimeout(clampToSurface, 360)
+    const settleToFinalSurface = () => {
+      /**
+       * 只有本次激活开始时确实跨了视口宽度，最终 settle 才重新夹 orb；
+       * 同视口重新激活只 resize width，保持 G735 的 orb 坐标。
+       */
+      const latest = shellRef.current
+      if (!latest) return
+      if (shouldClampFinal) {
+        applyShell(
+          agentShellStateForActivation(
+            latest,
+            null,
+            measureCanvasWorkArea(false),
+            measureAgentAvailableWidth(),
+          ),
+        )
+        return
+      }
+      applyShell(
+        resizeAgentShellForAreaChange(
+          latest,
+          measureAgentAvailableWidth(),
+        ),
+      )
+    }
+    const settleTimer = window.setTimeout(settleToFinalSurface, 360)
     return () => {
       mutationObserver?.disconnect()
       observer?.disconnect()

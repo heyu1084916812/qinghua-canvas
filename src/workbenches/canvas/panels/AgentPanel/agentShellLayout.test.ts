@@ -18,12 +18,43 @@ import {
   parseAgentShellState,
   parseLegacyAgentShellState,
   resizedAgentShellWidth,
+  resizeAgentShellForAreaChange,
+  shouldClampAgentOrbToSurface,
   type AgentWorkArea,
 } from './agentShellLayout'
 
 const AREA: AgentWorkArea = { x: 64, y: 48, width: 1200, height: 800 }
 
 describe('Agent shell layout', () => {
+  it('面板开合的 area change 只重算宽度，不移动 orb', () => {
+    const state = {
+      orb: { x: 740, y: 120 },
+      width: 1376,
+    }
+    const next = resizeAgentShellForAreaChange(state, 1024)
+    expect(next.orb).toBe(state.orb)
+    expect(next.width).toBe(agentShellWidth(state.width, 1024))
+  })
+
+  it('只有首次激活或视口宽度变化才 surface clamp orb', () => {
+    expect(shouldClampAgentOrbToSurface(null, 1440)).toBe(true)
+    expect(shouldClampAgentOrbToSurface(1440, 1440)).toBe(false)
+    expect(shouldClampAgentOrbToSurface(1440, 1024)).toBe(true)
+    expect(shouldClampAgentOrbToSurface(1024, 1440)).toBe(true)
+  })
+
+  it('cleanup 保留 viewport token，同宽重新激活不夹 orb', () => {
+    let lastViewportWidth: number | null = null
+    expect(shouldClampAgentOrbToSurface(lastViewportWidth, 1280)).toBe(
+      true,
+    )
+    lastViewportWidth = 1280
+    // activation cleanup 不重置 token
+    expect(shouldClampAgentOrbToSurface(lastViewportWidth, 1280)).toBe(
+      false,
+    )
+  })
+
   it('keeps the orb inside the canvas and uses the shell default width', () => {
     const state = defaultAgentShellState(AREA)
     expect(state.orb.x + AGENT_ORB_SIZE).toBeLessThanOrEqual(AREA.x + AREA.width - AGENT_SHELL_GAP)

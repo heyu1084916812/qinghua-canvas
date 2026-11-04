@@ -5,6 +5,26 @@ export interface AgentWorkArea {
   height: number
 }
 
+export function resizeAgentShellForAreaChange(
+  state: AgentShellState,
+  availableWidth: number,
+): AgentShellState {
+  return {
+    ...state,
+    width: agentShellWidth(state.width, availableWidth),
+  }
+}
+
+export function shouldClampAgentOrbToSurface(
+  previousViewportWidth: number | null,
+  currentViewportWidth: number,
+): boolean {
+  return (
+    previousViewportWidth === null ||
+    previousViewportWidth !== currentViewportWidth
+  )
+}
+
 export interface AgentOrbPoint {
   x: number
   y: number
