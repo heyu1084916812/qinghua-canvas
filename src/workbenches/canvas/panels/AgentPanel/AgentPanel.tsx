@@ -69,7 +69,6 @@ import {
 } from '../../../../features/shared/lifecycle/taskLifecycle'
 import { createContextRepository } from '../../../../state/shared/contextRepository'
 import { createAgentPanelShutdownControl } from './agentPanelShutdown'
-import { steerMessagesOf } from '../../../../domain/agent/steering'
 import {
   getAgentDeliveryMode,
   setAgentDeliveryMode,
@@ -85,7 +84,15 @@ import {
   setAgentCanvasReview,
   subscribeAgentCanvasReview,
 } from '../../../../state/ui/agentCanvasReview'
-import { toConversation } from './conversation'
+import {
+  buildAssetHashByNode,
+  buildConversationItems,
+  buildNodeTitles,
+  currentTurnHasProcessOf,
+  latestProcessIndexOf,
+  latestUserStartedAtOf,
+  nodeLabelOf as conversationNodeLabelOf,
+} from './agentConversationItems'
 import { createAgentToolRecipeContext } from './agentToolRecipeContext'
 import { createAgentToolPlanPorts } from './agentToolPlanPorts'
 import { createAgentToolCanvasOps } from './agentToolCanvasOps'
@@ -143,7 +150,6 @@ import { previewOf } from './agentConfirmationPreview'
 import { originOf, viewportWorldOf } from './agentPanelViewHelpers'
 import {
   parseMentions,
-  stripMentionMarkup,
 } from '../../text/MentionEditor'
 
 /**
@@ -959,28 +965,14 @@ export function AgentPanel({
   }, [applySessionLifecycleSnapshot])
 
   const graph = useGraph()
-  const nodeTitles = useMemo(
-    () =>
-      new Map(
-        graph.nodes.map((node) => [
-          node.id,
-          node.title?.trim() || '未命名节点',
-        ]),
-      ),
-    [graph.nodes],
-  )
+  const nodeTitles = useMemo(() => buildNodeTitles(graph), [graph.nodes])
   const items = useMemo(
     () =>
-      toConversation(
-        [
-          ...messages,
-          ...steerMessagesOf(
-            current?.pendingSteers ?? [],
-            stripMentionMarkup,
-          ),
-        ],
+      buildConversationItems({
+        messages,
+        pendingSteers: current?.pendingSteers ?? [],
         nodeTitles,
-      ),
+      }),
     [current?.pendingSteers, messages, nodeTitles],
   )
   const scrollRef = useRef<HTMLDivElement | null>(null)
@@ -1542,38 +1534,15 @@ export function AgentPanel({
    */
   /** 节点在正文里显示成什么名字（没起名就写「素材」，不露 `node_xxx`） */
   const nodeLabelOf = useCallback(
-    (id: string) => {
-      const hit = store.getSnapshot().nodes.find((n) => n.id === id)
-      return (hit?.title ?? '').trim() || '素材'
-    },
-    [store],
+    (id: string) => conversationNodeLabelOf(graph.nodes, id),
+    [graph.nodes],
   )
 
-  const latestUserIndex = visibleItems.reduce(
-    (at, item, index) => (item.kind === 'user' ? index : at),
-    -1,
-  )
-  const latestUserStartedAt =
-    latestUserIndex >= 0 && visibleItems[latestUserIndex]?.kind === 'user'
-      ? visibleItems[latestUserIndex]?.createdAt
-      : undefined
-  const latestProcessIndex = visibleItems.reduce(
-    (at, item, index) =>
-      item.kind === 'process' && index > latestUserIndex ? index : at,
-    -1,
-  )
-  const currentTurnHasProcess = visibleItems
-    .slice(latestUserIndex + 1)
-    .some((item) => item.kind === 'process')
+  const latestUserStartedAt = latestUserStartedAtOf(visibleItems)
+  const latestProcessIndex = latestProcessIndexOf(visibleItems)
+  const currentTurnHasProcess = currentTurnHasProcessOf(visibleItems)
   /** 节点 id → 产物 hash：步骤卡据此把这一步产出的图**内嵌**显示（图变更时跟着刷） */
-  const hashOfNode = useMemo(() => {
-    const map = new Map<string, string>()
-    for (const n of graph.nodes) {
-      const hash = (n.data as { assetHash?: unknown }).assetHash
-      if (typeof hash === 'string' && hash) map.set(n.id, hash)
-    }
-    return map
-  }, [graph])
+  const hashOfNode = useMemo(() => buildAssetHashByNode(graph), [graph])
 
   const {
     addFromLibrary,
