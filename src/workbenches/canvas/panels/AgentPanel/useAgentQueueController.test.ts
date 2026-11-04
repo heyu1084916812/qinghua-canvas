@@ -316,7 +316,8 @@ describe('useAgentQueueController', () => {
     // 有明确错误态，不是静默吞掉
     expect(props.setStatusFor).toHaveBeenCalledWith(session.id, {
       kind: 'error',
-      message: '网络断了',
+      // #912 起在原始错误后面补一句可操作的指路文案
+      message: expect.stringContaining('网络断了'),
     })
     // 活动锁必须释放，否则这条会话的队列会被永久卡死
     expect(isSessionActivityActive(session.id)).toBe(false)
@@ -346,5 +347,149 @@ describe('useAgentQueueController', () => {
     expect(isSessionActivityActive(session.id)).toBe(false)
     // 空队列不保留自动续排标记，避免空闲时反复空转
     expect(shouldDrainQueue(session.id)).toBe(false)
+  })
+
+  /**
+   * #912：结算失败会让 `activeTurnId` 残留 ⇒ 该会话的队首永远领不到。
+   * 这两条钉住「先重试一次、再 releaseActiveTurn 兜底、最后队列还能被领到」。
+   */
+  const queuedTurn = {
+    id: 'turn-1',
+    text: '再生成一张',
+    createdAt: 1,
+    channelId: 'channel-1',
+    model: 'GPT-6 Astra',
+  }
+
+  it('★ 结算首次抛错、重试成功：队列项保留、错误态一次、活动锁释放', async () => {
+    const lifecycle = createTaskLifecycle()
+    const queuedSession = {
+      ...session,
+      queuedTurns: [queuedTurn],
+      activeTurnId: queuedTurn.id,
+    }
+    const finishQueuedTurn = vi
+      .fn()
+      .mockRejectedValueOnce(new Error('finish failed'))
+      .mockResolvedValueOnce({ ...session, queuedTurns: [queuedTurn] })
+    const releaseActiveTurn = vi.fn(async () => session)
+    const sendText = vi.fn(async () => {
+      throw new Error('send failed')
+    })
+    const props = input({
+      controller: {
+        claimNextQueuedTurn: vi.fn(async () => ({
+          session: queuedSession,
+          turn: queuedTurn,
+        })),
+        finishQueuedTurn,
+      } as unknown as AgentController,
+      sessions: {
+        get: vi.fn(async () => session),
+        releaseActiveTurn,
+      } as unknown as AgentQueueControllerInput['sessions'],
+      sendText,
+      trackRun: (work) => lifecycle.track(work),
+    })
+    let api: ReturnType<typeof useAgentQueueController> | null = null
+    function Probe() {
+      api = useAgentQueueController(props)
+      return createElement('span', null, 'ok')
+    }
+    renderToStaticMarkup(createElement(Probe))
+
+    await api!.resumeQueue()
+    await lifecycle.waitForIdle(100)
+
+    // 第二次结算成功 ⇒ 不该走 releaseActiveTurn 兜底
+    expect(finishQueuedTurn).toHaveBeenCalledTimes(2)
+    expect(releaseActiveTurn).not.toHaveBeenCalled()
+    // 队列项仍在（返回的会话里还带着这条 turn）
+    expect(props.applySessionSnapshot).toHaveBeenCalledWith(
+      expect.objectContaining({ queuedTurns: [queuedTurn] }),
+    )
+    expect(props.setStatusFor).toHaveBeenCalledTimes(1)
+    expect(props.setStatusFor).toHaveBeenCalledWith(
+      session.id,
+      expect.objectContaining({
+        kind: 'error',
+        message: expect.stringContaining('恢复队列'),
+      }),
+    )
+    expect(isSessionActivityActive(session.id)).toBe(false)
+  })
+
+  it('★★ 结算一直失败：走 releaseActiveTurn 兜底，随后仍能重新领到这条 turn', async () => {
+    const lifecycle = createTaskLifecycle()
+    /** 带状态的最小 store：`activeTurnId` 残留时 claim 必须返回 null。 */
+    const store = {
+      activeTurnId: undefined as string | undefined,
+      queuedTurns: [queuedTurn],
+    }
+    const snapshot = () => ({
+      ...session,
+      queuedTurns: store.queuedTurns,
+      ...(store.activeTurnId ? { activeTurnId: store.activeTurnId } : {}),
+    })
+    const claimNextQueuedTurn = vi.fn(async () => {
+      if (store.activeTurnId) return null
+      store.activeTurnId = queuedTurn.id
+      return { session: snapshot(), turn: queuedTurn }
+    })
+    const finishQueuedTurn = vi.fn(async () => {
+      throw new Error('finish failed')
+    })
+    const releaseActiveTurn = vi.fn(async () => {
+      store.activeTurnId = undefined
+      return snapshot()
+    })
+    const sendText = vi.fn(async () => {
+      throw new Error('send failed')
+    })
+    const props = input({
+      controller: {
+        claimNextQueuedTurn,
+        finishQueuedTurn,
+      } as unknown as AgentController,
+      sessions: {
+        get: vi.fn(async () => snapshot()),
+        releaseActiveTurn,
+      } as unknown as AgentQueueControllerInput['sessions'],
+      sendText,
+      trackRun: (work) => lifecycle.track(work),
+    })
+    let api: ReturnType<typeof useAgentQueueController> | null = null
+    function Probe() {
+      api = useAgentQueueController(props)
+      return createElement('span', null, 'ok')
+    }
+    renderToStaticMarkup(createElement(Probe))
+
+    await api!.resumeQueue()
+    await lifecycle.waitForIdle(100)
+
+    // 重试一次后仍失败 ⇒ releaseActiveTurn 兜底，且活动锁与自动续排都清掉
+    expect(finishQueuedTurn).toHaveBeenCalledTimes(2)
+    expect(releaseActiveTurn).toHaveBeenCalledTimes(1)
+    expect(isSessionActivityActive(session.id)).toBe(false)
+    expect(shouldDrainQueue(session.id)).toBe(false)
+    expect(props.setStatusFor).toHaveBeenCalledWith(
+      session.id,
+      expect.objectContaining({
+        kind: 'error',
+        message: expect.stringContaining('队列结算失败'),
+      }),
+    )
+
+    // 命门：兜底之后这条 turn 必须还能被重新领到（不是"函数被调用过"）
+    await api!.resumeQueue()
+    await lifecycle.waitForIdle(100)
+    expect(claimNextQueuedTurn).toHaveBeenCalledTimes(2)
+    expect(sendText).toHaveBeenCalledTimes(2)
+    expect(sendText).toHaveBeenLastCalledWith(
+      queuedTurn.text,
+      expect.anything(),
+      expect.objectContaining({ queueTurnId: queuedTurn.id }),
+    )
   })
 })

@@ -251,14 +251,45 @@ export function useAgentQueueController({
             { preclaimed: true, queueTurnId: next.turn.id },
           )
         } catch (error) {
+          /**
+           * 结算失败会让会话行上的 `activeTurnId` 残留，而 `claimNextQueuedTurn` 见到它就
+           * 永远返回 null（`sessionStore.ts` 的 `if (latest.activeTurnId) return null`）——
+           * 表现为「消息排在队列里、永远不发，也没有重试入口」。
+           *
+           * 所以先原地重试一次；仍不行就用 store 现成的 `releaseActiveTurn` 兜底
+           * （只清活动标记、**保留**队列项），保证这条会话的队首还能被再次领取。
+           */
+          let settled: AgentSession | null = null
           if (claimedTurnId) {
-            const released = await controller
+            settled = await controller
               .finishQueuedTurn(sessionId, claimedTurnId, false)
               .catch(() => null)
-            if (released) applySessionSnapshot(released)
+            if (!settled) {
+              settled = await controller
+                .finishQueuedTurn(sessionId, claimedTurnId, false)
+                .catch(() => null)
+            }
+            if (settled) {
+              applySessionSnapshot(settled)
+            } else {
+              const released = await sessions
+                .releaseActiveTurn(sessionId)
+                .catch(() => null)
+              if (released) applySessionSnapshot(released)
+            }
           }
+          /**
+           * 失败后不再保留自动续排标记：否则状态一回到 idle 就会自动重试**同一条**
+           * 失败消息，持续性失败会被反复重放。恢复入口交给队列面板的「恢复队列」。
+           */
+          clearQueueDrain(sessionId)
           releaseSessionActivity(sessionId, claimedTurnId)
-          setStatusFor(sessionId, { kind: 'error', message: errText(error) })
+          setStatusFor(sessionId, {
+            kind: 'error',
+            message: settled
+              ? `${errText(error)}；队列已保留，可点「恢复队列」重试`
+              : `队列结算失败，请点「恢复队列」重试：${errText(error)}`,
+          })
         } finally {
           queuePumpingRef.current.delete(sessionId)
         }
@@ -267,6 +298,7 @@ export function useAgentQueueController({
       applySessionSnapshot,
       controller,
       queuePumpingRef,
+      sessions,
       sendText,
       setStatusFor,
       trackRun,
