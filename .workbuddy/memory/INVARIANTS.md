@@ -10,6 +10,16 @@
   最终模型变化时才写（先 remember 到 ref 再落库）；上下文素材只留 `image/*`。`toolCtx()` 必须每次重建，
   任何 per-session 缓存都会让「批准后才执行」的工具看到发消息那一刻的旧快照。
 
+- **四个动作控制器的顺序不在控制器里**：stop / cancel / continueTask / confirm 的编排顺序由
+  `agentInterruptSettlement` / `agentContinuationRun` / `agentConfirmationRun` 承载。控制器只负责守卫
+  （`stoppingRef` / `confirmingRef` / `inFlightConfirmationRef`，同步占、`finally` 释放）与调用时快照
+  （`request` / `target` / `messages`）、thunk 现取（`toolMode()` / `turnTools()` / `turnOrigin`）。
+- **`cleanupError` 有两层提示语义**：settlement 控制器发 error「停止任务时清理状态失败：…」，
+  stop / cancel 自己的成功提示必须被抑制。出现一条错误提示是正确行为，不要误判为重复提示，也不要"优化"成静默。
+- **队列摘掉后失败必须回收消息**：`removeQueuedTurn` 成功后，`cancelQueuedJob` / `settle` / `sendText`
+  任一失败或 `sendText` 返回 `undefined`，都要把文本写回草稿（当前会话 `setDraft` 合并、已切走
+  `writeDraftForSession`）并发一次 error。只有 send 成功才不写。
+
 - **工具账本调度只认端口**：`agentToolExecution.ts` 的 `createAgentToolExecution` 不读 React、不读单例，
   错误类由 `createBlockedError` 端口传入。语义铁律：无 `jobId` 直接执行且**不查会话**；
   `resolveJobId` 返回同步串时**不触发**回落查询；`pending` 一律 `needs_attention` + 原 outcome 透传；

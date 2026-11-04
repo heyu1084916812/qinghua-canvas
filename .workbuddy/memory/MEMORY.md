@@ -1,5 +1,20 @@
 # CanvasFlow（轻画）项目记忆
 
+### 确认/取消/继续/停止四控制器 + 引导失败回收（2026-11-04，对账 #890/#891，`866b832` + `1b4bfce`）
+
+- **四段动作只是"搬位置"**：顺序全在未改动模块里——stop 走 `agentInterruptSettlement`（abort→settle→transition→
+  removeSteers→finishQueuedTurn→删 6 张表→三个 clear+setStatus），confirm 走 `agentConfirmationRun`
+  （账本→loopDeps→finish→thinking→resume→自动确认→outcome→settle），continueTask 走 `agentContinuationRun`
+  （claim→claimActivity→ensureRoute→loopDeps→transition→runTurn→continue→outcome→settle）。
+  以后改这四个控制器，**别指望它们自己有顺序逻辑**，去改对应模块。
+- **`cleanupError` 不静默是两层**：settlement 控制器发一条 error「停止任务时清理状态失败：…」，stop / cancel 自己
+  的成功提示被抑制。验收时看到"有一条错误提示"是**正确**的，不是双提示。
+- **队列摘掉后失败必须回收消息**（#891）：`removeQueuedTurn` 成功之后，`cancelQueuedJob` / `settle` / `sendText`
+  任一步失败或 `sendText` 返回 `undefined`，都要把 `turn.text` 写回草稿（当前会话 `setDraft` 合并、已切走
+  `writeDraftForSession`）并发一次 error。旧测试曾把"静默丢消息"写成契约，**改写测试时先想清楚它是不是在保护 bug**。
+- **同文件并行 = 提交粒度毁掉**：这次两条线又同时动 `AgentPanel.tsx`（#890 与 #891），靠"区域不重叠 + 逐个 hunk 核对"
+  才拆成两个提交。规矩不变：**同一时刻只有一条线持有 `AgentPanel.tsx` 写锁**。
+
 ### AgentSendTurnRun + 结构护栏（2026-11-04，对账 #887/#889，`f652025` + `fdf6184`）
 
 - **发送主体的顺序就是产品行为**：`delete currentTurnJobId`（同步、不许插 `await`）→ `prepare`（`onPersisted` 内抢活动锁、
