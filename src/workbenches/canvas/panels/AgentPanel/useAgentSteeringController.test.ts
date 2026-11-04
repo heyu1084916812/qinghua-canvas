@@ -117,6 +117,21 @@ function deferred<T>() {
   return { promise, resolve, reject }
 }
 
+/**
+ * 取出 `setDraft` 收到的 updater 并执行它 —— 真实 React 会在下一次渲染时执行，
+ * 这里手动跑一遍，才能断言「消息真的回到输入框，而且落到了该会话的草稿里」。
+ */
+function runDraftUpdater(
+  setDraft: ReturnType<typeof vi.fn>,
+  previous = '',
+): string {
+  const updater = setDraft.mock.calls[0]?.[0]
+  if (typeof updater !== 'function') {
+    throw new Error('setDraft 没有收到 updater，消息没有回到输入框')
+  }
+  return (updater as (value: string) => string)(previous)
+}
+
 describe('useAgentSteeringController / guideDraft', () => {
   it('无 current 返回 false；带附件改为 queueText 一次', async () => {
     const noQueue = vi.fn()
@@ -397,8 +412,11 @@ describe('useAgentSteeringController / guideQueuedTurn', () => {
     ])
   })
 
-  it('确认卡 cleanupError 不 send', async () => {
+  it('确认卡 cleanupError 不 send，并把消息放回输入框', async () => {
     const sendText = vi.fn()
+    const setDraft = vi.fn()
+    const writeDraftForSession = vi.fn()
+    const notify = vi.fn()
     const { viewRef } = render(
       input({
         statusFor: () => confirmationStatus(),
@@ -406,12 +424,125 @@ describe('useAgentSteeringController / guideQueuedTurn', () => {
           cleanupError: new Error('cleanup failed'),
         })),
         sendText,
+        setDraft,
+        writeDraftForSession,
+        notify,
       }),
     )
     await act(async () => {
       await viewRef.current!.guideQueuedTurn(turn())
     })
     expect(sendText).not.toHaveBeenCalled()
+    // 队列项已经摘掉：失败必须把消息还回去，不能静默丢
+    const updater = setDraft.mock.calls[0]?.[0] as (prev: string) => string
+    expect(updater('')).toBe('把颜色调暖一些')
+    expect(writeDraftForSession).toHaveBeenCalledWith('s1', '把颜色调暖一些')
+    expect(notify).toHaveBeenCalledWith(
+      expect.stringContaining('已放回输入框'),
+      'error',
+    )
+  })
+
+  it('settle 抛错时把消息放回输入框，不向上抛', async () => {
+    const sendText = vi.fn()
+    const setDraft = vi.fn()
+    const writeDraftForSession = vi.fn()
+    const notify = vi.fn()
+    const { viewRef } = render(
+      input({
+        statusFor: () => confirmationStatus(),
+        settleInterruptedSession: vi.fn(async () => {
+          throw new Error('settle failed')
+        }),
+        sendText,
+        setDraft,
+        writeDraftForSession,
+        notify,
+      }),
+    )
+    await act(async () => {
+      await viewRef.current!.guideQueuedTurn(turn())
+    })
+    expect(sendText).not.toHaveBeenCalled()
+    expect(runDraftUpdater(setDraft)).toBe('把颜色调暖一些')
+    expect(writeDraftForSession).toHaveBeenCalledWith('s1', '把颜色调暖一些')
+    expect(notify).toHaveBeenCalledWith(
+      expect.stringContaining('取消等待中的动作失败'),
+      'error',
+    )
+  })
+
+  it('取消排队任务抛错时也把消息放回输入框，且不再 settle/send', async () => {
+    const settle = vi.fn()
+    const sendText = vi.fn()
+    const setDraft = vi.fn()
+    const writeDraftForSession = vi.fn()
+    const { viewRef } = render(
+      input({
+        statusFor: () => confirmationStatus(),
+        getQueuedJob: vi.fn(async () => ({
+          id: 'job-1',
+          status: 'queued',
+        })),
+        cancelQueuedJob: vi.fn(async () => {
+          throw new Error('cancel failed')
+        }),
+        settleInterruptedSession: settle,
+        sendText,
+        setDraft,
+        writeDraftForSession,
+      }),
+    )
+    await act(async () => {
+      await viewRef.current!.guideQueuedTurn(turn())
+    })
+    expect(settle).not.toHaveBeenCalled()
+    expect(sendText).not.toHaveBeenCalled()
+    expect(runDraftUpdater(setDraft)).toBe('把颜色调暖一些')
+    expect(writeDraftForSession).toHaveBeenCalledWith('s1', '把颜色调暖一些')
+  })
+
+  it('目标会话已切走时只写该会话草稿，不动当前草稿', async () => {
+    const setDraft = vi.fn()
+    const writeDraftForSession = vi.fn()
+    const { viewRef } = render(
+      input({
+        statusFor: () => confirmationStatus(),
+        isCurrentSession: vi.fn(() => false),
+        settleInterruptedSession: vi.fn(async () => ({
+          cleanupError: new Error('cleanup failed'),
+        })),
+        setDraft,
+        writeDraftForSession,
+      }),
+    )
+    await act(async () => {
+      await viewRef.current!.guideQueuedTurn(turn())
+    })
+    expect(setDraft).not.toHaveBeenCalled()
+    expect(writeDraftForSession).toHaveBeenCalledWith('s1', '把颜色调暖一些')
+  })
+
+  it('当前已有一半草稿时把放回的消息接在后面，不覆盖', async () => {
+    const writeDraftForSession = vi.fn()
+    const setDraft = vi.fn()
+    const { viewRef } = render(
+      input({
+        statusFor: () => confirmationStatus(),
+        settleInterruptedSession: vi.fn(async () => ({
+          cleanupError: new Error('cleanup failed'),
+        })),
+        setDraft,
+        writeDraftForSession,
+      }),
+    )
+    await act(async () => {
+      await viewRef.current!.guideQueuedTurn(turn())
+    })
+    const updater = setDraft.mock.calls[0]?.[0] as (prev: string) => string
+    const merged = updater('已经写了一半的新话')
+    expect(merged).toBe('已经写了一半的新话\n\n把颜色调暖一些')
+    expect(writeDraftForSession).toHaveBeenCalledWith('s1', merged)
   })
 
   it('removeQueuedTurn 返回 null 时不再 cancel/settle/send', async () => {
@@ -505,25 +636,84 @@ describe('useAgentSteeringController / guideQueuedTurn', () => {
     expect(withFallback).toHaveBeenCalledTimes(1)
   })
 
-  it('send reject 时只发送一次，保留队列已移除语义', async () => {
+  it('send reject 时只发送一次，并把消息放回输入框', async () => {
     const sendText = vi.fn(async () => {
       throw new Error('send failed')
     })
     const removeQueuedTurn = vi.fn(async () => session('s1'))
+    const setDraft = vi.fn()
+    const writeDraftForSession = vi.fn()
+    const notify = vi.fn()
     const { viewRef } = render(
       input({
         statusFor: () => confirmationStatus(),
         removeQueuedTurn,
         sendText,
+        setDraft,
+        writeDraftForSession,
+        notify,
       }),
     )
+    // 队列项已经摘掉，失败不能再往上抛成「什么都没发生」
     await act(async () => {
-      await expect(
-        viewRef.current!.guideQueuedTurn(turn()),
-      ).rejects.toThrow('send failed')
+      await viewRef.current!.guideQueuedTurn(turn())
     })
     expect(removeQueuedTurn).toHaveBeenCalledTimes(1)
     expect(sendText).toHaveBeenCalledTimes(1)
+    expect(runDraftUpdater(setDraft)).toBe('把颜色调暖一些')
+    expect(writeDraftForSession).toHaveBeenCalledWith('s1', '把颜色调暖一些')
+    expect(notify).toHaveBeenCalledWith(
+      expect.stringContaining('引导发送失败'),
+      'error',
+    )
+  })
+
+  it('sendText 没发出（返回 undefined）时把消息放回输入框', async () => {
+    const setDraft = vi.fn()
+    const writeDraftForSession = vi.fn()
+    const notify = vi.fn()
+    const { viewRef } = render(
+      input({
+        statusFor: () => confirmationStatus(),
+        sendText: vi.fn(async () => undefined),
+        setDraft,
+        writeDraftForSession,
+        notify,
+      }),
+    )
+    await act(async () => {
+      await viewRef.current!.guideQueuedTurn(turn())
+    })
+    expect(runDraftUpdater(setDraft)).toBe('把颜色调暖一些')
+    expect(writeDraftForSession).toHaveBeenCalledWith('s1', '把颜色调暖一些')
+    expect(notify).toHaveBeenCalledWith(
+      expect.stringContaining('引导发送失败'),
+      'error',
+    )
+  })
+
+  it('send 成功时不留错误提示、不写草稿', async () => {
+    const writeDraftForSession = vi.fn()
+    const setDraft = vi.fn()
+    const notify = vi.fn()
+    const { viewRef } = render(
+      input({
+        statusFor: () => confirmationStatus(),
+        sendText: vi.fn(async () => ({ kind: 'message' })),
+        writeDraftForSession,
+        setDraft,
+        notify,
+      }),
+    )
+    await act(async () => {
+      await viewRef.current!.guideQueuedTurn(turn())
+    })
+    expect(writeDraftForSession).not.toHaveBeenCalled()
+    expect(setDraft).not.toHaveBeenCalled()
+    expect(notify).not.toHaveBeenCalledWith(
+      expect.anything(),
+      'error',
+    )
   })
 
   it('promote 失败文案保持原文', async () => {

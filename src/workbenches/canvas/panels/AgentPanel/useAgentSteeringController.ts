@@ -7,6 +7,7 @@ import {
 import type { AgentSession } from '../../../../state/agent/sessionStore'
 import { createId } from '../../../../shared/id'
 import type { TaskLifecycle } from '../../../../features/shared/lifecycle/taskLifecycle'
+import { errText } from '../../agent/agentLoop'
 import {
   statusCanSteer,
   type AgentPanelStatus,
@@ -105,24 +106,80 @@ export function useAgentSteeringController(
           )
           if (!withoutTurn) return
           input.applySessionSnapshot(withoutTurn)
-          if (queuedJob?.status === 'queued') {
-            await input.cancelQueuedJob(queuedJob.id)
+          /**
+           * 队列项已经摘掉了：后面任何一步失败都不能直接 return ——
+           * 那样这条用户消息既不回队列、也不进历史，等于静默丢失。
+           *
+           * 还回**输入框草稿**而不是队列：草稿是惰性的，不会被队列泵自动重发，
+           * 失败原因没修好之前不会二次扣费；当前会话里还要立刻可见。
+           */
+          const restoreTurnText = (): boolean => {
+            try {
+              if (input.isCurrentSession(target.id)) {
+                input.setDraft((previous) => {
+                  const next = previous.trim()
+                    ? `${previous}\n\n${turn.text}`
+                    : turn.text
+                  if (next !== previous) {
+                    input.writeDraftForSession(target.id, next)
+                  }
+                  return next
+                })
+                return true
+              }
+              input.writeDraftForSession(target.id, turn.text)
+              return true
+            } catch {
+              return false
+            }
           }
-          const settled = await input.settleInterruptedSession(
-            withoutTurn,
-            pendingConfirmation,
-            'canceled',
-          )
-          if (settled.cleanupError) return
+          const reportUnsent = (label: string, detail?: unknown): void => {
+            const restored = restoreTurnText()
+            const suffix =
+              detail === undefined ? '' : `：${errText(detail)}`
+            input.notify(
+              restored
+                ? `${label}，这条消息已放回输入框${suffix}`
+                : `${label}，且这条消息没能放回输入框，请手动重新输入${suffix}`,
+              'error',
+            )
+          }
+
+          let settled: Awaited<
+            ReturnType<typeof input.settleInterruptedSession>
+          >
+          try {
+            if (queuedJob?.status === 'queued') {
+              await input.cancelQueuedJob(queuedJob.id)
+            }
+            settled = await input.settleInterruptedSession(
+              withoutTurn,
+              pendingConfirmation,
+              'canceled',
+            )
+          } catch (error) {
+            reportUnsent('取消等待中的动作失败', error)
+            return
+          }
+          if (settled.cleanupError) {
+            reportUnsent('取消等待中的动作失败', settled.cleanupError)
+            return
+          }
           const sendTarget = settled.session ?? withoutTurn
           input.notify(
             '已取消等待中的动作，并立即发送这条引导',
             'info',
           )
-          await input.sendText(
-            turn.text,
-            sessionForQueuedTurn(sendTarget, turn),
-          )
+          try {
+            const sent = await input.sendText(
+              turn.text,
+              sessionForQueuedTurn(sendTarget, turn),
+            )
+            /** `sendText` 返回 undefined = 这条消息没真正发出去。 */
+            if (!sent) reportUnsent('引导发送失败')
+          } catch (error) {
+            reportUnsent('引导发送失败', error)
+          }
           return
         }
 
@@ -159,14 +216,17 @@ export function useAgentSteeringController(
       input.cancelQueuedJob,
       input.current,
       input.getQueuedJob,
+      input.isCurrentSession,
       input.notify,
       input.promoteQueuedTurnToSteer,
       input.removeQueuedTurn,
       input.sendText,
+      input.setDraft,
       input.setQueueMenuId,
       input.settleInterruptedSession,
       input.statusFor,
       input.trackRun,
+      input.writeDraftForSession,
     ],
   )
 
