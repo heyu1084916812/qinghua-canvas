@@ -25,10 +25,6 @@ import type { TaskLifecycle } from '../../../../features/shared/lifecycle/taskLi
 import { parseMentions } from '../../text/MentionEditor'
 import { viewportWorldOf } from './agentPanelViewHelpers'
 
-interface AttachmentPatch {
-  pendingAssetIds: string[]
-}
-
 export interface AgentAttachmentsControllerInput {
   active: boolean
   projectId: string
@@ -46,8 +42,24 @@ export interface AgentAttachmentsControllerInput {
     label: string,
   ) => void
   nodeLabelOf: (nodeId: string) => string
-  patchSession: (patch: AttachmentPatch) => Promise<unknown>
-  patchSessionDetached: (patch: AttachmentPatch) => void
+  /**
+   * 追加待发送附件（store 侧原子读改写，见 `sessionStore.appendPendingAssetIds`）。
+   *
+   * 投递路径**不许**再用「渲染快照 `current.pendingAssetIds` + 整字段写回」：
+   * 两次快速投递会基于同一份旧基线互相覆盖（#919 P3），而控制器里本地 rebase
+   * 又会复活用户刚删掉的 id（这个字段还有别的写者）。
+   */
+  appendPendingAssetIds: (
+    sessionId: string,
+    assetIds: readonly string[],
+  ) => Promise<AgentSession | null>
+  /** 同上，但脱离点击等待链（画布 handoff 是同步入口） */
+  appendPendingAssetIdsDetached: (
+    sessionId: string,
+    assetIds: readonly string[],
+  ) => void
+  /** 把追加后的会话回灌到面板（`list` 与 `current` 都跟着更新） */
+  applySessionSnapshot: (session: AgentSession) => void
   trackRun: TaskLifecycle['track']
 }
 
@@ -78,16 +90,12 @@ export function useAgentAttachmentsController(
     for (const id of picked) {
       input.insertMention('node', id, input.nodeLabelOf(id))
     }
-    input.patchSessionDetached({
-      pendingAssetIds: [
-        ...new Set([...(input.current.pendingAssetIds ?? []), ...picked]),
-      ],
-    })
+    input.appendPendingAssetIdsDetached(input.current.id, picked)
   }, [
     input.current,
     input.insertMention,
     input.nodeLabelOf,
-    input.patchSessionDetached,
+    input.appendPendingAssetIdsDetached,
     input.store,
   ])
 
@@ -150,16 +158,16 @@ export function useAgentAttachmentsController(
         })
         if (!id) return
         input.insertMention('node', id, input.nodeLabelOf(id))
-        await input.patchSession({
-          pendingAssetIds: [...(input.current.pendingAssetIds ?? []), id],
-        })
+        const next = await input.appendPendingAssetIds(input.current.id, [id])
+        if (next) input.applySessionSnapshot(next)
       }),
     [
       input.current,
       input.insertMention,
       input.library,
       input.nodeLabelOf,
-      input.patchSession,
+      input.appendPendingAssetIds,
+      input.applySessionSnapshot,
       input.trackRun,
       placeAsset,
     ],
@@ -186,18 +194,15 @@ export function useAgentAttachmentsController(
         for (const id of added) {
           input.insertMention('node', id, input.nodeLabelOf(id))
         }
-        await input.patchSession({
-          pendingAssetIds: [
-            ...(input.current.pendingAssetIds ?? []),
-            ...added,
-          ],
-        })
+        const next = await input.appendPendingAssetIds(input.current.id, added)
+        if (next) input.applySessionSnapshot(next)
       }),
     [
       input.current,
       input.insertMention,
       input.nodeLabelOf,
-      input.patchSession,
+      input.appendPendingAssetIds,
+      input.applySessionSnapshot,
       input.platform,
       input.projectId,
       input.store,

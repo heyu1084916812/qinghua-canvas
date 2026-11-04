@@ -208,6 +208,19 @@ export interface AgentSessionStore {
     result: 'canceled' | 'interrupted',
     expectedRevision?: number,
   ): Promise<AgentSession | null>
+  /**
+   * 追加待发送附件（**原子**读改写，事务内 load → 追加 → 去重 → 写回）。
+   *
+   * `pendingAssetIds` 有多个写者：三条投递路径（文件 / 素材库 / 画布投递）、删 chip 时的
+   * 整字段同步、发送后的 `clearPendingAssetIds`。以前投递路径拿**渲染快照**读-改-写：
+   * 两次快速投递都基于同一份旧基线，后写覆盖先写 ⇒ 丢一条记账（#919 P3）。
+   * 这里把「读」搬进事务，追加永远落在这个字段的**最新值**上 —— 既不会丢并发追加，
+   * 也不会把用户刚删掉的 id 带回库里。
+   */
+  appendPendingAssetIds(
+    id: string,
+    assetIds: readonly string[],
+  ): Promise<AgentSession | null>
   clearPendingAssetIds(id: string, assetIds: readonly string[]): Promise<AgentSession | null>
   enqueueTurn(
     id: string,
@@ -789,6 +802,31 @@ export function createAgentSessionStore(storage: StoragePort): AgentSessionStore
           if (messagesChanged) {
             await replaceMessages(tx, id, next.projectId, messages, now)
           }
+          return next
+        },
+      )
+    },
+
+    async appendPendingAssetIds(id, assetIds) {
+      const additions = [
+        ...new Set(assetIds.filter((assetId) => assetId.trim() !== '')),
+      ]
+      if (additions.length === 0) return find(id)
+      await ensureSplit()
+      return storage.transaction(
+        ['agentSessions', 'agentMessages'],
+        async (tx) => {
+          const latest = await loadSession(tx, id)
+          if (!latest) return null
+          const merged = [
+            ...new Set([...(latest.pendingAssetIds ?? []), ...additions]),
+          ]
+          const next: AgentSession = {
+            ...latest,
+            pendingAssetIds: merged,
+            updatedAt: Date.now(),
+          }
+          await tx.put('agentSessions', sessionRow(next, next.updatedAt))
           return next
         },
       )

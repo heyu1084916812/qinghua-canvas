@@ -533,6 +533,17 @@ export function useAgentPanelSessionModel({
   )
   patchSessionDetachedRef.current = patchSessionDetached
 
+  /**
+   * 追加待发送附件（原子）。读-改-写整段在 store 的事务里，**不经过渲染快照**。
+   * 见 `sessionStore.appendPendingAssetIds`：这个字段还有别的写者（删 chip 的整字段同步、
+   * 发送后的清理），在控制器里本地 rebase 会复活用户刚删掉的 id。
+   */
+  const appendPendingAssetIds = useCallback(
+    (sessionId: string, assetIds: readonly string[]) =>
+      sessions.appendPendingAssetIds(sessionId, assetIds),
+    [sessions],
+  )
+
   const {
     skillFavs,
     skillLabel,
@@ -664,6 +675,23 @@ export function useAgentPanelSessionModel({
   /** 节点 id → 产物 hash：步骤卡据此把这一步产出的图**内嵌**显示（图变更时跟着刷） */
   const hashOfNode = useMemo(() => buildAssetHashByNode(graph), [graph])
 
+  /**
+   * 追加待发送附件的「脱离点击链」版本：画布 handoff 是同步入口，不能 await。
+   * 失败只提示一次（持久写门禁由 `runTrackedDetached` 负责）。
+   */
+  const appendPendingAssetIdsDetached = useCallback(
+    (sessionId: string, assetIds: readonly string[]) => {
+      runTrackedDetached(
+        async () => {
+          const next = await sessions.appendPendingAssetIds(sessionId, assetIds)
+          if (next) applySessionSnapshot(next)
+        },
+        '追加待发送附件失败',
+      )
+    },
+    [applySessionSnapshot, runTrackedDetached, sessions],
+  )
+
   const {
     addFromLibrary,
     attachFiles,
@@ -682,8 +710,9 @@ export function useAgentPanelSessionModel({
     library,
     insertMention,
     nodeLabelOf,
-    patchSession,
-    patchSessionDetached,
+    appendPendingAssetIds,
+    appendPendingAssetIdsDetached,
+    applySessionSnapshot,
     trackRun,
   })
 

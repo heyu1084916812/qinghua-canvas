@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { createMemoryPlatform } from '../../platform/memory'
+import type { StoragePort } from '../../platform/ports'
 import type { QueuedAgentTurn } from '../../domain/agent/queuedTurn'
 import { AGENT_CONTEXT_WINDOW, createAgentSessionStore } from './sessionStore'
 
@@ -1139,5 +1140,112 @@ describe('Agent 会话 · 待执行任务队列', () => {
     await s.remove(session.id)
     expect(await storage.query('agentJobs', { sessionId: session.id })).toEqual([])
     expect(await storage.query('agentEvents', { sessionId: session.id })).toEqual([])
+  })
+})
+
+/**
+ * #921：`pendingAssetIds` 的**原子追加**。
+ *
+ * 这个字段有多个写者（三条投递路径追加、删 chip 整字段替换、发送后清理），
+ * 所以「追加」必须在事务里基于库里的最新值，而不是基于调用方的渲染快照：
+ * - 并发两次追加不能互相覆盖（#919 的丢写）；
+ * - 用户刚删掉的 id 不能因为一次迟到的追加而复活。
+ */
+describe('Agent 会话 · 待发送附件的原子追加', () => {
+  function deferred() {
+    let resolve!: () => void
+    const promise = new Promise<void>((res) => {
+      resolve = res
+    })
+    return { promise, resolve }
+  }
+
+  /**
+   * 把存储的**事务串行化**（生产的两条存储都串行：IndexedDB 的真事务 /
+   * sharedStorage 的 `transactionTail`；`createMemoryPlatform` 的事务只是失败回滚、
+   * 不排队）。`hold` 用来把「武装之后的第一笔写回」卡住，制造确定的交错。
+   */
+  function serializedStorage(
+    base: StoragePort,
+    hold?: { armed: boolean; used: boolean; gate: Promise<void> },
+  ): StoragePort {
+    let tail: Promise<unknown> = Promise.resolve()
+    return {
+      ...base,
+      transaction: (tables, fn) => {
+        const run = tail.then(() =>
+          base.transaction(tables, (tx) =>
+            fn({
+              ...tx,
+              put: async (table, row) => {
+                // 只在「武装之后」的第一笔写回上卡一次：建会话与消息迁移也会写，
+                // 那些必须照常放行，否则测试会在准备阶段就把自己锁死。
+                if (hold?.armed && !hold.used && table === 'agentSessions') {
+                  hold.used = true
+                  await hold.gate
+                }
+                return tx.put(table, row)
+              },
+            }),
+          ),
+        )
+        tail = run.then(
+          () => undefined,
+          () => undefined,
+        )
+        return run
+      },
+    }
+  }
+
+  it('★ 并发两次追加：两条都落库，同一 id 只留一条', async () => {
+    const gate = deferred()
+    const hold = { armed: false, used: false, gate: gate.promise }
+    const s = createAgentSessionStore(
+      serializedStorage(createMemoryPlatform().storage, hold),
+    )
+    const a = await s.create({ projectId: 'p1', channelId: 'c1', model: 'm1' })
+
+    hold.armed = true
+    const first = s.appendPendingAssetIds(a.id, ['img-1', 'img-1'])
+    // 让第一次真的进到事务里、卡在写回之前
+    await Promise.resolve()
+    const second = s.appendPendingAssetIds(a.id, ['img-2'])
+    gate.resolve()
+
+    const [one, two] = await Promise.all([first, second])
+    // 第一次只看到它自己那条（去重后一条）
+    expect(one?.pendingAssetIds).toEqual(['img-1'])
+    // 第二次进事务时读到的是第一次已提交的值 —— 这正是「不丢写」的判据
+    expect(two?.pendingAssetIds).toEqual(['img-1', 'img-2'])
+    expect((await s.get(a.id))?.pendingAssetIds).toEqual(['img-1', 'img-2'])
+  })
+
+  it('★ 删 chip 之后到达的追加，不许复活已删的 id', async () => {
+    const s = store()
+    const a = await s.create({ projectId: 'p1', channelId: 'c1', model: 'm1' })
+    await s.updateFields(a.id, { pendingAssetIds: ['keep', 'deleted'] })
+    /** 渲染快照（旧值）—— 修前投递路径就是拿它拼整份列表 */
+    const staleSnapshot = ['keep', 'deleted']
+
+    // 用户删掉 'deleted' 那枚 chip：真实路径是整字段替换（composer → patchSession）
+    await s.updateFields(a.id, { pendingAssetIds: ['keep'] })
+    // 追加此刻才落地（比如投递的文件刚好导入完）
+    const next = await s.appendPendingAssetIds(a.id, ['fresh'])
+
+    expect(next?.pendingAssetIds).toEqual(['keep', 'fresh'])
+    expect(next?.pendingAssetIds).not.toContain('deleted')
+    // 反证：旧写法 `[...staleSnapshot, 'fresh']` 会把已经删掉的 id 带回来
+    expect([...staleSnapshot, 'fresh']).toContain('deleted')
+  })
+
+  it('会话不存在时返回 null；空追加不写入', async () => {
+    const storage = createMemoryPlatform().storage
+    const s = createAgentSessionStore(storage)
+    expect(await s.appendPendingAssetIds('missing', ['img-1'])).toBeNull()
+
+    const a = await s.create({ projectId: 'p1', channelId: 'c1', model: 'm1' })
+    expect((await s.appendPendingAssetIds(a.id, []))?.pendingAssetIds).toBeUndefined()
+    expect((await s.appendPendingAssetIds(a.id, ['  ']))?.pendingAssetIds).toBeUndefined()
   })
 })
