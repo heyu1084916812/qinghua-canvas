@@ -113,7 +113,7 @@ import { useAgentSteeringController } from './useAgentSteeringController'
 import { useAgentSessionLifecycle } from './useAgentSessionLifecycle'
 import { useAgentSessionActionsController } from './useAgentSessionActionsController'
 import { useAgentTaskPlanController } from './useAgentTaskPlanController'
-import { runAgentInitialLoad } from './agentInitialLoad'
+import { useAgentInitialLoadController } from './useAgentInitialLoadController'
 import { useAgentSkillsController } from './useAgentSkillsController'
 import { AgentSessionRuntimeState } from './agentSessionRuntime'
 import {
@@ -671,82 +671,29 @@ export function AgentPanel({
     [skills.builtinSkills, skills.userSkills],
   )
   /** 载入会话列表；没有就按默认模型建一个（设计文档 §8「新建会话用默认模型」） */
-  useEffect(() => {
-    let alive = true
-    void trackRun(async () => {
-      /**
-       * 渠道 store 是应用级单例、挂载时统一 load；但**新建画布页**这条路径
-       * 可能先于 load 完成就读 enabledChannels —— 那一刻 enabled 为空，
-       * 新会话会带着空渠道开出来，第一句话就报「还没选模型」。
-       * 这里补一次 await load（幂等），把时序缝上。
-       */
-      const versionBeforeLoad = selectionVersionRef.current
-      await channels.load()
-      if (
-        !alive ||
-        currentIdRef.current !== null ||
-        selectionVersionRef.current !== versionBeforeLoad
-      ) {
-        return
-      }
-      await runAgentInitialLoad({
-        isAlive: () => alive,
-        currentIdRef,
-        selectionVersionRef,
-        refresh,
-        loadReviewModel: () => presets.loadAgentReviewModel(),
-        loadCanvasReview: () => presets.loadAgentCanvasReview(),
-        setReviewModel: setAgentReviewModel,
-        setCanvasReview: setAgentCanvasReview,
-        getSession: sessions.get,
-        createSession: async (canCommit) => {
-          /**
-           * 用**刚刚读到的**渠道，而不是本次渲染闭包里的 `enabled`。
-           */
-          const liveChannels = channels.getState().channels
-          const liveOptions =
-            fallbackModelOptionsForChannels(liveChannels)
-          const saved = await presets.loadAgentDefault()
-          if (!canCommit()) return null
-          const savedModel = logicalModelOf(
-            saved?.model ?? '',
-            liveChannels,
-          )
-          return sessions.create({
-            projectId,
-            channelId: '',
-            model: defaultModelFor(liveOptions.chat, savedModel),
-            imageModel: liveOptions.image[0] ?? '',
-            videoModel: liveOptions.video[0] ?? '',
-          })
-        },
-        removeSession,
-        setList,
-        setCurrent: (session) => setCurrent(session),
-        setMessages,
-        /** 孤儿会话清理失败：提示一次（模块里已做有界重试），并记一条带 sessionId 的日志。 */
-        notifyCleanupFailure: (message) => store.notify(message, 'error'),
-        logCleanupFailure: ({ sessionId, attempts, error }) =>
-          platform.logger.log(
-            'warn',
-            '[agent] initial session cleanup failed',
-            { sessionId, attempts, error: errText(error) },
-          ),
-      })
-    }).catch((error) => {
-      if (
-        alive &&
-        !(error instanceof TaskLifecycleClosedError)
-      ) {
-        store.notify(`Agent 会话读取失败：${errText(error)}`, 'error')
-      }
-    })
-    return () => {
-      alive = false
-    }
-    // 依赖只列 projectId：这里做的是「项目换了就重建会话列表」，
-    // 把 refresh / sessions 列进来会让它在每次保存后重跑，把正在进行的对话打断
-  }, [projectId, trackRun])
+  useAgentInitialLoadController({
+    projectId,
+    trackRun,
+    loadChannels: channels.load,
+    liveChannels: () => channels.getState().channels,
+    currentIdRef,
+    selectionVersionRef,
+    refresh,
+    presets,
+    setReviewModel: setAgentReviewModel,
+    setCanvasReview: setAgentCanvasReview,
+    getSession: sessions.get,
+    createSession: sessions.create,
+    fallbackModelOptions: fallbackModelOptionsForChannels,
+    logicalModelOf,
+    defaultModelFor,
+    removeSession,
+    setList,
+    setCurrent,
+    setMessages,
+    notify: (message, tone) => store.notify(message, tone ?? 'error'),
+    logWarning: (message, detail) => platform.logger.log('warn', message, detail),
+  })
 
   const sessionActions = useAgentSessionActionsController({
     current,

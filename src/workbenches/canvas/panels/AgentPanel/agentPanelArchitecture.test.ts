@@ -17,9 +17,9 @@ import { describe, expect, it } from 'vitest'
  * 不是「把阈值调大」。
  *
  * 调节奏：按「该刀实测 + 40」定值，之后每刀同理——阈值始终贴着实测走，留出的 40 行
- * 只够接一刀，不够养回一个胖文件。当前 2126 = #885b 接线后实测 2086 + 40。
+ * 只够接一刀，不够养回一个胖文件。当前 1874 = #897 初始加载控制器拆出后实测 1834 + 40。
  */
-const AGENT_PANEL_MAX_LINES = 1929
+const AGENT_PANEL_MAX_LINES = 1874
 
 /**
  * `.ts` 下沉模块里允许出现的 hook 调用（模块名 → 理由）。
@@ -439,35 +439,44 @@ describe('toolCtx 的调用即取闭包', () => {
 })
 
 /**
- * 初始加载的孤儿清理端口接线。
+ * 初始加载的孤儿清理端口接线（面板 → 控制器 → 模块）。
  *
  * ⚠️ 这是**源码级**快照，不是行为验证：真正「失败会不会提示」由
- * `agentInitialLoad.test.ts` 的假端口用例证明；这里只防「有人把端口从面板
- * call site 上删掉 / 又加回一条内联 warn」这种静默回退。
+ * `agentInitialLoad.test.ts`（模块层）与 `useAgentInitialLoadController.test.ts`
+ * （控制器层，端口计数）证明；这里只防「端口被删 / 又加回一条内联 warn」这种静默回退。
  */
 describe('初始加载孤儿清理的接线快照', () => {
-  it('面板把两个端口都接上：提示走 store.notify(error)，日志带 sessionId', () => {
-    expect(PANEL_SOURCE).toContain(
-      "notifyCleanupFailure: (message) => store.notify(message, 'error')",
+  const controller = () => {
+    const source = CONTROLLER_MODULES['./useAgentInitialLoadController.ts']
+    expect(source, '没找到 useAgentInitialLoadController.ts').toBeTruthy()
+    return source ?? ''
+  }
+
+  it('控制器把两个端口接进 runAgentInitialLoad：提示走 error，日志带 sessionId', () => {
+    const source = controller()
+    expect(source).toContain(
+      "notifyCleanupFailure: (message) => input.notify(message, 'error')",
     )
-    expect(PANEL_SOURCE).toMatch(
-      /logCleanupFailure:\s*\(\{\s*sessionId,\s*attempts,\s*error\s*\}\)\s*=>\s*platform\.logger\.log\(\s*'warn',\s*'\[agent\] initial session cleanup failed',\s*\{\s*sessionId,\s*attempts,\s*error:\s*errText\(error\)\s*\},?\s*\)/,
+    expect(source).toMatch(
+      /logCleanupFailure:\s*\(\{\s*sessionId,\s*attempts,\s*error\s*\}\)\s*=>\s*input\.logWarning\(\s*'\[agent\] initial session cleanup failed',\s*\{\s*sessionId,\s*attempts,\s*error:\s*errText\(error\),?\s*\},?\s*\)/,
     )
   })
 
-  it('两个端口都传进 runAgentInitialLoad 的那次调用里', () => {
-    const call = PANEL_SOURCE.indexOf('runAgentInitialLoad({')
-    const notify = PANEL_SOURCE.indexOf('notifyCleanupFailure:')
-    const log = PANEL_SOURCE.indexOf('logCleanupFailure:')
-    expect(call).toBeGreaterThan(-1)
-    expect(notify).toBeGreaterThan(call)
-    expect(log).toBeGreaterThan(call)
+  it('面板把控制器要的两个出口接到 store.notify(error) 与 platform.logger(warn)', () => {
+    expect(PANEL_SOURCE).toContain(
+      "notify: (message, tone) => store.notify(message, tone ?? 'error'),",
+    )
+    expect(PANEL_SOURCE).toContain(
+      "logWarning: (message, detail) => platform.logger.log('warn', message, detail),",
+    )
   })
 
   it('不再有内联 warn：清理失败只经端口收口，不会记两条日志', () => {
     expect(PANEL_SOURCE).not.toContain('outcome.cleanupError')
     const occurrences =
-      PANEL_SOURCE.match(/\[agent\] initial session cleanup failed/g) ?? []
+      `${PANEL_SOURCE}\n${controller()}`.match(
+        /\[agent\] initial session cleanup failed/g,
+      ) ?? []
     expect(occurrences).toHaveLength(1)
   })
 })
