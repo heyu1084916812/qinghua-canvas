@@ -10,6 +10,13 @@
   最终模型变化时才写（先 remember 到 ref 再落库）；上下文素材只留 `image/*`。`toolCtx()` 必须每次重建，
   任何 per-session 缓存都会让「批准后才执行」的工具看到发消息那一刻的旧快照。
 
+- **对队列项做任何动作前必须判 `activeTurnId`**：在飞项仍留在 `queuedTurns` 里（`claimNextQueuedTurn` 只写标记不摘项），
+  「引导」这类入口漏判会导致**同一句话执行两遍、双倍扣费**。
+- **收口顺序：transition 要兜底，settle 无条件执行**。`transitionSessionJob` 抛错会打崩整个收口函数、连返回值都拿不到；
+  而 error 态下停止按钮不可用 ⇒ 活动锁泄漏 = 会话永久 busy，无手动恢复路径。
+- **`pendingAssetIds` 可以丢写，但附件不会丢**：发送真相是正文 chip（`visualNodeIds = union(pendingAssetIds, mentions)`）。
+  **不许**在控制器里加本地写链修它（会把用户刚删的 id 复活）；正解是 store 级原子 append。
+
 - **队列结算失败必须有兜底**：`finishQueuedTurn(false)` 抛错会让 `activeTurnId` 残留，而
   `claimNextQueuedTurn` 在 `activeTurnId` 非空时返回 null ⇒ 该会话队列永久停摆。必须"重试一次 →
   `releaseActiveTurn` 兜底 → 无论成败 `clearQueueDrain`"，并验证**随后真的能再领到**那条 turn。

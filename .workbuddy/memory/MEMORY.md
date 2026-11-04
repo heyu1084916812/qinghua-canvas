@@ -1,5 +1,21 @@
 # CanvasFlow（轻画）项目记忆
 
+### 引导 × 在飞队列项 / 确认收口跳过结算 / 附件丢写（2026-11-04，#914/#915/#916/#919）
+
+- **"队列项在飞时仍在 `queuedTurns` 里"是个反复咬人的前提**：`claimNextQueuedTurn` 只写 `activeTurnId`、不摘项，
+  所以**任何"对队列项做动作"的入口都必须自己判断 `activeTurnId === turnId`**。这次栽在「引导」上——
+  同一句话被 pump 发一次、又被 steer 注入一次，**双倍扣费**。#912 的停摆、#914 的重复执行，根子是同一个。
+- **收口里"先转 Job 再结算"的顺序必须给 transition 兜底**：`transitionSessionJob` 抛错会把整个函数打崩、
+  **连返回值都拿不到**，`settleSessionOutcome` 永远不执行 → 内存活动锁泄漏 → 会话永久 busy。
+  而 **error 态下"停止"按钮不可用**（`AgentComposerPane.tsx:654-666` 只在 thinking/toolRunning/executing 渲染），
+  **没有手动恢复路径**。正确顺序：transition 包 try/catch → **settle 无条件执行且自己再包一层** → 再决定返回值。
+- **`pendingAssetIds` 是渲染快照读-改-写，会丢写——但不会丢附件**：真正的真相是**正文 chip**
+  （`agentTurnRequest` 里 `visualNodeIds = union(pendingAssetIds, 正文 mentions)`）。**别在控制器里加写链**——
+  这个字段还有别的写者（删 chip、发送后清空），本地 rebase 会把用户刚删的 id 复活，等于拿 P3 换新 bug。
+  正解是 store 级原子 `appendPendingAssetIds`。
+- **"真 bug"要按后果分级**：静默丢弃 / 永久卡死 / 重复执行（重复扣费）——**重复执行比前两类更贵**，
+  但它不会表现为"报错"，所以审计时最容易漏。判据要包含它。
+
 ### 那条来历不明的 `hi`：查清了，**不是代码发的**（2026-11-04）
 
 - **结论**：外部输入（人，或仓库外的自动化）在测试等待窗口里敲进去的。**不是我们的代码多发消息**——
