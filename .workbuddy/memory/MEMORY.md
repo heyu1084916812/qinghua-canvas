@@ -1,5 +1,18 @@
 # CanvasFlow（轻画）项目记忆
 
+### 浮球 Y 重夹 + tool context 纯拼装（2026-11-04，对账 #888b/#893，`7593323` + `7a6426e`）
+
+- **"只比宽度"是几何 bug 的经典来源**：`shouldClampAgentOrbToSurface` 只比 viewport 宽度，纯高度变化
+  （拖下边框 / 任务栏变化）整条 clamp 被跳过，浮球跑出 surface 用户点不到。新增
+  `clampAgentOrbY(point, area, size)`，`resizeAgentShellForAreaChange` 的 `area` 参数**可选**：
+  **不传就不夹**（面板开合 / 同视口重新激活，#880 铁律：orb 连引用都不换），传了才夹 Y。
+- **只夹 Y 就别碰 X**：`clampAgentOrbY` 返回 `{ x: point.x, y: … }`，X 原样带过；宽度没变时重算
+  不许把用户摆好的位置平移。
+- **compose 收"已建好的东西"**：`composeAgentToolContext` 0 能力端口，只拼装 + 三个条件键。
+  面板剩下的 56 行是四个 `create*` 的端口字面量，那是宿主接线，不该硬塞进 builder。
+- **否决过 `useAgentToolContext`（25 端口换壳）**：端口一多，"哪几个必须调用即取"就看不出来了，
+  这比多 60 行危险得多。
+
 ### 工具上下文三段式 + autoRun 写入串行（2026-11-04，对账 #888a/#892，`d02f1fc` + `9e93417`）
 
 - **`taskPlan.save` 的三条顺序现在是可测的了**（`agentToolPlanPorts.ts`）：`updateFields → setList → setCurrent`；
