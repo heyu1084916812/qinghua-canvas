@@ -105,6 +105,11 @@
   确认卡必须用 `statusFor(target.id)` + target，A/B busy 隔离。活动等待最多 60×100ms；`trackRun` 同步 throw
   必须清 advancing 并返回 rejected Promise。`updateSessionFields` 返回 null 时不得 fallback、提前清成功或发送
   隐藏控制消息；只有落库成功后才清 live/status 并 sendText。切会话不取消旧目标，unmount 后停止后续写/发送。
+- **AgentModelSelectionController 只拥有模型派生与选择动作**：`useAgentModelSelectionController` 不得复制
+  Channel/Session/Canvas/sticky 真相；selectedModelOf 必须每次经 `getCanvasNodes()` + selection 实时读取。
+  pickModel/setModelKind 必须捕获 target sessionId，current 为空直接 no-op；写入按 `${sessionId}:${field}` 串行，
+  保证快速 A→B 最终 B，旧失败/晚回不能覆盖 B。pickModel 只清目标 route；setModelKind 只有 patch 返回非 null
+  成功后才 rememberStickyModel，失败/null 不写 sticky。模型目录、mention、shown/logical/default 只能有单份实现。
 - **AgentSessionActionsController 不绕过 lifecycle**：新建会话创建后必须走 `switchTo`，禁止直接
   `setCurrent`；改名和删除晚返回只在目标仍是当前时自动切换。两步删除必须保留活动/队列/确认中门禁；
   `sessions.remove` 成功前不得清 draft/runtime，删除落库后的 refresh / switch / fallback 失败必须清失效选择

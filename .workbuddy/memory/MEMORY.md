@@ -1,5 +1,18 @@
 # CanvasFlow（轻画）项目记忆
 
+### AgentModelSelectionController（2026-11-04，对账 #878，✅ 已独立验收，`5281184`）
+
+- `useAgentModelSelectionController` 只拥有模型目录派生与选择动作：custom/uncommon/global 清单、options、
+  mention、shown/logical、default、selectedModelOf、pickModel/setModelKind。Channel/Session/Canvas/sticky 仍是真相。
+- selectedModelOf 每次实时读 `getCanvasNodes()`，不得缓存 nodes/selection。pickModel 只清目标 route；
+  setModelKind 无 current no-op，只有 patch 返回非 null 成功后才写 sticky。
+- 模型写入按 `${sessionId}:${field}` 串行：快速 A→B 最终 B，A 失败/晚回不阻断也不覆盖 B。
+- `AgentPanel.tsx` **2669 → 2546 行**（净减少 123）；定向 **10/10**、AgentPanel **288/288**、
+  G735 **35/35**、G769 明暗 **39/39 ×2**、G865 **24/24**、全量 **4109 passed / 1 skipped**。
+- 真实页面 14 项清单、`gpt-6`→`GPT-6 Astra`、A→B 最终 `Luna`、A/B 隔离、写入 500 保留旧值；
+  1440×900 / 1024×700 明暗 8 张下拉截图通过。
+- P3：某字段 patch 永不 settle 会阻塞同字段后续选择；不设 timeout，避免误丢用户选择。
+
 ### AgentTaskPlanController（2026-11-04，对账 #877，✅ 已独立验收，`076190b`）
 
 - `useAgentTaskPlanController` 只拥有“直接下一步”的 per-session advancing Set 与 in-flight Promise Map；
