@@ -109,6 +109,7 @@ import { useAgentLoopDepsController } from './useAgentLoopDepsController'
 import { useAgentPrepareTurnController } from './useAgentPrepareTurnController'
 import { useAgentSkillChipReset } from './useAgentSkillChipReset'
 import { outcomeTurnOriginFor } from './agentOutcomeOrigin'
+import { useAgentPanelViewProps } from './useAgentPanelViewProps'
 import {
   useAgentConversationController,
   type AgentMessageReveal,
@@ -509,16 +510,9 @@ export function AgentPanel({
   const {
     draft,
     setDraft,
-    replaceDraft,
     openPicker,
     setOpenPicker,
-    editorRef,
-    composerRef,
     composerHeight,
-    composerResizing,
-    composerAvailableHeight,
-    beginComposerResize,
-    resizeComposerWithKeyboard,
     insertMention,
     cancelPendingAssetSync,
     writeDraftForSession,
@@ -737,17 +731,6 @@ export function AgentPanel({
     notify: store.notify,
   })
   sessionActionsResetRef.current = sessionActions.resetForSessionSwitch
-  const {
-    renaming,
-    titleDraft,
-    confirmDelete,
-    setTitleDraft,
-    cancelRename,
-    startRename,
-    commitRename,
-    deleteSession,
-    newSession,
-  } = sessionActions
 
   const toolCtx = useCallback(
     (
@@ -1579,159 +1562,92 @@ export function AgentPanel({
         })()
       : undefined
 
-  return (
-    <AgentPanelView
-      current={current}
-      openPicker={openPicker}
-      headerProps={{
-        sessions: list,
-        current,
-        renaming,
-        titleDraft,
-        pickerOpen: openPicker === 'agent-session',
-        confirmDelete,
-        onTitleDraftChange: setTitleDraft,
-        onCommitRename: () =>
-          runPromiseDetached(commitRename(), '重命名失败'),
-        onCancelRename: cancelRename,
-        onToggleSessionPicker: () =>
-          setOpenPicker(
-            openPicker === 'agent-session' ? null : 'agent-session',
-          ),
-        onClosePicker: () => setOpenPicker(null),
-        onSwitchSession: (session) => void switchTo(session),
-        onNewSession: () =>
-          runPromiseDetached(newSession(), '新建会话失败'),
-        onStartRename: startRename,
-        onDeleteSession: () =>
-          runPromiseDetached(deleteSession(), '删除会话失败'),
-        onOpenSettings,
-        onClose,
-      }}
-      conversationProps={{
-        current,
-        status,
-        items,
-        visibleItems,
-        latestProcessIndex,
-        streamingTextIndex,
-        liveActivities,
-        liveProcess,
-        runTasks,
-        copiedKey,
-        expanded,
-        hashOfNode,
-        thumbOf,
-        currentTurnHasProcess,
-        latestUserStartedAt,
-        pendingPlan,
-        pendingTaskStepId,
-        advancingTaskPlan,
-        scrollRef,
-        showJumpToLatest,
-        queueMenuId,
-        queueMenuPosition,
-        editingQueueId,
-        editingQueueTurn,
-        editingQueueText,
-        onConversationScroll,
-        onCopyReply: (key, text) => void copyReply(key, text),
-        onRetry: retry,
-        onToggleStep: toggleStep,
-        onAdvanceToNext: () => {
-          if (!current) return
-          runPromiseDetached(
-            advanceTaskPlan(current),
-            '推进任务计划失败',
-          )
-        },
-        onContinueTask: () =>
-          runPromiseDetached(continueTask(), '继续任务失败'),
-        onConfirm: () =>
-          runPromiseDetached(confirm(), '确认执行失败'),
-        onCancel: () =>
-          runPromiseDetached(cancel(), '取消任务失败'),
-        onJumpToLatest: jumpToLatest,
-        onGuideQueuedTurn: (turn) =>
-          runPromiseDetached(guideQueuedTurn(turn), '转为引导失败'),
-        onRemoveQueued: (turnId) =>
-          runPromiseDetached(removeQueued(turnId), '移出队列失败'),
-        onQueueMenuIdChange: setQueueMenuId,
-        onQueueMenuPositionChange: setQueueMenuPosition,
-        onBeginQueueEdit: beginQueueEdit,
-        onCommitQueueEdit: () =>
-          runPromiseDetached(commitQueueEdit(), '保存队列编辑失败'),
-        onEditingQueueIdChange: setEditingQueueId,
-        onEditingQueueTextChange: setEditingQueueText,
-        onResumeQueue: () =>
-          runPromiseDetached(resumeQueue(), '恢复队列失败'),
-      }}
-      composerProps={{
-        current,
-        status,
-        deliveryMode,
-        draft,
-        composerHeight,
-        composerResizing,
-        openPicker,
-        shownModel,
-        chatModelOptions,
-        modelOptionsByKind,
-        globalImageModels,
-        globalVideoModels,
-        mentionedModels,
-        graph,
-        libraryAssets,
-        allSkills,
-        skillLabel,
-        skillFavs,
-        skills,
-        thumbVersion,
-        editorRef,
-        composerRef,
-        fileRef,
-        skillFileRef,
-        skillDirRef,
-        composerAvailableHeight,
-        beginComposerResize,
-        resizeComposerWithKeyboard,
-        replaceDraft,
-        send,
-        stop: () => runPromiseDetached(stop(), '停止任务失败'),
-        attachFiles: (files) =>
-          runPromiseDetached(attachFiles(files), '添加素材失败'),
-        addFromLibrary: (hash) =>
-          runPromiseDetached(addFromLibrary(hash), '添加素材失败'),
-        pickModel: (name) =>
-          runPromiseDetached(pickModel(name), '保存模型设置失败'),
-        setModelKind: (kind, value) =>
-          runPromiseDetached(
-            setModelKind(kind, value),
-            '保存模型设置失败',
-          ),
-        setSkill: (id) =>
-          runPromiseDetached(setSkill(id), '保存技能设置失败'),
-        toggleSkillFavorite: (id) =>
-          runPromiseDetached(
-            toggleSkillFavorite(id),
-            '保存技能收藏失败',
-          ),
-        openSkillLibrary,
-        importSkills: (files) =>
-          runPromiseDetached(importSkills(files), '导入技能失败'),
-        patchSession: patchSessionDetached,
-        setAutoRun: (value) =>
-          runPromiseDetached(setAutoRun(value), '保存自动执行设置失败'),
-        insertMention,
-        setDraft,
-        setOpenPicker,
-        thumbOf,
-        channels,
-        library,
-      }}
-      onDismissPicker={() => setOpenPicker(null)}
-      onDropFiles={(files) =>
-        runPromiseDetached(attachFiles(files), '添加素材失败')}
-    />
-  )
+  /** 视图 props 的装配（字段与取值见 `useAgentPanelViewProps`）。 */
+  const viewProps = useAgentPanelViewProps({
+    current,
+    openPicker,
+    setOpenPicker,
+    sessions: list,
+    sessionActions,
+    switchTo,
+    onOpenSettings,
+    onClose,
+    runPromiseDetached,
+    status,
+    items,
+    visibleItems,
+    latestProcessIndex,
+    streamingTextIndex,
+    liveActivities,
+    liveProcess,
+    runTasks,
+    copiedKey,
+    expanded,
+    hashOfNode,
+    thumbOf,
+    currentTurnHasProcess,
+    latestUserStartedAt,
+    pendingPlan,
+    pendingTaskStepId,
+    advancingTaskPlan,
+    scrollRef,
+    showJumpToLatest,
+    queueMenuId,
+    queueMenuPosition,
+    editingQueueId,
+    editingQueueTurn,
+    editingQueueText,
+    onConversationScroll,
+    copyReply,
+    retry,
+    toggleStep,
+    advanceTaskPlan,
+    continueTask,
+    confirm,
+    cancel,
+    jumpToLatest,
+    guideQueuedTurn,
+    removeQueued,
+    setQueueMenuId,
+    setQueueMenuPosition,
+    beginQueueEdit,
+    commitQueueEdit,
+    setEditingQueueId,
+    setEditingQueueText,
+    resumeQueue,
+    deliveryMode,
+    composerController,
+    shownModel,
+    chatModelOptions,
+    modelOptionsByKind,
+    globalImageModels,
+    globalVideoModels,
+    mentionedModels,
+    graph,
+    libraryAssets,
+    allSkills,
+    skillLabel,
+    skillFavs,
+    skills,
+    thumbVersion,
+    fileRef,
+    skillFileRef,
+    skillDirRef,
+    send,
+    stop,
+    attachFiles,
+    addFromLibrary,
+    pickModel,
+    setModelKind,
+    setSkill,
+    toggleSkillFavorite,
+    openSkillLibrary,
+    importSkills,
+    patchSession: patchSessionDetached,
+    setAutoRun,
+    channels,
+    library,
+  })
+
+  return <AgentPanelView {...viewProps} />
 }
