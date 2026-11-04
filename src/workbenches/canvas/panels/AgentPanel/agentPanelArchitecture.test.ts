@@ -1,0 +1,301 @@
+import { describe, expect, it } from 'vitest'
+
+/**
+ * AgentPanel 的结构护栏。
+ *
+ * 只读源码、只做断言，不改任何实现。目的只有一个：**拆分成果不许回弹**。
+ * - 行数棘轮：`AgentPanel.tsx` 只能变小，想调高阈值请先拆分。
+ * - 下沉模块不许带 React 状态：`.ts` 里出现 hook 调用说明它其实是个组件/Hook。
+ * - 不许反向依赖：下沉模块不能反过来 import 面板本体。
+ * - 每个下沉模块都要有兄弟测试。
+ */
+
+/**
+ * `AgentPanel.tsx` 的行数上限。
+ *
+ * **每完成一刀就下调，只许降不许升。** 需要上调的话，答案永远是「继续拆」，
+ * 不是「把阈值调大」。
+ *
+ * 调节奏：当前 2260 是 A1 收尾时定的（当时实测 2258），只是**两刀之间的临时余量**，
+ * 不是永久上限。A2 落完后按「该刀实测 + 40」重新定值，之后每刀同理——阈值始终贴着
+ * 实测走，留出的 40 行只够接一刀，不够养回一个胖文件。
+ */
+const AGENT_PANEL_MAX_LINES = 2260
+
+/**
+ * `.ts` 下沉模块里允许出现的 hook 调用（模块名 → 理由）。
+ *
+ * 正常应当是空的：真的需要 React 状态就写成 `useAgent*.ts` 控制器。
+ * 加例外必须写清楚理由，否则护栏就变成了装饰。
+ */
+const REACT_STATE_EXCEPTIONS: Readonly<Record<string, string>> = {}
+
+/**
+ * 纯类型模块（模块名 → 为什么不需要兄弟测试）。
+ *
+ * 这些文件只有 `import type` / `export interface` / `export type`，**没有任何运行时导出**，
+ * 测无可测。既然不需要测试，就必须反过来钉住「它真的还是纯类型」——往里面加一个
+ * `export function` 或值导入，下面的断言会当场红，逼你把逻辑挪进有测试的模块。
+ */
+const TYPE_ONLY_MODULES: Readonly<Record<string, string>> = {
+  'agentChatRoute.ts':
+    '只有 import type / interface / type alias，无运行时导出，测无可测',
+}
+
+/**
+ * `import.meta.glob` 只接受字面量模式（Vite 在编译期展开），所以这里必须逐个写死，
+ * 不能抽成 `readRaw(pattern)` 之类的辅助函数。
+ */
+const PANEL_SOURCE = (
+  import.meta.glob('./AgentPanel.tsx', {
+    eager: true,
+    query: '?raw',
+    import: 'default',
+  }) as Record<string, string>
+)['./AgentPanel.tsx']
+const AGENT_MODULES = import.meta.glob('./agent*.ts', {
+  eager: true,
+  query: '?raw',
+  import: 'default',
+}) as Record<string, string>
+const CONTROLLER_MODULES = import.meta.glob('./useAgent*.ts', {
+  eager: true,
+  query: '?raw',
+  import: 'default',
+}) as Record<string, string>
+
+const NAME_ONLY = (path: string): string => path.replace(/^.*\//, '')
+
+/**
+ * 行数口径（与文档一致）：`source.split('\n')`，文件以换行结尾时减 1
+ * —— 否则那个收尾换行会被 split 算成一个多余的空行。
+ */
+const countLines = (source: string): number => {
+  const parts = source.split('\n').length
+  return source.endsWith('\n') ? parts - 1 : parts
+}
+
+const isTestFile = (path: string): boolean => path.endsWith('.test.ts')
+
+const HOOK_CALL =
+  /\b(?:useState|useEffect|useCallback|useMemo|useRef)\s*\(/
+
+/** 只匹配指向面板本体的相对导入（`./AgentPanel`、`./AgentPanelView`、带 `.tsx` 也行）。 */
+const PANEL_REVERSE_IMPORT =
+  /['"]\.\/AgentPanel(?:View)?(?:\.tsx)?['"]/
+
+const moduleNames = (): string[] =>
+  [...Object.keys(AGENT_MODULES), ...Object.keys(CONTROLLER_MODULES)]
+    .filter((path) => !isTestFile(path))
+    .map(NAME_ONLY)
+    .sort()
+
+/** 去掉块注释与行注释。类型模块里没有别的地方会出现这两个记号，够用。 */
+const stripComments = (source: string): string =>
+  source.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/\/\/[^\n]*/g, ' ')
+
+/**
+ * 切顶层语句：只在**深度 0** 的 `;` 处、或「深度 0 换行后紧跟 import/export（或文件结束）」处断开。
+ *
+ * 括号与引号内部不断，所以 `| { ok: false; message: string }` 这种联合体不会被劈成两条。
+ * 只服务 `TYPE_ONLY_MODULES` 这种极窄输入，不做通用 TS 解析。
+ */
+const topLevelStatements = (source: string): string[] => {
+  const out: string[] = []
+  let current = ''
+  let depth = 0
+  let quote: string | null = null
+  for (let index = 0; index < source.length; index += 1) {
+    const char = source[index]
+    if (quote) {
+      current += char
+      if (char === '\\') {
+        current += source[index + 1] ?? ''
+        index += 1
+        continue
+      }
+      if (char === quote) quote = null
+      continue
+    }
+    if (char === '"' || char === "'" || char === '`') {
+      quote = char
+      current += char
+      continue
+    }
+    if (char === '{' || char === '(' || char === '[') depth += 1
+    else if (char === '}' || char === ')' || char === ']') depth -= 1
+    if (depth === 0 && char === ';') {
+      if (current.trim()) out.push(current.trim())
+      current = ''
+      continue
+    }
+    if (depth === 0 && char === '\n') {
+      const rest = source.slice(index + 1).replace(/^\s+/, '')
+      if (rest === '' || /^(?:import|export)\b/.test(rest)) {
+        if (current.trim()) out.push(current.trim())
+        current = ''
+        continue
+      }
+    }
+    current += char
+  }
+  if (current.trim()) out.push(current.trim())
+  return out
+}
+
+/** 纯类型模块里唯一合法的三种顶层语句。 */
+const TYPE_ONLY_STATEMENT =
+  /^(?:import\s+type\b|export\s+interface\b|export\s+type\b)/
+
+/** 返回某文件里**不属于**上述三种形态的顶层语句（即运行时语句）。 */
+const runtimeStatementsOf = (source: string): string[] =>
+  topLevelStatements(stripComments(source)).filter(
+    (statement) => !TYPE_ONLY_STATEMENT.test(statement),
+  )
+
+const moduleSources = (): Map<string, string> =>
+  new Map(
+    Object.entries(AGENT_MODULES)
+      .filter(([path]) => !isTestFile(path))
+      .map(([path, source]) => [NAME_ONLY(path), source]),
+  )
+
+describe('AgentPanel 结构护栏', () => {
+  it('行数口径自检：收尾换行不算一行', () => {
+    // 度量本身也要被钉住，否则「口径写错」会让棘轮悄悄失效。
+    expect(countLines('a')).toBe(1)
+    expect(countLines('a\n')).toBe(1)
+    expect(countLines('a\nb\n')).toBe(2)
+    expect(countLines('a\nb')).toBe(2)
+  })
+
+  it(`AgentPanel.tsx 不超过 ${AGENT_PANEL_MAX_LINES} 行`, () => {
+    expect(PANEL_SOURCE, '没读到 AgentPanel.tsx 原文').toBeTypeOf('string')
+    const lines = countLines(PANEL_SOURCE)
+    const over = lines - AGENT_PANEL_MAX_LINES
+    if (over > 0) {
+      throw new Error(
+        `AgentPanel 超预算 ${over} 行：拆分后请把阈值调回实际值 + 40 的余量，别调上去放水`,
+      )
+    }
+    expect(lines).toBeLessThanOrEqual(AGENT_PANEL_MAX_LINES)
+  })
+
+  it('下沉模块清单不是空的（glob 没读到文件时上面几条会假绿）', () => {
+    expect(Object.keys(AGENT_MODULES).length).toBeGreaterThan(10)
+    expect(Object.keys(CONTROLLER_MODULES).length).toBeGreaterThan(5)
+    // 钉一个已知模块，确认读到的确实是本目录的真实源码。
+    expect(moduleNames()).toContain('agentToolExecution.ts')
+  })
+
+  it('规则正则自检：认得真实写法，也不误伤近似名', () => {
+    expect(HOOK_CALL.test('const [open, setOpen] = useState(false)')).toBe(true)
+    expect(HOOK_CALL.test('const value = useMemo(() => 1, [])')).toBe(true)
+    expect(HOOK_CALL.test('const state = useStateLater(1)')).toBe(false)
+
+    expect(PANEL_REVERSE_IMPORT.test("import { x } from './AgentPanel'")).toBe(
+      true,
+    )
+    expect(
+      PANEL_REVERSE_IMPORT.test("import { x } from './AgentPanelView'"),
+    ).toBe(true)
+    expect(
+      PANEL_REVERSE_IMPORT.test("import { x } from './AgentPanelView.tsx'"),
+    ).toBe(true)
+    expect(
+      PANEL_REVERSE_IMPORT.test("import { x } from './agentPanelShutdown'"),
+    ).toBe(false)
+  })
+
+  it('所有 agent*.ts 都不带 React 状态', () => {
+    const offenders = Object.entries(AGENT_MODULES)
+      .filter(([path]) => !isTestFile(path))
+      .filter(([, source]) => HOOK_CALL.test(source))
+      .map(([path]) => NAME_ONLY(path))
+      .filter((name) => !(name in REACT_STATE_EXCEPTIONS))
+
+    expect(offenders).toEqual([])
+  })
+
+  it('所有 agent*.ts 都不反向 import 面板本体', () => {
+    const offenders = Object.entries(AGENT_MODULES)
+      .filter(([path]) => !isTestFile(path))
+      .filter(([, source]) => PANEL_REVERSE_IMPORT.test(source))
+      .map(([path]) => NAME_ONLY(path))
+
+    expect(offenders).toEqual([])
+  })
+
+  it('每个下沉模块都有同名兄弟测试（纯类型模块除外）', () => {
+    const existing = new Set(
+      [...Object.keys(AGENT_MODULES), ...Object.keys(CONTROLLER_MODULES)]
+        .map(NAME_ONLY)
+        .filter(isTestFile),
+    )
+    const missing = moduleNames().filter(
+      (name) =>
+        !(name in TYPE_ONLY_MODULES) &&
+        !existing.has(`${name.replace(/\.ts$/, '')}.test.ts`),
+    )
+
+    expect(missing).toEqual([])
+  })
+
+  it('纯类型模块确实只有类型语句，没有运行时导出', () => {
+    const sources = moduleSources()
+    const offenders = Object.entries(TYPE_ONLY_MODULES)
+      .map(([name]) => ({
+        name,
+        source: sources.get(name),
+      }))
+      .filter((item) => {
+        expect(item.source, `${item.name} 不在 agent*.ts 清单里`).toBeTypeOf(
+          'string',
+        )
+        return runtimeStatementsOf(item.source ?? '').length > 0
+      })
+      .map(
+        (item) =>
+          `${item.name}：${runtimeStatementsOf(item.source ?? '')[0].slice(0, 60)}`,
+      )
+
+    expect(offenders).toEqual([])
+  })
+
+  it('纯类型模块扫描器自检：放行三种类型语句，抓得到运行时语句', () => {
+    const legitimate = [
+      "import type { DirectRunRouteCandidate } from '../../../../state/shared/directRun'",
+      'export interface AgentChatRoute extends RoutedChatTarget {\n  routePlanId: string\n  candidates: DirectRunRouteCandidate[]\n}',
+      'export type ChatRoutePreparation =\n  | { ok: true; route: AgentChatRoute }\n  | { ok: false; message: string }',
+    ].join('\n\n')
+    expect(runtimeStatementsOf(legitimate)).toEqual([])
+
+    expect(runtimeStatementsOf('export const value = 1')).toHaveLength(1)
+    expect(runtimeStatementsOf("import { A } from './a'")).toHaveLength(1)
+    expect(
+      runtimeStatementsOf('export function build(): number {\n  return 1\n}'),
+    ).toHaveLength(1)
+    // 类型语句后面偷偷追加一条运行时语句也要被抓到。
+    expect(
+      runtimeStatementsOf(
+        'export interface X {\n  a: string\n}\nexport const b = 2',
+      ),
+    ).toHaveLength(1)
+    // 注释里提到 hook 不算违规。
+    expect(
+      runtimeStatementsOf('// 这里曾经有个 useState(\nexport type A = string'),
+    ).toEqual([])
+  })
+
+  it('纯类型模块清单本身有效：文件存在、理由非空', () => {
+    const known = new Set(moduleNames())
+    expect(
+      Object.keys(TYPE_ONLY_MODULES).filter((name) => !known.has(name)),
+    ).toEqual([])
+    expect(
+      Object.values(TYPE_ONLY_MODULES).every(
+        (reason) => reason.trim().length > 0,
+      ),
+    ).toBe(true)
+  })
+})
