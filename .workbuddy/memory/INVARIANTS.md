@@ -5,6 +5,11 @@
 
 ## Agent · 过程与落位
 
+- **生成配方上下文每次调用重建**：`agentToolRecipeContext.ts` 是无 React 纯构建器，优先级
+  explicit > planned > sessionPicked > sticky > selected；渠道只按**启用渠道**反查并跟随最终模型；sticky 只在
+  最终模型变化时才写（先 remember 到 ref 再落库）；上下文素材只留 `image/*`。`toolCtx()` 必须每次重建，
+  任何 per-session 缓存都会让「批准后才执行」的工具看到发消息那一刻的旧快照。
+
 - **outcome CAS 的生产接口不得带测试钩子**：`applyAgentOutcome()` 只在存储事务内检查 expected
   `messageRevision`。确定性并发测试必须包装测试侧 `StoragePort.transaction` 延迟旧写进入事务，
   期间让新回合 `saveMessages()` 递增版本；旧写放行后只能返回 `conflict`，不得覆盖新消息、
