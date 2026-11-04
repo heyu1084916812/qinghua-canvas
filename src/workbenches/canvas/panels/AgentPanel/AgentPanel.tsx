@@ -98,6 +98,7 @@ import { useAgentSendTurnController } from './useAgentSendTurnController'
 import { useAgentConfirmationController } from './useAgentConfirmationController'
 import { useAgentContinuationController } from './useAgentContinuationController'
 import { useAgentStopController } from './useAgentStopController'
+import { useAgentLoopDepsController } from './useAgentLoopDepsController'
 import type { AgentPrepareArgs } from './agentSendTurnRun'
 import {
   useAgentConversationController,
@@ -970,97 +971,37 @@ export function AgentPanel({
   )
 
   /**
-   * AgentLoop 依赖的装配入口。
+   * AgentLoop 依赖的装配入口（端口与取值时机见 `useAgentLoopDepsController`）。
    *
-   * 纯组装在 `agentLoopDeps.ts`；这里只把 store / channels / 会话 / Job / 工具执行器
-   * 和 per-session refs 接成端口。回合创建时的 controller 必须由调用方显式传入。
+   * 纯组装仍在 `agentLoopDeps.ts`；回合创建时的 controller 必须由调用方显式传入。
    */
-  const loopDeps = useCallback(
-    (args: {
-      session: AgentSession
-      operationId: string
-      toolMode?: 'native' | 'json'
-      visualNodeIds?: readonly string[]
-      onProgress?: (messages: readonly ChatMessage[]) => void
-      turnTools?: readonly ToolDeclaration[]
-      turnController?: AbortController
-    }): AgentLoopDeps => {
-      const { session } = args
-      return assembleAgentLoopDeps(
-        {
-          store,
-          channels,
-          platform: { storage: platform.storage, assets: platform.assets },
-          modelRoute,
-          routeExecution,
-          sessions,
-          jobs,
-          reviewModel,
-          canvasReviewEnabled,
-          viewport,
-          executeToolWithLedger,
-          toolCtx,
-          nodeRunStates: () => execution.nodeStates,
-          abortSignalFor: (sessionId) =>
-            abortRefs.current.get(sessionId)?.signal,
-          cachedChatRoute,
-          commitChatRoute,
-          contextTraceFor: (sessionId) =>
-            contextTraceRef.current.get(sessionId),
-          planAliasesFor: (sessionId) =>
-            planAliasesRef.current.get(sessionId),
-          setPlanAliases: (sessionId, aliases) => {
-            planAliasesRef.current.set(sessionId, aliases)
-          },
-          turnToolsFor: (sessionId) =>
-            turnToolsRef.current.get(sessionId),
-          setTurnTools: (sessionId, tools) => {
-            turnToolsRef.current.set(sessionId, tools)
-          },
-          deliveredSteersFor: (sessionId) =>
-            deliveredSteersRef.current.get(sessionId) ?? new Set<string>(),
-          setDeliveredSteers: (sessionId, ids) => {
-            deliveredSteersRef.current.set(sessionId, ids)
-          },
-          appendLiveProcessFor,
-          setLiveActivityFor,
-          setStatusFor,
-        },
-        {
-          session,
-          operationId: args.operationId,
-          toolMode: args.toolMode ?? 'native',
-          visualNodeIds: args.visualNodeIds ?? [],
-          onProgress: args.onProgress,
-          turnTools: args.turnTools ?? activeAgentTools,
-          turnController: args.turnController,
-          abortSignalFor: (sessionId) =>
-            abortRefs.current.get(sessionId)?.signal,
-        },
-      )
-    },
-    [
-      channels,
-      cachedChatRoute,
-      commitChatRoute,
-      modelRoute,
-      reviewModel,
-      canvasReviewEnabled,
-      activeAgentTools,
-      viewport,
-      toolCtx,
-      store,
-      platform,
-      sessions,
-      jobs,
-      execution,
-      executeToolWithLedger,
-      routeExecution,
-      appendLiveProcessFor,
-      setLiveActivityFor,
-      setStatusFor,
-    ],
-  )
+  const loopDeps = useAgentLoopDepsController({
+    store,
+    channels,
+    platform,
+    modelRoute,
+    routeExecution,
+    sessions,
+    jobs,
+    reviewModel,
+    canvasReviewEnabled,
+    viewport,
+    executeToolWithLedger,
+    toolCtx,
+    execution,
+    cachedChatRoute,
+    commitChatRoute,
+    abortRefs,
+    contextTraceRef,
+    planAliasesRef,
+    turnToolsRef,
+    deliveredSteersRef,
+    appendLiveProcessFor,
+    setLiveActivityFor,
+    setStatusFor,
+    activeAgentTools,
+    assemble: assembleAgentLoopDeps,
+  })
 
   const applySessionSnapshot = useCallback((next: AgentSession) => {
     if (next.messageRevision !== undefined) {

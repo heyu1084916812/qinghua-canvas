@@ -19,7 +19,7 @@ import { describe, expect, it } from 'vitest'
  * 调节奏：按「该刀实测 + 40」定值，之后每刀同理——阈值始终贴着实测走，留出的 40 行
  * 只够接一刀，不够养回一个胖文件。当前 2126 = #885b 接线后实测 2086 + 40。
  */
-const AGENT_PANEL_MAX_LINES = 1988
+const AGENT_PANEL_MAX_LINES = 1929
 
 /**
  * `.ts` 下沉模块里允许出现的 hook 调用（模块名 → 理由）。
