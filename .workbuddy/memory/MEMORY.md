@@ -1,5 +1,20 @@
 # CanvasFlow（轻画）项目记忆
 
+### AgentToolRecipeContext（2026-11-04，对账 #882，✅ 已独立验收，`9f9d81e`）
+
+- 真正的优先级是代码里那条：**explicit > planned > sessionPicked > sticky > selected**。任务描述里常把 `planned`
+  漏掉，但它在 `preferredGeneratedModel` 里仍排在 sessionPicked 之上；重构时照抄输入顺序，别按印象重排。
+- `recipeForGenerated` 只按**启用渠道**反查，查不到返回 undefined（保持渠道默认配方）；
+  `explicitRecipeForGenerated` 查不到时仍返回 `{ channelId: '', model }`。两条路径语义不同，不能合并。
+- sticky 写入有条件：只有最终模型 ≠ 上次记住的才写；先 `rememberStickyModel`（ref，本轮立刻生效）再
+  `sessions.updateFields`（落库，重开还在）；没有 session 对象时只记 ref，不落库。
+- **getter 不能缓存**：上下文按 `toolCtx()` 每次调用创建，状态全走 getter 读 ref。缓存 per-session map 会让
+  「批准后才执行」的工具看到发消息那一刻的旧快照。
+- 上下文素材只喂 `image/*`，未知 MIME 有意丢弃；`categoryOfModel` 对 audio/unknown 仍返回 undefined。
+- `AgentPanel.tsx` **2403 → 2338 行**（净减 65）；定向 **26/26**、AgentPanel **344/344**、全量
+  **4165 passed / 1 skipped**；`npm run check` 通过。
+- P3：`selectedModelOf` 仍读当前画布选中而非 per-session 快照；sticky 落库 fire-and-forget，失败时内存可能领先持久层。
+
 ### AgentSteeringController（2026-11-04，对账 #881，✅ 已独立验收，`3ed1bf7`）
 
 - `useAgentSteeringController` 只做 guideDraft / guideQueuedTurn 端口化；SessionStore 的 pendingSteers/queuedTurns/

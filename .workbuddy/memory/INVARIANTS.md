@@ -119,6 +119,11 @@
   必须保持 remove→apply→cancel→settle→send；草稿路径保持附件回落 queue、settle 后 send、正常 enqueueSteer 后 apply，
   且仅在目标仍是 current 时清草稿。`sessionForQueuedTurn` 必须传递冻结 model/imageModel/videoModel/skill/autoRun；
   sendText 至多一次。事务失败补偿未实现，不得在文档中写成已保证。
+- **AgentToolRecipeContext 只做纯构建**：`agentToolRecipeContext.ts` 不得读 React 状态、Store 或闭包快照，
+  所有状态必须经调用方传入的 getter 现取；`AgentPanel` 每次 `toolCtx()` 创建一份，禁止按 session 缓存。
+  优先级固定 explicit > planned > sessionPicked > sticky > selected（`planned` 不能被跳过）；渠道只按启用渠道
+  反查并跟随最终模型；sticky 仅模型变化时写，先 `rememberStickyModel` 再落库，无会话对象只记 ref；上下文素材
+  只留 `image/*`；音频/未知类别仍必须返回 undefined。
 - **Agent 浮球只在视口变化时按 surface 夹取**：首次激活或 viewport 宽度真实变化才 surface-only clamp；同视口面板
   开合/设置页返回只能重算 panel width，orb 对象与坐标不得移动。viewport token 跨 activation cleanup 保留；
   activation settle 必须按激活时捕获的 shouldClampFinal 决定，不得无条件清 token 或无条件 surface clamp。
