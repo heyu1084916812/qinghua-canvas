@@ -59,6 +59,8 @@ $Evidence = Join-Path $Repo ".playwright-verify/$HashTag-$Name"
 New-Item -ItemType Directory -Force -Path $Evidence | Out-Null
 
 $script:Results = New-Object System.Collections.ArrayList
+# `-SmokeGroups a,b,c` 在 -File 调用下会是一整串，这里统一拆开
+$SmokeGroups = @($SmokeGroups -split ',' | Where-Object { $_ -ne '' } | ForEach-Object { $_.Trim() })
 function Add-Result([string]$Step, [bool]$Ok, [string]$Detail) {
   [void]$script:Results.Add([pscustomobject]@{ Step = $Step; Ok = $Ok; Detail = $Detail })
   $tag = if ($Ok) { 'PASS' } else { 'FAIL' }
