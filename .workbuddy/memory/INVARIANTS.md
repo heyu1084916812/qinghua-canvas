@@ -10,6 +10,11 @@
   最终模型变化时才写（先 remember 到 ref 再落库）；上下文素材只留 `image/*`。`toolCtx()` 必须每次重建，
   任何 per-session 缓存都会让「批准后才执行」的工具看到发消息那一刻的旧快照。
 
+- **收口 revision 走三层回退**：`persistedTurn.messageRevision → session.messageRevision → ref`，
+  第一层优先是因为收口要绑**落库成功那一次**的 revision；换成"发消息那一刻"会与存储层 CAS 对不上。
+- **提交/报数前必须在干净 checkout 验**：`gate-run.ps1 -HeadCheck <hash>`；**并发中间态的绿不算绿**，
+  且新工具必须用"已知红 + 已知绿"两个样本校准过才可信。
+
 - **`prepareTurn` 的快照口径**：`session/text/internalControl/signal` 点击瞬间值；`graph/projectId` 每次现取
   （一次调用会取两次快照）；其余依赖是渲染快照；`prepareRoute` 必须 `fresh=true`。
 - **浮球 clamp 只允许拖动时看到"含面板的 area"**：激活 / 重新激活 / window resize / ResizeObserver 一律用纯 surface；

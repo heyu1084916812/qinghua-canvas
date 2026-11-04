@@ -1,5 +1,18 @@
 # CanvasFlow（轻画）项目记忆
 
+### 收口 revision 的三层回退 + "并发中间态的绿不算绿"（2026-11-04，对账 #902）
+
+- **收口绑的是"落库后"的 revision**：`outcomeTurnOriginFor` 的回退链是
+  `persistedTurn.messageRevision → session.messageRevision → ref`。第一层不是多余的——
+  收口必须绑**落库成功那一次**的 revision，绑成"发消息那一刻"就会和存储层的 CAS 对不上。
+- **16 行语义不要塞进端口 bundle**：`handleOutcome` 那 20 个端口里，真正重要的是这 16 行 revision 回退；
+  分组要么每帧新建对象（四个下游回调全抖），要么 `useMemo` 把 14 个依赖列一遍（一行不省）。**结构性结论，不是口味。**
+- **并发中间态的绿不算绿**：`7677d85` 带着 `TS6133`（未使用的 `parseMentions` import），
+  而我提交前那次 `tsc=0` 跑在别人正在改的树上，取到瞬时状态。现在规矩：**提交前/报"可提交"前，
+  必须在干净 checkout 上验**——`gate-run.ps1 -HeadCheck <hash>`（worktree 检出 + 目录联接 node_modules + 只跑 tsc）。
+- **工具要用已知答案校准**：HeadCheck 上线时拿 `7677d85`（已知红）和 `30f5bd7`（已知绿）各跑一次，
+  前者必须红、后者必须绿。只看"输出 PASS"不算验证。
+
 ### prepareTurn 快照口径 + 浮球 clamp 真相 + 真实渠道验收（2026-11-04，#899/#900/M-REAL）
 
 - **`prepareTurn` 的快照口径（改之前先看这张表）**：`session` / `text` / `internalControl` / `signal` 是**点击瞬间值**；
