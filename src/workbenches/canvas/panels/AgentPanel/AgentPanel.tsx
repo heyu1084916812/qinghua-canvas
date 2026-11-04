@@ -95,6 +95,7 @@ import {
 } from '../../../../state/ui/agentCanvasReview'
 import { toConversation } from './conversation'
 import { createAgentToolRecipeContext } from './agentToolRecipeContext'
+import { createAgentToolExecution } from './agentToolExecution'
 import { isAdvanceTaskCommand } from './agentProcessText'
 import {
   useAgentConversationController,
@@ -136,10 +137,7 @@ import { assembleAgentLoopDeps } from './agentLoopDeps'
 import { continueAgentAutoConfirmations } from './agentAutoConfirmations'
 import { runAgentConfirmation } from './agentConfirmationRun'
 import { runAgentContinuation } from './agentContinuationRun'
-import {
-  settleAgentInterruption,
-  type AgentInterruptionSettlementResult,
-} from './agentInterruptSettlement'
+import { useAgentInterruptSettlementController } from './useAgentInterruptSettlementController'
 import { runAgentCanvasNodes } from './agentCanvasRun'
 import { useAgentRunPresentation } from './useAgentRunPresentation'
 import { previewOf } from './agentConfirmationPreview'
@@ -971,71 +969,50 @@ export function AgentPanel({
       inspirationRepository,
       memory,
       viewport,
+      runTrackedDetached,
     ],
   )
 
   /**
-   * 确认型工具只执行一次。
+   * 确认型工具只执行一次（回放 / needs_attention / 冲突语义见 `agentToolExecution.ts`）。
    *
-   * 工具结果写在同一 Job 的不可变事件流水里，应用崩溃或确认按钮被再次触发时：
-   * - 已完成：直接回放上次结果；
-   * - 已开始未完成：转 needs_attention，不自动重发；
-   * - 相同 callId 却换了参数：按失败处理，避免把两次不同操作混成一次。
+   * 这里只把 panel 的 controller / jobs / sessions / store 接成端口；
+   * 账本判断本身不读 React、不读单例，便于单测钉住每条分支。
    */
+  const toolExecution = useMemo(
+    () =>
+      createAgentToolExecution({
+        resolveJobId: (sessionId) =>
+          controller.jobId(sessionId) ??
+          jobs.active(sessionId).then((job) => job?.id),
+        getSession: (sessionId) => sessions.get(sessionId),
+        run: (input) => toolEffects.run(input),
+        notify: (message, tone) => store.notify(message, tone),
+        createBlockedError: AgentToolEffectBlockedError,
+      }),
+    [controller, jobs, sessions, store, toolEffects],
+  )
+
   const executeToolWithLedger = useCallback(
-    async (
+    (
       sessionId: string,
       request: AgentToolRequest,
       execute: () => Promise<unknown>,
-    ): Promise<unknown> => {
-      const jobId =
-        controller.jobId(sessionId) ??
-        (await jobs.active(sessionId))?.id
-      if (!jobId) {
-        return execute()
-      }
-      const latest = await sessions.get(sessionId)
-      const stepId = latest?.taskPlan?.currentStepId ?? 'unplanned'
-      const outcome = await toolEffects.run({
-        jobId,
-        stepId,
-        toolCallId: request.callId,
-        toolName: request.name,
-        args: request.args,
-        execute,
-      })
-      if (outcome.kind === 'completed') {
-        if (outcome.replayed) {
-          store.notify('已复用这次工具调用的持久结果，没有重复执行或扣费', 'info')
-        }
-        return outcome.result
-      }
-      if (outcome.kind === 'pending') {
-        throw new AgentToolEffectBlockedError(
-          outcome.reason,
-          'needs_attention',
-          outcome,
-        )
-      }
-      throw new AgentToolEffectBlockedError(
-        outcome.kind === 'conflict' ? outcome.reason : outcome.error,
-        'failed',
-        outcome,
-      )
-    },
-    [controller, jobs, sessions, store, toolEffects],
+    ): Promise<unknown> =>
+      toolExecution.executeWithLedger(sessionId, request, execute),
+    [toolExecution],
   )
 
   const executeConfirmedToolWithLedger = useCallback(
     (session: AgentSession, request: AgentToolRequest): Promise<unknown> =>
-      executeToolWithLedger(session.id, request, () =>
+      toolExecution.executeConfirmedWithLedger(session, request, (target) =>
         executeConfirmedTool(
           request.name,
           request.args,
-          toolCtx(originOf(viewport), session),
+          toolCtx(originOf(viewport), target),
         ),
       ),
-    [executeToolWithLedger, toolCtx, viewport],
+    [toolExecution, toolCtx, viewport],
   )
 
   /**
@@ -1596,94 +1573,37 @@ export function AgentPanel({
   /**
    * 用户主动取消 / 停止时唯一的收口。
    *
-   * 必须先 abort，再清持久化确认卡：否则迟到的 handleOutcome 可能在停止后
-   * 又把 pendingConfirmation 写回来。这里只结束当前任务，不续跑模型。
+   * 必须先 abort，再清持久化确认卡（顺序与所有权判定见
+   * `agentInterruptSettlement.ts`，origin 回退见 `agentInterruptOrigin.ts`）。
    */
-  const settleInterruptedSession = useCallback(
-    async (
-      session: AgentSession,
-      request: AgentToolRequest | undefined,
-      result: 'canceled' | 'interrupted',
-    ): Promise<AgentInterruptionSettlementResult> => {
-      const queueTurnId = activeQueueTurnOf(session.id)
-      const turnOrigin: AgentTurnOrigin = {
-        jobId:
-          currentTurnJobIdRef.current.get(session.id) ??
-          controller.jobId(session.id),
-        turnId: queueTurnId ??
-          currentTurnIdRef.current.get(session.id) ??
-          controller.turnId(session.id),
-        queueTurnId,
-        messageRevision:
-          session.messageRevision ??
-          currentTurnRevisionRef.current.get(session.id),
-      }
-      const settlement = await settleAgentInterruption({
-        session,
-        request,
-        result,
-        turnOrigin,
-        abortController: abortRefs.current.get(session.id),
-        isActivityActive: () =>
-          isSessionActivityActive(session.id),
-        turnMatchesActivity: (queueId, turnId) =>
-          turnMatchesSessionActivity(
-            session.id,
-            queueId,
-            turnId,
-          ),
-        queueTurnMatchesActivity: (queueId) =>
-          queueTurnMatchesSessionActivity(session.id, queueId),
-        clearQueueDrain: () => clearQueueDrain(session.id),
-        settleSession: sessions.settleInterruptedSession,
-        transitionSessionJob,
-        removeSteers: sessions.removeSteers,
-        finishQueuedTurn: controller.finishQueuedTurn,
-        releaseActivity: (queueId, turnId) =>
-          releaseSessionActivity(
-            session.id,
-            queueId,
-            turnId,
-          ),
-        isCurrentSession: () =>
-          currentIdRef.current === session.id,
-        deletePerSessionRefs: (sessionId) => {
-          abortRefs.current.delete(sessionId)
-          deliveredSteersRef.current.delete(sessionId)
-          inFlightConfirmationRef.current.delete(sessionId)
-          currentTurnIdRef.current.delete(sessionId)
-          currentTurnJobIdRef.current.delete(sessionId)
-          currentTurnRevisionRef.current.delete(sessionId)
-        },
-        applySessionSnapshot,
-        setMessages,
-        clearLiveActivities: () =>
-          clearLiveActivitiesFor(session.id),
-        clearLiveProcess: () =>
-          clearLiveProcessFor(session.id),
-        clearRunTasks: () => clearRunTasksFor(session.id),
-        setStatus: setStatusFor,
-      })
-      if (settlement.cleanupError) {
-        store.notify(
-          `停止任务时清理状态失败：${errText(settlement.cleanupError)}`,
-          'error',
-        )
-      }
-      return settlement
+  const settleInterruptedSession = useAgentInterruptSettlementController({
+    controller,
+    activeQueueTurnOf,
+    currentIdRef,
+    refs: {
+      abort: abortRefs,
+      deliveredSteers: deliveredSteersRef,
+      inFlightConfirmation: inFlightConfirmationRef,
+      currentTurnId: currentTurnIdRef,
+      currentTurnJobId: currentTurnJobIdRef,
+      currentTurnRevision: currentTurnRevisionRef,
     },
-    [
-      applySessionSnapshot,
-      clearLiveActivitiesFor,
-      clearLiveProcessFor,
-      clearRunTasksFor,
-      controller,
-      sessions,
-      setStatusFor,
-      store,
-      transitionSessionJob,
-    ],
-  )
+    isActivityActive: isSessionActivityActive,
+    turnMatchesActivity: turnMatchesSessionActivity,
+    queueTurnMatchesActivity: queueTurnMatchesSessionActivity,
+    clearQueueDrain,
+    settleSession: sessions.settleInterruptedSession,
+    transitionSessionJob,
+    removeSteers: sessions.removeSteers,
+    releaseActivity: releaseSessionActivity,
+    applySessionSnapshot,
+    setMessages,
+    clearLiveActivities: clearLiveActivitiesFor,
+    clearLiveProcess: clearLiveProcessFor,
+    clearRunTasks: clearRunTasksFor,
+    setStatus: setStatusFor,
+    notify: store.notify,
+  })
 
   const { guideQueuedTurn, guideDraft } =
     useAgentSteeringController({
