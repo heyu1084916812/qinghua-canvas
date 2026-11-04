@@ -145,4 +145,40 @@ describe('useAgentSkillChipReset', () => {
     const work = h.runPromiseDetached.mock.calls[0]![0] as Promise<unknown>
     await expect(work).rejects.toBe(failure)
   })
+
+  it('技能被摘掉再重新选上同名技能、草稿里从没出现过 chip → 不清', () => {
+    const h = harness({ draft: '' })
+    const { update } = render(h.input)
+
+    // 技能被摘掉：ref 归零
+    update({ ...h.input, current: session('s1'), draft: '' })
+    // 又选回同一个技能，但草稿里从来没有 chip
+    update({ ...h.input, current: session('s1', 'skill-1'), draft: '写个方案' })
+
+    expect(h.setSkill).not.toHaveBeenCalled()
+    expect(h.runPromiseDetached).not.toHaveBeenCalled()
+  })
+
+  it('A→B→A 往返：回来时 chip 已不在草稿 → 不清（prev 已被 B 覆盖）', () => {
+    const h = harness({ draft: `写个方案 ${chip()}` })
+    const { update } = render(h.input)
+
+    // 去 B：ref 被 B 覆盖
+    update({ ...h.input, current: session('s2', 'skill-1'), draft: '' })
+    // 回 A：prev.sessionId 是 B，不算"看见过 A 的 chip"
+    update({ ...h.input, current: session('s1', 'skill-1'), draft: '写个方案' })
+
+    expect(h.setSkill).not.toHaveBeenCalled()
+    expect(h.runPromiseDetached).not.toHaveBeenCalled()
+  })
+
+  it('草稿里只有别的技能的 chip（当前技能从未出现）→ 不清', () => {
+    const h = harness({ draft: `写个方案 ${chip('skill-2')}` })
+    const { update } = render(h.input)
+
+    update({ ...h.input, draft: '写个方案' })
+
+    expect(h.setSkill).not.toHaveBeenCalled()
+    expect(h.runPromiseDetached).not.toHaveBeenCalled()
+  })
 })

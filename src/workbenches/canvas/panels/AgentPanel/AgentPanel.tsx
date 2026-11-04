@@ -108,6 +108,7 @@ import { useAgentStopController } from './useAgentStopController'
 import { useAgentLoopDepsController } from './useAgentLoopDepsController'
 import { useAgentPrepareTurnController } from './useAgentPrepareTurnController'
 import { useAgentSkillChipReset } from './useAgentSkillChipReset'
+import { outcomeTurnOriginFor } from './agentOutcomeOrigin'
 import {
   useAgentConversationController,
   type AgentMessageReveal,
@@ -149,9 +150,6 @@ import { runAgentCanvasNodes } from './agentCanvasRun'
 import { useAgentRunPresentation } from './useAgentRunPresentation'
 import { previewOf } from './agentConfirmationPreview'
 import { originOf, viewportWorldOf } from './agentPanelViewHelpers'
-import {
-  parseMentions,
-} from '../../text/MentionEditor'
 
 /**
  * 画布右侧的 Agent 对话窗（设计文档 §7 / §8）。
@@ -1038,22 +1036,18 @@ export function AgentPanel({
     applySessionSnapshot,
     setStatusFor,
     refresh,
-    turnOriginFor: (session, persistedTurn) => {
-      const queueTurnId = activeQueueTurnOf(session.id)
-      return {
-        jobId:
-          currentTurnJobIdRef.current.get(session.id) ??
-          controller.jobId(session.id),
-        turnId:
-          queueTurnId ??
-          currentTurnIdRef.current.get(session.id) ??
-          controller.turnId(session.id),
-        queueTurnId,
-        messageRevision: persistedTurn?.messageRevision ??
-          session.messageRevision ??
-          currentTurnRevisionRef.current.get(session.id),
-      }
-    },
+    turnOriginFor: (session, persistedTurn) =>
+      outcomeTurnOriginFor({
+        session,
+        persistedTurn,
+        refs: {
+          currentTurnJobId: currentTurnJobIdRef,
+          currentTurnId: currentTurnIdRef,
+          currentTurnRevision: currentTurnRevisionRef,
+        },
+        controller,
+        activeQueueTurnOf,
+      }),
   })
 
   /**
