@@ -31,6 +31,7 @@ param(
   [int]$StorePort = 28792,
   [string]$SmokeBase = 'http://127.0.0.1:1420',
   [switch]$PreflightOnly,
+  [switch]$SkipStatic,
   [switch]$KeepStore,
   [switch]$AllowDirty
 )
@@ -168,6 +169,10 @@ function Invoke-GateStep([string]$Step, [string]$LogName, [scriptblock]$Body) {
   return @{ Code = $code; Contaminated = $false; Seconds = [Math]::Round($sw.Elapsed.TotalSeconds, 1) }
 }
 
+# ---------- B 档静态步骤（-SkipStatic 可跳过，只跑 UI 组） ----------
+if ($SkipStatic) {
+  Add-Result '静态步骤' $true '跳过（-SkipStatic）：tsc / 定向 / 全量单测 / build / diff --check'
+} else {
 # ---------- B1 tsc ----------
 $r = Invoke-GateStep 'tsc' 'tsc.log' { param($log) npx tsc --noEmit *> $log }
 if ($r.Contaminated) { Finish 2 }
@@ -223,6 +228,7 @@ if ($r.Contaminated) { Finish 2 }
 $size = (Get-Item (Join-Path $Evidence 'diff-check.log')).Length
 Add-Result 'diff --check' ($r.Code -eq 0 -and $size -eq 0) "exit=$($r.Code)，输出 $size 字节"
 if ($r.Code -ne 0 -or $size -ne 0) { Finish 1 }
+}
 
 # ---------- A 档：UI ----------
 if ($Ui) {
@@ -267,7 +273,10 @@ if ($Ui) {
     foreach ($group in $SmokeGroups) {
       foreach ($theme in @('light', 'dark')) {
         $label = "$group-$theme"
-        $imgBefore = @(Get-ChildItem (Join-Path $Repo '.playwright-verify') -Filter '*.png' -ErrorAction SilentlyContinue | ForEach-Object { $_.FullName })
+        # 截图基线按「路径 -> mtime:length」记录：smoke 用固定文件名覆盖，纯文件名差集永远为空
+        $imgBefore = @{}
+        Get-ChildItem (Join-Path $Repo '.playwright-verify') -Filter '*.png' -ErrorAction SilentlyContinue |
+          ForEach-Object { $imgBefore[$_.FullName] = "$($_.LastWriteTimeUtc.Ticks):$($_.Length)" }
         $env:SMOKE_STORE_BASE = "http://127.0.0.1:$port"
         $env:SMOKE_BASE = $SmokeBase
         $env:SMOKE_ONLY = $group
@@ -283,9 +292,13 @@ if ($Ui) {
         $sf = if ($sm.Success) { [int]$sm.Groups[2].Value } else { -1 }
         $st = if ($sm.Success) { [int]$sm.Groups[3].Value } else { -1 }
         $imgDir = Join-Path $Evidence $label
+        if (Test-Path -LiteralPath $imgDir) { Remove-Item -LiteralPath $imgDir -Recurse -Force }
         New-Item -ItemType Directory -Force -Path $imgDir | Out-Null
         Get-ChildItem (Join-Path $Repo '.playwright-verify') -Filter '*.png' -ErrorAction SilentlyContinue |
-          Where-Object { $imgBefore -notcontains $_.FullName } |
+          Where-Object {
+            $key = "$($_.LastWriteTimeUtc.Ticks):$($_.Length)"
+            (-not $imgBefore.ContainsKey($_.FullName)) -or ($imgBefore[$_.FullName] -ne $key)
+          } |
           Copy-Item -Destination $imgDir -Force
         $shots = @(Get-ChildItem $imgDir -Filter '*.png').Count
         Add-Result "smoke:$label" ($r.Code -eq 0 -and $sf -eq 0 -and $st -gt 0) "$sp/$sf/$st，截图 $shots 张，$($r.Seconds)s"
@@ -298,6 +311,7 @@ if ($Ui) {
       Finish 2
     }
     if (-not $KeepStore) { Stop-Process -Id $store.Id -Force -ErrorAction SilentlyContinue }
+    Add-Result 'UI:exception' $false ("未预期异常：" + $_.Exception.Message + ' @ line ' + $_.InvocationInfo.ScriptLineNumber)
     Finish 1
   }
   if (-not $KeepStore) { Stop-Process -Id $store.Id -Force -ErrorAction SilentlyContinue }
