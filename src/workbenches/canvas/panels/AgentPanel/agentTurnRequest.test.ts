@@ -431,4 +431,35 @@ describe('prepareAgentTurnRequest', () => {
     expect(result.systemPrompt).toContain('确认品牌方向')
     expect(result.requestMode).toBe('complex_plan')
   })
+
+  /**
+   * #919 的兜底底座：附件账（`pendingAssetIds`）可能被并发投递整字段覆盖掉一条，
+   * 但只要正文里有 node chip，发送链路照样把该节点并进本轮视觉输入
+   * （`visualNodeIds = union(pendingAssetIds, 正文 node mentions)`）。
+   *
+   * 这条把「丢写 ≠ 丢附件」钉在机器上，是 #919 判 P3、不动实现的依据。
+   */
+  it('★★ 附件账少一条但正文有 chip：视觉输入仍然两条都在', async () => {
+    const { sessions, session } = await createSession({
+      // 模拟 #919 覆盖后的结果：img-a 已从账上丢掉
+      pendingAssetIds: ['img-b'],
+    })
+    const graph = graphOf([imageNode('img-a'), imageNode('img-b')])
+    const result = await prepareAgentTurnRequest(
+      inputFor({
+        sessions,
+        session,
+        graph,
+        text:
+          `${mentionToken('node', 'img-a', '图一')} ` +
+          `${mentionToken('node', 'img-b', '图二')} 各生成一张横版`,
+      }),
+    )
+
+    expect(result.kind).toBe('ready')
+    if (result.kind !== 'ready') return
+    expect(result.visualNodeIds).toEqual(['img-b', 'img-a'])
+    const last = (await sessions.messagesFor(session.id)).at(-1)
+    expect(last?.imageNodeIds).toEqual(['img-b', 'img-a'])
+  })
 })

@@ -137,6 +137,7 @@ function render(
 ): {
   viewRef: { current: Hook | null }
   renderer: TestRenderer.ReactTestRenderer
+  update: (next: AgentAttachmentsControllerInput) => void
 } {
   const viewRef: { current: Hook | null } = { current: null }
   function Probe() {
@@ -147,7 +148,13 @@ function render(
   act(() => {
     renderer = TestRenderer.create(createElement(Probe))
   })
-  return { viewRef, renderer }
+  return {
+    viewRef,
+    renderer,
+    update: (next) => {
+      act(() => renderer.update(createElement(Probe, next)))
+    },
+  }
 }
 
 describe('useAgentAttachmentsController', () => {
@@ -286,5 +293,228 @@ describe('useAgentAttachmentsController', () => {
 
     act(() => renderer.unmount())
     expect(revoke).toHaveBeenCalledTimes(3)
+  })
+
+  /**
+   * #919 标定结论（2026-11-04，先跑红再收口）：
+   *
+   * 三条投递路径都先读**渲染快照** `input.current.pendingAssetIds`、再整字段写回
+   * （`sessionStore.updateFields` = `{...latest, ...patch}`）。第二次投递若在第一次
+   * 写回之前发起，两次用的就是同一份旧基线 ⇒ **`pendingAssetIds` 只剩最后一条**
+   * （实测：文件导入 / 素材库 / 画布投递各丢一条，`['node-1']`+`['node-2']` → `['node-2']`）。
+   *
+   * 之所以**不**算"静默丢附件"：`insertMention` 在写会话**之前**就把 node chip 插进正文，
+   * 而发送链路 `prepareAgentTurnRequest` 取的是
+   * `visualNodeIds = union(pendingAssetIds, 正文里的 node mentions)`（`agentTurnRequest.ts:185-195`），
+   * chip 会把丢掉的 id 原样补回模型输入。下面这条钉的就是这个兜底底座：
+   * 两次快速投递时，**两条 chip 都必须进正文**（这条在改成 store 级原子 append 后仍然成立）。
+   */
+  function deferred() {
+    let resolve!: () => void
+    const promise = new Promise<void>((res) => {
+      resolve = res
+    })
+    return { promise, resolve }
+  }
+
+  /** 最小会话行：只保留被读写的那个字段，写入即整份覆盖（与真实 store 同语义）。 */
+  function table() {
+    return { ids: [] as string[] }
+  }
+
+  const files = [{ name: 'a.png', type: 'image/png' }] as unknown as FileList
+
+  it('★★ 两次快速投递：两条 chip 都进正文（pendingAssetIds 被覆盖时的兜底）', async () => {
+    const gate = deferred()
+    const row = table()
+    const patchSession = vi.fn(
+      async (patch: { pendingAssetIds: string[] }) => {
+        await gate.promise
+        row.ids = [...patch.pendingAssetIds]
+      },
+    )
+    const insertMention = vi.fn()
+    createAssetNode
+      .mockReturnValueOnce('node-1')
+      .mockReturnValueOnce('node-2')
+    const props = input({
+      current: { ...session, pendingAssetIds: [] },
+      patchSession,
+      insertMention,
+    })
+    const { viewRef } = render(props)
+
+    let first!: Promise<void>
+    act(() => {
+      first = viewRef.current!.attachFiles(files)
+    })
+    await act(async () => {
+      await vi.waitFor(() =>
+        expect(patchSession).toHaveBeenCalledTimes(1),
+      )
+    })
+
+    let second!: Promise<void>
+    act(() => {
+      second = viewRef.current!.attachFiles(files)
+    })
+    await act(async () => {
+      await vi.waitFor(() =>
+        expect(patchSession).toHaveBeenCalledTimes(2),
+      )
+    })
+
+    await act(async () => {
+      gate.resolve()
+      await first
+      await second
+    })
+
+    // 两次都写了会话（中间没有串行化）；实测最终行里只剩 ['node-2']（见上方结论）
+    expect(patchSession).toHaveBeenCalledTimes(2)
+    // 兜底底座：两条 chip 都在正文里，发送时会由 mentions 并回视觉输入
+    expect(insertMention.mock.calls.map((call) => call[1])).toEqual([
+      'node-1',
+      'node-2',
+    ])
+  })
+
+  it('★ 画布投递连发两次：两条 chip 同样都进正文', async () => {
+    const gate = deferred()
+    const patchSession = vi.fn(
+      async (_patch: { pendingAssetIds: string[] }) => {
+        await gate.promise
+      },
+    )
+    const patchSessionDetached = vi.fn(
+      (patch: { pendingAssetIds: string[] }) => {
+        void patchSession(patch)
+      },
+    )
+    const insertMention = vi.fn()
+    const props = input({
+      current: { ...session, pendingAssetIds: [] },
+      patchSession,
+      patchSessionDetached,
+      insertMention,
+    })
+    render(props)
+
+    const listener = subscribeHandoff.mock.calls[0]?.[1] as (
+      ids: readonly string[],
+    ) => void
+    act(() => listener(['n1']))
+    await act(async () => {
+      await vi.waitFor(() =>
+        expect(patchSession).toHaveBeenCalledTimes(1),
+      )
+    })
+    act(() => listener(['n2']))
+    await act(async () => {
+      await vi.waitFor(() =>
+        expect(patchSession).toHaveBeenCalledTimes(2),
+      )
+    })
+    await act(async () => {
+      gate.resolve()
+      await Promise.resolve()
+    })
+    expect(insertMention.mock.calls.map((call) => call[1])).toEqual([
+      'n1',
+      'n2',
+    ])
+  })
+
+  it('★ 投递中途切到 B：写的是发起时的 A（不串会话）', async () => {
+    const gate = deferred()
+    const rowA = table()
+    const rowB = table()
+    const patchA = vi.fn(
+      async (patch: { pendingAssetIds: string[] }) => {
+        await gate.promise
+        rowA.ids = [...patch.pendingAssetIds]
+      },
+    )
+    const patchB = vi.fn(
+      async (patch: { pendingAssetIds: string[] }) => {
+        rowB.ids = [...patch.pendingAssetIds]
+      },
+    )
+    createAssetNode.mockReturnValueOnce('node-1')
+    const propsA = input({
+      current: { ...session, id: 'session-A', pendingAssetIds: [] },
+      patchSession: patchA,
+    })
+    const propsB = input({
+      current: { ...session, id: 'session-B', pendingAssetIds: [] },
+      patchSession: patchB,
+    })
+    const { viewRef, update } = render(propsA)
+
+    let first!: Promise<void>
+    act(() => {
+      first = viewRef.current!.attachFiles(files)
+    })
+    await act(async () => {
+      await vi.waitFor(() => expect(patchA).toHaveBeenCalledTimes(1))
+    })
+
+    update(propsB)
+    await act(async () => {
+      gate.resolve()
+      await first
+    })
+    expect(patchB).not.toHaveBeenCalled()
+    expect(rowB.ids).toEqual([])
+    expect(rowA.ids).toEqual(['node-1'])
+  })
+
+  it('★ 画布投递中途切到 B：同样写回发起时的 A', async () => {
+    const gate = deferred()
+    const rowA = table()
+    const rowB = table()
+    const patchA = vi.fn(
+      async (patch: { pendingAssetIds: string[] }) => {
+        await gate.promise
+        rowA.ids = [...patch.pendingAssetIds]
+      },
+    )
+    const patchB = vi.fn(
+      async (patch: { pendingAssetIds: string[] }) => {
+        rowB.ids = [...patch.pendingAssetIds]
+      },
+    )
+    const propsA = input({
+      current: { ...session, id: 'session-A', pendingAssetIds: [] },
+      patchSession: patchA,
+      patchSessionDetached: (patch) => {
+        void patchA(patch)
+      },
+    })
+    const propsB = input({
+      current: { ...session, id: 'session-B', pendingAssetIds: [] },
+      patchSession: patchB,
+      patchSessionDetached: (patch) => {
+        void patchB(patch)
+      },
+    })
+    const { update } = render(propsA)
+
+    const listener = subscribeHandoff.mock.calls[0]?.[1] as (
+      ids: readonly string[],
+    ) => void
+    act(() => listener(['n1']))
+    await act(async () => {
+      await vi.waitFor(() => expect(patchA).toHaveBeenCalledTimes(1))
+    })
+
+    update(propsB)
+    await act(async () => {
+      gate.resolve()
+      await Promise.resolve()
+    })
+    expect(patchB).not.toHaveBeenCalled()
+    expect(rowB.ids).toEqual([])
+    expect(rowA.ids).toEqual(['n1'])
   })
 })
