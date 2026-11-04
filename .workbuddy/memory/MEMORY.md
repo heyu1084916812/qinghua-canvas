@@ -1,5 +1,22 @@
 # CanvasFlow（轻画）项目记忆
 
+### 那条来历不明的 `hi`：查清了，**不是代码发的**（2026-11-04）
+
+- **结论**：外部输入（人，或仓库外的自动化）在测试等待窗口里敲进去的。**不是我们的代码多发消息**——
+  这条如果成立就是要花钱的 bug，所以值得花力气证伪。
+- **自动发送路径全查过，没有一条能产出 `hi`**：`send` / `retry`（`useAgentPanelTurnModel.ts:517/521/545/547`，
+  且 `retry` 只重用**上一条用户消息文本**）、队列泵（`useAgentQueueController.ts:248`，文本来自队列项本身）、
+  发送执行体、引导、任务计划推进（发的是 `internalControl: true` 的系统句）、初始加载（`sessionStore.ts:561`
+  建会话时 `messages: []`）；用户消息的唯一写入点是 `agentTurnPersistence.ts:77` 的 `saveMessages`，
+  **每次发送都必须由上述某个用户动作驱动**。全仓搜 `hi` 字面量 → 0 命中。
+- **迁移也排除**：`migrateLegacyMessages` 存在（`sessionStore.ts:465-517`），但实测标记
+  `agent-messages.split.v1 = { status: complete, sessionCount: 0, messageCount: 0 }`——**一条都没搬**；
+  `.migration-state.json` 的 `sourceRoot: null` ⇒ 没有外部源库被导入。
+- **时间线（DB 直读）**：seq=0 是脚本 prompt（+0s）→ job1 在 +5s 因 workbuddy 上游 503 失败 →
+  **+277s 出现 seq=1 的 `hi`** → +277.2s 立刻创建 job2。277 秒的等待窗口里有人按了发送。
+- **教训**：真机测试窗口是**可交互**的，测试期间别人（包括用户本人在看界面）敲进去的东西会污染证据。
+  以后跑这类验证，要么锁输入、要么在报告里带上"窗口在这段时间可交互"的说明。
+
 ### 四条"伪 P3"的判定（2026-11-04，对账 #911，结论：**不修**，别再查一遍）
 
 - **`selectedModelOf` 读当前画布选中**（`useAgentModelSelectionController.ts:152+`、`useAgentPanelToolModel.ts:100`）：
