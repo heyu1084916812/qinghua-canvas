@@ -326,3 +326,215 @@ describe('useAgentAutoRunController', () => {
     expect(confirmLatest).not.toHaveBeenCalled()
   })
 })
+
+describe('useAgentAutoRunController / 同会话并发串行化', () => {
+  const reviewStatus = (): AgentPanelStatus => ({
+    kind: 'awaitingConfirm',
+    request: {
+      callId: 'call-review',
+      name: 'requestTaskConfirmation',
+      args: { purpose: 'review' },
+    },
+  })
+
+  it('两次快速切换：落库严格串行，最终值与最后一次操作一致', async () => {
+    const first = deferred<AgentSession | null>()
+    const second = deferred<AgentSession | null>()
+    let round = 0
+    const patchSession = vi.fn(() =>
+      round++ === 0 ? first.promise : second.promise,
+    )
+    const { viewRef } = render(input({ patchSession }))
+
+    let firstCall!: Promise<boolean>
+    let secondCall!: Promise<boolean>
+    act(() => {
+      firstCall = viewRef.current!.setAutoRun(true)
+      secondCall = viewRef.current!.setAutoRun(false)
+    })
+
+    // 乐观写：第二次点击立刻可见，不等落库
+    expect(viewRef.current!.autoRunFor('s1')).toBe(false)
+    // 串行：第一条还没落库，第二条 patch 不许发起
+    expect(patchSession).toHaveBeenCalledTimes(1)
+    expect(patchSession).toHaveBeenNthCalledWith(1, 's1', { autoRun: true })
+
+    // 先尝试 resolve 第二条（它还没发起）：不许影响第一条的结算
+    second.resolve(session('s1', false))
+    await act(async () => {
+      await Promise.resolve()
+    })
+    expect(patchSession).toHaveBeenCalledTimes(1)
+
+    await act(async () => {
+      first.resolve(session('s1', true))
+      await expect(firstCall).resolves.toBe(true)
+    })
+    expect(patchSession).toHaveBeenCalledTimes(2)
+    expect(patchSession).toHaveBeenNthCalledWith(2, 's1', { autoRun: false })
+
+    await act(async () => {
+      second.resolve(session('s1', false))
+      await expect(secondCall).resolves.toBe(true)
+    })
+    expect(viewRef.current!.autoRunFor('s1')).toBe(false)
+  })
+
+  it('第一次失败、第二次成功：最终是第二次的值，不被第一次回滚污染', async () => {
+    const first = deferred<AgentSession | null>()
+    const second = deferred<AgentSession | null>()
+    let round = 0
+    const patchSession = vi.fn(() =>
+      round++ === 0 ? first.promise : second.promise,
+    )
+    const { viewRef } = render(input({ patchSession }))
+
+    let firstCall!: Promise<boolean>
+    let secondCall!: Promise<boolean>
+    act(() => {
+      firstCall = viewRef.current!.setAutoRun(true)
+      secondCall = viewRef.current!.setAutoRun(false)
+    })
+
+    await act(async () => {
+      first.resolve(null)
+      await expect(firstCall).resolves.toBe(false)
+    })
+    // 第一次失败：不得把用户第二次的意图（false）冲掉
+    expect(viewRef.current!.autoRunFor('s1')).toBe(false)
+
+    await act(async () => {
+      second.resolve(session('s1', false))
+      await expect(secondCall).resolves.toBe(true)
+    })
+    expect(viewRef.current!.autoRunFor('s1')).toBe(false)
+  })
+
+  it('第一次成功、第二次失败：回滚到第一次落库的值，且不 confirm', async () => {
+    const first = deferred<AgentSession | null>()
+    const second = deferred<AgentSession | null>()
+    let round = 0
+    const patchSession = vi.fn(() =>
+      round++ === 0 ? first.promise : second.promise,
+    )
+    const confirmLatest = vi.fn(async () => undefined)
+    const { viewRef } = render(
+      input({ patchSession, confirmLatest, statusFor: reviewStatus }),
+    )
+
+    let firstCall!: Promise<boolean>
+    let secondCall!: Promise<boolean>
+    act(() => {
+      firstCall = viewRef.current!.setAutoRun(true)
+      secondCall = viewRef.current!.setAutoRun(false)
+    })
+
+    await act(async () => {
+      first.resolve(session('s1', true))
+      await expect(firstCall).resolves.toBe(true)
+    })
+    // 第一次成功照旧走自动确认（review 卡 + autoRun=true）
+    expect(confirmLatest).toHaveBeenCalledTimes(1)
+
+    await act(async () => {
+      second.resolve(null)
+      await expect(secondCall).resolves.toBe(false)
+    })
+    // 回滚到「上一次成功落库」的 true，而不是回到进这次 patch 前的 false
+    expect(viewRef.current!.autoRunFor('s1')).toBe(true)
+    // 失败不 confirm
+    expect(confirmLatest).toHaveBeenCalledTimes(1)
+  })
+
+  it('第一次成功、第二次 reject：同样回滚到第一次的值并原样抛错', async () => {
+    const boom = new Error('second write failed')
+    const first = deferred<AgentSession | null>()
+    const second = deferred<AgentSession | null>()
+    let round = 0
+    const patchSession = vi.fn(() =>
+      round++ === 0 ? first.promise : second.promise,
+    )
+    const { viewRef } = render(input({ patchSession }))
+
+    let firstCall!: Promise<boolean>
+    let secondCall!: Promise<boolean>
+    act(() => {
+      firstCall = viewRef.current!.setAutoRun(true)
+      secondCall = viewRef.current!.setAutoRun(false)
+    })
+
+    await act(async () => {
+      first.resolve(session('s1', true))
+      await expect(firstCall).resolves.toBe(true)
+    })
+
+    await act(async () => {
+      second.reject(boom)
+      await expect(secondCall).rejects.toBe(boom)
+    })
+    expect(viewRef.current!.autoRunFor('s1')).toBe(true)
+  })
+
+  it('同一值连点两次：旧请求失败不许把新请求成功后落库的值冲掉', async () => {
+    const first = deferred<AgentSession | null>()
+    const second = deferred<AgentSession | null>()
+    let round = 0
+    const patchSession = vi.fn(() =>
+      round++ === 0 ? first.promise : second.promise,
+    )
+    const { viewRef } = render(input({ patchSession }))
+
+    let firstCall!: Promise<boolean>
+    let secondCall!: Promise<boolean>
+    act(() => {
+      firstCall = viewRef.current!.setAutoRun(true)
+      secondCall = viewRef.current!.setAutoRun(true)
+    })
+
+    await act(async () => {
+      first.resolve(null)
+      await expect(firstCall).resolves.toBe(false)
+    })
+    // 旧请求失败：不能把最新意图（true）回滚成旧值 false
+    expect(viewRef.current!.autoRunFor('s1')).toBe(true)
+
+    await act(async () => {
+      second.resolve(session('s1', true))
+      await expect(secondCall).resolves.toBe(true)
+    })
+    expect(viewRef.current!.autoRunFor('s1')).toBe(true)
+  })
+
+  it('不同会话的写入互不排队', async () => {
+    const aPatch = deferred<AgentSession | null>()
+    const bPatch = deferred<AgentSession | null>()
+    const patchSession = vi.fn((sessionId: string) =>
+      sessionId === 'a' ? aPatch.promise : bPatch.promise,
+    )
+    const props = input({ current: session('a'), patchSession })
+    const { viewRef, update } = render(props)
+
+    let firstCall!: Promise<boolean>
+    act(() => {
+      firstCall = viewRef.current!.setAutoRun(true)
+    })
+    expect(patchSession).toHaveBeenCalledTimes(1)
+
+    update({ ...props, current: session('b') })
+    let secondCall!: Promise<boolean>
+    act(() => {
+      secondCall = viewRef.current!.setAutoRun(true)
+    })
+    // A 还挂着，B 不该被 A 的链卡住
+    expect(patchSession).toHaveBeenCalledTimes(2)
+
+    await act(async () => {
+      aPatch.resolve(session('a', true))
+      bPatch.resolve(session('b', true))
+      await expect(firstCall).resolves.toBe(true)
+      await expect(secondCall).resolves.toBe(true)
+    })
+    expect(viewRef.current!.autoRunFor('a')).toBe(true)
+    expect(viewRef.current!.autoRunFor('b')).toBe(true)
+  })
+})
