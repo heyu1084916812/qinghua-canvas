@@ -7,6 +7,7 @@ import {
   claimSessionActivity,
   isSessionActivityActive,
   releaseSessionActivity,
+  shouldDrainQueue,
 } from '../../../../features/canvas/agent/sessionActivity'
 import {
   useAgentQueueController,
@@ -261,5 +262,89 @@ describe('useAgentQueueController', () => {
     props.queuePumpRef.current(session.id)
     await new Promise((resolve) => setTimeout(resolve, 0))
     expect(claimNextQueuedTurn).not.toHaveBeenCalled()
+  })
+
+  /**
+   * #904 审计的落点：pump 里「领取 → 发送」之间所有失败点都必须有明确归宿。
+   * 这一条钉住最危险的那个：**发送失败时消息不许从队列消失**，且要有错误态。
+   */
+  it('★ 排队消息发送失败：消息留在队列（completed=false）、转错误态、只尝试一次', async () => {
+    const lifecycle = createTaskLifecycle()
+    const queued = {
+      id: 'turn-1',
+      text: '再生成一张',
+      createdAt: 1,
+      channelId: 'channel-1',
+      model: 'GPT-6 Astra',
+    }
+    const claimed = {
+      ...session,
+      queuedTurns: [queued],
+      activeTurnId: queued.id,
+    }
+    const finishQueuedTurn = vi.fn(async () => ({
+      ...session,
+      queuedTurns: [queued],
+    }))
+    const sendText = vi.fn(async () => {
+      throw new Error('网络断了')
+    })
+    const props = input({
+      controller: {
+        claimNextQueuedTurn: vi.fn(async () => ({
+          session: claimed,
+          turn: queued,
+        })),
+        finishQueuedTurn,
+      } as unknown as AgentController,
+      sendText,
+      trackRun: (work) => lifecycle.track(work),
+    })
+    let api: ReturnType<typeof useAgentQueueController> | null = null
+    function Probe() {
+      api = useAgentQueueController(props)
+      return createElement('span', null, 'ok')
+    }
+    renderToStaticMarkup(createElement(Probe))
+
+    await api!.resumeQueue()
+    await lifecycle.waitForIdle(100)
+
+    expect(sendText).toHaveBeenCalledTimes(1)
+    // 失败不销队：completed=false ⇒ 消息仍在 queuedTurns 里可重试
+    expect(finishQueuedTurn).toHaveBeenCalledWith(session.id, queued.id, false)
+    // 有明确错误态，不是静默吞掉
+    expect(props.setStatusFor).toHaveBeenCalledWith(session.id, {
+      kind: 'error',
+      message: '网络断了',
+    })
+    // 活动锁必须释放，否则这条会话的队列会被永久卡死
+    expect(isSessionActivityActive(session.id)).toBe(false)
+  })
+
+  it('★ 队首领取不到时不发送，并清掉自动续排标记', async () => {
+    const lifecycle = createTaskLifecycle()
+    const sendText = vi.fn(async () => undefined)
+    const props = input({
+      controller: {
+        claimNextQueuedTurn: vi.fn(async () => null),
+        finishQueuedTurn: vi.fn(async () => session),
+      } as unknown as AgentController,
+      sendText,
+      trackRun: (work) => lifecycle.track(work),
+    })
+    let api: ReturnType<typeof useAgentQueueController> | null = null
+    function Probe() {
+      api = useAgentQueueController(props)
+      return createElement('span', null, 'ok')
+    }
+    renderToStaticMarkup(createElement(Probe))
+
+    await api!.resumeQueue()
+
+    expect(sendText).not.toHaveBeenCalled()
+    expect(isSessionActivityActive(session.id)).toBe(false)
+    // 空队列不保留自动续排标记，避免空闲时反复空转
+    expect(shouldDrainQueue(session.id)).toBe(false)
   })
 })
