@@ -101,25 +101,52 @@ function render(props: AgentInitialLoadControllerInput): {
   }
 }
 
-/** 让挂起的 promise 链跑完（不进 act：这条链是旁路）。 */
-async function flush(times = 12): Promise<void> {
-  for (let tick = 0; tick < times; tick += 1) await Promise.resolve()
+/**
+ * 把 effect 里经 `trackRun` 投递的那条链抓出来，用它当同步点。
+ *
+ * 以前这里是 `await flush()` —— 固定等 12 个 microtask。那对**否定断言**是假绿的温床：
+ * 链如果没跑完，"refresh 没被调用" 照样成立。现在改成等真实的链结算（#927）。
+ */
+function withTracked(props: AgentInitialLoadControllerInput): {
+  props: AgentInitialLoadControllerInput
+  settled: () => Promise<void>
+} {
+  const tracked: Promise<unknown>[] = []
+  return {
+    props: {
+      ...props,
+      trackRun: <T,>(work: () => Promise<T>) => {
+        const task = props.trackRun(work)
+        tracked.push(task)
+        return task
+      },
+    },
+    /** 等所有已投递的链结算；期间若又投递了新链（effect 重跑），继续等。 */
+    settled: async () => {
+      let seen = -1
+      while (seen !== tracked.length) {
+        seen = tracked.length
+        await Promise.allSettled([...tracked])
+      }
+    },
+  }
 }
 
 describe('useAgentInitialLoadController', () => {
   it('守卫①：卸载（alive=false）后 load 完成也不再继续', async () => {
     const gate = deferred<void>()
     const refresh = vi.fn(async () => ({ rows: [], applied: true }))
-    const controller = render(
+    const tracked = withTracked(
       input({
         loadChannels: () => gate.promise,
         refresh,
       }),
     )
+    const controller = render(tracked.props)
 
     controller.unmount()
     gate.resolve()
-    await flush()
+    await tracked.settled()
 
     expect(refresh).not.toHaveBeenCalled()
   })
@@ -129,7 +156,7 @@ describe('useAgentInitialLoadController', () => {
     const currentIdRef = { current: null as string | null }
     const refresh = vi.fn(async () => ({ rows: [], applied: true }))
     const createSession = vi.fn(async () => session('created'))
-    render(
+    const tracked = withTracked(
       input({
         currentIdRef,
         loadChannels: async () => {
@@ -140,9 +167,10 @@ describe('useAgentInitialLoadController', () => {
         createSession,
       }),
     )
+    render(tracked.props)
 
     gate.resolve()
-    await flush()
+    await tracked.settled()
 
     expect(refresh).not.toHaveBeenCalled()
     expect(createSession).not.toHaveBeenCalled()
@@ -152,7 +180,7 @@ describe('useAgentInitialLoadController', () => {
     const gate = deferred<void>()
     const selectionVersionRef = { current: 0 }
     const refresh = vi.fn(async () => ({ rows: [], applied: true }))
-    render(
+    const tracked = withTracked(
       input({
         selectionVersionRef,
         loadChannels: async () => {
@@ -162,9 +190,10 @@ describe('useAgentInitialLoadController', () => {
         refresh,
       }),
     )
+    render(tracked.props)
 
     gate.resolve()
-    await flush()
+    await tracked.settled()
 
     expect(refresh).not.toHaveBeenCalled()
   })
@@ -172,7 +201,7 @@ describe('useAgentInitialLoadController', () => {
   it('建会话用的是 load 之后的实时渠道，而不是渲染时那份', async () => {
     let loaded = false
     const createSession = vi.fn(async () => session('created'))
-    render(
+    const tracked = withTracked(
       input({
         loadChannels: async () => {
           loaded = true
@@ -182,8 +211,9 @@ describe('useAgentInitialLoadController', () => {
         createSession,
       }),
     )
+    render(tracked.props)
 
-    await flush()
+    await tracked.settled()
 
     expect(createSession).toHaveBeenCalledTimes(1)
     expect(createSession).toHaveBeenCalledWith({
@@ -200,7 +230,7 @@ describe('useAgentInitialLoadController', () => {
     const createSession = vi.fn(async () => session('created'))
     const setReviewModel = vi.fn()
     const setCanvasReview = vi.fn()
-    render(
+    const tracked = withTracked(
       input({
         presets: {
           loadAgentReviewModel: async () => {
@@ -217,8 +247,9 @@ describe('useAgentInitialLoadController', () => {
         setCanvasReview,
       }),
     )
+    render(tracked.props)
 
-    await flush()
+    await tracked.settled()
 
     expect(refresh).toHaveBeenCalledTimes(1)
     expect(createSession).toHaveBeenCalledTimes(1)
@@ -233,7 +264,7 @@ describe('useAgentInitialLoadController', () => {
     const removeSession = vi.fn(async () => {
       throw new Error('cleanup failed')
     })
-    render(
+    const tracked = withTracked(
       input({
         currentIdRef,
         refresh: async () => ({ rows: [], applied: true }),
@@ -247,8 +278,9 @@ describe('useAgentInitialLoadController', () => {
         logWarning,
       }),
     )
+    render(tracked.props)
 
-    await flush(30)
+    await tracked.settled()
 
     expect(removeSession.mock.calls.length).toBeGreaterThan(1)
     expect(notify).toHaveBeenCalledTimes(1)
@@ -268,19 +300,25 @@ describe('useAgentInitialLoadController', () => {
     const setCurrent = vi.fn()
     const setMessages = vi.fn()
     const setList = vi.fn()
-    const controller = render(
+    let refreshStarted = false
+    const tracked = withTracked(
       input({
-        refresh: () => gate.promise,
+        refresh: () => {
+          refreshStarted = true
+          return gate.promise
+        },
         setCurrent,
         setMessages,
         setList,
       }),
     )
+    const controller = render(tracked.props)
 
-    await flush()
+    // 先确认链真的走到 refresh 并卡住，再卸载 —— 否则后半段是空转
+    await vi.waitFor(() => expect(refreshStarted).toBe(true))
     controller.unmount()
     gate.resolve({ rows: [session('head')], applied: true })
-    await flush()
+    await tracked.settled()
 
     expect(setCurrent).not.toHaveBeenCalled()
     expect(setMessages).not.toHaveBeenCalled()
@@ -292,7 +330,7 @@ describe('useAgentInitialLoadController', () => {
     const createSession = vi.fn(async () => session('created'))
     const setCurrent = vi.fn()
     const setMessages = vi.fn()
-    render(
+    const tracked = withTracked(
       input({
         refresh: async () => ({ rows: [head], applied: true }),
         getSession: async () => ({ ...head, messages: [] }),
@@ -301,8 +339,9 @@ describe('useAgentInitialLoadController', () => {
         setMessages,
       }),
     )
+    render(tracked.props)
 
-    await flush()
+    await tracked.settled()
 
     expect(createSession).not.toHaveBeenCalled()
     expect(setCurrent).toHaveBeenCalledWith(expect.objectContaining({ id: 'head' }))
@@ -312,7 +351,7 @@ describe('useAgentInitialLoadController', () => {
   it('读取会话失败：提示一次错误，不建会话', async () => {
     const createSession = vi.fn(async () => session('created'))
     const notify = vi.fn()
-    render(
+    const tracked = withTracked(
       input({
         refresh: async () => {
           throw new Error('list failed')
@@ -321,8 +360,9 @@ describe('useAgentInitialLoadController', () => {
         notify,
       }),
     )
+    render(tracked.props)
 
-    await flush()
+    await tracked.settled()
 
     expect(createSession).not.toHaveBeenCalled()
     expect(notify).toHaveBeenCalledTimes(1)

@@ -549,6 +549,7 @@ describe('useAgentSteeringController / guideQueuedTurn', () => {
     const cancelQueuedJob = vi.fn()
     const settleInterruptedSession = vi.fn()
     const sendText = vi.fn()
+    const removeQueuedTurn = vi.fn(async () => null)
     const { viewRef } = render(
       input({
         statusFor: () => confirmationStatus(),
@@ -556,7 +557,7 @@ describe('useAgentSteeringController / guideQueuedTurn', () => {
           id: 'job-1',
           status: 'queued',
         })),
-        removeQueuedTurn: vi.fn(async () => null),
+        removeQueuedTurn,
         cancelQueuedJob,
         settleInterruptedSession,
         sendText,
@@ -565,6 +566,12 @@ describe('useAgentSteeringController / guideQueuedTurn', () => {
     await act(async () => {
       await viewRef.current!.guideQueuedTurn(turn())
     })
+    /**
+     * #927：先证明路径**真的走到了**摘队列这一步 —— 否则下面三条 "没被调用"
+     * 在 guideQueuedTurn 提前 return（例如状态不可引导）时也会绿。
+     */
+    expect(removeQueuedTurn).toHaveBeenCalledTimes(1)
+    expect(removeQueuedTurn).toHaveBeenCalledWith('s1', 'turn-1')
     expect(cancelQueuedJob).not.toHaveBeenCalled()
     expect(settleInterruptedSession).not.toHaveBeenCalled()
     expect(sendText).not.toHaveBeenCalled()
@@ -696,10 +703,11 @@ describe('useAgentSteeringController / guideQueuedTurn', () => {
     const writeDraftForSession = vi.fn()
     const setDraft = vi.fn()
     const notify = vi.fn()
+    const sendText = vi.fn(async () => ({ kind: 'message' }))
     const { viewRef } = render(
       input({
         statusFor: () => confirmationStatus(),
-        sendText: vi.fn(async () => ({ kind: 'message' })),
+        sendText,
         writeDraftForSession,
         setDraft,
         notify,
@@ -708,6 +716,12 @@ describe('useAgentSteeringController / guideQueuedTurn', () => {
     await act(async () => {
       await viewRef.current!.guideQueuedTurn(turn())
     })
+    /** #927：先证明这次引导真的发出去了，再断言"没留下错误痕迹"。 */
+    expect(sendText).toHaveBeenCalledTimes(1)
+    expect(sendText).toHaveBeenCalledWith(
+      '把颜色调暖一些',
+      expect.objectContaining({ model: 'Frozen Model' }),
+    )
     expect(writeDraftForSession).not.toHaveBeenCalled()
     expect(setDraft).not.toHaveBeenCalled()
     expect(notify).not.toHaveBeenCalledWith(

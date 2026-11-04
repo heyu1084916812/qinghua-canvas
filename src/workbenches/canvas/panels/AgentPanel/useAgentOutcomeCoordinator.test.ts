@@ -99,16 +99,22 @@ describe('useAgentOutcomeCoordinator', () => {
       settleInterruptedConfirmation,
     })
 
-    await handle(
-      session,
-      {
-        kind: 'message',
-        text: '旧回合',
-        messages: [{ role: 'assistant', content: '旧回合' }],
-      },
-      undefined,
-      oldController,
-    )
+    /**
+     * #927：光断言"都没被调用"是假绿 —— 钩子整个抛错、或提前 return 都会满足。
+     * 断言返回值是 `ignored`，才证明它真的走到了"controller 已换人"那条分支。
+     */
+    await expect(
+      handle(
+        session,
+        {
+          kind: 'message',
+          text: '旧回合',
+          messages: [{ role: 'assistant', content: '旧回合' }],
+        },
+        undefined,
+        oldController,
+      ),
+    ).resolves.toBe('ignored')
 
     expect(applyOutcome).not.toHaveBeenCalled()
     expect(transition).not.toHaveBeenCalled()
