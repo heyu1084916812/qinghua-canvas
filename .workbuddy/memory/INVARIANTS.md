@@ -10,6 +10,17 @@
   最终模型变化时才写（先 remember 到 ref 再落库）；上下文素材只留 `image/*`。`toolCtx()` 必须每次重建，
   任何 per-session 缓存都会让「批准后才执行」的工具看到发消息那一刻的旧快照。
 
+- **工具账本调度只认端口**：`agentToolExecution.ts` 的 `createAgentToolExecution` 不读 React、不读单例，
+  错误类由 `createBlockedError` 端口传入。语义铁律：无 `jobId` 直接执行且**不查会话**；
+  `resolveJobId` 返回同步串时**不触发**回落查询；`pending` 一律 `needs_attention` + 原 outcome 透传；
+  `conflict` 取 `reason`、其余失败取 `error`；账本自身异常原对象上抛、不包装。
+- **中断收口 origin 必须现场组装**：`interruptOriginFor` 的三元回退要在任何 `await` 之前算完，
+  且 `session.messageRevision` 优先于 ref；`clearTurnRefs` 必须清满 6 张 per-session 表
+  （abort / deliveredSteers / inFlightConfirmation / currentTurnId / currentTurnJobId / currentTurnRevision）。
+  少一张就是"停止无效 / 确认卡复活 / 迟到 steer 串轮 / revision 屏障失效"。
+- **素材过滤只许一份实现**：`imageContextAssets()` 是 `image/*` 的唯一规则来源，
+  `contextAssetsForGenerated` 与 `runNodes` 都必须调它，不许再写内联 filter。
+
 - **outcome CAS 的生产接口不得带测试钩子**：`applyAgentOutcome()` 只在存储事务内检查 expected
   `messageRevision`。确定性并发测试必须包装测试侧 `StoragePort.transaction` 延迟旧写进入事务，
   期间让新回合 `saveMessages()` 递增版本；旧写放行后只能返回 `conflict`，不得覆盖新消息、

@@ -1,5 +1,23 @@
 # CanvasFlow（轻画）项目记忆
 
+### AgentToolResearch / Defaults / ContextAssets + 中断收口 + 工具账本（2026-11-04，对账 #883/#884/#885，`b178656` + `ad04976`）
+
+- **一条规则两份实现 = 隐患**：`image/*` 素材过滤原来在 `runNodes` 与 `contextAssetsForGenerated` 各写一份，
+  现在只有 `imageContextAssets()` 一份，两边都调它。以后见到同类"看起来一样的 filter"，优先收成一函数。
+- **账本调度的短路语义**：`controller.jobId(id) ?? (await jobs.active(id))?.id` 里，左边是同步串时**不能**
+  再去查 active（会多一次异步写竞争）。端口化后写成 `typeof x === 'string' ? x : await x`，有专门用例锁死。
+- **无 jobId 就不查会话**：账本协调器在 `!jobId` 分支直接 `execute()`，连 `sessions.get()` 都不调；改这里会
+  让"没 Job 的工具调用"多一次读库，且可能读到半写状态。
+- **中断 origin 的三元回退是业务口径**：`jobId = currentTurnJobIdRef ?? controller.jobId`、
+  `turnId = activeQueueTurnOf ?? currentTurnIdRef ?? controller.turnId`、
+  `messageRevision = session.messageRevision ?? currentTurnRevisionRef`。必须在 `await` 之前组装好；
+  挪到之后，用户 A 点停止再切 B 就会把 **B 的 Job** 标 canceled。
+- **6 张 per-session 表一张都不能少**：`abortRefs` / `deliveredSteers` / `inFlightConfirmation` /
+  `currentTurnId` / `currentTurnJobId` / `currentTurnRevision`。少 `inFlightConfirmation` → 停止后再点确认复活旧卡；
+  少 `deliveredSteers` → 迟到 steer 被当新一轮；少 `currentTurnRevision` → 下次 send 的 revision 屏障失效。
+- **平行两条线改同一文件 = 提交粒度毁掉**：#883 与 #884 就是这样被迫合并成 `b178656`。
+  规矩：**同一时刻只有一条线持有 `AgentPanel.tsx` 写锁**，交回才放行；质量线跑门禁时其他线停写（FREEZE/THAW）。
+
 ### AgentToolRecipeContext（2026-11-04，对账 #882，已完成 / 独立复核已过，`9f9d81e`）
 
 - 真正的优先级是代码里那条：**explicit > planned > sessionPicked > sticky > selected**。任务描述里常把 `planned`
