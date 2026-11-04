@@ -20,6 +20,57 @@ export interface AgentInitialLoadInput {
   setList: (sessions: AgentSession[]) => void
   setCurrent: (session: AgentSession) => void
   setMessages: (messages: ChatMessage[]) => void
+  /**
+   * 孤儿会话（启动时建出来、随后被用户接管而丢弃的那条）删除失败时的**一次性**提示。
+   *
+   * 由面板注入：模块自己不碰 store / logger，也不逐次重试都弹一条。
+   */
+  notifyCleanupFailure?: (message: string) => void
+  /** 结构化日志：带 sessionId 与最终错误，便于事后定位。 */
+  logCleanupFailure?: (detail: {
+    sessionId: string
+    attempts: number
+    error: unknown
+  }) => void
+  /** 重试间隔（测试可注入立即返回的实现，避免真等）。 */
+  wait?: (ms: number) => Promise<void>
+}
+
+/** 孤儿清理最多尝试 3 次（首次 + 2 次重试）。 */
+export const AGENT_ORPHAN_CLEANUP_ATTEMPTS = 3
+export const AGENT_ORPHAN_CLEANUP_RETRY_DELAY_MS = 150
+export const AGENT_ORPHAN_CLEANUP_FAILURE_MESSAGE =
+  '启动时清理多余的 Agent 会话失败：它暂时还留在列表里，可以手动删除。'
+
+const defaultWait = (ms: number): Promise<void> =>
+  new Promise((resolve) => {
+    setTimeout(resolve, ms)
+  })
+
+/**
+ * 删掉被丢弃的空会话，失败就小退后再试。
+ *
+ * 清理是**旁路**：这里只负责「多试两次」，最终仍失败由调用方收口成
+ * 一次提示 + 一条日志，绝不上抛去打断启动。
+ */
+async function removeDiscardedSession(
+  input: AgentInitialLoadInput,
+  sessionId: string,
+): Promise<void> {
+  const wait = input.wait ?? defaultWait
+  let lastError: unknown
+  for (let attempt = 1; attempt <= AGENT_ORPHAN_CLEANUP_ATTEMPTS; attempt += 1) {
+    try {
+      await input.removeSession(sessionId)
+      return
+    } catch (error) {
+      lastError = error
+      if (attempt < AGENT_ORPHAN_CLEANUP_ATTEMPTS) {
+        await wait(AGENT_ORPHAN_CLEANUP_RETRY_DELAY_MS)
+      }
+    }
+  }
+  throw lastError
 }
 
 export type AgentInitialLoadOutcome =
@@ -72,9 +123,19 @@ export async function runAgentInitialLoad(
   if (!created) return { kind: 'stale' }
   if (!stillOwnsSelection()) {
     try {
-      await input.removeSession(created.id)
+      await removeDiscardedSession(input, created.id)
       return { kind: 'stale', discardedSessionId: created.id }
     } catch (cleanupError) {
+      /**
+       * 重试也没删掉：**提示一次**、记一条带 sessionId 的日志，
+       * 然后照常返回 stale —— 清理失败绝不能阻断启动或正常会话加载。
+       */
+      input.logCleanupFailure?.({
+        sessionId: created.id,
+        attempts: AGENT_ORPHAN_CLEANUP_ATTEMPTS,
+        error: cleanupError,
+      })
+      input.notifyCleanupFailure?.(AGENT_ORPHAN_CLEANUP_FAILURE_MESSAGE)
       return {
         kind: 'stale',
         discardedSessionId: created.id,

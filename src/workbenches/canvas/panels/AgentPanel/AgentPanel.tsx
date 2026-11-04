@@ -689,7 +689,7 @@ export function AgentPanel({
       ) {
         return
       }
-      const outcome = await runAgentInitialLoad({
+      await runAgentInitialLoad({
         isAlive: () => alive,
         currentIdRef,
         selectionVersionRef,
@@ -724,17 +724,15 @@ export function AgentPanel({
         setList,
         setCurrent: (session) => setCurrent(session),
         setMessages,
+        /** 孤儿会话清理失败：提示一次（模块里已做有界重试），并记一条带 sessionId 的日志。 */
+        notifyCleanupFailure: (message) => store.notify(message, 'error'),
+        logCleanupFailure: ({ sessionId, attempts, error }) =>
+          platform.logger.log(
+            'warn',
+            '[agent] initial session cleanup failed',
+            { sessionId, attempts, error: errText(error) },
+          ),
       })
-      if (outcome.kind === 'stale' && outcome.cleanupError) {
-        platform.logger.log(
-          'warn',
-          '[agent] initial session cleanup failed',
-          {
-            sessionId: outcome.discardedSessionId,
-            error: errText(outcome.cleanupError),
-          },
-        )
-      }
     }).catch((error) => {
       if (
         alive &&

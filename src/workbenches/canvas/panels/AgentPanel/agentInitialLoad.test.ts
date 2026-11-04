@@ -45,6 +45,13 @@ function mountHarness(config: {
     canCommit: () => boolean,
   ) => Promise<AgentSession | null>
   sessionsRemove: (sessionId: string) => Promise<void>
+  notifyCleanupFailure?: (message: string) => void
+  logCleanupFailure?: (detail: {
+    sessionId: string
+    attempts: number
+    error: unknown
+  }) => void
+  wait?: (ms: number) => Promise<void>
 }) {
   const lifecycleRef: {
     current: ReturnType<typeof useAgentSessionLifecycle> | null
@@ -117,6 +124,9 @@ function mountHarness(config: {
         getSession: config.getSession,
         createSession: config.createInitialSession,
         removeSession: lifecycle.removeSession,
+        notifyCleanupFailure: config.notifyCleanupFailure,
+        logCleanupFailure: config.logCleanupFailure,
+        wait: config.wait,
         setList: lifecycle.setList,
         setCurrent: (next) => lifecycle.setCurrent(next),
         setMessages: lifecycle.setMessages,
@@ -196,6 +206,7 @@ describe('runAgentInitialLoad', () => {
       createUserSession: async () => userSession,
       createInitialSession,
       sessionsRemove,
+      wait: async () => undefined,
     })
 
     let initialLoad!: Promise<AgentInitialLoadOutcome>
@@ -321,5 +332,235 @@ describe('runAgentInitialLoad', () => {
     expect(harness.lifecycleRef.current!.list.map((item) => item.id)).toEqual([
       'initial-created',
     ])
+  })
+})
+
+/**
+ * 孤儿会话清理：清理是**旁路**，不许阻断启动、不许刷屏、不许放宽判定。
+ */
+describe('runAgentInitialLoad / 孤儿清理失败回收', () => {
+  /**
+   * 复现「初始加载建了空会话、用户随后新建了会话」的接管时刻，
+   * 返回初始加载的 promise，等调用方决定 removeSession 的行为。
+   */
+  function startTakeOver(config: {
+    sessionsRemove: (sessionId: string) => Promise<void>
+    notifyCleanupFailure?: (message: string) => void
+    logCleanupFailure?: (detail: {
+      sessionId: string
+      attempts: number
+      error: unknown
+    }) => void
+    wait?: (ms: number) => Promise<void>
+  }) {
+    const initialCreate = deferred<AgentSession>()
+    const userSession = session('user')
+    const harness = mountHarness({
+      controllerRefresh: vi
+        .fn<() => Promise<AgentSession[]>>()
+        .mockImplementationOnce(async () => [])
+        .mockImplementationOnce(async () => [userSession]),
+      getSession: async (sessionId) =>
+        sessionId === userSession.id ? userSession : null,
+      createUserSession: async () => userSession,
+      createInitialSession: vi.fn(() => initialCreate.promise),
+      sessionsRemove: config.sessionsRemove,
+      ...(config.notifyCleanupFailure
+        ? { notifyCleanupFailure: config.notifyCleanupFailure }
+        : {}),
+      ...(config.logCleanupFailure
+        ? { logCleanupFailure: config.logCleanupFailure }
+        : {}),
+      ...(config.wait ? { wait: config.wait } : {}),
+    })
+    return { harness, initialCreate, userSession }
+  }
+
+  async function takeOver(
+    harness: ReturnType<typeof mountHarness>,
+    initialCreate: ReturnType<typeof deferred<AgentSession>>,
+  ): Promise<Promise<AgentInitialLoadOutcome>> {
+    let initialLoad!: Promise<AgentInitialLoadOutcome>
+    act(() => {
+      initialLoad = harness.initialLoadRef.current!()
+    })
+    await vi.waitFor(() => {
+      expect(harness.lifecycleRef.current).not.toBeNull()
+    })
+    await act(async () => {
+      await harness.actionsRef.current!.newSession()
+    })
+    /**
+     * 故意**不套 act**：清理重试可能长时间挂起（本文件里用 deferred 控制），
+     * 套进 act 会让 act 等这条旁路链走完。
+     */
+    initialCreate.resolve(session('initial-created'))
+    return initialLoad
+  }
+
+  it('第一次失败、第二次成功：最终删掉，且不打扰用户', async () => {
+    const sessionsRemove = vi
+      .fn<(sessionId: string) => Promise<void>>()
+      .mockRejectedValueOnce(new Error('flaky'))
+      .mockResolvedValueOnce(undefined)
+    const notifyCleanupFailure = vi.fn()
+    const logCleanupFailure = vi.fn<
+      (detail: { sessionId: string; attempts: number; error: unknown }) => void
+    >()
+    const { harness, initialCreate } = startTakeOver({
+      sessionsRemove,
+      notifyCleanupFailure,
+      logCleanupFailure,
+      wait: async () => undefined,
+    })
+
+    const initialLoad = await takeOver(harness, initialCreate)
+    let outcome!: AgentInitialLoadOutcome
+    await act(async () => {
+      outcome = await initialLoad
+    })
+
+    expect(sessionsRemove).toHaveBeenCalledTimes(2)
+    expect(sessionsRemove).toHaveBeenNthCalledWith(1, 'initial-created')
+    expect(sessionsRemove).toHaveBeenNthCalledWith(2, 'initial-created')
+    expect(outcome).toMatchObject({
+      kind: 'stale',
+      discardedSessionId: 'initial-created',
+    })
+    expect(outcome).not.toHaveProperty('cleanupError')
+    expect(notifyCleanupFailure).not.toHaveBeenCalled()
+    expect(logCleanupFailure).not.toHaveBeenCalled()
+    expect(harness.lifecycleRef.current!.current?.id).toBe('user')
+  })
+
+  it('一直失败：只提示一次、只记一条带 sessionId 的日志，启动照常', async () => {
+    const failure = new Error('cleanup failed')
+    const sessionsRemove = vi.fn(async () => {
+      throw failure
+    })
+    const notifyCleanupFailure = vi.fn()
+    const logCleanupFailure = vi.fn()
+    const { harness, initialCreate } = startTakeOver({
+      sessionsRemove,
+      notifyCleanupFailure,
+      logCleanupFailure,
+      wait: async () => undefined,
+    })
+
+    const initialLoad = await takeOver(harness, initialCreate)
+    let outcome!: AgentInitialLoadOutcome
+    await act(async () => {
+      outcome = await initialLoad
+    })
+
+    expect(sessionsRemove.mock.calls.length).toBeGreaterThan(1)
+    // 提示只发一次，不随重试次数刷屏
+    expect(notifyCleanupFailure).toHaveBeenCalledTimes(1)
+    expect(notifyCleanupFailure).toHaveBeenCalledWith(
+      expect.stringContaining('会话'),
+    )
+    expect(logCleanupFailure).toHaveBeenCalledTimes(1)
+    expect(logCleanupFailure.mock.calls[0]![0]).toMatchObject({
+      sessionId: 'initial-created',
+      error: failure,
+    })
+    expect(outcome).toMatchObject({
+      kind: 'stale',
+      discardedSessionId: 'initial-created',
+      cleanupError: failure,
+    })
+    // 启动照常：用户选中的会话仍在、列表里没有幽灵
+    expect(harness.lifecycleRef.current!.current?.id).toBe('user')
+    expect(harness.lifecycleRef.current!.list.map((item) => item.id)).toEqual([
+      'user',
+    ])
+  })
+
+  it('重试之间不阻塞：等待期间会话已经可用，且不会重复发起删除', async () => {
+    /**
+     * 这一条用纯端口驱动（不挂 React）：要证明的是「重试等待不阻塞」，
+     * 而 act 会等异步更新收尾，反而看不出旁路是否独立。
+     */
+    const waitGate = deferred<void>()
+    const waitDelays: number[] = []
+    const currentIdRef: { current: string | null } = { current: null }
+    const removedIds: string[] = []
+
+    const initialLoad = runAgentInitialLoad({
+      isAlive: () => true,
+      currentIdRef,
+      selectionVersionRef: { current: 0 },
+      refresh: async () => ({ rows: [], applied: true }),
+      loadReviewModel: async () => null,
+      loadCanvasReview: async () => false,
+      setReviewModel: () => undefined,
+      setCanvasReview: () => undefined,
+      getSession: async () => null,
+      createSession: async () => {
+        /** 建出空会话的同时用户就接管了选择。 */
+        currentIdRef.current = 'user'
+        return session('initial-created')
+      },
+      removeSession: async (sessionId) => {
+        removedIds.push(sessionId)
+        throw new Error('cleanup failed')
+      },
+      setList: () => undefined,
+      setCurrent: () => undefined,
+      setMessages: () => undefined,
+      wait: (ms) => {
+        waitDelays.push(ms)
+        return waitGate.promise
+      },
+    })
+
+    let settled = false
+    void initialLoad.then(() => {
+      settled = true
+    })
+
+    // 推进到「第一次删除失败、卡在重试等待上」这一拍
+    for (let tick = 0; tick < 30 && waitDelays.length === 0; tick += 1) {
+      await Promise.resolve()
+    }
+    expect(removedIds).toEqual(['initial-created'])
+    expect(settled).toBe(false)
+    expect(waitDelays).toHaveLength(1)
+
+    // 旁路等待期间，别的工作照常能推进
+    let otherWorkDone = false
+    const otherWork = Promise.resolve().then(() => {
+      otherWorkDone = true
+    })
+    await otherWork
+    expect(otherWorkDone).toBe(true)
+    // 等待期间不重复发起删除
+    expect(removedIds).toEqual(['initial-created'])
+    expect(settled).toBe(false)
+
+    waitGate.resolve()
+    await initialLoad
+    expect(removedIds.length).toBeGreaterThan(1)
+    expect(settled).toBe(true)
+  })
+
+  it('判定条件没放宽：只删被丢弃的那条，其它会话一条不动', async () => {
+    const sessionsRemove = vi.fn<(sessionId: string) => Promise<void>>(
+      async () => undefined,
+    )
+    const { harness, initialCreate } = startTakeOver({
+      sessionsRemove,
+      wait: async () => undefined,
+    })
+
+    const initialLoad = await takeOver(harness, initialCreate)
+    await act(async () => {
+      await initialLoad
+    })
+
+    expect(sessionsRemove).toHaveBeenCalledTimes(1)
+    const removedIds = sessionsRemove.mock.calls.map(([sessionId]) => sessionId)
+    expect(removedIds).toEqual(['initial-created'])
+    expect(removedIds).not.toContain('user')
   })
 })

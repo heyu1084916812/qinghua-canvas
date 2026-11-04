@@ -437,3 +437,37 @@ describe('toolCtx 的调用即取闭包', () => {
     }
   })
 })
+
+/**
+ * 初始加载的孤儿清理端口接线。
+ *
+ * ⚠️ 这是**源码级**快照，不是行为验证：真正「失败会不会提示」由
+ * `agentInitialLoad.test.ts` 的假端口用例证明；这里只防「有人把端口从面板
+ * call site 上删掉 / 又加回一条内联 warn」这种静默回退。
+ */
+describe('初始加载孤儿清理的接线快照', () => {
+  it('面板把两个端口都接上：提示走 store.notify(error)，日志带 sessionId', () => {
+    expect(PANEL_SOURCE).toContain(
+      "notifyCleanupFailure: (message) => store.notify(message, 'error')",
+    )
+    expect(PANEL_SOURCE).toMatch(
+      /logCleanupFailure:\s*\(\{\s*sessionId,\s*attempts,\s*error\s*\}\)\s*=>\s*platform\.logger\.log\(\s*'warn',\s*'\[agent\] initial session cleanup failed',\s*\{\s*sessionId,\s*attempts,\s*error:\s*errText\(error\)\s*\},?\s*\)/,
+    )
+  })
+
+  it('两个端口都传进 runAgentInitialLoad 的那次调用里', () => {
+    const call = PANEL_SOURCE.indexOf('runAgentInitialLoad({')
+    const notify = PANEL_SOURCE.indexOf('notifyCleanupFailure:')
+    const log = PANEL_SOURCE.indexOf('logCleanupFailure:')
+    expect(call).toBeGreaterThan(-1)
+    expect(notify).toBeGreaterThan(call)
+    expect(log).toBeGreaterThan(call)
+  })
+
+  it('不再有内联 warn：清理失败只经端口收口，不会记两条日志', () => {
+    expect(PANEL_SOURCE).not.toContain('outcome.cleanupError')
+    const occurrences =
+      PANEL_SOURCE.match(/\[agent\] initial session cleanup failed/g) ?? []
+    expect(occurrences).toHaveLength(1)
+  })
+})
