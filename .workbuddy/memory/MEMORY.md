@@ -1,5 +1,17 @@
 # CanvasFlow（轻画）项目记忆
 
+### 视图 props 装配 + 队列项"可重试载体"口径（2026-11-04，#904/#905，`aee632d`）
+
+- **视图 props 装配搬进 hook 时不许加 `useMemo`**：这些对象本来就是每帧新建，`useMemo` 会把 props
+  冻结成"上一次渲染"的值，是新 bug 不是优化。搬家的判据是"每个 prop 的名字、取值来源、包装行为逐项对账"，
+  不是"看起来一样"。
+- **队列项本身就是可重试载体**：pump 路径失败时正确归宿是**保留队列项 + 错误态**，
+  写回草稿只适用于"队列项已被摘掉"的路径（#891 的引导路径）。两条路别混。
+- **存储层语义决定上层能不能"保留"**：`claimNextQueuedTurn` 只写 `activeTurnId` 不删队列项，
+  `finishActiveQueuedTurn(completed=false)` 只清 `activeTurnId` 保留队列项，`completed=true` 才删。
+  审计这类问题时先看这三条。
+- **A 档截图要数得出来**：`aee632d` 这轮 76 张（15+15+18+18+5+5），磁盘实数与 SUMMARY 一致才有意义。
+
 ### 收口 revision 的三层回退 + "并发中间态的绿不算绿"（2026-11-04，对账 #902）
 
 - **收口绑的是"落库后"的 revision**：`outcomeTurnOriginFor` 的回退链是
