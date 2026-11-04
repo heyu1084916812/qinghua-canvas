@@ -1,5 +1,18 @@
 # CanvasFlow（轻画）项目记忆
 
+### 初始加载收口 + 里程碑 A 档（2026-11-04，对账 #897/#898/M-A，`5a3311d` + `c1fdae7`）
+
+- **初始加载的三重守卫必须在 `await loadChannels()` 之后重新判**：`alive` / `currentIdRef` / `selectionVersionRef`。
+  少一个就会出现"用户已经切走了，迟到的加载还在建会话/写状态"。
+- **`createSession` 必须用实时渠道**（`channels.getState()` 之类），不许用渲染闭包。切错的表现是
+  新画布页带着空渠道开会话，**用户第一句话就报"还没选模型"**。测试手法：加载前渠道空、加载后给三个渠道，
+  断言 `createSession` 收到三个非空模型名。
+- **effect 依赖只能 `[projectId, trackRun]`**：多列一个就会在依赖变化时打断进行中的对话。
+- **门禁"截图 0 张"是脚本缺陷**：按文件名差集判新图，而 smoke 是固定文件名覆盖 ⇒ 差集永远空。
+  正确做法是按 mtime/hash 差集或跑前清空目标目录。
+- **504 `Outdated Optimize Dep` 不等于代码坏了**：dev server 依赖缓存陈旧时页面 `#root` 全空、
+  `[data-canvas-hydrated]` 永远不出现。判归属先探针取证（看 1420 返回什么、`#root` 有没有内容），再决定是不是本批缺陷。
+
 ### loopDeps 控制器 + 孤儿清理重试（2026-11-04，对账 #894/#896，`3b208d4` + `e39fc32`）
 
 - **loopDeps 的"三个端口"才是不丢 `visualReview` 补丁的关键**：`toolCtx` 必须**同一引用**传下去

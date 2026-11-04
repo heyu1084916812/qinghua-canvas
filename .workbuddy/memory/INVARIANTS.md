@@ -10,6 +10,10 @@
   最终模型变化时才写（先 remember 到 ref 再落库）；上下文素材只留 `image/*`。`toolCtx()` 必须每次重建，
   任何 per-session 缓存都会让「批准后才执行」的工具看到发消息那一刻的旧快照。
 
+- **初始加载三个守卫**：`alive` / `currentIdRef` / `selectionVersionRef` 必须在 `await loadChannels()` **之后**重判；
+  `createSession` 必须用实时渠道（渲染闭包里的渠道可能是空的）；effect 依赖只能 `[projectId, trackRun]`。
+- **smoke 截图判定不许用文件名差集**：固定文件名覆盖会让差集永远为空，必须按 mtime/hash 比对或跑前清空目录。
+
 - **启动清理是旁路**：孤儿会话清理做有界重试，全失败也只发**一条** error 提示 + **一条**结构化日志，
   然后照常加载会话。日志只能有一个来源（端口接上后必须删掉面板内联 `logger.log`）。
 - **`loopDeps` 的三个端口决定 `visualReview` 补丁不丢**：`toolCtx` 同一引用传入（不许包新箭头）、
