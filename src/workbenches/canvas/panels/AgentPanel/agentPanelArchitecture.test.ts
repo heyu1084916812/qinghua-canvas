@@ -19,7 +19,7 @@ import { describe, expect, it } from 'vitest'
  * 调节奏：按「该刀实测 + 40」定值，之后每刀同理——阈值始终贴着实测走，留出的 40 行
  * 只够接一刀，不够养回一个胖文件。当前 2126 = #885b 接线后实测 2086 + 40。
  */
-const AGENT_PANEL_MAX_LINES = 2002
+const AGENT_PANEL_MAX_LINES = 1988
 
 /**
  * `.ts` 下沉模块里允许出现的 hook 调用（模块名 → 理由）。
@@ -358,22 +358,37 @@ describe('toolCtx 的调用即取闭包', () => {
     )
   })
 
-  it('perImage 每次建上下文都读 sessionRuntime.current', () => {
+  it('perImage 每次建上下文都读 sessionRuntime.current（条件键在组装层展开）', () => {
+    // 面板侧：建 ctx 时现读 ref，不许提前算成组件级常量
     expect(PANEL_SOURCE).toMatch(
-      /sessionRuntimeRef\.current\.isPerImage\(\s*sessionId\s*\)[\s\S]{0,60}perImage: true/,
+      /perImage:\s*sessionRuntimeRef\.current\.isPerImage\(\s*sessionId\s*\)/,
     )
-    // 不许改成「先算布尔再 spread」以外的形态（例如提到组件级常量）
     expect(PANEL_SOURCE).not.toMatch(
       /const\s+\w+\s*=\s*sessionRuntimeRef\.current\.isPerImage\(/,
     )
+    // 组装层：只有真值才**出键**（`perImage: false` 会把键带出来）
+    const composer = AGENT_MODULES['./agentToolContext.ts']
+    expect(composer, '没找到 agentToolContext.ts').toBeTruthy()
+    expect(composer).toMatch(
+      /base\.perImage\s*\?\s*\{\s*perImage:\s*true\s*\}\s*:\s*\{\}/,
+    )
+    expect(composer).not.toMatch(/perImage:\s*base\.perImage\b/)
   })
 
-  it('selectedIds / selectedModelOf 每次读当前画布选中，不能变快照', () => {
-    expect(PANEL_SOURCE).toContain('selectedIds: () => selection')
-    // 裸引用（函数本身来自控制器，内部经 getCanvasNodes() + selection 现算）
+  it('selectedIds / selectedModelOf 保持函数与同一引用，不能变快照', () => {
+    const composer = AGENT_MODULES['./agentToolContext.ts']
+    expect(composer, '没找到 agentToolContext.ts').toBeTruthy()
+    // 组装层：selectedIds 必须是函数（读建 ctx 时那份 selection）
+    expect(composer).toContain('selectedIds: () => base.selection')
+    // selectedModelOf 原样透传（同一引用，不包新箭头）
+    expect(composer).toMatch(
+      /^\s*selectedModelOf: base\.selectedModelOf,\s*$/m,
+    )
+    // 面板侧：只传快照与引用，不许包成值
     expect(PANEL_SOURCE).toMatch(/^\s*selectedModelOf,\s*$/m)
     expect(PANEL_SOURCE).not.toMatch(/selectedIds:\s*selection\b/)
     expect(PANEL_SOURCE).not.toMatch(/const\s+selectedIds\s*=\s*selection/)
+    expect(composer).not.toMatch(/selectedIds:\s*base\.selection\b/)
   })
 
   it('runNodes 的素材在调用时才读 contextTrace，不许提前算成常量', () => {

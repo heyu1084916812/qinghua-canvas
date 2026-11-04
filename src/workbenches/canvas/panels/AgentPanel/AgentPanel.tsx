@@ -89,6 +89,7 @@ import { toConversation } from './conversation'
 import { createAgentToolRecipeContext } from './agentToolRecipeContext'
 import { createAgentToolPlanPorts } from './agentToolPlanPorts'
 import { createAgentToolCanvasOps } from './agentToolCanvasOps'
+import { composeAgentToolContext } from './agentToolContext'
 import { createAgentToolExecution } from './agentToolExecution'
 import { createAgentToolResearch } from './agentToolResearch'
 import { createAgentToolDefaults } from './agentToolDefaults'
@@ -871,52 +872,37 @@ export function AgentPanel({
         getContextAssets: () =>
           contextTraceRef.current.get(sessionId)?.assetRefs,
       })
-      return {
-        store,
-        viewportWorld: viewportWorldOf(viewport),
-        memoryContext: {
-          workbench: 'canvas',
+      return composeAgentToolContext({
+        base: {
+          store,
+          origin,
+          viewportWorld: viewportWorldOf(viewport),
           projectId: store.getSnapshot().projectId,
-          ...(sessionId ? { sessionId } : {}),
+          sessionId,
+          selection,
+          selectedModelOf,
+          // 建 ctx 时现读：批准后才执行的工具要跟随**本回合**的停止信号。
+          abortSignal: abortRefs.current.get(sessionId)?.signal,
+          perImage: sessionRuntimeRef.current.isPerImage(sessionId),
         },
-        ...(sessionId
-          ? {
-              taskPlan: createAgentToolPlanPorts({
-                sessionId,
-                getSession: sessions.get,
-                updateFields: sessions.updateFields,
-                trackRun,
-                setList,
-                setCurrent,
-                currentIdRef,
-              }),
-            }
-          : {}),
-        origin,
-        selectedIds: () => selection,
-        selectedModelOf,
-        ...(abortRefs.current.get(sessionId)?.signal
-          ? { signal: abortRefs.current.get(sessionId)!.signal }
-          : {}),
-        /**
-         * 用 ref 而不是闭包变量：这个回调在发消息那一刻创建、在用户点「批准」时才真正执行
-         * （中间隔着一次确认），ref 读的是**最新一次发消息**算出来的判断。
-         */
-        ...(sessionRuntimeRef.current.isPerImage(sessionId)
-          ? { perImage: true }
-          : {}),
-      resolveNodeIds: (ids) => {
-        const aliases = planAliasesRef.current.get(sessionId)
-        return ids.map((id) => aliases?.get(id) ?? id)
-      },
-      runNodes: canvasOps.runNodes,
-      defaultsForNewNode: toolDefaults.defaultsForNewNode,
-      ...recipeContext,
-      sliceImage: canvasOps.sliceImage,
-      splitGrid: canvasOps.splitGrid,
-      rememberMemory: toolResearch.rememberMemory,
-      researchDesign: toolResearch.researchDesign,
-      }
+        plan: sessionId
+          ? createAgentToolPlanPorts({
+              sessionId,
+              getSession: sessions.get,
+              updateFields: sessions.updateFields,
+              trackRun,
+              setList,
+              setCurrent,
+              currentIdRef,
+            })
+          : undefined,
+        // 调用时现取：applyPlan 之后才写别名，不能在 build 时快照。
+        resolveAliases: () => planAliasesRef.current.get(sessionId),
+        recipe: recipeContext,
+        research: toolResearch,
+        defaults: toolDefaults,
+        canvasOps,
+      })
     },
     /**
      * 依赖集合不因这次拆分而变化：`toolResearch` / `toolDefaults` 都在函数体内创建，
