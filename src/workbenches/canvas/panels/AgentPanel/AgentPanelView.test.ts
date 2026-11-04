@@ -84,8 +84,28 @@ describe('AgentPanelView', () => {
   it('没有浮层时 Esc 不拦截下游快捷键', () => {
     const onDismissPicker = vi.fn()
     const { renderer } = renderView({ openPicker: null, onDismissPicker })
+    const handler = renderer.root.findByType('aside').props.onKeyDown
+    /** #930：监听**确实挂上了**才算数 —— 否则下面两条"没调用"是空转。 */
+    expect(typeof handler).toBe('function')
+
     const event = {
       key: 'Escape',
+      preventDefault: vi.fn(),
+    }
+
+    act(() => {
+      handler(event)
+    })
+
+    expect(event.preventDefault).not.toHaveBeenCalled()
+    expect(onDismissPicker).not.toHaveBeenCalled()
+  })
+
+  it('有浮层但不是 Esc：同样放行（key 判断也是活的）', () => {
+    const onDismissPicker = vi.fn()
+    const { renderer } = renderView({ openPicker: 'agent-model', onDismissPicker })
+    const event = {
+      key: 'a',
       preventDefault: vi.fn(),
     }
 

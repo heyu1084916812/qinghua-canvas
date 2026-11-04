@@ -68,6 +68,19 @@ describe('runAgentCanvasNodes', () => {
       nodeId: 'node-missing',
       ok: false,
     })
-    expect(setRunTasksFor).toHaveBeenCalled()
+    /**
+     * #930：钉住会话 id —— 写错会话的进度条正是这类断言要抓的。
+     * 无参数的 `toHaveBeenCalled()` 连"第一次写错会话"都会绿，所以这里查**每一次**调用。
+     */
+    const taskTargets = setRunTasksFor.mock.calls.map((call) => call[0])
+    expect(taskTargets.length).toBeGreaterThan(0)
+    expect(new Set(taskTargets)).toEqual(new Set(['session-1']))
+    expect(setRunTasksFor).toHaveBeenNthCalledWith(
+      1,
+      'session-1',
+      expect.arrayContaining([
+        expect.objectContaining({ nodeId: 'node-missing' }),
+      ]),
+    )
   })
 })

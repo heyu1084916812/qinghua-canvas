@@ -578,10 +578,127 @@ describe('会话隔离：非当前会话的界面不许被写', () => {
     expect(h.ui.setMessages).toHaveBeenCalledWith(
       persisted.historyMessages,
     )
+    // 会话行的更新器也要能"只替换命中的那条"
+    const applyList = vi.mocked(h.ui.setList).mock.calls[0]![0] as (
+      list: AgentSession[],
+    ) => AgentSession[]
+    const next = applyList([session('s1'), session('s9')])
+    expect(next[0]).toBe(persisted.saved)
+    expect(next[1]!.id).toBe('s9')
 
     expect(streams.progress).not.toBeNull()
     streams.progress!([{ role: 'assistant', content: '流式' }])
     expect(h.ui.setMessages).toHaveBeenCalledTimes(2)
     expect(h.ui.clearReveal).toHaveBeenCalledTimes(1)
+
+    // 自动续跑的过程消息同样要写进对话区（当前会话）
+    expect(streams.continued).not.toBeNull()
+    streams.continued!([{ role: 'assistant', content: '续跑' }])
+    expect(h.ui.setMessages).toHaveBeenCalledTimes(3)
+  })
+})
+
+/** #930-B：把 `agentSendTurnRun` 剩下几条未覆盖分支补上（全部断言行为）。 */
+describe('分支补齐：计划清除 / 失败携带 trace / 清附件快照', () => {
+  const plan = {
+    id: 'plan-1',
+    title: '计划',
+    steps: [{ id: 'step-1', title: '出图', status: 'done' as const }],
+    createdAt: 1,
+    updatedAt: 1,
+  }
+
+  it('计划清除成功：列表与当前会话都换成清除后的快照', async () => {
+    const cleared = session('s1', { taskPlan: undefined })
+    const h = harness({ session: session('s1', { taskPlan: plan }) })
+    h.ports.updateSessionFields = vi.fn(async () => cleared)
+
+    await runAgentSendTurn(h.input, h.ports)
+
+    expect(h.ui.setCurrent).toHaveBeenCalledWith(cleared)
+    const applyList = vi.mocked(h.ui.setList).mock.calls[0]![0] as (
+      list: AgentSession[],
+    ) => AgentSession[]
+    const next = applyList([session('s1'), session('s9')])
+    expect(next[0]).toBe(cleared)
+    expect(next[1]!.id).toBe('s9')
+  })
+
+  it('计划清除成功但会话已切走：只更新列表，不动当前界面', async () => {
+    const cleared = session('s1', { taskPlan: undefined })
+    const h = harness({ session: session('s1', { taskPlan: plan }) })
+    h.ports.updateSessionFields = vi.fn(async () => cleared)
+    h.ui.currentIdRef.current = 's9'
+
+    await runAgentSendTurn(h.input, h.ports)
+
+    expect(h.ui.setList).toHaveBeenCalled()
+    expect(h.ui.setCurrent).not.toHaveBeenCalled()
+  })
+
+  it('prepare 失败：contextTrace 落 ref，并按 message / phase 记失败', async () => {
+    const trace = { digest: 'trace-1' } as never
+    const h = harness({
+      prepare: async () => ({
+        kind: 'failed',
+        persistedTurn: persisted,
+        phase: 'tool_probe',
+        message: '工具能力探测失败',
+        contextTrace: trace,
+      }),
+    })
+
+    await runAgentSendTurn(h.input, h.ports)
+
+    expect(h.refs.contextTrace.current.get('s1')).toBe(trace)
+    expect(h.ports.failTurn).toHaveBeenCalledWith(
+      's1',
+      expect.objectContaining({
+        reason: '工具能力探测失败',
+        phase: 'tool_probe',
+      }),
+    )
+    expect(h.ports.runTurn).not.toHaveBeenCalled()
+  })
+
+  it('ready 携带 contextTrace 与已清附件快照：ref 写入、列表与当前会话都换', async () => {
+    const trace = { digest: 'trace-2' } as never
+    const cleared = session('s1', { pendingAssetIds: undefined })
+    const h = harness({
+      prepare: async ({ hooks }) => {
+        hooks.onPersisted(persisted)
+        await hooks.onRouteReady('op-1')
+        return ready({ contextTrace: trace, clearedPendingAssets: cleared })
+      },
+    })
+
+    await runAgentSendTurn(h.input, h.ports)
+
+    expect(h.refs.contextTrace.current.get('s1')).toBe(trace)
+    expect(h.ui.setCurrent).toHaveBeenCalledWith(cleared)
+    // 列表更新器要能"只替换命中的那条，其它原样留着"
+    const applyList = vi.mocked(h.ui.setList).mock.calls.at(-1)![0] as (
+      list: AgentSession[],
+    ) => AgentSession[]
+    const next = applyList([session('s1'), session('s9')])
+    expect(next[0]).toBe(cleared)
+    expect(next[1]!.id).toBe('s9')
+  })
+
+  it('已清附件快照回来时会话已切走：仍然只更新列表', async () => {
+    const cleared = session('s1', { pendingAssetIds: undefined })
+    const h = harness({
+      prepare: async ({ hooks }) => {
+        hooks.onPersisted(persisted)
+        await hooks.onRouteReady('op-1')
+        return ready({ clearedPendingAssets: cleared })
+      },
+    })
+    h.ui.currentIdRef.current = 's9'
+
+    await runAgentSendTurn(h.input, h.ports)
+
+    expect(h.ui.setList).toHaveBeenCalled()
+    expect(h.ui.setCurrent).not.toHaveBeenCalled()
   })
 })

@@ -102,7 +102,10 @@ describe('useAgentQueueController', () => {
         pendingAssetIds: ['node-1'],
       }),
     )
-    expect(props.applySessionSnapshot).toHaveBeenCalled()
+    // #930：无参数的 toHaveBeenCalled() 换个会话快照进来也绿；钉住是"刚入队的那份"
+    expect(props.applySessionSnapshot).toHaveBeenCalledWith(
+      expect.objectContaining({ id: session.id, queuedTurns: [] }),
+    )
   })
 
   it('没有对话模型时拒绝排队并给出明确状态', async () => {
