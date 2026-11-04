@@ -1,5 +1,21 @@
 # CanvasFlow（轻画）项目记忆
 
+### 继续任务失败残留 + 附件原子追加（2026-11-04，#921/#922，`64361bd` + `0c15ad8`）
+
+- **三条"自动续跑失败"调用方只有第三条漏转态**：发送中 / 用户点确认都会把 Job 转到 `needs_attention` 或 `failed`，
+  只有**点「继续任务」**那条只 settle 不转态 → Job 停在 `waiting_generation` + `pendingCallId`。
+  后果不是卡死而是**记账残留**：不刷新就继续发时 `jobIds` 映射还在，`ensureJob` 会**复用**这个 Job，
+  新回合挂旧 Job 上，"可能已扣费"的标记被静默带过。
+- **判"幽灵确认卡"要看三道判据**：`pendingConfirmation` 只在 `outcome.kind==='confirm'` 时写、
+  `refresh` 的优先级是 pendingConfirmation → continuation → attention、确认卡还要 `status.kind==='awaitingConfirm'`。
+  三道都不满足 ⇒ 不会出现"永远不会成立的确认卡"。**定性要给判据，不要凭感觉。**
+- **`pendingAssetIds` 的病根在控制器，不在 store**：`updateFields` 本来就在事务里；
+  坏在控制器拿"渲染快照 + 新 id"拼整份列表写回，把**删除语义**覆盖了。
+  正解是 store 内 `appendPendingAssetIds`（事务内 load → 去重 → 写回），
+  接线时三处入口都不许再出现"整份列表写回"。
+- **内存存储不排队，测试必须自己排队**：生产两条存储都串行化事务，`createMemoryPlatform` 只回滚快照；
+  测并发时要用 `serializedStorage` 包装，否则并发测试会假绿。
+
 ### 引导 × 在飞队列项 / 确认收口跳过结算 / 附件丢写（2026-11-04，#914/#915/#916/#919）
 
 - **"队列项在飞时仍在 `queuedTurns` 里"是个反复咬人的前提**：`claimNextQueuedTurn` 只写 `activeTurnId`、不摘项，

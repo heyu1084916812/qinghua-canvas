@@ -10,6 +10,12 @@
   最终模型变化时才写（先 remember 到 ref 再落库）；上下文素材只留 `image/*`。`toolCtx()` 必须每次重建，
   任何 per-session 缓存都会让「批准后才执行」的工具看到发消息那一刻的旧快照。
 
+- **"自动续跑失败"的三条调用方都必须转 Job 状态**：发送中 / 用户确认 / 「继续任务」。
+  漏掉任何一条，Job 会停在 `waiting_generation` + `pendingCallId`，而不刷新就继续发时 `jobIds` 映射还在，
+  `ensureJob` 会**复用**它，把"可能已扣费"静默带过。转态要单独 try/catch，**settle 无条件执行**。
+- **`pendingAssetIds` 只许原子追加**：`appendPendingAssetIds`（事务内 load → 去重 → 写回）。
+  控制器里**不许**再拼"旧快照 + 新 id"的整份列表写回——那会覆盖掉用户刚删的 id。
+
 - **对队列项做任何动作前必须判 `activeTurnId`**：在飞项仍留在 `queuedTurns` 里（`claimNextQueuedTurn` 只写标记不摘项），
   「引导」这类入口漏判会导致**同一句话执行两遍、双倍扣费**。
 - **收口顺序：transition 要兜底，settle 无条件执行**。`transitionSessionJob` 抛错会打崩整个收口函数、连返回值都拿不到；
