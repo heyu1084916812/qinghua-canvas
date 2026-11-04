@@ -106,7 +106,7 @@ import { useAgentConfirmationController } from './useAgentConfirmationController
 import { useAgentContinuationController } from './useAgentContinuationController'
 import { useAgentStopController } from './useAgentStopController'
 import { useAgentLoopDepsController } from './useAgentLoopDepsController'
-import type { AgentPrepareArgs } from './agentSendTurnRun'
+import { useAgentPrepareTurnController } from './useAgentPrepareTurnController'
 import {
   useAgentConversationController,
   type AgentMessageReveal,
@@ -1104,58 +1104,24 @@ export function AgentPanel({
     ])
 
   /**
-   * 把 `prepareAgentTurnRequest` 的静态入参接好；两个顺序回调由发送主体提供。
-   *
-   * 这一块留在宿主，是因为入参全是面板自己的数据接线（graph / selection /
-   * memory / skills / channels …）；搬进 hook 只会把同样的依赖再抄一遍。
+   * 把 `prepareAgentTurnRequest` 的静态入参接好；两个顺序回调由发送主体提供
+   * （端口与快照时机见 `useAgentPrepareTurnController`）。
    */
-  const prepareTurn = useCallback(
-    ({ session, text, internalControl, signal, hooks }: AgentPrepareArgs) =>
-      prepareAgentTurnRequest({
-        session,
-        text,
-        internalControl,
-        graph: store.getSnapshot(),
-        selection,
-        sessions,
-        prepareRoute: () => prepareChatRoute(session, true),
-        signal,
-        memory,
-        projectId: store.getSnapshot().projectId,
-        readAssetMime: async (hash) =>
-          (await platform.assets.read(hash).catch(() => null))?.mime ??
-          null,
-        notifyContextError: (message) =>
-          store.notify(message, 'error'),
-        skills: allSkills,
-        channels: allChannels,
-        canvasReviewEnabled,
-        activeAgentTools,
-        generationAvailability,
-        routeExecution,
-        notifyRecordWarning: (warning) =>
-          store.notify(
-            `结果已返回，但运行记录写入失败：${warning}`,
-            'error',
-          ),
-        onPersisted: hooks.onPersisted,
-        onRouteReady: hooks.onRouteReady,
-      }),
-    [
-      activeAgentTools,
-      allChannels,
-      allSkills,
-      canvasReviewEnabled,
-      generationAvailability,
-      memory,
-      platform,
-      prepareChatRoute,
-      routeExecution,
-      selection,
-      sessions,
-      store,
-    ],
-  )
+  const prepareTurn = useAgentPrepareTurnController({
+    store,
+    platform,
+    prepareChatRoute,
+    selection,
+    sessions,
+    memory,
+    allSkills,
+    allChannels,
+    canvasReviewEnabled,
+    activeAgentTools,
+    generationAvailability,
+    routeExecution,
+    prepare: prepareAgentTurnRequest,
+  })
 
   const runSendText = useAgentSendTurnController({
     currentTurnJobIdRef,
