@@ -1,5 +1,6 @@
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
+import TestRenderer, { act } from 'react-test-renderer'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { AgentController } from '../../../../features/shared/agent/AgentController'
 import type { AgentSession } from '../../../../state/agent/sessionStore'
@@ -647,5 +648,361 @@ describe('useAgentQueueController', () => {
     await lifecycle.waitForIdle(100)
     expect(releaseActiveTurn).toHaveBeenCalledTimes(1)
     expect(sendText).toHaveBeenCalledTimes(1)
+  })
+})
+
+/**
+ * #932：把「写错会让用户感觉到」的分支补上。
+ *
+ * 只挑这几类：**双倍领取 / 消息静默丢失 / 草稿串台 / 队列停摆 / 卡死无提示 / 冻结字段错**。
+ * getter、纯展示分支不补。
+ */
+describe('useAgentQueueController · 高危分支', () => {
+  function mountHook(props: AgentQueueControllerInput) {
+    let api: ReturnType<typeof useAgentQueueController> | null = null
+    function Probe() {
+      api = useAgentQueueController(props)
+      return createElement('span', null, 'ok')
+    }
+    renderToStaticMarkup(createElement(Probe))
+    return () => api!
+  }
+
+  afterEach(() => {
+    releaseSessionActivity(session.id)
+    clearQueueDrain(session.id)
+  })
+
+  it('★★ 同一会话同时两次泵：只领一次、只发一次（活动锁兜底，双泵 = 双倍扣费）', async () => {
+    const gate = new Promise<null>(() => {})
+    const claimNextQueuedTurn = vi.fn(() => gate)
+    const sendText = vi.fn(async () => undefined)
+    const props = input({
+      controller: {
+        claimNextQueuedTurn,
+        finishQueuedTurn: vi.fn(async () => session),
+      } as unknown as AgentController,
+      sendText,
+    })
+    mountHook(props)
+    requestQueueDrain(session.id)
+
+    /**
+     * 两次「该泵了」撞在一起：第一次卡在领取上，第二次**不许再领一次**。
+     *
+     * 注：`queuePumpingRef.has` 只是快路径，真正挡住的第二道闸是 `claimSessionActivity`
+     * —— 把活动锁那道判断删掉，这条会红（队列泵会二次领取同一条 turn ⇒ 双发/双扣费）。
+     */
+    props.queuePumpRef.current(session.id)
+    props.queuePumpRef.current(session.id)
+    await vi.waitFor(() =>
+      expect(claimNextQueuedTurn).toHaveBeenCalledTimes(1),
+    )
+    await Promise.resolve()
+    expect(claimNextQueuedTurn).toHaveBeenCalledTimes(1)
+    expect(sendText).not.toHaveBeenCalled()
+  })
+
+  it('★ 队列已满：给一次明确提示，不落草稿、不覆盖快照', async () => {
+    const notify = vi.fn()
+    const setDraft = vi.fn()
+    const enqueueTurn = vi.fn(async () => ({
+      ok: false as const,
+      reason: 'full' as const,
+    }))
+    const props = input({
+      notify,
+      setDraft,
+      controller: { enqueueTurn } as unknown as AgentController,
+    })
+    const api = mountHook(props)
+
+    await expect(api().queueText('第九条')).resolves.toBe(false)
+
+    expect(enqueueTurn).toHaveBeenCalledTimes(1)
+    expect(notify).toHaveBeenCalledWith(
+      '排队任务已达上限，请先处理或删除队列中的任务',
+      'error',
+    )
+    expect(setDraft).not.toHaveBeenCalled()
+    expect(props.applySessionSnapshot).not.toHaveBeenCalled()
+  })
+
+  it('★ 排队成功但会话已切走：入队照常，不动别人的草稿', async () => {
+    const setDraft = vi.fn()
+    const props = input({ setDraft })
+    props.currentIdRef.current = 'session-2'
+    const api = mountHook(props)
+
+    await expect(api().queueText('稍后发')).resolves.toBe(true)
+
+    expect(props.controller.enqueueTurn).toHaveBeenCalledTimes(1)
+    expect(props.applySessionSnapshot).toHaveBeenCalled()
+    expect(setDraft).not.toHaveBeenCalled()
+  })
+
+  it('★★ 回合正常结束且队列还有活：自动再泵一轮（否则队列停摆）', async () => {
+    const claimNextQueuedTurn = vi.fn(async () => null)
+    const props = input({
+      controller: {
+        claimNextQueuedTurn,
+        finishQueuedTurn: vi.fn(async () => session),
+      } as unknown as AgentController,
+    })
+    const api = mountHook(props)
+    expect(claimSessionActivity(session.id, 'turn-1', 'turn-1')).toBe(true)
+    requestQueueDrain(session.id)
+
+    await api().settleSessionOutcome(
+      session.id,
+      { kind: 'message', text: '完成', messages: [] },
+      { queueTurnId: 'turn-1', turnId: 'turn-1' },
+    )
+
+    await vi.waitFor(() =>
+      expect(claimNextQueuedTurn).toHaveBeenCalledWith(session.id),
+    )
+    // 再泵一轮之后锁必须收干净（否则下一次「恢复队列」会判 busy）
+    await vi.waitFor(() =>
+      expect(isSessionActivityActive(session.id)).toBe(false),
+    )
+  })
+
+  it('★★ 残留标记清不掉：给可指路的错误文案，而不是静默卡住', async () => {
+    const setStatusFor = vi.fn()
+    const props = input({
+      setStatusFor,
+      controller: {
+        claimNextQueuedTurn: vi.fn(async () => null),
+        finishQueuedTurn: vi.fn(async () => session),
+      } as unknown as AgentController,
+      sessions: {
+        get: vi.fn(async () => ({ ...session, activeTurnId: 'turn-stale' })),
+        releaseActiveTurn: vi.fn(async () => null),
+      } as unknown as AgentQueueControllerInput['sessions'],
+    })
+    const api = mountHook(props)
+    requestQueueDrain(session.id)
+
+    await api().resumeQueue()
+
+    expect(setStatusFor).toHaveBeenCalledWith(session.id, {
+      kind: 'error',
+      message: '队列被一条残留的进行中记录卡住，请重启应用',
+    })
+    expect(isSessionActivityActive(session.id)).toBe(false)
+  })
+
+  it('★ 冻结视频模型 / 技能 / 自动执行（漏一个就是发错模型或丢技能）', async () => {
+    const frozen = {
+      ...session,
+      videoModel: 'video-1',
+      skillId: 'skill-1',
+      autoRun: true,
+    }
+    const props = input({
+      current: frozen,
+      sessions: {
+        get: vi.fn(async () => frozen),
+      } as unknown as AgentQueueControllerInput['sessions'],
+    })
+    const api = mountHook(props)
+
+    await expect(api().queueText('按这个来')).resolves.toBe(true)
+
+    expect(props.controller.enqueueTurn).toHaveBeenCalledWith(
+      frozen.id,
+      expect.objectContaining({
+        videoModel: 'video-1',
+        skillId: 'skill-1',
+        autoRun: true,
+      }),
+    )
+  })
+
+  it('★ 空白文本 / 没有会话：都不入队（空回合会白扣一次）', async () => {
+    const props = input()
+    const api = mountHook(props)
+
+    await expect(api().queueText('   ')).resolves.toBe(false)
+    expect(props.controller.enqueueTurn).not.toHaveBeenCalled()
+    // 正向对照：同一实例换成有效文本必须真的入队
+    await expect(api().queueText('有内容')).resolves.toBe(true)
+    expect(props.controller.enqueueTurn).toHaveBeenCalledTimes(1)
+
+    const empty = input({ current: null })
+    const emptyApi = mountHook(empty)
+    await expect(emptyApi().queueText('没有会话')).resolves.toBe(false)
+    expect(empty.controller.enqueueTurn).not.toHaveBeenCalled()
+  })
+})
+
+/**
+ * #934-A：队列删改三件套（删一项 / 进编辑 / 提交编辑）。
+ *
+ * 这三条写错的后果都能被用户看见：删了还在、菜单不关、改完不生效或把空文案写进队列。
+ * 编辑态走 React state，所以这里用会重渲染的 TestRenderer，不用 `renderToStaticMarkup`。
+ */
+describe('useAgentQueueController · 队列删改三件套', () => {
+  const turn1 = {
+    id: 'turn-1',
+    text: '第一条',
+    createdAt: 1,
+    channelId: 'channel-1',
+    model: 'GPT-6 Astra',
+  }
+  const turn2 = { ...turn1, id: 'turn-2', text: '第二条', createdAt: 2 }
+
+  function mountLive(props: AgentQueueControllerInput) {
+    const ref: { current: ReturnType<typeof useAgentQueueController> | null } =
+      { current: null }
+    function Probe() {
+      ref.current = useAgentQueueController(props)
+      return null
+    }
+    let renderer!: TestRenderer.ReactTestRenderer
+    act(() => {
+      renderer = TestRenderer.create(createElement(Probe))
+    })
+    return {
+      get: () => ref.current!,
+      update: (next: AgentQueueControllerInput) => {
+        act(() => renderer.update(createElement(Probe, next)))
+      },
+      unmount: () => act(() => renderer.unmount()),
+    }
+  }
+
+  afterEach(() => {
+    releaseSessionActivity(session.id)
+    clearQueueDrain(session.id)
+  })
+
+  it('★ 删一项：用返回的会话刷新，并把该项菜单关掉（其它项菜单保持）', async () => {
+    const remaining = { ...session, queuedTurns: [turn2] }
+    const removeQueuedTurn = vi.fn(async () => remaining)
+    const applySessionSnapshot = vi.fn()
+    const setQueueMenuId = vi.fn()
+    const h = mountLive(
+      input({
+        current: { ...session, queuedTurns: [turn1, turn2] },
+        controller: { removeQueuedTurn } as unknown as AgentController,
+        applySessionSnapshot,
+        setQueueMenuId,
+      }),
+    )
+
+    await act(async () => {
+      await h.get().removeQueued('turn-1')
+    })
+
+    expect(removeQueuedTurn).toHaveBeenCalledWith(session.id, 'turn-1')
+    expect(applySessionSnapshot).toHaveBeenCalledWith(remaining)
+    const settleMenu = setQueueMenuId.mock.calls[0]![0] as (
+      id: string | null,
+    ) => string | null
+    expect(settleMenu('turn-1')).toBeNull()
+    expect(settleMenu('turn-2')).toBe('turn-2')
+  })
+
+  it('★ 删一项返回 null（已被别处删掉）：不刷新快照，但菜单照关', async () => {
+    const applySessionSnapshot = vi.fn()
+    const setQueueMenuId = vi.fn()
+    const h = mountLive(
+      input({
+        controller: {
+          removeQueuedTurn: vi.fn(async () => null),
+        } as unknown as AgentController,
+        applySessionSnapshot,
+        setQueueMenuId,
+      }),
+    )
+
+    await act(async () => {
+      await h.get().removeQueued('turn-1')
+    })
+
+    expect(applySessionSnapshot).not.toHaveBeenCalled()
+    expect(setQueueMenuId).toHaveBeenCalled()
+
+    // 没有当前会话时整段 no-op（别把别的会话的队列删了）
+    const none = input({ current: null })
+    const noneHook = mountLive(none)
+    await act(async () => {
+      await noneHook.get().removeQueued('turn-1')
+    })
+    expect(none.controller.removeQueuedTurn).not.toHaveBeenCalled()
+  })
+
+  it('★★ 进编辑 → 改文案 → 提交：新文案交给 controller，编辑态清空', async () => {
+    const editQueuedTurn = vi.fn(async () => session)
+    const applySessionSnapshot = vi.fn()
+    const setQueueMenuId = vi.fn()
+    const h = mountLive(
+      input({
+        controller: { editQueuedTurn } as unknown as AgentController,
+        applySessionSnapshot,
+        setQueueMenuId,
+      }),
+    )
+
+    act(() => {
+      h.get().beginQueueEdit(turn2)
+    })
+    // 进编辑会先关菜单，并把原文填进输入
+    expect(setQueueMenuId).toHaveBeenCalledWith(null)
+    expect(h.get().editingQueueId).toBe('turn-2')
+    expect(h.get().editingQueueText).toBe('第二条')
+
+    act(() => {
+      h.get().setEditingQueueText('  新文案  ')
+    })
+    expect(h.get().editingQueueText).toBe('  新文案  ')
+
+    await act(async () => {
+      await h.get().commitQueueEdit()
+    })
+
+    expect(editQueuedTurn).toHaveBeenCalledWith(
+      session.id,
+      'turn-2',
+      '新文案',
+    )
+    expect(applySessionSnapshot).toHaveBeenCalledWith(session)
+    expect(h.get().editingQueueId).toBeNull()
+    expect(h.get().editingQueueText).toBe('')
+  })
+
+  it('★★ 空文案提交：提示一次，且绝不把空串写进队列（编辑态保留）', async () => {
+    const editQueuedTurn = vi.fn(async () => session)
+    const notify = vi.fn()
+    const h = mountLive(
+      input({
+        controller: { editQueuedTurn } as unknown as AgentController,
+        notify,
+      }),
+    )
+
+    act(() => {
+      h.get().beginQueueEdit(turn2)
+    })
+    act(() => {
+      h.get().setEditingQueueText('   ')
+    })
+    await act(async () => {
+      await h.get().commitQueueEdit()
+    })
+
+    expect(notify).toHaveBeenCalledWith('消息不能为空', 'error')
+    expect(editQueuedTurn).not.toHaveBeenCalled()
+    // 正向证据：确实进了"空文案"这条分支 —— 编辑态没被清掉，用户还能继续改
+    expect(h.get().editingQueueId).toBe('turn-2')
+
+    // 没进编辑态就提交：整段 no-op
+    const idle = mountLive(input())
+    await act(async () => {
+      await idle.get().commitQueueEdit()
+    })
+    expect(idle.get().editingQueueId).toBeNull()
   })
 })
