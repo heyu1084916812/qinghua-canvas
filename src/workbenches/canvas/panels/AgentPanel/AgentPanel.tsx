@@ -16,9 +16,6 @@ import {
 } from '../../../../state/agent/sessionStore'
 import { createAgentJobStore } from '../../../../state/agent/jobStore'
 import type { AgentDeliveryMode } from '../../../../domain/agent/delivery'
-import {
-  agentTaskPlanProgress,
-} from '../../../../domain/agent/taskPlan'
 import { createPresetStore } from '../../../../state/project/presetStore'
 import type { AgentNodeType } from '../../../../domain/agent/plan'
 import {
@@ -58,10 +55,7 @@ import {
   executeConfirmedTool,
   type AgentToolContext,
 } from '../../agent/tools'
-import {
-  createAgentController,
-  type AgentTurnOrigin,
-} from '../../../../features/shared/agent/AgentController'
+import { createAgentController } from '../../../../features/shared/agent/AgentController'
 import { createAgentMemoryPort } from '../../../../features/shared/agent/MemoryPort'
 import {
   AgentToolEffectBlockedError,
@@ -97,6 +91,11 @@ import { toConversation } from './conversation'
 import { createAgentToolRecipeContext } from './agentToolRecipeContext'
 import { createAgentToolExecution } from './agentToolExecution'
 import { isAdvanceTaskCommand } from './agentProcessText'
+import {
+  failureStatus,
+  failureTurnPayload,
+  sendTurnSeed,
+} from './agentSendTurnPlan'
 import {
   useAgentConversationController,
   type AgentMessageReveal,
@@ -1279,15 +1278,14 @@ export function AgentPanel({
     actualTurnId = createId('turnmsg'),
     turnAbort = new AbortController(),
   ) => {
-    const turnOrigin: AgentTurnOrigin = {
-      turnId: actualTurnId,
+    const { turnOrigin, clearTaskPlan } = sendTurnSeed({
+      session,
+      text,
+      actualTurnId,
       queueTurnId: turnId,
-    }
+    })
     currentTurnJobIdRef.current.delete(session.id)
-    if (
-      session.taskPlan &&
-      agentTaskPlanProgress(session.taskPlan).status !== 'active'
-    ) {
+    if (clearTaskPlan) {
       const cleared = await trackRun(() =>
         sessions.updateFields(session.id, {
           taskPlan: undefined,
@@ -1303,20 +1301,21 @@ export function AgentPanel({
 
     let routeReady = false
     const failBeforeModel = async (message: string, phase: string) => {
-      await controller.failTurn(session.id, {
-        reason: message,
-        phase,
-        aborted: turnAbort.signal.aborted,
-        origin: turnOrigin,
-      })
+      await controller.failTurn(
+        session.id,
+        failureTurnPayload({
+          message,
+          phase,
+          aborted: turnAbort.signal.aborted,
+          origin: turnOrigin,
+        }),
+      )
       clearLiveActivitiesFor(session.id)
       clearLiveProcessFor(session.id)
       clearRunTasksFor(session.id)
       setStatusFor(
         session.id,
-        turnAbort.signal.aborted
-          ? IDLE_STATUS
-          : { kind: 'error', message },
+        failureStatus(turnAbort.signal.aborted, message),
       )
     }
     let requestPreparation: Awaited<
