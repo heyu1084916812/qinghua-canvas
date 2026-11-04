@@ -93,6 +93,9 @@ import { createAgentToolDefaults } from './agentToolDefaults'
 import { imageContextAssets } from './agentToolContextAssets'
 import { isAdvanceTaskCommand } from './agentProcessText'
 import { useAgentSendTurnController } from './useAgentSendTurnController'
+import { useAgentConfirmationController } from './useAgentConfirmationController'
+import { useAgentContinuationController } from './useAgentContinuationController'
+import { useAgentStopController } from './useAgentStopController'
 import type { AgentPrepareArgs } from './agentSendTurnRun'
 import {
   useAgentConversationController,
@@ -1546,196 +1549,81 @@ export function AgentPanel({
     status,
   ])
 
-  const confirm = useCallback(() => {
-    if (status.kind !== 'awaitingConfirm' || !current) return Promise.resolve()
-    if (confirmingRef.current.has(current.id)) return Promise.resolve()
-    confirmingRef.current.add(current.id)
-    const { request } = status
-    return trackRun(async () => {
-      try {
-        inFlightConfirmationRef.current.set(current.id, request)
-        await runAgentConfirmation({
-          session: current,
-          request,
-          messages,
-          turnOrigin: () => ({
-            jobId:
-              currentTurnJobIdRef.current.get(current.id) ??
-              controller.jobId(current.id),
-            turnId:
-              activeQueueTurnOf(current.id) ??
-              currentTurnIdRef.current.get(current.id) ??
-              controller.turnId(current.id),
-            queueTurnId: activeQueueTurnOf(current.id),
-            messageRevision:
-              current.messageRevision ??
-              currentTurnRevisionRef.current.get(current.id),
-          }),
-          beginConfirmation: controller.beginConfirmation,
-          finishConfirmedTool: controller.finishConfirmedTool,
-          executeConfirmedTool: executeConfirmedToolWithLedger,
-          createLoopDeps: (args) => loopDeps(args),
-          toolMode: () =>
-            toolModeRef.current.get(current.id) ?? 'native',
-          turnTools: () => turnToolsForSession(current),
-          resumeAgentTurn,
-          continueAutoConfirmations,
-          handleOutcome,
-          settleSessionOutcome,
-          transitionSessionJob,
-          setAbortController: (confirmationAbort) => {
-            abortRefs.current.set(current.id, confirmationAbort)
-          },
-          setStatus: (next) => setStatusFor(current.id, next),
-          isCurrentSession: () => currentIdRef.current === current.id,
-          setMessages,
-        })
-      } finally {
-        confirmingRef.current.delete(current.id)
-        if (
-          inFlightConfirmationRef.current.get(current.id)?.callId === request.callId
-        ) {
-          inFlightConfirmationRef.current.delete(current.id)
-        }
-      }
-    })
-  }, [
-    status,
+  /**
+   * 确认卡的两个动作（确认 / 取消）走同一个控制器：它们共用 `confirmingRef`，
+   * 互斥语义必须待在一个文件里才看得见。`confirmRef` 仍在这里赋值，
+   * 供自动执行路径的 `confirmLatest` 调用。
+   */
+  const { confirm, cancel } = useAgentConfirmationController({
     current,
+    status,
     messages,
+    confirmingRef,
+    inFlightConfirmationRef,
+    currentTurnJobIdRef,
+    currentTurnIdRef,
+    currentTurnRevisionRef,
+    activeQueueTurnOf,
     controller,
-    executeConfirmedToolWithLedger,
+    runConfirmation: runAgentConfirmation,
+    executeConfirmedTool: executeConfirmedToolWithLedger,
     loopDeps,
+    toolModeRef,
+    turnToolsForSession,
+    resumeAgentTurn,
+    continueAutoConfirmations,
     handleOutcome,
     settleSessionOutcome,
-    setStatusFor,
     transitionSessionJob,
-    continueAutoConfirmations,
-    turnToolsForSession,
+    abortRefs,
+    currentIdRef,
+    setStatusFor,
+    setMessages,
+    settleInterruptedSession,
     trackRun,
-  ])
+    notify: store.notify,
+  })
   confirmRef.current = confirm
 
-  /**
-   * 确认卡上的「取消」= 结束当前任务，交还控制权。
-   *
-   * 不回填工具结果会让历史里留下悬空 tool_call；自动续跑又会让模型换个方案
-   * 继续建节点。两者都不是用户点“取消”的意思，所以只补取消结果、不续跑。
-   */
-  const cancel = useCallback(() => {
-    if (status.kind !== 'awaitingConfirm' || !current) return Promise.resolve()
-    if (confirmingRef.current.has(current.id)) return Promise.resolve()
-    confirmingRef.current.add(current.id)
-    const { request } = status
-    return trackRun(async () => {
-      try {
-        const settled = await settleInterruptedSession(
-          current,
-          request,
-          'canceled',
-        )
-        if (!settled.cleanupError) {
-          store.notify('已取消；本次没有执行工具，也不会自动新增节点', 'info')
-        }
-      } finally {
-        confirmingRef.current.delete(current.id)
-      }
-    })
-  }, [
-    status,
-    current,
-    settleInterruptedSession,
-    store,
-    trackRun,
-  ])
-
   /** 轮数预算暂停后继续；工具结果已在 messages 中，不会重放已完成的调用。 */
-  const continueTask = useCallback(() => {
-    if (!current || status.kind !== 'paused') return Promise.resolve()
-    return trackRun(async () => {
-      await runAgentContinuation({
-        session: current,
-        messages,
-        activeQueueTurnId: () => activeQueueTurnOf(current.id),
-        currentTurnId: () =>
-          currentTurnIdRef.current.get(current.id) ??
-          controller.turnId(current.id),
-        turnOrigin: (turnId, queueTurnId) => ({
-          jobId:
-            currentTurnJobIdRef.current.get(current.id) ??
-            controller.jobId(current.id),
-          turnId:
-            turnId ??
-            controller.turnId(current.id),
-          queueTurnId,
-          messageRevision:
-            current.messageRevision ??
-            currentTurnRevisionRef.current.get(current.id),
-        }),
-        isActivityActive: () => isSessionActivityActive(current.id),
-        claimNextQueuedTurn: controller.claimNextQueuedTurn,
-        claimActivity: (sessionId, queueTurnId, turnId) =>
-          claimSessionActivity(sessionId, queueTurnId, turnId),
-        applySessionSnapshot,
-        ensureRoute: (session) => prepareChatRoute(session),
-        createLoopDeps: (args) => loopDeps(args),
-        toolMode: () => toolModeRef.current.get(current.id) ?? 'native',
-        turnTools: () => turnToolsForSession(current),
-        transitionSessionJob,
-        setAbortController: (continuationAbort) => {
-          abortRefs.current.set(current.id, continuationAbort)
-        },
-        setStatus: (next) => setStatusFor(current.id, next),
-        runAgentTurn,
-        continueAutoConfirmations,
-        handleOutcome,
-        settleSessionOutcome,
-        isCurrentSession: () => currentIdRef.current === current.id,
-        setMessages,
-      })
-    })
-  }, [
+  const continueTask = useAgentContinuationController({
     current,
     status,
     messages,
     controller,
+    activeQueueTurnOf,
+    currentTurnJobIdRef,
+    currentTurnIdRef,
+    currentTurnRevisionRef,
+    isActivityActive: isSessionActivityActive,
+    claimActivity: claimSessionActivity,
     applySessionSnapshot,
-    prepareChatRoute,
+    ensureRoute: prepareChatRoute,
     loopDeps,
+    toolModeRef,
+    turnToolsForSession,
+    transitionSessionJob,
+    abortRefs,
     setStatusFor,
+    runAgentTurn,
+    continueAutoConfirmations,
     handleOutcome,
     settleSessionOutcome,
-    transitionSessionJob,
-    continueAutoConfirmations,
-    turnToolsForSession,
+    currentIdRef,
+    setMessages,
     trackRun,
-  ])
+    runContinuation: runAgentContinuation,
+  })
 
-  const stop = useCallback(() => {
-    if (!current || stoppingRef.current.has(current.id)) return Promise.resolve()
-    stoppingRef.current.add(current.id)
-    const session = current
-    const request =
-      inFlightConfirmationRef.current.get(session.id) ??
-      (status.kind === 'awaitingConfirm' ? status.request : undefined)
-    return trackRun(async () => {
-      try {
-        const settled = await settleInterruptedSession(
-          session,
-          request,
-          'interrupted',
-        )
-        if (
-          !settled.cleanupError &&
-          (session.queuedTurns?.length ?? 0) > 0
-        ) {
-          store.notify('当前回合已停止，排队任务保留；可从队列手动继续', 'info')
-        }
-      } finally {
-        stoppingRef.current.delete(session.id)
-      }
-    })
-  }, [current, settleInterruptedSession, status, store, trackRun])
+  const stop = useAgentStopController({
+    current,
+    status,
+    inFlightConfirmationRef,
+    stoppingRef,
+    settleInterruptedSession,
+    notify: store.notify,
+    trackRun,
+  })
 
   /**
    * 存会话上的任意字段：模型、技能、素材标签、比例 / 画质 / 质量都走这一条。
