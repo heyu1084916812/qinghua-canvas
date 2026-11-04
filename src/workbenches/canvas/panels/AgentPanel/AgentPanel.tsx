@@ -80,10 +80,6 @@ import {
 } from '../../../../features/shared/lifecycle/taskLifecycle'
 import { createContextRepository } from '../../../../state/shared/contextRepository'
 import { createId } from '../../../../shared/id'
-import {
-  sessionForQueuedTurn,
-  type QueuedAgentTurn,
-} from '../../../../domain/agent/queuedTurn'
 import { createAgentPanelShutdownControl } from './agentPanelShutdown'
 import { steerMessagesOf } from '../../../../domain/agent/steering'
 import {
@@ -115,6 +111,7 @@ import { useAgentAttachmentsController } from './useAgentAttachmentsController'
 import { useAgentChatRouting } from './useAgentChatRouting'
 import { useAgentModelSelectionController } from './useAgentModelSelectionController'
 import { useAgentAutoRunController } from './useAgentAutoRunController'
+import { useAgentSteeringController } from './useAgentSteeringController'
 import { useAgentSessionLifecycle } from './useAgentSessionLifecycle'
 import { useAgentSessionActionsController } from './useAgentSessionActionsController'
 import { useAgentTaskPlanController } from './useAgentTaskPlanController'
@@ -1753,90 +1750,37 @@ export function AgentPanel({
     ],
   )
 
-  /**
-   * 队列项的“直接引导”：带新素材的消息不能被中途改成引导，因为当前请求的视觉输入
-   * 已经发出；普通文字则立即进入当前任务。若正停在确认卡，先取消这次待执行动作，
-   * 再把消息作为新的用户回合发出去，避免旧动作先执行、引导最后才看到。
-   */
-  const guideQueuedTurn = useCallback(
-    (turn: QueuedAgentTurn) =>
-      trackRun(async () => {
-        if (!current || !statusCanSteer(status)) return
-        if (turn.pendingAssetIds?.length) {
-          store.notify('带新素材的消息不能中途引导，请等它按队列发送', 'error')
-          return
-        }
-        const queuedJob = await jobs.forTurn(current.id, turn.id)
-
-        const pendingConfirmation =
-          status.kind === 'awaitingConfirm' ? status.request : current.pendingConfirmation
-        if (pendingConfirmation) {
-          const withoutTurn = await sessions.removeQueuedTurn(current.id, turn.id)
-          if (!withoutTurn) return
-          applySessionSnapshot(withoutTurn)
-          if (queuedJob?.status === 'queued') {
-            await jobs.transition(
-              queuedJob.id,
-              'canceled',
-              'canceled',
-              {},
-              { reason: 'promoted_to_steer' },
-            )
-          }
-          const settled = await settleInterruptedSession(
-            withoutTurn,
-            pendingConfirmation,
-            'canceled',
-          )
-          if (settled.cleanupError) return
-          const target = settled.session ?? withoutTurn
-          store.notify('已取消等待中的动作，并立即发送这条引导', 'info')
-          await sendText(turn.text, sessionForQueuedTurn(target, turn))
-          return
-        }
-
-        const promoted = await sessions.promoteQueuedTurnToSteer(
-          current.id,
-          turn.id,
-          createId('steer'),
+  const { guideQueuedTurn, guideDraft } =
+    useAgentSteeringController({
+      current,
+      statusFor: runPresentation.statusFor,
+      isCurrentSession: (sessionId) =>
+        currentIdRef.current === sessionId,
+      trackRun,
+      queueText,
+      sendText,
+      settleInterruptedSession,
+      removeQueuedTurn: sessions.removeQueuedTurn,
+      promoteQueuedTurnToSteer:
+        sessions.promoteQueuedTurnToSteer,
+      enqueueSteer: sessions.enqueueSteer,
+      getQueuedJob: (sessionId, turnId) =>
+        jobs.forTurn(sessionId, turnId),
+      cancelQueuedJob: async (jobId) => {
+        await jobs.transition(
+          jobId,
+          'canceled',
+          'canceled',
+          {},
+          { reason: 'promoted_to_steer' },
         )
-        if (!promoted.ok) {
-          store.notify(
-            promoted.reason === 'has_assets'
-              ? '带新素材的消息不能中途引导，请等它按队列发送'
-              : promoted.reason === 'steer_full'
-                ? '当前任务的引导已达上限'
-                : promoted.reason === 'awaiting_confirmation'
-                  ? 'Agent 正在等待确认，请重新点击引导'
-                : '这条排队消息已经不存在',
-            'error',
-          )
-          return
-        }
-        applySessionSnapshot(promoted.session)
-        if (queuedJob?.status === 'queued') {
-          await jobs.transition(
-            queuedJob.id,
-            'canceled',
-            'canceled',
-            {},
-            { reason: 'promoted_to_steer' },
-          )
-        }
-        setQueueMenuId(null)
-        store.notify('已转为引导，将在 Agent 下一次动作前应用', 'info')
-      }),
-    [
-    applySessionSnapshot,
-    current,
-    jobs,
-    sendText,
-    sessions,
-    settleInterruptedSession,
-    status,
-    store,
-    trackRun,
-  ])
+      },
+      applySessionSnapshot,
+      setDraft,
+      writeDraftForSession,
+      setQueueMenuId,
+      notify: store.notify,
+    })
 
   const { advanceTaskPlan, isAdvancingTaskPlan } =
     useAgentTaskPlanController({
@@ -1858,75 +1802,6 @@ export function AgentPanel({
       sendText,
       notify: store.notify,
     })
-
-  /**
-   * 输入框里的“引导”：直接把当前草稿投进正在运行的回合。
-   *
-   * 普通运行中走 pendingSteers；停在确认卡时先取消未执行动作，再把这条消息
-   * 作为新用户回合发起，避免用户还得先排队、展开列表、再点一次引导。
-   */
-  const guideDraft = useCallback(
-    (raw: string) =>
-      trackRun(async () => {
-        const text = raw.trim()
-        if (!text || !current) return false
-        if (current.pendingAssetIds?.length) {
-          store.notify('带新素材的消息不能中途引导，已改为排队发送', 'info')
-          return queueText(text)
-        }
-
-        const pendingConfirmation =
-          status.kind === 'awaitingConfirm' ? status.request : current.pendingConfirmation
-        if (pendingConfirmation) {
-          const settled = await settleInterruptedSession(
-            current,
-            pendingConfirmation,
-            'canceled',
-          )
-          if (settled.cleanupError) return false
-          const target = settled.session ?? current
-          store.notify('已取消等待中的动作，并立即发送这条引导', 'info')
-          await sendText(text, target)
-          return true
-        }
-
-        const steered = await sessions.enqueueSteer(current.id, {
-          id: createId('steer'),
-          text,
-          createdAt: Date.now(),
-        })
-        if (!steered.ok) {
-          store.notify(
-            steered.reason === 'full'
-              ? '当前任务的引导已达上限'
-              : '引导发送失败，请稍后重试',
-            'error',
-          )
-          return false
-        }
-        applySessionSnapshot(steered.session)
-        if (currentIdRef.current === current.id) {
-          setDraft((value) => {
-            const next = value.trim() === text ? '' : value
-            if (next !== value) writeDraftForSession(current.id, next)
-            return next
-          })
-        }
-        store.notify('已作为引导发送，将在 Agent 下一次动作前应用', 'info')
-        return true
-      }),
-    [
-    applySessionSnapshot,
-    current,
-    queueText,
-    sendText,
-    sessions,
-    settleInterruptedSession,
-    status,
-    store,
-    trackRun,
-    writeDraftForSession,
-  ])
 
   /** 输入框发送：空闲直接跑；忙碌时按当前“排队 / 引导”模式投递。 */
   const send = useCallback(
