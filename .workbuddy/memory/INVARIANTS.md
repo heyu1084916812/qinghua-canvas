@@ -10,6 +10,13 @@
   最终模型变化时才写（先 remember 到 ref 再落库）；上下文素材只留 `image/*`。`toolCtx()` 必须每次重建，
   任何 per-session 缓存都会让「批准后才执行」的工具看到发消息那一刻的旧快照。
 
+- **`taskPlan.save` 的落库投影顺序不可换**：`updateFields → setList → setCurrent`，`updateFields` 返回 null
+  时一个投影都不做，非当前会话只 `setList` 不 `setCurrent`，整段必须在 `trackRun` 内。
+- **可选键的"存在性"是契约**：`signal` / `perImage` / `taskPlan` 在不存在时**不出键**，不是出 `undefined`。
+  写成 `signal: undefined` 会让 `'signal' in input` 由 false 变 true，下游行为漂移。
+- **乐观写的回滚目标**是"最后一次成功落库的值"，不是"进入本次写入前的内存值"；并且只有最新意图
+  （序号守卫）能修改实时值，旧请求的失败不许冲掉用户后来的点击。
+
 - **四个动作控制器的顺序不在控制器里**：stop / cancel / continueTask / confirm 的编排顺序由
   `agentInterruptSettlement` / `agentContinuationRun` / `agentConfirmationRun` 承载。控制器只负责守卫
   （`stoppingRef` / `confirmingRef` / `inFlightConfirmationRef`，同步占、`finally` 释放）与调用时快照

@@ -1,5 +1,17 @@
 # CanvasFlow（轻画）项目记忆
 
+### 工具上下文三段式 + autoRun 写入串行（2026-11-04，对账 #888a/#892，`d02f1fc` + `9e93417`）
+
+- **`taskPlan.save` 的三条顺序现在是可测的了**（`agentToolPlanPorts.ts`）：`updateFields → setList → setCurrent`；
+  `updateFields` 返回 null 时**一个投影都不做**且返回 null；非当前会话**只 setList 不 setCurrent**
+  （否则会把用户从别的会话拽回来）；整段必须在 `trackRun` 内（面板已关不许写库）。
+- **`signal` 是"可选键"不是 undefined**：`canvasOps` 里没有取消信号时**连键都不出现**，
+  写成 `signal: undefined` 会让 `'signal' in input` 从 false 变 true，下游行为漂移。
+- **autoRun 回滚要回到"最后成功落库值"**，不是"进这次 patch 前的内存值"——串行化之后前者才正确，
+  后者会把上一次已成功的写入也抹掉。
+- **只有最新意图能改实时值**：`intentRef` 序号守卫，让"旧请求的失败"冲不掉用户后来的点击。
+- **写入链按会话分桶**：全局串行会让 A 的慢写卡住 B；每条链自己 `.catch(() => undefined)`，一次失败不掐断后续。
+
 ### 确认/取消/继续/停止四控制器 + 引导失败回收（2026-11-04，对账 #890/#891，`866b832` + `1b4bfce`）
 
 - **四段动作只是"搬位置"**：顺序全在未改动模块里——stop 走 `agentInterruptSettlement`（abort→settle→transition→
