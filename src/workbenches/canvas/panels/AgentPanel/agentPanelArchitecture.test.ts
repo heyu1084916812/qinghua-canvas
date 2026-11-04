@@ -17,9 +17,12 @@ import { describe, expect, it } from 'vitest'
  * 不是「把阈值调大」。
  *
  * 调节奏：按「该刀实测 + 40」定值，之后每刀同理——阈值始终贴着实测走，留出的 40 行
- * 只够接一刀，不够养回一个胖文件。当前 1843 = #898b 会话条目纯函数接线后实测 1803 + 40。
+ * 只够接一刀，不够养回一个胖文件。当前 185 = #907 三个领域模型拆出后实测 145 + 40。
+ *
+ * 面板现在只剩**接线**：refs → 会话模型 → 工具模型 → 回合模型 → 视图 props。
+ * 想再往里堆逻辑，答案仍然是「放进对应领域的 model」，不是「把阈值调大」。
  */
-const AGENT_PANEL_MAX_LINES = 1693
+const AGENT_PANEL_MAX_LINES = 185
 
 /**
  * `.ts` 下沉模块里允许出现的 hook 调用（模块名 → 理由）。
@@ -62,6 +65,42 @@ const CONTROLLER_MODULES = import.meta.glob('./useAgent*.ts', {
   query: '?raw',
   import: 'default',
 }) as Record<string, string>
+
+/**
+ * 三个领域模型 + ref 宿主的源码。
+ *
+ * 它们同样是 `useAgent*.ts`（已在上面的 glob 里），但**语义断言需要点名**：
+ * 「toolCtx 的取值时机」「初始加载的端口接线」「会话桶的唯一宿主」现在都住在这里，
+ * 而不是面板本体。断言仍然逐字对着源码，只是换了地址 —— 规则不变，位置跟着代码走。
+ */
+const SESSION_MODEL_SOURCE = (
+  import.meta.glob('./useAgentPanelSessionModel.ts', {
+    eager: true,
+    query: '?raw',
+    import: 'default',
+  }) as Record<string, string>
+)['./useAgentPanelSessionModel.ts']
+const TOOL_MODEL_SOURCE = (
+  import.meta.glob('./useAgentPanelToolModel.ts', {
+    eager: true,
+    query: '?raw',
+    import: 'default',
+  }) as Record<string, string>
+)['./useAgentPanelToolModel.ts']
+const TURN_MODEL_SOURCE = (
+  import.meta.glob('./useAgentPanelTurnModel.ts', {
+    eager: true,
+    query: '?raw',
+    import: 'default',
+  }) as Record<string, string>
+)['./useAgentPanelTurnModel.ts']
+const REFS_SOURCE = (
+  import.meta.glob('./useAgentPanelRefs.ts', {
+    eager: true,
+    query: '?raw',
+    import: 'default',
+  }) as Record<string, string>
+)['./useAgentPanelRefs.ts']
 
 const NAME_ONLY = (path: string): string => path.replace(/^.*\//, '')
 
@@ -345,7 +384,7 @@ const callBlock = (source: string, anchor: string): string => {
  */
 describe('toolCtx 的调用即取闭包', () => {
   it('signal 端口是 thunk：每次调用才读 abortRefs', () => {
-    const block = callBlock(PANEL_SOURCE, 'createAgentToolResearch(')
+    const block = callBlock(TOOL_MODEL_SOURCE, 'createAgentToolResearch(')
     expect(block, '没找到 createAgentToolResearch(...)').not.toBe('')
     // 必须是 `signal: () => abortRefs.current…`
     expect(block).toMatch(/signal:\s*\(\)\s*=>/)
@@ -353,17 +392,17 @@ describe('toolCtx 的调用即取闭包', () => {
     // 值形态一律不许：`signal: abortRefs.current…`
     expect(block).not.toMatch(/signal:\s*abortRefs\./)
     // 也不许在创建前先算好再传进来
-    expect(PANEL_SOURCE).not.toMatch(
+    expect(TOOL_MODEL_SOURCE).not.toMatch(
       /const\s+\w*[Ss]ignal\w*\s*=\s*abortRefs\.current/,
     )
   })
 
   it('perImage 每次建上下文都读 sessionRuntime.current（条件键在组装层展开）', () => {
-    // 面板侧：建 ctx 时现读 ref，不许提前算成组件级常量
-    expect(PANEL_SOURCE).toMatch(
+    // 工具模型：建 ctx 时现读 ref，不许提前算成常量
+    expect(TOOL_MODEL_SOURCE).toMatch(
       /perImage:\s*sessionRuntimeRef\.current\.isPerImage\(\s*sessionId\s*\)/,
     )
-    expect(PANEL_SOURCE).not.toMatch(
+    expect(TOOL_MODEL_SOURCE).not.toMatch(
       /const\s+\w+\s*=\s*sessionRuntimeRef\.current\.isPerImage\(/,
     )
     // 组装层：只有真值才**出键**（`perImage: false` 会把键带出来）
@@ -384,20 +423,22 @@ describe('toolCtx 的调用即取闭包', () => {
     expect(composer).toMatch(
       /^\s*selectedModelOf: base\.selectedModelOf,\s*$/m,
     )
-    // 面板侧：只传快照与引用，不许包成值
-    expect(PANEL_SOURCE).toMatch(/^\s*selectedModelOf,\s*$/m)
-    expect(PANEL_SOURCE).not.toMatch(/selectedIds:\s*selection\b/)
-    expect(PANEL_SOURCE).not.toMatch(/const\s+selectedIds\s*=\s*selection/)
+    // 工具模型：只传快照与引用，不许包成值
+    expect(TOOL_MODEL_SOURCE).toMatch(/^\s*selectedModelOf,\s*$/m)
+    expect(TOOL_MODEL_SOURCE).not.toMatch(/selectedIds:\s*selection\b/)
+    expect(TOOL_MODEL_SOURCE).not.toMatch(
+      /const\s+selectedIds\s*=\s*selection/,
+    )
     expect(composer).not.toMatch(/selectedIds:\s*base\.selection\b/)
   })
 
   it('runNodes 的素材在调用时才读 contextTrace，不许提前算成常量', () => {
     // 读 ref 的那一下必须在 thunk 里（`() => contextTraceRef.current…`），
     // 这样「跑节点」执行时才拿得到那一刻的素材（管它是内联还是经端口传下去）。
-    expect(PANEL_SOURCE).toMatch(
+    expect(TOOL_MODEL_SOURCE).toMatch(
       /\(\)\s*=>\s*contextTraceRef\.current\.get\(sessionId\)\?\.assetRefs/,
     )
-    expect(PANEL_SOURCE).not.toMatch(
+    expect(TOOL_MODEL_SOURCE).not.toMatch(
       /const\s+\w+\s*=\s*contextTraceRef\.current\.get\(sessionId\)\?\.assetRefs/,
     )
   })
@@ -422,16 +463,16 @@ describe('toolCtx 的调用即取闭包', () => {
     expect(handRolled).toEqual([])
   })
 
-  it('三份装配都在 toolCtx 函数体内，而不是组件级', () => {
-    const start = PANEL_SOURCE.indexOf('const toolCtx = useCallback(')
-    const end = PANEL_SOURCE.indexOf('const toolExecution = useMemo(')
+  it('三份装配都在 toolCtx 函数体内，而不是模型级', () => {
+    const start = TOOL_MODEL_SOURCE.indexOf('const toolCtx = useCallback(')
+    const end = TOOL_MODEL_SOURCE.indexOf('const toolExecution = useMemo(')
     expect(start).toBeGreaterThan(-1)
     expect(end).toBeGreaterThan(start)
     for (const anchor of [
       'createAgentToolResearch(',
       'createAgentToolDefaults(',
     ]) {
-      const at = PANEL_SOURCE.indexOf(anchor)
+      const at = TOOL_MODEL_SOURCE.indexOf(anchor)
       expect(at, `${anchor} 不在文件里`).toBeGreaterThan(start)
       expect(at, `${anchor} 不在 toolCtx 里`).toBeLessThan(end)
     }
@@ -462,21 +503,133 @@ describe('初始加载孤儿清理的接线快照', () => {
     )
   })
 
-  it('面板把控制器要的两个出口接到 store.notify(error) 与 platform.logger(warn)', () => {
-    expect(PANEL_SOURCE).toContain(
+  it('会话模型把控制器要的两个出口接到 store.notify(error) 与 platform.logger(warn)', () => {
+    expect(SESSION_MODEL_SOURCE).toContain(
       "notify: (message, tone) => store.notify(message, tone ?? 'error'),",
     )
-    expect(PANEL_SOURCE).toContain(
+    expect(SESSION_MODEL_SOURCE).toContain(
       "logWarning: (message, detail) => platform.logger.log('warn', message, detail),",
     )
   })
 
   it('不再有内联 warn：清理失败只经端口收口，不会记两条日志', () => {
     expect(PANEL_SOURCE).not.toContain('outcome.cleanupError')
+    expect(SESSION_MODEL_SOURCE).not.toContain('outcome.cleanupError')
     const occurrences =
-      `${PANEL_SOURCE}\n${controller()}`.match(
+      `${SESSION_MODEL_SOURCE}\n${controller()}`.match(
         /\[agent\] initial session cleanup failed/g,
       ) ?? []
     expect(occurrences).toHaveLength(1)
+  })
+})
+
+/**
+ * #907：面板一分为三之后的**单一宿主**护栏。
+ *
+ * 这一组是这次拆分真正想防的事故，而不是行数：
+ * - 面板自己又长出 state / ref / effect（那就等于没拆）；
+ * - 某个按会话分桶的 Map 被两个 hook 各建一份（**两份状态**，A 写的 B 读不到）；
+ * - 某个控制器被实例化两次（两条队列、两个 composer、两套 abort）。
+ *
+ * 这些都不会报错，只会表现为「停止按钮停不掉」「切会话后草稿丢了」这类最难复现的 bug。
+ */
+describe('三个领域模型的单一宿主', () => {
+  it('面板本体不再持有任何 state / ref / effect / memo', () => {
+    expect(PANEL_SOURCE).not.toMatch(HOOK_CALL)
+  })
+
+  it('面板只调用四个 hook：refs + 三个领域模型 + 视图 props 装配', () => {
+    for (const hook of [
+      'useAgentPanelRefs(',
+      'useAgentPanelSessionModel(',
+      'useAgentPanelToolModel(',
+      'useAgentPanelTurnModel(',
+      'useAgentPanelViewProps(',
+    ]) {
+      expect(
+        PANEL_SOURCE.split(hook).length - 1,
+        `${hook} 在面板里应当恰好出现一次`,
+      ).toBe(1)
+    }
+  })
+
+  it('按会话分桶的 Map / Set 只在 useAgentPanelRefs 里创建', () => {
+    /**
+     * 只扫**这次拆出来的四个文件**：更早就存在的控制器（队列泵、引导等）本来就各有
+     * 自己的小 Map，它们不归这次搬家管，扫全目录只会得到一屏与本次无关的噪音。
+     */
+    const offenders = [
+      ['AgentPanel.tsx', PANEL_SOURCE],
+      ['useAgentPanelSessionModel.ts', SESSION_MODEL_SOURCE],
+      ['useAgentPanelToolModel.ts', TOOL_MODEL_SOURCE],
+      ['useAgentPanelTurnModel.ts', TURN_MODEL_SOURCE],
+    ]
+      .filter(([, source]) => /useRef\(\s*new (Map|Set)/.test(source))
+      .map(([name]) => name)
+
+    expect(offenders).toEqual([])
+    // 反向自检：refs 里确实是在建桶（否则上面那条会空转成假绿）
+    expect(REFS_SOURCE).toMatch(/useRef\(\s*new (Map|Set)/)
+  })
+
+  it('15 个领域控制器在整个面板目录里各只被实例化一次', () => {
+    const controllers = [
+      'useAgentComposerController',
+      'useAgentChatRouting',
+      'useAgentModelSelectionController',
+      'useAgentInitialLoadController',
+      'useAgentSessionActionsController',
+      'useAgentSkillsController',
+      'useAgentAttachmentsController',
+      'useAgentConversationController',
+      'useAgentSessionLifecycle',
+      'useAgentAutoRunController',
+      'useAgentLoopDepsController',
+      'useAgentOutcomeCoordinator',
+      'useAgentPrepareTurnController',
+      'useAgentSendTurnController',
+      'useAgentSendController',
+      'useAgentQueueController',
+      'useAgentInterruptSettlementController',
+      'useAgentSteeringController',
+      'useAgentTaskPlanController',
+      'useAgentConfirmationController',
+      'useAgentContinuationController',
+      'useAgentStopController',
+    ]
+    const sources = [
+      ...Object.entries(CONTROLLER_MODULES)
+        .filter(([path]) => !isTestFile(path))
+        .map(([, source]) => source),
+    ]
+    const callSites = (source: string, name: string): number =>
+      // `export function useAgentX(` 是定义，不是实例化
+      (source.match(new RegExp(`(?<!function )${name}\\(`, 'g')) ?? []).length
+    const duplicated = controllers
+      .map((name) => ({
+        name,
+        calls: sources.reduce(
+          (total, source) => total + callSites(source, name),
+          0,
+        ),
+      }))
+      .filter((item) => item.calls !== 1)
+      .map((item) => `${item.name}：${item.calls}`)
+
+    expect(duplicated).toEqual([])
+  })
+
+  it('三个模型都没有反向 import 面板本体', () => {
+    for (const [name, source] of [
+      ['useAgentPanelRefs.ts', REFS_SOURCE],
+      ['useAgentPanelSessionModel.ts', SESSION_MODEL_SOURCE],
+      ['useAgentPanelToolModel.ts', TOOL_MODEL_SOURCE],
+      ['useAgentPanelTurnModel.ts', TURN_MODEL_SOURCE],
+    ] as const) {
+      expect(source, `${name} 没读到源码`).toBeTypeOf('string')
+      expect(PANEL_REVERSE_IMPORT.test(source), `${name} 反向 import 了面板`).toBe(
+        false,
+      )
+    }
   })
 })
