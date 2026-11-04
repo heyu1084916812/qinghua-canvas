@@ -1,5 +1,20 @@
 # CanvasFlow（轻画）项目记忆
 
+### AgentSendTurnRun + 结构护栏（2026-11-04，对账 #887/#889，`f652025` + `fdf6184`）
+
+- **发送主体的顺序就是产品行为**：`delete currentTurnJobId`（同步、不许插 `await`）→ `prepare`（`onPersisted` 内抢活动锁、
+  写 refs、置 `thinking`）→ `onRouteReady`（`routeReady = true` 必须先于 `ensureJob`）→ 五个 ref → `loopDeps` →
+  `runTurn` → `continueAutoConfirmations` → `handleOutcome`。任意一步挪位对应真实故障：停止打到旧 Job / 气泡永远"思考中" / 双发。
+- **`turnOrigin` 是一个会被就地改的对象**：`onPersisted` 写 `messageRevision`、`onRouteReady` 写 `jobId`，后面
+  `failTurn` / `handleOutcome` / `settleInterruptedSession` 读的都是同一份。谁把它改成"每步返回新对象"，收口就对不上 revision。
+- **`prepareTurn` 不该搬进 hook**：`prepareAgentTurnRequest` 的 12 个静态入参（graph / selection / memory / skills /
+  channels / routeExecution…）本来就是面板自己的数据接线，搬过去只会让端口从 14 涨到 26，收益为负。边界是"编排 vs 数据接线"。
+- **行数棘轮**：`agentPanelArchitecture.test.ts` 里 `AGENT_PANEL_MAX_LINES`，每刀按"实测 + 40"下调，**只许降不许升**；
+  想调大就先继续拆。当前 2140（实现 2100）。
+- **别给门禁开后门**：项目没有 `@types/node`，读源码用 `import.meta.glob('?raw')` 而不是装依赖；同理不为护栏引入 TS 编译器 API。
+- **测试文件的"真红"比"真绿"值钱**：护栏建设期 `agentSendTurnRun.ts` 先落盘、测试后到，规则 4 当场报红，测试落地自动转绿——
+  这次真红证明护栏不是摆设。
+
 ### AgentToolResearch / Defaults / ContextAssets + 中断收口 + 工具账本（2026-11-04，对账 #883/#884/#885，`b178656` + `ad04976`）
 
 - **一条规则两份实现 = 隐患**：`image/*` 素材过滤原来在 `runNodes` 与 `contextAssetsForGenerated` 各写一份，
