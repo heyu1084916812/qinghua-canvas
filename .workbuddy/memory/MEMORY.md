@@ -1,5 +1,18 @@
 # CanvasFlow（轻画）项目记忆
 
+### 面板三 hook 拆分：ref 单一宿主 + deps 不许裸 session（2026-11-04，#907/#909，`3eeac03`）
+
+- **17 个 per-session ref 必须只有一处 `useRef`**：全在 `useAgentPanelRefs.ts`。机械计数口径：
+  名字级扫 `const X = useRef` 跨全目录非测试文件，每个名字必须命中且**只命中 1 次**。
+  典型陷阱：`useAgentConversationController.ts:89-90` 的 `const scrollRef = input.scrollRef` 是**接收别名**，
+  不是第二份——审计时先分清"创建"与"别名"。
+- **`session` 对象每帧新建**，所以 **deps 数组里永远不许出现裸 `session`**：出现一次，
+  依赖它的回调每帧失效。正确写法是逐字段（`current` / `selection` / `channels`…）。
+- **拆分优化的是主文件，不是总行数**：`AgentPanel.tsx` 1653 → 145（−91%），但五个文件合计 +404 行
+  （参数解构 ~150 + 返回清单 ~135 + 契约注释 ~120）。对外解释时必须说清这一点，别让人以为总代码变少了。
+- **A 档门禁要按"风险点"点名，而不是只看 PASS**：这轮点名了五个风险点（完整一轮 / 切会话 / 刷新重开 / 浮球开合 / 输入区），
+  结果查出两处只有视觉证据、没有断言（停止按钮链路、A→B→A 隔离）。**"测试全绿"不等于"你关心的点被覆盖了"**。
+
 ### 0.1.15 出包流程实测（2026-11-04，对账 M-BUILD）
 
 - **`node scripts/release-desktop.mjs` 实测约 7 分钟**（Rust release 编译 3m34s + NSIS + 验签 + 11/11 真机自检）。
