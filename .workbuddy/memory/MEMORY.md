@@ -1,5 +1,18 @@
 # CanvasFlow（轻画）项目记忆
 
+### 0.1.15 出包流程实测（2026-11-04，对账 M-BUILD）
+
+- **`node scripts/release-desktop.mjs` 实测约 7 分钟**（Rust release 编译 3m34s + NSIS + 验签 + 11/11 真机自检）。
+  产物落在 `release/<version>/`：`qinghua_<v>_x64-setup.exe` + `.sig` + `latest.json`。本轮 0.1.15 = 43,860,178 B。
+- **构建前必须先让 18767/18768 空闲**：自己起的 debug 实例（`src-tauri/target/debug/qinghua.exe`）会占着，
+  自检直接起不来。**只停自己起的**（看 Path 判归属），用户正式安装版永远不碰。
+- **版本号不能"同号两套二进制"**：0.1.14 虽从未发布，但本地有基于旧提交打出的包；
+  再打就必须升号。六值用 `node scripts/check-versions.mjs` 一把校验。
+- **11/11 自检里有两条最值钱**：①"关于面板版本号 = package.json 版本"（证明构建期注入生效，
+  不是读的旧配置）②"随包 FFmpeg 真实编码 H.264 MP4"（证明资源真的打进包了，不是路径碰巧能读）。
+- **发不出去的两种事**：安装器门禁（要动本机旧版注册表记录，需用户点头）、
+  tag/Release 推送（要用户显式指认具体提交与内容）。
+
 ### 视图 props 装配 + 队列项"可重试载体"口径（2026-11-04，#904/#905，`aee632d`）
 
 - **视图 props 装配搬进 hook 时不许加 `useMemo`**：这些对象本来就是每帧新建，`useMemo` 会把 props
