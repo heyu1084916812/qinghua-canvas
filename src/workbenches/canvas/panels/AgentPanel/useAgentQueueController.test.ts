@@ -194,6 +194,72 @@ describe('useAgentQueueController', () => {
     expect(isSessionActivityActive(session.id)).toBe(false)
   })
 
+  /**
+   * #929-②：`confirm` 与「检查点暂停」**不许放锁**。
+   *
+   * 放锁的后果不是"少释放一次"：确认卡还挂着就放锁 ⇒ 用户点「确认」时活动锁是空的、
+   * 又能起一个回合（并发两回合 / 双倍扣费）；检查点暂停被当结束 ⇒「继续任务」点不动。
+   * 所以这两条必须**留着锁**，而真正结束的结局必须放锁。
+   */
+  it('★★ confirm / 检查点暂停都留着活动锁，真正结束才放锁', async () => {
+    let api: ReturnType<typeof useAgentQueueController> | null = null
+    const finishQueuedTurn = vi.fn(async () => session)
+    const props = input({
+      controller: {
+        finishQueuedTurn,
+      } as unknown as AgentController,
+    })
+
+    function Probe() {
+      api = useAgentQueueController(props)
+      return createElement('span', null, 'ok')
+    }
+
+    renderToStaticMarkup(createElement(Probe))
+    expect(
+      claimSessionActivity(session.id, 'turn-1', 'turn-1'),
+    ).toBe(true)
+
+    // ① 等用户确认：锁留着，队列项也不许销
+    await api!.settleSessionOutcome(
+      session.id,
+      {
+        kind: 'confirm',
+        request: { callId: 'call-1', name: 'runNode', args: {} },
+        messages: [],
+      },
+      { queueTurnId: 'turn-1', turnId: 'turn-1' },
+    )
+    expect(isSessionActivityActive(session.id)).toBe(true)
+    expect(finishQueuedTurn).not.toHaveBeenCalled()
+
+    // ② 检查点暂停（可以「继续」）：锁同样留着
+    await api!.settleSessionOutcome(
+      session.id,
+      {
+        kind: 'stopped',
+        reason: '达到步数上限',
+        messages: [],
+        checkpoint: {
+          kind: 'max_steps',
+          maxSteps: 3,
+          completedSteps: 3,
+        },
+      },
+      { queueTurnId: 'turn-1', turnId: 'turn-1' },
+    )
+    expect(isSessionActivityActive(session.id)).toBe(true)
+    expect(finishQueuedTurn).not.toHaveBeenCalled()
+
+    // ③ 对照：真正出错结束 ⇒ 必须放锁（否则队列永久判 busy）
+    await api!.settleSessionOutcome(
+      session.id,
+      { kind: 'error' },
+      { queueTurnId: 'turn-1', turnId: 'turn-1' },
+    )
+    expect(isSessionActivityActive(session.id)).toBe(false)
+  })
+
   it('queueText 的全段读写进 lifecycle，关闭后拒绝新入队', async () => {
     let releaseRead!: () => void
     const readGate = new Promise<void>((resolve) => {

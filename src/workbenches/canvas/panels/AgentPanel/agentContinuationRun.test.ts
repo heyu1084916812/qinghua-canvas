@@ -253,6 +253,33 @@ describe('runAgentContinuation', () => {
     )
   })
 
+  /**
+   * #929-③：抢锁失败这条必须**立刻退出**。
+   *
+   * 若漏掉 `return 'busy'`：两个回合会并发写同一会话（双倍扣费 + 历史重复）。
+   * 所以这里断的是"后面每一步都没发生"，而不是"返回值是 busy"这么一句。
+   */
+  it('★★ 抢锁失败返回 busy：后续一步都不许跑', async () => {
+    const h = harness({ claimActivity: vi.fn(() => false) })
+
+    const result = await runAgentContinuation(h.input)
+
+    expect(result).toBe('busy')
+    expect(h.input.claimActivity).toHaveBeenCalledWith(
+      session.id,
+      undefined,
+      'turn-current',
+    )
+    // 不许准备路由 / 建 loopDeps / 请求模型 / 迁 Job / 写状态 / 收口
+    expect(h.input.ensureRoute).not.toHaveBeenCalled()
+    expect(h.input.createLoopDeps).not.toHaveBeenCalled()
+    expect(h.input.runAgentTurn).not.toHaveBeenCalled()
+    expect(h.input.transitionSessionJob).not.toHaveBeenCalled()
+    expect(h.input.setStatus).not.toHaveBeenCalled()
+    expect(h.input.settleSessionOutcome).not.toHaveBeenCalled()
+    expect(h.input.setAbortController).not.toHaveBeenCalled()
+  })
+
   it('★★ 队列检查点先领取队首并把 queue / turn 绑定到同一活动锁', async () => {
     const queuedSession: AgentSession = {
       ...session,

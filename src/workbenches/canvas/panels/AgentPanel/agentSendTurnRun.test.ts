@@ -1,8 +1,10 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { AgentLoopDeps, AgentLoopOutcome } from '../../agent/agentLoop'
+import type { ChatMessage } from '../../../../domain/shared/execution/types'
 import type { AgentSession } from '../../../../state/agent/sessionStore'
 import type { PersistedAgentUserTurn } from './agentTurnPersistence'
 import type {
+  AgentLoopDepsArgs,
   AgentPrepareArgs,
   AgentSendTurnPorts,
   AgentSendTurnRefs,
@@ -504,5 +506,82 @@ describe('早退分支', () => {
       message: '渠道不可用',
     })
     expect(h.ports.runTurn).not.toHaveBeenCalled()
+  })
+})
+
+/**
+ * #929-①：`agentSendTurnRun` 里三处 "当前会话" 判断（:206 / :308 / :322）。
+ *
+ * 写错的后果不是"少刷新一次"：切走后发送会把 A 的流式文本写进 B 的对话区（串台），
+ * 或者把 B 的输入框清空。隔离的**边界**要断清楚：界面一个字不动，但回合照常跑完。
+ */
+describe('会话隔离：非当前会话的界面不许被写', () => {
+  function captureStreams(h: ReturnType<typeof harness>) {
+    const streams: {
+      progress: ((messages: readonly ChatMessage[]) => void) | null
+      continued: ((messages: ChatMessage[]) => void) | null
+    } = { progress: null, continued: null }
+    h.ports.loopDeps = vi.fn((args: AgentLoopDepsArgs) => {
+      streams.progress = args.onProgress ?? null
+      return args as unknown as AgentLoopDeps
+    })
+    h.ports.continueAutoConfirmations = vi.fn(
+      async (_session, initial, _deps, onMessages) => {
+        streams.continued = onMessages
+        return initial
+      },
+    )
+    return streams
+  }
+
+  it('★★ 非当前会话发送：界面一个字都不改，但回合照常跑完', async () => {
+    const h = harness()
+    // 用户已经切到 B，A 的发送还在后台跑
+    h.ui.currentIdRef.current = 's2'
+    const streams = captureStreams(h)
+
+    const outcome = await runAgentSendTurn(h.input, h.ports)
+
+    // 隔离 ≠ 不跑：回合照样跑完、outcome 照样交回
+    expect(outcome).toBe(OUTCOME)
+    expect(h.ports.runTurn).toHaveBeenCalledTimes(1)
+    expect(h.ports.handleOutcome).toHaveBeenCalledTimes(1)
+    // 会话列表行仍会更新（那是 A 自己的行，不是"当前界面"）
+    expect(h.ui.setList).toHaveBeenCalled()
+
+    // 但 B 的界面一点都不能被写
+    expect(h.ui.setCurrent).not.toHaveBeenCalled()
+    expect(h.ui.setDraft).not.toHaveBeenCalled()
+    expect(h.ui.writeDraftForSession).not.toHaveBeenCalled()
+    expect(h.ui.setMessages).not.toHaveBeenCalled()
+
+    // 两个流式回调确实被调用了，只是被隔离挡住（不是"回调根本没给"）
+    expect(streams.progress).not.toBeNull()
+    expect(streams.continued).not.toBeNull()
+    streams.progress!([{ role: 'assistant', content: '流式' }])
+    streams.continued!([{ role: 'assistant', content: '流式' }])
+    expect(h.ui.setMessages).not.toHaveBeenCalled()
+    expect(h.ui.clearReveal).not.toHaveBeenCalled()
+  })
+
+  it('★★ 当前会话发送（反例）：界面照常更新，流式能写进对话区', async () => {
+    const h = harness()
+    const streams = captureStreams(h)
+
+    await runAgentSendTurn(h.input, h.ports)
+
+    expect(h.ui.setCurrent).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 's1' }),
+    )
+    expect(h.ui.setDraft).toHaveBeenCalledWith('')
+    expect(h.ui.writeDraftForSession).toHaveBeenCalledWith('s1', '')
+    expect(h.ui.setMessages).toHaveBeenCalledWith(
+      persisted.historyMessages,
+    )
+
+    expect(streams.progress).not.toBeNull()
+    streams.progress!([{ role: 'assistant', content: '流式' }])
+    expect(h.ui.setMessages).toHaveBeenCalledTimes(2)
+    expect(h.ui.clearReveal).toHaveBeenCalledTimes(1)
   })
 })
