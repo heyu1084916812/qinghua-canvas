@@ -462,4 +462,106 @@ describe('prepareAgentTurnRequest', () => {
     const last = (await sessions.messagesFor(session.id)).at(-1)
     expect(last?.imageNodeIds).toEqual(['img-b', 'img-a'])
   })
+
+  /**
+   * #935：**停止发生在「工具探测已就绪、请求还没发」之间**必须整单放弃。
+   *
+   * 这条分支的代价直接是钱：放过去 = 用户点了停止，请求照样发出去。
+   * 构造：先把工具探测缓存预热（同渠道/模型第二次不再探），再让上下文读取挂起，
+   * 挂起期间 abort，然后放行 —— 恰好走到 `if (signal.aborted)` 那一步。
+   * 断言里的 `execute` 是**故意会抛**的 spy：它一旦被调用就说明请求发出去了。
+   */
+  it('★★ 工具探测之后停止：不再发请求，返回 tool_probe 失败', async () => {
+    const { sessions, session } = await createSession()
+    // 1) 预热探测缓存：下一次 ensureToolSupport 直接命中缓存，不会再探一次
+    await prepareAgentTurnRequest(
+      inputFor({ sessions, session, text: '预热探测' }),
+    )
+    const forbiddenExecute = vi.fn(() => {
+      throw new Error('停止之后不许再发请求')
+    })
+    let releaseRead!: (bundle: ContextBundle) => void
+    const read = vi.fn(
+      () =>
+        new Promise<ContextBundle>((resolve) => {
+          releaseRead = resolve
+        }),
+    )
+    const abort = new AbortController()
+    const onRouteReady = vi.fn(async () => {})
+    const pending = prepareAgentTurnRequest({
+      ...inputFor({
+        sessions,
+        session,
+        text: '停止这一轮',
+        onRouteReady,
+        memory: { read },
+        routeExecution: { execute: forbiddenExecute } as never,
+      }),
+      signal: abort.signal,
+    })
+
+    await vi.waitFor(() => expect(read).toHaveBeenCalledTimes(1))
+    abort.abort()
+    releaseRead(emptyBundle('p1', '停止这一轮', session.id))
+    const result = await pending
+
+    expect(result.kind).toBe('failed')
+    expect(result).toMatchObject({
+      phase: 'tool_probe',
+      message: '用户已停止当前回合',
+    })
+    // 关键：一条请求都没发出去
+    expect(forbiddenExecute).not.toHaveBeenCalled()
+    // 与 aborted_before_job 的区别：Job 已经建好（onRouteReady 已触发）
+    expect(onRouteReady).toHaveBeenCalledTimes(1)
+    expect((await sessions.messagesFor(session.id)).at(-1)).toMatchObject({
+      role: 'user',
+      content: '停止这一轮',
+    })
+  })
+
+  /**
+   * #935：上下文冲突必须**拒发**，且用户那条消息不许跟着丢。
+   *
+   * 写错的两种代价：①带着冲突素材发出去（图/引用对不上，钱白花）；
+   * ②顺手把已落库的用户消息回滚掉（用户看到自己那句话消失）。
+   * 冲突判断在工具探测**之前**，所以这里断言"一条请求都没发出"。
+   */
+  it('★★ 上下文有冲突：拒发（不发任何请求），保留已落库用户消息', async () => {
+    const { sessions, session } = await createSession()
+    const text = '把这张图和这条视频合成一条'
+    const execute = vi.fn()
+    const bundle: ContextBundle = {
+      ...emptyBundle('p1', text, session.id),
+      conflicts: [
+        {
+          key: 'asset-usage',
+          values: ['image', 'video'],
+          sources: ['session'],
+          message: '同一份素材被指定成两种用途',
+        },
+      ],
+    }
+    const result = await prepareAgentTurnRequest(
+      inputFor({
+        sessions,
+        session,
+        text,
+        memory: { read: async () => bundle },
+        routeExecution: { execute } as never,
+      }),
+    )
+
+    expect(result.kind).toBe('failed')
+    expect(result).toMatchObject({
+      phase: 'context_conflict',
+      message: expect.stringContaining('同一份素材被指定成两种用途'),
+    })
+    expect(execute).not.toHaveBeenCalled()
+    expect((await sessions.messagesFor(session.id)).at(-1)).toMatchObject({
+      role: 'user',
+      content: text,
+    })
+  })
 })
