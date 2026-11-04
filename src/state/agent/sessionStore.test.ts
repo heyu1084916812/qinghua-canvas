@@ -1167,7 +1167,13 @@ describe('Agent 会话 · 待发送附件的原子追加', () => {
    */
   function serializedStorage(
     base: StoragePort,
-    hold?: { armed: boolean; used: boolean; gate: Promise<void> },
+    hold?: {
+      armed: boolean
+      used: boolean
+      gate: Promise<void>
+      /** 第一笔被卡住的写回**已经进入事务**时调用（显式同步点，不靠 microtask 计数）。 */
+      entered?: () => void
+    },
   ): StoragePort {
     let tail: Promise<unknown> = Promise.resolve()
     return {
@@ -1182,6 +1188,7 @@ describe('Agent 会话 · 待发送附件的原子追加', () => {
                 // 那些必须照常放行，否则测试会在准备阶段就把自己锁死。
                 if (hold?.armed && !hold.used && table === 'agentSessions') {
                   hold.used = true
+                  hold.entered?.()
                   await hold.gate
                 }
                 return tx.put(table, row)
@@ -1200,7 +1207,13 @@ describe('Agent 会话 · 待发送附件的原子追加', () => {
 
   it('★ 并发两次追加：两条都落库，同一 id 只留一条', async () => {
     const gate = deferred()
-    const hold = { armed: false, used: false, gate: gate.promise }
+    const entered = deferred()
+    const hold = {
+      armed: false,
+      used: false,
+      gate: gate.promise,
+      entered: entered.resolve,
+    }
     const s = createAgentSessionStore(
       serializedStorage(createMemoryPlatform().storage, hold),
     )
@@ -1208,8 +1221,13 @@ describe('Agent 会话 · 待发送附件的原子追加', () => {
 
     hold.armed = true
     const first = s.appendPendingAssetIds(a.id, ['img-1', 'img-1'])
-    // 让第一次真的进到事务里、卡在写回之前
-    await Promise.resolve()
+    /**
+     * #923：这里以前是 `await Promise.resolve()` —— 用「让一个 microtask」当同步原语。
+     * 事务前的 `ensureSplit` / `loadSession` 需要几个 microtask，负载高时第一次
+     * 还没进事务、`tail` 也还没更新，第二次就会先跑 ⇒ `one` 变成两条都有。
+     * 改成等存储层**显式报告"已经进入事务"**，与调度快慢无关。
+     */
+    await entered.promise
     const second = s.appendPendingAssetIds(a.id, ['img-2'])
     gate.resolve()
 
