@@ -17,6 +17,37 @@ const SOURCE = (
 
 const countOf = (needle: string): number => SOURCE.split(needle).length - 1
 
+/** 取出 `anchor(...)` 这次调用的完整参数文本（跳过字符串内部的括号）。 */
+const callBlock = (anchor: string): string => {
+  const at = SOURCE.indexOf(anchor)
+  if (at < 0) return ''
+  const open = SOURCE.indexOf('(', at + anchor.length - 1)
+  if (open < 0) return ''
+  let depth = 0
+  let quote: string | null = null
+  for (let index = open; index < SOURCE.length; index += 1) {
+    const char = SOURCE[index]
+    if (quote) {
+      if (char === '\\') {
+        index += 1
+        continue
+      }
+      if (char === quote) quote = null
+      continue
+    }
+    if (char === '"' || char === "'" || char === '`') {
+      quote = char
+      continue
+    }
+    if (char === '(') depth += 1
+    else if (char === ')') {
+      depth -= 1
+      if (depth === 0) return SOURCE.slice(open, index + 1)
+    }
+  }
+  return ''
+}
+
 describe('useAgentPanelTurnModel 的结构契约', () => {
   it('不创建任何会话桶（全部来自 useAgentPanelRefs）', () => {
     expect(SOURCE).not.toMatch(/useRef\(\s*new (Map|Set)/)
@@ -105,5 +136,19 @@ describe('useAgentPanelTurnModel 的结构契约', () => {
     expectTypeOf<AgentPanelTurnModel['stop']>().toBeFunction()
     expectTypeOf<AgentPanelTurnModel['confirm']>().toBeFunction()
     expectTypeOf<AgentPanelTurnModel['continueTask']>().toBeFunction()
+  })
+
+  /**
+   * #913：任务计划推进必须知道「目标还是不是当前会话」。
+   *
+   * 少了这个端口，`isCurrentSession` 就是 `undefined` → 控制器按「永远是当前会话」兜底，
+   * 于是切走之后仍会落计划并发那条**隐藏控制消息**（一次没人看着的付费回合）。
+   * 这条护栏钉的是接线本身：端口在、且真的读 `currentIdRef`。
+   */
+  it('任务计划推进拿到 isCurrentSession（切走后不许再偷偷推进）', () => {
+    const block = callBlock('useAgentTaskPlanController(')
+    expect(block, '没找到 useAgentTaskPlanController(...)').not.toBe('')
+    expect(block).toContain('isCurrentSession:')
+    expect(block).toContain('currentIdRef.current === sessionId')
   })
 })

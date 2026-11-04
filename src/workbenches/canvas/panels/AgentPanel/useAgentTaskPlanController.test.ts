@@ -100,6 +100,8 @@ function input(
     settleInterruptedSession: vi.fn(async () => ({})),
     sendText: vi.fn(async () => undefined),
     notify: vi.fn(),
+    /** 默认口径：目标就是当前会话（不传也一样，这里写出来是为了让「切走」的用例有对照） */
+    isCurrentSession: () => true,
     ...patch,
   }
 }
@@ -227,6 +229,112 @@ describe('useAgentTaskPlanController', () => {
       await second
     })
     expect(viewRef.current!.isAdvancingTaskPlan('b')).toBe(false)
+  })
+
+  /**
+   * #913：**推进途中切会话**。
+   *
+   * 用户点了「跳过这一步的验收」，然后在「取消旧确认 → 等旧回合收尾」这几段 await
+   * 期间切到会话 B。切走之后必须整单退出：
+   * - 不落计划（A 的 taskPlan 不许被这次点击悄悄改掉）；
+   * - **不发那条隐藏控制消息** —— 它等于替用户开一次没人看着的付费回合；
+   * - 不写 B 的任何东西（B 根本没参与这次点击）；
+   * - advancing 只在 A 上清掉（`finally`），B 从头到尾不许被标过。
+   */
+  it('审批结算途中切到会话 B：不落库、不发隐藏控制消息、advancing 只在 A 上清', async () => {
+    const target = session('s1')
+    const settle = deferred<{ cleanupError?: unknown }>()
+    const statusFor = vi.fn(
+      (sessionId: string): AgentPanelStatus =>
+        sessionId === 's1'
+          ? {
+              kind: 'awaitingConfirm',
+              request: {
+                callId: 'call-1',
+                name: 'requestTaskConfirmation',
+                args: { stepId: 'step-1' },
+              },
+            }
+          : IDLE_STATUS,
+    )
+    const settleInterruptedSession = vi.fn(() => settle.promise)
+    const updateSessionFields = vi.fn(async () => advancedSession(target))
+    const sendText = vi.fn(async () => undefined)
+    const applySessionSnapshot = vi.fn()
+    const clearRunPresentationFor = vi.fn()
+    const setStatusFor = vi.fn()
+    const notify = vi.fn()
+    let currentId = 's1'
+    const { viewRef } = render(
+      input({
+        statusFor,
+        settleInterruptedSession,
+        updateSessionFields,
+        sendText,
+        applySessionSnapshot,
+        clearRunPresentationFor,
+        setStatusFor,
+        notify,
+        isCurrentSession: (sessionId) => sessionId === currentId,
+      }),
+    )
+
+    let advancing!: Promise<boolean>
+    act(() => {
+      advancing = viewRef.current!.advanceTaskPlan(target)
+    })
+    await vi.waitFor(() => {
+      expect(settleInterruptedSession).toHaveBeenCalledTimes(1)
+    })
+    // 结算还没回来：A 正在推进
+    expect(viewRef.current!.isAdvancingTaskPlan('s1')).toBe(true)
+
+    // 用户切到 B，随后结算返回
+    currentId = 's2'
+    await act(async () => {
+      settle.resolve({})
+      await expect(advancing).resolves.toBe(false)
+    })
+
+    // ① 不发隐藏控制消息
+    expect(sendText).not.toHaveBeenCalled()
+    // ② 不落 A 的计划；所有按会话的写都不该发生（B 更是完全没被碰到）
+    expect(updateSessionFields).not.toHaveBeenCalled()
+    expect(applySessionSnapshot).not.toHaveBeenCalled()
+    expect(clearRunPresentationFor).not.toHaveBeenCalled()
+    expect(setStatusFor).not.toHaveBeenCalled()
+    expect(notify).not.toHaveBeenCalled()
+    // ③ advancing 只在 A 上清掉，B 从未被标记
+    expect(viewRef.current!.isAdvancingTaskPlan('s1')).toBe(false)
+    expect(viewRef.current!.isAdvancingTaskPlan('s2')).toBe(false)
+  })
+
+  /**
+   * 反例：目标仍是当前会话时**必须照常推进并发出控制消息**。
+   * 没有这一条，上面那条可以靠「干脆什么都不做」通过 —— 功能被悄悄关死也测不出来。
+   */
+  it('目标仍是当前会话时照常推进并发隐藏控制消息（反例）', async () => {
+    const target = session('s1')
+    const updateSessionFields = vi.fn(async () =>
+      advancedSession(target),
+    )
+    const sendText = vi.fn(async () => undefined)
+    const { viewRef } = render(
+      input({
+        updateSessionFields,
+        sendText,
+        isCurrentSession: (sessionId) => sessionId === 's1',
+      }),
+    )
+
+    await act(async () => {
+      await expect(
+        viewRef.current!.advanceTaskPlan(target),
+      ).resolves.toBe(true)
+    })
+    expect(updateSessionFields).toHaveBeenCalledTimes(1)
+    expect(sendText).toHaveBeenCalledTimes(1)
+    expect(viewRef.current!.isAdvancingTaskPlan('s1')).toBe(false)
   })
 
   it('pendingConfirmation 和 status 都按目标 session 读取', async () => {

@@ -489,6 +489,8 @@ export function useAgentPanelTurnModel({
       applySessionSnapshot,
       settleInterruptedSession,
       sendText,
+      isCurrentSession: (sessionId) =>
+        currentIdRef.current === sessionId,
       notify: store.notify,
     })
 

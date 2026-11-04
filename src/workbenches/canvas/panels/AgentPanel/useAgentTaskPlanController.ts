@@ -39,6 +39,17 @@ export interface AgentTaskPlanControllerInput {
   ) => Promise<unknown>
   notify: (message: string, tone?: 'info' | 'error') => void
   sleep?: (milliseconds: number) => Promise<void>
+  /**
+   * 目标是否仍是面板正在显示的会话。
+   *
+   * 推进是**用户点的那一下**，但「取消旧确认 → 等旧回合收尾」全是异步的；这期间用户
+   * 完全可能切到别的会话。切走之后不许再落计划、更不许再发那条**隐藏控制消息**
+   * —— 那会替用户开一次没人看着的付费回合。所以在提交点前复检一次。
+   *
+   * 与 `useAgentContinuationController` 的 `isCurrentSession` 同形态；
+   * 不传视为「目标就是当前会话」（老调用与单测的默认口径）。
+   */
+  isCurrentSession?: (sessionId: string) => boolean
 }
 
 export interface AgentTaskPlanController {
@@ -135,6 +146,15 @@ export function useAgentTaskPlanController(
             return false
           }
 
+          /**
+           * 提交点复检：上面每条 await 期间用户都可能已经切走。
+           * 切走了就整单退出 —— 不落计划、不发隐藏控制消息，advancing 由 finally 清掉。
+           */
+          const stillCurrent = input.isCurrentSession
+            ? input.isCurrentSession(target.id)
+            : true
+          if (!stillCurrent) return false
+
           const updated = await input.updateSessionFields(target.id, {
             taskPlan: advanced.plan,
             pendingConfirmation: undefined,
@@ -186,6 +206,7 @@ export function useAgentTaskPlanController(
       input.applySessionSnapshot,
       input.clearRunPresentationFor,
       input.isActivityActive,
+      input.isCurrentSession,
       input.notify,
       input.sendText,
       input.settleInterruptedSession,
