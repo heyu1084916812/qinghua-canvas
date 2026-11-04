@@ -114,6 +114,11 @@
   setAutoRun 先乐观写实时值，patch reject/null 必须回滚且不 confirm；成功后必须重查目标仍 current、最新 status
   仍 awaitingConfirm 且显式审批=false，才 confirmLatest。A→B 不得确认 B；确认失败只走既有 status error，
   不得新增不可达专用提示或误报保存失败。
+- **AgentSteeringController 只做引导编排**：`useAgentSteeringController` 不得复制 pendingSteers/queuedTurns/
+  pendingConfirmation/Job 真相，也不得修改 sendText、queue pump、Job transition 或 SessionStore 事务语义。确认卡路径
+  必须保持 remove→apply→cancel→settle→send；草稿路径保持附件回落 queue、settle 后 send、正常 enqueueSteer 后 apply，
+  且仅在目标仍是 current 时清草稿。`sessionForQueuedTurn` 必须传递冻结 model/imageModel/videoModel/skill/autoRun；
+  sendText 至多一次。事务失败补偿未实现，不得在文档中写成已保证。
 - **Agent 浮球只在视口变化时按 surface 夹取**：首次激活或 viewport 宽度真实变化才 surface-only clamp；同视口面板
   开合/设置页返回只能重算 panel width，orb 对象与坐标不得移动。viewport token 跨 activation cleanup 保留；
   activation settle 必须按激活时捕获的 shouldClampFinal 决定，不得无条件清 token 或无条件 surface clamp。

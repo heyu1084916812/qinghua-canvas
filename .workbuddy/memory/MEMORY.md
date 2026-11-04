@@ -1,5 +1,15 @@
 # CanvasFlow（轻画）项目记忆
 
+### AgentSteeringController（2026-11-04，对账 #881，✅ 已独立验收，`3ed1bf7`）
+
+- `useAgentSteeringController` 只做 guideDraft / guideQueuedTurn 端口化；SessionStore 的 pendingSteers/queuedTurns/
+  pendingConfirmation、JobStore 与确认状态仍是唯一真相，不改 sendText/queue pump/Job transition/事务语义。
+- 顺序保持：确认卡路径 remove→apply→cancel→settle→send；草稿路径附件回落 queue、确认卡 settle 后 send、正常
+  enqueueSteer 后 apply；草稿只在目标仍 current 时清。队列冻结 model/imageModel/videoModel/skill/autoRun 原样传递。
+- `AgentPanel.tsx` **2528 → 2403 行**（净减 125）；Steering **16/16**、AgentPanel **318/318**、G769 明暗各 **39/39**、
+  G865 **24/24**、全量 **4139 passed / 1 skipped**。真实 UI 覆盖排队转引导；草稿转引导仅单测覆盖。
+- P3：队列已移除后 settle/send 失败不回收消息；promote 后 Job cancel 失败可能残留；callback 身份每渲染重建。
+
 ### AgentAutoRunController + 浮球 clamp（2026-11-04，对账 #879/#880，✅ 已独立验收，`f258e57` + `ee5db5c`）
 
 - `useAgentAutoRunController` 独家持有 per-session autoRun Map；`setAutoRun` 乐观写实时值，patch null/reject 回滚且不
