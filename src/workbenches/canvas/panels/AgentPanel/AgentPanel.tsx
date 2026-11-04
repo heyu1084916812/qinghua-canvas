@@ -87,10 +87,11 @@ import {
 } from '../../../../state/ui/agentCanvasReview'
 import { toConversation } from './conversation'
 import { createAgentToolRecipeContext } from './agentToolRecipeContext'
+import { createAgentToolPlanPorts } from './agentToolPlanPorts'
+import { createAgentToolCanvasOps } from './agentToolCanvasOps'
 import { createAgentToolExecution } from './agentToolExecution'
 import { createAgentToolResearch } from './agentToolResearch'
 import { createAgentToolDefaults } from './agentToolDefaults'
-import { imageContextAssets } from './agentToolContextAssets'
 import { isAdvanceTaskCommand } from './agentProcessText'
 import { useAgentSendTurnController } from './useAgentSendTurnController'
 import { useAgentConfirmationController } from './useAgentConfirmationController'
@@ -855,6 +856,21 @@ export function AgentPanel({
       const toolDefaults = createAgentToolDefaults({
         defaultsFor: (type) => resolveDefaults({ channels, type }),
       })
+      /** 跑节点 / 裁剪 / 宫格切分：上下文素材用**调用时现取**的 thunk。 */
+      const canvasOps = createAgentToolCanvasOps({
+        sessionId,
+        store,
+        platform,
+        execution,
+        channels,
+        setRunTasksFor,
+        runCanvasNodes: runAgentCanvasNodes,
+        cropAsset,
+        extractSelection,
+        splitNodeToGrid,
+        getContextAssets: () =>
+          contextTraceRef.current.get(sessionId)?.assetRefs,
+      })
       return {
         store,
         viewportWorld: viewportWorldOf(viewport),
@@ -865,22 +881,15 @@ export function AgentPanel({
         },
         ...(sessionId
           ? {
-              taskPlan: {
-                get: async () => (await sessions.get(sessionId))?.taskPlan,
-                save: (plan) =>
-                  trackRun(async () => {
-                    const next = await sessions.updateFields(sessionId, {
-                      taskPlan: plan,
-                    })
-                    if (next) {
-                      setList((prev) =>
-                        prev.map((item) => (item.id === next.id ? next : item)),
-                      )
-                      if (currentIdRef.current === next.id) setCurrent(next)
-                    }
-                    return next?.taskPlan ?? null
-                  }),
-              },
+              taskPlan: createAgentToolPlanPorts({
+                sessionId,
+                getSession: sessions.get,
+                updateFields: sessions.updateFields,
+                trackRun,
+                setList,
+                setCurrent,
+                currentIdRef,
+              }),
             }
           : {}),
         origin,
@@ -900,32 +909,11 @@ export function AgentPanel({
         const aliases = planAliasesRef.current.get(sessionId)
         return ids.map((id) => aliases?.get(id) ?? id)
       },
-      runNodes: (ids, signal) =>
-        runAgentCanvasNodes(
-          {
-            store,
-            execution,
-            channels,
-            platform,
-            contextAssets: imageContextAssets(
-              contextTraceRef.current.get(sessionId)?.assetRefs,
-            ),
-            setRunTasksFor,
-          },
-          {
-            sessionId,
-            nodeIds: ids,
-            ...(signal ? { signal } : {}),
-          },
-        ),
+      runNodes: canvasOps.runNodes,
       defaultsForNewNode: toolDefaults.defaultsForNewNode,
       ...recipeContext,
-      sliceImage: (nodeId, mode, rect, ratio) => {
-        const run = mode === 'crop' ? cropAsset : extractSelection
-        return run({ platform, store }, { nodeId, rect, ...(ratio ? { ratio } : {}) })
-      },
-      splitGrid: (nodeId, rows, cols) =>
-        splitNodeToGrid({ platform, store }, { nodeId, rows, cols }),
+      sliceImage: canvasOps.sliceImage,
+      splitGrid: canvasOps.splitGrid,
       rememberMemory: toolResearch.rememberMemory,
       researchDesign: toolResearch.researchDesign,
       }

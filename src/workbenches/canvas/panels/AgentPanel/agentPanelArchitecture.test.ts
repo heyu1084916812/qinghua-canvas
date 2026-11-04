@@ -19,7 +19,7 @@ import { describe, expect, it } from 'vitest'
  * 调节奏：按「该刀实测 + 40」定值，之后每刀同理——阈值始终贴着实测走，留出的 40 行
  * 只够接一刀，不够养回一个胖文件。当前 2126 = #885b 接线后实测 2086 + 40。
  */
-const AGENT_PANEL_MAX_LINES = 2014
+const AGENT_PANEL_MAX_LINES = 2002
 
 /**
  * `.ts` 下沉模块里允许出现的 hook 调用（模块名 → 理由）。
@@ -376,13 +376,35 @@ describe('toolCtx 的调用即取闭包', () => {
     expect(PANEL_SOURCE).not.toMatch(/const\s+selectedIds\s*=\s*selection/)
   })
 
-  it('runNodes 的素材过滤在调用时读 contextTrace，不许提前算成常量', () => {
+  it('runNodes 的素材在调用时才读 contextTrace，不许提前算成常量', () => {
+    // 读 ref 的那一下必须在 thunk 里（`() => contextTraceRef.current…`），
+    // 这样「跑节点」执行时才拿得到那一刻的素材（管它是内联还是经端口传下去）。
     expect(PANEL_SOURCE).toMatch(
-      /imageContextAssets\([\s\S]{0,80}contextTraceRef\.current\.get\(sessionId\)[\s\S]{0,40}\)/,
+      /\(\)\s*=>\s*contextTraceRef\.current\.get\(sessionId\)\?\.assetRefs/,
     )
     expect(PANEL_SOURCE).not.toMatch(
       /const\s+\w+\s*=\s*contextTraceRef\.current\.get\(sessionId\)\?\.assetRefs/,
     )
+  })
+
+  it('图片素材规则只有一份定义，并且真的被某个下沉模块用上', () => {
+    const users = Object.entries(AGENT_MODULES)
+      .filter(([path]) => !isTestFile(path))
+      .filter(([, source]) => source.includes('imageContextAssets('))
+      .map(([path]) => NAME_ONLY(path))
+      .filter((name) => name !== 'agentToolContextAssets.ts')
+
+    expect(users.length).toBeGreaterThan(0)
+    // 定义处只能有一个：别在别的地方再手写一遍 startsWith('image/')
+    const handRolled = Object.entries(AGENT_MODULES)
+      .filter(([path]) => !isTestFile(path))
+      .filter(
+        ([path, source]) =>
+          NAME_ONLY(path) !== 'agentToolContextAssets.ts' &&
+          source.includes("startsWith('image/')"),
+      )
+      .map(([path]) => NAME_ONLY(path))
+    expect(handRolled).toEqual([])
   })
 
   it('三份装配都在 toolCtx 函数体内，而不是组件级', () => {
@@ -398,9 +420,5 @@ describe('toolCtx 的调用即取闭包', () => {
       expect(at, `${anchor} 不在文件里`).toBeGreaterThan(start)
       expect(at, `${anchor} 不在 toolCtx 里`).toBeLessThan(end)
     }
-    // imageContextAssets 必须用在 toolCtx 内部，而不是面板别处
-    const imageAt = PANEL_SOURCE.indexOf('imageContextAssets(')
-    expect(imageAt).toBeGreaterThan(start)
-    expect(imageAt).toBeLessThan(end)
   })
 })
