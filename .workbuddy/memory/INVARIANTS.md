@@ -10,6 +10,13 @@
   最终模型变化时才写（先 remember 到 ref 再落库）；上下文素材只留 `image/*`。`toolCtx()` 必须每次重建，
   任何 per-session 缓存都会让「批准后才执行」的工具看到发消息那一刻的旧快照。
 
+- **队列结算失败必须有兜底**：`finishQueuedTurn(false)` 抛错会让 `activeTurnId` 残留，而
+  `claimNextQueuedTurn` 在 `activeTurnId` 非空时返回 null ⇒ 该会话队列永久停摆。必须"重试一次 →
+  `releaseActiveTurn` 兜底 → 无论成败 `clearQueueDrain`"，并验证**随后真的能再领到**那条 turn。
+- **切走会话后不许再推进**：`advanceTaskPlan` 等长流程要在**所有 await 之后、落库之前**复检
+  "目标仍是 current"，切走就静默整单退出；`isCurrentSession` 不传时兜底 true（兼容老调用），
+  但必须有一条接线护栏防止面板侧把它删了。
+
 - **收口 revision 走三层回退**：`persistedTurn.messageRevision → session.messageRevision → ref`，
   第一层优先是因为收口要绑**落库成功那一次**的 revision；换成"发消息那一刻"会与存储层 CAS 对不上。
 - **提交/报数前必须在干净 checkout 验**：`gate-run.ps1 -HeadCheck <hash>`；**并发中间态的绿不算绿**，

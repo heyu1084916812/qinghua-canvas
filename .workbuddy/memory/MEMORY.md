@@ -1,5 +1,34 @@
 # CanvasFlow（轻画）项目记忆
 
+### 四条"伪 P3"的判定（2026-11-04，对账 #911，结论：**不修**，别再查一遍）
+
+- **`selectedModelOf` 读当前画布选中**（`useAgentModelSelectionController.ts:152+`、`useAgentPanelToolModel.ts:100`）：
+  这是优先级链最后一档的**产品口径**——"会话还没有任何模型来源时，以用户此刻选中的节点模型为起点"。
+  改 per-session 快照要先定义"切走那一刻快照什么"，且与"用户当下选中即生效"直接冲突。
+- **sticky 落库 fire-and-forget**（`useAgentPanelToolModel.ts:108-118`）：**不是静默**——
+  `runTrackedDetached` → `runPromiseDetached`（`useAgentPanelSessionModel.ts:341-348`）失败会 `store.notify(…, 'error')`；
+  剩下的只是"内存领先持久层、重启回落"，与 `saveAgentReviewModel` 等偏好写同口径。
+- **三个动作控制器回调身份每帧变**：deps 是字段级没错，但**没有任何消费者**——
+  `useAgentPanelViewProps.ts:26` 明确"故意不用 useMemo"，`AgentComposerPane.tsx:142` 只是 prop 解构。
+  修它（加 ref / 拆依赖）只会制造 stale closure。
+- **队列项手动删除后"发送仍会完成"**：pump 在 `useAgentQueueController.ts:248` 已把 `next.turn.text` 取出发送，
+  `removeQueued` 只删存储项、不打断在飞请求。用户删的是"还没开始的那条"；打断在飞请求反而会造成半截请求。
+
+### 队列停摆 + 切走后仍推进计划（2026-11-04，#912/#913，`475072f` + `21e832b`）
+
+- **"结算自己也失败"是队列停摆的真凶**：`finishQueuedTurn(false)` 抛错 → `activeTurnId` 残留 →
+  `claimNextQueuedTurn` 因 `if (latest.activeTurnId) return null` 永远返回 null ⇒ 该会话队列**永久停摆**，
+  `resumeQueue` 也救不了。修法：失败**重试一次** → 仍失败走 `releaseActiveTurn` 兜底 → **无论成败 `clearQueueDrain`**。
+- **验证"能再领到"而不是"函数被调用"**：命门断言必须走到"`resumeQueue()` 之后 `claimNextQueuedTurn`
+  真的又拿到同一条 turn、`sendText` 第二次被调用"，否则"什么都不做"也能过。
+- **`advanceTaskPlan` 的 await 窗口是刹车点**：取消旧确认 → 等旧回合收尾，这几段 await 期间没有任何
+  "目标仍是 current"判断，切走之后照样落计划并发隐藏控制消息 = **替用户开一次没人看着的付费回合**。
+  复检要放在**所有 await 之后、落库之前**，切走就整单静默退出（不 notify）。
+- **护栏要能真的生效**：`isCurrentSession` 不传时必须"兜底成 true"（老调用不变），但那等于护栏空转——
+  所以面板侧那一行接线是必需的，并配**源码级接线护栏**（断言实参块里出现 `isCurrentSession` 且真的读 `currentIdRef`）。
+- **先测后修要留标定证据**：把复检临时短路成 `const stillCurrent = true` → 断言红（`expected true to be false`），
+  这条红证明现象真实存在，不是"先假设有 bug 再去凑测试"。
+
 ### 最终出包 0.1.15（`8a3c2d5`）：26 项自洽核对 + 新鲜度检查（2026-11-04，对账 M-BUILD2）
 
 - **"包过期"现在有自动化判据**：`check-release-artifacts.ps1` 比对产物 mtime 与 **HEAD 提交时间**。
