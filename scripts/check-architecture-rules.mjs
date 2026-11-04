@@ -57,13 +57,21 @@ try {
     'utf8',
   )
 
-  const depcruise = path.join(
-    root,
-    'node_modules',
-    'dependency-cruiser',
-    'bin',
-    'dependency-cruise.mjs',
+  /**
+   * 从装好的包里读 bin 路径，别写死文件名：
+   * dependency-cruiser 在 18.x 里把 `bin/dependency-cruise.mjs` 改成了
+   * `bin/dependency-cruiser.mjs`，而 package.json 的 `^18.2.0` 允许这种漂移，
+   * 于是"能装上但架构门禁找不到入口"。以包自己声明的 bin 为准。
+   */
+  const depcruisePkg = path.join(root, 'node_modules', 'dependency-cruiser')
+  const depcruiseMeta = JSON.parse(
+    readFileSync(path.join(depcruisePkg, 'package.json'), 'utf8'),
   )
+  const depcruiseBin =
+    depcruiseMeta.bin?.depcruise ??
+    depcruiseMeta.bin?.['dependency-cruise'] ??
+    'bin/dependency-cruiser.mjs'
+  const depcruise = path.join(depcruisePkg, depcruiseBin)
   const run = spawnSync(
     process.execPath,
     [depcruise, 'src', '--config', configPath],
