@@ -1,5 +1,18 @@
 # CanvasFlow（轻画）项目记忆
 
+### loopDeps 控制器 + 孤儿清理重试（2026-11-04，对账 #894/#896，`3b208d4` + `e39fc32`）
+
+- **loopDeps 的"三个端口"才是不丢 `visualReview` 补丁的关键**：`toolCtx` 必须**同一引用**传下去
+  （包一层新箭头就丢补丁、`origin` 还会变旧），`canvasReviewEnabled` 原样透传，`nodeRunStates` 是 thunk。
+  六张 per-session 数据（contextTrace / turnTools / planAliases / deliveredSteers / abortSignal / nodeRunStates）
+  **全部是 thunk**，每回合现取。
+- **启动清理是旁路，永远不许阻断启动**：孤儿会话清理做 3 次（首次 + 2 重试，150ms 间隔，`wait` 也是端口），
+  全失败才收口：**一条** error 提示 + **一条**带 `sessionId/attempts/error` 的结构化日志，然后照常加载会话。
+- **日志只能有一个来源**：端口接线后必须删掉面板里的内联 `logger.log`，否则一次失败两条日志。
+  测试用"日志字符串全文只出现一次"来钉这条。
+- **源码级快照测试的定位**：只防"端口被删 / 内联日志被加回来"这类静默回退；**行为**必须由假端口用例证明。
+  写这类测试要在注释里写清定位，别让人误以为是行为验证。
+
 ### 浮球 Y 重夹 + tool context 纯拼装（2026-11-04，对账 #888b/#893，`7593323` + `7a6426e`）
 
 - **"只比宽度"是几何 bug 的经典来源**：`shouldClampAgentOrbToSurface` 只比 viewport 宽度，纯高度变化

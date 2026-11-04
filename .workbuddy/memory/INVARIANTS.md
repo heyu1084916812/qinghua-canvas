@@ -10,6 +10,11 @@
   最终模型变化时才写（先 remember 到 ref 再落库）；上下文素材只留 `image/*`。`toolCtx()` 必须每次重建，
   任何 per-session 缓存都会让「批准后才执行」的工具看到发消息那一刻的旧快照。
 
+- **启动清理是旁路**：孤儿会话清理做有界重试，全失败也只发**一条** error 提示 + **一条**结构化日志，
+  然后照常加载会话。日志只能有一个来源（端口接上后必须删掉面板内联 `logger.log`）。
+- **`loopDeps` 的三个端口决定 `visualReview` 补丁不丢**：`toolCtx` 同一引用传入（不许包新箭头）、
+  `canvasReviewEnabled` 透传、`nodeRunStates` 是 thunk；六张 per-session 数据全部 thunk 现取。
+
 - **浮球几何：只比宽度的 clamp 会漏掉纯高度变化**。`clampAgentOrbY(point, area, size)` 只夹 Y、X 原样带过；
   `resizeAgentShellForAreaChange` 的 `area` 参数**可选**——不传（面板开合 / 同视口重新激活）就**完全不夹**，
   orb 连引用都不换；传了才夹，且只在 Y 真变时换对象。clamp 必须幂等，`NaN` 不许往下传。
