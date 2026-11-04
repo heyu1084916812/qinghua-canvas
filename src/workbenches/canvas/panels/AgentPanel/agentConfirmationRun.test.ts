@@ -324,4 +324,55 @@ describe('runAgentConfirmation', () => {
       origin,
     )
   })
+
+  /**
+   * #916：**Job 转态自己抛错**时，收口也不能停在那一步。
+   *
+   * `settleSessionOutcome` 才是释放内存活动锁（`releaseSessionActivity`）的地方。
+   * 以前 `transitionSessionJob` 没有兜底：store 写失败 / 生命周期已关闭导致它抛错时，
+   * 后面那行 settle 根本不会执行 ⇒ 该会话的活动锁永远归不了零 ⇒ 之后发消息、排队、
+   * 续跑全被判 busy（`claimSessionActivity` 恒 false），而 error 态下停止按钮**不渲染**，
+   * 面板内没有手动恢复入口。
+   *
+   * 对照 `agentContinuationRun` 的 `failRoute`：那里 transition 是显式包了 try/catch 的。
+   */
+  it('★★ Job 转态抛错时仍然执行活动锁收口，并把错误并进状态文案', async () => {
+    const failure = new Error('复核失败')
+    const transitionFailure = new Error('store 写失败')
+    const h = harness({
+      beginConfirmation: vi.fn(async () => {
+        throw failure
+      }),
+      transitionSessionJob: vi.fn(async () => {
+        throw transitionFailure
+      }),
+    })
+
+    const result = await runAgentConfirmation(h.input)
+
+    // ① 活动锁收口必须照常执行（它是唯一释放内存锁的一步）
+    expect(h.input.settleSessionOutcome).toHaveBeenCalledWith(
+      session.id,
+      { kind: 'error' },
+      origin,
+    )
+    // ② 状态必须可见：先摆原始失败，再把「Job 转态失败」并进去 —— 两条都不许吞
+    const statuses = vi.mocked(h.input.setStatus).mock.calls.map(
+      (call) => call[0],
+    )
+    expect(statuses[0]).toEqual({
+      kind: 'error',
+      message: '复核失败',
+    })
+    const last = statuses[statuses.length - 1] as {
+      kind: string
+      message: string
+    }
+    expect(last.kind).toBe('error')
+    expect(last.message).toContain('复核失败')
+    expect(last.message).toContain('Job 转态失败')
+    expect(last.message).toContain('store 写失败')
+    // ③ 失败语义不变
+    expect(result).toBe('failed')
+  })
 })

@@ -177,24 +177,50 @@ export async function runAgentConfirmation(
     const blocked =
       error instanceof AgentToolEffectBlockedError ? error : null
     input.setStatus({ kind: 'error', message: errText(error) })
-    await input.transitionSessionJob(
-      input.session.id,
-      blocked?.status ?? 'failed',
-      blocked ? 'tool_failed' : 'failed',
-      {
-        lastError: errText(error),
-        ...(blocked?.status === 'needs_attention'
-          ? { pendingCallId: blocked.outcome.effect.toolCallId }
-          : {}),
-      },
-      { phase: 'confirmed_tool' },
-      confirmationOrigin,
-    )
-    await input.settleSessionOutcome(
-      input.session.id,
-      { kind: 'error' },
-      confirmationOrigin,
-    )
+    /**
+     * 失败收口的三步顺序（与 `agentContinuationRun` 的 `failRoute` 对齐，#916）：
+     * 1) 先把可见错误摆出来（上面那行）；
+     * 2) Job 转态**单独兜住** —— 它会抛（store 写失败 / 生命周期已关闭）。
+     *    以前这里没有 try/catch：一旦抛错，下面那行 settle 根本执行不到；
+     * 3) `settleSessionOutcome` 必须**无条件**执行 —— 释放内存活动锁的正是它
+     *    （`releaseSessionActivity`）。跳过它，`claimSessionActivity` 就恒为 false，
+     *    之后发消息 / 排队 / 续跑全判 busy；而 error 态下停止按钮不渲染，
+     *    面板内没有手动恢复入口。
+     */
+    try {
+      await input.transitionSessionJob(
+        input.session.id,
+        blocked?.status ?? 'failed',
+        blocked ? 'tool_failed' : 'failed',
+        {
+          lastError: errText(error),
+          ...(blocked?.status === 'needs_attention'
+            ? { pendingCallId: blocked.outcome.effect.toolCallId }
+            : {}),
+        },
+        { phase: 'confirmed_tool' },
+        confirmationOrigin,
+      )
+    } catch (transitionError) {
+      // 不许静默吞：并进状态文案，用户看得到、日志里也有
+      input.setStatus({
+        kind: 'error',
+        message: `${errText(error)}；Job 转态失败：${errText(transitionError)}`,
+      })
+    }
+    try {
+      await input.settleSessionOutcome(
+        input.session.id,
+        { kind: 'error' },
+        confirmationOrigin,
+      )
+    } catch (settleError) {
+      input.setStatus({
+        kind: 'error',
+        message: `${errText(error)}；活动锁收口失败：${errText(settleError)}`,
+      })
+      return 'failed'
+    }
     return blocked?.status ?? 'failed'
   }
 }
