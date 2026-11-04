@@ -71,7 +71,18 @@ if (process.argv.includes('--json')) {
   if (aligned) {
     console.log(`✅ 六值一致：${unique[0]}`)
   } else {
+    const counts = new Map()
+    for (const value of Object.values(values)) {
+      if (!value) continue
+      counts.set(value, (counts.get(value) ?? 0) + 1)
+    }
+    const majority = [...counts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? null
+    const outliers = Object.entries(values).filter(([, value]) => value !== majority)
     console.log(`❌ 版本号不一致 / 缺失：${unique.join(' , ') || '(none)'}`)
+    if (majority) console.log(`   主流值：${majority}`)
+    for (const [label, value] of outliers) {
+      console.log(`   偏离项：${label} = ${value ?? '(缺失)'}`)
+    }
   }
   if (endpointVersioned) {
     console.log(`⚠️ updater 地址里带版本号（老客户端永远发现不了新版）：${endpointVersioned}`)
