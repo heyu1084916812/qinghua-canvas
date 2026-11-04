@@ -48,6 +48,7 @@ export interface AgentSteeringControllerInput {
           | 'has_assets'
           | 'steer_full'
           | 'awaiting_confirmation'
+          | 'active'
       }
   >
   enqueueSteer: (
@@ -196,7 +197,9 @@ export function useAgentSteeringController(
                 ? '当前任务的引导已达上限'
                 : promoted.reason === 'awaiting_confirmation'
                   ? 'Agent 正在等待确认，请重新点击引导'
-                  : '这条排队消息已经不存在',
+                  : promoted.reason === 'active'
+                    ? '这条消息正在发送中，不能转成引导'
+                    : '这条排队消息已经不存在',
             'error',
           )
           return

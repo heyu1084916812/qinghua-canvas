@@ -227,7 +227,13 @@ export interface AgentSessionStore {
     | { ok: true; session: AgentSession }
     | {
         ok: false
-        reason: 'missing' | 'has_assets' | 'steer_full' | 'awaiting_confirmation'
+        reason:
+          | 'missing'
+          | 'has_assets'
+          | 'steer_full'
+          | 'awaiting_confirmation'
+          /** 这条 turn 正在发送中（已被 pump 领取），不能再转成引导。 */
+          | 'active'
       }
   >
   /**
@@ -891,6 +897,14 @@ export function createAgentSessionStore(storage: StoragePort): AgentSessionStore
         }
         const turn = latest.queuedTurns.find((item) => item.id === turnId)
         if (!turn) return { ok: false as const, reason: 'missing' as const }
+        /**
+         * `claimNextQueuedTurn` 只写 `activeTurnId`、不把 turn 移出 `queuedTurns`，
+         * 所以「正在发送」的这一条仍然挂在面板上。此时若允许 promote，
+         * 同一句文本会先被 pump 发出去、再作为 steer 注入一次 ⇒ 执行两遍。
+         */
+        if (latest.activeTurnId === turnId) {
+          return { ok: false as const, reason: 'active' as const }
+        }
         if (turn.pendingAssetIds?.length) {
           return { ok: false as const, reason: 'has_assets' as const }
         }

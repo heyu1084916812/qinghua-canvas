@@ -492,4 +492,72 @@ describe('useAgentQueueController', () => {
       expect.objectContaining({ queueTurnId: queuedTurn.id }),
     )
   })
+
+  /**
+   * #915：#912 只兜住了「pump 自己抛错导致结算失败」那条路。还有一条更早的入口——
+   * 会话行上的 `activeTurnId` 在**进入 pump 之前**就已经残留（例如上一次结算在别处失败）。
+   * 这时 `claimNextQueuedTurn` 直接返回 null，pump 只会清掉自动续排标记 ⇒
+   * 队列永久停摆、没有任何提示、「恢复队列」也救不回来。
+   *
+   * 判据不是「releaseActiveTurn 被调用过」，而是：清完之后**真的又领到了队首并只发一次**。
+   */
+  it('★★ 进 pump 前已有残留 activeTurnId：自愈一次并重新领到队首（只发一次）', async () => {
+    const lifecycle = createTaskLifecycle()
+    const store = {
+      activeTurnId: queuedTurn.id as string | undefined,
+      queuedTurns: [queuedTurn],
+    }
+    const snapshot = () => ({
+      ...session,
+      queuedTurns: store.queuedTurns,
+      ...(store.activeTurnId ? { activeTurnId: store.activeTurnId } : {}),
+    })
+    const claimNextQueuedTurn = vi.fn(async () => {
+      if (store.activeTurnId) return null
+      store.activeTurnId = queuedTurn.id
+      return { session: snapshot(), turn: queuedTurn }
+    })
+    const releaseActiveTurn = vi.fn(async () => {
+      store.activeTurnId = undefined
+      return snapshot()
+    })
+    const sendText = vi.fn(async () => undefined)
+    const props = input({
+      controller: {
+        claimNextQueuedTurn,
+        finishQueuedTurn: vi.fn(async () => snapshot()),
+      } as unknown as AgentController,
+      sessions: {
+        get: vi.fn(async () => snapshot()),
+        releaseActiveTurn,
+      } as unknown as AgentQueueControllerInput['sessions'],
+      sendText,
+      trackRun: (work) => lifecycle.track(work),
+    })
+    let api: ReturnType<typeof useAgentQueueController> | null = null
+    function Probe() {
+      api = useAgentQueueController(props)
+      return createElement('span', null, 'ok')
+    }
+    renderToStaticMarkup(createElement(Probe))
+
+    await api!.resumeQueue()
+    await lifecycle.waitForIdle(100)
+
+    // 先失败一次 → 清残留 → 再领到同一条
+    expect(claimNextQueuedTurn).toHaveBeenCalledTimes(2)
+    expect(releaseActiveTurn).toHaveBeenCalledTimes(1)
+    expect(sendText).toHaveBeenCalledTimes(1)
+    expect(sendText).toHaveBeenCalledWith(
+      queuedTurn.text,
+      expect.anything(),
+      expect.objectContaining({ queueTurnId: queuedTurn.id }),
+    )
+
+    // 真正的回合还在跑（内存活动锁未释放）⇒ 再点「恢复队列」不得重复发送
+    await api!.resumeQueue()
+    await lifecycle.waitForIdle(100)
+    expect(releaseActiveTurn).toHaveBeenCalledTimes(1)
+    expect(sendText).toHaveBeenCalledTimes(1)
+  })
 })

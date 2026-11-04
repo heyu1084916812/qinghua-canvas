@@ -722,6 +722,7 @@ describe('useAgentSteeringController / guideQueuedTurn', () => {
       ['has_assets', '带新素材的消息不能中途引导，请等它按队列发送'],
       ['steer_full', '当前任务的引导已达上限'],
       ['awaiting_confirmation', 'Agent 正在等待确认，请重新点击引导'],
+      ['active', '这条消息正在发送中，不能转成引导'],
       ['missing', '这条排队消息已经不存在'],
     ] as const
     for (const [reason, message] of cases) {
@@ -739,6 +740,46 @@ describe('useAgentSteeringController / guideQueuedTurn', () => {
       })
       expect(notify).toHaveBeenLastCalledWith(message, 'error')
     }
+  })
+
+  /**
+   * #914：pump 已经把这条 turn 的文本发出去了（`activeTurnId === turn.id`）。
+   * 此时转成引导 = 同一句话再注入一次 ⇒ 必须明确拒绝，并且**不动队列、不重发**。
+   */
+  it('★★ 正在发送的 turn 被拒（active）：有提示，且不 remove/cancel/settle/send', async () => {
+    const notify = vi.fn()
+    const removeQueuedTurn = vi.fn()
+    const cancelQueuedJob = vi.fn()
+    const settleInterruptedSession = vi.fn()
+    const sendText = vi.fn()
+    const applySessionSnapshot = vi.fn()
+    const { viewRef } = render(
+      input({
+        notify,
+        removeQueuedTurn,
+        cancelQueuedJob,
+        settleInterruptedSession,
+        sendText,
+        applySessionSnapshot,
+        promoteQueuedTurnToSteer: vi.fn(async () => ({
+          ok: false as const,
+          reason: 'active' as const,
+        })),
+      }),
+    )
+    await act(async () => {
+      await viewRef.current!.guideQueuedTurn(turn())
+    })
+    expect(notify).toHaveBeenCalledTimes(1)
+    expect(notify).toHaveBeenCalledWith(
+      '这条消息正在发送中，不能转成引导',
+      'error',
+    )
+    expect(removeQueuedTurn).not.toHaveBeenCalled()
+    expect(cancelQueuedJob).not.toHaveBeenCalled()
+    expect(settleInterruptedSession).not.toHaveBeenCalled()
+    expect(sendText).not.toHaveBeenCalled()
+    expect(applySessionSnapshot).not.toHaveBeenCalled()
   })
 
   it('正常 promote 后 apply、cancel job、关菜单、通知', async () => {

@@ -591,6 +591,33 @@ describe('Agent 会话 · 待执行任务队列', () => {
     ).toEqual({ ok: false, reason: 'has_assets' })
   })
 
+  /**
+   * #914：`claimNextQueuedTurn` 只写 `activeTurnId`、**不把 turn 移出 `queuedTurns`**，
+   * 所以「正在发送」的队列项也还挂在队列面板上，「引导」按钮对它可用。
+   *
+   * 若此时再 promote 成功：pump 已经把同一句文本发出去（落库 + 开 Job），
+   * promote 又把同一句塞进 `pendingSteers` ⇒ 下一次模型动作前再注入一次，
+   * 同一句话执行两遍、双倍扣费、历史两条相同用户消息。
+   */
+  it('★★ 正在发送的队列项不能转成引导（同一句话不能跑两遍）', async () => {
+    const s = store()
+    const a = await s.create({ projectId: 'p1', channelId: 'c1', model: 'm1' })
+    await s.enqueueTurn(a.id, turn('1', '再生成一张'))
+
+    const claimed = await s.claimNextQueuedTurn(a.id)
+    expect(claimed?.turn.id).toBe('1')
+    expect(claimed?.session.activeTurnId).toBe('1')
+
+    expect(
+      await s.promoteQueuedTurnToSteer(a.id, '1', 'steer-1'),
+    ).toEqual({ ok: false, reason: 'active' })
+
+    const reopened = await s.get(a.id)
+    expect(reopened?.pendingSteers).toEqual([])
+    expect(reopened?.queuedTurns.map((item) => item.id)).toEqual(['1'])
+    expect(reopened?.activeTurnId).toBe('1')
+  })
+
   it('★★ 排队时冻结并消费附件，连续排队不会重复携带', async () => {
     const s = store()
     const a = await s.create({ projectId: 'p1', channelId: 'c1', model: 'm1' })

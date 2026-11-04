@@ -221,11 +221,40 @@ export function useAgentQueueController({
         let claimedTurnId: string | undefined
         try {
           if (!claimSessionActivity(sessionId)) return
-          const next = await controller.claimNextQueuedTurn(sessionId)
+          let next = await controller.claimNextQueuedTurn(sessionId)
           if (!next) {
-            clearQueueDrain(sessionId)
-            releaseSessionActivity(sessionId)
-            return
+            /**
+             * #915：`activeTurnId` 残留不只出现在「本轮 pump 自己抛错」那条路（#912
+             * 已在那里兜底），也可能在**进入 pump 之前**就残留在会话行上（上一次结算
+             * 在别处失败）。此时 claim 直接返回 null，pump 只会清掉自动续排标记 ⇒
+             * 该会话队首永远领不到，且没有任何提示。
+             *
+             * 判据：此刻内存活动锁是我们刚拿到的（同会话不可能有别的循环在跑），
+             * 所以 store 上的活动标记只可能是失败结算的残留 ⇒ 清一次再领。
+             * **只重试一次**：真的没有队首时就按空队列处理，绝不在这里重放消息。
+             */
+            const stuck = await sessions.get(sessionId).catch(() => null)
+            if (stuck?.activeTurnId) {
+              const released = await sessions
+                .releaseActiveTurn(sessionId)
+                .catch(() => null)
+              if (!released) {
+                clearQueueDrain(sessionId)
+                releaseSessionActivity(sessionId)
+                setStatusFor(sessionId, {
+                  kind: 'error',
+                  message: '队列被一条残留的进行中记录卡住，请重启应用',
+                })
+                return
+              }
+              applySessionSnapshot(released)
+              next = await controller.claimNextQueuedTurn(sessionId)
+            }
+            if (!next) {
+              clearQueueDrain(sessionId)
+              releaseSessionActivity(sessionId)
+              return
+            }
           }
           claimedTurnId = next.turn.id
           if (!bindQueueTurnToSessionActivity(sessionId, claimedTurnId)) {
