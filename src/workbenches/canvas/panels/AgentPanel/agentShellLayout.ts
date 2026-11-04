@@ -8,10 +8,19 @@ export interface AgentWorkArea {
 export function resizeAgentShellForAreaChange(
   state: AgentShellState,
   availableWidth: number,
+  area?: AgentWorkArea,
 ): AgentShellState {
+  const width = agentShellWidth(state.width, availableWidth)
+  /**
+   * 不传 `area` = 面板开合 / 同视口重新激活这类「只重算宽度」的路径：
+   * orb 连对象身份都不换（#880：开合面板不许移动浮球）。
+   */
+  if (!area) return { ...state, width }
+  const orb = clampAgentOrbY(state.orb, area)
   return {
     ...state,
-    width: agentShellWidth(state.width, availableWidth),
+    width,
+    orb: orb.x === state.orb.x && orb.y === state.orb.y ? state.orb : orb,
   }
 }
 
@@ -64,6 +73,29 @@ export function clampAgentOrb(
     x: Math.round(clamp(point.x, area.x + AGENT_SHELL_GAP, maxX)),
     y: Math.round(clamp(point.y, area.y + AGENT_SHELL_GAP, maxY)),
   }
+}
+
+/**
+ * **只夹 Y**。
+ *
+ * 窗口只改高度（拖下边框、任务栏变化）时，浮球可能被顶到可视区外、用户点不到；
+ * 这时只该把它收回 surface 的纵向范围。横向位置是用户亲手摆的，宽度没变却顺手
+ * 重算一次，就会把摆好的位置平移——所以这里绝不碰 X。
+ *
+ * 退化处理：surface 比浮球还小时夹到上边界（不许出现负数 / NaN）。
+ */
+export function clampAgentOrbY(
+  point: AgentOrbPoint,
+  area: AgentWorkArea,
+  size = AGENT_ORB_SIZE,
+): AgentOrbPoint {
+  if (!finite(area.y) || !finite(area.height)) {
+    return { x: point.x, y: finite(point.y) ? point.y : 0 }
+  }
+  const top = area.y + AGENT_SHELL_GAP
+  const bottom = Math.max(top, area.y + area.height - size - AGENT_SHELL_GAP)
+  const raw = finite(point.y) ? point.y : top
+  return { x: point.x, y: Math.round(clamp(raw, top, bottom)) }
 }
 
 export function agentShellMaxWidth(

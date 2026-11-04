@@ -183,6 +183,11 @@ export function AgentDock({
           ? resizeAgentShellForAreaChange(
               current,
               nextAvailableWidth,
+              /**
+               * surface 高度变了也要把浮球收回纵向范围；这里只会动 Y，
+               * X 由用户摆布，宽度没变就不许平移。
+               */
+              nextArea,
             )
           : {
               ...defaultAgentShellState(nextArea),
@@ -215,6 +220,8 @@ export function AgentDock({
         resizeAgentShellForAreaChange(
           current,
           measureAgentAvailableWidth(),
+          /** 走到这里说明视口宽度没变：只按新高度重夹 Y，X 原样保留。 */
+          measureCanvasWorkArea(false),
         ),
       )
     }

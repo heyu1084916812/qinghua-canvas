@@ -11,6 +11,7 @@ import {
   agentShellStateForActivation,
   agentShellWidth,
   clampAgentOrb,
+  clampAgentOrbY,
   clampAgentShellState,
   dampAgentShellWidth,
   defaultAgentShellState,
@@ -167,5 +168,84 @@ describe('Agent shell layout', () => {
     expect(parseAgentShellState('{')).toBeNull()
     expect(parseAgentShellState(JSON.stringify({ orb: { x: 1, y: 2 } }))).toBeNull()
     expect(parseLegacyAgentShellState(JSON.stringify({ panel: { width: 380 } }))).toBeNull()
+  })
+})
+
+/**
+ * 窗口只改高度（拖下边框、任务栏变化）时，浮球的 Y 必须被重夹回 surface；
+ * 但宽度没变就**一个像素都不许动 X** —— 否则用户摆好的水平位置会被平移。
+ */
+describe('浮球在高度变化时只重夹 Y', () => {
+  it('只改高度：Y 夹回 surface 内，X 完全不变', () => {
+    const state = { orb: { x: 1100, y: 780 }, width: 700 }
+    const shorter: AgentWorkArea = { ...AREA, height: 600 }
+    const expectedY = AREA.y + 600 - AGENT_ORB_SIZE - AGENT_SHELL_GAP
+
+    const next = resizeAgentShellForAreaChange(state, 1360, shorter)
+
+    expect(next.orb.x).toBe(1100)
+    expect(next.orb.y).toBe(expectedY)
+    // 宽度没变 ⇒ 宽度也算回去，但 orb 只动 Y
+    expect(next.width).toBe(agentShellWidth(700, 1360))
+  })
+
+  it('只改宽度：orb 完全不动（与拆分前一致）', () => {
+    const state = { orb: { x: 700, y: 300 }, width: 500 }
+
+    const next = resizeAgentShellForAreaChange(state, 1024, AREA)
+
+    expect(next.orb).toEqual(state.orb)
+    expect(next.width).toBe(agentShellWidth(500, 1024))
+  })
+
+  it('不传 area（面板开合路径）时 orb 连对象身份都不换', () => {
+    const state = { orb: { x: 740, y: 120 }, width: 1376 }
+
+    const next = resizeAgentShellForAreaChange(state, 1024)
+
+    expect(next.orb).toBe(state.orb)
+  })
+
+  it('clamp 是幂等的：clamp(clamp(x)) === clamp(x)', () => {
+    const area: AgentWorkArea = { x: 0, y: 0, width: 800, height: 500 }
+
+    const once = clampAgentOrbY({ x: 10, y: 999 }, area)
+    expect(clampAgentOrbY(once, area)).toEqual(once)
+
+    const full = clampAgentOrb({ x: -50, y: 999 }, area)
+    expect(clampAgentOrb(full, area)).toEqual(full)
+
+    const shell = clampAgentShellState(
+      { orb: { x: -50, y: 999 }, width: 9999 },
+      area,
+      700,
+    )
+    expect(clampAgentShellState(shell, area, 700)).toEqual(shell)
+    // 已经是合法值时，重夹一次必须原样返回
+    expect(clampAgentOrbY({ x: 10, y: 200 }, area)).toEqual({ x: 10, y: 200 })
+  })
+
+  it('surface 比浮球还小时退化到上边界，不出负数或 NaN', () => {
+    const tiny: AgentWorkArea = { x: 0, y: 0, width: 40, height: 40 }
+
+    const next = clampAgentOrbY({ x: 123, y: 456 }, tiny)
+
+    expect(next.x).toBe(123)
+    expect(next.y).toBe(AGENT_SHELL_GAP)
+    expect(Number.isFinite(next.y)).toBe(true)
+    expect(next.y).toBeGreaterThanOrEqual(0)
+  })
+
+  it('非法输入（NaN / 非有限 area）不产生 NaN', () => {
+    const nanY = clampAgentOrbY({ x: 5, y: Number.NaN }, AREA)
+    expect(nanY.x).toBe(5)
+    expect(Number.isFinite(nanY.y)).toBe(true)
+    expect(nanY.y).toBe(AREA.y + AGENT_SHELL_GAP)
+
+    const brokenArea = clampAgentOrbY(
+      { x: 5, y: 400 },
+      { ...AREA, height: Number.NaN },
+    )
+    expect(Number.isFinite(brokenArea.y)).toBe(true)
   })
 })
