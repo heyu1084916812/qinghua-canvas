@@ -16,11 +16,10 @@ import { describe, expect, it } from 'vitest'
  * **每完成一刀就下调，只许降不许升。** 需要上调的话，答案永远是「继续拆」，
  * 不是「把阈值调大」。
  *
- * 调节奏：当前 2260 是 A1 收尾时定的（当时实测 2258），只是**两刀之间的临时余量**，
- * 不是永久上限。A2 落完后按「该刀实测 + 40」重新定值，之后每刀同理——阈值始终贴着
- * 实测走，留出的 40 行只够接一刀，不够养回一个胖文件。
+ * 调节奏：按「该刀实测 + 40」定值，之后每刀同理——阈值始终贴着实测走，留出的 40 行
+ * 只够接一刀，不够养回一个胖文件。当前 2126 = #885b 接线后实测 2086 + 40。
  */
-const AGENT_PANEL_MAX_LINES = 2140
+const AGENT_PANEL_MAX_LINES = 2126
 
 /**
  * `.ts` 下沉模块里允许出现的 hook 调用（模块名 → 理由）。
@@ -297,5 +296,111 @@ describe('AgentPanel 结构护栏', () => {
         (reason) => reason.trim().length > 0,
       ),
     ).toBe(true)
+  })
+})
+
+/** 从 `openIndex` 处的括号开始，取到配对的闭括号（跳过字符串内部）。 */
+const balancedFrom = (source: string, openIndex: number): string => {
+  const open = source[openIndex]
+  const close = open === '(' ? ')' : open === '{' ? '}' : ']'
+  let depth = 0
+  let quote: string | null = null
+  for (let index = openIndex; index < source.length; index += 1) {
+    const char = source[index]
+    if (quote) {
+      if (char === '\\') {
+        index += 1
+        continue
+      }
+      if (char === quote) quote = null
+      continue
+    }
+    if (char === '"' || char === "'" || char === '`') {
+      quote = char
+      continue
+    }
+    if (char === open) depth += 1
+    else if (char === close) {
+      depth -= 1
+      if (depth === 0) return source.slice(openIndex, index + 1)
+    }
+  }
+  return ''
+}
+
+/** 取出 `createXxx(...)` 这次调用的完整参数文本；找不到就返回空串。 */
+const callBlock = (source: string, anchor: string): string => {
+  const at = source.indexOf(anchor)
+  if (at < 0) return ''
+  const open = source.indexOf('(', at + anchor.length - 1)
+  return open < 0 ? '' : balancedFrom(source, open)
+}
+
+/**
+ * toolCtx 的三条「调用即取」铁律。
+ *
+ * 这个回调是「发消息时创建、用户点批准才执行」的：任何一项变成渲染时快照，
+ * 执行时就会拿旧值 —— 轻则选错节点（`selectedIds` / `selectedModelOf`），
+ * 重则停止按钮关不掉正在跑的生成（`signal`）并继续扣费。
+ */
+describe('toolCtx 的调用即取闭包', () => {
+  it('signal 端口是 thunk：每次调用才读 abortRefs', () => {
+    const block = callBlock(PANEL_SOURCE, 'createAgentToolResearch(')
+    expect(block, '没找到 createAgentToolResearch(...)').not.toBe('')
+    // 必须是 `signal: () => abortRefs.current…`
+    expect(block).toMatch(/signal:\s*\(\)\s*=>/)
+    expect(block).toContain('abortRefs.current.get(sessionId)')
+    // 值形态一律不许：`signal: abortRefs.current…`
+    expect(block).not.toMatch(/signal:\s*abortRefs\./)
+    // 也不许在创建前先算好再传进来
+    expect(PANEL_SOURCE).not.toMatch(
+      /const\s+\w*[Ss]ignal\w*\s*=\s*abortRefs\.current/,
+    )
+  })
+
+  it('perImage 每次建上下文都读 sessionRuntime.current', () => {
+    expect(PANEL_SOURCE).toMatch(
+      /sessionRuntimeRef\.current\.isPerImage\(\s*sessionId\s*\)[\s\S]{0,60}perImage: true/,
+    )
+    // 不许改成「先算布尔再 spread」以外的形态（例如提到组件级常量）
+    expect(PANEL_SOURCE).not.toMatch(
+      /const\s+\w+\s*=\s*sessionRuntimeRef\.current\.isPerImage\(/,
+    )
+  })
+
+  it('selectedIds / selectedModelOf 每次读当前画布选中，不能变快照', () => {
+    expect(PANEL_SOURCE).toContain('selectedIds: () => selection')
+    // 裸引用（函数本身来自控制器，内部经 getCanvasNodes() + selection 现算）
+    expect(PANEL_SOURCE).toMatch(/^\s*selectedModelOf,\s*$/m)
+    expect(PANEL_SOURCE).not.toMatch(/selectedIds:\s*selection\b/)
+    expect(PANEL_SOURCE).not.toMatch(/const\s+selectedIds\s*=\s*selection/)
+  })
+
+  it('runNodes 的素材过滤在调用时读 contextTrace，不许提前算成常量', () => {
+    expect(PANEL_SOURCE).toMatch(
+      /imageContextAssets\([\s\S]{0,80}contextTraceRef\.current\.get\(sessionId\)[\s\S]{0,40}\)/,
+    )
+    expect(PANEL_SOURCE).not.toMatch(
+      /const\s+\w+\s*=\s*contextTraceRef\.current\.get\(sessionId\)\?\.assetRefs/,
+    )
+  })
+
+  it('三份装配都在 toolCtx 函数体内，而不是组件级', () => {
+    const start = PANEL_SOURCE.indexOf('const toolCtx = useCallback(')
+    const end = PANEL_SOURCE.indexOf('const toolExecution = useMemo(')
+    expect(start).toBeGreaterThan(-1)
+    expect(end).toBeGreaterThan(start)
+    for (const anchor of [
+      'createAgentToolResearch(',
+      'createAgentToolDefaults(',
+    ]) {
+      const at = PANEL_SOURCE.indexOf(anchor)
+      expect(at, `${anchor} 不在文件里`).toBeGreaterThan(start)
+      expect(at, `${anchor} 不在 toolCtx 里`).toBeLessThan(end)
+    }
+    // imageContextAssets 必须用在 toolCtx 内部，而不是面板别处
+    const imageAt = PANEL_SOURCE.indexOf('imageContextAssets(')
+    expect(imageAt).toBeGreaterThan(start)
+    expect(imageAt).toBeLessThan(end)
   })
 })

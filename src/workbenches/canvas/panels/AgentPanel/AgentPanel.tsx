@@ -17,7 +17,6 @@ import {
 import { createAgentJobStore } from '../../../../state/agent/jobStore'
 import type { AgentDeliveryMode } from '../../../../domain/agent/delivery'
 import { createPresetStore } from '../../../../state/project/presetStore'
-import type { AgentNodeType } from '../../../../domain/agent/plan'
 import {
   generationAvailabilityOf,
 } from '../../../../domain/project/generationRouting'
@@ -89,6 +88,9 @@ import {
 import { toConversation } from './conversation'
 import { createAgentToolRecipeContext } from './agentToolRecipeContext'
 import { createAgentToolExecution } from './agentToolExecution'
+import { createAgentToolResearch } from './agentToolResearch'
+import { createAgentToolDefaults } from './agentToolDefaults'
+import { imageContextAssets } from './agentToolContextAssets'
 import { isAdvanceTaskCommand } from './agentProcessText'
 import { useAgentSendTurnController } from './useAgentSendTurnController'
 import type { AgentPrepareArgs } from './agentSendTurnRun'
@@ -831,6 +833,25 @@ export function AgentPanel({
           )
         },
       })
+      /**
+       * `signal` 必须是**每次调用现取**的 thunk：调研是长任务，跑起来那一刻才决定用哪个
+       * 取消信号；写成值快照会拿上一回合的 AbortController，停止按钮关不掉、继续扣费。
+       */
+      const toolResearch = createAgentToolResearch({
+        remember: (candidate) => memory.remember(candidate),
+        readCachedSources: () => inspirationRepository.readAll(),
+        readConfiguredSources: () => loadInspirationSources(platform.storage),
+        network: platform.network,
+        runResearch: runDesignResearch,
+        signal: () =>
+          abortRefs.current.get(sessionId)?.signal ??
+          new AbortController().signal,
+        describeError: errText,
+      })
+      /** agent 建的节点要和手建的节点使用同一套默认值（串行取值顺序由模块保证）。 */
+      const toolDefaults = createAgentToolDefaults({
+        defaultsFor: (type) => resolveDefaults({ channels, type }),
+      })
       return {
         store,
         viewportWorld: viewportWorldOf(viewport),
@@ -883,9 +904,9 @@ export function AgentPanel({
             execution,
             channels,
             platform,
-            contextAssets: (
-              contextTraceRef.current.get(sessionId)?.assetRefs ?? []
-            ).filter((asset) => asset.mime.startsWith('image/')),
+            contextAssets: imageContextAssets(
+              contextTraceRef.current.get(sessionId)?.assetRefs,
+            ),
             setRunTasksFor,
           },
           {
@@ -894,14 +915,7 @@ export function AgentPanel({
             ...(signal ? { signal } : {}),
           },
         ),
-      /**
-       * agent 建的节点要和手建的节点使用同一套默认值。
-       */
-      defaultsForNewNode: async (types) => {
-        const out: Partial<Record<AgentNodeType, Record<string, unknown>>> = {}
-        for (const type of types) out[type] = await resolveDefaults({ channels, type })
-        return out
-      },
+      defaultsForNewNode: toolDefaults.defaultsForNewNode,
       ...recipeContext,
       sliceImage: (nodeId, mode, rect, ratio) => {
         const run = mode === 'crop' ? cropAsset : extractSelection
@@ -909,43 +923,15 @@ export function AgentPanel({
       },
       splitGrid: (nodeId, rows, cols) =>
         splitNodeToGrid({ platform, store }, { nodeId, rows, cols }),
-      rememberMemory: async (candidate) => {
-        try {
-          const saved = await memory.remember(candidate)
-          return {
-            ok: true,
-            memoryId: saved.id,
-            text: saved.text,
-          }
-        } catch (error) {
-          return {
-            ok: false,
-            reason: errText(error),
-          }
-        }
-      },
-      researchDesign: async (input) => {
-        const [cachedSources, configuredSources] = await Promise.all([
-          inspirationRepository.readAll().catch(() => []),
-          loadInspirationSources(platform.storage).catch(() => []),
-        ])
-        const enabledIds = new Set(
-          configuredSources.filter((source) => source.enabled).map((source) => source.id),
-        )
-        const libraryCases = cachedSources
-          .filter((source) => enabledIds.has(source.sourceId))
-          .flatMap((source) => source.cases)
-        return runDesignResearch(
-          input,
-          {
-            network: platform.network,
-            libraryCases,
-          },
-          abortRefs.current.get(sessionId)?.signal ?? new AbortController().signal,
-        )
-      },
+      rememberMemory: toolResearch.rememberMemory,
+      researchDesign: toolResearch.researchDesign,
       }
     },
+    /**
+     * 依赖集合不因这次拆分而变化：`toolResearch` / `toolDefaults` 都在函数体内创建，
+     * 只闭包下面这些变量。把它们提到组件级、再把对象塞进这里，就等于把
+     * 「调用即取」换成渲染时快照（`signal` 还会丢 sessionId）。
+     */
     [
       store,
       selection,
