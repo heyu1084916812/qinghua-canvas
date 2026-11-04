@@ -110,6 +110,13 @@
   pickModel/setModelKind 必须捕获 target sessionId，current 为空直接 no-op；写入按 `${sessionId}:${field}` 串行，
   保证快速 A→B 最终 B，旧失败/晚回不能覆盖 B。pickModel 只清目标 route；setModelKind 只有 patch 返回非 null
   成功后才 rememberStickyModel，失败/null 不写 sticky。模型目录、mention、shown/logical/default 只能有单份实现。
+- **AgentAutoRunController 只拥有实时 autoRun Map**：`useAgentAutoRunController` 不得复制 Session/Job/确认真相。
+  setAutoRun 先乐观写实时值，patch reject/null 必须回滚且不 confirm；成功后必须重查目标仍 current、最新 status
+  仍 awaitingConfirm 且显式审批=false，才 confirmLatest。A→B 不得确认 B；确认失败只走既有 status error，
+  不得新增不可达专用提示或误报保存失败。
+- **Agent 浮球只在视口变化时按 surface 夹取**：首次激活或 viewport 宽度真实变化才 surface-only clamp；同视口面板
+  开合/设置页返回只能重算 panel width，orb 对象与坐标不得移动。viewport token 跨 activation cleanup 保留；
+  activation settle 必须按激活时捕获的 shouldClampFinal 决定，不得无条件清 token 或无条件 surface clamp。
 - **AgentSessionActionsController 不绕过 lifecycle**：新建会话创建后必须走 `switchTo`，禁止直接
   `setCurrent`；改名和删除晚返回只在目标仍是当前时自动切换。两步删除必须保留活动/队列/确认中门禁；
   `sessions.remove` 成功前不得清 draft/runtime，删除落库后的 refresh / switch / fallback 失败必须清失效选择

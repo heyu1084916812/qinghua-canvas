@@ -1,5 +1,16 @@
 # CanvasFlow（轻画）项目记忆
 
+### AgentAutoRunController + 浮球 clamp（2026-11-04，对账 #879/#880，✅ 已独立验收，`f258e57` + `ee5db5c`）
+
+- `useAgentAutoRunController` 独家持有 per-session autoRun Map；`setAutoRun` 乐观写实时值，patch null/reject 回滚且不
+  confirm。成功后重新校验目标 current、最新 awaitingConfirm、非显式审批，才 confirmLatest；A→B 绝不能确认 B。
+- 当前确认失败由既有 status error 呈现；不要新增不可达专用通知，也不要把设置已保存误报成“保存失败”。
+- AgentDock：首次激活/视口宽度变化才 surface clamp；同视口面板开合/设置页返回只重算 panel width，orb 不变。
+  viewport token 跨 cleanup 保留；activation settle 按捕获的 shouldClampFinal 决定是否最终 surface clamp。
+- 验证：AgentPanel **2546→2528**、AutoRun **11/11**、G735 **35/35**（1186→1186）、G865 **24/24**
+  （1024 返回 orb 495–559 / surface 64–574）、G769 明暗各 39/39、全量 **4123 passed / 1 skipped**。
+- P3：同 session 快速并发 autoRun 保存未串行；confirm 二次清理窄路径；纯纵向 resize 不重夹 orb Y。
+
 ### AgentModelSelectionController（2026-11-04，对账 #878，✅ 已独立验收，`5281184`）
 
 - `useAgentModelSelectionController` 只拥有模型目录派生与选择动作：custom/uncommon/global 清单、options、
