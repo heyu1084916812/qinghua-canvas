@@ -1,5 +1,17 @@
 # CanvasFlow（轻画）项目记忆
 
+### 最终出包 0.1.15（`8a3c2d5`）：26 项自洽核对 + 新鲜度检查（2026-11-04，对账 M-BUILD2）
+
+- **"包过期"现在有自动化判据**：`check-release-artifacts.ps1` 比对产物 mtime 与 **HEAD 提交时间**。
+  第一次出包 08:46、HEAD 09:05 → 直接判红。**任何在出包后改代码的行为都会让包作废**，要么重打、要么别报"可发布"。
+- **签名核对不能只看"能解"**：正确口径是 `latest.json` 里的 signature 与 `.sig` **字符级完全相同**、
+  两侧 base64 解出**同样的 327 字节**、minisign 4 行结构、trusted comment 带 `version:`、keyid 与 updater 公钥**字节级**一致。
+- **url 尾段要与磁盘文件名逐字比对（`-ceq`，大小写敏感）**：`qinghua_0.1.15_x64-setup.exe` 少一个下划线在 Windows 上照样能开，
+  但线上直链会 404。
+- **exe 版本资源要从 `tauri.conf.json` 的 `productName` 读**，别在脚本里硬编码中文——PowerShell 5.1 会把无 BOM 的 UTF-8 当 ANSI，
+  硬编码中文比对的脚本会自己坏掉。
+- **本地自洽 ≠ 线上可用**：本地 26 项只证明"三件产物互相一致 + 不早于 HEAD"，线上还要 push 后跑 `check-published-release`。
+
 ### 面板三 hook 拆分：ref 单一宿主 + deps 不许裸 session（2026-11-04，#907/#909，`3eeac03`）
 
 - **17 个 per-session ref 必须只有一处 `useRef`**：全在 `useAgentPanelRefs.ts`。机械计数口径：
