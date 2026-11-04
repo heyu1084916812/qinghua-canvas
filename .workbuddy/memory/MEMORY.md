@@ -1,5 +1,22 @@
 # CanvasFlow（轻画）项目记忆
 
+### `npm install --no-save` 会顺手升级整棵树（2026-11-04，事故 + 复原）
+
+- **事故**：为了跑覆盖率，执行了 `npm install --no-save @vitest/coverage-v8@5.0.0`。
+  `--no-save` 只是**不写 package.json/lock**，但 npm 仍会在 `^` 范围内**重新解析整棵树** ⇒
+  **70 个包**装成了比 lock 更新的版本（`dependency-cruiser` 18.2.0→18.7.2、`@typescript-eslint/*` 8.70→8.72、
+  `@tauri-apps/*`、`@vitejs/plugin-react` 等）。
+- **后果**：dependency-cruiser 18.7 把 bin 从 `dependency-cruise.mjs` 改名成 `dependency-cruiser.mjs`，
+  而 `scripts/check-architecture-rules.mjs` 写死了旧名字 ⇒ **代码全绿但 `npm run check` exit 1**。
+  （已修：从装好的包读 `bin` 字段，两种名字都认。）
+- **复原**：`npm ci` 精确恢复到 lock。**第一次失败**是因为有个遗留的 vite dev server（PID 17300，
+  `node_modules/vite/bin/vite.js --port 1420`）占着文件，`npm ci` 删到一半把
+  `typescript`/`vitest`/`dependency-cruiser` 删掉就报 `operation rejected by your operating system`。
+  **先停掉那个 dev server 再 `npm ci` 才成功**（347 包，43s）。复原后：depcruise 18.2.0 / vitest 5.0.0 /
+  `npm run check` exit 0 / 全量 4486 绿。
+- **规矩**：以后要装临时工具，**装完立刻 `npm ci` 复原**；并且装之前先确认没有 dev server 占着 `node_modules`。
+  判断"环境有没有漂移"的机械办法：拿 `package-lock.json` 的每个 `node_modules/*` 版本去比 `node_modules/*/package.json`。
+
 ### 继续任务失败残留 + 附件原子追加（2026-11-04，#921/#922，`64361bd` + `0c15ad8`）
 
 - **三条"自动续跑失败"调用方只有第三条漏转态**：发送中 / 用户点确认都会把 Job 转到 `needs_attention` 或 `failed`，
