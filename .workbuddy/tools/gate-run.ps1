@@ -20,8 +20,8 @@
 #>
 [CmdletBinding()]
 param(
-  [Parameter(Mandatory = $true)][string]$Commit,
-  [Parameter(Mandatory = $true)][string]$Name,
+  [string]$Commit = '',
+  [string]$Name = 'run',
   [switch]$Ui,
   [string[]]$SmokeGroups = @('g769', 'g865'),
   [string[]]$Targeted = @(),
@@ -31,6 +31,7 @@ param(
   [int]$StorePort = 28792,
   [string]$SmokeBase = 'http://127.0.0.1:1420',
   [switch]$PreflightOnly,
+  [string]$HeadCheck = '',
   [switch]$SkipStatic,
   [switch]$KeepStore,
   [switch]$AllowDirty
@@ -40,7 +41,20 @@ $ErrorActionPreference = 'Continue'
 try { [Console]::OutputEncoding = [System.Text.Encoding]::UTF8 } catch { }
 
 $Repo = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
-$HashTag = $Commit.Substring(0, [Math]::Min(7, $Commit.Length))
+if ($HeadCheck) {
+  $HashTag = $HeadCheck.Substring(0, [Math]::Min(7, $HeadCheck.Length))
+  $Name = 'headcheck'
+} else {
+  $HashTag = $Commit.Substring(0, [Math]::Min(7, $Commit.Length))
+}
+if (-not $HeadCheck -and -not $Commit) {
+  Write-Host '缺少 -Commit（或用 -HeadCheck <hash>）'
+  exit 3
+}
+if ($Name -eq 'run' -and -not $HeadCheck) {
+  Write-Host '缺少 -Name（或改用 -HeadCheck <hash> 模式）'
+  exit 3
+}
 $Evidence = Join-Path $Repo ".playwright-verify/$HashTag-$Name"
 New-Item -ItemType Directory -Force -Path $Evidence | Out-Null
 
@@ -128,6 +142,58 @@ function Finish([int]$Code) {
   Write-Host "证据目录：$Evidence"
   Write-Host "结论：$verdict"
   exit $Code
+}
+
+# ---------- HeadCheck 模式：只证明「某个提交能不能编译」 ----------
+if ($HeadCheck) {
+  Write-Host "== HeadCheck $HeadCheck =="
+  $resolved = (git -C $Repo rev-parse --verify "$HeadCheck^{commit}" 2>$null)
+  if (-not $resolved) {
+    Add-Result 'HeadCheck:resolve' $false "找不到提交 $HeadCheck"
+    Finish 3
+  }
+  $resolved = $resolved.Trim()
+  $wt = Join-Path $Repo ".gate-headcheck-$HashTag"
+  if (Test-Path -LiteralPath $wt) {
+    Add-Result 'HeadCheck:worktree' $false "目录已存在：$wt（先清理）"
+    Finish 3
+  }
+  git -C $Repo worktree add $wt $resolved *> (Join-Path $Evidence 'worktree-add.log')
+  if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $wt)) {
+    Add-Result 'HeadCheck:worktree' $false "git worktree add 失败（见 worktree-add.log）"
+    Finish 3
+  }
+  $addLog = Get-Content -LiteralPath (Join-Path $Evidence 'worktree-add.log') -Raw
+  Add-Result 'HeadCheck:worktree' $true ("检出 $($resolved.Substring(0,7)) 到 .gate-headcheck-$HashTag")
+
+  $junction = Join-Path $wt 'node_modules'
+  cmd /c mklink /J "$junction" (Join-Path $Repo 'node_modules') *> (Join-Path $Evidence 'junction.log')
+  $junctionOk = Test-Path -LiteralPath (Join-Path $junction 'vite')
+  Add-Result 'HeadCheck:node_modules' $junctionOk "junction=.gate-headcheck-$HashTag/node_modules"
+
+  Push-Location $wt
+  try {
+    npx tsc --noEmit *> (Join-Path $Evidence 'tsc.log')
+    $code = $LASTEXITCODE
+  } finally {
+    Pop-Location
+  }
+  $tscLog = Join-Path $Evidence 'tsc.log'
+  $tscText = if (Test-Path -LiteralPath $tscLog) { Get-Content -LiteralPath $tscLog -Raw } else { '' }
+  $firstError = (($tscText -split "`n") | Where-Object { $_ -match 'error TS' } | Select-Object -First 3) -join ' | '
+  Add-Result 'HeadCheck:tsc' ($code -eq 0) ("hash=$HashTag exit=$code" + $(if ($firstError) { "；首批错误：$firstError" } else { '' }))
+
+  # 立即清理（先拆联接再删 worktree）
+  cmd /c rmdir "$junction" *> $null
+  git -C $Repo worktree remove $wt --force *> (Join-Path $Evidence 'worktree-remove.log')
+  if (Test-Path -LiteralPath $wt) {
+    try { [System.IO.Directory]::Delete($wt, $true) } catch { }
+  }
+  $cleaned = -not (Test-Path -LiteralPath $wt)
+  Add-Result 'HeadCheck:cleanup' $cleaned ("worktree 已移除=$cleaned")
+
+  if (-not $cleaned) { Finish 2 }
+  if ($code -eq 0) { Finish 0 } else { Finish 1 }
 }
 
 # ---------- 预检 ----------
