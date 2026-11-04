@@ -17,9 +17,6 @@ import {
 import { createAgentJobStore } from '../../../../state/agent/jobStore'
 import type { AgentDeliveryMode } from '../../../../domain/agent/delivery'
 import {
-  confirmationRequiresExplicitApproval,
-} from '../../../../domain/agent/confirmation'
-import {
   agentTaskPlanProgress,
 } from '../../../../domain/agent/taskPlan'
 import { createPresetStore } from '../../../../state/project/presetStore'
@@ -117,6 +114,7 @@ import { useAgentComposerController } from './useAgentComposerController'
 import { useAgentAttachmentsController } from './useAgentAttachmentsController'
 import { useAgentChatRouting } from './useAgentChatRouting'
 import { useAgentModelSelectionController } from './useAgentModelSelectionController'
+import { useAgentAutoRunController } from './useAgentAutoRunController'
 import { useAgentSessionLifecycle } from './useAgentSessionLifecycle'
 import { useAgentSessionActionsController } from './useAgentSessionActionsController'
 import { useAgentTaskPlanController } from './useAgentTaskPlanController'
@@ -583,8 +581,22 @@ export function AgentPanel({
     [activeAgentTools],
   )
   const planAliasesRef = useRef(new Map<string, Map<string, string>>())
-  /** 自动生成是“实时开关”：用户在本轮运行中切换，已经发出的这一轮也要立刻认新值 */
-  const autoRunRef = useRef(new Map<string, boolean>())
+  const confirmRef = useRef<() => Promise<unknown>>(
+    () => Promise.resolve(),
+  )
+  const {
+    setAutoRun,
+    autoRunFor,
+    syncFromSession: syncAutoRunFromSession,
+    clearAutoRuns,
+  } = useAgentAutoRunController({
+    current,
+    statusFor: runPresentation.statusFor,
+    patchSession: patchSessionFields,
+    confirmLatest: () => confirmRef.current(),
+    isCurrentSession: (sessionId) =>
+      currentIdRef.current === sessionId,
+  })
   /** 本轮正文里明确 @ 的图片 / 视频模型；只约束这一次用户回合。 */
   const explicitMediaModelsRef = useRef(
     new Map<string, { image?: string; video?: string }>(),
@@ -622,7 +634,7 @@ export function AgentPanel({
         currentTurnJobIdRef.current.clear()
         currentTurnRevisionRef.current.clear()
         planAliasesRef.current.clear()
-        autoRunRef.current.clear()
+        clearAutoRuns()
         explicitMediaModelsRef.current.clear()
         clearChatRoutes()
         contextTraceRef.current.clear()
@@ -644,6 +656,7 @@ export function AgentPanel({
     clearLiveActivitiesFor,
     clearLiveProcessFor,
     clearRunTasksFor,
+    clearAutoRuns,
     clearChatRoutes,
     cancelPendingAssetSync,
     lifecycle,
@@ -1323,7 +1336,7 @@ export function AgentPanel({
       session,
       initial,
       loopDeps: currentLoopDeps,
-      autoRun: () => autoRunRef.current.get(session.id) === true,
+      autoRun: () => autoRunFor(session.id),
       maxSteps: AUTO_RUN_LIMIT,
       turnOrigin: () => ({
         jobId:
@@ -1458,7 +1471,7 @@ export function AgentPanel({
           clearRunTasksFor(session.id)
           abortRefs.current.set(session.id, turnAbort)
           setStatusFor(session.id, { kind: 'thinking' })
-          autoRunRef.current.set(session.id, session.autoRun === true)
+          syncAutoRunFromSession(session)
         },
         onRouteReady: async (operationId) => {
           routeReady = true
@@ -2044,6 +2057,7 @@ export function AgentPanel({
     turnToolsForSession,
     trackRun,
   ])
+  confirmRef.current = confirm
 
   /**
    * 确认卡上的「取消」= 结束当前任务，交还控制权。
@@ -2214,38 +2228,6 @@ export function AgentPanel({
     notify: store.notify,
     trackRun,
   })
-
-  /**
-   * 手动 / 自动生成（用户 2026-10-02，参考产品图一那一档）。
-   *
-   * 「自动」= agent 请求落地 / 执行时**不再停下等确认**。默认必须是手动 ——
-   * 默认替你花钱不是本项目愿意做的决定（设计文档 §9）。
-   */
-  const setAutoRun = useCallback(
-    async (autoRun: boolean) => {
-      if (!current) return
-      /**
-       * 本轮模型循环可能早就开始了，`sendText` 捕获的是旧的 `current`。
-       * 先写实时 map，再落会话；这样用户在“思考中 / 正在执行”时切到自动，
-       * 下一张确认卡到达就会按新值继续，而不是继续沿用开局的手动模式。
-       */
-      autoRunRef.current.set(current.id, autoRun)
-      const resumeCurrent =
-        autoRun &&
-        status.kind === 'awaitingConfirm' &&
-        !confirmationRequiresExplicitApproval(
-          status.request.name,
-          status.request.args,
-        )
-      await patchSession({ autoRun })
-      /**
-       * 已经停在确认卡时也要立刻接管：用户不是在预约“下一次自动”，
-       * 而是要求这一刻起别再问。
-       */
-      if (resumeCurrent) await confirm()
-    },
-    [current, status, patchSession, confirm],
-  )
 
   /**
    * 在输入框里插入一个 @ 引用（引用菜单里选完之后调它）。
