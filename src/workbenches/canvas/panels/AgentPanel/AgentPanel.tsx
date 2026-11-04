@@ -107,6 +107,7 @@ import { useAgentContinuationController } from './useAgentContinuationController
 import { useAgentStopController } from './useAgentStopController'
 import { useAgentLoopDepsController } from './useAgentLoopDepsController'
 import { useAgentPrepareTurnController } from './useAgentPrepareTurnController'
+import { useAgentSkillChipReset } from './useAgentSkillChipReset'
 import {
   useAgentConversationController,
   type AgentMessageReveal,
@@ -1562,39 +1563,12 @@ export function AgentPanel({
    * 发送之后正文会被清空，那一瞬间不该把设置也一并清光（技能是「本会话挂着的
    * 东西」，不是「这一条的附件」）。
    */
-  const seenSkillChipRef = useRef<{
-    sessionId: string
-    skillId: string
-    seen: boolean
-  } | null>(null)
-  useEffect(() => {
-    if (!current?.skillId) {
-      seenSkillChipRef.current = null
-      return
-    }
-    const skillId = current.skillId
-    const skillIds = parseMentions(draft)
-      .filter((m) => m.kind === 'skill')
-      .map((m) => m.id)
-    const seen = skillIds.includes(skillId)
-    const prev = seenSkillChipRef.current
-    const removed =
-      draft.trim() !== '' &&
-      prev?.sessionId === current.id &&
-      prev.skillId === skillId &&
-      prev.seen &&
-      !seen
-    if (removed) {
-      runPromiseDetached(setSkill(''), '清除技能设置失败')
-    }
-    seenSkillChipRef.current = { sessionId: current.id, skillId, seen }
-  }, [
+  useAgentSkillChipReset({
+    current,
     draft,
-    current?.id,
-    current?.skillId,
-    runPromiseDetached,
     setSkill,
-  ])
+    runPromiseDetached,
+  })
 
   const pendingPlan = previewOf(status, store)
   const advancingTaskPlan = current
