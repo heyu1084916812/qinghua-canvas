@@ -5,8 +5,10 @@ import type { AgentController } from '../../../../features/shared/agent/AgentCon
 import type { AgentSession } from '../../../../state/agent/sessionStore'
 import {
   claimSessionActivity,
+  clearQueueDrain,
   isSessionActivityActive,
   releaseSessionActivity,
+  requestQueueDrain,
   shouldDrainQueue,
 } from '../../../../features/canvas/agent/sessionActivity'
 import {
@@ -74,6 +76,7 @@ function input(
 describe('useAgentQueueController', () => {
   afterEach(() => {
     releaseSessionActivity(session.id)
+    clearQueueDrain(session.id)
   })
 
   it('排队时冻结会话模型与附件快照', async () => {
@@ -245,11 +248,17 @@ describe('useAgentQueueController', () => {
   it('关闭后 queue pump 不领取新队首', async () => {
     const lifecycle = createTaskLifecycle()
     const claimNextQueuedTurn = vi.fn(async () => null)
+    /** 被生命周期追踪的每一次投递：拿它当同步点，不用 `setTimeout` 猜时机。 */
+    const tracked: Promise<unknown>[] = []
     const props = input({
       controller: {
         claimNextQueuedTurn,
       } as unknown as AgentController,
-      trackRun: (work) => lifecycle.track(work),
+      trackRun: (work) => {
+        const task = lifecycle.track(work)
+        tracked.push(task)
+        return task
+      },
     })
     function Probe() {
       useAgentQueueController(props)
@@ -258,9 +267,19 @@ describe('useAgentQueueController', () => {
     renderToStaticMarkup(createElement(Probe))
 
     claimSessionActivity(session.id, 'turn-active', 'turn-active')
+    /**
+     * 必须有自动续排标记，`queuePumpRef` 才会真的把泵叫起来。
+     * 少了这一行，本用例就是空转：泵根本没被调用，`claimNextQueuedTurn` 当然没被调。
+     */
+    requestQueueDrain(session.id)
     lifecycle.beginClose()
     props.queuePumpRef.current(session.id)
-    await new Promise((resolve) => setTimeout(resolve, 0))
+
+    // 泵确实投进了生命周期、并被「已关闭」挡回 —— 这才是这条用例要证明的事
+    expect(tracked).toHaveLength(1)
+    await expect(tracked[0]).rejects.toBeInstanceOf(
+      TaskLifecycleClosedError,
+    )
     expect(claimNextQueuedTurn).not.toHaveBeenCalled()
   })
 
