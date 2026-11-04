@@ -502,6 +502,81 @@ describe('AgentController', () => {
     expect(controller.jobId('s1')).toBeUndefined()
   })
 
+  /**
+   * #920-A 的关键放行路径（此前全仓零覆盖）：Job 停在 `needs_attention` 时，
+   * 用户**不需要**先"确认 / 放弃"就能继续发新消息 —— `ensureJob` 会先取消旧 Job
+   * （带原因，便于审计），再为新回合建一个新 Job。
+   *
+   * 这条是"能被继续用"的唯一机械证据；它断的是**先后顺序 + 不复用**，不是"函数被调过"。
+   */
+  it('★★ 新回合遇到 needs_attention 的旧 Job：先取消再新建，不复用', async () => {
+    const stale = {
+      id: 'job-stale',
+      sessionId: 's1',
+      projectId: 'p1',
+      turnId: 'turn-old',
+      status: 'needs_attention' as const,
+      revision: 3,
+      createdAt: 1,
+      updatedAt: 2,
+    }
+    const jobs = {
+      get: vi.fn(async () => null),
+      forTurn: vi.fn(async () => null),
+      active: vi.fn(async () => stale),
+      transition: vi.fn(async (_id: string, status: string) => ({
+        job: { ...stale, status },
+        event: { id: 'event' },
+      })),
+      create: vi.fn(async ({ turnId }: { turnId: string }) => ({
+        job: {
+          ...stale,
+          id: 'job-new',
+          turnId,
+          status: 'queued' as const,
+          revision: 0,
+        },
+        event: { id: 'event' },
+        created: true,
+      })),
+    }
+    const controller = createAgentController({
+      projectId: 'p1',
+      sessions: {} as never,
+      jobs: jobs as never,
+      hooks: {
+        isSessionActivityActive: () => false,
+        onPendingConfirmation: vi.fn(),
+        onContinuation: vi.fn(),
+        onNeedsAttention: vi.fn(),
+        onIdle: vi.fn(),
+        notify: vi.fn(),
+      },
+    })
+
+    const job = await controller.ensureJob(session(), 'turn-new')
+
+    // 先取消（带原因）
+    expect(jobs.transition).toHaveBeenCalledWith(
+      'job-stale',
+      'canceled',
+      'canceled',
+      {},
+      { reason: 'new_turn_after_needs_attention' },
+    )
+    // 再新建：新 turnId、不复用旧 Job
+    expect(jobs.create).toHaveBeenCalledWith({
+      sessionId: 's1',
+      projectId: 'p1',
+      turnId: 'turn-new',
+    })
+    expect(job.id).toBe('job-new')
+    expect(controller.jobId('s1')).toBe('job-new')
+    expect(jobs.transition.mock.invocationCallOrder[0]).toBeLessThan(
+      jobs.create.mock.invocationCallOrder[0]!,
+    )
+  })
+
   it('★★ 带 origin 的迟到收口只迁本回合 Job，不碰新活动 Job', async () => {
     const oldJob = {
       id: 'job-old',

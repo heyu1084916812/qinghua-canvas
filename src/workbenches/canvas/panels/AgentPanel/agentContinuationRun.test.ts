@@ -6,6 +6,7 @@ import type {
   AgentLoopDeps,
   AgentLoopOutcome,
 } from '../../agent/agentLoop'
+import { AgentToolEffectBlockedError } from '../../../../features/shared/agent/AgentToolEffectLedger'
 import {
   runAgentContinuation,
   type AgentContinuationRunInput,
@@ -414,5 +415,140 @@ describe('runAgentContinuation', () => {
     await runAgentContinuation(h.input)
 
     expect(h.input.setMessages).not.toHaveBeenCalled()
+  })
+
+  /**
+   * #922：`continueAgentAutoConfirmations` 先把 Job 推进到
+   * `waiting_generation + pendingCallId`，随后 `executeConfirmedTool`（账本拒绝）或
+   * `finishConfirmedTool` 抛错。这条 catch 以前**只收活动锁、不迁 Job** ⇒ Job 永远停在
+   * `waiting_generation`，而内存 `jobIds` 映射还在，下一次发送会被 `ensureJob` 当成
+   * 同回合 Job 静默复用，把「这次生成可能已扣费」的标记带过去。
+   */
+  function blockedByLedger() {
+    const reason =
+      '上一次同名工具已经开始执行，但应用没有收到完成结果。为避免重复写画布或重复扣费，本次不会自动重发。'
+    return new AgentToolEffectBlockedError(reason, 'needs_attention', {
+      kind: 'pending',
+      reason,
+      effect: {
+        effectKey: 'agent:job-1:unplanned:call-1',
+        stepId: 'unplanned',
+        toolCallId: 'call-1',
+        toolName: 'runNode',
+        argsDigest: 'digest',
+        state: 'started',
+        startedAt: 1,
+      },
+    })
+  }
+
+  /** 带状态的 Job 桩：从 `waiting_generation` 起，转态即改写状态，便于断言终态。 */
+  function stuckJob() {
+    const state = {
+      status: 'waiting_generation' as string,
+      pendingCallId: 'call-1' as string | undefined,
+    }
+    const transitionSessionJob = vi.fn(
+      async (
+        _sessionId: string,
+        to: string,
+        _eventType?: string,
+        patch?: { pendingCallId?: string },
+      ) => {
+        state.status = to
+        if (patch && 'pendingCallId' in patch) {
+          state.pendingCallId = patch.pendingCallId
+        }
+        return { job: { ...state } } as never
+      },
+    )
+    return { state, transitionSessionJob }
+  }
+
+  it('★★ 续跑中途账本拒绝：Job 必须离开 waiting_generation 并落到 needs_attention', async () => {
+    const { state, transitionSessionJob } = stuckJob()
+    const h = harness({
+      transitionSessionJob,
+      continueAutoConfirmations: vi.fn(async () => {
+        // 模拟 `agentAutoConfirmations.ts:71-79` 已经把 Job 推进到等待生成
+        state.status = 'waiting_generation'
+        state.pendingCallId = 'call-1'
+        throw blockedByLedger()
+      }),
+    })
+
+    const result = await runAgentContinuation(h.input)
+
+    expect(result).toBe('failed')
+    expect(transitionSessionJob).toHaveBeenCalledWith(
+      session.id,
+      'needs_attention',
+      'tool_failed',
+      expect.objectContaining({
+        pendingCallId: 'call-1',
+        lastError: expect.stringContaining('没有收到完成结果'),
+      }),
+      { phase: 'continued_turn' },
+      expect.objectContaining({ jobId: 'job-1', turnId: 'turn-current' }),
+    )
+    expect(state.status).not.toBe('waiting_generation')
+    expect(state.status).toBe('needs_attention')
+    expect(h.input.settleSessionOutcome).toHaveBeenCalledWith(
+      session.id,
+      { kind: 'error' },
+      expect.objectContaining({ jobId: 'job-1' }),
+    )
+  })
+
+  it('★★ 续跑中途其它错误：Job 落 failed，且不伪造 pendingCallId', async () => {
+    const { state, transitionSessionJob } = stuckJob()
+    const h = harness({
+      transitionSessionJob,
+      continueAutoConfirmations: vi.fn(async () => {
+        state.status = 'waiting_generation'
+        state.pendingCallId = 'call-1'
+        throw new Error('收口失败')
+      }),
+    })
+
+    const result = await runAgentContinuation(h.input)
+
+    expect(result).toBe('failed')
+    const lastCall =
+      transitionSessionJob.mock.calls.at(-1) as unknown as unknown[]
+    expect(lastCall[1]).toBe('failed')
+    expect(lastCall[2]).toBe('failed')
+    expect(lastCall[3]).toEqual({ lastError: '收口失败' })
+    expect(lastCall[3]).not.toHaveProperty('pendingCallId')
+    expect(state.status).toBe('failed')
+    expect(state.status).not.toBe('waiting_generation')
+  })
+
+  it('★★ Job 转态自己抛错时仍收口活动锁，并把失败并进可见文案', async () => {
+    const h = harness({
+      // 只让**失败收口**那次转态抛错；进入循环前的 planning 转态照常成功
+      transitionSessionJob: vi.fn(
+        async (_sessionId: string, to: string) => {
+          if (to === 'planning') return { job: {} } as never
+          throw new Error('job store 写失败')
+        },
+      ),
+      continueAutoConfirmations: vi.fn(async () => {
+        throw blockedByLedger()
+      }),
+    })
+
+    const result = await runAgentContinuation(h.input)
+
+    expect(result).toBe('failed')
+    expect(h.input.settleSessionOutcome).toHaveBeenCalledWith(
+      session.id,
+      { kind: 'error' },
+      expect.objectContaining({ jobId: 'job-1' }),
+    )
+    expect(h.input.setStatus).toHaveBeenLastCalledWith({
+      kind: 'error',
+      message: expect.stringContaining('Job 转态失败'),
+    })
   })
 })

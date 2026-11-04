@@ -12,6 +12,7 @@ import {
   type AgentLoopDeps,
   type AgentLoopOutcome,
 } from '../../agent/agentLoop'
+import { AgentToolEffectBlockedError } from '../../../../features/shared/agent/AgentToolEffectLedger'
 import type {
   AgentOutcomeCoordinationResult,
 } from './agentOutcomeCoordinator'
@@ -259,7 +260,39 @@ export async function runAgentContinuation(
     return applied
   } catch (error) {
     if (continuationAbort.signal.aborted) return 'aborted'
+    const blocked =
+      error instanceof AgentToolEffectBlockedError ? error : null
     input.setStatus({ kind: 'error', message: errText(error) })
+    /**
+     * #922：这条 catch 以前只收活动锁、不迁 Job。若抛点在
+     * `continueAgentAutoConfirmations` 的 `waiting_generation` 之后
+     * （账本拒绝执行 / `finishConfirmedTool` 失败），Job 会永远停在
+     * `waiting_generation + pendingCallId`；而内存 `jobIds` 映射仍在，下一次发送会被
+     * `ensureJob` 当成同回合 Job 静默复用，把「这次生成可能已扣费」的标记带过去。
+     *
+     * 与 `agentConfirmationRun` 的失败收口同形：Job 转态**单独兜住**（写失败只并进
+     * 可见文案），`settleSessionOutcome` 仍然无条件执行 —— 释放内存活动锁靠它。
+     */
+    try {
+      await input.transitionSessionJob(
+        input.session.id,
+        blocked?.status ?? 'failed',
+        blocked ? 'tool_failed' : 'failed',
+        {
+          lastError: errText(error),
+          ...(blocked?.status === 'needs_attention'
+            ? { pendingCallId: blocked.outcome.effect.toolCallId }
+            : {}),
+        },
+        { phase: 'continued_turn' },
+        continuationOrigin,
+      )
+    } catch (transitionError) {
+      input.setStatus({
+        kind: 'error',
+        message: `${errText(error)}；Job 转态失败：${errText(transitionError)}`,
+      })
+    }
     await input.settleSessionOutcome(
       input.session.id,
       { kind: 'error' },
