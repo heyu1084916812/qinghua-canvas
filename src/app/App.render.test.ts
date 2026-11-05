@@ -34,10 +34,14 @@ import { AppShell } from './AppShell'
  * 注意 3：默认 5s 超时对**整树 SSR**偏紧——它要挂完 Provider 链、等 React.lazy 的
  * 工作台 chunk、再初始化 memory 版 IndexedDB。单跑约 2s，但全量跑时 8 个 worker 抢 CPU
  * （transform 阶段可占上百秒），实测会顶到 5s 而假失败。这是**超时配错**不是断言失效：
- * 断言验的是 DOM 内容，与耗时无关。故显式放宽到 20s，避免它长期充当「偶发红灯」、
+ * 断言验的是 DOM 内容，与耗时无关。故显式放宽，避免它长期充当「偶发红灯」、
  * 掩盖真正的失败（历史上已在发布说明里被迫解释过两次「非本轮回归」）。
+ *
+ * 2026-11-05 再抬到 60s：开了 v8 覆盖率插桩后，全量跑时这条**连续 3 次**都顶到 20s
+ * （单跑仍只要 ~11s）。插桩让每个模块的执行都多一层开销，8 个 worker 抢 CPU 时被放大。
+ * 同样属于**超时配错**：隔离跑 3/3 通过，断言内容没变。
  */
-const TREE_TIMEOUT = 20000
+const TREE_TIMEOUT = 60000
 
 async function renderTree(entries: string[]): Promise<string> {
   const element = createElement(
