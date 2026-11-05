@@ -1,5 +1,15 @@
 # CanvasFlow（轻画）项目记忆
 
+### 存储拆分先隔离“数据形状”和“事务语义”（2026-11-05，M-SESSION-SPLIT）
+
+- **拆法**：`sessionStore.ts` **1181 → 746 行**；`AgentSession` / `AgentSessionStore` 归纯类型
+  `agentSessionTypes.ts`，row ↔ model、消息排序、坏行过滤、旧 `agentMessages` 拆表读取归
+  `agentSessionPersistence.ts`。队列、revision CAS、确认结算、附件原子追加仍留在 store 事务层。
+- **真实回归抓到边界**：首轮搬完 `contextFor` 分页分支仍直接调私有 `messageOf`，2 条会话隔离测试
+  当场红。正确收口是 `messagesFromRows`，非分页与分页共用同一排序/过滤，不能各写一份。
+- **规矩**：拆持久化代码时，**数据契约、行映射、事务 API 分层**，但不能把 CAS/队列/确认顺序一起搬走；
+  先搬纯映射，再改事务结构。定向测试必须在第一次提交前跑，不能等到全量测试才发现漏 import。
+
 ### 拆分验收要卡“每个领域文件”，不能只卡主入口（2026-11-05，M-TOOL-SPLIT）
 
 - **现象**：上轮把 `AgentPanel.tsx` 从 1653 行降到 139 行，但 `tools.ts` 仍有 1300 行，
