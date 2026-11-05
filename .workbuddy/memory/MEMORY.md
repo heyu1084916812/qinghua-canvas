@@ -1,5 +1,17 @@
 # CanvasFlow（轻画）项目记忆
 
+### 拆分验收要卡“每个领域文件”，不能只卡主入口（2026-11-05，M-TOOL-SPLIT）
+
+- **现象**：上轮把 `AgentPanel.tsx` 从 1653 行降到 139 行，但 `tools.ts` 仍有 1300 行，
+  `sessionStore.ts` 1181 行，面板 CSS 1543 行。主入口变薄不等于系统已经拆小。
+- **这次做法**：`tools.ts` **1300 → 794 行**，计划关口拆到 `agentPlanGate.ts`（161 行），
+  画布变更工具族拆到 `agentCanvasMutationTools.ts`（370 行）；原导出继续 re-export 同一实现，
+  外部调用零改动。
+- **规矩**：每次拆分必须同时加**域文件行数门禁**。只给主入口设上限，会逼着代码搬家后在新文件里继续膨胀。
+  当前 `tools.ts` ≤820、画布工具族 ≤410、计划关口 ≤210，想上调先继续拆。
+- **验证口径**：工具定向 **74/74**、全量 **4518 passed / 1 skipped**、`npm run check`、`npm run build`；
+  不能只拿“主文件行数变少”当拆分完成。
+
 ### 覆盖率插桩会把"慢测试"顶成"假失败"（2026-11-05）
 
 - **现象**：开 `npm run test:coverage` 后，`src/app/App.render.test.ts` 的「画布路由整树渲染」
