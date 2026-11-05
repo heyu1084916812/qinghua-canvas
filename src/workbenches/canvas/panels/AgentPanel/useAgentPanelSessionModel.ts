@@ -3,7 +3,6 @@ import {
   useEffect,
   useMemo,
   useRef,
-  useState,
   useSyncExternalStore,
 } from 'react'
 import { usePlatform } from '../../../../app/providers/PlatformProvider'
@@ -18,17 +17,12 @@ import { createAssetLibraryRepository } from '../../../../state/project/assetLib
 import { createAssetLibraryStore } from '../../../../state/project/assetLibraryStore'
 import { createInspirationRepository } from '../../../../state/project/inspirationRepository'
 import { useCanvasExecution } from '../../execution/CanvasExecutionProvider'
-import { useCanvasStore, useGraph, useSelection, useViewportState } from '../../storeContext'
+import { useCanvasStore, useSelection, useViewportState } from '../../storeContext'
 import { agentToolsForCapabilities } from '../../agent/tools'
 import { createAgentController } from '../../../../features/shared/agent/AgentController'
 import { createAgentMemoryPort } from '../../../../features/shared/agent/MemoryPort'
 import { createAgentToolEffectLedger } from '../../../../features/shared/agent/AgentToolEffectLedger'
 import { createContextRepository } from '../../../../state/shared/contextRepository'
-import {
-  TaskLifecycleClosedError,
-  createTaskLifecycle,
-  type TaskLifecycle,
-} from '../../../../features/shared/lifecycle/taskLifecycle'
 import {
   getAgentDeliveryMode,
   setAgentDeliveryMode,
@@ -44,18 +38,9 @@ import {
   setAgentCanvasReview,
   subscribeAgentCanvasReview,
 } from '../../../../state/ui/agentCanvasReview'
-import {
-  buildAssetHashByNode,
-  buildConversationItems,
-  buildNodeTitles,
-  currentTurnHasProcessOf,
-  latestProcessIndexOf,
-  latestUserStartedAtOf,
-  nodeLabelOf as conversationNodeLabelOf,
-} from './agentConversationItems'
+import { TaskLifecycleClosedError } from '../../../../features/shared/lifecycle/taskLifecycle'
 import { errText } from '../../agent/agentLoop'
 import { IDLE_STATUS, type AgentPanelStatus as Status } from './AgentActivityViews'
-import type { AgentQueueMenuPosition } from './AgentQueuePanel'
 import { useAgentRunPresentation } from './useAgentRunPresentation'
 import { useAgentSessionLifecycle } from './useAgentSessionLifecycle'
 import { useAgentComposerController } from './useAgentComposerController'
@@ -66,10 +51,9 @@ import { useAgentSessionActionsController } from './useAgentSessionActionsContro
 import { useAgentSkillsController } from './useAgentSkillsController'
 import { useAgentSkillChipReset } from './useAgentSkillChipReset'
 import { useAgentAttachmentsController } from './useAgentAttachmentsController'
-import {
-  useAgentConversationController,
-  type AgentMessageReveal,
-} from './useAgentConversationController'
+import { useAgentPanelQueueMenu } from './useAgentPanelQueueMenu'
+import { useAgentPanelRunLifecycle } from './useAgentPanelRunLifecycle'
+import { useAgentPanelSessionPresentation } from './useAgentPanelSessionPresentation'
 import type { AgentPanelRefs } from './useAgentPanelRefs'
 
 /**
@@ -178,15 +162,13 @@ export function useAgentPanelSessionModel({
     () => library.getState().assets,
   )
 
-  const lifecycleRef = useRef<TaskLifecycle | null>(null)
-  if (!lifecycleRef.current) {
-    lifecycleRef.current = createTaskLifecycle()
-  }
-  const lifecycle = lifecycleRef.current
-  const trackRun = useCallback<TaskLifecycle['track']>(
-    (work) => lifecycle.track(work),
-    [lifecycle],
-  )
+  const {
+    lifecycle,
+    trackRun,
+    runPromiseDetached,
+    runTrackedDetached,
+    runSync,
+  } = useAgentPanelRunLifecycle(store)
   const composerResetForSessionRef = useRef<(sessionId: string) => void>(
     () => {},
   )
@@ -257,13 +239,12 @@ export function useAgentPanelSessionModel({
     () => agentToolsForCapabilities({ canvasReview: canvasReviewEnabled }),
     [canvasReviewEnabled],
   )
-  const [queueMenuId, setQueueMenuId] = useState<string | null>(null)
-  const [queueMenuPosition, setQueueMenuPosition] =
-    useState<AgentQueueMenuPosition | null>(null)
-  useEffect(() => {
-    setQueueMenuId(null)
-    setQueueMenuPosition(null)
-  }, [current?.id])
+  const {
+    queueMenuId,
+    queueMenuPosition,
+    setQueueMenuId,
+    setQueueMenuPosition,
+  } = useAgentPanelQueueMenu(current?.id ?? null)
   useEffect(() => {
     let alive = true
     void presets
@@ -278,41 +259,6 @@ export function useAgentPanelSessionModel({
       alive = false
     }
   }, [presets])
-  useEffect(() => {
-    if (!queueMenuId) return
-    const closeOutside = (event: PointerEvent) => {
-      const target = event.target
-      if (!(target instanceof Element)) return
-      if (
-        target.closest(`[data-agent-queue-more="${queueMenuId}"]`) ||
-        target.closest(`[data-agent-queue-menu="${queueMenuId}"]`)
-      ) {
-        return
-      }
-      setQueueMenuId(null)
-      setQueueMenuPosition(null)
-    }
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        setQueueMenuId(null)
-        setQueueMenuPosition(null)
-      }
-    }
-    const closeOnViewportChange = () => {
-      setQueueMenuId(null)
-      setQueueMenuPosition(null)
-    }
-    document.addEventListener('pointerdown', closeOutside, true)
-    document.addEventListener('scroll', closeOnViewportChange, true)
-    window.addEventListener('keydown', closeOnEscape)
-    window.addEventListener('resize', closeOnViewportChange)
-    return () => {
-      document.removeEventListener('pointerdown', closeOutside, true)
-      document.removeEventListener('scroll', closeOnViewportChange, true)
-      window.removeEventListener('keydown', closeOnEscape)
-      window.removeEventListener('resize', closeOnViewportChange)
-    }
-  }, [queueMenuId])
   /** 订阅全量渠道：设置页改完立刻反映（与创作面板同一条口径） */
   const allChannels = useSyncExternalStore(
     channels.subscribe,
@@ -328,35 +274,7 @@ export function useAgentPanelSessionModel({
     clearChatRoute,
     clearChatRoutes,
   } = useAgentChatRouting({ channels, allChannels })
-  /** 刚复制过哪一条助手回复：图标短暂换成对勾，给用户一个「确实复制了」的回执 */
-  const [copiedKey, setCopiedKey] = useState<number | null>(null)
   const fileRef = useRef<HTMLInputElement | null>(null)
-  /**
-   * AgentPanel 的持久写门禁只有这一份：
-   * - 异步 SessionStore / Controller / preset / store 写必须走 trackRun；
-   * - 同步 draft / composer 本地写必须走 runSync；
-   * - 脱离点击等待链的 Promise 必须同时走 runTrackedDetached 或显式 catch。
-   * 内部再嵌套一次 track 是允许的；关闭后内层会先失败并收口外层。
-   */
-  const runPromiseDetached = useCallback(
-    (work: Promise<unknown>, failureMessage: string) => {
-      void work.catch((error) => {
-        if (error instanceof TaskLifecycleClosedError) return
-        store.notify(`${failureMessage}：${errText(error)}`, 'error')
-      })
-    },
-    [store],
-  )
-  const runTrackedDetached = useCallback(
-    (work: () => Promise<unknown>, failureMessage: string) => {
-      runPromiseDetached(trackRun(work), failureMessage)
-    },
-    [runPromiseDetached, trackRun],
-  )
-  const runSync = useCallback(
-    <T,>(work: () => T) => lifecycle.runSync(work),
-    [lifecycle],
-  )
   const composerPanelRef = useRef<HTMLElement | null>(null)
   const patchSessionDetachedRef = useRef<
     (patch: AgentPanelSessionPatch) => void
@@ -594,86 +512,36 @@ export function useAgentPanelSessionModel({
     applySessionLifecycleSnapshot(next)
   }, [applySessionLifecycleSnapshot])
 
-  const graph = useGraph()
-  const nodeTitles = useMemo(() => buildNodeTitles(graph), [graph.nodes])
-  const items = useMemo(
-    () =>
-      buildConversationItems({
-        messages,
-        pendingSteers: current?.pendingSteers ?? [],
-        nodeTitles,
-      }),
-    [current?.pendingSteers, messages, nodeTitles],
-  )
-  const scrollRef = useRef<HTMLDivElement | null>(null)
-  const conversationViewportRef = useRef<{
-    clientHeight: number
-    scrollHeight: number
-    scrollTop: number
-  } | null>(null)
   const {
-    beginReveal,
-    clearReveal,
+    graph,
+    items,
+    scrollRef,
     expanded,
     toggleStep,
     showJumpToLatest,
     setShowJumpToLatest,
     stickToLatestRef,
+    clearReveal,
     onConversationScroll,
     jumpToLatest,
     resetForSessionSwitch,
     streamingTextIndex,
     visibleItems,
-  } = useAgentConversationController({
-    items,
-    sessionId: current?.id ?? null,
+    setMessageReveal,
+    copiedKey,
+    copyReply,
+    nodeLabelOf,
+    latestUserStartedAt,
+    latestProcessIndex,
+    currentTurnHasProcess,
+    hashOfNode,
+  } = useAgentPanelSessionPresentation({
+    current,
     messages,
     status,
-    taskPlan: current?.taskPlan,
-    queuedCount: current?.queuedTurns.length ?? 0,
-    pendingCount: current?.pendingSteers.length ?? 0,
     composerHeight,
-    scrollRef,
-    conversationViewportRef,
   })
   conversationResetForSessionRef.current = resetForSessionSwitch
-  const setMessageReveal = useCallback(
-    (reveal: AgentMessageReveal | null) => {
-      if (reveal) {
-        beginReveal(
-          reveal.sessionId,
-          reveal.fullText,
-          reveal.visibleLength,
-        )
-      } else {
-        clearReveal()
-      }
-    },
-    [beginReveal, clearReveal],
-  )
-
-  /** 复制一条助手回复；剪贴板被拒时静默 —— 不弹一个用户看不懂的错误 */
-  const copyReply = useCallback(async (key: number, text: string) => {
-    try {
-      await navigator.clipboard.writeText(text)
-      setCopiedKey(key)
-      window.setTimeout(() => setCopiedKey((k) => (k === key ? null : k)), 1500)
-    } catch {
-      /* 无权限 / 非安全上下文：静默 */
-    }
-  }, [])
-
-  /** 节点在正文里显示成什么名字（没起名就写「素材」，不露 `node_xxx`） */
-  const nodeLabelOf = useCallback(
-    (id: string) => conversationNodeLabelOf(graph.nodes, id),
-    [graph.nodes],
-  )
-
-  const latestUserStartedAt = latestUserStartedAtOf(visibleItems)
-  const latestProcessIndex = latestProcessIndexOf(visibleItems)
-  const currentTurnHasProcess = currentTurnHasProcessOf(visibleItems)
-  /** 节点 id → 产物 hash：步骤卡据此把这一步产出的图**内嵌**显示（图变更时跟着刷） */
-  const hashOfNode = useMemo(() => buildAssetHashByNode(graph), [graph])
 
   /**
    * 追加待发送附件的「脱离点击链」版本：画布 handoff 是同步入口，不能 await。

@@ -1,5 +1,16 @@
 # CanvasFlow（轻画）项目记忆
 
+### 拆 hook 先查“状态是否被复制”，结构测试要跨子域计数（2026-11-05，M-SESSION-MODEL-SPLIT）
+
+- **事故**：会话中枢拆出展示 hook 时，`copiedKey` 的旧声明还留在主文件，新 hook 又建一份；
+  面板冒烟直接报 `Identifier copiedKey has already been declared`。这种双重状态在运行时可能表现为
+  “点复制有回执但另一处不更新”，比单纯 import 漏更难查。
+- **做法**：主文件 `useAgentPanelSessionModel.ts` **863 → 731 行**；
+  `useAgentPanelRunLifecycle` / `useAgentPanelQueueMenu` / `useAgentPanelSessionPresentation` 各自只拥一个子域。
+  结构测试从“只扫主文件”改成“主文件 + 三个子 hook 总计数”，并单独钉住 `const [copiedKey` 全局恰好一次。
+- **测试坑**：队列菜单直接摸 `document/window` 在 Node 测试里会红。正确做法是把事件目标当显式环境端口注入，
+  生产默认用全局对象，测试不依赖 jsdom；外部点击、Esc、切会话、卸载四条路都要有行为断言。
+
 ### 存储拆分先隔离“数据形状”和“事务语义”（2026-11-05，M-SESSION-SPLIT）
 
 - **拆法**：`sessionStore.ts` **1181 → 746 行**；`AgentSession` / `AgentSessionStore` 归纯类型

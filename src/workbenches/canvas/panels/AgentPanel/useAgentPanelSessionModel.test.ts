@@ -17,7 +17,38 @@ const SOURCE = (
   }) as Record<string, string>
 )['./useAgentPanelSessionModel.ts']
 
-const countOf = (needle: string): number => SOURCE.split(needle).length - 1
+const SUB_SOURCES = {
+  runLifecycle: (
+    import.meta.glob('./useAgentPanelRunLifecycle.ts', {
+      eager: true,
+      query: '?raw',
+      import: 'default',
+    }) as Record<string, string>
+  )['./useAgentPanelRunLifecycle.ts'],
+  queueMenu: (
+    import.meta.glob('./useAgentPanelQueueMenu.ts', {
+      eager: true,
+      query: '?raw',
+      import: 'default',
+    }) as Record<string, string>
+  )['./useAgentPanelQueueMenu.ts'],
+  presentation: (
+    import.meta.glob('./useAgentPanelSessionPresentation.ts', {
+      eager: true,
+      query: '?raw',
+      import: 'default',
+    }) as Record<string, string>
+  )['./useAgentPanelSessionPresentation.ts'],
+}
+const ALL_SOURCE = [SOURCE, ...Object.values(SUB_SOURCES)].join('\n')
+const countOf = (needle: string): number =>
+  ALL_SOURCE.split(needle).length - 1
+const countInMain = (needle: string): number =>
+  SOURCE.split(needle).length - 1
+const countLines = (source: string): number => {
+  const parts = source.split('\n').length
+  return source.endsWith('\n') ? parts - 1 : parts
+}
 
 describe('useAgentPanelSessionModel 的结构契约', () => {
   it('不自己创建任何按会话分桶的 ref（宿主只能是 useAgentPanelRefs）', () => {
@@ -44,6 +75,13 @@ describe('useAgentPanelSessionModel 的结构契约', () => {
     ]) {
       expect(countOf(hook), `${hook} 应当恰好出现一次`).toBe(1)
     }
+    for (const hook of [
+      'useAgentPanelRunLifecycle(',
+      'useAgentPanelQueueMenu(',
+      'useAgentPanelSessionPresentation(',
+    ]) {
+      expect(countInMain(hook), `${hook} 主文件应当恰好调用一次`).toBe(1)
+    }
   })
 
   /**
@@ -52,10 +90,10 @@ describe('useAgentPanelSessionModel 的结构契约', () => {
    */
   it('队列菜单的四条收起监听取消时一一对应', () => {
     for (const listener of [
-      "document.addEventListener('pointerdown'",
-      "document.addEventListener('scroll'",
-      "window.addEventListener('keydown'",
-      "window.addEventListener('resize'",
+      "addEventListener('pointerdown'",
+      "addEventListener('scroll'",
+      "addEventListener('keydown'",
+      "addEventListener('resize'",
     ]) {
       expect(countOf(listener), `${listener} 缺了`).toBe(1)
     }
@@ -77,5 +115,16 @@ describe('useAgentPanelSessionModel 的结构契约', () => {
     >()
     expectTypeOf<AgentPanelSessionModel['refresh']>().toBeFunction()
     expectTypeOf<AgentPanelSessionModel['applySessionSnapshot']>().toBeFunction()
+  })
+
+  it('主文件与三个子域都守住拆分后的行数上限', () => {
+    expect(countLines(SOURCE)).toBeLessThanOrEqual(770)
+    expect(countLines(SUB_SOURCES.runLifecycle)).toBeLessThanOrEqual(100)
+    expect(countLines(SUB_SOURCES.queueMenu)).toBeLessThanOrEqual(125)
+    expect(countLines(SUB_SOURCES.presentation)).toBeLessThanOrEqual(175)
+  })
+
+  it('复制回执状态只有一份，不能主文件与展示 hook 各建一套', () => {
+    expect(ALL_SOURCE.split('const [copiedKey').length - 1).toBe(1)
   })
 })
