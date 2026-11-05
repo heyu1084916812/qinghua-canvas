@@ -94,6 +94,13 @@ const TURN_MODEL_SOURCE = (
     import: 'default',
   }) as Record<string, string>
 )['./useAgentPanelTurnModel.ts']
+const TURN_CORE_SOURCE = (
+  import.meta.glob('./useAgentPanelTurnCore.ts', {
+    eager: true,
+    query: '?raw',
+    import: 'default',
+  }) as Record<string, string>
+)['./useAgentPanelTurnCore.ts']
 const REFS_SOURCE = (
   import.meta.glob('./useAgentPanelRefs.ts', {
     eager: true,
@@ -586,6 +593,7 @@ describe('三个领域模型的单一宿主', () => {
       ['useAgentPanelSessionModel.ts', SESSION_MODEL_SOURCE],
       ['useAgentPanelToolModel.ts', TOOL_MODEL_SOURCE],
       ['useAgentPanelTurnModel.ts', TURN_MODEL_SOURCE],
+      ['useAgentPanelTurnCore.ts', TURN_CORE_SOURCE],
     ]
       .filter(([, source]) => /useRef\(\s*new (Map|Set)/.test(source))
       .map(([name]) => name)
@@ -675,7 +683,7 @@ describe('三个领域模型的单一宿主', () => {
 
     expect(offenders).toEqual([])
     // 非空转自检：真的从这几个文件里扫出了依赖项（否则「没违规」是假绿）
-    expect(depsItemsOf(TURN_MODEL_SOURCE)).toContain('activeAgentTools')
+    expect(depsItemsOf(TURN_CORE_SOURCE)).toContain('activeAgentTools')
     expect(depsItemsOf(TOOL_MODEL_SOURCE)).toContain('selectedModelOf')
     // 自检：认得真写法，也不误伤函数实参 / 属性路径
     expect(

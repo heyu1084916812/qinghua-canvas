@@ -1,5 +1,15 @@
 # CanvasFlow（轻画）项目记忆
 
+### 回合拆分要按“运行主链 vs 用户动作”切，不能按控制器数量平均切（2026-11-05，M-TURN-CORE-SPLIT）
+
+- **拆法**：`useAgentPanelTurnModel.ts` **741 → 493 行**；AgentLoop 工具白名单 / autoRun / loopDeps / outcome /
+  自动确认 / prepare / sendTurn / sendText 下沉到 `useAgentPanelTurnCore.ts`（333 行）。队列、引导、确认、继续、
+  停止和关停清单仍留主文件，因为它们共同拥有用户动作顺序与清理契约。
+- **为什么不能继续硬切控制器**：每个控制器只有十几行接线，但依赖同一批 refs / status / session；单纯按数量拆只会造出
+  一个 20 端口的新中转文件，问题没少。正确边界是“同一运行生命周期”与“同一用户动作生命周期”。
+- **门禁要跟着代码走**：`activeAgentTools` 等 deps 非空自检从主文件迁到 core；控制器“只实例化一次”改为主文件 + core
+  总计数。只改文件不改门禁，会出现测试全绿但护栏已经扫空。
+
 ### 拆 hook 先查“状态是否被复制”，结构测试要跨子域计数（2026-11-05，M-SESSION-MODEL-SPLIT）
 
 - **事故**：会话中枢拆出展示 hook 时，`copiedKey` 的旧声明还留在主文件，新 hook 又建一份；

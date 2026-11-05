@@ -14,8 +14,19 @@ const SOURCE = (
     import: 'default',
   }) as Record<string, string>
 )['./useAgentPanelTurnModel.ts']
+const CORE_SOURCE = (
+  import.meta.glob('./useAgentPanelTurnCore.ts', {
+    eager: true,
+    query: '?raw',
+    import: 'default',
+  }) as Record<string, string>
+)['./useAgentPanelTurnCore.ts']
+const ALL_SOURCE = [SOURCE, CORE_SOURCE].join('\n')
 
-const countOf = (needle: string): number => SOURCE.split(needle).length - 1
+const countOf = (needle: string): number =>
+  ALL_SOURCE.split(needle).length - 1
+const countInMain = (needle: string): number =>
+  SOURCE.split(needle).length - 1
 
 /** 取出 `anchor(...)` 这次调用的完整参数文本（跳过字符串内部的括号）。 */
 const callBlock = (anchor: string): string => {
@@ -79,8 +90,8 @@ describe('useAgentPanelTurnModel 的结构契约', () => {
 
   /** 自动执行上限是「确认 → 执行」绕圈的安全阀，写死成字面量就失去了单一来源 */
   it('自动执行上限仍走常量，且真的传进了续跑入口', () => {
-    expect(SOURCE).toContain('const AUTO_RUN_LIMIT = 32')
-    expect(SOURCE).toContain('maxSteps: AUTO_RUN_LIMIT')
+    expect(CORE_SOURCE).toContain('const AUTO_RUN_LIMIT = 32')
+    expect(CORE_SOURCE).toContain('maxSteps: AUTO_RUN_LIMIT')
   })
 
   /**
@@ -150,5 +161,15 @@ describe('useAgentPanelTurnModel 的结构契约', () => {
     expect(block, '没找到 useAgentTaskPlanController(...)').not.toBe('')
     expect(block).toContain('isCurrentSession:')
     expect(block).toContain('currentIdRef.current === sessionId')
+  })
+
+  it('主文件与 AgentLoop 运行主链各守住拆分后的体量', () => {
+    const countLines = (source: string): number => {
+      const parts = source.split('\n').length
+      return source.endsWith('\n') ? parts - 1 : parts
+    }
+    expect(countLines(SOURCE)).toBeLessThanOrEqual(530)
+    expect(countLines(CORE_SOURCE)).toBeLessThanOrEqual(370)
+    expect(countInMain('useAgentPanelTurnCore(')).toBe(1)
   })
 })
