@@ -43,15 +43,15 @@ export default defineConfig({
       reporter: ['text-summary'],
       reportsDirectory: '.playwright-verify/coverage',
       /*
-       * 地板值。2026-11-04 补完队列删改 / 确认预览 / 停止后不发请求三处后实测：
-       * 语句 65.5% / 分支 55.8% / 函数 60.9% / 行 67.3%。
+       * 地板值。2026-11-05 加上「整块面板渲染冒烟」后实测：
+       * 语句 70.4% / 分支 57.8% / 函数 64.8% / 行 72.4%。
        * 每次抬阈值都必须先有行为断言垫着：**阈值只挡回退，不逼刷分**。
        */
       thresholds: {
-        statements: 63,
-        branches: 54,
-        functions: 59,
-        lines: 65,
+        statements: 68,
+        branches: 56,
+        functions: 63,
+        lines: 70,
       },
     },
   },
