@@ -24,6 +24,20 @@ const sources = {
       import: 'default',
     }) as Record<string, string>
   )['./agentCanvasMutationTools.ts'],
+  agentLoop: (
+    import.meta.glob('./agentLoop.ts', {
+      eager: true,
+      query: '?raw',
+      import: 'default',
+    }) as Record<string, string>
+  )['./agentLoop.ts'],
+  claimGuard: (
+    import.meta.glob('./agentCanvasClaimGuard.ts', {
+      eager: true,
+      query: '?raw',
+      import: 'default',
+    }) as Record<string, string>
+  )['./agentCanvasClaimGuard.ts'],
 }
 
 const countLines = (source: string): number => {
@@ -31,7 +45,7 @@ const countLines = (source: string): number => {
   return source.endsWith('\n') ? parts - 1 : parts
 }
 
-describe('Agent 工具模块结构护栏', () => {
+describe('Agent 工具与循环模块结构护栏', () => {
   it('行数口径自检：末尾换行不算一行', () => {
     expect(countLines('a')).toBe(1)
     expect(countLines('a\n')).toBe(1)
@@ -52,6 +66,15 @@ describe('Agent 工具模块结构护栏', () => {
     expect(countLines(sources.canvasMutations)).toBeLessThanOrEqual(410)
   })
 
+  it('能力门禁独立于 AgentLoop，主循环不重新长回千行', () => {
+    expect(sources.agentLoop, '没读到 agentLoop.ts 原文').toBeTypeOf('string')
+    expect(sources.claimGuard, '没读到 agentCanvasClaimGuard.ts 原文').toBeTypeOf(
+      'string',
+    )
+    expect(countLines(sources.agentLoop)).toBeLessThanOrEqual(840)
+    expect(countLines(sources.claimGuard)).toBeLessThanOrEqual(420)
+  })
+
   it('tools.ts 原有计划校验导出仍指向同一份实现', () => {
     expect(tools.planProblems).toBe(planGate.planProblems)
     expect(tools.promptlessGenerationProblems).toBe(
@@ -66,5 +89,15 @@ describe('Agent 工具模块结构护栏', () => {
       'export async function moveNodesInStore',
     )
     expect(sources.planGate).toContain('export function planProblems')
+  })
+
+  it('能力词表、执行证据和补查状态只住在门禁模块', () => {
+    expect(sources.agentLoop).not.toContain('EVIDENCE_TOOL_NAMES')
+    expect(sources.agentLoop).not.toContain('claimsCanvasActionPromise')
+    expect(sources.agentLoop).not.toContain('runCapabilityDiscovery')
+    expect(sources.claimGuard).toContain('export const toolResultFailed')
+    expect(sources.claimGuard).toContain(
+      'export function createAgentCanvasClaimGuard',
+    )
   })
 })

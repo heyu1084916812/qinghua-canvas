@@ -11,8 +11,11 @@
   `applyPlan` 不冒充真正生成。
 - **带工具调用的正文也过门**：同一模型回复里若 `content` 先写“改好了”、后面才带 tool_calls，
   正文不能原样落库；被拒流式草稿要调 `onProcessReset` 清掉，再按工具真实结果重答。
+- **门禁不能长回主循环**：动作词表、证据表、补查状态统一住在 `agentCanvasClaimGuard.ts`；
+  `agentLoop.ts` 只负责调用与接线。结构测试钉住 `agentLoop ≤ 840`、门禁模块 `≤ 420`。
 - **证据**：定向 4 文件 **152/152** + 回合装配 **14/14**；独立验收 A-N 通过；全量
-  **4566 passed / 1 skipped**；`npm run check`、`npm run build`、`git diff --check` 通过。
+  模块边界收口后定向 5 文件 **159/159**、全量 **4568 passed / 1 skipped**；
+  `npm run check`、`npm run build`、`git diff --check` 通过。
   本次没有新增改名功能，真正 `renameNode` 工具仍是独立后续项。
 
 ### 展开过程区只能有一个内容来源：实时帧与历史帧要合并（2026-11-05，#943）

@@ -10,6 +10,12 @@ import type { ChannelAdapter } from '../../../platform/channels/types'
 import { errorTextOf } from '../../../shared/result'
 import { createId } from '../../../shared/id'
 import { AgentToolEffectBlockedError } from '../../../features/shared/agent/AgentToolEffectLedger'
+import {
+  claimsCanvasActionDone,
+  createAgentCanvasClaimGuard,
+  hasSuccessfulCanvasMutation,
+  toolResultFailed as failedToolValue,
+} from './agentCanvasClaimGuard'
 import { parseJsonAgentAction } from './jsonToolFallback'
 import { parseAgentToolArguments } from './agentToolArgs'
 
@@ -174,169 +180,9 @@ const toolResult = (callId: string, toolName: string, value: unknown): ChatMessa
   createdAt: Date.now(),
 })
 
-const failedToolValue = (value: unknown): boolean => {
-  if (!value || typeof value !== 'object') return false
-  const row = value as { ok?: unknown; problems?: unknown }
-  return row.ok === false || (Array.isArray(row.problems) && row.problems.length > 0)
-}
-
 /** 工具调用的指纹，用于发现「反复调同一个」 */
 const callFingerprint = (name: string, args: unknown): string =>
   `${name}:${JSON.stringify(args ?? {})}`
-
-export type CanvasActionCategory =
-  | 'rename'
-  | 'delete'
-  | 'move'
-  | 'generate'
-  | 'connect'
-  | 'generic'
-
-const RENAME_ACTION =
-  /(改名|重命名|改(?:这个|那个|该|节点)?标题|换(?:这个|那个|该|节点)?标题|标题(?:改|换)|(?:修改|设置|改)(?:这个|那个|该|节点)?名称|节点名称)/
-const DELETE_ACTION = /(删除|删掉|删了|移除|去掉)/
-const MOVE_ACTION =
-  /(移动|挪动|拖到|拖拽|放到|摆在|排列|排成|整理|对齐|布局|缩放|调整大小|尺寸)/
-const GENERATE_ACTION = /(运行|执行|生成|出图|重跑|跑一遍)/
-const CONNECT_ACTION = /(连线|连上|连接|断开)/
-const ANY_CANVAS_ACTION =
-  /(改名|重命名|改(?:这个|那个|该|节点)?标题|换(?:这个|那个|该|节点)?标题|标题(?:改|换)|(?:修改|设置|改)(?:这个|那个|该|节点)?名称|节点名称|移动|挪动|拖到|拖拽|放到|摆在|排列|排成|整理|对齐|布局|缩放|调整大小|删除|删掉|移除|去掉|断开|连线|连上|连接|运行|执行|生成|出图|重跑|跑一遍|新建节点|建节点|创建工作流)/
-
-export function canvasActionCategoryOf(
-  text: string,
-): CanvasActionCategory | null {
-  if (RENAME_ACTION.test(text)) return 'rename'
-  if (DELETE_ACTION.test(text)) return 'delete'
-  if (MOVE_ACTION.test(text)) return 'move'
-  if (GENERATE_ACTION.test(text)) return 'generate'
-  if (CONNECT_ACTION.test(text)) return 'connect'
-  if (ANY_CANVAS_ACTION.test(text)) return 'generic'
-  return null
-}
-
-const NEGATED_CAPABILITY =
-  /(没有|不具备|不支持|无法|没法|不能|不会|不可用|缺少|做不到|做不了|帮不了|改不了)/
-
-/**
- * 画布动作的否定结论也必须先有目录证据。
- * 用动作类别复用同一套词表，避免“改名认得出、改名称却漏掉”的两份规则。
- */
-export function claimsMissingCapability(text: string): boolean {
-  return text.split(/[。！？\n]/).some((sentence) => {
-    if (!NEGATED_CAPABILITY.test(sentence)) return false
-    return (
-      canvasActionCategoryOf(sentence) !== null ||
-      /(能力|功能|操作|工具)/.test(sentence)
-    )
-  })
-}
-
-/**
- * 每个类别需要哪种工具的**成功结果**才算证据。
- * `rename` 是空数组：仓库里没有暴露给 Agent 的改名工具，`updateNode`（改参数）不算。
- */
-const EVIDENCE_TOOL_NAMES: Record<CanvasActionCategory, readonly string[]> = {
-  rename: [],
-  delete: ['deleteNodes', 'deleteEdges'],
-  move: ['moveNodes', 'arrangeNodes', 'resizeNodes'],
-  // applyPlan 只是建工作流，**不是真的生成**；"已生成/已出图"必须有 runNode / runFrom
-  generate: ['runNode', 'runFrom'],
-  connect: ['applyPlan'],
-  generic: [...AGENT_WRITE_TOOL_NAMES, ...AGENT_CONFIRM_TOOL_NAMES],
-}
-
-const toolResultSucceeded = (content: string): boolean => {
-  try {
-    const value = JSON.parse(content) as unknown
-    // 与工具失败判定同口径：ok:false **或** problems 非空都算失败
-    if (!value || typeof value !== 'object' || failedToolValue(value)) return false
-    const error = (value as { error?: unknown }).error
-    return !(typeof error === 'string' && error.trim())
-  } catch {
-    return false
-  }
-}
-
-/** 本回合最后一用户消息之后，是否出现过该类别的成功画布工具结果。 */
-export function hasSuccessfulCanvasMutation(
-  messages: readonly ChatMessage[],
-  category: CanvasActionCategory,
-): boolean {
-  const wanted = new Set(EVIDENCE_TOOL_NAMES[category])
-  if (wanted.size === 0) return false
-  // tool 消息可能没带 toolName（历史数据 / 老调用方），从 assistant.toolCalls 补名字
-  const callNameById = new Map<string, string>()
-  for (let index = messages.length - 1; index >= 0; index -= 1) {
-    const message = messages[index]!
-    if (message.role === 'user') break
-    if (message.role !== 'assistant') continue
-    for (const call of message.toolCalls ?? []) {
-      callNameById.set(call.id, call.name)
-    }
-  }
-  for (let index = messages.length - 1; index >= 0; index -= 1) {
-    const message = messages[index]!
-    if (message.role === 'user') break
-    if (message.role !== 'tool') continue
-    const name =
-      message.toolName || callNameById.get(message.toolCallId ?? '') || ''
-    if (!wanted.has(name)) continue
-    if (toolResultSucceeded(message.content)) return true
-  }
-  return false
-}
-
-/**
- * 正向承诺检测（保守）：同句必须同时有画布动作词 + 第一人称/征询语气。
- * 「建议你改名」「你可以自己改名」这类建议明确排除。
- */
-export function claimsCanvasActionPromise(text: string): boolean {
-  if (!ANY_CANVAS_ACTION.test(text)) return false
-  for (const sentence of text.split(/[。！？\n]/)) {
-    if (!ANY_CANVAS_ACTION.test(sentence)) continue
-    if (/(建议|最好|不妨|你可以自己|你可以试试)/.test(sentence)) continue
-    if (
-      /(我(?:可以|能|来|会|将|先|马上|这就|立即|帮你|给你)|要不要我|需要我|要我|可以帮你|可以给你)/.test(
-        sentence,
-      )
-    ) {
-      return true
-    }
-  }
-  return false
-}
-
-const DONE_STRONG: readonly [RegExp, CanvasActionCategory][] = [
-  [/(已改好|已经改好|改好了|已经改成|改成了|改标题完成|已修改|修改好了|改完了|已改名|改名成功|重命名成功)/, 'rename'],
-  [/(已删除|已经删除|删除成功|删除完成|删掉了|已移除|移除成功)/, 'delete'],
-  [/(已移动|已经移动|移动好了|移动完成|已排列|排好了|已整理|整理好了|已对齐|对齐了|已缩放|调整好了)/, 'move'],
-  [/(已生成|已经生成|生成好了|生成完成|已运行|运行完成|跑完了|已出图)/, 'generate'],
-  [/(已连接|连好了|已断开)/, 'connect'],
-]
-/**
- * 泛化完成语气只有同句带画布动作词时才算（否则会把「已完成总结」误拦）。
- */
-const DONE_WEAK = /(已完成|已经完成|做完了|做好了|处理好了|搞定了)/
-const PAST_REFERENCE = /(之前|刚才|上一轮|上一次|上周|前天)/
-
-export function claimsCanvasActionDone(
-  text: string,
-): { category: CanvasActionCategory } | null {
-  for (const sentence of text.split(/[。！？\n]/)) {
-    if (!sentence.trim()) continue
-    if (PAST_REFERENCE.test(sentence)) continue
-    // 建议 / 推荐不是"已完成"的声明
-    if (/(建议|推荐|不妨|你可以自己)/.test(sentence)) continue
-    for (const [pattern, category] of DONE_STRONG) {
-      if (pattern.test(sentence)) return { category }
-    }
-    if (DONE_WEAK.test(sentence)) {
-      const category = canvasActionCategoryOf(sentence)
-      if (category) return { category }
-    }
-  }
-  return null
-}
 
 async function askModel(
   history: ChatMessage[],
@@ -377,9 +223,6 @@ export async function runAgentTurn(
   const allowedToolNames = new Set(activeTools.map((tool) => tool.name))
   const seenCalls = new Map<string, number>()
   let visualReviewRan = false
-  let capabilityDiscoveryRan = false
-  let promiseGateRan = false
-  let completionGateRan = false
   const emitProgress = () => deps.onProgress?.([...messages])
   const pullSteering = async (): Promise<number> => {
     if (!deps.takeSteering) return 0
@@ -408,162 +251,16 @@ export async function runAgentTurn(
     for (const tool of added) allowedToolNames.add(tool.name)
     return added.map((tool) => tool.name)
   }
-  /**
-   * 该类别在本回合**确实有工具可用**吗？
-   *
-   * 只看 `capabilityDiscoveryRan=true` 不够：目录可能只加载了别的类别
-   * （例如查询"移动节点"却承诺"改名"）。rename 的期望工具集是空的 ⇒ 永远不可用。
-   */
-  const capabilityAvailableFor = (category: CanvasActionCategory): boolean =>
-    EVIDENCE_TOOL_NAMES[category].some((name) => allowedToolNames.has(name))
-  /**
-   * 模型没先查能力目录就直接下“做不到”的结论时，执行层先补查一次。
-   * 这里只加载 schema，业务动作仍由模型按普通权限与确认流程发起。
-   */
-  const lastUserRequestOf = (): string =>
-    [...messages].reverse().find((message) => message.role === 'user')
-      ?.content ?? ''
-  const capabilityQueryOf = (text: string): string =>
-    `${lastUserRequestOf()}\n${text}`.trim().slice(0, 2000)
-
-  /** 补查能力目录（两条防线共用）：加载 schema + 回填 system 结果。 */
-  const runCapabilityDiscovery = async (
-    step: number,
-    query: string,
-    intro: string,
-  ): Promise<void> => {
-    capabilityDiscoveryRan = true
-    emitActivity({
-      id: `capability-gate-${step}`,
-      phase: 'tool',
-      status: 'running',
-      tool: 'readCapabilities',
-    })
-    try {
-      const discovered = await deps.discoverCapabilities!({ query })
-      const loaded = loadDiscoveredTools(discovered)
-      emitActivity({
-        id: `capability-gate-${step}`,
-        phase: 'tool',
-        status: failedToolValue(discovered.result) ? 'failed' : 'done',
-        tool: 'readCapabilities',
-      })
-      messages.push({
-        role: 'system',
-        content:
-          `${intro}\n` +
-          `本轮新加载工具：${loaded.length > 0 ? loaded.join('、') : '无'}\n` +
-          `能力目录：${JSON.stringify(discovered.result)}`,
-        createdAt: Date.now(),
-      })
-    } catch (error) {
-      emitActivity({
-        id: `capability-gate-${step}`,
-        phase: 'tool',
-        status: 'failed',
-        tool: 'readCapabilities',
-      })
-      messages.push({
-        role: 'system',
-        content:
-          '能力目录读取失败；这是目录读取故障，不能据此断言某项能力不存在。' +
-          `错误：${errText(error)}`,
-        createdAt: Date.now(),
-      })
-    }
-    emitProgress()
-  }
-
-  /**
-   * 反方向（旧）：模型没查目录就断言“做不到” → 补查一次再让它重答。
-   */
-  const discoverBeforeCapabilityDenial = async (
-    text: string,
-    step: number,
-  ): Promise<boolean> => {
-    if (
-      capabilityDiscoveryRan ||
-      !deps.discoverCapabilities ||
-      !claimsMissingCapability(text)
-    ) {
-      return false
-    }
-    await runCapabilityDiscovery(
-      step,
-      capabilityQueryOf(text),
-      '执行层已自动读取能力目录，禁止在未检查该结果时继续断言“没有能力”。',
-    )
-    return true
-  }
-
-  /**
-   * 正向门禁（本次事故）：
-   * ① 没查能力就开始承诺画布动作 → 先补查，不许直接落成最终回答；
-   * ② 能力目录说“没有这个能力”（rename 目前就是）却还在承诺 → 拦一次，再犯直接报错；
-   * ③ 声称画布动作**已完成**但本回合没有对应类别的成功工具结果 → 拦一次，
-   *    并要求它要么真调用工具、要么如实说做不到。
-   *
-   * 三条都只认**确定性证据**（工具名 + ok:false 判定），不看模型自述。
-   */
-  const guardFinalCanvasClaims = async (
-    text: string,
-    step: number,
-  ): Promise<'ok' | 'continue' | 'blocked'> => {
-    const promisesAction = claimsCanvasActionPromise(text)
-    // ① 尚未查过能力就承诺
-    if (promisesAction && !capabilityDiscoveryRan && deps.discoverCapabilities) {
-      await runCapabilityDiscovery(
-        step,
-        capabilityQueryOf(text),
-        '执行层检测到本轮准备承诺一个画布动作，但尚未读取能力目录；已自动补查。' +
-          '在确认对应工具存在之前，不得承诺“我可以做”。',
-      )
-      return 'continue'
-    }
-    // ② 能力没真正到手（本回合工具集里没有该类别）却继续承诺
-    if (promisesAction) {
-      const category = canvasActionCategoryOf(text)
-      if (category && !capabilityAvailableFor(category)) {
-        // 还没确认过能力：先补查（这是"先查再承诺"的主路径）
-        if (!capabilityDiscoveryRan && deps.discoverCapabilities) {
-          await runCapabilityDiscovery(
-            step,
-            capabilityQueryOf(text),
-            '执行层检测到本轮准备承诺一个画布动作，但尚未确认该能力是否存在；已自动补查。',
-          )
-          return 'continue'
-        }
-        if (promiseGateRan) return 'blocked'
-        promiseGateRan = true
-        messages.push({
-          role: 'system',
-          content:
-            `当前可用的工具里没有能完成「${category}」的能力（本回合工具集与能力目录都不包含它）。` +
-            '不得向用户承诺“我可以做”或“要不要我做”；必须直接说明当前没有这项能力。',
-          createdAt: Date.now(),
-        })
-        emitProgress()
-        return 'continue'
-      }
-    }
-    // ③ 完成声明必须有本回合的成功执行证据
-    const claim = claimsCanvasActionDone(text)
-    if (!claim) return 'ok'
-    if (hasSuccessfulCanvasMutation(messages, claim.category)) return 'ok'
-    if (completionGateRan) return 'blocked'
-    completionGateRan = true
-    messages.push({
-      role: 'system',
-      content:
-        `执行层没有找到本回合与「${claim.category}」对应的成功工具结果，` +
-        '因此你声称的“已完成 / 已改好”没有执行证据，不能作为最终回答。' +
-        '要么现在调用真实工具完成动作，要么如实告诉用户还没做、以及当前是否根本没有这项能力' +
-        '（能力不存在时先 readCapabilities 再明确说“当前没有该能力”）。',
-      createdAt: Date.now(),
-    })
-    emitProgress()
-    return 'continue'
-  }
+  const canvasClaimGuard = createAgentCanvasClaimGuard({
+    messages,
+    allowedToolNames,
+    discoverCapabilities: deps.discoverCapabilities,
+    loadDiscoveredTools,
+    emitActivity,
+    emitProgress,
+  })
+  const { discoverBeforeCapabilityDenial, guardFinalCanvasClaims } =
+    canvasClaimGuard
 
   for (let step = 0; step < maxSteps; step += 1) {
     await pullSteering()
@@ -799,7 +496,7 @@ export async function runAgentTurn(
       }
 
       if (call.name === 'readCapabilities' && deps.discoverCapabilities) {
-        capabilityDiscoveryRan = true
+        canvasClaimGuard.noteCapabilityDiscoveryRan()
         emitActivity({
           id: call.id,
           phase: 'tool',

@@ -9,7 +9,8 @@
   已生成”之前，必须有本回合 `readCapabilities` / 对应成功工具的账。改名 / 标题 / 名称查询返回
   `supported:false, loaded:[]`，`updateNode` 只改节点参数、不能冒充改名；只读工具不算执行证据，
   `problems` 非空不算成功，`applyPlan` 建图不能冒充“已生成”。带 tool_calls 的同批正文也受同一
-  门禁约束，被拒流式草稿必须清掉。
+  门禁约束，被拒流式草稿必须清掉。动作词表、证据表、补查状态只住
+  `agentCanvasClaimGuard.ts`；`agentLoop.ts` 只接线，结构护栏钉住主循环 `≤ 840`、门禁模块 `≤ 420`。
 
 - **展开过程区实时帧与历史帧必须去重**：同一段 reasoning 既可能在 `liveProcess`，也可能已进入
   `processEntriesOf`。只保留更靠后的一帧；实时是历史续写时替换，历史领先时丢弃实时，

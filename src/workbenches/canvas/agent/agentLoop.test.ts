@@ -4,9 +4,11 @@ import type { ChatMessage } from '../../../domain/shared/execution/types'
 import { AgentToolEffectBlockedError } from '../../../features/shared/agent/AgentToolEffectLedger'
 import { ChannelError } from '../../../platform/channels/types'
 import {
-  AGENT_DEFAULT_MAX_STEPS,
   claimsCanvasActionDone,
   claimsMissingCapability,
+} from './agentCanvasClaimGuard'
+import {
+  AGENT_DEFAULT_MAX_STEPS,
   errText,
   resumeAgentTurn,
   runAgentTurn,
