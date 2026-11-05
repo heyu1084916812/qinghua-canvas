@@ -1,0 +1,258 @@
+.row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+/*
+ * 步骤卡：一步一张，一行标题打头，细节与产物缩略图跟在下面。
+ *
+ * 与消息气泡的区别是**它不左右分栏** —— 步骤是「系统做了什么」，
+ * 不是「谁在说话」，靠左贴边更像日志的一部分（参考产品也是这么收的）。
+ */
+.step,
+.stepFailed {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-1) 0;
+  border-radius: 0;
+  background: transparent;
+}
+.stepFailed {
+  color: var(--danger);
+}
+
+.stepHead {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 3px;
+  min-width: 0;
+  width: 100%;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+}
+.chevronDown,
+.chevronUp {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  color: var(--text-3);
+}
+.chevronDown {
+  opacity: 0;
+  transform: translateX(-2px);
+  transition:
+    opacity 120ms var(--ease-out),
+    transform 120ms var(--ease-out);
+}
+.chevronDown svg {
+  transform: rotate(-90deg);
+}
+.chevronUp svg {
+  transform: rotate(0deg);
+  transition: transform var(--dur-hover) ease;
+}
+
+.stepLabel {
+  min-width: 0;
+  max-width: calc(100% - 40px);
+  font-size: var(--fs-chip);
+  font-weight: 400;
+  color: var(--text-3);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  transition: color 120ms var(--ease-out);
+}
+
+.stepHead:hover .stepLabel,
+.stepHead:focus-visible .stepLabel {
+  color: var(--text-1);
+}
+
+.stepIcon {
+  flex: 0 0 auto;
+  width: 16px;
+  height: 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-3);
+}
+
+.stepHead:hover .stepIcon,
+.stepHead:focus-visible .stepIcon {
+  color: var(--text-2);
+}
+
+.stepHead:hover .chevronDown,
+.stepHead:focus-visible .chevronDown {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+.stepSummary {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 1px 0 2px;
+  color: var(--text-2);
+  font-size: var(--fs-chip);
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+}
+
+.stepSummary p {
+  margin: 0;
+}
+
+.stepSummary p:first-child {
+  color: var(--text-1);
+}
+
+.stepSummary p:last-child {
+  color: var(--text-3);
+}
+
+.stepLines {
+  list-style: none;
+  margin: 0;
+  padding-left: 0;
+  font-size: var(--fs-label);
+  color: var(--text-1);
+  font-weight: 400;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+
+.stepReveal {
+  display: grid;
+  grid-template-rows: 0fr;
+  opacity: 0;
+  transform: translateY(-3px);
+  transition:
+    grid-template-rows var(--dur-panel) var(--ease-panel),
+    opacity var(--dur-hover) var(--ease-out),
+    transform var(--dur-panel) var(--ease-panel);
+}
+
+.stepRevealOpen {
+  grid-template-rows: 1fr;
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.stepRevealInner {
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding-top: 0;
+}
+
+.stepRevealOpen .stepRevealInner {
+  padding-top: var(--space-1);
+}
+
+.continuationText {
+  margin: 0;
+  font-size: var(--fs-label);
+  color: var(--text-2);
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+
+/* 产物缩略图：固定方块，张数变多只换行、不把卡片撑高 */
+.thumbs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+.thumb {
+  flex: 0 0 auto;
+  width: 168px;
+  height: auto;
+  aspect-ratio: 4 / 3;
+  border-radius: var(--radius-node);
+  overflow: hidden;
+  background: var(--bg-hover);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.thumbImg {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.thumbButton {
+  width: 100%;
+  height: 100%;
+  display: block;
+  padding: 0;
+  border: none;
+  background: transparent;
+  cursor: zoom-in;
+}
+
+.thumbButton:focus-visible {
+  outline: 1px solid var(--stroke-focus);
+  outline-offset: -1px;
+}
+
+.thumbEmpty {
+  width: 100%;
+  height: 100%;
+}
+
+.preview {
+  /* 与步骤卡同一张皮的视觉，只是多了确认按钮 —— 参考产品把确认卡就当时间线里的步骤 */
+  border: none;
+  background: transparent;
+  padding: var(--space-1) 0;
+}
+
+.previewCard .stepLines {
+  box-sizing: border-box;
+  max-height: 156px;
+  overflow-y: auto;
+  padding-right: var(--space-1);
+}
+
+.previewCard .row {
+  flex-wrap: wrap;
+}
+
+.previewTitle {
+  margin: 0;
+  font-size: var(--fs-label);
+  font-weight: var(--fw-title);
+  color: var(--text-1);
+  overflow-wrap: anywhere;
+}
+
+.previewList {
+  margin: 0;
+  padding-left: 1.1em;
+  font-size: var(--fs-chip);
+  color: var(--text-2);
+  line-height: 1.7;
+}
+
+
+@media (prefers-reduced-motion: reduce) {
+  .stepReveal,
+  .stepRevealInner {
+    transition: none;
+  }
+}

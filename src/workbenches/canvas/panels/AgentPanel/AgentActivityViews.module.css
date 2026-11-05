@@ -1,0 +1,389 @@
+.activity {
+  flex: 0 0 auto;
+  min-width: 0;
+  padding: 5px var(--space-1) 6px;
+}
+
+.activityOpen {
+  padding-bottom: 8px;
+}
+
+.activityDuration {
+  margin-bottom: 9px;
+  padding-bottom: 7px;
+  border-bottom: 1px solid var(--stroke);
+  color: var(--text-3);
+  font-size: var(--fs-chip);
+  line-height: 1.4;
+  font-variant-numeric: tabular-nums;
+}
+
+.activityIntent {
+  margin-bottom: 7px;
+  color: var(--text-1);
+  font-size: var(--fs-label);
+  line-height: 1.65;
+}
+
+.activityIntent .activityCopy {
+  display: block;
+  overflow: visible;
+  color: var(--text-1);
+  font-size: var(--fs-label);
+  line-height: 1.65;
+  white-space: pre-wrap;
+  text-overflow: clip;
+}
+
+.activityMarkdown {
+  width: 100%;
+  color: var(--text-1);
+  font-size: var(--fs-label);
+  line-height: 1.65;
+}
+
+.activityHead {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 22px;
+}
+
+.activityCopy {
+  min-width: 0;
+  flex: 1 1 auto;
+  overflow: hidden;
+  color: var(--text-2);
+  font-size: var(--fs-chip);
+  line-height: 1.45;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.activityCursor {
+  display: inline-block;
+  width: 1px;
+  height: 1em;
+  margin-left: 2px;
+  vertical-align: -0.12em;
+  background: currentColor;
+  animation: activityCursor 0.8s steps(1, end) infinite;
+}
+
+.activityToggle {
+  flex: 0 0 auto;
+  width: 24px;
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--text-3);
+  cursor: pointer;
+}
+
+.activityToggle:hover {
+  background: var(--bg-hover);
+  color: var(--text-1);
+}
+
+.activityToggle:focus-visible {
+  outline: 1px solid var(--stroke-focus);
+  outline-offset: 1px;
+}
+
+.activityToggleIcon {
+  display: inline-flex;
+  transition: transform 160ms ease;
+}
+
+.activityOpen .activityToggleIcon {
+  transform: rotate(180deg);
+}
+
+.activityList {
+  max-height: 248px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: 4px;
+  padding-left: 0;
+}
+
+.activityProcessBody {
+  padding: var(--space-2);
+  border: 1px solid var(--stroke);
+  border-radius: var(--radius-control);
+  background: var(--bg-subtle);
+  color: var(--text-1);
+  font-size: var(--fs-chip);
+  line-height: 1.55;
+}
+
+.activityProcessBody :global([data-md-block]) {
+  margin-block: 0 4px;
+}
+
+.activityProcessBody :global([data-md-block]:last-child) {
+  margin-bottom: 0;
+}
+
+.activityRow,
+.activityRowFailed {
+  flex: 0 0 auto;
+  min-width: 0;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  min-height: 24px;
+  padding: 1px 0;
+  color: var(--text-2);
+  font-size: var(--fs-chip);
+  line-height: 1.45;
+}
+
+.activityRowFailed {
+  color: var(--danger);
+}
+
+.activitySpinner,
+.runTaskSpinner {
+  width: 10px;
+  height: 10px;
+  box-sizing: border-box;
+  border: 1.5px solid color-mix(in srgb, var(--accent) 28%, transparent);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: agentSpin 720ms linear infinite;
+}
+
+.activityStepName {
+  min-width: 0;
+  flex: 1 1 auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.activityStepName :global(.markdownBody) {
+  gap: 2px;
+}
+
+.activityStepName :global([data-md-block]) {
+  margin-block: 0;
+  color: var(--text-2);
+  font-size: var(--fs-chip);
+  line-height: 1.5;
+}
+
+.activityStepTime {
+  flex: 0 0 auto;
+  padding-top: 1px;
+  color: var(--text-3);
+  font-size: var(--fs-chip);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.activityStepDetail {
+  min-width: 0;
+  flex: 1 1 auto;
+  overflow: hidden;
+  color: var(--text-3);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.runTasks {
+  flex: 0 0 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 8px 9px;
+  border: 1px solid var(--stroke);
+  border-radius: var(--radius-node);
+  background: var(--bg-subtle);
+}
+
+.runTasksHead {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 8px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 7px;
+  color: var(--text-1);
+  font-size: var(--fs-chip);
+  font-weight: var(--fw-title);
+}
+
+.runTasksDot,
+.runTasksDotActive {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--text-3);
+}
+
+.runTasksDotActive {
+  background: var(--accent);
+  animation: activityPulse 1.4s ease-in-out infinite;
+}
+
+.runTasksTitle {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.runTasksCount {
+  color: var(--text-3);
+  font-size: var(--fs-chip);
+  font-variant-numeric: tabular-nums;
+  font-weight: 400;
+}
+
+.runTaskList {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  max-height: 204px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.runTaskRow {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 14px minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 7px;
+  min-height: 25px;
+  color: var(--text-2);
+  font-size: var(--fs-chip);
+  line-height: 1.4;
+}
+
+.runTaskRow + .runTaskRow {
+  border-top: 1px solid var(--stroke);
+}
+
+.runTaskIcon {
+  width: 14px;
+  height: 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--accent);
+}
+
+.runTaskRow[data-agent-run-task-status='queued'] .runTaskIcon,
+.runTaskRow[data-agent-run-task-status='queued'] .runTaskStatus {
+  color: var(--text-3);
+}
+
+.runTaskRow[data-agent-run-task-status='failed'] .runTaskIcon,
+.runTaskRow[data-agent-run-task-status='failed'] .runTaskStatus {
+  color: var(--danger);
+}
+
+.runTaskQueuedDot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  border: 1px solid currentColor;
+}
+
+.runTaskName {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text-1);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.runTaskStatus {
+  color: var(--accent);
+  white-space: nowrap;
+}
+
+.runTaskElapsed {
+  min-width: 68px;
+  color: var(--text-3);
+  text-align: right;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+
+@keyframes activityPulse {
+  0%,
+  100% {
+    opacity: 0.35;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+@keyframes agentSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes activityCursor {
+  0%,
+  48% {
+    opacity: 1;
+  }
+  49%,
+  100% {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .runTasksDotActive,
+  .activitySpinner,
+  .runTaskSpinner,
+  .activityCursor {
+    animation: none;
+  }
+
+  .activityToggleIcon {
+    transition: none;
+  }
+}
+
+.thumbImg {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.thumbButton {
+  width: 100%;
+  height: 100%;
+  display: block;
+  padding: 0;
+  border: none;
+  background: transparent;
+  cursor: zoom-in;
+}
+
+.thumbButton:focus-visible {
+  outline: 1px solid var(--stroke-focus);
+  outline-offset: -1px;
+}
+
+.thumbEmpty {
+  width: 100%;
+  height: 100%;
+}

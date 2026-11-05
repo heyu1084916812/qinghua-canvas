@@ -1,0 +1,274 @@
+.queue {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 6px 8px;
+  border: 1px solid var(--stroke);
+  border-radius: var(--radius-node);
+  background: var(--bg-subtle);
+}
+
+.queueHead {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.queueToggle,
+.queueResume,
+.queueAction,
+.queueSteer {
+  border: none;
+  background: transparent;
+  color: var(--text-2);
+  cursor: pointer;
+}
+
+.queueToggle {
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 2px 0;
+  font: inherit;
+  font-size: var(--fs-label);
+}
+
+.queueDot {
+  width: 6px;
+  height: 6px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: var(--text-2);
+}
+
+.queueChevron,
+.queueChevronOpen {
+  transition: transform 160ms ease;
+}
+
+.queueChevronOpen {
+  transform: rotate(180deg);
+}
+
+.queueResume {
+  flex: 0 0 auto;
+  align-self: flex-end;
+  min-height: 26px;
+  padding: 0 8px;
+  border: 1px solid var(--stroke);
+  border-radius: var(--radius-control);
+  font: inherit;
+  font-size: var(--fs-chip);
+  color: var(--text-1);
+}
+
+.queueToggle:hover,
+.queueResume:hover,
+.queueAction:hover:not(:disabled),
+.queueSteer:hover:not(:disabled) {
+  color: var(--text-1);
+}
+
+.queueList {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 132px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.queueItem {
+  position: relative;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 0;
+  border-top: 1px solid var(--stroke);
+}
+
+.queueIndex {
+  font-size: var(--fs-chip);
+  color: var(--text-3);
+  text-align: center;
+}
+
+.queueText {
+  min-width: 0;
+  overflow: hidden;
+  font-size: var(--fs-chip);
+  color: var(--text-2);
+  line-height: 1.45;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.queueActions {
+  display: inline-flex;
+  align-items: center;
+  gap: 1px;
+}
+
+.queueAction {
+  width: 24px;
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+
+.queueAction:disabled {
+  opacity: 0.34;
+  cursor: default;
+}
+
+.queueSteer {
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 0 5px;
+  font: inherit;
+  font-size: var(--fs-chip);
+  white-space: nowrap;
+}
+
+.queueSteer:not(:disabled) {
+  color: var(--text-1);
+  font-weight: 600;
+}
+
+.queueSteer:disabled {
+  opacity: 0.34;
+  cursor: default;
+}
+
+.queueAction:focus-visible,
+.queueSteer:focus-visible,
+.queueMenuItem:focus-visible,
+.queueEditSave:focus-visible,
+.queueEditCancel:focus-visible {
+  outline: 1px solid var(--stroke-focus);
+  outline-offset: 1px;
+}
+
+.queueMenu {
+  position: fixed;
+  z-index: 1000;
+  min-width: 136px;
+  padding: 4px;
+  border: 1px solid var(--stroke);
+  border-radius: var(--radius-control);
+  background: var(--bg-surface);
+  box-shadow: var(--shadow-float);
+  animation: menuInkIn var(--dur-menu) var(--ease-panel);
+}
+
+.queueMenuItem {
+  width: 100%;
+  min-height: 30px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: calc(var(--radius-control) - 2px);
+  background: transparent;
+  color: var(--text-1);
+  font: inherit;
+  font-size: var(--fs-label);
+  cursor: pointer;
+  text-align: left;
+}
+
+.queueMenuItem:hover {
+  background: var(--bg-hover);
+}
+
+.queueEditPopover {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 6px);
+  z-index: 66;
+  width: min(360px, 100%);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px;
+  border: 1px solid var(--stroke);
+  border-radius: var(--radius-node);
+  background: var(--bg-surface);
+  box-shadow: var(--shadow-float);
+}
+
+.queueEditInput {
+  width: 100%;
+  box-sizing: border-box;
+  resize: vertical;
+  min-height: 44px;
+  max-height: 88px;
+  padding: 7px 8px;
+  border: 1px solid var(--stroke);
+  border-radius: var(--radius-control);
+  background: var(--bg-surface);
+  color: var(--text-1);
+  font: inherit;
+  font-size: var(--fs-label);
+  line-height: 1.45;
+}
+
+.queueEditInput:focus-visible {
+  outline: 1px solid var(--stroke-focus);
+  outline-offset: 1px;
+}
+
+.queueEditActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-1);
+}
+
+.queueEditSave,
+.queueEditCancel {
+  min-height: 26px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 8px;
+  border: 1px solid var(--stroke);
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--text-2);
+  font: inherit;
+  font-size: var(--fs-chip);
+  cursor: pointer;
+}
+
+.queueEditSave {
+  border-color: var(--control-inverse-bg);
+  background: var(--control-inverse-bg);
+  color: var(--control-inverse-text);
+}
+
+.queueEditSave:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.queueEditCancel:hover,
+.queueEditSave:hover:not(:disabled) {
+  color: var(--text-1);
+}
+
+.queueEditSave:hover:not(:disabled) {
+  background: var(--control-inverse-bg-hover);
+  border-color: var(--control-inverse-bg-hover);
+  color: var(--control-inverse-text-hover);
+}

@@ -40,7 +40,10 @@ import {
   type MentionRef,
 } from '../../text/MentionEditor'
 import { SkillMenu } from './SkillMenu'
-import styles from './AgentPanel.module.css'
+import baseStyles from './AgentPanel.module.css'
+import composerStyles from './AgentComposerPane.module.css'
+
+const styles = { ...baseStyles, ...composerStyles }
 
 export interface AgentComposerPaneProps {
   current: AgentSession | null

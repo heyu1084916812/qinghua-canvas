@@ -14,7 +14,7 @@ import {
   statusCanSteer,
   type AgentPanelStatus,
 } from './AgentActivityViews'
-import styles from './AgentPanel.module.css'
+import styles from './AgentQueuePanel.module.css'
 
 export interface AgentQueueMenuPosition {
   right: number

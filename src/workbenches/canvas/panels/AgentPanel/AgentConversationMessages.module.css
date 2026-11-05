@@ -1,0 +1,258 @@
+.contentWrap {
+  flex: 1 1 auto;
+  min-height: 0;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.planDock {
+  position: relative;
+  z-index: 2;
+  flex: 0 0 auto;
+  min-height: 0;
+  max-height: min(36vh, 320px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-top: var(--space-1);
+  background: var(--bg-surface);
+}
+
+.content {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-3) 0 calc(var(--space-8) + var(--space-3));
+}
+
+.content > * {
+  flex: 0 0 auto;
+}
+
+.jumpLatest {
+  position: absolute;
+  right: 10px;
+  bottom: 10px;
+  z-index: 4;
+  height: 30px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 0 10px;
+  border: 1px solid var(--stroke);
+  border-radius: var(--radius-control);
+  background: var(--bg-surface);
+  box-shadow: var(--shadow-float);
+  color: var(--text-1);
+  font: inherit;
+  font-size: var(--fs-chip);
+  cursor: pointer;
+  animation: jumpLatestIn 140ms var(--ease-out);
+}
+
+.jumpLatest:hover {
+  background: var(--bg-hover);
+}
+
+.jumpLatest:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.streamCaret {
+  display: inline-block;
+  width: 1px;
+  height: 1.1em;
+  margin-left: 2px;
+  vertical-align: -0.15em;
+  background: currentColor;
+  animation: streamCaretBlink 0.75s steps(1, end) infinite;
+}
+
+.messages {
+  flex: 0 0 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.hint {
+  margin: 0;
+  font-size: var(--fs-label);
+  color: var(--text-3);
+  line-height: 1.6;
+}
+
+.msgTurn {
+  min-width: 0;
+  max-width: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.msgTurnUser {
+  align-self: flex-end;
+  align-items: flex-end;
+  max-width: 85%;
+}
+
+.msgTurnBot {
+  align-self: flex-start;
+  align-items: flex-start;
+}
+
+.msgRuntime {
+  margin-bottom: 5px;
+  color: var(--text-3);
+  font-size: var(--fs-chip);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.35;
+}
+
+/* 消息气泡：只允许在容器内换行，长串（id / hash）也要能断 */
+.msgUser,
+.msgBot {
+  max-width: 100%;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-node);
+  font-size: var(--fs-label);
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+.msgUser {
+  background: var(--bg-hover);
+  color: var(--text-1);
+}
+.msgBot {
+  color: var(--text-1);
+  padding-right: var(--space-3);
+  /**
+   * 助手气泡里现在是**结构化 Markdown 块**（标题 / 列表 / 段落各是一个 div），
+   * 所以不再用 `pre-wrap` —— 那会把源码里的缩进与换行也原样画出来，
+   * 与块自己的 margin 叠成一片莫名空行。
+   */
+  white-space: normal;
+}
+
+
+.msgTime {
+  display: inline;
+  margin: 0;
+  color: var(--text-3);
+  font-size: var(--fs-chip);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.3;
+}
+
+.msgMeta {
+  min-height: 24px;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: 3px;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-2px);
+  transition:
+    opacity 120ms var(--ease-out),
+    transform 120ms var(--ease-out);
+}
+
+.msgMetaUser {
+  justify-content: flex-end;
+}
+
+.msgTurn:hover .msgMeta,
+.msgTurn:focus-within .msgMeta {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0);
+}
+
+/**
+ * 助手回复下方的操作条（用户 2026-10-14 第 1 条：复制 / 重试）。
+ *
+ * 默认**淡出**、悬停在这条回复上（或键盘 Tab 进来）才显形：一屏十几条回复时，
+ * 两颗常驻按钮会把对话流切碎；但它们必须可达 —— 所以用 `opacity` 而不是
+ * `display:none`，键盘焦点照样进得来。
+ */
+.msgActions {
+  display: flex;
+  gap: var(--space-1);
+}
+
+.msgAction {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--text-3);
+  cursor: pointer;
+}
+
+.msgAction:hover {
+  background: var(--bg-hover);
+  color: var(--text-1);
+}
+
+.statusLine {
+  flex: 0 0 auto;
+  padding: 4px var(--space-1);
+  font-size: var(--fs-chip);
+  color: var(--text-3);
+}
+
+
+@keyframes jumpLatestIn {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes streamCaretBlink {
+  0%,
+  48% {
+    opacity: 1;
+  }
+  49%,
+  100% {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .streamCaret {
+    animation: none;
+  }
+
+  .jumpLatest {
+    animation: none;
+  }
+}
+
+.steerPending {
+  padding: 6px 8px;
+  border: 1px solid var(--stroke);
+  border-radius: var(--radius-node);
+  background: var(--bg-subtle);
+  color: var(--text-2);
+  font-size: var(--fs-chip);
+  line-height: 1.45;
+}

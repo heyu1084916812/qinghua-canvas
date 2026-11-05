@@ -36,7 +36,11 @@ import {
 } from './conversation'
 import { MentionRichText } from './MentionRichText'
 import { TaskPlanCard } from './TaskPlanCard'
-import styles from './AgentPanel.module.css'
+import baseStyles from './AgentPanel.module.css'
+import messageStyles from './AgentConversationMessages.module.css'
+import stepStyles from './AgentConversationSteps.module.css'
+
+const styles = { ...baseStyles, ...messageStyles, ...stepStyles }
 
 export interface AgentConversationPaneProps {
   current: AgentSession | null

@@ -28,7 +28,10 @@ import {
   type ConversationProcessEntry,
 } from './conversation'
 import { MarkdownBlocks } from '../../text/MarkdownBlocks'
-import styles from './AgentPanel.module.css'
+import baseStyles from './AgentPanel.module.css'
+import activityStyles from './AgentActivityViews.module.css'
+
+const styles = { ...baseStyles, ...activityStyles }
 
 export type AgentPanelStatus =
   | { kind: 'idle' }

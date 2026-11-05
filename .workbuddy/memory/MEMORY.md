@@ -1,5 +1,16 @@
 # CanvasFlow（轻画）项目记忆
 
+### CSS Modules 拆分要连 keyframes 和 media 一起搬（2026-11-05，M-CSS-SPLIT）
+
+- **拆法**：`AgentPanel.module.css` **1553 → 248 行**；队列、活动、消息、步骤卡、Composer 各一份模块。
+  组件用 `{...baseStyles, ...componentStyles}` 合并，不改任何 `styles.xxx` JSX 引用。
+- **必须一起搬的依赖**：组件自己的 `@keyframes`、`prefers-reduced-motion` 分支，以及同一 selector chain 里的 class
+  （例如 `.previewCard .row` 两端必须在同一模块）。只搬主选择器会造成动画失效或后代选择器永远不命中。
+- **脚本提取后必须跑 build**：PowerShell 数组拼接一旦写进 `System.Object[]`，`tsc/check` 可能仍绿，但 Vite CSS
+  解析会失败，G769 连 hydrate 都进不去。CSS 结构测试现在直接禁止伪行并检查括号配平。
+- **UI 证据口径**：改前/改后各跑 G769 浅色和深色；1440×900 + 1024×700，队列菜单/编辑浮层/Composer/活动都看一遍。
+  深色改前首轮在后续检查点超时，隔离重跑 39/39；这类与 CSS 无关的时序红要留档并单独复跑，不能混进视觉结论。
+
 ### 回合拆分要按“运行主链 vs 用户动作”切，不能按控制器数量平均切（2026-11-05，M-TURN-CORE-SPLIT）
 
 - **拆法**：`useAgentPanelTurnModel.ts` **741 → 493 行**；AgentLoop 工具白名单 / autoRun / loopDeps / outcome /
