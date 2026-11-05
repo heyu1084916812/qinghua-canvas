@@ -2,7 +2,6 @@ import {
   createContext,
   useCallback,
   useContext,
-  useEffect,
   useMemo,
   useSyncExternalStore,
   type ReactNode,
@@ -63,12 +62,7 @@ import {
   resolveCanvasRecordScope,
   type CanvasRecordScopeOverrideArgs,
 } from './canvasRecordScope'
-import {
-  LOCAL_RUN_CHANNEL_ID,
-  createRunRecord,
-  type RunRecord,
-} from '../../../domain/canvas/model/runRecord'
-import { fusionSpec } from '../../../domain/canvas/nodeSpecs/fusion'
+import type { RunRecord } from '../../../domain/canvas/model/runRecord'
 import type { FusionData } from '../../../domain/canvas/model/node'
 import { useCanvasStore } from '../storeContext'
 import { RunHotkeys } from './RunHotkeys'
@@ -82,7 +76,6 @@ import { trimToolResult } from '../../../features/shared/promptTools/promptTools
 import { composePromptFromDraft } from '../../../features/canvas/execution/composePrompt'
 import { asAppError, describeError } from '../../../shared/result'
 import { directTextTrace, runDirectText } from '../../../state/shared/directRun'
-import { emitRunRecordChanged } from './runRecordEvents'
 import {
   resolveNodeRoute,
   type RouteChannelSource,
@@ -98,11 +91,9 @@ import {
 } from './canvasRunState'
 import {
   activateCanvasExecutionRuntime,
-  initializeCanvasExecutionVersions,
-  nextCanvasExecutionVersion,
   peekCanvasExecutionRuntime,
-  trackCanvasExecutionVersion,
 } from './canvasExecutionRuntime'
+import { useCanvasRunRecorder } from './useCanvasRunRecorder'
 
 /**
  * 画布执行宿主（架构 §4.7 / §5.5）：把 `useExecution` 接到画布 store + 渠道解析器。
@@ -324,19 +315,20 @@ export function CanvasExecutionProvider({
     return ids
   }, [projectId, runtime])
 
-  // 版本计数（§6.21「每次执行的版本号」）：nodeId → 已知最大 version。
-  // 挂载时从 runRecords 表初始化；runEngine 经 nextVersion 递增；
-  // 引擎之外的写入方（版本恢复）经 appendRecord 递增，保证计数与库一致。
   /**
-   * 递增某节点的版本号，并**立刻**记进计数表（§6.21）。
-   *
-   * 抽出来是因为它现在有两个调用方：执行引擎的 `nextVersion`（每个 task 各调一次）、
-   * 以及**融合的留痕**（对账 #554）。两处各写一遍必然漂 —— 而这份计数是连续版本号
-   * 的唯一依据，漂了就是日志里两条记录同号。
+   * 版本账本与引擎外记录追加由 run recorder 独占。
+   * 正常 runEngine 的记录构造、recordScope 和操作生命周期仍留在本 Provider。
    */
-  const bumpVersion = useCallback((nodeId: string): number => {
-    return nextCanvasExecutionVersion(projectId, nodeId)
-  }, [projectId])
+  const {
+    nextVersion: bumpVersion,
+    appendRecord,
+    appendFusionRecord,
+  } = useCanvasRunRecorder({
+    projectId,
+    runtime,
+    store,
+    storage: platform.storage,
+  })
 
   /**
    * 批量进度计数（对账 #386 的 E5），按 planId 分开记。
@@ -346,27 +338,6 @@ export function CanvasExecutionProvider({
    * 两条挨着弹只会让提示位把前一条盖掉。
    */
   const planProgress = runtime.planProgress
-
-  // 挂载时读回历史：初始化版本计数（RunRecord 是日志面板的数据源）
-  useEffect(() => {
-    void initializeCanvasExecutionVersions(
-      projectId,
-      async () => {
-        const rows = await platform.storage.query(
-          'runRecords',
-          { projectId },
-        )
-        const byNode = new Map<string, number>()
-        for (const row of rows as unknown as RunRecord[]) {
-          byNode.set(
-            row.nodeId,
-            Math.max(byNode.get(row.nodeId) ?? 0, row.version),
-          )
-        }
-        return byNode
-      },
-    ).catch(() => undefined)
-  }, [platform, projectId])
 
   const host = useMemo(
     () => ({
@@ -1362,28 +1333,6 @@ export function CanvasExecutionProvider({
     [store, completeText, presetText.overrides],
   )
 
-  /**
-   * 追加一条 RunRecord（**引擎之外**的写入方）并同步版本计数（§6.21）。
-   *
-   * 抽成具名回调是因为它现在有两个调用方：版本恢复、以及**融合**（对账 #554）。
-   * 写两遍必然漏掉 `runtime.versionMax` 的同步，而那份计数是 version 递增的唯一依据。
-   */
-  const appendRecord = useCallback(
-    (record: RunRecord) =>
-      runtime.operations.track(async () => {
-        trackCanvasExecutionVersion(
-          projectId,
-          record.nodeId,
-          record.version,
-        )
-        store.dispatch({ kind: 'node.runRecord.append', nodeId: record.nodeId, record })
-        // append 走 800ms 防抖落库；日志面板实时读库，flush 完成后再返回
-        await store.flush()
-        emitRunRecordChanged()
-      }),
-    [runtime, store],
-  )
-
   const runNode = useCallback(
     (
       nodeId: string,
@@ -1445,48 +1394,14 @@ export function CanvasExecutionProvider({
         const durationMs = Date.now() - startedAt
         /** 提示里**指路**：原因已经落进日志（可复制、可留存），这一点要说出来 */
         if (!outcome.ok) store.notify(`${outcome.reason}（已记进日志）`, 'error')
-        const graphAfter = store.getSnapshot()
-        /** 产物落在新建的结果节点上，日志的缩略图与「输出 N 个」都读它 */
-        const outputHash = outcome.ok
-          ? ((graphAfter.nodes.find((n) => n.id === outcome.resultNodeId)?.data as
-              | { assetHash?: string }
-              | undefined)?.assetHash ?? '')
-          : ''
-        const subjectNodeId = outcome.ok ? outcome.resultNodeId : nodeId
-        await appendRecord(
-          createRunRecord({
-            id: createId('rec'),
-            nodeId: subjectNodeId,
-            projectId: graphAfter.projectId,
-            version: bumpVersion(subjectNodeId),
-            createdAt: startedAt,
-            status: outcome.ok ? 'succeeded' : 'failed',
-            inputs: fusionSpec.collectInputs({
-              node: node as NodeSnapshot<FusionData>,
-              graph: store.getSnapshot(),
-            }),
-            params: node.data,
-            outputHashes: outputHash ? [outputHash] : [],
-            /**
-             * 融合没有"内容指纹"这个概念（不读渠道、不参与陈旧判定）。
-             * 留一个确定性常量，而不是伪造一个看起来像指纹的哈希 ——
-             * 后者会让人以为它真的在参与某处判断。
-             */
-            fingerprint: 'fusion',
-            taskId: createId('task'),
-            durationMs,
-            sentChannelId: LOCAL_RUN_CHANNEL_ID,
-            sentModel: '本地融合',
-            ...(outcome.ok ? {} : { errorText: outcome.reason }),
-            scope: {
-              scopeVersion: 1,
-              workbench,
-              subjectId: subjectNodeId,
-              scopeId: `fusion:${nodeId}:${operationId}`,
-              operationId,
-            },
-          }),
-        )
+        await appendFusionRecord({
+          node: node as NodeSnapshot<FusionData>,
+          outcome,
+          startedAt,
+          durationMs,
+          operationId,
+          workbench,
+        })
         return
       }
 
@@ -1618,8 +1533,7 @@ export function CanvasExecutionProvider({
       runLoop,
       applySkillIfSelected,
       applyComposeIfNeeded,
-      appendRecord,
-      bumpVersion,
+      appendFusionRecord,
       platform,
       activeRunNodeIds,
       runtime,

@@ -58,6 +58,43 @@ function deferred<T>() {
 }
 
 describe('canvas per-project execution runtime', () => {
+  it('host adapter 公开 API 名称与转发身份保持不变', () => {
+    const api = {
+      runNode: vi.fn(async () => undefined),
+      runGroup: vi.fn(async () => undefined),
+      cancel: vi.fn(),
+      nodeStateOf: vi.fn(),
+      nodeStates: new Map(),
+      isRunning: false,
+      appendRecord: vi.fn(async () => undefined),
+      completeText: vi.fn(async () => ''),
+    } as unknown as CanvasExecutionApi
+
+    const adapter = createCanvasExecutionHostAdapter('p1', api)
+
+    expect(Object.keys(adapter).sort()).toEqual([
+      'appendRecord',
+      'cancel',
+      'completeText',
+      'isRunning',
+      'nodeStateOf',
+      'nodeStates',
+      'runGroup',
+      'runNode',
+    ])
+    expect(adapter.runNode).toBe(api.runNode)
+    expect(adapter.runGroup).toBe(api.runGroup)
+    expect(adapter.cancel).toBe(api.cancel)
+    expect(adapter.appendRecord).toBe(api.appendRecord)
+    expect(adapter.completeText).toBe(api.completeText)
+    expect(Object.getOwnPropertyDescriptor(adapter, 'nodeStates')?.get).toBeTypeOf(
+      'function',
+    )
+    expect(Object.getOwnPropertyDescriptor(adapter, 'isRunning')?.get).toBeTypeOf(
+      'function',
+    )
+  })
+
   it('provider 卸载后 live nodeStates / isRunning 仍更新，旧 cancel 仍能中止计划', async () => {
     vi.stubGlobal('window', {
       addEventListener: vi.fn(),
