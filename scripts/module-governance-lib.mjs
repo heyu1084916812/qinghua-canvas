@@ -2,8 +2,11 @@ import { execFileSync } from 'node:child_process'
 import fs from 'node:fs'
 import path from 'node:path'
 
-const ENTRY_KEYS = ['version', 'baseline', 'defaults', 'directories', 'legacy', 'modules']
+const ENTRY_KEYS = ['version', 'baseline', 'defaults', 'directories', 'legacy', 'modules', 'removedModules', 'moduleMoves']
 const MODULE_KEYS = ['module', 'owner', 'responsibility', 'owns', 'doesNotOwn', 'publicApi', 'test', 'budget']
+const MOVE_KEYS = ['from', 'to', 'reason']
+const productionFile = (file) => SOURCE.test(file) && !TEST.test(file)
+const relativePath = (root, file) => path.relative(root, file).split(path.sep).join('/')
 const SOURCE = /\.(?:ts|tsx|css)$/
 const TEST = /\.(?:test|spec)\.[^.]+$|(?:^|\/)(?:__tests__|fixtures|mocks)(?:\/|$)/
 const IMPORT_TEST_ARTIFACT = /\.(?:test|spec)\.[^/]+$|(?:^|\/)(?:__tests__|fixtures|mocks)(?:\/|$)/
@@ -19,7 +22,6 @@ const directoryBudget = (config, module) => {
 }
 const git = (root, args, env) => execFileSync('git', args, { cwd: root, encoding: 'utf8', env })
 const baselineContents = (root, baseline, env, files) => new Map(files.map((file) => [file, git(root, ['show', `${baseline}:${file}`], env)]))
-const baselineDirectories = (root, baseline, env) => new Set(git(root, ['ls-tree', '-d', '--name-only', `${baseline}:src`], env).trim().split(/\r?\n/).filter(Boolean).map((directory) => `src/${directory}`))
 const walk = (directory) => fs.readdirSync(directory, { withFileTypes: true }).flatMap((entry) => entry.isDirectory() ? walk(path.join(directory, entry.name)) : [path.join(directory, entry.name)])
 const pathOf = (root, relative) => path.join(root, ...relative.split('/'))
 const testExists = (root, reference) => {
@@ -38,6 +40,15 @@ export function validateGovernance(root, config, options = {}) {
   if (!keysAreExact(config, ENTRY_KEYS) || config.version !== 1 || !text(config.baseline)) fail('登记根字段或版本无效')
   if (!keysAreExact(config.defaults, ['ts', 'css']) || config.defaults.ts > 450 || config.defaults.css > 600) fail('新模块默认预算必须不超过 TS/TSX 450、CSS 600 行')
   if (!Array.isArray(config.directories) || config.directories.length === 0) fail('目录预算不能为空')
+  if (!Array.isArray(config.removedModules) || !Array.isArray(config.moduleMoves)) fail('删除/搬家台账必须是数组')
+  const removalItems = config.removedModules ?? []
+  const moveItems = config.moduleMoves ?? []
+  for (const item of removalItems) if (!validPath(item)) fail(`删除台账路径无效: ${item}`)
+  for (const item of moveItems) {
+    if (!keysAreExact(item, MOVE_KEYS) || !validPath(item.from) || !validPath(item.to) || !text(item.reason)) {
+      fail(`搬家台账字段无效: ${item?.from ?? '<unknown>'}`)
+    }
+  }
   for (const item of config.directories ?? []) {
     if (!keysAreExact(item, ['path', 'ts', 'css']) || !validPath(item.path, 'src') || !Number.isInteger(item.ts) || !Number.isInteger(item.css) || item.ts < 1 || item.css < 1 || item.ts > config.defaults.ts || item.css > config.defaults.css || item.path === 'src') fail(`目录预算无效或高于默认上限: ${item.path}`)
   }
@@ -53,24 +64,54 @@ export function validateGovernance(root, config, options = {}) {
     for (const reference of item.test) if (!validPath(reference, '') || (!reference.startsWith('src/') && !reference.startsWith('scripts/')) || !testExists(root, reference)) fail(`测试证据不存在: ${item.module} -> ${reference}`)
   }
   const baseline = new Set(git(root, ['ls-tree', '-r', '--name-only', config.baseline, '--', 'src'], options.env).trim().split(/\r?\n/).filter(Boolean))
-  const knownDirectories = baselineDirectories(root, config.baseline, options.env)
+  const baselineProduction = new Set([...baseline].filter(productionFile))
+  const removals = new Set(removalItems)
+  const moves = new Map(moveItems.filter((item) => item?.from && item?.to).map((item) => [item.from, item.to]))
   const legacyPaths = new Set()
   const baselineSources = baselineContents(root, config.baseline, options.env, (config.legacy ?? []).map((item) => item.module).filter((module) => baseline.has(module)))
   for (const item of config.legacy ?? []) {
     if (!item.module) continue
     legacyPaths.add(item.module)
-    if (!fs.existsSync(pathOf(root, item.module))) fail(`legacy 文件不存在: ${item.module}`)
-    if (!baseline.has(item.module)) fail(`legacy 不在基线 ${config.baseline}: ${item.module}`)
+    if (!fs.existsSync(pathOf(root, item.module))) {
+      if (removals.has(item.module)) continue
+      fail(`legacy 文件不存在: ${item.module}`)
+    }
+    if (!baselineProduction.has(item.module)) fail(`legacy 不在基线 ${config.baseline}: ${item.module}`)
   }
   for (const item of config.modules ?? []) {
     if (!item.module) continue
     if (legacyPaths.has(item.module)) fail(`同一文件不能同时是 legacy 和新模块: ${item.module}`)
     if (item.budget > directoryBudget(config, item.module)) fail(`新模块预算高于目录上限: ${item.module}`)
   }
-  const current = walk(pathOf(root, 'src')).map((file) => path.relative(root, file).split(path.sep).join('/')).filter((file) => SOURCE.test(file) && !TEST.test(file))
-  for (const directory of knownDirectories) if (!config.directories.some((item) => item.path === directory)) fail(`生产目录未配置预算: ${directory}`)
-  for (const directory of fs.readdirSync(pathOf(root, 'src'), { withFileTypes: true })) {
-    if (directory.isDirectory() && !config.directories.some((item) => item.path === `src/${directory.name}`)) fail(`新生产目录未配置预算: src/${directory.name}`)
+  const current = walk(pathOf(root, 'src')).map((file) => relativePath(root, file)).filter(productionFile)
+  const currentSet = new Set(current)
+  for (const item of removalItems) if (currentSet.has(item)) fail(`删除台账仍指向现有文件: ${item}`)
+  for (const item of moveItems) {
+    if (!item?.from || !item?.to) continue
+    if (!baselineProduction.has(item.from)) fail(`搬家起点不在基线生产文件: ${item.from}`)
+    if (currentSet.has(item.from)) fail(`搬家起点仍存在: ${item.from}`)
+    if (!currentSet.has(item.to)) fail(`搬家目标不存在: ${item.to}`)
+    if (!entries.has(item.to)) fail(`搬家目标缺少职责登记: ${item.to}`)
+  }
+  for (const item of baselineProduction) {
+    if (currentSet.has(item)) continue
+    if (removals.has(item) || moves.has(item)) continue
+    fail(`基线生产文件未经删除/搬家台账即消失: ${item}`)
+  }
+  const productionDirectories = new Set([
+    ...[...baselineProduction].flatMap((file) => {
+      const parts = file.split('/')
+      return parts.slice(0, -1).map((_, index) => parts.slice(0, index + 1).join('/'))
+    }),
+    ...current.flatMap((file) => {
+      const parts = file.split('/')
+      return parts.slice(0, -1).map((_, index) => parts.slice(0, index + 1).join('/'))
+    }),
+  ].filter((directory) => directory !== 'src'))
+  for (const directory of productionDirectories) {
+    if (!config.directories.some((item) => directory === item.path || directory.startsWith(`${item.path}/`))) {
+      fail(`生产目录未配置预算: ${directory}`)
+    }
   }
   for (const module of current) {
     const entry = entries.get(module)

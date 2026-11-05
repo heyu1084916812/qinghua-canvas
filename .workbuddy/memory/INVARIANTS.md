@@ -5,6 +5,12 @@
 
 ## 结构治理 · 第二批（2026-11-05）
 
+- **删除/改名/挪目录不是自由动作**：基线生产文件消失必须写入 `removedModules` 或
+  `moduleMoves {from,to,reason}`；搬家起点必须消失、目标必须存在且已登记，旧登记不得继续悬空。
+  生产目录预算递归覆盖 `src/**` 的所有嵌套层级，排除 `src` 根本身；新增目录、挪进深层目录
+  或把逻辑塞进 fixtures 都不能绕过 `architecture/module-governance.json`。删除/改名后的
+  legacy 预算仍只许下降，登记项指向不存在的文件必须红。
+
 - **渠道请求编排不能复制真相**：`channelRequestOrchestration.ts` 只接收 thunk / 端口并编排
   `completeWithTools`、语音、视频直连；`ChannelStore` 仍拥有渠道状态和全部公共 action，
   `GenerationClient` 仍是唯一生成客户端，运行态 Key 仍只经 `ChannelRepository.credentials.load(ref)`。

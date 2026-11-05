@@ -17,7 +17,7 @@ const write = (relative, source) => {
 }
 const registration = (overrides = {}) => ({ module: 'src/domain/newRule.ts', owner: 'domain', responsibility: '单一规则。', owns: ['规则'], doesNotOwn: ['UI'], publicApi: ['newRule'], test: ['src/domain/newRule.test.ts'], budget: 450, ...overrides })
 const run = (config) => validateGovernance(fixture, config, { env: fixtureEnv })
-const config = (entries = []) => ({ version: 1, baseline, defaults: { ts: 450, css: 600 }, directories: [{ path: 'src/domain', ts: 450, css: 600 }], legacy: [], modules: entries })
+const config = (entries = [], overrides = {}) => ({ version: 1, baseline, defaults: { ts: 450, css: 600 }, directories: [{ path: 'src/domain', ts: 450, css: 600 }], legacy: [], modules: entries, removedModules: [], moduleMoves: [], ...overrides })
 
 beforeAll(() => {
   fixture = fs.mkdtempSync(path.join(os.tmpdir(), 'qinghua-module-governance-'))
@@ -98,5 +98,51 @@ describe('模块预算与职责登记门禁', () => {
     ).toContain(
       'legacy 预算不得高于基线实测: src/domain/legacyBudget.ts 4 > 3',
     )
+  })
+  it('基线生产文件删除或改名必须进入显式台账', () => {
+    const source = 'src/domain/existing.ts'
+    fs.rmSync(path.join(fixture, source))
+    expect(run(config([registration()])).some((error) =>
+      error.includes('基线生产文件未经删除/搬家台账即消失: src/domain/existing.ts'),
+    )).toBe(true)
+    expect(run(config([registration()], {
+      removedModules: ['src/domain/existing.ts'],
+    })).some((error) => error.includes('基线生产文件未经删除/搬家台账即消失'))).toBe(false)
+    write('src/domain/renamed.ts', 'export const existing = true\n')
+    expect(run(config([
+      registration({ module: 'src/domain/newRule.ts' }),
+      registration({ module: 'src/domain/oversized.ts' }),
+      registration({ module: 'src/domain/renamed.ts' }),
+    ], {
+      moduleMoves: [{
+        from: source,
+        to: 'src/domain/renamed.ts',
+        reason: '改名后职责登记同步迁移',
+      }],
+    }))).toEqual([])
+    fs.rmSync(path.join(fixture, 'src/domain/renamed.ts'))
+    write(source, 'export const existing = true\n')
+  })
+  it('嵌套生产目录、登记失效与搬家目标缺失都会红', () => {
+    const source = 'src/domain/existing.ts'
+    if (!fs.existsSync(path.join(fixture, source))) write(source, 'export const existing = true\n')
+    fs.rmSync(path.join(fixture, source))
+    write('src/domain/nested/deep/hidden.ts', 'export const hidden = true\n')
+    expect(run(config([registration()], {
+      removedModules: [source],
+      moduleMoves: [{
+        from: source,
+        to: 'src/domain/missing.ts',
+        reason: '目标应存在',
+      }],
+    })).some((error) => error.includes('搬家目标不存在: src/domain/missing.ts'))).toBe(true)
+    expect(run(config([registration()], {
+      removedModules: [source],
+    })).some((error) => error.includes('新生产文件缺少职责登记: src/domain/nested/deep/hidden.ts'))).toBe(true)
+    expect(run(config([registration({ module: 'src/domain/deleted.ts' })], {
+      removedModules: [source],
+    })).some((error) => error.includes('新模块登记的文件不存在: src/domain/deleted.ts'))).toBe(true)
+    fs.rmSync(path.join(fixture, 'src/domain/nested'), { recursive: true, force: true })
+    write(source, 'export const existing = true\n')
   })
   }, 20_000)

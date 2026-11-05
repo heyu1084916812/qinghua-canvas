@@ -44,6 +44,8 @@
     { "module": "src/workbenches/ecommerce/EcommerceStudio.tsx", "owner": "ecommerce-studio-ui", "responsibility": "电商生成模式、参数表单和结果预览。", "owns": ["Studio 表单交互"], "doesNotOwn": ["任务仓储", "渠道协议实现"], "publicApi": ["电商工作台 Studio"], "test": ["src/workbenches/ecommerce/EcommerceStudio.status.test.ts"], "budget": 3221 },
     { "module": "src/workbenches/storyboard/useStoryboardVideoExecutionController.ts", "owner": "storyboard-execution", "responsibility": "漫剧视频执行控制器的 UI 生命周期装配。", "owns": ["视频执行控制状态"], "doesNotOwn": ["视频上游协议", "画布执行状态"], "publicApi": ["漫剧工作台视频执行 Hook"], "test": ["src/workbenches/storyboard/useStoryboardVideoExecutionController.test.ts"], "budget": 1028 }
   ],
+  "removedModules": [],
+  "moduleMoves": [],
   "modules": [
     {
       "module": "src/workbenches/canvas/agent/agentVisualClaimGuard.ts",
