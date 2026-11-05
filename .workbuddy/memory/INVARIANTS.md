@@ -3,6 +3,13 @@
 > `MEMORY.md` 放不下，本文件是完整版。**改动 canvas / comic 内部前必读**（由 MEMORY.md 顶部指引到此）。
 > 排序：canvas 通用 → 结果组/容器 → 生成与执行 → 复制粘贴 → 渠道与协议 → comic。
 
+## 发布 · GitHub 与自动更新
+
+- **canonical 仓库名是 `heyu1084916812/qinghua-canvas`**：旧 `qinhua-canvas` 只可能由 GitHub
+  重定向兜底，不能写进 remote、README、应用内链接或 Tauri updater endpoint。更新检查地址固定为
+  `https://github.com/heyu1084916812/qinghua-canvas/releases/latest/download/latest.json`，
+  不得带版本号。
+
 ## Agent · 过程与落位
 
 - **能力断言与完成声明都必须有确定性证据**：画布动作在承诺“我可以做”或声称“已改好 / 已删除 /

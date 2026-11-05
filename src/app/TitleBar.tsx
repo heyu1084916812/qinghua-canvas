@@ -9,7 +9,7 @@ import { AppMenuContent, EditShortcuts } from './titleBarMenus'
 import styles from './TitleBar.module.css'
 
 /** 项目主页：设置里「应用 → GitHub 项目地址」用它（与自动更新的仓库同一个）。 */
-const REPO_URL = 'https://github.com/heyu1084916812/qinhua-canvas'
+const REPO_URL = 'https://github.com/heyu1084916812/qinghua-canvas'
 
 /**
  * 「编辑」菜单里列出的快捷键。

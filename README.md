@@ -7,7 +7,7 @@
 <p align="center">本地优先的 AI 图片 / 视频创作工作台</p>
 
 <p align="center">
-  <a href="https://github.com/heyu1084916812/qinhua-canvas/releases/latest">下载最新版</a>
+  <a href="https://github.com/heyu1084916812/qinghua-canvas/releases/latest">下载最新版</a>
   ·
   <a href="文档总索引.md">文档索引</a>
   ·
@@ -22,10 +22,10 @@
 
 ## 下载
 
-当前桌面版：**v0.1.5**（Windows 10 / 11 x64）
+当前桌面版：**v0.1.16**（Windows 10 / 11 x64）
 
-- [GitHub Releases](https://github.com/heyu1084916812/qinhua-canvas/releases/latest)
-- 安装包：`qinghua_0.1.5_x64-setup.exe`（约 40.2 MiB）
+- [GitHub Releases](https://github.com/heyu1084916812/qinghua-canvas/releases/latest)
+- 安装包：`qinghua_0.1.16_x64-setup.exe`（约 41.8 MiB）
 - 桌面端基于 Tauri 2；首次运行需要系统具备 WebView2（Windows 10/11 通常已自带）
 
 ## 核心能力
@@ -41,7 +41,7 @@
 
 ## 快速开始
 
-1. 从 [Releases](https://github.com/heyu1084916812/qinhua-canvas/releases/latest) 下载并安装。
+1. 从 [Releases](https://github.com/heyu1084916812/qinghua-canvas/releases/latest) 下载并安装。
 2. 打开「全局设置 → 渠道配置」，填入你自己的渠道地址、密钥并勾选模型。
 3. 新建画布项目，或从「电商 / 漫剧」进入对应工作台。
 4. 生成结果会落在本地素材链里，可继续对比、编辑、收藏或导出。

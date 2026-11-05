@@ -1,5 +1,17 @@
 # CanvasFlow（轻画）项目记忆
 
+### GitHub canonical 仓库名以 `qinghua-canvas` 为准（2026-11-05，#945）
+
+- 旧地址 `heyu1084916812/qinhua-canvas` 已迁到
+  `https://github.com/heyu1084916812/qinghua-canvas`。GitHub 目前会重定向旧地址，但
+  remote、README、应用内项目链接和更新 endpoint 不能继续依赖重定向。
+- Tauri 更新检查只认装包时写死的稳定别名：
+  `https://github.com/heyu1084916812/qinghua-canvas/releases/latest/download/latest.json`。
+  Release 下载目录里的版本化安装包仍由发版脚本写入 `latest.json`。
+- `v0.1.16` 安装包 `43,870,617 B`，SHA-256
+  `656644B593A20BFCFEC7844EC39A5BF9715E67DC1FC159263B96CC43C8430000`；release 壳
+  真机自检 **11/11**，签名 keyid `7cec98e1251b82bf`。
+
 ### Agent 先查能力再承诺，完成声明必须有本回合执行证据（2026-11-05，#944）
 
 - **不能用“猜了一个相关工具”代替能力**：`updateNode` 只写 `node.data`（提示词 / 模型等），

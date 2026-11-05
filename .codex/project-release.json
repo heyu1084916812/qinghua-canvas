@@ -23,7 +23,7 @@
     "artifact": "release/0.1.16/qinghua_0.1.16_x64-setup.exe"
   },
   "github": {
-    "repository": "heyu1084916812/qinhua-canvas",
+    "repository": "heyu1084916812/qinghua-canvas",
     "release_tag": "v${version}",
     "asset_name": "qinghua_${version}_x64-setup.exe"
   },
