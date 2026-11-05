@@ -24,6 +24,7 @@ beforeAll(() => {
   fixtureEnv = Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith('GIT_')))
   execFileSync('git', ['init', '-q'], { cwd: fixture, env: { ...fixtureEnv, GIT_DIR: path.join(fixture, '.git'), GIT_WORK_TREE: fixture } })
   write('src/domain/existing.ts', 'export const existing = true\n')
+  write('src/domain/legacyBudget.ts', 'export const one = 1\nexport const two = 2\nexport const three = 3\n')
   write('src/domain/newRule.test.ts', '')
   execFileSync('git', ['add', 'src'], { cwd: fixture, env: fixtureEnv })
   execFileSync('git', ['-c', 'user.name=Fixture', '-c', 'user.email=fixture@localhost', 'commit', '-qm', 'base'], { cwd: fixture, env: fixtureEnv })
@@ -32,12 +33,15 @@ beforeAll(() => {
 afterAll(() => fs.rmSync(fixture, { recursive: true, force: true }))
 
 describe('模块预算与职责登记门禁', () => {
-  it('生产登记覆盖 18 个 TS/TSX 和 7 个 CSS legacy，实测等于基线', () => {
+  it('生产登记覆盖 18 个 TS/TSX 和 7 个 CSS legacy，预算不高于基线', () => {
     expect(realConfig.legacy).toHaveLength(25)
     expect(realConfig.legacy.filter((item) => /\.tsx?$/.test(item.module))).toHaveLength(18)
     expect(realConfig.legacy.filter((item) => item.module.endsWith('.css'))).toHaveLength(7)
     for (const item of realConfig.legacy) {
-      expect(countLines(execFileSync('git', ['show', `${realConfig.baseline}:${item.module}`], { cwd: root, encoding: 'utf8' })), item.module).toBe(item.budget)
+      const original = countLines(execFileSync('git', ['show', `${realConfig.baseline}:${item.module}`], { cwd: root, encoding: 'utf8' }))
+      const current = countLines(fs.readFileSync(path.join(root, item.module), 'utf8'))
+      expect(item.budget, item.module).toBeLessThanOrEqual(original)
+      expect(current, item.module).toBeLessThanOrEqual(item.budget)
     }
     expect(validateGovernance(root, realConfig)).toEqual([])
   }, 60_000)
@@ -85,17 +89,14 @@ describe('模块预算与职责登记门禁', () => {
     })
   })
   it('legacy 只能保持或下降，旧预算增加会红', () => {
+    write('src/domain/legacyBudget.ts', 'export const one = 1\nexport const two = 2\n')
     const current = config([registration(), registration({ module: 'src/domain/oversized.ts', budget: 450 })])
-    const old = registration({ module: 'src/domain/existing.ts', budget: 1 })
-    expect(run({ ...current, legacy: [old] })).toEqual([])
-    expect(run({ ...current, legacy: [{ ...old, budget: 2 }] }).some((error) => error.includes('只许下降'))).toBe(true)
-    write('src/domain/existing.ts', 'export const existing = true\nexport const smaller = true\n')
-    expect(run({ ...current, legacy: [old] }).some((error) => error.includes('2 > 1'))).toBe(true)
-    expect(run({ ...current, legacy: [{ ...old, budget: 2 }] }).some((error) => error.includes('只许下降'))).toBe(true)
-    execFileSync('git', ['add', 'src/domain/existing.ts'], { cwd: fixture, env: fixtureEnv })
-    execFileSync('git', ['-c', 'user.name=Fixture', '-c', 'user.email=fixture@localhost', 'commit', '-qm', 'shrink legacy', '--', 'src/domain/existing.ts'], { cwd: fixture, env: fixtureEnv })
-    baseline = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: fixture, encoding: 'utf8', env: fixtureEnv }).trim()
-    expect(countLines(execFileSync('git', ['show', `${baseline}:src/domain/existing.ts`], { cwd: fixture, encoding: 'utf8', env: fixtureEnv }))).toBe(2)
-    expect(run({ ...current, baseline, legacy: [{ ...old, budget: 2 }] })).toEqual([])
+    const tightened = registration({ module: 'src/domain/legacyBudget.ts', budget: 2 })
+    expect(run({ ...current, legacy: [tightened] })).toEqual([])
+    expect(
+      run({ ...current, legacy: [{ ...tightened, budget: 4 }] }),
+    ).toContain(
+      'legacy 预算不得高于基线实测: src/domain/legacyBudget.ts 4 > 3',
+    )
   })
   }, 20_000)

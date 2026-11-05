@@ -81,7 +81,7 @@ export function validateGovernance(root, config, options = {}) {
     if (lines > entry.budget) fail(`超出行数预算: ${module} ${lines} > ${entry.budget}`)
     if (legacyPaths.has(module) && baselineSources.has(module)) {
       const original = countLines(baselineSources.get(module))
-      if (original !== entry.budget) fail(`legacy 预算必须等于基线实测且只许下降: ${module} ${entry.budget} != ${original}`)
+      if (entry.budget > original) fail(`legacy 预算不得高于基线实测: ${module} ${entry.budget} > ${original}`)
     }
     for (const specifier of importSpecifiers(source)) {
       if (!specifier.startsWith('.')) continue
