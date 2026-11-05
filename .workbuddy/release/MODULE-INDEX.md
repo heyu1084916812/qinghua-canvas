@@ -1,5 +1,12 @@
 # AgentPanel 模块索引
 
+> **2026-11-05 结构治理第二批（模块导航补充）**：本索引主体是 AgentPanel 目录；第二批新增的
+> 三个模块目录外职责由 `architecture/module-governance.json` 机器登记，当前真相源补充如下：
+> `src/app/runtime/projectOperationLock.ts` 只管项目占用索引与 opaque owner，
+> `src/state/channel/channelRequestOrchestration.ts` 只管渠道直连请求编排，
+> `src/workbenches/canvas/execution/canvasRunPreflight.ts` 只管画布运行前预检。
+> 三者都不拥有 UI 状态，也不反向依赖 facade；详见《轻画-架构设计文档.md》文首第二批记录。
+
 > **生成方式**：读 `src/workbenches/canvas/panels/AgentPanel/` 的**实际代码**（导出名 / 文件头注释 / `import` 图），不抄任何文档。
 > 「→ 依赖谁」「← 谁依赖它」两列是机械扫 `import` 得到的；行数取 2026-11-04 的工作区。
 > 职责一栏括号里的 `导出 …` / `头注释` 就是依据；**没有依据的一律标「待确认」**（当前 0 项）。

@@ -3,6 +3,29 @@
 > `MEMORY.md` 放不下，本文件是完整版。**改动 canvas / comic 内部前必读**（由 MEMORY.md 顶部指引到此）。
 > 排序：canvas 通用 → 结果组/容器 → 生成与执行 → 复制粘贴 → 渠道与协议 → comic。
 
+## 结构治理 · 第二批（2026-11-05）
+
+- **渠道请求编排不能复制真相**：`channelRequestOrchestration.ts` 只接收 thunk / 端口并编排
+  `completeWithTools`、语音、视频直连；`ChannelStore` 仍拥有渠道状态和全部公共 action，
+  `GenerationClient` 仍是唯一生成客户端，运行态 Key 仍只经 `ChannelRepository.credentials.load(ref)`。
+  上下文冲突先于网络请求；素材按调用方输入顺序追加一次；RunRecord 终态与 route success 顺序不可交换。
+- **操作锁只拥有占用**：`ProjectOperationLockToken` 只能有 id、projectIds、opaque owner，
+  不得携带 `operation` / phase / prepared / shutdown state。Registry 按 owner 在 WeakMap 中持有唯一
+  `ProjectOperation`，并独占 registration、prepare、commit、rollback、recovery、completion 与 dispose。
+  claim 对去重后的全部 projectId 全有或全无；release 只删仍指向同一 token 的占用；空 claim 不占项目；
+  迟到注册、retry、recovery 和快照都经同一锁实例查询，快照不得成为占用真相。
+- **画布预检不能提交半批**：`canvasRunPreflight` 在令牌、节点路由、generation route、适配器和
+  渠道删除复核全部成功后，才返回 adapters / taskChannels。任一失败收集全批失败并由 Provider 统一把
+  整批节点置 failed；程序化调用方收到 `CanvasRunPreflightError`，无 signal 的手工路径仍以节点状态与
+  提示收口，不产生未处理 rejection。预检不排队、不启动 runEngine、不写 RunRecord、不提交资产。
+- **取消信号单一且贯通**：`runNode` / `runGroup` / `completeText` 链接调用方 signal 与项目运行态
+  controllers，项目关闭必须中止准备阶段 LLM；loop、batch、prompt skill、compose、付费适配器调用
+  全部沿用这条链接信号。已取消或 runtime closing 时立即取消，只对真实订阅过的 parent 移除监听。
+  `CanvasExecutionApi` 八项、宿主 getter、`completeText.signal` 必填契约与正常
+  runEngine / placement / flush / RunRecord / launch / cancel 顺序不变。
+- **预算只许下降**：第二批新模块必须登记 owner / responsibility / owns / doesNotOwn / publicApi /
+  test / budget；legacy 预算按拆分后的实测行数收紧，不允许因接线代码、测试或临时需求上调。
+
 ## 结构治理 · 第一批（2026-11-05）
 
 - **凭证只有一个读口**：用户操作走 `ChannelStore` 公共 action；运行态走

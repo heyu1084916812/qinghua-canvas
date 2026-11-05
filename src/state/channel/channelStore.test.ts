@@ -3,6 +3,7 @@ import { createMemoryPlatform } from '../../platform/memory'
 import type { NetworkRequest, NetworkResponse } from '../../platform/ports'
 import { createChannelStore } from './channelStore'
 import { directTextTrace } from '../shared/directRun'
+import type { RunRecord } from '../../domain/shared/execution/runRecord'
 import { createContextRepository } from '../shared/contextRepository'
 import { ECOMMERCE_INTENT_MARKER } from '../../domain/ecommerce/chatParse'
 import {
@@ -1024,6 +1025,157 @@ describe('channelStore', () => {
     expect(logAttempts).toBe(2)
     expect(warnings).toHaveLength(1)
     expect(warnings[0]).toContain('disk busy')
+  })
+
+  it('上下文冲突时先拒绝请求，不创建 RunRecord、不读模型', async () => {
+    const p = createMemoryPlatform()
+    const store = createChannelStore(p, { seedBuiltins: false })
+    const ch = await store.create({ name: 'Mock', protocol: 'mock', baseUrl: '' })
+    await store.setModels(ch.id, [
+      { id: 'mock-chat-1', category: 'chat', inputTypes: ['text'] },
+    ])
+    const memoryRow = (id: string, text: string) => ({
+      id,
+      kind: 'fact',
+      text,
+      scope: 'project',
+      projectId: 'proj_conflict',
+      key: 'brand.primaryColor',
+      source: 'user',
+      confidence: 1,
+      enabled: true,
+      currentRevision: 1,
+      createdAt: 1,
+      updatedAt: 1,
+    })
+    await p.storage.put('contextMemories', memoryRow('memory-a', '主色 #14532D') as never)
+    await p.storage.put('contextMemories', memoryRow('memory-b', '主色 #000000') as never)
+    let requests = 0
+    const network = { ...p.network }
+    Object.defineProperty(network, 'request', {
+      value: async () => {
+        requests += 1
+        throw new Error('conflict must not reach the model')
+      },
+    })
+    const guarded = { ...p, network }
+    const guardedStore = createChannelStore(guarded, { seedBuiltins: false })
+    await guardedStore.create({ name: 'Mock', protocol: 'mock', baseUrl: '' })
+    await guardedStore.setModels(ch.id, [
+      { id: 'mock-chat-1', category: 'chat', inputTypes: ['text'] },
+    ])
+
+    await expect(guardedStore.completeWithTools({
+      channelId: ch.id,
+      model: 'mock-chat-1',
+      tools: [],
+      messages: [{ role: 'user', content: '做一张亚马逊主图' }],
+      signal: new AbortController().signal,
+      trace: directTextTrace({
+        projectId: 'proj_conflict',
+        workbench: 'ecommerce',
+        subjectId: 'product:conflict',
+        scopeId: 'session:conflict',
+        operationId: 'op-context-conflict',
+        purpose: 'ecommerce-intent',
+        channelId: ch.id,
+        model: 'mock-chat-1',
+        prompt: '做一张亚马逊主图',
+      }),
+    })).rejects.toMatchObject({ appError: { kind: 'parse' } })
+    expect(requests).toBe(0)
+    expect(await p.storage.query('runRecords', { projectId: 'proj_conflict' })).toHaveLength(0)
+  })
+
+  it('上下文素材只按原始顺序追加一次，不覆盖调用方已有输入', async () => {
+    const p = createMemoryPlatform()
+    const store = createChannelStore(p, { seedBuiltins: false })
+    const ch = await store.create({ name: 'Mock', protocol: 'mock', baseUrl: '' })
+    await store.setModels(ch.id, [
+      { id: 'mock-chat-1', category: 'chat', inputTypes: ['text'] },
+    ])
+    for (const hash of ['kit-a', 'kit-b']) {
+      await p.storage.put('assets', {
+        id: hash,
+        mime: 'image/png',
+        bytes: new Uint8Array([hash.length]),
+      })
+    }
+    const contextRepo = createContextRepository(p.storage)
+    const created = await contextRepo.createKit({
+      kind: 'brand',
+      name: '素材顺序',
+      assetHashes: ['kit-a', 'kit-b'],
+    })
+    await contextRepo.bindProject({
+      projectId: 'proj_asset_order',
+      kitId: created.kit.id,
+      kitVersion: 1,
+    })
+    let requests: unknown[] = []
+    const original = p.network.request.bind(p.network)
+    const network = {
+      ...p.network,
+      async request(req: Parameters<typeof p.network.request>[0]) {
+        requests = [...requests, req]
+        return original(req, new AbortController().signal)
+      },
+    }
+    const ordered = { ...p, network }
+    const orderedStore = createChannelStore(ordered, { seedBuiltins: false })
+    await orderedStore.create({ name: 'Mock', protocol: 'mock', baseUrl: '' })
+    await orderedStore.setModels(ch.id, [
+      { id: 'mock-chat-1', category: 'chat', inputTypes: ['text'] },
+    ])
+
+    await orderedStore.completeWithTools({
+      channelId: ch.id,
+      model: 'mock-chat-1',
+      tools: [],
+      inputs: [
+        { kind: 'asset', nodeId: 'first', assetHash: 'kit-a', mime: 'image/png' },
+      ],
+      messages: [{ role: 'user', content: '做一张亚马逊主图' }],
+      signal: new AbortController().signal,
+      trace: directTextTrace({
+        projectId: 'proj_asset_order',
+        workbench: 'ecommerce',
+        subjectId: 'product:order',
+        scopeId: 'session:order',
+        operationId: 'op-asset-order',
+        purpose: 'ecommerce-intent',
+        channelId: ch.id,
+        model: 'mock-chat-1',
+        prompt: '做一张亚马逊主图',
+      }),
+    })
+
+    const [record] = await p.storage.query('runRecords', { projectId: 'proj_asset_order' })
+    const inputs = (record as Partial<RunRecord> | undefined)?.inputs as
+      | RunRecord['inputs']
+      | undefined
+    const assetInputs = (inputs ?? []).flatMap((input) =>
+      input.kind === 'asset' ? [input.assetHash] : [],
+    )
+    expect(assetInputs).toEqual(['kit-a', 'kit-b'])
+    expect(assetInputs).toHaveLength(2)
+  })
+
+  it('语音直连无 trace 时不写 RunRecord，返回产物形状不变', async () => {
+    const p = createMemoryPlatform()
+    const store = createChannelStore(p, { seedBuiltins: false })
+    const ch = await store.create({ name: 'Mock', protocol: 'mock', baseUrl: '' })
+
+    const asset = await store.generateSpeech({
+      channelId: ch.id,
+      model: 'mock-tts',
+      text: '留痕边界',
+      voice: 'nova',
+      signal: new AbortController().signal,
+    })
+    expect(asset.mime).toBe('audio/wav')
+    expect(asset.hash).toBeTruthy()
+    expect(await p.storage.query('runRecords', {})).toHaveLength(0)
   })
 
   /**

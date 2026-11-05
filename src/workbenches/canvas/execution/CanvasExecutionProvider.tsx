@@ -10,10 +10,6 @@ import {
   ChannelError,
   type ChannelAdapter,
 } from '../../../platform/channels/types'
-import { protocolNeedsNoToken } from '../../../domain/project/channel'
-import {
-  applyRoutePlanToRequest,
-} from '../../../domain/project/generationRouting'
 import { createGenerationClient } from '../../../platform/generation'
 import { buildRunPlan, type CanvasRunTask, type RunPlan } from '../../../features/canvas/execution/buildRunPlan'
 import { createId } from '../../../shared/id'
@@ -40,6 +36,7 @@ import { useExecution } from '../../../features/shared/execution/useExecution'
 import { trimProjectTasks } from '../../../features/shared/execution/taskLog'
 import { bindAbortToCancel } from '../../../features/shared/execution/abortToCancel'
 import type { RunSummary, RunTaskState } from '../../../features/shared/execution/runEngine'
+import type { ExecutionRuntime } from '../../../features/shared/execution/executionRuntime'
 import {
   registerGuardedChannelRun,
   unregisterGuardedChannelRun,
@@ -50,12 +47,8 @@ import { sendSystemNotify } from '../../../features/shared/notify/desktopNotify'
 import type { Command } from '../../../state/commands'
 import type { TransactionBoundary } from '../../../state/shared/types'
 import { createChannelRepository } from '../../../state/project/channelRepository'
-import type { Channel } from '../../../domain/project/channel'
 import type { RunRequest } from '../../../domain/canvas/nodeSpecs/types'
-import type {
-  NodeInput,
-  RunRouteCandidate,
-} from '../../../domain/shared/execution/types'
+import type { NodeInput } from '../../../domain/shared/execution/types'
 import type { RunRecordScope } from '../../../domain/shared/execution/runRecord'
 import type { WorkbenchId } from '../../../domain/shared/workbench'
 import {
@@ -76,10 +69,6 @@ import { trimToolResult } from '../../../features/shared/promptTools/promptTools
 import { composePromptFromDraft } from '../../../features/canvas/execution/composePrompt'
 import { asAppError, describeError } from '../../../shared/result'
 import { directTextTrace, runDirectText } from '../../../state/shared/directRun'
-import {
-  resolveNodeRoute,
-  type RouteChannelSource,
-} from '../../../domain/project/modelRouting'
 import { resolveUpstreamModel } from '../../../domain/project/modelMapping'
 import { buildGroupRunPlan } from '../../../features/canvas/execution/groupRunPlan'
 import { resolveTextRoute } from './textRoute'
@@ -93,7 +82,21 @@ import {
   activateCanvasExecutionRuntime,
   peekCanvasExecutionRuntime,
 } from './canvasExecutionRuntime'
+import {
+  adapterKey,
+  canceledRun,
+  CanvasRunPreflightError,
+  failedRun,
+  prepareCanvasRun,
+  type CanvasRunLaunchResult,
+  type CanvasRunPreflightFailure,
+} from './canvasRunPreflight'
 import { useCanvasRunRecorder } from './useCanvasRunRecorder'
+
+export {
+  CanvasRunPreflightError,
+  type CanvasRunPreflightFailure,
+} from './canvasRunPreflight'
 
 /**
  * 画布执行宿主（架构 §4.7 / §5.5）：把 `useExecution` 接到画布 store + 渠道解析器。
@@ -160,6 +163,35 @@ export interface CanvasExecutionApi {
   }): Promise<string>
 }
 
+function throwPreflightForCaller(
+  result: CanvasRunLaunchResult,
+  signal?: AbortSignal,
+): void {
+  if (!result.ok && !result.canceled && signal) {
+    throw new CanvasRunPreflightError(result.failures)
+  }
+}
+
+function linkRunSignal(
+  engine: ExecutionRuntime,
+  parent?: AbortSignal,
+): { signal: AbortSignal; dispose: () => void } {
+  const controller = new AbortController()
+  const registrationId = createId('run-signal')
+  const abort = () => controller.abort(parent?.reason)
+  const subscribed = !parent?.aborted && !engine.closing
+  if (subscribed) parent?.addEventListener('abort', abort, { once: true })
+  else abort()
+  engine.controllers.add(registrationId, controller)
+  return {
+    signal: controller.signal,
+    dispose() {
+      parent?.removeEventListener('abort', abort)
+      engine.controllers.remove(registrationId)
+    },
+  }
+}
+
 const Ctx = createContext<CanvasExecutionApi | null>(null)
 
 /**
@@ -202,14 +234,6 @@ export function CanvasExecutionValueProvider({
   children: ReactNode
 }) {
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>
-}
-
-function adapterKey(
-  channelId: string,
-  credentialGroupId: string | undefined,
-  kind: RunRequest['kind'],
-): string {
-  return `${channelId}\u0000${credentialGroupId ?? ''}\u0000${kind}`
 }
 
 /**
@@ -477,6 +501,58 @@ export function CanvasExecutionProvider({
     runtime.engine,
   )
 
+  const failPlan = useCallback(
+    (
+      plan: ReturnType<typeof buildRunPlan>,
+      failures: readonly CanvasRunPreflightFailure[],
+    ): CanvasRunLaunchResult => {
+      const failureByTask = new Map(
+        failures.map((failure) => [failure.taskId, failure] as const),
+      )
+      const allFailures: CanvasRunPreflightFailure[] = plan.tasks.map((task) => {
+        const current = failureByTask.get(task.id)
+        if (current) return current
+        return {
+          taskId: task.id,
+          nodeId: task.nodeId,
+          error: {
+            kind: 'validation',
+            field: 'runPlan',
+            reason: '同批任务预检失败，整批未启动',
+          },
+          message: '同批任务预检失败，整批未启动',
+        }
+      })
+      const errorByNode = new Map<
+        string,
+        CanvasRunPreflightFailure['error']
+      >()
+      for (const failure of allFailures) {
+        if (!errorByNode.has(failure.nodeId) || failureByTask.has(failure.taskId)) {
+          errorByNode.set(failure.nodeId, failure.error)
+        }
+      }
+      updateCanvasRunStates(store.getSnapshot().projectId, (previous) => {
+        const states = new Map(previous)
+        for (const [nodeId, error] of errorByNode) {
+          states.set(nodeId, { kind: 'failed', error, attempts: 1 })
+        }
+        return states
+      })
+      const first = failures[0]
+      if (first) {
+        store.notify(
+          failures.length > 1
+            ? `${first.message}；同批共 ${failures.length} 个任务预检失败`
+            : first.message,
+          'error',
+        )
+      }
+      return { ok: false, canceled: false, failures: allFailures }
+    },
+    [store],
+  )
+
   /** 渠道预解析 + 状态注入 + 派发执行计划 + 启动运行 */
   const launch = useCallback(
     async (
@@ -484,7 +560,7 @@ export function CanvasExecutionProvider({
       originNodeId: string | undefined,
       signal?: AbortSignal,
     ) => {
-      if (signal?.aborted) return
+      if (signal?.aborted) return canceledRun()
       /**
        * M7-3：执行前**按策略选路**并解析模型映射（§7.4.1）。
        *
@@ -496,249 +572,45 @@ export function CanvasExecutionProvider({
        *  ② 没有任何渠道提供这个逻辑模型 → **如实报错**，不静默退回原名
        *    （那会拿一个可能已下线的名字去请求，失败原因极难定位）。
        */
-      const all: Channel[] = channels.getState().channels
-      /**
-       * 逐个渠道判断「有没有令牌」。
-       *
-       * 离线协议（mock）不发真实请求，恒按「有令牌」处理 —— 否则 mock 渠道
-       * 会因没存令牌而永远进不了选路，本地离线跑的路径直接断掉。
-       */
-      const tokenFlags = new Map<string, boolean>()
-      /*
-       * 本机 CLI（对账 #308）与离线协议一样**不需要令牌**：命令跑在本机、用的是
-       * 本机登录态。判据由 domain 给（`protocolNeedsNoToken`），这里只提供
-       * "这台机器有没有本机 CLI"这个平台事实。
-       */
-      const hasLocalCli = platform.cli != null
-      for (const c of all) {
-        if (protocolNeedsNoToken(c.protocol, hasLocalCli)) {
-          tokenFlags.set(c.id, true)
-          continue
-        }
-        tokenFlags.set(
-          c.id,
-          c.credentialRef ? (await repo.credentials.load(c.credentialRef)) != null : false,
-        )
-      }
-      const sources: RouteChannelSource[] = all.map((c) => ({
-        id: c.id,
-        enabled: c.enabled,
-        hasToken: tokenFlags.get(c.id) ?? false,
-        priority: c.priority,
-        weight: c.weight,
-        lastTestLatency: c.lastTestLatency,
-        modelIds: c.models.map((m) => m.id),
-        modelMap: c.modelMap,
-        credentialGroups: c.credentialGroups.map((group) => ({
-          id: group.id,
-          hasToken: group.hasToken,
-          priority: group.priority,
-          modelIds: group.models.map((model) => model.id),
-        })),
-      }))
-
-      /** 全局选路策略（用户 2026-09-29 第 12 轮）：一次执行内固定，不再看渠道字段 */
-      const strategy = channels.getState().routeStrategy
-      for (const task of plan.tasks) {
-        const logical = task.request.model
-        const explicitChannelId = task.request.channelId.trim()
-        const routed = resolveNodeRoute(sources, logical, explicitChannelId, {
-          strategy,
-          resolve: resolveUpstreamModel,
-          random: Math.random(),
-          /**
-           * 画布前端已经没有“选渠道”这一档，`channelId` 是创建时的内部值。
-           * 这里只先得到一个可读的初始候选；真正执行顺序由下面的全局
-           * `planGenerationRoute` 按渠道优先度冻结，旧 channelId 不能把高优先渠道挡住。
-           */
-          fallbackFromExplicit: true,
-        })
-        if (!routed.ok) {
-          const channelName =
-            all.find((channel) => channel.id === explicitChannelId)?.name ?? explicitChannelId
-          const failure =
-            routed.reason === 'channel_missing'
-              ? ({ kind: 'channel', detail: 'missingChannel' } as const)
-              : routed.reason === 'channel_no_token'
-                ? ({ kind: 'channel', detail: 'missingKey' } as const)
-                : routed.reason === 'model_missing' || routed.reason === 'no_provider'
-                  ? ({ kind: 'channel', detail: 'missingModel' } as const)
-                  : ({
-                      kind: 'validation',
-                      field: '平台',
-                      reason: `渠道「${channelName}」已停用`,
-                    } as const)
-          /**
-           * 渠道类失败必须停在规划阶段：不置 queued / running、不发网络请求。
-           * 同时把失败写回节点状态，用户能看到原因，不必只靠一闪而过的 toast 猜。
-           */
-          updateCanvasRunStates(store.getSnapshot().projectId, (prev) =>
-            new Map(prev).set(task.nodeId, {
-              kind: 'failed',
-              error: failure,
-              attempts: 1,
-            }),
-          )
-          const reason =
-            routed.reason === 'channel_disabled'
-              ? `节点指定的渠道「${channelName}」已停用`
-              : routed.reason === 'channel_no_token'
-                ? `节点指定的渠道「${channelName}」没有可用令牌`
-                : routed.reason === 'channel_missing'
-                  ? `节点指定的渠道「${channelName}」已删除，生成已停止，请重新选择平台`
-                  : routed.reason === 'model_missing'
-                    ? `节点指定的渠道「${channelName}」没有提供模型「${logical}」`
-                : null
-          if (reason) {
-            store.notify(reason, 'error')
-            return
-          }
-          store.notify(
-            `没有渠道提供模型「${logical}」：请到后台设置的「模型管理」里勾选并配置映射`,
-            'error',
-          )
-          return
-        }
-        const picked = routed.selection
-        const routedChannelName =
-          all.find((channel) => channel.id === picked.channelId)?.name ??
-          picked.channelId
-        const baseRequest = {
-          ...task.request,
-          channelId: picked.channelId,
-          model: picked.upstreamModel,
-          ...(picked.credentialGroupId
-            ? {
-                credentialGroupId: picked.credentialGroupId,
-                credentialGroupIds: picked.credentialGroupIds,
-              }
-            : {}),
-        } as RunRequest
-        if (task.request.kind === 'image' || task.request.kind === 'video') {
-          const routePlan = await channels.planGenerationRoute({
-            category: task.request.kind,
-            logicalModel: logical,
-            explicitChannelId: picked.channelId,
+      const preflight = await prepareCanvasRun({
+        plan,
+        signal,
+        channels: () => channels.getState().channels,
+        currentChannels: () => channels.getState().channels,
+        routeStrategy: () => channels.getState().routeStrategy,
+        hasLocalCli: platform.cli != null,
+        loadCredential: (credentialRef) => repo.credentials.load(credentialRef),
+        planGenerationRoute: (opts) => channels.planGenerationRoute(opts),
+        resolveAdapter: async ({
+          channel,
+          model,
+          kind,
+          credentialGroupId,
+        }) => {
+          const target = await generation.resolve({
+            channel,
+            request: { model },
+            kind,
+            hints: {
+              modelIsUpstream: true,
+              ...(credentialGroupId ? { credentialGroupId } : {}),
+            },
           })
-          if (!routePlan.ok) {
-            store.notify(
-              routePlan.reason === 'policy_excluded'
-                ? `渠道「${routedChannelName}」不在当前路由范围内，生成已停止`
-                : `渠道「${routedChannelName}」无法生成模型「${logical}」，生成已停止`,
-              'error',
-            )
-            return
-          }
-          task.request = applyRoutePlanToRequest(
-            baseRequest,
-            routePlan.plan,
-            `${plan.id}:${task.id}:route`,
-          )
-        } else {
-          task.request = baseRequest
-        }
-      }
-
-      // channelResolver 必须同步：预先把计划里涉及的渠道解析成适配器映射
-      const map = new Map<string, ChannelAdapter>()
-      const list: Channel[] = all
-      /**
-       * 协议目录**在这里取一次**：渠道行上只存协议 id，适配器要的 family /
-       * capabilities / versionPath 都在目录里（内置站点协议 + 用户自建）。
-       * 少了这一步，内置站点协议（`comfly` 等）会解析不出 family ⇒
-       * `createChannelAdapter` 抛「不支持的协议」，表现就是**点生成没反应**（2026-09-30 实修）。
-       */
-      for (const task of plan.tasks) {
-        const candidates: RunRouteCandidate[] =
-          task.request.routeCandidates?.length
-            ? task.request.routeCandidates.map((candidate) => ({ ...candidate }))
-            : (task.request.credentialGroupIds?.length
-                ? task.request.credentialGroupIds
-                : [task.request.credentialGroupId]
-              ).map((groupId) => ({
-                channelId: task.request.channelId,
-                ...(groupId ? { credentialGroupId: groupId } : {}),
-                model: task.request.model,
-              }))
-        for (const candidate of candidates) {
-          const id = candidate.channelId
-          const ch = list.find((c) => c.id === id)
-          if (!ch) continue
-          const groupId = candidate.credentialGroupId
-          const mapKey = adapterKey(id, groupId, task.request.kind)
-          if (map.has(mapKey)) continue
-          /**
-           * 造不出适配器时**如实报错并中止**，不让异常冒到宿主外。
-           * 冒出去的表现是「点了生成既没请求也没提示」，用户只能干瞪眼 ——
-           * 这正是这次排查花掉最多时间的地方。
-           */
-          try {
-            const target = await generation.resolve({
-              channel: ch,
-              request: { model: candidate.model },
-              kind: task.request.kind,
-              hints: {
-                modelIsUpstream: true,
-                ...(groupId ? { credentialGroupId: groupId } : {}),
-              },
-            })
-            map.set(mapKey, target.adapter)
-          } catch (e) {
-            const app = asAppError(e)
-            store.notify(
-              app
-                ? `渠道「${ch.name}」无法执行：${describeError(app)}`
-                : `渠道「${ch.name}」无法执行：${String(e)}`,
-              'error',
-            )
-            return
-          }
-        }
-      }
-      /**
-       * 令牌读取是异步的；读凭据期间用户可能已经在设置页删掉渠道。
-       * 因此进入 queued / running 之前必须用最新渠道表再校验一次。
-       */
-      const currentChannels = new Map(
-        channels.getState().channels.map((channel) => [channel.id, channel]),
-      )
-      const vanished = plan.tasks.filter(
-        (task) => {
-          const usedChannels =
-            task.request.routeCandidates?.length
-              ? task.request.routeCandidates.map((candidate) => candidate.channelId)
-              : [task.request.channelId]
-          return usedChannels.some((channelId) => !currentChannels.has(channelId))
+          return target.adapter
         },
-      )
-      if (vanished.length > 0) {
-        const projectId = store.getSnapshot().projectId
-        const vanishedNodeIds = new Set(vanished.map((task) => task.nodeId))
-        updateCanvasRunStates(projectId, (prev) => {
-          const states = new Map(prev)
-          for (const nodeId of vanishedNodeIds) {
-            states.set(nodeId, {
-              kind: 'failed',
-              error: { kind: 'channel', detail: 'missingChannel' },
-              attempts: 1,
-            })
-          }
-          return states
-        })
-        store.notify('渠道已删除，生成已停止；请重新选择平台后再生成', 'error')
-        return
+        random: Math.random(),
+      })
+      if (!preflight.ok) {
+        return preflight.canceled
+          ? preflight
+          : failPlan(plan, preflight.failures)
       }
-
+      const map = preflight.adapters
       runtime.adapterMaps.set(plan.id, map)
-      const taskToNode = new Map(plan.tasks.map((task) => [task.id, task.nodeId]))
-      const taskChannels = new Map(
-        plan.tasks.map((task) => [
-          task.id,
-          task.request.routeCandidates?.length
-            ? [...new Set(task.request.routeCandidates.map((candidate) => candidate.channelId))]
-            : task.request.channelId,
-        ]),
+      const taskToNode = new Map(
+        plan.tasks.map((task) => [task.id, task.nodeId] as const),
       )
+      const taskChannels = preflight.taskChannels
       runtime.taskToNodeMaps.set(plan.id, taskToNode)
       runtime.nodeScopedRunCancellation.trackPlan(plan.id, [
         ...(originNodeId ? [originNodeId] : []),
@@ -864,8 +736,9 @@ export function CanvasExecutionProvider({
         runtime.adapterMaps.delete(plan.id)
         runtime.taskToNodeMaps.delete(plan.id)
       }
+      return { ok: true } as const
     },
-    [store, channels, repo, platform, generation, startRun, cancelRun],
+    [store, channels, repo, platform, generation, startRun, cancelRun, failPlan],
   )
 
   /**
@@ -911,19 +784,23 @@ export function CanvasExecutionProvider({
       loopNode: NodeSnapshot<LoopData>,
       graph: GraphSnapshot,
       contextAssets?: readonly GenerationContextAsset[],
+      signal?: AbortSignal,
     ) => {
+      if (signal?.aborted) return canceledRun()
       const rounds = planLoopRounds(
         loopNode,
         loopUpstreamAssets(loopNode, graph),
         loopUpstreamPrompts(loopNode, graph),
       )
       if (rounds.length === 0) {
-        store.notify('循环次数为 0，没有可跑的轮次', 'error')
-        return
+        const message = '循环次数为 0，没有可跑的轮次'
+        store.notify(message, 'error')
+        return failedRun(`loop:${loopNode.id}`, loopNode.id, message)
       }
       if (!hasRunnableDownstream(loopNode, graph)) {
-        store.notify('循环节点下游还没有生成节点，无法运行', 'error')
-        return
+        const message = '循环节点下游还没有生成节点，无法运行'
+        store.notify(message, 'error')
+        return failedRun(`loop:${loopNode.id}`, loopNode.id, message)
       }
 
       /**
@@ -964,6 +841,7 @@ export function CanvasExecutionProvider({
          */
         const allTasks: CanvasRunTask[] = []
         for (const round of rounds) {
+          if (signal?.aborted) return canceledRun()
           /**
            * 把本轮的输入写进**循环节点自己**（而不是改写下游节点的字段）。
            *
@@ -1004,19 +882,19 @@ export function CanvasExecutionProvider({
             added += 1
           }
           if (added === 0) {
-            store.notify(
+            const message =
               round.prompt || round.assetHashes.length > 0
                 ? `第 ${round.index} 轮无法构建请求，已停止`
-                : `第 ${round.index} 轮没有可用的提示词或图片，已停止（在下游节点写提示词，或在循环节点写一条）`,
-              'error',
-            )
-            return
+                : `第 ${round.index} 轮没有可用的提示词或图片，已停止（在下游节点写提示词，或在循环节点写一条）`
+            store.notify(message, 'error')
+            return failedRun(`loop:${loopNode.id}`, loopNode.id, message)
           }
         }
 
         if (allTasks.length === 0) {
-          store.notify('没有可执行的轮次', 'error')
-          return
+          const message = '没有可执行的轮次'
+          store.notify(message, 'error')
+          return failedRun(`loop:${loopNode.id}`, loopNode.id, message)
         }
 
         /**
@@ -1092,7 +970,7 @@ export function CanvasExecutionProvider({
           mode: 'single',
           tasks: arranged,
         }
-        await launch(merged, loopNode.id)
+        return await launch(merged, loopNode.id, signal)
       } finally {
         // 清掉运行期瞬态字段，避免它们留在数据里（下一轮会重新写）
         store.dispatch({
@@ -1134,8 +1012,9 @@ export function CanvasExecutionProvider({
       text: string
       inputs?: NodeInput[]
       signal: AbortSignal
-    }): Promise<string> =>
-      runtime.operations.track(async () => {
+    }): Promise<string> => {
+      const linked = linkRunSignal(runtime.engine, signal)
+      return runtime.operations.track(async () => {
         const all = channels.getState().channels
       /**
        * 提示词工具只有“模型”这一个用户可见选择，`channelId` 是节点上的内部解析值。
@@ -1165,7 +1044,7 @@ export function CanvasExecutionProvider({
           params: { system, requestedModel: route.model },
         }),
         channelId: ch.id,
-        signal,
+        signal: linked.signal,
         call: async (callSignal) => {
           const result = await generation.completeText(
             {
@@ -1186,7 +1065,8 @@ export function CanvasExecutionProvider({
         onRecordWarning: (warning) =>
           store.notify(`结果已返回，但运行日志写入失败：${warning}`, 'error'),
         })
-      }),
+      }).finally(linked.dispose)
+    },
     [channels, generation, platform.storage, runtime, store, workbench],
   )
 
@@ -1203,7 +1083,11 @@ export function CanvasExecutionProvider({
    * 混在里面会让 runNode 的分支数失控（它已经背了循环 / 批量两条分发路径）。
    */
   const applySkillIfSelected = useCallback(
-    async (node: NodeSnapshot<PromptData>): Promise<'none' | 'applied' | 'failed'> => {
+    async (
+      node: NodeSnapshot<PromptData>,
+      signal: AbortSignal,
+    ): Promise<'none' | 'applied' | 'failed'> => {
+      if (signal?.aborted) return 'failed'
       const skillId = node.data.skillId
       if (!skillId) return 'none'
 
@@ -1255,7 +1139,6 @@ export function CanvasExecutionProvider({
         return 'failed'
       }
 
-      const ac = new AbortController()
       try {
         const result = await completeText({
           channelId,
@@ -1265,7 +1148,7 @@ export function CanvasExecutionProvider({
           system: skill.content,
           text,
           inputs,
-          signal: ac.signal,
+      signal,
         })
         store.dispatch({
           kind: 'node.updateData',
@@ -1276,6 +1159,7 @@ export function CanvasExecutionProvider({
         })
         return 'applied'
       } catch (e) {
+        if (signal?.aborted) return 'failed'
         const appError = asAppError(e)
         store.notify(
           appError ? `技能执行失败：${describeError(appError)}` : `技能执行失败：${String(e)}`,
@@ -1299,11 +1183,16 @@ export function CanvasExecutionProvider({
    * 「还没有写提示词」，把真正的失败原因盖掉。
    */
   const applyComposeIfNeeded = useCallback(
-    async (node: NodeSnapshot<PromptData>): Promise<'none' | 'applied' | 'failed'> => {
+    async (
+      node: NodeSnapshot<PromptData>,
+      signal: AbortSignal,
+    ): Promise<'none' | 'applied' | 'failed'> => {
+      if (signal.aborted) return 'failed'
       const result = await composePromptFromDraft({
         node,
         graph: store.getSnapshot(),
         presetOverrides: presetText.overrides,
+        signal,
         completeText: ({ channelId, model, system, text, inputs, signal }) =>
           completeText({
             channelId,
@@ -1318,7 +1207,7 @@ export function CanvasExecutionProvider({
       })
       if (result.kind === 'skip') return 'none'
       if (result.kind === 'failed') {
-        store.notify(result.message, 'error')
+        if (!signal.aborted) store.notify(result.message, 'error')
         return 'failed'
       }
       store.dispatch({
@@ -1342,10 +1231,13 @@ export function CanvasExecutionProvider({
         signal?: AbortSignal
         contextAssets?: readonly GenerationContextAsset[]
       },
-    ) =>
-      runtime.operations.track(async () => {
+    ) => {
+      const linked = linkRunSignal(runtime.engine, opts?.signal)
+      const signal = linked.signal
+      return runtime.operations.track(async () => {
         let graph = store.getSnapshot()
       const node = graph.nodes.find((n) => n.id === nodeId)
+      if (signal.aborted) return
 
       /**
        * 循环节点走**另一条路**：它自己不产图，而是把下游链路跑 N 轮。
@@ -1361,11 +1253,13 @@ export function CanvasExecutionProvider({
        *  - 串行天然成立（一轮 await 完再下一轮）。
        */
       if (node?.type === 'loop') {
-        await runLoop(
+        const result = await runLoop(
           node as NodeSnapshot<LoopData>,
           graph,
           opts?.contextAssets,
+          signal,
         )
+        throwPreflightForCaller(result, signal)
         return
       }
 
@@ -1439,13 +1333,13 @@ export function CanvasExecutionProvider({
             new Map(prev).set(nodeId, { kind: 'running', startedAt: Date.now() }),
           )
           try {
-            const applied = await applySkillIfSelected(promptNode)
+            const applied = await applySkillIfSelected(promptNode, signal)
             if (applied === 'failed') return
             if (applied === 'applied') {
               // 技能刚改写正文：下游规划必须读新快照，不能用进入函数时那份
               graph = store.getSnapshot()
             } else {
-              const composed = await applyComposeIfNeeded(promptNode)
+              const composed = await applyComposeIfNeeded(promptNode, signal)
               if (composed === 'failed') return
               if (composed === 'applied') graph = store.getSnapshot()
             }
@@ -1461,6 +1355,7 @@ export function CanvasExecutionProvider({
               return next
             })
           }
+          if (signal.aborted) return
         }
       }
 
@@ -1504,7 +1399,8 @@ export function CanvasExecutionProvider({
             explainEmptyPlan(target.id)
             return
           }
-          await launch(plan, target.id)
+          const result = await launch(plan, target.id, signal)
+          throwPreflightForCaller(result, signal)
           return
         }
       }
@@ -1524,8 +1420,10 @@ export function CanvasExecutionProvider({
         explainEmptyPlan(nodeId)
         return
       }
-        await launch(plan, nodeId, opts?.signal)
-      }),
+        const result = await launch(plan, nodeId, signal)
+        throwPreflightForCaller(result, signal)
+      }).finally(linked.dispose)
+    },
     [
       store,
       launch,
@@ -1541,8 +1439,9 @@ export function CanvasExecutionProvider({
   )
 
   const runGroup = useCallback(
-    (memberIds: readonly string[]) =>
-      runtime.operations.track(async () => {
+    (memberIds: readonly string[]) => {
+      const linked = linkRunSignal(runtime.engine)
+      return runtime.operations.track(async () => {
         const graph = store.getSnapshot()
         const known = new Set(graph.nodes.map((node) => node.id))
         const ids = memberIds.filter((id) => known.has(id))
@@ -1555,8 +1454,12 @@ export function CanvasExecutionProvider({
           store.notify('组内没有配好提示词或可用上游的生成节点', 'error')
           return
         }
-        await launch(plan, plan.tasks[0]?.nodeId)
-      }),
+        const result = await launch(plan, plan.tasks[0]?.nodeId, linked.signal)
+        if (!result.ok && !result.canceled) {
+          throw new CanvasRunPreflightError(result.failures)
+        }
+      }).finally(linked.dispose)
+    },
     [launch, runtime, store],
   )
 

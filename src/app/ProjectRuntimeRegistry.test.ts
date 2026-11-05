@@ -289,6 +289,43 @@ describe('ProjectRuntimeRegistry', () => {
     })
   })
 
+  it('重复 projectId 只占一把锁，提交后可重新 claim', async () => {
+    registerProjectRuntime({
+      projectId: 'p1',
+      key: 'canvas-agent',
+      beginDispose: () => control(async () => undefined),
+    })
+
+    const disposal = await prepareProjectRuntimes([
+      'p1',
+      'p1',
+    ])
+    await expect(
+      prepareProjectRuntimes(['p1']),
+    ).rejects.toBeInstanceOf(ProjectRuntimeBusyError)
+    await expect(disposal.commit()).resolves.toEqual({
+      status: 'cleanup_complete',
+    })
+
+    const next = await prepareProjectRuntimes(['p1'])
+    await expect(next.commit()).resolves.toEqual({
+      status: 'cleanup_complete',
+    })
+  })
+
+  it('空 projectId 集合生成可提交但不占项目的操作', async () => {
+    const disposal = await prepareProjectRuntimes([])
+    const unrelated = await prepareProjectRuntimes(['p1'])
+
+    await expect(disposal.commit()).resolves.toEqual({
+      status: 'cleanup_complete',
+    })
+    expect(getProjectRuntimePendingSnapshot()).toEqual([])
+    await expect(unrelated.commit()).resolves.toEqual({
+      status: 'cleanup_complete',
+    })
+  })
+
   it('work 期间同 project/key 重注册必须复用旧 registration，commit 后无残留', async () => {
     let oldBegins = 0
     let lateBegins = 0
@@ -1272,6 +1309,111 @@ describe('ProjectRuntimeRegistry', () => {
     await expect(committing).resolves.toEqual({
       status: 'cleanup_complete',
     })
+  })
+
+  it('迟到注册后旧 operation 释放不误清新 operation 的占用', async () => {
+    registerProjectRuntime({
+      projectId: 'p1',
+      key: 'canvas-agent',
+      beginDispose: () => control(async () => undefined),
+    })
+    const previous = await prepareProjectRuntimes(['p1'])
+    registerProjectRuntime({
+      projectId: 'p1',
+      key: 'late-runtime',
+      beginDispose: () => control(async () => undefined),
+    })
+    await expect(previous.commit('first delete')).resolves.toEqual({
+      status: 'cleanup_complete',
+    })
+
+    const current = await prepareProjectRuntimes(['p1'])
+    await expect(
+      prepareProjectRuntimes(['p1']),
+    ).rejects.toBeInstanceOf(ProjectRuntimeBusyError)
+
+    await expect(previous.commit()).resolves.toEqual({
+      status: 'cleanup_complete',
+    })
+    await expect(
+      prepareProjectRuntimes(['p1']),
+    ).rejects.toBeInstanceOf(ProjectRuntimeBusyError)
+
+    await expect(current.commit()).resolves.toEqual({
+      status: 'cleanup_complete',
+    })
+    const next = await prepareProjectRuntimes(['p1'])
+    await expect(next.commit()).resolves.toEqual({
+      status: 'cleanup_complete',
+    })
+  })
+
+  it('cleanup 失败保留锁，精确重试时不让快照成为占用真相', async () => {
+    let finalizeAttempts = 0
+    registerProjectRuntime({
+      projectId: 'p1',
+      key: 'canvas-agent',
+      beginDispose: () => ({
+        waitForIdle: async () => undefined,
+        whenIdle: async () => undefined,
+        canReopen: () => true,
+        reopenIfIdle: () => true,
+        canFinalize: () => true,
+        finalize() {
+          finalizeAttempts += 1
+          return finalizeAttempts > 1
+        },
+      }),
+    })
+
+    await expect(
+      withPreparedProjectRuntimes(['p1'], async () => 'deleted'),
+    ).rejects.toBeInstanceOf(ProjectRuntimeCleanupError)
+    await expect(
+      prepareProjectRuntimes(['p1']),
+    ).rejects.toBeInstanceOf(ProjectRuntimeBusyError)
+    const pending = getProjectRuntimePendingSnapshot()
+
+    await expect(
+      retryProjectRuntimeCleanup(['p1']),
+    ).resolves.toBeUndefined()
+    expect(finalizeAttempts).toBe(2)
+    expect(getProjectRuntimePendingSnapshot()).not.toEqual(pending)
+    expect(getProjectRuntimePendingSnapshot()).toEqual([])
+    const next = await prepareProjectRuntimes(['p1'])
+    await expect(next.commit()).resolves.toEqual({
+      status: 'cleanup_complete',
+    })
+  })
+
+  it('recovery 失败保留锁，结构化 snapshot 不改变占用', async () => {
+    registerProjectRuntime({
+      projectId: 'p1',
+      key: 'canvas-agent',
+      beginDispose: () => ({
+        waitForIdle: async () => {
+          throw new Error('still busy')
+        },
+        whenIdle: () => new Promise<void>(() => undefined),
+        canReopen: () => false,
+        reopenIfIdle: () => false,
+        canFinalize: () => false,
+        finalize: () => false,
+      }),
+    })
+
+    await expect(
+      prepareProjectRuntimes(['p1'], {
+        shutdownTimeoutMs: 5,
+      }),
+    ).rejects.toBeInstanceOf(ProjectRuntimeRecoveryError)
+    const pending = await waitForPending(
+      (snapshot) => snapshot[0]?.status === 'recovery_failed',
+    )
+    await expect(
+      prepareProjectRuntimes(['p1']),
+    ).rejects.toBeInstanceOf(ProjectRuntimeBusyError)
+    expect(getProjectRuntimePendingSnapshot()).toEqual(pending)
   })
 
   it('超时恢复尚未 idle 时锁保持，第二次 prepare 不能覆盖 attempt', async () => {

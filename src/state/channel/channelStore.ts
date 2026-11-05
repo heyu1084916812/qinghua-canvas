@@ -21,7 +21,6 @@ import {
 } from '../../domain/project/protocol'
 import {
   buildDefaultModelMap,
-  resolveUpstreamModel,
   setModelMapping,
 } from '../../domain/project/modelMapping'
 import type { RouteStrategy } from '../../domain/project/modelRouting'
@@ -44,6 +43,7 @@ import {
 } from '../../domain/project/modelPresets'
 import { createChannelRepository, type ChannelRepository } from '../project/channelRepository'
 import { createChannelCredentials } from './channelCredentials'
+import { createChannelRequestOrchestration } from './channelRequestOrchestration'
 import { BUILTIN_CHANNEL_IDS, isBuiltinChannelId } from '../../domain/project/builtinChannels'
 import type { CredentialSlot } from '../../domain/project/channel'
 import { createPresetStore, type PresetStore } from '../project/presetStore'
@@ -52,7 +52,6 @@ import {
   createChannelAdapter,
   type ResolvedChannelConfig,
 } from '../../platform/channels/registry'
-import { ChannelError } from '../../platform/channels/types'
 import type {
   GeneratedAsset,
   SpeechRunRequest,
@@ -63,18 +62,13 @@ import type {
 import type { ChatMessage, NodeInput, ToolDeclaration } from '../../domain/shared/execution/types'
 import { describeError, asAppError } from '../../shared/result'
 import {
-  formatContextBundleForPrompt,
-} from '../../domain/shared/context'
-import {
   createGenerationClient,
   resolvedChannelConfig,
 } from '../../platform/generation'
 import {
-  runDirectGeneration,
   type DirectRunRouteCandidate,
   type DirectRunTraceInput,
 } from '../shared/directRun'
-import { ChannelRemovalInterruptedError } from '../shared/runChannelGuard'
 import { createContextRepository } from '../shared/contextRepository'
 
 /**
@@ -364,8 +358,6 @@ export type ChannelStore = MiniStore<ChannelStoreState> & ChannelStoreActions
  * 整轮历史，天然比「优化一句提示词」重。只放宽走 `completeWithTools` 的这条路，
  * 普通文本调用仍是 60 秒。
  */
-const AGENT_CHAT_TIMEOUT_MS = 180_000
-
 function timeoutSignal(ms: number): AbortSignal {
   return typeof AbortSignal !== 'undefined' && typeof (AbortSignal as { timeout?: unknown }).timeout === 'function'
     ? AbortSignal.timeout(ms)
@@ -1257,291 +1249,12 @@ export function createChannelStore(
     )
   }
 
-  /**
-   * Agent 的带工具多轮调用。
-   *
-   * 复用与 verify / refreshModels 同一套「渠道 → 令牌 → registry」解析，
-   * 不另写一份 —— 那两份迟早分叉（比如只在一处补了协议定义）。
-   */
-  const completeWithTools: ChannelStoreActions['completeWithTools'] = async ({
-    channelId: requestedChannelId,
-    model: requestedModel,
-    modelIsUpstream = false,
-    tools,
-    messages,
-    inputs = [],
-    signal,
-    timeoutMs,
-    routeCandidates = [],
-    routePlanId,
-    trace,
-    onRecordWarning,
-    onRouteSucceeded,
-    onChunk,
-  }) => {
-    const traceParams =
-      trace?.params && typeof trace.params === 'object'
-        ? { ...(trace.params as Record<string, unknown>) }
-        : {}
-    let outboundMessages = messages
-    const outboundInputs = [...inputs]
-    let contextMeta: Record<string, unknown> = {}
-    if (
-      trace &&
-      typeof traceParams.contextDigest !== 'string' &&
-      traceParams.purpose !== 'agent-tool-probe'
-    ) {
-      try {
-        const lastUser = [...messages]
-          .reverse()
-          .find((message) => message.role === 'user')
-        const bundle = await contextRepo.bundleForProject({
-          projectId: trace.projectId,
-          workbench: trace.workbench,
-          request: lastUser?.content ?? '',
-          sessionId: trace.scopeId,
-          taskId: trace.subjectId,
-        })
-        if (bundle.conflicts.length > 0) {
-          throw new ChannelError({
-            kind: 'parse',
-            raw: `上下文有冲突，请先处理：${bundle.conflicts
-              .map((conflict) => conflict.message)
-              .join('；')}`,
-          })
-        }
-        const contextPrompt = formatContextBundleForPrompt(bundle)
-        if (contextPrompt) {
-          outboundMessages = [
-            { role: 'system', content: contextPrompt },
-            ...messages,
-          ]
-        }
-        contextMeta = {
-          contextDigest: bundle.digest,
-          memoryRefs: bundle.memoryRefs,
-          kitVersionRefs: bundle.kitVersionRefs,
-        }
-        const existingAssetHashes = new Set(
-          outboundInputs.flatMap((input) =>
-            input.kind === 'asset' ? [input.assetHash] : [],
-          ),
-        )
-        for (const hash of bundle.assetHashes) {
-          if (existingAssetHashes.has(hash)) continue
-          const payload = await platform.assets.read(hash).catch(() => null)
-          if (!payload) continue
-          existingAssetHashes.add(hash)
-          outboundInputs.push({
-            kind: 'asset',
-            nodeId: `context-kit:${hash}`,
-            assetHash: hash,
-            mime: payload.mime,
-          })
-        }
-      } catch (error) {
-        if (error instanceof ChannelError) throw error
-        // 记忆 / 套件读取失败不能阻断正常付费调用；本次按“无长期上下文”继续。
-      }
-    }
-    const effectiveTrace = trace
-      ? {
-          ...trace,
-          params: { ...traceParams, ...contextMeta },
-        }
-      : undefined
-    const firstChannel = store
-      .getState()
-      .channels.find((channel) => channel.id === requestedChannelId)
-    if (!firstChannel) throw new ChannelError({ kind: 'channel', detail: 'missingChannel' })
-    const firstSentModel = modelIsUpstream
-      ? requestedModel
-      : resolveUpstreamModel(firstChannel.modelMap, requestedModel) ?? requestedModel
-    const candidates: readonly DirectRunRouteCandidate[] =
-      routeCandidates.length > 0
-        ? routeCandidates
-        : [
-            {
-              channelId: requestedChannelId,
-              model: modelIsUpstream ? requestedModel : firstSentModel,
-            },
-          ]
-    const isFrozenRoute = (route: DirectRunRouteCandidate | undefined): boolean =>
-      Boolean(
-        route &&
-          routeCandidates.some(
-            (candidate) =>
-              candidate.channelId === route.channelId &&
-              candidate.credentialGroupId === route.credentialGroupId &&
-              candidate.model === route.model,
-          ),
-      )
-    const call = (
-      callSignal: AbortSignal,
-      route: DirectRunRouteCandidate | undefined,
-    ) => {
-      const selected = route ?? candidates[0]!
-      const ch = store.getState().channels.find((channel) => channel.id === selected.channelId)
-      if (!ch) throw new ChannelError({ kind: 'channel', detail: 'missingChannel' })
-      const args = {
-        channel: ch,
-        model: selected.model,
-        request: {
-          kind: 'text' as const,
-          prompt: '',
-          inputs: outboundInputs,
-          params: {},
-          tools,
-          messages: outboundMessages,
-          /** 调用方不给就用 Agent 的默认上限；探测会显式传一个更短的 */
-          timeoutMs: timeoutMs ?? AGENT_CHAT_TIMEOUT_MS,
-        },
-        hints: {
-          modelIsUpstream: isFrozenRoute(route) || modelIsUpstream,
-          ...(selected.credentialGroupId
-            ? { credentialGroupId: selected.credentialGroupId }
-            : {}),
-          operationId:
-            effectiveTrace?.operationId ??
-            `text:${selected.channelId}:${selected.model}`,
-        },
-      }
-      return onChunk
-        ? generation.streamText(args, callSignal, onChunk)
-        : generation.completeText(args, callSignal)
-    }
-    if (!effectiveTrace) return call(signal, candidates[0])
-    const firstCandidate = candidates[0]!
-    try {
-      const finished = await runDirectGeneration({
-          storage: platform.storage,
-          trace: {
-            ...effectiveTrace,
-            inputs: outboundInputs,
-            sentChannelId: firstCandidate.channelId,
-            sentModel: firstCandidate.model,
-            ...(routePlanId ? { routePlanId } : {}),
-          },
-          channelId: firstCandidate.channelId,
-          routeCandidates: candidates,
-          signal,
-          call,
-          outputHashesOf: () => [],
-          ...(onRecordWarning ? { onRecordWarning } : {}),
-        })
-      if (finished.record.sentChannelId && finished.record.sentModel) {
-        onRouteSucceeded?.({
-          channelId: finished.record.sentChannelId,
-          ...(finished.record.credentialGroupId
-            ? { credentialGroupId: finished.record.credentialGroupId }
-            : {}),
-          model: finished.record.sentModel,
-        })
-      }
-      return finished.result
-    } catch (error) {
-      if (error instanceof ChannelRemovalInterruptedError) {
-        throw new ChannelError({ kind: 'channel', detail: 'missingChannel' })
-      }
-      throw error
-    }
-  }
-
-  const generateSpeech: ChannelStoreActions['generateSpeech'] = async ({
-    signal,
-    channelId,
-    model,
-    text,
-    voice,
-    speed,
-    responseFormat,
-    timeoutMs,
-    trace,
-  }) => {
-    const ch = store.getState().channels.find((c) => c.id === channelId)
-    if (!ch) throw new ChannelError({ kind: 'channel', detail: 'missingChannel' })
-    const call = (callSignal: AbortSignal) => generation.generateSpeech(
-      {
-        channel: ch,
-        model,
-        request: {
-          text,
-          voice,
-          ...(speed !== undefined ? { speed } : {}),
-          ...(responseFormat ? { responseFormat } : {}),
-          ...(timeoutMs !== undefined ? { timeoutMs } : {}),
-        },
-        hints: {
-          operationId: `speech:${channelId}:${model}`,
-        },
-      },
-      callSignal,
-    )
-    if (!trace) return call(signal)
-    try {
-      return (
-        await runDirectGeneration({
-          storage: platform.storage,
-          trace,
-          channelId,
-          signal,
-          call,
-          outputHashesOf: (result) => [result.hash],
-          outputAssetOf: (result) => result,
-        })
-      ).result
-    } catch (error) {
-      if (error instanceof ChannelRemovalInterruptedError) {
-        throw new ChannelError({ kind: 'channel', detail: 'missingChannel' })
-      }
-      throw error
-    }
-  }
-
-  const generateVideo: ChannelStoreActions['generateVideo'] = async ({
-    signal,
-    channelId,
-    model,
-    trace,
-    ...request
-  }) => {
-    const ch = store.getState().channels.find((c) => c.id === channelId)
-    if (!ch) throw new ChannelError({ kind: 'channel', detail: 'missingChannel' })
-    const call = (callSignal: AbortSignal) => generation.generateVideo(
-      {
-        channel: ch,
-        model,
-        request,
-        hints: {
-          operationId: `video:${channelId}:${model}`,
-        },
-      },
-      callSignal,
-    )
-    if (!trace) return call(signal)
-    try {
-      return (
-        await runDirectGeneration({
-          storage: platform.storage,
-          trace: {
-            ...trace,
-            sentChannelId: trace.sentChannelId ?? channelId,
-            inputs: trace.inputs ?? request.inputs,
-          },
-          channelId,
-          signal,
-          call,
-          outputHashesOf: (result) => result.map((asset) => asset.hash),
-          outputAssetOf: (result) => result[0],
-        })
-      ).result
-    } catch (error) {
-      if (error instanceof ChannelRemovalInterruptedError) {
-        throw new ChannelError({ kind: 'channel', detail: 'missingChannel' })
-      }
-      throw error
-    }
-  }
+  const requests = createChannelRequestOrchestration({
+    platform,
+    contextRepo,
+    generation,
+    channels: () => store.getState().channels,
+  })
 
   return {
     ...store,
@@ -1588,8 +1301,8 @@ export function createChannelStore(
     setRecipeMemory,
     setDefaultRecipe,
     defaultForNewNode,
-    completeWithTools,
-    generateSpeech,
-    generateVideo,
+    completeWithTools: requests.completeWithTools,
+    generateSpeech: requests.generateSpeech,
+    generateVideo: requests.generateVideo,
   }
 }

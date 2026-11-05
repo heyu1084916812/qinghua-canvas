@@ -1,5 +1,31 @@
 # CanvasFlow（轻画）项目记忆
 
+### 结构治理第二批与交接限流（2026-11-05，M-P0-SPLIT-2）
+
+- 总管1 最后交办的「切得少 / 是否安全」不是解释题，而是三刀交付：渠道请求编排、运行态操作锁、
+  `canvasRunPreflight`。总管2 接管时三条子任务都停在工作树中间态；**文件状态优先于聊天自述**，
+  逐条看 diff、红线、旧函数残留和合并后门禁。一个子任务命中 429 后立即换模型重试，
+  不把限流当完成、失败或用户要回答的问题。
+- **并行子任务必须按文件边界分工**：渠道只碰 `channelStore*`，运行态只碰
+  `ProjectRuntimeRegistry* / runtime/projectOperationLock*`，画布只碰
+  `CanvasExecutionProvider* / canvasRunPreflight*`。模块登记、legacy 预算、文档、本地 commit
+  全由主管一次收口，避免三条线各写一份真相。
+- 渠道请求编排搬出后，`channelStore` 仍是唯一渠道状态和 facade；新模块复用传入的
+  `GenerationClient` 与 `repo.credentials.load`，不得复制渠道表、Key 或第二套生成客户端。
+  冲突上下文要先拒绝且不触网；套件素材按调用方输入顺序去重追加一次；语音无 trace 不写 RunRecord。
+- 操作锁 token 不能挂 `operation`：`projectOperationLock` 只保存 projectId 占用、精确集合、
+  opaque owner 与条件释放；Registry 用 `WeakMap<owner, ProjectOperation>` 持有唯一事务对象，
+  继续独占 phase / registration / prepare / commit / recovery / rollback / dispose。空 claim 不占项目，
+  旧 token 释放不能清掉新 token。
+- `canvasRunPreflight` 不写节点状态、不排队、不构造 RunRecord；它返回整批结构化失败，由 Provider
+  统一落 failed 与提示。`runNode` 的链接 signal 必须贯通 loop / batch / skill / compose / 付费请求，
+  并把项目关闭的运行态 controllers 作为同一取消源；手工无 signal 路径不得产生未处理 rejection。
+  `CanvasExecutionApi` 与 `completeText.signal` 必填契约不可为了拆分顺手放宽。
+- **不涉及 UI 的门禁**：本轮只改逻辑、类型、导出和 TSX 接线；提交前逐项查 `git diff --name-only`
+  与 Provider diff 中 JSX / className / data / style / 文案。没有用户可见渲染变化，不伪造截图证据。
+- 三个新模块先被治理门禁正确拦下，再按真实职责登记；legacy 预算只按实降收紧
+  （Registry 950→948、channelStore 1595→1308、Provider 1606→1509），不因为「接线变长」上调。
+
 ### 结构治理第一批（2026-11-05，P0 第一刀）
 
 - `channelCredentials.ts` 是凭证明文、Key 分组和槽位解析的唯一实现；运行态只拿窄

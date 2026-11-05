@@ -9,12 +9,9 @@ import {
   type ProjectRuntimeOperationPhase,
   type ProjectRuntimePendingOperation,
 } from './runtime/projectRuntimeSnapshots'
+import { createProjectOperationLock, type ProjectOperationLockToken } from './runtime/projectOperationLock'
 
-export type {
-  ProjectRuntimeOperationPhase,
-  ProjectRuntimePendingOperation,
-  ProjectRuntimePendingStatus,
-} from './runtime/projectRuntimeSnapshots'
+export type { ProjectRuntimeOperationPhase, ProjectRuntimePendingOperation, ProjectRuntimePendingStatus } from './runtime/projectRuntimeSnapshots'
 
 interface ProjectRuntimeRegistration {
   key: string
@@ -85,9 +82,7 @@ const registrations = new Map<
   string,
   Map<string, ProjectRuntimeRegistration>
 >()
-const projectOperations = new Map<string, ProjectOperation>()
 let nextGeneration = 1
-let nextOperationId = 1
 const completionListeners = new Set<
   (completion: ProjectRuntimeCompletion) => void
 >()
@@ -95,6 +90,7 @@ const projectRuntimeSnapshots =
   createProjectRuntimeSnapshotStore()
 
 interface ProjectOperation {
+  readonly token: ProjectOperationToken
   readonly id: number
   readonly projectIds: ReadonlySet<string>
   readonly prepared: PreparedRuntime[]
@@ -110,6 +106,54 @@ interface ProjectOperation {
   workCommitted: boolean
   workResult: unknown
   released: boolean
+}
+
+type ProjectOperationToken = ProjectOperationLockToken
+
+const operationsByOwner = new WeakMap<object, ProjectOperation>()
+
+function operationOf(token: ProjectOperationToken): ProjectOperation {
+  const operation = operationsByOwner.get(token.owner)
+  if (!operation) throw new Error('项目操作锁缺少对应的运行态事务')
+  return operation
+}
+
+function createProjectOperation(
+  token: ProjectOperationToken,
+  shutdownTimeoutMs = DEFAULT_TASK_SHUTDOWN_TIMEOUT_MS,
+): ProjectOperation {
+  return {
+    token, id: token.id, projectIds: token.projectIds,
+    prepared: [], shutdownTimeoutMs, phase: 'preparing',
+    commitPromise: null, commitMarksWork: null,
+    recoveryPromise: null, recoveryError: null,
+    triggerReason: null, workReason: null,
+    recoveryReason: null, workCommitted: false,
+    workResult: undefined, released: false,
+  }
+}
+
+const projectOperationLock = createProjectOperationLock({
+  onBusy: (projectIds) => {
+    throw new ProjectRuntimeBusyError(projectIds)
+  },
+})
+
+function claimOperation(
+  projectIds: readonly string[],
+  options: ProjectRuntimePrepareOptions = {},
+): ProjectOperation {
+  const token = projectOperationLock.claim(projectIds)
+  const operation = createProjectOperation(token, options.shutdownTimeoutMs)
+  operationsByOwner.set(token.owner, operation)
+  return operation
+}
+
+function releaseOperation(operation: ProjectOperation): void {
+  if (operation.released) return
+  operation.released = true
+  projectOperationLock.release(operation.token)
+  refreshPendingSnapshot()
 }
 
 export class ProjectRuntimeBusyError extends Error {
@@ -251,12 +295,12 @@ function waitWithTimeout<T>(
   })
 }
 
-function uniqueOperations(): ProjectOperation[] {
-  return [...new Set(projectOperations.values())]
-}
-
 function refreshPendingSnapshot(): void {
-  projectRuntimeSnapshots.refresh(uniqueOperations())
+  projectRuntimeSnapshots.refresh(
+    projectOperationLock
+      .owners()
+      .map(operationOf),
+  )
 }
 
 export function subscribeProjectRuntimePending(
@@ -295,55 +339,6 @@ function emitProjectRuntimeCompleted(
       // 运行态已经清理成功；订阅方的界面收尾异常不能反转提交结果。
     }
   }
-}
-
-function claimProjects(
-  projectIds: readonly string[],
-  options: ProjectRuntimePrepareOptions,
-): ProjectOperation {
-  const ids = [...new Set(projectIds)]
-  const busy = ids.filter((projectId) =>
-    projectOperations.has(projectId),
-  )
-  if (busy.length > 0) {
-    throw new ProjectRuntimeBusyError(busy)
-  }
-  const operation: ProjectOperation = {
-    id: nextOperationId++,
-    projectIds: new Set(ids),
-    prepared: [],
-    shutdownTimeoutMs:
-      options.shutdownTimeoutMs ??
-      DEFAULT_TASK_SHUTDOWN_TIMEOUT_MS,
-    phase: 'preparing',
-    commitPromise: null,
-    commitMarksWork: null,
-    recoveryPromise: null,
-    recoveryError: null,
-    triggerReason: null,
-    workReason: null,
-    recoveryReason: null,
-    workCommitted: false,
-    workResult: undefined,
-    released: false,
-  }
-  for (const projectId of ids) {
-    projectOperations.set(projectId, operation)
-  }
-  return operation
-}
-
-function releaseProjectOperation(
-  operation: ProjectOperation,
-): void {
-  if (operation.released) return
-  operation.released = true
-  for (const projectId of operation.projectIds) {
-    if (projectOperations.get(projectId) === operation) {
-      projectOperations.delete(projectId)
-    }
-  }
-  refreshPendingSnapshot()
 }
 
 function controlsOf(
@@ -462,7 +457,9 @@ async function settlePrepared(
   }
 }
 
-function tryReopenPrepared(operation: ProjectOperation): boolean {
+function tryReopenPrepared(
+  operation: ProjectOperation,
+): boolean {
   if (operation.prepared.some((item) => item.finalized)) {
     return false
   }
@@ -482,7 +479,7 @@ function tryReopenPrepared(operation: ProjectOperation): boolean {
   operation.recoveryError = null
   operation.recoveryReason = null
   operation.recoveryPromise = null
-  releaseProjectOperation(operation)
+  releaseOperation(operation)
   return true
 }
 
@@ -576,30 +573,24 @@ async function retryOperationRecovery(
 function operationForExactIds(
   projectIds: readonly string[],
 ): ProjectOperation | null {
-  const ids = [...new Set(projectIds)]
-  let operation: ProjectOperation | null = null
-  for (const projectId of ids) {
-    const current = projectOperations.get(projectId)
-    if (!current) return null
-    if (operation && operation !== current) return null
-    operation = current
-  }
-  if (!operation || operation.projectIds.size !== ids.length) {
-    return null
-  }
-  return operation
+  const token =
+    projectOperationLock.forExactIds(projectIds)
+  return token ? operationOf(token) : null
 }
 
 function relatedOperations(
   projectIds: readonly string[],
 ): ProjectOperation[] {
   const ids = new Set(projectIds)
-  return uniqueOperations().filter(
-    (operation) =>
-      projectRuntimePendingSnapshotOf(operation) !== null &&
-      [...operation.projectIds].some((projectId) =>
-        ids.has(projectId),
-      ),
+  return projectOperationLock
+    .owners()
+    .map(operationOf)
+    .filter(
+      (operation) =>
+        projectRuntimePendingSnapshotOf(operation) !== null &&
+        [...operation.projectIds].some((projectId) =>
+          ids.has(projectId),
+        ),
   )
 }
 
@@ -676,7 +667,7 @@ async function performCommitOperation(
     }
     if (project.size === 0) registrations.delete(projectId)
   }
-  releaseProjectOperation(operation)
+  releaseOperation(operation)
   emitProjectRuntimeCompleted(operation)
   return { status: 'cleanup_complete' }
 }
@@ -725,7 +716,8 @@ function commitOperation(
 export function registerProjectRuntime(
   input: Omit<ProjectRuntimeRegistration, 'generation' | 'active'>,
 ): ProjectRuntimeRegistrationHandle {
-  const operation = projectOperations.get(input.projectId)
+  const token = projectOperationLock.get(input.projectId)
+  const operation = token ? operationOf(token) : null
   if (operation) {
     const current = registrations.get(input.projectId)?.get(input.key)
     if (current) {
@@ -772,7 +764,7 @@ export async function prepareProjectRuntimes(
   projectIds: readonly string[],
   options: ProjectRuntimePrepareOptions = {},
 ): Promise<ProjectRuntimeDisposal> {
-  const operation = claimProjects(projectIds, options)
+  const operation = claimOperation(projectIds, options)
   try {
     for (const projectId of operation.projectIds) {
       const project = registrations.get(projectId)
@@ -901,13 +893,18 @@ export async function retryProjectRuntimeCleanup(
     !!pending &&
     pending.phase === 'cleanup_failed' &&
     pending.projectIds.size === ids.length &&
-    ids.every((projectId) => pending.projectIds.has(projectId))
+    ids.every((projectId) =>
+      pending.projectIds.has(projectId),
+    )
   if (!exact) {
     throw new ProjectRuntimeRetryScopeError(
       ids,
-      related.flatMap((operation) => [...operation.projectIds]),
+      related.flatMap((operation) => [
+        ...operation.projectIds,
+      ]),
     )
   }
+  if (!pending) return
   const result = await commitOperation(pending)
   if (result.status === 'cleanup_failed') {
     throw result.error
@@ -917,8 +914,10 @@ export async function retryProjectRuntimeCleanup(
 export async function retryProjectRuntimeOperation(
   operationId: number,
 ): Promise<void> {
-  const operation = uniqueOperations().find(
-    (item) => item.id === operationId,
+  const operation = projectOperationLock
+    .owners()
+    .map(operationOf)
+    .find((item) => item.id === operationId,
   )
   if (!operation) return
   if (operation.phase === 'cleanup_failed') {
@@ -943,8 +942,7 @@ export async function disposeAllProjectRuntimes(): Promise<void> {
 
 export function resetProjectRuntimesForTests(): void {
   registrations.clear()
-  projectOperations.clear()
+  projectOperationLock.clear()
   nextGeneration = 1
-  nextOperationId = 1
   projectRuntimeSnapshots.clear()
 }

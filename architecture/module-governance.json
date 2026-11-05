@@ -18,7 +18,7 @@
     { "path": "src/workbenches", "ts": 450, "css": 600 }
   ],
   "legacy": [
-    { "module": "src/app/ProjectRuntimeRegistry.ts", "owner": "project-runtime", "responsibility": "项目运行态的删除、恢复和释放阶段编排。", "owns": ["运行态操作锁和生命周期"], "doesNotOwn": ["画布执行算法", "页面展示"], "publicApi": ["AppShell 和项目页使用的运行态注册门面"], "test": ["src/app/ProjectRuntimeRegistry.test.ts"], "budget": 950 },
+    { "module": "src/app/ProjectRuntimeRegistry.ts", "owner": "project-runtime", "responsibility": "项目运行态的删除、恢复和释放阶段编排。", "owns": ["运行态操作锁和生命周期"], "doesNotOwn": ["画布执行算法", "页面展示"], "publicApi": ["AppShell 和项目页使用的运行态注册门面"], "test": ["src/app/ProjectRuntimeRegistry.test.ts"], "budget": 948 },
     { "module": "src/app/ProjectTree.tsx", "owner": "project-navigation", "responsibility": "项目树导航和项目管理操作。", "owns": ["项目树交互和展示"], "doesNotOwn": ["项目运行态内部事务"], "publicApi": ["AppSidebar 项目树"], "test": ["src/app/ProjectTree.test.ts"], "budget": 1273 },
     { "module": "src/domain/storyboard/storyboard.ts", "owner": "storyboard-domain", "responsibility": "漫剧项目、分集、分镜与镜头领域规则。", "owns": ["漫剧领域模型和规范化"], "doesNotOwn": ["网络请求", "React 渲染"], "publicApi": ["漫剧工作台和仓储共享的领域 API"], "test": ["src/domain/storyboard/storyboard.test.ts"], "budget": 1749 },
     { "module": "src/pages/AssetsPage/AssetsPage.module.css", "owner": "asset-library-ui", "responsibility": "素材页布局和素材卡片视觉样式。", "owns": ["素材页局部样式"], "doesNotOwn": ["素材导入逻辑"], "publicApi": ["AssetsPage CSS Module"], "test": ["scripts/smoke.mjs#G90"], "budget": 1540 },
@@ -33,9 +33,9 @@
     { "module": "src/pages/SkillsPage/SkillsPage.module.css", "owner": "skills-ui", "responsibility": "技能库列表、详情和编辑界面样式。", "owns": ["技能页局部样式"], "doesNotOwn": ["技能文件系统实现"], "publicApi": ["SkillsPage CSS Module"], "test": ["scripts/smoke.mjs#G94"], "budget": 1015 },
     { "module": "src/platform/channels/openaiImages.ts", "owner": "channel-image-adapters", "responsibility": "OpenAI 兼容及关联图片上游协议适配。", "owns": ["图片请求、响应解析和轮询"], "doesNotOwn": ["渠道 CRUD", "UI 状态"], "publicApi": ["channelStore 图片生成适配入口"], "test": ["src/platform/channels/openaiImages.test.ts"], "budget": 1685 },
     { "module": "src/platform/channels/runninghubEndpoints.ts", "owner": "runninghub-catalog", "responsibility": "RunningHub 官方模型端点和协议目录。", "owns": ["RunningHub 端点声明"], "doesNotOwn": ["页面模型选择", "渠道凭证存储"], "publicApi": ["RunningHub 适配器端点目录"], "test": ["src/platform/channels/runninghub.test.ts"], "budget": 1032 },
-    { "module": "src/state/channel/channelStore.ts", "owner": "channel-facade", "responsibility": "渠道配置、凭证、模型路由和生成请求中央门面。", "owns": ["渠道状态与请求路由"], "doesNotOwn": ["页面渲染", "工作台状态"], "publicApi": ["设置、Agent、电商和画布共享的渠道 API"], "test": ["src/state/channel/channelStore.test.ts"], "budget": 1595 },
+    { "module": "src/state/channel/channelStore.ts", "owner": "channel-facade", "responsibility": "渠道配置、凭证、模型路由和生成请求中央门面。", "owns": ["渠道状态与请求路由"], "doesNotOwn": ["页面渲染", "工作台状态"], "publicApi": ["设置、Agent、电商和画布共享的渠道 API"], "test": ["src/state/channel/channelStore.test.ts"], "budget": 1308 },
     { "module": "src/state/project/ecommerceTaskRepository.ts", "owner": "ecommerce-persistence", "responsibility": "电商任务、结果和待入素材的持久化事务。", "owns": ["电商任务仓储"], "doesNotOwn": ["上游请求", "页面导航"], "publicApi": ["电商工作流任务仓储 API"], "test": ["src/state/project/ecommerceTaskRepository.test.ts"], "budget": 1021 },
-    { "module": "src/workbenches/canvas/execution/CanvasExecutionProvider.tsx", "owner": "canvas-execution", "responsibility": "画布节点与分组运行的执行生命周期门面。", "owns": ["画布运行、取消和记录顺序"], "doesNotOwn": ["渠道协议解析", "项目删除事务"], "publicApi": ["画布工作台执行 Provider"], "test": ["src/workbenches/canvas/execution/canvasExecutionRuntime.test.ts"], "budget": 1606 },
+    { "module": "src/workbenches/canvas/execution/CanvasExecutionProvider.tsx", "owner": "canvas-execution", "responsibility": "画布节点与分组运行的执行生命周期门面。", "owns": ["画布运行、取消和记录顺序"], "doesNotOwn": ["渠道协议解析", "项目删除事务"], "publicApi": ["画布工作台执行 Provider"], "test": ["src/workbenches/canvas/execution/canvasExecutionRuntime.test.ts"], "budget": 1509 },
     { "module": "src/workbenches/canvas/flow/FlowSurface.tsx", "owner": "canvas-flow-ui", "responsibility": "画布节点表面、视口、选择和连接交互。", "owns": ["画布表面交互"], "doesNotOwn": ["生成请求", "项目运行态"], "publicApi": ["画布工作台 FlowSurface"], "test": ["src/workbenches/canvas/flow/flowGraph.test.ts"], "budget": 1576 },
     { "module": "src/workbenches/canvas/lightbox/LightboxLayer.tsx", "owner": "canvas-lightbox-ui", "responsibility": "画布素材灯箱查看和编辑交互。", "owns": ["灯箱局部视图状态"], "doesNotOwn": ["素材仓储实现"], "publicApi": ["画布灯箱层"], "test": ["scripts/smoke.mjs#G795"], "budget": 1764 },
     { "module": "src/workbenches/canvas/panels/CreationPanel.module.css", "owner": "canvas-creation-ui", "responsibility": "创作面板参数和素材区域的视觉样式。", "owns": ["创作面板局部样式"], "doesNotOwn": ["生成运行顺序"], "publicApi": ["CreationPanel CSS Module"], "test": ["src/workbenches/canvas/panels/CreationPanel.test.ts"], "budget": 1218 },
@@ -84,6 +84,36 @@
       "publicApi": ["CanvasExecutionProvider run recorder hook"],
       "test": ["src/workbenches/canvas/execution/useCanvasRunRecorder.test.ts"],
       "budget": 240
+    },
+    {
+      "module": "src/app/runtime/projectOperationLock.ts",
+      "owner": "project-operation-lock",
+      "responsibility": "项目运行态操作的原子项目占用索引与 opaque owner token。",
+      "owns": ["atomic projectId claim", "exact-id lookup", "owner token and conditional release", "stable owner enumeration"],
+      "doesNotOwn": ["operation phase", "runtime registration", "commit/recovery/rollback", "pending snapshot"],
+      "publicApi": ["createProjectOperationLock", "ProjectOperationLockToken"],
+      "test": ["src/app/runtime/projectOperationLock.test.ts", "src/app/ProjectRuntimeRegistry.test.ts"],
+      "budget": 120
+    },
+    {
+      "module": "src/state/channel/channelRequestOrchestration.ts",
+      "owner": "channel-request-orchestration",
+      "responsibility": "编排渠道文本、语音、视频直连请求的上下文附加、trace 和 RunRecord 收口。",
+      "owns": ["上下文注入与冲突拒绝", "输入素材去重追加", "直连 RunRecord 与 route success 顺序", "语音与视频直连包装"],
+      "doesNotOwn": ["渠道状态与凭证", "生成客户端和适配器", "UI、Job 与页面文案"],
+      "publicApi": ["createChannelRequestOrchestration", "ChannelRequestOrchestration"],
+      "test": ["src/state/channel/channelRequestOrchestration.test.ts", "src/state/channel/channelStore.test.ts"],
+      "budget": 360
+    },
+    {
+      "module": "src/workbenches/canvas/execution/canvasRunPreflight.ts",
+      "owner": "canvas-execution",
+      "responsibility": "画布运行前令牌检查、路由计划、适配器解析与批次失败收集。",
+      "owns": ["preflight result model", "adapter keys", "batch failure list", "task-to-channel projection"],
+      "doesNotOwn": ["node state application", "queued and startRun lifecycle", "cancellation owner", "RunRecord construction"],
+      "publicApi": ["prepareCanvasRun", "CanvasRunPreflightError", "canceledRun", "failedRun"],
+      "test": ["src/workbenches/canvas/execution/canvasRunPreflight.test.ts", "src/workbenches/canvas/execution/CanvasExecutionProvider.runPreflight.test.ts"],
+      "budget": 390
     }
   ]
 }
