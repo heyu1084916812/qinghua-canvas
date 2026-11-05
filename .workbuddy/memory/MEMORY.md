@@ -1,5 +1,17 @@
 # CanvasFlow（轻画）项目记忆
 
+### 总管2 交接与第五批并行清理（2026-11-06）
+
+- 总管1 线程最后因上游 503 / 工具调用与结果记录不匹配中断；交接只认对账清单、Git、文件与子线程终态，不恢复损坏对话。
+- 第五批 Q1–Q5 与 Q1R–Q4R 九条线并行写同一工作树，重复出现未接线视图、宿主半截替换、`tsc` 错误和审批/`spawn EPERM` 阻塞。
+  验收时必须先冻结所有子线，再删除本批新增 `views/` 源码并按 HEAD 恢复宿主；不能把治理脚本暂时通过或稳定树测试全绿冒充视图拆分完成。
+- 清理后 `0e7e012` 稳定树的 `tsc`、Vitest 569 files / 5016 tests、`npm run check`、`npm run build`、模块治理和 diff-check 全绿。
+  仍有 8 个超千行生产文件，`M-P0-SPLIT-5` 保持未完成；后续一次只派一到两个页面，独立写集 + 独立隔离 UI 证据 + 接线/测试/登记/commit 全部闭合。
+- 用户截图中的「回读 N 条」是发给模型的尾部 N 条 `agentMessages` 窗口（默认 20），不是完整历史或 N 轮对话；
+  长任务大量 assistant(tool_calls)/tool 结果会挤掉最初需求，画布节点、taskPlan、Job/RunRecord 不会自动变成聊天历史。
+  H 组已用 `modelMessageWindow.ts` 固定保留首条有效需求、按用户轮/成对工具结果裁剪，`agentSessionBrief.ts` 与 `messagesFor` 负责检查点续跑；
+  Composer 文案未改，仍属后续 UI 门禁范围。
+
 ### 全代码治理批次与长任务上下文（2026-11-06）
 
 - 第四批 I/J/K/L/M/N/O/P 组收口：channelStore 1258→885、Provider 1463→937、EcommercePage 2087→1653、

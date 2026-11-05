@@ -1,5 +1,14 @@
 # CanvasFlow 不变量详表
 
+## 结构治理 · 总管2 交接边界（2026-11-06）
+
+- 第五批「涉及 UI」拆分不能让多个子线程同时写同一工作树：未接线视图、半截 JSX 替换与 0 字节测试必须在验收前归零。
+  清理后若 8 个超千行文件仍在，对账清单的 `M-P0-SPLIT-5` 必须保持 🧩，不能因稳定树 `tsc/check/build` 全绿改 ✅。
+- 单页面小批次的完成证据缺一不可：宿主真实 import/render 新视图、目标 TSX `<1000`、兄弟测试、定向 Vitest/ESLint/tsc、
+  1440×900 与 1024×700 × 明暗四组改前/改后截图与几何/焦点/悬停/禁用/滚动/冒烟证据、治理登记、legacy 预算收紧、本地 commit。
+- Agent 长任务续跑：`modelMessageWindow` 固定保留首条有效用户需求并维持 assistant(tool_calls)/tool 成对；`agentSessionBrief` 只补紧凑 system 事实，
+  不重放已执行或付费工具；`continueTask` 必须按目标会话 `messagesFor` 回读，不能拿界面当前会话列表当历史。
+
 > `MEMORY.md` 放不下，本文件是完整版。**改动 canvas / comic 内部前必读**（由 MEMORY.md 顶部指引到此）。
 > 排序：canvas 通用 → 结果组/容器 → 生成与执行 → 复制粘贴 → 渠道与协议 → comic。
 
