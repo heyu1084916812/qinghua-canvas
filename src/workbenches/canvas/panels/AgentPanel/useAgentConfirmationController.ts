@@ -48,6 +48,7 @@ export interface AgentConfirmationControllerInput {
   >
   runConfirmation: (input: AgentConfirmationRunInput) => Promise<unknown>
   executeConfirmedTool: AgentConfirmationRunInput['executeConfirmedTool']
+  ensureRoute: AgentConfirmationRunInput['ensureRoute']
   loopDeps: (args: AgentConfirmationLoopDepsInput) => AgentLoopDeps
   toolModeRef: MutableRefObject<Map<string, 'native' | 'json'>>
   turnToolsForSession: (
@@ -115,6 +116,7 @@ export function useAgentConfirmationController(
           beginConfirmation: input.controller.beginConfirmation,
           finishConfirmedTool: input.controller.finishConfirmedTool,
           executeConfirmedTool: input.executeConfirmedTool,
+          ensureRoute: input.ensureRoute,
           createLoopDeps: (args) => input.loopDeps(args),
           toolMode: () =>
             input.toolModeRef.current.get(target.id) ?? 'native',
@@ -154,6 +156,7 @@ export function useAgentConfirmationController(
     input.currentTurnIdRef,
     input.currentTurnJobIdRef,
     input.currentTurnRevisionRef,
+    input.ensureRoute,
     input.executeConfirmedTool,
     input.handleOutcome,
     input.inFlightConfirmationRef,

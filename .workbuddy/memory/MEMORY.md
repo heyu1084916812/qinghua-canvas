@@ -1,5 +1,17 @@
 # CanvasFlow（轻画）项目记忆
 
+### 确认执行后续跑必须重新确保对话路由（2026-11-05，#939）
+
+- **症状很有欺骗性**：图片节点 RunRecord 已经 `succeeded`，`runNode` 工具结果也是 `ok:true`，
+  界面却紧接着报“渠道还没配好：这个渠道已经删除”。
+- **根因**：确认卡执行完工具后，续跑对话模型只读发送开始时缓存的路由；异步工具执行期间缓存失效，
+  `assembleAgentLoopDeps` 就拿到空 `channelId`，生成网关把它统一报成 `missingChannel`。
+  这不是渠道真的被删。
+- **修法**：确认执行、检查点继续都必须在续跑模型前 `ensureRoute`，并把**这次返回的 route 显式**
+  传给 `AgentLoopDeps`；不能规划完又回头读可能已清空的缓存。
+- **判据**：如果只有图片 RunRecord、没有后续 chat RunRecord，并且 Agent 面板出现 `missingChannel`，
+  先查路由续跑，不要先让用户重配渠道。
+
 ### Composer 分支测试要覆盖“用户会遇到的真实分叉”（2026-11-05，#938）
 
 - `useAgentComposerController` 的补测只挑用户能感知的分支：草稿保存失败、删 mention 后附件账同步、

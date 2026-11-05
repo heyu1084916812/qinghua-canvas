@@ -52,6 +52,7 @@ function harness(args: {
   toolMode?: 'native' | 'json'
   controller?: AbortController
   route?: AgentChatRoute | null
+  ensuredRoute?: AgentChatRoute
   nodeRunStates?:
     | ReadonlyMap<string, { kind: 'failed'; error: unknown }>
     | (() => ReadonlyMap<string, { kind: 'failed'; error: unknown }>)
@@ -220,6 +221,7 @@ function harness(args: {
   const deps = assembleAgentLoopDeps(ports, {
     session,
     operationId: 'op-1',
+    ...(args.ensuredRoute ? { route: args.ensuredRoute } : {}),
     toolMode: args.toolMode ?? 'native',
     visualNodeIds: ['img-1'],
     turnTools: args.turnTools ?? [tool('readGraph')],
@@ -252,6 +254,26 @@ const requestOf = (): TextRunRequest => ({
 })
 
 describe('assembleAgentLoopDeps', () => {
+  it('★★ 明确确保过的路由优先于已失效缓存，不允许退回空 channelId', async () => {
+    const ensured = {
+      ...ROUTE,
+      channelId: 'channel-ensured',
+      upstreamModel: 'upstream-ensured',
+    }
+    const h = harness({ route: null, ensuredRoute: ensured })
+
+    expect(h.deps.channelId).toBe('channel-ensured')
+    await h.deps.adapter.completeText(
+      requestOf(),
+      new AbortController().signal,
+    )
+    expect(h.executions[0]).toMatchObject({
+      channelId: 'channel-ensured',
+      model: 'upstream-ensured',
+      modelIsUpstream: true,
+    })
+  })
+
   it('★★ native 带本轮工具集，json 模式下不向渠道声明 tools', async () => {
     const native = harness({ turnTools: [tool('readGraph')] })
     await native.deps.adapter.completeText(

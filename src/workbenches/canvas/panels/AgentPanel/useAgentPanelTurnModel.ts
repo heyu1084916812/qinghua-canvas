@@ -325,6 +325,7 @@ export function useAgentPanelTurnModel({
     controller,
     runConfirmation: runAgentConfirmation,
     executeConfirmedTool: executeConfirmedToolWithLedger,
+    ensureRoute: prepareChatRoute,
     loopDeps,
     toolModeRef,
     turnToolsForSession,

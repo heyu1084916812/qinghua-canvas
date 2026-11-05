@@ -122,6 +122,10 @@ function harness(
     beginConfirmation: vi.fn(async () => {}),
     finishConfirmedTool: vi.fn(async () => {}),
     executeConfirmedTool: vi.fn(async () => ({ ok: true })),
+    ensureRoute: vi.fn(async () => ({
+      ok: true as const,
+      route: {} as never,
+    })),
     createLoopDeps: vi.fn(() => loopDeps),
     toolMode: () => 'native',
     turnTools: () => [],

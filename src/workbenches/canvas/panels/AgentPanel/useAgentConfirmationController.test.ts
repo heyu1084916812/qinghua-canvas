@@ -79,6 +79,10 @@ function harness(
       return 'done'
     }),
     executeConfirmedTool: vi.fn(async () => ({})),
+    ensureRoute: vi.fn(async () => ({
+      ok: true as const,
+      route: {} as never,
+    })),
     loopDeps: vi.fn(() => ({}) as never),
     toolModeRef: { current: new Map([['s1', 'native']]) },
     turnToolsForSession: vi.fn(() => []),
@@ -200,6 +204,7 @@ describe('confirm / 快照与 origin', () => {
     expect(params.session).toBe(target)
     expect(params.request).toEqual(request)
     expect(params.messages).toBe(h.input.messages)
+    expect(params.ensureRoute).toBe(h.input.ensureRoute)
   })
 
   it('turnOrigin 与本回合 stop / 引导同一套口径（queueTurnId 优先）', async () => {

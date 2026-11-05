@@ -12,10 +12,12 @@ import type {
   AgentLoopAssemblyPorts,
   AssembleAgentLoopInput,
 } from './agentLoopDeps'
+import type { AgentChatRoute } from './agentChatRoute'
 
 export interface AgentLoopDepsArgs {
   session: AgentSession
   operationId: string
+  route?: AgentChatRoute
   toolMode?: 'native' | 'json'
   visualNodeIds?: readonly string[]
   onProgress?: (messages: readonly ChatMessage[]) => void
@@ -126,6 +128,7 @@ export function useAgentLoopDepsController(
         {
           session: args.session,
           operationId: args.operationId,
+          ...(args.route ? { route: args.route } : {}),
           toolMode: args.toolMode ?? 'native',
           visualNodeIds: args.visualNodeIds ?? [],
           onProgress: args.onProgress,

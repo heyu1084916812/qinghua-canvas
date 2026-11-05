@@ -116,6 +116,8 @@ export interface AgentLoopAssemblyPorts {
 export interface AssembleAgentLoopInput {
   session: AgentSession
   operationId: string
+  /** 调用方刚刚确保过的路由；优先于可能已被清空的缓存。 */
+  route?: AgentChatRoute
   toolMode?: 'native' | 'json'
   visualNodeIds?: readonly string[]
   onProgress?: (messages: readonly ChatMessage[]) => void
@@ -142,7 +144,7 @@ export function assembleAgentLoopDeps(
     onProgress,
     turnTools,
   } = input
-  const route = ports.cachedChatRoute(session)
+  const route = input.route ?? ports.cachedChatRoute(session)
   const logicalModel =
     route?.logicalModel ??
     (toLogicalName(ports.channels.getState().channels, session.model) ||

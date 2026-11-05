@@ -78,6 +78,10 @@ function harness(overrides: Partial<AgentConfirmationRunInput> = {}) {
     beginConfirmation: vi.fn(async () => {}),
     finishConfirmedTool: vi.fn(async () => {}),
     executeConfirmedTool: vi.fn(async () => ({ ok: true })),
+    ensureRoute: vi.fn(async () => ({
+      ok: true as const,
+      route: {} as never,
+    })),
     createLoopDeps: vi.fn(() => loopDeps),
     toolMode: () => 'native',
     turnTools: () => [],
@@ -109,6 +113,10 @@ describe('runAgentConfirmation', () => {
       executeConfirmedTool: vi.fn(async () => {
         order.push('execute')
         return { ok: true }
+      }),
+      ensureRoute: vi.fn(async () => {
+        order.push('route')
+        return { ok: true as const, route: {} as never }
       }),
       createLoopDeps: vi.fn(() => {
         order.push('deps')
@@ -144,6 +152,7 @@ describe('runAgentConfirmation', () => {
       'begin',
       'status:executing',
       'execute',
+      'route',
       'deps',
       'finish',
       'status:thinking',
@@ -162,9 +171,11 @@ describe('runAgentConfirmation', () => {
       request,
       origin,
     )
+    expect(h.input.ensureRoute).toHaveBeenCalledWith(session)
     expect(h.input.createLoopDeps).toHaveBeenCalledWith({
       session,
       operationId: expect.stringMatching(/^op_/),
+      route: expect.any(Object),
       toolMode: 'native',
       visualNodeIds: ['node-1', 'node-2'],
       turnTools: [],
@@ -179,6 +190,39 @@ describe('runAgentConfirmation', () => {
     expect(h.input.settleSessionOutcome).toHaveBeenCalledWith(
       session.id,
       resumed,
+      origin,
+    )
+  })
+
+  it('★★ 确认执行后路由失效时先重建，不允许拿空渠道续跑', async () => {
+    const h = harness({
+      ensureRoute: vi.fn(async () => ({
+        ok: false as const,
+        message: '没有可用的模型服务提供「chat-model」',
+      })),
+    })
+
+    const result = await runAgentConfirmation(h.input)
+
+    expect(result).toBe('failed')
+    expect(h.input.ensureRoute).toHaveBeenCalledWith(session)
+    expect(h.input.createLoopDeps).not.toHaveBeenCalled()
+    expect(h.input.resumeAgentTurn).not.toHaveBeenCalled()
+    expect(h.input.setStatus).toHaveBeenCalledWith({
+      kind: 'error',
+      message: '没有可用的模型服务提供「chat-model」',
+    })
+    expect(h.input.transitionSessionJob).toHaveBeenCalledWith(
+      session.id,
+      'failed',
+      'failed',
+      { lastError: '没有可用的模型服务提供「chat-model」' },
+      { phase: 'confirmed_tool' },
+      origin,
+    )
+    expect(h.input.settleSessionOutcome).toHaveBeenCalledWith(
+      session.id,
+      { kind: 'error' },
       origin,
     )
   })

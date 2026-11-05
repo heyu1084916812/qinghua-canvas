@@ -5,6 +5,11 @@
 
 ## Agent · 过程与落位
 
+- **确认执行 / 检查点继续在续跑模型前必须重新确保对话路由**：`ensureRoute` 成功后要把返回的 route
+  显式传给 `AgentLoopDeps`，不能只写缓存再让装配层回头读。工具执行是异步过程，期间渠道表或路由
+  缓存可能变化；缓存失效时会退化成空 `channelId`，最终被误报成“渠道已删除（missingChannel）”，
+  即使图片 RunRecord 已经成功。
+
 - **生成配方上下文每次调用重建**：`agentToolRecipeContext.ts` 是无 React 纯构建器，优先级
   explicit > planned > sessionPicked > sticky > selected；渠道只按**启用渠道**反查并跟随最终模型；sticky 只在
   最终模型变化时才写（先 remember 到 ref 再落库）；上下文素材只留 `image/*`。`toolCtx()` 必须每次重建，

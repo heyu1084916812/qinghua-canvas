@@ -6,7 +6,10 @@ import type {
 import type { QueuedAgentTurn } from '../../../../domain/agent/queuedTurn'
 import { createId } from '../../../../shared/id'
 import type { AgentSession } from '../../../../state/agent/sessionStore'
-import type { ChatRoutePreparation } from './agentChatRoute'
+import type {
+  AgentChatRoute,
+  ChatRoutePreparation,
+} from './agentChatRoute'
 import {
   errText,
   type AgentLoopDeps,
@@ -24,6 +27,7 @@ type AgentContinuationStatus =
 export interface AgentContinuationLoopDepsInput {
   session: AgentSession
   operationId: string
+  route: AgentChatRoute
   toolMode: 'native' | 'json'
   visualNodeIds: readonly string[]
   turnTools: readonly ToolDeclaration[]
@@ -219,6 +223,7 @@ export async function runAgentContinuation(
   const currentLoopDeps = input.createLoopDeps({
     session: input.session,
     operationId: createId('op'),
+    route: route.route,
     toolMode: input.toolMode(),
     visualNodeIds: latestUserImageNodeIds(input.messages),
     turnTools: input.turnTools(),

@@ -20,6 +20,10 @@ import {
 import type {
   AgentOutcomeCoordinationResult,
 } from './agentOutcomeCoordinator'
+import type {
+  AgentChatRoute,
+  ChatRoutePreparation,
+} from './agentChatRoute'
 
 type AgentConfirmationStatus =
   | { kind: 'thinking' }
@@ -29,6 +33,7 @@ type AgentConfirmationStatus =
 export interface AgentConfirmationLoopDepsInput {
   session: AgentSession
   operationId: string
+  route: AgentChatRoute
   toolMode: 'native' | 'json'
   visualNodeIds: readonly string[]
   turnTools: readonly ToolDeclaration[]
@@ -47,6 +52,11 @@ export interface AgentConfirmationRunInput {
     session: AgentSession,
     request: AgentToolRequest,
   ) => Promise<unknown>
+  /**
+   * 工具执行期间渠道表、模型选择或面板宿主都可能变化，发送开始时的路由缓存
+   * 不能假设一定还在。续跑前必须重新确保对话路由，不能拿空 channelId 请求模型。
+   */
+  ensureRoute: (session: AgentSession) => Promise<ChatRoutePreparation>
   createLoopDeps: (
     input: AgentConfirmationLoopDepsInput,
   ) => AgentLoopDeps
@@ -129,9 +139,12 @@ export async function runAgentConfirmation(
       input.session,
       input.request,
     )
+    const route = await input.ensureRoute(input.session)
+    if (!route.ok) throw new Error(route.message)
     const currentLoopDeps = input.createLoopDeps({
       session: input.session,
       operationId: createId('op'),
+      route: route.route,
       toolMode: input.toolMode(),
       visualNodeIds: latestUserImageNodeIds(input.messages),
       turnTools: input.turnTools(),
