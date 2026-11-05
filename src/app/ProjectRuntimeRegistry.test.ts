@@ -6,6 +6,7 @@ import {
   ProjectRuntimeCommitStateError,
   ProjectRuntimeRecoveryError,
   ProjectRuntimeRetryScopeError,
+  ProjectRuntimeRollbackStateError,
   disposeProjectRuntimes,
   getProjectRuntimePendingSnapshot,
   prepareProjectRuntimes,
@@ -648,6 +649,82 @@ describe('ProjectRuntimeRegistry', () => {
     ).rejects.toBeInstanceOf(ProjectRuntimeBusyError)
   })
 
+  it('rollback during committing 结构化拒绝且不改变锁与快照', async () => {
+    let releaseLate!: () => void
+    const lateGate = new Promise<void>((resolve) => {
+      releaseLate = resolve
+    })
+    registerProjectRuntime({
+      projectId: 'p1',
+      key: 'canvas-agent',
+      beginDispose: () => control(async () => undefined),
+    })
+    const disposal = await prepareProjectRuntimes(['p1'])
+    registerProjectRuntime({
+      projectId: 'p1',
+      key: 'late-runtime',
+      beginDispose: () => ({
+        waitForIdle: () => lateGate,
+        whenIdle: () => lateGate,
+        canReopen: () => true,
+        reopenIfIdle: () => true,
+        canFinalize: () => true,
+        finalize: () => true,
+      }),
+    })
+
+    const committing = disposal.commit('deleted')
+    const pending = await waitForPending(
+      (snapshot) => snapshot[0]?.status === 'committing',
+    )
+    expect(() => disposal.rollback(new Error('late rollback'))).toThrow(
+      ProjectRuntimeRollbackStateError,
+    )
+    expect(getProjectRuntimePendingSnapshot()).toEqual(pending)
+
+    releaseLate()
+    await expect(committing).resolves.toEqual({
+      status: 'cleanup_complete',
+    })
+  })
+
+  it('cleanup_failed 后 rollback 不得降级为 recovery', async () => {
+    let finalizeAttempts = 0
+    registerProjectRuntime({
+      projectId: 'p1',
+      key: 'canvas-agent',
+      beginDispose: () => ({
+        waitForIdle: async () => undefined,
+        whenIdle: async () => undefined,
+        canReopen: () => true,
+        reopenIfIdle: () => true,
+        canFinalize: () => true,
+        finalize() {
+          finalizeAttempts += 1
+          return finalizeAttempts > 1
+        },
+      }),
+    })
+    const disposal = await prepareProjectRuntimes(['p1'])
+
+    await expect(disposal.commit('deleted')).resolves.toMatchObject({
+      status: 'cleanup_failed',
+    })
+    const pending = getProjectRuntimePendingSnapshot()
+    expect(pending[0]).toMatchObject({
+      status: 'cleanup_failed',
+      workCommitted: true,
+    })
+    expect(() => disposal.rollback(new Error('must not recover'))).toThrow(
+      ProjectRuntimeRollbackStateError,
+    )
+    expect(getProjectRuntimePendingSnapshot()).toEqual(pending)
+
+    await expect(disposal.commit()).resolves.toEqual({
+      status: 'cleanup_complete',
+    })
+  })
+
   it('并发 commit 共享同一 Promise，finalize 与 release 只执行一次', async () => {
     let openLateGate!: () => void
     const lateGate = new Promise<void>((resolve) => {
@@ -1053,6 +1130,148 @@ describe('ProjectRuntimeRegistry', () => {
     await retryProjectRuntimeCleanup(['p1'])
     expect(getProjectRuntimePendingSnapshot()).toEqual([])
     unsubscribe()
+  })
+
+  it('pending listener 抛错不阻塞 commit，也不阻断 completion', async () => {
+    registerProjectRuntime({
+      projectId: 'p1',
+      key: 'canvas-agent',
+      beginDispose: () => control(async () => undefined),
+    })
+
+    const throwingPending = vi.fn(() => {
+      throw new Error('pending subscriber failed')
+    })
+    const completed = vi.fn()
+    const unsubscribePending =
+      subscribeProjectRuntimePending(throwingPending)
+    const unsubscribeCompleted =
+      subscribeProjectRuntimeCompleted(completed)
+
+    try {
+      await expect(
+        withPreparedProjectRuntimes(['p1'], async () => 'deleted'),
+      ).resolves.toBe('deleted')
+      expect(throwingPending).toHaveBeenCalled()
+      expect(completed).toHaveBeenCalledOnce()
+      expect(getProjectRuntimePendingSnapshot()).toEqual([])
+    } finally {
+      unsubscribePending()
+      unsubscribeCompleted()
+    }
+  })
+
+  it('completion listener 抛错不反转已提交的清理结果', async () => {
+    registerProjectRuntime({
+      projectId: 'p1',
+      key: 'canvas-agent',
+      beginDispose: () => control(async () => undefined),
+    })
+    const unsubscribe = subscribeProjectRuntimeCompleted(() => {
+      throw new Error('completion subscriber failed')
+    })
+
+    try {
+      await expect(
+        withPreparedProjectRuntimes(['p1'], async () => 'deleted'),
+      ).resolves.toBe('deleted')
+      expect(getProjectRuntimePendingSnapshot()).toEqual([])
+    } finally {
+      unsubscribe()
+    }
+  })
+
+  it('pending listener 抛错不阻塞 recovery 状态机', async () => {
+    let idle = false
+    let release!: () => void
+    const gate = new Promise<void>((resolve) => {
+      release = resolve
+    })
+    registerProjectRuntime({
+      projectId: 'p1',
+      key: 'canvas-agent',
+      beginDispose: () => ({
+        waitForIdle: async () => {
+          if (!idle) throw new Error('still busy')
+        },
+        whenIdle: async () => {
+          await gate
+          idle = true
+        },
+        canReopen: () => idle,
+        reopenIfIdle: () => idle,
+        canFinalize: () => idle,
+        finalize: () => idle,
+      }),
+    })
+
+    const throwingPending = vi.fn(() => {
+      throw new Error('pending subscriber failed')
+    })
+    const unsubscribe = subscribeProjectRuntimePending(throwingPending)
+
+    try {
+      await expect(
+        prepareProjectRuntimes(['p1']),
+      ).rejects.toBeInstanceOf(ProjectRuntimeRecoveryError)
+      release()
+      await gate
+      await new Promise((resolve) => setTimeout(resolve, 0))
+
+      expect(throwingPending).toHaveBeenCalled()
+      expect(getProjectRuntimePendingSnapshot()).toEqual([])
+      await expect(
+        prepareProjectRuntimes(['p1']).then((disposal) =>
+          disposal.commit(),
+        ),
+      ).resolves.toEqual({ status: 'cleanup_complete' })
+    } finally {
+      unsubscribe()
+    }
+  })
+
+  it('旧 operation 再提交不能清除新 operation 的 pending 快照', async () => {
+    registerProjectRuntime({
+      projectId: 'p1',
+      key: 'canvas-agent',
+      beginDispose: () => control(async () => undefined),
+    })
+    const previous = await prepareProjectRuntimes(['p1'])
+    await expect(previous.commit('first delete')).resolves.toEqual({
+      status: 'cleanup_complete',
+    })
+
+    let releaseLate!: () => void
+    const lateGate = new Promise<void>((resolve) => {
+      releaseLate = resolve
+    })
+    const current = await prepareProjectRuntimes(['p1'])
+    registerProjectRuntime({
+      projectId: 'p1',
+      key: 'late-runtime',
+      beginDispose: () => ({
+        waitForIdle: () => lateGate,
+        whenIdle: () => lateGate,
+        canReopen: () => true,
+        reopenIfIdle: () => true,
+        canFinalize: () => true,
+        finalize: () => true,
+      }),
+    })
+    const committing = current.commit('second delete')
+    const pending = await waitForPending(
+      (snapshot) => snapshot[0]?.status === 'committing',
+    )
+
+    await expect(previous.commit()).resolves.toEqual({
+      status: 'cleanup_complete',
+    })
+    expect(getProjectRuntimePendingSnapshot()).toEqual(pending)
+
+    releaseLate()
+    await expect(committing).resolves.toEqual({
+      status: 'cleanup_complete',
+    })
   })
 
   it('超时恢复尚未 idle 时锁保持，第二次 prepare 不能覆盖 attempt', async () => {

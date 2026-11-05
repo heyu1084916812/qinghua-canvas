@@ -3,6 +3,18 @@ import {
   TaskLifecycleTimeoutError,
   type TaskShutdownControl,
 } from '../features/shared/lifecycle/taskLifecycle'
+import {
+  createProjectRuntimeSnapshotStore,
+  projectRuntimePendingSnapshotOf,
+  type ProjectRuntimeOperationPhase,
+  type ProjectRuntimePendingOperation,
+} from './runtime/projectRuntimeSnapshots'
+
+export type {
+  ProjectRuntimeOperationPhase,
+  ProjectRuntimePendingOperation,
+  ProjectRuntimePendingStatus,
+} from './runtime/projectRuntimeSnapshots'
 
 interface ProjectRuntimeRegistration {
   key: string
@@ -76,20 +88,11 @@ const registrations = new Map<
 const projectOperations = new Map<string, ProjectOperation>()
 let nextGeneration = 1
 let nextOperationId = 1
-const pendingListeners = new Set<() => void>()
 const completionListeners = new Set<
   (completion: ProjectRuntimeCompletion) => void
 >()
-let pendingSnapshot: readonly ProjectRuntimePendingOperation[] = []
-
-export type ProjectRuntimeOperationPhase =
-  | 'preparing'
-  | 'prepared'
-  | 'committing'
-  | 'recovering'
-  | 'recovery_failed'
-  | 'cleanup_failed'
-  | 'cleanup_complete'
+const projectRuntimeSnapshots =
+  createProjectRuntimeSnapshotStore()
 
 interface ProjectOperation {
   readonly id: number
@@ -107,23 +110,6 @@ interface ProjectOperation {
   workCommitted: boolean
   workResult: unknown
   released: boolean
-}
-
-export type ProjectRuntimePendingStatus =
-  | 'committing'
-  | 'recovering'
-  | 'recovery_failed'
-  | 'cleanup_failed'
-
-export interface ProjectRuntimePendingOperation {
-  id: number
-  projectIds: readonly string[]
-  status: ProjectRuntimePendingStatus
-  workCommitted: boolean
-  retryable: boolean
-  reason: string
-  workReason: string | null
-  recoveryReason: string | null
 }
 
 export class ProjectRuntimeBusyError extends Error {
@@ -174,6 +160,24 @@ export class ProjectRuntimeCommitStateError extends Error {
     this.operationId = operation.id
     this.projectIds = [...operation.projectIds]
     this.phase = operation.phase
+  }
+}
+
+export class ProjectRuntimeRollbackStateError extends Error {
+  readonly operationId: number
+  readonly projectIds: readonly string[]
+  readonly phase: ProjectRuntimeOperationPhase
+  readonly workCommitted: boolean
+
+  constructor(operation: ProjectOperation) {
+    super(
+      `项目运行态当前处于 ${operation.phase}，不能回滚到恢复阶段`,
+    )
+    this.name = 'ProjectRuntimeRollbackStateError'
+    this.operationId = operation.id
+    this.projectIds = [...operation.projectIds]
+    this.phase = operation.phase
+    this.workCommitted = operation.workCommitted
   }
 }
 
@@ -251,91 +255,19 @@ function uniqueOperations(): ProjectOperation[] {
   return [...new Set(projectOperations.values())]
 }
 
-function pendingOperationSnapshot(
-  operation: ProjectOperation,
-): ProjectRuntimePendingOperation | null {
-  let status: ProjectRuntimePendingStatus
-  if (operation.phase === 'committing') {
-    status = 'committing'
-  } else if (operation.phase === 'cleanup_failed') {
-    status = 'cleanup_failed'
-  } else if (operation.phase === 'recovering') {
-    status = 'recovering'
-  } else if (operation.phase === 'recovery_failed') {
-    status = 'recovery_failed'
-  } else {
-    return null
-  }
-  const reason =
-    status === 'committing'
-      ? '正在清理项目运行态'
-      : status === 'cleanup_failed'
-      ? operation.triggerReason ?? '运行态清理失败'
-      : [
-          operation.workReason
-            ? `原操作：${operation.workReason}`
-            : null,
-          operation.recoveryReason
-            ? `恢复：${operation.recoveryReason}`
-            : '恢复：等待运行态恢复',
-        ]
-          .filter(Boolean)
-          .join('；')
-  return {
-    id: operation.id,
-    projectIds: [...operation.projectIds],
-    status,
-    workCommitted: operation.workCommitted,
-    retryable:
-      status === 'cleanup_failed' ||
-      status === 'recovery_failed',
-    reason,
-    workReason: operation.workReason,
-    recoveryReason: operation.recoveryReason,
-  }
-}
-
 function refreshPendingSnapshot(): void {
-  const next = uniqueOperations()
-    .map(pendingOperationSnapshot)
-    .filter(
-      (item): item is ProjectRuntimePendingOperation => !!item,
-    )
-    .sort((left, right) => left.id - right.id)
-  const unchanged =
-    next.length === pendingSnapshot.length &&
-    next.every((item, index) => {
-      const current = pendingSnapshot[index]
-      return (
-        current?.id === item.id &&
-        current.status === item.status &&
-        current.reason === item.reason &&
-        current.workCommitted === item.workCommitted &&
-        current.retryable === item.retryable &&
-        current.workReason === item.workReason &&
-        current.recoveryReason === item.recoveryReason &&
-        current.projectIds.length === item.projectIds.length &&
-        current.projectIds.every(
-          (projectId, projectIndex) =>
-            projectId === item.projectIds[projectIndex],
-        )
-      )
-    })
-  if (unchanged) return
-  pendingSnapshot = next
-  pendingListeners.forEach((listener) => listener())
+  projectRuntimeSnapshots.refresh(uniqueOperations())
 }
 
 export function subscribeProjectRuntimePending(
   listener: () => void,
 ): () => void {
-  pendingListeners.add(listener)
-  return () => pendingListeners.delete(listener)
+  return projectRuntimeSnapshots.subscribe(listener)
 }
 
 export function getProjectRuntimePendingSnapshot():
   readonly ProjectRuntimePendingOperation[] {
-  return pendingSnapshot
+  return projectRuntimeSnapshots.getSnapshot()
 }
 
 export function subscribeProjectRuntimeCompleted(
@@ -604,6 +536,12 @@ function beginRecovery(
   cause: unknown,
   fromWork: boolean,
 ): ProjectRuntimeRollbackResult {
+  if (
+    operation.phase === 'committing' ||
+    operation.phase === 'cleanup_failed'
+  ) {
+    throw new ProjectRuntimeRollbackStateError(operation)
+  }
   operation.triggerReason = errorText(cause)
   if (fromWork) operation.workReason = errorText(cause)
   if (tryReopenPrepared(operation)) {
@@ -658,7 +596,7 @@ function relatedOperations(
   const ids = new Set(projectIds)
   return uniqueOperations().filter(
     (operation) =>
-      pendingOperationSnapshot(operation) !== null &&
+      projectRuntimePendingSnapshotOf(operation) !== null &&
       [...operation.projectIds].some((projectId) =>
         ids.has(projectId),
       ),
@@ -1008,6 +946,5 @@ export function resetProjectRuntimesForTests(): void {
   projectOperations.clear()
   nextGeneration = 1
   nextOperationId = 1
-  pendingSnapshot = []
-  pendingListeners.forEach((listener) => listener())
+  projectRuntimeSnapshots.clear()
 }
