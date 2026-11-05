@@ -1,6 +1,7 @@
 import type { StoragePort } from '../../platform/ports'
 import { createId } from '../../shared/id'
 import {
+  AGENT_QUEUE_LIMIT,
   enqueueAgentTurn,
   normalizeQueuedTurns,
   removeAgentTurn,
@@ -14,6 +15,7 @@ import {
 } from '../../domain/agent/steering'
 import { confirmationSettlementMessages } from '../../domain/agent/confirmation'
 import {
+  activeTurnForSession,
   asMessages,
   loadMessages,
   loadSession,
@@ -438,6 +440,13 @@ export function createAgentSessionStore(
               ),
             ),
           ]
+          const activeCount = latest.activeTurn || latest.activeTurnId ? 1 : 0
+          if (
+            normalizeQueuedTurns(latest.queuedTurns).length >=
+            AGENT_QUEUE_LIMIT - activeCount
+          ) {
+            return { ok: false as const, reason: 'full' as const }
+          }
           const queued = enqueueAgentTurn(latest.queuedTurns, {
             ...turn,
             ...(frozenAssetIds.length > 0
@@ -466,15 +475,24 @@ export function createAgentSessionStore(
     },
 
     async removeQueuedTurn(id, turnId) {
-      const latest = await find(id)
-      if (!latest) return null
-      const next = {
-        ...latest,
-        queuedTurns: removeAgentTurn(latest.queuedTurns, turnId),
-        updatedAt: Date.now(),
-      }
-      await storage.put('agentSessions', sessionRow(next, next.updatedAt))
-      return next
+      await ensureSplit()
+      return storage.transaction(
+        ['agentSessions', 'agentMessages'],
+        async (tx) => {
+          const latest = await loadSession(tx, id)
+          if (!latest) return null
+          if (latest.activeTurnId === turnId || activeTurnForSession(latest)?.id === turnId) {
+            return latest
+          }
+          const next = {
+            ...latest,
+            queuedTurns: removeAgentTurn(latest.queuedTurns, turnId),
+            updatedAt: Date.now(),
+          }
+          await tx.put('agentSessions', sessionRow(next, next.updatedAt))
+          return next
+        },
+      )
     },
 
     async updateQueuedTurnText(id, turnId, text) {
@@ -485,6 +503,9 @@ export function createAgentSessionStore(
         async (tx) => {
         const latest = await loadSession(tx, id)
         if (!latest) return null
+        if (latest.activeTurnId === turnId || activeTurnForSession(latest)?.id === turnId) {
+          return latest
+        }
         const next = {
           ...latest,
           queuedTurns: updateAgentTurnText(latest.queuedTurns, turnId, text),
@@ -506,16 +527,15 @@ export function createAgentSessionStore(
         if (latest.pendingConfirmation) {
           return { ok: false as const, reason: 'awaiting_confirmation' as const }
         }
-        const turn = latest.queuedTurns.find((item) => item.id === turnId)
-        if (!turn) return { ok: false as const, reason: 'missing' as const }
         /**
-         * `claimNextQueuedTurn` 只写 `activeTurnId`、不把 turn 移出 `queuedTurns`，
-         * 所以「正在发送」的这一条仍然挂在面板上。此时若允许 promote，
-         * 同一句文本会先被 pump 发出去、再作为 steer 注入一次 ⇒ 执行两遍。
+         * 正常结构里活动回合不在 waiting queue，下面这段只兜旧快照 / 迟到点击：
+         * 同一句文本若先被 pump 发出、再被 promote 注入，会执行两遍。
          */
-        if (latest.activeTurnId === turnId) {
+        if (latest.activeTurnId === turnId || activeTurnForSession(latest)?.id === turnId) {
           return { ok: false as const, reason: 'active' as const }
         }
+        const turn = latest.queuedTurns.find((item) => item.id === turnId)
+        if (!turn) return { ok: false as const, reason: 'missing' as const }
         if (turn.pendingAssetIds?.length) {
           return { ok: false as const, reason: 'has_assets' as const }
         }
@@ -596,6 +616,7 @@ export function createAgentSessionStore(
           allowedToolNames: undefined,
           activeTurnId: undefined,
           activeTurnStartedAt: undefined,
+          activeTurn: undefined,
           updatedAt: Date.now(),
         }
         await tx.put('agentSessions', sessionRow(next, next.updatedAt))
@@ -644,13 +665,16 @@ export function createAgentSessionStore(
         async (tx) => {
         const latest = await loadSession(tx, id)
         if (!latest) return null
-        if (latest.activeTurnId) return null
-        const turn = takeNextAgentTurn(latest.queuedTurns).turn
+        if (latest.activeTurnId || latest.activeTurn) return null
+        const taken = takeNextAgentTurn(latest.queuedTurns)
+        const turn = taken.turn
         if (!turn) return null
         const session = {
           ...latest,
+          queuedTurns: taken.turns,
           activeTurnId: turn.id,
           activeTurnStartedAt: Date.now(),
+          activeTurn: turn,
           updatedAt: Date.now(),
         }
         await tx.put('agentSessions', sessionRow(session, session.updatedAt))
@@ -666,14 +690,19 @@ export function createAgentSessionStore(
         async (tx) => {
         const latest = await loadSession(tx, id)
         if (!latest) return null
-        if (latest.activeTurnId !== turnId) return latest
+        const activeTurn = activeTurnForSession(latest)
+        if (activeTurn?.id !== turnId) return latest
+        const waitingTurns = removeAgentTurn(latest.queuedTurns, turnId)
         const next = {
           ...latest,
           queuedTurns: completed
-            ? removeAgentTurn(latest.queuedTurns, turnId)
-            : latest.queuedTurns,
+            ? waitingTurns
+            : activeTurn
+              ? [activeTurn, ...waitingTurns]
+              : waitingTurns,
           activeTurnId: undefined,
           activeTurnStartedAt: undefined,
+          activeTurn: undefined,
           updatedAt: Date.now(),
         }
         await tx.put('agentSessions', sessionRow(next, next.updatedAt))
@@ -683,16 +712,28 @@ export function createAgentSessionStore(
     },
 
     async releaseActiveTurn(id) {
-      const latest = await find(id)
-      if (!latest?.activeTurnId) return latest
-      const next = {
-        ...latest,
-        activeTurnId: undefined,
-        activeTurnStartedAt: undefined,
-        updatedAt: Date.now(),
-      }
-      await storage.put('agentSessions', sessionRow(next, next.updatedAt))
-      return next
+      await ensureSplit()
+      return storage.transaction(
+        ['agentSessions', 'agentMessages'],
+        async (tx) => {
+          const latest = await loadSession(tx, id)
+          if (!latest) return null
+          if (!latest.activeTurnId && !latest.activeTurn) return latest
+          const activeTurn = activeTurnForSession(latest)
+          const next = {
+            ...latest,
+            queuedTurns: activeTurn
+              ? [activeTurn, ...removeAgentTurn(latest.queuedTurns, activeTurn.id)]
+              : latest.queuedTurns,
+            activeTurnId: undefined,
+            activeTurnStartedAt: undefined,
+            activeTurn: undefined,
+            updatedAt: Date.now(),
+          }
+          await tx.put('agentSessions', sessionRow(next, next.updatedAt))
+          return next
+        },
+      )
     },
 
     async rename(id, title) {

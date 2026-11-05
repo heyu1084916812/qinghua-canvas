@@ -281,12 +281,11 @@ export function useAgentQueueController({
           )
         } catch (error) {
           /**
-           * 结算失败会让会话行上的 `activeTurnId` 残留，而 `claimNextQueuedTurn` 见到它就
-           * 永远返回 null（`sessionStore.ts` 的 `if (latest.activeTurnId) return null`）——
-           * 表现为「消息排在队列里、永远不发，也没有重试入口」。
+           * 结算失败会让会话行上的活动回合残留，而 `claimNextQueuedTurn` 见到它就
+           * 永远返回 null —— 表现为「消息排在队列里、永远不发，也没有重试入口」。
            *
            * 所以先原地重试一次；仍不行就用 store 现成的 `releaseActiveTurn` 兜底
-           * （只清活动标记、**保留**队列项），保证这条会话的队首还能被再次领取。
+           * （清活动标记并把快照放回队首），保证这条会话还能被再次领取。
            */
           let settled: AgentSession | null = null
           if (claimedTurnId) {

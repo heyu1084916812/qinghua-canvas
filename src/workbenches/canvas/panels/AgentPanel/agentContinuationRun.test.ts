@@ -294,6 +294,7 @@ describe('runAgentContinuation', () => {
     const claimedSession: AgentSession = {
       ...queuedSession,
       activeTurnId: queuedTurn.id,
+      activeTurn: queuedTurn,
       queuedTurns: [],
     }
     const h = harness({

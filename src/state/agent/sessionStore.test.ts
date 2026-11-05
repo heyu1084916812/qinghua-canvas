@@ -593,12 +593,8 @@ describe('Agent 会话 · 待执行任务队列', () => {
   })
 
   /**
-   * #914：`claimNextQueuedTurn` 只写 `activeTurnId`、**不把 turn 移出 `queuedTurns`**，
-   * 所以「正在发送」的队列项也还挂在队列面板上，「引导」按钮对它可用。
-   *
-   * 若此时再 promote 成功：pump 已经把同一句文本发出去（落库 + 开 Job），
-   * promote 又把同一句塞进 `pendingSteers` ⇒ 下一次模型动作前再注入一次，
-   * 同一句话执行两遍、双倍扣费、历史两条相同用户消息。
+   * 领取后等待队列立即为空，活动回合只存在于 `activeTurn` 快照。
+   * 迟到的「引导」点击仍必须按 active turn 拒绝，不能把同一句再塞进 steer。
    */
   it('★★ 正在发送的队列项不能转成引导（同一句话不能跑两遍）', async () => {
     const s = store()
@@ -608,6 +604,8 @@ describe('Agent 会话 · 待执行任务队列', () => {
     const claimed = await s.claimNextQueuedTurn(a.id)
     expect(claimed?.turn.id).toBe('1')
     expect(claimed?.session.activeTurnId).toBe('1')
+    expect(claimed?.session.activeTurn).toMatchObject({ id: '1' })
+    expect(claimed?.session.queuedTurns).toEqual([])
 
     expect(
       await s.promoteQueuedTurnToSteer(a.id, '1', 'steer-1'),
@@ -615,8 +613,39 @@ describe('Agent 会话 · 待执行任务队列', () => {
 
     const reopened = await s.get(a.id)
     expect(reopened?.pendingSteers).toEqual([])
-    expect(reopened?.queuedTurns.map((item) => item.id)).toEqual(['1'])
+    expect(reopened?.queuedTurns).toEqual([])
     expect(reopened?.activeTurnId).toBe('1')
+    expect(reopened?.activeTurn).toMatchObject({ id: '1' })
+  })
+
+  it('★★ 转引导成功只保留一条 steer 且等待队列原子出列', async () => {
+    const s = store()
+    const a = await s.create({ projectId: 'p1', channelId: 'c1', model: 'm1' })
+    const queued = await s.enqueueTurn(a.id, turn('1', '改成横版'))
+    expect(queued).toMatchObject({
+      ok: true,
+      session: { queuedTurns: [expect.objectContaining({ id: '1' })] },
+    })
+
+    const promoted = await s.promoteQueuedTurnToSteer(
+      a.id,
+      '1',
+      'steer-1',
+    )
+    expect(promoted).toMatchObject({
+      ok: true,
+      session: {
+        queuedTurns: [],
+        pendingSteers: [expect.objectContaining({ id: 'steer-1' })],
+      },
+    })
+    const duplicate = await s.promoteQueuedTurnToSteer(
+      a.id,
+      '1',
+      'steer-2',
+    )
+    expect(duplicate).toEqual({ ok: false, reason: 'missing' })
+    expect((await s.get(a.id))?.pendingSteers).toHaveLength(1)
   })
 
   it('★★ 排队时冻结并消费附件，连续排队不会重复携带', async () => {
@@ -795,7 +824,7 @@ describe('Agent 会话 · 待执行任务队列', () => {
     })
   })
 
-  it('FIFO 原子领取队首；完成前任务仍在库里', async () => {
+  it('FIFO 原子领取队首；等待队列出列，失败回队，完成不再领取', async () => {
     const s = store()
     const a = await s.create({ projectId: 'p1', channelId: 'c1', model: 'm1' })
     await s.enqueueTurn(a.id, turn('1'))
@@ -806,18 +835,70 @@ describe('Agent 会话 · 待执行任务队列', () => {
     const first = await s.claimNextQueuedTurn(a.id)
     expect(first?.turn.id).toBe('1')
     expect(first?.session.activeTurnId).toBe('1')
-    expect(first?.session.queuedTurns.map((item) => item.id)).toEqual(['1', '3'])
+    expect(first?.session.activeTurn).toMatchObject({ id: '1' })
+    expect(first?.session.queuedTurns.map((item) => item.id)).toEqual(['3'])
     expect(await s.claimNextQueuedTurn(a.id)).toBeNull()
 
     const kept = await s.finishActiveQueuedTurn(a.id, '1', false)
     expect(kept?.queuedTurns.map((item) => item.id)).toEqual(['1', '3'])
     expect(kept?.activeTurnId).toBeUndefined()
+    expect(kept?.activeTurn).toBeUndefined()
 
     const again = await s.claimNextQueuedTurn(a.id)
     expect(again?.turn.id).toBe('1')
+    expect(again?.session.queuedTurns.map((item) => item.id)).toEqual(['3'])
     const completed = await s.finishActiveQueuedTurn(a.id, '1', true)
     expect(completed?.queuedTurns.map((item) => item.id)).toEqual(['3'])
+    expect(completed?.activeTurn).toBeUndefined()
     expect((await s.claimNextQueuedTurn(a.id))?.turn.id).toBe('3')
+  })
+
+  it('★★ 唯一队首完成后不会被再次领取', async () => {
+    const s = store()
+    const a = await s.create({ projectId: 'p1', channelId: 'c1', model: 'm1' })
+    await s.enqueueTurn(a.id, turn('1', '只执行一次'))
+    expect((await s.claimNextQueuedTurn(a.id))?.turn.id).toBe('1')
+    expect((await s.finishActiveQueuedTurn(a.id, '1', true))?.queuedTurns).toEqual([])
+    expect(await s.claimNextQueuedTurn(a.id)).toBeNull()
+  })
+
+  it('活动回合与等待队列合计仍受 20 条上限约束', async () => {
+    const s = store()
+    const a = await s.create({ projectId: 'p1', channelId: 'c1', model: 'm1' })
+    for (let index = 0; index < 20; index += 1) {
+      await s.enqueueTurn(a.id, turn(String(index), `任务 ${index}`))
+    }
+    expect((await s.claimNextQueuedTurn(a.id))?.turn.id).toBe('0')
+    expect(await s.enqueueTurn(a.id, turn('overflow', '超限'))).toEqual({
+      ok: false,
+      reason: 'full',
+    })
+  })
+
+  it('★★ 旧数据中的在飞项读取时从等待队列剥离，恢复后原位回队', async () => {
+    const storage = createMemoryPlatform().storage
+    const now = Date.now()
+    await storage.put('agentSessions', {
+      id: 'chat-legacy-active',
+      projectId: 'p1',
+      title: '旧活动回合',
+      channelId: 'c1',
+      model: 'm1',
+      queuedTurns: [turn('1', '旧在飞任务'), turn('2', '后面等待')],
+      activeTurnId: '1',
+      activeTurnStartedAt: now,
+      createdAt: now,
+      updatedAt: now,
+    } as never)
+    const s = createAgentSessionStore(storage)
+    const loaded = await s.get('chat-legacy-active')
+    expect(loaded?.activeTurn).toMatchObject({ id: '1' })
+    expect(loaded?.queuedTurns.map((item) => item.id)).toEqual(['2'])
+
+    const released = await s.releaseActiveTurn('chat-legacy-active')
+    expect(released?.activeTurn).toBeUndefined()
+    expect(released?.activeTurnId).toBeUndefined()
+    expect(released?.queuedTurns.map((item) => item.id)).toEqual(['1', '2'])
   })
 
   it('后台回合只清理已发送的素材引用，不误删运行中后来附加的素材', async () => {
@@ -843,15 +924,17 @@ describe('Agent 会话 · 待执行任务队列', () => {
     expect(next?.queuedTurns.map((item) => item.id)).toEqual(['1'])
   })
 
-  it('进程中断恢复只释放活动标记，队首任务仍保留', async () => {
+  it('进程中断恢复把活动快照放回队首', async () => {
     const s = store()
     const a = await s.create({ projectId: 'p1', channelId: 'c1', model: 'm1' })
     await s.enqueueTurn(a.id, turn('1'))
     const claimed = await s.claimNextQueuedTurn(a.id)
     expect(claimed?.session.activeTurnId).toBe('1')
+    expect(claimed?.session.queuedTurns).toEqual([])
 
     const recovered = await s.releaseActiveTurn(a.id)
     expect(recovered?.activeTurnId).toBeUndefined()
+    expect(recovered?.activeTurn).toBeUndefined()
     expect(recovered?.queuedTurns.map((item) => item.id)).toEqual(['1'])
     expect((await s.claimNextQueuedTurn(a.id))?.turn.id).toBe('1')
   })

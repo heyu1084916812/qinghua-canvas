@@ -61,12 +61,15 @@ export interface AgentSession {
   /**
    * 当前回合尚未结束时，用户继续提交的任务。
    *
-   * 队列随会话落库，切走会话或关闭面板不会丢；任务真正开始时才取队首。
+   * 队列随会话落库，切走会话或关闭面板不会丢；这里只保存**尚未领取**的任务。
+   * 队列泵领取时会原子移出，并写入 `activeTurn`，避免运行中的消息继续显示成等待项。
    */
   queuedTurns: QueuedAgentTurn[]
   /** 已被队列泵领取、尚未最终完成的队首任务。 */
   activeTurnId?: string
   activeTurnStartedAt?: number
+  /** 被领取回合的完整冻结快照；失败 / 中断时原子放回等待队列。 */
+  activeTurn?: QueuedAgentTurn
   /** 当前运行回合尚未送入模型上下文、或尚未完成写回的引导消息。 */
   pendingSteers: AgentSteer[]
   /** 重启后仍需恢复的确认卡。工具参数只存结构副本，不存执行结果。 */

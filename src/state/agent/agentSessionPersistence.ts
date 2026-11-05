@@ -1,6 +1,9 @@
 import type { ChatMessage } from '../../domain/shared/execution/types'
 import type { RowOf, StoragePort } from '../../platform/ports'
-import { normalizeQueuedTurns } from '../../domain/agent/queuedTurn'
+import {
+  normalizeQueuedTurns,
+  type QueuedAgentTurn,
+} from '../../domain/agent/queuedTurn'
 import { normalizeAgentSteers } from '../../domain/agent/steering'
 import { normalizeStoredTaskPlan } from '../../domain/agent/taskPlan'
 import { isAgentToolName, type AgentToolName } from '../../domain/agent/toolRegistry'
@@ -9,6 +12,12 @@ import type { AgentSession } from './agentSessionTypes'
 export const asMessages = (v: unknown): ChatMessage[] =>
   Array.isArray(v) ? (v as ChatMessage[]) : []
 export const MESSAGE_SPLIT_MIGRATION_ID = 'agent-messages.split.v1'
+
+export const activeTurnForSession = (
+  session: Pick<AgentSession, 'activeTurn' | 'activeTurnId' | 'queuedTurns'>,
+): QueuedAgentTurn | undefined =>
+  session.activeTurn ??
+  session.queuedTurns.find((turn) => turn.id === session.activeTurnId)
 
 interface AgentMessageRow extends Record<string, unknown> {
 id: string
@@ -71,6 +80,24 @@ export const toSession = (
   messages: ChatMessage[] = [],
 ): AgentSession => {
   const taskPlan = normalizeStoredTaskPlan(row.taskPlan)
+  const rawQueuedTurns = normalizeQueuedTurns(row.queuedTurns)
+  const storedActiveTurn = normalizeQueuedTurns(
+    row.activeTurn ? [row.activeTurn] : [],
+  )[0]
+  const activeTurnId =
+    typeof row.activeTurnId === 'string' && row.activeTurnId
+      ? row.activeTurnId
+      : storedActiveTurn?.id
+  /**
+   * 旧数据里活动回合仍可能同时留在 queuedTurns。读取时统一成
+   * waiting-only 队列，下一次领取/结算会把新结构真正写回存储。
+   */
+  const activeTurn =
+    (storedActiveTurn?.id === activeTurnId ? storedActiveTurn : undefined) ??
+    rawQueuedTurns.find((turn) => turn.id === activeTurnId)
+  const queuedTurns = activeTurnId
+    ? rawQueuedTurns.filter((turn) => turn.id !== activeTurnId)
+    : rawQueuedTurns
   return {
   id: String(row.id),
   projectId: String(row.projectId ?? ''),
@@ -87,11 +114,12 @@ export const toSession = (
   ...(Array.isArray(row.pendingAssetIds) && row.pendingAssetIds.length > 0
     ? { pendingAssetIds: row.pendingAssetIds.filter((x): x is string => typeof x === 'string') }
     : {}),
-  queuedTurns: normalizeQueuedTurns(row.queuedTurns),
+  queuedTurns,
   pendingSteers: normalizeAgentSteers(row.pendingSteers),
-  ...(typeof row.activeTurnId === 'string' && row.activeTurnId
-    ? { activeTurnId: row.activeTurnId }
+  ...(activeTurnId
+    ? { activeTurnId }
     : {}),
+  ...(activeTurn ? { activeTurn } : {}),
   ...(typeof row.activeTurnStartedAt === 'number' && row.activeTurnStartedAt > 0
     ? { activeTurnStartedAt: row.activeTurnStartedAt }
     : {}),

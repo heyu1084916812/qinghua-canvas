@@ -4,6 +4,8 @@ import TestRenderer, { act } from 'react-test-renderer'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { AgentController } from '../../../../features/shared/agent/AgentController'
 import type { AgentSession } from '../../../../state/agent/sessionStore'
+import { createAgentSessionStore } from '../../../../state/agent/sessionStore'
+import { createMemoryPlatform } from '../../../../platform/memory'
 import {
   claimSessionActivity,
   clearQueueDrain,
@@ -375,15 +377,16 @@ describe('useAgentQueueController', () => {
       ...session,
       queuedTurns: [queued],
     }))
+    const claimNextQueuedTurn = vi.fn(async () => ({
+      session: claimed,
+      turn: queued,
+    }))
     const sendText = vi.fn(async () => {
       throw new Error('网络断了')
     })
     const props = input({
       controller: {
-        claimNextQueuedTurn: vi.fn(async () => ({
-          session: claimed,
-          turn: queued,
-        })),
+        claimNextQueuedTurn,
         finishQueuedTurn,
       } as unknown as AgentController,
       sendText,
@@ -399,6 +402,7 @@ describe('useAgentQueueController', () => {
     await api!.resumeQueue()
     await lifecycle.waitForIdle(100)
 
+    expect(claimNextQueuedTurn).toHaveBeenCalledTimes(1)
     expect(sendText).toHaveBeenCalledTimes(1)
     // 失败不销队：completed=false ⇒ 消息仍在 queuedTurns 里可重试
     expect(finishQueuedTurn).toHaveBeenCalledWith(session.id, queued.id, false)
@@ -410,6 +414,8 @@ describe('useAgentQueueController', () => {
     })
     // 活动锁必须释放，否则这条会话的队列会被永久卡死
     expect(isSessionActivityActive(session.id)).toBe(false)
+    // 失败后必须等用户点「恢复队列」，不得在 idle 窗口自动重领同一条
+    expect(shouldDrainQueue(session.id)).toBe(false)
   })
 
   it('★ 队首领取不到时不发送，并清掉自动续排标记', async () => {
@@ -648,6 +654,68 @@ describe('useAgentQueueController', () => {
     await lifecycle.waitForIdle(100)
     expect(releaseActiveTurn).toHaveBeenCalledTimes(1)
     expect(sendText).toHaveBeenCalledTimes(1)
+  })
+
+  it('★★ 真实 store：领取后队列行消失，失败后只回队一次且不自动重领', async () => {
+    const sessions = createAgentSessionStore(createMemoryPlatform().storage)
+    const created = await sessions.create({
+      projectId: 'p-real-lifecycle',
+      channelId: 'c1',
+      model: 'm1',
+    })
+    const queuedTurn = {
+      id: 'turn-real',
+      text: '真实队列生命周期',
+      createdAt: 1,
+      channelId: 'c1',
+      model: 'm1',
+    }
+    await sessions.enqueueTurn(created.id, queuedTurn)
+    const claimNextQueuedTurn = vi.fn(sessions.claimNextQueuedTurn)
+    const finishQueuedTurn = vi.fn(sessions.finishActiveQueuedTurn)
+    const snapshots: AgentSession[] = []
+    const props = input({
+      current: created,
+      sessions,
+      controller: {
+        claimNextQueuedTurn,
+        finishQueuedTurn,
+      } as unknown as AgentController,
+      sendText: vi.fn(async () => {
+        throw new Error('网络断了')
+      }),
+      applySessionSnapshot: (next) => snapshots.push(next),
+    })
+    let api: ReturnType<typeof useAgentQueueController> | null = null
+    function Probe() {
+      api = useAgentQueueController(props)
+      return createElement('span', null, 'ok')
+    }
+    renderToStaticMarkup(createElement(Probe))
+
+    await api!.resumeQueue()
+
+    expect(claimNextQueuedTurn).toHaveBeenCalledTimes(1)
+    expect(finishQueuedTurn).toHaveBeenCalledTimes(1)
+    expect(snapshots).toEqual([
+      expect.objectContaining({
+        activeTurnId: queuedTurn.id,
+        activeTurn: expect.objectContaining({ id: queuedTurn.id }),
+        queuedTurns: [],
+      }),
+      expect.objectContaining({
+        activeTurnId: undefined,
+        activeTurn: undefined,
+        queuedTurns: [expect.objectContaining({ id: queuedTurn.id })],
+      }),
+    ])
+    const saved = await sessions.get(created.id)
+    expect(saved?.activeTurnId).toBeUndefined()
+    expect(saved?.activeTurn).toBeUndefined()
+    expect(saved?.queuedTurns).toEqual([
+      expect.objectContaining({ id: queuedTurn.id }),
+    ])
+    expect(shouldDrainQueue(created.id)).toBe(false)
   })
 })
 

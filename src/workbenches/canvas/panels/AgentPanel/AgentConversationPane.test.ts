@@ -2,6 +2,8 @@ import { createElement, createRef } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it, vi } from 'vitest'
 import type { AgentSession } from '../../../../state/agent/sessionStore'
+import { createAgentSessionStore } from '../../../../state/agent/sessionStore'
+import { createMemoryPlatform } from '../../../../platform/memory'
 import { AgentConversationPane } from './AgentConversationPane'
 
 const session: AgentSession = {
@@ -126,5 +128,34 @@ describe('AgentConversationPane', () => {
     expect(html).toContain('data-agent-queue')
     expect(html).toContain('排在后面')
     expect(html).toContain('data-agent-scroll-wrap')
+  })
+
+  it('★★ 真实 store 领取后，活动回合不再渲染成等待队列行', async () => {
+    const sessions = createAgentSessionStore(createMemoryPlatform().storage)
+    const created = await sessions.create({
+      projectId: 'project-1',
+      channelId: '',
+      model: 'model-1',
+    })
+    await sessions.enqueueTurn(created.id, {
+      id: 'turn-active',
+      text: '正在运行的手帕种草图',
+      createdAt: 2,
+      channelId: '',
+      model: 'model-1',
+    })
+    const claimed = await sessions.claimNextQueuedTurn(created.id)
+    expect(claimed?.session).toMatchObject({
+      activeTurnId: 'turn-active',
+      activeTurn: { id: 'turn-active' },
+      queuedTurns: [],
+    })
+
+    const html = renderPane({
+      current: claimed!.session,
+      status: { kind: 'thinking' },
+    })
+    expect(html).not.toContain('data-agent-queue')
+    expect(html).not.toContain('正在运行的手帕种草图')
   })
 })
