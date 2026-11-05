@@ -569,7 +569,9 @@ const CAPABILITY_QUERY_GROUPS: readonly {
     names: ['applyPlan', 'proposeTaskPlan'],
   },
   {
-    terms: ['修改', '参数', '模型', '提示词', '改名'],
+    // ⚠️ `updateNode` 执行的是 `node.updateData`，**改不了 title**。
+    // 「改名 / 改标题」属于下面 UNSUPPORTED 那一类，绝不能在这里就近匹配到 updateNode。
+    terms: ['修改', '参数', '模型', '提示词'],
     names: ['updateNode'],
   },
   {
@@ -606,6 +608,47 @@ const CAPABILITY_QUERY_GROUPS: readonly {
   },
 ]
 
+/**
+ * 明确「当前没有对应工具」的动作。
+ *
+ * 事故（2026-11-04）：用户让 Agent 改节点标题，模型查能力拿到 `updateNode`，
+ * 于是先说“可以帮你改名”、再说“改好了”——画布没变，因为 `updateNode` 只改
+ * `node.data`（提示词 / 模型等），而仓库里根本没有暴露给 Agent 的 rename 命令。
+ *
+ * 这类查询必须**返回空匹配 + 明确的 supported:false**，让模型只能如实回答做不到；
+ * 绝不能就近落到某个"看起来相关"的工具上。
+ */
+const UNSUPPORTED_CAPABILITY_QUERIES: readonly {
+  terms: readonly string[]
+  capability: string
+  error: string
+}[] = [
+  {
+    terms: [
+      '改名',
+      '重命名',
+      '改标题',
+      '换标题',
+      '改节点标题',
+      '改节点名字',
+      '改名字',
+      '节点名称',
+      '修改节点名称',
+      '改名称',
+      '名称改成',
+      '设置名称',
+      '标题改成',
+      'rename',
+      'retitle',
+    ],
+    capability: 'rename',
+    error:
+      '当前没有改名 / 重命名节点的工具（supported: false）。' +
+      '`updateNode` 只能改节点参数（提示词、模型等），不能改节点标题；' +
+      '请如实告诉用户「当前没有改名能力」，不要假装已经改好。',
+  },
+]
+
 export interface AgentCapabilityDiscovery {
   result: Record<string, unknown>
   tools: readonly ToolDeclaration[]
@@ -626,6 +669,25 @@ export function discoverAgentTools(
       result: {
         ok: false,
         error: 'query 不能为空',
+        available: candidates.map((tool) => tool.name),
+      },
+      tools: [],
+    }
+  }
+
+  const unsupported = UNSUPPORTED_CAPABILITY_QUERIES.find((rule) =>
+    rule.terms.some((term) => normalized.includes(term)),
+  )
+  if (unsupported) {
+    return {
+      result: {
+        ok: false,
+        supported: false,
+        query,
+        capability: unsupported.capability,
+        loaded: [],
+        capabilities: [],
+        error: unsupported.error,
         available: candidates.map((tool) => tool.name),
       },
       tools: [],

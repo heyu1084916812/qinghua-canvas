@@ -160,6 +160,7 @@ export function useAgentPanelTurnCore({
     turnToolsRef,
     deliveredSteersRef,
     appendLiveProcessFor,
+    clearLiveProcessFor,
     setLiveActivityFor,
     setStatusFor,
     activeAgentTools,

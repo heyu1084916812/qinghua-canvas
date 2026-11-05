@@ -3,7 +3,14 @@ import type { AgentToolEffect } from '../../../domain/agent/job'
 import type { ChatMessage } from '../../../domain/shared/execution/types'
 import { AgentToolEffectBlockedError } from '../../../features/shared/agent/AgentToolEffectLedger'
 import { ChannelError } from '../../../platform/channels/types'
-import { AGENT_DEFAULT_MAX_STEPS, errText, resumeAgentTurn, runAgentTurn } from './agentLoop'
+import {
+  AGENT_DEFAULT_MAX_STEPS,
+  claimsCanvasActionDone,
+  claimsMissingCapability,
+  errText,
+  resumeAgentTurn,
+  runAgentTurn,
+} from './agentLoop'
 import { AGENT_TOOLS } from './tools'
 
 /**
@@ -670,6 +677,276 @@ describe('runAgentTurn · 基本往复', () => {
     expect(adapter.completeText).toHaveBeenCalledTimes(3)
     expect(r.kind).toBe('message')
     if (r.kind === 'message') expect(r.text).toBe('已经移动好了')
+  })
+
+  /**
+   * 2026-11-04 真实事故：用户要求改节点标题，模型**没调任何工具**就回答“改好了”，
+   * 画布却没有任何变化。修复分两条独立防线：
+   * ① 承诺前必须先查能力；② 声称完成必须有本回合的成功执行证据。
+   */
+  it('★★ 未查能力就承诺“我可以帮你改标题”：先补查，不许直接落成回答', async () => {
+    const discoverCapabilities = vi.fn(async () => ({
+      result: { ok: false, supported: false, loaded: [], error: '当前没有改名能力' },
+      tools: [],
+    }))
+    const { deps, adapter } = depsWith([
+      { text: '我可以帮你把这个节点的标题改成「封面」。' },
+      { text: '抱歉，当前没有改名工具，我做不到。' },
+    ])
+
+    const r = await runAgentTurn(user('把这个节点的标题改成「封面」'), {
+      ...deps,
+      discoverCapabilities,
+    })
+
+    expect(discoverCapabilities).toHaveBeenCalledOnce()
+    expect(adapter.completeText).toHaveBeenCalledTimes(2)
+    expect(r.kind).toBe('message')
+    if (r.kind === 'message') expect(r.text).toContain('没有改名工具')
+  })
+
+  it('★★ 零工具直接说“改好了”：拦截 → 回填 → 改口“做不到”才允许收口', async () => {
+    const discoverCapabilities = vi.fn(async () => ({
+      result: { ok: false, supported: false, loaded: [], error: '当前没有改名能力' },
+      tools: [],
+    }))
+    const { deps, adapter } = depsWith([
+      { text: '改好了，标题已经换成「封面」。' },
+      // 还没查能力就直接否认 —— 必须再补查一次，不能直接收口
+      { text: '当前没有改名工具。' },
+      { text: '抱歉，当前没有改名工具，这次没有做任何修改。' },
+    ])
+    const onProcessReset = vi.fn()
+
+    const r = await runAgentTurn(user('把这个节点的标题改成「封面」'), {
+      ...deps,
+      discoverCapabilities,
+      onProcessReset,
+    })
+
+    // ①“改好了”被拦 → ②未查能力就否认被要求补查 → ③基于真实能力目录收口
+    expect(adapter.completeText).toHaveBeenCalledTimes(3)
+    expect(discoverCapabilities).toHaveBeenCalledOnce()
+    expect(onProcessReset).toHaveBeenCalledTimes(2)
+    expect(r.kind).toBe('message')
+    if (r.kind === 'message') expect(r.text).toContain('没有改名工具')
+    expect(
+      r.messages.some(
+        (message) =>
+          message.role === 'system' &&
+          message.content.includes('没有执行证据'),
+      ),
+    ).toBe(true)
+  })
+
+  it('★★ 补查结果为空后仍继续承诺：第二次被 promiseGate 拦成 error', async () => {
+    const discoverCapabilities = vi.fn(async () => ({
+      result: { ok: false, supported: false, loaded: [], error: '当前没有改名能力' },
+      tools: [],
+    }))
+    const { deps, adapter } = depsWith([
+      { text: '我可以帮你改这个标题。' },
+      { text: '我可以帮你改这个标题。' },
+      { text: '我可以帮你改这个标题。' },
+    ])
+
+    const r = await runAgentTurn(user('把标题改成「封面」'), {
+      ...deps,
+      discoverCapabilities,
+    })
+
+    expect(discoverCapabilities).toHaveBeenCalledOnce()
+    expect(adapter.completeText).toHaveBeenCalledTimes(3)
+    expect(r.kind).toBe('error')
+    if (r.kind === 'error') {
+      expect(r.message).toContain('已拦下这次回答')
+    }
+  })
+
+  it('★★ updateNode 成功不能冒充改名成功（按类别核对证据）', async () => {
+    const { deps, adapter } = depsWith([
+      { text: '标题已经改好了。' },
+      { text: '当前没有改名能力，刚才只改了参数。' },
+    ])
+    // 手工构造“本回合 updateNode 成功”的历史（它就是 node.updateData，改不了 title）
+    const history: ChatMessage[] = [
+      { role: 'user', content: '把标题改成「封面」' },
+      {
+        role: 'assistant',
+        content: '',
+        toolCalls: [{ id: 'u1', name: 'updateNode', args: '{}' }],
+      },
+      {
+        role: 'tool',
+        toolCallId: 'u1',
+        toolName: 'updateNode',
+        content: JSON.stringify({ ok: true }),
+      },
+    ]
+
+    const r = await runAgentTurn(history, deps)
+
+    expect(adapter.completeText).toHaveBeenCalledTimes(2)
+    expect(r.kind).toBe('message')
+    if (r.kind === 'message') expect(r.text).toContain('没有改名能力')
+  })
+
+  it('★★ 只读过图（readGraph 成功）同样不算改名证据', async () => {
+    const { deps, adapter } = depsWith([
+      { text: '标题改好了。' },
+      { text: '当前做不到：没有改名工具，我刚才只是读了画布。' },
+    ])
+    const history: ChatMessage[] = [
+      { role: 'user', content: '把标题改成「封面」' },
+      {
+        role: 'assistant',
+        content: '',
+        toolCalls: [{ id: 'r1', name: 'readGraph', args: '{"scope":"all"}' }],
+      },
+      {
+        role: 'tool',
+        toolCallId: 'r1',
+        toolName: 'readGraph',
+        content: JSON.stringify({ nodes: [] }),
+      },
+    ]
+
+    const r = await runAgentTurn(history, deps)
+
+    expect(adapter.completeText).toHaveBeenCalledTimes(2)
+    expect(r.kind).toBe('message')
+    if (r.kind === 'message') expect(r.text).toContain('没有改名工具')
+  })
+
+  it('★★ 带工具调用的正文先报“改好了”：正文撤下，工具照常执行后重答', async () => {
+    const { deps, adapter } = depsWith([
+      {
+        text: '改好了。',
+        toolCalls: [{ id: 'read', name: 'readGraph', args: '{"scope":"all"}' }],
+      },
+      { text: '标题还没改，当前只是读取了画布。' },
+    ])
+    const onProcessReset = vi.fn()
+
+    const r = await runAgentTurn(user('把标题改成「封面」'), {
+      ...deps,
+      onProcessReset,
+    })
+
+    expect(onProcessReset).toHaveBeenCalledOnce()
+    expect(adapter.completeText).toHaveBeenCalledTimes(2)
+    expect(r.kind).toBe('message')
+    expect(
+      r.messages.filter((message) => message.role === 'assistant'),
+    ).toEqual([
+      expect.objectContaining({
+        content: '',
+        toolCalls: [{ id: 'read', name: 'readGraph', args: '{"scope":"all"}' }],
+      }),
+      expect.objectContaining({ content: '标题还没改，当前只是读取了画布。' }),
+    ])
+  })
+
+  it('★★ 工具结果 problems 非空不算执行证据', async () => {
+    const { deps, adapter } = depsWith([
+      { text: '已经生成好了。' },
+      { text: '刚才那次生成失败了，还没有出新图。' },
+    ])
+    const history: ChatMessage[] = [
+      { role: 'user', content: '生成一张封面图' },
+      {
+        role: 'assistant',
+        content: '',
+        toolCalls: [{ id: 'r1', name: 'runNode', args: '{}' }],
+      },
+      {
+        role: 'tool',
+        toolCallId: 'r1',
+        toolName: 'runNode',
+        content: JSON.stringify({ ok: true, problems: ['节点不存在'] }),
+      },
+    ]
+
+    const r = await runAgentTurn(history, deps)
+
+    expect(adapter.completeText).toHaveBeenCalledTimes(2)
+    expect(r.kind).toBe('message')
+  })
+
+  it('★★ applyPlan 建工作流不能冒充“已生成”', async () => {
+    const { deps, adapter } = depsWith([
+      { text: '已经生成好了。' },
+      { text: '刚建好工作流，还没有运行生成。' },
+    ])
+    const history: ChatMessage[] = [
+      { role: 'user', content: '生成一张封面图' },
+      {
+        role: 'assistant',
+        content: '',
+        toolCalls: [{ id: 'p1', name: 'applyPlan', args: '{}' }],
+      },
+      {
+        role: 'tool',
+        toolCallId: 'p1',
+        toolName: 'applyPlan',
+        content: JSON.stringify({ ok: true }),
+      },
+    ]
+
+    const r = await runAgentTurn(history, deps)
+
+    expect(adapter.completeText).toHaveBeenCalledTimes(2)
+    expect(r.kind).toBe('message')
+  })
+
+  it('★★ 普通聊天与创作建议不触发能力补查，也不拦完成语气', async () => {
+    const discoverCapabilities = vi.fn()
+    const { deps, adapter } = depsWith([
+      { text: '我建议你手动把标题改短一些；这段文案整体不错，已完成的部分保留。' },
+    ])
+
+    const r = await runAgentTurn(user('帮我看看这段文案'), {
+      ...deps,
+      discoverCapabilities,
+    })
+
+    expect(discoverCapabilities).not.toHaveBeenCalled()
+    expect(adapter.completeText).toHaveBeenCalledTimes(1)
+    expect(r.kind).toBe('message')
+  })
+
+  it('★★ 完成声明覆盖常见口语变体；回顾过去不算本轮完成', () => {
+    const cases: Array<[string, string]> = [
+      ['已经改好了', 'rename'],
+      ['已经改成「封面」了', 'rename'],
+      ['改成了「封面」', 'rename'],
+      ['改标题完成', 'rename'],
+      ['已经删除两个节点', 'delete'],
+      ['删除完成', 'delete'],
+      ['已经移动好了', 'move'],
+      ['移动完成', 'move'],
+      ['已经生成好了', 'generate'],
+      ['生成完成', 'generate'],
+    ]
+    for (const [text, category] of cases) {
+      expect(claimsCanvasActionDone(text), text).toEqual({ category })
+    }
+    // 回顾过去（"之前你删除了…"）不是本轮完成声明
+    expect(claimsCanvasActionDone('之前你删除了三个节点')).toBeNull()
+    // 普通总结里没有画布动作词，不算完成声明
+    expect(claimsCanvasActionDone('已完成总结')).toBeNull()
+  })
+
+  it('★★ 能力否定结论复用画布动作词表，先查能力再下结论', () => {
+    for (const text of [
+      '当前没有改名工具。',
+      '我不能修改节点名称。',
+      '标题改不了。',
+      '改名功能不可用。',
+    ]) {
+      expect(claimsMissingCapability(text), text).toBe(true)
+    }
+    expect(claimsMissingCapability('这段文案已经总结完成。')).toBe(false)
   })
 
   it('★ 实时活动只上报公开阶段与真实工具开始/结束', async () => {

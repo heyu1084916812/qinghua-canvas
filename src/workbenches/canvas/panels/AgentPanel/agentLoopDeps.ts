@@ -101,6 +101,7 @@ export interface AgentLoopAssemblyPorts {
     ids: Set<string>,
   ) => void
   appendLiveProcessFor: (sessionId: string, text: string) => void
+  clearLiveProcessFor?: (sessionId: string) => void
   setLiveActivityFor: (
     sessionId: string,
     activity: AgentLoopActivity,
@@ -273,6 +274,9 @@ export function assembleAgentLoopDeps(
         ports.setStatusFor(session.id, { kind: 'thinking' })
       }
     },
+    ...(ports.clearLiveProcessFor
+      ? { onProcessReset: () => ports.clearLiveProcessFor!(session.id) }
+      : {}),
     channelId: route?.channelId ?? '',
     model: logicalModel,
     tools: turnTools,

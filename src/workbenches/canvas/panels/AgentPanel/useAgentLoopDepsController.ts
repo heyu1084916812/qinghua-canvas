@@ -67,6 +67,7 @@ export interface AgentLoopDepsControllerInput {
   >
   deliveredSteersRef: MutableRefObject<Map<string, Set<string>>>
   appendLiveProcessFor: AgentLoopAssemblyPorts['appendLiveProcessFor']
+  clearLiveProcessFor: NonNullable<AgentLoopAssemblyPorts['clearLiveProcessFor']>
   setLiveActivityFor: AgentLoopAssemblyPorts['setLiveActivityFor']
   setStatusFor: AgentLoopAssemblyPorts['setStatusFor']
   activeAgentTools: readonly ToolDeclaration[]
@@ -122,6 +123,7 @@ export function useAgentLoopDepsController(
             input.deliveredSteersRef.current.set(sessionId, ids)
           },
           appendLiveProcessFor: input.appendLiveProcessFor,
+          clearLiveProcessFor: input.clearLiveProcessFor,
           setLiveActivityFor: input.setLiveActivityFor,
           setStatusFor: input.setStatusFor,
         },
@@ -146,6 +148,7 @@ export function useAgentLoopDepsController(
       input.cachedChatRoute,
       input.canvasReviewEnabled,
       input.channels,
+      input.clearLiveProcessFor,
       input.commitChatRoute,
       input.contextTraceRef,
       input.deliveredSteersRef,

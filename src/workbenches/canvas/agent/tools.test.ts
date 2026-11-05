@@ -153,6 +153,42 @@ describe('工具声明', () => {
     })
   })
 
+  it('★★ 改名 / 改标题查询不返回 updateNode，而是明确的“没有该能力”', () => {
+    for (const query of [
+      '改节点标题',
+      'rename node title',
+      '把节点重命名成新标题',
+      '修改节点名称',
+      '设置名称',
+      '标题改成「封面」',
+      '把节点名称改成「封面」',
+    ]) {
+      const found = discoverAgentTools(
+        query,
+        agentToolsForCapabilities({ canvasReview: false }),
+      )
+      expect(found.tools).toEqual([])
+      expect(found.result).toMatchObject({ ok: false, supported: false })
+      expect(String(found.result.error)).toContain('没有改名')
+      expect(found.result.loaded).toEqual([])
+    }
+  })
+
+  it('★ 移动 / 删除 / 运行的能力匹配不被改名规则误伤', () => {
+    const move = discoverAgentTools('把节点移动并排列成一排')
+    expect(move.tools.map((tool) => tool.name)).toEqual(
+      expect.arrayContaining(['moveNodes', 'arrangeNodes']),
+    )
+    const remove = discoverAgentTools('删除这些节点')
+    expect(remove.tools.map((tool) => tool.name)).toEqual(
+      expect.arrayContaining(['deleteNodes']),
+    )
+    const run = discoverAgentTools('运行节点生成图片')
+    expect(run.tools.map((tool) => tool.name)).toEqual(
+      expect.arrayContaining(['runNode']),
+    )
+  })
+
   it('设计调研读工具把规范化参数交给宿主服务', async () => {
     const researchDesign = vi.fn(async () => ({ ok: true, items: [] }))
     const result = await executeReadTool(

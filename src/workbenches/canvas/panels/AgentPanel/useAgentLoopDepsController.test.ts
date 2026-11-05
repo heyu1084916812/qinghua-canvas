@@ -78,6 +78,7 @@ function harness(over: Partial<AgentLoopDepsControllerInput> = {}) {
     turnToolsRef,
     deliveredSteersRef,
     appendLiveProcessFor: vi.fn() as never,
+    clearLiveProcessFor: vi.fn() as never,
     setLiveActivityFor: vi.fn() as never,
     setStatusFor: vi.fn() as never,
     activeAgentTools: [toolA] as never,

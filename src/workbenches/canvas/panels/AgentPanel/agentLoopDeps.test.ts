@@ -213,6 +213,7 @@ function harness(args: {
       deliveredStore.set(sessionId, ids)
     },
     appendLiveProcessFor: vi.fn(),
+    clearLiveProcessFor: vi.fn(),
     setLiveActivityFor: vi.fn(),
     setStatusFor: vi.fn((_id, status) => {
       statusUpdates.push(status)
@@ -593,5 +594,15 @@ describe('流式分片与过程状态', () => {
     )
     // tool 不切状态：只在 reasoning / content 时切
     expect(h.statusUpdates).toEqual([{ kind: 'thinking' }, { kind: 'thinking' }])
+  })
+
+  it('★★ 被能力/完成门禁丢弃的草稿会清掉当前会话的流式过程', () => {
+    const h = harness({})
+
+    h.deps.onProcessReset?.()
+
+    expect(vi.mocked(h.ports.clearLiveProcessFor!)).toHaveBeenCalledWith(
+      session.id,
+    )
   })
 })
