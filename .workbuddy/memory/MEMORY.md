@@ -1,5 +1,18 @@
 # CanvasFlow（轻画）项目记忆
 
+### 结构治理第一批（2026-11-05，P0 第一刀）
+
+- `channelCredentials.ts` 是凭证明文、Key 分组和槽位解析的唯一实现；运行态只拿窄
+  `repo.credentials.load(ref)`，不要再创建自己的 `ChannelRepository().loadToken`。
+  渠道删除顺序仍是“撤路由/中断在飞 → 停用行 → 清全部密文 → 删行”。
+- `projectRuntimeSnapshots.ts` 只发布 pending operation 的只读投影。监听器异常必须逐项隔离；
+  Registry 仍是 phase/lock/registration 和 commit/recovery/rollback 的唯一事务 owner。
+  `committing` 与 `cleanup_failed` 不接受 rollback 降级。
+- `useCanvasRunRecorder.ts` 只拥有引擎外记录追加、版本账本和融合记录构造。正常
+  `runEngine/placement` 的资产、节点、RunRecord 同批次提交顺序不能搬进 recorder。
+- 结构门禁的 legacy 预算必须允许“等于或低于基线”，不能把“只许下降”实现成“必须等于基线”。
+  本轮已修正并补了上调拒绝的反例测试。
+
 ### Agent 视觉能力不能由模型自述或过时目录裁定（2026-11-05，#946）
 
 - 视觉验收与主对话共用 `chatModelAcceptsImages`，按当前 route 的 chat + image 元数据判断；

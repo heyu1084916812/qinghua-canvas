@@ -2,7 +2,8 @@
 
 > 状态：治理基线  
 > 日期：2026-11-05  
-> 当前代码基线：`3b13aca`  
+> 当前代码基线：`c91a524`
+> 结构治理落地提交：`cfb4f0a`
 > 适用范围：整个 `src/`，重点是 Agent、电商、设置、画布执行、渠道和项目运行态  
 > 本文性质：结构治理方案，不是功能需求文档  
 > 判定原则：功能是否完成仍以 `轻画-功能对账清单.md` 为准；本文只解决代码结构、拆分顺序、行为边界和门禁
@@ -37,31 +38,43 @@
 
 ---
 
-## 验证记录（2026-11-05，基线 3b13aca）
+## 验证记录（2026-11-05，基线 c91a524）
 
 本文已按当前工作区重新核对，旧数据不再直接作为下一批任务依据。
 
-- 实测 TS/TSX：总 1,172、生产 715、测试 457；生产约 163,060 行，测试约 97,256 行。
-- 生产 TS/TSX 超千行：18 个，数量与原文一致。
+- **过期快照（保留，不再作为当前依据）**：旧摘要写 `8b50740`、本文 1,626 行、约 43KB；
+  其中全仓统计和 Agent 行数也已被后续提交改变，不能继续用于排期或验收。
+- **校准前文档实测（本次更新前）**：本文 1,663 行、45,775 bytes（按
+  `Get-Content.Count` / `git diff` 的换行口径）；旧摘要的 1,626 行、43KB 已过期。
+- **当前代码实测**：HEAD `c91a524`，结构治理门禁由 `cfb4f0a` 落地。
+- 实测 TS/TSX：总 1,180、生产 719、测试 461；生产 163,497 行，测试 98,869 行。
+- 生产 TS/TSX 超千行：17 个，第一批拆出两个低于 1,000 行。
 - 生产 CSS 超千行：7 个，原文写 8 个，已修正。
 - Agent：`AgentPanel.tsx` 145、`useAgentPanelSessionModel.ts` 731、
-  `useAgentPanelTurnModel.ts` 494、`agentLoop.ts` 803、`agentCanvasClaimGuard.ts` 348、
-  `tools.ts` 797、`sessionStore.ts` 749。
+  `useAgentPanelTurnModel.ts` 494、`AgentPanel.module.css` 248、`agentLoop.ts` 837、
+  `agentCanvasClaimGuard.ts` 348、`tools.ts` 797、`sessionStore.ts` 787。
 - 结构门禁已从方案变成代码：`architecture/module-governance.json` +
   `scripts/module-governance*.mjs`，接入 `npm run check`；现有 18 个 TS/TSX 和 7 个 CSS
   已进入 legacy 白名单，新生产文件默认 TS/TSX 450、CSS 600。
 
 三条 P0 审计结论：
 
+> **2026-11-05 第一批已落地**：渠道凭证已抽到 `channelCredentials.ts` 并统一运行态读口；
+> `ProjectRuntimeRegistry` 已先修 pending 订阅异常并抽出只读快照；`CanvasExecutionProvider` 已抽出
+> `useCanvasRunRecorder.ts`。这仍是第一批，不代表 P0 全部完成：锁、请求编排和 `runPreflight` 仍在后续。
+
 1. `channelStore` 凭证写入已基本单一化，但读取仍散在 ChannelStore 和三个执行宿主；
    路由快照还存在画布 live-token 双路径。第一刀应做凭证模块并接管运行态读取口，
    不先拆路由；渠道删除的“撤路由/中断在飞任务 → 停用 → 清凭据 → 删行”不可改变。
+   `src/platform/generation/generationClient.ts` 已负责选组/读 Key/适配器调用，
+   `channelStore.completeWithTools` 的问题是 Store 请求编排，不是缺少另一个 generation client。
 2. `ProjectRuntimeRegistry` 可拆，但不能拆成六个平级事务 owner。已发现 pending 订阅回调
-   异常可把 registry 卡在 `committing`；应先补异常隔离特征测试，再抽
-   `projectRuntimeSnapshots.ts`，commit/rollback/recovery 仍由同一个阶段负责人控制。
+   异常可把 registry 卡在 `committing`；必须先修异常隔离，再先抽
+   `projectRuntimeSnapshots.ts`，锁下一步再抽。commit/rollback/recovery 不能拆成三个独立事务
+   owner，`dispose` 也必须纳入同一生命周期语义。
 3. `CanvasExecutionProvider` 未发现可复现重复扣费或资产丢失 P0，但确认 4 个 P1：
    分支取消信号丢失、路由失败状态不完整、融合记录非原子、版本基线初始化失败被吞。
-   第一刀应做 `runRecorder`；`runPreflight` 必须排在其后并先修行为。
+   第一刀应做 `runRecorder`；`runPreflight` 必须排在其后，并先修取消信号与失败状态。
 
 ---
 
@@ -73,12 +86,12 @@
 
 | 指标 | 数量 |
 | --- | ---: |
-| TS/TSX 文件总数 | 1,172 |
-| 生产 TS/TSX 文件 | 715 |
-| 测试 TS/TSX 文件 | 457 |
-| 生产 TS/TSX 代码行 | 163,060 |
-| 测试 TS/TSX 代码行 | 97,256 |
-| 超过 1,000 行的生产 TS/TSX 文件 | 18 |
+| TS/TSX 文件总数 | 1,180 |
+| 生产 TS/TSX 文件 | 719 |
+| 测试 TS/TSX 文件 | 461 |
+| 生产 TS/TSX 代码行 | 163,497 |
+| 测试 TS/TSX 代码行 | 98,869 |
+| 超过 1,000 行的生产 TS/TSX 文件 | 17 |
 | 超过 1,000 行的生产 CSS 文件 | 7 |
 
 测试代码约占生产代码的 59%。这是明显优势，说明项目不是没有验证；但测试数量多不等于模块边界天然正确。大文件会让测试越来越难定位、越来越慢，也更容易出现“只验证局部、没有验证完整顺序”的假安全感。
@@ -93,10 +106,10 @@ Agent 已经从早期 6,000 行级主面板降到当前结构：
 | `useAgentPanelSessionModel.ts` | 731 | 会话域装配 |
 | `useAgentPanelTurnModel.ts` | 494 | 回合域装配 |
 | `AgentPanel.module.css` | 248 | 面板样式入口 |
-| `agentLoop.ts` | 803 | 模型循环与门禁接线 |
+| `agentLoop.ts` | 837 | 模型循环与门禁接线 |
 | `agentCanvasClaimGuard.ts` | 348 | 能力/完成证据门禁 |
 | `tools.ts` | 797 | 工具执行总入口 |
-| `sessionStore.ts` | 749 | 会话事务边界（≤790 结构预算） |
+| `sessionStore.ts` | 787 | 会话事务边界（≤790 结构预算） |
 
 Agent 仍是需要继续优化的大型模块，但已经不是全仓最危险的地方。它相对健康的证据是：
 
@@ -133,7 +146,7 @@ Agent 可以继续拆，但不应为了追求 300 行而继续碎片化。当前
 
 | 文件 | 行数 | 当前混合职责 | 风险 |
 | --- | ---: | --- | --- |
-| `src/workbenches/canvas/execution/CanvasExecutionProvider.tsx` | 1,692 | 启动运行、路由、循环、技能、合成、节点执行、整组执行、取消、记录 | 最高 |
+| `src/workbenches/canvas/execution/CanvasExecutionProvider.tsx` | 1,606 | 启动运行、路由、循环、技能、合成、节点执行、整组执行、取消；引擎外记录已下沉 | 最高 |
 | `src/workbenches/canvas/flow/FlowSurface.tsx` | 1,576 | 节点渲染、拖拽、连线、框选、右键菜单、导入、视口同步、删除 | 高 |
 | `src/workbenches/canvas/panels/CreationPanel.tsx` | 2,437 | 图片/视频参数、模型选择、生成配置、质量参数 | 高 |
 | `src/workbenches/canvas/lightbox/LightboxLayer.tsx` | 1,764 | 灯箱、图片查看和编辑交互 | 中高 |
@@ -142,7 +155,7 @@ Agent 可以继续拆，但不应为了追求 300 行而继续碎片化。当前
 
 | 文件 | 行数 | 当前混合职责 | 风险 |
 | --- | ---: | --- | --- |
-| `src/state/channel/channelStore.ts` | 1,802 | 渠道 CRUD、凭证、协议、模型、路由、配方、文本/语音/视频请求 | 最高 |
+| `src/state/channel/channelStore.ts` | 1,595 | 渠道 CRUD、凭证 facade、协议、模型、路由、配方、请求编排 | 最高 |
 | `src/platform/channels/openaiImages.ts` | 1,685 | 多上游图片响应、轮询、错误提取、图片解析、适配器 | 高 |
 | `src/platform/channels/runninghubEndpoints.ts` | 1,032 | RunningHub 端点与协议细节 | 中高 |
 | `src/platform/channels/runninghub.ts` | 约 866 | RunningHub 适配实现 | 中高 |
@@ -155,7 +168,7 @@ Agent 可以继续拆，但不应为了追求 300 行而继续碎片化。当前
 | --- | ---: | --- | --- |
 | `src/pages/ProjectsPage/ProjectsPage.tsx` | 1,421 | 项目列表、批量操作、删除确认、错误与恢复 | 高 |
 | `src/app/ProjectTree.tsx` | 1,273 | 项目树、新建、重命名、删除、繁忙态、恢复入口 | 高 |
-| `src/app/ProjectRuntimeRegistry.ts` | 1,013 | 操作锁、prepare、commit、rollback、recovery、dispose、快照订阅 | 最高 |
+| `src/app/ProjectRuntimeRegistry.ts` | 950 | 操作锁、prepare、commit、rollback、recovery、dispose；快照已下沉 | 最高 |
 
 `ProjectRuntimeRegistry` 是一个高风险状态机。它本身可以继续担任编排门面，但内部应拆成锁、准备、提交、恢复、快照五块。
 
@@ -301,7 +314,7 @@ ChannelFacade
 ### 4.5 公共层不等于单文件
 
 “渠道做成中央公共层”是正确的。  
-“渠道所有实现都放在一个 1,802 行文件”不是公共层的必然要求。
+“渠道所有实现都放在一个 1,802 行文件”不是公共层的必然要求；第一批已缩到 1,595 行。
 
 公共层可以是一个很小的门面，背后有多个内部模块。
 
@@ -472,7 +485,11 @@ ProjectRuntimeFacade
 
 ```text
 channelStore.ts
-  渠道 CRUD + Token + 凭证组 + 协议 + 模型 + 路由 + 配方 + 生成请求
+  渠道 CRUD + Token + 凭证组 + 协议 + 模型 + 路由 + 配方
+  + Store 请求编排（上下文/素材注入、RunRecord 包装）
+
+src/platform/generation/generationClient.ts
+  已有生成客户端：选凭据组、读 Key、映射模型、创建并调用协议适配器
 ```
 
 目标：
@@ -485,13 +502,19 @@ channelProtocols.ts              # 内置/自定义协议
 channelModelCatalog.ts           # 全局模型、分类、映射
 channelRouting.ts                # 候选、策略、权重、故障转移
 channelRecipes.ts                # 默认配方和记忆
-channelGenerationClient.ts       # 文本/图片/语音/视频统一入口
+channelRequestOrchestration.ts   # completeWithTools 的上下文、素材与 RunRecord 编排
 channelImporter.ts               # 导入、探测、刷新模型
+
+src/platform/generation/generationClient.ts
+  继续作为唯一生成客户端；复用，不另建第二套
 ```
 
 边界：
 
 - `channelStore` 只组合模块并维护状态；
+- 生成请求继续复用 `src/platform/generation/generationClient.ts`。它负责选组、读 Key、
+  模型映射和适配器调用；`channelStore.completeWithTools` 仍承担上下文、素材注入和
+  RunRecord 包装，因此下一步要拆的是 **Store 请求编排**，不是另建 generation client；
 - 凭证模块不生成图片；
 - 路由模块不发请求；
 - 适配器不修改渠道记录；
@@ -611,7 +634,6 @@ workbench/
 CanvasExecutionProvider.tsx       # 公共 Provider 和 API 门面
 execution/
   executionHost.ts
-  runPreflight.ts
   runPlanner.ts
   runLoop.ts
   textCompletionRunner.ts
@@ -619,13 +641,15 @@ execution/
   composeRunner.ts
   nodeRunner.ts
   groupRunner.ts
-  runRecorder.ts
+  runRecorder.ts                  # 第一刀
+  runPreflight.ts                 # 第二刀；先修取消信号与失败状态
   cancelRuntime.ts
 ```
 
 边界：
 
 - Provider 只组装 API 和生命周期；
+- 第一刀先抽 `runRecorder`；`runPreflight` 排在其后，并先修分支取消信号与路由失败状态；
 - preflight 不发请求；
 - runLoop 不拼 UI；
 - runRecorder 不改变执行顺序；
@@ -662,17 +686,18 @@ flow/
 ```text
 ProjectRuntimeRegistry.ts         # 操作门面
 runtime/
-  projectOperationLock.ts
-  prepareProjectRuntimes.ts
-  commitProjectRuntimes.ts
-  rollbackProjectRuntimes.ts
-  recoverProjectRuntimes.ts
-  projectRuntimeSnapshots.ts
+  projectRuntimeSnapshots.ts      # 第一刀
+  projectOperationLock.ts         # 第二刀
+  projectRuntimeTransactions.ts   # 后续：唯一事务协调器，非三个独立 owner
 ```
 
 边界：
 
 - Registry 统一控制阶段；
+- 先修 pending 订阅回调异常隔离，再抽快照；快照之后才动锁；
+- commit/rollback/recovery 必须由同一个事务协调器掌握，不能拆成三个各自提交、回滚或恢复的
+  transaction owner；`disposeProjectRuntimes` / `disposeAllProjectRuntimes` 也必须纳入同一套
+  生命周期与 cleanup 语义；
 - Lock 只判断占用；
 - Prepare 只准备，不提交；
 - Commit 只执行已准备事务；
@@ -1647,9 +1672,12 @@ INVARIANTS.md               # 不可破坏的行为顺序
 接下来不要同时大拆五块。按单一切口推进：
 
 1. 先做架构预算和职责登记门禁，防止边拆边膨胀。
-2. 从 `channelStore` 的凭证模块或路由模块切第一刀。
-3. 从 `ProjectRuntimeRegistry` 的操作锁或快照订阅切第一刀。
-4. 从 `CanvasExecutionProvider` 的 pure preflight 或 runRecorder 切第一刀。
+2. `channelStore` 凭证第一刀已完成；下一步拆 Store 请求编排，继续复用现有 generation client，
+   不另建第二套。
+3. `ProjectRuntimeRegistry` 的订阅异常隔离和快照第一刀已完成；下一步拆锁，
+   commit/rollback/recovery 保持单一事务 owner，dispose 一并纳入语义。
+4. `CanvasExecutionProvider` 的 `runRecorder` 第一刀已完成；下一步 `runPreflight`，
+   并先修取消信号与失败状态。
 5. 每刀完成后立即收紧预算，再进入下一个。
 6. 电商和设置页不先做一次性大重构，等真实需求触及时按 Tab、模式和业务用例拆。
 

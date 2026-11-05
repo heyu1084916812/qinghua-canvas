@@ -3,6 +3,18 @@
 > `MEMORY.md` 放不下，本文件是完整版。**改动 canvas / comic 内部前必读**（由 MEMORY.md 顶部指引到此）。
 > 排序：canvas 通用 → 结果组/容器 → 生成与执行 → 复制粘贴 → 渠道与协议 → comic。
 
+## 结构治理 · 第一批（2026-11-05）
+
+- **凭证只有一个读口**：用户操作走 `ChannelStore` 公共 action；运行态走
+  `ChannelRepository.credentials.load(ref)`。执行宿主不得直接创建仓储读 Key，也不得把明文写入 UI/日志。
+- **凭证清理顺序不可交换**：渠道删除必须保持“撤路由并中断在飞 → 停用行 → 清所有 refs → 删行”；
+  保存 Key 先密文后元数据，删除分组先移行再删密文。失败不能被吞成成功。
+- **快照不是事务 owner**：`projectRuntimeSnapshots.ts` 只做只读投影、稳定排序和订阅异常隔离；
+  Registry 独占 phase、锁、注册表、commit/recovery/rollback。`committing` 和 `cleanup_failed` 不得 rollback 回旧阶段。
+- **runRecorder 不改变执行顺序**：`useCanvasRunRecorder.ts` 只追加引擎外 RunRecord、维护版本账本和构造融合记录；
+  正常 `runEngine/placement` 的资产、节点、RunRecord flush 批次和 launch/cancel 顺序不能移入。
+- **门禁预算只许下降**：legacy 预算可以低于基线，绝不能高于基线；测试文件不能成为生产逻辑的绕过通道。
+
 ## 发布 · GitHub 与自动更新
 
 - **canonical 仓库名是 `heyu1084916812/qinghua-canvas`**：旧 `qinhua-canvas` 只可能由 GitHub
