@@ -18,6 +18,7 @@ import {
 } from './agentCanvasClaimGuard'
 import { parseJsonAgentAction } from './jsonToolFallback'
 import { parseAgentToolArguments } from './agentToolArgs'
+import { reviewBeforeVisualDenial } from './agentVisualClaimGuard'
 
 /**
  * Agent 循环（设计文档 §4）。
@@ -261,6 +262,24 @@ export async function runAgentTurn(
   })
   const { discoverBeforeCapabilityDenial, guardFinalCanvasClaims } =
     canvasClaimGuard
+  const checkVisualDenial = async (
+    text: string, step: number,
+  ) => reviewBeforeVisualDenial({
+      messages,
+      text,
+      step,
+      tools: allowedToolNames,
+      hasImageInputs: (deps.inputs ?? []).some(
+        (item) => item.kind === 'asset' && item.mime.toLowerCase().startsWith('image/'),
+      ),
+      executeRead: deps.executeRead,
+      onActivity: deps.onActivity,
+      onProgress: deps.onProgress,
+    })
+  const unreliableVisualDescription = (): AgentLoopOutcome => {
+    deps.onProcessReset?.()
+    return { kind: 'error', message: '当前模型没有给出可靠图片描述', messages }
+  }
 
   for (let step = 0; step < maxSteps; step += 1) {
     await pullSteering()
@@ -297,7 +316,9 @@ export async function runAgentTurn(
           typeof (action.args as { message?: unknown }).message === 'string'
             ? String((action.args as { message: string }).message)
             : result.text
-        if (await discoverBeforeCapabilityDenial(message, step)) {
+        const visualGuard = await checkVisualDenial(message, step)
+        if (visualGuard === 'unreliable') return unreliableVisualDescription()
+        if (visualGuard === 'retry' || await discoverBeforeCapabilityDenial(message, step)) {
           deps.onProcessReset?.()
           continue
         }
@@ -348,7 +369,9 @@ export async function runAgentTurn(
     }
     if (calls.length === 0) {
       if ((await pullSteering()) > 0) continue
-      if (await discoverBeforeCapabilityDenial(result.text, step)) {
+      const visualGuard = await checkVisualDenial(result.text, step)
+      if (visualGuard === 'unreliable') return unreliableVisualDescription()
+      if (visualGuard === 'retry' || await discoverBeforeCapabilityDenial(result.text, step)) {
         deps.onProcessReset?.()
         continue
       }

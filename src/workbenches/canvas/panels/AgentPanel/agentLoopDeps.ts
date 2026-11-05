@@ -213,6 +213,7 @@ export function assembleAgentLoopDeps(
         ? { contextTrace: ports.contextTraceFor(session.id)! }
         : {}),
       signal: signalOf(),
+      runtimeImageInputs: inputs,
       review,
     })
   }

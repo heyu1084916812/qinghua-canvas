@@ -241,6 +241,45 @@ describe('prepareAgentTurnRequest', () => {
     }
   })
 
+  it('★★ 查看画布：与视觉验收共用 route + inputTypes 判据，工具声明包含 visualReview', async () => {
+    const { sessions, session } = await createSession()
+    const result = await prepareAgentTurnRequest({
+      ...inputFor({ sessions, session, text: '检查画布图片是否一致' }),
+      channels: [{
+        id: 'channel-1', enabled: true, models: [{
+          id: 'upstream-chat', category: 'chat', inputTypes: ['text', 'image'],
+        }], modelMap: { 测试对话模型: 'upstream-chat' },
+      }] as unknown as PrepareAgentTurnRequestInput['channels'],
+      canvasReviewEnabled: true,
+      activeAgentTools: agentToolsForRequestMode('complex_plan', { canvasReview: true }),
+    })
+    expect(result.kind).toBe('ready')
+    if (result.kind !== 'ready') return
+    expect(result.turnTools.map((tool) => tool.name)).toContain('visualReview')
+    expect(result.systemPrompt).toContain('当前路由的图片能力已由能力目录')
+    expect(result.systemPrompt).toContain('验收一致性')
+  })
+
+  it('★★ @融合结果 这个图有什么：只把图片交给 chat，不产生 visualReview', async () => {
+    const { sessions, session } = await createSession()
+    const result = await prepareAgentTurnRequest({
+      ...inputFor({
+      sessions, session, text: `${mentionToken('node', 'fusion-1', '融合结果')} 这个图有什么`,
+      graph: graphOf([imageNode('fusion-1')]),
+      }),
+      channels: [{ id: 'channel-1', enabled: true, models: [{ id: 'upstream-chat', category: 'chat', inputTypes: ['text'] }], modelMap: { 测试对话模型: 'upstream-chat' } }] as unknown as PrepareAgentTurnRequestInput['channels'],
+      canvasReviewEnabled: true,
+      activeAgentTools: agentToolsForRequestMode('complex_plan', { canvasReview: true }),
+    })
+    expect(result.kind).toBe('ready')
+    if (result.kind !== 'ready') return
+    expect(result.requestMode).toBe('reference_edit')
+    expect(result.visualNodeIds).toEqual(['fusion-1'])
+    expect(result.turnTools.map((tool) => tool.name)).not.toContain('visualReview')
+    expect(result.systemPrompt).toContain('本次真实图片输入确认')
+    expect(result.systemPrompt).toContain('描述 / 识别图片直接回答')
+  })
+
   it('★★ 多图请求识别 per-image、按 reference_edit 裁剪工具并保留 JSON 降级', async () => {
     const { sessions, session } = await createSession()
     const graph = graphOf([

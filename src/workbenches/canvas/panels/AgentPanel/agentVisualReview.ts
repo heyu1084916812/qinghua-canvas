@@ -9,10 +9,7 @@ import {
   visualReviewGenerationBriefs,
   type VisualReviewResult,
 } from '../../../../domain/agent/visualReview'
-import {
-  capabilityOfLogical,
-  toLogicalName,
-} from '../../../../domain/project/modelCatalog'
+import { toLogicalName } from '../../../../domain/project/modelCatalog'
 import {
   runRouteCandidatesOf,
 } from '../../../../domain/project/generationRouting'
@@ -55,6 +52,8 @@ export async function runAgentVisualReview(
       nodeIds: readonly string[]
       checklist?: string
     }
+    /** 本回合已实际交给 Agent chat 的图片输入，优先于可能过时的模型目录。 */
+    runtimeImageInputs?: readonly import('../../../../domain/shared/execution/types').NodeInput[]
   },
 ): Promise<VisualReviewResult> {
   const graph = deps.store.getSnapshot()
@@ -85,24 +84,31 @@ export async function runAgentVisualReview(
     }
   }
 
+  const prepared = await prepareVisualReviewImages({
+    graph,
+    nodeIds: targetNodeIds,
+    contextAssets: input.contextTrace?.assetRefs,
+    readAsset: (hash) => deps.platform.assets.read(hash),
+    maxTargets: 4,
+    maxReferences: 4,
+  })
+  limitations.push(...prepared.limitations)
+  const suiteContextAvailable =
+    (input.contextTrace?.kitVersionRefs.length ?? 0) > 0 ||
+    prepared.referenceAssetCount > 0
+  if (prepared.targets.length === 0) {
+    return {
+      ok: false, verdict: 'unreviewable', summary: '没有可读取的目标图片，未执行视觉验收',
+      issues: [], targetNodeIds, referenceAssetCount: prepared.referenceAssetCount,
+      suiteContextAvailable, limitations,
+    }
+  }
+
   let reviewRoute = input.route
   if (input.reviewModel.trim()) {
     const logicalModel =
       toLogicalName(deps.allChannels, input.reviewModel) ||
       input.reviewModel.trim()
-    const capability = capabilityOfLogical(deps.allChannels, logicalModel)
-    if (!capability?.inputTypes.includes('image')) {
-      return {
-        ok: false,
-        verdict: 'unreviewable',
-        summary: `视觉验收模型「${logicalModel}」不支持图片输入，请重新选择`,
-        issues: [],
-        targetNodeIds,
-        referenceAssetCount: 0,
-        suiteContextAvailable: false,
-        limitations,
-      }
-    }
     const planned = await deps.modelRoute.plan({
       capability: 'chat',
       logicalModel,
@@ -143,50 +149,7 @@ export async function runAgentVisualReview(
       routePlanId: `${planned.plan.logicalModel}:${planned.plan.capability}:${planned.plan.strategy}`,
       candidates,
     }
-  } else if (
-    !capabilityOfLogical(
-      deps.allChannels,
-      input.route.logicalModel,
-    )?.inputTypes.includes('image')
-  ) {
-    return {
-      ok: false,
-      verdict: 'unreviewable',
-      summary: `主模型「${input.route.logicalModel}」不支持图片输入，请先为视觉验收单独选择模型`,
-      issues: [],
-      targetNodeIds,
-      referenceAssetCount: 0,
-      suiteContextAvailable: false,
-      limitations,
-    }
   }
-
-  const prepared = await prepareVisualReviewImages({
-    graph,
-    nodeIds: targetNodeIds,
-    contextAssets: input.contextTrace?.assetRefs,
-    readAsset: (hash) => deps.platform.assets.read(hash),
-    maxTargets: 4,
-    maxReferences: 4,
-  })
-  limitations.push(...prepared.limitations)
-  const suiteContextAvailable =
-    (input.contextTrace?.kitVersionRefs.length ?? 0) > 0 ||
-    prepared.referenceAssetCount > 0
-
-  if (prepared.targets.length === 0) {
-    return {
-      ok: false,
-      verdict: 'unreviewable',
-      summary: '没有可读取的目标图片，未执行视觉验收',
-      issues: [],
-      targetNodeIds,
-      referenceAssetCount: prepared.referenceAssetCount,
-      suiteContextAvailable,
-      limitations,
-    }
-  }
-
   const generationBriefs = visualReviewGenerationBriefs(graph, targetNodeIds)
   const prompt = buildVisualReviewPrompt({
     targets: prepared.targets,

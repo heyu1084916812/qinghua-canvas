@@ -45,6 +45,18 @@ const GENERATION_THEN_LAYOUT_PATTERN =
 const SHORT_CANVAS_ACTION_PATTERN =
   /^(?:帮我)?(?:移动|挪一下|排一下|排列|对齐|布局|整理|缩放|缩一下|调整大小|居中)(?:一下|下|好|整齐)?$/
 
+/**
+ * 描述 / 识别图片是主对话视觉理解，不是验收。只有明确的质检目的才加载
+ * visualReview，避免“这个图有什么”被改写成另一项任务。
+ */
+export function requestsVisualReview(text: string): boolean {
+  const normalized = normalizedText(text)
+  if (/视觉验收|验收|巡检画布|检查作品|质量把关/.test(normalized)) return true
+  if (/(有没有问题|有何问题|什么问题|有没有错)/.test(normalized)) return true
+  return /(检查|验收|审查|评估|核对|看看|查看)/.test(normalized) &&
+    /(是否一致|一致性|有没有问题|有何问题|什么问题|瑕疵|错字|质量|合规|是否符合|有没有错)/.test(normalized)
+}
+
 const EDIT_INTENT_PATTERN =
   /换|改|替换|调整|优化|修改|修一下|重绘|再生成|参考|基于|保持|变成|做成|加一个|去掉/
 
@@ -67,6 +79,7 @@ export function classifyAgentRequest(signals: AgentRequestSignals): AgentRequest
     return 'complex_plan'
   }
   if (
+    requestsVisualReview(text) ||
     IMPLICIT_CANVAS_LAYOUT_PATTERN.test(text) ||
     (CANVAS_ACTION_PATTERN.test(text) && CANVAS_OBJECT_PATTERN.test(text)) ||
     (signals.hasSelectedNodes && SHORT_CANVAS_ACTION_PATTERN.test(text))

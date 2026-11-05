@@ -497,6 +497,8 @@ export interface AgentPromptExtras {
   promptProfile?: AgentPromptProfile
   /** 画布巡检是否允许由 Agent 主动调用；false 时必须在提示词里明确禁止。 */
   canvasReviewEnabled?: boolean
+  /** 当前聊天 route 的渠道能力，与视觉验收使用同一判据。 */
+  imageInputAccepted?: boolean
   /**
    * 用户这句话是不是「只改一处、其余保持」那一类（见 `looksLikePreserveRequest`）。
    *
@@ -603,7 +605,8 @@ export function buildAgentSystemPromptWithContext(
     parts.push(
       [
         '## 本轮画布巡检按需可用',
-        '只有用户在当前消息里明确要求「巡检画布 / 检查作品 / 验收一致性」时，才可调用 `visualReview`。',
+        '只有用户在当前消息里明确要求「巡检画布 / 检查作品问题 / 验收一致性 / 质量把关」时，才可调用 `visualReview`。',
+        '用户只是问「图里有什么 / 描述一下 / 识别这张图」时，直接看随消息附上的图片回答，不要调用验收工具。',
         '不要因为刚生成完图片就自动巡检，也不要把巡检当成持久化后台任务。',
       ].join('\n'),
     )
@@ -616,6 +619,12 @@ export function buildAgentSystemPromptWithContext(
       ].join('\n'),
     )
   }
+
+  parts.push(
+    extras.imageInputAccepted === true
+      ? '## 当前对话模型的图片输入\n当前路由的图片能力已由能力目录或本次真实图片输入确认；明确 @ 或添加的图片会随请求发送。描述 / 识别图片直接回答，只有明确质检才按工具开关调用 visualReview。不要凭模型自述否认这项执行能力。'
+      : '## 当前对话模型的图片输入\n执行层能力目录没有确认当前聊天路由支持 image 输入。不要声称已直接看到图片；视觉验收工具若可用，仍应通过它的真实结果回答。',
+  )
 
   if (extras.contextBundle?.trim()) {
     parts.push(extras.contextBundle.trim())

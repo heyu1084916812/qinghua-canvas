@@ -595,8 +595,12 @@ const CAPABILITY_QUERY_GROUPS: readonly {
     names: ['researchDesign'],
   },
   {
-    terms: ['验收', '检查', '巡检'],
+    terms: ['验收', '检查', '巡检', '是否一致', '一致性', '质量把关'],
     names: ['visualReview'],
+  },
+  {
+    terms: ['查看画布', '看画布', '查看图片', '看图', '看到图片', '看不了图片', '视觉能力'],
+    names: ['readGraph', 'readAsset'],
   },
   {
     terms: ['记忆', '记住', '偏好'],

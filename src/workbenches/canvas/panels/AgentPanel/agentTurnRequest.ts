@@ -23,6 +23,9 @@ import {
   taskPlanPrompt,
 } from '../../../../domain/agent/taskPlan'
 import { capabilityOfLogical } from '../../../../domain/project/modelCatalog'
+import { chatModelAcceptsImages } from '../../../../domain/shared/capability'
+import { imageInputsOf } from '../../../../domain/shared/execution/inputs'
+import { collectAgentLoopInputs } from './agentLoopInputs'
 import type { AgentToolMode } from '../../../../features/shared/agent/toolSupport'
 import {
   decideToolMode,
@@ -466,6 +469,18 @@ export async function prepareAgentTurnRequest(
       requestMode,
       promptProfile,
       canvasReviewEnabled: input.canvasReviewEnabled,
+      imageInputAccepted: chatModelAcceptsImages(
+        capabilityOfLogical(
+          input.channels,
+          chatRoute.logicalModel,
+          chatRoute.channelId,
+        ),
+        imageInputsOf(collectAgentLoopInputs(
+          input.graph.nodes,
+          visualNodeIds,
+          contextTrace?.assetRefs ?? [],
+        )).length > 0,
+      ),
       ...(looksLikePreserveRequest(plainText)
         ? { preserve: true }
         : {}),

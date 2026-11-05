@@ -6,6 +6,7 @@ import {
   imageNodeIdsAmong,
   promptProfileForMode,
   resolveAgentSkillForTurn,
+  requestsVisualReview,
   summaryForAgentRequest,
 } from './agentContextPolicy'
 
@@ -54,6 +55,17 @@ describe('Agent request classification', () => {
         hasMentionedImage: true,
       }),
     ).toBe('reference_edit')
+  })
+
+  it('★★ 普通图片理解留在主对话，只有明确质检才进入视觉验收', () => {
+    for (const text of ['这个图有什么', '描述一下这张图', '识别这张图', '看看这个图是什么']) {
+      expect(requestsVisualReview(text), text).toBe(false)
+      expect(classifyAgentRequest({ ...noSignals, text, hasMentionedImage: true })).toBe('reference_edit')
+    }
+    for (const text of ['检查这四张图是否一致', '这张图有没有问题', '帮我验收这张图', '检查有没有错字']) {
+      expect(requestsVisualReview(text), text).toBe(true)
+      expect(classifyAgentRequest({ ...noSignals, text, hasMentionedImage: true })).toBe('canvas_operation')
+    }
   })
 
   it('uses an image selected on the canvas for an edit request', () => {

@@ -52,16 +52,19 @@
 - **`pendingAssetIds` 只许原子追加**：`appendPendingAssetIds`（事务内 load → 去重 → 写回）。
   控制器里**不许**再拼"旧快照 + 新 id"的整份列表写回——那会覆盖掉用户刚删的 id。
 
-- **对队列项做任何动作前必须判 `activeTurnId`**：在飞项仍留在 `queuedTurns` 里（`claimNextQueuedTurn` 只写标记不摘项），
-  「引导」这类入口漏判会导致**同一句话执行两遍、双倍扣费**。
+- **`queuedTurns` 只放等待项，活动回合必须独立成快照**：`claimNextQueuedTurn` 在同一事务里把队首移出
+  `queuedTurns`、写入 `activeTurnId + activeTurn.id`；`AgentQueuePanel` 直接渲染 waiting queue，不再在
+  UI 里临时过滤在飞项。完成清活动快照；失败 / 中断 / 恢复把快照原子放回队首。任何队列动作仍要按
+  `activeTurnId === turnId` 兜旧快照和迟到点击，否则「引导」会让同一句话执行两遍、双倍扣费。
 - **收口顺序：transition 要兜底，settle 无条件执行**。`transitionSessionJob` 抛错会打崩整个收口函数、连返回值都拿不到；
   而 error 态下停止按钮不可用 ⇒ 活动锁泄漏 = 会话永久 busy，无手动恢复路径。
 - **`pendingAssetIds` 可以丢写，但附件不会丢**：发送真相是正文 chip（`visualNodeIds = union(pendingAssetIds, mentions)`）。
   **不许**在控制器里加本地写链修它（会把用户刚删的 id 复活）；正解是 store 级原子 append。
 
-- **队列结算失败必须有兜底**：`finishQueuedTurn(false)` 抛错会让 `activeTurnId` 残留，而
-  `claimNextQueuedTurn` 在 `activeTurnId` 非空时返回 null ⇒ 该会话队列永久停摆。必须"重试一次 →
-  `releaseActiveTurn` 兜底 → 无论成败 `clearQueueDrain`"，并验证**随后真的能再领到**那条 turn。
+- **队列结算失败必须有兜底**：`finishQueuedTurn(false)` 抛错会让活动快照残留，而
+  `claimNextQueuedTurn` 在 `activeTurnId / activeTurn` 非空时返回 null ⇒ 该会话队列永久停摆。必须
+  "重试一次 → `releaseActiveTurn` 把快照放回队首并清活动标记 → 无论成败 `clearQueueDrain`"，并验证
+  **随后真的能再领到**那条 turn；失败后不得在 idle 窗口自动重领。
 - **切走会话后不许再推进**：`advanceTaskPlan` 等长流程要在**所有 await 之后、落库之前**复检
   "目标仍是 current"，切走就静默整单退出；`isCurrentSession` 不传时兜底 true（兼容老调用），
   但必须有一条接线护栏防止面板侧把它删了。
@@ -378,7 +381,8 @@
 - **流式过程不造内容**：只显示供应商公开返回的 reasoning/content/tool delta；收起行只保留最新一句。
 - **已有输出的流不换渠道**：出现首个 delta 后任何错误都收口为 `execution/accepted`。
 - **“直接下一步”走状态机**：调用 `advanceAgentTaskPlanAfterReview()`，内部指令必须 `hiddenFromConversation`。
-- **视觉验收模型独立选路**：只保存逻辑模型名，运行时重新 RoutePlan；未配置且主模型不支持图片时明确拒绝。
+- **视觉验收模型独立选路**：只保存逻辑模型名，运行时重新 RoutePlan。不能凭目录 `text-only` 提前拒绝；
+  先读真实目标图，有图就按真实 route 发请求，无图报缺素材，上游拒图才报请求失败。
 - **画布巡检默认关闭且按需触发**：`agent:canvas-review` 只保存开关偏好；开启才向模型提供
   `visualReview`，且只在当前消息明确要求巡检时调用。关闭时 native / JSON 工具声明和
   `AgentToolContext.visualReview` 必须同时移除；不得创建定时器、后台任务或离开页面后继续巡检。

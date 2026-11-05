@@ -54,8 +54,21 @@ export function clampDuration(sec: number, cap?: ModelCapability): number {
 }
 
 export function supportsInput(
-  cap: ModelCapability,
+  cap: Pick<ModelCapability, 'inputTypes'>,
   type: 'text' | 'image' | 'video' | 'audio',
 ): boolean {
   return cap.inputTypes.includes(type)
+}
+
+/**
+ * Agent 对话与视觉验收共用同一判据。是否真能看到仍以本次请求实际附上的
+ * 图片和渠道结果为准；模型自述、模型名称或渠道名称都不能替代能力元数据。
+ */
+export function chatModelAcceptsImages(
+  capability: Pick<ModelCapability, 'category' | 'inputTypes'> | undefined,
+  runtimeImageInputs = false,
+): boolean {
+  // 实际 route 已收到图片，是比站点 /models 摘要更强的本轮证据。
+  return runtimeImageInputs ||
+    (capability?.category === 'chat' && supportsInput(capability, 'image'))
 }

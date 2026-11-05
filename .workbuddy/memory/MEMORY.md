@@ -1,5 +1,57 @@
 # CanvasFlow（轻画）项目记忆
 
+### Agent 视觉能力不能由模型自述或过时目录裁定（2026-11-05，#946）
+
+- 视觉验收与主对话共用 `chatModelAcceptsImages`，按当前 route 的 chat + image 元数据判断；
+  `visualReview` 仍必须把真实目标图读成 `NodeInput` 交给 `routeExecution.execute`。
+- “查看画布”要归入 `canvas_operation`，否则简单生成工具裁剪会让 `visualReview` 消失。
+- 普通“这个图有什么 / 描述 / 识别”已有 chat 图片时，“我是纯文本模型 / 看不了”只补执行事实要求模型重答，
+  不能抢占成 `visualReview`；第二次仍否认才报“当前模型没有给出可靠图片描述”。
+- 明确“验收 / 一致性 / 质量”时，即使 chat 已有图片也不能被否认门禁截断，应允许 `visualReview`
+  读取真实目标图后回答；零图片、工具关闭或真实上游拒图才如实说明。
+- **主管反例补修**：`@融合结果 这个图有什么` 必须直接走 chat image inputs，不产生验收活动；
+  只有明确“检查 / 验收 / 一致性 / 质量”才走 `visualReview`。已有 chat 图片时不能用门禁抢占成验收。
+- **目录不是运行真相**：`modelCache.inputTypes=['text']` 可能过时；visualReview 有真实
+  prepared targets / chat image inputs 时必须发请求，不能提前返回“主模型不支持图片输入”。
+  主 route 与独立 reviewModel 都不再用目录 text-only 提前拒绝；上游实际拒图才按请求失败报告。
+- **普通看图只允许一次纠正**：已有 chat 图片却第一次自述看不了时，补 system 事实、重问一次，
+  不调用验收；第二次仍否认返回“当前模型没有给出可靠图片描述”。反例连续 5/5，
+  agent/视觉定向 320/320，全量 4597/4597，check/build 通过。
+- **真实渠道证据**：workbuddy 实际执行 `visualReview`，目标图 hash 进入 runRecord，上游 succeeded，
+  verdict=pass；Chat2api 同一工具也成功，随后主模型回答被外部 HTTP 502 阻断，Job 如实 failed。
+  证据 `.playwright-verify/visual-review-live/`。
+
+### 队列活动回合必须从等待队列原子移出（2026-11-05，#947）
+
+- **真实症状**：Agent 已显示“工作流已创建 / 已运行生成 / 图像生成中 0/4”，底部仍挂着同一条
+  “排队行 + 引导 / 删除 / 更多”。根因不是 React 旧快照，而是持久层把 `activeTurnId` 只当标记，
+  同一 turn 仍留在 `queuedTurns`，而面板直接渲染整份 `queuedTurns`。
+- **状态机**：`queuedTurns` 只保存尚未领取的等待项。`claimNextQueuedTurn` 在一个事务里从队首移除
+  并写 `activeTurn` 完整冻结快照（同时保留 `activeTurnId` 兼容活动锁/Job 查询）。完成时清活动快照；
+  失败、停止、进程中断经 `finishActiveQueuedTurn(false)` / `releaseActiveTurn()` 把快照放回队首，
+  等待用户显式“恢复队列”。已完成的 turn 永远不能被再次领取。
+- **旧数据**：读取时若 `activeTurnId` 仍指向 `queuedTurns` 内的一项，持久化映射会把它规范成
+  `activeTurn` 快照并从等待队列剥离；下一次领取或结算真正写回新结构。不要在 `AgentQueuePanel`
+  里临时过滤冒充状态修复。
+- **验证口径**：入队→转引导只留一条 steer 且出列；转引导失败队列原样；领取后 waiting queue 为空；
+  失败只回队一次且不自动重领；完成不再领取；A/B 并发泵不串队。真实运行态探针须同时断言
+  `activeTurnId = activeTurn = turn`、`queuedTurns.length = 0`、页面 `[data-agent-queue-item] = 0`、
+  无溢出且 `pageErrors / consoleErrors` 为空。
+
+### 模块预算要区分“现存文件”和“新文件”（2026-11-05，M-STRUCTURE-GATE）
+
+- 新生产文件不能以“工作区里已经存在”为理由跳过职责登记；门禁用 `git ls-tree` 对基线
+  `3b13acacf141997bb1719edeaabcd2a7322e76e5` 判断。登记在 `architecture/module-governance.json`，
+  必须有 owner、responsibility、owns、doesNotOwn、publicApi、test、budget。
+- `npm run check` 已接入 `scripts/check-module-governance.mjs`。目录覆盖 `src/**`，新 TS/TSX
+  默认 450 行、CSS 600 行，专用目录预算只能更小。现有 18+7 个超千行文件逐项冻结 legacy
+  实测上限；改动 legacy 时预算可以下调，不能因新功能上调。
+- 新模块登记要引用真实兄弟测试；纯样式 legacy 可引用实际存在的 smoke 脚本及用例组。
+  门禁本身是基础设施，不进入产品 `src/`，也不改 UI 或运行时行为。
+- Windows 读取 Git 基线不要混用 tree 和 blob 的批量输出：默认 `ls-tree` 的 `blob<TAB>path`
+  才稳定；但本实现最终用逐 legacy `git show`，避免缓冲区、CRLF 和 tree 展开造成行数偏移。
+  正反样本在独立临时仓库跑 Git，必须剥离 `GIT_*` 环境变量，否则可能写进父仓库。
+
 ### GitHub canonical 仓库名以 `qinghua-canvas` 为准（2026-11-05，#945）
 
 - 旧地址 `heyu1084916812/qinhua-canvas` 已迁到
