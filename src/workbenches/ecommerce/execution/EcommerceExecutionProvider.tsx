@@ -164,7 +164,7 @@ export function EcommerceExecutionProvider({
       createGenerationClient({
         platform,
         catalog: () => channels.protocolCatalog(),
-        loadToken: (credentialRef) => repo.loadToken(credentialRef),
+        loadToken: (credentialRef) => repo.credentials.load(credentialRef),
       }),
     [channels, platform, repo],
   )

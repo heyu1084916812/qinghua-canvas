@@ -143,6 +143,43 @@ describe('channelRepository', () => {
     expect(await repo.loadToken(thirdRef)).toBeNull()
   })
 
+  it('删除固定先停用行、再清全部凭据、最后删行', async () => {
+    const p = createMemoryPlatform()
+    const events: string[] = []
+    const repo = createChannelRepository(
+      {
+        ...p.storage,
+        async put(table, row) {
+          if (table === 'channels' && row.enabled === false) events.push('disabled')
+          await p.storage.put(table, row)
+        },
+        async delete(table, id) {
+          if (table === 'channels') events.push('row-deleted')
+          await p.storage.delete(table, id)
+        },
+      },
+      {
+        ...p.credentials,
+        async remove(ref) {
+          events.push(`credential:${ref}`)
+          await p.credentials.remove(ref)
+        },
+      },
+    )
+    const ch = await repo.create({ name: '删除顺序', protocol: 'mock', baseUrl: '' })
+    await repo.saveToken(ch.credentialRef!, 'sk')
+    await repo.saveToken(ch.altCredentialRef!, 'sk-alt')
+
+    await repo.remove(ch.id)
+
+    expect(events).toEqual([
+      'disabled',
+      `credential:${ch.credentialRef}`,
+      `credential:${ch.altCredentialRef}`,
+      'row-deleted',
+    ])
+  })
+
   it('老 65535 双槽按能力迁移成对话 / 生图两个分组', async () => {
     const p = createMemoryPlatform()
     const repo = createChannelRepository(p.storage, p.credentials)

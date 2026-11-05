@@ -623,6 +623,65 @@ describe('channelStore', () => {
     ).toHaveLength(2)
   })
 
+  it('保存 Key 先落密文再落元数据；元数据失败时不掩盖真实存储状态', async () => {
+    const base = createMemoryPlatform()
+    const events: string[] = []
+    const put = async (...args: Parameters<typeof base.storage.put>) => {
+      const [table, row] = args
+      if (table === 'channels' && (row as { hasToken?: boolean }).hasToken) {
+        events.push('metadata-failed')
+        throw new Error('metadata unavailable')
+      }
+      await base.storage.put(...args)
+    }
+    const platform = {
+      ...base,
+      credentials: {
+        ...base.credentials,
+        async save(ref: string, secret: string) {
+          events.push('secret')
+          await base.credentials.save(ref, secret)
+        },
+      },
+      storage: storageWithPut(base.storage, put),
+    }
+    const store = createChannelStore(platform, { seedBuiltins: false })
+    const ch = await store.create({ name: '顺序', protocol: 'mock', baseUrl: '' })
+
+    await expect(store.saveToken(ch.id, 'sk-before-metadata')).rejects.toThrow('metadata unavailable')
+    expect(events).toEqual(['secret', 'metadata-failed'])
+    expect(await base.credentials.load(ch.credentialRef!)).toBe('sk-before-metadata')
+    expect(store.getState().channels.find((item) => item.id === ch.id)?.hasToken).toBe(false)
+  })
+
+  it('删除分组先移出渠道行再删除密文；密文失败时旧 Key 不复活分组', async () => {
+    const base = createMemoryPlatform()
+    const events: string[] = []
+    const platform = {
+      ...base,
+      credentials: {
+        ...base.credentials,
+        async remove(_ref: string) {
+          events.push('secret-remove')
+          throw new Error('credential unavailable')
+        },
+      },
+    }
+    const store = createChannelStore(platform, { seedBuiltins: false })
+    const ch = await store.create({ name: '分组顺序', protocol: 'mock', baseUrl: '' })
+    const extra = await store.addCredentialGroup(ch.id, '备用')
+    await store.saveCredentialGroupToken(ch.id, extra.id, 'sk-extra')
+    const remove = store.removeCredentialGroup(ch.id, extra.id)
+    const rejected = expect(remove).rejects.toThrow('credential unavailable')
+    await new Promise((resolve) => setTimeout(resolve, 0))
+
+    expect(store.getState().channels[0]?.credentialGroups.map((group) => group.id)).not.toContain(extra.id)
+    await rejected
+    expect(events).toEqual(['secret-remove'])
+    expect(store.getState().channels[0]?.credentialGroups.map((group) => group.id)).not.toContain(extra.id)
+    expect(await store.loadCredentialGroupToken(ch.id, extra.id)).toBeNull()
+  })
+
   it('★ 全局前端模型可新增、持久化、按分类读取并删除；内置模型不可删', async () => {
     const p = createMemoryPlatform()
     const store = createChannelStore(p, { seedBuiltins: false })
@@ -1338,6 +1397,49 @@ describe('channelStore · 自建协议', () => {
     await removal
     expect(events[0]).toBe('store-removed')
     expect(events).toContain('credential')
+    unsubscribe()
+  })
+
+  it('渠道删除失败时保持撤路由与停用行，不删渠道记录，也不伪装恢复启用', async () => {
+    const base = createMemoryPlatform()
+    const events: string[] = []
+    const platform = {
+      ...base,
+      credentials: {
+        ...base.credentials,
+        async remove(ref: string) {
+          if (ref === 'cred-alt') {
+            events.push('credential-alt-failed')
+            throw new Error('alt credential unavailable')
+          }
+          events.push('credential-primary')
+          await base.credentials.remove(ref)
+        },
+      },
+    }
+    const store = createChannelStore(platform, { seedBuiltins: false })
+    const channel = await store.create({ name: '删除失败', protocol: 'mock', baseUrl: '' })
+    await store.update(channel.id, { altCredentialRef: 'cred-alt' })
+    await store.saveToken(channel.id, 'old-key')
+    const cancel = vi.fn()
+    registerGuardedChannelRun('plan-remove-fails', {
+      taskChannels: new Map([['task-1', channel.id]]),
+      cancel,
+      onInterrupted: vi.fn(),
+    })
+    const unsubscribe = store.subscribe(() => {
+      if (!store.getState().channels.some((item) => item.id === channel.id)) {
+        interruptGuardedRunsForRemovedChannels(new Set([channel.id]))
+        events.push('store-removed')
+      }
+    })
+
+    await expect(store.remove(channel.id)).rejects.toThrow('alt credential unavailable')
+    expect(cancel).toHaveBeenCalledTimes(1)
+    expect(events).toEqual(['store-removed', 'credential-primary', 'credential-alt-failed'])
+    const row = store.getState().channels.find((item) => item.id === channel.id)
+    expect(row?.enabled).toBe(false)
+    expect(await base.credentials.load(channel.credentialRef!)).toBeNull()
     unsubscribe()
   })
 

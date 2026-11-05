@@ -1,4 +1,8 @@
 import type { StoragePort, CredentialPort, RowOf, TableName } from '../../platform/ports'
+import {
+  createCredentialAccess,
+  type CredentialReadPort,
+} from '../channel/channelCredentials'
 import type {
   Channel,
   ChannelCredentialGroup,
@@ -37,6 +41,7 @@ export interface ChannelRepository {
   loadToken(ref: string): Promise<string | null>
   /** 删除令牌（§7.3 令牌旁的「删除」）：只清密文，渠道与 credentialRef 保留（可再存） */
   removeToken(ref: string): Promise<void>
+  credentials: CredentialReadPort
 }
 
 const toChannel = (row: Record<string, unknown>): Channel => {
@@ -218,6 +223,8 @@ function withGroupAggregates(channel: Channel): Channel {
 }
 
 export function createChannelRepository(storage: StoragePort, credentials: CredentialPort): ChannelRepository {
+  const credentialAccess = createCredentialAccess(credentials)
+  const credentialsPort: CredentialReadPort = { load: credentialAccess.load }
   const builtinPosition = new Map<string, number>(
     BUILTIN_CHANNEL_IDS.map((id, index) => [id, index] as const),
   )
@@ -386,7 +393,7 @@ export function createChannelRepository(storage: StoragePort, credentials: Crede
         ...ch.credentialGroups.map((group) => group.credentialRef),
       ].filter((ref): ref is string => Boolean(ref)),
     )
-    for (const ref of refs) await credentials.remove(ref)
+    for (const ref of refs) await credentialAccess.remove(ref)
     await storage.delete('channels', id)
   }
 
@@ -400,5 +407,5 @@ export function createChannelRepository(storage: StoragePort, credentials: Crede
     await credentials.remove(ref)
   }
 
-  return { list, seedBuiltins, get, create, update, reorder, remove, saveToken, loadToken, removeToken }
+  return { list, seedBuiltins, get, create, update, reorder, remove, saveToken, loadToken, removeToken, credentials: credentialsPort }
 }

@@ -6,7 +6,6 @@ import {
   channelIsRoutable,
   protocolNeedsNoToken,
   requiresBaseUrl,
-  tokenTailOf,
 } from '../../domain/project/channel'
 import {
   BUILTIN_PROTOCOLS,
@@ -44,6 +43,7 @@ import {
   type PresetVendor,
 } from '../../domain/project/modelPresets'
 import { createChannelRepository, type ChannelRepository } from '../project/channelRepository'
+import { createChannelCredentials } from './channelCredentials'
 import { BUILTIN_CHANNEL_IDS, isBuiltinChannelId } from '../../domain/project/builtinChannels'
 import type { CredentialSlot } from '../../domain/project/channel'
 import { createPresetStore, type PresetStore } from '../project/presetStore'
@@ -65,7 +65,6 @@ import { describeError, asAppError } from '../../shared/result'
 import {
   formatContextBundleForPrompt,
 } from '../../domain/shared/context'
-import { createId } from '../../shared/id'
 import {
   createGenerationClient,
   resolvedChannelConfig,
@@ -397,7 +396,7 @@ export function createChannelStore(
   const generation = createGenerationClient({
     platform,
     catalog: () => catalog(),
-    loadToken: (credentialRef) => repo.loadToken(credentialRef),
+    loadToken: (credentialRef) => credentials.loadByRef(credentialRef),
   })
   const store = createVanillaStore<ChannelStoreState>(() => ({
     channels: [],
@@ -413,6 +412,12 @@ export function createChannelStore(
     models: { status: 'idle' },
     detect: { status: 'idle', protocol: null },
   }))
+  const credentials = createChannelCredentials(repo, platform.credentials, (id, patch) =>
+    update(id, patch),
+  )
+  const loadKeys = credentials.loadKeys
+  const credentialGroupOf = credentials.credentialGroupOf
+  const patchCredentialGroup = credentials.patchCredentialGroup
 
   /** 当前目录：内置 + 已加载的自建。每次读取都现算，避免忘了在增删后同步 */
   const catalog = (): ProtocolCatalog =>
@@ -665,7 +670,7 @@ export function createChannelStore(
     if (!ch) return { status: 'error', message: '模型服务不存在' }
     const group =
       ch.credentialGroups.length > 0 ? credentialGroupOf(ch, groupId) : undefined
-    const groupKey = group ? await repo.loadToken(group.credentialRef) : null
+    const groupKey = group ? await credentials.loadByRef(group.credentialRef) : null
     const { apiKey: legacyApiKey, altApiKey } = await loadKeys(ch)
     const config: ResolvedChannelConfig = {
       ...toSafeConfig(ch, catalog()),
@@ -719,211 +724,6 @@ export function createChannelStore(
     const channels = await repo.reorder([...front, ...rest])
     store.setState({ channels })
   }
-
-  /**
-   * 槽位 → 该槽在渠道行上存的引用、**尾号字段**与**存过标记字段**
-   * （见 `Channel` 的 `altCredentialRef` / `hasToken` 注释）。
-   */
-  const slotFields = (ch: Channel, slot: CredentialSlot) =>
-    slot === 'alt'
-      ? {
-          ref: ch.altCredentialRef,
-          tail: 'altTokenTail' as const,
-          has: 'hasAltToken' as const,
-        }
-      : { ref: ch.credentialRef, tail: 'tokenTail' as const, has: 'hasToken' as const }
-
-  /** 两把明文 Key 一起读：合并协议按能力各自使用，普通协议只读主槽。 */
-  const loadKeys = async (ch: Channel) => ({
-    apiKey: ch.credentialRef ? await repo.loadToken(ch.credentialRef) : null,
-    altApiKey: ch.altCredentialRef ? await repo.loadToken(ch.altCredentialRef) : null,
-  })
-
-  const saveToken: ChannelStoreActions['saveToken'] = async (id, token, slot = 'primary') => {
-    const ch = await repo.get(id)
-    const f = ch ? slotFields(ch, slot) : null
-    if (!ch || !f?.ref) throw new Error(`[channelStore] 渠道无凭据引用：${id}`)
-    await repo.saveToken(f.ref, token)
-    /**
-     * 明文此刻唯一一次在手：顺手把尾号算出来存下，供设置页显示「存的是哪把钥匙」。
-     * 之后再没有任何路径能拿到明文（除非用户重新输入）。
-     *
-     * **“存过”必须与尾号分开记**（对账 #517）：短令牌没有尾号，只写尾号的话
-     * 界面会把它读成「没存过」，显示 / 删除两个按钮也一起置灰。
-     */
-    let group = [...ch.credentialGroups].sort(
-      (a, b) => b.priority - a.priority || a.createdAt - b.createdAt,
-    )[slot === 'alt' ? 1 : 0]
-    if (!group && slot === 'alt') {
-      group = {
-        id: createId('credgroup'),
-        name: '备用分组',
-        credentialRef: f.ref,
-        tokenTail: null,
-        hasToken: false,
-        priority: 0,
-        models: [],
-        modelCache: [],
-        createdAt: Date.now(),
-      }
-      await update(id, { credentialGroups: [...ch.credentialGroups, group] })
-    }
-    if (group) {
-      await patchCredentialGroup(id, group.id, {
-        tokenTail: tokenTailOf(token),
-        hasToken: true,
-      })
-      if (slot === 'alt') {
-        await update(id, { altTokenTail: tokenTailOf(token), hasAltToken: true })
-      }
-    } else {
-      await update(id, { [f.tail]: tokenTailOf(token), [f.has]: true })
-    }
-  }
-
-  const removeToken: ChannelStoreActions['removeToken'] = async (id, slot = 'primary') => {
-    const ch = await repo.get(id)
-    const f = ch ? slotFields(ch, slot) : null
-    if (!ch || !f?.ref) return
-    await repo.removeToken(f.ref)
-    const group = [...ch.credentialGroups].sort(
-      (a, b) => b.priority - a.priority || a.createdAt - b.createdAt,
-    )[slot === 'alt' ? 1 : 0]
-    if (group) {
-      await patchCredentialGroup(id, group.id, { tokenTail: null, hasToken: false })
-      if (slot === 'alt') {
-        await update(id, { altTokenTail: null, hasAltToken: false })
-      }
-    } else {
-      await update(id, { [f.tail]: null, [f.has]: false })
-    }
-  }
-
-  /**
-   * 读回明文（只服务「显示」那一个动作）。
-   *
-   * ⚠️ 调用方（设置页的令牌行）用完就丢：不写进任何持久化状态、也不 console.log。
-   * 读不到（没存过 / 凭据层不可用）如实回 `null`，由界面说清"这一槽没存过"。
-   */
-  const loadToken: ChannelStoreActions['loadToken'] = async (id, slot = 'primary') => {
-    const ch = await repo.get(id)
-    const ref = ch ? slotFields(ch, slot).ref : null
-    return ref ? repo.loadToken(ref) : null
-  }
-
-  const credentialGroupOf = (ch: Channel, groupId?: string): ChannelCredentialGroup => {
-    const group = groupId
-      ? ch.credentialGroups.find((item) => item.id === groupId)
-      : [...ch.credentialGroups].sort(
-          (a, b) => b.priority - a.priority || a.createdAt - b.createdAt,
-        )[0]
-    if (!group) throw new Error(`[channelStore] 渠道没有可用的 Key 分组：${ch.name}`)
-    return group
-  }
-
-  const patchCredentialGroup = async (
-    id: string,
-    groupId: string,
-    patch: Partial<ChannelCredentialGroup>,
-  ): Promise<void> => {
-    const ch = await repo.get(id)
-    if (!ch) throw new Error(`[channelStore] 渠道不存在：${id}`)
-    if (!ch.credentialGroups.some((group) => group.id === groupId)) {
-      throw new Error(`[channelStore] Key 分组不存在：${groupId}`)
-    }
-    await update(id, {
-      credentialGroups: ch.credentialGroups.map((group) =>
-        group.id === groupId ? { ...group, ...patch, id: group.id } : group,
-      ),
-    })
-  }
-
-  const addCredentialGroup: ChannelStoreActions['addCredentialGroup'] = async (
-    id,
-    name,
-  ) => {
-    const ch = await repo.get(id)
-    if (!ch) throw new Error(`[channelStore] 渠道不存在：${id}`)
-    const group: ChannelCredentialGroup = {
-      id: createId('credgroup'),
-      name: name?.trim() || `Key 分组 ${ch.credentialGroups.length + 1}`,
-      credentialRef: createId('cred'),
-      tokenTail: null,
-      hasToken: false,
-      priority: 0,
-      models: [],
-      modelCache: [],
-      createdAt: Date.now(),
-    }
-    await update(id, { credentialGroups: [...ch.credentialGroups, group] })
-    return group
-  }
-
-  const renameCredentialGroup: ChannelStoreActions['renameCredentialGroup'] = async (
-    id,
-    groupId,
-    name,
-  ) => {
-    await patchCredentialGroup(id, groupId, { name: name.trim() || '未命名分组' })
-  }
-
-  const setCredentialGroupPriority: ChannelStoreActions['setCredentialGroupPriority'] =
-    async (id, groupId, priority) => {
-      await patchCredentialGroup(id, groupId, {
-        priority: Number.isFinite(priority) ? Math.trunc(priority) : 0,
-      })
-    }
-
-  const removeCredentialGroup: ChannelStoreActions['removeCredentialGroup'] = async (
-    id,
-    groupId,
-  ) => {
-    const ch = await repo.get(id)
-    if (!ch) return
-    if (ch.credentialGroups.length <= 1) {
-      throw new Error('至少要保留一个 Key 分组；不想使用这个渠道可以停用或删除渠道')
-    }
-    const target = ch.credentialGroups.find((group) => group.id === groupId)
-    if (!target) return
-    await update(id, {
-      credentialGroups: ch.credentialGroups.filter((group) => group.id !== groupId),
-    })
-    await repo.removeToken(target.credentialRef)
-  }
-
-  const saveCredentialGroupToken: ChannelStoreActions['saveCredentialGroupToken'] = async (
-    id,
-    groupId,
-    token,
-  ) => {
-    const ch = await repo.get(id)
-    if (!ch) throw new Error(`[channelStore] 渠道不存在：${id}`)
-    const group = ch.credentialGroups.find((item) => item.id === groupId)
-    if (!group) throw new Error(`[channelStore] Key 分组不存在：${groupId}`)
-    await repo.saveToken(group.credentialRef, token)
-    await patchCredentialGroup(id, groupId, {
-      tokenTail: tokenTailOf(token),
-      hasToken: true,
-    })
-  }
-
-  const loadCredentialGroupToken: ChannelStoreActions['loadCredentialGroupToken'] = async (
-    id,
-    groupId,
-  ) => {
-    const ch = await repo.get(id)
-    const group = ch?.credentialGroups.find((item) => item.id === groupId)
-    return group ? repo.loadToken(group.credentialRef) : null
-  }
-
-  const removeCredentialGroupToken: ChannelStoreActions['removeCredentialGroupToken'] =
-    async (id, groupId) => {
-      const ch = await repo.get(id)
-      const group = ch?.credentialGroups.find((item) => item.id === groupId)
-      if (!group) return
-      await repo.removeToken(group.credentialRef)
-      await patchCredentialGroup(id, groupId, { tokenTail: null, hasToken: false })
-    }
 
   /**
    * 启用开关：**先改内存，再落库**（乐观更新，2026-10-08 修）。
@@ -1104,13 +904,6 @@ export function createChannelStore(
     })
   }
 
-  const hasToken: ChannelStoreActions['hasToken'] = async (id, slot = 'primary') => {
-    const ch = await repo.get(id)
-    const ref = ch ? slotFields(ch, slot).ref : null
-    if (!ref) return false
-    return (await repo.loadToken(ref)) != null
-  }
-
   const verify: ChannelStoreActions['verify'] = async (id, groupId) => {
     const ch = await repo.get(id)
     if (!ch) return
@@ -1128,7 +921,7 @@ export function createChannelStore(
     try {
       const group =
         ch.credentialGroups.length > 0 ? credentialGroupOf(ch, groupId) : undefined
-      const groupKey = group ? await repo.loadToken(group.credentialRef) : null
+      const groupKey = group ? await credentials.loadByRef(group.credentialRef) : null
       const { apiKey: legacyApiKey, altApiKey: legacyAltApiKey } = await loadKeys(ch)
       const apiKey = groupKey ?? legacyApiKey
       const altApiKey =
@@ -1182,9 +975,9 @@ export function createChannelStore(
     const group =
       ch.credentialGroups.length > 0 ? credentialGroupOf(ch, groupId) : undefined
     const apiKey = group
-      ? await repo.loadToken(group.credentialRef)
+      ? await credentials.loadByRef(group.credentialRef)
       : ch.credentialRef
-        ? await repo.loadToken(ch.credentialRef)
+        ? await credentials.loadByRef(ch.credentialRef)
         : null
     /**
      * 探测只问一件事：这个地址是不是 OpenAI 兼容 HTTP。
@@ -1247,7 +1040,7 @@ export function createChannelStore(
       const group =
         ch.credentialGroups.length > 0 ? credentialGroupOf(ch, groupId) : undefined
       const apiKey = group
-        ? await repo.loadToken(group.credentialRef)
+        ? await credentials.loadByRef(group.credentialRef)
         : (await loadKeys(ch)).apiKey
       const altApiKey = group ? null : (await loadKeys(ch)).altApiKey
       const config: ResolvedChannelConfig = {
@@ -1768,16 +1561,16 @@ export function createChannelStore(
     setModelUncommon,
     testModelMapping,
     reorder,
-    saveToken,
-    loadToken,
-    removeToken,
-    addCredentialGroup,
-    renameCredentialGroup,
-    setCredentialGroupPriority,
-    removeCredentialGroup,
-    saveCredentialGroupToken,
-    loadCredentialGroupToken,
-    removeCredentialGroupToken,
+    saveToken: credentials.saveToken,
+    loadToken: credentials.loadToken,
+    removeToken: credentials.removeToken,
+    addCredentialGroup: credentials.addCredentialGroup,
+    renameCredentialGroup: credentials.renameCredentialGroup,
+    setCredentialGroupPriority: credentials.setCredentialGroupPriority,
+    removeCredentialGroup: credentials.removeCredentialGroup,
+    saveCredentialGroupToken: credentials.saveCredentialGroupToken,
+    loadCredentialGroupToken: credentials.loadCredentialGroupToken,
+    removeCredentialGroupToken: credentials.removeCredentialGroupToken,
     setEnabled,
     setModels,
     setModelCategory,
@@ -1786,7 +1579,7 @@ export function createChannelStore(
     setRouteStrategy,
     setRoutingPolicy,
     planGenerationRoute,
-    hasToken,
+    hasToken: credentials.hasToken,
     verify,
     detectProtocol,
     refreshModels,

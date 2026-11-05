@@ -34,7 +34,7 @@ export function StoryboardExecutionHost({
       createGenerationClient({
         platform,
         catalog: () => channels.protocolCatalog(),
-        loadToken: (credentialRef) => channelRepo.loadToken(credentialRef),
+        loadToken: (credentialRef) => channelRepo.credentials.load(credentialRef),
       }),
     [channelRepo, channels, platform],
   )

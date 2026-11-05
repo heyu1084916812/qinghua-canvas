@@ -270,7 +270,7 @@ export function CanvasExecutionProvider({
       createGenerationClient({
         platform,
         catalog: () => channels.protocolCatalog(),
-        loadToken: (credentialRef) => repo.loadToken(credentialRef),
+        loadToken: (credentialRef) => repo.credentials.load(credentialRef),
       }),
     [channels, platform, repo],
   )
@@ -546,7 +546,7 @@ export function CanvasExecutionProvider({
         }
         tokenFlags.set(
           c.id,
-          c.credentialRef ? (await repo.loadToken(c.credentialRef)) != null : false,
+          c.credentialRef ? (await repo.credentials.load(c.credentialRef)) != null : false,
         )
       }
       const sources: RouteChannelSource[] = all.map((c) => ({
