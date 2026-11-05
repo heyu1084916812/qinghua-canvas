@@ -476,3 +476,100 @@ describe('assembleAgentLoopDeps', () => {
     ])
   })
 })
+
+/**
+ * #936：流式分片与过程状态（`streamModel` / `onProcess`）。
+ *
+ * 这里测的是**显示正确性**，不是端口透传：
+ * 思考内容不能混进正文通道、工具参数碎片不能刷成"准备调用"、空分片不能凭空产生过程行、
+ * `tool` 过程不能把状态切成"思考中"。
+ */
+describe('流式分片与过程状态', () => {
+  function setup(h: ReturnType<typeof harness>) {
+    const seen: { kind: string; text: string }[] = []
+    return {
+      seen,
+      run: () =>
+        h.deps.streamModel!(
+          requestOf(),
+          new AbortController().signal,
+          ((chunk: { kind: string; text: string }) => {
+            seen.push({ kind: chunk.kind, text: chunk.text })
+          }) as never,
+        ),
+      /** 触发 `executeText` 交给渠道的那条 `onStream`。 */
+      emit: (chunk: unknown) => {
+        const onStream = h.executions[0]!.onStream as
+          | ((value: unknown) => void)
+          | undefined
+        expect(typeof onStream).toBe('function')
+        onStream!(chunk)
+      },
+    }
+  }
+
+  it('★★ 思考与正文分流：reasoning 只进 reasoning，不混进 content', async () => {
+    const h = harness({})
+    const s = setup(h)
+    await s.run()
+
+    s.emit({ reasoning: '先想一下', text: '这是正文' })
+
+    expect(s.seen).toEqual([
+      { kind: 'reasoning', text: '先想一下' },
+      { kind: 'content', text: '这是正文' },
+    ])
+    expect(s.seen.filter((row) => row.kind === 'content')).toHaveLength(1)
+  })
+
+  it('★★ 工具调用分片：有 name 才提示"准备调用"，参数碎片不刷屏', async () => {
+    const h = harness({})
+    const s = setup(h)
+    await s.run()
+
+    s.emit({
+      toolCallDeltas: [
+        { name: 'runNode' },
+        { argumentsDelta: '{"nodeIds":[' },
+        { name: 'readResult' },
+      ],
+    })
+
+    expect(s.seen).toEqual([
+      { kind: 'tool', text: '准备调用 runNode' },
+      { kind: 'tool', text: '准备调用 readResult' },
+    ])
+  })
+
+  it('★ 空分片不产生过程行（否则对话区被空白行刷屏）', async () => {
+    const h = harness({})
+    const s = setup(h)
+    await s.run()
+
+    s.emit({})
+    s.emit({ reasoning: '', text: '', toolCallDeltas: [] })
+
+    expect(s.seen).toEqual([])
+  })
+
+  it('★★ 过程状态：reasoning / content 切"思考中"，tool 只追加过程行', () => {
+    const h = harness({})
+
+    h.deps.onProcess!('reasoning', '思考中…')
+    h.deps.onProcess!('content', '正文')
+    h.deps.onProcess!('tool', '准备调用 runNode')
+
+    expect(vi.mocked(h.ports.appendLiveProcessFor)).toHaveBeenNthCalledWith(
+      1,
+      session.id,
+      '思考中…',
+    )
+    expect(vi.mocked(h.ports.appendLiveProcessFor)).toHaveBeenNthCalledWith(
+      3,
+      session.id,
+      '准备调用 runNode',
+    )
+    // tool 不切状态：只在 reasoning / content 时切
+    expect(h.statusUpdates).toEqual([{ kind: 'thinking' }, { kind: 'thinking' }])
+  })
+})
