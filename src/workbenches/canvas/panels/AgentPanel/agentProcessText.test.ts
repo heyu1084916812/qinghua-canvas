@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { isAdvanceTaskCommand, latestProcessLine } from './agentProcessText'
+import {
+  expandedProcessView,
+  isAdvanceTaskCommand,
+  latestProcessLine,
+} from './agentProcessText'
 
 describe('agent process headline', () => {
   it('shows only the latest sentence while full text remains in the fold', () => {
@@ -20,5 +24,43 @@ describe('agent process headline', () => {
     expect(isAdvanceTaskCommand('直接下一步')).toBe(true)
     expect(isAdvanceTaskCommand(' 跳过验收，直接下一步！ ')).toBe(true)
     expect(isAdvanceTaskCommand('下一步帮我做海报')).toBe(false)
+  })
+
+  it('★★ 展开区实时文本与最新历史重复时只保留一份', () => {
+    const history = [
+      { id: 'old', text: '先检查画布。' },
+      { id: 'latest', text: '准备调用 readCapabilities' },
+    ]
+
+    expect(
+      expandedProcessView(history, '准备调用 readCapabilities'),
+    ).toEqual({
+      liveText: '准备调用 readCapabilities',
+      rows: [{ id: 'old', text: '先检查画布。' }],
+    })
+  })
+
+  it('★ 实时文本是历史帧的续写时，用最新实时文本替换旧帧', () => {
+    const history = [{ id: 'latest', text: '准备调用' }]
+
+    expect(
+      expandedProcessView(history, '准备调用 readCapabilities'),
+    ).toEqual({
+      liveText: '准备调用 readCapabilities',
+      rows: [],
+    })
+  })
+
+  it('★ 历史已经领先于实时文本时不显示过期实时正文', () => {
+    const history = [
+      { id: 'latest', text: '准备调用 readCapabilities 查能力' },
+    ]
+
+    expect(
+      expandedProcessView(history, '准备调用 readCapabilities'),
+    ).toEqual({
+      liveText: '',
+      rows: history,
+    })
   })
 })

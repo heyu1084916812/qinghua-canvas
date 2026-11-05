@@ -10,6 +10,33 @@ export function latestProcessLine(text: string): string {
   return rows.at(-1) ?? ''
 }
 
+/**
+ * 展开区里“实时过程正文”和“已落消息历史”可能是同一段内容的两帧。
+ * 只保留更靠后的一帧，避免工具调用时出现上方一个框、下方又一行同样的文字。
+ */
+export function expandedProcessView<T extends { text: string }>(
+  history: readonly T[],
+  processText: string,
+): { liveText: string; rows: readonly T[] } {
+  const liveText = processText.trim()
+  if (!liveText || history.length === 0) {
+    return { liveText, rows: history }
+  }
+  const latestIndex = history.length - 1
+  const latest = history[latestIndex]!
+  const latestText = latest.text.trim()
+  if (liveText === latestText || liveText.startsWith(latestText)) {
+    return {
+      liveText,
+      rows: history.slice(0, latestIndex),
+    }
+  }
+  if (latestText.startsWith(liveText)) {
+    return { liveText: '', rows: history }
+  }
+  return { liveText, rows: history }
+}
+
 export function isAdvanceTaskCommand(text: string): boolean {
   const normalized = text.replace(/[\s，。！？!?、]/g, '').toLowerCase()
   return new Set([

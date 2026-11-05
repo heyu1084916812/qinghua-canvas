@@ -15,7 +15,10 @@ import {
   conciseAgentRequest,
 } from './agentActivitySummary'
 import { agentRevealCharacters } from './agentOutputReveal'
-import { latestProcessLine } from './agentProcessText'
+import {
+  expandedProcessView,
+  latestProcessLine,
+} from './agentProcessText'
 import {
   agentRunTaskCounts,
   agentRunTaskTitle,
@@ -316,6 +319,10 @@ export function AgentActivityStrip({
     )?.detail?.trim()
   const latestHistory = reasoningHistory.at(-1) ?? history.at(-1)
   const processHistory = reasoningHistory
+  const expandedProcess = expandedProcessView(
+    processHistory,
+    processText,
+  )
   const canExpand = Boolean(processText.trim()) || processHistory.length > 0
   const generationTool = status.kind === 'executing' ? status.tool : undefined
 
@@ -421,22 +428,22 @@ export function AgentActivityStrip({
       ) : null}
       {expanded && canExpand ? (
         <div className={styles.activityList} data-agent-activity-list>
-          {processText.trim() ? (
+          {expandedProcess.liveText ? (
             <div className={styles.activityProcessBody} data-agent-process-live-body>
               <TypewriterActivity
-                text={processText}
-                live={live}
+                text={expandedProcess.liveText}
+                live={live || revealing}
                 textKey={`live-body-${latestHistory?.id ?? status.kind}`}
                 markdown
                 body
               />
             </div>
           ) : null}
-          {processHistory.map((step, index) => {
+          {expandedProcess.rows.map((step, index) => {
             const revealStep =
               revealing &&
-              index === processHistory.length - 1 &&
-              !processText.trim()
+              index === expandedProcess.rows.length - 1 &&
+              !expandedProcess.liveText
             return (
             <div
               key={step.id}
