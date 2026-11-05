@@ -1,0 +1,37 @@
+/* CreationPanel component-domain styles */
+/*
+ * 创作参数面板（产品文档 §6.8 / §6.11 / §6.12）。
+ * 无投影、1px 描边 + 背景明度区分层次（§3「画布工作区浮层」）。
+ * 宽度约 840px、高度自适应；三部分之间只用留白区分，不出现边线（§6.7）。
+ */
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+/*
+ * 提示词区只按内容占位，不再替固定高度的面板吸收剩余空间。
+ * 旧实现让短提示词下面多出一整块空白；现在面板本身按内容收缩，
+ * 长提示词仍由编辑器自己的 max-height 滚动。
+ */
+.promptSection {
+  flex: 0 0 auto;
+  min-height: 0;
+}
+
+.promptSectionComfort {
+  flex: 1 1 auto;
+  min-height: 54px;
+}
+
+/*
+ * 素材行与参数行是**固定内容**，不允许被压缩：面板钉死 360px 后，若它们可收缩，
+ * `flex-shrink` 会按比例把这两行也挤小（实测素材按钮从 48px 被压到 36px，
+ * 「加大一倍」直接失效）。让可伸缩的只有中间的提示词区。
+ */
+.assetsSection,
+.paramsSection {
+  flex: 0 0 auto;
+}

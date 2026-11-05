@@ -21,42 +21,50 @@ import type {
 import { createProjectRepository } from '../state/project/repository'
 import { buildProjectExport } from '../state/project/flowIo'
 import { forgetActiveWorkbench } from '../state/project/activeCanvas'
-import { formatRelative } from '../domain/shared/time'
 import {
   getProjectsRevision,
   subscribeProjectsChanged,
 } from '../state/project/projectEvents'
-import { buildProjectTree, projectGroupWindow } from './projectTreeModel'
 import { projectMenuPosition, type ProjectMenuFrame } from './projectMenuPosition'
 import {
   getProjectRuntimePendingSnapshot,
-  ProjectRuntimeCleanupError,
-  retryProjectRuntimeCleanup,
   subscribeProjectRuntimePending,
-  withPreparedProjectRuntimes,
 } from './ProjectRuntimeRegistry'
 import { usePlatform } from './providers/PlatformProvider'
 import {
-  IconCanvas,
-  IconEcommerce,
-  IconStoryboard,
-} from './AppSidebarIcons'
-import {
   IconChevron,
-  IconCloseCanvas,
   IconCopy,
-  IconFolder,
   IconFolderOut,
-  IconMore,
-  IconMove,
   IconPin,
   IconPlus,
   IconRename,
   IconReveal,
   IconTrash,
   IconUpload,
+  IconCloseCanvas,
+  IconMove,
 } from './ProjectTreeIcons'
 import styles from './ProjectTree.module.css'
+import {
+  GroupExpandButton,
+  GroupRow,
+  MenuButton,
+  ModalLayer,
+  ProjectDeleteConfirmActions,
+  ProjectRow,
+  WorkbenchIcon,
+} from './projectTree/ProjectTreeViews'
+import {
+  createProjectTreePathActions,
+  type ProjectTreePathStatus,
+} from './projectTree/treePathActions'
+import {
+  createProjectTreeMutationActions,
+  type ProjectTreeConfirmTarget,
+} from './projectTree/treeMutationActions'
+import { projectTreeProjection, toggleGroupId } from './projectTree/treeProjection'
+
+export { ProjectDeleteConfirmActions } from './projectTree/ProjectTreeViews'
 
 type MenuTarget =
   | {
@@ -76,74 +84,15 @@ interface RenameTarget {
   value: string
 }
 
-interface ConfirmTarget {
-  kind: 'folder' | 'project'
-  id: string
-  name: string
-}
-
-interface StatusState {
-  text: string
-  tone: 'info' | 'error'
-}
-
 interface ProjectTreeProps {
   open: boolean
   activeProjectId: string | null
-}
-
-export function ProjectDeleteConfirmActions({
-  deleting,
-  onCancel,
-  onConfirm,
-}: {
-  deleting: boolean
-  onCancel: () => void
-  onConfirm: () => void
-}) {
-  return (
-    <>
-      <button
-        type="button"
-        disabled={deleting}
-        onClick={onCancel}
-      >
-        取消
-      </button>
-      <button
-        type="button"
-        className={styles.dangerButton}
-        disabled={deleting}
-        data-project-tree-confirm-delete
-        onClick={onConfirm}
-      >
-        {deleting ? '收尾中…' : '确认删除'}
-      </button>
-    </>
-  )
-}
-
-const PROJECT_ICON: Record<WorkbenchId, (props: { size?: number }) => JSX.Element> = {
-  canvas: IconCanvas,
-  ecommerce: IconEcommerce,
-  storyboard: IconStoryboard,
 }
 
 const SHORT_WORKBENCH_LABEL: Record<WorkbenchId, string> = {
   canvas: '画布',
   ecommerce: '电商',
   storyboard: '漫剧',
-}
-
-function joinPath(directory: string, ...parts: string[]): string {
-  const separator = directory.includes('\\') ? '\\' : '/'
-  return [directory.replace(/[\\/]+$/, ''), ...parts]
-    .filter(Boolean)
-    .join(separator)
-}
-
-function safeFileName(name: string): string {
-  return (name.trim() || '未命名项目').replace(/[\\/:*?"<>|]/g, '_')
 }
 
 /**
@@ -176,11 +125,11 @@ export function ProjectTree({ open, activeProjectId }: ProjectTreeProps) {
   const [menuFrame, setMenuFrame] = useState<ProjectMenuFrame | null>(null)
   const [moveMenuOpen, setMoveMenuOpen] = useState(false)
   const [renameTarget, setRenameTarget] = useState<RenameTarget | null>(null)
-  const [confirmTarget, setConfirmTarget] = useState<ConfirmTarget | null>(null)
+  const [confirmTarget, setConfirmTarget] = useState<ProjectTreeConfirmTarget | null>(null)
   const [deleteBusy, setDeleteBusy] = useState(false)
   const [cleanupOperationId, setCleanupOperationId] =
     useState<number | null>(null)
-  const [status, setStatus] = useState<StatusState | null>(null)
+  const [status, setStatus] = useState<ProjectTreePathStatus | null>(null)
   const pendingRuntimeOperations = useSyncExternalStore(
     subscribeProjectRuntimePending,
     getProjectRuntimePendingSnapshot,
@@ -251,38 +200,59 @@ export function ProjectTree({ open, activeProjectId }: ProjectTreeProps) {
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [confirmTarget, deleteBusy, menu, renameTarget])
 
-  const tree = useMemo(() => buildProjectTree(projects, folders), [folders, projects])
-
-  const groupWindow = useCallback(
-    (items: readonly ProjectListItem[], groupId: string) => {
-      const expanded = expandedGroups.has(groupId)
-      const grouped = projectGroupWindow(items, activeProjectId, expanded)
-      return {
-        ...grouped,
-        expanded,
-      }
-    },
-    [activeProjectId, expandedGroups],
+  const projection = useMemo(
+    () => projectTreeProjection(projects, folders, activeProjectId, expandedGroups),
+    [activeProjectId, expandedGroups, folders, projects],
   )
-  const pinnedWindow = groupWindow(tree.pinnedProjects, 'pinned')
+  const { tree, pinnedWindow, groupWindow, folderTotal: totalInFolder } = projection
 
-  const toggleGroup = (id: string) => {
-    setCollapsed((current) => {
-      const next = new Set(current)
-      if (next.has(id)) next.delete(id)
-      else next.add(id)
-      return next
-    })
-  }
+  const toggleGroup = (id: string) =>
+    setCollapsed((current) => toggleGroupId(current, id))
 
-  const toggleExpandedGroup = (id: string) => {
-    setExpandedGroups((current) => {
-      const next = new Set(current)
-      if (next.has(id)) next.delete(id)
-      else next.add(id)
-      return next
-    })
-  }
+  const toggleExpandedGroup = (id: string) =>
+    setExpandedGroups((current) => toggleGroupId(current, id))
+
+  const pathActions = useMemo(
+    () =>
+      createProjectTreePathActions({
+        platform,
+        clipboard: navigator.clipboard,
+        exportProject: buildProjectExport,
+        onStatus: setStatus,
+      }),
+    [platform],
+  )
+
+  const mutations = useMemo(
+    () =>
+      createProjectTreeMutationActions({
+        repo,
+        projects,
+        navigate,
+        projectRoute,
+        status: setStatus,
+        clearMenu: () => setMenu(null),
+        setRenameTarget,
+        setConfirmTarget,
+        setCleanupOperationId,
+        busy: () => deleteBusy,
+        setBusy: setDeleteBusy,
+        load,
+      }),
+    [
+      deleteBusy,
+      load,
+      navigate,
+      projects,
+      repo,
+      setCleanupOperationId,
+      setConfirmTarget,
+      setRenameTarget,
+      setDeleteBusy,
+      setMenu,
+      setStatus,
+    ],
+  )
 
   const showMenu = (
     target: { kind: 'folder'; id: string } | { kind: 'project'; id: string },
@@ -315,286 +285,33 @@ export function ProjectTree({ open, activeProjectId }: ProjectTreeProps) {
     setRenameTarget({ kind, id, value })
   }
 
-  const submitRename = async () => {
-    if (!renameTarget) return
-    const next = renameTarget.value.trim()
-    if (!next) return
-    try {
-      if (renameTarget.kind === 'folder') await repo.renameFolder(renameTarget.id, next)
-      else await repo.rename(renameTarget.id, next)
-      setRenameTarget(null)
-    } catch (error) {
-      setStatus({
-        text: `重命名失败：${error instanceof Error ? error.message : String(error)}`,
-        tone: 'error',
-      })
-    }
-  }
-
-  const createFolder = async () => {
+  const runPathAction = (action: Promise<ProjectTreePathStatus>) => {
     setMenu(null)
-    try {
-      const folder = await repo.createFolder()
-      setRenameTarget({ kind: 'folder', id: folder.id, value: folder.name })
-    } catch (error) {
-      setStatus({
-        text: `新建文件夹失败：${error instanceof Error ? error.message : String(error)}`,
-        tone: 'error',
-      })
-    }
+    void action.then((next) => {
+      if (next.text) setStatus(next)
+    })
   }
 
-  const createProject = async (workbench: WorkbenchId, folderId?: string) => {
-    setMenu(null)
-    try {
-      const item = await repo.create({ workbench, folderId: folderId ?? null })
-      navigate(projectRoute(item.workbench, item.id))
-    } catch (error) {
-      setStatus({
-        text: `新建${SHORT_WORKBENCH_LABEL[workbench]}失败：${error instanceof Error ? error.message : String(error)}`,
-        tone: 'error',
-      })
-    }
-  }
-
-  const moveProject = async (projectId: string, folderId: string | null) => {
-    setMenu(null)
-    try {
-      await repo.setProjectFolder(projectId, folderId)
-    } catch (error) {
-      setStatus({
-        text: `移动项目失败：${error instanceof Error ? error.message : String(error)}`,
-        tone: 'error',
-      })
-    }
-  }
-
-  const moveAllOut = async (folderId: string) => {
-    setMenu(null)
-    const inside = projects.filter((project) => project.folderId === folderId)
-    try {
-      for (const project of inside) await repo.setProjectFolder(project.id, null)
-      setStatus({
-        text: inside.length
-          ? `已把 ${inside.length} 个项目移到未归档`
-          : '这个文件夹里没有项目',
-        tone: 'info',
-      })
-    } catch (error) {
-      setStatus({
-        text: `移出文件夹失败：${error instanceof Error ? error.message : String(error)}`,
-        tone: 'error',
-      })
-    }
-  }
-
-  const localDirectory = async (): Promise<string | null> => {
-    const assetPath = platform.assetFolder?.path?.()
-    if (assetPath) return assetPath
-    return platform.storageAdmin ? platform.storageAdmin.dataDir() : null
-  }
-
-  const copyProjectPath = async (project: ProjectListItem) => {
-    setMenu(null)
-    try {
-      const directory = await localDirectory()
-      if (!directory) {
-        setStatus({ text: '本地路径仅在桌面应用可用', tone: 'error' })
-        return
-      }
-      const path = joinPath(directory, `${safeFileName(project.name)}.flow.json`)
-      await navigator.clipboard.writeText(path)
-      setStatus({ text: '项目路径已复制', tone: 'info' })
-    } catch (error) {
-      setStatus({
-        text: `复制路径失败：${error instanceof Error ? error.message : String(error)}`,
-        tone: 'error',
-      })
-    }
-  }
-
-  const copyFolderPath = async (folder: ProjectFolder) => {
-    setMenu(null)
-    try {
-      const directory = await localDirectory()
-      if (!directory) {
-        setStatus({ text: '本地路径仅在桌面应用可用', tone: 'error' })
-        return
-      }
-      await navigator.clipboard.writeText(
-        joinPath(directory, safeFileName(folder.name)),
-      )
-      setStatus({ text: '文件夹路径已复制', tone: 'info' })
-    } catch (error) {
-      setStatus({
-        text: `复制路径失败：${error instanceof Error ? error.message : String(error)}`,
-        tone: 'error',
-      })
-    }
-  }
-
-  const revealProject = async () => {
-    setMenu(null)
-    try {
-      const directory = await localDirectory()
-      if (!directory || !platform.storageAdmin) {
-        setStatus({ text: '资源管理器仅在桌面应用可用', tone: 'error' })
-        return
-      }
-      await platform.storageAdmin.openDir(directory)
-    } catch (error) {
-      setStatus({
-        text: `打开资源管理器失败：${error instanceof Error ? error.message : String(error)}`,
-        tone: 'error',
-      })
-    }
-  }
-
-  const uploadProject = async (project: ProjectListItem) => {
-    setMenu(null)
-    setStatus({ text: `正在打包「${project.name}」…`, tone: 'info' })
-    try {
-      const payload = await buildProjectExport(platform, project.id, {
-        embedAssets: true,
-      })
-      setStatus({ text: '正在上传到 OSS…', tone: 'info' })
-      const result = await platform.hosting.upload({
-        blob: payload.blob,
-        name: payload.fileName,
-      })
-      if (!result) {
-        setStatus({
-          text: '素材传输还没有配置，先到全局设置 → 素材传输选择 OSS',
-          tone: 'error',
-        })
-        return
-      }
-      await navigator.clipboard.writeText(result.url)
-      setStatus({ text: '项目已上传，公网直链已复制', tone: 'info' })
-    } catch (error) {
-      setStatus({
-        text: `上传失败：${error instanceof Error ? error.message : String(error)}`,
-        tone: 'error',
-      })
-    }
-  }
-
-  const uploadFolder = async (folder: ProjectFolder) => {
-    setMenu(null)
-    const inside = projects.filter((project) => project.folderId === folder.id)
-    if (inside.length === 0) {
-      setStatus({ text: '这个文件夹里没有可上传的项目', tone: 'info' })
-      return
-    }
-    let uploaded = 0
-    try {
-      for (const project of inside) {
-        setStatus({
-          text: `正在上传 ${uploaded + 1}/${inside.length}：${project.name}`,
-          tone: 'info',
-        })
-        const payload = await buildProjectExport(platform, project.id, {
-          embedAssets: true,
-        })
-        const result = await platform.hosting.upload({
-          blob: payload.blob,
-          name: `${safeFileName(folder.name)}-${payload.fileName}`,
-        })
-        if (!result) {
-          setStatus({
-            text: '素材传输还没有配置，先到全局设置 → 素材传输选择 OSS',
-            tone: 'error',
-          })
-          return
-        }
-        uploaded += 1
-      }
-      setStatus({
-        text: `文件夹已上传 ${uploaded}/${inside.length} 个项目`,
-        tone: 'info',
-      })
-    } catch (error) {
-      setStatus({
-        text: `上传文件夹失败（已完成 ${uploaded}/${inside.length}）：${error instanceof Error ? error.message : String(error)}`,
-        tone: 'error',
-      })
-    }
-  }
-
-  const askDelete = (target: ConfirmTarget) => {
-    setMenu(null)
-    setConfirmTarget(target)
-  }
-
-  const confirmDelete = async () => {
-    if (!confirmTarget || deleteBusy) return
-    setDeleteBusy(true)
-    try {
-      if (confirmTarget.kind === 'folder') await repo.removeFolder(confirmTarget.id)
-      else {
-        await withPreparedProjectRuntimes(
-          [confirmTarget.id],
-          () => repo.remove(confirmTarget.id),
-        )
-      }
-      setStatus({
-        text:
-          confirmTarget.kind === 'folder'
-            ? '文件夹已删除，里面的项目已移到未归档'
-            : '项目已移到回收站',
-        tone: 'info',
-      })
-      setCleanupOperationId(null)
-      setConfirmTarget(null)
-    } catch (error) {
-      if (error instanceof ProjectRuntimeCleanupError) {
-        setCleanupOperationId(error.operationId ?? null)
-        setConfirmTarget(null)
-        setMenu(null)
-        setStatus({
-          text: error.message,
-          tone: 'error',
-        })
-        return
-      }
-      setStatus({
-        text: `删除失败：${error instanceof Error ? error.message : String(error)}`,
-        tone: 'error',
-      })
-    } finally {
-      setDeleteBusy(false)
-    }
-  }
-
-  const retryRuntimeCleanup = async () => {
-    if (!cleanupPending || deleteBusy || cleanupCommitting) return
-    setDeleteBusy(true)
-    try {
-      const retriedIds = cleanupPending.projectIds
-      await retryProjectRuntimeCleanup(retriedIds)
-      await load()
-      setCleanupOperationId(null)
-      setStatus({
-        text: '项目运行态清理完成',
-        tone: 'info',
-      })
-    } catch (error) {
-      if (error instanceof ProjectRuntimeCleanupError) {
-        setCleanupOperationId(error.operationId ?? null)
-        setStatus({
-          text: error.message,
-          tone: 'error',
-        })
-      } else {
-        setStatus({
-          text: `运行态清理失败：${error instanceof Error ? error.message : String(error)}`,
-          tone: 'error',
-        })
-      }
-    } finally {
-      setDeleteBusy(false)
-    }
-  }
+  const submitRename = () => void mutations.submitRename(renameTarget)
+  const createFolder = () => void mutations.createFolder()
+  const createProject = (workbench: WorkbenchId, folderId?: string) =>
+    void mutations.createProject(workbench, folderId)
+  const moveProject = (projectId: string, folderId: string | null) =>
+    void mutations.moveProject(projectId, folderId)
+  const moveAllOut = (folderId: string) => void mutations.moveAllOut(folderId)
+  const copyProjectPath = (project: ProjectListItem) =>
+    runPathAction(pathActions.copyProjectPath(project))
+  const copyFolderPath = (folder: ProjectFolder) =>
+    runPathAction(pathActions.copyFolderPath(folder))
+  const revealProject = () => runPathAction(pathActions.revealProject())
+  const uploadProject = (project: ProjectListItem) =>
+    runPathAction(pathActions.uploadProject(project))
+  const uploadFolder = (folder: ProjectFolder) =>
+    runPathAction(pathActions.uploadFolder(folder, projects))
+  const askDelete = (target: ProjectTreeConfirmTarget) => mutations.askDelete(target)
+  const confirmDelete = () => void mutations.confirmDelete(confirmTarget)
+  const retryRuntimeCleanup = () =>
+    void mutations.retryRuntimeCleanup(cleanupPending?.projectIds ?? [])
 
   useEffect(() => {
     if (cleanupOperationId === null) return
@@ -681,7 +398,7 @@ export function ProjectTree({ open, activeProjectId }: ProjectTreeProps) {
               const groupId = `folder:${folder.id}`
               const isCollapsed = collapsed.has(groupId)
               const window = groupWindow(folderProjects, groupId)
-              const total = projects.filter((project) => project.folderId === folder.id).length
+              const total = totalInFolder(folder.id)
               return (
                 <div
                   className={styles.section}
@@ -846,7 +563,7 @@ export function ProjectTree({ open, activeProjectId }: ProjectTreeProps) {
                   {WORKBENCH_ORDER.map((workbench) => (
                     <MenuButton
                       key={workbench}
-                      icon={iconsForWorkbench(workbench)}
+                      icon={<WorkbenchIcon workbench={workbench} />}
                       label={`新建${SHORT_WORKBENCH_LABEL[workbench]}`}
                       onClick={() => void createProject(workbench, menuFolder.id)}
                     />
@@ -1063,211 +780,5 @@ export function ProjectTree({ open, activeProjectId }: ProjectTreeProps) {
           document.body,
         )}
     </section>
-  )
-}
-
-function iconsForWorkbench(workbench: WorkbenchId) {
-  const Icon = PROJECT_ICON[workbench]
-  return <Icon size={16} />
-}
-
-function GroupRow({
-  label,
-  count,
-  pinned,
-  collapsed,
-  onToggle,
-  onTogglePin,
-  onMore,
-}: {
-  label: string
-  count: number
-  pinned: boolean
-  collapsed: boolean
-  onToggle: () => void
-  onTogglePin?: () => void
-  onMore?: (button: HTMLButtonElement) => void
-}) {
-  return (
-    <div className={styles.groupRow} data-project-tree-group>
-      <button
-        type="button"
-        className={styles.groupMain}
-        aria-expanded={!collapsed}
-        onClick={onToggle}
-      >
-        <span className={styles.groupIcon}>
-          <IconFolder size={16} />
-        </span>
-        <span className={styles.groupLabel}>{label}</span>
-        <span className={collapsed ? styles.chevron : `${styles.chevron} ${styles.chevronOpen}`}>
-          <IconChevron size={13} />
-        </span>
-        <span className={styles.groupCount}>{count}</span>
-      </button>
-      {(onTogglePin || onMore) && (
-        <div className={styles.rowActions}>
-          {onTogglePin && (
-            <button
-              type="button"
-              className={pinned ? `${styles.iconButton} ${styles.iconButtonOn}` : styles.iconButton}
-              title={pinned ? '取消置顶' : '置顶'}
-              aria-label={pinned ? '取消置顶' : '置顶'}
-              onClick={onTogglePin}
-            >
-              <IconPin size={14} />
-            </button>
-          )}
-          {onMore && (
-            <button
-              type="button"
-              className={styles.iconButton}
-              title="更多"
-              aria-label="更多"
-              onClick={(event) => onMore(event.currentTarget)}
-            >
-              <IconMore size={15} />
-            </button>
-          )}
-        </div>
-      )}
-    </div>
-  )
-}
-
-function GroupExpandButton({
-  count,
-  expanded,
-  groupId,
-  onToggle,
-}: {
-  count: number
-  expanded: boolean
-  groupId: string
-  onToggle: (groupId: string) => void
-}) {
-  return (
-    <button
-      type="button"
-      className={styles.groupExpand}
-      data-project-tree-expand={groupId}
-      aria-expanded={expanded}
-      onClick={() => onToggle(groupId)}
-    >
-      {expanded ? '收起' : `展开显示 (${count})`}
-    </button>
-  )
-}
-
-function ProjectRow({
-  project,
-  active,
-  onOpen,
-  onTogglePin,
-  onMore,
-}: {
-  project: ProjectListItem
-  active: boolean
-  onOpen: () => void
-  onTogglePin: () => void
-  onMore: (button: HTMLButtonElement) => void
-}) {
-  const Icon = PROJECT_ICON[project.workbench]
-  return (
-    <li
-      className={active ? `${styles.projectRow} ${styles.projectRowActive}` : styles.projectRow}
-      data-project-tree-item={project.id}
-      data-project-tree-workbench={project.workbench}
-      data-project-tree-active={active ? 'true' : 'false'}
-    >
-      <button
-        type="button"
-        className={styles.projectMain}
-        onClick={onOpen}
-        title={project.name}
-        aria-current={active ? 'page' : undefined}
-      >
-        <span className={styles.projectIcon}>
-          <Icon size={15} />
-        </span>
-        <span className={styles.projectName}>{project.name}</span>
-        <span className={styles.projectTime} title={new Date(project.updatedAt).toLocaleString('zh-CN')}>
-          {formatRelative(project.updatedAt)}
-        </span>
-      </button>
-      <div className={styles.rowActions}>
-        <button
-          type="button"
-          className={
-            project.pinnedAt
-              ? `${styles.iconButton} ${styles.iconButtonOn}`
-              : styles.iconButton
-          }
-          title={project.pinnedAt ? '取消置顶' : '置顶'}
-          aria-label={project.pinnedAt ? '取消置顶' : '置顶'}
-          onClick={onTogglePin}
-        >
-          <IconPin size={14} />
-        </button>
-        <button
-          type="button"
-          className={styles.iconButton}
-          title="更多"
-          aria-label="更多"
-          onClick={(event) => onMore(event.currentTarget)}
-        >
-          <IconMore size={15} />
-        </button>
-      </div>
-    </li>
-  )
-}
-
-function MenuButton({
-  icon,
-  label,
-  trailing,
-  danger = false,
-  disabled = false,
-  onClick,
-}: {
-  icon: React.ReactNode
-  label: string
-  trailing?: string
-  danger?: boolean
-  disabled?: boolean
-  onClick: () => void
-}) {
-  return (
-    <button
-      type="button"
-      role="menuitem"
-      disabled={disabled}
-      className={danger ? `${styles.menuItem} ${styles.menuItemDanger}` : styles.menuItem}
-      onClick={onClick}
-    >
-      <span className={styles.menuIcon}>{icon}</span>
-      <span className={styles.menuLabel}>{label}</span>
-      {trailing && <span className={styles.menuTrailing}>{trailing}</span>}
-    </button>
-  )
-}
-
-function ModalLayer({
-  children,
-  onClose,
-}: {
-  children: React.ReactNode
-  onClose: () => void
-}) {
-  return (
-    <div
-      className={styles.modalLayer}
-      onPointerDown={(event) => {
-        if (event.currentTarget === event.target) onClose()
-      }}
-    >
-      {children}
-    </div>
   )
 }

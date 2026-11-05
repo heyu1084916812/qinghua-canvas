@@ -1,0 +1,367 @@
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.uniformGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: var(--space-5);
+  grid-auto-rows: 240px;
+}
+
+.uniformGrid .cardMain {
+  height: 100%;
+}
+
+.uniformGrid .thumb {
+  aspect-ratio: auto;
+  height: 100%;
+}
+
+.uniformGrid .media {
+  object-fit: cover;
+}
+
+.card {
+  position: relative;
+  display: flex;
+  width: 100%;
+  /**
+   * ⚠️ **必须显式写 `border-box`**（用户 2026-10-10 #9：「图片上下间距和左右间距不一致」）。
+   *
+   * 卡片有 1px 边框，而 `width: 100%` 在默认的 content-box 下算的是**内容盒** ⇒
+   * 外框比多列栅格的列宽宽 2px，两侧各吃掉 1px 列间距。
+   * 实测（1800 视口）：列宽 273、列距 291 ⇒ 水平缝 **18px**，而纵向 `margin-bottom` 是 20px。
+   * 加上这一句之后两者都是 20px（`column-gap` 与 `margin-bottom` 同取 `--space-5`）。
+   */
+  box-sizing: border-box;
+  break-inside: avoid;
+  margin-bottom: var(--space-5);
+  background: var(--bg-subtle);
+  border: var(--border);
+  border-radius: var(--radius-node);
+  overflow: hidden;
+  transition:
+    border-color var(--dur-hover) var(--ease-out),
+    box-shadow var(--dur-hover) var(--ease-out);
+}
+
+.cardList {
+  display: grid;
+  grid-template-columns: 180px minmax(0, 1fr);
+  gap: var(--space-3);
+  align-items: stretch;
+  margin-bottom: 0;
+  overflow: visible;
+}
+
+.cardList .cardMain {
+  min-width: 0;
+}
+
+.cardList .thumb {
+  height: 100%;
+  min-height: 118px;
+}
+
+.cardList .media {
+  object-fit: cover;
+}
+
+.listInfo {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-3) var(--space-3) 0;
+}
+
+.listPrompt {
+  margin: 0;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  color: var(--text-1);
+  font-size: var(--fs-label);
+  line-height: 1.5;
+}
+
+.listMeta {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(82px, 1fr));
+  gap: var(--space-2);
+  margin: 0;
+}
+
+.listMeta div {
+  min-width: 0;
+}
+
+.listMeta dt {
+  color: var(--text-3);
+  font-size: var(--fs-chip);
+}
+
+.listMeta dd {
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-2);
+  font-size: var(--fs-chip);
+}
+
+.listChannel {
+  margin: 0;
+  color: var(--text-3);
+  font-size: var(--fs-chip);
+}
+
+.listTags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  margin: 0;
+}
+
+.listTags span {
+  padding: 1px var(--space-2);
+  border: 1px solid var(--stroke);
+  border-radius: var(--radius-pill);
+  color: var(--text-3);
+  font-size: var(--fs-chip);
+}
+
+.card:hover,
+.card:focus-within {
+  border-color: var(--stroke-focus);
+}
+
+.cardSelected {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+
+.cardChecked {
+  border-color: var(--accent);
+  background: var(--bg-subtle);
+}
+
+.cardSelectionMode .cardMain {
+  cursor: default;
+}
+
+.cardMain {
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+.cardMain:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: -2px;
+}
+
+.thumb {
+  position: relative;
+  display: block;
+  width: 100%;
+  background: var(--bg-surface);
+  overflow: hidden;
+}
+
+.media {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  object-position: center;
+}
+
+.cardActions {
+  position: absolute;
+  right: var(--space-2);
+  top: var(--space-2);
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  opacity: 0;
+  transition: opacity var(--dur-hover) var(--ease-out);
+}
+
+.favorite {
+  position: absolute;
+  top: var(--space-2);
+  left: var(--space-2);
+  z-index: 4;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-pill);
+  background: var(--control-inverse-bg);
+  color: var(--control-inverse-text);
+  cursor: pointer;
+}
+
+.selectionBox {
+  position: absolute;
+  top: var(--space-2);
+  left: var(--space-2);
+  z-index: 5;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 1px solid var(--stroke-focus);
+  border-radius: 6px;
+  background: var(--control-inverse-bg);
+  color: var(--control-inverse-text);
+  cursor: pointer;
+}
+
+.selectionBox[aria-pressed='true'] {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--accent-text);
+}
+
+.cardSelectionMode .favorite {
+  left: calc(var(--space-2) + 28px);
+}
+
+.favorite:hover {
+  background: var(--control-inverse-bg-hover);
+}
+
+.favoriteOn {
+  color: var(--favorite);
+}
+
+.card:hover .cardActions,
+.card:focus-within .cardActions,
+.cardActions:has(.menu),
+.cardActions:has(.confirm) {
+  opacity: 1;
+}
+
+.menuBtn {
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 9px;
+  background: var(--control-inverse-bg);
+  color: var(--control-inverse-text);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  transition:
+    background var(--dur-hover) var(--ease-out),
+    color var(--dur-hover) var(--ease-out);
+}
+
+.menuBtn:hover {
+  background: var(--control-inverse-bg-hover);
+  color: var(--control-inverse-text-hover);
+}
+
+.menuBtn:disabled {
+  opacity: 0.42;
+  cursor: default;
+}
+
+.menuBtn:disabled:hover {
+  background: var(--control-inverse-bg);
+  color: var(--control-inverse-text);
+}
+
+.menu {
+  position: absolute;
+  top: 28px;
+  right: 0;
+  min-width: 112px;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-surface);
+  border: var(--border);
+  border-radius: var(--radius-control);
+  box-shadow: var(--shadow-float);
+  padding: var(--space-1);
+  z-index: 2;
+}
+
+.menuItem {
+  text-align: left;
+  border: none;
+  background: transparent;
+  color: var(--text-1);
+  font-size: var(--fs-label);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-control);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.menuItem:hover {
+  background: var(--bg-hover);
+}
+
+.menuDanger {
+  color: var(--danger);
+}
+
+.confirm {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 2px var(--space-2);
+  background: var(--bg-surface);
+  border: var(--border);
+  border-radius: var(--radius-pill);
+  box-shadow: var(--shadow-float);
+}
+
+.confirmText {
+  font-size: var(--fs-chip);
+  color: var(--text-2);
+  white-space: nowrap;
+}
+
+.confirmYes,
+.confirmNo {
+  border: none;
+  background: transparent;
+  font-size: var(--fs-chip);
+  font-weight: var(--fw-chip);
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: var(--radius-pill);
+}
+
+.confirmYes {
+  color: var(--danger);
+}
+
+.confirmNo {
+  color: var(--text-2);
+}
+
+.confirmYes:hover,
+.confirmNo:hover {
+  background: var(--bg-hover);
+}

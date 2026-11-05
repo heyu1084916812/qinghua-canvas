@@ -1,0 +1,322 @@
+.globalRoute {
+  width: 100%;
+  max-width: 1120px;
+  /**
+   * ⚠️ **必须显式写 `border-box`**（用户第 19 批第 1 条：「最上方的比下方的宽，我要一样宽」）。
+   *
+   * 这一格本身有左右各 20px 内距，而 `width: 100%` 在**默认的 content-box** 下算的是内容盒
+   * ⇒ 实际外框 = 100% + 40px，比同为 `100%` 的 `.workarea`（它没有内距）**宽 40px**。
+   * 实测：浮层内容 920 ⇒ 选路条 912 / 工作区 872。
+   */
+  box-sizing: border-box;
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  /**
+   * 底色换成 `--bg-subtle`（用户 2026-10-09：「浅色主题下这个容器没有背景了，和图二不一致」）。
+   *
+   * 真因：`--bg-surface` 在**浅色**下等于 `--bg-canvas`（都是 #ffffff）⇒ 与页面同色，
+   * 看着就没有背景（暗色下才是 #222222 / #161616 那种分得开的组合）。
+   * `--bg-subtle` 两套主题都比画布深一档，于是「无描边容器」靠实色底就能分层。
+   */
+  background: var(--bg-subtle);
+  border-radius: var(--radius-node);
+}
+
+.globalRouteText {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.globalRouteControls {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.routeScopeButton,
+.routeScopeReset {
+  min-height: 32px;
+  box-sizing: border-box;
+  border: var(--border);
+  border-radius: var(--radius-control);
+  background: var(--bg-surface);
+  color: var(--text-1);
+  padding: 0 var(--space-3);
+  font: inherit;
+  font-size: var(--fs-label);
+  cursor: pointer;
+}
+
+.routeScopeButton {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.routeScopeButton span {
+  color: var(--text-3);
+  font-variant-numeric: tabular-nums;
+}
+
+.routeScopeButton:hover,
+.routeScopeButtonOpen,
+.routeScopeReset:hover {
+  background: var(--bg-hover);
+}
+
+.routeScopeReset:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.routeScopePanel {
+  width: 100%;
+  max-width: 1120px;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border-radius: var(--radius-node);
+  background: var(--bg-subtle);
+}
+
+.routeScopeHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+
+.routeScopeChannels {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.routeScopeChannel {
+  overflow: hidden;
+  border: var(--border);
+  border-radius: var(--radius-control);
+  background: var(--bg-surface);
+}
+
+.routeScopeChannelHead {
+  min-height: 52px;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+}
+
+.routeScopeChannelCheck {
+  width: 20px;
+  height: 20px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: var(--border);
+  border-radius: 5px;
+  background: var(--bg-surface);
+  color: var(--accent-text);
+  font: inherit;
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.routeScopeChannelCheck[aria-checked='true'],
+.routeScopeChannelCheck[aria-checked='mixed'] {
+  border-color: var(--accent);
+  background: var(--accent);
+}
+
+.routeScopeChannelCheck:focus-visible,
+.routeScopeChannelExpand:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.routeScopeChannelHead .routeScopeOptionText {
+  flex: 1;
+}
+
+.routeScopeChannelExpand {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-1) var(--space-2);
+  border: 0;
+  border-radius: calc(var(--radius-control) - 2px);
+  background: transparent;
+  color: var(--text-3);
+  font: inherit;
+  font-size: var(--fs-label);
+  cursor: pointer;
+}
+
+.routeScopeChannelExpand:hover {
+  background: var(--bg-hover);
+  color: var(--text-1);
+}
+
+.routeScopeGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3) var(--space-3) 48px;
+  border-top: var(--border);
+}
+
+.routeScopeOption {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  box-sizing: border-box;
+  padding: var(--space-2) var(--space-3);
+  border: 0;
+  border-radius: var(--radius-control);
+  background: var(--bg-subtle);
+  cursor: pointer;
+}
+
+.routeScopeOption:hover {
+  background: var(--bg-hover);
+}
+
+.routeScopeOption input {
+  flex: 0 0 auto;
+  accent-color: var(--accent);
+}
+
+.routeScopeOptionText {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.routeScopeOptionText b,
+.routeScopeOptionText small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.routeScopeOptionText b {
+  color: var(--text-1);
+  font-size: var(--fs-label);
+  font-weight: 600;
+}
+
+.routeScopeOptionText small,
+.routeScopeEmpty {
+  color: var(--text-3);
+  font-size: var(--fs-label);
+}
+
+.routeScopeEmpty {
+  margin: 0;
+}
+
+.labelRow {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.tokenRequired {
+  margin-left: var(--space-1);
+  padding: 0 var(--space-1);
+  border-radius: 4px;
+  background: var(--bg-hover);
+  color: var(--text-3);
+  font-size: var(--fs-label);
+}
+
+.docLink {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 0 var(--space-3);
+  border: var(--border);
+  border-radius: 999px;
+  background: var(--bg-app);
+  color: var(--accent);
+  font-size: var(--fs-label);
+  text-decoration: none;
+}
+
+.docLink:hover {
+  background: var(--bg-hover);
+  color: var(--text-1);
+}
+
+.keyGroups {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.keyGroupsHead,
+.keyGroupFoot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.keyGroupTabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.keyGroupTab {
+  min-height: 30px;
+  padding: 0 var(--space-3);
+  border: var(--border);
+  border-radius: 999px;
+  background: var(--bg-app);
+  color: var(--text-2);
+  font: inherit;
+  font-size: var(--fs-label);
+  cursor: pointer;
+}
+
+.keyGroupTab:hover {
+  background: var(--bg-hover);
+}
+
+.keyGroupTabOn {
+  border-color: var(--stroke-focus);
+  background: var(--bg-surface);
+  color: var(--text-1);
+  font-weight: 600;
+}
+
+.keyGroupEditor {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border: 0;
+  border-radius: 6px;
+  background: var(--bg-app);
+}
+
+.fileInput {
+  display: none;
+}

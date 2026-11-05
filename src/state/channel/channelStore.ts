@@ -1,7 +1,5 @@
 import { createStore as createVanilla } from 'zustand/vanilla'
-import type { PlatformKit, StreamChunk } from '../../platform/ports'
-import type { Channel, CreateChannelInput } from '../../domain/project/channel'
-import type { ChannelCredentialGroup } from '../../domain/project/channel'
+import type { Channel } from '../../domain/project/channel'
 import {
   channelIsRoutable,
   protocolNeedsNoToken,
@@ -15,104 +13,76 @@ import {
   validateCustomProtocol,
   PROBE_VERSION_PATHS,
   type CustomProtocolInput,
-  type CustomProtocolValidation,
-  type ProtocolCatalog,
   type ProtocolDefinition,
 } from '../../domain/project/protocol'
-import {
-  buildDefaultModelMap,
-  setModelMapping,
-} from '../../domain/project/modelMapping'
-import type { RouteStrategy } from '../../domain/project/modelRouting'
-import {
-  normalizeRoutePolicy,
-  type RoutePlanResult,
-  type RoutePolicy,
-} from '../../domain/project/routePlan'
-import { buildGenerationRoutePlan } from '../../domain/project/generationRouting'
-import {
-  NO_RECIPE,
-  rememberRecipe,
-  resolveForNode,
-} from '../../domain/project/generationPreset'
+import { setModelMapping } from '../../domain/project/modelMapping'
 import type { ModelCapability } from '../../domain/shared/capability'
 import {
   PRESET_MODELS,
   type PresetModel,
-  type PresetVendor,
 } from '../../domain/project/modelPresets'
 import { createChannelRepository, type ChannelRepository } from '../project/channelRepository'
 import { createChannelCredentials } from './channelCredentials'
 import { createChannelRequestOrchestration } from './channelRequestOrchestration'
 import { BUILTIN_CHANNEL_IDS, isBuiltinChannelId } from '../../domain/project/builtinChannels'
-import type { CredentialSlot } from '../../domain/project/channel'
 import { createPresetStore, type PresetStore } from '../project/presetStore'
 import { createRoutingPolicyStore } from '../project/routingPolicyStore'
 import {
   createChannelAdapter,
   type ResolvedChannelConfig,
 } from '../../platform/channels/registry'
-import type {
-  GeneratedAsset,
-  SpeechRunRequest,
-  TextResult,
-  VideoRunRequest,
-  VerifyResult,
-} from '../../platform/channels/types'
-import type { ChatMessage, NodeInput, ToolDeclaration } from '../../domain/shared/execution/types'
+import type { VerifyResult } from '../../platform/channels/types'
 import { describeError, asAppError } from '../../shared/result'
 import {
   createGenerationClient,
   resolvedChannelConfig,
 } from '../../platform/generation'
+import { createContextRepository } from '../shared/contextRepository'
 import {
+  initialChannelStoreState,
+  timeoutSignal,
+  type MiniStore,
+  type StoreFactory,
+  type PlatformKit,
+  type ProtocolCatalog,
+  type RouteStrategy,
+  type RoutePlanResult,
+  type RoutePolicy,
+  type PresetVendor,
+  type CreateChannelInput,
+  type CustomProtocolValidation,
+  type ChannelCredentialGroup,
+  type CredentialSlot,
+  type ChatMessage,
+  type NodeInput,
+  type ToolDeclaration,
+  type StreamChunk,
   type DirectRunRouteCandidate,
   type DirectRunTraceInput,
-} from '../shared/directRun'
-import { createContextRepository } from '../shared/contextRepository'
+  type GeneratedAsset,
+  type SpeechRunRequest,
+  type TextResult,
+  type VideoRunRequest,
+} from './channelStore/contracts'
 
-/**
- * zustand 5 的 createStore 类型与本项目装好的 TypeScript 6 泛型推断冲突（见 state/workbenches/canvas/store.ts）。
- * 收敛成等价的极简工厂签名（运行时仍是 zustand，行为一致）。
- */
-type MiniStore<T> = {
-  getState: () => T
-  setState: (partial: Partial<T> | ((prev: T) => Partial<T>)) => void
-  subscribe: (listener: () => void) => () => void
-}
-type StoreFactory = <T>(init: () => T) => MiniStore<T>
-const createVanillaStore = createVanilla as unknown as StoreFactory
-
-/**
- * 「验证地址」的结果（§7.3）：**只回答地址通不通 + 往返延迟**。
- * 刻意没有 modelCount —— 拉模型是「拉取模型」的职责，不是验证的副产品。
- */
+/** 「验证地址」的结果：只回答地址通不通与往返延迟。 */
 export interface ChannelVerify {
   status: 'idle' | 'checking' | 'ok' | 'error'
   message?: string
-  /** 本次「验证地址」的往返延迟（ms），供状态行展示（§7.3） */
   latency?: number
 }
 
-/**
- * 「拉取模型」的结果（§7.4）：与验证分开描述，因为它关心的不是通不通、而是拿到了几个模型。
- */
+/** 「拉取模型」的结果：与验证分开，关心的是拿到了几个模型。 */
 export interface ChannelModelsResult {
   status: 'idle' | 'checking' | 'ok' | 'error'
   message?: string
   modelCount?: number
 }
 
-/**
- * 「验证协议」的结果（§7.3）：逐个试打候选协议，命中即写回渠道。
- * 与 verify 分开是因为二者回答的不是同一个问题——verify 问「这个地址活着吗」，
- * detect 问「这个地址说哪种协议」，后者有协议这个额外产物与「全失败」这一额外结局。
- */
+/** 「验证协议」的结果：命中的协议与全失败原因。 */
 export interface ChannelDetect {
   status: 'idle' | 'checking' | 'ok' | 'error'
-  /** 探测命中的协议 value；全失败为 null */
   protocol: string | null
-  /** 全失败时留最后一条失败原因，供状态行展示 */
   message?: string
 }
 
@@ -125,29 +95,12 @@ export interface ModelMappingTestResult {
 
 export interface ChannelStoreState {
   channels: Channel[]
-  /**
-   * 全局选路策略（用户 2026-09-29 第 12 轮）：跨渠道比较共用的一把尺子。
-   *
-   * 从渠道字段迁出到这里，是因为「同一个模型在多条渠道都能出图」天然是
-   * 全局问题；放进每条渠道的表单会变成「用哪条渠道的策略」这种说不清的问题。
-   */
   routeStrategy: RouteStrategy
-  /** 新路由计划的持久策略；为空候选表示沿用所有可用渠道/分组。 */
   routingPolicy: RoutePolicy
-  /**
-   * 「记住上次参数」是否生效（对账 #386 的 E4）。
-   *
-   * 开（默认）= 现状：画布上改一次参数，下一个新节点就继承它。
-   * 关 = 默认值只认「设置 → 默认参数」里那一份，随手改动不再带走它。
-   */
   recipeMemory: boolean
-  /** 用户自建协议（内置协议不在这里，见 domain/project/protocol 的目录） */
   customProtocols: ProtocolDefinition[]
-  /** Built-in station protocols hidden from the protocol picker by the user. */
   hiddenBuiltinProtocolIds: string[]
-  /** 用户新增的全局前端模型；内置 `PRESET_MODELS` 不允许删除。 */
   customModels: PresetModel[]
-  /** 标为“不常用”的前端逻辑名；画布 / Agent / 默认参数不消费。 */
   uncommonModelIds: string[]
   loaded: boolean
   verify: ChannelVerify
@@ -157,15 +110,10 @@ export interface ChannelStoreState {
 
 export interface ChannelStoreActions {
   load(): Promise<void>
-  /** 当前目录：内置协议 + 已加载的自建协议（渠道解析 / 界面共用一份） */
   protocolCatalog(): ProtocolCatalog
-  /** 新增自建协议；返回校验结果，`ok:false` 时界面可直接展示原因 */
   createCustomProtocol(input: CustomProtocolInput): Promise<CustomProtocolValidation>
-  /** 删除自建协议；仍被渠道引用时抛错（不静默改指） */
   removeCustomProtocol(id: string): Promise<void>
-  /** Hide an unused built-in station protocol from the protocol picker. */
   removeBuiltinProtocol(id: string): Promise<void>
-  /** Restore every hidden built-in protocol. */
   restoreBuiltinProtocols(): Promise<void>
   create(input: CreateChannelInput): Promise<Channel>
   update(id: string, patch: Partial<Channel>): Promise<Channel>
@@ -179,32 +127,16 @@ export interface ChannelStoreActions {
   }): Promise<PresetModel>
   removeGlobalModel(name: string): Promise<void>
   setModelUncommon(name: string, uncommon: boolean): Promise<void>
-  /** 用 `/models` 目录校验映射，不发起生成请求、不产生生成费用。 */
   testModelMapping(
     id: string,
     logicalName: string,
     upstreamId: string,
     groupId?: string,
   ): Promise<ModelMappingTestResult>
-  /** 拖动排序（§7.2）：整表重编号 */
   reorder(orderedIds: string[]): Promise<void>
-  /**
-   * 存 / 删 / 查令牌（§7.3）。`slot` 缺省 = **主槽**（老调用方零改动）；
-   * `'alt'` = **备用槽** —— 声明了多把凭据的协议（RunningHub：金额 Key + 币 Key）才用得到。
-   */
   saveToken(id: string, token: string, slot?: CredentialSlot): Promise<void>
-  /**
-   * 读回**明文**（用户 2026-10-08 第 5 条：「渠道的令牌显示功能是不生效的」）。
-   *
-   * 为什么以前没有它：界面上那个「显示」按钮只切换了输入框的 `type`，而已存的令牌
-   * 一直只以**打码后的占位符**出现（明文从不进界面）⇒ 按了等于没按。
-   * 现在「显示」按下去**真去凭据层读一次**；读到的明文只放进当前这一次渲染的输入框，
-   * **不落库、不进日志**，切回「隐藏」时立刻丢掉。
-   */
   loadToken(id: string, slot?: CredentialSlot): Promise<string | null>
-  /** 删除令牌（§7.3）：只清密文，渠道保留、可再存 */
   removeToken(id: string, slot?: CredentialSlot): Promise<void>
-  /** 新增一个 Key 分组；模型目录初始为空，等待用这把 Key 拉取。 */
   addCredentialGroup(id: string, name?: string): Promise<ChannelCredentialGroup>
   renameCredentialGroup(id: string, groupId: string, name: string): Promise<void>
   setCredentialGroupPriority(id: string, groupId: string, priority: number): Promise<void>
@@ -213,165 +145,83 @@ export interface ChannelStoreActions {
   loadCredentialGroupToken(id: string, groupId: string): Promise<string | null>
   removeCredentialGroupToken(id: string, groupId: string): Promise<void>
   setEnabled(id: string, enabled: boolean): Promise<void>
-  /** 「应用到模型列表」（§7.4）：把面板勾选结果写进 `models` */
   setModels(id: string, models: ModelCapability[], groupId?: string): Promise<void>
-  /** 用户手动修正某个模型的分类；保留站点原始分类供追溯。 */
   setModelCategory(
     id: string,
     modelId: string,
     category: ModelCapability['category'],
     groupId?: string,
   ): Promise<void>
-  /**
-   * 写一条模型映射（§7.4.1，M7-2）：`逻辑名 → 该站上游 ID`。
-   * 上游 ID 传空串即**删除**该条映射（回到恒等），不存空串。
-   */
   setModelMapping(id: string, logicalName: string, upstreamId: string): Promise<void>
-  /**
-   * 渠道级选路参数（M7-2）：优先度（越大越优先）与权重（同档内加权随机）。
-   * 与 `modelMap` 一样住在渠道行上——它们衡量的是「这条渠道本身」。
-   */
   setRouteTuning(id: string, patch: { priority?: number; weight?: number }): Promise<void>
-  /** 全局选路策略（跨渠道比较用的那把尺子），落库到 `presets` 的保留行 */
   setRouteStrategy(strategy: RouteStrategy): Promise<void>
-  /** 持久化路由策略、最大尝试次数与允许参与路由的渠道/Key 分组。 */
   setRoutingPolicy(patch: Partial<RoutePolicy>): Promise<void>
-  /**
-   * 为一次新请求生成可执行 RoutePlan。
-   *
-   * 显式渠道只在该渠道内生成分组候选；未指定渠道时按全局策略跨渠道。
-   */
   planGenerationRoute(opts: {
     category: 'image' | 'video' | 'chat'
     logicalModel: string
     explicitChannelId?: string
   }): Promise<RoutePlanResult>
   hasToken(id: string, slot?: CredentialSlot): Promise<boolean>
-  /** 「验证地址」（§7.3）：只测通不通 + 延迟，不碰 models / modelCache */
   verify(id: string, groupId?: string): Promise<void>
-  /**
-   * 「验证协议」（§7.3）：按候选表逐个试打，第一个通过的写回 `protocol` 并落库。
-   * @returns 命中的协议 value；全失败返回 null（状态行给最后一条失败原因）
-   */
   detectProtocol(id: string, groupId?: string): Promise<string | null>
-  /** 「拉取模型」（§7.4）：把该地址的全部模型写进 `modelCache`（选择面板的数据源） */
   refreshModels(id: string, groupId?: string): Promise<void>
-  /** 已启用渠道：供创作面板的平台下拉使用（M2-2 接入） */
   enabledChannels(): Channel[]
-  /**
-   * 记住「**这次生成**实际用的渠道 + 模型 + 参数」，作为该渠道新建节点的默认值
-   * （用户 2026-09-18，2026-09-18 晚收口为按渠道）。调用方是**生成成功那一刻**，
-   * 不是选参数的瞬间——用户要的是「最后一次生成用的那套」，选了却没生成的不该影响默认值。
-   */
-  rememberRecipe(
-    channelId: string,
-    model: string,
-    params: Record<string, unknown>,
-  ): Promise<void>
-  /** 切换「记住上次参数」；会立刻落库（下次启动还认这个选择） */
+  rememberRecipe(channelId: string, model: string, params: Record<string, unknown>): Promise<void>
   setRecipeMemory(enabled: boolean): Promise<void>
-  /**
-   * **显式**设定某条渠道的默认配方（设置 → 默认参数里的"保存"）。
-   *
-   * 与 `rememberRecipe` 的区别：那是"随手改动顺便记住"，受「记住上次参数」开关管；
-   * 这是用户在设置里**明确点保存**，开关关掉时也要生效 ——
-   * 否则"关掉记忆"就等于"再也改不动默认值"，那明显不是用户要的。
-   */
   setDefaultRecipe(channelId: string, model: string, params: Record<string, unknown>): Promise<void>
-  /**
-   * 给节点解析「该填的渠道 / 模型 / 参数」。
-   *
-   * 解析链（与 domain/project/generationPreset.resolveForNode 同源）：
-   * 1. 节点自身已带的渠道 / 模型（`node` 参数，用户手动选过的最优先）
-   * 2. 该渠道上次记录（模型失效时兜底该渠道第一个可用模型）
-   * 3. 第一个可用渠道的第一个可用模型
-   * 4. 都没有 → `null`（调用方给出可诊断的解释）
-   *
-   * - `category`：提示词节点只要文本模型（生成节点不需要传）
-   *
-   * 为什么带 `node` 参数：面板打开时节点可能已经带了渠道 / 模型，
-   * 但也可能是「创建那刻没算出来」的空节点——此时面板用同一条解析链现算，
-   * 不再留一个空下拉。这是修「明明配好渠道，新建节点还是空的」的关键。
-   */
   defaultForNewNode(
     node: { channelId?: string; model?: string },
     category?: string,
   ): Promise<{ channelId: string; model: string; params: Record<string, unknown>; substituted: boolean } | null>
-  /**
-   * Agent 的带工具多轮调用（设计文档 §4）。
-   *
-   * 与 `CanvasExecutionProvider.completeText`（优化 / 翻译 / 反推那条）的分工：
-   * 那是「一段系统指令 + 一段正文」的单次调用，给提示词节点用；
-   * 这个要的是**完整消息数组 + 工具声明**，给 agent 循环用。
-   * 两者共用同一套适配器解析（渠道 → 令牌 → registry），不重复那份逻辑。
-   */
   completeWithTools(req: {
     channelId: string
     model: string
-    /** 调用方已经解析过渠道映射；电商对话会显式传上游 ID，避免二次翻译 */
     modelIsUpstream?: boolean
     tools: readonly ToolDeclaration[]
     messages: readonly ChatMessage[]
-    /**
-     * 随本轮对话附带的视觉素材。电商商品分析必须真正把原图发给模型，
-     * 只写文件名或节点 id 不算“看过图”。
-     */
     inputs?: readonly NodeInput[]
     signal: AbortSignal
-    /** 单次调用的等待上限；不给走 Agent 的默认值（见 `AGENT_CHAT_TIMEOUT_MS`） */
     timeoutMs?: number
-    /** 冻结的文本路由链；有值时按候选顺序安全降级并写入同一份 RunRecord。 */
     routeCandidates?: readonly DirectRunRouteCandidate[]
     routePlanId?: string
-    /** 直连付费调用的统一运行记录；新调用必须显式提供。 */
     trace: DirectRunTraceInput
-    /** 业务成功但日志写入失败时的可见回调；不会触发第二次付费请求。 */
     onRecordWarning?: (warning: string) => void
-    /** 候选降级成功后回报真实命中的目标，下一轮先把同一个目标放到首位。 */
     onRouteSucceeded?: (route: DirectRunRouteCandidate) => void
-    /** When provided, the selected channel streams provider-returned public deltas. */
     onChunk?: (chunk: StreamChunk) => void
   }): Promise<TextResult>
-  /** 单次 TTS：文本 → 音频字节；调用方负责把产物写进 assets。 */
   generateSpeech(
-    req: SpeechRunRequest & {
-      signal: AbortSignal
-      trace?: DirectRunTraceInput
-    },
+    req: SpeechRunRequest & { signal: AbortSignal; trace?: DirectRunTraceInput },
   ): Promise<GeneratedAsset>
-  /** 单次视频调用；给不经过画布节点的直连工作流（如漫剧数字人口播）使用。 */
   generateVideo(
-    req: VideoRunRequest & {
-      signal: AbortSignal
-      trace?: DirectRunTraceInput
-    },
+    req: VideoRunRequest & { signal: AbortSignal; trace?: DirectRunTraceInput },
   ): Promise<GeneratedAsset[]>
 }
 
 export type ChannelStore = MiniStore<ChannelStoreState> & ChannelStoreActions
+import {
+  buildRoutePlan,
+  filteredGlobalModels,
+  findGlobalModel,
+  loadedRoutingPolicy,
+  normalizedRoutingPolicy,
+  projectRefreshModels,
+  protocolDefinitionRows,
+  routeTuningPatch,
+  staleModelCachePatches,
+  tokenlessRoutableChannels,
+  withManualCategory,
+  legacyRouteStrategyFor,
+} from './channelStore/modelProjections'
+import { createRecipeCache } from './channelStore/recipeCache'
 
-/**
- * Agent 多轮对话的等待上限，**比普通文本调用的 60s 长**。
- *
- * 2026-10-14 实测：跑完 9 个节点后把结果回填给模型的那一轮，请求超过 60 秒默认值，
- * 用户看到「连不上：等太久，超时了」，而图其实已经出好了。那一轮要读工具结果 +
- * 整轮历史，天然比「优化一句提示词」重。只放宽走 `completeWithTools` 的这条路，
- * 普通文本调用仍是 60 秒。
- */
-function timeoutSignal(ms: number): AbortSignal {
-  return typeof AbortSignal !== 'undefined' && typeof (AbortSignal as { timeout?: unknown }).timeout === 'function'
-    ? AbortSignal.timeout(ms)
-    : new AbortController().signal
-}
+const createVanillaStore = createVanilla as unknown as StoreFactory
 
 function toSafeConfig(ch: Channel, catalog: ProtocolCatalog): ResolvedChannelConfig {
   return resolvedChannelConfig(ch, catalog, null, null)
 }
-
 /**
- * @param opts.seedBuiltins 读表时是否补齐**常驻内置渠道**（默认 `true`，用户第 20 批）。
- *   测试里那几条"一个渠道都没有"的用例传 `false` —— 它们测的是空态，不该被内置渠道填满；
- *   真实运行时永远用默认值（内置渠道必须常驻）。
+ * @param opts.seedBuiltins 读表时是否补齐常驻内置渠道（默认 true）。
+ *   测试里空态用例传 false，真实运行时内置渠道必须常驻。
  */
 export function createChannelStore(
   platform: PlatformKit,
@@ -390,20 +240,7 @@ export function createChannelStore(
     catalog: () => catalog(),
     loadToken: (credentialRef) => credentials.loadByRef(credentialRef),
   })
-  const store = createVanillaStore<ChannelStoreState>(() => ({
-    channels: [],
-    routeStrategy: 'priority',
-    routingPolicy: normalizeRoutePolicy(undefined),
-    recipeMemory: true,
-    customProtocols: [],
-    hiddenBuiltinProtocolIds: [],
-    customModels: [],
-    uncommonModelIds: [],
-    loaded: false,
-    verify: { status: 'idle' },
-    models: { status: 'idle' },
-    detect: { status: 'idle', protocol: null },
-  }))
+  const store = createVanillaStore<ChannelStoreState>(initialChannelStoreState)
   const credentials = createChannelCredentials(repo, platform.credentials, (id, patch) =>
     update(id, patch),
   )
@@ -414,31 +251,6 @@ export function createChannelStore(
   /** 当前目录：内置 + 已加载的自建。每次读取都现算，避免忘了在增删后同步 */
   const catalog = (): ProtocolCatalog =>
     buildProtocolCatalog(store.getState().customProtocols)
-
-  /** 自建协议在存储里就是一条行；只取 ProtocolDefinition 需要的字段（不塞进 UI 字段） */
-  const toCustomDefinition = (row: Record<string, unknown>): ProtocolDefinition | null => {
-    if (typeof row.id !== 'string') return null
-    const capabilities = Array.isArray(row.capabilities)
-      ? (row.capabilities.filter((c) => c === 'chat' || c === 'image' || c === 'video') as ProtocolDefinition['capabilities'])
-      : []
-    const recipe =
-      row.recipe && typeof row.recipe === 'object'
-        ? (row.recipe as ProtocolDefinition['recipe'])
-        : undefined
-    return {
-      id: row.id,
-      name: typeof row.name === 'string' ? row.name : row.id,
-      short: typeof row.short === 'string' ? row.short : row.id,
-      family: recipe ? 'declarative-http' : 'openai-compatible',
-      kind: 'custom',
-      status: 'ready',
-      capabilities,
-      ...(typeof row.defaultBaseUrl === 'string' ? { defaultBaseUrl: row.defaultBaseUrl } : {}),
-      ...(typeof row.versionPath === 'string' ? { versionPath: row.versionPath } : {}),
-      ...(typeof row.docUrl === 'string' ? { docUrl: row.docUrl } : {}),
-      ...(recipe ? { recipe } : {}),
-    }
-  }
 
   const load: ChannelStoreActions['load'] = async () => {
     /**
@@ -469,37 +281,17 @@ export function createChannelStore(
       routingPolicies.load(),
       presets.loadRecipeMemory(),
       ])
-    const routingPolicy =
-      storedRoutingPolicy.strategy === 'priority' && routeStrategy !== 'priority'
-        ? { ...storedRoutingPolicy, strategy: routeStrategy }
-        : storedRoutingPolicy
+    const routingPolicy = loadedRoutingPolicy(storedRoutingPolicy, routeStrategy)
     let channels = visibleChannels(loadedChannels)
-    const staleRunningHub = channels.filter(
-      (c) =>
-        c.protocol === 'runninghub-api' &&
-        !c.hasToken &&
-        (c.modelCache.length > 0 || c.models.length > 0),
-    )
-    if (staleRunningHub.length > 0) {
+    const stalePatches = staleModelCachePatches(channels)
+    if (stalePatches.length > 0) {
       const cleared = await Promise.all(
-        staleRunningHub.map((c) =>
-          repo.update(c.id, {
-            modelCache: [],
-            models: [],
-            credentialGroups: c.credentialGroups.map((group) => ({
-              ...group,
-              modelCache: [],
-              models: [],
-            })),
-          }),
-        ),
+        stalePatches.map(({ id, patch }) => repo.update(id, patch)),
       )
       const clearedById = new Map(cleared.map((c) => [c.id, c]))
       channels = channels.map((c) => clearedById.get(c.id) ?? c)
     }
-    const customProtocols = customRows
-      .map((r) => toCustomDefinition(r as Record<string, unknown>))
-      .filter((p): p is ProtocolDefinition => p !== null)
+    const customProtocols = protocolDefinitionRows(customRows)
     const hiddenBuiltinProtocolIds = storedHiddenBuiltinProtocolIds.filter((id) =>
       BUILTIN_PROTOCOLS.some((protocol) => protocol.id === id && protocol.kind === 'station'),
     )
@@ -600,18 +392,17 @@ export function createChannelStore(
     category,
     includeUncommon = false,
   ) => {
-    const uncommon = new Set(store.getState().uncommonModelIds)
-    return [...PRESET_MODELS, ...store.getState().customModels].filter(
-      (model) =>
-        model.category === category && (includeUncommon || !uncommon.has(model.id)),
+    return filteredGlobalModels(
+      PRESET_MODELS,
+      store.getState().customModels,
+      store.getState().uncommonModelIds,
+      category,
+      includeUncommon,
     )
   }
 
   const globalModelOf: ChannelStoreActions['globalModelOf'] = (name) => {
-    const key = name.trim()
-    return [...PRESET_MODELS, ...store.getState().customModels].find(
-      (model) => model.id === key,
-    )
+    return findGlobalModel(PRESET_MODELS, store.getState().customModels, name)
   }
 
   const addGlobalModel: ChannelStoreActions['addGlobalModel'] = async (input) => {
@@ -768,16 +559,7 @@ export function createChannelStore(
       ? credentialGroupOf(ch, groupId)
       : undefined
     const patchModel = (model: ModelCapability): ModelCapability =>
-      model.id === modelId
-        ? {
-            ...model,
-            category,
-            upstreamCategory:
-              model.upstreamCategory ??
-              (model.category === 'unknown' ? undefined : model.category),
-            categoryManual: true,
-          }
-        : model
+      withManualCategory(model, modelId, category)
     if (!targetGroup) {
       await update(id, {
         models: ch.models.map(patchModel),
@@ -814,24 +596,11 @@ export function createChannelStore(
   const setRouteTuning: ChannelStoreActions['setRouteTuning'] = async (id, patch) => {
     const ch = await repo.get(id)
     if (!ch) throw new Error(`[channelStore] 渠道不存在：${id}`)
-    const next: { priority?: number; weight?: number } = {}
-    // 优先度是整数档位，权重是非负整数 —— 表单里可能出现 "3.7" 或 "-1"，
-    // 直接写进去会让「档位」这个概念失去意义（分档靠相等比较，小数会分出无数档）。
-    if (typeof patch.priority === 'number') {
-      next.priority = Number.isFinite(patch.priority) ? Math.trunc(patch.priority) : 0
-    }
-    if (typeof patch.weight === 'number') {
-      const w = Number.isFinite(patch.weight) ? Math.trunc(patch.weight) : 0
-      next.weight = Math.max(0, w)
-    }
-    await update(id, next)
+    await update(id, routeTuningPatch(patch))
   }
 
   const setRouteStrategy: ChannelStoreActions['setRouteStrategy'] = async (strategy) => {
-    const routingPolicy = normalizeRoutePolicy({
-      ...store.getState().routingPolicy,
-      strategy,
-    })
+    const routingPolicy = normalizedRoutingPolicy(store.getState().routingPolicy, { strategy })
     await Promise.all([
       presets.saveRoutingStrategy(strategy),
       routingPolicies.save(routingPolicy),
@@ -840,14 +609,8 @@ export function createChannelStore(
   }
 
   const setRoutingPolicy: ChannelStoreActions['setRoutingPolicy'] = async (patch) => {
-    const routingPolicy = normalizeRoutePolicy({
-      ...store.getState().routingPolicy,
-      ...patch,
-    })
-    const legacyStrategy =
-      routingPolicy.strategy === 'round_robin'
-        ? store.getState().routeStrategy
-        : routingPolicy.strategy
+    const routingPolicy = normalizedRoutingPolicy(store.getState().routingPolicy, patch)
+    const legacyStrategy = legacyRouteStrategyFor(routingPolicy, store.getState().routeStrategy)
     await Promise.all([
       routingPolicies.save(routingPolicy),
       presets.saveRoutingStrategy(legacyStrategy),
@@ -858,23 +621,12 @@ export function createChannelStore(
   const planGenerationRoute: ChannelStoreActions['planGenerationRoute'] = async (opts) => {
     const state = store.getState()
     const hasLocalCli = platform.cli != null
-    const channels = state.channels.map((channel) => {
-      const tokenless = protocolNeedsNoToken(channel.protocol, hasLocalCli)
-      return {
-        ...channel,
-        hasToken: tokenless || channel.hasToken,
-        credentialGroups: channel.credentialGroups.map((group) => ({
-          ...group,
-          hasToken: tokenless || group.hasToken,
-        })),
-      }
-    })
-    const first = buildGenerationRoutePlan({
-      channels,
-      category: opts.category,
-      logicalModel: opts.logicalModel,
-      policy: state.routingPolicy,
-    })
+    const channels = tokenlessRoutableChannels(
+      state.channels,
+      hasLocalCli,
+      protocolNeedsNoToken,
+    )
+    const first = buildRoutePlan(channels, opts, state.routingPolicy)
     if (
       !first.ok ||
       first.plan.strategy !== 'round_robin' ||
@@ -887,13 +639,7 @@ export function createChannelStore(
       opts.category,
       first.plan.cursorModulus,
     )
-    return buildGenerationRoutePlan({
-      channels,
-      category: opts.category,
-      logicalModel: opts.logicalModel,
-      policy: state.routingPolicy,
-      cursor,
-    })
+    return buildRoutePlan(channels, opts, state.routingPolicy, cursor)
   }
 
   const verify: ChannelStoreActions['verify'] = async (id, groupId) => {
@@ -1065,59 +811,11 @@ export function createChannelStore(
           timeoutSignal(10_000),
         )
       }
-      const manualById = new Map(
-        [...(group?.modelCache ?? ch.modelCache), ...(group?.models ?? ch.models)]
-          .filter((model) => model.categoryManual)
-          .map((model) => [model.id, model]),
-      )
-      const models = pulled.map((model) => {
-        const manual = manualById.get(model.id)
-        return manual
-          ? {
-              ...model,
-              category: manual.category,
-              upstreamCategory:
-                model.category === 'unknown' ? undefined : model.category,
-              categoryManual: true,
-            }
-          : model
-      })
-      /**
-       * 拉取后**顺带建默认映射**（§7.4.1）：上游 ID 与逻辑名同名的自动补成恒等映射，
-       * 不同名的留空待用户填。
-       *
-       * 为什么在这里做而不是等用户点保存：映射表的键是「逻辑名」，而逻辑名的全集
-       * 正是此刻刚拉回来的这份 + 用户已勾选的那份；错过这一次，用户就得先手动
-       * 想起来有哪些名字。补的是**同名恒等**项，行为与不写完全一致，零风险。
-       */
-      const logicalNames = [
-        ...new Set([
-          ...models.map((model) => model.id),
-          ...(group?.models ?? ch.models).map((model) => model.id),
-        ]),
-      ]
-      /**
-       * 已勾选模型的选择集合不变，但能力元数据必须跟着最新目录刷新。
-       * Comfly 旧缓存曾把 `gemini-3.1-flash-image` 误判为 chat；只更新
-       * `modelCache` 会让它继续以“Nano Banana 2”出现在对话模型里。
-       */
-      const refreshedSelection = (group?.models ?? ch.models).map(
-        (selected) => models.find((model) => model.id === selected.id) ?? selected,
-      )
-      const nextGroups = group
-        ? ch.credentialGroups.map((item) =>
-            item.id === group.id
-              ? { ...item, modelCache: models, models: refreshedSelection }
-              : item,
-          )
-        : ch.credentialGroups
-      const updated = await repo.update(id, {
-        ...(group ? { credentialGroups: nextGroups } : { modelCache: models, models: refreshedSelection }),
-        modelMap: buildDefaultModelMap(ch.modelMap, logicalNames, models.map((m) => m.id)),
-      })
+      const projection = projectRefreshModels({ channel: ch, group, pulled })
+      const updated = await repo.update(id, projection.update)
       store.setState((s) => ({
         channels: s.channels.map((c) => (c.id === id ? updated : c)),
-        models: { status: 'ok', modelCount: models.length },
+        models: { status: 'ok', modelCount: projection.statusModelCount },
       }))
     } catch (e) {
       // 「拉取模型」与「验证地址」是并排的两个按钮、打的是同一个端点。
@@ -1157,97 +855,17 @@ export function createChannelStore(
    */
   const routableChannels = (): Channel[] =>
     store.getState().channels.filter((channel) => channelIsRoutable(channel, catalog()))
-  /**
-   * 配方的两个动作放在这里，是因为**解析需要渠道列表**（它有哪些已勾选模型），
-   * 而这个 store 正是列表的持有者。规则本身仍在 domain 的纯函数里，
-   * 这里只把列表喂给它——不复制那份判断。
-   */
-  /**
-   * 内存缓存：channelId → 配方（避免每次建节点都读一次库）。
-   *
-   * `cacheLoaded` 区分「还没从库里读过」与「读过但一条都没有」——
-   * 否则第二种情况会每次新建都重读一次库。
-   */
-  const recipeCache = new Map<string, typeof NO_RECIPE>()
-  let cacheLoaded = false
-  /**
-   * 配方时间戳**单调递增**（2026-09-23）。
-   *
-   * 解析链按 `savedAt` 挑「最近改过的那条」，而 `Date.now()` 只有毫秒精度：
-   * 用户连着在两个渠道上改参数（或程序化地连记两次）完全可能落在同一毫秒，
-   * 排序结果就不确定了——表现为「明明刚改过，新建却取了另一条」。
-   * 这里保证每次记录严格大于上一次，排序因此永远有确定答案。
-   */
-  let lastRecipeAt = 0
-  const nextRecipeAt = (): number => {
-    const now = Date.now()
-    lastRecipeAt = now > lastRecipeAt ? now : lastRecipeAt + 1
-    return lastRecipeAt
-  }
-
-  const ensureRecipes = async (): Promise<void> => {
-    if (cacheLoaded) return
-    recipeCache.clear()
-    for (const [channelId, recipe] of await presets.loadAll()) {
-      recipeCache.set(channelId, recipe)
-      // 从库里读回时也要把水位抬起来，避免与已存记录的时间戳撞上
-      if (recipe.savedAt > lastRecipeAt) lastRecipeAt = recipe.savedAt
-    }
-    cacheLoaded = true
-  }
-
-  /** 写默认配方的唯一实现（内存缓存 + 落库，两处调用方共用） */
-  const writeDefaultRecipe = async (
-    channelId: string,
-    model: string,
-    params: Record<string, unknown>,
-  ): Promise<void> => {
-    const next = rememberRecipe(channelId, model, params, nextRecipeAt())
-    if (!next) return
-    recipeCache.set(channelId, next)
-    await presets.save(next)
-  }
-
-  const setDefaultRecipe: ChannelStoreActions['setDefaultRecipe'] = writeDefaultRecipe
-
-  const rememberRecipeOfChannel: ChannelStoreActions['rememberRecipe'] = async (
-    channelId,
-    model,
-    params,
-  ) => {
-    /**
-     * 「记住上次参数」关掉时**整个跳过**：既不落库、也不更新内存里的配方缓存。
-     *
-     * 只跳过落库是不够的 —— `resolveForNode` 读的就是这份缓存，
-     * 不跳过的话"本次会话里默认值还是被带走了"，而用户明明关了开关。
-     */
-    if (!store.getState().recipeMemory) return
-    await writeDefaultRecipe(channelId, model, params)
-  }
-
-  const setRecipeMemory: ChannelStoreActions['setRecipeMemory'] = async (enabled) => {
-    store.setState({ recipeMemory: enabled })
-    await presets.saveRecipeMemory(enabled)
-  }
-
-  const defaultForNewNode: ChannelStoreActions['defaultForNewNode'] = async (node, category) => {
-    await ensureRecipes()
-    /**
-     * 只拿**已启用**的渠道参与解析：把没启用的当默认值，用户一生成就报
-     * 「平台未启用」，比空着更让人困惑。
-     */
-    const usable = routableChannels()
-    /**
-     * 解析链收在 domain 的纯函数里（见 generationPreset.resolveForNode），
-     * 面板兜底与创建路径**调的是同一个函数**——两条路各写一份必然漂移。
-     */
-    return resolveForNode(
-      node,
-      usable,
-      (channelId) => recipeCache.get(channelId) ?? NO_RECIPE,
-      category,
-    )
-  }
+  const recipes = createRecipeCache({
+    presets,
+    setState: (partial) => store.setState(partial),
+    recipeMemory: () => store.getState().recipeMemory,
+    routableChannels,
+    now: () => Date.now(),
+  })
+  const setDefaultRecipe: ChannelStoreActions['setDefaultRecipe'] = recipes.writeDefault
+  const rememberRecipeOfChannel: ChannelStoreActions['rememberRecipe'] = recipes.remember
+  const setRecipeMemory: ChannelStoreActions['setRecipeMemory'] = recipes.setMemory
+  const defaultForNewNode: ChannelStoreActions['defaultForNewNode'] = recipes.defaultForNewNode
 
   const requests = createChannelRequestOrchestration({
     platform,

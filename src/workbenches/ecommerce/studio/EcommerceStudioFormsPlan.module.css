@@ -1,0 +1,129 @@
+/* 电商工作台：方案历史与快捷建议。 */
+
+/*
+ * 「最近的方案」（对账 #433）。
+ *
+ * 与意图卡片**分开一层**（不同底、不同间距）：那张卡是"这次听懂了什么"，这里是
+ * "以前想过什么" —— 一件事一个框，扫一眼就知道该看哪儿。
+ */
+.planHistory {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}
+
+.planHistoryTitle {
+  font-size: var(--fs-chip);
+  color: var(--text-3);
+}
+
+.planList {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.planItem {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  border-radius: var(--radius-control);
+}
+
+.planOpen {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  flex: 1;
+  min-width: 0;
+  padding: 6px var(--space-2);
+  border: none;
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--text-2);
+  font-family: var(--font-sans);
+  font-size: var(--fs-label);
+  text-align: left;
+  cursor: pointer;
+}
+.planOpen:hover {
+  background: var(--bg-hover);
+  color: var(--text-1);
+}
+
+/* 长标题 / 长说明都用省略号收尾：列表宽度固定（悬停有 title 看全，别把左栏撑变形） */
+.planTitleText,
+.planMeta {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.planMeta {
+  color: var(--text-3);
+  font-size: var(--fs-chip);
+}
+
+/*
+ * 起手式（对账 #434）：三枚短标签。整句话在 `title` 与"点一下填进输入框"里 ——
+ * 把整句铺在按钮上会各占一行，把下面的表单顶下去一屏。
+ */
+.suggestRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.suggestChip {
+  padding: 4px var(--space-2);
+  border: var(--border);
+  border-radius: var(--radius-control);
+  background: var(--bg-canvas);
+  color: var(--text-3);
+  font-family: var(--font-sans);
+  font-size: var(--fs-chip);
+  cursor: pointer;
+}
+.suggestChip:hover {
+  background: var(--bg-hover);
+  color: var(--text-1);
+}
+
+.planRemove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--text-3);
+  font-size: var(--fs-chip);
+  line-height: 1;
+  cursor: pointer;
+}
+.planRemove:hover {
+  color: var(--danger);
+}
+
+.planApply {
+  padding: 2px var(--space-2);
+  border: none;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--text-3);
+  font-family: var(--font-sans);
+  font-size: var(--fs-chip);
+  cursor: pointer;
+}
+
+.planApply:hover {
+  background: var(--bg-hover);
+  color: var(--text-1);
+}

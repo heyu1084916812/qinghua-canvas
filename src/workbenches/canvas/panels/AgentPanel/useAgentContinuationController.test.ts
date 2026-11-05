@@ -2,6 +2,7 @@ import { createElement } from 'react'
 import TestRenderer, { act } from 'react-test-renderer'
 import { describe, expect, it, vi } from 'vitest'
 import type { AgentSession } from '../../../../state/agent/sessionStore'
+import type { ChatMessage } from '../../../../domain/shared/execution/types'
 import type { AgentLoopDeps } from '../../agent/agentLoop'
 import type { AgentPanelStatus } from './AgentActivityViews'
 import type { AgentContinuationRunInput } from './agentContinuationRun'
@@ -43,6 +44,12 @@ function harness(
     current: session(),
     status: paused,
     messages: [{ role: 'user', content: '继续' }],
+    sessions: {
+      messagesFor: vi.fn(async (): Promise<ChatMessage[]> => [{ role: 'user', content: '继续' }]),
+    },
+    sessionBrief: vi.fn(() => undefined),
+    localRevision: 11,
+    sessionRevision: 11,
     controller: {
       jobId: vi.fn(() => 'job-ctl'),
       turnId: vi.fn(() => 'turn-ctl'),
@@ -127,6 +134,25 @@ describe('continueTask / 端口语义', () => {
     expect(params.claimNextQueuedTurn).toBe(
       h.input.controller.claimNextQueuedTurn,
     )
+  })
+
+  it('把目标会话的 messagesFor 与 per-session revision 交给续跑，不接界面当前会话', async () => {
+    const h = harness({
+      current: session('s1'),
+      currentIdRef: { current: 's2' },
+      sessions: {
+        messagesFor: vi.fn(async (): Promise<ChatMessage[]> => [
+          { role: 'user', content: 's1 历史' },
+        ]),
+      },
+    })
+    await render(h.input).viewRef.current!()
+    const params = (h.input.runContinuation as ReturnType<typeof vi.fn>).mock
+      .calls[0]![0] as AgentContinuationRunInput
+    expect(params.sessions?.messagesFor).toBe(h.input.sessions?.messagesFor)
+    expect(params.sessionRevision).toBe(11)
+    expect(params.localRevision).toBe(11)
+    expect(params.messages).toBe(h.input.messages)
   })
 
   it('turnOrigin(turnId, queueTurnId)：参数优先、job/revision 现读 ref', async () => {

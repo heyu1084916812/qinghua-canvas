@@ -1,5 +1,33 @@
 # CanvasFlow（轻画）项目记忆
 
+### 全代码治理批次与长任务上下文（2026-11-06）
+
+- 第四批 I/J/K/L/M/N/O/P 组收口：channelStore 1258→885、Provider 1463→937、EcommercePage 2087→1653、
+  EcommerceWorkbench 1230→1037、EcommerceStudio 1922→1710、runninghubEndpoints 1026→21；超千行生产文件 11→8。
+  22 个新模块全部接线登记；L 组把 Windows CLI、AST 真实导出、CSS 类名、测试路径和占位文案拒绝纳入治理门禁，
+  138 条登记语义错误 0；M/O 组未接线孤岛、`.bak`、`.probe` 清零。全仓 Vitest 569 files / 5016 tests、
+  check、build、diff-check 通过。剩余 8 个大文件主体是 JSX 渲染树，必须另开「涉及 UI」批次做四组截图/几何/冒烟，
+  不能用未接线纯模块或改渲染树凑行数冒充完成。
+- 用户目标为「全部代码安全、可维护，都改完最后交付，只做分发、决策和验收」。按此派 A–F 六个拆分组、
+  G 只读诊断、H 上下文修复；限流/429 由总管换模型重发。最终超千行生产文件从 24 降到 11，
+  新增 110 个模块必须登记职责与预算；legacy 预算只能按实际行数下降。生产文件数增加是拆分结果，
+  不能把「主文件行数下降」冒充全仓完全安全。
+- 并行拆改时全仓 tsc/check/build 在中间态会红；各组只跑定向门禁，最终稳定后由总管统一跑全仓。
+  `node:fs` / `node:url` 类型桩绝不能散落在浏览器页面目录；CSS 结构测试改用 Vite `?raw/?inline`、
+  CSS Module 导出、编译产物与浏览器截图证据，避免 `@types/node` 缺失污染 tsc。
+- UI 组必须用独立 Vite / shared-store / LOCALAPPDATA 和显式 `SMOKE_ONLY`。F 组早期误跑全量 smoke，
+  观察到共享库 8 个新项目、2 个渠道、6 组素材及既有项目新增运行记录，未见删除；不得自行清理用户真实数据，
+  只能报告给用户确认。D 组原始改前取证被并行中间态污染，后续已在隔离基线补采 `before-final-*` 四组截图/几何，
+  但 G116 / G164 冒烟缺口仍不能冒充通过。
+- 最终收口修正：14 个文件 EOF 多余空行、无引用的 CSS 快照与登记、重复的 `AGENT_CONTEXT_WINDOW` 定义；
+  默认窗口常量只能由 `domain/agent/modelMessageWindow.ts` 定义，`sessionStore.ts` re-export 兼容旧导入。
+  收口后全量 Vitest 549 files / 4913 tests、check、build、diff-check 全绿，证据边界与共享库处理仍需用户确认。
+- #948 长任务续跑根因：`回读 N 条` 是尾部 N 条 `agentMessages` 窗口，长任务大量 assistant(tool_calls)/tool 结果
+  会挤掉最初品牌全案 user；画布节点/taskPlan/Job/RunRecord 不是聊天历史，不会自动补进 model messages。
+  修复后 `modelMessageWindow` 固定保留首条有效用户需求并按用户轮/成对工具结果裁剪；
+  `contextFor` 和发送链共用该纯函数。续跑强制 full/complex_plan，并注入 `agentSessionBrief`；
+  `continueTask` 通过 `messagesFor` 回读持久消息。Composer 文案未改，仍属后续 UI 门禁范围。
+
 ### 结构治理第三批第一刀：删改/挪目录也要有门禁（2026-11-05，M-P0-SPLIT-3）
 
 - 用户问「第三批 / 维护成本 / 后续删改有没有门禁 / 代码会不会散乱」，先如实量化：两批只把 P0 三个

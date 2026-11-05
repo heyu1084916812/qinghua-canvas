@@ -4,11 +4,8 @@ import {
   createStorageAssetPort,
   putGeneratedAssets,
 } from '../../platform/assets'
-import type { GeneratedAsset } from '../../platform/channels/types'
 import { createId } from '../../shared/id'
 import {
-  statusOfResult,
-  statusOfTask,
   taskStatusOf,
   resultMetadataOf,
   type EcommerceResultRecord,
@@ -16,26 +13,40 @@ import {
   type EcommerceTaskRecord,
 } from '../../domain/ecommerce/tasks'
 import type { EcommerceRequest } from '../../domain/ecommerce/types'
+import type { GeneratedAsset } from '../../platform/channels/types'
+import type { QueuedAssetSave, RetryAssetSaveResult } from './ecommerceTaskRepository/types'
+import {
+  queuedSaveRows,
+  resultRows as mapResultRows,
+  taskRows as mapTaskRows,
+} from './ecommerceTaskRepository/rowMappers'
+import {
+  doneRetrySave,
+  failedRetrySave,
+  primaryAssetFields,
+  queuedSaveFor,
+  retrySaveBlocksWrite,
+  withoutResultAttempt,
+  withoutResultFailure,
+} from './ecommerceTaskRepository/retrySaveProjections'
+import {
+  hashesToVerify,
+  hiddenResult,
+  interruptResults,
+  interruptedTask,
+  latestRunByNode,
+  latestTasks,
+  listedTasks,
+  projectResults,
+  queuedSaveByResult,
+  reconciledResult,
+  reconciledTasks,
+  refreshedTask,
+  resultRemovable,
+  resultsByPosition,
+} from './ecommerceTaskRepository/queryProjections'
 
-export interface QueuedAssetSave {
-  id: string
-  projectId: string
-  resultId: string
-  taskId: string
-  planId: string
-  prompt: string
-  model: string
-  assets: readonly GeneratedAsset[]
-  createdAt: number
-  updatedAt: number
-  errorText?: string
-}
-
-export interface RetryAssetSaveResult {
-  ok: boolean
-  result: EcommerceResultRecord | null
-  errorText?: string
-}
+export type { QueuedAssetSave, RetryAssetSaveResult } from './ecommerceTaskRepository/types'
 
 /**
  * 电商任务 / 结果的持久化仓储（对账 #399 第二期）。
@@ -125,94 +136,9 @@ export interface EcommerceTaskRepository {
   remove(taskId: string): Promise<void>
 }
 
-function taskOf(row: Record<string, unknown>): EcommerceTaskRecord {
-  return {
-    id: String(row.id),
-    projectId: String(row.projectId),
-    batchId: String(row.batchId),
-    createdAt: Number(row.createdAt) || 0,
-    updatedAt: Number(row.updatedAt) || 0,
-    status: statusOfTask(row.status),
-    request: (row.request ?? {}) as EcommerceRequest,
-    nodeIds: Array.isArray(row.nodeIds) ? row.nodeIds.map(String) : [],
-    ...(typeof row.sourceTaskId === 'string' && row.sourceTaskId
-      ? { sourceTaskId: row.sourceTaskId }
-      : {}),
-    ...(typeof row.sourceResultId === 'string' && row.sourceResultId
-      ? { sourceResultId: row.sourceResultId }
-      : {}),
-    ...(typeof row.sourceAssetHash === 'string' && row.sourceAssetHash
-      ? { sourceAssetHash: row.sourceAssetHash }
-      : {}),
-    ...(typeof row.errorText === 'string' && row.errorText ? { errorText: row.errorText } : {}),
-  }
-}
-
-function resultOf(row: Record<string, unknown>): EcommerceResultRecord {
-  const numberOrUndefined = (value: unknown) =>
-    typeof value === 'number' && Number.isFinite(value) ? value : undefined
-  const stringOrUndefined = (value: unknown) =>
-    typeof value === 'string' && value.length > 0 ? value : undefined
-  return {
-    id: String(row.id),
-    taskId: String(row.taskId),
-    projectId: String(row.projectId),
-    nodeId: String(row.nodeId),
-    ...(stringOrUndefined(row.canvasCopyNodeId)
-      ? { canvasCopyNodeId: String(row.canvasCopyNodeId) }
-      : {}),
-    position: Number(row.position) || 0,
-    createdAt: Number(row.createdAt) || 0,
-    updatedAt: Number(row.updatedAt) || 0,
-    status: statusOfResult(row.status),
-    ...(stringOrUndefined(row.assetHash) ? { assetHash: String(row.assetHash) } : {}),
-    ...(stringOrUndefined(row.mime) ? { mime: String(row.mime) } : {}),
-    ...(numberOrUndefined(row.hiddenAt) !== undefined
-      ? { hiddenAt: Number(row.hiddenAt) }
-      : {}),
-    ...(numberOrUndefined(row.width) !== undefined ? { width: Number(row.width) } : {}),
-    ...(numberOrUndefined(row.height) !== undefined ? { height: Number(row.height) } : {}),
-    ...(stringOrUndefined(row.prompt) ? { prompt: String(row.prompt) } : {}),
-    ...(stringOrUndefined(row.model) ? { model: String(row.model) } : {}),
-    ...(stringOrUndefined(row.errorText) ? { errorText: String(row.errorText) } : {}),
-    ...(row.recovery === 'retry-save' ? { recovery: 'retry-save' as const } : {}),
-    ...resultMetadataOf({
-      shotTitle: stringOrUndefined(row.shotTitle),
-      brief: stringOrUndefined(row.brief),
-      ratio: stringOrUndefined(row.ratio),
-      headline: stringOrUndefined(row.headline),
-      subheadline: stringOrUndefined(row.subheadline),
-      visualSystem: stringOrUndefined(row.visualSystem),
-    }),
-  }
-}
-
-/** RunRecord 的成功产物可能不止一张；电商一格只认第一张。 */
-function firstOutputHashOf(run: Record<string, unknown> | undefined): string | undefined {
-  if (!Array.isArray(run?.outputHashes)) return undefined
-  return run.outputHashes.map(String).find((hash) => hash.length > 0)
-}
-
-function queuedSaveOf(row: Record<string, unknown>): QueuedAssetSave {
-  const assets = Array.isArray(row.assets)
-    ? (row.assets as GeneratedAsset[])
-    : []
-  return {
-    id: String(row.id),
-    projectId: String(row.projectId ?? ''),
-    resultId: String(row.resultId ?? ''),
-    taskId: String(row.taskId ?? ''),
-    planId: String(row.planId ?? ''),
-    prompt: String(row.prompt ?? ''),
-    model: String(row.model ?? ''),
-    assets,
-    createdAt: Number(row.createdAt) || 0,
-    updatedAt: Number(row.updatedAt) || 0,
-    ...(typeof row.errorText === 'string' && row.errorText
-      ? { errorText: row.errorText }
-      : {}),
-  }
-}
+const resultOf = (row: Record<string, unknown>) => mapResultRows([row])[0]!
+const taskOf = (row: Record<string, unknown>) => mapTaskRows([row])[0]!
+const queuedSaveOf = (row: Record<string, unknown>) => queuedSaveRows([row])[0]!
 
 export function createEcommerceTaskRepository(
   storage: StoragePort,
@@ -227,11 +153,13 @@ export function createEcommerceTaskRepository(
   }
 
   const resultsOf = async (taskId: string) =>
-    (
-      (await storage.query('ecommerceResults', { taskId })) as unknown as Record<string, unknown>[]
+    resultsByPosition(
+      mapResultRows(
+        (await storage.query('ecommerceResults', {
+          taskId,
+        })) as unknown as Record<string, unknown>[],
+      ),
     )
-      .map(resultOf)
-      .sort((a, b) => a.position - b.position)
 
   return {
     async create({
@@ -321,17 +249,8 @@ export function createEcommerceTaskRepository(
             at,
           })
         } catch (recoveryError) {
-          const {
-            errorText: _oldError,
-            recovery: _oldRecovery,
-            assetHash: _oldAssetHash,
-            mime: _oldMime,
-            width: _oldWidth,
-            height: _oldHeight,
-            ...rest
-          } = current
           failed = {
-            ...rest,
+            ...withoutResultAttempt(current),
             status: 'failed',
             prompt,
             model,
@@ -353,20 +272,12 @@ export function createEcommerceTaskRepository(
         }
       }
 
-      const {
-        errorText: _oldError,
-        recovery: _oldRecovery,
-        ...rest
-      } = current
       const done: EcommerceResultRecord = {
-        ...rest,
+        ...withoutResultFailure(current),
         status: 'done',
-        assetHash: primary.hash,
-        mime: primary.mime,
+        ...primaryAssetFields(primary),
         prompt,
         model,
-        ...(primary.width ? { width: primary.width } : {}),
-        ...(primary.height ? { height: primary.height } : {}),
         updatedAt: at,
       }
       try {
@@ -418,37 +329,14 @@ export function createEcommerceTaskRepository(
       })) as unknown as Record<string, unknown>[]
       const row = rows.map(resultOf)[0]
       if (!row) return null
-      const {
-        errorText: _oldError,
-        recovery: _oldRecovery,
-        assetHash: _oldAssetHash,
-        mime: _oldMime,
-        width: _oldWidth,
-        height: _oldHeight,
-        ...rest
-      } = row
-      const next: EcommerceResultRecord = {
-        ...rest,
-        status: 'failed',
-        recovery: 'retry-save',
-        prompt,
-        model,
-        errorText,
-        updatedAt: at,
-      }
-      const queued: QueuedAssetSave = {
-        id: resultId,
-        projectId: row.projectId,
-        resultId,
-        taskId: row.taskId,
+      const { result: next, queued } = queuedSaveFor(row, {
         planId,
         prompt,
         model,
-        assets: [...queuedAssets],
-        createdAt: at,
-        updatedAt: at,
+        assets: queuedAssets,
         errorText,
-      }
+        at,
+      })
       await storage.transaction(
         ['assetSaveQueue', 'ecommerceResults'],
         async (tx) => {
@@ -489,14 +377,7 @@ export function createEcommerceTaskRepository(
               .map(resultOf)[0]
             const latestQueue = (queueRows as unknown as Record<string, unknown>[])
               .map(queuedSaveOf)[0]
-            if (
-              !latest ||
-              !latestQueue ||
-              latest.updatedAt !== current.updatedAt ||
-              latestQueue.updatedAt !== queued.updatedAt ||
-              latest.status !== 'failed' ||
-              latest.recovery !== 'retry-save'
-            ) {
+            if (retrySaveBlocksWrite(latest, latestQueue, current, queued)) {
               outcome = {
                 ok: false,
                 result: latest ?? null,
@@ -504,15 +385,7 @@ export function createEcommerceTaskRepository(
               }
               return
             }
-            const { errorText: _oldError, recovery: _oldRecovery, ...rest } =
-              latest
-            const failed: EcommerceResultRecord = {
-              ...rest,
-              status: 'failed',
-              recovery: 'retry-save',
-              errorText: message,
-              updatedAt: at,
-            }
+            const failed = failedRetrySave(latest!, message, at)
             await tx.put(
               'assetSaveQueue',
               { ...latestQueue, updatedAt: at, errorText: message } as never,
@@ -540,14 +413,7 @@ export function createEcommerceTaskRepository(
             .map(resultOf)[0]
           const latestQueue = (queueRows as unknown as Record<string, unknown>[])
             .map(queuedSaveOf)[0]
-          if (
-            !latest ||
-            !latestQueue ||
-            latest.updatedAt !== current.updatedAt ||
-            latestQueue.updatedAt !== queued.updatedAt ||
-            latest.status !== 'failed' ||
-            latest.recovery !== 'retry-save'
-          ) {
+          if (retrySaveBlocksWrite(latest, latestQueue, current, queued)) {
             outcome = {
               ok: false,
               result: latest ?? null,
@@ -555,26 +421,7 @@ export function createEcommerceTaskRepository(
             }
             return
           }
-          const {
-            errorText: _oldError,
-            recovery: _oldRecovery,
-            ...rest
-          } = latest
-          const done: EcommerceResultRecord = {
-            ...rest,
-            status: 'done',
-            prompt: latestQueue.prompt,
-            model: latestQueue.model,
-            ...(primary
-              ? {
-                  assetHash: primary.hash,
-                  mime: primary.mime,
-                  ...(primary.width ? { width: primary.width } : {}),
-                  ...(primary.height ? { height: primary.height } : {}),
-                }
-              : {}),
-            updatedAt: at,
-          }
+          const done = doneRetrySave(latest!, latestQueue!, primary, at)
           await tx.put('ecommerceResults', done as never)
           await tx.delete('assetSaveQueue', resultId)
           outcome = { ok: true, result: done }
@@ -607,14 +454,7 @@ export function createEcommerceTaskRepository(
       const task = taskRows.map(taskOf)[0]
       if (!task) return null
       const rows = await resultsOf(taskId)
-      const failed = rows.find((row) => row.status === 'failed' && row.errorText)
-      const { errorText: _oldError, ...rest } = task
-      const next: EcommerceTaskRecord = {
-        ...rest,
-        updatedAt: at,
-        status: taskStatusOf(rows),
-        ...(failed?.errorText ? { errorText: failed.errorText } : {}),
-      }
+      const next = refreshedTask(task, rows, at)
       await storage.put('ecommerceTasks', next as never)
       return next
     },
@@ -625,10 +465,9 @@ export function createEcommerceTaskRepository(
       })) as unknown as Record<string, unknown>[]
       const row = rows.map(resultOf)[0]
       if (!row) return
-      const { hiddenAt: _hiddenAt, ...rest } = row
       await storage.put(
         'ecommerceResults',
-        (hidden ? { ...rest, hiddenAt: at } : rest) as never,
+        hiddenResult(row, hidden, at) as never,
       )
     },
 
@@ -692,14 +531,8 @@ export function createEcommerceTaskRepository(
           projectId: before.projectId,
           nodeId: before.nodeId,
         })) as unknown as Record<string, unknown>[]
-      ).sort((a, b) => Number(b.createdAt ?? 0) - Number(a.createdAt ?? 0))
-      const latestRunStatus = String(runRows[0]?.status ?? '')
-      const removable =
-        before.status === 'failed' ||
-        before.status === 'canceled' ||
-        latestRunStatus === 'failed' ||
-        latestRunStatus === 'canceled'
-      if (!removable) return null
+      )
+      if (!resultRemovable(before, runRows)) return null
       return storage.transaction(
         ['ecommerceTasks', 'ecommerceResults', 'assetSaveQueue'],
         async (tx) => {
@@ -745,13 +578,7 @@ export function createEcommerceTaskRepository(
             projectId: preview.projectId,
           })) as unknown as Record<string, unknown>[])
         : []
-      const latestRunByNode = new Map<string, Record<string, unknown>>()
-      for (const run of runRows.sort(
-        (a, b) => Number(b.createdAt ?? 0) - Number(a.createdAt ?? 0),
-      )) {
-        const nodeId = String(run.nodeId ?? '')
-        if (nodeId && !latestRunByNode.has(nodeId)) latestRunByNode.set(nodeId, run)
-      }
+      const runsByNode = latestRunByNode(runRows)
       return storage.transaction(['ecommerceTasks', 'ecommerceResults'], async (tx) => {
         const taskRows = (await tx.query('ecommerceTasks', { id: taskId })) as unknown as Record<
           string,
@@ -762,30 +589,8 @@ export function createEcommerceTaskRepository(
         const rows = (await tx.query('ecommerceResults', {
           taskId,
         })) as unknown as Record<string, unknown>[]
-        const results = rows
-          .map(resultOf)
-          .sort((a, b) => a.position - b.position)
-          .map((row) =>
-            row.status === 'pending' || row.status === 'running'
-              ? (() => {
-                  const run = latestRunByNode.get(row.nodeId)
-                  const runError =
-                    String(run?.status ?? '') === 'failed' &&
-                    typeof run?.errorText === 'string' &&
-                    run.errorText
-                      ? run.errorText
-                      : reason
-                  return { ...row, status: 'failed' as const, errorText: runError, updatedAt: at }
-                })()
-              : row,
-          )
-        const nextTask: EcommerceTaskRecord = {
-          ...task,
-          status: taskStatusOf(results),
-          errorText:
-            results.find((row) => row.status === 'failed' && row.errorText)?.errorText ?? reason,
-          updatedAt: at,
-        }
+        const results = interruptResults(resultsByPosition(rows.map(resultOf)), runsByNode, reason, at)
+        const nextTask = interruptedTask(task, results, reason, at)
         await tx.put('ecommerceTasks', nextTask as never)
         await tx.bulkPut('ecommerceResults', results as never)
         return { task: nextTask, results }
@@ -801,170 +606,32 @@ export function createEcommerceTaskRepository(
         storage.query('runRecords', { projectId }),
         storage.query('assetSaveQueue', { projectId }),
       ])
-      const tasks = (taskRows as unknown as Record<string, unknown>[]).map(taskOf)
-      const results = (resultRows as unknown as Record<string, unknown>[]).map(resultOf)
-      const queuedByResult = new Map(
-        (queueRows as unknown as Record<string, unknown>[])
-          .map(queuedSaveOf)
-          .map((row) => [row.resultId, row] as const),
+      const tasks = mapTaskRows(taskRows as unknown as Record<string, unknown>[])
+      const results = mapResultRows(resultRows as unknown as Record<string, unknown>[])
+      const queuedByResult = queuedSaveByResult(
+        queuedSaveRows(queueRows as unknown as Record<string, unknown>[]),
       )
-      const latestByNode = new Map<string, Record<string, unknown>>()
-      for (const run of (runRows as unknown as Record<string, unknown>[]).sort(
-        (a, b) => Number(b.createdAt ?? 0) - Number(a.createdAt ?? 0),
-      )) {
-        const nodeId = String(run.nodeId ?? '')
-        if (nodeId && !latestByNode.has(nodeId)) latestByNode.set(nodeId, run)
-      }
-      const outputHashesToVerify = new Set<string>()
-      for (const row of results) {
-        const run = latestByNode.get(row.nodeId)
-        const runHash =
-          String(run?.status ?? '') === 'succeeded'
-            ? firstOutputHashOf(run)
-            : undefined
-        const hash = runHash ?? row.assetHash
-        if (
-          hash &&
-          (Boolean(runHash) ||
-            row.status === 'done' ||
-            row.recovery === 'retry-save')
-        ) {
-          outputHashesToVerify.add(hash)
-        }
-      }
+      const latestByNode = latestRunByNode(runRows as unknown as Record<string, unknown>[])
+      const outputHashesToVerify = hashesToVerify(results, latestByNode)
       const readableHashes = new Set<string>()
       for (const hash of outputHashesToVerify) {
         if (await assetHashIsReadable(assets, hash)) readableHashes.add(hash)
       }
       const changed: EcommerceResultRecord[] = []
       const nextResults = results.map((row) => {
-        const run = latestByNode.get(row.nodeId)
-        const runStatus = String(run?.status ?? '')
-        const runOutputHash = firstOutputHashOf(run)
-        const active = row.status === 'pending' || row.status === 'running'
-        const needsHashBackfill = row.status === 'done' && !row.assetHash
-        const needsRetrySave = row.recovery === 'retry-save'
-        const needsIntegrityCheck = row.status === 'done' && Boolean(row.assetHash)
-        if (
-          (!active &&
-            !needsHashBackfill &&
-            !needsRetrySave &&
-            !needsIntegrityCheck)
-        ) {
-          return row
-        }
-        if (
-          run &&
-          runStatus !== 'succeeded' &&
-          runStatus !== 'failed' &&
-          runStatus !== 'canceled'
-        ) {
-          return row
-        }
-        if (!run && active) return row
-        const succeeded = run ? runStatus === 'succeeded' : row.status === 'done'
-        const outputHash = succeeded ? runOutputHash ?? row.assetHash : undefined
-        const outputAssetExists = Boolean(
-          outputHash && readableHashes.has(outputHash),
-        )
-        if (
-          succeeded &&
-          outputHash &&
-          outputAssetExists &&
-          row.status === 'done' &&
-          row.assetHash === outputHash &&
-          !row.recovery
-        ) {
-          return row
-        }
-        const assetHash = succeeded
-          ? outputAssetExists
-            ? outputHash
-            : undefined
-          : row.assetHash
-        const queued = queuedByResult.get(row.id)
-        const {
-          errorText: _oldError,
-          recovery: _oldRecovery,
-          assetHash: _oldAssetHash,
-          mime: _oldMime,
-          width: _oldWidth,
-          height: _oldHeight,
-          ...rest
-        } = row
-        const next: EcommerceResultRecord = {
-          ...rest,
-          updatedAt: at,
-          status: succeeded ? (assetHash ? 'done' : 'failed') : 'failed',
-          ...(assetHash ? { assetHash } : {}),
-          ...(assetHash && (row.mime || queued?.assets[0]?.mime)
-            ? { mime: row.mime ?? queued?.assets[0]?.mime }
-            : {}),
-          ...(assetHash && succeeded && typeof run?.sentModel === 'string'
-            ? { model: run.sentModel }
-            : {}),
-          ...(assetHash &&
-          typeof run?.outputWidth === 'number' &&
-          run.outputWidth > 0
-            ? { width: run.outputWidth }
-            : {}),
-          ...(assetHash &&
-          typeof run?.outputHeight === 'number' &&
-          run.outputHeight > 0
-            ? { height: run.outputHeight }
-            : {}),
-          ...(succeeded && outputHash && !outputAssetExists && queued
-            ? {
-                recovery: 'retry-save' as const,
-                errorText:
-                  queued.errorText ??
-                  '生成已成功，但素材字节不在库中。请重试保存同一产物，不要重新生成。',
-              }
-            : !succeeded || !assetHash
-            ? {
-                errorText:
-                  !succeeded &&
-                  typeof run?.errorText === 'string' &&
-                  run.errorText
-                    ? run.errorText
-                    : !succeeded
-                      ? '这次 API 调用失败，但上游没有返回可读原因'
-                      : '生成已完成，但没有找到可展示的产物',
-              }
-            : {}),
-        }
+        const next = reconciledResult(row, {
+          run: latestByNode.get(row.nodeId),
+          hashIsReadable: (hash) => readableHashes.has(hash),
+          queued: queuedByResult.get(row.id),
+          at,
+        })
+        if (next === row) return row
         changed.push(next)
         return next
       })
-      const affected = new Set(changed.map((row) => row.taskId))
-      for (const task of tasks) {
-        const rows = nextResults.filter((row) => row.taskId === task.id)
-        const realError = rows.find((row) => row.status === 'failed' && row.errorText)?.errorText
-        if (
-          task.status !== taskStatusOf(rows) ||
-          realError !== task.errorText
-        ) {
-          affected.add(task.id)
-        }
-      }
-      const nextTasks = tasks.map((task) => {
-        if (!affected.has(task.id)) return task
-        const rows = nextResults.filter((row) => row.taskId === task.id)
-        const failed = rows.find((row) => row.status === 'failed' && row.errorText)
-        const { errorText: _oldError, ...rest } = task
-        return {
-          ...rest,
-          updatedAt: at,
-          status: taskStatusOf(rows),
-          ...(failed?.errorText ? { errorText: failed.errorText } : {}),
-        } satisfies EcommerceTaskRecord
-      })
-      const changedTasks = nextTasks.filter(
-        (task) => {
-          const old = tasks.find((candidate) => candidate.id === task.id)
-          return old?.status !== task.status || old?.errorText !== task.errorText
-        },
-      )
+      const projection = reconciledTasks(tasks, nextResults, changed, at)
+      const nextTasks = projection.next
+      const changedTasks = projection.changed
       await storage.transaction(['ecommerceResults', 'ecommerceTasks'], async (tx) => {
         if (changed.length > 0) await tx.bulkPut('ecommerceResults', changed as never)
         if (changedTasks.length > 0) await tx.bulkPut('ecommerceTasks', changedTasks as never)
@@ -973,13 +640,13 @@ export function createEcommerceTaskRepository(
     },
 
     async listResults(projectId) {
-      return (
-        (await storage.query('ecommerceResults', {
-          projectId,
-        })) as unknown as Record<string, unknown>[]
+      return projectResults(
+        mapResultRows(
+          (await storage.query('ecommerceResults', {
+            projectId,
+          })) as unknown as Record<string, unknown>[],
+        ),
       )
-        .map(resultOf)
-        .sort((a, b) => a.createdAt - b.createdAt || a.position - b.position)
     },
 
     async latestWithResults(projectId) {
@@ -987,9 +654,7 @@ export function createEcommerceTaskRepository(
         string,
         unknown
       >[]
-      const tasks = rows
-        .map(taskOf)
-        .sort((a, b) => b.createdAt - a.createdAt || b.updatedAt - a.updatedAt)
+      const tasks = latestTasks(mapTaskRows(rows))
       for (const task of tasks) {
         const results = await resultsOf(task.id)
         if (results.length > 0) return { task, results }
@@ -1002,7 +667,7 @@ export function createEcommerceTaskRepository(
         string,
         unknown
       >[]
-      return rows.map(taskOf).sort((a, b) => b.createdAt - a.createdAt)
+      return listedTasks(mapTaskRows(rows))
     },
 
     async remove(taskId) {

@@ -1,48 +1,541 @@
 {
   "version": 1,
   "baseline": "3b13acacf141997bb1719edeaabcd2a7322e76e5",
-  "defaults": { "ts": 450, "css": 600 },
+  "defaults": {
+    "ts": 450,
+    "css": 600
+  },
   "directories": [
-    { "path": "src/assets", "ts": 250, "css": 400 },
-    { "path": "src/dev", "ts": 250, "css": 400 },
-    { "path": "src/app", "ts": 450, "css": 600 },
-    { "path": "src/domain", "ts": 450, "css": 600 },
-    { "path": "src/features", "ts": 450, "css": 600 },
-    { "path": "src/pages", "ts": 450, "css": 600 },
-    { "path": "src/platform", "ts": 450, "css": 600 },
-    { "path": "src/shared", "ts": 350, "css": 400 },
-    { "path": "src/state", "ts": 450, "css": 600 },
-    { "path": "src/styles", "ts": 250, "css": 600 },
-    { "path": "src/test", "ts": 350, "css": 400 },
-    { "path": "src/ui", "ts": 350, "css": 500 },
-    { "path": "src/workbenches", "ts": 450, "css": 600 }
+    {
+      "path": "src/assets",
+      "ts": 250,
+      "css": 400
+    },
+    {
+      "path": "src/dev",
+      "ts": 250,
+      "css": 400
+    },
+    {
+      "path": "src/app",
+      "ts": 450,
+      "css": 600
+    },
+    {
+      "path": "src/domain",
+      "ts": 450,
+      "css": 600
+    },
+    {
+      "path": "src/features",
+      "ts": 450,
+      "css": 600
+    },
+    {
+      "path": "src/pages",
+      "ts": 450,
+      "css": 600
+    },
+    {
+      "path": "src/platform",
+      "ts": 450,
+      "css": 600
+    },
+    {
+      "path": "src/shared",
+      "ts": 350,
+      "css": 400
+    },
+    {
+      "path": "src/state",
+      "ts": 450,
+      "css": 600
+    },
+    {
+      "path": "src/styles",
+      "ts": 250,
+      "css": 600
+    },
+    {
+      "path": "src/test",
+      "ts": 350,
+      "css": 400
+    },
+    {
+      "path": "src/ui",
+      "ts": 350,
+      "css": 500
+    },
+    {
+      "path": "src/workbenches",
+      "ts": 450,
+      "css": 600
+    }
   ],
   "legacy": [
-    { "module": "src/app/ProjectRuntimeRegistry.ts", "owner": "project-runtime", "responsibility": "项目运行态的删除、恢复和释放阶段编排。", "owns": ["运行态操作锁和生命周期"], "doesNotOwn": ["画布执行算法", "页面展示"], "publicApi": ["AppShell 和项目页使用的运行态注册门面"], "test": ["src/app/ProjectRuntimeRegistry.test.ts"], "budget": 948 },
-    { "module": "src/app/ProjectTree.tsx", "owner": "project-navigation", "responsibility": "项目树导航和项目管理操作。", "owns": ["项目树交互和展示"], "doesNotOwn": ["项目运行态内部事务"], "publicApi": ["AppSidebar 项目树"], "test": ["src/app/ProjectTree.test.ts"], "budget": 1273 },
-    { "module": "src/domain/storyboard/storyboard.ts", "owner": "storyboard-domain", "responsibility": "漫剧项目、分集、分镜与镜头领域规则。", "owns": ["漫剧领域模型和规范化"], "doesNotOwn": ["网络请求", "React 渲染"], "publicApi": ["漫剧工作台和仓储共享的领域 API"], "test": ["src/domain/storyboard/storyboard.test.ts"], "budget": 1749 },
-    { "module": "src/pages/AssetsPage/AssetsPage.module.css", "owner": "asset-library-ui", "responsibility": "素材页布局和素材卡片视觉样式。", "owns": ["素材页局部样式"], "doesNotOwn": ["素材导入逻辑"], "publicApi": ["AssetsPage CSS Module"], "test": ["scripts/smoke.mjs#G90"], "budget": 1540 },
-    { "module": "src/pages/AssetsPage/ContextKitsDialog.module.css", "owner": "context-kit-ui", "responsibility": "上下文套件弹窗布局和视觉样式。", "owns": ["套件弹窗局部样式"], "doesNotOwn": ["套件持久化"], "publicApi": ["ContextKitsDialog CSS Module"], "test": ["src/domain/shared/context.test.ts"], "budget": 1014 },
-    { "module": "src/pages/AssetsPage/ContextKitsDialog.tsx", "owner": "context-kit-ui", "responsibility": "上下文套件的编辑、预览和素材选择。", "owns": ["套件弹窗交互"], "doesNotOwn": ["Agent 请求发送"], "publicApi": ["素材页套件弹窗"], "test": ["src/domain/shared/context.test.ts"], "budget": 1135 },
-    { "module": "src/pages/EcommercePage/EcommercePage.tsx", "owner": "ecommerce-workflow", "responsibility": "电商页面会话、任务和结果工作流装配。", "owns": ["电商页面用例顺序"], "doesNotOwn": ["画布执行 Provider", "上游协议解析"], "publicApi": ["电商工作台路由页面"], "test": ["scripts/smoke.mjs#G116"], "budget": 2185 },
-    { "module": "src/pages/EcommercePage/EcommerceWorkbench.tsx", "owner": "ecommerce-workbench", "responsibility": "电商结果工作台视口、选择和任务投影。", "owns": ["工作台交互状态"], "doesNotOwn": ["渠道请求", "电商任务仓储事务"], "publicApi": ["电商页面工作台"], "test": ["scripts/smoke.mjs#G116"], "budget": 1657 },
-    { "module": "src/pages/ProjectsPage/ProjectsPage.module.css", "owner": "project-list-ui", "responsibility": "项目列表和项目操作的视觉样式。", "owns": ["项目页局部样式"], "doesNotOwn": ["项目删除事务"], "publicApi": ["ProjectsPage CSS Module"], "test": ["scripts/smoke.mjs#G85"], "budget": 1021 },
-    { "module": "src/pages/ProjectsPage/ProjectsPage.tsx", "owner": "project-list-ui", "responsibility": "项目列表、批量操作、删除和恢复交互。", "owns": ["项目列表页面状态"], "doesNotOwn": ["运行态锁内部实现"], "publicApi": ["项目列表路由页面"], "test": ["src/pages/ProjectsPage/ProjectsPage.test.ts"], "budget": 1421 },
-    { "module": "src/pages/SettingsPage/SettingsPage.module.css", "owner": "settings-ui", "responsibility": "设置页各分区的布局和视觉样式。", "owns": ["设置页局部样式"], "doesNotOwn": ["渠道路由规则"], "publicApi": ["SettingsPage CSS Module"], "test": ["scripts/smoke.mjs#G53"], "budget": 2476 },
-    { "module": "src/pages/SettingsPage/SettingsPage.tsx", "owner": "settings-ui", "responsibility": "渠道、模型映射、外观和系统设置页面装配。", "owns": ["设置页表单交互"], "doesNotOwn": ["上游响应解析", "生成执行"], "publicApi": ["设置路由页面"], "test": ["src/pages/SettingsPage/customProtocolDraft.test.ts"], "budget": 3015 },
-    { "module": "src/pages/SkillsPage/SkillsPage.module.css", "owner": "skills-ui", "responsibility": "技能库列表、详情和编辑界面样式。", "owns": ["技能页局部样式"], "doesNotOwn": ["技能文件系统实现"], "publicApi": ["SkillsPage CSS Module"], "test": ["scripts/smoke.mjs#G94"], "budget": 1015 },
-    { "module": "src/platform/channels/openaiImages.ts", "owner": "channel-image-adapters", "responsibility": "OpenAI 兼容及关联图片上游协议适配。", "owns": ["图片请求、响应解析和轮询"], "doesNotOwn": ["渠道 CRUD", "UI 状态"], "publicApi": ["channelStore 图片生成适配入口"], "test": ["src/platform/channels/openaiImages.test.ts"], "budget": 1685 },
-    { "module": "src/platform/channels/runninghubEndpoints.ts", "owner": "runninghub-catalog", "responsibility": "RunningHub 官方模型端点和协议目录。", "owns": ["RunningHub 端点声明"], "doesNotOwn": ["页面模型选择", "渠道凭证存储"], "publicApi": ["RunningHub 适配器端点目录"], "test": ["src/platform/channels/runninghub.test.ts"], "budget": 1032 },
-    { "module": "src/state/channel/channelStore.ts", "owner": "channel-facade", "responsibility": "渠道配置、凭证、模型路由和生成请求中央门面。", "owns": ["渠道状态与请求路由"], "doesNotOwn": ["页面渲染", "工作台状态"], "publicApi": ["设置、Agent、电商和画布共享的渠道 API"], "test": ["src/state/channel/channelStore.test.ts"], "budget": 1308 },
-    { "module": "src/state/project/ecommerceTaskRepository.ts", "owner": "ecommerce-persistence", "responsibility": "电商任务、结果和待入素材的持久化事务。", "owns": ["电商任务仓储"], "doesNotOwn": ["上游请求", "页面导航"], "publicApi": ["电商工作流任务仓储 API"], "test": ["src/state/project/ecommerceTaskRepository.test.ts"], "budget": 1021 },
-    { "module": "src/workbenches/canvas/execution/CanvasExecutionProvider.tsx", "owner": "canvas-execution", "responsibility": "画布节点与分组运行的执行生命周期门面。", "owns": ["画布运行、取消和记录顺序"], "doesNotOwn": ["渠道协议解析", "项目删除事务"], "publicApi": ["画布工作台执行 Provider"], "test": ["src/workbenches/canvas/execution/canvasExecutionRuntime.test.ts"], "budget": 1509 },
-    { "module": "src/workbenches/canvas/flow/FlowSurface.tsx", "owner": "canvas-flow-ui", "responsibility": "画布节点表面、视口、选择和连接交互。", "owns": ["画布表面交互"], "doesNotOwn": ["生成请求", "项目运行态"], "publicApi": ["画布工作台 FlowSurface"], "test": ["src/workbenches/canvas/flow/flowGraph.test.ts"], "budget": 1576 },
-    { "module": "src/workbenches/canvas/lightbox/LightboxLayer.tsx", "owner": "canvas-lightbox-ui", "responsibility": "画布素材灯箱查看和编辑交互。", "owns": ["灯箱局部视图状态"], "doesNotOwn": ["素材仓储实现"], "publicApi": ["画布灯箱层"], "test": ["scripts/smoke.mjs#G795"], "budget": 1764 },
-    { "module": "src/workbenches/canvas/panels/CreationPanel.module.css", "owner": "canvas-creation-ui", "responsibility": "创作面板参数和素材区域的视觉样式。", "owns": ["创作面板局部样式"], "doesNotOwn": ["生成运行顺序"], "publicApi": ["CreationPanel CSS Module"], "test": ["src/workbenches/canvas/panels/CreationPanel.test.ts"], "budget": 1218 },
-    { "module": "src/workbenches/canvas/panels/CreationPanel.tsx", "owner": "canvas-creation-ui", "responsibility": "图片和视频生成参数与素材配置面板。", "owns": ["创作面板表单和展示"], "doesNotOwn": ["执行 Provider 内部循环"], "publicApi": ["画布创作面板"], "test": ["src/workbenches/canvas/panels/CreationPanel.test.ts"], "budget": 2437 },
-    { "module": "src/workbenches/ecommerce/EcommerceStudio.module.css", "owner": "ecommerce-studio-ui", "responsibility": "电商 Studio 表单和结果区域的视觉样式。", "owns": ["Studio 局部样式"], "doesNotOwn": ["任务执行规则"], "publicApi": ["EcommerceStudio CSS Module"], "test": ["scripts/smoke.mjs#G116"], "budget": 2042 },
-    { "module": "src/workbenches/ecommerce/EcommerceStudio.tsx", "owner": "ecommerce-studio-ui", "responsibility": "电商生成模式、参数表单和结果预览。", "owns": ["Studio 表单交互"], "doesNotOwn": ["任务仓储", "渠道协议实现"], "publicApi": ["电商工作台 Studio"], "test": ["src/workbenches/ecommerce/EcommerceStudio.status.test.ts"], "budget": 3221 },
-    { "module": "src/workbenches/storyboard/useStoryboardVideoExecutionController.ts", "owner": "storyboard-execution", "responsibility": "漫剧视频执行控制器的 UI 生命周期装配。", "owns": ["视频执行控制状态"], "doesNotOwn": ["视频上游协议", "画布执行状态"], "publicApi": ["漫剧工作台视频执行 Hook"], "test": ["src/workbenches/storyboard/useStoryboardVideoExecutionController.test.ts"], "budget": 1028 }
+    {
+      "module": "src/app/ProjectRuntimeRegistry.ts",
+      "owner": "project-runtime",
+      "responsibility": "项目运行态的删除、恢复和释放阶段编排。",
+      "owns": [
+        "运行态操作锁和生命周期"
+      ],
+      "doesNotOwn": [
+        "画布执行算法",
+        "页面展示"
+      ],
+      "publicApi": [
+        "AppShell 和项目页使用的运行态注册门面"
+      ],
+      "test": [
+        "src/app/ProjectRuntimeRegistry.test.ts"
+      ],
+      "budget": 948
+    },
+    {
+      "module": "src/app/ProjectTree.tsx",
+      "owner": "project-navigation",
+      "responsibility": "项目树导航和项目管理操作。",
+      "owns": [
+        "项目树交互和展示"
+      ],
+      "doesNotOwn": [
+        "项目运行态内部事务"
+      ],
+      "publicApi": [
+        "AppSidebar 项目树"
+      ],
+      "test": [
+        "src/app/ProjectTree.test.ts"
+      ],
+      "budget": 784
+    },
+    {
+      "module": "src/domain/storyboard/storyboard.ts",
+      "owner": "storyboard-domain",
+      "responsibility": "漫剧项目、分集、分镜与镜头领域规则。",
+      "owns": [
+        "漫剧领域模型和规范化"
+      ],
+      "doesNotOwn": [
+        "网络请求",
+        "React 渲染"
+      ],
+      "publicApi": [
+        "漫剧工作台和仓储共享的领域 API"
+      ],
+      "test": [
+        "src/domain/storyboard/storyboard.test.ts"
+      ],
+      "budget": 91
+    },
+    {
+      "module": "src/pages/AssetsPage/AssetsPage.module.css",
+      "owner": "asset-library-ui",
+      "responsibility": "素材页布局和素材卡片视觉样式。",
+      "owns": [
+        "素材页局部样式"
+      ],
+      "doesNotOwn": [
+        "素材导入逻辑"
+      ],
+      "publicApi": [
+        "AssetsPage CSS Module"
+      ],
+      "test": [
+        "scripts/smoke.mjs#G90"
+      ],
+      "budget": 125
+    },
+    {
+      "module": "src/pages/AssetsPage/ContextKitsDialog.module.css",
+      "owner": "context-kit-ui",
+      "responsibility": "上下文套件弹窗布局和视觉样式。",
+      "owns": [
+        "套件弹窗局部样式"
+      ],
+      "doesNotOwn": [
+        "套件持久化"
+      ],
+      "publicApi": [
+        "ContextKitsDialog CSS Module"
+      ],
+      "test": [
+        "src/domain/shared/context.test.ts"
+      ],
+      "budget": 70
+    },
+    {
+      "module": "src/pages/AssetsPage/ContextKitsDialog.tsx",
+      "owner": "context-kit-ui",
+      "responsibility": "上下文套件的编辑、预览和素材选择。",
+      "owns": [
+        "套件弹窗交互"
+      ],
+      "doesNotOwn": [
+        "Agent 请求发送"
+      ],
+      "publicApi": [
+        "素材页套件弹窗"
+      ],
+      "test": [
+        "src/domain/shared/context.test.ts"
+      ],
+      "budget": 985
+    },
+    {
+      "module": "src/pages/EcommercePage/EcommercePage.tsx",
+      "owner": "ecommerce-workflow",
+      "responsibility": "电商页面会话、任务和结果工作流装配。",
+      "owns": [
+        "电商页面用例顺序"
+      ],
+      "doesNotOwn": [
+        "画布执行 Provider",
+        "上游协议解析"
+      ],
+      "publicApi": [
+        "电商工作台路由页面"
+      ],
+      "test": [
+        "scripts/smoke.mjs#G116"
+      ],
+      "budget": 1716
+    },
+    {
+      "module": "src/pages/EcommercePage/EcommerceWorkbench.tsx",
+      "owner": "ecommerce-workbench",
+      "responsibility": "电商结果工作台视口、选择和任务投影。",
+      "owns": [
+        "工作台交互状态"
+      ],
+      "doesNotOwn": [
+        "渠道请求",
+        "电商任务仓储事务"
+      ],
+      "publicApi": [
+        "电商页面工作台"
+      ],
+      "test": [
+        "scripts/smoke.mjs#G116"
+      ],
+      "budget": 1078
+    },
+    {
+      "module": "src/pages/ProjectsPage/ProjectsPage.module.css",
+      "owner": "project-list-ui",
+      "responsibility": "项目列表和项目操作的视觉样式。",
+      "owns": [
+        "项目页局部样式"
+      ],
+      "doesNotOwn": [
+        "项目删除事务"
+      ],
+      "publicApi": [
+        "ProjectsPage CSS Module"
+      ],
+      "test": [
+        "scripts/smoke.mjs#G85"
+      ],
+      "budget": 282
+    },
+    {
+      "module": "src/pages/ProjectsPage/ProjectsPage.tsx",
+      "owner": "project-list-ui",
+      "responsibility": "项目列表、批量操作、删除和恢复交互。",
+      "owns": [
+        "项目列表页面状态"
+      ],
+      "doesNotOwn": [
+        "运行态锁内部实现"
+      ],
+      "publicApi": [
+        "项目列表路由页面"
+      ],
+      "test": [
+        "src/pages/ProjectsPage/ProjectsPage.test.ts"
+      ],
+      "budget": 1075
+    },
+    {
+      "module": "src/pages/SettingsPage/SettingsPage.module.css",
+      "owner": "settings-ui",
+      "responsibility": "设置页各分区的布局和视觉样式。",
+      "owns": [
+        "设置页局部样式"
+      ],
+      "doesNotOwn": [
+        "渠道路由规则"
+      ],
+      "publicApi": [
+        "SettingsPage CSS Module"
+      ],
+      "test": [
+        "scripts/smoke.mjs#G53"
+      ],
+      "budget": 210
+    },
+    {
+      "module": "src/pages/SettingsPage/SettingsPage.tsx",
+      "owner": "settings-ui",
+      "responsibility": "渠道、模型映射、外观和系统设置页面装配。",
+      "owns": [
+        "设置页表单交互"
+      ],
+      "doesNotOwn": [
+        "上游响应解析",
+        "生成执行"
+      ],
+      "publicApi": [
+        "设置路由页面"
+      ],
+      "test": [
+        "src/pages/SettingsPage/customProtocolDraft.test.ts"
+      ],
+      "budget": 2617
+    },
+    {
+      "module": "src/pages/SkillsPage/SkillsPage.module.css",
+      "owner": "skills-ui",
+      "responsibility": "技能库列表、详情和编辑界面样式。",
+      "owns": [
+        "技能页局部样式"
+      ],
+      "doesNotOwn": [
+        "技能文件系统实现"
+      ],
+      "publicApi": [
+        "SkillsPage CSS Module"
+      ],
+      "test": [
+        "scripts/smoke.mjs#G94"
+      ],
+      "budget": 85
+    },
+    {
+      "module": "src/platform/channels/openaiImages.ts",
+      "owner": "channel-image-adapters",
+      "responsibility": "OpenAI 兼容及关联图片上游协议适配。",
+      "owns": [
+        "图片请求、响应解析和轮询"
+      ],
+      "doesNotOwn": [
+        "渠道 CRUD",
+        "UI 状态"
+      ],
+      "publicApi": [
+        "channelStore 图片生成适配入口"
+      ],
+      "test": [
+        "src/platform/channels/openaiImages.test.ts"
+      ],
+      "budget": 51
+    },
+    {
+      "module": "src/platform/channels/runninghubEndpoints.ts",
+      "owner": "runninghub-catalog",
+      "responsibility": "RunningHub 官方模型端点和协议目录。",
+      "owns": [
+        "RunningHub 端点声明"
+      ],
+      "doesNotOwn": [
+        "页面模型选择",
+        "渠道凭证存储"
+      ],
+      "publicApi": [
+        "RunningHub 适配器端点目录"
+      ],
+      "test": [
+        "src/platform/channels/runninghub.test.ts"
+      ],
+      "budget": 22
+    },
+    {
+      "module": "src/state/channel/channelStore.ts",
+      "owner": "channel-facade",
+      "responsibility": "渠道配置、凭证、模型路由和生成请求中央门面。",
+      "owns": [
+        "渠道状态与请求路由"
+      ],
+      "doesNotOwn": [
+        "页面渲染",
+        "工作台状态"
+      ],
+      "publicApi": [
+        "设置、Agent、电商和画布共享的渠道 API"
+      ],
+      "test": [
+        "src/state/channel/channelStore.test.ts"
+      ],
+      "budget": 926
+    },
+    {
+      "module": "src/state/project/ecommerceTaskRepository.ts",
+      "owner": "ecommerce-persistence",
+      "responsibility": "电商任务、结果和待入素材的持久化事务。",
+      "owns": [
+        "电商任务仓储"
+      ],
+      "doesNotOwn": [
+        "上游请求",
+        "页面导航"
+      ],
+      "publicApi": [
+        "电商工作流任务仓储 API"
+      ],
+      "test": [
+        "src/state/project/ecommerceTaskRepository.test.ts"
+      ],
+      "budget": 686
+    },
+    {
+      "module": "src/workbenches/canvas/execution/CanvasExecutionProvider.tsx",
+      "owner": "canvas-execution",
+      "responsibility": "画布节点与分组运行的执行生命周期门面。",
+      "owns": [
+        "画布运行、取消和记录顺序"
+      ],
+      "doesNotOwn": [
+        "渠道协议解析",
+        "项目删除事务"
+      ],
+      "publicApi": [
+        "画布工作台执行 Provider"
+      ],
+      "test": [
+        "src/workbenches/canvas/execution/canvasExecutionRuntime.test.ts"
+      ],
+      "budget": 975
+    },
+    {
+      "module": "src/workbenches/canvas/flow/FlowSurface.tsx",
+      "owner": "canvas-flow-ui",
+      "responsibility": "画布节点表面、视口、选择和连接交互。",
+      "owns": [
+        "画布表面交互"
+      ],
+      "doesNotOwn": [
+        "生成请求",
+        "项目运行态"
+      ],
+      "publicApi": [
+        "画布工作台 FlowSurface"
+      ],
+      "test": [
+        "src/workbenches/canvas/flow/flowGraph.test.ts"
+      ],
+      "budget": 1519
+    },
+    {
+      "module": "src/workbenches/canvas/lightbox/LightboxLayer.tsx",
+      "owner": "canvas-lightbox-ui",
+      "responsibility": "画布素材灯箱查看和编辑交互。",
+      "owns": [
+        "灯箱局部视图状态"
+      ],
+      "doesNotOwn": [
+        "素材仓储实现"
+      ],
+      "publicApi": [
+        "画布灯箱层"
+      ],
+      "test": [
+        "scripts/smoke.mjs#G795"
+      ],
+      "budget": 1621
+    },
+    {
+      "module": "src/workbenches/canvas/panels/CreationPanel.module.css",
+      "owner": "canvas-creation-ui",
+      "responsibility": "创作面板参数和素材区域的视觉样式。",
+      "owns": [
+        "创作面板局部样式"
+      ],
+      "doesNotOwn": [
+        "生成运行顺序"
+      ],
+      "publicApi": [
+        "CreationPanel CSS Module"
+      ],
+      "test": [
+        "src/workbenches/canvas/panels/CreationPanel.test.ts"
+      ],
+      "budget": 31
+    },
+    {
+      "module": "src/workbenches/canvas/panels/CreationPanel.tsx",
+      "owner": "canvas-creation-ui",
+      "responsibility": "图片和视频生成参数与素材配置面板。",
+      "owns": [
+        "创作面板表单和展示"
+      ],
+      "doesNotOwn": [
+        "执行 Provider 内部循环"
+      ],
+      "publicApi": [
+        "画布创作面板"
+      ],
+      "test": [
+        "src/workbenches/canvas/panels/CreationPanel.test.ts"
+      ],
+      "budget": 1907
+    },
+    {
+      "module": "src/workbenches/ecommerce/EcommerceStudio.module.css",
+      "owner": "ecommerce-studio-ui",
+      "responsibility": "电商 Studio 表单和结果区域的视觉样式。",
+      "owns": [
+        "Studio 局部样式"
+      ],
+      "doesNotOwn": [
+        "任务执行规则"
+      ],
+      "publicApi": [
+        "EcommerceStudio CSS Module"
+      ],
+      "test": [
+        "scripts/smoke.mjs#G116"
+      ],
+      "budget": 302
+    },
+    {
+      "module": "src/workbenches/ecommerce/EcommerceStudio.tsx",
+      "owner": "ecommerce-studio-ui",
+      "responsibility": "电商生成模式、参数表单和结果预览。",
+      "owns": [
+        "Studio 表单交互"
+      ],
+      "doesNotOwn": [
+        "任务仓储",
+        "渠道协议实现"
+      ],
+      "publicApi": [
+        "电商工作台 Studio"
+      ],
+      "test": [
+        "src/workbenches/ecommerce/EcommerceStudio.status.test.ts"
+      ],
+      "budget": 1753
+    },
+    {
+      "module": "src/workbenches/storyboard/useStoryboardVideoExecutionController.ts",
+      "owner": "storyboard-execution",
+      "responsibility": "漫剧视频执行控制器的 UI 生命周期装配。",
+      "owns": [
+        "视频执行控制状态"
+      ],
+      "doesNotOwn": [
+        "视频上游协议",
+        "画布执行状态"
+      ],
+      "publicApi": [
+        "漫剧工作台视频执行 Hook"
+      ],
+      "test": [
+        "src/workbenches/storyboard/useStoryboardVideoExecutionController.test.ts"
+      ],
+      "budget": 223
+    }
   ],
   "removedModules": [],
   "moduleMoves": [],
@@ -51,71 +544,3675 @@
       "module": "src/workbenches/canvas/agent/agentVisualClaimGuard.ts",
       "owner": "canvas-agent-visual-capability",
       "responsibility": "普通看图一次纠正重答与明确质检的视觉证据补查，第二次否认如实失败。",
-      "owns": ["视觉否定识别、单次聊天重答门禁与视觉证据补查"],
-      "doesNotOwn": ["渠道路由", "图片协议编码", "Agent 主循环"],
-      "publicApi": ["agentLoop 的视觉自述门禁"],
-      "test": ["src/workbenches/canvas/agent/agentVisualClaimGuard.test.ts"],
+      "owns": [
+        "视觉否定识别、单次聊天重答门禁与视觉证据补查"
+      ],
+      "doesNotOwn": [
+        "渠道路由",
+        "图片协议编码",
+        "Agent 主循环"
+      ],
+      "publicApi": [
+        "deniesVisualCapability",
+        "requestsExplicitVisualReview",
+        "visualEvidenceToCheck",
+        "reviewBeforeVisualDenial"
+      ],
+      "test": [
+        "src/workbenches/canvas/agent/agentVisualClaimGuard.test.ts"
+      ],
       "budget": 140
     },
     {
       "module": "src/state/channel/channelCredentials.ts",
       "owner": "channel-credentials",
       "responsibility": "渠道凭证明文、Key 分组和运行态读取端口的唯一实现。",
-      "owns": ["credential slots and groups", "secret lifecycle", "runtime credential read port"],
-      "doesNotOwn": ["channel routing", "protocol adapters", "UI state"],
-      "publicApi": ["ChannelStore credential actions", "ChannelRepository.credentials"],
-      "test": ["src/state/channel/channelCredentials.test.ts"],
+      "owns": [
+        "credential slots and groups",
+        "secret lifecycle",
+        "runtime credential read port"
+      ],
+      "doesNotOwn": [
+        "channel routing",
+        "protocol adapters",
+        "UI state"
+      ],
+      "publicApi": [
+        "CredentialReadPort",
+        "CredentialAccessPort",
+        "createCredentialAccess",
+        "ChannelCredentials",
+        "createChannelCredentials"
+      ],
+      "test": [
+        "src/state/channel/channelCredentials.test.ts"
+      ],
       "budget": 240
     },
     {
       "module": "src/app/runtime/projectRuntimeSnapshots.ts",
       "owner": "project-runtime",
       "responsibility": "项目运行态待处理快照的只读投影与订阅发布。",
-      "owns": ["pending snapshot projection", "stable ordering and dedupe", "subscriber error isolation"],
-      "doesNotOwn": ["operation phase, project locks and runtime registrations", "prepare/commit/rollback/recovery", "completion event"],
-      "publicApi": ["ProjectRuntimeRegistry pending snapshot subscription and lookup"],
-      "test": ["src/app/runtime/projectRuntimeSnapshots.test.ts"],
+      "owns": [
+        "pending snapshot projection",
+        "stable ordering and dedupe",
+        "subscriber error isolation"
+      ],
+      "doesNotOwn": [
+        "operation phase, project locks and runtime registrations",
+        "prepare/commit/rollback/recovery",
+        "completion event"
+      ],
+      "publicApi": [
+        "ProjectRuntimeOperationPhase",
+        "ProjectRuntimePendingStatus",
+        "ProjectRuntimePendingOperation",
+        "ProjectRuntimeSnapshotSource",
+        "ProjectRuntimeSnapshotStore",
+        "projectRuntimePendingSnapshotOf",
+        "createProjectRuntimeSnapshotStore"
+      ],
+      "test": [
+        "src/app/runtime/projectRuntimeSnapshots.test.ts"
+      ],
       "budget": 210
     },
     {
       "module": "src/workbenches/canvas/execution/useCanvasRunRecorder.ts",
       "owner": "canvas-execution",
       "responsibility": "画布引擎外 RunRecord 追加、版本账本与融合记录构造。",
-      "owns": ["engine-external record append", "version ledger", "fusion record construction", "record change notification"],
-      "doesNotOwn": ["runEngine normal record construction", "recordScope", "operation lifecycle", "routing, cancellation or launch order"],
-      "publicApi": ["CanvasExecutionProvider run recorder hook"],
-      "test": ["src/workbenches/canvas/execution/useCanvasRunRecorder.test.ts"],
+      "owns": [
+        "engine-external record append",
+        "version ledger",
+        "fusion record construction",
+        "record change notification"
+      ],
+      "doesNotOwn": [
+        "runEngine normal record construction",
+        "recordScope",
+        "operation lifecycle",
+        "routing, cancellation or launch order"
+      ],
+      "publicApi": [
+        "CanvasRunRecorderInput",
+        "AppendFusionRunRecordInput",
+        "CanvasRunRecorder",
+        "fusionRunRecordSubjectId",
+        "createFusionRunRecord",
+        "useCanvasRunRecorder"
+      ],
+      "test": [
+        "src/workbenches/canvas/execution/useCanvasRunRecorder.test.ts"
+      ],
       "budget": 240
     },
     {
       "module": "src/app/runtime/projectOperationLock.ts",
       "owner": "project-operation-lock",
       "responsibility": "项目运行态操作的原子项目占用索引与 opaque owner token。",
-      "owns": ["atomic projectId claim", "exact-id lookup", "owner token and conditional release", "stable owner enumeration"],
-      "doesNotOwn": ["operation phase", "runtime registration", "commit/recovery/rollback", "pending snapshot"],
-      "publicApi": ["createProjectOperationLock", "ProjectOperationLockToken"],
-      "test": ["src/app/runtime/projectOperationLock.test.ts", "src/app/ProjectRuntimeRegistry.test.ts"],
+      "owns": [
+        "atomic projectId claim",
+        "exact-id lookup",
+        "owner token and conditional release",
+        "stable owner enumeration"
+      ],
+      "doesNotOwn": [
+        "operation phase",
+        "runtime registration",
+        "commit/recovery/rollback",
+        "pending snapshot"
+      ],
+      "publicApi": [
+        "createProjectOperationLock",
+        "ProjectOperationLockToken"
+      ],
+      "test": [
+        "src/app/runtime/projectOperationLock.test.ts",
+        "src/app/ProjectRuntimeRegistry.test.ts"
+      ],
       "budget": 120
     },
     {
       "module": "src/state/channel/channelRequestOrchestration.ts",
       "owner": "channel-request-orchestration",
       "responsibility": "编排渠道文本、语音、视频直连请求的上下文附加、trace 和 RunRecord 收口。",
-      "owns": ["上下文注入与冲突拒绝", "输入素材去重追加", "直连 RunRecord 与 route success 顺序", "语音与视频直连包装"],
-      "doesNotOwn": ["渠道状态与凭证", "生成客户端和适配器", "UI、Job 与页面文案"],
-      "publicApi": ["createChannelRequestOrchestration", "ChannelRequestOrchestration"],
-      "test": ["src/state/channel/channelRequestOrchestration.test.ts", "src/state/channel/channelStore.test.ts"],
+      "owns": [
+        "上下文注入与冲突拒绝",
+        "输入素材去重追加",
+        "直连 RunRecord 与 route success 顺序",
+        "语音与视频直连包装"
+      ],
+      "doesNotOwn": [
+        "渠道状态与凭证",
+        "生成客户端和适配器",
+        "UI、Job 与页面文案"
+      ],
+      "publicApi": [
+        "createChannelRequestOrchestration",
+        "ChannelRequestOrchestration"
+      ],
+      "test": [
+        "src/state/channel/channelRequestOrchestration.test.ts",
+        "src/state/channel/channelStore.test.ts"
+      ],
       "budget": 360
     },
     {
       "module": "src/workbenches/canvas/execution/canvasRunPreflight.ts",
       "owner": "canvas-execution",
       "responsibility": "画布运行前令牌检查、路由计划、适配器解析与批次失败收集。",
-      "owns": ["preflight result model", "adapter keys", "batch failure list", "task-to-channel projection"],
-      "doesNotOwn": ["node state application", "queued and startRun lifecycle", "cancellation owner", "RunRecord construction"],
-      "publicApi": ["prepareCanvasRun", "CanvasRunPreflightError", "canceledRun", "failedRun"],
-      "test": ["src/workbenches/canvas/execution/canvasRunPreflight.test.ts", "src/workbenches/canvas/execution/CanvasExecutionProvider.runPreflight.test.ts"],
+      "owns": [
+        "preflight result model",
+        "adapter keys",
+        "batch failure list",
+        "task-to-channel projection"
+      ],
+      "doesNotOwn": [
+        "node state application",
+        "queued and startRun lifecycle",
+        "cancellation owner",
+        "RunRecord construction"
+      ],
+      "publicApi": [
+        "prepareCanvasRun",
+        "CanvasRunPreflightError",
+        "canceledRun",
+        "failedRun"
+      ],
+      "test": [
+        "src/workbenches/canvas/execution/canvasRunPreflight.test.ts",
+        "src/workbenches/canvas/execution/CanvasExecutionProvider.runPreflight.test.ts"
+      ],
       "budget": 390
+    },
+    {
+      "module": "src/app/projectTree/ProjectTreeViews.tsx",
+      "owner": "project-navigation",
+      "responsibility": "渲染项目树分组、项目行、菜单按钮和删除确认层，并稳定工作台图标与展开按钮。",
+      "owns": [
+        "项目树分组与行状态",
+        "路径和文件命名",
+        "项目树动作端口"
+      ],
+      "doesNotOwn": [
+        "项目树 JSX 装配",
+        "项目运行态事务",
+        "项目仓储持久化"
+      ],
+      "publicApi": [
+        "PROJECT_ICON",
+        "ProjectDeleteConfirmActions",
+        "WorkbenchIcon",
+        "GroupRow",
+        "GroupExpandButton",
+        "ProjectRow",
+        "MenuButton",
+        "ModalLayer"
+      ],
+      "test": [
+        "src/app/projectTree/ProjectTreeViews.test.ts"
+      ],
+      "budget": 279
+    },
+    {
+      "module": "src/app/projectTree/treeMutationActions.ts",
+      "owner": "project-navigation",
+      "responsibility": "创建项目树新建、删除、移动、清空目录和清理重试动作，统一反馈状态与确认目标。",
+      "owns": [
+        "项目树分组与行状态",
+        "路径和文件命名",
+        "项目树动作端口"
+      ],
+      "doesNotOwn": [
+        "项目树 JSX 装配",
+        "项目运行态事务",
+        "项目仓储持久化"
+      ],
+      "publicApi": [
+        "ProjectTreeStatusTone",
+        "ProjectTreeStatus",
+        "ProjectTreeConfirmTarget",
+        "ProjectTreeMutationPorts",
+        "createProjectTreeMutationActions"
+      ],
+      "test": [
+        "src/app/projectTree/treeMutationActions.test.ts"
+      ],
+      "budget": 230
+    },
+    {
+      "module": "src/app/projectTree/treePathActions.ts",
+      "owner": "project-navigation",
+      "responsibility": "拼接项目树路径、生成安全文件名和本地目录，并把剪贴板操作映射成树状态。",
+      "owns": [
+        "项目树分组与行状态",
+        "路径和文件命名",
+        "项目树动作端口"
+      ],
+      "doesNotOwn": [
+        "项目树 JSX 装配",
+        "项目运行态事务",
+        "项目仓储持久化"
+      ],
+      "publicApi": [
+        "joinProjectPath",
+        "projectSafeFileName",
+        "projectLocalDirectory",
+        "ProjectTreeClipboard",
+        "ProjectTreePathStatus",
+        "ProjectTreePathActions",
+        "createProjectTreePathActions"
+      ],
+      "test": [
+        "src/app/projectTree/treePathActions.test.ts"
+      ],
+      "budget": 193
+    },
+    {
+      "module": "src/app/projectTree/treeProjection.ts",
+      "owner": "project-navigation",
+      "responsibility": "把项目与分组投影成可折叠窗口，并维护分组展开 id 的稳定顺序。",
+      "owns": [
+        "项目树分组与行状态",
+        "路径和文件命名",
+        "项目树动作端口"
+      ],
+      "doesNotOwn": [
+        "项目树 JSX 装配",
+        "项目运行态事务",
+        "项目仓储持久化"
+      ],
+      "publicApi": [
+        "ProjectTreeGroupWindow",
+        "ProjectTreeProjection",
+        "projectTreeProjection",
+        "toggleGroupId"
+      ],
+      "test": [
+        "src/app/projectTree/treeProjection.test.ts"
+      ],
+      "budget": 72
+    },
+    {
+      "module": "src/domain/agent/modelMessageWindow.ts",
+      "owner": "agent-history",
+      "responsibility": "按用户轮与成对工具结果裁剪模型消息，并固定保留首条有效用户需求。",
+      "owns": [
+        "模型消息窗口裁剪",
+        "首条用户需求保留",
+        "孤立工具消息清理"
+      ],
+      "doesNotOwn": [
+        "会话持久化",
+        "模型请求发送",
+        "Agent 面板渲染"
+      ],
+      "publicApi": [
+        "AGENT_CONTEXT_WINDOW",
+        "trimOrphanToolMessages",
+        "modelMessageWindow"
+      ],
+      "test": [
+        "src/domain/agent/modelMessageWindow.test.ts"
+      ],
+      "budget": 126
+    },
+    {
+      "module": "src/domain/storyboard/assetEditing.ts",
+      "owner": "storyboard-domain",
+      "responsibility": "维护漫剧角色与场景资产、资产合并以及镜头对场景和角色的引用。",
+      "owns": [
+        "漫剧文档模型",
+        "分集与镜头规则",
+        "资产和结果投影"
+      ],
+      "doesNotOwn": [
+        "视频上游请求",
+        "React 页面渲染",
+        "任务仓储事务"
+      ],
+      "publicApi": [
+        "addCharacter",
+        "addScene",
+        "updateCharacter",
+        "updateScene",
+        "removeCharacter",
+        "removeScene",
+        "mergeAsset",
+        "bindShotScene",
+        "toggleShotCharacter"
+      ],
+      "test": [
+        "src/domain/storyboard/assetEditing.test.ts"
+      ],
+      "budget": 232
+    },
+    {
+      "module": "src/domain/storyboard/editing.ts",
+      "owner": "storyboard-domain",
+      "responsibility": "编辑漫剧剧本、分集、镜头与台词，并保持镜头顺序和语音设置规则。",
+      "owns": [
+        "漫剧文档模型",
+        "分集与镜头规则",
+        "资产和结果投影"
+      ],
+      "doesNotOwn": [
+        "视频上游请求",
+        "React 页面渲染",
+        "任务仓储事务"
+      ],
+      "publicApi": [
+        "updateScript",
+        "updateSourceText",
+        "addEpisode",
+        "updateEpisode",
+        "removeEpisode",
+        "moveEpisode",
+        "addShot",
+        "updateShot",
+        "shotDialogueLines",
+        "shotDialogueTextOf",
+        "addShotLine",
+        "updateShotLine"
+      ],
+      "test": [
+        "src/domain/storyboard/editing.test.ts"
+      ],
+      "budget": 377
+    },
+    {
+      "module": "src/domain/storyboard/markdownExport.ts",
+      "owner": "storyboard-domain",
+      "responsibility": "把漫剧分集、镜头和台词规范化成可导出的 Markdown 表格文本。",
+      "owns": [
+        "漫剧文档模型",
+        "分集与镜头规则",
+        "资产和结果投影"
+      ],
+      "doesNotOwn": [
+        "视频上游请求",
+        "React 页面渲染",
+        "任务仓储事务"
+      ],
+      "publicApi": [
+        "cell",
+        "exportStoryboardMarkdown"
+      ],
+      "test": [
+        "src/domain/storyboard/markdownExport.test.ts"
+      ],
+      "budget": 101
+    },
+    {
+      "module": "src/domain/storyboard/mergesAndMirrors.ts",
+      "owner": "storyboard-domain",
+      "responsibility": "合并漫剧运行结果中的资产、镜头图片和视频，并同步节点引用与哈希镜像。",
+      "owns": [
+        "漫剧文档模型",
+        "分集与镜头规则",
+        "资产和结果投影"
+      ],
+      "doesNotOwn": [
+        "视频上游请求",
+        "React 页面渲染",
+        "任务仓储事务"
+      ],
+      "publicApi": [
+        "dismissMerge",
+        "setAssetNode",
+        "setAssetBaseHash",
+        "setAssetTurnaroundNode",
+        "setAssetTurnaroundHash",
+        "shotsNeedingNode",
+        "attachShotNodes",
+        "attachShotImages",
+        "setShotVideoNode",
+        "attachShotVideos",
+        "mergeStoryboardRunResults"
+      ],
+      "test": [
+        "src/domain/storyboard/mergesAndMirrors.test.ts"
+      ],
+      "budget": 316
+    },
+    {
+      "module": "src/domain/storyboard/model.ts",
+      "owner": "storyboard-domain",
+      "responsibility": "定义漫剧脚本、资产、分集与镜头模型，并提供空文档和时长音量边界。",
+      "owns": [
+        "漫剧文档模型",
+        "分集与镜头规则",
+        "资产和结果投影"
+      ],
+      "doesNotOwn": [
+        "视频上游请求",
+        "React 页面渲染",
+        "任务仓储事务"
+      ],
+      "publicApi": [
+        "StoryboardScript",
+        "DramaAsset",
+        "DramaCharacter",
+        "DramaScene",
+        "StoryboardLine",
+        "StoryboardEpisode",
+        "DEFAULT_BGM_VOLUME",
+        "DEFAULT_TRANSITION_SECONDS",
+        "MIN_TRANSITION_SECONDS",
+        "MAX_TRANSITION_SECONDS",
+        "clampTransitionSeconds",
+        "StoryboardShot"
+      ],
+      "test": [
+        "src/domain/storyboard/model.test.ts"
+      ],
+      "budget": 158
+    },
+    {
+      "module": "src/domain/storyboard/normalization.ts",
+      "owner": "storyboard-domain",
+      "responsibility": "从持久化文本解析并规范化漫剧文档，兼容旧字段与缺失集合。",
+      "owns": [
+        "漫剧文档模型",
+        "分集与镜头规则",
+        "资产和结果投影"
+      ],
+      "doesNotOwn": [
+        "视频上游请求",
+        "React 页面渲染",
+        "任务仓储事务"
+      ],
+      "publicApi": [
+        "parseStoryboard"
+      ],
+      "test": [
+        "src/domain/storyboard/normalization.test.ts"
+      ],
+      "budget": 242
+    },
+    {
+      "module": "src/domain/storyboard/presentation.ts",
+      "owner": "storyboard-domain",
+      "responsibility": "生成镜头提示词、资产提示词与参考图连线，并汇总漫剧统计信息。",
+      "owns": [
+        "漫剧文档模型",
+        "分集与镜头规则",
+        "资产和结果投影"
+      ],
+      "doesNotOwn": [
+        "视频上游请求",
+        "React 页面渲染",
+        "任务仓储事务"
+      ],
+      "publicApi": [
+        "ASSET_BLOCK_HEADER",
+        "shotPrompt",
+        "assetsOfShot",
+        "shotRefNodeIds",
+        "planShotRefEdges",
+        "shotPromptWithAssets",
+        "shotVideoPrompt",
+        "sceneNameOf",
+        "characterNamesOf",
+        "assetBasePrompt",
+        "assetTurnaroundPrompt",
+        "StoryboardStats"
+      ],
+      "test": [
+        "src/domain/storyboard/presentation.test.ts"
+      ],
+      "budget": 163
+    },
+    {
+      "module": "src/domain/storyboard/rules.ts",
+      "owner": "storyboard-domain",
+      "responsibility": "提供漫剧角色与场景的配对键和资产清单归一规则。",
+      "owns": [
+        "漫剧文档模型",
+        "分集与镜头规则",
+        "资产和结果投影"
+      ],
+      "doesNotOwn": [
+        "视频上游请求",
+        "React 页面渲染",
+        "任务仓储事务"
+      ],
+      "publicApi": [
+        "pairKey",
+        "AssetKind",
+        "assetListOf"
+      ],
+      "test": [
+        "src/domain/storyboard/rules.test.ts"
+      ],
+      "budget": 31
+    },
+    {
+      "module": "src/domain/storyboard/shotOrdering.ts",
+      "owner": "storyboard-domain",
+      "responsibility": "按分集顺序归一分镜编号，并提供稳定的镜头读取顺序。",
+      "owns": [
+        "漫剧文档模型",
+        "分集与镜头规则",
+        "资产和结果投影"
+      ],
+      "doesNotOwn": [
+        "视频上游请求",
+        "React 页面渲染",
+        "任务仓储事务"
+      ],
+      "publicApi": [
+        "normalizeShotOrder",
+        "shotsOf"
+      ],
+      "test": [
+        "src/domain/storyboard/shotOrdering.test.ts"
+      ],
+      "budget": 38
+    },
+    {
+      "module": "src/pages/AssetsPage/AssetsMasonry.module.css",
+      "owner": "asset-library-ui",
+      "responsibility": "定义素材页瀑布流网格与素材项的自适应列宽、间距和媒体容器样式。",
+      "owns": [
+        "素材列表布局样式",
+        "上下文套件草稿与图片持久化",
+        "预览和弹窗样式"
+      ],
+      "doesNotOwn": [
+        "素材字节仓储实现",
+        "Agent 请求发送",
+        "生成执行队列"
+      ],
+      "publicApi": [
+        "CSS_MODULE:AssetsMasonry 的页面局部样式域",
+        "CSS_CLASS:grid",
+        "CSS_CLASS:masonryItem"
+      ],
+      "test": [
+        "src/pages/AssetsPage/assetsPageCssArchitecture.test.ts"
+      ],
+      "budget": 39
+    },
+    {
+      "module": "src/pages/AssetsPage/AssetsPageCards.module.css",
+      "owner": "asset-library-ui",
+      "responsibility": "定义素材页列表卡片、统一网格、缩略图、标签和渠道信息样式。",
+      "owns": [
+        "素材列表布局样式",
+        "上下文套件草稿与图片持久化",
+        "预览和弹窗样式"
+      ],
+      "doesNotOwn": [
+        "素材字节仓储实现",
+        "Agent 请求发送",
+        "生成执行队列"
+      ],
+      "publicApi": [
+        "CSS_MODULE:AssetsPageCards 的页面局部样式域",
+        "CSS_CLASS:list",
+        "CSS_CLASS:uniformGrid",
+        "CSS_CLASS:cardMain",
+        "CSS_CLASS:thumb",
+        "CSS_CLASS:media"
+      ],
+      "test": [
+        "src/pages/AssetsPage/assetsPageCssArchitecture.test.ts"
+      ],
+      "budget": 387
+    },
+    {
+      "module": "src/pages/AssetsPage/AssetsPagePreview.module.css",
+      "owner": "asset-library-ui",
+      "responsibility": "定义素材预览遮罩、左右切换、计数、媒体舞台和详情面板样式。",
+      "owns": [
+        "素材列表布局样式",
+        "上下文套件草稿与图片持久化",
+        "预览和弹窗样式"
+      ],
+      "doesNotOwn": [
+        "素材字节仓储实现",
+        "Agent 请求发送",
+        "生成执行队列"
+      ],
+      "publicApi": [
+        "CSS_MODULE:AssetsPagePreview 的页面局部样式域",
+        "CSS_CLASS:overlay",
+        "CSS_CLASS:previewPanel",
+        "CSS_CLASS:previewStage",
+        "CSS_CLASS:previewNav",
+        "CSS_CLASS:previewNavPrev"
+      ],
+      "test": [
+        "src/pages/AssetsPage/assetsPageCssArchitecture.test.ts"
+      ],
+      "budget": 541
+    },
+    {
+      "module": "src/pages/AssetsPage/AssetsPageShell.module.css",
+      "owner": "asset-library-ui",
+      "responsibility": "定义素材页外框、导航栏、标题、工具栏、侧栏与主内容区域样式。",
+      "owns": [
+        "素材列表布局样式",
+        "上下文套件草稿与图片持久化",
+        "预览和弹窗样式"
+      ],
+      "doesNotOwn": [
+        "素材字节仓储实现",
+        "Agent 请求发送",
+        "生成执行队列"
+      ],
+      "publicApi": [
+        "CSS_MODULE:AssetsPageShell 的页面局部样式域",
+        "CSS_CLASS:page",
+        "CSS_CLASS:head",
+        "CSS_CLASS:toolbar",
+        "CSS_CLASS:body",
+        "CSS_CLASS:rail"
+      ],
+      "test": [
+        "src/pages/AssetsPage/assetsPageCssArchitecture.test.ts"
+      ],
+      "budget": 429
+    },
+    {
+      "module": "src/pages/AssetsPage/AssetsPageShellDetails.module.css",
+      "owner": "asset-library-ui",
+      "responsibility": "定义素材页搜索、计数、网格空态、删除确认与遮罩细节样式。",
+      "owns": [
+        "素材列表布局样式",
+        "上下文套件草稿与图片持久化",
+        "预览和弹窗样式"
+      ],
+      "doesNotOwn": [
+        "素材字节仓储实现",
+        "Agent 请求发送",
+        "生成执行队列"
+      ],
+      "publicApi": [
+        "CSS_MODULE:AssetsPageShellDetails 的页面局部样式域",
+        "CSS_CLASS:sectionTitle",
+        "CSS_CLASS:search",
+        "CSS_CLASS:count",
+        "CSS_CLASS:ts",
+        "CSS_CLASS:masonryItem"
+      ],
+      "test": [
+        "src/pages/AssetsPage/assetsPageCssArchitecture.test.ts"
+      ],
+      "budget": 284
+    },
+    {
+      "module": "src/pages/AssetsPage/contextKitDraft.ts",
+      "owner": "asset-library-ui",
+      "responsibility": "维护上下文套件草稿、颜色字体事实、旧数据兼容和版本标签。",
+      "owns": [
+        "素材列表布局样式",
+        "上下文套件草稿与图片持久化",
+        "预览和弹窗样式"
+      ],
+      "doesNotOwn": [
+        "素材字节仓储实现",
+        "Agent 请求发送",
+        "生成执行队列"
+      ],
+      "publicApi": [
+        "KIT_KINDS",
+        "KIT_COPY",
+        "MAX_ASSET_BYTES",
+        "COLOR_FACT_PREFIX",
+        "FONT_FACT_PREFIX",
+        "Draft",
+        "EMPTY_DRAFT",
+        "legacyColors",
+        "legacyFonts",
+        "draftFromVersion",
+        "factsForDraft",
+        "versionLabel"
+      ],
+      "test": [
+        "src/pages/AssetsPage/contextKitsPublicApi.test.ts"
+      ],
+      "budget": 156
+    },
+    {
+      "module": "src/pages/AssetsPage/contextKitPersistence.ts",
+      "owner": "asset-library-ui",
+      "responsibility": "把上下文套件草稿中的图片写入素材平台并返回可持久化的素材哈希。",
+      "owns": [
+        "素材列表布局样式",
+        "上下文套件草稿与图片持久化",
+        "预览和弹窗样式"
+      ],
+      "doesNotOwn": [
+        "素材字节仓储实现",
+        "Agent 请求发送",
+        "生成执行队列"
+      ],
+      "publicApi": [
+        "ContextKitStoragePort",
+        "persistContextKitImage"
+      ],
+      "test": [
+        "src/pages/AssetsPage/contextKitsPublicApi.test.ts"
+      ],
+      "budget": 71
+    },
+    {
+      "module": "src/pages/AssetsPage/ContextKitsAssets.module.css",
+      "owner": "asset-library-ui",
+      "responsibility": "定义上下文套件图片拖拽区、上传提示、URL 输入和小按钮样式。",
+      "owns": [
+        "素材列表布局样式",
+        "上下文套件草稿与图片持久化",
+        "预览和弹窗样式"
+      ],
+      "doesNotOwn": [
+        "素材字节仓储实现",
+        "Agent 请求发送",
+        "生成执行队列"
+      ],
+      "publicApi": [
+        "CSS_MODULE:ContextKitsAssets 的页面局部样式域",
+        "CSS_CLASS:dropzone",
+        "CSS_CLASS:dropzoneOn",
+        "CSS_CLASS:uploadIcon",
+        "CSS_CLASS:dropCopy",
+        "CSS_CLASS:dropActions"
+      ],
+      "test": [
+        "src/pages/AssetsPage/assetsPageCssArchitecture.test.ts"
+      ],
+      "budget": 252
+    },
+    {
+      "module": "src/pages/AssetsPage/ContextKitsEditor.module.css",
+      "owner": "asset-library-ui",
+      "responsibility": "定义上下文套件编辑分区、颜色网格、字体选项和删除控件样式。",
+      "owns": [
+        "素材列表布局样式",
+        "上下文套件草稿与图片持久化",
+        "预览和弹窗样式"
+      ],
+      "doesNotOwn": [
+        "素材字节仓储实现",
+        "Agent 请求发送",
+        "生成执行队列"
+      ],
+      "publicApi": [
+        "CSS_MODULE:ContextKitsEditor 的页面局部样式域",
+        "CSS_CLASS:section",
+        "CSS_CLASS:sectionHead",
+        "CSS_CLASS:addButton",
+        "CSS_CLASS:guide",
+        "CSS_CLASS:sectionEmpty"
+      ],
+      "test": [
+        "src/pages/AssetsPage/assetsPageCssArchitecture.test.ts"
+      ],
+      "budget": 334
+    },
+    {
+      "module": "src/pages/AssetsPage/ContextKitsShell.module.css",
+      "owner": "asset-library-ui",
+      "responsibility": "定义上下文套件弹窗、类型标签、项目选择、侧栏和工作区布局样式。",
+      "owns": [
+        "素材列表布局样式",
+        "上下文套件草稿与图片持久化",
+        "预览和弹窗样式"
+      ],
+      "doesNotOwn": [
+        "素材字节仓储实现",
+        "Agent 请求发送",
+        "生成执行队列"
+      ],
+      "publicApi": [
+        "CSS_MODULE:ContextKitsShell 的页面局部样式域",
+        "CSS_CLASS:scrim",
+        "CSS_CLASS:panel",
+        "CSS_CLASS:head",
+        "CSS_CLASS:section",
+        "CSS_CLASS:eyebrow"
+      ],
+      "test": [
+        "src/pages/AssetsPage/assetsPageCssArchitecture.test.ts"
+      ],
+      "budget": 486
+    },
+    {
+      "module": "src/pages/EcommercePage/ecommercePageSupport.ts",
+      "owner": "ecommerce-workflow",
+      "responsibility": "推导电商遗留节点素材、最新结果、显示状态、图片参数和批次标识。",
+      "owns": [
+        "电商结果投影",
+        "工作台几何与工具视图",
+        "电商页面辅助规则"
+      ],
+      "doesNotOwn": [
+        "渠道请求发送",
+        "任务仓储事务",
+        "Studio 表单状态"
+      ],
+      "publicApi": [
+        "LegacyGenerationNode",
+        "legacyAssetHashesOfNode",
+        "freshestWorkbenchResults",
+        "ecommerceResultDisplayStatus",
+        "ecommerceImageParamOptionsByModel",
+        "ecommerceVisualInputsOf",
+        "ecommerceBatchId",
+        "ecommerceSubjectId",
+        "EcommerceResultRecord"
+      ],
+      "test": [
+        "src/pages/EcommercePage/ecommercePageModuleCoverage.test.ts"
+      ],
+      "budget": 120
+    },
+    {
+      "module": "src/pages/EcommercePage/EcommerceWorkbenchViews.tsx",
+      "owner": "ecommerce-workflow",
+      "responsibility": "渲染电商工作台工具图标、媒体类型、耗时标签和结果占位视图。",
+      "owns": [
+        "电商结果投影",
+        "工作台几何与工具视图",
+        "电商页面辅助规则"
+      ],
+      "doesNotOwn": [
+        "渠道请求发送",
+        "任务仓储事务",
+        "Studio 表单状态"
+      ],
+      "publicApi": [
+        "WorkbenchTool",
+        "ToolIcon",
+        "WorkbenchMedia",
+        "elapsedLabel",
+        "WorkbenchResultPlaceholder"
+      ],
+      "test": [
+        "src/pages/EcommercePage/ecommercePagePublicApi.test.ts"
+      ],
+      "budget": 313
+    },
+    {
+      "module": "src/pages/EcommercePage/workbenchGeometry.ts",
+      "owner": "ecommerce-workflow",
+      "responsibility": "计算电商工作台视口、缩放、平移、屏幕矩形和小地图投影。",
+      "owns": [
+        "电商结果投影",
+        "工作台几何与工具视图",
+        "电商页面辅助规则"
+      ],
+      "doesNotOwn": [
+        "渠道请求发送",
+        "任务仓储事务",
+        "Studio 表单状态"
+      ],
+      "publicApi": [
+        "Viewport",
+        "Point",
+        "ResizeHandle",
+        "MIN_SCALE",
+        "MAX_SCALE",
+        "MIN_ITEM_SIZE",
+        "MINIMAP_WIDTH",
+        "MINIMAP_HEIGHT",
+        "MINIMAP_PADDING",
+        "clamp",
+        "toCanvasViewport",
+        "fromCanvasViewport"
+      ],
+      "test": [
+        "src/pages/EcommercePage/ecommercePageModuleCoverage.test.ts"
+      ],
+      "budget": 141
+    },
+    {
+      "module": "src/pages/EcommercePage/workbenchResultProjection.ts",
+      "owner": "ecommerce-workflow",
+      "responsibility": "把电商运行记录投影成工作台结果项，并归一生成结果显示状态。",
+      "owns": [
+        "电商结果投影",
+        "工作台几何与工具视图",
+        "电商页面辅助规则"
+      ],
+      "doesNotOwn": [
+        "渠道请求发送",
+        "任务仓储事务",
+        "Studio 表单状态"
+      ],
+      "publicApi": [
+        "WorkbenchResultProjection",
+        "projectWorkbenchResults",
+        "workbenchDisplayStatusOf"
+      ],
+      "test": [
+        "src/pages/EcommercePage/ecommercePageModuleCoverage.test.ts"
+      ],
+      "budget": 65
+    },
+    {
+      "module": "src/pages/ProjectsPage/projectDeletionCoordinator.ts",
+      "owner": "project-list-ui",
+      "responsibility": "协调项目删除、运行态占用清理和失败重试，并生成用户可见通知。",
+      "owns": [
+        "项目列表投影与选择",
+        "删除运行态协调",
+        "项目卡片和工具栏样式"
+      ],
+      "doesNotOwn": [
+        "项目运行锁实现",
+        "项目数据持久化",
+        "画布执行 Provider"
+      ],
+      "publicApi": [
+        "ProjectDeletionNotice",
+        "DeleteProjectPorts",
+        "RetryCleanupPorts",
+        "reportDeleteFailure",
+        "deleteProjectsWithRuntime",
+        "retryProjectCleanup"
+      ],
+      "test": [
+        "src/pages/ProjectsPage/projectDeletionCoordinator.test.ts"
+      ],
+      "budget": 92
+    },
+    {
+      "module": "src/pages/ProjectsPage/projectListProjection.ts",
+      "owner": "project-list-ui",
+      "responsibility": "按类型统计与过滤项目列表，并生成项目卡片展示元数据。",
+      "owns": [
+        "项目列表投影与选择",
+        "删除运行态协调",
+        "项目卡片和工具栏样式"
+      ],
+      "doesNotOwn": [
+        "项目运行锁实现",
+        "项目数据持久化",
+        "画布执行 Provider"
+      ],
+      "publicApi": [
+        "ProjectKind",
+        "ProjectKindOption",
+        "PROJECT_KIND_ORDER",
+        "projectKindCounts",
+        "projectsForKind",
+        "projectCardMeta"
+      ],
+      "test": [
+        "src/pages/ProjectsPage/projectListProjection.test.ts"
+      ],
+      "budget": 65
+    },
+    {
+      "module": "src/pages/ProjectsPage/projectResultPresentation.ts",
+      "owner": "project-list-ui",
+      "responsibility": "把导入、删除、回收站恢复和清理失败映射成项目页通知文案。",
+      "owns": [
+        "项目列表投影与选择",
+        "删除运行态协调",
+        "项目卡片和工具栏样式"
+      ],
+      "doesNotOwn": [
+        "项目运行锁实现",
+        "项目数据持久化",
+        "画布执行 Provider"
+      ],
+      "publicApi": [
+        "ProjectNotice",
+        "importResultNotice",
+        "projectFailureNotice",
+        "deletionNotice",
+        "trashRestoreNotice",
+        "projectCleanupNotice"
+      ],
+      "test": [
+        "src/pages/ProjectsPage/projectResultPresentation.test.ts"
+      ],
+      "budget": 69
+    },
+    {
+      "module": "src/pages/ProjectsPage/projectSelectionModel.ts",
+      "owner": "project-list-ui",
+      "responsibility": "维护项目多选、回收站选择和保留天数窗口的投影计算。",
+      "owns": [
+        "项目列表投影与选择",
+        "删除运行态协调",
+        "项目卡片和工具栏样式"
+      ],
+      "doesNotOwn": [
+        "项目运行锁实现",
+        "项目数据持久化",
+        "画布执行 Provider"
+      ],
+      "publicApi": [
+        "TRASH_KEEP_DAYS",
+        "TrashSelectionWindow",
+        "TrashProjection",
+        "toggleVisibleProjects",
+        "toggleTrashItem",
+        "selectAllTrash",
+        "pruneTrashSelection",
+        "trashProjection"
+      ],
+      "test": [
+        "src/pages/ProjectsPage/projectSelectionModel.test.ts"
+      ],
+      "budget": 118
+    },
+    {
+      "module": "src/pages/ProjectsPage/ProjectsPageCards.module.css",
+      "owner": "project-list-ui",
+      "responsibility": "定义项目卡片、选中态、缩略图、重命名输入和操作菜单样式。",
+      "owns": [
+        "项目列表投影与选择",
+        "删除运行态协调",
+        "项目卡片和工具栏样式"
+      ],
+      "doesNotOwn": [
+        "项目运行锁实现",
+        "项目数据持久化",
+        "画布执行 Provider"
+      ],
+      "publicApi": [
+        "CSS_MODULE:ProjectsPageCards 的页面局部样式域",
+        "CSS_CLASS:card",
+        "CSS_CLASS:cardSelected",
+        "CSS_CLASS:thumb",
+        "CSS_CLASS:cover",
+        "CSS_CLASS:cardBody"
+      ],
+      "test": [
+        "src/pages/ProjectsPage/projectsPageCssArchitecture.test.ts"
+      ],
+      "budget": 309
+    },
+    {
+      "module": "src/pages/ProjectsPage/ProjectsPageOverlays.module.css",
+      "owner": "project-list-ui",
+      "responsibility": "定义新建菜单、菜单遮罩、批量操作条和危险操作按钮样式。",
+      "owns": [
+        "项目列表投影与选择",
+        "删除运行态协调",
+        "项目卡片和工具栏样式"
+      ],
+      "doesNotOwn": [
+        "项目运行锁实现",
+        "项目数据持久化",
+        "画布执行 Provider"
+      ],
+      "publicApi": [
+        "CSS_MODULE:ProjectsPageOverlays 的页面局部样式域",
+        "CSS_CLASS:menuBackdrop",
+        "CSS_CLASS:newMenu",
+        "CSS_CLASS:menuItem",
+        "CSS_CLASS:newBtnGhost",
+        "CSS_CLASS:bulkBar"
+      ],
+      "test": [
+        "src/pages/ProjectsPage/projectsPageCssArchitecture.test.ts"
+      ],
+      "budget": 138
+    },
+    {
+      "module": "src/pages/ProjectsPage/ProjectsPageShell.module.css",
+      "owner": "project-list-ui",
+      "responsibility": "定义项目页顶栏、品牌、按钮、主内容、分区标题和空态样式。",
+      "owns": [
+        "项目列表投影与选择",
+        "删除运行态协调",
+        "项目卡片和工具栏样式"
+      ],
+      "doesNotOwn": [
+        "项目运行锁实现",
+        "项目数据持久化",
+        "画布执行 Provider"
+      ],
+      "publicApi": [
+        "CSS_MODULE:ProjectsPageShell 的页面局部样式域",
+        "CSS_CLASS:page",
+        "CSS_CLASS:main",
+        "CSS_CLASS:topbar",
+        "CSS_CLASS:topbarRight",
+        "CSS_CLASS:brand"
+      ],
+      "test": [
+        "src/pages/ProjectsPage/projectsPageCssArchitecture.test.ts"
+      ],
+      "budget": 282
+    },
+    {
+      "module": "src/pages/ProjectsPage/ProjectsPageToolbar.module.css",
+      "owner": "project-list-ui",
+      "responsibility": "定义项目类型筛选、选择开关、搜索、排序和导入按钮样式。",
+      "owns": [
+        "项目列表投影与选择",
+        "删除运行态协调",
+        "项目卡片和工具栏样式"
+      ],
+      "doesNotOwn": [
+        "项目运行锁实现",
+        "项目数据持久化",
+        "画布执行 Provider"
+      ],
+      "publicApi": [
+        "CSS_MODULE:ProjectsPageToolbar 的页面局部样式域",
+        "CSS_CLASS:kindFilter",
+        "CSS_CLASS:kindBtn",
+        "CSS_CLASS:kindBtnOn",
+        "CSS_CLASS:kindCount",
+        "CSS_CLASS:selectToggle"
+      ],
+      "test": [
+        "src/pages/ProjectsPage/projectsPageCssArchitecture.test.ts"
+      ],
+      "budget": 155
+    },
+    {
+      "module": "src/pages/ProjectsPage/ProjectsPageTrash.module.css",
+      "owner": "project-list-ui",
+      "responsibility": "定义回收站面板、列表项、选中态、批量操作和危险按钮样式。",
+      "owns": [
+        "项目列表投影与选择",
+        "删除运行态协调",
+        "项目卡片和工具栏样式"
+      ],
+      "doesNotOwn": [
+        "项目运行锁实现",
+        "项目数据持久化",
+        "画布执行 Provider"
+      ],
+      "publicApi": [
+        "CSS_MODULE:ProjectsPageTrash 的页面局部样式域",
+        "CSS_CLASS:trashPanel",
+        "CSS_CLASS:trashHead",
+        "CSS_CLASS:trashTitle",
+        "CSS_CLASS:trashHint",
+        "CSS_CLASS:trashEmpty"
+      ],
+      "test": [
+        "src/pages/ProjectsPage/projectsPageCssArchitecture.test.ts"
+      ],
+      "budget": 168
+    },
+    {
+      "module": "src/pages/ProjectsPage/ProjectsPageViews.tsx",
+      "owner": "project-list-ui",
+      "responsibility": "渲染项目页空状态、项目卡片、图标选择、确认图标和删除图标。",
+      "owns": [
+        "项目列表投影与选择",
+        "删除运行态协调",
+        "项目卡片和工具栏样式"
+      ],
+      "doesNotOwn": [
+        "项目运行锁实现",
+        "项目数据持久化",
+        "画布执行 Provider"
+      ],
+      "publicApi": [
+        "HomeEmptyState",
+        "ProjectCard",
+        "IconSelect",
+        "IconCheck",
+        "IconTrash"
+      ],
+      "test": [
+        "src/pages/ProjectsPage/projectsPagePublicApi.test.ts"
+      ],
+      "budget": 303
+    },
+    {
+      "module": "src/pages/SettingsPage/SettingsAppearanceSystem.module.css",
+      "owner": "settings-ui",
+      "responsibility": "定义设置页渠道菜单、资料抽屉、头像预览和外观分区样式。",
+      "owns": [
+        "设置页样式分区",
+        "渠道头像和令牌控件",
+        "路由候选与焦点规则"
+      ],
+      "doesNotOwn": [
+        "渠道 CRUD 事务",
+        "凭证明文存储",
+        "模型路由请求执行"
+      ],
+      "publicApi": [
+        "CSS_MODULE:SettingsAppearanceSystem 的页面局部样式域",
+        "CSS_CLASS:channelContextMenu",
+        "CSS_CLASS:channelMenuItem",
+        "CSS_CLASS:channelMenuItemDanger",
+        "CSS_CLASS:channelMenuConfirmText",
+        "CSS_CLASS:profileDrawerLayer"
+      ],
+      "test": [
+        "src/pages/SettingsPage/settingsPageCssArchitecture.test.ts"
+      ],
+      "budget": 342
+    },
+    {
+      "module": "src/pages/SettingsPage/SettingsChannelAvatar.tsx",
+      "owner": "settings-ui",
+      "responsibility": "渲染设置页渠道头像，按渠道图标或名称首字母生成展示。",
+      "owns": [
+        "设置页样式分区",
+        "渠道头像和令牌控件",
+        "路由候选与焦点规则"
+      ],
+      "doesNotOwn": [
+        "渠道 CRUD 事务",
+        "凭证明文存储",
+        "模型路由请求执行"
+      ],
+      "publicApi": [
+        "SettingsChannelAvatar"
+      ],
+      "test": [
+        "src/pages/SettingsPage/settingsPagePublicApi.test.ts"
+      ],
+      "budget": 69
+    },
+    {
+      "module": "src/pages/SettingsPage/SettingsChannelForm.module.css",
+      "owner": "settings-ui",
+      "responsibility": "定义渠道编辑表单、供应商头部、分组卡片、字段和控件布局样式。",
+      "owns": [
+        "设置页样式分区",
+        "渠道头像和令牌控件",
+        "路由候选与焦点规则"
+      ],
+      "doesNotOwn": [
+        "渠道 CRUD 事务",
+        "凭证明文存储",
+        "模型路由请求执行"
+      ],
+      "publicApi": [
+        "CSS_MODULE:SettingsChannelForm 的页面局部样式域",
+        "CSS_CLASS:editor",
+        "CSS_CLASS:shell",
+        "CSS_CLASS:placeholder",
+        "CSS_CLASS:form",
+        "CSS_CLASS:providerEditorHead"
+      ],
+      "test": [
+        "src/pages/SettingsPage/settingsPageCssArchitecture.test.ts"
+      ],
+      "budget": 571
+    },
+    {
+      "module": "src/pages/SettingsPage/SettingsChannelList.module.css",
+      "owner": "settings-ui",
+      "responsibility": "定义设置页渠道列表、预设渠道栏、搜索、工作区和侧栏布局样式。",
+      "owns": [
+        "设置页样式分区",
+        "渠道头像和令牌控件",
+        "路由候选与焦点规则"
+      ],
+      "doesNotOwn": [
+        "渠道 CRUD 事务",
+        "凭证明文存储",
+        "模型路由请求执行"
+      ],
+      "publicApi": [
+        "CSS_MODULE:SettingsChannelList 的页面局部样式域",
+        "CSS_CLASS:page",
+        "CSS_CLASS:topbar",
+        "CSS_CLASS:back",
+        "CSS_CLASS:heading",
+        "CSS_CLASS:tsx"
+      ],
+      "test": [
+        "src/pages/SettingsPage/settingsPageCssArchitecture.test.ts"
+      ],
+      "budget": 561
+    },
+    {
+      "module": "src/pages/SettingsPage/SettingsChannelListDetails.module.css",
+      "owner": "settings-ui",
+      "responsibility": "定义渠道列表项、字母色调、启停圆点、拖拽手柄和详情样式。",
+      "owns": [
+        "设置页样式分区",
+        "渠道头像和令牌控件",
+        "路由候选与焦点规则"
+      ],
+      "doesNotOwn": [
+        "渠道 CRUD 事务",
+        "凭证明文存储",
+        "模型路由请求执行"
+      ],
+      "publicApi": [
+        "CSS_MODULE:SettingsChannelListDetails 的页面局部样式域",
+        "CSS_CLASS:monogramTone2",
+        "CSS_CLASS:monogramTone3",
+        "CSS_CLASS:monogramTone4",
+        "CSS_CLASS:monogramTone5",
+        "CSS_CLASS:itemBody"
+      ],
+      "test": [
+        "src/pages/SettingsPage/settingsPageCssArchitecture.test.ts"
+      ],
+      "budget": 457
+    },
+    {
+      "module": "src/pages/SettingsPage/SettingsChannelTokenField.tsx",
+      "owner": "settings-ui",
+      "responsibility": "渲染渠道令牌输入行，并控制明密文切换与按钮可访问状态。",
+      "owns": [
+        "设置页样式分区",
+        "渠道头像和令牌控件",
+        "路由候选与焦点规则"
+      ],
+      "doesNotOwn": [
+        "渠道 CRUD 事务",
+        "凭证明文存储",
+        "模型路由请求执行"
+      ],
+      "publicApi": [
+        "ChannelTokenField"
+      ],
+      "test": [
+        "src/pages/SettingsPage/settingsPagePublicApi.test.ts"
+      ],
+      "budget": 199
+    },
+    {
+      "module": "src/pages/SettingsPage/SettingsModelMapping.module.css",
+      "owner": "settings-ui",
+      "responsibility": "定义模型映射标题、已选分组、标签、过滤器、面板与表格样式。",
+      "owns": [
+        "设置页样式分区",
+        "渠道头像和令牌控件",
+        "路由候选与焦点规则"
+      ],
+      "doesNotOwn": [
+        "渠道 CRUD 事务",
+        "凭证明文存储",
+        "模型路由请求执行"
+      ],
+      "publicApi": [
+        "CSS_MODULE:SettingsModelMapping 的页面局部样式域",
+        "CSS_CLASS:modelsHead",
+        "CSS_CLASS:modelsTitleBox",
+        "CSS_CLASS:modelsSub",
+        "CSS_CLASS:modelsEmpty",
+        "CSS_CLASS:selectedGroups"
+      ],
+      "test": [
+        "src/pages/SettingsPage/settingsPageCssArchitecture.test.ts"
+      ],
+      "budget": 433
+    },
+    {
+      "module": "src/pages/SettingsPage/settingsPageConstants.ts",
+      "owner": "settings-ui",
+      "responsibility": "提供设置页过滤器、协议分组、渠道首字母、色调和抽屉尺寸规则。",
+      "owns": [
+        "设置页样式分区",
+        "渠道头像和令牌控件",
+        "路由候选与焦点规则"
+      ],
+      "doesNotOwn": [
+        "渠道 CRUD 事务",
+        "凭证明文存储",
+        "模型路由请求执行"
+      ],
+      "publicApi": [
+        "MAP_FILTERS",
+        "MapFilterKey",
+        "ChannelFilterKey",
+        "CHANNEL_FILTER_OPTIONS",
+        "channelInitial",
+        "channelMonogramTone",
+        "measureProfileDrawerBounds",
+        "GLOBAL_MODEL_VENDORS",
+        "PROTOCOL_GROUPS",
+        "PresetModel",
+        "PresetVendor"
+      ],
+      "test": [
+        "src/pages/SettingsPage/settingsPageConstants.test.ts"
+      ],
+      "budget": 135
+    },
+    {
+      "module": "src/pages/SettingsPage/settingsPageOverlayRules.ts",
+      "owner": "settings-ui",
+      "responsibility": "处理渠道菜单箭头键和资料抽屉 Tab 焦点的循环与边界规则。",
+      "owns": [
+        "设置页样式分区",
+        "渠道头像和令牌控件",
+        "路由候选与焦点规则"
+      ],
+      "doesNotOwn": [
+        "渠道 CRUD 事务",
+        "凭证明文存储",
+        "模型路由请求执行"
+      ],
+      "publicApi": [
+        "channelMenuArrowFocus",
+        "drawerTabFocus"
+      ],
+      "test": [
+        "src/pages/SettingsPage/settingsPagePublicApi.test.ts"
+      ],
+      "budget": 52
+    },
+    {
+      "module": "src/pages/SettingsPage/settingsPageRoutingRules.ts",
+      "owner": "settings-ui",
+      "responsibility": "投影路由候选行、渠道分组、选中键和合法候选，并计算菜单几何。",
+      "owns": [
+        "设置页样式分区",
+        "渠道头像和令牌控件",
+        "路由候选与焦点规则"
+      ],
+      "doesNotOwn": [
+        "渠道 CRUD 事务",
+        "凭证明文存储",
+        "模型路由请求执行"
+      ],
+      "publicApi": [
+        "RouteCandidateRow",
+        "RoutingChannelGroup",
+        "routingCandidatesFor",
+        "routingChannelGroupsFor",
+        "selectedRoutingKeysFor",
+        "nextAllowedCandidatesFor",
+        "channelMenuGeometry"
+      ],
+      "test": [
+        "src/pages/SettingsPage/settingsPageRoutingRules.test.ts"
+      ],
+      "budget": 121
+    },
+    {
+      "module": "src/pages/SettingsPage/SettingsRoutePolicy.module.css",
+      "owner": "settings-ui",
+      "responsibility": "定义全局路由、范围按钮、渠道勾选面板和候选列表样式。",
+      "owns": [
+        "设置页样式分区",
+        "渠道头像和令牌控件",
+        "路由候选与焦点规则"
+      ],
+      "doesNotOwn": [
+        "渠道 CRUD 事务",
+        "凭证明文存储",
+        "模型路由请求执行"
+      ],
+      "publicApi": [
+        "CSS_MODULE:SettingsRoutePolicy 的页面局部样式域",
+        "CSS_CLASS:globalRoute",
+        "CSS_CLASS:workarea",
+        "CSS_CLASS:globalRouteText",
+        "CSS_CLASS:globalRouteControls",
+        "CSS_CLASS:routeScopeButton"
+      ],
+      "test": [
+        "src/pages/SettingsPage/settingsPageCssArchitecture.test.ts"
+      ],
+      "budget": 342
+    },
+    {
+      "module": "src/pages/SkillsPage/SkillsDetailEditor.module.css",
+      "owner": "skills-ui",
+      "responsibility": "定义技能详情弹窗、编辑表单、预览媒体、提示和动作栏样式。",
+      "owns": [
+        "技能页弹窗与卡片样式",
+        "共享表单控件样式",
+        "技能页阶段布局"
+      ],
+      "doesNotOwn": [
+        "技能文件读写",
+        "技能执行调度",
+        "素材仓储"
+      ],
+      "publicApi": [
+        "CSS_MODULE:SkillsDetailEditor 的页面局部样式域",
+        "CSS_CLASS:mediaBadge",
+        "CSS_CLASS:noticeOk",
+        "CSS_CLASS:noticeErr",
+        "CSS_CLASS:editor",
+        "CSS_CLASS:field"
+      ],
+      "test": [
+        "src/pages/SkillsPage/skillsPageCssArchitecture.test.ts"
+      ],
+      "budget": 402
+    },
+    {
+      "module": "src/pages/SkillsPage/SkillsPageCards.module.css",
+      "owner": "skills-ui",
+      "responsibility": "定义技能卡片操作图标、收藏态、使用按钮和详情按钮样式。",
+      "owns": [
+        "技能页弹窗与卡片样式",
+        "共享表单控件样式",
+        "技能页阶段布局"
+      ],
+      "doesNotOwn": [
+        "技能文件读写",
+        "技能执行调度",
+        "素材仓储"
+      ],
+      "publicApi": [
+        "CSS_MODULE:SkillsPageCards 的页面局部样式域",
+        "CSS_CLASS:cardActionIcon",
+        "CSS_CLASS:starOn",
+        "CSS_CLASS:cardUse",
+        "CSS_CLASS:detailIconButton"
+      ],
+      "test": [
+        "src/pages/SkillsPage/skillsPageCssArchitecture.test.ts"
+      ],
+      "budget": 51
+    },
+    {
+      "module": "src/pages/SkillsPage/SkillsPageSharedControls.module.css",
+      "owner": "skills-ui",
+      "responsibility": "定义技能页输入框、文本域、确认提示、正文和卡片操作区样式。",
+      "owns": [
+        "技能页弹窗与卡片样式",
+        "共享表单控件样式",
+        "技能页阶段布局"
+      ],
+      "doesNotOwn": [
+        "技能文件读写",
+        "技能执行调度",
+        "素材仓储"
+      ],
+      "publicApi": [
+        "CSS_MODULE:SkillsPageSharedControls 的页面局部样式域",
+        "CSS_CLASS:input",
+        "CSS_CLASS:textarea",
+        "CSS_CLASS:actions",
+        "CSS_CLASS:confirmHint",
+        "CSS_CLASS:skillBody"
+      ],
+      "test": [
+        "src/pages/SkillsPage/skillsPageCssArchitecture.test.ts"
+      ],
+      "budget": 102
+    },
+    {
+      "module": "src/pages/SkillsPage/SkillsPageShell.module.css",
+      "owner": "skills-ui",
+      "responsibility": "定义技能库页面、浏览编辑预设阶段、层级栏和按钮样式。",
+      "owns": [
+        "技能页弹窗与卡片样式",
+        "共享表单控件样式",
+        "技能页阶段布局"
+      ],
+      "doesNotOwn": [
+        "技能文件读写",
+        "技能执行调度",
+        "素材仓储"
+      ],
+      "publicApi": [
+        "CSS_MODULE:SkillsPageShell 的页面局部样式域",
+        "CSS_CLASS:page",
+        "CSS_CLASS:browserStage",
+        "CSS_CLASS:editorStage",
+        "CSS_CLASS:presetsStage",
+        "CSS_CLASS:levelBar"
+      ],
+      "test": [
+        "src/pages/SkillsPage/skillsPageCssArchitecture.test.ts"
+      ],
+      "budget": 539
+    },
+    {
+      "module": "src/platform/channels/openaiImages/chatImageProtocol.ts",
+      "owner": "channel-image-adapters",
+      "responsibility": "通过 OpenAI 兼容 chat 协议提交生图请求，并把响应交给统一解析层。",
+      "owns": [
+        "图片请求协议构造",
+        "上游响应解析",
+        "异步轮询与素材归一"
+      ],
+      "doesNotOwn": [
+        "渠道配置状态",
+        "凭证读取",
+        "页面模型选择"
+      ],
+      "publicApi": [
+        "generateChatImage"
+      ],
+      "test": [
+        "src/platform/channels/openaiImages/splitStructure.test.ts"
+      ],
+      "budget": 89
+    },
+    {
+      "module": "src/platform/channels/openaiImages/contracts.ts",
+      "owner": "channel-image-adapters",
+      "responsibility": "定义 OpenAI 兼容图片适配器的配置、网络、素材、轮询与生成核心端口。",
+      "owns": [
+        "图片请求协议构造",
+        "上游响应解析",
+        "异步轮询与素材归一"
+      ],
+      "doesNotOwn": [
+        "渠道配置状态",
+        "凭证读取",
+        "页面模型选择"
+      ],
+      "publicApi": [
+        "OpenAiAdapterConfig",
+        "OpenAiImagesOptions",
+        "ImageItem",
+        "ImageFile",
+        "InlineImage",
+        "SubmitNetwork",
+        "OpenAiImagesCore",
+        "AssetWriter",
+        "SoonStudioSubmissionInput"
+      ],
+      "test": [
+        "src/platform/channels/openaiImages/contracts.test.ts"
+      ],
+      "budget": 105
+    },
+    {
+      "module": "src/platform/channels/openaiImages/createAdapter.ts",
+      "owner": "channel-image-adapters",
+      "responsibility": "由图片生成核心创建渠道适配器，并组合提交、轮询和资源写入入口。",
+      "owns": [
+        "图片请求协议构造",
+        "上游响应解析",
+        "异步轮询与素材归一"
+      ],
+      "doesNotOwn": [
+        "渠道配置状态",
+        "凭证读取",
+        "页面模型选择"
+      ],
+      "publicApi": [
+        "createOpenAiImagesAdapterFromCore",
+        "createOpenAiImagesCore"
+      ],
+      "test": [
+        "src/platform/channels/openaiImages/createAdapter.test.ts"
+      ],
+      "budget": 140
+    },
+    {
+      "module": "src/platform/channels/openaiImages/errorNormalization.ts",
+      "owner": "channel-image-adapters",
+      "responsibility": "归一图片上游错误文本、SoonStudio 失败、Gemini 原生切换和网络请求细节。",
+      "owns": [
+        "图片请求协议构造",
+        "上游响应解析",
+        "异步轮询与素材归一"
+      ],
+      "doesNotOwn": [
+        "渠道配置状态",
+        "凭证读取",
+        "页面模型选择"
+      ],
+      "publicApi": [
+        "textField",
+        "soonStudioErrorText",
+        "soonStudioUpstreamErrorIn",
+        "isGeminiNativeRequestRequired",
+        "soonStudioFailureIn",
+        "transportTextOf",
+        "acceptedAfterSubmit",
+        "waitFor",
+        "submitNetwork",
+        "readNetworkDetail"
+      ],
+      "test": [
+        "src/platform/channels/openaiImages/splitStructure.test.ts"
+      ],
+      "budget": 145
+    },
+    {
+      "module": "src/platform/channels/openaiImages/geminiImageProtocol.ts",
+      "owner": "channel-image-adapters",
+      "responsibility": "处理 Gemini 原生图片请求的不支持路径与真实生图提交流程。",
+      "owns": [
+        "图片请求协议构造",
+        "上游响应解析",
+        "异步轮询与素材归一"
+      ],
+      "doesNotOwn": [
+        "渠道配置状态",
+        "凭证读取",
+        "页面模型选择"
+      ],
+      "publicApi": [
+        "unsupportedGeminiNativePath",
+        "generateGeminiNativeImage"
+      ],
+      "test": [
+        "src/platform/channels/openaiImages/protocolAdapters.test.ts"
+      ],
+      "budget": 121
+    },
+    {
+      "module": "src/platform/channels/openaiImages/generatedAssets.ts",
+      "owner": "channel-image-adapters",
+      "responsibility": "把图片响应结果转换成素材记录，并创建统一的素材写入工厂。",
+      "owns": [
+        "图片请求协议构造",
+        "上游响应解析",
+        "异步轮询与素材归一"
+      ],
+      "doesNotOwn": [
+        "渠道配置状态",
+        "凭证读取",
+        "页面模型选择"
+      ],
+      "publicApi": [
+        "toAsset",
+        "createGeneratedAssetFactory"
+      ],
+      "test": [
+        "src/platform/channels/openaiImages/generatedAssets.test.ts"
+      ],
+      "budget": 145
+    },
+    {
+      "module": "src/platform/channels/openaiImages/generateImage.ts",
+      "owner": "channel-image-adapters",
+      "responsibility": "按 OpenAI 图片协议和 Gemini 原生协议分发生成请求并回收结果。",
+      "owns": [
+        "图片请求协议构造",
+        "上游响应解析",
+        "异步轮询与素材归一"
+      ],
+      "doesNotOwn": [
+        "渠道配置状态",
+        "凭证读取",
+        "页面模型选择"
+      ],
+      "publicApi": [
+        "generateImage"
+      ],
+      "test": [
+        "src/platform/channels/openaiImages/splitStructure.test.ts"
+      ],
+      "budget": 150
+    },
+    {
+      "module": "src/platform/channels/openaiImages/imageParams.ts",
+      "owner": "channel-image-adapters",
+      "responsibility": "解析图片尺寸、质量、比例与规格参数，并提取 chat 内容中的图片地址。",
+      "owns": [
+        "图片请求协议构造",
+        "上游响应解析",
+        "异步轮询与素材归一"
+      ],
+      "doesNotOwn": [
+        "渠道配置状态",
+        "凭证读取",
+        "页面模型选择"
+      ],
+      "publicApi": [
+        "RequestedImageDimensions",
+        "GEMINI_DEFAULT_RATIO",
+        "openAiImageSize",
+        "openAiImageQuality",
+        "specImageSize",
+        "sizeToDimensions",
+        "imageUrlFromChatContent"
+      ],
+      "test": [
+        "src/platform/channels/openaiImages/splitStructure.test.ts"
+      ],
+      "budget": 107
+    },
+    {
+      "module": "src/platform/channels/openaiImages/requestConstruction.ts",
+      "owner": "channel-image-adapters",
+      "responsibility": "构造编辑、生成与规格生图请求，准备参考图、内联图片和 Gemini 请求体。",
+      "owns": [
+        "图片请求协议构造",
+        "上游响应解析",
+        "异步轮询与素材归一"
+      ],
+      "doesNotOwn": [
+        "渠道配置状态",
+        "凭证读取",
+        "页面模型选择"
+      ],
+      "publicApi": [
+        "PreparedImageRequest",
+        "GeminiNativeRequestShape",
+        "readImageFiles",
+        "postEdits",
+        "postGenerations",
+        "postSpecGenerations",
+        "toDataUris",
+        "toInlineImages",
+        "geminiNativeRequestShape",
+        "geminiImageSize",
+        "geminiRequestOptions",
+        "prepareImageRequest"
+      ],
+      "test": [
+        "src/platform/channels/openaiImages/protocolConstruction.test.ts"
+      ],
+      "budget": 351
+    },
+    {
+      "module": "src/platform/channels/openaiImages/responseParsing.ts",
+      "owner": "channel-image-adapters",
+      "responsibility": "从 Gemini 与内联响应中查找图片，归一无图原因并提取图片条目。",
+      "owns": [
+        "图片请求协议构造",
+        "上游响应解析",
+        "异步轮询与素材归一"
+      ],
+      "doesNotOwn": [
+        "渠道配置状态",
+        "凭证读取",
+        "页面模型选择"
+      ],
+      "publicApi": [
+        "GeminiImagePayload",
+        "findGeminiImage",
+        "findInlineImage",
+        "geminiNoImageReason",
+        "imageItemsIn"
+      ],
+      "test": [
+        "src/platform/channels/openaiImages/protocolAdapters.test.ts"
+      ],
+      "budget": 246
+    },
+    {
+      "module": "src/platform/channels/openaiImages/soonStudioPolling.ts",
+      "owner": "channel-image-adapters",
+      "responsibility": "提交 SoonStudio 异步任务并按状态轮询，把完成结果解析成图片素材。",
+      "owns": [
+        "图片请求协议构造",
+        "上游响应解析",
+        "异步轮询与素材归一"
+      ],
+      "doesNotOwn": [
+        "渠道配置状态",
+        "凭证读取",
+        "页面模型选择"
+      ],
+      "publicApi": [
+        "SoonStudioPorts",
+        "soonStudioSubmitRequest",
+        "generateSoonStudioImage"
+      ],
+      "test": [
+        "src/platform/channels/openaiImages/splitStructure.test.ts"
+      ],
+      "budget": 348
+    },
+    {
+      "module": "src/state/project/ecommerceTaskRepository/queryProjections.ts",
+      "owner": "ecommerce-persistence",
+      "responsibility": "投影电商任务与结果查询，包含最新批次、隐藏结果、中断和待核对哈希。",
+      "owns": [
+        "电商任务行映射",
+        "查询与补存投影",
+        "仓储内部类型"
+      ],
+      "doesNotOwn": [
+        "上游图片请求",
+        "页面 UI 状态",
+        "渠道凭证存储"
+      ],
+      "publicApi": [
+        "resultsByPosition",
+        "projectResults",
+        "latestTasks",
+        "listedTasks",
+        "refreshedTask",
+        "hiddenResult",
+        "latestRunByNode",
+        "queuedSaveByResult",
+        "interruptResults",
+        "interruptedTask",
+        "resultRemovable",
+        "reconciledResult"
+      ],
+      "test": [
+        "src/state/project/ecommerceTaskRepository/queryProjections.test.ts"
+      ],
+      "budget": 277
+    },
+    {
+      "module": "src/state/project/ecommerceTaskRepository/retrySaveProjections.ts",
+      "owner": "ecommerce-persistence",
+      "responsibility": "计算电商素材补存的排队、阻塞、失败与完成投影，并保留主素材字段。",
+      "owns": [
+        "电商任务行映射",
+        "查询与补存投影",
+        "仓储内部类型"
+      ],
+      "doesNotOwn": [
+        "上游图片请求",
+        "页面 UI 状态",
+        "渠道凭证存储"
+      ],
+      "publicApi": [
+        "withoutResultAttempt",
+        "withoutResultFailure",
+        "primaryAssetFields",
+        "queuedSaveFor",
+        "retrySaveBlocksWrite",
+        "failedRetrySave",
+        "doneRetrySave"
+      ],
+      "test": [
+        "src/state/project/ecommerceTaskRepository/retrySaveProjections.test.ts"
+      ],
+      "budget": 142
+    },
+    {
+      "module": "src/state/project/ecommerceTaskRepository/rowMappers.ts",
+      "owner": "ecommerce-persistence",
+      "responsibility": "把电商任务、结果和补存队列在数据库行与领域对象之间双向映射。",
+      "owns": [
+        "电商任务行映射",
+        "查询与补存投影",
+        "仓储内部类型"
+      ],
+      "doesNotOwn": [
+        "上游图片请求",
+        "页面 UI 状态",
+        "渠道凭证存储"
+      ],
+      "publicApi": [
+        "taskOf",
+        "resultOf",
+        "queuedSaveOf",
+        "firstOutputHashOf",
+        "resultRows",
+        "taskRows",
+        "queuedSaveRows"
+      ],
+      "test": [
+        "src/state/project/ecommerceTaskRepository/rowMappers.test.ts"
+      ],
+      "budget": 132
+    },
+    {
+      "module": "src/state/project/ecommerceTaskRepository/types.ts",
+      "owner": "ecommerce-persistence",
+      "responsibility": "定义电商任务仓储的待写素材队列和重试补存结果类型。",
+      "owns": [
+        "电商任务行映射",
+        "查询与补存投影",
+        "仓储内部类型"
+      ],
+      "doesNotOwn": [
+        "上游图片请求",
+        "页面 UI 状态",
+        "渠道凭证存储"
+      ],
+      "publicApi": [
+        "QueuedAssetSave",
+        "RetryAssetSaveResult"
+      ],
+      "test": [
+        "src/state/project/ecommerceTaskRepository/types.test.ts"
+      ],
+      "budget": 42
+    },
+    {
+      "module": "src/workbenches/canvas/flow/flowSurfaceDomAnchors.ts",
+      "owner": "canvas-flow-ui",
+      "responsibility": "为画布节点标签、框选矩形和 DOM 交互锚点计算世界坐标属性。",
+      "owns": [
+        "画布视口与指针几何",
+        "菜单和导入判定",
+        "节点 DOM 锚点"
+      ],
+      "doesNotOwn": [
+        "画布节点状态存储",
+        "生成请求发送",
+        "渠道协议解析"
+      ],
+      "publicApi": [
+        "tagWorldAnchor",
+        "tagMarqueeAnchors",
+        "installCanvasDomAnchors"
+      ],
+      "test": [
+        "src/workbenches/canvas/flow/flowSurfaceDomAnchors.test.ts"
+      ],
+      "budget": 53
+    },
+    {
+      "module": "src/workbenches/canvas/flow/flowSurfaceImport.ts",
+      "owner": "canvas-flow-ui",
+      "responsibility": "判定拖放与粘贴媒体是否可导入，并生成对应的导入反馈。",
+      "owns": [
+        "画布视口与指针几何",
+        "菜单和导入判定",
+        "节点 DOM 锚点"
+      ],
+      "doesNotOwn": [
+        "画布节点状态存储",
+        "生成请求发送",
+        "渠道协议解析"
+      ],
+      "publicApi": [
+        "FlowImportPorts",
+        "shouldAcceptDraggedFiles",
+        "shouldPasteMediaFiles",
+        "importFeedback"
+      ],
+      "test": [
+        "src/workbenches/canvas/flow/flowSurfacePublicApi.test.ts"
+      ],
+      "budget": 42
+    },
+    {
+      "module": "src/workbenches/canvas/flow/flowSurfaceMenus.ts",
+      "owner": "canvas-flow-ui",
+      "responsibility": "计算画布右键菜单位置、键盘可编辑目标和运行删除选择命令。",
+      "owns": [
+        "画布视口与指针几何",
+        "菜单和导入判定",
+        "节点 DOM 锚点"
+      ],
+      "doesNotOwn": [
+        "画布节点状态存储",
+        "生成请求发送",
+        "渠道协议解析"
+      ],
+      "publicApi": [
+        "FlowMenuTarget",
+        "ContextMenuPoint",
+        "contextMenuPoint",
+        "shouldSelectNodeForMenu",
+        "shouldRouteRun",
+        "shouldRouteCancel",
+        "isEditableKeyboardTarget",
+        "DeleteSelectionCommands",
+        "deleteSelectionCommands"
+      ],
+      "test": [
+        "src/workbenches/canvas/flow/flowSurfacePublicApi.test.ts"
+      ],
+      "budget": 76
+    },
+    {
+      "module": "src/workbenches/canvas/flow/flowSurfacePointer.ts",
+      "owner": "canvas-flow-ui",
+      "responsibility": "计算画布指针世界坐标、框选范围、点击拖动阈值和拖动锚点。",
+      "owns": [
+        "画布视口与指针几何",
+        "菜单和导入判定",
+        "节点 DOM 锚点"
+      ],
+      "doesNotOwn": [
+        "画布节点状态存储",
+        "生成请求发送",
+        "渠道协议解析"
+      ],
+      "publicApi": [
+        "FLOATING_SELECTORS",
+        "CLICK_SLOP_PX",
+        "FlowPointerLike",
+        "pointerWorldPoint",
+        "marqueeBetween",
+        "isClickAfterDrag",
+        "dragAnchorOf"
+      ],
+      "test": [
+        "src/workbenches/canvas/flow/flowSurfacePublicApi.test.ts"
+      ],
+      "budget": 95
+    },
+    {
+      "module": "src/workbenches/canvas/flow/flowSurfaceViewport.ts",
+      "owner": "canvas-flow-ui",
+      "responsibility": "比较并同步画布视口，声明 FlowSurface 的节点、连线和边类型配置。",
+      "owns": [
+        "画布视口与指针几何",
+        "菜单和导入判定",
+        "节点 DOM 锚点"
+      ],
+      "doesNotOwn": [
+        "画布节点状态存储",
+        "生成请求发送",
+        "渠道协议解析"
+      ],
+      "publicApi": [
+        "VIEWPORT_EPSILON",
+        "sameFlowViewport",
+        "shouldSyncStoreViewport",
+        "FLOW_NODE_TYPES",
+        "FLOW_EDGE_TYPES",
+        "FLOW_EDGE_OPTIONS"
+      ],
+      "test": [
+        "src/workbenches/canvas/flow/flowSurfacePublicApi.test.ts"
+      ],
+      "budget": 43
+    },
+    {
+      "module": "src/workbenches/canvas/lightbox/lightboxCatalog.tsx",
+      "owner": "canvas-lightbox-ui",
+      "responsibility": "声明灯箱编辑手柄位置、编辑模式和标注工具栏的静态目录。",
+      "owns": [
+        "灯箱视图数学",
+        "键盘与编辑状态",
+        "画廊投影和缩略图"
+      ],
+      "doesNotOwn": [
+        "素材字节仓储",
+        "画布节点事务",
+        "图片上游请求"
+      ],
+      "publicApi": [
+        "HANDLE_POS",
+        "EDITOR_MODES",
+        "ANNOTATE_TOOLS"
+      ],
+      "test": [
+        "src/workbenches/canvas/lightbox/lightboxCatalog.test.ts"
+      ],
+      "budget": 60
+    },
+    {
+      "module": "src/workbenches/canvas/lightbox/lightboxEditState.ts",
+      "owner": "canvas-lightbox-ui",
+      "responsibility": "管理灯箱对比视图、裁剪路径、分割比例和标注撤销重做状态。",
+      "owns": [
+        "灯箱视图数学",
+        "键盘与编辑状态",
+        "画廊投影和缩略图"
+      ],
+      "doesNotOwn": [
+        "素材字节仓储",
+        "画布节点事务",
+        "图片上游请求"
+      ],
+      "publicApi": [
+        "compareViewOf",
+        "compareViewsOf",
+        "compareClipPathOf",
+        "splitRatioAt",
+        "undoAnnotation",
+        "redoAnnotation"
+      ],
+      "test": [
+        "src/workbenches/canvas/lightbox/lightboxPublicApi.test.ts"
+      ],
+      "budget": 70
+    },
+    {
+      "module": "src/workbenches/canvas/lightbox/lightboxGallery.ts",
+      "owner": "canvas-lightbox-ui",
+      "responsibility": "投影灯箱画廊项、归属节点、对比哈希和可用编辑模式。",
+      "owns": [
+        "灯箱视图数学",
+        "键盘与编辑状态",
+        "画廊投影和缩略图"
+      ],
+      "doesNotOwn": [
+        "素材字节仓储",
+        "画布节点事务",
+        "图片上游请求"
+      ],
+      "publicApi": [
+        "LightboxGalleryItem",
+        "LightboxStateLike",
+        "galleryViewOf",
+        "ownerNodeOf",
+        "compareHashOf",
+        "initialEditorModeOf",
+        "availableEditorModes"
+      ],
+      "test": [
+        "src/workbenches/canvas/lightbox/lightboxPublicApi.test.ts"
+      ],
+      "budget": 113
+    },
+    {
+      "module": "src/workbenches/canvas/lightbox/LightboxGalleryThumb.tsx",
+      "owner": "canvas-lightbox-ui",
+      "responsibility": "渲染灯箱画廊缩略图，处理图片加载失败与选中态显示。",
+      "owns": [
+        "灯箱视图数学",
+        "键盘与编辑状态",
+        "画廊投影和缩略图"
+      ],
+      "doesNotOwn": [
+        "素材字节仓储",
+        "画布节点事务",
+        "图片上游请求"
+      ],
+      "publicApi": [
+        "GalleryThumb"
+      ],
+      "test": [
+        "src/workbenches/canvas/lightbox/lightboxGallery.test.ts"
+      ],
+      "budget": 65
+    },
+    {
+      "module": "src/workbenches/canvas/lightbox/lightboxKeyboard.ts",
+      "owner": "canvas-lightbox-ui",
+      "responsibility": "把键盘事件、舞台点击和指针按键映射成灯箱动作并保护文本输入。",
+      "owns": [
+        "灯箱视图数学",
+        "键盘与编辑状态",
+        "画廊投影和缩略图"
+      ],
+      "doesNotOwn": [
+        "素材字节仓储",
+        "画布节点事务",
+        "图片上游请求"
+      ],
+      "publicApi": [
+        "LightboxEditorMode",
+        "CompareView",
+        "isTextEditingTarget",
+        "LightboxKeyAction",
+        "lightboxKeyAction",
+        "shouldCloseOnStageClick",
+        "isPrimaryPointer",
+        "isMiddlePointer"
+      ],
+      "test": [
+        "src/workbenches/canvas/lightbox/lightboxPublicApi.test.ts"
+      ],
+      "budget": 82
+    },
+    {
+      "module": "src/workbenches/canvas/lightbox/lightboxViewportMath.ts",
+      "owner": "canvas-lightbox-ui",
+      "responsibility": "计算灯箱缩放、平移、适配视口、图片点坐标和裁剪框几何。",
+      "owns": [
+        "灯箱视图数学",
+        "键盘与编辑状态",
+        "画廊投影和缩略图"
+      ],
+      "doesNotOwn": [
+        "素材字节仓储",
+        "画布节点事务",
+        "图片上游请求"
+      ],
+      "publicApi": [
+        "FIT_PADDING",
+        "WHEEL_STEP",
+        "DRAG_SLOP",
+        "MediaBox",
+        "wheelZoom",
+        "dragPan",
+        "fitMediaViewport",
+        "mediaBoxOf",
+        "imagePointAt",
+        "cropBoxOf"
+      ],
+      "test": [
+        "src/workbenches/canvas/lightbox/lightboxPublicApi.test.ts"
+      ],
+      "budget": 86
+    },
+    {
+      "module": "src/workbenches/canvas/panels/AgentPanel/agentSessionBrief.ts",
+      "owner": "agent-context",
+      "responsibility": "为续跑生成紧凑会话摘要，并从持久消息校验可恢复的续跑上下文。",
+      "owns": [
+        "续跑会话摘要",
+        "持久消息校验",
+        "续跑上下文选择"
+      ],
+      "doesNotOwn": [
+        "会话消息队列",
+        "工具执行",
+        "上游模型请求"
+      ],
+      "publicApi": [
+        "AgentSessionBriefFacts",
+        "AgentSessionBriefSource",
+        "sessionBriefForContinuation",
+        "resolveContinuationMessages"
+      ],
+      "test": [
+        "src/workbenches/canvas/panels/AgentPanel/agentSessionBrief.test.ts"
+      ],
+      "budget": 157
+    },
+    {
+      "module": "src/workbenches/canvas/panels/creation/CreationAssetViews.tsx",
+      "owner": "canvas-creation-ui",
+      "responsibility": "渲染创作面板提及缩略图、素材缩略图与收藏卡片视图。",
+      "owns": [
+        "创作参数目录与投影",
+        "创作面板几何",
+        "素材缩略图和样式门面"
+      ],
+      "doesNotOwn": [
+        "生成执行 Provider",
+        "渠道模型目录",
+        "素材仓储事务"
+      ],
+      "publicApi": [
+        "MentionThumb",
+        "MentionThumbProbe",
+        "Thumb",
+        "CollectionCard"
+      ],
+      "test": [
+        "src/workbenches/canvas/panels/creation/CreationAssetViews.test.ts"
+      ],
+      "budget": 161
+    },
+    {
+      "module": "src/workbenches/canvas/panels/creation/creationCatalog.ts",
+      "owner": "canvas-creation-ui",
+      "responsibility": "提供创作面板数量、比例、分辨率、质量、时长和分类目录及标签。",
+      "owns": [
+        "创作参数目录与投影",
+        "创作面板几何",
+        "素材缩略图和样式门面"
+      ],
+      "doesNotOwn": [
+        "生成执行 Provider",
+        "渠道模型目录",
+        "素材仓储事务"
+      ],
+      "publicApi": [
+        "COUNT_OPTIONS",
+        "RATIO_OPTIONS",
+        "RATIO_FOLLOW_SOURCE",
+        "RESOLUTION_CUSTOM",
+        "CUSTOM_SIZE_SEED",
+        "RESOLUTION_OPTIONS",
+        "QUALITY_OPTIONS",
+        "SIZE_OPTIONS",
+        "CATEGORY_OPTIONS",
+        "DEFAULT_DURATION",
+        "QUALITY_LABELS",
+        "BACKGROUND_LABELS"
+      ],
+      "test": [
+        "src/workbenches/canvas/panels/creation/creationPublicApi.test.ts"
+      ],
+      "budget": 123
+    },
+    {
+      "module": "src/workbenches/canvas/panels/creation/creationModelOptions.ts",
+      "owner": "canvas-creation-ui",
+      "responsibility": "把渠道模型目录投影成创作面板可选模型列表与稳定名称。",
+      "owns": [
+        "创作参数目录与投影",
+        "创作面板几何",
+        "素材缩略图和样式门面"
+      ],
+      "doesNotOwn": [
+        "生成执行 Provider",
+        "渠道模型目录",
+        "素材仓储事务"
+      ],
+      "publicApi": [
+        "CreationModelOption",
+        "CreationModelOptionContext",
+        "creationModelNames",
+        "creationModelOptions"
+      ],
+      "test": [
+        "src/workbenches/canvas/panels/creation/creationPublicApi.test.ts"
+      ],
+      "budget": 53
+    },
+    {
+      "module": "src/workbenches/canvas/panels/creation/CreationPanelAssets.module.css",
+      "owner": "canvas-creation-ui",
+      "responsibility": "定义创作面板素材分类、缩略图、拖拽和收藏区域样式。",
+      "owns": [
+        "创作参数目录与投影",
+        "创作面板几何",
+        "素材缩略图和样式门面"
+      ],
+      "doesNotOwn": [
+        "生成执行 Provider",
+        "渠道模型目录",
+        "素材仓储事务"
+      ],
+      "publicApi": [
+        "CSS_MODULE:CreationPanelAssets 的页面局部样式域",
+        "CSS_CLASS:assetsHead",
+        "CSS_CLASS:category",
+        "CSS_CLASS:catBtn",
+        "CSS_CLASS:catOn",
+        "CSS_CLASS:thumbs"
+      ],
+      "test": [
+        "src/workbenches/canvas/panels/creation/creationStyles.test.ts"
+      ],
+      "budget": 378
+    },
+    {
+      "module": "src/workbenches/canvas/panels/creation/CreationPanelBase.module.css",
+      "owner": "canvas-creation-ui",
+      "responsibility": "定义创作面板基础分区、提示词、素材和参数区块布局样式。",
+      "owns": [
+        "创作参数目录与投影",
+        "创作面板几何",
+        "素材缩略图和样式门面"
+      ],
+      "doesNotOwn": [
+        "生成执行 Provider",
+        "渠道模型目录",
+        "素材仓储事务"
+      ],
+      "publicApi": [
+        "CSS_MODULE:CreationPanelBase 的页面局部样式域",
+        "CSS_CLASS:section",
+        "CSS_CLASS:promptSection",
+        "CSS_CLASS:promptSectionComfort",
+        "CSS_CLASS:assetsSection",
+        "CSS_CLASS:paramsSection"
+      ],
+      "test": [
+        "src/workbenches/canvas/panels/creation/creationStyles.test.ts"
+      ],
+      "budget": 58
+    },
+    {
+      "module": "src/workbenches/canvas/panels/creation/creationPanelGeometry.ts",
+      "owner": "canvas-creation-ui",
+      "responsibility": "按可用视口计算创作面板宽度、锚点与分区边界几何。",
+      "owns": [
+        "创作参数目录与投影",
+        "创作面板几何",
+        "素材缩略图和样式门面"
+      ],
+      "doesNotOwn": [
+        "生成执行 Provider",
+        "渠道模型目录",
+        "素材仓储事务"
+      ],
+      "publicApi": [
+        "CreationPanelGeometry",
+        "panelGeometryFor"
+      ],
+      "test": [
+        "src/workbenches/canvas/panels/creation/creationPublicApi.test.ts"
+      ],
+      "budget": 78
+    },
+    {
+      "module": "src/workbenches/canvas/panels/creation/CreationPanelParams.module.css",
+      "owner": "canvas-creation-ui",
+      "responsibility": "定义创作面板参数、滑块、数量、时长、运行按钮与提示样式。",
+      "owns": [
+        "创作参数目录与投影",
+        "创作面板几何",
+        "素材缩略图和样式门面"
+      ],
+      "doesNotOwn": [
+        "生成执行 Provider",
+        "渠道模型目录",
+        "素材仓储事务"
+      ],
+      "publicApi": [
+        "CSS_MODULE:CreationPanelParams 的页面局部样式域",
+        "CSS_CLASS:params",
+        "CSS_CLASS:toolGroup",
+        "CSS_CLASS:paramDivider",
+        "CSS_CLASS:error",
+        "CSS_CLASS:setupHint"
+      ],
+      "test": [
+        "src/workbenches/canvas/panels/creation/creationStyles.test.ts"
+      ],
+      "budget": 414
+    },
+    {
+      "module": "src/workbenches/canvas/panels/creation/CreationPanelPrompt.module.css",
+      "owner": "canvas-creation-ui",
+      "responsibility": "定义创作面板提示词、关联素材、展开、提及菜单和变量提示样式。",
+      "owns": [
+        "创作参数目录与投影",
+        "创作面板几何",
+        "素材缩略图和样式门面"
+      ],
+      "doesNotOwn": [
+        "生成执行 Provider",
+        "渠道模型目录",
+        "素材仓储事务"
+      ],
+      "publicApi": [
+        "CSS_MODULE:CreationPanelPrompt 的页面局部样式域",
+        "CSS_CLASS:promptRow",
+        "CSS_CLASS:linked",
+        "CSS_CLASS:linkedRow",
+        "CSS_CLASS:linkedIcon",
+        "CSS_CLASS:linkedMeta"
+      ],
+      "test": [
+        "src/workbenches/canvas/panels/creation/creationStyles.test.ts"
+      ],
+      "budget": 452
+    },
+    {
+      "module": "src/workbenches/canvas/panels/creation/creationQualityParams.ts",
+      "owner": "canvas-creation-ui",
+      "responsibility": "从用户输入推导创作质量参数，并生成自定义尺寸提示。",
+      "owns": [
+        "创作参数目录与投影",
+        "创作面板几何",
+        "素材缩略图和样式门面"
+      ],
+      "doesNotOwn": [
+        "生成执行 Provider",
+        "渠道模型目录",
+        "素材仓储事务"
+      ],
+      "publicApi": [
+        "CreationQualityParams",
+        "CreationQualityInput",
+        "customSizeHintOf",
+        "deriveCreationQualityParams"
+      ],
+      "test": [
+        "src/workbenches/canvas/panels/creation/creationPublicApi.test.ts"
+      ],
+      "budget": 229
+    },
+    {
+      "module": "src/workbenches/canvas/panels/creation/creationStyles.ts",
+      "owner": "canvas-creation-ui",
+      "responsibility": "合并创作面板基础、素材、提示词和参数 CSS Module 为统一样式门面。",
+      "owns": [
+        "创作参数目录与投影",
+        "创作面板几何",
+        "素材缩略图和样式门面"
+      ],
+      "doesNotOwn": [
+        "生成执行 Provider",
+        "渠道模型目录",
+        "素材仓储事务"
+      ],
+      "publicApi": [
+        "creationStyles"
+      ],
+      "test": [
+        "src/workbenches/canvas/panels/creation/creationPublicApi.test.ts"
+      ],
+      "budget": 32
+    },
+    {
+      "module": "src/workbenches/ecommerce/studio/EcommerceStudioForms.module.css",
+      "owner": "ecommerce-studio-ui",
+      "responsibility": "定义电商 Studio 表单区块、AI 改写、上传槽位和素材移除样式。",
+      "owns": [
+        "Studio 表单契约与视图",
+        "模式参数组件",
+        "Studio 样式门面与分区"
+      ],
+      "doesNotOwn": [
+        "电商任务仓储",
+        "图片上游协议",
+        "渠道凭证读取"
+      ],
+      "publicApi": [
+        "CSS_MODULE:EcommerceStudioForms 的页面局部样式域",
+        "CSS_CLASS:block",
+        "CSS_CLASS:blockHead",
+        "CSS_CLASS:aiWrite",
+        "CSS_CLASS:blockDrop",
+        "CSS_CLASS:blockTitle"
+      ],
+      "test": [
+        "src/workbenches/ecommerce/studio/ecommerceStudioCssArchitecture.test.ts"
+      ],
+      "budget": 519
+    },
+    {
+      "module": "src/workbenches/ecommerce/studio/EcommerceStudioFormsIntent.module.css",
+      "owner": "ecommerce-studio-ui",
+      "responsibility": "定义电商意图卡片、分镜标题、方案操作和生成按钮样式。",
+      "owns": [
+        "Studio 表单契约与视图",
+        "模式参数组件",
+        "Studio 样式门面与分区"
+      ],
+      "doesNotOwn": [
+        "电商任务仓储",
+        "图片上游协议",
+        "渠道凭证读取"
+      ],
+      "publicApi": [
+        "CSS_MODULE:EcommerceStudioFormsIntent 的页面局部样式域",
+        "CSS_CLASS:intentRow",
+        "CSS_CLASS:intentCard",
+        "CSS_CLASS:intentLead",
+        "CSS_CLASS:intentList",
+        "CSS_CLASS:intentItem"
+      ],
+      "test": [
+        "src/workbenches/ecommerce/studio/ecommerceStudioCssArchitecture.test.ts"
+      ],
+      "budget": 153
+    },
+    {
+      "module": "src/workbenches/ecommerce/studio/EcommerceStudioFormsPerson.module.css",
+      "owner": "ecommerce-studio-ui",
+      "responsibility": "定义电商人物设置网格、字段标签、输入控件和错误提示样式。",
+      "owns": [
+        "Studio 表单契约与视图",
+        "模式参数组件",
+        "Studio 样式门面与分区"
+      ],
+      "doesNotOwn": [
+        "电商任务仓储",
+        "图片上游协议",
+        "渠道凭证读取"
+      ],
+      "publicApi": [
+        "CSS_MODULE:EcommerceStudioFormsPerson 的页面局部样式域",
+        "CSS_CLASS:personSettings",
+        "CSS_CLASS:personGrid",
+        "CSS_CLASS:field",
+        "CSS_CLASS:fieldHead",
+        "CSS_CLASS:fieldLabel"
+      ],
+      "test": [
+        "src/workbenches/ecommerce/studio/ecommerceStudioCssArchitecture.test.ts"
+      ],
+      "budget": 105
+    },
+    {
+      "module": "src/workbenches/ecommerce/studio/EcommerceStudioFormsPlan.module.css",
+      "owner": "ecommerce-studio-ui",
+      "responsibility": "定义电商方案历史、建议标签、恢复和删除操作样式。",
+      "owns": [
+        "Studio 表单契约与视图",
+        "模式参数组件",
+        "Studio 样式门面与分区"
+      ],
+      "doesNotOwn": [
+        "电商任务仓储",
+        "图片上游协议",
+        "渠道凭证读取"
+      ],
+      "publicApi": [
+        "CSS_MODULE:EcommerceStudioFormsPlan 的页面局部样式域",
+        "CSS_CLASS:planHistory",
+        "CSS_CLASS:planHistoryTitle",
+        "CSS_CLASS:planList",
+        "CSS_CLASS:planItem",
+        "CSS_CLASS:planOpen"
+      ],
+      "test": [
+        "src/workbenches/ecommerce/studio/ecommerceStudioCssArchitecture.test.ts"
+      ],
+      "budget": 150
+    },
+    {
+      "module": "src/workbenches/ecommerce/studio/EcommerceStudioModeParameters.tsx",
+      "owner": "ecommerce-studio-ui",
+      "responsibility": "按电商生成模式装配对应的产品参数、媒体参数与穿戴参数面板。",
+      "owns": [
+        "Studio 表单契约与视图",
+        "模式参数组件",
+        "Studio 样式门面与分区"
+      ],
+      "doesNotOwn": [
+        "电商任务仓储",
+        "图片上游协议",
+        "渠道凭证读取"
+      ],
+      "publicApi": [
+        "ModeSpecificParameters"
+      ],
+      "test": [
+        "src/workbenches/ecommerce/studio/studioModuleCoverage.test.ts"
+      ],
+      "budget": 34
+    },
+    {
+      "module": "src/workbenches/ecommerce/studio/EcommerceStudioModeParametersMedia.tsx",
+      "owner": "ecommerce-studio-ui",
+      "responsibility": "渲染媒体与穿戴生成模式的参考图、比例和模式专属参数控件。",
+      "owns": [
+        "Studio 表单契约与视图",
+        "模式参数组件",
+        "Studio 样式门面与分区"
+      ],
+      "doesNotOwn": [
+        "电商任务仓储",
+        "图片上游协议",
+        "渠道凭证读取"
+      ],
+      "publicApi": [
+        "MediaAndWearModeParameters"
+      ],
+      "test": [
+        "src/workbenches/ecommerce/studio/studioModuleCoverage.test.ts"
+      ],
+      "budget": 233
+    },
+    {
+      "module": "src/workbenches/ecommerce/studio/EcommerceStudioModeParametersProduct.tsx",
+      "owner": "ecommerce-studio-ui",
+      "responsibility": "渲染产品生成模式的产品图、平台、语言和补充要求参数控件。",
+      "owns": [
+        "Studio 表单契约与视图",
+        "模式参数组件",
+        "Studio 样式门面与分区"
+      ],
+      "doesNotOwn": [
+        "电商任务仓储",
+        "图片上游协议",
+        "渠道凭证读取"
+      ],
+      "publicApi": [
+        "ProductModeParameters"
+      ],
+      "test": [
+        "src/workbenches/ecommerce/studio/studioModuleCoverage.test.ts"
+      ],
+      "budget": 429
+    },
+    {
+      "module": "src/workbenches/ecommerce/studio/EcommerceStudioOverlays.module.css",
+      "owner": "ecommerce-studio-ui",
+      "responsibility": "定义电商确认弹层、上传灯箱、对比视图与结果图片舞台样式。",
+      "owns": [
+        "Studio 表单契约与视图",
+        "模式参数组件",
+        "Studio 样式门面与分区"
+      ],
+      "doesNotOwn": [
+        "电商任务仓储",
+        "图片上游协议",
+        "渠道凭证读取"
+      ],
+      "publicApi": [
+        "CSS_MODULE:EcommerceStudioOverlays 的页面局部样式域",
+        "CSS_CLASS:confirm",
+        "CSS_CLASS:uploadLightbox",
+        "CSS_CLASS:uploadLightboxBody",
+        "CSS_CLASS:uploadLightboxStage",
+        "CSS_CLASS:uploadLightboxClose"
+      ],
+      "test": [
+        "src/workbenches/ecommerce/studio/ecommerceStudioCssArchitecture.test.ts"
+      ],
+      "budget": 362
+    },
+    {
+      "module": "src/workbenches/ecommerce/studio/EcommerceStudioPersonSettings.tsx",
+      "owner": "ecommerce-studio-ui",
+      "responsibility": "渲染电商人物性别、年龄、姿态、场景和风格设置表单。",
+      "owns": [
+        "Studio 表单契约与视图",
+        "模式参数组件",
+        "Studio 样式门面与分区"
+      ],
+      "doesNotOwn": [
+        "电商任务仓储",
+        "图片上游协议",
+        "渠道凭证读取"
+      ],
+      "publicApi": [
+        "PersonSettings"
+      ],
+      "test": [
+        "src/workbenches/ecommerce/studio/studioModuleCoverage.test.ts"
+      ],
+      "budget": 123
+    },
+    {
+      "module": "src/workbenches/ecommerce/studio/EcommerceStudioResults.module.css",
+      "owner": "ecommerce-studio-ui",
+      "responsibility": "定义电商结果头部、空态、主视觉长图、结果卡和操作工具样式。",
+      "owns": [
+        "Studio 表单契约与视图",
+        "模式参数组件",
+        "Studio 样式门面与分区"
+      ],
+      "doesNotOwn": [
+        "电商任务仓储",
+        "图片上游协议",
+        "渠道凭证读取"
+      ],
+      "publicApi": [
+        "CSS_MODULE:EcommerceStudioResults 的页面局部样式域",
+        "CSS_CLASS:resultsHead",
+        "CSS_CLASS:headTools",
+        "CSS_CLASS:linkBtn",
+        "CSS_CLASS:empty",
+        "CSS_CLASS:hero"
+      ],
+      "test": [
+        "src/workbenches/ecommerce/studio/ecommerceStudioCssArchitecture.test.ts"
+      ],
+      "budget": 398
+    },
+    {
+      "module": "src/workbenches/ecommerce/studio/EcommerceStudioStatus.module.css",
+      "owner": "ecommerce-studio-ui",
+      "responsibility": "定义电商生成阶段、运行覆盖层、失败提示和进度轨道样式。",
+      "owns": [
+        "Studio 表单契约与视图",
+        "模式参数组件",
+        "Studio 样式门面与分区"
+      ],
+      "doesNotOwn": [
+        "电商任务仓储",
+        "图片上游协议",
+        "渠道凭证读取"
+      ],
+      "publicApi": [
+        "CSS_MODULE:EcommerceStudioStatus 的页面局部样式域",
+        "CSS_CLASS:generationStage",
+        "CSS_CLASS:generationStageDot",
+        "CSS_CLASS:generationStageCopy",
+        "CSS_CLASS:generationStageCount",
+        "CSS_CLASS:resultOverlay"
+      ],
+      "test": [
+        "src/workbenches/ecommerce/studio/ecommerceStudioCssArchitecture.test.ts"
+      ],
+      "budget": 204
+    },
+    {
+      "module": "src/workbenches/ecommerce/studio/EcommerceStudioStatusViews.tsx",
+      "owner": "ecommerce-studio-ui",
+      "responsibility": "渲染电商生成阶段计数与结果状态覆盖层，不持有执行状态。",
+      "owns": [
+        "Studio 表单契约与视图",
+        "模式参数组件",
+        "Studio 样式门面与分区"
+      ],
+      "doesNotOwn": [
+        "电商任务仓储",
+        "图片上游协议",
+        "渠道凭证读取"
+      ],
+      "publicApi": [
+        "ResultStatusOverlay",
+        "GenerationStageView"
+      ],
+      "test": [
+        "src/workbenches/ecommerce/studio/studioModuleCoverage.test.ts"
+      ],
+      "budget": 128
+    },
+    {
+      "module": "src/workbenches/ecommerce/studio/studioContracts.ts",
+      "owner": "ecommerce-studio-ui",
+      "responsibility": "定义电商 Studio 上传、结果、类别、模式、表单默认值和组件属性契约。",
+      "owns": [
+        "Studio 表单契约与视图",
+        "模式参数组件",
+        "Studio 样式门面与分区"
+      ],
+      "doesNotOwn": [
+        "电商任务仓储",
+        "图片上游协议",
+        "渠道凭证读取"
+      ],
+      "publicApi": [
+        "EcommerceUpload",
+        "EcommerceImageParamOptions",
+        "EcommerceResultItem",
+        "StudioCategory",
+        "StudioMode",
+        "STUDIO_CATEGORIES",
+        "STUDIO_MODES",
+        "EcommerceLongImageTools",
+        "EcommerceStudioProps",
+        "DEFAULT_MODE_FORM_STATE"
+      ],
+      "test": [
+        "src/workbenches/ecommerce/studio/studioModuleCoverage.test.ts"
+      ],
+      "budget": 261
+    },
+    {
+      "module": "src/workbenches/ecommerce/studio/studioSharedViews.tsx",
+      "owner": "ecommerce-studio-ui",
+      "responsibility": "渲染电商模式选项、模型图标、选中勾、类别图标和文本选项。",
+      "owns": [
+        "Studio 表单契约与视图",
+        "模式参数组件",
+        "Studio 样式门面与分区"
+      ],
+      "doesNotOwn": [
+        "电商任务仓储",
+        "图片上游协议",
+        "渠道凭证读取"
+      ],
+      "publicApi": [
+        "OptionContent",
+        "modelIconFor",
+        "OptionCheck",
+        "textOptions",
+        "CategoryGlyph"
+      ],
+      "test": [
+        "src/workbenches/ecommerce/studio/studioModuleCoverage.test.ts"
+      ],
+      "budget": 106
+    },
+    {
+      "module": "src/workbenches/ecommerce/studio/studioStyles.ts",
+      "owner": "ecommerce-studio-ui",
+      "responsibility": "合并电商 Studio 基础与各区块 CSS Module，提供统一样式门面。",
+      "owns": [
+        "Studio 表单契约与视图",
+        "模式参数组件",
+        "Studio 样式门面与分区"
+      ],
+      "doesNotOwn": [
+        "电商任务仓储",
+        "图片上游协议",
+        "渠道凭证读取"
+      ],
+      "publicApi": [
+        "styles",
+        "StudioStyles"
+      ],
+      "test": [
+        "src/workbenches/ecommerce/studio/studioModuleCoverage.test.ts"
+      ],
+      "budget": 41
+    },
+    {
+      "module": "src/workbenches/storyboard/videoExecution/contracts.ts",
+      "owner": "storyboard-execution",
+      "responsibility": "定义漫剧视频后处理目标、控制器参数、准备镜头与运行端口类型。",
+      "owns": [
+        "视频执行契约与状态",
+        "镜头素材准备",
+        "视频结果投影"
+      ],
+      "doesNotOwn": [
+        "视频上游适配器",
+        "React 页面状态",
+        "画布执行 Provider"
+      ],
+      "publicApi": [
+        "VideoUpscaleTarget",
+        "VideoEraseTarget",
+        "VideoEditTarget",
+        "VideoExtendTarget",
+        "StoryboardVideoExecutionControllerArgs",
+        "PreparedShotVideo",
+        "VideoExecStatus",
+        "VideoStatusReporter",
+        "VideoRunPorts",
+        "PostprocessInput",
+        "RunOutcome",
+        "StoryboardRunPlan"
+      ],
+      "test": [
+        "src/workbenches/storyboard/videoExecution/splitStructure.test.ts"
+      ],
+      "budget": 158
+    },
+    {
+      "module": "src/workbenches/storyboard/videoExecution/executionState.ts",
+      "owner": "storyboard-execution",
+      "responsibility": "执行漫剧镜头与分集视频计划，管理后处理租约、来源节点和运行结果。",
+      "owns": [
+        "视频执行契约与状态",
+        "镜头素材准备",
+        "视频结果投影"
+      ],
+      "doesNotOwn": [
+        "视频上游适配器",
+        "React 页面状态",
+        "画布执行 Provider"
+      ],
+      "publicApi": [
+        "executePlan",
+        "runShotVideo",
+        "runEpisodeVideoPlan",
+        "runPostprocessWithLease",
+        "sourceNodeOf"
+      ],
+      "test": [
+        "src/workbenches/storyboard/videoExecution/splitStructure.test.ts"
+      ],
+      "budget": 367
+    },
+    {
+      "module": "src/workbenches/storyboard/videoExecution/materialPreparation.ts",
+      "owner": "storyboard-execution",
+      "responsibility": "准备漫剧视频素材 MIME、父运行标识、镜头素材和分集视频计划。",
+      "owns": [
+        "视频执行契约与状态",
+        "镜头素材准备",
+        "视频结果投影"
+      ],
+      "doesNotOwn": [
+        "视频上游适配器",
+        "React 页面状态",
+        "画布执行 Provider"
+      ],
+      "publicApi": [
+        "assetMimeOf",
+        "humanError",
+        "parentRunIdOf",
+        "prepareShotVideo",
+        "buildShotVideoPlan"
+      ],
+      "test": [
+        "src/workbenches/storyboard/videoExecution/splitStructure.test.ts"
+      ],
+      "budget": 235
+    },
+    {
+      "module": "src/workbenches/storyboard/videoExecution/resultProjection.ts",
+      "owner": "storyboard-execution",
+      "responsibility": "读取合并后的漫剧文档，并把视频运行结果投影回镜头与资产字段。",
+      "owns": [
+        "视频执行契约与状态",
+        "镜头素材准备",
+        "视频结果投影"
+      ],
+      "doesNotOwn": [
+        "视频上游适配器",
+        "React 页面状态",
+        "画布执行 Provider"
+      ],
+      "publicApi": [
+        "loadMergedDocument",
+        "projectVideoResults"
+      ],
+      "test": [
+        "src/workbenches/storyboard/videoExecution/splitStructure.test.ts"
+      ],
+      "budget": 200
+    },
+    {
+      "module": "src/pages/EcommercePage/ecommercePage/pageActionCoordinator.ts",
+      "owner": "pages-ecommerce-actions",
+      "responsibility": "把电商工作台下载、收藏和重试动作解析成目标与端口调用。",
+      "owns": [
+        "工作台动作目标解析",
+        "动作端口调用协调"
+      ],
+      "doesNotOwn": [
+        "结果真源与任务仓储",
+        "React 状态和渲染树",
+        "付费请求执行"
+      ],
+      "publicApi": [
+        "EcommerceActionPorts",
+        "workbenchActionOf"
+      ],
+      "test": [
+        "src/pages/EcommercePage/ecommercePage/pageActionCoordinator.test.ts"
+      ],
+      "budget": 120
+    },
+    {
+      "module": "src/pages/EcommercePage/ecommercePage/pageAiRequests.ts",
+      "owner": "pages-ecommerce-ai",
+      "responsibility": "执行电商意图、卖点和双遍分镜文本请求，并收敛超时与失败。",
+      "owns": [
+        "文本请求端口与响应解析",
+        "双遍分镜失败处理"
+      ],
+      "doesNotOwn": [
+        "渠道状态与路由",
+        "付费生图请求",
+        "React 状态"
+      ],
+      "publicApi": [
+        "EcommerceChatTarget",
+        "EcommerceTextRequestPorts",
+        "requestEcommerceIntent",
+        "requestEcommerceSellingPoints",
+        "EcommerceShotRequestPorts",
+        "requestEcommerceShots"
+      ],
+      "test": [
+        "src/pages/EcommercePage/ecommercePage/pageAiRequests.test.ts"
+      ],
+      "budget": 287
+    },
+    {
+      "module": "src/pages/EcommercePage/ecommercePage/pageDataCoordinator.ts",
+      "owner": "pages-ecommerce-data",
+      "responsibility": "协调电商页刷新、首屏回读、任务状态收口和画布显隐投影。",
+      "owns": [
+        "刷新端口调用顺序",
+        "只读快照与画布投影"
+      ],
+      "doesNotOwn": [
+        "仓储事务与业务状态",
+        "React 状态与 DOM",
+        "React 组件渲染树与 DOM 锚点"
+      ],
+      "publicApi": [
+        "EcommerceWorkbenchSnapshot",
+        "EcommercePageDataPorts",
+        "refreshEcommerceWorkbench",
+        "EcommerceInitialTaskLoad",
+        "loadEcommerceInitialTask",
+        "refreshEcommerceTask",
+        "EcommerceCanvasItemDiff",
+        "projectEcommerceCanvasItemDiff"
+      ],
+      "test": [
+        "src/pages/EcommercePage/ecommercePage/pageDataCoordinator.test.ts"
+      ],
+      "budget": 141
+    },
+    {
+      "module": "src/pages/EcommercePage/ecommercePage/pageResultProjection.ts",
+      "owner": "pages-ecommerce-results",
+      "responsibility": "投影电商结果卡、长图、阶段、批量重试、重跑准备与生成预设。",
+      "owns": [
+        "结果视图数据派生",
+        "长图切片与动作目标投影"
+      ],
+      "doesNotOwn": [
+        "业务状态与执行引擎",
+        "结果持久化",
+        "React 组件渲染树与结果卡 DOM"
+      ],
+      "publicApi": [
+        "EcommerceResultViewContext",
+        "projectEcommerceResults",
+        "longImageTilesOf",
+        "generationStageOfTerminalResults",
+        "retryableResultIdsOf",
+        "EcommerceStoredResultPorts",
+        "prepareStoredResultRerun",
+        "EcommercePrescribedShot",
+        "prescribeEcommerceShots",
+        "imageParamOptionsByModel",
+        "EcommerceWorkbenchActionContext",
+        "workbenchActionTargetOf",
+        "workbenchDisplayStatusOf"
+      ],
+      "test": [
+        "src/pages/EcommercePage/ecommercePage/pageResultProjection.test.ts"
+      ],
+      "budget": 380
+    },
+    {
+      "module": "src/pages/EcommercePage/workbench/workbenchInteraction.ts",
+      "owner": "pages-ecommerce-workbench",
+      "responsibility": "计算电商工作台选择、框选、移动、缩放、旋转与空白手势交互。",
+      "owns": [
+        "指针几何与选择投影",
+        "变换后的工作台条目计算"
+      ],
+      "doesNotOwn": [
+        "React 状态和 DOM 事件注册",
+        "CSS 与文案",
+        "仓储事务"
+      ],
+      "publicApi": [
+        "WorkbenchTool",
+        "WorkbenchAction",
+        "WorkbenchInteraction",
+        "WorkbenchRect",
+        "workbenchPointerWorld",
+        "workbenchSelectionAfterItemPointer",
+        "workbenchMoveInteraction",
+        "workbenchResizeInteraction",
+        "workbenchRotateInteraction",
+        "workbenchBlankInteraction",
+        "marqueeSelectionIds",
+        "workbenchMarqueeSelection",
+        "workbenchPointerBox",
+        "movedWorkbenchItems",
+        "rotatedWorkbenchItems",
+        "resizedWorkbenchItems",
+        "nextWorkbenchObjectPosition",
+        "selectedWorkbenchActions",
+        "workbenchRunLogStateOf"
+      ],
+      "test": [
+        "src/pages/EcommercePage/workbench/workbenchInteraction.test.ts"
+      ],
+      "budget": 394
+    },
+    {
+      "module": "src/platform/channels/runninghubEndpoints/catalogFixture.ts",
+      "owner": "platform-runninghub-catalog",
+      "responsibility": "从官方能力目录构造 RunningHub 端点规格与模型生成夹具。",
+      "owns": [
+        "目录夹具类型与规范化",
+        "端点三片与模型夹具构造"
+      ],
+      "doesNotOwn": [
+        "运行时渠道请求",
+        "UI 与仓储",
+        "生成脚本文件写入"
+      ],
+      "publicApi": [
+        "CatalogParam",
+        "CatalogEndpoint",
+        "CatalogFixture",
+        "createCatalogFixture",
+        "RUNNINGHUB_ENDPOINT_SPECS_A",
+        "RUNNINGHUB_ENDPOINT_SPECS_B",
+        "RUNNINGHUB_ENDPOINT_SPECS_C"
+      ],
+      "test": [
+        "src/platform/channels/runninghubEndpoints/catalogFixture.test.ts"
+      ],
+      "budget": 120
+    },
+    {
+      "module": "src/platform/channels/runninghubEndpoints/contracts.ts",
+      "owner": "platform-runninghub-catalog",
+      "responsibility": "装配分片端点规格和模型表，向公共入口提供稳定值导出。",
+      "owns": [
+        "端点与模型数组装配"
+      ],
+      "doesNotOwn": [
+        "端点原始数据",
+        "模型参数推导",
+        "运行时请求"
+      ],
+      "publicApi": [
+        "RUNNINGHUB_ENDPOINT_SPECS",
+        "RUNNINGHUB_MODELS"
+      ],
+      "test": [
+        "src/platform/channels/runninghubEndpoints/characterization.test.ts"
+      ],
+      "budget": 120
+    },
+    {
+      "module": "src/platform/channels/runninghubEndpoints/endpointSpecs.partA.ts",
+      "owner": "platform-runninghub-catalog",
+      "responsibility": "保存生成目录第一片 RunningHub 端点规格数据。",
+      "owns": [
+        "端点规格第一分片"
+      ],
+      "doesNotOwn": [
+        "其它端点分片",
+        "生成的 RunningHub 模型目录表",
+        "运行时请求"
+      ],
+      "publicApi": [
+        "RUNNINGHUB_ENDPOINT_SPECS_A"
+      ],
+      "test": [
+        "src/platform/channels/runninghubEndpoints/characterization.test.ts"
+      ],
+      "budget": 215
+    },
+    {
+      "module": "src/platform/channels/runninghubEndpoints/endpointSpecs.partB.ts",
+      "owner": "platform-runninghub-catalog",
+      "responsibility": "保存生成目录第二片 RunningHub 端点规格数据。",
+      "owns": [
+        "端点规格第二分片"
+      ],
+      "doesNotOwn": [
+        "其它端点分片",
+        "生成的 RunningHub 模型目录表",
+        "运行时请求"
+      ],
+      "publicApi": [
+        "RUNNINGHUB_ENDPOINT_SPECS_B"
+      ],
+      "test": [
+        "src/platform/channels/runninghubEndpoints/characterization.test.ts"
+      ],
+      "budget": 230
+    },
+    {
+      "module": "src/platform/channels/runninghubEndpoints/endpointSpecs.partC.ts",
+      "owner": "platform-runninghub-catalog",
+      "responsibility": "保存生成目录第三片 RunningHub 端点规格数据。",
+      "owns": [
+        "端点规格第三分片"
+      ],
+      "doesNotOwn": [
+        "其它端点分片",
+        "生成的 RunningHub 模型目录表",
+        "运行时请求"
+      ],
+      "publicApi": [
+        "RUNNINGHUB_ENDPOINT_SPECS_C"
+      ],
+      "test": [
+        "src/platform/channels/runninghubEndpoints/characterization.test.ts"
+      ],
+      "budget": 206
+    },
+    {
+      "module": "src/platform/channels/runninghubEndpoints/models.ts",
+      "owner": "platform-runninghub-catalog",
+      "responsibility": "保存生成的 RunningHub 模型目录与默认参数数据。",
+      "owns": [
+        "模型目录生成数据"
+      ],
+      "doesNotOwn": [
+        "端点规格原始数据",
+        "运行时选路",
+        "渠道状态"
+      ],
+      "publicApi": [
+        "RUNNINGHUB_MODELS"
+      ],
+      "test": [
+        "src/platform/channels/runninghubEndpoints/characterization.test.ts"
+      ],
+      "budget": 375
+    },
+    {
+      "module": "src/platform/channels/runninghubEndpoints/types.ts",
+      "owner": "platform-runninghub-catalog",
+      "responsibility": "定义 RunningHub 端点规格、媒体参数与模型目录的公共类型。",
+      "owns": [
+        "生成目录类型契约"
+      ],
+      "doesNotOwn": [
+        "生成数据",
+        "运行时适配",
+        "渠道状态"
+      ],
+      "publicApi": [
+        "RunningHubMediaParam",
+        "RunningHubDrivenParam",
+        "RunningHubEndpointSpec",
+        "RunningHubModel"
+      ],
+      "test": [
+        "src/platform/channels/runninghubEndpoints/characterization.test.ts"
+      ],
+      "budget": 120
+    },
+    {
+      "module": "src/state/channel/channelStore/contracts.ts",
+      "owner": "channel-store",
+      "responsibility": "定义渠道 Store 内部端口、初始状态与超时信号的共享契约。",
+      "owns": [
+        "Store 内部类型",
+        "初始化状态与超时信号"
+      ],
+      "doesNotOwn": [
+        "渠道公共 action",
+        "请求编排",
+        "凭证密文"
+      ],
+      "publicApi": [
+        "MiniStore",
+        "StoreFactory",
+        "ChannelStore",
+        "ChannelStorePlatform",
+        "initialChannelStoreState",
+        "timeoutSignal"
+      ],
+      "test": [
+        "src/state/channel/channelStore/publicApi.test.ts"
+      ],
+      "budget": 120
+    },
+    {
+      "module": "src/state/channel/channelStore/modelProjections.ts",
+      "owner": "channel-store",
+      "responsibility": "规范化渠道模型缓存、手动分类、路由投影和配置派生。",
+      "owns": [
+        "模型缓存合并与坏行过滤",
+        "路由策略投影"
+      ],
+      "doesNotOwn": [
+        "渠道状态写入",
+        "付费请求与 RunRecord",
+        "UI 渲染"
+      ],
+      "publicApi": [
+        "toCustomProtocolDefinition",
+        "filteredGlobalModels",
+        "findGlobalModel",
+        "withManualCategory",
+        "routeTuningPatch",
+        "loadedRoutingPolicy",
+        "legacyRouteStrategyFor",
+        "normalizedRoutingPolicy",
+        "RefreshModelsProjection",
+        "projectRefreshModels",
+        "clearStaleModelCaches",
+        "staleModelCachePatches",
+        "tokenlessRoutableChannels",
+        "buildRoutePlan",
+        "protocolDefinitionRows",
+        "catalogOf"
+      ],
+      "test": [
+        "src/state/channel/channelStore/modelProjections.test.ts"
+      ],
+      "budget": 286
+    },
+    {
+      "module": "src/state/channel/channelStore/recipeCache.ts",
+      "owner": "channel-store",
+      "responsibility": "读取并更新节点默认配方缓存，避免并发写覆盖较新时间戳。",
+      "owns": [
+        "配方读回与单调时间戳",
+        "默认配方写回"
+      ],
+      "doesNotOwn": [
+        "渠道模型状态",
+        "节点渲染",
+        "持久化事务 owner"
+      ],
+      "publicApi": [
+        "RecipeCachePorts",
+        "RecipeCache",
+        "createRecipeCache"
+      ],
+      "test": [
+        "src/state/channel/channelStore/recipeCache.test.ts"
+      ],
+      "budget": 120
+    },
+    {
+      "module": "src/workbenches/canvas/execution/provider/loopRunPlan.ts",
+      "owner": "canvas-execution-provider",
+      "responsibility": "编排画布循环任务的上游解析、批次排列与逐项运行。",
+      "owns": [
+        "循环任务排列",
+        "循环运行端口协调"
+      ],
+      "doesNotOwn": [
+        "Provider 状态注入",
+        "RunRecord 与 placement 事务",
+        "付费请求适配器"
+      ],
+      "publicApi": [
+        "CanvasLoopRunPorts",
+        "sourceOfLoopTask",
+        "arrangeLoopTasks",
+        "runCanvasLoop"
+      ],
+      "test": [
+        "src/workbenches/canvas/execution/provider/loopRunPlan.test.ts"
+      ],
+      "budget": 187
+    },
+    {
+      "module": "src/workbenches/canvas/execution/provider/promptPreparation.ts",
+      "owner": "canvas-execution-provider",
+      "responsibility": "在画布文本执行前应用选中技能与融合草稿提示词。",
+      "owns": [
+        "技能提示词应用",
+        "融合草稿提示词准备"
+      ],
+      "doesNotOwn": [
+        "工具账本与模型请求",
+        "画布节点事务",
+        "React 渲染"
+      ],
+      "publicApi": [
+        "PromptPreparationResult",
+        "PromptSkill",
+        "CanvasPromptPreparationPorts",
+        "applySelectedSkill",
+        "applyComposeFromDraft"
+      ],
+      "test": [
+        "src/workbenches/canvas/execution/provider/promptPreparation.test.ts"
+      ],
+      "budget": 155
+    },
+    {
+      "module": "src/workbenches/canvas/execution/provider/runCallbacks.ts",
+      "owner": "canvas-execution-provider",
+      "responsibility": "构造画布运行成功、失败和取消回调，保持记录收口顺序。",
+      "owns": [
+        "运行结果回调构造",
+        "回调端口编排"
+      ],
+      "doesNotOwn": [
+        "引擎执行顺序",
+        "RunRecord 事务 owner",
+        "React Provider 的渲染树与 DOM 属性"
+      ],
+      "publicApi": [
+        "CanvasRunCallbacksPorts",
+        "createCanvasRunCallbacks"
+      ],
+      "test": [
+        "src/workbenches/canvas/execution/provider/runCallbacks.test.ts"
+      ],
+      "budget": 175
+    },
+    {
+      "module": "src/workbenches/canvas/execution/provider/textExecution.ts",
+      "owner": "canvas-execution-provider",
+      "responsibility": "按用途执行画布文本请求并保持信号与 trace 契约。",
+      "owns": [
+        "文本执行端口与用途",
+        "取消信号透传"
+      ],
+      "doesNotOwn": [
+        "渠道路由状态",
+        "Provider 队列顺序",
+        "UI 渲染"
+      ],
+      "publicApi": [
+        "CanvasTextPurpose",
+        "CanvasTextRequest",
+        "CanvasCompleteText",
+        "CanvasTextExecutionPorts",
+        "completeCanvasText"
+      ],
+      "test": [
+        "src/workbenches/canvas/execution/provider/textExecution.test.ts"
+      ],
+      "budget": 120
+    },
+    {
+      "module": "src/workbenches/ecommerce/studio/controller/studioFormProjection.ts",
+      "owner": "ecommerce-studio-controller",
+      "responsibility": "投影电商工作室表单初始态、模式选项、字段可见性与输入预设。",
+      "owns": [
+        "表单状态纯投影",
+        "模式参数与展示选项计算"
+      ],
+      "doesNotOwn": [
+        "React state 与表单事件",
+        "DOM、CSS 和文案",
+        "任务仓储"
+      ],
+      "publicApi": [
+        "StudioInitialFormState",
+        "StudioFormProjection",
+        "initialStudioFormState",
+        "applyModeFormPatch",
+        "setStudioModeOption",
+        "toggleStudioModeOption",
+        "ensureStudioModeState",
+        "projectStudioForm",
+        "studioFormDraft",
+        "orderedStudioPlatforms",
+        "pruneSelectedEditNodes",
+        "nextModeFormAfterModelChange",
+        "StudioFieldVisibility",
+        "studioFieldVisibility",
+        "StudioImageParameterChoice",
+        "studioImageParameterChoices",
+        "studioEditPresets",
+        "StudioCarouselCase",
+        "studioCarouselCases"
+      ],
+      "test": [
+        "src/workbenches/ecommerce/studio/controller/studioFormProjection.test.ts"
+      ],
+      "budget": 421
+    },
+    {
+      "module": "src/workbenches/ecommerce/studio/controller/studioRequestCoordinator.ts",
+      "owner": "ecommerce-studio-controller",
+      "responsibility": "装配电商生成请求、校验提交前置条件、协调上传与逐产品提交。",
+      "owns": [
+        "请求字段装配",
+        "提交校验与上传容量计算"
+      ],
+      "doesNotOwn": [
+        "React state 与表单事件",
+        "付费请求适配器",
+        "任务仓储事务"
+      ],
+      "publicApi": [
+        "BuildStudioRequestInput",
+        "buildStudioRequest",
+        "StudioStartValidationInput",
+        "validateStudioStart",
+        "studioRequestForProduct",
+        "usesAiPlan",
+        "StudioSubmissionInput",
+        "submitStudioGeneration",
+        "StudioUploadCapacityInput",
+        "appendProductUpload",
+        "appendReferenceUpload",
+        "uploadRoom",
+        "uploadFailureMessage",
+        "sellingPointFailureMessage",
+        "studioRequestLanguage"
+      ],
+      "test": [
+        "src/workbenches/ecommerce/studio/controller/studioRequestCoordinator.test.ts"
+      ],
+      "budget": 214
+    },
+    {
+      "module": "src/workbenches/ecommerce/studio/controller/studioResultActionCoordinator.ts",
+      "owner": "ecommerce-studio-controller",
+      "responsibility": "协调电商结果单张编辑、批量编辑、超清和上传预览动作。",
+      "owns": [
+        "结果动作提交投影",
+        "批量进度与失败消息计算"
+      ],
+      "doesNotOwn": [
+        "结果状态 owner",
+        "付费请求与 RunRecord",
+        "React 组件渲染树与结果卡 DOM"
+      ],
+      "publicApi": [
+        "StudioEditOptions",
+        "StudioEditSubmission",
+        "studioEditSubmission",
+        "StudioBatchEditSubmission",
+        "studioBatchEditSubmission",
+        "StudioUpscaleProgress",
+        "runStudioUpscale",
+        "availableStudioUpscaleOptions",
+        "studioEditableResult",
+        "studioUpscalableResult",
+        "studioUploadPreviewItems",
+        "studioUploadPreviewStep",
+        "studioEditFailureMessage",
+        "studioBatchEditFailureMessage",
+        "studioUploadFailureMessage"
+      ],
+      "test": [
+        "src/workbenches/ecommerce/studio/controller/studioResultActionCoordinator.test.ts"
+      ],
+      "budget": 160
     }
   ]
 }

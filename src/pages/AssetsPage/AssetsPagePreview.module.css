@@ -1,0 +1,521 @@
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-6);
+  box-sizing: border-box;
+  background: var(--scrim);
+  backdrop-filter: blur(10px);
+}
+
+.previewPanel {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 380px;
+  width: min(1360px, 100%);
+  height: min(820px, calc(100svh - var(--space-8) - var(--space-8)));
+  box-sizing: border-box;
+  background: var(--bg-surface);
+  border: var(--border);
+  border-radius: var(--radius-node);
+  box-shadow: var(--shadow-float);
+  overflow: hidden;
+  animation: previewIn 180ms var(--ease-out) both;
+}
+
+.previewStage {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-8);
+  box-sizing: border-box;
+  background: var(--bg-canvas);
+  border-right: var(--border);
+  overflow: hidden;
+}
+
+.previewNav {
+  position: absolute;
+  top: 50%;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: var(--border);
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--bg-surface) 88%, transparent);
+  color: var(--text-1);
+  font-size: 26px;
+  line-height: 1;
+  cursor: pointer;
+  transform: translateY(-50%);
+}
+
+.previewNav:hover:not(:disabled),
+.previewNav:focus-visible {
+  background: var(--bg-hover);
+}
+
+.previewNav:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.previewNavPrev {
+  left: var(--space-3);
+}
+
+.previewNavNext {
+  right: var(--space-3);
+}
+
+.previewPosition {
+  position: absolute;
+  left: 50%;
+  bottom: var(--space-3);
+  padding: 4px 10px;
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--bg-surface) 88%, transparent);
+  color: var(--text-2);
+  font-size: var(--fs-chip);
+  transform: translateX(-50%);
+}
+
+.previewMedia {
+  max-width: 100%;
+  max-height: 100%;
+  display: block;
+  object-fit: contain;
+  border-radius: var(--radius-control);
+  box-shadow: var(--shadow-float);
+}
+
+.previewDetails {
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-surface);
+  overflow: hidden;
+}
+
+.previewHeader {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-6) var(--space-6) var(--space-4);
+}
+
+.previewBody {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 0 var(--space-6) var(--space-5);
+}
+
+.previewHeading {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.previewTitle {
+  margin: 0;
+  font-size: var(--fs-panel-title);
+  font-weight: var(--fw-panel-title);
+  color: var(--text-1);
+}
+
+.previewSubtitle {
+  margin: 0;
+  color: var(--text-3);
+  font-size: var(--fs-chip);
+  line-height: 1.5;
+}
+
+.iconButton {
+  width: 40px;
+  height: 40px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  border: var(--border);
+  border-radius: var(--radius-control);
+  background: var(--bg-subtle);
+  color: var(--text-2);
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+  transition:
+    background var(--dur-hover) var(--ease-out),
+    color var(--dur-hover) var(--ease-out);
+}
+
+.iconButton:hover {
+  background: var(--bg-hover);
+  color: var(--text-1);
+}
+
+.detailSection {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.detailLabel {
+  margin: 0;
+  color: var(--text-3);
+  font-size: var(--fs-chip);
+  font-weight: var(--fw-chip);
+  line-height: 1.4;
+}
+
+.paletteBoard {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  min-height: 58px;
+  padding: var(--space-2);
+  border: var(--border);
+  border-radius: var(--radius-control);
+  background: var(--bg-subtle);
+}
+
+.swatchItem {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  padding: 4px 8px 4px 4px;
+  /* 现在是一枚 <button>（点击复制色值）⇒ 把按钮的默认外观全抹平，回到它原来的样子 */
+  border: none;
+  border-radius: var(--radius-pill);
+  background: var(--bg-surface);
+  font-family: var(--font-sans);
+  cursor: pointer;
+}
+
+.swatchItem:hover {
+  background: var(--bg-hover);
+}
+
+.swatchItem:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 1px;
+}
+
+.swatch {
+  width: 28px;
+  height: 28px;
+  flex: none;
+  border: var(--border);
+  border-radius: var(--radius-pill);
+}
+
+.swatchWrap {
+  position: relative;
+  flex: none;
+  display: inline-flex;
+}
+
+.swatchCheck {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  border-radius: var(--radius-pill);
+  /*
+   * 垫一层半透明的表面色：色块本身可能是白的也可能是黑的，
+   * 直接画对勾必然有一半看不见 —— 垫底之后在任何颜色上都读得出来。
+   */
+  background: color-mix(in srgb, var(--bg-surface) 82%, transparent);
+  color: var(--text-1);
+  animation: swatchCheckIn var(--dur-hover) var(--ease-out);
+}
+
+.swatchText {
+  color: var(--text-2);
+  font-size: var(--fs-chip);
+  line-height: 1;
+}
+
+.metaMuted {
+  align-self: center;
+  color: var(--text-3);
+  font-size: var(--fs-label);
+}
+
+.promptBlock {
+  max-height: 180px;
+  padding: var(--space-3);
+  border: var(--border);
+  border-radius: var(--radius-control);
+  background: var(--bg-subtle);
+  color: var(--text-1);
+  font-size: var(--fs-label);
+  line-height: 1.7;
+  white-space: pre-wrap;
+  overflow: auto;
+  overflow-wrap: anywhere;
+  /* 整块可点即复制 ⇒ 给出手势提示（块本体仍是 div，语义靠 role/tabIndex 补） */
+  cursor: copy;
+}
+
+.promptBlockCopied {
+  box-shadow: inset 0 0 0 1px var(--focus-ring);
+}
+
+.promptWrap {
+  position: relative;
+}
+
+.promptWrap .promptBlock {
+  padding-right: 64px;
+}
+
+.copyBtn {
+  position: absolute;
+  top: var(--space-2);
+  right: var(--space-2);
+  z-index: 1;
+  padding: 2px var(--space-2);
+  border: var(--border);
+  border-radius: var(--radius-pill);
+  background: var(--bg-surface);
+  color: var(--text-2);
+  font-family: var(--font-sans);
+  font-size: var(--fs-chip);
+  font-weight: var(--fw-chip);
+  cursor: pointer;
+}
+
+.copyBtn:hover:not(:disabled) {
+  background: var(--bg-hover);
+  color: var(--text-1);
+}
+
+.copyBtn:disabled {
+  color: var(--text-3);
+  cursor: not-allowed;
+}
+
+.metaGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-2);
+  margin: 0;
+}
+
+.metaItem {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: var(--space-3);
+  border: var(--border);
+  border-radius: var(--radius-control);
+  background: var(--bg-subtle);
+}
+
+.metaItemWide {
+  grid-column: 1 / -1;
+}
+
+.tagBlock {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: var(--border);
+  border-radius: var(--radius-control);
+  background: var(--bg-subtle);
+}
+
+.tagHead {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.tagLabel {
+  color: var(--text-3);
+  font-size: var(--fs-chip);
+}
+
+.tagRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 24px;
+}
+
+.tagChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 24px;
+  padding: 0 var(--space-2);
+  border: 1px solid var(--stroke);
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--text-1);
+  font-size: var(--fs-chip);
+  font-weight: var(--fw-title);
+}
+
+.tagRemove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--text-3);
+  font-size: var(--fs-chip);
+  line-height: 1;
+  cursor: pointer;
+}
+
+.tagRemove:hover {
+  color: var(--danger);
+}
+
+.tagForm {
+  display: flex;
+}
+
+.tagInput {
+  width: 100%;
+  height: 30px;
+  padding: 0 var(--space-3);
+  border: var(--border);
+  border-radius: var(--radius-control);
+  background: var(--bg-surface);
+  color: var(--text-1);
+  font-family: var(--font-sans);
+  font-size: var(--fs-label);
+}
+
+.tagInput::placeholder {
+  color: var(--text-3);
+}
+
+.tagHint {
+  margin: 0;
+  color: var(--danger);
+  font-size: var(--fs-chip);
+}
+
+.metaItem dt {
+  color: var(--text-3);
+  font-size: var(--fs-chip);
+  line-height: 1.4;
+}
+
+.metaItem dd {
+  min-width: 0;
+  margin: 0;
+  color: var(--text-1);
+  font-size: var(--fs-label);
+  font-weight: var(--fw-title);
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.metaRaw {
+  display: block;
+  margin-top: 2px;
+  color: var(--text-3);
+  font-size: var(--fs-chip);
+  font-weight: 400;
+  overflow-wrap: anywhere;
+}
+
+.previewActions {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+  padding: var(--space-4) var(--space-6) var(--space-5);
+  border-top: var(--border);
+  background: var(--bg-surface);
+}
+
+.previewSpacer {
+  flex: 1 1 auto;
+}
+
+.ghost,
+.dangerGhost {
+  height: 40px;
+  padding: 0 var(--space-3);
+  border-radius: var(--radius-control);
+  font-family: var(--font-sans);
+  font-size: var(--fs-chip);
+  font-weight: var(--fw-chip);
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.ghost,
+.dangerGhost {
+  border: 1px solid var(--stroke);
+  background: var(--bg-surface);
+  color: var(--text-1);
+}
+
+.ghost:hover,
+.dangerGhost:hover {
+  background: var(--bg-hover);
+}
+
+@media (max-width: 880px) {
+  .previewPanel {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(260px, 1fr) minmax(0, 42svh);
+    height: min(860px, calc(100svh - var(--space-6) - var(--space-6)));
+    overflow: auto;
+  }
+  .previewStage {
+    min-height: 260px;
+    padding: var(--space-4);
+    border-right: none;
+    border-bottom: var(--border);
+  }
+  .previewDetails {
+    padding: 0;
+  }
+  .previewHeader {
+    padding: var(--space-5) var(--space-5) var(--space-3);
+  }
+  .previewBody {
+    padding: 0 var(--space-5) var(--space-4);
+  }
+  .previewActions {
+    padding: var(--space-3) var(--space-5) var(--space-4);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .previewPanel {
+    animation: none;
+  }
+}

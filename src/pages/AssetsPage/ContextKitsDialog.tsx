@@ -6,17 +6,10 @@ import type {
   ContextKitAsset,
   ContextKitAssetRole,
   ContextKitColor,
-  ContextKitFact,
   ContextKitFont,
   ContextKitKind,
   ContextKitVersion,
 } from '../../domain/shared/context'
-import { fingerprintBytes } from '../../domain/shared/hash'
-import { imageSizeFromHeader } from '../../domain/shared/imageSize'
-import {
-  ensureFreshDisplayThumb,
-  rememberFreshAsset,
-} from '../../platform/freshAssets'
 import { activeCanvasId } from '../../state/project/activeCanvas'
 import { createProjectRepository } from '../../state/project/repository'
 import { createContextRepository } from '../../state/shared/contextRepository'
@@ -31,139 +24,27 @@ import {
   FONT_SIZE_MAX,
   type UserFont,
 } from '../../domain/ui/fonts'
-import styles from './ContextKitsDialog.module.css'
+import baseStyles from './ContextKitsDialog.module.css'
+import contextKitsShellStyles from './ContextKitsShell.module.css'
+import contextKitsEditorStyles from './ContextKitsEditor.module.css'
+import contextKitsAssetsStyles from './ContextKitsAssets.module.css'
+import {
+  EMPTY_DRAFT,
+  KIT_KINDS,
+  KIT_COPY,
+  draftFromVersion,
+  factsForDraft,
+  versionLabel,
+  type Draft,
+} from './contextKitDraft'
+import { persistContextKitImage } from './contextKitPersistence'
 
-const KIT_KINDS: { value: ContextKitKind; label: string }[] = [
-  { value: 'brand', label: '品牌套件' },
-  { value: 'product', label: '产品套件' },
-  { value: 'role', label: '角色套件' },
-  { value: 'custom', label: '自定义套件' },
-]
-
-const KIT_COPY: Record<
-  ContextKitKind,
-  {
-    namePlaceholder: string
-    guideLabel: string
-    guidePlaceholder: string
-    primaryAssetLabel: string
-    primaryAssetHint: string
-  }
-> = {
-  brand: {
-    namePlaceholder: '未命名品牌套件',
-    guideLabel: '品牌设计指南',
-    guidePlaceholder: '写下品牌语气、版式原则、使用场景和明确的禁区。',
-    primaryAssetLabel: 'Logo',
-    primaryAssetHint: '添加品牌标志或字标',
-  },
-  product: {
-    namePlaceholder: '未命名产品套件',
-    guideLabel: '产品资料',
-    guidePlaceholder: '写下产品结构、材质、外观特征和不可改变的关键细节。',
-    primaryAssetLabel: '产品标志',
-    primaryAssetHint: '添加产品标志或关键识别图',
-  },
-  role: {
-    namePlaceholder: '未命名角色套件',
-    guideLabel: '角色设定',
-    guidePlaceholder: '写下身份、外观、服装、体型和跨画面必须保持一致的细节。',
-    primaryAssetLabel: '角色主图',
-    primaryAssetHint: '添加角色定妆图或身份基准图',
-  },
-  custom: {
-    namePlaceholder: '未命名自定义套件',
-    guideLabel: '套件指南',
-    guidePlaceholder: '写下这套内容需要长期保持的规范、事实和视觉约束。',
-    primaryAssetLabel: '主素材',
-    primaryAssetHint: '添加这套内容的主参考图',
-  },
-}
-
-const MAX_ASSET_BYTES = 20 * 1024 * 1024
-const COLOR_FACT_PREFIX = '颜色/'
-const FONT_FACT_PREFIX = '字体/'
-
-interface Draft {
-  name: string
-  description: string
-  guide: string
-  hiddenFacts: ContextKitFact[]
-  resources: ContextKitAsset[]
-  colors: ContextKitColor[]
-  fonts: ContextKitFont[]
-}
-
-const EMPTY_DRAFT: Draft = {
-  name: '',
-  description: '',
-  guide: '',
-  hiddenFacts: [],
-  resources: [],
-  colors: [],
-  fonts: [],
-}
-
-function legacyColors(facts: readonly ContextKitFact[]): ContextKitColor[] {
-  return facts
-    .filter((fact) => fact.key.startsWith(COLOR_FACT_PREFIX))
-    .flatMap((fact, index) => {
-      if (!/^#[0-9a-f]{6}$/i.test(fact.value.trim())) return []
-      return [
-        {
-          id: `legacy-color-${index}`,
-          name: fact.key.slice(COLOR_FACT_PREFIX.length) || '品牌颜色',
-          value: fact.value.trim().toLowerCase(),
-        },
-      ]
-    })
-}
-
-function legacyFonts(facts: readonly ContextKitFact[]): ContextKitFont[] {
-  return facts
-    .filter((fact) => fact.key.startsWith(FONT_FACT_PREFIX))
-    .map((fact, index) => ({
-      id: `legacy-font-${index}`,
-      name: fact.key.slice(FONT_FACT_PREFIX.length) || '品牌字体',
-      detail: fact.value,
-    }))
-}
-
-function draftFromVersion(kit: ContextKit, version: ContextKitVersion | null): Draft {
-  const facts = version?.facts ?? []
-  const importedColors = version?.colors.length
-    ? version.colors
-    : legacyColors(facts)
-  const importedFonts = version?.fonts.length ? version.fonts : legacyFonts(facts)
-  const managedFacts = new Set([
-    ...importedColors.map((color) => `${COLOR_FACT_PREFIX}${color.name}`),
-    ...importedFonts.map((font) => `${FONT_FACT_PREFIX}${font.name}`),
-  ])
-  return {
-    name: kit.name,
-    description: kit.description,
-    guide: version?.guide ?? '',
-    hiddenFacts: facts.filter((fact) => !managedFacts.has(fact.key)),
-    resources: version?.resources ?? [],
-    colors: importedColors,
-    fonts: importedFonts,
-  }
-}
-
-function factsForDraft(draft: Draft): ContextKitFact[] {
-  return [...draft.hiddenFacts]
-}
-
-function versionLabel(version: ContextKitVersion | null): string {
-  if (!version) return '尚未保存'
-  const parts = [
-    version.guide.trim() ? '设计指南' : '',
-    version.colors.length ? `${version.colors.length} 色` : '',
-    version.fonts.length ? `${version.fonts.length} 字体` : '',
-    version.resources.length ? `${version.resources.length} 素材` : '',
-  ].filter(Boolean)
-  return parts.length ? parts.join(' · ') : '空套件'
-}
+const styles = {
+  ...baseStyles,
+  ...contextKitsShellStyles,
+  ...contextKitsEditorStyles,
+  ...contextKitsAssetsStyles,
+} as Record<string, string>
 
 function ContextAssetThumb({
   resource,
@@ -290,39 +171,8 @@ export function ContextKitsDialog({ onClose }: { onClose: () => void }) {
     blob: Blob,
     name: string,
     role: ContextKitAssetRole,
-  ): Promise<ContextKitAsset> => {
-    if (!blob.type.startsWith('image/')) {
-      throw new Error('这里只支持图片文件')
-    }
-    if (blob.size > MAX_ASSET_BYTES) {
-      throw new Error(`${name || '图片'}超过 20MB`)
-    }
-    const bytes = new Uint8Array(await blob.arrayBuffer())
-    if (bytes.length === 0) throw new Error(`${name || '图片'}没有内容`)
-    const hash = await fingerprintBytes(bytes)
-    const mime = blob.type || 'image/png'
-    const size = imageSizeFromHeader(bytes)
-    const fresh = new Blob([bytes as unknown as BlobPart], { type: mime })
-    rememberFreshAsset(hash, fresh)
-    void ensureFreshDisplayThumb(hash, size)
-    await platform.storage.put(
-      'assets',
-      {
-        id: hash,
-        hash,
-        mime,
-        bytes,
-        ...(size ?? {}),
-        createdAt: Date.now(),
-        projectId: projectId || activeCanvasId() || 'context-kits',
-      } as never,
-    )
-    return {
-      hash,
-      role,
-      name: name.trim() || `素材 ${hash.slice(0, 6)}`,
-    }
-  }
+  ): Promise<ContextKitAsset> =>
+    persistContextKitImage(blob, name, role, projectId, platform.storage)
 
   const addResources = (next: readonly ContextKitAsset[]) => {
     setDraft((current) => {

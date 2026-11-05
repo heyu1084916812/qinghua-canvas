@@ -7,15 +7,13 @@ import {
   useSyncExternalStore,
   useState,
 } from 'react'
-import { clampDuration, type ModelCapability } from '../../../domain/shared/capability'
+import type { ModelCapability } from '../../../domain/shared/capability'
 import type { GenerationData } from '../../../domain/canvas/model/node'
-import type { PanelCollection, PanelModel, PanelThumb, RecipeSnapshot } from './panelModel'
+import type { PanelModel, RecipeSnapshot } from './panelModel'
 import { generationParams } from '../../../domain/canvas/nodeSpecs/params'
-import { customSizeIssue } from '../../../domain/canvas/layout/customSize'
 import { moveInOrder } from './panelModel'
 import { useChannels } from '../../../app/providers/ChannelStoreProvider'
 import { useSkills } from '../../../app/providers/SkillStoreProvider'
-import { useAsset } from '../../../features/shared/assets/index'
 import {
   MentionEditor,
   mentionToken,
@@ -29,15 +27,19 @@ import type { PromptToolTarget } from '../../../features/shared/promptTools/useP
 import { resolveTextRoute } from '../execution/textRoute'
 import { ParamPicker, type ParamSection } from './ParamPicker'
 import { SkillPicker } from './SkillPicker'
-import styles from './CreationPanel.module.css'
+import { creationStyles as styles } from './creation/creationStyles'
+import {
+  CollectionCard,
+  MentionThumb,
+  MentionThumbProbe,
+  Thumb,
+} from './creation/CreationAssetViews'
 /** 浮层外壳（与情绪面板共用一份，见那个文件） */
 import shell from './PanelShell.module.css'
-import { RATIO_FOLLOW_SOURCE } from '../../../domain/canvas/layout/constants'
 import {
+  VIDEO_MODE_LABELS,
   isAutoRatio,
   videoParamsFor,
-  VIDEO_MODE_LABELS,
-  type VideoModeId,
 } from '../../../domain/canvas/layout/videoParams'
 import { MJ_PERSONALIZE_MAX, MJ_SLIDERS, mjSettingsOf } from '../../../domain/canvas/layout/mjParams'
 import { imageParamsFor } from '../../../domain/canvas/layout/imageParams'
@@ -45,14 +47,12 @@ import {
   capabilityOfLogical,
   categoryOfLogical,
   channelIdForLogical,
-  panelModelOptions,
   toLogicalName,
 } from '../../../domain/project/modelCatalog'
 import { ModelIcon } from '../../../features/shared/modelIcon/ModelIcon'
 import {
   IconChevronDown,
   IconChevronUp,
-  IconClose,
   IconPrompt,
   IconPreset,
   IconSpinner,
@@ -64,8 +64,30 @@ import {
 } from '../../../domain/canvas/layout/presets'
 import { PresetMenu, PresetOptions } from './PresetMenu'
 
-/** 生成数量：固定四项（§6.8「1张 / 2张 / 4张 / 9张，固定四项」） */
-export const COUNT_OPTIONS = [1, 2, 4, 9] as const
+import {
+  CATEGORY_OPTIONS,
+  CUSTOM_SIZE_SEED,
+  RESOLUTION_CUSTOM,
+  backgroundLabelOf,
+  promptNeedsExpand,
+  qualityLabelOf,
+  resolutionLabelOf,
+  resolutionValueOf,
+} from './creation/creationCatalog'
+import { creationModelNames, creationModelOptions } from './creation/creationModelOptions'
+import { deriveCreationQualityParams } from './creation/creationQualityParams'
+import { panelGeometryFor } from './creation/creationPanelGeometry'
+
+export {
+  COUNT_OPTIONS,
+  RATIO_OPTIONS,
+  RATIO_FOLLOW_SOURCE,
+  RESOLUTION_CUSTOM,
+  resolutionsOf,
+  ratiosOf,
+  withFollowRatio,
+  promptNeedsExpand,
+} from './creation/creationCatalog'
 /**
  * 比例档位：**九档**（§6.8）。
  *
@@ -76,161 +98,11 @@ export const COUNT_OPTIONS = [1, 2, 4, 9] as const
  * 排序按「方 → 横 → 竖」成对排列，竖版列表里同类相邻，不用在长列表里来回找。
  * 模型**上报了** `aspectRatios` 时仍以模型为准（能力驱动，UI 不写死）。
  */
-export const RATIO_OPTIONS = [
-  '1:1',
-  '1:2',
-  '2:1',
-  '9:16',
-  '16:9',
-  '3:4',
-  '4:3',
-  '3:2',
-  '2:3',
-  '5:4',
-  '4:5',
-  '21:9',
-  '9:21',
-] as const
-
-/** 「跟随素材」档位值取自 domain：执行计划也认它，不能两处各写一份 */
-export { RATIO_FOLLOW_SOURCE }
-/**
- * 画质档位（§6.8）。
- *
- * 首项「自动」= **不向渠道指定画质**（与「质量」chip 同一口径）。
- * 此前只有 1K/2K/4K 三档、没有「自动」，于是未设置时 chip 只能拿字段名「画质」
- * 当占位——用户分不清这是档位名还是「没选」。补上它之后与 `quality` 完全一致：
- * 未设置即显示「自动」，语义是「交给模型决定」。
- */
-const RESOLUTION_OPTIONS: { value: 'auto' | '1k' | '2k' | '4k'; label: string }[] = [
-  /**
-   * `auto` 的文案是**自适应**（用户 2026-10-03 图一那份面板里就叫「自适应」）。
-   *
-   * 语义与视频的比例那档一致：**不向渠道指定**，交给模型自己定。
-   * 只有「这个模型根本没有尺寸档」时才会看到它（如 Midjourney：只有这一档）。
-   */
-  { value: 'auto', label: '自适应' },
-  { value: '1k', label: '1K' },
-  { value: '2k', label: '2K' },
-  { value: '4k', label: '4K' },
-]
-/**
- * 「画质」那排最后一格**自定义像素**的哨兵值（用户 2026-10-15：「自定义要加上」）。
- *
- * 它**只活在界面里**：选中之后真正落到 `data.resolution` 的是用户敲的那个像素本身
- * （如 `1024x1536`）—— 传输层认它，见 `openaiImages.ts` 的 `customImageSize`。
- *
- * ⚠️ 比例网格那一格同名的「自定义」已于 2026-10-16 撤下（用户：「比例也不需要有自定义」）——
- * 画幅由像素那一格说全即可，两个口子并存只会互相矛盾。
- */
-export const RESOLUTION_CUSTOM = '自定义'
-/**
- * 点「自定义」时**先落下的种子值**（用户还没敲字就点生成也不该发一个非法值）。
- *
- * `1024x1024` 落在 gpt-image 文档的合法区间里（16 的倍数、总像素 655360–8294400、
- * 长短边比 ≤ 3:1），所以它既是提示、也是一个能直接用的默认值。
- */
-const CUSTOM_SIZE_SEED = '1024x1024'
-const QUALITY_OPTIONS: { value: 'auto' | 'low' | 'medium' | 'high'; label: string }[] = [
-  { value: 'auto', label: '自动' },
-  { value: 'low', label: '低' },
-  { value: 'medium', label: '中' },
-  { value: 'high', label: '高' },
-]
-/** 视频尺寸档位（§6.8）：自动 / 480p / 720p / 1080p */
-const SIZE_OPTIONS: { value: 'auto' | '480p' | '720p' | '1080p'; label: string }[] = [
-  { value: 'auto', label: '自动' },
-  { value: '480p', label: '480p' },
-  { value: '720p', label: '720p' },
-  { value: '1080p', label: '1080p' },
-]
-/**
- * 功能类别（§6.8「右上角为图片 / 视频功能类别切换」）。
- *
- * 视频**不是另一种节点**，而是同一个生成节点的 `data.mode`——模板「图生视频」
- * 创建的就是 `{ type: 'generation', data: { mode: 'video' } }`。参数集随它切换。
- */
-const CATEGORY_OPTIONS: { value: 'image' | 'video'; label: string }[] = [
-  { value: 'image', label: '图片' },
-  { value: 'video', label: '视频' },
-]
-/** 视频时长滑块边界（模型未声明时，§6.8「滑块 3 – 15 秒」） */
-const DEFAULT_DURATION = 5
-
 /** 提示词节点的 LLM 工具状态（由 PanelLayer 持有 usePromptTools 并下传，§6.7） */
 export interface PanelPromptTools {
   status: 'idle' | 'running' | 'error'
   error: string | null
   run: (text: string, action: PromptToolAction, target?: PromptToolTarget) => void
-}
-
-/**
- * 比例候选（§6.8「按 `aspectRatios` 推导」）：模型上报了就用模型的，没上报用九档兜底。
- *
- * 抽成纯函数是为了能直接测——「模型什么都没报时用户到底看到几档」这件事，
- * 光靠看面板渲染结果（SSR 下浮层是收起的）根本断言不了。
- */
-/**
- * 画质候选档位（§6.8）：**始终是「自动 + 1K / 2K / 4K」全套**。
- *
- * 用户 2026-09-16 报「image-2 没有 4K」：旧实现把模型上报的 `resolutions` 当**白名单**，
- * 模型（或缓存）只报 `['1k','2k']` 时 4K 就被**隐藏**了。而多数中转站的 `/v1/models`
- * 根本不报这个字段，缓存里那两条也很可能只是当初的残缺快照——
- * 「没报」不等于「不支持」，拿它当白名单等于让残缺元数据**永久砍掉**用户可选项。
- *
- * 语义修正：档位**始终给全**；模型明确声明只支持某几档时，由面板把够不到的档位置灰
- * （`ParamPicker` 的 `disabled`），而不是从列表里删掉。看得见但暂时不可选，
- * 比「选项凭空消失、用户以为功能没了」可解释得多。
- */
-export function resolutionsOf(cap?: ModelCapability): string[] {
-  void cap
-  return RESOLUTION_OPTIONS.map((r) => r.value)
-}
-
-/**
- * 比例候选（§6.8）：与 `resolutionsOf` 同一口径——**始终给全 13 档**。
- *
- * 旧实现「模型上报就用模型的」会把残缺的快照当权威：缓存里只有 `['1:1','16:9']` 时，
- * 图形化网格里就只剩两格，用户报「比例没有图例」。13 档是**画布的表达能力**，
- * 不该被一次残缺上报锁死；模型确实不认的比例由渠道层如实报错，而不是界面上先藏掉。
- */
-/**
- * `withFollowSource`：上游**有图片素材**时多一档「跟随素材」（见 `RATIO_FOLLOW_SOURCE`）。
- *
- * 判据是「这次生成有没有参考图」，不是「节点是哪种类型」（2026-09-24 用户拍板）：
- *  - 批量节点自己出图    → 有素材，给这一档；
- *  - 批量 → 下游生成节点 → 那个生成节点也有素材，同样给（此前漏了，这是主要缺口）；
- *  - 普通图生图          → 有参考图，也给，跟随**参考图 1**；
- *  - 纯文生图            → 没有素材可跟随，不给（给了就是死开关）。
- */
-export function ratiosOf(cap?: ModelCapability, withFollowSource = false): string[] {
-  void cap
-  return withFollowRatio(RATIO_OPTIONS, withFollowSource)
-}
-
-/**
- * 给一组比例档**补上「跟随素材」**（已经有就不重复补）。
- *
- * 抽出来是因为比例的来源有三个：模型自己的能力表、通用 13 档、以及视频那几档 ——
- * 而「有没有这一档」这件事**只该由一件事决定：这次生成有没有参考图**
- * （用户 2026-09-24 定稿的规则）。
- *
- * ⚠️ 2026-10-03 修的 bug：这条规则原先只接在「通用 13 档」那一条路上 ——
- * 有规格的模型（GPT Image / Nano Banana / Agnes 图片 / 四个视频档）走的是
- * `spec.ratios`，压根不经过这里，于是**只有 Midjourney 看得到这一档**
- * （用户报：「只有 mj 模型有这个跟随素材的功能」）。现在三个来源都过这道函数，
- * 差别只剩「摆的是哪几档比例」，不再有「哪个模型才有跟随素材」这种漂移。
- */
-export function withFollowRatio(ratios: readonly string[], withFollowSource: boolean): string[] {
-  if (!withFollowSource || ratios.includes(RATIO_FOLLOW_SOURCE)) return [...ratios]
-  return [...ratios, RATIO_FOLLOW_SOURCE]
-}
-
-export function promptNeedsExpand(
-  scrollHeight: number,
-  clientHeight: number,
-): boolean {
-  return scrollHeight > clientHeight + 1
 }
 
 export interface CreationPanelProps {
@@ -348,7 +220,7 @@ export function CreationPanel(props: CreationPanelProps) {
     () => channels.getState().channels,
     () => channels.getState().channels,
   )
-  const customModels = useSyncExternalStore(
+  useSyncExternalStore(
     channels.subscribe,
     () => channels.getState().customModels,
     () => [],
@@ -855,22 +727,27 @@ export function CreationPanel(props: CreationPanelProps) {
    * 渠道模型不在这儿，但**渠道照样能跑**：选路认两种提供方式 ——
    * 渠道勾选列表里有这个显示名，或它的映射表里有一行（`routeCandidatesFor`）。
    */
-  const logicalModelNames: string[] = useMemo(
-    () =>
-      wantedCategory === 'chat'
-        ? panelModelOptions('chat', uncommonModelIds)
-        : channels.globalModelsOf(wantedCategory).map((model) => model.id),
-    [channels, customModels, uncommonModelIds, wantedCategory],
+  const globalModelIds = useMemo(
+    () => channels.globalModelsOf(wantedCategory).map((model) => model.id),
+    [channels, wantedCategory],
   )
-  /** 固定清单条目（有则模型行带厂商图标）；渠道模型没有图标，只出名字 */
-  const modelOptions = logicalModelNames.map((n) => {
-    const preset = channels.globalModelOf(n)
-    return {
-      value: n,
-      label: n,
-      ...(preset ? { icon: <ModelIcon vendor={preset.vendor} /> } : {}),
-    }
-  })
+  const logicalModelNames = useMemo(
+    () => creationModelNames({ wantedCategory, uncommonModelIds, globalModelIds }),
+    [wantedCategory, uncommonModelIds, globalModelIds],
+  )
+  const modelOptions = useMemo(
+    () =>
+      creationModelOptions({
+        wantedCategory,
+        uncommonModelIds,
+        globalModelIds,
+        iconFor: (name) => {
+          const preset = channels.globalModelOf(name)
+          return preset ? <ModelIcon vendor={preset.vendor} /> : undefined
+        },
+      }),
+    [channels, wantedCategory, uncommonModelIds, globalModelIds],
+  )
 /** 节点上存的模型名 → 逻辑名（老数据迁移）：见 `logicalModelNames` 处的说明 */
   const shownLogicalModel = toLogicalName(allChannels, shownModel)
   /**
@@ -968,96 +845,45 @@ export function CreationPanel(props: CreationPanelProps) {
    * 与模型有没有能力表无关（见该函数的说明）。
    */
   /** 这次生成**有没有参考图**：有才有「跟随素材」可跟随 */
-  const hasSource = props.hasSourceImage === true
-  const ratios = withFollowRatio(
-    videoSpec ? videoSpec.ratios : imageSpec ? imageSpec.ratios : ratiosOf(activeModel),
-    hasSource,
-  )
-  /**
-   * 面板上**显示**的比例值。
-   *
-   * 节点上可能存着一个「跟随素材」（上一次选了它、或被配方记忆带过来），
-   * 而这一屏**没有参考图** —— 那就没有可跟随的对象。这时显示成未设置，
-   * 而不是摆一个此刻做不到的值（用户 2026-10-03：「无论有没有素材的时候」
-   * 都看到这一档）。**不写回节点**：接上参考图它就该重新生效。
-   */
-  const storedRatio = String(data.ratio ?? '')
-  const shownRatio = storedRatio === RATIO_FOLLOW_SOURCE && !hasSource ? '' : storedRatio
-  const resolutions: readonly string[] = imageSpec
-    ? [...imageSpec.sizes]
-    : resolutionsOf(activeModel)
-
-  const declaredMax = activeModel?.maxCount
-  const maxCount =
-    imageSpec
-      ? Math.max(...imageSpec.counts)
-      : typeof declaredMax === 'number' && declaredMax > 0
-      ? Math.max(1, declaredMax)
-      : COUNT_OPTIONS[COUNT_OPTIONS.length - 1]
-  const count = Math.max(1, Math.min(data.count ?? 1, maxCount))
-  /** 张数候选：有规格就只摆规格里的（Agnes 图片只有 1 张 ⇒ 这一段整个不摆） */
-  const countChoices: readonly number[] = imageSpec ? imageSpec.counts : COUNT_OPTIONS
-  /** 质量候选：规格里没有就不摆（Agnes 图片们都没有 `quality`） */
-  const qualityChoices = imageSpec ? imageSpec.qualities : QUALITY_OPTIONS.map((q) => q.value)
-
-  /**
-   * 「生成参数」胶囊上的那一行摘要。
-   *
-   * 顺序与胶囊里四段的顺序一致（比例 · 画质 · 质量 · 张数），也就是把原先
-   * 四枚 chip 的文案用「 · 」串起来 —— 用户 2026-10-02 的参考产品就是
-   * 「1K · 中 · 透明底 · 1:1」这种一行说法。
-   */
-  /**
-   * 文案表：**值仍是各家接口的合法枚举**，只在这里换中文标签
-   * （GPT Image 那排 2026-10-16 起只剩 低 / 中 / 高；背景 2026-10-15 起是 默认 / 透明底）。
-   *
-   * ⚠️ 2026-10-15：**去掉「画质」后缀**（用户：「文字上不需要加画质那两个字了，
-   * 直接就是低，标准，这种文字即可」）。六个档位原先每个都背两字后缀，一排下来
-   * 光后缀就占一大截，短标签才排得开 —— 段落标题「画质」已经说明了这是什么，
-   * 每档再说一遍是冗余。
-   *
-   * ⚠️ 2026-10-16：`medium` 的文案由「标准」改为 **「中」**（用户：「只有高中低」）——
-   * 与 `QUALITY_OPTIONS` 那排（低 / 中 / 高）和参考图的口径一致。
-   * `auto` / `xhigh` / `max` 三个键**留着**：它们已不在能力表里，但旧节点上
-   * 可能存过这些值，摘要行照旧要能读成人话而不是 `xhigh` 字面量。
-   */
-  const QUALITY_LABELS: Record<string, string> = {
-    auto: '自动',
-    low: '低',
-    medium: '中',
-    high: '高',
-    xhigh: '超高',
-    max: '极致',
-  }
-  const BACKGROUND_LABELS: Record<string, string> = {
-    /**
-     * 2026-10-15：**砍到两档**（用户：「背景不需要三个了，直接就两个，默认和透明底」）。
-     * `opaque`（原「保留背景」）已从能力表里拿掉；文案也照用户那两格改短
-     * （`自动` → 默认、`透明背景` → 透明底）—— 值没动，仍是接口枚举。
-     */
-    auto: '默认',
-    transparent: '透明底',
-  }
-  const resolutionLabel = (value: string): string =>
-    RESOLUTION_OPTIONS.find((r) => r.value === value)?.label ?? value.toUpperCase()
-  const qualityLabelOf = (value: string): string =>
-    QUALITY_LABELS[value] ?? QUALITY_OPTIONS.find((q) => q.value === value)?.label ?? value
-  const backgroundLabelOf = (value: string): string => BACKGROUND_LABELS[value] ?? value
-  /** 背景档：只有声明支持它的模型（GPT Image）才摆这一段 */
-  const backgroundChoices: readonly string[] = imageSpec ? imageSpec.backgrounds : []
-
-  /**
-   * 摘要只串**这次真的摆出来的那几段**，顺序与面板一致
-   * （图一那份：画质 · 清晰度 · 背景 · 比例 · 生成数量）。
-   */
-  const paramsLabel = [
-    resolutions.length > 0 ? resolutionLabel(data.resolution ?? 'auto') : '',
-    qualityChoices.length > 0 ? qualityLabelOf(data.quality ?? 'auto') : '',
-    backgroundChoices.length > 0 ? backgroundLabelOf(data.background ?? 'auto') : '',
-    ratios.length > 0 ? shownRatio || '比例' : '',
-  ]
-    .filter(Boolean)
-    .join(' · ')
+  const quality = deriveCreationQualityParams({
+    data,
+    activeModel,
+    imageSpec,
+    videoSpec,
+    hasSourceImage: props.hasSourceImage === true,
+    customModeOn,
+  })
+  const {
+    ratios,
+    shownRatio,
+    resolutions,
+    maxCount,
+    count,
+    countChoices,
+    qualityChoices,
+    backgroundChoices,
+    paramsLabel,
+    canCustomSize,
+    customResolutionOn,
+    resolutionPillValue,
+    customSizeHint: customSizeHintValue,
+    sizeChoices,
+    sizeValue,
+    sizeLabel,
+    minSec,
+    maxSec,
+    duration,
+    showDuration,
+    videoModeOptions,
+    videoModeValue,
+    showVideoMode,
+    videoCounts,
+    videoCount,
+    showVideoCount,
+    showGenerateAudio,
+    generateAudio,
+  } = quality
+  const storedResolution = String(data.resolution ?? '')
 
   /**
    * 图片模式的几段，**顺序与分组照用户 2026-10-15 的参考图**：
@@ -1097,57 +923,7 @@ export function CreationPanel(props: CreationPanelProps) {
    * 单独做一个面板」）—— 它已从胶囊里搬出、独立成一枚 chip，见 JSX 里那枚 `count`。
    * 张数是每次都要动的量，与「这一次怎么画」的画质 / 比例不是一类。
    */
-  /** 能自定像素 / 自定比例的只有 `openai-images` 方言（见上面那段说明） */
-  const canCustomSize = imageSpec?.dialect === 'openai-images'
-  const resolutionValueOf = (size: string): string =>
-    /^\d+k$/i.test(size) ? size.toLowerCase() : size
-  /**
-   * 档位表里的值（`1K` → `1k`…）。
-   *
-   * 存着的值**不在表里** = 用户填过一个自定义像素（`1024x1536`），
-   * 或节点是从别的模型带过来的自定义值 —— 两种情况都该把「自定义」那格点亮。
-   */
-  const ladderResolutions = resolutions.map((v) => resolutionValueOf(v))
-  const storedResolution = String(data.resolution ?? '')
-  const storedIsCustomSize = storedResolution !== '' && !ladderResolutions.includes(storedResolution.toLowerCase())
-  /**
-   * 自定义档的三种成立方式（缺一不可）：
-   * ① 这个模型**有能力表**且支持自定义像素（香蕉那类没有，摆了就是死格子）；
-   * ② 存着一个自定义尺寸（**外部来源**：老数据 / 别处写入 / 撤销回来）；
-   * ③ 或者用户**正处在自定义模式**且当前值不是档位值 —— 这一条就是"清空后不消失"的关键：
-   *    值为空时靠它把输入框留住（见 `customMode` 的说明）。
-   */
-  const customResolutionOn =
-    canCustomSize &&
-    (storedIsCustomSize || (customModeOn && !ladderResolutions.includes(storedResolution.toLowerCase())))
-  const resolutionPillValue = customResolutionOn
-    ? RESOLUTION_CUSTOM
-    : ladderResolutions.includes(storedResolution.toLowerCase())
-      ? storedResolution.toLowerCase()
-      : storedResolution
-  /**
-   * **自定义像素填错了要当场说清为什么**（对账 #542，收口 #526 的残留）。
-   *
-   * 规则来自 `domain/canvas/layout/customSize`（**与传输层同一份**）—— 传输层对不合法的值
-   * 是静默回落的（不发 `size`、改走"比例 × 档位"），界面不说话用户就只会觉得"我填了没用"。
-   * 语气分两档：**空** = 只是提醒格式（`muted`）、**填了但不合法** = 这个值不会被采用（`error`）。
-   */
-  const customSizeHintOf = (value: string): { text: string; tone: 'muted' | 'error' } | undefined => {
-    const issue = customSizeIssue(value)
-    if (!issue) return undefined
-    const text =
-      issue === 'format'
-        ? '格式：宽x高，例如 1024x1536'
-        : issue === 'snap'
-          ? '长和宽都要是 16 的倍数'
-          : issue === 'edge'
-            ? '最长边不能超过 3840'
-            : issue === 'pixels'
-              ? '总像素要在 655360–8294400 之间'
-              : '长宽比不能超过 3:1'
-    return { text, tone: value.trim() === '' ? 'muted' : 'error' }
-  }
-  const customSizeHint = customSizeHintOf(storedResolution)
+  const customSizeHint = customSizeHintValue
   const paramSections: ParamSection[] = [
     ...(resolutions.length > 0
       ? [
@@ -1159,7 +935,7 @@ export function CreationPanel(props: CreationPanelProps) {
             options: [
               ...resolutions.map((v) => ({
                 value: resolutionValueOf(v),
-                label: resolutionLabel(v),
+                label: resolutionLabelOf(v),
               })),
               /** 「自定义」那格：选中之后下面才长出输入框（见下一段） */
               ...(canCustomSize
@@ -1279,114 +1055,6 @@ export function CreationPanel(props: CreationPanelProps) {
   ]
 
   /**
-   * 视频参数（§6.8 视频模式；用户 2026-10-03 图三～图十一）：
-   * **生成模式 · 比例 · 清晰度 · 时长 · 生成音频 · 生成数量**。
-   *
-   * 这一段与图片模式**刻意不同**：图片那六枚参数收在一枚胶囊里，而视频这边
-   * 时长是滑块（`ParamPicker` 的三段形态都装不下它），所以仍是「几枚 chip + 一个滑块」。
-   * 每一枚都**只在模型真的声明了它的时候才摆** —— 摆一个点了没用的格子，
-   * 用户会以为功能坏了。
-   */
-  /** 清晰度档：有规格就只按规格出（**去掉 auto / 480P 这种它不认的值**），否则用通用档 */
-  const sizeChoices: { value: string; label: string }[] = videoSpec
-    ? videoSpec.sizes.map((s) => ({ value: s, label: s.toUpperCase() }))
-    : SIZE_OPTIONS.map((s) => ({ value: s.value, label: s.label }))
-  /**
-   * 显示值：**落在该模型认的档位里**。
-   *
-   * 节点上存的可能是上一个模型的档（同一节点换模型不换节点），
-   * 直接拿它去比对就会显示成占位文案「清晰度」—— 看着像「没选」，
-   * 而适配器那边其实会把它夹到最接近的合法档。这里同样落到第一条合法档，
-   * 让界面与实际发出去的值一致（§6.8「所见即所发」）。
-   */
-  const sizeValue =
-    data.size && sizeChoices.some((s) => s.value === data.size)
-      ? data.size
-      : videoSpec
-        ? (sizeChoices[0]?.value ?? 'auto')
-        : (data.size ?? 'auto')
-  const sizeLabel = sizeChoices.find((s) => s.value === sizeValue)?.label ?? '清晰度'
-  /**
-   * 时长：有规格就按规格（图三 4–15、图六 4–30、图八/图十 5–15），
-   * 没有规格才退回通用的 3–15（并按渠道声明的区间收）。
-   */
-  const secondsRange = videoSpec?.seconds
-  const [minSec, maxSec] = secondsRange
-    ? [secondsRange.min, secondsRange.max]
-    : (activeModel?.durations ?? [3, 15])
-  const duration = secondsRange
-    ? Math.min(
-        secondsRange.max,
-        Math.max(secondsRange.min, Math.round(data.durationSec ?? secondsRange.default)),
-      )
-    : clampDuration(data.durationSec ?? DEFAULT_DURATION, activeModel)
-  /** **时长这一段只在模型真有这个参数时出现**（没有 `seconds` 的模型不摆滑块） */
-  const showDuration = Boolean(secondsRange) || !videoSpec
-
-  /**
-   * 生成模式（图四/图五/图七/图九那种下拉）。
-   *
-   * 值优先取 `videoMode`，其次认老字段 `refMode`（这一档的前身，两个值）——
-   * 不认老字段的话，旧项目里选过「首尾帧」的节点打开就变成「文生视频」。
-   */
-  const modeIds: readonly VideoModeId[] = videoSpec
-    ? videoSpec.modes
-    : (['text', 'all-purpose', 'first-last-frame'] as const)
-  const storedMode: VideoModeId | undefined =
-    (typeof data.videoMode === 'string' ? (data.videoMode as VideoModeId) : undefined) ??
-    (data.refMode === 'first-last-frame' || data.refMode === 'all-purpose'
-      ? data.refMode
-      : undefined)
-  const disabledModes = new Set<string>(videoSpec?.disabledModes ?? [])
-  /**
-   * **默认档要跳过置灰项**（用户 2026-10-03 图七/图九那份参考实现里，「文生视频」是灰的）。
-   *
-   * 不跳的话新节点一打开就停在「文生视频」上 —— 用户看到的是「默认选了一个选不了的档」，
-   * 而且他真点生成时才会发现这一档不给用。跳到第一个**可选**的档，
-   * 至少当场就能看出该模型是从哪一档起步的（H3 / H3 Max 都从「图生视频」起）。
-   */
-  const enabledModes = modeIds.filter((id) => !disabledModes.has(id))
-  const videoModeValue: VideoModeId =
-    storedMode && enabledModes.includes(storedMode)
-      ? storedMode
-      : (enabledModes[0] ?? modeIds[0] ?? 'text')
-  /** 只有一档模式就别摆 chip 了（摆了也只能选它） */
-  const showVideoMode = modeIds.length > 1
-  const videoModeOptions = modeIds.map((id) => {
-    const meta = VIDEO_MODE_LABELS[id]
-    /**
-     * Agnes 那条路的「全能参考」补一句**官方文档的用法**（`agnes-video-25`：
-     * reference 模式用 `<Picture N>` / `<Audio N>` / `<Video N>` 指代输入素材）。
-     *
-     * 为什么值得写在面板上：用户 2026-10-03 报「全能参考好像没按我的参考来」——
-     * 除了键名那个真 bug（见 `openaiVideo.ts`），另一半是**用法**：
-     * 提示词里不点名第几张图，模型没有理由照搬它的风格。
-     * 只对 Agnes 那两套方言给这条提示（别家没有这个占位符约定）。
-     */
-    const agnesReference = id === 'all-purpose' && videoSpec?.dialect !== 'openai-videos'
-    return {
-      value: id,
-      label: meta.beta ? `${meta.label} Beta` : meta.label,
-      ...(agnesReference
-        ? { hint: '参考图按连线顺序编号；提示词里可用 <Picture 1> 指代第 1 张' }
-        : {}),
-      ...(disabledModes.has(id)
-        ? { disabled: true, title: `${meta.label}：当前模型不支持这一档` }
-        : {}),
-    }
-  })
-
-  /** 生成数量（图三/图六/图八/图十那排 1/2/4）：**只有一档时整段不摆** */
-  const videoCounts: readonly number[] = videoSpec ? videoSpec.counts : [1]
-  const videoMaxCount = Math.max(...videoCounts)
-  const videoCount = Math.max(1, Math.min(Math.round(data.count ?? 1), videoMaxCount))
-  const showVideoCount = videoCounts.length > 1
-
-  /** 「生成音频」开关：图三/图六有，图八/图十没有 —— 只有声明支持的模型才摆 */
-  const showGenerateAudio = videoSpec?.supportsAudio === true
-  const generateAudio = data.generateAudio ?? true
-
-  /**
    * **Midjourney 的「高级设置」**（用户 2026-10-03 图二）。
    *
    * 它独有、而且别家都没有的那几档风格参数（`--stylize` / `--weird` / `--chaos` / `--p`）
@@ -1473,51 +1141,25 @@ export function CreationPanel(props: CreationPanelProps) {
    * 它不再是**禁用**理由。
    */
   const busyGlobal = false
-  /**
-   * 生成按钮文案（§6.7 / §6.8）。
-   *
-   * 提示词节点**自己不发请求**——执行计划里写死了「提示词节点自己不能发请求：它的语义是
-   * 让下游生成节点出图」。所以面板上这个按钮点下去是**触发下游生成**，文案必须说清这一点，
-   * 否则用户按了半天看到下游在动，会以为按了个寂寞（同「假成功」那一类）。
-   */
-  const runLabel = props.running
-    ? '取消当前生成'
-    : busyGlobal
-      ? '全局工作流运行中'
-      : promptMode || props.runsDownstream
-        ? '生成下游节点'
-        : '生成当前节点'
-
-  // 无可用平台时给出**可点击的**解释：空下拉本身不说明「为什么空」，用户只会觉得点了没反应。
-  // 区分「一个渠道都没建」与「建了但没启用」——后者最容易被误以为已经配好了。
   const noPlatform = enabled.length === 0
-  const platformGap = allChannels.length === 0 ? '还没有添加任何模型服务' : '已添加的模型服务都未启用'
-  /**
-   * 「现在按下去一定不会有反应」这件事，按钮自己先说清楚（用户 2026-09-23 报「没有反应点了」）。
-   *
-   * 此前面板上方已经挂了「还没有配置任何渠道」的引导条，但**生成按钮仍然可点**：
-   * 点下去后执行层 `toRunRequest` 返回 null ⇒ 该节点不进执行计划 ⇒ `runNode` 见到
-   * `plan.tasks.length === 0` 直接 return，于是没有提示、没有报错、没有任何状态。
-   * 用户读到的就是「这个按钮是坏的」。
-   *
-   * **只剩「一个可用渠道都没有」这一条**（用户 2026-09-27 第 8 轮）：
-   * 模型下拉现在**永远有固定显示名**，所以「该类别一个模型都没勾」不再是一个
-   * 必空状态 —— 名字选得出来、映射配好就能跑，按钮不该因此置灰。
-   * 提示词节点那条「暂无可用文本模型」的旧口径也随之取消（它把用户挡在换模型之外）。
-   */
-  const blockedReason = props.running
-    ? null
-    : props.disabled
-      ? '节点已禁用'
-      : noPlatform
-        ? platformGap
-        : null
-  const runDisabled = busyGlobal || blockedReason !== null
-  const runTitle = props.disabled
-    ? '节点已禁用 —— 先启用再生成；它的内容（含已生成的图）不会作为上游输入'
-    : blockedReason
-      ? `${blockedReason}，去后台设置后再生成`
-      : runLabel
+  const geometry = panelGeometryFor({
+    data,
+    nodeId,
+    expandedNodeId,
+    promptMode,
+    runsDownstream: props.runsDownstream === true,
+    running: props.running,
+    disabled: props.disabled === true,
+    enabledChannelCount: enabled.length,
+    allChannelCount: allChannels.length,
+  })
+  const {
+    runLabel,
+    blockedReason,
+    runDisabled,
+    runTitle,
+    platformGap,
+  } = geometry
 
   return (
     <div
@@ -2263,175 +1905,3 @@ export function CreationPanel(props: CreationPanelProps) {
  * 这里是普通 React 行，直接用 `useAsset` 拿 objectURL 就行 —— 别为了「统一」把
  * 菜单也做成命令式，那只会多一份要维护的 DOM。
  */
-function MentionThumb({ hash }: { hash: string | undefined }) {
-  const url = useAsset(hash)
-  return <span className={styles.mentionThumb}>{url ? <img src={url} alt="" /> : null}</span>
-}
-
-/**
- * 不可见的取图探针（见调用处那段说明）。
- *
- * 存在的唯一理由是**hook 规则**：候选是运行期才定的，不能在一个组件里按数量循环
- * 调 `useAsset`。一个候选一个实例就绕开了这件事，而且取到的还是同一个
- * `useAsset`（缩略图行用的那条路），不另开一套取图逻辑。
- */
-function MentionThumbProbe({
-  id,
-  hash,
-  sink,
-  onLoaded,
-}: {
-  id: string
-  hash: string | undefined
-  sink: { current: Map<string, string> }
-  onLoaded: () => void
-}) {
-  const url = useAsset(hash)
-  useEffect(() => {
-    if (!url || sink.current.get(id) === url) return
-    sink.current.set(id, url)
-    onLoaded()
-  }, [id, url, sink, onLoaded])
-  return null
-}
-
-function Thumb({
-  thumb,
-  index,
-  dragging,
-  onDragStart,
-  onDrop,
-  onToggle,
-  onRemove,
-}: {
-  thumb: PanelThumb
-  index: number
-  dragging: boolean
-  onDragStart: () => void
-  onDrop: () => void
-  onToggle: () => void
-  onRemove: () => void
-}) {
-  const url = useAsset(thumb.assetHash)
-  return (
-    <div
-      className={[styles.thumb, dragging ? styles.thumbDragging : '', thumb.visible ? '' : styles.thumbHidden]
-        .filter(Boolean)
-        .join(' ')}
-      draggable
-      onDragStart={onDragStart}
-      onDragOver={(e) => e.preventDefault()}
-      onDrop={onDrop}
-      data-panel-thumb={thumb.id}
-    >
-      {/*
-        画面层单独包一层：**圆角裁切只作用在它身上**（用户 2026-09-21）。
-
-        拆开的原因是两个需求打架：圆角裁图需要 `overflow:hidden`，
-        而角标 / 小眼睛要「探出边框」需要 `overflow:visible`。
-        放在同一个盒子上只能二选一——旧版选了 visible，于是**图片变成方的**
-        （裁切失效），角标也**压在图上**（它只能待在容器内部）。
-        现在裁切下沉到内层，外层保持 visible，两个需求各得其所。
-      */}
-      <span className={styles.thumbFrame}>
-        {url ? (
-          <img src={url} alt="" draggable={false} />
-        ) : (
-          <span className={styles.thumbText} title={thumb.text}>
-            {thumb.text?.trim() ? thumb.text : '空提示词'}
-          </span>
-        )}
-      </span>
-      {/*
-        编号角标：**骑在左上角外沿**（用户 2026-09-21：「遮住了素材」）。
-        它原先贴在容器内的 (1,1)，数字直接盖在图片上。现在向内收 − 向外探，
-        既让开画面、又能被一眼看到。
-      */}
-      <span className={styles.badge}>{index + 1}</span>
-      {/* 小眼睛：右上，隐性（hover / 选中才显形） */}
-      <button
-        type="button"
-        className={`${styles.eye} ${styles.eyeAtBottom}`}
-        title={thumb.visible ? '本次生成包含该素材' : '本次生成跳过该素材'}
-        aria-label={thumb.visible ? '跳过该素材' : '启用该素材'}
-        aria-pressed={thumb.visible}
-        onClick={(e) => {
-          e.stopPropagation()
-          onToggle()
-        }}
-      >
-        {thumb.visible ? '👁' : '⃠'}
-      </button>
-      {/*
-        删除角标：**中心骑在右上角顶点**（用户 2026-09-21）。
-        与左上的编号角标对称——都是「中心落在角顶点」的骑角做法。
-
-        语义按来源分两种（见 panelModel 的说明）：
-        - 上游缩略图 → 删掉那条连线；
-        - 自身素材 → 清空本节点的图，回到「没上传图片」状态。
-        两者都进撤销栈，误删能撤回。
-      */}
-      {thumb.removable && (
-        <button
-          type="button"
-          className={styles.deleteBadge}
-          data-thumb-delete={thumb.id}
-          title={thumb.owner === 'upstream' ? '移除该上游素材（删除连线）' : '清除素材'}
-          aria-label={thumb.owner === 'upstream' ? '移除该上游素材（删除连线）' : '清除素材'}
-          onPointerDown={(e) => e.stopPropagation()}
-          onClick={(e) => {
-            e.stopPropagation()
-            onRemove()
-          }}
-        >
-          <IconClose size={12} />
-        </button>
-      )}
-    </div>
-  )
-}
-
-/**
- * 集合卡（产品文档 §6.12「作为上游：集合卡」）。
- *
- * 批量节点作为上游连到生成节点时，第一部分**不展开**内部素材，
- * 只显示一张标注数量的卡；数量已排除隐藏项。可与其他缩略图拖动排序
- * （M3 只支持容器内部排序，集合卡顺序跟随容器 childIds）。
- */
-function CollectionCard({
-  collection,
-  onToggle,
-}: {
-  collection: PanelCollection
-  onToggle: () => void
-}) {
-  const label = collection.kind === 'prompt' ? '提示词' : '素材'
-  return (
-    <div
-      className={`${styles.collection} ${collection.visible ? '' : styles.thumbHidden}`}
-      data-panel-collection={collection.id}
-      data-panel-collection-count={collection.count}
-      title={`集合：${collection.count} 个${label}`}
-    >
-      <span className={styles.collectionBadge}>{collection.count}</span>
-      <span className={styles.collectionText}>
-        集合
-        <br />
-        {label}
-      </span>
-      <button
-        type="button"
-        className={styles.eye}
-        title={collection.visible ? '本次生成包含该集合' : '本次生成跳过该集合'}
-        aria-label={collection.visible ? '跳过该集合' : '启用该集合'}
-        aria-pressed={collection.visible}
-        onClick={(e) => {
-          e.stopPropagation()
-          onToggle()
-        }}
-      >
-        {collection.visible ? '👁' : '⃠'}
-      </button>
-    </div>
-  )
-}

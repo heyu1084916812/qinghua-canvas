@@ -349,6 +349,7 @@ export function useAgentPanelTurnModel({
     current,
     status,
     messages,
+    sessions: { messagesFor: (sessionId) => sessions.messagesFor(sessionId) },
     controller,
     activeQueueTurnOf,
     currentTurnJobIdRef,

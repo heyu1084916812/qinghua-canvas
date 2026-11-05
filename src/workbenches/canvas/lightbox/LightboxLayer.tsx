@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import type {
-  CSSProperties,
   PointerEvent as ReactPointerEvent,
   WheelEvent as ReactWheelEvent,
 } from 'react'
@@ -9,8 +8,7 @@ import { useAssetMeta } from '../../../features/shared/assets/index'
 import { usePlatform } from '../../../app/providers/PlatformProvider'
 import type { Rect } from '../../../domain/canvas/geometry/rect'
 import type { Viewport } from '../../../domain/canvas/geometry/coords'
-import { screenToWorld } from '../../../domain/canvas/geometry/coords'
-import { fitViewport, panBy, zoomAt } from '../../../domain/canvas/geometry/transform'
+import { fitViewport } from '../../../domain/canvas/geometry/transform'
 import type { FusionRect } from '../../../domain/canvas/model/node'
 import {
   CROP_HANDLES,
@@ -40,25 +38,52 @@ import {
 import { saveAnnotatedAsset } from '../annotate/bakeAnnotate'
 import { saveRotatedAsset } from '../rotate/bakeRotate'
 import {
-  IconAnnotate,
   IconCheck,
   IconChevronLeft,
   IconChevronRight,
   IconClose,
-  IconCompare,
-  IconCrop,
   IconDelete,
-  IconImage,
   IconMirrorH,
   IconMirrorV,
-  IconRect,
   IconRedo,
-  IconRotate,
-  IconScan,
-  IconText,
   IconUndo,
 } from '../toolbar/icons'
 import styles from './LightboxLayer.module.css'
+import {
+  DRAG_SLOP,
+  FIT_PADDING,
+  cropBoxOf,
+  dragPan,
+  imagePointAt,
+  mediaBoxOf,
+  wheelZoom,
+} from './lightboxViewportMath'
+import {
+  isMiddlePointer,
+  isPrimaryPointer,
+  isTextEditingTarget,
+  lightboxKeyAction,
+  shouldCloseOnStageClick,
+  type CompareView,
+  type LightboxEditorMode,
+} from './lightboxKeyboard'
+import {
+  availableEditorModes,
+  compareHashOf,
+  galleryViewOf,
+  initialEditorModeOf,
+  ownerNodeOf,
+} from './lightboxGallery'
+import {
+  compareClipPathOf,
+  compareViewOf,
+  compareViewsOf,
+  redoAnnotation,
+  splitRatioAt,
+  undoAnnotation,
+} from './lightboxEditState'
+import { ANNOTATE_TOOLS, EDITOR_MODES, HANDLE_POS } from './lightboxCatalog'
+import { GalleryThumb } from './LightboxGalleryThumb'
 
 /**
  * 素材灯箱（产品文档 §6.17）。
@@ -75,100 +100,14 @@ import styles from './LightboxLayer.module.css'
  * 只持有瞬时态：开合状态在 store（与 menu / notice 同口径，不落库不进撤销栈），
  * 缩放 / 平移是组件本地 state——关掉即忘，下次打开重新适配。
  */
-/** 顶部现在有两排浮条（模式 + 当前工具），初次适配给它们留出不被压住的余量。 */
-const FIT_PADDING = 112
-/** 滚轮每格倍率（与画布一致的手感：一格约 12%） */
-const WHEEL_STEP = 1.12
-/** 超过这个位移就算「拖过」，不再当成「点击空白关闭」 */
-const DRAG_SLOP = 3
-
-/**
- * 八个手柄在框内的位置（百分比 → 跟着框缩放）+ 各自的鼠标指针形状。
- * 用内联几何而不是八个 CSS 类：位置与手柄 id 的一致性一眼可见，改起来只有一处。
- */
-const HANDLE_POS: Record<CropHandle, CSSProperties> = {
-  nw: { left: 0, top: 0, cursor: 'nwse-resize' },
-  n: { left: '50%', top: 0, cursor: 'ns-resize' },
-  ne: { left: '100%', top: 0, cursor: 'nesw-resize' },
-  e: { left: '100%', top: '50%', cursor: 'ew-resize' },
-  se: { left: '100%', top: '100%', cursor: 'nwse-resize' },
-  s: { left: '50%', top: '100%', cursor: 'ns-resize' },
-  sw: { left: 0, top: '100%', cursor: 'nesw-resize' },
-  w: { left: 0, top: '50%', cursor: 'ew-resize' },
-}
-
-/** 对比灯箱三档：first = assetHash，second = compareWith；文案由 compareKind 决定 */
-type CompareView = 'first' | 'split' | 'second'
-
-/** 灯箱底部的模式切换：查看 / 提取选区 / 裁剪 / 框脸 / 标注 / 旋转 / 对比 */
-const EDITOR_MODES = [
-  { id: 'view', label: '查看', icon: <IconImage size={16} /> },
-  { id: 'extract', label: '提取选区', icon: <IconScan size={16} /> },
-  { id: 'crop', label: '裁剪', icon: <IconCrop size={16} /> },
-  { id: 'face', label: '框脸', icon: <IconScan size={16} /> },
-  { id: 'annotate', label: '标注', icon: <IconAnnotate size={16} /> },
-  { id: 'rotate', label: '旋转', icon: <IconRotate size={16} /> },
-  { id: 'compare', label: '对比', icon: <IconCompare size={16} /> },
-] as const
-type EditorMode = (typeof EDITOR_MODES)[number]['id']
-
-/** 标注模式的三件工具（用户 2026-10-05 第 10 条：画笔 / 矩形 / 文字） */
-const ANNOTATE_TOOLS = [
-  { id: 'brush', label: '画笔', icon: <IconAnnotate size={16} /> },
-  { id: 'rect', label: '矩形', icon: <IconRect size={16} /> },
-  { id: 'text', label: '文字', icon: <IconText size={16} /> },
-] as const
-
-function GalleryThumb({
-  item,
-  index,
-  active,
-  onSelect,
-}: {
-  item: { assetHash: string; nodeId: string; title: string }
-  index: number
-  active: boolean
-  onSelect: (index: number) => void
-}) {
-  const { url, mime } = useAssetMeta(item.assetHash)
-  const video = (mime ?? '').startsWith('video/')
-  return (
-    <button
-      type="button"
-      className={active ? styles.galleryThumbOn : styles.galleryThumb}
-      data-lightbox-thumbnail={index}
-      data-lightbox-thumbnail-active={active ? 'true' : undefined}
-      aria-label={`查看第 ${index + 1} 张：${item.title}`}
-      aria-current={active ? 'true' : undefined}
-      title={item.title}
-      onPointerDown={(event) => event.stopPropagation()}
-      onClick={(event) => {
-        event.stopPropagation()
-        onSelect(index)
-      }}
-    >
-      {url ? (
-        video ? (
-          <video src={url} muted playsInline preload="metadata" />
-        ) : (
-          <img src={url} alt="" draggable={false} />
-        )
-      ) : (
-        <IconImage size={16} />
-      )}
-    </button>
-  )
-}
+type EditorMode = LightboxEditorMode
 
 export function LightboxLayer() {
   const store = useCanvasStore()
   const platform = usePlatform()
   const lightbox = useSyncExternalStore(store.subscribe, store.getLightbox, store.getLightbox)
   const assetHash = lightbox?.assetHash
-  const gallery = lightbox?.gallery ?? []
-  const galleryIndex = lightbox?.galleryIndex ?? 0
-  const galleryItem = gallery[galleryIndex]
-  const hasGalleryNavigation = gallery.length > 1
+  const { gallery, galleryIndex, galleryItem, hasGalleryNavigation } = galleryViewOf(lightbox)
   const { url, mime } = useAssetMeta(assetHash)
   const isVideo = (mime ?? '').startsWith('video/')
 
@@ -210,13 +149,7 @@ export function LightboxLayer() {
    * 于是「查看 → 选区 / 标注 / 旋转」可以全在灯箱里切换。
    * 同一 hash 被多个节点引用时取第一个；这是编辑目标，不会用来改画布结构。
    */
-  const ownerNode = (() => {
-    if (!assetHash) return undefined
-    return store.getSnapshot().nodes.find((n) => {
-      const data = n.data as { assetHash?: unknown }
-      return data.assetHash === assetHash
-    })
-  })()
+  const ownerNode = ownerNodeOf(store.getSnapshot().nodes, assetHash)
   const ownerNodeId = ownerNode?.id ?? ''
   const cropNodeId = cropFor ?? faceFor ?? ownerNodeId
   const rotateNodeId = lightbox?.rotateFor ?? ownerNodeId
@@ -247,21 +180,16 @@ export function LightboxLayer() {
       const data = n.data as { assetHash?: unknown; compareWith?: unknown }
       return data.assetHash === assetHash && typeof data.compareWith === 'string'
     })
-    setMode(
-      faceFor
-        ? 'face'
-        : cropFor
-          ? cropPlain
-            ? 'crop'
-            : 'extract'
-        : lightbox?.rotateFor
-          ? 'rotate'
-          : lightbox?.annotateFor
-            ? 'annotate'
-            : lightbox?.compareWith || nodeHasComparePair
-              ? 'compare'
-              : 'view',
-    )
+    setMode(initialEditorModeOf({
+      assetHash,
+      faceFor,
+      cropFor,
+      cropPlain,
+      rotateFor: lightbox?.rotateFor,
+      annotateFor: lightbox?.annotateFor,
+      compareWith: lightbox?.compareWith,
+      nodeHasComparePair,
+    }))
   }, [
     assetHash,
     store,
@@ -280,19 +208,11 @@ export function LightboxLayer() {
    * 原图融出来的」在产出那一刻就定了。读不到配对（老节点 / 素材被删）时对比入口
    * 自动不出现 —— 不猜，也不给一个点不通的开关。
    */
-  const compareHash = (() => {
-    if (!assetHash) return null
-    /**
-     * **调用方显式给了配对就用它**（对比节点双击进来：那两张图来自两个不同的上游节点，
-     * 节点上根本没有 `compareWith` 可读 —— 见 store 的 `openLightbox` 说明）。
-     */
-    if (lightbox?.compareWith) return lightbox.compareWith
-    for (const n of store.getSnapshot().nodes) {
-      const d = n.data as { assetHash?: string; compareWith?: string }
-      if (d.assetHash === assetHash && d.compareWith) return d.compareWith
-    }
-    return null
-  })()
+  const compareHash = compareHashOf(
+    store.getSnapshot().nodes,
+    assetHash,
+    lightbox?.compareWith,
+  )
   const compareAsset = useAssetMeta(compareHash ?? undefined)
   const compareUrl = compareAsset.url
   const compareIsVideo = (compareAsset.mime ?? '').startsWith('video/')
@@ -407,25 +327,16 @@ export function LightboxLayer() {
     if (!assetHash) return
     closeRef.current?.focus()
     const onKey = (e: KeyboardEvent) => {
-      const editingText =
-        e.target instanceof HTMLElement &&
-        (e.target.isContentEditable ||
-          e.target.tagName === 'INPUT' ||
-          e.target.tagName === 'TEXTAREA')
-      if (e.key === 'Escape' && !editingText) {
-        e.preventDefault()
-        close()
-        return
-      }
-      if (
-        mode === 'view' &&
-        hasGalleryNavigation &&
-        !editingText &&
-        (e.key === 'ArrowLeft' || e.key === 'ArrowRight')
-      ) {
-        e.preventDefault()
-        navigateGallery(e.key === 'ArrowLeft' ? -1 : 1)
-      }
+      const editingText = isTextEditingTarget(
+        e.target instanceof HTMLElement
+          ? { tagName: e.target.tagName, isContentEditable: e.target.isContentEditable }
+          : null,
+      )
+      const action = lightboxKeyAction({ key: e.key, editingText, mode, hasGalleryNavigation })
+      if (action.kind === 'ignore') return
+      e.preventDefault()
+      if (action.kind === 'close') close()
+      else navigateGallery(action.delta)
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
@@ -502,15 +413,8 @@ export function LightboxLayer() {
   }
 
   /** 屏幕坐标 → **原图像素**坐标（夹在图内）。灯箱把图放在世界 (0,0)，故就是 screenToWorld */
-  const imgPointAt = (clientX: number, clientY: number): { x: number; y: number } | null => {
-    const r = rectNow()
-    if (!r || !vp || !natural) return null
-    const p = screenToWorld({ x: clientX, y: clientY }, vp, r)
-    return {
-      x: Math.max(0, Math.min(natural.w, p.x)),
-      y: Math.max(0, Math.min(natural.h, p.y)),
-    }
-  }
+  const imgPointAt = (clientX: number, clientY: number): { x: number; y: number } | null =>
+    imagePointAt(clientX, clientY, natural, vp, rectNow())
 
   /** 把框吸附到当前比例档（只缩不放）+ 夹进图内 —— 复用融合节点那套几何，不另写一份 */
   const lockCrop = (rect: FusionRect): FusionRect => {
@@ -536,7 +440,7 @@ export function LightboxLayer() {
      * 那一下就会变成「搬框」而视图纹丝不动 —— 而他以为自己按的是平移。
      * 非左键**直接放行**（不 `stopPropagation`），让它照旧冒到舞台那条通用平移去。
      */
-    if (e.button !== 0) return
+    if (!isPrimaryPointer(e.button)) return
     e.stopPropagation()
     e.preventDefault()
     movedRef.current = true
@@ -594,7 +498,7 @@ export function LightboxLayer() {
   const startResize = (handle: CropHandle, e: ReactPointerEvent) => {
     if (!cropRect || !natural) return
     /** 同 `startMove`：手柄也只有左键能拖，中键一律让给「平移视图」 */
-    if (e.button !== 0) return
+    if (!isPrimaryPointer(e.button)) return
     // 手柄在舞台里面：不拦这一下就会被当成「在空白处重新画框」，一拖就把原框擦掉
     e.stopPropagation()
     e.preventDefault()
@@ -696,7 +600,7 @@ export function LightboxLayer() {
    * - `stopPropagation` 不是可选项：不拦的话舞台会同时起手平移，画一笔 = 图跑一下。
    */
   const onAnnDown = (e: ReactPointerEvent<HTMLCanvasElement>) => {
-    if (e.button !== 0) return
+    if (!isPrimaryPointer(e.button)) return
     e.stopPropagation()
     const p = annPointOf(e)
     if (annTool === 'text') {
@@ -769,7 +673,7 @@ export function LightboxLayer() {
   }
 
   const startTextMove = (e: ReactPointerEvent, item: AnnotateTextItem) => {
-    if (e.button !== 0 || !vp) return
+    if (!isPrimaryPointer(e.button) || !vp) return
     e.stopPropagation()
     e.preventDefault()
     selectTextItem(item.id)
@@ -795,7 +699,7 @@ export function LightboxLayer() {
   }
 
   const startTextResize = (e: ReactPointerEvent, item: AnnotateTextItem) => {
-    if (e.button !== 0 || !vp) return
+    if (!isPrimaryPointer(e.button) || !vp) return
     e.stopPropagation()
     e.preventDefault()
     selectTextItem(item.id)
@@ -833,29 +737,22 @@ export function LightboxLayer() {
 
   /** 撤销 / 重做 = 把操作列表切一刀（重放即得画面，不需要存快照） */
   const undoAnn = () => {
-    setAnnOps((prev) => {
-      if (prev.length === 0) return prev
-      const last = prev[prev.length - 1]!
-      setAnnUndone((u) => [last, ...u])
-      return prev.slice(0, -1)
-    })
+    const next = undoAnnotation(annOps)
+    setAnnOps(next.ops)
+    if (next.undone.length > 0) setAnnUndone((previous) => [...next.undone, ...previous])
   }
 
   const redoAnn = () => {
-    setAnnUndone((prev) => {
-      if (prev.length === 0) return prev
-      const [first, ...rest] = prev
-      setAnnOps((o) => [...o, first!])
-      return rest
-    })
+    const next = redoAnnotation(annOps, annUndone)
+    setAnnOps(next.ops)
+    setAnnUndone(next.undone)
   }
 
   const onWheel = (e: ReactWheelEvent) => {
     const rect = rectNow()
     if (!vp || !rect) return
     e.preventDefault()
-    const factor = e.deltaY < 0 ? WHEEL_STEP : 1 / WHEEL_STEP
-    setVp(zoomAt(vp, { x: e.clientX, y: e.clientY }, rect, vp.zoom * factor))
+    setVp(wheelZoom(vp, e.deltaY, e.clientX, e.clientY, rect))
   }
 
   const onPointerDown = (e: ReactPointerEvent) => {
@@ -869,11 +766,11 @@ export function LightboxLayer() {
      *
      * 中键还要 `preventDefault()`：不拦的话浏览器会同时启动自己的「中键自动滚动」。
      */
-    if (cropping && e.button === 0) {
+    if (cropping && isPrimaryPointer(e.button)) {
       startCrop(e)
       return
     }
-    if (e.button === 1) e.preventDefault()
+    if (isMiddlePointer(e.button)) e.preventDefault()
     movedRef.current = false
     const start = { x: e.clientX, y: e.clientY }
     let last = start
@@ -885,7 +782,7 @@ export function LightboxLayer() {
       if (Math.abs(ev.clientX - start.x) + Math.abs(ev.clientY - start.y) > DRAG_SLOP) {
         movedRef.current = true
       }
-      current = panBy(current, dx, dy)
+      current = dragPan(current, dx, dy)
       setVp(current)
     }
     const up = () => {
@@ -916,14 +813,7 @@ export function LightboxLayer() {
       ),
     )
   }
-  const box = placed
-    ? {
-        left: -vp.x * vp.zoom,
-        top: -vp.y * vp.zoom,
-        width: natural.w * vp.zoom,
-        height: natural.h * vp.zoom,
-      }
-    : undefined
+  const box = placed ? mediaBoxOf(natural, vp) : undefined
   /**
    * 旋转模式：预览直接挂在灯箱这张图上（用户 2026-10-16：「交互不变，可以拖动，缩放」）——
    * `box` 管的是它在舞台里的矩形，`transform` 只叠在自己身上，两者不冲突。
@@ -938,15 +828,7 @@ export function LightboxLayer() {
         }
       : box
   /** 选区框：同一套世界 → 屏幕换算（与媒体框同源，缩放平移时不会漂） */
-  const cropBox =
-    placed && cropRect
-      ? {
-          left: -vp.x * vp.zoom + cropRect.x * vp.zoom,
-          top: -vp.y * vp.zoom + cropRect.y * vp.zoom,
-          width: cropRect.w * vp.zoom,
-          height: cropRect.h * vp.zoom,
-        }
-      : undefined
+  const cropBox = placed ? cropBoxOf(cropRect, vp) : undefined
   /**
    * 「确认」可用：两种框选模式共用同一套判据（拖了一个够大的框）。
    * 短边下限仍是 `FUSION_MIN_EDGE` —— 它管的是「这个框是认真拖的，不是误触」，
@@ -1007,36 +889,19 @@ export function LightboxLayer() {
 
   /** 有真实配对、两边都是图才给「对比」入口；是否处于该模式由 `mode` 决定。 */
   const compareAvailable = !!compareHash && !!compareUrl && !isVideo && !compareIsVideo
-  const view: CompareView = mode === 'compare' && compareAvailable ? compareView : 'first'
+  const view = compareViewOf(mode, compareAvailable, compareView)
   const splitActive = view === 'split'
   const showSecondOnly = view === 'second'
-  const compareViews =
-    compareKind === 'pair'
-      ? [
-          { id: 'first' as const, label: 'A · 左' },
-          { id: 'split' as const, label: '对比' },
-          { id: 'second' as const, label: 'B · 右' },
-        ]
-      : [
-          { id: 'first' as const, label: '结果' },
-          { id: 'split' as const, label: '对比' },
-          { id: 'second' as const, label: '原图' },
-        ]
+  const compareViews = compareViewsOf(compareKind)
   const compareLeftHash = compareKind === 'pair' ? assetHash : compareHash
   const compareRightHash = compareKind === 'pair' ? compareHash : assetHash
   /** 主图：切到第二张时换成 compareWith（整块几何仍按 assetHash 那张算） */
   const primaryUrl = showSecondOnly ? (compareUrl ?? url) : url
   const primaryIsVideo = showSecondOnly ? compareIsVideo : isVideo
-  const compareClipPath =
-    compareKind === 'pair'
-      ? `inset(0 0 0 ${(splitRatio * 100).toFixed(3)}%)`
-      : `inset(0 ${((1 - splitRatio) * 100).toFixed(3)}% 0 0)`
+  const compareClipPath = compareClipPathOf(compareKind, splitRatio)
   /** 分割线位置：只改本地瞬时值，不进撤销栈（与对比节点同一口径） */
-  const splitAt = (clientX: number, stageRect: Rect): number => {
-    if (!box || box.width <= 0) return splitRatio
-    const rel = clientX - stageRect.x - box.left
-    return Math.min(0.95, Math.max(0.05, rel / box.width))
-  }
+  const splitAt = (clientX: number, stageRect: Rect): number =>
+    splitRatioAt(clientX, stageRect, box, splitRatio)
   const startSplitDrag = (e: ReactPointerEvent) => {
     e.stopPropagation()
     e.preventDefault()
@@ -1060,15 +925,10 @@ export function LightboxLayer() {
   }
 
   const selectedTextItem = annTextItems.find((item) => item.id === selectedTextId) ?? null
-  const availableModes = EDITOR_MODES.filter((m) => {
-    if (m.id === 'view') return true
-    if (m.id === 'extract') return canCrop && !faceFor
-    if (m.id === 'crop') return canCrop && !faceFor
-    if (m.id === 'face') return canCrop && !!faceFor
-    if (m.id === 'annotate') return canAnnotate
-    if (m.id === 'rotate') return canRotate
-    return compareAvailable
-  })
+  const availableModeIds = new Set(
+    availableEditorModes({ canCrop, canAnnotate, canRotate, compareAvailable, faceFor }),
+  )
+  const availableModes = EDITOR_MODES.filter((m) => availableModeIds.has(m.id))
 
   return (
     <div
@@ -1106,10 +966,7 @@ export function LightboxLayer() {
         onWheel={onWheel}
         onPointerDown={onPointerDown}
         onClick={() => {
-          // 编辑模式不吃空白单击关闭：刚框好的框、刚画的一笔、正在旋转的预览不能被误点清掉
-          if (cropping || mode === 'annotate' || mode === 'rotate') return
-          // 拖动松手也会触发 click：只有没拖过的单击才关闭（与版本预览同口径）
-          if (movedRef.current) return
+          if (!shouldCloseOnStageClick({ cropping, mode, moved: movedRef.current })) return
           close()
         }}
       >

@@ -19,6 +19,7 @@ import { AgentToolEffectBlockedError } from '../../../../features/shared/agent/A
 import type {
   AgentOutcomeCoordinationResult,
 } from './agentOutcomeCoordinator'
+import { resolveContinuationMessages } from './agentSessionBrief'
 
 type AgentContinuationStatus =
   | { kind: 'thinking' }
@@ -32,11 +33,19 @@ export interface AgentContinuationLoopDepsInput {
   visualNodeIds: readonly string[]
   turnTools: readonly ToolDeclaration[]
   turnController: AbortController
+  sessionBrief?: string
 }
 
 export interface AgentContinuationRunInput {
   session: AgentSession
   messages: readonly ChatMessage[]
+  /** Persisted history of this exact session; never use React messages from another session. */
+  sessions?: {
+    messagesFor: (sessionId: string) => Promise<readonly ChatMessage[]>
+  }
+  sessionBrief?: (messages: readonly ChatMessage[]) => string | undefined
+  localRevision?: number
+  sessionRevision?: number
   activeQueueTurnId: () => string | undefined
   currentTurnId: () => string | undefined
   turnOrigin: (
@@ -128,6 +137,25 @@ export async function runAgentContinuation(
     input.currentTurnId() ??
     (input.createTurnId?.() ?? createId('turnmsg'))
 
+  const continuationMessages = input.sessions
+    ? await resolveContinuationMessages({
+        sessionId: input.session.id,
+        localMessages: input.messages,
+        localRevision: input.localRevision ?? input.session.messageRevision,
+        sessionRevision: input.sessionRevision ?? input.session.messageRevision,
+        sessions: input.sessions,
+        ...(input.session.taskPlan ? { taskPlan: input.session.taskPlan } : {}),
+        ...(input.session.continuation
+          ? { runRecord: { status: 'paused', reason: `max_steps=${input.session.continuation.maxSteps}` } }
+          : {}),
+        promptProfile: input.sessionBrief ? 'full' : 'light',
+      })
+    : { messages: [...input.messages], source: 'local' as const }
+  const brief = input.sessionBrief?.(continuationMessages.messages)
+  const continuationHistory = brief && continuationMessages.messages[0]?.role !== 'system'
+    ? [{ role: 'system' as const, content: brief }, ...continuationMessages.messages]
+    : continuationMessages.messages
+
   if (!input.isActivityActive()) {
     if (
       queueTurnId &&
@@ -161,7 +189,7 @@ export async function runAgentContinuation(
     const outcome: AgentLoopOutcome = {
       kind: 'error',
       message,
-      messages: [...input.messages],
+      messages: [...continuationHistory],
       phase: 'continuation_route',
     }
     let applied: AgentOutcomeCoordinationResult = 'ignored'
@@ -225,9 +253,10 @@ export async function runAgentContinuation(
     operationId: createId('op'),
     route: route.route,
     toolMode: input.toolMode(),
-    visualNodeIds: latestUserImageNodeIds(input.messages),
+    visualNodeIds: latestUserImageNodeIds(continuationHistory),
     turnTools: input.turnTools(),
     turnController: continuationAbort,
+    ...(brief ? { sessionBrief: brief } : {}),
   })
   await input.transitionSessionJob(
     input.session.id,
@@ -240,7 +269,7 @@ export async function runAgentContinuation(
   input.setStatus({ kind: 'thinking' })
   try {
     const initial = await input.runAgentTurn(
-      input.messages,
+      continuationHistory,
       currentLoopDeps,
     )
     const outcome = await input.continueAutoConfirmations(

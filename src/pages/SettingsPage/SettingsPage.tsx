@@ -11,8 +11,6 @@ import { useChannels } from '../../app/providers/ChannelStoreProvider'
 import { noticeA11y, type NoticeTone } from '../../domain/ui/notice'
 import {
   channelCapabilities,
-  maskTokenTail,
-  protocolNeedsNoToken,
   protocolLabel,
   protocolShort,
   type Channel,
@@ -22,7 +20,6 @@ import {
   protocolById,
   type CustomProtocolInput,
   type ProtocolDefinition,
-  type ProtocolKind,
 } from '../../domain/project/protocol'
 import {
   DECLARATIVE_PROTOCOL_TEMPLATE,
@@ -46,17 +43,34 @@ import {
   routeMapOptions,
   type CategoryFilter,
 } from '../../domain/project/modelSelection'
-import styles from './SettingsPage.module.css'
+import baseStyles from './SettingsPage.module.css'
+import settingsChannelListStyles from './SettingsChannelList.module.css'
+import settingsChannelListDetailsStyles from './SettingsChannelListDetails.module.css'
+import settingsRoutePolicyStyles from './SettingsRoutePolicy.module.css'
+import settingsChannelFormStyles from './SettingsChannelForm.module.css'
+import settingsModelMappingStyles from './SettingsModelMapping.module.css'
+import settingsAppearanceSystemStyles from './SettingsAppearanceSystem.module.css'
+import { ChannelTokenField } from './SettingsChannelTokenField'
+import { SettingsChannelAvatar } from './SettingsChannelAvatar'
+import { routingCandidatesFor, routingChannelGroupsFor, selectedRoutingKeysFor, nextAllowedCandidatesFor, channelMenuGeometry } from './settingsPageRoutingRules'
+import { channelMenuArrowFocus, drawerTabFocus } from './settingsPageOverlayRules'
 import {
   ROUTE_PLAN_STRATEGIES,
-  routeCandidateKey,
-  type RouteCandidateRef,
   type RoutePlanStrategy,
 } from '../../domain/project/routePlan'
-import type { PresetModel, PresetVendor } from '../../domain/project/modelPresets'
+import {
+  CHANNEL_FILTER_OPTIONS,
+  GLOBAL_MODEL_VENDORS,
+  MAP_FILTERS,
+  PROTOCOL_GROUPS,
+  measureProfileDrawerBounds,
+  type ChannelFilterKey,
+  type MapFilterKey,
+  type PresetModel,
+  type PresetVendor,
+} from './settingsPageConstants'
 import type { ModelCapability } from '../../domain/shared/capability'
 import { ModelIcon } from '../../features/shared/modelIcon/ModelIcon'
-import { ChannelIcon } from '../../features/shared/channelIcon/ChannelIcon'
 import { readChannelIconFile } from '../../features/shared/channelIcon/readIconFile'
 import { isBuiltinChannelId } from '../../domain/project/builtinChannels'
 import { ModelMapCombo, StrategyPicker } from './SettingsPicker'
@@ -76,12 +90,21 @@ import {
   IconClose,
   IconChannels,
 } from '../../app/SettingsIcons'
-import { hasChannelBrandIcon } from '../../features/shared/channelIcon/ChannelIcon'
 import {
   customProtocolIdForName,
   customProtocolShortForName,
   protocolVersionForBaseUrl,
 } from './customProtocolDraft'
+
+const styles = {
+  ...baseStyles,
+  ...settingsChannelListStyles,
+  ...settingsChannelListDetailsStyles,
+  ...settingsRoutePolicyStyles,
+  ...settingsChannelFormStyles,
+  ...settingsModelMappingStyles,
+  ...settingsAppearanceSystemStyles,
+} as Record<string, string>
 
 /**
  * 模型映射区的**五个筛选**（用户 2026-10-08 第 1 条：「图一这个模型映射的地方换成五个筛选吧，
@@ -95,338 +118,6 @@ import {
  * 这也是为什么筛选键用 `string` 而不是去扩 `ModelCapability['category']`：
  * 扩那个联合要动渠道拉取 / 选路 / 画布面板一整条链，而清单里现在并没有那两类模型。
  */
-const MAP_FILTERS = [
-  { key: 'image', title: '生图' },
-  { key: 'chat', title: '对话' },
-  { key: 'video', title: '视频' },
-  { key: 'audio', title: '音频' },
-] as const
-
-type MapFilterKey = (typeof MAP_FILTERS)[number]['key']
-
-type ChannelFilterKey = 'all' | 'enabled' | 'disabled'
-
-const CHANNEL_FILTER_OPTIONS: { value: ChannelFilterKey; label: string }[] = [
-  { value: 'all', label: '全部服务商' },
-  { value: 'enabled', label: '仅已启用' },
-  { value: 'disabled', label: '仅已禁用' },
-]
-
-function channelInitial(name: string): string {
-  return Array.from(name.trim())[0]?.toUpperCase() ?? '?'
-}
-
-function channelMonogramTone(name: string): number {
-  let hash = 0
-  for (const char of name) hash = (hash * 31 + (char.codePointAt(0) ?? 0)) >>> 0
-  return hash % 6
-}
-
-function measureProfileDrawerBounds() {
-  const rect = document
-    .querySelector<HTMLElement>('[data-settings-workarea]')
-    ?.getBoundingClientRect()
-  if (!rect || rect.width <= 0 || rect.height <= 0) return null
-  return {
-    left: Math.round(rect.left),
-    top: Math.round(rect.top),
-    width: Math.round(rect.width),
-    height: Math.round(rect.height),
-  }
-}
-
-const GLOBAL_MODEL_VENDORS: { value: PresetVendor; label: string }[] = [
-  { value: 'openai', label: 'OpenAI' },
-  { value: 'google', label: 'Google' },
-  { value: 'midjourney', label: 'Midjourney' },
-  { value: 'bytedance', label: '字节跳动' },
-  { value: 'minimax', label: 'MiniMax' },
-  { value: 'fal', label: 'fal' },
-  { value: 'alibaba', label: '阿里' },
-  { value: 'agnes', label: 'Agnes' },
-  { value: 'deepseek', label: 'DeepSeek' },
-  { value: 'zhipu', label: '智谱' },
-  { value: 'tencent', label: '腾讯' },
-  { value: 'anthropic', label: 'Anthropic' },
-  { value: 'xai', label: 'xAI' },
-  { value: 'mistral', label: 'Mistral' },
-  { value: 'moonshot', label: 'Moonshot' },
-  { value: 'baidu', label: '百度' },
-  { value: 'cohere', label: 'Cohere' },
-  { value: 'perplexity', label: 'Perplexity' },
-  { value: 'stability', label: 'Stability' },
-  { value: 'runway', label: 'Runway' },
-  { value: 'luma', label: 'Luma' },
-  { value: 'ideogram', label: 'Ideogram' },
-  { value: 'bfl', label: 'BFL' },
-  { value: 'recraft', label: 'Recraft' },
-  { value: 'kling', label: '可灵' },
-  { value: 'suno', label: 'Suno' },
-  { value: 'elevenlabs', label: 'ElevenLabs' },
-  { value: 'ollama', label: 'Ollama' },
-  { value: 'huggingface', label: 'Hugging Face' },
-  { value: 'openrouter', label: 'OpenRouter' },
-  { value: 'siliconcloud', label: '硅基流动' },
-  { value: 'modelscope', label: 'ModelScope' },
-  { value: 'doubao', label: '豆包' },
-  { value: 'volcengine', label: '火山引擎' },
-  { value: 'flux', label: 'FLUX' },
-  { value: 'jimeng', label: '即梦' },
-]
-
-
-/**
- * 协议下拉的分组顺序（用户 2026-09-28「一站一协议」）。
- *
- * 分组只影响**看见的顺序**，不影响行为：`kind` 与协议目录里的取值同字面。
- * 站点排在前是因为「一站一条渠道」之后，用户多数时候是在选具体站点；
- * 公开模板与旧协议往下放，避免它们挤掉最常用的那几条。
- */
-const PROTOCOL_GROUPS: { kind: ProtocolKind; label: string }[] = [
-  { kind: 'offline', label: '离线 / 测试' },
-  { kind: 'station', label: '站点' },
-  { kind: 'public', label: '公开协议' },
-  { kind: 'legacy', label: '旧协议' },
-  { kind: 'custom', label: '自定义协议' },
-]
-
-/**
- * 后台模型设置页（产品文档 §7）。
- * 左：渠道列表（可拖动排序）；右：选中渠道的配置（名称 / 地址 / 加密令牌 / 启用 / 协议 / 验证）
- * + 模型管理（§7.4：拉取 → 勾选 → 已选三行分组）。
- * 所有写操作经 useChannels() 的 channel store，直连 storage + 凭据层，不进画布 undo 栈。
- */
-/**
- * **一行令牌**（用户第 22 批 #358：「RunningHub有两个令牌，一个是币的，一个是金额的，做在一个渠道里面」）。
- *
- * 为什么抽成组件：原来那段内联 JSX 只服务"一把钥匙"，再接一把就得复制一份 ——
- * 两份迟早分叉。这里按 `slot` 驱动，**协议声明了几把就渲染几行**。
- *
- * "已保存"的判据是外面传进来的**尾号**（`savedTail`）：它是 store 里的真相，
- * 组件自己不再存一份 `tokenSaved`；存完 / 删完由 store 变化把新尾号推下来。
- * 明文依旧只在保存那一瞬间经手（`saveToken` 之后本地清空输入框）。
- */
-function ChannelTokenField({
-  channels,
-  channelId,
-  slot,
-  groupId,
-  label,
-  hint,
-  required,
-  docUrl,
-  savedTail,
-  saved,
-}: {
-  channels: ReturnType<typeof useChannels>
-  channelId: string
-  slot: 'primary' | 'alt'
-  /** 有值时走渠道内 Key 分组；slot 只作为老双槽的兼容身份。 */
-  groupId?: string
-  label: string
-  hint?: string
-  required?: boolean
-  docUrl: string
-  /** 已保存令牌的尾 4 位；null = 这一槽没存过 */
-  savedTail: string | null
-  /**
-   * **这一槽存过没有**（对账 #517）。
-   *
-   * 它是「已保存」的唯一判据；尾号只负责**显示成什么**。
-   * 两者分开才不会把"存了但没有尾号的短令牌"显示成没保存
-   * （短令牌没尾号是刻意设计：9 位上露 4 位等于把大半个密钥打在界面上）。
-   */
-  saved: boolean
-}) {
-  const [token, setToken] = useState('')
-  const [show, setShow] = useState(false)
-  /**
-   * 「显示」那一刻从凭据层读回来的**明文**。
-   *
-   * 只活在这一屏：切回「隐藏」、保存、删除、换渠道都立刻丢掉（不落库、不进日志）。
-   */
-  const [revealed, setRevealed] = useState<string | null>(null)
-  const [busy, setBusy] = useState(false)
-  const masked = savedTail ? maskTokenTail(savedTail) : ''
-  /** 存过但没尾号时也要给一句看得见的确认，不能看起来像没保存 */
-  const savedText = masked || (saved ? '已保存' : '')
-
-  /** 换了渠道 / 换了槽位：把"已显示"这件事清掉，免得上一条的明文挂在新渠道上 */
-  useEffect(() => {
-    setShow(false)
-    setRevealed(null)
-  }, [channelId, slot, groupId])
-
-  /**
-   * 「显示 / 隐藏」（用户 2026-10-08 第 5 条：「渠道的令牌显示功能是不生效的」）。
-   *
-   * **为什么以前点了没反应**：它只切了输入框的 `type`，而已存的令牌从来只以
-   * **打码占位符**出现（明文不进界面）⇒ 输入框里根本没有可显示的东西，切了也看不出变化。
-   * 现在「显示」= **真去凭据层读一次**：输入框里是用户刚敲的就显示刚敲的，
-   * 否则显示存好的那把（读回明文这条链路见 `channelStore.loadToken`）。
-   */
-  const toggleShow = async () => {
-    if (show) {
-      setShow(false)
-      setRevealed(null)
-      return
-    }
-    setBusy(true)
-    try {
-      const plain = groupId
-        ? await channels.loadCredentialGroupToken(channelId, groupId)
-        : await channels.loadToken(channelId, slot)
-      setRevealed(token ? token : saved ? plain : null)
-      setShow(true)
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  /** 显示态下编辑的是**明文那一份**；隐藏态下编辑的是"准备保存的新令牌" */
-  const shownValue = show ? (revealed ?? token) : token
-  const onTokenChange = (next: string) => {
-    setToken(next)
-    if (show) setRevealed(next)
-  }
-
-  const save = async () => {
-    if (!token) return
-    setBusy(true)
-    try {
-      if (groupId) await channels.saveCredentialGroupToken(channelId, groupId, token)
-      else await channels.saveToken(channelId, token, slot)
-      setToken('')
-      /* 存完回到"打码占位"的常态：明文不再留在界面上 */
-      setShow(false)
-      setRevealed(null)
-    } finally {
-      setBusy(false)
-    }
-  }
-  const remove = async () => {
-    setBusy(true)
-    try {
-      if (groupId) await channels.removeCredentialGroupToken(channelId, groupId)
-      else await channels.removeToken(channelId, slot)
-      setToken('')
-      setShow(false)
-      setRevealed(null)
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  return (
-    <div className={styles.field} data-settings-token-row={groupId ?? slot}>
-      <span className={styles.labelRow}>
-        <span className={styles.label}>
-          {label}
-          {required && <span className={styles.tokenRequired}>必填</span>}
-        </span>
-        {docUrl && (
-          <a
-            className={styles.docLink}
-            data-settings-doc-link={groupId ?? slot}
-            href={docUrl}
-            target="_blank"
-            rel="noreferrer"
-          >
-            去官网获取令牌
-          </a>
-        )}
-      </span>
-      <div className={styles.tokenRow}>
-        <input
-          className={styles.input}
-          data-settings-token-tail={groupId ?? slot}
-          type={show ? 'text' : 'password'}
-          /**
-           * 已存过时，输入框**直接显示存好的那一把（中间打码）**（用户第 19 批 #3、
-           * 参考图五 `••••••••Sm3a`）。用 `placeholder` 不是 `value`：整串明文不进界面，
-           * 放进 value 的话用户一按保存就会把那串圆点当成新令牌存进去。
-           */
-          placeholder={saved ? savedText : '粘贴 API Key'}
-          value={shownValue}
-          onChange={(e) => onTokenChange(e.target.value)}
-        />
-        <button
-          className={styles.ghostBtn}
-          data-settings-token-reveal={groupId ?? slot}
-          /* 既没存过、输入框也是空的 ⇒ 没有东西可显示（不给"按下去没反应"的按钮） */
-          disabled={busy || (!saved && !token)}
-          onClick={() => void toggleShow()}
-        >
-          {show ? '隐藏' : '显示'}
-        </button>
-        <button
-          className={styles.ghostBtn}
-          data-settings-token-save={groupId ?? slot}
-          disabled={!token || busy}
-          onClick={() => void save()}
-        >
-          保存
-        </button>
-        <button
-          className={styles.ghostBtn}
-          data-settings-token-remove={groupId ?? slot}
-          disabled={!saved || busy}
-          onClick={() => void remove()}
-        >
-          删除
-        </button>
-      </div>
-      {hint && <span className={styles.cardSub}>{hint}</span>}
-    </div>
-  )
-}
-
-function SettingsChannelAvatar({
-  channelId,
-  protocol,
-  icon,
-  name,
-  size,
-}: {
-  channelId?: string
-  protocol: string
-  icon?: string | null
-  name: string
-  size: number
-}) {
-  const hasVisual = Boolean(icon) || hasChannelBrandIcon(protocol)
-  const kind = hasVisual ? 'image' : 'monogram'
-  return (
-    <span
-      className={
-        hasVisual
-          ? `${styles.channelAvatarFrame} ${styles.channelAvatarOutline}`
-          : `${styles.channelAvatarFrame} ${styles.channelAvatarFilled} ${styles[`monogramTone${channelMonogramTone(name)}`]}`
-      }
-      data-channel-avatar-frame
-      data-channel-avatar-kind={kind}
-      data-channel-monogram={hasVisual ? undefined : channelId}
-      style={{ width: size, height: size }}
-      aria-hidden
-    >
-      {hasVisual ? (
-        <ChannelIcon
-          protocol={protocol}
-          icon={icon}
-          size={Math.max(14, size - 4)}
-        />
-      ) : (
-        <span
-          className={styles.channelMonogramText}
-          style={{ fontSize: Math.max(12, Math.round(size * 0.4)) }}
-        >
-          {channelInitial(name)}
-        </span>
-      )}
-    </span>
-  )
-}
-
 export function SettingsPage({ embedded = false }: { embedded?: boolean } = {}) {
   const channels = useChannels()
   const channelsList = useSyncExternalStore(
@@ -586,81 +277,23 @@ export function SettingsPage({ embedded = false }: { embedded?: boolean } = {}) 
   const platform = usePlatform()
   /** 桌面壳里才有本机命令（对账 #308）：状态行文案据此区分"本机命令"与"地址" */
   const hasLocalCli = platform.cli != null
-  const routingCandidates = useMemo(() => {
-    return channelsList.filter((channel) => channel.enabled).flatMap((channel) => {
-      const tokenless = protocolNeedsNoToken(channel.protocol, hasLocalCli)
-      const groups =
-        channel.credentialGroups.length > 0
-          ? channel.credentialGroups.map((group) => ({
-              id: group.id,
-              name: group.name,
-              hasToken: tokenless || group.hasToken,
-            }))
-          : [{
-              id: undefined,
-              name: '渠道级 Key',
-              hasToken: tokenless || channel.hasToken,
-            }]
-      return groups.map((group) => {
-        const ref: RouteCandidateRef = {
-          channelId: channel.id,
-          ...(group.id ? { credentialGroupId: group.id } : {}),
-        }
-        return {
-          ref,
-          key: routeCandidateKey(ref),
-          channelName: channel.name,
-          groupName: group.name,
-          hasToken: group.hasToken,
-          enabled: channel.enabled,
-        }
-      })
-    })
-  }, [channelsList, hasLocalCli])
-  const routingChannelGroups = useMemo(() => {
-    const groups = new Map<
-      string,
-      {
-        channelId: string
-        channelName: string
-        candidates: typeof routingCandidates
-      }
-    >()
-    for (const candidate of routingCandidates) {
-      const current = groups.get(candidate.ref.channelId)
-      if (current) {
-        current.candidates.push(candidate)
-      } else {
-        groups.set(candidate.ref.channelId, {
-          channelId: candidate.ref.channelId,
-          channelName: candidate.channelName,
-          candidates: [candidate],
-        })
-      }
-    }
-    return [...groups.values()]
-  }, [routingCandidates])
-  const allRoutingCandidateKeys = useMemo(
-    () => new Set(routingCandidates.map((candidate) => candidate.key)),
+  const routingCandidates = useMemo(
+    () => routingCandidatesFor(channelsList, hasLocalCli),
+    [channelsList, hasLocalCli],
+  )
+  const routingChannelGroups = useMemo(
+    () => routingChannelGroupsFor(routingCandidates),
     [routingCandidates],
   )
-  const selectedRoutingCandidateKeys =
-    routingPolicy.allowedCandidates.length === 0
-      ? allRoutingCandidateKeys
-      : new Set(
-          routingPolicy.allowedCandidates
-            .map(routeCandidateKey)
-            .filter((key) => allRoutingCandidateKeys.has(key)),
-        )
+  const selectedRoutingCandidateKeys = useMemo(
+    () => selectedRoutingKeysFor(routingCandidates, routingPolicy.allowedCandidates),
+    [routingCandidates, routingPolicy.allowedCandidates],
+  )
 
   const setRoutingCandidateKeys = (next: Set<string>) => {
     if (next.size === 0) return
-    const allowedCandidates =
-      next.size === routingCandidates.length
-        ? []
-        : routingCandidates
-            .filter((candidate) => next.has(candidate.key))
-            .map((candidate) => candidate.ref)
+    const allowedCandidates = nextAllowedCandidatesFor(routingCandidates, next)
+    if (!allowedCandidates) return
     void channels.setRoutingPolicy({ allowedCandidates })
   }
 
@@ -847,24 +480,7 @@ export function SettingsPage({ embedded = false }: { embedded?: boolean } = {}) 
         setProfileDrawerOpen(false)
         return
       }
-      if (event.key !== 'Tab') return
-      const drawer = document.querySelector<HTMLElement>('[data-settings-profile-drawer]')
-      if (!drawer) return
-      const focusable = Array.from(
-        drawer.querySelectorAll<HTMLElement>(
-          'button:not(:disabled), input:not(:disabled), [tabindex]:not([tabindex="-1"])',
-        ),
-      )
-      if (focusable.length === 0) return
-      const first = focusable[0]
-      const last = focusable[focusable.length - 1]
-      if (event.shiftKey && document.activeElement === first) {
-        event.preventDefault()
-        last.focus()
-      } else if (!event.shiftKey && document.activeElement === last) {
-        event.preventDefault()
-        first.focus()
-      }
+      drawerTabFocus(event, document.querySelector<HTMLElement>('[data-settings-profile-drawer]'))
     }
     document.addEventListener('keydown', onKeyDown)
     window.addEventListener('resize', syncBounds)
@@ -1549,15 +1165,12 @@ export function SettingsPage({ embedded = false }: { embedded?: boolean } = {}) 
     ? channelsList.find((channel) => channel.id === channelMenu.channelId) ?? null
     : null
   const menuBuiltin = !!menuChannel && isBuiltinChannelId(menuChannel.id)
-  const menuWidth = 184
-  const menuHeight = menuConfirmDelete ? 164 : menuBuiltin ? 52 : 104
-  const menuLeft = channelMenu
-    ? Math.max(8, Math.min(channelMenu.x, window.innerWidth - menuWidth - 8))
-    : 0
-  const menuTop = channelMenu
-    ? Math.max(8, Math.min(channelMenu.y, window.innerHeight - menuHeight - 8))
-    : 0
-
+  const { width: menuWidth, left: menuLeft, top: menuTop } = channelMenuGeometry(
+    channelMenu,
+    { width: window.innerWidth, height: window.innerHeight },
+    menuConfirmDelete,
+    menuBuiltin,
+  )
   return (
     <div className={styles.page}>
       {/*
@@ -2939,18 +2552,7 @@ export function SettingsPage({ embedded = false }: { embedded?: boolean } = {}) 
               role="menu"
               aria-label={`${menuChannel.name} 操作`}
               style={{ left: menuLeft, top: menuTop, width: menuWidth }}
-              onKeyDown={(event) => {
-                if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return
-                event.preventDefault()
-                const items = [
-                  ...(event.currentTarget.querySelectorAll<HTMLButtonElement>('button:not(:disabled)') ??
-                    []),
-                ]
-                if (items.length === 0) return
-                const current = items.indexOf(document.activeElement as HTMLButtonElement)
-                const delta = event.key === 'ArrowDown' ? 1 : -1
-                items[(current + delta + items.length) % items.length]?.focus()
-              }}
+              onKeyDown={channelMenuArrowFocus}
             >
               {menuConfirmDelete ? (
                 <>

@@ -1,0 +1,289 @@
+.card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  overflow: visible;
+  cursor: pointer;
+  transition: color var(--dur-hover) var(--ease-out);
+}
+.card:hover {
+  color: var(--text-1);
+}
+.card:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+.cardSelected {
+  color: var(--accent);
+}
+
+.thumb {
+  width: 303px;
+  height: 180px;
+  flex: none;
+  background: var(--bg-subtle);
+  background-image:
+    linear-gradient(var(--grid-line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
+  background-size: 24px 24px;
+  overflow: hidden;
+  border-radius: var(--radius-control);
+}
+
+.cover {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+}
+
+.cardBody {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  padding: 0;
+}
+.cardName {
+  font-size: var(--fs-nav);
+  line-height: var(--lh-nav);
+  font-weight: 500;
+  color: var(--text-1);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.cardMeta {
+  font-size: var(--fs-nav);
+  line-height: var(--lh-nav);
+  font-weight: 400;
+  color: var(--text-3);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.renameInput {
+  width: 100%;
+  box-sizing: border-box;
+  border: var(--border);
+  border-radius: var(--radius-control);
+  padding: 2px var(--space-2);
+  font-size: var(--fs-title);
+  font-weight: var(--fw-title);
+  color: var(--text-1);
+  background: var(--bg-surface);
+}
+.renameInput:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 1px;
+}
+
+.cardActions {
+  position: absolute;
+  right: var(--space-2);
+  bottom: var(--space-2);
+  z-index: 3;
+  opacity: 0;
+  transition: opacity var(--dur-hover) var(--ease-out);
+}
+.card:hover .cardActions,
+.card:focus-within .cardActions,
+.cardActions:has(.menu),
+.cardActions:has(.confirm) {
+  opacity: 1;
+}
+.card[data-selecting='true'] .cardActions {
+  display: none;
+}
+
+.menuBtn {
+  width: 28px;
+  height: 28px;
+  border-radius: 9px;
+  border: 0;
+  background: var(--control-inverse-bg);
+  color: var(--control-inverse-text);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  transition: background var(--dur-hover) var(--ease-out), color var(--dur-hover) var(--ease-out);
+}
+.menuBtn:hover {
+  background: var(--control-inverse-bg-hover);
+  color: var(--control-inverse-text-hover);
+}
+
+.menu {
+  position: absolute;
+  top: auto;
+  bottom: 28px;
+  right: 0;
+  min-width: 96px;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-surface);
+  border: var(--border);
+  border-radius: var(--radius-control);
+  box-shadow: var(--shadow-float);
+  padding: var(--space-1);
+  z-index: 2;
+}
+
+.selectMark {
+  position: absolute;
+  top: var(--space-2);
+  right: var(--space-2);
+  z-index: 2;
+  width: 24px;
+  height: 24px;
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1.5px solid var(--stroke);
+  border-radius: var(--radius-pill);
+  color: var(--accent-text);
+  background: var(--bg-surface);
+  transition:
+    background var(--dur-hover) var(--ease-out),
+    border-color var(--dur-hover) var(--ease-out),
+    color var(--dur-hover) var(--ease-out);
+}
+.selectMarkOn {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+.menuItem {
+  text-align: left;
+  border: none;
+  background: transparent;
+  color: var(--text-1);
+  font-size: var(--fs-label);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-control);
+  cursor: pointer;
+}
+.menuItem:hover {
+  background: var(--bg-hover);
+}
+.menuDanger {
+  color: var(--danger);
+}
+.menuDanger:hover {
+  background: var(--bg-hover);
+}
+
+.newCard {
+  width: 303px;
+  height: 180px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+  min-width: 0;
+  min-height: 0;
+  padding: 0;
+  border: none;
+  background: var(--bg-subtle);
+  border-radius: var(--radius-control);
+  color: var(--text-2);
+  cursor: pointer;
+  transition: background var(--dur-hover) var(--ease-out), color var(--dur-hover) var(--ease-out);
+}
+.newCard:hover {
+  background: var(--bg-hover);
+  color: var(--text-1);
+}
+.newPlus {
+  font-size: 24px;
+  line-height: 1;
+}
+.newLabel {
+  font-size: var(--fs-label);
+}
+
+.confirm {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 2px var(--space-2);
+  background: var(--bg-surface);
+  border: var(--border);
+  border-radius: var(--radius-pill);
+}
+.confirmText {
+  font-size: var(--fs-chip);
+  color: var(--text-2);
+}
+.confirmYes,
+.confirmNo {
+  border: none;
+  background: transparent;
+  font-size: var(--fs-chip);
+  font-weight: var(--fw-chip);
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: var(--radius-pill);
+}
+.confirmYes {
+  color: var(--danger);
+}
+.confirmNo {
+  color: var(--text-2);
+}
+.confirmYes:hover {
+  background: var(--bg-hover);
+}
+.confirmNo:hover {
+  background: var(--bg-hover);
+}
+.confirmYes:disabled,
+.confirmNo:disabled {
+  opacity: 1;
+  color: var(--text-2);
+  cursor: wait;
+}
+
+.tplCard {
+  display: flex;
+  flex-direction: column;
+  text-align: left;
+  background: var(--bg-surface);
+  border: var(--border);
+  border-radius: var(--radius-node);
+  overflow: hidden;
+  cursor: pointer;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  transition: border-color var(--dur-hover) var(--ease-out), background var(--dur-hover) var(--ease-out);
+}
+.tplCard:hover {
+  border-color: var(--stroke-focus);
+  background: var(--bg-hover);
+}
+.tplCard:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+.tplThumb {
+  aspect-ratio: 16 / 9;
+  background: var(--bg-subtle);
+}
+.tplBody {
+  padding: var(--space-3);
+}
+
+@media (max-width: 680px) {
+  .thumb,
+  .newCard {
+    width: min(303px, 100%);
+  }
+}

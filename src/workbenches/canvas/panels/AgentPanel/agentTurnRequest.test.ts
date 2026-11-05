@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type {
   ContextBundle,
 } from '../../../../domain/shared/context'
+import type { ChatMessage } from '../../../../domain/shared/execution/types'
 import type {
   GraphSnapshot,
 } from '../../../../domain/canvas/model/graph'
@@ -124,6 +125,7 @@ async function createSession(
   patch: Parameters<
     ReturnType<typeof createAgentSessionStore>['updateFields']
   >[1] = {},
+  history: ChatMessage[] = [],
 ): Promise<{
   sessions: ReturnType<typeof createAgentSessionStore>
   session: AgentSession
@@ -138,6 +140,9 @@ async function createSession(
     Object.keys(patch).length > 0
       ? (await sessions.updateFields(created.id, patch)) ?? created
       : created
+  if (history.length > 0) {
+    await sessions.saveMessages(created.id, history)
+  }
   return { sessions, session }
 }
 
@@ -469,6 +474,109 @@ describe('prepareAgentTurnRequest', () => {
     expect(result.systemPrompt).toContain('素材节点 asset-current')
     expect(result.systemPrompt).toContain('确认品牌方向')
     expect(result.requestMode).toBe('complex_plan')
+  })
+
+  it('★★ 502 后普通「继续」升级 full，并保留上次失败原因与原始需求', async () => {
+    const original = '云岚茶品牌全案：宋韵、青瓷主色、12 页作品集'
+    const { sessions, session } = await createSession({}, [
+      { role: 'user', content: original },
+      { role: 'assistant', content: '服务端返回错误（HTTP 502）：upstream failed' },
+    ])
+    const result = await prepareAgentTurnRequest(inputFor({
+      sessions,
+      session,
+      text: '继续',
+    }))
+    expect(result.kind).toBe('ready')
+    if (result.kind !== 'ready') return
+    expect(result.requestMode).toBe('complex_plan')
+    expect(result.promptProfile).toBe('full')
+    expect(result.persistedTurn.modelWindow[0]?.content).toBe(original)
+    expect(result.systemPrompt).toContain('HTTP 502')
+    expect(result.systemPrompt).not.toContain('轻量执行规则')
+  })
+
+  it('★★ 「下一步」/ internalControl / active taskPlan / paused / 未完生成四种状态都强制 full', async () => {
+    const activePlan = {
+      id: 'plan-1',
+      title: '品牌全案',
+      summary: '分阶段完成',
+      steps: [
+        { id: 'step-1', title: '视觉规范', status: 'done' as const },
+        { id: 'step-2', title: '主视觉', status: 'in_progress' as const },
+      ],
+      currentStepId: 'step-2',
+      createdAt: 1,
+      updatedAt: 2,
+    }
+    const states: Array<{
+      text: string
+      patch?: Parameters<ReturnType<typeof createAgentSessionStore>['updateFields']>[1]
+      internalControl?: boolean
+      history?: ChatMessage[]
+    }> = [
+      { text: '下一步', patch: { taskPlan: activePlan } },
+      { text: '继续', patch: { taskPlan: activePlan } },
+      { text: '继续', internalControl: true },
+      {
+        text: '继续',
+        patch: { continuation: { reason: 'max_steps' as const, maxSteps: 8, createdAt: 1 } },
+      },
+      {
+        text: '继续',
+        patch: { pendingConfirmation: { callId: 'call-1', name: 'runNode', args: {} } },
+      },
+      {
+        text: '继续',
+        history: [{ role: 'user', content: '生成 4 张主视觉' }, { role: 'assistant', content: '图像生成中 0/4' }],
+      },
+      {
+        text: '继续',
+        history: [{ role: 'user', content: '品牌全案' }, { role: 'assistant', content: 'HTTP 502' }],
+      },
+    ]
+    for (const state of states) {
+      clearToolSupportCache()
+      const { sessions, session } = await createSession(state.patch ?? {}, state.history)
+      const result = await prepareAgentTurnRequest({
+        ...inputFor({ sessions, session, text: state.text }),
+        ...(state.internalControl ? { internalControl: true } : {}),
+      })
+      expect(result.kind, state.text).toBe('ready')
+      if (result.kind !== 'ready') continue
+      expect(result.requestMode, state.text).toBe('complex_plan')
+      expect(result.promptProfile, state.text).toBe('full')
+      expect(result.systemPrompt, state.text).toContain('本次会话状态摘要')
+    }
+  })
+
+  it('★★ 轻量档原始短句不误升 full，也不注入 sessionBrief', async () => {
+    const { sessions, session } = await createSession()
+    const result = await prepareAgentTurnRequest(inputFor({
+      sessions,
+      session,
+      text: '画一只猫',
+    }))
+    expect(result.kind).toBe('ready')
+    if (result.kind !== 'ready') return
+    expect(result.requestMode).toBe('simple_generate')
+    expect(result.systemPrompt).not.toContain('本次会话状态摘要')
+  })
+
+  it('★★ 502 后全新需求仍是轻量档，不把上一轮未完成状态带成新任务', async () => {
+    const { sessions, session } = await createSession({}, [
+      { role: 'assistant', content: '服务端返回错误（HTTP 502）：upstream failed' },
+    ])
+    const result = await prepareAgentTurnRequest(inputFor({
+      sessions,
+      session,
+      text: '画一只新的猫',
+    }))
+    expect(result.kind).toBe('ready')
+    if (result.kind !== 'ready') return
+    expect(result.requestMode).toBe('simple_generate')
+    expect(result.promptProfile).toBe('light')
+    expect(result.systemPrompt).not.toContain('本次会话状态摘要')
   })
 
   /**

@@ -493,6 +493,8 @@ export function buildLightAgentSystemPrompt(
 export interface AgentPromptExtras {
   /** 本轮请求分类；轻量档只用于 simple_generate / reference_edit。 */
   requestMode?: AgentRequestMode
+  /** 检查点续跑的结构化复原摘要；只补一条 system 事实，不改轻量/完整档选择。 */
+  sessionBrief?: string
   /** full 保留完整规则和词表；light 只带本次相关节点。 */
   promptProfile?: AgentPromptProfile
   /** 画布巡检是否允许由 Agent 主动调用；false 时必须在提示词里明确禁止。 */
@@ -632,6 +634,10 @@ export function buildAgentSystemPromptWithContext(
 
   if (extras.taskPlan?.trim()) {
     parts.push(extras.taskPlan.trim())
+  }
+
+  if (extras.sessionBrief?.trim()) {
+    parts.push(extras.sessionBrief.trim())
   }
 
   if (extras.preserve) {

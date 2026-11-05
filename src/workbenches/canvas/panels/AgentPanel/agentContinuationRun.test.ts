@@ -62,6 +62,10 @@ function harness(overrides: Partial<AgentContinuationRunInput> = {}) {
   const value: AgentContinuationRunInput = {
     session,
     messages,
+    sessions: {
+      messagesFor: vi.fn(async () => messages),
+    },
+    sessionBrief: vi.fn(() => undefined),
     activeQueueTurnId: () => undefined,
     currentTurnId: () => 'turn-current',
     turnOrigin: vi.fn((turnId, queueTurnId) => ({
@@ -100,6 +104,91 @@ function harness(overrides: Partial<AgentContinuationRunInput> = {}) {
 }
 
 describe('runAgentContinuation', () => {
+  it('★★ 检查点本地 messages 为空但持久历史有时，从目标会话恢复并补 sessionBrief', async () => {
+    const persisted: ChatMessage[] = [
+      { role: 'user', content: '云岚茶品牌全案：宋韵、青瓷主色' },
+      ...messages.slice(1),
+    ]
+    const messagesFor = vi.fn(async () => persisted)
+    const sessionBrief = vi.fn(() => '## 会话状态复原\n原始需求：云岚茶品牌全案')
+    const h = harness({
+      messages: [],
+      localRevision: 8,
+      sessionRevision: 8,
+      sessions: { messagesFor },
+      sessionBrief,
+      runAgentTurn: vi.fn(async (history) => ({ ...initial, messages: [...history] })),
+    })
+    h.input.continueAutoConfirmations = vi.fn(async (_session, start) => start)
+
+    await runAgentContinuation(h.input)
+
+    expect(messagesFor).toHaveBeenCalledWith(session.id)
+    const history = (h.input.runAgentTurn as ReturnType<typeof vi.fn>).mock.calls[0]![0] as ChatMessage[]
+    expect(history[0]).toMatchObject({ role: 'system', content: expect.stringContaining('云岚茶品牌全案') })
+    expect(history.slice(1)).toEqual(persisted)
+    expect(history.filter((message) => message.role === 'tool')).toEqual(
+      persisted.filter((message) => message.role === 'tool'),
+    )
+    expect((h.input.runAgentTurn as ReturnType<typeof vi.fn>)).toHaveBeenCalledTimes(1)
+  })
+
+  it('★★ 切会话不串史：当前界面是 B，检查点仍只恢复 session-a 的持久消息', async () => {
+    const foreign: ChatMessage[] = [{ role: 'user', content: 'B 的私密需求' }]
+    const messagesFor = vi.fn(async () => messages)
+    const h = harness({
+      messages: foreign,
+      localRevision: 9,
+      sessionRevision: 8,
+      sessions: { messagesFor },
+      runAgentTurn: vi.fn(async (history) => ({ ...initial, messages: [...history] })),
+    })
+    h.input.continueAutoConfirmations = vi.fn(async (_session, start) => start)
+
+    await runAgentContinuation(h.input)
+
+    expect(messagesFor).toHaveBeenCalledWith(session.id)
+    const history = (h.input.runAgentTurn as ReturnType<typeof vi.fn>).mock.calls[0]![0] as ChatMessage[]
+    expect(JSON.stringify(history)).not.toContain('B 的私密需求')
+    expect(history.slice(-messages.length)).toEqual(messages)
+  })
+
+  it('★★ sessionBrief 是一次 system 复原，不触发 runNode / 付费重放', async () => {
+    const toolHistory: ChatMessage[] = [
+      ...messages,
+      { role: 'assistant', content: '', toolCalls: [{ id: 'paid-call', name: 'runNode', args: '{}' }] },
+      { role: 'tool', content: '{"ok":true}', toolCallId: 'paid-call', toolName: 'runNode' },
+    ]
+    const runAgentTurn = vi.fn(async () => ({ ...initial, messages: toolHistory }))
+    const h = harness({
+      messages: [],
+      sessions: { messagesFor: vi.fn(async () => toolHistory) },
+      sessionBrief: vi.fn(() => '## 会话状态复原\n未完成，禁止重放付费请求'),
+      runAgentTurn,
+    })
+    h.input.continueAutoConfirmations = vi.fn(async (_session, start) => start)
+
+    await runAgentContinuation(h.input)
+
+    const history = (runAgentTurn.mock.calls[0] as unknown as ChatMessage[][])[0]!
+    expect(history.filter((message) => message.role === 'system')).toHaveLength(1)
+    expect(history.filter((message) => message.role === 'tool')).toHaveLength(1)
+    expect(h.input.transitionSessionJob).not.toHaveBeenCalledWith(
+      session.id,
+      'waiting_generation',
+      expect.anything(),
+      expect.anything(),
+      expect.anything(),
+      expect.anything(),
+    )
+    expect(history.at(-1)).toMatchObject({ toolCallId: 'paid-call' })
+    expect(h.input.createLoopDeps).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sessionBrief: '## 会话状态复原\n未完成，禁止重放付费请求',
+      }),
+    )
+  })
+
   it('★★ 已有活动锁时直接复用，不重新领取队列', async () => {
     const h = harness({
       activeQueueTurnId: () => 'queue-live',

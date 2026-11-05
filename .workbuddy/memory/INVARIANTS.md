@@ -5,6 +5,23 @@
 
 ## 结构治理 · 第二批（2026-11-05）
 
+- **第四批职责登记与预算收口（2026-11-06）**：`check-module-governance.mjs` 的 CLI 判定必须用
+  `fileURLToPath(import.meta.url)`，Windows 中文路径下不能用 URL pathname 字符串比较，否则语义校验会静默跳过。
+  语义门禁拒绝占位 responsibility / owns / doesNotOwn / publicApi / test：TS 公共 API 必须是 AST 能查到的真实导出，
+  CSS 必须声明样式域且类名真实存在，测试路径和脚本锚点必须存在；`NO_EXPORT:` 必须与源码无导出相符。
+  未完成接线的新模块和测试孤岛不得登记或留在工作树；无法在不改渲染树时继续下降的视图体量必须转「涉及 UI」门禁。
+
+- **全代码治理收口**：新增生产模块必须登记 owner / responsibility / owns / doesNotOwn / publicApi /
+  test / budget；`removedModules` / `moduleMoves` 是删除、改名、搬目录的唯一台账；生产目录预算递归覆盖
+  `src/**`。并行拆分时各组只跑定向门禁，最终稳定工作树必须统一跑全仓 tsc / test / check / build，
+  任何组不得把中间态红当完成。`node:fs` / `node:url` 类型桩不得进入浏览器页面目录。
+- **长任务上下文窗口**：`contextFor` 与 `persistAgentUserTurnBeforeRequest` 共用 `modelMessageWindow`。
+  模型窗口固定保留首条有效用户需求，按用户轮和成对 assistant(tool_calls)/tool 结果有界裁剪；
+  纯尾部 `slice(-N)` 不得回流。`继续 / 下一步 / internalControl / active taskPlan / paused /
+  pendingConfirmation / 未完成生成 / 502 后继续` 必须按完整档处理；检查点续跑用 `messagesFor(sessionId)`
+  校验持久消息，并用 `agentSessionBrief` 注入原始需求、计划、工具账本摘要，禁止伪造生成成功或重放付费请求。
+  `AGENT_CONTEXT_WINDOW` 只在 `modelMessageWindow.ts` 定义；`sessionStore.ts` 只 re-export，不能保留第二份默认值。
+
 - **删除/改名/挪目录不是自由动作**：基线生产文件消失必须写入 `removedModules` 或
   `moduleMoves {from,to,reason}`；搬家起点必须消失、目标必须存在且已登记，旧登记不得继续悬空。
   生产目录预算递归覆盖 `src/**` 的所有嵌套层级，排除 `src` 根本身；新增目录、挪进深层目录

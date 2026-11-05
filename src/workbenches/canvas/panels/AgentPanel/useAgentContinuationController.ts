@@ -30,6 +30,13 @@ export interface AgentContinuationControllerInput {
   current: AgentSession | null
   status: AgentPanelStatus
   messages: readonly ChatMessage[]
+  /** Store port bound to the target session; never derive history from the visible composer. */
+  sessions?: {
+    messagesFor: (sessionId: string) => Promise<readonly ChatMessage[]>
+  }
+  sessionBrief?: (messages: readonly ChatMessage[]) => string | undefined
+  localRevision?: number
+  sessionRevision?: number
   controller: Pick<
     AgentController,
     'jobId' | 'turnId' | 'claimNextQueuedTurn'
@@ -75,6 +82,14 @@ export function useAgentContinuationController(
       await input.runContinuation({
         session: target,
         messages: input.messages,
+        ...(input.sessions ? { sessions: input.sessions } : {}),
+        ...(input.sessionBrief ? { sessionBrief: input.sessionBrief } : {}),
+        ...(input.localRevision === undefined
+          ? {}
+          : { localRevision: input.localRevision }),
+        ...(input.sessionRevision === undefined
+          ? {}
+          : { sessionRevision: input.sessionRevision }),
         activeQueueTurnId: () => input.activeQueueTurnOf(target.id),
         currentTurnId: () =>
           input.currentTurnIdRef.current.get(target.id) ??
@@ -129,6 +144,10 @@ export function useAgentContinuationController(
     input.isActivityActive,
     input.loopDeps,
     input.messages,
+    input.localRevision,
+    input.sessionBrief,
+    input.sessionRevision,
+    input.sessions,
     input.runAgentTurn,
     input.runContinuation,
     input.setMessages,

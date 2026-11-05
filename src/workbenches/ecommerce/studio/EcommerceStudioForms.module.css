@@ -1,0 +1,498 @@
+/* 电商工作台：上传、通用字段与参数子界面。 */
+
+.block {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.blockHead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.aiWrite {
+  min-height: 26px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: var(--bg-subtle);
+  color: var(--accent);
+  font: inherit;
+  font-size: var(--fs-chip);
+  cursor: pointer;
+}
+
+.aiWrite:hover:not(:disabled),
+.aiWrite:focus-visible {
+  background: var(--bg-hover);
+}
+
+.aiWrite:disabled {
+  color: var(--text-3);
+  cursor: not-allowed;
+}
+
+/*
+ * 拖放悬停（对账 #427）：松手会落在这儿的那一块**整块**亮起来。
+ * 用"虚线描边"而不是只换个底色 —— 形状语言本身就是"可以放这儿"，
+ * 而且深浅两套主题下都不用另调颜色（只用令牌）。
+ */
+.blockDrop {
+  outline: 2px dashed var(--stroke-focus);
+  outline-offset: 2px;
+  border-radius: var(--radius-control);
+  background: var(--bg-hover);
+}
+
+.blockTitle {
+  font-size: var(--fs-label);
+  font-weight: 600;
+  color: var(--text-1);
+}
+
+.file {
+  display: none;
+}
+
+.slotRow {
+  display: flex;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.slot,
+.emptySlot,
+.addSlot {
+  border-radius: var(--radius-control);
+  border: var(--border);
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+.slot {
+  position: relative;
+  width: 84px;
+  height: 84px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-subtle);
+}
+
+.slotPreview {
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: zoom-in;
+}
+
+.slotRemove {
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  width: 20px;
+  height: 20px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: var(--control-inverse-bg);
+  color: var(--control-inverse-text);
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity var(--dur-hover) var(--ease-out);
+}
+
+.slot:hover .slotRemove,
+.slot:focus-within .slotRemove {
+  opacity: 1;
+}
+
+.slot img,
+.slot video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.emptySlot {
+  width: 84px;
+  height: 84px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  border-style: dashed;
+  color: var(--text-2);
+  font-size: var(--fs-label);
+  cursor: pointer;
+}
+
+.emptySlot:hover {
+  background: var(--bg-hover);
+}
+
+.emptyHint {
+  font-size: var(--fs-chip);
+  color: var(--text-3);
+}
+
+.addSlot {
+  width: 84px;
+  height: 84px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-style: dashed;
+  background: var(--bg-surface);
+  color: var(--text-2);
+  font-size: var(--fs-panel-title);
+  cursor: pointer;
+}
+
+.uploadPlus {
+  font-size: 22px;
+  line-height: 1;
+  color: var(--text-2);
+}
+
+.addSlot:hover {
+  background: var(--bg-hover);
+}
+
+.segments {
+  display: inline-flex;
+  border: var(--border);
+  border-radius: var(--radius-control);
+  overflow: hidden;
+  flex-wrap: wrap;
+}
+
+.seg {
+  height: 32px;
+  padding: 0 var(--space-3);
+  border: none;
+  background: transparent;
+  color: var(--text-2);
+  font: inherit;
+  font-size: var(--fs-label);
+  cursor: pointer;
+}
+
+.seg + .seg {
+  border-left: var(--border);
+}
+
+.segOn {
+  background: var(--bg-subtle);
+  color: var(--text-1);
+  font-weight: 600;
+}
+
+.twoCols {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-2);
+}
+
+.choiceGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.choiceCard {
+  width: 100%;
+  min-height: 58px;
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  padding: 10px 11px;
+  border: var(--border);
+  border-radius: var(--radius-control);
+  background: var(--bg-surface);
+  color: var(--text-2);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.choiceCard:hover,
+.choiceCard:focus-visible {
+  background: var(--bg-hover);
+  color: var(--text-1);
+}
+
+.choiceCardOn,
+.choiceCardOn:hover {
+  background: var(--bg-surface);
+  color: var(--text-1);
+}
+
+.choiceRadio {
+  flex: 0 0 auto;
+  width: 14px;
+  height: 14px;
+  margin-top: 2px;
+  box-sizing: border-box;
+  border: var(--border);
+  border-radius: 50%;
+  background: transparent;
+}
+
+.optionMark {
+  flex: 0 0 auto;
+  width: 18px;
+  height: 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 1px;
+  box-sizing: border-box;
+  border: var(--border);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--control-inverse-text);
+}
+
+.choiceCardOn .choiceRadio {
+  border: 4px solid var(--control-inverse-bg);
+  background: var(--bg-surface);
+}
+
+.choiceTitle,
+.choiceHint {
+  display: block;
+}
+
+.choiceTitle {
+  font-size: var(--fs-label);
+  font-weight: 600;
+}
+
+.choiceHint {
+  margin-top: 2px;
+  color: var(--text-3);
+  font-size: var(--fs-chip);
+  line-height: 1.45;
+}
+
+.optionGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.optionTile {
+  min-height: 58px;
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  padding: 9px 10px;
+  border: var(--border);
+  border-radius: var(--radius-control);
+  background: var(--bg-surface);
+  color: var(--text-2);
+  font: inherit;
+  font-size: var(--fs-chip);
+  text-align: left;
+  cursor: pointer;
+}
+
+.optionText {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.optionLabel {
+  color: inherit;
+  font-size: var(--fs-label);
+  line-height: 1.35;
+}
+
+.optionHint {
+  color: var(--text-3);
+  font-size: var(--fs-chip);
+  line-height: 1.35;
+}
+
+.optionTile:hover,
+.optionTile:focus-visible {
+  background: var(--bg-hover);
+  color: var(--text-1);
+}
+
+.optionTileOn,
+.optionTileOn:hover {
+  background: var(--bg-surface);
+  color: var(--text-1);
+}
+
+.optionTileOn .optionMark {
+  border-color: var(--control-inverse-bg);
+  background: var(--control-inverse-bg);
+}
+
+.setCountList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.setCountItem {
+  min-height: 62px;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 9px 10px;
+  box-sizing: border-box;
+  border: var(--border);
+  border-radius: var(--radius-control);
+  background: var(--bg-surface);
+}
+
+.setCheck {
+  flex: 0 0 auto;
+  width: 17px;
+  height: 17px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  box-sizing: border-box;
+  border: var(--border);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--control-inverse-text);
+  cursor: pointer;
+}
+
+.setCheckOn {
+  border-color: var(--control-inverse-bg);
+  background: var(--control-inverse-bg);
+}
+
+.setCountBody {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.setCountTitleRow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.setCountTitle {
+  color: var(--text-1);
+  font-size: var(--fs-label);
+  font-weight: 600;
+}
+
+.setCountHint {
+  color: var(--text-3);
+  font-size: var(--fs-chip);
+  line-height: 1.35;
+}
+
+.setAiBadge {
+  flex: 0 0 auto;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: var(--control-inverse-bg);
+  color: var(--control-inverse-text);
+  font-size: 10px;
+  line-height: 1.5;
+}
+
+.stepperList {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-top: 2px;
+}
+
+.stepperRow {
+  min-height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  color: var(--text-2);
+  font-size: var(--fs-label);
+}
+
+.stepper {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.stepper button {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: var(--bg-subtle);
+  color: var(--text-1);
+  font: inherit;
+  cursor: pointer;
+}
+
+.stepper button:hover {
+  background: var(--bg-hover);
+}
+
+.stepper span[data-ecommerce-set-count] {
+  min-width: 18px;
+}
+
+.colorControl {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.colorWell {
+  width: 44px;
+  height: 36px;
+  flex: none;
+  box-sizing: border-box;
+  padding: 2px;
+  border: var(--border);
+  border-radius: var(--radius-control);
+  background: var(--bg-surface);
+  cursor: pointer;
+}
+
+.colorWell span {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: calc(var(--radius-control) - 3px);
+}
+
+.colorValue {
+  color: var(--text-2);
+  font-size: var(--fs-label);
+  font-variant-numeric: tabular-nums;
+  text-transform: uppercase;
+}

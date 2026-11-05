@@ -1,0 +1,322 @@
+.channelContextMenu {
+  position: fixed;
+  z-index: 80;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  box-sizing: border-box;
+  padding: var(--space-1);
+  border: var(--border);
+  border-radius: var(--radius-control);
+  background: var(--bg-surface);
+  box-shadow: var(--shadow-float);
+}
+
+.channelMenuItem {
+  min-height: 34px;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  padding: 0 var(--space-2);
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-1);
+  font: inherit;
+  font-size: var(--fs-label);
+  text-align: left;
+  cursor: pointer;
+}
+
+.channelMenuItem:hover:not(:disabled),
+.channelMenuItem:focus-visible {
+  outline: none;
+  background: var(--bg-hover);
+}
+
+.channelMenuItemDanger {
+  color: var(--danger);
+}
+
+.channelMenuItem:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.channelMenuConfirmText {
+  margin: 0;
+  padding: var(--space-2);
+  color: var(--text-2);
+  font-size: var(--fs-label);
+  line-height: 1.5;
+}
+
+.profileDrawerLayer {
+  position: fixed;
+  z-index: 70;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  padding: 24px;
+  overflow: hidden;
+}
+
+.profileDrawerBackdrop {
+  position: absolute;
+  inset: 0;
+  background: color-mix(in srgb, var(--text-1) 20%, transparent);
+}
+
+.profileDrawer {
+  position: relative;
+  z-index: 1;
+  width: min(360px, calc(100% - 48px));
+  max-height: calc(100% - 48px);
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  border: var(--border);
+  border-radius: var(--radius-node);
+  background: var(--bg-surface);
+  color: var(--text-1);
+  box-shadow: var(--shadow-float);
+  overflow: hidden;
+}
+
+.profileDrawerHead {
+  min-height: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: 0 var(--space-5);
+}
+
+.profileDrawerHead h2 {
+  margin: 0;
+  font-size: var(--fs-title);
+  font-weight: var(--fw-panel-title);
+}
+
+.profileDrawerClose {
+  width: 30px;
+  height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-3);
+  cursor: pointer;
+}
+
+.profileDrawerClose:hover {
+  background: var(--bg-hover);
+  color: var(--text-1);
+}
+
+.profileDrawerBody {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-6) var(--space-5);
+}
+
+.profileAvatarPreview {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.profileAvatarActions {
+  display: flex;
+  justify-content: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.profileAvatarButton {
+  min-height: 32px;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 0 var(--space-3);
+  border: var(--border);
+  border-radius: var(--radius-control);
+  background: var(--bg-app);
+  color: var(--text-1);
+  font: inherit;
+  font-size: var(--fs-label);
+  cursor: pointer;
+}
+
+.profileAvatarButton:hover {
+  background: var(--bg-hover);
+}
+
+.profileField {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+  font-size: var(--fs-label);
+  color: var(--text-2);
+}
+
+.profileField b {
+  color: var(--danger);
+  font-weight: var(--fw-chip);
+}
+
+.profileInput {
+  width: 100%;
+  min-height: 40px;
+  box-sizing: border-box;
+  padding: 0 var(--space-3);
+  border: var(--border);
+  border-radius: var(--radius-control);
+  background: var(--bg-app);
+  color: var(--text-1);
+  font: inherit;
+  font-size: var(--fs-label);
+}
+
+.profileInput:focus {
+  outline: none;
+  border-color: var(--focus-ring);
+  box-shadow: 0 0 0 2px var(--focus-ring);
+}
+
+.profileDrawerFoot {
+  flex: 0 0 auto;
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  padding: var(--space-4) var(--space-5);
+  border-top: var(--border);
+}
+
+.profileCancel,
+.profileSave {
+  min-height: 34px;
+  padding: 0 var(--space-4);
+  border: var(--border);
+  border-radius: var(--radius-control);
+  font: inherit;
+  font-size: var(--fs-label);
+  cursor: pointer;
+}
+
+.profileCancel {
+  background: var(--bg-surface);
+  color: var(--text-1);
+}
+
+.profileSave {
+  background: var(--accent);
+  color: var(--accent-text);
+}
+
+.profileSave:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.noticeOk,
+.noticeErr {
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-control);
+  font-size: var(--fs-label);
+  background: var(--bg-subtle);
+}
+
+.noticeOk {
+  color: var(--text-1);
+}
+
+.noticeErr {
+  color: var(--danger);
+}
+
+.presetList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.presetCard {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  border: var(--border);
+  border-radius: var(--radius-control);
+  padding: var(--space-3);
+}
+
+.presetHead {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.presetName {
+  font-weight: var(--fw-title);
+  color: var(--text-1);
+}
+
+.presetChanged {
+  padding: 0 var(--space-1);
+  border: var(--border);
+  border-radius: var(--radius-pill);
+  font-size: var(--fs-label);
+  color: var(--text-2);
+}
+
+.presetHint {
+  flex: 1 1 100%;
+  font-size: var(--fs-label);
+  color: var(--text-3);
+  line-height: 1.5;
+}
+
+.presetTextarea {
+  width: 100%;
+  min-height: 108px;
+  box-sizing: border-box;
+  padding: var(--space-2);
+  border: var(--border);
+  border-radius: var(--radius-control);
+  background: var(--bg-surface);
+  color: var(--text-1);
+  font-family: var(--font-sans);
+  font-size: var(--fs-label);
+  line-height: 1.6;
+  resize: vertical;
+}
+
+.presetTextarea:focus {
+  outline: none;
+  border-color: var(--stroke-focus);
+}
+
+.presetFoot {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.presetCounter {
+  flex: 1;
+  font-size: var(--fs-label);
+  color: var(--text-3);
+}

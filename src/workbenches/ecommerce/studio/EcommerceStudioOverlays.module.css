@@ -1,0 +1,341 @@
+/* 电商工作台：预览、确认、编辑与详情浮层。 */
+
+.confirm {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--scrim);
+  z-index: 20;
+}
+
+.uploadLightbox {
+  position: absolute;
+  inset: 0;
+  z-index: 40;
+  display: grid;
+  place-items: center;
+  padding: var(--space-6);
+  box-sizing: border-box;
+  background: var(--scrim);
+  backdrop-filter: blur(10px);
+}
+
+.uploadLightboxBody {
+  position: relative;
+  width: min(1080px, 96%);
+  height: min(760px, 90%);
+  display: grid;
+  place-items: center;
+  border: var(--border);
+  border-radius: 8px;
+  background: var(--bg-surface);
+  box-shadow: var(--shadow-float);
+  overflow: hidden;
+}
+
+.uploadLightboxStage {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  padding: 54px;
+  box-sizing: border-box;
+  background: var(--bg-canvas);
+}
+
+.uploadLightboxStage img,
+.uploadLightboxStage video {
+  display: block;
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+
+.uploadLightboxClose {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: var(--border);
+  border-radius: 6px;
+  background: var(--bg-surface);
+  color: var(--text-1);
+  font-size: 20px;
+  cursor: pointer;
+}
+
+.uploadLightboxArrow {
+  position: absolute;
+  top: 50%;
+  z-index: 2;
+  width: 38px;
+  height: 52px;
+  padding: 0;
+  border: var(--border);
+  border-radius: 7px;
+  background: var(--bg-surface);
+  color: var(--text-1);
+  font-size: 32px;
+  line-height: 1;
+  cursor: pointer;
+  transform: translateY(-50%);
+}
+
+.uploadLightboxArrow:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+
+.uploadLightboxPrev {
+  left: 12px;
+}
+
+.uploadLightboxNext {
+  right: 12px;
+}
+
+.uploadLightboxCount {
+  position: absolute;
+  left: 50%;
+  bottom: 12px;
+  padding: 4px 9px;
+  border-radius: var(--radius-pill);
+  background: var(--control-inverse-bg);
+  color: var(--control-inverse-text);
+  font-size: var(--fs-chip);
+  transform: translateX(-50%);
+}
+
+.confirmCard {
+  width: min(420px, 90%);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  border: var(--border);
+  border-radius: 8px;
+  background: var(--bg-surface);
+  padding: var(--space-4);
+  box-shadow: var(--shadow-float);
+}
+
+.compareCard {
+  width: min(920px, 94%);
+}
+
+.compareGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+
+.comparePane {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.comparePane figcaption {
+  font-size: var(--fs-label);
+  color: var(--text-2);
+}
+
+.compareImage {
+  aspect-ratio: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border-radius: 8px;
+  background: var(--bg-subtle);
+}
+
+.compareImage img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.confirmTitle {
+  margin: 0;
+  font-size: var(--fs-panel-title);
+  font-weight: var(--fw-panel-title);
+}
+
+.confirmText {
+  margin: 0;
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
+  color: var(--text-1);
+}
+
+.confirmFlow {
+  margin: calc(var(--space-1) * -1) 0 0;
+  color: var(--text-2);
+  font-size: var(--fs-label);
+  line-height: var(--lh-body);
+}
+
+.editInput {
+  width: 100%;
+  min-height: 112px;
+  box-sizing: border-box;
+  resize: vertical;
+  padding: var(--space-3);
+  border: var(--border);
+  border-radius: var(--radius-control);
+  background: var(--bg-subtle);
+  color: var(--text-1);
+  font: inherit;
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
+}
+
+.editModel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  color: var(--text-2);
+  font-size: var(--fs-label);
+}
+
+.editPresets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.editPreset {
+  min-height: 30px;
+  padding: 0 var(--space-3);
+  border: none;
+  border-radius: var(--radius-pill);
+  background: var(--bg-subtle);
+  color: var(--text-1);
+  font: inherit;
+  font-size: var(--fs-label);
+  cursor: pointer;
+}
+
+.editPreset:hover {
+  background: var(--bg-hover);
+}
+
+.editPresetOn {
+  background: var(--bg-hover);
+  font-weight: 600;
+}
+
+.upscaleSection {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+}
+
+.upscaleLabel {
+  color: var(--text-2);
+  font-size: var(--fs-label);
+  font-weight: 600;
+}
+
+.editReferenceRow {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.editReferencePreview {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.editReferencePreview > :first-child,
+.editReferencePreview img {
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-control);
+  object-fit: cover;
+}
+
+.editInput:focus {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 1px;
+}
+
+.editError {
+  margin: 0;
+  color: var(--danger);
+  font-size: var(--fs-label);
+  line-height: 1.6;
+}
+
+.detailGrid {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: var(--space-2) var(--space-3);
+  margin: 0;
+  font-size: var(--fs-label);
+}
+
+.detailGrid dt {
+  color: var(--text-2);
+}
+
+.detailGrid dd {
+  margin: 0;
+  color: var(--text-1);
+  overflow-wrap: anywhere;
+}
+
+.detailPrompt {
+  max-height: min(320px, 40vh);
+  overflow: auto;
+  margin: 0;
+  padding: var(--space-3);
+  border-radius: 8px;
+  background: var(--bg-subtle);
+  color: var(--text-1);
+  font-family: var(--font-sans);
+  font-size: var(--fs-label);
+  line-height: 1.65;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.confirmActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
+}
+
+.editSubmit {
+  padding: 0 var(--space-4);
+}
+
+.cancel {
+  height: 36px;
+  padding: 0 var(--space-3);
+  border: var(--border);
+  border-radius: var(--radius-control);
+  background: var(--bg-surface);
+  color: var(--text-1);
+  font: inherit;
+  font-size: var(--fs-body);
+  cursor: pointer;
+}
+
+.cancel:hover {
+  background: var(--bg-hover);
+}

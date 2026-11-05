@@ -14,34 +14,52 @@ import {
   type ImportResult,
 } from '../../state/project/flowIo'
 import { projectRoute, WORKBENCHES, WORKBENCH_ORDER, type WorkbenchId } from '../../domain/shared/workbench'
-import { noticeA11y, type NoticeTone } from '../../domain/ui/notice'
+import { noticeA11y } from '../../domain/ui/notice'
 import { formatRelative } from '../../domain/shared/time'
+import { toggleProjectSelection } from '../../domain/project/selection'
 import { TEMPLATES, type TemplateId } from '../../state/project/templates'
 import type { ProjectListItem } from '../../domain/project/project'
-import {
-  allVisibleProjectsSelected,
-  clearVisibleProjects,
-  selectVisibleProjects,
-  toggleProjectSelection,
-} from '../../domain/project/selection'
 import styles from './ProjectsPage.module.css'
 import { ChoicePicker } from '../../features/shared/choicePicker/ChoicePicker'
-import { useAssetMeta } from '../../features/shared/assets/index'
 import {
   getProjectRuntimePendingSnapshot,
-  ProjectRuntimeCleanupError,
-  retryProjectRuntimeCleanup,
   subscribeProjectRuntimePending,
-  withPreparedProjectRuntimes,
 } from '../../app/ProjectRuntimeRegistry'
+import {
+  IconSelect,
+  IconTrash,
+  HomeEmptyState,
+  ProjectCard,
+} from './ProjectsPageViews'
+import {
+  PROJECT_KIND_ORDER,
+  projectKindCounts,
+  projectsForKind,
+  type ProjectKind,
+} from './projectListProjection'
+import {
+  TRASH_KEEP_DAYS,
+  pruneTrashSelection,
+  selectAllTrash as selectAllTrashItems,
+  toggleTrashItem as toggleTrashItemModel,
+  toggleVisibleProjects,
+  trashProjection,
+} from './projectSelectionModel'
+import {
+  deletionNotice,
+  importResultNotice,
+  projectCleanupNotice,
+  projectFailureNotice,
+  trashRestoreNotice,
+  type ProjectNotice,
+} from './projectResultPresentation'
+import {
+  deleteProjectsWithRuntime,
+  reportDeleteFailure,
+  retryProjectCleanup,
+} from './projectDeletionCoordinator'
 
-/**
- * 回收站的"保留天数"（对账 #409）：超过这些天的项目会出现在「清理 N 天前」按钮上。
- *
- * 30 天与产品文档 §12 的原始设计一致。**这个数字只用于"提醒 + 显式清理"**，
- * 没有任何后台任务按它自动删 —— 删的是不可恢复的数据，必须由用户点两次确认。
- */
-const TRASH_KEEP_DAYS = 30
+export { HomeEmptyState, ProjectCard } from './ProjectsPageViews'
 
 /**
  * 项目页（产品文档 §5.1 / §5.3；路由 `/projects`）。
@@ -54,15 +72,6 @@ const TRASH_KEEP_DAYS = 30
  * —— 它从第一版起就是项目网格。把它叫「首页」才是一直以来的错位，
  * 现在按它实际干的事命名。
  */
-/** 项目类型筛选的三个档（`all` 之外的两档与 `WorkbenchId` 同名，便于直接过滤） */
-type ProjectKind = 'all' | WorkbenchId
-const PROJECT_KINDS: readonly { id: ProjectKind; label: string }[] = [
-  { id: 'all', label: '全部' },
-  { id: 'canvas', label: '画布' },
-  { id: 'ecommerce', label: '电商' },
-  { id: 'storyboard', label: '漫剧' },
-]
-
 export function ProjectsPage() {
   const platform = usePlatform()
   const navigate = useNavigate()
@@ -86,7 +95,8 @@ export function ProjectsPage() {
    * 真正的"两个独立工作区"（各自的存储与数据模型）见对账 #396。
    */
   const [kindFilter, setKindFilter] = useState<ProjectKind>('all')
-  const shown = kindFilter === 'all' ? visible : visible.filter((p) => p.workbench === kindFilter)
+  const shown = projectsForKind(visible, kindFilter)
+  const kindCounts = projectKindCounts(visible)
   const loading = useSyncExternalStore(store.subscribe, () => store.getState().loading, () => store.getState().loading)
   const sort = useSyncExternalStore(store.subscribe, () => store.getState().sort, () => store.getState().sort)
   const query = useSyncExternalStore(store.subscribe, () => store.getState().query, () => store.getState().query)
@@ -117,31 +127,31 @@ export function ProjectsPage() {
   const cleanupCommitting =
     cleanupRuntimeOperation?.status === 'committing'
   const [status, setStatusText] = useState('')
-  /** 这一条状态是"正常结果"还是"失败"（产品文档 §4.5：失败要 `role=alert` 念给屏幕阅读器） */
-  const [statusTone, setStatusTone] = useState<NoticeTone>('info')
+  const [statusTone, setStatusTone] = useState<ProjectNotice['tone']>('info')
   /**
    * 写状态行的**唯一入口**：默认 `info`，失败那几处显式传 `'error'`。
    *
    * 这样写而不是"另开一个 setTone"：语气**跟着这一次写入走**，不会出现
    * "上一条是失败、这一条是成功，但 role 还留在 alert"的残留。
    */
-  const setStatus = useCallback((text: string, tone: NoticeTone = 'info') => {
-    setStatusText(text)
-    setStatusTone(tone)
+  const notice = useCallback((next: ProjectNotice) => {
+    setStatusText(next.text)
+    setStatusTone(next.tone)
   }, [])
-  const reportDeleteFailure = useCallback(
-    (error: unknown, prefix: string) => {
-      if (error instanceof ProjectRuntimeCleanupError) {
-        setCleanupOperationId(error.operationId ?? null)
-        setStatus(error.message, 'error')
-        return
-      }
-      setStatus(
-        `${prefix}：${error instanceof Error ? error.message : String(error)}`,
-        'error',
-      )
-    },
-    [setStatus],
+  const setStatus = useCallback((text: string, tone: ProjectNotice['tone'] = 'info') => {
+    notice({ text, tone })
+  }, [notice])
+  const reportFailure = useCallback(
+    (error: unknown, prefix: string) =>
+      reportDeleteFailure(
+        {
+          status: notice,
+          setCleanupOperationId,
+        },
+        error,
+        prefix,
+      ),
+    [notice],
   )
   /** 正拖着文件停在这一页上（决定要不要显那层「松开即导入」的提示） */
   const [dragging, setDragging] = useState(false)
@@ -211,15 +221,12 @@ export function ProjectsPage() {
     if (deletingId) return
     setDeletingId(id)
     try {
-      await withPreparedProjectRuntimes(
-        [id],
-        () => store.remove(id),
-      )
+      await deleteProjectsWithRuntime([id], () => store.remove(id))
       setCleanupOperationId(null)
       setConfirmId(null)
       setMenuId(null)
     } catch (error) {
-      reportDeleteFailure(error, '删除失败')
+      reportFailure(error, '删除失败')
     } finally {
       setDeletingId((current) => current === id ? null : current)
     }
@@ -250,11 +257,7 @@ export function ProjectsPage() {
   const refreshTrash = async () => {
     const next = await store.listDeleted()
     setTrashItems(next)
-    const live = new Set(next.map((project) => project.id))
-    setTrashSelectedIds((prev) => {
-      const kept = new Set([...prev].filter((id) => live.has(id)))
-      return kept.size === prev.size ? prev : kept
-    })
+    setTrashSelectedIds((prev) => pruneTrashSelection(prev, next).selected)
     if (next.length === 0) {
       setTrashSelectedIds(new Set())
       setTrashSelectionAnchor(null)
@@ -265,20 +268,19 @@ export function ProjectsPage() {
   }
 
   const retryRuntimeCleanup = async () => {
-    if (!cleanupPending || busy || cleanupCommitting) return
-    setBusy(true)
-    try {
-      const projectIds = cleanupPending.projectIds
-      await retryProjectRuntimeCleanup(projectIds)
-      await store.load()
-      if (trashOpen) await refreshTrash()
-      setCleanupOperationId(null)
-      setStatus('项目运行态清理完成')
-    } catch (error) {
-      reportDeleteFailure(error, '运行态清理失败')
-    } finally {
-      setBusy(false)
-    }
+    await retryProjectCleanup(
+      {
+        status: notice,
+        setCleanupOperationId,
+        busy: () => busy,
+        setBusy,
+        load: () => store.load(),
+        refreshTrash,
+        trashOpen: () => trashOpen,
+      },
+      cleanupPending,
+      cleanupCommitting,
+    )
   }
 
   useEffect(() => {
@@ -291,7 +293,7 @@ export function ProjectsPage() {
       return
     }
     setCleanupOperationId(null)
-    setStatus('项目运行态清理完成')
+    notice(projectCleanupNotice())
   }, [
     cleanupOperationId,
     pendingRuntimeOperations,
@@ -306,7 +308,7 @@ export function ProjectsPage() {
       await refreshTrash()
       setStatus('已从回收站还原')
     } catch (error) {
-      setStatus(`还原失败：${error instanceof Error ? error.message : String(error)}`, 'error')
+      notice(projectFailureNotice('还原失败', error))
     } finally {
       setTrashBusy(false)
     }
@@ -316,15 +318,12 @@ export function ProjectsPage() {
     if (trashBusy) return
     setTrashBusy(true)
     try {
-      await withPreparedProjectRuntimes(
-        [id],
-        () => store.purge(id),
-      )
+      await deleteProjectsWithRuntime([id], () => store.purge(id))
       await refreshTrash()
       setCleanupOperationId(null)
       setStatus('已彻底删除（不可恢复）')
     } catch (error) {
-      reportDeleteFailure(error, '彻底删除失败')
+      reportFailure(error, '彻底删除失败')
       await refreshTrash()
     } finally {
       setTrashBusy(false)
@@ -337,7 +336,7 @@ export function ProjectsPage() {
     setTrashBusy(true)
     setTrashConfirmClear(false)
     try {
-      const n = await withPreparedProjectRuntimes(
+      const n = await deleteProjectsWithRuntime(
         trashItems.map((project) => project.id),
         () => store.purgeAll(),
       )
@@ -345,7 +344,7 @@ export function ProjectsPage() {
       setCleanupOperationId(null)
       setStatus(`已清空回收站（${n} / ${total} 个项目）`)
     } catch (error) {
-      reportDeleteFailure(
+      reportFailure(
         error,
         '清空回收站失败，未完成的项目仍保留',
       )
@@ -357,26 +356,21 @@ export function ProjectsPage() {
 
   const toggleTrashItem = (id: string, shift: boolean) => {
     setTrashConfirmBulk(false)
-    setTrashSelectedIds((current) => {
-      if (shift && trashSelectionAnchor) {
-        const from = trashItems.findIndex((project) => project.id === trashSelectionAnchor)
-        const to = trashItems.findIndex((project) => project.id === id)
-        if (from >= 0 && to >= 0) {
-          const [start, end] = from < to ? [from, to] : [to, from]
-          return new Set(trashItems.slice(start, end + 1).map((project) => project.id))
-        }
-      }
-      const next = new Set(current)
-      if (next.has(id)) next.delete(id)
-      else next.add(id)
-      return next
-    })
-    setTrashSelectionAnchor(id)
+    const next = toggleTrashItemModel(
+      trashItems,
+      trashSelectedIds,
+      trashSelectionAnchor,
+      id,
+      shift,
+    )
+    setTrashSelectedIds(next.selected)
+    setTrashSelectionAnchor(next.anchor)
   }
 
   const selectAllTrash = () => {
-    setTrashSelectedIds(new Set(trashItems.map((project) => project.id)))
-    setTrashSelectionAnchor(trashItems[0]?.id ?? null)
+    const next = selectAllTrashItems(trashItems)
+    setTrashSelectedIds(next.selected)
+    setTrashSelectionAnchor(next.anchor)
     setTrashConfirmBulk(false)
   }
 
@@ -399,11 +393,7 @@ export function ProjectsPage() {
     setTrashSelectedIds(new Set(failed))
     setTrashSelectionAnchor(failed[0] ?? null)
     setTrashBusy(false)
-    if (failed.length === 0) {
-      setStatus(`已还原 ${restored} 个项目`)
-    } else {
-      setStatus(`已还原 ${restored} 个，${failed.length} 个失败并保留选择`, 'error')
-    }
+    notice(trashRestoreNotice(restored, failed.length))
   }
 
   const purgeTrashSelected = async () => {
@@ -412,7 +402,7 @@ export function ProjectsPage() {
     setTrashConfirmBulk(false)
     const selected = [...trashSelectedIds]
     try {
-      const n = await withPreparedProjectRuntimes(
+      const n = await deleteProjectsWithRuntime(
         selected,
         () => store.purgeMany(selected),
       )
@@ -422,7 +412,7 @@ export function ProjectsPage() {
       setCleanupOperationId(null)
       setStatus(`已彻底删除 ${n} 个项目（不可恢复）`)
     } catch (error) {
-      reportDeleteFailure(
+      reportFailure(
         error,
         '批量彻底删除失败，未完成的项目仍保留',
       )
@@ -443,15 +433,8 @@ export function ProjectsPage() {
     setTrashBusy(true)
     setTrashConfirmOld(false)
     try {
-      const n = await withPreparedProjectRuntimes(
-        trashItems
-          .filter(
-            (project) =>
-              typeof project.deletedAt === 'number' &&
-              project.deletedAt <
-                Date.now() - TRASH_KEEP_DAYS * 86_400_000,
-          )
-          .map((project) => project.id),
+      const n = await deleteProjectsWithRuntime(
+        trashProjection(trashItems, trashSelectedIds, Date.now()).oldIds,
         () => store.purgeOlderThan(TRASH_KEEP_DAYS),
       )
       await refreshTrash()
@@ -460,20 +443,17 @@ export function ProjectsPage() {
         n > 0 ? `已清理 ${n} 个 ${TRASH_KEEP_DAYS} 天前的项目（不可恢复）` : `没有超过 ${TRASH_KEEP_DAYS} 天的项目`,
       )
     } catch (error) {
-      reportDeleteFailure(error, '清理旧项目失败')
+      reportFailure(error, '清理旧项目失败')
       await refreshTrash()
     } finally {
       setTrashBusy(false)
     }
   }
 
-  /** 回收站里"超过保留期"的那几条：只用来把**数量**写在按钮上，不代表会去自动删 */
-  const oldTrashCount = trashItems.filter(
-    (p) => typeof p.deletedAt === 'number' && p.deletedAt < Date.now() - TRASH_KEEP_DAYS * 86_400_000,
-  ).length
-  const trashSelectedCount = trashSelectedIds.size
-  const allTrashSelected =
-    trashItems.length > 0 && trashItems.every((project) => trashSelectedIds.has(project.id))
+  const trashView = trashProjection(trashItems, trashSelectedIds, Date.now())
+  const oldTrashCount = trashView.oldCount
+  const trashSelectedCount = trashView.selectedCount
+  const allTrashSelected = trashView.allSelected
 
   const visibleIds = shown.map((p) => p.id)
   const selectedCount = selectedIds.size
@@ -501,9 +481,7 @@ export function ProjectsPage() {
 
   const toggleSelectVisible = () => {
     setSelectedIds((current) =>
-      allVisibleProjectsSelected(current, visibleIds)
-        ? clearVisibleProjects(current, visibleIds)
-        : selectVisibleProjects(current, visibleIds),
+      toggleVisibleProjects(current, visibleIds),
     )
     setBulkConfirm(false)
   }
@@ -518,17 +496,14 @@ export function ProjectsPage() {
     const ids = [...selectedIds]
     setBulkDeleting(true)
     try {
-      await withPreparedProjectRuntimes(
-        ids,
-        () => store.removeMany(ids),
-      )
+      await deleteProjectsWithRuntime(ids, () => store.removeMany(ids))
       setMenuId(null)
       setConfirmId(null)
       exitSelection()
       setCleanupOperationId(null)
-      setStatus(`已删除 ${selectedCount} 个项目`)
+      notice(deletionNotice(selectedCount))
     } catch (error) {
-      reportDeleteFailure(error, '批量删除失败')
+      reportFailure(error, '批量删除失败')
     } finally {
       setBulkDeleting(false)
     }
@@ -551,25 +526,10 @@ export function ProjectsPage() {
    * 免得出现"拖进来不播报 / 播报得不一样"这类分叉。
    */
   const applyImportResult = async (res: ImportResult) => {
-    if (res.cancelled) return
+    const result = importResultNotice(res)
+    if (!result) return
     await store.load()
-    /**
-     * 陈旧标记下线后（用户 2026-09-17），缺失的模型不再往节点上「标记」——
-     * 文案里的「已标记」会指向一个不存在的视觉信号，故改成直说事实。
-     *
-     * 第二轮（对账 #465）：**修掉了什么也要说**。导入的是别人给的文件，
-     * 里面可能有端点不存在的连线、指向不存在父节点的归属 —— 静默修掉等于用户
-     * 永远不知道"为什么少了一条线"。
-     */
-    const notes: string[] = []
-    if (res.missingModels.length) notes.push(`${res.missingModels.length} 个节点引用了本机没有的模型`)
-    if (res.repaired.detachedParents) {
-      notes.push(`${res.repaired.detachedParents} 个节点的归属已失效、已放回画布根层`)
-    }
-    if (res.repaired.droppedEdges) {
-      notes.push(`${res.repaired.droppedEdges} 条连线指向不存在的节点、已清掉`)
-    }
-    setStatus(`已导入「${res.project?.name}」${notes.length ? `（${notes.join('；')}）` : ''}`)
+    notice(result)
   }
 
   /**
@@ -690,11 +650,8 @@ export function ProjectsPage() {
               </h2>
               {/* 类型筛选（用户 2026-10-10 #5）：画布项目与电商项目分开展示，计数直接写在按钮上 */}
               <div className={styles.kindFilter} role="radiogroup" aria-label="项目类型">
-                {PROJECT_KINDS.map((kind) => {
-                  const n =
-                    kind.id === 'all'
-                      ? visible.length
-                      : visible.filter((p) => p.workbench === kind.id).length
+                {PROJECT_KIND_ORDER.map((kind) => {
+                  const n = kindCounts.find((option) => option.id === kind.id)?.count ?? 0
                   return (
                     <button
                       key={kind.id}
@@ -1114,308 +1071,5 @@ export function ProjectsPage() {
         </div>
       ) : null}
     </div>
-  )
-}
-
-/** 无项目时的空状态（产品文档 §5.6）。导出供 /_preview 陈列室做视觉回归 */
-export function HomeEmptyState({ onCreate }: { onCreate: () => void }) {
-  return (
-    <div className={styles.empty}>
-      <p className={styles.emptyTitle}>还没有项目</p>
-      <p className={styles.emptyHint}>从下方模板开始，或新建空白项目。</p>
-      <button className={styles.newBtn} onClick={onCreate} data-new-project>
-        ＋ 新建项目
-      </button>
-    </div>
-  )
-}
-
-/**
- * 项目封面（用户 2026-09-27 第 2 条）：
- * 「用最后一张生成的图片作为封面，平铺展示，不要拉伸，占满显示项目卡片的显示区域即可」。
- *
- * 「不要拉伸」与「占满区域」要**同时成立**，所以：
- *  - `object-fit: cover` —— 等比放大到铺满、多出来的部分裁掉；
- *    **绝不能是 `fill`**（那才是拉伸变形）；
- *  - 没有产物时不留白：回落到原来的网格占位（§5.3「无内容时显示 24px 网格占位」），
- *    而不是显示一个破图图标。
- */
-function ProjectCover({ item }: { item: ProjectListItem }) {
-  const meta = useAssetMeta(item.coverHash ?? undefined)
-
-  if (!meta.url) {
-    /* 无产物 / 还没取到字节：保留占位，不闪空框 */
-    return <div className={styles.thumb} aria-hidden />
-  }
-  if (meta.mime?.startsWith('video/')) {
-    /*
-     * 视频封面：用 `<video>` 停在第 0 帧当静态图。
-     * 刻意**不 autoplay** —— 首页一排卡片同时解码十几个视频是性能事故。
-     */
-    return (
-      <div className={styles.thumb}>
-        <video className={styles.cover} src={meta.url} muted playsInline preload="metadata" />
-      </div>
-    )
-  }
-  return (
-    <div className={styles.thumb}>
-      <img className={styles.cover} src={meta.url} alt="" aria-hidden="true" draggable={false} />
-    </div>
-  )
-}
-
-/** 项目卡片（产品文档 §5.3）。导出供 /_preview 陈列室做视觉回归 */
-export function ProjectCard(props: {
-  project: ProjectListItem
-  selecting: boolean
-  selected: boolean
-  confirming: boolean
-  deleting: boolean
-  menuOpen: boolean
-  renaming: boolean
-  renameValue: string
-  onOpen: () => void
-  onRenameChange: (v: string) => void
-  onRenameCommit: () => void
-  onCancelRename: () => void
-  onRequestDelete: () => void
-  onConfirmDelete: () => void
-  onCancelDelete: () => void
-  onToggleMenu: () => void
-  onCloseMenu: () => void
-  onStartRename: () => void
-  onDuplicate: () => void
-  onExport: () => void
-  /** 导出**含素材**的那一档（方案 §3 的兜底路：文件大、不默认打开） */
-  onExportWithAssets: () => void
-}) {
-  const {
-    project, selecting, selected, confirming, deleting, menuOpen, renaming, renameValue,
-    onOpen, onRenameChange, onRenameCommit, onCancelRename,
-    onRequestDelete, onConfirmDelete, onCancelDelete,
-    onToggleMenu, onStartRename, onDuplicate, onExport, onExportWithAssets,
-  } = props
-  const name = selecting && selected ? `${project.name}，已选择` : project.name
-
-  return (
-    <div
-      className={`${styles.card} ${selected ? styles.cardSelected : ''}`}
-      onClick={onOpen}
-      role="button"
-      tabIndex={0}
-      aria-pressed={selecting ? selected : undefined}
-      data-selecting={selecting ? 'true' : undefined}
-      data-selected={selected ? 'true' : undefined}
-      data-project-card={project.id}
-      /*
-       * 类型落在**卡片根上**（用户 2026-10-10 #5 的"分类"靠它过滤），
-       * 而不是在卡片里画一枚标签：用户 2026-09-28 对着五张截图定稿过
-       * 「名称与『相对日期 · N 个节点』两行，删除工作台标签胶囊」（对账 #40 / 冒烟 G85），
-       * 在 meta 行里塞一枚"画布 / 电商"的胶囊会把那条定稿推翻 —— 分类交给筛选条，
-       * 卡片上只留数据属性供筛选与冒烟读。
-       */
-      data-project-workbench={project.workbench}
-      aria-label={name}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter' || e.key === ' ') {
-          e.preventDefault()
-          onOpen()
-        }
-      }}
-    >
-      <ProjectCover item={project} />
-      {selecting && (
-        <span
-          className={`${styles.selectMark} ${selected ? styles.selectMarkOn : ''}`}
-          data-project-select-mark
-          aria-hidden
-        >
-          {selected && <IconCheck />}
-        </span>
-      )}
-
-      <div className={styles.cardBody}>
-        {renaming ? (
-          <input
-            className={styles.renameInput}
-            value={renameValue}
-            autoFocus
-            onChange={(e) => onRenameChange(e.target.value)}
-            onClick={(e) => e.stopPropagation()}
-            onBlur={onRenameCommit}
-            onKeyDown={(e) => {
-              // 必须阻止冒泡：卡片容器对 Enter / 空格有「打开项目」的键盘处理
-              if (e.key === 'Enter' || e.key === ' ') e.stopPropagation()
-              if (e.key === 'Enter') onRenameCommit()
-              if (e.key === 'Escape') onCancelRename()
-            }}
-          />
-        ) : (
-          <div className={styles.cardName} data-project-name>
-            {project.name}
-          </div>
-        )}
-        <div className={styles.cardMeta} data-project-meta>
-          {formatRelative(project.updatedAt)}
-          {project.workbench === 'canvas' ? ` · ${project.nodeCount} 个节点` : ''}
-        </div>
-      </div>
-
-      <div className={styles.cardActions} onClick={(e) => e.stopPropagation()}>
-        {confirming ? (
-          <div className={styles.confirm}>
-            <span className={styles.confirmText}>删除？</span>
-            <button
-              className={styles.confirmYes}
-              data-project-card-confirm-delete
-              disabled={deleting}
-              onClick={onConfirmDelete}
-            >
-              {deleting ? '收尾中…' : '确认'}
-            </button>
-            <button
-              className={styles.confirmNo}
-              disabled={deleting}
-              onClick={onCancelDelete}
-            >
-              取消
-            </button>
-          </div>
-        ) : (
-          <button
-            className={styles.menuBtn}
-            onClick={onToggleMenu}
-            aria-label="项目菜单"
-            aria-haspopup="menu"
-            aria-expanded={menuOpen}
-            title="更多"
-          >
-            ⋯
-          </button>
-        )}
-
-        {menuOpen && !confirming && (
-          <div className={styles.menu} role="menu">
-            <button
-              className={styles.menuItem}
-              role="menuitem"
-              onClick={(e) => {
-                e.stopPropagation()
-                onStartRename()
-              }}
-            >
-              重命名
-            </button>
-            <button
-              className={styles.menuItem}
-              role="menuitem"
-              onClick={(e) => {
-                e.stopPropagation()
-                onDuplicate()
-              }}
-            >
-              复制
-            </button>
-            <button
-              className={`${styles.menuItem} ${styles.menuDanger}`}
-              role="menuitem"
-              onClick={(e) => {
-                e.stopPropagation()
-                onRequestDelete()
-              }}
-            >
-              删除
-            </button>
-            <button
-              className={styles.menuItem}
-              role="menuitem"
-              data-project-export
-              onClick={(e) => {
-                e.stopPropagation()
-                onExport()
-              }}
-            >
-              导出
-            </button>
-            {/*
-              「含素材」是**另一条入口**，不是同一个里加勾选：它的产物可能几百 MB，
-              默认摆在那里容易被误点；而日常备份该走「素材文件夹」那条（结构 + 盘上字节）。
-            */}
-            <button
-              className={styles.menuItem}
-              role="menuitem"
-              data-project-export-embed
-              onClick={(e) => {
-                e.stopPropagation()
-                onExportWithAssets()
-              }}
-            >
-              导出（含素材，体积大）
-            </button>
-          </div>
-        )}
-      </div>
-    </div>
-  )
-}
-
-/** 顶栏选择模式入口与批量栏复用的一组轻量图标 */
-function IconSelect({ size = 18 }: { size?: number }) {
-  return (
-    <svg
-      width={size}
-      height={size}
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={1.7}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden
-    >
-      <rect x="4" y="5" width="6" height="6" rx="1.5" />
-      <path d="m5.4 8 1.2 1.2L9 7.1" />
-      <path d="M14 6.5h6M14 10.5h5" />
-      <rect x="4" y="14" width="6" height="6" rx="1.5" />
-      <path d="M14 16.5h6M14 20h5" />
-    </svg>
-  )
-}
-
-function IconCheck({ size = 13 }: { size?: number }) {
-  return (
-    <svg
-      width={size}
-      height={size}
-      viewBox="0 0 16 16"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={2.2}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden
-    >
-      <path d="m3 8.3 3.1 3.1L13 4.7" />
-    </svg>
-  )
-}
-
-function IconTrash({ size = 15 }: { size?: number }) {
-  return (
-    <svg
-      width={size}
-      height={size}
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={1.8}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden
-    >
-      <path d="M4.5 7h15M9 4.5h6M7 7l.8 12h8.4L17 7" />
-      <path d="M10 10.5v5M14 10.5v5" />
-    </svg>
   )
 }

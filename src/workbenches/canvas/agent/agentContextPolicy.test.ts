@@ -152,6 +152,45 @@ describe('Agent request classification', () => {
     )
   })
 
+  it('★★ 继续 / 下一步 / 内部控制和四种未完状态一律升级 full/complex_plan', () => {
+    const cases = [
+      { text: '继续', hasTaskPlan: false },
+      { text: '继续任务', hasTaskPlan: false },
+      { text: '下一步', hasTaskPlan: false },
+      { text: '直接下一步', hasTaskPlan: false },
+      { text: '继续', hasTaskPlan: true },
+      { text: '继续', hasTaskPlan: false, internalControl: true },
+      { text: '继续', hasTaskPlan: false, hasActiveContinuation: true },
+      { text: '继续', hasTaskPlan: false, hasPendingConfirmation: true },
+      { text: '继续', hasTaskPlan: false, hasUnfinishedGeneration: true },
+      { text: '继续', hasTaskPlan: true, hasNeedsAttentionJob: true },
+      { text: '继续', hasTaskPlan: false, lastAssistantFailed: true },
+    ] as const
+    for (const signals of cases) {
+      expect(classifyAgentRequest({ ...noSignals, ...signals })).toBe('complex_plan')
+      expect(promptProfileForMode(classifyAgentRequest({ ...noSignals, ...signals }))).toBe('full')
+    }
+  })
+
+  it('普通新请求不会仅因为上一轮 502 或画布选中被误升级', () => {
+    expect(classifyAgentRequest({ ...noSignals, text: '画一只新的猫' })).toBe('simple_generate')
+    expect(classifyAgentRequest({
+      ...noSignals,
+      text: '画一只新的猫',
+      hasSelectedNodes: true,
+      hasNeedsAttentionJob: true,
+    })).toBe('simple_generate')
+  })
+
+  it('旧 active taskPlan 不因孤立继续短句被判成轻量生成', () => {
+    expect(classifyAgentRequest({
+      ...noSignals,
+      text: '继续',
+      hasTaskPlan: true,
+      hasMentionedImage: true,
+    })).toBe('complex_plan')
+  })
+
   it('uses light prompts for simple generation and reference edits', () => {
     expect(promptProfileForMode('simple_generate')).toBe('light')
     expect(promptProfileForMode('reference_edit')).toBe('light')

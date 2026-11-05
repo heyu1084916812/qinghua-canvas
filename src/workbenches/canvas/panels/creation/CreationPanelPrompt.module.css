@@ -1,0 +1,431 @@
+/* CreationPanel component-domain styles */
+/* ── 第二部分：提示词 ── */
+.promptRow {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  gap: var(--space-2);
+}
+
+.linked {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2em;
+  height: 1.72em;
+  box-sizing: border-box;
+  padding: 0 3px;
+  border: 1px solid var(--stroke);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-1);
+  font-size: inherit;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.linkedRow {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35em;
+  min-width: 0;
+  color: var(--text-2);
+}
+
+.linkedIcon {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  color: var(--text-2);
+}
+
+.linkedIcon svg {
+  width: 0.95em;
+  height: 0.95em;
+}
+
+.linkedMeta {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text-3);
+  font-size: var(--fs-chip);
+  font-weight: var(--fw-chip);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.prompt {
+  --prompt-scrollbar-size: 6px;
+  width: 100%;
+  /**
+   * **高度跟着内容长**（用户 2026-09-24 第 1 条）。
+   *
+   * 此前是 `flex: 1 1 auto`：textarea 只会**撑满**父级给它的高度，
+   * 内容超出时它自己内部滚动 —— 于是面板永远 360px、里面一条滚动条。
+   * 用户明确不要这个（「文字太多的时候右边出现滚动条，自适应就好」）。
+   *
+   * `field-sizing: content` 让表单控件按内容定高（Chromium 123+ 标准属性）。
+   * 配合下面的 `max-height` 兜底：粘一篇超长文章进来时，
+   * 面板长到某个高度就停住，剩下的由 textarea 自己滚 ——
+   * 用户要的「输入框可以有滚动条」正是这个状态。
+   *
+   * 不再需要 `flex: 1 1 auto`：面板高度由内容决定，
+   * 短内容时靠 `.panel` 的 `min-height` 撑出原来那块 21:9 的大面板。
+   */
+  flex: 0 0 auto;
+  field-sizing: content;
+  /** 下限只保一行；短提示词下方不再留固定高度。 */
+  min-height: 1lh;
+  /**
+   * 文字区的高度上限（设计值，zoom 0.75 后屏幕上 ×0.75）。
+   *
+   * 两个约束取**更小**的那个：
+   *  - 固定的 420：常见长提示词都装得下，且不会长得离谱；
+   *  - **面板可用高度减去其它几行**：面板高度被 `--panel-available-h` 钳住时，
+   *    文字区必须跟着收，否则它会顶破面板（面板现在是 `overflow: visible`，
+   *    顶破了就真的画到屏幕上、盖住下面的东西）。
+   *
+   * 减掉的约 190px 是「素材行 + 参数行 + 内距 + 间距」的设计值合计；
+   * 取 160 留一点余量，宁可文字区小一点，也不要面板溢出。
+   */
+  max-height: min(
+    420px,
+    calc(var(--panel-available-h, 480px) - 160px)
+  );
+  /**
+   * 去掉右下角的拖拽手柄（用户 2026-09-24：「下拉按钮目前好像是一个死功能」）。
+   *
+   * 它来自 `resize: vertical`。但面板整体挂着 `zoom: 0.75`，
+   * 原生 resize 手柄的命中区**不跟着 zoom 缩放**，拖它时灵时不灵；
+   * 而且面板现在是「内容多高它就多高」，再给一个手动拉高的小三角
+   * 既没用、又占着文本框右下角最碍事的那一格。故直接禁掉。
+   */
+  resize: none;
+  /* 滚到头之后不再把滚轮传给外面（画布就在下面，穿过去会变成缩放） */
+  overscroll-behavior: contain;
+  border: none;
+  outline: none;
+  background: transparent;
+  font: inherit;
+  /**
+   * 用户第 3 条：「参数文字加大」也覆盖提示词正文——它是面板里最主要的一块阅读内容。
+   * 2026-10-05 再加大一档：**屏幕**要 15px（对齐参考产品），面板挂 0.75 ⇒ 写 20px。
+   */
+  font-size: 20px;
+  line-height: var(--lh-body);
+  text-align: left;
+  color: var(--text-1);
+  box-sizing: border-box;
+  /**
+   * 文本框**保留**自己的滚动条（用户 2026-09-24 明确）：
+   * 「提示词节点的文本输入框可以有滚动条，但是要细一点，
+   *   而且不要上下两个箭头，同时滚动条的背景颜色也不要，
+   *   滚动条容器的位置就在文本输入框与左右两边间距的里面」。
+   *
+   * ⚠️ **这里刻意只写 `::-webkit-scrollbar-*`，不写标准的
+   * `scrollbar-width` / `scrollbar-color`**（2026-09-24 踩坑后定的）。
+   *
+   * 原因：现代 Chromium 一旦看到标准的 `scrollbar-width`，
+   * 就改用**内置滚动条**渲染，并**整组忽略 `::-webkit-scrollbar-*`** ——
+   * 包括那条「隐藏上下箭头」的 `-webkit-scrollbar-button { display:none }`。
+   * 于是用户看到的正是「箭头还在」（我写了消失规则，却被浏览器整个跳过）。
+   * 两套机制只能选一套：要自定义箭头/轨道/宽度，就必须用 webkit 那套。
+   *
+   * 宽度：8px 在面板 `zoom: 0.75` 下渲染约 6px。用户说「起码缩小一半」
+   * 是相对系统默认（约 15px）而言，6px 已达成；这里再收一档到 6px
+   * （屏幕上约 4.5px），但留一个下限不再更小 —— 再细就点不中了。
+   */
+  /**
+   * `padding-right` 让**文字**不贴到滚动条上。
+   * 滚动条本身在内边距**之内**（浏览器把滚动条画在 padding box 里），
+   * 这正是用户说的「位置在文本框与左右两边间距的里面，不是在右边间距再加一个容器」。
+   */
+  padding-right: 6px;
+}
+
+/* ── 提示词框：`@` 引用（用户 2026-10-05 第 15 条） ── */
+/*
+ * 提示词行那一行的头：左「上游已链接提示词节点」、右 `@`。
+ * 没有头那一行时整块不渲染（空行会在面板里多出 20 多像素的空白）。
+ */
+.promptHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  min-height: 22px;
+}
+
+/* 提示词框本体：预设 chip 与正文都在里面（chip 不再单独占一行） */
+.promptBox {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-height: 0;
+}
+
+.promptBoxComfort {
+  flex: 1 1 auto;
+}
+
+.promptExpand {
+  position: absolute;
+  top: 0;
+  right: -4px;
+  z-index: 3;
+  width: 14px;
+  height: 16px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--text-3);
+  cursor: pointer;
+  opacity: 0.72;
+  transition:
+    color var(--dur-hover) var(--ease-out),
+    opacity var(--dur-hover) var(--ease-out);
+}
+
+.promptExpand:hover,
+.promptExpand:focus-visible {
+  color: var(--text-1);
+  opacity: 1;
+}
+
+.promptExpand:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 1px;
+}
+
+/*
+ * 候选菜单：面板**内部**的浮层（绝对定位，不跟着画布缩放）。
+ * 不用原生 select —— 它的展开层由浏览器绘制，既不受 `zoom: 0.75` 约束、
+ * 也不跟主题走（§3.3 里为参数菜单定的同一条理由）。
+ */
+.mentionMenu {
+  position: absolute;
+  z-index: 3;
+  /*
+   * 默认落在输入框左上角（量不到光标时的兜底）；量到光标时由内联 style 顶到光标下面
+   * —— 用户 2026-10-05 第 4 条：「面板需要在输入框艾特的位置，不要固定在右边」。
+   */
+  top: 34px;
+  left: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  /*
+   * 与对话窗那套引用菜单同一档**屏幕**尺寸（第 4 条：「面板和文字都太小了，
+   * 需要像 agent 一样的插入正文 chip 一样的大小」）。
+   *
+   * 实测对照（2026-10-05 收尾轮，`scripts/probe-goal-audit.mjs`）：
+   * 助手那份候选菜单是 **266 宽 / 行高 46 / 字号 16（屏幕，它不挂缩放）**；
+   * 这里原来只有 300 宽 / 行高 44 / **字号 13.5**，字明显小一档，正是用户报的那句。
+   * 字号按 16 ÷ 0.75 ≈ 21.3 取 **21 设计值**（屏幕 15.75），与助手对齐。
+   * ⚠️ 面板挂 0.75 缩放，所以下面这些都要写**设计值**：宽 400 / 上限 320 / 行高 58 /
+   * 缩略图 53×40 / 字号 21。
+   */
+  width: 400px;
+  max-height: 320px;
+  overflow-y: auto;
+  box-sizing: border-box;
+  padding: var(--space-3);
+  background: var(--bg-surface);
+  border: 1px solid var(--stroke);
+  border-radius: var(--radius-control);
+  box-shadow: var(--shadow-float);
+}
+
+.mentionHint {
+  padding: 0 4px 4px;
+  color: var(--text-3);
+  /* 屏幕 12px */
+  font-size: 16px;
+}
+
+.mentionItem {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  /*
+   * 屏幕 ≈ 46px —— 与**助手那份 @ 候选菜单**同档（它不挂缩放，实测 46px / 16px）。
+   *
+   * ⚠️ 这两个数（`height` 与下面的 `font-size`）被 G104 那条「候选菜单的行高 / 字号与助手那份
+   * 同档」钉着。2026-10-16 实测过一次翻车：一处「面板文字字号收敛」把字号从 21 收到 20
+   * （屏幕 16 → 15），**那条断言当场变红、而改的人没复跑 G104** ⇒ 红了一天才被发现。
+   * 改这里请连着跑 `SMOKE_ONLY=g104 node scripts/smoke.mjs`。
+   */
+  height: 61px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--text-1);
+  font-family: var(--font-sans);
+  /* 屏幕 15.75px ≈ 16 —— 与助手那份候选菜单（16px 屏幕）同档 */
+  font-size: 21px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.mentionItem:hover {
+  background: var(--bg-hover);
+}
+
+.mentionThumb {
+  flex: 0 0 auto;
+  /* 屏幕 40×30 */
+  width: 53px;
+  height: 40px;
+  border-radius: 3px;
+  overflow: hidden;
+  background: var(--bg-subtle);
+}
+
+.mentionThumb img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* 名字过长时省略（用户原话：「小框图片缩略图加上省略的名称」） */
+.mentionName {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/*
+ * 富文本提示词框：`.prompt` 那组规则与 textarea 时期**共用**（字号 / 边距 /
+ * 细滚动条 / 高度上限都要一样），这里只补 contenteditable 与 textarea 的差异。
+ *
+ * 为什么把 `.prompt` 里那几条再写一遍：`MentionEditor.module.css` 的 `.editor`
+ * 自带 `min-height: 44px; max-height: 120px; font-size: var(--fs-label)`，
+ * 而两个 CSS module 的先后顺序由打包顺序决定 —— 各写一份、谁也别指望谁，
+ * 面板这边的效果才不会被一次无关的导入顺序调整掀翻。
+ */
+.promptEditor {
+  min-height: 1lh;
+  max-height: min(
+    420px,
+    calc(var(--panel-available-h, 480px) - 160px)
+  );
+  /**
+   * 左边 10px、右边 4px：滚动条自己占 6px，
+   * 合计后文字到两侧的视觉间距接近相等，不再多出右侧空带。
+   */
+  padding: 0 4px 0 10px;
+  /* 屏幕 15px（与 `.prompt` 同一条口径：面板 0.75 缩放，设计值写 20） */
+  font-size: 20px;
+  line-height: var(--lh-body);
+  overflow-y: auto;
+  /* contenteditable 默认 `overflow: visible`：不写这条，超出上限的内容会画到面板外 */
+  overscroll-behavior: contain;
+}
+
+.promptEditorComfort {
+  flex: 1 1 0;
+  min-height: 72px;
+}
+
+  /**
+   * ⚠️ 这是全局细滚动条（`ui/base.css` 里那套 4px）的**一个有理由的例外**，
+   * 不是漏改的旧样式 —— 改之前先读这段。
+   *
+   * 全局默认 4px 是按「用户要求缩小四分之三」定的（系统默认 15px ⇒ 15÷4≈4px），
+   * 但**面板整体挂 `zoom: 0.75`**：4px 在面板里渲染出来只有 3px，实测基本抓不住。
+   * 故面板这一处显式放宽到 6px（屏幕上约 4.5px），仍是系统默认的三分之一。
+   *
+   * 其余滚动条（节点本体、日志面板、设置页…）一律走全局 4px，不要在这里各写一份。
+   */
+.prompt::-webkit-scrollbar {
+  width: var(--prompt-scrollbar-size);
+  height: var(--prompt-scrollbar-size);
+}
+
+/**
+ * 上下两端**不出现箭头按钮**（用户两轮都提到）。
+ *
+ * ⚠️ 这条此前**没生效**，原因值得记下来：同一条规则块里还写了标准的
+ * `scrollbar-width: thin`。现代 Chromium 一看到它就切到内置滚动条渲染，
+ * 并**整组忽略 `::-webkit-scrollbar-*`** —— 包括这里的 `display: none`。
+ * 于是「我明明写了隐藏箭头，用户那边箭头还在」。
+ *
+ * 现在标准属性**完全不写**，Chromium 走这套 webkit 伪元素，`display:none` 才真正生效。
+ * （代价：Firefox 拿不到自定义样式，用它的默认滚动条 —— 可接受，
+ *   Chromium 系是主目标；两套混写会互相打断，只能选一套。）
+ */
+.prompt::-webkit-scrollbar-button {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+/**
+ * 展开按钮与原生滚动条共用右侧窄栏：
+ * 只保留滚动条顶部的透明起始格，让轨道从按钮下方开始；
+ * 底部格继续隐藏。这里不增加横向宽度，也不抬高文字区域。
+ */
+.prompt::-webkit-scrollbar-button:single-button:vertical:decrement {
+  display: block;
+  width: var(--prompt-scrollbar-size);
+  height: 16px;
+  background: transparent;
+}
+
+.prompt::-webkit-scrollbar-button:single-button:vertical:increment {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+/**
+ * 轨道**与节点内部同色**（用户 2026-09-24 第二次反馈）。
+ *
+ * 第一版给的 `transparent` 在 Chromium 下会被渲染成「透出下面一层」，
+ * 而文本框所在的那层底色与面板底色并不总是一致，看起来仍像「多了一条槽」。
+ * 用户的原话是「背景需要和节点的内部的颜色一样，这样才会感觉是没有背景」——
+ * 所以这里直接取**与面板/节点内部同一个令牌**，让它彻底融进去。
+ */
+.prompt::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* 拇指颜色和显隐统一由 base.css 的滚动容器活动状态控制。 */
+.prompt::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+}
+
+/* 右下角那个「两条斜线凑成的小三角」是滚动条的 corner，一并去掉 */
+.prompt::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+.prompt::placeholder {
+  color: var(--text-3);
+}
+
+.eyeBtn {
+  align-self: flex-end;
+  width: 22px;
+  height: 22px;
+  border: 1px solid var(--stroke);
+  border-radius: 999px;
+  background: var(--bg-surface);
+  color: var(--text-1);
+  font-size: 11px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.eyeOff {
+  opacity: 0.5;
+}

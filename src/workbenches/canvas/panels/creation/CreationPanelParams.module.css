@@ -1,0 +1,394 @@
+/* CreationPanel component-domain styles */
+/* ── 第三部分：参数与生成 ── */
+.params {
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  /*
+   * 换行后的行距比列距大一档（用户 2026-10-03：「有点太挤了」）。
+   *
+   * 列距仍是 8：同一行的 chip 靠在一起是「一组参数」的直观表达；
+   * 而折到第二行时如果还是 8，两行会糊成一片 —— 12 让「换行了」看得出来。
+   */
+  column-gap: var(--space-2);
+  row-gap: var(--space-3);
+}
+
+/*
+ * 参数行里的**分组竖线**（用户 2026-09-24 定下的做法，与 `.toolGroup::before` 同一套）。
+ *
+ * 「模型」与后面那一串参数是两件事：前者决定这次发给谁，后者决定怎么发。
+ * 六个 chip 平铺时它们看起来是同一类东西 —— 一条竖线就把这句话说明白了，
+ * 也让整行不再是一堵密不透风的墙（用户 2026-10-03：「有点太挤了」）。
+ */
+.paramDivider {
+  flex: none;
+  width: 1px;
+  height: 22px;
+  background: var(--stroke);
+}
+
+/*
+ * 无可用平台时的引导条（§6.8）。独占一行（与 .error 同一排版位）、可点击，
+ * 视觉上仍遵守「1px 细描边 + 背景明度区分」：不做强调色，避免与生成按钮抢注意力。
+ */
+.setupHint {
+  flex-basis: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--stroke);
+  border-radius: var(--radius-control);
+  background: var(--bg-subtle);
+  color: var(--text-2);
+  font-family: var(--font-sans);
+  font-size: var(--fs-label);
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--dur-hover) var(--ease-out);
+}
+
+.setupHint:hover {
+  background: var(--bg-hover);
+  color: var(--text-1);
+}
+
+.setupHintGo {
+  flex: 0 0 auto;
+  font-weight: 600;
+  color: var(--text-1);
+  white-space: nowrap;
+}
+
+/* 参数 chip 已迁到 ParamPicker（§3.3 / §6.8）——原生 <select> 的展开层
+   由浏览器绘制，不受浮层规范约束也无法被断言，故不在此处保留样式。 */
+
+/* 视频时长（§6.8「滑块 3 – 15 秒，支持直接键入数值」）：滑块 + 数字框 + 单位 */
+.duration {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  height: 38px;
+  padding: 0 10px;
+  border-radius: var(--radius-control);
+}
+
+.slider {
+  width: 96px;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+.durationNum {
+  width: 44px;
+  height: 30px;
+  box-sizing: border-box;
+  padding: 0 var(--space-1);
+  border: 1px solid var(--stroke);
+  border-radius: calc(var(--radius-control) - 4px);
+  background: var(--bg-surface);
+  font-family: var(--font-sans);
+  /**
+   * 数字与它右边那个「秒」**同一档**（用户 2026-10-15：参数面板里的数字要和文字一样）。
+   * 原来这里是 15px、单位 20px，同一个读数拆成两种字号。
+   */
+  font-size: var(--fs-label);
+  font-weight: var(--fw-chip);
+  color: var(--text-1);
+  text-align: center;
+}
+
+.durationNum:focus-visible {
+  outline: none;
+  border-color: var(--stroke-focus);
+}
+
+.durationUnit {
+  font-size: var(--fs-label);
+  font-weight: var(--fw-chip);
+  color: var(--text-2);
+}
+
+.countGroup {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.countBtn {
+  height: 30px;
+  padding: 0 12px;
+  border: 1px solid var(--stroke);
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--text-1);
+  font: inherit;
+  font-size: var(--fs-chip);
+  font-weight: var(--fw-chip);
+  cursor: pointer;
+}
+
+.countActive {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-text);
+}
+
+.countBtn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* 生成按钮：圆形 46×46，实色 --accent，高度与参数行（chip 46px）齐平（§6.8） */
+.run {
+  margin-left: auto;
+  width: 46px;
+  height: 46px;
+  flex: 0 0 auto;
+  border: none;
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--accent-text);
+  font-size: 20px;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.run:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/*
+ * 生成按钮里的箭头：与按钮同色（`currentColor`），`display:block` 去掉基线偏移。
+ * 尺寸由 SVG 的 width/height 决定，不在这里写死，方便以后单点微调。
+ */
+.runArrow {
+  display: block;
+}
+
+.runCancel {
+  background: var(--bg-surface);
+  color: var(--text-1);
+  border: 1px solid var(--stroke);
+}
+
+.runBusy {
+  animation: panelSpin 0.9s linear infinite;
+}
+
+@keyframes panelSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.error {
+  flex-basis: 100%;
+  font-size: var(--fs-label);
+  color: var(--danger);
+}
+
+/* 禁用节点：与错误行同一落点，但用次要文字色 —— 它是一条状态说明，不是报错 */
+.disabledNotice {
+  flex-basis: 100%;
+  font-size: var(--fs-label);
+  color: var(--text-2);
+}
+
+/*
+ * 提示词节点面板（§6.7）：**字数**单独一行。
+ *
+ * 用户 2026-09-24 报「左边的文字和右边的下拉的下方有空隙」——
+ * 根因是这一行原本 `justify-content: space-between`，把字数推到最左、
+ * 把后面的东西推到最右，中间空出一整条。现在这里只剩字数，
+ * 去掉 `space-between`（它只为「两端对齐」存在），行高按字数自身收，
+ * 不再撑出一条空隙。
+ */
+.toolRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}
+
+.toolCount {
+  font-size: var(--fs-label);
+  font-weight: 600;
+  color: var(--text-3);
+}
+
+/*
+ * 「技能 / 优化 / 翻译 / 反推」这一组（参数行尾）。
+ *
+ * 用户 2026-09-24：「技能 / 优化 / 翻译 / 反推的 UI 和渠道、模型的 UI 一样，
+ * 两个地方用一条竖线分开即可」。
+ *
+ * 于是这里**不再是一个灰色胶囊背景**（那会形成「框里有框」），
+ * 而是与渠道 / 模型 chip 同形：透明底、同样高度、同样的圆角与字号，
+ * 靠 `margin-left: auto` 停在行尾、紧贴生成按钮。
+ * 分组之间只用一条竖线（::before）分隔。
+ */
+.toolGroup {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  /**
+   * ⚠️ 这里**不能**再用 `margin-left: auto`（用户 2026-09-24 截图反馈）。
+   *
+   * 上一版用它把整组顶到行尾，于是「渠道 / 模型」与那条竖线之间
+   * 被撑出一大段空白（用户：「左边的渠道和模型还有右边的竖线太远了，要始终…」）。
+   *
+   * 现在改成**紧跟在模型 chip 之后**：竖线与前一组之间只留常规间距。
+   * 生成按钮仍靠右，由它自己的 `margin-left: auto` 负责（见 `.run`）——
+   * 于是「参数…｜技能」靠左成组、按钮贴右，中间的空隙落在**该落**的地方。
+   */
+  margin-left: var(--space-1);
+}
+
+.toolGroup::before {
+  content: '';
+  width: 1px;
+  height: 22px;
+  margin: 0 8px;
+  background: var(--stroke);
+  flex: none;
+}
+
+/*
+ * 工具按钮与参数 chip 同形（用户要求「UI 一样」）。
+ *
+ * 数值对齐 `ParamPicker.module.css` 的 `.chip`：高 46px、左右 12px 内距、
+ * `--radius-control` 圆角、字重 500、悬停浮现 `--bg-hover`。
+ * 写死数值而不是复用类名：CSS module 不跨文件组合，抄的是**同一套视觉参数**，
+ * 哪边改了都要一起看（若将来抽成共享 token 更好）。
+ *
+ * 字号 16 → 21px（2026-10-05）：chip 那一档已由 `--picker-fs` 提到 21，
+ * 这一排工具按钮跟它同形，字号也得跟上，否则又成了「同一行两种字大小」。
+ * 屏幕上是 15.75px（面板挂 0.75 缩放）。
+ */
+.toolBtn {
+  border: none;
+  background: transparent;
+  height: 46px;
+  padding: 0 12px;
+  border-radius: var(--radius-control);
+  font-family: var(--font-sans);
+  font-size: 16px;
+  font-weight: 500;
+  color: var(--text-1);
+  cursor: pointer;
+  transition: background var(--dur-hover) var(--ease-out);
+}
+
+.toolBtn:hover:not(:disabled) {
+  background: var(--bg-hover);
+  color: var(--text-1);
+}
+
+.toolBtn:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+
+.toolError {
+  margin-top: var(--space-1);
+  font-size: var(--fs-label);
+  color: var(--danger);
+}
+
+/* ── 预设与情绪（用户 2026-10-05 第 14 条） ── */
+/*
+ * 预设入口与它的菜单：菜单锚在这枚按钮的容器上（`position: relative`）。
+ * 菜单本体向上弹，见 `PresetMenu.module.css` —— 这里只负责给锚点。
+ */
+.presetAnchor {
+  position: relative;
+  display: inline-flex;
+  flex: 0 0 auto;
+}
+
+.presetBtn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  /**
+   * 2026-10-05 第 4 批：「图四的这两个图标都太小了」。
+   * 按钮 32 → **36** 设计值（屏幕 24 → 27），里面的图标由 JSX 给到 28（屏幕 21，原来 17）。
+   */
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  /*
+   * **没有外框**（用户 2026-10-05 第 11 条：「我不要外框」）——
+   * 它只是一枚图标按钮，悬停时才给一层底色作为反馈。
+   */
+  border: 0;
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--text-1);
+  cursor: pointer;
+}
+
+.presetBtn:hover {
+  background: var(--bg-hover);
+}
+
+/*
+ * 选中态：**底色**（用户 2026-10-06：「那个小点没有任何意义」⇒ 右上角那颗小点已删）。
+ *
+ * 小点原本是"已选"的唯一信号，删掉之后必须换个表达，否则用户看不出当前有没有预设。
+ * 换成的就是面板里既有的那套语言 —— 预设菜单里"当前那一条"（`.itemOn`）与参数 chip
+ * 展开态（`.chipOpen`）都用同一个底色，三处一致。
+ */
+.presetBtnOn {
+  color: var(--text-1);
+  background: var(--bg-hover);
+}
+
+/*
+ * 当前预设那一条（图五：名称 + 右侧示例小字）。
+ * 小字只做说明、不进提示词，长了就省略 —— 它旁边还有输入框，不能让它把行撑破。
+ */
+/*
+ * 正文里那几枚 chip（预设 / @ 引用）。
+ *
+ * 用户 2026-10-05 第 3 条：「需要像 agent 一样的插入正文 chip 一样的大小和功能，
+ * 不是单独在一行」—— 所以预设现在**就是正文里的一枚 chip**（kind = `preset`），
+ * 不再有「单独一行」的那套 `.presetLine/.presetChip/...` 样式。
+ *
+ * 尺寸按**屏幕**定（面板挂 0.75 缩放，所以下面写的是设计值）：
+ * **字号与正文同为 20px**（用户 2026-10-05 第 4 批第 3 条：「预设功能里面的文字是 18px，
+ * 正文是 20px，我需要两个文字要一样的大小」）；
+ * 外框与图标各放大一档：高 38（屏幕 28.5）、图标 24（屏幕 18）——
+ * 同一批原话：「预设框能大一点没事，图标需要大一点」。
+ *
+ * ⚠️ 这里用 `[data-token]` 这个**属性选择器**：chip 是编辑器命令式建的 DOM，
+ * 类名在 `MentionEditor.module.css` 里，跨文件选不到。
+ */
+.promptBox [data-token] {
+  height: 38px;
+  padding: 0 10px;
+  gap: 8px;
+  border-radius: 8px;
+  font-size: 20px;
+}
+
+.promptBox [data-token] svg {
+  width: 24px;
+  height: 24px;
+}
+
+/*
+ * 预设 chip 右侧那枚小箭头**已删**（用户 2026-10-06：「不要右边的那个下方向符号了」）。
+ *
+ * 它原本是"点这枚 chip 能换一条 / 调搭配"的暗示，但 chip 整枚可点、点上去就出菜单，
+ * 箭头属于冗余装饰；而且它是拿 `⌄` 这个**字形**画的（位置随字体飘，与仓库
+ * 「不拿字形当图标」那条相悖）—— 一起清掉。
+ */

@@ -9,6 +9,10 @@ import {
   updateAgentTurnText,
 } from '../../domain/agent/queuedTurn'
 import {
+  AGENT_CONTEXT_WINDOW,
+  modelMessageWindow,
+} from '../../domain/agent/modelMessageWindow'
+import {
   enqueueAgentSteer,
   normalizeAgentSteers,
   removeAgentSteers,
@@ -20,7 +24,6 @@ import {
   loadMessages,
   loadSession,
   MESSAGE_SPLIT_MIGRATION_ID,
-  messagesFromRows,
   replaceMessages,
   sessionRow,
   toSession,
@@ -48,10 +51,8 @@ export type {
  *    「它知道我没在这个会话里说过的事」，而那正是多会话最经典的 bug。
  */
 
-/** 发给模型的上下文窗口：保留最近 N 条（设计文档 §4.3） */
-export const AGENT_CONTEXT_WINDOW = 20
-
 const splitReady = new WeakMap<StoragePort, Promise<void>>()
+export { AGENT_CONTEXT_WINDOW } from '../../domain/agent/modelMessageWindow'
 
 export function createAgentSessionStore(
   storage: StoragePort,
@@ -766,22 +767,23 @@ export function createAgentSessionStore(
       if (!sessions[0]) return []
       const limit = Math.max(0, Math.trunc(window))
       if (limit === 0) return []
+      const history = await loadMessages(storage, id)
+      if (storage.queryPage) {
+        const page = await storage.queryPage(
+          'agentMessages',
+          { sessionId: id },
+          {
+            orderBy: { field: 'sequence', direction: 'desc' },
+            limit,
+          },
+        )
+        if (page.total > 0) return modelMessageWindow(history, limit)
+      }
       if (!storage.queryPage) {
-        return (await loadMessages(storage, id)).slice(-limit)
+        if (history.length > 0) return modelMessageWindow(history, limit)
       }
-      const page = await storage.queryPage(
-        'agentMessages',
-        { sessionId: id },
-        {
-          orderBy: { field: 'sequence', direction: 'desc' },
-          limit,
-        },
-      )
-      if (page.total === 0 && Array.isArray(sessions[0].messages)) {
-        return asMessages(sessions[0].messages).slice(-limit)
-      }
-      return messagesFromRows(page.rows)
-        .slice(-limit)
+      const legacy = asMessages(sessions[0].messages)
+      return legacy.length > 0 ? modelMessageWindow(legacy, limit) : []
     },
   }
 }

@@ -6,36 +6,26 @@ import {
   useSyncExternalStore,
   type ReactNode,
 } from 'react'
-import {
-  ChannelError,
-  type ChannelAdapter,
-} from '../../../platform/channels/types'
 import { createGenerationClient } from '../../../platform/generation'
-import { buildRunPlan, type CanvasRunTask, type RunPlan } from '../../../features/canvas/execution/buildRunPlan'
+import { buildRunPlan, type CanvasRunTask } from '../../../features/canvas/execution/buildRunPlan'
 import { createId } from '../../../shared/id'
 import { emptyPlanReason } from '../../../features/canvas/execution/emptyPlanReason'
 import {
   candidateDownstream,
   hasRunnableDownstream,
-  loopUpstreamAssets,
-  loopUpstreamPrompts,
-  planLoopRounds,
 } from '../../../features/canvas/execution/loopRun'
-import type { LoopData } from '../../../domain/canvas/model/node'
-import { directDownstream } from '../../../domain/canvas/graph/upstreamOf'
-import type { GraphSnapshot } from '../../../domain/canvas/model/graph'
 import type {
+  LoopData,
   GenerationContextAsset,
   NodeSnapshot,
 } from '../../../domain/canvas/model/node'
-import { generatedNodeTitle } from '../../../domain/canvas/naming/autoTitle'
 import { createCanvasPlacement } from '../../../features/canvas/execution/canvasPlacement'
 import { fuseNode } from '../../../features/canvas/execution/fuseNode'
 // 执行引擎与宿主上移共享层（M6-5 路径 B）：画布注入自己的命令类型与落位适配器
 import { useExecution } from '../../../features/shared/execution/useExecution'
 import { trimProjectTasks } from '../../../features/shared/execution/taskLog'
 import { bindAbortToCancel } from '../../../features/shared/execution/abortToCancel'
-import type { RunSummary, RunTaskState } from '../../../features/shared/execution/runEngine'
+import type { RunTaskState } from '../../../features/shared/execution/runEngine'
 import type { ExecutionRuntime } from '../../../features/shared/execution/executionRuntime'
 import {
   registerGuardedChannelRun,
@@ -45,10 +35,7 @@ import { imageCountOf, progressNotice, runNotice, shouldNotify } from '../../../
 import { getNotifyPrefs } from '../../../state/ui/notifyPrefs'
 import { sendSystemNotify } from '../../../features/shared/notify/desktopNotify'
 import type { Command } from '../../../state/commands'
-import type { TransactionBoundary } from '../../../state/shared/types'
 import { createChannelRepository } from '../../../state/project/channelRepository'
-import type { RunRequest } from '../../../domain/canvas/nodeSpecs/types'
-import type { NodeInput } from '../../../domain/shared/execution/types'
 import type { RunRecordScope } from '../../../domain/shared/execution/runRecord'
 import type { WorkbenchId } from '../../../domain/shared/workbench'
 import {
@@ -63,15 +50,8 @@ import { useChannels } from '../../../app/providers/ChannelStoreProvider'
 import { usePlatform } from '../../../app/providers/PlatformProvider'
 import { useSkillsOptional } from '../../../app/providers/SkillStoreProvider'
 import { usePresetTextOptional } from '../../../app/providers/PresetTextProvider'
-import { promptSpec } from '../../../domain/canvas/nodeSpecs/prompt'
 import type { PromptData } from '../../../domain/canvas/model/node'
-import { trimToolResult } from '../../../features/shared/promptTools/promptTools'
-import { composePromptFromDraft } from '../../../features/canvas/execution/composePrompt'
-import { asAppError, describeError } from '../../../shared/result'
-import { directTextTrace, runDirectText } from '../../../state/shared/directRun'
-import { resolveUpstreamModel } from '../../../domain/project/modelMapping'
 import { buildGroupRunPlan } from '../../../features/canvas/execution/groupRunPlan'
-import { resolveTextRoute } from './textRoute'
 import {
   canvasRunIsRunning,
   canvasRunStatesOf,
@@ -86,12 +66,18 @@ import {
   adapterKey,
   canceledRun,
   CanvasRunPreflightError,
-  failedRun,
   prepareCanvasRun,
   type CanvasRunLaunchResult,
   type CanvasRunPreflightFailure,
 } from './canvasRunPreflight'
 import { useCanvasRunRecorder } from './useCanvasRunRecorder'
+import { createCanvasRunCallbacks } from './provider/runCallbacks'
+import { completeCanvasText, type CanvasTextRequest } from './provider/textExecution'
+import {
+  applyComposeFromDraft,
+  applySelectedSkill,
+} from './provider/promptPreparation'
+import { runCanvasLoop } from './provider/loopRunPlan'
 
 export {
   CanvasRunPreflightError,
@@ -147,20 +133,7 @@ export interface CanvasExecutionApi {
    * `inputs` 是可带可不带：优化 / 翻译只处理文本，反推必须带上游图片素材——
    * 图若进不了这个请求，「上游图片送进 LLM」就永远只是界面上画了条线而已。
    */
-  completeText(req: {
-    channelId: string
-    model: string
-    /** 稳定业务对象：提示词节点 / 生成节点 id。 */
-    subjectId: string
-    /** 日志用途：优化 / 翻译 / 反推 / 技能 / 草稿成文 / 人脸识别。 */
-    purpose: 'optimize' | 'translate' | 'describe' | 'skill' | 'compose' | 'face-detect' | 'text'
-    /** 系统指令（优化 / 翻译 / 反推），与用户文本拼成最终 prompt */
-    system: string
-    text: string
-    /** 随请求一起送出的素材（反推用）；不带即纯文本提问 */
-    inputs?: NodeInput[]
-    signal: AbortSignal
-  }): Promise<string>
+  completeText(req: CanvasTextRequest): Promise<string>
 }
 
 function throwPreflightForCaller(
@@ -365,135 +338,27 @@ export function CanvasExecutionProvider({
 
   const host = useMemo(
     () => ({
-      writeBack: (commands: Command[], transaction?: TransactionBoundary) => {
-        for (const c of commands) {
-          store.dispatch(c, transaction)
-        }
-      },
-      channelResolver: (request: RunRequest, runPlanId: string): ChannelAdapter => {
-        const routeCandidate = request.routeCandidates?.[request.routingAttempt ?? 0]
-        const ids = request.credentialGroupIds ?? []
-        const groupId =
-          routeCandidate?.credentialGroupId ??
-          (ids.length > 0
-            ? ids[Math.min(request.routingAttempt ?? 0, ids.length - 1)]
-            : request.credentialGroupId)
-        const channelId = routeCandidate?.channelId ?? request.channelId
-        const a = runtime.adapterMaps
-          .get(runPlanId)
-          ?.get(adapterKey(channelId, groupId, request.kind))
-        if (!a) throw new Error(`[execution] 未解析到渠道适配器：${channelId}`)
-        return a
-      },
-      projectId: store.getSnapshot().projectId,
-      // 画布落位适配器：槽位/结果组等画布专有落位逻辑都在这里（架构 §5.5 路径 B）
-      placement: createCanvasPlacement(() => store.getSnapshot().projectId),
-      recordScope: (
-        plan: ReturnType<typeof buildRunPlan>,
-        _task: CanvasRunTask,
-        targetId: string,
-      ) => {
-        const node = store.getSnapshot().nodes.find((item) => item.id === targetId)
-        return resolveCanvasRecordScope({
-          workbench,
-          targetId,
-          planId: plan.id,
-          nodeData: node?.data as Readonly<Record<string, unknown>> | undefined,
-          override: recordScopeOverride,
-        })
-      },
-      onTaskUpdate: (planId: string, taskId: string, state: RunTaskState) => {
-        /**
-         * 按 **planId 精确定位**本计划那份映射表。
-         *
-         * 此前不带 planId、遍历全部计划去找 taskId —— 并发或上一轮残留计划未清时，
-         * 会命中**别的**计划的那一份（拿到错的 nodeId，或拿到已被删掉的旧表），
-         * 于是 queued/running/succeeded 的后续更新全部写丢，
-         * 表现为「图出来了但一直转圈」（2026-09-16 截图反馈）。
-         */
-        const m = runtime.taskToNodeMaps.get(planId)
-        const nodeId = m?.get(taskId)
-        if (nodeId) {
-          updateCanvasRunStates(store.getSnapshot().projectId, (prev) => new Map(prev).set(nodeId, state))
-        }
-        /**
-         * 批量进度（对账 #386 的 E5）：只数**已经收口**的任务
-         * （succeeded / failed / canceled），queued / running 不算数。
-         */
-        if (state.kind !== 'queued' && state.kind !== 'running') {
-          const progress = planProgress.get(planId)
-          if (progress) {
-            progress.done += 1
-            const notice = progressNotice(progress.done, progress.total)
-            if (notice && shouldNotify(getNotifyPrefs(), notice.kind)) store.notify(notice.text)
-          }
-        }
-      },
-      /**
-       * 落点确定后立刻改绑：taskId 原本映射到**触发节点**，但画布可能为这次产出
-       * **另建承载节点**。此后该 task 的状态一律画在承载节点上，
-       * 触发节点不再显示「生成中」（用户 2026-09-16 报的那条）。
-       */
-      onTaskTarget: (planId: string, taskId: string, targetId: string) => {
-        /**
-         * 按 **planId 精确定位**本计划那份映射表。
-         *
-         * 此前不带 planId，只能遍历全部计划的 Map 去找这条 task —— 并发时
-         * （或上一轮残留计划还没清掉时）会改到**别的**计划的那一份，
-         * 本计划的没改到 → 清理时对不上 → queued/running 残留（转圈不停）。
-         */
-        const m = runtime.taskToNodeMaps.get(planId)
-        if (m && m.has(taskId)) {
-          const from = m.get(taskId)!
-          m.set(taskId, targetId)
-          runtime.nodeScopedRunCancellation.addTarget(planId, targetId)
-          /**
-           * 状态一律**只挂在真正收产物的节点**上。
-           *
-           * 两种情形都要处理：
-           *  - 源节点上已有状态（启动时预置的 queued）→ 搬过去并删掉旧的。
-           *    只改映射表是不够的：源节点那条不删，用户看到的就是「转圈一直在
-           *    原始节点上」（2026-09-16 报）——状态停在源节点，而结果跑到新节点。
-           *  - 源节点上没有状态（启动时按 slot 判定没给它预置，见 launch）→ 
-           *    必须在这里给承载节点补一条 queued，否则它在调用渠道前是「无状态」的，
-           *    等 `onTaskUpdate` 送来 running 才突然开始转圈，开头那段是空的。
-           */
-          if (from !== targetId) {
-            updateCanvasRunStates(store.getSnapshot().projectId, (prev) => {
-              const next = new Map(prev)
-              const st = next.get(from)
-              next.set(targetId, st ?? { kind: 'queued' })
-              next.delete(from)
-              return next
-            })
-          }
-        }
-      },
-      onFinish: (summary: RunSummary) => {
-        void store.flush()
-        planProgress.delete(summary.runPlanId)
-        if (runtime.channelInterruptedPlans.delete(summary.runPlanId)) {
-          store.notify('渠道已删除，相关生成已停止；请重新选择平台后再生成', 'error')
-          return
-        }
-        const notice = runNotice({
-          images: imageCountOf(summary.taskResults),
-          failed: summary.failed,
-        })
-        if (!notice || !shouldNotify(getNotifyPrefs(), notice.kind)) return
-        store.notify(notice.text, notice.kind === 'failure' ? 'error' : 'info')
-        /**
-         * 系统通知**只发收口这一句**，不跟着每条进度发 ——
-         * 一次批量跑 20 张会把通知中心刷屏，那是"通知"功能最经典的翻车方式。
-         * `sendSystemNotify` 在没有能力 / 没允许时返回 false，什么都不做（页内提示照旧）；
-         * 桌面壳里它会走**壳自己的通知插件**（对账 #392：WebView2 那套 Notification 不可靠）。
-         */
-        void sendSystemNotify(platform.notify, '轻画', notice.text)
-      },
+      ...createCanvasRunCallbacks({
+        runtime,
+        store,
+        workbench,
+        platformNotify: platform.notify,
+        recordScopeOverride,
+        resolveCanvasRecordScope,
+        createPlacement: createCanvasPlacement,
+        adapterKey,
+        updateRunStates: updateCanvasRunStates,
+        getNotifyPrefs,
+        progressNotice,
+        runNotice,
+        shouldNotify,
+        imageCountOf,
+        sendSystemNotify,
+      }),
       // 引擎为每个 task 各调一次（写回发生在两次调用之间），同步递增即得连续版本号
       nextVersion: bumpVersion,
     }),
-    [bumpVersion, recordScopeOverride, store, workbench],
+    [bumpVersion, platform.notify, recordScopeOverride, runtime, store, workbench],
   )
 
   const { startRun, cancelRun, isRunning } = useExecution<CanvasRunTask, Command>(
@@ -764,462 +629,63 @@ export function CanvasExecutionProvider({
     [store, channels],
   )
 
-  /**
-   * 一键运行循环节点（用户 2026-09-23）。
-   *
-   * 逐轮执行下游链路：每轮把该轮的**图片切片 + 替换过变量的提示词**交给下游，
-   * 下游按普通单点运行跑一趟。循环节点自己不产生任何产物。
-   *
-   * 几处刻意的取舍：
-   *  - **串行**：一轮 await 完再跑下一轮。`mode: parallel` 目前不并发——
-   *    并发要处理「多轮同时改同一批下游节点」的写入竞态，风险远大于收益，
-   *    先保证能跑、且结果正确（设计文档里 `parallel` 也注明「受并发上限约束」）。
-   *  - **提示词替换走一次性的节点数据改动**：把该轮提示词临时写回下游节点的
-   *    `prompt`，跑完恢复原值。这样下游的既有链路（收集 inputs、构建请求）零改造。
-   *  - **任一轮失败就停**：继续跑下去会把「上游没出图」的状态传染给后续轮次，
-   *    报错也难定位。停下来并如实说明。
-   */
-  const runLoop = useCallback(
-    async (
-      loopNode: NodeSnapshot<LoopData>,
-      graph: GraphSnapshot,
-      contextAssets?: readonly GenerationContextAsset[],
-      signal?: AbortSignal,
-    ) => {
-      if (signal?.aborted) return canceledRun()
-      const rounds = planLoopRounds(
-        loopNode,
-        loopUpstreamAssets(loopNode, graph),
-        loopUpstreamPrompts(loopNode, graph),
-      )
-      if (rounds.length === 0) {
-        const message = '循环次数为 0，没有可跑的轮次'
-        store.notify(message, 'error')
-        return failedRun(`loop:${loopNode.id}`, loopNode.id, message)
-      }
-      if (!hasRunnableDownstream(loopNode, graph)) {
-        const message = '循环节点下游还没有生成节点，无法运行'
-        store.notify(message, 'error')
-        return failedRun(`loop:${loopNode.id}`, loopNode.id, message)
-      }
-
-      /**
-       * 落位的源节点是**下游的生成节点**，不是循环节点（用户 2026-09-24）：
-       *
-       * > 「槽位应该是出现在循环节点下游的生成节点的右边，而且线条应该是链接
-       * >  循环节点下游的生成节点的，不是从循环节点出来的，因为参数是靠循环节点
-       * >  下游的生成节点控制的参数」
-       *
-       * 所以计划要从**每个下游生成节点**各自发起（`originNodeId = 该节点`），
-       * 而不是从循环节点发起。这样落位、连线、进度状态全都自然走
-       * 「生成节点自己跑一趟」那条既有规则 —— 不必为循环另写一套落位。
-       */
-      const downstreamIds = directDownstream(loopNode.id, graph.edges)
-        .map((id) => graph.nodes.find((n) => n.id === id))
-        .filter((n): n is NodeSnapshot => !!n)
-        .filter((n) => n.type === 'generation' || n.type === 'batch')
-        .map((n) => n.id)
-
-      try {
-        /**
-         * 先把**所有轮次**的计划建出来、合并成一个计划，再交给引擎跑。
-         *
-         * 为什么必须合并（用户 2026-09-24）：「次数=2 时应该在下游生成节点右边
-         * 出现**两个槽位**」。若逐轮各建一个计划，每轮的 `slotIndex` 都从 0 起算
-         * ⇒ 两个承载节点会算出**同一个格位**、重叠在一起（实测 x 都是 1448，
-         * 标题也都是「生成的输出1」）。
-         *
-         * 合并成一个计划后，引擎按 `slotIndex / slotCount` 统一排布，
-         * N 个槽位自然并列铺开；`mode: parallel` 时它们还会并发发起
-         * （引擎的并发上限负责节流），不再是一轮跑完才冒出一个。
-         *
-         * 这不改 `buildRunPlan` 的主流程 —— 只是在宿主侧把多个计划的任务
-         * 拼成一个，槽位重新按总数分配。
-         */
-        /**
-         * 逐轮建计划，把任务收集起来；**槽位按总数统一重排**（见上方说明）。
-         */
-        const allTasks: CanvasRunTask[] = []
-        for (const round of rounds) {
-          if (signal?.aborted) return canceledRun()
-          /**
-           * 把本轮的输入写进**循环节点自己**（而不是改写下游节点的字段）。
-           *
-           * 为什么写在循环节点上：下游的 `collectInputs` 会去读「上游循环节点
-           * 给的这一轮输入」（见 generation spec 的 loop 分支）。这样：
-           *  - 下游节点的数据**一个字节都不动**（改写用户节点的 prompt 需要备份 +
-           *    恢复，异常路径漏一次就是数据损坏）；
-           *  - 语义也对：提示词是「循环分发出来的输入」，不是「下游自己写的」。
-           */
-          store.dispatch({
-            kind: 'node.updateData',
-            id: loopNode.id,
-            patch: { __roundPrompt: round.prompt, __roundAssets: round.assetHashes },
-            transient: true,
-          })
-
-          let added = 0
-          for (const nodeId of downstreamIds) {
-            const fresh = store.getSnapshot()
-            /**
-             * 用 `single-alt` 而不是 `single`（用户 2026-09-24）。
-             *
-             * `single` 的落位规则里，**空的下游节点本身也是候选槽位** ——
-             * 于是第一轮的产物会写进下游生成节点自己，第二轮才另建一个。
-             * 用户看到的是「先跑完一轮、才冒出一个槽位」，而他要的是
-             * **次数=2 时直接在下游生成节点右边出现两个槽位**（每一轮各占一个）。
-             *
-             * `single-alt` 在本项目里的语义正是「保留原有节点、一律铺新承载节点」，
-             * 与这里要的行为一致：循环的每一轮都是**新增一次产出**，
-             * 不该占用下游节点本身（那个节点是「参数与输入的持有者」）。
-             */
-            const plan = buildRunPlan('node', { originNodeId: nodeId }, fresh, 'single-alt', {
-              reservedNodeIds: activeRunNodeIds(),
-              ...(contextAssets?.length ? { contextAssets } : {}),
-            })
-            if (plan.tasks.length === 0) continue
-            allTasks.push(...plan.tasks)
-            added += 1
-          }
-          if (added === 0) {
-            const message =
-              round.prompt || round.assetHashes.length > 0
-                ? `第 ${round.index} 轮无法构建请求，已停止`
-                : `第 ${round.index} 轮没有可用的提示词或图片，已停止（在下游节点写提示词，或在循环节点写一条）`
-            store.notify(message, 'error')
-            return failedRun(`loop:${loopNode.id}`, loopNode.id, message)
-          }
-        }
-
-        if (allTasks.length === 0) {
-          const message = '没有可执行的轮次'
-          store.notify(message, 'error')
-          return failedRun(`loop:${loopNode.id}`, loopNode.id, message)
-        }
-
-        /**
-         * 槽位重排：N 个任务按 `slotIndex / slotCount` 统一铺开。
-         *
-         * 每个任务原本的 `slot` 是「自己那一轮的第 1 格」（title 都是「输出1」、
-         * 位置也相同）。重排后第 i 个任务拿到第 i 格，标题带序号、位置依次右移 ——
-         * 这正是用户要的「两个槽位并排在生成节点右边」。
-         */
-        const total = allTasks.length
-        /**
-         * 循环把多轮任务合成一个 plan 后再重排。标题序号必须按**同一个下游生成节点**
-         * 分组重算；直接用全局下标会出现「第 1/6 张」「第 6/6 张」这种跨节点串号。
-         */
-        const sourceOf = (task: (typeof allTasks)[number]) =>
-          task.slot.kind === 'new' ? task.slot.connectFrom : task.nodeId
-        const outputTotals = new Map<string, number>()
-        for (const task of allTasks) {
-          const from = sourceOf(task)
-          outputTotals.set(from, (outputTotals.get(from) ?? 0) + 1)
-        }
-        const outputSeen = new Map<string, number>()
-        const assignedTitles: string[] = []
-        const arranged: CanvasRunTask[] = allTasks.map((t, i) => {
-          /** 承载节点挂在**它的来源生成节点**右边（用户 2026-09-24 的要求） */
-          const from = sourceOf(t)
-          const fromNode = graph.nodes.find((n) => n.id === from)
-          const outputIndex = outputSeen.get(from) ?? 0
-          outputSeen.set(from, outputIndex + 1)
-          const outputTotal = outputTotals.get(from) ?? 1
-          const autoTitle = generatedNodeTitle({
-            prompt: t.request.prompt,
-            mode: t.request.kind === 'video' ? 'video' : 'image',
-            slotKind: 'new',
-            sourceTitle: t.sourceTitle,
-            targetTitle: t.targetTitle,
-            materialTitle: t.materialTitle,
-            presetName: t.presetName,
-            existingTitles: [
-              ...graph.nodes.map((node) => node.title),
-              ...assignedTitles,
-            ],
-            index: outputIndex,
-            total: outputTotal,
-          })
-          assignedTitles.push(autoTitle)
-          return {
-            ...t,
-            slot: {
-              kind: 'new' as const,
-              title: `${fromNode?.title ?? '生成'}的输出${i + 1}`,
-              connectFrom: from,
-            },
-            seq: i,
-            callCount: total,
-            outputIndex,
-            outputTotal,
-            autoTitle,
-          }
-        })
-
-        /**
-         * 一个计划跑全部轮次。
-         *
-         * 复用第一份计划的 `id` / `scope` / `mode` 之外的字段没必要 ——
-         * 引擎只认 `tasks`；其余字段由这里按「一次循环运行」重新给定，
-         * 于是日志与中断恢复把它看成**一次运行**（与设计文档「整次循环运行 =
-         * 一步撤销」的口径一致）。
-         */
-        const merged: RunPlan = {
-          id: createId('plan'),
-          scope: 'node',
-          mode: 'single',
-          tasks: arranged,
-        }
-        return await launch(merged, loopNode.id, signal)
-      } finally {
-        // 清掉运行期瞬态字段，避免它们留在数据里（下一轮会重新写）
-        store.dispatch({
-          kind: 'node.updateData',
-          id: loopNode.id,
-          patch: { __roundPrompt: undefined, __roundAssets: undefined },
-          transient: true,
-        })
-        void store.flush()
-      }
-    },
-    [store, launch, activeRunNodeIds],
-  )
-
-  /**
-   * 文本 LLM 单次调用（提示词节点的优化 / 翻译 / 反推 / 技能都用它）。
-   *
-   * 从 `api` 里抽出来单独一个 callback，是因为**技能要在生成前调它**，
-   * 而技能的执行发生在 `runNode` 里 —— 若它仍留在 `api` 的 useMemo 内部，
-   * `runNode` 就得反过来引用 `api`，形成一个「api 依赖 runNode、
-   * runNode 依赖 api」的循环。抽成独立值后两边都只是引用它。
-   */
   const completeText = useCallback(
-    ({
-      channelId,
-      model,
-      subjectId,
-      purpose,
-      system,
-      text,
-      inputs,
-      signal,
-    }: {
-      channelId: string
-      model: string
-      subjectId: string
-      purpose: 'optimize' | 'translate' | 'describe' | 'skill' | 'compose' | 'face-detect' | 'text'
-      system: string
-      text: string
-      inputs?: NodeInput[]
-      signal: AbortSignal
-    }): Promise<string> => {
-      const linked = linkRunSignal(runtime.engine, signal)
-      return runtime.operations.track(async () => {
-        const all = channels.getState().channels
-      /**
-       * 提示词工具只有“模型”这一个用户可见选择，`channelId` 是节点上的内部解析值。
-       * 旧节点可能保留着当时渠道，后来用户在设置里改了该渠道的勾选模型；
-       * 此时必须重新找能提供该逻辑模型的启用渠道，不能拿过期组合直接发请求。
-       */
-      const route = resolveTextRoute(all, channelId, model)
-      if (!route) throw new ChannelError({ kind: 'channel', detail: 'missingModel' })
-      const ch = all.find((c) => c.id === route.channelId)
-      if (!ch) throw new ChannelError({ kind: 'channel', detail: 'missingChannel' })
-      const prompt = system ? `${system}\n\n${text}` : text
-      const sentModel = resolveUpstreamModel(ch.modelMap, route.model) ?? route.model
-      const operationId = createId('op')
-        return runDirectText({
+    (request: CanvasTextRequest): Promise<string> => {
+      const linked = linkRunSignal(runtime.engine, request.signal)
+      return runtime.operations.track(() => completeCanvasText(request, {
+        channels: () => channels.getState().channels,
+        generation,
         storage: platform.storage,
-        trace: directTextTrace({
-          projectId: store.getSnapshot().projectId,
-          workbench,
-          subjectId,
-          scopeId: `session:${subjectId}`,
-          operationId,
-          purpose,
-          channelId: ch.id,
-          model: sentModel,
-          prompt: text,
-          inputs: inputs ?? [],
-          params: { system, requestedModel: route.model },
-        }),
-        channelId: ch.id,
-        signal: linked.signal,
-        call: async (callSignal) => {
-          const result = await generation.completeText(
-            {
-              channel: ch,
-              model: route.model,
-              request: {
-                kind: 'text',
-                prompt,
-                inputs: inputs ?? [],
-                params: {},
-              },
-              hints: { operationId },
-            },
-            callSignal,
-          )
-          return result.text
-        },
-        onRecordWarning: (warning) =>
-          store.notify(`结果已返回，但运行日志写入失败：${warning}`, 'error'),
-        })
-      }).finally(linked.dispose)
+        projectId: () => store.getSnapshot().projectId,
+        workbench,
+        notify: store.notify,
+        linkedSignal: () => linked.signal,
+      })).finally(linked.dispose)
     },
     [channels, generation, platform.storage, runtime, store, workbench],
   )
 
-  /**
-   * 若提示词节点选了技能，**在生成前**用技能跑一遍 LLM（用户 2026-09-24）。
-   *
-   * 返回：
-   *  - `'none'`：没选技能，照常往下跑；
-   *  - `'applied'`：跑完并把结果写回正文，照常往下跑；
-   *  - `'failed'`：技能跑不动（缺模型 / 请求失败 / 技能已被删），**中止这次生成** ——
-   *    不能带着「没处理的正文」继续，那会让用户以为技能生效了。
-   *
-   * 抽成独立回调而不是塞进 runNode 体内：这段有 4 个提前返回分支，
-   * 混在里面会让 runNode 的分支数失控（它已经背了循环 / 批量两条分发路径）。
-   */
-  const applySkillIfSelected = useCallback(
-    async (
-      node: NodeSnapshot<PromptData>,
-      signal: AbortSignal,
-    ): Promise<'none' | 'applied' | 'failed'> => {
-      if (signal?.aborted) return 'failed'
-      const skillId = node.data.skillId
-      if (!skillId) return 'none'
-
-      const skill = skillStore.skills.find((s) => s.id === skillId)
-      if (!skill) {
-        /**
-         * 技能找不到了（在技能库里被删、或换了项目）。
-         *
-         * **清掉节点上的选择**再报错：不清的话用户每次点生成都撞同一堵墙，
-         * 而面板上还写着那个已经不存在的技能名 —— 看起来像功能坏了。
-         */
-        store.dispatch({
-          kind: 'node.updateData',
-          id: node.id,
-          patch: { skillId: undefined },
-          transient: false,
-        })
-        store.notify('选中的技能已被删除，已取消选择，请重新选择后再生成', 'error')
-        return 'failed'
-      }
-
-      /**
-       * 技能属于面板 LLM 动作：输入只取草稿；节点正文是结果，不反向当输入。
-       * 结果写 `text`，不覆盖草稿（对账 #728 / #729）。
-       */
-      const text = (node.data.draft ?? '').trim()
-      const channelId = node.data.channelId
-      const model = node.data.model
-      if (!channelId || !model) {
-        store.notify('技能需要文本模型：请先在创作面板选择平台与模型', 'error')
-        return 'failed'
-      }
-      /**
-       * 技能声明要图时，把上游素材一起送出去（与「反推」同一口径）。
-       *
-       * 复用 `promptSpec.collectInputs` 而不是自己扫图：它就是反推按钮
-       * 与实际请求共用的那一份，两处各扫一遍迟早不一致。
-       */
-      const needsImages = skill.inputMode !== 'text'
-      const inputs = needsImages
-        ? promptSpec.collectInputs({ node, graph: store.getSnapshot() }).filter((i) => i.kind === 'asset')
-        : []
-      if (skill.inputMode === 'image' && inputs.length === 0) {
-        store.notify(`技能「${skill.name}」需要上游图片：先把一个已出图的生成节点连到本节点`, 'error')
-        return 'failed'
-      }
-      if (skill.inputMode === 'text' && !text) {
-        store.notify(`技能「${skill.name}」需要提示词正文：先在本节点写一段内容`, 'error')
-        return 'failed'
-      }
-
-      try {
-        const result = await completeText({
-          channelId,
-          model,
-          subjectId: node.id,
-          purpose: 'skill',
-          system: skill.content,
-          text,
-          inputs,
-      signal,
-        })
-        store.dispatch({
-          kind: 'node.updateData',
-          id: node.id,
-          patch: { text: trimToolResult(result) },
-          // 进撤销栈：技能改写正文是一次明确的创作动作，要能反悔
-          transient: false,
-        })
-        return 'applied'
-      } catch (e) {
-        if (signal?.aborted) return 'failed'
-        const appError = asAppError(e)
-        store.notify(
-          appError ? `技能执行失败：${describeError(appError)}` : `技能执行失败：${String(e)}`,
-          'error',
-        )
-        return 'failed'
-      }
-    },
-    [skillStore, store, completeText],
+  const promptPreparation = useMemo(
+    () => ({
+      graph: () => store.getSnapshot(),
+      dispatch: (command: Parameters<typeof store.dispatch>[0]) =>
+        store.dispatch(command),
+      notify: store.notify,
+      skills: () => skillStore.skills,
+      presetOverrides: presetText.overrides,
+      completeText,
+    }),
+    [completeText, presetText.overrides, skillStore.skills, store],
   )
 
-  /**
-   * 面板草稿 → LLM → 节点正文（用户 2026-10-23）。
-   *
-   * 用户定稿的语义：下面创作面板写的是**给 LLM 的请求**，上面提示词节点
-   * 存的是**结果**。所以点生成时，只要正文还是空的、草稿有内容，就先让
-   * 对话模型生成正文，再把结果写回 `text`，然后继续跑下游。
-   *
-   * 返回 `'none'`（不需要补正文）时调用方照旧规划下游；
-   * `'failed'` 必须中止 —— 拿空正文继续跑只会得到一个更难懂的
-   * 「还没有写提示词」，把真正的失败原因盖掉。
-   */
+  const applySkillIfSelected = useCallback(
+    (node: NodeSnapshot<PromptData>, signal: AbortSignal) =>
+      applySelectedSkill(node, signal, promptPreparation),
+    [promptPreparation],
+  )
+
   const applyComposeIfNeeded = useCallback(
-    async (
-      node: NodeSnapshot<PromptData>,
-      signal: AbortSignal,
-    ): Promise<'none' | 'applied' | 'failed'> => {
-      if (signal.aborted) return 'failed'
-      const result = await composePromptFromDraft({
-        node,
-        graph: store.getSnapshot(),
-        presetOverrides: presetText.overrides,
-        signal,
-        completeText: ({ channelId, model, system, text, inputs, signal }) =>
-          completeText({
-            channelId,
-            model,
-            subjectId: node.id,
-            purpose: 'compose',
-            system,
-            text,
-            inputs,
-            signal,
-          }),
-      })
-      if (result.kind === 'skip') return 'none'
-      if (result.kind === 'failed') {
-        if (!signal.aborted) store.notify(result.message, 'error')
-        return 'failed'
-      }
-      store.dispatch({
-        kind: 'node.updateData',
-        id: node.id,
-        patch: { text: result.text },
-        // 进撤销栈：从草稿生成正文是一次明确的创作动作，要能反悔
-        transient: false,
-      })
-      return 'applied'
-    },
-    [store, completeText, presetText.overrides],
+    (node: NodeSnapshot<PromptData>, signal: AbortSignal) =>
+      applyComposeFromDraft(node, signal, promptPreparation),
+    [promptPreparation],
+  )
+
+  const runLoop = useCallback(
+    (
+      loopNode: Parameters<typeof runCanvasLoop>[0],
+      graph: ReturnType<typeof store.getSnapshot>,
+      contextAssets?: readonly GenerationContextAsset[],
+      signal?: AbortSignal,
+    ) => runCanvasLoop(loopNode, contextAssets, signal, {
+      graph,
+      getSnapshot: () => store.getSnapshot(),
+      dispatch: (command) => store.dispatch(command),
+      notify: store.notify,
+      flush: () => store.flush(),
+      activeRunNodeIds,
+      launch,
+    }),
+    [activeRunNodeIds, launch, store],
   )
 
   const runNode = useCallback(

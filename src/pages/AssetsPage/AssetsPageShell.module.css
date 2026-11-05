@@ -1,0 +1,409 @@
+.page {
+  box-sizing: border-box;
+  background: var(--bg-canvas);
+  color: var(--text-1);
+  font-family: var(--font-sans);
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
+  /*
+   * ── 三排（用户 2026-10-06 第 11 条 + 参考图十二，对账 #291）──
+   *
+   * ```
+   * ① 标题区            （.head）
+   * ② 整行筛选规则       （.toolbar，横跨全宽 + 下一条分隔线）
+   * ③ 左筛选 | 右内容    （.body > .rail + .main）
+   * ```
+   *
+   * ⚠️ 高度与滚动：**本页自己当滚动容器链**（对账 #287，与项目页同一口径）——
+   * 页面定高、不滚；`.rail` 与 `.main` 各自滚。滚动条因此落在页面内部，
+   * 不会像原来那样贴着卡片的圆角。
+   */
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* 第 3 排：左栏 + 内容。`align-items: stretch` 让左栏底色一路通到这一排的底 —— 分栏才像分栏 */
+
+.body {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  align-items: stretch;
+}
+
+/* ── 左侧栏（参考图五）── */
+
+.rail {
+  flex: 0 0 auto;
+  width: 240px;
+  box-sizing: border-box;
+  padding: var(--space-4) var(--space-4) var(--space-6);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+  /*
+   * 左栏自己滚：筛选条目多起来时不该把整页顶高（内容那一列才是主滚动区）。
+   * `min-height: 0` 是 flex 行子项能被压缩的前提。
+   */
+  min-height: 0;
+  overflow-y: auto;
+  /*
+   * 底色 = **页面底色**，不是 `--bg-subtle`（用户 2026-10-06：「快速筛选应该也在我的素材那一页里面」）。
+   *
+   * 用 `--bg-subtle` 时它与外壳侧栏**同色**（两处都是 #f5f5f5），于是这一栏看起来像
+   * 应用侧栏多长出来的一段，而不是"我的素材"里的一栏。改成与页面同底、用一条**页面内的分栏线**
+   * 隔开之后，它才读起来属于这一页。
+   *
+   * ⚠️ 这条线与壳层那条被删掉的侧栏描边不是一回事：那是**外壳的分隔**（会切开"包围式"观感），
+   * 这是**页面内部的栏目分隔**（没有它两栏会糊成一片）。
+   */
+  background: var(--bg-canvas);
+  border-right: var(--border);
+}
+
+.railGroup {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.railLabel {
+  margin-bottom: var(--space-1);
+  padding: 0 var(--space-3);
+  color: var(--text-3);
+  font-size: var(--fs-chip);
+  font-weight: var(--fw-chip);
+}
+
+.railItem {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  min-height: 36px;
+  padding: 0 var(--space-3);
+  /**
+   * 选中态用**有颜色的边框**表达（用户 2026-10-14：「选中的按钮会有阴影，
+   * 应该是一个有颜色的无阴影边框」）。基础态留一条透明边框，选中时只换颜色，
+   * 尺寸不跳；`border-box` 保证 36px 高度不被这条边框撑大。
+   */
+  box-sizing: border-box;
+  border: 1px solid transparent;
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--text-2);
+  font-family: var(--font-sans);
+  font-size: var(--fs-label);
+  font-weight: var(--fw-title);
+  text-align: left;
+  cursor: pointer;
+  transition:
+    background var(--dur-hover) var(--ease-out),
+    border-color var(--dur-hover) var(--ease-out),
+    color var(--dur-hover) var(--ease-out);
+}
+
+.railItem:hover {
+  /* 悬停 / 选中是两档（用户 2026-10-14）：悬停 `--bg-subtle`、选中 `--bg-selected` */
+  background: var(--bg-subtle);
+  color: var(--text-1);
+}
+
+.railItemOn {
+  /**
+   * 选中态**不描边**（用户 2026-10-14：「浅色 / 深色主题的按钮都不要描边，
+   * 怎么又给我加了描边」）。这一版用填充底色表达：去掉上一版的 `--accent` 边框，
+   * 只留 `--bg-surface` 填充，阴影早在上一轮已经去掉。
+   */
+  /* 选中底单独一档：`--bg-surface` 在浅色下与页面同为 #fff，看起来像没填充 */
+  background: var(--bg-selected);
+  color: var(--text-1);
+  border-color: transparent;
+  box-shadow: none;
+}
+
+.railItemLabel {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.railItemCount {
+  flex: 0 0 auto;
+  color: var(--text-3);
+  font-size: var(--fs-chip);
+}
+
+.railEmpty {
+  margin: 0;
+  padding: 0 var(--space-3);
+  color: var(--text-3);
+  font-size: var(--fs-chip);
+}
+
+/* ── 页头与工具行 ── */
+
+.head {
+  /* 第 1 排：标题区。固定高度（不参与伸缩），下方留一点与工具行的间距 */
+  flex: none;
+  padding: var(--space-6) var(--space-6) var(--space-3);
+}
+
+.title {
+  margin: 0;
+  font-size: var(--fs-page-title);
+  font-weight: var(--fw-page-title);
+  line-height: var(--lh-page-title);
+}
+
+.subtitle {
+  margin: var(--space-1) 0 0;
+  color: var(--text-3);
+  font-size: var(--fs-label);
+}
+
+.toolbar {
+  /* 第 2 排：整行筛选规则（横跨全宽），下面一条分隔线把它与内容分开 */
+  flex: none;
+  padding: 0 var(--space-6) var(--space-3);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+  border-bottom: var(--border);
+}
+
+.kitButton {
+  flex: 0 0 auto;
+  min-height: 34px;
+  padding: 0 14px;
+  border: 1px solid var(--stroke);
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--text-2);
+  font: inherit;
+  font-size: var(--fs-chip);
+  cursor: pointer;
+}
+
+.kitButton:hover {
+  background: var(--bg-hover);
+  color: var(--text-1);
+}
+
+.selectBar {
+  flex: none;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-6);
+  border-bottom: var(--border);
+  background: var(--bg-subtle);
+}
+
+.selectCount {
+  margin-right: auto;
+  color: var(--text-2);
+  font-size: var(--fs-label);
+}
+
+.selectAction {
+  min-height: 30px;
+  padding: 0 var(--space-3);
+  border: var(--border);
+  border-radius: var(--radius-control);
+  background: var(--bg-surface);
+  color: var(--text-2);
+  cursor: pointer;
+}
+
+.selectAction:hover:not(:disabled) {
+  background: var(--bg-hover);
+  color: var(--text-1);
+}
+
+.selectAction:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.selectDanger {
+  color: var(--danger);
+}
+
+.segmented {
+  display: inline-flex;
+  gap: var(--space-1);
+  padding: var(--space-1);
+  border: var(--border);
+  border-radius: var(--radius-control);
+  background: var(--bg-subtle);
+}
+
+/* ── 分组 ── */
+
+.groups {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+}
+
+.group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.groupLabel {
+  margin: 0;
+  color: var(--text-3);
+  font-size: var(--fs-label);
+  font-weight: var(--fw-title);
+}
+
+.groupLabelButton {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  align-self: flex-start;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--text-3);
+  cursor: pointer;
+}
+
+.groupLabelButton:hover {
+  color: var(--text-1);
+}
+
+.groupCount {
+  color: var(--text-3);
+  font-size: var(--fs-chip);
+}
+
+/* 列表视图：一行一张 —— 在"找某一张"这件事上比网格快 */
+
+/* 真网格：统一容器尺寸、统一裁切；与瀑布流是两种视图。 */
+
+.uniformGrid .card,
+.uniformGrid .failedCard {
+  height: 100%;
+  min-height: 0;
+  margin-bottom: 0;
+}
+
+.uniformGrid .failedCard {
+  overflow: hidden;
+  /* 失败卡有 16px 内距 + 描边；不写 border-box 时 height:100% 会多长 34px。 */
+  box-sizing: border-box;
+}
+
+.uniformGrid .failedPrompt {
+  display: -webkit-box;
+  -webkit-line-clamp: 5;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/*
+ * 失败卡（对账 #264）：没有产物可显示，所以不摆图 ——
+ * 摆一个灰框只会让人以为"图没加载出来"。它要讲清的是"哪一次失败了"。
+ *
+ * ⚠️ **`break-inside: avoid` 不能漏**（对账 #421，用户 2026-10-10 #9 的图七）：
+ * 这一栏用的是 CSS 多列瀑布流，多列会把**放不进当前列**的块从中间切开、
+ * 后半截续到下一列的开头。图片卡 `.card` 一直有这一行，失败卡**漏了** ——
+ * 于是长提示词的失败卡被拦腰截断：卡里的时间行跑到上一列顶上，
+ * 提示词后半段出现在别的卡片旁边（用户截图里圈的就是它）。
+ * 探针 `scripts/probe-assets-failed-cards.mjs`：修前 6 张里 2 张被切，修后 0 张。
+ */
+
+.failedCard {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-4);
+  border: var(--border);
+  border-radius: var(--radius-node);
+  background: var(--bg-surface);
+  break-inside: avoid;
+}
+
+.failedBadge {
+  align-self: flex-start;
+  padding: 2px var(--space-2);
+  border-radius: var(--radius-pill);
+  background: var(--danger);
+  color: var(--accent-text);
+  font-size: var(--fs-chip);
+  font-weight: var(--fw-chip);
+}
+
+.failedPrompt {
+  margin: 0;
+  color: var(--text-1);
+  font-size: var(--fs-label);
+  overflow-wrap: anywhere;
+}
+
+.failedMeta {
+  margin: 0;
+  color: var(--text-3);
+  font-size: var(--fs-chip);
+}
+
+.main {
+  /*
+   * 第 3 排右半边：**本页的主滚动区**。
+   * 撑满 `.body` 剩下的高度自己滚；`min-height: 0` 是 flex 子项能被压缩的前提。
+   */
+  flex: 1 1 auto;
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 0;
+  overflow-y: auto;
+  /*
+   * ⚠️ **两处口径（用户 2026-10-10 #3 / #9）**：
+   * ① 这一层铺满工作区、自己滚 ⇒ 滚动条贴**工作区右沿**（原来定宽 1520 居中，
+   *    滚动条画在内容框右沿，用户截图里打叉的就是它）；
+   * ② 不再给内容封顶 1520：瀑布流用满工作区宽度，左右不留那两条空白。
+   *    左右内距由下面的直接子块给（观感与上一版一致）。
+   */
+  padding: var(--space-6) 0;
+  /*
+   * 滚动条**紧贴卡片（工作区）右沿**（用户 2026-10-06 第 11 批第 6 条，与项目页同口径）——
+   * 上一轮那两条 16px 透明边框已去掉；"两端穿出圆角"改由下面给拇指做上下内缩来保证。
+   */
+}
+
+/* 直接子块：铺满 + 左右内距（原来由 `.main` 统一给） */
+
+.main > * {
+  width: 100%;
+  box-sizing: border-box;
+  padding-inline: var(--space-6);
+}
+
+/* 滚动条拇指：上下各缩 8px，左右不缩（详见 ProjectsPage 的同名注释） */
+
+.main::-webkit-scrollbar-thumb {
+  border-top: 8px solid transparent;
+  border-bottom: 8px solid transparent;
+  background-clip: padding-box;
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.sectionHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+}

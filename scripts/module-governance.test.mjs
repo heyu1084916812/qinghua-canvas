@@ -2,10 +2,14 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { execFileSync } from 'node:child_process'
+import { createRequire } from 'node:module'
+import { pathToFileURL } from 'node:url'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { countLines, validateGovernance } from './module-governance-lib.mjs'
+import { cliModulePath, validateGovernanceSemantics } from './check-module-governance.mjs'
 
 const root = path.resolve(import.meta.dirname, '..')
+const require = createRequire(import.meta.url)
 const realConfig = JSON.parse(fs.readFileSync(path.join(root, 'architecture/module-governance.json'), 'utf8'))
 let fixture
 let baseline
@@ -17,7 +21,45 @@ const write = (relative, source) => {
 }
 const registration = (overrides = {}) => ({ module: 'src/domain/newRule.ts', owner: 'domain', responsibility: '单一规则。', owns: ['规则'], doesNotOwn: ['UI'], publicApi: ['newRule'], test: ['src/domain/newRule.test.ts'], budget: 450, ...overrides })
 const run = (config) => validateGovernance(fixture, config, { env: fixtureEnv })
+const semanticRegistration = (overrides = {}) => ({
+  module: 'src/domain/newRule.ts',
+  owner: 'domain',
+  responsibility: '把项目树路径归一成稳定键，生成折叠状态与删除确认提示。',
+  owns: ['路径归一化', '折叠状态投影'],
+  doesNotOwn: ['项目树 React 渲染', '项目仓储事务'],
+  publicApi: ['newRule'],
+  test: ['src/domain/newRule.test.ts'],
+  budget: 450,
+  ...overrides,
+})
+const runSemantics = (config) => validateGovernanceSemantics(fixture, config)
 const config = (entries = [], overrides = {}) => ({ version: 1, baseline, defaults: { ts: 450, css: 600 }, directories: [{ path: 'src/domain', ts: 450, css: 600 }], legacy: [], modules: entries, removedModules: [], moduleMoves: [], ...overrides })
+
+const runCli = (configObject, overrides = {}) => {
+  const cliRoot = path.join(fixture, 'cli')
+  fs.rmSync(cliRoot, { recursive: true, force: true })
+  const pack = (relative, value) => {
+    const target = path.join(cliRoot, relative)
+    fs.mkdirSync(path.dirname(target), { recursive: true })
+    fs.writeFileSync(target, typeof value === 'string' ? value : `${JSON.stringify(value, null, 2)}\n`)
+  }
+  pack('src/domain/newRule.ts', 'export const newRule = true\n')
+  pack('src/domain/newRule.test.ts', '')
+  pack('architecture/module-governance.json', configObject)
+  const typescriptEntry = pathToFileURL(require.resolve('typescript')).href
+  pack('scripts/check-module-governance.mjs', fs.readFileSync(cliModulePath, 'utf8').replace(
+    "from 'typescript'",
+    `from ${JSON.stringify(typescriptEntry)}`,
+  ))
+  pack('scripts/module-governance-lib.mjs', fs.readFileSync(path.join(root, 'scripts/module-governance-lib.mjs'), 'utf8'))
+  return execFileSync(process.execPath, ['scripts/check-module-governance.mjs'], {
+    cwd: cliRoot,
+    env: fixtureEnv,
+    encoding: 'utf8',
+    stdio: ['ignore', 'pipe', 'pipe'],
+    ...overrides,
+  })
+}
 
 beforeAll(() => {
   fixture = fs.mkdtempSync(path.join(os.tmpdir(), 'qinghua-module-governance-'))
@@ -146,3 +188,81 @@ describe('模块预算与职责登记门禁', () => {
     write(source, 'export const existing = true\n')
   })
   }, 20_000)
+
+describe('职责登记语义门禁', () => {
+  it('语义合格的新模块通过：职责具体、公共 API 是真实导出、测试路径存在', () => {
+    write('src/domain/newRule.ts', 'export const newRule = true\n')
+    expect(runSemantics(config([semanticRegistration()]))).toEqual([])
+  })
+
+  it('占位 responsibility、纯套话边界与空职责都会红', () => {
+    const placeholder = '按目录职责拆分出的单一生产模块；具体范围以源码导出与兄弟测试为准。'
+    expect(runSemantics(config([semanticRegistration({ responsibility: placeholder })])).some((error) =>
+      error.includes('responsibility 是占位文案'),
+    )).toBe(true)
+    expect(runSemantics(config([semanticRegistration({ responsibility: '单一生产模块。' })])).some((error) =>
+      error.includes('responsibility 缺少具体职责'),
+    )).toBe(true)
+    expect(runSemantics(config([semanticRegistration({ owns: ['本模块声明的纯函数、类型或局部视图'] })])).some((error) =>
+      error.includes('owns 是占位文案'),
+    )).toBe(true)
+    expect(runSemantics(config([semanticRegistration({ doesNotOwn: ['跨模块事务 owner', '根文档与治理登记', '其他目录业务状态'] })])).some((error) =>
+      error.includes('doesNotOwn 是占位文案'),
+    )).toBe(true)
+  })
+
+  it('publicApi 占位、虚构导出名与不存在的测试路径都会红', () => {
+    expect(runSemantics(config([semanticRegistration({ publicApi: ['本模块导出符号'] })])).some((error) =>
+      error.includes('publicApi 是占位文案'),
+    )).toBe(true)
+    expect(runSemantics(config([semanticRegistration({ publicApi: ['missingRule'] })])).some((error) =>
+      error.includes('publicApi 不是真实导出'),
+    )).toBe(true)
+    expect(runSemantics(config([semanticRegistration({ test: ['src/domain/missing.test.ts'] })])).some((error) =>
+      error.includes('测试证据不存在'),
+    )).toBe(true)
+  })
+
+  it('CSS 模块可用真实样式域和类名，拒绝占位或虚构类名', () => {
+    write('src/domain/newRule.module.css', '.rule { color: red; }\n.ruleOn { color: green; }\n')
+    const cssRegistration = (overrides = {}) => semanticRegistration({
+      module: 'src/domain/newRule.module.css',
+      publicApi: ['CSS_MODULE:领域规则状态样式', 'CSS_CLASS:rule', 'CSS_CLASS:ruleOn'],
+      budget: 600,
+      ...overrides,
+    })
+    expect(runSemantics(config([cssRegistration()]))).toEqual([])
+    expect(runSemantics(config([cssRegistration({ publicApi: ['本模块导出符号'] })])).some((error) =>
+      error.includes('publicApi 是占位文案'),
+    )).toBe(true)
+    expect(runSemantics(config([cssRegistration({ publicApi: ['CSS_MODULE:领域规则状态样式', 'CSS_CLASS:notAClass'] })])).some((error) =>
+      error.includes('publicApi 不是真实 CSS 类名'),
+    )).toBe(true)
+  })
+
+  it('显式 no-export 模块通过；未标明的无导出 TS 模块会红', () => {
+    write('src/domain/noExports.ts', 'globalThis.__moduleGovernanceProbe = true\n')
+    const noExports = semanticRegistration({ module: 'src/domain/noExports.ts' })
+    expect(runSemantics(config([{ ...noExports, publicApi: ['NO_EXPORT:仅注册全局领域规则副作用，不提供模块导出'] }]))).toEqual([])
+    expect(runSemantics(config([noExports])).some((error) => error.includes('publicApi 不是真实导出'))).toBe(true)
+  })
+
+  it('Windows 路径下 CLI 相对路径调用也执行语义门禁，红绿结果与函数一致', () => {
+    write('src/domain/newRule.ts', 'export const newRule = true\n')
+    write('src/domain/noExports.ts', 'globalThis.__moduleGovernanceProbe = true\n')
+    const good = config([semanticRegistration()], { baseline })
+    const bad = config([semanticRegistration({ publicApi: ['本模块导出符号'] })], { baseline })
+    expect(validateGovernanceSemantics(fixture, good)).toEqual([])
+    expect(validateGovernanceSemantics(fixture, bad).length).toBeGreaterThan(0)
+    expect(runCli(good)).toContain('module governance passed')
+    let cliFailure
+    try {
+      runCli(bad)
+    } catch (error) {
+      cliFailure = error
+    }
+    expect(cliFailure).toBeTruthy()
+    expect(cliFailure.status).toBe(1)
+    expect(`${cliFailure.stdout ?? ''}${cliFailure.stderr ?? ''}`).toContain('publicApi 是占位文案')
+  })
+})

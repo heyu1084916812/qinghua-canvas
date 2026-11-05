@@ -25,11 +25,16 @@
  * 其余"可选且有默认值"的参数**不写进表**：官方 CLI 也不填它们，交给服务端默认。
  */
 
-import { readFileSync, writeFileSync } from 'node:fs'
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { dirname, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
 
-const [, , catalogPath] = process.argv
+const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
+const [, , catalogPathArg, dryRunArg] = process.argv
+const catalogPath = catalogPathArg
+const dryRun = dryRunArg === '--dry-run'
 if (!catalogPath) {
-  console.error('用法：node scripts/gen-runninghub-models.mjs <capabilities.json>')
+  console.error('用法：node scripts/gen-runninghub-models.mjs <capabilities.json> [--dry-run]')
   process.exit(1)
 }
 
@@ -435,7 +440,7 @@ const DRIVEN = {
 }
 const MEDIA_TYPES = new Set(['IMAGE', 'VIDEO', 'AUDIO'])
 
-const catalog = JSON.parse(readFileSync(catalogPath, 'utf8'))
+const catalog = JSON.parse(readFileSync(resolve(root, catalogPath), 'utf8'))
 const byId = new Map((catalog.endpoints ?? []).map((e) => [e.endpoint, e]))
 
 const wanted = new Set()
@@ -517,63 +522,101 @@ const specs = [...wanted].map(specOf).sort((a, b) => a.id.localeCompare(b.id))
 const q = (s) => "'" + String(s).replace(/\\/g, '\\\\').replace(/'/g, "\\'") + "'"
 const jsonish = (v) => JSON.stringify(v, null, 1).replace(/\n\s*/g, ' ')
 
-const lines = []
-lines.push('/**')
-lines.push(' * RunningHub 标准模型端点规格（**自动生成，别手改**）')
-lines.push(' *')
-lines.push(' * 生成：`node scripts/gen-runninghub-models.mjs <RH_CLI>/src/rh_cli/catalog/data/capabilities.json`')
-lines.push(' * 来源：RunningHub 官方 CLI（github.com/HM-RunningHub/RH_CLI）随包附带的端点目录')
-lines.push(` *       capabilities.json —— version ${catalog.version}，共 ${catalog.total} 个端点；`)
-lines.push(' *       本文件只留**精挑的 ' + specs.length + ' 个端点**（官方 CLI 快捷选择 + 本项目已交付的端点）。')
-lines.push(' *')
-lines.push(' * 官方 CLI 建请求体的最后一步是「**必填 + 有默认值**而还没填的参数一律补默认值」')
-lines.push(' * （`model/payload.py`）—— 适配器照同一条规则走 `requiredDefaults`。')
-lines.push(' * 所以这里只保留三类参数：必填的、界面能驱动的（比例 / 清晰度 / 时长）、媒体类（IMAGE……）。')
-lines.push(' */')
-lines.push('')
-lines.push('export interface RunningHubMediaParam {')
-lines.push('  key: string')
-lines.push("  type: 'IMAGE' | 'VIDEO' | 'AUDIO'")
-lines.push('  multiple?: boolean')
-lines.push('  required?: boolean')
-lines.push('}')
-lines.push('')
-lines.push('export interface RunningHubDrivenParam {')
-lines.push('  key: string')
-lines.push('  options?: string[]')
-lines.push('}')
-lines.push('')
-lines.push('export interface RunningHubEndpointSpec {')
-lines.push('  id: string')
-lines.push('  /** 目录里的任务类型（`text-to-image` / `image-to-video` …），给日志与排查用 */')
-lines.push('  task: string')
-lines.push("  kind: 'image' | 'video'")
-lines.push('  /** 目录里的中文名（原样，不加工） */')
-lines.push('  label: string')
-lines.push('  /** 提示词参数的键（目录里所有端点都是 `prompt`，仍照实记） */')
-lines.push('  promptKey?: string')
-lines.push('  /** 参考图 / 视频 / 音频参数的键与是否多值 */')
-lines.push('  media?: RunningHubMediaParam')
-lines.push('  /** 第二个媒体槽（可选参考图，或图片必填 + 视频可选的组合） */')
-lines.push('  secondaryMedia?: RunningHubMediaParam')
-  lines.push('  /** 音频输入（数字人口播等端点与图片分开声明） */')
-  lines.push('  audio?: RunningHubMediaParam')
-lines.push('  /** 比例、清晰度、时长：键名各端点不同（`aspectRatio` / `ratio`…），故逐个记 */')
-lines.push('  ratio?: RunningHubDrivenParam')
-lines.push('  resolution?: RunningHubDrivenParam')
-lines.push('  duration?: RunningHubDrivenParam')
-  lines.push('  /** 视频超清的输出帧率（如 Topaz 的 targetFps） */')
-  lines.push('  fps?: RunningHubDrivenParam')
-  lines.push('  /** 超分类模型的放大倍数（2x / 4x / 6x） */')
-  lines.push('  scale?: RunningHubDrivenParam')
-lines.push('  /** 必填且界面上没有对应档位的参数（键 → 照官方目录的默认值原样补） */')
-lines.push('  requiredDefaults?: Record<string, unknown>')
-lines.push('}')
-lines.push('')
-lines.push('/** 精挑的端点规格（key = 端点 id） */')
-lines.push('export const RUNNINGHUB_ENDPOINT_SPECS: readonly RunningHubEndpointSpec[] = [')
-for (const s of specs) {
-  lines.push('  {')
+const generatedHeader = (file) => [
+  '/**',
+  ` * ${file}（**自动生成，别手改**）`,
+  ' *',
+  ' * 生成：`node scripts/gen-runninghub-models.mjs <RH_CLI>/src/rh_cli/catalog/data/capabilities.json`',
+  ' * 来源：RunningHub 官方 CLI（github.com/HM-RunningHub/RH_CLI）随包附带的端点目录',
+  ` *       capabilities.json —— version ${catalog.version}，共 ${catalog.total} 个端点；`,
+  ' *       本批只留**精挑的 ' + specs.length + ' 个端点 / ' + MODELS.length + ' 个模型**。',
+  ' *',
+  ' * 官方 CLI 建请求体的最后一步是「**必填 + 有默认值**而还没填的参数一律补默认值」',
+  ' * （`model/payload.py`）—— 适配器照同一条规则走 `requiredDefaults`。',
+  ' */',
+  '',
+]
+
+const contractsLines = [
+  ...generatedHeader('公共类型与装配门面'),
+  "import type { RunningHubEndpointSpec, RunningHubModel } from './types'",
+  "import { RUNNINGHUB_ENDPOINT_SPECS_A } from './endpointSpecs.partA'",
+  "import { RUNNINGHUB_ENDPOINT_SPECS_B } from './endpointSpecs.partB'",
+  "import { RUNNINGHUB_ENDPOINT_SPECS_C } from './endpointSpecs.partC'",
+  "import { RUNNINGHUB_MODELS as GENERATED_RUNNINGHUB_MODELS } from './models'",
+  '',
+  '/** 保持原有公共数组身份：端点按官方目录 id 排序后由三个生成分片拼装 */',
+  'export const RUNNINGHUB_ENDPOINT_SPECS: readonly RunningHubEndpointSpec[] = [',
+  '  ...RUNNINGHUB_ENDPOINT_SPECS_A,',
+  '  ...RUNNINGHUB_ENDPOINT_SPECS_B,',
+  '  ...RUNNINGHUB_ENDPOINT_SPECS_C,',
+  ']',
+  '',
+  'export const RUNNINGHUB_MODELS: readonly RunningHubModel[] = GENERATED_RUNNINGHUB_MODELS',
+  '',
+]
+
+const facadeLines = [
+  ...generatedHeader('公共导出门面'),
+  'export {',
+  '  RUNNINGHUB_ENDPOINT_SPECS,',
+  '  RUNNINGHUB_MODELS,',
+  "} from './runninghubEndpoints/contracts'",
+  'export type {',
+  '  RunningHubDrivenParam,',
+  '  RunningHubEndpointSpec,',
+  '  RunningHubMediaParam,',
+  '  RunningHubModel,',
+  "} from './runninghubEndpoints/types'",
+  '',
+]
+
+const typeLines = [
+  ...generatedHeader('目录数据类型'),
+  'export interface RunningHubMediaParam {',
+  '  key: string',
+  "  type: 'IMAGE' | 'VIDEO' | 'AUDIO'",
+  '  multiple?: boolean',
+  '  required?: boolean',
+  '}',
+  '',
+  'export interface RunningHubDrivenParam {',
+  '  key: string',
+  '  options?: string[]',
+  '}',
+  '',
+  'export interface RunningHubEndpointSpec {',
+  '  id: string',
+  '  /** 目录里的任务类型，给日志与排查用 */',
+  '  task: string',
+  "  kind: 'image' | 'video'",
+  '  /** 目录里的中文名（原样，不加工） */',
+  '  label: string',
+  '  promptKey?: string',
+  '  media?: RunningHubMediaParam',
+  '  secondaryMedia?: RunningHubMediaParam',
+  '  audio?: RunningHubMediaParam',
+  '  ratio?: RunningHubDrivenParam',
+  '  resolution?: RunningHubDrivenParam',
+  '  duration?: RunningHubDrivenParam',
+  '  fps?: RunningHubDrivenParam',
+  '  scale?: RunningHubDrivenParam',
+  '  requiredDefaults?: Record<string, unknown>',
+  '}',
+  '',
+  '/** 轻画里出现的模型（下拉里的一行 = 一个模型，不是"一个端点"） */',
+  'export interface RunningHubModel {',
+  '  id: string',
+  '  hint: string',
+  "  kind: 'image' | 'video'",
+  '  textEndpoint: string',
+  '  imageEndpoint?: string',
+  '}',
+  '',
+]
+
+function endpointSpecLines(s) {
+  const lines = ['  {']
   const put = (k, v) => lines.push('    ' + k + ': ' + v + ',')
   put('id', q(s.id))
   put('task', q(s.task))
@@ -586,40 +629,72 @@ for (const s of specs) {
   if (s.ratio) put('ratio', jsonish(s.ratio))
   if (s.resolution) put('resolution', jsonish(s.resolution))
   if (s.duration) put('duration', jsonish(s.duration))
-    if (s.fps) put('fps', jsonish(s.fps))
+  if (s.fps) put('fps', jsonish(s.fps))
   if (s.scale) put('scale', jsonish(s.scale))
   if (s.requiredDefaults) put('requiredDefaults', jsonish(s.requiredDefaults))
   lines.push('  },')
+  return lines
 }
-lines.push(']')
-lines.push('')
-lines.push('/** 轻画里出现的模型（下拉里的一行 = 一个模型，不是"一个端点"） */')
-lines.push('export interface RunningHubModel {')
-lines.push('  /** 轻画的模型 id = **显示名**（下拉里显示的就是它；`app:` 那条是 AI 应用，扣币） */')
-lines.push('  id: string')
-lines.push('  hint: string')
-lines.push("  kind: 'image' | 'video'")
-lines.push('  /** 文生…端点（节点没有参考图时走它） */')
-lines.push('  textEndpoint: string')
-lines.push('  /** 图生…端点（节点连了参考图时走它）；没有这一项表示该模型没有图生档 */')
-lines.push('  imageEndpoint?: string')
-lines.push('}')
-lines.push('')
-lines.push('export const RUNNINGHUB_MODELS: readonly RunningHubModel[] = [')
-for (const m of MODELS) {
-  lines.push('  {')
-  /* id = 前端显示名（有对应的就用它，见 MODELS 里的 preset）；官方目录名留一行注释备查 */
-  lines.push('    // 官方目录：' + m.label)
-  lines.push('    id: ' + q(m.preset ?? m.label) + ',')
-  lines.push('    hint: ' + q(m.hint) + ',')
-  lines.push('    kind: ' + q(m.kind) + ',')
-  lines.push('    textEndpoint: ' + q(m.text) + ',')
-  if (m.image) lines.push('    imageEndpoint: ' + q(m.image) + ',')
-  lines.push('  },')
-}
-lines.push(']')
-lines.push('')
 
-const out = 'src/platform/channels/runninghubEndpoints.ts'
-writeFileSync(out, lines.join('\n'), 'utf8')
-console.log('已写出 ' + out + '：端点 ' + specs.length + ' 个、模型 ' + MODELS.length + ' 个')
+const chunks = [specs.slice(0, 21), specs.slice(21, 42), specs.slice(42)]
+const endpointFiles = chunks.map((part, index) => {
+  const suffix = String.fromCharCode(65 + index)
+  return {
+    path: `src/platform/channels/runninghubEndpoints/endpointSpecs.part${suffix}.ts`,
+    lines: [
+      ...generatedHeader(`端点规格分片 ${suffix}`),
+      "import type { RunningHubEndpointSpec } from './types'",
+      '',
+      `export const RUNNINGHUB_ENDPOINT_SPECS_${suffix}: readonly RunningHubEndpointSpec[] = [`,
+      ...part.flatMap(endpointSpecLines),
+      ']',
+      '',
+    ],
+  }
+})
+
+const modelLines = [
+  ...generatedHeader('精选模型目录'),
+  "import type { RunningHubModel } from './types'",
+  '',
+  'export const RUNNINGHUB_MODELS: readonly RunningHubModel[] = [',
+]
+for (const m of MODELS) {
+  modelLines.push('  {')
+  /* id = 前端显示名（有对应的就用它，见 MODELS 里的 preset）；官方目录名留一行注释备查 */
+  modelLines.push('    // 官方目录：' + m.label)
+  modelLines.push('    id: ' + q(m.preset ?? m.label) + ',')
+  modelLines.push('    hint: ' + q(m.hint) + ',')
+  modelLines.push('    kind: ' + q(m.kind) + ',')
+  modelLines.push('    textEndpoint: ' + q(m.text) + ',')
+  if (m.image) modelLines.push('    imageEndpoint: ' + q(m.image) + ',')
+  modelLines.push('  },')
+}
+modelLines.push(']', '')
+
+const outputs = [
+  { path: 'src/platform/channels/runninghubEndpoints.ts', lines: facadeLines },
+  { path: 'src/platform/channels/runninghubEndpoints/types.ts', lines: typeLines },
+  { path: 'src/platform/channels/runninghubEndpoints/contracts.ts', lines: contractsLines },
+  ...endpointFiles,
+  { path: 'src/platform/channels/runninghubEndpoints/models.ts', lines: modelLines },
+]
+
+for (const output of outputs) {
+  const source = output.lines.join('\n')
+  const target = resolve(root, output.path)
+  if (dryRun) {
+    const current = readFileSync(target, 'utf8')
+    if (current !== source) {
+      console.error('dry-run 不一致：' + output.path)
+      process.exit(1)
+    }
+  } else {
+    mkdirSync(dirname(target), { recursive: true })
+    writeFileSync(target, source, 'utf8')
+  }
+}
+
+console.log(
+  `${dryRun ? 'dry-run 一致' : '已写出'} ${outputs.length} 个文件：端点 ${specs.length} 个（${chunks.map((c) => c.length).join(' / ')}）、模型 ${MODELS.length} 个`,
+)

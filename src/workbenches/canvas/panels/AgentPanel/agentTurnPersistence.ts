@@ -1,9 +1,11 @@
 import type {
   ChatMessage,
 } from '../../../../domain/shared/execution/types'
-import { AGENT_CONTEXT_WINDOW } from '../../../../state/agent/sessionStore'
 import type { AgentSession, AgentSessionStore } from '../../../../state/agent/sessionStore'
-import { trimOrphanToolMessages } from '../../agent/historyWindow'
+import {
+  AGENT_CONTEXT_WINDOW,
+  modelMessageWindow,
+} from '../../../../domain/agent/modelMessageWindow'
 
 export interface AgentUserTurnInput {
   content: string
@@ -63,8 +65,7 @@ export async function persistAgentUserTurnBeforeRequest(
       ? fullHistory.slice(0, -1)
       : fullHistory
   const windowSize = input.contextWindow ?? AGENT_CONTEXT_WINDOW
-  const cut = Math.max(0, history.length - windowSize)
-  const modelWindow = trimOrphanToolMessages(history.slice(cut))
+  const modelWindow = modelMessageWindow(history, windowSize)
   const userMessage: ChatMessage = {
     role: 'user',
     content: input.content,

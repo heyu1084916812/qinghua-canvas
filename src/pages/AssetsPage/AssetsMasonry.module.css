@@ -1,0 +1,19 @@
+.grid {
+  columns: 240px;
+  column-gap: var(--space-5);
+}
+
+.grid[data-masonry='on'] {
+  columns: auto;
+  position: relative;
+}
+
+.masonryItem {
+  break-inside: avoid;
+}
+
+.grid[data-masonry='on'] .masonryItem {
+  position: absolute;
+  top: 0;
+  left: 0;
+}

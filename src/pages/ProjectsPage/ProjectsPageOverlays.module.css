@@ -1,0 +1,118 @@
+.menuBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1;
+}
+
+.newMenu {
+  position: fixed;
+  min-width: 132px;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-surface);
+  border: var(--border);
+  border-radius: var(--radius-control);
+  box-shadow: var(--shadow-float);
+  padding: var(--space-1);
+  z-index: 2;
+}
+
+.menuItem {
+  text-align: left;
+  border: none;
+  background: transparent;
+  color: var(--text-1);
+  font-size: var(--fs-label);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-control);
+  cursor: pointer;
+}
+.menuItem:hover {
+  background: var(--bg-hover);
+}
+.menuItem:hover {
+  background: var(--bg-hover);
+}
+
+.newBtnGhost {
+  border: var(--border);
+  background: transparent;
+  color: var(--text-2);
+  border-radius: var(--radius-control);
+  padding: var(--space-2) var(--space-4);
+  font-size: var(--fs-label);
+  font-weight: var(--fw-title);
+  cursor: pointer;
+  transition: background var(--dur-hover) var(--ease-out), color var(--dur-hover) var(--ease-out);
+}
+.newBtnGhost:hover {
+  background: var(--bg-hover);
+  color: var(--text-1);
+}
+
+.bulkBar {
+  position: fixed;
+  left: calc(var(--sidebar-w, 0px) + (100vw - var(--sidebar-w, 0px)) / 2);
+  bottom: var(--space-6);
+  transform: translateX(-50%);
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  max-width: calc(100vw - var(--sidebar-w, 0px) - var(--space-8));
+  padding: var(--space-2) var(--space-3);
+  border: var(--border);
+  border-radius: var(--radius-control);
+  background: var(--bg-surface);
+  box-shadow: var(--shadow-float);
+  color: var(--text-1);
+  white-space: nowrap;
+}
+.bulkText {
+  padding-inline: var(--space-2);
+  font-size: var(--fs-label);
+  color: var(--text-2);
+}
+.bulkSelectAll,
+.bulkBtn,
+.bulkDanger {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  border: none;
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--text-1);
+  padding: var(--space-2) var(--space-3);
+  font-size: var(--fs-label);
+  cursor: pointer;
+}
+.bulkSelectAll:hover,
+.bulkBtn:hover {
+  background: var(--bg-hover);
+}
+.bulkDanger:hover {
+  background: var(--bg-hover);
+}
+.bulkDanger {
+  color: var(--danger);
+}
+.bulkDanger:hover {
+  background: var(--bg-hover);
+}
+.bulkDanger:disabled {
+  opacity: 1;
+  color: var(--text-2);
+  cursor: wait;
+}
+
+@media (max-width: 460px) {
+  .bulkBar {
+    gap: var(--space-2);
+  }
+  .bulkText {
+    max-width: 120px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+}

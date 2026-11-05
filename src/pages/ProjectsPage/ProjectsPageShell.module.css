@@ -1,0 +1,262 @@
+.page {
+  /*
+   * 高度跟随工作区（不是 `100vh`：那会比可用区高一截，永远多一条纵向滚动）。
+   *
+   * ⚠️ **滚动从"工作区那一层"下沉到本页**（用户 2026-10-06，对账 #287）。
+   *
+   * 此前是 `min-height: 100%` + 由 `[data-app-workspace]` 滚动 —— 于是滚动条画在
+   * **卡片最右沿**，而卡片是圆角的：它的上下两端正好落在圆角上，看起来"漏出来"。
+   * 现在这一层定高、不滚，滚动交给 `.main`（并且 `.main` 用透明右边框把滚动条
+   * 从卡片边缘推进来 16px），滚动条因此完全落在卡片内部。
+   */
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  /* 这层只负责"填满 + 给状态行留位"；滚动在 `.main` 里 */
+  overflow: hidden;
+  /*
+   * 工作区底色取 `--bg-canvas`，**不是 `--bg-app`**（用户 2026-09-27 定色后修正）。
+   *
+   * 页面是壳右侧工作区里的插槽，`--bg-canvas` 才是「工作区」那一层；
+   * `--bg-app` 现在是**一级菜单**的颜色。原先写 `--bg-app` 时两者恰好接近看不出，
+   * 新配色下菜单（#f5f5f5 / #1a1a1a）与工作区（#ffffff / #161616）差一档，
+   * 页面一填 `--bg-app` 就把工作区染成了菜单色。
+   */
+  background: var(--bg-canvas);
+  color: var(--text-1);
+  font-family: var(--font-sans);
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
+  /* 拖入提示层要相对**这一页**定位（对账 #234）。卡片自己有 `position: relative`，不受影响 */
+  position: relative;
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-4) var(--space-6);
+  border-bottom: var(--border);
+  background: var(--bg-surface);
+}
+
+/* 右侧出口簇：主题切换与「后台设置」同排，间距比顶栏两端的留白小 */
+.topbarRight {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.brand {
+  font-size: var(--fs-panel-title);
+  font-weight: var(--fw-panel-title);
+  color: var(--text-1);
+}
+
+.ghostBtn {
+  border: var(--border);
+  background: var(--bg-surface);
+  color: var(--text-2);
+  border-radius: var(--radius-control);
+  padding: var(--space-2) var(--space-4);
+  font-size: var(--fs-label);
+  cursor: pointer;
+  transition: background var(--dur-hover) var(--ease-out), color var(--dur-hover) var(--ease-out);
+}
+.ghostBtn:hover {
+  background: var(--bg-hover);
+  color: var(--text-1);
+}
+
+.newBtn {
+  border: var(--border);
+  background: var(--accent);
+  color: var(--accent-text);
+  border-radius: var(--radius-control);
+  padding: var(--space-2) var(--space-4);
+  font-size: var(--fs-label);
+  font-weight: var(--fw-title);
+  cursor: pointer;
+  transition: opacity var(--dur-hover) var(--ease-out);
+}
+.newBtn:hover {
+  opacity: 0.88;
+}
+
+.main {
+  /*
+   * 内容相对**右侧工作区**居中，而不是相对浏览器视口居中：
+   * `.main` 的上游就是 `[data-app-workspace]`，这里给上限宽度再加
+   * `margin-inline: auto` 即可；侧栏开合后工作区宽度变化，内容会重新居中。
+   */
+  width: 100%;
+  box-sizing: border-box;
+  /*
+   * ⚠️ **滚动条位置（用户 2026-10-10 #3）**：原来这一层自己定宽 1520 居中并滚动，
+   * 于是滚动条画在"内容框的右沿"（宽屏下离工作区右沿还有一大截，用户截图里打叉的位置）。
+   * 现在 `.main` 铺满工作区、滚动条自然贴工作区右沿；内容定宽居中的事交给每个直接子块。
+   */
+  padding: var(--space-8) 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+  /*
+   * 本页的**滚动容器**（对账 #287）：撑满 `.page` 剩下的高度、自己滚。
+   *
+   * `min-height: 0` 是 flex 子项能被压缩的前提 —— 少了它这一层会被内容顶高，
+   * 于是它既不滚、又去顶工作区（老毛病原样复现）。
+   */
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+/* 直接子块：定宽居中 + 左右内距（= 上一版 `.main` 的口径，观感不变） */
+.main > * {
+  width: 100%;
+  max-width: 1520px;
+  margin-inline: auto;
+  box-sizing: border-box;
+  padding-inline: var(--space-8);
+}
+
+.main::-webkit-scrollbar-thumb {
+  border-top: 8px solid transparent;
+  border-bottom: 8px solid transparent;
+  background-clip: padding-box;
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.sectionHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+
+.titleGroup {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.sectionTitle {
+  margin: 0;
+  font-size: var(--fs-page-title);
+  font-weight: var(--fw-page-title);
+  line-height: var(--lh-page-title);
+  color: var(--sidebar-page-title);
+}
+
+.empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-8) 0;
+  color: var(--text-2);
+}
+.emptyTitle {
+  font-size: var(--fs-panel-title);
+  font-weight: var(--fw-panel-title);
+  color: var(--text-1);
+  margin: 0;
+}
+.emptyHint {
+  margin: 0;
+  font-size: var(--fs-label);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, 303px);
+  justify-content: center;
+  gap: var(--space-5);
+}
+
+.status {
+  width: 100%;
+  max-width: 1520px;
+  margin-inline: auto;
+  box-sizing: border-box;
+  flex: none;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  min-height: var(--space-5);
+  padding: 0 var(--space-6) var(--space-6);
+  font-size: var(--fs-label);
+  color: var(--text-2);
+}
+.status:empty {
+  display: none;
+}
+.statusRetry {
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--danger);
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}
+.statusRetry:disabled {
+  opacity: 1;
+  color: var(--text-2);
+  cursor: wait;
+}
+
+.dropHint {
+  position: absolute;
+  inset: var(--space-4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px dashed var(--stroke-focus);
+  border-radius: var(--radius-node);
+  background: var(--bg-surface);
+  color: var(--text-1);
+  font-family: var(--font-sans);
+  font-size: var(--fs-body);
+  pointer-events: none;
+  z-index: 5;
+}
+
+.templateTestBridge {
+  position: fixed;
+  top: 1px;
+  left: 1px;
+  z-index: 100;
+  display: flex;
+  width: 72px;
+  height: 12px;
+  opacity: 0;
+}
+
+.templateTestBridge button {
+  flex: 0 0 12px;
+  width: 12px;
+  height: 12px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+@media (max-width: 680px) {
+  .main {
+    padding-inline: var(--space-4);
+  }
+  .grid {
+    grid-template-columns: repeat(auto-fill, min(303px, 100%));
+  }
+  .sectionHead {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}

@@ -54,6 +54,7 @@ import {
   looksLikePreserveRequest,
   looksLikeStyleOnlyRequest,
 } from '../../agent/agentSystemPrompt'
+import { sessionBriefForContinuation } from './agentSessionBrief'
 import { agentToolsForRequestMode } from '../../agent/tools'
 import { errText } from '../../agent/agentLoop'
 import type {
@@ -438,14 +439,50 @@ export async function prepareAgentTurnRequest(
     agentTaskPlanProgress(input.session.taskPlan).status === 'active'
       ? input.session.taskPlan
       : undefined
+  const previousMessages = persistedTurn.historyMessages.slice(0, -1)
+  const lastAssistant = [...previousMessages].reverse().find(
+    (message) => message.role === 'assistant',
+  )
+  const lastAssistantFailed = /HTTP\s*50\d|服务端返回错误|生成失败|运行失败|请求失败|上游/.test(
+    lastAssistant?.content ?? '',
+  )
+  const hasUnfinishedGeneration = /生成中\s*\d+\s*\/\s*\d+|等待生成|waiting_generation/.test(
+    lastAssistant?.content ?? '',
+  )
   const requestMode = classifyAgentRequest({
     text: plainText,
     hasMentionedImage: mentionedImageIds.length > 0,
     hasSelectedNodes: input.selection.length > 0,
     hasSelectedImage: selectedImageIds.length > 0,
     hasTaskPlan: Boolean(activeTaskPlan),
+    internalControl: input.internalControl === true,
+    hasActiveContinuation: input.session.continuation !== undefined,
+    hasPendingConfirmation: input.session.pendingConfirmation !== undefined,
+    hasUnfinishedGeneration,
+    lastAssistantFailed,
+    hasNeedsAttentionJob: /needs_attention|需要人工处理|等待人工/.test(
+      lastAssistant?.content ?? '',
+    ),
   })
   const promptProfile = promptProfileForMode(requestMode)
+  const sessionBrief = requestMode === 'complex_plan'
+    ? sessionBriefForContinuation({
+        messages: previousMessages,
+        promptProfile: 'light',
+        ...(lastAssistantFailed
+          ? { runRecord: { status: 'interrupted', reason: lastAssistant?.content } }
+          : {}),
+        taskPlan: activeTaskPlan,
+        graphSummary: {
+          nodes: input.graph.nodes.length,
+          edges: input.graph.edges.length,
+          generated: input.graph.nodes.filter((node) => {
+            const data = node.data as { assetHash?: unknown } | undefined
+            return typeof data?.assetHash === 'string' && data.assetHash.length > 0
+          }).length,
+        },
+      })
+    : undefined
   const turnTools = [
     ...agentToolsForRequestMode(requestMode, {
       canvasReview: input.canvasReviewEnabled,
@@ -499,6 +536,7 @@ export async function prepareAgentTurnRequest(
       ...(activeTaskPlan
         ? { taskPlan: taskPlanPrompt(activeTaskPlan) }
         : {}),
+      ...(sessionBrief ? { sessionBrief } : {}),
       ...(decision.mode === 'json'
         ? { jsonToolFallback: true, tools: turnTools }
         : {}),

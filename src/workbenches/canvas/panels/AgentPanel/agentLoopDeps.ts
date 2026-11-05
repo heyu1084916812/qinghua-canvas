@@ -127,6 +127,8 @@ export interface AssembleAgentLoopInput {
   turnController?: AbortController
   /** 确认 / 继续入口在未显式传 controller 时仍从所属会话取同一信号。 */
   abortSignalFor: (sessionId: string) => AbortSignal | undefined
+  /** 检查点续跑的系统复原摘要；只补一条 system 消息，不复制或重放历史。 */
+  sessionBrief?: string
 }
 
 /**
@@ -222,6 +224,18 @@ export function assembleAgentLoopDeps(
     signal: AbortSignal,
     onStream?: Parameters<RouteExecutionPort['execute']>[0]['onStream'],
   ) => {
+    const requestMessages = request.messages ?? []
+    const brief = input.sessionBrief?.trim()
+    const withBrief = (): readonly ChatMessage[] => {
+      if (!brief) return requestMessages
+      const firstSystem = requestMessages.findIndex((message) => message.role === 'system')
+      if (firstSystem < 0) return [{ role: 'system', content: brief }, ...requestMessages]
+      return requestMessages.map((message, index) =>
+        index === firstSystem
+          ? { ...message, content: `${message.content}\n\n${brief}` }
+          : message,
+      )
+    }
     const liveRoute = ports.cachedChatRoute(session) ?? route
     return ports.routeExecution.execute({
       channelId: liveRoute?.channelId ?? request.channelId,
@@ -230,7 +244,7 @@ export function assembleAgentLoopDeps(
       tools:
         request.tools ??
         (toolMode === 'native' ? turnTools : []),
-      messages: request.messages ?? [],
+      messages: withBrief(),
       inputs: request.inputs,
       signal,
       ...(liveRoute

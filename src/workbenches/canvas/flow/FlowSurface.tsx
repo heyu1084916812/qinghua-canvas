@@ -116,6 +116,23 @@ import {
   nextCanvasDetailMode,
   type CanvasDetailMode,
 } from './detailMode'
+import { sameFlowViewport, VIEWPORT_EPSILON } from './flowSurfaceViewport'
+import {
+  FLOATING_SELECTORS,
+  dragAnchorOf,
+  isClickAfterDrag,
+  marqueeBetween,
+  pointerWorldPoint as pointerWorldPointPure,
+} from './flowSurfacePointer'
+import {
+  contextMenuPoint,
+  isEditableKeyboardTarget,
+  shouldRouteCancel,
+  shouldRouteRun,
+  shouldSelectNodeForMenu,
+} from './flowSurfaceMenus'
+import { importFeedback, shouldPasteMediaFiles } from './flowSurfaceImport'
+import { installCanvasDomAnchors } from './flowSurfaceDomAnchors'
 
 /**
  * 引擎替换 P0：用 React Flow 渲染**真实图**。
@@ -148,15 +165,6 @@ export function FlowSurface({
 const NODE_TYPES = { qh: FlowFlowNode, coarse: FlowCoarseNode }
 const EDGE_TYPES = { qh: QhEdge, coarse: QhCoarseEdge }
 const EDGE_OPTIONS = { type: 'default' } as const
-const VIEWPORT_EPSILON = 0.01
-
-function sameFlowViewport(a: FlowViewport, b: FlowViewport): boolean {
-  return (
-    Math.abs(a.x - b.x) < VIEWPORT_EPSILON &&
-    Math.abs(a.y - b.y) < VIEWPORT_EPSILON &&
-    Math.abs(a.zoom - b.zoom) < VIEWPORT_EPSILON
-  )
-}
 
 function FlowViewportController() {
   const viewport = useViewportState()
@@ -217,26 +225,6 @@ function useCanvasDetailMode(store: CanvasStore): CanvasDetailMode {
  * 组的选中被清掉、跟随栏再也不回来。枚举式名单本来就容易漏，改成数组至少让
  * "少一个逗号"这种手滑在 diff 里一眼可见。
  */
-const FLOATING_SELECTORS = [
-  '[data-creation-panel]',
-  '[data-emotion-panel]',
-  '[data-node-follow-bar]',
-  '[data-multi-select-bar]',
-  '[data-context-menu]',
-  '[data-link-menu]',
-  '[data-canvas-notice]',
-  '[data-undo-bar]',
-  '[data-lightbox]',
-  '[data-minimap]',
-  '[data-flow-hud]',
-  '[data-canvas-toolbar]',
-  '[data-edge]',
-  '.react-flow__edge',
-  '.react-flow__handle',
-  '[data-flow-port-hit]',
-  '[data-empty-canvas-guide]',
-].join(', ')
-
 /**
  * 给这一次按下所在的节点打一帧 `nodrag`（松手自动摘掉）。
  *
@@ -280,17 +268,14 @@ function blockNativeNodeDrag(target: EventTarget | null): void {
  * 与「新建节点」「拖入导入」「连线落点」同一条口径。拿不到事件或 surface 时返回 `null`，
  * 由调用方决定是退回节点中心还是放弃 —— 不要在这里猜一个坐标出来。
  */
-function pointerWorldPoint(
+function pointerWorldPointDom(
   ev: MouseEvent | TouchEvent | ReactPointerEvent | null | undefined,
   store: CanvasStore,
 ): Point | null {
-  if (!ev || !('clientX' in ev)) return null
-  const { clientX, clientY } = ev
-  if (typeof clientX !== 'number' || typeof clientY !== 'number') return null
   const el = document.querySelector<HTMLElement>('[data-canvas-surface]')
   if (!el) return null
   const r = el.getBoundingClientRect()
-  return screenToWorld({ x: clientX, y: clientY }, store.getViewport(), {
+  return pointerWorldPointPure(ev, store.getViewport(), {
     x: r.left,
     y: r.top,
     w: r.width,
@@ -489,7 +474,7 @@ function FlowSurfaceInner({
        * 阈值取 4px，与 RF 自己的 `paneClickDistance` 同一口径（它也是拿"有没有移动过"区分点击）。
        */
       const press = pressAtRef.current
-      if (press && Math.hypot(e.clientX - press.x, e.clientY - press.y) > 4) return
+      if (isClickAfterDrag(press, { x: e.clientX, y: e.clientY })) return
       const target = e.target as HTMLElement
       const hit = target.closest('[data-node-id]')
       const childId = hit?.getAttribute('data-node-id')
@@ -585,16 +570,14 @@ function FlowSurfaceInner({
       const vp = store.getViewport()
       const zoom = vp.zoom || 1
       const surface = e.currentTarget.getBoundingClientRect()
-      const nodes = new Map<string, { x: number; y: number }>()
+      const rects = new Map<string, { x: number; y: number }>()
       for (const id of ids) {
         const nodeEl = document.querySelector<HTMLElement>(`[data-node-id="${id}"]`)
         if (!nodeEl) continue
         const r = nodeEl.getBoundingClientRect()
-        nodes.set(id, {
-          x: (r.left - surface.left) / zoom + vp.x,
-          y: (r.top - surface.top) / zoom + vp.y,
-        })
+        rects.set(id, { x: r.left, y: r.top })
       }
+      const nodes = dragAnchorOf(ids, rects, surface, vp)
       dragAnchorRef.current = { clientX: e.clientX, clientY: e.clientY, zoom, nodes }
     },
     [store, spaceHeld, beginPan],
@@ -613,10 +596,11 @@ function FlowSurfaceInner({
         files,
         world,
       )
-      if (rejected > 0) store.notify(`跳过 ${rejected} 个文件：只支持图片 / 视频素材`, 'error')
+      const feedback = importFeedback(ids.length, rejected)
+      if (rejected > 0 && feedback) store.notify(feedback, 'error')
       if (ids.length > 0) {
         store.setSelection(ids)
-        store.showUndoBar(`已导入 ${ids.length} 个素材`)
+        if (feedback) store.showUndoBar(feedback)
       }
     },
     [platform, store, projectId],
@@ -652,11 +636,9 @@ function FlowSurfaceInner({
    */
   useEffect(() => {
     const onPaste = (e: ClipboardEvent): void => {
-      if (isTextEntryElement(e.target as { tagName?: string; isContentEditable?: boolean } | null)) {
-        return
-      }
+      const target = e.target as { tagName?: string; isContentEditable?: boolean } | null
       const files = clipboardMediaFiles(e.clipboardData)
-      if (files.length === 0) return
+      if (!shouldPasteMediaFiles({ files, editableTarget: isTextEntryElement(target) })) return
       const at = pastePoint(store)
       if (!at) return
       e.preventDefault()
@@ -677,16 +659,17 @@ function FlowSurfaceInner({
     (e: ReactMouseEvent<HTMLDivElement>) => {
       e.preventDefault()
       const r = e.currentTarget.getBoundingClientRect()
-      const x = e.clientX - r.left
-      const y = e.clientY - r.top
-      const nodeEl = (e.target as HTMLElement).closest('[data-node-id]')
-      const nodeId = nodeEl?.getAttribute('data-node-id') ?? null
-      if (nodeId) {
-        if (!store.getSelection().includes(nodeId)) store.setSelection([nodeId])
-        store.setMenu(x, y, { kind: 'node', nodeId })
-      } else {
-        store.setMenu(x, y, { kind: 'canvas' })
+      const nodeId = (e.target as HTMLElement)
+        .closest('[data-node-id]')
+        ?.getAttribute('data-node-id') ?? null
+      const menu = contextMenuPoint(e.clientX, e.clientY, { x: r.left, y: r.top }, nodeId)
+      if (
+        menu.target.kind === 'node' &&
+        shouldSelectNodeForMenu(store.getSelection(), menu.target.nodeId)
+      ) {
+        store.setSelection([menu.target.nodeId])
       }
+      store.setMenu(menu.x, menu.y, menu.target)
     },
     [store],
   )
@@ -708,11 +691,11 @@ function FlowSurfaceInner({
   /** 节点事件出口：视图只能 emit，由这一层翻译成命令（架构 §4.7） */
   const makeEmit = useCallback(
     (nodeId: string) => (event: NodeViewEvent) => {
-      if (event.type === 'requestRun') {
+      if (shouldRouteRun(event)) {
         void exec.runNode(nodeId)
         return
       }
-      if (event.type === 'requestRunCancel') {
+      if (shouldRouteCancel(event)) {
         exec.cancel(nodeId)
         return
       }
@@ -945,22 +928,17 @@ function FlowSurfaceInner({
   const updateSelectionMarquee = useCallback(
     (event: MouseEvent | ReactPointerEvent<HTMLDivElement>) => {
       if (!selectionStartRef.current) return
-      const point = pointerWorldPoint(event, store)
+      const point = pointerWorldPointDom(event, store)
       if (!point) return
       const start = selectionStartRef.current
-      selectionMarqueeRef.current = {
-        x: start.x,
-        y: start.y,
-        w: point.x - start.x,
-        h: point.y - start.y,
-      }
+      selectionMarqueeRef.current = marqueeBetween(start, point)
     },
     [store],
   )
 
   const onSelectionStart = useCallback(
     (event: ReactMouseEvent) => {
-      const point = pointerWorldPoint(event.nativeEvent, store)
+      const point = pointerWorldPointDom(event.nativeEvent, store)
       if (!point) return
       selectionStartRef.current = point
       selectionBaselineRef.current = event.shiftKey ? store.getSelection() : []
@@ -1149,7 +1127,7 @@ function FlowSurfaceInner({
       if (!node) return
       // 落点：指针位置（指针不在节点内 —— 真的甩出去了 —— 时退回节点中心），与老表面同一判定。
       // 上面那步终点对齐保证了"节点已在松手的地方"，所以这里不会再被丢帧带偏。
-      const worldPoint = dropPointOf(pointerWorldPoint(e, store), node, graph)
+      const worldPoint = dropPointOf(pointerWorldPointDom(e, store), node, graph)
       const outcome = resolveDropOutcome(node.id, worldPoint, graph)
       if (outcome.kind === 'rejected') {
         store.notify(outcome.reason, 'error')
@@ -1187,41 +1165,7 @@ function FlowSurfaceInner({
     [store],
   )
 
-  /**
-   * 给 React Flow 的**视口层**挂上老锚点 `data-world`。
-   *
-   * 为什么值得专门接：冒烟的 `readViewport()` 读的就是 `[data-world]` 的 style，从中解析
-   * `translate(…px,…px) scale(…)` 来算坐标 —— 全量里大量组依赖它。而 RF 的
-   * `.react-flow__viewport` 用的**正是同一种格式**（`translate(x,y) scale(z)`，
-   * 其中 x = -vp.x*zoom，与老 `.world` 的 `translate(-vp.x*zoom,…)` 数值一致），
-   * 所以挂上锚点后，那套坐标数学**一个字都不用改**。
-   */
-  useEffect(() => {
-    const el = document.querySelector<HTMLElement>('[data-canvas-surface] .react-flow__viewport')
-    if (!el) return
-    el.setAttribute('data-world', '')
-    return () => el.removeAttribute('data-world')
-  }, [])
-
-  /**
-   * 给 RF 的**框选矩形**挂上老锚点 `data-marquee`（冒烟按它确认"Ctrl+拖 = 框选"真的画出来了）。
-   *
-   * 老表面那个矩形是自己的 div；RF 用内部类名 `.react-flow__selection`，而且元素随框选**动态增删**，
-   * 所以不能像 `data-world` 那样挂一次就走 —— 用 MutationObserver 在它出现时打标（消失时随元素一起没了）。
-   */
-  useEffect(() => {
-    const surface = document.querySelector<HTMLElement>('[data-canvas-surface]')
-    if (!surface) return
-    const tag = () => {
-      for (const el of surface.querySelectorAll('.react-flow__selection')) {
-        if (!el.hasAttribute('data-marquee')) el.setAttribute('data-marquee', '')
-      }
-    }
-    tag()
-    const observer = new MutationObserver(tag)
-    observer.observe(surface, { childList: true, subtree: true })
-    return () => observer.disconnect()
-  }, [])
+  useEffect(() => installCanvasDomAnchors(), [])
 
   const onEdgesDelete = useCallback(
     (deleted: { id: string }[]) => {
@@ -1246,8 +1190,7 @@ function FlowSurfaceInner({
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key !== 'Delete' && e.key !== 'Backspace') return
       const el = e.target as HTMLElement | null
-      const tag = el?.tagName
-      if (tag === 'INPUT' || tag === 'TEXTAREA' || el?.isContentEditable) return
+      if (isEditableKeyboardTarget(el)) return
       const nodes = store.getSelection()
       const edges = store.getEdgeSelection()
       if (nodes.length === 0 && edges.length === 0) return

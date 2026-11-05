@@ -1,5 +1,15 @@
 # AgentPanel 模块索引
 
+> **2026-11-06 全代码治理索引补充**：前两轮新增 109 个生产模块、第四批再新增 22 个生产模块；
+> 合计 138 条语义登记的机器可读职责、owns/doesNotOwn、publicApi、
+> test 与行数预算统一在 `architecture/module-governance.json`。新增目录包括 `app/projectTree/`、
+> `platform/channels/openaiImages/`、`state/project/ecommerceTaskRepository/`、`domain/storyboard/` 子模块、
+> `workbenches/ecommerce/studio/`、`workbenches/canvas/panels/creation/`、`canvas/flow/`、`canvas/lightbox/`
+> 及 `workbenches/storyboard/videoExecution/`；第四批另增 `state/channel/channelStore/`、
+> `canvas/execution/provider/`、`pages/EcommercePage/{ecommercePage,workbench}/`、
+> `platform/channels/runninghubEndpoints/` 与 `ecommerce/studio/controller/`。
+> 本索引主体仍是 AgentPanel 目录；跨域模块导航以治理登记为准。
+
 > **2026-11-05 结构治理第二批（模块导航补充）**：本索引主体是 AgentPanel 目录；第二批新增的
 > 三个模块目录外职责由 `architecture/module-governance.json` 机器登记，当前真相源补充如下：
 > `src/app/runtime/projectOperationLock.ts` 只管项目占用索引与 opaque owner，

@@ -8,6 +8,7 @@ import {
   persistAgentUserTurnBeforeRoute,
   persistAgentUserTurnForSession,
 } from './agentTurnPersistence'
+import { modelMessageWindow } from '../../../../domain/agent/modelMessageWindow'
 
 describe('persistAgentUserTurnBeforeRequest', () => {
   it('★★ 在模型请求前落库用户正文与附件引用，取消后仍可恢复', async () => {
@@ -47,42 +48,107 @@ describe('persistAgentUserTurnBeforeRequest', () => {
     expect(persisted.messageRevision).toBeGreaterThan(0)
   })
 
-  it('保持回读窗口不变，同时把窗口外历史留在持久化消息里', async () => {
+  it('3/20/200 回读档共用稳定窗口口径，并把窗口外历史留在持久化消息里', async () => {
     const sessions = createAgentSessionStore(createMemoryPlatform().storage)
     const session = await sessions.create({
       projectId: 'p1',
       channelId: 'c1',
       model: 'm1',
     })
-    const history = Array.from({ length: 4 }, (_, index) => ({
-      role: index % 2 === 0 ? ('user' as const) : ('assistant' as const),
-      content: `历史 ${index}`,
-    }))
+    const history = [
+      { role: 'user' as const, content: '最初的品牌全案需求' },
+      ...Array.from({ length: 210 }, (_, index) => ({
+        role: index % 2 === 0 ? ('user' as const) : ('assistant' as const),
+        content: `历史 ${index}`,
+      })),
+    ]
+    for (const contextWindow of [3, 20, 200]) {
+      const persisted = await persistAgentUserTurnBeforeRequest(
+        sessions,
+        session.id,
+        {
+          history,
+          content: '新请求',
+          display: '新请求',
+          imageNodeIds: [],
+          contextWindow,
+          now: 20,
+        },
+      )
+      expect(persisted.modelWindow).toEqual(modelMessageWindow(history, contextWindow))
+      expect(persisted.modelWindow.length).toBeLessThanOrEqual(contextWindow)
+      expect(persisted.modelWindow[0]?.content).toBe('最初的品牌全案需求')
+      expect(persisted.historyMessages).toEqual([...history, persisted.userMessage])
+    }
+  })
 
-    const persisted = await persistAgentUserTurnBeforeRequest(
-      sessions,
-      session.id,
-      {
+  it('★★ 8/32 步长任务后仍保留原始需求，且发给模型的窗口有界', async () => {
+    const sessions = createAgentSessionStore(createMemoryPlatform().storage)
+    const session = await sessions.create({
+      projectId: 'p1',
+      channelId: 'c1',
+      model: 'm1',
+    })
+    for (const steps of [8, 32]) {
+      const history = [
+        { role: 'user' as const, content: '云岚茶品牌全案：宋韵、青瓷主色、12 页作品集' },
+        ...Array.from({ length: steps }, (_, index) => [
+          {
+            role: 'assistant' as const,
+            content: '',
+            toolCalls: [{ id: `call-${index}`, name: 'readGraph', args: '{}' }],
+          },
+          {
+            role: 'tool' as const,
+            content: `{"ok":true}`,
+            toolCallId: `call-${index}`,
+            toolName: 'readGraph',
+          },
+        ]).flat(),
+      ]
+      const persisted = await persistAgentUserTurnBeforeRequest(sessions, session.id, {
         history,
-        content: '新请求',
-        display: '新请求',
+        content: '继续',
+        display: '继续',
         imageNodeIds: [],
-        contextWindow: 2,
-        now: 20,
-      },
-    )
+        contextWindow: 20,
+        now: 21,
+      })
+      expect(persisted.modelWindow[0]?.content).toContain('云岚茶品牌全案')
+      expect(persisted.modelWindow.length).toBeLessThanOrEqual(20)
+      expect(persisted.historyMessages).toHaveLength(history.length + 1)
+      for (const message of persisted.modelWindow) {
+        if (message.role !== 'tool') continue
+        expect(persisted.modelWindow.some((item) =>
+          item.role === 'assistant' && item.toolCalls?.some((call) => call.id === message.toolCallId),
+        )).toBe(true)
+      }
+    }
+  })
 
-    expect(persisted.modelWindow.map((message) => message.content)).toEqual([
-      '历史 2',
-      '历史 3',
-    ])
-    expect(persisted.historyMessages.map((message) => message.content)).toEqual([
-      '历史 0',
-      '历史 1',
-      '历史 2',
-      '历史 3',
-      '新请求',
-    ])
+  it('发送链窗口与 contextFor 的建议纯函数口径一致；存储事务断言不依赖 UI 历史', async () => {
+    const sessions = createAgentSessionStore(createMemoryPlatform().storage)
+    const a = await sessions.create({ projectId: 'p1', channelId: 'c1', model: 'm1' })
+    const b = await sessions.create({ projectId: 'p1', channelId: 'c1', model: 'm1' })
+    const longHistory = [
+      { role: 'user' as const, content: 'A 的最初需求' },
+      ...Array.from({ length: 30 }, (_, index) => ({
+        role: 'user' as const,
+        content: `A 第 ${index} 条`,
+      })),
+    ]
+    await sessions.saveMessages(a.id, longHistory)
+    await sessions.saveMessages(b.id, [{ role: 'user' as const, content: 'B 的最初需求' }])
+    const turn = await persistAgentUserTurnForSession(sessions, a.id, {
+      content: 'A 继续',
+      display: 'A 继续',
+      imageNodeIds: [],
+      now: 22,
+    })
+    expect(turn.modelWindow[0]?.content).toBe('A 的最初需求')
+    expect(turn.modelWindow).toEqual(modelMessageWindow(longHistory, 20))
+    expect((await sessions.messagesFor(b.id)).map((m) => m.content)).toEqual(['B 的最初需求'])
+    expect(await sessions.contextFor(a.id, 20)).toHaveLength(20)
   })
 
   it('★★ 后台发送 B 时只读取 B 自己的历史，不串入界面上的 A', async () => {
@@ -207,6 +273,8 @@ describe('persistAgentUserTurnBeforeRequest', () => {
     )
 
     expect(persisted.modelWindow.map((message) => message.content)).toEqual([
+      '旧请求',
+      '旧回答',
       '上一句',
     ])
     expect(

@@ -255,6 +255,34 @@ const requestOf = (): TextRunRequest => ({
 })
 
 describe('assembleAgentLoopDeps', () => {
+  it('★★ 轻量档检查点续跑把 sessionBrief 合成一条 system 事实，不复制历史消息', async () => {
+    const h = harness({})
+    const brief = '## 会话状态复原\n原始需求：云岚茶品牌全案'
+    const history: ChatMessage[] = [
+      { role: 'user', content: '继续' },
+      { role: 'assistant', content: '', toolCalls: [{ id: 'call-1', name: 'readGraph', args: '{}' }] },
+      { role: 'tool', content: '{}', toolCallId: 'call-1', toolName: 'readGraph' },
+    ]
+    const request = { ...requestOf(), messages: history }
+    await h.deps.adapter.completeText(request, h.deps.signal)
+    const sent = h.executions.at(-1) as { messages?: ChatMessage[] }
+    expect(sent.messages).toEqual(history)
+
+    const briefDeps = assembleAgentLoopDeps(h.ports, {
+      session,
+      operationId: 'op-brief',
+      toolMode: 'native',
+      turnTools: [tool('readGraph')],
+      abortSignalFor: () => undefined,
+      sessionBrief: brief,
+    })
+    await briefDeps.adapter.completeText(request, briefDeps.signal)
+    const briefSent = h.executions.at(-1) as { messages?: ChatMessage[] }
+    expect(briefSent.messages?.[0]).toEqual({ role: 'system', content: brief })
+    expect(briefSent.messages?.slice(1)).toEqual(history)
+    expect(briefSent.messages?.filter((m) => m.role === 'tool')).toHaveLength(1)
+  })
+
   it('★★ 明确确保过的路由优先于已失效缓存，不允许退回空 channelId', async () => {
     const ensured = {
       ...ROUTE,

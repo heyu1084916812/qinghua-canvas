@@ -1,0 +1,31 @@
+.cardActionIcon:hover,
+.starOn {
+  background: var(--bg-selected);
+  color: var(--text-1);
+}
+
+.cardUse {
+  height: 28px;
+  padding: 0 10px;
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-control);
+  background: var(--accent);
+  color: var(--accent-text);
+  font-family: var(--font-sans);
+  font-size: var(--fs-chip);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.cardUse:disabled {
+  border-color: var(--stroke);
+  background: var(--bg-subtle);
+  color: var(--text-3);
+  cursor: not-allowed;
+}
+
+.detailIconButton:hover,
+.detailIconButton.starOn {
+  background: var(--bg-hover);
+  color: var(--text-1);
+}

@@ -17,6 +17,13 @@ export interface AgentRequestSignals {
   hasSelectedNodes: boolean
   hasSelectedImage: boolean
   hasTaskPlan: boolean
+  /** Deterministic "continue a previous turn" signals; short text alone is enough. */
+  internalControl?: boolean
+  hasActiveContinuation?: boolean
+  hasPendingConfirmation?: boolean
+  hasUnfinishedGeneration?: boolean
+  hasNeedsAttentionJob?: boolean
+  lastAssistantFailed?: boolean
 }
 
 const EMPTY_GRAPH_SUMMARY: GraphSummary = { nodes: [], edges: [] }
@@ -45,6 +52,20 @@ const GENERATION_THEN_LAYOUT_PATTERN =
 const SHORT_CANVAS_ACTION_PATTERN =
   /^(?:帮我)?(?:移动|挪一下|排一下|排列|对齐|布局|整理|缩放|缩一下|调整大小|居中)(?:一下|下|好|整齐)?$/
 
+const CONTINUATION_PATTERN =
+  /^(?:请)?(?:继续|接着|下一步|直接下一步|继续任务|继续当前任务|继续生成|把剩下的(?:做|生成)完|跳过验收(?:直接下一步)?)(?:[，。！？!?\s]|$)/
+
+function resumesUnfinishedTurn(signals: AgentRequestSignals, text: string): boolean {
+  const unfinished = signals.hasActiveContinuation === true ||
+    signals.hasPendingConfirmation === true ||
+    signals.hasUnfinishedGeneration === true ||
+    signals.hasNeedsAttentionJob === true ||
+    signals.lastAssistantFailed === true
+  return CONTINUATION_PATTERN.test(text) ||
+    (signals.internalControl === true && unfinished) ||
+    (unfinished && signals.hasTaskPlan)
+}
+
 /**
  * 描述 / 识别图片是主对话视觉理解，不是验收。只有明确的质检目的才加载
  * visualReview，避免“这个图有什么”被改写成另一项任务。
@@ -66,7 +87,11 @@ function normalizedText(text: string): string {
 
 export function classifyAgentRequest(signals: AgentRequestSignals): AgentRequestMode {
   const text = normalizedText(signals.text)
-  if (signals.hasTaskPlan || MULTI_STAGE_PATTERN.test(text)) {
+  if (
+    signals.hasTaskPlan ||
+    resumesUnfinishedTurn(signals, text) ||
+    MULTI_STAGE_PATTERN.test(text)
+  ) {
     return 'complex_plan'
   }
   if (DESIGN_RESEARCH_PATTERN.test(text)) {

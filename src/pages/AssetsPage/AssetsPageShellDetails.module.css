@@ -1,0 +1,264 @@
+.sectionTitle {
+  margin: 0;
+  font-size: var(--fs-page-title);
+  font-weight: var(--fw-page-title);
+  line-height: var(--lh-page-title);
+  color: var(--sidebar-page-title);
+}
+
+.search {
+  border: var(--border);
+  background: var(--bg-surface);
+  color: var(--text-1);
+  border-radius: var(--radius-control);
+  padding: var(--space-2) var(--space-3);
+  font-size: var(--fs-label);
+  min-width: 240px;
+}
+
+.search:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 1px;
+}
+
+.count {
+  margin: 0;
+  font-size: var(--fs-label);
+  color: var(--text-3);
+}
+
+/*
+ * CSS 多列是最轻量的瀑布流：卡片宽度固定，高度由素材真实比例决定。
+ * 卡片不再承载文字信息，图片完整显示，因此不会出现 cover 裁切。
+ */
+
+/*
+ * 最短列堆砌（对账 #502，用户 2026-10-14 第 4 条）。
+ *
+ * 上面那条 `columns: 240px` 保留为 **SSR / 测量前 / 无 JS 的兜底**；
+ * `MasonryGrid` 量完宽高后把容器切到 `data-masonry="on"`：
+ * 容器不再走多列，卡片由内联 `left/top` 绝对定位，容器高度由 JS 给。
+ *
+ * ⚠️ `masonryLayout.ts` 里的 240 / 20 与这两条是同一口径（CSS 没有"把计算值
+ * 传给 JS"的通道，改这里时两处一起改；`.masonryItem` 的兜底多列也靠这里的列宽）。
+ */
+
+/* 兜底多列模式下，整张卡不许被从中间切开（原来这条在 `.card` 上） */
+
+/* 堆砌模式：卡片是绝对定位项 */
+
+/* 间距由布局算法的 gap 负责；卡片自身的 margin 不清掉会叠成 40px */
+
+.grid[data-masonry='on'] .card,
+.grid[data-masonry='on'] .failedCard {
+  margin-bottom: 0;
+}
+
+.marquee {
+  position: fixed;
+  z-index: 60;
+  border: 1px solid var(--accent);
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  pointer-events: none;
+}
+
+.empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-8) 0;
+  color: var(--text-2);
+  text-align: center;
+}
+
+.emptyTitle {
+  margin: 0;
+  font-size: var(--fs-panel-title);
+  font-weight: var(--fw-panel-title);
+  color: var(--text-1);
+}
+
+.emptyHint {
+  margin: 0;
+  font-size: var(--fs-label);
+}
+
+.status {
+  width: 100%;
+  max-width: 1520px;
+  margin-inline: auto;
+  box-sizing: border-box;
+  /* `.page` 这一列 flex 的固定一行：不参与伸缩（对账 #291 三排之外的播报行） */
+  flex: none;
+  min-height: var(--space-5);
+  padding: 0 var(--space-6) var(--space-6);
+  font-size: var(--fs-label);
+  color: var(--text-2);
+}
+
+.status:empty {
+  display: none;
+}
+
+.backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1;
+}
+
+.removeDialog {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  z-index: 50;
+  width: min(420px, calc(100vw - var(--space-8)));
+  box-sizing: border-box;
+  padding: var(--space-5);
+  border: var(--border);
+  border-radius: var(--radius-node);
+  background: var(--bg-surface);
+  box-shadow: var(--shadow-float);
+  transform: translate(-50%, -50%);
+}
+
+.removeTitle {
+  margin: 0;
+  color: var(--text-1);
+  font-size: var(--fs-panel-title);
+  font-weight: var(--fw-panel-title);
+}
+
+.removeHint {
+  margin: var(--space-2) 0 var(--space-5);
+  color: var(--text-2);
+  font-size: var(--fs-label);
+  line-height: 1.6;
+}
+
+.removeActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
+}
+
+/* 色块 + 那枚"已复制"对勾的定位盒（对账 #290）：对勾绝对定位 ⇒ 不占排版 */
+
+@keyframes swatchCheckIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/*
+ * 复制成功的反馈（对账 #290）：**只加一圈内描边**，不加内边距、不改文字 ——
+ * 任何改变盒子尺寸的写法都会让整块跳一下（那正是用户报的"排版一直变"）。
+ */
+
+/* 提示词那一段：块 + 右上角那枚复制按钮（按钮浮在块的上方，不占排版） */
+
+/*
+ * 标签区（对账 #303）。
+ *
+ * 与 `metaGrid` 那两张卡同一套语言（`--bg-subtle` 底 + `--border` 描边 + 同一圆角），
+ * 但**不放进 `metaGrid`**：那里是"这张图的参数"，这里是"我的整理"——两件不同的事。
+ */
+
+@keyframes previewIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.99);
+  }
+}
+
+@media (max-width: 680px) {
+  .main {
+    padding-inline: var(--space-4);
+  }
+  .sectionHead {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .tools {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+  .search {
+    flex: 1 1 180px;
+  }
+  .overlay {
+    padding: var(--space-4);
+  }
+  .previewPanel {
+    height: calc(100svh - var(--space-4) - var(--space-4));
+  }
+  .metaGrid {
+    grid-template-columns: 1fr;
+  }
+  .metaItemWide {
+    grid-column: auto;
+  }
+}
+
+.chipCount {
+  margin-left: var(--space-1);
+  color: var(--text-3);
+  font-size: var(--fs-chip);
+}
+
+.tools {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.filters {
+  display: inline-flex;
+  gap: var(--space-1);
+  padding: var(--space-1);
+  border: var(--border);
+  border-radius: var(--radius-control);
+  background: var(--bg-subtle);
+}
+
+.chip {
+  box-sizing: border-box;
+  border: 1px solid transparent;
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--text-2);
+  padding: var(--space-1) var(--space-3);
+  font-size: var(--fs-label);
+  font-weight: var(--fw-title);
+  cursor: pointer;
+  transition:
+    background var(--dur-hover) var(--ease-out),
+    border-color var(--dur-hover) var(--ease-out),
+    color var(--dur-hover) var(--ease-out);
+}
+
+.chip:hover {
+  color: var(--text-1);
+  background: var(--bg-hover);
+}
+
+.chip:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 1px;
+}
+
+.chipOn {
+  background: var(--bg-surface);
+  color: var(--text-1);
+  /* 同上：选中只靠填充，不描边 */
+  border-color: transparent;
+  box-shadow: none;
+}
+
+.dangerGhost {
+  color: var(--danger);
+}

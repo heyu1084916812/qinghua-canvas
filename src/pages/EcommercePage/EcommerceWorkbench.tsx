@@ -11,77 +11,42 @@ import {
 import type {
   EcommerceCanvasItem,
 } from '../../domain/ecommerce/canvasItem'
-import {
-  findFreeWorkbenchPosition,
-  snapWorkbenchMove,
-} from '../../domain/ecommerce/canvasItem'
-import {
-  freshestResultsById,
-  resultDisplayStatus,
-  type EcommerceDisplayResultStatus,
-  type EcommerceResultRecord,
-  type EcommerceTaskRecord,
+import type {
+  EcommerceDisplayResultStatus,
+  EcommerceResultRecord,
+  EcommerceTaskRecord,
 } from '../../domain/ecommerce/tasks'
 import type { RunRecord } from '../../domain/shared/execution/runRecord'
-import {
-  pixelSummaryOf,
-  routeAttemptSummaryOf,
-} from '../../domain/shared/execution/runRecord'
-import {
-  screenToWorld as canvasScreenToWorld,
-  type Viewport as CanvasViewport,
-} from '../../domain/shared/geometry/coords'
-import { fitViewport, panBy, zoomAt } from '../../domain/shared/geometry/transform'
+import { fitViewport as fitCanvasViewport, panBy, zoomAt } from '../../domain/shared/geometry/transform'
 import { createId } from '../../shared/id'
-import { workbenchBlankDragIntent } from '../../domain/ecommerce/workbenchGesture'
-import {
-  useAssetMeta,
-  useAssetPreview,
-} from '../../features/shared/assets/index'
 import styles from './EcommerceWorkbench.module.css'
+import { pixelSummaryOf, routeAttemptSummaryOf } from '../../domain/shared/execution/runRecord'
+import { projectWorkbenchResults } from './workbenchResultProjection'
+import {
+  marqueeSelectionIds,
+  movedWorkbenchItems,
+  nextWorkbenchObjectPosition,
+  resizedWorkbenchItems,
+  rotatedWorkbenchItems,
+  selectedWorkbenchActions,
+  workbenchBlankInteraction,
+  workbenchMarqueeSelection,
+  workbenchMoveInteraction,
+  workbenchPointerBox,
+  workbenchResizeInteraction,
+  workbenchRotateInteraction,
+  type WorkbenchAction,
+  type WorkbenchInteraction,
+} from './workbench/workbenchInteraction'
+import { workbenchDisplayStatusOf } from './ecommercePage/pageResultProjection'
 
-type WorkbenchTool = 'select' | 'hand'
-type ResizeHandle = 'nw' | 'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w'
-
-interface Viewport {
-  x: number
-  y: number
-  scale: number
-}
-
-interface Point {
-  x: number
-  y: number
-}
-
-interface Interaction {
-  kind: 'move' | 'resize' | 'rotate' | 'pan' | 'marquee'
-  itemId?: string
-  handle?: ResizeHandle
-  startClient: Point
-  startViewport: Viewport
-  startItem?: EcommerceCanvasItem
-  startItems?: EcommerceCanvasItem[]
-  startWorld: Point
-  center?: Point
-  startAngle?: number
-  additive?: boolean
-  button?: number
-  moved: boolean
-}
-
-export type EcommerceWorkbenchAction =
-  | 'download'
-  | 'save'
-  | 'retry'
-
+export type EcommerceWorkbenchAction = WorkbenchAction
 interface EcommerceWorkbenchProps {
   projectId: string
   items: readonly EcommerceCanvasItem[]
   results: readonly EcommerceResultRecord[]
   tasks: readonly EcommerceTaskRecord[]
   runs?: readonly RunRecord[]
-  /** 当前活跃批次，用于兼容既有失败卡与结果状态锚点。 */
   activeResults?: readonly EcommerceResultRecord[]
   running?: boolean
   availableActions?: readonly EcommerceWorkbenchAction[]
@@ -91,338 +56,27 @@ interface EcommerceWorkbenchProps {
   onRemoveFailed?: (resultId: string) => void
   channelLabelOf?: (channelId: string) => string
 }
-
 const MIN_SCALE = 0.1
 const MAX_SCALE = 4
 const MIN_ITEM_SIZE = 96
-const MINIMAP_WIDTH = 184
-const MINIMAP_HEIGHT = 112
 const MINIMAP_PADDING = 9
+import {
+  ToolIcon,
+  WorkbenchMedia,
+  WorkbenchResultPlaceholder,
+  elapsedLabel,
+  type WorkbenchTool,
+} from './EcommerceWorkbenchViews'
+import {
+  clamp,
+  fromCanvasViewport,
+  itemScreenRect,
+  toCanvasViewport,
+  workbenchMinimapModel,
+  type Viewport,
+} from './workbenchGeometry'
+import type { Point, ResizeHandle } from './workbenchGeometry'
 
-function clamp(value: number, min: number, max: number): number {
-  return Math.min(Math.max(value, min), max)
-}
-
-function toCanvasViewport(viewport: Viewport): CanvasViewport {
-  return {
-    x: -viewport.x / viewport.scale,
-    y: -viewport.y / viewport.scale,
-    zoom: viewport.scale,
-  }
-}
-
-function fromCanvasViewport(viewport: CanvasViewport): Viewport {
-  return {
-    x: -viewport.x * viewport.zoom,
-    y: -viewport.y * viewport.zoom,
-    scale: viewport.zoom,
-  }
-}
-
-function screenToWorkbenchWorld(
-  point: Point,
-  viewport: Viewport,
-  rect: DOMRect,
-): Point {
-  return canvasScreenToWorld(point, toCanvasViewport(viewport), {
-    x: rect.left,
-    y: rect.top,
-    w: rect.width,
-    h: rect.height,
-  })
-}
-
-function itemScreenRect(item: EcommerceCanvasItem, viewport: Viewport): {
-  left: number
-  top: number
-  width: number
-  height: number
-} {
-  return {
-    left: viewport.x + item.x * viewport.scale,
-    top: viewport.y + item.y * viewport.scale,
-    width: item.width * viewport.scale,
-    height: item.height * viewport.scale,
-  }
-}
-
-function ToolIcon({ name }: { name: WorkbenchTool | 'upload' | 'text' | 'undo' | 'redo' | 'log' | 'close' | 'download' | 'rotate' | 'save' | 'retry' }) {
-  const common = {
-    width: 17,
-    height: 17,
-    viewBox: '0 0 24 24',
-    fill: 'none',
-    stroke: 'currentColor',
-    strokeWidth: 1.8,
-    strokeLinecap: 'round' as const,
-    strokeLinejoin: 'round' as const,
-    'aria-hidden': true,
-  }
-  if (name === 'select') {
-    return <svg {...common}><path d="m5 3 11 8-5.2 1.3L8 18Z" /><path d="m12.5 14 3.2 5" /></svg>
-  }
-  if (name === 'hand') {
-    return <svg {...common}><path d="M7 11V6.5a1.5 1.5 0 0 1 3 0V11" /><path d="M10 10V5.5a1.5 1.5 0 0 1 3 0V11" /><path d="M13 10V7a1.5 1.5 0 0 1 3 0v4" /><path d="M16 11V9a1.5 1.5 0 0 1 3 0v5a6 6 0 0 1-6 6h-1.2a5 5 0 0 1-3.3-1.2L5 15.5a1.6 1.6 0 0 1 2.2-2.3L9 15" /></svg>
-  }
-  if (name === 'upload') {
-    return <svg {...common}><path d="M12 16V4" /><path d="m7.5 8.5 4.5-4.5 4.5 4.5" /><path d="M4 15v4a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-4" /></svg>
-  }
-  if (name === 'text') {
-    return <svg {...common}><path d="M5 5h14" /><path d="M12 5v14" /><path d="M8 19h8" /></svg>
-  }
-  if (name === 'undo' || name === 'redo') {
-    return <svg {...common}><path d={name === 'undo' ? 'M9 7 4 12l5 5' : 'm15 7 5 5-5 5'} /><path d={name === 'undo' ? 'M4 12h9a6 6 0 0 1 6 6' : 'M20 12h-9a6 6 0 0 0-6 6'} /></svg>
-  }
-  if (name === 'log') {
-    return <svg {...common}><path d="M5 4h14v16H5z" /><path d="M8 8h8M8 12h8M8 16h5" /></svg>
-  }
-  if (name === 'close') {
-    return <svg {...common}><path d="m6 6 12 12M18 6 6 18" /></svg>
-  }
-  if (name === 'download') {
-    return <svg {...common}><path d="M12 4v11" /><path d="m7.5 10.5 4.5 4.5 4.5-4.5" /><path d="M5 19h14" /></svg>
-  }
-  if (name === 'rotate') {
-    return <svg {...common}><path d="M20 11a8 8 0 1 0-2.4 5.7" /><path d="M20 5v6h-6" /></svg>
-  }
-  if (name === 'retry') {
-    return <svg {...common}><path d="M20 11a8 8 0 1 0-2.4 5.7" /><path d="M20 5v6h-6" /></svg>
-  }
-  return <svg {...common}><path d="M5 4h14v16l-7-3-7 3z" /></svg>
-}
-
-type WorkbenchMediaSource = 'preview' | 'original'
-
-interface DisplayedWorkbenchImage {
-  hash: string
-  url: string
-  source: WorkbenchMediaSource
-}
-
-function WorkbenchMedia({ item, original }: { item: EcommerceCanvasItem; original: boolean }) {
-  const previewMeta = useAssetPreview(item.assetHash)
-  const [previewFailedUrl, setPreviewFailedUrl] = useState<string | null>(null)
-  const [originalFailedUrl, setOriginalFailedUrl] = useState<string | null>(null)
-  const [displayedImage, setDisplayedImage] = useState<DisplayedWorkbenchImage | null>(null)
-  const [videoLoadedUrl, setVideoLoadedUrl] = useState<string | null>(null)
-
-  /*
-   * 与画布节点一致：预览先顶住，原图只在选中或预览不可用时补读。
-   * 选中时绝不先撤掉预览，否则 src 切换与原图解码之间会出现一帧空白。
-   */
-  const previewUrl =
-    previewMeta.url && previewMeta.url !== previewFailedUrl ? previewMeta.url : null
-  const needOriginal = original || !!previewFailedUrl || previewMeta.missing === true
-  const originalMeta = useAssetMeta(needOriginal ? item.assetHash : undefined)
-  const originalUrl =
-    originalMeta.url && originalMeta.url !== originalFailedUrl ? originalMeta.url : null
-  const candidateUrl = originalUrl ?? previewUrl
-  const candidateSource: WorkbenchMediaSource | null =
-    candidateUrl && candidateUrl === originalUrl ? 'original' : candidateUrl ? 'preview' : null
-  const isVideo =
-    item.kind === 'video' ||
-    originalMeta.mime?.startsWith('video/') ||
-    previewMeta.mime?.startsWith('video/')
-
-  /*
-   * 图片先在脱离 DOM 的 Image 里完成解码，成功后一次替换 displayedImage。
-   * 这样原图到达时，页面仍显示已解码的预览；新图已经可绘制时才切过去，
-   * 不会出现“原图 src 已换、但还没解码”的白帧。
-   */
-  useEffect(() => {
-    if (isVideo || !item.assetHash || !candidateUrl || !candidateSource) return
-    if (
-      displayedImage?.hash === item.assetHash &&
-      displayedImage.url === candidateUrl
-    ) {
-      return
-    }
-    let alive = true
-    const probe = new Image()
-    probe.decoding = 'async'
-    probe.onload = () => {
-      if (!alive) return
-      setDisplayedImage({
-        hash: item.assetHash!,
-        url: candidateUrl,
-        source: candidateSource,
-      })
-    }
-    probe.onerror = () => {
-      if (!alive) return
-      if (candidateSource === 'preview') setPreviewFailedUrl(candidateUrl)
-      else setOriginalFailedUrl(candidateUrl)
-    }
-    probe.src = candidateUrl
-    return () => {
-      alive = false
-      probe.onload = null
-      probe.onerror = null
-    }
-  }, [candidateSource, candidateUrl, displayedImage, isVideo, item.assetHash])
-
-  const displayed =
-    displayedImage?.hash === item.assetHash ? displayedImage : null
-  const source = isVideo ? candidateSource : displayed?.source ?? null
-  const loaded = isVideo ? !!candidateUrl && videoLoadedUrl === candidateUrl : !!displayed
-  const previewUnavailable = !!previewFailedUrl || previewMeta.missing === true
-  const originalUnavailable = !!originalFailedUrl || originalMeta.missing === true
-  const missing =
-    !displayed &&
-    !candidateUrl &&
-    needOriginal &&
-    previewUnavailable &&
-    originalUnavailable
-
-  if (!item.assetHash) return <span className={styles.missing}>素材不存在</span>
-  if (missing) {
-    const expectedPath = originalMeta.expectedPath ?? previewMeta.expectedPath
-    return (
-      <span className={styles.mediaMissing} data-ecommerce-media-missing>
-        <span className={styles.mediaMissingTitle}>素材缺失</span>
-        {expectedPath ? (
-          <span className={styles.mediaMissingPath} title={expectedPath}>
-            {expectedPath}
-          </span>
-        ) : null}
-      </span>
-    )
-  }
-
-  if (isVideo) {
-    return (
-      <span
-        className={styles.mediaStage}
-        aria-busy={!loaded}
-        data-ecommerce-media-state={loaded ? 'ready' : candidateUrl ? 'loading' : 'pending'}
-      >
-        {candidateUrl ? (
-          <video
-            className={loaded ? `${styles.media} ${styles.mediaReady}` : styles.media}
-            src={candidateUrl}
-            controls
-            playsInline
-            preload="metadata"
-            data-ecommerce-media-source={source}
-            onLoadedData={() => setVideoLoadedUrl(candidateUrl)}
-            onError={() => {
-              if (source === 'preview') setPreviewFailedUrl(candidateUrl)
-              else if (source === 'original') setOriginalFailedUrl(candidateUrl)
-              setVideoLoadedUrl(null)
-            }}
-            onPointerDown={(event) => event.stopPropagation()}
-          />
-        ) : null}
-        {!loaded ? <span className={styles.mediaPending} data-ecommerce-media-loading /> : null}
-        <span className={styles.srOnly} aria-live="polite">
-          {loaded ? '媒体已载入' : '正在载入媒体'}
-        </span>
-      </span>
-    )
-  }
-
-  return (
-    <span
-      className={styles.mediaStage}
-      aria-busy={!displayed}
-      data-ecommerce-media-state={displayed ? 'ready' : candidateUrl ? 'loading' : 'pending'}
-    >
-      {displayed ? (
-        <img
-          className={`${styles.media} ${styles.mediaReady}`}
-          src={displayed.url}
-          alt=""
-          draggable={false}
-          data-ecommerce-media-source={displayed.source}
-        />
-      ) : null}
-      {!displayed ? <span className={styles.mediaPending} data-ecommerce-media-loading /> : null}
-      <span className={styles.srOnly} aria-live="polite">
-        {displayed ? '图片已载入' : '正在载入图片'}
-      </span>
-    </span>
-  )
-}
-
-function elapsedLabel(task: EcommerceTaskRecord): string {
-  const ms = Math.max(0, task.updatedAt - task.createdAt)
-  if (ms < 1000) return '<1s'
-  return `${Math.round(ms / 1000)}s`
-}
-
-function WorkbenchResultPlaceholder({
-  result,
-  status,
-  errorText,
-  onRetry,
-  onRemove,
-}: {
-  result: EcommerceResultRecord
-  status: EcommerceDisplayResultStatus
-  errorText: string
-  onRetry?: () => void
-  onRemove?: () => void
-}) {
-  const [seconds, setSeconds] = useState(0)
-  useEffect(() => {
-    if (status !== 'running') return
-    const started = result.createdAt || Date.now()
-    const timer = window.setInterval(() => {
-      setSeconds(Math.max(0, Math.floor((Date.now() - started) / 1000)))
-    }, 500)
-    return () => window.clearInterval(timer)
-  }, [result.createdAt, status])
-  if (status === 'failed') {
-    return (
-      <div
-        className={styles.resultFailure}
-        data-ecommerce-result-overlay="failed"
-        role="alert"
-      >
-        <strong>生成失败</strong>
-        <small data-ecommerce-result-error>{errorText}</small>
-        <div className={styles.resultFailureActions}>
-          {onRetry ? (
-            <button
-              type="button"
-              data-ecommerce-retry-failed={result.nodeId}
-              onPointerDown={(event) => event.stopPropagation()}
-              onClick={(event) => {
-                event.stopPropagation()
-                onRetry()
-              }}
-            >
-              重新生成
-            </button>
-          ) : null}
-          {onRemove ? (
-            <button
-              type="button"
-              data-ecommerce-remove-failed={result.nodeId}
-              onPointerDown={(event) => event.stopPropagation()}
-              onClick={(event) => {
-                event.stopPropagation()
-                onRemove()
-              }}
-            >
-              移除记录
-            </button>
-          ) : null}
-        </div>
-      </div>
-    )
-  }
-  return (
-    <div
-      className={styles.resultRunning}
-      data-ecommerce-result-overlay="running"
-      aria-live="polite"
-    >
-      <span className={styles.runningOrbit} data-ecommerce-result-orbit aria-hidden />
-      <span data-ecommerce-result-elapsed={seconds}>生成中 {seconds}s</span>
-    </div>
-  )
-}
 
 export function EcommerceWorkbench({
   projectId,
@@ -442,7 +96,7 @@ export function EcommerceWorkbench({
   const viewportRef = useRef<HTMLDivElement | null>(null)
   const actionPanelRef = useRef<HTMLElement | null>(null)
   const fileRef = useRef<HTMLInputElement | null>(null)
-  const interactionRef = useRef<Interaction | null>(null)
+  const interactionRef = useRef<WorkbenchInteraction | null>(null)
   const undoRef = useRef<EcommerceCanvasItem[][]>([])
   const redoRef = useRef<EcommerceCanvasItem[][]>([])
   const textEditHistoryRef = useRef(new Set<string>())
@@ -542,22 +196,11 @@ export function EcommerceWorkbench({
     return () => node.removeEventListener('wheel', onWheel)
   }, [])
 
-  /** 数据库回读与内存实时结果按 updatedAt 取新，避免旧 running 覆盖对账后的 done。 */
-  const latestResultById = useMemo(
-    () => freshestResultsById(results, activeResults),
-    [activeResults, results],
+  const projection = useMemo(
+    () => projectWorkbenchResults(results, activeResults, tasks, runs),
+    [activeResults, results, runs, tasks],
   )
-  const taskById = useMemo(
-    () => new Map(tasks.map((task) => [task.id, task] as const)),
-    [tasks],
-  )
-  const latestRunByNode = useMemo(() => {
-    const byNode = new Map<string, RunRecord>()
-    for (const run of [...runs].sort((a, b) => b.createdAt - a.createdAt)) {
-      if (!byNode.has(run.nodeId)) byNode.set(run.nodeId, run)
-    }
-    return byNode
-  }, [runs])
+  const { latestResultById, taskById, latestRunByNode } = projection
   const selectedItems = localItems.filter((item) => selectedIds.has(item.id))
   const selected = selectedItems.length === 1 ? selectedItems[0]! : null
   const selectedResult = selected?.resultId
@@ -566,26 +209,11 @@ export function EcommerceWorkbench({
 
   const displayStatusOf = useCallback(
     (result: EcommerceResultRecord): EcommerceDisplayResultStatus => {
-      const run = latestRunByNode.get(result.nodeId)
-      if (result.status === 'running' && (!run || result.updatedAt >= run.createdAt)) return 'running'
-      if (run?.status === 'failed' || run?.status === 'canceled') return 'failed'
-      if (run?.status === 'succeeded') return result.assetHash ? 'done' : 'failed'
-      const task = taskById.get(result.taskId)
-      const terminal =
-        task &&
-        (task.status === 'done' ||
-          task.status === 'partial' ||
-          task.status === 'failed' ||
-          task.status === 'canceled')
-      if (
-        terminal &&
-        (result.status === 'pending' || result.status === 'running')
-      ) {
-        return result.assetHash ? 'done' : 'failed'
-      }
-      return resultDisplayStatus({
-        stored: result.status,
-        hasAsset: Boolean(result.assetHash),
+      return workbenchDisplayStatusOf(result, {
+        ...(latestRunByNode.get(result.nodeId)
+          ? { run: latestRunByNode.get(result.nodeId) }
+          : {}),
+        ...(taskById.get(result.taskId) ? { task: taskById.get(result.taskId) } : {}),
       })
     },
     [latestRunByNode, taskById],
@@ -598,7 +226,7 @@ export function EcommerceWorkbench({
     }
     const rect = viewportRef.current.getBoundingClientRect()
     setViewport(fromCanvasViewport(
-      fitViewport(
+      fitCanvasViewport(
         localItems.map((item) => ({
           x: item.x,
           y: item.y,
@@ -616,7 +244,7 @@ export function EcommerceWorkbench({
     if (!viewportRef.current || targets.length === 0) return
     const rect = viewportRef.current.getBoundingClientRect()
     setViewport(fromCanvasViewport(
-      fitViewport(
+      fitCanvasViewport(
         targets.map((item) => ({
           x: item.x,
           y: item.y,
@@ -722,32 +350,19 @@ export function EcommerceWorkbench({
     event.stopPropagation()
     const rect = viewportRef.current?.getBoundingClientRect()
     if (!rect) return
-    const additive = event.shiftKey
-    let nextSelection: Set<string>
-    if (additive) {
-      nextSelection = new Set(selectedIds)
-      if (nextSelection.has(item.id)) nextSelection.delete(item.id)
-      else nextSelection.add(item.id)
-    } else {
-      nextSelection = selectedIds.has(item.id)
-        ? new Set(selectedIds)
-        : new Set([item.id])
-    }
+    const move = workbenchMoveInteraction({
+      event,
+      item,
+      selectedIds,
+      additive: event.shiftKey,
+      items: localItemsRef.current,
+      viewport,
+      rect,
+    })
+    const nextSelection = move.selection
     setSelectedIds(nextSelection)
     if (!nextSelection.has(item.id)) return
-    const movingItems = localItemsRef.current.filter((candidate) =>
-      nextSelection.has(candidate.id),
-    )
-    interactionRef.current = {
-      kind: 'move',
-      itemId: item.id,
-      startClient: { x: event.clientX, y: event.clientY },
-      startViewport: viewport,
-      startItem: item,
-      startItems: movingItems,
-      startWorld: screenToWorkbenchWorld({ x: event.clientX, y: event.clientY }, viewport, rect),
-      moved: false,
-    }
+    interactionRef.current = move.interaction
     event.currentTarget.setPointerCapture?.(event.pointerId)
   }
 
@@ -762,16 +377,7 @@ export function EcommerceWorkbench({
     setGuides({ x: null, y: null })
     const rect = viewportRef.current?.getBoundingClientRect()
     if (!rect) return
-    interactionRef.current = {
-      kind: 'resize',
-      itemId: item.id,
-      handle,
-      startClient: { x: event.clientX, y: event.clientY },
-      startViewport: viewport,
-      startItem: item,
-      startWorld: screenToWorkbenchWorld({ x: event.clientX, y: event.clientY }, viewport, rect),
-      moved: false,
-    }
+    interactionRef.current = workbenchResizeInteraction({ event, item, handle, viewport, rect })
     event.currentTarget.setPointerCapture?.(event.pointerId)
   }
 
@@ -780,69 +386,34 @@ export function EcommerceWorkbench({
     setSelectedIds(new Set([item.id]))
     const rect = viewportRef.current?.getBoundingClientRect()
     if (!rect) return
-    const world = screenToWorkbenchWorld({ x: event.clientX, y: event.clientY }, viewport, rect)
-    const center = { x: item.x + item.width / 2, y: item.y + item.height / 2 }
-    interactionRef.current = {
-      kind: 'rotate',
-      itemId: item.id,
-      startClient: { x: event.clientX, y: event.clientY },
-      startViewport: viewport,
-      startItem: item,
-      startWorld: world,
-      center,
-      startAngle: Math.atan2(world.y - center.y, world.x - center.x) - (item.rotation * Math.PI) / 180,
-      moved: false,
-    }
+    interactionRef.current = workbenchRotateInteraction({ event, item, viewport, rect })
     event.currentTarget.setPointerCapture?.(event.pointerId)
   }
 
   const beginPan = (event: ReactPointerEvent<HTMLDivElement>) => {
     const target = event.target as HTMLElement
-    const blank = !target.closest(
+    const isBlank = !target.closest(
       '[data-ecommerce-workbench-item], [data-ecommerce-action-panel], [data-ecommerce-workbench-toolbar], [data-ecommerce-workbench-log], [data-ecommerce-workbench-zoom], [data-ecommerce-workbench-minimap], button',
     )
-    if (!blank) return
-    const intent = workbenchBlankDragIntent({
-      button: event.button,
+    if (!isBlank || !viewportRef.current) return
+    const blank = workbenchBlankInteraction({
+      event,
       tool,
       spaceHeld,
-      ctrlKey: event.ctrlKey,
-      metaKey: event.metaKey,
+      viewport,
+      rect: viewportRef.current.getBoundingClientRect(),
     })
-    if (intent === 'none') return
+    if (!blank) return
     event.preventDefault()
     setEditingTextId(null)
-    if (intent === 'marquee') {
-      const rect = viewportRef.current?.getBoundingClientRect()
-      if (!rect) return
-      const box = {
-        left: event.clientX - rect.left,
-        top: event.clientY - rect.top,
-        width: 0,
-        height: 0,
-      }
-      selectionBoxRef.current = box
-      setSelectionBox(box)
-      interactionRef.current = {
-        kind: 'marquee',
-        startClient: { x: event.clientX, y: event.clientY },
-        startViewport: viewport,
-        startWorld: { x: 0, y: 0 },
-        additive: event.shiftKey,
-        button: event.button,
-        moved: false,
-      }
+    if (blank.selectionBox) {
+      selectionBoxRef.current = blank.selectionBox
+      setSelectionBox(blank.selectionBox)
+      interactionRef.current = blank.interaction
       event.currentTarget.setPointerCapture?.(event.pointerId)
       return
     }
-    interactionRef.current = {
-      kind: 'pan',
-      startClient: { x: event.clientX, y: event.clientY },
-      startViewport: viewport,
-      startWorld: { x: 0, y: 0 },
-      button: event.button,
-      moved: false,
-    }
+    interactionRef.current = blank.interaction
     event.currentTarget.setPointerCapture?.(event.pointerId)
   }
 
@@ -853,19 +424,14 @@ export function EcommerceWorkbench({
     setGuides({ x: null, y: null })
     if (interaction.kind === 'marquee') {
       const box = selectionBoxRef.current
-      const next = interaction.moved && box
-        ? localItemsRef.current.filter((item) => {
-            const screen = itemScreenRect(item, interaction.startViewport)
-            return (
-              screen.left + screen.width >= box.left &&
-              screen.left <= box.left + box.width &&
-              screen.top + screen.height >= box.top &&
-              screen.top <= box.top + box.height
-            )
-          }).map((item) => item.id)
-        : []
+      const next = marqueeSelectionIds(
+        localItemsRef.current,
+        interaction.startViewport,
+        box,
+        interaction.moved,
+      )
       setSelectedIds((current) =>
-        new Set(interaction.additive ? [...current, ...next] : next),
+        workbenchMarqueeSelection(current, next, interaction.additive === true),
       )
       setSelectionBox(null)
       selectionBoxRef.current = null
@@ -895,21 +461,8 @@ export function EcommerceWorkbench({
     ) {
       return
     }
-    const world = screenToWorkbenchWorld(
-      { x: event.clientX, y: event.clientY },
-      interaction.startViewport,
-      rect,
-    )
-    const angle =
-      (Math.atan2(world.y - interaction.center.y, world.x - interaction.center.x) -
-        (interaction.startAngle ?? 0)) *
-      (180 / Math.PI)
     interaction.moved = true
-    updateLocalItems((current) =>
-      current.map((candidate) =>
-        candidate.id === interaction.itemId ? { ...candidate, rotation: angle } : candidate,
-      ),
-    )
+    updateLocalItems((current) => rotatedWorkbenchItems(interaction, current, event, rect))
   }
 
   useEffect(() => {
@@ -928,97 +481,27 @@ export function EcommerceWorkbench({
       const rect = viewportRef.current?.getBoundingClientRect()
       if (interaction.kind === 'marquee') {
         if (!rect) return
-        const left = Math.min(interaction.startClient.x, event.clientX) - rect.left
-        const top = Math.min(interaction.startClient.y, event.clientY) - rect.top
-        const box = {
-          left,
-          top,
-          width: Math.abs(event.clientX - interaction.startClient.x),
-          height: Math.abs(event.clientY - interaction.startClient.y),
-        }
+        const box = workbenchPointerBox(interaction, event, rect)
         selectionBoxRef.current = box
         setSelectionBox(box)
         return
       }
       if (!rect || !interaction.startItem || !interaction.itemId) return
-      const item = interaction.startItem
       if (interaction.kind === 'move') {
-        const world = screenToWorkbenchWorld({ x: event.clientX, y: event.clientY }, interaction.startViewport, rect)
-        const rawX = item.x + world.x - interaction.startWorld.x
-        const rawY = item.y + world.y - interaction.startWorld.y
-        const snapped = snapWorkbenchMove(
-          item,
-          rawX,
-          rawY,
-          localItemsRef.current.filter(
-            (candidate) => !interaction.startItems?.some((moving) => moving.id === candidate.id),
-          ),
-          interaction.startViewport.scale,
-        )
-        setGuides(snapped.guides)
-        const deltaX = snapped.x - item.x
-        const deltaY = snapped.y - item.y
-        const moving = new Map(
-          (interaction.startItems ?? [item]).map((candidate) => [candidate.id, candidate] as const),
-        )
-        updateLocalItems((current) =>
-          current.map((candidate) =>
-            moving.has(candidate.id)
-              ? {
-                  ...candidate,
-                  x: moving.get(candidate.id)!.x + deltaX,
-                  y: moving.get(candidate.id)!.y + deltaY,
-                  autoLayout: false,
-                }
-              : candidate,
-          ),
-        )
+        updateLocalItems((current) => {
+          const next = movedWorkbenchItems(interaction, current, event, rect)
+          setGuides(next.guides)
+          return next.items
+        })
         return
       }
       if (interaction.kind === 'rotate' && interaction.center) {
-        const world = screenToWorkbenchWorld({ x: event.clientX, y: event.clientY }, interaction.startViewport, rect)
-        const angle =
-          (Math.atan2(world.y - interaction.center.y, world.x - interaction.center.x) -
-            (interaction.startAngle ?? 0)) *
-          (180 / Math.PI)
-        updateLocalItems((current) =>
-          current.map((candidate) =>
-            candidate.id === item.id ? { ...candidate, rotation: angle } : candidate,
-          ),
-        )
+        updateLocalItems((current) => rotatedWorkbenchItems(interaction, current, event, rect))
         return
       }
       if (interaction.kind === 'resize' && interaction.handle) {
-        const world = screenToWorkbenchWorld({ x: event.clientX, y: event.clientY }, interaction.startViewport, rect)
-        const handle = interaction.handle
-        const aspect = item.width / Math.max(1, item.height)
-        let width = item.width
-        let height = item.height
-        let x = item.x
-        let y = item.y
-        if (handle.includes('e')) width = Math.max(MIN_ITEM_SIZE, item.width + world.x - interaction.startWorld.x)
-        if (handle.includes('s')) height = Math.max(MIN_ITEM_SIZE, item.height + world.y - interaction.startWorld.y)
-        if (handle.includes('w')) {
-          width = Math.max(MIN_ITEM_SIZE, item.width - (world.x - interaction.startWorld.x))
-          x = item.x + item.width - width
-        }
-        if (handle.includes('n')) {
-          height = Math.max(MIN_ITEM_SIZE, item.height - (world.y - interaction.startWorld.y))
-          y = item.y + item.height - height
-        }
-        if (handle.length === 2 && item.aspectLocked) {
-          const scale = Math.max(width / item.width, height / item.height)
-          width = Math.max(MIN_ITEM_SIZE, item.width * scale)
-          height = width / aspect
-          if (handle.includes('w')) x = item.x + item.width - width
-          if (handle.includes('n')) y = item.y + item.height - height
-        }
         updateLocalItems((current) =>
-          current.map((candidate) =>
-            candidate.id === item.id
-              ? { ...candidate, x, y, width, height, autoLayout: false }
-              : candidate,
-          ),
+          resizedWorkbenchItems(interaction, current, event, rect, MIN_ITEM_SIZE),
         )
       }
     }
@@ -1034,19 +517,12 @@ export function EcommerceWorkbench({
   })
 
   const nextObjectPosition = (width: number, height: number): Point => {
-    const rect = viewportRef.current?.getBoundingClientRect()
-    const center = rect
-      ? screenToWorkbenchWorld(
-          { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 },
-          viewport,
-          rect,
-        )
-      : { x: 160, y: 120 }
-    return findFreeWorkbenchPosition(
+    return nextWorkbenchObjectPosition(
       localItemsRef.current,
       width,
       height,
-      { x: center.x - width / 2, y: center.y - height / 2 },
+      viewport,
+      viewportRef.current?.getBoundingClientRect() ?? null,
     )
   }
 
@@ -1124,68 +600,13 @@ export function EcommerceWorkbench({
 
   const selectedAssetHash = selected?.assetHash ?? selectedResult?.assetHash
   const selectedResultStatus = selectedResult ? displayStatusOf(selectedResult) : null
-  const selectedActions = [
-    ...(selectedResultStatus === 'failed'
-      ? ([[
-          'retry',
-          selectedResult?.recovery === 'retry-save' ? '重试保存' : '重新生成',
-        ]] as const)
-      : []),
-    ...(selectedAssetHash
-      ? ([
-          ['download', '下载'],
-          ['save', '收藏到素材库'],
-        ] as const)
-      : []),
-  ]
+  const selectedActions = selectedWorkbenchActions(
+    selectedResultStatus,
+    selectedAssetHash,
+    selectedResult,
+  )
 
-  const minimap = useMemo(() => {
-    if (size.width <= 0 || size.height <= 0) return null
-    const view = {
-      x: -viewport.x / viewport.scale,
-      y: -viewport.y / viewport.scale,
-      width: size.width / viewport.scale,
-      height: size.height / viewport.scale,
-    }
-    const bounds = localItems.reduce(
-      (acc, item) => ({
-        minX: Math.min(acc.minX, item.x),
-        minY: Math.min(acc.minY, item.y),
-        maxX: Math.max(acc.maxX, item.x + item.width),
-        maxY: Math.max(acc.maxY, item.y + item.height),
-      }),
-      {
-        minX: view.x,
-        minY: view.y,
-        maxX: view.x + view.width,
-        maxY: view.y + view.height,
-      },
-    )
-    const worldWidth = Math.max(1, bounds.maxX - bounds.minX)
-    const worldHeight = Math.max(1, bounds.maxY - bounds.minY)
-    const scale = Math.min(
-      (MINIMAP_WIDTH - MINIMAP_PADDING * 2) / worldWidth,
-      (MINIMAP_HEIGHT - MINIMAP_PADDING * 2) / worldHeight,
-    )
-    return {
-      bounds,
-      scale,
-      items: localItems.map((item) => ({
-        id: item.id,
-        left: MINIMAP_PADDING + (item.x - bounds.minX) * scale,
-        top: MINIMAP_PADDING + (item.y - bounds.minY) * scale,
-        width: Math.max(2, item.width * scale),
-        height: Math.max(2, item.height * scale),
-        selected: selectedIds.has(item.id),
-      })),
-      viewportRect: {
-        left: MINIMAP_PADDING + (view.x - bounds.minX) * scale,
-        top: MINIMAP_PADDING + (view.y - bounds.minY) * scale,
-        width: view.width * scale,
-        height: view.height * scale,
-      },
-    }
-  }, [localItems, selectedIds, size.height, size.width, viewport])
+  const minimap = useMemo(() => workbenchMinimapModel(localItems, selectedIds, size, viewport), [localItems, selectedIds, size.height, size.width, viewport])
 
   const moveViewportFromMinimap = (event: ReactPointerEvent<HTMLDivElement>) => {
     if (!minimap) return

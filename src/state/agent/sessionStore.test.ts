@@ -228,7 +228,7 @@ describe('Agent 会话 · 隔离（最容易出错的地方）', () => {
     expect(JSON.stringify(ctxA)).not.toContain('B 会话')
   })
 
-  it('★★ 上下文窗口从尾部截断：保留最近的，丢掉最早那几条', async () => {
+  it('★★ 上下文窗口共用稳定模型窗口：保留首条需求与最近的尾部消息', async () => {
     const s = store()
     const a = await s.create({ projectId: 'p1', channelId: 'c', model: 'm' })
     const many = Array.from({ length: AGENT_CONTEXT_WINDOW + 5 }, (_, i) => ({
@@ -239,7 +239,7 @@ describe('Agent 会话 · 隔离（最容易出错的地方）', () => {
     const ctx = await s.contextFor(a.id)
     expect(ctx).toHaveLength(AGENT_CONTEXT_WINDOW)
     expect(ctx.at(-1)!.content).toBe(`第${many.length - 1}条`)
-    expect(ctx[0]!.content).toBe(`第${many.length - AGENT_CONTEXT_WINDOW}条`)
+    expect(ctx[0]!.content).toBe('第0条')
   })
 
   /*

@@ -1,0 +1,437 @@
+.monogramTone2 {
+  background: var(--danger);
+  color: var(--accent-text);
+}
+
+.monogramTone3 {
+  background: var(--focus-ring);
+  color: var(--accent-text);
+}
+
+.monogramTone4 {
+  background: var(--success-soft);
+  color: var(--success);
+}
+
+.monogramTone5 {
+  background: var(--bg-hover);
+  color: var(--text-1);
+}
+
+/** 右：名称 + 启用开关两排，整体在方块那个高度（56px）里垂直居中 */
+
+.itemBody {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  /* 名称与第二排之间只留 4px：缩小一档之后两排仍要分得开，但别把行高撑回去 */
+  gap: var(--space-1);
+  /* 与图标方块同高（两部分高度一致）；写 min-height 而不是 height：内容万一更高也不裁切 */
+  min-height: var(--channel-icon-box);
+  /* 撑开时不许把图标列挤扁（长名称的省略号靠这一行才生效） */
+  min-width: 0;
+}
+
+.itemName {
+  /**
+   * 名称字号：第 21 批从 13 提到 15（「让图标和文字一样大小放大文字」），
+   * 2026-10-08 又因「左边太大、缩小一点」回到 **14**（`--fs-nav`）——
+   * 再小就掉到 12px 那一档了，列表的可读性不值当为省两像素牺牲掉。
+   */
+  font-size: var(--fs-label);
+  font-weight: var(--fw-title);
+  /**
+   * 两列布局之后名称只剩一半宽度：超长一律省略号。
+   * 换行会把「右侧两排」撑高 ⇒ 图标方块跟着变高 ⇒ 行高在不同渠道之间不一致。
+   */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.itemEnabledDot {
+  flex: 0 0 auto;
+  width: 7px;
+  height: 7px;
+  margin-left: auto;
+  border-radius: 50%;
+  background: var(--text-3);
+  opacity: 0.55;
+}
+
+.itemEnabledDot[data-enabled='true'] {
+  background: var(--success);
+  opacity: 1;
+}
+
+.item {
+  --channel-icon-box: 28px;
+  min-height: 38px;
+  gap: 2px;
+  padding: 4px 6px 4px 0;
+  cursor: default;
+}
+
+.item:active {
+  cursor: default;
+}
+
+.item[data-dragging='true'] {
+  opacity: 0.55;
+}
+
+.dragHandleSlot {
+  flex: 0 0 16px;
+  width: 16px;
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.dragHandle {
+  width: 16px;
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--text-3);
+  opacity: 0;
+  pointer-events: none;
+  cursor: grab;
+}
+
+.dragHandle:active {
+  cursor: grabbing;
+}
+
+.item:hover .dragHandle,
+.item:focus-within .dragHandle,
+.item[data-menu-open] .dragHandle {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.dragHandle:hover {
+  background: transparent;
+  color: var(--text-1);
+}
+
+.itemMain {
+  flex: 1;
+  min-width: 0;
+  min-height: 32px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.itemMain:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 1px;
+}
+
+.itemBody {
+  min-height: 0;
+  gap: 0;
+}
+
+.itemTrailing {
+  position: relative;
+  flex: 0 0 24px;
+  width: 24px;
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.itemTrailing .itemEnabledDot {
+  position: absolute;
+  margin: 0;
+}
+
+.itemMenuTrigger {
+  position: absolute;
+  inset: 0;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--text-2);
+  cursor: pointer;
+}
+
+.itemMenuTrigger:hover {
+  background: var(--bg-surface);
+  color: var(--text-1);
+}
+
+.item:hover .itemMenuTrigger,
+.item:focus-within .itemMenuTrigger,
+.item[data-menu-open] .itemMenuTrigger {
+  display: inline-flex;
+}
+
+.item:hover .itemEnabledDot,
+.item:focus-within .itemEnabledDot,
+.item[data-menu-open] .itemEnabledDot {
+  display: none;
+}
+
+@media (hover: none) {
+  .dragHandle,
+  .itemMenuTrigger {
+    opacity: 1;
+    pointer-events: auto;
+    display: inline-flex;
+  }
+
+  .itemEnabledDot {
+    display: none;
+  }
+}
+
+/** 第二排 = 开关 + 模型数（模型数不归开关管，点它是选中这一行 —— 所以放在开关那一层外面） */
+
+.itemStatusRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+/**
+ * 「N 个模型 / 未选模型」（用户 2026-10-08：把"已启用"那两个字换成它）。
+ *
+ * 两句一起看：**不是裸数字**（`6` 读不出是什么），也**不换行**（窄了省略号 + 悬停给全量）——
+ * 与 `ui-ux-pro-max` 的 `Compact Label Overflow` 那条一致。
+ */
+
+.itemCount {
+  font-size: var(--fs-label);
+  color: var(--text-3);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.itemProto {
+  font-size: var(--fs-label);
+  font-weight: var(--fw-chip);
+  color: var(--text-3);
+}
+
+.itemMeta {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.itemOn {
+  font-size: var(--fs-label);
+  font-weight: var(--fw-chip);
+  color: var(--success);
+}
+
+.itemModels {
+  font-size: var(--fs-label);
+  color: var(--text-3);
+}
+
+/* 列表项里的启用开关（用户第 21 批第 2 条：开关搬到每条渠道下方） */
+
+.itemToggle {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  /**
+   * **只占自己那点宽度**（`align-self: flex-start`），不要撑满右侧那一栏 ——
+   * `flex-direction: column` 的默认 `align-items: stretch` 会让它铺满整行宽，
+   * 于是开关右边那一大片空白也归它，而它又 `stopPropagation` 收走了指针：
+   * **点了既不选中渠道、也不切开关 = 死区**（用户 2026-10-08 框出来的那一块）。
+   * 收成内容宽之后：点开关 = 切开关，点这块空白 = 选中这条渠道（与行的其他位置一致）。
+   */
+  align-self: flex-start;
+  /* 开关自己收指针（见 JSX 的 stopPropagation）：点它只切开关，不选渠道、也不起拖动 */
+  cursor: default;
+}
+
+/* `.switchText`（开关旁边那两字"已启用"）2026-10-08 起不再使用：换成「N 个模型」，
+   由 `.itemCount` 承担 —— 于是这里不再保留那条样式，免得看上去还有一处能改。 */
+
+/* 这条渠道实际能用什么：对话 / 生图 / 视频三枚小标 */
+
+.itemCaps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  margin-top: var(--space-1);
+}
+
+.empty {
+  font-size: var(--fs-label);
+  color: var(--text-3);
+  padding: var(--space-2);
+}
+
+/* —— 右侧编辑器（在卡片内独立滚动） —— */
+
+/**
+ * 设置项卡片（用户 2026-09-28：右侧配置「看不清，能不能分卡片」）。
+ *
+ * 之前所有字段平铺成一长列，只有两条 `border-top` 当分隔 —— 分组存在，
+ * 但**视觉上没有边界**，一眼看下去仍是「一坨输入框」。改成四张同级卡片：
+ * 基本信息 / 连接与鉴权 / 模型列表 / 选路与模型映射。
+ *
+ * 卡面**保留自己的背景框**（用户 2026-10-13 截图纠正）：与左栏同用
+ * `--bg-subtle` 和外层 `--bg-canvas` 分层；圆角沿用 `--radius-control`，不新造半径。
+ */
+
+/**
+ * 开关（用户 2026-09-28：设置项看不清、希望有更明确的选择控件）。
+ *
+ * 结构：原生 checkbox + 一条 `.switchTrack` + 文字。
+ * 视觉用 `--accent` / `--bg-hover` 两个令牌，不引入新颜色。
+ *
+ * 原生 checkbox **不裁切、保持在命中层**，只用 `opacity: 0` 隐形并铺在与轨道
+ * 等大的位置上：
+ *  - 无障碍与键盘焦点仍走原生控件，不改语义；
+ *  - 命中和 `isVisible()` 都成立，自动化（`check()`）与真人点击走同一条路径。
+ *
+ * 早期版本用 `clip: rect(0 0 0 0)` 把它缩成 1px 藏起来，结果自动化判定为
+ * 不可见、`check()` 静默失败 —— 渠道没被启用，画布侧误报「没选渠道」。
+ * 教训见 `.workbuddy/memory/MEMORY.md`。
+ */
+
+/* 协议区：协议下拉 + 连通性测试（§7.3，同一排） */
+
+/* 自建协议（用户 2026-09-28）：入口按钮 + 就地展开的声明表单。
+   表单落在渠道卡内，与模型选择面板同一口径——就地展开、不做浮层。 */
+
+/*
+ * 待支持协议的原因文案。
+ * 必须显示「为什么不支持」：只写「待支持」等于没解释，
+ * 用户会当成还没做完的功能，而不是「这个形态在浏览器里不成立」。
+ */
+
+/* 删除渠道（§7.2）：与「+ 新增渠道」同在左栏底部，二次确认就地展开——不弹窗、
+   不跳到别处，确认框只占住按钮原位置，视线不用移动。 */
+
+/* mock 协议下的「这次没出网」提示：验证通过的样子和真实中转一模一样，必须显式说清楚 */
+
+/* 选择面板：就地展开、不做浮层遮罩（本页是独立页面，没有需要遮挡的画布） */
+
+/*
+ * 映射区的分组容器（用户 2026-09-27 第 9 轮：分生图 / 对话 / 视频三组）。
+ *
+ * 组与组之间留出比「行间距」更大的空隙，让分组在视觉上真的成立 ——
+ * 否则三组紧挨着排下来，与「一长条平铺」没有区别（那正是要改掉的）。
+ */
+
+/**
+ * 映射区的**五个筛选**（用户 2026-10-08 第 1 条）。
+ *
+ * 取代了原来的组标题（`.mapGroupTitle`）：筛选项本身就是那一类的名字，
+ * 再在下面写一行标题是重复；顺带把"一屏扫 15 行"压到 7 行以内。
+ * 观感与画布参数胶囊、Agent 三档模型同一套（小圆角 chip）。
+ */
+
+/* 每一行 = 逻辑名 + 输入 + 保存：名字定宽，输入框吃满剩余宽度，
+   这样换一条长模型名也不会把按钮挤到下一行（固定格式控件的尺寸要稳定）。 */
+
+/* 名字长了只省略文字本身，不把厂商图标挤掉（图标是识别厂商的第一眼线索） */
+
+/*
+ * 页内二级导航整家已移除（2026-09-27）。
+ *
+ * 这里原来住着「后台中枢」那一版的左侧竖排导航：`.shell`（把导航 + 内容收成
+ * 1060px 居中卡片的外壳）、`.rail` / `.railBtn` / `.railOn` / `.railIcon` /
+ * `.railLabel`（导航本体与选中态），以及 `.content`（它的右栏）。
+ *
+ * 用户第 9 轮把这条导航整个删了（「后台设置工作区里面左边的几个菜单也不需要了」），
+ * 三条菜单里两条已迁去技能库一级页、只剩「渠道」一项，单个选项的菜单没有导航价值；
+ * 身份与导航改由应用壳侧栏承担。上游 `e26767c` 又删掉了 `.shell` 在 JSX 里的
+ * 最后一个引用。于是**这一家全部成了死代码**。
+ *
+ * ⚠️ 它们必须**整家一起删**，不能只删 `.shell`：`--rail-cutout` 定义在 `.shell` 上、
+ * 只被 `.railOn` 的伪元素消费。只删 `.shell` 会让 `.railOn` 引用一个不存在的令牌 ——
+ * CSS 里 `var()` 取不到值时**整条声明作废且不报错**，那两道反向凹圆角会静默变成直角
+ * （主题守卫能拦住这种引用，但留着死样式仍会误导后来的人）。
+ *
+ * 当前真正在用的结构是 `.page > .layout > (.sidebar + .editor)`，见上面 `.layout`。
+ */
+
+/* ── 功能预设词区（后台中枢）─────────────────────────────────────
+   三条卡片竖排。刻意**不**做成「列表 + 详情」（渠道那样）：只有三条，
+   全摊开比来回点更省事。 */
+
+/* ── 技能区（后台中枢）──────────────────────────────────────────
+   直接复用技能面板，只给它一个与渠道卡片同宽同形的高容器 —— 于是
+   「在 /skills 页」与「在后台设置里」看到的是同一块东西。 */
+
+.capChip {
+  font-size: var(--fs-label);
+  font-weight: var(--fw-chip);
+  color: var(--text-2);
+  background: var(--bg-hover);
+  border-radius: var(--radius-pill);
+  padding: 1px var(--space-2);
+  line-height: 1.6;
+}
+
+.presetHost {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  overflow-y: auto;
+  background: var(--bg-surface);
+  /* 最外层不描边（用户 2026-09-26）；内部的每条预设词卡片仍各有自己的描边 */
+  /**
+   * 内边距**收成与大容器同级**：外面已经有一层 `.shell` 的 `padding`（16px），
+   * 这里若再留 32px，两段相加就是 48px —— 内容离边缘太远、白块显得空。
+   * 用户要的「内容离边缘远一点」由**外层那 16px + 这里的 16px**共同给出。
+   */
+  padding: var(--space-4);
+  box-sizing: border-box;
+}
+
+.presetLead {
+  margin: 0;
+  font-size: var(--fs-label);
+  color: var(--text-2);
+  line-height: 1.6;
+}
+
+.skillsHost {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-surface);
+  /* 最外层不描边（用户 2026-09-26）；内部的列表 / 编辑面板仍各有描边 */
+  border-radius: 0;
+  overflow: hidden;
+  box-sizing: border-box;
+}

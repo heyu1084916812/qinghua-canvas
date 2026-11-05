@@ -1,0 +1,82 @@
+.input {
+  height: 32px;
+  padding: 0 var(--space-2);
+}
+
+.textarea {
+  flex: 1 1 auto;
+  min-height: 220px;
+  padding: var(--space-2);
+  line-height: 1.6;
+  resize: vertical;
+}
+
+.input:focus,
+.textarea:focus {
+  border-color: var(--stroke-focus);
+}
+
+.actions {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.confirmHint {
+  color: var(--text-3);
+  font-size: var(--fs-label);
+}
+
+.skillBody {
+  max-height: 460px;
+  margin: 0;
+  padding: var(--space-4);
+  overflow-y: auto;
+  border: var(--border);
+  border-radius: var(--radius-control);
+  background: var(--bg-subtle);
+  color: var(--text-1);
+  font-family: var(--font-sans);
+  font-size: var(--fs-label);
+  line-height: 1.75;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.skillJsonBody {
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, Consolas, monospace);
+  font-size: 12px;
+  line-height: 1.65;
+  tab-size: 2;
+}
+
+.skillBodyEmpty {
+  padding: var(--space-5);
+  border: var(--border);
+  border-radius: var(--radius-control);
+  background: var(--bg-subtle);
+  color: var(--text-3);
+  font-size: var(--fs-label);
+  text-align: center;
+}
+
+@media (max-width: 1260px) {
+  .cards {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (hover: none) {
+  .cardActions {
+    opacity: 1;
+    pointer-events: auto;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cardActions {
+    transition: none;
+  }
+}
