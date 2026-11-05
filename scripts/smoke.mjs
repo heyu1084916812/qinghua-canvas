@@ -41892,7 +41892,17 @@ async function g769(browser) {
         ...document.querySelectorAll('[data-agent-process-intent] span'),
       ].some((node) => Number(getComputedStyle(node).fontWeight) >= 600),
       processLine:
-        document.querySelector('[data-agent-process-current]')?.textContent ?? '',
+        document.querySelector(
+          '[data-agent-process-current] [aria-hidden="true"]',
+        )?.textContent ?? '',
+      srOnlyBox: (() => {
+        const node = [
+          ...document.querySelectorAll('[data-agent-process-current] span'),
+        ].find((item) => !item.hasAttribute('aria-hidden'))
+        if (!node) return null
+        const rect = node.getBoundingClientRect()
+        return { width: rect.width, height: rect.height }
+      })(),
       processCount:
         document
           .querySelector('[data-agent-activity]')
@@ -41938,6 +41948,9 @@ async function g769(browser) {
         !processTimeline.processLine.includes('正在理解') &&
         processTimeline.processCount === '3' &&
         processTimeline.processTop < processTimeline.resultTop &&
+        !!processTimeline.srOnlyBox &&
+        processTimeline.srOnlyBox.width <= 1 &&
+        processTimeline.srOnlyBox.height <= 1 &&
         !`${processTimeline.intent}${processTimeline.processLine}`.includes('node-g769-thumb'),
       JSON.stringify(processTimeline),
     )

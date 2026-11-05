@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import activityStyles from './AgentActivityViews.module.css'
 
 const MAIN_SOURCE = (
   import.meta.glob('./AgentPanel.module.css', {
@@ -49,6 +50,10 @@ describe('AgentPanel CSS 结构护栏', () => {
         'System.Object[]',
       )
     }
+  })
+
+  it('打字机保留可见文本和读屏文本，但读屏副本必须真正隐藏', () => {
+    expect(activityStyles.srOnly).toBeTruthy()
   })
 
   it('组件实际引用对应的样式模块', () => {
