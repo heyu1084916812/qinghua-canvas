@@ -261,8 +261,8 @@ if ($Targeted.Count -gt 0) {
   Add-Result '定向单测' $true '未指定 -Targeted，跳过'
 }
 
-# ---------- B3 全量单测 ----------
-$r = Invoke-GateStep 'npm test' 'npm-test.log' { param($log) npm test *> $log }
+# ---------- B3 全量单测（带覆盖率，阈值由 vite.config.ts 把关） ----------
+$r = Invoke-GateStep 'npm run test:coverage' 'npm-test.log' { param($log) npm run test:coverage *> $log }
 if ($r.Contaminated) { Finish 2 }
 $txt = Get-Content -LiteralPath (Join-Path $Evidence 'npm-test.log') -Raw
 $filesM = [regex]::Match($txt, 'Test Files\s+(\d+) passed\s*\|\s*(\d+) skipped\s*\((\d+)\)')
@@ -275,7 +275,10 @@ $skipped = if ($testsM.Success) { [int]$testsM.Groups[2].Value } else { -1 }
 $total = if ($testsM.Success) { [int]$testsM.Groups[3].Value } else { -1 }
 $monotonic = $passed -ge $BaselinePassed
 $baseNote = "基线 $BaselinePassed/$BaselineSkipped/$BaselineTotal；实际 $passed/$skipped/$total；文件 $filesPassed passed/$filesSkipped skipped/$filesTotal；$(if ($monotonic) { '只增不减 OK' } else { '低于基线！' })"
-Add-Result 'npm test' ($r.Code -eq 0 -and $monotonic) "exit=$($r.Code)，$baseNote，$($r.Seconds)s"
+Add-Result 'npm test (coverage)' ($r.Code -eq 0 -and $monotonic) "exit=$($r.Code)，$baseNote，$($r.Seconds)s"
+$covM = [regex]::Matches($txt, '(Statements|Branches|Functions|Lines)\s*:\s*([\d.]+)%')
+$covNote = ($covM | ForEach-Object { "$($_.Groups[1].Value) $($_.Groups[2].Value)%" }) -join '；'
+Add-Result 'coverage' ($covM.Count -eq 4) $covNote
 if ($r.Code -ne 0 -or -not $monotonic) { Finish 1 }
 
 # ---------- B4 build ----------
