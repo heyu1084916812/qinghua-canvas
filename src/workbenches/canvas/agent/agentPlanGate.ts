@@ -85,11 +85,59 @@ function disambiguateAttachAliases(raw: unknown): unknown {
   return { ...row, nodes: [...row.nodes, ...extraNodes], edges, attach }
 }
 
+export interface ExistingAgentNode {
+  id: string
+  type: AgentNodeType
+}
+
+function alignAttachedNodeTypes(
+  raw: unknown,
+  existing: ReadonlyMap<string, AgentNodeType>,
+): unknown {
+  if (existing.size === 0) return raw
+  const row = asRecord(raw)
+  if (!Array.isArray(row.nodes) || !Array.isArray(row.attach)) return raw
+  const attachedByLocalId = new Map(
+    row.attach.flatMap((item) => {
+      const entry = asRecord(item)
+      return typeof entry.localId === 'string' && entry.localId
+        ? [[entry.localId, entry] as const]
+        : []
+    }),
+  )
+  let changed = false
+  const nodes = row.nodes.map((item) => {
+    const node = asRecord(item)
+    const localId =
+      typeof node.localId === 'string' ? node.localId : ''
+    const existingNodeId =
+      typeof attachedByLocalId.get(localId)?.existingNodeId === 'string'
+        ? String(attachedByLocalId.get(localId)!.existingNodeId)
+        : ''
+    const actualType = existing.get(existingNodeId)
+    if (!actualType || node.type === actualType) return node
+    changed = true
+    return { ...node, type: actualType }
+  })
+  return changed ? { ...row, nodes } : raw
+}
+
 export function planProblems(
   args: unknown,
-  existingNodeIds: readonly string[],
+  existingNodes: readonly (string | ExistingAgentNode)[],
 ): { problems: string[]; plan: AgentPlan | null } {
-  const { plan } = normalizeAgentPlan(disambiguateAttachAliases(args))
+  const existingNodeIds = existingNodes.map((node) =>
+    typeof node === 'string' ? node : node.id,
+  )
+  const existingTypes = new Map(
+    existingNodes.flatMap((node) =>
+      typeof node === 'string' ? [] : [[node.id, node.type] as const],
+    ),
+  )
+  const aligned = alignAttachedNodeTypes(args, existingTypes)
+  const { plan } = normalizeAgentPlan(
+    disambiguateAttachAliases(aligned),
+  )
   const checked = validateAgentPlan(plan, existingNodeIds)
   if (!checked.ok) return { problems: checked.errors, plan: null }
   const attachedLocalIds = new Set((checked.plan.attach ?? []).map((item) => item.localId))

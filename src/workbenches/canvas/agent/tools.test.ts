@@ -1357,6 +1357,39 @@ describe('planProblems · 跑不起来的生成节点', () => {
     })
   })
 
+  it('★★ attach 复用现有图片时，以画布真实节点类型纠正模型写的 prompt', () => {
+    const r = planProblems(
+      {
+        ...plan(
+          [
+            {
+              localId: 'ref1',
+              type: 'prompt',
+              title: '参考图｜KV 主视觉',
+              data: { text: '参考原图' },
+              order: 0,
+            },
+            {
+              localId: 'var1',
+              type: 'generation',
+              title: 'KV 变体 B',
+              data: { prompt: '基于参考图做暖金变体', ratio: '16:9' },
+              order: 1,
+            },
+          ],
+          [{ source: 'ref1', target: 'var1' }],
+        ),
+        attach: [{ localId: 'ref1', existingNodeId: 'node_kv' }],
+      },
+      [{ id: 'node_kv', type: 'generation' }],
+    )
+
+    expect(r.problems).toEqual([])
+    expect(r.plan?.nodes.find((node) => node.localId === 'ref1')).toMatchObject({
+      type: 'generation',
+    })
+  })
+
   it('★★ attach 节点已经在作上游时，不能再被误拆成新生成节点', () => {
     const r = planProblems(
       {

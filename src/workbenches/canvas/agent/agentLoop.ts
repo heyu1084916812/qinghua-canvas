@@ -11,6 +11,7 @@ import { errorTextOf } from '../../../shared/result'
 import { createId } from '../../../shared/id'
 import { AgentToolEffectBlockedError } from '../../../features/shared/agent/AgentToolEffectLedger'
 import { parseJsonAgentAction } from './jsonToolFallback'
+import { parseAgentToolArguments } from './agentToolArgs'
 
 /**
  * Agent 循环（设计文档 §4）。
@@ -157,7 +158,7 @@ const PARSE_FAILED = Symbol('parse-failed')
 /** 参数解析失败**不抛**：把错误回填给模型让它重发，这是它能自己修的问题（§4） */
 function parseArgs(raw: string): unknown | typeof PARSE_FAILED {
   try {
-    return JSON.parse(raw || '{}')
+    return parseAgentToolArguments(raw)
   } catch {
     return PARSE_FAILED
   }

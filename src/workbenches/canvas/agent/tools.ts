@@ -440,7 +440,10 @@ export async function executeConfirmedTool(
       }
     }
     case 'applyPlan': {
-      const existing = ctx.store.getSnapshot().nodes.map((n) => n.id)
+      const existing = ctx.store.getSnapshot().nodes.map((n) => ({
+        id: n.id,
+        type: n.type,
+      }))
       const { problems, plan } = planProblems(a, existing)
       if (!plan) return { ok: false, problems }
       /**

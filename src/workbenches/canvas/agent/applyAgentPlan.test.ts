@@ -135,6 +135,48 @@ describe('applyAgentPlan · 落地并自检', () => {
     expect(s.getSnapshot().nodes).toHaveLength(0)
   })
 
+  it('★★ 落地后自检失败必须自动回滚，不能留下“界面说没建成”的半成品', () => {
+    const s = store()
+    s.dispatch({
+      kind: 'node.create',
+      projectId: 'p1',
+      type: 'generation',
+      at: { x: 0, y: 0 },
+      data: { mode: 'image', assetHash: 'existing-image' },
+    })
+    const sourceId = s.getSnapshot().nodes[0]!.id
+    const bad: AgentPlan = {
+      summary: '错误地复用图片并把类型写成 prompt',
+      nodes: [
+        {
+          localId: 'ref1',
+          type: 'prompt',
+          title: '参考图',
+          data: { text: '参考原图' },
+          order: 0,
+        },
+        {
+          localId: 'var1',
+          type: 'generation',
+          title: 'KV 变体',
+          data: { prompt: '基于参考图生成变体', mode: 'image' },
+          order: 1,
+        },
+      ],
+      edges: [{ source: 'ref1', target: 'var1' }],
+      attach: [{ localId: 'ref1', existingNodeId: sourceId }],
+    }
+
+    const r = applyAgentPlan(s, bad, { x: 400, y: 0 })
+
+    expect(r.ok).toBe(false)
+    expect(r.problems.join(' ')).toContain('类型不对')
+    expect(r.createdNodeIds).toEqual([])
+    expect(r.resolvedNodes).toEqual([])
+    expect(s.getSnapshot().nodes).toHaveLength(1)
+    expect(s.getSnapshot().edges).toHaveLength(0)
+  })
+
   it('toGraphView 只取自检要的字段', () => {
     const s = store()
     applyAgentPlan(s, twoStep, { x: 0, y: 0 })

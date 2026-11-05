@@ -133,6 +133,38 @@ export function applyAgentPlan(
   const after = toGraphView(store.getSnapshot())
   const check = verifyAgentPlanLanding({ plan, idOf, before, after })
   const createdIds = new Set(command.nodes.map((n) => n.id))
+  if (!check.ok) {
+    /**
+     * 自检失败时**不能留下半成品**。`applyPlan` 的“一次 dispatch”只保证用户
+     * 事后点一次撤销能全退，不等于系统自己已经回滚；此前这里在自检失败后直接
+     * 返回 `ok:false`，画布却已经多了节点和连线，界面于是说“没建成”，后续读取
+     * 又能看到那个节点。
+     *
+     * 紧邻 dispatch 调用 `undo()`，中间没有 await，因此撤掉的必然是刚提交的
+     * 这一组。回滚后再按图快照核对一次；若仍不一致，必须如实报告，不能假装干净。
+     */
+    store.undo()
+    const rolledBack =
+      JSON.stringify(toGraphView(store.getSnapshot())) ===
+      JSON.stringify(before)
+    if (!rolledBack) {
+      return {
+        ok: false,
+        problems: [
+          ...check.problems,
+          '落地自检失败后自动回滚也没有恢复原画布，请先撤销本次操作并检查画布。',
+        ],
+        createdNodeIds: [...createdIds],
+        resolvedNodes: [],
+      }
+    }
+    return {
+      ok: false,
+      problems: check.problems,
+      createdNodeIds: [],
+      resolvedNodes: [],
+    }
+  }
 
   return {
     ok: check.ok,

@@ -1,5 +1,18 @@
 # CanvasFlow（轻画）项目记忆
 
+### applyPlan 自检失败必须自动回滚（2026-11-05，#940）
+
+- **真实症状**：Agent 时间线连续显示“工作流没建成”，但画布上其实已经多出变体节点和一条连线，
+  后续 `readGraph` 能读到它，`runNode` 也能正常出图。
+- **根因不是一句话**：模型先输出了未转义换行的 JSON；重试后又没把 `ref1` 写进 `nodes[]`；
+  再重试时把实际 `generation` 的现有图片声明成了 `prompt`。最后 `applyPlan` 先 dispatch、
+  后自检，自检失败却没有 `undo`，于是产生“界面失败、画布成功”的半成品。
+- **修法**：`parseAgentToolArguments` 只修复字符串内原始换行 / 制表符等控制字符；
+  `planProblems` 对 `attach.existingNodeId` 按画布真实节点类型纠正计划节点类型；
+  `applyAgentPlan` 落图后自检失败必须立即回滚并回读核对。
+- **判据**：任何 `ok:false` 的 `applyPlan` 都不允许留下新建节点 / 连线；
+  如果回滚本身失败，必须明确报“回滚失败”，不能假装未落地。
+
 ### 确认执行后续跑必须重新确保对话路由（2026-11-05，#939）
 
 - **症状很有欺骗性**：图片节点 RunRecord 已经 `succeeded`，`runNode` 工具结果也是 `ok:true`，
