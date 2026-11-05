@@ -197,12 +197,14 @@ export function TypewriterActivity({
   textKey,
   current = false,
   markdown = false,
+  body = false,
 }: {
   text: string
   live: boolean
   textKey: string
   current?: boolean
   markdown?: boolean
+  body?: boolean
 }) {
   const [visible, setVisible] = useState(text)
   const [typing, setTyping] = useState(false)
@@ -262,7 +264,7 @@ export function TypewriterActivity({
 
   return (
     <span
-      className={styles.activityCopy}
+      className={body ? styles.activityRevealBody : styles.activityCopy}
       aria-live="polite"
       data-agent-process-text
       {...(current ? { 'data-agent-process-current': '' } : {})}
@@ -285,6 +287,7 @@ export function AgentActivityStrip({
   startedAt,
   finishedAt,
   live,
+  revealing = false,
 }: {
   status: AgentPanelStatus
   items: readonly ConversationItem[]
@@ -294,6 +297,8 @@ export function AgentActivityStrip({
   startedAt?: number
   finishedAt?: number
   live: boolean
+  /** 最终消息仍在逐字 reveal：让刚到达的整块过程也继续逐字展开。 */
+  revealing?: boolean
 }) {
   const [expanded, setExpanded] = useState(false)
   const [generationPhraseIndex, setGenerationPhraseIndex] = useState(0)
@@ -350,6 +355,7 @@ export function AgentActivityStrip({
     : isGeneration
       ? currentText
       : latestProcessLine(processText) || liveDetail || latestProcessLine(latestHistory?.text || '') || currentText
+  const animateCurrent = live || revealing
   const elapsedEnd =
     live
       ? now
@@ -389,7 +395,7 @@ export function AgentActivityStrip({
           {showCurrentLine ? (
             <TypewriterActivity
               text={visibleText}
-              live={live}
+              live={animateCurrent}
               textKey={latestHistory?.id ?? `${status.kind}-${generationPhraseIndex}`}
               current
             />
@@ -417,17 +423,38 @@ export function AgentActivityStrip({
         <div className={styles.activityList} data-agent-activity-list>
           {processText.trim() ? (
             <div className={styles.activityProcessBody} data-agent-process-live-body>
-              <MarkdownBlocks source={processText} />
+              <TypewriterActivity
+                text={processText}
+                live={live}
+                textKey={`live-body-${latestHistory?.id ?? status.kind}`}
+                markdown
+                body
+              />
             </div>
           ) : null}
-          {processHistory.map((step) => (
+          {processHistory.map((step, index) => {
+            const revealStep =
+              revealing &&
+              index === processHistory.length - 1 &&
+              !processText.trim()
+            return (
             <div
               key={step.id}
               className={styles.activityRow}
               data-agent-process-row={step.id}
             >
               <div className={styles.activityStepName}>
-                <MarkdownBlocks source={step.text} />
+                {revealStep ? (
+                  <TypewriterActivity
+                    text={step.text}
+                    live
+                    textKey={`reveal-${step.id}`}
+                    markdown
+                    body
+                  />
+                ) : (
+                  <MarkdownBlocks source={step.text} />
+                )}
               </div>
               {step.createdAt ? (
                 <time
@@ -438,7 +465,8 @@ export function AgentActivityStrip({
                 </time>
               ) : null}
             </div>
-          ))}
+            )
+          })}
         </div>
       ) : null}
     </section>

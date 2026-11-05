@@ -1,6 +1,7 @@
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
-import { describe, expect, it } from 'vitest'
+import TestRenderer, { act } from 'react-test-renderer'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   AgentActivityStrip,
   AgentGenerationTasks,
@@ -11,6 +12,10 @@ import {
 } from './AgentActivityViews'
 
 describe('AgentActivityViews', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
   it('保留状态忙闲判断与生成中文案', () => {
     expect(statusIsBusy({ kind: 'thinking' })).toBe(true)
     expect(statusIsBusy({ kind: 'idle' })).toBe(false)
@@ -77,5 +82,41 @@ describe('AgentActivityViews', () => {
     expect(html).toContain('data-agent-process-current')
     expect(html).toContain('data-agent-activity-toggle')
     expect(html).toContain('正在生成主图')
+  })
+
+  it('★★ 最终消息 reveal 期间，整块过程文本继续打字而不是一次性铺满', () => {
+    vi.stubGlobal('window', {
+      matchMedia: () => ({ matches: false }),
+      setInterval,
+      clearInterval,
+    })
+    let renderer!: TestRenderer.ReactTestRenderer
+    act(() => {
+      renderer = TestRenderer.create(
+        createElement(AgentActivityStrip, {
+          status: { kind: 'idle' },
+          items: [],
+          activities: [],
+          history: [
+            {
+              id: 'reasoning-1',
+              source: 'reasoning',
+              text: '这是一段需要逐字展示的过程内容。',
+              createdAt: 1,
+            },
+          ],
+          processText: '',
+          live: false,
+          revealing: true,
+        }),
+      )
+    })
+
+    const current = renderer.root
+      .findAllByType(TypewriterActivity)
+      .find((node) => node.props.current === true)
+    expect(current?.props.live).toBe(true)
+    expect(current?.props.text).toContain('这是一段需要逐字展示')
+    act(() => renderer.unmount())
   })
 })

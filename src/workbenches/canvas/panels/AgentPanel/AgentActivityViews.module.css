@@ -47,6 +47,17 @@
   border: 0;
 }
 
+.activityRevealBody {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  color: var(--text-2);
+  font-size: var(--fs-chip);
+  line-height: 1.55;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
 .activityMarkdown {
   width: 100%;
   color: var(--text-1);

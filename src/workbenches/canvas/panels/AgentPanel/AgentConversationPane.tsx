@@ -209,6 +209,8 @@ export function AgentConversationPane({
             }
             if (item.kind === 'process') {
               const live = index === latestProcessIndex && statusIsBusy(status)
+              const revealing =
+                index === latestProcessIndex && streamingTextIndex >= 0
               return (
                 <AgentActivityStrip
                   key={index}
@@ -220,6 +222,7 @@ export function AgentConversationPane({
                   startedAt={item.startedAt}
                   finishedAt={item.finishedAt}
                   live={live}
+                  revealing={revealing}
                 />
               )
             }
