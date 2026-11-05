@@ -1,5 +1,14 @@
 # CanvasFlow（轻画）项目记忆
 
+### Composer 分支测试要覆盖“用户会遇到的真实分叉”（2026-11-05，#938）
+
+- `useAgentComposerController` 的补测只挑用户能感知的分支：草稿保存失败、删 mention 后附件账同步、
+  切会话不覆盖正在写的草稿、按 `pendingAssetIds` 重建 chip、右键/中键不进入拖拽、键盘调高度上限/下限。
+- 纯 getter、SSR、端口透传不补。测试文件从 7 条增至 **12 条**；定向 **12/12**、全量
+  **4540 passed / 1 skipped**、`npm run check` 通过（869 模块 / 3440 依赖，0 违规）。
+- 这项由可靠性主线完成，主管单独收口为 `3be0109`；不要把它混进 CSS 拆分提交。工作区里的
+  `$null`、`2026-01-01')` 和未跟踪架构治理稿不属于该提交。
+
 ### CSS Modules 拆分要连 keyframes 和 media 一起搬（2026-11-05，M-CSS-SPLIT）
 
 - **拆法**：`AgentPanel.module.css` **1553 → 248 行**；队列、活动、消息、步骤卡、Composer 各一份模块。
