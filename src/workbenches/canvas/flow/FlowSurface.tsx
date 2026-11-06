@@ -42,29 +42,20 @@ import {
 } from './FlowNode'
 import {
   childrenByParent,
-  isContainerType,
-  nodeMeasurementKey,
-  nodesIntersectingMarquee,
-  topLevelNodes,
   type MarqueeRect,
 } from './flowGraph'
 import type { NodeSnapshot } from '../../../domain/canvas/model/node'
-import type { RunMode } from '../../../domain/canvas/model/runRecord'
 import type { NodeViewEvent } from '../nodes/registry'
 import { useNodeDerivedMaps } from '../useNodeDerivedMaps'
-import type { FlowNodeDerivedProps } from './FlowNode'
-import { QhCoarseEdge, QhEdge, type QhEdgeData } from './FlowEdge'
+import { QhCoarseEdge, QhEdge } from './FlowEdge'
 import { FlowChildEdgeLayer } from './FlowChildEdgeLayer'
 import { FlowCoarseEdgeLayer } from './FlowCoarseEdgeLayer'
 import { FlowGroupBoardLayer } from './FlowGroupBoardLayer'
-import { childEdgeIdSet } from './childEdges'
 import { FlowPortLayer } from './FlowPortLayer'
 import { FlowDraftLayer } from './FlowDraftLayer'
 import { FlowSnapLayer } from './FlowSnapLayer'
 import { EmptyCanvasGuide } from '../surface/EmptyCanvasGuide'
 import { MultiSelectBar } from '../toolbar/MultiSelectBar'
-import { sourcePortOf, targetPortOf } from '../../../domain/canvas/model/edge'
-import { describeError } from '../../../shared/result'
 import {
   flowViewportToStore,
   storeViewportToFlow,
@@ -78,13 +69,7 @@ import { useFonts } from '../../../app/providers/FontProvider'
 import { screenToWorld } from '../../../domain/canvas/geometry/coords'
 import { useEdgeDrag } from '../../../features/canvas/useEdgeDrag'
 import { useSpaceHeld } from '../../../features/canvas/useSpaceHeld'
-/* 与 RF 自己的 `useViewport` 同名不同物：那个读 RF 视口，这个给「空格 + 拖拽」平移用 */
 import { useViewport as useCanvasViewport } from '../../../features/canvas/useViewport'
-/*
- * 「素材文件夹」那四个动作已抽到 `features/canvas/useAssetFolderActions`：
- * 选目录 / 导出在「全局设置 → 存储」，从文件夹加载在空白处右键菜单（对账 #293）。
- * 这里不再直接 import 那两个实现 —— 否则同一件事会在两处各接线一次。
- */
 import { useNodeDownload } from '../../../features/canvas/useNodeDownload'
 import {
   clipboardMediaFiles,
@@ -118,46 +103,45 @@ import {
 import { sameFlowViewport, VIEWPORT_EPSILON } from './flowSurfaceViewport'
 import {
   FLOATING_SELECTORS,
-  dragAnchorOf,
-  isClickAfterDrag,
   marqueeBetween,
   pointerWorldPoint as pointerWorldPointPure,
 } from './flowSurfacePointer'
-import {
-  contextMenuPoint,
-  shouldRouteCancel,
-  shouldRouteRun,
-  shouldSelectNodeForMenu,
-} from './flowSurfaceMenus'
-import { importFeedback, shouldPasteMediaFiles } from './flowSurfaceImport'
+import { shouldPasteMediaFiles } from './flowSurfaceImport'
 import { installCanvasDomAnchors } from './flowSurfaceDomAnchors'
 import {
   deleteFlowEdgeIds,
   deleteFlowNodeIds,
-  dragIdsOf,
-  executeFlowDeletion,
-  planChildNodeSelection,
-  planEdgeSelection,
-  planFlowDeleteKey,
-  planFlowDragDrop,
-  planFlowDragEnd,
-  planNodePositionChanges,
-  planNodeSelection,
   type FlowDragAnchor,
 } from './flowSurfaceChangeCoordinator'
+import {
+  importSurfaceFiles,
+  planChildPointerDown,
+  planSurfaceClick,
+  planSurfaceContextMenu,
+  planSurfacePointerDown,
+} from './flowSurfaceInteractionCoordinator'
+import {
+  applyFlowDeleteKey,
+  applyFlowEdgeChanges,
+  applyFlowNodeChanges,
+  beginFlowNodeDrag,
+  beginSelectionMarquee,
+  finishFlowNodeDrag,
+  flowEdgeIdsOf,
+  flowNodeIdsOf,
+  routeFlowNodeEvent,
+  scheduleFlowNodeMeasurement,
+  selectionFromMarquee,
+} from './flowSurfaceFlowActionCoordinator'
+import {
+  derivedPropsFor,
+  flowEdgesFor,
+  flowMeasurementKey,
+  flowNodesFor,
+  flowRunPresentationOf,
+} from './flowSurfaceRenderModel'
 
-/**
- * 引擎替换 P0：用 React Flow 渲染**真实图**。
- *
- * 边界（这条最重要）：**store 仍是唯一真相**。
- * - 位置 / 连线 / 选中由 React Flow 产出事件 → 立刻回写 store（`node.move` / `edge.connect` / `setSelection`）；
- * - store 的其它变更（数据 / 增删）→ 由 `useGraph()` 推回 React Flow。
- * 两边**不各存一份位置**，这正是 liblib.tv 自己踩过的「双源 stale」。
- *
- * P0 尚未接管（见《轻画-画布引擎替换方案.md》P1–P4）：
- * 面板 / 工具栏 / 标注 / 旋转 / 宫格 / 跟随栏 / 右键菜单 / 拖入导入 / 快捷键 / 容器与结果组。
- * 因此它挂在 `?engine=rf` 后面，默认仍是老画布。
- */
+/** React Flow 只渲染真实图；store 是位置、连线与选中的唯一真相。 */
 export function FlowSurface({
   projectId,
   onOpenSettings,
@@ -177,7 +161,6 @@ export function FlowSurface({
 const NODE_TYPES = { qh: FlowFlowNode, coarse: FlowCoarseNode }
 const EDGE_TYPES = { qh: QhEdge, coarse: QhCoarseEdge }
 const EDGE_OPTIONS = { type: 'default' } as const
-
 function FlowViewportController() {
   const viewport = useViewportState()
   const flow = useReactFlow()
@@ -212,49 +195,7 @@ function useCanvasDetailMode(store: CanvasStore): CanvasDetailMode {
   return mode
 }
 
-/**
- * 「点空白清选中」的**豁免名单**（浮在画布上、不属于画布空白的东西）。
- *
- * 三段历史教训都写在这儿，别再踩一次：
- *
- * ① **情绪面板必须在名单里**（`[data-emotion-panel]`，2026-10-08 补）。
- *    它与创作面板是同一个位置上的两种模式，但从创作面板里搬出来时漏了一笔 ——
- *    后果不是"少点一下"，而是**点它里面任何东西都会把自己关掉**：
- *    面板虽然在 `onPointerDown` 里停了传播，可按下锚是在**捕获阶段**记的
- *    （`onPointerDownCapture`）⇒ 松手时那个 `click` 照样落到这里、被判成点空白 ⇒
- *    清选中 ⇒ 面板随 `selectedNode` 一起卸载（实测 g105 / g108 两条红）。
- *
- * ② **端点命中层也必须算"不是空白"**（`[data-flow-port-hit]`）：它挂在节点**外面**
- *    （与节点元素是兄弟），`closest('[data-node-id]')` 找不到节点；不排除它的话，
- *    "点一下端点没拖动"会被当成点空白、把选中清掉 ⇒ 跟随栏整条消失，后面
- *    「排列与整理」再也点不到（G15）。
- *
- * ③ **空画布模板卡片**（`[data-empty-canvas-guide]`，对账 #388）：同样是浮在画布上的一层。
- *
- * ⚠️ **写成数组再 `join(', ')`，不要再拼字符串**：
- * 2026-10-09 实测踩过一次 —— 少写一个逗号会把两条选择器拼成**后代组合**（`A B`），
- * `closest()` **不报错**、只是永远不匹配；表现就是 G15 红：点端点被当成点空白、
- * 组的选中被清掉、跟随栏再也不回来。枚举式名单本来就容易漏，改成数组至少让
- * "少一个逗号"这种手滑在 diff 里一眼可见。
- */
-/**
- * 给这一次按下所在的节点打一帧 `nodrag`（松手自动摘掉）。
- *
- * 为什么需要它：RF 的节点拖动是 **d3-drag 挂在节点元素上的原生监听**，它的过滤条件里有一条
- * 「目标的祖先里有没有 `nodrag`」；React 的 `stopPropagation` 挡不住它（`resizeHandle` 那条教训）。
- * 捕获阶段早于节点上的原生监听 ⇒ 这一帧打上，它这次就判定"不可拖"。
- *
- * 两处用它：**Alt + 拖动**（原地复制）、**空格 + 拖动**（平移画布）。
- *
- * ⚠️ **必须盯着它被抹掉再补回来**：`nodrag` 是手写在 DOM 上的类，而 React 每次提交都会把
- * 那个元素的 `className` 整块重写（这一帧正好会重渲染：`node.duplicate` / 选中变化都会改
- * 节点元素的类名）—— 而 d3-drag 的过滤条件是在**它自己的按下监听器**里才读这个类，
- * 那时 React 已经提交过一轮。漏了这一步的实测后果（第 16 批探针）：按下瞬间类还在、
- * 一进拖动就没了 ⇒ 原件被 RF 拖走、副本留在原地，正好把「Alt 复制」做反
- *（用户看到的是"两个节点都跑到新位置去了"）。
- * `MutationObserver` 的回调与 React 的提交在**同一个微任务检查点**里跑，
- * 补回去的时刻仍早于 d3 的按下监听器。
- */
+/** RF 的 d3-drag 只认原生 `nodrag`；React 提交会重写 className，所以松手前要持续补回。 */
 function blockNativeNodeDrag(target: EventTarget | null): void {
   const frame = target instanceof Element ? target.closest<HTMLElement>('[data-node-id]') : null
   if (!frame) return
@@ -274,12 +215,7 @@ function blockNativeNodeDrag(target: EventTarget | null): void {
   window.addEventListener('pointercancel', cleanup)
 }
 
-/**
- * 指针屏幕坐标 → **世界坐标**（用画布 surface 的矩形 + store 视口换算）。
- *
- * 与「新建节点」「拖入导入」「连线落点」同一条口径。拿不到事件或 surface 时返回 `null`，
- * 由调用方决定是退回节点中心还是放弃 —— 不要在这里猜一个坐标出来。
- */
+/** 指针屏幕坐标 → 世界坐标；缺事件或 surface 时返回 null，不猜落点。 */
 function pointerWorldPointDom(
   ev: MouseEvent | TouchEvent | ReactPointerEvent | null | undefined,
   store: CanvasStore,
@@ -308,7 +244,6 @@ function FlowSurfaceInner({
   const detailMode = useCanvasDetailMode(store)
   const graph = useGraph()
   const selection = useSelection()
-  /** 选中的连线（§6.14）：选中态由 store 决定，RF 只是它的视图 */
   const edgeSelection = useEdgeSelection()
   const initialFlowViewport = useRef(storeViewportToFlow(store.getViewport())).current
   const handleViewportChange = useCallback(
@@ -330,85 +265,64 @@ function FlowSurfaceInner({
   const exec = useCanvasExecution()
   const { emitNodeEvent } = useCanvasPageEvents(store, onOpenSettings)
   const platform = usePlatform()
-  /**
-   * 项目级画布外观（对账 #379 C4/C5）：背景样式 / 色调 / 节点内容字号。
-   * 它存在项目行里、随项目导出（见 domain/project/canvasStyle 的说明），
-   * 运行时由 CanvasStyleProvider 统一供给 —— 设置浮层改了这里当帧就变。
-   */
   const { style: canvasStyle } = useCanvasStyle()
   const { resolved: theme } = useTheme()
   const customCanvasColors = canvasStyle.customCanvas[theme]
   const customCanvasColor = customCanvasColors.background
   const customDotColor = customCanvasColors.dot
   const customNodeColor = canvasStyle.customNode[theme]
-  /** 界面偏好（本机）：小地图显示开关（#379 剩余项） */
   const { appearance } = useFonts()
   const handleDownload = useNodeDownload(platform, store)
   // Ctrl/Cmd + C/V（§4.2）：剪贴板是模块级单例、不订阅，故不参与本组件重渲染
   useClipboardHotkeys(store)
-  /* 画布级快捷键（Z 复位视图 / Ctrl+Z 撤销 / Tab 与方向键导航 / Ctrl+G 打组）：
-     与老表面同一份实现（见 `useCanvasKeyboard` 的说明）。少了它，G12 那条"复位视图"
-     以及所有依赖 Ctrl+Z 的组在 RF 面全部静默失效。 */
   useCanvasKeyboard(store)
-  /**
-   * 空格按住 = 平移模式（§6.3）。RF 自己不认这条（见 `onSurfacePointerDown` 的注释），
-   * 所以键位状态要在这里跟踪、平移要交给老表面那支 `useViewport.beginPan`。
-   */
   const spaceHeld = useSpaceHeld()
   const { beginPan } = useCanvasViewport(store)
   const [importHover, setImportHover] = useState(false)
-  /** 本次节点拖动是否**真的发生了位移**（§6.15：「有位移才让面板保持隐藏」） */
   const dragMovedRef = useRef(false)
-  /**
-   * 拖动起点锚：`{ 指针屏幕坐标, 缩放, 各被拖节点的起始世界坐标 }`，在**我们自己的
-   * pointerdown** 上记（见 `onSurfacePointerDown`），不在 RF 的 `onNodeDragStart` 上记。
-   *
-   * 为什么不能用 `onNodeDragStart` 当基准：它触发时指针**已经走了一步**、而节点还没动
-   * （实测差一整步），拿它算"应该落在哪"会把节点整体放偏 —— G71 里正是这个偏移把批量
-   * 容器推到了创作面板底下。用途见 `onNodeDragStop` 的**终点对齐**。
-   */
+  /** 锚点必须在 pointerdown 记录；RF 的 dragStart 已晚一步，会导致终点对齐偏移。 */
   const dragAnchorRef = useRef<FlowDragAnchor | null>(null)
-  /**
-   * 这一次按下的**屏幕坐标**：给 `onSurfaceClick` 判"是点了一下还是拖过一段"用
-   *（见那里的注释：框选 / 平移松手后浏览器仍会补一个 `click`）。
-   */
   const pressAtRef = useRef<{ x: number; y: number } | null>(null)
-  /**
-   * 本次事件里**刚落下过"节点选中"变更**。
-   *
-   * 框选时 RF 会先发"选中这些节点"、**紧接着**再发"选中挂在这些节点上的线"
-   * （`commitUserSelectionRect` 里那两段是连着调的）—— 见 `onEdgesChange` 里为什么需要它。
-   */
   const nodeSelectStampRef = useRef(false)
-  /** 用户此刻正在画的框选矩形（世界坐标）；框选结束时再用 store 真实矩形做一次兜底裁剪。 */
+  /** 框选矩形（世界坐标）；结束时用 store 真实矩形兜底裁剪。 */
   const selectionMarqueeRef = useRef<MarqueeRect | null>(null)
   const selectionStartRef = useRef<Point | null>(null)
-  /** Shift 加选时保留框选开始前已有的节点，不能把框外旧选中误删。 */
   const selectionBaselineRef = useRef<string[]>([])
+  const actionPorts = useMemo(
+    () => ({
+      setSelection: (ids: string[]) => store.setSelection(ids),
+      stampNodeSelection: () => {
+        nodeSelectStampRef.current = true
+        queueMicrotask(() => {
+          nodeSelectStampRef.current = false
+        })
+      },
+      setSnapHints: (hints: Parameters<typeof store.setSnapHints>[0]) => store.setSnapHints(hints),
+      markDragMoved: (moved: boolean) => { dragMovedRef.current = moved },
+      moveNodes: (ids: string[], dx: number, dy: number, phase: 'begin' | 'move' | 'end') => {
+        store.dispatch({ kind: 'node.move', ids, dx, dy, phase })
+      },
+      setDragging: (active: boolean, nodeId: string | null = null) => store.setDragging(active, nodeId),
+      getSnapshot: () => store.getSnapshot(),
+      resetDragTracking: () => {
+        dragMovedRef.current = false
+        dragAnchorRef.current = null
+      },
+      setPanelDismissed: (dismissed: boolean) => store.setPanelDismissed(dismissed),
+      notify: (message: string, tone: 'error') => store.notify(message, tone),
+      reparent: (id: string, parentId: string | null, at?: Point) =>
+        store.dispatch({ kind: 'node.reparent', id, toParent: parentId, at }),
+      getEdgeSelection: () => store.getEdgeSelection(),
+      setEdgeSelection: (ids: string[]) => store.setEdgeSelection(ids),
+    }),
+    [store],
+  )
 
-  /**
-   * 容器子节点的拖动**复用老表面的控制器**（`useNodeDrag`）。
-   *
-   * 容器子节点不是 React Flow 的节点（由容器 View 按网格渲染），RF 拖不动它们；
-   * 而「拖动改坐标 → 松手按落点判定归属（拖出容器 / 换容器）」这条语义本来就写在那个控制器里。
-   * 再写一遍只会得到两份迟早走样的判定，所以这里直接共用。
-   */
   const surfaceEl = useCallback(
     () => document.querySelector<HTMLElement>('[data-canvas-surface]'),
     [],
   )
   const drag = useNodeDrag(store, surfaceEl)
-  /**
-   * 端点拖线**也复用老表面那套控制器**（`useEdgeDrag`），理由比上面那条更硬：
-   *
-   * ① 语义只有一份 —— 方向（从输出口拖出 = 出 / 从输入口反拖 = 入）、落点选口
-   *    （`nearestInputPort`，融合节点左侧 `input` 与右侧 `patch` 靠它分）、空白松手菜单、
-   *    多选"共有端点"一次连多个，全都在这个控制器里，两个引擎不再各写一份；
-   * ② 端点命中不受层叠影响 —— RF 的 Handle 会被相邻节点整块盖住（见 `FlowPortLayer` 注释），
-   *    而这里由 `FlowPortLayer` 在最上层收指针，命中后调用本函数。
-   *
-   * 草稿曲线由 `FlowDraftLayer` 画（老表面是 `EdgeLayer` 画），锚点 `data-edge-draft` 不变。
-   */
   const edgeDrag = useEdgeDrag(store)
   const edgeDragBegin = edgeDrag.begin
   const beginEdgeDrag = useCallback(
@@ -420,198 +334,123 @@ function FlowSurfaceInner({
     [edgeDragBegin, surfaceEl],
   )
 
-  /** 容器子节点按下：与老表面 `画布表面.onNodePointerDown` 同一套选中语义 + 拖动 */
   const onChildPointerDown = useCallback(
     (e: ReactPointerEvent, childId: string) => {
-      if (e.shiftKey) {
-        const sel = store.getSelection()
-        store.setSelection(
-          sel.includes(childId) ? sel.filter((id) => id !== childId) : [...sel, childId],
-        )
-        return
-      }
-      const sel = store.getSelection()
-      if (!(sel.length > 1 && sel.includes(childId))) store.setSelection([childId])
-      /**
-       * ★ **批量**里的子节点：位置由格位决定 ⇒ 拖动开始时先把坐标**归一成它的格位**。
-       * 这样"拖动位移 = 坐标 − 格位"成立，视图才画得出拖动（用户第 15 批 #335-③：
-       * 「批量节点内部的子节点可以点击+拖动出批量节点，但是我看不到拖动」）。
-       * 事务与随后那串 `node.move` 合并（同一个 coalesce key）⇒ 一次撤销全退。
-       */
-      const slot = batchSlotOf(childId, store.getSnapshot())
-      if (slot) {
+      const plan = planChildPointerDown({
+        selection: store.getSelection(),
+        childId,
+        shiftKey: e.shiftKey,
+        batchSlot: batchSlotOf(childId, store.getSnapshot()),
+      })
+      if (plan.selection) store.setSelection(plan.selection)
+      if (plan.reparent) {
         store.dispatch(
-          { kind: 'node.reparent', id: childId, toParent: slot.parentId, at: slot.at },
+          {
+            kind: 'node.reparent',
+            id: childId,
+            toParent: plan.reparent.parentId,
+            at: plan.reparent.at,
+          },
           { mode: 'coalesce', groupId: `move:${childId}`, label: '移动节点' },
         )
       }
-      drag.begin(e, childId)
+      if (plan.beginDrag) drag.begin(e, childId)
     },
     [store, drag],
   )
 
-  /**
-   * ★★ 点容器（分组 / 批量）里的子节点：**选中判给子节点，不是容器**
-   * （用户第 15 批 #333：「分组功能选择不了里面的节点…我需要的是分组里面的节点也可以单独操作」；
-   *  #335-②：「批量节点也无法真正的选中里面的子节点，会跳转到选中批量节点上」）。
-   *
-   * 为什么必须在这一层兜：子节点是容器节点的 **DOM 后代**，而 React Flow 的
-   * `handleNodeClick` 绑在**容器**那个节点元素上（它只知道"这次点击属于哪个 RF 节点"）
-   * ⇒ 点子节点时 RF 一定会把容器选上。按下阶段我们已经按子节点规则选过一次
-   *（`onChildPointerDown`），这里是**等 RF 覆盖之后再改回来**：
-   * React 的合成事件按 React 树的深度派发，容器节点比这层 surface **更深、先跑**，
-   * 所以挂在 surface 上的 `onClick` 天然是"最后一个说话的人"。
-   *
-   * 三条口径（与 `onChildPointerDown` 完全一致，别各写一份）：
-   * ① 普通点 = 选中这一个子节点；② Shift 点 = 增 / 减选；
-   * ③ 顺带把**被点节点的父容器**从选中集合里摘掉 —— RF 刚才把它选上了。
-   *（容器不嵌套 ⇒ 祖先最多一层，直接看 `parentId` 就够。）
-   */
+  /** RF 会先把容器选上；surface 的 click 最后按子节点规则改回，并摘掉父容器。 */
   const onSurfaceClick = useCallback(
     (e: ReactMouseEvent<HTMLDivElement>) => {
-      /**
-       * ★★ **拖过一段就不算"点空白"**（用户第 17 批 #1：「上面三个图**有时候**框选多选不了」）。
-       *
-       * 浏览器的 `click` 只要**按下与松手在同一个元素**上就会触发，不管中间拖了多远 ——
-       * 而框选（Ctrl+拖）与平移（空白处拖）都恰好是"按在画布上、松手也在画布上"
-       * ⇒ 松手那一瞬间会跟着来一个 `click`，把刚框好的选中**整片清掉**。
-       * 用户说的"有时候"就是这么来的：起点与终点落在同一个元素上才触发
-       *（落在连线上 / 落在另一个节点上就不触发 —— 于是看起来像"跟连线有关"）。
-       *
-       * 阈值取 4px，与 RF 自己的 `paneClickDistance` 同一口径（它也是拿"有没有移动过"区分点击）。
-       */
-      const press = pressAtRef.current
-      if (isClickAfterDrag(press, { x: e.clientX, y: e.clientY })) return
       const target = e.target as HTMLElement
-      const hit = target.closest('[data-node-id]')
-      const childId = hit?.getAttribute('data-node-id')
-      if (!childId) {
-        /**
-         * ★★ 点**画布空白**：把选中清掉（用户第 16 批 #4：「批量节点和分组背景里面的节点
-         * 选中后弹出的框点击画布空白区域无法隐藏」）。
-         *
-         * 为什么必须自己清：容器子节点**不是 RF 节点**，RF 的"点空白清选中"只清它自己
-         * 认得的那些 ⇒ 子节点会一直赖在选中集合里，创作面板也就一直开着。
-         * 只在**画布本身**上清：点面板 / 菜单 / 跟随栏 / 连线等浮层一律不插手
-         *（那是它们自己的交互，清了反而坏事）。
-         */
-        if (target.closest(FLOATING_SELECTORS)) return
-        if (store.getSelection().length > 0) store.setSelection([])
-        return
-      }
-      const graph = store.getSnapshot()
-      const node = graph.nodes.find((n) => n.id === childId)
-      /** 顶层节点：RF 自己就选对了，不插手 */
-      if (!node?.parentId) return
-      const plan = planChildNodeSelection({
+      const nodeId = target.closest('[data-node-id]')?.getAttribute('data-node-id') ?? null
+      const node = nodeId ? store.getSnapshot().nodes.find((item) => item.id === nodeId) : null
+      const plan = planSurfaceClick({
+        press: pressAtRef.current,
+        release: { x: e.clientX, y: e.clientY },
+        nodeId,
+        parentId: node?.parentId ?? null,
+        floatingTarget: !!target.closest(FLOATING_SELECTORS),
         selection: store.getSelection(),
-        childId,
-        parentId: node.parentId,
         shiftKey: e.shiftKey,
       })
-      if (plan.changed) store.setSelection(plan.selection)
+      if (plan.kind !== 'none') store.setSelection(plan.selection)
     },
     [store],
   )
 
-  /**
-   * 画布上的 pointerdown（**捕获阶段**）：两件老表面在 pointerdown 上就做完的事。
-   *
-   * ① §6.15「拖动后，要下一次**显式选中**面板才回来」——RF 对**已经选中**的节点再点一下
-   *    不产生任何 select 变更，标记就永远清不掉（G71 实测：拖动生成节点后点它，面板没开、
-   *    它自己那句提示词根本没写进去，下游那趟于是空跑）。
-   * ② 记**拖动起点锚**：终点对齐（见 `onNodeDragStop`）需要"按下时指针在哪、节点在哪"这对基准；
-   *    不能在 RF 的 `onNodeDragStart` 上记 —— 那时指针已经走了一步、节点还没动。
-   *
-   * 只清标记 / 只记账：**不改选区、不阻断事件**（React Flow 那边照常收得到）。
-   * ⚠️ 别改用 RF 的 `onNodeClick`：它会改变 RF 对节点的指针处理，
-   * G71 那条「从端点拖出去连线」的手势会直接失效（实测边数 2 → 2）。
-   */
+  /** 捕获 pointerdown：处理空格平移 / Alt 复制，记录显式选中与终点对齐锚。 */
   const onSurfacePointerDown = useCallback(
     (e: ReactPointerEvent<HTMLDivElement>) => {
       pressAtRef.current = { x: e.clientX, y: e.clientY }
-      /**
-       * **空格 + 拖拽 = 平移画布**（§6.3）。这条必须在这里自己接：
-       * React Flow 的 `panActivationKeyCode='Space'` 只放宽 d3-zoom 的过滤条件，
-       * 指针落在**节点**上时 d3-drag 仍然先接管，而节点元素自带 `nopan`、连冒泡到画布的机会都没有
-       * ⇒ 空格 + 拖节点 = 拖节点，画布纹丝不动（G4 实测 `(0,0) → (0,0)`）。
-       * 老表面就是「捕获阶段 stopPropagation + 自己 `beginPan`」，这里照同一条：
-       * 停掉原生传播（RF 的 d3 监听收不到）+ 打一帧 `nodrag` 兜底 + 交给 `useViewport.beginPan`。
-       */
-      if (e.button === 0 && spaceHeld) {
+      const nodeId =
+        (e.target as HTMLElement)
+          .closest('[data-node-id]')
+          ?.getAttribute('data-node-id') ?? null
+      const vp = store.getViewport()
+      const surface = e.currentTarget.getBoundingClientRect()
+      const selection = store.getSelection()
+      const plan = planSurfacePointerDown({
+        button: e.button,
+        spaceHeld,
+        altKey: e.altKey,
+        nodeId,
+        selection,
+        graph: store.getSnapshot(),
+        viewport: vp,
+        surface: {
+          left: surface.left,
+          top: surface.top,
+          width: surface.width,
+          height: surface.height,
+        },
+        nodeRects: () => {
+          const rects = new Map<string, Point>()
+          const ids = new Set(selection)
+          if (nodeId) ids.add(nodeId)
+          for (const id of ids) {
+            const nodeEl = document.querySelector<HTMLElement>(`[data-node-id="${id}"]`)
+            if (!nodeEl) continue
+            const rect = nodeEl.getBoundingClientRect()
+            rects.set(id, { x: rect.left, y: rect.top })
+          }
+          return rects
+        },
+        clientX: e.clientX,
+        clientY: e.clientY,
+      })
+      if (plan.kind === 'pan') {
         e.preventDefault()
         e.stopPropagation()
         blockNativeNodeDrag(e.target)
         beginPan(e)
         return
       }
-      const nodeId = (e.target as HTMLElement).closest('[data-node-id]')?.getAttribute('data-node-id')
-      if (!nodeId) return
-      if (store.isPanelDismissed()) store.setPanelDismissed(false)
-      const tops = new Set(topLevelNodes(store.getSnapshot()).map((n) => n.id))
-      if (!tops.has(nodeId)) return
-      /**
-       * **Alt + 拖动 = 原地复制**（§4.2）。这条**交给老表面那套控制器**（`useNodeDrag` 里已经
-       * 有"先原地复制、再把副本拖走、松手按落点归属"的完整语义），并且要**掐断 RF 的原生拖动**：
-       * RF 的拖动绑在原生 `pointerdown` 上，只靠 React 的 `stopPropagation` 拦不住
-       * （见 `resizeHandle` 那条 `nodrag` 的教训）—— 不拦的话原件会被 RF 拖走、副本留在原地，
-       * 正好把这条交互做反。捕获阶段停掉**原生**传播，RF 的监听器就不会被调用。
-       */
-      if (e.altKey) {
-        /** 光停 React 的传播不够（理由见 `blockNativeNodeDrag`）：先给这一帧打上 `nodrag` */
+      if (plan.dismissPanel && store.isPanelDismissed()) store.setPanelDismissed(false)
+      if (plan.kind === 'duplicate') {
         e.preventDefault()
         blockNativeNodeDrag(e.target)
-        drag.begin(e, nodeId)
-        return
+        drag.begin(e, plan.nodeId)
+      } else if (plan.kind === 'anchor') {
+        dragAnchorRef.current = plan.anchor
       }
-      // 多选整组拖动：按下的是选区内的一员 → 锚要覆盖整组（与 RF 的拖动集合一致）
-      const sel = store.getSelection().filter((id) => tops.has(id))
-      const ids = sel.length > 1 && sel.includes(nodeId) ? sel : [nodeId]
-      /**
-       * 锚点取**节点渲染出来的位置**（DOM 的 rect），**不取 store 的 x/y**：
-       * 两者在个别情况下会不一致（实测差 101px，见方案 §8.10.2），而"松手时节点该落在哪"
-       * 是「用户看到的位置 + 指针位移」—— 用 DOM 才是自洽的（顺带把不一致纠正回来）。
-       */
-      const vp = store.getViewport()
-      const zoom = vp.zoom || 1
-      const surface = e.currentTarget.getBoundingClientRect()
-      const rects = new Map<string, { x: number; y: number }>()
-      for (const id of ids) {
-        const nodeEl = document.querySelector<HTMLElement>(`[data-node-id="${id}"]`)
-        if (!nodeEl) continue
-        const r = nodeEl.getBoundingClientRect()
-        rects.set(id, { x: r.left, y: r.top })
-      }
-      const nodes = dragAnchorOf(ids, rects, surface, vp)
-      dragAnchorRef.current = { clientX: e.clientX, clientY: e.clientY, zoom, nodes }
     },
     [store, spaceHeld, beginPan],
   )
 
-  /**
-   * 导入一批素材文件 —— **拖入**与**从系统剪贴板粘贴**共用这一条。
-   *
-   * 抽出来的理由与「下载」那条一样：两个入口各写一遍，迟早在其中一处漏掉
-   * 已经修好的行为（选中新节点 / 一次撤销 / 被拒文件要说一声）。
-   */
   const importFiles = useCallback(
     async (files: readonly File[], world: Point): Promise<void> => {
-      const { ids, rejected } = await importDroppedFiles(
-        { platform, store, projectId },
-        files,
-        world,
-      )
-      const feedback = importFeedback(ids.length, rejected)
-      if (rejected > 0 && feedback) store.notify(feedback, 'error')
-      if (ids.length > 0) {
-        store.setSelection(ids)
-        if (feedback) store.showUndoBar(feedback)
-      }
+      await importSurfaceFiles(files, world, {
+        importFiles: (nextFiles, point) =>
+          importDroppedFiles({ platform, store, projectId }, nextFiles, point),
+        select: (ids) => store.setSelection(ids),
+        notify: (message, tone) => store.notify(message, tone),
+        showUndoBar: (message) => store.showUndoBar(message),
+      })
     },
     [platform, store, projectId],
   )
 
-  /** 从系统拖入图片 / 视频（§6.3）：与老表面共用同一份批量导入规则 */
   const onDropFiles = async (e: ReactDragEvent<HTMLDivElement>) => {
     const files = draggedFiles(e)
     if (files.length === 0) return
@@ -626,19 +465,7 @@ function FlowSurfaceInner({
     await importFiles(files, world)
   }
 
-  /**
-   * **从系统剪贴板粘贴素材进画布**（用户 2026-10-16：「软件外的内容无法复制进画布」）。
-   *
-   * 这条链路此前**完全不存在**：画布的 `Ctrl+V` 只认「应用内复制的节点快照」，
-   * 从截图工具 / 浏览器复制来的图没有任何人接手 —— 于是用户手里唯一能进图的入口
-   * 就只剩生成节点的「上传」（对账 #551）。
-   *
-   * 两条纪律（与 `useClipboardHotkeys` 同口径）：
-   * - **文本框内放行**：节点正文 / 面板里粘字才是用户的本来意图，不能抢；
-   * - **剪贴板里没有媒体就放行**：粘文字、粘路径这些正常粘贴一律不吞。
-   *
-   * 落点复用「粘贴落点」：鼠标在哪儿就落在哪儿（没动过鼠标则落在视口中心）。
-   */
+  /** 系统媒体粘贴：文本输入目标和非媒体剪贴板一律放行。 */
   useEffect(() => {
     const onPaste = (e: ClipboardEvent): void => {
       const target = e.target as { tagName?: string; isContentEditable?: boolean } | null
@@ -653,13 +480,6 @@ function FlowSurfaceInner({
     return () => window.removeEventListener('paste', onPaste)
   }, [store, importFiles])
 
-  /**
-   * 画布右键菜单（§4.1）：**空白的按下位置**决定弹哪一份 ——
-   * 落在节点上 → 选中它并弹节点菜单；否则弹画布菜单。
-   *
-   * 坐标必须是 surface 的**局部屏幕坐标**（菜单靠它定位），所以要用 `currentTarget` 的矩形换算。
-   * 关闭由 `ContextMenu` 自己处理（window pointerdown / Esc / 滚轮），这里只负责打开。
-   */
   const onContextMenu = useCallback(
     (e: ReactMouseEvent<HTMLDivElement>) => {
       e.preventDefault()
@@ -667,85 +487,50 @@ function FlowSurfaceInner({
       const nodeId = (e.target as HTMLElement)
         .closest('[data-node-id]')
         ?.getAttribute('data-node-id') ?? null
-      const menu = contextMenuPoint(e.clientX, e.clientY, { x: r.left, y: r.top }, nodeId)
-      if (
-        menu.target.kind === 'node' &&
-        shouldSelectNodeForMenu(store.getSelection(), menu.target.nodeId)
-      ) {
-        store.setSelection([menu.target.nodeId])
-      }
-      store.setMenu(menu.x, menu.y, menu.target)
+      const plan = planSurfaceContextMenu({
+        clientX: e.clientX,
+        clientY: e.clientY,
+        surface: { left: r.left, top: r.top },
+        nodeId,
+        selection: store.getSelection(),
+      })
+      if (plan.selection) store.setSelection(plan.selection)
+      store.setMenu(plan.menu.x, plan.menu.y, plan.menu.target)
     },
     [store],
   )
 
-  /**
-   * 视口**受控**（`viewport` + `onViewportChange`），不用 `defaultViewport`：
-   * 后者会让 React Flow 与 store 各存一份视口 ⇒ 工具栏按 store 视口中心新建的节点
-   * 会落在 React Flow 的视野之外，被 `onlyRenderVisibleElements` 裁掉
-   * （第一次跑就实测到了：store 3 个节点、DOM 只画 2 个）。
-   * 这里 store 是唯一真相，React Flow 只是它的一个视图。
-   */
-  /**
-   * **故意不调 `fitView`**：老表面是"按项目存储的视口打开"，不自动重框。
-   * 我一度在挂载时 fit 了一次 —— 结果缩放被改成 0.75，同样的屏幕坐标落到节点上的位置变了
-   * （G66 里那一下点在了「上传素材」按钮上，而它 `stopPropagation` ⇒ 节点没选中、面板没开，
-   * 表现为"上游缩略图 0"）。换引擎不该顺手改掉"打开时的取景"。
-   */
+  /** 视口受控同步 store；刻意不 fitView，保留项目存储的打开取景。 */
 
-  /** 节点事件出口：视图只能 emit，由这一层翻译成命令（架构 §4.7） */
   const makeEmit = useCallback(
-    (nodeId: string) => (event: NodeViewEvent) => {
-      if (shouldRouteRun(event)) {
-        void exec.runNode(nodeId)
-        return
-      }
-      if (shouldRouteCancel(event)) {
-        exec.cancel(nodeId)
-        return
-      }
-      emitNodeEvent(nodeId, event)
-    },
+    (nodeId: string) => (event: NodeViewEvent) =>
+      routeFlowNodeEvent(nodeId, event, {
+        run: (id) => void exec.runNode(id),
+        cancel: exec.cancel,
+        emit: emitNodeEvent,
+      }),
     [exec, emitNodeEvent],
   )
 
-  /** 父 → 子索引（整图一次）：容器本体要拿它把自己的子节点画出来 */
   const childIndex = useMemo(() => childrenByParent(graph), [graph])
 
-  /** 图级派生数据（上游素材 / 提示词数 / 可运行判定 / 图像输入 / 按口分组素材）：与老表面同一批口径 */
   const derived = useNodeDerivedMaps(graph)
   const derivedFor = useCallback(
-    (id: string): FlowNodeDerivedProps => ({
-      upstreamAssetHashes: derived.upstreamHashes.get(id),
-      upstreamPromptCount: derived.upstreamPromptCounts.get(id),
-      hasRunnableDownstream: derived.runnableDownstream.get(id),
-      upstreamImageInputs: derived.upstreamImageInputs.get(id),
-      inputPortAssets: derived.inputPortAssets.get(id),
-    }),
+    (id: string) => derivedPropsFor(derived, id),
     [derived],
   )
 
-  /**
-   * 容器子节点的渲染：与顶层节点**同一套** `NodeFrame` + `def.View`，
-   * 差别只有坐标归零（由容器网格定位）与端点隐藏（§6.11）。
-   */
   const renderFlowChild = useCallback(
     (child: NodeSnapshot) => {
-      const state = exec.nodeStateOf(child.id)
-      const running = state?.kind === 'queued' || state?.kind === 'running'
-      const error = state?.kind === 'failed' ? describeError(state.error) : null
-      const runMode: RunMode =
-        state && (state.kind === 'queued' || state.kind === 'running' || state.kind === 'canceled')
-          ? 'single'
-          : 'idle'
+      const run = flowRunPresentationOf(exec.nodeStateOf(child.id))
       return (
         <FlowChildFrame
           key={child.id}
           child={child}
           selected={selection.includes(child.id)}
-          running={running}
-          error={error}
-          runMode={runMode}
+          running={run.running}
+          error={run.error}
+          runMode={run.runMode}
           emit={makeEmit(child.id)}
           resize={(rect, phase) => store.dispatch({ kind: 'node.resize', id: child.id, rect, phase })}
           onFramePointerDown={(e) => onChildPointerDown(e, child.id)}
@@ -758,141 +543,45 @@ function FlowSurfaceInner({
 
   const nodes = useMemo<RFNode<FlowNodeData>[]>(
     () =>
-      topLevelNodes(graph)
-        .map((n) => {
-          const state = exec.nodeStateOf(n.id)
-          const running = state?.kind === 'queued' || state?.kind === 'running'
-          const error = state?.kind === 'failed' ? describeError(state.error) : null
-          const runMode: FlowNodeData['runMode'] =
-            state && (state.kind === 'queued' || state.kind === 'running' || state.kind === 'canceled')
-              ? 'single'
-              : 'idle'
-          return {
-            id: n.id,
-            type: detailMode === 'coarse' ? 'coarse' : 'qh',
-            position: { x: n.x, y: n.y },
-            /*
-             * 尺寸按官方文档写在**节点对象**上（`width`/`height`），省掉一次测量。
-             * ⚠️ 注意别把它当成"新节点不显示"的解药：那个症状的真因是**视口语义**
-             * （见 viewportBridge.ts），尺寸给不给都实测 12/12。
-             */
-            width: n.w,
-            height: n.h,
-            /* 选中态由 store 决定（store 是唯一真相）：这样工具栏 / agent 程序化选中也能传到画布 */
-            selected: selection.includes(n.id),
-            style: { width: n.w, height: n.h },
-            data: {
-              node: n,
-              running,
-              error,
-              runMode,
-              emit: makeEmit(n.id),
-              resize: (rect, phase) => store.dispatch({ kind: 'node.resize', id: n.id, rect, phase }),
-              ...derivedFor(n.id),
-              /*
-               * 容器（分组 / 批量）：把子节点连同渲染函数一起交给容器本体 ——
-               * 与老画布那套「容器子节点按网格渲染」同一套语义，网格布局与拖出归属都不用重写。
-               */
-              ...(isContainerType(n.type)
-                ? {
-                    childNodes: childIndex.get(n.id) ?? [],
-                    renderChild:
-                      (childIndex.get(n.id)?.length ?? 0) > 0 ? renderFlowChild : undefined,
-                  }
-                : {}),
-            } satisfies FlowNodeData,
-          }
-        }),
+      flowNodesFor({
+        graph,
+        selection,
+        detailMode,
+        derived,
+        childIndex,
+        nodeStateOf: exec.nodeStateOf,
+        emitFor: makeEmit,
+        resize: (id, rect, phase) => {
+          store.dispatch({ kind: 'node.resize', id, rect, phase })
+        },
+        renderChild: renderFlowChild,
+      }),
     [graph, selection, exec, makeEmit, childIndex, renderFlowChild, derivedFor, store, detailMode],
   )
 
   const edges = useMemo(
-    () => {
-      const selectedNodes = new Set(selection)
-      const childEdgeIds = childEdgeIdSet(graph)
-      const list = graph.edges
-        /**
-         * 牵涉容器子节点的边**摘出去**交给 `FlowChildEdgeLayer` 画：
-         * RF 按 `source / target` 找它自己的节点，子节点不在其中 ⇒ 这类边在 RF 里
-         * 找不到端点、会静默消失（图上连着、屏幕上看不见）。
-         */
-        .filter((e) => !childEdgeIds.has(e.id))
-        .map((e) => ({
-          id: e.id,
-          type: detailMode === 'coarse' ? 'coarse' : 'qh',
-          source: e.source,
-          target: e.target,
-          sourceHandle: sourcePortOf(e),
-          targetHandle: targetPortOf(e),
-          /* 选中态从 store 推回来（与节点同一条：store 是唯一真相） */
-          selected: edgeSelection.includes(e.id),
-          data: {
-            sourcePort: sourcePortOf(e),
-            targetPort: targetPortOf(e),
-            /* 选中节点时，与它相连的线一并高亮 + 出现删除按钮（§6.14，与老表面同一判据） */
-            related: selectedNodes.has(e.source) || selectedNodes.has(e.target),
-            onDelete: (id: string) => store.dispatch({ kind: 'edge.remove', id }),
-          } satisfies QhEdgeData,
-        }))
-      return detailMode === 'coarse' ? [] : list
-    },
-    /*
-     * ⚠️ 依赖里必须是**整个 `graph`**，不能只写 `graph.edges`：
-     * 上面那个 `isChildEdge` 读的是**节点**的 `parentId`（"这条边牵涉容器子节点吗"），
-     * 而"节点进出容器"只换 `graph.nodes`、**`graph.edges` 这个数组还是原来那一个引用**
-     * ⇒ 只依赖 `graph.edges` 的话这份列表**不会重算**，用户会看到
-     * 「拖出分组的节点连着的线整条消失，直到下次点空白（选中变化）才回来」
-     *（第 16 批 #7 探针实测：拖出后 `list.length = 0`、`childEdges = 2`；
-     *  点一下空白才变成 `2 / 0` —— 差的就是这一次重算）。
-     */
+    () =>
+      flowEdgesFor({
+        graph,
+        selection,
+        edgeSelection,
+        detailMode,
+        removeEdge: (id) => store.dispatch({ kind: 'edge.remove', id }),
+      }),
     [graph, selection, edgeSelection, store, detailMode],
   )
 
-  /**
-   * **连线偶发不显示**的兜底重测（2026-10-10 全量冒烟抓到：G2 / G51 / G107 各红一次，
-   * 探针复现率 2/6~2/8）。
-   *
-   * 实测事实（探针读的是**同一个 store 快照**，不是猜测）：
-   * - 库里 2 条边、`store.getSnapshot().edges.length === 2`、3 个节点也都渲染出来了；
-   * - 但 `.react-flow__edge` / `[data-edge]` 是 **0**，滚轮缩放 / 点空白 / 改窗口都救不回来，
-   *   只有刷新页面才恢复。
-   *
-   * 结论：不是数据问题，是 React Flow 的**节点测量**漏了一拍 —— 它要拿到端点的
-   * `handleBounds` 才肯画边，而首帧正好撞上「模板灌入 + `fitCanvasView` 改视口」
-   * （两帧 rAF），测量一旦落空就再没人重测。这里在节点集合变化后补一次
-   * `updateNodeInternals`（延后到视口自适应之后），把这一拍补上。
-   */
+  /** RF 首帧可能漏测节点导致边不显示；双 rAF 后补一次 updateNodeInternals。 */
   const updateNodeInternals = useUpdateNodeInternals()
-  const measurementKey = [
-    nodeMeasurementKey(graph),
-    graph.edges
-      .map(
-        (edge) =>
-          `${edge.id}:${edge.source}>${edge.target}:${edge.sourcePort ?? ''}>${
-            edge.targetPort ?? ''
-          }`,
-      )
-      .join(','),
-  ].join('||')
+  const measurementKey = flowMeasurementKey(graph)
   useEffect(() => {
-    const ids = graph.nodes.map((node) => node.id)
-    if (ids.length === 0) return
-    /** 双 rAF + 一小段延迟：等节点进 DOM、且 `fitCanvasView` 的两帧 rAF 跑完再量 */
-    const rafs: number[] = []
-    let timer: ReturnType<typeof setTimeout> | undefined
-    rafs.push(
-      requestAnimationFrame(() => {
-        rafs.push(
-          requestAnimationFrame(() => {
-            timer = setTimeout(() => updateNodeInternals(ids), 120)
-          }),
-        )
-      }),
-    )
-    return () => {
-      for (const raf of rafs) cancelAnimationFrame(raf)
-      if (timer !== undefined) clearTimeout(timer)
-    }
+    return scheduleFlowNodeMeasurement(graph, {
+      requestFrame: (callback) => requestAnimationFrame(callback),
+      cancelFrame: (id) => cancelAnimationFrame(id),
+      schedule: (callback, delayMs) => window.setTimeout(callback, delayMs),
+      cancelSchedule: (id) => window.clearTimeout(id),
+      updateNodeInternals,
+    })
   }, [measurementKey, updateNodeInternals])
 
   const updateSelectionMarquee = useCallback(
@@ -910,9 +599,14 @@ function FlowSurfaceInner({
     (event: ReactMouseEvent) => {
       const point = pointerWorldPointDom(event.nativeEvent, store)
       if (!point) return
-      selectionStartRef.current = point
-      selectionBaselineRef.current = event.shiftKey ? store.getSelection() : []
-      selectionMarqueeRef.current = { x: point.x, y: point.y, w: 0, h: 0 }
+      const session = beginSelectionMarquee({
+        point,
+        selection: store.getSelection(),
+        shiftKey: event.shiftKey,
+      })
+      selectionStartRef.current = session.start
+      selectionBaselineRef.current = session.baseline
+      selectionMarqueeRef.current = session.marquee
     },
     [store],
   )
@@ -924,13 +618,10 @@ function FlowSurfaceInner({
       const baseline = selectionBaselineRef.current
       selectionStartRef.current = null
       if (!marquee) return
-      /**
-       * 等这一帧 React Flow 自己的 select change 全部落完，再用 store 的真实节点矩形
-       * 裁一次。这样即使节点刚换尺寸、RF 内部测量晚了一拍，也不会留下框外节点。
-       */
+      /** 等 RF 的 select change 落完，再按 store 几何裁掉框外节点。 */
       window.requestAnimationFrame(() => {
         store.setSelection(
-          nodesIntersectingMarquee(store.getSnapshot(), marquee, baseline),
+          selectionFromMarquee({ graph: store.getSnapshot(), marquee, baseline }),
         )
         selectionMarqueeRef.current = null
         selectionBaselineRef.current = []
@@ -939,127 +630,54 @@ function FlowSurfaceInner({
     [store, updateSelectionMarquee],
   )
 
-  /** 位置变化 → 翻译成 `node.move`（React Flow 给的是绝对坐标，这里换成增量） */
   const onNodesChange = useCallback(
     (changes: NodeChange<RFNode<FlowNodeData>>[]) => {
-      const snapshot = store.getSnapshot()
-      const selectionPlan = planNodeSelection({
-        graph: snapshot,
-        selection: store.getSelection(),
-        changes,
-        marquee: selectionMarqueeRef.current,
-        baseline: selectionBaselineRef.current,
-      })
-      if (selectionPlan.changed) {
-        store.setSelection(selectionPlan.selection)
-        /**
-         * 打一个"这一帧刚选过节点"的戳：RF 紧接着还会发一批"选中挂在这些节点上的线"，
-         * 而"选线"会把节点选中清掉（见 `onEdgesChange`）⇒ 那批必须丢掉。
-         * 戳在微任务里清掉 —— RF 那两个回调是**同一次**同步调用里连着来的。
-         */
-        nodeSelectStampRef.current = true
-        queueMicrotask(() => {
-          nodeSelectStampRef.current = false
-        })
-      }
-      const positionPlan = planNodePositionChanges({
-        graph: snapshot,
-        changes,
-        anchor: dragAnchorRef.current,
-      })
-      if (!positionPlan) return
-      if (positionPlan.snapHintsChanged) store.setSnapHints(positionPlan.snapHints)
-      if (!positionPlan.move) return
-      // 真有位移：松手后要让创作面板保持隐藏（§6.15），见 onNodeDragStop
-      dragMovedRef.current = true
-      store.dispatch({ kind: 'node.move', ...positionPlan.move, phase: 'move' })
+      applyFlowNodeChanges(
+        {
+          graph: store.getSnapshot(),
+          selection: store.getSelection(),
+          changes,
+          marquee: selectionMarqueeRef.current,
+          baseline: selectionBaselineRef.current,
+          anchor: dragAnchorRef.current,
+        },
+        actionPorts,
+      )
     },
-    [store],
+    [store, actionPorts],
   )
 
   const onNodeDragStart = useCallback(
     (_e: MouseEvent | TouchEvent, _n: RFNode, dragged: RFNode[]) => {
-      const ids = dragIdsOf(
-        _n.id,
-        dragged.map((node) => node.id),
+      beginFlowNodeDrag(
+        { mainId: _n.id, draggedIds: dragged.map((node) => node.id) },
+        actionPorts,
       )
-      dragMovedRef.current = false
-      store.setDragging(true, ids[0] ?? null)
-      store.dispatch({ kind: 'node.move', ids, dx: 0, dy: 0, phase: 'begin' })
     },
-    [store],
+    [actionPorts],
   )
 
   const onNodeDragStop = useCallback(
     (e: MouseEvent | TouchEvent, _n: RFNode, dragged: RFNode[]) => {
-      const ids = dragIdsOf(
-        _n.id,
-        dragged.map((node) => node.id),
+      finishFlowNodeDrag(
+        {
+          mainId: _n.id,
+          draggedIds: dragged.map((node) => node.id),
+          moved: dragMovedRef.current,
+          anchor: dragAnchorRef.current,
+          pointer:
+            'clientX' in e
+              ? { clientX: e.clientX, clientY: e.clientY }
+              : null,
+          pointerWorld: () => pointerWorldPointDom(e, store),
+        },
+        actionPorts,
       )
-      const anchor = dragAnchorRef.current
-      const plan = planFlowDragEnd({
-        graph: store.getSnapshot(),
-        ids,
-        moved: dragMovedRef.current,
-        anchor,
-        pointer:
-          'clientX' in e
-            ? { clientX: e.clientX, clientY: e.clientY }
-            : null,
-      })
-      dragMovedRef.current = false
-      dragAnchorRef.current = null
-      for (const move of plan.moves) {
-        store.dispatch({ kind: 'node.move', ...move, phase: 'move' })
-      }
-      if (plan.snapMove) {
-        store.dispatch({ kind: 'node.move', ...plan.snapMove, phase: 'move' })
-      }
-      store.dispatch({ kind: 'node.move', ids, dx: 0, dy: 0, phase: 'end' })
-      store.setDragging(false)
-      /* 参考线 / 间距徽标只属于"拖动进行中"：松手即撤，不留残影 */
-      store.setSnapHints(null)
-      // §6.15：有位移的拖动松手后创作面板保持隐藏，直到下一次显式选中（与老表面同一条口径）
-      if (plan.moved) store.setPanelDismissed(true)
-
-      /**
-       * 归属判定（§6.11 / §6.12）：React Flow 自己接管拖动，老的 `resolveDropOutcome`
-       * **不在链路上** —— 不补这一步，"把节点拖进容器"就只会改坐标、不发生归属
-       * （P3 留下的最大缺口）。与老表面一致，**只在单节点拖动时判定**：
-       * 多选落进容器的归属有歧义（谁进谁不进），不做猜测。
-       */
-      const graph = store.getSnapshot()
-      // 落点：指针位置（指针不在节点内 —— 真的甩出去了 —— 时退回节点中心），与老表面同一判定。
-      // 上面那步终点对齐保证了"节点已在松手的地方"，所以这里不会再被丢帧带偏。
-      const outcome = planFlowDragDrop({
-        graph,
-        ids,
-        pointerWorld: pointerWorldPointDom(e, store),
-      })
-      if (outcome.kind === 'rejected') {
-        store.notify(outcome.reason, 'error')
-        return
-      }
-      if (outcome.kind === 'ok') {
-        /** `at` 一起带上：进**批量**要吸到格位（分组会忽略它 —— 它保的是世界位置） */
-        store.dispatch({
-          kind: 'node.reparent',
-          id: ids[0],
-          toParent: outcome.drop.toParent,
-          at: outcome.drop.at,
-        })
-      }
     },
-    [store],
+    [store, actionPorts],
   )
 
-  /*
-   * 端点拖线**不再走 React Flow 的连接手势**（`onConnect` / `isValidConnection` / `onConnectEnd`
-   * 三件套已删）：RF 的 Handle 会被相邻节点整块盖住（见 `FlowPortLayer`），而且它只认"手柄到手柄"，
-   * §6.14 的"松手落在节点范围内也完成连接""空白松手菜单""落点选最近输入口"都要自己再实现一遍。
-   * 现在统一由 `FlowPortLayer`（命中）+ `useEdgeDrag`（语义）+ `FlowDraftLayer`（草稿）这条链路负责，
-   * 两个引擎共用同一份建边规则 —— 不是"少接了一条"，是**刻意只留一份**。
-   */
+  /** 不用 RF 的连接手势；命中、语义、草稿统一走 FlowPortLayer + useEdgeDrag。 */
 
   const deletionPorts = useMemo(
     () => ({
@@ -1075,10 +693,7 @@ function FlowSurfaceInner({
   const onNodesDelete = useCallback(
     (deleted: RFNode[]) => {
       // 与右键菜单 / 跟随栏的删除同一句（老表面的键盘删除也会弹撤销条）
-      deleteFlowNodeIds(
-        deleted.map((node) => node.id),
-        deletionPorts,
-      )
+      deleteFlowNodeIds(flowNodeIdsOf(deleted), deletionPorts)
     },
     [deletionPorts],
   )
@@ -1087,10 +702,7 @@ function FlowSurfaceInner({
 
   const onEdgesDelete = useCallback(
     (deleted: { id: string }[]) => {
-      deleteFlowEdgeIds(
-        deleted.map((edge) => edge.id),
-        deletionPorts,
-      )
+      deleteFlowEdgeIds(flowEdgeIdsOf(deleted), deletionPorts)
     },
     [deletionPorts],
   )
@@ -1098,40 +710,31 @@ function FlowSurfaceInner({
   /** Del / Backspace 的按键守卫与删除顺序归 flowSurfaceChangeCoordinator。 */
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
-      const plan = planFlowDeleteKey({
-        key: e.key,
-        target: e.target as HTMLElement | null,
-        nodeIds: store.getSelection(),
-        edgeIds: store.getEdgeSelection(),
-      })
-      if (!plan) return
-      e.preventDefault()
-      executeFlowDeletion(plan, deletionPorts)
+      const handled = applyFlowDeleteKey(
+        {
+          key: e.key,
+          target: e.target as HTMLElement | null,
+          nodeIds: store.getSelection(),
+          edgeIds: store.getEdgeSelection(),
+        },
+        deletionPorts,
+      )
+      if (handled) e.preventDefault()
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [store, deletionPorts])
 
-  /**
-   * 边的**选中**：与节点同一条路（受控模式下走 `EdgeChange('select')`，见 `onNodesChange` 的注释）。
-   *
-   * 为什么必须自己接：不接的话 RF 内部知道"这条边选中了"，而我们的 store 不知道
-   * ⇒ `edges[].selected` 一直是 false ⇒ §6.14 的删除按钮永远不出现（G12 实测）。
-   * 选中连线时 store 会**清掉节点选中**（`setEdgeSelection` 的既有语义，与老表面一致）。
-   */
   const onEdgesChange = useCallback(
     (changes: EdgeChange<RFEdge>[]) => {
-      const plan = planEdgeSelection({
-        current: store.getEdgeSelection(),
-        changes,
-        nodeSelectStamp: nodeSelectStampRef.current,
-      })
-      if (plan.kind === 'apply') store.setEdgeSelection(plan.ids)
+      applyFlowEdgeChanges(
+        { changes, nodeSelectStamp: nodeSelectStampRef.current },
+        actionPorts,
+      )
     },
-    [store],
+    [actionPorts],
   )
 
-  /** 双击连线直接删除（§6.14）。RF 把 `dblclick` 挂在 `<g class="react-flow__edge">` 上，冒泡即达 */
   const onEdgeDoubleClick = useCallback(
     (_e: ReactMouseEvent, edge: RFEdge) => {
       deleteFlowEdgeIds([edge.id], deletionPorts)

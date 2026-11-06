@@ -1,5 +1,18 @@
 # CanvasFlow（轻画）项目记忆
 
+### FlowSurface 交互、动作与渲染模型拆分（2026-11-06）
+
+- `flowSurfaceInteractionCoordinator.ts` 只规划点击、Shift 子节点选择、平移/复制、锚点、菜单和导入反馈；
+  `flowSurfaceFlowActionCoordinator.ts` 只编排 Flow 节点/连线变更、拖拽、删除、框选和测量；
+  `flowSurfaceRenderModel.ts` 只投影 React Flow 节点/连线/运行态。hooks、state/refs、DOM、Store 和 JSX 仍归宿主。
+- 容器子节点 `Shift + pointerdown` 只能切换选中并立即结束，必须 `beginDrag=false`、`reparent=null`；普通点击
+  才允许 batchSlot 归位和拖动。`planChildPointerDown` 必须显式返回 beginDrag，宿主不能再次分散判断事件。
+- `FlowSurface` 1396→999，`FlowSurfaceInner` 主渲染段 222 行哈希
+  `FCE6F4A6C443DE0177D30D1F656AC64D909DD7BD7D7EA98BC4C38F942A5BC46E` 不变；模块预算 187/271/132、宿主 999。
+- 并行全量曾让治理 CLI 超过 15 秒并出现 worker 终止噪声；治理文件单跑 15/15 后，用
+  `--testTimeout=60000 --no-file-parallelism` 得到最终 595 files / 5213 tests（1 skipped），check
+  （1020 modules / 4095 deps、25 legacy、164 semantic）与 build 通过；超千行生产文件从 4 降到 3。
+
 ### 灯箱编辑与媒体投影拆分（2026-11-06）
 
 - `lightboxEditorProjection.ts` 只投影素材 owner、裁剪/旋转/标注目标、能力、当前编辑态与可用模式；

@@ -1,5 +1,17 @@
 # CanvasFlow 不变量详表
 
+## FlowSurface 交互、动作与渲染模型边界（2026-11-06）
+
+- `flowSurfaceInteractionCoordinator.ts`、`flowSurfaceFlowActionCoordinator.ts`、`flowSurfaceRenderModel.ts`
+  不得 import React/React Flow hooks；React state/refs、DOM rect、Store dispatch、Execution 和 JSX 仍归 `FlowSurface`。
+- 容器子节点 Shift 点击只做选择切换，`beginDrag=false` 且 `reparent=null`；只有普通 pointerdown 才允许 batchSlot
+  归位和 `drag.begin`。空格平移优先于节点分支，Alt 复制必须阻断 RF 原生拖动。
+- 拖拽固定 begin→move/alignment→end→setDragging(false)→snap 清空→panel dismiss→drop/reparent；删除固定
+  edge→node→clear selection→undo bar；边选择必须先同值抑制，再受节点选择 stamp 抑制。
+- 拆分必须保持 `FlowSurfaceInner` 主渲染段 222 行及
+  `FCE6F4A6C443DE0177D30D1F656AC64D909DD7BD7D7EA98BC4C38F942A5BC46E` 不变；改 JSX/DOM/CSS/文案时立即转
+  「涉及 UI」门禁。宿主预算不得回涨到 1000 行以上。
+
 ## 灯箱编辑与媒体投影边界（2026-11-06）
 
 - `lightboxEditorProjection.ts` / `lightboxMediaProjection.ts` 只处理只读投影，不得 import React、DOM、Store 或

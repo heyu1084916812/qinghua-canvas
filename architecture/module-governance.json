@@ -424,7 +424,7 @@
       "test": [
         "src/workbenches/canvas/flow/flowGraph.test.ts"
       ],
-      "budget": 1396
+      "budget": 999
     },
     {
       "module": "src/workbenches/canvas/lightbox/LightboxLayer.tsx",
@@ -4898,6 +4898,105 @@
         "src/workbenches/canvas/lightbox/lightboxMediaProjection.test.ts"
       ],
       "budget": 114
+    },
+    {
+      "module": "src/workbenches/canvas/flow/flowSurfaceInteractionCoordinator.ts",
+      "owner": "canvas-flow-surface-interaction",
+      "responsibility": "规划 FlowSurface 空白/子节点点击、平移与复制起手、右键菜单和文件导入反馈。",
+      "owns": [
+        "空白点击、子节点点击与 Shift 选择计划",
+        "空格平移、Alt 复制、拖动锚点和右键菜单计划",
+        "导入文件后的选中、拒绝提示与撤销条顺序"
+      ],
+      "doesNotOwn": [
+        "React state/refs、DOM 事件和 Store 写入",
+        "节点位置、连线、删除和容器归属决策",
+        "画布 JSX/CSS 与用户界面结构"
+      ],
+      "publicApi": [
+        "SurfaceClickPlan",
+        "planSurfaceClick",
+        "ChildPointerPlan",
+        "planChildPointerDown",
+        "SurfacePointerDownPlan",
+        "planSurfacePointerDown",
+        "ContextMenuPlan",
+        "planSurfaceContextMenu",
+        "ImportedSurfaceFiles",
+        "FlowImportPorts",
+        "importSurfaceFiles"
+      ],
+      "test": [
+        "src/workbenches/canvas/flow/flowSurfaceInteractionCoordinator.test.ts"
+      ],
+      "budget": 187
+    },
+    {
+      "module": "src/workbenches/canvas/flow/flowSurfaceFlowActionCoordinator.ts",
+      "owner": "canvas-flow-surface-actions",
+      "responsibility": "编排节点/连线选择和变更、拖拽开始结束、删除、框选与节点测量调度。",
+      "owns": [
+        "节点位置、选择戳、拖动锚点与 reparent 顺序",
+        "连线选择抑制、删除顺序与节点事件路由",
+        "框选会话和双 rAF 节点测量生命周期"
+      ],
+      "doesNotOwn": [
+        "React Flow hooks、React state/refs 和 DOM rect",
+        "底层图变更算法、容器计算和 Store 实现",
+        "画布 JSX/CSS 与用户界面结构"
+      ],
+      "publicApi": [
+        "FlowNodeChangePorts",
+        "applyFlowNodeChanges",
+        "FlowNodeDragStartPorts",
+        "beginFlowNodeDrag",
+        "FlowNodeDragEndInput",
+        "FlowNodeDragEndPorts",
+        "finishFlowNodeDrag",
+        "FlowEdgeChangePorts",
+        "FlowSurfaceActionPorts",
+        "applyFlowEdgeChanges",
+        "routeFlowNodeEvent",
+        "applyFlowDeleteKey",
+        "beginSelectionMarquee",
+        "selectionFromMarquee",
+        "FlowMeasurementPorts",
+        "scheduleFlowNodeMeasurement",
+        "flowNodeIdsOf",
+        "flowEdgeIdsOf"
+      ],
+      "test": [
+        "src/workbenches/canvas/flow/flowSurfaceFlowActionCoordinator.test.ts"
+      ],
+      "budget": 271
+    },
+    {
+      "module": "src/workbenches/canvas/flow/flowSurfaceRenderModel.ts",
+      "owner": "canvas-flow-surface-render-model",
+      "responsibility": "把画布图快照投影为 React Flow 节点、连线、运行展示和测量键。",
+      "owns": [
+        "顶层节点与容器子节点的 RF 投影",
+        "连线数据、选中关联和 child-edge 过滤",
+        "运行态展示与节点测量键"
+      ],
+      "doesNotOwn": [
+        "React Flow hooks、实际渲染和事件提交",
+        "画布图变更、容器归属和运行引擎",
+        "画布 JSX/CSS 与用户界面结构"
+      ],
+      "publicApi": [
+        "derivedPropsFor",
+        "flowRunPresentationOf",
+        "FlowNodeProjectionInput",
+        "flowNodesFor",
+        "FlowEdgeProjectionInput",
+        "flowEdgesFor",
+        "flowMeasurementKey"
+      ],
+      "test": [
+        "src/workbenches/canvas/flow/flowSurfaceRenderModel.test.ts"
+      ],
+      "budget": 132
     }
   ]
 }
