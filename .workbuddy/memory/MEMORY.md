@@ -1,5 +1,16 @@
 # CanvasFlow（轻画）项目记忆
 
+### 创作面板视图拆分（2026-11-06）
+
+- `CreationPanel.tsx` 1782→981，仅保留 React state/refs/hooks、DOM 测量、Store/节点动作与区块编排；素材条、
+  提示词编辑、参数控件、提示词工具、运行按钮拆到 5 个 `creation/` 视图组件，公共 props 归 `creationPanelTypes.ts`。
+- 提示词 `MentionEditor` ref/anchor、@ 菜单、预设/情绪菜单、参数浮层、生成按钮和 `data-panel-*` 锚点必须原位保留；
+  视图不得直接 import Store/Platform，也不得新增加布局 wrapper。
+- 隔离 1425+18767 下四组新场景截图的几何/焦点/悬停/滚动一致，像素差 ≤0.029%；G23/G46 与 `50d7d39` 基线
+  独立库同失败集（既有滚动条变量/视频令牌夹具问题），不能算本刀回归。
+- 最终流水 `--testTimeout=60000 --hookTimeout=60000 --no-file-parallelism`：597 files / 5223 tests（1 skipped），
+  check（1037 modules / 4180 deps、25 legacy、181 semantic）与 build 通过；超千行生产文件仅剩 SettingsPage。
+
 ### 电商 Studio 视图组件拆分（2026-11-06）
 
 - `EcommerceStudio.tsx` 1598→729，仅保留 React state/refs、Store/Platform 动作和区块编排；上传、通用参数、卖点、

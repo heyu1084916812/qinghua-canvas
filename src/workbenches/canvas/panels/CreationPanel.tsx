@@ -9,12 +9,11 @@ import {
 } from 'react'
 import type { ModelCapability } from '../../../domain/shared/capability'
 import type { GenerationData } from '../../../domain/canvas/model/node'
-import type { PanelModel, RecipeSnapshot } from './panelModel'
+import type { RecipeSnapshot } from './panelModel'
 import { moveInOrder } from './panelModel'
 import { useChannels } from '../../../app/providers/ChannelStoreProvider'
 import { useSkills } from '../../../app/providers/SkillStoreProvider'
 import {
-  MentionEditor,
   mentionToken,
   parseMentions,
   stripMentionMarkup,
@@ -22,23 +21,15 @@ import {
 } from '../text/MentionEditor'
 import { expandMentions, type MentionCandidate } from '../text/mentionValue'
 import type { PromptToolAction } from '../../../features/shared/promptTools/promptTools'
-import type { PromptToolTarget } from '../../../features/shared/promptTools/usePromptTools'
 import { resolveTextRoute } from '../execution/textRoute'
-import { ParamPicker, type ParamSection } from './ParamPicker'
-import { SkillPicker } from './SkillPicker'
+import type { ParamSection } from './ParamPicker'
 import { creationStyles as styles } from './creation/creationStyles'
-import {
-  CollectionCard,
-  MentionThumb,
-  MentionThumbProbe,
-  Thumb,
-} from './creation/CreationAssetViews'
 /** 浮层外壳（与情绪面板共用一份，见那个文件） */
 import shell from './PanelShell.module.css'
 import {
   VIDEO_MODE_LABELS,
-  isAutoRatio,
   videoParamsFor,
+  type VideoModeId,
 } from '../../../domain/canvas/layout/videoParams'
 import { mjSettingsOf } from '../../../domain/canvas/layout/mjParams'
 import { imageParamsFor } from '../../../domain/canvas/layout/imageParams'
@@ -50,23 +41,11 @@ import {
 } from '../../../domain/project/modelCatalog'
 import { ModelIcon } from '../../../features/shared/modelIcon/ModelIcon'
 import {
-  IconChevronDown,
-  IconChevronUp,
-  IconPrompt,
-  IconPreset,
-  IconSpinner,
-  IconStop,
-} from '../toolbar/icons'
-import {
   DEFAULT_EMOTION_ID,
   presetById,
 } from '../../../domain/canvas/layout/presets'
-import { PresetMenu, PresetOptions } from './PresetMenu'
 
-import {
-  CATEGORY_OPTIONS,
-  promptNeedsExpand,
-} from './creation/creationCatalog'
+import { promptNeedsExpand } from './creation/creationCatalog'
 import { creationModelNames, creationModelOptions } from './creation/creationModelOptions'
 import { deriveCreationQualityParams } from './creation/creationQualityParams'
 import { panelGeometryFor } from './creation/creationPanelGeometry'
@@ -86,6 +65,14 @@ import {
   runPromptToolAction,
   type PromptCommitScheduler,
 } from './creation/creationPromptCoordinator'
+import { CreationAssetsView } from './creation/CreationAssetsView'
+import { CreationParameterControls } from './creation/CreationParameterControls'
+import { CreationPromptToolsView } from './creation/CreationPromptToolsView'
+import { CreationPromptView } from './creation/CreationPromptView'
+import { CreationRunActionsView } from './creation/CreationRunActionsView'
+import type { CreationPanelProps } from './creation/creationPanelTypes'
+
+export type { CreationPanelProps, PanelPromptTools } from './creation/creationPanelTypes'
 
 export {
   COUNT_OPTIONS,
@@ -107,106 +94,6 @@ export {
  * 排序按「方 → 横 → 竖」成对排列，竖版列表里同类相邻，不用在长列表里来回找。
  * 模型**上报了** `aspectRatios` 时仍以模型为准（能力驱动，UI 不写死）。
  */
-/** 提示词节点的 LLM 工具状态（由 PanelLayer 持有 usePromptTools 并下传，§6.7） */
-export interface PanelPromptTools {
-  status: 'idle' | 'running' | 'error'
-  error: string | null
-  run: (text: string, action: PromptToolAction, target?: PromptToolTarget) => void
-}
-
-export interface CreationPanelProps {
-  /**
-   * 当前节点的 id。
-   *
-   * 为什么面板需要知道它：面板实例**会被不同节点复用**（`PanelLayer` 上没挂 `key`），
-   * 所以任何"跟随某个节点的局部状态"都必须按 id 认人 —— 否则切节点时会串味。
-   * 目前只有一个消费者：「自定义像素」那一格的模式状态（见 `customMode`）。
-   */
-  nodeId?: string
-  /** 节点数据（提供渠道 / 模型 / 参数当前值） */
-  data: GenerationData
-  model: PanelModel
-  /** 节点已禁用（§9.3 不变量 5）：本次不参与执行，已有产物仍可作只读上游 */
-  disabled?: boolean
-  running: boolean
-  globalRunning: boolean
-  error: string | null
-  onEvent: (event: import('./panelModel').PanelEvent) => void
-  /** 关闭面板（点面板外 / Esc） */
-  onClose: () => void
-  /** 面板形态：generation（默认，§6.8）| prompt（提示词节点，§6.7） */
-  mode?: 'generation' | 'prompt'
-  /** prompt 模式下的优化 / 翻译工具（缺省则不显示按钮） */
-  promptTools?: PanelPromptTools | null
-  /** 打开技能库（缺技能时的出口）；由页面容器注入路由跳转 */
-  onOpenSkills?: () => void
-  /**
-   * 选中提示词节点的**上游图片数量**（§6.7 反推）。
-   *
-   * 面板是纯视图、不读图，数量由装配层算好注入；反推按钮据此决定能不能点，
-   * 而不是去猜「大概有图吧」——猜错的代价是用户点了没反应。
-   */
-  promptImageCount?: number
-  /**
-   * 是否显示「图片 / 视频」功能类别切换（§6.8）。
-   *
-   * 只有**生成节点**显示：分组 / 批量共用本面板（§6.11 / §6.12「与生成节点完全一致」），
-   * 但它们的类别由内容决定，不提供手动切换。由装配层按节点类型注入。
-   */
-  showCategoryToggle?: boolean
-  /**
-   * 这次生成**有没有图片参考**（上游素材，或节点自身的素材）。
-   *
-   * 唯一的影响是比例候选多一档「跟随素材」——没有素材可跟随就不该给这一档
-   * （给了是个死开关）。判据是「有没有素材」而不是「是不是批量节点」
-   * （2026-09-24 用户拍板：凡是有生图、有素材的地方都给这一档）。
-   *
-   * 由装配层按图算出并注入；面板保持纯视图、不读图（架构 §4.7）。
-   */
-  hasSourceImage?: boolean
-  /**
-   * 选中的**分发器**节点（循环 / 批量）下游有可运行的生成节点。
-   *
-   * 有下游时，这个节点的「生成」按钮实际驱动的是**下游生成节点**
-   * （用它的参数），与提示词节点同一种语义——用户 2026-09-24：
-   * 「点击一键生成的时候参考普通节点生成的逻辑」。按钮文案必须说清这件事，
-   * 否则按下去看到下游在动，会以为按了个寂寞（同「假成功」那一类）。
-   *
-   * 由装配层按图算出并注入；面板保持纯视图、不读图（架构 §4.7）。
-   */
-  runsDownstream?: boolean
-}
-
-/**
- * 生成按钮里的箭头（用户 2026-09-19：「换一个粗一点的，前方左右两边要长一点」）。
- *
- * 为什么不用文字 `↑`：字形箭头又细又小，笔画宽度跟着字体走、改不动。
- * 自绘 SVG 能把**线宽**（2.2）和**两侧斜臂的长度**（从尖端往左下拉得较长）
- * 都定死，得到一个「粗、臂长、看得清方向」的箭头——这正是它作为主操作要有的分量。
- */
-function RunArrow() {
-  return (
-    <svg
-      className={styles.runArrow}
-      width="18"
-      height="18"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={2.2}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-      focusable="false"
-    >
-      {/* 主干：从下往上 */}
-      <path d="M12 20.5V4.5" />
-      {/* 两侧斜臂：往下拉得较长，形成开阔的箭头 */}
-      <path d="M5.5 11 12 4.5 18.5 11" />
-    </svg>
-  )
-}
-
 /**
  * 创作参数面板（产品文档 §6.8 / §6.11 / §6.12）。
  *
@@ -243,69 +130,24 @@ export function CreationPanel(props: CreationPanelProps) {
   const promptMode = props.mode === 'prompt'
   /** 视频是生成节点的功能类别（`data.mode`），参数集与图片模式不同（§6.8） */
   const videoMode = !promptMode && data.mode === 'video'
-  /**
-   * 面板兜底：节点上**空着**时，按**解析链**现算一个可用的渠道 / 模型。
-   *
-   * 为什么面板也要兜底：早期只在**创建那一刻**算一次，算不出来就写空节点；
-   * 于是「渠道已配置、模型只进了 modelCache、尚未勾选」这条最常见的路径下，
-   * 新建节点永远是空的，而面板这边又只看节点上的值——**没有第二道兜底**。
-   * 现在创建与面板调的是同一个 domain 解析链（`defaultForNewNode`）。
-   *
-   * **只在节点模型为空时兜底**，这是刻意的边界（G46 实测踩到）：
-   * 节点已经带了模型（哪怕它不属于当前类别）是**用户自己的状态**，
-   * 例如「图片 → 视频」切类别会把图片模型清掉，若这里又按新类别塞一个，
-   * 就等于面板在跟用户抢所有权——类别切换会立刻被填回一个值，切完看着像没生效。
-   *
-   * 兜底只影响**显示**：不写回节点。用户不动它、直接点生成，执行层仍按节点上
-   * 已固化的值为准；用户改选时才会把选择写回节点（与 §6.8「所见即所发」一致）。
-   */
+  /** 仅在节点模型为空时解析并写回默认配方，已有模型绝不覆盖。 */
   const [fallback, setFallback] = useState<{ channelId: string; model: string } | null>(null)
-  /**
-   * `onEvent` 是父组件每次渲染新建的内联函数，**不能进 effect 依赖**：
-   * 那会让这个「解析默认配方」的 effect 每渲染一次就跑一遍，进而反复派发写回事件，
-   * 把节点数据与撤销栈刷爆。用 ref 取最新引用，effect 只按真实业务值触发。
-   */
+  /** onEvent 每次渲染都会新建，effect 通过 ref 读取最新值。 */
   const onEventRef = useRef(onEvent)
   onEventRef.current = onEvent
   const ownedChannelId = data.channelId ?? ''
   const ownedModel = data.model ?? ''
-  /**
-   * 依赖用**稳定值**：`enabled` 是每次渲染新建的数组，直接进依赖会无限重跑；
-   * 渠道数量 + 各自的勾选状态足以覆盖「渠道被启用 / 被禁用 / 勾选模型变化」。
-   */
+  /** 用稳定签名覆盖渠道启用和模型勾选变化。 */
   const channelSignature = enabled
     .map((c) => `${c.id}:${c.models.length}:${c.modelCache?.length ?? 0}`)
     .join('|')
-  /**
-   * 兜底算出的渠道 / 模型**要写回节点**，不能只拿来显示。
-   *
-   * 用户 2026-09-23 实测报：「UI 层有默认模型，但实际没有；新建节点直接生成，
-   * 下方提示我没选渠道」。
-   *
-   * 根因是这里曾经只做「显示兜底」：`shownModel` 由解析链补齐，面板看着配好了，
-   * 而节点 data 里 `channelId` / `model` 仍是空 —— 执行层读的**只有节点 data**
-   * （`toRunRequest` 见到空渠道直接返回 null ⇒ 该节点不进计划）。于是界面与事实
-   * 分叉：面板显示一套，执行用另一套，点下去必然失败。
-   *
-   * 这与项目里反复出现的一类缺陷同源（「看着通了、其实没接上」）：**显示层替用户
-   * 做了决定，却没把决定落到数据上**。修法是让兜底落地 —— 解析链既然能算出一条可用
-   * 配方，就把它写进节点，显示与实际从此同源，点生成也用得上。
-   *
-   * 只在**节点自身为空**时写（`ownedChannelId` / `ownedModel` 都空），
-   * 所以不会覆盖用户的任何显式选择，也不参与「切类别清模型」那条路径
-   * （那条走 `ownedModel` 非空的分支，进不来）。
-   */
+  /** 解析出的配方必须写回节点；只补显示会造成界面与执行数据分叉。 */
   useEffect(() => {
     let cancelled = false
-    /**
-     * 节点模型非空 → 一律不兜底。节点上的值是用户的选择（或类别切换后的刻意为空），
-     * 面板是纯视图，不该拿解析链覆盖它。
-     */
     if (ownedModel) {
       setFallback(null)
       return
     }
-    /** 一个渠道都没有时不必算：解析链必然返回 null，白白多跑一次。 */
     if (enabled.length === 0) {
       setFallback(null)
       return
@@ -316,54 +158,23 @@ export function CreationPanel(props: CreationPanelProps) {
       .then((recipe) => {
         if (cancelled || !recipe) return
         setFallback({ channelId: recipe.channelId, model: recipe.model })
-        /**
-         * 写回节点。
-         *
-         * 两个事件而不是一个：`setChannel` 的语义是「换渠道 ⇒ 清空模型」，
-         * 先发它、再发 `setModel`，落到 reducer 上正好是一次完整赋值，
-         * 复用既有事件、不新增命令（也就不用动 state 层与测试台）。
-         */
+        /** setChannel 会清模型，因此随后必须写回配方模型。 */
         if (!ownedChannelId) onEventRef.current({ type: 'setChannel', channelId: recipe.channelId })
         onEventRef.current({ type: 'setModel', model: recipe.model })
       })
-      .catch(() => {
-        /** 解析失败不该让面板崩：留空并照常渲染「还没配置渠道」的解释 */
-      })
+      .catch(() => {})
     return () => {
       cancelled = true
     }
   }, [channels, ownedChannelId, ownedModel, promptMode, videoMode, channelSignature])
-  /**
-   * 「有模型、却没有渠道」→ 补一条可用渠道（用户 2026-09-27 去掉平台 chip 后的必要配套）。
-   *
-   * 去掉平台 chip 之后，用户可能先选模型、而节点上还没有渠道：
-   *  - 上面那条兜底在 `ownedModel` 非空时**刻意不跑**（不覆盖用户选择）；
-   *  - 而 `toRunRequest` 见到空 `channelId` 直接返回 null ⇒ 节点不进计划
-   *    ⇒ 点生成**毫无反应**（本项目反复踩过的「假成功」）。
-   *
-   * 所以这里只补**渠道**、不动模型：渠道是「这次打哪条路」的兜底，
-   * 模型是用户刚选的东西。补完节点就能参与选路，哪怕这条渠道还没有该模型的
-   * 映射，也会走「没有渠道提供模型」的**明确报错**，而不是静默失败。
-   */
+  /** 有模型无渠道时只补渠道，并保持用户刚选的模型不变。 */
   useEffect(() => {
     if (ownedChannelId || enabled.length === 0) return
-    /**
-     * ⚠️ 挑**真能提供这个模型**的那条渠道，不是 `enabled[0]`（2026-10-08 修）。
-     *
-     * 以前下拉里可能有渠道自己的模型 ID，随便补一条渠道都"能用"（选路只按模型名找）。
-     * A 口径之后节点上的模型是**前端显示名**，「第一条启用渠道」很可能一个模型都不提供 ——
-     * 实测（G9/G10 的探针）：节点会被写成「ModelScope + mock-image-1」这种不匹配的一对，
-     * 而后补的这条还会把解析链刚算好的渠道覆盖掉（两条 effect 抢着写）。
-     * 判据与 Agent 面板同一条：`channelIdForLogical`（映射优先、同名直配兜底）。
-     */
+    /** 优先选择真能提供该逻辑模型的渠道。 */
     const provider = ownedModel ? channelIdForLogical(enabled, ownedModel) : undefined
     const target = provider ? enabled.find((c) => c.id === provider) : enabled[0]
     if (!target) return
-    /**
-     * `setChannel` 的语义是「换渠道 ⇒ 清空模型」（见 PanelLayer）。
-     * 若此刻节点上已经有用户刚选的模型，必须**随后写回**，
-     * 否则「先选模型、再补渠道」这条路径会把用户的选择当场抹掉。
-     */
+    /** setChannel 会清模型，因此有用户模型时立即写回。 */
     onEventRef.current({ type: 'setChannel', channelId: target.id })
     if (ownedModel) onEventRef.current({ type: 'setModel', model: ownedModel })
     // 依赖口径与上一条兜底一致：用稳定的 `channelSignature` 而不是每次新建的 `enabled`
@@ -374,25 +185,10 @@ export function CreationPanel(props: CreationPanelProps) {
   const [dragIndex, setDragIndex] = useState<number | null>(null)
   const [expandedNodeId, setExpandedNodeId] = useState<string | null>(null)
   const promptExpanded = nodeId !== '' && expandedNodeId === nodeId
-  /**
-   * 当前展开的参数浮层（§6.8「同一时刻只允许一个面板打开，开新关旧」）。
-   *
-   * 唯一性由**这一个 key** 保证，而不是每个 chip 各自持一个 boolean——
-   * 那样必然能同时开出两个浮层，再靠互相通知去关，是自找的竞态。
-   */
+  /** 单个 key 保证同一时刻只开一个参数浮层。 */
   const [openPicker, setOpenPicker] = useState<string | null>(null)
 
-  /**
-   * 提示词输入的**本地草稿 + 防抖落库**（用户 2026-09-24：「批量节点里面输入文字有点卡」）。
-   *
-   * 卡的原因：`onChange` 每敲一个键就 `dispatch` 一次 `node.updateData`。
-   * 每次 dispatch 都会**替换整张 graph 快照**并触发整图重渲染；而批量节点还要
-   * 额外算集合成员（`batchItemsOf` 遍历子节点），于是每键的代价被放大。
-   *
-   * 做法：输入时只改**本地状态**（那一层是浏览器原生的，没有重渲染），
-   * 停手 300ms 后再落库。落库前如果用户切了节点，`model.prompt` 会变，
-   * 下面的 effect 会把草稿同步过去 —— 不会把 A 节点的内容写进 B 节点。
-   */
+  /** 本地草稿停手 300ms 后落库；切节点时用外部 prompt 覆盖草稿。 */
   const [promptDraft, setPromptDraft] = useState(model.prompt)
   const promptCommit = useRef<PromptCommitScheduler | null>(null)
   if (!promptCommit.current) {
@@ -402,18 +198,7 @@ export function CreationPanel(props: CreationPanelProps) {
   }
   const promptTimer = promptCommit.current
 
-  /**
-   * **「自定义像素」那一格的模式**（对账 #545，收口 #542 的残留）。
-   *
-   * 问题：那一格的显隐原先**只**由存着的值推出（`值非空 && 不是档位值` ⇒ 算自定义档）。
-   * 于是用户把输入框**清空**（按住 Backspace 删干净）时，值变空 ⇒ 整格连同输入框一起消失，
-   * 焦点也没了 —— 想改成别的尺寸只能重新点一次「自定义」再填。全选后直接重打没事
-   * （第一下键入就有值），所以这个坑只在"清空再打"这条路上撞到。
-   *
-   * 做法：加一个**按节点记**的模式位 —— 点「自定义」置位、点档位（1K/2K/4K）复位。
-   * ⚠️ 必须**按 nodeId 认人**：面板实例会被不同节点复用（`PanelLayer` 上没挂 `key`），
-   * 只存一个 boolean 会在切节点时串味（A 节点处于自定义模式 → 切到 B 也冒出个输入框）。
-   */
+  /** 自定义尺寸模式按 nodeId 隔离，清空输入时仍保留输入框。 */
   const [customMode, setCustomMode] = useState<{ nodeId: string; on: boolean } | null>(null)
   const customModeOn = customMode?.nodeId === nodeId && customMode.on
 
@@ -436,23 +221,10 @@ export function CreationPanel(props: CreationPanelProps) {
   const togglePicker = (key: string) => setOpenPicker((cur) => (cur === key ? null : key))
   const tools = promptMode ? (props.promptTools ?? null) : null
 
-  /**
-   * 创作面板里的 `@`（用户 2026-10-05 第 15 条）：能引用**本节点上游**的图 / 视频素材。
-   *
-   * 存储里只放纯文本（`@名字`），引用形态只活在编辑器那一层 —— 理由与两个方向的
-   * 转换都写在 `text/mentionValue.ts`（提示词还要发给模型、给下游，不能夹带机器形态）。
-   * 这里只管三件事：纯文本 → 编辑器 value、编辑器文本 → 纯文本、给 chip 备好缩略图。
-   */
+  /** 存储只放纯文本；chip 形态、光标落点和缩略图由编辑器层维护。 */
   const promptEditorRef = useRef<MentionEditorHandle | null>(null)
   const [mentionOpen, setMentionOpen] = useState(false)
-  /**
-   * 引用候选菜单的落点（相对提示词框的左上角）。
-   *
-   * 用户 2026-10-05 第 4 条：「艾特功能出现的面板需要在输入框艾特的位置，不要固定在右边」——
-   * 所以这里量的是**光标所在的那个矩形**（`Selection.getRangeAt(0)`），
-   * 菜单就贴在光标下面，跟用户在哪儿打 `@` 走。量不到光标（比如刚点完按钮）时退回 `null`，
-   * 菜单回到输入框左上角，而不是固定在右侧。
-   */
+  /** 菜单跟随光标；量不到光标时退回输入框左上角。 */
   const [mentionPos, setMentionPos] = useState<{ left: number; top: number } | null>(null)
   const promptBoxRef = useRef<HTMLDivElement | null>(null)
   const [promptOverflow, setPromptOverflow] = useState(false)
@@ -734,13 +506,7 @@ export function CreationPanel(props: CreationPanelProps) {
   )
 /** 节点上存的模型名 → 逻辑名（老数据迁移）：见 `logicalModelNames` 处的说明 */
   const shownLogicalModel = toLogicalName(allChannels, shownModel)
-  /**
-   * 工具调用的目标与面板当前“看起来选中的值”同源。
-   *
-   * 节点里的旧 `channelId` 只作首选提示；若当前启用渠道已不能提供这个模型，
-   * 就从其余启用渠道中重新解析。解析不到时传空，让守卫在本地说明配置问题，
-   * 不把过期组合发到上游换一个 HTTP 400。
-   */
+  /** 工具目标与界面当前显示值同源，过期渠道组合不发给上游。 */
   const promptToolTarget = resolveTextRoute(allChannels, shownChannelId, shownModel)
   const runPromptTool = (action: PromptToolAction) =>
     runPromptToolAction({
@@ -750,88 +516,28 @@ export function CreationPanel(props: CreationPanelProps) {
       fallbackModel: shownLogicalModel,
       tools,
     })
-  /**
-   * 模型 chip 在**还没选**时的占位文案（用户 2026-09-27 第 8 轮）。
-   *
-   * 此前占位就是类别名（「生图模型」「文本模型」），用户看不出默认该用哪个。
-   * 现在固定清单的**第一个**就是该类别的默认显示名，直接用它的名字当占位 ——
-   * 用户一眼就知道「这里点了会先给什么」。
-   */
+  /** 未选模型时用固定清单第一项作为可执行默认提示。 */
   const defaultModelLabel =
     logicalModelNames[0] ??
     (promptMode ? '文本模型' : videoMode ? '视频模型' : '生图模型')
-  /**
-   * 能力（分类 / 张数上限 / 时长区间 / 参考图数）仍按**站点 ID**取（与 M7-4 之前一致）。
-   *
-   * ⚠️ 这里**刻意不改**按逻辑名取：二分实测（BISECT-D）证明改了会让 G46 失败 ——
-   * 切类别那一帧节点上还是上一档的模型，`capabilityOfLogical` 返回 undefined
-   * ⇒ 参考模式被判隐藏、chip 取不到视频模型。
-   * 而按站点 ID 取不影响用户要的「下拉只显示一个逻辑名」（那由下面的
- * `logicalModelNames` 负责），故保持改动面最小、不冒险。
-   *
-   * 已知限制：某站把逻辑名映射成**不同名**的上游 ID 时，该站的能力参数
-   * （张数上限等）会取不到 —— 待 M7 收尾时连同切类别时序一起处理，已记入对账清单。
-   */
-  /**
-   * 这次要用的**能力表**（比例 / 清晰度 / 张数 / 时长）—— 两条路，缺一不可：
-   *
-   *  ① 节点上存的就是该渠道的模型 ID（老节点、或上游 ID 恰好等于显示名的站）⇒ 同名直配；
-   *  ② 节点上存的是**前端显示名**（用户 2026-10-08 定下 A 口径之后的常态：
-   *     下拉只给显示名，真实 ID 由映射翻译）⇒ 经映射表 / 别名归一后再找
-   *     （`capabilityOfLogical`，与选路用的是同一条搜索）。
-   *
-   * ⚠️ ② 只能**兜底**，不能取代 ①：切类别那一帧，节点上还是上一档的模型名，
-   * 那时按显示名查会拿到 undefined（二分实测：把这个顺序改反会让 G46 红 ——
-   * 参考模式被判隐藏、chip 取不到视频模型）。所以是「先同名、再归一」。
-   */
+  /** 能力先按站点模型 ID 查，再按逻辑名归一；顺序反转会让切类别帧丢能力。 */
   const activeModel =
     models.find((m) => m.id === shownModel) ??
     capabilityOfLogical(allChannels, shownLogicalModel, shownChannelId || undefined)
   /** 类别名：写进占位文案与空态提示，让「没模型」这件事说得出是**哪一类**没有 */
   const categoryLabel = promptMode ? '文本模型' : videoMode ? '视频模型' : '生图模型'
-  /**
-   * 生成数量上限：**只在模型显式声明 `maxCount` 时才生效**。
-   *
-   * 早先写的是 `Math.max(1, activeModel?.maxCount ?? 1)`——`?? 1` 把两种完全不同的
-   * 情况都判成了「最多 1 张」：
-   *   1) 还没选模型（`activeModel` 为空）；
-   *   2) 模型没上报 `maxCount`（多数中转渠道的 /v1/models 不报这个字段）。
-   * 结果是 2张/4张/9张 三个胶囊一进面板就整排置灰、提示「当前模型最多 1 张」——
-   * 而此刻根本没有「当前模型」。真机探针实测到的就是这个（§6.8「固定四项」被压成一项）。
-   *
-   * 语义修正：未声明 = 不知道上限 = 不设限，上限取最大的那个档位；
-   * 只有模型明确报出更小的上限时才置灰它够不到的档位。
-   */
-  /**
-   * **图片模型各自的参数能力**（用户 2026-10-03：「把图片生成节点和视频生成节点的模型
-   * 具体每个模型有哪些配置单独设置，不要通用设置，去官方文档找一下」）。
-   *
-   * 与 `videoParamsFor` 同一套做法：有规格就**只按规格渲染**（Agnes Image 2.0 只给像素尺寸、
-   * 2.1/2.5 给 1K–4K 档位 + 8 档画幅、都没有「张数 / 质量」），
-   * 没有规格才退回原来那套通用档位（其它厂商的显示名，参数以渠道上报为准）。
-   */
+  /** 未声明 maxCount 表示不设限；图片参数有规格时只渲染模型真实支持的档位。 */
   const imageSpec =
     !promptMode && !videoMode
       ? imageParamsFor(shownLogicalModel || String(data.model ?? ''))
       : undefined
 
-  /**
-   * **视频模型各自的参数能力**（用户 2026-10-03：「每个视频模型应该有的参数单独做，
-   * 因为有些模型他不支持」）。值域来自 `videoParamsFor`（Agnes 官方文档）——
-   * 有它就按它渲染，没有才退回原来那套通用档位。
-   */
+  /** 视频参数有模型规格时只渲染真实能力，否则退回通用档位。 */
   const videoSpec = videoMode
     ? videoParamsFor(shownLogicalModel || String(data.model ?? ''))
     : undefined
 
-  /**
-   * 比例 / 尺寸两段候选：**模型有能力表就只按能力表**（模型不支持的档位直接隐藏，
-   * §6.8「参数项随模型能力动态渲染」），没有才按渠道上报的能力。
-   *
-   * 三条来源最后都过一遍 `withFollowRatio`：「跟随素材」这一档**只看有没有参考图**，
-   * 与模型有没有能力表无关（见该函数的说明）。
-   */
-  /** 这次生成**有没有参考图**：有才有「跟随素材」可跟随 */
+  /** 参数候选由能力表驱动；“跟随素材”只在确有参考图时出现。 */
   const quality = deriveCreationQualityParams({
     data,
     activeModel,
@@ -844,31 +550,12 @@ export function CreationPanel(props: CreationPanelProps) {
     ratios,
     shownRatio,
     resolutions,
-    maxCount,
-    count,
-    countChoices,
     qualityChoices,
     backgroundChoices,
-    paramsLabel,
     canCustomSize,
     customResolutionOn,
     resolutionPillValue,
     customSizeHint: customSizeHintValue,
-    sizeChoices,
-    sizeValue,
-    sizeLabel,
-    minSec,
-    maxSec,
-    duration,
-    showDuration,
-    videoModeOptions,
-    videoModeValue,
-    showVideoMode,
-    videoCounts,
-    videoCount,
-    showVideoCount,
-    showGenerateAudio,
-    generateAudio,
   } = quality
   const storedResolution = String(data.resolution ?? '')
 
@@ -1035,6 +722,89 @@ export function CreationPanel(props: CreationPanelProps) {
     runTitle,
     platformGap,
   } = geometry
+  const reorderThumb = (toIndex: number) => {
+    if (dragIndex === null) return
+    const order = moveInOrder(model.thumbs, dragIndex, toIndex).map((thumb) => thumb.id)
+    setDragIndex(null)
+    onEvent({ type: 'reorderThumbs', owner: model.thumbs[toIndex].owner, order })
+  }
+  const changeMode = (mode: 'image' | 'video') => {
+    if (data.mode === mode) return
+    onEvent({
+      type: 'setMode',
+      mode,
+      keepModel: modelBelongsTo(mode),
+      recipe: recipeSnapshot({ mode }),
+    })
+  }
+  const togglePromptExpand = () => {
+    setOpenPicker(null)
+    setMentionOpen(false)
+    closePresetMenus()
+    setExpandedNodeId((current) => (current === nodeId ? null : nodeId))
+  }
+  const onClickPromptChip = (ref: { kind: string; id: string }) => {
+    if (ref.kind !== 'preset') return
+    setMentionOpen(false)
+    if (presetById(ref.id)?.options) {
+      setPresetOpen(false)
+      setPresetOptionsOpen(true)
+    } else {
+      setPresetOptionsOpen(false)
+      setPresetOpen(true)
+    }
+  }
+  const onPromptBlur = () => {
+    if (!promptTimer.current) return
+    promptTimer.cancel()
+    onEvent({ type: 'setPrompt', text: promptDraft })
+  }
+  const setDurationSeconds = (raw: string) => {
+    const value = Number(raw)
+    if (!Number.isFinite(value) || raw.trim() === '') return
+    onEvent({
+      type: 'setDurationSec',
+      sec: value,
+      recipe: recipeSnapshot({ durationSec: value }),
+    })
+  }
+  const selectVideoMode = (videoMode: VideoModeId) =>
+    onEvent({
+      type: 'setVideoMode',
+      videoMode,
+      recipe: recipeSnapshot({ videoMode }),
+    })
+  const selectRatio = (ratio: string) =>
+    onEvent({ type: 'setRatio', ratio, recipe: recipeSnapshot({ ratio }) })
+  const selectSize = (size: string) =>
+    onEvent({ type: 'setSize', size, recipe: recipeSnapshot({ size }) })
+  const selectGenerateAudio = (value: string) =>
+    onEvent({
+      type: 'setGenerateAudio',
+      generateAudio: value === 'on',
+      recipe: recipeSnapshot({ generateAudio: value === 'on' }),
+    })
+  const selectCount = (value: string) =>
+    onEvent({
+      type: 'setCount',
+      count: Number(value),
+      recipe: recipeSnapshot({ count: Number(value) }),
+    })
+  const togglePreset = () => {
+    setMentionOpen(false)
+    setPresetOptionsOpen(false)
+    setPresetOpen((open) => !open)
+  }
+  const pickPreset = (preset: string) => {
+    setPresetOpen(false)
+    onEvent({ type: 'setPreset', preset })
+  }
+  const pickEmotion = () => {
+    closePresetMenus()
+    onEvent({ type: 'setEmotion', emotion: model.emotion ?? DEFAULT_EMOTION_ID })
+  }
+  const pickPresetOption = (group: string, choice: string) =>
+    onEvent({ type: 'setPresetOption', group, choice })
 
   return (
     <div
@@ -1082,692 +852,121 @@ export function CreationPanel(props: CreationPanelProps) {
         }
       }}
     >
-      {/* 第一部分：素材缩略图（分组 = 上游 + 组内；批量 = 内部素材） */}
-      <section className={`${styles.section} ${styles.assetsSection}`} data-panel-part="assets">
-      {/*
-        首行：素材条在左、「图片 / 视频」功能类别切换在右，同一行且等高（30px）。
+      <CreationAssetsView
+        assetsEmpty={assetsEmpty}
+        emptyHint={model.emptyHint}
+        collections={model.collections}
+        thumbs={model.thumbs}
+        dragIndex={dragIndex}
+        mode={data.mode}
+        showCategoryToggle={props.showCategoryToggle}
+        onDragStart={setDragIndex}
+        onDrop={reorderThumb}
+        onToggleCollection={(id) => onEvent({ type: 'toggleCollection', id })}
+        onToggleThumb={(owner, id) => onEvent({ type: 'toggleThumb', owner, id })}
+        onRemoveThumb={(owner, id) => onEvent({ type: 'removeThumb', owner, id })}
+        onModeChange={changeMode}
+      />
 
-        - 空态：左边是「拖入素材」虚线空态框（吃掉剩余宽度）；
-        - 有素材：左边是缩略图条——此前缩略图是 64×64 的卡片独占一行，块头比切换大一倍；
-          现缩到与切换同高（30px 方块），并排进首行，切换仍贴最右端。
-          缩略图条允许换行（素材多时首行自然长高，切换垂直居中）。
-      */}
-      <div className={styles.assetsHead} data-panel-assets-head>
-        {assetsEmpty ? (
-          <div className={styles.assetEmpty} data-panel-asset-empty>
-            {model.emptyHint}
-          </div>
-        ) : (
-          <div className={styles.thumbs}>
-            {model.collections.map((c) => (
-              <CollectionCard
-                key={`collection:${c.id}`}
-                collection={c}
-                onToggle={() => onEvent({ type: 'toggleCollection', id: c.id })}
-              />
-            ))}
-            {model.thumbs.map((t, i) => (
-              <Thumb
-                key={`${t.owner}:${t.id}`}
-                thumb={t}
-                index={i}
-                dragging={dragIndex === i}
-                onDragStart={() => setDragIndex(i)}
-                onDrop={() => {
-                  if (dragIndex === null) return
-                  const order = moveInOrder(model.thumbs, dragIndex, i).map((x) => x.id)
-                  setDragIndex(null)
-                  onEvent({ type: 'reorderThumbs', owner: t.owner, order })
-                }}
-                onToggle={() => onEvent({ type: 'toggleThumb', owner: t.owner, id: t.id })}
-                onRemove={() => onEvent({ type: 'removeThumb', owner: t.owner, id: t.id })}
-              />
-            ))}
-          </div>
-        )}
-        {props.showCategoryToggle && (
-          <div className={styles.category} role="group" aria-label="功能类别">
-            {CATEGORY_OPTIONS.map((c) => (
-              <button
-                key={c.value}
-                type="button"
-                className={
-                  data.mode === c.value ? `${styles.catBtn} ${styles.catOn}` : styles.catBtn
-                }
-                data-param-mode={c.value}
-                aria-pressed={data.mode === c.value}
-                title={`切换为${c.label}生成`}
-                onClick={() => {
-                  if (data.mode === c.value) return
-                  // 模型不属于新类别就清空：留着只会把图片模型发给视频渠道
-                  onEvent({ type: 'setMode', mode: c.value, keepModel: modelBelongsTo(c.value), recipe: recipeSnapshot({ mode: c.value }) })
-                }}
-              >
-                {c.label}
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
-      </section>
+      <CreationPromptView
+        promptExpanded={promptExpanded}
+        promptOverflow={promptOverflow}
+        linkedPromptCount={model.linkedPromptCount}
+        promptBoxRef={promptBoxRef}
+        promptEditorRef={promptEditorRef}
+        promptValue={promptValue}
+        label={promptMode ? '提示词节点正文' : '生成提示词'}
+        placeholder={
+          activePreset && !promptMode
+            ? activePreset.hint
+            : promptMode
+              ? '输入提示词（下游生成节点读的就是这里）'
+              : '输入提示词，或连线上游提示词节点'
+        }
+        mentionOpen={mentionOpen}
+        mentionPos={mentionPos}
+        mentionCandidates={mentionCandidates}
+        mentionHashOf={mentionHashOf}
+        mentionThumbRef={mentionThumbRef}
+        mentionThumbVersion={mentionThumbVersion}
+        mentionThumbOf={mentionThumbOf}
+        promptToggle={model.promptToggle}
+        promptMode={promptMode}
+        promptLength={model.prompt.length}
+        toolError={tools?.error}
+        onToggleExpand={togglePromptExpand}
+        onPromptValueChange={onPromptValueChange}
+        onMentionTrigger={openMentionAtCaret}
+        onChipClick={onClickPromptChip}
+        onPromptBlur={onPromptBlur}
+        onInsertMention={insertMention}
+        onMentionThumbLoaded={() => setMentionThumbVersion((version) => version + 1)}
+        onTogglePrompt={() => onEvent({ type: 'togglePrompt' })}
+      />
 
-      {/* 第二部分：提示词 */}
       <section
-        className={`${styles.section} ${styles.promptSection} ${styles.promptSectionComfort}`}
-        data-panel-part="prompt"
-        data-panel-prompt-comfort="fixed"
+        className={`${styles.section} ${styles.params} ${styles.paramsSection}`}
+        data-panel-part="params"
       >
-        <div className={styles.promptRow}>
-          {/*
-            提示词那一行的头：只剩「上游已链接提示词节点」这个胶囊。
-
-            ⚠️ 右下角那枚 `@` 按钮**已删掉**（用户 2026-10-05 第 4 条：
-            「不需要在素材框下面加一个艾特按钮，删掉它」）—— 引用入口就是**在正文里打 `@`**，
-            与对话窗一致；多一枚按钮既占地方，又会让「@ 只是个按钮」的误会成立。
-          */}
-          {model.linkedPromptCount > 0 && (
-            <div className={styles.promptHead}>
-              <span className={styles.linkedRow} data-panel-linked-prompt>
-                <span className={styles.linked}>
-                  <span className={styles.linkedIcon} aria-hidden="true">
-                    <IconPrompt size={14} />
-                  </span>
-                  <span>提示词</span>
-                </span>
-                <span className={styles.linkedMeta}>已链接 {model.linkedPromptCount} 个</span>
-              </span>
-            </div>
-          )}
-          {/*
-            提示词框 = **预设 chip + 正文**（用户 2026-10-05 第 3 条：「像 agent 那样插进正文的
-            chip，不是单独一行」）。
-
-            容器只负责「chip 与正文在同一块输入区里」，本身不画边框（与输入区一贯的无框口径一致）。
-          */}
-          <div
-            className={`${styles.promptBox} ${styles.promptBoxComfort}`}
-            ref={promptBoxRef}
-            data-panel-prompt-box
-          >
-          {promptExpanded || promptOverflow ? (
-            <button
-              type="button"
-              className={styles.promptExpand}
-              data-panel-prompt-expand
-              aria-label={promptExpanded ? '收起编辑区' : '展开编辑区'}
-              aria-pressed={promptExpanded}
-              title={promptExpanded ? '收起编辑区' : '展开编辑区'}
-              onClick={() => {
-                setOpenPicker(null)
-                setMentionOpen(false)
-                closePresetMenus()
-                setExpandedNodeId((current) => (current === nodeId ? null : nodeId))
-              }}
-            >
-              {promptExpanded ? <IconChevronDown size={14} /> : <IconChevronUp size={14} />}
-            </button>
-          ) : null}
-          {/*
-            提示词框 = 带引用的富文本框（用户 2026-10-05 第 15 条）。
-
-            它仍然是**同一个 `[data-panel-prompt]`**：既有冒烟、探针都按这个锚点打字，
-            换组件不该让它们集体失灵。`.prompt` 那组样式（含细滚动条）照旧挂在它身上 ——
-            contenteditable 与 textarea 在「字多大、边距多少」上没有差别，
-            只有「高度跟内容长」这一条需要 `autoGrow`（textarea 有 `field-sizing`）。
-          */}
-          <MentionEditor
-            ref={promptEditorRef}
-            className={`${styles.prompt} ${styles.promptEditor} ${styles.promptEditorComfort}`}
-            anchorAttr={{ 'data-panel-prompt': '' }}
-            label={promptMode ? '提示词节点正文' : '生成提示词'}
-            /** 面板高度由默认/展开两档决定，编辑区只吃剩余空间并在内部滚动。 */
-            autoGrow={false}
-            value={promptValue}
-            placeholder={
-              /**
-               * 选了预设时，占位就是那句**示例小字**（用户第 3 条：「右边的小字只是给用户
-               * 举例要输入什么内容，用户填写正文后就会隐藏」）—— 编辑器只在正文为空
-               * （含「只有一枚 chip」这种）时显示它，一打字自动让位。
-               */
-              activePreset && !promptMode
-                ? activePreset.hint
-                : promptMode
-                  ? '输入提示词（下游生成节点读的就是这里）'
-                  : '输入提示词，或连线上游提示词节点'
-            }
-            /** 存回去的是**纯文本**，同时把预设与 chip 对齐（见 onPromptValueChange） */
-            onChange={onPromptValueChange}
-            /** 刚打出 `@` → 在**光标处**开候选（用户第 4 条：不要固定在右边） */
-            onMentionTrigger={openMentionAtCaret}
-            /** 点正文里那枚预设 chip → 打开预设菜单 / 它的搭配面板 */
-            onChipClick={(ref) => {
-              if (ref.kind !== 'preset') return
-              setMentionOpen(false)
-              if (presetById(ref.id)?.options) {
-                setPresetOpen(false)
-                setPresetOptionsOpen(true)
-              } else {
-                setPresetOptionsOpen(false)
-                setPresetOpen(true)
-              }
-            }}
-            thumbOf={mentionThumbOf}
-            thumbVersion={mentionThumbVersion}
-            /* 失焦立即落库，不等那 300ms —— 用户点走就是「我打完了」 */
-            onBlur={() => {
-              if (!promptTimer.current) return
-              clearTimeout(promptTimer.current)
-              promptTimer.current = null
-              onEvent({ type: 'setPrompt', text: promptDraft })
-            }}
-          />
-          {mentionOpen && (
-            <div
-              className={styles.mentionMenu}
-              data-panel-mention-menu
-              /** 量不到光标时不写 inline 定位，退回 CSS 里的左上角兜底 */
-              style={mentionPos ? { left: mentionPos.left, top: mentionPos.top } : undefined}
-            >
-              <div className={styles.mentionHint}>引用本节点上游的素材</div>
-              {mentionCandidates.map((c) => (
-                <button
-                  key={c.id}
-                  type="button"
-                  className={styles.mentionItem}
-                  data-panel-mention={c.id}
-                  onClick={() => insertMention(c)}
-                >
-                  <MentionThumb hash={mentionHashOf.get(c.id)} />
-                  <span className={styles.mentionName} title={c.label}>
-                    {c.label}
-                  </span>
-                </button>
-              ))}
-            </div>
-          )}
-          </div>
-          {/*
-            chip 上的缩略图：编辑器里那些 chip 是**命令式建的 DOM**、拿不到 hook，
-            所以由宿主替它们取图。一个候选渲染一个不可见的取图探针（一个候选一个
-            组件实例 ⇒ hook 规则安全），取到就写进 map、再用版本号通知编辑器
-            **就地**把图补进 chip 的槽位（与对话窗那套同一招）。
-          */}
-          {mentionCandidates.map((c) => (
-            <MentionThumbProbe
-              key={c.id}
-              id={c.id}
-              hash={mentionHashOf.get(c.id)}
-              sink={mentionThumbRef}
-              onLoaded={() => setMentionThumbVersion((v) => v + 1)}
-            />
-          ))}
-          {model.promptToggle && (
-            <button
-              type="button"
-              className={
-                model.promptToggle.visible ? styles.eyeBtn : `${styles.eyeBtn} ${styles.eyeOff}`
-              }
-              title={model.promptToggle.title}
-              aria-label={model.promptToggle.title}
-              aria-pressed={model.promptToggle.visible}
-              onClick={() => onEvent({ type: 'togglePrompt' })}
-            >
-              {model.promptToggle.visible ? '👁' : '⃠'}
-            </button>
-          )}
-        </div>
-        {promptMode && (
-          /*
-           * 提示词区的收尾行（§6.7）：只留**字数**。
-           *
-           * 「技能 / 优化 / 翻译 / 反推」这一排已挪到第三部分参数行的尾部
-           * （用户 2026-09-24：「这一排放在参数那一排的后面即可」）——
-           * 它们和渠道 / 模型 / 生成按钮同属「这次生成怎么跑」，
-           * 摆在同一排比塞在提示词框下方更容易一次扫完。
-           */
-          <div className={styles.toolRow} data-panel-prompt-tools>
-            <span className={styles.toolCount} data-panel-prompt-count>
-              {model.prompt.length} 字
-            </span>
-          </div>
-        )}
-        {promptMode && tools?.error && (
-          <div className={styles.toolError} data-panel-prompt-tool-error>
-            {tools.error}
-          </div>
-        )}
-      </section>
-
-      {/* 第三部分：参数与生成 */}
-      <section className={`${styles.section} ${styles.params} ${styles.paramsSection}`} data-panel-part="params">
-        {/* 无可用平台 → 引导去后台设置（独占一行，与错误提示同一排版位） */}
-        {noPlatform && (
-          <button
-            type="button"
-            className={styles.setupHint}
-            data-panel-setup-hint={platformGap}
-            onClick={() => onEvent({ type: 'openSettings' })}
-          >
-            <span>{platformGap}</span>
-            <span className={styles.setupHintGo}>去后台设置 →</span>
-          </button>
-        )}
-        {/*
-          **没有平台 chip**（用户 2026-09-27 第 8 轮：「提示词节点也不需要平台的配置了，
-          只需要模型即可」）。
-
-          生成节点早一轮就去掉了，提示词节点这一轮跟上。渠道不再由用户手选：
-          面板的解析链会把首个可用渠道写进节点（「有模型无渠道就补渠道」那条兜底），
-          文本调用再从节点的 `channelId` 取渠道。用户只需要关心「用哪个模型」。
-        */}
-        {/*
-        模型 chip：**提示词节点同样要选**（§6.7「只能选 LLM 模型」，优化 / 翻译要用），
-          所以这里不能按 promptMode 收窄。
-
-          下拉现在**永远有固定显示名**（用户 2026-09-27），不再有
-          「这一类没得选 → 藏起来换引导条」的状态；名字在、映射配好就能跑。
-        */}
-        <ParamPicker
-            name="model"
-            ariaLabel={categoryLabel}
-            label={shownLogicalModel || defaultModelLabel}
-            options={modelOptions}
-            value={shownLogicalModel}
-            variant="list"
-            open={openPicker === 'model'}
-            onToggle={() => togglePicker('model')}
-            onClose={closePicker}
-            onSelect={selectModel}
-            /*
-             * **一律可点**（用户 2026-09-27 第 8 轮：「当前提示词节点的模型是灰色的
-             * 无法点击进行修改」）。
-             *
-             * 下拉里永远有固定显示名（6 生图 / 4 对话 / 5 视频），所以「没得选」
-             * 这个状态已经不存在了。此前的提示词节点在「该渠道没勾对话模型」时
-             * 把 chip 置灰 —— 用户看到的是「模型动不了」，而他真正想做的只是换个模型。
-             * 名字选得出来、映射配好就能跑；真发不出去时由执行层报明确原因。
-             */
-            disabled={false}
+        <CreationParameterControls
+          noPlatform={noPlatform}
+          platformGap={platformGap}
+          categoryLabel={categoryLabel}
+          modelLabel={shownLogicalModel || defaultModelLabel}
+          modelOptions={modelOptions}
+          modelValue={shownLogicalModel}
+          modelOpen={openPicker === 'model'}
+          videoModeLabel={VIDEO_MODE_LABELS[quality.videoModeValue].label}
+          promptMode={promptMode}
+          videoMode={videoMode}
+          quality={quality}
+          paramSections={paramSections}
+          isMj={isMj}
+          mjSections={mjSections}
+          openPicker={openPicker}
+          onOpenSettings={() => onEvent({ type: 'openSettings' })}
+          onTogglePicker={togglePicker}
+          onClosePicker={closePicker}
+          onSelectModel={selectModel}
+          onSelectVideoMode={selectVideoMode}
+          onSelectRatio={selectRatio}
+          onSelectSize={selectSize}
+          onDurationChange={setDurationSeconds}
+          onSelectGenerateAudio={selectGenerateAudio}
+          onSelectCount={selectCount}
         />
-
-        {/*
-          「模型」与后面那串参数是**两件事**：前者决定这次发给谁，后者决定怎么发。
-          六个 chip 平铺时它们看起来是同一类东西 —— 一条竖线就把这句话说明白了
-          （与「技能 / 优化 / 翻译」那组用的是同一个做法，见 `.toolGroup::before`）。
-        */}
-        {!promptMode && <span className={styles.paramDivider} data-param-divider aria-hidden="true" />}
-
-       {!promptMode && (
-          <>
-            {videoMode ? (
-              <>
-                {/*
-                  生成模式（用户 2026-10-03 图四/图五/图七/图九）：参考实现里那枚
-                  「视频生成模式」下拉，逐档照抄 —— 包括「超长视频 Beta」的角标，
-                  以及「文生视频 / 视频编辑」那种**看得见但选不了**的灰项。
-                */}
-                {showVideoMode && (
-                  <ParamPicker
-                    name="videoMode"
-                    ariaLabel="视频生成模式"
-                    label={VIDEO_MODE_LABELS[videoModeValue].label}
-                    options={videoModeOptions}
-                    value={videoModeValue}
-                    variant="list"
-                    open={openPicker === 'videoMode'}
-                    onToggle={() => togglePicker('videoMode')}
-                    onClose={closePicker}
-                    onSelect={(v) =>
-                      onEvent({
-                        type: 'setVideoMode',
-                        videoMode: v,
-                        recipe: recipeSnapshot({ videoMode: v }),
-                      })
-                    }
-                  />
-                )}
-                {/* 比例：**视频模式**仍自己一枚（图片模式已并进「生成参数」胶囊，见下） */}
-                <ParamPicker
-                  name="ratio"
-                  ariaLabel="画面比例"
-                  label={shownRatio || '比例'}
-                  options={ratios.map((r) => ({
-                    value: r,
-                    /* 「自适应」不是宽高比，画矩形示意只会和 1:1 撞脸 —— 只留文字 */
-                    label: isAutoRatio(r) ? '自适应' : r,
-                  }))}
-                  value={shownRatio}
-                  variant="ratioGrid"
-                  open={openPicker === 'ratio'}
-                  onToggle={() => togglePicker('ratio')}
-                  onClose={closePicker}
-                  onSelect={(v) => onEvent({ type: 'setRatio', ratio: v, recipe: recipeSnapshot({ ratio: v }) })}
-                />
-                {/* 清晰度：竖版列表（§6.8 视频模式） */}
-                <ParamPicker
-                  name="size"
-                  ariaLabel="视频清晰度"
-                  label={sizeLabel}
-                  options={sizeChoices}
-                  value={sizeValue}
-                  variant="list"
-                  open={openPicker === 'size'}
-                  onToggle={() => togglePicker('size')}
-                  onClose={closePicker}
-                  onSelect={(v) => onEvent({ type: 'setSize', size: v, recipe: recipeSnapshot({ size: v }) })}
-                />
-                {/*
-                  时长：滑块 + 可直接键入（§6.8）。
-                  区间按模型走 —— 图三 4–15、图六 4–30、图八/图十 5–15。
-                */}
-                {showDuration && (
-                  <span className={styles.duration} data-param-duration>
-                    <input
-                      type="range"
-                      className={styles.slider}
-                      data-param-duration-range
-                      aria-label="视频时长滑块"
-                      min={minSec}
-                      max={maxSec}
-                      step={1}
-                      value={duration}
-                      onChange={(e) => onEvent({ type: 'setDurationSec', sec: Number(e.target.value), recipe: recipeSnapshot({ durationSec: Number(e.target.value) }) })}
-                    />
-                    <input
-                      type="number"
-                      className={styles.durationNum}
-                      data-param-duration-input
-                      aria-label="视频时长秒数"
-                      min={minSec}
-                      max={maxSec}
-                      step={1}
-                      value={duration}
-                      onChange={(e) => {
-                        const n = Number(e.target.value)
-                        // 清空输入框时 Number('') === 0，直接夹回会把用户正在改的 8 变成 3
-                        if (!Number.isFinite(n) || e.target.value.trim() === '') return
-                        onEvent({ type: 'setDurationSec', sec: n, recipe: recipeSnapshot({ durationSec: n }) })
-                      }}
-                    />
-                    <span className={styles.durationUnit}>秒</span>
-                  </span>
-                )}
-                {/* 生成音频（图三/图六那枚「开启 / 关闭」）：只有声明支持的模型才摆 */}
-                {showGenerateAudio && (
-                  <ParamPicker
-                    name="generateAudio"
-                    ariaLabel="生成音频"
-                    label={generateAudio ? '生成音频 · 开' : '生成音频 · 关'}
-                    options={[
-                      { value: 'on', label: '开启' },
-                      { value: 'off', label: '关闭' },
-                    ]}
-                    value={generateAudio ? 'on' : 'off'}
-                    variant="pill"
-                    open={openPicker === 'generateAudio'}
-                    onToggle={() => togglePicker('generateAudio')}
-                    onClose={closePicker}
-                    onSelect={(v) =>
-                      onEvent({
-                        type: 'setGenerateAudio',
-                        generateAudio: v === 'on',
-                        recipe: recipeSnapshot({ generateAudio: v === 'on' }),
-                      })
-                    }
-                  />
-                )}
-                {/* 生成数量（图三/图六/图八/图十那排 1/2/4）：只有一档时整段不摆 */}
-                {showVideoCount && (
-                  <ParamPicker
-                    name="count"
-                    ariaLabel="生成数量"
-                    label={`${videoCount} 个`}
-                    options={videoCounts.map((c) => ({ value: String(c), label: `${c} 个` }))}
-                    value={String(videoCount)}
-                    variant="pill"
-                    open={openPicker === 'count'}
-                    onToggle={() => togglePicker('count')}
-                    onClose={closePicker}
-                    onSelect={(v) =>
-                      onEvent({
-                        type: 'setCount',
-                        count: Number(v),
-                        recipe: recipeSnapshot({ count: Number(v) }),
-                      })
-                    }
-                  />
-                )}
-              </>
-            ) : (
-              /*
-                图片模式：**比例 · 画质 · 质量 · 张数**收进一枚胶囊
-                （用户 2026-10-02 参考产品图五 / 图六：「把比例，质量，画质，张数变成
-                一个胶囊显示，而且点击显示的面板……把所有的参数都放上去」）。
-
-                分段的名字仍是 `ratio / resolution / quality / count` —— 冒烟与单测的
-                锚点不必重学，只是从「四枚 chip」变成「一层的四段」。
-                选完**不关**（多组模式）：调参数常常一次要动两三样，每选一格就收起
-                会逼人重复点开三次。
-              */
-              /**
-               * 一段都没有的模型（Nano Banana：只有 prompt 有参数）**整枚 chip 都不摆** ——
-               * 摆一个点开空空如也的「参数」比不摆更让人以为坏了（用户 2026-10-03
-               * 「不要通用设置」的同一条道理：没有的东西别装出来）。
-               */
-              paramSections.length > 0 ? (
-                <ParamPicker
-                  name="gen-params"
-                  ariaLabel={`生成参数（${paramsLabel}）`}
-                  label={paramsLabel}
-                  sections={paramSections}
-                  open={openPicker === 'gen-params'}
-                  onToggle={() => togglePicker('gen-params')}
-                  onClose={closePicker}
-                />
-              ) : null
-            )}
-            {/*
-              **生成数量**：独立一枚，摆在「生成参数」那一枚的**右边**
-              （用户 2026-10-15：「数量的选择单独设置在参数的右边，单独做一个面板」）。
-
-              它原先收在胶囊里（2026-10-02 那一条），现在搬出来 —— 张数是每次都要动的量，
-              与画质 / 比例不是一类；搬出来之后图片模式与视频模式的张数也终于同一形状
-              （视频那边本来就是独立一枚，见上面 `showVideoCount`）。
-              只有一档时不摆（Agnes 2.0 这类），与旧行为一致。
-            */}
-            {!videoMode && countChoices.length > 1 && (
-              <ParamPicker
-                name="count"
-                ariaLabel="生成数量"
-                label={`${count} 张`}
-                options={countChoices.map((c) => ({
-                  value: String(c),
-                  label: `${c} 张`,
-                  /** 模型明确声明的上限才置灰；未声明 = 不设限（见 maxCount 的注释） */
-                  disabled: c > maxCount,
-                  title: c > maxCount ? `当前模型最多 ${maxCount} 张` : `${c} 张`,
-                }))}
-                value={String(count)}
-                variant="pill"
-                open={openPicker === 'count'}
-                onToggle={() => togglePicker('count')}
-                onClose={closePicker}
-                onSelect={(v) =>
-                  onEvent({
-                    type: 'setCount',
-                    count: Number(v),
-                    recipe: recipeSnapshot({ count: Number(v) }),
-                  })
-                }
-              />
-            )}
-            {/*
-              **Midjourney 的高级设置**（用户 2026-10-03 图二：
-              「把 mj 的自己独有的参数设置面板做一个，放在参数的后面」）。
-
-              位置就在参数那一枚**之后**、生成按钮之前 —— 它是风格，不是每次都要动的量，
-              所以另起一枚而不是塞进「生成参数」胶囊里。
-            */}
-            {isMj && (
-              <ParamPicker
-                name="mj-params"
-                ariaLabel="Midjourney 高级设置"
-                label="高级设置"
-                sections={mjSections}
-                open={openPicker === 'mj-params'}
-                onToggle={() => togglePicker('mj-params')}
-                onClose={closePicker}
-              />
-            )}
-          </>
-        )}
-        {/*
-          「技能 / 优化 / 翻译 / 反推」这一排（§6.7）。
-
-          用户 2026-09-24：「这一排放在参数那一排的后面即可」——
-          它们决定**这次调用用哪段系统指令 / 拿上游图去推**，
-          与渠道 / 模型 / 生成按钮同属「这次生成怎么跑」，
-          摆进参数行、紧挨着生成按钮，一次扫完。
-
-          为什么要 `margin-left: auto`：参数行是 flex 换行容器，
-          这一组靠右对齐后永远贴着生成按钮，参数多少都不会把它挤走。
-        */}
-        {promptMode && tools && (
-          <span className={styles.toolGroup} data-panel-prompt-tools>
-            <SkillPicker
-              skills={skills}
-              running={tools.status === 'running'}
-              text={model.prompt}
-              imageCount={props.promptImageCount ?? 0}
-              selectedId={model.selectedSkillId ?? null}
-              onSelect={(skillId) => onEvent({ type: 'selectSkill', skillId })}
-              onOpenLibrary={props.onOpenSkills}
-            />
-            <button
-              type="button"
-              className={styles.toolBtn}
-              disabled={tools.status === 'running' || model.prompt.trim().length === 0}
-              title={tools.error ?? '用文本模型优化此提示词'}
-              onClick={() => runPromptTool('optimize')}
-            >
-              优化
-            </button>
-            <button
-              type="button"
-              className={styles.toolBtn}
-              disabled={tools.status === 'running' || model.prompt.trim().length === 0}
-              title={tools.error ?? '中文 ⇄ 英文互译'}
-              onClick={() => runPromptTool('translate')}
-            >
-              翻译
-            </button>
-            {/* 反推（§6.7）：输入是**上游图片**而非文本，故禁用条件与其它两个相反——
-                有图就能点（哪怕一个字都没有），没图点了也是空跑。 */}
-            <button
-              type="button"
-              className={styles.toolBtn}
-              data-panel-prompt-tool="describe"
-              disabled={tools.status === 'running' || (props.promptImageCount ?? 0) === 0}
-              title={
-                tools.error ??
-                ((props.promptImageCount ?? 0) > 0
-                  ? `把上游 ${props.promptImageCount} 张图发给文本模型，反推出绘画提示词（覆盖当前文本）`
-                  : '反推需要上游图片：先把一个已出图的生成节点连到本节点')
-              }
-              onClick={() => runPromptTool('describe')}
-            >
-              反推
-            </button>
-          </span>
-        )}
-        {/* §6.7：提示词节点的第三部分同样以生成按钮收尾（触发下游生成，见 runLabel） */}
-        {/*
-          预设入口（用户 2026-10-05 第 14 条：「在节点参数右边加一个预设功能的按钮」）：
-          位置就在参数与生成按钮之间。菜单挂在这枚按钮的容器里 ——
-          它是面板里唯一的位置锚点，两个入口（这枚按钮、预设名称上的箭头）都开在同一个地方，
-          用户不会遇到「同一个菜单从两个方向弹出来」。
-        */}
-        {!promptMode && (
-          <span className={styles.presetAnchor}>
-            <button
-              type="button"
-              className={activePreset ? `${styles.presetBtn} ${styles.presetBtnOn}` : styles.presetBtn}
-              data-panel-preset
-              aria-label="预设"
-              aria-haspopup="menu"
-              aria-expanded={presetOpen}
-              title="预设：分镜叙事 / 空间与机位 / 设定图 / 质感调节"
-              onClick={() => {
-                setMentionOpen(false)
-                setPresetOptionsOpen(false)
-                setPresetOpen((v) => !v)
-              }}
-            >
-              {/*
-                图标 22 → 28（用户 2026-10-05 第 4 批「这枚图标太小」）；
-                2026-10-06 又重画了一版并把图形**占满画布**（用户：「四个部件显得太拥挤了」），
-                同样的 28 现在看起来明显更大 —— 见 `icons/presetGlyph.tsx`。
-                右上角那颗"已选小点"**已删**（用户：「那个小点没有任何意义」），
-                选中态改由底色表达（`.presetBtnOn`）。
-              */}
-              <IconPreset size={28} />
-            </button>
-            {presetOpen && (
-              <PresetMenu
-                activeId={model.preset}
-                emotionOn={emotionOn}
-                onPick={(id) => {
-                  setPresetOpen(false)
-                  onEvent({ type: 'setPreset', preset: id })
-                }}
-                onPickEmotion={() => {
-                  closePresetMenus()
-                  /** 打开情绪面板 = 先落一个情绪（默认正中间那个），面板由它决定显示与否 */
-                  onEvent({ type: 'setEmotion', emotion: model.emotion ?? DEFAULT_EMOTION_ID })
-                }}
-              />
-            )}
-            {presetOptionsOpen && activePreset?.options && (
-              <PresetOptions
-                presetId={activePreset.id}
-                options={model.presetOptions}
-                onPick={(group, choice) =>
-                  /** 选完**不关**：五组搭配通常要连着调（参考图十九就是一屏五组） */
-                  onEvent({ type: 'setPresetOption', group, choice })
-                }
-              />
-            )}
-          </span>
-        )}
-        <button
-          className={[
-            styles.run,
-            props.running ? styles.runCancel : '',
-            busyGlobal ? styles.runBusy : '',
-          ]
-            .filter(Boolean)
-            .join(' ')}
-          disabled={runDisabled}
-          data-panel-run
-          data-panel-run-blocked={blockedReason ?? undefined}
-          title={runTitle}
-          aria-label={runLabel}
-          onClick={() => onEvent({ type: props.running ? 'cancel' : 'run' })}
-        >
-          {props.running ? (
-            <IconStop size={18} />
-          ) : busyGlobal ? (
-            <IconSpinner size={20} />
-          ) : (
-            <RunArrow />
-          )}
-        </button>
-        {props.disabled && (
-          <span className={styles.disabledNotice} data-panel-disabled>
-            节点已禁用：不参与执行，它的内容（含已生成的图）也不会作为上游输入
-          </span>
-        )}
-        {props.error && <span className={styles.error}>{props.error}</span>}
+        <CreationPromptToolsView
+          promptMode={promptMode}
+          tools={tools}
+          skills={skills}
+          model={model}
+          promptImageCount={props.promptImageCount ?? 0}
+          onSelectSkill={(skillId) => onEvent({ type: 'selectSkill', skillId })}
+          onOpenSkills={props.onOpenSkills}
+          onRunTool={runPromptTool}
+        />
+        <CreationRunActionsView
+          promptMode={promptMode}
+          activePreset={activePreset}
+          presetOptionsAvailable={activePreset?.options != null}
+          presetOpen={presetOpen}
+          presetOptionsOpen={presetOptionsOpen}
+          model={model}
+          emotionOn={emotionOn}
+          running={props.running}
+          busyGlobal={busyGlobal}
+          runDisabled={runDisabled}
+          runLabel={runLabel}
+          runTitle={runTitle}
+          blockedReason={blockedReason}
+          disabled={props.disabled === true}
+          error={props.error}
+          onTogglePreset={togglePreset}
+          onPickPreset={pickPreset}
+          onPickEmotion={pickEmotion}
+          onPickPresetOption={pickPresetOption}
+          onRunAction={() => onEvent({ type: props.running ? 'cancel' : 'run' })}
+        />
       </section>
     </div>
   )

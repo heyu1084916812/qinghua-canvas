@@ -1,5 +1,15 @@
 # CanvasFlow 不变量详表
 
+## 创作面板视图边界（2026-11-06）
+
+- `CreationPanel.tsx` 持有 React state/refs/hooks、DOM 测量、Store、节点动作和所有 handler；`creation/` 视图
+  只接 props/callbacks，不得直接调用 Store/Platform，不得新增布局 wrapper 或重写 CSS。
+- 提示词编辑器的 ref/anchor、`@` 菜单、预设/情绪菜单、参数浮层、生成按钮顺序、`data-panel-*`、aria/title、
+  可见文案和事件接线必须逐字保持；条件渲染仍返回 null/Fragment，不能改变兄弟顺序。
+- UI 验证必须使用独立 1440×900 / 1024×700 明暗场景，不能靠先建大视口再缩窗来制造面板锚点；确认面板在视口内、
+  无横向溢出、焦点/悬停/滚动一致。G23/G46 失败必须与基线同集合，不能把既有夹具失败算作通过或回归。
+- 宿主预算不得回涨到 1000 行以上。
+
 ## 电商 Studio 视图边界（2026-11-06）
 
 - `EcommerceStudio.tsx` 持有 React state/refs、Store/Platform、动作和扣费确认；`studio/EcommerceStudio*.tsx`

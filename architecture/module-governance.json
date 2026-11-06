@@ -478,7 +478,7 @@
       "test": [
         "src/workbenches/canvas/panels/CreationPanel.test.ts"
       ],
-      "budget": 1782
+      "budget": 981
     },
     {
       "module": "src/workbenches/ecommerce/EcommerceStudio.module.css",
@@ -5221,6 +5221,131 @@
         "src/workbenches/ecommerce/studio/EcommerceStudioViews.test.ts"
       ],
       "budget": 71
+    },
+    {
+      "module": "src/workbenches/canvas/panels/creation/creationPanelTypes.ts",
+      "owner": "canvas-creation-panel-contracts",
+      "responsibility": "声明创作面板 props 和提示词工具状态等跨视图公共类型。",
+      "owns": [
+        "CreationPanelProps 与 PanelPromptTools 契约"
+      ],
+      "doesNotOwn": [
+        "React state/refs 与业务动作",
+        "Store、平台、生成执行或 DOM",
+        "CSS 与视图渲染"
+      ],
+      "publicApi": [
+        "PanelPromptTools",
+        "CreationPanelProps"
+      ],
+      "test": [
+        "src/workbenches/canvas/panels/creation/CreationPanelViews.test.ts"
+      ],
+      "budget": 31
+    },
+    {
+      "module": "src/workbenches/canvas/panels/creation/CreationAssetsView.tsx",
+      "owner": "canvas-creation-assets-view",
+      "responsibility": "渲染创作面板上游素材条、空态和图片/视频类别切换。",
+      "owns": [
+        "素材 section、素材/集合卡顺序与拖放回调",
+        "图片/视频类别按钮、aria 和模式回调"
+      ],
+      "doesNotOwn": [
+        "素材读取、排序状态和节点写入",
+        "面板几何、Store dispatch 与事件",
+        "CSS 与业务校验"
+      ],
+      "publicApi": [
+        "CreationAssetsView"
+      ],
+      "test": [
+        "src/workbenches/canvas/panels/creation/CreationPanelViews.test.ts"
+      ],
+      "budget": 94
+    },
+    {
+      "module": "src/workbenches/canvas/panels/creation/CreationPromptView.tsx",
+      "owner": "canvas-creation-prompt-view",
+      "responsibility": "渲染提示词编辑框、引用候选、展开按钮、字数和提示词工具错误区。",
+      "owns": [
+        "提示词 section、MentionEditor ref/锚点和引用候选 DOM",
+        "提示词展开、入点触发、chip 点击、失焦与显隐控件"
+      ],
+      "doesNotOwn": [
+        "提示词草稿/计时器、DOM 测量和业务事件",
+        "素材取图实现、Store 写入和生成动作",
+        "CSS 与持久化"
+      ],
+      "publicApi": [
+        "CreationPromptView"
+      ],
+      "test": [
+        "src/workbenches/canvas/panels/creation/CreationPanelViews.test.ts"
+      ],
+      "budget": 202
+    },
+    {
+      "module": "src/workbenches/canvas/panels/creation/CreationParameterControls.tsx",
+      "owner": "canvas-creation-parameter-view",
+      "responsibility": "渲染创作面板模型 chip、图片/视频参数段和 Midjourney 高级参数。",
+      "owns": [
+        "模型、视频模式、比例、尺寸、时长、张数等控件和顺序",
+        "ParamSection/MJ section 投影与变更回调"
+      ],
+      "doesNotOwn": [
+        "能力解析、参数事件、模型选择和业务校验",
+        "Store、执行器、面板状态与 DOM 测量",
+        "CSS 与持久化"
+      ],
+      "publicApi": [
+        "CreationParameterControls"
+      ],
+      "test": [
+        "src/workbenches/canvas/panels/creation/CreationPanelViews.test.ts"
+      ],
+      "budget": 270
+    },
+    {
+      "module": "src/workbenches/canvas/panels/creation/CreationPromptToolsView.tsx",
+      "owner": "canvas-creation-prompt-tools-view",
+      "responsibility": "渲染提示词工具行的技能、优化、翻译、反推入口和忙碌状态。",
+      "owns": [
+        "PromptTools 按钮顺序、禁用/忙碌态和回调绑定"
+      ],
+      "doesNotOwn": [
+        "提示词请求、技能选择和路由解析",
+        "文本状态、Store 或执行动作",
+        "CSS 与持久化"
+      ],
+      "publicApi": [
+        "CreationPromptToolsView"
+      ],
+      "test": [
+        "src/workbenches/canvas/panels/creation/CreationPanelViews.test.ts"
+      ],
+      "budget": 76
+    },
+    {
+      "module": "src/workbenches/canvas/panels/creation/CreationRunActionsView.tsx",
+      "owner": "canvas-creation-run-actions-view",
+      "responsibility": "渲染预设、情绪、生成/停止按钮及面板禁用和错误提示。",
+      "owns": [
+        "预设菜单、情绪选项、生成按钮与禁用提示的 DOM 顺序",
+        "预设/情绪/运行回调绑定和 aria/锚点"
+      ],
+      "doesNotOwn": [
+        "生成计划、运行控制、预设状态和业务校验",
+        "Store、执行器、节点写入和 DOM 测量",
+        "CSS 与持久化"
+      ],
+      "publicApi": [
+        "CreationRunActionsView"
+      ],
+      "test": [
+        "src/workbenches/canvas/panels/creation/CreationPanelViews.test.ts"
+      ],
+      "budget": 140
     }
   ]
 }
