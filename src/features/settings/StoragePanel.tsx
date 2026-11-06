@@ -1,17 +1,18 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { usePlatform } from '../../app/providers/PlatformProvider'
 import type {
   StorageMigrationReport,
-  StoragePort,
   StorageRootInfo,
 } from '../../platform/ports'
 import {
   backfillAssetPreviews,
   backfillAssetThumbs,
 } from '../../platform/assetThumb'
-import { countAssets, type LibraryCountRow } from '../../domain/shared/assetHistory'
-import { createAssetHistoryRepository } from '../../state/project/assetHistoryRepository'
-import { createAssetLibraryRepository } from '../../state/project/assetLibraryRepository'
+import {
+  startStorageOverviewRefresh,
+  type StorageAssetCounts,
+  type StorageUsage,
+} from './storageOverviewRefresh'
 import styles from './StoragePanel.module.css'
 
 interface MediaCounts {
@@ -27,11 +28,9 @@ export function StoragePanel() {
   const platform = usePlatform()
   const admin = platform.storageAdmin
 
-  const [counts, setCounts] = useState<{ projects: number; assets: number; saved: number } | null>(
-    null,
-  )
-  const [mediaCounts, setMediaCounts] = useState<MediaCounts>(EMPTY_MEDIA_COUNTS)
-  const [usage, setUsage] = useState<{ used: number; quota: number } | null>(null)
+  const [projects, setProjects] = useState<number | null>(null)
+  const [assets, setAssets] = useState<StorageAssetCounts | null>(null)
+  const [usage, setUsage] = useState<StorageUsage | null>(null)
   const [dataDir, setDataDir] = useState('')
   const [rootInfo, setRootInfo] = useState<StorageRootInfo | null>(null)
   const [pendingDataDir, setPendingDataDir] = useState('')
@@ -47,34 +46,25 @@ export function StoragePanel() {
   const [variantBusy, setVariantBusy] = useState<'thumb' | 'preview' | null>(null)
   const [variantProgress, setVariantProgress] = useState('')
 
-  const refresh = useCallback(async () => {
-    const [projects, assetCounts] = await Promise.all([
-      countStorageProjects(platform.storage),
-      countStorageAssets(platform.storage),
-    ])
-    setCounts({
-      projects,
-      assets: assetCounts.all,
-      saved: assetCounts.saved,
-    })
-    setMediaCounts({
-      images: assetCounts.image,
-      videos: assetCounts.video,
-      audio: assetCounts.audio,
-      other: Math.max(0, assetCounts.all - assetCounts.image - assetCounts.video - assetCounts.audio),
-    })
-    setUsage(await platform.storage.estimateUsage())
-    if (admin) {
-      const dir = await admin.dataDir()
-      setDataDir(dir)
-      setRootInfo((await admin.inspectRoot?.(dir)) ?? null)
-      setCacheBytes(await admin.cacheUsage())
-    }
-  }, [platform, admin])
-
   useEffect(() => {
-    void refresh().catch((error: unknown) => setStatus(`读取失败：${String(error)}`))
-  }, [refresh])
+    const refresh = startStorageOverviewRefresh(
+      { storage: platform.storage, admin },
+      {
+        onUpdate(update) {
+          if (update.kind === 'usage') setUsage(update.usage)
+          else if (update.kind === 'projects') setProjects(update.projects)
+          else if (update.kind === 'assets') setAssets(update.assets)
+          else if (update.kind === 'data-dir') setDataDir(update.dataDir)
+          else if (update.kind === 'root') setRootInfo(update.rootInfo)
+          else setCacheBytes(update.cacheBytes)
+        },
+        onError(_area, error) {
+          setStatus(`读取失败：${String(error)}`)
+        },
+      },
+    )
+    return refresh.cancel
+  }, [platform.storage, admin])
 
   const clearCache = async () => {
     if (!admin) return
@@ -195,6 +185,14 @@ export function StoragePanel() {
     }
   }
 
+  const mediaCounts: MediaCounts = assets
+    ? {
+        images: assets.image,
+        videos: assets.video,
+        audio: assets.audio,
+        other: Math.max(0, assets.all - assets.image - assets.video - assets.audio),
+      }
+    : EMPTY_MEDIA_COUNTS
   const usagePercent = storageUsagePercent(usage)
   const canSwitchRoot = Boolean(
     admin?.pickDataDir &&
@@ -240,15 +238,15 @@ export function StoragePanel() {
         <dl className={styles.facts}>
           <div>
             <dt>项目</dt>
-            <dd data-storage-count="projects">{counts ? counts.projects : '…'}</dd>
+            <dd data-storage-count="projects">{projects ?? '…'}</dd>
           </div>
           <div>
             <dt>素材</dt>
-            <dd data-storage-count="assets">{counts ? counts.assets : '…'}</dd>
+            <dd data-storage-count="assets">{assets ? assets.all : '…'}</dd>
           </div>
           <div>
             <dt>收藏</dt>
-            <dd data-storage-count="saved">{counts ? counts.saved : '…'}</dd>
+            <dd data-storage-count="saved">{assets ? assets.saved : '…'}</dd>
           </div>
           <div>
             <dt>占用</dt>
@@ -258,19 +256,19 @@ export function StoragePanel() {
         <dl className={`${styles.facts} ${styles.mediaFacts}`}>
           <div>
             <dt>图片</dt>
-            <dd data-storage-media="images">{counts ? mediaCounts.images : '…'}</dd>
+            <dd data-storage-media="images">{assets ? mediaCounts.images : '…'}</dd>
           </div>
           <div>
             <dt>视频</dt>
-            <dd data-storage-media="videos">{counts ? mediaCounts.videos : '…'}</dd>
+            <dd data-storage-media="videos">{assets ? mediaCounts.videos : '…'}</dd>
           </div>
           <div>
             <dt>音频</dt>
-            <dd data-storage-media="audio">{counts ? mediaCounts.audio : '…'}</dd>
+            <dd data-storage-media="audio">{assets ? mediaCounts.audio : '…'}</dd>
           </div>
           <div>
             <dt>其他</dt>
-            <dd data-storage-media="other">{counts ? mediaCounts.other : '…'}</dd>
+            <dd data-storage-media="other">{assets ? mediaCounts.other : '…'}</dd>
           </div>
         </dl>
       </section>
@@ -561,45 +559,6 @@ export function formatBytes(bytes: number): string {
       ? String(Math.round(value))
       : value.toFixed(1).replace(/\.0$/, '')
   return `${rendered} ${units[unit]}`
-}
-
-/** 与素材页一致：生成历史 ∪ 收藏，按素材 hash 去重。 */
-export async function countStorageAssets(
-  storage: StoragePort,
-  now = Date.now(),
-): Promise<ReturnType<typeof countAssets>> {
-  const [rawHistory, rawLibrary, hidden] = await Promise.all([
-    createAssetHistoryRepository(storage).list(),
-    storage.query('assetLibrary', {}),
-    createAssetLibraryRepository(storage).listHidden(),
-  ])
-  const history = rawHistory.filter(
-    (item) => item.kind !== 'output' || !hidden.has(item.hash),
-  )
-  const library = (rawLibrary as LibraryCountRow[]).filter((row) => {
-    const hash = typeof row.hash === 'string' ? row.hash : typeof row.id === 'string' ? row.id : ''
-    return !hash || !hidden.has(hash)
-  })
-  return countAssets(history, library, now)
-}
-
-export async function countStorageProjects(storage: StoragePort): Promise<number> {
-  const scan = storage.scan?.bind(storage)
-  if (!scan) {
-    return (await storage.query('projects', {}, { includePayload: false })).filter(
-      (row) => !row.deletedAt,
-    ).length
-  }
-  let total = 0
-  await scan(
-    'projects',
-    50,
-    async (rows) => {
-      total += rows.filter((row) => !row.deletedAt).length
-    },
-    { includePayload: false },
-  )
-  return total
 }
 
 /** 配额未知时返回 null，不伪造进度。 */
