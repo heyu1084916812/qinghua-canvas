@@ -1,5 +1,13 @@
 # CanvasFlow 不变量详表
 
+## 灯箱裁剪动作边界（2026-11-06）
+
+- `lightboxCropActionCoordinator.ts` 不得 import React、DOM 或 Store 实例；React state/refs、DOM rect、window
+  适配器、Store 与平台仍归 `LightboxLayer`，协调器只接收显式 state/rect/pointer/业务端口。
+- 框选/搬框/改手柄只认左键；pointerdown 的 cropRect 是整段拖拽 base；参与框选必须标记 moved；pointer drag
+  替换前释放旧订阅。脸部框写入顺序为 update→close→notify；crop 失败不得 close，成功先解锁 busy 再 close/notify。
+- 裁剪动作拆分必须保持 `LightboxLayer` render-after 哈希不变；改 JSX/DOM/CSS/文案或可见交互时立即转「涉及 UI」门禁。
+
 ## 画布变更决策边界（2026-11-06）
 
 - `flowSurfaceChangeCoordinator.ts` 不得 import React、React Flow hooks 或 CanvasStore 实例；React Flow 回调壳、refs、

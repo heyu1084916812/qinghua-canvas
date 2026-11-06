@@ -13,16 +13,11 @@ import type { FusionRect } from '../../../domain/canvas/model/node'
 import {
   CROP_HANDLES,
   FUSION_MIN_EDGE,
-  clampRect,
   fitRectToRatio,
-  movedCropRect,
   ratioValueOf,
-  resizedCropRect,
-  type CropHandle,
 } from '../../../domain/canvas/fusion/fusionPlan'
 import { RATIO_CHOICES } from '../../../domain/canvas/layout/ratioChoices'
 import { cropAsset, extractSelection } from '../../../features/canvas/extractSelection'
-import { faceBoxFromRect } from '../../../features/canvas/emotionEdit'
 import { downloadAsset } from '../../../features/shared/assets/downloadAsset'
 import { createId } from '../../../shared/id'
 import {
@@ -52,7 +47,6 @@ import {
   FIT_PADDING,
   cropBoxOf,
   dragPan,
-  imagePointAt,
   mediaBoxOf,
   wheelZoom,
 } from './lightboxViewportMath'
@@ -86,6 +80,10 @@ import {
   type LightboxAnnotationState,
   type LightboxPointerDragHandlers,
 } from './lightboxAnnotationCoordinator'
+import {
+  createLightboxCropActions,
+  type LightboxCropState,
+} from './lightboxCropActionCoordinator'
 
 function annotationCanvasBox(canvas: HTMLCanvasElement): LightboxAnnotationCanvas {
   const { left, top, width, height } = canvas.getBoundingClientRect()
@@ -454,175 +452,32 @@ export function LightboxLayer() {
     return r ? { x: r.x, y: r.y, w: r.width, h: r.height } : null
   }
 
-  /** 屏幕坐标 → **原图像素**坐标（夹在图内）。灯箱把图放在世界 (0,0)，故就是 screenToWorld */
-  const imgPointAt = (clientX: number, clientY: number): { x: number; y: number } | null =>
-    imagePointAt(clientX, clientY, natural, vp, rectNow())
-
-  /** 把框吸附到当前比例档（只缩不放）+ 夹进图内 —— 复用融合节点那套几何，不另写一份 */
-  const lockCrop = (rect: FusionRect): FusionRect => {
-    if (!natural) return rect
-    const locked = ratioValue ? fitRectToRatio(rect, ratioValue) : rect
-    return clampRect(locked, { w: natural.w, h: natural.h })
+  const cropStateRef = useRef<LightboxCropState | null>(null)
+  cropStateRef.current = {
+    cropRect, cropRatio, ratioValue, natural, viewport: vp,
+    faceFor, cropFor, ownerNodeId, plainCrop,
   }
-
-  /**
-   * 拖**框本身**（框内按下）。
-   *
-   * 用户 2026-09-30：「在选取内拖动每次都会新建一个选取」—— 首版把「按在图上」
-   * 一律当成画新框，于是框好之后想挪个位置就必须重画。现在框内按下 = 搬框
-   * （尺寸不变），只有按在框**外**才是画新框；这层由 `[data-lightbox-crop-move]`
-   * 覆盖在选框上接管指针，顺带把光标变成 `move` 给出提示。
-   */
-  const startMove = (e: ReactPointerEvent) => {
-    if (!cropRect || !natural) return
-    /**
-     * **只有左键搬框**（用户 2026-10-16 定的手势分工：左键画框 / 改框、中键平移）。
-     *
-     * 不写这一句的后果很隐蔽：选框经常占掉大半张图，用户在中键平移时手正好落在框里，
-     * 那一下就会变成「搬框」而视图纹丝不动 —— 而他以为自己按的是平移。
-     * 非左键**直接放行**（不 `stopPropagation`），让它照旧冒到舞台那条通用平移去。
-     */
-    if (!isPrimaryPointer(e.button)) return
-    e.stopPropagation()
-    e.preventDefault()
-    movedRef.current = true
-    const base = cropRect
-    const bounds = { w: natural.w, h: natural.h }
-    const from = imgPointAt(e.clientX, e.clientY)
-    if (!from) return
-    const move = (ev: PointerEvent) => {
-      const cur = imgPointAt(ev.clientX, ev.clientY)
-      if (!cur) return
-      setCropRect(movedCropRect(base, cur.x - from.x, cur.y - from.y, bounds))
-    }
-    const up = () => {
-      window.removeEventListener('pointermove', move)
-      window.removeEventListener('pointerup', up)
-    }
-    window.addEventListener('pointermove', move)
-    window.addEventListener('pointerup', up)
-  }
-
-  /** 提取选区模式下的拖拽 = **画框**（不是平移） */
-  const startCrop = (e: ReactPointerEvent) => {
-    const start = imgPointAt(e.clientX, e.clientY)
-    if (!start) return
-    e.stopPropagation()
-    // 框选期间别被「拖过就当成拖拽、单击才关闭」那套判定认成单击
-    movedRef.current = true
-    const move = (ev: PointerEvent) => {
-      const cur = imgPointAt(ev.clientX, ev.clientY)
-      if (!cur) return
-      setCropRect(
-        lockCrop({
-          x: Math.min(start.x, cur.x),
-          y: Math.min(start.y, cur.y),
-          w: Math.abs(cur.x - start.x),
-          h: Math.abs(cur.y - start.y),
-        }),
-      )
-    }
-    const up = () => {
-      window.removeEventListener('pointermove', move)
-      window.removeEventListener('pointerup', up)
-    }
-    window.addEventListener('pointermove', move)
-    window.addEventListener('pointerup', up)
-  }
-
-  /**
-   * 拖手柄**改**已经画好的框（用户 2026-09-30：「灯箱框选要能二次修改」）。
-   *
-   * 基准取按下那一刻的 `cropRect`（不是每次 setState 的最新值）：整段拖拽都以
-   * 起点为参照，指针回到原位框就回到原样。若用「上一帧的框」当基准，误差会一帧
-   * 一帧累加，拖一会框就飘走了。
-   */
-  const startResize = (handle: CropHandle, e: ReactPointerEvent) => {
-    if (!cropRect || !natural) return
-    /** 同 `startMove`：手柄也只有左键能拖，中键一律让给「平移视图」 */
-    if (!isPrimaryPointer(e.button)) return
-    // 手柄在舞台里面：不拦这一下就会被当成「在空白处重新画框」，一拖就把原框擦掉
-    e.stopPropagation()
-    e.preventDefault()
-    movedRef.current = true
-    const base = cropRect
-    const bounds = { w: natural.w, h: natural.h }
-    const move = (ev: PointerEvent) => {
-      const cur = imgPointAt(ev.clientX, ev.clientY)
-      if (!cur) return
-      setCropRect(
-        resizedCropRect({
-          base,
-          handle,
-          pointer: cur,
-          bounds,
-          ratio: ratioValue,
-          minEdge: FUSION_MIN_EDGE,
-        }),
-      )
-    }
-    const up = () => {
-      window.removeEventListener('pointermove', move)
-      window.removeEventListener('pointerup', up)
-    }
-    window.addEventListener('pointermove', move)
-    window.addEventListener('pointerup', up)
-  }
-
-  /**
-   * 确认框选。两种模式**确认之后干的事完全不同**：
-   *
-   * - **框脸**（`faceFor`）：把框换算成归一化值写进节点的 `data.faceBox`，**不建任何节点**。
-   *   情绪调节的整条链路只有一次生成（用户 2026-10-06 定的口径），这里只是把
-   *   「脸在哪」补上，接着由用户点「生成」。
-   * - **提取选区**（`cropFor`）：裁剪 + 落库 + 在原图右侧建局部图 + 写上下文（都在 features 里）。
-   */
-  const confirmCrop = async () => {
-    if (!cropRect) return
-    if (faceFor) {
-      if (!natural) return
-      const box = faceBoxFromRect(cropRect, natural)
-      if (!box) {
-        store.notify('这个框太小了，重新拖一个大一点的', 'error')
-        return
-      }
-      store.dispatch({ kind: 'node.updateData', id: faceFor, patch: { faceBox: box } })
-      close()
-      store.notify('已框好脸部：点「生成」开始')
-      return
-    }
-    /**
-     * 普通双击灯箱没有 `cropFor`：用从当前素材反查到的节点 id 作为提取目标；
-     * 只有既没有显式目标、也没有归属节点时才无从下手。
-     */
-    const targetNodeId = cropFor ?? ownerNodeId
-    if (!targetNodeId) return
-    setBusy(true)
-    /**
-     * 两个用途走同一段实现、只有"切哪个矩形 + 写不写上下文"不同（见 `createPiece`）：
-     * 裁剪按原框、不写上下文；提取选区外扩一圈、写上下文。
-     */
-    const out = plainCrop
-      ? await cropAsset(
-          { platform, store },
-          { nodeId: targetNodeId, rect: cropRect, ratio: cropRatio },
-        )
-      : await extractSelection(
-          { platform, store },
-          { nodeId: targetNodeId, rect: cropRect, ratio: cropRatio },
-        )
-    setBusy(false)
-    if (out.ok) {
-      close()
-      store.notify(
-        plainCrop
-          ? '已裁剪：新图已生成在原图右侧（不带选区上下文）'
-          : '已提取选区：局部图已生成在原图右侧，并带上上下文',
-      )
-    } else {
-      store.notify(out.reason, 'error')
-    }
-  }
+  const [cropActions] = useState(() =>
+    createLightboxCropActions({
+      state: () => cropStateRef.current!,
+      stageRect: rectNow,
+      setCropRect,
+      setMoved: (value) => {
+        movedRef.current = value
+      },
+      setBusy,
+      notify: (message, tone) => store.notify(message, tone),
+      updateFaceBox: (nodeId, box) => {
+        store.dispatch({ kind: 'node.updateData', id: nodeId, patch: { faceBox: box } })
+      },
+      crop: (input) => cropAsset({ platform, store }, input),
+      extract: (input) => extractSelection({ platform, store }, input),
+      close,
+      subscribePointerDrag: subscribeWindowPointerDrag,
+    }),
+  )
+  useEffect(() => () => cropActions.dispose(), [cropActions])
+  const { lockCrop, startMove, startCrop, startResize, confirmCrop } = cropActions
 
   const onAnnDown = (e: ReactPointerEvent<HTMLCanvasElement>) =>
     annActions.pointerDown(e, annotationCanvasBox(e.currentTarget), redrawAnn)

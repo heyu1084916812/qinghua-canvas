@@ -442,7 +442,7 @@
       "test": [
         "scripts/smoke.mjs#G795"
       ],
-      "budget": 1501
+      "budget": 1356
     },
     {
       "module": "src/workbenches/canvas/panels/CreationPanel.module.css",
@@ -4550,6 +4550,34 @@
         "src/workbenches/canvas/flow/flowSurfaceChangeCoordinator.test.ts"
       ],
       "budget": 382
+    },
+    {
+      "module": "src/workbenches/canvas/lightbox/lightboxCropActionCoordinator.ts",
+      "owner": "canvas-lightbox-crop-actions",
+      "responsibility": "编排灯箱裁剪与框脸的移动、缩放、确认分支和 pointer drag 生命周期。",
+      "owns": [
+        "裁剪框点换算、比例锁定与最小边缩放",
+        "框选/搬框 pointer 订阅替换和清理",
+        "脸部框写入与裁剪/提取的 busy、通知和关闭顺序"
+      ],
+      "doesNotOwn": [
+        "React state、refs 与组件生命周期",
+        "DOM 测量、window listener 注册与 JSX",
+        "素材裁剪实现、CanvasStore 和页面文案"
+      ],
+      "publicApi": [
+        "LightboxCropState",
+        "LightboxCropPointer",
+        "LightboxCropPointerDragHandlers",
+        "LightboxCropRequest",
+        "LightboxCropOutcome",
+        "LightboxCropPorts",
+        "createLightboxCropActions"
+      ],
+      "test": [
+        "src/workbenches/canvas/lightbox/lightboxCropActionCoordinator.test.ts"
+      ],
+      "budget": 226
     }
   ]
 }

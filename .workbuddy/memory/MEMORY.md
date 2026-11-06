@@ -1,5 +1,15 @@
 # CanvasFlow（轻画）项目记忆
 
+### 灯箱裁剪动作拆分（2026-11-06）
+
+- `lightboxCropActionCoordinator.ts` 只编排裁剪框/框脸移动、框选、缩放、pointer drag、脸部框写入和
+  crop/extract 的 busy/通知/关闭顺序；`LightboxLayer` 继续持有 React state/refs、DOM rect、窗口适配器、Store 与平台。
+- 左键才搬框/画框/改手柄；框选必须标记 moved；base 取 pointerdown 快照；pointer drag 替换先释放旧订阅；
+  crop 失败不关闭灯箱，成功先解锁 busy 再 close+notify。`LightboxLayer` 1501→1356，render-after 689 行哈希
+  `D543B6D0D584B8A7D9610DD123F358949A7A0D53ECB3FC249C582BF344FE4067` 不变；新模块预算 226、宿主预算 1356。
+- 全仓默认 5 秒下治理 CLI 子进程测试偶发超时；单跑 15/15 后，以 `--testTimeout=15000` 全量
+  580 files / 5111 tests 通过，check（1005 modules / 3989 deps、25 legacy、149 semantic）与 build 通过。
+
 ### 画布变更决策拆分（2026-11-06）
 
 - `flowSurfaceChangeCoordinator.ts` 只产出节点/连线选择、位置吸附、拖拽终点/落点与删除计划；
