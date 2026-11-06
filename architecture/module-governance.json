@@ -515,7 +515,7 @@
       "test": [
         "src/workbenches/ecommerce/EcommerceStudio.status.test.ts"
       ],
-      "budget": 1753
+      "budget": 1598
     },
     {
       "module": "src/workbenches/storyboard/useStoryboardVideoExecutionController.ts",
@@ -4478,6 +4478,33 @@
         "src/pages/EcommercePage/ecommercePage/pageResultActionCoordinator.test.ts"
       ],
       "budget": 277
+    },
+    {
+      "module": "src/workbenches/ecommerce/studio/controller/studioActionCoordinator.ts",
+      "owner": "ecommerce-studio-actions",
+      "responsibility": "编排电商工作台模式切换、素材上传、卖点补写以及编辑、批编辑和超清的提交动作。",
+      "owns": [
+        "上传容量、失败提示、拖放逐张处理和参考图分路",
+        "模式切换默认状态与媒体类型变化清模型",
+        "编辑、批编辑、超清、生成确认的守卫、错误与 finally 解锁"
+      ],
+      "doesNotOwn": [
+        "React state、refs 与组件生命周期",
+        "JSX/DOM/CSS 与工作台可见文案",
+        "平台上传实现、任务存储与生成执行器"
+      ],
+      "publicApi": [
+        "StudioUploadKind",
+        "StudioActionResultTarget",
+        "StudioUpscaleTarget",
+        "StudioActionState",
+        "StudioActionPorts",
+        "createStudioActions"
+      ],
+      "test": [
+        "src/workbenches/ecommerce/studio/controller/studioActionCoordinator.test.ts"
+      ],
+      "budget": 358
     }
   ]
 }

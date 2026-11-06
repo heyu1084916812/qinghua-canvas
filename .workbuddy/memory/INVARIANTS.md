@@ -1,5 +1,13 @@
 # CanvasFlow 不变量详表
 
+## 电商 Studio 动作边界（2026-11-06）
+
+- `studioActionCoordinator.ts` 不得 import React、DOM 或 Store；React state/refs、DOM 事件对象、平台上传端口和
+  子组件 props 仍归 `EcommerceStudio`。协调器只接收状态快照与显式 action ports。
+- 模式切换只有跨 mediaKind 才清模型；上传必须按剩余容量逐张 await；编辑/批编辑/超清的错误分支不得关闭层，
+  成功分支的字段清理保持一致，所有 busy 都必须在 finally 解锁。
+- Studio 动作拆分必须保持 `EcommerceStudio` render-after 哈希不变；改 JSX、DOM、CSS 或可见文案时立即转「涉及 UI」门禁。
+
 ## 电商结果动作边界（2026-11-06）
 
 - `pageResultActionCoordinator.ts` 不得 import React、DOM 或 Store；结果投影、hooks、平台实例与工作台 props 仍归

@@ -22,7 +22,6 @@ import type {
 } from '../../domain/ecommerce/upscale'
 import { ECOMMERCE_NOTE_MAX } from '../../domain/ecommerce/prompt'
 import {
-  defaultEcommerceModeOptions,
   modeOptionString,
   normalizeEcommerceModeOptions,
 } from '../../domain/ecommerce/modeOptions'
@@ -31,11 +30,9 @@ import { ECOMMERCE_UPSCALE_SCALES } from '../../domain/ecommerce/upscale'
 import { EcommerceSelect } from './EcommerceSelect'
 import { styles } from './studio/studioStyles'
 import {
-  DEFAULT_MODE_FORM_STATE,
   STUDIO_CATEGORIES,
   STUDIO_MODES,
   type StudioCategory,
-  type StudioMode,
   type EcommerceResultItem,
   type EcommerceUpload,
   type EcommerceStudioProps,
@@ -45,7 +42,6 @@ import { CategoryGlyph, modelIconFor } from './studio/studioSharedViews'
 import { ModeSpecificParameters } from './studio/EcommerceStudioModeParameters'
 import {
   applyModeFormPatch,
-  ensureStudioModeState,
   initialStudioFormState,
   nextModeFormAfterModelChange,
   orderedStudioPlatforms,
@@ -59,25 +55,14 @@ import {
   studioImageParameterChoices,
   toggleStudioModeOption,
 } from './studio/controller/studioFormProjection'
+import { createStudioActions } from './studio/controller/studioActionCoordinator'
 import {
-  appendProductUpload,
-  appendReferenceUpload,
   buildStudioRequest,
-  sellingPointFailureMessage,
-  submitStudioGeneration,
-  uploadFailureMessage,
-  uploadRoom,
   usesAiPlan,
   validateStudioStart,
 } from './studio/controller/studioRequestCoordinator'
 import {
   availableStudioUpscaleOptions,
-  runStudioUpscale,
-  studioBatchEditFailureMessage,
-  studioBatchEditSubmission,
-  studioEditFailureMessage,
-  studioEditSubmission,
-  studioUploadFailureMessage,
   studioUploadPreviewItems,
   studioUploadPreviewStep,
 } from './studio/controller/studioResultActionCoordinator'
@@ -204,40 +189,6 @@ export function EcommerceStudio({
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [uploadPreview, uploadPreviewItems.length])
 
-  const openEditForResult = (result: EcommerceResultItem) => {
-    if (!onEditResult || running || result.mime?.startsWith('video/')) return
-    setEditTarget({ nodeId: result.nodeId, label: '这张结果' })
-    setEditInstruction(note.trim())
-    setEditModel('')
-    setEditReference(null)
-    setEditError('')
-  }
-
-  const openUpscaleForResult = (result: EcommerceResultItem) => {
-    if (!onUpscaleResult || running || result.mime?.startsWith('video/')) return
-    const first = availableUpscaleOptions[0]
-    if (!first) return
-    setUpscaleTarget({ items: [result], batch: false })
-    setUpscaleProfile(first.id)
-    setUpscaleScale('4x')
-    setUpscaleError('')
-  }
-
-  const longImageNode = longImage?.({
-    busy: running,
-    ...(onEditResult ? {
-      editResult: (nodeId: string) => {
-        const result = results.find((item) => item.nodeId === nodeId)
-        if (result) openEditForResult(result)
-      },
-    } : {}),
-    ...(onUpscaleResult && availableUpscaleOptions.length > 0 ? {
-      upscaleResult: (nodeId: string) => {
-        const result = results.find((item) => item.nodeId === nodeId)
-        if (result) openUpscaleForResult(result)
-      },
-    } : {}),
-  })
   /**
    * 正在往哪一块拖（对账 #427）：`null` = 没在拖。只用来画一个"松手会落这儿"的提示 ——
    * 没有提示的话，用户拖着图悬在框上不知道能不能放（画布那边早就有拖放，
@@ -352,102 +303,115 @@ export function EcommerceStudio({
     return orderedStudioPlatforms(platforms)
   }, [platforms])
 
-  const activateMode = (next: StudioMode) => {
-    const previousKind = mode.mediaKind
-    setModeId(next.id)
-    setCategory(next.category)
-    setUsage(next.usage)
-    setModeOptionsByMode((current) =>
-      ensureStudioModeState(current, next, defaultEcommerceModeOptions(next.id)),
-    )
-    setModeStates((current) =>
-      ensureStudioModeState(current, next, DEFAULT_MODE_FORM_STATE(next)),
-    )
-    if (previousKind !== next.mediaKind) onModelChange('')
-    setError('')
-  }
+  const buildRequest = (): EcommerceRequest => buildStudioRequest({
+    mode,
+    modeOptions,
+    usage,
+    form: modeFormState,
+    effectiveCount,
+    videoDuration,
+    products,
+    references,
+    model,
+  })
 
-  const activateCategory = (next: StudioCategory) => {
-    const first = STUDIO_MODES.find((item) => item.category === next)
-    if (first) activateMode(first)
-  }
+  const studioActions = createStudioActions({
+    request: buildRequest(),
+    mode,
+    products,
+    references,
+    note,
+    batchWhite,
+    productLimit,
+    running,
+    firstUpscaleProfile: availableUpscaleOptions[0]?.id ?? null,
+    resultLabel: '这张结果',
+    uploadReadFailure: '这张图没能读进来（格式不支持或读取失败），换一张再试',
+    emptySellingPointsError: '模型没有返回可用的卖点文案',
+    editTarget,
+    editInstruction,
+    editReference,
+    editModel,
+    batchInstruction,
+    results,
+    selectedEditNodes,
+    batchReference,
+    batchEditModel,
+    upscaleTarget,
+    upscaleProfile,
+    upscaleScale,
+  }, {
+    onUpload,
+    ...(onWriteSellingPoints ? { onWriteSellingPoints } : {}),
+    onGenerate,
+    ...(onEditResult ? { onEditResult } : {}),
+    ...(onEditResults ? { onEditResults } : {}),
+    ...(onUpscaleResult ? { onUpscaleResult } : {}),
+    onModelChange,
+    setModeId,
+    setCategory,
+    setUsage,
+    setModeOptionsByMode,
+    setModeStates,
+    setError,
+    setProducts,
+    setReferences,
+    setDragOver,
+    setWritingSellingPoints,
+    setSellingPointsError,
+    setNote,
+    setEditTarget,
+    setEditInstruction,
+    setEditModel,
+    setEditReference,
+    setEditError,
+    setEditSubmitting,
+    setEditReferenceBusy,
+    setBatchEditOpen,
+    setBatchInstruction,
+    setBatchEditError,
+    setBatchEditSubmitting,
+    setBatchEditModel,
+    setBatchReference,
+    setBatchReferenceBusy,
+    setSelectedEditNodes,
+    setUpscaleTarget,
+    setUpscaleProfile,
+    setUpscaleScale,
+    setUpscaleSubmitting,
+    setUpscaleError,
+    setConfirming,
+  })
+  const {
+    openEditForResult,
+    openUpscaleForResult,
+    activateMode,
+    activateCategory,
+    onPick,
+    onDropFiles,
+    pickEditReference,
+    writeSellingPoints,
+    confirm,
+    submitEdit,
+    submitUpscale,
+    submitBatchEdit,
+  } = studioActions
 
-  const onPick = async (file: File | undefined, kind: 'product' | 'reference') => {
-    if (!file) return
-    setError('')
-    const uploaded = await onUpload(file, kind)
-    if (!uploaded) {
-      setError(`这张图没能读进来（格式不支持或读取失败），换一张再试`)
-      return
-    }
-    if (kind === 'product') {
-      setProducts((prev) => appendProductUpload(prev, uploaded, {
-        batchWhite,
-        productLimit,
-        productCount: prev.length,
-        referenceCount: references.length,
-      }))
-    } else {
-      setReferences((prev) => appendReferenceUpload(prev, uploaded, products.length))
-    }
-  }
-
-  /**
-   * **拖进来的文件**（对账 #427）。
-   *
-   * 两条与文件选择保持一致的规矩（两条路各写一套迟早分叉）：
-   * - 走的是**同一个** `onPick`（所以"不是图 / 读不出来"的提示也是同一句话）；
-   * - 参考图仍然**最多 4 张**：放不下的一次**不收**，也不偷偷挤掉已有的。
-   */
-  const onDropFiles = (kind: 'product' | 'reference', files: FileList | null) => {
-    setDragOver(null)
-    const picked = [...(files ?? [])]
-    if (picked.length === 0) return
-    void (async () => {
-      if (kind === 'product') {
-        const room = uploadRoom('product', {
-          batchWhite,
-          productLimit,
-          productCount: products.length,
-          referenceCount: references.length,
-        })
-        for (const file of picked.slice(0, room)) await onPick(file, 'product')
-        return
-      }
-      const room = uploadRoom('reference', {
-        batchWhite,
-        productLimit,
-        productCount: products.length,
-        referenceCount: references.length,
-      })
-      for (const f of picked.slice(0, room)) await onPick(f, 'reference')
-    })()
-  }
-
-  const pickEditReference = async (file: File | undefined, batch: boolean) => {
-    if (!file) return
-    if (batch) {
-      setBatchReferenceBusy(true)
-      setBatchEditError('')
-    } else {
-      setEditReferenceBusy(true)
-      setEditError('')
-    }
-    try {
-      const uploaded = await onUpload(file, 'reference')
-      if (!uploaded) {
-        const message = studioUploadFailureMessage()
-        if (batch) setBatchEditError(message)
-        else setEditError(message)
-        return
-      }
-      if (batch) setBatchReference(uploaded)
-      else setEditReference(uploaded)
-    } finally {
-      if (batch) setBatchReferenceBusy(false)
-      else setEditReferenceBusy(false)
-    }
-  }
+  const longImageNode = longImage?.({
+    busy: running,
+    ...(onEditResult ? {
+      editResult: (nodeId: string) => {
+        const result = results.find((item) => item.nodeId === nodeId)
+        if (result) openEditForResult(result)
+      },
+    } : {}),
+    ...(onUpscaleResult && availableUpscaleOptions.length > 0 ? {
+      upscaleResult: (nodeId: string) => {
+        const result = results.find((item) => item.nodeId === nodeId)
+        if (result) openUpscaleForResult(result)
+      },
+    } : {}),
+  })
 
   /** 拖放的四个处理器：两块上传区共用（`kind` 决定落到哪儿） */
   const dropProps = (kind: 'product' | 'reference') => ({
@@ -465,33 +429,6 @@ export function EcommerceStudio({
       onDropFiles(kind, e.dataTransfer?.files ?? null)
     },
   })
-
-  const buildRequest = (): EcommerceRequest => buildStudioRequest({
-    mode,
-    modeOptions,
-    usage,
-    form: modeFormState,
-    effectiveCount,
-    videoDuration,
-    products,
-    references,
-    model,
-  })
-
-  const writeSellingPoints = async () => {
-    if (!onWriteSellingPoints) return
-    setWritingSellingPoints(true)
-    setSellingPointsError('')
-    try {
-      const text = (await onWriteSellingPoints(buildRequest())).trim()
-      if (!text) throw new Error('模型没有返回可用的卖点文案')
-      setNote(text.slice(0, ECOMMERCE_NOTE_MAX))
-    } catch (e) {
-      setSellingPointsError(sellingPointFailureMessage(e))
-    } finally {
-      setWritingSellingPoints(false)
-    }
-  }
 
   const start = () => {
     const request = buildRequest()
@@ -517,98 +454,6 @@ export function EcommerceStudio({
     () => studioEditPresets(language, usage, ecommerceLanguageOptionLabel),
     [language, usage],
   )
-  const confirm = async () => {
-    setConfirming(false)
-    setError('')
-    try {
-      await submitStudioGeneration({
-        batchWhite,
-        products,
-        request: buildRequest(),
-        onGenerate,
-      })
-    } catch (e) {
-      setError(uploadFailureMessage(e))
-    }
-  }
-
-  const submitEdit = async () => {
-    if (!editTarget || !onEditResult) return
-    const submission = studioEditSubmission(editInstruction, editReference, editModel)
-    if ('error' in submission) {
-      setEditError(submission.error)
-      return
-    }
-    setEditError('')
-    setEditSubmitting(true)
-    try {
-      await onEditResult(
-        editTarget.nodeId,
-        submission.instruction,
-        submission.options,
-      )
-      setEditTarget(null)
-      setEditInstruction('')
-      setEditReference(null)
-      setEditModel('')
-    } catch (e) {
-      setEditError(studioEditFailureMessage(e))
-    } finally {
-      setEditSubmitting(false)
-    }
-  }
-
-  const submitUpscale = async () => {
-    if (!upscaleTarget?.items.length || !onUpscaleResult) return
-    setUpscaleError('')
-    setUpscaleSubmitting(true)
-    const progress = await runStudioUpscale({
-      items: upscaleTarget.items,
-      profile: upscaleProfile,
-      scale: upscaleScale,
-      onUpscale: onUpscaleResult,
-    })
-    if (!progress.error) {
-      if (upscaleTarget.batch) setSelectedEditNodes(new Set())
-      setUpscaleTarget(null)
-    } else {
-      setUpscaleError(progress.error)
-    }
-    setUpscaleSubmitting(false)
-  }
-
-  const submitBatchEdit = async () => {
-    if (!onEditResults) return
-    const submission = studioBatchEditSubmission({
-      instruction: batchInstruction,
-      results,
-      selectedNodeIds: selectedEditNodes,
-      reference: batchReference,
-      model: batchEditModel,
-    })
-    if ('error' in submission) {
-      setBatchEditError(submission.error)
-      return
-    }
-    setBatchEditError('')
-    setBatchEditSubmitting(true)
-    try {
-      await onEditResults(
-        submission.imageNodeIds,
-        submission.instruction,
-        submission.options,
-      )
-      setBatchEditOpen(false)
-      setBatchInstruction('')
-      setBatchReference(null)
-      setBatchEditModel('')
-      setSelectedEditNodes(new Set())
-    } catch (e) {
-      setBatchEditError(studioBatchEditFailureMessage(e))
-    } finally {
-      setBatchEditSubmitting(false)
-    }
-  }
 
   const { resolutionChoices, qualityChoices } = studioImageParameterChoices(
     imageParamOptionsByModel,

@@ -1,5 +1,14 @@
 # CanvasFlow（轻画）项目记忆
 
+### 电商 Studio 动作编排拆分（2026-11-06）
+
+- `studioActionCoordinator.ts` 负责模式切换、上传容量与逐张等待、参考图、卖点补写、生成确认和
+  编辑/批编辑/超清提交；`EcommerceStudio` 继续拥有 React state/refs、DOM 事件、平台上传和子组件接线。
+- 模式跨媒体类型才清模型；product/reference 上传只处理剩余容量且逐张 await；编辑/批编辑/超清 busy
+  必须在 finally 解锁，失败不关闭层，成功才清对应字段。`EcommerceStudio` 1753→1598，render-after
+  1114 行哈希 `A4AAF01385538FEA697EECA98951B8E5264019610D3258D84EF3A8740048F46F` 不变；新模块预算 358。
+- 本轮全量 578 files / 5093 tests，check（1003 modules / 3975 deps、25 legacy、147 semantic）与 build 通过。
+
 ### 电商结果动作编排拆分（2026-11-06）
 
 - `pageResultActionCoordinator.ts` 负责结果行查找、编辑/超清 payload 与来源、批量首错中止、失败重试、
