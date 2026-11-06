@@ -4,7 +4,8 @@ import {
   useRef,
   useSyncExternalStore,
   useState,
-  type PointerEvent as ReactPointerEvent,
+  type Dispatch,
+  type SetStateAction,
 } from 'react'
 import { createPortal } from 'react-dom'
 import { useChannels } from '../../app/providers/ChannelStoreProvider'
@@ -13,33 +14,18 @@ import {
   channelCapabilities,
   protocolLabel,
   protocolShort,
-  type Channel,
 } from '../../domain/project/channel'
 import {
   CAPABILITY_LABEL,
   protocolById,
-  type CustomProtocolInput,
   type ProtocolDefinition,
 } from '../../domain/project/protocol'
+import type { DeclarativeProtocolPackage } from '../../domain/project/protocolRecipe'
 import {
-  DECLARATIVE_PROTOCOL_TEMPLATE,
-  parseDeclarativeProtocol,
-  type DeclarativeProtocolPackage,
-} from '../../domain/project/protocolRecipe'
-import {
-  builtinProtocolReferenceForExport,
-  protocolPackageForExport,
-  serializeBuiltinProtocolReference,
-  serializeProtocolPackage,
-} from '../../domain/project/protocolExport'
-import {
-  applySelection,
   CATEGORY_FILTERS,
   categoryLabel,
   filterModels,
   groupModelsByCategory,
-  initialChecked,
-  removeModel,
   routeMapOptions,
   type CategoryFilter,
 } from '../../domain/project/modelSelection'
@@ -70,8 +56,8 @@ import {
   type PresetVendor,
 } from './settingsPageConstants'
 import type { ModelCapability } from '../../domain/shared/capability'
+import type { Channel } from '../../domain/project/channel'
 import { ModelIcon } from '../../features/shared/modelIcon/ModelIcon'
-import { readChannelIconFile } from '../../features/shared/channelIcon/readIconFile'
 import { isBuiltinChannelId } from '../../domain/project/builtinChannels'
 import { ModelMapCombo, StrategyPicker } from './SettingsPicker'
 import { usePlatform } from '../../app/providers/PlatformProvider'
@@ -91,10 +77,52 @@ import {
   IconChannels,
 } from '../../app/SettingsIcons'
 import {
-  customProtocolIdForName,
-  customProtocolShortForName,
-  protocolVersionForBaseUrl,
-} from './customProtocolDraft'
+  createChannelActions,
+  type ChannelActions,
+  type ChannelActionPorts,
+  type ChannelActionState,
+  type ChannelFormState,
+} from './settingsPage/channelActionCoordinator'
+import {
+  createModelMappingActions,
+  type ModelMappingPorts,
+} from './settingsPage/modelMappingActionCoordinator'
+import {
+  createProtocolActions,
+  type ProtocolActionPorts,
+  type ProtocolActionState,
+} from './settingsPage/protocolActionCoordinator'
+
+type SettingsSetter<T> = Dispatch<SetStateAction<T>>
+type ChannelActionsOpenMenu = ChannelActions['openChannelMenuFromButton']
+
+function patchFormSetter(
+  setName: SettingsSetter<string>,
+  setProtocol: SettingsSetter<string>,
+  setBaseUrl: SettingsSetter<string>,
+  setEnabled: SettingsSetter<boolean>,
+): (next: Partial<ChannelFormState>) => void {
+  return (next) => {
+    if (next.name !== undefined) setName(next.name)
+    if (next.protocol !== undefined) setProtocol(next.protocol)
+    if (next.baseUrl !== undefined) setBaseUrl(next.baseUrl)
+    if (next.enabled !== undefined) setEnabled(next.enabled)
+  }
+}
+
+function profileFocusSetter(ref: { current: HTMLElement | null }): (value: HTMLElement | null) => void {
+  return (value) => {
+    ref.current = value
+  }
+}
+
+function channelActionState(value: ChannelActionState): ChannelActionState {
+  return value
+}
+
+function protocolActionState(value: ProtocolActionState): ProtocolActionState {
+  return value
+}
 
 const styles = {
   ...baseStyles,
@@ -509,589 +537,156 @@ export function SettingsPage({ embedded = false }: { embedded?: boolean } = {}) 
     [],
   )
 
-  const handleCreate = async () => {
-    const fallbackProtocol =
-      protocolOptions.find(
-        (item) =>
-          item.status === 'ready' &&
-          !hiddenBuiltinProtocolSet.has(item.id) &&
-          item.kind !== 'legacy' &&
-          item.kind !== 'hidden',
-      )?.id ?? 'mock'
-    const ch = await channels.create({
-      name: '新建服务',
-      protocol: fallbackProtocol,
-      baseUrl: '',
-    })
-    setChannelFilter('all')
-    setChannelSearch('')
-    setSelectedId(ch.id)
+  const channelPorts: ChannelActionPorts = {
+    channels,
+    getChannels: () => channels.getState().channels,
+    setSelectedId,
+    setActiveGroupId,
+    setChannelFilter,
+    setChannelSearch,
+    setForm: patchFormSetter(setName, setProtocol, setBaseUrl, setEnabled),
+    setBusy,
+    setVerifiedFor,
+    setChannelMenu,
+    setMenuConfirmDelete,
+    setProfileDrawerBounds,
+    setProfileNameDraft,
+    setProfileIconDraft,
+    setProfileDrawerOpen,
+    setProfileSaving,
+    profileReturnFocus: profileFocusSetter(profileReturnFocusRef),
+    setPanelOpen,
+    setDraftChecked,
+    setDraftCategory,
+    setDraftKeyword,
+    setDragId,
+    setNewModelName,
+    setModelAddOpen,
+    setMapCategory,
+    alert: (message) => window.alert(message),
+    confirm: (message) => window.confirm(message),
   }
-
-  const handleEnableChange = async (next: boolean) => {
-    if (!selectedId) return
-    setEnabled(next)
-    try {
-      await channels.setEnabled(selectedId, next)
-    } catch (error) {
-      setEnabled(!next)
-      alert(error instanceof Error ? error.message : '保存启用状态失败')
-    }
+  const channelState = () => channelActionState({
+    selectedId,
+    form: { name, protocol, baseUrl, enabled },
+    selected,
+    selectedKeyGroups,
+    activeGroup,
+    activeModels,
+    activeModelCache,
+    channelList: channelsList,
+    catalog,
+    hiddenBuiltinProtocolIds: hiddenBuiltinProtocolSet,
+    draftChecked,
+    dragId,
+    profileNameDraft,
+    profileIconDraft,
+    newModelName,
+    newModelCategory,
+    newModelVendor,
+    platform,
+  })
+  const channelActions = createChannelActions(channelPorts)
+  const mappingPorts: ModelMappingPorts = {
+    channels,
+    selectedId: () => selectedId,
+    activeGroupId: () => activeGroup?.id,
+    timers: mapSaveTimersRef.current,
+    setMapDrafts,
+    setMapSaveNotice,
+    setMapTests,
+    setTimeout: (handler, delay) => window.setTimeout(handler, delay),
+    clearTimeout: (timer) => window.clearTimeout(timer),
   }
-
-  /** 图片上传进入抽屉草稿，只有点“保存”才写库。 */
-  const handleProfileIconFile = async (file: File | undefined) => {
-    if (!file) return
-    try {
-      setProfileIconDraft(await readChannelIconFile(file))
-    } catch {
-      alert('这张图片读不出来，换一张试试')
-    }
+  const mappingActions = createModelMappingActions(mappingPorts)
+  const protocolPorts: ProtocolActionPorts = {
+    channels,
+    platform,
+    setCatalogVersion,
+    setProtocol,
+    setBaseUrl,
+    setNpImportText,
+    setNpImported,
+    setNpError,
+    setNpNotice,
+    setProtoRemoveError,
+    setProtoManageNotice,
+    setNewProtoOpen,
   }
+  const protocolState = () => protocolActionState({
+    selectedId,
+    protocol,
+    baseUrl,
+    catalog,
+    npImportText,
+    npImported,
+    newProtoOpen,
+  })
+  const protocolActions = createProtocolActions(protocolPorts)
 
-  const saveProfileDrawer = async () => {
-    if (!selectedId) return
-    setProfileSaving(true)
-    try {
-      const nextName = profileNameDraft.trim() || selected?.name || '未命名服务'
-      const saved = await channels.update(selectedId, {
-        name: nextName,
-        icon: profileIconDraft,
-      })
-      setName(saved.name)
-      setProfileNameDraft(saved.name)
-      setProfileIconDraft(saved.icon)
-      setProfileDrawerOpen(false)
-    } catch (error) {
-      alert(error instanceof Error ? error.message : '保存失败')
-    } finally {
-      setProfileSaving(false)
-    }
-  }
-
-  /** 表单字段 → 落库值（名兜底、地址去空白以库为准） */
-  const syncForm = (ch: Channel) => {
-    setName(ch.name)
-    setProtocol(ch.protocol)
-    setBaseUrl(ch.baseUrl)
-    setEnabled(ch.enabled)
-  }
-
-  /** 把表单**当前内容**落库，返回落库后的渠道。 */
-  const persistForm = async (): Promise<Channel> => {
+  const handleCreate = async () => await channelActions.create(channelState())
+  const handleEnableChange = async (next: boolean) => await channelActions.setEnabled(channelState(), next)
+  const handleProfileIconFile = async (file: File | undefined) => await channelActions.readProfileIconFile(file)
+  const saveProfileDrawer = async () => await channelActions.saveProfileDrawer(channelState())
+  const persistForm = async () => {
     const saved = await channels.update(selectedId!, {
       name: name.trim() || '新建服务',
       protocol,
       baseUrl: baseUrl.trim(),
       enabled,
     })
-    syncForm(saved)
+    channelActions.syncForm(saved)
     return saved
   }
-
-  const handleVerify = async () => {
-    if (!selectedId) return
-    setBusy(true)
-    try {
-      // 先落库、再验证：`verify` 用的是**库里**的 protocol。
-      // 只改了下拉就直接点「验证地址」，会静默拿旧协议去验——协议还停在 mock 时
-      // 表现为「秒过」却完全没出网，地址填了也白填。
-      await persistForm()
-      setVerifiedFor({ channelId: selectedId, protocol, source: 'verify' })
-      await channels.verify(selectedId, activeGroup?.id)
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  /**
-   * 「验证协议」（§7.3）：逐个试打候选协议，把命中的那个填进「协议」并落库。
-   *
-   * 存在的意义是**别让用户猜**：他手里只有一个地址，未必知道该选中继的哪一项协议；
-   * 猜错的表现是 404 —— 而 404 看起来和「地址填错」一模一样，无从分辨。
-   */
-  const handleDetect = async () => {
-    if (!selectedId) return
-    setBusy(true)
-    try {
-      // 与「验证地址」同一口径：先落库，探测打的是库里的 baseUrl。
-      await persistForm()
-      setVerifiedFor({ channelId: selectedId, protocol, source: 'detect' })
-      const hit = await channels.detectProtocol(selectedId, activeGroup?.id)
-      // 同步回表单。探测的全部意义就是替用户把「协议」这一格填对；
-      // 只在库里写、表单不动，用户看到的下拉还是旧值，等于没自动选。
-      if (hit) setProtocol(hit)
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  const handleRefresh = async () => {
-    if (!selectedId) return
-    setBusy(true)
-    try {
-      await persistForm()
-      setVerifiedFor({ channelId: selectedId, protocol, source: 'models' })
-      await channels.refreshModels(selectedId, activeGroup?.id)
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  const openChannelMenu = (channelId: string, x: number, y: number) => {
-    setChannelMenu({ channelId, x, y })
-    setMenuConfirmDelete(false)
-  }
-
-  const openChannelMenuFromButton = (
-    event: Pick<ReactPointerEvent<HTMLButtonElement>, 'currentTarget' | 'stopPropagation'>,
-    channelId: string,
-  ) => {
-    event.stopPropagation()
-    const rect = event.currentTarget.getBoundingClientRect()
-    openChannelMenu(channelId, rect.right - 8, rect.bottom + 6)
-  }
-
-  const editChannel = (channelId: string) => {
-    const channel = channels.getState().channels.find((item) => item.id === channelId)
-    if (!channel) return
-    profileReturnFocusRef.current =
-      document.activeElement instanceof HTMLElement ? document.activeElement : null
-    setProfileDrawerBounds(measureProfileDrawerBounds())
-    setSelectedId(channelId)
-    setProfileNameDraft(channel.name)
-    setProfileIconDraft(channel.icon)
-    setProfileDrawerOpen(true)
-    setChannelMenu(null)
-    setMenuConfirmDelete(false)
-  }
-
-  const handleRemove = async (channelId: string) => {
-    if (isBuiltinChannelId(channelId)) return
-    setBusy(true)
-    try {
-      await channels.remove(channelId)
-      if (selectedId === channelId) setSelectedId(null)
-      setChannelMenu(null)
-      setMenuConfirmDelete(false)
-    } catch (err) {
-      /** 内置渠道会被命令层拒绝（界面也已禁用）—— 如实说一句，别静默失败 */
-      alert(err instanceof Error ? err.message : '删除失败')
-      setMenuConfirmDelete(false)
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  const handleAddKeyGroup = async () => {
-    if (!selectedId) return
-    setBusy(true)
-    try {
-      const group = await channels.addCredentialGroup(selectedId)
-      setActiveGroupId(group.id)
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  const handleRemoveKeyGroup = async () => {
-    if (!selectedId || !activeGroup) return
-    if (!window.confirm(`删除 Key 分组「${activeGroup.name}」？这会同时删除该组 Key。`)) {
-      return
-    }
-    setBusy(true)
-    try {
-      await channels.removeCredentialGroup(selectedId, activeGroup.id)
-      const rest = selectedKeyGroups.filter((group) => group.id !== activeGroup.id)
-      setActiveGroupId(rest[0]?.id ?? null)
-    } catch (error) {
-      alert(error instanceof Error ? error.message : String(error))
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  const flushModelMapping = async (logicalName: string, upstreamId: string) => {
-    if (!selectedId) return
-    const timer = mapSaveTimersRef.current.get(logicalName)
-    if (timer !== undefined) window.clearTimeout(timer)
-    mapSaveTimersRef.current.delete(logicalName)
-    try {
-      await channels.setModelMapping(selectedId, logicalName, upstreamId)
-      setMapDrafts((prev) => {
-        if (prev[logicalName] !== upstreamId) return prev
-        const next = { ...prev }
-        delete next[logicalName]
-        return next
-      })
-      setMapSaveNotice({ id: logicalName, tone: 'ok', text: '已保存' })
-    } catch (error) {
-      setMapSaveNotice({
-        id: logicalName,
-        tone: 'error',
-        text: error instanceof Error ? error.message : '保存失败',
-      })
-    }
-  }
-
-  const scheduleModelMapping = (logicalName: string, upstreamId: string) => {
-    const previous = mapSaveTimersRef.current.get(logicalName)
-    if (previous !== undefined) window.clearTimeout(previous)
-    setMapSaveNotice(null)
-    const timer = window.setTimeout(() => {
-      void flushModelMapping(logicalName, upstreamId)
-    }, 600)
-    mapSaveTimersRef.current.set(logicalName, timer)
-  }
-
-  const testModelMapping = async (logicalName: string, upstreamId: string) => {
-    if (!selectedId) return
-    setMapTests((prev) => ({
-      ...prev,
-      [logicalName]: { status: 'checking', message: '正在读取模型目录…' },
-    }))
-    try {
-      await flushModelMapping(logicalName, upstreamId)
-      const result = await channels.testModelMapping(
-        selectedId,
-        logicalName,
-        upstreamId,
-        activeGroup?.id,
-      )
-      setMapTests((prev) => ({
-        ...prev,
-        [logicalName]: { status: result.status, message: result.message },
-      }))
-    } catch (error) {
-      setMapTests((prev) => ({
-        ...prev,
-        [logicalName]: {
-          status: 'error',
-          message: error instanceof Error ? error.message : String(error),
-        },
-      }))
-    }
-  }
-
-  const handleAddGlobalModel = async () => {
-    try {
-      const model = await channels.addGlobalModel({
-        name: newModelName,
-        category: newModelCategory,
-        vendor: newModelVendor,
-      })
-      setNewModelName('')
-      setModelAddOpen(false)
-      setMapCategory(model.category as MapFilterKey)
-    } catch (error) {
-      alert(error instanceof Error ? error.message : String(error))
-    }
-  }
-
-  const handleRemoveGlobalModel = async (name: string) => {
-    if (!window.confirm(`删除前端模型「${name}」？各渠道里的同名映射会保留。`)) return
-    try {
-      await channels.removeGlobalModel(name)
-    } catch (error) {
-      alert(error instanceof Error ? error.message : String(error))
-    }
-  }
-
-  // —— 模型管理（§7.4）——
-
-  const openPanel = () => {
-    if (!selected) return
-    // 打开时此前已选的保持勾上（§7.4「可再次打开面板勾选此前未选中的模型」）
-    setDraftChecked(initialChecked(activeModels))
-    setDraftCategory('all')
-    setDraftKeyword('')
-    setPanelOpen(true)
-  }
-
-  const toggleDraft = (modelId: string, on: boolean) => {
-    setDraftChecked((prev) => {
-      const next = new Set(prev)
-      if (on) next.add(modelId)
-      else next.delete(modelId)
-      return next
-    })
-  }
-
-  const applyDraft = async () => {
-    if (!selectedId || !selected) return
-    setBusy(true)
-    try {
-      await channels.setModels(
-        selectedId,
-        applySelection(activeModels, activeModelCache, draftChecked),
-        activeGroup?.id,
-      )
-      setPanelOpen(false)
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  const dropSelectedModel = async (modelId: string) => {
-    if (!selectedId || !selected) return
-    await channels.setModels(
-      selectedId,
-      removeModel(activeModels, modelId),
-      activeGroup?.id,
-    )
-  }
-
-  /** 拖动排序（§7.2）：把 dragId 挪到 targetId 的位置，整表重编号 */
-  const dropOnChannel = async (targetId: string) => {
-    const from = dragId
-    setDragId(null)
-    if (!from || from === targetId) return
-    const ids = channelsList.map((c) => c.id)
-    const i = ids.indexOf(from)
-    const j = ids.indexOf(targetId)
-    if (i < 0 || j < 0) return
-    ids.splice(j, 0, ...ids.splice(i, 1))
-    await channels.reorder(ids)
-  }
-
+  const handleVerify = async () => await channelActions.verify(channelState())
+  const handleDetect = async () => await channelActions.detect(channelState())
+  const handleRefresh = async () => await channelActions.refresh(channelState())
+  const openChannelMenu = (channelId: string, x: number, y: number) =>
+    channelActions.openChannelMenu(channelId, x, y)
+  const openChannelMenuFromButton: ChannelActionsOpenMenu = (event, channelId) =>
+    channelActions.openChannelMenuFromButton(event, channelId)
+  const editChannel = (channelId: string) => channelActions.editChannel(channelState(), channelId)
+  const handleRemove = async (channelId: string) => await channelActions.remove(channelState(), channelId)
+  const handleAddKeyGroup = async () => await channelActions.addKeyGroup(channelState())
+  const handleRemoveKeyGroup = async () => await channelActions.removeKeyGroup(channelState())
+  const flushModelMapping = async (logicalName: string, upstreamId: string) =>
+    mappingActions.flush(logicalName, upstreamId)
+  const scheduleModelMapping = (logicalName: string, upstreamId: string) =>
+    mappingActions.schedule(logicalName, upstreamId)
+  const testModelMapping = async (logicalName: string, upstreamId: string) =>
+    mappingActions.test(logicalName, upstreamId)
+  const handleAddGlobalModel = async () => await channelActions.addGlobalModel(channelState())
+  const handleRemoveGlobalModel = async (name: string) => await channelActions.removeGlobalModel(name)
+  const openPanel = () => channelActions.openPanel(channelState())
+  const toggleDraft = (modelId: string, on: boolean) =>
+    channelActions.toggleDraft(channelState(), modelId, on)
+  const applyDraft = async () => await channelActions.applyDraft(channelState())
+  const dropSelectedModel = async (modelId: string) =>
+    channelActions.dropSelectedModel(channelState(), modelId)
+  const dropOnChannel = async (targetId: string) =>
+    channelActions.dropOnChannel(channelState(), targetId)
   const draftList = useMemo(
     () => (selected ? filterModels(activeModelCache, draftCategory, draftKeyword) : []),
     [activeModelCache, selected, draftCategory, draftKeyword],
   )
   const selectedGroups = useMemo(
-    () => groupModelsByCategory(activeModels).filter((g) => g.models.length > 0),
+    () => groupModelsByCategory(activeModels).filter((group) => group.models.length > 0),
     [activeModels],
   )
-
-  /**
-   * 协议下拉切换：选中带默认地址的站点协议时「选中即填地址」。
-   *
-   * 只覆盖两种情况——地址还是空的，或地址恰好**是上一条协议的默认地址**
-   * （说明用户没动过它）。用户手填过的地址一律保留：切协议不该抹掉他刚敲进去的东西。
-   * 站点类协议（玉玉 / 灵境 等）的地址就是靠这一步省掉「翻文档抄一遍」。
-   */
-  const handleProtocolChange = (id: string) => {
-    const prevDefault = protocolById(protocol, catalog)?.defaultBaseUrl ?? ''
-    const nextDefault = protocolById(id, catalog)?.defaultBaseUrl ?? ''
-    setProtocol(id)
-    const current = baseUrl.trim()
-    const nextBaseUrl =
-      nextDefault && (!current || current === prevDefault) ? nextDefault : baseUrl
-    if (nextBaseUrl !== baseUrl) setBaseUrl(nextBaseUrl)
-    if (selectedId) {
-      void channels.update(selectedId, {
-        protocol: id,
-        baseUrl: nextBaseUrl.trim(),
-      })
-    }
-  }
-
-  const createProtocolWithUniqueId = async (
-    draft: Omit<CustomProtocolInput, 'id'> & { idHint?: string },
-  ) => {
-    const existingIds = new Set(catalog.all.map((item) => item.id))
-    let id = customProtocolIdForName(draft.idHint ?? draft.name, existingIds)
-    let res = await channels.createCustomProtocol({ ...draft, id })
-    for (
-      let attempt = 0;
-      !res.ok &&
-      res.field === 'id' &&
-      res.reason.includes('已被占用') &&
-      attempt < 20;
-      attempt += 1
-    ) {
-      existingIds.add(id)
-      id = customProtocolIdForName(draft.idHint ?? draft.name, existingIds)
-      res = await channels.createCustomProtocol({ ...draft, id })
-    }
-    return res
-  }
-
-  const bindCreatedProtocol = async (res: Extract<Awaited<ReturnType<typeof createProtocolWithUniqueId>>, { ok: true }>) => {
-    setCatalogVersion((v) => v + 1)
-    setProtocol(res.value.id)
-    if (selectedId) {
-      await channels.update(selectedId, {
-        protocol: res.value.id,
-        baseUrl: baseUrl.trim(),
-      })
-    }
-    if (!baseUrl.trim() && res.value.defaultBaseUrl) setBaseUrl(res.value.defaultBaseUrl)
-  }
-
-  const checkImportedProtocol = () => {
-    setNpError('')
-    setNpNotice('')
-    const parsed = parseDeclarativeProtocol(npImportText)
-    if (!parsed.ok) {
-      setNpImported(null)
-      setNpError(parsed.reason)
-      return null
-    }
-    setNpImported(parsed.value)
-    return parsed.value
-  }
-
-  const handleImportProtocolFile = async (file: File | undefined) => {
-    if (!file) return
-    const text = await file.text()
-    setNpImportText(text)
-    setNpImported(null)
-    setNpError('')
-    const parsed = parseDeclarativeProtocol(text)
-    if (!parsed.ok) {
-      setNpError(parsed.reason)
-      return
-    }
-    setNpImported(parsed.value)
-  }
-
-  const handleSaveImportedProtocol = async () => {
-    const imported = npImported ?? checkImportedProtocol()
-    if (!imported) return
-    setNpError('')
-    setNpNotice('')
-    const res = await createProtocolWithUniqueId({
-      idHint: imported.id ?? imported.name,
-      name: imported.name,
-      short: imported.short || customProtocolShortForName(imported.name),
-      capabilities: imported.capabilities,
-      versionPath: imported.versionPath ?? protocolVersionForBaseUrl(baseUrl),
-      docUrl: imported.docUrl,
-      recipe: imported.recipe,
-    })
-    if (!res.ok) {
-      setNpError(res.reason)
-      return
-    }
-    await bindCreatedProtocol(res)
-    setNpImportText('')
-    setNpImported(null)
-    setNewProtoOpen(false)
-    setNpNotice(`已导入并选中「${res.value.name}」`)
-  }
-
-  const saveDownload = async (
-    content: string,
-    filename: string,
-  ): Promise<'saved' | 'cancelled'> => {
-    const blob = new Blob([content], { type: 'application/json;charset=utf-8' })
-    try {
-      if (platform.files.saveFileWithResult) {
-        return await platform.files.saveFileWithResult(filename, blob)
-      }
-      await platform.files.saveFile(filename, blob)
-      return 'saved'
-    } catch (error) {
-      setProtoRemoveError(error instanceof Error ? error.message : String(error))
-      return 'cancelled'
-    }
-  }
-
-  const downloadProtocolTemplate = async () => {
-    const blob = new Blob([DECLARATIVE_PROTOCOL_TEMPLATE], {
-      type: 'text/plain;charset=utf-8',
-    })
-    setProtoRemoveError('')
-    setProtoManageNotice('')
-    try {
-      if (platform.files.saveFileWithResult) {
-        const outcome = await platform.files.saveFileWithResult(
-          '轻画-自定义协议模板.txt',
-          blob,
-        )
-        if (outcome === 'cancelled') return
-      } else {
-        await platform.files.saveFile('轻画-自定义协议模板.txt', blob)
-      }
-      setProtoManageNotice('已下载协议模板')
-    } catch (error) {
-      setProtoRemoveError(error instanceof Error ? error.message : String(error))
-    }
-  }
-
-  const downloadProtocol = async (definition: ProtocolDefinition) => {
-    setProtoRemoveError('')
-    setProtoManageNotice('')
-    if (definition.kind !== 'custom') {
-      const reference = builtinProtocolReferenceForExport(definition)
-      if (!reference) {
-        setProtoRemoveError('这条站点协议没有可导出的说明内容')
-        return
-      }
-      const outcome = await saveDownload(
-        serializeBuiltinProtocolReference(reference),
-        `${definition.id}.protocol-reference.json`,
-      )
-      if (outcome === 'cancelled') return
-      setProtoManageNotice(`已下载「${definition.name}」协议说明`)
-      return
-    }
-    const pkg = protocolPackageForExport(definition)
-    if (!pkg) {
-      setProtoRemoveError('这条旧协议没有可导出的声明内容')
-      return
-    }
-    const outcome = await saveDownload(
-      serializeProtocolPackage(pkg),
-      `${definition.id}.qinghua.json`,
-    )
-    if (outcome === 'cancelled') return
-    setProtoManageNotice(`已下载「${definition.name}」协议文件`)
-  }
-
-  const toggleNewProtocol = () => {
-    const next = !newProtoOpen
-    setNewProtoOpen(next)
-    if (next) {
-      setNpImportText('')
-      setNpImported(null)
-      setNpError('')
-      setNpNotice('')
-    }
-  }
-
-  /** 删除自建协议：仍被渠道引用时 store 会抛错，界面原样展示原因 */
-  const handleRemoveProtocol = async (definition: ProtocolDefinition) => {
-    setProtoRemoveError('')
-    setProtoManageNotice('')
-    try {
-      /*
-       * Protocol switching persists in the background. Flush the current
-       * channel first so an immediate delete cannot race against the old value.
-       */
-      if (selectedId) {
-        await channels.update(selectedId, {
-          protocol,
-          baseUrl: baseUrl.trim(),
-        })
-      }
-      if (definition.kind === 'custom') {
-        await channels.removeCustomProtocol(definition.id)
-        setProtoManageNotice(`已删除「${definition.name}」`)
-      } else {
-        await channels.removeBuiltinProtocol(definition.id)
-        setProtoManageNotice(`已移除「${definition.name}」，可从恢复入口找回`)
-      }
-      setCatalogVersion((v) => v + 1)
-    } catch (e) {
-      setProtoRemoveError(e instanceof Error ? e.message : String(e))
-    }
-  }
-
-  // 状态行只对「本次选中的渠道 + 本渠道最近一次动作」负责，避免 A 渠道的结论
-  // 挂到 B 渠道头上（store 里的三份结果都是全局单份）。
-  const handleRestoreBuiltinProtocols = async () => {
-    setProtoRemoveError('')
-    setProtoManageNotice('')
-    try {
-      await channels.restoreBuiltinProtocols()
-      setCatalogVersion((v) => v + 1)
-      setProtoManageNotice('已恢复全部站点协议')
-    } catch (e) {
-      setProtoRemoveError(e instanceof Error ? e.message : String(e))
-    }
-  }
+  const handleProtocolChange = (id: string) =>
+    protocolActions.handleProtocolChange(protocolState(), id)
+  const checkImportedProtocol = () => protocolActions.checkImportedProtocol(protocolState())
+  const handleImportProtocolFile = async (file: File | undefined) =>
+    protocolActions.importProtocolFile(file)
+  const handleSaveImportedProtocol = async () =>
+    protocolActions.saveImportedProtocol(protocolState())
+  const downloadProtocolTemplate = async () => protocolActions.downloadProtocolTemplate()
+  const downloadProtocol = async (definition: ProtocolDefinition) =>
+    protocolActions.downloadProtocol(definition)
+  const toggleNewProtocol = () => protocolActions.toggleNewProtocol(protocolState())
+  const handleRemoveProtocol = async (definition: ProtocolDefinition) =>
+    protocolActions.removeProtocol(protocolState(), definition)
+  const handleRestoreBuiltinProtocols = async () => protocolActions.restoreBuiltinProtocols()
 
   const action = verifiedFor?.channelId === selectedId ? verifiedFor.source : null
 

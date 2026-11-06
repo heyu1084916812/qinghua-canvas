@@ -292,7 +292,7 @@
       "test": [
         "src/pages/SettingsPage/customProtocolDraft.test.ts"
       ],
-      "budget": 2620
+      "budget": 2215
     },
     {
       "module": "src/pages/SkillsPage/SkillsPage.module.css",
@@ -4293,6 +4293,83 @@
         "src/pages/ProjectsPage/projectsPage/projectActionCoordinator.test.ts"
       ],
       "budget": 140
+    },
+    {
+      "module": "src/pages/SettingsPage/settingsPage/channelActionCoordinator.ts",
+      "owner": "pages-settings-channel-actions",
+      "responsibility": "编排设置页渠道表单、校验动作、资料抽屉、Key 分组、模型草稿和拖动排序。",
+      "owns": [
+        "ChannelFormState 与 ChannelActionState 表单快照",
+        "ChannelActionPorts 端口和 createChannelActions 返回的全部动作",
+        "验证前落库、失败回滚与 busy 解锁顺序"
+      ],
+      "doesNotOwn": [
+        "React state 与生命周期",
+        "JSX/DOM/CSS 与页面文案",
+        "ChannelStore 真相与平台协议目录"
+      ],
+      "publicApi": [
+        "ChannelFormState",
+        "ChannelActionState",
+        "ChannelActionPorts",
+        "ChannelActions",
+        "createChannelActions"
+      ],
+      "test": [
+        "src/pages/SettingsPage/settingsPage/channelActionCoordinator.test.ts"
+      ],
+      "budget": 350
+    },
+    {
+      "module": "src/pages/SettingsPage/settingsPage/modelMappingActionCoordinator.ts",
+      "owner": "pages-settings-model-mapping",
+      "responsibility": "编排模型映射 600ms 防抖保存、草稿回收、保存回执和映射测试。",
+      "owns": [
+        "映射定时器端口与草稿状态",
+        "flush / schedule / test 动作顺序",
+        "保存与测试通知形状"
+      ],
+      "doesNotOwn": [
+        "React state 与生命周期",
+        "ChannelStore 与模型目录",
+        "DOM 状态展示与 CSS"
+      ],
+      "publicApi": [
+        "ModelMappingNotice",
+        "ModelMappingTestState",
+        "ModelMappingPorts",
+        "ModelMappingActions",
+        "createModelMappingActions"
+      ],
+      "test": [
+        "src/pages/SettingsPage/settingsPage/modelMappingActionCoordinator.test.ts"
+      ],
+      "budget": 120
+    },
+    {
+      "module": "src/pages/SettingsPage/settingsPage/protocolActionCoordinator.ts",
+      "owner": "pages-settings-protocol-actions",
+      "responsibility": "编排自定义协议唯一 id、导入绑定、模板/协议下载、切换默认地址、删除与恢复。",
+      "owns": [
+        "ProtocolActionState 与 ProtocolActionPorts 动作契约",
+        "协议 id 冲突重试与导入绑定",
+        "模板/协议下载取消语义和删除恢复提示"
+      ],
+      "doesNotOwn": [
+        "React state 与生命周期",
+        "协议解析/序列化实现",
+        "ChannelStore 事务与文件保存实现"
+      ],
+      "publicApi": [
+        "ProtocolActionState",
+        "ProtocolActionPorts",
+        "ProtocolActions",
+        "createProtocolActions"
+      ],
+      "test": [
+        "src/pages/SettingsPage/settingsPage/protocolActionCoordinator.test.ts"
+      ],
+      "budget": 290
     }
   ]
 }
