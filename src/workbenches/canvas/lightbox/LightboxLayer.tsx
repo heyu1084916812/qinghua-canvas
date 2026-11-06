@@ -29,8 +29,6 @@ import {
   ANNOTATE_COLORS,
   clampAnnotateTextSize,
   drawAnnotateOp,
-  moveAnnotateText,
-  resizeAnnotateText,
   type AnnotateOp,
   type AnnotateTextItem,
   type AnnotateTool,
@@ -78,12 +76,29 @@ import {
   compareClipPathOf,
   compareViewOf,
   compareViewsOf,
-  redoAnnotation,
   splitRatioAt,
-  undoAnnotation,
 } from './lightboxEditState'
 import { ANNOTATE_TOOLS, EDITOR_MODES, HANDLE_POS } from './lightboxCatalog'
 import { GalleryThumb } from './LightboxGalleryThumb'
+import {
+  createLightboxAnnotationActions,
+  type LightboxAnnotationCanvas,
+  type LightboxAnnotationState,
+  type LightboxPointerDragHandlers,
+} from './lightboxAnnotationCoordinator'
+
+function annotationCanvasBox(canvas: HTMLCanvasElement): LightboxAnnotationCanvas {
+  const { left, top, width, height } = canvas.getBoundingClientRect()
+  return { left, top, width, height, pixelWidth: canvas.width, pixelHeight: canvas.height }
+}
+
+function subscribeWindowPointerDrag(handlers: LightboxPointerDragHandlers): () => void {
+  const controller = new AbortController()
+  const move = (event: PointerEvent) => handlers.onMove({ clientX: event.clientX, clientY: event.clientY })
+  window.addEventListener('pointermove', move, { signal: controller.signal })
+  window.addEventListener('pointerup', handlers.onUp, { signal: controller.signal })
+  return () => controller.abort()
+}
 
 /**
  * 素材灯箱（产品文档 §6.17）。
@@ -266,17 +281,44 @@ export function LightboxLayer() {
   const [annSaving, setAnnSaving] = useState(false)
   const annCanvasRef = useRef<HTMLCanvasElement | null>(null)
   const annDrawingRef = useRef<AnnotateOp | null>(null)
+  const annStateRef = useRef<LightboxAnnotationState | null>(null)
+  annStateRef.current = {
+    tool: annTool, color: annColor, size: annSize,
+    ops: annOps, textItems: annTextItems,
+    selectedTextId, editingTextId, undone: annUndone,
+    viewport: vp, natural, annotating, saving: annSaving,
+  }
+  const [annActions] = useState(() =>
+    createLightboxAnnotationActions({
+      state: () => annStateRef.current!,
+      getDrawing: () => annDrawingRef.current,
+      setDrawing: (drawing) => {
+        annDrawingRef.current = drawing
+      },
+      setTextItems: setAnnTextItems, setSelectedTextId, setEditingTextId,
+      setOps: setAnnOps, setUndone: setAnnUndone,
+      setTool: setAnnTool, setSaving: setAnnSaving,
+      capturePointer: (pointerId) => annCanvasRef.current?.setPointerCapture(pointerId),
+      scheduleTextEditing: (id) => window.setTimeout(() => setEditingTextId(id), 0),
+      createTextId: () => createId('text'),
+      subscribePointerDrag: subscribeWindowPointerDrag,
+      hasNode: (nodeId) => store.getSnapshot().nodes.some((node) => node.id === nodeId), selectNode: (id) => store.setSelection([id]),
+      saveAnnotation: async ({ nodeId, url, ops, textItems }) => {
+        const graph = store.getSnapshot()
+        const node = graph.nodes.find((candidate) => candidate.id === nodeId)
+        return node
+          ? saveAnnotatedAsset({ store, graph, node, url, ops: [...ops], textItems: [...textItems] })
+          : null
+      },
+      close: () => store.closeLightbox(),
+    }),
+  )
+  useEffect(() => () => annActions.dispose(), [annActions])
 
   /** 每次进标注模式从空白开始（上一次的标注留着会直接盖在新图上） */
   useEffect(() => {
-    if (!assetHash) return
-    setAnnOps([])
-    setAnnTextItems([])
-    setSelectedTextId(null)
-    setEditingTextId(null)
-    setAnnUndone([])
-    setAnnTool('brush')
-  }, [assetHash, lightbox?.annotateFor])
+    if (assetHash) annActions.resetAnnotation()
+  }, [assetHash, lightbox?.annotateFor, annActions])
 
   /**
    * 重画那层画布：**底图不画进来**（灯箱那张 `<img>` 就在它下面），只画标注操作。
@@ -582,171 +624,31 @@ export function LightboxLayer() {
     }
   }
 
-  /** 事件坐标 → **图片像素**坐标（画布按 CSS 缩放过，必须按比例换算回去） */
-  const annPointOf = (e: ReactPointerEvent<HTMLCanvasElement>): { x: number; y: number } => {
-    const canvas = e.currentTarget
-    const rect = canvas.getBoundingClientRect()
-    return {
-      x: ((e.clientX - rect.left) / rect.width) * canvas.width,
-      y: ((e.clientY - rect.top) / rect.height) * canvas.height,
-    }
-  }
+  const onAnnDown = (e: ReactPointerEvent<HTMLCanvasElement>) =>
+    annActions.pointerDown(e, annotationCanvasBox(e.currentTarget), redrawAnn)
+  const onAnnMove = (e: ReactPointerEvent<HTMLCanvasElement>) =>
+    annActions.pointerMove(e, annotationCanvasBox(e.currentTarget), redrawAnn)
+  const onAnnUp = () => annActions.pointerUp(redrawAnn)
 
-  /**
-   * 标注画布上的按下：
-   *
-   * - **只接管左键**。中键要留给舞台那条通用平移（`onPointerDown` 里的 button 1 分支）——
-   *   这里一旦无差别 `stopPropagation()`，用户在标注模式下就再也拖不动视图了。
-   * - `stopPropagation` 不是可选项：不拦的话舞台会同时起手平移，画一笔 = 图跑一下。
-   */
-  const onAnnDown = (e: ReactPointerEvent<HTMLCanvasElement>) => {
-    if (!isPrimaryPointer(e.button)) return
-    e.stopPropagation()
-    const p = annPointOf(e)
-    if (annTool === 'text') {
-      const item: AnnotateTextItem = {
-        id: createId('text'),
-        x: p.x,
-        y: p.y,
-        text: '',
-        color: annColor,
-        fontSize: clampAnnotateTextSize(Math.max(14, annSize * 5)),
-      }
-      setAnnTextItems((prev) => [...prev, item])
-      setSelectedTextId(item.id)
-      /**
-       * 等这次 pointerdown / pointerup / click 序列走完再挂编辑框。
-       * 立刻挂会被随后的 click 抢走焦点，textarea 一 mount 就 blur，用户看不到光标。
-       */
-      window.setTimeout(() => setEditingTextId(item.id), 0)
-      return
-    }
-    e.currentTarget.setPointerCapture(e.pointerId)
-    annDrawingRef.current = { tool: annTool, color: annColor, size: annSize, points: [p] }
-    redrawAnn()
-  }
-
-  const onAnnMove = (e: ReactPointerEvent<HTMLCanvasElement>) => {
-    const draw = annDrawingRef.current
-    if (!draw) return
-    const p = annPointOf(e)
-    if (draw.tool === 'brush') draw.points.push(p)
-    else draw.points[1] = p
-    redrawAnn()
-  }
-
-  const onAnnUp = () => {
-    const draw = annDrawingRef.current
-    annDrawingRef.current = null
-    if (!draw) return
-    const a = draw.points[0]
-    const b = draw.points[1]
-    /** 矩形太小的算误触（与老那一层同一条判据：短边不足 3px 的白点没有意义） */
-    const tooSmall =
-      draw.tool === 'rect' && (!a || !b || (Math.abs(b.x - a.x) < 3 && Math.abs(b.y - a.y) < 3))
-    if (tooSmall) {
-      redrawAnn()
-      return
-    }
-    setAnnOps((prev) => [...prev, draw])
-    setAnnUndone([])
-  }
-
-  const patchTextItem = (id: string, patch: Partial<AnnotateTextItem>) => {
-    setAnnTextItems((prev) => prev.map((item) => (item.id === id ? { ...item, ...patch } : item)))
-  }
-
-  const deleteTextItem = (id: string) => {
-    setAnnTextItems((prev) => prev.filter((item) => item.id !== id))
-    setSelectedTextId((current) => (current === id ? null : current))
-    setEditingTextId((current) => (current === id ? null : current))
-  }
-
-  /** 选中的文字提到数组末尾 —— DOM 顺序就是图层顺序，保存时也按同一顺序画。 */
-  const selectTextItem = (id: string) => {
-    setSelectedTextId(id)
-    setAnnTextItems((prev) => {
-      const item = prev.find((x) => x.id === id)
-      if (!item || prev[prev.length - 1]?.id === id) return prev
-      return [...prev.filter((x) => x.id !== id), item]
-    })
-  }
-
-  const startTextMove = (e: ReactPointerEvent, item: AnnotateTextItem) => {
-    if (!isPrimaryPointer(e.button) || !vp) return
-    e.stopPropagation()
-    e.preventDefault()
-    selectTextItem(item.id)
-    setEditingTextId(null)
-    const start = { x: e.clientX, y: e.clientY }
-    const move = (ev: PointerEvent) => {
-      const dx = (ev.clientX - start.x) / vp.zoom
-      const dy = (ev.clientY - start.y) / vp.zoom
-      setAnnTextItems((prev) =>
-        prev.map((current) =>
-          current.id === item.id
-            ? moveAnnotateText(item, dx, dy, natural ? { w: natural.w, h: natural.h } : undefined)
-            : current,
-        ),
-      )
-    }
-    const up = () => {
-      window.removeEventListener('pointermove', move)
-      window.removeEventListener('pointerup', up)
-    }
-    window.addEventListener('pointermove', move)
-    window.addEventListener('pointerup', up)
-  }
-
-  const startTextResize = (e: ReactPointerEvent, item: AnnotateTextItem) => {
-    if (!isPrimaryPointer(e.button) || !vp) return
-    e.stopPropagation()
-    e.preventDefault()
-    selectTextItem(item.id)
-    setEditingTextId(null)
-    const startX = e.clientX
-    const move = (ev: PointerEvent) => {
-      const delta = (ev.clientX - startX) / vp.zoom
-      setAnnTextItems((prev) =>
-        prev.map((current) =>
-          current.id === item.id
-            ? resizeAnnotateText(item, item.fontSize + delta)
-            : current,
-        ),
-      )
-    }
-    const up = () => {
-      window.removeEventListener('pointermove', move)
-      window.removeEventListener('pointerup', up)
-    }
-    window.addEventListener('pointermove', move)
-    window.addEventListener('pointerup', up)
-  }
+  const {
+    patchTextItem,
+    deleteTextItem,
+    selectTextItem,
+    startTextMove,
+    startTextResize,
+    undoAnn,
+    redoAnn,
+  } = annActions
 
   /** Delete / Backspace 删掉当前文字图层；正在编辑文字时不抢键。 */
   useEffect(() => {
     if (!annotating || !selectedTextId || editingTextId) return
     const onKey = (e: KeyboardEvent) => {
-      if (e.key !== 'Delete' && e.key !== 'Backspace') return
-      e.preventDefault()
-      deleteTextItem(selectedTextId)
+      if (annActions.deleteSelectedTextForKey(e.key)) e.preventDefault()
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [annotating, selectedTextId, editingTextId])
-
-  /** 撤销 / 重做 = 把操作列表切一刀（重放即得画面，不需要存快照） */
-  const undoAnn = () => {
-    const next = undoAnnotation(annOps)
-    setAnnOps(next.ops)
-    if (next.undone.length > 0) setAnnUndone((previous) => [...next.undone, ...previous])
-  }
-
-  const redoAnn = () => {
-    const next = redoAnnotation(annOps, annUndone)
-    setAnnOps(next.ops)
-    setAnnUndone(next.undone)
-  }
+  }, [annActions, annotating, selectedTextId, editingTextId])
 
   const onWheel = (e: ReactWheelEvent) => {
     const rect = rectNow()
@@ -863,29 +765,7 @@ export function LightboxLayer() {
    * 保存标注：把「底图 + 全部标注」合成一张新图，落到**原图右侧的新节点**上。
    * 合成那一段与 UI 无关，在 `annotate/bakeAnnotate` 里（与老那一层同一份实现）。
    */
-  const saveAnnotation = async () => {
-    const nodeId = annotateNodeId
-    if (!nodeId || annSaving || !url) return
-    const graph = store.getSnapshot()
-    const node = graph.nodes.find((n) => n.id === nodeId)
-    if (!node) return
-    setAnnSaving(true)
-    try {
-      const id = await saveAnnotatedAsset({
-        store,
-        graph,
-        node,
-        url,
-        ops: annOps,
-        textItems: annTextItems,
-      })
-      /** 落地就选中它（与老那一层同一手感：保存完眼睛已经在那张新图上） */
-      if (id) store.setSelection([id])
-      close()
-    } finally {
-      setAnnSaving(false)
-    }
-  }
+  const saveAnnotation = () => annActions.saveAnnotation(annotateNodeId, url)
 
   /** 有真实配对、两边都是图才给「对比」入口；是否处于该模式由 `mode` 决定。 */
   const compareAvailable = !!compareHash && !!compareUrl && !isVideo && !compareIsVideo

@@ -1,5 +1,15 @@
 # CanvasFlow（轻画）项目记忆
 
+### 灯箱标注动作编排拆分（2026-11-06）
+
+- `lightboxAnnotationCoordinator.ts` 只编排指针绘制、文字图层、键盘删除、撤销重做、拖拽订阅与保存端口；
+  React state/refs、Canvas 重绘、节点存在性与 Store 写入仍归 `LightboxLayer`。宿主用最新 state ref 喂端口，
+  不能把组件生命周期或 DOM listener 复制进协调器。
+- `LightboxLayer` 本次 1621→1501，render-after 689 行哈希
+  `D543B6D0D584B8A7D9610DD123F358949A7A0D53ECB3FC249C582BF344FE4067` 不变；新模块预算 324、宿主预算 1501。
+  全仓并行跑测试会导致无关的素材库/快照测试与治理 hook 超时，先拆开单跑回绿后必须再串行跑一次全量，
+  串行结果才是验收证据。
+
 ### 设置页动作编排拆分（2026-11-06）
 
 - `SettingsPage.tsx` 的 render 前动作群可分成通道、模型映射、协议三组端口协调器；搬出后仍由页面持有 React state owner，

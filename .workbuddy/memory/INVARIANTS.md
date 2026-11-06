@@ -1,5 +1,12 @@
 # CanvasFlow 不变量详表
 
+## 灯箱标注动作边界（2026-11-06）
+
+- `lightboxAnnotationCoordinator.ts` 不得 import React、DOM、CanvasStore 或素材烘焙实现；它只能经显式端口读写状态与副作用。
+  React state/refs、Canvas 重绘、节点存在性与 Store 写入仍由 `LightboxLayer` 持有，保存失败仍由宿主 `finally` 语义解锁。
+- 纯动作拆分必须保持 `LightboxLayer` render-after 源码哈希不变；若需要改 JSX/DOM/CSS/文案或可见交互，立即转「涉及 UI」四组取证门禁。
+- 全量测试必须串行复跑作为最终证据：并行跑全仓导致的无关超时只说明资源竞争，不能作为代码通过或失败结论。
+
 ## 结构治理 · 总管2 交接边界（2026-11-06）
 
 - 第五批「涉及 UI」拆分不能让多个子线程同时写同一工作树：未接线视图、半截 JSX 替换与 0 字节测试必须在验收前归零。

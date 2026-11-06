@@ -442,7 +442,7 @@
       "test": [
         "scripts/smoke.mjs#G795"
       ],
-      "budget": 1621
+      "budget": 1501
     },
     {
       "module": "src/workbenches/canvas/panels/CreationPanel.module.css",
@@ -4370,6 +4370,35 @@
         "src/pages/SettingsPage/settingsPage/protocolActionCoordinator.test.ts"
       ],
       "budget": 290
+    },
+    {
+      "module": "src/workbenches/canvas/lightbox/lightboxAnnotationCoordinator.ts",
+      "owner": "canvas-lightbox-annotation",
+      "responsibility": "编排灯箱标注画布的指针绘制、文字图层交互、键盘删除、撤销重做与保存生命周期。",
+      "owns": [
+        "标注指针坐标换算、绘制落点与过小矩形判定",
+        "文字图层选择置顶、移动缩放、删除及撤销重做",
+        "pointer drag 订阅替换、释放和标注保存端口顺序"
+      ],
+      "doesNotOwn": [
+        "React state、refs 与组件生命周期",
+        "画布渲染、JSX/DOM/CSS 与页面文案",
+        "素材烘焙、节点写入和 CanvasStore 真相"
+      ],
+      "publicApi": [
+        "LightboxAnnotationState",
+        "LightboxAnnotationPointer",
+        "LightboxAnnotationCanvas",
+        "LightboxPointerDragPoint",
+        "LightboxPointerDragHandlers",
+        "LightboxAnnotationPorts",
+        "lightboxAnnotationPointOf",
+        "createLightboxAnnotationActions"
+      ],
+      "test": [
+        "src/workbenches/canvas/lightbox/lightboxAnnotationCoordinator.test.ts"
+      ],
+      "budget": 324
     }
   ]
 }
