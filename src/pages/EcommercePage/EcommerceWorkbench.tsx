@@ -8,76 +8,56 @@ import {
   type CSSProperties,
   type PointerEvent as ReactPointerEvent,
 } from 'react'
-import type {
-  EcommerceCanvasItem,
-} from '../../domain/ecommerce/canvasItem'
+import type { EcommerceCanvasItem } from '../../domain/ecommerce/canvasItem'
 import type {
   EcommerceDisplayResultStatus,
   EcommerceResultRecord,
-  EcommerceTaskRecord,
 } from '../../domain/ecommerce/tasks'
-import type { RunRecord } from '../../domain/shared/execution/runRecord'
-import { fitViewport as fitCanvasViewport, panBy, zoomAt } from '../../domain/shared/geometry/transform'
-import { createId } from '../../shared/id'
 import styles from './EcommerceWorkbench.module.css'
 import { pixelSummaryOf, routeAttemptSummaryOf } from '../../domain/shared/execution/runRecord'
 import { projectWorkbenchResults } from './workbenchResultProjection'
 import {
+  clamp,
+  createWorkbenchTextItem,
+  createWorkbenchUploadedItem,
+  fitWorkbenchItemsViewport,
   marqueeSelectionIds,
+  MIN_ITEM_SIZE,
   movedWorkbenchItems,
   nextWorkbenchObjectPosition,
+  panWorkbenchViewport,
   resizedWorkbenchItems,
   rotatedWorkbenchItems,
   selectedWorkbenchActions,
+  wheelWorkbenchViewport,
   workbenchBlankInteraction,
   workbenchMarqueeSelection,
   workbenchMoveInteraction,
   workbenchPointerBox,
   workbenchResizeInteraction,
   workbenchRotateInteraction,
+  workbenchUploadedSize,
+  workbenchViewportFromMinimapPointer,
   type WorkbenchAction,
   type WorkbenchInteraction,
-} from './workbench/workbenchInteraction'
+  type EcommerceWorkbenchProps,
+  type Point,
+  type ResizeHandle,
+  type Viewport,
+  type WorkbenchTool,
+} from './workbench/workbenchContracts'
 import { workbenchDisplayStatusOf } from './ecommercePage/pageResultProjection'
-
-export type EcommerceWorkbenchAction = WorkbenchAction
-interface EcommerceWorkbenchProps {
-  projectId: string
-  items: readonly EcommerceCanvasItem[]
-  results: readonly EcommerceResultRecord[]
-  tasks: readonly EcommerceTaskRecord[]
-  runs?: readonly RunRecord[]
-  activeResults?: readonly EcommerceResultRecord[]
-  running?: boolean
-  availableActions?: readonly EcommerceWorkbenchAction[]
-  onItemsChange: (items: EcommerceCanvasItem[]) => void
-  onCanvasUpload?: (file: File) => Promise<{ hash: string; width?: number; height?: number } | null>
-  onAction?: (item: EcommerceCanvasItem, action: EcommerceWorkbenchAction) => void
-  onRemoveFailed?: (resultId: string) => void
-  channelLabelOf?: (channelId: string) => string
-}
-const MIN_SCALE = 0.1
-const MAX_SCALE = 4
-const MIN_ITEM_SIZE = 96
-const MINIMAP_PADDING = 9
 import {
   ToolIcon,
   WorkbenchMedia,
   WorkbenchResultPlaceholder,
   elapsedLabel,
-  type WorkbenchTool,
 } from './EcommerceWorkbenchViews'
 import {
-  clamp,
-  fromCanvasViewport,
   itemScreenRect,
-  toCanvasViewport,
   workbenchMinimapModel,
-  type Viewport,
 } from './workbenchGeometry'
-import type { Point, ResizeHandle } from './workbenchGeometry'
-
-
+export type EcommerceWorkbenchAction = WorkbenchAction
 export function EcommerceWorkbench({
   projectId,
   items,
@@ -175,22 +155,7 @@ export function EcommerceWorkbench({
       }
       event.preventDefault()
       const rect = node.getBoundingClientRect()
-      setViewport((current) => {
-        const canvasViewport = toCanvasViewport(current)
-        const zoom = clamp(
-          current.scale * Math.exp(-event.deltaY * 0.0015),
-          MIN_SCALE,
-          MAX_SCALE,
-        )
-        return fromCanvasViewport(
-          zoomAt(
-            canvasViewport,
-            { x: event.clientX, y: event.clientY },
-            { x: rect.left, y: rect.top, w: rect.width, h: rect.height },
-            zoom,
-          ),
-        )
-      })
+      setViewport((current) => wheelWorkbenchViewport(current, event, rect))
     }
     node.addEventListener('wheel', onWheel, { passive: false })
     return () => node.removeEventListener('wheel', onWheel)
@@ -220,40 +185,21 @@ export function EcommerceWorkbench({
   )
 
   const fitAll = useCallback(() => {
-    if (!viewportRef.current || localItems.length === 0) {
-      setViewport({ x: 48, y: 48, scale: 1 })
-      return
-    }
-    const rect = viewportRef.current.getBoundingClientRect()
-    setViewport(fromCanvasViewport(
-      fitCanvasViewport(
-        localItems.map((item) => ({
-          x: item.x,
-          y: item.y,
-          w: item.width,
-          h: item.height,
-        })),
-        { x: 0, y: 0, w: rect.width, h: rect.height },
-        72,
-      ),
+    if (!viewportRef.current) return
+    setViewport(fitWorkbenchItemsViewport(
+      localItems,
+      viewportRef.current.getBoundingClientRect(),
+      72,
     ))
   }, [localItems])
 
   /** 新批次落位后把视口带到新对象，而不是把用户留在旧结果的位置。 */
   const focusItems = useCallback((targets: readonly EcommerceCanvasItem[]) => {
     if (!viewportRef.current || targets.length === 0) return
-    const rect = viewportRef.current.getBoundingClientRect()
-    setViewport(fromCanvasViewport(
-      fitCanvasViewport(
-        targets.map((item) => ({
-          x: item.x,
-          y: item.y,
-          w: item.width,
-          h: item.height,
-        })),
-        { x: 0, y: 0, w: rect.width, h: rect.height },
-        96,
-      ),
+    setViewport(fitWorkbenchItemsViewport(
+      targets,
+      viewportRef.current.getBoundingClientRect(),
+      96,
     ))
   }, [])
 
@@ -473,9 +419,7 @@ export function EcommerceWorkbench({
       const dy = event.clientY - interaction.startClient.y
       if (Math.abs(dx) + Math.abs(dy) > 2) interaction.moved = true
       if (interaction.kind === 'pan') {
-        setViewport(fromCanvasViewport(
-          panBy(toCanvasViewport(interaction.startViewport), dx, dy),
-        ))
+        setViewport(panWorkbenchViewport(interaction.startViewport, dx, dy))
         return
       }
       const rect = viewportRef.current?.getBoundingClientRect()
@@ -528,22 +472,7 @@ export function EcommerceWorkbench({
 
   const addText = () => {
     const position = nextObjectPosition(280, 84)
-    const item: EcommerceCanvasItem = {
-      id: createId('eci'),
-      projectId,
-      kind: 'text',
-      text: '输入文字',
-      x: position.x,
-      y: position.y,
-      width: 280,
-      height: 84,
-      rotation: 0,
-      zIndex: Math.max(0, ...localItems.map((candidate) => candidate.zIndex)) + 1,
-      aspectLocked: false,
-      autoLayout: false,
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
-    }
+    const item = createWorkbenchTextItem({ projectId, position, items: localItems })
     commitItems([...localItems, item])
     setSelectedIds(new Set([item.id]))
     setEditingTextId(item.id)
@@ -553,26 +482,10 @@ export function EcommerceWorkbench({
     if (!file || !onCanvasUpload) return
     const uploaded = await onCanvasUpload(file)
     if (!uploaded) return
-    const width = 520
-    const aspect = uploaded.width && uploaded.height ? uploaded.width / uploaded.height : 1
-    const height = Math.max(120, Math.round(width / aspect))
+    const size = workbenchUploadedSize(uploaded)
+    const { width, height } = size
     const position = nextObjectPosition(width, height)
-    const item: EcommerceCanvasItem = {
-      id: createId('eci'),
-      projectId,
-      kind: 'image',
-      assetHash: uploaded.hash,
-      x: position.x,
-      y: position.y,
-      width,
-      height,
-      rotation: 0,
-      zIndex: Math.max(0, ...localItems.map((candidate) => candidate.zIndex)) + 1,
-      aspectLocked: true,
-      autoLayout: false,
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
-    }
+    const item = createWorkbenchUploadedItem({ projectId, uploaded, position, size, items: localItems })
     commitItems([...localItems, item])
     setSelectedIds(new Set([item.id]))
   }
@@ -611,16 +524,12 @@ export function EcommerceWorkbench({
   const moveViewportFromMinimap = (event: ReactPointerEvent<HTMLDivElement>) => {
     if (!minimap) return
     const rect = event.currentTarget.getBoundingClientRect()
-    const worldX =
-      minimap.bounds.minX +
-      (event.clientX - rect.left - MINIMAP_PADDING) / minimap.scale
-    const worldY =
-      minimap.bounds.minY +
-      (event.clientY - rect.top - MINIMAP_PADDING) / minimap.scale
-    setViewport(fromCanvasViewport({
-      x: worldX - size.width / (2 * viewport.scale),
-      y: worldY - size.height / (2 * viewport.scale),
-      zoom: viewport.scale,
+    setViewport(workbenchViewportFromMinimapPointer({
+      minimap,
+      event,
+      rect,
+      size,
+      scale: viewport.scale,
     }))
   }
 

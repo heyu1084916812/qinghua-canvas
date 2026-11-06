@@ -1,5 +1,13 @@
 # CanvasFlow（轻画）项目记忆
 
+### 设置页 CSS Module 同名类覆盖回归（2026-11-06）
+
+- 多份 CSS Module 展开到同一个 `styles` 对象时，后展开模块会**整体替换同名导出**，不是 CSS 层叠。
+  设置页 `item` 被 `SettingsChannelListDetails.module.css` 的 28px 窄行覆盖后，基础 44px 渠道行规则丢失，
+  浏览器实测每个渠道项 94px；修复必须在合并对象后恢复 `item: baseStyles.item`，让 facade 的两次 `composes` 同时生效。
+- 涉及 UI 的取证：改前/改后 1440×900、1024×700 明暗四组几何从 94px → 42px，无横向溢出和页面错误；
+  截图/JSON 在 `.playwright-verify/settings-ui-fix/`。CSS 拆分后要检查重名导出的对象覆盖，不能只看 `composes` 写对了。
+
 ### 总管2 交接与第五批并行清理（2026-11-06）
 
 - 总管1 线程最后因上游 503 / 工具调用与结果记录不匹配中断；交接只认对账清单、Git、文件与子线程终态，不恢复损坏对话。

@@ -29,6 +29,19 @@ const countLines = (source: string) =>
   source.endsWith('\n') ? source.split('\n').length - 1 : source.split('\n').length
 
 describe('SettingsPage CSS 模块结构护栏', () => {
+  it('渠道行主类保留 facade 组合，不被后展开的 Details 模块覆盖', () => {
+    const SOURCE = (
+      import.meta.glob('./SettingsPage.tsx', {
+        eager: true,
+        query: '?raw',
+        import: 'default',
+      }) as Record<string, string>
+    )['./SettingsPage.tsx']
+    const FACADE = (sourceOf('./SettingsPage.module.css') as string)
+    expect(SOURCE).toMatch(/\.\.\.settingsChannelListDetailsStyles,\s*[\s\S]*?item:\s*baseStyles\.item/)
+    expect(FACADE).toBeTypeOf('string')
+  })
+
   it('主模块只保留类名组合门面', () => {
     for (const source of Object.values(PART_SOURCES)) {
       expect(source).not.toContain('System.Object[]')

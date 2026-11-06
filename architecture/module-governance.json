@@ -219,7 +219,7 @@
       "test": [
         "scripts/smoke.mjs#G116"
       ],
-      "budget": 1078
+      "budget": 987
     },
     {
       "module": "src/pages/ProjectsPage/ProjectsPage.module.css",
@@ -292,7 +292,7 @@
       "test": [
         "src/pages/SettingsPage/customProtocolDraft.test.ts"
       ],
-      "budget": 2617
+      "budget": 2620
     },
     {
       "module": "src/pages/SkillsPage/SkillsPage.module.css",
@@ -4213,6 +4213,58 @@
         "src/workbenches/ecommerce/studio/controller/studioResultActionCoordinator.test.ts"
       ],
       "budget": 160
+    },
+    {
+      "module": "src/pages/EcommercePage/workbench/workbenchContracts.ts",
+      "owner": "pages-ecommerce-workbench",
+      "responsibility": "聚合电商工作台契约、几何边界与对象/视口纯投影。",
+      "owns": [
+        "工作台 Props 与 Action 类型",
+        "四个几何常量与视口换算",
+        "交互 helper 再导出与对象创建"
+      ],
+      "doesNotOwn": [
+        "React state 与生命周期",
+        "DOM/JSX/CSS 与页面文案",
+        "任务仓储与渠道请求"
+      ],
+      "publicApi": [
+        "EcommerceWorkbenchAction",
+        "EcommerceWorkbenchProps",
+        "WorkbenchUploadResult",
+        "WorkbenchRectLike",
+        "WorkbenchWheelEvent",
+        "MIN_SCALE",
+        "MAX_SCALE",
+        "MIN_ITEM_SIZE",
+        "MINIMAP_PADDING",
+        "fitWorkbenchItemsViewport",
+        "panWorkbenchViewport",
+        "wheelWorkbenchViewport",
+        "workbenchViewportFromMinimapPointer",
+        "workbenchUploadedSize",
+        "createWorkbenchTextItem",
+        "createWorkbenchUploadedItem",
+        "clamp",
+        "fromCanvasViewport",
+        "toCanvasViewport",
+        "marqueeSelectionIds",
+        "movedWorkbenchItems",
+        "nextWorkbenchObjectPosition",
+        "resizedWorkbenchItems",
+        "rotatedWorkbenchItems",
+        "selectedWorkbenchActions",
+        "workbenchBlankInteraction",
+        "workbenchMarqueeSelection",
+        "workbenchMoveInteraction",
+        "workbenchPointerBox",
+        "workbenchResizeInteraction",
+        "workbenchRotateInteraction"
+      ],
+      "test": [
+        "src/pages/EcommercePage/workbench/workbenchContracts.test.ts"
+      ],
+      "budget": 250
     }
   ]
 }

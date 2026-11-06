@@ -104,6 +104,9 @@ const styles = {
   ...settingsChannelFormStyles,
   ...settingsModelMappingStyles,
   ...settingsAppearanceSystemStyles,
+  // The facade composes both `.item` rules in CSS order; object spread would
+  // otherwise replace it with only the later details-row override.
+  item: baseStyles.item,
 } as Record<string, string>
 
 /**
