@@ -1,5 +1,16 @@
 # CanvasFlow 不变量详表
 
+## 电商 Studio 视图边界（2026-11-06）
+
+- `EcommerceStudio.tsx` 持有 React state/refs、Store/Platform、动作和扣费确认；`studio/EcommerceStudio*.tsx`
+  视图组件只接 props/children，不存储业务状态，不直接导入 Store/Platform 或发请求。
+- 视图拆分不得新增布局 wrapper，不得改 DOM 标签层级、className 组合、data-* 锚点、aria/role、输入 id/htmlFor、
+  可见文案、按钮顺序、焦点/禁用/滚动或事件顺序。条件视图继续在原位置返回 null 或用 Fragment 保持兄弟顺序。
+- UI 验收必须有 1440×900 / 1024×700 × 明暗四组改前/改后证据、几何/焦点/悬停/溢出/滚动和页面错误检查；隔离端口
+  不得写共享 store。像素差只能作为辅助，DOM 锚点和几何必须逐项一致。
+- smoke 隔离库代理必须使用 Node 侧 fetch + fulfill 并补 loopback CORS；不得 `route.continue` 让浏览器直连不同端口，
+  也不得在失败时回退到共享 18765。宿主预算不得回涨到 730 行以上。
+
 ## FlowSurface 交互、动作与渲染模型边界（2026-11-06）
 
 - `flowSurfaceInteractionCoordinator.ts`、`flowSurfaceFlowActionCoordinator.ts`、`flowSurfaceRenderModel.ts`

@@ -7,10 +7,6 @@ import {
 import { ECOMMERCE_PLATFORMS } from '../../domain/ecommerce/platforms'
 import {
   ecommerceLanguageOptionLabel,
-  ecommerceLanguageOptions,
-  ecommerceRatioLabel,
-  ecommerceRatioOptions,
-  usageLabel,
   type EcommerceLanguage,
   type EcommerceModeOptions,
   type EcommerceRequest,
@@ -20,26 +16,27 @@ import type {
   EcommerceUpscaleProfile,
   EcommerceUpscaleScale,
 } from '../../domain/ecommerce/upscale'
-import { ECOMMERCE_NOTE_MAX } from '../../domain/ecommerce/prompt'
-import {
-  modeOptionString,
-  normalizeEcommerceModeOptions,
-} from '../../domain/ecommerce/modeOptions'
+import { normalizeEcommerceModeOptions } from '../../domain/ecommerce/modeOptions'
 import type { EcommerceModeFormState } from '../../domain/ecommerce/draft'
-import { ECOMMERCE_UPSCALE_SCALES } from '../../domain/ecommerce/upscale'
-import { EcommerceSelect } from './EcommerceSelect'
 import { styles } from './studio/studioStyles'
 import {
-  STUDIO_CATEGORIES,
-  STUDIO_MODES,
   type StudioCategory,
   type EcommerceResultItem,
   type EcommerceUpload,
   type EcommerceStudioProps,
 } from './studio/studioContracts'
-import { GenerationStageView, ResultStatusOverlay } from './studio/EcommerceStudioStatusViews'
-import { CategoryGlyph, modelIconFor } from './studio/studioSharedViews'
-import { ModeSpecificParameters } from './studio/EcommerceStudioModeParameters'
+import { GenerationStageView } from './studio/EcommerceStudioStatusViews'
+import { EcommerceStudioCategoryRail } from './studio/EcommerceStudioCategoryRail'
+import { EcommerceStudioUploadPanels } from './studio/EcommerceStudioUploadPanels'
+import { EcommerceStudioCommonParameters } from './studio/EcommerceStudioCommonParameters'
+import { EcommerceStudioSellingPointsPanel } from './studio/EcommerceStudioSellingPointsPanel'
+import { EcommerceStudioModelFields } from './studio/EcommerceStudioModelFields'
+import { EcommerceStudioResultsPane } from './studio/EcommerceStudioResultsPane'
+import { EcommerceStudioResultDetailDialogs } from './studio/EcommerceStudioResultDetailDialogs'
+import { EcommerceStudioEditDialogs } from './studio/EcommerceStudioEditDialogs'
+import { EcommerceStudioUpscaleDialog } from './studio/EcommerceStudioUpscaleDialog'
+import { EcommerceStudioUploadPreviewDialog } from './studio/EcommerceStudioUploadPreviewDialog'
+import { EcommerceStudioGenerateConfirmDialog } from './studio/EcommerceStudioGenerateConfirmDialog'
 import {
   applyModeFormPatch,
   initialStudioFormState,
@@ -74,7 +71,8 @@ export type {
   EcommerceLongImageTools,
   EcommerceStudioProps,
 } from './studio/studioContracts'
-export { GenerationStageView, ResultStatusOverlay }
+export { GenerationStageView }
+export { ResultStatusOverlay } from './studio/EcommerceStudioStatusViews'
 
 export function EcommerceStudio({
   initialDraft = null,
@@ -481,377 +479,133 @@ export function EcommerceStudio({
   }
   const carouselCases = studioCarouselCases(mode)
   const confirmUsesAiPlan = usesAiPlan(confirming, chatTargetLabel, buildRequest())
+  const changeBatchInstruction = (value: string) => {
+    setBatchInstruction(value)
+    if (batchEditError) setBatchEditError('')
+  }
+  const applyBatchPreset = (instruction: string) => {
+    setBatchInstruction(instruction)
+    if (batchEditError) setBatchEditError('')
+  }
+  const closeBatchEdit = () => {
+    setBatchEditOpen(false)
+    setBatchInstruction('')
+    setBatchEditModel('')
+    setBatchReference(null)
+    setBatchEditError('')
+  }
+  const changeEditInstruction = (value: string) => {
+    setEditInstruction(value)
+    if (editError) setEditError('')
+  }
+  const applyEditPreset = (instruction: string) => {
+    setEditInstruction(instruction)
+    if (editError) setEditError('')
+  }
+  const closeEdit = () => {
+    setEditTarget(null)
+    setEditInstruction('')
+    setEditModel('')
+    setEditReference(null)
+    setEditError('')
+  }
+  const closeUpscale = () => {
+    setUpscaleTarget(null)
+    setUpscaleError('')
+  }
+  const copyDetailPrompt = (prompt: string) => {
+    void navigator.clipboard?.writeText(prompt)
+  }
+  const previousUploadPreview = () => {
+    setUploadPreview((current) =>
+      current && current.index > 0 ? { ...current, index: current.index - 1 } : current,
+    )
+  }
+  const nextUploadPreview = () => {
+    setUploadPreview((current) =>
+      current && current.index < uploadPreviewItems.length - 1
+        ? { ...current, index: current.index + 1 }
+        : current,
+    )
+  }
 
   return (
     <div className={styles.wrap} data-ecommerce-studio>
-      <aside className={styles.categoryRail} data-ecommerce-categories>
-        {STUDIO_CATEGORIES.map((item) => (
-          <button
-            key={item.id}
-            type="button"
-            className={
-              item.id === category
-                ? `${styles.categoryButton} ${styles.categoryButtonOn}`
-                : styles.categoryButton
-            }
-            data-ecommerce-category={item.id}
-            aria-pressed={item.id === category}
-            onClick={() => activateCategory(item.id)}
-          >
-            <CategoryGlyph category={item.id} />
-            <span>{item.label}</span>
-          </button>
-        ))}
-      </aside>
+      <EcommerceStudioCategoryRail
+        category={category}
+        onSelect={activateCategory}
+      />
 
       {/* 右：参数 */}
       <aside className={styles.form} data-ecommerce-form>
         <div className={styles.formScroll} data-ecommerce-param-mode={mode.id}>
-        <section
-          className={dragOver === 'product' ? `${styles.block} ${styles.blockDrop}` : styles.block}
-          data-ecommerce-product-drop={dragOver === 'product' ? 'true' : 'false'}
-          data-param-section="product"
-          {...dropProps('product')}
-        >
-          <div className={styles.blockHead}>
-            <label className={styles.blockTitle} htmlFor="ecommerce-product">
-              商品原图
-            </label>
-            <span className={styles.hint} data-ecommerce-product-hint>
-              {batchWhite
-                ? `支持 1–12 张源图；每张按上方角度独立生成，最多 36 张输出`
-                : '支持 1–3 张图片，多角度效果更佳'}
-            </span>
-          </div>
-          <input
-            id="ecommerce-product"
-            className={styles.file}
-            type="file"
-            accept="image/*"
-            multiple
-            data-ecommerce-product-input
-            onChange={(e) => {
-              const files = [...(e.target.files ?? [])]
-              void (async () => {
-                for (const file of files) await onPick(file, 'product')
-              })()
-              e.currentTarget.value = ''
-            }}
-          />
-          <div className={styles.slotRow}>
-            {products.map((item, index) => (
-              <div key={item.nodeId} className={styles.slot} data-ecommerce-product-preview>
-                <button
-                  type="button"
-                  className={styles.slotPreview}
-                  data-ecommerce-product-open={index}
-                  aria-label={`放大预览第 ${index + 1} 张商品图`}
-                  onClick={() => setUploadPreview({ kind: 'product', index })}
-                >
-                  {item.preview}
-                </button>
-                <button
-                  type="button"
-                  className={styles.slotRemove}
-                  aria-label={`移除第 ${index + 1} 张产品图`}
-                  onClick={() => setProducts((prev) => prev.filter((row) => row.nodeId !== item.nodeId))}
-                >
-                  ×
-                </button>
-              </div>
-            ))}
-            {products.length === 0 ? (
-              <label className={styles.emptySlot} htmlFor="ecommerce-product">
-                <span className={styles.uploadPlus}>+</span>
-                <span>上传图片</span>
-              </label>
-            ) : products.length < productLimit &&
-              (batchWhite || products.length + references.length < 4) ? (
-              <label className={styles.addSlot} htmlFor="ecommerce-product" data-ecommerce-product-add>
-                +
-              </label>
-            ) : null}
-          </div>
-        </section>
+        <EcommerceStudioUploadPanels
+          mode={mode}
+          products={products}
+          references={references}
+          productLimit={productLimit}
+          batchWhite={batchWhite}
+          dragOver={dragOver}
+          referenceRequired={referenceRequired}
+          showReferenceBlock={showReferenceBlock}
+          referenceLabel={referenceLabel}
+          dropProps={dropProps}
+          onPick={onPick}
+          setProducts={setProducts}
+          setReferences={setReferences}
+          setUploadPreview={setUploadPreview}
+        />
 
-        {showReferenceBlock ? (
-          <section
-            className={
-              dragOver === 'reference' ? `${styles.block} ${styles.blockDrop}` : styles.block
-            }
-            data-ecommerce-reference-drop={dragOver === 'reference' ? 'true' : 'false'}
-            {...dropProps('reference')}
-          >
-            <div className={styles.blockHead}>
-              <label className={styles.blockTitle} htmlFor="ecommerce-reference">
-                {referenceLabel}
-              </label>
-              <span className={styles.hint}>{referenceRequired ? '必填' : '选填'}</span>
-            </div>
-            <input
-              id="ecommerce-reference"
-              className={styles.file}
-              type="file"
-              accept={mode.id === 'video-recreate' ? 'video/*,image/*' : 'image/*'}
-              multiple={mode.id !== 'video-recreate'}
-              data-ecommerce-reference-input
-              onChange={(e) => {
-                const files = [...(e.target.files ?? [])]
-                void (async () => {
-                  for (const f of files) await onPick(f, 'reference')
-                })()
-              }}
-            />
-            <div className={styles.slotRow}>
-              {references.map((r) => (
-                <div key={r.nodeId} className={styles.slot} data-ecommerce-reference-preview>
-                  <button
-                    type="button"
-                    className={styles.slotPreview}
-                    data-ecommerce-reference-open={references.indexOf(r)}
-                    aria-label="放大预览参考图"
-                    onClick={() =>
-                      setUploadPreview({ kind: 'reference', index: references.indexOf(r) })
-                    }
-                  >
-                    {r.preview}
-                  </button>
-                  <button
-                    type="button"
-                    className={styles.slotRemove}
-                    aria-label="移除参考图"
-                    onClick={() =>
-                      setReferences((prev) => prev.filter((row) => row.nodeId !== r.nodeId))
-                    }
-                  >
-                    ×
-                  </button>
-                </div>
-              ))}
-              {references.length + products.length < 4 ? (
-                <label
-                  className={styles.addSlot}
-                  htmlFor="ecommerce-reference"
-                  data-ecommerce-reference-add
-                >
-                  +
-                </label>
-              ) : null}
-            </div>
-            {referenceRequired && references.length === 0 ? (
-              <p className={styles.hint} data-ecommerce-recreate-hint>
-                {mode.id === 'video-recreate'
-                  ? '先上传参考视频，再生成同款视频。'
-                  : mode.id === 'wear-tryon'
-                    ? '先上传人物参考图，服装和人物都会以素材为准。'
-                    : '先上传爆款参考图，产品主体仍以商品原图为准。'}
-              </p>
-            ) : null}
-          </section>
-        ) : null}
+        <EcommerceStudioCommonParameters
+          mode={mode}
+          modeOptions={modeOptions}
+          platformId={platformId}
+          orderedPlatforms={orderedPlatforms}
+          language={language}
+          ratio={ratio}
+          resolution={resolution}
+          quality={quality}
+          resolutionChoices={resolutionChoices}
+          qualityChoices={qualityChoices}
+          showCommonFields={showCommonFields}
+          showPlatformAndLanguage={showPlatformAndLanguage}
+          showLanguageField={showLanguageField}
+          showRatioField={showRatioField}
+          showResolutionField={showResolutionField}
+          showQualityField={showQualityField}
+          setModeOption={setModeOption}
+          setPlatformId={setPlatformId}
+          setLanguage={setLanguage}
+          setRatio={setRatio}
+          setResolution={setResolution}
+          setQuality={setQuality}
+        />
 
-        {showCommonFields ? (
-        <section className={styles.block} data-param-section="common">
-          <div className={styles.twoCols}>
-            {showPlatformAndLanguage && mode.mediaKind === 'video' ? (
-              <div className={styles.field}>
-                <span className={styles.fieldLabel}>市场地区</span>
-                <EcommerceSelect
-                  ariaLabel="市场地区"
-                  name="market-region"
-                  value={modeOptionString(modeOptions, 'marketRegion', 'us')}
-                  onChange={(value) => setModeOption('marketRegion', value)}
-                  options={[
-                    { value: 'us', label: '美国' },
-                    { value: 'uk', label: '英国' },
-                    { value: 'eu', label: '欧洲' },
-                    { value: 'sea', label: '东南亚' },
-                    { value: 'me', label: '中东' },
-                  ]}
-                  dataAttributes={{ 'data-ecommerce-market-region': true }}
-                />
-              </div>
-            ) : showPlatformAndLanguage ? (
-              <div className={styles.field}>
-                <span className={styles.fieldLabel}>上架平台</span>
-                <EcommerceSelect
-                  ariaLabel="上架平台"
-                  name="platform"
-                  value={platformId}
-                  onChange={setPlatformId}
-                  options={[
-                    { value: '', label: '不指定（通用）' },
-                    ...orderedPlatforms.map((platform) => ({
-                      value: platform.id,
-                      label: platform.name,
-                    })),
-                  ]}
-                  dataAttributes={{ 'data-ecommerce-platform': true }}
-                />
-              </div>
-            ) : null}
-            {showLanguageField ? (
-              <div className={styles.field}>
-                <span className={styles.fieldLabel}>语言</span>
-                <EcommerceSelect
-                  ariaLabel="输出语言"
-                  name="language"
-                  value={language}
-                  onChange={(value) => setLanguage(value as EcommerceLanguage)}
-                  options={ecommerceLanguageOptions(mode.usage)}
-                  dataAttributes={{ 'data-ecommerce-language': true }}
-                />
-              </div>
-            ) : null}
-            {showRatioField ? (
-              <div className={styles.field}>
-                <span className={styles.fieldLabel}>
-                  {mode.mediaKind === 'video' ? '视频比例' : '图片比例'}
-                </span>
-                <EcommerceSelect
-                  ariaLabel={mode.mediaKind === 'video' ? '视频比例' : '图片比例'}
-                  name="ratio"
-                  value={ratio}
-                  onChange={setRatio}
-                  options={ecommerceRatioOptions(mode.usage, mode.mediaKind)}
-                  dataAttributes={{ 'data-ecommerce-ratio': true }}
-                />
-              </div>
-            ) : null}
-            {showResolutionField ? (
-              <div className={styles.field}>
-                <span className={styles.fieldLabel}>分辨率</span>
-                <EcommerceSelect
-                  ariaLabel="图片分辨率"
-                  name="resolution"
-                  value={resolution}
-                  onChange={setResolution}
-                  options={resolutionChoices}
-                  dataAttributes={{ 'data-ecommerce-resolution': true }}
-                />
-              </div>
-            ) : null}
-            {showQualityField ? (
-              <div className={styles.field}>
-                <span className={styles.fieldLabel}>质量</span>
-                <EcommerceSelect
-                  ariaLabel="图片质量"
-                  name="quality"
-                  value={quality}
-                  onChange={setQuality}
-                  options={qualityChoices}
-                  dataAttributes={{ 'data-ecommerce-quality': true }}
-                />
-              </div>
-            ) : null}
-          </div>
-        </section>
-        ) : null}
+        <EcommerceStudioSellingPointsPanel
+          visible={showSellingPoints}
+          note={note}
+          writingSellingPoints={writingSellingPoints}
+          chatTargetLabel={chatTargetLabel}
+          sellingPointsError={sellingPointsError}
+          onWriteSellingPoints={writeSellingPoints}
+          onNoteChange={setNote}
+        />
 
-        {showSellingPoints ? (
-        <section className={styles.block} data-param-section="selling">
-          <div className={styles.blockHead}>
-            <label className={styles.blockTitle} htmlFor="ecommerce-note">
-              商品卖点 &amp; 要求
-            </label>
-            <button
-              type="button"
-              className={styles.aiWrite}
-              data-ecommerce-ai-write
-              disabled={writingSellingPoints || !chatTargetLabel}
-              onClick={() => void writeSellingPoints()}
-            >
-              {writingSellingPoints ? '生成中…' : 'AI 帮写'}
-            </button>
-          </div>
-          <textarea
-            id="ecommerce-note"
-            className={styles.textarea}
-            value={note}
-            maxLength={ECOMMERCE_NOTE_MAX}
-            placeholder="例：突出防水材质；模特手持场景；不要出现文字"
-            data-ecommerce-note
-            onChange={(e) => setNote(e.target.value)}
-          />
-          {sellingPointsError ? (
-            <p className={styles.error} role="alert" data-ecommerce-ai-write-error>
-              {sellingPointsError}
-            </p>
-          ) : null}
-        </section>
-        ) : null}
-
-        {mode.id !== 'product-white' ? (
-        <div className={styles.field} data-param-section="plan-model">
-          <span className={styles.fieldHead}>
-            <span className={styles.fieldLabel}>对话模型</span>
-            {onConfigureChannels ? (
-              <button
-                type="button"
-                className={styles.fieldAction}
-                data-ecommerce-configure-channels
-                onClick={onConfigureChannels}
-              >
-                模型服务
-              </button>
-            ) : null}
-          </span>
-          <EcommerceSelect
-            ariaLabel="对话模型"
-            name="intent-model"
-            value={
-              (chatModels.includes(intentModel) ? intentModel : undefined) ??
-              (chatTargetLabel && chatModels.includes(chatTargetLabel)
-                ? chatTargetLabel
-                : undefined) ??
-              chatModels[0] ??
-              ''
-            }
-            onChange={(value) => onIntentModelChange?.(value)}
-            placeholder="未配置对话模型"
-            menuMinWidth={260}
-            disabled={chatModels.length === 0}
-            options={chatModels.map((item) => ({
-              value: item,
-              label: item,
-              icon: modelIconFor(item),
-            }))}
-            dataAttributes={{ 'data-ecommerce-intent-model': true }}
-          />
-        </div>
-        ) : null}
-
-        <div className={styles.field} data-param-section="generate-model">
-          <span className={styles.fieldLabel}>
-            {mode.mediaKind === 'video' ? '视频模型' : '生成模型'}
-          </span>
-          <EcommerceSelect
-            ariaLabel={mode.mediaKind === 'video' ? '视频模型' : '生成模型'}
-            name="generate-model"
-            value={model}
-            onChange={handleGenerateModelChange}
-            placeholder="默认（按渠道解析）"
-            menuMinWidth={250}
-            options={[
-              { value: '', label: '默认（按渠道解析）' },
-              ...(mode.mediaKind === 'video' ? videoModels : models).map((item) => ({
-                value: item,
-                label: item,
-                icon: modelIconFor(item),
-              })),
-            ]}
-            dataAttributes={{ 'data-ecommerce-model': true }}
-          />
-        </div>
-
-        <div data-param-section="mode">
-          <ModeSpecificParameters
-            modeId={mode.id}
-            options={modeOptions}
-            setOption={setModeOption}
-            toggleOption={toggleModeOption}
-          />
-        </div>
+        <EcommerceStudioModelFields
+          mode={mode}
+          modeOptions={modeOptions}
+          chatModels={chatModels}
+          intentModel={intentModel}
+          chatTargetLabel={chatTargetLabel}
+          onConfigureChannels={onConfigureChannels}
+          onIntentModelChange={onIntentModelChange}
+          model={model}
+          onGenerateModelChange={handleGenerateModelChange}
+          models={models}
+          videoModels={videoModels}
+          setModeOption={setModeOption}
+          toggleModeOption={toggleModeOption}
+        />
 
         </div>
 
@@ -879,720 +633,97 @@ export function EcommerceStudio({
       </aside>
 
       {/* 中：产物 */}
-      <section className={styles.results} data-ecommerce-results>
-        <nav className={styles.modeBar} data-ecommerce-modes>
-          {categoryModes.map((item) => (
-            <button
-              key={item.id}
-              type="button"
-              className={
-                item.id === mode.id
-                  ? `${styles.modeButton} ${styles.modeButtonOn}`
-                  : styles.modeButton
-              }
-              data-ecommerce-mode={item.id}
-              {...(STUDIO_MODES.find(
-                (candidate) =>
-                  candidate.category === item.category && candidate.usage === item.usage,
-              )?.id === item.id
-                ? { 'data-ecommerce-usage': item.usage }
-                : {})}
-              aria-pressed={item.id === mode.id}
-              aria-checked={item.usage === usage}
-              onClick={() => activateMode(item)}
-            >
-              {item.label}
-            </button>
-          ))}
-        </nav>
-        {workbench ?? (visibleResults.length === 0 ? (
-          <div className={styles.caseSection} data-ecommerce-empty>
-            <div className={styles.carousel} data-ecommerce-case-carousel>
-              {carouselCases.map((item, index) => (
-                <article className={styles.caseCard} key={item.id}>
-                  <header className={styles.caseHead}>
-                    <span className={styles.caseTitle}>{item.title}</span>
-                    <span className={styles.caseTag}>{item.tag}</span>
-                  </header>
-                  <div className={styles.caseBody}>
-                    <div className={styles.caseSource}>
-                      {index === 0 && products[0]?.preview ? (
-                        products[0].preview
-                      ) : (
-                        <span>{mode.mediaKind === 'video' ? '视频' : '商品'}</span>
-                      )}
-                    </div>
-                    <span className={styles.caseArrow}>→</span>
-                    <div className={styles.caseResults}>
-                      {item.tiles.map((tile) => (
-                        <span key={tile}>{tile}</span>
-                      ))}
-                    </div>
-                  </div>
-                </article>
-              ))}
-            </div>
-          </div>
-        ) : (
-          <div className={styles.grid} data-ecommerce-grid>
-            {visibleResults.map((r) => (
-              <figure
-                key={r.nodeId}
-                className={styles.cell}
-                data-ecommerce-result
-                data-ecommerce-result-id={r.nodeId}
-                data-status={r.status}
-              >
-                <div className={styles.cellBody}>
-                  {r.preview ?? (
-                    r.status === 'done' ? (
-                      <span className={styles.cellState}>已完成</span>
-                    ) : null
-                  )}
-                  {r.status === 'running' || r.status === 'failed' ? (
-                    <ResultStatusOverlay item={r} />
-                  ) : null}
-                </div>
-                {r.status === 'failed' ? (
-                  <figcaption className={styles.cellFoot}>
-                    <span className={styles.cellError}>
-                      {r.error ?? '失败（没有原因记录）'}
-                    </span>
-                    {r.recovery === 'retry-save' && r.onRetrySave ? (
-                      <button
-                        type="button"
-                        className={styles.cellRetry}
-                        data-ecommerce-retry-save={r.nodeId}
-                        disabled={running}
-                        onClick={() => void r.onRetrySave?.()}
-                      >
-                        重试保存
-                      </button>
-                    ) : r.onRerun ? (
-                      <button
-                        type="button"
-                        className={styles.cellRetry}
-                        data-ecommerce-retry-result={r.nodeId}
-                        disabled={running}
-                        onClick={() => void r.onRerun?.()}
-                      >
-                        重新生成
-                      </button>
-                    ) : null}
-                    {r.onRemoveFailed ? (
-                      <button
-                        type="button"
-                        className={styles.cellRemove}
-                        data-ecommerce-remove-failed={r.nodeId}
-                        onClick={r.onRemoveFailed}
-                      >
-                        移除
-                      </button>
-                    ) : null}
-                  </figcaption>
-                ) : null}
-              </figure>
-            ))}
-          </div>
-        ))}
-        {longImageNode}
-      </section>
+      <EcommerceStudioResultsPane
+        mode={mode}
+        usage={usage}
+        categoryModes={categoryModes}
+        products={products}
+        workbench={workbench}
+        visibleResults={visibleResults}
+        carouselCases={carouselCases}
+        longImageNode={longImageNode}
+        running={running}
+        onActivateMode={activateMode}
+      />
 
-      {detailTarget ? (
-        <div
-          className={styles.confirm}
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="ecommerce-result-detail-title"
-          data-ecommerce-result-detail-dialog
-        >
-          <div className={styles.confirmCard}>
-            <h2 className={styles.confirmTitle} id="ecommerce-result-detail-title">
-              结果详情
-            </h2>
-            <dl className={styles.detailGrid}>
-              {detailTarget.model ? (
-                <>
-                  <dt>模型</dt>
-                  <dd>{detailTarget.model}</dd>
-                </>
-              ) : null}
-              {detailTarget.shotTitle ? (
-                <>
-                  <dt>图片类型</dt>
-                  <dd>{detailTarget.shotTitle}</dd>
-                </>
-              ) : null}
-              {detailTarget.ratio ? (
-                <>
-                  <dt>比例</dt>
-                  <dd>{ecommerceRatioLabel(detailTarget.ratio)}</dd>
-                </>
-              ) : null}
-              {detailTarget.headline ? (
-                <>
-                  <dt>画面主文案</dt>
-                  <dd>{detailTarget.headline}</dd>
-                </>
-              ) : null}
-              {detailTarget.visualSystem ? (
-                <>
-                  <dt>视觉系统</dt>
-                  <dd>{detailTarget.visualSystem}</dd>
-                </>
-              ) : null}
-              {detailTarget.createdAt ? (
-                <>
-                  <dt>生成时间</dt>
-                  <dd>{new Date(detailTarget.createdAt).toLocaleString('zh-CN')}</dd>
-                </>
-              ) : null}
-              {detailTarget.note ? (
-                <>
-                  <dt>任务要求</dt>
-                  <dd>{detailTarget.note}</dd>
-                </>
-              ) : null}
-            </dl>
-            {detailTarget.prompt ? (
-              <pre className={styles.detailPrompt} data-ecommerce-result-prompt>
-                {detailTarget.prompt}
-              </pre>
-            ) : null}
-            <div className={styles.confirmActions}>
-              {detailTarget.prompt ? (
-                <button
-                  type="button"
-                  className={styles.cancel}
-                  data-ecommerce-result-prompt-copy
-                  onClick={() => {
-                    void navigator.clipboard?.writeText(detailTarget.prompt ?? '')
-                  }}
-                >
-                  复制提示词
-                </button>
-              ) : null}
-              <button
-                type="button"
-                className={styles.cancel}
-                data-ecommerce-result-detail-close
-                onClick={() => setDetailTarget(null)}
-              >
-                关闭
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
+      <EcommerceStudioResultDetailDialogs
+        detailTarget={detailTarget}
+        compareTarget={compareTarget}
+        onCloseDetail={() => setDetailTarget(null)}
+        onCopyPrompt={copyDetailPrompt}
+        onCloseCompare={() => setCompareTarget(null)}
+      />
 
-      {compareTarget ? (
-        <div
-          className={styles.confirm}
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="ecommerce-compare-title"
-          data-ecommerce-compare-dialog
-        >
-          <div className={`${styles.confirmCard} ${styles.compareCard}`}>
-            <h2 className={styles.confirmTitle} id="ecommerce-compare-title">
-              编辑前后对比
-            </h2>
-            <div className={styles.compareGrid}>
-              <figure className={styles.comparePane}>
-                <figcaption>原图</figcaption>
-                <div className={styles.compareImage} data-ecommerce-compare-source-image>
-                  {compareTarget.sourcePreview}
-                </div>
-              </figure>
-              <figure className={styles.comparePane}>
-                <figcaption>编辑结果</figcaption>
-                <div className={styles.compareImage} data-ecommerce-compare-result-image>
-                  {compareTarget.preview}
-                </div>
-              </figure>
-            </div>
-            <div className={styles.confirmActions}>
-              <button
-                type="button"
-                className={styles.cancel}
-                data-ecommerce-compare-close
-                onClick={() => setCompareTarget(null)}
-              >
-                关闭
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
+      <EcommerceStudioEditDialogs
+        batchEditOpen={batchEditOpen}
+        selectedImageEditCount={selectedImageEditCount}
+        editPresets={editPresets}
+        batchInstruction={batchInstruction}
+        batchEditError={batchEditError}
+        batchReference={batchReference}
+        batchReferenceBusy={batchReferenceBusy}
+        editModels={editModels}
+        batchEditModel={batchEditModel}
+        batchEditSubmitting={batchEditSubmitting}
+        running={running}
+        editTarget={editTarget}
+        editInstruction={editInstruction}
+        editError={editError}
+        editReference={editReference}
+        editReferenceBusy={editReferenceBusy}
+        editModel={editModel}
+        editSubmitting={editSubmitting}
+        onBatchInstructionChange={changeBatchInstruction}
+        onBatchPreset={applyBatchPreset}
+        onPickBatchReference={(file) => pickEditReference(file, true)}
+        onRemoveBatchReference={() => setBatchReference(null)}
+        onBatchModelChange={setBatchEditModel}
+        onBatchCancel={closeBatchEdit}
+        onBatchSubmit={submitBatchEdit}
+        onEditInstructionChange={changeEditInstruction}
+        onEditPreset={applyEditPreset}
+        onPickEditReference={(file) => pickEditReference(file, false)}
+        onRemoveEditReference={() => setEditReference(null)}
+        onEditModelChange={setEditModel}
+        onEditCancel={closeEdit}
+        onEditSubmit={submitEdit}
+      />
 
-      {batchEditOpen ? (
-        <div
-          className={styles.confirm}
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="ecommerce-batch-edit-title"
-          data-ecommerce-batch-edit-dialog
-        >
-          <div className={styles.confirmCard}>
-            <h2 className={styles.confirmTitle} id="ecommerce-batch-edit-title">
-              批量 AI 编辑
-            </h2>
-            <p className={styles.confirmText}>
-              将对选中的 {selectedImageEditCount} 张图逐张执行同一套修改要求。每张都会生成独立新批次，
-              原结果全部保留；会调用你的渠道，产生 {selectedImageEditCount} 次真实用量。
-            </p>
-            <div className={styles.editPresets} aria-label="常用批量编辑要求">
-              {editPresets.map((preset) => (
-                <button
-                  key={preset.key}
-                  type="button"
-                  className={styles.editPreset}
-                  data-ecommerce-batch-edit-preset={preset.key}
-                  onClick={() => {
-                    setBatchInstruction(preset.instruction)
-                    if (batchEditError) setBatchEditError('')
-                  }}
-                >
-                  {preset.label}
-                </button>
-              ))}
-            </div>
-            <div className={styles.editReferenceRow}>
-              <input
-                id="ecommerce-batch-edit-reference"
-                type="file"
-                accept="image/*"
-                hidden
-                data-ecommerce-batch-edit-reference-input
-                disabled={batchReferenceBusy}
-                onChange={(e) => {
-                  void pickEditReference(e.target.files?.[0], true)
-                  e.currentTarget.value = ''
-                }}
-              />
-              <label className={styles.editPreset} htmlFor="ecommerce-batch-edit-reference">
-                {batchReferenceBusy
-                  ? '正在读取参考图…'
-                  : batchReference
-                    ? '更换参考图'
-                    : '上传参考图（可选）'}
-              </label>
-              {batchReference ? (
-                <span className={styles.editReferencePreview} data-ecommerce-batch-edit-reference-preview>
-                  {batchReference.preview}
-                  <button
-                    type="button"
-                    className={styles.linkBtn}
-                    data-ecommerce-batch-edit-reference-remove
-                    onClick={() => setBatchReference(null)}
-                  >
-                    移除
-                  </button>
-                </span>
-              ) : null}
-            </div>
-            {editModels.length > 0 ? (
-              <div className={styles.editModel}>
-                <span>编辑模型</span>
-                <EcommerceSelect
-                  ariaLabel="批量编辑模型"
-                  name="batch-edit-model"
-                  value={batchEditModel}
-                  onChange={setBatchEditModel}
-                  menuMinWidth={250}
-                  options={[
-                    { value: '', label: '跟随原任务模型' },
-                    ...editModels.map((item) => ({
-                      value: item,
-                      label: item,
-                      icon: modelIconFor(item),
-                    })),
-                  ]}
-                  dataAttributes={{ 'data-ecommerce-batch-edit-model': true }}
-                />
-              </div>
-            ) : null}
-            <textarea
-              className={styles.editInput}
-              data-ecommerce-batch-edit-instruction
-              value={batchInstruction}
-              maxLength={ECOMMERCE_NOTE_MAX}
-              onChange={(e) => {
-                setBatchInstruction(e.target.value)
-                if (batchEditError) setBatchEditError('')
-              }}
-              placeholder="例如：只把每一张的背景都换成浅灰摄影棚背景，产品和文字保持不变"
-              aria-label="这批图统一要改什么"
-            />
-            {batchEditError ? (
-              <p className={styles.editError} data-ecommerce-batch-edit-error>
-                {batchEditError}
-              </p>
-            ) : null}
-            <div className={styles.confirmActions}>
-              <button
-                type="button"
-                className={styles.cancel}
-                data-ecommerce-batch-edit-cancel
-                disabled={batchEditSubmitting}
-                onClick={() => {
-                  setBatchEditOpen(false)
-                  setBatchInstruction('')
-                  setBatchEditModel('')
-                  setBatchReference(null)
-                  setBatchEditError('')
-                }}
-              >
-                取消
-              </button>
-              <button
-                type="button"
-                className={`${styles.generate} ${styles.editSubmit}`}
-                data-ecommerce-batch-edit-submit
-                disabled={
-                  batchEditSubmitting ||
-                  running ||
-                  selectedImageEditCount === 0 ||
-                  !batchInstruction.trim()
-                }
-                onClick={() => void submitBatchEdit()}
-              >
-                {batchEditSubmitting ? '正在逐张执行…' : `生成 ${selectedImageEditCount} 张编辑结果`}
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
+      <EcommerceStudioUpscaleDialog
+        upscaleTarget={upscaleTarget}
+        availableUpscaleOptions={availableUpscaleOptions}
+        upscaleProfile={upscaleProfile}
+        upscaleScale={upscaleScale}
+        upscaleError={upscaleError}
+        upscaleSubmitting={upscaleSubmitting}
+        running={running}
+        onProfileChange={setUpscaleProfile}
+        onScaleChange={setUpscaleScale}
+        onCancel={closeUpscale}
+        onSubmit={submitUpscale}
+      />
 
-      {/* 单张结果定向编辑：独立批次、独立指令，不覆盖原结果 */}
-      {editTarget ? (
-        <div
-          className={styles.confirm}
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="ecommerce-edit-title"
-          data-ecommerce-edit-dialog
-        >
-          <div className={styles.confirmCard}>
-            <h2 className={styles.confirmTitle} id="ecommerce-edit-title">
-              AI 编辑这一张
-            </h2>
-            <p className={styles.confirmText}>
-              {editTarget.label}。只改你写明的内容，未点名的产品、人物、构图、光影和文字保持不变；
-              原图与历史都不会被覆盖。
-            </p>
-            <div className={styles.editPresets} aria-label="常用编辑要求">
-              {editPresets.map((preset) => (
-                <button
-                  key={preset.key}
-                  type="button"
-                  className={styles.editPreset}
-                  data-ecommerce-edit-preset={preset.key}
-                  onClick={() => {
-                    setEditInstruction(preset.instruction)
-                    if (editError) setEditError('')
-                  }}
-                >
-                  {preset.label}
-                </button>
-              ))}
-            </div>
-            <div className={styles.editReferenceRow}>
-              <input
-                id="ecommerce-edit-reference"
-                type="file"
-                accept="image/*"
-                hidden
-                data-ecommerce-edit-reference-input
-                disabled={editReferenceBusy}
-                onChange={(e) => {
-                  void pickEditReference(e.target.files?.[0], false)
-                  e.currentTarget.value = ''
-                }}
-              />
-              <label className={styles.editPreset} htmlFor="ecommerce-edit-reference">
-                {editReferenceBusy ? '正在读取参考图…' : editReference ? '更换参考图' : '上传参考图（可选）'}
-              </label>
-              {editReference ? (
-                <span className={styles.editReferencePreview} data-ecommerce-edit-reference-preview>
-                  {editReference.preview}
-                  <button
-                    type="button"
-                    className={styles.linkBtn}
-                    data-ecommerce-edit-reference-remove
-                    onClick={() => setEditReference(null)}
-                  >
-                    移除
-                  </button>
-                </span>
-              ) : null}
-            </div>
-            {editModels.length > 0 ? (
-              <div className={styles.editModel}>
-                <span>编辑模型</span>
-                <EcommerceSelect
-                  ariaLabel="单张编辑模型"
-                  name="edit-model"
-                  value={editModel}
-                  onChange={setEditModel}
-                  menuMinWidth={250}
-                  options={[
-                    { value: '', label: '跟随原任务模型' },
-                    ...editModels.map((item) => ({
-                      value: item,
-                      label: item,
-                      icon: modelIconFor(item),
-                    })),
-                  ]}
-                  dataAttributes={{ 'data-ecommerce-edit-model': true }}
-                />
-              </div>
-            ) : null}
-            <textarea
-              className={styles.editInput}
-              data-ecommerce-edit-instruction
-              value={editInstruction}
-              maxLength={ECOMMERCE_NOTE_MAX}
-              onChange={(e) => {
-                setEditInstruction(e.target.value)
-                if (editError) setEditError('')
-              }}
-              placeholder="例如：只把背景换成海边日落，产品和画面文字保持不变"
-              aria-label="这一张要改什么"
-            />
-            {editError ? (
-              <p className={styles.editError} data-ecommerce-edit-error>
-                {editError}
-              </p>
-            ) : null}
-            <div className={styles.confirmActions}>
-              <button
-                type="button"
-                className={styles.cancel}
-                data-ecommerce-edit-cancel
-                disabled={editSubmitting}
-                onClick={() => {
-                  setEditTarget(null)
-                  setEditInstruction('')
-                  setEditModel('')
-                  setEditReference(null)
-                  setEditError('')
-                }}
-              >
-                取消
-              </button>
-              <button
-                type="button"
-                className={`${styles.generate} ${styles.editSubmit}`}
-                data-ecommerce-edit-submit
-                disabled={editSubmitting || running || !editInstruction.trim()}
-                onClick={() => void submitEdit()}
-              >
-                {editSubmitting ? '提交中…' : '生成编辑结果'}
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
-
-      {upscaleTarget ? (
-        <div
-          className={styles.confirm}
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="ecommerce-upscale-title"
-          data-ecommerce-upscale-dialog
-        >
-          <div className={styles.confirmCard}>
-            <h2 className={styles.confirmTitle} id="ecommerce-upscale-title">
-              AI 超清
-            </h2>
-            <p className={styles.confirmText}>
-              使用真实 Topaz 超分模型放大
-              {upscaleTarget.items.length > 1
-                ? `所选 ${upscaleTarget.items.length} 张结果`
-                : '这张结果'}
-              ，不重绘商品也不生成新画面。原图和原任务都会保留；会调用当前渠道，产生
-              {upscaleTarget.items.length > 1
-                ? ` ${upscaleTarget.items.length} 次真实用量。`
-                : '一次真实用量。'}
-            </p>
-            <p className={styles.hint} data-ecommerce-upscale-count>
-              本次处理 {upscaleTarget.items.length} 张
-            </p>
-            <div className={styles.upscaleSection}>
-              <span className={styles.upscaleLabel}>方案</span>
-              <div className={styles.editPresets} aria-label="AI 超清方案">
-                {availableUpscaleOptions.map((option) => (
-                  <button
-                    key={option.id}
-                    type="button"
-                    className={
-                      option.id === upscaleProfile
-                        ? `${styles.editPreset} ${styles.editPresetOn}`
-                        : styles.editPreset
-                    }
-                    data-ecommerce-upscale-profile={option.id}
-                    title={option.hint}
-                    onClick={() => setUpscaleProfile(option.id)}
-                  >
-                    {option.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div className={styles.upscaleSection}>
-              <span className={styles.upscaleLabel}>放大倍数</span>
-              <div className={styles.editPresets} aria-label="AI 超清倍数">
-                {ECOMMERCE_UPSCALE_SCALES.map((scale) => (
-                  <button
-                    key={scale}
-                    type="button"
-                    className={
-                      scale === upscaleScale
-                        ? `${styles.editPreset} ${styles.editPresetOn}`
-                        : styles.editPreset
-                    }
-                    data-ecommerce-upscale-scale={scale}
-                    onClick={() => setUpscaleScale(scale)}
-                  >
-                    {scale}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <p className={styles.hint} data-ecommerce-upscale-model>
-              {
-                availableUpscaleOptions.find((option) => option.id === upscaleProfile)?.model
-              }
-            </p>
-            {upscaleError ? (
-              <p className={styles.editError} data-ecommerce-upscale-error>
-                {upscaleError}
-              </p>
-            ) : null}
-            <div className={styles.confirmActions}>
-              <button
-                type="button"
-                className={styles.cancel}
-                data-ecommerce-upscale-cancel
-                disabled={upscaleSubmitting}
-                onClick={() => {
-                  setUpscaleTarget(null)
-                  setUpscaleError('')
-                }}
-              >
-                取消
-              </button>
-              <button
-                type="button"
-                className={styles.generate}
-                data-ecommerce-upscale-submit
-                disabled={upscaleSubmitting || running}
-                onClick={() => void submitUpscale()}
-              >
-                {upscaleSubmitting
-                  ? `提交中…（${upscaleTarget.items.length} 张）`
-                  : `AI 超清 ${upscaleScale}${upscaleTarget.items.length > 1 ? `（${upscaleTarget.items.length}）` : ''}`}
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
-
-      {uploadPreview && uploadPreviewItem ? (
-        <div
-          className={styles.uploadLightbox}
-          role="dialog"
-          aria-modal="true"
-          data-ecommerce-upload-lightbox
-          onClick={() => setUploadPreview(null)}
-        >
-          <div className={styles.uploadLightboxBody} onClick={(event) => event.stopPropagation()}>
-            <button
-              type="button"
-              className={styles.uploadLightboxClose}
-              aria-label="关闭预览"
-              onClick={() => setUploadPreview(null)}
-            >
-              ×
-            </button>
-            <button
-              type="button"
-              className={`${styles.uploadLightboxArrow} ${styles.uploadLightboxPrev}`}
-              aria-label="上一张"
-              disabled={uploadPreview.index <= 0}
-              onClick={() =>
-                setUploadPreview((current) =>
-                  current && current.index > 0 ? { ...current, index: current.index - 1 } : current,
-                )
-              }
-            >
-              ‹
-            </button>
-            <div className={styles.uploadLightboxStage}>{uploadPreviewItem.preview}</div>
-            <button
-              type="button"
-              className={`${styles.uploadLightboxArrow} ${styles.uploadLightboxNext}`}
-              aria-label="下一张"
-              disabled={uploadPreview.index >= uploadPreviewItems.length - 1}
-              onClick={() =>
-                setUploadPreview((current) =>
-                  current && current.index < uploadPreviewItems.length - 1
-                    ? { ...current, index: current.index + 1 }
-                    : current,
-                )
-              }
-            >
-              ›
-            </button>
-            <span className={styles.uploadLightboxCount} data-ecommerce-upload-position>
-              {uploadPreview.index + 1} / {uploadPreviewItems.length}
-            </span>
-          </div>
-        </div>
-      ) : null}
+      <EcommerceStudioUploadPreviewDialog
+        uploadPreviewItem={uploadPreviewItem}
+        uploadPreviewIndex={uploadPreview?.index ?? 0}
+        uploadPreviewCount={uploadPreviewItems.length}
+        onClose={() => setUploadPreview(null)}
+        onPrevious={previousUploadPreview}
+        onNext={nextUploadPreview}
+      />
 
       {/* 付费确认（D6）：先报"预计 N 张"，确认后才发请求 */}
-      {confirming ? (
-        <div className={styles.confirm} role="dialog" aria-modal="true" data-ecommerce-confirm>
-          <div className={styles.confirmCard}>
-            <h2 className={styles.confirmTitle}>确认生成</h2>
-            <p className={styles.confirmText}>
-              将生成 <b>{mode.mediaKind === 'video' ? 1 : batchOutputCount}</b>{' '}
-              {mode.mediaKind === 'video' ? '条' : '张'}
-              {mode.mediaKind === 'video' ? mode.label : usageLabel(usage)}，比例{' '}
-              {ecommerceRatioLabel(ratio)}
-              {platform ? `，面向 ${platform.name}` : ''}。会调用你的渠道，产生真实用量。
-            </p>
-            {confirmUsesAiPlan ? (
-              <p className={styles.confirmFlow} data-ecommerce-confirm-ai-flow>
-                确认后会先生成整批方案，再由 AI 自审并修正逐张提示词，然后交给生图模型。
-                本次会多花一次对话额度。
-              </p>
-            ) : null}
-            <div className={styles.confirmActions}>
-              <button
-                type="button"
-                className={styles.cancel}
-                data-ecommerce-confirm-cancel
-                onClick={() => setConfirming(false)}
-              >
-                再改改
-              </button>
-              <button
-                type="button"
-                className={styles.generate}
-                data-ecommerce-confirm-ok
-                onClick={() => void confirm()}
-              >
-                确认生成 {mode.mediaKind === 'video' ? 1 : batchOutputCount}{' '}
-                {mode.mediaKind === 'video' ? '条视频' : '张'}
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
+      <EcommerceStudioGenerateConfirmDialog
+        confirming={confirming}
+        mode={mode}
+        batchOutputCount={batchOutputCount}
+        usage={usage}
+        ratio={ratio}
+        platform={platform}
+        confirmUsesAiPlan={confirmUsesAiPlan}
+        onCancel={() => setConfirming(false)}
+        onConfirm={confirm}
+      />
     </div>
   )
 }

@@ -14,6 +14,74 @@ const STORE_BASE = String(process.env.SMOKE_STORE_BASE ?? 'http://127.0.0.1:1876
   /\/$/,
   '',
 )
+const LOOPBACK_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]'])
+
+function smokeCorsOrigin(requestHeaders) {
+  const requested = String(requestHeaders.origin ?? '')
+  if (requested) {
+    try {
+      const origin = new URL(requested)
+      if (
+        (origin.protocol === 'http:' || origin.protocol === 'https:') &&
+        LOOPBACK_HOSTS.has(origin.hostname)
+      ) {
+        return origin.origin
+      }
+    } catch {
+      /* 非法 Origin 不进入 CORS 白名单，回退到冒烟页面自身的本地 origin。 */
+    }
+  }
+  return new URL(BASE).origin
+}
+
+function smokeProxyHeaders(responseHeaders, requestHeaders) {
+  const header = (name) =>
+    Object.entries(responseHeaders).find(
+      ([key]) => key.toLowerCase() === name,
+    )?.[1] ?? ''
+  const mergeCsv = (...values) => {
+    const seen = new Map()
+    for (const value of values) {
+      for (const item of String(value ?? '').split(',')) {
+        const label = item.trim()
+        if (label) seen.set(label.toLowerCase(), label)
+      }
+    }
+    return [...seen.values()].join(', ')
+  }
+  const headers = {}
+  for (const [name, value] of Object.entries(responseHeaders)) {
+    if (
+      name.toLowerCase() === 'access-control-allow-origin' ||
+      name.toLowerCase() === 'access-control-allow-methods' ||
+      name.toLowerCase() === 'access-control-allow-headers'
+    ) {
+      continue
+    }
+    headers[name] = value
+  }
+  headers['access-control-allow-origin'] = smokeCorsOrigin(requestHeaders)
+  headers['access-control-allow-methods'] = mergeCsv(
+    'GET',
+    'HEAD',
+    'POST',
+    'PUT',
+    'PATCH',
+    'DELETE',
+    'OPTIONS',
+    header('access-control-allow-methods'),
+    requestHeaders['access-control-request-method'],
+  )
+  headers['access-control-allow-headers'] = mergeCsv(
+    'content-type',
+    'authorization',
+    header('access-control-allow-headers'),
+    requestHeaders['access-control-request-headers'],
+  )
+  headers.vary = mergeCsv(header('vary'), 'Origin')
+  return headers
+}
+
 const OUT = '.playwright-verify'
 mkdirSync(OUT, { recursive: true })
 
@@ -1732,13 +1800,47 @@ async function newCtx(browser, opts = {}) {
    */
   if (process.env.SMOKE_STORE_BASE) {
     const target = new URL(STORE_BASE)
-    await ctx.route('http://127.0.0.1:18765/**', async (route) => {
-      const url = new URL(route.request().url())
+    const handler = async (route) => {
+      const request = route.request()
+      const requestHeaders = request.headers()
+      const url = new URL(request.url())
       url.protocol = target.protocol
       url.hostname = target.hostname
       url.port = target.port
-      await route.continue({ url: url.toString() })
-    })
+      try {
+        const response = await route.fetch({ url: url.toString() })
+        await route.fulfill({
+          response,
+          headers: smokeProxyHeaders(response.headers(), requestHeaders),
+        })
+      } catch (error) {
+        console.error(
+          `[smoke-store-proxy] ${request.method()} ${url.pathname}${url.search}: ${String(error).slice(0, 300)}`,
+        )
+        await route
+          .fulfill({
+            status: 502,
+            headers: {
+              ...smokeProxyHeaders({}, requestHeaders),
+              'content-type': 'application/json',
+            },
+            body: JSON.stringify({
+              ok: false,
+              error: 'isolated shared-store proxy failed',
+            }),
+          })
+          .catch(() => {})
+      }
+    }
+    /*
+     * 页面既可能请求默认 18765，也会把注入的 SMOKE_STORE_BASE（例如 18767）
+     * 直接传给 page.evaluate。两条 origin 都必须留在 Node 代理里，
+     * 否则浏览器会绕过 18765 的重写去直连隔离库，再次撞上 CORS。
+     */
+    const routeOrigins = new Set(['http://127.0.0.1:18765', target.origin])
+    for (const origin of routeOrigins) {
+      await ctx.route(`${origin}/**`, handler)
+    }
   }
   /*
    * Playwright + 当前 Chrome 在部分有下载 / 大素材的组里会卡在 `ctx.close()`。

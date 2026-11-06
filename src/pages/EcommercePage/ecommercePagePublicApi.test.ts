@@ -25,7 +25,7 @@ describe('ecommerce public API snapshot', () => {
     expect(WORKBENCH_SOURCE).toContain('export type EcommerceWorkbenchAction =')
   })
 
-  it('keeps the studio public component, status views and prop types', () => {
+  it('keeps the studio public component, status exports and prop types', () => {
     for (const name of [
       'EcommerceUpload',
       'EcommerceImageParamOptions',
@@ -37,6 +37,9 @@ describe('ecommerce public API snapshot', () => {
       expect(STUDIO_SOURCE, `${name} missing`).toContain(name)
     }
     expect(STUDIO_SOURCE).toContain("from './studio/studioContracts'")
-    expect(STUDIO_SOURCE).toContain('export { GenerationStageView, ResultStatusOverlay }')
+    expect(STUDIO_SOURCE, 'GenerationStageView public export missing')
+      .toMatch(/export\s*\{[^}\n]*\bGenerationStageView\b[^}\n]*\}/)
+    expect(STUDIO_SOURCE, 'ResultStatusOverlay public export missing')
+      .toMatch(/export\s*\{[^}\n]*\bResultStatusOverlay\b[^}\n]*\}/)
   })
 })

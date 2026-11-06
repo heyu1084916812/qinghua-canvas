@@ -515,7 +515,7 @@
       "test": [
         "src/workbenches/ecommerce/EcommerceStudio.status.test.ts"
       ],
-      "budget": 1598
+      "budget": 729
     },
     {
       "module": "src/workbenches/storyboard/useStoryboardVideoExecutionController.ts",
@@ -4997,6 +4997,230 @@
         "src/workbenches/canvas/flow/flowSurfaceRenderModel.test.ts"
       ],
       "budget": 132
+    },
+    {
+      "module": "src/workbenches/ecommerce/studio/EcommerceStudioCategoryRail.tsx",
+      "owner": "ecommerce-studio-category-view",
+      "responsibility": "渲染电商 Studio 左侧品类导航及其选中语义。",
+      "owns": [
+        "品类按钮顺序、文案、aria-pressed 与点击回调"
+      ],
+      "doesNotOwn": [
+        "品类切换动作与 Studio state",
+        "工作台状态、任务或渠道",
+        "CSS 与业务校验"
+      ],
+      "publicApi": [
+        "EcommerceStudioCategoryRail"
+      ],
+      "test": [
+        "src/workbenches/ecommerce/studio/EcommerceStudioViews.test.ts"
+      ],
+      "budget": 36
+    },
+    {
+      "module": "src/workbenches/ecommerce/studio/EcommerceStudioUploadPanels.tsx",
+      "owner": "ecommerce-studio-upload-view",
+      "responsibility": "渲染商品原图与参考图上传区、预览槽、容量提示和拖放事件绑定。",
+      "owns": [
+        "商品/参考上传 section、file input、预览槽和添加槽",
+        "上传拖放属性、引用上限与提示文案"
+      ],
+      "doesNotOwn": [
+        "素材导入、文件读取与状态更新",
+        "预览灯箱状态和生成动作",
+        "CSS 与持久化实现"
+      ],
+      "publicApi": [
+        "EcommerceStudioUploadPanels"
+      ],
+      "test": [
+        "src/workbenches/ecommerce/studio/EcommerceStudioViews.test.ts"
+      ],
+      "budget": 200
+    },
+    {
+      "module": "src/workbenches/ecommerce/studio/EcommerceStudioCommonParameters.tsx",
+      "owner": "ecommerce-studio-common-parameter-view",
+      "responsibility": "渲染上架平台、语言、比例、分辨率和质量等通用参数控件。",
+      "owns": [
+        "通用参数 section 顺序、标签、选项和变更回调",
+        "测试锚点与禁用/可见字段"
+      ],
+      "doesNotOwn": [
+        "参数默认值、模式草稿和校验",
+        "任务创建与请求构造",
+        "CSS 与页面状态"
+      ],
+      "publicApi": [
+        "EcommerceStudioCommonParameters"
+      ],
+      "test": [
+        "src/workbenches/ecommerce/studio/EcommerceStudioViews.test.ts"
+      ],
+      "budget": 155
+    },
+    {
+      "module": "src/workbenches/ecommerce/studio/EcommerceStudioSellingPointsPanel.tsx",
+      "owner": "ecommerce-studio-selling-points-view",
+      "responsibility": "渲染商品卖点与要求输入、AI 帮写入口及错误提示。",
+      "owns": [
+        "卖点 section、textarea、AI 帮写按钮和错误锚点"
+      ],
+      "doesNotOwn": [
+        "文本清洗、模型调用和错误状态",
+        "草稿保存与生成校验",
+        "CSS 与请求执行"
+      ],
+      "publicApi": [
+        "EcommerceStudioSellingPointsPanel"
+      ],
+      "test": [
+        "src/workbenches/ecommerce/studio/EcommerceStudioViews.test.ts"
+      ],
+      "budget": 54
+    },
+    {
+      "module": "src/workbenches/ecommerce/studio/EcommerceStudioModelFields.tsx",
+      "owner": "ecommerce-studio-model-field-view",
+      "responsibility": "渲染对话模型、生成模型和模式专属参数的模型控件。",
+      "owns": [
+        "模型字段 section 顺序、选项、缺失模型入口和变更回调"
+      ],
+      "doesNotOwn": [
+        "模型解析、路由、选择策略和能力过滤",
+        "生成请求与价格确认",
+        "CSS 与持久化"
+      ],
+      "publicApi": [
+        "EcommerceStudioModelFields"
+      ],
+      "test": [
+        "src/workbenches/ecommerce/studio/EcommerceStudioViews.test.ts"
+      ],
+      "budget": 112
+    },
+    {
+      "module": "src/workbenches/ecommerce/studio/EcommerceStudioResultsPane.tsx",
+      "owner": "ecommerce-studio-results-view",
+      "responsibility": "渲染中间结果工作台、模式条、空态、结果卡片和长图入口。",
+      "owns": [
+        "结果 section、模式导航、空态轮播和结果网格",
+        "结果卡状态覆盖层与失败动作锚点"
+      ],
+      "doesNotOwn": [
+        "结果投影、任务/素材读取和下载动作",
+        "编辑/超清弹窗状态",
+        "CSS 与运行引擎"
+      ],
+      "publicApi": [
+        "EcommerceStudioResultsPane"
+      ],
+      "test": [
+        "src/workbenches/ecommerce/studio/EcommerceStudioViews.test.ts"
+      ],
+      "budget": 156
+    },
+    {
+      "module": "src/workbenches/ecommerce/studio/EcommerceStudioResultDetailDialogs.tsx",
+      "owner": "ecommerce-studio-result-detail-view",
+      "responsibility": "渲染结果详情与对比弹窗的只读内容和关闭动作。",
+      "owns": [
+        "详情/对比 dialog 结构、文案、复制和关闭锚点"
+      ],
+      "doesNotOwn": [
+        "结果选择状态、剪贴板实现和比较计算",
+        "结果重跑或编辑动作",
+        "CSS 与持久化"
+      ],
+      "publicApi": [
+        "EcommerceStudioResultDetailDialogs"
+      ],
+      "test": [
+        "src/workbenches/ecommerce/studio/EcommerceStudioViews.test.ts"
+      ],
+      "budget": 146
+    },
+    {
+      "module": "src/workbenches/ecommerce/studio/EcommerceStudioEditDialogs.tsx",
+      "owner": "ecommerce-studio-edit-dialog-view",
+      "responsibility": "渲染批量编辑和单图编辑弹窗的输入、预设、参考图与提交控件。",
+      "owns": [
+        "批量/单图编辑 dialog 结构、顺序、锚点和可见文案",
+        "编辑指令、预设、参考图、模型和提交回调绑定"
+      ],
+      "doesNotOwn": [
+        "编辑请求、参考图读取、结果写入和错误状态机",
+        "任务执行与付费确认",
+        "CSS 与持久化"
+      ],
+      "publicApi": [
+        "EcommerceStudioEditDialogs"
+      ],
+      "test": [
+        "src/workbenches/ecommerce/studio/EcommerceStudioViews.test.ts"
+      ],
+      "budget": 329
+    },
+    {
+      "module": "src/workbenches/ecommerce/studio/EcommerceStudioUpscaleDialog.tsx",
+      "owner": "ecommerce-studio-upscale-dialog-view",
+      "responsibility": "渲染 AI 超清弹窗的档位、倍率、费用提示和提交控件。",
+      "owns": [
+        "超清 dialog 结构、选项顺序、错误和按钮锚点"
+      ],
+      "doesNotOwn": [
+        "超清目标、可用档位计算和任务提交",
+        "结果状态与渠道能力解析",
+        "CSS 与持久化"
+      ],
+      "publicApi": [
+        "EcommerceStudioUpscaleDialog"
+      ],
+      "test": [
+        "src/workbenches/ecommerce/studio/EcommerceStudioViews.test.ts"
+      ],
+      "budget": 134
+    },
+    {
+      "module": "src/workbenches/ecommerce/studio/EcommerceStudioUploadPreviewDialog.tsx",
+      "owner": "ecommerce-studio-upload-preview-view",
+      "responsibility": "渲染上传素材放大灯箱、位置提示和前后切换控件。",
+      "owns": [
+        "上传预览 dialog、位置文案、关闭和前后切换锚点"
+      ],
+      "doesNotOwn": [
+        "预览索引状态、素材集合和导航动作",
+        "素材读取与缩略图生成",
+        "CSS 与持久化"
+      ],
+      "publicApi": [
+        "EcommerceStudioUploadPreviewDialog"
+      ],
+      "test": [
+        "src/workbenches/ecommerce/studio/EcommerceStudioViews.test.ts"
+      ],
+      "budget": 62
+    },
+    {
+      "module": "src/workbenches/ecommerce/studio/EcommerceStudioGenerateConfirmDialog.tsx",
+      "owner": "ecommerce-studio-generate-confirm-view",
+      "responsibility": "渲染电商付费生成前的数量、比例、平台和 AI 方案确认弹窗。",
+      "owns": [
+        "确认 dialog、预计输出文案、取消与确认按钮锚点"
+      ],
+      "doesNotOwn": [
+        "生成校验、请求构造、任务提交和费用计算",
+        "确认状态机与运行态",
+        "CSS 与持久化"
+      ],
+      "publicApi": [
+        "EcommerceStudioGenerateConfirmDialog"
+      ],
+      "test": [
+        "src/workbenches/ecommerce/studio/EcommerceStudioViews.test.ts"
+      ],
+      "budget": 71
     }
   ]
 }

@@ -1,5 +1,16 @@
 # CanvasFlow（轻画）项目记忆
 
+### 电商 Studio 视图组件拆分（2026-11-06）
+
+- `EcommerceStudio.tsx` 1598→729，仅保留 React state/refs、Store/Platform 动作和区块编排；上传、通用参数、卖点、
+  模型、结果工作台、详情/对比、批量/单图编辑、超清、上传预览、生成确认拆到 11 个同目录视图组件。
+- UI 拆分必须直接返回原 `aside/section/div/Fragment`，不得新增布局 wrapper；className、data-*、aria、role、id、
+  htmlFor、文案、按钮顺序和事件回调保持逐字一致。隔离 1425+18767 四组截图几何/交互状态一致，像素差 ≤0.0325%。
+- `scripts/smoke.mjs` 的隔离库代理必须 Node 侧 `route.fetch` 后 `route.fulfill` 并回填 loopback CORS；只代理
+  18765 与 SMOKE_STORE_BASE origin，异常回 502，禁止回退共享库。
+- G161/G164 与 `064871e` 基线独立库结果同失败集，不能把既有失败算作 UI 拆分通过或回归；本刀最终全量
+  596 files / 5219 tests（1 skipped），check（1031 modules / 4150 deps、25 legacy、175 semantic）与 build 通过。
+
 ### FlowSurface 交互、动作与渲染模型拆分（2026-11-06）
 
 - `flowSurfaceInteractionCoordinator.ts` 只规划点击、Shift 子节点选择、平移/复制、锚点、菜单和导入反馈；
