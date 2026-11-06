@@ -1,5 +1,17 @@
 # CanvasFlow（轻画）项目记忆
 
+### 灯箱视口手势与命令生命周期拆分（2026-11-06）
+
+- `lightboxViewportGestureCoordinator.ts` 负责舞台 resize/rect、pointer 平移、滚轮、媒体首次适配、图库切图
+  视口保留和对比分割线；`lightboxCommandLifecycle.ts` 负责关闭/图库导航/键鼠命令、下载反馈计时器、
+  编辑模式复位、旋转 busy/finally 与标注保存委托。Store/Platform/DOM/JSX 仍归 `LightboxLayer`。
+- 平移/分割线 drag 只能有一个 active subscription，替换前释放旧监听；中键必须 preventDefault，框选模式左键
+  先走 crop；下载提示 1500ms 计时器在 dispose 清理；旋转失败不得 close，busy 必须 finally 解锁。
+- `LightboxLayer` 治理基线 1356→1148，render-after 689 行哈希
+  `D543B6D0D584B8A7D9610DD123F358949A7A0D53ECB3FC249C582BF344FE4067` 不变；模块预算 217/184、宿主预算 1148。
+- `--testTimeout=15000` 串行全量 590 files / 5184 tests（1 skipped），check（1015 modules / 4060 deps、
+  25 legacy、159 semantic）与 build 通过；超千行生产文件仍为 5（LightboxLayer 已降到 1148）。
+
 ### 电商草稿动作拆分（2026-11-06）
 
 - `pageDraftActionCoordinator.ts` 负责草稿与节点并行恢复、上传 ID 去重、节点素材优先与 assets 回退、

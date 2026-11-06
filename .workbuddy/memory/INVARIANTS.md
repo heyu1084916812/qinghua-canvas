@@ -1,5 +1,16 @@
 # CanvasFlow 不变量详表
 
+## 灯箱视口手势与命令边界（2026-11-06）
+
+- `lightboxViewportGestureCoordinator.ts` 不得 import React/DOM/Store；只接收 stage rect、subscribe、setter 和
+  显式回调。`lightboxCommandLifecycle.ts` 不得持有 Store/Platform；下载、键盘、旋转和标注保存都经显式端口。
+- 框选模式左键必须先走 crop，中键仍负责平移并 preventDefault；平移与分割线拖拽只能有一个 active pointer
+  subscription，替换前必须释放旧监听。媒体加载后只有 preserve flag 为 true 且尚无视口时才补一次 fit。
+- 下载提示计时器必须被替换/清理；旋转保存失败只能解锁 busy，不得 close；标注删除只在有选中文字且未编辑时抢键。
+- 灯箱拆分必须保持 render-after 689 行及
+  `D543B6D0D584B8A7D9610DD123F358949A7A0D53ECB3FC249C582BF344FE4067` 不变；改 JSX/DOM/CSS/文案时立即转
+  「涉及 UI」门禁。宿主预算不得回涨到 1200 行以上。
+
 ## 电商草稿动作边界（2026-11-06）
 
 - `pageDraftActionCoordinator.ts` 只拥有草稿/节点恢复、上传引用清理和 500ms 自动保存；React state/refs、

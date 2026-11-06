@@ -442,7 +442,7 @@
       "test": [
         "scripts/smoke.mjs#G795"
       ],
-      "budget": 1356
+      "budget": 1148
     },
     {
       "module": "src/workbenches/canvas/panels/CreationPanel.module.css",
@@ -4799,6 +4799,57 @@
         "src/pages/EcommercePage/ecommercePage/pageDraftActionCoordinator.test.ts"
       ],
       "budget": 197
+    },
+    {
+      "module": "src/workbenches/canvas/lightbox/lightboxViewportGestureCoordinator.ts",
+      "owner": "canvas-lightbox-viewport-gestures",
+      "responsibility": "编排灯箱舞台测量、平移与滚轮手势、媒体初次适配、图库切图视口保留和对比分割线拖拽。",
+      "owns": [
+        "舞台 resize 测量与视口初次落位",
+        "左键框选优先、中键平移与 pointer drag 生命周期",
+        "图库切图视口保留与对比分割线拖拽"
+      ],
+      "doesNotOwn": [
+        "React state/refs 与页面生命周期",
+        "画布 transform、媒体框和分割比例数学",
+        "灯箱 JSX/DOM/CSS 与可见文案"
+      ],
+      "publicApi": [
+        "LightboxViewportPointer",
+        "LightboxViewportWheel",
+        "LightboxViewportPointerDragHandlers",
+        "LightboxViewportGesturePorts",
+        "createLightboxViewportGestureCoordinator"
+      ],
+      "test": [
+        "src/workbenches/canvas/lightbox/lightboxViewportGestureCoordinator.test.ts"
+      ],
+      "budget": 217
+    },
+    {
+      "module": "src/workbenches/canvas/lightbox/lightboxCommandLifecycle.ts",
+      "owner": "canvas-lightbox-command-lifecycle",
+      "responsibility": "编排灯箱关闭、图库切换、下载反馈、键盘导航、编辑模式复位和旋转/标注保存入口。",
+      "owns": [
+        "关闭、图库导航和键盘命令监听",
+        "下载成功反馈及 1500ms 计时器清理",
+        "编辑模式初始化、旋转保存 busy/finally 和标注保存委托"
+      ],
+      "doesNotOwn": [
+        "React state/refs 与页面生命周期",
+        "CanvasStore、Platform、DOM 和 JSX",
+        "旋转像素烘焙、标注合成与键盘规则实现"
+      ],
+      "publicApi": [
+        "LightboxCommandKeyEvent",
+        "LightboxRotationInput",
+        "LightboxCommandPorts",
+        "createLightboxCommandLifecycle"
+      ],
+      "test": [
+        "src/workbenches/canvas/lightbox/lightboxCommandLifecycle.test.ts"
+      ],
+      "budget": 184
     }
   ]
 }
