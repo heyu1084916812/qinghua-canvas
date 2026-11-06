@@ -1,5 +1,13 @@
 # CanvasFlow 不变量详表
 
+## 电商结果重跑归属（2026-11-06）
+
+- 已有结果的重跑/原地替换必须继续归 `pageResultActionCoordinator.ts`，不得另造第二个结果动作层。
+  React state/refs、Store、平台与执行器归宿主，协调器只接收快照和显式 prepare/target/input/lease/refresh 端口。
+- sourceTask 先 activeTask 后 taskHistory；非 inPlace 才 append 并切任务；sourceAssetHash 补入前去重；
+  lease 固定 acquire→execute→warnings→refresh→finally release，失败也不得泄漏 lease。
+- 重跑拆分必须保持 `EcommercePage` render-after 哈希不变，协调器总行数仍受 <=450 预算约束。
+
 ## 电商方案与分镜动作边界（2026-11-06）
 
 - `pagePlanningActionCoordinator.ts` 不得 import React、DOM 或 Store 实例；React state/refs、会话 Store、平台实例

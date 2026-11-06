@@ -1,5 +1,15 @@
 # CanvasFlow（轻画）项目记忆
 
+### 电商结果重跑并入既有动作模块（2026-11-06）
+
+- 已有结果重跑/原地替换归 `pageResultActionCoordinator.ts`，不另造第二个结果协调器。sourceTask 先匹配 activeTask，
+  再查 taskHistory；非 inPlace 才追加结果并切当前任务；sourceAssetHash 去重后补入视觉输入；RunPlan 的
+  task/channel/model/credentials/inputs/shot/metadata 保持原字段。
+- lease 顺序固定为 acquire→exec.run→warnings log→refresh task/history/workbench→finally release；协调器模块
+  277→439（仍为单一结果动作领域），`EcommercePage` 1416→1294，render-after 89 行哈希
+  `A0F3C6A34DC95A5B3002C0980132290991C5501CBF6907DE7D6AB600035E1972` 不变。
+- 全量 586 files / 5148 tests，check（1011 modules / 4029 deps、25 legacy、155 semantic）与 build 通过。
+
 ### 电商方案与分镜动作拆分（2026-11-06）
 
 - `pagePlanningActionCoordinator.ts` 负责方案历史、意图解析、卖点写作、视觉输入投影和两轮分镜请求；

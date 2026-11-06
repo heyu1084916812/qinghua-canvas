@@ -1,20 +1,18 @@
 import type { EcommerceShot } from '../../../domain/ecommerce/prompt'
-import type {
-  EcommerceResultRecord,
-  EcommerceTaskRecord,
-} from '../../../domain/ecommerce/tasks'
+import type { Channel } from '../../../domain/project/channel'
+import { resolveGenerationTarget as resolveGenerationTargetImpl } from '../../../domain/project/generationRouting'
+import type { ProtocolCatalog } from '../../../domain/project/protocol'
+import type { RouteStrategy } from '../../../domain/project/modelRouting'
+import { resultMetadataOf, type EcommerceResultRecord, type EcommerceTaskRecord } from '../../../domain/ecommerce/tasks'
 import type { EcommerceRequest } from '../../../domain/ecommerce/types'
-import {
-  upscaleNoteOf,
-  upscaleOptionOf,
-  type EcommerceUpscaleProfile,
-  type EcommerceUpscaleScale,
-} from '../../../domain/ecommerce/upscale'
-import {
-  downloadAsset as downloadAssetImpl,
-  type DownloadAssetDeps,
-} from '../../../features/shared/assets/downloadAsset'
-import { retryableResultIdsOf } from './pageResultProjection'
+import type { RunPlan } from '../../../domain/shared/execution/plan'
+import type { NodeInput } from '../../../domain/shared/execution/types'
+import { upscaleNoteOf, upscaleOptionOf, type EcommerceUpscaleProfile, type EcommerceUpscaleScale } from '../../../domain/ecommerce/upscale'
+import { buildEcommerceRunPlan, type EcommerceRunTask } from '../../../features/ecommerce/execution/ecommerceRunPlan'
+import { downloadAsset as downloadAssetImpl, type DownloadAssetDeps } from '../../../features/shared/assets/downloadAsset'
+import type { EcommerceTaskRepository } from '../../../state/project/ecommerceTaskRepository'
+import type { LegacyGenerationNode } from '../ecommercePageSupport'
+import { prepareStoredResultRerun as prepareStoredResultRerunImpl, retryableResultIdsOf, type EcommerceStoredResultPorts } from './pageResultProjection'
 
 export interface PageResultActionLineage {
   sourceTaskId?: string
@@ -109,6 +107,170 @@ export interface ResultLibraryActions {
       ratio?: string
     },
   ): (() => Promise<void>) | undefined
+}
+
+type AssetInput = Extract<NodeInput, { kind: 'asset' }>
+type ResultRowsSetter = (
+  rows:
+    | EcommerceResultRecord[]
+    | ((current: EcommerceResultRecord[]) => EcommerceResultRecord[]),
+) => void
+type StoredResultTaskRepository = Pick<EcommerceTaskRepository, 'appendResults' | 'updateResult' | 'results'>
+
+export interface StoredResultRerunPorts {
+  activeTask: EcommerceTaskRecord | null
+  taskHistory: readonly EcommerceTaskRecord[]
+  row: EcommerceResultRecord
+  inPlace?: boolean
+  channels: readonly Channel[]
+  catalog: ProtocolCatalog
+  strategy?: RouteStrategy
+  nodes: readonly LegacyGenerationNode[]
+  taskRepo: StoredResultTaskRepository
+  execution: {
+    run(plan: RunPlan<EcommerceRunTask>): Promise<{ warnings: readonly string[] }>
+  }
+  assets: {
+    read(hash: string): Promise<{ mime: string } | null>
+  }
+  logger: {
+    log(level: string, message: string, details?: unknown): void
+  }
+  lease: {
+    acquire(taskId: string): void
+    release(taskId: string): void
+  }
+  refresh: {
+    task(task: EcommerceTaskRecord): Promise<void>
+    history(): Promise<void>
+    workbench(): Promise<void>
+  }
+  state: {
+    setActiveTask(task: EcommerceTaskRecord): void
+    setResultRows: ResultRowsSetter
+  }
+  visualInputsFor(
+    request: EcommerceRequest,
+    nodes: readonly LegacyGenerationNode[],
+  ): Promise<readonly AssetInput[]>
+  subjectId(): string
+  now?: () => number
+  prepareStoredResultRerun?: (
+    ports: EcommerceStoredResultPorts,
+  ) => ReturnType<typeof prepareStoredResultRerunImpl>
+  resolveGenerationTarget?: typeof resolveGenerationTargetImpl
+}
+
+const sourceTaskOf = (
+  activeTask: EcommerceTaskRecord | null,
+  taskHistory: readonly EcommerceTaskRecord[],
+  row: EcommerceResultRecord,
+): EcommerceTaskRecord | null =>
+  (activeTask?.id === row.taskId ? activeTask : null) ??
+  taskHistory.find((task) => task.id === row.taskId) ??
+  null
+
+/**
+ * Re-run an existing result row without creating a canvas node.
+ *
+ * The host owns React state, stores and platform instances; this module only
+ * coordinates the persisted result row, execution plan and refresh order.
+ */
+export async function runStoredResultRerun(
+  ports: StoredResultRerunPorts,
+): Promise<void> {
+  const sourceTask = sourceTaskOf(ports.activeTask, ports.taskHistory, ports.row)
+  if (!sourceTask) throw new Error('找不到这张图所属的电商任务')
+
+  const prepared = await (ports.prepareStoredResultRerun ?? prepareStoredResultRerunImpl)({
+    activeTask: sourceTask,
+    taskHistory: ports.taskHistory,
+    row: ports.row,
+    inPlace: ports.inPlace,
+    now: (ports.now ?? Date.now)(),
+    subjectId: ports.subjectId,
+    taskRepo: ports.taskRepo,
+  })
+  const { task, targetRow, running } = prepared
+  if (!ports.inPlace) {
+    ports.state.setActiveTask(task)
+    ports.state.setResultRows(await ports.taskRepo.results(task.id))
+  }
+  ports.state.setResultRows((rows) =>
+    rows.map((item) => (item.id === running.id ? running : item)),
+  )
+
+  const mediaKind: 'image' | 'video' = task.request.mediaKind ?? 'image'
+  const resolveTarget = ports.resolveGenerationTarget ?? resolveGenerationTargetImpl
+  const target = resolveTarget({
+    channels: ports.channels,
+    category: mediaKind,
+    catalog: ports.catalog,
+    strategy: ports.strategy,
+    logicalModel: task.request.resolvedModel ?? task.request.model,
+    channelId: task.request.resolvedChannelId ?? task.request.channelId,
+  })
+  if (!target) throw new Error('这个结果对应的模型 / 渠道已经不可用')
+
+  const inputs = [...(await ports.visualInputsFor(task.request, ports.nodes))]
+  const sourceAssetHash = task.sourceAssetHash
+  if (sourceAssetHash && !inputs.some((input) => input.assetHash === sourceAssetHash)) {
+    const payload = await ports.assets.read(sourceAssetHash)
+    if (payload) {
+      inputs.push({
+        kind: 'asset',
+        nodeId: `result:${task.sourceResultId ?? ports.row.id}`,
+        assetHash: sourceAssetHash,
+        mime: payload.mime,
+      })
+    }
+  }
+
+  const params = {
+    ratio: ports.row.ratio ?? task.request.ratio,
+    count: 1,
+    ...(task.request.resolution ? { resolution: task.request.resolution } : {}),
+    ...(task.request.quality ? { quality: task.request.quality } : {}),
+    ...(task.request.scale ? { scale: task.request.scale } : {}),
+    ...(mediaKind === 'video' ? { durationSec: task.request.durationSec ?? 5 } : {}),
+  }
+  const plan = buildEcommerceRunPlan({
+    taskId: task.id,
+    mediaKind,
+    channelId: target.channelId,
+    model: target.upstreamModel,
+    logicalModel: target.logicalModel,
+    ...(target.credentialGroupId ? { credentialGroupId: target.credentialGroupId } : {}),
+    ...(target.credentialGroupIds?.length
+      ? { credentialGroupIds: target.credentialGroupIds }
+      : {}),
+    inputs,
+    shots: [
+      {
+        resultId: targetRow.id,
+        subjectId: targetRow.nodeId,
+        prompt:
+          ports.row.prompt?.trim() ||
+          task.request.note?.trim() ||
+          '按当前任务配置重新生成这张图',
+        params,
+        metadata: resultMetadataOf(ports.row),
+      },
+    ],
+  })
+
+  ports.lease.acquire(task.id)
+  try {
+    const outcome = await ports.execution.run(plan)
+    for (const warning of outcome.warnings) {
+      ports.logger.log('warn', '[ecommerce] 重跑结果落库 / 投影警告', { warning })
+    }
+    await ports.refresh.task(task)
+    await ports.refresh.history()
+    await ports.refresh.workbench()
+  } finally {
+    ports.lease.release(task.id)
+  }
 }
 
 const waitForDownload = (milliseconds: number) =>

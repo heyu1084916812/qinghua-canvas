@@ -4,13 +4,18 @@ import type {
   EcommerceTaskRecord,
 } from '../../../domain/ecommerce/tasks'
 import type { EcommerceRequest } from '../../../domain/ecommerce/types'
+import type { RunPlan } from '../../../domain/shared/execution/plan'
+import type { EcommerceRunTask } from '../../../features/ecommerce/execution/ecommerceRunPlan'
+import type { EcommerceStoredResultPorts } from './pageResultProjection'
 import {
   createPageResultActionCoordinator,
   createResultLibraryActions,
   downloadAllResults,
   retryFailedResults,
+  runStoredResultRerun,
   type PageResultActionPorts,
   type PageResultActionView,
+  type StoredResultRerunPorts,
 } from './pageResultActionCoordinator'
 
 const taskOf = (overrides: Partial<EcommerceTaskRecord> = {}): EcommerceTaskRecord => ({
@@ -72,6 +77,55 @@ const portsOf = (
   wait: vi.fn(async () => undefined),
   ...overrides,
 })
+
+const preparedOf = (
+  task: EcommerceTaskRecord,
+  targetRow = rowOf('target-row', 'target-node'),
+  running: EcommerceResultRecord = { ...targetRow, status: 'running' },
+) => ({ task, targetRow, running })
+
+const storedRerunPortsOf = (
+  overrides: Partial<StoredResultRerunPorts> = {},
+): StoredResultRerunPorts => {
+  const task = taskOf({ id: 'task-source' })
+  const row = rowOf('source-row', 'source-node')
+  return {
+    activeTask: task,
+    taskHistory: [],
+    row,
+    channels: [],
+    catalog: {} as StoredResultRerunPorts['catalog'],
+    nodes: [],
+    taskRepo: {
+      appendResults: vi.fn(async () => ({ task, results: [row] })),
+      updateResult: vi.fn(async () => undefined),
+      results: vi.fn(async () => [row]),
+    },
+    execution: { run: vi.fn(async () => ({ warnings: [] })) },
+    assets: { read: vi.fn(async () => ({ mime: 'image/png' })) },
+    logger: { log: vi.fn() },
+    lease: { acquire: vi.fn(), release: vi.fn() },
+    refresh: {
+      task: vi.fn(async () => undefined),
+      history: vi.fn(async () => undefined),
+      workbench: vi.fn(async () => undefined),
+    },
+    state: { setActiveTask: vi.fn(), setResultRows: vi.fn() },
+    visualInputsFor: vi.fn(async () => []),
+    subjectId: vi.fn(() => 'new-subject'),
+    now: vi.fn(() => 123),
+    prepareStoredResultRerun: vi.fn(async () => preparedOf(task, row)),
+    resolveGenerationTarget: vi.fn(() => ({
+      channelId: 'channel-target',
+      credentialGroupId: 'credential-group',
+      credentialGroupIds: ['credential-group'],
+      logicalModel: 'Logical Model',
+      upstreamModel: 'upstream-model',
+      usedMock: false,
+    })),
+    ...overrides,
+  }
+}
 
 describe('ecommerce result edit actions', () => {
   it('keeps row lookup and all three edit validation errors before generate', async () => {
@@ -333,6 +387,297 @@ describe('ecommerce result batch actions', () => {
       retryWorkbenchResult: emptyRetry,
     })
     expect(emptyRetry).not.toHaveBeenCalled()
+  })
+})
+
+describe('ecommerce stored result rerun actions', () => {
+  it('selects activeTask, then history, and rejects a missing source before prepare', async () => {
+    const row = rowOf('source-row', 'source-node')
+    const active = taskOf({ id: row.taskId, updatedAt: 10 })
+    const staleHistory = taskOf({ id: row.taskId, updatedAt: 99 })
+    const activePrepare = vi.fn(async (_ports: EcommerceStoredResultPorts) => preparedOf(active, row))
+    await runStoredResultRerun(storedRerunPortsOf({
+      row,
+      activeTask: active,
+      taskHistory: [staleHistory],
+      prepareStoredResultRerun: activePrepare,
+    }))
+    expect(activePrepare.mock.calls[0]?.[0].activeTask).toBe(active)
+
+    const otherActive = taskOf({ id: 'other-task' })
+    const history = taskOf({ id: row.taskId, updatedAt: 11 })
+    const historyPrepare = vi.fn(async (_ports: EcommerceStoredResultPorts) => preparedOf(history, row))
+    await runStoredResultRerun(storedRerunPortsOf({
+      row,
+      activeTask: otherActive,
+      taskHistory: [history],
+      prepareStoredResultRerun: historyPrepare,
+    }))
+    expect(historyPrepare.mock.calls[0]?.[0].activeTask).toBe(history)
+
+    const missingPrepare = vi.fn()
+    await expect(runStoredResultRerun(storedRerunPortsOf({
+      row,
+      activeTask: otherActive,
+      taskHistory: [],
+      prepareStoredResultRerun: missingPrepare,
+    }))).rejects.toThrow('找不到这张图所属的电商任务')
+    expect(missingPrepare).not.toHaveBeenCalled()
+  })
+
+  it('updates stored rows for appended draws and only replaces the row in place', async () => {
+    const sourceRow = rowOf('source-row', 'source-node')
+    const appendedTask = taskOf({ id: sourceRow.taskId })
+    const appendedRow = rowOf('appended-row', 'appended-node')
+    const appendedRunning = { ...appendedRow, status: 'running' as const }
+    const storedRows = [rowOf('stored-row', 'stored-node')]
+    const setActiveTask = vi.fn()
+    const setResultRows = vi.fn()
+    const results = vi.fn(async () => storedRows)
+    await runStoredResultRerun(storedRerunPortsOf({
+      row: sourceRow,
+      taskRepo: {
+        appendResults: vi.fn(),
+        updateResult: vi.fn(),
+        results,
+      },
+      prepareStoredResultRerun: vi.fn(async () =>
+        preparedOf(appendedTask, appendedRow, appendedRunning)),
+      state: { setActiveTask, setResultRows },
+    }))
+    expect(setActiveTask).toHaveBeenCalledWith(appendedTask)
+    expect(results).toHaveBeenCalledWith(appendedTask.id)
+    expect(setResultRows).toHaveBeenNthCalledWith(1, storedRows)
+    const appendUpdater = setResultRows.mock.calls[1]?.[0] as (
+      rows: EcommerceResultRecord[],
+    ) => EcommerceResultRecord[]
+    expect(appendUpdater([sourceRow, appendedRow])).toEqual([sourceRow, appendedRunning])
+
+    const inPlaceRunning = { ...sourceRow, status: 'running' as const }
+    const inPlaceSetActive = vi.fn()
+    const inPlaceSetRows = vi.fn()
+    const inPlaceResults = vi.fn(async () => storedRows)
+    await runStoredResultRerun(storedRerunPortsOf({
+      row: sourceRow,
+      inPlace: true,
+      taskRepo: {
+        appendResults: vi.fn(),
+        updateResult: vi.fn(),
+        results: inPlaceResults,
+      },
+      prepareStoredResultRerun: vi.fn(async () =>
+        preparedOf(taskOf({ id: sourceRow.taskId }), sourceRow, inPlaceRunning)),
+      state: { setActiveTask: inPlaceSetActive, setResultRows: inPlaceSetRows },
+    }))
+    expect(inPlaceSetActive).not.toHaveBeenCalled()
+    expect(inPlaceResults).not.toHaveBeenCalled()
+    expect(inPlaceSetRows).toHaveBeenCalledTimes(1)
+    const inPlaceUpdater = inPlaceSetRows.mock.calls[0]?.[0] as (
+      rows: EcommerceResultRecord[],
+    ) => EcommerceResultRecord[]
+    expect(inPlaceUpdater([sourceRow])).toEqual([inPlaceRunning])
+  })
+
+  it('stops after prepare when the generation target is unavailable', async () => {
+    const visualInputsFor = vi.fn(async () => [])
+    const run = vi.fn()
+    const acquire = vi.fn()
+    await expect(runStoredResultRerun(storedRerunPortsOf({
+      visualInputsFor,
+      resolveGenerationTarget: vi.fn(() => null),
+      execution: { run },
+      lease: { acquire, release: vi.fn() },
+    }))).rejects.toThrow('这个结果对应的模型 / 渠道已经不可用')
+    expect(visualInputsFor).not.toHaveBeenCalled()
+    expect(run).not.toHaveBeenCalled()
+    expect(acquire).not.toHaveBeenCalled()
+  })
+
+  it('builds the complete run plan and preserves acquire/run/log/refresh/release order', async () => {
+    const trace: string[] = []
+    const sourceHash = 'source-asset-hash'
+    const row = rowOf('source-result', 'source-node', {
+      ratio: '4:5',
+      prompt: '  keep the product  ',
+      shotTitle: '主图',
+    })
+    const task = taskOf({
+      id: row.taskId,
+      sourceResultId: 'original-result',
+      sourceAssetHash: sourceHash,
+      request: {
+        ...taskOf().request,
+        mediaKind: 'video',
+        model: 'fallback-model',
+        resolvedModel: 'logical-model',
+        channelId: 'fallback-channel',
+        resolvedChannelId: 'requested-channel',
+        ratio: '3:4',
+        note: 'task note',
+        resolution: '2k',
+        quality: 'high',
+        scale: '2x',
+        durationSec: 8,
+      },
+    })
+    const existingInput = {
+      kind: 'asset' as const,
+      nodeId: 'existing-node',
+      assetHash: 'existing-hash',
+      mime: 'image/png',
+    }
+    const run = vi.fn(async (plan: RunPlan<EcommerceRunTask>) => {
+      trace.push('run')
+      expect(plan).toBeDefined()
+      return { warnings: ['投影失败'] }
+    })
+    const ports = storedRerunPortsOf({
+      row,
+      activeTask: task,
+      prepareStoredResultRerun: vi.fn(async () => preparedOf(task, row)),
+      resolveGenerationTarget: vi.fn(() => ({
+        channelId: 'target-channel',
+        credentialGroupId: 'target-group',
+        credentialGroupIds: ['target-group', 'target-group-alt'],
+        logicalModel: 'target-logical',
+        upstreamModel: 'target-upstream',
+        usedMock: false,
+      })),
+      visualInputsFor: vi.fn(async () => [existingInput]),
+      assets: { read: vi.fn(async () => ({ mime: 'image/jpeg' })) },
+      execution: { run },
+      logger: { log: vi.fn(() => trace.push('warning')) },
+      lease: {
+        acquire: vi.fn(() => trace.push('acquire')),
+        release: vi.fn(() => trace.push('release')),
+      },
+      refresh: {
+        task: vi.fn(async () => {
+          trace.push('refresh-task')
+        }),
+        history: vi.fn(async () => {
+          trace.push('refresh-history')
+        }),
+        workbench: vi.fn(async () => {
+          trace.push('refresh-workbench')
+        }),
+      },
+      now: () => 456,
+    })
+
+    await runStoredResultRerun(ports)
+    expect(trace).toEqual([
+      'acquire',
+      'run',
+      'warning',
+      'refresh-task',
+      'refresh-history',
+      'refresh-workbench',
+      'release',
+    ])
+    expect(ports.prepareStoredResultRerun).toHaveBeenCalledWith(expect.objectContaining({
+      activeTask: task,
+      row,
+      now: 456,
+      subjectId: ports.subjectId,
+      taskRepo: ports.taskRepo,
+    }))
+    expect(ports.resolveGenerationTarget).toHaveBeenCalledWith({
+      channels: [],
+      category: 'video',
+      catalog: ports.catalog,
+      strategy: undefined,
+      logicalModel: 'logical-model',
+      channelId: 'requested-channel',
+    })
+
+    const plan = run.mock.calls[0]?.[0]
+    expect(plan).toMatchObject({
+      id: `ecommerce:${task.id}:run`,
+      scope: 'global',
+      mode: 'single',
+      tasks: [{
+        taskId: task.id,
+        resultId: row.id,
+        nodeId: row.nodeId,
+        request: {
+          kind: 'video',
+          channelId: 'target-channel',
+          model: 'target-upstream',
+          logicalModel: 'target-logical',
+          credentialGroupId: 'target-group',
+          credentialGroupIds: ['target-group', 'target-group-alt'],
+          prompt: 'keep the product',
+          inputs: [
+            existingInput,
+            {
+              kind: 'asset',
+              nodeId: 'result:original-result',
+              assetHash: sourceHash,
+              mime: 'image/jpeg',
+            },
+          ],
+          params: {
+            ratio: '4:5',
+            count: 1,
+            resolution: '2k',
+            quality: 'high',
+            scale: '2x',
+            durationSec: 8,
+          },
+        },
+        metadata: { shotTitle: '主图' },
+      }],
+    })
+  })
+
+  it('does not read or append the source asset when visual inputs already contain it', async () => {
+    const row = rowOf('source-result', 'source-node')
+    const task = taskOf({
+      id: row.taskId,
+      sourceAssetHash: 'already-present',
+    })
+    const run = vi.fn(async (_plan: RunPlan<EcommerceRunTask>) => ({ warnings: [] }))
+    const read = vi.fn(async () => ({ mime: 'image/png' }))
+    await runStoredResultRerun(storedRerunPortsOf({
+      row,
+      activeTask: task,
+      prepareStoredResultRerun: vi.fn(async () => preparedOf(task, row)),
+      visualInputsFor: vi.fn(async () => [{
+        kind: 'asset' as const,
+        nodeId: 'existing',
+        assetHash: 'already-present',
+        mime: 'image/png',
+      }]),
+      assets: { read },
+      execution: { run },
+    }))
+    expect(read).not.toHaveBeenCalled()
+    const inputs = run.mock.calls[0]?.[0].tasks[0]?.request.inputs
+    expect(inputs).toHaveLength(1)
+    expect(inputs?.[0]).toMatchObject({ kind: 'asset', assetHash: 'already-present' })
+  })
+
+  it('releases the lease when execution fails and skips refreshes', async () => {
+    const refreshTask = vi.fn(async () => undefined)
+    const refreshHistory = vi.fn(async () => undefined)
+    const refreshWorkbench = vi.fn(async () => undefined)
+    const release = vi.fn()
+    await expect(runStoredResultRerun(storedRerunPortsOf({
+      execution: { run: vi.fn(async () => {
+        throw new Error('exec failed')
+      }) },
+      lease: { acquire: vi.fn(), release },
+      refresh: {
+        task: refreshTask,
+        history: refreshHistory,
+        workbench: refreshWorkbench,
+      },
+    }))).rejects.toThrow('exec failed')
+    expect(release).toHaveBeenCalledTimes(1)
+    expect(refreshTask).not.toHaveBeenCalled()
+    expect(refreshHistory).not.toHaveBeenCalled()
+    expect(refreshWorkbench).not.toHaveBeenCalled()
   })
 })
 

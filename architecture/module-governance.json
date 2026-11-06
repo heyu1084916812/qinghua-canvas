@@ -200,7 +200,7 @@
       "test": [
         "scripts/smoke.mjs#G116"
       ],
-      "budget": 1416
+      "budget": 1294
     },
     {
       "module": "src/pages/EcommercePage/EcommerceWorkbench.tsx",
@@ -4469,7 +4469,9 @@
         "PageResultActionCoordinator",
         "ResultLibraryActionPorts",
         "ResultLibraryActions",
+        "StoredResultRerunPorts",
         "createResultLibraryActions",
+        "runStoredResultRerun",
         "downloadAllResults",
         "retryFailedResults",
         "createPageResultActionCoordinator"
@@ -4477,7 +4479,7 @@
       "test": [
         "src/pages/EcommercePage/ecommercePage/pageResultActionCoordinator.test.ts"
       ],
-      "budget": 277
+      "budget": 439
     },
     {
       "module": "src/workbenches/ecommerce/studio/controller/studioActionCoordinator.ts",

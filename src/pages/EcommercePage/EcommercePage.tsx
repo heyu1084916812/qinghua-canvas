@@ -48,11 +48,7 @@ import {
   cleanEcommerceDraftRefs,
   type EcommerceFormDraft,
 } from '../../domain/ecommerce/draft'
-import {
-  resultMetadataOf,
-  type EcommerceResultRecord,
-  type EcommerceTaskRecord,
-} from '../../domain/ecommerce/tasks'
+import type { EcommerceResultRecord, EcommerceTaskRecord } from '../../domain/ecommerce/tasks'
 import {
   ECOMMERCE_PLATFORMS,
   type EcommercePlatform,
@@ -81,16 +77,10 @@ import {
   legacyAssetHashesOfNode,
   type LegacyGenerationNode,
 } from './ecommercePageSupport'
-import {
-  loadEcommerceInitialTask,
-  projectEcommerceCanvasItemDiff,
-  refreshEcommerceTask,
-  refreshEcommerceWorkbench,
-} from './ecommercePage/pageDataCoordinator'
+import { loadEcommerceInitialTask, projectEcommerceCanvasItemDiff, refreshEcommerceTask, refreshEcommerceWorkbench } from './ecommercePage/pageDataCoordinator'
 import {
   generationStageOfTerminalResults,
   imageParamOptionsByModel as imageParamOptionsOfModels,
-  prepareStoredResultRerun,
   longImageTilesOf,
   prescribeEcommerceShots,
   projectEcommerceResults,
@@ -101,6 +91,7 @@ import {
   createResultLibraryActions,
   downloadAllResults,
   retryFailedResults,
+  runStoredResultRerun,
 } from './ecommercePage/pageResultActionCoordinator'
 import { createPagePlanningActionCoordinator } from './ecommercePage/pagePlanningActionCoordinator'
 
@@ -868,132 +859,19 @@ function StudioHost({ projectId }: { projectId: string }) {
       : null
   }
 
-  /**
-   * 重跑 / 替换现有结果。
-   *
-   * 结果行是唯一落点；抽卡先追加一行，原地替换复用原行。
-   * 这里不创建画布生成节点，也不从节点状态推结果。
-   */
   const runStoredResult = useCallback(
-    async (
-      row: EcommerceResultRecord,
-      options: { inPlace?: boolean } = {},
-    ): Promise<void> => {
-      const sourceTask =
-        (activeTask?.id === row.taskId ? activeTask : null) ??
-        taskHistory.find((task) => task.id === row.taskId) ??
-        null
-      if (!sourceTask) throw new Error('找不到这张图所属的电商任务')
-
-      const prepared = await prepareStoredResultRerun({
-        activeTask,
-        taskHistory,
-        row,
-        inPlace: options.inPlace,
-        now: Date.now(),
-        subjectId: ecommerceSubjectId,
-        taskRepo,
-      })
-      const { task, targetRow, running } = prepared
-      if (!options.inPlace) {
-        setActiveTask(task)
-        setResultRows((await taskRepo.results(task.id)) ?? [])
-      }
-      setResultRows((rows) =>
-        rows.map((item) => (item.id === running.id ? running : item)),
-      )
-
-      const mediaKind = task.request.mediaKind ?? 'image'
-      const target = resolveGenerationTarget({
-        channels: channelList,
-        category: mediaKind,
-        catalog: channels.protocolCatalog(),
-        strategy: routeStrategy,
-        logicalModel: task.request.resolvedModel ?? task.request.model,
-        channelId: task.request.resolvedChannelId ?? task.request.channelId,
-      })
-      if (!target) throw new Error('这个结果对应的模型 / 渠道已经不可用')
-
-      const inputs = [...(await visualInputsFor(task.request, graph.nodes))]
-      if (
-        task.sourceAssetHash &&
-        !inputs.some((input) => input.assetHash === task.sourceAssetHash)
-      ) {
-        const payload = await platform.assets.read(task.sourceAssetHash)
-        if (payload) {
-          inputs.push({
-            kind: 'asset',
-            nodeId: `result:${task.sourceResultId ?? row.id}`,
-            assetHash: task.sourceAssetHash,
-            mime: payload.mime,
-          })
-        }
-      }
-
-      const params = {
-        ratio: row.ratio ?? task.request.ratio,
-        count: 1,
-        ...(task.request.resolution ? { resolution: task.request.resolution } : {}),
-        ...(task.request.quality ? { quality: task.request.quality } : {}),
-        ...(task.request.scale ? { scale: task.request.scale } : {}),
-        ...(mediaKind === 'video'
-          ? { durationSec: task.request.durationSec ?? 5 }
-          : {}),
-      }
-      const plan = buildEcommerceRunPlan({
-        taskId: task.id,
-        mediaKind,
-        channelId: target.channelId,
-        model: target.upstreamModel,
-        logicalModel: target.logicalModel,
-        ...(target.credentialGroupId
-          ? { credentialGroupId: target.credentialGroupId }
-          : {}),
-        ...(target.credentialGroupIds?.length
-          ? { credentialGroupIds: target.credentialGroupIds }
-          : {}),
-        inputs,
-        shots: [
-          {
-            resultId: targetRow.id,
-            subjectId: targetRow.nodeId,
-            prompt:
-              row.prompt?.trim() ||
-              task.request.note?.trim() ||
-              '按当前任务配置重新生成这张图',
-            params,
-            metadata: resultMetadataOf(row),
-          },
-        ],
-      })
-
-      acquireEcommerceTaskLease(task.id)
-      try {
-        const outcome = await exec.run(plan)
-        for (const warning of outcome.warnings) {
-          platform.logger.log('warn', '[ecommerce] 重跑结果落库 / 投影警告', { warning })
-        }
-        await refreshTask(task)
-        await refreshTaskHistory()
-        await queueWorkbenchRefresh()
-      } finally {
-        releaseEcommerceTaskLease(task.id)
-      }
-    },
+    (row: EcommerceResultRecord, options: { inPlace?: boolean } = {}) =>
+      runStoredResultRerun({
+        activeTask, taskHistory, row, inPlace: options.inPlace, subjectId: ecommerceSubjectId,
+        taskRepo, channels: channelList, catalog: channels.protocolCatalog(), strategy: routeStrategy,
+        nodes: graph.nodes, execution: exec, assets: platform.assets, logger: platform.logger,
+        lease: { acquire: acquireEcommerceTaskLease, release: releaseEcommerceTaskLease },
+        refresh: { task: refreshTask, history: refreshTaskHistory, workbench: queueWorkbenchRefresh },
+        state: { setActiveTask, setResultRows }, visualInputsFor,
+      }),
     [
-      activeTask,
-      channelList,
-      channels,
-      exec,
-      platform,
-      queueWorkbenchRefresh,
-      refreshTask,
-      refreshTaskHistory,
-      routeStrategy,
-      taskHistory,
-      taskRepo,
-      visualInputsFor,
-      graph.nodes,
+      activeTask, channelList, channels, exec, platform, graph.nodes, queueWorkbenchRefresh,
+      refreshTask, refreshTaskHistory, routeStrategy, taskHistory, taskRepo, visualInputsFor,
     ],
   )
 
