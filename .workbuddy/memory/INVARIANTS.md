@@ -1,5 +1,15 @@
 # CanvasFlow 不变量详表
 
+## 灯箱编辑与媒体投影边界（2026-11-06）
+
+- `lightboxEditorProjection.ts` / `lightboxMediaProjection.ts` 只处理只读投影，不得 import React、DOM、Store 或
+  Platform；编辑动作、保存链路与 JSX 仍归 `LightboxLayer`。投影模块不得写回节点或触发副作用。
+- owner 取当前素材命中的第一个节点；显式 crop/face/rotate/annotate 目标优先；视频禁用所有图片编辑与对比。
+  `cropPlainRequested` 与当前 `plainCrop` 必须分开，媒体框/旋转/裁剪几何继续复用既有数学。
+- 投影拆分必须保持 render-after 689 行及
+  `D543B6D0D584B8A7D9610DD123F358949A7A0D53ECB3FC249C582BF344FE4067` 不变；改 JSX/DOM/CSS/文案时立即转
+  「涉及 UI」门禁。宿主预算不得回涨到 1000 行以上。
+
 ## 灯箱视口手势与命令边界（2026-11-06）
 
 - `lightboxViewportGestureCoordinator.ts` 不得 import React/DOM/Store；只接收 stage rect、subscribe、setter 和

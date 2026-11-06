@@ -1,5 +1,17 @@
 # CanvasFlow（轻画）项目记忆
 
+### 灯箱编辑与媒体投影拆分（2026-11-06）
+
+- `lightboxEditorProjection.ts` 只投影素材 owner、裁剪/旋转/标注目标、能力、当前编辑态与可用模式；
+  `lightboxMediaProjection.ts` 只投影对比来源/可用性、主媒体、媒体框、旋转 transform、裁剪框和确认阈值。
+  两模块不得 import React/DOM/Store/Platform，动作和 JSX 仍归 `LightboxLayer`。
+- 视频媒体必须禁用裁剪/旋转/标注与对比；plain crop 请求态和当前 crop 模式要分开；旋转 transform 使用原角度，
+  normalizedAngle 仅给 UI 显示；框选确认仍用共享 `FUSION_MIN_EDGE`。
+- `LightboxLayer` 1148→999，render-after 689 行哈希
+  `D543B6D0D584B8A7D9610DD123F358949A7A0D53ECB3FC249C582BF344FE4067` 不变；模块预算 65/114、宿主预算 999。
+- `--testTimeout=15000` 串行全量 592 files / 5193 tests（1 skipped），check（1017 modules / 4070 deps、
+  25 legacy、161 semantic）与 build 通过；超千行生产文件从 5 降到 4。
+
 ### 灯箱视口手势与命令生命周期拆分（2026-11-06）
 
 - `lightboxViewportGestureCoordinator.ts` 负责舞台 resize/rect、pointer 平移、滚轮、媒体首次适配、图库切图

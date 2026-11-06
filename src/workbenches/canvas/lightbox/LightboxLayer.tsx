@@ -42,27 +42,15 @@ import {
 } from '../toolbar/icons'
 import styles from './LightboxLayer.module.css'
 import {
-  cropBoxOf,
-  mediaBoxOf,
-} from './lightboxViewportMath'
-import {
   isTextEditingTarget,
   shouldCloseOnStageClick,
   type CompareView,
   type LightboxEditorMode,
 } from './lightboxKeyboard'
 import {
-  availableEditorModes,
-  compareHashOf,
   galleryViewOf,
-  ownerNodeOf,
 } from './lightboxGallery'
-import {
-  compareClipPathOf,
-  compareViewOf,
-  compareViewsOf,
-} from './lightboxEditState'
-import { ANNOTATE_TOOLS, EDITOR_MODES, HANDLE_POS } from './lightboxCatalog'
+import { ANNOTATE_TOOLS, HANDLE_POS } from './lightboxCatalog'
 import { GalleryThumb } from './LightboxGalleryThumb'
 import {
   createLightboxAnnotationActions,
@@ -79,6 +67,12 @@ import {
   createLightboxCommandLifecycle,
   type LightboxCommandKeyEvent,
 } from './lightboxCommandLifecycle'
+import { lightboxEditorProjectionOf } from './lightboxEditorProjection'
+import {
+  lightboxCompareAvailableOf,
+  lightboxCompareSourceOf,
+  lightboxMediaProjectionOf,
+} from './lightboxMediaProjection'
 
 function annotationCanvasBox(canvas: HTMLCanvasElement): LightboxAnnotationCanvas {
   const { left, top, width, height } = canvas.getBoundingClientRect()
@@ -118,7 +112,6 @@ export function LightboxLayer() {
   const { gallery, galleryIndex, galleryItem, hasGalleryNavigation } = galleryViewOf(lightbox)
   const { url, mime } = useAssetMeta(assetHash)
   const isVideo = (mime ?? '').startsWith('video/')
-
   const stageRef = useRef<HTMLDivElement>(null)
   const closeRef = useRef<HTMLButtonElement>(null)
   const movedRef = useRef(false)
@@ -129,93 +122,39 @@ export function LightboxLayer() {
   const previousAssetHashRef = useRef<string | undefined>(undefined)
   const preserveViewportAfterMediaLoadRef = useRef(false)
 
-  /**
-   * 两种「框选模式」（见 store 里 `lightbox` 的注释）：
-   *
-   * - `cropFor` = 提取选区（§6.23）：确认后建一张带上下文的局部图；
-   * - `faceFor` = 给情绪调节框脸（2026-10-06）：确认后**只写 `data.faceBox`**。
-   *
-   * 两者共用同一套框选交互，只有「确认之后干什么」不同。
-   *
-   * 选区存**原图像素坐标**（不是屏幕坐标）：缩放 / 平移时选区跟着图走，
-   * 不必在每次 setVp 时重算，关掉也不会串味。
-   */
-  const cropFor = lightbox?.cropFor
-  const faceFor = lightbox?.faceFor
-  /**
-   * 「裁剪」而不是「提取选区」（用户 2026-10-17，对账 #553）：同一个框选交互，
-   * 但产出**不带选区上下文** —— 按框原样切一块，融不回原图。
-   */
-  const cropPlain = lightbox?.cropPlain === true
   const [cropRect, setCropRect] = useState<FusionRect | null>(null)
   const [cropRatio, setCropRatio] = useState('')
   const [busy, setBusy] = useState(false)
   const ratioValue = ratioValueOf(cropRatio)
-
-  /**
-   * 双击打开时不再要求调用方预先把某个编辑模式塞进 store：从当前素材反查它属于哪个节点，
-   * 于是「查看 → 选区 / 标注 / 旋转」可以全在灯箱里切换。
-   * 同一 hash 被多个节点引用时取第一个；这是编辑目标，不会用来改画布结构。
-   */
-  const ownerNode = ownerNodeOf(store.getSnapshot().nodes, assetHash)
-  const ownerNodeId = ownerNode?.id ?? ''
-  const cropNodeId = cropFor ?? faceFor ?? ownerNodeId
-  const rotateNodeId = lightbox?.rotateFor ?? ownerNodeId
-  const annotateNodeId = lightbox?.annotateFor ?? ownerNodeId
-  const canCrop = !isVideo && !!cropNodeId
-  const canAnnotate = !isVideo && !!annotateNodeId
-  const canRotate = !isVideo && !!rotateNodeId
-  const cropping = (mode === 'extract' || mode === 'crop' || mode === 'face') && canCrop
-  const plainCrop = mode === 'crop'
-  const rotating = mode === 'rotate' && canRotate
-  const annotating = mode === 'annotate' && canAnnotate
-
-  /**
-   * 「对比原图」的配对从**产物节点自己**读（`GenerationData.compareWith`）。
-   *
-   * 不靠连线反推：连线是活状态（上游换图 / 删线都会变），而「这张结果是从哪张
-   * 原图融出来的」在产出那一刻就定了。读不到配对（老节点 / 素材被删）时对比入口
-   * 自动不出现 —— 不猜，也不给一个点不通的开关。
-   */
-  const compareHash = compareHashOf(
-    store.getSnapshot().nodes,
-    assetHash,
-    lightbox?.compareWith,
-  )
-  const compareAsset = useAssetMeta(compareHash ?? undefined)
-  const compareUrl = compareAsset.url
-  const compareIsVideo = (compareAsset.mime ?? '').startsWith('video/')
-  const compareKind = lightbox?.compareKind === 'pair' ? 'pair' : 'result'
   const [compareView, setCompareView] = useState<CompareView>('first')
   const [splitRatio, setSplitRatio] = useState(0.5)
-  /**
-   * **旋转与镜像**（2026-10-16 搬进灯箱，见 store 的 `openRotateEditor`）。
-   *
-   * 三件状态与老那一层完全一样（角度 / 步长 / 两个镜像），只有落点变了：
-   * 预览直接挂在灯箱自己那张 `<img>` 的 `transform` 上，于是**按住拖动平移、
-   * 滚轮缩放**这些灯箱能力天然继续可用 —— 这正是用户要的「交互不变」。
-   */
   const [angle, setAngle] = useState(0)
   const [rotateStep, setRotateStep] = useState(90)
   const [mirrorH, setMirrorH] = useState(false)
   const [mirrorV, setMirrorV] = useState(false)
   const [rotating2, setRotating2] = useState(false)
-
-  /**
-   * **标注模式**（2026-10-16 从独立的全屏层 `AnnotateLayer` 搬进灯箱，见 store 的
-   * `openAnnotateEditor`）。
-   *
-   * 落点与旋转那条**恰好相反**：旋转是把变换叠在灯箱那张 `<img>` 上；标注则是在图上
-   * 再盖一层 `<canvas>`——因为标注要**累积像素动作**（一笔一笔画），不能靠 CSS 表达。
-   *
-   * 那一层画布与灯箱那张图**同一块矩形**（都用 `box`，连 1px 描边都一样）：于是
-   * 「屏幕坐标 → 图片像素」只需要按这一块的比例换算一次，缩放 / 平移时标注自然跟图走，
-   * 而且画布尺寸本身就是**原图像素**，保存时一个换算都不用做。
-   *
-   * 手势分工（用户 2026-10-16 定的口径）：**左键在画布上画**、**中键拖动画布**、
-   * **滚轮缩放**（滚轮事件不拦，照旧冒到舞台）。左键被画占用这件事只发生在画布这一层，
-   * 所以画布只 `stopPropagation` 左键，其余按键一律放行给舞台那条通用平移。
-   */
+  const nodes = store.getSnapshot().nodes
+  const compareSource = lightboxCompareSourceOf({ nodes, assetHash, compareWith: lightbox?.compareWith, compareKind: lightbox?.compareKind })
+  const compareAsset = useAssetMeta(compareSource.compareHash ?? undefined)
+  const { compareHash, compareKind } = compareSource
+  const compareUrl = compareAsset.url
+  const compareIsVideo = (compareAsset.mime ?? '').startsWith('video/')
+  const compareAvailable = lightboxCompareAvailableOf({ compareHash: compareSource.compareHash, compareUrl: compareAsset.url, isVideo, compareIsVideo })
+  const editorProjection = lightboxEditorProjectionOf({ nodes, assetHash, isVideo, mode, lightbox, compareAvailable })
+  const mediaProjection = lightboxMediaProjectionOf({
+    assetHash, url, isVideo, compareHash: compareSource.compareHash, compareUrl: compareAsset.url,
+    compareIsVideo, compareKind: compareSource.compareKind, compareView, splitRatio, mode,
+    rotating: editorProjection.rotating, cropping: editorProjection.cropping,
+    angle, mirrorH, mirrorV, cropRect, natural, viewport: vp,
+  })
+  const {
+    cropFor, faceFor, cropPlainRequested: cropPlain, ownerNode, ownerNodeId, rotateNodeId,
+    annotateNodeId, cropping, plainCrop, rotating, annotating, availableModes,
+  } = editorProjection
+  const { view, splitActive, showSecondOnly, compareViews, compareLeftHash, compareRightHash,
+    primaryUrl, primaryIsVideo, compareClipPath, box, normalizedAngle, mediaStyle, cropBox, canConfirm,
+  } = mediaProjection
+  /** 标注画布覆盖在媒体矩形上，累积原图像素动作；左键绘制，其余指针手势留给舞台。 */
   const [annTool, setAnnTool] = useState<AnnotateTool>('brush')
   const [annColor, setAnnColor] = useState<string>(ANNOTATE_COLORS[0])
   const [annSize, setAnnSize] = useState(6)
@@ -229,8 +168,7 @@ export function LightboxLayer() {
   const annDrawingRef = useRef<AnnotateOp | null>(null)
   const annStateRef = useRef<LightboxAnnotationState | null>(null)
   annStateRef.current = {
-    tool: annTool, color: annColor, size: annSize,
-    ops: annOps, textItems: annTextItems,
+    tool: annTool, color: annColor, size: annSize, ops: annOps, textItems: annTextItems,
     selectedTextId, editingTextId, undone: annUndone,
     viewport: vp, natural, annotating, saving: annSaving,
   }
@@ -238,33 +176,24 @@ export function LightboxLayer() {
     createLightboxAnnotationActions({
       state: () => annStateRef.current!,
       getDrawing: () => annDrawingRef.current,
-      setDrawing: (drawing) => {
-        annDrawingRef.current = drawing
-      },
+      setDrawing: (drawing) => { annDrawingRef.current = drawing },
       setTextItems: setAnnTextItems, setSelectedTextId, setEditingTextId,
-      setOps: setAnnOps, setUndone: setAnnUndone,
-      setTool: setAnnTool, setSaving: setAnnSaving,
+      setOps: setAnnOps, setUndone: setAnnUndone, setTool: setAnnTool, setSaving: setAnnSaving,
       capturePointer: (pointerId) => annCanvasRef.current?.setPointerCapture(pointerId),
       scheduleTextEditing: (id) => window.setTimeout(() => setEditingTextId(id), 0),
-      createTextId: () => createId('text'),
-      subscribePointerDrag: subscribeWindowPointerDrag,
+      createTextId: () => createId('text'), subscribePointerDrag: subscribeWindowPointerDrag,
       hasNode: (nodeId) => store.getSnapshot().nodes.some((node) => node.id === nodeId), selectNode: (id) => store.setSelection([id]),
       saveAnnotation: async ({ nodeId, url, ops, textItems }) => {
         const graph = store.getSnapshot()
         const node = graph.nodes.find((candidate) => candidate.id === nodeId)
-        return node
-          ? saveAnnotatedAsset({ store, graph, node, url, ops: [...ops], textItems: [...textItems] })
-          : null
+        return node ? saveAnnotatedAsset({ store, graph, node, url, ops: [...ops], textItems: [...textItems] }) : null
       },
       close: () => store.closeLightbox(),
     }),
   )
   useEffect(() => () => annActions.dispose(), [annActions])
 
-  /**
-   * 重画那层画布：**底图不画进来**（灯箱那张 `<img>` 就在它下面），只画标注操作。
-   * 正在画的那一笔（`annDrawingRef`）也一起重放，所以拖动时是所见即所得。
-   */
+  /** 只重画标注操作；底图由灯箱 `<img>` 承担，正在画的一笔也参与回放。 */
   const redrawAnn = useCallback(() => {
     const canvas = annCanvasRef.current
     if (!canvas || !canvas.width) return
@@ -284,24 +213,18 @@ export function LightboxLayer() {
   const [commands] = useState(() => createLightboxCommandLifecycle({
     close: () => store.closeLightbox(),
     navigateGallery: (delta) => store.navigateLightbox(delta),
-    download: (hash, title) => downloadAsset(
-      { assets: platform.assets, files: platform.files },
-      hash,
-      title,
-    ),
+    download: (hash, title) => downloadAsset({ assets: platform.assets, files: platform.files }, hash, title),
     setDownloaded,
     schedule: (callback, delay) => window.setTimeout(callback, delay),
     cancelSchedule: (handle) => window.clearTimeout(handle),
     focusClose: () => closeRef.current?.focus(),
     subscribeKeydown: subscribeLightboxCommandKeydown,
     nodeHasComparePair: (hash) => store.getSnapshot().nodes.some((candidate) => {
-      const data = candidate.data as { assetHash?: unknown; compareWith?: unknown }
-      return data.assetHash === hash && typeof data.compareWith === 'string'
+      const data = candidate.data as { assetHash?: unknown; compareWith?: unknown }; return data.assetHash === hash && typeof data.compareWith === 'string'
     }),
     setMode, setAngle, setMirrorH, setMirrorV, resetAnnotation: annActions.resetAnnotation, setCropRect, setCropRatio,
     prepareRotation: (nodeId) => {
-      const graph = store.getSnapshot()
-      const node = graph.nodes.find((candidate) => candidate.id === nodeId)
+      const graph = store.getSnapshot(), node = graph.nodes.find((candidate) => candidate.id === nodeId)
       return node ? (input) => saveRotatedAsset({ store, graph, node, ...input }) : null
     },
     setRotationBusy: setRotating2,
@@ -315,7 +238,6 @@ export function LightboxLayer() {
   useEffect(() => commands.watchKeyboard({ assetHash, mode, hasGalleryNavigation }), [assetHash, commands, hasGalleryNavigation, mode])
   useEffect(() => commands.resetCropSelection(), [assetHash, commands, cropFor, faceFor])
   useEffect(() => () => commands.dispose(), [commands])
-
   /** 事件时刻的舞台矩形：不读 state，避免缩放 / 平移后拿到过期值 */
   const rectNow = (): Rect | null => {
     const r = stageRef.current?.getBoundingClientRect()
@@ -324,22 +246,17 @@ export function LightboxLayer() {
 
   const cropStateRef = useRef<LightboxCropState | null>(null)
   cropStateRef.current = {
-    cropRect, cropRatio, ratioValue, natural, viewport: vp,
-    faceFor, cropFor, ownerNodeId, plainCrop,
+    cropRect, cropRatio, ratioValue, natural, viewport: vp, faceFor, cropFor, ownerNodeId, plainCrop,
   }
   const [cropActions] = useState(() =>
     createLightboxCropActions({
       state: () => cropStateRef.current!,
       stageRect: rectNow,
       setCropRect,
-      setMoved: (value) => {
-        movedRef.current = value
-      },
+      setMoved: (value) => { movedRef.current = value },
       setBusy,
       notify: (message, tone) => store.notify(message, tone),
-      updateFaceBox: (nodeId, box) => {
-        store.dispatch({ kind: 'node.updateData', id: nodeId, patch: { faceBox: box } })
-      },
+      updateFaceBox: (nodeId, box) => { store.dispatch({ kind: 'node.updateData', id: nodeId, patch: { faceBox: box } }) },
       crop: (input) => cropAsset({ platform, store }, input),
       extract: (input) => extractSelection({ platform, store }, input),
       close,
@@ -351,20 +268,14 @@ export function LightboxLayer() {
 
   const [viewportGestures] = useState(() =>
     createLightboxViewportGestureCoordinator({
-      stageRect: rectNow,
-      setStage,
-      setNatural,
-      setViewport: setVp,
-      setCompareView,
-      setSplitRatio,
+      stageRect: rectNow, setStage, setNatural, setViewport: setVp, setCompareView, setSplitRatio,
       setMoved: (value) => { movedRef.current = value },
       previousAssetHash: () => previousAssetHashRef.current,
       setPreviousAssetHash: (value) => { previousAssetHashRef.current = value },
       setPreserveViewportAfterMediaLoad: (value) => { preserveViewportAfterMediaLoadRef.current = value },
       preserveViewportAfterMediaLoad: () => preserveViewportAfterMediaLoadRef.current,
       clearPreserveViewportAfterMediaLoad: () => { preserveViewportAfterMediaLoadRef.current = false },
-      startCrop,
-      subscribeResize: (listener) => { window.addEventListener('resize', listener); return () => window.removeEventListener('resize', listener) },
+      startCrop, subscribeResize: (listener) => { window.addEventListener('resize', listener); return () => window.removeEventListener('resize', listener) },
       subscribePointerDrag: subscribeWindowPointerDrag,
     }),
   )
@@ -374,26 +285,12 @@ export function LightboxLayer() {
   useEffect(() => viewportGestures.fitInitialViewport(natural, stage, vp), [natural, stage, vp, viewportGestures])
   useEffect(() => () => viewportGestures.dispose(), [viewportGestures])
 
-  const onAnnDown = (e: ReactPointerEvent<HTMLCanvasElement>) =>
-    annActions.pointerDown(e, annotationCanvasBox(e.currentTarget), redrawAnn)
-  const onAnnMove = (e: ReactPointerEvent<HTMLCanvasElement>) =>
-    annActions.pointerMove(e, annotationCanvasBox(e.currentTarget), redrawAnn)
+  const onAnnDown = (e: ReactPointerEvent<HTMLCanvasElement>) => annActions.pointerDown(e, annotationCanvasBox(e.currentTarget), redrawAnn)
+  const onAnnMove = (e: ReactPointerEvent<HTMLCanvasElement>) => annActions.pointerMove(e, annotationCanvasBox(e.currentTarget), redrawAnn)
   const onAnnUp = () => annActions.pointerUp(redrawAnn)
 
-  const {
-    patchTextItem,
-    deleteTextItem,
-    selectTextItem,
-    startTextMove,
-    startTextResize,
-    undoAnn,
-    redoAnn,
-  } = annActions
-
-  useEffect(
-    () => commands.watchAnnotationDelete({ annotating, selectedTextId, editingTextId }),
-    [annotating, commands, editingTextId, selectedTextId],
-  )
+  const { patchTextItem, deleteTextItem, selectTextItem, startTextMove, startTextResize, undoAnn, redoAnn } = annActions
+  useEffect(() => commands.watchAnnotationDelete({ annotating, selectedTextId, editingTextId }), [annotating, commands, editingTextId, selectedTextId])
 
   const onWheel = (e: ReactWheelEvent) => viewportGestures.wheel(e, vp)
   const onPointerDown = (e: ReactPointerEvent) => viewportGestures.pointerDown(e, { viewport: vp, cropping })
@@ -402,60 +299,14 @@ export function LightboxLayer() {
 
   const placed = natural !== null && vp !== null
   const settleNaturalSize = (w: number, h: number) => viewportGestures.settleMediaSize(w, h, vp)
-  const box = placed ? mediaBoxOf(natural, vp) : undefined
-  /**
-   * 旋转模式：预览直接挂在灯箱这张图上（用户 2026-10-16：「交互不变，可以拖动，缩放」）——
-   * `box` 管的是它在舞台里的矩形，`transform` 只叠在自己身上，两者不冲突。
-   */
-  const normalizedAngle = ((angle % 360) + 360) % 360
-  const mediaStyle =
-    rotating && box
-      ? {
-          ...box,
-          transformOrigin: '50% 50%',
-          transform: `rotate(${angle}deg) scaleX(${mirrorH ? -1 : 1}) scaleY(${mirrorV ? -1 : 1})`,
-        }
-      : box
-  /** 选区框：同一套世界 → 屏幕换算（与媒体框同源，缩放平移时不会漂） */
-  const cropBox = placed ? cropBoxOf(cropRect, vp) : undefined
-  /**
-   * 「确认」可用：两种框选模式共用同一套判据（拖了一个够大的框）。
-   * 短边下限仍是 `FUSION_MIN_EDGE` —— 它管的是「这个框是认真拖的，不是误触」，
-   * 与框完之后是建局部图还是写人脸框无关。
-   */
-  const canConfirm =
-    cropping && !!cropRect && Math.min(cropRect.w, cropRect.h) >= FUSION_MIN_EDGE
 
-  const saveRotation = () => commands.saveRotation({
-    nodeId: rotateNodeId,
-    url: primaryUrl ?? undefined,
-    busy: rotating2,
-    angle,
-    mirrorH,
-    mirrorV,
-  })
+  const saveRotation = () => commands.saveRotation({ nodeId: rotateNodeId, url: primaryUrl ?? undefined, busy: rotating2, angle, mirrorH, mirrorV })
   const saveAnnotation = () => commands.saveAnnotation(annotateNodeId, url ?? undefined)
   const download = () => commands.download(assetHash, ownerNode?.title)
 
-  /** 有真实配对、两边都是图才给「对比」入口；是否处于该模式由 `mode` 决定。 */
-  const compareAvailable = !!compareHash && !!compareUrl && !isVideo && !compareIsVideo
-  const view = compareViewOf(mode, compareAvailable, compareView)
-  const splitActive = view === 'split'
-  const showSecondOnly = view === 'second'
-  const compareViews = compareViewsOf(compareKind)
-  const compareLeftHash = compareKind === 'pair' ? assetHash : compareHash
-  const compareRightHash = compareKind === 'pair' ? compareHash : assetHash
-  /** 主图：切到第二张时换成 compareWith（整块几何仍按 assetHash 那张算） */
-  const primaryUrl = showSecondOnly ? (compareUrl ?? url) : url
-  const primaryIsVideo = showSecondOnly ? compareIsVideo : isVideo
-  const compareClipPath = compareClipPathOf(compareKind, splitRatio)
   const startSplitDrag = (e: ReactPointerEvent) => viewportGestures.startSplitDrag(e, { mediaBox: box, splitRatio })
 
   const selectedTextItem = annTextItems.find((item) => item.id === selectedTextId) ?? null
-  const availableModeIds = new Set(
-    availableEditorModes({ canCrop, canAnnotate, canRotate, compareAvailable, faceFor }),
-  )
-  const availableModes = EDITOR_MODES.filter((m) => availableModeIds.has(m.id))
 
   return (
     <div

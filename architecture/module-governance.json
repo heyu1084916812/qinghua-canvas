@@ -442,7 +442,7 @@
       "test": [
         "scripts/smoke.mjs#G795"
       ],
-      "budget": 1148
+      "budget": 999
     },
     {
       "module": "src/workbenches/canvas/panels/CreationPanel.module.css",
@@ -4850,6 +4850,54 @@
         "src/workbenches/canvas/lightbox/lightboxCommandLifecycle.test.ts"
       ],
       "budget": 184
+    },
+    {
+      "module": "src/workbenches/canvas/lightbox/lightboxEditorProjection.ts",
+      "owner": "canvas-lightbox-editor-projection",
+      "responsibility": "从灯箱状态与画布节点快照投影 owner、编辑目标、媒体能力和可用编辑模式。",
+      "owns": [
+        "素材 owner 与裁剪/旋转/标注目标解析",
+        "图片/视频编辑能力与当前编辑模式判定",
+        "可用编辑模式列表投影"
+      ],
+      "doesNotOwn": [
+        "React state/refs 与页面生命周期",
+        "编辑动作、保存链路和画布节点写入",
+        "灯箱 JSX/DOM/CSS 与用户界面结构"
+      ],
+      "publicApi": [
+        "LightboxEditorProjectionInput",
+        "lightboxEditorProjectionOf"
+      ],
+      "test": [
+        "src/workbenches/canvas/lightbox/lightboxEditorProjection.test.ts"
+      ],
+      "budget": 65
+    },
+    {
+      "module": "src/workbenches/canvas/lightbox/lightboxMediaProjection.ts",
+      "owner": "canvas-lightbox-media-projection",
+      "responsibility": "投影灯箱对比来源、主媒体、媒体框、旋转样式、裁剪框与确认条件。",
+      "owns": [
+        "对比 hash/类型/可用性/档位与主媒体投影",
+        "媒体框、旋转 transform 与裁剪框几何投影",
+        "框选确认阈值判定"
+      ],
+      "doesNotOwn": [
+        "React state/refs 与页面生命周期",
+        "画布几何数学、Store 和 Platform 实现",
+        "灯箱 JSX/DOM/CSS 与用户界面结构"
+      ],
+      "publicApi": [
+        "lightboxCompareSourceOf",
+        "lightboxCompareAvailableOf",
+        "LightboxMediaProjectionInput",
+        "lightboxMediaProjectionOf"
+      ],
+      "test": [
+        "src/workbenches/canvas/lightbox/lightboxMediaProjection.test.ts"
+      ],
+      "budget": 114
     }
   ]
 }
