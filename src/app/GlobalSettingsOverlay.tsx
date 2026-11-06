@@ -1,21 +1,4 @@
 import { lazy, Suspense, useEffect, useState, useSyncExternalStore, type ComponentType } from 'react'
-import { SettingsPage } from '../pages/SettingsPage/SettingsPage'
-import { StoragePanel } from '../features/settings/StoragePanel'
-import { CliPanel } from '../features/settings/CliPanel'
-import { FontManagerPanel } from '../features/settings/FontManagerPanel'
-import { CanvasLookPanel } from '../features/settings/CanvasLookPanel'
-import { ThemePanel } from '../features/settings/ThemePanel'
-import { ShortcutsPanel } from '../features/settings/ShortcutsPanel'
-import { SnapshotsPanel } from '../features/settings/SnapshotsPanel'
-import { PackPanel } from '../features/settings/PackPanel'
-import { HelpPanel } from '../features/settings/HelpPanel'
-import { AboutPanel } from '../features/settings/AboutPanel'
-import { DefaultParamsPanel } from '../features/settings/DefaultParamsPanel'
-import { AgentMemoryPanel } from '../features/settings/AgentMemoryPanel'
-import { AgentSettingsPanel } from '../features/settings/AgentSettingsPanel'
-import { AllLogsPanel } from '../features/settings/AllLogsPanel'
-import { NotifyPanel } from '../features/settings/NotifyPanel'
-import { BackupPanel } from '../features/settings/BackupPanel'
 import { IconClose } from './AppSidebarIcons'
 import {
   IconAbout,
@@ -50,6 +33,73 @@ import styles from './GlobalSettingsOverlay.module.css'
 
 const HostingPage = lazy(() =>
   import('../pages/HostingPage/HostingPage').then((m) => ({ default: m.HostingPage })),
+)
+const SettingsPage = lazy(() =>
+  import('../pages/SettingsPage/SettingsPage').then((m) => ({ default: m.SettingsPage })),
+)
+const StoragePanel = lazy(() =>
+  import('../features/settings/StoragePanel').then((m) => ({ default: m.StoragePanel })),
+)
+const CliPanel = lazy(() =>
+  import('../features/settings/CliPanel').then((m) => ({ default: m.CliPanel })),
+)
+const FontManagerPanel = lazy(() =>
+  import('../features/settings/FontManagerPanel').then((m) => ({
+    default: m.FontManagerPanel,
+  })),
+)
+const CanvasLookPanel = lazy(() =>
+  import('../features/settings/CanvasLookPanel').then((m) => ({
+    default: m.CanvasLookPanel,
+  })),
+)
+const ThemePanel = lazy(() =>
+  import('../features/settings/ThemePanel').then((m) => ({ default: m.ThemePanel })),
+)
+const ShortcutsPanel = lazy(() =>
+  import('../features/settings/ShortcutsPanel').then((m) => ({
+    default: m.ShortcutsPanel,
+  })),
+)
+const SnapshotsPanel = lazy(() =>
+  import('../features/settings/SnapshotsPanel').then((m) => ({
+    default: m.SnapshotsPanel,
+  })),
+)
+const PackPanel = lazy(() =>
+  import('../features/settings/PackPanel').then((m) => ({ default: m.PackPanel })),
+)
+const HelpPanel = lazy(() =>
+  import('../features/settings/HelpPanel').then((m) => ({ default: m.HelpPanel })),
+)
+const AboutPanel = lazy(() =>
+  import('../features/settings/AboutPanel').then((m) => ({ default: m.AboutPanel })),
+)
+const DefaultParamsPanel = lazy(() =>
+  import('../features/settings/DefaultParamsPanel').then((m) => ({
+    default: m.DefaultParamsPanel,
+  })),
+)
+const AgentMemoryPanel = lazy(() =>
+  import('../features/settings/AgentMemoryPanel').then((m) => ({
+    default: m.AgentMemoryPanel,
+  })),
+)
+const AgentSettingsPanel = lazy(() =>
+  import('../features/settings/AgentSettingsPanel').then((m) => ({
+    default: m.AgentSettingsPanel,
+  })),
+)
+const AllLogsPanel = lazy(() =>
+  import('../features/settings/AllLogsPanel').then((m) => ({
+    default: m.AllLogsPanel,
+  })),
+)
+const NotifyPanel = lazy(() =>
+  import('../features/settings/NotifyPanel').then((m) => ({ default: m.NotifyPanel })),
+)
+const BackupPanel = lazy(() =>
+  import('../features/settings/BackupPanel').then((m) => ({ default: m.BackupPanel })),
 )
 
 /**
@@ -284,41 +334,39 @@ export function GlobalSettingsOverlay() {
               </p>
             </header>
             <div className={styles.sectionBody} data-settings-section-body>
-              {section === 'channels' && <SettingsPage key="channels" embedded />}
-              {section === 'cli' && <CliPanel key="cli" />}
-              {section === 'hosting' && (
-                <Suspense fallback={null}>
-                  <HostingPage key="hosting" />
-                </Suspense>
-              )}
-              {section === 'storage' && <StoragePanel key="storage" />}
-              {section === 'allLogs' && <AllLogsPanel key="allLogs" />}
-              {section === 'appearance' && <ThemePanel key="appearance" />}
-              {section === 'typography' && <FontManagerPanel key="typography" />}
-              {section === 'canvasLook' && <CanvasLookPanel key="canvasLook" />}
-              {/* 「备份与恢复」（对账 #378）：全量备份导出 / 导入。
-                  与「存储」分栏：一个回答"在哪"，一个回答"出事怎么办"。 */}
-              {section === 'backup' && <BackupPanel key="backup" />}
-              {section === 'snapshots' && <SnapshotsPanel key="snapshots" />}
-              {/* 「扩展包」（对账 #386 阶段一）：只装数据（技能 + 电商平台规则），不执行代码 */}
-              {section === 'packs' && <PackPanel key="packs" />}
-              {/* 「默认参数」（对账 #386 的 E4）：默认模型 / 比例 / 画质 / 张数 + 记住上次参数 */}
-              {section === 'defaults' && <DefaultParamsPanel key="defaults" />}
-              {section === 'agent' && (
-                <AgentSettingsPanel
-                  key="agent"
-                  tab={agentTab}
-                  onTabChange={(tab) => openGlobalSettings('agent', tab)}
-                />
-              )}
-              {section === 'agentMemory' && <AgentMemoryPanel key="agentMemory" />}
-              {/* 「通知」（对账 #386 的 E5）：完成 / 失败 / 批量进度三档 + 系统通知能力说明 */}
-              {section === 'notify' && <NotifyPanel key="notify" />}
-              {/* 「帮助」（对账 #388 / E7）：快捷键 / 常见问题 / 版本 + 重看新手引导 */}
-              {section === 'help' && <HelpPanel key="help" />}
-              {section === 'shortcuts' && <ShortcutsPanel key="shortcuts" />}
-              {/* 「关于与隐私」（对账 #386 的 E6）：五段如实说明 + 隐私声明 */}
-              {section === 'about' && <AboutPanel key="about" />}
+              <Suspense fallback={null}>
+                {section === 'channels' && <SettingsPage key="channels" embedded />}
+                {section === 'cli' && <CliPanel key="cli" />}
+                {section === 'hosting' && <HostingPage key="hosting" />}
+                {section === 'storage' && <StoragePanel key="storage" />}
+                {section === 'allLogs' && <AllLogsPanel key="allLogs" />}
+                {section === 'appearance' && <ThemePanel key="appearance" />}
+                {section === 'typography' && <FontManagerPanel key="typography" />}
+                {section === 'canvasLook' && <CanvasLookPanel key="canvasLook" />}
+                {/* 「备份与恢复」（对账 #378）：全量备份导出 / 导入。
+                    与「存储」分栏：一个回答"在哪"，一个回答"出事怎么办"。 */}
+                {section === 'backup' && <BackupPanel key="backup" />}
+                {section === 'snapshots' && <SnapshotsPanel key="snapshots" />}
+                {/* 「扩展包」（对账 #386 阶段一）：只装数据（技能 + 电商平台规则），不执行代码 */}
+                {section === 'packs' && <PackPanel key="packs" />}
+                {/* 「默认参数」（对账 #386 的 E4）：默认模型 / 比例 / 画质 / 张数 + 记住上次参数 */}
+                {section === 'defaults' && <DefaultParamsPanel key="defaults" />}
+                {section === 'agent' && (
+                  <AgentSettingsPanel
+                    key="agent"
+                    tab={agentTab}
+                    onTabChange={(tab) => openGlobalSettings('agent', tab)}
+                  />
+                )}
+                {section === 'agentMemory' && <AgentMemoryPanel key="agentMemory" />}
+                {/* 「通知」（对账 #386 的 E5）：完成 / 失败 / 批量进度三档 + 系统通知能力说明 */}
+                {section === 'notify' && <NotifyPanel key="notify" />}
+                {/* 「帮助」（对账 #388 / E7）：快捷键 / 常见问题 / 版本 + 重看新手引导 */}
+                {section === 'help' && <HelpPanel key="help" />}
+                {section === 'shortcuts' && <ShortcutsPanel key="shortcuts" />}
+                {/* 「关于与隐私」（对账 #386 的 E6）：五段如实说明 + 隐私声明 */}
+                {section === 'about' && <AboutPanel key="about" />}
+              </Suspense>
             </div>
           </div>
         </div>

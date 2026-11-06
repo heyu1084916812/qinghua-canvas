@@ -33,7 +33,6 @@ export interface QhEdgeData extends Record<string, unknown> {
  *    点一下删掉这条边。RF 的坐标是**流坐标**（随缩放变化），而按钮要恒定大小 ⇒ 按 1/zoom 反向缩放。
  */
 function QhEdgeInner(props: EdgeProps) {
-  const zoom = useStore((s) => s.transform[2])
   const data = props.data as QhEdgeData | undefined
   // 第 2 个返回值就是贝塞尔 t=0.5 的点（标签位置），正好是删除按钮该待的地方
   const [path, midX, midY] = getBezierPath({
@@ -66,25 +65,47 @@ function QhEdgeInner(props: EdgeProps) {
         data-edge-hit={props.id}
       />
       {active && (
-        <g
-          className={styles.deleteBtn}
-          data-edge-delete={props.id}
-          transform={`translate(${midX}, ${midY}) scale(${1 / (zoom || 1)})`}
-          onPointerDown={(e) => e.stopPropagation()}
-          onClick={(e) => {
-            e.stopPropagation()
-            data?.onDelete(props.id)
-          }}
-        >
-          <circle className={styles.deleteCircle} r={9} />
-          <path className={styles.deleteCross} d="M -3.5 -3.5 L 3.5 3.5 M 3.5 -3.5 L -3.5 3.5" />
-        </g>
+        <QhEdgeDeleteButton
+          id={props.id}
+          midX={midX}
+          midY={midY}
+          onDelete={data?.onDelete}
+        />
       )}
     </>
   )
 }
 
 export const QhEdge = memo(QhEdgeInner)
+
+function QhEdgeDeleteButton({
+  id,
+  midX,
+  midY,
+  onDelete,
+}: {
+  id: string
+  midX: number
+  midY: number
+  onDelete: ((id: string) => void) | undefined
+}) {
+  const zoom = useStore((state) => state.transform[2])
+  return (
+    <g
+      className={styles.deleteBtn}
+      data-edge-delete={id}
+      transform={`translate(${midX}, ${midY}) scale(${1 / (zoom || 1)})`}
+      onPointerDown={(event) => event.stopPropagation()}
+      onClick={(event) => {
+        event.stopPropagation()
+        onDelete?.(id)
+      }}
+    >
+      <circle className={styles.deleteCircle} r={9} />
+      <path className={styles.deleteCross} d="M -3.5 -3.5 L 3.5 3.5 M 3.5 -3.5 L -3.5 3.5" />
+    </g>
+  )
+}
 
 export const QhCoarseEdge = memo(function QhCoarseEdge(props: EdgeProps) {
   const data = props.data as QhEdgeData | undefined

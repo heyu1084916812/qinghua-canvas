@@ -5,7 +5,7 @@
 // 前端资源内嵌进 exe、没有 dev 服务器兜底、`__APP_VERSION__` 由构建时注入、
 // 11.7 MB 的 mediapipe wasm 也在包里。这些差异只在 release 里才暴露。
 //
-// 它验的七件事（每条都读**磁盘或页面里的真值**，不读"意图"）：
+// 它验的八件事（每条都读**磁盘或页面里的真值**，不读"意图"）：
 //   ① 跑的是内嵌前端（`http://tauri.localhost`），不是 :1420 的开发服务器；
 //   ② 平台判定是 desktop；
 //   ③ 首屏 + 首次引导能渲染、能关掉；项目页能把**真库里的项目**渲染成卡片；
@@ -13,6 +13,7 @@
 //   ⑤ mediapipe wasm 能从包里取到且字节数与 dist 一致；
 //   ⑥ 产品文件夹内的 `data-v2\` 自动创建且直接使用 SQLite V2。
 //   ⑦ 随包 FFmpeg 能从安装布局解析并真实编码 H.264 MP4。
+//   ⑧ 安装布局内的 `canvas-mcp.ps1` 能真实完成 MCP stdio 三步骤。
 //
 // 隔离：把 exe 拷到 `<工作区>/.playwright-verify/release-shell/app/` 再跑，
 // 于是 Rust 的「产品文件夹内 data-v2」规则生效（闸门 0 只对
@@ -135,6 +136,31 @@ function check(name, ok, detail = '') {
   results.push({ name, ok, detail })
   console.log(`${ok ? '✅' : '❌'} ${name}${detail ? ` — ${detail}` : ''}`)
 }
+
+// 随包资源必须真的被复制到安装布局，并用 stdio 客户端跑完三个协议步骤。
+const packagedCanvasMcp = path.join(appDir, 'resources', 'canvas-mcp.ps1')
+const canvasMcpProbe = spawnSync(
+  process.execPath,
+  [path.join(ROOT, 'scripts/test-canvas-mcp.mjs')],
+  {
+    cwd: ROOT,
+    env: {
+      ...process.env,
+      QH_CANVAS_MCP_ADAPTER: packagedCanvasMcp,
+    },
+    encoding: 'utf8',
+    timeout: 30_000,
+  },
+)
+check(
+  '安装布局内的 Canvas MCP stdio 适配器可执行',
+  existsSync(packagedCanvasMcp) &&
+    canvasMcpProbe.status === 0 &&
+    !canvasMcpProbe.error,
+  canvasMcpProbe.error
+    ? String(canvasMcpProbe.error)
+    : (canvasMcpProbe.stdout || canvasMcpProbe.stderr || '').trim(),
+)
 
 /**
  * release 构建带着 `windows_subsystem = "windows"`（`src-tauri/src/main.rs` 第一行），

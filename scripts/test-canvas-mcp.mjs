@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 import { spawn } from 'node:child_process'
-import { createServer } from 'node:http'
 import path from 'node:path'
 import process from 'node:process'
+import { startCanvasMcpGateway } from './canvas-mcp-test-fixture.mjs'
 
 if (process.platform !== 'win32') {
   console.log('canvas MCP stdio test skipped: Windows PowerShell is not available')
@@ -10,64 +10,9 @@ if (process.platform !== 'win32') {
 }
 
 const root = path.resolve(import.meta.dirname, '..')
-const adapter = path.join(root, 'src-tauri', 'resources', 'canvas-mcp.ps1')
-const token = 'canvas-mcp-test-token'
-let actionCalls = 0
-
-const server = createServer((request, response) => {
-  if (request.headers.authorization !== `Bearer ${token}`) {
-    response.writeHead(401).end()
-    return
-  }
-  if (request.method === 'GET' && request.url === '/capabilities') {
-    response.writeHead(200, { 'content-type': 'application/json' }).end(
-      JSON.stringify({
-        ok: true,
-        result: {
-          tools: [
-            {
-              name: 'readGraph',
-              description: 'Read the current canvas graph',
-              inputSchema: { type: 'object', properties: {} },
-            },
-          ],
-          denied: ['deleteNodes'],
-        },
-      }),
-    )
-    return
-  }
-  if (request.method === 'POST' && request.url === '/action') {
-    let body = ''
-    request.on('data', (chunk) => {
-      body += chunk
-    })
-    request.on('end', () => {
-      const parsed = JSON.parse(body)
-      actionCalls += 1
-      response.writeHead(200, { 'content-type': 'application/json' }).end(
-        JSON.stringify({
-          ok: true,
-          result: {
-            tool: parsed.name,
-            idempotencyKey: parsed.idempotencyKey,
-            nodes: 2,
-          },
-        }),
-      )
-    })
-    return
-  }
-  response.writeHead(404).end()
-})
-
-function listen() {
-  return new Promise((resolve, reject) => {
-    server.once('error', reject)
-    server.listen(0, '127.0.0.1', () => resolve(server.address().port))
-  })
-}
-
+const adapter =
+  process.env.QH_CANVAS_MCP_ADAPTER ??
+  path.join(root, 'src-tauri', 'resources', 'canvas-mcp.ps1')
 function waitForExit(child) {
   return new Promise((resolve, reject) => {
     child.once('error', reject)
@@ -78,8 +23,8 @@ function waitForExit(child) {
   })
 }
 
+const fixture = await startCanvasMcpGateway()
 try {
-  const port = await listen()
   const child = spawn(
     'powershell.exe',
     ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', adapter],
@@ -87,8 +32,8 @@ try {
       cwd: root,
       env: {
         ...process.env,
-        QINGHUA_CANVAS_URL: `http://127.0.0.1:${port}`,
-        QINGHUA_CANVAS_TOKEN: token,
+        QINGHUA_CANVAS_URL: fixture.url,
+        QINGHUA_CANVAS_TOKEN: fixture.token,
       },
       stdio: ['pipe', 'pipe', 'pipe'],
     },
@@ -163,8 +108,8 @@ try {
       `canvas MCP tools/call did not return the gateway result: ${JSON.stringify(called)}`,
     )
   }
-  if (actionCalls !== 1) {
-    throw new Error(`canvas MCP forwarded ${actionCalls} actions instead of one`)
+  if (fixture.actionCalls() !== 1) {
+    throw new Error(`canvas MCP forwarded ${fixture.actionCalls()} actions instead of one`)
   }
 
   child.stdin.end()
@@ -172,5 +117,5 @@ try {
   if (stderr.trim()) throw new Error(`canvas MCP wrote stderr: ${stderr.trim()}`)
   console.log('canvas MCP stdio passed: initialize, tools/list, tools/call')
 } finally {
-  server.close()
+  await fixture.close()
 }

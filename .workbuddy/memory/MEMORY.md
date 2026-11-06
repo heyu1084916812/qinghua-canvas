@@ -27,6 +27,19 @@
 - 最终门禁：`npm run check`、`npm run build`、Rust 63 tests、全量 Vitest 608 files / 5271 tests（1 skipped）
   与 Impeccable detector 0 findings 通过。构建仍保留 CanvasPage 602KB、主入口 747KB 两个 >500KB warning。
 
+### Canvas 生产性能、MCP harness 与设置拆包（2026-11-07）
+
+- `npm run perf:canvas:production` 必须用真实 Tauri release + WebView2 + 1440×900 + 隔离 store；当前
+  300 节点 / 500 连线全挂载，连续两次复跑的各 3 轮 P95 都在 13.9–14.4ms，页面异常 0。
+  `QhEdge` 不能每条边都订阅 zoom；只有高亮态删除按钮需要订阅，否则 500 条普通边会随缩放一起重渲染。
+  不要再用 DEV-only `__seedPerfGraph` 或 headless preview 的帧率代表用户侧生产性能。
+- 全局设置重面板必须按栏目 lazy：`GlobalSettingsOverlay` 统一 Suspense，`routes.tsx` 的 Settings/Assets/Projects
+  也走懒加载。主入口从约 747KB 降到 393KB；CanvasPage 仍约 603KB，是剩余唯一 >500KB chunk。
+- 官方 MCP Inspector 是独立 harness 门禁：`npm run test:canvas-mcp:inspector` 走真实 PowerShell stdio，
+  并保存 `.playwright-verify/canvas-mcp-inspector.json`。Codex CLI 本机存在但未登录，不能把“有命令”冒充登录态联调。
+- release 布局必须验证 `resources/canvas-mcp.ps1`，并跑 NSIS 真启动；当前 `release-desktop.mjs` 12/12 通过，
+  但有登录态的 Codex / Claude Code 对真实 Tauri 画布调用仍是外部验收缺口。
+
 ### 存储面板分阶段读取（2026-11-07 → 对账 #952）
 
 - `StoragePanel` 的概览读取归 `storageOverviewRefresh.ts`：第一阶段读取占用、项目数、数据目录/根类型；

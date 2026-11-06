@@ -1,9 +1,6 @@
 import { lazy, Suspense } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { HomePage } from '../pages/HomePage/HomePage'
-import { ProjectsPage } from '../pages/ProjectsPage/ProjectsPage'
-import { AssetsPage } from '../pages/AssetsPage/AssetsPage'
-import { SettingsPage } from '../pages/SettingsPage/SettingsPage'
 
 /**
  * 路由表（react-router-dom v7，架构 §3）。
@@ -59,6 +56,18 @@ const InspirationPage = lazy(() =>
   import('../pages/InspirationPage/InspirationPage').then((m) => ({
     default: m.InspirationPage,
   })),
+)
+
+const ProjectsPage = lazy(() =>
+  import('../pages/ProjectsPage/ProjectsPage').then((m) => ({ default: m.ProjectsPage })),
+)
+
+const AssetsPage = lazy(() =>
+  import('../pages/AssetsPage/AssetsPage').then((m) => ({ default: m.AssetsPage })),
+)
+
+const SettingsPage = lazy(() =>
+  import('../pages/SettingsPage/SettingsPage').then((m) => ({ default: m.SettingsPage })),
 )
 
 /**
