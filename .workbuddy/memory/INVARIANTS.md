@@ -1,5 +1,15 @@
 # CanvasFlow 不变量详表
 
+## 电商草稿动作边界（2026-11-06）
+
+- `pageDraftActionCoordinator.ts` 只拥有草稿/节点恢复、上传引用清理和 500ms 自动保存；React state/refs、
+  预览 JSX、Store 与平台实例仍归宿主。纯模块只返回 `{nodeId, hash, kind}`，不得 import React 或拼 JSX。
+- 恢复必须并行读草稿和节点；节点有 assetHash 时优先，节点缺失才查 assets；清理后才能回写，引用没有变化不得写。
+  自动保存只能有一个 timer owner：替换输入先取消旧 timer，`pagehide` flush，卸载 dispose 并保存最新草稿。
+- 草稿拆分必须保持 `EcommercePage` render-after 89 行及
+  `A0F3C6A34DC95A5B3002C0980132290991C5501CBF6907DE7D6AB600035E1972` 不变；改 JSX/DOM/CSS/文案时立即转
+  「涉及 UI」门禁。宿主预算不得回涨到 1000 行以上。
+
 ## 电商生成动作边界（2026-11-06）
 
 - `pageGenerationActionCoordinator.ts` 只拥有生成计划、分镜请求、渠道选路、任务/RunPlan、后台 reconcile/轮询、

@@ -34,10 +34,7 @@ import { createEcommerceTaskRepository } from '../../state/project/ecommerceTask
 import { createAssetLibraryRepository } from '../../state/project/assetLibraryRepository'
 import { createEcommerceCanvasRepository } from '../../state/project/ecommerceCanvasRepository'
 import type { EcommerceCanvasItem } from '../../domain/ecommerce/canvasItem'
-import {
-  cleanEcommerceDraftRefs,
-  type EcommerceFormDraft,
-} from '../../domain/ecommerce/draft'
+import type { EcommerceFormDraft } from '../../domain/ecommerce/draft'
 import type { EcommerceResultRecord, EcommerceTaskRecord } from '../../domain/ecommerce/tasks'
 import {
   ECOMMERCE_PLATFORMS,
@@ -81,6 +78,10 @@ import {
 } from './ecommercePage/pageResultActionCoordinator'
 import { createPagePlanningActionCoordinator } from './ecommercePage/pagePlanningActionCoordinator'
 import { createPageGenerationActionCoordinator } from './ecommercePage/pageGenerationActionCoordinator'
+import {
+  createEcommercePageDraftActionCoordinator,
+  type EcommerceDraftUploadProjection,
+} from './ecommercePage/pageDraftActionCoordinator'
 
 /**
  * 电商工作台页（对账 #384 的 D3/D4/D5/D6）。
@@ -201,6 +202,12 @@ function ResultPreview({ hash, mime }: { hash: string; mime?: string }) {
   return <img src={meta.url} alt="" />
 }
 
+function restoredUploadsOf(
+  uploads: readonly EcommerceDraftUploadProjection[],
+): EcommerceUpload[] {
+  return uploads.map(({ nodeId, hash }) => ({ nodeId, hash, preview: <ResultPreview hash={hash} /> }))
+}
+
 function StudioHost({ projectId }: { projectId: string }) {
   const platform = usePlatform()
   const channels = useChannels()
@@ -274,17 +281,37 @@ function StudioHost({ projectId }: { projectId: string }) {
    * 渠道拉回来的裸模型名不进这个列表，理由见 `modelCatalog` 的注释（对账 #371）。
    */
   const [model, setModel] = useState('')
-  /**
-   * 左侧草稿（对账 #477）：`undefined` = 还在读，`null` = 这个项目还没有草稿。
-   * 读出来之前不渲染工作台，避免先闪一版默认值再把用户上传的图顶掉。
-   */
+  /** `undefined` = 读取中，`null` = 无草稿；读取完成前不渲染工作台。 */
   const [savedDraft, setSavedDraft] = useState<EcommerceFormDraft | null | undefined>(undefined)
   const [initialUploads, setInitialUploads] = useState<{
     products: EcommerceUpload[]
     references: EcommerceUpload[]
   }>({ products: [], references: [] })
-  const draftTimer = useRef<number | null>(null)
   const draftLatest = useRef<EcommerceFormDraft | null>(null)
+  const draftActions = useMemo(
+    () =>
+      createEcommercePageDraftActionCoordinator({
+        projectId,
+        repository: {
+          load: (id) => loadEcommerceDraft(platform.storage, id),
+          nodes: async (id) =>
+            (await platform.storage.query('nodes', { projectId: id })) as unknown as LegacyGenerationNode[],
+          save: (id, draft) => saveEcommerceDraft(platform.storage, id, draft),
+        },
+        assets: platform.assets,
+        scheduler: {
+          setTimeout: (callback, milliseconds) => window.setTimeout(callback, milliseconds),
+          clearTimeout: (timer) => window.clearTimeout(timer),
+        },
+        state: {
+          getLatest: () => draftLatest.current,
+          setLatest: (draft) => {
+            draftLatest.current = draft
+          },
+        },
+      }),
+    [platform, projectId],
+  )
   /** 长图面板开不开（对账 #420）：纯 UI 态，不落库 */
   const [longOpen, setLongOpen] = useState(false)
   /**
@@ -422,83 +449,24 @@ function StudioHost({ projectId }: { projectId: string }) {
     }
   }, [platform, projectId])
 
-  /**
-   * 读回左侧草稿，并顺手清理悬空上传引用：
-   * 草稿记着 node_1，但那个节点已被删 ⇒ 这一项不能放回表单（否则会得到一个
-   * 点生成才发现"产品图不存在"的假恢复）。清理结果同步写回，保持库与界面一致。
-   */
+  /** 读回草稿；悬空引用由协调器清理，宿主只应用可渲染的投影。 */
   useEffect(() => {
     let cancelled = false
     void (async () => {
-      const [draft, rows] = await Promise.all([
-        loadEcommerceDraft(platform.storage, projectId),
-        platform.storage.query('nodes', { projectId }),
-      ])
-      if (cancelled) return
-      const nodes = rows as unknown as LegacyGenerationNode[]
-      const byId = new Map(nodes.map((n) => [n.id, n]))
-      const draftIds = [
-        ...new Set([
-          ...(draft?.productNodeIds ?? []),
-          ...(draft?.referenceNodeIds ?? []),
-        ]),
-      ]
-      const assetIds = new Set<string>()
-      await Promise.all(
-        draftIds.map(async (id) => {
-          if (byId.has(id)) return
-          if (await platform.assets.read(id)) assetIds.add(id)
-        }),
-      )
-      if (cancelled) return
-      const uploadOf = (uploadId: string | null | undefined): EcommerceUpload | null => {
-        if (!uploadId) return null
-        const node = byId.get(uploadId)
-        const hash = node ? legacyAssetHashesOfNode(node)[0] : undefined
-        if (hash) {
-          return { nodeId: uploadId, hash, preview: <ResultPreview hash={hash} /> }
-        }
-        if (assetIds.has(uploadId)) {
-          return {
-            nodeId: uploadId,
-            hash: uploadId,
-            preview: <ResultPreview hash={uploadId} />,
-          }
-        }
-        return null
-      }
-      const validNodeIds = new Set(
-        [
-          ...nodes
-            .filter((node) => legacyAssetHashesOfNode(node).length > 0)
-            .map((node) => node.id),
-          ...assetIds,
-        ],
-      )
-      const cleaned = draft ? cleanEcommerceDraftRefs(draft, validNodeIds) : null
-      const products = (cleaned?.productNodeIds ?? [])
-        .map((id) => uploadOf(id))
-        .filter((item): item is EcommerceUpload => item !== null)
-      const references = (cleaned?.referenceNodeIds ?? [])
-        .map((id) => uploadOf(id))
-        .filter((item): item is EcommerceUpload => item !== null)
-      if (cleaned) setModel(cleaned.model)
-      setInitialUploads({ products, references })
-      setSavedDraft(cleaned)
-      draftLatest.current = cleaned
-      if (
-        draft &&
-        cleaned &&
-        (draft.productNodeIds.join('|') !== cleaned.productNodeIds.join('|') ||
-          draft.referenceNodeIds.join('|') !== cleaned.referenceNodeIds.join('|'))
-      ) {
-        void saveEcommerceDraft(platform.storage, projectId, cleaned)
-      }
+      const restored = await draftActions.restore(() => cancelled)
+      if (!restored || cancelled) return
+      if (restored.draft) setModel(restored.draft.model)
+      setInitialUploads({
+        products: restoredUploadsOf(restored.products),
+        references: restoredUploadsOf(restored.references),
+      })
+      setSavedDraft(restored.draft)
+      draftLatest.current = restored.draft
     })()
     return () => {
       cancelled = true
     }
-  }, [platform, projectId])
+  }, [draftActions])
 
   /** 从自己的结果表读回最近一批；老项目没有任务行时 `taskLoaded=true` + 空任务走节点兜底。 */
   useEffect(() => {
@@ -605,43 +573,23 @@ function StudioHost({ projectId }: { projectId: string }) {
     },
     [activeTask, platform, projectId, taskRepo],
   )
-  /** 立刻把最新草稿写库（离页 / 关窗 / 防抖到点三条路共用）。 */
-  const flushDraft = useCallback(() => {
-    if (draftTimer.current !== null) {
-      window.clearTimeout(draftTimer.current)
-      draftTimer.current = null
-    }
-    const draft = draftLatest.current
-    if (draft) void saveEcommerceDraft(platform.storage, projectId, draft)
-  }, [platform, projectId])
-
-  /**
-   * 表单变化先留在内存，500ms 防抖落库。
-   *
-   * 不逐键写库（补充要求会一次打很多字），也不等"用户自己记得保存"：
-   * 离页与 `pagehide` 都会 flush，桌面壳里切页 / 关窗不丢最后一笔。
-   */
+  /** 表单变化走协调器的 500ms 防抖；离页与卸载由下方生命周期 flush。 */
   const handleDraftChange = useCallback(
     (draft: EcommerceFormDraft) => {
-      draftLatest.current = draft
       setSavedDraft(draft)
-      if (draftTimer.current !== null) window.clearTimeout(draftTimer.current)
-      draftTimer.current = window.setTimeout(() => {
-        draftTimer.current = null
-        void saveEcommerceDraft(platform.storage, projectId, draft)
-      }, 500)
+      draftActions.change(draft)
     },
-    [platform, projectId],
+    [draftActions],
   )
 
   useEffect(() => {
-    const onHide = () => flushDraft()
+    const onHide = () => draftActions.flush()
     window.addEventListener('pagehide', onHide)
     return () => {
       window.removeEventListener('pagehide', onHide)
-      flushDraft()
+      draftActions.dispose()
     }
-  }, [flushDraft])
+  }, [draftActions])
 
   /**
    * 对话模型下拉保持固定的前端清单，不按当前渠道增删。

@@ -1,5 +1,16 @@
 # CanvasFlow（轻画）项目记忆
 
+### 电商草稿动作拆分（2026-11-06）
+
+- `pageDraftActionCoordinator.ts` 负责草稿与节点并行恢复、上传 ID 去重、节点素材优先与 assets 回退、
+  失效引用清理和 500ms 单计时器自动保存；React state/refs、预览 JSX、Store 与平台仍归 `EcommercePage`。
+- 预览 JSX 不进入纯模块：协调器只返回 `{nodeId, hash, kind}` 投影，宿主映射成 `EcommerceUpload`。
+  `pagehide` 调 flush，卸载调 dispose；替换输入必须取消旧 timer，最新草稿 ref 只有一个 owner。
+- `EcommercePage` 1049→997，render-after 89 行哈希
+  `A0F3C6A34DC95A5B3002C0980132290991C5501CBF6907DE7D6AB600035E1972` 不变；新模块预算 197、宿主预算 997。
+- `--testTimeout=15000` 串行全量 588 files / 5164 tests（1 skipped），check（1013 modules / 4051 deps、
+  25 legacy、157 semantic）与 build 通过；超千行生产文件从 6 降到 5。
+
 ### 电商生成动作拆分（2026-11-06）
 
 - `pageGenerationActionCoordinator.ts` 负责生成计划、两轮分镜提示词、渠道选路、任务/RunPlan、后台 reconcile/轮询、

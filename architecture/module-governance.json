@@ -200,7 +200,7 @@
       "test": [
         "scripts/smoke.mjs#G116"
       ],
-      "budget": 1049
+      "budget": 997
     },
     {
       "module": "src/pages/EcommercePage/EcommerceWorkbench.tsx",
@@ -4764,6 +4764,41 @@
         "src/pages/EcommercePage/ecommercePage/pageGenerationActionCoordinator.test.ts"
       ],
       "budget": 443
+    },
+    {
+      "module": "src/pages/EcommercePage/ecommercePage/pageDraftActionCoordinator.ts",
+      "owner": "pages-ecommerce-draft-actions",
+      "responsibility": "恢复电商页面草稿、清理失效上传引用，并拥有 500ms 自动保存、flush 与 dispose 生命周期。",
+      "owns": [
+        "草稿与节点读数、素材回退和上传引用清理",
+        "500ms 单计时器防抖与最新草稿落库",
+        "离页 flush、卸载 dispose 与取消读取"
+      ],
+      "doesNotOwn": [
+        "React state/refs 与页面生命周期",
+        "上传预览 JSX、工作台结构与样式",
+        "存储表结构、素材字节编解码和草稿归一规则"
+      ],
+      "publicApi": [
+        "ECOMMERCE_DRAFT_AUTOSAVE_MS",
+        "EcommerceDraftUploadProjection",
+        "EcommerceDraftRecoveryRepository",
+        "EcommerceDraftRecoveryPorts",
+        "EcommerceDraftRecoveryResult",
+        "restoreEcommercePageDraft",
+        "EcommerceDraftAutoSaveScheduler",
+        "EcommerceDraftAutoSaveState",
+        "EcommerceDraftAutoSavePorts",
+        "EcommerceDraftAutoSaveController",
+        "EcommercePageDraftActionPorts",
+        "EcommercePageDraftActionCoordinator",
+        "createEcommercePageDraftActionCoordinator",
+        "createEcommerceDraftAutoSaveController"
+      ],
+      "test": [
+        "src/pages/EcommercePage/ecommercePage/pageDraftActionCoordinator.test.ts"
+      ],
+      "budget": 197
     }
   ]
 }
