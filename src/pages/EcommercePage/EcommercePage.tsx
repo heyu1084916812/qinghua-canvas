@@ -6,12 +6,10 @@ import {
   EcommerceExecutionProvider,
   useEcommerceExecution,
 } from '../../workbenches/ecommerce/execution/EcommerceExecutionProvider'
-import { buildEcommerceRunPlan } from '../../features/ecommerce/execution/ecommerceRunPlan'
 import { useAssetMeta } from '../../features/shared/assets/index'
 import { EcommerceStudio, type EcommerceResultItem, type EcommerceUpload } from '../../workbenches/ecommerce/EcommerceStudio'
 import { createAgentSessionStore } from '../../state/agent/sessionStore'
 import { openGlobalSettings } from '../../state/ui/globalSettings'
-import { resolveGenerationTarget } from '../../domain/project/generationRouting'
 import {
   resolveRoutedChatTarget,
 } from '../../domain/shared/chatTarget'
@@ -21,11 +19,7 @@ import {
 import { LongImagePanel, type LongImageTileSource } from './LongImagePanel'
 import { createProjectRepository } from '../../state/project/repository'
 import { importEcommerceAsset } from '../../features/ecommerce/importEcommerceAsset'
-import { buildEcommercePlan } from '../../domain/ecommerce/plan'
-import { imagePromptForModel } from '../../domain/ecommerce/imagePromptProfile'
 import type { EcommerceIntentDraft } from '../../domain/ecommerce/chatParse'
-import { shouldExpandShots } from '../../domain/ecommerce/chatShots'
-import type { EcommerceShot } from '../../domain/ecommerce/prompt'
 import {
   capabilityOfLogical,
   logicalNames,
@@ -41,10 +35,6 @@ import { createAssetLibraryRepository } from '../../state/project/assetLibraryRe
 import { createEcommerceCanvasRepository } from '../../state/project/ecommerceCanvasRepository'
 import type { EcommerceCanvasItem } from '../../domain/ecommerce/canvasItem'
 import {
-  acquireEcommerceTaskLease,
-  releaseEcommerceTaskLease,
-} from '../../features/ecommerce/execution/taskLease'
-import {
   cleanEcommerceDraftRefs,
   type EcommerceFormDraft,
 } from '../../domain/ecommerce/draft'
@@ -55,7 +45,6 @@ import {
 } from '../../domain/ecommerce/platforms'
 import {
   ECOMMERCE_LANGUAGES,
-  ecommerceAspectRatio,
   type EcommerceLanguage,
 } from '../../domain/ecommerce/types'
 import { rememberActiveWorkbench } from '../../state/project/activeCanvas'
@@ -73,16 +62,14 @@ import styles from './EcommercePage.module.css'
 
 import {
   ecommerceBatchId,
-  ecommerceSubjectId,
   legacyAssetHashesOfNode,
   type LegacyGenerationNode,
 } from './ecommercePageSupport'
-import { loadEcommerceInitialTask, projectEcommerceCanvasItemDiff, refreshEcommerceTask, refreshEcommerceWorkbench } from './ecommercePage/pageDataCoordinator'
+import { loadEcommerceInitialTask, projectEcommerceCanvasItemDiff, refreshEcommerceWorkbench } from './ecommercePage/pageDataCoordinator'
 import {
   generationStageOfTerminalResults,
   imageParamOptionsByModel as imageParamOptionsOfModels,
   longImageTilesOf,
-  prescribeEcommerceShots,
   projectEcommerceResults,
 } from './ecommercePage/pageResultProjection'
 import { workbenchActionOf } from './ecommercePage/pageActionCoordinator'
@@ -91,9 +78,9 @@ import {
   createResultLibraryActions,
   downloadAllResults,
   retryFailedResults,
-  runStoredResultRerun,
 } from './ecommercePage/pageResultActionCoordinator'
 import { createPagePlanningActionCoordinator } from './ecommercePage/pagePlanningActionCoordinator'
+import { createPageGenerationActionCoordinator } from './ecommercePage/pageGenerationActionCoordinator'
 
 /**
  * 电商工作台页（对账 #384 的 D3/D4/D5/D6）。
@@ -542,26 +529,6 @@ function StudioHost({ projectId }: { projectId: string }) {
     }
   }, [projectId, refreshWorkbench, taskRepo])
 
-  /** 用最新的逐格状态收口整批任务（running / partial / done / failed / canceled）。 */
-  const refreshTask = useCallback(
-    async (task: EcommerceTaskRecord) => {
-      /**
-       * 并发生成时，单张 `syncResultRow` 可能比 RunRecord 的最终可见稍早，
-       * 先把结果行按各自最新 RunRecord 收口，再计算整批状态。
-       * 否则数据库会先变成 done，但 `resultRows` 仍停在 running，界面一直转。
-       */
-      const refreshed = await refreshEcommerceTask({
-        projectId,
-        canvasSaveQueue: canvasSaveQueueRef.current,
-        taskRepo,
-        canvasRepo,
-        runLogs,
-      }, task)
-      setActiveTask(refreshed.task)
-      setResultRows(refreshed.rows)
-    },
-    [projectId, taskRepo],
-  )
   /** 刷新历史批次列表（#399 第二期 / #479 的任务列表 UI）。 */
   const refreshTaskHistory = useCallback(async () => {
     try {
@@ -607,50 +574,6 @@ function StudioHost({ projectId }: { projectId: string }) {
     [canvasRepo, platform, projectId, taskRepo],
   )
 
-  async function retrySaveWorkbenchResult(resultId: string) {
-    const outcome = await taskRepo.retrySave(resultId)
-    await refreshWorkbench()
-    if (!outcome.ok) {
-      platform.logger.log('warn', '[ecommerce] 重试保存仍未成功', {
-        resultId,
-        error: outcome.errorText ?? 'unknown',
-      })
-    }
-  }
-
-  async function retryWorkbenchResult(resultId: string) {
-    const row =
-      workbenchResults.find((result) => result.id === resultId) ??
-      resultRows.find((result) => result.id === resultId)
-    if (!row) return
-    if (row.recovery === 'retry-save') {
-      await retrySaveWorkbenchResult(resultId)
-      return
-    }
-    await runStoredResult(row, { inPlace: true })
-  }
-
-  const handleWorkbenchAction = useCallback(
-    () => workbenchActionOf({
-      projectId,
-      workbenchResults,
-      resultRows,
-      activeTask,
-      platform,
-      assetLibraryRepo,
-      retryWorkbenchResult,
-      downloadAsset,
-      setGenerationStage,
-    }),
-    [
-      assetLibraryRepo,
-      platform,
-      projectId,
-      resultRows,
-      retryWorkbenchResult,
-      workbenchResults,
-    ],
-  )
   /** 点一条历史批次：把结果区切到那一批，不改表单、不重跑。 */
   const onSelectTask = useCallback(
     async (taskId: string) => {
@@ -859,245 +782,77 @@ function StudioHost({ projectId }: { projectId: string }) {
       : null
   }
 
-  const runStoredResult = useCallback(
-    (row: EcommerceResultRecord, options: { inPlace?: boolean } = {}) =>
-      runStoredResultRerun({
-        activeTask, taskHistory, row, inPlace: options.inPlace, subjectId: ecommerceSubjectId,
-        taskRepo, channels: channelList, catalog: channels.protocolCatalog(), strategy: routeStrategy,
-        nodes: graph.nodes, execution: exec, assets: platform.assets, logger: platform.logger,
-        lease: { acquire: acquireEcommerceTaskLease, release: releaseEcommerceTaskLease },
-        refresh: { task: refreshTask, history: refreshTaskHistory, workbench: queueWorkbenchRefresh },
-        state: { setActiveTask, setResultRows }, visualInputsFor,
-      }),
+  const generationActions = createPageGenerationActionCoordinator({
+    projectId,
+    activeTask,
+    taskHistory,
+    workbenchResults,
+    resultRows,
+    platforms,
+    channels: channelList,
+    channelStore: channels,
+    strategy: routeStrategy,
+    chatTarget,
+    nodes: graph.nodes,
+    taskRepo,
+    reconcile: (projectId) => taskRepo.reconcileFromRunRecords(projectId),
+    canvasSaveQueue: () => canvasSaveQueueRef.current,
+    canvasRepo,
+    runLogs,
+    assets: platform.assets,
+    /*
+     * 宿主只提供 execution 实例；后台 `void exec.run(runPlan)`、轮询和 lease
+     * 收口都由生成协调器拥有。
+     */
+    execution: exec,
+    logger: platform.logger,
+    refresh: {
+      history: refreshTaskHistory,
+      workbench: queueWorkbenchRefresh,
+    },
+    requestShots,
+    visualInputsFor,
+    nextBatchId: () => {
+      const batchId = ecommerceBatchId()
+      return batchId
+    },
+    state: {
+      setSubmitting,
+      setShotPlanNote,
+      setPreparingShots,
+      setGenerationStage,
+      setGenerationFailed: (message) => setGenerationStage({ phase: 'failed', label: '生成失败', detail: message }),
+      setActiveTask,
+      setResultRows,
+    },
+  })
+  const {
+    onGenerate,
+    runStoredResult,
+    retrySaveWorkbenchResult,
+    retryWorkbenchResult,
+  } = generationActions
+  const handleWorkbenchAction = useCallback(
+    () => workbenchActionOf({
+      projectId,
+      workbenchResults,
+      resultRows,
+      activeTask,
+      platform,
+      assetLibraryRepo,
+      retryWorkbenchResult,
+      downloadAsset,
+      setGenerationStage,
+    }),
     [
-      activeTask, channelList, channels, exec, platform, graph.nodes, queueWorkbenchRefresh,
-      refreshTask, refreshTaskHistory, routeStrategy, taskHistory, taskRepo, visualInputsFor,
+      assetLibraryRepo,
+      platform,
+      projectId,
+      resultRows,
+      retryWorkbenchResult,
+      workbenchResults,
     ],
   )
-
-  const onGenerate = async (
-    request: EcommerceRequest,
-    shotPlan?: readonly EcommerceShot[],
-    lineage?: {
-      sourceTaskId?: string
-      sourceResultId?: string
-      sourceAssetHash?: string
-    },
-  ) => {
-    setSubmitting(true)
-    setShotPlanNote('')
-    setGenerationStage({ phase: 'validate', label: '正在检查素材与参数' })
-    try {
-      /**
-       * ① **先按确定性脚本建一次计划**：它同时完成**全部校验**。
-       *
-       * 校验不过就当场抛错，**绝不在一个非法请求上先花掉一次对话额度**。
-       */
-      let plan = buildEcommercePlan(request, { platforms })
-
-      /**
-       * ② **商品分析 + 最终提示词**。
-       *
-       * 白底图保留抽卡语义；编辑直接使用用户的编辑指令。其余商品图必须先把
-       * 商品原图随对话发出，让模型返回 productAnalysis 与每张的最终 prompt。
-       * 这一步失败时停止，不再拿策划简报冒充生图提示词。
-       */
-      const usablePlan = shotPlan && shotPlan.length === request.count ? shotPlan : null
-      if (usablePlan) {
-        plan = buildEcommercePlan(request, { platforms, shots: usablePlan })
-        setShotPlanNote(`这 ${request.count} 张使用已确认的逐张方案。`)
-        setGenerationStage({ phase: 'prompts', label: '正在采用已确认的逐张提示词' })
-      } else if (shouldExpandShots(request)) {
-        if (!chatTarget) {
-          throw new Error(
-            '没有可用的对话模型：无法先分析商品原图并写逐张提示词。为避免把策划文案直接送去生图，本轮未生成。',
-          )
-        }
-        setPreparingShots(true)
-        try {
-          setGenerationStage({
-            phase: 'analyze',
-            label: '正在分析商品图并写逐张提示词',
-          })
-          const out = await requestShots(request, chatTarget, graph.nodes)
-          if (!out.ok) {
-            throw new Error(`商品分析或逐张提示词生成失败：${out.error}`)
-          }
-          plan = buildEcommercePlan(request, { platforms, shots: out.shots })
-          setShotPlanNote(
-            `已分析商品图，并由 ${chatTarget.logicalModel} 生成 ${request.count} 条不同的最终提示词。`,
-          )
-        } finally {
-          setPreparingShots(false)
-        }
-      } else {
-        setGenerationStage({
-          phase: 'prompts',
-          label:
-            request.usage === 'white-bg'
-              ? '正在准备白底图抽卡提示词'
-              : '正在准备编辑提示词',
-        })
-      }
-
-      const mediaKind = request.mediaKind ?? 'image'
-      const recipe = await channels.defaultForNewNode({}, mediaKind)
-      const target = resolveGenerationTarget({
-        channels: channelList,
-        category: mediaKind,
-        catalog: channels.protocolCatalog(),
-        strategy: routeStrategy,
-        ...(request.model ? { logicalModel: request.model } : {}),
-        ...(request.channelId ? { channelId: request.channelId } : {}),
-        recipe,
-      })
-      if (!target) {
-        throw new Error(
-          request.model
-            ? `所选模型「${request.model}」没有可用的真实${mediaKind === 'video' ? '视频' : '生图'}渠道`
-            : mediaKind === 'video'
-              ? '还没有可用的视频模型服务 —— 先去「全局设置 → 模型服务」添加一条并勾上视频模型'
-              : '还没有可用的生图模型服务 —— 先去「全局设置 → 模型服务」添加一条并勾上模型',
-        )
-      }
-      const modelForRun = target.logicalModel
-      const channelForRun = target.channelId
-
-      /**
-       * **两段式**（对账 #410）：先异步解析全部默认值，再在同一个
-       * `beginPlan` / `endPlan` 内同步落节点，保证一次撤销整批退回。
-       */
-      const batchId = ecommerceBatchId()
-      const prescribed = prescribeEcommerceShots({
-        count: plan.count,
-        planPrompts: plan.prompts,
-        fallbackPrompt: plan.prompt,
-        ratio: plan.ratio,
-        shots: plan.shots,
-        mediaKind,
-        request,
-        model: modelForRun,
-        imagePromptForModel,
-        aspectRatioOf: ecommerceAspectRatio,
-      })
-      setGenerationStage({ phase: 'workflow', label: '正在建立结果记录' })
-      const effectiveRequest: EcommerceRequest = {
-        ...request,
-        resolvedModel: modelForRun,
-        resolvedChannelId: channelForRun,
-      }
-      const createdTask = await taskRepo.create({
-        projectId,
-        batchId,
-        request: effectiveRequest,
-        nodeIds: prescribed.map(() => ecommerceSubjectId()),
-        metadata: prescribed.map((item) => item.metadata),
-        ...(lineage?.sourceTaskId ? { sourceTaskId: lineage.sourceTaskId } : {}),
-        ...(lineage?.sourceResultId ? { sourceResultId: lineage.sourceResultId } : {}),
-        ...(lineage?.sourceAssetHash ? { sourceAssetHash: lineage.sourceAssetHash } : {}),
-      })
-      const task = createdTask.task
-      setActiveTask(task)
-      setResultRows(createdTask.results)
-      acquireEcommerceTaskLease(task.id)
-      await queueWorkbenchRefresh()
-
-      const runPlan = buildEcommerceRunPlan({
-        taskId: task.id,
-        mediaKind,
-        channelId: channelForRun,
-        model: target.upstreamModel,
-        logicalModel: target.logicalModel,
-        ...(target.credentialGroupId
-          ? { credentialGroupId: target.credentialGroupId }
-          : {}),
-        ...(target.credentialGroupIds?.length
-          ? { credentialGroupIds: target.credentialGroupIds }
-          : {}),
-        inputs: await visualInputsFor(request, graph.nodes),
-        shots: createdTask.results.map((row, index) => {
-          const prescribedShot = prescribed[index]
-          return {
-            resultId: row.id,
-            subjectId: row.nodeId,
-            prompt: prescribedShot?.prompt ?? (plan.prompts[index] ?? plan.prompt),
-            params: prescribedShot?.params ?? {},
-            metadata: prescribed[index]?.metadata ?? {},
-          }
-        }),
-      })
-      const total = runPlan.tasks.length
-      let completed = 0
-      setGenerationStage({
-        phase: 'generate',
-        label: `正在生成 0/${total}`,
-        current: 0,
-        total,
-      })
-
-      /*
-       * 请求已经提交，`onGenerate` 不再等图片返回。进度从结果表轮询收口；
-       * 执行层直接把每格写到 `ecommerceResults`，不再经过画布节点状态。
-       */
-      void exec
-        .run(runPlan)
-        .then((outcome) => {
-          for (const warning of outcome.warnings) {
-            platform.logger.log('warn', '[ecommerce] 结果落库 / 投影警告', { warning })
-          }
-        })
-        .catch((error: unknown) => {
-          platform.logger.log('warn', '[ecommerce] 执行失败', {
-            error: error instanceof Error ? error.message : String(error),
-          })
-        })
-      const currentTask = task
-      void (async () => {
-        const startedAt = Date.now()
-        try {
-          while (Date.now() - startedAt < 10 * 60_000) {
-            await taskRepo.reconcileFromRunRecords(projectId)
-            const rows = await taskRepo.results(currentTask.id)
-            completed = rows.filter(
-              (row) => row.status === 'done' || row.status === 'failed' || row.status === 'canceled',
-            ).length
-            setGenerationStage((current) =>
-              current?.phase === 'done'
-                ? current
-                : {
-                    phase: 'generate',
-                    label: `正在生成 ${completed}/${total}`,
-                    current: completed,
-                    total,
-                  },
-            )
-            if (completed >= total) break
-            await new Promise((resolve) => window.setTimeout(resolve, 250))
-          }
-          await refreshTask(currentTask)
-          await refreshTaskHistory()
-          await queueWorkbenchRefresh()
-          setGenerationStage({
-            phase: 'done',
-            label: `本批已结束 ${total}/${total}`,
-            current: total,
-            total,
-          })
-        } catch (error) {
-          const message = error instanceof Error ? error.message : '生成失败'
-          setGenerationStage({ phase: 'failed', label: '生成失败', detail: message })
-        } finally {
-          releaseEcommerceTaskLease(currentTask.id)
-        }
-      })()
-    } catch (error) {
-      const message = error instanceof Error ? error.message : '生成失败'
-      setGenerationStage({ phase: 'failed', label: '生成失败', detail: message })
-      throw error
-    } finally {
-      setSubmitting(false)
-    }
-  }
 
   const resultLibraryActions = useMemo(
     () => createResultLibraryActions({

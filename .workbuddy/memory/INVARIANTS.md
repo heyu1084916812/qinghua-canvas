@@ -1,5 +1,16 @@
 # CanvasFlow 不变量详表
 
+## 电商生成动作边界（2026-11-06）
+
+- `pageGenerationActionCoordinator.ts` 只拥有生成计划、分镜请求、渠道选路、任务/RunPlan、后台 reconcile/轮询、
+  刷新顺序和结果动作入口；React state/refs、DOM/JSX、Store、平台与执行器实例仍归 `EcommercePage`。
+- lease 顺序固定为 acquire→refresh workbench→execute→立即 warnings/失败日志→reconcile/results/stage/wait→
+  refresh task/history/workbench→finally release。`exec.run(plan).then(...)` 的 warnings 必须随执行完成立即记录，
+  失败必须由 `.catch` 立即记录，不得等轮询结束后补记；轮询仍先 reconcile 再读结果。
+- 生成动作拆分必须保持 `EcommercePage` render-after 89 行及
+  `A0F3C6A34DC95A5B3002C0980132290991C5501CBF6907DE7D6AB600035E1972` 不变；改 JSX/DOM/CSS/文案时立即转
+  「涉及 UI」门禁。协调器预算不得超过 450 行，宿主预算不得回涨。
+
 ## 电商结果重跑归属（2026-11-06）
 
 - 已有结果的重跑/原地替换必须继续归 `pageResultActionCoordinator.ts`，不得另造第二个结果动作层。

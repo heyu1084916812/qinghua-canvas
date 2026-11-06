@@ -200,7 +200,7 @@
       "test": [
         "scripts/smoke.mjs#G116"
       ],
-      "budget": 1294
+      "budget": 1049
     },
     {
       "module": "src/pages/EcommercePage/EcommerceWorkbench.tsx",
@@ -4737,6 +4737,33 @@
         "src/pages/EcommercePage/ecommercePage/pagePlanningActionCoordinator.test.ts"
       ],
       "budget": 345
+    },
+    {
+      "module": "src/pages/EcommercePage/ecommercePage/pageGenerationActionCoordinator.ts",
+      "owner": "pages-ecommerce-generation-actions",
+      "responsibility": "编排电商页面生成计划、分镜提示词、渠道选路、任务建立、后台轮询刷新与结果重跑入口。",
+      "owns": [
+        "生成计划、聊天分镜请求和 RunPlan 组装",
+        "任务 lease 获取、后台轮询、刷新顺序与释放",
+        "既有结果重跑和保存失败重试的动作委托"
+      ],
+      "doesNotOwn": [
+        "React state/refs 与页面生命周期",
+        "工作台 JSX/DOM/CSS 与用户界面结构",
+        "任务仓储 SQL、渠道协议和模型适配器实现"
+      ],
+      "publicApi": [
+        "PageGenerationLineage",
+        "PageGenerationStatePort",
+        "PageGenerationTaskPort",
+        "PageGenerationActionPorts",
+        "PageGenerationActionCoordinator",
+        "createPageGenerationActionCoordinator"
+      ],
+      "test": [
+        "src/pages/EcommercePage/ecommercePage/pageGenerationActionCoordinator.test.ts"
+      ],
+      "budget": 443
     }
   ]
 }

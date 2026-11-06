@@ -1,5 +1,18 @@
 # CanvasFlow（轻画）项目记忆
 
+### 电商生成动作拆分（2026-11-06）
+
+- `pageGenerationActionCoordinator.ts` 负责生成计划、两轮分镜提示词、渠道选路、任务/RunPlan、后台 reconcile/轮询、
+  任务与工作台刷新，以及结果重跑和保存失败重试的入口委托；`EcommercePage` 继续持有 React state/refs、
+  DOM/JSX、Store、平台和执行器实例。
+- 后台时序固定为 acquire lease→refresh workbench→`exec.run(plan)`→`exec.run().then` 立即记录 warnings/
+  `.catch` 立即记录执行失败→reconcile→results→stage→wait；成功或超时都刷新 task/history/workbench 后
+  在 finally release。不能把 warnings 拖到轮询结束后再记录。
+- `EcommercePage` 1294→1049，render-after 89 行哈希
+  `A0F3C6A34DC95A5B3002C0980132290991C5501CBF6907DE7D6AB600035E1972` 不变；新模块预算 443、宿主预算 1049。
+- `--testTimeout=15000` 串行全量 587 files / 5158 tests（1 skipped），check（1012 modules / 4047 deps、
+  25 legacy、156 semantic）与 build 通过。
+
 ### 电商结果重跑并入既有动作模块（2026-11-06）
 
 - 已有结果重跑/原地替换归 `pageResultActionCoordinator.ts`，不另造第二个结果协调器。sourceTask 先匹配 activeTask，
