@@ -1,5 +1,16 @@
 # CanvasFlow（轻画）项目记忆
 
+### 设置页交互控制拆分（2026-11-06）
+
+- 设置页渲染前控制拆成五个职责模块：`settingsRoutingActions` 管选路；`settingsChannelPresentation` 管渠道/协议投影；
+  `settingsInteractionLifecycle` 管选渠道复位、菜单/抽屉生命周期和计时器；`settingsStatusPresentation` 管状态文案；
+  `settingsActionDelegates` 只做动作委托。首版 447 行大协调器因职责混杂被退回，不能把多个领域重新塞进一个文件。
+- 保留 `SettingsPage` 的 React state/refs、Store、DOM 查询与 listener 注册；`protocolUsageFor` 必须有生产调用，
+  不得成为只在测试中使用的死导出。目标文件 2215→2093，render-after 1444 行哈希
+  `C00DE8133EDFC94D433367B6AA1E10C682DA110223DF74058FA2B8402E330AC8` 不变。
+- 全量 `--testTimeout=15000`：585 files / 5131 tests，check（1010 modules / 4010 deps、25 legacy、154 semantic）
+  与 build 通过；五个新模块预算分别为 73/115/137/108/65。
+
 ### 灯箱裁剪动作拆分（2026-11-06）
 
 - `lightboxCropActionCoordinator.ts` 只编排裁剪框/框脸移动、框选、缩放、pointer drag、脸部框写入和

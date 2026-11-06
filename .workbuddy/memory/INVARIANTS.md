@@ -1,5 +1,13 @@
 # CanvasFlow 不变量详表
 
+## 设置页交互控制边界（2026-11-06）
+
+- 设置页渲染前控制必须按领域拆开：选路、渠道/协议展示、交互生命周期、状态文案、动作委托不得重新合成一个大协调器。
+  React state/refs、Store、DOM 查询和 listener 注册仍归 `SettingsPage`；协调模块只接收只读快照与显式端口。
+- 选路空集合和失效候选不得写 policy；选渠道先撤旧 panel/menu/mapping 草稿与 timers 再初始化新表单；渠道菜单和资料抽屉
+  必须保留 focus/Esc/Tab/resize/scroll/cleanup/return-focus 语义；notice timer cleanup 必须清掉。
+- 新增展示 helper 必须有生产调用，不能靠测试维持死代码。设置页控制拆分必须保持 render-after 哈希不变。
+
 ## 灯箱裁剪动作边界（2026-11-06）
 
 - `lightboxCropActionCoordinator.ts` 不得 import React、DOM 或 Store 实例；React state/refs、DOM rect、window

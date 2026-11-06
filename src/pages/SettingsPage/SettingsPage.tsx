@@ -9,23 +9,19 @@ import {
 } from 'react'
 import { createPortal } from 'react-dom'
 import { useChannels } from '../../app/providers/ChannelStoreProvider'
-import { noticeA11y, type NoticeTone } from '../../domain/ui/notice'
+import { noticeA11y } from '../../domain/ui/notice'
 import {
   channelCapabilities,
-  protocolLabel,
   protocolShort,
 } from '../../domain/project/channel'
 import {
   CAPABILITY_LABEL,
   protocolById,
-  type ProtocolDefinition,
 } from '../../domain/project/protocol'
 import type { DeclarativeProtocolPackage } from '../../domain/project/protocolRecipe'
 import {
   CATEGORY_FILTERS,
   categoryLabel,
-  filterModels,
-  groupModelsByCategory,
   routeMapOptions,
   type CategoryFilter,
 } from '../../domain/project/modelSelection'
@@ -38,7 +34,6 @@ import settingsModelMappingStyles from './SettingsModelMapping.module.css'
 import settingsAppearanceSystemStyles from './SettingsAppearanceSystem.module.css'
 import { ChannelTokenField } from './SettingsChannelTokenField'
 import { SettingsChannelAvatar } from './SettingsChannelAvatar'
-import { routingCandidatesFor, routingChannelGroupsFor, selectedRoutingKeysFor, nextAllowedCandidatesFor, channelMenuGeometry } from './settingsPageRoutingRules'
 import { channelMenuArrowFocus, drawerTabFocus } from './settingsPageOverlayRules'
 import {
   ROUTE_PLAN_STRATEGIES,
@@ -78,7 +73,6 @@ import {
 } from '../../app/SettingsIcons'
 import {
   createChannelActions,
-  type ChannelActions,
   type ChannelActionPorts,
   type ChannelActionState,
   type ChannelFormState,
@@ -92,9 +86,42 @@ import {
   type ProtocolActionPorts,
   type ProtocolActionState,
 } from './settingsPage/protocolActionCoordinator'
+import * as actionDelegates from './settingsPage/settingsActionDelegates'
+import * as channelPresentation from './settingsPage/settingsChannelPresentation'
+import * as interactionLifecycle from './settingsPage/settingsInteractionLifecycle'
+import * as routingInteractions from './settingsPage/settingsRoutingActions'
+import * as statusPresentation from './settingsPage/settingsStatusPresentation'
 
 type SettingsSetter<T> = Dispatch<SetStateAction<T>>
-type ChannelActionsOpenMenu = ChannelActions['openChannelMenuFromButton']
+
+const settingsTimerPorts: interactionLifecycle.TimerPorts = {
+  setTimeout: (handler, delay) => window.setTimeout(handler, delay),
+  clearTimeout: (timer) => window.clearTimeout(timer),
+}
+
+function listenPointerDown(listener: (target: unknown) => void, capture: boolean): () => void {
+  const handler = (event: PointerEvent) => listener(event.target)
+  document.addEventListener('pointerdown', handler, capture)
+  return () => document.removeEventListener('pointerdown', handler, capture)
+}
+
+function listenKeyDown(
+  listener: (event: { key: string; shiftKey: boolean; preventDefault(): void }) => void,
+): () => void {
+  const handler = (event: KeyboardEvent) => listener(event)
+  document.addEventListener('keydown', handler)
+  return () => document.removeEventListener('keydown', handler)
+}
+
+function listenResize(listener: () => void): () => void {
+  window.addEventListener('resize', listener)
+  return () => window.removeEventListener('resize', listener)
+}
+
+function listenScroll(listener: () => void): () => void {
+  window.addEventListener('scroll', listener, true)
+  return () => window.removeEventListener('scroll', listener, true)
+}
 
 function patchFormSetter(
   setName: SettingsSetter<string>,
@@ -114,14 +141,6 @@ function profileFocusSetter(ref: { current: HTMLElement | null }): (value: HTMLE
   return (value) => {
     ref.current = value
   }
-}
-
-function channelActionState(value: ChannelActionState): ChannelActionState {
-  return value
-}
-
-function protocolActionState(value: ProtocolActionState): ProtocolActionState {
-  return value
 }
 
 const styles = {
@@ -308,58 +327,35 @@ export function SettingsPage({ embedded = false }: { embedded?: boolean } = {}) 
   const platform = usePlatform()
   /** 桌面壳里才有本机命令（对账 #308）：状态行文案据此区分"本机命令"与"地址" */
   const hasLocalCli = platform.cli != null
-  const routingCandidates = useMemo(
-    () => routingCandidatesFor(channelsList, hasLocalCli),
-    [channelsList, hasLocalCli],
-  )
-  const routingChannelGroups = useMemo(
-    () => routingChannelGroupsFor(routingCandidates),
-    [routingCandidates],
-  )
-  const selectedRoutingCandidateKeys = useMemo(
-    () => selectedRoutingKeysFor(routingCandidates, routingPolicy.allowedCandidates),
-    [routingCandidates, routingPolicy.allowedCandidates],
+  const {
+    candidates: routingCandidates, groups: routingChannelGroups, selectedKeys: selectedRoutingCandidateKeys,
+  } = useMemo(
+    () => routingInteractions.routingPresentationFor(
+      channelsList,
+      hasLocalCli,
+      routingPolicy.allowedCandidates,
+    ),
+    [channelsList, hasLocalCli, routingPolicy.allowedCandidates],
   )
 
-  const setRoutingCandidateKeys = (next: Set<string>) => {
-    if (next.size === 0) return
-    const allowedCandidates = nextAllowedCandidatesFor(routingCandidates, next)
-    if (!allowedCandidates) return
-    void channels.setRoutingPolicy({ allowedCandidates })
-  }
-
-  const toggleRoutingCandidate = (candidateKey: string, checked: boolean) => {
-    const next = new Set(selectedRoutingCandidateKeys)
-    if (checked) next.add(candidateKey)
-    else next.delete(candidateKey)
-    setRoutingCandidateKeys(next)
-  }
-
-  const toggleRoutingChannel = (
-    candidates: typeof routingCandidates,
-    checked: boolean,
-  ) => {
-    const next = new Set(selectedRoutingCandidateKeys)
-    for (const candidate of candidates) {
-      if (checked) next.add(candidate.key)
-      else next.delete(candidate.key)
-    }
-    setRoutingCandidateKeys(next)
-  }
+  const routingActions = routingInteractions.createRoutingActions(
+    routingCandidates,
+    selectedRoutingCandidateKeys,
+    (next) => void channels.setRoutingPolicy(next),
+  )
+  const toggleRoutingCandidate = routingActions.toggleCandidate
+  const toggleRoutingChannel = routingActions.toggleChannel
 
   const toggleRoutingChannelExpanded = (channelId: string) => {
-    setExpandedRoutingChannels((current) => {
-      const next = new Set(current)
-      if (next.has(channelId)) next.delete(channelId)
-      else next.add(channelId)
-      return next
-    })
+    setExpandedRoutingChannels((current) =>
+      routingInteractions.toggleRoutingChannelExpanded(current, channelId),
+    )
   }
   /** 抓站点图标要原生 HTTP（对账 #396）：浏览器里跨域读不到，按钮据此如实禁用 */
   /** 下拉里的全部协议（含 pending：它们显示为“待支持”且不可选，见协议区渲染） */
-  const protocolOptions = catalog.all
-  /** 当前所选协议的说明（CLI 网关等有前提的协议必须显示出来，否则用户会填错地址） */
-  const selectedProtocolNote = protocolById(protocol, catalog)?.note ?? ''
+  const {
+    note: selectedProtocolNote = '', credentials: credentialSlots = [], docUrl = '',
+  } = channelPresentation.protocolUsageFor(protocol, catalog)
   /**
    * 旧协议（`openai-images` / `openai-chat`）**只在当前渠道本身就是它时才出现**（用户 2026-09-29「不要重复的东西」）。
    *
@@ -367,26 +363,14 @@ export function SettingsPage({ embedded = false }: { embedded?: boolean } = {}) 
    * 适配器也认不出族（`registry.ts` 的 `LEGACY_FAMILY` 正是靠它们兜底）。
    * 但新渠道不该再选到 —— 它们与「OpenAI 兼容」是同一套适配器，只是能力被写死成单项。
    */
-  const visibleProtocolOptions = protocolOptions.filter(
-    /*
-     * `hidden`（对账 #308）：CLI / RunningHub 四条已搬到「全局设置 → CLI」，
-     * 新渠道的下拉里不再出现；但**当前渠道正在用的那条**仍要留着 ——
-     * 否则老渠道一打开下拉就是空白，用户以为协议丢了。
-     */
-    (p) =>
-      ((p.kind !== 'legacy' && p.kind !== 'hidden') || p.id === protocol) &&
-      (!hiddenBuiltinProtocolSet.has(p.id) || p.id === protocol),
-  )
-  /**
-   * 还留在**渠道下拉**里的待支持协议。`hidden` 的不算 —— 它们已经搬到
-   * 「全局设置 → CLI」（对账 #308），再在这儿列一遍就成了两个说法。
-   */
-  const pendingProtocols = protocolOptions.filter(
-    (p) =>
-      p.status === 'pending' &&
-      p.kind !== 'hidden' &&
-      !hiddenBuiltinProtocolSet.has(p.id),
-  )
+  const {
+    visible: visibleProtocolOptions,
+    pending: pendingProtocols,
+  } = channelPresentation.protocolOptionsFor({
+    catalog,
+    currentProtocol: protocol,
+    hiddenBuiltinProtocolIds: hiddenBuiltinProtocolSet,
+  })
 
   // —— 添加自定义协议（用户 2026-09-28）：只开放 OpenAI 兼容族的对话 / 生图声明 ——
   const [newProtoOpen, setNewProtoOpen] = useState(false)
@@ -401,139 +385,111 @@ export function SettingsPage({ embedded = false }: { embedded?: boolean } = {}) 
     void channels.load()
   }, [channels])
 
-  useEffect(() => {
-    if (!protoManageNotice) return
-    const timer = window.setTimeout(() => setProtoManageNotice(''), 2600)
-    return () => window.clearTimeout(timer)
-  }, [protoManageNotice])
-
-  const selected = useMemo(
-    () => channelsList.find((c) => c.id === selectedId) ?? null,
-    [channelsList, selectedId],
-  )
-  const visibleChannels = useMemo(() => {
-    const keyword = channelSearch.trim().toLocaleLowerCase()
-    return channelsList.filter((channel) => {
-      if (channelFilter === 'enabled' && !channel.enabled) return false
-      if (channelFilter === 'disabled' && channel.enabled) return false
-      if (!keyword) return true
-      return (
-        channel.name.toLocaleLowerCase().includes(keyword) ||
-        protocolShort(channel.protocol, catalog).toLocaleLowerCase().includes(keyword)
-      )
-    })
-  }, [catalog, channelFilter, channelSearch, channelsList])
-  const selectedKeyGroups = useMemo(
+  useEffect(
     () =>
-      [...(selected?.credentialGroups ?? [])].sort(
-        (a, b) => b.priority - a.priority || a.createdAt - b.createdAt,
+      interactionLifecycle.clearTimedNotice(
+        Boolean(protoManageNotice),
+        2600,
+        () => setProtoManageNotice(''),
+        settingsTimerPorts,
       ),
-    [selected],
+    [protoManageNotice],
   )
-  const activeGroup =
-    selectedKeyGroups.find((group) => group.id === activeGroupId) ??
-    selectedKeyGroups[0] ??
-    null
+
+  const selected = channelsList.find((channel) => channel.id === selectedId) ?? null
+  const visibleChannels = useMemo(
+    () => channelPresentation.visibleChannelsFor(
+      channelsList,
+      channelFilter,
+      channelSearch,
+      catalog,
+    ),
+    [catalog, channelFilter, channelSearch, channelsList],
+  )
+  const selectedKeyGroups = useMemo(() => channelPresentation.credentialGroupsFor(selected), [selected])
+  const activeGroup = channelPresentation.activeCredentialGroupFor(selectedKeyGroups, activeGroupId)
   const activeModels = activeGroup?.models ?? selected?.models ?? []
   const activeModelCache = activeGroup?.modelCache ?? selected?.modelCache ?? []
 
-  // 选中变化 → 同步表单。
-  //
-  // 依赖**刻意只放 `selectedId`**，不跟随 `selected`：表单是「这条渠道」的初始化，
-  // 而 store 每次落库（验证回写 modelCache、启用开关回写 enabled）都会产生新的渠道对象。
-  // 若跟着 `selected` 走，用户在下拉里刚选好的协议会被静默弹回库里旧值——
-  // 表现为「刚切到 OpenAI 兼容，点一下别处就又变回 Mock」，且没有任何提示。
+  // 选中变化 → 同步表单。依赖刻意只放 selectedId；store 回写对象不能重置表单草稿。
   useEffect(() => {
     const ch = channels.getState().channels.find((c) => c.id === selectedId) ?? null
-    setPanelOpen(false)
-    setChannelMenu(null)
-    setMenuConfirmDelete(false)
-    setMapDrafts({})
-    setMapSaveNotice(null)
-    setMapTests({})
-    for (const timer of mapSaveTimersRef.current.values()) window.clearTimeout(timer)
-    mapSaveTimersRef.current.clear()
-    if (!ch) return
-    const groups = [...ch.credentialGroups].sort(
-      (a, b) => b.priority - a.priority || a.createdAt - b.createdAt,
-    )
-    setActiveGroupId(groups[0]?.id ?? null)
-    setName(ch.name)
-    setProtocol(ch.protocol)
-    setBaseUrl(ch.baseUrl)
-    setEnabled(ch.enabled)
+    interactionLifecycle.applySelectedChannelChange(ch, {
+      resetPanel: () => setPanelOpen(false),
+      resetChannelMenu: () => {
+        setChannelMenu(null)
+        setMenuConfirmDelete(false)
+      },
+      resetMapDrafts: () => setMapDrafts({}),
+      resetMapSaveNotice: () => setMapSaveNotice(null),
+      resetMapTests: () => setMapTests({}),
+      clearMapSaveTimers: () =>
+        interactionLifecycle.clearMapSaveTimers(
+          mapSaveTimersRef.current,
+          (timer) => window.clearTimeout(timer),
+        ),
+      setActiveGroupId,
+      setForm: patchFormSetter(setName, setProtocol, setBaseUrl, setEnabled),
+    })
   }, [selectedId, channels])
 
-  useEffect(() => {
-    if (!channelMenu) return
-    const focusTimer = window.setTimeout(() => {
-      channelMenuRef.current?.querySelector<HTMLButtonElement>('button')?.focus()
-    }, 0)
-    const onPointerDown = (event: PointerEvent) => {
-      const target = event.target
-      if (target instanceof Element && target.closest('[data-channel-context-menu]')) return
-      setChannelMenu(null)
-      setMenuConfirmDelete(false)
-    }
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== 'Escape') return
-      event.preventDefault()
-      setChannelMenu(null)
-      setMenuConfirmDelete(false)
-    }
-    const close = () => {
-      setChannelMenu(null)
-      setMenuConfirmDelete(false)
-    }
-    document.addEventListener('pointerdown', onPointerDown, true)
-    document.addEventListener('keydown', onKeyDown)
-    window.addEventListener('resize', close)
-    window.addEventListener('scroll', close, true)
-    return () => {
-      window.clearTimeout(focusTimer)
-      document.removeEventListener('pointerdown', onPointerDown, true)
-      document.removeEventListener('keydown', onKeyDown)
-      window.removeEventListener('resize', close)
-      window.removeEventListener('scroll', close, true)
-    }
-  }, [channelMenu, menuConfirmDelete])
-
-  useEffect(() => {
-    if (!profileDrawerOpen) return
-    const syncBounds = () => setProfileDrawerBounds(measureProfileDrawerBounds())
-    syncBounds()
-    const focusTimer = window.setTimeout(() => {
-      document.querySelector<HTMLInputElement>('[data-settings-profile-name]')?.focus()
-    }, 0)
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        event.preventDefault()
-        setProfileDrawerOpen(false)
-        return
-      }
-      drawerTabFocus(event, document.querySelector<HTMLElement>('[data-settings-profile-drawer]'))
-    }
-    document.addEventListener('keydown', onKeyDown)
-    window.addEventListener('resize', syncBounds)
-    return () => {
-      window.clearTimeout(focusTimer)
-      document.removeEventListener('keydown', onKeyDown)
-      window.removeEventListener('resize', syncBounds)
-      profileReturnFocusRef.current?.focus()
-    }
-  }, [profileDrawerOpen])
-
-  useEffect(() => {
-    if (mapSaveNotice?.tone !== 'ok') return
-    const timer = window.setTimeout(() => setMapSaveNotice(null), 1200)
-    return () => window.clearTimeout(timer)
-  }, [mapSaveNotice])
+  useEffect(
+    () =>
+      interactionLifecycle.watchChannelMenu(Boolean(channelMenu), {
+        ...settingsTimerPorts,
+        onPointerDown: listenPointerDown,
+        onKeyDown: listenKeyDown,
+        onResize: listenResize,
+        onScroll: listenScroll,
+        close: () => {
+          setChannelMenu(null)
+          setMenuConfirmDelete(false)
+        },
+        focusFirstButton: () =>
+          channelMenuRef.current?.querySelector<HTMLButtonElement>('button')?.focus(),
+        isInsideMenu: (target) =>
+          target instanceof Element && Boolean(target.closest('[data-channel-context-menu]')),
+      }),
+    [channelMenu, menuConfirmDelete],
+  )
 
   useEffect(
-    () => () => {
-      for (const timer of mapSaveTimersRef.current.values()) window.clearTimeout(timer)
-      mapSaveTimersRef.current.clear()
-    },
+    () =>
+      interactionLifecycle.watchProfileDrawer(profileDrawerOpen, {
+        ...settingsTimerPorts,
+        onKeyDown: listenKeyDown,
+        onResize: listenResize,
+        syncBounds: () => setProfileDrawerBounds(measureProfileDrawerBounds()),
+        focusNameInput: () =>
+          document.querySelector<HTMLInputElement>('[data-settings-profile-name]')?.focus(),
+        close: () => setProfileDrawerOpen(false),
+        trapTabFocus: (event) =>
+          drawerTabFocus(
+            event as KeyboardEvent,
+            document.querySelector<HTMLElement>('[data-settings-profile-drawer]'),
+          ),
+        restoreFocus: () => profileReturnFocusRef.current?.focus(),
+      }),
+    [profileDrawerOpen],
+  )
+
+  useEffect(
+    () =>
+      interactionLifecycle.clearTimedNotice(
+        mapSaveNotice?.tone === 'ok',
+        1200,
+        () => setMapSaveNotice(null),
+        settingsTimerPorts,
+      ),
+    [mapSaveNotice],
+  )
+
+  useEffect(
+    () => () =>
+      interactionLifecycle.clearMapSaveTimers(
+        mapSaveTimersRef.current,
+        (timer) => window.clearTimeout(timer),
+      ),
     [],
   )
 
@@ -566,7 +522,7 @@ export function SettingsPage({ embedded = false }: { embedded?: boolean } = {}) 
     alert: (message) => window.alert(message),
     confirm: (message) => window.confirm(message),
   }
-  const channelState = () => channelActionState({
+  const channelState = (): ChannelActionState => ({
     selectedId,
     form: { name, protocol, baseUrl, enabled },
     selected,
@@ -613,7 +569,7 @@ export function SettingsPage({ embedded = false }: { embedded?: boolean } = {}) 
     setProtoManageNotice,
     setNewProtoOpen,
   }
-  const protocolState = () => protocolActionState({
+  const protocolState = (): ProtocolActionState => ({
     selectedId,
     protocol,
     baseUrl,
@@ -624,150 +580,72 @@ export function SettingsPage({ embedded = false }: { embedded?: boolean } = {}) 
   })
   const protocolActions = createProtocolActions(protocolPorts)
 
-  const handleCreate = async () => await channelActions.create(channelState())
-  const handleEnableChange = async (next: boolean) => await channelActions.setEnabled(channelState(), next)
-  const handleProfileIconFile = async (file: File | undefined) => await channelActions.readProfileIconFile(file)
-  const saveProfileDrawer = async () => await channelActions.saveProfileDrawer(channelState())
-  const persistForm = async () => {
-    const saved = await channels.update(selectedId!, {
-      name: name.trim() || '新建服务',
-      protocol,
-      baseUrl: baseUrl.trim(),
-      enabled,
-    })
-    channelActions.syncForm(saved)
-    return saved
-  }
-  const handleVerify = async () => await channelActions.verify(channelState())
-  const handleDetect = async () => await channelActions.detect(channelState())
-  const handleRefresh = async () => await channelActions.refresh(channelState())
-  const openChannelMenu = (channelId: string, x: number, y: number) =>
-    channelActions.openChannelMenu(channelId, x, y)
-  const openChannelMenuFromButton: ChannelActionsOpenMenu = (event, channelId) =>
-    channelActions.openChannelMenuFromButton(event, channelId)
-  const editChannel = (channelId: string) => channelActions.editChannel(channelState(), channelId)
-  const handleRemove = async (channelId: string) => await channelActions.remove(channelState(), channelId)
-  const handleAddKeyGroup = async () => await channelActions.addKeyGroup(channelState())
-  const handleRemoveKeyGroup = async () => await channelActions.removeKeyGroup(channelState())
-  const flushModelMapping = async (logicalName: string, upstreamId: string) =>
-    mappingActions.flush(logicalName, upstreamId)
-  const scheduleModelMapping = (logicalName: string, upstreamId: string) =>
-    mappingActions.schedule(logicalName, upstreamId)
-  const testModelMapping = async (logicalName: string, upstreamId: string) =>
-    mappingActions.test(logicalName, upstreamId)
-  const handleAddGlobalModel = async () => await channelActions.addGlobalModel(channelState())
-  const handleRemoveGlobalModel = async (name: string) => await channelActions.removeGlobalModel(name)
-  const openPanel = () => channelActions.openPanel(channelState())
-  const toggleDraft = (modelId: string, on: boolean) =>
-    channelActions.toggleDraft(channelState(), modelId, on)
-  const applyDraft = async () => await channelActions.applyDraft(channelState())
-  const dropSelectedModel = async (modelId: string) =>
-    channelActions.dropSelectedModel(channelState(), modelId)
-  const dropOnChannel = async (targetId: string) =>
-    channelActions.dropOnChannel(channelState(), targetId)
-  const draftList = useMemo(
-    () => (selected ? filterModels(activeModelCache, draftCategory, draftKeyword) : []),
-    [activeModelCache, selected, draftCategory, draftKeyword],
+  const {
+    handleCreate, handleEnableChange, handleProfileIconFile, saveProfileDrawer,
+    persistForm, handleVerify, handleDetect, handleRefresh,
+    openChannelMenu, openChannelMenuFromButton, editChannel, handleRemove,
+    handleAddKeyGroup, handleRemoveKeyGroup, flushModelMapping, scheduleModelMapping,
+    testModelMapping, handleAddGlobalModel, handleRemoveGlobalModel, openPanel,
+    toggleDraft, applyDraft, dropSelectedModel, dropOnChannel,
+    handleProtocolChange, checkImportedProtocol, handleImportProtocolFile,
+    handleSaveImportedProtocol, downloadProtocolTemplate, downloadProtocol,
+    toggleNewProtocol, handleRemoveProtocol, handleRestoreBuiltinProtocols,
+  } = actionDelegates.createSettingsActionDelegates({
+    channelActions,
+    mappingActions,
+    protocolActions,
+    channelState,
+    protocolState,
+  })
+  const draftList = channelPresentation.draftModelsFor(
+    selected,
+    activeModelCache,
+    draftCategory,
+    draftKeyword,
   )
-  const selectedGroups = useMemo(
-    () => groupModelsByCategory(activeModels).filter((group) => group.models.length > 0),
-    [activeModels],
-  )
-  const handleProtocolChange = (id: string) =>
-    protocolActions.handleProtocolChange(protocolState(), id)
-  const checkImportedProtocol = () => protocolActions.checkImportedProtocol(protocolState())
-  const handleImportProtocolFile = async (file: File | undefined) =>
-    protocolActions.importProtocolFile(file)
-  const handleSaveImportedProtocol = async () =>
-    protocolActions.saveImportedProtocol(protocolState())
-  const downloadProtocolTemplate = async () => protocolActions.downloadProtocolTemplate()
-  const downloadProtocol = async (definition: ProtocolDefinition) =>
-    protocolActions.downloadProtocol(definition)
-  const toggleNewProtocol = () => protocolActions.toggleNewProtocol(protocolState())
-  const handleRemoveProtocol = async (definition: ProtocolDefinition) =>
-    protocolActions.removeProtocol(protocolState(), definition)
-  const handleRestoreBuiltinProtocols = async () => protocolActions.restoreBuiltinProtocols()
-
+  const selectedGroups = channelPresentation.selectedModelGroupsFor(activeModels)
   const action = verifiedFor?.channelId === selectedId ? verifiedFor.source : null
 
-  /**
-   * 状态行文案：三个按钮问的是**三个不同的问题**，所以文案分开写。
-   * 共用一句「验证通过」会让「地址通不通 / 是哪种协议 / 拉回几个模型」看起来像同一件事——
-   * 这正是此前分不清「这次到底出没出网」的根源。
-   */
-  const statusLine = useMemo(() => {
-    if (!action) return null
-    if (action === 'detect') {
-      if (detect.status === 'checking') return '正在探测协议…'
-      if (detect.status === 'ok' && detect.protocol)
-        return `✓ 已识别协议 · ${protocolLabel(detect.protocol, catalog)}`
-      if (detect.status === 'error') return `✗ 未识别出协议 · ${detect.message ?? '所有候选协议均未通过'}`
-      return null
-    }
-    const label = protocolLabel(verifiedFor?.protocol ?? '', catalog)
-    if (action === 'models') {
-      if (modelsResult.status === 'checking') return '正在拉取模型…'
-      if (modelsResult.status === 'ok')
-        return `✓ 已拉取模型 · ${label} · 发现 ${modelsResult.modelCount ?? 0} 个模型`
-      if (modelsResult.status === 'error') return `✗ 拉取失败 · ${modelsResult.message ?? '未知错误'}`
-      return null
-    }
-    /*
-     * CLI 族没有"地址"这回事（对账 #308）：它的验证是"本机命令在不在"。
-     * 文案必须跟着走 —— 一条本机命令的渠道回「地址可达」，用户会去找那个根本不存在的地址。
-     */
-    /*
-     * 判据是**这次走的是哪条路**，不只看协议族：桌面壳里 CLI 渠道起的是本机命令，
-     * 浏览器里同一条协议走的是"访问自建网关"（那时它确实是在验地址）。
-     * 只看 `family` 的话，浏览器里网关验证成功也会显示「本机命令就绪」—— 一句假的。
-     */
-    const isCli =
-      hasLocalCli && verifiedFor ? protocolById(verifiedFor.protocol, catalog)?.family === 'cli-gateway' : false
-    if (verify.status === 'checking') return isCli ? '正在检查本机命令…' : '正在验证地址…'
-    if (verify.status === 'ok')
-      return `${isCli ? '✓ 本机命令就绪' : '✓ 地址可达'} · ${label}${typeof verify.latency === 'number' ? ` · ${verify.latency}ms` : ''}`
-    if (verify.status === 'error') return `✗ ${verify.message ?? (isCli ? '本机命令有问题' : '地址不可达')}`
-    return null
-  }, [action, verifiedFor, verify, modelsResult, detect, catalog, hasLocalCli])
-
-  /**
-   * 同一条状态行的**语气**（产品文档 §4.5）：只看"这次是哪个动作、它现在什么状态"，
-   * 三个动作各有自己的失败档（探测未识别 / 拉取失败 / 验证不通）—— 与上面的文案分支一一对应。
-   */
-  const statusTone: NoticeTone = useMemo(() => {
-    if (!action) return 'info'
-    if (action === 'detect') return detect.status === 'error' ? 'error' : 'info'
-    if (action === 'models') return modelsResult.status === 'error' ? 'error' : 'info'
-    return verify.status === 'error' ? 'error' : 'info'
-  }, [action, detect.status, modelsResult.status, verify.status])
+  const {
+    line: statusLine,
+    tone: statusTone,
+    showMockNote,
+  } = statusPresentation.settingsStatusPresentation({
+    action,
+    verifiedFor,
+    verify,
+    modelsResult,
+    detect,
+    catalog,
+    hasLocalCli,
+  })
 
   // mock 提示只在**真的拿 mock 验了地址**时出现（探测的候选表不含 mock，故不受其影响）。
-  const showMockNote = action === 'verify' && verify.status === 'ok' && verifiedFor?.protocol === 'mock'
   /**
    * 这条协议**要几把钥匙**（用户第 22 批 #358）：协议目录声明（RunningHub 两把），
    * 没声明的协议回落到"一把"，见下面令牌区的渲染。
    */
-  const credentialSlots = protocolById(protocol, catalog)?.credentials ?? []
   /**
    * 这一条协议官网的**取令牌页**（用户第 19 批 #2：「需要有点击就跳转到官网，获取令牌的选项」）。
    * 地址来自协议目录的 `docUrl`（唯一来源）—— 没写就**不出现**这个链接，不猜地址。
    */
-  const docUrl = protocolById(protocol, catalog)?.docUrl ?? ''
   /**
    * 选中的是不是**内置渠道**（用户第 20 批：三条常驻渠道「固定字段」= 名称 + 协议）。
    * 界面据此禁用名称 / 协议与删除；命令层（仓储）另有一道同样的拦截，
    * 所以"禁不掉"这件事不靠界面自觉。
    */
   const builtinSelected = !!selectedId && isBuiltinChannelId(selectedId)
-  const menuChannel = channelMenu
-    ? channelsList.find((channel) => channel.id === channelMenu.channelId) ?? null
-    : null
-  const menuBuiltin = !!menuChannel && isBuiltinChannelId(menuChannel.id)
-  const { width: menuWidth, left: menuLeft, top: menuTop } = channelMenuGeometry(
+  const {
+    channel: menuChannel,
+    builtin: menuBuiltin,
+    width: menuWidth,
+    left: menuLeft,
+    top: menuTop,
+  } = channelPresentation.channelMenuPresentationFor(
+    channelsList,
     channelMenu,
     { width: window.innerWidth, height: window.innerHeight },
     menuConfirmDelete,
-    menuBuiltin,
   )
   return (
     <div className={styles.page}>

@@ -292,7 +292,7 @@
       "test": [
         "src/pages/SettingsPage/customProtocolDraft.test.ts"
       ],
-      "budget": 2215
+      "budget": 2093
     },
     {
       "module": "src/pages/SkillsPage/SkillsPage.module.css",
@@ -4578,6 +4578,137 @@
         "src/workbenches/canvas/lightbox/lightboxCropActionCoordinator.test.ts"
       ],
       "budget": 226
+    },
+    {
+      "module": "src/pages/SettingsPage/settingsPage/settingsRoutingActions.ts",
+      "owner": "pages-settings-routing-actions",
+      "responsibility": "派生设置页选路候选并编排单项、整组切换和展开集合。",
+      "owns": [
+        "路由候选、渠道分组与已选 key 投影",
+        "空集合、失效候选拒绝和 routingPolicy 写入",
+        "候选增减与渠道展开集合动作"
+      ],
+      "doesNotOwn": [
+        "React state 与页面生命周期",
+        "JSX/DOM/CSS 与选路界面渲染",
+        "ChannelStore 存储实现"
+      ],
+      "publicApi": [
+        "RoutingActions",
+        "routingPresentationFor",
+        "createRoutingActions",
+        "toggleRoutingChannelExpanded"
+      ],
+      "test": [
+        "src/pages/SettingsPage/settingsPage/settingsRoutingActions.test.ts"
+      ],
+      "budget": 73
+    },
+    {
+      "module": "src/pages/SettingsPage/settingsPage/settingsChannelPresentation.ts",
+      "owner": "pages-settings-channel-presentation",
+      "responsibility": "投影设置页渠道过滤、凭证组、协议选项、菜单几何和模型分组展示状态。",
+      "owns": [
+        "渠道搜索过滤与凭证组排序选择",
+        "协议可见项、说明、凭据槽和文档地址",
+        "渠道菜单展示信息与模型草稿/分组投影"
+      ],
+      "doesNotOwn": [
+        "React hooks 与组件生命周期",
+        "ChannelStore 持久化和协议适配器",
+        "JSX/DOM/CSS 与视觉样式"
+      ],
+      "publicApi": [
+        "visibleChannelsFor",
+        "credentialGroupsFor",
+        "activeCredentialGroupFor",
+        "channelMenuPresentationFor",
+        "protocolOptionsFor",
+        "protocolUsageFor",
+        "draftModelsFor",
+        "selectedModelGroupsFor"
+      ],
+      "test": [
+        "src/pages/SettingsPage/settingsPage/settingsChannelPresentation.test.ts"
+      ],
+      "budget": 115
+    },
+    {
+      "module": "src/pages/SettingsPage/settingsPage/settingsInteractionLifecycle.ts",
+      "owner": "pages-settings-interaction-lifecycle",
+      "responsibility": "编排设置页选渠道复位、菜单与资料抽屉生命周期、notice 和映射计时器。",
+      "owns": [
+        "选中渠道后的浮层、草稿、测试和计时器复位顺序",
+        "渠道菜单和资料抽屉的焦点、Esc、resize、scroll 清理",
+        "定时 notice 与映射保存计时器清理"
+      ],
+      "doesNotOwn": [
+        "React state/refs 与 DOM 查询实现",
+        "JSX/CSS 与页面结构",
+        "ChannelStore 和映射持久化"
+      ],
+      "publicApi": [
+        "TimerPorts",
+        "SelectedChannelPorts",
+        "applySelectedChannelChange",
+        "KeyFacts",
+        "ChannelMenuLifecyclePorts",
+        "watchChannelMenu",
+        "ProfileDrawerLifecyclePorts",
+        "watchProfileDrawer",
+        "clearTimedNotice",
+        "clearMapSaveTimers"
+      ],
+      "test": [
+        "src/pages/SettingsPage/settingsPage/settingsInteractionLifecycle.test.ts"
+      ],
+      "budget": 137
+    },
+    {
+      "module": "src/pages/SettingsPage/settingsPage/settingsStatusPresentation.ts",
+      "owner": "pages-settings-status-presentation",
+      "responsibility": "统一设置页验证、协议探测和模型拉取的状态文案、语气与 mock 提示。",
+      "owns": [
+        "三种动作的 checking/success/error 文案",
+        "CLI 与浏览器路由语态区分",
+        "状态 tone 和 mock 提示投影"
+      ],
+      "doesNotOwn": [
+        "请求执行与结果存储",
+        "React state 与提示组件渲染",
+        "协议适配器和渠道配置"
+      ],
+      "publicApi": [
+        "SettingsStatusInput",
+        "settingsStatusPresentation"
+      ],
+      "test": [
+        "src/pages/SettingsPage/settingsPage/settingsStatusPresentation.test.ts"
+      ],
+      "budget": 108
+    },
+    {
+      "module": "src/pages/SettingsPage/settingsPage/settingsActionDelegates.ts",
+      "owner": "pages-settings-action-delegates",
+      "responsibility": "把渠道、模型映射和协议协调器的动作绑定到页面最新状态快照。",
+      "owns": [
+        "频道动作与 channelState 的委托",
+        "映射动作的直接委托",
+        "协议动作与 protocolState 的委托"
+      ],
+      "doesNotOwn": [
+        "动作实现和状态存储",
+        "React state 与事件绑定",
+        "JSX/DOM/CSS 与页面文案"
+      ],
+      "publicApi": [
+        "SettingsActionDelegateSources",
+        "createSettingsActionDelegates"
+      ],
+      "test": [
+        "src/pages/SettingsPage/settingsPage/settingsActionDelegates.test.ts"
+      ],
+      "budget": 65
     }
   ]
 }
