@@ -478,7 +478,7 @@
       "test": [
         "src/workbenches/canvas/panels/CreationPanel.test.ts"
       ],
-      "budget": 1907
+      "budget": 1782
     },
     {
       "module": "src/workbenches/ecommerce/EcommerceStudio.module.css",
@@ -4399,6 +4399,53 @@
         "src/workbenches/canvas/lightbox/lightboxAnnotationCoordinator.test.ts"
       ],
       "budget": 324
+    },
+    {
+      "module": "src/workbenches/canvas/panels/creation/creationPromptCoordinator.ts",
+      "owner": "canvas-creation-prompt-actions",
+      "responsibility": "编排创作面板提示词防抖、引用与预设菜单、模型选路、配方快照和参数分节。",
+      "owns": [
+        "提示词 300ms 提交计时器与取消时序",
+        "mention/preset 菜单动作和模型 recipe/channelId 事件",
+        "图片、视频与 MJ 参数分节的纯构造规则"
+      ],
+      "doesNotOwn": [
+        "React hooks、state、refs 与组件生命周期",
+        "DOM 测量、事件监听注册和 JSX 渲染",
+        "ChannelStore、生成执行与节点写入真相"
+      ],
+      "publicApi": [
+        "PromptCommitScheduler",
+        "PromptCommitTimerPorts",
+        "createPromptCommitScheduler",
+        "MenuPointerAction",
+        "mentionPointerAction",
+        "presetPointerAction",
+        "InsertMentionPorts",
+        "insertMentionAction",
+        "OpenMentionPorts",
+        "openMentionAtCaretAction",
+        "PromptValuePorts",
+        "applyPromptValueChange",
+        "RecipeSnapshotInput",
+        "buildRecipeSnapshot",
+        "ModelSelectionInput",
+        "creationModelSelectionEvent",
+        "PromptToolInput",
+        "runPromptToolAction",
+        "MjSliderInput",
+        "mjSliderEvent",
+        "ModelCategoryInput",
+        "modelBelongsToCategory",
+        "CreationParamSectionsInput",
+        "creationParamSections",
+        "MjParamSectionsInput",
+        "mjParamSections"
+      ],
+      "test": [
+        "src/workbenches/canvas/panels/creation/creationPromptCoordinator.test.ts"
+      ],
+      "budget": 390
     }
   ]
 }

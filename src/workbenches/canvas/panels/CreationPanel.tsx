@@ -10,7 +10,6 @@ import {
 import type { ModelCapability } from '../../../domain/shared/capability'
 import type { GenerationData } from '../../../domain/canvas/model/node'
 import type { PanelModel, RecipeSnapshot } from './panelModel'
-import { generationParams } from '../../../domain/canvas/nodeSpecs/params'
 import { moveInOrder } from './panelModel'
 import { useChannels } from '../../../app/providers/ChannelStoreProvider'
 import { useSkills } from '../../../app/providers/SkillStoreProvider'
@@ -41,7 +40,7 @@ import {
   isAutoRatio,
   videoParamsFor,
 } from '../../../domain/canvas/layout/videoParams'
-import { MJ_PERSONALIZE_MAX, MJ_SLIDERS, mjSettingsOf } from '../../../domain/canvas/layout/mjParams'
+import { mjSettingsOf } from '../../../domain/canvas/layout/mjParams'
 import { imageParamsFor } from '../../../domain/canvas/layout/imageParams'
 import {
   capabilityOfLogical,
@@ -66,17 +65,27 @@ import { PresetMenu, PresetOptions } from './PresetMenu'
 
 import {
   CATEGORY_OPTIONS,
-  CUSTOM_SIZE_SEED,
-  RESOLUTION_CUSTOM,
-  backgroundLabelOf,
   promptNeedsExpand,
-  qualityLabelOf,
-  resolutionLabelOf,
-  resolutionValueOf,
 } from './creation/creationCatalog'
 import { creationModelNames, creationModelOptions } from './creation/creationModelOptions'
 import { deriveCreationQualityParams } from './creation/creationQualityParams'
 import { panelGeometryFor } from './creation/creationPanelGeometry'
+import {
+  applyPromptValueChange,
+  buildRecipeSnapshot,
+  creationModelSelectionEvent,
+  creationParamSections,
+  createPromptCommitScheduler,
+  insertMentionAction,
+  mentionPointerAction,
+  mjParamSections,
+  mjSliderEvent,
+  modelBelongsToCategory,
+  openMentionAtCaretAction,
+  presetPointerAction,
+  runPromptToolAction,
+  type PromptCommitScheduler,
+} from './creation/creationPromptCoordinator'
 
 export {
   COUNT_OPTIONS,
@@ -385,7 +394,13 @@ export function CreationPanel(props: CreationPanelProps) {
    * 下面的 effect 会把草稿同步过去 —— 不会把 A 节点的内容写进 B 节点。
    */
   const [promptDraft, setPromptDraft] = useState(model.prompt)
-  const promptTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const promptCommit = useRef<PromptCommitScheduler | null>(null)
+  if (!promptCommit.current) {
+    promptCommit.current = createPromptCommitScheduler((text) => {
+      onEventRef.current({ type: 'setPrompt', text })
+    })
+  }
+  const promptTimer = promptCommit.current
 
   /**
    * **「自定义像素」那一格的模式**（对账 #545，收口 #542 的残留）。
@@ -405,26 +420,17 @@ export function CreationPanel(props: CreationPanelProps) {
   // 外部值变了（切节点 / 撤销 / 别的入口写入）→ 丢弃本地草稿，跟着外部走
   useEffect(() => {
     setPromptDraft(model.prompt)
-    if (promptTimer.current) {
-      clearTimeout(promptTimer.current)
-      promptTimer.current = null
-    }
+    promptCommit.current?.cancel()
   }, [model.prompt])
 
   // 卸载前把未落库的输入补交，避免「刚打完就关面板」丢字
   useEffect(() => {
-    return () => {
-      if (promptTimer.current) clearTimeout(promptTimer.current)
-    }
+    return () => promptCommit.current?.cancel()
   }, [])
 
   const onPromptChange = (text: string) => {
     setPromptDraft(text)
-    if (promptTimer.current) clearTimeout(promptTimer.current)
-    promptTimer.current = setTimeout(() => {
-      promptTimer.current = null
-      onEvent({ type: 'setPrompt', text })
-    }, 300)
+    promptCommit.current?.schedule(text)
   }
   const closePicker = () => setOpenPicker(null)
   const togglePicker = (key: string) => setOpenPicker((cur) => (cur === key ? null : key))
@@ -504,15 +510,9 @@ export function CreationPanel(props: CreationPanelProps) {
   useEffect(() => {
     if (!mentionOpen) return
     const onDown = (e: PointerEvent) => {
-      const el = e.target as HTMLElement | null
-      /**
-       * 只有「点在某一条候选上」才算操作菜单；菜单里的空白（内距 / 两栏高度差留下的空档）
-       * 一律按「点别处」处理 —— 用户 2026-10-05 第 3 批：「点击其他空白的区域需要取消」。
-       */
-      if (el?.closest('[data-panel-mention]')) {
-        return
+      if (mentionPointerAction(e.target as HTMLElement | null) === 'close') {
+        setMentionOpen(false)
       }
-      setMentionOpen(false)
     }
     /**
      * **捕获阶段**（第三个参数 `true`）——这条不是保险，是必需：
@@ -529,8 +529,10 @@ export function CreationPanel(props: CreationPanelProps) {
 
   /** 插进正文：走编辑器自己的 `insertMention`（落在光标处、带 chip 的存储形态） */
   const insertMention = (c: MentionCandidate) => {
-    promptEditorRef.current?.insertMention(mentionToken('node', c.id, c.label))
-    setMentionOpen(false)
+    insertMentionAction(c, mentionToken, {
+      insert: (token) => promptEditorRef.current?.insertMention(token),
+      closeMention: () => setMentionOpen(false),
+    })
   }
 
   /**
@@ -541,26 +543,28 @@ export function CreationPanel(props: CreationPanelProps) {
    *    「实际发出去的」（`presetPromptSuffix` 拼的那句）永远同源。
    */
   const onPromptValueChange = (next: string) => {
-    const presetRef = parseMentions(next).find((m) => m.kind === 'preset')
-    if ((presetRef?.id ?? null) !== (model.preset ?? null)) {
-      onEvent({ type: 'setPreset', preset: presetRef?.id ?? null })
-    }
-    onPromptChange(stripMentionMarkup(next))
+    applyPromptValueChange(next, {
+      currentPreset: model.preset ?? null,
+      presetIdOf: (value) =>
+        parseMentions(value).find((mention) => mention.kind === 'preset')?.id ?? null,
+      plainTextOf: stripMentionMarkup,
+      setPreset: (preset) => onEvent({ type: 'setPreset', preset }),
+      schedulePrompt: onPromptChange,
+    })
   }
 
   /** 打出 `@`（或编辑器报「触发了引用」）时，把候选菜单落到光标下面 */
   const openMentionAtCaret = () => {
-    if (mentionCandidates.length === 0) return
-    const box = promptBoxRef.current?.getBoundingClientRect()
     const sel = window.getSelection()
-    const rect = sel && sel.rangeCount > 0 ? sel.getRangeAt(0).getBoundingClientRect() : null
-    if (box && rect && (rect.width > 0 || rect.height > 0)) {
-      setMentionPos({ left: rect.left - box.left, top: rect.bottom - box.top + 4 })
-    } else {
-      setMentionPos(null)
-    }
-    closePresetMenus()
-    setMentionOpen(true)
+    openMentionAtCaretAction({
+      candidateCount: mentionCandidates.length,
+      boxRect: promptBoxRef.current?.getBoundingClientRect() ?? null,
+      caretRect:
+        sel && sel.rangeCount > 0 ? sel.getRangeAt(0).getBoundingClientRect() : null,
+      setPosition: setMentionPos,
+      closePresetMenus,
+      openMention: () => setMentionOpen(true),
+    })
   }
 
   /**
@@ -596,27 +600,9 @@ export function CreationPanel(props: CreationPanelProps) {
   useEffect(() => {
     if (!presetOpen && !presetOptionsOpen) return
     const onDown = (e: PointerEvent) => {
-      const el = e.target as HTMLElement | null
-      /**
-       * 菜单里「点在某一条 / 某一档按钮上」= 操作它，不收起；
-       * 点在菜单自己的**空白**上（行距、两栏高度差留下的空档、面板内距）
-       * 按「点别处」处理并收起 —— 用户要的就是这一下能取消。
-       */
-      if (
-        el?.closest('[data-preset-menu] button') ||
-        el?.closest('[data-preset-options] button')
-      ) {
-        return
+      if (presetPointerAction(e.target as HTMLElement | null) === 'close') {
+        closePresetMenus()
       }
-      /**
-       * 开关按钮自己不算「别处」：这一下交给它的 `onClick` 去 toggle。
-       *
-       * ⚠️ 这里以前写的是 `[data-panel-preset-open]` / `[data-panel-preset-gear]` ——
-       * 两个选择器**在代码里根本不存在**（按钮上的真名是 `data-panel-preset`，
-       * 那枚「齿轮」随预设 chip 改版一起删了），于是这条守卫从来没生效过。
-       */
-      if (el?.closest('[data-panel-preset]')) return
-      closePresetMenus()
     }
     /**
      * 同上：**捕获阶段**。用户 2026-10-05 第 3 批报的「点其他空白区域不收起」
@@ -649,13 +635,12 @@ export function CreationPanel(props: CreationPanelProps) {
    * `overrides` 是本次正要写入的那一项（例如刚选的 ratio），因为 state 还没更新。
    */
   const recipeSnapshot = (overrides: Partial<GenerationData> = {}): RecipeSnapshot => {
-    const merged = { ...(data as GenerationData), ...overrides }
-    return {
+    return buildRecipeSnapshot({
+      data,
+      overrides,
       channelId: shownChannelId,
       model: shownModel,
-      mode: merged.mode ?? 'image',
-      params: { mode: merged.mode ?? 'image', ...generationParams(merged) },
-    }
+    })
   }
 
   /**
@@ -667,16 +652,15 @@ export function CreationPanel(props: CreationPanelProps) {
    */
   const selectModel = (modelName: string) => {
     const provider = channelIdForLogical(enabled, modelName, ownedChannelId)
-    const nextChannelId = provider ?? ownedChannelId
-    onEvent({
-      type: 'setModel',
-      model: modelName,
-      ...(provider && provider !== ownedChannelId ? { channelId: provider } : {}),
-      recipe: {
-        ...recipeSnapshot({ model: modelName }),
-        channelId: nextChannelId || shownChannelId,
-      },
-    })
+    onEvent(
+      creationModelSelectionEvent({
+        modelName,
+        provider,
+        ownedChannelId,
+        shownChannelId,
+        recipe: recipeSnapshot({ model: modelName }),
+      }),
+    )
   }
 
   const activeChannel = enabled.find((c) => c.id === shownChannelId)
@@ -759,9 +743,12 @@ export function CreationPanel(props: CreationPanelProps) {
    */
   const promptToolTarget = resolveTextRoute(allChannels, shownChannelId, shownModel)
   const runPromptTool = (action: PromptToolAction) =>
-    tools?.run(model.prompt, action, {
-      channelId: promptToolTarget?.channelId ?? '',
-      model: promptToolTarget?.model ?? shownLogicalModel,
+    runPromptToolAction({
+      text: model.prompt,
+      action,
+      target: promptToolTarget,
+      fallbackModel: shownLogicalModel,
+      tools,
     })
   /**
    * 模型 chip 在**还没选**时的占位文案（用户 2026-09-27 第 8 轮）。
@@ -924,135 +911,40 @@ export function CreationPanel(props: CreationPanelProps) {
    * 张数是每次都要动的量，与「这一次怎么画」的画质 / 比例不是一类。
    */
   const customSizeHint = customSizeHintValue
-  const paramSections: ParamSection[] = [
-    ...(resolutions.length > 0
-      ? [
-          {
-            name: 'resolution',
-            /** 这一组的标题（参考图里 `画质` 就写在尺寸行上面） */
-            label: '画质',
-            variant: 'pill' as const,
-            options: [
-              ...resolutions.map((v) => ({
-                value: resolutionValueOf(v),
-                label: resolutionLabelOf(v),
-              })),
-              /** 「自定义」那格：选中之后下面才长出输入框（见下一段） */
-              ...(canCustomSize
-                ? [
-                    {
-                      value: RESOLUTION_CUSTOM,
-                      label: RESOLUTION_CUSTOM,
-                      /** 不写死选中态，靠 `resolutionPillValue` 那一条判定 —— 一处口径 */
-                    },
-                  ]
-                : []),
-            ],
-            value: resolutionPillValue,
-            onSelect: (v: string) => {
-              /** 点「自定义」= 进自定义模式；点 1K/2K/4K = 退出（见 `customMode` 的说明） */
-              setCustomMode({ nodeId, on: v === RESOLUTION_CUSTOM })
-              onEvent({
-                type: 'setResolution',
-                /**
-                 * 点「自定义」时先落一个**合法种子值**，而不是把哨兵写进节点：
-                 * 用户还没敲字就点生成的话，发出去的是 1024x1024（官方认可的方图），
-                 * 不是一个 `自定义` 字符串 —— 那会被服务端直接 400。
-                 */
-                resolution: v === RESOLUTION_CUSTOM ? CUSTOM_SIZE_SEED : v,
-                recipe: recipeSnapshot({
-                  resolution: v === RESOLUTION_CUSTOM ? CUSTOM_SIZE_SEED : v,
-                }),
-              })
-            },
-          },
-        ]
-      : []),
-    /**
-     * 自定义像素输入框：**只在「自定义」那格亮着时才有这一段**。
-     *
-     * `name` 用 `resolutionCustom` 而不是 `resolution`：冒烟与单测按段名定位，
-     * 与上面那个胶囊是同一件事的两个形态，混用同名会让「段里到底有什么」说不清。
-     */
-    ...(customResolutionOn
-      ? [
-          {
-            name: 'resolutionCustom',
-            label: '',
-            variant: 'text' as const,
-            options: [],
-            value: storedResolution,
-            placeholder: '宽x高，如 1024x1536',
-            hint: customSizeHint?.text,
-            hintTone: customSizeHint?.tone,
-            onSelect: (v: string) =>
-              onEvent({
-                type: 'setResolution',
-                resolution: v,
-                recipe: recipeSnapshot({ resolution: v }),
-              }),
-          },
-        ]
-      : []),
-    ...(qualityChoices.length > 0
-      ? [
-          {
-            name: 'quality',
-            /** 空标题：并入上面那一组「画质」，不再另起一行小标题 */
-            label: '',
-            variant: 'pill' as const,
-            options: qualityChoices.map((q) => ({ value: q, label: qualityLabelOf(q) })),
-            value: data.quality ?? 'auto',
-            onSelect: (v: string) =>
-              onEvent({
-                type: 'setQuality',
-                quality: v,
-                recipe: recipeSnapshot({ quality: v as NonNullable<GenerationData['quality']> }),
-              }),
-          },
-        ]
-      : []),
-    ...(backgroundChoices.length > 0
-      ? [
-          {
-            name: 'background',
-            label: '背景',
-            variant: 'pill' as const,
-            options: backgroundChoices.map((b) => ({ value: b, label: backgroundLabelOf(b) })),
-            value: data.background ?? 'auto',
-            onSelect: (v: string) =>
-              onEvent({
-                type: 'setBackground',
-                background: v,
-                recipe: recipeSnapshot({ background: v }),
-              }),
-          },
-        ]
-      : []),
-    /** 自定像素亮着时比例整段退场（它已经把画幅说全了，见上面那段说明） */
-    ...(ratios.length > 0 && !customResolutionOn
-      ? [
-          {
-            name: 'ratio',
-            label: '比例',
-            variant: 'ratioGrid' as const,
-            /**
-             * ⚠️ 2026-10-16：**末格「自定义」已撤下**（用户：「比例也不需要有自定义」）。
-             * 自定义像素那一格已经把画幅说全了，比例再开一格自定只是同一个能力开两个口子；
-             * 而且用户在比例里敲 `7:5`、又在画质里敲 `1536x1024` 时，两者会互相矛盾。
-             */
-            options: ratios.map((r) => ({ value: r, label: r })),
-            value: shownRatio,
-            onSelect: (v: string) =>
-              onEvent({
-                type: 'setRatio',
-                ratio: v,
-                recipe: recipeSnapshot({ ratio: v }),
-              }),
-          },
-        ]
-      : []),
-  ]
+  const paramSections: ParamSection[] = creationParamSections({
+    data,
+    resolutions,
+    canCustomSize,
+    resolutionPillValue,
+    customResolutionOn,
+    storedResolution,
+    customSizeHint,
+    qualityChoices,
+    backgroundChoices,
+    ratios,
+    shownRatio,
+    onCustomMode: (on) => setCustomMode({ nodeId, on }),
+    onResolution: (value) =>
+      onEvent({
+        type: 'setResolution',
+        resolution: value,
+        recipe: recipeSnapshot({ resolution: value }),
+      }),
+    onQuality: (quality) =>
+      onEvent({
+        type: 'setQuality',
+        quality,
+        recipe: recipeSnapshot({ quality: quality as NonNullable<GenerationData['quality']> }),
+      }),
+    onBackground: (background) =>
+      onEvent({
+        type: 'setBackground',
+        background,
+        recipe: recipeSnapshot({ background }),
+      }),
+    onRatio: (ratio) =>
+      onEvent({ type: 'setRatio', ratio, recipe: recipeSnapshot({ ratio }) }),
+  })
 
   /**
    * **Midjourney 的「高级设置」**（用户 2026-10-03 图二）。
@@ -1075,44 +967,20 @@ export function CreationPanel(props: CreationPanelProps) {
    * 名字对不上就会「改了参数、新建节点却没记住」。
    */
   const onMjSlider = (key: 'stylize' | 'weird' | 'chaos', n: number) => {
-    if (!Number.isFinite(n)) return
-    if (key === 'stylize') {
-      onEvent({ type: 'setMjStylize', value: n, recipe: recipeSnapshot({ mjStylize: n }) })
-    } else if (key === 'weird') {
-      onEvent({ type: 'setMjWeird', value: n, recipe: recipeSnapshot({ mjWeird: n }) })
-    } else {
-      onEvent({ type: 'setMjChaos', value: n, recipe: recipeSnapshot({ mjChaos: n }) })
-    }
+    const event = mjSliderEvent({ key, value: n, recipeFor: recipeSnapshot })
+    if (event) onEvent(event)
   }
-  const mjSections: ParamSection[] = isMj
-    ? [
-        {
-          name: 'mj-personalize',
-          label: '个性化风格',
-          variant: 'text' as const,
-          options: [],
-          value: mj.personalize,
-          placeholder: `填写你的个性化风格代码（--p，最多 ${MJ_PERSONALIZE_MAX} 字）`,
-          onSelect: (v: string) =>
-            onEvent({
-              type: 'setMjPersonalize',
-              value: v,
-              recipe: recipeSnapshot({ mjPersonalize: v }),
-            }),
-        },
-        ...MJ_SLIDERS.map((spec) => ({
-          name: `mj-${spec.key}`,
-          label: spec.label,
-          variant: 'slider' as const,
-          options: [],
-          min: spec.min,
-          max: spec.max,
-          step: 1,
-          value: String(mj[spec.key]),
-          onSelect: (v: string) => onMjSlider(spec.key, Number(v)),
-        })),
-      ]
-    : []
+  const mjSections: ParamSection[] = mjParamSections({
+    enabled: isMj,
+    settings: mj,
+    onPersonalize: (value) =>
+      onEvent({
+        type: 'setMjPersonalize',
+        value,
+        recipe: recipeSnapshot({ mjPersonalize: value }),
+      }),
+    onSlider: onMjSlider,
+  })
   /**
    * 切换功能类别时，**节点自己存的**模型是否属于目标类别；不属于就得清掉
    * （否则会把图片模型发给视频渠道）。
@@ -1127,10 +995,17 @@ export function CreationPanel(props: CreationPanelProps) {
  * 那次渲染里调用的，此刻 `videoMode` 仍是旧值 —— 按当前类别判会恒为真
  * ⇒ 旧模型永远清不掉（G46 实测踩到）。
    */
-  const modelBelongsTo = (m: 'image' | 'video') =>
-    !!ownedModel &&
-    categoryOfLogical(allChannels, toLogicalName(allChannels, ownedModel), ownedChannelId || undefined) ===
-      m
+  const modelBelongsTo = (target: 'image' | 'video') =>
+    modelBelongsToCategory({
+      ownedModel,
+      target,
+      categoryOf: (model) =>
+        categoryOfLogical(
+          allChannels,
+          toLogicalName(allChannels, model),
+          ownedChannelId || undefined,
+        ),
+    })
 
   /**
    * 全局运行中**不再**禁用本节点的生成按钮（用户报「一个节点生成时其他节点无法生成」）。

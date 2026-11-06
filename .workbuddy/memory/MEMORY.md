@@ -1,5 +1,15 @@
 # CanvasFlow（轻画）项目记忆
 
+### 创作面板提示词动作编排拆分（2026-11-06）
+
+- `creationPromptCoordinator.ts` 接管 300ms 提示词提交计时器、mention/preset 菜单判定、模型选择事件、recipe 快照、
+  prompt tool 输入消费与参数分节；`CreationPanel` 继续拥有 React state/refs、DOM 测量、window 监听、Store dispatch 和 JSX。
+- `promptToolTarget = resolveTextRoute(...)` 必须在 render 时解析，点击时只消费该快照；改成点击时重新解析会引入时序漂移。
+  提示词计时器只能由 `createPromptCommitScheduler` 管，替换输入必须取消前一计时器，外部 prompt 同步/卸载必须 cancel。
+- `CreationPanel.tsx` 1907→1782，render-after 哈希
+  `F2D331A80E33724ADC6CD016BF7B624731941470F8667AC927717858CAA1E7EE` 不变；新模块预算 390、宿主预算 1782。
+  全量 576 files / 5073 tests，check（1001 modules / 3959 deps、25 legacy、145 semantic）和 build 通过。
+
 ### 灯箱标注动作编排拆分（2026-11-06）
 
 - `lightboxAnnotationCoordinator.ts` 只编排指针绘制、文字图层、键盘删除、撤销重做、拖拽订阅与保存端口；

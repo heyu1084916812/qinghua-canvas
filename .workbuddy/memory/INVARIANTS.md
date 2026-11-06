@@ -1,5 +1,13 @@
 # CanvasFlow 不变量详表
 
+## 创作面板提示词动作边界（2026-11-06）
+
+- `creationPromptCoordinator.ts` 不得 import React、DOM 或 Store；`CreationPanel` 继续拥有 state/refs、DOM 测量、
+  window 监听器、Store dispatch 与 JSX。协调器只接收显式快照和动作端口。
+- `promptToolTarget` 必须在 render 时由 `resolveTextRoute` 解析；点击只消费同一快照，禁止在点击时重新解析当前渠道。
+  提示词防抖只允许一个 scheduler owner，替换输入先取消旧计时器，外部草稿同步和卸载都走 cancel。
+- 任何涉及提示词/模型动作的拆分必须保持 `CreationPanel` render-after 哈希不变；出现 JSX、文案、菜单结构变化即转「涉及 UI」取证。
+
 ## 灯箱标注动作边界（2026-11-06）
 
 - `lightboxAnnotationCoordinator.ts` 不得 import React、DOM、CanvasStore 或素材烘焙实现；它只能经显式端口读写状态与副作用。
