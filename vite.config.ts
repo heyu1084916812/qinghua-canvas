@@ -27,6 +27,29 @@ export default defineConfig({
   build: {
     // 生产构建剔除 dev/ 陈列室：入口不引用即被 tree-shake，这里再显式排除源码
     sourcemap: false,
+    rolldownOptions: {
+      output: {
+        codeSplitting: {
+          groups: [
+            {
+              name: 'react-vendor',
+              test: /node_modules[\\/](?:react|react-dom|react-router|react-router-dom|scheduler)[\\/]/,
+              priority: 20,
+            },
+            {
+              name: 'xyflow',
+              test: /node_modules[\\/]@xyflow[\\/]/,
+              priority: 15,
+            },
+            {
+              name: 'channel-adapters',
+              test: /src[\\/]platform[\\/]channels[\\/]/,
+              priority: 10,
+            },
+          ],
+        },
+      },
+    },
   },
   test: {
     environment: 'node',

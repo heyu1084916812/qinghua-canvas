@@ -22,10 +22,10 @@
 
 ## 下载
 
-当前桌面版：**v0.1.16**（Windows 10 / 11 x64）
+当前桌面版：**v0.1.17**（Windows 10 / 11 x64）
 
 - [GitHub Releases](https://github.com/heyu1084916812/qinghua-canvas/releases/latest)
-- 安装包：`qinghua_0.1.16_x64-setup.exe`（约 41.8 MiB）
+- 安装包：`qinghua_0.1.17_x64-setup.exe`（本轮未构建安装包）
 - 桌面端基于 Tauri 2；首次运行需要系统具备 WebView2（Windows 10/11 通常已自带）
 
 ## 核心能力

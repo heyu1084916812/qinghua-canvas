@@ -1,5 +1,4 @@
-import { useEffect, useState, useSyncExternalStore, type ComponentType } from 'react'
-import { HostingPage } from '../pages/HostingPage/HostingPage'
+import { lazy, Suspense, useEffect, useState, useSyncExternalStore, type ComponentType } from 'react'
 import { SettingsPage } from '../pages/SettingsPage/SettingsPage'
 import { StoragePanel } from '../features/settings/StoragePanel'
 import { CliPanel } from '../features/settings/CliPanel'
@@ -48,6 +47,10 @@ import {
   type GlobalSettingsSection,
 } from '../state/ui/globalSettings'
 import styles from './GlobalSettingsOverlay.module.css'
+
+const HostingPage = lazy(() =>
+  import('../pages/HostingPage/HostingPage').then((m) => ({ default: m.HostingPage })),
+)
 
 /**
  * 栏目 → 图标（用户 2026-10-10 #8）。
@@ -283,7 +286,11 @@ export function GlobalSettingsOverlay() {
             <div className={styles.sectionBody} data-settings-section-body>
               {section === 'channels' && <SettingsPage key="channels" embedded />}
               {section === 'cli' && <CliPanel key="cli" />}
-              {section === 'hosting' && <HostingPage key="hosting" />}
+              {section === 'hosting' && (
+                <Suspense fallback={null}>
+                  <HostingPage key="hosting" />
+                </Suspense>
+              )}
               {section === 'storage' && <StoragePanel key="storage" />}
               {section === 'allLogs' && <AllLogsPanel key="allLogs" />}
               {section === 'appearance' && <ThemePanel key="appearance" />}
