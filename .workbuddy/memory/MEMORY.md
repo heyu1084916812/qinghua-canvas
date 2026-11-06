@@ -1,5 +1,12 @@
 # CanvasFlow（轻画）项目记忆
 
+### 第六批单文件拆分模板（2026-11-06）
+
+- 对剩余视图大文件，先找与渲染无关的纯动作编排（导入/导出、请求、投影、几何），用显式端口模块接线搬走，
+  再按治理口径收紧 legacy 预算；这样属于「不涉及 UI」，不需要截图，但必须证明 render 之后源码哈希不变。
+- `ProjectsPage.tsx` 的模板：导入/拖放/导出归 `projectsPage/projectActionCoordinator.ts`，目标 1075→987，
+  busy 守卫、失败文案、进度播报、带素材导出和 `finally` 解锁由兄弟测试钉住；禁止复制 Store/Repository/flowIo 真相。
+
 ### 设置页 CSS Module 同名类覆盖回归（2026-11-06）
 
 - 多份 CSS Module 展开到同一个 `styles` 对象时，后展开模块会**整体替换同名导出**，不是 CSS 层叠。

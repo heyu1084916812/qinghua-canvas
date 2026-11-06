@@ -255,7 +255,7 @@
       "test": [
         "src/pages/ProjectsPage/ProjectsPage.test.ts"
       ],
-      "budget": 1075
+      "budget": 987
     },
     {
       "module": "src/pages/SettingsPage/SettingsPage.module.css",
@@ -4265,6 +4265,34 @@
         "src/pages/EcommercePage/workbench/workbenchContracts.test.ts"
       ],
       "budget": 250
+    },
+    {
+      "module": "src/pages/ProjectsPage/projectsPage/projectActionCoordinator.ts",
+      "owner": "pages-projects-actions",
+      "responsibility": "编排项目导入、拖放导入与导出的忙碌守卫、状态播报和既有 flowIo / store 调用。",
+      "owns": [
+        "ProjectActionPorts 与 ProjectExportOptions 动作契约",
+        "导入/拖放/导出端口顺序与失败收口",
+        "忙碌守卫与进度状态播报"
+      ],
+      "doesNotOwn": [
+        "React state 与生命周期",
+        "DOM/JSX/CSS 与页面文案",
+        "ProjectRepository 与 flowIo 序列化",
+        "系统文件保存框"
+      ],
+      "publicApi": [
+        "ProjectActionPorts",
+        "ProjectExportOptions",
+        "applyProjectImportResult",
+        "importProjectFlow",
+        "dropProjectFlow",
+        "exportProjectFlow"
+      ],
+      "test": [
+        "src/pages/ProjectsPage/projectsPage/projectActionCoordinator.test.ts"
+      ],
+      "budget": 140
     }
   ]
 }

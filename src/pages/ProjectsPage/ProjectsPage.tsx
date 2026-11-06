@@ -7,12 +7,6 @@ import {
   type ProjectListStore,
   type ProjectSort,
 } from '../../state/project/listStore'
-import {
-  exportProject,
-  importProjectFile,
-  importProjectFromFile,
-  type ImportResult,
-} from '../../state/project/flowIo'
 import { projectRoute, WORKBENCHES, WORKBENCH_ORDER, type WorkbenchId } from '../../domain/shared/workbench'
 import { noticeA11y } from '../../domain/ui/notice'
 import { formatRelative } from '../../domain/shared/time'
@@ -31,12 +25,7 @@ import {
   HomeEmptyState,
   ProjectCard,
 } from './ProjectsPageViews'
-import {
-  PROJECT_KIND_ORDER,
-  projectKindCounts,
-  projectsForKind,
-  type ProjectKind,
-} from './projectListProjection'
+import { PROJECT_KIND_ORDER, projectKindCounts, projectsForKind, type ProjectKind } from './projectListProjection'
 import {
   TRASH_KEEP_DAYS,
   pruneTrashSelection,
@@ -45,19 +34,9 @@ import {
   toggleVisibleProjects,
   trashProjection,
 } from './projectSelectionModel'
-import {
-  deletionNotice,
-  importResultNotice,
-  projectCleanupNotice,
-  projectFailureNotice,
-  trashRestoreNotice,
-  type ProjectNotice,
-} from './projectResultPresentation'
-import {
-  deleteProjectsWithRuntime,
-  reportDeleteFailure,
-  retryProjectCleanup,
-} from './projectDeletionCoordinator'
+import { deletionNotice, projectCleanupNotice, projectFailureNotice, trashRestoreNotice, type ProjectNotice } from './projectResultPresentation'
+import { deleteProjectsWithRuntime, reportDeleteFailure, retryProjectCleanup } from './projectDeletionCoordinator'
+import { dropProjectFlow, exportProjectFlow, importProjectFlow, type ProjectActionPorts } from './projectsPage/projectActionCoordinator'
 
 export { HomeEmptyState, ProjectCard } from './ProjectsPageViews'
 
@@ -509,91 +488,24 @@ export function ProjectsPage() {
     }
   }
 
+  const actionPorts: ProjectActionPorts = {
+    platform,
+    repo,
+    status: notice,
+    load: () => store.load(),
+    busy: () => busy,
+    setBusy,
+    setDragging,
+    closeMenu: () => setMenuId(null),
+  }
   const handleImport = async () => {
-    if (busy) return
-    setBusy(true)
-    try {
-      await applyImportResult(await importProjectFile(platform, repo))
-    } catch (err) {
-      setStatus(`导入失败：${(err as Error).message}`, 'error')
-    } finally {
-      setBusy(false)
-    }
+    await importProjectFlow(actionPorts)
   }
-
-  /**
-   * 导入结果的**统一收尾**（对账 #234）：菜单选文件与"拖进来"两条入口共用，
-   * 免得出现"拖进来不播报 / 播报得不一样"这类分叉。
-   */
-  const applyImportResult = async (res: ImportResult) => {
-    const result = importResultNotice(res)
-    if (!result) return
-    await store.load()
-    notice(result)
-  }
-
-  /**
-   * **把一个 `.flow.json` 拖到项目页 = 导入**（对账 #234）。
-   *
-   * 为什么值得做：换机器时用户手里就是一个文件，"拖进来"是最自然的动作 ——
-   * 而在此之前拖上去**毫无反应**（页面没有 drop 处理），那很容易被当成"文件坏了"。
-   * 它同时让这条路可以被**自动化验收**（拖拽可脚本化，系统文件框不行），
-   * 于是"迁移"这件事不再只能靠手点。
-   */
   const handleDrop = async (e: React.DragEvent<HTMLDivElement>) => {
-    const file = e.dataTransfer?.files?.[0]
-    setDragging(false)
-    if (!file) return
-    if (!/\.json$/i.test(file.name)) {
-      setStatus('这里只接受 .flow.json 项目文件（拖进来的是别的类型）', 'error')
-      return
-    }
-    e.preventDefault()
-    if (busy) return
-    setBusy(true)
-    try {
-      await applyImportResult(
-        await importProjectFromFile(platform, repo, {
-          name: file.name,
-          size: file.size,
-          mime: file.type || 'application/json',
-          blob: file,
-        }),
-      )
-    } catch (err) {
-      setStatus(`导入失败：${(err as Error).message}`, 'error')
-    } finally {
-      setBusy(false)
-    }
+    await dropProjectFlow(actionPorts, e)
   }
-
-  /**
-   * 导出 .flow.json。`embedAssets` = **连素材字节一起带走**（方案 §3 的第 ② 条兜底）。
-   *
-   * 为什么要有这一档：默认导出只有结构，搬到另一台机器 / 桌面壳时"节点在、图全丢"；
-   * 素材多时文件会很大，所以**不默认打开**、也不并进同一个入口 —— 用户明确点那一条才带素材。
-   * （日常备份仍推荐「素材文件夹」那条路：字节留在盘上，JSON 只带结构。）
-   */
-  const handleExport = async (id: string, name: string, opts?: { embedAssets?: boolean }) => {
-    if (busy) return
-    setBusy(true)
-    setMenuId(null)
-    try {
-      const { fileName } = await exportProject(platform, id, {
-        ...opts,
-        /**
-         * 带素材的导出可能要**几十秒**：进度直接写在状态行上。
-         * 没有读数时，用户会以为卡死并去点第二次（同对账 #229 那条口径）。
-         */
-        onProgress: (done, total) => setStatus(`导出中 ${done}/${total}…`),
-      })
-      setStatus(`已导出「${name}」为 ${fileName}${opts?.embedAssets ? '（含素材）' : ''}`)
-    } catch (err) {
-      setStatus(`导出失败：${(err as Error).message}`, 'error')
-    } finally {
-      setBusy(false)
-    }
-  }
+  const handleExport = async (id: string, name: string, opts?: { embedAssets?: boolean }) =>
+    exportProjectFlow(actionPorts, id, name, opts)
 
   const startRename = (p: ProjectListItem) => {
     setRenamingId(p.id)
