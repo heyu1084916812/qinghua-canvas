@@ -10,10 +10,11 @@ export interface CanvasLogPage<TRecord extends RunRecord = RunRecord> {
 export function canvasLogFirstPage<TRecord extends RunRecord>(
   records: readonly TRecord[],
   pageSize: number,
+  hasMore = records.length > pageSize,
 ): CanvasLogPage<TRecord> {
   return {
     entries: records.slice(0, pageSize),
-    hasMore: records.length > pageSize,
+    hasMore,
   }
 }
 
@@ -21,9 +22,10 @@ export function canvasLogFirstPage<TRecord extends RunRecord>(
 export function canvasLogAppendPage<TRecord extends RunRecord>(
   loaded: readonly TRecord[],
   nextEntries: readonly TRecord[],
+  hasMore: boolean,
 ): CanvasLogPage<TRecord> {
   const seen = new Set(loaded.map((record) => record.id))
   const additions = nextEntries.filter((record) => !seen.has(record.id))
   const entries = [...loaded, ...additions]
-  return { entries, hasMore: nextEntries.length > additions.length }
+  return { entries, hasMore }
 }

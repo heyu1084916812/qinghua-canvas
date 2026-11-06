@@ -64,6 +64,11 @@ describe('Agent 确认卡', () => {
     }
     expect(confirmationRequiresExplicitApproval('proposeTaskPlan')).toBe(true)
     expect(
+      confirmationRequiresExplicitApproval('proposeTaskPlan', undefined, {
+        autoRun: true,
+      }),
+    ).toBe(false)
+    expect(
       confirmationRequiresExplicitApproval('requestTaskConfirmation', {
         purpose: 'clarification',
       }),
@@ -82,6 +87,9 @@ describe('Agent 确认卡', () => {
       expect(confirmationRunsGeneration(name)).toBe(false)
       expect(confirmationApprovalSteps({ ...request, name })).toHaveLength(1)
       expect(confirmationRequiresExplicitApproval(name)).toBe(true)
+      expect(
+        confirmationRequiresExplicitApproval(name, undefined, { autoRun: true }),
+      ).toBe(true)
     }
     expect(confirmationRequiresExplicitApproval('runNode')).toBe(false)
     expect(confirmationRequiresExplicitApproval('runFrom')).toBe(false)

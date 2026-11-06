@@ -533,6 +533,8 @@ export interface AgentPromptExtras {
    * 只注入本次必要片段，不把完整照片或记忆库塞进提示词。
    */
   contextBundle?: string
+  /** Current composer mode. In auto mode planning checkpoints are resolved for the user. */
+  autoRun?: boolean
   /** 当前会话已批准的执行计划；让模型每轮都沿用同一组 stepId 更新进度。 */
   taskPlan?: string
   /**
@@ -602,6 +604,18 @@ export function buildAgentSystemPromptWithContext(
       ? buildLightAgentSystemPrompt(summary, inherited, extras.requestMode)
       : buildAgentSystemPrompt(summary, inherited),
   ]
+
+  if (extras.autoRun === true) {
+    parts.push(
+      [
+        '## 当前为自动执行模式',
+        '用户已选择“自动生成”。你可以提出任务计划，但系统会自动确认计划，不需要等待用户点击确认。',
+        '不要在步骤之间调用 `requestTaskConfirmation` 询问“是否继续”或“是否满意”；按已确认计划连续推进。',
+        '只有缺少会改变结果且无法从现有项目/画布判断的信息时，才可用 `requestTaskConfirmation` 的 clarification。',
+        '删除、改已有节点、记忆写入等破坏性或长期副作用仍必须等待用户亲自确认。',
+      ].join('\n'),
+    )
+  }
 
   if (extras.canvasReviewEnabled === true) {
     parts.push(

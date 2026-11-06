@@ -2,9 +2,11 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::collections::{HashMap, VecDeque};
 use std::io::Read;
+use std::path::PathBuf;
 use std::sync::{Arc, Mutex, OnceLock};
 use std::thread;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
+use tauri::path::BaseDirectory;
 use tauri::{AppHandle, Emitter, Manager};
 use tiny_http::{Header, Method, Request, Response, Server, StatusCode};
 
@@ -62,6 +64,7 @@ pub struct GatewayInfo {
     url: String,
     token: String,
     mcp_command: String,
+    mcp_config: Value,
 }
 
 pub fn start(app: AppHandle) -> Result<(), String> {
@@ -101,7 +104,7 @@ pub fn start(app: AppHandle) -> Result<(), String> {
 }
 
 #[tauri::command]
-pub fn canvas_gateway_info() -> Result<GatewayInfo, String> {
+pub fn canvas_gateway_info(app: AppHandle) -> Result<GatewayInfo, String> {
     let state = GATEWAY
         .get()
         .ok_or_else(|| "Canvas 网关尚未启动".to_string())?
@@ -109,13 +112,45 @@ pub fn canvas_gateway_info() -> Result<GatewayInfo, String> {
         .map_err(|_| "Canvas 网关状态锁已损坏".to_string())?;
     let url = format!("http://127.0.0.1:{}", gateway_port());
     let token = state.token.clone();
+    let script = app
+        .path()
+        .resolve("resources/canvas-mcp.ps1", BaseDirectory::Resource)
+        .ok()
+        .filter(|path| path.exists())
+        .unwrap_or_else(|| {
+            PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("resources/canvas-mcp.ps1")
+        });
+    let development = std::env::current_exe()
+        .ok()
+        .is_some_and(|exe| super::is_development_output(&exe));
     let mcp_command = format!(
-        "QINGHUA_CANVAS_URL={url} QINGHUA_CANVAS_TOKEN={token} node scripts/canvas-mcp.mjs"
+        "powershell.exe -NoProfile -ExecutionPolicy Bypass -File \"{}\"{}",
+        script.display(),
+        if development { " -Dev" } else { "" }
     );
+    let mut mcp_args = vec![
+        "-NoProfile".to_string(),
+        "-ExecutionPolicy".to_string(),
+        "Bypass".to_string(),
+        "-File".to_string(),
+        script.display().to_string(),
+    ];
+    if development {
+        mcp_args.push("-Dev".to_string());
+    }
+    let mcp_config = json!({
+        "mcpServers": {
+            "qinghua-canvas": {
+                "command": "powershell.exe",
+                "args": mcp_args
+            }
+        }
+    });
     Ok(GatewayInfo {
         url,
         token,
         mcp_command,
+        mcp_config,
     })
 }
 
@@ -188,14 +223,8 @@ fn gateway_port() -> u16 {
 }
 
 fn configured_port() -> Result<u16, String> {
-    let release_gate = std::env::var(RELEASE_GATE_ENV)
-        .ok()
-        .as_deref()
-        == Some("1");
-    resolve_port(
-        release_gate,
-        std::env::var(PORT_ENV).ok().as_deref(),
-    )
+    let release_gate = std::env::var(RELEASE_GATE_ENV).ok().as_deref() == Some("1");
+    resolve_port(release_gate, std::env::var(PORT_ENV).ok().as_deref())
 }
 
 fn resolve_port(release_gate: bool, raw: Option<&str>) -> Result<u16, String> {

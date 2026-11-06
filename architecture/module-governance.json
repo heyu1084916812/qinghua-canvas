@@ -5585,6 +5585,114 @@
         "src/features/settings/storageOverviewRefresh.test.ts"
       ],
       "budget": 170
+    },
+    {
+      "module": "src/features/settings/CanvasMcpPanel.tsx",
+      "owner": "settings-canvas-mcp-panel",
+      "responsibility": "展示 Canvas MCP 网关状态、工具范围、验证入口和可复制的 harness 配置。",
+      "owns": [
+        "Canvas MCP 状态读取、验证按钮和配置复制交互",
+        "受保护工具数量及拒绝项的用户可见状态"
+      ],
+      "doesNotOwn": [
+        "MCP stdio 协议实现与画布工具执行",
+        "网关 token 持久化和 harness 进程管理"
+      ],
+      "publicApi": [
+        "CanvasMcpPanel"
+      ],
+      "test": [
+        "src/app/deliveryBuild.test.ts"
+      ],
+      "budget": 156
+    },
+    {
+      "module": "src/features/settings/CanvasMcpPanel.module.css",
+      "owner": "settings-canvas-mcp-panel-style",
+      "responsibility": "定义 Canvas MCP 面板的头部、状态事实、配置代码块和窄屏布局。",
+      "owns": [
+        "Canvas MCP 面板局部间距、边框、滚动和响应式样式"
+      ],
+      "doesNotOwn": [
+        "网关状态与工具执行逻辑",
+        "全局设置主题令牌定义"
+      ],
+      "publicApi": [
+        "CSS_MODULE:Canvas MCP settings panel"
+      ],
+      "test": [
+        "src/app/deliveryBuild.test.ts"
+      ],
+      "budget": 135
+    },
+    {
+      "module": "src/features/settings/cliPanelPresentation.ts",
+      "owner": "settings-cli-presentation",
+      "responsibility": "把 CLI 探测结果投影为主操作、摘要和诊断按钮文案。",
+      "owns": [
+        "CLI 主操作、探测摘要和诊断标签的纯展示规则"
+      ],
+      "doesNotOwn": [
+        "CLI 安装、登录、进程执行和状态持久化",
+        "React 状态与面板渲染"
+      ],
+      "publicApi": [
+        "primaryCliAction",
+        "probeSummary",
+        "runDiagnosticLabel",
+        "CliProbe",
+        "CliProbeKind",
+        "CliPrimaryAction"
+      ],
+      "test": [
+        "src/features/settings/cliPanelPresentation.test.ts"
+      ],
+      "budget": 64
+    },
+    {
+      "module": "src/state/shared/runLogFastPage.ts",
+      "owner": "run-log-fast-page",
+      "responsibility": "提供总日志首屏和增量读取所需的快速分页投影。",
+      "owns": [
+        "首屏与增量页请求参数",
+        "hasMore 判定和页大小截断"
+      ],
+      "doesNotOwn": [
+        "日志筛选、作用域分类和存储查询实现",
+        "日志面板渲染与用户交互"
+      ],
+      "publicApi": [
+        "runLogFastPage",
+        "runLogFastFirstPage",
+        "runLogStorageFastFirstPage",
+        "RunLogFastPage"
+      ],
+      "test": [
+        "src/state/shared/runLogFastPage.test.ts"
+      ],
+      "budget": 106
+    },
+    {
+      "module": "src/workbenches/canvas/panels/canvasLogQuery.ts",
+      "owner": "canvas-log-page-query",
+      "responsibility": "计算画布日志的首屏页和追加去重结果。",
+      "owns": [
+        "画布日志首屏截断和 hasMore 投影",
+        "追加日志按记录 ID 去重"
+      ],
+      "doesNotOwn": [
+        "运行记录持久化和作用域分类",
+        "日志面板滚动、加载和清空动作"
+      ],
+      "publicApi": [
+        "canvasLogFirstPage",
+        "canvasLogAppendPage",
+        "CanvasLogPage"
+      ],
+      "test": [
+        "src/workbenches/canvas/panels/canvasLogQuery.test.ts"
+      ],
+      "budget": 31
     }
   ]
 }

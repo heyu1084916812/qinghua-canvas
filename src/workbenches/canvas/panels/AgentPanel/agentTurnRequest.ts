@@ -532,6 +532,7 @@ export async function prepareAgentTurnRequest(
       ...(mentions.length > 0 ? { mentions } : {}),
       ...(Object.keys(mediaModels).length > 0 ? { mediaModels } : {}),
       generationAvailability: input.generationAvailability,
+      autoRun: input.session.autoRun === true,
       ...(contextPrompt ? { contextBundle: contextPrompt } : {}),
       ...(activeTaskPlan
         ? { taskPlan: taskPlanPrompt(activeTaskPlan) }

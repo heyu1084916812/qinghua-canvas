@@ -46,6 +46,17 @@
   min-width: 0;
 }
 
+.probeChip {
+  flex: none;
+  padding: 1px 6px;
+  border-radius: var(--radius-pill);
+  background: var(--bg-hover);
+  color: var(--text-3);
+  font-size: var(--fs-label);
+  line-height: 1.5;
+  white-space: nowrap;
+}
+
 .cap {
   padding: 1px 6px;
   border-radius: var(--radius-pill);
@@ -217,7 +228,8 @@
 }
 
 .input {
-  flex: 1 1 220px;
+  flex: 0 0 auto;
+  width: 100%;
   min-width: 180px;
   height: 32px;
   box-sizing: border-box;
@@ -231,6 +243,15 @@
   font-family: var(--font-mono, ui-monospace, monospace);
 }
 
+.row .input {
+  flex: 1 1 220px;
+  width: auto;
+}
+
+.field .input {
+  min-width: 0;
+}
+
 .input:focus-visible {
   outline: 2px solid var(--focus-ring);
   outline-offset: 1px;
@@ -239,6 +260,7 @@
 .grid {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 140px;
+  align-items: start;
   gap: var(--space-3);
   padding: var(--space-3) var(--space-2) 0;
 }
@@ -263,10 +285,20 @@
 
 .actions {
   display: flex;
+  align-items: center;
   flex-wrap: wrap;
   gap: var(--space-2);
   margin-top: var(--space-3);
   padding: 0 var(--space-2);
+}
+
+.actions .hint {
+  flex: 1 1 280px;
+}
+
+.confirmDanger {
+  border-color: var(--danger, var(--accent));
+  color: var(--danger, var(--accent));
 }
 
 .output {

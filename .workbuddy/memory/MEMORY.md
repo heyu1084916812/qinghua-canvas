@@ -1,5 +1,23 @@
 # CanvasFlow（轻画）项目记忆
 
+### 总管2接管复验：可插拔、Agent、Pinterest、MCP、日志（2026-11-07）
+
+- 工作台不是运行时插件：`WorkbenchId` 字面量、`WORKBENCHES`、手写 lazy route、手写 NAV 共同登记。
+  新增工作台不能只加 manifest；真正优点是独立 chunk + 依赖门禁禁止跨工作台反向引用。
+- Agent 历史按 sessionId 落库，但模型只拿有界窗口；`continue` 走 `complex_plan` 并由 `sessionBrief`
+  重建原始需求、任务计划、画布摘要和最近工具账本。不要把 UI 显示全量历史误当成模型全量上下文。
+- Pinterest 现在只有公开 URL / Pin 解析。账号收藏必须有官方 OAuth、token 刷新、boards/pins API；
+  没有 Developer App 凭据时禁止用 Cookie 抓取或把公开搜索冒充“自己的收藏”。
+- Canvas MCP 的交付物是 Tauri 回环网关 + 随包 `canvas-mcp.ps1`。`scripts/test-canvas-mcp.mjs`
+  必须真实走 `initialize / tools/list / tools/call`，并验证复制配置里没有 token。
+- 总日志 `queryFast` 读到 `offset + limit + 1` 条就停；完整 `query` 只为清空等明确全量动作保留。
+  画布日志续载必须保存候选游标，不能拿已渲染条数当 offset；“清空”要删当前项目全部可见画布记录。
+- 浏览器 UI 复验必须用 `http://127.0.0.1:1420`：共享存储只放行 1420 / tauri.localhost。
+  Playwright 若停在 `waitUntil:'commit'`，加 `--no-proxy-server`；新手引导的跳过按钮是原生文本，
+  内联 PowerShell 脚本里的中文可能变 `??`，用索引或稳定 data 属性定位。
+- 多代理共享同一工作树时，提交可能把另一条线刚写的治理登记/补丁一起吞掉。收尾必须重跑
+  `node scripts/check-module-governance.mjs`、`git status` 和定向测试，不认代理口头“已登记”。
+
 ### 存储面板分阶段读取（2026-11-07 → 对账 #952）
 
 - `StoragePanel` 的概览读取归 `storageOverviewRefresh.ts`：第一阶段读取占用、项目数、数据目录/根类型；

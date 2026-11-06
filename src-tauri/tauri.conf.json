@@ -38,7 +38,8 @@
       "resources/ffmpeg.exe",
       "resources/FFMPEG-LICENSE.txt",
       "resources/FFMPEG-NOTICE.txt",
-      "resources/ffmpeg-build.json"
+      "resources/ffmpeg-build.json",
+      "resources/canvas-mcp.ps1"
     ],
     "icon": [
       "icons/32x32.png",

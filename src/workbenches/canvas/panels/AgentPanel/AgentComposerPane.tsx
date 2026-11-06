@@ -636,7 +636,7 @@ export function AgentComposerPane({
                 {
                   value: 'auto',
                   label: '自动生成',
-                  hint: '直接消耗积分',
+                  hint: '自动确认计划并直接消耗积分',
                   icon: <IconAuto size={16} />,
                 },
               ]}

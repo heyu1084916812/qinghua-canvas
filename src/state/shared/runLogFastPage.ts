@@ -12,14 +12,36 @@ export interface RunLogFastPage {
 }
 
 /** 首屏只取最近一页候选，跳过全表 count 和剩余记录的反序列化。 */
-export async function runLogFastFirstPage(
-  repoQuery: (filter: RunLogQuery) => Promise<{ entries: RunLogEntry[] }>,
+export async function runLogFastPage(
+  repoQuery: (filter: RunLogQuery) => Promise<{
+    entries: RunLogEntry[]
+    hasMore?: boolean
+  }>,
+  filter: RunLogQuery,
+  offset: number,
+  pageSize: number,
+): Promise<RunLogFastPage> {
+  const page = await repoQuery({
+    ...filter,
+    offset: Math.max(0, Math.trunc(offset)),
+    limit: pageSize + 1,
+  })
+  const entries = page.entries.slice(0, pageSize)
+  return {
+    entries,
+    hasMore: page.hasMore === true || page.entries.length > pageSize,
+  }
+}
+
+export function runLogFastFirstPage(
+  repoQuery: (filter: RunLogQuery) => Promise<{
+    entries: RunLogEntry[]
+    hasMore?: boolean
+  }>,
   filter: RunLogQuery,
   pageSize: number,
 ): Promise<RunLogFastPage> {
-  const page = await repoQuery({ ...filter, offset: 0, limit: pageSize + 1 })
-  const entries = page.entries.slice(0, pageSize)
-  return { entries, hasMore: page.entries.length > pageSize }
+  return runLogFastPage(repoQuery, filter, 0, pageSize)
 }
 
 /** 首页候选直接从 storage 下推分页读取；旧存储退回一次 query 后在内存里截页。 */

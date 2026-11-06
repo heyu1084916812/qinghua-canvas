@@ -58,29 +58,43 @@ export function LogPanel({ onClose }: { onClose: () => void }) {
   const [hasMore, setHasMore] = useState(false)
   const [copiedId, setCopiedId] = useState<string | null>(null)
   const listRef = useRef<HTMLDivElement | null>(null)
+  const candidateOffsetRef = useRef(0)
 
-  const loadCandidatePage = useCallback(async (offset: number, limit: number) => {
-    const page = await runLogs.query({
+  const loadCandidatePage = useCallback(async () => {
+    const page = await runLogs.queryFast({
       projectId,
       workbench: 'canvas',
-      offset,
-      limit,
+      offset: candidateOffsetRef.current,
+      limit: CANVAS_LOG_PAGE_SIZE + 1,
     })
-    return page.entries
-      .map((entry) => entry.record as RunRecord)
-      .filter(shouldShowInCanvasLog)
+    candidateOffsetRef.current += page.entries.length
+    return {
+      records: page.entries
+        .map((entry) => entry.record as RunRecord)
+        .filter(shouldShowInCanvasLog),
+      hasMore: page.hasMore || page.entries.length > CANVAS_LOG_PAGE_SIZE,
+    }
   }, [projectId, runLogs])
 
   const reload = useCallback(async () => {
-    const candidates = await loadCandidatePage(0, CANVAS_LOG_PAGE_SIZE)
-    const page = canvasLogFirstPage(candidates, CANVAS_LOG_PAGE_SIZE)
+    candidateOffsetRef.current = 0
+    const candidates = await loadCandidatePage()
+    const page = canvasLogFirstPage(
+      candidates.records,
+      CANVAS_LOG_PAGE_SIZE,
+      candidates.hasMore,
+    )
     setRecords(page.entries)
     setHasMore(page.hasMore)
   }, [loadCandidatePage])
 
   const loadMore = useCallback(async () => {
-    const candidates = await loadCandidatePage(records.length, CANVAS_LOG_PAGE_SIZE)
-    const page = canvasLogAppendPage(records, candidates)
+    const candidates = await loadCandidatePage()
+    const page = canvasLogAppendPage(
+      records,
+      candidates.records,
+      candidates.hasMore,
+    )
     setRecords(page.entries)
     setHasMore(page.hasMore)
   }, [loadCandidatePage, records])
@@ -178,7 +192,16 @@ export function LogPanel({ onClose }: { onClose: () => void }) {
   }
 
   const clear = async () => {
-    for (const r of records) await platform.storage.delete('runRecords', r.id)
+    const all = await runLogs.query({
+      projectId,
+      workbench: 'canvas',
+      limit: Number.MAX_SAFE_INTEGER,
+    })
+    for (const entry of all.entries) {
+      if (shouldShowInCanvasLog(entry.record as RunRecord)) {
+        await platform.storage.delete('runRecords', entry.record.id)
+      }
+    }
     await reload()
   }
 

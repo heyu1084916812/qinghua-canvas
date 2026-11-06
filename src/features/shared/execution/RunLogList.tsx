@@ -11,7 +11,10 @@ import {
   type RunLogEntry,
   type RunLogQuery,
 } from '../../../state/shared/runLogRepository'
-import { runLogFastFirstPage } from '../../../state/shared/runLogFastPage'
+import {
+  runLogFastFirstPage,
+  runLogFastPage,
+} from '../../../state/shared/runLogFastPage'
 import styles from './RunLogList.module.css'
 
 export type RunLogFilter = Omit<RunLogQuery, 'offset' | 'limit'>
@@ -60,7 +63,7 @@ export function RunLogList({
     setError('')
     try {
       const page = await runLogFastFirstPage(
-        (fastFilter) => repo.query(fastFilter),
+        (fastFilter) => repo.queryFast(fastFilter),
         stableFilter,
         pageSize,
       )
@@ -78,12 +81,20 @@ export function RunLogList({
   }, [loadFirstPage])
 
   const loadMore = async () => {
-    const page = await repo.query({
-      ...stableFilter,
-      offset: entries.length,
-      limit: pageSize,
+    const page = await runLogFastPage(
+      (fastFilter) => repo.queryFast(fastFilter),
+      stableFilter,
+      entries.length,
+      pageSize,
+    )
+    setEntries((current) => {
+      const seen = new Set(current.map((entry) => entry.record.id))
+      return [
+        ...current,
+        ...page.entries.filter((entry) => !seen.has(entry.record.id)),
+      ]
     })
-    setEntries((current) => [...current, ...page.entries])
+    setHasMore(page.hasMore)
   }
 
   const channelName = (id: string | undefined): string => {

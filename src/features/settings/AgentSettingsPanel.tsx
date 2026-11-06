@@ -43,6 +43,7 @@ import {
   subscribeAgentCanvasReview,
 } from '../../state/ui/agentCanvasReview'
 import { AgentMemoryPanel } from './AgentMemoryPanel'
+import { CanvasMcpPanel } from './CanvasMcpPanel'
 import { ChoicePicker } from '../shared/choicePicker/ChoicePicker'
 import { SettingsRow } from './SettingsRow'
 import styles from './AgentSettingsPanel.module.css'
@@ -503,6 +504,7 @@ export function AgentSettingsPanel({
                 打开存储
               </button>
             </div>
+            <CanvasMcpPanel />
           </section>
         ) : null}
       </div>

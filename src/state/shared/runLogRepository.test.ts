@@ -454,4 +454,32 @@ describe('runLogRepository', () => {
       ['legacy-1', 'legacy'],
     ])
   })
+
+  it('queryFast stops after the next-page evidence instead of scanning the rest', async () => {
+    const storage = createMemoryStorage()
+    await storage.put('projects', project('p1', 'canvas') as never)
+    await storage.bulkPut(
+      'runRecords',
+      Array.from({ length: 450 }, (_, index) =>
+        record(`r${index + 1}`, 'p1', { createdAt: index + 1 }),
+      ) as never,
+    )
+    const queryPage = storage.queryPage!.bind(storage)
+    let pageCalls = 0
+    storage.queryPage = async (table, filter, options) => {
+      pageCalls += 1
+      return queryPage(table, filter, options)
+    }
+    const repo = createRunLogRepository(storage)
+
+    const page = await repo.queryFast({
+      projectId: 'p1',
+      workbench: 'canvas',
+      limit: 20,
+    })
+
+    expect(page.entries).toHaveLength(20)
+    expect(page.hasMore).toBe(true)
+    expect(pageCalls).toBe(1)
+  })
 })

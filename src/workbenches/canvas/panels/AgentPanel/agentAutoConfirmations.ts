@@ -59,6 +59,7 @@ export async function continueAgentAutoConfirmations(
     !confirmationRequiresExplicitApproval(
       outcome.request.name,
       outcome.request.args,
+      { autoRun: input.autoRun() },
     ) &&
     autoSteps < input.maxSteps
   ) {
@@ -108,6 +109,7 @@ export async function continueAgentAutoConfirmations(
     !confirmationRequiresExplicitApproval(
       outcome.request.name,
       outcome.request.args,
+      { autoRun: input.autoRun() },
     )
   ) {
     outcome = {

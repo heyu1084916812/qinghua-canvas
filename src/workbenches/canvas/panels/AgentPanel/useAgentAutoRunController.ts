@@ -49,6 +49,7 @@ export function useAgentAutoRunController(
         !confirmationRequiresExplicitApproval(
           status.request.name,
           status.request.args,
+          { autoRun },
         )
 
       /** 乐观写：UI 立刻变，不等落库。 */
@@ -94,6 +95,7 @@ export function useAgentAutoRunController(
             !confirmationRequiresExplicitApproval(
               latestStatus.request.name,
               latestStatus.request.args,
+              { autoRun },
             )
           ) {
             await input.confirmLatest()

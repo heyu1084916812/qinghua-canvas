@@ -1,0 +1,135 @@
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin-top: var(--space-5);
+  padding-top: var(--space-4);
+  border-top: var(--border);
+}
+
+.head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+
+.head h4 {
+  margin: 0;
+  color: var(--text-1);
+}
+
+.head p,
+.note,
+.status {
+  margin: var(--space-1) 0 0;
+  color: var(--text-3);
+  font-size: var(--fs-label);
+  line-height: 1.5;
+}
+
+.actions {
+  display: flex;
+  flex: none;
+  gap: var(--space-2);
+}
+
+.btn,
+.linkBtn {
+  border: var(--border);
+  border-radius: var(--radius-control);
+  background: var(--bg-surface);
+  color: var(--text-1);
+  font: inherit;
+  cursor: pointer;
+}
+
+.btn {
+  height: 32px;
+  padding: 0 var(--space-3);
+  font-size: var(--fs-label);
+}
+
+.primary {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--accent-text);
+}
+
+.btn:disabled {
+  color: var(--text-3);
+  cursor: not-allowed;
+}
+
+.linkBtn {
+  min-height: 28px;
+  padding: 0 var(--space-2);
+  border-color: transparent;
+  color: var(--text-3);
+  font-size: var(--fs-label);
+}
+
+.linkBtn:hover {
+  background: var(--bg-hover);
+  color: var(--text-1);
+}
+
+.facts {
+  display: grid;
+  grid-template-columns: 92px minmax(0, 1fr);
+  gap: var(--space-2) var(--space-3);
+  align-items: baseline;
+  color: var(--text-2);
+  font-size: var(--fs-label);
+}
+
+.facts code {
+  font-family: var(--font-mono, ui-monospace, monospace);
+  color: var(--text-1);
+  overflow-wrap: anywhere;
+}
+
+.codeBlock {
+  overflow: hidden;
+  border: var(--border);
+  border-radius: var(--radius-control);
+  background: var(--bg-surface);
+}
+
+.codeHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 36px;
+  padding: 0 var(--space-2) 0 var(--space-3);
+  border-bottom: var(--border);
+  color: var(--text-2);
+  font-size: var(--fs-label);
+}
+
+.codeBlock pre {
+  max-height: 210px;
+  margin: 0;
+  padding: var(--space-3);
+  overflow: auto;
+  color: var(--text-1);
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: var(--fs-label);
+  line-height: 1.55;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.status {
+  color: var(--text-2);
+}
+
+@media (max-width: 720px) {
+  .head {
+    flex-direction: column;
+  }
+
+  .facts {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

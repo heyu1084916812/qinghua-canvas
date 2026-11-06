@@ -1,6 +1,6 @@
 ﻿#!/usr/bin/env node
 /**
- * 五处版本号一致性检查（发布前置，可进 CI）。
+ * 发布版本号一致性检查（发布前置，可进 CI）。
  *
  * 为什么单独成脚本：`node -e "..."` 里带引号的正则在 PowerShell 5.1 下会被吞引号，
  * 一上手就断；这里用文件跑，跨 shell 稳定。
@@ -48,9 +48,13 @@ pick('Cargo.lock（name = "qinghua"）', () => {
   const text = read('src-tauri/Cargo.lock')
   return (text.match(/name = "qinghua"\r?\nversion = "([^"]+)"/) ?? [])[1]
 })
+pick('canvas-mcp.ps1', () => {
+  const text = read('src-tauri/resources/canvas-mcp.ps1')
+  return (text.match(/version\s*=\s*'([^']+)'/) ?? [])[1]
+})
 
 const unique = [...new Set(Object.values(values).filter(Boolean))]
-const aligned = unique.length === 1 && Object.keys(values).length === 6 && errors.length === 0
+const aligned = unique.length === 1 && Object.keys(values).length === 7 && errors.length === 0
 
 const endpoints = conf?.plugins?.updater?.endpoints ?? []
 const endpointVersioned = endpoints.find((url) => /\/v?\d+\.\d+\.\d+(\/|$)/.test(String(url)))
@@ -69,7 +73,7 @@ if (process.argv.includes('--json')) {
   }
   console.log('')
   if (aligned) {
-    console.log(`✅ 六值一致：${unique[0]}`)
+    console.log(`✅ 七值一致：${unique[0]}`)
   } else {
     const counts = new Map()
     for (const value of Object.values(values)) {

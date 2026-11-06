@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { usePlatform } from '../../app/providers/PlatformProvider'
 import {
   buildArgs,
@@ -11,6 +11,12 @@ import {
 } from '../../domain/shared/cliTools'
 import type { CliOutcome } from '../../platform/ports'
 import { createCliToolStore } from '../../state/project/cliToolStore'
+import {
+  primaryCliAction,
+  probeSummary,
+  runDiagnosticLabel,
+  type CliProbe,
+} from './cliPanelPresentation'
 import styles from './CliPanel.module.css'
 
 /**
@@ -46,28 +52,80 @@ export function CliPanel() {
   const store = useMemo(() => createCliToolStore(platform.storage), [platform.storage])
 
   const [tools, setTools] = useState<CliTool[]>(() => defaultCliTools())
-  const [probes, setProbes] = useState<Record<string, string>>({})
+  const [probes, setProbes] = useState<Record<string, CliProbe>>({})
   const [runs, setRuns] = useState<Record<string, string>>({})
   const [statusOut, setStatusOut] = useState<Record<string, string>>({})
   const [loginMsg, setLoginMsg] = useState<Record<string, string>>({})
   const [keys, setKeys] = useState<Record<string, string>>({})
+  const [moreOpen, setMoreOpen] = useState<Record<string, boolean>>({})
+  const [confirmRun, setConfirmRun] = useState<Record<string, boolean>>({})
   /** 正在跑的那件小事（`<toolId>:<action>`）；空串 = 空闲 */
   const [busy, setBusy] = useState('')
+
+  const probeTool = useCallback(
+    async (tool: CliTool): Promise<CliProbe> => {
+      if (!cli) {
+        const unavailable = { kind: 'unavailable' as const, detail: '仅桌面应用可用' }
+        setProbes((prev) => ({ ...prev, [tool.id]: unavailable }))
+        return unavailable
+      }
+      setProbes((prev) => ({
+        ...prev,
+        [tool.id]: { kind: 'checking', detail: `正在检测「${tool.program}」…` },
+      }))
+      try {
+        const found = await cli.which(tool.program)
+        const next: CliProbe = found
+          ? { kind: 'found', detail: `已找到：${found}` }
+          : { kind: 'missing', detail: `未找到命令「${tool.program}」` }
+        setProbes((prev) => ({ ...prev, [tool.id]: next }))
+        return next
+      } catch (error) {
+        const next: CliProbe = {
+          kind: 'error',
+          detail: `检测失败：${String(error)}`,
+        }
+        setProbes((prev) => ({ ...prev, [tool.id]: next }))
+        return next
+      }
+    },
+    [cli],
+  )
 
   useEffect(() => {
     let alive = true
     void store.load().then((loaded) => {
-      if (alive) setTools(loaded)
+      if (!alive) return
+      setTools(loaded)
+      if (cli) {
+        void Promise.all(loaded.map((tool) => probeTool(tool)))
+      } else {
+        setProbes(
+          Object.fromEntries(
+            loaded.map((tool) => [
+              tool.id,
+              { kind: 'unavailable' as const, detail: '仅桌面应用可用' },
+            ]),
+          ),
+        )
+      }
     })
     return () => {
       alive = false
     }
-  }, [store])
+  }, [cli, probeTool, store])
 
   /** 改一个字段：先改内存、再写库（反过来的话打字会等一次异步落库、一顿一顿） */
   const patchTool = (id: string, patch: Partial<CliTool>) => {
     const next = tools.map((tool) => (tool.id === id ? { ...tool, ...patch } : tool))
     setTools(next)
+    if ('program' in patch) {
+      setProbes((prev) => {
+        const copy = { ...prev }
+        delete copy[id]
+        return copy
+      })
+    }
     void store.save(next)
   }
 
@@ -75,10 +133,7 @@ export function CliPanel() {
     if (!cli || busy) return
     setBusy(`${tool.id}:which`)
     try {
-      const found = await cli.which(tool.program)
-      setProbes((prev) => ({ ...prev, [tool.id]: found ? `找到了：${found}` : '没找到' }))
-    } catch (err) {
-      setProbes((prev) => ({ ...prev, [tool.id]: `检测失败：${String(err)}` }))
+      await probeTool(tool)
     } finally {
       setBusy('')
     }
@@ -145,10 +200,16 @@ export function CliPanel() {
     const say = (text: string) => setLoginMsg((prev) => ({ ...prev, [tool.id]: text }))
     try {
       const found = await cli.which(tool.program)
-      setProbes((prev) => ({ ...prev, [tool.id]: found ? `找到了：${found}` : '没找到' }))
+      setProbes((prev) => ({
+        ...prev,
+        [tool.id]: found
+          ? { kind: 'found', detail: `已找到：${found}` }
+          : { kind: 'missing', detail: `未找到命令「${tool.program}」` },
+      }))
       if (!found) {
         const cmd = parseArgs(tool.installCommand.trim())
         if (cmd.length === 0) {
+          setMoreOpen((prev) => ({ ...prev, [tool.id]: true }))
           say(`本机没有「${tool.program}」，而这个工具没有能自动装的官方途径 —— ${tool.installHint}`)
           return
         }
@@ -164,10 +225,14 @@ export function CliPanel() {
        * 只能靠密钥的（`keyLoginKind === 'config'`，RunningHub 就是）把用户引到下面那格去 ——
        * 不给一个按下去没用的"登录窗口"。
        */
-      if (tool.keyLoginKind === 'config') {
+      if (tool.keyLoginKind === 'config' || tool.keyLoginKind === 'stdin') {
+        setMoreOpen((prev) => ({ ...prev, [tool.id]: true }))
         say(
-          `已经装好了 → 把 API Key 粘到下面那一格，点「用密钥登录」就完成登录` +
-            `（写进它自己的配置，之后一直是登录态）。`,
+          tool.keyLoginKind === 'config'
+            ? `已经装好了 → 把 API Key 粘到下面那一格，点「用密钥登录」就完成登录` +
+                `（写进它自己的配置，之后一直是登录态）。`
+            : `已经装好了 → 把密钥粘到下面那一格，点「用密钥登录」` +
+                `（通过 stdin 交给这条命令，不进入命令行参数，也不写入轻画数据库）。`,
         )
         return
       }
@@ -194,7 +259,7 @@ export function CliPanel() {
       await cli.spawnWindow({ program: cmd[0], args: cmd.slice(1) })
       setLoginMsg((prev) => ({
         ...prev,
-        [tool.id]: `已经打开安装窗口跑「${tool.installCommand}」；装完回来点「检测」确认。`,
+        [tool.id]: `已经打开安装窗口跑「${tool.installCommand}」；装完回来点「重新检测」确认。`,
       }))
     } catch (err) {
       setLoginMsg((prev) => ({ ...prev, [tool.id]: `打不开安装窗口：${String(err)}` }))
@@ -277,6 +342,17 @@ export function CliPanel() {
                 </span>
               ))}
             </span>
+            <span className={styles.probeChip} data-cli-probe-state={tool.id}>
+              {probes[tool.id]?.kind === 'found'
+                ? '已安装'
+                : probes[tool.id]?.kind === 'missing'
+                  ? '未安装'
+                  : probes[tool.id]?.kind === 'unavailable'
+                    ? '桌面专属'
+                  : probes[tool.id]?.kind === 'error'
+                    ? '检测失败'
+                    : '检测中'}
+            </span>
             {tool.docUrl && (
               <a className={styles.link} href={tool.docUrl} target="_blank" rel="noreferrer">
                 文档
@@ -293,30 +369,32 @@ export function CliPanel() {
               type="button"
               className={`${styles.btn} ${styles.primary}`}
               data-cli-setup={tool.id}
-              disabled={!hasLocalCli || busy !== ''}
-              onClick={() => void oneClickSetup(tool)}
+              disabled={
+                !hasLocalCli ||
+                busy !== '' ||
+                primaryCliAction(tool, probes[tool.id]).kind === 'checking'
+              }
+              onClick={() => {
+                const action = primaryCliAction(tool, probes[tool.id])
+                if (action.opensDetails) {
+                  setMoreOpen((prev) => ({ ...prev, [tool.id]: true }))
+                }
+                void oneClickSetup(tool)
+              }}
             >
-              安装并登录
+              {primaryCliAction(tool, probes[tool.id]).label}
             </button>
-            <button
-              type="button"
-              className={styles.btn}
-              data-cli-detect={tool.id}
-              disabled={!hasLocalCli || busy !== ''}
-              onClick={() => void detect(tool)}
-            >
-              检测
-            </button>
-            <button
-              type="button"
-              className={styles.btn}
-              data-cli-status={tool.id}
-              disabled={!hasLocalCli || busy !== '' || tool.statusArgs.trim() === ''}
-              onClick={() => void runInto(tool, 'status', buildArgs(tool.statusArgs, {}))}
-            >
-              查状态
-            </button>
-            {tool.statusArgs.trim() === '' && (
+            {tool.statusArgs.trim() !== '' ? (
+              <button
+                type="button"
+                className={styles.btn}
+                data-cli-status={tool.id}
+                disabled={!hasLocalCli || busy !== ''}
+                onClick={() => void runInto(tool, 'status', buildArgs(tool.statusArgs, {}))}
+              >
+                查询状态
+              </button>
+            ) : (
               <span className={styles.result} data-cli-status-none={tool.id}>
                 <span className={styles.statusNone}>无可查命令</span>
               </span>
@@ -326,10 +404,10 @@ export function CliPanel() {
           {/* 结果行：检测 / 登录 / 状态的结果都贴在按钮下面（没有就不占位） */}
           {probes[tool.id] && (
             <p className={styles.result} data-cli-probe={tool.id}>
-              {probes[tool.id]}
+              {probeSummary(probes[tool.id])}
             </p>
           )}
-          {probes[tool.id] === '没找到' && (
+          {probes[tool.id]?.kind === 'missing' && (
             <p className={styles.hint} data-cli-install-hint={tool.id}>
               {tool.installHint}
             </p>
@@ -356,9 +434,40 @@ export function CliPanel() {
             这些锚点**换了位置但一个没删**：冒烟按它们数"每条路在不在"
             （收起的内容 `textContent` 照样读得到，见 G89）。
           */}
-          <details className={styles.more} data-cli-login-box={tool.id}>
+          <details
+            className={styles.more}
+            data-cli-login-box={tool.id}
+            open={moreOpen[tool.id] === true}
+            onToggle={(event) =>
+              setMoreOpen((prev) => ({
+                ...prev,
+                [tool.id]: event.currentTarget.open,
+              }))
+            }
+          >
             <summary className={styles.summary}>更多操作</summary>
             <div className={styles.moreBody}>
+              <div className={styles.row}>
+                <button
+                  type="button"
+                  className={styles.btn}
+                  data-cli-detect={tool.id}
+                  disabled={!hasLocalCli || busy !== ''}
+                  onClick={() => void detect(tool)}
+                >
+                  重新检测
+                </button>
+                {tool.statusArgs.trim() === '' && (
+                  <button
+                    type="button"
+                    className={styles.btn}
+                    data-cli-status={tool.id}
+                    disabled
+                  >
+                    查询状态
+                  </button>
+                )}
+              </div>
               {tool.installCommand.trim() !== '' && (
                 <div className={styles.row}>
                   <button
@@ -515,15 +624,31 @@ export function CliPanel() {
             <div className={styles.actions}>
               <button
                 type="button"
-                className={styles.btn}
+                className={
+                  confirmRun[tool.id]
+                    ? `${styles.btn} ${styles.confirmDanger}`
+                    : styles.btn
+                }
                 data-cli-run={tool.id}
                 disabled={!hasLocalCli || busy !== ''}
-                onClick={() =>
-                  void runInto(tool, 'run', buildArgs(tool.argsTemplate, { prompt: TEST_PROMPT }))
-                }
+                onClick={() => {
+                  if (!confirmRun[tool.id]) {
+                    setConfirmRun((prev) => ({ ...prev, [tool.id]: true }))
+                    return
+                  }
+                  setConfirmRun((prev) => ({ ...prev, [tool.id]: false }))
+                  void runInto(
+                    tool,
+                    'run',
+                    buildArgs(tool.argsTemplate, { prompt: TEST_PROMPT }),
+                  )
+                }}
               >
-                测试运行
+                {runDiagnosticLabel(confirmRun[tool.id] === true)}
               </button>
+              <p className={styles.hint}>
+                诊断会执行当前参数模板，可能调用真实模型并产生费用。
+              </p>
             </div>
             {runs[tool.id] && (
               <pre className={styles.output} data-cli-runout={tool.id}>

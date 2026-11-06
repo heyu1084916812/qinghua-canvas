@@ -149,9 +149,10 @@ describe('storage overview refresh', () => {
     await flush()
     expect(updates).toEqual(['data-dir'])
     expect(assetScanStarted).toBe(false)
-    expect(cacheReadStarted).toBe(false)
+    expect(cacheReadStarted).toBe(true)
 
     usage.resolve({ used: 1024, quota: 0 })
+    cache.resolve(4096)
     await flush()
     expect(updates).toContain('usage')
     expect(updates).not.toContain('projects')
@@ -169,7 +170,6 @@ describe('storage overview refresh', () => {
     expect(updates).toContain('projects')
     expect(assetScanStarted).toBe(true)
 
-    cache.resolve(4096)
     assets.resolve()
     await refresh.done
     expect(updates).toContain('assets')

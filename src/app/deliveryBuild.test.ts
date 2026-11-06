@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import overlay from './GlobalSettingsOverlay.tsx?raw'
 import routes from './routes.tsx?raw'
+import canvasMcpPanel from '../features/settings/CanvasMcpPanel.tsx?raw'
 import viteConfig from '../../vite.config.ts?raw'
 import ciWorkflow from '../../.github/workflows/ci.yml?raw'
 
@@ -24,5 +25,10 @@ describe('delivery build boundaries', () => {
     }
     expect(ciWorkflow).toContain('run: node scripts/check-versions.mjs')
     expect(ciWorkflow).not.toMatch(/run:\s*git\s+(?:push|tag)/)
+  })
+
+  it('copies the packaged Canvas MCP config without embedding the gateway token', () => {
+    expect(canvasMcpPanel).toContain('mcpConfigText(info.mcpConfig)')
+    expect(canvasMcpPanel).not.toContain('JSON.stringify(info)')
   })
 })
