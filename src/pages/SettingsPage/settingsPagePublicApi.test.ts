@@ -29,6 +29,22 @@ const TOKEN_SOURCE = (
   }) as Record<string, string>
 )['./SettingsChannelTokenField.tsx']
 
+const STYLE_FACADE = (
+  import.meta.glob('./settingsPage/settingsPageStyles.ts', {
+    eager: true,
+    query: '?raw',
+    import: 'default',
+  }) as Record<string, string>
+)['./settingsPage/settingsPageStyles.ts']
+
+const VIEW_SOURCES = Object.values(
+  import.meta.glob('./settingsPage/Settings*View.tsx', {
+    eager: true,
+    query: '?raw',
+    import: 'default',
+  }) as Record<string, string>,
+).join('\n')
+
 const CHANNEL_ACTION_KEYS: readonly (keyof ChannelActions)[] = [
   'create',
   'setEnabled',
@@ -97,7 +113,7 @@ describe('SettingsPage 公共导出与页面锚点', () => {
     expect(SETTINGS_SOURCE).toContain('const channelActions = createChannelActions(channelPorts)')
     expect(SETTINGS_SOURCE).toContain('const mappingActions = createModelMappingActions(mappingPorts)')
     expect(SETTINGS_SOURCE).toContain('const protocolActions = createProtocolActions(protocolPorts)')
-    expect(SETTINGS_SOURCE).toContain('item: baseStyles.item')
+    expect(STYLE_FACADE).toContain('item: baseStyles.item')
   })
 
   it('保留渠道表单、Token、模型映射、路由策略与资料抽屉锚点', () => {
@@ -115,7 +131,8 @@ describe('SettingsPage 公共导出与页面锚点', () => {
       'data-settings-channel-route',
       'data-settings-profile-drawer',
     ]
-    for (const anchor of anchors) expect(SETTINGS_SOURCE, anchor).toContain(anchor)
+    const settingsSurfaceSource = `${SETTINGS_SOURCE}\n${VIEW_SOURCES}`
+    for (const anchor of anchors) expect(settingsSurfaceSource, anchor).toContain(anchor)
     expect(TOKEN_SOURCE).toContain('data-settings-token-row')
   })
 })

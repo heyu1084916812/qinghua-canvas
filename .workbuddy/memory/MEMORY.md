@@ -194,6 +194,19 @@
 - 涉及 UI 的取证：改前/改后 1440×900、1024×700 明暗四组几何从 94px → 42px，无横向溢出和页面错误；
   截图/JSON 在 `.playwright-verify/settings-ui-fix/`。CSS 拆分后要检查重名导出的对象覆盖，不能只看 `composes` 写对了。
 
+### 设置页视图拆分与样式门面（2026-11-06）
+
+- `SettingsPage.tsx` 2093→876，只保留 React state/refs/hooks、Store/DOM 接线、页面异步动作和区块编排；
+  既有 `SettingsChannelTokenField` 仍自管令牌状态和读写，是本轮明确保留的封装例外；
+  全局选路、侧栏、标题、连接、协议、模型、路由、资料抽屉和右键菜单拆成 9 个视图，最大 389 行。
+  视图必须直接返回原 `section/aside/div/Fragment`，不能为了“组件化”新增 wrapper，否则几何和可访问性锚点都会漂。
+- `settingsPageStyles.ts` 是唯一合并门面，必须保留 `item: baseStyles.item`。对象展开不是 CSS 层叠：
+  `SettingsChannelListDetails` 的同名 `item` 会覆盖基础行规则，实测渠道行 42→94px。样式改动要先打开真实设置页量行高，
+  再跑四组明暗/视口截图；单测通过不能证明 HMR 中间态或 CSS Module 导出没有坏。
+- AP 组验收：隔离四组几何、焦点、悬停、滚动一致，overflow/page/console error 为 0；全量 598 files / 5234 tests
+  （1 skipped）、check（1047 modules / 4229 deps、25 legacy、191 semantic）、build 通过。
+  G8/G44/G45/G74 与 `dbc95e8` 独立基线失败集一致；当前生产 TS/TSX/CSS 已无单文件超过 1000 行。
+
 ### 总管2 交接与第五批并行清理（2026-11-06）
 
 - 总管1 线程最后因上游 503 / 工具调用与结果记录不匹配中断；交接只认对账清单、Git、文件与子线程终态，不恢复损坏对话。

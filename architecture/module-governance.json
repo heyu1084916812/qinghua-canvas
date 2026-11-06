@@ -292,7 +292,7 @@
       "test": [
         "src/pages/SettingsPage/customProtocolDraft.test.ts"
       ],
-      "budget": 2093
+      "budget": 876
     },
     {
       "module": "src/pages/SkillsPage/SkillsPage.module.css",
@@ -5346,6 +5346,216 @@
         "src/workbenches/canvas/panels/creation/CreationPanelViews.test.ts"
       ],
       "budget": 140
+    },
+    {
+      "module": "src/pages/SettingsPage/settingsPage/SettingsGlobalRouteView.tsx",
+      "owner": "pages-settings-global-route-view",
+      "responsibility": "渲染设置页全局选路策略、最大尝试次数、路由范围开关和 Key 分组选择。",
+      "owns": [
+        "global route section、策略与次数控件顺序",
+        "路由范围面板、渠道折叠和候选复选框锚点"
+      ],
+      "doesNotOwn": [
+        "选路候选派生、策略持久化和 Store 写入",
+        "页面 React state 与业务回调实现",
+        "CSS 与跨页面路由"
+      ],
+      "publicApi": [
+        "SettingsGlobalRouteView"
+      ],
+      "test": [
+        "src/pages/SettingsPage/settingsPage/SettingsPageViews.test.ts"
+      ],
+      "budget": 216
+    },
+    {
+      "module": "src/pages/SettingsPage/settingsPage/SettingsChannelSidebarView.tsx",
+      "owner": "pages-settings-channel-sidebar-view",
+      "responsibility": "渲染设置页渠道搜索、筛选、排序列表、启停标记和新增服务入口。",
+      "owns": [
+        "渠道 sidebar、搜索与筛选控件顺序",
+        "渠道行、拖拽和菜单入口锚点及可访问名称"
+      ],
+      "doesNotOwn": [
+        "渠道过滤、排序写入和菜单打开状态",
+        "ChannelStore、协议目录和平台服务",
+        "CSS 与页面生命周期"
+      ],
+      "publicApi": [
+        "SettingsChannelSidebarView"
+      ],
+      "test": [
+        "src/pages/SettingsPage/settingsPage/SettingsPageViews.test.ts"
+      ],
+      "budget": 229
+    },
+    {
+      "module": "src/pages/SettingsPage/settingsPage/SettingsProviderHeaderView.tsx",
+      "owner": "pages-settings-provider-header-view",
+      "responsibility": "渲染当前渠道头像、名称、资料编辑入口和启停开关。",
+      "owns": [
+        "provider header 结构与文案顺序",
+        "资料编辑、启停开关锚点和 aria/title"
+      ],
+      "doesNotOwn": [
+        "渠道名称、头像和启用状态写入",
+        "资料抽屉动作与平台文件读取",
+        "CSS 与页面状态"
+      ],
+      "publicApi": [
+        "SettingsProviderHeaderView"
+      ],
+      "test": [
+        "src/pages/SettingsPage/settingsPage/SettingsPageViews.test.ts"
+      ],
+      "budget": 57
+    },
+    {
+      "module": "src/pages/SettingsPage/settingsPage/SettingsConnectionView.tsx",
+      "owner": "pages-settings-connection-view",
+      "responsibility": "渲染渠道地址、Key 分组、令牌字段、协议探测和连接状态区域。",
+      "owns": [
+        "连接与鉴权 section、分组编辑器顺序",
+        "地址、令牌、探测按钮和状态提示锚点"
+      ],
+      "doesNotOwn": [
+        "凭据持久化、验证请求和协议探测",
+        "Key 分组事务与平台端口实现",
+        "CSS 与页面路由"
+      ],
+      "publicApi": [
+        "SettingsConnectionView"
+      ],
+      "test": [
+        "src/pages/SettingsPage/settingsPage/SettingsPageViews.test.ts"
+      ],
+      "budget": 389
+    },
+    {
+      "module": "src/pages/SettingsPage/settingsPage/SettingsProtocolDetailsView.tsx",
+      "owner": "pages-settings-protocol-details-view",
+      "responsibility": "渲染渠道协议说明、内置能力提示、导入入口和协议专用字段。",
+      "owns": [
+        "协议说明区块与导入按钮顺序",
+        "协议字段、只读提示和测试锚点"
+      ],
+      "doesNotOwn": [
+        "协议目录解析、动作编排和下载",
+        "渠道表单持久化与状态派生",
+        "CSS 与页面生命周期"
+      ],
+      "publicApi": [
+        "SettingsProtocolDetailsView"
+      ],
+      "test": [
+        "src/pages/SettingsPage/settingsPage/SettingsPageViews.test.ts"
+      ],
+      "budget": 150
+    },
+    {
+      "module": "src/pages/SettingsPage/settingsPage/SettingsModelsView.tsx",
+      "owner": "pages-settings-models-view",
+      "responsibility": "渲染渠道已选模型、拉取入口、模型选择面板和分类筛选。",
+      "owns": [
+        "模型列表 section、模型 chip 与空态",
+        "选择面板搜索、分类标签和候选模型行"
+      ],
+      "doesNotOwn": [
+        "模型拉取、勾选写入和业务校验",
+        "ChannelStore、平台模型缓存和协议能力",
+        "CSS 与页面生命周期"
+      ],
+      "publicApi": [
+        "SettingsModelsView"
+      ],
+      "test": [
+        "src/pages/SettingsPage/settingsPage/SettingsPageViews.test.ts"
+      ],
+      "budget": 209
+    },
+    {
+      "module": "src/pages/SettingsPage/settingsPage/SettingsChannelRouteView.tsx",
+      "owner": "pages-settings-channel-route-view",
+      "responsibility": "渲染渠道优先级、权重、前端模型映射和映射测试控件。",
+      "owns": [
+        "路由调优与模型映射 section 顺序",
+        "映射行、常用切换、测试按钮和状态锚点"
+      ],
+      "doesNotOwn": [
+        "模型映射保存、防抖和测试请求",
+        "前端模型全局状态与 ChannelStore 写入",
+        "CSS 与页面生命周期"
+      ],
+      "publicApi": [
+        "SettingsChannelRouteView"
+      ],
+      "test": [
+        "src/pages/SettingsPage/settingsPage/SettingsPageViews.test.ts"
+      ],
+      "budget": 370
+    },
+    {
+      "module": "src/pages/SettingsPage/settingsPage/SettingsProfileDrawerView.tsx",
+      "owner": "pages-settings-profile-drawer-view",
+      "responsibility": "渲染渠道资料编辑抽屉的头像、字段、上传与保存操作。",
+      "owns": [
+        "profile dialog 根结构、标题和关闭入口",
+        "头像操作、名称输入和保存状态锚点"
+      ],
+      "doesNotOwn": [
+        "资料草稿、头像文件读取和保存动作",
+        "抽屉几何测量、焦点生命周期与 Store",
+        "CSS 与 portal 挂载点"
+      ],
+      "publicApi": [
+        "SettingsProfileDrawerView"
+      ],
+      "test": [
+        "src/pages/SettingsPage/settingsPage/SettingsPageViews.test.ts"
+      ],
+      "budget": 142
+    },
+    {
+      "module": "src/pages/SettingsPage/settingsPage/SettingsChannelContextMenuView.tsx",
+      "owner": "pages-settings-channel-context-menu-view",
+      "responsibility": "渲染渠道右键菜单、编辑删除项和删除二次确认内容。",
+      "owns": [
+        "菜单 role、定位样式和操作顺序",
+        "编辑、删除、确认与取消锚点及禁用态"
+      ],
+      "doesNotOwn": [
+        "菜单打开、键盘导航和删除事务",
+        "渠道状态与内置渠道判断",
+        "CSS 与 portal 挂载点"
+      ],
+      "publicApi": [
+        "SettingsChannelContextMenuView"
+      ],
+      "test": [
+        "src/pages/SettingsPage/settingsPage/SettingsPageViews.test.ts"
+      ],
+      "budget": 101
+    },
+    {
+      "module": "src/pages/SettingsPage/settingsPage/settingsPageStyles.ts",
+      "owner": "pages-settings-style-facade",
+      "responsibility": "合并设置页各 CSS Module 并保持渠道 item 组合规则不被后加载模块覆盖。",
+      "owns": [
+        "设置页样式导出门面",
+        "item 组合规则的固定覆盖"
+      ],
+      "doesNotOwn": [
+        "具体视觉样式定义",
+        "React 组件结构或业务状态",
+        "页面主题切换实现"
+      ],
+      "publicApi": [
+        "settingsPageStyles"
+      ],
+      "test": [
+        "src/pages/SettingsPage/settingsPageCssArchitecture.test.ts"
+      ],
+      "budget": 20
     }
   ]
 }

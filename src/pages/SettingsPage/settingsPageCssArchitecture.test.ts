@@ -24,21 +24,23 @@ const sourceOf = (path: string): string => {
 const PART_SOURCES = Object.fromEntries(
   PART_NAMES.map((name) => [`./${name}.module.css`, sourceOf(`./${name}.module.css`)]),
 )
+const STYLE_FACADE = (
+  import.meta.glob('./settingsPage/settingsPageStyles.ts', {
+    eager: true,
+    query: '?raw',
+    import: 'default',
+  }) as Record<string, string>
+)['./settingsPage/settingsPageStyles.ts']
 
 const countLines = (source: string) =>
   source.endsWith('\n') ? source.split('\n').length - 1 : source.split('\n').length
 
 describe('SettingsPage CSS 模块结构护栏', () => {
   it('渠道行主类保留 facade 组合，不被后展开的 Details 模块覆盖', () => {
-    const SOURCE = (
-      import.meta.glob('./SettingsPage.tsx', {
-        eager: true,
-        query: '?raw',
-        import: 'default',
-      }) as Record<string, string>
-    )['./SettingsPage.tsx']
     const FACADE = (sourceOf('./SettingsPage.module.css') as string)
-    expect(SOURCE).toMatch(/\.\.\.settingsChannelListDetailsStyles,\s*[\s\S]*?item:\s*baseStyles\.item/)
+    expect(STYLE_FACADE).toMatch(
+      /\.\.\.settingsChannelListDetailsStyles,\s*[\s\S]*?item:\s*baseStyles\.item/,
+    )
     expect(FACADE).toBeTypeOf('string')
   })
 
@@ -60,17 +62,10 @@ describe('SettingsPage CSS 模块结构护栏', () => {
     }
   })
 
-  it('组件入口继续合并全部组件样式模块', () => {
-    const SOURCE = (
-      import.meta.glob('./SettingsPage.tsx', {
-        eager: true,
-        query: '?raw',
-        import: 'default',
-      }) as Record<string, string>
-    )['./SettingsPage.tsx']
+  it('样式门面继续合并全部组件样式模块', () => {
     for (const name of PART_NAMES) {
-      expect(SOURCE, name).toContain(`./${name}.module.css`)
-      expect(SOURCE, name).toContain(`${name[0].toLowerCase()}${name.slice(1)}Styles`)
+      expect(STYLE_FACADE, name).toContain(`../${name}.module.css`)
+      expect(STYLE_FACADE, name).toContain(`${name[0].toLowerCase()}${name.slice(1)}Styles`)
     }
   })
 })

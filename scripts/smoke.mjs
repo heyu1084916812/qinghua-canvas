@@ -13487,7 +13487,7 @@ async function g74(browser) {
     g,
     '服务行改为紧凑单行，不再有多选删除',
     !!rowInteraction &&
-      rowInteraction.height <= 42 &&
+      rowInteraction.height === 42 &&
       rowInteraction.deleteCheckboxes === 0 &&
       rowInteraction.dragHandle === 1 &&
       rowInteraction.menuTrigger === 1 &&

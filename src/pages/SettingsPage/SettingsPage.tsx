@@ -9,68 +9,24 @@ import {
 } from 'react'
 import { createPortal } from 'react-dom'
 import { useChannels } from '../../app/providers/ChannelStoreProvider'
-import { noticeA11y } from '../../domain/ui/notice'
-import {
-  channelCapabilities,
-  protocolShort,
-} from '../../domain/project/channel'
-import {
-  CAPABILITY_LABEL,
-  protocolById,
-} from '../../domain/project/protocol'
 import type { DeclarativeProtocolPackage } from '../../domain/project/protocolRecipe'
 import {
-  CATEGORY_FILTERS,
-  categoryLabel,
-  routeMapOptions,
   type CategoryFilter,
 } from '../../domain/project/modelSelection'
-import baseStyles from './SettingsPage.module.css'
-import settingsChannelListStyles from './SettingsChannelList.module.css'
-import settingsChannelListDetailsStyles from './SettingsChannelListDetails.module.css'
-import settingsRoutePolicyStyles from './SettingsRoutePolicy.module.css'
-import settingsChannelFormStyles from './SettingsChannelForm.module.css'
-import settingsModelMappingStyles from './SettingsModelMapping.module.css'
-import settingsAppearanceSystemStyles from './SettingsAppearanceSystem.module.css'
-import { ChannelTokenField } from './SettingsChannelTokenField'
-import { SettingsChannelAvatar } from './SettingsChannelAvatar'
-import { channelMenuArrowFocus, drawerTabFocus } from './settingsPageOverlayRules'
+import { drawerTabFocus } from './settingsPageOverlayRules'
 import {
   ROUTE_PLAN_STRATEGIES,
   type RoutePlanStrategy,
 } from '../../domain/project/routePlan'
 import {
-  CHANNEL_FILTER_OPTIONS,
-  GLOBAL_MODEL_VENDORS,
-  MAP_FILTERS,
-  PROTOCOL_GROUPS,
   measureProfileDrawerBounds,
   type ChannelFilterKey,
   type MapFilterKey,
   type PresetModel,
   type PresetVendor,
 } from './settingsPageConstants'
-import type { ModelCapability } from '../../domain/shared/capability'
-import type { Channel } from '../../domain/project/channel'
-import { ModelIcon } from '../../features/shared/modelIcon/ModelIcon'
 import { isBuiltinChannelId } from '../../domain/project/builtinChannels'
-import { ModelMapCombo, StrategyPicker } from './SettingsPicker'
 import { usePlatform } from '../../app/providers/PlatformProvider'
-import { ChoicePicker } from '../../features/shared/choicePicker/ChoicePicker'
-import {
-  IconDelete,
-  IconDownload,
-  IconEdit,
-  IconFilter,
-  IconGear,
-  IconGrip,
-  IconImageUpload,
-  IconMoreVertical,
-  IconResetAvatar,
-  IconSearch,
-  IconClose,
-  IconChannels,
-} from '../../app/SettingsIcons'
 import {
   createChannelActions,
   type ChannelActionPorts,
@@ -91,6 +47,15 @@ import * as channelPresentation from './settingsPage/settingsChannelPresentation
 import * as interactionLifecycle from './settingsPage/settingsInteractionLifecycle'
 import * as routingInteractions from './settingsPage/settingsRoutingActions'
 import * as statusPresentation from './settingsPage/settingsStatusPresentation'
+import { settingsPageStyles as styles } from './settingsPage/settingsPageStyles'
+import { SettingsGlobalRouteView } from './settingsPage/SettingsGlobalRouteView'
+import { SettingsChannelSidebarView } from './settingsPage/SettingsChannelSidebarView'
+import { SettingsProviderHeaderView } from './settingsPage/SettingsProviderHeaderView'
+import { SettingsConnectionView } from './settingsPage/SettingsConnectionView'
+import { SettingsModelsView } from './settingsPage/SettingsModelsView'
+import { SettingsChannelRouteView } from './settingsPage/SettingsChannelRouteView'
+import { SettingsProfileDrawerView } from './settingsPage/SettingsProfileDrawerView'
+import { SettingsChannelContextMenuView } from './settingsPage/SettingsChannelContextMenuView'
 
 type SettingsSetter<T> = Dispatch<SetStateAction<T>>
 
@@ -142,19 +107,6 @@ function profileFocusSetter(ref: { current: HTMLElement | null }): (value: HTMLE
     ref.current = value
   }
 }
-
-const styles = {
-  ...baseStyles,
-  ...settingsChannelListStyles,
-  ...settingsChannelListDetailsStyles,
-  ...settingsRoutePolicyStyles,
-  ...settingsChannelFormStyles,
-  ...settingsModelMappingStyles,
-  ...settingsAppearanceSystemStyles,
-  // The facade composes both `.item` rules in CSS order; object spread would
-  // otherwise replace it with only the later details-row override.
-  item: baseStyles.item,
-} as Record<string, string>
 
 /**
  * 模型映射区的**五个筛选**（用户 2026-10-08 第 1 条：「图一这个模型映射的地方换成五个筛选吧，
@@ -663,1243 +615,214 @@ export function SettingsPage({ embedded = false }: { embedded?: boolean } = {}) 
       */}
       {(
       <div className={embedded ? styles.layoutEmbedded : styles.layout} data-settings-card>
-        {/* —— 全局选路策略（用户 2026-09-29 第 12/13 轮）——
-            跨渠道比较用的一把尺子，与「当前选中哪条渠道」无关。
-            它**不放进渠道编辑区**（否则看上去像是右边渠道表单里的一项）——
-            独立成一条横跨左右两栏的顶栏，未选中渠道时也能设置。 */}
-        <section className={styles.globalRoute} data-settings-global-route>
-          <div className={styles.globalRouteText}>
-            <span className={styles.cardTitle}>选路策略</span>
-            <span className={styles.cardSub}>
-              同一模型可用时，按此规则选择渠道和 Key 分组。
-            </span>
-          </div>
-          <div className={styles.globalRouteControls}>
-            <StrategyPicker
-              value={routingPolicy.strategy}
-              options={ROUTE_PLAN_STRATEGIES.map((strategy) => ({
-                value: strategy.value,
-                label: strategy.label,
-                hint: strategy.hint,
-              }))}
-              onChange={(value) =>
-                void channels.setRoutingPolicy({
-                  strategy: value as RoutePlanStrategy,
-                })
-              }
-            />
-            <ChoicePicker
-              name="routing-max-attempts"
-              value={String(routingPolicy.maxAttempts)}
-              options={[1, 2, 3, 4, 5].map((count) => ({
-                value: String(count),
-                label: `最多 ${count} 次`,
-              }))}
-              ariaLabel="最大尝试次数"
-              onChange={(value) =>
-                void channels.setRoutingPolicy({ maxAttempts: Number(value) })
-              }
-            />
-            <button
-              type="button"
-              className={routingScopeOpen ? `${styles.routeScopeButton} ${styles.routeScopeButtonOpen}` : styles.routeScopeButton}
-              data-routing-scope-toggle
-              aria-expanded={routingScopeOpen}
-              onClick={() => setRoutingScopeOpen((open) => !open)}
-            >
-              路由范围
-              <span>
-                {selectedRoutingCandidateKeys.size}/{routingCandidates.length}
-              </span>
-            </button>
-          </div>
-        </section>
-
-        {routingScopeOpen && (
-          <section className={styles.routeScopePanel} data-routing-scope>
-            <div className={styles.routeScopeHead}>
-              <div className={styles.globalRouteText}>
-                <span className={styles.cardTitle}>参与路由的 Key 分组</span>
-                <span className={styles.cardSub}>
-                  至少保留一项；未勾选的分组不会被自动回退使用。
-                </span>
-              </div>
-              <button
-                type="button"
-                className={styles.routeScopeReset}
-                disabled={routingPolicy.allowedCandidates.length === 0}
-                onClick={() =>
-                  void channels.setRoutingPolicy({ allowedCandidates: [] })
-                }
-              >
-                全部可用
-              </button>
-            </div>
-            {routingCandidates.length === 0 ? (
-              <p className={styles.routeScopeEmpty}>还没有可参与路由的渠道。</p>
-            ) : (
-              <div className={styles.routeScopeChannels}>
-                {routingChannelGroups.map((group) => {
-                  const checkedCount = group.candidates.filter((candidate) =>
-                    selectedRoutingCandidateKeys.has(candidate.key),
-                  ).length
-                  const allChecked = checkedCount === group.candidates.length
-                  const mixed = checkedCount > 0 && !allChecked
-                  const expanded = expandedRoutingChannels.has(group.channelId)
-                  return (
-                    <article
-                      key={group.channelId}
-                      className={styles.routeScopeChannel}
-                      data-routing-channel={group.channelId}
-                      data-routing-channel-groups-count={group.candidates.length}
-                      data-routing-channel-checked={
-                        allChecked ? 'true' : mixed ? 'mixed' : 'false'
-                      }
-                    >
-                      <div className={styles.routeScopeChannelHead}>
-                        <button
-                          type="button"
-                          role="checkbox"
-                          aria-checked={mixed ? 'mixed' : allChecked}
-                          aria-label={`${group.channelName} 的 Key 分组`}
-                          className={styles.routeScopeChannelCheck}
-                          data-routing-channel-toggle={group.channelId}
-                          onClick={() => toggleRoutingChannel(group.candidates, !allChecked)}
-                        >
-                          {allChecked ? '✓' : mixed ? '−' : ''}
-                        </button>
-                        <span className={styles.routeScopeOptionText}>
-                          <b>{group.channelName}</b>
-                          <small>
-                            {checkedCount}/{group.candidates.length} 个 Key 分组参与路由
-                          </small>
-                        </span>
-                        <button
-                          type="button"
-                          className={styles.routeScopeChannelExpand}
-                          aria-expanded={expanded}
-                          aria-controls={`routing-groups-${group.channelId}`}
-                          data-routing-channel-expand={group.channelId}
-                          onClick={() => toggleRoutingChannelExpanded(group.channelId)}
-                        >
-                          {group.candidates.length} 个分组
-                          <span aria-hidden>{expanded ? '⌃' : '⌄'}</span>
-                        </button>
-                      </div>
-                      {expanded ? (
-                        <div
-                          id={`routing-groups-${group.channelId}`}
-                          className={styles.routeScopeGrid}
-                          data-routing-channel-groups={group.channelId}
-                        >
-                          {group.candidates.map((candidate) => {
-                            const checked = selectedRoutingCandidateKeys.has(candidate.key)
-                            return (
-                              <label
-                                key={candidate.key}
-                                className={styles.routeScopeOption}
-                                data-routing-candidate={candidate.key}
-                                data-routing-candidate-checked={checked ? 'true' : 'false'}
-                              >
-                                <input
-                                  type="checkbox"
-                                  checked={checked}
-                                  onChange={(event) =>
-                                    toggleRoutingCandidate(candidate.key, event.target.checked)
-                                  }
-                                />
-                                <span className={styles.routeScopeOptionText}>
-                                  <b>{candidate.groupName}</b>
-                                  <small>
-                                    {!candidate.enabled
-                                      ? '已停用'
-                                      : !candidate.hasToken
-                                        ? '未配置 Key'
-                                        : '可用于路由'}
-                                  </small>
-                                </span>
-                              </label>
-                            )
-                          })}
-                        </div>
-                      ) : null}
-                    </article>
-                  )
-                })}
-              </div>
-            )}
-          </section>
-        )}
+        <SettingsGlobalRouteView
+          strategy={routingPolicy.strategy}
+          strategyOptions={ROUTE_PLAN_STRATEGIES.map((strategy) => ({
+            value: strategy.value,
+            label: strategy.label,
+            hint: strategy.hint,
+          }))}
+          maxAttempts={routingPolicy.maxAttempts}
+          scopeOpen={routingScopeOpen}
+          allowedCandidatesCount={routingPolicy.allowedCandidates.length}
+          routingCandidatesCount={routingCandidates.length}
+          selectedRoutingCandidateKeys={selectedRoutingCandidateKeys}
+          routingChannelGroups={routingChannelGroups}
+          expandedRoutingChannels={expandedRoutingChannels}
+          onStrategyChange={(value) =>
+            void channels.setRoutingPolicy({
+              strategy: value as RoutePlanStrategy,
+            })
+          }
+          onMaxAttemptsChange={(value) =>
+            void channels.setRoutingPolicy({ maxAttempts: Number(value) })
+          }
+          onToggleScope={() => setRoutingScopeOpen((open) => !open)}
+          onResetScope={() =>
+            void channels.setRoutingPolicy({ allowedCandidates: [] })
+          }
+          onToggleRoutingChannel={toggleRoutingChannel}
+          onToggleRoutingChannelExpanded={toggleRoutingChannelExpanded}
+          onToggleRoutingCandidate={toggleRoutingCandidate}
+        />
 
         <div className={styles.workarea} data-settings-workarea>
-          <aside className={styles.sidebar} data-settings-sidebar>
-            <div className={styles.sidebarTools} data-channel-tools>
-              <div className={styles.channelSearch}>
-                <IconSearch size={16} />
-                <input
-                  value={channelSearch}
-                  data-channel-search
-                  placeholder="搜索模型平台..."
-                  aria-label="搜索模型服务"
-                  onChange={(event) => setChannelSearch(event.target.value)}
-                />
-                <ChoicePicker
-                  name="channel-filter"
-                  value={channelFilter}
-                  compact
-                  iconOnly
-                  alignEnd
-                  triggerIcon={<IconFilter size={16} />}
-                  ariaLabel="筛选模型服务"
-                  options={CHANNEL_FILTER_OPTIONS}
-                  onChange={(value) => setChannelFilter(value as ChannelFilterKey)}
-                  className={styles.channelFilterPicker}
-                />
-              </div>
-            </div>
-            <ul className={styles.list} data-channel-list>
-              {visibleChannels.map((ch: Channel) => {
-                const caps = channelCapabilities(
-                  ch,
-                  protocolById(ch.protocol, catalog)?.capabilities ?? [],
-                )
-                return (
-                  <li key={ch.id}>
-                    <div
-                      className={
-                        ch.id === selectedId
-                          ? `${styles.item} ${styles.itemActive}`
-                          : styles.item
-                      }
-                      data-channel-item
-                      data-channel-id={ch.id}
-                      data-channel-selected={ch.id === selectedId ? 'true' : undefined}
-                      data-channel-proto={protocolShort(ch.protocol, catalog)}
-                      data-channel-enabled-state={ch.enabled ? 'true' : 'false'}
-                      data-channel-caps={(['chat', 'image', 'video'] as const)
-                        .filter((key) => caps[key])
-                        .join(',')}
-                      data-channel-fixed={isBuiltinChannelId(ch.id) ? 'true' : undefined}
-                      data-dragging={dragId === ch.id ? 'true' : undefined}
-                      data-menu-open={channelMenu?.channelId === ch.id ? 'true' : undefined}
-                      onContextMenu={(event) => {
-                        event.preventDefault()
-                        openChannelMenu(ch.id, event.clientX, event.clientY)
-                      }}
-                      onDragOver={(event) => {
-                        if (!dragId) return
-                        event.preventDefault()
-                      }}
-                      onDrop={(event) => {
-                        if (!dragId) return
-                        event.preventDefault()
-                        void dropOnChannel(ch.id)
-                      }}
-                    >
-                      <span className={styles.dragHandleSlot}>
-                        {!isBuiltinChannelId(ch.id) ? (
-                          <button
-                            type="button"
-                            className={styles.dragHandle}
-                            draggable
-                            aria-label={`拖动 ${ch.name} 排序`}
-                            title="拖动排序"
-                            data-channel-drag-handle={ch.id}
-                            onDragStart={(event) => {
-                              event.stopPropagation()
-                              setDragId(ch.id)
-                            }}
-                            onDragEnd={() => setDragId(null)}
-                          >
-                            <IconGrip size={15} />
-                          </button>
-                        ) : null}
-                      </span>
-                      <button
-                        type="button"
-                        className={styles.itemMain}
-                        onPointerDown={(event) => {
-                          if (event.button === 0) setSelectedId(ch.id)
-                        }}
-                        onClick={() => setSelectedId(ch.id)}
-                        onKeyDown={(event) => {
-                          const menuKey =
-                            event.key === 'ContextMenu' ||
-                            (event.shiftKey && event.key === 'F10')
-                          if (!menuKey) return
-                          event.preventDefault()
-                          const rect = event.currentTarget.getBoundingClientRect()
-                          openChannelMenu(ch.id, rect.right - 8, rect.top + rect.height)
-                        }}
-                      >
-                        <span className={styles.itemIcon} data-channel-icon-box>
-                          <SettingsChannelAvatar
-                            channelId={ch.id}
-                            protocol={ch.protocol}
-                            icon={ch.icon}
-                            name={ch.name}
-                            size={24}
-                          />
-                        </span>
-                        <span className={styles.itemBody} data-channel-body>
-                          <span className={styles.itemName}>{ch.name}</span>
-                        </span>
-                      </button>
-                      <span className={styles.itemTrailing}>
-                        {ch.enabled ? (
-                          <span
-                            className={styles.itemEnabledDot}
-                            data-channel-state-dot={ch.id}
-                            data-enabled="true"
-                            title="已启用"
-                            aria-label="已启用"
-                          />
-                        ) : null}
-                        <button
-                          type="button"
-                          className={styles.itemMenuTrigger}
-                          data-channel-menu-trigger={ch.id}
-                          aria-label={`打开 ${ch.name} 菜单`}
-                          aria-haspopup="menu"
-                          aria-expanded={channelMenu?.channelId === ch.id}
-                          title="更多操作"
-                          onPointerDown={(event) => event.stopPropagation()}
-                          onClick={(event) => openChannelMenuFromButton(event, ch.id)}
-                        >
-                          <IconMoreVertical size={17} />
-                        </button>
-                      </span>
-                    </div>
-                  </li>
-                )
-              })}
-              {visibleChannels.length === 0 && (
-                <li className={styles.empty}>
-                  {channelsList.length === 0
-                    ? '还没有模型服务，点下方「添加服务商」'
-                    : '没有符合搜索或筛选条件的模型服务'}
-                </li>
-              )}
-            </ul>
-            <div className={styles.sidebarFoot}>
-              <button className={styles.addBtn} data-channel-add onClick={handleCreate}>
-                + 添加服务商
-              </button>
-            </div>
-          </aside>
+          <SettingsChannelSidebarView
+            catalog={catalog}
+            channels={channelsList}
+            visibleChannels={visibleChannels}
+            selectedId={selectedId}
+            channelSearch={channelSearch}
+            channelFilter={channelFilter}
+            dragId={dragId}
+            openChannelId={channelMenu?.channelId ?? null}
+            onSearchChange={setChannelSearch}
+            onFilterChange={setChannelFilter}
+            onSelectChannel={setSelectedId}
+            onOpenChannelMenu={openChannelMenu}
+            onOpenChannelMenuFromButton={openChannelMenuFromButton}
+            onDragStart={setDragId}
+            onDragEnd={() => setDragId(null)}
+            onDropOnChannel={(channelId) => void dropOnChannel(channelId)}
+            onCreate={() => void handleCreate()}
+          />
 
         <section className={styles.editor} data-settings-editor>
           {!selected ? (
             <div className={styles.placeholder}>从左侧选择，或新增一个模型服务</div>
           ) : (
             <div className={styles.form} data-settings-form>
-              <div className={styles.providerEditorHead} data-settings-provider-head>
-                <SettingsChannelAvatar
-                  protocol={protocol}
-                  icon={selected.icon}
-                  name={name}
-                  size={34}
-                />
-                <div className={styles.providerNameGroup}>
-                  <span className={styles.providerNameText} data-settings-name>
-                    {name}
-                  </span>
-                  <button
-                    type="button"
-                    className={styles.providerGear}
-                    data-settings-profile-edit
-                    aria-label="编辑服务资料"
-                    title="编辑服务资料"
-                    onClick={() => editChannel(selected.id)}
-                  >
-                    <IconGear size={16} />
-                  </button>
-                </div>
-                <label
-                  className={styles.switch}
-                  title={enabled ? '停用模型服务' : '启用模型服务'}
-                >
-                  <input
-                    className={styles.switchInput}
-                    type="checkbox"
-                    checked={enabled}
-                    aria-label={`${selected.name}：${enabled ? '已启用' : '未启用'}`}
-                    data-channel-enabled={selected.id}
-                    onChange={(event) => void handleEnableChange(event.target.checked)}
-                  />
-                  <span className={styles.switchTrack} aria-hidden="true" />
-                </label>
-              </div>
-              {/* —— 连接与鉴权（§7.3）—— */}
-              <section className={styles.editorSection} data-settings-connection>
-                <div className={styles.cardHead}>
-                  <span className={styles.cardTitle}>连接与鉴权</span>
-                  <span className={styles.cardSub}>站点地址、API Key 与协议</span>
-                </div>
-
-                <label className={styles.field}>
-                  <span className={styles.label}>地址</span>
-                  <input
-                    className={styles.input}
-                    data-settings-baseurl
-                    placeholder="https://your-relay.example.com（含 /v1 或不含都可以）"
-                    value={baseUrl}
-                    onChange={(e) => setBaseUrl(e.target.value)}
-                    onBlur={() => void persistForm()}
-                  />
-                </label>
-
-                {activeGroup ? (
-                  <div className={styles.keyGroups} data-key-groups>
-                    <div className={styles.keyGroupsHead}>
-                      <span className={styles.label}>Key 分组</span>
-                      <button
-                        className={styles.ghostBtn}
-                        data-key-group-add
-                        disabled={busy}
-                        onClick={() => void handleAddKeyGroup()}
-                      >
-                        + 添加分组
-                      </button>
-                    </div>
-                    <div className={styles.keyGroupTabs} role="tablist" aria-label="Key 分组">
-                      {selectedKeyGroups.map((group) => (
-                        <button
-                          key={group.id}
-                          type="button"
-                          role="tab"
-                          aria-selected={group.id === activeGroup.id}
-                          className={
-                            group.id === activeGroup.id
-                              ? `${styles.keyGroupTab} ${styles.keyGroupTabOn}`
-                              : styles.keyGroupTab
-                          }
-                          data-key-group-tab={group.id}
-                          onClick={() => setActiveGroupId(group.id)}
-                        >
-                          {group.name}
-                          {group.hasToken ? '' : ' · 未填 Key'}
-                        </button>
-                      ))}
-                    </div>
-
-                    <div className={styles.keyGroupEditor} data-key-group-editor={activeGroup.id}>
-                      <div className={styles.fieldRow}>
-                        <label className={`${styles.field} ${styles.grow}`}>
-                          <span className={styles.label}>分组名称</span>
-                          <input
-                            key={`${activeGroup.id}-name`}
-                            className={styles.input}
-                            data-key-group-name
-                            defaultValue={activeGroup.name}
-                            onBlur={(event) => {
-                              const value = event.target.value.trim()
-                              if (value && value !== activeGroup.name) {
-                                void channels.renameCredentialGroup(
-                                  selected.id,
-                                  activeGroup.id,
-                                  value,
-                                )
-                              }
-                            }}
-                          />
-                        </label>
-                        <label className={styles.field}>
-                          <span className={styles.label}>分组优先级</span>
-                          <input
-                            key={`${activeGroup.id}-priority`}
-                            className={`${styles.input} ${styles.numInput}`}
-                            type="number"
-                            data-key-group-priority
-                            defaultValue={activeGroup.priority}
-                            onBlur={(event) => {
-                              const value = Number(event.target.value)
-                              if (Number.isFinite(value) && value !== activeGroup.priority) {
-                                void channels.setCredentialGroupPriority(
-                                  selected.id,
-                                  activeGroup.id,
-                                  value,
-                                )
-                              }
-                            }}
-                          />
-                        </label>
-                      </div>
-                      <ChannelTokenField
-                        key={activeGroup.id}
-                        channels={channels}
-                        channelId={selected.id}
-                        slot={selectedKeyGroups[0]?.id === activeGroup.id ? 'primary' : 'alt'}
-                        groupId={activeGroup.id}
-                        label="API Key"
-                        docUrl={docUrl}
-                        savedTail={activeGroup.tokenTail}
-                        saved={activeGroup.hasToken}
-                      />
-                      <div className={styles.keyGroupFoot}>
-                        <span className={styles.cardSub}>
-                          每组独立保存 Key 和模型，优先级高的先请求。
-                        </span>
-                        <button
-                          className={styles.ghostBtn}
-                          data-key-group-remove
-                          disabled={busy || selectedKeyGroups.length <= 1}
-                          onClick={() => void handleRemoveKeyGroup()}
-                        >
-                          删除分组
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                ) : (
-                  (credentialSlots.length > 0
-                    ? credentialSlots
-                    : [{ id: 'primary', label: '令牌（API Key）' }]
-                  ).map((cred, i) => (
-                    <ChannelTokenField
-                      key={cred.id}
-                      channels={channels}
-                      channelId={selected.id}
-                      slot={i === 0 ? 'primary' : 'alt'}
-                      label={cred.label}
-                      hint={cred.hint}
-                      required={cred.required}
-                      docUrl={docUrl}
-                      savedTail={i === 0 ? selected.tokenTail : selected.altTokenTail}
-                      saved={i === 0 ? selected.hasToken : selected.hasAltToken}
-                    />
-                  ))
-                )}
-
-                {/* 协议区（§7.3）：协议下拉 + 三个动作按钮。
-                    「验证地址」只回答地址通不通；「验证协议」按候选表试打并把命中的协议填进下拉；
-                    「拉取模型」在下方模型区分内。三者职责不重叠，所以按钮文案也是三句不同的话。 */}
-                <div className={styles.protocolRow}>
-                  <label className={`${styles.field} ${styles.grow}`}>
-                    <span className={styles.label}>协议</span>
-                    <ChoicePicker
-                      name="settings-protocol"
-                      value={protocol}
-                      ariaLabel="渠道协议"
-                      disabled={builtinSelected}
-                      onChange={handleProtocolChange}
-                      options={[
-                        ...(!visibleProtocolOptions.some((item) => item.id === protocol)
-                          ? [
-                              {
-                                value: protocol,
-                                label: `未知协议（${protocol}）`,
-                                group: '当前协议',
-                              },
-                            ]
-                          : []),
-                        ...PROTOCOL_GROUPS.flatMap(({ kind, label }) =>
-                          visibleProtocolOptions
-                            .filter((item) => item.kind === kind)
-                            .map((item) => ({
-                              value: item.id,
-                              label: `${item.name}${item.status !== 'ready' ? '（待支持）' : ''}`,
-                              group: label,
-                              disabled: item.status !== 'ready',
-                              actions:
-                                item.kind === 'station' || item.kind === 'custom'
-                                  ? [
-                                      {
-                                        key: 'download',
-                                        label: `下载协议 ${item.name}`,
-                                        title: '下载协议',
-                                        icon: <IconDownload size={14} />,
-                                        onSelect: () => downloadProtocol(item),
-                                      },
-                                      {
-                                        key: 'delete',
-                                        label: `删除协议 ${item.name}`,
-                                        title: referencedProtocolIds.has(item.id)
-                                          ? '仍有渠道使用，先切换渠道协议再删除'
-                                          : '删除协议',
-                                        icon: <IconDelete size={14} />,
-                                        danger: true,
-                                        disabled: referencedProtocolIds.has(item.id),
-                                        onSelect: () => void handleRemoveProtocol(item),
-                                      },
-                                    ]
-                                  : undefined,
-                            })),
-                        ),
-                      ]}
-                    />
-                  </label>
-                  <button
-                    className={styles.ghostBtn}
-                    data-settings-detect
-                    disabled={busy}
-                    onClick={handleDetect}
-                    title="按候选协议逐个试打，第一个通的自动选中"
-                  >
-                    验证协议
-                  </button>
-                  <button
-                    className={styles.ghostBtn}
-                    data-settings-verify
-                    disabled={busy}
-                    onClick={handleVerify}
-                  >
-                    验证地址
-                  </button>
-                </div>
-
-                <div
-                  className={styles.status}
-                  data-settings-status
-                  data-status-tone={statusTone}
-                  {...noticeA11y(statusTone)}
-                >
-                  {statusLine}
-                </div>
-
-                <div className={styles.protoTools}>
-                  <button
-                    className={styles.ghostBtn}
-                    data-proto-add-toggle
-                    onClick={toggleNewProtocol}
-                  >
-                    {newProtoOpen ? '收起 AI 协议导入' : '导入 AI 协议'}
-                  </button>
-                  {hiddenBuiltinProtocolIds.length > 0 && (
-                    <button
-                      type="button"
-                      className={styles.ghostBtn}
-                      data-proto-restore
-                      onClick={() => void handleRestoreBuiltinProtocols()}
-                    >
-                      恢复已移除（{hiddenBuiltinProtocolIds.length}）
-                    </button>
-                  )}
-                  {npNotice && <span className={styles.saved}>{npNotice}</span>}
-                  {protoManageNotice && (
-                    <span className={styles.saved} data-proto-manage-notice>
-                      {protoManageNotice}
-                    </span>
-                  )}
-                  {protoRemoveError && (
-                    <span className={styles.protoInlineError} data-proto-remove-error>
-                      {protoRemoveError}
-                    </span>
-                  )}
-                </div>
-
-                {newProtoOpen && (
-                  <div className={styles.protoForm} data-proto-form>
-                    <p className={styles.protoLead}>
-                      普通中转站直接选「OpenAI 兼容」。只有接口格式不同才需要导入 AI 协议。
-                    </p>
-                    <p className={styles.protoLead}>
-                      下载模板后，把模板和站点 API 文档一起交给 AI。AI 只输出协议 JSON，
-                      这里负责校验和保存。
-                    </p>
-                    <div className={styles.protoImportActions}>
-                      <button
-                        type="button"
-                        className={styles.ghostBtn}
-                        data-proto-template-download
-                        onClick={downloadProtocolTemplate}
-                      >
-                        下载协议模板
-                      </button>
-                      <label className={styles.ghostBtn} data-proto-file-label>
-                        选择 .txt / .json
-                        <input
-                          type="file"
-                          accept=".txt,.json,text/plain,application/json"
-                          hidden
-                          data-proto-file
-                          onChange={(event) => {
-                            void handleImportProtocolFile(event.target.files?.[0])
-                            event.target.value = ''
-                          }}
-                        />
-                      </label>
-                    </div>
-                    <textarea
-                      className={styles.protoImportText}
-                      data-proto-import-text
-                      placeholder="粘贴 AI 生成的协议内容"
-                      value={npImportText}
-                      onChange={(event) => {
-                        setNpImportText(event.target.value)
-                        setNpImported(null)
-                        setNpError('')
-                      }}
-                    />
-                    {npImported && (
-                      <div className={styles.protoPreview} data-proto-preview>
-                        <strong>{npImported.name}</strong>
-                        <span>
-                          {npImported.capabilities
-                            .map((capability) => CAPABILITY_LABEL[capability])
-                            .join(' / ')}
-                        </span>
-                        <span>{npImported.recipe.auth.type} 鉴权</span>
-                      </div>
-                    )}
-                    {npError && (
-                      <p className={styles.protoError} data-proto-error>
-                        {npError}
-                      </p>
-                    )}
-                    <div className={styles.protoFoot}>
-                      <button
-                        className={styles.ghostBtn}
-                        data-proto-check
-                        onClick={checkImportedProtocol}
-                      >
-                        检查协议
-                      </button>
-                      <button
-                        className={styles.primary}
-                        data-proto-import-save
-                        onClick={handleSaveImportedProtocol}
-                      >
-                        保存并选中
-                      </button>
-                    </div>
-                  </div>
-                )}
-
-                {/*
-                  待支持协议（CLI / RunningHub）。
-
-                  为什么单独列一块而不是只留在下拉里灰掉：灰掉的 `<option>` 在多数浏览器里
-                  几乎看不见，用户只会以为「根本没有 CLI 这一项」。列出来才回答得上
-                  「支不支持」这个问题，同时明写为什么不支持 —— 这也是「能看到但选不了」
-                  与「压根不知道有」的区别。
-                */}
-                {pendingProtocols.length > 0 && (
-                  <div className={styles.protoMine} data-proto-pending>
-                    <span className={styles.label}>待支持协议</span>
-                    {pendingProtocols.map((p) => (
-                      <div key={p.id} className={styles.protoMineRow} data-proto-pending-item={p.id}>
-                        <span className={styles.protoMineName}>{p.name}</span>
-                        <span className={styles.protoPendingWhy}>{p.note}</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                {/*
-                  ⛔ 「本机 CLI」那一块**整块删掉**（用户第 21 批第 1 条：
-                  「每个渠道的这里的cli都不需要了，cli有单独的位置了」）——
-                  CLI 现在在「全局设置 → 左侧 CLI 一栏」，渠道页再挂一份入口就是两处口径
-                  （而且它看起来像"这条渠道的 CLI 配置"，实际是全局的）。
-                */}
-
-                {showMockNote && (
-                  <p className={styles.offlineNote} data-settings-mock-note>
-                    Mock 是离线协议：不发任何网络请求、也不会去访问上面填的地址，所以验证必然通过。
-                    要联调真实中转，把「协议」切到「OpenAI 兼容（对话 + 生图）」后再点一次「验证地址」，
-                    或者直接点「验证协议」让它自己认。
-                  </p>
-                )}
-                {/*
-                  「这条协议有什么前提」一直写在目录的 `note` 里，却从未显示 ——
-                  于是 CLI 网关类协议看起来与普通站点无异，用户把 CLI 官网地址填进来
-                  必然验证失败，还不知道为什么。这里把当前协议的说明显式说出来。
-                  mock 另有专门提示（要点是「没出网」），故仅在非 mock 时显示。
-                */}
-                {selectedProtocolNote && protocol !== 'mock' && (
-                  <p className={styles.offlineNote} data-settings-proto-note>
-                    {selectedProtocolNote}
-                  </p>
-                )}
-              </section>
-
-              {/* —— 模型管理（§7.4）—— */}
-              <section className={styles.editorSection} data-settings-models>
-                <div className={styles.modelsHead}>
-                  <div className={styles.modelsTitleBox}>
-                    <span className={styles.cardTitle}>模型列表</span>
-                    <span className={styles.cardSub}>
-                      {activeGroup ? `当前分组：${activeGroup.name}` : '从上游 api 自动拉取所有可用模型'}
-                    </span>
-                  </div>
-                  <button className={styles.ghostBtn} disabled={busy} onClick={handleRefresh}>
-                    拉取模型
-                  </button>
-                  <button
-                    className={styles.ghostBtn}
-                    disabled={busy || activeModelCache.length === 0}
-                    onClick={openPanel}
-                  >
-                    选择模型
-                  </button>
-                </div>
-
-                {activeModelCache.length === 0 ? (
-                  <p className={styles.modelsEmpty} data-models-empty>
-                    还没有拉取过模型。点「拉取模型」从上游取回全部可用模型，再点「选择模型」勾选要用的。
-                  </p>
-                ) : selectedGroups.length === 0 ? (
-                  <p className={styles.modelsEmpty} data-models-none>
-                    {/* ⚠️ 2026-10-08：删掉"与漫画"——漫画剧工作台 2026-09-25 已整体移除，
-                        这句是漏网的旧文案（用户第 3 条一眼看到：「怎么会有个漫画的东西」）。 */}
-                    上游有 {activeModelCache.length} 个模型，但还没勾选任何一个——画布的模型下拉只列这里选中的。
-                    点「选择模型」去挑。
-                  </p>
-                ) : (
-                  <div className={styles.selectedGroups}>
-                    {selectedGroups.map((group) => (
-                      <div key={group.category} className={styles.selectedRow}>
-                        <span className={styles.selectedLabel}>{group.label}模型</span>
-                        <div className={styles.chips}>
-                          {group.models.map((m) => (
-                            <span key={m.id} className={styles.chip} data-model-chip data-model-id={m.id}>
-                              {m.id}
-                              <button
-                                className={styles.chipX}
-                                aria-label={`移除模型 ${m.id}`}
-                                data-model-remove={m.id}
-                                onClick={() => void dropSelectedModel(m.id)}
-                              >
-                                ×
-                              </button>
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                {panelOpen && (
-                  <div className={styles.panel} data-model-panel>
-                    <div className={styles.panelHead}>
-                      <span className={styles.panelTitle}>选择模型</span>
-                      <button className={styles.chipX} aria-label="关闭选择模型" onClick={() => setPanelOpen(false)}>
-                        ×
-                      </button>
-                    </div>
-                    <div className={styles.panelFilters}>
-                      <div className={styles.tabs}>
-                        {CATEGORY_FILTERS.map((c) => (
-                          <button
-                            key={c.value}
-                            className={c.value === draftCategory ? `${styles.tab} ${styles.tabOn}` : styles.tab}
-                            data-model-tab={c.value}
-                            onClick={() => setDraftCategory(c.value)}
-                          >
-                            {c.label}
-                          </button>
-                        ))}
-                      </div>
-                      <input
-                        className={`${styles.input} ${styles.search}`}
-                        data-model-search
-                        placeholder="搜索模型名称"
-                        value={draftKeyword}
-                        onChange={(e) => setDraftKeyword(e.target.value)}
-                      />
-                    </div>
-
-                    <ul className={styles.optionList}>
-                      {draftList.map((m) => (
-                        <li key={m.id}>
-                          <label className={styles.option} data-model-option={m.id}>
-                            <input
-                              type="checkbox"
-                              checked={draftChecked.has(m.id)}
-                              onChange={(e) => toggleDraft(m.id, e.target.checked)}
-                            />
-                            <span className={styles.optionName}>{m.id}</span>
-                            <ChoicePicker
-                              name={`model-category-${m.id}`}
-                              value={m.category}
-                              ariaLabel={`${m.id} 的模型分类`}
-                              compact
-                              className={styles.categorySelect}
-                              options={CATEGORY_FILTERS.filter(
-                                (item) => item.value !== 'all',
-                              ).map((item) => ({
-                                value: item.value,
-                                label: item.label,
-                              }))}
-                              onChange={(next) =>
-                                void channels.setModelCategory(
-                                  selected.id,
-                                  m.id,
-                                  next as ModelCapability['category'],
-                                  activeGroup?.id,
-                                )
-                              }
-                            />
-                          </label>
-                        </li>
-                      ))}
-                      {draftList.length === 0 && (
-                        <li className={styles.optionEmpty}>
-                          {activeModelCache.length === 0 ? '没有可选的模型，先「拉取模型」' : '没有匹配的模型'}
-                        </li>
-                      )}
-                    </ul>
-
-                    <div className={styles.panelFoot}>
-                      <button className={styles.ghostBtn} onClick={() => setPanelOpen(false)}>
-                        取消
-                      </button>
-                      <button className={styles.primary} disabled={busy} data-model-apply onClick={applyDraft}>
-                        应用到模型列表
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </section>
-
-              {/* —— 渠道的选路权重与模型映射（§7.4.1，M7-2）——
-                  策略本身是全局的（见上方 `data-settings-global-route`）；
-                  这里只留**按渠道**才有意义的优先度 / 权重 / 映射。 */}
-              <section className={styles.editorSection} data-settings-channel-route>
-                <div className={styles.modelsHead}>
-                  <div className={styles.modelsTitleBox}>
-                    <span className={styles.cardTitle}>渠道权重与模型映射</span>
-                    <span className={styles.cardSub}>
-                      仅作用于当前渠道。
-                    </span>
-                  </div>
-                </div>
-
-                <div className={styles.fieldRow}>
-                  <label className={styles.field}>
-                    <span className={styles.label}>优先度（越大越先）</span>
-                    <input
-                      className={`${styles.input} ${styles.numInput}`}
-                      type="number"
-                      data-route-priority
-                      value={selected.priority}
-                      onChange={(e) =>
-                        void channels.setRouteTuning(selectedId!, {
-                          priority: Number(e.target.value),
-                        })
-                      }
-                    />
-                  </label>
-                  <label className={styles.field}>
-                    <span className={styles.label}>权重（同档均摊）</span>
-                    <input
-                      className={`${styles.input} ${styles.numInput}`}
-                      type="number"
-                      min={0}
-                      data-route-weight
-                      value={selected.weight}
-                      onChange={(e) =>
-                        void channels.setRouteTuning(selectedId!, {
-                          weight: Number(e.target.value),
-                        })
-                      }
-                    />
-                  </label>
-                </div>
-
-                <div className={styles.mapHead}>
-                  <span className={styles.label}>模型映射（前端显示名 → 本站点真实 ID）</span>
-                  <button
-                    className={styles.ghostBtn}
-                    data-global-model-add-toggle
-                    onClick={() => setModelAddOpen((open) => !open)}
-                  >
-                    {modelAddOpen ? '收起' : '+ 添加前端模型'}
-                  </button>
-                </div>
-
-                {modelAddOpen && (
-                  <div className={styles.modelAddForm} data-global-model-form>
-                    <label className={styles.field}>
-                      <span className={styles.label}>前端显示名</span>
-                      <input
-                        className={styles.input}
-                        data-global-model-name
-                        value={newModelName}
-                        placeholder="例如：My Image Pro"
-                        onChange={(event) => setNewModelName(event.target.value)}
-                      />
-                    </label>
-                    <div className={styles.modelAddRow}>
-                      <span className={styles.label}>分类</span>
-                      <div className={styles.mapFilters}>
-                        {(['image', 'chat', 'video', 'audio'] as const).map((category) => (
-                          <button
-                            key={category}
-                            type="button"
-                            className={
-                              newModelCategory === category
-                                ? `${styles.mapFilter} ${styles.mapFilterOn}`
-                                : styles.mapFilter
-                            }
-                            data-global-model-category={category}
-                            onClick={() => setNewModelCategory(category)}
-                          >
-                            {categoryLabel(category)}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                    <div className={styles.modelAddRow}>
-                      <span className={styles.label}>图标</span>
-                      <div className={styles.vendorGrid}>
-                        {GLOBAL_MODEL_VENDORS.map((vendor) => (
-                          <button
-                            key={vendor.value}
-                            type="button"
-                            className={
-                              newModelVendor === vendor.value
-                                ? `${styles.vendorOption} ${styles.vendorOptionOn}`
-                                : styles.vendorOption
-                            }
-                            data-global-model-vendor={vendor.value}
-                            onClick={() => setNewModelVendor(vendor.value)}
-                          >
-                            <ModelIcon vendor={vendor.value} size={18} />
-                            <span>{vendor.label}</span>
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                    <div className={styles.modelAddActions}>
-                      <button
-                        className={styles.ghostBtn}
-                        onClick={() => setModelAddOpen(false)}
-                      >
-                        取消
-                      </button>
-                      <button
-                        className={styles.primary}
-                        data-global-model-add
-                        disabled={!newModelName.trim()}
-                        onClick={() => void handleAddGlobalModel()}
-                      >
-                        添加
-                      </button>
-                    </div>
-                  </div>
-                )}
-
-                {/*
-                  映射列表 = **前端固定显示名**。
-
-                  为什么固定名一定要在这里出现（用户 2026-09-27）：
-                  画布下拉列的就是这几个名字，它们**不一定出现在本站的模型清单里**
-                  （例如前端叫 `GPT Image 2.5 Flare`，本站叫 `gpt-image-2.5-flare`）。
-                  若这里只列「已勾选模型」，用户就没地方填这个翻译 ——
-                  在画布选完固定名，请求会带着显示名发出去并被上游拒绝。
-
-                  上游拉到的模型 ID 只作为输入框候选（`routeMapOptions`），
-                  不再额外生成映射行；否则站点一拉模型，映射区就会越积越多。
-                */}
-                {(() => {
-                  const presetIds = allGlobalModels.map((model) => model.id)
-                  /**
-                   * 一行的 `key` 固定取预设显示名，标签与它一致。
-                   *
-                   * 映射保存的就是「显示名 → 本站真实 ID」，上游 ID 不占一个显示槽位。
-                   */
-                  const rows = allGlobalModels.map((m) => ({
-                    key: m.id,
-                    label: m.id,
-                    category: m.category,
-                    // 图标与画布那边的模型下拉同源（同一份 ModelIcon），两处不会画出两个样
-                    vendor: m.vendor,
-                  }))
-                  return (
-                    <>
-                      {/*
-                        **五个筛选**（用户 2026-10-08 第 1 条：「换成五个筛选吧…加上音频，3d」），
-                        以及**两行说明文案已删**（第 4 条：「这个框住的文字可以删掉了」）——
-                        左列是什么、右列填什么，看一遍就懂；填错时那行会有自己的提示。
-                      */}
-                      <div className={styles.mapToolbar}>
-                        <div className={styles.mapFilters} role="tablist" aria-label="模型映射分类">
-                          {MAP_FILTERS.map((f) => (
-                            <button
-                              key={f.key}
-                              type="button"
-                              role="tab"
-                              aria-selected={mapCategory === f.key}
-                              data-route-map-filter={f.key}
-                              className={
-                                mapCategory === f.key
-                                  ? `${styles.mapFilter} ${styles.mapFilterOn}`
-                                  : styles.mapFilter
-                              }
-                              onClick={() => setMapCategory(f.key)}
-                            >
-                              {f.title}
-                            </button>
-                          ))}
-                        </div>
-                        <label className={styles.showUncommonToggle}>
-                          <input
-                            type="checkbox"
-                            checked={showUncommonModels}
-                            data-route-map-show-uncommon
-                            onChange={(event) => setShowUncommonModels(event.target.checked)}
-                          />
-                          <span>显示不常用模型</span>
-                        </label>
-                      </div>
-                      {/*
-                        按类别分三组（用户 2026-09-27 第 9 轮）：
-                        「模型映射的部分也需要分生图模型，对话模型和视频模型」。
-                        上一版是一长条平铺 15 个名字 —— 找某个生图模型要扫过对话与视频。
-
-                        分类取自 `PRESET_MODELS` 自己的 `category`，**不在这里另写一份**
-                        （写两份必然漂移，那正是本项目反复踩的坑）。
-                      */}
-                      {(() => {
-                        const uncommon = new Set(uncommonModelIds)
-                        const allGroupRows = rows.filter(
-                          (row) => String(row.category) === mapCategory,
-                        )
-                        const groupRows = allGroupRows.filter(
-                          (row) => showUncommonModels || !uncommon.has(row.key),
-                        )
-                        /*
-                         * 空的这一类**如实说**：前端显示名清单里目前只有生图 / 对话 / 视频，
-                         * 音频与 3D 是预留位（清单里加上就会自动出现，不必改这里）。
-                         */
-                        if (groupRows.length === 0) {
-                          return (
-                            <p className={styles.modelsEmpty} data-route-map-empty={mapCategory}>
-                              {allGroupRows.length > 0
-                                ? '这一类的模型都已标为不常用。勾选“显示不常用模型”可恢复为常用。'
-                                : '这一类的模型列表目前为空。'}
-                            </p>
-                          )
-                        }
-                        /*
-                         * 候选 = 该渠道**已勾选且同类**的模型 ID。
-                         * 这是用户要的「没填写的话可以下拉选择已经选择好类别的模型」——
-                         * 上游 ID 本来就躺在已勾选清单里，让人重复默写没有道理。
-                         *
-                         * 控件是 `ModelMapCombo`（用户 2026-09-29 第 13 轮）：输入框仍可手填
-                         * （模型没勾选、或 ID 不在清单里的情况依然存在），右侧的下拉开关
-                         * 展开**与画布参数同一套**的浮层菜单。此前用的原生 `<datalist>`
-                         * 的候选列表由浏览器绘制，既不受浮层规范约束，也无法被冒烟断言。
-                         */
-                        /* 候选取法见 domain 纯函数 routeMapOptions（已勾选优先、缺失回落已拉取） */
-                        /* 走到这里类别必是 image / chat / video（空的那两类上面已经返回了）——
-                           所以这个收窄是安全的；写它只是为了不把 `ModelCapability['category']` 这条
-                           联合扩到音频 / 3D（那要动渠道拉取 / 选路 / 画布面板一整条链）。 */
-                        const options = routeMapOptions(
-                          mapCategory as 'image' | 'chat' | 'video' | 'audio',
-                          activeModels,
-                          activeModelCache,
-                        )
-                        return (
-                          /* 组标题已撤：筛选项本身就是那一类的名字，再写一行是重复 */
-                          <div className={styles.mapGroup} data-route-map-group={mapCategory}>
-                            <div className={styles.mapList}>
-                              {groupRows.map(({ key: id, label, vendor }) => {
-                                const saved = selected.modelMap[id] ?? ''
-                                const draft = mapDrafts[id]
-                                const value = draft ?? saved
-                                const isPreset = presetIds.includes(id)
-                                const uncommon = uncommonModelIds.includes(id)
-                                const test = mapTests[id]
-                                return (
-                                  <div
-                                    key={id}
-                                    className={styles.mapRow}
-                                    data-route-map-row={id}
-                                    data-route-map-preset={isPreset ? '1' : '0'}
-                                  >
-                                    <span className={styles.mapName} title={id} data-route-map-label>
-                                      <ModelIcon vendor={vendor} size={19} />
-                                      <span className={styles.mapLabelText}>{label}</span>
-                                    </span>
-                                    <ModelMapCombo
-                                      rowId={id}
-                                      category={mapCategory as 'image' | 'chat' | 'video' | 'audio'}
-                                      value={value}
-                                      options={options}
-                                      placeholder="留空 = 按原名发送"
-                                      emptyHint="该渠道还没勾选同类模型"
-                                      ariaLabel={`${MAP_FILTERS.find((f) => f.key === mapCategory)?.title ?? ''} ${label} 对应的本站模型 ID`}
-                                      onChange={(next) => {
-                                        setMapDrafts((prev) => ({ ...prev, [id]: next }))
-                                        scheduleModelMapping(id, next)
-                                      }}
-                                      onBlur={() => void flushModelMapping(id, value)}
-                                    />
-                                    <span
-                                      className={
-                                        mapSaveNotice?.tone === 'error'
-                                          ? `${styles.mapSaveState} ${styles.mapSaveError}`
-                                          : styles.mapSaveState
-                                      }
-                                      data-route-map-save-state={
-                                        mapSaveNotice?.id === id ? mapSaveNotice.tone : undefined
-                                      }
-                                      aria-live="polite"
-                                    >
-                                      {mapSaveNotice?.id === id ? mapSaveNotice.text : ''}
-                                    </span>
-                                    <label
-                                      className={styles.mapUncommonToggle}
-                                      title="勾选后从画布、Agent、默认参数和电商模型中隐藏"
-                                    >
-                                      <input
-                                        type="checkbox"
-                                        checked={uncommon}
-                                        data-route-map-uncommon={id}
-                                        onChange={(event) => {
-                                          void channels.setModelUncommon(id, event.target.checked)
-                                        }}
-                                      />
-                                      <span>不常用</span>
-                                    </label>
-                                    <button
-                                      type="button"
-                                      className={styles.mapTestButton}
-                                      data-route-map-test={id}
-                                      disabled={test?.status === 'checking'}
-                                      onClick={() => void testModelMapping(id, value)}
-                                    >
-                                      {test?.status === 'checking' ? '测试中' : '测试'}
-                                    </button>
-                                    {customModels.some((model) => model.id === id) && (
-                                      <button
-                                        className={styles.chipX}
-                                        aria-label={`删除前端模型 ${id}`}
-                                        data-global-model-remove={id}
-                                        onClick={() => void handleRemoveGlobalModel(id)}
-                                      >
-                                        ×
-                                      </button>
-                                    )}
-                                    <span
-                                      className={
-                                        test?.status === 'ok'
-                                          ? `${styles.mapTestState} ${styles.mapTestOk}`
-                                          : test?.status === 'missing'
-                                            ? `${styles.mapTestState} ${styles.mapTestMissing}`
-                                            : test?.status === 'error'
-                                              ? `${styles.mapTestState} ${styles.mapTestError}`
-                                              : styles.mapTestState
-                                      }
-                                      data-route-map-test-state={test?.status}
-                                      aria-live="polite"
-                                    >
-                                      {test?.message ?? ''}
-                                    </span>
-                                  </div>
-                                )
-                              })}
-                            </div>
-                          </div>
-                        )
-                      })()}
-                    </>
+              <SettingsProviderHeaderView
+                channelId={selected.id}
+                protocol={protocol}
+                icon={selected.icon}
+                name={name}
+                ariaName={selected.name}
+                enabled={enabled}
+                onEditProfile={editChannel}
+                onEnabledChange={(next) => void handleEnableChange(next)}
+              />
+              <SettingsConnectionView
+                channels={channels}
+                selected={selected}
+                baseUrl={baseUrl}
+                busy={busy}
+                activeGroup={activeGroup}
+                selectedKeyGroups={selectedKeyGroups}
+                credentialSlots={credentialSlots}
+                docUrl={docUrl}
+                protocol={protocol}
+                builtinSelected={builtinSelected}
+                visibleProtocolOptions={visibleProtocolOptions}
+                pendingProtocols={pendingProtocols}
+                referencedProtocolIds={referencedProtocolIds}
+                statusLine={statusLine}
+                statusTone={statusTone}
+                showMockNote={showMockNote}
+                selectedProtocolNote={selectedProtocolNote}
+                newProtoOpen={newProtoOpen}
+                hiddenBuiltinProtocolCount={hiddenBuiltinProtocolIds.length}
+                npNotice={npNotice}
+                protoManageNotice={protoManageNotice}
+                protoRemoveError={protoRemoveError}
+                npImportText={npImportText}
+                npImported={npImported}
+                npError={npError}
+                onBaseUrlChange={setBaseUrl}
+                onPersistForm={persistForm}
+                onAddKeyGroup={handleAddKeyGroup}
+                onRemoveKeyGroup={handleRemoveKeyGroup}
+                onActiveGroupChange={setActiveGroupId}
+                onRenameKeyGroup={(groupId, nextName) =>
+                  void channels.renameCredentialGroup(
+                    selected.id,
+                    groupId,
+                    nextName,
                   )
-                })()}
-              </section>
+                }
+                onSetKeyGroupPriority={(groupId, priority) =>
+                  void channels.setCredentialGroupPriority(
+                    selected.id,
+                    groupId,
+                    priority,
+                  )
+                }
+                onProtocolChange={handleProtocolChange}
+                onDownloadProtocol={downloadProtocol}
+                onRemoveProtocol={(protocolOption) =>
+                  void handleRemoveProtocol(protocolOption)
+                }
+                onDetect={handleDetect}
+                onVerify={handleVerify}
+                onToggleNewProtocol={toggleNewProtocol}
+                onRestoreBuiltinProtocols={() =>
+                  void handleRestoreBuiltinProtocols()
+                }
+                onDownloadProtocolTemplate={downloadProtocolTemplate}
+                onImportProtocolFile={(file) =>
+                  void handleImportProtocolFile(file)
+                }
+                onImportTextChange={setNpImportText}
+                onClearImported={() => setNpImported(null)}
+                onClearImportError={() => setNpError('')}
+                onCheckImportedProtocol={checkImportedProtocol}
+                onSaveImportedProtocol={handleSaveImportedProtocol}
+              />
+
+              <SettingsModelsView
+                busy={busy}
+                activeGroup={activeGroup}
+                activeModelCache={activeModelCache}
+                selectedGroups={selectedGroups}
+                panelOpen={panelOpen}
+                draftCategory={draftCategory}
+                draftKeyword={draftKeyword}
+                draftChecked={draftChecked}
+                draftList={draftList}
+                onRefresh={() => void handleRefresh()}
+                onOpenPanel={() => void openPanel()}
+                onClosePanel={() => setPanelOpen(false)}
+                onDraftCategoryChange={setDraftCategory}
+                onDraftKeywordChange={setDraftKeyword}
+                onToggleDraft={toggleDraft}
+                onModelCategoryChange={(modelId, category) =>
+                  void channels.setModelCategory(
+                    selected.id,
+                    modelId,
+                    category,
+                    activeGroup?.id,
+                  )
+                }
+                onDropSelectedModel={(modelId) => void dropSelectedModel(modelId)}
+                onApplyDraft={() => void applyDraft()}
+              />
+
+              <SettingsChannelRouteView
+                priority={selected.priority}
+                weight={selected.weight}
+                allGlobalModels={allGlobalModels}
+                customModels={customModels}
+                uncommonModelIds={uncommonModelIds}
+                activeModels={activeModels}
+                activeModelCache={activeModelCache}
+                modelAddOpen={modelAddOpen}
+                newModelName={newModelName}
+                newModelCategory={newModelCategory}
+                newModelVendor={newModelVendor}
+                showUncommonModels={showUncommonModels}
+                mapCategory={mapCategory}
+                modelMap={selected.modelMap}
+                mapDrafts={mapDrafts}
+                mapSaveNotice={mapSaveNotice}
+                mapTests={mapTests}
+                onPriorityChange={(priority) =>
+                  void channels.setRouteTuning(selectedId!, { priority })
+                }
+                onWeightChange={(weight) =>
+                  void channels.setRouteTuning(selectedId!, { weight })
+                }
+                onModelAddOpenChange={setModelAddOpen}
+                onNewModelNameChange={setNewModelName}
+                onNewModelCategoryChange={setNewModelCategory}
+                onNewModelVendorChange={setNewModelVendor}
+                onAddGlobalModel={() => void handleAddGlobalModel()}
+                onMapCategoryChange={setMapCategory}
+                onShowUncommonModelsChange={setShowUncommonModels}
+                onDraftChange={(id, value) =>
+                  setMapDrafts((previous) => ({ ...previous, [id]: value }))
+                }
+                onScheduleModelMapping={scheduleModelMapping}
+                onFlushModelMapping={(id, value) =>
+                  void flushModelMapping(id, value)
+                }
+                onTestModelMapping={(id, value) =>
+                  void testModelMapping(id, value)
+                }
+                onModelUncommonChange={(id, uncommon) =>
+                  void channels.setModelUncommon(id, uncommon)
+                }
+                onRemoveGlobalModel={(id) => void handleRemoveGlobalModel(id)}
+              />
             </div>
           )}
         </section>
@@ -1908,181 +831,41 @@ export function SettingsPage({ embedded = false }: { embedded?: boolean } = {}) 
       )}
       {profileDrawerOpen && selected && profileDrawerBounds
         ? createPortal(
-            <div
-              className={styles.profileDrawerLayer}
-              style={profileDrawerBounds}
-            >
-              <div
-                className={styles.profileDrawerBackdrop}
-                aria-hidden
-                onPointerDown={() => setProfileDrawerOpen(false)}
-              />
-              <aside
-                className={styles.profileDrawer}
-                data-settings-profile-drawer
-                role="dialog"
-                aria-modal="true"
-                aria-labelledby="settings-profile-drawer-title"
-                onPointerDown={(event) => event.stopPropagation()}
-              >
-                <header className={styles.profileDrawerHead}>
-                  <h2 id="settings-profile-drawer-title">编辑</h2>
-                  <button
-                    type="button"
-                    className={styles.profileDrawerClose}
-                    data-settings-profile-close
-                    aria-label="关闭编辑"
-                    title="关闭"
-                    onClick={() => setProfileDrawerOpen(false)}
-                  >
-                    <IconClose size={18} />
-                  </button>
-                </header>
-                <div className={styles.profileDrawerBody}>
-                  <div className={styles.profileAvatarPreview}>
-                    <SettingsChannelAvatar
-                      protocol={selected.protocol}
-                      icon={profileIconDraft}
-                      name={profileNameDraft}
-                      size={76}
-                    />
-                  </div>
-                  <div className={styles.profileAvatarActions}>
-                    <label
-                      className={styles.profileAvatarButton}
-                      data-settings-profile-upload
-                    >
-                      <IconImageUpload size={16} />
-                      图片上传
-                      <input
-                        ref={profileFileRef}
-                        className={styles.fileInput}
-                        type="file"
-                        accept="image/*"
-                        onChange={(event) => {
-                          void handleProfileIconFile(event.target.files?.[0])
-                          event.target.value = ''
-                        }}
-                      />
-                    </label>
-                    <button
-                      type="button"
-                      className={styles.profileAvatarButton}
-                      data-settings-profile-builtin
-                      onClick={() => setProfileIconDraft(null)}
-                    >
-                      <IconChannels size={16} />
-                      内置头像
-                    </button>
-                    <button
-                      type="button"
-                      className={styles.profileAvatarButton}
-                      data-settings-profile-reset
-                      onClick={() => setProfileIconDraft(selected.icon)}
-                    >
-                      <IconResetAvatar size={16} />
-                      重置头像
-                    </button>
-                  </div>
-                  <label className={styles.profileField}>
-                    <span>
-                      服务商名称 <b aria-hidden>*</b>
-                    </span>
-                    <input
-                      className={styles.profileInput}
-                      data-settings-profile-name
-                      value={profileNameDraft}
-                      onChange={(event) => setProfileNameDraft(event.target.value)}
-                    />
-                  </label>
-                </div>
-                <footer className={styles.profileDrawerFoot}>
-                  <button
-                    type="button"
-                    className={styles.profileCancel}
-                    onClick={() => setProfileDrawerOpen(false)}
-                  >
-                    取消
-                  </button>
-                  <button
-                    type="button"
-                    className={styles.profileSave}
-                    data-settings-profile-save
-                    disabled={profileSaving || !profileNameDraft.trim()}
-                    onClick={() => void saveProfileDrawer()}
-                  >
-                    {profileSaving ? '保存中' : '保存'}
-                  </button>
-                </footer>
-              </aside>
-            </div>,
+            <SettingsProfileDrawerView
+              protocol={selected.protocol}
+              icon={profileIconDraft}
+              name={profileNameDraft}
+              saving={profileSaving}
+              bounds={profileDrawerBounds}
+              fileInputRef={profileFileRef}
+              onBackdropClose={() => setProfileDrawerOpen(false)}
+              onClose={() => setProfileDrawerOpen(false)}
+              onIconFile={(file) => void handleProfileIconFile(file)}
+              onUseBuiltin={() => setProfileIconDraft(null)}
+              onResetIcon={() => setProfileIconDraft(selected.icon)}
+              onNameChange={setProfileNameDraft}
+              onSave={() => void saveProfileDrawer()}
+            />,
             document.body,
           )
         : null}
       {channelMenu && menuChannel
         ? createPortal(
-            <div
-              ref={channelMenuRef}
-              className={styles.channelContextMenu}
-              data-channel-context-menu={menuChannel.id}
-              role="menu"
-              aria-label={`${menuChannel.name} 操作`}
-              style={{ left: menuLeft, top: menuTop, width: menuWidth }}
-              onKeyDown={channelMenuArrowFocus}
-            >
-              {menuConfirmDelete ? (
-                <>
-                  <p className={styles.channelMenuConfirmText}>
-                    删除「{menuChannel.name}」？不可撤销
-                  </p>
-                  <button
-                    type="button"
-                    className={`${styles.channelMenuItem} ${styles.channelMenuItemDanger}`}
-                    role="menuitem"
-                    data-channel-menu-delete-confirm={menuChannel.id}
-                    disabled={busy}
-                    onClick={() => void handleRemove(menuChannel.id)}
-                  >
-                    <IconDelete size={16} />
-                    确认删除
-                  </button>
-                  <button
-                    type="button"
-                    className={styles.channelMenuItem}
-                    role="menuitem"
-                    data-channel-menu-delete-cancel
-                    onClick={() => setMenuConfirmDelete(false)}
-                  >
-                    取消
-                  </button>
-                </>
-              ) : (
-                <>
-                  <button
-                    type="button"
-                    className={styles.channelMenuItem}
-                    role="menuitem"
-                    data-channel-menu-edit={menuChannel.id}
-                    onClick={() => editChannel(menuChannel.id)}
-                  >
-                    <IconEdit size={16} />
-                    编辑
-                  </button>
-                  {!menuBuiltin ? (
-                    <button
-                      type="button"
-                      className={`${styles.channelMenuItem} ${styles.channelMenuItemDanger}`}
-                      role="menuitem"
-                      data-channel-menu-delete={menuChannel.id}
-                      onClick={() => setMenuConfirmDelete(true)}
-                    >
-                      <IconDelete size={16} />
-                      删除
-                    </button>
-                  ) : null}
-                </>
-              )}
-            </div>,
+            <SettingsChannelContextMenuView
+              menuRef={channelMenuRef}
+              channelId={menuChannel.id}
+              channelName={menuChannel.name}
+              builtin={menuBuiltin}
+              confirmDelete={menuConfirmDelete}
+              busy={busy}
+              left={menuLeft}
+              top={menuTop}
+              width={menuWidth}
+              onEdit={editChannel}
+              onRequestDelete={() => setMenuConfirmDelete(true)}
+              onConfirmDelete={(channelId) => void handleRemove(channelId)}
+              onCancelDelete={() => setMenuConfirmDelete(false)}
+            />,
             document.body,
           )
         : null}

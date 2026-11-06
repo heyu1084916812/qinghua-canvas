@@ -99,6 +99,18 @@
   必须保留 focus/Esc/Tab/resize/scroll/cleanup/return-focus 语义；notice timer cleanup 必须清掉。
 - 新增展示 helper 必须有生产调用，不能靠测试维持死代码。设置页控制拆分必须保持 render-after 哈希不变。
 
+## 设置页视图边界（2026-11-06）
+
+- `SettingsPage.tsx` 继续持有 React state/refs/hooks、Store、DOM 查询、listener 和页面异步动作；
+  `settingsPage/Settings*View.tsx` 只接收快照与回调，不得复制业务状态或持久化事务。既有
+  `SettingsChannelTokenField` 的令牌状态与读写是明确保留的封装例外，不能据此扩散出新的 Store 持有型视图。
+- 视图根节点必须直接是原来的 `section/aside/div/Fragment`，不得新增布局 wrapper；`data-channel-*`、
+  `data-settings-*`、`data-route-*`、aria/title、输入 id/htmlFor、按钮顺序和可见文案必须保真。
+- `settingsPageStyles.ts` 必须保留 `item: baseStyles.item`。任何向 facade 增加的新 CSS Module 都要检查同名导出，
+  因为对象展开会整体替换而不是 CSS 层叠；渠道行默认 42px，若出现 94px 先查这里。
+- 设置页 UI 拆分必须在 1440×900、1024×700 和明暗四组下对比几何、焦点、悬停、滚动与溢出；仅跑 jsdom 或 tsc
+  不能替代真实页面门禁。
+
 ## 灯箱裁剪动作边界（2026-11-06）
 
 - `lightboxCropActionCoordinator.ts` 不得 import React、DOM 或 Store 实例；React state/refs、DOM rect、window
