@@ -1,5 +1,15 @@
 # CanvasFlow（轻画）项目记忆
 
+### 电商方案与分镜动作拆分（2026-11-06）
+
+- `pagePlanningActionCoordinator.ts` 负责方案历史、意图解析、卖点写作、视觉输入投影和两轮分镜请求；
+  `EcommercePage` 继续持有 React state/refs、会话 Store、平台与工作台接线。
+- 解析成功才保存方案；卖点保持 trim/围栏清理/500 字截断；删除固定 remove→refresh；分镜顺序固定为
+  素材读取→视觉输入投影→两轮请求，`preparingShots` 在所有成功/无素材/失败路径 finally 解锁。
+  `EcommercePage` 1594→1416，render-after 89 行哈希
+  `A0F3C6A34DC95A5B3002C0980132290991C5501CBF6907DE7D6AB600035E1972` 不变；新模块预算 345、宿主预算 1416。
+- 全量 586 files / 5142 tests，check（1011 modules / 4020 deps、25 legacy、155 semantic）与 build 通过。
+
 ### 设置页交互控制拆分（2026-11-06）
 
 - 设置页渲染前控制拆成五个职责模块：`settingsRoutingActions` 管选路；`settingsChannelPresentation` 管渠道/协议投影；

@@ -200,7 +200,7 @@
       "test": [
         "scripts/smoke.mjs#G116"
       ],
-      "budget": 1594
+      "budget": 1416
     },
     {
       "module": "src/pages/EcommercePage/EcommerceWorkbench.tsx",
@@ -4709,6 +4709,32 @@
         "src/pages/SettingsPage/settingsPage/settingsActionDelegates.test.ts"
       ],
       "budget": 65
+    },
+    {
+      "module": "src/pages/EcommercePage/ecommercePage/pagePlanningActionCoordinator.ts",
+      "owner": "pages-ecommerce-planning-actions",
+      "responsibility": "编排电商方案历史、意图解析、卖点写作、分镜视觉输入与两轮分镜请求。",
+      "owns": [
+        "方案历史读取、保存、删除与恢复动作",
+        "意图解析、卖点清洗和文本运行告警",
+        "分镜素材投影、请求链和 preparingShots 生命周期"
+      ],
+      "doesNotOwn": [
+        "React state/refs 与页面生命周期",
+        "工作台 JSX/DOM/CSS 与用户界面结构",
+        "生成执行器、任务存储和平台实现"
+      ],
+      "publicApi": [
+        "PagePlanningSessionPort",
+        "PagePlanningStatePort",
+        "PagePlanningActionPorts",
+        "PagePlanningActionCoordinator",
+        "createPagePlanningActionCoordinator"
+      ],
+      "test": [
+        "src/pages/EcommercePage/ecommercePage/pagePlanningActionCoordinator.test.ts"
+      ],
+      "budget": 345
     }
   ]
 }

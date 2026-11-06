@@ -1,5 +1,13 @@
 # CanvasFlow 不变量详表
 
+## 电商方案与分镜动作边界（2026-11-06）
+
+- `pagePlanningActionCoordinator.ts` 不得 import React、DOM 或 Store 实例；React state/refs、会话 Store、平台实例
+  与工作台 props 仍归 `EcommercePage`。协调器只接收显式 session/AI/asset/logger/state 端口。
+- 意图解析成功才能创建并保存方案；删除固定 remove→refresh；分镜先读素材并投影视觉输入，再做两轮请求；
+  `preparingShots` 在成功、无素材、失败全部 finally 解锁，失败不得提交半成品。
+- 方案/分镜拆分必须保持 `EcommercePage` render-after 哈希不变；改 JSX/DOM/CSS/文案时立即转「涉及 UI」门禁。
+
 ## 设置页交互控制边界（2026-11-06）
 
 - 设置页渲染前控制必须按领域拆开：选路、渠道/协议展示、交互生命周期、状态文案、动作委托不得重新合成一个大协调器。

@@ -16,10 +16,6 @@ import {
   resolveRoutedChatTarget,
 } from '../../domain/shared/chatTarget'
 import {
-  planTitleOf,
-  recentPlanSessions,
-  toPlanMessages,
-  toPlanSession,
   type EcommercePlanSession,
 } from '../../domain/ecommerce/sessions'
 import { LongImagePanel, type LongImageTileSource } from './LongImagePanel'
@@ -27,28 +23,17 @@ import { createProjectRepository } from '../../state/project/repository'
 import { importEcommerceAsset } from '../../features/ecommerce/importEcommerceAsset'
 import { buildEcommercePlan } from '../../domain/ecommerce/plan'
 import { imagePromptForModel } from '../../domain/ecommerce/imagePromptProfile'
-import {
-  buildIntentSystem,
-  buildIntentText,
-  parseEcommerceIntent,
-  type EcommerceIntentDraft,
-} from '../../domain/ecommerce/chatParse'
-import {
-  shouldExpandShots,
-  type ShotPlanResult,
-} from '../../domain/ecommerce/chatShots'
+import type { EcommerceIntentDraft } from '../../domain/ecommerce/chatParse'
+import { shouldExpandShots } from '../../domain/ecommerce/chatShots'
 import type { EcommerceShot } from '../../domain/ecommerce/prompt'
 import {
   capabilityOfLogical,
   logicalNames,
   panelModelOptions,
 } from '../../domain/project/modelCatalog'
-import type { NodeInput } from '../../domain/shared/execution/types'
 import { projectRoute } from '../../domain/shared/workbench'
 import { downloadAsset } from '../../features/shared/assets/downloadAsset'
 import { describeError } from '../../shared/result'
-import { createId } from '../../shared/id'
-import { directTextTrace } from '../../state/shared/directRun'
 import { createPackStore } from '../../state/project/packStore'
 import { loadEcommerceDraft, saveEcommerceDraft } from '../../state/project/ecommerceDraft'
 import { createEcommerceTaskRepository } from '../../state/project/ecommerceTaskRepository'
@@ -75,7 +60,6 @@ import {
 import {
   ECOMMERCE_LANGUAGES,
   ecommerceAspectRatio,
-  languageLabel,
   type EcommerceLanguage,
 } from '../../domain/ecommerce/types'
 import { rememberActiveWorkbench } from '../../state/project/activeCanvas'
@@ -94,7 +78,6 @@ import styles from './EcommercePage.module.css'
 import {
   ecommerceBatchId,
   ecommerceSubjectId,
-  ecommerceVisualInputsOf,
   legacyAssetHashesOfNode,
   type LegacyGenerationNode,
 } from './ecommercePageSupport'
@@ -119,11 +102,7 @@ import {
   downloadAllResults,
   retryFailedResults,
 } from './ecommercePage/pageResultActionCoordinator'
-import {
-  requestEcommerceIntent,
-  requestEcommerceSellingPoints,
-  requestEcommerceShots,
-} from './ecommercePage/pageAiRequests'
+import { createPagePlanningActionCoordinator } from './ecommercePage/pagePlanningActionCoordinator'
 
 /**
  * 电商工作台页（对账 #384 的 D3/D4/D5/D6）。
@@ -812,135 +791,57 @@ function StudioHost({ projectId }: { projectId: string }) {
     [channelList, intentModel, intentModelOptions, routeStrategy],
   )
 
-  /**
-   * 一句话 → 待确认草稿（对账 #422）。
-   *
-   * 三条硬口径：
-   *  ① 模型回什么都要过 `parseEcommerceIntent`（白名单），解析不过**一个字都不改表单**；
-   *  ② 没配对话模型 / 超时 / 渠道报错，一律**如实说**，绝不静默填一份猜的值；
-   *  ③ 这里只产**草稿** —— 真填表由工作台里那句「应用到表单」触发。
-   */
-  /** 读一遍这个项目的方案历史（读失败只记日志：历史是"顺手留下的"，不该挡住出图这条主路） */
-  const refreshPlanHistory = useCallback(async () => {
-    try {
-      const rows = await planSessions.list(projectId)
-      const list = rows
-        .map((row) => toPlanSession(row))
-        .filter((item): item is EcommercePlanSession => item !== null)
-      setPlanHistory(recentPlanSessions(list))
-    } catch (e) {
-      platform.logger.log('warn', '[ecommerce] 方案历史读取失败', { error: String(e) })
-    }
-  }, [planSessions, platform, projectId])
+  const planningActions = useMemo(
+    () =>
+      createPagePlanningActionCoordinator({
+        projectId,
+        platforms,
+        sessions: {
+          list: (id) => planSessions.list(id),
+          create: (input) => planSessions.create(input),
+          save: (session, messages) =>
+            planSessions.save({ ...session, messages: [...messages] }),
+          remove: (id) => planSessions.remove(id),
+        },
+        assets: platform.assets,
+        logger: platform.logger,
+        completeWithTools: (request) =>
+          channels.completeWithTools(request) as Promise<{ text: string }>,
+        onTextRecordWarning: showTextRecordWarning,
+        state: {
+          setIntent,
+          setIntentError,
+          setParsingIntent,
+          setPlanHistory,
+          setPreparingShots,
+          setTextRecordWarning,
+          setGenerationStage,
+        },
+      }),
+    [channels, planSessions, platform, platforms, projectId, showTextRecordWarning],
+  )
+  const {
+    refreshPlanHistory,
+    parseIntent,
+    writeSellingPoints,
+    restorePlan,
+    removePlan,
+    planShots,
+    requestShots,
+    visualInputsFor,
+  } = planningActions
 
   useEffect(() => {
     void refreshPlanHistory()
   }, [refreshPlanHistory])
 
-  /** 存一条方案：**存失败不影响这次解析**（草稿已经在界面上了），但要在日志里留痕 */
-  const savePlanSession = async (text: string, draft: EcommerceIntentDraft) => {
-    if (!chatTarget) return
-    try {
-      const created = await planSessions.create({
-        projectId,
-        channelId: chatTarget.channelId,
-        model: chatTarget.logicalModel,
-        title: planTitleOf(text),
-      })
-      await planSessions.save({ ...created, messages: toPlanMessages(text, draft) })
-      await refreshPlanHistory()
-    } catch (e) {
-      platform.logger.log('warn', '[ecommerce] 方案历史写入失败', { error: String(e) })
-    }
-  }
-
-  const onParseIntent = async (text: string) => {
-    if (!chatTarget) {
-      setIntent(null)
-      setIntentError('没有可用的对话模型 —— 先去「设置 → 模型服务」给一条服务勾上对话模型')
-      return
-    }
-    setParsingIntent(true)
-    setIntentError('')
-    setTextRecordWarning('')
-    setIntent(null)
-    /* 30 秒兜底：解析是"一句话"的小请求，卡住不该让按钮一直转 */
-    const ac = new AbortController()
-    const timer = setTimeout(() => ac.abort(), 30_000)
-    try {
-      const parsed = await requestEcommerceIntent({
-        projectId,
-        chatTarget,
-        operationId: createId('op'),
-        completeWithTools: (request) => channels.completeWithTools(request) as Promise<{ text: string }>,
-        directTextTrace,
-        onRecordWarning: showTextRecordWarning,
-        abortSignal: () => ac.signal,
-        clearTimer: () => clearTimeout(timer),
-      }, {
-        text,
-        platforms,
-        buildSystem: buildIntentSystem,
-        buildUser: buildIntentText,
-        parse: parseEcommerceIntent,
-      })
-      if (parsed.ok) {
-        setIntent(parsed.draft)
-        /* 顺手留一条历史方案（对账 #433）—— 不 await：这一步失败不该拖住界面 */
-        void savePlanSession(text, parsed.draft)
-      } else setIntentError(parsed.error)
-    } catch {
-      setIntentError('解析失败：这次没能拿到结果，稍后再试。')
-    } finally {
-      clearTimeout(timer)
-      setParsingIntent(false)
-    }
-  }
-
-  const onWriteSellingPoints = async (request: EcommerceRequest): Promise<string> => {
-    if (!chatTarget) {
-      throw new Error('没有可用的对话模型 —— 先在模型服务里勾选一个对话模型')
-    }
-    setTextRecordWarning('')
-    const ac = new AbortController()
-    const timer = setTimeout(() => ac.abort(), 30_000)
-    return requestEcommerceSellingPoints({
-      projectId,
-      chatTarget,
-      operationId: createId('op'),
-      completeWithTools: (payload) => channels.completeWithTools(payload) as Promise<{ text: string }>,
-      directTextTrace,
-      onRecordWarning: showTextRecordWarning,
-      abortSignal: () => ac.signal,
-      clearTimer: () => clearTimeout(timer),
-    }, {
-      request,
-      platformsWithName: ECOMMERCE_PLATFORMS,
-      systemPrompt:
-        '你是电商图片文案助手。只根据用户已经提供的事实，写 2–4 句简洁的商品卖点与画面要求。' +
-        '不要编造参数、认证、功效、价格或品牌信息；只输出可直接放进输入框的正文，不要标题、解释或 JSON。',
-      languageLabel,
-    })
-  }
-
-  /**
-   * 调出一条旧方案 = **把那张确认卡放回来**（草稿进 `intent`），不直接填表单：
-   * 用户点的是「我看看这条」，真正落表仍由那句「应用到表单」触发（与 #422 同一条口径）。
-   */
-  const onRestorePlan = (session: EcommercePlanSession) => {
-    setIntent(session.draft)
-    setIntentError('')
-  }
-
-  /** 删一条历史方案（删不动只记日志：列表是顺手留下的，不该弹错挡住出图） */
-  const onRemovePlan = async (id: string) => {
-    try {
-      await planSessions.remove(id)
-      await refreshPlanHistory()
-    } catch (e) {
-      platform.logger.log('warn', '[ecommerce] 方案历史删除失败', { error: String(e) })
-    }
-  }
+  const onParseIntent = (text: string) => parseIntent(text, chatTarget)
+  const onWriteSellingPoints = (request: EcommerceRequest) =>
+    writeSellingPoints(request, chatTarget)
+  const onRestorePlan = restorePlan
+  const onRemovePlan = removePlan
+  const onPlanShots = (request: EcommerceRequest) =>
+    planShots(request, chatTarget, graph.nodes)
 
   const onUpload = async (file: File, _kind: 'product' | 'reference'): Promise<EcommerceUpload | null> => {
     const asset = await importEcommerceAsset({ platform, projectId, file })
@@ -965,86 +866,6 @@ function StudioHost({ projectId }: { projectId: string }) {
           ...(uploaded.height ? { height: uploaded.height } : {}),
         }
       : null
-  }
-
-  /**
-   * 问一次对话渠道，把这几张的镜头写出来（对账 #406 / #423）。
-   *
-   * **两个入口共用这一支**：出图前「先出一份方案」，与出图时那条自动扩展。
-   * 各写一份的话，迟早出现"手动那条会先说多花额度、自动那条不会"这种分叉
-   * （#406 那条"判据只能有一份"的教训，这里是"请求只能有一份"）。
-   *
-   * **不抛错**：所有失败都变成 `{ ok:false, error }` —— 调用方要的是"能不能拿到方案"，
-   * 而不是一个异常（分镜失败从来不该让出图失败）。
-   */
-  const visualInputsFor = async (
-    request: EcommerceRequest,
-  ): Promise<Extract<NodeInput, { kind: 'asset' }>[]> => {
-    const assets: Record<string, { mime?: string }> = {}
-    for (const nodeId of new Set([
-      request.productNodeId,
-      ...(request.productNodeIds ?? []),
-      ...request.referenceNodeIds,
-    ].filter(Boolean))) {
-      const payload = await platform.assets.read(nodeId)
-      if (payload) assets[nodeId] = { mime: payload.mime }
-    }
-    return ecommerceVisualInputsOf(request, graph.nodes, assets)
-  }
-
-  const requestShots = async (request: EcommerceRequest): Promise<ShotPlanResult> => {
-    if (!chatTarget) {
-      return {
-        ok: false,
-        error: '没有可用的对话模型 —— 先去「设置 → 模型服务」给一条服务勾上对话模型',
-      }
-    }
-    setTextRecordWarning('')
-    const visualInputs = await visualInputsFor(request)
-    if (visualInputs.length === 0) {
-      return {
-        ok: false,
-        error: '没有可随对话发送的商品图 —— 无法先分析产品外观，已停止本次生图。',
-      }
-    }
-    const operationId = createId('op')
-    const timers = new Set<ReturnType<typeof setTimeout>>()
-    return requestEcommerceShots({
-      projectId,
-      chatTarget,
-      operationId,
-      completeWithTools: (payload) => channels.completeWithTools(payload) as Promise<{ text: string }>,
-      directTextTrace,
-      onRecordWarning: showTextRecordWarning,
-      abortSignal: () => {
-        const ac = new AbortController()
-        const timer = setTimeout(() => ac.abort(), 60_000)
-        timers.add(timer)
-        return ac.signal
-      },
-      clearTimer: () => {
-        for (const timer of timers) clearTimeout(timer)
-        timers.clear()
-      },
-      visualInputs,
-      platforms,
-      setStage: setGenerationStage,
-    }, request)
-  }
-
-  /**
-   * 「先出一份方案」的入口（对账 #423）：工作台点按钮 → 这里问一次 → 结果原样回去。
-   *
-   * 同一段请求也盖进 `preparingShots`：否则"出方案"那几秒里「开始生成」点得动，
-   * 用户会为同一批图花两份对话额度。
-   */
-  const onPlanShots = async (request: EcommerceRequest): Promise<ShotPlanResult> => {
-    setPreparingShots(true)
-    try {
-      return await requestShots(request)
-    } finally {
-      setPreparingShots(false)
-    }
   }
 
   /**
@@ -1093,7 +914,7 @@ function StudioHost({ projectId }: { projectId: string }) {
       })
       if (!target) throw new Error('这个结果对应的模型 / 渠道已经不可用')
 
-      const inputs = [...(await visualInputsFor(task.request))]
+      const inputs = [...(await visualInputsFor(task.request, graph.nodes))]
       if (
         task.sourceAssetHash &&
         !inputs.some((input) => input.assetHash === task.sourceAssetHash)
@@ -1172,6 +993,7 @@ function StudioHost({ projectId }: { projectId: string }) {
       taskHistory,
       taskRepo,
       visualInputsFor,
+      graph.nodes,
     ],
   )
 
@@ -1219,7 +1041,7 @@ function StudioHost({ projectId }: { projectId: string }) {
             phase: 'analyze',
             label: '正在分析商品图并写逐张提示词',
           })
-          const out = await requestShots(request)
+          const out = await requestShots(request, chatTarget, graph.nodes)
           if (!out.ok) {
             throw new Error(`商品分析或逐张提示词生成失败：${out.error}`)
           }
@@ -1314,7 +1136,7 @@ function StudioHost({ projectId }: { projectId: string }) {
         ...(target.credentialGroupIds?.length
           ? { credentialGroupIds: target.credentialGroupIds }
           : {}),
-        inputs: await visualInputsFor(request),
+        inputs: await visualInputsFor(request, graph.nodes),
         shots: createdTask.results.map((row, index) => {
           const prescribedShot = prescribed[index]
           return {
