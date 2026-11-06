@@ -6,8 +6,12 @@
   新增工作台不能只加 manifest；真正优点是独立 chunk + 依赖门禁禁止跨工作台反向引用。
 - Agent 历史按 sessionId 落库，但模型只拿有界窗口；`continue` 走 `complex_plan` 并由 `sessionBrief`
   重建原始需求、任务计划、画布摘要和最近工具账本。不要把 UI 显示全量历史误当成模型全量上下文。
-- Pinterest 现在只有公开 URL / Pin 解析。账号收藏必须有官方 OAuth、token 刷新、boards/pins API；
-  没有 Developer App 凭据时禁止用 Cookie 抓取或把公开搜索冒充“自己的收藏”。
+  检查点卡必须显示持久历史 / 用户需求 / 工具结果 / 计划步数和注入范围，让用户能判断“恢复到了什么”。
+- Pinterest 账号收藏链已实现官方 OAuth、token 刷新、boards/pins 分页、素材库与当前画布导入；
+  secret/token 只进 `CredentialPort`。仍必须有真实 Developer App 凭据和获批 scope 才能宣称线上可用；
+  没有凭据时禁止用 Cookie 抓取或把公开搜索冒充“自己的收藏”。后台只收 HTTPS 回调时走手动回贴。
+- CLI 的 `cwd` 必须随工具配置保存，并传给 `cli_run` / 可见登录窗口；运行 id 必须每次唯一，面板要能 `cli.kill`，
+  不能只靠超时结束。只声明 `needsCwd` 而不传值是假的。
 - Canvas MCP 的交付物是 Tauri 回环网关 + 随包 `canvas-mcp.ps1`。`scripts/test-canvas-mcp.mjs`
   必须真实走 `initialize / tools/list / tools/call`，并验证复制配置里没有 token。
 - 总日志 `queryFast` 读到 `offset + limit + 1` 条就停；完整 `query` 只为清空等明确全量动作保留。
@@ -17,6 +21,11 @@
   内联 PowerShell 脚本里的中文可能变 `??`，用索引或稳定 data 属性定位。
 - 多代理共享同一工作树时，提交可能把另一条线刚写的治理登记/补丁一起吞掉。收尾必须重跑
   `node scripts/check-module-governance.mjs`、`git status` 和定向测试，不认代理口头“已登记”。
+- 本轮 Pinterest / CLI / Agent 四组 UI 证据在 `.playwright-verify/pinterest-cli-2026-11-07/`；
+  隔离 shared-store 必须同时放 `window.__QINGHUA_SHARED_STORE_PORT__`；Agent 消息拆表迁移标记不存在时，
+  手工 seed 的 `agentMessages` 会被首次迁移清空，必须先让迁移完成或写 legacy 会话消息再验证。
+- 最终门禁：`npm run check`、`npm run build`、Rust 63 tests、全量 Vitest 608 files / 5271 tests（1 skipped）
+  与 Impeccable detector 0 findings 通过。构建仍保留 CanvasPage 602KB、主入口 747KB 两个 >500KB warning。
 
 ### 存储面板分阶段读取（2026-11-07 → 对账 #952）
 

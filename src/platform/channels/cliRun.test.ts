@@ -58,14 +58,24 @@ interface FakeOptions {
 
 /** 一个记账用的假壳：把"前端要求壳做什么"原样记下来 */
 function fakeCli(options: FakeOptions = {}) {
-  const calls: { program: string; args: string[]; timeoutMs?: number }[] = []
+  const calls: {
+    program: string
+    args: string[]
+    timeoutMs?: number
+    cwd?: string
+  }[] = []
   const files = new Map<string, Uint8Array>()
   const port: CliPort = {
     async which(program) {
       return options.missing ? null : `C:\\bin\\${program}.exe`
     },
     async run(req) {
-      calls.push({ program: req.program, args: req.args, timeoutMs: req.timeoutMs })
+      calls.push({
+        program: req.program,
+        args: req.args,
+        timeoutMs: req.timeoutMs,
+        cwd: req.cwd,
+      })
       const outPath = req.args.find((arg) => /\.[a-z0-9]+$/i.test(arg) && arg.includes('cli-out'))
       if (options.write && outPath) files.set(outPath, options.write(outPath))
       return {
@@ -145,7 +155,14 @@ describe('本机 CLI 适配器 · 对话', () => {
     const platform = createMemoryPlatform()
     await platform.storage.put('presets', {
       id: CLI_TOOLS_ROW_ID,
-      tools: [{ id: 'codex', program: 'D:/tools/codex.cmd', argsTemplate: 'run {prompt}' }],
+      tools: [
+        {
+          id: 'codex',
+          program: 'D:/tools/codex.cmd',
+          argsTemplate: 'run {prompt}',
+          cwd: 'E:/workspace/current',
+        },
+      ],
     } as never)
     const cli = fakeCli({ stdout: 'ok' })
     const adapter = createCliRunAdapter(configOf('gpt-cli'), { ...platform, cli: cli.port })
@@ -155,6 +172,7 @@ describe('本机 CLI 适配器 · 对话', () => {
     )
     expect(cli.calls[0]?.program).toBe('D:/tools/codex.cmd')
     expect(cli.calls[0]?.args).toEqual(['run', 'hi'])
+    expect(cli.calls[0]?.cwd).toBe('E:/workspace/current')
   })
 
   it('多轮 messages 以它为准（Agent 走同一条路）', async () => {

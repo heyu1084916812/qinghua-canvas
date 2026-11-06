@@ -61,6 +61,8 @@ export interface CliTool {
   timeoutMs: number
   /** 是否需要在某个目录里跑（工作流 / 项目文件那类） */
   needsCwd: boolean
+  /** CLI 的工作目录；空串 = 继承轻画进程目录。 */
+  cwd: string
   docUrl: string
   /** 给用户的一句话：这个工具的坑在哪、要先做什么 */
   note: string
@@ -157,6 +159,7 @@ export function defaultCliTools(): CliTool[] {
       models: [{ id: 'codex', category: 'chat' }],
       timeoutMs: 5 * MINUTE,
       needsCwd: true,
+      cwd: '',
       docUrl: 'https://github.com/openai/codex',
       note: '用你登录的 Codex 额度跑对话 / 写代码。先在本机终端登录一次，子命令以 `codex --help` 为准。',
       /* 实测：`codex login status` 回「Logged in using an API key - ***」，它只报登录态。 */
@@ -181,6 +184,7 @@ export function defaultCliTools(): CliTool[] {
       ],
       timeoutMs: 10 * MINUTE,
       needsCwd: false,
+      cwd: '',
       docUrl: '',
       note: '即梦没有官方 CLI，能跑的是社区那层封装：命令名与子命令按你装的那份 `--help` 填。',
       statusArgs: '',
@@ -200,6 +204,7 @@ export function defaultCliTools(): CliTool[] {
       models: [{ id: 'gemini', category: 'chat' }],
       timeoutMs: 5 * MINUTE,
       needsCwd: true,
+      cwd: '',
       docUrl: 'https://github.com/google-gemini/gemini-cli',
       note: 'Google 官方 Gemini CLI，走你本机登录的账号额度。',
       statusArgs: '--version',
@@ -245,6 +250,7 @@ export function defaultCliTools(): CliTool[] {
       ],
       timeoutMs: 20 * MINUTE,
       needsCwd: false,
+      cwd: '',
       docUrl: 'https://github.com/HM-RunningHub/RH_CLI',
       note: '官方 CLI（`rh`）。模型那两行是它的任务名，`--task` 会按官方目录自动挑端点；要图生图 / 图生视频得带 `-i 参考图`，本机模板暂时没有图片占位符。',
       /**
@@ -508,6 +514,7 @@ export function mergeTools(row: unknown): CliTool[] {
         superseded?.argsTemplate,
       ),
       timeoutMs: clampToolTimeout(patch.timeoutMs, tool.timeoutMs),
+      cwd: text(patch.cwd, tool.cwd),
       /*
        * 这三条也允许用户改（他装的那份 CLI 子命令可能不同）。
        * 注意"空串是**合法值**"——它的意思是"这个工具没有这条命令"，所以这里不能用
@@ -537,6 +544,7 @@ export function toolPatchOf(tool: CliTool): Record<string, unknown> {
     program: tool.program,
     argsTemplate: tool.argsTemplate,
     timeoutMs: tool.timeoutMs,
+    cwd: tool.cwd,
     /* 这三条用户也改得动（他装的那份 CLI 子命令可能不同）；空串是合法值，见 `text()` */
     statusArgs: tool.statusArgs,
     loginArgs: tool.loginArgs,

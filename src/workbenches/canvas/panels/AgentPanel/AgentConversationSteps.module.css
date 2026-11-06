@@ -170,6 +170,20 @@
   overflow-wrap: anywhere;
 }
 
+.continuationText + .continuationText {
+  margin-top: var(--space-1);
+}
+
+.continuationText[data-agent-context-recovery] {
+  color: var(--text-1);
+  font-size: var(--fs-chip);
+}
+
+.continuationText[data-agent-context-injection] {
+  color: var(--text-3);
+  font-size: var(--fs-chip);
+}
+
 /* 产物缩略图：固定方块，张数变多只换行、不把卡片撑高 */
 .thumbs {
   display: flex;

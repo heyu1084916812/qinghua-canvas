@@ -16,6 +16,7 @@ import {
 } from '../../state/project/inspirationSourceStore'
 import { InspirationDetail } from './InspirationDetail'
 import { DesignResearchPanel } from './DesignResearchPanel'
+import { PinterestPanel } from '../../features/shared/pinterest/PinterestPanel'
 import {
   InspirationSourcesPanel,
   type NewInspirationSourceInput,
@@ -115,6 +116,7 @@ export function InspirationPage() {
   const [refreshingIds, setRefreshingIds] = useState<Set<string>>(new Set())
   const [sourcesOpen, setSourcesOpen] = useState(false)
   const [researchOpen, setResearchOpen] = useState(false)
+  const [pinterestOpen, setPinterestOpen] = useState(false)
   const [query, setQuery] = useState('')
   const [sourceId, setSourceId] = useState<string | null>(null)
   const [modelCategory, setModelCategory] = useState<string | null>(null)
@@ -476,6 +478,14 @@ export function InspirationPage() {
           <button
             type="button"
             className={styles.refresh}
+            data-inspiration-pinterest-open
+            onClick={() => setPinterestOpen(true)}
+          >
+            Pinterest 收藏
+          </button>
+          <button
+            type="button"
+            className={styles.refresh}
             data-inspiration-research-open
             onClick={() => setResearchOpen(true)}
           >
@@ -735,6 +745,7 @@ export function InspirationPage() {
           onSave={saveResearchItem}
         />
       )}
+      {pinterestOpen && <PinterestPanel onClose={() => setPinterestOpen(false)} />}
       {detail && (
         <InspirationDetail
           item={detail}

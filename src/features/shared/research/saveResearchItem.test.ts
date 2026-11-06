@@ -52,7 +52,16 @@ describe('saveDesignResearchItem', () => {
       new AbortController().signal,
     )
 
-    expect(result).toEqual({ ok: true, message: '已保存到素材库' })
+    expect(result).toMatchObject({
+      ok: true,
+      message: '已保存到素材库',
+      asset: {
+        mime: 'image/png',
+        width: 1,
+        height: 1,
+        projectId: 'inspiration-library',
+      },
+    })
     const rows = await platform.storage.query('assets', {})
     expect(rows).toHaveLength(1)
     expect(rows[0]).toMatchObject({

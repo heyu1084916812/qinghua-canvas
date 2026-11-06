@@ -30,6 +30,7 @@ use tauri_plugin_opener::OpenerExt;
 use tauri_plugin_updater::UpdaterExt;
 
 mod canvas_gateway;
+mod pinterest_oauth;
 
 /// 「选一个目录当素材文件夹」：弹系统目录选择框 → 把该目录**递归**加进 fs 作用域 → 返回绝对路径。
 ///
@@ -3772,7 +3773,10 @@ pub fn run() {
             rh_set_api_key,
             ui_heartbeat,
             canvas_gateway::canvas_gateway_info,
-            canvas_gateway::canvas_gateway_respond
+            canvas_gateway::canvas_gateway_respond,
+            pinterest_oauth::pinterest_oauth_listen,
+            pinterest_oauth::pinterest_oauth_wait,
+            pinterest_oauth::pinterest_oauth_cancel
         ])
         .setup(move |app| {
             apply_data_dir_config(app.handle());

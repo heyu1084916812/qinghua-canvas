@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { usePlatform } from '../../app/providers/PlatformProvider'
 import {
   buildArgs,
@@ -10,6 +10,7 @@ import {
   type CliTool,
 } from '../../domain/shared/cliTools'
 import type { CliOutcome } from '../../platform/ports'
+import { createId } from '../../shared/id'
 import { createCliToolStore } from '../../state/project/cliToolStore'
 import {
   primaryCliAction,
@@ -59,6 +60,13 @@ export function CliPanel() {
   const [keys, setKeys] = useState<Record<string, string>>({})
   const [moreOpen, setMoreOpen] = useState<Record<string, boolean>>({})
   const [confirmRun, setConfirmRun] = useState<Record<string, boolean>>({})
+  const [activeRun, setActiveRun] = useState<{
+    id: string
+    toolId: string
+    slot: 'run' | 'status'
+  } | null>(null)
+  const activeRunRef = useRef<{ id: string } | null>(null)
+  const [stopping, setStopping] = useState(false)
   /** 正在跑的那件小事（`<toolId>:<action>`）；空串 = 空闲 */
   const [busy, setBusy] = useState('')
 
@@ -115,6 +123,14 @@ export function CliPanel() {
     }
   }, [cli, probeTool, store])
 
+  useEffect(
+    () => () => {
+      const running = activeRunRef.current
+      if (running && cli) void cli.kill(running.id)
+    },
+    [cli],
+  )
+
   /** 改一个字段：先改内存、再写库（反过来的话打字会等一次异步落库、一顿一顿） */
   const patchTool = (id: string, patch: Partial<CliTool>) => {
     const next = tools.map((tool) => (tool.id === id ? { ...tool, ...patch } : tool))
@@ -142,18 +158,23 @@ export function CliPanel() {
   /** 跑一条命令并把输出原样写进指定槽位（测试运行 / 查状态 共用） */
   const runInto = async (tool: CliTool, slot: 'run' | 'status', args: string[], stdin?: string) => {
     if (!cli || busy) return
+    const id = createId(`cli-${slot}-${tool.id}`)
     const head = `$ ${tool.program} ${args.join(' ')}`
     const write = (text: string) => {
       const setter = slot === 'status' ? setStatusOut : setRuns
       setter((prev) => ({ ...prev, [tool.id]: text }))
     }
     setBusy(`${tool.id}:${slot}`)
+    setStopping(false)
+    activeRunRef.current = { id }
+    setActiveRun({ id, toolId: tool.id, slot })
     write(`${head}\n…正在跑`)
     try {
       const out = await cli.run({
-        id: `cli-${slot}-${tool.id}`,
+        id,
         program: tool.program,
         args,
+        ...(tool.cwd.trim() ? { cwd: tool.cwd.trim() } : {}),
         ...(stdin === undefined ? {} : { stdin }),
         timeoutMs: tool.timeoutMs,
       })
@@ -161,7 +182,32 @@ export function CliPanel() {
     } catch (err) {
       write(`${head}\n跑不起来：${String(err)}`)
     } finally {
+      if (activeRunRef.current?.id === id) activeRunRef.current = null
+      setStopping(false)
+      setActiveRun(null)
       setBusy('')
+    }
+  }
+
+  const stopRun = async () => {
+    if (!cli || !activeRun || stopping) return
+    setStopping(true)
+    try {
+      const stopped = await cli.kill(activeRun.id)
+      if (!stopped) {
+        const setter = activeRun.slot === 'status' ? setStatusOut : setRuns
+        setter((prev) => ({
+          ...prev,
+          [activeRun.toolId]: `${prev[activeRun.toolId] ?? ''}\n进程已经结束，无需再停止。`.trim(),
+        }))
+      }
+    } catch (error) {
+      const setter = activeRun.slot === 'status' ? setStatusOut : setRuns
+      setter((prev) => ({
+        ...prev,
+        [activeRun.toolId]: `${prev[activeRun.toolId] ?? ''}\n停止失败：${String(error)}`.trim(),
+      }))
+      setStopping(false)
     }
   }
 
@@ -171,7 +217,11 @@ export function CliPanel() {
     setBusy(`${tool.id}:login`)
     try {
       const args = tool.loginArgs.trim() ? buildArgs(tool.loginArgs, {}) : []
-      await cli.spawnWindow({ program: tool.program, args })
+      await cli.spawnWindow({
+        program: tool.program,
+        args,
+        ...(tool.cwd.trim() ? { cwd: tool.cwd.trim() } : {}),
+      })
       setLoginMsg((prev) => ({
         ...prev,
         [tool.id]: `已经打开一个窗口跑「${[tool.program, ...args].join(' ')}」——在那里完成登录（浏览器授权或输密码都行）；完成后回来点「检测 / 查状态」确认。`,
@@ -237,7 +287,11 @@ export function CliPanel() {
         return
       }
       const args = tool.loginArgs.trim() ? buildArgs(tool.loginArgs, {}) : []
-      await cli.spawnWindow({ program: tool.program, args })
+      await cli.spawnWindow({
+        program: tool.program,
+        args,
+        ...(tool.cwd.trim() ? { cwd: tool.cwd.trim() } : {}),
+      })
       say(
         `已经装好了 → 打开了登录窗口「${[tool.program, ...args].join(' ')}」：` +
           `在那里完成登录（浏览器授权或输密码都行），完成后点「查状态」确认。`,
@@ -399,6 +453,17 @@ export function CliPanel() {
                 <span className={styles.statusNone}>无可查命令</span>
               </span>
             )}
+            {activeRun?.toolId === tool.id && activeRun.slot === 'status' ? (
+              <button
+                type="button"
+                className={styles.btn}
+                data-cli-stop={tool.id}
+                disabled={stopping}
+                onClick={() => void stopRun()}
+              >
+                {stopping ? '停止中…' : '停止'}
+              </button>
+            ) : null}
           </div>
 
           {/* 结果行：检测 / 登录 / 状态的结果都贴在按钮下面（没有就不占位） */}
@@ -569,6 +634,17 @@ export function CliPanel() {
                   }
                 />
               </label>
+              <label className={styles.field}>
+                <span className={styles.label}>工作目录（可选）</span>
+                <input
+                  className={styles.input}
+                  data-cli-cwd={tool.id}
+                  value={tool.cwd}
+                  placeholder="例如 E:\项目\当前工作区"
+                  spellCheck={false}
+                  onChange={(e) => patchTool(tool.id, { cwd: e.target.value })}
+                />
+              </label>
             </div>
             <label className={styles.field}>
               <span className={styles.label}>参数模板（生成 / 对话用）</span>
@@ -646,6 +722,17 @@ export function CliPanel() {
               >
                 {runDiagnosticLabel(confirmRun[tool.id] === true)}
               </button>
+              {activeRun?.toolId === tool.id && activeRun.slot === 'run' ? (
+                <button
+                  type="button"
+                  className={styles.btn}
+                  data-cli-stop={tool.id}
+                  disabled={stopping}
+                  onClick={() => void stopRun()}
+                >
+                  {stopping ? '停止中…' : '停止运行'}
+                </button>
+              ) : null}
               <p className={styles.hint}>
                 诊断会执行当前参数模板，可能调用真实模型并产生费用。
               </p>

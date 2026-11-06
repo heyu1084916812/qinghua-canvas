@@ -8,6 +8,7 @@ import { imageMimeFromBytes } from '../../../domain/shared/imageMime'
 import { imageSizeFromHeader } from '../../../domain/shared/imageSize'
 import { isPublicHttpUrl } from '../../../domain/shared/publicUrl'
 import type { NetworkPort, StoragePort } from '../../../platform/ports'
+import type { LibraryAsset } from '../../../domain/shared/assetLibrary'
 import { errorTextOf } from '../../../shared/result'
 import {
   ASSET_LIBRARY_TAGS_KEY,
@@ -36,7 +37,7 @@ export async function saveDesignResearchItem(
     storage: StoragePort
   },
   signal: AbortSignal,
-): Promise<{ ok: boolean; message: string }> {
+): Promise<{ ok: boolean; message: string; asset?: LibraryAsset }> {
   if (!item.imageUrl) return { ok: false, message: '这张参考没有可保存的图片地址' }
   if (!isPublicHttpUrl(item.imageUrl) || !isPublicHttpUrl(item.url)) {
     return { ok: false, message: '来源不是公开互联网地址，已拒绝保存' }
@@ -86,6 +87,16 @@ export async function saveDesignResearchItem(
     }
     const savedAt = Date.now()
     const host = sourceHost(item.url)
+    const savedAsset: LibraryAsset = {
+      hash,
+      mime: detectedMime,
+      bytes: bytes.length,
+      width: size.width,
+      height: size.height,
+      savedAt,
+      projectId: 'inspiration-library',
+      prompt: `${item.title}\n来源：${item.url}\n${DESIGN_RESEARCH_RIGHTS_NOTE}`,
+    }
     if (signal.aborted) return { ok: false, message: '保存已取消' }
     await deps.storage.transaction(['assets', 'assetLibrary', 'presets'], async (tx) => {
       if (signal.aborted) throw new DOMException('保存已取消', 'AbortError')
@@ -154,7 +165,7 @@ export async function saveDesignResearchItem(
       }
       if (signal.aborted) throw new DOMException('保存已取消', 'AbortError')
     })
-    return { ok: true, message: '已保存到素材库' }
+    return { ok: true, message: '已保存到素材库', asset: savedAsset }
   } catch (cause) {
     return {
       ok: false,

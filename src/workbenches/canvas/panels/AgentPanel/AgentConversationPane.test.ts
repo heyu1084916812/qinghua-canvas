@@ -130,6 +130,42 @@ describe('AgentConversationPane', () => {
     expect(html).toContain('data-agent-scroll-wrap')
   })
 
+  it('检查点明确显示恢复了多少持久历史与工具账本', () => {
+    const html = renderPane({
+      current: {
+        ...session,
+        id: 'session-context-1234',
+        messages: [
+          { role: 'user', content: '做一套品牌图' },
+          {
+            role: 'assistant',
+            content: '',
+            toolCalls: [{ id: 'call-1', name: 'readGraph', args: '{}' }],
+          },
+          {
+            role: 'tool',
+            content: '读取完成',
+            toolCallId: 'call-1',
+            toolName: 'readGraph',
+          },
+        ],
+        continuation: {
+          reason: 'max_steps',
+          maxSteps: 12,
+          createdAt: 2,
+        },
+      },
+      status: { kind: 'paused', message: '已达到检查点' },
+    })
+
+    expect(html).toContain('data-agent-context-recovery')
+    expect(html).toContain('已保存 3 条历史')
+    expect(html).toContain('1 条用户需求')
+    expect(html).toContain('1 条工具结果')
+    expect(html).toContain('data-agent-context-injection')
+    expect(html).toContain('最近 1 条工具账本')
+  })
+
   it('★★ 真实 store 领取后，活动回合不再渲染成等待队列行', async () => {
     const sessions = createAgentSessionStore(createMemoryPlatform().storage)
     const created = await sessions.create({

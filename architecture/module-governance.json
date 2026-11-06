@@ -541,6 +541,216 @@
   "moduleMoves": [],
   "modules": [
     {
+      "module": "src/domain/inspiration/pinterest.ts",
+      "owner": "pinterest-domain",
+      "responsibility": "Pinterest OAuth、账号、收藏板与 Pin 的纯规范化规则。",
+      "owns": [
+        "OAuth URL",
+        "scope",
+        "token and API projections"
+      ],
+      "doesNotOwn": [
+        "network transport",
+        "credential storage",
+        "React rendering"
+      ],
+      "publicApi": [
+        "pinterestOAuthUrl",
+        "normalizePinterestToken",
+        "normalizePinterestUser",
+        "normalizePinterestBoard",
+        "normalizePinterestPin",
+        "pinterestPinToResearchItem"
+      ],
+      "test": [
+        "src/domain/inspiration/pinterest.test.ts"
+      ],
+      "budget": 212
+    },
+    {
+      "module": "src/state/project/pinterestConnectionStore.ts",
+      "owner": "pinterest-connection",
+      "responsibility": "Pinterest 非敏感连接配置与加密凭据的分层持久化。",
+      "owns": [
+        "connection metadata",
+        "secret references",
+        "session lifecycle"
+      ],
+      "doesNotOwn": [
+        "OAuth callback server",
+        "Pinterest API calls",
+        "UI state"
+      ],
+      "publicApi": [
+        "PinterestConnection",
+        "loadPinterestConnection",
+        "savePinterestApp",
+        "savePinterestSession",
+        "savePinterestToken",
+        "clearPinterestSession",
+        "clearPinterestConnection"
+      ],
+      "test": [
+        "src/state/project/pinterestConnectionStore.test.ts"
+      ],
+      "budget": 247
+    },
+    {
+      "module": "src/features/shared/pinterest/pinterestApi.ts",
+      "owner": "pinterest-api",
+      "responsibility": "Pinterest OAuth token、用户、收藏板与 Pin 分页 API。",
+      "owns": [
+        "token exchange",
+        "token refresh",
+        "paginated reads"
+      ],
+      "doesNotOwn": [
+        "OAuth browser callback",
+        "secret persistence",
+        "canvas import"
+      ],
+      "publicApi": [
+        "PinterestApi",
+        "createPinterestApi"
+      ],
+      "test": [
+        "src/features/shared/pinterest/pinterestApi.test.ts"
+      ],
+      "budget": 215
+    },
+    {
+      "module": "src/features/shared/pinterest/pinterestSession.ts",
+      "owner": "pinterest-session",
+      "responsibility": "向 Pinterest API 调用方提供有效 access token，并在临近过期时刷新。",
+      "owns": [
+        "session open",
+        "refresh threshold",
+        "token replacement"
+      ],
+      "doesNotOwn": [
+        "OAuth consent",
+        "boards and pins parsing",
+        "React rendering"
+      ],
+      "publicApi": [
+        "PinterestSession",
+        "openPinterestSession"
+      ],
+      "test": [
+        "src/features/shared/pinterest/pinterestSession.test.ts"
+      ],
+      "budget": 64
+    },
+    {
+      "module": "src/features/shared/pinterest/pinterestOAuth.ts",
+      "owner": "pinterest-oauth-input",
+      "responsibility": "手动回调 URL 的解析和 OAuth state 校验。",
+      "owns": [
+        "callback parsing",
+        "state verification"
+      ],
+      "doesNotOwn": [
+        "OAuth server",
+        "token exchange",
+        "React rendering"
+      ],
+      "publicApi": [
+        "PinterestOAuthCallback",
+        "parsePinterestCallbackInput"
+      ],
+      "test": [
+        "src/features/shared/pinterest/pinterestOAuth.test.ts"
+      ],
+      "budget": 41
+    },
+    {
+      "module": "src/features/shared/pinterest/PinterestPanel.tsx",
+      "owner": "pinterest-ui",
+      "responsibility": "Pinterest 登录、收藏读取与文库/画布导入的交互编排。",
+      "owns": [
+        "OAuth UI flow",
+        "board and pin selection state",
+        "import actions"
+      ],
+      "doesNotOwn": [
+        "API protocol",
+        "credential persistence",
+        "canvas node internals"
+      ],
+      "publicApi": [
+        "PinterestPanel"
+      ],
+      "test": [
+        "src/features/shared/pinterest/pinterestApi.test.ts"
+      ],
+      "budget": 431
+    },
+    {
+      "module": "src/features/shared/pinterest/PinterestSetupView.tsx",
+      "owner": "pinterest-ui",
+      "responsibility": "Pinterest OAuth 应用配置和手动回调表单。",
+      "owns": [
+        "setup fields",
+        "authorization and callback controls"
+      ],
+      "doesNotOwn": [
+        "OAuth network flow",
+        "credential storage"
+      ],
+      "publicApi": [
+        "PinterestSetupViewProps",
+        "PinterestSetupView"
+      ],
+      "test": [
+        "scripts/smoke.mjs"
+      ],
+      "budget": 111
+    },
+    {
+      "module": "src/features/shared/pinterest/PinterestImportView.tsx",
+      "owner": "pinterest-ui",
+      "responsibility": "Pinterest 收藏板、Pin 选择与导入动作的受控视图。",
+      "owns": [
+        "board selection view",
+        "pin grid",
+        "import controls"
+      ],
+      "doesNotOwn": [
+        "API reads",
+        "asset writes",
+        "canvas imports"
+      ],
+      "publicApi": [
+        "PinterestImportViewProps",
+        "PinterestImportView"
+      ],
+      "test": [
+        "scripts/smoke.mjs"
+      ],
+      "budget": 134
+    },
+    {
+      "module": "src/features/shared/pinterest/PinterestPanel.module.css",
+      "owner": "pinterest-ui",
+      "responsibility": "Pinterest 收藏弹窗的局部布局、状态和响应式样式。",
+      "owns": [
+        "panel geometry",
+        "selection states",
+        "responsive wrapping"
+      ],
+      "doesNotOwn": [
+        "global tokens",
+        "Pinterest business logic"
+      ],
+      "publicApi": [
+        "CSS_MODULE:PinterestPanel 的局部样式域"
+      ],
+      "test": [
+        "scripts/smoke.mjs"
+      ],
+      "budget": 286
+    },
+    {
       "module": "src/workbenches/canvas/agent/agentVisualClaimGuard.ts",
       "owner": "canvas-agent-visual-capability",
       "responsibility": "普通看图一次纠正重答与明确质检的视觉证据补查，第二次否认如实失败。",

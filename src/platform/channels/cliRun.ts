@@ -154,6 +154,7 @@ async function runTool(
       program: tool.program,
       args,
       timeoutMs: tool.timeoutMs,
+      ...(tool.cwd.trim() ? { cwd: tool.cwd.trim() } : {}),
     })
   } catch (err) {
     const message = String(err)

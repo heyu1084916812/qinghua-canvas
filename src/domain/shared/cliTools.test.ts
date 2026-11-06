@@ -150,6 +150,7 @@ describe('CLI 工具配置的归一化', () => {
     const tool = defaultCliTools()[0]!
     expect(Object.keys(toolPatchOf(tool)).sort()).toEqual([
       'argsTemplate',
+      'cwd',
       'id',
       'installCommand',
       'keyLoginArgs',

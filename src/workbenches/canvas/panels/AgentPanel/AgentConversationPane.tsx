@@ -447,6 +447,22 @@ export function AgentConversationPane({
             <p className={styles.continuationText}>
               已完成 {current.continuation.maxSteps} 步，工具结果已保存。继续时从检查点接着执行。
             </p>
+            <p className={styles.continuationText} data-agent-context-recovery>
+              已保存 {current.messages.length} 条历史 ·{' '}
+              {current.messages.filter((message) => message.role === 'user').length} 条用户需求 ·{' '}
+              {current.messages.filter((message) => message.role === 'tool').length} 条工具结果
+              {current.taskPlan
+                ? ` · ${current.taskPlan.steps.length} 个计划步骤`
+                : ' · 无任务计划'}
+            </p>
+            <p className={styles.continuationText} data-agent-context-injection>
+              继续时会重建原始需求、任务计划和画布摘要，并附上最近{' '}
+              {Math.min(
+                4,
+                current.messages.filter((message) => message.role === 'tool').length,
+              )}{' '}
+              条工具账本；完整历史仍按本会话的模型窗口读取。
+            </p>
             <div className={styles.row}>
               <button
                 type="button"
