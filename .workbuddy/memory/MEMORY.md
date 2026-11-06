@@ -39,6 +39,8 @@
   并保存 `.playwright-verify/canvas-mcp-inspector.json`。Codex CLI 本机存在但未登录，不能把“有命令”冒充登录态联调。
 - release 布局必须验证 `resources/canvas-mcp.ps1`，并跑 NSIS 真启动；当前 `release-desktop.mjs` 12/12 通过，
   但有登录态的 Codex / Claude Code 对真实 Tauri 画布调用仍是外部验收缺口。
+- 远端 CI 必须双平台：Linux 跑测试 / check / build，Windows 单独跑 `cargo test`、自定义 MCP stdio 与
+  官方 Inspector harness。只有本地 YAML 没有 push 时，只能记“配置就绪”，不能记远端 CI 已通过。
 
 ### 存储面板分阶段读取（2026-11-07 → 对账 #952）
 
