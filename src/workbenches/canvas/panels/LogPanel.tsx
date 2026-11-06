@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { usePlatform } from '../../../app/providers/PlatformProvider'
 import { useChannels } from '../../../app/providers/ChannelStoreProvider'
 import { useCanvasStore } from '../storeContext'
@@ -14,6 +14,7 @@ import type { GenerationData } from '../../../domain/canvas/model/node'
 import { NODE_MINIMUMS } from '../../../domain/canvas/layout/constants'
 import { createId } from '../../../shared/id'
 import { createRunLogRepository } from '../../../state/shared/runLogRepository'
+import { canvasLogAppendPage, canvasLogFirstPage } from './canvasLogQuery'
 import styles from './LogPanel.module.css'
 
 export { routeAttemptSummary }
@@ -35,6 +36,8 @@ export function isLogBackdropPointerDown(
   return target !== null && target === currentTarget
 }
 
+const CANVAS_LOG_PAGE_SIZE = 60
+
 /**
  * 日志面板（产品文档 §6.18）：顶栏「日志」打开的浮层，按项目倒序列出 RunRecord。
  * 每条：上排胶囊（状态 / 平台 / 模型 / 时长）+ 粗体日期与输出信息 + 提示词小字
@@ -52,20 +55,40 @@ export function LogPanel({ onClose }: { onClose: () => void }) {
   )
 
   const [records, setRecords] = useState<RunRecord[]>([])
+  const [hasMore, setHasMore] = useState(false)
   const [copiedId, setCopiedId] = useState<string | null>(null)
+  const listRef = useRef<HTMLDivElement | null>(null)
 
-  const reload = useCallback(async () => {
+  const loadCandidatePage = useCallback(async (offset: number, limit: number) => {
     const page = await runLogs.query({
       projectId,
       workbench: 'canvas',
-      limit: Number.MAX_SAFE_INTEGER,
+      offset,
+      limit,
     })
-    setRecords(
-      page.entries
-        .map((entry) => entry.record as RunRecord)
-        .filter(shouldShowInCanvasLog),
-    )
+    return page.entries
+      .map((entry) => entry.record as RunRecord)
+      .filter(shouldShowInCanvasLog)
   }, [projectId, runLogs])
+
+  const reload = useCallback(async () => {
+    const candidates = await loadCandidatePage(0, CANVAS_LOG_PAGE_SIZE)
+    const page = canvasLogFirstPage(candidates, CANVAS_LOG_PAGE_SIZE)
+    setRecords(page.entries)
+    setHasMore(page.hasMore)
+  }, [loadCandidatePage])
+
+  const loadMore = useCallback(async () => {
+    const candidates = await loadCandidatePage(records.length, CANVAS_LOG_PAGE_SIZE)
+    const page = canvasLogAppendPage(records, candidates)
+    setRecords(page.entries)
+    setHasMore(page.hasMore)
+  }, [loadCandidatePage, records])
+
+  const loadMoreIfVisible = useCallback(async () => {
+    if (!hasMore) return
+    await loadMore()
+  }, [hasMore, loadMore])
 
   useEffect(() => {
     void reload()
@@ -73,6 +96,19 @@ export function LogPanel({ onClose }: { onClose: () => void }) {
 
   /** 运行记录写入不改变图快照；这里单独订阅写入信号，失败也要在面板里立刻出现。 */
   useEffect(() => subscribeRunRecordChanged(() => void reload()), [reload])
+
+  useEffect(() => {
+    if (!hasMore) return
+    const list = listRef.current
+    if (!list) return
+    const observer = new IntersectionObserver((entries) => {
+      if (entries.some((entry) => entry.isIntersecting)) {
+        void loadMoreIfVisible()
+      }
+    })
+    observer.observe(list)
+    return () => observer.disconnect()
+  }, [hasMore, loadMoreIfVisible])
 
   /**
    * `Esc` 关闭（2026-09-27 补）。
@@ -143,7 +179,7 @@ export function LogPanel({ onClose }: { onClose: () => void }) {
 
   const clear = async () => {
     for (const r of records) await platform.storage.delete('runRecords', r.id)
-    setRecords([])
+    await reload()
   }
 
   /**
@@ -179,7 +215,7 @@ export function LogPanel({ onClose }: { onClose: () => void }) {
             关闭
           </button>
         </div>
-        <div className={styles.list}>
+        <div className={styles.list} ref={listRef}>
           {records.length === 0 ? (
             <div className={styles.empty}>还没有生成记录</div>
           ) : (
@@ -230,7 +266,7 @@ function LogRow({
   onOpenThumb: () => void
 }) {
   const params = record.params as GenerationData
-  const thumbUrl = useAsset(record.outputHashes[0])
+  const thumbUrl = useAsset(record.outputHashes[0] ?? '')
   const ok = record.status === 'succeeded'
   const seconds = (record.durationMs / 1000).toFixed(1)
   // §6.18「请求1024x1024  实际1024x1024」：未知即不显示（不显示 0x0、也不拿一侧顶另一侧）

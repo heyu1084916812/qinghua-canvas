@@ -11,6 +11,7 @@ import {
   type RunLogEntry,
   type RunLogQuery,
 } from '../../../state/shared/runLogRepository'
+import { runLogFastFirstPage } from '../../../state/shared/runLogFastPage'
 import styles from './RunLogList.module.css'
 
 export type RunLogFilter = Omit<RunLogQuery, 'offset' | 'limit'>
@@ -50,7 +51,7 @@ export function RunLogList({
     [filterKey],
   )
   const [entries, setEntries] = useState<RunLogEntry[]>([])
-  const [total, setTotal] = useState(0)
+  const [hasMore, setHasMore] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
@@ -58,13 +59,13 @@ export function RunLogList({
     setLoading(true)
     setError('')
     try {
-      const page = await repo.query({
-        ...stableFilter,
-        offset: 0,
-        limit: pageSize,
-      })
+      const page = await runLogFastFirstPage(
+        (fastFilter) => repo.query(fastFilter),
+        stableFilter,
+        pageSize,
+      )
       setEntries(page.entries)
-      setTotal(page.total)
+      setHasMore(page.hasMore)
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : String(reason))
     } finally {
@@ -83,7 +84,6 @@ export function RunLogList({
       limit: pageSize,
     })
     setEntries((current) => [...current, ...page.entries])
-    setTotal(page.total)
   }
 
   const channelName = (id: string | undefined): string => {
@@ -106,7 +106,7 @@ export function RunLogList({
   return (
     <div className={styles.list} data-run-log-list>
       <div className={styles.summary}>
-        <span>{total} 条</span>
+        <span>最近 {entries.length} 条</span>
         <button type="button" onClick={() => void loadFirstPage()} disabled={loading}>
           刷新
         </button>
@@ -167,9 +167,9 @@ export function RunLogList({
           </article>
         )
       })}
-      {entries.length < total ? (
+      {hasMore ? (
         <button type="button" className={styles.more} onClick={() => void loadMore()}>
-          加载更多（剩余 {total - entries.length} 条）
+          加载更多
         </button>
       ) : null}
     </div>

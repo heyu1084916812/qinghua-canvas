@@ -5556,6 +5556,35 @@
         "src/pages/SettingsPage/settingsPageCssArchitecture.test.ts"
       ],
       "budget": 20
+    },
+    {
+      "module": "src/features/settings/storageOverviewRefresh.ts",
+      "owner": "settings-storage-overview-refresh",
+      "responsibility": "分两阶段读取存储面板的快速信息与重统计数据，并隔离单项失败。",
+      "owns": [
+        "占用、项目、素材、目录根类型与缓存的读取顺序",
+        "素材去重计数和项目轻量计数",
+        "取消后停止增量回填"
+      ],
+      "doesNotOwn": [
+        "React 状态与存储面板渲染",
+        "目录切换、迁移和缓存清理动作",
+        "存储后端查询实现"
+      ],
+      "publicApi": [
+        "startStorageOverviewRefresh",
+        "countStorageAssets",
+        "countStorageProjects",
+        "StorageAssetCounts",
+        "StorageOverviewArea",
+        "StorageOverviewRefresh",
+        "StorageOverviewUpdate",
+        "StorageUsage"
+      ],
+      "test": [
+        "src/features/settings/storageOverviewRefresh.test.ts"
+      ],
+      "budget": 170
     }
   ]
 }

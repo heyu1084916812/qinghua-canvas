@@ -37,10 +37,20 @@ export interface RunLogPage {
   entries: RunLogEntry[]
   /** 过滤后的总数，不受 offset / limit 影响。 */
   total: number
+  /** true 表示后面还有至少一页候选；全量分页时由总页大小判定。 */
+  hasMore?: boolean
+}
+
+export interface RunLogFastPage {
+  entries: RunLogEntry[]
+  /** 快速查询不统计全库，只证明当前页之后是否还有至少一条。 */
+  hasMore: boolean
 }
 
 export interface RunLogRepository {
   query(filter?: RunLogQuery): Promise<RunLogPage>
+  /** 首屏 / 增量读取用：读到 offset + limit + 1 条匹配后立即停止。 */
+  queryFast(filter?: RunLogQuery): Promise<RunLogFastPage>
 }
 
 const PAGE_SIZE = 256
@@ -71,7 +81,32 @@ export function createRunLogRepository(storage: StoragePort): RunLogRepository {
         if (total > offset && entries.length < limit) entries.push(entry)
       }
 
-      return { entries, total }
+      return { entries, total, hasMore: false }
+    },
+
+    async queryFast(filter = {}) {
+      validateQuery(filter)
+      const reader = createRunLogReader(storage)
+      const offset = Math.max(0, filter.offset ?? 0)
+      const limit = Math.max(0, filter.limit ?? 200)
+      const entries: RunLogEntry[] = []
+      let matched = 0
+      let hasMore = false
+
+      for await (const record of readCandidateRecords(storage, filter)) {
+        const entry = await reader.resolve(record)
+        if (!matchesFilter(entry, filter)) continue
+        matched += 1
+        if (matched <= offset) continue
+        if (entries.length < limit) {
+          entries.push(entry)
+          continue
+        }
+        hasMore = true
+        break
+      }
+
+      return { entries, hasMore }
     },
   }
 }

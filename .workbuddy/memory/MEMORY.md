@@ -12168,3 +12168,10 @@ React 端口 → `invoke` → Rust `check_update` → updater 插件读配置 �
 - **请求顺序是 Logo 优先、再 Reference、再用户上游图**，hash 去重；最终提示词显式要求 Logo
   保留原字形、比例、颜色和标志结构。全量 Vitest **3645 passed / 1 skipped**。真实浏览器四组几何通过：
   `1440×900 / 1024×700`、明暗主题，单行编辑器设计高 32px（屏幕 24px），无页面异常。
+
+### 全局/画布日志首屏快速分页（2026-11-07）
+
+- 总日志首屏只取最近 50 条候选 + 1 探针，hasMore 表示可继续加载；不再为精确总数继续扫描全表。
+- 画布日志当前项目 60 条首屏，IntersectionObserver 续载；分页 offset 必须用已加载记录数，清空只删除当前已加载记录，不误删未加载历史。
+- 快速分页逻辑归 unLogFastPage.ts 和 canvasLogQuery.ts，组件只负责状态、订阅和渲染；治理已登记两模块。
+- 验证：定向 5 files / 20 tests 通过；全量 5251 passed / 1 skipped，唯一失败为另一线 storageOverviewRefresh 缺登记；check 被另一线 deliveryBuild.test node types 错误阻断，不是本刀回归。
