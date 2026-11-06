@@ -1,5 +1,13 @@
 # CanvasFlow 不变量详表
 
+## 画布变更决策边界（2026-11-06）
+
+- `flowSurfaceChangeCoordinator.ts` 不得 import React、React Flow hooks 或 CanvasStore 实例；React Flow 回调壳、refs、
+  microtask 戳、Store dispatch 与 JSX 仍归 `FlowSurface`。协调器只处理只读快照与显式端口。
+- 节点选择按顶层 RF 节点 baseline 和框选过滤；边选择必须**先判 same、再判 nodeSelectStamp**；删除顺序固定为
+  edge→node→clear selection→undo bar，输入框中的 Delete/Backspace 必须放行。位置增量为零时不得下发 move。
+- 画布变更拆分必须保持 `FlowSurfaceInner` 主渲染段哈希不变；改 JSX/DOM/CSS/文案时立即转「涉及 UI」门禁。
+
 ## 电商 Studio 动作边界（2026-11-06）
 
 - `studioActionCoordinator.ts` 不得 import React、DOM 或 Store；React state/refs、DOM 事件对象、平台上传端口和

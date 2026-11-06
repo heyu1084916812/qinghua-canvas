@@ -1,5 +1,15 @@
 # CanvasFlow（轻画）项目记忆
 
+### 画布变更决策拆分（2026-11-06）
+
+- `flowSurfaceChangeCoordinator.ts` 只产出节点/连线选择、位置吸附、拖拽终点/落点与删除计划；
+  React Flow 回调生命周期、refs、microtask 戳、Store dispatch 和 JSX 仍归 `FlowSurface`。
+- 节点选择必须只以顶层 RF 节点为 baseline 并保留框选过滤；边选择先判 same 再受 nodeSelectStamp 抑制；
+  删除顺序固定为 edge→node→clear selection→undo bar，输入框中的 Delete/Backspace 不得删除。
+  `FlowSurface` 1519→1396，主渲染段 222 行哈希
+  `FCE6F4A6C443DE0177D30D1F656AC64D909DD7BD7D7EA98BC4C38F942A5BC46E` 不变；新模块预算 382、宿主预算 1396。
+- 本轮全量 579 files / 5105 tests，check（1004 modules / 3981 deps、25 legacy、148 semantic）与 build 通过。
+
 ### 电商 Studio 动作编排拆分（2026-11-06）
 
 - `studioActionCoordinator.ts` 负责模式切换、上传容量与逐张等待、参考图、卖点补写、生成确认和

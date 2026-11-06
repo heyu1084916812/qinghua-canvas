@@ -424,7 +424,7 @@
       "test": [
         "src/workbenches/canvas/flow/flowGraph.test.ts"
       ],
-      "budget": 1519
+      "budget": 1396
     },
     {
       "module": "src/workbenches/canvas/lightbox/LightboxLayer.tsx",
@@ -4505,6 +4505,51 @@
         "src/workbenches/ecommerce/studio/controller/studioActionCoordinator.test.ts"
       ],
       "budget": 358
+    },
+    {
+      "module": "src/workbenches/canvas/flow/flowSurfaceChangeCoordinator.ts",
+      "owner": "canvas-flow-change-actions",
+      "responsibility": "编排 React Flow 节点与连线选择、位移吸附、拖拽终点和删除动作计划。",
+      "owns": [
+        "节点/连线选择集合与框选过滤决策",
+        "节点位移、吸附提示、终点校正与归属落点计划",
+        "Delete 守卫、删除顺序和 dispatch 端口"
+      ],
+      "doesNotOwn": [
+        "React Flow 回调生命周期与 refs",
+        "JSX/DOM/CSS 与画布表面结构",
+        "CanvasStore 状态、dispatch 实现与节点渲染"
+      ],
+      "publicApi": [
+        "FlowNodeChangeLike",
+        "FlowEdgeChangeLike",
+        "FlowDragAnchor",
+        "FlowNodeMove",
+        "FlowSnapHints",
+        "NodeSelectionPlan",
+        "NodePositionPlan",
+        "EdgeSelectionPlan",
+        "FlowDeletionPlan",
+        "FlowDeletePorts",
+        "FlowDragEndPlan",
+        "NodeClickSelectionPlan",
+        "planNodeSelection",
+        "planChildNodeSelection",
+        "planNodePositionChanges",
+        "dragIdsOf",
+        "planFlowDragEnd",
+        "planFlowDragDrop",
+        "planEdgeSelection",
+        "planFlowDeletion",
+        "planFlowDeleteKey",
+        "executeFlowDeletion",
+        "deleteFlowNodeIds",
+        "deleteFlowEdgeIds"
+      ],
+      "test": [
+        "src/workbenches/canvas/flow/flowSurfaceChangeCoordinator.test.ts"
+      ],
+      "budget": 382
     }
   ]
 }
