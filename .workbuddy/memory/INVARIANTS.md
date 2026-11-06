@@ -1,5 +1,13 @@
 # CanvasFlow 不变量详表
 
+## 电商结果动作边界（2026-11-06）
+
+- `pageResultActionCoordinator.ts` 不得 import React、DOM 或 Store；结果投影、hooks、平台实例与工作台 props 仍归
+  `EcommercePage`。协调器只接收结果快照、渠道快照与显式 generate/retry/download/logger 端口。
+- 批量编辑必须逐张串行且首错即停；下载只允许 done+imageHash，按结果顺序使用 1-based 文件名并在每张后等待 250ms；
+  失败重试必须按既有 `retryableResultIdsOf` 顺序，空集合不得调用端口。
+- 结果动作拆分必须保持 `EcommercePage` render-after 哈希不变；改 JSX、结果卡结构或可见文案时立即转「涉及 UI」门禁。
+
 ## 创作面板提示词动作边界（2026-11-06）
 
 - `creationPromptCoordinator.ts` 不得 import React、DOM 或 Store；`CreationPanel` 继续拥有 state/refs、DOM 测量、

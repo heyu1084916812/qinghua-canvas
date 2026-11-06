@@ -1,5 +1,14 @@
 # CanvasFlow（轻画）项目记忆
 
+### 电商结果动作编排拆分（2026-11-06）
+
+- `pageResultActionCoordinator.ts` 负责结果行查找、编辑/超清 payload 与来源、批量首错中止、失败重试、
+  顺序下载和结果卡下载/收藏；`EcommercePage` 继续拥有结果投影、hooks、平台实例与工作台 props。
+- `downloadAll` 只处理 done 且有 imageHash，文件名按 1-based 可见序号，每张后等 250ms；`retryFailed` 按既有
+  `retryableResultIdsOf` 顺序，空集合绝不调用端口。`EcommercePage` 1716→1594，render-after 89 行哈希
+  `FBEEF264507B26B95731291BB5C0DFE5FBFE48C56D76BE28625A4CD2280DAC57` 不变；新模块预算 277、宿主预算 1594。
+- 本轮全量 577 files / 5082 tests，check（1002 modules / 3966 deps、25 legacy、146 semantic）与 build 通过。
+
 ### 创作面板提示词动作编排拆分（2026-11-06）
 
 - `creationPromptCoordinator.ts` 接管 300ms 提示词提交计时器、mention/preset 菜单判定、模型选择事件、recipe 快照、

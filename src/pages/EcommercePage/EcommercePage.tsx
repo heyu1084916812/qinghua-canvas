@@ -88,10 +88,6 @@ import type { EcommerceRequest } from '../../domain/ecommerce/types'
 import type { EcommerceGenerationStage } from '../../domain/ecommerce/progress'
 import {
   ECOMMERCE_UPSCALE_OPTIONS,
-  upscaleNoteOf,
-  upscaleOptionOf,
-  type EcommerceUpscaleProfile,
-  type EcommerceUpscaleScale,
 } from '../../domain/ecommerce/upscale'
 import styles from './EcommercePage.module.css'
 
@@ -115,9 +111,14 @@ import {
   longImageTilesOf,
   prescribeEcommerceShots,
   projectEcommerceResults,
-  retryableResultIdsOf,
 } from './ecommercePage/pageResultProjection'
 import { workbenchActionOf } from './ecommercePage/pageActionCoordinator'
+import {
+  createPageResultActionCoordinator,
+  createResultLibraryActions,
+  downloadAllResults,
+  retryFailedResults,
+} from './ecommercePage/pageResultActionCoordinator'
 import {
   requestEcommerceIntent,
   requestEcommerceSellingPoints,
@@ -1398,149 +1399,17 @@ function StudioHost({ projectId }: { projectId: string }) {
     }
   }
 
-  /**
-   * 以当前结果图为上游做一次**定向 AI 编辑**。
-   *
-   * 直接用结果素材 hash 作为编辑输入；新产物另起一个批次，原结果不动。
-   */
-  const editResult = async (
-    nodeId: string,
-    instruction: string,
-    options?: { referenceNodeId?: string; model?: string },
-  ) => {
-    const row =
-      resultRows.find((item) => item.nodeId === nodeId || item.canvasCopyNodeId === nodeId) ?? null
-    if (!row) throw new Error('没找到这张结果对应的素材记录')
-    if (!row.assetHash) throw new Error('这张结果还没有可编辑的素材')
-    const text = instruction.trim()
-    if (!text) throw new Error('先在左侧「补充要求」写清要换成的背景')
-    await onGenerate(
-      {
-        usage: 'edit',
-        platformId: activeTask?.request.platformId,
-        language: activeTask?.request.language ?? 'zh-CN',
-        count: 1,
-        ratio: activeTask?.request.ratio ?? '1:1',
-        productNodeId: row.assetHash,
-        referenceNodeIds: options?.referenceNodeId ? [options.referenceNodeId] : [],
-        note: text,
-        ...(options?.model || row.model
-          ? { model: options?.model || row.model }
-          : {}),
-      },
-      undefined,
-      {
-        sourceTaskId: row.taskId,
-        sourceResultId: row.id,
-        ...(row.assetHash ? { sourceAssetHash: row.assetHash } : {}),
-      },
-    )
-  }
-
-  /**
-   * 批量编辑仍逐张走 `editResult`：每张独立复制、独立任务、独立结果记录。
-   * 不把多个节点塞进一个任务，失败时才能知道具体是哪张没改成。
-   */
-  const editResults = async (
-    nodeIds: readonly string[],
-    instruction: string,
-    options?: { referenceNodeId?: string; model?: string },
-  ) => {
-    for (const nodeId of nodeIds) {
-      await editResult(nodeId, instruction, options)
-    }
-  }
-
-  /**
-   * AI 超清：把结果复制成独立节点，再调用真实的 Topaz 超分模型。
-   *
-   * 这里不走提示词模板，也不允许“看起来更清楚”的普通生图；模型必须来自当前
-   * RunningHub 渠道勾选的 Topaz 端点。新任务照常保留来源，可用于前后对比。
-   */
-  const upscaleResult = async (
-    nodeId: string,
-    profile: EcommerceUpscaleProfile,
-    scale: EcommerceUpscaleScale,
-  ) => {
-    const row =
-      resultRows.find((item) => item.nodeId === nodeId || item.canvasCopyNodeId === nodeId) ?? null
-    if (!row?.assetHash) throw new Error('没找到这张结果的原始素材')
-    const option = upscaleOptionOf(profile)
-    const target = channelList.find(
-      (channel) =>
-        channel.enabled &&
-        channel.models.some(
-          (model) => model.id === option.model && model.category === 'image',
-        ),
-    )
-    if (!target) {
-      throw new Error(`当前没有可用的「${option.model}」渠道，请先在 RunningHub 勾选该模型`)
-    }
-    await onGenerate(
-      {
-        usage: 'edit',
-        channelId: target.id,
-        platformId: activeTask?.request.platformId,
-        language: activeTask?.request.language ?? 'zh-CN',
-        count: 1,
-        ratio: activeTask?.request.ratio ?? '1:1',
-        productNodeId: row.assetHash,
-        referenceNodeIds: [],
-        note: upscaleNoteOf(profile, scale),
-        model: option.model,
-        scale,
-      },
-      undefined,
-      {
-        sourceTaskId: row.taskId,
-        sourceResultId: row.id,
-        sourceAssetHash: row.assetHash,
-      },
-    )
-  }
+  const resultLibraryActions = useMemo(
+    () => createResultLibraryActions({
+      projectId,
+      platform,
+      assetLibraryRepo,
+      logger: platform.logger,
+    }),
+    [assetLibraryRepo, platform, projectId],
+  )
 
   const results = useMemo<EcommerceResultItem[]>(() => {
-    const downloadOf = (hash: string | undefined) =>
-      hash
-        ? () => {
-            /* 下载复用既有那份实现：它认识"素材已不在库里"与"远端素材在新标签页打开"两档 */
-            void downloadAsset({ assets: platform.assets, files: platform.files }, hash)
-          }
-        : undefined
-
-    const saveToLibraryOf = (
-      hash: string | undefined,
-      meta: {
-        width?: number
-        height?: number
-        prompt?: string
-        model?: string
-        ratio?: string
-      },
-    ) =>
-      hash
-        ? async () => {
-            try {
-              const payload = await platform.assets.read(hash)
-              if (!payload) return
-              await assetLibraryRepo.save({
-                hash,
-                mime: payload.mime,
-                bytes: payload.bytes.length,
-                ...(meta.width ? { width: meta.width } : {}),
-                ...(meta.height ? { height: meta.height } : {}),
-                savedAt: Date.now(),
-                projectId,
-                ...(meta.prompt ? { prompt: meta.prompt } : {}),
-                ...(meta.model ? { model: meta.model } : {}),
-                ...(meta.ratio ? { ratio: meta.ratio } : {}),
-              })
-            } catch (e) {
-              platform.logger.log('warn', '[ecommerce] 收藏结果失败', { error: String(e) })
-            }
-          }
-        : undefined
-
     return projectEcommerceResults({
       activeTask,
       resultRows,
@@ -1549,8 +1418,8 @@ function StudioHost({ projectId }: { projectId: string }) {
       legacyAssetHashesOfNode: (node) => node ? legacyAssetHashesOfNode(node) : [],
       resultStateOf: (resultId) => exec.resultStateOf(resultId),
       previewOf: (hash, mime) => <ResultPreview hash={hash} mime={mime} />,
-      downloadOf,
-      saveToLibraryOf,
+      downloadOf: resultLibraryActions.downloadOf,
+      saveToLibraryOf: resultLibraryActions.saveToLibraryOf,
       errorDescriptionOf: describeError,
       runStoredResult,
       retryWorkbenchResult,
@@ -1567,6 +1436,7 @@ function StudioHost({ projectId }: { projectId: string }) {
     projectId,
     runStoredResult,
     assetLibraryRepo,
+    resultLibraryActions,
     taskRepo,
   ])
 
@@ -1582,35 +1452,43 @@ function StudioHost({ projectId }: { projectId: string }) {
     setGenerationStage((current) => generationStageOfTerminalResults(current, results))
   }, [activeTask, results])
 
+  const resultActions = createPageResultActionCoordinator({
+    activeTask,
+    resultRows,
+    results,
+    channels: channelList,
+    platform,
+    onGenerate,
+    retryWorkbenchResult,
+  })
+  const editResult = resultActions.editResult
+  const editResults = resultActions.editResults
+  const upscaleResult = resultActions.upscaleResult
+
   const failedCount = results.filter((r) => r.status === 'failed').length
   const downloadableCount = results.filter((r) => r.status === 'done' && r.imageHash).length
 
   /** 串行下载当前批次；并发触发多个下载会被浏览器拦。 */
-  const downloadAll = useCallback(async () => {
-    let index = 0
-    for (const result of results) {
-      if (result.status !== 'done' || !result.imageHash) continue
-      index += 1
-      await downloadAsset(
-        { assets: platform.assets, files: platform.files },
-        result.imageHash,
-        `轻画-电商-${index}`,
-      )
-      await new Promise((resolve) => setTimeout(resolve, 250))
-    }
-  }, [platform, results])
+  const downloadAll = useCallback(
+    () => downloadAllResults({ results, platform }),
+    [platform, results],
+  )
 
   /** 一键重试失败 / 取消的结果；逐张跑，全部走既有执行链路。 */
-  const retryFailed = useCallback(async () => {
-    const ids = retryableResultIdsOf(activeTask, resultRows, results)
-    if (ids.length === 0) return
-    for (const resultId of ids) await retryWorkbenchResult(resultId)
-  }, [
-    activeTask,
-    retryWorkbenchResult,
-    resultRows,
-    results,
-  ])
+  const retryFailed = useCallback(
+    () => retryFailedResults({
+      activeTask,
+      resultRows,
+      results,
+      retryWorkbenchResult,
+    }),
+    [
+      activeTask,
+      retryWorkbenchResult,
+      resultRows,
+      results,
+    ],
+  )
 
   /**
    * 长图拼合的输入（对账 #420）：只取**已完成且有真实像素**的。

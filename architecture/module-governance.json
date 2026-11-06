@@ -200,7 +200,7 @@
       "test": [
         "scripts/smoke.mjs#G116"
       ],
-      "budget": 1716
+      "budget": 1594
     },
     {
       "module": "src/pages/EcommercePage/EcommerceWorkbench.tsx",
@@ -4446,6 +4446,38 @@
         "src/workbenches/canvas/panels/creation/creationPromptCoordinator.test.ts"
       ],
       "budget": 390
+    },
+    {
+      "module": "src/pages/EcommercePage/ecommercePage/pageResultActionCoordinator.ts",
+      "owner": "pages-ecommerce-result-actions",
+      "responsibility": "编排电商结果编辑、超清、顺序下载、失败重试与结果卡下载收藏动作。",
+      "owns": [
+        "结果行查找、编辑/超清请求和来源元数据构造",
+        "批量编辑与失败重试的串行顺序和首错传播",
+        "顺序下载过滤、编号、节流和结果素材收藏端口"
+      ],
+      "doesNotOwn": [
+        "React state、refs 与组件生命周期",
+        "结果卡片投影、JSX/DOM/CSS 与页面文案",
+        "生成执行器、渠道选择和任务存储实现"
+      ],
+      "publicApi": [
+        "PageResultActionLineage",
+        "PageResultActionView",
+        "PageResultActionChannel",
+        "PageResultActionPorts",
+        "PageResultActionCoordinator",
+        "ResultLibraryActionPorts",
+        "ResultLibraryActions",
+        "createResultLibraryActions",
+        "downloadAllResults",
+        "retryFailedResults",
+        "createPageResultActionCoordinator"
+      ],
+      "test": [
+        "src/pages/EcommercePage/ecommercePage/pageResultActionCoordinator.test.ts"
+      ],
+      "budget": 277
     }
   ]
 }
