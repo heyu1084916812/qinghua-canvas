@@ -611,12 +611,62 @@
       ],
       "publicApi": [
         "PinterestApi",
-        "createPinterestApi"
+        "createPinterestApi",
+        "PinterestPageResult",
+        "pinterestRequestError"
       ],
       "test": [
         "src/features/shared/pinterest/pinterestApi.test.ts"
       ],
       "budget": 215
+    },
+    {
+      "module": "src/features/shared/pinterest/pinterestPaging.ts",
+      "owner": "pinterest-paging",
+      "responsibility": "有上限地读取 Pinterest 分页，并显式报告安全上限截断。",
+      "owns": [
+        "PAGE_SIZE 与 MAX_PAGES 安全上限",
+        "按 id 去重与 PinterestPageResult 投影"
+      ],
+      "doesNotOwn": [
+        "HTTP 请求、OAuth 与凭据",
+        "React 状态和导入动作"
+      ],
+      "publicApi": [
+        "PINTEREST_MAX_PAGES",
+        "PINTEREST_PAGE_SIZE",
+        "PinterestPageResult",
+        "pinterestPagedResult"
+      ],
+      "test": [
+        "src/features/shared/pinterest/pinterestPaging.test.ts"
+      ],
+      "budget": 40
+    },
+    {
+      "module": "src/features/shared/pinterest/pinterestHttp.ts",
+      "owner": "pinterest-http",
+      "responsibility": "Pinterest HTTP 请求中的 Basic Auth、JSON 解码和错误文本投影。",
+      "owns": [
+        "Basic Auth 字节编码",
+        "空响应 / 非 JSON / 上游错误文本规范化"
+      ],
+      "doesNotOwn": [
+        "分页循环、凭据落库与 OAuth 回调",
+        "UI 状态与素材导入"
+      ],
+      "publicApi": [
+        "pinterestBasicAuth",
+        "pinterestJsonPayload",
+        "pinterestResponseError",
+        "pinterestRecordOf",
+        "pinterestArrayOf",
+        "pinterestTextOf"
+      ],
+      "test": [
+        "src/features/shared/pinterest/pinterestHttp.test.ts"
+      ],
+      "budget": 55
     },
     {
       "module": "src/features/shared/pinterest/pinterestSession.ts",
@@ -681,9 +731,39 @@
         "PinterestPanel"
       ],
       "test": [
-        "src/features/shared/pinterest/pinterestApi.test.ts"
+        "src/features/shared/pinterest/pinterestApi.test.ts",
+        "src/features/shared/pinterest/pinterestImportSummary.test.ts"
       ],
       "budget": 431
+    },
+    {
+      "module": "src/features/shared/pinterest/pinterestImportSummary.ts",
+      "owner": "pinterest-import-summary",
+      "responsibility": "汇总 Pinterest 多板读取、导入目标、逐张结果和用户可见状态文案。",
+      "owns": [
+        "多板部分成功 / 失败汇总与目标解析",
+        "串行导入动作、取消后保留部分结果",
+        "收藏板 / 图片 / 导入状态文案"
+      ],
+      "doesNotOwn": [
+        "React 组件状态与 JSX 渲染",
+        "Pinterest HTTP 协议与分页循环"
+      ],
+      "publicApi": [
+        "PinterestPinLoadSummary",
+        "PinterestImportSummary",
+        "summarizePinterestPinLoads",
+        "resolvePinterestImportTargets",
+        "summarizePinterestImportResults",
+        "runPinterestImports",
+        "pinterestBoardStatus",
+        "pinterestPinStatus",
+        "pinterestImportStatus"
+      ],
+      "test": [
+        "src/features/shared/pinterest/pinterestImportSummary.test.ts"
+      ],
+      "budget": 225
     },
     {
       "module": "src/features/shared/pinterest/PinterestSetupView.tsx",

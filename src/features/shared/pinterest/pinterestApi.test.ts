@@ -172,4 +172,68 @@ describe('Pinterest API', () => {
       api.user('access', new AbortController().signal),
     ).rejects.toThrow('Pinterest API HTTP 403: scope is not approved')
   })
+
+  it('reports truncation when pagination still has a bookmark at the page limit', async () => {
+    const page = (pageIndex: number, bookmark?: string) =>
+      jsonResponse({
+        items: Array.from({ length: 100 }, (_, index) => ({
+          id: `b${pageIndex}-${index}`,
+          name: `Board ${pageIndex}-${index}`,
+          pin_count: 1,
+        })),
+        ...(bookmark ? { bookmark } : {}),
+      })
+    const { network, requests } = networkWith([
+      page(0, 'bookmark-1'),
+      page(1, 'bookmark-2'),
+      ...Array.from({ length: 18 }, (_, index) =>
+        page(index + 2, 'bookmark-next'),
+      ),
+    ])
+    const api = createPinterestApi(network)
+
+    const result = await api.boardsDetailed(
+      'access',
+      new AbortController().signal,
+    )
+
+    expect(result.truncated).toBe(true)
+    expect(result.pageCount).toBe(20)
+    expect(result.items.length).toBe(20 * 100)
+    expect(requests.length).toBe(20)
+  })
+
+  it('reports truncation for pin pagination', async () => {
+    const page = (pageIndex: number, bookmark?: string) =>
+      jsonResponse({
+        items: Array.from({ length: 100 }, (_, index) => ({
+          id: `p${pageIndex}-${index}`,
+          board_id: 'b1',
+          title: `Pin ${pageIndex}-${index}`,
+          media: {
+            images: {
+              '600x': { url: `https://i.pinimg.com/600x/${index}.jpg` },
+            },
+          },
+        })),
+        ...(bookmark ? { bookmark } : {}),
+      })
+    const { network } = networkWith([
+      page(0, 'bookmark-1'),
+      ...Array.from({ length: 19 }, (_, index) =>
+        page(index + 1, 'bookmark-next'),
+      ),
+    ])
+    const api = createPinterestApi(network)
+
+    const result = await api.pinsDetailed(
+      'access',
+      'b1',
+      new AbortController().signal,
+    )
+
+    expect(result.truncated).toBe(true)
+    expect(result.pageCount).toBe(20)
+    expect(result.items.length).toBe(20 * 100)
+  })
 })

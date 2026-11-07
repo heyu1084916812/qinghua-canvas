@@ -28879,6 +28879,14 @@ async function g118(browser) {
       aboutText.includes('MIT'),
     `段数=${aboutBlocks}`,
   )
+  rec(
+    g,
+    '★★ 关于面板按默认装配描述本机 shared-store，不再声称网页版存 IndexedDB',
+    aboutText.includes('默认写入本机的 shared-store 权威库') &&
+      aboutText.includes('具体数据目录以「设置 → 存储」显示为准') &&
+      !aboutText.includes('网页版是浏览器的数据库（IndexedDB）'),
+    `段数=${aboutBlocks}`,
+  )
 
   /**
    * ⑥ 空画布：模板直达。

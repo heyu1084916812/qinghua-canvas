@@ -9,13 +9,24 @@ import {
   type PinterestTokenSet,
   type PinterestUser,
 } from '../../../domain/inspiration/pinterest'
-import { bytesToBase64 } from '../../../domain/shared/base64'
 import type { NetworkPort } from '../../../platform/ports'
 import { errorTextOf } from '../../../shared/result'
+import {
+  pinterestArrayOf,
+  pinterestBasicAuth,
+  pinterestJsonPayload,
+  pinterestRecordOf,
+  pinterestResponseError,
+  pinterestTextOf,
+} from './pinterestHttp'
+import {
+  PINTEREST_PAGE_SIZE,
+  pinterestPagedResult,
+  type PinterestPageResult,
+} from './pinterestPaging'
 
 const TOKEN_URL = `${PINTEREST_API_BASE}/oauth/token`
-const PAGE_SIZE = 100
-const MAX_PAGES = 20
+export type { PinterestPageResult }
 
 export interface PinterestTokenCredentials {
   clientId: string
@@ -34,11 +45,20 @@ export interface PinterestApi {
   ): Promise<PinterestTokenSet>
   user(accessToken: string, signal: AbortSignal): Promise<PinterestUser>
   boards(accessToken: string, signal: AbortSignal): Promise<PinterestBoard[]>
+  boardsDetailed(
+    accessToken: string,
+    signal: AbortSignal,
+  ): Promise<PinterestPageResult<PinterestBoard>>
   pins(
     accessToken: string,
     boardId: string,
     signal: AbortSignal,
   ): Promise<PinterestPin[]>
+  pinsDetailed(
+    accessToken: string,
+    boardId: string,
+    signal: AbortSignal,
+  ): Promise<PinterestPageResult<PinterestPin>>
 }
 
 export function createPinterestApi(network: NetworkPort): PinterestApi {
@@ -52,7 +72,7 @@ export function createPinterestApi(network: NetworkPort): PinterestApi {
         url: TOKEN_URL,
         method: 'POST',
         headers: {
-          Authorization: `Basic ${basicAuth(credentials.clientId, credentials.clientSecret)}`,
+          Authorization: `Basic ${pinterestBasicAuth(credentials.clientId, credentials.clientSecret)}`,
           Accept: 'application/json',
         },
         body,
@@ -62,9 +82,9 @@ export function createPinterestApi(network: NetworkPort): PinterestApi {
       },
       signal,
     )
-    const payload = await jsonPayload(response.status, response.text)
+    const payload = await pinterestJsonPayload(response.status, response.text)
     if (response.status < 200 || response.status >= 300) {
-      throw new Error(pinterestError(payload, `Pinterest OAuth HTTP ${response.status}`))
+      throw new Error(pinterestResponseError(payload, `Pinterest OAuth HTTP ${response.status}`))
     }
     return normalizePinterestToken(payload as never)
   }
@@ -88,12 +108,51 @@ export function createPinterestApi(network: NetworkPort): PinterestApi {
       },
       signal,
     )
-    const payload = await jsonPayload(response.status, response.text)
+    const payload = await pinterestJsonPayload(response.status, response.text)
     if (response.status < 200 || response.status >= 300) {
-      throw new Error(pinterestError(payload, `Pinterest API HTTP ${response.status}`))
+      throw new Error(pinterestResponseError(payload, `Pinterest API HTTP ${response.status}`))
     }
     return payload
   }
+
+  const pageJson = async (
+    base: string,
+    bookmark: string,
+    accessToken: string,
+    signal: AbortSignal,
+  ) => {
+    const url = new URL(base)
+    url.searchParams.set('page_size', String(PINTEREST_PAGE_SIZE))
+    if (bookmark) url.searchParams.set('bookmark', bookmark)
+    const payload = pinterestRecordOf(await getJson(url.toString(), accessToken, signal))
+    return {
+      items: pinterestArrayOf(payload.items),
+      bookmark: pinterestTextOf(payload.bookmark),
+    }
+  }
+
+  const boardsPage = (accessToken: string, signal: AbortSignal) =>
+    pinterestPagedResult(
+      (bookmark) => {
+        return pageJson(`${PINTEREST_API_BASE}/boards`, bookmark, accessToken, signal)
+      },
+      normalizePinterestBoard,
+      (item) => item.id,
+    ).then((result) => ({
+      ...result,
+      items: result.items.sort((left, right) =>
+        left.name.localeCompare(right.name, 'zh-CN'),
+      ),
+    }))
+
+  const pinsPage = (accessToken: string, boardId: string, signal: AbortSignal) =>
+    pinterestPagedResult(
+      (bookmark) => {
+        return pageJson(`${PINTEREST_API_BASE}/boards/${encodeURIComponent(boardId)}/pins`, bookmark, accessToken, signal)
+      },
+      normalizePinterestPin,
+      (item) => item.id,
+    )
 
   return {
     exchangeCode(input, signal) {
@@ -120,94 +179,21 @@ export function createPinterestApi(network: NetworkPort): PinterestApi {
     },
 
     async boards(accessToken, signal) {
-      const items: PinterestBoard[] = []
-      const seen = new Set<string>()
-      let bookmark = ''
-      for (let page = 0; page < MAX_PAGES; page += 1) {
-        const url = new URL(`${PINTEREST_API_BASE}/boards`)
-        url.searchParams.set('page_size', String(PAGE_SIZE))
-        if (bookmark) url.searchParams.set('bookmark', bookmark)
-        const payload = recordOf(await getJson(url.toString(), accessToken, signal))
-        for (const raw of arrayOf(payload.items)) {
-          const item = normalizePinterestBoard(raw)
-          if (!item || seen.has(item.id)) continue
-          seen.add(item.id)
-          items.push(item)
-        }
-        bookmark = textOf(payload.bookmark)
-        if (!bookmark) break
-      }
-      return items.sort((left, right) => left.name.localeCompare(right.name, 'zh-CN'))
+      return (await boardsPage(accessToken, signal)).items
+    },
+
+    boardsDetailed(accessToken, signal) {
+      return boardsPage(accessToken, signal)
     },
 
     async pins(accessToken, boardId, signal) {
-      const items: PinterestPin[] = []
-      const seen = new Set<string>()
-      let bookmark = ''
-      for (let page = 0; page < MAX_PAGES; page += 1) {
-        const url = new URL(
-          `${PINTEREST_API_BASE}/boards/${encodeURIComponent(boardId)}/pins`,
-        )
-        url.searchParams.set('page_size', String(PAGE_SIZE))
-        if (bookmark) url.searchParams.set('bookmark', bookmark)
-        const payload = recordOf(await getJson(url.toString(), accessToken, signal))
-        for (const raw of arrayOf(payload.items)) {
-          const item = normalizePinterestPin(raw)
-          if (!item || seen.has(item.id)) continue
-          seen.add(item.id)
-          items.push(item)
-        }
-        bookmark = textOf(payload.bookmark)
-        if (!bookmark) break
-      }
-      return items
+      return (await pinsPage(accessToken, boardId, signal)).items
+    },
+
+    pinsDetailed(accessToken, boardId, signal) {
+      return pinsPage(accessToken, boardId, signal)
     },
   }
-}
-
-function basicAuth(clientId: string, clientSecret: string): string {
-  return bytesToBase64(new TextEncoder().encode(`${clientId}:${clientSecret}`))
-}
-
-async function jsonPayload(
-  status: number,
-  text: () => Promise<string>,
-): Promise<unknown> {
-  const raw = await text().catch(() => '')
-  if (!raw.trim()) {
-    if (status >= 200 && status < 300) {
-      throw new Error('Pinterest 返回了空响应')
-    }
-    return {}
-  }
-  try {
-    return JSON.parse(raw) as unknown
-  } catch {
-    if (status >= 200 && status < 300) {
-      throw new Error(`Pinterest 返回了无法解析的响应：${raw.slice(0, 200)}`)
-    }
-    return { message: raw.slice(0, 500) }
-  }
-}
-
-function pinterestError(payload: unknown, fallback: string): string {
-  const value = recordOf(payload)
-  const detail = textOf(value.message) || textOf(value.error_description) || textOf(value.error)
-  return detail ? `${fallback}: ${detail}` : fallback
-}
-
-function recordOf(value: unknown): Record<string, unknown> {
-  return value && typeof value === 'object' && !Array.isArray(value)
-    ? (value as Record<string, unknown>)
-    : {}
-}
-
-function arrayOf(value: unknown): unknown[] {
-  return Array.isArray(value) ? value : []
-}
-
-function textOf(value: unknown): string {
-  return typeof value === 'string' ? value.trim() : ''
 }
 
 export function pinterestRequestError(error: unknown): string {

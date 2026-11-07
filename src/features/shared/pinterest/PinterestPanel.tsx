@@ -2,14 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { invoke, isTauri } from '@tauri-apps/api/core'
 import { openUrl } from '@tauri-apps/plugin-opener'
 import { usePlatform } from '../../../app/providers/PlatformProvider'
-import type {
-  PinterestBoard,
-  PinterestPin,
-} from '../../../domain/inspiration/pinterest'
-import {
-  pinterestOAuthUrl,
-  pinterestPinToResearchItem,
-} from '../../../domain/inspiration/pinterest'
+import type { PinterestBoard, PinterestPin } from '../../../domain/inspiration/pinterest'
+import { pinterestOAuthUrl } from '../../../domain/inspiration/pinterest'
 import { activeCanvasId } from '../../../state/project/activeCanvas'
 import {
   clearPinterestConnection,
@@ -19,10 +13,17 @@ import {
   savePinterestSession,
   type PinterestConnection,
 } from '../../../state/project/pinterestConnectionStore'
-import { saveDesignResearchItem } from '../research/saveResearchItem'
-import { sendAssetToActiveCanvas } from '../../assets/sendToActiveCanvas'
 import { createId } from '../../../shared/id'
 import { createPinterestApi } from './pinterestApi'
+import {
+  pinterestBoardStatus,
+  pinterestImportStatus,
+  pinterestPinStatus,
+  resolvePinterestImportTargets,
+  runPinterestImports,
+  summarizePinterestImportResults,
+  summarizePinterestPinLoads,
+} from './pinterestImportSummary'
 import { openPinterestSession } from './pinterestSession'
 import {
   isPinterestLoopbackRedirect,
@@ -219,13 +220,14 @@ export function PinterestPanel({ onClose }: { onClose: () => void }) {
     try {
       const controller = newController()
       const session = await openPinterestSession(platform, controller.signal)
-      const next = await session.api.boards(session.accessToken, controller.signal)
+      const page = await session.api.boardsDetailed(session.accessToken, controller.signal)
+      const next = page.items
       setConnection(session.connection)
       setBoards(next)
       setSelectedBoards(new Set(next.map((board) => board.id)))
       setPins([])
       setSelectedPins(new Set())
-      setStatus(`读取到 ${next.length} 个收藏板。`)
+      setStatus(pinterestBoardStatus(page))
     } catch (error) {
       setStatus(`读取收藏板失败：${errorText(error)}`)
     } finally {
@@ -244,16 +246,19 @@ export function PinterestPanel({ onClose }: { onClose: () => void }) {
     try {
       const controller = newController()
       const session = await openPinterestSession(platform, controller.signal)
-      const batches = await Promise.all(
-        boards
-          .filter((board) => selectedBoards.has(board.id))
-          .map((board) => session.api.pins(session.accessToken, board.id, controller.signal)),
-      )
-      const next = batches.flat()
+      const selected = boards.filter((board) => selectedBoards.has(board.id))
+      const loadOutcomes = await Promise.allSettled(selected.map((board) =>
+        session.api.pinsDetailed(session.accessToken, board.id, controller.signal)))
+      const loadInputs = loadOutcomes.map((outcome, index) => ({
+        board: selected[index]!,
+        outcome,
+      }))
+      const summary = summarizePinterestPinLoads(loadInputs)
+      const next = summary.items
       setConnection(session.connection)
       setPins(next)
       setSelectedPins(new Set(next.filter((pin) => pin.imageUrl).map((pin) => pin.id)))
-      setStatus(`读取到 ${next.length} 张收藏图片。`)
+      setStatus(pinterestPinStatus(summary))
     } catch (error) {
       setStatus(`读取收藏图片失败：${errorText(error)}`)
     } finally {
@@ -263,7 +268,7 @@ export function PinterestPanel({ onClose }: { onClose: () => void }) {
 
   const importSelected = async (toCanvas: boolean) => {
     if (busy) return
-    const targets = pins.filter((pin) => selectedPins.has(pin.id) && pin.imageUrl)
+    const { targets, skipped } = resolvePinterestImportTargets(pins, selectedPins, boards)
     if (targets.length === 0) {
       setStatus('先选择要导入的 Pinterest 图片。')
       return
@@ -273,29 +278,17 @@ export function PinterestPanel({ onClose }: { onClose: () => void }) {
       return
     }
     setBusy(toCanvas ? 'import-canvas' : 'import-library')
-    let imported = 0
     try {
       const controller = newController()
-      for (const pin of targets) {
-        const board = boards.find((item) => item.id === pin.boardId)
-        if (!board) continue
-        const item = pinterestPinToResearchItem(pin, board)
-        if (!item) continue
-        const saved = await saveDesignResearchItem(
-          item,
-          { network: platform.network, storage: platform.storage },
-          controller.signal,
-        )
-        if (!saved.ok || !saved.asset) throw new Error(saved.message)
-        if (toCanvas) await sendAssetToActiveCanvas(platform, saved.asset)
-        imported += 1
-        setStatus(`正在导入 ${imported}/${targets.length}…`)
-      }
-      setStatus(
-        toCanvas
-          ? `已导入 ${imported} 张到当前画布。`
-          : `已保存 ${imported} 张到素材库。`,
-      )
+      const { results, canceled } = await runPinterestImports({
+        targets,
+        toCanvas,
+        platform,
+        signal: controller.signal,
+        onProgress: (done, total) => setStatus(`正在导入 ${done}/${total}…`),
+      })
+      const summary = summarizePinterestImportResults(results, skipped, canceled)
+      setStatus(pinterestImportStatus(summary, toCanvas, canceled))
     } catch (error) {
       setStatus(`导入中断：${errorText(error)}`)
     } finally {

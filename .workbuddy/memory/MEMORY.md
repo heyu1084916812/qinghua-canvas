@@ -12244,3 +12244,12 @@ React 端口 → `invoke` → Rust `check_update` → updater 插件读配置 �
 - Canvas MCP 配置有通用 JSON 与 Codex TOML 两种可复制格式；TOML 从 stdio command/args 投影，不写 token。
 - 当前 CLI 高级设置输入框是 32px 且顶部对齐，旧截图的大输入框问题已不复现；浏览器开发版不渲染 MCP 配置区，需桌面或静态渲染测试验证。
 - 图一 / 图二要求外部账号、真实 harness、干净机器、LICENSE、发布授权、跨平台时，保留缺口，不得把本地测试冒充发布完成。
+
+
+### 总管2 四图目标第四轮（2026-11-07）
+
+- 生产装配中桌面与网页默认都走本机 shared-store；AboutPanel 与 desktop/index 注释不得再写网页版 IndexedDB 或 WebCrypto 凭据。
+- Pinterest 分页安全上限和截断标记归 pinterestPaging；HTTP 解码归 pinterestHttp；多板部分成功、逐张导入汇总和状态文案归 pinterestImportSummary。
+- Pinterest 面板只保留 React/OAuth/视图接线；导入取消后保留已成功数，不把已入库素材抹掉。
+- HostingPage 两处 lazy import 必须保持同一边界；生产构建只有一个 HostingPage chunk，静态门禁不许回退成静态导入。
+- 文案改动涉及 UI 时必须留 1440×900 / 1024×700 明暗四组改前/改后证据；本轮证据在 .playwright-verify/about-storage-copy/。

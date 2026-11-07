@@ -16,7 +16,7 @@ import styles from './AboutPanel.module.css'
 const BLOCKS: { title: string; body: string }[] = [
   {
     title: '数据存放在哪',
-    body: '项目、素材、生成记录全部存在本机：网页版是浏览器的数据库（IndexedDB），桌面版是应用数据目录 —— 具体路径在「设置 → 存储」里能看到并打开。没有服务器替你保存项目。',
+    body: '项目、素材、生成记录默认写入本机的 shared-store 权威库；桌面壳和开发网页连的是这一份库，具体数据目录以「设置 → 存储」显示为准。没有服务器替你保存项目。',
   },
   {
     title: '什么时候会联网',

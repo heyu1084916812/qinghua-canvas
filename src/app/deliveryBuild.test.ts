@@ -9,9 +9,13 @@ import ciWorkflow from '../../.github/workflows/ci.yml?raw'
 
 describe('delivery build boundaries', () => {
   it('loads HostingPage dynamically from both its route and the settings overlay', () => {
-    expect(overlay).toContain("import('../pages/HostingPage/HostingPage')")
-    expect(routes).toContain("import('../pages/HostingPage/HostingPage')")
+    const boundary = "import('../pages/HostingPage/HostingPage').then((m) => ({ default: m.HostingPage }))"
+    expect(overlay).toContain(boundary)
+    expect(routes).toContain(boundary)
+    expect(overlay.match(/import\('\.\.\/pages\/HostingPage\/HostingPage'\)/g)?.length).toBe(1)
+    expect(routes.match(/import\('\.\.\/pages\/HostingPage\/HostingPage'\)/g)?.length).toBe(1)
     expect(overlay).not.toContain("import { HostingPage } from '../pages/HostingPage/HostingPage'")
+    expect(routes).not.toContain("import { HostingPage } from '../pages/HostingPage/HostingPage'")
   })
 
   it('keeps explicit stable chunk boundaries', () => {
