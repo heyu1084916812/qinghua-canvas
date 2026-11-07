@@ -31,7 +31,7 @@ export function confirmationRunsGeneration(name: string): boolean {
 export function confirmationRequiresExplicitApproval(
   name: string,
   args?: unknown,
-  context: { autoRun?: boolean } = {},
+  _context: { autoRun?: boolean } = {},
 ): boolean {
   /**
    * 自动模式只允许白名单里的付费生成免人工确认。
@@ -45,13 +45,7 @@ export function confirmationRequiresExplicitApproval(
         : undefined
     if (purpose === 'review') return false
   }
-  /**
-   * The composer's "自动生成" mode already means "do not stop at every planning
-   * checkpoint". A task plan has no side effect by itself, so auto mode may
-   * resolve that proposal automatically. Destructive tools and genuine
-   * clarification still fall through to manual approval.
-   */
-  if (context.autoRun === true && name === 'proposeTaskPlan') return false
+  // 计划是用户授权后续连续执行的边界；自动模式不能代点，否则提示词与确认卡会分叉。
   return !toolRunsGenerationInAutoMode(name)
 }
 

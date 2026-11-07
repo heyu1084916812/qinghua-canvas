@@ -81,14 +81,14 @@ describe('continueAgentAutoConfirmations', () => {
   })
 
   it('★★ 显式批准工具在自动模式仍返回 confirm', async () => {
-    const initial = confirmOutcome('deleteNodes', {
-      nodeIds: ['node-1'],
-    })
-    const args = input(initial)
-    const result = await continueAgentAutoConfirmations(args)
-    expect(result).toBe(initial)
-    expect(args.transitionSessionJob).not.toHaveBeenCalled()
-    expect(args.executeConfirmedTool).not.toHaveBeenCalled()
+    for (const name of ['deleteNodes', 'proposeTaskPlan']) {
+      const initial = confirmOutcome(name, { nodeIds: ['node-1'] })
+      const args = input(initial)
+      const result = await continueAgentAutoConfirmations(args)
+      expect(result).toBe(initial)
+      expect(args.transitionSessionJob).not.toHaveBeenCalled()
+      expect(args.executeConfirmedTool).not.toHaveBeenCalled()
+    }
   })
 
   it('★★ 生成工具保持 transition → execute → finish → resume 顺序', async () => {

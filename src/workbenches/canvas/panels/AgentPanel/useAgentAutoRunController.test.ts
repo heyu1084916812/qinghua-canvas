@@ -162,6 +162,26 @@ describe('useAgentAutoRunController', () => {
     expect(confirmLatest).not.toHaveBeenCalled()
   })
 
+  it('切到自动模式不会代点待确认的执行计划', async () => {
+    const confirmLatest = vi.fn(async () => undefined)
+    const statusFor = vi.fn((): AgentPanelStatus => ({
+      kind: 'awaitingConfirm',
+      request: {
+        callId: 'call-plan',
+        name: 'proposeTaskPlan',
+        args: { title: '品牌全案' },
+      },
+    }))
+    const { viewRef } = render(input({ statusFor, confirmLatest }))
+
+    await act(async () => {
+      await expect(viewRef.current!.setAutoRun(true)).resolves.toBe(true)
+    })
+    expect(statusFor).toHaveBeenCalledWith('s1')
+    expect(confirmLatest).not.toHaveBeenCalled()
+    expect(viewRef.current!.autoRunFor('s1')).toBe(true)
+  })
+
   it('非 awaitingConfirm 不自动确认', async () => {
     const confirmLatest = vi.fn(async () => undefined)
     const { viewRef } = render(

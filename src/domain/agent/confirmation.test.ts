@@ -67,7 +67,7 @@ describe('Agent 确认卡', () => {
       confirmationRequiresExplicitApproval('proposeTaskPlan', undefined, {
         autoRun: true,
       }),
-    ).toBe(false)
+    ).toBe(true)
     expect(
       confirmationRequiresExplicitApproval('requestTaskConfirmation', {
         purpose: 'clarification',

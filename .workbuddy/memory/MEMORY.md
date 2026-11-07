@@ -12262,3 +12262,12 @@ React 端口 → `invoke` → Rust `check_update` → updater 插件读配置 �
 - Canvas log nextOffset counts consumed raw candidates, not filtered visible records; append pages dedupe by ID and pass the cursor through.
 - UI removal of dead controls still needs 1440x900 / 1024x700 light/dark before-after evidence; a short stash of only the UI files can capture HEAD baseline, then pop immediately.
 - G97 tmpfiles.org upload failure is an external service boundary; when the product failure-message assertion passes, do not call it a code regression.
+
+
+### 总管2 第六轮：重点能力审计、Agent 计划确认、当前 HEAD 性能复验（2026-11-07）
+
+- 工作台不是运行时插件：WorkbenchId / WORKBENCHES / lazy route / NAV 四份静态登记由 src/app/deliveryArchitecture.test.ts 一起锁住；workbench.ts 旧注释「只剩 canvas」已纠正。
+- 自动执行只能推进用户亲自确认过的计划。confirmationRequiresExplicitApproval 在 autoRun=true 时对 proposeTaskPlan 必须保持 true；自动模式不能因为计划无付费副作用就代点，否则系统提示词、确认卡和 #800 口径分叉。
+- Agent 显示层只承接公开正文 / reasoning 与工具条目；模型把英文内部过程写进 content 时，UI 不能把它包装成结构化过程，更不能展示私有思维链。检查点计数只是持久历史数，不等于模型窗口全量。
+- Pinterest / Canvas MCP / 品牌套件 / CLI 都要按「代码已接线 / 本机已验证 / 外部登录态或凭据未完成」分层。真实 Developer App、已登录 harness、干净机器、LICENSE、跨平台和未确认 push 不得标成已交付。
+- 图四当前 HEAD 用 scripts/verify-storage-log-first-paint.mjs 在隔离 V1 335 项目 / 1400 素材 / 500 RunRecord 下复验：存储 3732ms、全局日志 1734ms、画布日志 2831ms，页面错误与溢出 0。比 9s 改前快，但没达到旧证据 0.5-1s；保留 #964，不把性能债清零。隔离 store 必须用 --port 参数和独立 --data-dir，直接设 QINGHUA_SHARED_STORE_PORT 对 shared-store CLI 不生效。
