@@ -215,6 +215,7 @@ describe('countHistory / modelCounts', () => {
       image: 2,
       video: 1,
       audio: 0,
+      other: 0,
       saved: 1,
       recent: 3, // 今天/昨天/3 天前；30 天前那张不算
       failed: 1,
@@ -244,6 +245,7 @@ describe('countHistory / modelCounts', () => {
         image: 1,
         video: 0,
         audio: 0,
+        other: 0,
         saved: 1,
         recent: 1,
         failed: 0,
@@ -254,7 +256,7 @@ describe('countHistory / modelCounts', () => {
       const lib = [{ hash: 'i1', mime: 'image/png', savedAt: NOW - 60 * 60 * 1000 }]
       expect(countAssets(items, lib, NOW)).toEqual({
         /*
-         * `all` **只数素材**（图/视频/音频三家之和 = all，口径自洽）；
+         * `all` **只数素材**（图/视频/音频/其他四家之和 = all，口径自洽）；
          * 失败那一条进 `failed`，不再混进"全部" —— 参考图五里它本来就是独立一档
          * （左侧「生成失败 N」），旧实现把它算进"全部"才让 4 ≠ 2+1+0。
          */
@@ -262,6 +264,7 @@ describe('countHistory / modelCounts', () => {
         image: 2,
         video: 1,
         audio: 0,
+        other: 0,
         saved: 1,
         recent: 2,
         failed: 1,
@@ -310,10 +313,24 @@ describe('countHistory / modelCounts', () => {
         image: 1,
         video: 1,
         audio: 0,
+        other: 0,
         saved: 1,
         recent: 2,
         failed: 0,
       })
+    })
+
+    it('未知 MIME 归入其他，不冒充音频', () => {
+      expect(
+        countAssetRecords(
+          [
+            { hash: 'audio-1', mime: 'audio/mpeg', createdAt: NOW },
+            { hash: 'pdf-1', mime: 'application/pdf', createdAt: NOW },
+          ],
+          [],
+          NOW,
+        ),
+      ).toMatchObject({ all: 2, audio: 1, other: 1 })
     })
   })
 })

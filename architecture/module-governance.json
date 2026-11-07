@@ -6049,6 +6049,30 @@
       "budget": 40
     },
     {
+      "module": "src/features/settings/storageOverviewCache.ts",
+      "owner": "settings-storage-overview-cache",
+      "responsibility": "按存储端口保留当前会话的存储概况快照，让面板重开时先显示上次结果再后台刷新。",
+      "owns": [
+        "存储概况字段的内存快照",
+        "不同 StoragePort 之间的缓存隔离",
+        "独立字段更新后的快照合并"
+      ],
+      "doesNotOwn": [
+        "存储读取顺序与错误隔离",
+        "React 面板状态",
+        "跨启动持久化或用户数据副本"
+      ],
+      "publicApi": [
+        "StorageOverviewSnapshot",
+        "readStorageOverviewSnapshot",
+        "rememberStorageOverviewUpdate"
+      ],
+      "test": [
+        "src/features/settings/storageOverviewCache.test.ts"
+      ],
+      "budget": 80
+    },
+    {
       "module": "src/features/settings/CanvasMcpPanel.tsx",
       "owner": "settings-canvas-mcp-panel",
       "responsibility": "展示 Canvas MCP 网关状态、工具范围、验证入口和可复制的 harness 配置。",
@@ -6263,6 +6287,29 @@
         "src/state/shared/runLogFastPage.test.ts"
       ],
       "budget": 106
+    },
+    {
+      "module": "src/state/shared/runLogFastPageCache.ts",
+      "owner": "run-log-fast-page-cache",
+      "responsibility": "按 StoragePort、筛选条件和页大小复用当前会话的日志首屏，减少面板重开与切换时的重复查询。",
+      "owns": [
+        "日志首屏快照的内存缓存",
+        "不同 StoragePort 与筛选条件之间的缓存隔离",
+        "首屏页大小和候选游标的独立键"
+      ],
+      "doesNotOwn": [
+        "日志查询与作用域分类",
+        "缓存持久化或跨会话失效",
+        "React 面板刷新与请求竞态"
+      ],
+      "publicApi": [
+        "readRunLogFastPageCache",
+        "rememberRunLogFastPage"
+      ],
+      "test": [
+        "src/state/shared/runLogFastPageCache.test.ts"
+      ],
+      "budget": 60
     },
     {
       "module": "src/state/shared/runLogStorageFastPage.ts",

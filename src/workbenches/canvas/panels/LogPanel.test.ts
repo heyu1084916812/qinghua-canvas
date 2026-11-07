@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import {
+  canvasLogRecordsOf,
   formatLogTime,
   isLogBackdropPointerDown,
   routeAttemptSummary,
@@ -82,8 +83,14 @@ describe('LogPanel / 展示逻辑', () => {
   })
 
   it('画布日志过滤对话模型调用，只保留生成与本地合成', () => {
-    expect(shouldShowInCanvasLog({ params: { kind: 'text', model: 'Deepseek' } })).toBe(false)
-    expect(shouldShowInCanvasLog({ params: { mode: 'image', model: 'GPT Image 2' } })).toBe(true)
-    expect(shouldShowInCanvasLog({ params: {} })).toBe(true)
+    const text = { id: 'text', params: { kind: 'text', model: 'Deepseek' } }
+    const image = { id: 'image', params: { mode: 'image', model: 'GPT Image 2' } }
+    const unknown = { id: 'unknown', params: {} }
+    expect(shouldShowInCanvasLog(text)).toBe(false)
+    expect(shouldShowInCanvasLog(image)).toBe(true)
+    expect(shouldShowInCanvasLog(unknown)).toBe(true)
+    expect(
+      canvasLogRecordsOf([text, image, unknown] as never).map((record) => record.id),
+    ).toEqual(['image', 'unknown'])
   })
 })

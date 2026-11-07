@@ -16,6 +16,10 @@ import {
   runLogFastAppendPage,
   runLogFastPage,
 } from '../../../state/shared/runLogFastPage'
+import {
+  readRunLogFastPageCache,
+  rememberRunLogFastPage,
+} from '../../../state/shared/runLogFastPageCache'
 import styles from './RunLogList.module.css'
 
 export type RunLogFilter = Omit<RunLogQuery, 'offset' | 'limit'>
@@ -54,15 +58,29 @@ export function RunLogList({
     () => JSON.parse(filterKey) as RunLogFilter,
     [filterKey],
   )
-  const [entries, setEntries] = useState<RunLogEntry[]>([])
-  const [hasMore, setHasMore] = useState(false)
-  const [loading, setLoading] = useState(true)
+  const initialCache = useMemo(
+    () => readRunLogFastPageCache(platform.storage, stableFilter, pageSize),
+    [pageSize, platform.storage, stableFilter],
+  )
+  const [entries, setEntries] = useState<RunLogEntry[]>(initialCache?.entries ?? [])
+  const [hasMore, setHasMore] = useState(initialCache?.hasMore ?? false)
+  const [loading, setLoading] = useState(!initialCache)
   const [error, setError] = useState('')
-  const candidateOffsetRef = useRef(0)
+  const candidateOffsetRef = useRef(initialCache?.nextOffset ?? 0)
   const loadingMoreRef = useRef(false)
+  const requestRevisionRef = useRef(0)
 
   const loadFirstPage = useCallback(async () => {
-    setLoading(true)
+    const revision = ++requestRevisionRef.current
+    const cached = readRunLogFastPageCache(platform.storage, stableFilter, pageSize)
+    if (cached) {
+      candidateOffsetRef.current = cached.nextOffset
+      setEntries(cached.entries)
+      setHasMore(cached.hasMore)
+      setLoading(false)
+    } else {
+      setLoading(true)
+    }
     setError('')
     try {
       const page = await runLogFastFirstPage(
@@ -70,15 +88,18 @@ export function RunLogList({
         stableFilter,
         pageSize,
       )
+      rememberRunLogFastPage(platform.storage, stableFilter, pageSize, page)
+      if (revision !== requestRevisionRef.current) return
       candidateOffsetRef.current = page.nextOffset
       setEntries(page.entries)
       setHasMore(page.hasMore)
     } catch (reason) {
+      if (revision !== requestRevisionRef.current) return
       setError(reason instanceof Error ? reason.message : String(reason))
     } finally {
-      setLoading(false)
+      if (revision === requestRevisionRef.current) setLoading(false)
     }
-  }, [pageSize, repo, stableFilter])
+  }, [pageSize, platform.storage, repo, stableFilter])
 
   useEffect(() => {
     void loadFirstPage()
@@ -87,6 +108,7 @@ export function RunLogList({
   const loadMore = async () => {
     if (loadingMoreRef.current) return
     loadingMoreRef.current = true
+    const revision = requestRevisionRef.current
     try {
       const page = await runLogFastPage(
         (fastFilter) => repo.queryFast(fastFilter),
@@ -94,6 +116,7 @@ export function RunLogList({
         candidateOffsetRef.current,
         pageSize,
       )
+      if (revision !== requestRevisionRef.current) return
       candidateOffsetRef.current = page.nextOffset
       setEntries((current) => runLogFastAppendPage(current, page).entries)
       setHasMore(page.hasMore)

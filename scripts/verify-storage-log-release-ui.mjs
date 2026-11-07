@@ -166,6 +166,12 @@ try {
   const storageText = await page.locator('[data-storage-panel]').innerText()
   await page.screenshot({ path: path.join(output, 'storage-1440-dark.png'), fullPage: false })
 
+  await page.locator('[data-global-settings-tab="theme"]').click()
+  const reopenStarted = Date.now()
+  await page.locator('[data-global-settings-tab="storage"]').click()
+  await page.waitForFunction(fullWait, null, { timeout: 5_000 })
+  const storageReopenMs = Date.now() - reopenStarted
+
   await page.locator('[data-global-settings-tab="allLogs"]').click()
   const globalStarted = Date.now()
   await page.locator('[data-run-log-row]').first().waitFor({ timeout: 45_000 })
@@ -213,6 +219,7 @@ try {
       errors.length === 0 &&
       storage.quickMs <= 1_500 &&
       storage.fullMs <= 5_000 &&
+      storageReopenMs <= 500 &&
       globalLogsMs <= 1_500 &&
       canvasLogsMs <= 1_500 &&
       !storageText.includes('统计中…') &&
@@ -227,6 +234,7 @@ try {
     timings: {
       storageQuickMs: storage.quickMs,
       storageFullMs: storage.fullMs,
+      storageReopenMs,
       globalLogsMs,
       canvasLogsMs,
     },

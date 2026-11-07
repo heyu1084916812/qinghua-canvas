@@ -1,5 +1,4 @@
 import {
-  assetKindOf,
   byteLengthOf,
   normalizeMetaString,
   normalizeTag,
@@ -74,7 +73,7 @@ export interface HistoryFailure {
 export type HistoryItem = HistoryOutput | HistoryFailure
 
 /** 素材类型分档（参考图顶部那排：全部 / 图 / 视频 / 音频） */
-export type HistoryKind = 'all' | 'image' | 'video' | 'audio'
+export type HistoryKind = 'all' | 'image' | 'video' | 'audio' | 'other'
 
 /** 左侧"快速筛选"（参考图那一栏） */
 export type QuickFilter = 'all' | 'saved' | 'recent' | 'failed'
@@ -98,12 +97,13 @@ function sizePair(w: unknown, h: unknown): { width: number; height: number } | u
   return width && height ? { width, height } : undefined
 }
 
-/** 音频也算一类（参考图里"音频 0"就在那排里）；`assetKindOf` 只认图/视频，故这里另开一档 */
+/** 未知 MIME 单独归“其他”，不能冒充音频。 */
 export function historyKindOf(mime: string | undefined | null): HistoryKind {
   const m = mime ?? ''
+  if (m.startsWith('image/')) return 'image'
+  if (m.startsWith('video/')) return 'video'
   if (m.startsWith('audio/')) return 'audio'
-  const kind = assetKindOf(m)
-  return kind === 'image' || kind === 'video' ? kind : 'audio'
+  return 'other'
 }
 
 export interface BuildHistoryArgs {
@@ -281,6 +281,7 @@ export interface HistoryCounts {
   image: number
   video: number
   audio: number
+  other: number
   saved: number
   recent: number
   failed: number
@@ -289,7 +290,16 @@ export interface HistoryCounts {
 /** 顶部那排数字与左侧"快速筛选"的计数 —— 都是**对全量**算的（不受当前筛选影响） */
 export function countHistory(items: readonly HistoryItem[], now: number): HistoryCounts {
   const recentFrom = now - RECENT_DAYS * DAY_MS
-  const counts: HistoryCounts = { all: items.length, image: 0, video: 0, audio: 0, saved: 0, recent: 0, failed: 0 }
+  const counts: HistoryCounts = {
+    all: items.length,
+    image: 0,
+    video: 0,
+    audio: 0,
+    other: 0,
+    saved: 0,
+    recent: 0,
+    failed: 0,
+  }
   for (const item of items) {
     if (item.createdAt >= recentFrom) counts.recent += 1
     if (item.kind === 'failed') {
@@ -394,6 +404,7 @@ export function countAssetRecords(
     image: 0,
     video: 0,
     audio: 0,
+    other: 0,
     saved: savedHashes.size,
     recent: 0,
     failed: 0,

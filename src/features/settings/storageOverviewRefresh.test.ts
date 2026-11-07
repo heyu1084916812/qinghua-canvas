@@ -106,6 +106,7 @@ describe('storage overview refresh', () => {
       image: 2,
       video: 1,
       audio: 0,
+      other: 0,
       saved: 1,
     })
     expect(scan).toHaveBeenCalledWith(

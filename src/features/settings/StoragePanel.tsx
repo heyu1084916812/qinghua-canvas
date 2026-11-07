@@ -13,6 +13,10 @@ import {
   type StorageAssetCounts,
   type StorageUsage,
 } from './storageOverviewRefresh'
+import {
+  readStorageOverviewSnapshot,
+  rememberStorageOverviewUpdate,
+} from './storageOverviewCache'
 import styles from './StoragePanel.module.css'
 
 interface MediaCounts {
@@ -27,15 +31,16 @@ const EMPTY_MEDIA_COUNTS: MediaCounts = { images: 0, videos: 0, audio: 0, other:
 export function StoragePanel() {
   const platform = usePlatform()
   const admin = platform.storageAdmin
+  const cached = readStorageOverviewSnapshot(platform.storage)
 
-  const [projects, setProjects] = useState<number | null>(null)
-  const [assets, setAssets] = useState<StorageAssetCounts | null>(null)
-  const [usage, setUsage] = useState<StorageUsage | null>(null)
-  const [dataDir, setDataDir] = useState('')
-  const [rootInfo, setRootInfo] = useState<StorageRootInfo | null>(null)
+  const [projects, setProjects] = useState<number | null>(cached?.projects ?? null)
+  const [assets, setAssets] = useState<StorageAssetCounts | null>(cached?.assets ?? null)
+  const [usage, setUsage] = useState<StorageUsage | null>(cached?.usage ?? null)
+  const [dataDir, setDataDir] = useState(cached?.dataDir ?? '')
+  const [rootInfo, setRootInfo] = useState<StorageRootInfo | null>(cached?.rootInfo ?? null)
   const [pendingDataDir, setPendingDataDir] = useState('')
   const [switchingDir, setSwitchingDir] = useState(false)
-  const [cacheBytes, setCacheBytes] = useState<number | null>(null)
+  const [cacheBytes, setCacheBytes] = useState<number | null>(cached?.cacheBytes ?? null)
   const [busy, setBusy] = useState(false)
   const [status, setStatus] = useState('')
   const [migrationTarget, setMigrationTarget] = useState('')
@@ -51,6 +56,7 @@ export function StoragePanel() {
       { storage: platform.storage, admin },
       {
         onUpdate(update) {
+          rememberStorageOverviewUpdate(platform.storage, update)
           if (update.kind === 'usage') setUsage(update.usage)
           else if (update.kind === 'projects') setProjects(update.projects)
           else if (update.kind === 'assets') setAssets(update.assets)
@@ -190,7 +196,7 @@ export function StoragePanel() {
         images: assets.image,
         videos: assets.video,
         audio: assets.audio,
-        other: Math.max(0, assets.all - assets.image - assets.video - assets.audio),
+        other: assets.other,
       }
     : EMPTY_MEDIA_COUNTS
   const usagePercent = storageUsagePercent(usage)

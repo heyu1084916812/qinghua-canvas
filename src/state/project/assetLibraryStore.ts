@@ -191,7 +191,7 @@ export function createAssetLibraryStore(
     history: [],
     historyVisible: [],
     groups: [],
-    counts: { all: 0, image: 0, video: 0, audio: 0, saved: 0, recent: 0, failed: 0 },
+    counts: { all: 0, image: 0, video: 0, audio: 0, other: 0, saved: 0, recent: 0, failed: 0 },
     models: [],
     tags: [],
     loading: false,

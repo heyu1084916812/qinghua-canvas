@@ -14,7 +14,15 @@ import type { GenerationData } from '../../../domain/canvas/model/node'
 import { NODE_MINIMUMS } from '../../../domain/canvas/layout/constants'
 import { createId } from '../../../shared/id'
 import { createRunLogRepository } from '../../../state/shared/runLogRepository'
-import { canvasLogAppendPage, canvasLogFirstPage } from './canvasLogQuery'
+import {
+  runLogFastFirstPage,
+  runLogFastPage,
+} from '../../../state/shared/runLogFastPage'
+import {
+  readRunLogFastPageCache,
+  rememberRunLogFastPage,
+} from '../../../state/shared/runLogFastPageCache'
+import { canvasLogAppendPage } from './canvasLogQuery'
 import styles from './LogPanel.module.css'
 
 export { routeAttemptSummary }
@@ -37,6 +45,11 @@ export function isLogBackdropPointerDown(
 }
 
 const CANVAS_LOG_PAGE_SIZE = 60
+const RUN_RECORD_REFRESH_DELAY_MS = 50
+
+export function canvasLogRecordsOf(records: readonly RunRecord[]): RunRecord[] {
+  return records.filter(shouldShowInCanvasLog)
+}
 
 /**
  * 日志面板（产品文档 §6.18）：顶栏「日志」打开的浮层，按项目倒序列出 RunRecord。
@@ -53,63 +66,96 @@ export function LogPanel({ onClose }: { onClose: () => void }) {
     () => createRunLogRepository(platform.storage),
     [platform],
   )
+  const filter = useMemo(
+    () => ({ projectId, workbench: 'canvas' as const }),
+    [projectId],
+  )
+  const initialCache = readRunLogFastPageCache(
+    platform.storage,
+    filter,
+    CANVAS_LOG_PAGE_SIZE,
+  )
 
-  const [records, setRecords] = useState<RunRecord[]>([])
-  const [hasMore, setHasMore] = useState(false)
+  const [records, setRecords] = useState<RunRecord[]>(() =>
+    canvasLogRecordsOf(
+      (initialCache?.entries ?? []).map((entry) => entry.record as RunRecord),
+    ),
+  )
+  const [hasMore, setHasMore] = useState(initialCache?.hasMore ?? false)
   const [copiedId, setCopiedId] = useState<string | null>(null)
   const listRef = useRef<HTMLDivElement | null>(null)
-  const candidateOffsetRef = useRef(0)
+  const candidateOffsetRef = useRef(initialCache?.nextOffset ?? 0)
   const loadingMoreRef = useRef(false)
-
-  const loadCandidatePage = useCallback(async () => {
-    const page = await runLogs.queryFast({
-      projectId,
-      workbench: 'canvas',
-      offset: candidateOffsetRef.current,
-      limit: CANVAS_LOG_PAGE_SIZE + 1,
-    })
-    const consumed = page.entries.slice(0, CANVAS_LOG_PAGE_SIZE)
-    candidateOffsetRef.current += consumed.length
-    return {
-      records: page.entries
-        .slice(0, CANVAS_LOG_PAGE_SIZE)
-        .map((entry) => entry.record as RunRecord)
-        .filter(shouldShowInCanvasLog),
-      hasMore: page.hasMore || page.entries.length > CANVAS_LOG_PAGE_SIZE,
-    }
-  }, [projectId, runLogs])
+  const requestRevisionRef = useRef(0)
 
   const reload = useCallback(async () => {
-    candidateOffsetRef.current = 0
-    const candidates = await loadCandidatePage()
-    const page = canvasLogFirstPage(
-      candidates.records,
+    const revision = ++requestRevisionRef.current
+    const cached = readRunLogFastPageCache(
+      platform.storage,
+      filter,
       CANVAS_LOG_PAGE_SIZE,
-      candidates.hasMore,
-      candidateOffsetRef.current,
     )
-    setRecords(page.entries)
+    if (cached) {
+      candidateOffsetRef.current = cached.nextOffset
+      setRecords(
+        canvasLogRecordsOf(
+          cached.entries.map((entry) => entry.record as RunRecord),
+        ),
+      )
+      setHasMore(cached.hasMore)
+    }
+
+    const page = await runLogFastFirstPage(
+      (fastFilter) => runLogs.queryFast(fastFilter),
+      filter,
+      CANVAS_LOG_PAGE_SIZE,
+    )
+    rememberRunLogFastPage(
+      platform.storage,
+      filter,
+      CANVAS_LOG_PAGE_SIZE,
+      page,
+    )
+    if (revision !== requestRevisionRef.current) return
+
+    candidateOffsetRef.current = page.nextOffset
+    setRecords(
+      canvasLogRecordsOf(
+        page.entries.map((entry) => entry.record as RunRecord),
+      ),
+    )
     setHasMore(page.hasMore)
-  }, [loadCandidatePage])
+  }, [filter, platform.storage, runLogs])
 
   const loadMore = useCallback(async () => {
-    const candidates = await loadCandidatePage()
-    const page = canvasLogAppendPage(
-      records,
-      candidates.records,
-      candidates.hasMore,
+    const revision = requestRevisionRef.current
+    const page = await runLogFastPage(
+      (fastFilter) => runLogs.queryFast(fastFilter),
+      filter,
       candidateOffsetRef.current,
+      CANVAS_LOG_PAGE_SIZE,
     )
-    setRecords(page.entries)
-    setHasMore(page.hasMore)
-  }, [loadCandidatePage, records])
+    if (revision !== requestRevisionRef.current) return
+
+    candidateOffsetRef.current = page.nextOffset
+    const appended = canvasLogAppendPage(
+      records,
+      canvasLogRecordsOf(
+        page.entries.map((entry) => entry.record as RunRecord),
+      ),
+      page.hasMore,
+      page.nextOffset,
+    )
+    setRecords(appended.entries)
+    setHasMore(appended.hasMore)
+  }, [filter, records, runLogs])
 
   const loadMoreIfVisible = useCallback(async () => {
     if (!hasMore) return
     if (loadingMoreRef.current) return
     loadingMoreRef.current = true
     try {
-    await loadMore()
+      await loadMore()
     } finally {
       loadingMoreRef.current = false
     }
@@ -119,8 +165,21 @@ export function LogPanel({ onClose }: { onClose: () => void }) {
     void reload()
   }, [reload])
 
-  /** 运行记录写入不改变图快照；这里单独订阅写入信号，失败也要在面板里立刻出现。 */
-  useEffect(() => subscribeRunRecordChanged(() => void reload()), [reload])
+  /** 批量写入常连续发多个事件，合并成一次短延迟刷新。 */
+  useEffect(() => {
+    let timer: number | undefined
+    const unsubscribe = subscribeRunRecordChanged(() => {
+      if (timer !== undefined) window.clearTimeout(timer)
+      timer = window.setTimeout(() => {
+        timer = undefined
+        void reload()
+      }, RUN_RECORD_REFRESH_DELAY_MS)
+    })
+    return () => {
+      unsubscribe()
+      if (timer !== undefined) window.clearTimeout(timer)
+    }
+  }, [reload])
 
   useEffect(() => {
     if (!hasMore) return
@@ -154,17 +213,6 @@ export function LogPanel({ onClose }: { onClose: () => void }) {
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [onClose])
-
-  // 面板打开期间图有变更（新生成写回）时刷新列表
-  useEffect(() => {
-    let last = store.getSnapshot()
-    return store.subscribe(() => {
-      const g = store.getSnapshot()
-      if (g === last) return
-      last = g
-      void reload()
-    })
-  }, [store, reload])
 
   const copy = async (id: string, text: string) => {
     if (!text) return
