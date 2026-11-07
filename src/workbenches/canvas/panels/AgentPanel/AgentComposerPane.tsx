@@ -619,7 +619,7 @@ export function AgentComposerPane({
               name="agent-autorun"
               ariaLabel={
                 current?.autoRun
-                  ? '自动生成：不再逐步询问'
+                  ? '自动生成：计划需你确认，之后自动执行'
                   : '手动生成：每次生成前问你一句'
               }
               label=""
@@ -636,7 +636,7 @@ export function AgentComposerPane({
                 {
                   value: 'auto',
                   label: '自动生成',
-                  hint: '自动确认计划并直接消耗积分',
+                  hint: '计划需你确认，之后自动执行并扣费',
                   icon: <IconAuto size={16} />,
                 },
               ]}

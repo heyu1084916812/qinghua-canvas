@@ -28934,6 +28934,17 @@ async function g118(browser) {
       !aboutText.includes('网页版是浏览器的数据库（IndexedDB）'),
     `段数=${aboutBlocks}`,
   )
+  rec(
+    g,
+    '★★ 关于面板只声明真实随包的 FFmpeg 许可，其余依赖许可指向依赖包',
+    aboutText.includes('当前安装包单独附带 FFmpeg') &&
+      aboutText.includes('其他第三方许可仍以各自依赖包中的 LICENSE 为准') &&
+      aboutText.includes('Dexie 仅用于读取旧浏览器库迁移'),
+    aboutText.slice(aboutText.indexOf('第三方组件与开源许可'), aboutText.indexOf('隐私声明')),
+  )
+  await page.screenshot({
+    path: `${OUT}/118-about-license-${process.env.SMOKE_DARK === '1' ? 'dark' : 'light'}-${process.env.SMOKE_VIEWPORT === '1024' ? '1024' : '1440'}.png`,
+  })
 
   /**
    * ⑥ 空画布：模板直达。
@@ -43482,9 +43493,21 @@ async function g800(browser) {
       timeout: 10000,
     })
     await page.locator('[data-param-chip="agent-autorun"]').click()
-    await page
+    const autoOption = page
       .locator('[data-param-popup="agent-autorun"] button', { hasText: '自动生成' })
-      .click()
+    const autoHint = await autoOption.innerText()
+    await page.screenshot({
+      path: `${OUT}/800-agent-auto-menu-before-${variant}.png`,
+    })
+    rec(
+      g,
+      '自动生成菜单明确计划仍需用户确认',
+      autoHint.includes('计划需你确认') &&
+        autoHint.includes('自动执行') &&
+        autoHint.includes('扣费'),
+      autoHint,
+    )
+    await autoOption.click()
     await page.waitForTimeout(500)
 
     const row = await sharedRow(page, 'agentSessions', sessionId)

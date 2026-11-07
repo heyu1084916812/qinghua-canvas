@@ -117,6 +117,13 @@ describe('AgentComposerPane', () => {
 
     expect(html).toContain('data-agent-delivery-mode="queue"')
     expect(html).toContain('回读 20 条')
-    expect(html).toContain('自动生成：不再逐步询问')
+    expect(html).toContain('自动生成：计划需你确认，之后自动执行')
+
+    const expanded = renderComposer({
+      current: { ...session, autoRun: true },
+      openPicker: 'agent-autorun',
+    })
+    expect(expanded).toContain('计划需你确认，之后自动执行并扣费')
+    expect(expanded).not.toContain('自动确认计划并直接消耗积分')
   })
 })

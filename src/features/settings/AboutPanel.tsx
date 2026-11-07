@@ -32,7 +32,7 @@ const BLOCKS: { title: string; body: string }[] = [
   },
   {
     title: '第三方组件与开源许可',
-    body: '运行时主要依赖：React / React DOM / React Router / React Flow(xyflow) / zustand 为 MIT，Dexie 为 Apache-2.0；桌面壳 Tauri 为 MIT 或 Apache-2.0。完整许可条文在各自依赖包的 LICENSE 文件里，随包分发。',
+    body: '运行时主要依赖：React / React DOM / React Router / React Flow(xyflow) / zustand 为 MIT，桌面壳 Tauri 为 MIT 或 Apache-2.0。Dexie 仅用于读取旧浏览器库迁移。当前安装包单独附带 FFmpeg 的 LICENSE / NOTICE；其他第三方许可仍以各自依赖包中的 LICENSE 为准。',
   },
 ]
 
