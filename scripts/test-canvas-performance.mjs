@@ -709,6 +709,8 @@ async function main() {
     // separately so round one measures steady-state zoom, not the phase switch.
     await zoomRound(page)
     await page.waitForTimeout(250)
+    await zoomRound(page)
+    await page.waitForTimeout(250)
     for (let round = 0; round < 3; round += 1) {
       const before = await viewportState(page)
       const intervals = await zoomRound(page)

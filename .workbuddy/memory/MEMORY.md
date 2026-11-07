@@ -10,7 +10,7 @@
   `FlowViewportController` 与 HUD 的 store 视口字段也直接订阅；不要为测试字段保留整层每帧 React 渲染。
 - `useCanvasDetailMode` 的 220ms 必须是“缩放停止窗口”：每次 zoom 变化都重置，平移不重置，到点只 `setMode` 一次。
   原实现从首次跨阈值起算，会在持续缩放手势中整批替换 300 个节点，出现 20.6–27.6ms 单帧尖峰。
-- 性能脚本测量缩放前必须单独预热一次缩放手势。平移测量会把 store 留在 780×270 等终点，直接进入缩放会把
+- 性能脚本测量缩放前必须单独预热两次缩放手势。平移测量会把 store 留在 780×270 等终点，直接进入缩放会把
   “780×270 回零点”的阶段切换算进首轮；预热后三组均为 14ms。报告要记录每轮前后 full/coarse 数与视口。
 - 证据：
   `.playwright-verify/canvas-perf-release-2026-11-07T21-14-32-880/report.json`、
@@ -18,6 +18,10 @@
   `.playwright-verify/canvas-perf-release-2026-11-07T21-16-17-864/report.json`。
 - 最终门禁：`npm run check`（1084 modules / 4334 dependencies、228 semantic registrations）、串行全量
   Vitest 636 files / 5384 passed / 1 skipped；`smoke:critical` 4 组 97 项全绿。
+- 最终安装包从 `176cc59` 重建，44,048,388 B，SHA-256
+  `5CE564D24D3E78CC06F92A9AB39DFE366B4C468FB649A1237707CFDF1F334A28`，release 壳 12/12。
+  最终包另有两份通过、两份 20.2–20.8ms 边界失败；本机长期运行的项目 Vite / debug WebView 与其他应用
+  争用明显，失败报告保留，干净机器性能仍是外部验收边界。
 
 ### 总管2 第二十一轮：存储首屏、CLI 窗口链、Canvas 分包与关键冒烟（2026-11-08）
 
