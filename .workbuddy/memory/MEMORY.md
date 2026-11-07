@@ -12289,3 +12289,12 @@ React 端口 → `invoke` → Rust `check_update` → updater 插件读配置 �
 - 生产探针证明修 N+1 后全局日志阶段共享库请求 116 → 15、projects 28 次逐条 query → 1 次 queryPage + 1 次启动 query，首行 436 → 170ms。专项测试 15/15，治理登记 217 条。
 - 剩余 #966 是可维护债，不再是用户可见慢：生产存储首屏仍有 64 次请求，集中 nodes / assets / channels / presets 的启动 hydrate；后续按 Store 懒加载或合并初始化请求处理，不能塞回面板组件。
 - 外部账号、真实 harness、LICENSE / 发布授权、干净机器安装、跨平台 / Authenticode、3D 与未确认 push 仍需用户决策，不把本机性能达标冒充整个发布目标完成。
+### 总管2 第九轮：接管复核、严格 HEAD 证据与最终门禁（2026-11-07）
+
+- 总管1 线程因 429 / 工具记录损坏失联后，项目状态只认文件。失联子对话和 429 功能复核不能算完成；换模型接替的 `glm-5.3-flash` 生产探针与 `hy4-preview` 功能只读复核均已返回，失败句柄关闭。
+- 生产首屏证据必须由当前 HEAD 运行并写入 result.json：本轮 `9042c7b9837822cf13b3831f0bb018fdb5c77323` 实测 1061 / 225 / 367ms、68 / 15 / 24 请求、错误与溢出 0；旧 result 里的 `4c4c75e` 是提交前 HEAD，不能作为最终审计证据。
+- 当前 HEAD 全量门禁：npm run check（1073 modules / 4313 dependencies / 217 semantic registrations / MCP stdio / theme / contrast / geometry / docs / versions）、新增探针契约测试、npm test（618 files / 5309 passed / 1 skipped）、npm run build、shared-store Rust 46、Tauri Rust 63、官方 MCP Inspector 全通过；CanvasPage 约 603KB warning 保留。
+- 全仓生产 TS/TSX/CSS 超 1000 行文件为 0；模块治理同时覆盖新增未登记、删除/改名台账、挪目录、行数回涨和真实导出/测试路径。工作台是编译期静态登记，不是运行时插件市场。
+- Agent「回读 N 条」是 20 条消息窗口，不是 N 轮或全量对话。长任务中断后画布节点不是聊天历史；修复是首条需求锚点、成对工具结果裁剪和 sessionBrief 检查点。界面只展示公开 content / reasoning 与工具步骤，模型正文里的英文内部句要靠上游提示词约束。
+- 两张当前附图的 modlens 视觉服务因地区限制 / 超时失败，改用本地图像查看与像素取样；模型服务截图里的黄框是 #FFF200 截图标注，源码无黄色高亮令牌，不能误判为 UI 改动。
+- 图一 / 图二外部事项仍未完成：53 个本地 commit 未 push，LICENSE / 发布授权、干净机器安装、真实渠道、跨平台 / Authenticode、3D、tag / Release、真实 Pinterest App 与已登录 harness 对真实 Tauri 画布联调都需用户决策或外部登录态。不得自动 push 或发布。
