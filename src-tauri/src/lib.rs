@@ -2409,6 +2409,7 @@ struct CliOutcome {
 const CLI_MAX_OUTPUT: usize = 200 * 1024;
 const CLI_DEFAULT_TIMEOUT_MS: u64 = 120_000;
 const CLI_MAX_TIMEOUT_MS: u64 = 30 * 60 * 1000;
+const CLI_MEDIA_IMPORT_TIMEOUT_MS: u64 = 120_000;
 
 /// 超时夹在 [1s, 30min]：`Some(0)` 会让它在下一轮轮询就被杀，比不填更糟。
 fn clamp_timeout(ms: Option<u64>) -> u64 {
@@ -3299,7 +3300,15 @@ async fn cli_import_asset(
     }
     let port = app.state::<SharedStoreRuntime>().port;
     let url = format!("http://127.0.0.1:{port}/asset/{hash}");
-    let response = reqwest::get(&url)
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_millis(
+            CLI_MEDIA_IMPORT_TIMEOUT_MS,
+        ))
+        .build()
+        .map_err(|err| format!("创建本机素材读取客户端失败：{err}"))?;
+    let response = client
+        .get(&url)
+        .send()
         .await
         .map_err(|err| format!("从共享素材库读取 {hash} 失败：{err}"))?;
     let status = response.status();

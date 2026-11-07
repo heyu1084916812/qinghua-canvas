@@ -7,13 +7,16 @@
  * by method + path + table so hydrate storms are visible in production.
  */
 import { spawn, spawnSync } from 'node:child_process'
-import { existsSync, mkdirSync, rmSync, writeFileSync, createWriteStream } from 'node:fs'
+import { createHash } from 'node:crypto'
+import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync, createWriteStream } from 'node:fs'
 import path from 'node:path'
 import process from 'node:process'
 import { chromium } from 'playwright'
 
 const root = process.cwd()
-const outDir = path.join(root, '.playwright-verify', 'storage-log-first-paint-production')
+const outputRoot = path.join(root, '.playwright-verify', 'storage-log-first-paint-production')
+const runStamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 23)
+const outDir = path.join(outputRoot, runStamp)
 const dataDir = path.join(outDir, 'shared-store-v1')
 const storeExe = path.join(root, 'shared-store', 'target', 'debug', 'qinghua-store.exe')
 const distDir = path.join(root, 'dist')
@@ -39,8 +42,33 @@ if (!existsSync(storeExe)) {
   throw new Error('shared-store debug binary not found; build shared-store first')
 }
 
-rmSync(outDir, { recursive: true, force: true })
 mkdirSync(dataDir, { recursive: true })
+
+function hashDist(dir) {
+  const hash = createHash('sha256')
+  let files = 0
+  const walk = (current, relative = '') => {
+    for (const entry of readdirSync(current, { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name))) {
+      const nextRelative = relative ? `${relative}/${entry.name}` : entry.name
+      const next = path.join(current, entry.name)
+      if (entry.isDirectory()) {
+        walk(next, nextRelative)
+      } else if (entry.isFile()) {
+        files += 1
+        hash.update(nextRelative)
+        hash.update('\0')
+        hash.update(readFileSync(next))
+        hash.update('\0')
+      }
+    }
+  }
+  walk(dir)
+  return { sha256: hash.digest('hex'), files }
+}
+
+const distFingerprint = hashDist(distDir)
+const gitHead = spawnSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).stdout.trim()
+const gitStatus = spawnSync('git', ['status', '--porcelain=v1'], { cwd: root, encoding: 'utf8' }).stdout.trim()
 
 const PROJECT_COUNT = 334
 const ASSET_COUNT = 1400
@@ -356,7 +384,16 @@ try {
 
   const summary = {
     generatedAt: new Date().toISOString(),
-    gitHead: spawnSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).stdout.trim(),
+    gitHead,
+    sourceTree: {
+      clean: gitStatus === '',
+      status: gitStatus ? gitStatus.split(/\r?\n/) : [],
+    },
+    build: {
+      command: 'npm run build',
+      distSha256: distFingerprint.sha256,
+      distFiles: distFingerprint.files,
+    },
     mode: 'production',
     base,
     storeBase,
@@ -367,7 +404,9 @@ try {
     geometry,
     errors,
   }
-  writeFileSync(path.join(outDir, 'result.json'), JSON.stringify(summary, null, 2))
+  const serialized = JSON.stringify(summary, null, 2)
+  writeFileSync(path.join(outDir, 'result.json'), serialized)
+  writeFileSync(path.join(outputRoot, 'result.json'), serialized)
   console.log(JSON.stringify(summary, null, 2))
   if (errors.length > 0) process.exitCode = 1
 } finally {

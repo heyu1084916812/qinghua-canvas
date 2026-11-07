@@ -23,6 +23,7 @@ const GROUP_TIMEOUT_MS = Number(process.env.SMOKE_MATRIX_GROUP_TIMEOUT_MS ?? 300
 
 /** 桌面 / 正常版 / release gate / MCP 已占用的端口，矩阵一律绕开。 */
 export const RESERVED_PORTS = new Set([1420, 18765, 18766, 18791])
+export const CRITICAL_SMOKE_GROUPS = ['g8', 'g44', 'g45', 'g74']
 const MATRIX_BASE_PORT = Number(process.env.SMOKE_MATRIX_BASE_PORT ?? 18800)
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
@@ -72,6 +73,19 @@ export function healthOk(body, expectedDir) {
     body?.backend === 'json-v1' &&
     path.resolve(String(body.dataDir ?? '')) === path.resolve(expectedDir)
   )
+}
+
+export function parseSmokeSummary(logText) {
+  const match = logText.match(
+    /=====\s*(\d+)\s+passed\s*\/\s*(\d+)\s+failed\s*\/\s*(\d+)\s+total(?:\s*\/\s*(\d+)\s+external skipped)?\s*=====/,
+  )
+  if (!match) return { passed: null, failed: null, total: null, externalSkipped: null }
+  return {
+    passed: Number(match[1]),
+    failed: Number(match[2]),
+    total: Number(match[3]),
+    externalSkipped: match[4] === undefined ? 0 : Number(match[4]),
+  }
 }
 
 function killTree(child) {
@@ -217,15 +231,16 @@ async function main() {
   const released = await portReleased(plan.port)
 
   const logText = readFileSync(smokeLog, 'utf8')
-  const summary = logText.match(/=====\s*(\d+)\s+passed\s*\/\s*(\d+)\s+failed\s*\/\s*(\d+)\s+total\s*=====/)
+  const summary = parseSmokeSummary(logText)
   const result = {
     group,
     ok: code === 0 && !timedOut,
     code,
     timedOut,
-    passed: summary ? Number(summary[1]) : null,
-    failed: summary ? Number(summary[2]) : null,
-    total: summary ? Number(summary[3]) : null,
+    passed: summary.passed,
+    failed: summary.failed,
+    total: summary.total,
+    externalSkipped: summary.externalSkipped,
     elapsedMs: Date.now() - startedAt,
     log: smokeLog,
     storeDir: plan.dataDir,

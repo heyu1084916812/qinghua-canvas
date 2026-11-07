@@ -164,8 +164,14 @@ export function CliPanel() {
   }
 
   /** 跑一条命令并把输出原样写进指定槽位（测试运行 / 查状态 共用） */
-  const runInto = async (tool: CliTool, slot: 'run' | 'status', args: string[], stdin?: string) => {
-    if (!cli || busyRef.current) return
+  const runInto = async (
+    tool: CliTool,
+    slot: 'run' | 'status',
+    args: string[],
+    stdin?: string,
+    options?: { allowBusy?: boolean },
+  ) => {
+    if (!cli || (busyRef.current && !options?.allowBusy)) return
     const id = createId(`cli-${slot}-${tool.id}`)
     const head = `$ ${tool.program} ${args.join(' ')}`
     const write = (text: string) => {
@@ -238,44 +244,42 @@ export function CliPanel() {
       ...prev,
       [tool.id]: `已经打开登录窗口「${[tool.program, ...args].join(' ')}」；窗口关闭后会自动继续，不需要再点。`,
     }))
-    watchWindow(tool, 'login', handle)
+    await watchWindow(tool, 'login', handle)
   }
 
-  function watchWindow(tool: CliTool, flow: CliWindowFlow, handle: CliWindowHandle) {
-    void handle
-      .wait()
-      .then(async (exitCode) => {
-        const port = cli
-        if (!port) return
-        let found: boolean | null = null
-        if (flow !== 'login') {
-          const path = await port.which(tool.program)
-          found = path !== null
-          setProbes((prev) => ({
-            ...prev,
-            [tool.id]: found
-              ? { kind: 'found', detail: `已找到：${path}` }
-              : { kind: 'missing', detail: `未找到命令「${tool.program}」` },
-          }))
-        }
-        const followUp = cliWindowFollowUp(flow, tool, found, exitCode)
-        setLoginMsg((prev) => ({ ...prev, [tool.id]: followUp.message }))
-        if (followUp.action === 'login') {
-          if (tool.keyLoginKind === 'config' || tool.keyLoginKind === 'stdin') {
-            guideKeyLogin(tool, '安装完成后')
-          } else {
-            await spawnLoginWindow(tool)
-          }
-        } else if (followUp.action === 'status' && followUp.statusArgs) {
-          await runInto(tool, 'status', followUp.statusArgs)
-        }
-      })
-      .catch((err) => {
-        setLoginMsg((prev) => ({
+  async function watchWindow(tool: CliTool, flow: CliWindowFlow, handle: CliWindowHandle) {
+    try {
+      const exitCode = await handle.wait()
+      const port = cli
+      if (!port) return
+      let found: boolean | null = null
+      if (flow !== 'login') {
+        const path = await port.which(tool.program)
+        found = path !== null
+        setProbes((prev) => ({
           ...prev,
-          [tool.id]: `等待窗口结束失败：${String(err)}`,
+          [tool.id]: found
+            ? { kind: 'found', detail: `已找到：${path}` }
+            : { kind: 'missing', detail: `未找到命令「${tool.program}」` },
         }))
-      })
+      }
+      const followUp = cliWindowFollowUp(flow, tool, found, exitCode)
+      setLoginMsg((prev) => ({ ...prev, [tool.id]: followUp.message }))
+      if (followUp.action === 'login') {
+        if (tool.keyLoginKind === 'config' || tool.keyLoginKind === 'stdin') {
+          guideKeyLogin(tool, '安装完成后')
+        } else {
+          await spawnLoginWindow(tool)
+        }
+      } else if (followUp.action === 'status' && followUp.statusArgs) {
+        await runInto(tool, 'status', followUp.statusArgs, undefined, { allowBusy: true })
+      }
+    } catch (err) {
+      setLoginMsg((prev) => ({
+        ...prev,
+        [tool.id]: `等待窗口结束失败：${String(err)}`,
+      }))
+    }
   }
 
   /** 一键登录：把它自己的登录命令丢进一个可见窗口，用户在那边完成 */
@@ -316,7 +320,7 @@ export function CliPanel() {
         }
         const handle = await cli.spawnWindow(cliWindowRequest(tool, cmd[0], cmd.slice(1)))
         say(`已经打开安装窗口跑「${tool.installCommand}」；窗口关闭后会自动重新检测并继续，不需要再点。`)
-        watchWindow(tool, 'install', handle)
+        await watchWindow(tool, 'install', handle)
         return
       }
       if (tool.keyLoginKind === 'config' || tool.keyLoginKind === 'stdin') {
@@ -326,26 +330,6 @@ export function CliPanel() {
       await spawnLoginWindow(tool)
     } catch (err) {
       say(`一键设置没走通：${String(err)}`)
-    } finally {
-      updateBusy('')
-    }
-  }
-
-  /** 只装：窗口结束后自动重新检测，不再要求用户回来点。 */
-  const installOnly = async (tool: CliTool) => {
-    if (!cli || busyRef.current) return
-    const cmd = parseArgs(tool.installCommand.trim())
-    if (cmd.length === 0) return
-    updateBusy(`${tool.id}:install`)
-    try {
-      const handle = await cli.spawnWindow(cliWindowRequest(tool, cmd[0], cmd.slice(1)))
-      setLoginMsg((prev) => ({
-        ...prev,
-        [tool.id]: `已经打开安装窗口跑「${tool.installCommand}」；窗口关闭后会自动重新检测。`,
-      }))
-      watchWindow(tool, 'installOnly', handle)
-    } catch (err) {
-      setLoginMsg((prev) => ({ ...prev, [tool.id]: `打不开安装窗口：${String(err)}` }))
     } finally {
       updateBusy('')
     }
@@ -378,6 +362,7 @@ export function CliPanel() {
           ...prev,
           [tool.id]: completion.message,
         }))
+        setMoreOpen((prev) => ({ ...prev, [tool.id]: false }))
       } catch (err) {
         setLoginMsg((prev) => ({ ...prev, [tool.id]: `写配置失败：${String(err)}` }))
       } finally {
@@ -549,19 +534,6 @@ export function CliPanel() {
                   重新检测
                 </button>
               </div>
-              {tool.installCommand.trim() !== '' && (
-                <div className={styles.row}>
-                  <button
-                    type="button"
-                    className={styles.btn}
-                    data-cli-install={tool.id}
-                    disabled={!hasLocalCli || busy !== ''}
-                    onClick={() => void installOnly(tool)}
-                  >
-                    一键安装（打开窗口）
-                  </button>
-                </div>
-              )}
               <p className={styles.loginHint} data-cli-login-hint={tool.id}>
                 {tool.loginHint}
               </p>

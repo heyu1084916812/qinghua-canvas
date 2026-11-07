@@ -7,6 +7,7 @@ import {
   countStorageAssets,
   type StorageAssetCounts,
 } from './storageOverviewAssetCount'
+import { countStorageProjects } from './storageOverviewProjectCount'
 import { readStorageCount } from './storageOverviewReadDedup'
 
 export interface StorageUsage {
@@ -55,6 +56,7 @@ export function startStorageOverviewRefresh(
 ): StorageOverviewRefresh {
   let active = true
   const quick: Promise<void>[] = []
+  const earlyProjects: Promise<void>[] = []
 
   const reportError = (area: StorageOverviewArea, error: unknown) => {
     if (active) handlers.onError?.(area, error)
@@ -108,13 +110,28 @@ export function startStorageOverviewRefresh(
     })
   }
 
+  // `queryPage` 的 total 是一次元数据查询，不应等桌面目录 / 缓存检查结束；
+  // 旧后端的 scan 仍留到快速项之后，避免全表扫描占住串行存储锁。
+  if (source.storage.queryPage) {
+    start(
+      earlyProjects,
+      'projects',
+      () => readStorageCount(source.storage, 'projects', () => countStorageProjects(source.storage)),
+      (projects) => {
+        handlers.onUpdate({ kind: 'projects', projects })
+      },
+    )
+  }
+
   return {
-    done: Promise.all(quick).then(async () => {
+    done: Promise.all([...quick, ...earlyProjects]).then(async () => {
       if (!active) return
       const heavy: Promise<void>[] = []
-      start(heavy, 'projects', () => readStorageCount(source.storage, 'projects', () => countStorageProjects(source.storage)), (projects) => {
-        handlers.onUpdate({ kind: 'projects', projects })
-      })
+      if (!source.storage.queryPage) {
+        start(heavy, 'projects', () => readStorageCount(source.storage, 'projects', () => countStorageProjects(source.storage)), (projects) => {
+          handlers.onUpdate({ kind: 'projects', projects })
+        })
+      }
       start(heavy, 'assets', () => readStorageCount(source.storage, 'assets', () => countStorageAssets(source.storage)), (assets) => {
         handlers.onUpdate({ kind: 'assets', assets })
       })
@@ -124,23 +141,4 @@ export function startStorageOverviewRefresh(
       active = false
     },
   }
-}
-
-export async function countStorageProjects(storage: StoragePort): Promise<number> {
-  const scan = storage.scan?.bind(storage)
-  if (!scan) {
-    return (await storage.query('projects', {}, { includePayload: false })).filter(
-      (row) => !row.deletedAt,
-    ).length
-  }
-  let total = 0
-  await scan(
-    'projects',
-    50,
-    async (rows) => {
-      total += rows.filter((row) => !row.deletedAt).length
-    },
-    { includePayload: false },
-  )
-  return total
 }

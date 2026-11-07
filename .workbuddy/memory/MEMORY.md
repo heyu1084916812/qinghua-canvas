@@ -1,5 +1,18 @@
 # CanvasFlow（轻画）项目记忆
 
+### 总管2 第二十一轮：存储首屏、CLI 窗口链、Canvas 分包与关键冒烟（2026-11-08）
+
+- 存储项目数必须先走 `queryPage` 的 total，并用 `missingFields:['deletedAt']` 排除回收站；旧后端才 scan 兜底。
+  分页项目数可和 usage 并行，素材重统计仍等快速项结束。release 探针实测快速 653ms、完整 1061ms。
+- CLI 的安装、登录、重检、状态查询必须由同一个 await 链持有 busy；成功后收起高级区，重复“一键安装”入口删除。
+  `React.lazy` AgentHost 后，Agent 仍常驻，但首载拆为 284KB 独立块。
+- CanvasPage 604→272KB，灯箱/文本/日志/AgentHost 都用真实 lazy 边界；manual chunk 会把传递依赖聚成 1.27MB，
+  已否决。所有 JS chunk 已低于 500KB。
+- `smoke:critical` 固定 4 组，最新 16/26/12/43 全绿；解析器必须处理 external skipped，不能把计数丢成 null。
+- 真实图片性能在清理本机调试进程竞争后有一次 14ms 级通过，但紧接复跑缩放仍 20.9–21.0ms；`contain:layout style`
+  恶化到 27.9ms，已撤回。#971 仍稳定未达标。
+- 最终代码门禁：1084 modules / 4334 dependencies、228 semantic registrations、636 files / 5382 tests（1 skipped）。
+
 ### 总管2 第二十轮：真实图片诊断扩展、当前 HEAD 包与性能稳定性（2026-11-08）
 
 - 用户要求性能任务必须用真实图片。正式门禁固定 150 张唯一 PNG/WebP、300 节点 / 500 连线、P95 ≤20ms；

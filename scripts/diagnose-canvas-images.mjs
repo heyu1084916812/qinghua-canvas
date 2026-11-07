@@ -120,6 +120,7 @@ async function measureWithTransformProbe(page) {
     ['will change plus layout style contain', '.react-flow__node { will-change: transform !important; contain: layout style !important; }'],
     ['will change plus backface hidden', '.react-flow__node { will-change: transform !important; backface-visibility: hidden !important; }'],
     ['node content visibility auto', '.react-flow__node { content-visibility: auto !important; contain-intrinsic-size: 240px 160px !important; }'],
+    ['content visibility plus layout style contain', '.react-flow__node { content-visibility: auto !important; contain-intrinsic-size: auto 240px 160px !important; contain: layout style !important; }'],
     ['content visibility plus will change', '.react-flow__node { content-visibility: auto !important; contain-intrinsic-size: 240px 160px !important; will-change: transform !important; }'],
   ]
   const rounds = []

@@ -1061,3 +1061,13 @@
 - `diagnose-canvas-images.mjs` 的隔离项必须覆盖背景、端口层、小地图、HUD 和画布浮层，并继续每轮 reload、只保留一条 style。诊断结果只能用于定位，不能替代 `npm run perf:canvas:production`。
 - 当前 HEAD 的真实图片诊断中，基线缩放约 14.1ms；单独隐藏背景 / 端口层 / 小地图 / HUD / 浮层仍为 14.0–14.2ms，隐藏整个节点层约 13.9ms，`will-change` 反而不稳定。不能把这些隔离结果包装成正式达标，也不要重新引入强制分层候选。
 - 当前 release 已生成 0.1.17 NSIS 包并通过 12/12 release 壳；安装器门禁在本机已有正式版时必须拒绝写注册表。干净机器安装、Authenticode、push、tag / Release 仍需外部条件或用户明确授权。
+
+## 存储计数、CLI 窗口链与 Canvas 首载边界（2026-11-08 第二十一轮）
+
+- 项目计数归 `storageOverviewProjectCount.ts`：生产优先 `queryPage` + `missingFields=['deletedAt']` + `limit=1` 取 total；旧后端才 scan/query。该逻辑必须排除回收站，不能为了快把已删除项目算进去。
+- `storageOverviewRefresh.ts` 可让 usage 与分页项目数并行，但素材全量重统计仍必须在快速项之后；任何慢目录/缓存读取不得阻塞项目数发布。
+- CLI 窗口流程必须由一个 await 链持有 busy 直到窗口关闭和后续动作完成；内部 status 续跑只能通过 `allowBusy` 受控重入。成功后自动收起高级区，且不得恢复重复的一键安装入口。
+- CanvasPage 的灯箱、文本编辑器、日志和 AgentHost 必须保持真实 `React.lazy`/Suspense 边界；禁止用 manual chunks 把传递依赖聚成更大的块。当前所有 JS chunk 必须低于 500KB。
+- `smoke:critical` 必须一次跑 G8/G44/G45/G74，并解析带或不带 `external skipped` 的摘要；计数为 null 或漏组都不能算通过。
+- 真实图片性能只能按正式 `perf:canvas:production` 的 150 图 / 300 节点 / 500 连线 / P95≤20ms 判定。调试进程降优先级只可减少测量干扰，不能改阈值；当前仍不稳定。
+- 桌面存储/日志验收必须走隔离 release/WebView2 且记录完整字段、资源目录、缓存、两类日志首行、release hash、错误与溢出；Chrome preview 不能替代桌面 storageAdmin 路径。

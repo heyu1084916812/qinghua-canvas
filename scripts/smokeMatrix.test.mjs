@@ -1,7 +1,18 @@
 import { describe, expect, it } from 'vitest'
-import { groupPlan, groupPort, healthOk, RESERVED_PORTS } from './smoke-matrix.mjs'
+import {
+  CRITICAL_SMOKE_GROUPS,
+  groupPlan,
+  groupPort,
+  healthOk,
+  parseSmokeSummary,
+  RESERVED_PORTS,
+} from './smoke-matrix.mjs'
 
 describe('smoke-matrix isolation plan', () => {
+  it('keeps one deterministic critical gate for the settings-sensitive groups', () => {
+    expect(CRITICAL_SMOKE_GROUPS).toEqual(['g8', 'g44', 'g45', 'g74'])
+  })
+
   it('gives each group an explicit isolated store port, data dir, and proxy env', () => {
     const plan0 = groupPlan(0, 'E:/tmp/run', 18800, 'g8')
     const plan1 = groupPlan(1, 'E:/tmp/run', 18800, 'g44')
@@ -63,5 +74,28 @@ describe('smoke-matrix isolation plan', () => {
     )).toBe(false)
     expect(healthOk({ ok: true, version: 4, backend: 'json-v1', dataDir: plan.dataDir }, plan.dataDir)).toBe(false)
     expect(healthOk({ ok: false, version: 8, backend: 'json-v1', dataDir: plan.dataDir }, plan.dataDir)).toBe(false)
+  })
+
+  it('parses current smoke summaries with and without external skips', () => {
+    expect(parseSmokeSummary('===== 16 passed / 0 failed / 16 total =====')).toEqual({
+      passed: 16,
+      failed: 0,
+      total: 16,
+      externalSkipped: 0,
+    })
+    expect(
+      parseSmokeSummary('===== 31 passed / 0 failed / 31 total / 1 external skipped ====='),
+    ).toEqual({
+      passed: 31,
+      failed: 0,
+      total: 31,
+      externalSkipped: 1,
+    })
+    expect(parseSmokeSummary('no summary')).toEqual({
+      passed: null,
+      failed: null,
+      total: null,
+      externalSkipped: null,
+    })
   })
 })

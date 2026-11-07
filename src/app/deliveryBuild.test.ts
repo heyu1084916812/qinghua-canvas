@@ -6,6 +6,7 @@ import canvasMcpBlock from '../features/settings/CanvasMcpConfigBlock.tsx?raw'
 import canvasMcpConfig from '../features/settings/canvasMcpConfig.ts?raw'
 import viteConfig from '../../vite.config.ts?raw'
 import ciWorkflow from '../../.github/workflows/ci.yml?raw'
+import canvasPage from '../pages/CanvasPage/CanvasPage.tsx?raw'
 
 describe('delivery build boundaries', () => {
   it('loads HostingPage dynamically from both its route and the settings overlay', () => {
@@ -19,10 +20,29 @@ describe('delivery build boundaries', () => {
   })
 
   it('keeps explicit stable chunk boundaries', () => {
-    for (const name of ['react-vendor', 'xyflow', 'channel-adapters']) {
+    for (const name of [
+      'react-vendor',
+      'xyflow',
+      'channel-adapters',
+    ]) {
       expect(viteConfig).toContain(`name: '${name}'`)
     }
     expect(viteConfig).toContain('codeSplitting:')
+  })
+
+  it('defers canvas overlays and the agent host behind real lazy boundaries', () => {
+    for (const modulePath of [
+      '../../workbenches/canvas/lightbox/LightboxLayer',
+      '../../workbenches/canvas/text/TextEditorLayer',
+      '../../workbenches/canvas/panels/LogPanel',
+      '../../workbenches/canvas/panels/AgentPanel/CanvasAgentHost',
+    ]) {
+      expect(canvasPage).toContain(`import('${modulePath}')`)
+    }
+    expect(canvasPage).not.toContain("import { LightboxLayer } from")
+    expect(canvasPage).not.toContain("import { TextEditorLayer } from")
+    expect(canvasPage).not.toContain("import { LogPanel } from")
+    expect(canvasPage).not.toContain("import { CanvasAgentHostBridge } from")
   })
 
   it('runs delivery checks without publishing', () => {

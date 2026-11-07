@@ -27,6 +27,9 @@ describe('CLI empty status UI gate', () => {
     expect(probe).toContain('scrollIntoViewIfNeeded')
     expect(probe).toContain('登录窗口已结束')
     expect(probe).toContain('windowCases')
+    expect(probe).toContain('busyDisabledDuringWindow')
+    expect(probe).toContain('legacyInstallButtons')
+    expect(probe).toContain('detailsOpen')
   })
 
   it('launches an isolated release and kills only its own pid', () => {
@@ -41,5 +44,13 @@ describe('CLI empty status UI gate', () => {
   it('does not read a null currentTarget from the details toggle event', () => {
     expect(cliPanel).toContain('event.target instanceof HTMLDetailsElement')
     expect(cliPanel).not.toContain('event.currentTarget.open')
+  })
+
+  it('holds the busy slot through window close and the automatic follow-up', () => {
+    expect(cliPanel).toMatch(/async function watchWindow/)
+    expect(cliPanel).toContain("await watchWindow(tool, 'install', handle)")
+    expect(cliPanel).toContain("await watchWindow(tool, 'login', handle)")
+    expect(cliPanel).toContain('allowBusy: true')
+    expect(cliPanel).not.toMatch(/\n\s{6}watchWindow\(/)
   })
 })

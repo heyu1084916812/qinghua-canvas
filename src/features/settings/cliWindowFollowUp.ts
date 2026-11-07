@@ -1,6 +1,6 @@
 import { buildArgs, type CliTool } from '../../domain/shared/cliTools'
 
-export type CliWindowFlow = 'install' | 'installOnly' | 'login'
+export type CliWindowFlow = 'install' | 'login'
 
 export type CliWindowAction = 'login' | 'none' | 'status'
 
@@ -22,15 +22,12 @@ export function cliWindowFollowUp(
   exitCode: number | null,
 ): CliWindowFollowUp {
   const suffix = exitSuffix(exitCode)
-  if (flow === 'install' || flow === 'installOnly') {
+  if (flow === 'install') {
     if (found) {
       return {
-        action: flow === 'install' ? 'login' : 'none',
+        action: 'login',
         statusArgs: null,
-        message:
-          flow === 'install'
-            ? `安装窗口已结束${suffix}，已重新检测到「${tool.program}」，正在继续登录。`
-            : `安装窗口已结束${suffix}，已重新检测到「${tool.program}」。`,
+        message: `安装窗口已结束${suffix}，已重新检测到「${tool.program}」，正在继续登录。`,
       }
     }
     return {

@@ -5939,7 +5939,7 @@
       "responsibility": "分两阶段读取存储面板的快速信息与重统计数据，并隔离单项失败。",
       "owns": [
         "占用、项目、素材、目录根类型与缓存的读取顺序",
-        "素材去重计数和项目轻量计数",
+        "快速项提前发布与重统计延后调度",
         "取消后停止增量回填"
       ],
       "doesNotOwn": [
@@ -5950,7 +5950,6 @@
       "publicApi": [
         "startStorageOverviewRefresh",
         "countStorageAssets",
-        "countStorageProjects",
         "StorageAssetCounts",
         "StorageOverviewArea",
         "StorageOverviewRefresh",
@@ -5961,6 +5960,28 @@
         "src/features/settings/storageOverviewRefresh.test.ts"
       ],
       "budget": 170
+    },
+    {
+      "module": "src/features/settings/storageOverviewProjectCount.ts",
+      "owner": "settings-storage-overview-project-count",
+      "responsibility": "用分页总数统计非回收站项目，并为旧存储保留流式扫描兜底。",
+      "owns": [
+        "活动项目过滤",
+        "分页 total 快路径",
+        "旧后端 scan 兜底"
+      ],
+      "doesNotOwn": [
+        "React 面板状态",
+        "素材计数",
+        "存储空间占用"
+      ],
+      "publicApi": [
+        "countStorageProjects"
+      ],
+      "test": [
+        "src/features/settings/storageOverviewRefresh.test.ts"
+      ],
+      "budget": 40
     },
     {
       "module": "src/features/settings/storageOverviewAssetCount.ts",

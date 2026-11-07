@@ -2,11 +2,11 @@ import { describe, expect, it, vi } from 'vitest'
 import type { StorageAdminPort, StoragePort } from '../../platform/ports'
 import {
   countStorageAssets,
-  countStorageProjects,
   startStorageOverviewRefresh,
   type StorageOverviewArea,
   type StorageOverviewUpdate,
 } from './storageOverviewRefresh'
+import { countStorageProjects } from './storageOverviewProjectCount'
 
 function deferred<T>() {
   let resolve!: (value: T) => void
@@ -23,7 +23,27 @@ async function flush() {
 }
 
 describe('storage overview refresh', () => {
-  it('counts only live projects without loading project payloads', async () => {
+  it('uses one paged metadata count for live projects when available', async () => {
+    const queryPage = vi.fn(async () => ({ rows: [{ id: 'p1' }], total: 334 }))
+    const scan = vi.fn()
+    const storage = { queryPage, scan } as unknown as StoragePort
+
+    await expect(countStorageProjects(storage)).resolves.toBe(334)
+    expect(queryPage).toHaveBeenCalledWith(
+      'projects',
+      {},
+      {
+        includePayload: false,
+        fields: ['id'],
+        missingFields: ['deletedAt'],
+        offset: 0,
+        limit: 1,
+      },
+    )
+    expect(scan).not.toHaveBeenCalled()
+  })
+
+  it('falls back to a stream scan for older storage ports', async () => {
     const scan = vi.fn(async (_table, _batch, onBatch) => {
       await onBatch([{ id: 'p1' }, { id: 'p2', deletedAt: 1 }] as never, { total: 2 })
       return 2
@@ -191,6 +211,48 @@ describe('storage overview refresh', () => {
     expect(updates).toContain('assets')
     expect(updates).toContain('cache')
     expect(errors).toEqual([])
+  })
+
+  it('does not delay a paged project count behind desktop root or cache checks', async () => {
+    const root = deferred<void>()
+    const cache = deferred<number>()
+    const updates: StorageOverviewUpdate['kind'][] = []
+    let projectReadStarted = false
+    const storage = {
+      estimateUsage: async () => ({ used: 1, quota: 2 }),
+      query: async () => [],
+      queryPage: async () => {
+        projectReadStarted = true
+        return { rows: [{ id: 'p1' }], total: 334 }
+      },
+      scan: async () => 0,
+    } as unknown as StoragePort
+    const admin = {
+      dataDir: async () => 'D:/data',
+      inspectRoot: async () => {
+        await root.promise
+        return { path: 'D:/data', kind: 'v2', ready: true }
+      },
+      cacheUsage: () => cache.promise,
+    } as unknown as StorageAdminPort
+
+    void startStorageOverviewRefresh(
+      { storage, admin },
+      {
+        onUpdate(update) {
+          updates.push(update.kind)
+        },
+      },
+    )
+
+    await flush()
+    expect(projectReadStarted).toBe(true)
+    expect(updates).toContain('projects')
+    expect(updates).not.toContain('root')
+    expect(updates).not.toContain('cache')
+
+    root.resolve()
+    cache.resolve(2048)
   })
 
   it('isolates one failed read and still publishes the rest', async () => {

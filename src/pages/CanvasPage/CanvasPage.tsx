@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import { useParams, useLocation, useNavigate } from 'react-router-dom'
 import { usePlatform } from '../../app/providers/PlatformProvider'
 import { openGlobalSettings } from '../../state/ui/globalSettings'
@@ -10,12 +10,8 @@ import { CanvasStoreProvider } from '../../workbenches/canvas/storeContext'
 import { FlowSurface } from '../../workbenches/canvas/flow/FlowSurface'
 import { fitCanvasView, focusCanvasNode } from '../../workbenches/canvas/surface/fitView'
 import { CanvasExecutionProvider } from '../../workbenches/canvas/execution/CanvasExecutionProvider'
-import { LogPanel } from '../../workbenches/canvas/panels/LogPanel'
-import { CanvasAgentHostBridge } from '../../workbenches/canvas/panels/AgentPanel/CanvasAgentHost'
 import { CanvasGatewayBridge } from '../../workbenches/canvas/agent/CanvasGatewayBridge'
 import { CanvasToolbar } from '../../workbenches/canvas/toolbar/CanvasToolbar'
-import { LightboxLayer } from '../../workbenches/canvas/lightbox/LightboxLayer'
-import { TextEditorLayer } from '../../workbenches/canvas/text/TextEditorLayer'
 import { screenToWorld } from '../../domain/canvas/geometry/coords'
 import { NODE_MINIMUMS } from '../../domain/canvas/layout/constants'
 import { assetNodeSize } from '../../domain/canvas/layout/assetNodeSize'
@@ -33,11 +29,32 @@ import { createProjectRepository } from '../../state/project/repository'
 import { projectRoute } from '../../domain/shared/workbench'
 import styles from './CanvasPage.module.css'
 
+const LightboxLayer = lazy(() =>
+  import('../../workbenches/canvas/lightbox/LightboxLayer').then((module) => ({
+    default: module.LightboxLayer,
+  })),
+)
+const TextEditorLayer = lazy(() =>
+  import('../../workbenches/canvas/text/TextEditorLayer').then((module) => ({
+    default: module.TextEditorLayer,
+  })),
+)
+const LogPanel = lazy(() =>
+  import('../../workbenches/canvas/panels/LogPanel').then((module) => ({
+    default: module.LogPanel,
+  })),
+)
+const CanvasAgentHostBridge = lazy(() =>
+  import('../../workbenches/canvas/panels/AgentPanel/CanvasAgentHost').then((module) => ({
+    default: module.CanvasAgentHostBridge,
+  })),
+)
+
 /**
  * 画布页面容器（架构 §4.7：只接线，不放规则）。
  * 路由参数 projectId 决定打开哪个项目：
  * - 'demo'：空白临时画布，不读库（便于 SSR 冒烟与即时打开）
- * - 其它：挂载时从 IndexedDB 把 nodes/edges 读回 store
+ * - 其它：挂载时从 shared-store 把 nodes/edges 读回 store
  *   图数据变更仍只走 dispatch(command)；读回是 hydrate，不进撤销栈。
  *
  * ## 无 id 的 `/canvas`（2026-09-27 应用壳新增）
@@ -153,7 +170,7 @@ function CanvasProject({ projectId }: { projectId: string }) {
     store.setNodeScale(nodeDensityFactor(canvasStyle.density))
   }, [store, canvasStyle.density])
 
-  // 从 IndexedDB 读回图数据（demo 不需要）；读回后若是模板新建的项目，套用模板预置节点
+  // 从 shared-store 读回图数据（demo 不需要）；读回后若是模板新建的项目，套用模板预置节点
   useEffect(() => {
     if (projectId === 'demo') return
     /** 已经 hydrate 过（切走又回来）：**不要**再灌一次，那会把内存里正在跑的改动盖回去 */
@@ -395,7 +412,9 @@ function CanvasProject({ projectId }: { projectId: string }) {
       {/* 执行宿主上提一层包住整页：顶栏的「仅刷新陈旧 / 全图重跑」需要与画布共用同一份
           执行状态（原先只包住 Surface，顶栏拿不到 useCanvasExecution）。 */}
       <CanvasExecutionProvider>
-        <CanvasAgentHostBridge projectId={projectId} />
+        <Suspense fallback={null}>
+          <CanvasAgentHostBridge projectId={projectId} />
+        </Suspense>
         {/*
           水合完成标记（冒烟 / 探针用）。
 
@@ -469,13 +488,21 @@ function CanvasProject({ projectId }: { projectId: string }) {
             onCreateNode={addNodeAtCenter}
             onImportAsset={() => void importAssetAtCenter()}
           />
-          {logOpen && <LogPanel onClose={() => setLogOpen(false)} />}
+          {logOpen && (
+            <Suspense fallback={null}>
+              <LogPanel onClose={() => setLogOpen(false)} />
+            </Suspense>
+          )}
           {/* 素材灯箱（§6.17）挂在页面级：它的触发方有画布表面与日志面板两处，
               挂在任一子树里另一处都够不着；状态在 store，故放哪都能读 */}
-          <LightboxLayer />
+          <Suspense fallback={null}>
+            <LightboxLayer />
+          </Suspense>
           {/* 文本编辑灯箱（§6.7）：与素材灯箱同级、互斥。同样挂页面级——
               入口有「右键菜单」与「节点跟随栏的全屏按钮」两处 */}
-          <TextEditorLayer />
+          <Suspense fallback={null}>
+            <TextEditorLayer />
+          </Suspense>
           {/* 旋转与镜像 / 标注（用户 2026-10-05 第 10 条）：**现已都住在素材灯箱里**
               （2026-10-16 搬的，见 store 的 `openRotateEditor` / `openAnnotateEditor`）——
               它们是灯箱的两种模式，不再各占一个全屏层，所以这里没有对应的挂载点。

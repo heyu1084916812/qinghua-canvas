@@ -12,6 +12,9 @@ describe('production first-paint probe evidence contract', () => {
     const source = read('scripts/verify-storage-log-first-paint-production.mjs')
 
     expect(source).toContain("['rev-parse', 'HEAD']")
+    expect(source).toContain("['status', '--porcelain=v1']")
+    expect(source).toContain('distSha256')
+    expect(source).toContain('sourceTree:')
     expect(source).toContain('generatedAt: new Date().toISOString()')
     expect(source).toContain("mode: 'production'")
     expect(source).toContain('seed: { projects: projects.length, assets: assets.length, runRecords: runRecords.length }')
@@ -30,5 +33,16 @@ describe('production first-paint probe evidence contract', () => {
     expect(source).toContain("if (!existsSync(storeExe))")
     expect(source).toContain("killTree(store)")
     expect(source).toContain("killTree(preview)")
+  })
+
+  it('keeps README and product storage descriptions on the current shared-store truth', () => {
+    const readme = read('README.md')
+    const product = read('轻画-产品设计文档.md')
+
+    expect(readme).toContain('本地 0.1.17 安装包已构建并通过 release 壳自检')
+    expect(readme).not.toContain('本轮未构建安装包')
+    expect(product).toContain('业务主库由本机 `shared-store` 提供')
+    expect(product).toContain('凭据存于本机 shared-store')
+    expect(product).not.toContain('凭据由 WebCrypto `AES-GCM` 加密后存于 IndexedDB')
   })
 })

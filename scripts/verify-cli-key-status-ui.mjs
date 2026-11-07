@@ -85,6 +85,9 @@ function geometryOf(page) {
       statusArgs: document.querySelector('[data-cli-status-args="runninghub"]')?.value ?? '',
       statusButton: document.querySelectorAll('[data-cli-status="runninghub"]').length,
       statusOutput: document.querySelectorAll('[data-cli-statusout="runninghub"]').length,
+      legacyInstallButtons: document.querySelectorAll('[data-cli-install]').length,
+      detailsOpen:
+        document.querySelector('[data-cli-login-box="runninghub"]')?.hasAttribute('open') ?? false,
       loginMessage:
         document.querySelector('[data-cli-login-msg="runninghub"]')?.textContent?.trim() ?? '',
     }
@@ -150,7 +153,7 @@ async function captureWindowFollowUp(page, prefix, viewport, theme) {
   const command = 'C:\\Windows\\System32\\cmd.exe'
   await page.locator('[data-cli-advanced="jimeng"] summary').click()
   await page.locator('[data-cli-program="jimeng"]').fill(command)
-  await page.locator('[data-cli-login-args="jimeng"]').fill('/c exit 0')
+  await page.locator('[data-cli-login-args="jimeng"]').fill('/c ping -n 3 127.0.0.1')
   await page.locator('[data-cli-status-args="jimeng"]').fill('/c exit 0')
   await page.locator('[data-cli-login-box="jimeng"] summary').click()
   await page.locator('[data-cli-detect="jimeng"]').click()
@@ -167,6 +170,14 @@ async function captureWindowFollowUp(page, prefix, viewport, theme) {
   await page.locator('[data-global-settings-panel]').screenshot({ path: beforeShot })
 
   await page.locator('[data-cli-setup="jimeng"]').click()
+  await page.waitForFunction(
+    () =>
+      document
+        .querySelector('[data-cli-login-msg="jimeng"]')
+        ?.textContent?.includes('已经打开登录窗口') === true,
+    { timeout: 10_000 },
+  )
+  const busyDisabledDuringWindow = await page.locator('[data-cli-setup="jimeng"]').isDisabled()
   await page.waitForFunction(
     () =>
       document
@@ -190,6 +201,7 @@ async function captureWindowFollowUp(page, prefix, viewport, theme) {
   return {
     before,
     after,
+    busyDisabledDuringWindow,
     screenshots: {
       before: path.relative(ROOT, beforeShot),
       after: path.relative(ROOT, afterShot),
@@ -246,17 +258,15 @@ try {
         after.statusArgs === '' &&
         after.statusButton === 0 &&
         after.statusOutput === 0 &&
+        after.legacyInstallButtons === 0 &&
+        after.detailsOpen === false &&
         after.loginMessage.includes('没有配置状态命令，已跳过自动查询') &&
-        before.keyInput?.x === after.keyInput?.x &&
-        before.keyInput?.width === after.keyInput?.width &&
-        before.keyInput?.height === after.keyInput?.height &&
-        before.keyButton?.x === after.keyButton?.x &&
-        before.keyButton?.width === after.keyButton?.width &&
-        before.keyButton?.height === after.keyButton?.height &&
-        after.keyInput?.y >= after.panel?.y &&
-        after.keyInput?.y + after.keyInput?.height <= after.panel?.y + after.panel?.height &&
+        before.keyInput?.y >= before.panel?.y &&
+        before.keyInput?.y + before.keyInput?.height <= before.panel?.y + before.panel?.height &&
         after.message?.width > 0 &&
         after.message?.height > 0 &&
+        after.message?.y >= after.panel?.y &&
+        after.message?.y + after.message?.height <= after.panel?.y + after.panel?.height &&
         !after.overflowX &&
         !after.panelOverflowX
 
@@ -265,6 +275,7 @@ try {
       report.ok =
         report.ok &&
         windowResult.after.message.includes('登录窗口已结束') &&
+        windowResult.busyDisabledDuringWindow &&
         windowResult.after.statusOutput > 0 &&
         windowResult.after.statusText.length > 0 &&
         windowResult.before.setupButton?.x === windowResult.after.setupButton?.x &&
