@@ -25,7 +25,7 @@
 当前代码构建版本：**v0.1.17**（Windows 10 / 11 x64）
 
 - [GitHub Releases](https://github.com/heyu1084916812/qinghua-canvas/releases/latest)
-- 本地 0.1.17 安装包已构建并通过 release 壳自检；GitHub 最新公开 Release 仍是 v0.1.16，v0.1.17 需经确认后才发布
+- 本地 0.1.17 安装包已构建并通过 release 壳自检（12/12），构建提交 `2cd9f06`；GitHub 最新公开 Release 仍是 v0.1.16，v0.1.17 需经确认后才发布
 - 桌面端基于 Tauri 2；首次运行需要系统具备 WebView2（Windows 10/11 通常已自带）
 
 ## 核心能力

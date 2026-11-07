@@ -166,7 +166,7 @@ try {
   const storageText = await page.locator('[data-storage-panel]').innerText()
   await page.screenshot({ path: path.join(output, 'storage-1440-dark.png'), fullPage: false })
 
-  await page.locator('[data-global-settings-tab="theme"]').click()
+  await page.locator('[data-global-settings-tab="appearance"]').click()
   const reopenStarted = Date.now()
   await page.locator('[data-global-settings-tab="storage"]').click()
   await page.waitForFunction(fullWait, null, { timeout: 5_000 })

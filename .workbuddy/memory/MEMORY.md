@@ -14,7 +14,11 @@
   其他依赖以各自包内 LICENSE 为准，Dexie 只用于旧浏览器库迁移。
 - 本轮最终代码门禁：1086 modules / 4343 dependencies / 230 semantic registrations；串行全量
   639 files（638 passed / 1 skipped）/ 5389 tests（5388 passed / 1 skipped）；build 最大 JS 377.82KB；
-  `smoke:critical` 4/4 组、97 项、0 失败。安装包从本提交重建后补记 hash。
+  `smoke:critical` 4/4 组、97 项、0 失败。
+- 新 release（代码提交 `2cd9f06`）为 44,054,453 B，SHA-256
+  `8E09962CF0F9B5D3C02FDC01A30B28271F443E98B04A00BDBC898B6F94A77F2B`，release 壳 12/12。
+ 存储/日志探针：快速 216ms、完整 589ms、重开 68ms、全局日志 92ms、画布日志 201ms，错误和溢出 0；
+  CLI release 四组明暗/视口全通过。探针“外观”栏的锚点是 `appearance`，不是 `theme`。
 
 ### 总管2 第二十二轮：真实图片性能稳定闭环、可见订阅与缩放稳态（2026-11-08）
 
