@@ -9,7 +9,7 @@ import { saveAssetToLibrary } from '../../../features/canvas/saveAssetToLibrary'
 import { noOverlapDelta } from '../../../features/canvas/duplicatePlacement'
 import { sendSelectionToAgent } from '../../../features/canvas/agentHandoff'
 import { createId } from '../../../shared/id'
-import { useCanvasStore, useGraph, useSelection, useViewportState } from '../storeContext'
+import { useCanvasStore, useGraph, useSelection, useViewportStateWhen } from '../storeContext'
 import { FOLLOW_BAR_HEIGHT } from './followBarAnchor'
 import {
   IconDownload,
@@ -76,7 +76,6 @@ export function MultiSelectBar({
   const store = useCanvasStore()
   const graph = useGraph()
   const selection = useSelection()
-  const viewport = useViewportState()
   const platform = usePlatform()
   const { arrange, arrangeMode } = useArrangeTools(store)
   const [menuOpen, setMenuOpen] = useState(false)
@@ -84,6 +83,7 @@ export function MultiSelectBar({
   const nodes = selection
     .map((id) => graph.nodes.find((n) => n.id === id))
     .filter((n): n is NonNullable<typeof n> => Boolean(n))
+  const viewport = useViewportStateWhen(nodes.length >= 2)
 
   /**
    * 选中集合一变就把展开的菜单收掉（用户 2026-10-06 第 13 批第 8 条：

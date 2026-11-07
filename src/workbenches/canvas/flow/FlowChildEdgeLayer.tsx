@@ -1,7 +1,7 @@
 import { memo, useMemo } from 'react'
 import { useGraph, useSelection, useViewportState } from '../storeContext'
 import { useCanvasStore } from '../storeContext'
-import { childEdgePaths } from './childEdges'
+import { childEdgeIdSet, childEdgePaths } from './childEdges'
 import styles from './FlowChildEdgeLayer.module.css'
 
 /**
@@ -16,6 +16,9 @@ import styles from './FlowChildEdgeLayer.module.css'
  * 视口换算挂在一个 `transform` 上 —— 平移 / 缩放帧只改一个属性，子树的 props 不变。
  */
 export function FlowChildEdgeLayer({ hitOnly = false }: { hitOnly?: boolean }) {
+  const graph = useGraph()
+  const hasChildEdges = useMemo(() => childEdgeIdSet(graph).size > 0, [graph])
+  if (!hasChildEdges) return null
   return <ChildEdgeViewport hitOnly={hitOnly} />
 }
 

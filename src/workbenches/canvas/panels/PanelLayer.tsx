@@ -13,7 +13,7 @@ import { CreationPanel } from './CreationPanel'
 import { EmotionPanel } from './EmotionPanel'
 import type { PanelEvent, PanelModel, PanelThumb, RecipeSnapshot } from './panelModel'
 import type { MentionCandidate } from '../text/mentionValue'
-import { useGraph, useViewportState, useCanvasStore, useSelection } from '../storeContext'
+import { useGraph, useViewportStateWhen, useCanvasStore, useSelection } from '../storeContext'
 import { useCanvasExecution } from '../execution/CanvasExecutionProvider'
 import { usePromptTools } from '../../../features/shared/promptTools/usePromptTools'
 import { useChannels } from '../../../app/providers/ChannelStoreProvider'
@@ -75,7 +75,6 @@ export function PanelLayer({
 }) {
   const graph = useGraph()
   const selection = useSelection()
-  const viewport = useViewportState()
   const store = useCanvasStore()
   const exec = useCanvasExecution()
   /** 情绪那条流水线要读素材字节（裁局部）——平台端口在这一层拿 */
@@ -101,6 +100,7 @@ export function PanelLayer({
     const n = graph.nodes.find((x) => x.id === selection[0])
     return n && PANEL_TYPES.has(n.type) ? n : null
   }, [graph.nodes, selection, dragging, panelDismissed])
+  const viewport = useViewportStateWhen(selectedNode !== null)
 
   // 提示词节点的「优化 / 翻译」工具（§6.7）：面板是纯视图，状态由本层持有
   const promptData = selectedNode?.type === 'prompt' ? (selectedNode.data as PromptData) : null

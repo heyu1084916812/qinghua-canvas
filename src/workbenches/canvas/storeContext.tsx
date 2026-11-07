@@ -63,6 +63,25 @@ export function useViewportState(): Viewport {
   return useSyncExternalStore(store.subscribeViewport, store.getViewport, store.getViewport)
 }
 
+const DETACHED_VIEWPORT: Viewport = Object.freeze({ x: 0, y: 0, zoom: 1 })
+const subscribeNever = () => () => {}
+const getDetachedViewport = () => DETACHED_VIEWPORT
+
+/**
+ * 只有可见浮层需要跟随视口时，才订阅高频视口变化。
+ *
+ * 隐藏时返回同一份冻结快照，保证 `useSyncExternalStore` 不会因新对象触发
+ * 重渲染；恢复可见后再重新订阅当前视口。
+ */
+export function useViewportStateWhen(enabled: boolean): Viewport {
+  const store = useCanvasStore()
+  return useSyncExternalStore(
+    enabled ? store.subscribeViewport : subscribeNever,
+    enabled ? store.getViewport : getDetachedViewport,
+    enabled ? store.getViewport : getDetachedViewport,
+  )
+}
+
 /**
  * 画布级瞬时提示（§6.12「另一种类型拖入被拒绝并给出弱提示」/ §6.10 对比超 2 张）。
  * 纯展示态：不落库、不进撤销栈。

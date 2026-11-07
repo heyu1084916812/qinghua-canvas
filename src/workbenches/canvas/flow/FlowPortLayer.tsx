@@ -1,7 +1,7 @@
-import { memo, useCallback, useEffect, useMemo, useRef } from 'react'
+import { memo, useCallback, useEffect, useMemo, useRef, useSyncExternalStore } from 'react'
 import type { CSSProperties, PointerEvent as ReactPointerEvent } from 'react'
 import { useStore } from '@xyflow/react'
-import { useGraph, useSelection, useViewportState } from '../storeContext'
+import { useCanvasStore, useGraph, useSelection } from '../storeContext'
 import {
   PORT_EDGE_GAP,
   PORT_MIN_SCALE,
@@ -69,21 +69,56 @@ const PortHitViewport = memo(function PortHitViewport({
   hits: PortHit[]
   onPortDown: PortDown
 }) {
-  const viewport = useViewportState()
+  const store = useCanvasStore()
+  const viewport = store.getViewport()
   const zoom = viewport.zoom || 1
   const surfaceW = useStore((state) => state.width)
   const surfaceH = useStore((state) => state.height)
+  const layerRef = useRef<HTMLDivElement>(null)
   const sourceHits = useRef(hits)
-  const visibleCache = useRef<PortHit[]>(hits)
-  const nextVisible = portHitsInView(hits, viewport, surfaceW, surfaceH)
-  if (
-    sourceHits.current !== hits ||
-    !samePortHitList(visibleCache.current, nextVisible)
-  ) {
-    sourceHits.current = hits
-    visibleCache.current = nextVisible
-  }
-  const visibleHits = visibleCache.current
+  const visibleCache = useRef<PortHit[]>(
+    portHitsInView(hits, viewport, surfaceW, surfaceH),
+  )
+
+  const applyTransform = useCallback(() => {
+    const current = store.getViewport()
+    const currentZoom = current.zoom || 1
+    const layer = layerRef.current
+    if (!layer) return
+    layer.style.transform =
+      `translate(${-current.x * currentZoom}px, ${-current.y * currentZoom}px) scale(${currentZoom})`
+    layer.style.setProperty('--port-inverse-scale', String(portInverseScale(currentZoom)))
+  }, [store])
+
+  const visibleStore = useMemo(
+    () => ({
+      subscribe(listener: () => void) {
+        applyTransform()
+        const unsubscribe = store.subscribeViewport(() => {
+          applyTransform()
+          listener()
+        })
+        return unsubscribe
+      },
+      getSnapshot() {
+        const next = portHitsInView(hits, store.getViewport(), surfaceW, surfaceH)
+        if (
+          sourceHits.current !== hits ||
+          !samePortHitList(visibleCache.current, next)
+        ) {
+          sourceHits.current = hits
+          visibleCache.current = next
+        }
+        return visibleCache.current
+      },
+    }),
+    [applyTransform, hits, store, surfaceW, surfaceH],
+  )
+  const visibleHits = useSyncExternalStore(
+    visibleStore.subscribe,
+    visibleStore.getSnapshot,
+    visibleStore.getSnapshot,
+  )
   /**
    * 按住 Ctrl / ⌘（框选键）时，命中层**整层不吃指针** —— 这一层挂在 `.react-flow__pane` 外面，
    * 它一旦接住按下，RF 的框选就不会启动（见 `useSelectionKeyHeld` 的说明）。
@@ -97,6 +132,7 @@ const PortHitViewport = memo(function PortHitViewport({
      */
     <div className={styles.clip} data-flow-port-layer data-port-selecting={selecting ? '1' : undefined}>
       <div
+        ref={layerRef}
         className={styles.layer}
         style={{
           transform: `translate(${-viewport.x * zoom}px, ${-viewport.y * zoom}px) scale(${zoom})`,

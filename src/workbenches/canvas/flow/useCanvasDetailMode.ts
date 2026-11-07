@@ -6,63 +6,56 @@ import {
   type CanvasDetailMode,
 } from './detailMode'
 
-interface DetailModeState {
-  mode: CanvasDetailMode
-  pendingMode: CanvasDetailMode | null
-  settleAt: number
-}
+const ZOOM_EPSILON = 0.001
 
 /**
  * full/coarse 切换会替换全部节点的 React 类型。缩放手势连续穿过阈值时，
  * 等视口稳定一拍再切换，避免真实图片节点整批卸载、解码、重挂载。
  */
 export function useCanvasDetailMode(store: CanvasStore): CanvasDetailMode {
-  const [state, setState] = useState<DetailModeState>(() => ({
-    mode: nextCanvasDetailMode('full', store.getViewport().zoom),
-    pendingMode: null,
-    settleAt: 0,
-  }))
-  const modeRef = useRef(state.mode)
-  modeRef.current = state.mode
-
-  useEffect(
-    () =>
-      store.subscribeViewport(() => {
-        const now = Date.now()
-        const target = nextCanvasDetailMode(modeRef.current, store.getViewport().zoom)
-        setState((current) => {
-          if (target === current.mode) {
-            if (!current.pendingMode && !current.settleAt) return current
-            return { mode: current.mode, pendingMode: null, settleAt: 0 }
-          }
-          const settledAt =
-            current.pendingMode === target
-              ? current.settleAt
-              : now + DETAIL_MODE_SETTLE_MS
-          if (now >= settledAt) {
-            modeRef.current = target
-            return { mode: target, pendingMode: null, settleAt: 0 }
-          }
-          return { mode: current.mode, pendingMode: target, settleAt: settledAt }
-        })
-      }),
-    [store],
+  const [mode, setMode] = useState<CanvasDetailMode>(() =>
+    nextCanvasDetailMode('full', store.getViewport().zoom),
   )
+  const modeRef = useRef(mode)
+  modeRef.current = mode
 
   useEffect(() => {
-    if (!state.pendingMode || !state.settleAt) return
-    const timer = setTimeout(() => {
-      setState((current) => {
-        const target = nextCanvasDetailMode(current.mode, store.getViewport().zoom)
-        if (target === current.mode || current.pendingMode !== target) {
-          return { mode: current.mode, pendingMode: null, settleAt: 0 }
-        }
-        modeRef.current = target
-        return { mode: target, pendingMode: null, settleAt: 0 }
-      })
-    }, Math.max(0, state.settleAt - Date.now()))
-    return () => clearTimeout(timer)
-  }, [state.pendingMode, state.settleAt, store])
+    let timer: ReturnType<typeof setTimeout> | null = null
+    let lastZoom = store.getViewport().zoom
 
-  return state.mode
+    const settle = () => {
+      timer = null
+      const viewport = store.getViewport()
+      const target = nextCanvasDetailMode(modeRef.current, viewport.zoom)
+      if (target !== modeRef.current) {
+        modeRef.current = target
+        setMode(target)
+      }
+    }
+
+    const schedule = (initial = false) => {
+      const viewport = store.getViewport()
+      const zoomChanged =
+        initial || Math.abs(viewport.zoom - lastZoom) >= ZOOM_EPSILON
+      lastZoom = viewport.zoom
+      if (!zoomChanged) return
+
+      if (timer) clearTimeout(timer)
+      const target = nextCanvasDetailMode(modeRef.current, viewport.zoom)
+      if (target === modeRef.current) {
+        timer = null
+        return
+      }
+      timer = setTimeout(settle, DETAIL_MODE_SETTLE_MS)
+    }
+
+    schedule(true)
+    const unsubscribe = store.subscribeViewport(() => schedule())
+    return () => {
+      unsubscribe()
+      if (timer) clearTimeout(timer)
+    }
+  }, [store])
+
+  return mode
 }

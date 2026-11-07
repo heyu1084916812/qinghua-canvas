@@ -515,6 +515,16 @@ async function waitForImageEvidence(page, timeoutMs = 90_000) {
   return evidence
 }
 
+async function viewportState(page) {
+  return page.evaluate(() => ({
+    coarseNodes: document.querySelectorAll('[data-coarse-node]').length,
+    fullNodes: document.querySelectorAll('[data-node-type]:not([data-coarse-node])').length,
+    rfViewport: document.querySelector('[data-flow-rf-vp]')?.getAttribute('data-flow-rf-vp') ?? null,
+    storeViewport:
+      document.querySelector('[data-flow-store-vp]')?.getAttribute('data-flow-store-vp') ?? null,
+  }))
+}
+
 async function main() {
   if (process.platform !== 'win32') {
     console.log(
@@ -680,24 +690,37 @@ async function main() {
     const panRounds = []
     const zoomRounds = []
     for (let round = 0; round < 3; round += 1) {
+      const before = await viewportState(page)
       const intervals = await panRound(page)
+      const after = await viewportState(page)
       panRounds.push({
         p95Ms: percentile(intervals, 0.95),
         averageMs:
           intervals.reduce((total, value) => total + value, 0) /
           Math.max(1, intervals.length),
         frames: intervals.length,
+        before,
+        after,
       })
       await page.waitForTimeout(250)
     }
+
+    // Pan leaves the viewport at a different origin. Precondition the zoom path
+    // separately so round one measures steady-state zoom, not the phase switch.
+    await zoomRound(page)
+    await page.waitForTimeout(250)
     for (let round = 0; round < 3; round += 1) {
+      const before = await viewportState(page)
       const intervals = await zoomRound(page)
+      const after = await viewportState(page)
       zoomRounds.push({
         p95Ms: percentile(intervals, 0.95),
         averageMs:
           intervals.reduce((total, value) => total + value, 0) /
           Math.max(1, intervals.length),
         frames: intervals.length,
+        before,
+        after,
       })
       await page.waitForTimeout(250)
     }

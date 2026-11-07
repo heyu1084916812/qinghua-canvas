@@ -1,4 +1,4 @@
-import { useSnapHints, useViewportState } from '../storeContext'
+import { useSnapHints, useViewportStateWhen } from '../storeContext'
 import styles from './FlowSnapLayer.module.css'
 
 /**
@@ -19,7 +19,8 @@ import styles from './FlowSnapLayer.module.css'
  */
 export function FlowSnapLayer() {
   const hints = useSnapHints()
-  const viewport = useViewportState()
+  const visible = !!hints && (hints.guides.length > 0 || hints.gaps.length > 0)
+  const viewport = useViewportStateWhen(visible)
   if (!hints || (hints.guides.length === 0 && hints.gaps.length === 0)) return null
 
   const sx = (x: number) => (x - viewport.x) * viewport.zoom

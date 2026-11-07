@@ -30,7 +30,6 @@ import {
   useEdgeSelection,
   useGraph,
   useSelection,
-  useViewportState,
 } from '../storeContext'
 import { useCanvasExecution } from '../execution/CanvasExecutionProvider'
 import { useCanvasPageEvents } from '../../../features/canvas/useCanvasPageEvents'
@@ -159,17 +158,21 @@ const NODE_TYPES = { qh: FlowFlowNode, coarse: FlowCoarseNode }
 const EDGE_TYPES = { qh: QhEdge, coarse: QhCoarseEdge }
 const EDGE_OPTIONS = { type: 'default' } as const
 function FlowViewportController() {
-  const viewport = useViewportState()
+  const store = useCanvasStore()
   const flow = useReactFlow()
 
   useEffect(() => {
-    const target = storeViewportToFlow(viewport)
-    if (sameFlowViewport(flow.getViewport(), target)) return
-    // 缩放手势期间 RF 自己就在改 transform；这里只跟随外部逻辑视口变化，
-    // 避免 onViewportChange → setViewport → setViewport 的回写循环。
-    if (Math.abs(flow.getViewport().zoom - target.zoom) < VIEWPORT_EPSILON) return
-    void flow.setViewport(target)
-  }, [flow, viewport])
+    const sync = () => {
+      const target = storeViewportToFlow(store.getViewport())
+      if (sameFlowViewport(flow.getViewport(), target)) return
+      // 缩放手势期间 RF 自己就在改 transform；这里只跟随外部逻辑视口变化，
+      // 避免 onViewportChange → setViewport → setViewport 的回写循环。
+      if (Math.abs(flow.getViewport().zoom - target.zoom) < VIEWPORT_EPSILON) return
+      void flow.setViewport(target)
+    }
+    sync()
+    return store.subscribeViewport(sync)
+  }, [flow, store])
 
   return null
 }
@@ -944,7 +947,21 @@ function FlowSurfaceInner({
 
 function Hud({ count, ids }: { count: number; ids: string[] }) {
   const { x, y, zoom } = useViewport()
-  const storeVp = useViewportState()
+  const store = useCanvasStore()
+  const hudRef = useRef<HTMLDivElement>(null)
+  const storeVp = store.getViewport()
+
+  useEffect(() => {
+    const sync = () => {
+      const viewport = store.getViewport()
+      hudRef.current?.setAttribute(
+        'data-flow-store-vp',
+        `${Math.round(viewport.x)},${Math.round(viewport.y)}@${viewport.zoom.toFixed(2)}`,
+      )
+    }
+    sync()
+    return store.subscribeViewport(sync)
+  }, [store])
 
   /**
    * ⚠️ 这里**只留节点数与缩放**（用户 2026-10-06 第 13 条：「只保留节点和缩放」）。
@@ -958,6 +975,7 @@ function Hud({ count, ids }: { count: number; ids: string[] }) {
    */
   return (
     <div
+      ref={hudRef}
       className={styles.hud}
       data-flow-hud
       data-flow-store-vp={`${Math.round(storeVp.x)},${Math.round(storeVp.y)}@${storeVp.zoom.toFixed(2)}`}

@@ -1,4 +1,4 @@
-import { useViewportState } from '../storeContext'
+import { useViewportStateWhen } from '../storeContext'
 import type { LinkDraft } from '../../../features/canvas/useEdgeDrag'
 import styles from './FlowDraftLayer.module.css'
 
@@ -28,7 +28,7 @@ function draftPath(from: ScreenPoint, to: ScreenPoint, fromSide: 'left' | 'right
  * 功能上每个节点都连上了，但只画一条线时读起来像"只连了一个"。
  */
 export function FlowDraftLayer({ draft }: { draft: LinkDraft | null }) {
-  const viewport = useViewportState()
+  const viewport = useViewportStateWhen(draft !== null)
   if (!draft) return null
   const toScreen = (p: { x: number; y: number }): ScreenPoint => ({
     x: (p.x - viewport.x) * viewport.zoom,

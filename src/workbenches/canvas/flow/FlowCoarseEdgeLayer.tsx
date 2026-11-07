@@ -17,6 +17,7 @@ export function FlowCoarseEdgeLayer() {
     () => coarseEdgePaths(graph, selection, edgeSelection),
     [edgeSelection, graph, selection],
   )
+  if (paths.length === 0) return null
   return <CoarseEdgeViewport paths={paths} />
 }
 
@@ -34,7 +35,6 @@ function CoarseEdgeViewport({ paths }: { paths: CoarseEdgePath[] }) {
     if (edgeId) store.dispatch({ kind: 'edge.remove', id: edgeId })
   }
 
-  if (paths.length === 0) return null
   return (
     <svg
       className={styles.svg}

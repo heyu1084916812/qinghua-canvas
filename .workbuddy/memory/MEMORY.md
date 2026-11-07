@@ -1,5 +1,24 @@
 # CanvasFlow（轻画）项目记忆
 
+### 总管2 第二十二轮：真实图片性能稳定闭环、可见订阅与缩放稳态（2026-11-08）
+
+- 真实图片门禁固定 150 张唯一 PNG/WebP、300 节点 / 500 连线、P95 ≤20ms；三份独立 release 报告连续通过：
+  平移最高 14.0ms，缩放最高 14.2ms。150 张全部 rendered / decoded / 64px thumbnail，300/500 全挂载、错误 0。
+- 隐藏浮层不要先订阅再 `return null`。`useViewportStateWhen(enabled)` 在 disabled 时返回同一个冻结视口快照，
+  且不接 `subscribeViewport`；单选、多选和空的分组 / 子边 / 草稿 / 吸附层都要在不可见时断开高频订阅。
+- `FlowPortLayer` 外层 transform 和反缩放变量用命令式同步；只有可见端口集合变化才让 React 重渲染。
+  `FlowViewportController` 与 HUD 的 store 视口字段也直接订阅；不要为测试字段保留整层每帧 React 渲染。
+- `useCanvasDetailMode` 的 220ms 必须是“缩放停止窗口”：每次 zoom 变化都重置，平移不重置，到点只 `setMode` 一次。
+  原实现从首次跨阈值起算，会在持续缩放手势中整批替换 300 个节点，出现 20.6–27.6ms 单帧尖峰。
+- 性能脚本测量缩放前必须单独预热一次缩放手势。平移测量会把 store 留在 780×270 等终点，直接进入缩放会把
+  “780×270 回零点”的阶段切换算进首轮；预热后三组均为 14ms。报告要记录每轮前后 full/coarse 数与视口。
+- 证据：
+  `.playwright-verify/canvas-perf-release-2026-11-07T21-14-32-880/report.json`、
+  `.playwright-verify/canvas-perf-release-2026-11-07T21-15-26-374/report.json`、
+  `.playwright-verify/canvas-perf-release-2026-11-07T21-16-17-864/report.json`。
+- 最终门禁：`npm run check`（1084 modules / 4334 dependencies、228 semantic registrations）、串行全量
+  Vitest 636 files / 5384 passed / 1 skipped；`smoke:critical` 4 组 97 项全绿。
+
 ### 总管2 第二十一轮：存储首屏、CLI 窗口链、Canvas 分包与关键冒烟（2026-11-08）
 
 - 存储项目数必须先走 `queryPage` 的 total，并用 `missingFields:['deletedAt']` 排除回收站；旧后端才 scan 兜底。

@@ -17,6 +17,7 @@ import styles from './FlowGroupBoardLayer.module.css'
 export function FlowGroupBoardLayer() {
   const graph = useGraph()
   const boards = useMemo(() => groupBoards(graph), [graph])
+  if (boards.length === 0) return null
   return <BoardViewport boards={boards} />
 }
 
@@ -27,7 +28,6 @@ const BoardViewport = memo(function BoardViewport({
 }) {
   const viewport = useViewportState()
   const zoom = viewport.zoom || 1
-  if (boards.length === 0) return null
   return (
     <div className={styles.clip} data-group-board-layer>
       <div
