@@ -73,14 +73,15 @@ describe('画布词表', () => {
     expect(vocab).toContain('aspectRatio')
   })
 
-  it('tells the model that automatic mode resolves plans but keeps destructive confirmations', () => {
+  it('tells the model that automatic mode keeps plan confirmation and destructive confirmations for the user', () => {
     const prompt = buildAgentSystemPromptWithContext(
       { nodes: [], edges: [] },
       undefined,
       { autoRun: true },
     )
     expect(prompt).toContain('当前为自动执行模式')
-    expect(prompt).toContain('系统会自动确认计划')
+    expect(prompt).toContain('计划确认必须由用户亲自完成')
+    expect(prompt).toContain('自动模式不会代替用户点确认')
     expect(prompt).toContain('破坏性或长期副作用仍必须等待用户亲自确认')
   })
 })

@@ -5855,9 +5855,52 @@
         "CanvasMcpPanel"
       ],
       "test": [
-        "src/app/deliveryBuild.test.ts"
+        "src/app/deliveryBuild.test.ts",
+        "src/features/settings/canvasMcpConfig.test.ts"
       ],
       "budget": 156
+    },
+    {
+      "module": "src/features/settings/CanvasMcpConfigBlock.tsx",
+      "owner": "settings-canvas-mcp-config-block",
+      "responsibility": "切换并展示通用 JSON 与 Codex TOML 两种可复制 MCP harness 配置。",
+      "owns": [
+        "MCP 配置格式切换状态与只读预渲染",
+        "复制按钮的纯展示接线"
+      ],
+      "doesNotOwn": [
+        "网关状态读取和能力验证",
+        "网关 token、stdio 协议与画布工具执行"
+      ],
+      "publicApi": [
+        "CanvasMcpConfigBlock"
+      ],
+      "test": [
+        "src/features/settings/canvasMcpConfig.test.ts",
+        "src/app/deliveryBuild.test.ts"
+      ],
+      "budget": 55
+    },
+    {
+      "module": "src/features/settings/canvasMcpConfig.ts",
+      "owner": "settings-canvas-mcp-config",
+      "responsibility": "把通用 MCP stdio 配置投影为 Codex config.toml 文本。",
+      "owns": [
+        "stdio 命令与 argv 的 TOML 字符串投影",
+        "无效配置返回空串，不暴露 token"
+      ],
+      "doesNotOwn": [
+        "React 渲染、剪贴板和网关状态",
+        "MCP 工具清单与权限"
+      ],
+      "publicApi": [
+        "CanvasMcpConfigShape",
+        "codexMcpConfigText"
+      ],
+      "test": [
+        "src/features/settings/canvasMcpConfig.test.ts"
+      ],
+      "budget": 30
     },
     {
       "module": "src/features/settings/CanvasMcpPanel.module.css",
@@ -5877,6 +5920,25 @@
         "src/app/deliveryBuild.test.ts"
       ],
       "budget": 135
+    },
+    {
+      "module": "src/features/settings/CanvasMcpConfigBlock.module.css",
+      "owner": "settings-canvas-mcp-config-block-style",
+      "responsibility": "定义 MCP 配置格式切换按钮的局部选中态与禁用态。",
+      "owns": [
+        "格式页签间距、选中背景和复制禁用样式"
+      ],
+      "doesNotOwn": [
+        "全局主题令牌与既有 MCP 面板样式",
+        "配置内容生成和网关状态"
+      ],
+      "publicApi": [
+        "CSS_MODULE:Canvas MCP config block"
+      ],
+      "test": [
+        "src/app/deliveryBuild.test.ts"
+      ],
+      "budget": 15
     },
     {
       "module": "src/features/settings/cliPanelPresentation.ts",

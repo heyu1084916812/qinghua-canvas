@@ -609,8 +609,8 @@ export function buildAgentSystemPromptWithContext(
     parts.push(
       [
         '## 当前为自动执行模式',
-        '用户已选择“自动生成”。你可以提出任务计划，但系统会自动确认计划，不需要等待用户点击确认。',
-        '不要在步骤之间调用 `requestTaskConfirmation` 询问“是否继续”或“是否满意”；按已确认计划连续推进。',
+        '用户已选择“自动生成”。你可以提出任务计划，但计划确认必须由用户亲自完成；自动模式不会代替用户点确认。',
+        '计划被用户确认后，不要在步骤之间调用 `requestTaskConfirmation` 询问“是否继续”或“是否满意”；按已确认计划连续推进。',
         '只有缺少会改变结果且无法从现有项目/画布判断的信息时，才可用 `requestTaskConfirmation` 的 clarification。',
         '删除、改已有节点、记忆写入等破坏性或长期副作用仍必须等待用户亲自确认。',
       ].join('\n'),

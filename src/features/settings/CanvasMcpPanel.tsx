@@ -1,5 +1,6 @@
 import { invoke, isTauri } from '@tauri-apps/api/core'
 import { useCallback, useEffect, useState } from 'react'
+import { CanvasMcpConfigBlock } from './CanvasMcpConfigBlock'
 import styles from './CanvasMcpPanel.module.css'
 
 interface CanvasGatewayInfo {
@@ -15,10 +16,6 @@ interface CapabilityResponse {
     tools?: unknown[]
     denied?: string[]
   }
-}
-
-function mcpConfigText(config: unknown): string {
-  return JSON.stringify(config, null, 2) ?? '{}'
 }
 
 export function CanvasMcpPanel() {
@@ -125,20 +122,7 @@ export function CanvasMcpPanel() {
             <span>受保护操作</span>
             <strong>{denied.length ? denied.join(' · ') : '验证后显示'}</strong>
           </div>
-          <div className={styles.codeBlock}>
-            <div className={styles.codeHead}>
-              <span>MCP 配置</span>
-              <button
-                type="button"
-                className={styles.linkBtn}
-                data-canvas-mcp-copy
-                onClick={() => void copy(mcpConfigText(info.mcpConfig))}
-              >
-                复制配置
-              </button>
-            </div>
-            <pre>{mcpConfigText(info.mcpConfig)}</pre>
-          </div>
+          <CanvasMcpConfigBlock config={info.mcpConfig} copy={(text) => void copy(text)} />
           <p className={styles.note}>
             配置只调用随应用打包的 PowerShell 适配器；读取 Token 由适配器从本机网关配置完成，不写进 harness 配置。
             画布必须处于打开状态；删除、改节点、付费生成和记忆写入不会开放给外部 MCP。
