@@ -12307,3 +12307,11 @@ React 端口 → `invoke` → Rust `check_update` → updater 插件读配置 �
 - storageOverviewReadDedup 按同一 StoragePort + area 复用进行中的项目/素材计数，完成后立即释放；取消只阻止该订阅者回填，不能让另一个活跃订阅者丢结果，下一次显式刷新仍读最新值。
 - 生产探针两次复测三段请求数 69/10/12 与 53/10/12、总请求 262/246，较第九轮基线 68/15/24、总 364 下降 102–118 次；assets /rows 从 18/7 降到 14/4。错误与几何溢出 0。耗时受同机并发 snapshots/channels 读取影响仍约 2.06s，保留 #966 健康债，不把请求数下降冒充耗时达标。
 - 两个不同模型分别实现文案与 hydrate；多代理写根文档时曾把新段落插到文件开头并造成大面积行尾变化，已按 HEAD 原文件恢复。后续追加记忆/文档应只在文件末尾按原行尾追加，并用 git diff --stat / --check 立即复核。
+
+### 总管2 第十一轮：发布门禁配置、隔离矩阵与 release 壳（2026-11-07）
+
+- smoke-matrix 只设 LOCALAPPDATA 不等于隔离：store 必须显式 --data-dir / --backend v1 / --port，health 校验同组 dataDir 与 json-v1，smoke 子进程传 SMOKE_STORE_BASE，结束后等端口释放。1420/18765/18766/18791 是保留端口。
+- G74 在独立库失败时不要删断言：模板提示词节点初始为空，先用 setTextViaEditor 在本组写入「原始正文」，再点优化；共享库残留提示词不能算夹具。
+- CI 配置静态测试要锁住 Linux Node 五项、Windows Rust/MCP、shared-store Rust、read-only permissions、触发方式，并禁止自动 push/publish/release upload/secrets。配置就绪不等于远端 Actions 已跑，push 仍要用户逐次确认。
+- check-release-shell 的 Canvas MCP 夹具需同时写 dev 错 token、release-gate、正式版 canvas-gateway.json；否则安装布局适配器默认档读不到正式配置，12 项门禁会只剩 11 项通过。
+- 本机已有正式安装版 0.1.10 与卸载登记时，check-installer-windows 会拒绝执行；不得为跑门禁卸载用户软件或改 HKCU 注册表。release 壳 12/12 可跑，干净机器真装/卸载/升级仍是外部验收。

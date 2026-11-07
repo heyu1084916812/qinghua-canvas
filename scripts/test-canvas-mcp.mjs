@@ -129,6 +129,7 @@ try {
   for (const [configName, token] of [
     ['canvas-gateway.dev.json', 'wrong-development-token'],
     ['canvas-gateway.release-gate.json', fixture.token],
+    ['canvas-gateway.json', fixture.token],
   ]) {
     writeFileSync(
       path.join(isolatedData, 'com.qinghua.canvas', configName),

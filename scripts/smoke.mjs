@@ -14032,6 +14032,11 @@ async function g74(browser) {
   await sleep(250)
   await pickParam(panel, 'model', 'GPT-6 Astra')
   await sleep(300)
+  /**
+   * 独立库没有历史提示词，模板节点初始正文为空。这里必须用真实页面写入一段正文，
+   * 让「优化」按钮有可发送的内容；否则 mock 回显空 prompt，G74 会依赖共享库残留。
+   */
+  await setTextViaEditor(page, promptNode, '原始正文')
   {
     const ta = panelPrompt(panel)
     await ta.click()

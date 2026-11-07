@@ -24,6 +24,14 @@ jobs:
       - run: node scripts/check-versions.mjs
       - run: npm run build
 
+  shared-store-rust:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - run: cargo test --manifest-path shared-store/Cargo.toml
+
   windows-rust-mcp:
     runs-on: windows-latest
     timeout-minutes: 30

@@ -988,3 +988,10 @@
 - `storageOverviewReadDedup` 只复用同一 `StoragePort + area` 的进行中读取，完成/失败后立即释放；取消只影响当前订阅者，下一次刷新必须重新读库。
 - 计数必须继续走「生成历史 ∪ 收藏、按 hash 去重、排除隐藏记录」的既有口径，不能改成估算；每项失败仍需隔离。
 - HostingPage 的上传/测连通失败文案只经 `hostingErrorText -> errorTextOf`，禁止重新出现 `String(err)` 或 `[object Object]`。
+
+## 发布门禁与冒烟隔离边界（2026-11-07 第十一轮）
+
+- `smoke-matrix` 每组的 store 参数、health URL、`SMOKE_STORE_BASE` 必须指向同一独立端口和 `dataDir`；组结束必须确认端口释放，保留端口不得复用。
+- G8 / G44 / G45 / G74 等冒烟必须在自己的独立库里构造所需页面数据，不得依赖 18765 共享库的残留提示词或历史渠道。
+- CI 工作流只能做验证，不得自动 push / publish / release upload；静态测试必须覆盖 shared-store Rust 与 Windows MCP Inspector。远端运行结果需用户确认 push 后另行验收。
+- release 壳自检的 Canvas MCP 适配夹具必须覆盖 dev、release-gate、正式版三个配置名；正式版配置缺失时 12/12 不得宣称通过。
