@@ -14,6 +14,8 @@ describe('canvas image diagnosis probe', () => {
     expect(source).toContain('images display none')
     expect(source).toContain('diagnosis only')
     expect(source).toContain('decoded')
+    expect(source).toContain("page.reload({ waitUntil: 'domcontentloaded'")
+    expect(source).toContain('element.remove()')
     expect(source).not.toContain('MAX_P95_MS')
   })
 })

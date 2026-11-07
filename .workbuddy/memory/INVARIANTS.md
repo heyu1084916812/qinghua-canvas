@@ -1008,3 +1008,10 @@
 - `useViewportState` 与 `useCanvasDetailMode` 只订阅视口；`FlowSurfaceInner` 的 nodes/edges 投影不得因视口变化重建，也不得依赖整个 `CanvasExecutionApi`。React Flow 自身滚轮缩放时，同 zoom 的平移不得由 `FlowViewportController` 反向 `setViewport`。
 - full/coarse 切换是整批节点类型替换；`useCanvasDetailMode.ts` 必须保留稳定窗口和取消逻辑，`detailMode.ts` 只保留纯阈值规则。瞬时穿阈值不得让 150 张 `<img>` 反复卸载、解码和重挂载。
 - 正式性能验收必须由 `npm run perf:canvas:production` 在 150 张图片全部解码、300/500 全挂载、P95 ≤20ms 下判定。`diagnose-canvas-images.mjs` 的逐层隐藏结果只用于根因定位，不得冒充验收；当前两刀修复后 P95 仍 >20ms，#971 保持未完成。
+
+## 真实图片视口外内容与 CLI 残余边界（2026-11-08 第十四轮）
+
+- `FlowSurface.module.css` 的 `.flow :global(.react-flow__node)` 必须保留 `content-visibility: auto` 与 `contain-intrinsic-size`。真实图片 300/500 的 release 诊断显示，节点内容合成是主成本；`will-change` 候选边界不稳定，不能替代该策略。不得隐藏图片或减少节点，且每次 UI 改动后必须保留四视图截图/几何/像素 diff 证据。
+- 性能判定只看正式 `npm run perf:canvas:production`：150 张图片必须全部 rendered/decoded、300/500 全挂载、P95 ≤20ms、page/console error 0。两次当前 release 报告均已通过；隐藏元素/诊断探针不得写成正式验收。
+- `diagnose-canvas-images.mjs` 必须每轮 reload 并只保留一条 style，避免 cumulative CSS 污染读数；`run-canvas-image-diagnosis.mjs` 只启动并清理自己的 app pid，端口保留集合是 1420/18765/18766/18791。
+- CLI 死控件、cwd、运行 id、按 id `cli.kill` 和浏览器禁用提示已有证据；真实已登录 CLI、进程树终止、媒体导出、清空 `statusArgs` 后自动查状态以及窗口结束后自动重检仍属 #972，不得把图三判成全完成。

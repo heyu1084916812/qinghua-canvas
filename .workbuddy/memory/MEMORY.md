@@ -12332,3 +12332,12 @@ React 端口 → `invoke` → Rust `check_update` → updater 插件读配置 �
 - 两刀修复后重建 release 并用同一真实图片探针实测：第一刀平移 84.8/78.8/78.7ms、缩放 84.9/145.2/90.8ms；第二刀平移 72.8/66.7/72.7ms、缩放 78.7/84.9/84.9ms。相比第十二轮约 90–121ms 有改善，但 12 组 P95 仍全部 >20ms，#971 必须保持未完成，不删图片、不减 300/500、不调阈值。
 - `scripts/diagnose-canvas-images.mjs` 是逐层隐藏图片/节点/端口层/小地图的根因工具，报告明确 diagnosis only；隐藏元素的绿结果不能冒充正式性能验收。后续应先用它定位图片光栅化、DOM 合成或 React 重渲，再按定位做单一职责修复。
 - 本轮不涉及 UI：没有 JSX 渲染树、CSS、视觉令牌、文案、布局或交互变化；新增模块均登记真实职责/导出/测试路径，治理 222 条。push 与外部发布条件仍需用户逐次确认。
+
+### 总管2 第十四轮：真实图片视口外内容收口与 CLI 残余审计（2026-11-08）
+
+- 分层诊断必须先隔离再下结论：第一版 cumulative CSS 把端口/小地图读数污染了；改成每轮 reload 并移除单条 style 后，确认块状开销来自 300 个完整节点的合成，而不是 150 张 WebP 解码或端口/小地图。
+- `will-change: transform` 候选虽然一度达到 15ms，但同方案复跑出现 20.7–21.1ms，不能作为最终方案。`FlowSurface.module.css` 最终使用 `.flow :global(.react-flow__node) { content-visibility: auto; contain-intrinsic-size: auto 240px 160px; }`；最终两次 release 平移 7.3ms、缩放 7.4–13.9ms，150 张图片全部 rendered/decoded，page/console error 0。不要用隐藏图片、减少节点或放宽阈值换取绿。
+- UI 门禁证据在 `.playwright-verify/canvas-transform-ui/report.json`：1440×900 / 1024×700 × 明暗四组，改前 `content-visibility:visible`、改后 `auto`，几何一致、无溢出，像素差 0.88%–1.45%，diff 只落在文字/描边抗锯齿和光球；未来改 canvas 节点视口外内容策略必须复跑该探针。
+- `scripts/diagnose-canvas-images.mjs` 的隐藏元素结果只用于定位；正式验收仍由 `npm run perf:canvas:production` 判定。`flowSurfacePerformance.test.ts` 静态锁住 `content-visibility`，防止性能回退。
+- 图三只读复核确认死控件、cwd、运行 id、按 id kill 和浏览器禁用提示有证据；仍缺当前 HEAD 的真实已登录 CLI、进程树终止、媒体导出。`statusArgs` 清空后密钥登录仍可能无条件跑状态命令，安装/登录窗口结束后仍需手动重点，统一记在 #972。
+- 外部账号、授权、push、LICENSE、干净机器、跨平台签名和 tag/Release 仍未完成；本地 commit 不自动 push。

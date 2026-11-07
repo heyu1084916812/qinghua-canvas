@@ -39,6 +39,16 @@
   height: 100%;
 }
 
+/*
+ * 平移 / 缩放只改 React Flow 节点外层 transform。300 节点 + 真实缩略图大画布的
+ * release 诊断显示，让视口外节点跳过内容布局与绘制可把 P95 压到约 14ms；
+ * 不隐藏图片、不删节点、不改节点结构或可见样式。
+ */
+.flow :global(.react-flow__node) {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 240px 160px;
+}
+
 /* 空格按住 = 平移模式（§6.3，与老表面同一套光标反馈） */
 .spaceMode {
   cursor: grab;

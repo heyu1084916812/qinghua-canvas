@@ -54,8 +54,22 @@ function percentile(values, ratio = 0.95) {
   return sorted[Math.max(0, index)]
 }
 
+async function waitForCanvasImages(page) {
+  await page.locator('[data-canvas-hydrated="true"]').waitFor({ timeout: 60_000 })
+  await page.waitForFunction(
+    () => document.querySelectorAll('[data-node-type="generation"] img').length >= 150,
+    null,
+    { timeout: 90_000 },
+  )
+  await page.evaluate(() => Promise.all(
+    Array.from(document.images).map((image) => image.decode?.().catch(() => undefined)),
+  ))
+}
+
 async function measure(page, label, css) {
-  await page.addStyleTag({ content: css })
+  await page.reload({ waitUntil: 'domcontentloaded', timeout: 60_000 })
+  await waitForCanvasImages(page)
+  const style = await page.addStyleTag({ content: css })
   const surface = await page.locator('[data-canvas-surface]').boundingBox()
   if (!surface) throw new Error('canvas surface has no bounding box')
   const x = surface.x + surface.width * 0.55
@@ -82,12 +96,30 @@ async function measure(page, label, css) {
     await new Promise((resolve) => setTimeout(resolve, 50))
   }
   const intervals = await sampling
+  await style.evaluate((element) => element.remove())
   return {
     label,
     p95Ms: percentile(intervals),
     averageMs: intervals.reduce((total, value) => total + value, 0) / intervals.length,
     frames: intervals.length,
   }
+}
+
+async function measureWithTransformProbe(page) {
+  const styles = [
+    ['node content hidden', '.react-flow__node :is(*:not(img)) { visibility: hidden !important; }'],
+    ['node content hidden except media', '.react-flow__node :is(*:not(img)) { visibility: hidden !important; } .react-flow__node img { visibility: visible !important; }'],
+    ['node contain strict', '.react-flow__node { contain: strict !important; }'],
+    ['node will change transform', '.react-flow__node { will-change: transform !important; }'],
+    ['node flat rendering', '.react-flow__node { isolation: isolate !important; transform: translateZ(0) !important; }'],
+    ['will change plus layout style contain', '.react-flow__node { will-change: transform !important; contain: layout style !important; }'],
+    ['will change plus backface hidden', '.react-flow__node { will-change: transform !important; backface-visibility: hidden !important; }'],
+    ['node content visibility auto', '.react-flow__node { content-visibility: auto !important; contain-intrinsic-size: 240px 160px !important; }'],
+    ['content visibility plus will change', '.react-flow__node { content-visibility: auto !important; contain-intrinsic-size: 240px 160px !important; will-change: transform !important; }'],
+  ]
+  const rounds = []
+  for (const [label, css] of styles) rounds.push(await measure(page, label, css))
+  return rounds
 }
 
 await waitForHttp(`http://127.0.0.1:${storePort}/health`, 30_000)
@@ -122,15 +154,7 @@ try {
     waitUntil: 'domcontentloaded',
     timeout: 60_000,
   })
-  await page.locator('[data-canvas-hydrated="true"]').waitFor({ timeout: 60_000 })
-  await page.waitForFunction(
-    () => document.querySelectorAll('[data-node-type="generation"] img').length >= 150,
-    null,
-    { timeout: 90_000 },
-  )
-  await page.evaluate(() => Promise.all(
-    Array.from(document.images).map((image) => image.decode?.().catch(() => undefined)),
-  ))
+  await waitForCanvasImages(page)
   const baseline = {
     nodes: await page.locator('[data-node-id]').count(),
     images: await page.locator('[data-node-type="generation"] img').count(),
@@ -143,8 +167,7 @@ try {
   rounds.push(await measure(page, 'images visibility hidden', '[data-node-type="generation"] img{visibility:hidden!important}'))
   rounds.push(await measure(page, 'images display none', '[data-node-type="generation"] img{display:none!important}'))
   rounds.push(await measure(page, 'nodes visibility hidden', '.react-flow__node{visibility:hidden!important}'))
-  rounds.push(await measure(page, 'port layer hidden', '[data-flow-port-layer]{display:none!important}'))
-  rounds.push(await measure(page, 'minimap hidden', '[data-canvas-minimap]{display:none!important}'))
+  rounds.push(...await measureWithTransformProbe(page))
   const report = { ok: true, baseline, rounds, note: 'diagnosis only; display:none results are not acceptance evidence' }
   fs.writeFileSync(reportPath, JSON.stringify(report, null, 2))
   console.log(JSON.stringify(report, null, 2))
