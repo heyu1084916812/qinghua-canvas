@@ -21,8 +21,11 @@ export interface AssetHistoryRepository {
   list(): Promise<HistoryItem[]>
 }
 
-/** 分批大小：一行可能几 MB，取小一点（峰值内存 ≈ batchSize × 单张大小） */
-const SCAN_BATCH = 8
+/**
+ * 分批大小：下面只请求元数据（`includePayload:false`），不再下发素材字节。
+ * 128 行仍只占少量元数据内存，却把 1,400 行素材从约 175 个数据页降到 11 个。
+ */
+const SCAN_BATCH = 128
 
 const TABLES: TableName[] = ['runRecords', 'assets', 'assetLibrary', 'projects']
 

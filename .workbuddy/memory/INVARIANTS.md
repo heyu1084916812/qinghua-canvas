@@ -981,3 +981,10 @@
 ## 文档索引
 
 产品文档（§15 里程碑、§11 渠道契约、§6.8 生成行为、§6.9 结果组）、架构文档（§5.5 执行引擎、§5.10/§9.4 新工作台）、功能对账清单。随代码同步更新。
+
+## 存储面板计数与错误文案边界（2026-11-07 第十轮）
+
+- `assetHistoryRepository` 的 `assets` 扫描必须 payloadless（`includePayload:false`），批量固定 128；优化请求数只能靠元数据页变大，不能回退成 `query('assets', {})` 或把字节带入历史计数数组。
+- `storageOverviewReadDedup` 只复用同一 `StoragePort + area` 的进行中读取，完成/失败后立即释放；取消只影响当前订阅者，下一次刷新必须重新读库。
+- 计数必须继续走「生成历史 ∪ 收藏、按 hash 去重、排除隐藏记录」的既有口径，不能改成估算；每项失败仍需隔离。
+- HostingPage 的上传/测连通失败文案只经 `hostingErrorText -> errorTextOf`，禁止重新出现 `String(err)` 或 `[object Object]`。

@@ -17,6 +17,7 @@ import {
   type HostingProviderId,
 } from '../../domain/shared/hosting'
 import { ChoicePicker } from '../../features/shared/choicePicker/ChoicePicker'
+import { hostingErrorText } from './hostingErrorText'
 import styles from './HostingPage.module.css'
 
 /** 测试上传用的一张 32×32 真 PNG（免去让用户先去挑文件） */
@@ -110,7 +111,7 @@ export function HostingPage() {
     try {
       setProbeResult(await platform.hosting.test())
     } catch (err) {
-      setProbeResult({ ok: false, message: `测不了：${String((err as Error)?.message ?? err).slice(0, 120)}` })
+      setProbeResult({ ok: false, message: `测不了：${hostingErrorText(err)}` })
     } finally {
       setProbing(false)
     }
@@ -133,7 +134,7 @@ export function HostingPage() {
       setTestedUrl(out.url)
       setStatus('上传成功：这条直链可以被上游抓取')
     } catch (err) {
-      setStatus(`上传失败：${String((err as Error)?.message ?? err).slice(0, 120)}`)
+      setStatus(`上传失败：${hostingErrorText(err)}`)
     } finally {
       setBusy(false)
     }

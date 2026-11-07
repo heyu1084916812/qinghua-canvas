@@ -90,7 +90,7 @@ describe('storage overview refresh', () => {
     })
     expect(scan).toHaveBeenCalledWith(
       'assets',
-      8,
+      128,
       expect.any(Function),
       { includePayload: false },
     )
@@ -253,5 +253,87 @@ describe('storage overview refresh', () => {
     await refresh.done
     expect(updates).toEqual([])
     expect(scannedTables).not.toContain('assets')
+  })
+
+  it('reuses in-flight project and asset counts across a StrictMode remount', async () => {
+    const assetScan = deferred<void>()
+    const projectScan = deferred<void>()
+    const scanCalls = new Map<string, number>()
+    const firstUpdates: StorageOverviewUpdate['kind'][] = []
+    const secondUpdates: StorageOverviewUpdate['kind'][] = []
+    const storage = {
+      estimateUsage: async () => ({ used: 1, quota: 2 }),
+      query: async () => [],
+      scan: async (
+        table: string,
+        _batch: number,
+        onBatch: (rows: never[], meta: { total: number }) => Promise<void>,
+      ) => {
+        scanCalls.set(table, (scanCalls.get(table) ?? 0) + 1)
+        if (table === 'assets') {
+          await assetScan.promise
+          await onBatch([{ id: 'asset-1', mime: 'image/png' }] as never[], { total: 1 })
+          return 1
+        }
+        await projectScan.promise
+        await onBatch([{ id: 'project-1' }] as never[], { total: 1 })
+        return 1
+      },
+    } as unknown as StoragePort
+
+    const first = startStorageOverviewRefresh(
+      { storage },
+      {
+        onUpdate(update) {
+          firstUpdates.push(update.kind)
+        },
+      },
+    )
+    await flush()
+    const second = startStorageOverviewRefresh(
+      { storage },
+      {
+        onUpdate(update) {
+          secondUpdates.push(update.kind)
+        },
+      },
+    )
+    await flush()
+
+    expect(scanCalls.get('projects')).toBe(1)
+    expect(scanCalls.get('assets')).toBe(1)
+
+    first.cancel()
+    const firstAfterCancel = [...firstUpdates]
+    assetScan.resolve()
+    projectScan.resolve()
+    await second.done
+
+    expect(firstUpdates).toEqual(firstAfterCancel)
+    expect(secondUpdates).toEqual(
+      expect.arrayContaining(['usage', 'projects', 'assets']),
+    )
+  })
+
+  it('recounts after the shared in-flight read settles', async () => {
+    let assetScans = 0
+    const storage = {
+      estimateUsage: async () => ({ used: 1, quota: 2 }),
+      query: async () => [],
+      scan: async (
+        table: string,
+        _batch: number,
+        onBatch: (rows: never[], meta: { total: number }) => Promise<void>,
+      ) => {
+        if (table === 'assets') assetScans += 1
+        await onBatch([], { total: 0 })
+        return 0
+      },
+    } as unknown as StoragePort
+
+    await startStorageOverviewRefresh({ storage }, { onUpdate() {} }).done
+    await startStorageOverviewRefresh({ storage }, { onUpdate() {} }).done
+
+    expect(assetScans).toBe(2)
   })
 })

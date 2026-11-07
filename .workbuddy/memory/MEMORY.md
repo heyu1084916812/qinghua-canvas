@@ -12298,3 +12298,12 @@ React 端口 → `invoke` → Rust `check_update` → updater 插件读配置 �
 - Agent「回读 N 条」是 20 条消息窗口，不是 N 轮或全量对话。长任务中断后画布节点不是聊天历史；修复是首条需求锚点、成对工具结果裁剪和 sessionBrief 检查点。界面只展示公开 content / reasoning 与工具步骤，模型正文里的英文内部句要靠上游提示词约束。
 - 两张当前附图的 modlens 视觉服务因地区限制 / 超时失败，改用本地图像查看与像素取样；模型服务截图里的黄框是 #FFF200 截图标注，源码无黄色高亮令牌，不能误判为 UI 改动。
 - 图一 / 图二外部事项仍未完成：53 个本地 commit 未 push，LICENSE / 发布授权、干净机器安装、真实渠道、跨平台 / Authenticode、3D、tag / Release、真实 Pinterest App 与已登录 harness 对真实 Tauri 画布联调都需用户决策或外部登录态。不得自动 push 或发布。
+
+### 总管2 第十轮：Hosting 错误文案、启动 hydrate 请求与证据边界（2026-11-07）
+
+- 外部上传失败时 String(err) 会把网络端口抛出的 AppError 显示成 [object Object]；HostingPage 两处 catch 统一经 hostingErrorText -> errorTextOf，错误分类仍归 shared/result，页面只展示有界中文。UI 文案改动必须留四组截图、几何、Impeccable detector 和 G97 失败提示证据。
+- 共享 18765 开发库里 G97 的「默认关闭」失败是历史 tmpfiles 配置污染；隔离 V1 store 复跑 31 passed / 0 failed / 1 external skipped。不要为了让共享库变绿去改产品默认或删断言。
+- ssetHistoryRepository.list() 的 assets 扫描固定 includePayload:false，批量 8→128；1,400 素材从约 176 次 /rows 降到约 12 次。不能把字节带回内存换请求数下降。
+- storageOverviewReadDedup 按同一 StoragePort + area 复用进行中的项目/素材计数，完成后立即释放；取消只阻止该订阅者回填，不能让另一个活跃订阅者丢结果，下一次显式刷新仍读最新值。
+- 生产探针两次复测三段请求数 69/10/12 与 53/10/12、总请求 262/246，较第九轮基线 68/15/24、总 364 下降 102–118 次；assets /rows 从 18/7 降到 14/4。错误与几何溢出 0。耗时受同机并发 snapshots/channels 读取影响仍约 2.06s，保留 #966 健康债，不把请求数下降冒充耗时达标。
+- 两个不同模型分别实现文案与 hydrate；多代理写根文档时曾把新段落插到文件开头并造成大面积行尾变化，已按 HEAD 原文件恢复。后续追加记忆/文档应只在文件末尾按原行尾追加，并用 git diff --stat / --check 立即复核。

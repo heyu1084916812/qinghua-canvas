@@ -9,6 +9,7 @@ import {
 } from '../../domain/shared/assetHistory'
 import { createAssetHistoryRepository } from '../../state/project/assetHistoryRepository'
 import { createAssetLibraryRepository } from '../../state/project/assetLibraryRepository'
+import { readStorageCount } from './storageOverviewReadDedup'
 
 export interface StorageUsage {
   used: number
@@ -113,10 +114,10 @@ export function startStorageOverviewRefresh(
     done: Promise.all(quick).then(async () => {
       if (!active) return
       const heavy: Promise<void>[] = []
-      start(heavy, 'projects', () => countStorageProjects(source.storage), (projects) => {
+      start(heavy, 'projects', () => readStorageCount(source.storage, 'projects', () => countStorageProjects(source.storage)), (projects) => {
         handlers.onUpdate({ kind: 'projects', projects })
       })
-      start(heavy, 'assets', () => countStorageAssets(source.storage), (assets) => {
+      start(heavy, 'assets', () => readStorageCount(source.storage, 'assets', () => countStorageAssets(source.storage)), (assets) => {
         handlers.onUpdate({ kind: 'assets', assets })
       })
       await Promise.all(heavy)

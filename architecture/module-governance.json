@@ -5920,6 +5920,48 @@
       "budget": 170
     },
     {
+      "module": "src/pages/HostingPage/hostingErrorText.ts",
+      "owner": "settings-hosting-error-text",
+      "responsibility": "把素材传输页面的任意抛出物归一化成有界、可读的失败说明。",
+      "owns": [
+        "上传失败与测连通失败的公用错误文本",
+        "错误说明长度上限"
+      ],
+      "doesNotOwn": [
+        "图床配置与上传请求",
+        "页面状态与渲染",
+        "错误分类规则"
+      ],
+      "publicApi": [
+        "hostingErrorText"
+      ],
+      "test": [
+        "src/pages/HostingPage/hostingErrorText.test.ts"
+      ],
+      "budget": 30
+    },
+    {
+      "module": "src/features/settings/storageOverviewReadDedup.ts",
+      "owner": "settings-storage-overview-read-dedupe",
+      "responsibility": "按存储端口与统计区域复用进行中的项目/素材计数，并在完成后释放。",
+      "owns": [
+        "StrictMode 与重挂载场景的 in-flight 计数复用",
+        "读取完成或失败后的去重表释放"
+      ],
+      "doesNotOwn": [
+        "存储面板读取顺序与失败隔离",
+        "项目/素材计数口径",
+        "React 状态或存储后端实现"
+      ],
+      "publicApi": [
+        "readStorageCount"
+      ],
+      "test": [
+        "src/features/settings/storageOverviewRefresh.test.ts"
+      ],
+      "budget": 40
+    },
+    {
       "module": "src/features/settings/CanvasMcpPanel.tsx",
       "owner": "settings-canvas-mcp-panel",
       "responsibility": "展示 Canvas MCP 网关状态、工具范围、验证入口和可复制的 harness 配置。",
