@@ -1,5 +1,21 @@
 # CanvasFlow（轻画）项目记忆
 
+### 总管2 第二十三轮：存储/日志重开缓存、MIME 分类与文案复验（2026-11-08）
+
+- 存储面板的会话快照必须按 `StoragePort` 隔离，只用于重开时先显示上次字段；后台刷新仍由
+  `startStorageOverviewRefresh` 独立发布并最终覆盖。不要把快照持久化、复制用户数据或跨端口复用。
+- `historyKindOf` 只把 `audio/*` 算音频；未知 MIME 归 `other`，`StoragePanel` 直接显示 `assets.other`，
+  不能再用“总数减三类”得到恒为零的“其他”。
+- 总日志与画布日志首屏缓存按 StoragePort + 稳定筛选 + 页大小隔离，只缓存第一页。首查和续载都要在 await
+  后比较请求 revision；迟到响应不能覆盖新筛选。
+- 画布日志只订阅 `subscribeRunRecordChanged`，连续写入以 50ms 合并；不要同时订阅整张图快照，否则一次生成
+  可能触发重复查询。release 探针重开存储必须 `storageReopenMs <= 500`。
+- 自动生成菜单文案统一为“计划需你确认，之后自动执行并扣费”。About 只声明真实随包的 FFmpeg 许可，
+  其他依赖以各自包内 LICENSE 为准，Dexie 只用于旧浏览器库迁移。
+- 本轮最终代码门禁：1086 modules / 4343 dependencies / 230 semantic registrations；串行全量
+  639 files（638 passed / 1 skipped）/ 5389 tests（5388 passed / 1 skipped）；build 最大 JS 377.82KB；
+  `smoke:critical` 4/4 组、97 项、0 失败。安装包从本提交重建后补记 hash。
+
 ### 总管2 第二十二轮：真实图片性能稳定闭环、可见订阅与缩放稳态（2026-11-08）
 
 - 真实图片门禁固定 150 张唯一 PNG/WebP、300 节点 / 500 连线、P95 ≤20ms；三份独立 release 报告连续通过：
