@@ -12348,3 +12348,12 @@ React 端口 → `invoke` → Rust `check_update` → updater 插件读配置 �
 - Windows CLI 停止不能只 `Child::kill()`；`cli_kill`、broken 清理和超时清理必须共用 `taskkill.exe /PID <own child id> /T /F`，失败才回退直接 kill。禁止 `/IM`、按进程名或全局匹配，真实测试只允许终止本测试创建的父/子进程。
 - 登录、一键设置登录和单独安装窗口统一经 `features/settings/cliWindowRequest.ts` 传递 trimmed cwd；空串表示继承应用目录。不要在各按钮回调里重复拼请求。
 - 本机逻辑证据：Tauri Rust 66/66（含 Windows 父子进程终止）、CLI 定向 9/9、module governance 223 条。真实已登录 CLI、媒体导出、RunningHub 多产物、空 statusArgs 自动状态和窗口结束自动重检仍是 #972 外部/后续项。
+
+### 总管2 第十六轮：CLI 空状态、toggle 崩溃与隔离 release 复验（2026-11-08）
+
+- 配置型密钥登录后的状态查询归 `features/settings/cliKeyLoginResult.ts`：`statusArgs.trim()` 为空时返回 `null` 和“已跳过自动查询”，`CliPanel` 不得再用空参数运行工具本体；非空时才构造参数并调用 `runInto`。
+- React 19 的 `<details>` `toggle` 回调里 `event.currentTarget` 可能已经是 `null`；读取 `event.currentTarget.open` 会让用户点“更多操作”时抛错并卸载整个全局设置浮层。稳定写法是 `event.target instanceof HTMLDetailsElement && event.target.open`，真实 release 点击门禁必须覆盖。
+- release gate 的 WebView2 `shell-v2` 必须跟随 `QINGHUA_RELEASE_GATE_DATA_DIR` 的父目录隔离；只换业务 store、复用用户实例 profile 时，Windows 会拒绝创建 WebView 并在 20 秒后自动重载。自动化可显式设 `QINGHUA_DISABLE_UI_WATCHDOG=1`，产品默认看门狗不得关闭。
+- CLI UI 探针使用独立 store / CDP / LOCALAPPDATA / APPDATA / shell profile，只按自己 app pid 执行 `taskkill /PID <pid> /T /F`。四组 1440×900 / 1024×700 × 明暗 release 证据为 `ok=true`：隔离密钥文件真实写入，空 `statusArgs` 无状态按钮/输出，key 行宽高稳定、无横向或面板溢出、page/console error 0。
+- 真实图片性能复验固定 150 张唯一 PNG/WebP、300 节点 / 500 连线、P95 ≤20ms。本轮首跑缩放 14.1/20.9/21.0ms 失败，随后两次通过：平移 7.3/7.3/7.3ms、缩放 7.4/7.4/7.3ms，以及平移 7.3/7.3/7.4ms、缩放 7.4/7.3/13.9ms；三次都保持 150 张 rendered/decoded、300/500 全挂载、错误 0。首跑抖动必须保留，不能抹掉或用平均帧率掩盖。
+- 真实已登录 CLI 运行/停止、安装/登录窗口结束后的自动重检、媒体导出、RunningHub 多产物、push、LICENSE、干净机器、跨平台签名和 tag/Release 仍未完成。

@@ -6085,6 +6085,28 @@
       "budget": 15
     },
     {
+      "module": "src/features/settings/cliKeyLoginResult.ts",
+      "owner": "settings-cli-key-login-result",
+      "responsibility": "决定配置型密钥登录后的自动状态命令与反馈文案。",
+      "owns": [
+        "空 statusArgs 跳过自动查询",
+        "非空 statusArgs 参数构造与登录反馈"
+      ],
+      "doesNotOwn": [
+        "密钥写入配置文件",
+        "CLI 子进程执行",
+        "React 面板渲染"
+      ],
+      "publicApi": [
+        "cliKeyLoginResult",
+        "CliKeyLoginResult"
+      ],
+      "test": [
+        "src/features/settings/cliKeyLoginResult.test.ts"
+      ],
+      "budget": 35
+    },
+    {
       "module": "src/features/settings/cliWindowRequest.ts",
       "owner": "settings-cli-window-request",
       "responsibility": "构造带工具工作目录的可见 CLI 窗口请求。",

@@ -400,10 +400,20 @@ fn populated_v1_source(candidates: &[PathBuf]) -> Option<PathBuf> {
 ///
 /// 业务数据已迁到 shared-store；这里只放 WebView2 缓存和可重建偏好。
 fn shared_shell_profile_dir(app: &tauri::AppHandle) -> Option<PathBuf> {
-    app.path()
-        .app_local_data_dir()
-        .ok()
+    shell_profile_dir_for(
+        release_gate_data_dir().as_deref(),
+        app.path().app_local_data_dir().ok(),
+    )
+}
+
+fn shell_profile_dir_for(
+    release_gate_data_dir: Option<&Path>,
+    app_local_data_dir: Option<PathBuf>,
+) -> Option<PathBuf> {
+    release_gate_data_dir
+        .and_then(Path::parent)
         .map(|root| root.join("shell-v2"))
+        .or_else(|| app_local_data_dir.map(|root| root.join("shell-v2")))
 }
 
 /// 第一次在新位置启动时，把**数据**从默认 profile 搬过去（不是每次启动都搬）。
@@ -4109,6 +4119,26 @@ mod data_dir_tests {
         assert_eq!(
             parse_release_gate_data_dir(None, Some("D:\\gate\\data-v2")),
             None
+        );
+    }
+
+    #[test]
+    fn release_gate_shell_profile_follows_the_isolated_data_root() {
+        assert_eq!(
+            shell_profile_dir_for(
+                Some(Path::new("D:\\gate\\product\\data-v2")),
+                Some(PathBuf::from("C:\\Users\\me\\AppData\\Local\\com.qinghua.canvas")),
+            ),
+            Some(PathBuf::from("D:\\gate\\product\\shell-v2"))
+        );
+        assert_eq!(
+            shell_profile_dir_for(
+                None,
+                Some(PathBuf::from("C:\\Users\\me\\AppData\\Local\\com.qinghua.canvas")),
+            ),
+            Some(PathBuf::from(
+                "C:\\Users\\me\\AppData\\Local\\com.qinghua.canvas\\shell-v2"
+            ))
         );
     }
 

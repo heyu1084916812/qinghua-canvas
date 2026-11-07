@@ -1021,3 +1021,14 @@
 - Windows CLI 停止、broken 清理和超时清理必须按本方持有的 `Child::id()` 使用 `/PID <pid> /T /F`，失败才回退直接 `child.kill()`；禁止 `/IM`、按进程名或全局匹配。测试只能终止自己创建的父子辅助进程。
 - 登录、一键设置登录、单独安装窗口必须统一经 `cliWindowRequest.ts` 传 trimmed `cwd`；空串表示继承应用目录。页面回调不得重新拼第二套窗口请求。
 - 本机进程树和 cwd 测试不能替代真实已登录 CLI、媒体导出、RunningHub 多产物、空 `statusArgs` 自动状态或窗口结束自动重检；这些继续留在 #972。
+
+## CLI 空状态、toggle 与 release gate profile（2026-11-08 第十六轮）
+
+- `cliKeyLoginResult` 必须在 `statusArgs.trim()` 为空时返回 `statusArgs:null`；配置型密钥登录成功后不得再调用 `runInto(tool,'status',[])` 去运行工具本体。非空状态命令才构造参数并反馈“下面立刻查一次状态”。
+- `<details onToggle>` 禁止读取 `event.currentTarget.open`；React 19 下 `currentTarget` 可能为 `null`。必须从 `event.target` 判断 `HTMLDetailsElement.open`，否则“更多操作”会抛错并卸掉全局设置浮层。
+- release gate 的 `shell-v2` 必须跟随临时数据目录的父目录；只隔离 store 端口/业务库仍会与用户实例争用 WebView2 profile。UI 自动化可设 `QINGHUA_DISABLE_UI_WATCHDOG=1`，但只能用于探针进程，不能改产品默认看门狗。
+- CLI UI 探针只能操作隔离 release 并终止自己持有的 app pid；密钥文件必须留在 `.playwright-verify/.../localappdata`。四组截图还需同时证明空状态命令无状态按钮/输出、key 行宽高稳定、无横向/面板溢出、page/console error 0。
+
+## 真实图片性能复验边界（2026-11-08 第十六轮）
+
+- 当前 release 性能门禁仍必须固定 150 张唯一 PNG/WebP、300 节点、500 连线、P95 ≤20ms；首跑缩放 14.1/20.9/21.0ms 的边界失败必须保留。随后两次通过为平移 7.3/7.3/7.3ms、缩放 7.4/7.4/7.3ms，以及平移 7.3/7.3/7.4ms、缩放 7.4/7.3/13.9ms；不能因为一次抖动就删除失败报告或下调标准。

@@ -19,6 +19,7 @@ import {
   runDiagnosticLabel,
   type CliProbe,
 } from './cliPanelPresentation'
+import { cliKeyLoginResult } from './cliKeyLoginResult'
 import styles from './CliPanel.module.css'
 
 /**
@@ -332,12 +333,15 @@ export function CliPanel() {
       if (!cli.rhSetApiKey) return
       setBusy(`${tool.id}:key`)
       let written = ''
+      let autoStatusArgs: string[] | null = null
       try {
         written = await cli.rhSetApiKey(secret)
         setKeys((prev) => ({ ...prev, [tool.id]: '' }))
+        const completion = cliKeyLoginResult(tool, written)
+        autoStatusArgs = completion.statusArgs
         setLoginMsg((prev) => ({
           ...prev,
-          [tool.id]: `Key 已写入 ${written}（与手敲 \`rh auth set-key\` 等效，密钥没有进命令行）——下面立刻查一次状态。`,
+          [tool.id]: completion.message,
         }))
       } catch (err) {
         setLoginMsg((prev) => ({ ...prev, [tool.id]: `写配置失败：${String(err)}` }))
@@ -345,7 +349,7 @@ export function CliPanel() {
         setBusy('')
       }
       /* `runInto` 自带 busy 门，所以这一句必须等上面释放了再调 */
-      if (written) await runInto(tool, 'status', buildArgs(tool.statusArgs, {}))
+      if (written && autoStatusArgs) await runInto(tool, 'status', autoStatusArgs)
       return
     }
 
@@ -492,12 +496,10 @@ export function CliPanel() {
             className={styles.more}
             data-cli-login-box={tool.id}
             open={moreOpen[tool.id] === true}
-            onToggle={(event) =>
-              setMoreOpen((prev) => ({
-                ...prev,
-                [tool.id]: event.currentTarget.open,
-              }))
-            }
+            onToggle={(event) => {
+              const open = event.target instanceof HTMLDetailsElement && event.target.open
+              setMoreOpen((prev) => ({ ...prev, [tool.id]: open }))
+            }}
           >
             <summary className={styles.summary}>更多操作</summary>
             <div className={styles.moreBody}>
