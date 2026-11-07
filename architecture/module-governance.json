@@ -1124,6 +1124,27 @@
       "budget": 72
     },
     {
+      "module": "src/app/projectTree/reload.ts",
+      "owner": "project-navigation",
+      "responsibility": "决定项目树何时加载、跳过或重置列表扫描，避免路由变化重复读库。",
+      "owns": [
+        "项目树 revision 加载判定"
+      ],
+      "doesNotOwn": [
+        "项目仓储查询",
+        "React 渲染",
+        "项目事件发布"
+      ],
+      "publicApi": [
+        "projectTreeLoadDecision",
+        "ProjectTreeLoadDecision"
+      ],
+      "test": [
+        "src/app/projectTree/reload.test.ts"
+      ],
+      "budget": 30
+    },
+    {
       "module": "src/domain/agent/modelMessageWindow.ts",
       "owner": "agent-history",
       "responsibility": "按用户轮与成对工具结果裁剪模型消息，并固定保留首条有效用户需求。",
@@ -5940,6 +5961,29 @@
         "src/features/settings/storageOverviewRefresh.test.ts"
       ],
       "budget": 170
+    },
+    {
+      "module": "src/features/settings/storageOverviewAssetCount.ts",
+      "owner": "settings-storage-overview-asset-count",
+      "responsibility": "用最小字段统计存储面板的素材数量与最近使用时间，不构造完整历史卡片。",
+      "owns": [
+        "生成输出 hash 与时间去重",
+        "素材 MIME 元数据投影",
+        "素材库隐藏项过滤"
+      ],
+      "doesNotOwn": [
+        "React 面板状态",
+        "项目数量扫描",
+        "存储空间占用"
+      ],
+      "publicApi": [
+        "countStorageAssets",
+        "StorageAssetCounts"
+      ],
+      "test": [
+        "src/features/settings/storageOverviewRefresh.test.ts"
+      ],
+      "budget": 110
     },
     {
       "module": "src/pages/HostingPage/hostingErrorText.ts",

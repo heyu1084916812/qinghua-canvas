@@ -17,4 +17,5 @@ describe('ProjectTree delete confirmation', () => {
     expect(html).toContain('收尾中…')
     expect(html.match(/disabled=""/g)).toHaveLength(2)
   })
+
 })

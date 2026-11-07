@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   buildHistory,
   countAssets,
+  countAssetRecords,
   countHistory,
   dateLabelOf,
   filterHistory,
@@ -292,6 +293,27 @@ describe('countHistory / modelCounts', () => {
     it('★ 失败记录仍然只来自生成历史（素材库没有这一档）', () => {
       expect(countAssets(items, [], NOW).failed).toBe(1)
       expect(countAssets([], [{ hash: 'up-1', mime: 'image/png' }], NOW).failed).toBe(0)
+    })
+
+    it('存储面板可用最小 hash/MIME/时间记录计数，不构造完整历史卡', () => {
+      expect(
+        countAssetRecords(
+          [
+            { hash: 'out-1', mime: 'image/png', createdAt: NOW },
+            { hash: 'out-2', mime: 'video/mp4', createdAt: NOW - 30 * DAY },
+          ],
+          [{ hash: 'out-2', mime: 'video/mp4', savedAt: NOW }],
+          NOW,
+        ),
+      ).toEqual({
+        all: 2,
+        image: 1,
+        video: 1,
+        audio: 0,
+        saved: 1,
+        recent: 2,
+        failed: 0,
+      })
     })
   })
 })

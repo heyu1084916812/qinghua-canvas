@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { createMemoryPlatform } from '../../platform/memory'
 import { createPresetStore } from './presetStore'
 
@@ -177,5 +177,30 @@ describe('不常用前端模型 · 偏好', () => {
     await store.save({ channelId: 'c1', model: 'mock-image-1', params: {}, savedAt: 1 })
     await store.saveUncommonModels(['Midjourney'])
     expect([...(await store.loadAll()).keys()]).toEqual(['c1'])
+  })
+})
+
+describe('渠道启动配置 · 单次 presets 读取', () => {
+  it('一次查询读回隐藏协议、自定义模型、不常用模型、选路和配方记忆', async () => {
+    const platform = createMemoryPlatform()
+    const s = createPresetStore(platform.storage)
+    await s.saveHiddenBuiltinProtocols(['protocol-a'])
+    await s.saveCustomModels([{ id: 'custom-image', vendor: 'openai', category: 'image' }])
+    await s.saveUncommonModels(['rare-model'])
+    await s.saveRoutingStrategy('balanced')
+    await s.saveRecipeMemory(false)
+
+    const query = vi.spyOn(platform.storage, 'query')
+    const snapshot = await s.loadChannelBootstrap()
+    const presetQueries = query.mock.calls.filter((call) => call[0] === 'presets')
+
+    expect(presetQueries).toHaveLength(1)
+    expect(snapshot).toEqual({
+      hiddenBuiltinProtocolIds: ['protocol-a'],
+      customModels: [{ id: 'custom-image', vendor: 'openai', category: 'image' }],
+      uncommonModelIds: ['rare-model'],
+      routeStrategy: 'balanced',
+      recipeMemory: false,
+    })
   })
 })

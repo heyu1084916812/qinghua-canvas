@@ -4,11 +4,9 @@ import type {
   StorageRootInfo,
 } from '../../platform/ports'
 import {
-  countAssets,
-  type LibraryCountRow,
-} from '../../domain/shared/assetHistory'
-import { createAssetHistoryRepository } from '../../state/project/assetHistoryRepository'
-import { createAssetLibraryRepository } from '../../state/project/assetLibraryRepository'
+  countStorageAssets,
+  type StorageAssetCounts,
+} from './storageOverviewAssetCount'
 import { readStorageCount } from './storageOverviewReadDedup'
 
 export interface StorageUsage {
@@ -16,7 +14,7 @@ export interface StorageUsage {
   quota: number
 }
 
-export type StorageAssetCounts = ReturnType<typeof countAssets>
+export { countStorageAssets, type StorageAssetCounts } from './storageOverviewAssetCount'
 
 export type StorageOverviewUpdate =
   | { kind: 'usage'; usage: StorageUsage }
@@ -126,27 +124,6 @@ export function startStorageOverviewRefresh(
       active = false
     },
   }
-}
-
-/** 与素材页一致：生成历史 ∪ 收藏，按素材 hash 去重。 */
-export async function countStorageAssets(
-  storage: StoragePort,
-  now = Date.now(),
-): Promise<StorageAssetCounts> {
-  const [rawHistory, rawLibrary, hidden] = await Promise.all([
-    createAssetHistoryRepository(storage).list(),
-    storage.query('assetLibrary', {}),
-    createAssetLibraryRepository(storage).listHidden(),
-  ])
-  const history = rawHistory.filter(
-    (item) => item.kind !== 'output' || !hidden.has(item.hash),
-  )
-  const library = (rawLibrary as LibraryCountRow[]).filter((row) => {
-    const hash =
-      typeof row.hash === 'string' ? row.hash : typeof row.id === 'string' ? row.id : ''
-    return !hash || !hidden.has(hash)
-  })
-  return countAssets(history, library, now)
 }
 
 export async function countStorageProjects(storage: StoragePort): Promise<number> {

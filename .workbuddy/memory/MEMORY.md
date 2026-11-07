@@ -12372,3 +12372,10 @@ React 端口 → `invoke` → Rust `check_update` → updater 插件读配置 �
 - `cliRun` 只把图片/视频填进 `{image}`/`{video}`；缺占位符、同类素材超量、未知 MIME 都在起进程前明确拒绝。当前每个占位符只接一个同类素材，不能静默只取第一张，也不能把 hash 冒充路径。
 - RunningHub `results[]` 必须逐项下载；新增回归证明两个 URL 都下载、hash 不同且 assets 全部落库。画布主节点显示第一张，`thumbOrder` 保留完整顺序；结果组不回潮。
 - 定向回归：`cliRun.test.ts` 23/23、`runninghub.test.ts` 与 `execution.test.ts` 合计 113/113，`tsc --noEmit` 通过；Rust 新增 `cli_media_file_name` 白名单测试。真实已登录付费任务和真实 RunningHub 多文件返回仍是外部验收。
+
+### 总管2 第十九轮：图四 hydrate 请求与项目树重复扫描（2026-11-08）
+
+- 渠道启动所需 5 类 `presets` 偏好必须经 `loadChannelBootstrap()` 一次读回；不要在 `ChannelStore.load()` 里按 id 拆成多次 `/query`。读失败仍回落默认值。
+- 项目树列表只由打开状态和项目 revision 驱动；路由切换、当前项目高亮变化只改投影，不得重查 projects/nodes/runRecords。判定在 `projectTree/reload.ts`，并由 `ProjectTree.test.ts` 的 decision 测试覆盖。
+- 存储素材计数归 `storageOverviewAssetCount.ts`，只投影 `runRecords.createdAt/outputHashes` 与 assets MIME 元数据，不构造完整历史卡；assets 批为 256。首次内置渠道补齐用一次 `bulkPut`，不要逐行 `/put`。
+- 当前生产探针：总请求 288→247–275，存储阶段 79→53–74，`presets` 7→3，`assetLibrary` 2→1；三段耗时约 1.1–1.2s / 0.19–0.36s / 0.38–0.56s。请求下降已证实，耗时仍受 V1 波动影响，#966 未清零。

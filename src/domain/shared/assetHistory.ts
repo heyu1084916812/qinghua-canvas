@@ -337,21 +337,38 @@ export function countAssets(
   library: readonly LibraryCountRow[],
   now: number,
 ): HistoryCounts {
+  const records = items
+    .filter((item): item is HistoryOutput => item.kind === 'output')
+    .map((item) => ({ hash: item.hash, mime: item.mime, createdAt: item.createdAt }))
+  const counts = countAssetRecords(records, library, now)
+  return {
+    ...counts,
+    failed: items.filter((item) => item.kind === 'failed').length,
+  }
+}
+
+export interface AssetCountRecord {
+  hash: string
+  mime: string | null
+  createdAt: number
+}
+
+/** 只凭 hash / MIME / 时间计数；存储面板不需要构造完整历史卡片。 */
+export function countAssetRecords(
+  records: readonly AssetCountRecord[],
+  library: readonly LibraryCountRow[],
+  now: number,
+): HistoryCounts {
   const recentFrom = now - RECENT_DAYS * DAY_MS
   /** hash → { 类型, 时间 }。时间取两份来源里**更晚**的那个 */
   const seen = new Map<string, { kind: HistoryKind; at: number }>()
   const savedHashes = new Set<string>()
-  let failed = 0
 
-  for (const item of items) {
-    if (item.kind === 'failed') {
-      failed += 1
-      continue
-    }
-    const prev = seen.get(item.hash)
-    seen.set(item.hash, {
-      kind: historyKindOf(item.mime),
-      at: Math.max(prev?.at ?? 0, item.createdAt),
+  for (const record of records) {
+    const prev = seen.get(record.hash)
+    seen.set(record.hash, {
+      kind: historyKindOf(record.mime),
+      at: Math.max(prev?.at ?? 0, record.createdAt),
     })
   }
 
@@ -379,7 +396,7 @@ export function countAssets(
     audio: 0,
     saved: savedHashes.size,
     recent: 0,
-    failed,
+    failed: 0,
   }
   for (const { kind, at } of seen.values()) {
     counts[kind] += 1

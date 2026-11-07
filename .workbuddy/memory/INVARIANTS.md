@@ -1046,3 +1046,11 @@
 - `{image}` / `{video}` 只能填真实导入后的本地路径。模板缺对应占位符、图片/视频超过当前一格容量、未知 MIME 都必须起进程前拒绝；当前不支持多同类素材时不许静默只取第一张。
 - RunningHub `results[]` 必须全部下载和算 hash。画布当前边界是主节点显示第一张、`thumbOrder` 保留完整顺序、assets 全部落库；不要为多产物恢复已下线的结果组。
 - 验证必须覆盖图片导入、视频导入、缺占位符拒绝、多素材拒绝、RunningHub 两 URL、画布单任务两产物与 Rust 文件名白名单；真实付费账号返回仍是外部验收。
+
+## 图四 hydrate 请求与项目树边界（2026-11-08 第十九轮）
+
+- 渠道启动所需的隐藏协议、自定义模型、不常用模型、选路策略和配方记忆必须经 `loadChannelBootstrap()` 一次读取后分发；禁止在 `ChannelStore.load()` 里对同一 `presets` 小表拆成多个按 id 查询。
+- 项目树列表只受打开状态和项目 revision 驱动。路由切换或 activeProjectId 高亮变化不得重新扫描 `projects/nodes/runRecords`；判定必须复用 `projectTree/reload.ts`。
+- 存储素材计数必须使用 `storageOverviewAssetCount.ts` 的最小字段路径：`runRecords` 只取 `createdAt/outputHashes`，assets 只取元数据且批为 256；不得为了计数构造完整历史卡或查无关 projects 表。
+- 内置渠道补齐必须用一次 `bulkPut` 写缺失行；已有行只补协议不回写凭据/名称。验证要同时覆盖幂等、改名保留和批写次数。
+- 生产探针只能按“请求数下降”和“耗时波动”分开报告。当前总请求 288→247–275，但三段耗时仍约 1.1–1.2s / 0.19–0.36s / 0.38–0.56s，#966 不得标完成。

@@ -77,11 +77,52 @@ export interface AgentDefaultModel {
   model: string
 }
 
+export interface ChannelPresetBootstrap {
+  hiddenBuiltinProtocolIds: string[]
+  customModels: PresetModel[]
+  uncommonModelIds: string[]
+  routeStrategy: RouteStrategy
+  recipeMemory: boolean
+}
+
 /** 未知 / 缺字段 / 读失败时回落 `priority`（手工排的优先度，行为最可预测） */
 function routeStrategyFromRow(row: unknown): RouteStrategy {
   if (!row || typeof row !== 'object') return 'priority'
   const value = (row as Record<string, unknown>).strategy
   return ROUTE_STRATEGIES.some((s) => s.value === value) ? (value as RouteStrategy) : 'priority'
+}
+
+function recipeMemoryFromRow(row: unknown): boolean {
+  return (row as { enabled?: unknown } | undefined)?.enabled !== false
+}
+
+function customModelsFromRow(row: unknown): PresetModel[] {
+  const raw = (row as { models?: unknown } | undefined)?.models
+  if (!Array.isArray(raw)) return []
+  const categories = new Set(['image', 'chat', 'video', 'audio'])
+  return raw.filter((item): item is PresetModel => {
+    if (!item || typeof item !== 'object') return false
+    const model = item as Record<string, unknown>
+    return (
+      typeof model.id === 'string' &&
+      model.id.trim() !== '' &&
+      typeof model.vendor === 'string' &&
+      typeof model.category === 'string' &&
+      categories.has(model.category)
+    )
+  })
+}
+
+function uncommonModelsFromRow(row: unknown): string[] {
+  const names = (row as { names?: unknown } | undefined)?.names
+  if (!Array.isArray(names)) return []
+  return [...new Set(names.filter((name): name is string => typeof name === 'string'))]
+}
+
+function hiddenBuiltinProtocolsFromRow(row: unknown): string[] {
+  const ids = (row as { ids?: unknown } | undefined)?.ids
+  if (!Array.isArray(ids)) return []
+  return [...new Set(ids.filter((id): id is string => typeof id === 'string' && !!id))]
 }
 
 export interface PresetStore {
@@ -94,6 +135,8 @@ export interface PresetStore {
   saveRecipeMemory(enabled: boolean): Promise<void>
   /** 一次读回全部配方，供面板兜底时同步查表（避免逐个 await） */
   loadAll(): Promise<Map<string, GenerationRecipe>>
+  /** 渠道 Store 启动所需的小配置一次读回，避免同表拆成多次请求。 */
+  loadChannelBootstrap(): Promise<ChannelPresetBootstrap>
   /** 读取全局选路策略；没有 / 数据不可信时回落 `priority` */
   loadRoutingStrategy(): Promise<RouteStrategy>
   /** 写入全局选路策略 */
@@ -151,9 +194,8 @@ export function createPresetStore(storage: StoragePort): PresetStore {
     async loadRecipeMemory() {
       try {
         const rows = await storage.query('presets', { id: RECIPE_MEMORY_ROW_ID })
-        const raw = (rows[0] as { enabled?: unknown } | undefined)?.enabled
         /* 只有**明确的 false** 才算关；缺行 / 脏值一律当开（与"现状就是记住"一致） */
-        return raw !== false
+        return recipeMemoryFromRow(rows[0])
       } catch {
         return true
       }
@@ -187,6 +229,32 @@ export function createPresetStore(storage: StoragePort): PresetStore {
         // 同上：读不到就退化为「谁都没记过」，由解析链兜底
       }
       return out
+    },
+    async loadChannelBootstrap() {
+      const fallback: ChannelPresetBootstrap = {
+        hiddenBuiltinProtocolIds: [],
+        customModels: [],
+        uncommonModelIds: [],
+        routeStrategy: 'priority',
+        recipeMemory: true,
+      }
+      try {
+        const rows = await storage.query('presets', {})
+        const byId = new Map(
+          rows.map((row) => [(row as { id?: unknown }).id, row] as const),
+        )
+        return {
+          hiddenBuiltinProtocolIds: hiddenBuiltinProtocolsFromRow(
+            byId.get(HIDDEN_BUILTIN_PROTOCOLS_ROW_ID),
+          ),
+          customModels: customModelsFromRow(byId.get(CUSTOM_MODELS_ROW_ID)),
+          uncommonModelIds: uncommonModelsFromRow(byId.get(UNCOMMON_MODELS_ROW_ID)),
+          routeStrategy: routeStrategyFromRow(byId.get(ROUTE_STRATEGY_ROW_ID)),
+          recipeMemory: recipeMemoryFromRow(byId.get(RECIPE_MEMORY_ROW_ID)),
+        }
+      } catch {
+        return fallback
+      }
     },
     async loadRoutingStrategy() {
       try {
@@ -321,20 +389,7 @@ export function createPresetStore(storage: StoragePort): PresetStore {
     async loadCustomModels() {
       try {
         const rows = await storage.query('presets', { id: CUSTOM_MODELS_ROW_ID })
-        const raw = (rows[0] as { models?: unknown } | undefined)?.models
-        if (!Array.isArray(raw)) return []
-        const categories = new Set(['image', 'chat', 'video', 'audio'])
-        return raw.filter((item): item is PresetModel => {
-          if (!item || typeof item !== 'object') return false
-          const row = item as Record<string, unknown>
-          return (
-            typeof row.id === 'string' &&
-            row.id.trim() !== '' &&
-            typeof row.vendor === 'string' &&
-            typeof row.category === 'string' &&
-            categories.has(row.category)
-          )
-        })
+        return customModelsFromRow(rows[0])
       } catch {
         return []
       }
@@ -355,9 +410,7 @@ export function createPresetStore(storage: StoragePort): PresetStore {
     async loadUncommonModels() {
       try {
         const rows = await storage.query('presets', { id: UNCOMMON_MODELS_ROW_ID })
-        const row = rows[0] as { names?: unknown } | undefined
-        if (!row || !Array.isArray(row.names)) return []
-        return [...new Set(row.names.filter((name): name is string => typeof name === 'string'))]
+        return uncommonModelsFromRow(rows[0])
       } catch {
         return []
       }
@@ -375,9 +428,7 @@ export function createPresetStore(storage: StoragePort): PresetStore {
         const rows = await storage.query('presets', {
           id: HIDDEN_BUILTIN_PROTOCOLS_ROW_ID,
         })
-        const ids = (rows[0] as { ids?: unknown } | undefined)?.ids
-        if (!Array.isArray(ids)) return []
-        return [...new Set(ids.filter((id): id is string => typeof id === 'string' && !!id))]
+        return hiddenBuiltinProtocolsFromRow(rows[0])
       } catch {
         return []
       }

@@ -1,9 +1,21 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { createMemoryPlatform } from '../../platform/memory'
 import { BUILTIN_CHANNEL_IDS } from '../../domain/project/builtinChannels'
 import { createChannelRepository } from './channelRepository'
 
 describe('channelRepository', () => {
+  it('首次补齐内置渠道只批量写一次，不逐行放大存储请求', async () => {
+    const p = createMemoryPlatform()
+    const repo = createChannelRepository(p.storage, p.credentials)
+    const put = vi.spyOn(p.storage, 'put')
+    const bulkPut = vi.spyOn(p.storage, 'bulkPut')
+
+    await repo.seedBuiltins()
+
+    expect(bulkPut).toHaveBeenCalledTimes(1)
+    expect(put.mock.calls.filter((call) => call[0] === 'channels')).toHaveLength(0)
+  })
+
   it('seedBuiltins 幂等补齐常驻渠道，包含 SoonStudio 与它的站点协议', async () => {
     const p = createMemoryPlatform()
     const repo = createChannelRepository(p.storage, p.credentials)

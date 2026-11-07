@@ -264,6 +264,7 @@ export function createChannelRepository(storage: StoragePort, credentials: Crede
    */
   const seedBuiltins = async (): Promise<Channel[]> => {
     let current = await list()
+    let changed = false
     const retired = new Set<string>(RETIRED_BUILTIN_CHANNEL_IDS)
     for (const channel of current) {
       if (!retired.has(channel.id)) continue
@@ -273,8 +274,9 @@ export function createChannelRepository(storage: StoragePort, credentials: Crede
        */
       if (channel.hasToken || channel.hasAltToken || channel.models.length > 0) continue
       await storage.delete('channels', channel.id)
+      changed = true
     }
-    current = await list()
+    if (changed) current = current.filter((channel) => !retired.has(channel.id))
 
     /**
      * 内置渠道只固定 id 与协议；名称和头像是用户可以编辑的资料。
@@ -283,17 +285,18 @@ export function createChannelRepository(storage: StoragePort, credentials: Crede
     for (const spec of BUILTIN_CHANNELS) {
       const existing = current.find((channel) => channel.id === spec.id)
       if (!existing || existing.protocol === spec.protocol) continue
+      const next = { ...existing, protocol: spec.protocol }
       await storage.put('channels', {
-        ...existing,
-        protocol: spec.protocol,
+        ...next,
       } as unknown as RowOf<TableName>)
+      current = current.map((channel) => (channel.id === spec.id ? next : channel))
+      changed = true
     }
-    current = await list()
 
     const have = new Set(current.map((c) => c.id))
     const missing = BUILTIN_CHANNELS.filter((spec) => !have.has(spec.id))
     if (missing.length === 0) return current
-    for (const spec of missing) {
+    const created = missing.map((spec) => {
       const ch = createBuiltinChannel(spec, BUILTIN_CHANNELS.indexOf(spec))
       /** 凭据引用走与普通渠道同一条路（不然"存令牌"没有落点） */
       ch.credentialRef = createId('cred')
@@ -310,9 +313,11 @@ export function createChannelRepository(storage: StoragePort, credentials: Crede
             ]
           : []),
       ]
-      await storage.put('channels', ch as unknown as RowOf<TableName>)
-    }
-    return list()
+      return ch
+    })
+    await storage.bulkPut('channels', created as unknown as RowOf<TableName>[])
+    changed = true
+    return changed ? list() : current
   }
 
   const create = async (input: CreateChannelInput): Promise<Channel> => {

@@ -260,12 +260,8 @@ export function createChannelStore(
     const [
       loadedChannels,
       customRows,
-      storedHiddenBuiltinProtocolIds,
-      customModels,
-      uncommonModelIds,
-      routeStrategy,
+      channelPresetBootstrap,
       storedRoutingPolicy,
-      recipeMemory,
     ] =
       await Promise.all([
       /**
@@ -274,14 +270,13 @@ export function createChannelStore(
        */
       seedBuiltins ? repo.seedBuiltins() : repo.list(),
       platform.storage.query('customProtocols', {}),
-      presets.loadHiddenBuiltinProtocols(),
-      presets.loadCustomModels(),
-      presets.loadUncommonModels(),
-      presets.loadRoutingStrategy(),
+      presets.loadChannelBootstrap(),
       routingPolicies.load(),
-      presets.loadRecipeMemory(),
       ])
-    const routingPolicy = loadedRoutingPolicy(storedRoutingPolicy, routeStrategy)
+    const routingPolicy = loadedRoutingPolicy(
+      storedRoutingPolicy,
+      channelPresetBootstrap.routeStrategy,
+    )
     let channels = visibleChannels(loadedChannels)
     const stalePatches = staleModelCachePatches(channels)
     if (stalePatches.length > 0) {
@@ -292,18 +287,18 @@ export function createChannelStore(
       channels = channels.map((c) => clearedById.get(c.id) ?? c)
     }
     const customProtocols = protocolDefinitionRows(customRows)
-    const hiddenBuiltinProtocolIds = storedHiddenBuiltinProtocolIds.filter((id) =>
+    const hiddenBuiltinProtocolIds = channelPresetBootstrap.hiddenBuiltinProtocolIds.filter((id) =>
       BUILTIN_PROTOCOLS.some((protocol) => protocol.id === id && protocol.kind === 'station'),
     )
     store.setState({
       channels,
       customProtocols,
       hiddenBuiltinProtocolIds,
-      customModels,
-      uncommonModelIds,
-      routeStrategy,
+      customModels: channelPresetBootstrap.customModels,
+      uncommonModelIds: channelPresetBootstrap.uncommonModelIds,
+      routeStrategy: channelPresetBootstrap.routeStrategy,
       routingPolicy,
-      recipeMemory,
+      recipeMemory: channelPresetBootstrap.recipeMemory,
       loaded: true,
     })
   }

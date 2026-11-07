@@ -90,9 +90,25 @@ describe('storage overview refresh', () => {
     })
     expect(scan).toHaveBeenCalledWith(
       'assets',
-      128,
+      256,
       expect.any(Function),
       { includePayload: false },
+    )
+    expect(query).toHaveBeenCalledWith(
+      'runRecords',
+      {},
+      {
+        includePayload: false,
+        fields: ['createdAt', 'outputHashes'],
+      },
+    )
+    expect(query).toHaveBeenCalledWith(
+      'assetLibrary',
+      {},
+      {
+        includePayload: false,
+        fields: ['id', 'hash', 'mime', 'savedAt', 'createdAt'],
+      },
     )
   })
 

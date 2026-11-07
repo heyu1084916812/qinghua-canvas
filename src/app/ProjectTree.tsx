@@ -8,7 +8,7 @@ import {
   useSyncExternalStore,
 } from 'react'
 import { createPortal } from 'react-dom'
-import { useLocation, useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import {
   WORKBENCH_ORDER,
   projectRoute,
@@ -63,6 +63,7 @@ import {
   type ProjectTreeConfirmTarget,
 } from './projectTree/treeMutationActions'
 import { projectTreeProjection, toggleGroupId } from './projectTree/treeProjection'
+import { projectTreeLoadDecision } from './projectTree/reload'
 
 export { ProjectDeleteConfirmActions } from './projectTree/ProjectTreeViews'
 
@@ -104,7 +105,6 @@ const SHORT_WORKBENCH_LABEL: Record<WorkbenchId, string> = {
 export function ProjectTree({ open, activeProjectId }: ProjectTreeProps) {
   const platform = usePlatform()
   const navigate = useNavigate()
-  const location = useLocation()
   const repo = useMemo(
     () => createProjectRepository(platform.storage),
     [platform.storage],
@@ -147,6 +147,7 @@ export function ProjectTree({ open, activeProjectId }: ProjectTreeProps) {
     cleanupRuntimeOperation?.status === 'committing'
   const renameInputRef = useRef<HTMLInputElement | null>(null)
   const menuRef = useRef<HTMLDivElement | null>(null)
+  const loadedRevisionRef = useRef<number | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -159,6 +160,7 @@ export function ProjectTree({ open, activeProjectId }: ProjectTreeProps) {
       setProjects(nextProjects)
       setFolders(nextFolders)
     } catch (error) {
+      loadedRevisionRef.current = null
       setStatus({
         text: `项目树读取失败：${error instanceof Error ? error.message : String(error)}`,
         tone: 'error',
@@ -169,14 +171,11 @@ export function ProjectTree({ open, activeProjectId }: ProjectTreeProps) {
   }, [platform.storage, repo])
 
   useEffect(() => {
-    if (!open) return
-    void load()
-    /**
-     * 项目页与侧栏树各自持有一份列表快照。页面切换后只依赖项目事件会让
-     * “页面已经有 7 个项目、侧栏还停在 1 个”的旧快照继续显示；路由与当前项目
-     * 都是可见范围变化，必须重新对齐。
-     */
-  }, [activeProjectId, load, location.pathname, open, revision])
+    const decision = projectTreeLoadDecision(open, revision, loadedRevisionRef.current)
+    loadedRevisionRef.current =
+      decision === 'reset' ? null : decision === 'load' ? revision : loadedRevisionRef.current
+    if (decision === 'load') void load()
+  }, [load, open, revision])
 
   useEffect(() => {
     if (!renameTarget) return
