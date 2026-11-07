@@ -5332,6 +5332,28 @@
       "budget": 132
     },
     {
+      "module": "src/workbenches/canvas/flow/useCanvasDetailMode.ts",
+      "owner": "canvas-flow-surface-detail-mode",
+      "responsibility": "根据稳定后的画布缩放决定 full/coarse 节点视图模式。",
+      "owns": [
+        "缩放档位的稳定窗口与取消",
+        "视口专属订阅到模式状态的映射"
+      ],
+      "doesNotOwn": [
+        "节点 JSX、CSS 和实际渲染",
+        "React Flow 视口实例与手势",
+        "画布图数据、选区和运行态"
+      ],
+      "publicApi": [
+        "useCanvasDetailMode"
+      ],
+      "test": [
+        "src/workbenches/canvas/flow/detailMode.test.ts",
+        "src/workbenches/canvas/flow/useCanvasDetailMode.test.ts"
+      ],
+      "budget": 68
+    },
+    {
       "module": "src/workbenches/ecommerce/studio/EcommerceStudioCategoryRail.tsx",
       "owner": "ecommerce-studio-category-view",
       "responsibility": "渲染电商 Studio 左侧品类导航及其选中语义。",
@@ -6191,6 +6213,53 @@
       "test": [
         "src/state/shared/runLogProjectLookup.test.ts",
         "src/state/shared/runLogRepository.test.ts"
+      ],
+      "budget": 80
+    },
+    {
+      "module": "src/app/thumbBackfillRun.ts",
+      "owner": "thumb-backfill-run",
+      "responsibility": "存量素材一次性缩略图补图的去重与生命周期：按同一 StoragePort 复用进行中的标记读取与补图，成功后本会话跳过，订阅者引用计数归零才中断。",
+      "owns": [
+        "job:assetThumbBackfill 标记的读取与写入时机",
+        "进行中补图 Promise 的会话级复用与中断"
+      ],
+      "doesNotOwn": [
+        "补图扫描与缩略图生成实现（platform/assetThumb）",
+        "React 挂载与路由判断（ThumbBackfill.tsx）",
+        "StoragePort 实现"
+      ],
+      "publicApi": [
+        "THUMB_BACKFILL_MARKER_ID",
+        "ThumbBackfillSubscription",
+        "subscribeThumbBackfill",
+        "resetThumbBackfillForTest"
+      ],
+      "test": [
+        "src/app/thumbBackfillRun.test.ts"
+      ],
+      "budget": 120
+    },
+    {
+      "module": "src/domain/shared/threeDCapability.ts",
+      "owner": "three-d-capability",
+      "responsibility": "声明 3D 生成能力的递延状态、设置页空态和未来支持前的五项前提，并提供唯一能力判定。",
+      "owns": [
+        "3D 递延状态、可见不可选空态和五项启用前提",
+        "当前唯一的 3D 生成能力判定"
+      ],
+      "doesNotOwn": [
+        "ModelCapability 与 ProtocolCapability 联合类型",
+        "设置页筛选渲染和交互",
+        "渠道适配器、真实端点与结果落库"
+      ],
+      "publicApi": [
+        "ThreeDCapabilitySpec",
+        "THREE_D_CAPABILITY_SPEC",
+        "threeDGenerationSupported"
+      ],
+      "test": [
+        "src/domain/shared/threeDCapability.test.ts"
       ],
       "budget": 80
     }

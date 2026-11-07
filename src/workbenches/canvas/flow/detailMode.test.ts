@@ -1,9 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import {
-  COARSE_ENTER_ZOOM,
-  COARSE_EXIT_ZOOM,
-  nextCanvasDetailMode,
-} from './detailMode'
+import { COARSE_ENTER_ZOOM, COARSE_EXIT_ZOOM, nextCanvasDetailMode } from './detailMode'
 
 describe('nextCanvasDetailMode', () => {
   it('enters coarse mode only below the low zoom boundary', () => {

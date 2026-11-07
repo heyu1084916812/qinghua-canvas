@@ -181,6 +181,34 @@ describe('canvas store / 撤销条（§6.12）', () => {
  */
 
 describe('canvas store / 瞬态状态', () => {
+  it('视口每帧变化只通知视口订阅者，不唤醒图、节点和面板订阅', () => {
+    const store = createCanvasStore({ platform, projectId: 'p1' })
+    let semanticFired = 0
+    let viewportFired = 0
+    const unsub = store.subscribe(() => {
+      semanticFired += 1
+    })
+    const unsubViewport = store.subscribeViewport(() => {
+      viewportFired += 1
+    })
+
+    store.setViewport({ x: 12, zoom: 1.25 })
+    store.setViewport({ x: 14, zoom: 1.5 })
+    expect(semanticFired).toBe(0)
+    expect(viewportFired).toBe(2)
+    expect(store.getViewport()).toMatchObject({ x: 14, zoom: 1.5 })
+
+    store.setSelection(['n1'])
+    expect(semanticFired).toBe(1)
+    expect(viewportFired).toBe(2)
+
+    unsub()
+    unsubViewport()
+    store.setViewport({ x: 20 })
+    expect(semanticFired).toBe(1)
+    expect(viewportFired).toBe(2)
+  })
+
   it('选中与视口走独立 API，不进 dispatch / undo / 持久化', () => {
     const store = createCanvasStore({ platform, projectId: 'p1' })
     store.setSelection(['a', 'b'])

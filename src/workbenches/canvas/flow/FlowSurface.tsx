@@ -96,10 +96,7 @@ import { LinkMenu } from '../menu/LinkMenu'
 import { CanvasNotice } from '../surface/CanvasNotice'
 import { Minimap } from '../surface/Minimap'
 import { UndoBar } from '../surface/UndoBar'
-import {
-  nextCanvasDetailMode,
-  type CanvasDetailMode,
-} from './detailMode'
+import { useCanvasDetailMode } from './useCanvasDetailMode'
 import { sameFlowViewport, VIEWPORT_EPSILON } from './flowSurfaceViewport'
 import {
   FLOATING_SELECTORS,
@@ -168,31 +165,13 @@ function FlowViewportController() {
   useEffect(() => {
     const target = storeViewportToFlow(viewport)
     if (sameFlowViewport(flow.getViewport(), target)) return
+    // 缩放手势期间 RF 自己就在改 transform；这里只跟随外部逻辑视口变化，
+    // 避免 onViewportChange → setViewport → setViewport 的回写循环。
+    if (Math.abs(flow.getViewport().zoom - target.zoom) < VIEWPORT_EPSILON) return
     void flow.setViewport(target)
   }, [flow, viewport])
 
   return null
-}
-
-function useCanvasDetailMode(store: CanvasStore): CanvasDetailMode {
-  const [mode, setMode] = useState<CanvasDetailMode>(() =>
-    nextCanvasDetailMode('full', store.getViewport().zoom),
-  )
-  const modeRef = useRef(mode)
-  modeRef.current = mode
-
-  useEffect(
-    () =>
-      store.subscribe(() => {
-        const next = nextCanvasDetailMode(modeRef.current, store.getViewport().zoom)
-        if (next === modeRef.current) return
-        modeRef.current = next
-        setMode(next)
-      }),
-    [store],
-  )
-
-  return mode
 }
 
 /** RF 的 d3-drag 只认原生 `nodrag`；React 提交会重写 className，所以松手前要持续补回。 */
@@ -541,6 +520,7 @@ function FlowSurfaceInner({
     [exec, selection, makeEmit, derivedFor, store, onChildPointerDown],
   )
 
+  const nodeStateOf = useCallback((id: string) => exec.nodeStateOf(id), [exec])
   const nodes = useMemo<RFNode<FlowNodeData>[]>(
     () =>
       flowNodesFor({
@@ -549,14 +529,12 @@ function FlowSurfaceInner({
         detailMode,
         derived,
         childIndex,
-        nodeStateOf: exec.nodeStateOf,
+        nodeStateOf,
         emitFor: makeEmit,
-        resize: (id, rect, phase) => {
-          store.dispatch({ kind: 'node.resize', id, rect, phase })
-        },
+        resize: (id, rect, phase) => store.dispatch({ kind: 'node.resize', id, rect, phase }),
         renderChild: renderFlowChild,
       }),
-    [graph, selection, exec, makeEmit, childIndex, renderFlowChild, derivedFor, store, detailMode],
+    [graph, selection, nodeStateOf, makeEmit, childIndex, renderFlowChild, derived, store, detailMode],
   )
 
   const edges = useMemo(

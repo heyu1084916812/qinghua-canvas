@@ -12315,3 +12315,20 @@ React 端口 → `invoke` → Rust `check_update` → updater 插件读配置 �
 - CI 配置静态测试要锁住 Linux Node 五项、Windows Rust/MCP、shared-store Rust、read-only permissions、触发方式，并禁止自动 push/publish/release upload/secrets。配置就绪不等于远端 Actions 已跑，push 仍要用户逐次确认。
 - check-release-shell 的 Canvas MCP 夹具需同时写 dev 错 token、release-gate、正式版 canvas-gateway.json；否则安装布局适配器默认档读不到正式配置，12 项门禁会只剩 11 项通过。
 - 本机已有正式安装版 0.1.10 与卸载登记时，check-installer-windows 会拒绝执行；不得为跑门禁卸载用户软件或改 HKCU 注册表。release 壳 12/12 可跑，干净机器真装/卸载/升级仍是外部验收。
+
+### 总管2 第十二轮：3D 边界、真实图片性能与补图去重（2026-11-07）
+
+- 图一第 5 条的 3D 不能靠扩 `ModelCapability.category` 假装支持；用 `threeDCapability.ts` 的 deferred 规格、恒 false 判定和静态联合类型测试，把「设置页空态」与「领域能力」分开。未来只扩类型不补适配器/端点/结果形态会红。
+- 300/500 性能探针必须有真实图片：150 个生成节点各绑定唯一 1024×1024 PNG 与 64×64 WebP 缩略图，报告断言 rendered/decoded/thumbnail 数量和截图。空节点绿色不等于真实画布负载。
+- 当前真实图片 300/500 release 性能两次复跑均超过 20ms（第一次平移 90.8/115.1/91.0、缩放 90.9/109/109；第二次平移 102.9/96.8/102.9、缩放 115.1/121.1/109.1）。这是明确性能债，不能靠减节点、删图片或调阈值包装成完成。
+- `ThumbBackfill` 的一次性后台补图按同一 StoragePort 复用 in-flight Promise；StrictMode/重挂载不重复读 presets 或扫 assets，引用计数归零才 abort，成功标记后本会话跳过，失败/中断不写标记且可重试。
+- 三个不同模型并行时写集必须互斥；并行中间态可能让治理临时红，等负责模块的子任务登记完再跑全仓门禁。
+
+### 总管2 第十三轮：真实图片大画布订阅隔离与档位稳定窗口（2026-11-07）
+
+- `CanvasStore.subscribeViewport` 把每帧平移/缩放从全量 `subscribe` 拆开；`useViewportState`、`useCanvasDetailMode` 只订阅视口，图、选中、菜单、重命名仍走语义订阅。否则一次 `setViewport` 会唤醒 `FlowSurfaceInner`、全部 `NodeFrame` 和面板订阅者，带 150 张真实缩略图的 300/500 画布必然长帧。
+- `FlowSurfaceInner` 的 RF 节点/连线投影不要依赖整个 `CanvasExecutionApi`；节点运行态与 resize/removeEdge 用稳定回调或窄依赖表达。React Flow 自己处理滚轮缩放时，同 zoom 的平移不要经 `FlowViewportController` 反向 `setViewport`，避免双视口互写。
+- full/coarse 切换会替换 300 个节点的 React 类型；缩放手势连续穿过 0.18/0.28 阈值时，用 `useCanvasDetailMode.ts` 的 220ms 稳定窗口，避免 150 张 `<img>` 整批卸载、解码、重挂载。阈值纯规则仍归 `detailMode.ts`。
+- 两刀修复后重建 release 并用同一真实图片探针实测：第一刀平移 84.8/78.8/78.7ms、缩放 84.9/145.2/90.8ms；第二刀平移 72.8/66.7/72.7ms、缩放 78.7/84.9/84.9ms。相比第十二轮约 90–121ms 有改善，但 12 组 P95 仍全部 >20ms，#971 必须保持未完成，不删图片、不减 300/500、不调阈值。
+- `scripts/diagnose-canvas-images.mjs` 是逐层隐藏图片/节点/端口层/小地图的根因工具，报告明确 diagnosis only；隐藏元素的绿结果不能冒充正式性能验收。后续应先用它定位图片光栅化、DOM 合成或 React 重渲，再按定位做单一职责修复。
+- 本轮不涉及 UI：没有 JSX 渲染树、CSS、视觉令牌、文案、布局或交互变化；新增模块均登记真实职责/导出/测试路径，治理 222 条。push 与外部发布条件仍需用户逐次确认。

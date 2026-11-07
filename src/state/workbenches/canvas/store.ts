@@ -9,7 +9,7 @@ import type { AppStore, CommandResult, TransactionBoundary } from '../../shared/
 type MiniStore<T> = {
   getState: () => T
   setState: (partial: Partial<T> | ((prev: T) => Partial<T>)) => void
-  subscribe: (listener: () => void) => () => void
+  subscribe: (listener: (state: T, previous: T) => void) => () => void
 }
 type StoreFactory = <T>(init: () => T) => MiniStore<T>
 const createVanillaStore = createVanilla as unknown as StoreFactory
@@ -249,6 +249,8 @@ export interface CanvasStore extends AppStore<GraphSnapshot, Command> {
   getEdgeSelection(): string[]
   setViewport(vp: Partial<Viewport>): void
   getViewport(): Viewport
+  /** 只订阅视口变化；平移 / 缩放帧不唤醒全量的视图订阅者。 */
+  subscribeViewport(listener: () => void): () => void
   /** 测试与卸载时手动冲刷防抖持久化 */
   flush(): Promise<void>
   /**
@@ -577,6 +579,24 @@ export function createCanvasStore(opts: CanvasStoreOptions): CanvasStore {
     textEditor: null,
   }))
 
+  const semanticListeners = new Set<() => void>()
+  const viewportListeners = new Set<() => void>()
+  let viewportUpdate = false
+
+  /**
+   * 视口是每帧变化的高频值。把它从 vanilla store 的全量订阅里拆出来，
+   * 否则一次平移会唤醒整张图、全部 NodeFrame 和所有面板订阅者；
+   * 带 150 张真实缩略图的 300/500 画布会因此出现 90–120ms 长帧。
+   */
+  store.subscribe((state, previous) => {
+    if (viewportUpdate) {
+      if (state.viewport === previous.viewport) return
+      for (const listener of viewportListeners) listener()
+      return
+    }
+    for (const listener of semanticListeners) listener()
+  })
+
   // 当前进行中的多步事务（拓扑生成）：非 null 时，所有命令都合并进同一个撤销单元
   let activePlan: { planId: string; label: string } | null = null
 
@@ -667,18 +687,35 @@ export function createCanvasStore(opts: CanvasStoreOptions): CanvasStore {
     redo,
     canUndo: () => store.getState().undoStack.length > 0,
     canRedo: () => store.getState().redoStack.length > 0,
-    subscribe: (listener) => store.subscribe(listener),
+    subscribe: (listener) => {
+      semanticListeners.add(listener)
+      return () => {
+        semanticListeners.delete(listener)
+      }
+    },
+    subscribeViewport: (listener) => {
+      viewportListeners.add(listener)
+      return () => {
+        viewportListeners.delete(listener)
+      }
+    },
     // 节点选择与连线选择互斥（§6.14 / §6.15）：选节点即清空连线选择，反之亦然
     setSelection: (ids) =>
       store.setState({ selection: ids, selectedEdgeIds: [], panelDismissed: false }),
     getSelection: () => store.getState().selection,
     setEdgeSelection: (ids) => store.setState({ selectedEdgeIds: ids, selection: [] }),
     getEdgeSelection: () => store.getState().selectedEdgeIds,
-    setViewport: (vp) =>
-      store.setState((s) => ({
+    setViewport: (vp) => {
+      viewportUpdate = true
+      try {
+        store.setState((s) => ({
         // 缩放统一在此 clamp 到 10% – 500%（产品文档 §6.3），避免任何调用方绕过
         viewport: { ...s.viewport, ...vp, zoom: clampZoom(vp.zoom ?? s.viewport.zoom) },
-      })),
+        }))
+      } finally {
+        viewportUpdate = false
+      }
+    },
     getViewport: () => store.getState().viewport,
     flush: () => persister.flush(),
     hydrate: (snapshot) => {

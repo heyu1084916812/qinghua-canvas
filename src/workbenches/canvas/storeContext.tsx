@@ -60,7 +60,7 @@ export function useEdgeSelection(): string[] {
 /** 当前视口值（平移 / 缩放只改这里，不触发节点重渲） */
 export function useViewportState(): Viewport {
   const store = useCanvasStore()
-  return useSyncExternalStore(store.subscribe, store.getViewport, store.getViewport)
+  return useSyncExternalStore(store.subscribeViewport, store.getViewport, store.getViewport)
 }
 
 /**

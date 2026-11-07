@@ -1,7 +1,7 @@
 import { useEffect } from 'react'
 import { useLocation } from 'react-router-dom'
 import { usePlatform } from './providers/PlatformProvider'
-import { backfillAssetThumbs } from '../platform/assetThumb'
+import { subscribeThumbBackfill } from './thumbBackfillRun'
 
 /**
  * **存量素材的一次性补图**（对账 #232）—— 没有界面，只在后台跑一趟。
@@ -16,8 +16,6 @@ import { backfillAssetThumbs } from '../platform/assetThumb'
  * - 没跑完**不打标记**，下次接着补（缩略图本身是落库的，天然可续）；
  * - 全静默，只在日志里留一行（它不是功能，是整理）。
  */
-const MARKER_ID = 'job:assetThumbBackfill'
-
 export function ThumbBackfill() {
   const platform = usePlatform()
   const location = useLocation()
@@ -25,26 +23,8 @@ export function ThumbBackfill() {
 
   useEffect(() => {
     if (inCanvas) return
-    const controller = new AbortController()
-    let alive = true
-    void (async () => {
-      const marked = await platform.storage.query('presets', { id: MARKER_ID })
-      if (!alive || marked[0]) return
-      const result = await backfillAssetThumbs(platform, { signal: controller.signal })
-      if (!alive || result.aborted) return
-      await platform.storage.put('presets', { id: MARKER_ID, version: 1, doneAt: Date.now() })
-      platform.logger.log('info', '[assetThumb] 存量素材缩略图补完', {
-        scanned: result.scanned,
-        generated: result.generated,
-      })
-    })().catch((err) => {
-      // 补图失败不该打扰任何人：缩略图是优化，界面照旧用原图
-      platform.logger.log('warn', '[assetThumb] 补图未完成', { error: String(err) })
-    })
-    return () => {
-      alive = false
-      controller.abort()
-    }
+    const sub = subscribeThumbBackfill(platform)
+    return () => sub.release()
   }, [platform, inCanvas])
 
   return null

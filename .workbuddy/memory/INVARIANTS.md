@@ -995,3 +995,16 @@
 - G8 / G44 / G45 / G74 等冒烟必须在自己的独立库里构造所需页面数据，不得依赖 18765 共享库的残留提示词或历史渠道。
 - CI 工作流只能做验证，不得自动 push / publish / release upload；静态测试必须覆盖 shared-store Rust 与 Windows MCP Inspector。远端运行结果需用户确认 push 后另行验收。
 - release 壳自检的 Canvas MCP 适配夹具必须覆盖 dev、release-gate、正式版三个配置名；正式版配置缺失时 12/12 不得宣称通过。
+
+## 3D 能力、真实图片性能与补图边界（2026-11-07 第十二轮）
+
+- 3D 生成当前恒不支持；设置页 3D 筛选只是可见不可选的空态。`THREE_D_CAPABILITY_SPEC.status` 必须是 deferred，`threeDGenerationSupported()` 必须返回 false；任何 `ModelCapability.category` / `ProtocolCapability` 扩 `3d` 都必须先完成五项前提并更新静态测试。
+- 大画布性能门禁必须使用真实可解码图片，300 节点 / 500 连线和 P95 ≤20ms 阈值不得缩减；报告必须记录 150 张 generation 图片的 rendered/decoded/thumbnail 数量，图片不足直接失败。真实图片负载未达标时保持缺口，不删图片或调阈值。
+- `thumbBackfillRun` 只复用进行中的标记读取与补图；一个订阅者取消不得中断另一个活跃订阅者，全部退出才 abort，失败/中断不写标记且可重试，`ThumbBackfill` 组件永远 return null。
+
+## 真实图片大画布视口订阅与档位稳定边界（2026-11-07 第十三轮）
+
+- `CanvasStore.setViewport` 只能通知 `subscribeViewport`；`subscribe` 仍负责图、选中、菜单、重命名等语义变化。视口每帧唤醒全量订阅者，会让 150 张图片节点与所有 NodeFrame/面板一起重渲，属于性能回归。
+- `useViewportState` 与 `useCanvasDetailMode` 只订阅视口；`FlowSurfaceInner` 的 nodes/edges 投影不得因视口变化重建，也不得依赖整个 `CanvasExecutionApi`。React Flow 自身滚轮缩放时，同 zoom 的平移不得由 `FlowViewportController` 反向 `setViewport`。
+- full/coarse 切换是整批节点类型替换；`useCanvasDetailMode.ts` 必须保留稳定窗口和取消逻辑，`detailMode.ts` 只保留纯阈值规则。瞬时穿阈值不得让 150 张 `<img>` 反复卸载、解码和重挂载。
+- 正式性能验收必须由 `npm run perf:canvas:production` 在 150 张图片全部解码、300/500 全挂载、P95 ≤20ms 下判定。`diagnose-canvas-images.mjs` 的逐层隐藏结果只用于根因定位，不得冒充验收；当前两刀修复后 P95 仍 >20ms，#971 保持未完成。
