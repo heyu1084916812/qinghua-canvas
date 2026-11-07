@@ -9,6 +9,7 @@ import {
   parseArgs,
   type CliTool,
 } from '../../domain/shared/cliTools'
+import { cliWindowRequest } from './cliWindowRequest'
 import type { CliOutcome } from '../../platform/ports'
 import { createId } from '../../shared/id'
 import { createCliToolStore } from '../../state/project/cliToolStore'
@@ -217,11 +218,7 @@ export function CliPanel() {
     setBusy(`${tool.id}:login`)
     try {
       const args = tool.loginArgs.trim() ? buildArgs(tool.loginArgs, {}) : []
-      await cli.spawnWindow({
-        program: tool.program,
-        args,
-        ...(tool.cwd.trim() ? { cwd: tool.cwd.trim() } : {}),
-      })
+      await cli.spawnWindow(cliWindowRequest(tool, tool.program, args))
       setLoginMsg((prev) => ({
         ...prev,
         [tool.id]: `已经打开一个窗口跑「${[tool.program, ...args].join(' ')}」——在那里完成登录（浏览器授权或输密码都行）；完成后回来点「检测 / 查状态」确认。`,
@@ -263,7 +260,7 @@ export function CliPanel() {
           say(`本机没有「${tool.program}」，而这个工具没有能自动装的官方途径 —— ${tool.installHint}`)
           return
         }
-        await cli.spawnWindow({ program: cmd[0], args: cmd.slice(1) })
+        await cli.spawnWindow(cliWindowRequest(tool, cmd[0], cmd.slice(1)))
         say(
           `没装「${tool.program}」→ 已经打开安装窗口跑「${tool.installCommand}」。` +
             `等那个窗口跑完（可能要一两分钟），回来**再点一次「一键设置」**就会进下一步（登录）。`,
@@ -287,11 +284,7 @@ export function CliPanel() {
         return
       }
       const args = tool.loginArgs.trim() ? buildArgs(tool.loginArgs, {}) : []
-      await cli.spawnWindow({
-        program: tool.program,
-        args,
-        ...(tool.cwd.trim() ? { cwd: tool.cwd.trim() } : {}),
-      })
+      await cli.spawnWindow(cliWindowRequest(tool, tool.program, args))
       say(
         `已经装好了 → 打开了登录窗口「${[tool.program, ...args].join(' ')}」：` +
           `在那里完成登录（浏览器授权或输密码都行），完成后点「查状态」确认。`,
@@ -310,7 +303,7 @@ export function CliPanel() {
     if (cmd.length === 0) return
     setBusy(`${tool.id}:install`)
     try {
-      await cli.spawnWindow({ program: cmd[0], args: cmd.slice(1) })
+      await cli.spawnWindow(cliWindowRequest(tool, cmd[0], cmd.slice(1)))
       setLoginMsg((prev) => ({
         ...prev,
         [tool.id]: `已经打开安装窗口跑「${tool.installCommand}」；装完回来点「重新检测」确认。`,

@@ -6085,6 +6085,26 @@
       "budget": 15
     },
     {
+      "module": "src/features/settings/cliWindowRequest.ts",
+      "owner": "settings-cli-window-request",
+      "responsibility": "构造带工具工作目录的可见 CLI 窗口请求。",
+      "owns": [
+        "登录、安装和工具窗口共享的 cwd 传递规则"
+      ],
+      "doesNotOwn": [
+        "CLI 进程启动与终止",
+        "安装或登录业务状态",
+        "React 面板渲染"
+      ],
+      "publicApi": [
+        "cliWindowRequest"
+      ],
+      "test": [
+        "src/features/settings/cliWindowRequest.test.ts"
+      ],
+      "budget": 20
+    },
+    {
       "module": "src/features/settings/cliPanelPresentation.ts",
       "owner": "settings-cli-presentation",
       "responsibility": "把 CLI 探测结果投影为主操作、摘要和诊断按钮文案。",

@@ -1015,3 +1015,9 @@
 - 性能判定只看正式 `npm run perf:canvas:production`：150 张图片必须全部 rendered/decoded、300/500 全挂载、P95 ≤20ms、page/console error 0。两次当前 release 报告均已通过；隐藏元素/诊断探针不得写成正式验收。
 - `diagnose-canvas-images.mjs` 必须每轮 reload 并只保留一条 style，避免 cumulative CSS 污染读数；`run-canvas-image-diagnosis.mjs` 只启动并清理自己的 app pid，端口保留集合是 1420/18765/18766/18791。
 - CLI 死控件、cwd、运行 id、按 id `cli.kill` 和浏览器禁用提示已有证据；真实已登录 CLI、进程树终止、媒体导出、清空 `statusArgs` 后自动查状态以及窗口结束后自动重检仍属 #972，不得把图三判成全完成。
+
+## CLI 进程树与可见窗口边界（2026-11-08 第十五轮）
+
+- Windows CLI 停止、broken 清理和超时清理必须按本方持有的 `Child::id()` 使用 `/PID <pid> /T /F`，失败才回退直接 `child.kill()`；禁止 `/IM`、按进程名或全局匹配。测试只能终止自己创建的父子辅助进程。
+- 登录、一键设置登录、单独安装窗口必须统一经 `cliWindowRequest.ts` 传 trimmed `cwd`；空串表示继承应用目录。页面回调不得重新拼第二套窗口请求。
+- 本机进程树和 cwd 测试不能替代真实已登录 CLI、媒体导出、RunningHub 多产物、空 `statusArgs` 自动状态或窗口结束自动重检；这些继续留在 #972。

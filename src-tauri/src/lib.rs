@@ -2473,6 +2473,42 @@ fn describe_spawn_error(program: &str, err: std::io::Error) -> String {
 #[derive(Default)]
 struct CliRegistry(std::sync::Mutex<std::collections::HashMap<String, std::process::Child>>);
 
+/// `taskkill.exe` 只能按本方持有的 `Child::id()` 终止进程树。
+///
+/// 刻意不提供进程名入口：`/IM` 或按名字匹配会误伤同名的其它用户进程。
+#[cfg(any(windows, test))]
+fn cli_child_tree_kill_args(pid: u32) -> Vec<String> {
+    vec![
+        "/PID".to_string(),
+        pid.to_string(),
+        "/T".to_string(),
+        "/F".to_string(),
+    ]
+}
+
+#[cfg(windows)]
+fn terminate_cli_child_tree(child: &mut std::process::Child) {
+    let taskkill_succeeded = std::process::Command::new("taskkill.exe")
+        .args(cli_child_tree_kill_args(child.id()))
+        .stdin(std::process::Stdio::null())
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .status()
+        .map(|status| status.success())
+        .unwrap_or(false);
+
+    if !taskkill_succeeded {
+        let _ = child.kill();
+    }
+    let _ = child.wait();
+}
+
+#[cfg(not(windows))]
+fn terminate_cli_child_tree(child: &mut std::process::Child) {
+    let _ = child.kill();
+    let _ = child.wait();
+}
+
 #[cfg(test)]
 mod cli_tests {
     use super::*;
@@ -2487,6 +2523,148 @@ mod cli_tests {
             clamp_timeout(Some(CLI_MAX_TIMEOUT_MS + 1)),
             CLI_MAX_TIMEOUT_MS
         );
+    }
+
+    #[test]
+    fn taskkill_arguments_target_only_the_held_pid_tree() {
+        let args = cli_child_tree_kill_args(42);
+        assert_eq!(args, ["/PID", "42", "/T", "/F"]);
+        assert!(!args.iter().any(|arg| arg.eq_ignore_ascii_case("/IM")));
+        assert!(!args.iter().any(|arg| arg.ends_with(".exe")));
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn windows_taskkill_terminates_the_parent_and_descendant() {
+        use std::io::Read;
+        use std::time::{Duration, Instant};
+
+        let marker = std::env::temp_dir().join(format!(
+            "qinghua-cli-tree-{}-{}.pid",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_nanos()
+        ));
+        let mut helper = std::process::Command::new(std::env::current_exe().unwrap())
+            .args([
+                "--exact",
+                "cli_tests::windows_taskkill_process_tree_helper",
+                "--nocapture",
+            ])
+            .env("QINGHUA_CLI_TREE_HELPER", "1")
+            .env("QINGHUA_CLI_TREE_MARKER", &marker)
+            .stdin(std::process::Stdio::null())
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::piped())
+            .spawn()
+            .expect("启动测试辅助进程失败");
+
+        let descendant_pid = {
+            let deadline = Instant::now() + Duration::from_secs(5);
+            loop {
+                if let Ok(text) = std::fs::read_to_string(&marker) {
+                    if let Ok(pid) = text.trim().parse::<u32>() {
+                        break pid;
+                    }
+                }
+                if let Some(status) = helper.try_wait().unwrap() {
+                    let mut stderr = String::new();
+                    if let Some(pipe) = helper.stderr.as_mut() {
+                        let _ = pipe.read_to_string(&mut stderr);
+                    }
+                    panic!("测试辅助进程提前退出（{status}）：{stderr}");
+                }
+                if Instant::now() >= deadline {
+                    terminate_cli_child_tree(&mut helper);
+                    let _ = std::fs::remove_file(&marker);
+                    panic!("等待测试辅助进程写出子进程 PID 超时");
+                }
+                std::thread::sleep(Duration::from_millis(25));
+            }
+        };
+
+        terminate_cli_child_tree(&mut helper);
+        let descendant_stopped = wait_for_test_pid_exit(descendant_pid, Duration::from_secs(3));
+        if !descendant_stopped {
+            cleanup_test_pid(descendant_pid);
+        }
+        let _ = std::fs::remove_file(&marker);
+
+        assert!(
+            descendant_stopped,
+            "父进程被终止后，子进程 {descendant_pid} 仍然存活"
+        );
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn windows_taskkill_process_tree_helper() {
+        use std::io::Write;
+        use std::time::Duration;
+
+        if std::env::var_os("QINGHUA_CLI_TREE_HELPER").is_none() {
+            return;
+        }
+        let marker =
+            std::env::var_os("QINGHUA_CLI_TREE_MARKER").expect("测试辅助进程缺少 PID 标记文件路径");
+        let descendant = std::process::Command::new("ping.exe")
+            .args(["-n", "60", "127.0.0.1"])
+            .stdin(std::process::Stdio::null())
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .spawn()
+            .expect("启动无害子进程失败");
+        let descendant_pid = descendant.id();
+        let marker_result = std::fs::File::create(marker).and_then(|mut marker_file| {
+            write!(marker_file, "{descendant_pid}")?;
+            marker_file.flush()
+        });
+        if let Err(err) = marker_result {
+            let mut descendant = descendant;
+            let _ = descendant.kill();
+            let _ = descendant.wait();
+            panic!("写入 PID 标记失败：{err}");
+        }
+
+        loop {
+            std::thread::sleep(Duration::from_secs(1));
+        }
+    }
+
+    #[cfg(windows)]
+    fn wait_for_test_pid_exit(pid: u32, timeout: std::time::Duration) -> bool {
+        let deadline = std::time::Instant::now() + timeout;
+        loop {
+            if !test_process_is_running(pid) {
+                return true;
+            }
+            if std::time::Instant::now() >= deadline {
+                return false;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(50));
+        }
+    }
+
+    #[cfg(windows)]
+    fn test_process_is_running(pid: u32) -> bool {
+        let output = std::process::Command::new("tasklist.exe")
+            .args(["/FI", &format!("PID eq {pid}"), "/FO", "CSV", "/NH"])
+            .output()
+            .expect("查询测试子进程状态失败");
+        String::from_utf8_lossy(&output.stdout).contains(&format!("\"{pid}\""))
+    }
+
+    #[cfg(windows)]
+    fn cleanup_test_pid(pid: u32) {
+        let _ = std::process::Command::new("taskkill.exe")
+            .args(cli_child_tree_kill_args(pid))
+            .stdin(std::process::Stdio::null())
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .status();
+        let _ = wait_for_test_pid_exit(pid, std::time::Duration::from_secs(2));
     }
 
     #[test]
@@ -2594,8 +2772,7 @@ fn cli_kill(app: tauri::AppHandle, id: String) -> bool {
     };
     match map.remove(&id) {
         Some(mut child) => {
-            let _ = child.kill();
-            let _ = child.wait();
+            terminate_cli_child_tree(&mut child);
             true
         }
         None => false,
@@ -2747,8 +2924,7 @@ fn run_cli_blocking(
                 Poll::Gone
             } else if let Some(message) = broken {
                 if let Some(mut dead) = map.remove(&id) {
-                    let _ = dead.kill();
-                    let _ = dead.wait();
+                    terminate_cli_child_tree(&mut dead);
                 }
                 Poll::Broken(format!("等待「{program}」结束失败：{message}"))
             } else if let Some(status) = exit {
@@ -2779,8 +2955,7 @@ fn run_cli_blocking(
             let registry = app.state::<CliRegistry>();
             if let Ok(mut map) = registry.0.lock() {
                 if let Some(mut child) = map.remove(&id) {
-                    let _ = child.kill();
-                    let _ = child.wait();
+                    terminate_cli_child_tree(&mut child);
                 }
             }
             break;

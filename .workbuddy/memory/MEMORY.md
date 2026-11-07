@@ -12341,3 +12341,10 @@ React 端口 → `invoke` → Rust `check_update` → updater 插件读配置 �
 - `scripts/diagnose-canvas-images.mjs` 的隐藏元素结果只用于定位；正式验收仍由 `npm run perf:canvas:production` 判定。`flowSurfacePerformance.test.ts` 静态锁住 `content-visibility`，防止性能回退。
 - 图三只读复核确认死控件、cwd、运行 id、按 id kill 和浏览器禁用提示有证据；仍缺当前 HEAD 的真实已登录 CLI、进程树终止、媒体导出。`statusArgs` 清空后密钥登录仍可能无条件跑状态命令，安装/登录窗口结束后仍需手动重点，统一记在 #972。
 - 外部账号、授权、push、LICENSE、干净机器、跨平台签名和 tag/Release 仍未完成；本地 commit 不自动 push。
+
+
+### 总管2 第十五轮：CLI 进程树终止与窗口 cwd 收口（2026-11-08）
+
+- Windows CLI 停止不能只 `Child::kill()`；`cli_kill`、broken 清理和超时清理必须共用 `taskkill.exe /PID <own child id> /T /F`，失败才回退直接 kill。禁止 `/IM`、按进程名或全局匹配，真实测试只允许终止本测试创建的父/子进程。
+- 登录、一键设置登录和单独安装窗口统一经 `features/settings/cliWindowRequest.ts` 传递 trimmed cwd；空串表示继承应用目录。不要在各按钮回调里重复拼请求。
+- 本机逻辑证据：Tauri Rust 66/66（含 Windows 父子进程终止）、CLI 定向 9/9、module governance 223 条。真实已登录 CLI、媒体导出、RunningHub 多产物、空 statusArgs 自动状态和窗口结束自动重检仍是 #972 外部/后续项。
