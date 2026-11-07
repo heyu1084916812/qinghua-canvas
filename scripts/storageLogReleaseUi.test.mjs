@@ -27,5 +27,6 @@ describe('storage and log release UI probe', () => {
     expect(probe).toContain('[data-storage-cache]')
     expect(probe).toContain('release:')
     expect(probe).toContain('sha256')
+    expect(probe).toContain('trackedClean')
   })
 })

@@ -15,6 +15,7 @@ describe('production first-paint probe evidence contract', () => {
     expect(source).toContain("['status', '--porcelain=v1']")
     expect(source).toContain('distSha256')
     expect(source).toContain('sourceTree:')
+    expect(source).toContain('trackedClean')
     expect(source).toContain('generatedAt: new Date().toISOString()')
     expect(source).toContain("mode: 'production'")
     expect(source).toContain('seed: { projects: projects.length, assets: assets.length, runRecords: runRecords.length }')

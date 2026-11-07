@@ -69,6 +69,7 @@ function hashDist(dir) {
 const distFingerprint = hashDist(distDir)
 const gitHead = spawnSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).stdout.trim()
 const gitStatus = spawnSync('git', ['status', '--porcelain=v1'], { cwd: root, encoding: 'utf8' }).stdout.trim()
+const gitStatusRows = gitStatus ? gitStatus.split(/\r?\n/) : []
 
 const PROJECT_COUNT = 334
 const ASSET_COUNT = 1400
@@ -386,8 +387,9 @@ try {
     generatedAt: new Date().toISOString(),
     gitHead,
     sourceTree: {
-      clean: gitStatus === '',
-      status: gitStatus ? gitStatus.split(/\r?\n/) : [],
+      clean: gitStatusRows.length === 0,
+      trackedClean: gitStatusRows.every((row) => row.startsWith('??')),
+      status: gitStatusRows,
     },
     build: {
       command: 'npm run build',

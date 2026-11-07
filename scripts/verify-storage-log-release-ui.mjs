@@ -89,7 +89,13 @@ function fileSha256(file) {
 function readSourceState() {
   const head = spawnSync('git', ['rev-parse', 'HEAD'], { cwd: ROOT, encoding: 'utf8' }).stdout.trim()
   const status = spawnSync('git', ['status', '--porcelain=v1'], { cwd: ROOT, encoding: 'utf8' }).stdout.trim()
-  return { head, clean: status === '', status: status ? status.split(/\r?\n/) : [] }
+  const rows = status ? status.split(/\r?\n/) : []
+  return {
+    head,
+    clean: rows.length === 0,
+    trackedClean: rows.every((row) => row.startsWith('??')),
+    status: rows,
+  }
 }
 
 async function measure(page, click, quickWait, fullWait) {
