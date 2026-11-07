@@ -43,6 +43,7 @@ struct Store {
     root: Arc<PathBuf>,
     lock: Arc<Mutex<()>>,
     maintenance: Arc<AtomicBool>,
+    usage_cache: Arc<Mutex<Option<u64>>>,
 }
 
 #[derive(Serialize)]
@@ -479,16 +480,23 @@ enum TxOp {
     Delete { table: String, id: String },
 }
 
-fn apply_tx(root: &Path, request: TxRequest) -> Result<(), String> {
+fn apply_tx(root: &Path, request: TxRequest) -> Result<i128, String> {
     let mut snapshots: Vec<(PathBuf, Option<Vec<u8>>)> = Vec::new();
     let mut touched: Vec<PathBuf> = Vec::new();
+    let mut usage_delta: i128 = 0;
 
-    let mut add_snapshot = |path: PathBuf| -> Result<(), String> {
+    let add_snapshot = |path: PathBuf,
+                        snapshots: &mut Vec<(PathBuf, Option<Vec<u8>>)>,
+                        touched: &mut Vec<PathBuf>,
+                        usage_delta: &mut i128|
+     -> Result<(), String> {
         if touched.contains(&path) {
             return Ok(());
         }
         let old = if path.exists() {
-            Some(fs::read(&path).map_err(|error| format!("snapshot row: {error}"))?)
+            let bytes = fs::read(&path).map_err(|error| format!("snapshot row: {error}"))?;
+            *usage_delta -= bytes.len() as i128;
+            Some(bytes)
         } else {
             None
         };
@@ -505,8 +513,16 @@ fn apply_tx(root: &Path, request: TxRequest) -> Result<(), String> {
                         .get("id")
                         .and_then(Value::as_str)
                         .ok_or_else(|| "row.id missing".to_string())?;
-                    add_snapshot(row_path(root, &table, id)?)?;
+                    add_snapshot(
+                        row_path(root, &table, id)?,
+                        &mut snapshots,
+                        &mut touched,
+                        &mut usage_delta,
+                    )?;
                     write_row(root, &table, &row)?;
+                    usage_delta += fs::metadata(row_path(root, &table, id)?)
+                        .map(|meta| meta.len() as i128)
+                        .unwrap_or(0);
                 }
                 TxOp::BulkPut { table, rows } => {
                     for row in rows {
@@ -514,12 +530,25 @@ fn apply_tx(root: &Path, request: TxRequest) -> Result<(), String> {
                             .get("id")
                             .and_then(Value::as_str)
                             .ok_or_else(|| "row.id missing".to_string())?;
-                        add_snapshot(row_path(root, &table, id)?)?;
+                        add_snapshot(
+                            row_path(root, &table, id)?,
+                            &mut snapshots,
+                            &mut touched,
+                            &mut usage_delta,
+                        )?;
                         write_row(root, &table, &row)?;
+                        usage_delta += fs::metadata(row_path(root, &table, id)?)
+                            .map(|meta| meta.len() as i128)
+                            .unwrap_or(0);
                     }
                 }
                 TxOp::Delete { table, id } => {
-                    add_snapshot(row_path(root, &table, &id)?)?;
+                    add_snapshot(
+                        row_path(root, &table, &id)?,
+                        &mut snapshots,
+                        &mut touched,
+                        &mut usage_delta,
+                    )?;
                     delete_row(root, &table, &id)?;
                 }
             }
@@ -537,7 +566,7 @@ fn apply_tx(root: &Path, request: TxRequest) -> Result<(), String> {
         }
         return Err(error);
     }
-    Ok(())
+    Ok(usage_delta)
 }
 
 fn usage(root: &Path) -> Usage {
@@ -560,6 +589,60 @@ fn usage(root: &Path) -> Usage {
     Usage {
         used: sum(root),
         quota: 0,
+    }
+}
+
+/// V1 目录后端 `/usage` recursively walks the whole data dir, which is slow on
+/// large stores. Every write path holds the same store lock, so invalidating
+/// inside that lock keeps reads fresh without weakening the HTTP contract.
+fn cached_usage(store: &Store) -> u64 {
+    {
+        let cache = store.usage_cache.lock().expect("usage cache poisoned");
+        if let Some(used) = *cache {
+            return used;
+        }
+    }
+    let used = usage(store.root.as_path()).used;
+    let mut cache = store.usage_cache.lock().expect("usage cache poisoned");
+    *cache = Some(used);
+    used
+}
+
+fn shift_usage(store: &Store, delta: i128) {
+    let mut cache = store.usage_cache.lock().expect("usage cache poisoned");
+    if cache.is_none() {
+        *cache = Some(usage(store.root.as_path()).used);
+    }
+    if delta == 0 {
+        return;
+    }
+    if let Some(used) = cache.as_mut() {
+        *used = (*used as i128 + delta).max(0) as u64;
+    }
+}
+
+fn invalidate_usage(store: &Store) {
+    *store.usage_cache.lock().expect("usage cache poisoned") = None;
+}
+
+/// Track exact byte deltas for plain row writes; asset writes create several
+/// sidecars, so they invalidate the cache. Lazy thumbnail/preview reads apply
+/// only the newly materialized sidecar size.
+fn apply_usage_delta(store: &Store, removed_bytes: i128, written_path: Option<&Path>) {
+    let mut cache = store.usage_cache.lock().expect("usage cache poisoned");
+    match (written_path, cache.as_mut()) {
+        (Some(_), _) if written_path.is_some_and(|p| p.starts_with(store.root.join("assets"))) => {
+            *cache = None;
+        }
+        (Some(_), Some(used)) => {
+            let written = written_path
+                .and_then(|path| fs::metadata(path).ok())
+                .map(|meta| meta.len() as i128)
+                .unwrap_or(0);
+            let next = *used as i128 + removed_bytes + written;
+            *cache = Some(next.max(0) as u64);
+        }
+        _ => *cache = None,
     }
 }
 
@@ -724,14 +807,41 @@ impl StoreBackend for Store {
     fn put(&self, table: &str, row: &Value) -> Result<(), String> {
         let _guard = self.lock.lock().expect("store lock poisoned");
         self.ensure_writes_allowed()?;
-        write_row(self.root.as_path(), table, row)
+        let path = row_path(
+            self.root.as_path(),
+            table,
+            row.get("id")
+                .and_then(Value::as_str)
+                .ok_or("row.id must be a string")?,
+        )?;
+        let before = fs::metadata(&path).map(|meta| meta.len()).unwrap_or(0);
+        write_row(self.root.as_path(), table, row)?;
+        if table == "assets" {
+            invalidate_usage(self);
+        } else {
+            apply_usage_delta(self, -(before as i128), Some(&path));
+        }
+        Ok(())
     }
 
     fn bulk_put(&self, table: &str, rows: &[Value]) -> Result<(), String> {
         let _guard = self.lock.lock().expect("store lock poisoned");
         self.ensure_writes_allowed()?;
         for row in rows {
+            let path = row_path(
+                self.root.as_path(),
+                table,
+                row.get("id")
+                    .and_then(Value::as_str)
+                    .ok_or("row.id must be a string")?,
+            )?;
+            let before = fs::metadata(&path).map(|meta| meta.len()).unwrap_or(0);
             write_row(self.root.as_path(), table, row)?;
+            if table == "assets" {
+                invalidate_usage(self);
+            } else {
+                apply_usage_delta(self, -(before as i128), Some(&path));
+            }
         }
         Ok(())
     }
@@ -739,13 +849,23 @@ impl StoreBackend for Store {
     fn delete(&self, table: &str, id: &str) -> Result<(), String> {
         let _guard = self.lock.lock().expect("store lock poisoned");
         self.ensure_writes_allowed()?;
-        delete_row(self.root.as_path(), table, id)
+        let path = row_path(self.root.as_path(), table, id)?;
+        let before = fs::metadata(&path).map(|meta| meta.len()).unwrap_or(0);
+        delete_row(self.root.as_path(), table, id)?;
+        if table == "assets" {
+            invalidate_usage(self);
+        } else {
+            apply_usage_delta(self, -(before as i128), None);
+        }
+        Ok(())
     }
 
     fn transaction(&self, ops: Vec<TxOp>) -> Result<(), String> {
         let _guard = self.lock.lock().expect("store lock poisoned");
         self.ensure_writes_allowed()?;
-        apply_tx(self.root.as_path(), TxRequest { ops })
+        let delta = apply_tx(self.root.as_path(), TxRequest { ops })?;
+        shift_usage(self, delta);
+        Ok(())
     }
 
     fn query(
@@ -862,7 +982,7 @@ impl StoreBackend for Store {
 
     fn usage(&self) -> u64 {
         let _guard = self.lock.lock().expect("store lock poisoned");
-        usage(self.root.as_path()).used
+        cached_usage(self)
     }
 
     fn kv_get(&self, key: &str) -> Result<Value, String> {
@@ -878,16 +998,22 @@ impl StoreBackend for Store {
         let _guard = self.lock.lock().expect("store lock poisoned");
         self.ensure_writes_allowed()?;
         let path = self.root.join("_kv").join(format!("{}.json", hex_id(key)));
+        let before = fs::metadata(&path).map(|meta| meta.len()).unwrap_or(0);
         let payload = serde_json::to_vec(value).map_err(|error| format!("encode kv: {error}"))?;
         write_atomic(&path, &payload)
+            .map(|_| ())?;
+        shift_usage(self, payload.len() as i128 - before as i128);
+        Ok(())
     }
 
     fn kv_delete(&self, key: &str) -> Result<(), String> {
         let _guard = self.lock.lock().expect("store lock poisoned");
         self.ensure_writes_allowed()?;
         let path = self.root.join("_kv").join(format!("{}.json", hex_id(key)));
+        let before = fs::metadata(&path).map(|meta| meta.len()).unwrap_or(0);
         if path.exists() {
             fs::remove_file(path).map_err(|error| error.to_string())?;
+            shift_usage(self, -(before as i128));
         }
         Ok(())
     }
@@ -899,12 +1025,26 @@ impl StoreBackend for Store {
 
     fn asset_thumb(&self, id: &str) -> Result<Vec<u8>, String> {
         let _guard = self.lock.lock().expect("store lock poisoned");
-        load_thumb(self.root.as_path(), id)
+        let sidecar = thumb_path(self.root.as_path(), id);
+        let before = fs::metadata(&sidecar).map(|meta| meta.len() as i128).unwrap_or(0);
+        let bytes = load_thumb(self.root.as_path(), id)?;
+        let after = fs::metadata(&sidecar).map(|meta| meta.len() as i128).unwrap_or(0);
+        if after > before {
+            shift_usage(self, after - before);
+        }
+        Ok(bytes)
     }
 
     fn asset_preview(&self, id: &str) -> Result<Vec<u8>, String> {
         let _guard = self.lock.lock().expect("store lock poisoned");
-        load_preview(self.root.as_path(), id)
+        let sidecar = preview_path(self.root.as_path(), id);
+        let before = fs::metadata(&sidecar).map(|meta| meta.len() as i128).unwrap_or(0);
+        let bytes = load_preview(self.root.as_path(), id)?;
+        let after = fs::metadata(&sidecar).map(|meta| meta.len() as i128).unwrap_or(0);
+        if after > before {
+            shift_usage(self, after - before);
+        }
+        Ok(bytes)
     }
 
     fn set_maintenance(&self, enabled: bool) {
@@ -1026,6 +1166,7 @@ fn select_backend(data_dir: &Path) -> Result<Arc<dyn StoreBackend>, String> {
             root: Arc::new(data_dir.to_path_buf()),
             lock: Arc::new(Mutex::new(())),
             maintenance: Arc::new(AtomicBool::new(false)),
+            usage_cache: Arc::new(Mutex::new(None)),
         })),
         "sqlite" | "sqlite-v2" | "v2" => Ok(Arc::new(sqlite::SqliteStore::open(data_dir)?)),
         other => Err(format!(
@@ -1040,6 +1181,7 @@ fn open_backend(data_dir: &Path, requested: &str) -> Result<Arc<dyn StoreBackend
             root: Arc::new(data_dir.to_path_buf()),
             lock: Arc::new(Mutex::new(())),
             maintenance: Arc::new(AtomicBool::new(false)),
+            usage_cache: Arc::new(Mutex::new(None)),
         })),
         "sqlite" | "sqlite-v2" | "v2" => Ok(Arc::new(sqlite::SqliteStore::open(data_dir)?)),
         other => Err(format!("unsupported storage backend: {other}")),
@@ -1502,6 +1644,7 @@ mod tests {
             root: Arc::new(json_root.clone()),
             lock: Arc::new(Mutex::new(())),
             maintenance: Arc::new(AtomicBool::new(false)),
+            usage_cache: Arc::new(Mutex::new(None)),
         }));
         let _ = fs::remove_dir_all(json_root);
 
@@ -1517,6 +1660,7 @@ mod tests {
             root: Arc::new(root.clone()),
             lock: Arc::new(Mutex::new(())),
             maintenance: Arc::new(AtomicBool::new(false)),
+            usage_cache: Arc::new(Mutex::new(None)),
         };
         store
             .put("projects", &json!({"id":"p1","name":"before"}))
@@ -1807,6 +1951,172 @@ mod tests {
         assert_eq!(bytes, vec![1, 2, 3, 4]);
         assert_eq!(mime, "image/png");
         let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn usage_reflects_writes_and_deletes_after_cache() {
+        let root = temp_root("usage-cache");
+        let store = Store {
+            root: Arc::new(root.clone()),
+            lock: Arc::new(Mutex::new(())),
+            maintenance: Arc::new(AtomicBool::new(false)),
+            usage_cache: Arc::new(Mutex::new(None)),
+        };
+
+        assert_eq!(store.usage(), 0);
+
+        store
+            .put("projects", &json!({"id":"p1","name":"one"}))
+            .unwrap();
+        let after_one = store.usage();
+        assert!(after_one > 0);
+
+        store
+            .put("projects", &json!({"id":"p2","name":"two is longer"}))
+            .unwrap();
+        let after_two = store.usage();
+        assert!(after_two > after_one, "usage must not be stale after write");
+
+        store.delete("projects", "p2").unwrap();
+        assert!(store.usage() < after_two, "usage must drop after delete");
+
+        store
+            .bulk_put("projects", &[json!({"id":"p3","name":"three"})])
+            .unwrap();
+        assert!(store.usage() > 0);
+
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn cached_usage_survives_lazy_thumbnail_read() {
+        let root = temp_root("usage-thumbnail-cache");
+        let store = Store {
+            root: Arc::new(root.clone()),
+            lock: Arc::new(Mutex::new(())),
+            maintenance: Arc::new(AtomicBool::new(false)),
+            usage_cache: Arc::new(Mutex::new(None)),
+        };
+
+        let thumb = b"thumbnail-bytes";
+        let hash = crate::hash::sha1_hex(thumb)[..16].to_string();
+        store
+            .put(
+                "assets",
+                &json!({
+                    "id": hash,
+                    "mime": "image/webp",
+                    "thumb": {
+                        "__qhType": "u8",
+                        "base64": base64::engine::general_purpose::STANDARD.encode(thumb)
+                    }
+                }),
+            )
+            .unwrap();
+
+        *store.usage_cache.lock().unwrap() = None;
+        assert_eq!(store.asset_thumb(&hash).unwrap(), thumb.to_vec());
+        let after_read = usage(&root).used;
+        assert!(after_read > 0);
+        *store.usage_cache.lock().unwrap() = Some(after_read);
+        assert_eq!(store.usage(), after_read);
+
+        assert_eq!(store.asset_thumb(&hash).unwrap(), thumb.to_vec());
+        assert_eq!(store.usage(), after_read);
+
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn query_page_total_filter_order_offset_and_limit() {
+        let root = temp_root("query-page-semantics");
+        let store = Store {
+            root: Arc::new(root.clone()),
+            lock: Arc::new(Mutex::new(())),
+            maintenance: Arc::new(AtomicBool::new(false)),
+            usage_cache: Arc::new(Mutex::new(None)),
+        };
+
+        for id in ["a", "b", "c", "d", "e"] {
+            store
+                .put(
+                    "projects",
+                    &json!({"id": id, "kind": "alpha", "updatedAt": 1}),
+                )
+                .unwrap();
+        }
+        store
+            .put("projects", &json!({"id":"f","kind":"beta","updatedAt":2}))
+            .unwrap();
+
+        let page = PageQuery {
+            ids: vec![],
+            missing_fields: vec![],
+            ranges: vec![],
+            order_by: Some(PageOrder {
+                field: "id".into(),
+                direction: Some("desc".into()),
+            }),
+            offset: 1,
+            limit: 2,
+            include_payload: true,
+            fields: None,
+        };
+        let (rows, total) = store
+            .query_page(
+                "projects",
+                &Map::from_iter([("kind".into(), json!("alpha"))]),
+                &page,
+            )
+            .unwrap();
+        assert_eq!(total, 5, "total is filtered count, not page count");
+        assert_eq!(
+            rows.iter().map(|r| r["id"].clone()).collect::<Vec<_>>(),
+            vec![json!("d"), json!("c")]
+        );
+
+        let page_asc = PageQuery {
+            order_by: Some(PageOrder {
+                field: "id".into(),
+                direction: Some("asc".into()),
+            }),
+            ..page.clone()
+        };
+        let (rows, total) = store
+            .query_page("projects", &Map::new(), &page_asc)
+            .unwrap();
+        assert_eq!(total, 6);
+        assert_eq!(rows.len(), 2);
+        assert_eq!(rows[0]["id"], json!("b"));
+
+        let page_empty = PageQuery {
+            offset: 0,
+            ..page.clone()
+        };
+        let (rows, total) = store
+            .query_page(
+                "projects",
+                &Map::from_iter([("kind".into(), json!("none"))]),
+                &page_empty,
+            )
+            .unwrap();
+        assert_eq!(total, 0);
+        assert!(rows.is_empty());
+
+        let empty_root = temp_root("query-page-empty");
+        let empty_store = Store {
+            root: Arc::new(empty_root.clone()),
+            lock: Arc::new(Mutex::new(())),
+            maintenance: Arc::new(AtomicBool::new(false)),
+            usage_cache: Arc::new(Mutex::new(None)),
+        };
+        let (rows, total) = empty_store
+            .query_page("projects", &Map::new(), &page_empty)
+            .unwrap();
+        assert_eq!(total, 0);
+        assert!(rows.is_empty());
+        let _ = fs::remove_dir_all(root);
+        let _ = fs::remove_dir_all(empty_root);
     }
 
     #[test]

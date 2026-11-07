@@ -86,9 +86,14 @@ const OUT = '.playwright-verify'
 mkdirSync(OUT, { recursive: true })
 
 const results = []
+const externalSkips = []
 function rec(group, name, pass, detail = '') {
   results.push({ group, name, pass, detail })
   console.log(`${pass ? 'PASS' : 'FAIL'} | ${group} | ${name}${detail ? ' | ' + detail : ''}`)
+}
+function skipExternal(group, name, reason) {
+  externalSkips.push({ group, name, reason })
+  console.log(`SKIP | ${group} | ${name} | ${reason}`)
 }
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 
@@ -22524,8 +22529,13 @@ async function g97(browser) {
   const pageErrors = []
   page.on('pageerror', (e) => pageErrors.push(String(e).slice(0, 160)))
 
-  await page.goto(`${BASE}/hosting`, { waitUntil: 'networkidle' })
+  await page.goto(`${BASE}/hosting`, { waitUntil: 'domcontentloaded' })
+  await page.locator('[data-hosting-page]').waitFor({ state: 'visible', timeout: 20_000 })
   await sleep(700)
+
+  const initialHostingProvider = await page
+    .locator('[data-hosting-provider="off"]')
+    .getAttribute('aria-pressed')
 
   rec(
     g,
@@ -22708,10 +22718,20 @@ async function g97(browser) {
     (await page.locator('[data-storage-count="assets"]').innerText()).trim(),
   )
   const assetsPage = await ctx.newPage()
-  await assetsPage.goto(`${BASE}/assets`, { waitUntil: 'networkidle' })
+  await assetsPage.goto(`${BASE}/assets`, { waitUntil: 'domcontentloaded' })
   await assetsPage.locator('[data-assets-quick="all"]').waitFor({ state: 'visible', timeout: 20000 })
-  const quickText = await assetsPage.locator('[data-assets-quick="all"]').innerText()
-  const visibleAssetCount = Number(quickText.match(/(\d+)\s*$/)?.[1] ?? '')
+  await assetsPage
+    .waitForFunction(
+      () => {
+        const count = document.querySelector('[data-assets-quick-count="all"]')?.textContent?.trim()
+        return !!count && Number(count) > 0
+      },
+      null,
+      { timeout: 20_000 },
+    )
+    .catch(() => {})
+  const quickText = await assetsPage.locator('[data-assets-quick-count="all"]').innerText()
+  const visibleAssetCount = Number(quickText.trim())
   await assetsPage.close()
   rec(
     g,
@@ -22918,7 +22938,7 @@ async function g97(browser) {
   rec(
     g,
     '★ 默认「关闭」（不会偷偷把素材传出去）',
-    (await page.locator('[data-hosting-provider="off"]').getAttribute('aria-pressed')) === 'true',
+    initialHostingProvider === 'true',
   )
 
   /**
@@ -23015,9 +23035,16 @@ async function g97(browser) {
     (await page.locator('[data-hosting-provider="tmpfiles"]').getAttribute('aria-pressed')) === 'true',
   )
 
+  const externalReachable = await fetch('https://tmpfiles.org/', {
+    signal: AbortSignal.timeout(5000),
+  })
+    .then((response) => response.ok)
+    .catch(() => false)
+
   /**
    * 外网上传允许重试一次：全量冒烟里 tmpfiles 偶发 5xx / 连接中断，第一次会红但隔离复跑即绿。
    * 重试只放宽**外部服务抖动**，不放宽产品行为：两次都失败时下面两条仍会如实变红。
+   * 服务整体不可达时把上传直链断言记为外部 SKIP，但仍跑一次产品失败路径。
    */
   let url = ''
   let status = ''
@@ -23027,14 +23054,23 @@ async function g97(browser) {
     url = await page.locator('[data-hosting-url]').innerText().catch(() => '')
     status = await page.locator('[data-hosting-status]').innerText().catch(() => '')
     if (/https:\/\/tmpfiles\.org\/dl\//.test(url)) break
+    if (!externalReachable) break
     if (attempt === 0) await sleep(1000)
   }
-  rec(
-    g,
-    '★★ 测试上传拿到 `/dl/` 直链（页面地址换成直链形态）',
-    /https:\/\/tmpfiles\.org\/dl\//.test(url),
-    `url=${url.trim()} status=${status.trim()}`,
-  )
+  if (externalReachable) {
+    rec(
+      g,
+      '★★ 测试上传拿到 `/dl/` 直链（页面地址换成直链形态）',
+      /https:\/\/tmpfiles\.org\/dl\//.test(url),
+      `url=${url.trim()} status=${status.trim()}`,
+    )
+  } else {
+    skipExternal(
+      g,
+      '★★ 测试上传拿到 `/dl/` 直链（页面地址换成直链形态）',
+      `tmpfiles.org 不可达；生产链路仍验证失败提示 url=${url.trim()} status=${status.trim()}`,
+    )
+  }
   rec(
     g,
     '★ 失败时如实报错，不静默（外网依赖，失败会写在这里）',
@@ -45291,7 +45327,8 @@ try {
 
 const pass = results.filter((r) => r.pass).length
 const fail = results.length - pass
-console.log(`\n===== ${pass} passed / ${fail} failed / ${results.length} total =====`)
+console.log(`\n===== ${pass} passed / ${fail} failed / ${results.length} total / ${externalSkips.length} external skipped =====`)
+for (const item of externalSkips) console.log(`SKIP(external) | [${item.group}] ${item.name} | ${item.reason}`)
 if (results.some((r) => r.name.startsWith('★ 环境失败'))) {
   console.log('⚠️ 本轮以**环境失败**结束（浏览器关闭）—— 上面的 failed 数**不是产品缺陷数**，请重跑一轮。')
 }

@@ -123,6 +123,8 @@ store.stderr.pipe(storeStream)
 let browser
 const results = []
 const errors = []
+const requests = []
+const requestTimings = new WeakMap()
 try {
   const health = await waitHealth(store)
   await bulkPut('projects', projects)
@@ -141,6 +143,27 @@ try {
     localStorage.setItem('flow:theme', 'dark')
   }, storePort)
   const page = await context.newPage()
+  page.on('request', (request) => {
+    if (!request.url().startsWith(storeBase)) return
+    const entry = {
+      label: 'app-boot',
+      method: request.method(),
+      path: new URL(request.url()).pathname,
+      startedAt: Date.now(),
+    }
+    requestTimings.set(request, entry)
+    requests.push(entry)
+  })
+  page.on('requestfinished', (request) => {
+    const entry = requestTimings.get(request)
+    if (entry) entry.completedAt = Date.now()
+  })
+  page.on('requestfailed', (request) => {
+    const entry = requestTimings.get(request)
+    if (!entry) return
+    entry.completedAt = Date.now()
+    entry.failed = true
+  })
   page.on('pageerror', (error) => errors.push(`page:${error.message}`))
   page.on('console', (message) => {
     if (message.type() === 'error') errors.push(`console:${message.text()}`)
@@ -151,13 +174,35 @@ try {
   await page.locator('[data-global-settings-tab="channels"]').waitFor({ state: 'visible', timeout: 20_000 })
 
   const measure = async (label, click, waitFor) => {
+    const requestOffset = requests.length
     const start = Date.now()
     await click()
     await page.waitForFunction(waitFor, null, { timeout: 30_000 })
     const elapsedMs = Date.now() - start
-    const result = { label, elapsedMs }
+    const measured = requests.slice(requestOffset)
+      .filter((entry) => entry.completedAt !== undefined)
+      .map((entry) => ({
+        method: entry.method,
+        path: entry.path,
+        elapsedMs: entry.completedAt - entry.startedAt,
+        failed: entry.failed === true,
+      }))
+    const counts = new Map()
+    for (const entry of measured) {
+      const key = `${entry.method} ${entry.path}`
+      const group = counts.get(key) ?? { method: entry.method, path: entry.path, count: 0, maxMs: 0, totalMs: 0 }
+      group.count += 1
+      group.maxMs = Math.max(group.maxMs, entry.elapsedMs)
+      group.totalMs += entry.elapsedMs
+      counts.set(key, group)
+    }
+    const slowest = [...counts.values()]
+      .sort((a, b) => b.maxMs - a.maxMs || b.totalMs - a.totalMs)
+      .slice(0, 8)
+    const measuredRequests = slowest
+    const result = { label, elapsedMs, requests: slowest, requestCount: measured.length }
     results.push(result)
-    console.log(label, `${elapsedMs}ms`)
+    console.log(label, `${elapsedMs}ms`, JSON.stringify(measuredRequests))
     await page.screenshot({ path: path.join(outDir, `${label}.png`), fullPage: false })
     return result
   }
@@ -202,6 +247,7 @@ try {
     health: { backend: health.backend, version: health.version },
     seed: { projects: projects.length, assets: assets.length, runRecords: runRecords.length },
     results,
+    requestTotal: requests.length,
     geometry,
     errors,
   }

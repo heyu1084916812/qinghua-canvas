@@ -12271,3 +12271,12 @@ React 端口 → `invoke` → Rust `check_update` → updater 插件读配置 �
 - Agent 显示层只承接公开正文 / reasoning 与工具条目；模型把英文内部过程写进 content 时，UI 不能把它包装成结构化过程，更不能展示私有思维链。检查点计数只是持久历史数，不等于模型窗口全量。
 - Pinterest / Canvas MCP / 品牌套件 / CLI 都要按「代码已接线 / 本机已验证 / 外部登录态或凭据未完成」分层。真实 Developer App、已登录 harness、干净机器、LICENSE、跨平台和未确认 push 不得标成已交付。
 - 图四当前 HEAD 用 scripts/verify-storage-log-first-paint.mjs 在隔离 V1 335 项目 / 1400 素材 / 500 RunRecord 下复验：存储 3732ms、全局日志 1734ms、画布日志 2831ms，页面错误与溢出 0。比 9s 改前快，但没达到旧证据 0.5-1s；保留 #964，不把性能债清零。隔离 store 必须用 --port 参数和独立 --data-dir，直接设 QINGHUA_SHARED_STORE_PORT 对 shared-store CLI 不生效。
+
+
+### 总管2 第七轮：图四 V1 后端缓存、G97 外部跳过与请求级首屏探针（2026-11-07）
+
+- JSON V1 目录后端的 /usage 缓存只在写入路径维护：普通行 put / bulkPut / delete、tx、kv 按真实字节差值；assets 写入会生成多个 sidecar，保守失效；缩略图 / 预览图懒生成 sidecar 按文件真实增量补齐。缓存刚失效时发生增量写入必须先重建基准，避免少算。
+- 不要把 usage 精确性换成读路径无条件重新扫盘；Rust 测试必须覆盖写入 / 删除后不陈旧、懒缩略图后与磁盘一致、queryPage 的 filtered total / order / offset / limit 不变。
+- scripts/verify-storage-log-first-paint.mjs 用 Playwright request 对象精确配对并聚合慢端点，避免同路径并发请求误配；第七轮最终隔离复测存储 2082ms、全局日志 963ms、画布日志 707ms，requestTotal 496，页面错误和溢出 0。剩余瓶颈是启动 hydrate 高频 /query 与 /rows，保留 #964 / #966。
+- G97 的 tmpfiles.org 不可达要输出 external skipped，但仍执行一次产品测试上传并保留失败提示断言；网络可达时完整直链断言不变。旧 networkidle、素材 quick-count 和默认 provider 时序夹具已修，SMOKE_ONLY=g97 为 31 passed / 0 failed / 1 external skipped。
+- 外部账号、真实 harness、干净机器、LICENSE / 发布授权、跨平台 / Authenticode、3D 与未确认 push 仍需用户决策，不把本机门禁冒充发布完成。
