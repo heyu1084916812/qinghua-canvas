@@ -56,7 +56,9 @@ async function openCliPanel(page) {
   await setInputValue(page, '[data-cli-status-args="runninghub"]', '')
   await page.locator('[data-cli-login-box="runninghub"] summary').click()
   await page.locator('[data-cli-key="runninghub"]').waitFor({ state: 'visible' })
-  await page.locator('[data-cli-key="runninghub"]').scrollIntoViewIfNeeded()
+  await page.locator('[data-cli-key="runninghub"]').evaluate((element) => {
+    element.scrollIntoView({ block: 'center', inline: 'nearest' })
+  })
   await page.waitForTimeout(400)
 }
 

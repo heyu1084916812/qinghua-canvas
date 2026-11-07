@@ -24,7 +24,7 @@ describe('CLI empty status UI gate', () => {
     expect(probe).toContain('没有配置状态命令，已跳过自动查询')
     expect(probe).toContain('statusOutput === 0')
     expect(probe).toContain('panelOverflowX')
-    expect(probe).toContain('scrollIntoViewIfNeeded')
+    expect(probe).toContain("scrollIntoView({ block: 'center', inline: 'nearest' })")
     expect(probe).toContain('登录窗口已结束')
     expect(probe).toContain('windowCases')
     expect(probe).toContain('busyDisabledDuringWindow')
