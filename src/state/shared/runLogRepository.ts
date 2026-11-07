@@ -2,6 +2,7 @@ import type { Project } from '../../domain/project/project'
 import type { RunRecord } from '../../domain/shared/execution/runRecord'
 import type { StoragePort } from '../../platform/ports'
 import type { WorkbenchId } from '../../domain/shared/workbench'
+import { createRunLogProjectLookup } from './runLogProjectLookup'
 
 export type RunLogScopeState = 'scoped' | 'legacy' | 'unclassified'
 
@@ -68,13 +69,19 @@ export function createRunLogRepository(storage: StoragePort): RunLogRepository {
   return {
     async query(filter = {}) {
       validateQuery(filter)
-      const reader = createRunLogReader(storage)
+      const projects = createRunLogProjectLookup(storage)
+      const reader = createRunLogReader(storage, projects)
       const offset = Math.max(0, filter.offset ?? 0)
       const limit = Math.max(0, filter.limit ?? 200)
       let total = 0
       const entries: RunLogEntry[] = []
 
+      const records: RunRecord[] = []
       for await (const record of readCandidateRecords(storage, filter)) {
+        records.push(record)
+      }
+      await projects.prepare(records)
+      for (const record of records) {
         const entry = await reader.resolve(record)
         if (!matchesFilter(entry, filter)) continue
         total += 1
@@ -86,25 +93,40 @@ export function createRunLogRepository(storage: StoragePort): RunLogRepository {
 
     async queryFast(filter = {}) {
       validateQuery(filter)
-      const reader = createRunLogReader(storage)
+      const projects = createRunLogProjectLookup(storage)
+      const reader = createRunLogReader(storage, projects)
       const offset = Math.max(0, filter.offset ?? 0)
       const limit = Math.max(0, filter.limit ?? 200)
       const entries: RunLogEntry[] = []
       let matched = 0
       let hasMore = false
 
-      for await (const record of readCandidateRecords(storage, filter)) {
-        const entry = await reader.resolve(record)
-        if (!matchesFilter(entry, filter)) continue
-        matched += 1
-        if (matched <= offset) continue
-        if (entries.length < limit) {
-          entries.push(entry)
-          continue
+      const candidatePage: RunRecord[] = []
+      const flushCandidates = async () => {
+        if (candidatePage.length === 0) return
+        await projects.prepare(candidatePage)
+        for (const record of candidatePage) {
+          if (hasMore) break
+          const entry = await reader.resolve(record)
+          if (!matchesFilter(entry, filter)) continue
+          matched += 1
+          if (matched <= offset) continue
+          if (entries.length < limit) {
+            entries.push(entry)
+            continue
+          }
+          hasMore = true
         }
-        hasMore = true
-        break
+        candidatePage.length = 0
       }
+
+      for await (const record of readCandidateRecords(storage, filter)) {
+        if (hasMore) break
+        candidatePage.push(record)
+        if (candidatePage.length < 64) continue
+        await flushCandidates()
+      }
+      if (!hasMore) await flushCandidates()
 
       return { entries, hasMore }
     },
@@ -209,9 +231,11 @@ function compareRecords(a: RunRecord, b: RunRecord): number {
   return b.createdAt - a.createdAt || a.id.localeCompare(b.id)
 }
 
-function createRunLogReader(storage: StoragePort) {
+function createRunLogReader(
+  storage: StoragePort,
+  projectLookup: ReturnType<typeof createRunLogProjectLookup>,
+) {
   const records = new Map<string, RunRecord | null>()
-  const projects = new Map<string, Project | null>()
   const resolved = new Map<string, RunLogEntry>()
 
   const getRecord = async (id: string): Promise<RunRecord | null> => {
@@ -225,13 +249,7 @@ function createRunLogReader(storage: StoragePort) {
   }
 
   const getProject = async (id: string): Promise<Project | null> => {
-    if (projects.has(id)) return projects.get(id) ?? null
-    const rows = (await storage.query('projects', { id } as never)) as unknown as
-      | Project[]
-      | undefined
-    const project = rows?.[0] ?? null
-    projects.set(id, project)
-    return project
+    return projectLookup.get(id)
   }
 
   const classify = async (record: RunRecord): Promise<RunLogEntry> => {

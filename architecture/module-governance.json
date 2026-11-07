@@ -6129,6 +6129,28 @@
         "src/workbenches/canvas/panels/canvasLogQuery.test.ts"
       ],
       "budget": 20
+    },
+    {
+      "module": "src/state/shared/runLogProjectLookup.ts",
+      "owner": "run-log-project-lookup",
+      "responsibility": "按运行日志候选页批量解析项目工作台，消除作用域分类的逐条项目查询。",
+      "owns": [
+        "项目 ID 去重与缓存",
+        "queryPage 批量 ids 查询和旧存储整表回退"
+      ],
+      "doesNotOwn": [
+        "RunLogEntry 作用域分类规则",
+        "日志分页、UI 状态与运行记录持久化"
+      ],
+      "publicApi": [
+        "createRunLogProjectLookup",
+        "RunLogProjectLookup"
+      ],
+      "test": [
+        "src/state/shared/runLogProjectLookup.test.ts",
+        "src/state/shared/runLogRepository.test.ts"
+      ],
+      "budget": 80
     }
   ]
 }

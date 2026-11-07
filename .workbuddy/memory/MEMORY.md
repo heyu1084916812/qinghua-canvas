@@ -12280,3 +12280,12 @@ React 端口 → `invoke` → Rust `check_update` → updater 插件读配置 �
 - scripts/verify-storage-log-first-paint.mjs 用 Playwright request 对象精确配对并聚合慢端点，避免同路径并发请求误配；第七轮最终隔离复测存储 2082ms、全局日志 963ms、画布日志 707ms，requestTotal 496，页面错误和溢出 0。剩余瓶颈是启动 hydrate 高频 /query 与 /rows，保留 #964 / #966。
 - G97 的 tmpfiles.org 不可达要输出 external skipped，但仍执行一次产品测试上传并保留失败提示断言；网络可达时完整直链断言不变。旧 networkidle、素材 quick-count 和默认 provider 时序夹具已修，SMOKE_ONLY=g97 为 31 passed / 0 failed / 1 external skipped。
 - 外部账号、真实 harness、干净机器、LICENSE / 发布授权、跨平台 / Authenticode、3D 与未确认 push 仍需用户决策，不把本机门禁冒充发布完成。
+
+
+### 总管2 第八轮：生产首屏实证与总日志项目解析 N+1（2026-11-07）
+
+- 图四性能最终以生产构建为准：scripts/verify-storage-log-first-paint-production.mjs 用 vite preview + 独立 V1 store + 335 项目 / 1400 素材 / 500 RunRecords，按 method+path+table 聚合；当前生产三段 537 / 170 / 350ms，页面错误与溢出 0，均进入 0.5-1s 目标。开发 Vite 的 transform / StrictMode 渲染开销不是生产回归，不能用开发态耗时冒充发布态。
+- runLogProjectLookup.ts 拥有候选页项目 ID 去重、批量 ids 查询、缓存和旧存储整表回退；runLogRepository.ts 仍拥有 RunLogEntry 作用域分类、parentRunId 解析和分页。queryFast 必须逐批消费候选，够 offset+limit+1 即停；精确 query 才允许全量物化候选。
+- 生产探针证明修 N+1 后全局日志阶段共享库请求 116 → 15、projects 28 次逐条 query → 1 次 queryPage + 1 次启动 query，首行 436 → 170ms。专项测试 15/15，治理登记 217 条。
+- 剩余 #966 是可维护债，不再是用户可见慢：生产存储首屏仍有 64 次请求，集中 nodes / assets / channels / presets 的启动 hydrate；后续按 Store 懒加载或合并初始化请求处理，不能塞回面板组件。
+- 外部账号、真实 harness、LICENSE / 发布授权、干净机器安装、跨平台 / Authenticode、3D 与未确认 push 仍需用户决策，不把本机性能达标冒充整个发布目标完成。

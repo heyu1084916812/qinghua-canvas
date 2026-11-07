@@ -465,9 +465,11 @@ describe('runLogRepository', () => {
       ) as never,
     )
     const queryPage = storage.queryPage!.bind(storage)
-    let pageCalls = 0
+    let runRecordPageCalls = 0
+    let projectPageCalls = 0
     storage.queryPage = async (table, filter, options) => {
-      pageCalls += 1
+      if (table === 'runRecords') runRecordPageCalls += 1
+      if (table === 'projects') projectPageCalls += 1
       return queryPage(table, filter, options)
     }
     const repo = createRunLogRepository(storage)
@@ -480,6 +482,50 @@ describe('runLogRepository', () => {
 
     expect(page.entries).toHaveLength(20)
     expect(page.hasMore).toBe(true)
-    expect(pageCalls).toBe(1)
+    expect(runRecordPageCalls).toBe(1)
+    expect(projectPageCalls).toBe(1)
+  })
+
+  it('queryFast batch-resolves project workbenches without N+1 point reads', async () => {
+    const storage = createMemoryStorage()
+    await storage.bulkPut(
+      'projects',
+      Array.from({ length: 60 }, (_, index) =>
+        project(`p${index + 1}`, index % 2 === 0 ? 'canvas' : 'ecommerce'),
+      ) as never,
+    )
+    await storage.bulkPut(
+      'runRecords',
+      Array.from({ length: 60 }, (_, index) =>
+        record(`r${index + 1}`, `p${index + 1}`, {
+          createdAt: index + 1,
+          scopeVersion: 1,
+          workbench: index % 2 === 0 ? 'canvas' : 'ecommerce',
+          subjectId: `node-${index + 1}`,
+          scopeId: `plan-${index + 1}`,
+          operationId: `op-${index + 1}`,
+        }),
+      ) as never,
+    )
+
+    const rawQuery = storage.query.bind(storage)
+    const queryCalls: string[] = []
+    storage.query = async (table, filter, options) => {
+      queryCalls.push(String(table))
+      return rawQuery(table, filter, options)
+    }
+    const rawQueryPage = storage.queryPage!.bind(storage)
+    let projectPageCalls = 0
+    storage.queryPage = async (table, filter, options) => {
+      if (table === 'projects') projectPageCalls += 1
+      return rawQueryPage(table, filter, options)
+    }
+
+    const page = await createRunLogRepository(storage).queryFast({ limit: 50 })
+    expect(page.entries).toHaveLength(50)
+    expect(page.hasMore).toBe(true)
+    expect(queryCalls.filter((table) => table === 'projects')).toHaveLength(0)
+    expect(projectPageCalls).toBe(1)
+    expect(page.entries.every((entry) => entry.scopeState === 'scoped')).toBe(true)
   })
 })
