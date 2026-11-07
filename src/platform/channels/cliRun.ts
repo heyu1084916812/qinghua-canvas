@@ -11,7 +11,11 @@ import {
   type CliTool,
 } from '../../domain/shared/cliTools'
 import type { ModelCapability } from '../../domain/shared/capability'
-import { flattenInputs } from '../../domain/shared/execution/inputs'
+import {
+  flattenInputs,
+  imageInputsOf,
+  videoInputsOf,
+} from '../../domain/shared/execution/inputs'
 import { fingerprintBytes } from '../../domain/shared/hash'
 import { imageSizeFromHeader } from '../../domain/shared/imageSize'
 import { sniffMimeFromBytes } from '../../domain/shared/mimeSniff'
@@ -128,21 +132,71 @@ function varsOf(
   return vars
 }
 
-/** 当前端口不能把素材导出为本地文件，不能把 hash 冒充路径或静默丢输入。 */
-function assertSupportedMediaInputs(
+/** 把共享素材导入 CLI 可读的本地路径；模板不认的不静默丢。 */
+async function mediaVarsOf(
+  deps: ChannelDeps,
   tool: CliTool,
   request: TextRunRequest | ImageRunRequest | VideoRunRequest,
-): void {
-  const assets = flattenInputs(request.inputs).filter((input) => input.kind === 'asset')
-  if (assets.length === 0) return
-  const images = assets.filter((input) => input.mime.toLowerCase().startsWith('image/'))
-  const videos = assets.filter((input) => input.mime.toLowerCase().startsWith('video/'))
-  const detail = images.length
-    ? `这次请求带 ${images.length} 张媒体素材，但「${tool.name}」当前没有可用的本地媒体文件导出端口；请移除素材或改用支持媒体导出的 CLI 适配器`
-    : videos.length
-      ? `这次请求带 ${videos.length} 个视频素材，但「${tool.name}」当前没有可用的本地媒体文件导出端口；请移除素材或改用支持媒体导出的 CLI 适配器`
-      : `这次请求带 ${assets.length} 个媒体素材，但「${tool.name}」当前没有可用的本地媒体文件导出端口；请移除素材后再运行`
-  throw new ChannelError({ kind: 'cli', detail: 'failed', message: detail })
+): Promise<{ image?: string; video?: string }> {
+  const cli = deps.cli
+  if (!cli) return {}
+  const images = imageInputsOf(request.inputs, 2)
+  const videos = videoInputsOf(request.inputs, 2)
+  if (images.length > 1) {
+    throw new ChannelError({
+      kind: 'cli',
+      detail: 'failed',
+      message: `「${tool.name}」的 CLI 模板当前只支持 1 张图片输入；这次带了 ${images.length} 张`,
+    })
+  }
+  if (videos.length > 1) {
+    throw new ChannelError({
+      kind: 'cli',
+      detail: 'failed',
+      message: `「${tool.name}」的 CLI 模板当前只支持 1 个视频输入；这次带了 ${videos.length} 个`,
+    })
+  }
+  if (images.length > 0 && !tool.argsTemplate.includes('{image}')) {
+    throw new ChannelError({
+      kind: 'cli',
+      detail: 'failed',
+      message: `这次请求带图片素材，但「${tool.name}」的参数模板没有 {image}；请补上占位符或移除素材`,
+    })
+  }
+  if (videos.length > 0 && !tool.argsTemplate.includes('{video}')) {
+    throw new ChannelError({
+      kind: 'cli',
+      detail: 'failed',
+      message: `这次请求带视频素材，但「${tool.name}」的参数模板没有 {video}；请补上占位符或移除素材`,
+    })
+  }
+
+  const unsupported = flattenInputs(request.inputs).find(
+    (input) =>
+      input.kind === 'asset' &&
+      !input.mime.toLowerCase().startsWith('image/') &&
+      !input.mime.toLowerCase().startsWith('video/'),
+  )
+  if (unsupported?.kind === 'asset') {
+    throw new ChannelError({
+      kind: 'cli',
+      detail: 'failed',
+      message: `「${tool.name}」的 CLI 模板不支持 ${unsupported.mime} 素材输入`,
+    })
+  }
+
+  const vars: { image?: string; video?: string } = {}
+  try {
+    if (images[0]) vars.image = await cli.importAsset(images[0].assetHash, images[0].mime)
+    if (videos[0]) vars.video = await cli.importAsset(videos[0].assetHash, videos[0].mime)
+  } catch (err) {
+    throw new ChannelError({
+      kind: 'cli',
+      detail: 'failed',
+      message: `导出参考素材给本机 CLI 失败：${String(err)}`,
+    })
+  }
+  return vars
 }
 
 function assertNoUnresolvedMedia(tool: CliTool, args: string[]): void {
@@ -243,9 +297,13 @@ export function createCliRunAdapter(
       throw new ChannelError({ kind: 'channel', detail: 'unsupported' })
     }
     const tool = await resolveTool(deps, config.protocol)
-    assertSupportedMediaInputs(tool, request)
+    const mediaVars = await mediaVarsOf(deps, tool, request)
     const outPath = joinPath(await cli.outDir(), `${runIdFor(config.protocol)}.${outExtFor(kind)}`)
-    const args = buildArgs(tool.argsTemplate, { ...varsOf(request), out: outPath })
+    const args = buildArgs(tool.argsTemplate, {
+      ...varsOf(request),
+      ...mediaVars,
+      out: outPath,
+    })
     assertNoUnresolvedMedia(tool, args)
     /*
      * 模板里没有 `{out}` ⇒ 产物无处落地。**当场拒掉并说清怎么修**：
@@ -330,8 +388,8 @@ export function createCliRunAdapter(
 
     async completeText(request, signal) {
       const tool = await resolveTool(deps, config.protocol)
-      assertSupportedMediaInputs(tool, request)
-      const args = buildArgs(tool.argsTemplate, varsOf(request))
+      const mediaVars = await mediaVarsOf(deps, tool, request)
+      const args = buildArgs(tool.argsTemplate, { ...varsOf(request), ...mediaVars })
       assertNoUnresolvedMedia(tool, args)
       const outcome = await runTool(
         deps,

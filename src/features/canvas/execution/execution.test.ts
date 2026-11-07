@@ -583,6 +583,47 @@ describe('runEngine · mock 渠道出图', () => {  it('完整跑通一次：结
     expect(pixelSummaryOf(record)).toBe('请求64x36  实际64x36')
   })
 
+  it('★ 单个任务返回多个产物时全部落库，主节点显示第一张并保留完整 thumbOrder', async () => {
+    const { platform, store, promptId, genId } = setup()
+    const first = solidPng(5, 4, [0xff, 0x00, 0x00])
+    const second = solidPng(6, 3, [0x00, 0x00, 0xff])
+    const assets: GeneratedAsset[] = [
+      {
+        hash: fingerprintHex('multi-first'),
+        mime: 'image/png',
+        bytes: first,
+        ...(imageSizeFromHeader(first) ?? {}),
+      },
+      {
+        hash: fingerprintHex('multi-second'),
+        mime: 'image/png',
+        bytes: second,
+        ...(imageSizeFromHeader(second) ?? {}),
+      },
+    ]
+    const channel: ChannelAdapter = {
+      protocol: 'multi-result-stub',
+      verify: async () => ({ ok: true, models: [] }),
+      listModels: async () => [],
+      generateImage: async () => assets,
+      generateVideo: async () => [],
+      completeText: async () => ({ text: '' }),
+    }
+    const plan = buildRunPlan('node', { originNodeId: promptId }, store.getSnapshot(), 'single')
+    const summary = await runEngine(plan, deps(store, channel))
+    store.endPlan()
+
+    expect(summary.succeeded).toBe(1)
+    const data = dataOf(store, genId)
+    expect(data.assetHash).toBe(assets[0]!.hash)
+    expect(data.thumbOrder).toEqual(assets.map((asset) => asset.hash))
+    await store.flush()
+    const stored = await platform.storage.query('assets', {})
+    expect(stored.map((row) => row.id)).toEqual(
+      expect.arrayContaining(assets.map((asset) => asset.hash)),
+    )
+  })
+
   /**
    * ★ engine 层「实际像素 ≠ 请求像素」的**非恒等**证明。
    *

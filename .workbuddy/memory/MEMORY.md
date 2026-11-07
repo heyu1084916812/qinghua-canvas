@@ -12365,3 +12365,10 @@ React 端口 → `invoke` → Rust `check_update` → updater 插件读配置 �
 - 跨窗口回调必须查 `busyRef`，不能依赖旧 render 的 `busy` state；异步等待失败要进入可见消息。真实 release 探针用 `cmd.exe /c exit 0` 验证四组明暗/视口，均自动执行状态命令并显示退出码 0，setup 几何稳定、无溢出、页面错误 0。
 - 本轮关联代码：`src/features/settings/cliWindowFollowUp.ts`、`src-tauri/src/lib.rs` 的 `CliWindowRegistry`、`src/platform/{ports.ts,desktop/tauriCli.ts}`。Rust 68/68、模块治理 225 条。
 - 真实账号运行/停止、真实安装器升级、媒体导出、RunningHub 多产物、push、LICENSE、干净机器、跨平台签名和 tag/Release 仍未完成。
+
+### 总管2 第十八轮：CLI 媒体输入与多产物落库（2026-11-08）
+
+- CLI 输入素材不能走前端任意路径，也不能把大视频塞进 IPC。`CliPort.importAsset(hash,mime)` 只传内容寻址；Rust 从本机 shared-store `/asset/<hash>` 拉字节，按 MIME 白名单写成 `<数据目录>/cli-in/<hash>.<ext>`，目录和文件名都由壳决定。
+- `cliRun` 只把图片/视频填进 `{image}`/`{video}`；缺占位符、同类素材超量、未知 MIME 都在起进程前明确拒绝。当前每个占位符只接一个同类素材，不能静默只取第一张，也不能把 hash 冒充路径。
+- RunningHub `results[]` 必须逐项下载；新增回归证明两个 URL 都下载、hash 不同且 assets 全部落库。画布主节点显示第一张，`thumbOrder` 保留完整顺序；结果组不回潮。
+- 定向回归：`cliRun.test.ts` 23/23、`runninghub.test.ts` 与 `execution.test.ts` 合计 113/113，`tsc --noEmit` 通过；Rust 新增 `cli_media_file_name` 白名单测试。真实已登录付费任务和真实 RunningHub 多文件返回仍是外部验收。

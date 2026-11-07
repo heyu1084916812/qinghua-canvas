@@ -3077,6 +3077,7 @@ fn run_cli_blocking(
 // 产物本来就只该落在这个目录，所以把范围收死：越界一律拒。
 
 const CLI_OUT_DIR_NAME: &str = "cli-out";
+const CLI_IN_DIR_NAME: &str = "cli-in";
 
 /// 标准 base64 编码（含 `=` 补齐）。
 ///
@@ -3245,6 +3246,78 @@ fn cli_write_out(app: tauri::AppHandle, name: String, bytes: Vec<u8>) -> Result<
     Ok(target.to_string_lossy().to_string())
 }
 
+fn cli_media_file_name(hash: &str, mime: &str) -> Option<String> {
+    let valid_hash = (8..=128).contains(&hash.len())
+        && hash.chars().all(|ch| ch.is_ascii_hexdigit());
+    if !valid_hash {
+        return None;
+    }
+    let mime = mime.split(';').next()?.trim().to_ascii_lowercase();
+    let ext = match mime.as_str() {
+        "image/png" => "png",
+        "image/jpeg" => "jpg",
+        "image/webp" => "webp",
+        "image/gif" => "gif",
+        "video/mp4" => "mp4",
+        "video/webm" => "webm",
+        "video/quicktime" => "mov",
+        "audio/mpeg" => "mp3",
+        "audio/wav" => "wav",
+        "audio/ogg" => "ogg",
+        "audio/mp4" => "m4a",
+        "audio/aac" => "aac",
+        "audio/flac" => "flac",
+        _ => return None,
+    };
+    Some(format!("{hash}.{ext}"))
+}
+
+fn cli_in_root(app: &tauri::AppHandle) -> Result<PathBuf, String> {
+    let dir = current_data_dir(app)
+        .ok_or_else(|| "拿不到数据目录，无法给本机 CLI 准备输入位置".to_string())?
+        .join(CLI_IN_DIR_NAME);
+    std::fs::create_dir_all(&dir).map_err(|err| format!("建 CLI 输入目录失败：{err}"))?;
+    Ok(dir)
+}
+
+/// 把共享库里的素材导入 `<数据目录>/cli-in`，供本机 CLI 以普通文件路径读取。
+///
+/// 前端只给 hash 与 MIME，URL、文件名和落盘范围都由壳决定；这样既不把大视频塞进 IPC，
+/// 也不把“任意文件写入”暴露给页面。
+#[tauri::command]
+async fn cli_import_asset(
+    app: tauri::AppHandle,
+    hash: String,
+    mime: String,
+) -> Result<String, String> {
+    let name = cli_media_file_name(&hash, &mime)
+        .ok_or_else(|| "CLI 输入素材的 hash 或 MIME 不合法".to_string())?;
+    let root = cli_in_root(&app)?;
+    let target = root.join(name);
+    if !is_inside(&root, &target) {
+        return Err("只能写本机 CLI 输入目录里的文件".to_string());
+    }
+    let port = app.state::<SharedStoreRuntime>().port;
+    let url = format!("http://127.0.0.1:{port}/asset/{hash}");
+    let response = reqwest::get(&url)
+        .await
+        .map_err(|err| format!("从共享素材库读取 {hash} 失败：{err}"))?;
+    let status = response.status();
+    if !status.is_success() {
+        return Err(format!("共享素材库没有返回 {hash}（HTTP {status}）"));
+    }
+    let bytes = response
+        .bytes()
+        .await
+        .map_err(|err| format!("读取共享素材 {hash} 的字节失败：{err}"))?;
+    if bytes.is_empty() {
+        return Err(format!("共享素材 {hash} 是空文件"));
+    }
+    std::fs::write(&target, &bytes)
+        .map_err(|err| format!("把素材 {hash} 写入 CLI 输入目录失败：{err}"))?;
+    Ok(target.to_string_lossy().to_string())
+}
+
 // ── RunningHub CLI 的登录：写它自己的配置文件 ──
 //
 // 用户 2026-10-08 第 3 条：「runininghub 的 cli 是在 github 上找的，看看 github 上
@@ -3313,6 +3386,20 @@ fn rh_set_api_key(api_key: String) -> Result<String, String> {
 #[cfg(test)]
 mod cli_out_tests {
     use super::*;
+
+    #[test]
+    fn cli_media_file_name_requires_safe_hash_and_known_mime() {
+        assert_eq!(
+            cli_media_file_name("0123456789abcdef", "image/png;charset=binary"),
+            Some("0123456789abcdef.png".to_string())
+        );
+        assert_eq!(
+            cli_media_file_name("0123456789abcdef", "video/quicktime"),
+            Some("0123456789abcdef.mov".to_string())
+        );
+        assert_eq!(cli_media_file_name("../escape", "image/png"), None);
+        assert_eq!(cli_media_file_name("0123456789abcdef", "text/html"), None);
+    }
 
     #[test]
     fn base64_matches_rfc4648_vectors() {
@@ -4034,6 +4121,7 @@ pub fn run() {
             cli_out_dir,
             cli_read_out,
             cli_write_out,
+            cli_import_asset,
             rh_set_api_key,
             ui_heartbeat,
             canvas_gateway::canvas_gateway_info,

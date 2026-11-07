@@ -879,6 +879,38 @@ describe('RunningHub 适配器 / 标准模型（金额路）', () => {
     })
   })
 
+  it('★ 一次任务返回多个结果时全部下载，不丢第 2 个产物', async () => {
+    const secondPng = new Uint8Array([...PNG_BYTES, 0])
+    const platform = createMemoryPlatform({
+      handler: async (req: NetworkRequest) => {
+        if (req.url.endsWith('/openapi/v2/query')) {
+          return json(200, {
+            status: 'SUCCESS',
+            results: [
+              { url: 'https://files.runninghub.cn/multi-a.png', outputType: 'png' },
+              { url: 'https://files.runninghub.cn/multi-b.png', outputType: 'png' },
+            ],
+          })
+        }
+        if (req.url.endsWith('/openapi/v2/rhart-image-g-2/text-to-image')) {
+          return json(200, { code: 0, taskId: 'multi-task' })
+        }
+        if (req.url.endsWith('/multi-b.png')) return bytes(200, secondPng)
+        if (req.url.startsWith('https://files.runninghub.cn/')) return bytes(200, PNG_BYTES)
+        return json(200, {})
+      },
+    })
+    const adapter = createRunningHubAdapter(config, platform, FAST)
+    const assets = await adapter.generateImage(imageRequest('GPT Image 2'), signal)
+
+    expect(assets).toHaveLength(2)
+    expect(new Set(assets.map((asset) => asset.hash)).size).toBe(2)
+    expect(assets.map((asset) => asset.url)).toEqual([
+      'https://files.runninghub.cn/multi-a.png',
+      'https://files.runninghub.cn/multi-b.png',
+    ])
+  })
+
   it('★★ Topaz 图像超清走真实端点：imageUrl + scale，不发送无关 prompt', async () => {
     let submitBody: Record<string, unknown> | null = null
     const platform = createMemoryPlatform({

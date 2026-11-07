@@ -641,6 +641,12 @@ export interface CliPort {
   /** 把 CLI 写出来的产物读回来（base64 在壳内部解决，这里直接给字节） */
   readOut(path: string): Promise<Uint8Array>
   /**
+   * 把共享素材导出为 CLI 可读的本地文件，返回绝对路径。
+   *
+   * 前端只给内容 hash 与 MIME；落盘目录和文件名由壳决定，不能变成任意文件写入。
+   */
+  importAsset(hash: string, mime: string): Promise<string>
+  /**
    * 把**小文本文件**写进 CLI 产物目录（当前只用于 `.srt` 字幕）。
    *
    * 名称只能是单文件名，壳会拒绝路径、控制字符和非 `.srt` 扩展名；内容上限 2MB。

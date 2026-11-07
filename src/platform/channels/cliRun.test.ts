@@ -64,6 +64,7 @@ function fakeCli(options: FakeOptions = {}) {
     timeoutMs?: number
     cwd?: string
   }[] = []
+  const imported: { hash: string; mime: string; path: string }[] = []
   const files = new Map<string, Uint8Array>()
   const port: CliPort = {
     async which(program) {
@@ -107,8 +108,14 @@ function fakeCli(options: FakeOptions = {}) {
       if (!found) throw new Error('读不到本机 CLI 的产物')
       return found
     },
+    async importAsset(hash, mime) {
+      const ext = mime.split('/')[1]?.split(';')[0] ?? 'bin'
+      const path = `C:\\data\\cli-in\\${hash}.${ext}`
+      imported.push({ hash, mime, path })
+      return path
+    },
   }
-  return { port, calls, files }
+  return { port, calls, files, imported }
 }
 
 function depsOf(cli: CliPort | undefined): ChannelDeps {
@@ -220,6 +227,110 @@ describe('本机 CLI 适配器 · 图 / 视频', () => {
     mime,
   })
 
+  it('★ 图片素材先导入 cli-in，再把真实本地路径填进 {image}', async () => {
+    const platform = createMemoryPlatform()
+    await platform.storage.put('presets', {
+      id: CLI_TOOLS_ROW_ID,
+      tools: [
+        {
+          id: 'jimeng',
+          argsTemplate: 'generate --image {image} --prompt {prompt} --out {out}',
+        },
+      ],
+    } as never)
+    const cli = fakeCli({ write: () => pngBytes(8, 8) })
+    const adapter = createCliRunAdapter(configOf('jimeng-cli'), { ...platform, cli: cli.port })
+    const outputs = await adapter.generateImage(
+      {
+        kind: 'image',
+        channelId: 'ch-1',
+        model: 'jimeng-image',
+        prompt: '参考这张图',
+        inputs: [assetInput('0123456789abcdef')],
+        params: {},
+      },
+      new AbortController().signal,
+    )
+    expect(cli.imported).toEqual([
+      {
+        hash: '0123456789abcdef',
+        mime: 'image/png',
+        path: 'C:\\data\\cli-in\\0123456789abcdef.png',
+      },
+    ])
+    expect(cli.calls[0]?.args).toEqual([
+      'generate',
+      '--image',
+      'C:\\data\\cli-in\\0123456789abcdef.png',
+      '--prompt',
+      '参考这张图',
+      '--out',
+      expect.stringContaining('cli-out'),
+    ])
+    expect(outputs[0]?.mime).toBe('image/png')
+  })
+
+  it('★ 视频素材同样导入 cli-in 并填进 {video}', async () => {
+    const platform = createMemoryPlatform()
+    await platform.storage.put('presets', {
+      id: CLI_TOOLS_ROW_ID,
+      tools: [
+        {
+          id: 'runninghub',
+          argsTemplate: 'run --task {model} --video {video} --prompt {prompt} --out {out}',
+        },
+      ],
+    } as never)
+    const cli = fakeCli({ write: () => mp4Bytes() })
+    const adapter = createCliRunAdapter(configOf('runninghub'), { ...platform, cli: cli.port })
+    const outputs = await adapter.generateVideo(
+      {
+        kind: 'video',
+        channelId: 'ch-1',
+        model: 'text-to-video',
+        prompt: '参考这段视频',
+        inputs: [assetInput('abcdef0123456789', 'video/mp4')],
+        params: {},
+      },
+      new AbortController().signal,
+    )
+    expect(cli.imported).toEqual([
+      {
+        hash: 'abcdef0123456789',
+        mime: 'video/mp4',
+        path: 'C:\\data\\cli-in\\abcdef0123456789.mp4',
+      },
+    ])
+    expect(cli.calls[0]?.args).toContain('C:\\data\\cli-in\\abcdef0123456789.mp4')
+    expect(outputs[0]?.mime).toBe('video/mp4')
+  })
+
+  it('多张图片不会静默只取第一张，模板容量不足时先拒绝', async () => {
+    const platform = createMemoryPlatform()
+    await platform.storage.put('presets', {
+      id: CLI_TOOLS_ROW_ID,
+      tools: [{ id: 'jimeng', argsTemplate: 'generate --image {image} --out {out}' }],
+    } as never)
+    const cli = fakeCli({ write: () => pngBytes(8, 8) })
+    const adapter = createCliRunAdapter(configOf('jimeng-cli'), { ...platform, cli: cli.port })
+    const app = await cliErrorOf(
+      adapter.generateImage(
+        {
+          kind: 'image',
+          channelId: 'ch-1',
+          model: 'jimeng-image',
+          prompt: '两张参考图',
+          inputs: [assetInput('0123456789abcdef'), assetInput('fedcba9876543210')],
+          params: {},
+        },
+        new AbortController().signal,
+      ),
+    )
+    expect(app.kind === 'cli' ? app.message : '').toMatch(/只支持 1 张图片/)
+    expect(cli.imported).toHaveLength(0)
+    expect(cli.calls).toHaveLength(0)
+  })
+
   it('★ 带图片素材时在起进程前明确拒绝，不静默丢输入', async () => {
     const cli = fakeCli({ write: () => pngBytes(8, 8) })
     const adapter = createCliRunAdapter(configOf('jimeng-cli'), depsOf(cli.port))
@@ -236,8 +347,9 @@ describe('本机 CLI 适配器 · 图 / 视频', () => {
         new AbortController().signal,
       ),
     )
-    expect(app.kind === 'cli' ? app.message : '').toMatch(/媒体素材/)
+    expect(app.kind === 'cli' ? app.message : '').toMatch(/图片素材/)
     expect(cli.calls).toHaveLength(0)
+    expect(cli.imported).toHaveLength(0)
   })
 
   it('★ 纯文本模板不再宣称支持图片，且视频素材同样拒绝', async () => {
@@ -261,6 +373,7 @@ describe('本机 CLI 适配器 · 图 / 视频', () => {
     )
     expect(app.kind === 'cli' ? app.message : '').toMatch(/视频素材/)
     expect(cli.calls).toHaveLength(0)
+    expect(cli.imported).toHaveLength(0)
   })
 
   it('★ 图生图那条路真的走通：{out} 落文件 → 读回字节 → 认出类型与像素', async () => {
@@ -415,6 +528,9 @@ describe('本机 CLI 适配器 · 出错如实说', () => {
       },
       async readOut() {
         return new Uint8Array()
+      },
+      async importAsset(hash, mime) {
+        return `C:\\data\\cli-in\\${hash}.${mime.split('/')[1] ?? 'bin'}`
       },
     }
     const adapter = createCliRunAdapter(configOf('gpt-cli'), depsOf(port))

@@ -45,6 +45,7 @@ export function createTauriCli(): CliPort {
     },
     outDir: () => invoke<string>('cli_out_dir'),
     readOut: async (path) => base64ToBytes(await invoke<string>('cli_read_out', { path })),
+    importAsset: (hash, mime) => invoke<string>('cli_import_asset', { hash, mime }),
     writeOut: (name, bytes) =>
       invoke<string>('cli_write_out', { name, bytes: Array.from(bytes) }),
     /**
