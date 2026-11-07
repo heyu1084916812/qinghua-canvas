@@ -73,6 +73,39 @@ describe('buildEcommerceRunPlan', () => {
     expect(make('同一句')).not.toBe(make('换一句'))
   })
 
+  it('keeps user assets first and carries deduplicated kit inputs into image and video requests', () => {
+    const product = { kind: 'asset' as const, nodeId: 'product', assetHash: 'product', mime: 'image/png' }
+    const reference = { kind: 'asset' as const, nodeId: 'reference', assetHash: 'reference', mime: 'image/png' }
+    const logo = { kind: 'asset' as const, nodeId: 'context:logo:logo', assetHash: 'logo', mime: 'image/png' }
+    for (const mediaKind of ['image', 'video'] as const) {
+      const plan = buildEcommerceRunPlan({
+        taskId: 'ect_1',
+        mediaKind,
+        channelId: 'ch_1',
+        model: 'media-model',
+        inputs: [product, reference, logo],
+        contextInputs: [logo, { ...logo, assetHash: 'brand-reference' }],
+        shots: [{ resultId: 'ecr_1', prompt: '媒体', params: {} }],
+      })
+      expect(plan.tasks[0]?.request.inputs).toEqual([
+        product,
+        reference,
+        logo,
+        { ...logo, assetHash: 'brand-reference' },
+      ])
+      expect(plan.tasks[0]?.request.prompt).toContain('媒体\n\n品牌套件素材规则')
+      expect(plan.tasks[0]?.request.prompt.match(/追加素材 1/g)).toHaveLength(1)
+      expect(plan.tasks[0]?.fingerprint).not.toBe(buildEcommerceRunPlan({
+        taskId: 'ect_1',
+        mediaKind,
+        channelId: 'ch_1',
+        model: 'media-model',
+        inputs: [product, reference, logo],
+        shots: [{ resultId: 'ecr_1', prompt: '媒体', params: {} }],
+      }).tasks[0]?.fingerprint)
+    }
+  })
+
   it('缺少任务、渠道、模型或结果行时直接失败', () => {
     expect(() =>
       buildEcommerceRunPlan({

@@ -1700,7 +1700,7 @@
       "test": [
         "src/pages/EcommercePage/ecommercePageModuleCoverage.test.ts"
       ],
-      "budget": 65
+      "budget": 85
     },
     {
       "module": "src/pages/ProjectsPage/projectDeletionCoordinator.ts",
@@ -4949,6 +4949,49 @@
       "budget": 345
     },
     {
+      "module": "src/features/shared/context/contextGenerationInputs.ts",
+      "owner": "context-generation-inputs",
+      "responsibility": "读取项目绑定套件、校验图片字节并将套件输入追加到最终媒体请求。",
+      "owns": [
+        "ContextRepository 套件读取与素材 MIME 预检",
+        "套件 asset NodeInput 投影和按 hash 保序去重"
+      ],
+      "doesNotOwn": [
+        "文本规划、商品与参考素材选择",
+        "任务建立、付费执行和页面渲染"
+      ],
+      "publicApi": [
+        "AssetInput",
+        "ContextGenerationInputPorts",
+        "contextGenerationInputs",
+        "brandContextPrompt",
+        "mergeContextGenerationInputs"
+      ],
+      "test": [
+        "src/features/shared/context/contextGenerationInputs.test.ts"
+      ],
+      "budget": 85
+    },
+    {
+      "module": "src/pages/EcommercePage/ecommercePage/pageContextInputPort.ts",
+      "owner": "pages-ecommerce-context-inputs",
+      "responsibility": "把电商请求投影为共享品牌套件输入端口的请求文本。",
+      "owns": [
+        "页面 ContextRepository、素材端口和项目范围的适配"
+      ],
+      "doesNotOwn": [
+        "品牌素材读取与提示词规则",
+        "React 渲染、任务建立与结果执行"
+      ],
+      "publicApi": [
+        "createPageContextInputPort"
+      ],
+      "test": [
+        "src/pages/EcommercePage/ecommercePage/pageGenerationActionCoordinator.test.ts"
+      ],
+      "budget": 20
+    },
+    {
       "module": "src/pages/EcommercePage/ecommercePage/pageGenerationActionCoordinator.ts",
       "owner": "pages-ecommerce-generation-actions",
       "responsibility": "编排电商页面生成计划、分镜提示词、渠道选路、任务建立、后台轮询刷新与结果重跑入口。",
@@ -4973,7 +5016,7 @@
       "test": [
         "src/pages/EcommercePage/ecommercePage/pageGenerationActionCoordinator.test.ts"
       ],
-      "budget": 443
+      "budget": 440
     },
     {
       "module": "src/pages/EcommercePage/ecommercePage/pageDraftActionCoordinator.ts",

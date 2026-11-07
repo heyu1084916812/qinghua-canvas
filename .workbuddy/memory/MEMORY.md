@@ -12228,3 +12228,11 @@ React 端口 → `invoke` → Rust `check_update` → updater 插件读配置 �
 - 画布日志当前项目 60 条首屏，IntersectionObserver 续载；分页 offset 必须用已加载记录数，清空只删除当前已加载记录，不误删未加载历史。
 - 快速分页逻辑归 unLogFastPage.ts 和 canvasLogQuery.ts，组件只负责状态、订阅和渲染；治理已登记两模块。
 - 验证：定向 5 files / 20 tests 通过；全量 5251 passed / 1 skipped，唯一失败为另一线 storageOverviewRefresh 缺登记；check 被另一线 deliveryBuild.test node types 错误阻断，不是本刀回归。
+
+
+### 总管2 第二轮：MCP 实例隔离、CLI 输入诚实、电商品牌套件（2026-11-07）
+
+- Canvas MCP release-gate 使用独立 canvas-gateway.release-gate.json，适配器必须收 -ReleaseGate；dev、release-gate、正式版配置不能互相覆盖。
+- CLI 图片/视频输入能力必须由参数模板真实占位符推导；没有本地素材导出端口时在起进程前拒绝，不静默丢掉参考素材。
+- 电商最终媒体与重跑经 contextGenerationInputs 读取冻结套件版本，图片追加在商品/用户参考图后并按 hash 去重；漫剧仍未接入。
+- 生产 preview 不渲染 [data-template] 开发测试桥；G74 必须走开发 Vite，且每组冒烟使用全新隔离 store。

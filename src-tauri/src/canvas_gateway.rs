@@ -123,10 +123,18 @@ pub fn canvas_gateway_info(app: AppHandle) -> Result<GatewayInfo, String> {
     let development = std::env::current_exe()
         .ok()
         .is_some_and(|exe| super::is_development_output(&exe));
+    let release_gate = std::env::var(RELEASE_GATE_ENV).ok().as_deref() == Some("1");
+    let config_switch = if release_gate {
+        " -ReleaseGate"
+    } else if development {
+        " -Dev"
+    } else {
+        ""
+    };
     let mcp_command = format!(
         "powershell.exe -NoProfile -ExecutionPolicy Bypass -File \"{}\"{}",
         script.display(),
-        if development { " -Dev" } else { "" }
+        config_switch
     );
     let mut mcp_args = vec![
         "-NoProfile".to_string(),
@@ -135,7 +143,9 @@ pub fn canvas_gateway_info(app: AppHandle) -> Result<GatewayInfo, String> {
         "-File".to_string(),
         script.display().to_string(),
     ];
-    if development {
+    if release_gate {
+        mcp_args.push("-ReleaseGate".to_string());
+    } else if development {
         mcp_args.push("-Dev".to_string());
     }
     let mcp_config = json!({
@@ -250,11 +260,16 @@ fn gateway_config_path(app: &AppHandle) -> Result<std::path::PathBuf, String> {
         .path()
         .app_local_data_dir()
         .map_err(|error| format!("read app data dir: {error}"))?;
-    Ok(dir.join(gateway_config_name(&exe)))
+    Ok(dir.join(gateway_config_name(
+        &exe,
+        std::env::var(RELEASE_GATE_ENV).ok().as_deref() == Some("1"),
+    )))
 }
 
-fn gateway_config_name(exe: &std::path::Path) -> &'static str {
-    if super::is_development_output(exe) {
+fn gateway_config_name(exe: &std::path::Path, release_gate: bool) -> &'static str {
+    if release_gate {
+        "canvas-gateway.release-gate.json"
+    } else if super::is_development_output(exe) {
         "canvas-gateway.dev.json"
     } else {
         "canvas-gateway.json"
@@ -642,14 +657,19 @@ mod tests {
     #[test]
     fn development_gateway_config_is_isolated_from_installed_app() {
         assert_eq!(
-            gateway_config_name(std::path::Path::new(
-                "E:\\work\\qinghua\\src-tauri\\target\\debug\\qinghua.exe"
-            )),
+            gateway_config_name(
+                std::path::Path::new("E:\\work\\qinghua\\src-tauri\\target\\debug\\qinghua.exe"),
+                false,
+            ),
             "canvas-gateway.dev.json"
         );
         assert_eq!(
-            gateway_config_name(std::path::Path::new("E:\\apps\\轻画\\qinghua.exe")),
+            gateway_config_name(std::path::Path::new("E:\\apps\\轻画\\qinghua.exe"), false,),
             "canvas-gateway.json"
+        );
+        assert_eq!(
+            gateway_config_name(std::path::Path::new("E:\\apps\\轻画\\qinghua.exe"), true,),
+            "canvas-gateway.release-gate.json"
         );
     }
 

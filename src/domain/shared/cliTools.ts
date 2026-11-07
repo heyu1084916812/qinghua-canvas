@@ -126,7 +126,7 @@ export interface CliTool {
 }
 
 /** 参数模板里认得的占位符 */
-export const CLI_PLACEHOLDERS = ['prompt', 'out', 'model', 'workflow'] as const
+export const CLI_PLACEHOLDERS = ['prompt', 'out', 'model', 'workflow', 'image', 'video'] as const
 
 export type CliPlaceholder = (typeof CLI_PLACEHOLDERS)[number]
 
@@ -301,13 +301,18 @@ export function capabilitiesOfTool(tool: CliTool): CliCapability[] {
 
 /** 给渠道 `listModels` 用的形态（`domain/shared/capability` 的公共形状） */
 export function modelCapabilitiesOf(tool: CliTool): ModelCapability[] {
+  const hasImage = tool.argsTemplate.includes('{image}')
+  const hasVideo = tool.argsTemplate.includes('{video}')
   return tool.models.map((model) => {
     const category = model.category
     return {
       id: model.id,
       category,
-      // 三类输入都收：提示词 + 参考图（视频还可能要首尾帧），由参数模板怎么用决定
-      inputTypes: category === 'video' ? ['text', 'image', 'video'] : ['text', 'image'],
+      inputTypes: [
+        'text',
+        ...(hasImage ? (['image'] as const) : []),
+        ...(hasVideo ? (['video'] as const) : []),
+      ],
     }
   })
 }
@@ -404,12 +409,29 @@ export function fillArgs(
   tokens: string[],
   vars: Partial<Record<CliPlaceholder, string>>,
 ): string[] {
-  return tokens.map((token) =>
-    token.replace(PLACEHOLDER_RE, (whole, rawName: string) => {
-      const value = (vars as Record<string, string | undefined>)[rawName]
-      return value === undefined || value === '' ? whole : value
-    }),
-  )
+  const out: string[] = []
+  for (const token of tokens) {
+    if (token.includes('{image}') || token.includes('{video}')) {
+      const filled = token.replace(PLACEHOLDER_RE, (whole, rawName: string) => {
+        const value = (vars as Record<string, string | undefined>)[rawName]
+        return value === undefined || value === '' ? whole : value
+      })
+      if (/\{(?:image|video)\}/.test(filled)) {
+        // `--image {image}` 是参数对；没有素材时连选项一起删掉。
+        if (out.at(-1)?.startsWith('-')) out.pop()
+        continue
+      }
+      out.push(filled)
+      continue
+    }
+    out.push(
+      token.replace(PLACEHOLDER_RE, (whole, rawName: string) => {
+        const value = (vars as Record<string, string | undefined>)[rawName]
+        return value === undefined || value === '' ? whole : value
+      }),
+    )
+  }
+  return out
 }
 
 /** 一次把模板变成最终参数（UI 与将来的执行层都用这一条） */

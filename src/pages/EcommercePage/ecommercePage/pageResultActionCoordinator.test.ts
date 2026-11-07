@@ -90,6 +90,7 @@ const storedRerunPortsOf = (
   const task = taskOf({ id: 'task-source' })
   const row = rowOf('source-row', 'source-node')
   return {
+    contextInputs: vi.fn(async () => []),
     activeTask: task,
     taskHistory: [],
     row,
@@ -656,6 +657,36 @@ describe('ecommerce stored result rerun actions', () => {
     const inputs = run.mock.calls[0]?.[0].tasks[0]?.request.inputs
     expect(inputs).toHaveLength(1)
     expect(inputs?.[0]).toMatchObject({ kind: 'asset', assetHash: 'already-present' })
+  })
+
+  it('carries kit inputs on a stored result rerun and preserves explicit user assets', async () => {
+    const run = vi.fn(async (_plan: RunPlan<EcommerceRunTask>) => ({ warnings: [] }))
+    await runStoredResultRerun(storedRerunPortsOf({
+      contextInputs: vi.fn(async () => [
+        { kind: 'asset' as const, nodeId: 'context:logo:product-hash', assetHash: 'product-hash', mime: 'image/png' },
+        { kind: 'asset' as const, nodeId: 'context:reference:brand-reference', assetHash: 'brand-reference', mime: 'image/png' },
+      ]),
+      visualInputsFor: vi.fn(async () => [{
+        kind: 'asset' as const,
+        nodeId: 'user-product',
+        assetHash: 'product-hash',
+        mime: 'image/png',
+      }]),
+      execution: { run },
+    }))
+    expect(run.mock.calls[0]?.[0].tasks[0]?.request.inputs).toEqual([
+      { kind: 'asset', nodeId: 'user-product', assetHash: 'product-hash', mime: 'image/png' },
+      { kind: 'asset', nodeId: 'context:reference:brand-reference', assetHash: 'brand-reference', mime: 'image/png' },
+    ])
+  })
+
+  it('stops a stored result rerun before execution when a kit asset is missing', async () => {
+    const run = vi.fn(async () => ({ warnings: [] }))
+    await expect(runStoredResultRerun(storedRerunPortsOf({
+      contextInputs: vi.fn(async () => { throw new Error('missing 已停止生成') }),
+      execution: { run },
+    }))).rejects.toThrow('已停止生成')
+    expect(run).not.toHaveBeenCalled()
   })
 
   it('releases the lease when execution fails and skips refreshes', async () => {

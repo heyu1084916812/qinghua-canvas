@@ -9,6 +9,7 @@ import {
 import { useAssetMeta } from '../../features/shared/assets/index'
 import { EcommerceStudio, type EcommerceResultItem, type EcommerceUpload } from '../../workbenches/ecommerce/EcommerceStudio'
 import { createAgentSessionStore } from '../../state/agent/sessionStore'
+import { createPageContextInputPort } from './ecommercePage/pageContextInputPort'
 import { openGlobalSettings } from '../../state/ui/globalSettings'
 import {
   resolveRoutedChatTarget,
@@ -233,18 +234,9 @@ function StudioHost({ projectId }: { projectId: string }) {
   }, [platform, projectId])
   const graph = useMemo(() => ({ nodes: legacyNodes }), [legacyNodes])
   const taskRepo = useMemo(() => createEcommerceTaskRepository(platform.storage), [platform])
-  const runLogs = useMemo(
-    () => createRunLogRepository(platform.storage),
-    [platform],
-  )
-  const canvasRepo = useMemo(
-    () => createEcommerceCanvasRepository(platform.storage),
-    [platform],
-  )
-  const assetLibraryRepo = useMemo(
-    () => createAssetLibraryRepository(platform.storage),
-    [platform],
-  )
+  const runLogs = useMemo(() => createRunLogRepository(platform.storage), [platform])
+  const canvasRepo = useMemo(() => createEcommerceCanvasRepository(platform.storage), [platform])
+  const assetLibraryRepo = useMemo(() => createAssetLibraryRepository(platform.storage), [platform])
   const [projectName, setProjectName] = useState('')
   /**
    * 结果真源是 `ecommerceTasks` / `ecommerceResults`（对账 #399 第二期）。
@@ -748,6 +740,7 @@ function StudioHost({ projectId }: { projectId: string }) {
     canvasRepo,
     runLogs,
     assets: platform.assets,
+    contextInputs: createPageContextInputPort(platform, projectId),
     /*
      * 宿主只提供 execution 实例；后台 `void exec.run(runPlan)`、轮询和 lease
      * 收口都由生成协调器拥有。

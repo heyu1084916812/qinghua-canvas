@@ -7,11 +7,37 @@ import {
   defaultCliTools,
   fillArgs,
   mergeTools,
+  modelCapabilitiesOf,
   parseArgs,
   toolPatchOf,
 } from './cliTools'
 
 describe('CLI 参数模板', () => {
+  it('媒体输入能力由参数模板决定，默认 CLI 不虚报图片 / 视频输入', () => {
+    const base = defaultCliTools()[0]!
+    expect(modelCapabilitiesOf(base)[0]?.inputTypes).toEqual(['text'])
+    expect(
+      modelCapabilitiesOf({ ...base, argsTemplate: 'exec {prompt} --input {image}' })[0]
+        ?.inputTypes,
+    ).toEqual(['text', 'image'])
+    expect(
+      modelCapabilitiesOf({ ...base, argsTemplate: 'exec {prompt} --video {video}' })[0]
+        ?.inputTypes,
+    ).toEqual(['text', 'video'])
+  })
+
+  it('没有媒体素材时省略可选媒体参数，旧占位符语义不变', () => {
+    expect(buildArgs('model run --prompt {prompt} --image {image} --video {video}', {
+      prompt: 'text only',
+    })).toEqual(['model', 'run', '--prompt', 'text only'])
+    expect(fillArgs(['--image', '{image}'], { prompt: 'text only' })).toEqual([])
+    expect(fillArgs(['--input={image}'], { prompt: 'text only' })).toEqual([])
+    expect(fillArgs(['--model', '{model}'], { prompt: 'text only' })).toEqual([
+      '--model',
+      '{model}',
+    ])
+  })
+
   it('按空格切词，引号里的空格不算分隔', () => {
     expect(parseArgs('exec --prompt a b')).toEqual(['exec', '--prompt', 'a', 'b'])
     expect(parseArgs('generate --prompt "两 个 词" --out x')).toEqual([

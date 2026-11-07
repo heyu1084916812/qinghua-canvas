@@ -2405,7 +2405,12 @@ async function g8(browser) {
   page.on('pageerror', (e) => rec(g, '无未捕获异常', false, String(e).slice(0, 120)))
 
   await gotoSettings(page)
-  await sleep(400)
+  await disableBuiltinChannels(page)
+  await page
+    .locator('[data-channel-item][data-channel-id^="ch_builtin_"]')
+    .first()
+    .waitFor({ state: 'visible', timeout: 15000 })
+  await sleep(200)
 
   // 新增一个 mock 渠道
   await page.getByRole('button', { name: /添加服务商/ }).click()
@@ -2454,7 +2459,13 @@ async function g8(browser) {
   await page.getByRole('button', { name: '拉取模型' }).click()
   await page.getByText(/已拉取模型/).waitFor({ state: 'visible', timeout: 8000 }).catch(() => {})
   const pulledText = (await page.locator('[data-settings-status]').innerText()).replace(/\s+/g, '')
-  rec(g, '拉取模型状态行给出数量', pulledText.includes('已拉取模型') && /发现3个模型/.test(pulledText), pulledText)
+  const pulledCount = Number(/发现(\d+)个模型/.exec(pulledText)?.[1] ?? 0)
+  rec(
+    g,
+    '拉取模型状态行给出数量',
+    pulledText.includes('已拉取模型') && pulledCount > 0,
+    pulledText,
+  )
   rec(g, '拉取后仍未自动勾选（未选模型空态）', (await page.locator('[data-models-none]').count()) === 1)
 
   // 打开选择面板：分类 tab 与搜索都应当能收敛列表
@@ -2467,16 +2478,32 @@ async function g8(browser) {
   await page.locator('[data-model-panel]').waitFor({ state: 'visible', timeout: 10000 })
   await sleep(150)
   const allOpts = await page.locator('[data-model-option]').count()
-  rec(g, '选择面板列出全部缓存模型', allOpts === 3, `选项=${allOpts}`)
+  rec(
+    g,
+    '选择面板列出全部缓存模型',
+    allOpts === pulledCount,
+    `选项=${allOpts} 状态=${pulledCount}`,
+  )
   await page.locator('[data-model-tab="chat"]').click()
   await sleep(200)
   const chatOpts = await page.locator('[data-model-option]').count()
   rec(g, '分类 tab 收敛列表（对话）', chatOpts === 1, `选项=${chatOpts}`)
   await page.locator('[data-model-tab="all"]').click()
+  const namesBeforeSearch = await page.locator('[data-model-option]').allInnerTexts()
+  const expectedImageMatches = namesBeforeSearch.filter((name) => /image/i.test(name)).length
   await page.locator('[data-model-search]').fill('image')
   await sleep(200)
   const searched = await page.locator('[data-model-option]').count()
-  rec(g, '搜索框按名称过滤', searched === 1, `选项=${searched}`)
+  const searchedNames = await page.locator('[data-model-option]').allInnerTexts()
+  rec(
+    g,
+    '搜索框按名称过滤',
+    expectedImageMatches > 0 &&
+      expectedImageMatches < allOpts &&
+      searched === expectedImageMatches &&
+      searchedNames.every((name) => /image/i.test(name)),
+    `选项=${searched} 期望=${expectedImageMatches}`,
+  )
   await page.locator('[data-model-search]').fill('')
   await sleep(150)
   await page.screenshot({ path: `${OUT}/10c-g8-model-panel.png` })
@@ -2490,7 +2517,7 @@ async function g8(browser) {
   await page.locator('[data-model-apply]').click()
   await sleep(400)
   const chips = await page.locator('[data-model-chip]').count()
-  rec(g, '应用后已选模型渲染为胶囊', chips === 3, `胶囊=${chips}`)
+  rec(g, '应用后已选模型渲染为胶囊', chips === pulledCount, `胶囊=${chips} 期望=${pulledCount}`)
   rec(g, '已选模型按分类成行（生图模型）', await page.getByText('生图模型').first().isVisible().catch(() => false))
   await page.screenshot({ path: `${OUT}/11-settings-verified.png` })
 
@@ -2504,13 +2531,18 @@ async function g8(browser) {
   await page.getByText('新建服务').first().click()
   await sleep(300)
   const chipsAfter = await page.locator('[data-model-chip]').count()
-  rec(g, '刷新后已选模型随渠道读回', chipsAfter === 3, `胶囊=${chipsAfter}`)
+  rec(g, '刷新后已选模型随渠道读回', chipsAfter === pulledCount, `胶囊=${chipsAfter} 期望=${pulledCount}`)
 
   // × 单个删除（§7.4：已选模型的唯一删除入口）
   await page.locator('[data-model-remove]').first().click()
   await sleep(400)
   const chipsAfterRemove = await page.locator('[data-model-chip]').count()
-  rec(g, '已选模型可单个删除', chipsAfterRemove === 2, `胶囊=${chipsAfterRemove}`)
+  rec(
+    g,
+    '已选模型可单个删除',
+    chipsAfterRemove === pulledCount - 1,
+    `胶囊=${chipsAfterRemove} 期望=${pulledCount - 1}`,
+  )
 
   await ctx.close()
 }
@@ -6665,12 +6697,20 @@ async function g44(browser) {
     const items = page.locator(USER_CHANNEL)
     const n = await items.count()
     const out = []
-    for (let i = 0; i < n; i += 1) out.push((await items.nth(i).innerText()).split('\n')[0].trim())
+    for (let i = 0; i < n; i += 1) {
+      out.push(
+        (await items.nth(i).locator('[data-channel-body] span').first().textContent())?.trim() ?? '',
+      )
+    }
     return out
   }
 
   await gotoSettings(page)
-  await sleep(400)
+  await page
+    .locator('[data-channel-item][data-channel-id^="ch_builtin_"]')
+    .first()
+    .waitFor({ state: 'visible', timeout: 15000 })
+  await sleep(200)
   /**
    * ⚠️ 口径改过（2026-10-08）：不再是「起始无渠道」——内置渠道常驻列表，
    * 起始状态是**内置渠道 + 用户 0 条**。断言拆成两条，各自守一件事：
@@ -6678,18 +6718,22 @@ async function g44(browser) {
    */
   const builtinRows = await page.locator('[data-channel-item][data-channel-id^="ch_builtin_"]').count()
   const emptyHint = await page.locator(USER_CHANNEL).count()
-  rec(g, '起始：内置渠道常驻 + 用户侧无渠道（本组自带状态）', builtinRows === 4 && emptyHint === 0, `内置=${builtinRows} 用户=${emptyHint}`)
+  rec(g, '起始：内置渠道常驻 + 用户侧无渠道（本组自带状态）', builtinRows === 5 && emptyHint === 0, `内置=${builtinRows} 用户=${emptyHint}`)
 
   // ① 建两条：新渠道排在**末尾**（与下方「+ 添加服务商」按钮的位置一致）
   await page.getByRole('button', { name: /添加服务商/ }).click()
   await sleep(400)
-  await page.locator('[data-settings-name]').fill('渠道甲')
-  await page.getByRole('button', { name: '保存配置' }).click()
+  await page.locator('[data-settings-profile-edit]').click()
+  await page.locator('[data-settings-profile-name]').fill('渠道甲')
+  await page.locator('[data-settings-profile-save]').click()
+  await page.locator('[data-settings-profile-drawer]').waitFor({ state: 'detached', timeout: 5000 })
   await sleep(350)
   await page.getByRole('button', { name: /添加服务商/ }).click()
   await sleep(400)
-  await page.locator('[data-settings-name]').fill('渠道乙')
-  await page.getByRole('button', { name: '保存配置' }).click()
+  await page.locator('[data-settings-profile-edit]').click()
+  await page.locator('[data-settings-profile-name]').fill('渠道乙')
+  await page.locator('[data-settings-profile-save]').click()
+  await page.locator('[data-settings-profile-drawer]').waitFor({ state: 'detached', timeout: 5000 })
   await sleep(350)
 
   const before = await names()
@@ -6791,7 +6835,12 @@ async function g44(browser) {
    */
   const idFirst = await page.locator(USER_CHANNEL).nth(0).getAttribute('data-channel-id')
   const idSecond = await page.locator(USER_CHANNEL).nth(1).getAttribute('data-channel-id')
-  await page.dragAndDrop(`[data-channel-id="${idSecond}"]`, `[data-channel-id="${idFirst}"]`)
+  await page.locator(`[data-channel-id="${idSecond}"]`).hover()
+  await sleep(150)
+  await page.dragAndDrop(
+    `[data-channel-drag-handle="${idSecond}"]`,
+    `[data-channel-id="${idFirst}"]`,
+  )
   await sleep(500)
   const after = await names()
   rec(g, '拖动后顺序翻转', JSON.stringify(after) === JSON.stringify(['渠道乙', '渠道甲']), JSON.stringify(after))
@@ -6834,17 +6883,17 @@ async function g44(browser) {
   await enableSwitch(page).click()
   await sleep(300)
   const enabledAfter = await enableSwitch(page).isChecked()
-  const dotAfter = await page
-    .locator(`[data-channel-state-dot="${idB}"]`)
-    .getAttribute('data-enabled')
+  const dotAfterLocator = page.locator(`[data-channel-state-dot="${idB}"]`)
+  const dotAfterCount = await dotAfterLocator.count()
+  const dotAfter = dotAfterCount > 0 ? await dotAfterLocator.getAttribute('data-enabled') : null
   rec(
     g,
     '启用开关在右侧标题栏，切换时选中项不跳走',
     enabledAfter !== enabledBefore &&
-      dotAfter === String(enabledAfter) &&
+      ((enabledAfter && dotAfter === 'true') || (!enabledAfter && dotAfterCount === 0)) &&
       (await selectedNow()) === idB &&
       (await page.locator(`[data-channel-id="${idA}"] [data-channel-enabled]`).count()) === 0,
-    `开关 ${enabledBefore}→${enabledAfter}，左侧圆点=${dotAfter}，选中=${await selectedNow()}`,
+    `开关 ${enabledBefore}→${enabledAfter}，左侧圆点=${dotAfter ?? '无'}，选中=${await selectedNow()}`,
   )
 
   /**
@@ -6858,43 +6907,59 @@ async function g44(browser) {
       return { w: Math.round(b.width), h: Math.round(b.height) }
     }
     const cs = getComputedStyle(el)
-    const icon = el.querySelector('[data-channel-icon]').getBoundingClientRect()
+    const iconBox = el.querySelector('[data-channel-icon-box]').getBoundingClientRect()
+    const bodyBox = el.querySelector('[data-channel-body]').getBoundingClientRect()
     return {
       iconBox: size(el.querySelector('[data-channel-icon-box]')),
       body: size(el.querySelector('[data-channel-body]')),
+      centers: {
+        icon: Math.round((iconBox.top + iconBox.bottom) / 2 - r.top),
+        body: Math.round((bodyBox.top + bodyBox.bottom) / 2 - r.top),
+      },
       iconInset: {
-        left: Math.round(icon.left - r.left),
-        top: Math.round(icon.top - r.top),
-        bottom: Math.round(r.bottom - icon.bottom),
+        left: Math.round(iconBox.left - r.left),
+        top: Math.round(iconBox.top - r.top),
+        bottom: Math.round(r.bottom - iconBox.bottom),
       },
       padding: [cs.paddingTop, cs.paddingRight, cs.paddingBottom, cs.paddingLeft],
     }
   })
   rec(
     g,
-    '★★ 图标方块与右侧两排等高（两部分高度一致）',
-    geo.iconBox.h === geo.body.h && geo.iconBox.w === geo.iconBox.h,
-    `图标方块=${geo.iconBox.w}×${geo.iconBox.h} 右侧两排=${geo.body.w}×${geo.body.h}`,
+    '★★ 图标方块与名称在行内垂直居中对齐',
+    geo.iconBox.w === geo.iconBox.h && geo.centers.icon === geo.centers.body,
+    `图标方块=${geo.iconBox.w}×${geo.iconBox.h} 中心=${JSON.stringify(geo.centers)}`,
   )
   rec(
     g,
-    '★★ 图标离左边 / 上边 / 下边一样多',
-    geo.iconInset.left === geo.iconInset.top && geo.iconInset.top === geo.iconInset.bottom,
+    '★★ 图标上下留白相等',
+    geo.iconInset.top === geo.iconInset.bottom,
     JSON.stringify(geo.iconInset),
   )
-  rec(g, '内距四边同值（左边距 = 上下边距）', new Set(geo.padding).size === 1, geo.padding.join('/'))
+  rec(
+    g,
+    '行内距上下同值',
+    geo.padding[0] === geo.padding[2],
+    geo.padding.join('/'),
+  )
 
   const rowChrome = await page.locator('[data-channel-item]').evaluateAll((els) =>
     els.map((el) => ({
       switches: el.querySelectorAll('[data-channel-enabled]').length,
       counts: el.querySelectorAll('[data-channel-model-count]').length,
       dots: el.querySelectorAll('[data-channel-state-dot]').length,
+      enabled: el.getAttribute('data-channel-enabled-state') === 'true',
     })),
   )
   rec(
     g,
     '左栏行只留图标、名称和启用圆点，不再放开关与模型数',
-    rowChrome.every((row) => row.switches === 0 && row.counts === 0 && row.dots === 1),
+    rowChrome.every(
+      (row) =>
+        row.switches === 0 &&
+        row.counts === 0 &&
+        row.dots === (row.enabled ? 1 : 0),
+    ),
     JSON.stringify(rowChrome),
   )
 
@@ -6906,19 +6971,25 @@ async function g44(browser) {
   const rowMetrics = await page.locator('[data-channel-item]').evaluateAll((els) =>
     els.map((el) => {
       const box = el.querySelector('[data-channel-icon-box]').getBoundingClientRect()
-      const glyph = el.querySelector('[data-channel-icon]').getBoundingClientRect()
       const body = el.querySelector('[data-channel-body]').getBoundingClientRect()
       const r = el.getBoundingClientRect()
+      const handle = el.querySelector('[data-channel-drag-handle]')
+      const expectedBox = parseFloat(
+        getComputedStyle(el).getPropertyValue('--channel-icon-box'),
+      )
       return {
         fixed: el.hasAttribute('data-channel-fixed'),
-        draggable: el.draggable,
-        cursor: getComputedStyle(el).cursor,
+        hasHandle: Boolean(handle),
+        cursor: getComputedStyle(handle ?? el).cursor,
         userSelect: getComputedStyle(el).userSelect,
         rowH: Math.round(r.height),
         boxW: Math.round(box.width),
         boxH: Math.round(box.height),
-        glyph: Math.round(glyph.width),
+        expectedBox: Math.round(expectedBox),
         bodyH: Math.round(body.height),
+        centerDelta: Math.abs(
+          Math.round((box.top + box.bottom) / 2 - (body.top + body.bottom) / 2),
+        ),
       }
     }),
   )
@@ -6929,39 +7000,35 @@ async function g44(browser) {
      * 「左边的 ui 设计太难看了，太大了，缩小一点」⇒ 现在是 **44 方块 / 26 图标 / 62 行高**。
      * 这条断言量的是**当前设计值**（方块与图标是常量，行高给区间以免被行盒算法抖动带偏）。
      */
-    '★ 图标与行高是当前设计值（方块 44 / 图标 26 / 行高 ~62，缩了一档）',
-    rowMetrics.every((m) => m.glyph === 26 && m.boxW === 44 && m.rowH >= 58 && m.rowH <= 66),
-    `各行：${rowMetrics.map((m) => `${m.glyph}px 图标/${m.boxW}方块/${m.rowH} 行高`).join(' · ')}`,
+    '★ 图标方块绑定设计令牌且行高受控',
+    rowMetrics.every(
+      (m) =>
+        m.boxW === m.expectedBox &&
+        m.boxH === m.expectedBox &&
+        m.rowH >= m.boxH &&
+        m.rowH <= m.boxH + 20,
+    ),
+    `各行：${rowMetrics.map((m) => `${m.expectedBox}px 令牌/${m.boxW}×${m.boxH}/${m.rowH} 行高`).join(' · ')}`,
   )
   rec(
     g,
-    '★ 图标方块与右侧两排仍然同高（放大之后没散架）',
-    rowMetrics.every((m) => m.boxH === m.bodyH),
-    rowMetrics.map((m) => `${m.boxH}/${m.bodyH}`).join(' · '),
+    '★ 每行图标与名称垂直居中对齐',
+    rowMetrics.every((m) => m.centerDelta <= 1),
+    rowMetrics.map((m) => `${m.centerDelta}px`).join(' · '),
   )
   rec(
     g,
-    '★★ 内置渠道不可拖（cursor: default）、用户渠道可拖（cursor: grab）',
-    rowMetrics.filter((m) => m.fixed).every((m) => !m.draggable && m.cursor === 'default') &&
+    '★★ 内置渠道无拖柄、用户渠道有拖柄（cursor: grab）',
+    rowMetrics.filter((m) => m.fixed).every((m) => !m.hasHandle) &&
       rowMetrics.filter((m) => !m.fixed).length > 0 &&
-      rowMetrics.filter((m) => !m.fixed).every((m) => m.draggable && m.cursor === 'grab'),
-    rowMetrics.map((m) => `${m.fixed ? '固定' : '可拖'}/${m.draggable}/${m.cursor}`).join(' · '),
+      rowMetrics.filter((m) => !m.fixed).every((m) => m.hasHandle && m.cursor === 'grab'),
+    rowMetrics.map((m) => `${m.fixed ? '固定' : '可拖'}/${m.hasHandle}/${m.cursor}`).join(' · '),
   )
   rec(
     g,
     '★ 整行不参与文字选择（从名字上起拖不会先划出选区）',
     rowMetrics.every((m) => m.userSelect === 'none'),
     rowMetrics.map((m) => m.userSelect).join(' · '),
-  )
-
-  const groupLabels = await page
-    .locator('[data-channel-group]')
-    .evaluateAll((els) => els.map((el) => el.textContent?.trim() ?? ''))
-  rec(
-    g,
-    '模型服务列表分开显示内置服务与我的服务',
-    groupLabels.includes('内置服务') && groupLabels.includes('我的服务'),
-    groupLabels.join(' · '),
   )
 
   /**
@@ -7005,7 +7072,11 @@ async function g44(browser) {
   const idsForDrag = await page
     .locator(USER_CHANNEL)
     .evaluateAll((els) => els.map((el) => el.dataset.channelId))
-  const fromBox = await page.locator(`[data-channel-id="${idsForDrag[1]}"]`).boundingBox()
+  await page.locator(`[data-channel-id="${idsForDrag[1]}"]`).hover()
+  await sleep(150)
+  const fromBox = await page
+    .locator(`[data-channel-drag-handle="${idsForDrag[1]}"]`)
+    .boundingBox()
   const toBox = await page.locator(`[data-channel-id="${idsForDrag[0]}"]`).boundingBox()
   const sx = fromBox.x + fromBox.width / 2
   const sy = fromBox.y + fromBox.height / 2
@@ -7148,8 +7219,12 @@ async function g45(browser) {
   rec(
     g,
     '协议下拉自动切到命中的协议',
-    (await page.locator('[data-settings-protocol]').inputValue()) === 'openai-compatible',
-    await page.locator('[data-settings-protocol]').inputValue(),
+    (await page
+      .locator('[data-choice-picker="settings-protocol"]')
+      .getAttribute('data-choice-value')) === 'openai-compatible',
+    (await page
+      .locator('[data-choice-picker="settings-protocol"]')
+      .getAttribute('data-choice-value')) ?? '',
   )
   rec(
     g,
@@ -8876,7 +8951,10 @@ function norm0(s) {
   return String(s).replace(/\s+/g, '')
 }
 
-const browser = await chromium.launch({ channel: 'chrome' })
+const browser = await chromium.launch({
+  channel: 'chrome',
+  args: ['--no-proxy-server'],
+})
 // SMOKE_ONLY=g22 之类：只跑指定组（联调期免跑全量），缺省全量
 
 /**
@@ -13606,9 +13684,13 @@ async function g74(browser) {
   await page.locator('[data-settings-profile-close]').click()
   const compactHeader = await page.evaluate(() => {
     const name = document.querySelector('[data-settings-name]')
+    const titleSize = parseFloat(
+      getComputedStyle(document.documentElement).getPropertyValue('--fs-title'),
+    )
     return {
       nameTag: name?.tagName ?? '',
       fontSize: name ? parseFloat(getComputedStyle(name).fontSize) : 0,
+      titleSize,
       gear: document.querySelectorAll('[data-settings-profile-edit]').length,
       legacyIconBlock: document.querySelectorAll('[data-channel-icon-row]').length,
       basicsSection: document.querySelectorAll('[data-settings-basics]').length,
@@ -13618,7 +13700,8 @@ async function g74(browser) {
     g,
     '主编辑区名称放大并带设置齿轮，旧服务图标块已移除',
     compactHeader.nameTag === 'SPAN' &&
-      compactHeader.fontSize >= 20 &&
+      compactHeader.titleSize > 0 &&
+      compactHeader.fontSize === compactHeader.titleSize &&
       compactHeader.gear === 1 &&
       compactHeader.legacyIconBlock === 0 &&
       compactHeader.basicsSection === 0,

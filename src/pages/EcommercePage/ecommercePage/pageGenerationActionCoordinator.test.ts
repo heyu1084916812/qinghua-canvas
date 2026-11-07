@@ -134,6 +134,7 @@ function harness(overrides: Partial<PageGenerationActionPorts> = {}) {
     assets: {
       read: vi.fn(async () => ({ mime: 'image/png' })),
     },
+    contextInputs: vi.fn(async () => []),
     execution: {
       run: vi.fn(async () => ({ warnings: [] })),
     },
@@ -410,6 +411,31 @@ describe('ecommerce page generation action coordinator', () => {
       'refresh-workbench',
       'release',
     ])
+  })
+
+  it('appends kit assets to final media requests before creating a paid task', async () => {
+    const h = harness({
+      contextInputs: vi.fn(async () => [
+        { kind: 'asset' as const, nodeId: 'context:logo:logo', assetHash: 'logo', mime: 'image/png' },
+        { kind: 'asset' as const, nodeId: 'context:reference:reference', assetHash: 'reference', mime: 'image/png' },
+      ]),
+    })
+    await h.coordinator.onGenerate(requestOf())
+    const plan = vi.mocked(h.ports.execution.run).mock.calls[0]?.[0]
+    expect(plan?.tasks[0]?.request.inputs.map((input) => input.kind === 'asset' ? input.assetHash : input.kind))
+      .toEqual(['logo', 'reference'])
+    expect(vi.mocked(h.ports.contextInputs).mock.invocationCallOrder[0])
+      .toBeLessThan(vi.mocked(h.ports.taskRepo.create).mock.invocationCallOrder[0])
+  })
+
+  it('does not create a paid task when a bound kit asset is missing', async () => {
+    const h = harness({
+      contextInputs: vi.fn(async () => { throw new Error('缺失 Logo 已停止生成') }),
+    })
+    await expect(h.coordinator.onGenerate(requestOf())).rejects.toThrow('缺失 Logo')
+    expect(h.ports.taskRepo.create).not.toHaveBeenCalled()
+    expect(h.ports.execution.run).not.toHaveBeenCalled()
+    expect(h.state.setGenerationFailed).toHaveBeenCalledWith(expect.stringContaining('已停止生成'))
   })
 
   it('releases the lease when execution fails', async () => {

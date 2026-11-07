@@ -107,6 +107,7 @@ export interface PageGenerationActionPorts {
   assets: {
     read(hash: string): Promise<{ mime: string } | null>
   }
+  contextInputs(request: EcommerceRequest): Promise<readonly NodeInput[]>
   execution: {
     run(plan: RunPlan<EcommerceRunTask>): Promise<{ warnings: readonly string[] }>
   }
@@ -147,16 +148,9 @@ export interface PageGenerationActionCoordinator {
   retryWorkbenchResult(resultId: string): Promise<void>
 }
 
-const waitForPoll = (milliseconds: number) =>
-  new Promise<void>((resolve) => setTimeout(resolve, milliseconds))
-
+const waitForPoll = (ms: number) => new Promise<void>((r) => setTimeout(r, ms))
 const terminalResultCount = (rows: readonly EcommerceResultRecord[]): number =>
-  rows.filter(
-    (row) =>
-      row.status === 'done' ||
-      row.status === 'failed' ||
-      row.status === 'canceled',
-  ).length
+  rows.filter((row) => ['done', 'failed', 'canceled'].includes(row.status)).length
 
 export function createPageGenerationActionCoordinator(
   ports: PageGenerationActionPorts,
@@ -212,6 +206,7 @@ export function createPageGenerationActionCoordinator(
         setResultRows: ports.state.setResultRows,
       },
       visualInputsFor: ports.visualInputsFor,
+      contextInputs: ports.contextInputs,
       subjectId: ecommerceSubjectId,
     })
 
@@ -296,10 +291,11 @@ export function createPageGenerationActionCoordinator(
     ports.state.setShotPlanNote('')
     setStage('validate', '正在检查素材与参数')
     try {
-      let plan = buildEcommercePlan(request, { platforms: ports.platforms })
+      const mediaKind = request.mediaKind ?? 'image'
+      const contextInputs = await ports.contextInputs(request)
       const usablePlan = shotPlan && shotPlan.length === request.count ? shotPlan : null
+      let plan = buildEcommercePlan(request, { platforms: ports.platforms, ...(usablePlan ? { shots: usablePlan } : {}) })
       if (usablePlan) {
-        plan = buildEcommercePlan(request, { platforms: ports.platforms, shots: usablePlan })
         ports.state.setShotPlanNote(`这 ${request.count} 张使用已确认的逐张方案。`)
         setStage('prompts', '正在采用已确认的逐张提示词')
       } else if (shouldExpandShots(request)) {
@@ -334,7 +330,6 @@ export function createPageGenerationActionCoordinator(
         )
       }
 
-      const mediaKind = request.mediaKind ?? 'image'
       const recipe = await ports.channelStore.defaultForNewNode({}, mediaKind)
       const target = resolveGenerationTarget({
         channels: ports.channels,
@@ -404,6 +399,7 @@ export function createPageGenerationActionCoordinator(
             ? { credentialGroupIds: target.credentialGroupIds }
             : {}),
           inputs: await ports.visualInputsFor(request, ports.nodes),
+          contextInputs,
           shots: createdTask.results.map((row, index) => {
             const prescribedShot = prescribed[index]
             return {

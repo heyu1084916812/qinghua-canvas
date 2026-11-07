@@ -1,5 +1,6 @@
 param(
-  [switch]$Dev
+  [switch]$Dev,
+  [switch]$ReleaseGate
 )
 
 $ErrorActionPreference = 'Stop'
@@ -11,7 +12,7 @@ if ($envUrl -and $envToken) {
   $gatewayToken = $envToken
 } else {
   $appData = if ($env:LOCALAPPDATA) { $env:LOCALAPPDATA } else { [Environment]::GetFolderPath('LocalApplicationData') }
-  $configName = if ($Dev) { 'canvas-gateway.dev.json' } else { 'canvas-gateway.json' }
+  $configName = if ($ReleaseGate) { 'canvas-gateway.release-gate.json' } elseif ($Dev) { 'canvas-gateway.dev.json' } else { 'canvas-gateway.json' }
   $configPath = Join-Path $appData "com.qinghua.canvas\$configName"
   if (-not (Test-Path -LiteralPath $configPath)) {
     throw "Canvas gateway config not found: $configPath"

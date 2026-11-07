@@ -11,6 +11,7 @@ import {
   type CliTool,
 } from '../../domain/shared/cliTools'
 import type { ModelCapability } from '../../domain/shared/capability'
+import { flattenInputs } from '../../domain/shared/execution/inputs'
 import { fingerprintBytes } from '../../domain/shared/hash'
 import { imageSizeFromHeader } from '../../domain/shared/imageSize'
 import { sniffMimeFromBytes } from '../../domain/shared/mimeSniff'
@@ -127,6 +128,33 @@ function varsOf(
   return vars
 }
 
+/** 当前端口不能把素材导出为本地文件，不能把 hash 冒充路径或静默丢输入。 */
+function assertSupportedMediaInputs(
+  tool: CliTool,
+  request: TextRunRequest | ImageRunRequest | VideoRunRequest,
+): void {
+  const assets = flattenInputs(request.inputs).filter((input) => input.kind === 'asset')
+  if (assets.length === 0) return
+  const images = assets.filter((input) => input.mime.toLowerCase().startsWith('image/'))
+  const videos = assets.filter((input) => input.mime.toLowerCase().startsWith('video/'))
+  const detail = images.length
+    ? `这次请求带 ${images.length} 张媒体素材，但「${tool.name}」当前没有可用的本地媒体文件导出端口；请移除素材或改用支持媒体导出的 CLI 适配器`
+    : videos.length
+      ? `这次请求带 ${videos.length} 个视频素材，但「${tool.name}」当前没有可用的本地媒体文件导出端口；请移除素材或改用支持媒体导出的 CLI 适配器`
+      : `这次请求带 ${assets.length} 个媒体素材，但「${tool.name}」当前没有可用的本地媒体文件导出端口；请移除素材后再运行`
+  throw new ChannelError({ kind: 'cli', detail: 'failed', message: detail })
+}
+
+function assertNoUnresolvedMedia(tool: CliTool, args: string[]): void {
+  const unresolved = args.find((arg) => /\{(?:image|video)\}/.test(arg))
+  if (!unresolved) return
+  throw new ChannelError({
+    kind: 'cli',
+    detail: 'failed',
+    message: `「${tool.name}」的媒体占位符没有实际素材可填（${unresolved}）；请提供对应素材或去掉占位符`,
+  })
+}
+
 /** 起进程。壳抛的是人话，这里只做"包装成人话的 AppError" */
 async function runTool(
   deps: ChannelDeps,
@@ -215,8 +243,10 @@ export function createCliRunAdapter(
       throw new ChannelError({ kind: 'channel', detail: 'unsupported' })
     }
     const tool = await resolveTool(deps, config.protocol)
+    assertSupportedMediaInputs(tool, request)
     const outPath = joinPath(await cli.outDir(), `${runIdFor(config.protocol)}.${outExtFor(kind)}`)
     const args = buildArgs(tool.argsTemplate, { ...varsOf(request), out: outPath })
+    assertNoUnresolvedMedia(tool, args)
     /*
      * 模板里没有 `{out}` ⇒ 产物无处落地。**当场拒掉并说清怎么修**：
      * 让它跑下去只会得到"命令跑完了但读不到产物"，而那句话没有指出去哪儿补占位符。
@@ -300,10 +330,13 @@ export function createCliRunAdapter(
 
     async completeText(request, signal) {
       const tool = await resolveTool(deps, config.protocol)
+      assertSupportedMediaInputs(tool, request)
+      const args = buildArgs(tool.argsTemplate, varsOf(request))
+      assertNoUnresolvedMedia(tool, args)
       const outcome = await runTool(
         deps,
         tool,
-        buildArgs(tool.argsTemplate, varsOf(request)),
+        args,
         signal,
       )
       assertOk(outcome)

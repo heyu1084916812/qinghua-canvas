@@ -1,7 +1,9 @@
 #!/usr/bin/env node
 import { spawn } from 'node:child_process'
+import { mkdirSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import process from 'node:process'
+import { fileURLToPath } from 'node:url'
 import { startCanvasMcpGateway } from './canvas-mcp-test-fixture.mjs'
 
 if (process.platform !== 'win32') {
@@ -115,6 +117,64 @@ try {
   child.stdin.end()
   await waitForExit(child)
   if (stderr.trim()) throw new Error(`canvas MCP wrote stderr: ${stderr.trim()}`)
+
+  // release-gate 必须读自己的配置，不能覆盖或误读开发版实例的端口与 token。
+  const isolatedData = path.join(
+    path.dirname(fileURLToPath(import.meta.url)),
+    '..',
+    '.playwright-verify',
+    'mcp-config',
+  )
+  mkdirSync(path.join(isolatedData, 'com.qinghua.canvas'), { recursive: true })
+  for (const [configName, token] of [
+    ['canvas-gateway.dev.json', 'wrong-development-token'],
+    ['canvas-gateway.release-gate.json', fixture.token],
+  ]) {
+    writeFileSync(
+      path.join(isolatedData, 'com.qinghua.canvas', configName),
+      JSON.stringify({ url: fixture.url, token }),
+    )
+  }
+  const probeChild = spawn(
+    'powershell.exe',
+    ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', adapter, '-ReleaseGate'],
+    {
+      cwd: root,
+      env: {
+        ...process.env,
+        LOCALAPPDATA: isolatedData,
+        QINGHUA_CANVAS_URL: '',
+        QINGHUA_CANVAS_TOKEN: '',
+      },
+      stdio: ['pipe', 'pipe', 'pipe'],
+    },
+  )
+  const probeResponse = await new Promise((resolve, reject) => {
+    let output = ''
+    const timer = setTimeout(
+      () => reject(new Error('canvas MCP config probe timed out')),
+      15_000,
+    )
+    probeChild.stderr.on('data', (chunk) => reject(new Error(String(chunk))))
+    probeChild.stdout.on('data', (chunk) => {
+      output += chunk
+      const line = output.split(/\r?\n/).find(Boolean)
+      if (!line) return
+      clearTimeout(timer)
+      resolve(JSON.parse(line))
+    })
+    probeChild.once('error', reject)
+    probeChild.stdin.end(
+      `${JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/list', params: {} })}\n`,
+    )
+  })
+  try {
+    if (probeResponse.result?.tools?.[0]?.name !== 'readGraph') {
+      throw new Error(`release gate config probe failed: ${JSON.stringify(probeResponse)}`)
+    }
+  } finally {
+    if (probeChild.exitCode === null) probeChild.kill()
+  }
   console.log('canvas MCP stdio passed: initialize, tools/list, tools/call')
 } finally {
   await fixture.close()

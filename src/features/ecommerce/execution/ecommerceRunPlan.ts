@@ -2,6 +2,7 @@ import type { EcommerceResultMetadata } from '../../../domain/ecommerce/tasks'
 import type { RunPlan, RunTask } from '../../../domain/shared/execution/plan'
 import type { NodeInput, RunRequest } from '../../../domain/shared/execution/types'
 import { fingerprintHex } from '../../../domain/shared/hash'
+import { brandContextPrompt, mergeContextGenerationInputs } from '../../shared/context/contextGenerationInputs'
 
 export interface EcommerceRunShot {
   /** 对应 `ecommerceResults.id`；执行计划不依赖画布节点 id。 */
@@ -24,6 +25,7 @@ export interface EcommerceRunPlanInput {
   credentialGroupId?: string
   credentialGroupIds?: string[]
   inputs: readonly NodeInput[]
+  contextInputs?: readonly NodeInput[]
   shots: readonly EcommerceRunShot[]
 }
 
@@ -39,6 +41,9 @@ function requestOf(
   input: EcommerceRunPlanInput,
   shot: EcommerceRunShot,
 ): RunRequest {
+  const inputs = mergeContextGenerationInputs(input.inputs, input.contextInputs ?? [])
+  const contextPrompt = brandContextPrompt(input.contextInputs ?? [])
+  const prompt = contextPrompt ? `${shot.prompt}\n\n${contextPrompt}` : shot.prompt
   const request = {
     kind: input.mediaKind,
     channelId: input.channelId,
@@ -46,8 +51,8 @@ function requestOf(
     ...(input.logicalModel?.trim()
       ? { logicalModel: input.logicalModel.trim() }
       : {}),
-    prompt: shot.prompt,
-    inputs: [...input.inputs],
+    prompt,
+    inputs,
     params: { ...shot.params },
   } as RunRequest
   return {
@@ -85,9 +90,9 @@ export function buildEcommerceRunPlan(
         kind: input.mediaKind,
         channelId: input.channelId,
         model: input.model,
-        prompt: shot.prompt,
+        prompt: request.prompt,
         params: shot.params,
-        inputs: input.inputs,
+        inputs: request.inputs,
       }),
     )
     return {

@@ -6,10 +6,15 @@ import path from 'node:path'
 import readline from 'node:readline'
 
 const useDevelopmentConfig = process.argv.includes('--dev')
+const useReleaseGateConfig = process.argv.includes('--release-gate')
 const configPath = path.join(
   process.env.LOCALAPPDATA || path.join(homedir(), 'AppData', 'Local'),
   'com.qinghua.canvas',
-  useDevelopmentConfig ? 'canvas-gateway.dev.json' : 'canvas-gateway.json',
+  useReleaseGateConfig
+    ? 'canvas-gateway.release-gate.json'
+    : useDevelopmentConfig
+      ? 'canvas-gateway.dev.json'
+      : 'canvas-gateway.json',
 )
 const packageVersion = JSON.parse(
   readFileSync(new URL('../package.json', import.meta.url), 'utf8'),

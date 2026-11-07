@@ -117,7 +117,15 @@ type ResultRowsSetter = (
 ) => void
 type StoredResultTaskRepository = Pick<EcommerceTaskRepository, 'appendResults' | 'updateResult' | 'results'>
 
+async function appendSourceAsset(ports: StoredResultRerunPorts, task: EcommerceTaskRecord, inputs: NodeInput[]): Promise<void> {
+  const hash = task.sourceAssetHash
+  if (!hash || inputs.some((input) => input.kind === 'asset' && input.assetHash === hash)) return
+  const payload = await ports.assets.read(hash)
+  if (payload) inputs.push({ kind: 'asset', nodeId: `result:${task.sourceResultId ?? ports.row.id}`, assetHash: hash, mime: payload.mime })
+}
+
 export interface StoredResultRerunPorts {
+  contextInputs(request: EcommerceRequest): Promise<readonly NodeInput[]>
   activeTask: EcommerceTaskRecord | null
   taskHistory: readonly EcommerceTaskRecord[]
   row: EcommerceResultRecord
@@ -213,18 +221,8 @@ export async function runStoredResultRerun(
   if (!target) throw new Error('这个结果对应的模型 / 渠道已经不可用')
 
   const inputs = [...(await ports.visualInputsFor(task.request, ports.nodes))]
-  const sourceAssetHash = task.sourceAssetHash
-  if (sourceAssetHash && !inputs.some((input) => input.assetHash === sourceAssetHash)) {
-    const payload = await ports.assets.read(sourceAssetHash)
-    if (payload) {
-      inputs.push({
-        kind: 'asset',
-        nodeId: `result:${task.sourceResultId ?? ports.row.id}`,
-        assetHash: sourceAssetHash,
-        mime: payload.mime,
-      })
-    }
-  }
+  const contextInputs = await ports.contextInputs(task.request)
+  await appendSourceAsset(ports, task, inputs)
 
   const params = {
     ratio: ports.row.ratio ?? task.request.ratio,
@@ -245,6 +243,7 @@ export async function runStoredResultRerun(
       ? { credentialGroupIds: target.credentialGroupIds }
       : {}),
     inputs,
+    contextInputs,
     shots: [
       {
         resultId: targetRow.id,

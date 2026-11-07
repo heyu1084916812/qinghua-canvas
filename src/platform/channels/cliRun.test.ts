@@ -211,6 +211,56 @@ describe('本机 CLI 适配器 · 对话', () => {
 })
 
 describe('本机 CLI 适配器 · 图 / 视频', () => {
+  const assetInput = (hash: string, mime = 'image/png') => ({
+    kind: 'asset' as const,
+    nodeId: `node-${hash}`,
+    assetHash: hash,
+    mime,
+  })
+
+  it('★ 带图片素材时在起进程前明确拒绝，不静默丢输入', async () => {
+    const cli = fakeCli({ write: () => pngBytes(8, 8) })
+    const adapter = createCliRunAdapter(configOf('jimeng-cli'), depsOf(cli.port))
+    const app = await cliErrorOf(
+      adapter.generateImage(
+        {
+          kind: 'image',
+          channelId: 'ch-1',
+          model: 'jimeng-image',
+          prompt: '参考这张图',
+          inputs: [assetInput('image-1')],
+          params: {},
+        },
+        new AbortController().signal,
+      ),
+    )
+    expect(app.kind === 'cli' ? app.message : '').toMatch(/媒体素材/)
+    expect(cli.calls).toHaveLength(0)
+  })
+
+  it('★ 纯文本模板不再宣称支持图片，且视频素材同样拒绝', async () => {
+    const cli = fakeCli({})
+    const adapter = createCliRunAdapter(configOf('runninghub'), depsOf(cli.port))
+    const models = await adapter.listModels(configOf('runninghub'), new AbortController().signal)
+    expect(models.find((model) => model.category === 'image')?.inputTypes).toEqual(['text'])
+    expect(models.find((model) => model.category === 'video')?.inputTypes).toEqual(['text'])
+    const app = await cliErrorOf(
+      adapter.generateVideo(
+        {
+          kind: 'video',
+          channelId: 'ch-1',
+          model: 'text-to-video',
+          prompt: '参考这段视频',
+          inputs: [assetInput('video-1', 'video/mp4')],
+          params: {},
+        },
+        new AbortController().signal,
+      ),
+    )
+    expect(app.kind === 'cli' ? app.message : '').toMatch(/视频素材/)
+    expect(cli.calls).toHaveLength(0)
+  })
+
   it('★ 图生图那条路真的走通：{out} 落文件 → 读回字节 → 认出类型与像素', async () => {
     const cli = fakeCli({ write: () => pngBytes(640, 480) })
     const adapter = createCliRunAdapter(configOf('jimeng-cli'), depsOf(cli.port))
