@@ -10,7 +10,7 @@
   已否决。所有 JS chunk 已低于 500KB。
 - `smoke:critical` 固定 4 组，最新 16/26/12/43 全绿；解析器必须处理 external skipped，不能把计数丢成 null。
 - 真实图片性能在清理本机调试进程竞争后有一次 14ms 级通过，但紧接复跑缩放仍 20.9–21.0ms；`contain:layout style`
-  恶化到 27.9ms，已撤回。#971 仍稳定未达标。
+  恶化到 27.9ms，已撤回。最终包复跑平移 14.1/14.0/14.1ms，缩放又出现 21.1/27.8/27.8ms；#971 仍稳定未达标。
 - 最终代码门禁：1084 modules / 4334 dependencies、228 semantic registrations、636 files / 5382 tests（1 skipped）。
 - 最终包从产品提交 `9c86bd5` 重建：44,043,876 B，SHA-256
   `8226F4A5CC85D11B781EA555C2FF1FB42246D8C05B00C07B57763A4A423DFE6E`，release 壳 12/12；
