@@ -19,12 +19,14 @@ describe('canvasLogQuery', () => {
 
   it('继续加载去重；候选含重复时按是否有新增判断下一页', () => {
     const first = canvasLogFirstPage([row('r3'), row('r2')], 2)
-    const next = canvasLogAppendPage(first.entries, [row('r2'), row('r1')], true)
+    const next = canvasLogAppendPage(first.entries, [row('r2'), row('r1')], true, 4)
     expect(next.entries.map((record) => record.id)).toEqual(['r3', 'r2', 'r1'])
     expect(next.hasMore).toBe(true)
+    expect(next.nextOffset).toBe(4)
 
-    const duplicated = canvasLogAppendPage(next.entries, [row('r1')], false)
+    const duplicated = canvasLogAppendPage(next.entries, [row('r1')], false, 5)
     expect(duplicated.entries).toHaveLength(3)
     expect(duplicated.hasMore).toBe(false)
+    expect(duplicated.nextOffset).toBe(5)
   })
 })

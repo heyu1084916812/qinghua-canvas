@@ -6059,6 +6059,7 @@
       "publicApi": [
         "runLogFastPage",
         "runLogFastFirstPage",
+        "runLogFastAppendPage",
         "runLogStorageFastFirstPage",
         "RunLogFastPage"
       ],
@@ -6066,6 +6067,26 @@
         "src/state/shared/runLogFastPage.test.ts"
       ],
       "budget": 106
+    },
+    {
+      "module": "src/state/shared/runLogStorageFastPage.ts",
+      "owner": "run-log-storage-fast-page",
+      "responsibility": "把总日志首屏候选下推到 StoragePort 分页，并为旧存储提供内存回退。",
+      "owns": [
+        "queryPage 的 createdAt 排序、范围与 missingFields 参数",
+        "旧存储全量查询后的过滤、排序和首页截断"
+      ],
+      "doesNotOwn": [
+        "RunLogEntry 作用域解析与 UI 状态",
+        "增量页游标和 hasMore 投影"
+      ],
+      "publicApi": [
+        "runLogStorageFastFirstPage"
+      ],
+      "test": [
+        "src/state/shared/runLogFastPage.test.ts"
+      ],
+      "budget": 65
     },
     {
       "module": "src/workbenches/canvas/panels/canvasLogQuery.ts",
@@ -6088,6 +6109,26 @@
         "src/workbenches/canvas/panels/canvasLogQuery.test.ts"
       ],
       "budget": 31
+    },
+    {
+      "module": "src/workbenches/canvas/panels/canvasLogAppend.ts",
+      "owner": "canvas-log-append",
+      "responsibility": "按记录 ID 去重地把下一候选页追加到画布日志，并保存候选游标。",
+      "owns": [
+        "追加页去重",
+        "nextOffset 透传与加载后的 hasMore"
+      ],
+      "doesNotOwn": [
+        "候选记录读取与过滤",
+        "日志面板滚动和清空动作"
+      ],
+      "publicApi": [
+        "canvasLogAppendPage"
+      ],
+      "test": [
+        "src/workbenches/canvas/panels/canvasLogQuery.test.ts"
+      ],
+      "budget": 20
     }
   ]
 }

@@ -55,4 +55,10 @@ describe('CLI panel presentation', () => {
       '检测失败：权限不足',
     )
   })
+
+  it('leaves status command and quota location separate from the primary row', () => {
+    const jimeng = tool('jimeng')
+    expect(jimeng.statusArgs.trim()).toBe('')
+    expect(jimeng.quotaWhere.length).toBeGreaterThan(10)
+  })
 })

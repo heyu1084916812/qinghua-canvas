@@ -146,16 +146,6 @@
   overflow-wrap: anywhere;
 }
 
-.statusNone {
-  padding: 1px 6px;
-  border-radius: var(--radius-pill);
-  background: var(--bg-hover);
-  color: var(--text-3);
-  font-size: var(--fs-label);
-  line-height: 1.5;
-  white-space: nowrap;
-}
-
 .hint {
   margin: 0;
   color: var(--text-3);

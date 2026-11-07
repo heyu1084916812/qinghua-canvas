@@ -12253,3 +12253,12 @@ React 端口 → `invoke` → Rust `check_update` → updater 插件读配置 �
 - Pinterest 面板只保留 React/OAuth/视图接线；导入取消后保留已成功数，不把已入库素材抹掉。
 - HostingPage 两处 lazy import 必须保持同一边界；生产构建只有一个 HostingPage chunk，静态门禁不许回退成静态导入。
 - 文案改动涉及 UI 时必须留 1440×900 / 1024×700 明暗四组改前/改后证据；本轮证据在 .playwright-verify/about-storage-copy/。
+
+
+### 总管2 四图目标第五轮（2026-11-07）
+
+- CLI without real statusArgs must not show a status-none chip or disabled status button; quota location stays in more actions and G97 derives status controls from statusArgs.
+- Global log loadMore must use candidate nextOffset, not rendered entries.length; probe candidates count toward the next offset.
+- Canvas log nextOffset counts consumed raw candidates, not filtered visible records; append pages dedupe by ID and pass the cursor through.
+- UI removal of dead controls still needs 1440x900 / 1024x700 light/dark before-after evidence; a short stash of only the UI files can capture HEAD baseline, then pop immediately.
+- G97 tmpfiles.org upload failure is an external service boundary; when the product failure-message assertion passes, do not call it a code regression.

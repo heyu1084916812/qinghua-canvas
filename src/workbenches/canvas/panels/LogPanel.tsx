@@ -59,6 +59,7 @@ export function LogPanel({ onClose }: { onClose: () => void }) {
   const [copiedId, setCopiedId] = useState<string | null>(null)
   const listRef = useRef<HTMLDivElement | null>(null)
   const candidateOffsetRef = useRef(0)
+  const loadingMoreRef = useRef(false)
 
   const loadCandidatePage = useCallback(async () => {
     const page = await runLogs.queryFast({
@@ -67,9 +68,11 @@ export function LogPanel({ onClose }: { onClose: () => void }) {
       offset: candidateOffsetRef.current,
       limit: CANVAS_LOG_PAGE_SIZE + 1,
     })
-    candidateOffsetRef.current += page.entries.length
+    const consumed = page.entries.slice(0, CANVAS_LOG_PAGE_SIZE)
+    candidateOffsetRef.current += consumed.length
     return {
       records: page.entries
+        .slice(0, CANVAS_LOG_PAGE_SIZE)
         .map((entry) => entry.record as RunRecord)
         .filter(shouldShowInCanvasLog),
       hasMore: page.hasMore || page.entries.length > CANVAS_LOG_PAGE_SIZE,
@@ -83,6 +86,7 @@ export function LogPanel({ onClose }: { onClose: () => void }) {
       candidates.records,
       CANVAS_LOG_PAGE_SIZE,
       candidates.hasMore,
+      candidateOffsetRef.current,
     )
     setRecords(page.entries)
     setHasMore(page.hasMore)
@@ -94,6 +98,7 @@ export function LogPanel({ onClose }: { onClose: () => void }) {
       records,
       candidates.records,
       candidates.hasMore,
+      candidateOffsetRef.current,
     )
     setRecords(page.entries)
     setHasMore(page.hasMore)
@@ -101,7 +106,13 @@ export function LogPanel({ onClose }: { onClose: () => void }) {
 
   const loadMoreIfVisible = useCallback(async () => {
     if (!hasMore) return
+    if (loadingMoreRef.current) return
+    loadingMoreRef.current = true
+    try {
     await loadMore()
+    } finally {
+      loadingMoreRef.current = false
+    }
   }, [hasMore, loadMore])
 
   useEffect(() => {

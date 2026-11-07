@@ -22760,8 +22760,8 @@ async function g97(browser) {
   )
   /**
    * ★★ 三件事各就各位（对账 #314：用户问「是我还需要什么嘛」「我如何使用」「怎么显示额度」）：
-   * 每个工具都要给出「检测 / 一键登录 / 查状态」三条路；没有可查命令的要**直说**，
-   * 并且**必须**写明额度去哪儿看（`quotaWhere`）—— 不能只回一句"查不到"。
+   * 每个工具都给「检测」与真的登录入口；只有配置了状态命令才给「查状态」按钮。
+   * 没有可查命令的不摆不可操作控件，但必须写明额度去哪儿看（`quotaWhere`）。
    */
   const cliRoutes = await page.evaluate(() =>
     ['codex', 'jimeng', 'gemini', 'runninghub'].map((id) => ({
@@ -22769,6 +22769,7 @@ async function g97(browser) {
       detect: document.querySelectorAll(`[data-cli-detect="${id}"]`).length,
       login: document.querySelectorAll(`[data-cli-login="${id}"]`).length,
       status: document.querySelectorAll(`[data-cli-status="${id}"]`).length,
+      statusArgs: (document.querySelector(`[data-cli-status-args="${id}"]`)?.value ?? '').trim(),
       quotaWhere: (document.querySelector(`[data-cli-quota-where="${id}"]`)?.textContent ?? '').trim().length,
       keyInput: document.querySelectorAll(`[data-cli-key="${id}"]`).length,
     })),
@@ -22782,9 +22783,13 @@ async function g97(browser) {
      * 所以判据改成「**每条路都要有真的登录入口**」：能开窗口的给按钮、只能写密钥的给密钥格，
      * 不许出现"两个都没有"（那等于没登录入口）。
      */
-    '★★ 每个工具都有「检测 / 查状态」，且都有真的登录入口（开窗口 或 密钥）',
+    '★★ 每个工具都有检测与真的登录入口，状态按钮只跟随实际状态命令',
     cliRoutes.every(
-      (t) => t.detect === 1 && t.status === 1 && t.login + t.keyInput >= 1 && t.quotaWhere > 10,
+      (t) =>
+        t.detect === 1 &&
+        t.status === (t.statusArgs ? 1 : 0) &&
+        t.login + t.keyInput >= 1 &&
+        t.quotaWhere > 10,
     ),
     JSON.stringify(cliRoutes),
   )
@@ -22852,19 +22857,20 @@ async function g97(browser) {
   )
   rec(
     g,
-    '★★ 查不到额度的工具直说「没有可查的命令」（不假装能查）',
-    (await page.locator('[data-cli-status-none="jimeng"]').count()) === 1 &&
-      (await page.locator('[data-cli-status="jimeng"]').isDisabled()) &&
+    '★★ 无可查状态的工具不再在主操作行摆不可操作胶囊，更多操作里仍有额度去处说明',
+    (await page.locator('[data-cli-status-none="jimeng"]').count()) === 0 &&
+      (await page.locator('[data-cli-status="jimeng"]').count()) === 0 &&
       /**
        * ⚠️ 口径**反转**（2026-10-08）：RunningHub 以前被归在"没有官方 CLI"那一档，
        * 实测推翻 —— 官方有 `HM-RunningHub/RH_CLI`（装完注册 `rh`），而且
        * `rh --json check` 是四个工具里**唯一真能读到额度**的（余额 + RH 币）。
        * 所以它不再显示"没有可查命令"，而是挂着查额度命令那一档；
-       * "没有就是没有"这条规则本身仍由上面那句 jimeng 守着。
+       * 操作行不再自己摆一颗无状态胶囊，说明仍由下面那一行完成。
        */
       (await page.locator('[data-cli-status-none="runninghub"]').count()) === 0 &&
       (await page.locator('[data-cli-status="runninghub"]').count()) === 1 &&
-      (await page.locator('[data-cli-status-none="codex"]').count()) === 0,
+      (await page.locator('[data-cli-status-none="codex"]').count()) === 0 &&
+      (await page.locator('[data-cli-quota-where="jimeng"]').count()) === 1,
   )
   rec(
     g,

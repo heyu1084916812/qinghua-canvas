@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useChannels } from '../../../app/providers/ChannelStoreProvider'
 import { usePlatform } from '../../../app/providers/PlatformProvider'
 import {
@@ -13,6 +13,7 @@ import {
 } from '../../../state/shared/runLogRepository'
 import {
   runLogFastFirstPage,
+  runLogFastAppendPage,
   runLogFastPage,
 } from '../../../state/shared/runLogFastPage'
 import styles from './RunLogList.module.css'
@@ -57,6 +58,8 @@ export function RunLogList({
   const [hasMore, setHasMore] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const candidateOffsetRef = useRef(0)
+  const loadingMoreRef = useRef(false)
 
   const loadFirstPage = useCallback(async () => {
     setLoading(true)
@@ -67,6 +70,7 @@ export function RunLogList({
         stableFilter,
         pageSize,
       )
+      candidateOffsetRef.current = page.nextOffset
       setEntries(page.entries)
       setHasMore(page.hasMore)
     } catch (reason) {
@@ -81,20 +85,23 @@ export function RunLogList({
   }, [loadFirstPage])
 
   const loadMore = async () => {
-    const page = await runLogFastPage(
-      (fastFilter) => repo.queryFast(fastFilter),
-      stableFilter,
-      entries.length,
-      pageSize,
-    )
-    setEntries((current) => {
-      const seen = new Set(current.map((entry) => entry.record.id))
-      return [
-        ...current,
-        ...page.entries.filter((entry) => !seen.has(entry.record.id)),
-      ]
-    })
-    setHasMore(page.hasMore)
+    if (loadingMoreRef.current) return
+    loadingMoreRef.current = true
+    try {
+      const page = await runLogFastPage(
+        (fastFilter) => repo.queryFast(fastFilter),
+        stableFilter,
+        candidateOffsetRef.current,
+        pageSize,
+      )
+      candidateOffsetRef.current = page.nextOffset
+      setEntries((current) => runLogFastAppendPage(current, page).entries)
+      setHasMore(page.hasMore)
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : String(reason))
+    } finally {
+      loadingMoreRef.current = false
+    }
   }
 
   const channelName = (id: string | undefined): string => {

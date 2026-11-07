@@ -438,7 +438,7 @@ export function CliPanel() {
             >
               {primaryCliAction(tool, probes[tool.id]).label}
             </button>
-            {tool.statusArgs.trim() !== '' ? (
+            {tool.statusArgs.trim() !== '' && (
               <button
                 type="button"
                 className={styles.btn}
@@ -448,10 +448,6 @@ export function CliPanel() {
               >
                 查询状态
               </button>
-            ) : (
-              <span className={styles.result} data-cli-status-none={tool.id}>
-                <span className={styles.statusNone}>无可查命令</span>
-              </span>
             )}
             {activeRun?.toolId === tool.id && activeRun.slot === 'status' ? (
               <button
@@ -522,16 +518,6 @@ export function CliPanel() {
                 >
                   重新检测
                 </button>
-                {tool.statusArgs.trim() === '' && (
-                  <button
-                    type="button"
-                    className={styles.btn}
-                    data-cli-status={tool.id}
-                    disabled
-                  >
-                    查询状态
-                  </button>
-                )}
               </div>
               {tool.installCommand.trim() !== '' && (
                 <div className={styles.row}>
