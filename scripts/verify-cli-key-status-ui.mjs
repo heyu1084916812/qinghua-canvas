@@ -118,6 +118,85 @@ async function capture(page, prefix, viewport, theme) {
   }
 }
 
+function windowFollowUpGeometry(page) {
+  return page.evaluate(() => {
+    const rect = (selector) => {
+      const element = document.querySelector(selector)
+      if (!element) return null
+      const box = element.getBoundingClientRect()
+      return {
+        x: Number(box.x.toFixed(2)),
+        y: Number(box.y.toFixed(2)),
+        width: Number(box.width.toFixed(2)),
+        height: Number(box.height.toFixed(2)),
+      }
+    }
+    const panel = document.querySelector('[data-global-settings-panel]')
+    return {
+      panel: rect('[data-global-settings-panel]'),
+      setupButton: rect('[data-cli-setup="jimeng"]'),
+      statusOutput: document.querySelectorAll('[data-cli-statusout="jimeng"]').length,
+      statusText:
+        document.querySelector('[data-cli-statusout="jimeng"]')?.textContent?.trim() ?? '',
+      message:
+        document.querySelector('[data-cli-login-msg="jimeng"]')?.textContent?.trim() ?? '',
+      overflowX: document.documentElement.scrollWidth > document.documentElement.clientWidth,
+      panelOverflowX: panel ? panel.scrollWidth > panel.clientWidth : null,
+    }
+  })
+}
+
+async function captureWindowFollowUp(page, prefix, viewport, theme) {
+  const command = 'C:\\Windows\\System32\\cmd.exe'
+  await page.locator('[data-cli-advanced="jimeng"] summary').click()
+  await page.locator('[data-cli-program="jimeng"]').fill(command)
+  await page.locator('[data-cli-login-args="jimeng"]').fill('/c exit 0')
+  await page.locator('[data-cli-status-args="jimeng"]').fill('/c exit 0')
+  await page.locator('[data-cli-login-box="jimeng"] summary').click()
+  await page.locator('[data-cli-detect="jimeng"]').click()
+  await page.waitForFunction(
+    () =>
+      document.querySelector('[data-cli-probe-state="jimeng"]')?.textContent?.trim() ===
+      '已安装',
+    { timeout: 15_000 },
+  )
+  await page.waitForTimeout(300)
+
+  const before = await windowFollowUpGeometry(page)
+  const beforeShot = path.join(output, `${prefix}-window-before-${viewport.name}-${theme}.png`)
+  await page.locator('[data-global-settings-panel]').screenshot({ path: beforeShot })
+
+  await page.locator('[data-cli-setup="jimeng"]').click()
+  await page.waitForFunction(
+    () =>
+      document
+        .querySelector('[data-cli-login-msg="jimeng"]')
+        ?.textContent?.includes('登录窗口已结束') === true,
+    { timeout: 15_000 },
+  )
+  await page.locator('[data-cli-statusout="jimeng"]').waitFor({ timeout: 15_000 })
+  await page.waitForFunction(
+    () => {
+      const text = document
+        .querySelector('[data-cli-statusout="jimeng"]')
+        ?.textContent?.trim()
+      return Boolean(text && !text.includes('…正在跑'))
+    },
+    { timeout: 15_000 },
+  )
+  const after = await windowFollowUpGeometry(page)
+  const afterShot = path.join(output, `${prefix}-window-after-${viewport.name}-${theme}.png`)
+  await page.locator('[data-global-settings-panel]').screenshot({ path: afterShot })
+  return {
+    before,
+    after,
+    screenshots: {
+      before: path.relative(ROOT, beforeShot),
+      after: path.relative(ROOT, afterShot),
+    },
+  }
+}
+
 function readCredentialWrite() {
   const credentialPath = path.join(runtimeRoot, 'localappdata', 'rh', 'config.toml')
   try {
@@ -151,7 +230,7 @@ try {
   page.on('console', (message) => {
     if (message.type() === 'error') errors.push(message.text())
   })
-  const report = { ok: true, cases: {}, errors }
+  const report = { ok: true, cases: {}, windowCases: {}, errors }
   for (const viewport of VIEWPORTS) {
     for (const theme of THEMES) {
       const key = `${viewport.name}-${theme}`
@@ -180,6 +259,19 @@ try {
         after.message?.height > 0 &&
         !after.overflowX &&
         !after.panelOverflowX
+
+      report.windowCases[key] = await captureWindowFollowUp(page, 'cli', viewport, theme)
+      const windowResult = report.windowCases[key]
+      report.ok =
+        report.ok &&
+        windowResult.after.message.includes('登录窗口已结束') &&
+        windowResult.after.statusOutput > 0 &&
+        windowResult.after.statusText.length > 0 &&
+        windowResult.before.setupButton?.x === windowResult.after.setupButton?.x &&
+        windowResult.before.setupButton?.width === windowResult.after.setupButton?.width &&
+        windowResult.before.setupButton?.height === windowResult.after.setupButton?.height &&
+        !windowResult.after.overflowX &&
+        !windowResult.after.panelOverflowX
     }
   }
   report.ok = report.ok && errors.length === 0

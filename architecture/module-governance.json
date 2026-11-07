@@ -6107,6 +6107,31 @@
       "budget": 35
     },
     {
+      "module": "src/features/settings/cliWindowFollowUp.ts",
+      "owner": "settings-cli-window-follow-up",
+      "responsibility": "决定可见安装/登录窗口结束后是继续登录、自动查状态还是如实停止。",
+      "owns": [
+        "窗口退出码文案",
+        "安装后自动重检决策",
+        "登录后状态命令决策"
+      ],
+      "doesNotOwn": [
+        "可见窗口子进程生命周期",
+        "CLI 命令执行",
+        "React 面板渲染"
+      ],
+      "publicApi": [
+        "cliWindowFollowUp",
+        "CliWindowAction",
+        "CliWindowFlow",
+        "CliWindowFollowUp"
+      ],
+      "test": [
+        "src/features/settings/cliWindowFollowUp.test.ts"
+      ],
+      "budget": 70
+    },
+    {
       "module": "src/features/settings/cliWindowRequest.ts",
       "owner": "settings-cli-window-request",
       "responsibility": "构造带工具工作目录的可见 CLI 窗口请求。",

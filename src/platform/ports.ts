@@ -602,6 +602,12 @@ export interface CliOutcome {
   ms: number
 }
 
+/** 壳持有的可见 CLI 窗口；`wait` 只等待该窗口进程退出，不阻塞应用界面。 */
+export interface CliWindowHandle {
+  id: string
+  wait(): Promise<number | null>
+}
+
 /**
  * **本机 CLI 端口**（对账 #308）。
  *
@@ -621,9 +627,9 @@ export interface CliPort {
    *
    * 与 `run` 的区别是刻意的：不捕获输出、**不等它结束** —— 登录要么在浏览器里点授权、
    * 要么在终端里输密码，我们只需要把它"递到用户面前"，剩下的他自己在那个窗口里完成。
-   * 立刻 resolve；起不来时抛一句人话（与 `run` 的 NotFound 文案同一套）。
+   * spawn 后立刻返回句柄；起不来时抛一句人话（与 `run` 的 NotFound 文案同一套）。
    */
-  spawnWindow(req: CliWindowRequest): Promise<void>
+  spawnWindow(req: CliWindowRequest): Promise<CliWindowHandle>
   /**
    * 给产物准备一个**可写**的目录（绝对路径）。
    *

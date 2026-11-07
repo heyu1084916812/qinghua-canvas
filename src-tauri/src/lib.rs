@@ -2483,6 +2483,10 @@ fn describe_spawn_error(program: &str, err: std::io::Error) -> String {
 #[derive(Default)]
 struct CliRegistry(std::sync::Mutex<std::collections::HashMap<String, std::process::Child>>);
 
+/// 可见安装 / 登录窗口。句柄仍只归壳持有，前端只拿到可等待的 id。
+#[derive(Default)]
+struct CliWindowRegistry(std::sync::Mutex<std::collections::HashMap<String, std::process::Child>>);
+
 /// `taskkill.exe` 只能按本方持有的 `Child::id()` 终止进程树。
 ///
 /// 刻意不提供进程名入口：`/IM` 或按名字匹配会误伤同名的其它用户进程。
@@ -2606,6 +2610,27 @@ mod cli_tests {
             descendant_stopped,
             "父进程被终止后，子进程 {descendant_pid} 仍然存活"
         );
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn cli_window_wait_returns_exit_code_and_removes_handle() {
+        let windows = CliWindowRegistry::default();
+        let child = std::process::Command::new("cmd.exe")
+            .args(["/C", "exit 7"])
+            .spawn()
+            .expect("启动测试窗口进程失败");
+        windows
+            .0
+            .lock()
+            .expect("测试窗口表锁失败")
+            .insert("test-window".to_string(), child);
+
+        assert_eq!(
+            wait_for_cli_window(&windows, "test-window").expect("等待测试窗口失败"),
+            Some(7)
+        );
+        assert!(wait_for_cli_window(&windows, "test-window").is_err());
     }
 
     #[cfg(windows)]
@@ -2802,9 +2827,22 @@ fn cli_kill(app: tauri::AppHandle, id: String) -> bool {
 /// 安全边界与 `cli_run` **完全一致**：`Command::new(program).args(args)`、不过 shell、
 /// 参数是数组 ⇒ 命令注入不成立；命令与参数都是用户在设置里填的。
 #[tauri::command]
-fn cli_spawn_window(program: String, args: Vec<String>, cwd: Option<String>) -> Result<(), String> {
+fn cli_spawn_window(
+    windows: tauri::State<CliWindowRegistry>,
+    id: String,
+    program: String,
+    args: Vec<String>,
+    cwd: Option<String>,
+) -> Result<(), String> {
     use std::process::Command;
 
+    let mut map = windows
+        .0
+        .lock()
+        .map_err(|_| "CLI 窗口表被上一次崩溃污染了，请重启应用".to_string())?;
+    if map.contains_key(&id) {
+        return Err(format!("CLI 窗口 id 已存在：{id}"));
+    }
     let mut cmd = Command::new(&program);
     cmd.args(&args);
     if let Some(dir) = cwd.as_deref().filter(|d| !d.is_empty()) {
@@ -2817,9 +2855,48 @@ fn cli_spawn_window(program: String, args: Vec<String>, cwd: Option<String>) -> 
         // 注意别顺手加上 0x0800_0000（CREATE_NO_WINDOW）—— 两个标志一起加就等于又藏起来了。
         cmd.creation_flags(0x0000_0010);
     }
-    cmd.spawn()
-        .map(|_| ())
-        .map_err(|err| describe_spawn_error(&program, err))
+    let child = cmd
+        .spawn()
+        .map_err(|err| describe_spawn_error(&program, err))?;
+    map.insert(id, child);
+    Ok(())
+}
+
+fn wait_for_cli_window(
+    windows: &CliWindowRegistry,
+    id: &str,
+) -> Result<Option<i32>, String> {
+    loop {
+        let status = {
+            let mut map = windows
+                .0
+                .lock()
+                .map_err(|_| "CLI 窗口表被上一次崩溃污染了，请重启应用".to_string())?;
+            let Some(child) = map.get_mut(id) else {
+                return Err(format!("CLI 窗口已不存在：{id}"));
+            };
+            let status = child
+                .try_wait()
+                .map_err(|err| format!("读取 CLI 窗口状态失败：{err}"))?;
+            if status.is_some() {
+                map.remove(id);
+            }
+            status
+        };
+        if let Some(status) = status {
+            return Ok(status.code());
+        }
+        std::thread::sleep(std::time::Duration::from_millis(50));
+    }
+}
+
+#[tauri::command]
+async fn cli_wait_window(app: tauri::AppHandle, id: String) -> Result<Option<i32>, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        wait_for_cli_window(&app.state::<CliWindowRegistry>(), &id)
+    })
+    .await
+    .map_err(|err| format!("等待 CLI 窗口失败：{err}"))?
 }
 
 fn run_cli_blocking(
@@ -3883,6 +3960,7 @@ pub fn run() {
          * 进的是 `AppHandle` 的受管状态，所以 `cli_run` 与 `cli_kill` 看到的是同一张表。
          */
         .manage(CliRegistry::default())
+        .manage(CliWindowRegistry::default())
         .manage(FetchStreamCancels::default())
         /*
          * 窗口几何的自动记盘（用户 2026-10-06 第 11 批第 7 条："记住上次窗口尺寸和位置"）。
@@ -3952,6 +4030,7 @@ pub fn run() {
             cli_run,
             cli_kill,
             cli_spawn_window,
+            cli_wait_window,
             cli_out_dir,
             cli_read_out,
             cli_write_out,

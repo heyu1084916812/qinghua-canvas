@@ -12357,3 +12357,11 @@ React 端口 → `invoke` → Rust `check_update` → updater 插件读配置 �
 - CLI UI 探针使用独立 store / CDP / LOCALAPPDATA / APPDATA / shell profile，只按自己 app pid 执行 `taskkill /PID <pid> /T /F`。四组 1440×900 / 1024×700 × 明暗 release 证据为 `ok=true`：隔离密钥文件真实写入，空 `statusArgs` 无状态按钮/输出，key 行宽高稳定、无横向或面板溢出、page/console error 0。
 - 真实图片性能复验固定 150 张唯一 PNG/WebP、300 节点 / 500 连线、P95 ≤20ms。本轮首跑缩放 14.1/20.9/21.0ms 失败，随后两次通过：平移 7.3/7.3/7.3ms、缩放 7.4/7.4/7.3ms，以及平移 7.3/7.3/7.4ms、缩放 7.4/7.3/13.9ms；三次都保持 150 张 rendered/decoded、300/500 全挂载、错误 0。首跑抖动必须保留，不能抹掉或用平均帧率掩盖。
 - 真实已登录 CLI 运行/停止、安装/登录窗口结束后的自动重检、媒体导出、RunningHub 多产物、push、LICENSE、干净机器、跨平台签名和 tag/Release 仍未完成。
+
+### 总管2 第十七轮：CLI 可见窗口自动跟随（2026-11-08）
+
+- `CliPort.spawnWindow` 必须返回 `{ id, wait() }`，不能只返回 void。窗口是否结束只有壳持有的 `Child` 知道；Rust 新增 `CliWindowRegistry` 和 `cli_wait_window`，等待逻辑放 `spawn_blocking`，不能阻塞 Tauri IPC 或前端事件循环。
+- 安装窗口结束后自动重新 `which`：找到了继续登录，密钥型工具展开密钥输入，仍找不到就停并显示真实错误；登录窗口结束后有 `statusArgs` 才自动查状态，没有就明确“无法自动确认登录态”。不要再写“回来再点一次”。
+- 跨窗口回调必须查 `busyRef`，不能依赖旧 render 的 `busy` state；异步等待失败要进入可见消息。真实 release 探针用 `cmd.exe /c exit 0` 验证四组明暗/视口，均自动执行状态命令并显示退出码 0，setup 几何稳定、无溢出、页面错误 0。
+- 本轮关联代码：`src/features/settings/cliWindowFollowUp.ts`、`src-tauri/src/lib.rs` 的 `CliWindowRegistry`、`src/platform/{ports.ts,desktop/tauriCli.ts}`。Rust 68/68、模块治理 225 条。
+- 真实账号运行/停止、真实安装器升级、媒体导出、RunningHub 多产物、push、LICENSE、干净机器、跨平台签名和 tag/Release 仍未完成。

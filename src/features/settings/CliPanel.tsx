@@ -10,7 +10,7 @@ import {
   type CliTool,
 } from '../../domain/shared/cliTools'
 import { cliWindowRequest } from './cliWindowRequest'
-import type { CliOutcome } from '../../platform/ports'
+import type { CliOutcome, CliWindowHandle } from '../../platform/ports'
 import { createId } from '../../shared/id'
 import { createCliToolStore } from '../../state/project/cliToolStore'
 import {
@@ -20,6 +20,7 @@ import {
   type CliProbe,
 } from './cliPanelPresentation'
 import { cliKeyLoginResult } from './cliKeyLoginResult'
+import { cliWindowFollowUp, type CliWindowFlow } from './cliWindowFollowUp'
 import styles from './CliPanel.module.css'
 
 /**
@@ -38,7 +39,7 @@ import styles from './CliPanel.module.css'
  *
  * 0. **一键设置**（第 14 批第 3 条：「cli 的那我做成一键安装并且登录不就行了吗？」）——
  *    一个按钮把"装 + 登录"串起来：没装就开一个安装窗口，装好了就开登录窗口。
- *    每一步都**如实说**它这一刻在做什么、做完要回来点哪里；
+ *    每一步都**如实说**它这一刻在做什么；窗口关闭后自动继续，不要求回来补点；
  * 1. **装没装**（检测）—— 没装就直接告诉他怎么装（`installHint`），能自动装的给「一键安装」；
  * 2. **登录**——「一键登录」在可见窗口里跑它自己的登录命令（浏览器授权 / 输密码都行），
  *    或用密钥登录（密钥走 stdin，不进 argv、不落我们的库）；
@@ -71,6 +72,11 @@ export function CliPanel() {
   const [stopping, setStopping] = useState(false)
   /** 正在跑的那件小事（`<toolId>:<action>`）；空串 = 空闲 */
   const [busy, setBusy] = useState('')
+  const busyRef = useRef('')
+  const updateBusy = useCallback((next: string) => {
+    busyRef.current = next
+    setBusy(next)
+  }, [])
 
   const probeTool = useCallback(
     async (tool: CliTool): Promise<CliProbe> => {
@@ -148,25 +154,25 @@ export function CliPanel() {
   }
 
   const detect = async (tool: CliTool) => {
-    if (!cli || busy) return
-    setBusy(`${tool.id}:which`)
+    if (!cli || busyRef.current) return
+    updateBusy(`${tool.id}:which`)
     try {
       await probeTool(tool)
     } finally {
-      setBusy('')
+      updateBusy('')
     }
   }
 
   /** 跑一条命令并把输出原样写进指定槽位（测试运行 / 查状态 共用） */
   const runInto = async (tool: CliTool, slot: 'run' | 'status', args: string[], stdin?: string) => {
-    if (!cli || busy) return
+    if (!cli || busyRef.current) return
     const id = createId(`cli-${slot}-${tool.id}`)
     const head = `$ ${tool.program} ${args.join(' ')}`
     const write = (text: string) => {
       const setter = slot === 'status' ? setStatusOut : setRuns
       setter((prev) => ({ ...prev, [tool.id]: text }))
     }
-    setBusy(`${tool.id}:${slot}`)
+    updateBusy(`${tool.id}:${slot}`)
     setStopping(false)
     activeRunRef.current = { id }
     setActiveRun({ id, toolId: tool.id, slot })
@@ -187,7 +193,7 @@ export function CliPanel() {
       if (activeRunRef.current?.id === id) activeRunRef.current = null
       setStopping(false)
       setActiveRun(null)
-      setBusy('')
+      updateBusy('')
     }
   }
 
@@ -213,38 +219,85 @@ export function CliPanel() {
     }
   }
 
+  function guideKeyLogin(tool: CliTool, lead = '已经装好了') {
+    setMoreOpen((prev) => ({ ...prev, [tool.id]: true }))
+    setLoginMsg((prev) => ({
+      ...prev,
+      [tool.id]:
+        tool.keyLoginKind === 'config'
+          ? `${lead} → 把 API Key 粘到下面那一格，点「用密钥登录」就完成登录（写进它自己的配置，之后一直是登录态）。`
+          : `${lead} → 把密钥粘到下面那一格，点「用密钥登录」（通过 stdin 交给这条命令，不进入命令行参数，也不写入轻画数据库）。`,
+    }))
+  }
+
+  async function spawnLoginWindow(tool: CliTool) {
+    if (!cli) return
+    const args = tool.loginArgs.trim() ? buildArgs(tool.loginArgs, {}) : []
+    const handle = await cli.spawnWindow(cliWindowRequest(tool, tool.program, args))
+    setLoginMsg((prev) => ({
+      ...prev,
+      [tool.id]: `已经打开登录窗口「${[tool.program, ...args].join(' ')}」；窗口关闭后会自动继续，不需要再点。`,
+    }))
+    watchWindow(tool, 'login', handle)
+  }
+
+  function watchWindow(tool: CliTool, flow: CliWindowFlow, handle: CliWindowHandle) {
+    void handle
+      .wait()
+      .then(async (exitCode) => {
+        const port = cli
+        if (!port) return
+        let found: boolean | null = null
+        if (flow !== 'login') {
+          const path = await port.which(tool.program)
+          found = path !== null
+          setProbes((prev) => ({
+            ...prev,
+            [tool.id]: found
+              ? { kind: 'found', detail: `已找到：${path}` }
+              : { kind: 'missing', detail: `未找到命令「${tool.program}」` },
+          }))
+        }
+        const followUp = cliWindowFollowUp(flow, tool, found, exitCode)
+        setLoginMsg((prev) => ({ ...prev, [tool.id]: followUp.message }))
+        if (followUp.action === 'login') {
+          if (tool.keyLoginKind === 'config' || tool.keyLoginKind === 'stdin') {
+            guideKeyLogin(tool, '安装完成后')
+          } else {
+            await spawnLoginWindow(tool)
+          }
+        } else if (followUp.action === 'status' && followUp.statusArgs) {
+          await runInto(tool, 'status', followUp.statusArgs)
+        }
+      })
+      .catch((err) => {
+        setLoginMsg((prev) => ({
+          ...prev,
+          [tool.id]: `等待窗口结束失败：${String(err)}`,
+        }))
+      })
+  }
+
   /** 一键登录：把它自己的登录命令丢进一个可见窗口，用户在那边完成 */
   const openLogin = async (tool: CliTool) => {
-    if (!cli || busy) return
-    setBusy(`${tool.id}:login`)
+    if (!cli || busyRef.current) return
+    updateBusy(`${tool.id}:login`)
     try {
-      const args = tool.loginArgs.trim() ? buildArgs(tool.loginArgs, {}) : []
-      await cli.spawnWindow(cliWindowRequest(tool, tool.program, args))
-      setLoginMsg((prev) => ({
-        ...prev,
-        [tool.id]: `已经打开一个窗口跑「${[tool.program, ...args].join(' ')}」——在那里完成登录（浏览器授权或输密码都行）；完成后回来点「检测 / 查状态」确认。`,
-      }))
+      await spawnLoginWindow(tool)
     } catch (err) {
       setLoginMsg((prev) => ({ ...prev, [tool.id]: `打不开登录窗口：${String(err)}` }))
     } finally {
-      setBusy('')
+      updateBusy('')
     }
   }
 
   /**
-   * **一键设置**（用户 2026-10-06 第 14 批第 3 条：「我希望能一键设置，然后输入密码或者
-   * 其他的就可以保持登录」）。
-   *
-   * 三步如实走：① 检测 → ② 没装就开**安装窗口**（`installCommand`，可见窗口，进度与
-   * 交互提示都在那儿）→ ③ 装好了就开**登录窗口**（工具自己的登录命令，浏览器授权 / 输密码）。
-   *
-   * 为什么走完安装要**回来再点一次**：安装是另一个窗口里的事，我们不知道它什么时候完
-   * —— 等它就会把界面卡住（登录动辄几分钟）。所以这里只在消息里写清"装完再点一次"，
-   * 不假装一步到位。
+   * **一键设置**：检测 → 没装先开安装窗口 → 安装窗口结束自动重检 → 继续登录。
+   * 不再要求用户回面板手点第二次。
    */
   const oneClickSetup = async (tool: CliTool) => {
-    if (!cli || busy) return
-    setBusy(`${tool.id}:setup`)
+    if (!cli || busyRef.current) return
+    updateBusy(`${tool.id}:setup`)
     const say = (text: string) => setLoginMsg((prev) => ({ ...prev, [tool.id]: text }))
     try {
       const found = await cli.which(tool.program)
@@ -261,58 +314,40 @@ export function CliPanel() {
           say(`本机没有「${tool.program}」，而这个工具没有能自动装的官方途径 —— ${tool.installHint}`)
           return
         }
-        await cli.spawnWindow(cliWindowRequest(tool, cmd[0], cmd.slice(1)))
-        say(
-          `没装「${tool.program}」→ 已经打开安装窗口跑「${tool.installCommand}」。` +
-            `等那个窗口跑完（可能要一两分钟），回来**再点一次「一键设置」**就会进下一步（登录）。`,
-        )
+        const handle = await cli.spawnWindow(cliWindowRequest(tool, cmd[0], cmd.slice(1)))
+        say(`已经打开安装窗口跑「${tool.installCommand}」；窗口关闭后会自动重新检测并继续，不需要再点。`)
+        watchWindow(tool, 'install', handle)
         return
       }
-      /**
-       * 登录这一步分两种落点：能开窗口的自己开（浏览器授权 / 输密码），
-       * 只能靠密钥的（`keyLoginKind === 'config'`，RunningHub 就是）把用户引到下面那格去 ——
-       * 不给一个按下去没用的"登录窗口"。
-       */
       if (tool.keyLoginKind === 'config' || tool.keyLoginKind === 'stdin') {
-        setMoreOpen((prev) => ({ ...prev, [tool.id]: true }))
-        say(
-          tool.keyLoginKind === 'config'
-            ? `已经装好了 → 把 API Key 粘到下面那一格，点「用密钥登录」就完成登录` +
-                `（写进它自己的配置，之后一直是登录态）。`
-            : `已经装好了 → 把密钥粘到下面那一格，点「用密钥登录」` +
-                `（通过 stdin 交给这条命令，不进入命令行参数，也不写入轻画数据库）。`,
-        )
+        guideKeyLogin(tool)
         return
       }
-      const args = tool.loginArgs.trim() ? buildArgs(tool.loginArgs, {}) : []
-      await cli.spawnWindow(cliWindowRequest(tool, tool.program, args))
-      say(
-        `已经装好了 → 打开了登录窗口「${[tool.program, ...args].join(' ')}」：` +
-          `在那里完成登录（浏览器授权或输密码都行），完成后点「查状态」确认。`,
-      )
+      await spawnLoginWindow(tool)
     } catch (err) {
       say(`一键设置没走通：${String(err)}`)
     } finally {
-      setBusy('')
+      updateBusy('')
     }
   }
 
-  /** 只装：跳过登录，直接开安装窗口（已经装过的人不用它，但"重装 / 升级"时有用） */
+  /** 只装：窗口结束后自动重新检测，不再要求用户回来点。 */
   const installOnly = async (tool: CliTool) => {
-    if (!cli || busy) return
+    if (!cli || busyRef.current) return
     const cmd = parseArgs(tool.installCommand.trim())
     if (cmd.length === 0) return
-    setBusy(`${tool.id}:install`)
+    updateBusy(`${tool.id}:install`)
     try {
-      await cli.spawnWindow(cliWindowRequest(tool, cmd[0], cmd.slice(1)))
+      const handle = await cli.spawnWindow(cliWindowRequest(tool, cmd[0], cmd.slice(1)))
       setLoginMsg((prev) => ({
         ...prev,
-        [tool.id]: `已经打开安装窗口跑「${tool.installCommand}」；装完回来点「重新检测」确认。`,
+        [tool.id]: `已经打开安装窗口跑「${tool.installCommand}」；窗口关闭后会自动重新检测。`,
       }))
+      watchWindow(tool, 'installOnly', handle)
     } catch (err) {
       setLoginMsg((prev) => ({ ...prev, [tool.id]: `打不开安装窗口：${String(err)}` }))
     } finally {
-      setBusy('')
+      updateBusy('')
     }
   }
 
@@ -327,11 +362,11 @@ export function CliPanel() {
    */
   const loginWithKey = async (tool: CliTool) => {
     const secret = (keys[tool.id] ?? '').trim()
-    if (!cli || busy || !secret) return
+    if (!cli || busyRef.current || !secret) return
 
     if (tool.keyLoginKind === 'config') {
       if (!cli.rhSetApiKey) return
-      setBusy(`${tool.id}:key`)
+      updateBusy(`${tool.id}:key`)
       let written = ''
       let autoStatusArgs: string[] | null = null
       try {
@@ -346,7 +381,7 @@ export function CliPanel() {
       } catch (err) {
         setLoginMsg((prev) => ({ ...prev, [tool.id]: `写配置失败：${String(err)}` }))
       } finally {
-        setBusy('')
+        updateBusy('')
       }
       /* `runInto` 自带 busy 门，所以这一句必须等上面释放了再调 */
       if (written && autoStatusArgs) await runInto(tool, 'status', autoStatusArgs)

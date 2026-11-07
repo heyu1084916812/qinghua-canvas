@@ -1,5 +1,6 @@
 import { invoke } from '@tauri-apps/api/core'
 import { base64ToBytes } from '../../domain/shared/base64'
+import { createId } from '../../shared/id'
 import type { CliOutcome, CliPort, CliRunRequest, CliWindowRequest } from '../ports'
 
 /**
@@ -30,7 +31,17 @@ export function createTauriCli(): CliPort {
       }),
     kill: (id) => invoke<boolean>('cli_kill', { id }),
     spawnWindow: async (req: CliWindowRequest) => {
-      await invoke('cli_spawn_window', { program: req.program, args: req.args, cwd: req.cwd })
+      const id = createId('cli-window')
+      await invoke('cli_spawn_window', {
+        id,
+        program: req.program,
+        args: req.args,
+        cwd: req.cwd,
+      })
+      return {
+        id,
+        wait: () => invoke<number | null>('cli_wait_window', { id }),
+      }
     },
     outDir: () => invoke<string>('cli_out_dir'),
     readOut: async (path) => base64ToBytes(await invoke<string>('cli_read_out', { path })),

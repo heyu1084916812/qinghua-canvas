@@ -25,6 +25,8 @@ describe('CLI empty status UI gate', () => {
     expect(probe).toContain('statusOutput === 0')
     expect(probe).toContain('panelOverflowX')
     expect(probe).toContain('scrollIntoViewIfNeeded')
+    expect(probe).toContain('登录窗口已结束')
+    expect(probe).toContain('windowCases')
   })
 
   it('launches an isolated release and kills only its own pid', () => {
