@@ -109,6 +109,11 @@ async function measureWithTransformProbe(page) {
   const styles = [
     ['node content hidden', '.react-flow__node :is(*:not(img)) { visibility: hidden !important; }'],
     ['node content hidden except media', '.react-flow__node :is(*:not(img)) { visibility: hidden !important; } .react-flow__node img { visibility: visible !important; }'],
+    ['background hidden', '.react-flow__background { display: none !important; }'],
+    ['port layer hidden', '[data-flow-port-layer] { display: none !important; }'],
+    ['minimap hidden', '[data-canvas-minimap] { display: none !important; }'],
+    ['hud hidden', '[data-flow-hud] { display: none !important; }'],
+    ['canvas overlays hidden', '[data-flow-port-layer], [data-canvas-minimap], [data-flow-hud], .panel-anchor { display: none !important; }'],
     ['node contain strict', '.react-flow__node { contain: strict !important; }'],
     ['node will change transform', '.react-flow__node { will-change: transform !important; }'],
     ['node flat rendering', '.react-flow__node { isolation: isolate !important; transform: translateZ(0) !important; }'],

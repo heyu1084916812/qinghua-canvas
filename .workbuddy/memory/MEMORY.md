@@ -1,5 +1,22 @@
 # CanvasFlow（轻画）项目记忆
 
+### 总管2 第二十轮：真实图片诊断扩展、当前 HEAD 包与性能稳定性（2026-11-08）
+
+- 用户要求性能任务必须用真实图片。正式门禁固定 150 张唯一 PNG/WebP、300 节点 / 500 连线、P95 ≤20ms；
+  150 张必须全部 rendered / decoded / thumbnail / 64px，不能删图片、减节点或只挂节点。
+- 当前 HEAD 四次 release 正式复跑为 1 次通过、3 次边界失败。失败出现在缩放尾轮，值 20.4–21.0ms；
+  通过的一次为缩放 13.9 / 14.0 / 13.9ms。全部报告保留，不能把一次绿色写稳定性已关闭。
+- `diagnose-canvas-images.mjs` 已扩到分别隔离背景、端口层、小地图、HUD、画布浮层。当前 release 基线约 14.1ms，
+  各浮层隐藏后仍 14.0–14.2ms，整节点层隐藏约 13.9ms；`will-change` 反而 20.6ms。剩余尾部不是隐藏浮层能解释，
+  停止用强制 GPU 分层包装。
+- 项目自己的 Vite dev server 长期运行时会持续占多核；本轮曾临时降到 Idle 后复测，仍在第 3 轮出现 20.4ms。
+  可以记录测量环境干扰，但不得把降优先级或延长时间当成阈值变化。
+- 当前 HEAD 已打本地 0.1.17 NSIS：44,025,807 B，SHA-256
+  `C3CCDDFE843F5B1475429CE239376EA79CD2F224F0BE2CFE8E8FF2E4CFB13340`，签名 keyid `7cec98e1251b82bf`。
+  release 壳 12/12 通过；本机已有正式安装版，安装器门禁按保护逻辑拒绝，干净机器安装仍需外部环境。
+- 最终门禁：`npm run check`（1083 modules / 4332 dependencies、25 legacy budgets、227 semantic registrations）
+  与串行全量 Vitest 635 files / 5373 passed / 1 skipped 通过。
+
 ### 总管2接管复验：可插拔、Agent、Pinterest、MCP、日志（2026-11-07）
 
 - 工作台不是运行时插件：`WorkbenchId` 字面量、`WORKBENCHES`、手写 lazy route、手写 NAV 共同登记。
