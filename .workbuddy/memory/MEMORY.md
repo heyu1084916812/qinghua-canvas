@@ -1,5 +1,13 @@
 # CanvasFlow（轻画）项目记忆
 
+### 总管2 第三十轮：不同模型复核与干净 HEAD 收口（2026-11-08）
+
+- 三个不同模型复核按范围分工：目标覆盖、功能回归、发布边界。功能回归确认 Pinterest / Agent 文案 /
+  Canvas MCP / CLI / 存储与两类日志本机闭环，模块归属正确；`LogPanel` 在 run-record 事件后回第一页
+  是现有设计取舍，不是未完成缺陷。
+- 目标覆盖模型提醒的“发布检查脚本尚未提交”是审计启动旧快照；当前 `04abacf` 已提交，
+  `check:release-readiness` 给出 `trackedClean=true`、`ok=true`，同时保留外部条件列表。
+
 ### 总管2 第二十九轮：发布前置只读检查（2026-11-08）
 
 - `npm run check:release-readiness` 只读汇总发布前状态；它不 push、不 tag、不创建 Release。
