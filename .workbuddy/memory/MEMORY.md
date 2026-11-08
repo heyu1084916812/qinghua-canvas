@@ -1,5 +1,12 @@
 # CanvasFlow（轻画）项目记忆
 
+### 总管2 第二十七轮：Authenticode 可选签名能力（2026-11-08）
+
+- Tauri updater `.sig` 是 Ed25519 更新签名，不等于 Windows Authenticode。发版机提供 `QH_SIGNTOOL`
+  和 `QH_SIGNTOOL_SUBJECT` / `QH_SIGNTOOL_THUMBPRINT` 时，`release-desktop.mjs` 才执行 `signtool`；
+  没证书就明确输出未签名并继续本地出品。
+- 本机无代码签名证书，当前 `release/0.1.17` 安装包仍为 `NotSigned`；不要把它写成已签名发行版。
+
 ### 总管2 第二十六轮：远端状态与发布确认清单（2026-11-08）
 
 - 发布前必须先看 `.playwright-verify/release-confirmation-0.1.17.md`：列明 79 个待推提交、三个资产、

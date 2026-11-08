@@ -41,6 +41,8 @@
 - 全量 Vitest `640 files（639 passed / 1 skipped）/ 5392 tests（5391 passed / 1 skipped）`；
   `npm run check`、`smoke:critical` 97 项通过。
 - `verify:mcp:release`、`verify:storage:release`、`verify:cli:release` 均通过。
+- 发版脚本支持可选 Windows Authenticode 签名，并与 Tauri updater Ed25519 签名分开记录；
+  未提供代码签名证书时明确输出 `NotSigned`，不冒充已签名。
 - 本地安装包 `44,050,916 B`，SHA-256
   `CE302F80037ED329D66BA8AF54C7812DF976674916826337ABC970D32065FB5A`；release 壳 12/12。
 - 真实已登录渠道、CLI、Pinterest、外部 MCP harness、干净机器安装和远端发布仍需外部账号或用户确认。

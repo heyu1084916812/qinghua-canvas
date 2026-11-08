@@ -78,6 +78,8 @@ node scripts/release-desktop.mjs
 
 发版脚本会构建前端 + Rust + NSIS、生成 updater 签名与 `latest.json`，并对 release 产物做真机启动门禁。
 更新私钥默认从 `%USERPROFILE%\.tauri\qinghua-updater.key` 读取，不会进入仓库。
+如需 Windows Authenticode 签名，可在发布机设置 `QH_SIGNTOOL` 与 `QH_SIGNTOOL_SUBJECT`
+或 `QH_SIGNTOOL_THUMBPRINT`；未提供证书时发版脚本会明确记录安装包保持未签名。
 
 ## 项目结构
 

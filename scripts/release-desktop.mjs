@@ -17,6 +17,7 @@
  *   node scripts/release-desktop.mjs --notes "改了啥"     # 写进清单，客户端会看到
  *   node scripts/release-desktop.mjs --notes-file x.txt  # 从 UTF-8 文件读取，避免 PowerShell 中文编码坑
  *   node scripts/release-desktop.mjs --base-url <地址>    # 覆盖下载地址前缀
+ *   QH_SIGNTOOL / QH_SIGNTOOL_SUBJECT / QH_SIGNTOOL_THUMBPRINT  # 可选 Windows Authenticode 签名
  *   node scripts/release-desktop.mjs --no-shell-check    # 跳过启动自检（不推荐）
  */
 import { createHash, createPublicKey, verify } from 'node:crypto'
@@ -180,6 +181,39 @@ function runBuild(key) {
   })
 }
 
+/**
+ * Tauri updater 的 Ed25519 `.sig` 不是 Windows Authenticode。两者互不替代：
+ * 前者保证更新包由本项目私钥签名，后者决定 Windows 是否显示「未知发布者」。
+ * 只有发布机显式给出 signtool 和证书条件时才签；未提供就保持未签名并如实记录。
+ */
+function signAuthenticode(setupPath) {
+  if (process.platform !== 'win32') return false
+  const tool = process.env.QH_SIGNTOOL?.trim()
+  const subject = process.env.QH_SIGNTOOL_SUBJECT?.trim()
+  const thumbprint = process.env.QH_SIGNTOOL_THUMBPRINT?.trim()
+  if (!tool || (!subject && !thumbprint)) {
+    console.log('[release] 未配置 QH_SIGNTOOL 证书条件：Windows Authenticode 保持未签名')
+    return false
+  }
+  const args = [
+    'sign',
+    '/fd',
+    'SHA256',
+    '/td',
+    'SHA256',
+    '/tr',
+    process.env.QH_SIGNTOOL_TIMESTAMP?.trim() || 'http://timestamp.digicert.com',
+    ...(thumbprint ? ['/sha1', thumbprint] : ['/n', subject]),
+    setupPath,
+  ]
+  const result = spawnSync(tool, args, { cwd: ROOT, stdio: 'inherit' })
+  if (result.status !== 0) {
+    throw new Error(`Windows Authenticode 签名失败（退出码 ${result.status}）`)
+  }
+  console.log('[release] Windows Authenticode 签名完成')
+  return true
+}
+
 /** 从 origin 推出下载地址前缀（GitHub Releases 的固定形态）；推不出就返回 null */
 function defaultBaseUrl(version) {
   try {
@@ -285,6 +319,7 @@ mkdirSync(outDir, { recursive: true })
 const asset = assetName(version)
 copyFileSync(setupPath, path.join(outDir, asset))
 copyFileSync(sigPath, path.join(outDir, `${asset}.sig`))
+signAuthenticode(path.join(outDir, asset))
 
 const manifest = {
   version,
