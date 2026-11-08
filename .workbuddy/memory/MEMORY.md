@@ -1,5 +1,12 @@
 # CanvasFlow（轻画）项目记忆
 
+### 总管2 第三十一轮：确认清单新鲜度门禁（2026-11-08）
+
+- `.playwright-verify/release-confirmation-0.1.17.md` 不写死 HEAD / 未推提交数；实时值由
+  `npm run check:release-readiness` 输出，避免每次文档提交都让清单过期。
+- readiness 报告同时输出 `blockers`，`ok=true` 只代表本机资产/源码/门禁齐备，不代表线上发布完成。
+  当前仍是 `v0.1.16` 为最新 Release、安装包 `NotSigned`、无 LICENSE。
+
 ### 总管2 第三十轮：不同模型复核与干净 HEAD 收口（2026-11-08）
 
 - 三个不同模型复核按范围分工：目标覆盖、功能回归、发布边界。功能回归确认 Pinterest / Agent 文案 /
