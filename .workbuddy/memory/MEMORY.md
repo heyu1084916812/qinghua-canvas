@@ -1,5 +1,13 @@
 # CanvasFlow（轻画）项目记忆
 
+### 总管2 第三十二轮：最终干净 HEAD 全量复验（2026-11-08）
+
+- HEAD `04a4c20` 最终复跑：check、串行全量 Vitest 642 files / 5397 tests、build、
+  smoke:critical 97 项、release-readiness、MCP/存储/CLI release 探针全部通过。
+- 最新 release 探针：MCP 真实画布 2 节点 / 1 连线，存储快速 294ms、完整 611ms、重开 64ms、
+  全局日志 102ms、画布日志 402ms，错误和溢出 0；CLI 四组明暗/视口全绿。
+- 这些数字只证明本机交付基线；不能替代 push 后的远端 Actions、GitHub Release 或真实账号验收。
+
 ### 总管2 第三十一轮：确认清单新鲜度门禁（2026-11-08）
 
 - `.playwright-verify/release-confirmation-0.1.17.md` 不写死 HEAD / 未推提交数；实时值由
