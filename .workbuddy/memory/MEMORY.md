@@ -1,5 +1,12 @@
 # CanvasFlow（轻画）项目记忆
 
+### 总管2 第二十六轮：远端状态与发布确认清单（2026-11-08）
+
+- 发布前必须先看 `.playwright-verify/release-confirmation-0.1.17.md`：列明 79 个待推提交、三个资产、
+  安装包 hash 和所有仍需用户决定的外部条件。
+- 远端 `origin/main` 仍为 `3b13aca`；本轮 GitHub API 503 / git 连接重置，远端 Release / Actions 状态不能
+  写成已验证。未经用户明确确认，不 push、不 tag、不创建 Release、不上传 `latest.json`。
+
 ### 总管2 第二十五轮：最终包 hash 与发布验证清单（2026-11-08）
 
 - 最终 0.1.17 安装包为 44,050,916 B，SHA-256
