@@ -256,10 +256,16 @@ fn resolve_port(release_gate: bool, raw: Option<&str>) -> Result<u16, String> {
 
 fn gateway_config_path(app: &AppHandle) -> Result<std::path::PathBuf, String> {
     let exe = std::env::current_exe().map_err(|error| format!("read current exe: {error}"))?;
-    let dir = app
-        .path()
-        .app_local_data_dir()
-        .map_err(|error| format!("read app data dir: {error}"))?;
+    let dir = std::env::var_os("LOCALAPPDATA")
+        .filter(|value| !value.is_empty())
+        .map(PathBuf::from)
+        .map(|root| root.join(app.config().identifier.clone()))
+        .map(Ok)
+        .unwrap_or_else(|| {
+            app.path()
+                .app_local_data_dir()
+                .map_err(|error| format!("read app data dir: {error}"))
+        })?;
     Ok(dir.join(gateway_config_name(
         &exe,
         std::env::var(RELEASE_GATE_ENV).ok().as_deref() == Some("1"),
@@ -669,6 +675,14 @@ mod tests {
         );
         assert_eq!(
             gateway_config_name(std::path::Path::new("E:\\apps\\轻画\\qinghua.exe"), true,),
+            "canvas-gateway.release-gate.json"
+        );
+    }
+
+    #[test]
+    fn release_gate_config_name_keeps_harness_and_app_on_the_same_profile() {
+        assert_eq!(
+            gateway_config_name(std::path::Path::new("E:\\apps\\轻画\\qinghua.exe"), true),
             "canvas-gateway.release-gate.json"
         );
     }

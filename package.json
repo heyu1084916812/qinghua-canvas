@@ -18,6 +18,7 @@
     "test:coverage": "vitest run --coverage",
     "test:canvas-mcp": "node scripts/test-canvas-mcp.mjs",
     "test:canvas-mcp:inspector": "node scripts/test-canvas-mcp-inspector.mjs",
+    "verify:mcp:release": "node scripts/run-canvas-mcp-release.mjs",
     "perf:canvas:production": "node scripts/test-canvas-performance.mjs",
     "verify:cli:release": "node scripts/run-cli-key-status-ui.mjs",
     "verify:storage:release": "node scripts/run-storage-log-release-ui.mjs",

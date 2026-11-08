@@ -1,5 +1,15 @@
 # CanvasFlow（轻画）项目记忆
 
+### 总管2 第二十四轮：真实 Canvas MCP 联调与隔离 token（2026-11-08）
+
+- 外部 MCP 验收不能只跑 Inspector 或测试 gateway。`npm run verify:mcp:release` 必须启动真实 release、
+  使用隔离 V2 store 和独立 stdio harness，打开种子画布并真实读回 2 节点 / 1 连线。
+- Canvas gateway 的配置必须写进应用当前的 `LOCALAPPDATA\\com.qinghua.canvas`；隔离 profile 下写到用户默认
+  profile 会让 harness 读不到或接错 token。适配器可用 `QINGHUA_CANVAS_URL / TOKEN` 覆盖测试入口，但默认
+  release-gate 路径必须与壳一致。
+- `deleteNodes` / `runNode` / `rememberMemory` 属于受保护操作；真实 MCP 联调必须同时断言它们被拒绝且图中
+  节点数不变。查询共享库使用 POST `/query`，不要用浏览器页面里的 GET URL 形态。
+
 ### 总管2 第二十三轮：存储/日志重开缓存、MIME 分类与文案复验（2026-11-08）
 
 - 存储面板的会话快照必须按 `StoragePort` 隔离，只用于重开时先显示上次字段；后台刷新仍由
