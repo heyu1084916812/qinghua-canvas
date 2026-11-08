@@ -4,6 +4,8 @@
 
 - 最终 0.1.17 安装包为 44,050,916 B，SHA-256
   `CE302F80037ED329D66BA8AF54C7812DF976674916826337ABC970D32065FB5A`，release 壳 12/12。
+- 最终 HEAD 复跑：串行全量 Vitest 640 files（639 passed / 1 skipped）/ 5392 tests
+  （5391 passed / 1 skipped）；`npm run check`、`smoke:critical` 4/4 组 97 项通过。
 - `.codex/project-release.json` 的验证命令包含 `verify:mcp:release`、`verify:storage:release`、
   `verify:cli:release`，发布前不能只跑 npm test / check / build。
 - 真实 MCP 联调已作为代码与证据提交 `606d4b2`。正式 push、tag、GitHub Release、真实账号链路、

@@ -38,7 +38,8 @@
 
 **验证**
 
-- 全量 Vitest `639 files / 5389 passed / 1 skipped`；`npm run check`、`smoke:critical` 97 项通过。
+- 全量 Vitest `640 files（639 passed / 1 skipped）/ 5392 tests（5391 passed / 1 skipped）`；
+  `npm run check`、`smoke:critical` 97 项通过。
 - `verify:mcp:release`、`verify:storage:release`、`verify:cli:release` 均通过。
 - 本地安装包 `44,050,916 B`，SHA-256
   `CE302F80037ED329D66BA8AF54C7812DF976674916826337ABC970D32065FB5A`；release 壳 12/12。
