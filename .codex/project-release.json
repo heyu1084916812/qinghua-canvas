@@ -20,12 +20,16 @@
       "npm run check",
       "npm run build",
       "npm run check:release-readiness",
-      "npm run check:published-release",
       "npm run verify:mcp:release",
       "npm run verify:storage:release",
       "npm run verify:cli:release"
     ],
     "artifact": "release/0.1.17/qinghua_0.1.17_x64-setup.exe"
+  },
+  "post_publish": {
+    "commands": [
+      "npm run check:published-release"
+    ]
   },
   "github": {
     "repository": "heyu1084916812/qinghua-canvas",

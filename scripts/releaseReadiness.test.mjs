@@ -6,6 +6,8 @@ const source = readFileSync(
   fileURLToPath(new URL('../scripts/check-release-readiness.mjs', import.meta.url)),
   'utf8',
 )
+const read = (relative) =>
+  readFileSync(fileURLToPath(new URL(`../${relative}`, import.meta.url)), 'utf8')
 
 describe('release readiness report', () => {
   it('is a read-only report and never performs publishing actions', () => {
@@ -32,5 +34,13 @@ describe('release readiness report', () => {
   it('does not let a stale confirmation file silently pass', () => {
     expect(source).toContain('confirmationPresent: assets.confirmation.exists && confirmationMatches')
     expect(source).toContain('未经明确确认不得执行')
+  })
+
+  it('keeps the post-publish online check out of pre-publish validation', () => {
+    const release = JSON.parse(read('.codex/project-release.json'))
+    const pre = release.validation.commands
+    const post = release.post_publish?.commands ?? []
+    expect(post).toContain('npm run check:published-release')
+    expect(pre).not.toContain('npm run check:published-release')
   })
 })
