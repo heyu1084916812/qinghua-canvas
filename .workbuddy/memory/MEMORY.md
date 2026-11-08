@@ -1,5 +1,14 @@
 # CanvasFlow（轻画）项目记忆
 
+### 总管2 第二十五轮：最终包 hash 与发布验证清单（2026-11-08）
+
+- 最终 0.1.17 安装包为 44,050,916 B，SHA-256
+  `CE302F80037ED329D66BA8AF54C7812DF976674916826337ABC970D32065FB5A`，release 壳 12/12。
+- `.codex/project-release.json` 的验证命令包含 `verify:mcp:release`、`verify:storage:release`、
+  `verify:cli:release`，发布前不能只跑 npm test / check / build。
+- 真实 MCP 联调已作为代码与证据提交 `606d4b2`。正式 push、tag、GitHub Release、真实账号链路、
+  干净机器安装、Authenticode 与 LICENSE 仍保留外部边界。
+
 ### 总管2 第二十四轮：真实 Canvas MCP 联调与隔离 token（2026-11-08）
 
 - 外部 MCP 验收不能只跑 Inspector 或测试 gateway。`npm run verify:mcp:release` 必须启动真实 release、

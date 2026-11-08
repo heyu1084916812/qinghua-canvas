@@ -23,6 +23,12 @@
 - 安装 / 登录窗口结束会自动重检、继续登录或查询状态；空状态命令明确跳过，不再要求用户重复点击。
 - 可见窗口由壳持有并等待退出码，进程树只按本方 PID 终止；媒体输入和 RunningHub 多产物走受控落库。
 
+**Canvas MCP**
+
+- 新增真实 release 联调门禁：隔离 V2 store 中打开种子画布，独立 stdio harness 完成
+  `initialize → tools/list → tools/call(readGraph)`，读回 2 个节点和 1 条连线。
+- 删除节点、付费生成和记忆写入仍不开放给外部 MCP；隔离 profile 下 gateway token 与应用配置目录一致。
+
 **画布**
 
 - AgentHost、灯箱、文本编辑器和日志改为真实懒加载边界，所有 JS chunk 低于 500KB。
@@ -32,9 +38,10 @@
 
 **验证**
 
-- 全量 Vitest `639 files / 5388 passed / 1 skipped`；`npm run check`、`smoke:critical` 97 项通过。
-- 本地安装包 `44,054,453 B`，SHA-256
-  `8E09962CF0F9B5D3C02FDC01A30B28271F443E98B04A00BDBC898B6F94A77F2B`；release 壳 12/12。
+- 全量 Vitest `639 files / 5389 passed / 1 skipped`；`npm run check`、`smoke:critical` 97 项通过。
+- `verify:mcp:release`、`verify:storage:release`、`verify:cli:release` 均通过。
+- 本地安装包 `44,050,916 B`，SHA-256
+  `CE302F80037ED329D66BA8AF54C7812DF976674916826337ABC970D32065FB5A`；release 壳 12/12。
 - 真实已登录渠道、CLI、Pinterest、外部 MCP harness、干净机器安装和远端发布仍需外部账号或用户确认。
 
 ---
