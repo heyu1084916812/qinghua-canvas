@@ -1,5 +1,11 @@
 # CanvasFlow（轻画）项目记忆
 
+### 总管2 第二十九轮：发布前置只读检查（2026-11-08）
+
+- `npm run check:release-readiness` 只读汇总发布前状态；它不 push、不 tag、不创建 Release。
+- 报告里的 `ok` 只表示本机源码/资产/清单/门禁齐备；Authenticode、LICENSE、真实账号、干净机器和
+  发布授权仍会在 `externalConditions` 中如实列出，不能用 `ok=true` 冒充线上发布完成。
+
 ### 总管2 第二十八轮：最终计数复验（2026-11-08）
 
 - 可选 Authenticode 签名能力提交后最终串行全量 Vitest 为 641 files（640 passed / 1 skipped）/
