@@ -69,6 +69,19 @@ const installerHash = assets.exe.exists ? sha256(files.exe) : null
 const manifest = assets.json.exists
   ? JSON.parse(readFileSync(files.json, 'utf8'))
   : null
+const confirmation = assets.confirmation.exists
+  ? readFileSync(files.confirmation, 'utf8')
+  : ''
+const confirmationMatches = confirmation
+  ? [
+      `# 0.1.17 发布确认清单`,
+      `release/0.1.17/qinghua_0.1.17_x64-setup.exe`,
+      installerHash,
+      `qinghua_0.1.17_x64-setup.exe.sig`,
+      `latest.json`,
+      `未经明确确认不得执行`,
+    ].every((token) => confirmation.includes(token))
+  : false
 const updaterSignatureMatches =
   assets.sig.exists && manifest
     ? readFileSync(files.sig, 'utf8').trim() ===
@@ -81,7 +94,7 @@ const checks = {
   manifestVersion: manifest?.version === version,
   updaterSignatureMatches,
   workflowPresent: assets.workflow.exists,
-  confirmationPresent: assets.confirmation.exists,
+  confirmationPresent: assets.confirmation.exists && confirmationMatches,
   authenticodeSigned: authenticode.status === 'Valid',
   licensePresent: assets.license.exists,
 }
@@ -112,6 +125,7 @@ const report = {
   },
   assets,
   checks,
+  blockers: externalConditions,
   authenticode,
   externalConditions,
 }

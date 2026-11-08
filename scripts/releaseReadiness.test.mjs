@@ -22,8 +22,15 @@ describe('release readiness report', () => {
       'authenticodeSigned',
       'licensePresent',
       'externalConditions',
+      'confirmationMatches',
+      'blockers: externalConditions',
     ]) {
       expect(source).toContain(token)
     }
+  })
+
+  it('does not let a stale confirmation file silently pass', () => {
+    expect(source).toContain('confirmationPresent: assets.confirmation.exists && confirmationMatches')
+    expect(source).toContain('未经明确确认不得执行')
   })
 })
