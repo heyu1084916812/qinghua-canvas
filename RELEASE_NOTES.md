@@ -38,7 +38,7 @@
 
 **验证**
 
-- 全量 Vitest `640 files（639 passed / 1 skipped）/ 5392 tests（5391 passed / 1 skipped）`；
+- 全量 Vitest `641 files（640 passed / 1 skipped）/ 5394 tests（5393 passed / 1 skipped）`；
   `npm run check`、`smoke:critical` 97 项通过。
 - `verify:mcp:release`、`verify:storage:release`、`verify:cli:release` 均通过。
 - 发版脚本支持可选 Windows Authenticode 签名，并与 Tauri updater Ed25519 签名分开记录；

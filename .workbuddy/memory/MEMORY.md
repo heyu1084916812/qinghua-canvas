@@ -1,5 +1,10 @@
 # CanvasFlow（轻画）项目记忆
 
+### 总管2 第二十八轮：最终计数复验（2026-11-08）
+
+- 可选 Authenticode 签名能力提交后最终串行全量 Vitest 为 641 files（640 passed / 1 skipped）/
+  5394 tests（5393 passed / 1 skipped）；`npm run check`、发布契约测试与本轮文档同步通过。
+
 ### 总管2 第二十七轮：Authenticode 可选签名能力（2026-11-08）
 
 - Tauri updater `.sig` 是 Ed25519 更新签名，不等于 Windows Authenticode。发版机提供 `QH_SIGNTOOL`
