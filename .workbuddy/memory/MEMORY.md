@@ -1,5 +1,11 @@
 # CanvasFlow（轻画）项目记忆
 
+### 总管2 第三十三轮：发布确认清单去旧值（2026-11-08）
+
+- 确认清单不再维护静态 HEAD / 提交数 / 全量测试数；这些值由 `check:release-readiness` 和实时 git 提供。
+- `npm run check:published-release` 已登记为发布后第一道匿名只读验收；必须在明确授权发布之后才运行，
+  发布前运行只能看到旧 Release / 404，不能算失败修复。
+
 ### 总管2 第三十二轮：最终干净 HEAD 全量复验（2026-11-08）
 
 - HEAD `04a4c20` 最终复跑：check、串行全量 Vitest 642 files / 5397 tests、build、
