@@ -6726,13 +6726,14 @@
     {
       "module": "src/pages/CanvasPage/ReferenceKitPanel.module.css",
       "owner": "canvas-reference-kit-panel-style",
-      "responsibility": "定义套件子面板、筛选器和图片/颜色/字体条目的样式。",
+      "responsibility": "定义套件子面板头部、返回、筛选浮层、空态与键盘焦点的样式。",
       "owns": [
         "套件子面板头部与筛选浮层",
-        "图片、颜色、字体卡片",
-        "抽屉内紧凑密度"
+        "筛选空态与控件焦点",
+        "抽屉内套件子面板密度"
       ],
       "doesNotOwn": [
+        "图片、颜色、字体条目卡片",
         "参考卡片与抽屉壳层",
         "参考详情灯箱",
         "全局主题令牌"
@@ -6741,7 +6742,7 @@
         "CSS_MODULE:reference-kit-panel",
         "CSS_CLASS:head",
         "CSS_CLASS:filters",
-        "CSS_CLASS:item"
+        "CSS_CLASS:empty"
       ],
       "test": [
         "src/app/uiSevenPoints.test.ts"
@@ -6749,12 +6750,136 @@
       "budget": 200
     },
     {
+      "module": "src/features/canvas/kitReference.ts",
+      "owner": "canvas-kit-reference",
+      "responsibility": "把套件卡和套件内图片稳定投影成项目参考台账条目，供 Agent chip 和后续生成上下文复用。",
+      "owns": [
+        "套件卡与单张套件图片的稳定参考 id",
+        "套件版本、图片角色和标题的参考投影",
+        "素材 MIME 到参考类型的解析"
+      ],
+      "doesNotOwn": [
+        "Agent pending chip 管理",
+        "参考台账持久化实现",
+        "React 界面与用户提示"
+      ],
+      "publicApi": [
+        "ensureKitCardReference",
+        "ensureKitAssetReference"
+      ],
+      "test": [
+        "src/features/canvas/kitReference.test.ts"
+      ],
+      "budget": 120
+    },
+    {
+      "module": "src/pages/CanvasPage/MyAssetsShelf.tsx",
+      "owner": "canvas-my-assets-shelf",
+      "responsibility": "渲染我的素材分类、创建套件入口、真实套件缩略图卡和套件详情，并处理加入 Agent。",
+      "owns": [
+        "品牌、角色、产品和自定义套件分类",
+        "创建套件虚线与已保存套件横卡",
+        "四格真实缩略图与右上详情入口",
+        "套件详情分区和加入对话动作"
+      ],
+      "doesNotOwn": [
+        "套件编辑器弹窗",
+        "套件持久化事务",
+        "Agent 面板渲染与生成请求"
+      ],
+      "publicApi": [
+        "MyAssetsShelf"
+      ],
+      "test": [
+        "src/app/uiSevenPoints.test.ts"
+      ],
+      "budget": 300
+    },
+    {
+      "module": "src/pages/CanvasPage/MyAssetsShelf.module.css",
+      "owner": "canvas-my-assets-shelf-style",
+      "responsibility": "定义我的素材分类下划线、创建套件虚线卡、套件横卡、缩略图和详情页样式。",
+      "owns": [
+        "分类页签的选中下划线",
+        "创建套件与已保存套件卡层级",
+        "四格缩略图和详情分区密度"
+      ],
+      "doesNotOwn": [
+        "画布抽屉外壳几何",
+        "套件编辑器弹窗样式",
+        "全局主题令牌"
+      ],
+      "publicApi": [
+        "CSS_MODULE:我的素材套件货架",
+        "CSS_CLASS:tabOn",
+        "CSS_CLASS:createKit",
+        "CSS_CLASS:kitCard"
+      ],
+      "test": [
+        "scripts/capture-ui-seven-points.mjs"
+      ],
+      "budget": 360
+    },
+    {
+      "module": "src/pages/CanvasPage/ReferenceKitItems.tsx",
+      "owner": "canvas-reference-kit-items",
+      "responsibility": "把套件版本投影成瀑布流图片、颜色和字体卡，并实现图片单击加入 Agent、双击与放大灯箱和套件筛选。",
+      "owns": [
+        "套件图片、颜色和字体条目投影",
+        "图片单击延迟与双击取消",
+        "右上放大按钮与悬停焦点态",
+        "套件来源和类型筛选面板"
+      ],
+      "doesNotOwn": [
+        "套件版本读取与参考持久化",
+        "Agent 面板与会话状态",
+        "参考灯箱内部导航"
+      ],
+      "publicApi": [
+        "KitItem",
+        "KitImageItem",
+        "ItemKind",
+        "kitItemsOf",
+        "ReferenceKitItems",
+        "ReferenceKitFilters"
+      ],
+      "test": [
+        "src/app/uiSevenPoints.test.ts"
+      ],
+      "budget": 240
+    },
+    {
+      "module": "src/pages/CanvasPage/ReferenceKitItems.module.css",
+      "owner": "canvas-reference-kit-items-style",
+      "responsibility": "定义套件图片、颜色、字体条目和右上放大按钮的尺寸、悬停、焦点与紧凑排版。",
+      "owns": [
+        "套件图片与颜色字体卡尺寸",
+        "右上放大按钮的悬停和焦点显示",
+        "条目标题与元信息截断"
+      ],
+      "doesNotOwn": [
+        "套件子面板头部与筛选浮层",
+        "参考详情灯箱",
+        "全局主题令牌"
+      ],
+      "publicApi": [
+        "CSS_MODULE:套件条目瀑布流",
+        "CSS_CLASS:imageItem",
+        "CSS_CLASS:imageExpand",
+        "CSS_CLASS:caption"
+      ],
+      "test": [
+        "src/app/uiSevenPoints.test.ts"
+      ],
+      "budget": 160
+    },
+    {
       "module": "src/pages/CanvasPage/MyAssetsDrawer.tsx",
       "owner": "canvas-my-assets-drawer",
-      "responsibility": "在画布工作区左列展示四个并列素材来源，复用真实套件、项目参考台账与 Pinterest 数据。",
+      "responsibility": "在画布工作区左列编排参考、我的素材、Pinterest 和轻画插件四个来源，并把真实套件货架挂到我的素材页签。",
       "owns": [
         "参考、我的素材、Pinterest、轻画插件四个页签",
-        "四类套件列表与真实仓储读取",
+        "套件仓储读取与素材货架挂载",
         "我的素材抽屉四来源编排与 ReferenceSourcePanel 挂载",
         "现有 PinterestPanel 的抽屉化嵌入与未完成来源的如实状态",
         "在画布工作区左列占用真实布局宽度"
@@ -6779,7 +6904,7 @@
       "responsibility": "定义画布我的素材左侧抽屉的布局、页签、滚动和嵌入面板样式。",
       "owns": [
         "左侧抽屉与画布让位几何",
-        "四页签与套件列表的深浅主题样式",
+        "四页签的深浅主题与下划线选中态",
         "Pinterest 面板嵌入抽屉时的局部布局归零"
       ],
       "doesNotOwn": [
@@ -6791,12 +6916,12 @@
         "CSS_MODULE:左侧抽屉与页签布局",
         "CSS_CLASS:drawer",
         "CSS_CLASS:tabs",
-        "CSS_CLASS:kitCard"
+        "CSS_CLASS:tabOn"
       ],
       "test": [
         "scripts/capture-ui-seven-points.mjs"
       ],
-      "budget": 240
+      "budget": 160
     },
     {
       "module": "src/features/settings/cliOutputText.ts",

@@ -93,63 +93,6 @@
   accent-color: var(--accent);
 }
 
-.item {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
-  min-width: 0;
-}
-
-.image,
-.color,
-.font {
-  display: block;
-  width: 100%;
-  overflow: hidden;
-  border: 1px solid var(--stroke);
-  border-radius: 8px;
-  background: var(--bg-surface);
-}
-
-.image {
-  aspect-ratio: 4 / 3;
-}
-
-.image img {
-  display: block;
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-}
-
-.color {
-  aspect-ratio: 1;
-}
-
-.font {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  aspect-ratio: 1;
-  color: var(--text-1);
-  font-size: 42px;
-  line-height: 1;
-}
-
-.caption {
-  overflow: hidden;
-  color: var(--text-2);
-  font-size: var(--fs-chip);
-  line-height: 1.45;
-  text-overflow: ellipsis;
-}
-
-.meta {
-  color: var(--text-3);
-  font-size: var(--fs-chip);
-  overflow-wrap: anywhere;
-}
-
 .empty {
   margin: 0;
   padding: var(--space-4);

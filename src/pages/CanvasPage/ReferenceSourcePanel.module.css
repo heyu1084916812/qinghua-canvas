@@ -159,7 +159,7 @@
   border: 0;
   background: transparent;
   color: inherit;
-  cursor: zoom-in;
+  cursor: pointer;
 }
 
 .referenceMediaEmpty {
@@ -169,7 +169,7 @@
   background: var(--bg-subtle);
 }
 
-.referenceQuickAdd {
+.referenceExpand {
   position: absolute;
   z-index: 1;
   top: var(--space-2);
@@ -190,14 +190,14 @@
   transition: opacity 120ms ease;
 }
 
-.referenceCard:hover .referenceQuickAdd,
-.referenceCard:focus-within .referenceQuickAdd,
-.referenceQuickAdd:focus-visible {
+.referenceCard:hover .referenceExpand,
+.referenceCard:focus-within .referenceExpand,
+.referenceExpand:focus-visible {
   opacity: 1;
   pointer-events: auto;
 }
 
-.referenceQuickAdd:hover {
+.referenceExpand:hover {
   background: var(--bg-hover);
 }
 
@@ -318,7 +318,7 @@
 .filterButton:focus-visible,
 .filters input:focus-visible,
 .referenceOpen:focus-visible,
-.referenceQuickAdd:focus-visible,
+.referenceExpand:focus-visible,
 .kitFolderButton:focus-visible {
   outline: 1px solid var(--stroke-focus);
   outline-offset: 1px;

@@ -1,11 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { usePlatform } from '../../app/providers/PlatformProvider'
 import type { ContextKit, ContextKitVersion } from '../../domain/shared/context'
-import type {
-  ReferenceItem,
-  ReferenceKind,
-  ReferenceSource,
-} from '../../domain/project/referenceLedger'
+import type { ReferenceItem, ReferenceKind, ReferenceSource } from '../../domain/project/referenceLedger'
 import { sendReferenceToAgent } from '../../features/canvas/agentHandoff'
 import { setReferenceDragData } from '../../features/canvas/dropImport'
 import { importAssetFile, IMPORT_ACCEPT } from '../../features/canvas/importAsset'
@@ -14,7 +10,12 @@ import { createContextRepository } from '../../state/shared/contextRepository'
 import { createReferenceLedgerRepository } from '../../state/project/referenceLedgerRepository'
 import type { CanvasStore } from '../../state/workbenches/canvas/store'
 import { createId } from '../../shared/id'
-import { IconPlus, IconSliders, IconSpinner } from '../../workbenches/canvas/toolbar/icons'
+import {
+  IconExpand,
+  IconPlus,
+  IconSliders,
+  IconSpinner,
+} from '../../workbenches/canvas/toolbar/icons'
 import { KIT_KINDS } from '../AssetsPage/contextKitDraft'
 import { MasonryGrid } from '../AssetsPage/MasonryGrid'
 import { ReferenceLightbox } from './ReferenceLightbox'
@@ -60,6 +61,7 @@ export function ReferenceSourcePanel({
     [platform.storage],
   )
   const inputRef = useRef<HTMLInputElement | null>(null)
+  const clickTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [references, setReferences] = useState<ReferenceItem[]>([])
   const [versions, setVersions] = useState<Record<string, ContextKitVersion | null>>({})
   const [lightboxId, setLightboxId] = useState<string | null>(null)
@@ -79,6 +81,10 @@ export function ReferenceSourcePanel({
     })
     return () => { active = false }
   }, [projectId, referenceRepo])
+
+  useEffect(() => () => {
+    if (clickTimerRef.current) clearTimeout(clickTimerRef.current)
+  }, [])
 
   useEffect(() => {
     let active = true
@@ -136,6 +142,8 @@ export function ReferenceSourcePanel({
   if (selectedKit) {
     return (
       <ReferenceKitPanel
+        projectId={projectId}
+        store={store}
         kit={selectedKit}
         version={versions[selectedKit.id] ?? null}
         onBack={() => setSelectedKitId(null)}
@@ -148,6 +156,18 @@ export function ReferenceSourcePanel({
   }
   const toggleKind = (value: KindFilter) => {
     setKindFilters((current) => toggledSet(current, value))
+  }
+  const addReference = (item: ReferenceItem) => {
+    if (clickTimerRef.current) clearTimeout(clickTimerRef.current)
+    clickTimerRef.current = setTimeout(() => {
+      clickTimerRef.current = null
+      sendReferenceToAgent(projectId, [{ id: item.id, label: item.title }])
+    }, 220)
+  }
+  const openReference = (item: ReferenceItem) => {
+    if (clickTimerRef.current) clearTimeout(clickTimerRef.current)
+    clickTimerRef.current = null
+    setLightboxId(item.id)
   }
 
   return (
@@ -244,14 +264,8 @@ export function ReferenceSourcePanel({
                 className={styles.referenceOpen}
                 data-my-assets-reference-open={item.id}
                 aria-label={`查看参考 ${item.title}`}
-                title="双击查看参考"
-                onDoubleClick={() => item.assetHash && setLightboxId(item.id)}
-                onKeyDown={(event) => {
-                  if ((event.key === 'Enter' || event.key === ' ') && item.assetHash) {
-                    event.preventDefault()
-                    setLightboxId(item.id)
-                  }
-                }}
+                onClick={() => addReference(item)}
+                onDoubleClick={() => item.assetHash && openReference(item)}
               >
                 <ReferenceMedia
                   hash={item.assetHash}
@@ -261,13 +275,13 @@ export function ReferenceSourcePanel({
               </button>
               <button
                 type="button"
-                className={styles.referenceQuickAdd}
-                data-my-assets-reference-agent={item.id}
-                aria-label={`将 ${item.title} 加入对话`}
-                title="加入对话"
-                onClick={() => sendReferenceToAgent(projectId, [{ id: item.id, label: item.title }])}
+                className={styles.referenceExpand}
+                data-my-assets-reference-expand={item.id}
+                aria-label={`放大查看 ${item.title}`}
+                title="放大查看"
+                onClick={() => openReference(item)}
               >
-                <IconPlus size={14} />
+                <IconExpand size={14} />
               </button>
             </div>
             <div className={styles.referenceCopy}>

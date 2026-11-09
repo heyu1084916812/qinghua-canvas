@@ -1,12 +1,9 @@
 import { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react'
 import { usePlatform } from '../../app/providers/PlatformProvider'
 import { createContextRepository } from '../../state/shared/contextRepository'
-import type {
-  ContextKit,
-  ContextKitKind,
-} from '../../domain/shared/context'
+import type { ContextKit } from '../../domain/shared/context'
 import type { CanvasStore } from '../../state/workbenches/canvas/store'
-import { KIT_KINDS } from '../AssetsPage/contextKitDraft'
+import { MyAssetsShelf } from './MyAssetsShelf'
 import { ReferenceSourcePanel } from './ReferenceSourcePanel'
 import styles from './MyAssetsDrawer.module.css'
 
@@ -43,7 +40,6 @@ export function MyAssetsDrawer({
   )
   const [source, setSource] = useState<Source>('assets')
   const [kits, setKits] = useState<ContextKit[]>([])
-  const [kind, setKind] = useState<ContextKitKind>('brand')
   const [error, setError] = useState('')
   const closeRef = useRef<HTMLButtonElement | null>(null)
 
@@ -65,8 +61,6 @@ export function MyAssetsDrawer({
     })
     return () => { active = false }
   }, [contextRepo])
-
-  const visibleKits = kits.filter((kit) => kit.kind === kind)
 
   return (
       <aside className={styles.drawer} aria-label="我的素材" data-my-assets-drawer>
@@ -96,47 +90,13 @@ export function MyAssetsDrawer({
             <ReferenceSourcePanel projectId={projectId} store={store} kits={kits} />
           ) : null}
           {source === 'assets' ? (
-            <div>
-              <div className={styles.subhead}>
-                <span>账号级套件资料库</span>
-                <button
-                  type="button"
-                  className={styles.kitAction}
-                  data-my-assets-edit-kits
-                  onClick={onOpenKitEditor}
-                >
-                  管理套件
-                </button>
-              </div>
-              <div className={styles.kinds} aria-label="套件分类">
-                {KIT_KINDS.map((item) => (
-                  <button
-                    key={item.value}
-                    type="button"
-                    className={kind === item.value ? styles.tabOn : styles.kind}
-                    data-my-assets-kind={item.value}
-                    aria-pressed={kind === item.value}
-                    onClick={() => setKind(item.value)}
-                  >
-                    {item.label}
-                  </button>
-                ))}
-              </div>
-              {error ? <p className={styles.notice}>{error}</p> : null}
-              {!error && visibleKits.length === 0 ? (
-                <p className={styles.empty} data-my-assets-empty>
-                  还没有{KIT_KINDS.find((item) => item.value === kind)?.label}。点击「管理套件」创建或编辑真实套件。
-                </p>
-              ) : null}
-              <div className={styles.kitList}>
-                {visibleKits.map((kit) => (
-                  <article key={kit.id} className={styles.kitCard} data-my-assets-kit={kit.id}>
-                    <span className={styles.kitName} title={kit.name}>{kit.name}</span>
-                    <span className={styles.kitMeta}>v{kit.currentVersion}</span>
-                  </article>
-                ))}
-              </div>
-            </div>
+            <MyAssetsShelf
+              projectId={projectId}
+              store={store}
+              kits={kits}
+              error={error}
+              onOpenKitEditor={onOpenKitEditor}
+            />
           ) : null}
           {source === 'pinterest' ? (
             <div className={styles.embeddedPinterest} data-my-assets-pinterest>

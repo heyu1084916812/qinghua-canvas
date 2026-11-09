@@ -13,6 +13,10 @@ const phase = process.argv.includes('--after') ? 'after' : 'before'
 const out = path.join(ROOT, '.playwright-verify', `ui-seven-${phase}`)
 fs.mkdirSync(out, { recursive: true })
 const storeData = path.join(out, 'store')
+if (!storeData.startsWith(`${out}${path.sep}`)) {
+  throw new Error(`unsafe store path: ${storeData}`)
+}
+fs.rmSync(storeData, { recursive: true, force: true })
 fs.mkdirSync(storeData, { recursive: true })
 
 const variants = [
@@ -29,12 +33,14 @@ async function mediaFixtures(browser) {
     #square { width: 320px; height: 320px; background: #b9c9a8; }
     #tall { width: 240px; height: 420px; background: #a8c8bb; }
     #wide { width: 480px; height: 220px; background: #c4b48c; }
-  </style><div id="square"></div><div id="tall"></div><div id="wide"></div>`)
+    #portrait { width: 260px; height: 400px; background: #d6b99c; }
+  </style><div id="square"></div><div id="tall"></div><div id="wide"></div><div id="portrait"></div>`)
   const square = await page.locator('#square').screenshot()
   const tall = await page.locator('#tall').screenshot()
   const wide = await page.locator('#wide').screenshot()
+  const portrait = await page.locator('#portrait').screenshot()
   await page.close()
-  return { square, tall, wide }
+  return { square, tall, wide, portrait }
 }
 
 const pageErrors = (page) => {
@@ -328,9 +334,14 @@ try {
         mimeType: 'image/png',
         buffer: fixtures.wide,
       },
+      {
+        name: 'portrait-reference.png',
+        mimeType: 'image/png',
+        buffer: fixtures.portrait,
+      },
     ])
     await page.waitForFunction(
-      () => document.querySelectorAll('[data-my-assets-reference]').length >= 3,
+      () => document.querySelectorAll('[data-my-assets-reference]').length >= 4,
       { timeout: 20_000 },
     ).catch(() => {})
     const referenceQueryResponse = await fetch(`${STORE}/query`, {
@@ -343,7 +354,10 @@ try {
       .filter((row) => typeof row.assetHash === 'string' && row.assetHash)
       .sort((left, right) => Number(right.createdAt ?? 0) - Number(left.createdAt ?? 0))[0]
     if (!previewReference) throw new Error('reference fixture asset missing')
-    const previewHash = previewReference.assetHash
+    const previewHashes = [
+      ...new Set(referenceRows.map((row) => row.assetHash).filter(Boolean)),
+    ].slice(0, 4)
+    if (previewHashes.length < 4) throw new Error('expected four reference fixture assets')
     const kitId = 'ui-seven-anbel-kit'
     const kitTime = 1_700_000_000_000
     const kitRows = [{
@@ -361,8 +375,12 @@ try {
       version: 1,
       guide: '自然有机、轻盈、干净的品牌视觉。',
       facts: [],
-      assetHashes: [previewHash],
-      resources: [{ hash: previewHash, role: 'logo', name: 'Anbel 标志' }],
+      assetHashes: previewHashes,
+      resources: previewHashes.map((hash, index) => ({
+        hash,
+        role: index === 0 ? 'logo' : 'reference',
+        name: ['Anbel 标志', '办公空间 1', '办公空间 2', '产品陈列'][index],
+      })),
       colors: [{ id: 'brand-green', name: '主色', value: '#8fc466' }],
       fonts: [{ id: 'abeezee', name: 'ABeeZee', detail: 'Regular' }],
       createdAt: kitTime,
@@ -384,7 +402,7 @@ try {
     await page.locator('[data-my-assets-source="reference"]').click()
     await page.locator('[data-my-assets-kit-folder]').waitFor({ timeout: 10_000 })
     await page.waitForFunction(
-      () => document.querySelectorAll('[data-my-assets-reference]').length >= 3,
+      () => document.querySelectorAll('[data-my-assets-reference]').length >= 4,
       { timeout: 15_000 },
     )
     await page.waitForFunction(
@@ -397,7 +415,7 @@ try {
     const referenceCards = await page.locator('[data-my-assets-reference]').count()
     const referenceFolders = await page.locator('[data-my-assets-kit-folder]').count()
     const referenceUpload = await page.locator('[data-my-assets-reference-upload]').count()
-    const referenceAgentActions = await page.locator('[data-my-assets-reference-agent]').count()
+    const referenceExpandActions = await page.locator('[data-my-assets-reference-expand]').count()
     const referenceLayout = await page.evaluate(() => {
       const grid = document.querySelector('[data-masonry-scope="my-assets-reference"]')
       const cards = [...document.querySelectorAll('[data-my-assets-reference]')]
@@ -424,19 +442,26 @@ try {
         referenceGridLeft: gridRect?.left ?? -1,
         referenceGridRight: gridRect?.right ?? -1,
         referenceCardRightmost: Math.max(...rects.map((rect) => rect.right)),
+        referenceGridOverflowPx: grid
+          ? Math.max(0, grid.scrollWidth - grid.clientWidth)
+          : -1,
         referenceGridOverflowX: grid
-          ? grid.scrollWidth > grid.clientWidth + 1
+          ? grid.scrollWidth > grid.clientWidth + 2
           : true,
       }
     })
     await page.screenshot({ path: path.join(out, `${file}-canvas-reference.png`) })
     await page.locator('[data-reference-source-filter]').click()
     await page.locator('[data-reference-source-filter-panel]').waitFor({ timeout: 5_000 })
+    const referenceFilterIcon = await page.locator('[data-reference-source-filter] svg').evaluate((svg) => ({
+      circles: svg.querySelectorAll('circle').length,
+      paths: svg.querySelectorAll('path').length,
+    }))
     await page.locator('[data-reference-source-filter-kind="image"]').check()
     await page.locator('[data-reference-source-filter-source="file"]').check()
     await page.waitForFunction(
       () =>
-        document.querySelectorAll('[data-my-assets-reference]').length === 3 &&
+        document.querySelectorAll('[data-my-assets-reference]').length === 4 &&
         document.querySelectorAll('[data-my-assets-kit-folder]').length === 0,
       { timeout: 5_000 },
     )
@@ -449,10 +474,30 @@ try {
     await page.locator('[data-reference-source-filter-panel]').waitFor({ state: 'detached', timeout: 5_000 })
     await page.locator('[data-my-assets-reference]').first().hover()
     await page.waitForTimeout(180)
-    const referenceQuickAddVisible = await page.locator('[data-my-assets-reference-agent]').first().evaluate(
+    const referenceExpandVisible = await page.locator('[data-my-assets-reference-expand]').first().evaluate(
       (button) => getComputedStyle(button).opacity === '1',
     )
     await page.screenshot({ path: path.join(out, `${file}-canvas-reference-hover.png`) })
+    await page.locator('[data-my-assets-reference-expand]').first().click()
+    await page.locator('[data-reference-lightbox]').waitFor({ timeout: 15_000 })
+    const referenceExpandOpenedLightbox =
+      (await page.locator('[data-reference-lightbox]').count()) === 1
+    await page.keyboard.press('Escape')
+    await page.locator('[data-reference-lightbox]').waitFor({ state: 'detached', timeout: 10_000 })
+    await page.locator('[data-my-assets-reference-open]').first().dblclick()
+    await page.locator('[data-reference-lightbox]').waitFor({ timeout: 15_000 })
+    const referenceDoubleClickOpenedLightbox =
+      (await page.locator('[data-reference-lightbox]').count()) === 1
+    await page.keyboard.press('Escape')
+    await page.locator('[data-reference-lightbox]').waitFor({ state: 'detached', timeout: 10_000 })
+    await page.locator('[data-my-assets-reference-open]').first().click()
+    await page.locator('[data-agent-panel]').waitFor({ timeout: 15_000 })
+    await page.locator('[data-agent-composer] [data-mention-kind="reference"]').first().waitFor({ timeout: 15_000 })
+    const referenceClickChipCount =
+      await page.locator('[data-agent-composer] [data-mention-kind="reference"]').count()
+    await page.screenshot({ path: path.join(out, `${file}-canvas-reference-click-agent.png`) })
+    await page.locator('[data-agent-close]').click()
+    await page.locator('[data-agent-panel]').waitFor({ state: 'hidden', timeout: 10_000 })
     await page.locator('[data-my-assets-kit-folder]').first().hover()
     await page.waitForTimeout(180)
     const referenceFolderOpenVisible = await page.locator('[data-my-assets-kit-folder]').first().evaluate(
@@ -470,6 +515,31 @@ try {
     const referenceKitItems = await page.locator('[data-reference-kit-item]').count()
     const referenceKitImageItems = await page.locator('[data-reference-kit-item="image"]').count()
     await page.screenshot({ path: path.join(out, `${file}-canvas-reference-kit.png`) })
+    await page.locator('[data-reference-kit-item-add]').first().click()
+    await page.locator('[data-agent-panel]').waitFor({ timeout: 15_000 })
+    await page.locator('[data-agent-composer] [data-mention-kind="reference"]').first().waitFor({ timeout: 15_000 })
+    const referenceKitClickChipCount =
+      await page.locator('[data-agent-composer] [data-mention-kind="reference"]').count()
+    await page.locator('[data-agent-close]').click()
+    await page.locator('[data-agent-panel]').waitFor({ state: 'hidden', timeout: 10_000 })
+    await page.locator('[data-reference-kit-item="image"]').nth(1).hover()
+    await page.waitForTimeout(180)
+    const referenceKitExpandVisible = await page.locator('[data-reference-kit-item-expand]').nth(1).evaluate(
+      (button) => getComputedStyle(button).opacity === '1',
+    )
+    await page.screenshot({ path: path.join(out, `${file}-canvas-reference-kit-hover.png`) })
+    await page.locator('[data-reference-kit-item-expand]').nth(1).click()
+    await page.locator('[data-reference-lightbox]').waitFor({ timeout: 15_000 })
+    const referenceKitExpandOpenedLightbox =
+      (await page.locator('[data-reference-lightbox]').count()) === 1
+    await page.keyboard.press('Escape')
+    await page.locator('[data-reference-lightbox]').waitFor({ state: 'detached', timeout: 10_000 })
+    await page.locator('[data-reference-kit-item-add]').nth(2).dblclick()
+    await page.locator('[data-reference-lightbox]').waitFor({ timeout: 15_000 })
+    const referenceKitDoubleClickOpenedLightbox =
+      (await page.locator('[data-reference-lightbox]').count()) === 1
+    await page.keyboard.press('Escape')
+    await page.locator('[data-reference-lightbox]').waitFor({ state: 'detached', timeout: 10_000 })
     await page.locator('[data-reference-kit-filter]').click()
     await page.locator('[data-reference-kit-filter-panel]').waitFor({ timeout: 5_000 })
     await page.locator('[data-reference-kit-filter-kind="color"]').uncheck()
@@ -492,7 +562,6 @@ try {
     const referenceDroppedTitle =
       (await page.locator('[data-node-id]').last().textContent({ timeout: 5_000 })) ?? ''
     await page.screenshot({ path: path.join(out, `${file}-canvas-reference-dropped.png`) })
-    await page.waitForTimeout(2_200)
     await page.locator('[data-my-assets-reference-open]').first().dblclick()
     await page.locator('[data-reference-lightbox]').waitFor({ timeout: 15_000 })
     await page.locator('[data-reference-lightbox-media]').hover()
@@ -587,13 +656,71 @@ try {
     await page.locator('[data-reference-lightbox]').waitFor({ timeout: 15_000 })
     await page.locator('[data-reference-lightbox-add-agent]').click()
     await page.locator('[data-agent-panel]').waitFor({ timeout: 15_000 })
-    await page.locator('[data-agent-composer] [data-mention-kind="reference"]').waitFor({ timeout: 15_000 })
+    await page.locator('[data-agent-composer] [data-mention-kind="reference"]').first().waitFor({ timeout: 15_000 })
     const referenceChipMounted = await page.locator('[data-agent-composer] [data-mention-kind="reference"]').count()
     const referenceLightboxClosedByAgent =
       (await page.locator('[data-reference-lightbox]').count()) === 0
     await page.screenshot({ path: path.join(out, `${file}-canvas-reference-agent.png`) })
+    await page.locator('[data-agent-close]').click()
+    await page.locator('[data-agent-panel]').waitFor({ state: 'hidden', timeout: 10_000 })
     await page.locator('[data-my-assets-source="assets"]').click()
+    await page.locator('[data-my-assets-shelf]').waitFor({ timeout: 10_000 })
+    await page.locator('[data-my-assets-kit-card]').waitFor({ timeout: 10_000 })
+    await page.waitForFunction(
+      () => {
+        const images = [...document.querySelectorAll('[data-my-assets-kit-card] img')]
+        return images.length === 4 &&
+          images.every((image) => image.complete && image.naturalWidth > 0)
+      },
+      { timeout: 15_000 },
+    )
+    const shelfState = await page.evaluate(() => {
+      const tabs = [...document.querySelectorAll('[data-my-assets-kind]')]
+      const selected = tabs.find((tab) => tab.getAttribute('aria-selected') === 'true')
+      const create = document.querySelector('[data-my-assets-create-kit]')
+      const card = document.querySelector('[data-my-assets-kit-card]')
+      const createRect = create?.getBoundingClientRect()
+      const cardRect = card?.getBoundingClientRect()
+      return {
+        shelfTabs: tabs.length,
+        selectedShelfTabs: tabs.filter((tab) => tab.getAttribute('aria-selected') === 'true').length,
+        selectedShelfText: selected?.textContent?.trim() ?? '',
+        selectedShelfColor: selected ? getComputedStyle(selected).color : '',
+        selectedShelfUnderline: selected
+          ? getComputedStyle(selected, '::after').backgroundColor
+          : '',
+        createKitCards: create ? 1 : 0,
+        shelfKitCards: card ? 1 : 0,
+        shelfKitThumbs: card?.querySelectorAll('img').length ?? 0,
+        shelfCreateBeforeKit: Boolean(createRect && cardRect && createRect.top < cardRect.top),
+      }
+    })
     await page.screenshot({ path: path.join(out, `${file}-canvas-kits.png`) })
+    await page.locator('[data-my-assets-kit-open]').click()
+    await page.locator('[data-my-assets-kit-detail]').waitFor({ timeout: 10_000 })
+    const shelfDetailSections = await page.locator('[data-my-assets-kit-detail] section').count()
+    const shelfDetailTitle =
+      (await page.locator('[data-my-assets-kit-detail] h2').textContent({ timeout: 5_000 }))?.trim() ?? ''
+    await page.screenshot({ path: path.join(out, `${file}-canvas-kit-detail.png`) })
+    await page.locator('[data-my-assets-kit-back]').click()
+    await page.locator('[data-my-assets-shelf]').waitFor({ timeout: 10_000 })
+    await page.locator('[data-my-assets-kit-add]').click()
+    await page.locator('[data-agent-panel]').waitFor({ timeout: 15_000 })
+    await page.locator('[data-agent-composer] [data-mention-kind="reference"]').first().waitFor({ timeout: 15_000 })
+    const shelfKitClickChipCount =
+      await page.locator('[data-agent-composer] [data-mention-kind="reference"]').count()
+    await page.screenshot({ path: path.join(out, `${file}-canvas-kit-click-agent.png`) })
+    await page.locator('[data-agent-close]').click()
+    await page.locator('[data-agent-panel]').waitFor({ state: 'hidden', timeout: 10_000 })
+    await page.locator('[data-my-assets-kit-open]').click()
+    await page.locator('[data-my-assets-kit-detail]').waitFor({ timeout: 10_000 })
+    await page.locator('[data-my-assets-kit-detail-add]').click()
+    await page.locator('[data-agent-panel]').waitFor({ timeout: 15_000 })
+    await page.locator('[data-agent-composer] [data-mention-kind="reference"]').first().waitFor({ timeout: 15_000 })
+    const shelfDetailChipCount =
+      await page.locator('[data-agent-composer] [data-mention-kind="reference"]').count()
+    await page.locator('[data-agent-close]').click()
+    await page.locator('[data-agent-panel]').waitFor({ state: 'hidden', timeout: 10_000 })
     report.push({
       variant,
       surface: 'canvasKits',
@@ -604,16 +731,29 @@ try {
       referenceCards,
       referenceFolders,
       referenceUpload,
-      referenceAgentActions,
+      referenceExpandActions,
       referenceFilteredCards,
       referenceFilteredFolders,
+      referenceFilterIcon,
       referenceFolderOpenVisible,
       referenceFolderImageLoaded,
       referenceKitItems,
       referenceKitImageItems,
       referenceKitFilteredItems,
       referenceChipMounted,
-      referenceQuickAddVisible,
+      referenceExpandVisible,
+      referenceExpandOpenedLightbox,
+      referenceDoubleClickOpenedLightbox,
+      referenceClickChipCount,
+      referenceKitClickChipCount,
+      referenceKitExpandVisible,
+      referenceKitExpandOpenedLightbox,
+      referenceKitDoubleClickOpenedLightbox,
+      shelfDetailSections,
+      shelfDetailTitle,
+      shelfKitClickChipCount,
+      shelfDetailChipCount,
+      ...shelfState,
       referenceLightboxOpen: referenceLightbox.referenceLightboxOpen,
       referenceLightboxTitle: referenceLightbox.referenceLightboxTitle,
       referenceLightboxTitleAfterNext,

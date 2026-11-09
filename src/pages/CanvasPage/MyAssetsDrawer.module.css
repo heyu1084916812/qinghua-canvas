@@ -45,41 +45,38 @@
 
 .close:focus-visible,
 .tab:focus-visible,
-.kitAction:focus-visible {
+.tabOn:focus-visible {
   outline: 1px solid var(--stroke-focus);
   outline-offset: 1px;
 }
 
 .tabs {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: var(--space-1);
-  padding: var(--space-3) var(--space-4);
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  padding: 0 var(--space-4);
   border-bottom: 1px solid var(--stroke);
 }
 
 .tab,
 .tabOn {
   min-width: 0;
-  min-height: 32px;
-  padding: 0 var(--space-2);
-  border: 1px solid transparent;
-  border-radius: var(--radius-control);
+  min-height: 42px;
+  padding: 0;
+  border: 0;
   background: transparent;
-  color: var(--text-2);
+  color: var(--text-3);
   font: inherit;
   font-size: var(--fs-chip);
   cursor: pointer;
 }
 
 .tab:hover {
-  background: var(--bg-hover);
   color: var(--text-1);
 }
 
 .tabOn {
-  border-color: var(--stroke);
-  background: var(--bg-hover);
+  box-shadow: inset 0 -1px var(--text-1);
   color: var(--text-1);
   font-weight: var(--fw-title);
 }
@@ -104,28 +101,6 @@
   font-size: var(--fs-chip);
 }
 
-.kitAction {
-  min-height: 30px;
-  padding: 0 var(--space-3);
-  border: 1px solid var(--stroke);
-  border-radius: var(--radius-control);
-  background: transparent;
-  color: var(--text-1);
-  font: inherit;
-  font-size: var(--fs-chip);
-  cursor: pointer;
-}
-
-.kitAction:hover {
-  background: var(--bg-hover);
-}
-
-.kitAction:disabled {
-  color: var(--text-3);
-  cursor: default;
-}
-
-.empty,
 .notice {
   margin: 0;
   padding: var(--space-4);
@@ -134,54 +109,6 @@
   color: var(--text-2);
   font-size: var(--fs-chip);
   line-height: 1.6;
-}
-
-.kitList {
-  display: grid;
-  gap: var(--space-2);
-}
-
-.kitCard {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-3);
-  min-width: 0;
-  padding: var(--space-3);
-  border: 1px solid var(--stroke);
-  border-radius: var(--radius-control);
-  background: var(--bg-subtle);
-}
-
-.kitName {
-  min-width: 0;
-  overflow: hidden;
-  color: var(--text-1);
-  font-size: var(--fs-label);
-  font-weight: var(--fw-title);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.kitMeta {
-  flex: 0 0 auto;
-  color: var(--text-3);
-  font-size: var(--fs-chip);
-}
-
-.kinds {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-2);
-  margin-bottom: var(--space-4);
-}
-
-.kind {
-  padding: var(--space-1) var(--space-2);
-  border: 1px solid var(--stroke);
-  border-radius: var(--radius-control);
-  color: var(--text-2);
-  font-size: var(--fs-chip);
 }
 
 .embeddedPinterest {

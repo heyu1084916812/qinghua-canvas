@@ -615,14 +615,13 @@ export function IconSettings(props: IconProps) {
   )
 }
 
-/** 筛选与排序：三条带滑块的横线，对应参考栏右上角入口。 */
+/** 筛选与排序：两条带滑块的横线，对应参考栏右上角入口。 */
 export function IconSliders(props: IconProps) {
   return (
     <Svg {...props}>
-      <path d="M4 7h4M12 7h8M4 12h10M18 12h2M4 17h3M11 17h9" />
-      <circle cx="10" cy="7" r="2" />
-      <circle cx="16" cy="12" r="2" />
-      <circle cx="9" cy="17" r="2" />
+      <path d="M4 8h5M14 8h6M4 16h9M18 16h2" />
+      <circle cx="11.5" cy="8" r="2" />
+      <circle cx="15.5" cy="16" r="2" />
     </Svg>
   )
 }

@@ -1,5 +1,13 @@
 # CanvasFlow（轻画）项目记忆
 
+### 总管2 第四十二轮：参考与套件卡交互、我的素材货架（2026-11-10）
+
+- 图片卡统一单击延迟 220ms 加入 Agent，双击必须在同一计时器上取消防单击再开灯箱；右上放大按钮等价双击。参考图和套件内图片适用，颜色/字体不适用。不要给图片主按钮留原生 `title`，否则悬停提示会盖住筛选区和标题。
+- 我的素材必须走 `MyAssetsShelf`，不要回填进 `MyAssetsDrawer`。分类是文字加下划线，创建套件虚线卡在套件卡前，套件卡含名称、四格缩略图、右上箭头；主体点击加套件 chip，箭头只进详情。套件卡与套件图片通过 `features/canvas/kitReference.ts` 投影稳定项目参考。
+- `ReferenceKitPanel` 只编排套件版本和 Agent/灯箱动作，条目和筛选在 `ReferenceKitItems`；样式也按 `ReferenceKitPanel.module.css` 与 `ReferenceKitItems.module.css` 分域，避免 269 行宿主和 215 行 CSS 各写一坨。
+- UI 证据脚本必须每次清理自己的隔离 store，否则重复跑会把旧素材混进四格缩略图。四组 1440×900 / 1024×700 × 明暗验证 `referenceCards=4 / referenceKitItems=6 / shelfKitThumbs=4 / detailSections=5`，所有点击与灯箱命中、子元素越界 0、页面错误 0。
+- 最终门禁：check 1113 modules / 4456 deps / 257 registrations，串行 Vitest 651 files（650 passed / 1 skipped）/ 5442 tests（5441 passed / 1 skipped），build 1245 modules，Impeccable detector 0 findings。未 push。
+
 ### 总管2 第四十一轮：实点 Lovart 侧栏与参考筛选器（2026-11-09）
 
 - 已用已登录 Chrome 实际进入 Lovart 项目 `2vdv9ijnxs74` 并点击四个侧栏。参考筛选器固定为“来源：文件/链接/资产/连接器 + 类型：图片/视频/文档/颜色/字体/音频”，默认全不选；轻画现按组内 OR、组间 AND 映射真实 `ReferenceItem`，套件文件夹按资产来源处理，选择具体类型时隐藏。
