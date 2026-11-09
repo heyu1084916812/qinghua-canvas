@@ -6441,6 +6441,149 @@
         "src/domain/shared/threeDCapability.test.ts"
       ],
       "budget": 80
+    },
+    {
+      "module": "src/app/ContextKitsDialogHost.tsx",
+      "owner": "context-kit-shell-host",
+      "responsibility": "在应用壳层管理品牌套件弹窗的打开事件与 lazy 挂载边界。",
+      "owns": [
+        "品牌套件弹窗事件订阅与关闭状态",
+        "ContextKitsDialog 的异步加载边界"
+      ],
+      "doesNotOwn": [
+        "套件领域模型和持久化",
+        "画布或素材页页面状态"
+      ],
+      "publicApi": [
+        "ContextKitsDialogHost"
+      ],
+      "test": [
+        "src/app/uiSevenPoints.test.ts"
+      ],
+      "budget": 45
+    },
+    {
+      "module": "src/features/shared/project/NewProjectChoice.tsx",
+      "owner": "new-project-choice-ui",
+      "responsibility": "展示画布、电商和漫剧三种新建项目工作区选择。",
+      "owns": [
+        "新建项目选择弹窗文案与三个工作区选项",
+        "选择和关闭的用户可见交互"
+      ],
+      "doesNotOwn": [
+        "项目创建与路由导航",
+        "工作区注册和项目仓储"
+      ],
+      "publicApi": [
+        "NewProjectChoice"
+      ],
+      "test": [
+        "src/app/uiSevenPoints.test.ts"
+      ],
+      "budget": 80
+    },
+    {
+      "module": "src/features/shared/project/NewProjectChoiceHost.tsx",
+      "owner": "new-project-choice-host",
+      "responsibility": "作为应用壳层的新建项目选择宿主，按用户选择创建项目并进入对应工作区。",
+      "owns": [
+        "新建项目选择状态的壳级订阅",
+        "项目创建后的路由跳转"
+      ],
+      "doesNotOwn": [
+        "弹窗视觉结构和文案",
+        "项目仓储内部事务"
+      ],
+      "publicApi": [
+        "NewProjectChoiceHost"
+      ],
+      "test": [
+        "src/app/uiSevenPoints.test.ts"
+      ],
+      "budget": 60
+    },
+    {
+      "module": "src/features/shared/project/NewProjectChoice.module.css",
+      "owner": "new-project-choice-style",
+      "responsibility": "定义新建项目选择弹窗的遮罩、面板、页头和选项局部样式。",
+      "owns": [
+        "选择弹窗间距、层级与明暗主题令牌复用"
+      ],
+      "doesNotOwn": [
+        "全局主题令牌定义",
+        "其他页面布局和组件样式"
+      ],
+      "publicApi": [
+        "CSS_MODULE:新建项目工作区选择弹窗"
+      ],
+      "test": [
+        "src/app/uiSevenPoints.test.ts"
+      ],
+      "budget": 120
+    },
+    {
+      "module": "src/state/ui/newProjectChoice.ts",
+      "owner": "new-project-choice-state",
+      "responsibility": "维护新建项目选择弹窗的模块级开关与订阅通知。",
+      "owns": [
+        "打开、关闭与当前打开的只读状态",
+        "订阅者注册与释放"
+      ],
+      "doesNotOwn": [
+        "项目创建和页面导航",
+        "React 弹窗渲染"
+      ],
+      "publicApi": [
+        "requestNewProjectChoice",
+        "closeNewProjectChoice",
+        "getNewProjectChoiceOpen",
+        "subscribeNewProjectChoice"
+      ],
+      "test": [
+        "src/app/uiSevenPoints.test.ts"
+      ],
+      "budget": 60
+    },
+    {
+      "module": "src/state/ui/contextKitsDialog.ts",
+      "owner": "context-kit-dialog-state",
+      "responsibility": "提供品牌套件弹窗的跨页面打开事件与订阅清理。",
+      "owns": [
+        "品牌套件弹窗打开事件名与订阅生命周期"
+      ],
+      "doesNotOwn": [
+        "弹窗显隐状态与视觉渲染",
+        "套件数据读写"
+      ],
+      "publicApi": [
+        "openContextKitsDialog",
+        "subscribeContextKitsDialog"
+      ],
+      "test": [
+        "src/app/uiSevenPoints.test.ts"
+      ],
+      "budget": 35
+    },
+    {
+      "module": "src/features/settings/cliOutputText.ts",
+      "owner": "cli-output-text",
+      "responsibility": "在 CLI 输出进入界面前清理替换符、控制字符和 ANSI 颜色序列。",
+      "owns": [
+        "不可显示字符与 CSI/OSC 序列过滤",
+        "空可读输出的文案回退"
+      ],
+      "doesNotOwn": [
+        "CLI 子进程编码探测",
+        "面板状态和输出排版"
+      ],
+      "publicApi": [
+        "readableCliOutput",
+        "hasReadableCliOutput"
+      ],
+      "test": [
+        "src/features/settings/cliOutputText.test.ts"
+      ],
+      "budget": 35
     }
   ]
 }

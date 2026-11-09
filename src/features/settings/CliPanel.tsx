@@ -21,6 +21,7 @@ import {
 } from './cliPanelPresentation'
 import { cliKeyLoginResult } from './cliKeyLoginResult'
 import { cliWindowFollowUp, type CliWindowFlow } from './cliWindowFollowUp'
+import { hasReadableCliOutput, readableCliOutput } from './cliOutputText'
 import styles from './CliPanel.module.css'
 
 /**
@@ -762,12 +763,16 @@ function describeOutcome(out: CliOutcome): string {
  * 「Logged in using an API key - ***」）打在 stderr 上 —— 只看 stdout 会误判成"什么都没输出"。
  */
 function describeRun(head: string, out: CliOutcome): string {
+  const stdout = readableCliOutput(out.stdout)
+  const stderr = readableCliOutput(out.stderr)
+  const hasStdout = hasReadableCliOutput(out.stdout)
+  const hasStderr = hasReadableCliOutput(out.stderr)
   return [
     head,
     describeOutcome(out),
-    out.stdout.trim() ? `— 输出 —\n${tail(out.stdout)}` : '',
-    out.stderr.trim() ? `— stderr —\n${tail(out.stderr)}` : '',
-    !out.stdout.trim() && !out.stderr.trim() ? '（没有任何输出）' : '',
+    hasStdout ? `— 输出 —\n${tail(stdout)}` : '',
+    hasStderr ? `— stderr —\n${tail(stderr)}` : '',
+    !hasStdout && !hasStderr ? '（没有任何可读输出）' : '',
   ]
     .filter(Boolean)
     .join('\n')

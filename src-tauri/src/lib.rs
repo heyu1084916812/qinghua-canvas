@@ -30,6 +30,7 @@ use tauri_plugin_opener::OpenerExt;
 use tauri_plugin_updater::UpdaterExt;
 
 mod canvas_gateway;
+mod cli_output_tests;
 mod pinterest_oauth;
 
 /// 「选一个目录当素材文件夹」：弹系统目录选择框 → 把该目录**递归**加进 fs 作用域 → 返回绝对路径。
@@ -3057,12 +3058,166 @@ fn run_cli_blocking(
 
     Ok(CliOutcome {
         code,
-        stdout: tail_of(String::from_utf8_lossy(&stdout).to_string(), CLI_MAX_OUTPUT),
-        stderr: tail_of(String::from_utf8_lossy(&stderr).to_string(), CLI_MAX_OUTPUT),
+        stdout: decode_cli_output(&stdout),
+        stderr: decode_cli_output(&stderr),
         timed_out,
         cancelled,
         ms: started.elapsed().as_millis() as u64,
     })
+}
+
+/// Windows CLI 可能输出 UTF-8、带或不带 BOM 的 UTF-16、系统 ANSI/GBK，以及 ANSI 色码；
+/// 一律按 UTF-8 解会把中文和彩色控制序列变成菱形乱码。
+pub(crate) fn decode_cli_output(bytes: &[u8]) -> String {
+    let decoded = if bytes.starts_with(&[0xFF, 0xFE]) {
+        decode_utf16(&bytes[2..], true)
+    } else if bytes.starts_with(&[0xFE, 0xFF]) {
+        decode_utf16(&bytes[2..], false)
+    } else if let Some(text) = decode_utf16_without_bom(bytes) {
+        text
+    } else if let Ok(utf8) = std::str::from_utf8(bytes) {
+        utf8.to_string()
+    } else {
+        decode_windows_ansi(bytes).unwrap_or_else(|| String::from_utf8_lossy(bytes).to_string())
+    };
+    tail_of(clean_cli_text(&decoded), CLI_MAX_OUTPUT)
+}
+
+fn decode_utf16(bytes: &[u8], little_endian: bool) -> String {
+    let units: Vec<u16> = bytes
+        .chunks_exact(2)
+        .map(|pair| {
+            if little_endian {
+                u16::from_le_bytes([pair[0], pair[1]])
+            } else {
+                u16::from_be_bytes([pair[0], pair[1]])
+            }
+        })
+        .collect();
+    String::from_utf16_lossy(&units)
+}
+
+/// PowerShell / CMD 重定向时常见无 BOM 的 UTF-16LE：ASCII 字符之间夹着 NUL。
+/// 只在高比例间隔 NUL 且解码没有替换符时采用，避免把普通二进制误判成文本。
+fn decode_utf16_without_bom(bytes: &[u8]) -> Option<String> {
+    if bytes.len() < 4 || bytes.len() % 2 != 0 {
+        return None;
+    }
+    let even_nul = bytes.iter().step_by(2).filter(|byte| **byte == 0).count();
+    let odd_nul = bytes
+        .iter()
+        .skip(1)
+        .step_by(2)
+        .filter(|byte| **byte == 0)
+        .count();
+    let half = bytes.len() / 2;
+    let (little_endian, nul_count) = if odd_nul >= half / 3 && even_nul <= odd_nul / 4 {
+        (true, odd_nul)
+    } else if even_nul >= half / 3 && odd_nul <= even_nul / 4 {
+        (false, even_nul)
+    } else {
+        return None;
+    };
+    if nul_count == 0 {
+        return None;
+    }
+    let text = decode_utf16(bytes, little_endian);
+    let readable = text
+        .chars()
+        .filter(|ch| ch.is_ascii_graphic() || ch.is_ascii_whitespace() || !ch.is_ascii())
+        .count();
+    if text.contains('\u{FFFD}') || readable < 2 {
+        return None;
+    }
+    Some(text)
+}
+
+/// 去掉 CSI / OSC 颜色序列和不可见控制符，保留换行、制表与回车。
+fn clean_cli_text(text: &str) -> String {
+    let chars: Vec<char> = text.chars().collect();
+    let mut out = String::with_capacity(text.len());
+    let mut i = 0;
+    while i < chars.len() {
+        if chars[i] == '\u{1b}' {
+            i += 1;
+            if i >= chars.len() {
+                break;
+            }
+            if chars[i] == '[' {
+                i += 1;
+                while i < chars.len() && !('@'..='~').contains(&chars[i]) {
+                    i += 1;
+                }
+                i += usize::from(i < chars.len());
+                continue;
+            }
+            if chars[i] == ']' {
+                i += 1;
+                while i < chars.len() && chars[i] != '\u{7}' && chars[i] != '\u{1b}' {
+                    i += 1;
+                }
+                if i < chars.len() && chars[i] == '\u{1b}' && i + 1 < chars.len() {
+                    i += 2;
+                } else {
+                    i += usize::from(i < chars.len());
+                }
+                continue;
+            }
+            if i < chars.len() {
+                i += 1;
+            }
+            continue;
+        }
+        let ch = chars[i];
+        if ch == '\n' || ch == '\r' || ch == '\t' || !ch.is_control() {
+            out.push(ch);
+        }
+        i += 1;
+    }
+    out
+}
+
+#[cfg(windows)]
+fn decode_windows_ansi(bytes: &[u8]) -> Option<String> {
+    #[link(name = "kernel32")]
+    unsafe extern "system" {
+        fn GetACP() -> u32;
+        fn MultiByteToWideChar(
+            code_page: u32,
+            flags: u32,
+            multi_byte_str: *const u8,
+            multi_byte_len: i32,
+            wide_char_str: *mut u16,
+            wide_char_len: i32,
+        ) -> i32;
+    }
+    unsafe {
+        let page = GetACP();
+        let len = i32::try_from(bytes.len()).ok()?;
+        let needed = MultiByteToWideChar(page, 0, bytes.as_ptr(), len, std::ptr::null_mut(), 0);
+        if needed <= 0 {
+            return None;
+        }
+        let mut wide = vec![0u16; needed as usize];
+        let written = MultiByteToWideChar(
+            page,
+            0,
+            bytes.as_ptr(),
+            len,
+            wide.as_mut_ptr(),
+            needed,
+        );
+        if written <= 0 {
+            return None;
+        }
+        wide.truncate(written as usize);
+        Some(String::from_utf16_lossy(&wide))
+    }
+}
+
+#[cfg(not(windows))]
+fn decode_windows_ansi(_bytes: &[u8]) -> Option<String> {
+    None
 }
 
 // ── 本机 CLI 的产物文件 ──
