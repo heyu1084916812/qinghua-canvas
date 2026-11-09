@@ -430,6 +430,23 @@ try {
       }
     })
     await page.screenshot({ path: path.join(out, `${file}-canvas-reference.png`) })
+    await page.locator('[data-reference-source-filter]').click()
+    await page.locator('[data-reference-source-filter-panel]').waitFor({ timeout: 5_000 })
+    await page.locator('[data-reference-source-filter-kind="image"]').check()
+    await page.locator('[data-reference-source-filter-source="file"]').check()
+    await page.waitForFunction(
+      () =>
+        document.querySelectorAll('[data-my-assets-reference]').length === 3 &&
+        document.querySelectorAll('[data-my-assets-kit-folder]').length === 0,
+      { timeout: 5_000 },
+    )
+    const referenceFilteredCards = await page.locator('[data-my-assets-reference]').count()
+    const referenceFilteredFolders = await page.locator('[data-my-assets-kit-folder]').count()
+    await page.screenshot({ path: path.join(out, `${file}-canvas-reference-filter.png`) })
+    await page.locator('[data-reference-source-filter-kind="image"]').uncheck()
+    await page.locator('[data-reference-source-filter-source="file"]').uncheck()
+    await page.locator('[data-reference-source-filter]').click()
+    await page.locator('[data-reference-source-filter-panel]').waitFor({ state: 'detached', timeout: 5_000 })
     await page.locator('[data-my-assets-reference]').first().hover()
     await page.waitForTimeout(180)
     const referenceQuickAddVisible = await page.locator('[data-my-assets-reference-agent]').first().evaluate(
@@ -588,6 +605,8 @@ try {
       referenceFolders,
       referenceUpload,
       referenceAgentActions,
+      referenceFilteredCards,
+      referenceFilteredFolders,
       referenceFolderOpenVisible,
       referenceFolderImageLoaded,
       referenceKitItems,

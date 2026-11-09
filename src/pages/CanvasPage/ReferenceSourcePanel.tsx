@@ -1,7 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { usePlatform } from '../../app/providers/PlatformProvider'
 import type { ContextKit, ContextKitVersion } from '../../domain/shared/context'
-import type { ReferenceItem } from '../../domain/project/referenceLedger'
+import type {
+  ReferenceItem,
+  ReferenceKind,
+  ReferenceSource,
+} from '../../domain/project/referenceLedger'
 import { sendReferenceToAgent } from '../../features/canvas/agentHandoff'
 import { setReferenceDragData } from '../../features/canvas/dropImport'
 import { importAssetFile, IMPORT_ACCEPT } from '../../features/canvas/importAsset'
@@ -10,13 +14,32 @@ import { createContextRepository } from '../../state/shared/contextRepository'
 import { createReferenceLedgerRepository } from '../../state/project/referenceLedgerRepository'
 import type { CanvasStore } from '../../state/workbenches/canvas/store'
 import { createId } from '../../shared/id'
-import { IconPlus, IconSpinner } from '../../workbenches/canvas/toolbar/icons'
+import { IconPlus, IconSliders, IconSpinner } from '../../workbenches/canvas/toolbar/icons'
 import { KIT_KINDS } from '../AssetsPage/contextKitDraft'
 import { MasonryGrid } from '../AssetsPage/MasonryGrid'
 import { ReferenceLightbox } from './ReferenceLightbox'
 import { ReferenceKitPanel } from './ReferenceKitPanel'
 import { ReferenceMedia } from './ReferenceMedia'
 import styles from './ReferenceSourcePanel.module.css'
+
+type SourceFilter = 'file' | 'link' | 'asset' | 'connector'
+type KindFilter = 'image' | 'video' | 'document' | 'color' | 'font' | 'audio'
+
+const SOURCE_FILTERS: readonly { value: SourceFilter; label: string }[] = [
+  { value: 'file', label: '文件' },
+  { value: 'link', label: '链接' },
+  { value: 'asset', label: '资产' },
+  { value: 'connector', label: '连接器' },
+]
+
+const KIND_FILTERS: readonly { value: KindFilter; label: string }[] = [
+  { value: 'image', label: '图片' },
+  { value: 'video', label: '视频' },
+  { value: 'document', label: '文档' },
+  { value: 'color', label: '颜色' },
+  { value: 'font', label: '字体' },
+  { value: 'audio', label: '音频' },
+]
 
 export function ReferenceSourcePanel({
   projectId,
@@ -41,6 +64,9 @@ export function ReferenceSourcePanel({
   const [versions, setVersions] = useState<Record<string, ContextKitVersion | null>>({})
   const [lightboxId, setLightboxId] = useState<string | null>(null)
   const [selectedKitId, setSelectedKitId] = useState<string | null>(null)
+  const [filterOpen, setFilterOpen] = useState(false)
+  const [sourceFilters, setSourceFilters] = useState<Set<SourceFilter>>(new Set())
+  const [kindFilters, setKindFilters] = useState<Set<KindFilter>>(new Set())
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
 
@@ -101,6 +127,12 @@ export function ReferenceSourcePanel({
   }
 
   const selectedKit = kits.find((kit) => kit.id === selectedKitId) ?? null
+  const visibleReferences = references.filter((item) =>
+    matchesReferenceFilters(item, sourceFilters, kindFilters),
+  )
+  const visibleKits = (sourceFilters.size === 0 || sourceFilters.has('asset')) && kindFilters.size === 0
+    ? kits
+    : []
   if (selectedKit) {
     return (
       <ReferenceKitPanel
@@ -111,12 +143,70 @@ export function ReferenceSourcePanel({
     )
   }
 
+  const toggleSource = (value: SourceFilter) => {
+    setSourceFilters((current) => toggledSet(current, value))
+  }
+  const toggleKind = (value: KindFilter) => {
+    setKindFilters((current) => toggledSet(current, value))
+  }
+
   return (
-    <div className={styles.panel} data-reference-source-panel>
+    <div
+      className={styles.panel}
+      data-reference-source-panel
+      onKeyDown={(event) => {
+        if (event.key === 'Escape' && filterOpen) {
+          event.stopPropagation()
+          setFilterOpen(false)
+        }
+      }}
+    >
       <div className={styles.subhead}>
         <span>当前项目的参考</span>
-        <span>{references.length + kits.length} 项</span>
+        <button
+          type="button"
+          className={styles.filterButton}
+          data-reference-source-filter
+          aria-label="筛选和排序参考素材"
+          title="筛选和排序参考素材"
+          aria-expanded={filterOpen}
+          onClick={() => setFilterOpen((current) => !current)}
+        >
+          <IconSliders size={17} />
+        </button>
       </div>
+      {filterOpen ? (
+        <div className={styles.filters} data-reference-source-filter-panel>
+          <fieldset>
+            <legend>按来源</legend>
+            {SOURCE_FILTERS.map((option) => (
+              <label key={option.value}>
+                <input
+                  type="checkbox"
+                  data-reference-source-filter-source={option.value}
+                  checked={sourceFilters.has(option.value)}
+                  onChange={() => toggleSource(option.value)}
+                />
+                {option.label}
+              </label>
+            ))}
+          </fieldset>
+          <fieldset>
+            <legend>按类型</legend>
+            {KIND_FILTERS.map((option) => (
+              <label key={option.value}>
+                <input
+                  type="checkbox"
+                  data-reference-source-filter-kind={option.value}
+                  checked={kindFilters.has(option.value)}
+                  onChange={() => toggleKind(option.value)}
+                />
+                {option.label}
+              </label>
+            ))}
+          </fieldset>
+        </div>
+      ) : null}
       <input
         ref={inputRef}
         type="file"
@@ -139,7 +229,7 @@ export function ReferenceSourcePanel({
         >
           {busy ? <IconSpinner size={24} /> : <IconPlus size={30} />}
         </button>
-        {references.map((item) => (
+        {visibleReferences.map((item) => (
           <article
             className={styles.referenceCard}
             data-my-assets-reference={item.id}
@@ -185,7 +275,7 @@ export function ReferenceSourcePanel({
             </div>
           </article>
         ))}
-        {kits.map((kit) => (
+        {visibleKits.map((kit) => (
           <KitFolder
             key={kit.id}
             kit={kit}
@@ -205,6 +295,34 @@ export function ReferenceSourcePanel({
       ) : null}
     </div>
   )
+}
+
+function referenceSourceFilter(source: ReferenceSource): SourceFilter {
+  if (source === 'file') return 'file'
+  if (source === 'link' || source === 'webFetch' || source === 'search') return 'link'
+  if (source === 'asset' || source === 'kit') return 'asset'
+  return 'connector'
+}
+
+function referenceKindFilter(kind: ReferenceKind): KindFilter {
+  return kind === 'text' ? 'document' : kind
+}
+
+function matchesReferenceFilters(
+  item: ReferenceItem,
+  sources: ReadonlySet<SourceFilter>,
+  kinds: ReadonlySet<KindFilter>,
+): boolean {
+  const sourceMatches = sources.size === 0 || sources.has(referenceSourceFilter(item.source))
+  const kindMatches = kinds.size === 0 || kinds.has(referenceKindFilter(item.kind))
+  return sourceMatches && kindMatches
+}
+
+function toggledSet<T>(current: ReadonlySet<T>, value: T): Set<T> {
+  const next = new Set(current)
+  if (next.has(value)) next.delete(value)
+  else next.add(value)
+  return next
 }
 
 function KitFolder({

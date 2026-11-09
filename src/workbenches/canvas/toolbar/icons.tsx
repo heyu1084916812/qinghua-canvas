@@ -615,6 +615,18 @@ export function IconSettings(props: IconProps) {
   )
 }
 
+/** 筛选与排序：三条带滑块的横线，对应参考栏右上角入口。 */
+export function IconSliders(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path d="M4 7h4M12 7h8M4 12h10M18 12h2M4 17h3M11 17h9" />
+      <circle cx="10" cy="7" r="2" />
+      <circle cx="16" cy="12" r="2" />
+      <circle cx="9" cy="17" r="2" />
+    </Svg>
+  )
+}
+
 /** 关闭 / 移除：叉（标签上的「✕」也用它，字号不再决定形状） */
 export function IconClose(props: IconProps) {
   return (

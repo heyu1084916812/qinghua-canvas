@@ -1,5 +1,11 @@
 # CanvasFlow（轻画）项目记忆
 
+### 总管2 第四十一轮：实点 Lovart 侧栏与参考筛选器（2026-11-09）
+
+- 已用已登录 Chrome 实际进入 Lovart 项目 `2vdv9ijnxs74` 并点击四个侧栏。参考筛选器固定为“来源：文件/链接/资产/连接器 + 类型：图片/视频/文档/颜色/字体/音频”，默认全不选；轻画现按组内 OR、组间 AND 映射真实 `ReferenceItem`，套件文件夹按资产来源处理，选择具体类型时隐藏。
+- 实点还确认：我的素材是横向套件卡 + 缩略图带 + 箭头详情，卡片主点击加套件 chip，箭头进详情（描述/Logo/颜色/字体/照片/底部添加到对话）；Pinterest 有 Pins/Boards、刷新和版权说明；Lovart Clipper 有全部/未分类、加号/筛选和安装空态。轻画只有参考栏基本对齐，后三项仍是明确缺口，不要误称全部完成。
+- 本轮最终门禁：check 1108 modules / 4430 deps / 252 registrations，串行 Vitest 649 files / 5439 tests（1 skipped），build 1240 modules，Impeccable detector 0 findings；参考筛选四组 `referenceFilteredCards=3 / referenceFilteredFolders=0`。
+
 ### 总管2 第四十轮：Lovart 参考卡片与套件文件夹（2026-11-09）
 
 - 参考栏卡片必须由 `ReferenceSourcePanel` 组合，不要再塞回 `MyAssetsDrawer`。形态是“大号上传加号卡 → 说明式媒体卡 → 套件文件夹卡”，普通卡不再显示文件名粗标题，描述最多两行。套件文件夹要有层叠纸页、真实主素材缩略图和 hover/focus“打开”。

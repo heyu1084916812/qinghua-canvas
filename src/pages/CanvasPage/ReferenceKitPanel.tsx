@@ -6,7 +6,7 @@ import type {
   ContextKitVersion,
 } from '../../domain/shared/context'
 import { useAsset } from '../../features/shared/assets'
-import { IconChevronLeft, IconSettings } from '../../workbenches/canvas/toolbar/icons'
+import { IconChevronLeft, IconSliders } from '../../workbenches/canvas/toolbar/icons'
 import { MasonryGrid } from '../AssetsPage/MasonryGrid'
 import styles from './ReferenceKitPanel.module.css'
 
@@ -62,7 +62,7 @@ export function ReferenceKitPanel({
           aria-expanded={filterOpen}
           onClick={() => setFilterOpen((current) => !current)}
         >
-          <IconSettings size={17} />
+          <IconSliders size={17} />
         </button>
       </header>
       {filterOpen ? (

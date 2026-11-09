@@ -6660,6 +6660,7 @@
         "项目参考读取与上传",
         "参考媒体卡与上传加号卡",
         "套件文件夹卡与真实版本索引",
+        "来源/类型筛选与套件文件夹筛选联动",
         "参考灯箱和套件子面板入口"
       ],
       "doesNotOwn": [
@@ -6673,7 +6674,7 @@
       "test": [
         "src/app/uiSevenPoints.test.ts"
       ],
-      "budget": 280
+      "budget": 380
     },
     {
       "module": "src/pages/CanvasPage/ReferenceSourcePanel.module.css",
@@ -6698,7 +6699,7 @@
       "test": [
         "src/app/uiSevenPoints.test.ts"
       ],
-      "budget": 300
+      "budget": 360
     },
     {
       "module": "src/pages/CanvasPage/ReferenceKitPanel.tsx",

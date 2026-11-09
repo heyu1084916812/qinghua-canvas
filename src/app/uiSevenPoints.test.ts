@@ -56,6 +56,8 @@ describe('seven UI placement fixes', () => {
     expect(referenceSource).toContain('setReferenceDragData')
     expect(referenceSource).toContain('data-my-assets-reference-drag')
     expect(referenceSource).toContain('data-my-assets-kit-folder')
+    expect(referenceSource).toContain('data-reference-source-filter-panel')
+    expect(referenceSource).toContain('data-reference-source-filter-kind')
     expect(referenceKit).toContain('data-reference-kit-panel')
     expect(referenceKit).toContain('data-reference-kit-filter-panel')
     expect(referenceLightbox).toContain('data-reference-lightbox-thumbs')
