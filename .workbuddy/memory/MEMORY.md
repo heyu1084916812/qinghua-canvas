@@ -1,5 +1,12 @@
 # CanvasFlow（轻画）项目记忆
 
+### 总管2 第三十八轮：Lovart 式参考详情灯箱（2026-11-09）
+
+- 参考详情使用独立 `ReferenceLightbox`，不要继续往通用 `LightboxLayer` 塞项目参考业务。通用灯箱继续负责裁剪、旋转、标注、对比；参考详情只负责看图、What/HowToUse、缩略图导航和“添加到画布/对话”。`ReferenceMedia` 已拆出，`MyAssetsDrawer.tsx` 现 311 行。
+- 详情层从 `referenceItems.what` 与最新 `referenceUsages.howToUse` 取真实文案；没有 usage 必须显示“尚未生成”，不能伪造 AI 分析。底部缩略图来自项目参考列表，箭头/键盘/缩略图三种导航共用 index；Esc 回焦原卡，加入 Agent 时不得把焦点抢回旧卡。
+- 四组 1440×900 / 1024×700 × 明暗：缩略图 3、动作 2、activeThumb 1，square→tall→wide 导航正常；拖拽先 0→1 节点，详情“添加到画布”再 1→2，Agent chip=1，焦点进入/归还 true，无溢出与页面错误。证据 `.playwright-verify/ui-seven-after/*-canvas-reference-lightbox{,-action}.png`。
+- 最终门禁：check 1104 modules / 4413 deps / 34 tables / 248 registrations，串行 Vitest 649 files / 5439 tests（1 skipped），build 1236 modules，Impeccable detector 0 findings。仍未做：`curate_references` 自动 What/HowToUse 与任务 usage、套件文件夹/子面板/筛选、参考台账批量管理、Clipper。
+
 ### 总管2 第三十七轮：项目参考拖到画布（2026-11-09）
 
 - 项目参考卡拖拽用 `application/x-qinghua-reference`，不能混进 `Files`；否则系统文件导入会误判。`useCanvasDrop` 统一分派文件与参考，`FlowSurface` 只负责拖放表面，避免继续胀大旧 999 行预算。

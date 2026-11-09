@@ -6587,6 +6587,72 @@
       "budget": 120
     },
     {
+      "module": "src/pages/CanvasPage/ReferenceMedia.tsx",
+      "owner": "canvas-reference-media",
+      "responsibility": "展示项目参考卡的图片或视频缩略媒体，并处理素材尚未读到的空态。",
+      "owns": [
+        "参考卡片的图片/视频分支",
+        "缩略媒体读取与无障碍标题"
+      ],
+      "doesNotOwn": [
+        "参考台账写入",
+        "灯箱详情与画布节点动作"
+      ],
+      "publicApi": [
+        "ReferenceMedia"
+      ],
+      "test": [
+        "src/app/uiSevenPoints.test.ts"
+      ],
+      "budget": 80
+    },
+    {
+      "module": "src/pages/CanvasPage/ReferenceLightbox.tsx",
+      "owner": "canvas-reference-lightbox",
+      "responsibility": "展示项目参考大图、What/HowToUse、缩略图导航和添加画布/对话动作。",
+      "owns": [
+        "参考详情全屏层与键盘导航",
+        "项目参考缩略图条",
+        "添加到画布与添加到 Agent 的详情动作"
+      ],
+      "doesNotOwn": [
+        "素材字节存储与参考台账规则",
+        "通用素材灯箱的编辑、裁剪和对比"
+      ],
+      "publicApi": [
+        "ReferenceLightbox"
+      ],
+      "test": [
+        "src/app/uiSevenPoints.test.ts"
+      ],
+      "budget": 360
+    },
+    {
+      "module": "src/pages/CanvasPage/ReferenceLightbox.module.css",
+      "owner": "canvas-reference-lightbox-style",
+      "responsibility": "定义参考详情层的大图、信息列、缩略图条、动作与明暗主题样式。",
+      "owns": [
+        "参考详情全屏布局",
+        "信息列与缩略图导航样式",
+        "窄桌面视口适配"
+      ],
+      "doesNotOwn": [
+        "通用素材灯箱样式",
+        "全局主题令牌"
+      ],
+      "publicApi": [
+        "CSS_MODULE:reference-lightbox-detail",
+        "CSS_CLASS:overlay",
+        "CSS_CLASS:layout",
+        "CSS_CLASS:info",
+        "CSS_CLASS:thumbs"
+      ],
+      "test": [
+        "src/app/uiSevenPoints.test.ts"
+      ],
+      "budget": 600
+    },
+    {
       "module": "src/pages/CanvasPage/MyAssetsDrawer.tsx",
       "owner": "canvas-my-assets-drawer",
       "responsibility": "在画布工作区左列展示四个并列素材来源，复用真实套件、项目参考台账与 Pinterest 数据。",

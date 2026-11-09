@@ -10,11 +10,12 @@ import type { CanvasStore } from '../../state/workbenches/canvas/store'
 import { KIT_KINDS } from '../AssetsPage/contextKitDraft'
 import { importAssetFile, IMPORT_ACCEPT } from '../../features/canvas/importAsset'
 import { sendReferenceToAgent } from '../../features/canvas/agentHandoff'
-import { useAsset } from '../../features/shared/assets'
 import { createId } from '../../shared/id'
 import { MasonryGrid } from '../AssetsPage/MasonryGrid'
 import { IconPlus } from '../../workbenches/canvas/toolbar/icons'
 import { setReferenceDragData } from '../../features/canvas/dropImport'
+import { ReferenceMedia } from './ReferenceMedia'
+import { ReferenceLightbox } from './ReferenceLightbox'
 import styles from './MyAssetsDrawer.module.css'
 
 const PinterestPanel = lazy(() =>
@@ -31,22 +32,6 @@ const SOURCES: readonly { id: Source; label: string }[] = [
   { id: 'pinterest', label: 'Pinterest' },
   { id: 'clipper', label: '轻画插件' },
 ]
-
-function ReferenceMedia({
-  hash,
-  title,
-  kind,
-}: {
-  hash?: string
-  title: string
-  kind: 'image' | 'video'
-}) {
-  const url = useAsset(hash ?? '')
-  if (!url) return <span className={styles.referenceMediaEmpty} />
-  return kind === 'video'
-    ? <video src={url} muted playsInline preload="metadata" aria-label={title} />
-    : <img src={url} alt={title} loading="lazy" />
-}
 
 export function MyAssetsDrawer({
   projectId,
@@ -78,11 +63,12 @@ export function MyAssetsDrawer({
   const closeRef = useRef<HTMLButtonElement | null>(null)
   const referenceInputRef = useRef<HTMLInputElement | null>(null)
   const [referenceBusy, setReferenceBusy] = useState(false)
+  const [referenceLightboxId, setReferenceLightboxId] = useState<string | null>(null)
 
   useEffect(() => {
     closeRef.current?.focus()
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onClose()
+      if (event.key === 'Escape' && !document.querySelector('[data-reference-lightbox]')) onClose()
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
@@ -212,15 +198,13 @@ export function MyAssetsDrawer({
                         title="双击查看参考"
                         onDoubleClick={() => {
                           if (!item.assetHash) return
-                          store.openLightbox(item.assetHash)
-                          onClose()
+                          setReferenceLightboxId(item.id)
                         }}
                         onKeyDown={(event) => {
                           if (event.key !== 'Enter' && event.key !== ' ') return
                           if (!item.assetHash) return
                           event.preventDefault()
-                          store.openLightbox(item.assetHash)
-                          onClose()
+                          setReferenceLightboxId(item.id)
                         }}
                       >
                         <ReferenceMedia
@@ -313,6 +297,15 @@ export function MyAssetsDrawer({
             </div>
           ) : null}
         </div>
+        {referenceLightboxId ? (
+          <ReferenceLightbox
+            projectId={projectId}
+            store={store}
+            items={references}
+            initialItemId={referenceLightboxId}
+            onClose={() => setReferenceLightboxId(null)}
+          />
+        ) : null}
       </aside>
   )
 }

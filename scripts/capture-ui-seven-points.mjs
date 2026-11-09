@@ -370,28 +370,6 @@ try {
       (button) => getComputedStyle(button).opacity === '1',
     )
     await page.screenshot({ path: path.join(out, `${file}-canvas-reference-hover.png`) })
-    await page.locator('[data-my-assets-reference-open]').first().dblclick()
-    await page.locator('[data-lightbox]').waitFor({ timeout: 15_000 })
-    const referenceLightbox = await page.evaluate(() => {
-      const lightbox = document.querySelector('[data-lightbox]')
-      const media = lightbox?.querySelector('[data-lightbox-media]')
-      return {
-        referenceLightboxOpen: Boolean(lightbox),
-        referenceLightboxHash: lightbox?.getAttribute('data-lightbox-hash') ?? '',
-        referenceLightboxMediaLoaded:
-          media instanceof HTMLImageElement
-            ? media.complete && media.naturalWidth > 0
-            : Boolean(media),
-      }
-    })
-    await page.screenshot({ path: path.join(out, `${file}-canvas-reference-lightbox.png`) })
-    await page.keyboard.press('Escape')
-    await page.locator('[data-lightbox]').waitFor({ state: 'detached', timeout: 10_000 })
-    const referenceLightboxClosed =
-      (await page.locator('[data-lightbox]').count()) === 0
-    await page.locator('[data-canvas-my-assets]').click()
-    await page.locator('[data-my-assets-drawer]').waitFor({ timeout: 10_000 })
-    await page.locator('[data-my-assets-source="reference"]').click()
     const referenceNodesBeforeDrop = await page.locator('[data-node-id]').count()
     await page.locator('[data-my-assets-reference-drag]').first().dragTo(
       page.locator('[data-canvas-surface]'),
@@ -406,11 +384,96 @@ try {
     const referenceDroppedTitle =
       (await page.locator('[data-node-id]').last().textContent({ timeout: 5_000 })) ?? ''
     await page.screenshot({ path: path.join(out, `${file}-canvas-reference-dropped.png`) })
-    await page.locator('[data-my-assets-reference]').first().hover()
-    await page.locator('[data-my-assets-reference-agent]').first().click()
+    await page.waitForTimeout(2_200)
+    await page.locator('[data-my-assets-reference-open]').first().dblclick()
+    await page.locator('[data-reference-lightbox]').waitFor({ timeout: 15_000 })
+    await page.locator('[data-reference-lightbox-media]').hover()
+    await page.waitForTimeout(250)
+    const referenceLightbox = await page.evaluate(() => {
+      const lightbox = document.querySelector('[data-reference-lightbox]')
+      const media = lightbox?.querySelector('[data-reference-lightbox-media] img, [data-reference-lightbox-media] video')
+      const info = lightbox?.querySelector('[data-reference-lightbox-info]')
+      const infoRect = info?.getBoundingClientRect()
+      const mediaRect = media?.getBoundingClientRect()
+      return {
+        referenceLightboxOpen: Boolean(lightbox),
+        referenceLightboxTitle:
+          lightbox?.querySelector('[data-reference-lightbox-title]')?.textContent?.trim() ?? '',
+        referenceLightboxInfo: Boolean(info),
+        referenceLightboxThumbs:
+          lightbox?.querySelectorAll('[data-reference-lightbox-thumb]').length ?? 0,
+        referenceLightboxActions:
+          lightbox?.querySelectorAll('[data-reference-lightbox-add-canvas], [data-reference-lightbox-add-agent]').length ?? 0,
+        referenceLightboxMediaLoaded:
+          media instanceof HTMLImageElement
+            ? media.complete && media.naturalWidth > 0
+            : media instanceof HTMLVideoElement
+              ? media.readyState >= 1
+              : false,
+        referenceLightboxInfoInside:
+          Boolean(infoRect) &&
+          infoRect.left >= -1 &&
+          infoRect.right <= window.innerWidth + 1,
+        referenceLightboxMediaInside:
+          Boolean(mediaRect) &&
+          mediaRect.left >= -1 &&
+          mediaRect.right <= window.innerWidth + 1 &&
+          mediaRect.top >= -1 &&
+          mediaRect.bottom <= window.innerHeight + 1,
+        referenceLightboxOverflowX:
+          Boolean(lightbox) && lightbox.scrollWidth > lightbox.clientWidth + 1,
+        referenceLightboxFocus:
+          document.activeElement?.hasAttribute('data-reference-lightbox-close') ?? false,
+      }
+    })
+    await page.screenshot({ path: path.join(out, `${file}-canvas-reference-lightbox.png`) })
+    const referenceLightboxTitleBeforeNext = referenceLightbox.referenceLightboxTitle
+    await page.locator('[data-reference-lightbox-next]').click()
+    await page.waitForFunction(
+      (before) =>
+        document.querySelector('[data-reference-lightbox-title]')?.textContent?.trim() !== before,
+      referenceLightboxTitleBeforeNext,
+      { timeout: 5_000 },
+    )
+    const referenceLightboxTitleAfterNext =
+      (await page.locator('[data-reference-lightbox-title]').textContent({ timeout: 5_000 }))?.trim() ?? ''
+    await page.locator('[data-reference-lightbox-thumb]').last().click()
+    await page.waitForFunction(
+      (before) =>
+        document.querySelector('[data-reference-lightbox-title]')?.textContent?.trim() !== before,
+      referenceLightboxTitleAfterNext,
+      { timeout: 5_000 },
+    )
+    const referenceLightboxTitleAfterThumb =
+      (await page.locator('[data-reference-lightbox-title]').textContent({ timeout: 5_000 }))?.trim() ?? ''
+    const referenceLightboxActiveThumbs =
+      await page.locator('[data-reference-lightbox-thumb][aria-pressed="true"]').count()
+    const referenceNodesBeforeLightboxAdd = await page.locator('[data-node-id]').count()
+    await page.locator('[data-reference-lightbox-add-canvas]').click()
+    await page.waitForFunction(
+      (before) => document.querySelectorAll('[data-node-id]').length > before,
+      referenceNodesBeforeLightboxAdd,
+      { timeout: 15_000 },
+    )
+    const referenceNodesAfterLightboxAdd = await page.locator('[data-node-id]').count()
+    const referenceLightboxAddStatus =
+      (await page.locator('[data-reference-lightbox-info] [role="status"]').textContent({ timeout: 5_000 }))?.trim() ?? ''
+    await page.screenshot({ path: path.join(out, `${file}-canvas-reference-lightbox-action.png`) })
+    await page.keyboard.press('Escape')
+    await page.locator('[data-reference-lightbox]').waitFor({ state: 'detached', timeout: 10_000 })
+    const referenceLightboxClosed =
+      (await page.locator('[data-reference-lightbox]').count()) === 0
+    const referenceLightboxFocusReturned = await page.evaluate(
+      () => document.activeElement?.hasAttribute('data-my-assets-reference-open') ?? false,
+    )
+    await page.locator('[data-my-assets-reference-open]').first().dblclick()
+    await page.locator('[data-reference-lightbox]').waitFor({ timeout: 15_000 })
+    await page.locator('[data-reference-lightbox-add-agent]').click()
     await page.locator('[data-agent-panel]').waitFor({ timeout: 15_000 })
     await page.locator('[data-agent-composer] [data-mention-kind="reference"]').waitFor({ timeout: 15_000 })
     const referenceChipMounted = await page.locator('[data-agent-composer] [data-mention-kind="reference"]').count()
+    const referenceLightboxClosedByAgent =
+      (await page.locator('[data-reference-lightbox]').count()) === 0
     await page.screenshot({ path: path.join(out, `${file}-canvas-reference-agent.png`) })
     await page.locator('[data-my-assets-source="assets"]').click()
     await page.screenshot({ path: path.join(out, `${file}-canvas-kits.png`) })
@@ -427,12 +490,27 @@ try {
       referenceChipMounted,
       referenceQuickAddVisible,
       referenceLightboxOpen: referenceLightbox.referenceLightboxOpen,
-      referenceLightboxHash: referenceLightbox.referenceLightboxHash,
+      referenceLightboxTitle: referenceLightbox.referenceLightboxTitle,
+      referenceLightboxTitleAfterNext,
+      referenceLightboxTitleAfterThumb,
+      referenceLightboxActiveThumbs,
+      referenceLightboxInfo: referenceLightbox.referenceLightboxInfo,
+      referenceLightboxThumbs: referenceLightbox.referenceLightboxThumbs,
+      referenceLightboxActions: referenceLightbox.referenceLightboxActions,
       referenceLightboxMediaLoaded: referenceLightbox.referenceLightboxMediaLoaded,
+      referenceLightboxInfoInside: referenceLightbox.referenceLightboxInfoInside,
+      referenceLightboxMediaInside: referenceLightbox.referenceLightboxMediaInside,
+      referenceLightboxOverflowX: referenceLightbox.referenceLightboxOverflowX,
+      referenceLightboxFocus: referenceLightbox.referenceLightboxFocus,
+      referenceLightboxFocusReturned,
+      referenceLightboxAddStatus,
       referenceLightboxClosed,
+      referenceLightboxClosedByAgent,
       referenceNodesBeforeDrop,
       referenceNodesAfterDrop,
       referenceDroppedTitle,
+      referenceNodesBeforeLightboxAdd,
+      referenceNodesAfterLightboxAdd,
       ...referenceLayout,
       stageWidthClosed,
       ...drawerGeometry,
