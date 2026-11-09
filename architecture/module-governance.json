@@ -816,6 +816,101 @@
       "budget": 80
     },
     {
+      "module": "src/domain/canvas/browserWindow.ts",
+      "owner": "canvas-browser-window",
+      "responsibility": "计算画布浏览器浮层的初始位置、拖动边界和缩放下限。",
+      "owns": [
+        "画布内浏览器矩形与舞台尺寸",
+        "居中、拖动和缩放的纯几何约束"
+      ],
+      "doesNotOwn": [
+        "浏览器 iframe 和用户输入",
+        "网页抓取、收藏或 Agent 上下文"
+      ],
+      "publicApi": [
+        "BrowserWindowRect",
+        "BrowserWindowStage",
+        "fitBrowserWindow",
+        "moveBrowserWindow",
+        "resizeBrowserWindow"
+      ],
+      "test": [
+        "src/domain/canvas/browserWindow.test.ts"
+      ],
+      "budget": 90
+    },
+    {
+      "module": "src/pages/CanvasPage/browser/CanvasBrowserLayer.tsx",
+      "owner": "canvas-browser-overlay",
+      "responsibility": "在画布舞台内渲染可拖动、可缩放、可收藏当前页的浏览器浮层。",
+      "owns": [
+        "画布浏览器地址栏和 iframe",
+        "窗口拖动、缩放与重置",
+        "当前页网页收藏动作"
+      ],
+      "doesNotOwn": [
+        "iframe 内跨域导航读取",
+        "网页收藏持久化规则",
+        "参考、Agent 和画布动作"
+      ],
+      "publicApi": [
+        "CanvasBrowserLayer"
+      ],
+      "test": [
+        "src/domain/canvas/browserWindow.test.ts",
+        "src/pages/CanvasPage/clipper/clipperCapture.test.ts",
+        "src/app/uiSevenPoints.test.ts"
+      ],
+      "budget": 340
+    },
+    {
+      "module": "src/pages/CanvasPage/browser/CanvasBrowserLayer.module.css",
+      "owner": "canvas-browser-overlay-style",
+      "responsibility": "定义画布浏览器浮层的窗口、标题栏、地址栏、状态和缩放命中区样式。",
+      "owns": [
+        "画布浏览器窗口几何外观",
+        "标题栏、地址栏和缩放把手",
+        "画布浏览器状态提示"
+      ],
+      "doesNotOwn": [
+        "全局颜色和间距令牌",
+        "网页内容自身样式",
+        "抽屉内嵌浏览器样式"
+      ],
+      "publicApi": [
+        "CSS_MODULE:canvas-browser-overlay",
+        "CSS_CLASS:layer",
+        "CSS_CLASS:window",
+        "CSS_CLASS:resizeHandle"
+      ],
+      "test": [
+        "src/app/uiSevenPoints.test.ts"
+      ],
+      "budget": 240
+    },
+    {
+      "module": "src/pages/CanvasPage/clipper/clipperCapture.ts",
+      "owner": "clipper-capture",
+      "responsibility": "把单个公开网页抓取并写入账号级网页收藏，供抽屉和画布浏览器共用。",
+      "owns": [
+        "单页公开网页抓取",
+        "可收藏图片过滤与收藏写入"
+      ],
+      "doesNotOwn": [
+        "网页收藏条目规则",
+        "网络请求实现",
+        "React 状态和提示"
+      ],
+      "publicApi": [
+        "ClipperCaptureResult",
+        "captureClipperPage"
+      ],
+      "test": [
+        "src/pages/CanvasPage/clipper/clipperCapture.test.ts"
+      ],
+      "budget": 80
+    },
+    {
       "module": "src/pages/CanvasPage/clipper/ClipperPanel.tsx",
       "owner": "clipper-panel",
       "responsibility": "网页地址抓取、轻画浏览器预览和网页收藏到参考/Agent/画布的交互编排。",
@@ -7028,6 +7123,7 @@
         "ReferenceFilterFields",
         "referenceSourceFilter",
         "referenceKindFilter",
+        "matchesReferenceFilters",
         "toggledReferenceFilter"
       ],
       "test": [

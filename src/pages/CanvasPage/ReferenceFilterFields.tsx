@@ -70,6 +70,7 @@ export function ReferenceFilterFields({
   sourceOptions = REFERENCE_SOURCE_FILTERS,
   kindOptions = REFERENCE_KIND_FILTERS,
   disabledSources = new Set(),
+  disabledKinds = new Set(),
   onToggleSource,
   onToggleKind,
 }: {
@@ -85,6 +86,7 @@ export function ReferenceFilterFields({
     label: string
   }[]
   disabledSources?: ReadonlySet<ReferenceSourceFilter>
+  disabledKinds?: ReadonlySet<ReferenceKindFilter>
   onToggleSource: (value: ReferenceSourceFilter) => void
   onToggleKind: (value: ReferenceKindFilter) => void
 }) {
@@ -116,17 +118,24 @@ export function ReferenceFilterFields({
       </fieldset>
       <fieldset>
         <legend>按类型</legend>
-        {kindOptions.map((option) => (
-          <label key={option.value}>
-            <input
-              type="checkbox"
-              data-reference-filter-kind={option.value}
-              checked={kindValues.has(option.value)}
-              onChange={() => onToggleKind(option.value)}
-            />
-            {option.label}
-          </label>
-        ))}
+        {kindOptions.map((option) => {
+          const disabled = disabledKinds.has(option.value)
+          return (
+            <label
+              key={option.value}
+              className={disabled ? styles.disabled : undefined}
+            >
+              <input
+                type="checkbox"
+                data-reference-filter-kind={option.value}
+                checked={kindValues.has(option.value)}
+                disabled={disabled}
+                onChange={() => onToggleKind(option.value)}
+              />
+              {option.label}
+            </label>
+          )
+        })}
       </fieldset>
     </div>
   )
@@ -141,6 +150,19 @@ export function referenceSourceFilter(source: ReferenceSource): ReferenceSourceF
 
 export function referenceKindFilter(kind: ReferenceKind): ReferenceKindFilter {
   return kind === 'text' ? 'document' : kind
+}
+
+export function matchesReferenceFilters(
+  source: ReferenceSource,
+  kind: ReferenceKind,
+  sources: ReadonlySet<ReferenceSourceFilter>,
+  kinds: ReadonlySet<ReferenceKindFilter>,
+): boolean {
+  const sourceMatches =
+    sources.size === 0 || sources.has(referenceSourceFilter(source))
+  const kindMatches =
+    kinds.size === 0 || kinds.has(referenceKindFilter(kind))
+  return sourceMatches && kindMatches
 }
 
 export function toggledReferenceFilter<T>(current: ReadonlySet<T>, value: T): Set<T> {

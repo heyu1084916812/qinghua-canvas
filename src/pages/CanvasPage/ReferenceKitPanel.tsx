@@ -1,24 +1,15 @@
 import { useState } from 'react'
 import { usePlatform } from '../../app/providers/PlatformProvider'
-import type {
-  ContextKit,
-  ContextKitVersion,
-} from '../../domain/shared/context'
+import type { ContextKit, ContextKitVersion } from '../../domain/shared/context'
 import type { ReferenceItem } from '../../domain/project/referenceLedger'
 import { sendReferenceToAgent } from '../../features/canvas/agentHandoff'
 import { ensureKitAssetReference } from '../../features/canvas/kitReference'
 import type { CanvasStore } from '../../state/workbenches/canvas/store'
-import {
-  IconChevronLeft,
-} from '../../workbenches/canvas/toolbar/icons'
+import { IconChevronLeft } from '../../workbenches/canvas/toolbar/icons'
 import { ReferenceLightbox } from './ReferenceLightbox'
+import { kitItemsOf, ReferenceKitItems, type KitImageItem } from './ReferenceKitItems'
 import {
-  kitItemsOf,
-  ReferenceKitItems,
-  type KitImageItem,
-} from './ReferenceKitItems'
-import {
-  REFERENCE_KIND_FILTERS,
+  matchesReferenceFilters,
   ReferenceFilterButton,
   ReferenceFilterFields,
   toggledReferenceFilter,
@@ -27,14 +18,15 @@ import {
 } from './ReferenceFilterFields'
 import styles from './ReferenceKitPanel.module.css'
 
-const KIT_KIND_OPTIONS = REFERENCE_KIND_FILTERS.filter((option) =>
-  option.value === 'image' || option.value === 'color' || option.value === 'font',
-)
-const KIT_SOURCE_VALUES = new Set<ReferenceSourceFilter>(['asset'])
 const DISABLED_KIT_SOURCES = new Set<ReferenceSourceFilter>([
   'file',
   'link',
   'connector',
+])
+const DISABLED_KIT_KINDS = new Set<ReferenceKindFilter>([
+  'video',
+  'document',
+  'audio',
 ])
 
 export function ReferenceKitPanel({
@@ -55,16 +47,24 @@ export function ReferenceKitPanel({
   const imageItems = items.filter(
     (item): item is KitImageItem => item.kind === 'image',
   )
-  const [kindFilters, setKindFilters] = useState<Set<ReferenceKindFilter>>(
-    new Set(['image', 'color', 'font']),
+  const [sourceFilters, setSourceFilters] = useState<Set<ReferenceSourceFilter>>(
+    new Set(),
   )
+  const [kindFilters, setKindFilters] = useState<Set<ReferenceKindFilter>>(new Set())
   const [filterOpen, setFilterOpen] = useState(false)
   const [lightbox, setLightbox] = useState<{
     items: ReferenceItem[]
     initialItemId: string
   } | null>(null)
-  const visible = items.filter((item) => kindFilters.has(item.kind))
+  const visible = items.filter((item) =>
+    matchesReferenceFilters('asset', item.kind, sourceFilters, kindFilters),
+  )
+  const toggleSource = (source: ReferenceSourceFilter) => {
+    if (DISABLED_KIT_SOURCES.has(source)) return
+    setSourceFilters((current) => toggledReferenceFilter(current, source))
+  }
   const toggleKind = (kind: ReferenceKindFilter) => {
+    if (DISABLED_KIT_KINDS.has(kind)) return
     setKindFilters((current) => toggledReferenceFilter(current, kind))
   }
   const addImage = async (item: KitImageItem) => {
@@ -148,11 +148,11 @@ export function ReferenceKitPanel({
         {filterOpen ? (
           <ReferenceFilterFields
             scope="kit"
-            sourceValues={KIT_SOURCE_VALUES}
+            sourceValues={sourceFilters}
             kindValues={kindFilters}
-            kindOptions={KIT_KIND_OPTIONS}
             disabledSources={DISABLED_KIT_SOURCES}
-            onToggleSource={() => undefined}
+            disabledKinds={DISABLED_KIT_KINDS}
+            onToggleSource={toggleSource}
             onToggleKind={toggleKind}
           />
         ) : null}

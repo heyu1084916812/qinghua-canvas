@@ -20,8 +20,7 @@ import { KIT_KINDS } from '../AssetsPage/contextKitDraft'
 import { MasonryGrid } from '../AssetsPage/MasonryGrid'
 import { ReferenceLightbox } from './ReferenceLightbox'
 import {
-  referenceKindFilter,
-  referenceSourceFilter,
+  matchesReferenceFilters,
   ReferenceFilterButton,
   ReferenceFilterFields,
   toggledReferenceFilter,
@@ -79,8 +78,7 @@ export function ReferenceSourcePanel({
   useEffect(() => {
     let active = true
     void Promise.all(kits.map(async (kit) => {
-      const rows = await contextRepo.listKitVersions(kit.id)
-      return [kit.id, rows.find((row) => row.version === kit.currentVersion) ?? rows.at(-1) ?? null] as const
+      return [kit.id, await contextRepo.currentKitVersion(kit)] as const
     })).then((rows) => {
       if (active) setVersions(Object.fromEntries(rows))
     }).catch(() => {
@@ -90,10 +88,11 @@ export function ReferenceSourcePanel({
   }, [contextRepo, kits])
 
   const addKit = async (kit: ContextKit) => {
-    const version = versions[kit.id]
-    if (version === undefined) {
-      store.notify('正在读取套件版本，请稍后再试')
-      return
+    const version = versions[kit.id] !== undefined
+      ? versions[kit.id]
+      : await contextRepo.currentKitVersion(kit)
+    if (versions[kit.id] === undefined) {
+      setVersions((current) => ({ ...current, [kit.id]: version }))
     }
     if (!version) {
       store.notify('这个套件还没有保存版本', 'error')
@@ -145,7 +144,7 @@ export function ReferenceSourcePanel({
 
   const selectedKit = kits.find((kit) => kit.id === selectedKitId) ?? null
   const visibleReferences = references.filter((item) =>
-    matchesReferenceFilters(item, sourceFilters, kindFilters),
+    matchesReferenceFilters(item.source, item.kind, sourceFilters, kindFilters),
   )
   const visibleKits = (sourceFilters.size === 0 || sourceFilters.has('asset')) && kindFilters.size === 0
     ? kits
@@ -295,16 +294,6 @@ export function ReferenceSourcePanel({
   )
 }
 
-function matchesReferenceFilters(
-  item: ReferenceItem,
-  sources: ReadonlySet<ReferenceSourceFilter>,
-  kinds: ReadonlySet<ReferenceKindFilter>,
-): boolean {
-  const sourceMatches = sources.size === 0 || sources.has(referenceSourceFilter(item.source))
-  const kindMatches = kinds.size === 0 || kinds.has(referenceKindFilter(item.kind))
-  return sourceMatches && kindMatches
-}
-
 function KitFolder({
   kit,
   version,
@@ -320,13 +309,20 @@ function KitFolder({
   const url = useAsset(preview?.hash ?? '')
   const typeLabel = KIT_KINDS.find((item) => item.value === kit.kind)?.label ?? '套件'
   return (
-    <article className={styles.kitFolderCard} data-my-assets-kit-folder={kit.id}>
+    <article
+      className={styles.kitFolderCard}
+      data-my-assets-kit-folder={kit.id}
+      onClick={onAdd}
+    >
       <button
         type="button"
         className={styles.kitFolderButton}
         data-my-assets-kit-folder-add={kit.id}
         aria-label={`将套件 ${kit.name} 加入对话`}
-        onClick={onAdd}
+        onClick={(event) => {
+          event.stopPropagation()
+          onAdd()
+        }}
       >
         <span className={styles.kitFolderStack}>
           <span className={styles.kitFolderLayerBack} />
@@ -343,7 +339,10 @@ function KitFolder({
         data-my-assets-kit-folder-open={kit.id}
         aria-label={`打开套件 ${kit.name}`}
         title="打开套件"
-        onClick={onOpen}
+        onClick={(event) => {
+          event.stopPropagation()
+          onOpen()
+        }}
       >
         打开
       </button>

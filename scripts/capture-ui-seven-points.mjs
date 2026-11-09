@@ -330,6 +330,64 @@ try {
     await page.mouse.move(900, 80)
     await page.waitForTimeout(600)
     await page.screenshot({ path: path.join(out, `${file}-canvas-clipper.png`) })
+    await page.locator('[data-clipper-open-canvas]').click()
+    await page.locator('[data-canvas-browser]').waitFor({ timeout: 10_000 })
+    await page.locator('[data-my-assets-drawer]').waitFor({ state: 'detached', timeout: 10_000 })
+    const canvasBrowserFrame = page.frameLocator('[data-canvas-browser] iframe')
+    await canvasBrowserFrame.locator('body').waitFor({ timeout: 10_000 })
+    const canvasBrowserFrameText = await canvasBrowserFrame.locator('body').innerText()
+    const canvasBrowserBefore = await page.locator('[data-canvas-browser]').evaluate((browser) => {
+      const stage = document.querySelector('[data-canvas-stage]')
+      const rect = browser.getBoundingClientRect()
+      const stageRect = stage?.getBoundingClientRect()
+      return {
+        left: rect.left,
+        top: rect.top,
+        width: rect.width,
+        height: rect.height,
+        inside: Boolean(
+          stageRect &&
+          rect.left >= stageRect.left - 1 &&
+          rect.top >= stageRect.top - 1 &&
+          rect.right <= stageRect.right + 1 &&
+          rect.bottom <= stageRect.bottom + 1,
+        ),
+        frame: browser.querySelectorAll('iframe').length,
+      }
+    })
+    const dragBox = await page.locator('[data-canvas-browser-drag]').boundingBox()
+    if (dragBox) {
+      await page.mouse.move(dragBox.x + 80, dragBox.y + 18)
+      await page.mouse.down()
+      await page.mouse.move(dragBox.x + 130, dragBox.y + 48)
+      await page.mouse.up()
+    }
+    const canvasBrowserMoved = await page.locator('[data-canvas-browser]').evaluate((browser) => {
+      const rect = browser.getBoundingClientRect()
+      return { left: rect.left, top: rect.top }
+    })
+    const resizeBox = await page.locator('[data-canvas-browser-resize]').boundingBox()
+    if (resizeBox) {
+      await page.mouse.move(resizeBox.x + 10, resizeBox.y + 10)
+      await page.mouse.down()
+      await page.mouse.move(resizeBox.x + 50, resizeBox.y + 40)
+      await page.mouse.up()
+    }
+    const canvasBrowserAfter = await page.locator('[data-canvas-browser]').evaluate((browser) => {
+      const rect = browser.getBoundingClientRect()
+      return {
+        width: rect.width,
+        height: rect.height,
+        pageOverflowX: document.documentElement.scrollWidth > document.documentElement.clientWidth + 1,
+      }
+    })
+    await page.screenshot({ path: path.join(out, `${file}-canvas-browser.png`) })
+    await page.locator('[data-canvas-browser-close]').click()
+    await page.locator('[data-canvas-browser]').waitFor({ state: 'detached', timeout: 5_000 })
+    await page.locator('[data-canvas-my-assets]').click()
+    await page.locator('[data-my-assets-drawer]').waitFor({ timeout: 10_000 })
+    await page.locator('[data-my-assets-source="clipper"]').click()
+    await page.locator('[data-clipper-panel]').waitFor({ timeout: 10_000 })
     await page.locator('[data-my-assets-source="reference"]').click()
     await page.locator('[data-my-assets-reference-file]').setInputFiles([
       {
@@ -566,8 +624,8 @@ try {
     await page.locator('[data-reference-lightbox]').waitFor({ state: 'detached', timeout: 10_000 })
     await page.locator('[data-reference-filter-trigger="kit"]').click()
     await page.locator('[data-reference-filter-panel="kit"]').waitFor({ timeout: 5_000 })
-    await page.locator('[data-reference-filter-kind="color"]').uncheck()
-    await page.locator('[data-reference-filter-kind="font"]').uncheck()
+    await page.locator('[data-reference-filter-source="asset"]').check()
+    await page.locator('[data-reference-filter-kind="image"]').check()
     const referenceKitFilteredItems = await page.locator('[data-reference-kit-item]').count()
     await page.screenshot({ path: path.join(out, `${file}-canvas-reference-kit-filter.png`) })
     await page.locator('[data-reference-kit-back]').click()
@@ -758,6 +816,16 @@ try {
       clipperComposer,
       clipperBrowser,
       clipperFrame,
+      canvasBrowserOpened: canvasBrowserBefore.frame === 1,
+      canvasBrowserFrameLoaded: canvasBrowserFrameText.trim().length > 0,
+      canvasBrowserInsideStage: canvasBrowserBefore.inside,
+      canvasBrowserMoved:
+        Math.abs(canvasBrowserMoved.left - canvasBrowserBefore.left) >= 20 &&
+        Math.abs(canvasBrowserMoved.top - canvasBrowserBefore.top) >= 15,
+      canvasBrowserResized:
+        canvasBrowserAfter.width > canvasBrowserBefore.width + 20 &&
+        canvasBrowserAfter.height > canvasBrowserBefore.height + 15,
+      canvasBrowserOverflowX: canvasBrowserAfter.pageOverflowX,
       referenceCards,
       referenceFolders,
       referenceUpload,

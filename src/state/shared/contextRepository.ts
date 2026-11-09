@@ -92,6 +92,7 @@ export interface ContextRepository {
     },
   ): Promise<{ kit: ContextKit; version: ContextKitVersion } | null>
   listKitVersions(kitId: string): Promise<ContextKitVersion[]>
+  currentKitVersion(kit: ContextKit): Promise<ContextKitVersion | null>
   bindProject(input: {
     projectId: string
     kitId: string
@@ -366,6 +367,13 @@ export function createContextRepository(storage: StoragePort): ContextRepository
     (await storage.query('contextKitVersions', { kitId }))
       .map(kitVersionOf)
       .sort((left, right) => right.version - left.version)
+
+  const currentKitVersion = async (
+    kit: ContextKit,
+  ): Promise<ContextKitVersion | null> => {
+    const versions = await listKitVersions(kit.id)
+    return versions[0] ?? null
+  }
 
   const listProjectBindings = async (
     projectId: string,
@@ -646,6 +654,7 @@ export function createContextRepository(storage: StoragePort): ContextRepository
     listMemoryRevisions,
     listKits,
     listKitVersions,
+    currentKitVersion,
     listProjectBindings,
     recordMemoryUsage,
 

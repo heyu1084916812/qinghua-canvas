@@ -278,6 +278,10 @@ describe('context repository', () => {
 
     await repo.saveKitVersion(created.kit.id, { guide: '新指南' })
     const [latest] = await repo.listKitVersions(created.kit.id)
+    expect(await repo.currentKitVersion(created.kit)).toMatchObject({
+      version: latest?.version,
+      guide: '新指南',
+    })
     expect(latest?.resources).toEqual(created.version.resources)
     expect(latest?.colors).toEqual(created.version.colors)
     expect(latest?.fonts).toEqual(created.version.fonts)

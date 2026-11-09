@@ -1,5 +1,13 @@
 # CanvasFlow（轻画）项目记忆
 
+### 总管2 第四十七轮：套件上下文、共享筛选、画布浏览器与免费调研（2026-11-10）
+
+- 套件点击取版本必须走 `ContextRepository.currentKitVersion(kit)`，它返回版本表首项，不能按可能过期的 `kit.currentVersion` 回查旧版。文件夹整卡点击加入 Agent，主按钮和“打开”都要 `stopPropagation`，避免重复触发。
+- 参考与套件筛选共用 `ReferenceFilterFields`、完整 `REFERENCE_SOURCE_FILTERS` / `REFERENCE_KIND_FILTERS` 和 `matchesReferenceFilters`。不适用的类型用 `disabledKinds` 禁用，不再为套件维护第二套筛选 UI。
+- 画布浏览器拆为 `domain/canvas/browserWindow.ts` 纯几何 + `CanvasBrowserLayer` 页面组件；`clipperCapture.ts` 是抽屉和画布浮层共用的单页采集服务。UI 探针必须等待 iframe `body` 可见，不能只等 `<iframe>` 元素。
+- Lovart 实测调研顺序：技能加载 → 网页/图片搜索 → 候选 → 用户选中进入参考 → 参考分析 → 思考完成 → 生成，搜索结果不自动进参考，每轮通常最多两批。Openverse 与 Wikipedia 已实测返回图片授权信息和正文内容。
+- 本轮证据：四组 1440×900 / 1024×700 × 明暗均 `referenceFolderChipCount=2 / referenceKitFilteredItems=4 / canvasBrowserFrameLoaded=true / moved=true / resized=true / pageOverflowX=false / errors=0`；check 1132 modules / 4538 deps / 276 registrations；全量 Vitest 660 files（659 passed / 1 skipped）/ 5467 tests（5466 passed / 1 skipped）；build 1264 modules；detector 0 findings。未 push。
+
 ### 总管2 第四十六轮：浏览器扩展一键收藏与本机接收端（2026-11-10）
 
 - Clipper 的 MV3 扩展是独立静态包，只向 `127.0.0.1:53684/clip` 发送当前标签页 URL 与标题，不读 Cookie。Tauri 接收端校验 `X-Qinghua-Clipper-Token`、CORS、32KB 请求体和 100 条待收队列；`/health` 只报运行状态。

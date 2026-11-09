@@ -1,6 +1,7 @@
 import { openUrl } from '@tauri-apps/plugin-opener'
 import {
   IconClose,
+  IconExpand,
   IconLink,
 } from '../../../workbenches/canvas/toolbar/icons'
 import styles from './ClipperPanel.module.css'
@@ -8,15 +9,29 @@ import styles from './ClipperPanel.module.css'
 export function ClipperBrowser({
   url,
   onClose,
+  onOpenCanvas,
 }: {
   url: string
   onClose: () => void
+  onOpenCanvas?: () => void
 }) {
   return (
     <section className={styles.browser} data-clipper-browser>
       <header>
         <span title={url}>{url}</span>
         <div>
+          {onOpenCanvas ? (
+            <button
+              type="button"
+              className={styles.iconButton}
+              data-clipper-open-canvas
+              aria-label="在画布中打开浏览器"
+              title="在画布中打开浏览器"
+              onClick={onOpenCanvas}
+            >
+              <IconExpand size={15} />
+            </button>
+          ) : null}
           <button
             type="button"
             className={styles.iconButton}

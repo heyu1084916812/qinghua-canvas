@@ -42,8 +42,7 @@ export function MyAssetsShelf({
   useEffect(() => {
     let active = true
     void Promise.all(kits.map(async (kit) => {
-      const rows = await repository.listKitVersions(kit.id)
-      return [kit.id, rows.find((row) => row.version === kit.currentVersion) ?? rows.at(-1) ?? null] as const
+      return [kit.id, await repository.currentKitVersion(kit)] as const
     })).then((rows) => {
       if (active) setVersions(Object.fromEntries(rows))
     }).catch(() => {
@@ -53,10 +52,11 @@ export function MyAssetsShelf({
   }, [kits, repository])
 
   const addKit = async (kit: ContextKit) => {
-    const version = versions[kit.id]
-    if (version === undefined) {
-      store.notify('正在读取套件版本，请稍后再试')
-      return
+    const version = versions[kit.id] !== undefined
+      ? versions[kit.id]
+      : await repository.currentKitVersion(kit)
+    if (versions[kit.id] === undefined) {
+      setVersions((current) => ({ ...current, [kit.id]: version }))
     }
     if (!version) {
       store.notify('这个套件还没有保存版本', 'error')

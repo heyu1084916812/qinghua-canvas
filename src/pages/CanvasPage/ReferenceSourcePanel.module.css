@@ -60,6 +60,7 @@
 
 .kitFolderCard {
   position: relative;
+  cursor: pointer;
 }
 
 .referenceCard {

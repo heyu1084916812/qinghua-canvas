@@ -6,17 +6,18 @@ import type {
 } from '../../../domain/inspiration/clipper'
 import { isPublicHttpUrl } from '../../../domain/shared/publicUrl'
 import { sendReferenceToAgent } from '../../../features/canvas/agentHandoff'
-import { runDesignResearch } from '../../../features/shared/research/designResearchRunner'
 import { createClipperCollectionRepository } from '../../../state/shared/clipperCollectionRepository'
 import { createReferenceLedgerRepository } from '../../../state/project/referenceLedgerRepository'
 import type { CanvasStore } from '../../../state/workbenches/canvas/store'
 import {
+  IconExpand,
   IconLink,
   IconPlus,
 } from '../../../workbenches/canvas/toolbar/icons'
 import { ClipperBrowser } from './ClipperBrowser'
 import { ClipperItemCard } from './ClipperItemCard'
 import { ClipperPairing, type ClipperReceiverInfo } from './ClipperPairing'
+import { captureClipperPage } from './clipperCapture'
 import {
   addClipperReference,
   sendClipperToCanvas,
@@ -35,9 +36,11 @@ interface PendingClip {
 export function ClipperPanel({
   projectId,
   store,
+  onOpenCanvasBrowser,
 }: {
   projectId: string
   store: CanvasStore
+  onOpenCanvasBrowser?: (url: string) => void
 }) {
   const platform = usePlatform()
   const collection = useMemo(
@@ -94,41 +97,27 @@ export function ClipperPanel({
     }
     const controller = newController()
     try {
-      const result = await runDesignResearch(
-        {
-          topic: target,
-          urls: [target],
-          maxResults: 24,
-          includeOpenSearch: false,
-        },
-        { network: platform.network, libraryCases: [] },
-        controller.signal,
-      )
-      const now = Date.now()
-      const collected = result.items
-        .filter((item) => isPublicHttpUrl(item.url) && isPublicHttpUrl(item.imageUrl))
-        .map((item, index): ClipperItem => ({
-          ...item,
-          source: 'web',
-          collectedAt: now + index,
-          category: '未分类',
-        }))
-      if (collected.length === 0) {
+      const result = await captureClipperPage({
+        url: target,
+        network: platform.network,
+        collection,
+        signal: controller.signal,
+      })
+      if (result.items.length === 0) {
         if (!options.background) {
           setStatus(result.warnings[0] ?? '这个页面没有可收藏的图片。')
         }
         return 0
       }
-      const next = await collection.upsert(collected)
-      setItems(next)
+      setItems(result.collection)
       if (!options.background) {
         setUrl(target)
         if (options.closeComposer !== false) setComposerOpen(false)
         setStatus(
-          `${options.statusPrefix ?? ''}已收藏 ${collected.length} 张网页图片。`,
+          `${options.statusPrefix ?? ''}已收藏 ${result.items.length} 张网页图片。`,
         )
       }
-      return collected.length
+      return result.items.length
     } catch (error) {
       if (!controller.signal.aborted && !options.background) {
         setStatus(`网页收藏失败：${errorText(error)}`)
@@ -194,6 +183,15 @@ export function ClipperPanel({
       return
     }
     setBrowserUrl(target)
+  }
+  const openCanvasBrowser = (value: string) => {
+    const target = normalizedPublicUrl(value)
+    if (!target || !onOpenCanvasBrowser) {
+      setStatus('画布浏览器暂不可用')
+      return
+    }
+    setBrowserUrl('')
+    onOpenCanvasBrowser(target)
   }
 
   const addToReference = async (item: ClipperItem, toAgent: boolean) => {
@@ -299,6 +297,17 @@ export function ClipperPanel({
           <button
             type="button"
             className={styles.iconButton}
+            data-clipper-browse-canvas
+            disabled={!onOpenCanvasBrowser || !url.trim()}
+            aria-label="在画布中打开浏览器"
+            title="在画布中打开浏览器"
+            onClick={() => openCanvasBrowser(url)}
+          >
+            <IconExpand size={16} />
+          </button>
+          <button
+            type="button"
+            className={styles.iconButton}
             data-clipper-add
             aria-label="收藏网页"
             title="收藏网页"
@@ -351,7 +360,13 @@ export function ClipperPanel({
       ) : null}
 
       {browserUrl ? (
-        <ClipperBrowser url={browserUrl} onClose={() => setBrowserUrl('')} />
+        <ClipperBrowser
+          url={browserUrl}
+          onClose={() => setBrowserUrl('')}
+          onOpenCanvas={onOpenCanvasBrowser
+            ? () => openCanvasBrowser(browserUrl)
+            : undefined}
+        />
       ) : null}
 
       {visible.length > 0 ? (

@@ -57,6 +57,11 @@ const CanvasAgentHostBridge = lazy(() =>
     default: module.CanvasAgentHostBridge,
   })),
 )
+const CanvasBrowserLayer = lazy(() =>
+  import('./browser/CanvasBrowserLayer').then((module) => ({
+    default: module.CanvasBrowserLayer,
+  })),
+)
 
 /**
  * 画布页面容器（架构 §4.7：只接线，不放规则）。
@@ -131,6 +136,7 @@ function CanvasProject({ projectId }: { projectId: string }) {
   const [externalEdit, setExternalEdit] = useState(false)
   const [logOpen, setLogOpen] = useState(false)
   const [myAssetsOpen, setMyAssetsOpen] = useState(false)
+  const [canvasBrowserUrl, setCanvasBrowserUrl] = useState('')
   /**
    * 水合完成的计数（只用来**触发重跑**，值本身没意义）。
    *
@@ -446,6 +452,10 @@ function CanvasProject({ projectId }: { projectId: string }) {
                   setMyAssetsOpen(false)
                   openContextKitsDialog()
                 }}
+                onOpenCanvasBrowser={(url) => {
+                  setMyAssetsOpen(false)
+                  setCanvasBrowserUrl(url)
+                }}
               />
             </Suspense>
           ) : null}
@@ -535,6 +545,14 @@ function CanvasProject({ projectId }: { projectId: string }) {
             onCreateNode={addNodeAtCenter}
             onImportAsset={() => void importAssetAtCenter()}
           />
+          {canvasBrowserUrl ? (
+            <Suspense fallback={null}>
+              <CanvasBrowserLayer
+                url={canvasBrowserUrl}
+                onClose={() => setCanvasBrowserUrl('')}
+              />
+            </Suspense>
+          ) : null}
           {logOpen && (
             <Suspense fallback={null}>
               <LogPanel onClose={() => setLogOpen(false)} />
