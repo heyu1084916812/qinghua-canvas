@@ -6584,6 +6584,33 @@
         "src/features/settings/cliOutputText.test.ts"
       ],
       "budget": 35
+    },
+    {
+      "module": "src/domain/agent/phase.ts",
+      "owner": "agent-phase-contract",
+      "responsibility": "定义可折叠 Agent 阶段词表、事实标题和完成后的摘要投影。",
+      "owns": [
+        "阶段词表与类型守卫",
+        "阶段标题与证据数量摘要",
+        "折叠态纯文本投影"
+      ],
+      "doesNotOwn": [
+        "模型消息协议与上下文窗口",
+        "Agent 面板渲染和滚动状态",
+        "阶段事件的持久化与生成参数"
+      ],
+      "publicApi": [
+        "AGENT_PHASES",
+        "AgentPhase",
+        "AgentPhaseEvent",
+        "isAgentPhase",
+        "agentPhaseTitle",
+        "agentPhaseCollapsedSummary"
+      ],
+      "test": [
+        "src/domain/agent/phase.test.ts"
+      ],
+      "budget": 90
     }
   ]
 }

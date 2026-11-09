@@ -1,3 +1,4 @@
+import type { AgentPhase } from '../../../../domain/agent/phase'
 import type { ChatMessage } from '../../../../domain/shared/execution/types'
 
 /**
@@ -30,6 +31,8 @@ export interface ConversationStep {
   /** 这一步牵扯到的节点 id：面板据此把它们产出的图**内嵌**显示 */
   nodeIds: string[]
   failed: boolean
+  /** 该步骤来自哪个真实阶段；旧消息可以没有。 */
+  phase?: AgentPhase
 }
 
 export interface ConversationProcessEntry {
@@ -37,6 +40,9 @@ export interface ConversationProcessEntry {
   text: string
   createdAt?: number
   source?: 'intent' | 'reasoning'
+  /** 仅由阶段事件产生，和模型正文 / reasoning 分开。 */
+  phase?: AgentPhase
+  collapsedSummary?: string
 }
 
 export interface ConversationProcess {
