@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  collapsedProcessHeadline,
   expandedProcessView,
   isAdvanceTaskCommand,
   latestProcessLine,
@@ -24,6 +25,25 @@ describe('agent process headline', () => {
     expect(isAdvanceTaskCommand('直接下一步')).toBe(true)
     expect(isAdvanceTaskCommand(' 跳过验收，直接下一步！ ')).toBe(true)
     expect(isAdvanceTaskCommand('下一步帮我做海报')).toBe(false)
+  })
+
+  it('uses the latest completed phase as the collapsed headline', () => {
+    expect(collapsedProcessHeadline([
+      { id: 'a', text: '正在找参考', source: 'intent' },
+      {
+        id: 'b',
+        text: '调研完成：设计调研完成',
+        phase: 'research',
+        collapsedSummary: '调研完成 · 2 项依据',
+      },
+    ], '忽略这段实时过程')).toBe('调研完成 · 2 项依据')
+  })
+
+  it('falls back to the latest process line without phase events', () => {
+    expect(collapsedProcessHeadline(
+      [{ id: 'a', text: '先检查画布。', source: 'intent' }],
+      '先检查画布。最后准备生成。',
+    )).toBe('最后准备生成。')
   })
 
   it('★★ 展开区实时文本与最新历史重复时只保留一份', () => {

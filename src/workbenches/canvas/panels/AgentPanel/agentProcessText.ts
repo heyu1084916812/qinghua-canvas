@@ -1,3 +1,5 @@
+import type { ConversationProcessEntry } from './conversation'
+
 /**
  * The collapsed row is a headline, not a transcript. Keep the newest complete
  * sentence (or newest line) and leave the full accumulated text in the fold.
@@ -46,4 +48,18 @@ export function isAdvanceTaskCommand(text: string): boolean {
     '跳过验收',
     '跳过验收直接下一步',
   ]).has(normalized)
+}
+
+/**
+ * 已完成阶段优先用事实摘要做折叠标题；没有阶段事件时保留原来的「最新过程行」。
+ * 运行中不用它，避免把尚未完成的阶段包装成结论。
+ */
+export function collapsedProcessHeadline(
+  history: readonly ConversationProcessEntry[],
+  processText: string,
+): string {
+  const phaseEntry = [...history]
+    .reverse()
+    .find((entry) => entry.phase && entry.collapsedSummary)
+  return phaseEntry?.collapsedSummary || latestProcessLine(processText)
 }

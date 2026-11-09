@@ -16,6 +16,7 @@ import {
 } from './agentActivitySummary'
 import { agentRevealCharacters } from './agentOutputReveal'
 import {
+  collapsedProcessHeadline,
   expandedProcessView,
   latestProcessLine,
 } from './agentProcessText'
@@ -358,7 +359,7 @@ export function AgentActivityStrip({
     live && status.kind === 'executing' &&
     (status.tool === 'runNode' || status.tool === 'runFrom')
   const visibleText = !live
-    ? latestProcessLine(processText || latestHistory?.text || '')
+    ? collapsedProcessHeadline(history, processText || latestHistory?.text || '')
     : isGeneration
       ? currentText
       : latestProcessLine(processText) || liveDetail || latestProcessLine(latestHistory?.text || '') || currentText
