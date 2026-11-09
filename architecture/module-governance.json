@@ -766,6 +766,105 @@
       "budget": 225
     },
     {
+      "module": "src/domain/inspiration/clipper.ts",
+      "owner": "clipper-collection-rules",
+      "responsibility": "定义网页收藏条目、去重排序、数量上限和不完整行清洗的纯规则。",
+      "owns": [
+        "ClipperItem 数据形状",
+        "按网页 + 图片去重并保留最新收藏",
+        "公开 HTTP 地址校验与 200 条上限"
+      ],
+      "doesNotOwn": [
+        "账号级收藏持久化",
+        "网页抓取和图片下载",
+        "React 面板和画布导入动作"
+      ],
+      "publicApi": [
+        "CLIPPER_COLLECTION_KEY",
+        "CLIPPER_MAX_ITEMS",
+        "ClipperItem",
+        "normalizeClipperItems",
+        "upsertClipperItems",
+        "removeClipperItem"
+      ],
+      "test": [
+        "src/domain/inspiration/clipper.test.ts"
+      ],
+      "budget": 120
+    },
+    {
+      "module": "src/state/shared/clipperCollectionRepository.ts",
+      "owner": "clipper-collection-persistence",
+      "responsibility": "在共享 presets 中读写账号级网页收藏集合，并复用纯规则做去重与清洗。",
+      "owns": [
+        "clipper:collection:v1 单行读写",
+        "收藏追加和单项移除"
+      ],
+      "doesNotOwn": [
+        "网页解析与素材字节",
+        "项目参考台账和画布节点",
+        "React 状态"
+      ],
+      "publicApi": [
+        "ClipperCollectionRepository",
+        "createClipperCollectionRepository"
+      ],
+      "test": [
+        "src/state/shared/clipperCollectionRepository.test.ts"
+      ],
+      "budget": 80
+    },
+    {
+      "module": "src/pages/CanvasPage/clipper/ClipperPanel.tsx",
+      "owner": "clipper-panel",
+      "responsibility": "网页地址抓取、轻画浏览器预览和网页收藏到参考/Agent/画布的交互编排。",
+      "owns": [
+        "网页收藏地址输入与单页抓取",
+        "全部 / 未分类筛选和嵌入式浏览",
+        "收藏、移除、加入参考、加入 Agent、放到画布动作"
+      ],
+      "doesNotOwn": [
+        "网页收藏纯规则与持久化",
+        "网络协议、素材下载和参考台账事务",
+        "画布节点内部渲染"
+      ],
+      "publicApi": [
+        "ClipperPanel"
+      ],
+      "test": [
+        "src/domain/inspiration/clipper.test.ts",
+        "src/state/shared/clipperCollectionRepository.test.ts",
+        "src/features/shared/research/designResearchRunner.test.ts"
+      ],
+      "budget": 450
+    },
+    {
+      "module": "src/pages/CanvasPage/clipper/ClipperPanel.module.css",
+      "owner": "clipper-panel",
+      "responsibility": "网页收藏、地址输入、轻画浏览器和两列收藏网格的样式域。",
+      "owns": [
+        "收藏筛选与操作按钮",
+        "嵌入式浏览器几何",
+        "收藏卡网格和窄宽度降级"
+      ],
+      "doesNotOwn": [
+        "组件状态与抓取逻辑",
+        "共享主题令牌定义"
+      ],
+      "publicApi": [
+        "CSS_MODULE:网页收藏与轻画浏览器",
+        "CSS_CLASS:panel",
+        "CSS_CLASS:composer",
+        "CSS_CLASS:browser",
+        "CSS_CLASS:grid",
+        "CSS_CLASS:item"
+      ],
+      "test": [
+        "src/domain/inspiration/clipper.test.ts"
+      ],
+      "budget": 300
+    },
+    {
       "module": "src/features/shared/pinterest/PinterestSetupView.tsx",
       "owner": "pinterest-ui",
       "responsibility": "Pinterest OAuth 应用配置和手动回调表单。",

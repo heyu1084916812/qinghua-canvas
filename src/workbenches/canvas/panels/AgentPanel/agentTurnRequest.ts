@@ -88,6 +88,7 @@ export interface AgentTurnContextTrace {
   brief?: string
   referenceEvidence?: string[]
   referencePhaseEvent?: AgentPhaseEvent
+  skillPhaseEvent?: AgentPhaseEvent
 }
 
 export type AgentTurnMention = MentionRef & {
@@ -533,6 +534,14 @@ export async function prepareAgentTurnRequest(
   const skill = skillId
     ? input.skills.find((item) => item.id === skillId)
     : undefined
+  if (contextTrace && skill) {
+    contextTrace.skillPhaseEvent = {
+      phase: 'skillLoaded',
+      title: '技能加载完成',
+      detail: `已加载技能「${skill.name}」。`,
+      evidence: [skill.id],
+    }
+  }
   const explicitMediaModels = explicitMediaModelsFromMentions(
     mentions,
     (model) => capabilityOfLogical(input.channels, model)?.category,

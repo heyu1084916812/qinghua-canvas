@@ -317,6 +317,19 @@ try {
     await page.locator('[data-my-assets-source="pinterest"]').click()
     await page.locator('[data-pinterest-panel]').waitFor({ timeout: 10_000 }).catch(() => {})
     const pinterestMounted = await page.locator('[data-pinterest-panel]').count()
+    await page.locator('[data-my-assets-source="clipper"]').click()
+    await page.locator('[data-clipper-panel]').waitFor({ timeout: 10_000 })
+    const clipperMounted = await page.locator('[data-clipper-panel]').count()
+    await page.locator('[data-clipper-add]').click()
+    const clipperComposer = await page.locator('[data-clipper-composer]').count()
+    await page.locator('[data-clipper-url]').fill('https://example.com/')
+    await page.locator('[data-clipper-browse]').click()
+    await page.locator('[data-clipper-browser] iframe').waitFor({ timeout: 10_000 })
+    const clipperBrowser = await page.locator('[data-clipper-browser]').count()
+    const clipperFrame = await page.locator('[data-clipper-browser] iframe').count()
+    await page.mouse.move(900, 80)
+    await page.waitForTimeout(600)
+    await page.screenshot({ path: path.join(out, `${file}-canvas-clipper.png`) })
     await page.locator('[data-my-assets-source="reference"]').click()
     await page.locator('[data-my-assets-reference-file]').setInputFiles([
       {
@@ -741,6 +754,10 @@ try {
       sourceTabs,
       assetKinds,
       pinterestMounted,
+      clipperMounted,
+      clipperComposer,
+      clipperBrowser,
+      clipperFrame,
       referenceCards,
       referenceFolders,
       referenceUpload,

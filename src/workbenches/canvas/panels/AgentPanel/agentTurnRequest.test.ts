@@ -230,6 +230,7 @@ describe('prepareAgentTurnRequest', () => {
     expect(withoutChip.kind).toBe('ready')
     if (withoutChip.kind === 'ready') {
       expect(withoutChip.systemPrompt).not.toContain('技能正文：保留品牌字形和主色。')
+      expect(withoutChip.contextTrace?.skillPhaseEvent).toBeUndefined()
     }
 
     clearToolSupportCache()
@@ -244,6 +245,12 @@ describe('prepareAgentTurnRequest', () => {
     if (withChip.kind === 'ready') {
       expect(withChip.skill?.id).toBe('skill-brand')
       expect(withChip.systemPrompt).toContain('技能正文：保留品牌字形和主色。')
+      expect(withChip.contextTrace?.skillPhaseEvent).toEqual({
+        phase: 'skillLoaded',
+        title: '技能加载完成',
+        detail: '已加载技能「品牌技能」。',
+        evidence: ['skill-brand'],
+      })
     }
   })
 

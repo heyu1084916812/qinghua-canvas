@@ -332,11 +332,18 @@ export async function runAgentSendTurn(
       }
     },
   )
-  const referencePhaseEvent = prepared.contextTrace?.referencePhaseEvent
-  const savedPhaseEventMessages = referencePhaseEvent
-    ? await saveReferencePhaseEvent({
+  const phaseEvents = [
+    ...(prepared.contextTrace?.skillPhaseEvent
+      ? [prepared.contextTrace.skillPhaseEvent]
+      : []),
+    ...(prepared.contextTrace?.referencePhaseEvent
+      ? [prepared.contextTrace.referencePhaseEvent]
+      : []),
+  ]
+  const savedPhaseEventMessages = phaseEvents.length > 0
+    ? await savePhaseEvents({
         sessionId: session.id,
-        event: referencePhaseEvent,
+        events: phaseEvents,
         history: withFullHistory(outcome.messages),
         saveMessages: ports.savePhaseEventMessages,
       })
@@ -356,11 +363,11 @@ export async function runAgentSendTurn(
   return outcome
 }
 
-async function saveReferencePhaseEvent(input: {
+async function savePhaseEvents(input: {
   sessionId: string
-  event: NonNullable<
+  events: NonNullable<
     NonNullable<PreparedAgentTurnRequest['contextTrace']>['referencePhaseEvent']
-  >
+  >[]
   history: ChatMessage[]
   saveMessages: AgentSendTurnPorts['savePhaseEventMessages']
 }): Promise<ChatMessage[] | null> {
@@ -369,21 +376,20 @@ async function saveReferencePhaseEvent(input: {
     -1,
   )
   if (userIndex < 0) return null
-  const eventMessage: ChatMessage = {
+  const startedAt = Date.now()
+  const eventMessages: ChatMessage[] = input.events.map((event, index) => ({
     role: 'assistant',
     content: '',
-    createdAt: Date.now(),
+    createdAt: startedAt + index,
     phaseEvent: {
-      phase: input.event.phase,
-      title: input.event.title,
-      ...(input.event.detail ? { detail: input.event.detail } : {}),
-      ...(input.event.evidence
-        ? { evidence: [...input.event.evidence] }
-        : {}),
+      phase: event.phase,
+      title: event.title,
+      ...(event.detail ? { detail: event.detail } : {}),
+      ...(event.evidence ? { evidence: [...event.evidence] } : {}),
     },
-  }
+  }))
   const history = [...input.history]
-  history.splice(userIndex + 1, 0, eventMessage)
+  history.splice(userIndex + 1, 0, ...eventMessages)
   const saved = await input.saveMessages(input.sessionId, history)
   return saved?.messages ?? history
 }

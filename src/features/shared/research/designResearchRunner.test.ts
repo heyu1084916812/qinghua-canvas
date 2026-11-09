@@ -219,6 +219,38 @@ describe('runDesignResearch', () => {
     expect(result.items[1]?.description).toContain('材料')
   })
 
+  it('Clipper mode reads only the requested page and skips open search', async () => {
+    const request = vi.fn<NetworkPort['request']>(async (input) => {
+      if (input.url !== 'https://example.com/clip') {
+        throw new Error(`unexpected request ${input.url}`)
+      }
+      return {
+        status: 200,
+        headers: { 'content-type': 'text/html' },
+        text: async () =>
+          '<title>Clipped</title><meta property="og:image" content="/clip.jpg">',
+        json: async <T,>() => ({}) as T,
+        arrayBuffer: async () => new ArrayBuffer(0),
+      }
+    })
+    const result = await runDesignResearch(
+      {
+        topic: 'https://example.com/clip',
+        urls: ['https://example.com/clip'],
+        includeOpenSearch: false,
+      },
+      { network: { request, stream: async function* () {} } },
+      new AbortController().signal,
+    )
+
+    expect(result.items).toHaveLength(1)
+    expect(result.items[0]).toMatchObject({
+      title: 'Clipped',
+      imageUrl: 'https://example.com/clip.jpg',
+    })
+    expect(request).toHaveBeenCalledOnce()
+  })
+
   it('honors cancellation through the network signal', async () => {
     const controller = new AbortController()
     controller.abort()

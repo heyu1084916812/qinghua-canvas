@@ -12,6 +12,11 @@ const PinterestPanel = lazy(() =>
     default: module.PinterestPanel,
   })),
 )
+const ClipperPanel = lazy(() =>
+  import('./clipper/ClipperPanel').then((module) => ({
+    default: module.ClipperPanel,
+  })),
+)
 
 type Source = 'reference' | 'assets' | 'pinterest' | 'clipper'
 
@@ -106,15 +111,9 @@ export function MyAssetsDrawer({
             </div>
           ) : null}
           {source === 'clipper' ? (
-            <div>
-              <div className={styles.subhead}>
-                <span>网页收藏接收端</span>
-                <span>待接入轻画插件</span>
-              </div>
-              <p className={styles.notice}>
-                画布内浏览器与轻画插件尚在开发。插件上线后，网页收藏会落到这里，并与参考、我的素材、Pinterest 共用「添加到对话 / 加入参考台账 / 放到画布」三种动作。
-              </p>
-            </div>
+            <Suspense fallback={<p className={styles.notice}>正在打开网页收藏…</p>}>
+              <ClipperPanel projectId={projectId} store={store} />
+            </Suspense>
           ) : null}
         </div>
       </aside>

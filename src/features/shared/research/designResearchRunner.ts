@@ -19,6 +19,8 @@ export interface DesignResearchRunnerInput {
   topic: string
   urls?: readonly string[]
   maxResults?: number
+  /** Clipper 等单页抓取只读用户给出的 URL，不额外做开放图片/百科搜索。 */
+  includeOpenSearch?: boolean
 }
 
 export interface DesignResearchRunnerDeps {
@@ -150,14 +152,16 @@ export async function runDesignResearch(
     request.topic,
     Math.min(request.maxResults, 12),
   )
-  const openSearch = await searchOpenResearch(
-    deps.network,
-    request.topic,
-    request.maxResults,
-    signal,
-  )
-  items.push(...openSearch.items)
-  warnings.push(...openSearch.warnings)
+  if (input.includeOpenSearch !== false) {
+    const openSearch = await searchOpenResearch(
+      deps.network,
+      request.topic,
+      request.maxResults,
+      signal,
+    )
+    items.push(...openSearch.items)
+    warnings.push(...openSearch.warnings)
+  }
 
   const pages = await Promise.allSettled(
     safeUrls.map(async (url) => {
@@ -196,7 +200,11 @@ export async function runDesignResearch(
   }
 
   if (items.length === 0) {
-    warnings.push('开放搜索没有找到可用参考；可以补充公开 Pinterest / Behance / 网页 URL 后重试。')
+    warnings.push(
+      input.includeOpenSearch === false
+        ? '页面没有提供可用的 Open Graph 图片或文章内容。'
+        : '开放搜索没有找到可用参考；可以补充公开 Pinterest / Behance / 网页 URL 后重试。',
+    )
   }
 
   const report = buildDesignResearchReport({

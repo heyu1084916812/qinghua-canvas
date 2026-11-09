@@ -1,5 +1,13 @@
 # CanvasFlow（轻画）项目记忆
 
+### 总管2 第四十五轮：网页收藏、轻画浏览器与技能加载阶段（2026-11-10）
+
+- Clipper 页签现在是真实网页收藏，不是占位。`runDesignResearch` 对单页抓取必须传 `includeOpenSearch:false`，否则会错误混入 Openverse / Wikipedia；收藏写 `clipper:collection:v1`，最多 200 条，按页面 + 图片去重。
+- `ClipperPanel` 必须放 `src/pages/CanvasPage/clipper/`，因为它依赖 Agent handoff、active canvas 和画布图标；放进 `features/shared` 会被 no-shared-to-workbench 门禁拒绝。纯规则 `domain/inspiration/clipper.ts` 和账号级仓储 `state/shared/clipperCollectionRepository.ts` 保留在下层。
+- 轻画浏览器采用 sandbox iframe，跨域页面内容不可读是边界；收藏以地址栏输入为准，站点拒绝嵌入时用系统浏览器打开。不要声称浏览器已读取用户 Cookie、私密页面或 iframe 内当前地址。
+- 技能 chip 命中后在 `prepareAgentTurnRequest` 写真实 `skillLoaded` 事件；`agentSendTurnRun` 按技能加载 → 参考分析顺序插到本轮用户消息后一次保存。模型窗口仍剥掉 phaseEvent，其余阶段只从真实工具结果映射。
+- 本轮门禁：check 1124 modules / 4506 deps / 268 registrations，全量 Vitest 656 files（655 passed / 1 skipped）/ 5459 tests（5458 passed / 1 skipped），build 1256 modules，四组 Clipper UI `clipperMounted/composer/browser/frame=1`、越界/错误 0，Impeccable detector 0 findings。未 push。
+
 ### 总管2 第四十四轮：自动参考分析与任务 usage（2026-11-10）
 
 - `curateReferences` 是和 `researchDesign` 同级的 Agent 读工具。分析协议和稳定 usage id 放 `domain/project/referenceCuration.ts`；执行、素材读取和台账写入放 `AgentPanel/agentReferenceCuration.ts`。不要把模型提示词、路由、存储、UI 重新塞回同一个文件。

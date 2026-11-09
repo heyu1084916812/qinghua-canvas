@@ -1,0 +1,248 @@
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.subhead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  min-height: 34px;
+}
+
+.filters {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+}
+
+.tab,
+.tabOn {
+  min-height: 32px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text-3);
+  font: inherit;
+  font-size: var(--fs-chip);
+  cursor: pointer;
+}
+
+.tab:hover {
+  color: var(--text-1);
+}
+
+.tabOn {
+  box-shadow: inset 0 -1px var(--text-1);
+  color: var(--text-1);
+  font-weight: var(--fw-title);
+}
+
+.iconButton,
+.action {
+  display: inline-grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 1px solid var(--stroke);
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--text-2);
+  cursor: pointer;
+}
+
+.iconButton:hover,
+.action:hover {
+  background: var(--bg-hover);
+  color: var(--text-1);
+}
+
+.iconButton:focus-visible,
+.action:focus-visible,
+.tab:focus-visible,
+.tabOn:focus-visible,
+.media:focus-visible,
+.primary:focus-visible {
+  outline: 1px solid var(--stroke-focus);
+  outline-offset: 1px;
+}
+
+.iconButton:disabled,
+.action:disabled,
+.primary:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+
+.composer {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: 1px solid var(--stroke);
+  border-radius: var(--radius-control);
+}
+
+.composer input {
+  min-width: 0;
+  height: 34px;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--stroke);
+  border-radius: var(--radius-control);
+  background: var(--bg-surface);
+  color: var(--text-1);
+  font: inherit;
+  font-size: var(--fs-chip);
+}
+
+.composerActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
+}
+
+.primary {
+  min-height: 30px;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--stroke);
+  border-radius: var(--radius-control);
+  background: var(--text-1);
+  color: var(--bg-surface);
+  font: inherit;
+  font-size: var(--fs-chip);
+  cursor: pointer;
+}
+
+.browser {
+  overflow: hidden;
+  border: 1px solid var(--stroke);
+  border-radius: var(--radius-control);
+}
+
+.browser header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  min-height: 36px;
+  padding: 0 var(--space-2) 0 var(--space-3);
+  border-bottom: 1px solid var(--stroke);
+}
+
+.browser header > span {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text-3);
+  font-size: var(--fs-chip);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.browser header > div {
+  display: flex;
+  gap: var(--space-1);
+}
+
+.browser iframe {
+  display: block;
+  width: 100%;
+  height: 320px;
+  border: 0;
+  background: var(--bg-surface);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.item {
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid var(--stroke);
+  border-radius: var(--radius-control);
+  background: var(--bg-surface);
+}
+
+.media {
+  display: block;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  padding: 0;
+  overflow: hidden;
+  border: 0;
+  background: var(--bg-hover);
+  cursor: pointer;
+}
+
+.media img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.itemBody {
+  display: grid;
+  gap: var(--space-1);
+  padding: var(--space-2);
+}
+
+.itemBody strong {
+  overflow: hidden;
+  color: var(--text-1);
+  font-size: var(--fs-chip);
+  font-weight: var(--fw-title);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.itemBody > span {
+  overflow: hidden;
+  color: var(--text-3);
+  font-size: var(--fs-chip);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.itemActions {
+  display: flex;
+  gap: var(--space-1);
+  padding-top: var(--space-1);
+}
+
+.action {
+  width: 26px;
+  height: 26px;
+}
+
+.empty {
+  display: grid;
+  place-items: center;
+  gap: var(--space-2);
+  min-height: 180px;
+  border: 1px dashed var(--stroke);
+  border-radius: var(--radius-control);
+  color: var(--text-3);
+  font-size: var(--fs-chip);
+}
+
+.status {
+  min-height: 20px;
+  margin: 0;
+  color: var(--text-3);
+  font-size: var(--fs-chip);
+  line-height: 1.5;
+}
+
+@media (max-width: 360px) {
+  .grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

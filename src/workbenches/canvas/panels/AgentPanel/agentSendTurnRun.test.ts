@@ -365,6 +365,12 @@ describe('A-5 #3 / #4 / #5 / #6 / #9：保存与准备之间的顺序', () => {
             detail: '本轮怎么用：保持字形与颜色不变',
             evidence: ['r1:u1'],
           },
+          skillPhaseEvent: {
+            phase: 'skillLoaded',
+            title: '技能加载完成',
+            detail: '已加载技能「品牌技能」。',
+            evidence: ['skill-brand'],
+          },
         },
       }),
     })
@@ -376,8 +382,15 @@ describe('A-5 #3 / #4 / #5 / #6 / #9：保存与准备之间的顺序', () => {
       'user',
       'assistant',
       'assistant',
+      'assistant',
     ])
     expect((messages?.[1] as ChatMessage).phaseEvent).toEqual({
+      phase: 'skillLoaded',
+      title: '技能加载完成',
+      detail: '已加载技能「品牌技能」。',
+      evidence: ['skill-brand'],
+    })
+    expect((messages?.[2] as ChatMessage).phaseEvent).toEqual({
       phase: 'referenceAnalysis',
       title: '参考分析完成 · 1 项依据',
       detail: '本轮怎么用：保持字形与颜色不变',
