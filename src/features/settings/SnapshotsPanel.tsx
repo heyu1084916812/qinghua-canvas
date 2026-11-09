@@ -3,7 +3,7 @@ import { usePlatform } from '../../app/providers/PlatformProvider'
 import { createSnapshotStore } from '../../state/project/snapshotStore'
 import {
   describeSnapshot,
-  SNAPSHOT_KEEP_CHOICES,
+  SNAPSHOT_KEEP_DEFAULT,
   type ProjectSnapshot,
 } from '../../domain/project/snapshot'
 import styles from './SnapshotsPanel.module.css'
@@ -21,8 +21,10 @@ export function SnapshotsPanel() {
   const [snapshots, setSnapshots] = useState<ProjectSnapshot[]>([])
   const snapshotStore = useMemo(() => createSnapshotStore(platform.storage), [platform])
 
-  const refresh = useCallback(async () => {
+  const refresh = useCallback(async (): Promise<number> => {
+    const removed = await snapshotStore.pruneAll(SNAPSHOT_KEEP_DEFAULT)
     setSnapshots(await snapshotStore.list())
+    return removed
   }, [snapshotStore])
 
   useEffect(() => {
@@ -42,8 +44,12 @@ export function SnapshotsPanel() {
       for (const project of projects.filter((p) => !p.deletedAt)) {
         if (await snapshotStore.capture(project.id)) n += 1
       }
-      await refresh()
-      setStatus(n > 0 ? `已为 ${n} 个项目拍下快照` : '没有需要拍的项目（空项目不会拍）')
+      const removed = await refresh()
+      setStatus(
+        `${n > 0 ? `已为 ${n} 个项目拍下快照` : '没有需要拍的项目（空项目不会拍）'}${
+          removed > 0 ? `，已清理 ${removed} 份多余快照` : ''
+        }`,
+      )
     } catch (err) {
       setStatus(`拍快照失败：${err instanceof Error ? err.message : String(err)}`)
     } finally {
@@ -77,7 +83,7 @@ export function SnapshotsPanel() {
         <p className={styles.caption}>每天保存项目结构快照，默认保留 7 份。</p>
         <SettingsRow
           label="已有快照"
-          description={`${snapshots.length > 0 ? `${snapshots.length} 份` : '还没有（打开应用后会自动拍）'} · 保留 ${SNAPSHOT_KEEP_CHOICES[1]} 份`}
+          description={`${snapshots.length > 0 ? `${snapshots.length} 份` : '还没有（打开应用后会自动拍）'} · 每个项目保留 ${SNAPSHOT_KEEP_DEFAULT} 份`}
           control={
             <button
               type="button"
@@ -92,7 +98,7 @@ export function SnapshotsPanel() {
         />
         {snapshots.length > 0 ? (
           <ul className={styles.snapList}>
-            {snapshots.slice(0, 20).map((snapshot) => (
+            {snapshots.map((snapshot) => (
               <li key={snapshot.id} className={styles.snapItem} data-snapshot-item={snapshot.id}>
                 <span className={styles.snapText}>{describeSnapshot(snapshot)}</span>
                 <button

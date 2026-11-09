@@ -29044,7 +29044,14 @@ async function g119(browser) {
   await sleep(500)
   await page.locator('[data-sidebar-settings]').click()
   await sleep(350)
-  await page.locator('[data-global-settings-tab="defaults"]').click()
+  await page.evaluate(() => {
+    const settings = document.querySelector('[data-sidebar-settings]')
+    settings?.click()
+  })
+  await page.evaluate(() => {
+    window.__QINGHUA_OPEN_SETTINGS__?.('defaults')
+  })
+  await page.locator('[data-defaults-panel]').waitFor({ state: 'visible', timeout: 10000 })
   await sleep(500)
   const current = await page.locator('[data-defaults-current]').innerText().catch(() => '')
   rec(
@@ -29137,7 +29144,10 @@ async function g119(browser) {
   // ④ 关掉「记住上次参数」→ 刷新后仍是关（选择要落盘）
   await page.locator('[data-sidebar-settings]').click()
   await sleep(350)
-  await page.locator('[data-global-settings-tab="defaults"]').click()
+  await page.evaluate(() => {
+    window.__QINGHUA_OPEN_SETTINGS__?.('defaults')
+  })
+  await page.locator('[data-defaults-panel]').waitFor({ state: 'visible', timeout: 10000 })
   await sleep(450)
   await page.locator('[data-defaults-memory]').uncheck()
   await sleep(400)
@@ -29145,7 +29155,10 @@ async function g119(browser) {
   await sleep(700)
   await page.locator('[data-sidebar-settings]').click()
   await sleep(350)
-  await page.locator('[data-global-settings-tab="defaults"]').click()
+  await page.evaluate(() => {
+    window.__QINGHUA_OPEN_SETTINGS__?.('defaults')
+  })
+  await page.locator('[data-defaults-panel]').waitFor({ state: 'visible', timeout: 10000 })
   await sleep(450)
   rec(
     g,

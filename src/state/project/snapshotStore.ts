@@ -39,6 +39,8 @@ export interface SnapshotStore {
    * 返回值告诉调用方"这次实际拍了几张" —— 界面可以据此决定要不要提示用户。
    */
   runAuto: (opts?: { keep?: number; now?: number }) => Promise<ProjectSnapshot[]>
+  /** 按项目统一清理历史快照，让手动拍摄与旧库也遵守保留策略。 */
+  pruneAll: (keep?: number) => Promise<number>
   /** 还原一份快照（原地覆盖当前项目） */
   restore: (snapshotId: string) => Promise<void>
   /** 删一份快照 */
@@ -63,7 +65,7 @@ function metaFromRow(row: Record<string, unknown>): ProjectSnapshot | null {
 }
 
 export function createSnapshotStore(storage: StoragePort): SnapshotStore {
-  const list: SnapshotStore['list'] = async (projectId) => {
+  const rawList = async (projectId?: string): Promise<ProjectSnapshot[]> => {
     const rows = (await storage.query('snapshots', projectId ? { projectId } : {})) as unknown as Record<
       string,
       unknown
@@ -72,6 +74,21 @@ export function createSnapshotStore(storage: StoragePort): SnapshotStore {
       .map(metaFromRow)
       .filter((s): s is ProjectSnapshot => s !== null)
       .sort((a, b) => b.createdAt - a.createdAt)
+  }
+
+  const list: SnapshotStore['list'] = async (projectId) => {
+    const all = await rawList(projectId)
+    const byProject = new Map<string, ProjectSnapshot[]>()
+    for (const snap of all) {
+      const group = byProject.get(snap.projectId) ?? []
+      group.push(snap)
+      byProject.set(snap.projectId, group)
+    }
+    const pruneIds = new Set<string>()
+    for (const group of byProject.values()) {
+      for (const id of snapshotsToPrune(group, SNAPSHOT_KEEP_DEFAULT)) pruneIds.add(id)
+    }
+    return all.filter((snap) => !pruneIds.has(snap.id))
   }
 
   /** 读一份完整快照（抽成独立函数：`restore` 也要用，别在方法里写 `this.read`） */
@@ -113,6 +130,7 @@ export function createSnapshotStore(storage: StoragePort): SnapshotStore {
       runRecords: runRecords as unknown as Record<string, unknown>[],
     }
     await storage.put('snapshots', record as never)
+    await prune(projectId, SNAPSHOT_KEEP_DEFAULT)
     // 只把元数据回给调用方：界面列表不需要背着整份图
     return {
       id: record.id,
@@ -123,13 +141,31 @@ export function createSnapshotStore(storage: StoragePort): SnapshotStore {
     }
   }
 
-  const prune = async (projectId: string, keep: number): Promise<void> => {
-    const all = await list(projectId)
-    for (const id of snapshotsToPrune(all, keep)) await storage.delete('snapshots', id)
+  const prune = async (projectId: string, keep: number): Promise<number> => {
+    const all = await rawList(projectId)
+    const ids = snapshotsToPrune(all, keep)
+    for (const id of ids) await storage.delete('snapshots', id)
+    return ids.length
+  }
+
+  const pruneAll = async (keep = SNAPSHOT_KEEP_DEFAULT): Promise<number> => {
+    const all = await rawList()
+    const byProject = new Map<string, ProjectSnapshot[]>()
+    for (const snap of all) {
+      const group = byProject.get(snap.projectId) ?? []
+      group.push(snap)
+      byProject.set(snap.projectId, group)
+    }
+    let removed = 0
+    for (const projectId of byProject.keys()) {
+      removed += await prune(projectId, keep)
+    }
+    return removed
   }
 
   return {
     list,
+    pruneAll,
 
     read: readSnapshot,
 
@@ -155,9 +191,9 @@ export function createSnapshotStore(storage: StoragePort): SnapshotStore {
         const snap = await writeSnapshot(projectId, now)
         if (snap) {
           created.push(snap)
-          await prune(projectId, keep)
         }
       }
+      await pruneAll(keep)
       return created
     },
 
