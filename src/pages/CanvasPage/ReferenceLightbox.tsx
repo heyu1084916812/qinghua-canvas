@@ -166,45 +166,57 @@ export function ReferenceLightbox({
         <IconClose size={18} />
       </button>
       <div className={styles.layout}>
-        <div className={styles.mediaPane}>
-          <button type="button" className={styles.nav} data-reference-lightbox-prev aria-label="上一张参考" title="上一张参考" disabled={items.length < 2} onClick={() => go(-1)}>
-            <IconChevronLeft size={18} />
-          </button>
-          <div className={styles.mediaFrame} data-reference-lightbox-media>
-            {mediaUrl && !isVideo ? (
-              <img
-                src={mediaUrl}
-                alt={item.title}
-                onLoad={(event) => setSize({
-                  width: event.currentTarget.naturalWidth,
-                  height: event.currentTarget.naturalHeight,
-                })}
-                onError={() => setMediaError('图片内容不存在或无法读取')}
-              />
-            ) : null}
-            {mediaUrl && isVideo ? (
-              <video
-                src={mediaUrl}
-                controls
-                playsInline
-                preload="metadata"
-                onLoadedMetadata={(event) => setSize({
-                  width: event.currentTarget.videoWidth,
-                  height: event.currentTarget.videoHeight,
-                })}
-                onError={() => setMediaError('视频内容不存在或无法读取')}
-              />
-            ) : null}
-            {!mediaUrl && !mediaError ? (
-              <span className={styles.mediaLoading}>
-                {item.assetHash ? '正在读取素材…' : '这条参考没有可直接预览的媒体'}
-              </span>
-            ) : null}
-            {mediaError ? <span className={styles.mediaError}>{mediaError}</span> : null}
+        <div className={styles.visual}>
+          <div className={styles.mediaPane}>
+            <button type="button" className={styles.nav} data-reference-lightbox-prev aria-label="上一张参考" title="上一张参考" disabled={items.length < 2} onClick={() => go(-1)}>
+              <IconChevronLeft size={18} />
+            </button>
+            <div className={styles.mediaFrame} data-reference-lightbox-media>
+              {mediaUrl && !isVideo ? (
+                <img
+                  src={mediaUrl}
+                  alt={item.title}
+                  onLoad={(event) => setSize({
+                    width: event.currentTarget.naturalWidth,
+                    height: event.currentTarget.naturalHeight,
+                  })}
+                  onError={() => setMediaError('图片内容不存在或无法读取')}
+                />
+              ) : null}
+              {mediaUrl && isVideo ? (
+                <video
+                  src={mediaUrl}
+                  controls
+                  playsInline
+                  preload="metadata"
+                  onLoadedMetadata={(event) => setSize({
+                    width: event.currentTarget.videoWidth,
+                    height: event.currentTarget.videoHeight,
+                  })}
+                  onError={() => setMediaError('视频内容不存在或无法读取')}
+                />
+              ) : null}
+              {!mediaUrl && !mediaError ? (
+                <span className={styles.mediaLoading}>
+                  {item.assetHash ? '正在读取素材…' : '这条参考没有可直接预览的媒体'}
+                </span>
+              ) : null}
+              {mediaError ? <span className={styles.mediaError}>{mediaError}</span> : null}
+            </div>
+            <button type="button" className={styles.nav} data-reference-lightbox-next aria-label="下一张参考" title="下一张参考" disabled={items.length < 2} onClick={() => go(1)}>
+              <IconChevronRight size={18} />
+            </button>
           </div>
-          <button type="button" className={styles.nav} data-reference-lightbox-next aria-label="下一张参考" title="下一张参考" disabled={items.length < 2} onClick={() => go(1)}>
-            <IconChevronRight size={18} />
-          </button>
+          <div className={styles.thumbs} data-reference-lightbox-thumbs role="group" aria-label="项目参考缩略图">
+            {items.map((row, rowIndex) => (
+              <LightboxThumb
+                key={row.id}
+                item={row}
+                active={rowIndex === index}
+                onClick={() => select(rowIndex)}
+              />
+            ))}
+          </div>
         </div>
         <aside className={styles.info} data-reference-lightbox-info>
           <header>
@@ -231,16 +243,6 @@ export function ReferenceLightbox({
           </div>
           <p className={styles.status} role="status" aria-live="polite">{actionStatus}</p>
         </aside>
-      </div>
-      <div className={styles.thumbs} data-reference-lightbox-thumbs role="group" aria-label="项目参考缩略图">
-        {items.map((row, rowIndex) => (
-          <LightboxThumb
-            key={row.id}
-            item={row}
-            active={rowIndex === index}
-            onClick={() => select(rowIndex)}
-          />
-        ))}
       </div>
     </div>,
     document.body,

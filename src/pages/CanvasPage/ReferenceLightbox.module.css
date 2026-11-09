@@ -40,7 +40,15 @@
   gap: clamp(24px, 4vw, 72px);
   flex: 1 1 auto;
   min-height: 0;
-  padding: 64px clamp(52px, 6vw, 96px) 92px;
+  padding: 64px clamp(52px, 6vw, 96px) 32px;
+}
+
+.visual {
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
+  gap: var(--space-4);
+  min-width: 0;
+  min-height: 0;
 }
 
 .mediaPane {
@@ -214,15 +222,12 @@
 }
 
 .thumbs {
-  position: absolute;
-  bottom: var(--space-4);
-  left: 50%;
   display: flex;
+  justify-self: center;
   gap: var(--space-2);
-  max-width: min(60vw, 560px);
-  padding: var(--space-2);
+  max-width: 100%;
+  padding: 0 var(--space-2);
   overflow-x: auto;
-  transform: translateX(-50%);
 }
 
 .thumb,
@@ -267,7 +272,7 @@
   .layout {
     grid-template-columns: minmax(0, 1fr) 240px;
     gap: var(--space-5);
-    padding: 48px 44px 76px;
+    padding: 48px 44px 24px;
   }
 
   .info {

@@ -393,8 +393,10 @@ try {
       const lightbox = document.querySelector('[data-reference-lightbox]')
       const media = lightbox?.querySelector('[data-reference-lightbox-media] img, [data-reference-lightbox-media] video')
       const info = lightbox?.querySelector('[data-reference-lightbox-info]')
+      const thumbs = lightbox?.querySelector('[data-reference-lightbox-thumbs]')
       const infoRect = info?.getBoundingClientRect()
       const mediaRect = media?.getBoundingClientRect()
+      const thumbsRect = thumbs?.getBoundingClientRect()
       return {
         referenceLightboxOpen: Boolean(lightbox),
         referenceLightboxTitle:
@@ -422,6 +424,13 @@ try {
           mediaRect.bottom <= window.innerHeight + 1,
         referenceLightboxOverflowX:
           Boolean(lightbox) && lightbox.scrollWidth > lightbox.clientWidth + 1,
+        referenceThumbCenterDelta:
+          mediaRect && thumbsRect
+            ? Math.abs(
+                (mediaRect.left + mediaRect.right) / 2 -
+                (thumbsRect.left + thumbsRect.right) / 2,
+              )
+            : -1,
         referenceLightboxFocus:
           document.activeElement?.hasAttribute('data-reference-lightbox-close') ?? false,
       }
@@ -501,6 +510,7 @@ try {
       referenceLightboxInfoInside: referenceLightbox.referenceLightboxInfoInside,
       referenceLightboxMediaInside: referenceLightbox.referenceLightboxMediaInside,
       referenceLightboxOverflowX: referenceLightbox.referenceLightboxOverflowX,
+      referenceThumbCenterDelta: referenceLightbox.referenceThumbCenterDelta,
       referenceLightboxFocus: referenceLightbox.referenceLightboxFocus,
       referenceLightboxFocusReturned,
       referenceLightboxAddStatus,

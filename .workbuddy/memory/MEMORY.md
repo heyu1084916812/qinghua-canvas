@@ -1,5 +1,10 @@
 # CanvasFlow（轻画）项目记忆
 
+### 总管2 第三十九轮：参考缩略图跟随大图居中（2026-11-09）
+
+- 参考详情空间结构必须是 `.layout > .visual + .info`；`.visual` 自己再分“大图 / 缩略图”两行。缩略图不能再用 `position:absolute; left:50%` 相对视口居中，否则宽屏会跑到右侧信息列下方。本轮四组实测大图与缩略图中心误差都是 0px。
+- 本轮 check 1104 modules / 4413 deps / 248 registrations，串行 Vitest 649 files / 5439 tests（1 skipped），build 1236 modules，Impeccable layout detector 0 findings。参考详情剩余仍是自动 What/HowToUse / 任务 usage、套件文件夹/筛选、台账批量管理、Clipper。
+
 ### 总管2 第三十八轮：Lovart 式参考详情灯箱（2026-11-09）
 
 - 参考详情使用独立 `ReferenceLightbox`，不要继续往通用 `LightboxLayer` 塞项目参考业务。通用灯箱继续负责裁剪、旋转、标注、对比；参考详情只负责看图、What/HowToUse、缩略图导航和“添加到画布/对话”。`ReferenceMedia` 已拆出，`MyAssetsDrawer.tsx` 现 311 行。
