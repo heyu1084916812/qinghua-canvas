@@ -308,6 +308,64 @@ describe('prepareAgentTurnRequest', () => {
     })
   })
 
+  it('★★ 套件参考把多图资产集合全部并入本轮 assetRefs', async () => {
+    const { sessions, session } = await createSession()
+    const readAssetMime = vi.fn(async (hash: string) =>
+      hash.startsWith('image-') ? 'image/png' : null,
+    )
+    const selectForTask = vi.fn(async (
+      _projectId: string,
+      _taskKey: string,
+    ): Promise<ReferenceSelection> => ({
+      selected: [{
+        item: {
+          id: 'kit-ref',
+          projectId: 'p1',
+          title: 'Anbel',
+          source: 'kit',
+          kind: 'image',
+          assetHash: 'image-logo',
+          assets: [
+            { hash: 'image-logo', role: 'logo', name: 'Logo' },
+            { hash: 'image-room', role: 'reference', name: '空间' },
+            { hash: 'broken-photo', role: 'reference', name: '缺失图' },
+            { hash: 'image-room', role: 'reference', name: '重复空间' },
+          ],
+          what: '完整品牌套件',
+          createdAt: 1,
+          updatedAt: 1,
+        },
+        usage: {
+          id: 'usage-kit',
+          itemId: 'kit-ref',
+          projectId: 'p1',
+          taskKey: 'simple_generate',
+          usage: 'style',
+          howToUse: '沿用完整套件',
+          createdAt: 1,
+        },
+      }],
+      omitted: [],
+    }))
+
+    const result = await prepareAgentTurnRequest({
+      ...inputFor({ sessions, session, text: '用品牌套件做一张 KV' }),
+      readAssetMime,
+      referenceLedger: {
+        selectForTask,
+        listItems: vi.fn(async () => []),
+      },
+    })
+
+    expect(result.kind).toBe('ready')
+    if (result.kind !== 'ready') return
+    expect(result.contextTrace?.assetRefs).toEqual([
+      { hash: 'image-logo', mime: 'image/png', role: 'logo', name: 'Logo' },
+      { hash: 'image-room', mime: 'image/png', role: 'reference', name: '空间' },
+    ])
+    expect(readAssetMime).toHaveBeenCalledWith('broken-photo')
+  })
+
   it('★★ 正文参考 chip 与会话持续参考都进入本轮上下文，不依赖 usage 预登记', async () => {
     const { sessions, session } = await createSession({
       referenceIds: ['r2'],

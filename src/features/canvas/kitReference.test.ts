@@ -44,6 +44,10 @@ describe('kit reference projection', () => {
 
     expect(item.id).toBe('ref_kit_brand-anbel')
     expect(item.assetHash).toBe('logo-hash')
+    expect(item.assets).toEqual([
+      { hash: 'logo-hash', role: 'logo', name: 'Anbel 标志' },
+      { hash: 'photo-hash', role: 'reference', name: '空间照片' },
+    ])
     expect(item.kitVersion).toBe(3)
     expect(item.what).toContain('2 张图片')
     expect(rows).toHaveLength(1)
@@ -70,6 +74,9 @@ describe('kit reference projection', () => {
 
     expect(item.id).toBe('ref_kit_asset_brand-anbel_photo-hash')
     expect(item.title).toBe('空间照片')
+    expect(item.assets).toEqual([
+      { hash: 'photo-hash', role: 'reference', name: '空间照片' },
+    ])
     expect(item.what).toContain('品牌套件「Anbel」v3')
     expect(item.kind).toBe('image')
     expect(rows).toHaveLength(1)

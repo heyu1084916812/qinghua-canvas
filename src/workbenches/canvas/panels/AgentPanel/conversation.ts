@@ -1,5 +1,6 @@
 import { agentPhaseForTool, agentPhaseTitle, isAgentPhase, type AgentPhase } from '../../../../domain/agent/phase'
 import type { ChatMessage } from '../../../../domain/shared/execution/types'
+import { isPublicHttpUrl } from '../../../../domain/shared/publicUrl'
 
 /**
  * 对话流（设计文档 §8「输出：计划预览 + 普通对话」）。
@@ -30,9 +31,19 @@ export interface ConversationStep {
   summaryLines?: string[]
   /** 这一步牵扯到的节点 id：面板据此把它们产出的图**内嵌**显示 */
   nodeIds: string[]
+  researchItems?: ConversationResearchItem[]
   failed: boolean
   /** 该步骤来自哪个真实阶段；旧消息可以没有。 */
   phase?: AgentPhase
+}
+
+export interface ConversationResearchItem {
+  id: string
+  title: string
+  url: string
+  imageUrl: string
+  source: string
+  description?: string
 }
 
 export interface ConversationProcessEntry {
@@ -88,7 +99,7 @@ const TOOL_LABEL: Record<string, string> = {
   readGraph: '已看画布',
   readAsset: '已读素材',
   readResult: '已读结果',
-  researchDesign: '设计调研完成',
+  researchDesign: '联网调研完成',
   visualReview: '视觉验收完成',
   proposeTaskPlan: '执行计划已确认',
   updateTaskStep: '计划进度已更新',
@@ -111,7 +122,7 @@ const TOOL_RUNNING_LABEL: Record<string, string> = {
   readGraph: '正在读取画布',
   readAsset: '正在读取素材',
   readResult: '正在读取结果',
-  researchDesign: '正在做设计调研',
+  researchDesign: '正在联网调研',
   visualReview: '正在视觉验收',
   proposeTaskPlan: '正在整理任务计划',
   updateTaskStep: '正在更新任务进度',
@@ -142,7 +153,7 @@ const TOOL_LABEL_FAILED: Record<string, string> = {
   readGraph: '看画布失败',
   readAsset: '读素材失败',
   readResult: '读结果失败',
-  researchDesign: '设计调研没完成',
+  researchDesign: '联网调研没完成',
   visualReview: '视觉验收没完成',
   proposeTaskPlan: '执行计划未确认',
   updateTaskStep: '计划进度没更新',
@@ -241,6 +252,7 @@ export function describeToolResult(
   lines: string[]
   summaryLines?: string[]
   nodeIds: string[]
+  researchItems?: ConversationResearchItem[]
   failed: boolean
   activityLabel?: string
   activityKind?: 'tool' | 'image'
@@ -311,12 +323,28 @@ export function describeToolResult(
       const items = asArray(r.items).map(asRecord)
       const sources = asArray(r.sources).map(asRecord)
       const warnings = asArray(r.warnings).map((item) => clean(item))
+      const researchItems = items
+        .flatMap((item): ConversationResearchItem[] => {
+          const url = String(item.url ?? '')
+          if (!isPublicHttpUrl(url)) return []
+          const imageUrl = String(item.imageUrl ?? '')
+          return [{
+            id: String(item.id ?? url),
+            title: clean(String(item.title ?? url)),
+            url,
+            imageUrl: isPublicHttpUrl(imageUrl) ? imageUrl : '',
+            source: String(item.source ?? 'web'),
+            description: clean(String(item.description ?? '')),
+          }]
+        })
+        .slice(0, 6)
       return {
         lines: [
           `找到 ${items.length} 条参考，覆盖 ${sources.length} 个来源`,
           ...warnings.slice(0, 2),
         ],
         nodeIds: [],
+        researchItems,
         failed: r.ok === false,
       }
     }

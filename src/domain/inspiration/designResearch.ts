@@ -1,4 +1,10 @@
-export type ResearchProvider = 'google' | 'pinterest' | 'behance' | 'web'
+export type ResearchProvider =
+  | 'google'
+  | 'pinterest'
+  | 'behance'
+  | 'openverse'
+  | 'wikipedia'
+  | 'web'
 
 export const DEFAULT_RESEARCH_MAX_RESULTS = 24
 export const MIN_RESEARCH_MAX_RESULTS = 1
@@ -27,6 +33,10 @@ export interface DesignResearchItem {
   title: string
   url: string
   imageUrl: string
+  description?: string
+  credit?: string
+  license?: string
+  licenseUrl?: string
 }
 
 export interface ResearchSourceSummary {
@@ -74,12 +84,16 @@ const PROVIDER_TITLES: Record<ResearchProvider, string> = {
   google: 'Web references',
   pinterest: 'Pinterest',
   behance: 'Behance',
+  openverse: 'Openverse',
+  wikipedia: 'Wikipedia',
   web: 'Other references',
 }
 
 const PROVIDER_ORDER: readonly ResearchProvider[] = [
   'pinterest',
   'behance',
+  'openverse',
+  'wikipedia',
   'google',
   'web',
 ]

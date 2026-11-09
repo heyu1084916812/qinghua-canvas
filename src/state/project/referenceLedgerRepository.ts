@@ -1,5 +1,6 @@
 import type { StoragePort } from '../../platform/ports'
 import type {
+  ReferenceAssetRef,
   ReferenceItem,
   ReferenceSelection,
   ReferenceUsage,
@@ -16,6 +17,26 @@ export interface ReferenceLedgerRepository {
   selectForTask(projectId: string, taskKey: string): Promise<ReferenceSelection>
 }
 
+function assetsOf(value: unknown): ReferenceAssetRef[] {
+  if (!Array.isArray(value)) return []
+  const rows: ReferenceAssetRef[] = []
+  for (const candidate of value) {
+    if (!candidate || typeof candidate !== 'object') continue
+    const row = candidate as Record<string, unknown>
+    if (
+      typeof row.hash !== 'string' ||
+      !row.hash ||
+      (row.role !== 'logo' && row.role !== 'reference')
+    ) continue
+    rows.push({
+      hash: row.hash,
+      role: row.role,
+      name: typeof row.name === 'string' ? row.name : '',
+    })
+  }
+  return rows
+}
+
 function itemOf(row: Record<string, unknown>): ReferenceItem | null {
   if (
     typeof row.id !== 'string' ||
@@ -27,6 +48,7 @@ function itemOf(row: Record<string, unknown>): ReferenceItem | null {
     typeof row.createdAt !== 'number' ||
     typeof row.updatedAt !== 'number'
   ) return null
+  const assets = assetsOf(row.assets)
   return {
     id: row.id,
     projectId: row.projectId,
@@ -34,6 +56,7 @@ function itemOf(row: Record<string, unknown>): ReferenceItem | null {
     source: row.source as ReferenceItem['source'],
     kind: row.kind as ReferenceItem['kind'],
     ...(typeof row.assetHash === 'string' ? { assetHash: row.assetHash } : {}),
+    ...(assets.length > 0 ? { assets } : {}),
     ...(typeof row.url === 'string' ? { url: row.url } : {}),
     ...(typeof row.kitId === 'string' ? { kitId: row.kitId } : {}),
     ...(typeof row.kitVersion === 'number' ? { kitVersion: row.kitVersion } : {}),

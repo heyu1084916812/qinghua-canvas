@@ -13,6 +13,7 @@ import {
 import type { NetworkPort } from '../../../platform/ports'
 import { isPublicHttpUrl } from '../../../domain/shared/publicUrl'
 import { errorTextOf } from '../../../shared/result'
+import { searchOpenResearch } from './openResearchSearch'
 
 export interface DesignResearchRunnerInput {
   topic: string
@@ -149,6 +150,14 @@ export async function runDesignResearch(
     request.topic,
     Math.min(request.maxResults, 12),
   )
+  const openSearch = await searchOpenResearch(
+    deps.network,
+    request.topic,
+    request.maxResults,
+    signal,
+  )
+  items.push(...openSearch.items)
+  warnings.push(...openSearch.warnings)
 
   const pages = await Promise.allSettled(
     safeUrls.map(async (url) => {
@@ -186,11 +195,8 @@ export async function runDesignResearch(
     }
   }
 
-  if (request.urls.length === 0) {
-    warnings.push('没有提供公开页面 URL；本次只检索了轻画本地灵感库。')
-  }
   if (items.length === 0) {
-    warnings.push('没有找到可用参考。可以补充公开 Pinterest / Behance / 网页 URL 后重试。')
+    warnings.push('开放搜索没有找到可用参考；可以补充公开 Pinterest / Behance / 网页 URL 后重试。')
   }
 
   const report = buildDesignResearchReport({

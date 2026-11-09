@@ -35,6 +35,7 @@ import {
   type ConversationProcessEntry,
 } from './conversation'
 import { MentionRichText } from './MentionRichText'
+import { ResearchResultsPreview } from './ResearchResultsPreview'
 import { TaskPlanCard } from './TaskPlanCard'
 import baseStyles from './AgentPanel.module.css'
 import messageStyles from './AgentConversationMessages.module.css'
@@ -365,6 +366,12 @@ export function AgentConversationPane({
                       <p key={lineIndex}>{line}</p>
                     ))}
                   </div>
+                ) : null}
+                {item.tool === 'researchDesign' && item.researchItems?.length ? (
+                  <ResearchResultsPreview
+                    items={item.researchItems}
+                    limit={isOpen ? 6 : 3}
+                  />
                 ) : null}
                 {hasDetail ? (
                   <div

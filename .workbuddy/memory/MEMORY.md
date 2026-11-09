@@ -1,5 +1,13 @@
 # CanvasFlow（轻画）项目记忆
 
+### 总管2 第四十三轮：共享筛选、多图套件 chip 与免费联网调研（2026-11-10）
+
+- 参考栏和套件子面板必须共用 `ReferenceFilterFields`。来源/类型字段、双滑块按钮、测试锚点和组内 OR/组间 AND 语义只能有一份；不要在两个面板里重新写筛选 UI。
+- 套件 chip 使用 `ReferenceItem.assets[]` 保存全部图片资源，`assetHash` 继续作为主预览兼容入口。发送回合时必须按真实 hash 读取 MIME、去重、跳过损坏素材，再把全部有效图片并入 `contextTrace.assetRefs`；Logo 继续保持优先。
+- `design_research` 在无 URL 时也会自动联网，免费来源是 Openverse Images 和 Wikipedia，两个请求并行，单源失败只出 warning。`ResearchResultsPreview` 只展示候选，不能自动写入项目参考；正式参考仍要用户明确加入或由后续真实分析工具/台账匹配产生。
+- 通用“联网/搜索/搜一下/查一下/网上找/最新资料”会进入设计调研；UI 只显示真实工具结果对应的“联网调研完成”，不要从模型正文猜阶段，也不要伪造 reasoning。
+- 最终门禁：check 1118 modules / 4470 deps / 262 registrations，定向 9 files / 95 tests，串行 Vitest 652 files（651 passed / 1 skipped）/ 5447 tests（5446 passed / 1 skipped），build 1250 modules，Impeccable detector 0 findings。未 push。
+
 ### 总管2 第四十二轮：参考与套件卡交互、我的素材货架（2026-11-10）
 
 - 图片卡统一单击延迟 220ms 加入 Agent，双击必须在同一计时器上取消防单击再开灯箱；右上放大按钮等价双击。参考图和套件内图片适用，颜色/字体不适用。不要给图片主按钮留原生 `title`，否则悬停提示会盖住筛选区和标题。

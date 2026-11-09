@@ -6726,10 +6726,10 @@
     {
       "module": "src/pages/CanvasPage/ReferenceKitPanel.module.css",
       "owner": "canvas-reference-kit-panel-style",
-      "responsibility": "定义套件子面板头部、返回、筛选浮层、空态与键盘焦点的样式。",
+      "responsibility": "定义套件子面板头部、返回、空态与键盘焦点的样式。",
       "owns": [
-        "套件子面板头部与筛选浮层",
-        "筛选空态与控件焦点",
+        "套件子面板头部与返回",
+        "空态与控件焦点",
         "抽屉内套件子面板密度"
       ],
       "doesNotOwn": [
@@ -6741,13 +6741,12 @@
       "publicApi": [
         "CSS_MODULE:reference-kit-panel",
         "CSS_CLASS:head",
-        "CSS_CLASS:filters",
         "CSS_CLASS:empty"
       ],
       "test": [
         "src/app/uiSevenPoints.test.ts"
       ],
-      "budget": 200
+      "budget": 100
     },
     {
       "module": "src/features/canvas/kitReference.ts",
@@ -6821,14 +6820,68 @@
       "budget": 360
     },
     {
+      "module": "src/pages/CanvasPage/ReferenceFilterFields.tsx",
+      "owner": "canvas-reference-filter",
+      "responsibility": "为项目参考和套件子面板提供同一套筛选按钮、来源/类型选项与切换规则。",
+      "owns": [
+        "参考来源与类型筛选词表",
+        "共享筛选按钮和复选框面板",
+        "参考来源/类型到筛选组的映射"
+      ],
+      "doesNotOwn": [
+        "参考条目读取与过滤执行",
+        "套件版本读取",
+        "Agent 或画布状态"
+      ],
+      "publicApi": [
+        "ReferenceSourceFilter",
+        "ReferenceKindFilter",
+        "REFERENCE_SOURCE_FILTERS",
+        "REFERENCE_KIND_FILTERS",
+        "ReferenceFilterButton",
+        "ReferenceFilterFields",
+        "referenceSourceFilter",
+        "referenceKindFilter",
+        "toggledReferenceFilter"
+      ],
+      "test": [
+        "src/app/uiSevenPoints.test.ts"
+      ],
+      "budget": 220
+    },
+    {
+      "module": "src/pages/CanvasPage/ReferenceFilterFields.module.css",
+      "owner": "canvas-reference-filter-style",
+      "responsibility": "定义参考面板和套件面板共用的筛选触发按钮、浮层、选项与焦点样式。",
+      "owns": [
+        "共享筛选按钮尺寸与悬停",
+        "筛选浮层几何和层级",
+        "复选框行距与焦点环"
+      ],
+      "doesNotOwn": [
+        "参考卡片与套件条目样式",
+        "抽屉壳层",
+        "全局主题令牌"
+      ],
+      "publicApi": [
+        "CSS_MODULE:参考与套件共享筛选",
+        "CSS_CLASS:filterButton",
+        "CSS_CLASS:filters",
+        "CSS_CLASS:disabled"
+      ],
+      "test": [
+        "src/app/uiSevenPoints.test.ts"
+      ],
+      "budget": 120
+    },
+    {
       "module": "src/pages/CanvasPage/ReferenceKitItems.tsx",
       "owner": "canvas-reference-kit-items",
-      "responsibility": "把套件版本投影成瀑布流图片、颜色和字体卡，并实现图片单击加入 Agent、双击与放大灯箱和套件筛选。",
+      "responsibility": "把套件版本投影成瀑布流图片、颜色和字体卡，并实现图片单击加入 Agent、双击与放大灯箱。",
       "owns": [
         "套件图片、颜色和字体条目投影",
         "图片单击延迟与双击取消",
-        "右上放大按钮与悬停焦点态",
-        "套件来源和类型筛选面板"
+        "右上放大按钮与悬停焦点态"
       ],
       "doesNotOwn": [
         "套件版本读取与参考持久化",
@@ -6838,15 +6891,13 @@
       "publicApi": [
         "KitItem",
         "KitImageItem",
-        "ItemKind",
         "kitItemsOf",
-        "ReferenceKitItems",
-        "ReferenceKitFilters"
+        "ReferenceKitItems"
       ],
       "test": [
         "src/app/uiSevenPoints.test.ts"
       ],
-      "budget": 240
+      "budget": 180
     },
     {
       "module": "src/pages/CanvasPage/ReferenceKitItems.module.css",
@@ -6871,7 +6922,7 @@
       "test": [
         "src/app/uiSevenPoints.test.ts"
       ],
-      "budget": 160
+      "budget": 140
     },
     {
       "module": "src/pages/CanvasPage/MyAssetsDrawer.tsx",
@@ -6922,6 +6973,76 @@
         "scripts/capture-ui-seven-points.mjs"
       ],
       "budget": 160
+    },
+    {
+      "module": "src/features/shared/research/openResearchSearch.ts",
+      "owner": "open-research-search",
+      "responsibility": "通过 Openverse 与 Wikipedia 免费开放 API 执行联网图片和内容检索，并统一为设计调研候选。",
+      "owns": [
+        "Openverse 图片搜索与许可字段投影",
+        "Wikipedia 内容搜索与摘要投影",
+        "开放来源失败时的分源警告"
+      ],
+      "doesNotOwn": [
+        "用户 URL 页面抓取",
+        "项目参考持久化与画布写入",
+        "Agent 工具路由和 UI"
+      ],
+      "publicApi": [
+        "OpenResearchSearchResult",
+        "searchOpenResearch"
+      ],
+      "test": [
+        "src/features/shared/research/openResearchSearch.test.ts"
+      ],
+      "budget": 220
+    },
+    {
+      "module": "src/workbenches/canvas/panels/AgentPanel/ResearchResultsPreview.tsx",
+      "owner": "agent-research-results-ui",
+      "responsibility": "在 Agent 调研步骤中展示有上限的开放来源候选，图片和文本来源共用同一外链卡片。",
+      "owns": [
+        "调研候选缩略图与文本预览",
+        "候选来源标签和外链行为",
+        "折叠态与展开态的数量上限"
+      ],
+      "doesNotOwn": [
+        "联网搜索请求与结果解析",
+        "项目参考入库",
+        "Agent 工具执行"
+      ],
+      "publicApi": [
+        "ResearchResultsPreview"
+      ],
+      "test": [
+        "src/workbenches/canvas/panels/AgentPanel/ResearchResultsPreview.test.tsx"
+      ],
+      "budget": 100
+    },
+    {
+      "module": "src/workbenches/canvas/panels/AgentPanel/ResearchResultsPreview.module.css",
+      "owner": "agent-research-results-ui-style",
+      "responsibility": "定义 Agent 调研候选的三列缩略网格、文本预览、来源标签和焦点样式。",
+      "owns": [
+        "调研候选固定三列网格",
+        "图片与文本候选外观",
+        "来源标签和键盘焦点"
+      ],
+      "doesNotOwn": [
+        "Agent 活动步骤外壳",
+        "右侧面板布局",
+        "全局主题令牌"
+      ],
+      "publicApi": [
+        "CSS_MODULE:Agent 联网调研候选",
+        "CSS_CLASS:grid",
+        "CSS_CLASS:item",
+        "CSS_CLASS:source"
+      ],
+      "test": [
+        "src/workbenches/canvas/panels/AgentPanel/ResearchResultsPreview.test.tsx"
+      ],
+      "budget": 120
     },
     {
       "module": "src/features/settings/cliOutputText.ts",

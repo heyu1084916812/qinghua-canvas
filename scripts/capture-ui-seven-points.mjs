@@ -451,14 +451,14 @@ try {
       }
     })
     await page.screenshot({ path: path.join(out, `${file}-canvas-reference.png`) })
-    await page.locator('[data-reference-source-filter]').click()
-    await page.locator('[data-reference-source-filter-panel]').waitFor({ timeout: 5_000 })
-    const referenceFilterIcon = await page.locator('[data-reference-source-filter] svg').evaluate((svg) => ({
+    await page.locator('[data-reference-filter-trigger="source"]').click()
+    await page.locator('[data-reference-filter-panel="source"]').waitFor({ timeout: 5_000 })
+    const referenceFilterIcon = await page.locator('[data-reference-filter-trigger="source"] svg').evaluate((svg) => ({
       circles: svg.querySelectorAll('circle').length,
       paths: svg.querySelectorAll('path').length,
     }))
-    await page.locator('[data-reference-source-filter-kind="image"]').check()
-    await page.locator('[data-reference-source-filter-source="file"]').check()
+    await page.locator('[data-reference-filter-kind="image"]').check()
+    await page.locator('[data-reference-filter-source="file"]').check()
     await page.waitForFunction(
       () =>
         document.querySelectorAll('[data-my-assets-reference]').length === 4 &&
@@ -468,10 +468,10 @@ try {
     const referenceFilteredCards = await page.locator('[data-my-assets-reference]').count()
     const referenceFilteredFolders = await page.locator('[data-my-assets-kit-folder]').count()
     await page.screenshot({ path: path.join(out, `${file}-canvas-reference-filter.png`) })
-    await page.locator('[data-reference-source-filter-kind="image"]').uncheck()
-    await page.locator('[data-reference-source-filter-source="file"]').uncheck()
-    await page.locator('[data-reference-source-filter]').click()
-    await page.locator('[data-reference-source-filter-panel]').waitFor({ state: 'detached', timeout: 5_000 })
+    await page.locator('[data-reference-filter-kind="image"]').uncheck()
+    await page.locator('[data-reference-filter-source="file"]').uncheck()
+    await page.locator('[data-reference-filter-trigger="source"]').click()
+    await page.locator('[data-reference-filter-panel="source"]').waitFor({ state: 'detached', timeout: 5_000 })
     await page.locator('[data-my-assets-reference]').first().hover()
     await page.waitForTimeout(180)
     const referenceExpandVisible = await page.locator('[data-my-assets-reference-expand]').first().evaluate(
@@ -495,6 +495,7 @@ try {
     await page.locator('[data-agent-composer] [data-mention-kind="reference"]').first().waitFor({ timeout: 15_000 })
     const referenceClickChipCount =
       await page.locator('[data-agent-composer] [data-mention-kind="reference"]').count()
+    await page.waitForTimeout(350)
     await page.screenshot({ path: path.join(out, `${file}-canvas-reference-click-agent.png`) })
     await page.locator('[data-agent-close]').click()
     await page.locator('[data-agent-panel]').waitFor({ state: 'hidden', timeout: 10_000 })
@@ -510,7 +511,17 @@ try {
       (image) => image instanceof HTMLImageElement && image.complete && image.naturalWidth > 0,
     )
     await page.screenshot({ path: path.join(out, `${file}-canvas-reference-folder-hover.png`) })
-    await page.locator('[data-my-assets-kit-folder] button').first().click()
+    await page.locator('[data-my-assets-kit-folder-add]').click()
+    await page.locator('[data-agent-panel]').waitFor({ timeout: 15_000 })
+    await page.locator('[data-agent-composer] [data-mention-kind="reference"]').first().waitFor({ timeout: 15_000 })
+    const referenceFolderChipCount =
+      await page.locator('[data-agent-composer] [data-mention-kind="reference"]').count()
+    await page.waitForTimeout(350)
+    await page.screenshot({ path: path.join(out, `${file}-canvas-kit-folder-agent.png`) })
+    await page.locator('[data-agent-close]').click()
+    await page.locator('[data-agent-panel]').waitFor({ state: 'hidden', timeout: 10_000 })
+    await page.locator('[data-my-assets-kit-folder]').first().hover()
+    await page.locator('[data-my-assets-kit-folder-open]').click()
     await page.locator('[data-reference-kit-panel]').waitFor({ timeout: 10_000 })
     const referenceKitItems = await page.locator('[data-reference-kit-item]').count()
     const referenceKitImageItems = await page.locator('[data-reference-kit-item="image"]').count()
@@ -540,10 +551,10 @@ try {
       (await page.locator('[data-reference-lightbox]').count()) === 1
     await page.keyboard.press('Escape')
     await page.locator('[data-reference-lightbox]').waitFor({ state: 'detached', timeout: 10_000 })
-    await page.locator('[data-reference-kit-filter]').click()
-    await page.locator('[data-reference-kit-filter-panel]').waitFor({ timeout: 5_000 })
-    await page.locator('[data-reference-kit-filter-kind="color"]').uncheck()
-    await page.locator('[data-reference-kit-filter-kind="font"]').uncheck()
+    await page.locator('[data-reference-filter-trigger="kit"]').click()
+    await page.locator('[data-reference-filter-panel="kit"]').waitFor({ timeout: 5_000 })
+    await page.locator('[data-reference-filter-kind="color"]').uncheck()
+    await page.locator('[data-reference-filter-kind="font"]').uncheck()
     const referenceKitFilteredItems = await page.locator('[data-reference-kit-item]').count()
     await page.screenshot({ path: path.join(out, `${file}-canvas-reference-kit-filter.png`) })
     await page.locator('[data-reference-kit-back]').click()
@@ -660,6 +671,7 @@ try {
     const referenceChipMounted = await page.locator('[data-agent-composer] [data-mention-kind="reference"]').count()
     const referenceLightboxClosedByAgent =
       (await page.locator('[data-reference-lightbox]').count()) === 0
+    await page.waitForTimeout(350)
     await page.screenshot({ path: path.join(out, `${file}-canvas-reference-agent.png`) })
     await page.locator('[data-agent-close]').click()
     await page.locator('[data-agent-panel]').waitFor({ state: 'hidden', timeout: 10_000 })
@@ -709,6 +721,7 @@ try {
     await page.locator('[data-agent-composer] [data-mention-kind="reference"]').first().waitFor({ timeout: 15_000 })
     const shelfKitClickChipCount =
       await page.locator('[data-agent-composer] [data-mention-kind="reference"]').count()
+    await page.waitForTimeout(350)
     await page.screenshot({ path: path.join(out, `${file}-canvas-kit-click-agent.png`) })
     await page.locator('[data-agent-close]').click()
     await page.locator('[data-agent-panel]').waitFor({ state: 'hidden', timeout: 10_000 })
@@ -737,6 +750,7 @@ try {
       referenceFilterIcon,
       referenceFolderOpenVisible,
       referenceFolderImageLoaded,
+      referenceFolderChipCount,
       referenceKitItems,
       referenceKitImageItems,
       referenceKitFilteredItems,

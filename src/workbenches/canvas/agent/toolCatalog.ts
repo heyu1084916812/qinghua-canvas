@@ -52,9 +52,9 @@ export const AGENT_TOOLS: readonly ToolDeclaration[] = [
   {
     name: 'researchDesign',
     description:
-      '做设计调研：检索轻画灵感库，并可从用户提供的公开网页、Pinterest Pin / Board 或 Behance 页面提取参考图与出处。' +
+      '做联网调研：自动检索 Openverse 开放版权图片、Wikipedia 内容、轻画灵感库，并可从用户提供的公开网页、Pinterest Pin / Board 或 Behance 页面提取参考图与出处。' +
       '只读取公开页面，不使用任何账号 Cookie，不声称完成私密内容或无限制全站搜索。' +
-      '结果用于形成 Moodboard、来源报告和设计方向；图片只作为参考，保留原链接与权利状态。',
+      '搜索结果只是候选，不会自动加入项目参考；结果用于形成 Moodboard、来源报告和设计方向，并保留原链接、作者与权利状态。',
     parameters: {
       type: 'object',
       properties: {
@@ -67,7 +67,7 @@ export const AGENT_TOOLS: readonly ToolDeclaration[] = [
           maxItems: 8,
           items: { type: 'string' },
           description:
-            '用户提供或明确点名的公开页面 URL。没有 URL 时仍可检索本地灵感库。',
+            '用户提供或明确点名的公开页面 URL；没有 URL 时仍会自动检索开放来源。',
         },
         maxResults: {
           type: 'integer',

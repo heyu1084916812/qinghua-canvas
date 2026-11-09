@@ -18,6 +18,8 @@ import {
 function sourceTag(source: DesignResearchItem['source']): string {
   if (source === 'pinterest') return 'Pinterest'
   if (source === 'behance') return 'Behance'
+  if (source === 'openverse') return 'Openverse'
+  if (source === 'wikipedia') return 'Wikipedia'
   if (source === 'google') return 'Google'
   return '网页'
 }
@@ -95,7 +97,14 @@ export async function saveDesignResearchItem(
       height: size.height,
       savedAt,
       projectId: 'inspiration-library',
-      prompt: `${item.title}\n来源：${item.url}\n${DESIGN_RESEARCH_RIGHTS_NOTE}`,
+      prompt: [
+        item.title,
+        item.description,
+        item.credit ? `作者：${item.credit}` : '',
+        item.license ? `许可：${item.license}${item.licenseUrl ? ` ${item.licenseUrl}` : ''}` : '',
+        `来源：${item.url}`,
+        DESIGN_RESEARCH_RIGHTS_NOTE,
+      ].filter(Boolean).join('\n'),
     }
     if (signal.aborted) return { ok: false, message: '保存已取消' }
     await deps.storage.transaction(['assets', 'assetLibrary', 'presets'], async (tx) => {
@@ -120,7 +129,14 @@ export async function saveDesignResearchItem(
         height: size.height,
         savedAt,
         projectId: 'inspiration-library',
-        prompt: `${item.title}\n来源：${item.url}\n${DESIGN_RESEARCH_RIGHTS_NOTE}`,
+        prompt: [
+          item.title,
+          item.description,
+          item.credit ? `作者：${item.credit}` : '',
+          item.license ? `许可：${item.license}${item.licenseUrl ? ` ${item.licenseUrl}` : ''}` : '',
+          `来源：${item.url}`,
+          DESIGN_RESEARCH_RIGHTS_NOTE,
+        ].filter(Boolean).join('\n'),
       })
       if (signal.aborted) throw new DOMException('保存已取消', 'AbortError')
       await library.setTags(

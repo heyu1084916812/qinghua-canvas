@@ -14,6 +14,10 @@ describe('reference ledger repository', () => {
       kind: 'image',
       kitId: 'k1',
       kitVersion: 2,
+      assets: [
+        { hash: 'logo-hash', role: 'logo', name: 'Logo' },
+        { hash: 'photo-hash', role: 'reference', name: '照片' },
+      ],
       what: '绿色圆角标准字',
       createdAt: 1,
       updatedAt: 1,
@@ -42,6 +46,10 @@ describe('reference ledger repository', () => {
     const selection = await repo.selectForTask('p1', 'kv')
     expect(selection.selected).toHaveLength(1)
     expect(selection.selected[0]?.item.kitVersion).toBe(2)
+    expect(selection.selected[0]?.item.assets).toEqual([
+      { hash: 'logo-hash', role: 'logo', name: 'Logo' },
+      { hash: 'photo-hash', role: 'reference', name: '照片' },
+    ])
     await repo.removeItem('p1', 'r1')
     expect(await repo.listItems('p1')).toEqual([])
     expect(await repo.listUsages('p1')).toEqual([])

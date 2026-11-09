@@ -32,7 +32,7 @@ const MULTI_STAGE_PATTERN =
   /整套|套件|视觉规范|品牌\s*vi|vi\s*系统|品牌(?:视觉|套件)|全案|系列物料|批量|多阶段|分镜脚本|详情页|第一步|第二步|阶段|先.{0,24}(?:再|然后|接着|最后)|(?:然后|接着|之后).{0,40}(?:再|继续|最后)/i
 
 const DESIGN_RESEARCH_PATTERN =
-  /设计调研|设计研究|设计灵感|视觉参考|灵感采集|找(?:一些|点)?参考|收集(?:一些|点)?(?:素材|参考|灵感)|参考(?:案例|网站|页面)|mood\s*board|情绪板|竞品(?:分析|调研)|design\s*research/i
+  /设计调研|设计研究|设计灵感|视觉参考|灵感采集|找(?:一些|点)?参考|收集(?:一些|点)?(?:素材|参考|灵感)|参考(?:案例|网站|页面)|mood\s*board|情绪板|竞品(?:分析|调研)|联网|上网|搜索|搜一下|查一下|网上找|最新资料|design\s*research/i
 
 const RESEARCH_SOURCE_PATTERN = /pinterest|behance|pixiv|p站/i
 const RESEARCH_ACTION_PATTERN = /找|收集|看看|调研|参考|灵感|案例|mood\s*board|情绪板/i

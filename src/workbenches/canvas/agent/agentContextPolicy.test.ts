@@ -119,6 +119,12 @@ describe('Agent request classification', () => {
     expect(
       classifyAgentRequest({
         ...noSignals,
+        text: '联网搜一下最近的自然有机包装案例',
+      }),
+    ).toBe('design_research')
+    expect(
+      classifyAgentRequest({
+        ...noSignals,
         text: '用这张 Pinterest 参考图生成一个改版',
         hasMentionedImage: true,
       }),

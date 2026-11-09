@@ -32,6 +32,12 @@ export type ReferenceUsageKind =
   | 'avoid'
   | 'textGuide'
 
+export interface ReferenceAssetRef {
+  hash: string
+  role: 'logo' | 'reference'
+  name: string
+}
+
 export interface ReferenceItem {
   id: string
   projectId: string
@@ -40,6 +46,8 @@ export interface ReferenceItem {
   kind: ReferenceKind
   /** 内容地址或纯 URL；文本卡可为空。 */
   assetHash?: string
+  /** 一张参考卡携带的多资产集合；assetHash 继续作为主预览和兼容入口。 */
+  assets?: readonly ReferenceAssetRef[]
   url?: string
   /** 套件、Pinterest 等来源的冻结引用。 */
   kitId?: string

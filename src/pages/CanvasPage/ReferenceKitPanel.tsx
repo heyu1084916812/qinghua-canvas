@@ -10,17 +10,32 @@ import { ensureKitAssetReference } from '../../features/canvas/kitReference'
 import type { CanvasStore } from '../../state/workbenches/canvas/store'
 import {
   IconChevronLeft,
-  IconSliders,
 } from '../../workbenches/canvas/toolbar/icons'
 import { ReferenceLightbox } from './ReferenceLightbox'
 import {
   kitItemsOf,
-  ReferenceKitFilters,
   ReferenceKitItems,
-  type ItemKind,
   type KitImageItem,
 } from './ReferenceKitItems'
+import {
+  REFERENCE_KIND_FILTERS,
+  ReferenceFilterButton,
+  ReferenceFilterFields,
+  toggledReferenceFilter,
+  type ReferenceKindFilter,
+  type ReferenceSourceFilter,
+} from './ReferenceFilterFields'
 import styles from './ReferenceKitPanel.module.css'
+
+const KIT_KIND_OPTIONS = REFERENCE_KIND_FILTERS.filter((option) =>
+  option.value === 'image' || option.value === 'color' || option.value === 'font',
+)
+const KIT_SOURCE_VALUES = new Set<ReferenceSourceFilter>(['asset'])
+const DISABLED_KIT_SOURCES = new Set<ReferenceSourceFilter>([
+  'file',
+  'link',
+  'connector',
+])
 
 export function ReferenceKitPanel({
   projectId,
@@ -40,19 +55,17 @@ export function ReferenceKitPanel({
   const imageItems = items.filter(
     (item): item is KitImageItem => item.kind === 'image',
   )
-  const [enabled, setEnabled] = useState<Record<ItemKind, boolean>>({
-    image: true,
-    color: true,
-    font: true,
-  })
+  const [kindFilters, setKindFilters] = useState<Set<ReferenceKindFilter>>(
+    new Set(['image', 'color', 'font']),
+  )
   const [filterOpen, setFilterOpen] = useState(false)
   const [lightbox, setLightbox] = useState<{
     items: ReferenceItem[]
     initialItemId: string
   } | null>(null)
-  const visible = items.filter((item) => enabled[item.kind])
-  const toggle = (kind: ItemKind) => {
-    setEnabled((current) => ({ ...current, [kind]: !current[kind] }))
+  const visible = items.filter((item) => kindFilters.has(item.kind))
+  const toggleKind = (kind: ReferenceKindFilter) => {
+    setKindFilters((current) => toggledReferenceFilter(current, kind))
   }
   const addImage = async (item: KitImageItem) => {
     if (!version) return
@@ -125,19 +138,24 @@ export function ReferenceKitPanel({
             <IconChevronLeft size={18} />
           </button>
           <h2>{kit.name}</h2>
-          <button
-            type="button"
-            className={styles.iconButton}
-            data-reference-kit-filter
-            aria-label="筛选套件内容"
-            title="筛选套件内容"
-            aria-expanded={filterOpen}
-            onClick={() => setFilterOpen((current) => !current)}
-          >
-            <IconSliders size={17} />
-          </button>
+          <ReferenceFilterButton
+            scope="kit"
+            open={filterOpen}
+            label="筛选套件内容"
+            onToggle={() => setFilterOpen((current) => !current)}
+          />
         </header>
-        {filterOpen ? <ReferenceKitFilters enabled={enabled} toggle={toggle} /> : null}
+        {filterOpen ? (
+          <ReferenceFilterFields
+            scope="kit"
+            sourceValues={KIT_SOURCE_VALUES}
+            kindValues={kindFilters}
+            kindOptions={KIT_KIND_OPTIONS}
+            disabledSources={DISABLED_KIT_SOURCES}
+            onToggleSource={() => undefined}
+            onToggleKind={toggleKind}
+          />
+        ) : null}
         {!version ? (
           <p className={styles.empty}>这个套件还没有保存版本。</p>
         ) : visible.length === 0 ? (

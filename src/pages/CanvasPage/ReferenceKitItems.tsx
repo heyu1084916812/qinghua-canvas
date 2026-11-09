@@ -22,7 +22,6 @@ export type KitItem =
   | { kind: 'font'; id: string; font: ContextKitFont }
 
 export type KitImageItem = Extract<KitItem, { kind: 'image' }>
-export type ItemKind = 'image' | 'color' | 'font'
 
 export function kitItemsOf(version: ContextKitVersion | null): KitItem[] {
   if (!version) return []
@@ -62,56 +61,6 @@ export function ReferenceKitItems({
         <KitItemCard item={item} key={item.id} onAdd={onAdd} onOpen={onOpen} />
       ))}
     </MasonryGrid>
-  )
-}
-
-export function ReferenceKitFilters({
-  enabled,
-  toggle,
-}: {
-  enabled: Record<ItemKind, boolean>
-  toggle: (kind: ItemKind) => void
-}) {
-  return (
-    <div className={styles.filters} data-reference-kit-filter-panel>
-      <fieldset>
-        <legend>按来源</legend>
-        <label><input type="checkbox" checked disabled />资产</label>
-        <label className={styles.disabled}><input type="checkbox" disabled />文件</label>
-        <label className={styles.disabled}><input type="checkbox" disabled />链接</label>
-        <label className={styles.disabled}><input type="checkbox" disabled />连接器</label>
-      </fieldset>
-      <fieldset>
-        <legend>按类型</legend>
-        <label>
-          <input
-            type="checkbox"
-            data-reference-kit-filter-kind="image"
-            checked={enabled.image}
-            onChange={() => toggle('image')}
-          />
-          图片
-        </label>
-        <label>
-          <input
-            type="checkbox"
-            data-reference-kit-filter-kind="color"
-            checked={enabled.color}
-            onChange={() => toggle('color')}
-          />
-          颜色
-        </label>
-        <label>
-          <input
-            type="checkbox"
-            data-reference-kit-filter-kind="font"
-            checked={enabled.font}
-            onChange={() => toggle('font')}
-          />
-          字体
-        </label>
-      </fieldset>
-    </div>
   )
 }
 

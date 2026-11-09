@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { usePlatform } from '../../app/providers/PlatformProvider'
 import type { ContextKit, ContextKitVersion } from '../../domain/shared/context'
-import type { ReferenceItem, ReferenceKind, ReferenceSource } from '../../domain/project/referenceLedger'
+import type { ReferenceItem } from '../../domain/project/referenceLedger'
 import { sendReferenceToAgent } from '../../features/canvas/agentHandoff'
 import { setReferenceDragData } from '../../features/canvas/dropImport'
 import { importAssetFile, IMPORT_ACCEPT } from '../../features/canvas/importAsset'
+import { ensureKitCardReference } from '../../features/canvas/kitReference'
 import { useAsset } from '../../features/shared/assets'
 import { createContextRepository } from '../../state/shared/contextRepository'
 import { createReferenceLedgerRepository } from '../../state/project/referenceLedgerRepository'
@@ -13,34 +14,23 @@ import { createId } from '../../shared/id'
 import {
   IconExpand,
   IconPlus,
-  IconSliders,
   IconSpinner,
 } from '../../workbenches/canvas/toolbar/icons'
 import { KIT_KINDS } from '../AssetsPage/contextKitDraft'
 import { MasonryGrid } from '../AssetsPage/MasonryGrid'
 import { ReferenceLightbox } from './ReferenceLightbox'
+import {
+  referenceKindFilter,
+  referenceSourceFilter,
+  ReferenceFilterButton,
+  ReferenceFilterFields,
+  toggledReferenceFilter,
+  type ReferenceKindFilter,
+  type ReferenceSourceFilter,
+} from './ReferenceFilterFields'
 import { ReferenceKitPanel } from './ReferenceKitPanel'
 import { ReferenceMedia } from './ReferenceMedia'
 import styles from './ReferenceSourcePanel.module.css'
-
-type SourceFilter = 'file' | 'link' | 'asset' | 'connector'
-type KindFilter = 'image' | 'video' | 'document' | 'color' | 'font' | 'audio'
-
-const SOURCE_FILTERS: readonly { value: SourceFilter; label: string }[] = [
-  { value: 'file', label: '文件' },
-  { value: 'link', label: '链接' },
-  { value: 'asset', label: '资产' },
-  { value: 'connector', label: '连接器' },
-]
-
-const KIND_FILTERS: readonly { value: KindFilter; label: string }[] = [
-  { value: 'image', label: '图片' },
-  { value: 'video', label: '视频' },
-  { value: 'document', label: '文档' },
-  { value: 'color', label: '颜色' },
-  { value: 'font', label: '字体' },
-  { value: 'audio', label: '音频' },
-]
 
 export function ReferenceSourcePanel({
   projectId,
@@ -67,8 +57,8 @@ export function ReferenceSourcePanel({
   const [lightboxId, setLightboxId] = useState<string | null>(null)
   const [selectedKitId, setSelectedKitId] = useState<string | null>(null)
   const [filterOpen, setFilterOpen] = useState(false)
-  const [sourceFilters, setSourceFilters] = useState<Set<SourceFilter>>(new Set())
-  const [kindFilters, setKindFilters] = useState<Set<KindFilter>>(new Set())
+  const [sourceFilters, setSourceFilters] = useState<Set<ReferenceSourceFilter>>(new Set())
+  const [kindFilters, setKindFilters] = useState<Set<ReferenceKindFilter>>(new Set())
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
 
@@ -98,6 +88,27 @@ export function ReferenceSourcePanel({
     })
     return () => { active = false }
   }, [contextRepo, kits])
+
+  const addKit = async (kit: ContextKit) => {
+    const version = versions[kit.id]
+    if (version === undefined) {
+      store.notify('正在读取套件版本，请稍后再试')
+      return
+    }
+    if (!version) {
+      store.notify('这个套件还没有保存版本', 'error')
+      return
+    }
+    try {
+      const reference = await ensureKitCardReference(platform, projectId, kit, version)
+      sendReferenceToAgent(projectId, [{ id: reference.id, label: reference.title }])
+    } catch (cause) {
+      store.notify(
+        `加入对话失败：${cause instanceof Error ? cause.message : '未知错误'}`,
+        'error',
+      )
+    }
+  }
 
   const uploadReferences = async (files: FileList | null) => {
     if (!files || files.length === 0 || busy) return
@@ -151,11 +162,11 @@ export function ReferenceSourcePanel({
     )
   }
 
-  const toggleSource = (value: SourceFilter) => {
-    setSourceFilters((current) => toggledSet(current, value))
+  const toggleSource = (value: ReferenceSourceFilter) => {
+    setSourceFilters((current) => toggledReferenceFilter(current, value))
   }
-  const toggleKind = (value: KindFilter) => {
-    setKindFilters((current) => toggledSet(current, value))
+  const toggleKind = (value: ReferenceKindFilter) => {
+    setKindFilters((current) => toggledReferenceFilter(current, value))
   }
   const addReference = (item: ReferenceItem) => {
     if (clickTimerRef.current) clearTimeout(clickTimerRef.current)
@@ -183,49 +194,21 @@ export function ReferenceSourcePanel({
     >
       <div className={styles.subhead}>
         <span>当前项目的参考</span>
-        <button
-          type="button"
-          className={styles.filterButton}
-          data-reference-source-filter
-          aria-label="筛选和排序参考素材"
-          title="筛选和排序参考素材"
-          aria-expanded={filterOpen}
-          onClick={() => setFilterOpen((current) => !current)}
-        >
-          <IconSliders size={17} />
-        </button>
+        <ReferenceFilterButton
+          scope="source"
+          open={filterOpen}
+          label="筛选和排序参考素材"
+          onToggle={() => setFilterOpen((current) => !current)}
+        />
       </div>
       {filterOpen ? (
-        <div className={styles.filters} data-reference-source-filter-panel>
-          <fieldset>
-            <legend>按来源</legend>
-            {SOURCE_FILTERS.map((option) => (
-              <label key={option.value}>
-                <input
-                  type="checkbox"
-                  data-reference-source-filter-source={option.value}
-                  checked={sourceFilters.has(option.value)}
-                  onChange={() => toggleSource(option.value)}
-                />
-                {option.label}
-              </label>
-            ))}
-          </fieldset>
-          <fieldset>
-            <legend>按类型</legend>
-            {KIND_FILTERS.map((option) => (
-              <label key={option.value}>
-                <input
-                  type="checkbox"
-                  data-reference-source-filter-kind={option.value}
-                  checked={kindFilters.has(option.value)}
-                  onChange={() => toggleKind(option.value)}
-                />
-                {option.label}
-              </label>
-            ))}
-          </fieldset>
-        </div>
+        <ReferenceFilterFields
+          scope="source"
+          sourceValues={sourceFilters}
+          kindValues={kindFilters}
+          onToggleSource={toggleSource}
+          onToggleKind={toggleKind}
+        />
       ) : null}
       <input
         ref={inputRef}
@@ -294,6 +277,7 @@ export function ReferenceSourcePanel({
             key={kit.id}
             kit={kit}
             version={versions[kit.id] ?? null}
+            onAdd={() => void addKit(kit)}
             onOpen={() => setSelectedKitId(kit.id)}
           />
         ))}
@@ -311,41 +295,25 @@ export function ReferenceSourcePanel({
   )
 }
 
-function referenceSourceFilter(source: ReferenceSource): SourceFilter {
-  if (source === 'file') return 'file'
-  if (source === 'link' || source === 'webFetch' || source === 'search') return 'link'
-  if (source === 'asset' || source === 'kit') return 'asset'
-  return 'connector'
-}
-
-function referenceKindFilter(kind: ReferenceKind): KindFilter {
-  return kind === 'text' ? 'document' : kind
-}
-
 function matchesReferenceFilters(
   item: ReferenceItem,
-  sources: ReadonlySet<SourceFilter>,
-  kinds: ReadonlySet<KindFilter>,
+  sources: ReadonlySet<ReferenceSourceFilter>,
+  kinds: ReadonlySet<ReferenceKindFilter>,
 ): boolean {
   const sourceMatches = sources.size === 0 || sources.has(referenceSourceFilter(item.source))
   const kindMatches = kinds.size === 0 || kinds.has(referenceKindFilter(item.kind))
   return sourceMatches && kindMatches
 }
 
-function toggledSet<T>(current: ReadonlySet<T>, value: T): Set<T> {
-  const next = new Set(current)
-  if (next.has(value)) next.delete(value)
-  else next.add(value)
-  return next
-}
-
 function KitFolder({
   kit,
   version,
+  onAdd,
   onOpen,
 }: {
   kit: ContextKit
   version: ContextKitVersion | null
+  onAdd: () => void
   onOpen: () => void
 }) {
   const preview = version?.resources.find((item) => item.role === 'logo') ?? version?.resources[0]
@@ -356,9 +324,9 @@ function KitFolder({
       <button
         type="button"
         className={styles.kitFolderButton}
-        aria-label={`打开套件 ${kit.name}`}
-        title={`打开 ${kit.name}`}
-        onClick={onOpen}
+        data-my-assets-kit-folder-add={kit.id}
+        aria-label={`将套件 ${kit.name} 加入对话`}
+        onClick={onAdd}
       >
         <span className={styles.kitFolderStack}>
           <span className={styles.kitFolderLayerBack} />
@@ -366,9 +334,18 @@ function KitFolder({
           <span className={styles.kitFolderFace}>
             {url ? <img src={url} alt="" /> : <span>{kit.name.slice(0, 1)}</span>}
           </span>
-          <span className={styles.kitFolderOpen}>打开</span>
         </span>
         <span className={styles.kitFolderCopy}>{kit.name}</span>
+      </button>
+      <button
+        type="button"
+        className={styles.kitFolderOpen}
+        data-my-assets-kit-folder-open={kit.id}
+        aria-label={`打开套件 ${kit.name}`}
+        title="打开套件"
+        onClick={onOpen}
+      >
+        打开
       </button>
       <span className={styles.srOnly}>{typeLabel}</span>
     </article>

@@ -321,15 +321,17 @@ export async function prepareAgentTurnRequest(
     })
     const referenceMimes = selection
       ? await Promise.all(
-          selection.selected.map(async ({ item }) => {
-            if (
-              !item.assetHash ||
-              (item.kind !== 'image' && item.kind !== 'video')
-            ) return null
-            const mime = await input
-              .readAssetMime(item.assetHash)
-              .catch(() => null)
-            return mime ? [item.assetHash, mime] as const : null
+          selection.selected.flatMap(({ item }) => {
+            if (item.kind !== 'image' && item.kind !== 'video') return []
+            const hashes = item.assets?.length
+              ? item.assets.map((asset) => asset.hash)
+              : item.assetHash
+                ? [item.assetHash]
+                : []
+            return hashes.map(async (hash) => {
+              const mime = await input.readAssetMime(hash).catch(() => null)
+              return mime ? [hash, mime] as const : null
+            })
           }),
         )
       : []

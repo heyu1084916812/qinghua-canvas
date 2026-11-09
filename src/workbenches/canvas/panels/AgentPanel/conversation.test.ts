@@ -209,7 +209,7 @@ describe('工具结果 → 人话', () => {
 
   it('★ 没登记的工具给兜底标题，不假装认识', () => {
     expect(toolLabel('runNode')).toBe('已运行生成')
-    expect(toolLabel('researchDesign')).toBe('设计调研完成')
+    expect(toolLabel('researchDesign')).toBe('联网调研完成')
     expect(toolLabel('someFutureTool')).toContain('someFutureTool')
   })
 
@@ -218,7 +218,23 @@ describe('工具结果 → 人话', () => {
       'researchDesign',
       JSON.stringify({
         ok: true,
-        items: [{ id: 'pinterest:1' }, { id: 'web:1' }],
+        items: [
+          {
+            id: 'pinterest:1',
+            title: 'Pinterest reference',
+            url: 'https://www.pinterest.com/pin/1/',
+            imageUrl: 'https://i.pinimg.com/1.jpg',
+            source: 'pinterest',
+          },
+          {
+            id: 'wikipedia:1',
+            title: 'Wikipedia reference',
+            url: 'https://zh.wikipedia.org/wiki/Test',
+            imageUrl: '',
+            source: 'wikipedia',
+            description: '开放内容摘要',
+          },
+        ],
         sources: [{ name: 'pinterest.com' }, { name: 'example.com' }],
         warnings: ['没有提供公开页面 URL；本次只检索了轻画本地灵感库。'],
       }),
@@ -227,6 +243,10 @@ describe('工具结果 → 人话', () => {
     expect(d.lines).toEqual([
       '找到 2 条参考，覆盖 2 个来源',
       '没有提供公开页面 URL；本次只检索了轻画本地灵感库。',
+    ])
+    expect(d.researchItems).toEqual([
+      expect.objectContaining({ id: 'pinterest:1', source: 'pinterest' }),
+      expect.objectContaining({ id: 'wikipedia:1', source: 'wikipedia' }),
     ])
   })
 
@@ -494,7 +514,7 @@ describe('消息 → 对话条目', () => {
     expect(process?.entries).toEqual([
       {
         id: 'phase-research',
-        text: '调研完成：设计调研完成',
+      text: '调研完成：联网调研完成',
         phase: 'research',
         collapsedSummary: '调研完成',
       },

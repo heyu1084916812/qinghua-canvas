@@ -32,19 +32,25 @@ export function projectAgentTurnReferences(
       `- 【${label}】这是什么：${item.what.trim()}；本轮怎么用：${usage.howToUse.trim()}；用法类型：${usage.usage}。`,
     )
     evidence.push(`${item.id}:${usage.id}`)
-    if (
-      item.assetHash &&
-      (item.kind === 'image' || item.kind === 'video')
-    ) {
-      const mime = assetMime(item.assetHash)
-      if (mime) {
-        assetRefs.push({
-          hash: item.assetHash,
-          mime,
-          role: usage.usage === 'identityAnchor' ? 'logo' : 'reference',
-          name: label,
-        })
-      }
+    const mediaAssets = item.assets?.length
+      ? item.assets
+      : item.assetHash
+        ? [{
+            hash: item.assetHash,
+            role: usage.usage === 'identityAnchor' ? 'logo' as const : 'reference' as const,
+            name: label,
+          }]
+        : []
+    for (const asset of mediaAssets) {
+      if (!asset.hash || assetRefs.some((row) => row.hash === asset.hash)) continue
+      const mime = assetMime(asset.hash)
+      if (!mime) continue
+      assetRefs.push({
+        hash: asset.hash,
+        mime,
+        role: asset.role,
+        name: asset.name.trim() || label,
+      })
     }
   }
   const omitted = selection.omitted.length

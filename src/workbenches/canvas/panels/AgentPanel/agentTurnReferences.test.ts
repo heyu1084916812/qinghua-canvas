@@ -91,4 +91,44 @@ describe('Agent turn reference projection', () => {
     }, () => 'image/png')
     expect(result.assetRefs).toEqual([])
   })
+
+  it('projects every image in a multi-asset kit card once, logo first', () => {
+    const result = projectAgentTurnReferences({
+      selected: [{
+        item: {
+          id: 'kit-1',
+          projectId: 'p1',
+          title: 'Anbel',
+          source: 'kit',
+          kind: 'image',
+          assetHash: 'logo-hash',
+          assets: [
+            { hash: 'logo-hash', role: 'logo', name: 'Logo' },
+            { hash: 'photo-1', role: 'reference', name: '空间一' },
+            { hash: 'photo-2', role: 'reference', name: '空间二' },
+            { hash: 'photo-1', role: 'reference', name: '重复素材' },
+          ],
+          what: '完整品牌套件',
+          createdAt: 1,
+          updatedAt: 1,
+        },
+        usage: {
+          id: 'usage-kit',
+          itemId: 'kit-1',
+          projectId: 'p1',
+          taskKey: 'kv',
+          usage: 'style',
+          howToUse: '沿用品牌图片',
+          createdAt: 1,
+        },
+      }],
+      omitted: [],
+    }, (hash) => hash === 'missing' ? null : 'image/png')
+
+    expect(result.assetRefs).toEqual([
+      { hash: 'logo-hash', mime: 'image/png', role: 'logo', name: 'Logo' },
+      { hash: 'photo-1', mime: 'image/png', role: 'reference', name: '空间一' },
+      { hash: 'photo-2', mime: 'image/png', role: 'reference', name: '空间二' },
+    ])
+  })
 })

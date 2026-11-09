@@ -6,6 +6,24 @@ import { runDesignResearch } from './designResearchRunner'
 function networkWith(pages: Record<string, string>): NetworkPort {
   return {
     async request(req) {
+      if (req.url.startsWith('https://api.openverse.org/')) {
+        return {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+          text: async () => '',
+          json: async <T,>() => ({ results: [] }) as T,
+          arrayBuffer: async () => new ArrayBuffer(0),
+        }
+      }
+      if (req.url.startsWith('https://zh.wikipedia.org/w/api.php')) {
+        return {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+          text: async () => '',
+          json: async <T,>() => ({ query: { pages: {} } }) as T,
+          arrayBuffer: async () => new ArrayBuffer(0),
+        }
+      }
       const html = pages[req.url]
       if (html === undefined) throw new Error('offline')
       return {
@@ -128,7 +146,7 @@ describe('runDesignResearch', () => {
       new AbortController().signal,
     )
 
-    expect(request).not.toHaveBeenCalled()
+    expect(request.mock.calls.some(([req]) => req.url === 'http://127.0.0.1:18765/state')).toBe(false)
     expect(result.ok).toBe(false)
     expect(result.items).toEqual([])
     expect(result.warnings[0]).toContain('不是公开互联网地址')
@@ -143,8 +161,62 @@ describe('runDesignResearch', () => {
 
     expect(result.ok).toBe(false)
     expect(result.items).toEqual([])
-    expect(result.warnings.join(' ')).toContain('没有提供公开页面 URL')
     expect(result.warnings.join(' ')).toContain('没有找到可用参考')
+  })
+
+  it('discovers Openverse and Wikipedia results without user-provided URLs', async () => {
+    const network: NetworkPort = {
+      async request(req) {
+        if (req.url.startsWith('https://api.openverse.org/')) {
+          return {
+            status: 200,
+            headers: { 'content-type': 'application/json' },
+            text: async () => '',
+            json: async <T,>() => ({
+              results: [{
+                id: 'ov-1',
+                title: 'Sustainable packaging',
+                thumbnail: 'https://api.openverse.org/v1/images/ov-1/thumb/',
+                foreign_landing_url: 'https://example.com/openverse-1',
+              }],
+            }) as T,
+            arrayBuffer: async () => new ArrayBuffer(0),
+          }
+        }
+        return {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+          text: async () => '',
+          json: async <T,>() => ({
+            query: {
+              pages: {
+                9: {
+                  pageid: 9,
+                  title: '可持续包装',
+                  fullurl: 'https://zh.wikipedia.org/wiki/可持续包装',
+                  extract: '材料与回收',
+                },
+              },
+            },
+          }) as T,
+          arrayBuffer: async () => new ArrayBuffer(0),
+        }
+      },
+      async *stream() {},
+    }
+
+    const result = await runDesignResearch(
+      { topic: '可持续包装', maxResults: 6 },
+      { network },
+      new AbortController().signal,
+    )
+
+    expect(result.ok).toBe(true)
+    expect(result.items.map((item) => item.source)).toEqual([
+      'openverse',
+      'wikipedia',
+    ])
+    expect(result.items[1]?.description).toContain('材料')
   })
 
   it('honors cancellation through the network signal', async () => {

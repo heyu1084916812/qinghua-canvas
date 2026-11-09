@@ -16,72 +16,6 @@
   font-size: var(--fs-chip);
 }
 
-.filterButton {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 30px;
-  height: 30px;
-  padding: 0;
-  border: 1px solid transparent;
-  border-radius: var(--radius-control);
-  background: transparent;
-  color: var(--text-2);
-  cursor: pointer;
-}
-
-.filterButton:hover {
-  border-color: var(--stroke);
-  background: var(--bg-hover);
-  color: var(--text-1);
-}
-
-.filters {
-  position: absolute;
-  z-index: 5;
-  top: 38px;
-  right: 0;
-  display: grid;
-  gap: var(--space-3);
-  width: min(210px, calc(100% - 16px));
-  padding: var(--space-3);
-  border: 1px solid var(--stroke);
-  border-radius: 8px;
-  background: var(--bg-surface);
-}
-
-.filters fieldset {
-  display: grid;
-  gap: var(--space-2);
-  min-width: 0;
-  margin: 0;
-  padding: 0;
-  border: 0;
-}
-
-.filters legend {
-  margin-bottom: var(--space-1);
-  color: var(--text-3);
-  font-size: var(--fs-chip);
-}
-
-.filters label {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  min-height: 24px;
-  color: var(--text-1);
-  font-size: var(--fs-label);
-  cursor: pointer;
-}
-
-.filters input {
-  width: 14px;
-  height: 14px;
-  margin: 0;
-  accent-color: var(--accent);
-}
-
 .notice {
   margin: 0 0 var(--space-3);
   padding: var(--space-3);
@@ -122,6 +56,10 @@
   flex-direction: column;
   gap: var(--space-2);
   min-width: 0;
+}
+
+.kitFolderCard {
+  position: relative;
 }
 
 .referenceCard {
@@ -290,6 +228,7 @@
 
 .kitFolderOpen {
   position: absolute;
+  z-index: 1;
   top: 14px;
   right: 8px;
   padding: 4px var(--space-2);
@@ -298,13 +237,21 @@
   background: var(--bg-surface);
   color: var(--text-1);
   font-size: var(--fs-chip);
+  cursor: pointer;
   opacity: 0;
+  pointer-events: none;
   transition: opacity 120ms ease;
 }
 
 .kitFolderCard:hover .kitFolderOpen,
 .kitFolderCard:focus-within .kitFolderOpen {
   opacity: 1;
+  pointer-events: auto;
+}
+
+.kitFolderOpen:hover {
+  border-color: var(--text-3);
+  background: var(--bg-hover);
 }
 
 .kitFolderCopy {
@@ -315,11 +262,10 @@
 }
 
 .uploadTile:focus-visible,
-.filterButton:focus-visible,
-.filters input:focus-visible,
 .referenceOpen:focus-visible,
 .referenceExpand:focus-visible,
-.kitFolderButton:focus-visible {
+.kitFolderButton:focus-visible,
+.kitFolderOpen:focus-visible {
   outline: 1px solid var(--stroke-focus);
   outline-offset: 1px;
 }

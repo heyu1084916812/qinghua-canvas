@@ -15,10 +15,16 @@ export async function ensureKitCardReference(
   version: ContextKitVersion,
 ): Promise<ReferenceItem> {
   const primary = version.resources.find((item) => item.role === 'logo') ?? version.resources[0]
+  const assets = version.resources.map((item) => ({
+    hash: item.hash,
+    role: item.role,
+    name: item.name,
+  }))
   return ensureReference(platform, projectId, {
     id: `ref_kit_${kit.id}`,
     title: kit.name,
     asset: primary,
+    assets,
     what: [
       `${kitKindLabel(kit.kind)}「${kit.name}」当前 v${version.version}。`,
       kit.description.trim(),
@@ -41,6 +47,11 @@ export async function ensureKitAssetReference(
     id: `ref_kit_asset_${kit.id}_${resource.hash.slice(0, 12)}`,
     title: resource.name.trim() || kit.name,
     asset: resource,
+    assets: [{
+      hash: resource.hash,
+      role: resource.role,
+      name: resource.name,
+    }],
     what: `来自${kitKindLabel(kit.kind)}「${kit.name}」v${version.version} 的图片素材${resource.name.trim() ? `「${resource.name.trim()}」` : ''}。`,
     kit,
     version,
@@ -54,6 +65,7 @@ async function ensureReference(
     id: string
     title: string
     asset?: ContextKitAsset
+    assets?: ReferenceItem['assets']
     what: string
     kit: ContextKit
     version: ContextKitVersion
@@ -81,6 +93,7 @@ async function ensureReference(
     source: 'kit',
     kind,
     ...(input.asset ? { assetHash: input.asset.hash } : {}),
+    ...(input.assets?.length ? { assets: input.assets } : {}),
     kitId: input.kit.id,
     kitVersion: input.version.version,
     what: input.what,
