@@ -6653,13 +6653,108 @@
       "budget": 600
     },
     {
+      "module": "src/pages/CanvasPage/ReferenceSourcePanel.tsx",
+      "owner": "canvas-reference-source",
+      "responsibility": "展示项目参考的上传卡、媒体卡与套件文件夹，处理上传、加入 Agent、灯箱和文件夹导航。",
+      "owns": [
+        "项目参考读取与上传",
+        "参考媒体卡与上传加号卡",
+        "套件文件夹卡与真实版本索引",
+        "参考灯箱和套件子面板入口"
+      ],
+      "doesNotOwn": [
+        "参考台账存储规则",
+        "套件内容编辑与生成上下文注入",
+        "通用素材灯箱编辑模式"
+      ],
+      "publicApi": [
+        "ReferenceSourcePanel"
+      ],
+      "test": [
+        "src/app/uiSevenPoints.test.ts"
+      ],
+      "budget": 280
+    },
+    {
+      "module": "src/pages/CanvasPage/ReferenceSourcePanel.module.css",
+      "owner": "canvas-reference-source-style",
+      "responsibility": "定义参考上传卡、媒体卡、套件文件夹卡的紧凑瀑布样式。",
+      "owns": [
+        "参考上传加号卡",
+        "参考媒体卡与快捷动作",
+        "套件文件夹层叠外观"
+      ],
+      "doesNotOwn": [
+        "参考详情灯箱样式",
+        "套件子面板样式",
+        "全局主题令牌"
+      ],
+      "publicApi": [
+        "CSS_MODULE:reference-source-cards",
+        "CSS_CLASS:uploadTile",
+        "CSS_CLASS:referenceCard",
+        "CSS_CLASS:kitFolderCard"
+      ],
+      "test": [
+        "src/app/uiSevenPoints.test.ts"
+      ],
+      "budget": 300
+    },
+    {
+      "module": "src/pages/CanvasPage/ReferenceKitPanel.tsx",
+      "owner": "canvas-reference-kit-panel",
+      "responsibility": "展示单个套件版本的图片、色板、字体，并提供返回和类型筛选。",
+      "owns": [
+        "套件子面板头部与返回",
+        "套件条目投影",
+        "来源/类型筛选交互"
+      ],
+      "doesNotOwn": [
+        "套件版本存储和编辑",
+        "项目参考台账",
+        "Agent 上下文注入"
+      ],
+      "publicApi": [
+        "ReferenceKitPanel"
+      ],
+      "test": [
+        "src/app/uiSevenPoints.test.ts"
+      ],
+      "budget": 180
+    },
+    {
+      "module": "src/pages/CanvasPage/ReferenceKitPanel.module.css",
+      "owner": "canvas-reference-kit-panel-style",
+      "responsibility": "定义套件子面板、筛选器和图片/颜色/字体条目的样式。",
+      "owns": [
+        "套件子面板头部与筛选浮层",
+        "图片、颜色、字体卡片",
+        "抽屉内紧凑密度"
+      ],
+      "doesNotOwn": [
+        "参考卡片与抽屉壳层",
+        "参考详情灯箱",
+        "全局主题令牌"
+      ],
+      "publicApi": [
+        "CSS_MODULE:reference-kit-panel",
+        "CSS_CLASS:head",
+        "CSS_CLASS:filters",
+        "CSS_CLASS:item"
+      ],
+      "test": [
+        "src/app/uiSevenPoints.test.ts"
+      ],
+      "budget": 200
+    },
+    {
       "module": "src/pages/CanvasPage/MyAssetsDrawer.tsx",
       "owner": "canvas-my-assets-drawer",
       "responsibility": "在画布工作区左列展示四个并列素材来源，复用真实套件、项目参考台账与 Pinterest 数据。",
       "owns": [
         "参考、我的素材、Pinterest、轻画插件四个页签",
         "四类套件列表与真实仓储读取",
-        "项目参考上传、紧凑瀑布列表、灯箱入口、拖到画布的数据源与加入 Agent 的 handoff 触发",
+        "我的素材抽屉四来源编排与 ReferenceSourcePanel 挂载",
         "现有 PinterestPanel 的抽屉化嵌入与未完成来源的如实状态",
         "在画布工作区左列占用真实布局宽度"
       ],
@@ -6667,7 +6762,7 @@
         "套件创建和版本编辑",
         "Pinterest OAuth 协议和导入实现",
         "Agent chip 插入与生成上下文",
-        "素材灯箱的缩放、编辑和下载实现"
+        "参考上传、灯箱、套件文件夹与素材灯箱编辑实现"
       ],
       "publicApi": [
         "MyAssetsDrawer"
@@ -6675,7 +6770,7 @@
       "test": [
         "src/app/uiSevenPoints.test.ts"
       ],
-      "budget": 320
+      "budget": 200
     },
     {
       "module": "src/pages/CanvasPage/MyAssetsDrawer.module.css",
@@ -6683,7 +6778,7 @@
       "responsibility": "定义画布我的素材左侧抽屉的布局、页签、滚动和嵌入面板样式。",
       "owns": [
         "左侧抽屉与画布让位几何",
-        "四页签、套件列表和参考卡紧凑瀑布的深浅主题样式",
+        "四页签与套件列表的深浅主题样式",
         "Pinterest 面板嵌入抽屉时的局部布局归零"
       ],
       "doesNotOwn": [
@@ -6700,7 +6795,7 @@
       "test": [
         "scripts/capture-ui-seven-points.mjs"
       ],
-      "budget": 360
+      "budget": 240
     },
     {
       "module": "src/features/settings/cliOutputText.ts",

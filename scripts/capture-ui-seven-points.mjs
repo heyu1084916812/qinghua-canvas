@@ -195,14 +195,18 @@ try {
             },
           })
         } catch (error) {
-          await route.fulfill({
-            status: 502,
-            headers: {
-              'content-type': 'application/json',
-              'access-control-allow-origin': pageOrigin,
-            },
-            body: JSON.stringify({ ok: false, error: String(error) }),
-          })
+          try {
+            await route.fulfill({
+              status: 502,
+              headers: {
+                'content-type': 'application/json',
+                'access-control-allow-origin': pageOrigin,
+              },
+              body: JSON.stringify({ ok: false, error: String(error) }),
+            })
+          } catch (fallbackError) {
+            if (!String(fallbackError).includes('Route is already handled')) throw fallbackError
+          }
         }
       })
     }
@@ -329,7 +333,69 @@ try {
       () => document.querySelectorAll('[data-my-assets-reference]').length >= 3,
       { timeout: 20_000 },
     ).catch(() => {})
+    const referenceQueryResponse = await fetch(`${STORE}/query`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ table: 'referenceItems', filter: {}, includePayload: false }),
+    })
+    const referenceRows = (await referenceQueryResponse.json()).rows ?? []
+    const previewReference = referenceRows
+      .filter((row) => typeof row.assetHash === 'string' && row.assetHash)
+      .sort((left, right) => Number(right.createdAt ?? 0) - Number(left.createdAt ?? 0))[0]
+    if (!previewReference) throw new Error('reference fixture asset missing')
+    const previewHash = previewReference.assetHash
+    const kitId = 'ui-seven-anbel-kit'
+    const kitTime = 1_700_000_000_000
+    const kitRows = [{
+      id: kitId,
+      kind: 'brand',
+      name: 'Anbel',
+      description: '自然有机风品牌套件',
+      currentVersion: 1,
+      createdAt: kitTime,
+      updatedAt: kitTime,
+    }]
+    const kitVersionRows = [{
+      id: `${kitId}:v1`,
+      kitId,
+      version: 1,
+      guide: '自然有机、轻盈、干净的品牌视觉。',
+      facts: [],
+      assetHashes: [previewHash],
+      resources: [{ hash: previewHash, role: 'logo', name: 'Anbel 标志' }],
+      colors: [{ id: 'brand-green', name: '主色', value: '#8fc466' }],
+      fonts: [{ id: 'abeezee', name: 'ABeeZee', detail: 'Regular' }],
+      createdAt: kitTime,
+    }]
+    for (const [table, rows] of [
+      ['contextKits', kitRows],
+      ['contextKitVersions', kitVersionRows],
+    ]) {
+      const seeded = await fetch(`${STORE}/bulkPut`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ table, rows }),
+      })
+      if (!seeded.ok) throw new Error(`${table} seed failed: HTTP ${seeded.status}`)
+    }
+    await page.locator('[data-my-assets-close]').click()
+    await page.locator('[data-canvas-my-assets]').click()
+    await page.locator('[data-my-assets-drawer]').waitFor({ timeout: 10_000 })
+    await page.locator('[data-my-assets-source="reference"]').click()
+    await page.locator('[data-my-assets-kit-folder]').waitFor({ timeout: 10_000 })
+    await page.waitForFunction(
+      () => document.querySelectorAll('[data-my-assets-reference]').length >= 3,
+      { timeout: 15_000 },
+    )
+    await page.waitForFunction(
+      () => {
+        const image = document.querySelector('[data-my-assets-kit-folder] img')
+        return image instanceof HTMLImageElement && image.complete && image.naturalWidth > 0
+      },
+      { timeout: 15_000 },
+    )
     const referenceCards = await page.locator('[data-my-assets-reference]').count()
+    const referenceFolders = await page.locator('[data-my-assets-kit-folder]').count()
     const referenceUpload = await page.locator('[data-my-assets-reference-upload]').count()
     const referenceAgentActions = await page.locator('[data-my-assets-reference-agent]').count()
     const referenceLayout = await page.evaluate(() => {
@@ -370,6 +436,31 @@ try {
       (button) => getComputedStyle(button).opacity === '1',
     )
     await page.screenshot({ path: path.join(out, `${file}-canvas-reference-hover.png`) })
+    await page.locator('[data-my-assets-kit-folder]').first().hover()
+    await page.waitForTimeout(180)
+    const referenceFolderOpenVisible = await page.locator('[data-my-assets-kit-folder]').first().evaluate(
+      (folder) => {
+        const open = folder.querySelector('[class*="kitFolderOpen"]')
+        return Boolean(open) && getComputedStyle(open).opacity === '1'
+      },
+    )
+    const referenceFolderImageLoaded = await page.locator('[data-my-assets-kit-folder] img').first().evaluate(
+      (image) => image instanceof HTMLImageElement && image.complete && image.naturalWidth > 0,
+    )
+    await page.screenshot({ path: path.join(out, `${file}-canvas-reference-folder-hover.png`) })
+    await page.locator('[data-my-assets-kit-folder] button').first().click()
+    await page.locator('[data-reference-kit-panel]').waitFor({ timeout: 10_000 })
+    const referenceKitItems = await page.locator('[data-reference-kit-item]').count()
+    const referenceKitImageItems = await page.locator('[data-reference-kit-item="image"]').count()
+    await page.screenshot({ path: path.join(out, `${file}-canvas-reference-kit.png`) })
+    await page.locator('[data-reference-kit-filter]').click()
+    await page.locator('[data-reference-kit-filter-panel]').waitFor({ timeout: 5_000 })
+    await page.locator('[data-reference-kit-filter-kind="color"]').uncheck()
+    await page.locator('[data-reference-kit-filter-kind="font"]').uncheck()
+    const referenceKitFilteredItems = await page.locator('[data-reference-kit-item]').count()
+    await page.screenshot({ path: path.join(out, `${file}-canvas-reference-kit-filter.png`) })
+    await page.locator('[data-reference-kit-back]').click()
+    await page.locator('[data-reference-kit-panel]').waitFor({ state: 'detached', timeout: 5_000 })
     const referenceNodesBeforeDrop = await page.locator('[data-node-id]').count()
     await page.locator('[data-my-assets-reference-drag]').first().dragTo(
       page.locator('[data-canvas-surface]'),
@@ -494,8 +585,14 @@ try {
       assetKinds,
       pinterestMounted,
       referenceCards,
+      referenceFolders,
       referenceUpload,
       referenceAgentActions,
+      referenceFolderOpenVisible,
+      referenceFolderImageLoaded,
+      referenceKitItems,
+      referenceKitImageItems,
+      referenceKitFilteredItems,
       referenceChipMounted,
       referenceQuickAddVisible,
       referenceLightboxOpen: referenceLightbox.referenceLightboxOpen,

@@ -1,5 +1,5 @@
 import { useAsset } from '../../features/shared/assets'
-import styles from './MyAssetsDrawer.module.css'
+import styles from './ReferenceSourcePanel.module.css'
 
 export function ReferenceMedia({
   hash,

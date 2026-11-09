@@ -1,21 +1,13 @@
 import { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react'
 import { usePlatform } from '../../app/providers/PlatformProvider'
 import { createContextRepository } from '../../state/shared/contextRepository'
-import { createReferenceLedgerRepository } from '../../state/project/referenceLedgerRepository'
 import type {
   ContextKit,
   ContextKitKind,
 } from '../../domain/shared/context'
 import type { CanvasStore } from '../../state/workbenches/canvas/store'
 import { KIT_KINDS } from '../AssetsPage/contextKitDraft'
-import { importAssetFile, IMPORT_ACCEPT } from '../../features/canvas/importAsset'
-import { sendReferenceToAgent } from '../../features/canvas/agentHandoff'
-import { createId } from '../../shared/id'
-import { MasonryGrid } from '../AssetsPage/MasonryGrid'
-import { IconPlus } from '../../workbenches/canvas/toolbar/icons'
-import { setReferenceDragData } from '../../features/canvas/dropImport'
-import { ReferenceMedia } from './ReferenceMedia'
-import { ReferenceLightbox } from './ReferenceLightbox'
+import { ReferenceSourcePanel } from './ReferenceSourcePanel'
 import styles from './MyAssetsDrawer.module.css'
 
 const PinterestPanel = lazy(() =>
@@ -49,26 +41,16 @@ export function MyAssetsDrawer({
     () => createContextRepository(platform.storage),
     [platform.storage],
   )
-  const referenceRepo = useMemo(
-    () => createReferenceLedgerRepository(platform.storage),
-    [platform.storage],
-  )
   const [source, setSource] = useState<Source>('assets')
   const [kits, setKits] = useState<ContextKit[]>([])
-  const [references, setReferences] = useState<
-    Awaited<ReturnType<typeof referenceRepo.listItems>>
-  >([])
   const [kind, setKind] = useState<ContextKitKind>('brand')
   const [error, setError] = useState('')
   const closeRef = useRef<HTMLButtonElement | null>(null)
-  const referenceInputRef = useRef<HTMLInputElement | null>(null)
-  const [referenceBusy, setReferenceBusy] = useState(false)
-  const [referenceLightboxId, setReferenceLightboxId] = useState<string | null>(null)
 
   useEffect(() => {
     closeRef.current?.focus()
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape' && !document.querySelector('[data-reference-lightbox]')) onClose()
+      if (event.key === 'Escape' && !document.querySelector('[data-reference-lightbox], [data-reference-kit-panel]')) onClose()
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
@@ -84,56 +66,13 @@ export function MyAssetsDrawer({
     return () => { active = false }
   }, [contextRepo])
 
-  useEffect(() => {
-    let active = true
-    void referenceRepo.listItems(projectId).then((rows) => {
-      if (active) setReferences(rows)
-    }).catch((cause) => {
-      if (active) setError(cause instanceof Error ? cause.message : '读取项目参考失败')
-    })
-    return () => { active = false }
-  }, [projectId, referenceRepo])
-
-  const uploadReferences = async (files: FileList | null) => {
-    if (!files || files.length === 0 || referenceBusy) return
-    setReferenceBusy(true)
-    setError('')
-    try {
-      const next = [...references]
-      for (const file of Array.from(files)) {
-        const asset = await importAssetFile({ platform, store, projectId }, file)
-        if (!asset || (!asset.mime.startsWith('image/') && !asset.mime.startsWith('video/'))) continue
-        const now = Date.now()
-        const item = {
-          id: createId('ref'),
-          projectId,
-          title: (asset.name ?? '参考素材').replace(/\.[^.]+$/, '').trim() || '参考素材',
-          source: 'file' as const,
-          kind: asset.mime.startsWith('video/') ? 'video' as const : 'image' as const,
-          assetHash: asset.hash,
-          what: `用户上传的${asset.mime.startsWith('video/') ? '视频' : '图片'}参考；等待后续任务分析补充 What / How to use。`,
-          createdAt: now,
-          updatedAt: now,
-        }
-        await referenceRepo.putItem(item)
-        next.push(item)
-      }
-      setReferences(next)
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : '上传项目参考失败')
-    } finally {
-      setReferenceBusy(false)
-      if (referenceInputRef.current) referenceInputRef.current.value = ''
-    }
-  }
-
   const visibleKits = kits.filter((kit) => kit.kind === kind)
 
   return (
       <aside className={styles.drawer} aria-label="我的素材" data-my-assets-drawer>
         <header className={styles.head}>
           <h2>我的素材</h2>
-          <button ref={closeRef} type="button" className={styles.close} onClick={onClose}>
+          <button ref={closeRef} type="button" className={styles.close} data-my-assets-close onClick={onClose}>
             关闭
           </button>
         </header>
@@ -154,86 +93,7 @@ export function MyAssetsDrawer({
         </nav>
         <div className={styles.body} data-my-assets-body={source}>
           {source === 'reference' ? (
-            <div>
-              <div className={styles.subhead}>
-                <span>当前项目的参考台账</span>
-                <button
-                  type="button"
-                  className={styles.kitAction}
-                  data-my-assets-reference-upload
-                  disabled={referenceBusy}
-                  onClick={() => referenceInputRef.current?.click()}
-                >
-                  {referenceBusy ? '正在导入…' : '上传参考'}
-                </button>
-              </div>
-              <input
-                ref={referenceInputRef}
-                type="file"
-                accept={IMPORT_ACCEPT}
-                multiple
-                hidden
-                data-my-assets-reference-file
-                onChange={(event) => void uploadReferences(event.target.files)}
-              />
-              {error ? <p className={styles.notice}>{error}</p> : null}
-              {!error && references.length === 0 ? (
-                <p className={styles.empty} data-my-assets-reference-empty>
-                  这个项目还没有参考。上传图片或视频后，它们会留在项目参考台账里，Agent 按任务或 chip 取用。
-                </p>
-              ) : null}
-              <MasonryGrid
-                minColumnWidth={132}
-                gap={10}
-                scope="my-assets-reference"
-              >
-                {references.map((item) => (
-                  <article className={styles.referenceCard} data-my-assets-reference={item.id} data-my-assets-reference-drag={item.id} draggable key={item.id} onDragStart={(event) => setReferenceDragData(event.dataTransfer, item.id)}>
-                    <div className={styles.referenceMedia}>
-                      <button
-                        type="button"
-                        className={styles.referenceOpen}
-                        data-my-assets-reference-open={item.id}
-                        aria-label={`查看参考 ${item.title}`}
-                        title="双击查看参考"
-                        onDoubleClick={() => {
-                          if (!item.assetHash) return
-                          setReferenceLightboxId(item.id)
-                        }}
-                        onKeyDown={(event) => {
-                          if (event.key !== 'Enter' && event.key !== ' ') return
-                          if (!item.assetHash) return
-                          event.preventDefault()
-                          setReferenceLightboxId(item.id)
-                        }}
-                      >
-                        <ReferenceMedia
-                          hash={item.assetHash}
-                          title={item.title}
-                          kind={item.kind === 'video' ? 'video' : 'image'}
-                        />
-                      </button>
-                      <button
-                        type="button"
-                        className={styles.referenceQuickAdd}
-                        data-my-assets-reference-agent={item.id}
-                        aria-label={`将 ${item.title} 加入对话`}
-                        title="加入对话"
-                        onClick={() => sendReferenceToAgent(projectId, [{ id: item.id, label: item.title }])}
-                      >
-                        <IconPlus size={14} />
-                      </button>
-                    </div>
-                    <div className={styles.referenceCopy}>
-                      <strong title={item.title}>{item.title}</strong>
-                      <span title={item.what}>
-                        {item.what || `${item.kind === 'video' ? '视频参考' : '图片参考'} · 项目台账`}
-                      </span>
-                    </div>
-                  </article>
-                ))}
-              </MasonryGrid>
-            </div>
+            <ReferenceSourcePanel projectId={projectId} store={store} kits={kits} />
           ) : null}
           {source === 'assets' ? (
             <div>
@@ -297,15 +157,6 @@ export function MyAssetsDrawer({
             </div>
           ) : null}
         </div>
-        {referenceLightboxId ? (
-          <ReferenceLightbox
-            projectId={projectId}
-            store={store}
-            items={references}
-            initialItemId={referenceLightboxId}
-            onClose={() => setReferenceLightboxId(null)}
-          />
-        ) : null}
       </aside>
   )
 }

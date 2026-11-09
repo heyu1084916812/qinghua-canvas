@@ -1,5 +1,12 @@
 # CanvasFlow（轻画）项目记忆
 
+### 总管2 第四十轮：Lovart 参考卡片与套件文件夹（2026-11-09）
+
+- 参考栏卡片必须由 `ReferenceSourcePanel` 组合，不要再塞回 `MyAssetsDrawer`。形态是“大号上传加号卡 → 说明式媒体卡 → 套件文件夹卡”，普通卡不再显示文件名粗标题，描述最多两行。套件文件夹要有层叠纸页、真实主素材缩略图和 hover/focus“打开”。
+- 套件文件夹进入 `ReferenceKitPanel`：只消费一个 `ContextKitVersion`，图片、颜色、字体都从真实版本投影；筛选面板只能过滤真实类型，未接来源禁用。`MyAssetsDrawer.tsx` 当前 162 行（预算 200），CSS 211 行（预算 240）；来源面板与套件面板独立登记，后续不要反塞回壳层。
+- 四组 1440×900 / 1024×700 × 明暗：upload 1、参考 3、文件夹 1、两列，文件夹缩略图解码且“打开”可见；套件子面板 3 项，筛选后 1 项，page/console error 0。证据 `.playwright-verify/ui-seven-after/*-canvas-reference{,-folder-hover,-kit,-kit-filter}.png`。
+- 最终门禁：check 1108 modules / 4430 deps / 252 registrations，串行 Vitest 649 files / 5439 tests（1 skipped），build 1240 modules，Impeccable detector 0 findings。仍未做：套件条目自身加入 Agent/画布、自动 What/HowToUse 与任务 usage、参考台账批量管理、Clipper。
+
 ### 总管2 第三十九轮：参考缩略图跟随大图居中（2026-11-09）
 
 - 参考详情空间结构必须是 `.layout > .visual + .info`；`.visual` 自己再分“大图 / 缩略图”两行。缩略图不能再用 `position:absolute; left:50%` 相对视口居中，否则宽屏会跑到右侧信息列下方。本轮四组实测大图与缩略图中心误差都是 0px。
