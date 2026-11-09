@@ -144,6 +144,7 @@ function harness(options: {
   }
   const ports: AgentSendTurnPorts = {
     trackRun: (work) => work(),
+    savePhaseEventMessages: vi.fn(async () => null),
     updateSessionFields: vi.fn(async () => {
       events.push('updateFields')
       return null
@@ -347,6 +348,55 @@ describe('A-5 #3 / #4 / #5 / #6 / #9：保存与准备之间的顺序', () => {
     await runAgentSendTurn(h.input, h.ports)
 
     expect(abortAtThinking).toBe(h.turnAbort)
+  })
+
+  it('参考台账阶段事件先落库，再随收口一起写入，且置于本轮用户消息后', async () => {
+    const h = harness({
+      prepare: async () => ready({
+        contextTrace: {
+          digest: 'digest-reference',
+          memoryRefs: [],
+          kitVersionRefs: [],
+          assetRefs: [],
+          referenceEvidence: ['r1:u1'],
+          referencePhaseEvent: {
+            phase: 'referenceAnalysis',
+            title: '参考分析完成 · 1 项依据',
+            detail: '本轮怎么用：保持字形与颜色不变',
+            evidence: ['r1:u1'],
+          },
+        },
+      }),
+    })
+
+    await runAgentSendTurn(h.input, h.ports)
+
+    const messages = vi.mocked(h.ports.savePhaseEventMessages).mock.calls[0]?.[1]
+    expect(messages?.map((message) => message.role)).toEqual([
+      'user',
+      'assistant',
+      'assistant',
+    ])
+    expect((messages?.[1] as ChatMessage).phaseEvent).toEqual({
+      phase: 'referenceAnalysis',
+      title: '参考分析完成 · 1 项依据',
+      detail: '本轮怎么用：保持字形与颜色不变',
+      evidence: ['r1:u1'],
+    })
+    expect(h.ports.handleOutcome).toHaveBeenCalledWith(
+      h.input.session,
+      OUTCOME,
+      expect.objectContaining({
+        historyMessages: expect.arrayContaining([
+          expect.objectContaining({
+            phaseEvent: expect.objectContaining({
+              phase: 'referenceAnalysis',
+            }),
+          }),
+        ]),
+      }),
+      h.turnAbort,
+    )
   })
 })
 

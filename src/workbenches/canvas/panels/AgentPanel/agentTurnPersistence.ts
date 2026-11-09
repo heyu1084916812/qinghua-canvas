@@ -131,7 +131,7 @@ export function buildAgentModelMessages(
 ): ChatMessage[] {
   return [
     { role: 'system', content: system },
-    ...turn.modelWindow,
+    ...turn.modelWindow.map(({ phaseEvent: _phaseEvent, ...message }) => message),
     turn.userMessage,
   ]
 }

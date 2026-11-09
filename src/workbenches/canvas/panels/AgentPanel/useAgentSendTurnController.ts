@@ -68,6 +68,7 @@ export interface AgentSendTurnControllerInput {
   clearReveal: AgentSendTurnUi['clearReveal']
   trackRun: TaskLifecycle['track']
   updateSessionFields: AgentSendTurnPorts['updateSessionFields']
+  savePhaseEventMessages: AgentSendTurnPorts['savePhaseEventMessages']
   failTurn: AgentSendTurnPorts['failTurn']
   ensureJob: AgentSendTurnPorts['ensureJob']
   transitionSessionJob: AgentSendTurnPorts['transition']
@@ -106,6 +107,7 @@ export function useAgentSendTurnController(
         {
           trackRun: input.trackRun,
           updateSessionFields: input.updateSessionFields,
+          savePhaseEventMessages: input.savePhaseEventMessages,
           failTurn: input.failTurn,
           prepare: input.prepareTurn,
           ensureJob: input.ensureJob,
@@ -166,6 +168,7 @@ export function useAgentSendTurnController(
       input.loopDeps,
       input.prepareTurn,
       input.runAgentTurn,
+      input.savePhaseEventMessages,
       input.sessionRuntime,
       input.setCurrent,
       input.setDraft,

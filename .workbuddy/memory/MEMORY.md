@@ -12550,3 +12550,12 @@ React 端口 → `invoke` → Rust `check_update` → updater 插件读配置 �
 - `projectAgentTurnReferences` 只把 What / HowToUse 写成本轮文字上下文；带真实 `assetHash` 且 MIME 已核的图片/视频才进入 `contextTrace.assetRefs`。文本/颜色/字体、avoid 和未命中项不得冒充生成参考图；`contextTrace.assetRefs` 经 `collectAgentLoopInputs` 成为本轮视觉输入，再经既有 `contextAssetsForGenerated` 进入新建生成节点。
 - 参考选择可产生真实 `referenceAnalysis` 阶段事件和证据，但不能伪造模型 thinking。当前事件只保存在 `contextTrace.referencePhaseEvent`，尚未投影成可见折叠卡；下次改 `ConversationProcessEntry` / `AgentActivityViews` 或 CSS 时必须转「涉及 UI」四视口取证。
 - 本轮不涉及 UI，没有 JSX/DOM/CSS/文案变化；治理 241 条。证据：定向 4 files / 47 tests、`npm run check`、串行全量 Vitest 648 files / 5425 tests、`npm run build`。身份锚点暂沿用 `GenerationContextAsset.role='logo'`，不扩窄词表。外部账号、真实付费生成、四来源抽屉、套件 chip、技能/网页/模型参数阶段源与六类流程策略仍未完成。
+
+### 总管2 第二十一轮：参考分析阶段卡与桌面开发版（2026-11-09）
+
+- `phaseEvent` 只放在 `ChatMessage` 的展示字段里。`runAgentSendTurn` 在 `handleOutcome` 前把真实参考筛选事件插入完整历史，并让收口一次写入；`buildAgentModelMessages` 必须剥离旧历史的 `phaseEvent`，否则阶段卡会污染模型协议或用空 assistant 消息制造假对话。
+- `toConversation` 用 `isAgentPhase` 守卫后才把阶段消息投影成 `ConversationProcessEntry`。`AgentActivityStrip` 非 live 时优先显示 `collapsedSummary`，并从展开 rows 里过滤同一已完成阶段行；live / revealing 和普通 reasoning 回退不能因此丢掉。
+- UI 取证脚本 `capture-agent-phase-ui.mjs` 用 Vite SSR 渲染组件，展开态是静态 HTML 证据夹具，不是浏览器交互栈；真实交互行为由 `AgentActivityViews.test.ts` 锁住。四视口明暗改前/改后截图、焦点、溢出、几何与 Impeccable detector 必须一起留档，不能只凭截图说 DOM 正确。
+- 用户要求打开桌面开发版时，当前有效流程是 `npm run tauri dev -- --no-dev-server` 复用已健康的 Vite `1420`；Tauri 壳自己启动 `18765` 的 shared-store。用 `Start-Process -WindowStyle Hidden` 拉起后台命令后，必须等 `qinghua.exe` 主窗口与 `18765/health` 同时出现，并把窗口调到前台。孤立端口 `18821` 是上一轮测试隔离库，不要当成开发库。
+- 当前桌面开发窗口为 `src-tauri/target/debug/qinghua.exe`，共享库健康响应是 `sqlite-v2 / data-v2`。外部账号、真实付费生成、四来源抽屉、项目级套件选择器、套件 chip、Pinterest/Clipper 抽屉、技能/网页/模型参数阶段源与六类生图流程仍未完成。
+- 第四阶段最终门禁：全仓 `npm run check` 1097 modules / 4369 deps / 34 tables / 241 registrations，串行全量 Vitest 648 files / 5429 tests，`npm run build` 最大 JS 381.22KB，Impeccable detector 0 findings。四视口取证与产品代码改动都留在同一本地提交链，不把截图夹具的静态展开行当成真实交互行为。

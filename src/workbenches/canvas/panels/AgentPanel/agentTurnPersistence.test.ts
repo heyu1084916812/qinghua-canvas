@@ -11,6 +11,30 @@ import {
 import { modelMessageWindow } from '../../../../domain/agent/modelMessageWindow'
 
 describe('persistAgentUserTurnBeforeRequest', () => {
+  it('★★ 阶段事件只留在界面历史，不进入模型消息', () => {
+    const messages = buildAgentModelMessages('系统提示', {
+      modelWindow: [{
+        role: 'assistant',
+        content: '',
+        phaseEvent: {
+          phase: 'referenceAnalysis',
+          title: '参考分析完成 · 1 项依据',
+          evidence: ['r1:u1'],
+        },
+      }],
+      userMessage: { role: 'user', content: '继续做海报' },
+      historyMessages: [],
+      outcomeTailIndex: 0,
+      saved: {} as never,
+      messageRevision: 1,
+    })
+    expect(messages).toEqual([
+      { role: 'system', content: '系统提示' },
+      { role: 'assistant', content: '' },
+      { role: 'user', content: '继续做海报' },
+    ])
+  })
+
   it('★★ 在模型请求前落库用户正文与附件引用，取消后仍可恢复', async () => {
     const sessions = createAgentSessionStore(createMemoryPlatform().storage)
     const session = await sessions.create({

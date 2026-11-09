@@ -139,6 +139,13 @@ export interface ChatMessage {
    * 只用于时间线展示，发回模型前必须剥离。
    */
   reasoning?: string
+  /** 准备阶段真实产出的阶段事件；只用于时间线展示，不发给模型。 */
+  phaseEvent?: {
+    phase: string
+    title: string
+    detail?: string
+    evidence?: readonly string[]
+  }
   /** `role:'assistant'` 时：它请求调用的工具 */
   toolCalls?: { id: string; name: string; args: string }[]
   /** `role:'tool'` 时：这条结果对应哪一次调用 */

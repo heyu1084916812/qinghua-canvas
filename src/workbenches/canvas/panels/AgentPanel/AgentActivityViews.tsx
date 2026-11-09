@@ -319,6 +319,11 @@ export function AgentActivityStrip({
         activity.status === 'running' && activity.detail?.trim(),
     )?.detail?.trim()
   const latestHistory = reasoningHistory.at(-1) ?? history.at(-1)
+  const collapsedHeadline = collapsedProcessHeadline(history, processText || latestHistory?.text || '')
+  const completedPhase = !live ? [...history]
+    .reverse()
+    .find((entry) => entry.phase && entry.collapsedSummary)
+    : undefined
   const processHistory = reasoningHistory
   const expandedProcess = expandedProcessView(
     processHistory,
@@ -359,7 +364,7 @@ export function AgentActivityStrip({
     live && status.kind === 'executing' &&
     (status.tool === 'runNode' || status.tool === 'runFrom')
   const visibleText = !live
-    ? collapsedProcessHeadline(history, processText || latestHistory?.text || '')
+    ? collapsedHeadline
     : isGeneration
       ? currentText
       : latestProcessLine(processText) || liveDetail || latestProcessLine(latestHistory?.text || '') || currentText
@@ -373,6 +378,12 @@ export function AgentActivityStrip({
       ? formatAgentRunElapsed((elapsedEnd - startedAt) / 1_000)
       : ''
   const showCurrentLine = Boolean(visibleText && visibleText !== intent?.text)
+  const visibleExpandedProcess = !live && completedPhase
+    ? {
+        ...expandedProcess,
+        rows: expandedProcess.rows.filter((row) => row.id !== completedPhase.id),
+      }
+    : expandedProcess
 
   return (
     <section
@@ -429,10 +440,10 @@ export function AgentActivityStrip({
       ) : null}
       {expanded && canExpand ? (
         <div className={styles.activityList} data-agent-activity-list>
-          {expandedProcess.liveText ? (
+          {visibleExpandedProcess.liveText ? (
             <div className={styles.activityProcessBody} data-agent-process-live-body>
               <TypewriterActivity
-                text={expandedProcess.liveText}
+              text={visibleExpandedProcess.liveText}
                 live={live || revealing}
                 textKey={`live-body-${latestHistory?.id ?? status.kind}`}
                 markdown
@@ -440,11 +451,11 @@ export function AgentActivityStrip({
               />
             </div>
           ) : null}
-          {expandedProcess.rows.map((step, index) => {
+          {visibleExpandedProcess.rows.map((step, index) => {
             const revealStep =
               revealing &&
-              index === expandedProcess.rows.length - 1 &&
-              !expandedProcess.liveText
+              index === visibleExpandedProcess.rows.length - 1 &&
+              !visibleExpandedProcess.liveText
             return (
             <div
               key={step.id}

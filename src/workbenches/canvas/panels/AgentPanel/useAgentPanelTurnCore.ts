@@ -287,6 +287,8 @@ export function useAgentPanelTurnCore({
     clearReveal,
     trackRun,
     updateSessionFields: sessions.updateFields,
+    savePhaseEventMessages: (sessionId, messages) =>
+      sessions.saveMessages(sessionId, [...messages]),
     failTurn: controller.failTurn,
     ensureJob: ensureAgentJob,
     transitionSessionJob,

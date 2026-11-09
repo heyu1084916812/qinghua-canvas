@@ -71,6 +71,7 @@ function input(
     clearReveal: vi.fn(),
     trackRun: (work) => work(),
     updateSessionFields: vi.fn(async () => null),
+    savePhaseEventMessages: vi.fn(async () => null),
     failTurn: vi.fn(async () => {}),
     ensureJob: vi.fn(async () => ({ id: 'job-1' })),
     transitionSessionJob: vi.fn(async () => null),

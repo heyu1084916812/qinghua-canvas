@@ -14,6 +14,7 @@ import {
 import type {
   AgentTurnContextTrace,
   AgentTurnRequestPreparation,
+  PreparedAgentTurnRequest,
 } from './agentTurnRequest'
 import { failureStatus, failureTurnPayload, sendTurnSeed } from './agentSendTurnPlan'
 import type { ExplicitMediaModels } from './mediaMentions'
@@ -93,6 +94,10 @@ export interface AgentLoopDepsArgs {
 
 export interface AgentSendTurnPorts {
   trackRun: TaskLifecycle['track']
+  savePhaseEventMessages: (
+    sessionId: string,
+    messages: readonly ChatMessage[],
+  ) => Promise<AgentSession | null>
   updateSessionFields: (
     sessionId: string,
     patch: { taskPlan: undefined },
@@ -324,7 +329,58 @@ export async function runAgentSendTurn(
       }
     },
   )
+  const referencePhaseEvent = prepared.contextTrace?.referencePhaseEvent
+  const savedPhaseEventMessages = referencePhaseEvent
+    ? await saveReferencePhaseEvent({
+        sessionId: session.id,
+        event: referencePhaseEvent,
+        history: withFullHistory(outcome.messages),
+        saveMessages: ports.savePhaseEventMessages,
+      })
+    : null
   // A-5 #10：必须在 handleOutcome 之后才把 outcome 交回调用方。
-  await ports.handleOutcome(session, outcome, persistedUserTurn, turnAbort)
+  await ports.handleOutcome(
+    session,
+    outcome,
+    savedPhaseEventMessages
+      ? { ...persistedUserTurn, historyMessages: savedPhaseEventMessages }
+      : persistedUserTurn,
+    turnAbort,
+  )
+  if (savedPhaseEventMessages && ui.currentIdRef.current === session.id) {
+    ui.setMessages(savedPhaseEventMessages)
+  }
   return outcome
+}
+
+async function saveReferencePhaseEvent(input: {
+  sessionId: string
+  event: NonNullable<
+    NonNullable<PreparedAgentTurnRequest['contextTrace']>['referencePhaseEvent']
+  >
+  history: ChatMessage[]
+  saveMessages: AgentSendTurnPorts['savePhaseEventMessages']
+}): Promise<ChatMessage[] | null> {
+  const userIndex = input.history.reduce(
+    (at, message, index) => message.role === 'user' ? index : at,
+    -1,
+  )
+  if (userIndex < 0) return null
+  const eventMessage: ChatMessage = {
+    role: 'assistant',
+    content: '',
+    createdAt: Date.now(),
+    phaseEvent: {
+      phase: input.event.phase,
+      title: input.event.title,
+      ...(input.event.detail ? { detail: input.event.detail } : {}),
+      ...(input.event.evidence
+        ? { evidence: [...input.event.evidence] }
+        : {}),
+    },
+  }
+  const history = [...input.history]
+  history.splice(userIndex + 1, 0, eventMessage)
+  const saved = await input.saveMessages(input.sessionId, history)
+  return saved?.messages ?? history
 }

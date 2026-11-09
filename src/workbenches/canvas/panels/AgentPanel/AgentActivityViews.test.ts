@@ -84,6 +84,34 @@ describe('AgentActivityViews', () => {
     expect(html).toContain('正在生成主图')
   })
 
+  it('★★ 已完成阶段折叠时只显示事实摘要，不重复展开同一阶段正文', () => {
+    const html = renderToStaticMarkup(
+      createElement(AgentActivityStrip, {
+        status: { kind: 'idle' },
+        items: [],
+        activities: [],
+        history: [
+          { id: 'intent', text: '先核对参考图。', source: 'intent', createdAt: 1 },
+          {
+            id: 'phase-ref',
+            text: '按当前任务匹配到 3 张参考。',
+            phase: 'referenceAnalysis',
+            collapsedSummary: '参考分析完成 · 3 项依据',
+            createdAt: 2,
+          },
+        ],
+        processText: '',
+        startedAt: 1,
+        finishedAt: 3,
+        live: false,
+      }),
+    )
+
+    expect(html).toContain('参考分析完成 · 3 项依据')
+    expect(html).not.toContain('先核对参考图。参考分析完成')
+    expect(html).toContain('data-agent-activity-toggle')
+  })
+
   it('★★ 最终消息 reveal 期间，整块过程文本继续打字而不是一次性铺满', () => {
     vi.stubGlobal('window', {
       matchMedia: () => ({ matches: false }),

@@ -1,4 +1,4 @@
-import { agentPhaseForTool, agentPhaseTitle, type AgentPhase } from '../../../../domain/agent/phase'
+import { agentPhaseForTool, agentPhaseTitle, isAgentPhase, type AgentPhase } from '../../../../domain/agent/phase'
 import type { ChatMessage } from '../../../../domain/shared/execution/types'
 
 /**
@@ -653,6 +653,18 @@ export function toConversation(
   for (const [messageIndex, m] of messages.entries()) {
     if (m.role === 'system') continue
     if (m.hiddenFromConversation) continue
+    if (m.role === 'assistant' && m.phaseEvent) {
+      const phase = m.phaseEvent.phase
+      if (isAgentPhase(phase)) {
+        ensureProcess(m).entries.push({
+          id: `phase-event-${messageIndex}`,
+          text: m.phaseEvent.detail?.trim() || m.phaseEvent.title,
+          phase,
+          collapsedSummary: m.phaseEvent.title,
+          ...timeOf(m),
+        })
+      }
+    }
 
     if (m.role === 'user') {
       finishProcess()

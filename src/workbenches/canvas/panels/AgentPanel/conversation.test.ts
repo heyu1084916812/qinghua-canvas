@@ -501,6 +501,36 @@ describe('消息 → 对话条目', () => {
     ])
   })
 
+  it('★★ 真实参考选择阶段事件进入当前回合过程块，不伪造 assistant 正文', () => {
+    const items = toConversation([
+      { role: 'user', content: '按项目参考做一张海报' },
+      {
+        role: 'assistant',
+        content: '',
+        phaseEvent: {
+          phase: 'referenceAnalysis',
+          title: '参考分析完成 · 2 项依据',
+          detail: '本轮采用品牌标准字与文案语气。',
+          evidence: ['r1:u1', 'r2:u2'],
+        },
+      },
+      { role: 'assistant', content: '海报已完成。' },
+    ])
+    expect(items).toEqual([
+      { kind: 'user', text: '按项目参考做一张海报' },
+      {
+        kind: 'process',
+        entries: [{
+          id: 'phase-event-1',
+          text: '本轮采用品牌标准字与文案语气。',
+          phase: 'referenceAnalysis',
+          collapsedSummary: '参考分析完成 · 2 项依据',
+        }],
+      },
+      { kind: 'text', text: '海报已完成。' },
+    ])
+  })
+
   it('★ 系统提示词不进对话流（那是给模型看的，不是给用户看的）', () => {
     const items = toConversation([
       { role: 'system', content: '你是「轻画」这张无限画布上的助手…' },
