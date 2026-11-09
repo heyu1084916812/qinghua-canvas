@@ -48,4 +48,12 @@ describe('useAgentPanelTurnCore 结构契约', () => {
     expect(countOf('resumeAgentTurn,')).toBe(2)
     expect(countOf('runAgentTurn,')).toBe(2)
   })
+
+  it('准备回合仍从宿主 platform 接真实存储端口', () => {
+    const start = SOURCE.indexOf('useAgentPrepareTurnController({')
+    const end = SOURCE.indexOf('})', start)
+    expect(start).toBeGreaterThan(-1)
+    expect(end).toBeGreaterThan(start)
+    expect(SOURCE.slice(start, end)).toMatch(/^\s*platform,\s*$/m)
+  })
 })

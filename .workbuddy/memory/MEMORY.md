@@ -12542,3 +12542,11 @@ React 端口 → `invoke` → Rust `check_update` → updater 插件读配置 �
 - 项目树列表只由打开状态和项目 revision 驱动；路由切换、当前项目高亮变化只改投影，不得重查 projects/nodes/runRecords。判定在 `projectTree/reload.ts`，并由 `ProjectTree.test.ts` 的 decision 测试覆盖。
 - 存储素材计数归 `storageOverviewAssetCount.ts`，只投影 `runRecords.createdAt/outputHashes` 与 assets MIME 元数据，不构造完整历史卡；assets 批为 256。首次内置渠道补齐用一次 `bulkPut`，不要逐行 `/put`。
 - 当前生产探针：总请求 288→247–275，存储阶段 79→53–74，`presets` 7→3，`assetLibrary` 2→1；三段耗时约 1.1–1.2s / 0.19–0.36s / 0.38–0.56s。请求下降已证实，耗时仍受 V1 波动影响，#966 未清零。
+
+### 总管2 第二十轮：项目参考台账接入 Agent turn（2026-11-09）
+
+- 台账 `taskKey` 必须是稳定语义值。当前复用 `classifyAgentRequest` 的 `requestMode`（如 `simple_generate` / `reference_edit`），随机 `operationId` 只服务本轮 Job 和运行记录；用 operationId 查 `referenceUsages` 会永远空选。准备回合时提前算一次分类，后续 `requestMode` 直接复用，避免两套分类规则漂移。
+- 生产装配由 `useAgentPrepareTurnController` 从同一个 `platform.storage` 创建 `createReferenceLedgerRepository`，不能只在测试里 mock 一个端口。`useAgentPanelTurnCore` 仍需把完整 `platform` 透传给该 hook；静态结构测试锁住这条线。
+- `projectAgentTurnReferences` 只把 What / HowToUse 写成本轮文字上下文；带真实 `assetHash` 且 MIME 已核的图片/视频才进入 `contextTrace.assetRefs`。文本/颜色/字体、avoid 和未命中项不得冒充生成参考图；`contextTrace.assetRefs` 经 `collectAgentLoopInputs` 成为本轮视觉输入，再经既有 `contextAssetsForGenerated` 进入新建生成节点。
+- 参考选择可产生真实 `referenceAnalysis` 阶段事件和证据，但不能伪造模型 thinking。当前事件只保存在 `contextTrace.referencePhaseEvent`，尚未投影成可见折叠卡；下次改 `ConversationProcessEntry` / `AgentActivityViews` 或 CSS 时必须转「涉及 UI」四视口取证。
+- 本轮不涉及 UI，没有 JSX/DOM/CSS/文案变化；治理 241 条。证据：定向 4 files / 47 tests、`npm run check`、串行全量 Vitest 648 files / 5425 tests、`npm run build`。身份锚点暂沿用 `GenerationContextAsset.role='logo'`，不扩窄词表。外部账号、真实付费生成、四来源抽屉、套件 chip、技能/网页/模型参数阶段源与六类流程策略仍未完成。

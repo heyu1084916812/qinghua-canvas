@@ -1,7 +1,8 @@
-import { useCallback } from 'react'
+import { useCallback, useMemo } from 'react'
 import type { PlatformKit } from '../../../../platform/ports'
 import type { AgentSession } from '../../../../state/agent/sessionStore'
 import type { CanvasStore } from '../../../../state/workbenches/canvas/store'
+import { createReferenceLedgerRepository } from '../../../../state/project/referenceLedgerRepository'
 import type { AgentPrepareArgs } from './agentSendTurnRun'
 import type {
   AgentTurnRequestPreparation,
@@ -25,7 +26,7 @@ type PrepInput = PrepareAgentTurnRequestInput
  */
 export interface AgentPrepareTurnControllerInput {
   store: Pick<CanvasStore, 'getSnapshot' | 'notify'>
-  platform: Pick<PlatformKit, 'assets'>
+  platform: Pick<PlatformKit, 'storage' | 'assets'>
   prepareChatRoute: (
     session: AgentSession,
     fresh?: boolean,
@@ -51,6 +52,10 @@ export type AgentPrepareTurn = (
 export function useAgentPrepareTurnController(
   input: AgentPrepareTurnControllerInput,
 ): AgentPrepareTurn {
+  const referenceLedger = useMemo(
+    () => createReferenceLedgerRepository(input.platform.storage),
+    [input.platform.storage],
+  )
   return useCallback<AgentPrepareTurn>(
     ({ session, text, internalControl, signal, hooks }) =>
       input.prepare({
@@ -81,6 +86,7 @@ export function useAgentPrepareTurnController(
             `结果已返回，但运行记录写入失败：${warning}`,
             'error',
           ),
+        referenceLedger,
         // 两个顺序回调原样透传：它们的执行时机在发送主体里。
         onPersisted: hooks.onPersisted,
         onRouteReady: hooks.onRouteReady,
@@ -95,6 +101,7 @@ export function useAgentPrepareTurnController(
       input.platform,
       input.prepare,
       input.prepareChatRoute,
+      referenceLedger,
       input.routeExecution,
       input.selection,
       input.sessions,

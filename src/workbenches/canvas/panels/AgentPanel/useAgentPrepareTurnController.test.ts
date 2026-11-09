@@ -34,13 +34,48 @@ function harness(over: Partial<AgentPrepareTurnControllerInput> = {}) {
   }
   const read = vi.fn(async () => ({ mime: 'image/png' }))
   const prepareChatRoute = vi.fn(async () => ({ ok: true }) as never)
+  const referenceRows = [
+    {
+      id: 'r1',
+      projectId: 'proj-1',
+      title: '品牌标准字',
+      source: 'kit',
+      kind: 'image',
+      assetHash: 'hash-logo',
+      what: '绿色圆角标准字',
+      createdAt: 1,
+      updatedAt: 1,
+    },
+  ]
+  const referenceUsageRows = [
+    {
+      id: 'u1',
+      itemId: 'r1',
+      projectId: 'proj-1',
+      taskKey: 'simple_generate',
+      usage: 'identityAnchor',
+      howToUse: '保持字形与颜色不变',
+      identityAnchor: true,
+      createdAt: 1,
+    },
+  ]
+  const storage = {
+    query: vi.fn(async (table: string) => {
+      if (table === 'referenceItems') return referenceRows
+      if (table === 'referenceUsages') return referenceUsageRows
+      return []
+    }),
+  }
   const prepare = vi.fn(async (input: PrepareAgentTurnRequestInput) => {
     captured.push(input)
     return { kind: 'aborted_before_job', persistedTurn: {} } as never
   })
   const input: AgentPrepareTurnControllerInput = {
     store: store as never,
-    platform: { assets: { read } } as never,
+    platform: {
+      assets: { read },
+      storage,
+    } as never,
     prepareChatRoute: prepareChatRoute as never,
     selection: ['n1'],
     sessions: { get: vi.fn() } as never,
@@ -54,7 +89,16 @@ function harness(over: Partial<AgentPrepareTurnControllerInput> = {}) {
     prepare: prepare as never,
     ...over,
   }
-  return { input, captured, store, read, prepareChatRoute, prepare, snapshots }
+  return {
+    input,
+    captured,
+    store,
+    read,
+    prepareChatRoute,
+    prepare,
+    snapshots,
+    storage,
+  }
 }
 
 function render(props: AgentPrepareTurnControllerInput): {
@@ -112,6 +156,7 @@ describe('useAgentPrepareTurnController / 12 个静态依赖原样透传', () =>
     )
     expect(input.routeExecution).toBe(h.input.routeExecution)
     expect(input.projectId).toBe('proj-1')
+    expect(input.referenceLedger).toBeTruthy()
     // 调用参数原样
     expect(input.session).toBe(a.session)
     expect(input.text).toBe('画一张海报')
@@ -161,6 +206,28 @@ describe('useAgentPrepareTurnController / 12 个静态依赖原样透传', () =>
     await h.captured[0]!.prepareRoute()
 
     expect(h.prepareChatRoute).toHaveBeenCalledWith(a.session, true)
+  })
+
+  it('参考台账由真实 platform.storage 装配，按项目与稳定任务类型筛选', async () => {
+    const h = harness()
+    const { viewRef } = render(h.input)
+
+    await viewRef.current!(args())
+    const referenceLedger = h.captured[0]!.referenceLedger!
+    const selected = await referenceLedger.selectForTask(
+      'proj-1',
+      'simple_generate',
+    )
+
+    expect(h.storage.query).toHaveBeenCalledWith('referenceItems', {
+      projectId: 'proj-1',
+    })
+    expect(h.storage.query).toHaveBeenCalledWith('referenceUsages', {
+      projectId: 'proj-1',
+      taskKey: 'simple_generate',
+    })
+    expect(selected.selected.map(({ item }) => item.id)).toEqual(['r1'])
+    expect(selected.omitted).toEqual([])
   })
 })
 

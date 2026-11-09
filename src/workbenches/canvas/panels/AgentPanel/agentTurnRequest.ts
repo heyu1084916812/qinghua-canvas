@@ -69,6 +69,11 @@ import {
   explicitMediaModelsFromMentions,
   type ExplicitMediaModels,
 } from './mediaMentions'
+import { projectAgentTurnReferences } from './agentTurnReferences'
+import type {
+  ReferenceLedgerRepository,
+} from '../../../../state/project/referenceLedgerRepository'
+import type { AgentPhaseEvent } from '../../../../domain/agent/phase'
 
 export interface AgentTurnContextTrace {
   digest: string
@@ -76,6 +81,8 @@ export interface AgentTurnContextTrace {
   kitVersionRefs: { kitId: string; version: number }[]
   assetRefs: (GenerationContextAsset & { mime: string })[]
   brief?: string
+  referenceEvidence?: string[]
+  referencePhaseEvent?: AgentPhaseEvent
 }
 
 export type AgentTurnMention = MentionRef & {
@@ -100,6 +107,10 @@ export interface PrepareAgentTurnRequestInput {
   projectId: string
   readAssetMime: (hash: string) => Promise<string | null>
   notifyContextError: (message: string) => void
+  /** 可选：项目参考台账。未接入时行为与旧版完全一致。 */
+  referenceLedger?: {
+    selectForTask: ReferenceLedgerRepository['selectForTask']
+  }
   skills: readonly Skill[]
   channels: readonly Channel[]
   canvasReviewEnabled: boolean
@@ -229,21 +240,90 @@ export async function prepareAgentTurnRequest(
   const operationId = createId('op')
   await input.onRouteReady(operationId)
 
+  // 台账按任务类型登记用法；operationId 是每次随机生成，不能当 taskKey。
+  const mentionedImageIds = imageNodeIdsAmong(
+    input.graph.nodes,
+    mentions
+      .filter((mention) => mention.kind === 'node')
+      .map((mention) => mention.id),
+  )
+  const selectedImageIds = imageNodeIdsAmong(
+    input.graph.nodes,
+    input.selection,
+  )
+  const activeTaskPlanForTask =
+    input.session.taskPlan &&
+    agentTaskPlanProgress(input.session.taskPlan).status === 'active'
+      ? input.session.taskPlan
+      : undefined
+  const previousMessagesForTask = persistedTurn.historyMessages.slice(0, -1)
+  const lastAssistantForTask = [...previousMessagesForTask].reverse().find(
+    (message) => message.role === 'assistant',
+  )
+  const lastAssistantTextForTask = lastAssistantForTask?.content ?? ''
+  const taskKey = classifyAgentRequest({
+    text: plainText,
+    hasMentionedImage: mentionedImageIds.length > 0,
+    hasSelectedNodes: input.selection.length > 0,
+    hasSelectedImage: selectedImageIds.length > 0,
+    hasTaskPlan: Boolean(activeTaskPlanForTask),
+    internalControl: input.internalControl === true,
+    hasActiveContinuation: input.session.continuation !== undefined,
+    hasPendingConfirmation: input.session.pendingConfirmation !== undefined,
+    hasUnfinishedGeneration: /生成中\s*\d+\s*\/\s*\d+|等待生成|waiting_generation/.test(
+      lastAssistantTextForTask,
+    ),
+    lastAssistantFailed: /HTTP\s*50\d|服务端返回错误|生成失败|运行失败|请求失败|上游/.test(
+      lastAssistantTextForTask,
+    ),
+    hasNeedsAttentionJob: /needs_attention|需要人工处理|等待人工/.test(
+      lastAssistantTextForTask,
+    ),
+  })
+
   let contextPrompt = ''
   let contextTrace: AgentTurnContextTrace | null = null
   try {
+    const selection = input.referenceLedger
+      ? await input.referenceLedger.selectForTask(input.projectId, taskKey)
+      : null
     const bundle = await input.memory.read({
       projectId: input.projectId,
       workbench: 'canvas',
       request: plainText,
       sessionId: input.session.id,
     })
+    const referenceMimes = selection
+      ? await Promise.all(
+          selection.selected.map(async ({ item }) => {
+            if (
+              !item.assetHash ||
+              (item.kind !== 'image' && item.kind !== 'video')
+            ) return null
+            const mime = await input
+              .readAssetMime(item.assetHash)
+              .catch(() => null)
+            return mime ? [item.assetHash, mime] as const : null
+          }),
+        )
+      : []
+    const referenceMimeCache = new Map(
+      referenceMimes.filter(
+        (entry): entry is readonly [string, string] => entry !== null,
+      ),
+    )
+    const projected = selection
+      ? projectAgentTurnReferences(
+          selection,
+          (hash) => referenceMimeCache.get(hash) ?? null,
+        )
+      : null
     contextTrace = {
       digest: bundle.digest,
       memoryRefs: bundle.memoryRefs,
       kitVersionRefs: bundle.kitVersionRefs,
-      assetRefs: (
-        await Promise.all(
+      assetRefs: ([
+        ...(await Promise.all(
           bundle.assets.map(async (asset) => {
             const mime = await input
               .readAssetMime(asset.hash)
@@ -257,11 +337,23 @@ export async function prepareAgentTurnRequest(
                 }
               : null
           }),
-        )
-      ).filter(
+        )),
+        ...(projected?.assetRefs ?? []),
+      ] as (GenerationContextAsset & { mime: string } | null)[])
+      .filter(
         (asset): asset is GenerationContextAsset & { mime: string } =>
           asset !== null,
+      )
+      .filter(
+        (asset, index, all) =>
+          all.findIndex((row) => row?.hash === asset.hash) === index,
       ),
+      ...(projected?.evidence.length
+        ? { referenceEvidence: projected.evidence }
+        : {}),
+      ...(projected?.phaseEvent
+        ? { referencePhaseEvent: projected.phaseEvent }
+        : {}),
     }
     if (bundle.conflicts.length > 0) {
       return {
@@ -274,7 +366,12 @@ export async function prepareAgentTurnRequest(
         contextTrace,
       }
     }
-    contextPrompt = formatContextBundleForPrompt(bundle)
+    contextPrompt = [
+      formatContextBundleForPrompt(bundle),
+      projected?.prompt ?? '',
+    ]
+      .filter(Boolean)
+      .join('\n\n')
     contextTrace.brief = contextPrompt
     const memoryCandidate = memoryCandidateFromText(plainText, {
       workbench: 'canvas',
@@ -420,50 +517,17 @@ export async function prepareAgentTurnRequest(
       ? { video: input.session.videoModel }
       : {}),
   }
-  const mentionedImageIds = imageNodeIdsAmong(
-    input.graph.nodes,
-    mentions
-      .filter((mention) => mention.kind === 'node')
-      .map((mention) => mention.id),
-  )
-  const selectedImageIds = imageNodeIdsAmong(
-    input.graph.nodes,
-    input.selection,
-  )
   const perImage = expectsPerImageFlows(
     plainText,
     mentionedImageIds.length,
   )
-  const activeTaskPlan =
-    input.session.taskPlan &&
-    agentTaskPlanProgress(input.session.taskPlan).status === 'active'
-      ? input.session.taskPlan
-      : undefined
-  const previousMessages = persistedTurn.historyMessages.slice(0, -1)
-  const lastAssistant = [...previousMessages].reverse().find(
-    (message) => message.role === 'assistant',
-  )
+  const activeTaskPlan = activeTaskPlanForTask
+  const previousMessages = previousMessagesForTask
+  const lastAssistant = lastAssistantForTask
   const lastAssistantFailed = /HTTP\s*50\d|服务端返回错误|生成失败|运行失败|请求失败|上游/.test(
-    lastAssistant?.content ?? '',
+    lastAssistantTextForTask,
   )
-  const hasUnfinishedGeneration = /生成中\s*\d+\s*\/\s*\d+|等待生成|waiting_generation/.test(
-    lastAssistant?.content ?? '',
-  )
-  const requestMode = classifyAgentRequest({
-    text: plainText,
-    hasMentionedImage: mentionedImageIds.length > 0,
-    hasSelectedNodes: input.selection.length > 0,
-    hasSelectedImage: selectedImageIds.length > 0,
-    hasTaskPlan: Boolean(activeTaskPlan),
-    internalControl: input.internalControl === true,
-    hasActiveContinuation: input.session.continuation !== undefined,
-    hasPendingConfirmation: input.session.pendingConfirmation !== undefined,
-    hasUnfinishedGeneration,
-    lastAssistantFailed,
-    hasNeedsAttentionJob: /needs_attention|需要人工处理|等待人工/.test(
-      lastAssistant?.content ?? '',
-    ),
-  })
+  const requestMode = taskKey
   const promptProfile = promptProfileForMode(requestMode)
   const sessionBrief = requestMode === 'complex_plan'
     ? sessionBriefForContinuation({

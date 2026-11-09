@@ -15,6 +15,7 @@ import {
   type AgentLoopAssemblyPorts,
 } from './agentLoopDeps'
 import type { AgentChatRoute } from './agentChatRoute'
+import type { AgentTurnContextTrace } from './agentTurnRequest'
 
 const ROUTE: AgentChatRoute = {
   channelId: 'channel-1',
@@ -59,6 +60,7 @@ function harness(args: {
   delivered?: Set<string>
   runLatestFailures?: Map<string, unknown>
   applyPlanResult?: unknown
+  contextTrace?: AgentTurnContextTrace
 }) {
   const executions: Record<string, unknown>[] = []
   const statusUpdates: unknown[] = []
@@ -190,7 +192,7 @@ function harness(args: {
         return true
       },
     ) as never,
-    contextTraceFor: () => undefined,
+    contextTraceFor: () => args.contextTrace,
     planAliasesFor: (sessionId: string) =>
       planAliasesStore.get(sessionId),
     setPlanAliases: (
@@ -525,6 +527,30 @@ describe('assembleAgentLoopDeps', () => {
         mime: 'image/png',
       },
     ])
+  })
+
+  it('★★ 参考台账的 contextTrace 素材也进入本轮视觉输入', () => {
+    const h = harness({
+      contextTrace: {
+        digest: 'digest-reference',
+        memoryRefs: [],
+        kitVersionRefs: [],
+        assetRefs: [{
+          hash: 'hash-reference',
+          mime: 'image/png',
+          role: 'reference',
+          name: '参考图',
+        }],
+        referenceEvidence: ['r1:u1'],
+      },
+    })
+    const inputs = (h.deps.inputs ?? []) as NodeInput[]
+    expect(inputs).toContainEqual({
+      kind: 'asset',
+      nodeId: 'context-kit:hash-reference',
+      assetHash: 'hash-reference',
+      mime: 'image/png',
+    })
   })
 })
 

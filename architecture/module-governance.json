@@ -6663,6 +6663,29 @@
         "src/state/project/referenceLedgerRepository.test.ts"
       ],
       "budget": 160
+    },
+    {
+      "module": "src/workbenches/canvas/panels/AgentPanel/agentTurnReferences.ts",
+      "owner": "agent-turn-references",
+      "responsibility": "把项目参考台账选择结果投影成本轮上下文文本、素材引用与真实参考分析阶段事件。",
+      "owns": [
+        "选中的 What 与 HowToUse 文本投影",
+        "真实素材 hash 到生成素材引用的转换",
+        "选中证据与参考分析阶段事件"
+      ],
+      "doesNotOwn": [
+        "参考台账读写与任务匹配",
+        "素材 MIME 权威读取和字节",
+        "React 渲染、模型窗口与工具执行"
+      ],
+      "publicApi": [
+        "AgentTurnReferenceProjection",
+        "projectAgentTurnReferences"
+      ],
+      "test": [
+        "src/workbenches/canvas/panels/AgentPanel/agentTurnReferences.test.ts"
+      ],
+      "budget": 120
     }
   ]
 }

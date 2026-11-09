@@ -10,6 +10,7 @@ import type {
   NodeSnapshot,
 } from '../../../../domain/canvas/model/node'
 import type { Skill } from '../../../../domain/prompt/skill'
+import type { ReferenceSelection } from '../../../../domain/project/referenceLedger'
 import type { TextResult } from '../../../../platform/channels/types'
 import { createMemoryPlatform } from '../../../../platform/memory'
 import {
@@ -244,6 +245,66 @@ describe('prepareAgentTurnRequest', () => {
       expect(withChip.skill?.id).toBe('skill-brand')
       expect(withChip.systemPrompt).toContain('技能正文：保留品牌字形和主色。')
     }
+  })
+
+  it('★★ 参考台账命中项进入本轮上下文与 assetRefs，未命中不注入', async () => {
+    const { sessions, session } = await createSession()
+    const selectForTask = vi.fn(async (
+      _projectId: string,
+      _taskKey: string,
+    ): Promise<ReferenceSelection> => ({
+      selected: [
+        {
+          item: {
+            id: 'r1',
+            projectId: 'p1',
+            title: '品牌标准字',
+            source: 'kit',
+            kind: 'image',
+            assetHash: 'hash-logo',
+            what: '绿色圆角标准字',
+            createdAt: 1,
+            updatedAt: 1,
+          },
+          usage: {
+            id: 'u1',
+            itemId: 'r1',
+            projectId: 'p1',
+            taskKey: 'simple_generate',
+            usage: 'identityAnchor',
+            howToUse: '保持字形与颜色不变',
+            identityAnchor: true,
+            createdAt: 1,
+          },
+        },
+      ],
+      omitted: [],
+    }))
+    const result = await prepareAgentTurnRequest({
+      ...inputFor({ sessions, session, text: '按参考做一张 KV' }),
+      referenceLedger: {
+        selectForTask,
+      },
+    })
+    expect(result.kind).toBe('ready')
+    if (result.kind !== 'ready') return
+    expect(selectForTask).toHaveBeenCalledWith('p1', 'simple_generate')
+    expect(selectForTask.mock.calls[0]?.[1]).not.toBe(result.operationId)
+    expect(result.contextPrompt).toContain('本次任务采用的参考台账')
+    expect(result.contextPrompt).toContain('保持字形与颜色不变')
+    expect(result.contextTrace?.assetRefs).toContainEqual({
+      hash: 'hash-logo',
+      mime: 'image/png',
+      role: 'logo',
+      name: '品牌标准字',
+    })
+    expect(result.contextTrace?.referenceEvidence).toEqual(['r1:u1'])
+    expect(result.contextTrace?.referencePhaseEvent).toEqual({
+      phase: 'referenceAnalysis',
+      title: '参考分析完成 · 1 项依据',
+      detail: expect.stringContaining('保持字形与颜色不变'),
+      evidence: ['r1:u1'],
+    })
   })
 
   it('★★ 查看画布：与视觉验收共用 route + inputTypes 判据，工具声明包含 visualReview', async () => {
