@@ -309,11 +309,14 @@ describe('消息 → 对话条目', () => {
       },
     ]
     const items = toConversation(messages)
-    expect(items.map((i) => i.kind)).toEqual(['user', 'step'])
+    expect(items.map((i) => i.kind)).toEqual(['user', 'step', 'process'])
     const step = items[1]
     if (step?.kind !== 'step') throw new Error('第二项应当是步骤卡')
     expect(step.label).toBe('工作流已创建')
+    expect(step.phase).toBe('plan')
     expect(step.lines.join()).toContain('新建 2 个节点')
+    const process = items[2]
+    expect(process?.kind === 'process' ? process.entries[0]?.phase : undefined).toBe('plan')
     // 空的 assistant 文本不该冒出一个空气泡
     expect(items.some((i) => i.kind === 'text')).toBe(false)
   })
@@ -457,12 +460,45 @@ describe('消息 → 对话条目', () => {
           source: 'reasoning',
           text: '先确认产品结构，再运行生成。',
         },
+        {
+          phase: 'generate',
+          collapsedSummary: '生成完成',
+          text: '生成完成：已运行生成',
+        },
       ],
     })
     expect(items.at(-1)).toMatchObject({
       kind: 'text',
       text: '白底产品图已经生成完成。',
     })
+  })
+
+  it('★★ 已知工具结果生成阶段摘要，未知工具不伪造阶段', () => {
+    const items = toConversation([
+      { role: 'user', content: '找参考并出图' },
+      {
+        role: 'assistant',
+        content: '',
+        toolCalls: [
+          { id: 'research', name: 'researchDesign', args: '{}' },
+          { id: 'custom', name: 'futureTool', args: '{}' },
+        ],
+      },
+      { role: 'tool', toolCallId: 'research', content: '{"ok":true}' },
+      { role: 'tool', toolCallId: 'custom', content: '{"ok":true}' },
+    ])
+    const steps = items.filter((item) => item.kind === 'step')
+    expect(steps[0]).toMatchObject({ phase: 'research' })
+    expect(steps[1]?.phase).toBeUndefined()
+    const process = items.find((item) => item.kind === 'process')
+    expect(process?.entries).toEqual([
+      {
+        id: 'phase-research',
+        text: '调研完成：设计调研完成',
+        phase: 'research',
+        collapsedSummary: '调研完成',
+      },
+    ])
   })
 
   it('★ 系统提示词不进对话流（那是给模型看的，不是给用户看的）', () => {

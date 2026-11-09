@@ -54,3 +54,28 @@ export function agentPhaseCollapsedSummary(event: AgentPhaseEvent): string {
   const suffix = evidence.length > 0 ? ` · ${evidence.length} 项依据` : ''
   return `${agentPhaseTitle(event.phase)}${suffix}`
 }
+
+/**
+ * 已登记工具 → 用户可理解的阶段。返回空表示「这一步没有阶段语义」，
+ * 调用方必须保留普通工具步骤，不能用猜测或默认阶段伪装成新流程。
+ */
+export function agentPhaseForTool(tool: string): AgentPhase | undefined {
+  const phases: Record<string, AgentPhase> = {
+    readGraph: 'align',
+    readAsset: 'align',
+    readResult: 'align',
+    researchDesign: 'research',
+    visualReview: 'review',
+    proposeTaskPlan: 'plan',
+    updateTaskStep: 'plan',
+    requestTaskConfirmation: 'plan',
+    applyPlan: 'plan',
+    runNode: 'generate',
+    runFrom: 'generate',
+    compareNodes: 'review',
+    sliceImage: 'iterate',
+    splitGrid: 'iterate',
+    updateNode: 'iterate',
+  }
+  return phases[tool]
+}

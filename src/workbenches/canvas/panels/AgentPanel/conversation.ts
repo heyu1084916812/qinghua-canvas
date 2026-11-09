@@ -1,4 +1,4 @@
-import type { AgentPhase } from '../../../../domain/agent/phase'
+import { agentPhaseForTool, agentPhaseTitle, type AgentPhase } from '../../../../domain/agent/phase'
 import type { ChatMessage } from '../../../../domain/shared/execution/types'
 
 /**
@@ -718,6 +718,7 @@ export function toConversation(
       for (const call of m.toolCalls ?? []) {
         if (planUiTools.has(call.name)) continue
         stepAt.set(call.id, out.length)
+        const phase = agentPhaseForTool(call.name)
         out.push({
           kind: 'step',
           ...timeOf(m),
@@ -727,6 +728,7 @@ export function toConversation(
           lines: [],
           nodeIds: [],
           failed: false,
+          ...(phase ? { phase } : {}),
         })
       }
       continue
@@ -743,6 +745,16 @@ export function toConversation(
      * 才知道成没成。失败还顶着「工作流已创建」是最误导人的一处。
      */
     out[at] = { ...item, ...described, label: toolLabelOf(item.tool, described.failed) }
+    const phase = item.phase
+    if (phase) {
+      ensureProcess(m).entries.push({
+        id: `phase-${m.toolCallId ?? at}`,
+        text: `${agentPhaseTitle(phase)}：${toolLabelOf(item.tool, described.failed)}`,
+        phase,
+        collapsedSummary: agentPhaseTitle(phase),
+        ...timeOf(m),
+      })
+    }
   }
 
   /**

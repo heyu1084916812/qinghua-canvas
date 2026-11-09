@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   AGENT_PHASES,
   agentPhaseCollapsedSummary,
+  agentPhaseForTool,
   agentPhaseTitle,
   isAgentPhase,
 } from './phase'
@@ -41,5 +42,12 @@ describe('Agent phase contract', () => {
       phase: 'skillLoaded',
       title: '技能加载完成',
     })).toBe('技能加载完成')
+  })
+
+  it('maps only known tool evidence to phases', () => {
+    expect(agentPhaseForTool('researchDesign')).toBe('research')
+    expect(agentPhaseForTool('runNode')).toBe('generate')
+    expect(agentPhaseForTool('visualReview')).toBe('review')
+    expect(agentPhaseForTool('unknownTool')).toBeUndefined()
   })
 })
