@@ -1,5 +1,11 @@
 # CanvasFlow（轻画）项目记忆
 
+### 总管2 第三十四轮：七项 UI 整改收口与 #989 开工基线（2026-11-09）
+
+- #975–#981 已拆成 `495d3af` / `cf5496c` / `27e0815` 三个本地提交；`npm run check`、串行全量 Vitest 644 files / 5409 tests、build、Tauri 75 tests、Impeccable detector 0 findings 全部通过。隔离 Vite/store 的四视口报告统一显示快照 7 份、新建选择 4 项、画布双入口、MCP 一级入口与套件弹层，page/console error 0。
+- UI 取证脚本 `capture-ui-seven-points.mjs` 默认自己起隔离服务；外部 `QH_UI_BASE/QH_UI_STORE` 模式下由调用方管理服务。代理必须把默认 18765 与隔离端口都拦住，并带允许来源头，否则页面仍会连用户库或卡在 CORS。
+- #989 后续做「过程可见、结束折叠」时，只扩展 `AgentLoopActivity / ConversationProcessEntry` 的阶段字段并复用 `AgentActivityViews` 折叠卡；真实工具/路由/参考筛选/技能加载才产生阶段事件，禁止伪造 thinking。项目参考台账按 projectId 隔离；我的素材/Pinterest/Clipper 是账号级共享，不要混用作用域。
+
 ### 总管2 第三十三轮：发布确认清单去旧值（2026-11-08）
 
 - 确认清单不再维护静态 HEAD / 提交数 / 全量测试数；这些值由 `check:release-readiness` 和实时 git 提供。
