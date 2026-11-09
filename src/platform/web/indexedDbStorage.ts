@@ -65,6 +65,8 @@ class QinghuaDB extends Dexie {
   inspirationCache!: Table<Row, string>
   agentMessages!: Table<Row, string>
   storageMigrations!: Table<Row, string>
+  referenceItems!: Table<Row, string>
+  referenceUsages!: Table<Row, string>
 
   constructor(name = 'qinghua') {
     super(name)
@@ -255,6 +257,14 @@ class QinghuaDB extends Dexie {
       agentMessages:
         'id, sessionId, projectId, sequence, createdAt, [sessionId+sequence]',
       storageMigrations: 'id, completedAt',
+    })
+    /**
+     * v22：项目参考台账按项目隔离；用法按项目 + 任务键 + 素材索引。
+     * 不复制素材字节，字节仍在 assets。
+     */
+    this.version(22).stores({
+      referenceItems: 'id, projectId, source, kind, updatedAt, [projectId+source]',
+      referenceUsages: 'id, itemId, projectId, taskKey, usage, [projectId+taskKey]',
     })
   }
 }

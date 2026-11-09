@@ -6611,6 +6611,58 @@
         "src/domain/agent/phase.test.ts"
       ],
       "budget": 90
+    },
+    {
+      "module": "src/domain/project/referenceLedger.ts",
+      "owner": "project-reference-rules",
+      "responsibility": "定义项目参考卡、任务用法与按当前任务 usage 筛选的纯规则。",
+      "owns": [
+        "参考来源与类型词表",
+        "What 与 HowToUse 数据结构",
+        "身份锚点优先与无关素材排除"
+      ],
+      "doesNotOwn": [
+        "素材字节与画布节点",
+        "存储读写和 React 状态",
+        "模型提示词与生成工具调用"
+      ],
+      "publicApi": [
+        "ReferenceSource",
+        "ReferenceKind",
+        "ReferenceUsageKind",
+        "ReferenceItem",
+        "ReferenceUsage",
+        "SelectedReference",
+        "ReferenceSelection",
+        "selectReferencesForTask"
+      ],
+      "test": [
+        "src/domain/project/referenceLedger.test.ts"
+      ],
+      "budget": 160
+    },
+    {
+      "module": "src/state/project/referenceLedgerRepository.ts",
+      "owner": "project-reference-persistence",
+      "responsibility": "按项目持久化参考卡与任务用法，并提供删除级联和任务筛选仓储入口。",
+      "owns": [
+        "referenceItems 与 referenceUsages 行映射",
+        "项目隔离查询与用法查询",
+        "删除参考卡时的用法级联"
+      ],
+      "doesNotOwn": [
+        "参考分析算法与模型上下文",
+        "assets 字节和画布节点写入",
+        "UI 面板状态与拖拽行为"
+      ],
+      "publicApi": [
+        "ReferenceLedgerRepository",
+        "createReferenceLedgerRepository"
+      ],
+      "test": [
+        "src/state/project/referenceLedgerRepository.test.ts"
+      ],
+      "budget": 160
     }
   ]
 }

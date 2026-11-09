@@ -53,6 +53,10 @@ export type TableName =
   | 'contextKitVersions'
   /** 项目显式绑定的套件版本；不会自动跟随最新版本。 */
   | 'projectContextBindings'
+  /** 项目级参考候选台账：一行 = 一张图片/文本/套件/链接参考卡的基础描述。 */
+  | 'referenceItems'
+  /** 参考卡在具体任务里的 How to use；同一素材可有多条任务用法。 */
+  | 'referenceUsages'
   /**
    * 用户自定义界面字体（用户 2026-10-09）。
    *

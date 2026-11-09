@@ -6,6 +6,11 @@
 - UI 取证脚本 `capture-ui-seven-points.mjs` 默认自己起隔离服务；外部 `QH_UI_BASE/QH_UI_STORE` 模式下由调用方管理服务。代理必须把默认 18765 与隔离端口都拦住，并带允许来源头，否则页面仍会连用户库或卡在 CORS。
 - #989 后续做「过程可见、结束折叠」时，只扩展 `AgentLoopActivity / ConversationProcessEntry` 的阶段字段并复用 `AgentActivityViews` 折叠卡；真实工具/路由/参考筛选/技能加载才产生阶段事件，禁止伪造 thinking。项目参考台账按 projectId 隔离；我的素材/Pinterest/Clipper 是账号级共享，不要混用作用域。
 
+### 总管2 第三十五轮：#989 阶段契约与项目参考台账（2026-11-09）
+
+- 阶段契约落在 `domain/agent/phase.ts`，`agentPhaseForTool` 只映射已登记工具；`conversation.ts` 给 `ConversationStep/ConversationProcessEntry` 加可选 phase，`AgentActivityViews` 完成时优先显示阶段摘要，普通 reasoning 回退原行为。四视口明暗证据、Impeccable detector 与全仓门禁通过。
+- 项目参考台账用 `referenceItems`（What）和 `referenceUsages`（按 projectId + taskKey 的 HowToUse）两张表，素材字节仍在 `assets`。新增表必须同步 `ports.ts`、Rust `TABLE_NAMES`（34 表 parity）、IndexedDB v22、备份白名单、Rust 读写测试、治理登记。`selectReferencesForTask` 已排除跨项目/无用法/avoid 并优先身份锚点；后续只把 selected 合入 `ContextBundle/contextTrace`。
+
 ### 总管2 第三十三轮：发布确认清单去旧值（2026-11-08）
 
 - 确认清单不再维护静态 HEAD / 提交数 / 全量测试数；这些值由 `check:release-readiness` 和实时 git 提供。

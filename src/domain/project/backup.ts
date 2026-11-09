@@ -60,6 +60,8 @@ export const BACKUP_TABLES = [
   'contextKits',
   'contextKitVersions',
   'projectContextBindings',
+  'referenceItems',
+  'referenceUsages',
   // 字体是本机界面偏好；体积不小，所以**可选**（见 BackupOptions.includeFonts）
   'fonts',
 ] as const

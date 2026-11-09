@@ -69,6 +69,8 @@ describe('全库备份 · 编解码', () => {
       'contextKits',
       'contextKitVersions',
       'projectContextBindings',
+      'referenceItems',
+      'referenceUsages',
     ]) {
       expect(BACKUP_TABLES).toContain(table)
     }

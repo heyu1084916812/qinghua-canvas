@@ -1749,6 +1749,14 @@ mod tests {
                 "projectContextBindings",
                 json!({ "id": "b1", "projectId": "p1", "kitId": "k1", "kitVersion": 1 }),
             ),
+            (
+                "referenceItems",
+                json!({ "id": "r1", "projectId": "p1", "kind": "image", "what": "Logo" }),
+            ),
+            (
+                "referenceUsages",
+                json!({ "id": "u1", "itemId": "r1", "projectId": "p1", "taskKey": "kv", "usage": "identityAnchor" }),
+            ),
         ];
         for (table, row) in rows {
             write_row(&root, table, &row).unwrap();

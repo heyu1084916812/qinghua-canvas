@@ -16,7 +16,7 @@ pub const SCHEMA_VERSION: i64 = 3;
 
 static TEMP_SEQUENCE: AtomicU64 = AtomicU64::new(1);
 
-pub const TABLE_NAMES: [&str; 32] = [
+pub const TABLE_NAMES: [&str; 34] = [
     "projects",
     "projectFolders",
     "nodes",
@@ -48,6 +48,8 @@ pub const TABLE_NAMES: [&str; 32] = [
     "contextKits",
     "contextKitVersions",
     "projectContextBindings",
+    "referenceItems",
+    "referenceUsages",
     "storageMigrations",
 ];
 
