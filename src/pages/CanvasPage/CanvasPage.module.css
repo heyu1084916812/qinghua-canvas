@@ -27,6 +27,16 @@
  * 但浮层（日志 / 灯箱）要能盖住它。
  */
 /* 右上角入口容器：Agent 已迁到浮球 + 应用壳面板，这里只剩日志。 */
+.topLeftActions {
+  position: absolute;
+  top: var(--space-3);
+  left: var(--space-3);
+  z-index: 18;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
 .topRightActions {
   position: absolute;
   top: var(--space-3);

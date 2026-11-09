@@ -22,9 +22,12 @@ import { createAssetHistoryRepository } from '../../state/project/assetHistoryRe
 import { createAssetLibraryStore } from '../../state/project/assetLibraryStore'
 import type { AssetsView } from '../../state/project/assetLibraryStore'
 import { activeCanvasId } from '../../state/project/activeCanvas'
+/*
+ * 品牌套件入口已移到画布工作区左上，并由应用壳统一挂载弹窗；素材页不再持有
+ * 不可达的套件状态，也不再让其他一级页面反向依赖本页内部组件。
+ */
 import { AssetCard } from './AssetCard'
 import { AssetPreview } from './AssetPreview'
-import { ContextKitsDialog } from './ContextKitsDialog'
 import { MasonryGrid } from './MasonryGrid'
 import styles from './AssetsPage.module.css'
 
@@ -165,7 +168,6 @@ export function AssetsPage() {
   const [status, setStatusText] = useState('')
   /** 这一条状态是"正常结果"还是"失败"（产品文档 §4.5：失败要 `role=alert`） */
   const [statusTone, setStatusTone] = useState<NoticeTone>('info')
-  const [kitsOpen, setKitsOpen] = useState(false)
   /** 日期分组收起状态：按分组标题记，刷新后继续保留。 */
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(() => {
     try {
@@ -519,14 +521,6 @@ export function AssetsPage() {
           data-assets-search
           onChange={(event) => store.setQuery(event.target.value)}
         />
-        <button
-          type="button"
-          className={styles.kitButton}
-          data-assets-context-kits-open
-          onClick={() => setKitsOpen(true)}
-        >
-          品牌 / 产品套件
-        </button>
         <div className={styles.segmented} data-assets-group>
           {GROUP_MODES.map((item) => (
             <button
@@ -938,7 +932,6 @@ export function AssetsPage() {
           }
         />
       )}
-      {kitsOpen ? <ContextKitsDialog onClose={() => setKitsOpen(false)} /> : null}
     </div>
   )
 }

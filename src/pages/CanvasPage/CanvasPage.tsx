@@ -27,6 +27,7 @@ import { migrateLegacyGeneratedTitles } from '../../domain/canvas/naming/autoTit
 import { rememberActiveCanvas } from '../../state/project/activeCanvas'
 import { createProjectRepository } from '../../state/project/repository'
 import { projectRoute } from '../../domain/shared/workbench'
+import { openContextKitsDialog } from '../../state/ui/contextKitsDialog'
 import styles from './CanvasPage.module.css'
 
 const LightboxLayer = lazy(() =>
@@ -449,6 +450,28 @@ function CanvasProject({ projectId }: { projectId: string }) {
             右上角只保留日志。Agent 由画布浮球打开应用壳右侧面板，
             不再占固定顶栏位置，也不会再挤压日志。
           */}
+          <div className={styles.topLeftActions}>
+            <button
+              type="button"
+              className={styles.topBtn}
+              data-canvas-context-kits
+              aria-label="品牌 / 产品套件"
+              title="品牌 / 产品套件"
+              onClick={openContextKitsDialog}
+            >
+              品牌套件
+            </button>
+            <button
+              type="button"
+              className={styles.topBtn}
+              data-canvas-defaults
+              aria-label="新建节点默认值"
+              title="新建节点默认值"
+              onClick={() => openGlobalSettings('defaults')}
+            >
+              默认值
+            </button>
+          </div>
           <div className={styles.topRightActions}>
             <button
               type="button"

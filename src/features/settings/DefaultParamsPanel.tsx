@@ -135,7 +135,9 @@ export function DefaultParamsPanel() {
     <div className={styles.panel} data-defaults-panel data-settings-panel>
       <section className={styles.block}>
         <h3 className={styles.title}>默认参数</h3>
-        <p className={styles.caption}>仅影响之后新建的节点。</p>
+        <p className={styles.caption}>
+          画布新节点使用这里的配方；电商与漫剧生成也读取同一份默认模型设置。
+        </p>
 
         <SettingsRow
           label="类别"

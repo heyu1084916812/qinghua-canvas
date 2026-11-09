@@ -9,7 +9,7 @@ export function HomeEmptyState({ onCreate }: { onCreate: () => void }) {
   return (
     <div className={styles.empty}>
       <p className={styles.emptyTitle}>还没有项目</p>
-      <p className={styles.emptyHint}>从下方模板开始，或新建空白项目。</p>
+      <p className={styles.emptyHint}>选择工作区后新建项目。</p>
       <button className={styles.newBtn} onClick={onCreate} data-new-project>
         ＋ 新建项目
       </button>

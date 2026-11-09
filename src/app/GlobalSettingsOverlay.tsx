@@ -6,6 +6,7 @@ import {
   IconBackup,
   IconChannels,
   IconCli,
+  IconMcpLink,
   IconDefaults,
   IconHelp,
   IconHosting,
@@ -20,6 +21,7 @@ import {
   IconTypography,
 } from './SettingsIcons'
 import {
+  GLOBAL_SETTINGS_BRIDGE_KEY,
   GLOBAL_SETTINGS_GROUPS,
   GLOBAL_SETTINGS_SECTIONS,
   closeGlobalSettings,
@@ -42,6 +44,9 @@ const StoragePanel = lazy(() =>
 )
 const CliPanel = lazy(() =>
   import('../features/settings/CliPanel').then((m) => ({ default: m.CliPanel })),
+)
+const CanvasMcpPanel = lazy(() =>
+  import('../features/settings/CanvasMcpPanel').then((m) => ({ default: m.CanvasMcpPanel })),
 )
 const FontManagerPanel = lazy(() =>
   import('../features/settings/FontManagerPanel').then((m) => ({
@@ -113,6 +118,7 @@ const SECTION_ICONS: Record<GlobalSettingsSection, ComponentType<{ size?: number
   channels: IconChannels,
   cli: IconCli,
   hosting: IconHosting,
+  canvasMcp: IconMcpLink,
   storage: IconStorage,
   allLogs: IconLogs,
   appearance: IconPalette,
@@ -134,6 +140,7 @@ const SECTION_INTROS: Record<GlobalSettingsSection, string> = {
   channels: '配置模型服务与密钥。',
   cli: '管理本机 CLI。',
   hosting: '设置素材上传与公网访问。',
+  canvasMcp: '连接外部 MCP harness 到当前画布。',
   storage: '管理数据与缓存。',
   allLogs: '查看全部运行记录。',
   appearance: '设置主题与动效。',
@@ -192,6 +199,10 @@ export function GlobalSettingsOverlay() {
   const [query, setQuery] = useState('')
   const visible = matchSettingsSections(query)
   const currentSection = GLOBAL_SETTINGS_SECTIONS.find((item) => item.id === section) ?? null
+
+  useEffect(() => {
+    Object.assign(window, { [GLOBAL_SETTINGS_BRIDGE_KEY]: openGlobalSettings })
+  }, [])
 
   useEffect(() => {
     if (!open) return
@@ -338,6 +349,7 @@ export function GlobalSettingsOverlay() {
                 {section === 'channels' && <SettingsPage key="channels" embedded />}
                 {section === 'cli' && <CliPanel key="cli" />}
                 {section === 'hosting' && <HostingPage key="hosting" />}
+                {section === 'canvasMcp' && <CanvasMcpPanel key="canvasMcp" />}
                 {section === 'storage' && <StoragePanel key="storage" />}
                 {section === 'allLogs' && <AllLogsPanel key="allLogs" />}
                 {section === 'appearance' && <ThemePanel key="appearance" />}

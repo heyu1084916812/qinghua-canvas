@@ -54,6 +54,19 @@ export function IconHosting({ size = 16 }: IconProps) {
   )
 }
 
+/** Canvas MCP：本机画布与外部 harness 之间的双向链路。 */
+export function IconMcpLink({ size = 16 }: IconProps) {
+  return (
+    <svg {...BASE} width={size} height={size} viewBox="0 0 24 24">
+      <rect x="3" y="5" width="8" height="7" rx="1.5" />
+      <rect x="13" y="12" width="8" height="7" rx="1.5" />
+      <path d="M11 8.5h3.5a2 2 0 0 1 2 2V12" />
+      <path d="M13 15.5H9.5a2 2 0 0 1-2-2V12" />
+      <path d="m14.3 10.3 1.4 1.4-1.4 1.4M9.7 11.3 8.3 12.7l1.4 1.4" />
+    </svg>
+  )
+}
+
 /** 存储：数据库柱体 */
 export function IconStorage({ size = 16 }: IconProps) {
   return (

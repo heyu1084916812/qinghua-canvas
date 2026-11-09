@@ -1,8 +1,5 @@
-import { useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { usePlatform } from '../../app/providers/PlatformProvider'
-import { createProjectRepository } from '../../state/project/repository'
-import { projectRoute } from '../../domain/shared/workbench'
+import { requestNewProjectChoice } from '../../state/ui/newProjectChoice'
 import { CatLogo } from '../../app/CatLogo'
 import { QinghuaWordmark } from '../../app/QinghuaWordmark'
 import styles from './HomePage.module.css'
@@ -18,23 +15,6 @@ import styles from './HomePage.module.css'
  */
 export function HomePage() {
   const navigate = useNavigate()
-  const platform = usePlatform()
-  const repoRef = useRef<ReturnType<typeof createProjectRepository> | null>(null)
-
-  /**
-   * 「新建项目」= 真的把项目建出来再进画布（产品文档 §5.1：首页保留新建入口）。
-   *
-   * 为什么不是「跳去 /projects 让用户自己点」：那是把一个**动作**
-   * 换成了「再走两步」。首页是进门第一眼，最常见的事就是开一张新画布，
-   * 这条路径必须一步到位 —— 与侧栏那个「+ 新建项目」同一个语义。
-   *
-   * 未选模板 = 空白画布：模板是**可选的**起点，不该成为新建的前置条件。
-   */
-  const createBlank = async () => {
-    const repo = (repoRef.current ??= createProjectRepository(platform.storage))
-    const created = await repo.create({ workbench: 'canvas' })
-    navigate(projectRoute('canvas', created.id))
-  }
 
   return (
     <div className={styles.page} data-home-page>
@@ -59,7 +39,7 @@ export function HomePage() {
             type="button"
             className={styles.primary}
             data-home-new
-            onClick={() => void createBlank()}
+            onClick={requestNewProjectChoice}
           >
             新建项目
           </button>

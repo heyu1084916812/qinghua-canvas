@@ -6,6 +6,7 @@ import {
 } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { AppSidebar } from './AppSidebar'
+import { ContextKitsDialogHost } from './ContextKitsDialogHost'
 import { GlobalSettingsOverlay } from './GlobalSettingsOverlay'
 import { StorageUpgradeGate } from './StorageUpgradeGate'
 import { TitleBar } from './TitleBar'
@@ -24,6 +25,7 @@ import { usePlatform } from './providers/PlatformProvider'
 import { useAutoSnapshot } from '../state/project/useAutoSnapshot'
 import { startUiHeartbeat } from './uiHeartbeat'
 import { AgentHostOutlet } from './AgentHostOutlet'
+import { NewProjectChoiceHost } from '../features/shared/project/NewProjectChoiceHost'
 import { ProjectRuntimeRecoveryNotice } from './ProjectRuntimeRecoveryNotice'
 import { subscribeProjectRuntimeCompleted } from './ProjectRuntimeRegistry'
 import { finalizeCommittedProjectRuntimes } from './deletedProjectState'
@@ -141,6 +143,9 @@ export function AppShell({ children }: { children: ReactNode }) {
       <UpdateNotice />
       {/* 全局设置浮层（对账 #259）：挂在这一层，任何路由都能打开 */}
       <GlobalSettingsOverlay />
+      {/* 跨页面的两个轻弹窗统一在壳层挂载，页面只发打开事件 */}
+      <ContextKitsDialogHost />
+      <NewProjectChoiceHost />
       <StorageUpgradeGate />
       {/* 首次使用引导（对账 #388 / E7）：看没看过只认本机标记；跳过 / 看完都不再自动弹 */}
       <GettingStarted />

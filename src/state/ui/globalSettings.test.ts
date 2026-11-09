@@ -109,13 +109,13 @@ describe('globalSettings · 全局设置浮层', () => {
       'channels',
       'cli',
       'hosting',
+      'canvasMcp',
       'storage',
       'allLogs',
       'appearance',
       'typography',
       'canvasLook',
       'backup',
-      'defaults',
       'agent',
       'packs',
       'snapshots',
@@ -128,13 +128,13 @@ describe('globalSettings · 全局设置浮层', () => {
       '模型服务',
       'CLI',
       '素材传输',
+      'Canvas MCP',
       '存储',
       '日志',
       '主题',
       '字体',
       '画布',
       '备份',
-      '默认值',
       'Agent',
       '扩展包',
       '快照',
@@ -156,6 +156,7 @@ describe('globalSettings · 全局设置浮层', () => {
     expect(byId.get('channels')).toBe('连接')
     expect(byId.get('cli')).toBe('连接')
     expect(byId.get('hosting')).toBe('连接')
+    expect(byId.get('canvasMcp')).toBe('连接')
     expect(byId.get('storage')).toBe('数据')
     expect(byId.get('allLogs')).toBe('数据')
     expect(byId.get('backup')).toBe('数据')

@@ -29,6 +29,7 @@ export type GlobalSettingsSection =
   | 'channels'
   | 'cli'
   | 'hosting'
+  | 'canvasMcp'
   | 'storage'
   /** 总日志：跨项目汇总同一份 RunRecord，不复制日志库。 */
   | 'allLogs'
@@ -145,6 +146,12 @@ export const GLOBAL_SETTINGS_SECTIONS: {
     group: '连接',
     keywords: ['图床', '上传', '素材', '公网', '直链', '外链', '图床配置'],
   },
+  {
+    id: 'canvasMcp',
+    label: 'Canvas MCP',
+    group: '连接',
+    keywords: ['mcp', 'canvas mcp', 'codex', 'claude', 'cursor', '外部工具', 'stdio', '网关'],
+  },
   // 「存储」（对账 #261）：存储概况 / 数据目录 / 网页缓存 / 素材文件夹
   {
     id: 'storage',
@@ -187,12 +194,6 @@ export const GLOBAL_SETTINGS_SECTIONS: {
     keywords: ['备份', '恢复', '导出', '导入', '快照', '还原', '回收站', '数据安全', '换机器'],
   },
   // 「扩展包」（对账 #386 阶段一）：数据型扩展包 —— 技能 + 电商平台规则
-  {
-    id: 'defaults',
-    label: '默认值',
-    group: '生成',
-    keywords: ['默认', '模型', '比例', '尺寸', '画质', '张数', '参数', '记住上次'],
-  },
   {
     id: 'agent',
     label: 'Agent',
@@ -321,6 +322,9 @@ export function subscribeGlobalSettings(fn: () => void): () => void {
     listeners.delete(fn)
   }
 }
+
+/** 供开发/冒烟桥使用：外部自动化可以直达不再出现在左侧导航的深链栏目。 */
+export const GLOBAL_SETTINGS_BRIDGE_KEY = '__QINGHUA_OPEN_SETTINGS__'
 
 /** 仅供测试：复位成「关着 + 模型服务」。 */
 export function __resetGlobalSettingsForTest(): void {

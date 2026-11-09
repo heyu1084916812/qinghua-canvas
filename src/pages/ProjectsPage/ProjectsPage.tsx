@@ -26,6 +26,7 @@ import {
   ProjectCard,
 } from './ProjectsPageViews'
 import { PROJECT_KIND_ORDER, projectKindCounts, projectsForKind, type ProjectKind } from './projectListProjection'
+import { requestNewProjectChoice } from '../../state/ui/newProjectChoice'
 import {
   TRASH_KEEP_DAYS,
   pruneTrashSelection,
@@ -792,16 +793,13 @@ export function ProjectsPage() {
           )}
 
           {shown.length === 0 && !loading ? (
-            <HomeEmptyState onCreate={() => void createBlank('canvas')} />
+            <HomeEmptyState onCreate={requestNewProjectChoice} />
           ) : (
             <div className={styles.grid}>
               {/* 参考图口径：新建项目是网格第一张，其余项目依次排开 */}
               <button
                 className={styles.newCard}
-                onClick={(e) => {
-                  const r = e.currentTarget.getBoundingClientRect()
-                  setNewMenu({ x: r.left, y: r.bottom + 8 })
-                }}
+                onClick={requestNewProjectChoice}
                 data-new-card
               >
                 <span className={styles.newPlus} aria-hidden>

@@ -27,6 +27,7 @@ import {
   openGlobalSettings,
   subscribeGlobalSettings,
 } from '../state/ui/globalSettings'
+import { requestNewProjectChoice } from '../state/ui/newProjectChoice'
 import styles from './AppSidebar.module.css'
 import { ProjectTree } from './ProjectTree'
 import {
@@ -366,7 +367,10 @@ export function AppSidebar() {
         data-sidebar-new
         aria-label="新建项目"
         title="新建项目"
-        onClick={() => navigate('/')}
+        onClick={() => {
+          navigate('/')
+          requestNewProjectChoice()
+        }}
       >
         <span className={styles.newIcon} aria-hidden="true">
           <IconNewProject />

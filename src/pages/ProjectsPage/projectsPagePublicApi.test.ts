@@ -103,7 +103,7 @@ describe('ProjectsPage public API', () => {
       createElement(ProjectsPageModule.HomeEmptyState, { onCreate: () => {} }),
     )
     expect(html).toContain('还没有项目')
-    expect(html).toContain('从下方模板开始，或新建空白项目。')
+    expect(html).toContain('选择工作区后新建项目。')
     expect(html).toContain('data-new-project')
   })
 })
