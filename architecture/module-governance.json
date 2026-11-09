@@ -6571,14 +6571,15 @@
       "owns": [
         "参考、我的素材、Pinterest、轻画插件四个页签",
         "四类套件列表与真实仓储读取",
-        "项目参考上传、列表与加入 Agent 的 handoff 触发",
+        "项目参考上传、紧凑瀑布列表、灯箱入口与加入 Agent 的 handoff 触发",
         "现有 PinterestPanel 的抽屉化嵌入与未完成来源的如实状态",
         "在画布工作区左列占用真实布局宽度"
       ],
       "doesNotOwn": [
         "套件创建和版本编辑",
         "Pinterest OAuth 协议和导入实现",
-        "Agent chip 插入与生成上下文"
+        "Agent chip 插入与生成上下文",
+        "素材灯箱的缩放、编辑和下载实现"
       ],
       "publicApi": [
         "MyAssetsDrawer"
@@ -6594,7 +6595,7 @@
       "responsibility": "定义画布我的素材左侧抽屉的布局、页签、滚动和嵌入面板样式。",
       "owns": [
         "左侧抽屉与画布让位几何",
-        "四页签和套件列表的深浅主题样式",
+        "四页签、套件列表和参考卡紧凑瀑布的深浅主题样式",
         "Pinterest 面板嵌入抽屉时的局部布局归零"
       ],
       "doesNotOwn": [
@@ -6611,7 +6612,7 @@
       "test": [
         "scripts/capture-ui-seven-points.mjs"
       ],
-      "budget": 320
+      "budget": 360
     },
     {
       "module": "src/features/settings/cliOutputText.ts",

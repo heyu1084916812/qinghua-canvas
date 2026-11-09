@@ -1,5 +1,12 @@
 # CanvasFlow（轻画）项目记忆
 
+### 总管2 第三十六轮：参考面板瀑布流与卡片动作（2026-11-09）
+
+- 画布「参考」复用素材页 `MasonryGrid` 时传 `minColumnWidth=132 / gap=10 / scope=my-assets-reference`；不要在抽屉里另写 CSS columns。`MasonryGrid` 的默认 240/20 必须保持，素材页不跟着变。421px 抽屉是两列 189px，321px 抽屉是两列 139px。
+- 参考卡图片必须用真实宽高形成参差，不能用 1×1 透明图冒充验收；本轮探针用 320×320、240×420、480×220 三张有色 PNG，实测比例 1 / 0.57 / 2.18、图片真实解码、四组无横向溢出。
+- 快捷加号是绝对定位交互层，必须有 `z-index` 并在 hover/focus 时恢复 `pointer-events`；只看到按钮不代表可点。灯箱入口用双击，键盘 Enter/Space 等价，打开既有 `LightboxLayer`，Esc 关闭；全套四视口截图与 `report.json` 在 `.playwright-verify/ui-seven-after/`。
+- 本轮 `npm run check`（1100 modules / 4390 deps / 34 tables / 244 registrations）、串行全量 Vitest 649 files / 5436 tests（1 skipped）、build 1232 modules、Impeccable detector 0 findings 通过。仍未完成：Lovart 灯箱右侧信息与底部缩略条、套件文件夹/筛选、拖到画布、台账批量管理、`curate_references` 与按任务 usage；不要声称整个参考面板已一比一。
+
 ### 总管2 第三十四轮：七项 UI 整改收口与 #989 开工基线（2026-11-09）
 
 - #975–#981 已拆成 `495d3af` / `cf5496c` / `27e0815` 三个本地提交；`npm run check`、串行全量 Vitest 644 files / 5409 tests、build、Tauri 75 tests、Impeccable detector 0 findings 全部通过。隔离 Vite/store 的四视口报告统一显示快照 7 份、新建选择 4 项、画布双入口、MCP 一级入口与套件弹层，page/console error 0。

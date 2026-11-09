@@ -21,10 +21,21 @@ const variants = [
   { width: 1024, height: 700, theme: 'dark' },
   { width: 1024, height: 700, theme: 'light' },
 ]
-const ONE_PIXEL_PNG = Buffer.from(
-  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Wl2n0sAAAAASUVORK5CYII=',
-  'base64',
-)
+async function mediaFixtures(browser) {
+  const page = await browser.newPage({ viewport: { width: 800, height: 900 } })
+  await page.setContent(`<!doctype html><style>
+    body { margin: 0; background: #d8e3df; }
+    div { border: 8px solid #48675f; box-sizing: border-box; }
+    #square { width: 320px; height: 320px; background: #b9c9a8; }
+    #tall { width: 240px; height: 420px; background: #a8c8bb; }
+    #wide { width: 480px; height: 220px; background: #c4b48c; }
+  </style><div id="square"></div><div id="tall"></div><div id="wide"></div>`)
+  const square = await page.locator('#square').screenshot()
+  const tall = await page.locator('#tall').screenshot()
+  const wide = await page.locator('#wide').screenshot()
+  await page.close()
+  return { square, tall, wide }
+}
 
 const pageErrors = (page) => {
   const errors = []
@@ -136,6 +147,7 @@ try {
 }
 
 const browser = await chromium.launch({ channel: 'chrome', args: ['--no-proxy-server'] })
+const fixtures = await mediaFixtures(browser)
 const report = []
 const snapshots = Array.from({ length: 12 }, (_, index) => ({
   id: `ui-seven-seed-${phase}-${index}`,
@@ -296,16 +308,91 @@ try {
     await page.locator('[data-pinterest-panel]').waitFor({ timeout: 10_000 }).catch(() => {})
     const pinterestMounted = await page.locator('[data-pinterest-panel]').count()
     await page.locator('[data-my-assets-source="reference"]').click()
-    await page.locator('[data-my-assets-reference-file]').setInputFiles({
-      name: 'project-reference.png',
-      mimeType: 'image/png',
-      buffer: ONE_PIXEL_PNG,
-    })
-    await page.locator('[data-my-assets-reference]').waitFor({ timeout: 10_000 }).catch(() => {})
+    await page.locator('[data-my-assets-reference-file]').setInputFiles([
+      {
+        name: 'square-reference.png',
+        mimeType: 'image/png',
+        buffer: fixtures.square,
+      },
+      {
+        name: 'tall-reference.png',
+        mimeType: 'image/png',
+        buffer: fixtures.tall,
+      },
+      {
+        name: 'wide-reference.png',
+        mimeType: 'image/png',
+        buffer: fixtures.wide,
+      },
+    ])
+    await page.waitForFunction(
+      () => document.querySelectorAll('[data-my-assets-reference]').length >= 3,
+      { timeout: 20_000 },
+    ).catch(() => {})
     const referenceCards = await page.locator('[data-my-assets-reference]').count()
     const referenceUpload = await page.locator('[data-my-assets-reference-upload]').count()
     const referenceAgentActions = await page.locator('[data-my-assets-reference-agent]').count()
+    const referenceLayout = await page.evaluate(() => {
+      const grid = document.querySelector('[data-masonry-scope="my-assets-reference"]')
+      const cards = [...document.querySelectorAll('[data-my-assets-reference]')]
+      const rects = cards.map((card) => card.getBoundingClientRect())
+      const media = cards.map((card) => card.querySelector('img, video'))
+      const mediaRects = media.map((item) => item?.getBoundingClientRect())
+      const lefts = [...new Set(rects.map((rect) => Math.round(rect.left)))]
+      const tops = [...new Set(rects.map((rect) => Math.round(rect.top)))]
+      const gridRect = grid?.getBoundingClientRect()
+      return {
+        referenceGridPresent: Boolean(grid),
+        referenceColumns: lefts.length,
+        referenceStaggered: tops.length > 1,
+        referenceWidths: [...new Set(rects.map((rect) => Math.round(rect.width)))],
+        referenceCardHeights: rects.map((rect) => Math.round(rect.height)),
+        referenceMediaLoaded: media.every(
+          (item) => item instanceof HTMLImageElement && item.complete && item.naturalWidth > 0,
+        ),
+        referenceMediaRatios: mediaRects.map((rect) =>
+          rect && rect.height > 0 ? Number((rect.width / rect.height).toFixed(2)) : -1,
+        ),
+        referenceGridClientWidth: grid?.clientWidth ?? -1,
+        referenceGridScrollWidth: grid?.scrollWidth ?? -1,
+        referenceGridLeft: gridRect?.left ?? -1,
+        referenceGridRight: gridRect?.right ?? -1,
+        referenceCardRightmost: Math.max(...rects.map((rect) => rect.right)),
+        referenceGridOverflowX: grid
+          ? grid.scrollWidth > grid.clientWidth + 1
+          : true,
+      }
+    })
     await page.screenshot({ path: path.join(out, `${file}-canvas-reference.png`) })
+    await page.locator('[data-my-assets-reference]').first().hover()
+    await page.waitForTimeout(180)
+    const referenceQuickAddVisible = await page.locator('[data-my-assets-reference-agent]').first().evaluate(
+      (button) => getComputedStyle(button).opacity === '1',
+    )
+    await page.screenshot({ path: path.join(out, `${file}-canvas-reference-hover.png`) })
+    await page.locator('[data-my-assets-reference-open]').first().dblclick()
+    await page.locator('[data-lightbox]').waitFor({ timeout: 15_000 })
+    const referenceLightbox = await page.evaluate(() => {
+      const lightbox = document.querySelector('[data-lightbox]')
+      const media = lightbox?.querySelector('[data-lightbox-media]')
+      return {
+        referenceLightboxOpen: Boolean(lightbox),
+        referenceLightboxHash: lightbox?.getAttribute('data-lightbox-hash') ?? '',
+        referenceLightboxMediaLoaded:
+          media instanceof HTMLImageElement
+            ? media.complete && media.naturalWidth > 0
+            : Boolean(media),
+      }
+    })
+    await page.screenshot({ path: path.join(out, `${file}-canvas-reference-lightbox.png`) })
+    await page.keyboard.press('Escape')
+    await page.locator('[data-lightbox]').waitFor({ state: 'detached', timeout: 10_000 })
+    const referenceLightboxClosed =
+      (await page.locator('[data-lightbox]').count()) === 0
+    await page.locator('[data-canvas-my-assets]').click()
+    await page.locator('[data-my-assets-drawer]').waitFor({ timeout: 10_000 })
+    await page.locator('[data-my-assets-source="reference"]').click()
+    await page.locator('[data-my-assets-reference]').first().hover()
     await page.locator('[data-my-assets-reference-agent]').first().click()
     await page.locator('[data-agent-panel]').waitFor({ timeout: 15_000 })
     await page.locator('[data-agent-composer] [data-mention-kind="reference"]').waitFor({ timeout: 15_000 })
@@ -324,6 +411,12 @@ try {
       referenceUpload,
       referenceAgentActions,
       referenceChipMounted,
+      referenceQuickAddVisible,
+      referenceLightboxOpen: referenceLightbox.referenceLightboxOpen,
+      referenceLightboxHash: referenceLightbox.referenceLightboxHash,
+      referenceLightboxMediaLoaded: referenceLightbox.referenceLightboxMediaLoaded,
+      referenceLightboxClosed,
+      ...referenceLayout,
       stageWidthClosed,
       ...drawerGeometry,
       canvasWidthDelta: stageWidthClosed - drawerGeometry.stageWidthOpen,

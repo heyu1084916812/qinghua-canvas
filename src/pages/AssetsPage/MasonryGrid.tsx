@@ -35,10 +35,6 @@ import styles from './AssetsPage.module.css'
  */
 const useIsomorphicLayoutEffect = typeof window === 'undefined' ? useEffect : useLayoutEffect
 
-/** 与 `.grid` 的 `columns: 240px` / `column-gap: var(--space-5)` 同一口径 */
-const MIN_COLUMN_WIDTH = 240
-const GAP = 20
-
 function sameLayout(a: MasonryLayout | null, b: MasonryLayout): boolean {
   if (!a) return false
   if (a.columns !== b.columns) return false
@@ -51,7 +47,17 @@ function sameLayout(a: MasonryLayout | null, b: MasonryLayout): boolean {
   )
 }
 
-export function MasonryGrid({ children }: { children: ReactNode }) {
+export function MasonryGrid({
+  children,
+  minColumnWidth = 240,
+  gap = 20,
+  scope,
+}: {
+  children: ReactNode
+  minColumnWidth?: number
+  gap?: number
+  scope?: string
+}) {
   const ref = useRef<HTMLDivElement>(null)
   const [layout, setLayout] = useState<MasonryLayout | null>(null)
   const items = Children.toArray(children)
@@ -80,8 +86,8 @@ export function MasonryGrid({ children }: { children: ReactNode }) {
         child.getBoundingClientRect().height,
       )
       const next = layoutMasonry(heights, width, {
-        minColumnWidth: MIN_COLUMN_WIDTH,
-        gap: GAP,
+        minColumnWidth,
+        gap,
       })
       setLayout((prev) => (sameLayout(prev, next) ? prev : next))
     }
@@ -98,7 +104,7 @@ export function MasonryGrid({ children }: { children: ReactNode }) {
       if (frame) cancelAnimationFrame(frame)
       observer.disconnect()
     }
-  }, [keySignature])
+  }, [gap, keySignature, minColumnWidth])
 
   return (
     <div
@@ -106,7 +112,10 @@ export function MasonryGrid({ children }: { children: ReactNode }) {
       className={styles.grid}
       data-assets-grid
       data-masonry={activeLayout ? 'on' : 'off'}
-      style={activeLayout ? { height: `${activeLayout.containerHeight}px` } : undefined}
+      data-masonry-scope={scope}
+      style={activeLayout
+        ? { height: `${activeLayout.containerHeight}px` }
+        : { columns: `${minColumnWidth}px`, columnGap: `${gap}px` }}
     >
       {items.map((item, index) => (
         <div

@@ -12,6 +12,8 @@ import { importAssetFile, IMPORT_ACCEPT } from '../../features/canvas/importAsse
 import { sendReferenceToAgent } from '../../features/canvas/agentHandoff'
 import { useAsset } from '../../features/shared/assets'
 import { createId } from '../../shared/id'
+import { MasonryGrid } from '../AssetsPage/MasonryGrid'
+import { IconPlus } from '../../workbenches/canvas/toolbar/icons'
 import styles from './MyAssetsDrawer.module.css'
 
 const PinterestPanel = lazy(() =>
@@ -29,19 +31,20 @@ const SOURCES: readonly { id: Source; label: string }[] = [
   { id: 'clipper', label: '轻画插件' },
 ]
 
-function ReferenceThumb({
+function ReferenceMedia({
   hash,
   title,
+  kind,
 }: {
   hash?: string
   title: string
+  kind: 'image' | 'video'
 }) {
   const url = useAsset(hash ?? '')
-  return (
-    <span className={styles.referenceThumb}>
-      {url ? <img src={url} alt={title} loading="lazy" /> : null}
-    </span>
-  )
+  if (!url) return <span className={styles.referenceMediaEmpty} />
+  return kind === 'video'
+    ? <video src={url} muted playsInline preload="metadata" aria-label={title} />
+    : <img src={url} alt={title} loading="lazy" />
 }
 
 export function MyAssetsDrawer({
@@ -192,27 +195,59 @@ export function MyAssetsDrawer({
                   这个项目还没有参考。上传图片或视频后，它们会留在项目参考台账里，Agent 按任务或 chip 取用。
                 </p>
               ) : null}
-              <div className={styles.referenceList}>
+              <MasonryGrid
+                minColumnWidth={132}
+                gap={10}
+                scope="my-assets-reference"
+              >
                 {references.map((item) => (
                   <article className={styles.referenceCard} data-my-assets-reference={item.id} key={item.id}>
-                    <ReferenceThumb hash={item.assetHash} title={item.title} />
+                    <div className={styles.referenceMedia}>
+                      <button
+                        type="button"
+                        className={styles.referenceOpen}
+                        data-my-assets-reference-open={item.id}
+                        aria-label={`查看参考 ${item.title}`}
+                        title="双击查看参考"
+                        onDoubleClick={() => {
+                          if (!item.assetHash) return
+                          store.openLightbox(item.assetHash)
+                          onClose()
+                        }}
+                        onKeyDown={(event) => {
+                          if (event.key !== 'Enter' && event.key !== ' ') return
+                          if (!item.assetHash) return
+                          event.preventDefault()
+                          store.openLightbox(item.assetHash)
+                          onClose()
+                        }}
+                      >
+                        <ReferenceMedia
+                          hash={item.assetHash}
+                          title={item.title}
+                          kind={item.kind === 'video' ? 'video' : 'image'}
+                        />
+                      </button>
+                      <button
+                        type="button"
+                        className={styles.referenceQuickAdd}
+                        data-my-assets-reference-agent={item.id}
+                        aria-label={`将 ${item.title} 加入对话`}
+                        title="加入对话"
+                        onClick={() => sendReferenceToAgent(projectId, [{ id: item.id, label: item.title }])}
+                      >
+                        <IconPlus size={14} />
+                      </button>
+                    </div>
                     <div className={styles.referenceCopy}>
                       <strong title={item.title}>{item.title}</strong>
                       <span title={item.what}>
                         {item.what || `${item.kind === 'video' ? '视频参考' : '图片参考'} · 项目台账`}
                       </span>
                     </div>
-                    <button
-                      type="button"
-                      className={styles.kitAction}
-                      data-my-assets-reference-agent={item.id}
-                      onClick={() => sendReferenceToAgent(projectId, [{ id: item.id, label: item.title }])}
-                    >
-                      加入对话
-                    </button>
                   </article>
                 ))}
-              </div>
+              </MasonryGrid>
             </div>
           ) : null}
           {source === 'assets' ? (
