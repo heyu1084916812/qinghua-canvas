@@ -1,5 +1,13 @@
 # CanvasFlow（轻画）项目记忆
 
+### 总管2 第四十四轮：自动参考分析与任务 usage（2026-11-10）
+
+- `curateReferences` 是和 `researchDesign` 同级的 Agent 读工具。分析协议和稳定 usage id 放 `domain/project/referenceCuration.ts`；执行、素材读取和台账写入放 `AgentPanel/agentReferenceCuration.ts`。不要把模型提示词、路由、存储、UI 重新塞回同一个文件。
+- 参考分析必须逐条读取真实素材并校验 MIME；缺图或非图片只跳过该素材并写 limitations。没有路由、JSON 缺 What/HowToUse 或 usage 非法时只能失败，不能写占位分析或猜风格。
+- usage 按 projectId + taskKey + itemId 稳定写入。已有当前任务 usage 时不重复调用模型；显式 itemIds 才重新分析。Logo/产品/角色保持身份时用 `identityAnchor`，其他风格、构图、禁用项和文字规范按封闭词表写入。
+- 参考灯箱打开时必须重新读 `referenceItems` 最新行，否则父级列表快照会让刚完成的 What/HowToUse 仍显示占位。阶段只认真实 `curateReferences` 工具结果，映射 `referenceAnalysis`，不要从模型正文猜“分析完成”。
+- 本轮门禁：check 1120 modules / 4486 deps / 264 registrations，定向 8 files / 172 tests，串行 Vitest 654 files（653 passed / 1 skipped）/ 5454 tests（5453 passed / 1 skipped），build 1252 modules，四组 UI 和 Impeccable detector 0 findings。未 push。
+
 ### 总管2 第四十三轮：共享筛选、多图套件 chip 与免费联网调研（2026-11-10）
 
 - 参考栏和套件子面板必须共用 `ReferenceFilterFields`。来源/类型字段、双滑块按钮、测试锚点和组内 OR/组间 AND 语义只能有一份；不要在两个面板里重新写筛选 UI。

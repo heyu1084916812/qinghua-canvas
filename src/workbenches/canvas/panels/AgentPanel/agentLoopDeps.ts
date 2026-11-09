@@ -37,10 +37,12 @@ import {
 } from './agentLoopTrace'
 import type { AgentChatRoute } from './agentChatRoute'
 import type { AgentTurnContextTrace } from './agentTurnRequest'
+import type { AgentRequestMode } from '../../agent/agentContextPolicy'
 import {
   runAgentVisualReview,
   type AgentVisualReviewDeps,
 } from './agentVisualReview'
+import { runAgentReferenceCuration } from './agentReferenceCuration'
 import { latestRunFailuresForNodes } from './agentRunState'
 
 export interface AgentLoopAssemblyPorts {
@@ -120,6 +122,7 @@ export interface AssembleAgentLoopInput {
   /** 调用方刚刚确保过的路由；优先于可能已被清空的缓存。 */
   route?: AgentChatRoute
   toolMode?: 'native' | 'json'
+  requestMode?: AgentRequestMode
   visualNodeIds?: readonly string[]
   onProgress?: (messages: readonly ChatMessage[]) => void
   turnTools: readonly ToolDeclaration[]
@@ -143,6 +146,7 @@ export function assembleAgentLoopDeps(
     session,
     operationId,
     toolMode = 'native',
+    requestMode = 'reference_edit',
     visualNodeIds = [],
     onProgress,
     turnTools,
@@ -219,6 +223,30 @@ export function assembleAgentLoopDeps(
       review,
     })
   }
+  const runReferenceCuration = (curation: {
+    task: string
+    itemIds?: readonly string[]
+  }) =>
+    runAgentReferenceCuration({
+      storage: ports.platform.storage,
+      assets: ports.platform.assets,
+      routeExecution: ports.routeExecution,
+      onRecordWarning,
+    }, {
+      projectId: ports.store.getSnapshot().projectId,
+      sessionId: session.id,
+      operationId,
+      taskKey: requestMode,
+      task: curation.task,
+      route: ports.cachedChatRoute(session) ?? route,
+      ...(session.referenceIds?.length
+        ? { preferredItemIds: session.referenceIds }
+        : {}),
+      ...(curation.itemIds?.length
+        ? { requestedItemIds: curation.itemIds }
+        : {}),
+      signal: signalOf(),
+    })
   const executeText = (
     request: TextRunRequest,
     signal: AbortSignal,
@@ -425,6 +453,7 @@ export function assembleAgentLoopDeps(
         () =>
           executeReadTool(name, args, {
             ...base,
+            curateReferences: runReferenceCuration,
             ...(name === 'visualReview' && ports.canvasReviewEnabled
               ? { visualReview: runVisualReview }
               : {}),

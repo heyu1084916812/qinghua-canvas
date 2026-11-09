@@ -7122,6 +7122,35 @@
       "budget": 160
     },
     {
+      "module": "src/domain/project/referenceCuration.ts",
+      "owner": "project-reference-curation-rules",
+      "responsibility": "定义参考分析提示词、结构化结果解析、usage 校验和稳定 usage id 的纯规则。",
+      "owns": [
+        "参考分析模型协议与 JSON 解析",
+        "What / HowToUse / usage 的合法性校验",
+        "同项目、任务和参考的稳定 usage id"
+      ],
+      "doesNotOwn": [
+        "模型路由与素材字节读取",
+        "referenceItems / referenceUsages 持久化",
+        "Agent 工具执行与 UI 渲染"
+      ],
+      "publicApi": [
+        "REFERENCE_CURATION_PROMPT_VERSION",
+        "REFERENCE_USAGE_KINDS",
+        "ReferenceCurationAnalysis",
+        "ReferenceCurationResult",
+        "REFERENCE_CURATION_SYSTEM_PROMPT",
+        "buildReferenceCurationPrompt",
+        "parseReferenceCurationText",
+        "referenceUsageId"
+      ],
+      "test": [
+        "src/domain/project/referenceCuration.test.ts"
+      ],
+      "budget": 200
+    },
+    {
       "module": "src/state/project/referenceLedgerRepository.ts",
       "owner": "project-reference-persistence",
       "responsibility": "按项目持久化参考卡与任务用法，并提供删除级联和任务筛选仓储入口。",
@@ -7166,6 +7195,30 @@
         "src/workbenches/canvas/panels/AgentPanel/agentTurnReferences.test.ts"
       ],
       "budget": 120
+    },
+    {
+      "module": "src/workbenches/canvas/panels/AgentPanel/agentReferenceCuration.ts",
+      "owner": "agent-reference-curation",
+      "responsibility": "读取项目参考和套件多图，调用真实视觉模型逐项生成并持久化 What、HowToUse 与任务 usage。",
+      "owns": [
+        "当前任务参考候选选择与数量上限",
+        "参考图片读取、MIME 校验和缺失素材降级",
+        "分析结果写回项目参考台账"
+      ],
+      "doesNotOwn": [
+        "提示词 JSON 结构定义与纯解析",
+        "模型渠道路由和底层请求传输",
+        "React 面板、灯箱和用户交互状态"
+      ],
+      "publicApi": [
+        "AgentReferenceCurationDeps",
+        "AgentReferenceCurationInput",
+        "runAgentReferenceCuration"
+      ],
+      "test": [
+        "src/workbenches/canvas/panels/AgentPanel/agentReferenceCuration.test.ts"
+      ],
+      "budget": 300
     },
     {
       "module": "src/state/agent/agentSessionIds.ts",

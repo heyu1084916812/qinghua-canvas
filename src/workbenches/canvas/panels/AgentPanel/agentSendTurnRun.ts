@@ -18,6 +18,7 @@ import type {
 } from './agentTurnRequest'
 import { failureStatus, failureTurnPayload, sendTurnSeed } from './agentSendTurnPlan'
 import type { ExplicitMediaModels } from './mediaMentions'
+import type { AgentRequestMode } from '../../agent/agentContextPolicy'
 
 /**
  * 一次发送回合的主体（A2 刀，从 AgentPanel.runSendText 搬出）。
@@ -86,6 +87,7 @@ export interface AgentLoopDepsArgs {
   session: AgentSession
   operationId: string
   toolMode?: AgentToolMode
+  requestMode?: AgentRequestMode
   visualNodeIds?: readonly string[]
   onProgress?: (messages: readonly ChatMessage[]) => void
   turnTools?: readonly ToolDeclaration[]
@@ -308,6 +310,7 @@ export async function runAgentSendTurn(
     session,
     operationId,
     toolMode,
+    requestMode: prepared.requestMode,
     visualNodeIds: prepared.visualNodeIds,
     onProgress: (next) => {
       if (ui.currentIdRef.current !== session.id) return

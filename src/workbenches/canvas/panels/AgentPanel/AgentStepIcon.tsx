@@ -62,6 +62,7 @@ export function AgentStepIcon({ tool, size = 14 }: { tool: string; size?: number
         </Glyph>
       )
     case 'researchDesign':
+    case 'curateReferences':
       return (
         <Glyph tool={tool} size={size}>
           <circle cx="11" cy="11" r="8" />

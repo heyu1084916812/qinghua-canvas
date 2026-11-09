@@ -99,6 +99,7 @@ const TOOL_LABEL: Record<string, string> = {
   readGraph: '已看画布',
   readAsset: '已读素材',
   readResult: '已读结果',
+  curateReferences: '参考分析完成',
   researchDesign: '联网调研完成',
   visualReview: '视觉验收完成',
   proposeTaskPlan: '执行计划已确认',
@@ -122,6 +123,7 @@ const TOOL_RUNNING_LABEL: Record<string, string> = {
   readGraph: '正在读取画布',
   readAsset: '正在读取素材',
   readResult: '正在读取结果',
+  curateReferences: '正在分析参考',
   researchDesign: '正在联网调研',
   visualReview: '正在视觉验收',
   proposeTaskPlan: '正在整理任务计划',
@@ -153,6 +155,7 @@ const TOOL_LABEL_FAILED: Record<string, string> = {
   readGraph: '看画布失败',
   readAsset: '读素材失败',
   readResult: '读结果失败',
+  curateReferences: '参考分析没完成',
   researchDesign: '联网调研没完成',
   visualReview: '视觉验收没完成',
   proposeTaskPlan: '执行计划未确认',
@@ -346,6 +349,33 @@ export function describeToolResult(
         nodeIds: [],
         researchItems,
         failed: r.ok === false,
+      }
+    }
+    case 'curateReferences': {
+      const analyzed = asArray(r.analyzed).map(asRecord)
+      const failedItems = asArray(r.failed).map(asRecord)
+      const limitations = asArray(r.limitations).map((item) => clean(item))
+      return {
+        lines: [
+          analyzed.length > 0
+            ? `已分析 ${analyzed.length} 条参考`
+            : clean(r.summary ?? '没有需要重新分析的参考'),
+          ...analyzed.slice(0, 4).map((row) =>
+            `${clean(row.title || '参考')}：${clean(row.howToUse || row.what)}`,
+          ),
+          ...failedItems.slice(0, 2).map((row) =>
+            `${clean(row.title || '参考')} 分析失败：${clean(row.reason)}`,
+          ),
+          ...limitations.slice(0, 2).map((item) => `限制：${item}`),
+        ],
+        nodeIds: [],
+        failed,
+        ...(analyzed.length > 0
+          ? {
+              activityLabel: `已分析 ${analyzed.length} 条参考`,
+              activityKind: 'image' as const,
+            }
+          : {}),
       }
     }
     case 'visualReview': {

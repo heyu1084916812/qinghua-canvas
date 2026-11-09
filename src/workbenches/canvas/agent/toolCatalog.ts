@@ -50,6 +50,30 @@ export const AGENT_TOOLS: readonly ToolDeclaration[] = [
     },
   },
   {
+    name: 'curateReferences',
+    description:
+      '读取当前项目和本轮对话里的真实参考、套件图片，分析每条参考的 What，并针对本次任务写入具体的 HowToUse 与 usage。' +
+      '涉及品牌套件、产品、角色、风格参考的生成或改图前应先调用；它不会生成图片、不会改动画布、不会把候选搜索自动加入项目参考。' +
+      '文字、颜色、字体参考也可以分析；图片素材会按真实读取结果提交，缺图或无法确认的内容会在 limitations 中说明。',
+    parameters: {
+      type: 'object',
+      properties: {
+        task: {
+          type: 'string',
+          description: '本次用户真正要完成的任务目标，用于判断 HowToUse 和 usage。',
+        },
+        itemIds: {
+          type: 'array',
+          maxItems: 12,
+          items: { type: 'string' },
+          description:
+            '可选：只分析指定参考 id。通常省略，默认分析当前会话加入的参考；没有会话参考时分析项目参考。',
+        },
+      },
+      required: ['task'],
+    },
+  },
+  {
     name: 'researchDesign',
     description:
       '做联网调研：自动检索 Openverse 开放版权图片、Wikipedia 内容、轻画灵感库，并可从用户提供的公开网页、Pinterest Pin / Board 或 Behance 页面提取参考图与出处。' +
@@ -591,8 +615,8 @@ const CAPABILITY_QUERY_GROUPS: readonly {
     names: ['sliceImage', 'splitGrid'],
   },
   {
-    terms: ['调研', '参考', '灵感', 'moodboard'],
-    names: ['researchDesign'],
+    terms: ['调研', '参考', '灵感', 'moodboard', '套件', '品牌', '怎么用'],
+    names: ['researchDesign', 'curateReferences'],
   },
   {
     terms: ['验收', '检查', '巡检', '是否一致', '一致性', '质量把关'],
@@ -747,6 +771,7 @@ export function discoverAgentTools(
 
 const SIMPLE_GENERATE_TOOLS = new Set([
   'readGraph',
+  'curateReferences',
   'applyPlan',
   'runNode',
   'readResult',
@@ -756,6 +781,7 @@ const SIMPLE_GENERATE_TOOLS = new Set([
 const REFERENCE_EDIT_TOOLS = new Set([
   'readGraph',
   'readAsset',
+  'curateReferences',
   'applyPlan',
   'runNode',
   'readResult',
@@ -765,6 +791,7 @@ const REFERENCE_EDIT_TOOLS = new Set([
 const DESIGN_RESEARCH_TOOLS = new Set([
   'readGraph',
   'researchDesign',
+  'curateReferences',
   'applyPlan',
   'runNode',
   'readResult',

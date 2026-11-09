@@ -4,6 +4,7 @@ export type AgentToolName =
   | 'readCapabilities'
   | 'readGraph'
   | 'readAsset'
+  | 'curateReferences'
   | 'researchDesign'
   | 'applyPlan'
   | 'updateNode'
@@ -57,6 +58,12 @@ export const AGENT_TOOL_DEFINITIONS: readonly AgentToolDefinition[] = [
   { name: 'readGraph', category: 'canvas', access: 'read', sideEffect: 'none' },
   { name: 'readAsset', category: 'canvas', access: 'read', sideEffect: 'none' },
   { name: 'readResult', category: 'canvas', access: 'read', sideEffect: 'none' },
+  {
+    name: 'curateReferences',
+    category: 'host-service',
+    access: 'read',
+    sideEffect: 'none',
+  },
   {
     name: 'researchDesign',
     category: 'host-service',

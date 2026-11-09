@@ -29,6 +29,7 @@ import {
   type MemoryCandidate,
 } from '../../../domain/shared/memoryOrganizer'
 import type { VisualReviewResult } from '../../../domain/agent/visualReview'
+import type { ReferenceCurationResult } from '../../../domain/project/referenceCuration'
 import {
   approveAgentTaskPlanReview,
   markAgentTaskPlanResultsReady,
@@ -198,6 +199,11 @@ export interface AgentToolContext {
     urls?: readonly string[]
     maxResults?: number
   }) => Promise<unknown>
+  /** 真实参考分析；由界面层注入视觉模型、台账和素材读取能力。 */
+  curateReferences?: (input: {
+    task: string
+    itemIds?: readonly string[]
+  }) => Promise<ReferenceCurationResult>
 }
 
 /**
@@ -268,6 +274,21 @@ export async function executeReadTool(
       return readGraphSummary(ctx.store, a.scope, ctx.selectedIds?.() ?? [])
     case 'readAsset':
       return { assets: readAssetInfo(ctx.store, a.nodeIds) }
+    case 'curateReferences': {
+      const task = typeof a.task === 'string' ? a.task.trim() : ''
+      if (!task) return { ok: false, error: '参考分析缺少 task' }
+      if (!ctx.curateReferences) {
+        return { ok: false, error: '当前会话没有接入参考分析服务' }
+      }
+      const itemIds = asStringArray(a.itemIds)
+        .map((id) => id.trim())
+        .filter(Boolean)
+        .slice(0, 12)
+      return ctx.curateReferences({
+        task,
+        ...(itemIds.length > 0 ? { itemIds } : {}),
+      })
+    }
     case 'readResult':
       return { results: readResults(ctx.store, a.nodeIds, ctx.nodeRunStateOf) }
     case 'researchDesign': {

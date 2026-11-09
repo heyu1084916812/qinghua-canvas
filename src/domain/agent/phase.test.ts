@@ -46,6 +46,7 @@ describe('Agent phase contract', () => {
 
   it('maps only known tool evidence to phases', () => {
     expect(agentPhaseForTool('researchDesign')).toBe('research')
+    expect(agentPhaseForTool('curateReferences')).toBe('referenceAnalysis')
     expect(agentPhaseForTool('runNode')).toBe('generate')
     expect(agentPhaseForTool('visualReview')).toBe('review')
     expect(agentPhaseForTool('unknownTool')).toBeUndefined()

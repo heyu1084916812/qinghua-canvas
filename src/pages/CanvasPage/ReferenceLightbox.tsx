@@ -43,13 +43,15 @@ export function ReferenceLightbox({
   const initialIndex = Math.max(0, items.findIndex((item) => item.id === initialItemId))
   const [index, setIndex] = useState(initialIndex)
   const [usages, setUsages] = useState<ReferenceUsage[]>([])
+  const [freshItem, setFreshItem] = useState<ReferenceItem | null>(null)
   const [size, setSize] = useState<Size | null>(null)
   const [mediaError, setMediaError] = useState('')
   const [actionStatus, setActionStatus] = useState('')
   const overlayRef = useRef<HTMLDivElement>(null)
   const closeRef = useRef<HTMLButtonElement>(null)
   const restoreFocusRef = useRef(true)
-  const item = items[index]
+  const sourceItem = items[index]
+  const item = freshItem?.id === sourceItem?.id ? freshItem : sourceItem
   const meta = useAssetMeta(item?.assetHash)
   const mediaUrl = meta.url ?? item?.url ?? null
   const isVideo = item?.kind === 'video' || (meta.mime ?? '').startsWith('video/')
@@ -59,6 +61,20 @@ export function ReferenceLightbox({
   const dimensionText = size
     ? `${formatNumber(size.width)} × ${formatNumber(size.height)}`
     : mediaUrl || item?.assetHash ? '读取尺寸…' : '尺寸未知'
+
+  useEffect(() => {
+    if (!sourceItem?.id) return
+    let active = true
+    setFreshItem(null)
+    void repository.listItems(projectId).then((rows) => {
+      if (active) {
+        setFreshItem(rows.find((row) => row.id === sourceItem.id) ?? null)
+      }
+    }).catch(() => {
+      if (active) setFreshItem(null)
+    })
+    return () => { active = false }
+  }, [projectId, repository, sourceItem?.id])
 
   useEffect(() => {
     let active = true

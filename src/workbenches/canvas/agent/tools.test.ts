@@ -75,6 +75,7 @@ describe('工具声明', () => {
       'applyPlan',
       'arrangeNodes',
       'compareNodes',
+      'curateReferences',
       'deleteEdges',
       'deleteNodes',
       'moveNodes',
@@ -116,6 +117,7 @@ describe('工具声明', () => {
     }).map((tool) => tool.name)
     expect(simple.sort()).toEqual([
       'applyPlan',
+      'curateReferences',
       'readCapabilities',
       'readGraph',
       'readResult',
@@ -209,6 +211,34 @@ describe('工具声明', () => {
       topic: 'bakery identity',
       urls: ['https://www.pinterest.com/pin/42/'],
       maxResults: 24,
+    })
+  })
+
+  it('参考分析读工具把真实任务和参考 id 交给宿主服务', async () => {
+    const curateReferences = vi.fn(async () => ({
+      ok: true,
+      summary: '分析了 1 条参考',
+      taskKey: 'reference_edit',
+      analyzed: [],
+      failed: [],
+      limitations: [],
+    }))
+    const result = await executeReadTool(
+      'curateReferences',
+      {
+        task: '  为品牌做一张横向海报  ',
+        itemIds: ['ref-kit-1', ' ', 'ref-2'],
+      },
+      {
+        ...setup().ctx,
+        curateReferences,
+      },
+    )
+
+    expect(result).toMatchObject({ ok: true, summary: '分析了 1 条参考' })
+    expect(curateReferences).toHaveBeenCalledWith({
+      task: '为品牌做一张横向海报',
+      itemIds: ['ref-kit-1', 'ref-2'],
     })
   })
 

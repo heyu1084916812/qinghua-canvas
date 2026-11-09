@@ -13,12 +13,14 @@ import type {
   AssembleAgentLoopInput,
 } from './agentLoopDeps'
 import type { AgentChatRoute } from './agentChatRoute'
+import type { AgentRequestMode } from '../../agent/agentContextPolicy'
 
 export interface AgentLoopDepsArgs {
   session: AgentSession
   operationId: string
   route?: AgentChatRoute
   toolMode?: 'native' | 'json'
+  requestMode?: AgentRequestMode
   visualNodeIds?: readonly string[]
   onProgress?: (messages: readonly ChatMessage[]) => void
   turnTools?: readonly ToolDeclaration[]
@@ -132,6 +134,7 @@ export function useAgentLoopDepsController(
           operationId: args.operationId,
           ...(args.route ? { route: args.route } : {}),
           toolMode: args.toolMode ?? 'native',
+          ...(args.requestMode ? { requestMode: args.requestMode } : {}),
           visualNodeIds: args.visualNodeIds ?? [],
           onProgress: args.onProgress,
           turnTools: args.turnTools ?? input.activeAgentTools,
