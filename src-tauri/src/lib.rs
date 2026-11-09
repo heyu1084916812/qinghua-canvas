@@ -30,6 +30,7 @@ use tauri_plugin_opener::OpenerExt;
 use tauri_plugin_updater::UpdaterExt;
 
 mod canvas_gateway;
+mod clipper_receiver;
 mod cli_output_tests;
 mod pinterest_oauth;
 
@@ -4290,6 +4291,8 @@ pub fn run() {
             ui_heartbeat,
             canvas_gateway::canvas_gateway_info,
             canvas_gateway::canvas_gateway_respond,
+            clipper_receiver::clipper_receiver_info,
+            clipper_receiver::clipper_take_pending,
             pinterest_oauth::pinterest_oauth_listen,
             pinterest_oauth::pinterest_oauth_wait,
             pinterest_oauth::pinterest_oauth_cancel
@@ -4308,6 +4311,9 @@ pub fn run() {
             }
             if let Err(error) = canvas_gateway::start(app.handle().clone()) {
                 eprintln!("[canvas-gateway] 启动失败：{error}");
+            }
+            if let Err(error) = clipper_receiver::start() {
+                eprintln!("[clipper] 启动失败：{error}");
             }
             /*
              * 窗口在这里**手动建**（`tauri.conf.json` 那条窗口配了 `"create": false`），

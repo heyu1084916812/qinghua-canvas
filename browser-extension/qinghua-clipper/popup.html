@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>轻画 Clipper</title>
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <main>
+      <header>
+        <div>
+          <strong>轻画 Clipper</strong>
+          <span id="status-dot" class="dot" aria-hidden="true"></span>
+        </div>
+        <span id="status">正在读取当前网页…</span>
+      </header>
+
+      <section class="page">
+        <span>当前网页</span>
+        <strong id="page-title">—</strong>
+        <small id="page-url">—</small>
+      </section>
+
+      <button id="clip" class="primary" type="button">收藏到轻画</button>
+
+      <details id="settings">
+        <summary>接收端设置</summary>
+        <label>
+          <span>本机地址</span>
+          <input id="endpoint" value="http://127.0.0.1:53684/clip" />
+        </label>
+        <label>
+          <span>配对令牌</span>
+          <input id="token" type="password" autocomplete="off" />
+        </label>
+        <button id="save" class="secondary" type="button">保存设置</button>
+      </details>
+    </main>
+    <script src="popup.js"></script>
+  </body>
+</html>

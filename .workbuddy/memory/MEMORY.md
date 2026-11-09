@@ -1,5 +1,12 @@
 # CanvasFlow（轻画）项目记忆
 
+### 总管2 第四十六轮：浏览器扩展一键收藏与本机接收端（2026-11-10）
+
+- Clipper 的 MV3 扩展是独立静态包，只向 `127.0.0.1:53684/clip` 发送当前标签页 URL 与标题，不读 Cookie。Tauri 接收端校验 `X-Qinghua-Clipper-Token`、CORS、32KB 请求体和 100 条待收队列；`/health` 只报运行状态。
+- `ClipperPanel` 留在画布页面层，只做抓取、3 秒轮询和状态编排；`ClipperPairing` 管地址/令牌，`ClipperBrowser` 管 iframe，`ClipperItemCard` 管卡片动作，`clipperActions` 管三种去向。接收端口测试必须用系统分配端口，不能写死 53684，否则开发版占用时会误报。
+- 空令牌不能靠 `??` 兜底；接收端启动失败返回 `token:'' + error` 时必须显示“接收端未启动”。`ClipperPairing.test.ts` 已锁住正常态与失败态。桌面开发版实测配对区正常，扩展实际安装仍要用户主动完成。
+- 本轮验证：Rust 全量 79/79、接收端 4/4、配对组件 2/2、扩展安全契约 2/2；`npm run check` 1128 modules / 4523 deps / 272 项语义登记；串行全量 Vitest 658 files（657 passed / 1 skipped）/ 5463 tests（5462 passed / 1 skipped）；build 1260 modules；四组 UI `clipperMounted/composer/browser/frame=1` 且越界/错误 0；Impeccable detector 0 findings。未 push。
+
 ### 总管2 第四十五轮：网页收藏、轻画浏览器与技能加载阶段（2026-11-10）
 
 - Clipper 页签现在是真实网页收藏，不是占位。`runDesignResearch` 对单页抓取必须传 `includeOpenSearch:false`，否则会错误混入 Openverse / Wikipedia；收藏写 `clipper:collection:v1`，最多 200 条，按页面 + 图片去重。

@@ -788,7 +788,8 @@
         "removeClipperItem"
       ],
       "test": [
-        "src/domain/inspiration/clipper.test.ts"
+        "src/domain/inspiration/clipper.test.ts",
+        "src/domain/inspiration/clipperExtension.test.ts"
       ],
       "budget": 120
     },
@@ -837,6 +838,92 @@
         "src/features/shared/research/designResearchRunner.test.ts"
       ],
       "budget": 450
+    },
+    {
+      "module": "src/pages/CanvasPage/clipper/ClipperPairing.tsx",
+      "owner": "clipper-panel",
+      "responsibility": "展示并复制浏览器扩展配对所需的本机地址和临时令牌。",
+      "owns": [
+        "接收端地址 / 令牌展示",
+        "本机剪贴板复制反馈"
+      ],
+      "doesNotOwn": [
+        "接收端 HTTP 服务和令牌生成",
+        "扩展安装和发送动作"
+      ],
+      "publicApi": [
+        "ClipperReceiverInfo",
+        "ClipperPairing"
+      ],
+      "test": [
+        "src/pages/CanvasPage/clipper/ClipperPairing.test.ts"
+      ],
+      "budget": 100
+    },
+    {
+      "module": "src/pages/CanvasPage/clipper/ClipperBrowser.tsx",
+      "owner": "clipper-panel",
+      "responsibility": "在网页收藏抽屉内提供受限 iframe 预览和系统浏览器兜底。",
+      "owns": [
+        "嵌入式浏览地址栏几何",
+        "关闭和外部打开动作"
+      ],
+      "doesNotOwn": [
+        "跨域页面内容读取",
+        "网页解析与收藏"
+      ],
+      "publicApi": [
+        "ClipperBrowser"
+      ],
+      "test": [
+        "src/app/uiSevenPoints.test.ts"
+      ],
+      "budget": 80
+    },
+    {
+      "module": "src/pages/CanvasPage/clipper/ClipperItemCard.tsx",
+      "owner": "clipper-panel",
+      "responsibility": "渲染单个网页收藏卡及其加入 Agent、参考、画布和移除动作。",
+      "owns": [
+        "收藏图、标题与来源展示",
+        "卡片级四个动作入口"
+      ],
+      "doesNotOwn": [
+        "收藏数据和素材持久化",
+        "网页抓取与浏览器状态"
+      ],
+      "publicApi": [
+        "ClipperItemCard"
+      ],
+      "test": [
+        "src/app/uiSevenPoints.test.ts"
+      ],
+      "budget": 120
+    },
+    {
+      "module": "src/pages/CanvasPage/clipper/clipperActions.ts",
+      "owner": "clipper-actions",
+      "responsibility": "把网页收藏落为素材、项目参考或当前画布节点，复用现有导入与 Agent handoff。",
+      "owns": [
+        "公开图片保存为素材",
+        "网页收藏投影为项目参考",
+        "网页收藏发送到当前画布"
+      ],
+      "doesNotOwn": [
+        "网络页面解析",
+        "React 状态和提示文案",
+        "画布节点内部实现"
+      ],
+      "publicApi": [
+        "saveClipperAsset",
+        "addClipperReference",
+        "sendClipperToCanvas"
+      ],
+      "test": [
+        "src/domain/inspiration/clipper.test.ts",
+        "src/features/shared/research/designResearchRunner.test.ts"
+      ],
+      "budget": 90
     },
     {
       "module": "src/pages/CanvasPage/clipper/ClipperPanel.module.css",

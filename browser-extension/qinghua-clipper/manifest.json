@@ -1,0 +1,12 @@
+{
+  "manifest_version": 3,
+  "name": "轻画 Clipper",
+  "version": "0.1.0",
+  "description": "把当前网页收藏到本机轻画的网页收藏面板。",
+  "permissions": ["activeTab", "storage"],
+  "host_permissions": ["http://127.0.0.1:53684/*"],
+  "action": {
+    "default_title": "收藏到轻画",
+    "default_popup": "popup.html"
+  }
+}

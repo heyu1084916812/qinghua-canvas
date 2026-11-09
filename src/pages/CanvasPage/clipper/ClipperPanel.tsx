@@ -1,29 +1,36 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
-import { openUrl } from '@tauri-apps/plugin-opener'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { invoke, isTauri } from '@tauri-apps/api/core'
 import { usePlatform } from '../../../app/providers/PlatformProvider'
 import type {
   ClipperItem,
 } from '../../../domain/inspiration/clipper'
-import type { DesignResearchItem } from '../../../domain/inspiration/designResearch'
 import { isPublicHttpUrl } from '../../../domain/shared/publicUrl'
 import { sendReferenceToAgent } from '../../../features/canvas/agentHandoff'
-import { sendAssetToActiveCanvas } from '../../../features/assets/sendToActiveCanvas'
 import { runDesignResearch } from '../../../features/shared/research/designResearchRunner'
-import { saveDesignResearchItem } from '../../../features/shared/research/saveResearchItem'
 import { createClipperCollectionRepository } from '../../../state/shared/clipperCollectionRepository'
 import { createReferenceLedgerRepository } from '../../../state/project/referenceLedgerRepository'
 import type { CanvasStore } from '../../../state/workbenches/canvas/store'
 import {
-  IconChat,
-  IconClose,
-  IconDelete,
-  IconImage,
   IconLink,
   IconPlus,
 } from '../../../workbenches/canvas/toolbar/icons'
+import { ClipperBrowser } from './ClipperBrowser'
+import { ClipperItemCard } from './ClipperItemCard'
+import { ClipperPairing, type ClipperReceiverInfo } from './ClipperPairing'
+import {
+  addClipperReference,
+  sendClipperToCanvas,
+} from './clipperActions'
 import styles from './ClipperPanel.module.css'
 
 type Filter = 'all' | 'uncategorized'
+
+interface PendingClip {
+  id: string
+  url: string
+  title?: string
+  receivedAt: number
+}
 
 export function ClipperPanel({
   projectId,
@@ -48,7 +55,11 @@ export function ClipperPanel({
   const [composerOpen, setComposerOpen] = useState(false)
   const [busy, setBusy] = useState('')
   const [status, setStatus] = useState('')
+  const [receiver, setReceiver] = useState<ClipperReceiverInfo | null>(null)
+  const [pairingOpen, setPairingOpen] = useState(false)
   const controllerRef = useRef<AbortController | null>(null)
+  const busyRef = useRef(false)
+  const receivingRef = useRef(false)
 
   useEffect(() => {
     let active = true
@@ -67,16 +78,21 @@ export function ClipperPanel({
     ? items.filter((item) => item.category === '未分类')
     : items
 
-  const collect = async () => {
-    if (busy) return
-    const target = normalizedPublicUrl(url)
-    if (!target) {
-      setStatus('请输入公开的 http / https 网页地址')
-      return
+  const collectTarget = useCallback(async (
+    target: string,
+    options: {
+      closeComposer?: boolean
+      background?: boolean
+      statusPrefix?: string
+    } = {},
+  ): Promise<number> => {
+    if (!options.background && busyRef.current) return 0
+    if (!options.background) {
+      busyRef.current = true
+      setBusy('collect')
+      setStatus(options.statusPrefix ?? '正在读取网页图片…')
     }
     const controller = newController()
-    setBusy('collect')
-    setStatus('正在读取网页图片…')
     try {
       const result = await runDesignResearch(
         {
@@ -98,20 +114,78 @@ export function ClipperPanel({
           category: '未分类',
         }))
       if (collected.length === 0) {
-        setStatus(result.warnings[0] ?? '这个页面没有可收藏的图片。')
-        return
+        if (!options.background) {
+          setStatus(result.warnings[0] ?? '这个页面没有可收藏的图片。')
+        }
+        return 0
       }
       const next = await collection.upsert(collected)
       setItems(next)
-      setUrl(target)
-      setComposerOpen(false)
-      setStatus(`已收藏 ${collected.length} 张网页图片。`)
+      if (!options.background) {
+        setUrl(target)
+        if (options.closeComposer !== false) setComposerOpen(false)
+        setStatus(
+          `${options.statusPrefix ?? ''}已收藏 ${collected.length} 张网页图片。`,
+        )
+      }
+      return collected.length
     } catch (error) {
-      if (!controller.signal.aborted) setStatus(`网页收藏失败：${errorText(error)}`)
+      if (!controller.signal.aborted && !options.background) {
+        setStatus(`网页收藏失败：${errorText(error)}`)
+      }
+      return 0
     } finally {
-      setBusy('')
+      if (!options.background) {
+        busyRef.current = false
+        setBusy('')
+      }
     }
+  }, [collection, platform.network])
+
+  const collect = async () => {
+    const target = normalizedPublicUrl(url)
+    if (!target) {
+      setStatus('请输入公开的 http / https 网页地址')
+      return
+    }
+    await collectTarget(target)
   }
+
+  const syncReceiver = useCallback(async () => {
+    if (!isTauri() || receivingRef.current) return
+    receivingRef.current = true
+    try {
+      const info = await invoke<ClipperReceiverInfo>('clipper_receiver_info')
+      setReceiver(info)
+      if (!info.running) return
+      const pending = await invoke<PendingClip[]>('clipper_take_pending')
+      if (pending.length === 0) return
+      let imported = 0
+      for (const clip of pending) {
+        const target = normalizedPublicUrl(clip.url)
+        if (!target) continue
+        imported += await collectTarget(target, { background: true })
+      }
+      if (imported > 0) {
+        setStatus(`已从浏览器扩展接收 ${imported} 张网页图片。`)
+      }
+    } catch (error) {
+      setReceiver((current) => current ? {
+        ...current,
+        running: false,
+        error: errorText(error),
+      } : null)
+    } finally {
+      receivingRef.current = false
+    }
+  }, [collectTarget])
+
+  useEffect(() => {
+    if (!isTauri()) return
+    void syncReceiver()
+    const timer = window.setInterval(() => void syncReceiver(), 3_000)
+    return () => window.clearInterval(timer)
+  }, [syncReceiver])
 
   const openBrowser = () => {
     const target = normalizedPublicUrl(url)
@@ -122,36 +196,19 @@ export function ClipperPanel({
     setBrowserUrl(target)
   }
 
-  const saveAsset = async (item: DesignResearchItem) => {
-    const controller = newController()
-    const saved = await saveDesignResearchItem(
-      item,
-      { network: platform.network, storage: platform.storage },
-      controller.signal,
-    )
-    if (!saved.ok || !saved.asset) throw new Error(saved.message)
-    return saved.asset
-  }
-
   const addToReference = async (item: ClipperItem, toAgent: boolean) => {
-    if (busy) return
+    if (busyRef.current) return
+    busyRef.current = true
     setBusy(`${item.id}:${toAgent ? 'agent' : 'reference'}`)
     setStatus('正在保存网页收藏…')
     try {
-      const asset = await saveAsset(item)
-      const now = Date.now()
-      const id = `ref_clipper_${asset.hash.slice(0, 12)}`
-      await referenceLedger.putItem({
-        id,
+      const controller = newController()
+      const id = await addClipperReference({
+        platform,
+        ledger: referenceLedger,
         projectId,
-        title: item.title,
-        source: 'clipper',
-        kind: 'image',
-        assetHash: asset.hash,
-        url: item.url,
-        what: item.description?.trim() || `网页收藏「${item.title}」，来源 ${item.url}。`,
-        createdAt: now,
-        updatedAt: now,
+        item,
+        signal: controller.signal,
       })
       if (toAgent) {
         sendReferenceToAgent(projectId, [{ id, label: item.title }])
@@ -163,27 +220,31 @@ export function ClipperPanel({
     } catch (error) {
       setStatus(`加入参考失败：${errorText(error)}`)
     } finally {
+      busyRef.current = false
       setBusy('')
     }
   }
 
   const addToCanvas = async (item: ClipperItem) => {
-    if (busy) return
+    if (busyRef.current) return
+    busyRef.current = true
     setBusy(`${item.id}:canvas`)
     setStatus('正在放到画布…')
     try {
-      const asset = await saveAsset(item)
-      await sendAssetToActiveCanvas(platform, asset)
+      const controller = newController()
+      await sendClipperToCanvas(platform, item, controller.signal)
       setStatus('已放到当前画布。')
     } catch (error) {
       setStatus(`放到画布失败：${errorText(error)}`)
     } finally {
+      busyRef.current = false
       setBusy('')
     }
   }
 
   const remove = async (item: ClipperItem) => {
-    if (busy) return
+    if (busyRef.current) return
+    busyRef.current = true
     setBusy(`${item.id}:remove`)
     try {
       setItems(await collection.remove(item.id))
@@ -191,6 +252,7 @@ export function ClipperPanel({
     } catch (error) {
       setStatus(`移除失败：${errorText(error)}`)
     } finally {
+      busyRef.current = false
       setBusy('')
     }
   }
@@ -220,18 +282,35 @@ export function ClipperPanel({
             未分类
           </button>
         </div>
-        <button
-          type="button"
-          className={styles.iconButton}
-          data-clipper-add
-          aria-label="收藏网页"
-          title="收藏网页"
-          aria-expanded={composerOpen}
-          onClick={() => setComposerOpen((current) => !current)}
-        >
-          <IconPlus size={16} />
-        </button>
+        <div className={styles.headActions}>
+          {isTauri() ? (
+            <button
+              type="button"
+              className={styles.iconButton}
+              data-clipper-pair
+              aria-label="浏览器扩展配对"
+              title="浏览器扩展配对"
+              aria-expanded={pairingOpen}
+              onClick={() => setPairingOpen((current) => !current)}
+            >
+              <IconLink size={16} />
+            </button>
+          ) : null}
+          <button
+            type="button"
+            className={styles.iconButton}
+            data-clipper-add
+            aria-label="收藏网页"
+            title="收藏网页"
+            aria-expanded={composerOpen}
+            onClick={() => setComposerOpen((current) => !current)}
+          >
+            <IconPlus size={16} />
+          </button>
+        </div>
       </div>
+
+      {pairingOpen ? <ClipperPairing receiver={receiver} /> : null}
 
       {composerOpen ? (
         <div className={styles.composer} data-clipper-composer>
@@ -272,103 +351,21 @@ export function ClipperPanel({
       ) : null}
 
       {browserUrl ? (
-        <section className={styles.browser} data-clipper-browser>
-          <header>
-            <span title={browserUrl}>{browserUrl}</span>
-            <div>
-              <button
-                type="button"
-                className={styles.iconButton}
-                aria-label="在系统浏览器打开"
-                title="在系统浏览器打开"
-                onClick={() => void openUrl(browserUrl)}
-              >
-                <IconLink size={15} />
-              </button>
-              <button
-                type="button"
-                className={styles.iconButton}
-                aria-label="关闭轻画浏览器"
-                title="关闭轻画浏览器"
-                onClick={() => setBrowserUrl('')}
-              >
-                <IconClose size={15} />
-              </button>
-            </div>
-          </header>
-          <iframe
-            src={browserUrl}
-            title="轻画浏览器"
-            referrerPolicy="no-referrer"
-            sandbox="allow-forms allow-popups allow-scripts"
-          />
-        </section>
+        <ClipperBrowser url={browserUrl} onClose={() => setBrowserUrl('')} />
       ) : null}
 
       {visible.length > 0 ? (
         <div className={styles.grid} data-clipper-items>
           {visible.map((item) => (
-            <article className={styles.item} key={item.id} data-clipper-item={item.id}>
-              <button
-                type="button"
-                className={styles.media}
-                aria-label={`打开来源：${item.title}`}
-                title={item.title}
-                onClick={() => void openUrl(item.url)}
-              >
-                <img src={item.imageUrl} alt="" loading="lazy" referrerPolicy="no-referrer" />
-              </button>
-              <div className={styles.itemBody}>
-                <strong>{item.title}</strong>
-                <span>{hostOf(item.url)}</span>
-                <div className={styles.itemActions}>
-                  <button
-                    type="button"
-                    className={styles.action}
-                    disabled={Boolean(busy)}
-                    title="加入 Agent 对话"
-                    aria-label={`把 ${item.title} 加入 Agent 对话`}
-                    data-clipper-agent={item.id}
-                    onClick={() => void addToReference(item, true)}
-                  >
-                    <IconChat size={14} />
-                  </button>
-                  <button
-                    type="button"
-                    className={styles.action}
-                    disabled={Boolean(busy)}
-                    title="加入项目参考"
-                    aria-label={`把 ${item.title} 加入项目参考`}
-                    data-clipper-reference={item.id}
-                    onClick={() => void addToReference(item, false)}
-                  >
-                    <IconImage size={14} />
-                  </button>
-                  <button
-                    type="button"
-                    className={styles.action}
-                    disabled={Boolean(busy)}
-                    title="放到当前画布"
-                    aria-label={`把 ${item.title} 放到当前画布`}
-                    data-clipper-canvas={item.id}
-                    onClick={() => void addToCanvas(item)}
-                  >
-                    <IconPlus size={14} />
-                  </button>
-                  <button
-                    type="button"
-                    className={styles.action}
-                    disabled={Boolean(busy)}
-                    title="移除收藏"
-                    aria-label={`移除 ${item.title}`}
-                    data-clipper-remove={item.id}
-                    onClick={() => void remove(item)}
-                  >
-                    <IconDelete size={14} />
-                  </button>
-                </div>
-              </div>
-            </article>
+            <ClipperItemCard
+              key={item.id}
+              item={item}
+              busy={Boolean(busy)}
+              onAgent={() => void addToReference(item, true)}
+              onReference={() => void addToReference(item, false)}
+              onCanvas={() => void addToCanvas(item)}
+              onRemove={() => void remove(item)}
+            />
           ))}
         </div>
       ) : (
@@ -400,14 +397,6 @@ function normalizedPublicUrl(value: string): string {
   try {
     const url = new URL(trimmed)
     return isPublicHttpUrl(url.toString()) ? url.toString() : ''
-  } catch {
-    return ''
-  }
-}
-
-function hostOf(value: string): string {
-  try {
-    return new URL(value).hostname.replace(/^www\./i, '')
   } catch {
     return ''
   }
