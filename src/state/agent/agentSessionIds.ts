@@ -1,0 +1,53 @@
+import type { StoragePort } from '../../platform/ports'
+import type { AgentSession } from './agentSessionTypes'
+
+export function normalizeAgentSessionIds(value: unknown): string[] {
+  if (!Array.isArray(value)) return []
+  return [
+    ...new Set(
+      value.flatMap((id) =>
+        typeof id === 'string' && id.trim() ? [id.trim()] : [],
+      ),
+    ),
+  ]
+}
+
+export async function appendAgentSessionIds(input: {
+  storage: StoragePort
+  ensureSplit: () => Promise<void>
+  id: string
+  ids: readonly string[]
+  currentIds: (session: AgentSession) => readonly string[]
+  apply: (session: AgentSession, ids: string[]) => AgentSession
+  load: (
+    storage: StoragePort,
+    id: string,
+  ) => Promise<AgentSession | null>
+  save: (
+    storage: StoragePort,
+    session: AgentSession,
+  ) => Promise<void>
+}): Promise<AgentSession | null> {
+  const additions = normalizeAgentSessionIds(input.ids)
+  await input.ensureSplit()
+  if (additions.length === 0) return input.load(input.storage, input.id)
+  return input.storage.transaction(
+    ['agentSessions', 'agentMessages'],
+    async (tx) => {
+      const latest = await input.load(tx, input.id)
+      if (!latest) return null
+      const merged = [
+        ...new Set([
+          ...normalizeAgentSessionIds(input.currentIds(latest)),
+          ...additions,
+        ]),
+      ]
+      const next = {
+        ...input.apply(latest, merged),
+        updatedAt: Date.now(),
+      }
+      await input.save(tx, next)
+      return next
+    },
+  )
+}

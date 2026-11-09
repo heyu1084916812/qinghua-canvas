@@ -8,6 +8,7 @@ import { normalizeAgentSteers } from '../../domain/agent/steering'
 import { normalizeStoredTaskPlan } from '../../domain/agent/taskPlan'
 import { isAgentToolName, type AgentToolName } from '../../domain/agent/toolRegistry'
 import type { AgentSession } from './agentSessionTypes'
+import { normalizeAgentSessionIds } from './agentSessionIds'
 
 export const asMessages = (v: unknown): ChatMessage[] =>
   Array.isArray(v) ? (v as ChatMessage[]) : []
@@ -80,6 +81,7 @@ export const toSession = (
   messages: ChatMessage[] = [],
 ): AgentSession => {
   const taskPlan = normalizeStoredTaskPlan(row.taskPlan)
+  const referenceIds = normalizeAgentSessionIds(row.referenceIds)
   const rawQueuedTurns = normalizeQueuedTurns(row.queuedTurns)
   const storedActiveTurn = normalizeQueuedTurns(
     row.activeTurn ? [row.activeTurn] : [],
@@ -114,6 +116,7 @@ export const toSession = (
   ...(Array.isArray(row.pendingAssetIds) && row.pendingAssetIds.length > 0
     ? { pendingAssetIds: row.pendingAssetIds.filter((x): x is string => typeof x === 'string') }
     : {}),
+  ...(referenceIds.length > 0 ? { referenceIds } : {}),
   queuedTurns,
   pendingSteers: normalizeAgentSteers(row.pendingSteers),
   ...(activeTurnId

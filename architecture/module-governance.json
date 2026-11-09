@@ -877,7 +877,7 @@
       "test": [
         "src/state/channel/channelCredentials.test.ts"
       ],
-      "budget": 240
+      "budget": 320
     },
     {
       "module": "src/app/runtime/projectRuntimeSnapshots.ts",
@@ -6567,10 +6567,11 @@
     {
       "module": "src/pages/CanvasPage/MyAssetsDrawer.tsx",
       "owner": "canvas-my-assets-drawer",
-      "responsibility": "在画布工作区左侧展示四个并列素材来源，并复用真实套件与 Pinterest 数据。",
+      "responsibility": "在画布工作区左列展示四个并列素材来源，复用真实套件、项目参考台账与 Pinterest 数据。",
       "owns": [
         "参考、我的素材、Pinterest、轻画插件四个页签",
         "四类套件列表与真实仓储读取",
+        "项目参考上传、列表与加入 Agent 的 handoff 触发",
         "现有 PinterestPanel 的抽屉化嵌入与未完成来源的如实状态",
         "在画布工作区左列占用真实布局宽度"
       ],
@@ -6585,14 +6586,14 @@
       "test": [
         "src/app/uiSevenPoints.test.ts"
       ],
-      "budget": 240
+      "budget": 320
     },
     {
       "module": "src/pages/CanvasPage/MyAssetsDrawer.module.css",
       "owner": "canvas-my-assets-drawer-style",
       "responsibility": "定义画布我的素材左侧抽屉的布局、页签、滚动和嵌入面板样式。",
       "owns": [
-        "左侧抽屉与遮罩几何",
+        "左侧抽屉与画布让位几何",
         "四页签和套件列表的深浅主题样式",
         "Pinterest 面板嵌入抽屉时的局部布局归零"
       ],
@@ -6610,7 +6611,7 @@
       "test": [
         "scripts/capture-ui-seven-points.mjs"
       ],
-      "budget": 260
+      "budget": 320
     },
     {
       "module": "src/features/settings/cliOutputText.ts",
@@ -6734,6 +6735,29 @@
         "src/workbenches/canvas/panels/AgentPanel/agentTurnReferences.test.ts"
       ],
       "budget": 120
+    },
+    {
+      "module": "src/state/agent/agentSessionIds.ts",
+      "owner": "agent-session-id-rules",
+      "responsibility": "归一化并原子追加 Agent 会话中的附件与参考 id 数组，复用同一事务规则。",
+      "owns": [
+        "字符串 id 数组的 trim、去重与空值过滤",
+        "基于最新会话快照的 id 原子追加",
+        "空追加只读回落与事务写回顺序"
+      ],
+      "doesNotOwn": [
+        "Agent 会话消息与运行状态",
+        "参考卡或附件的业务含义",
+        "存储表结构迁移"
+      ],
+      "publicApi": [
+        "normalizeAgentSessionIds",
+        "appendAgentSessionIds"
+      ],
+      "test": [
+        "src/state/agent/agentSessionIds.test.ts"
+      ],
+      "budget": 100
     }
   ]
 }

@@ -18,7 +18,10 @@ import {
 } from '../../../../features/canvas/importAsset'
 import {
   subscribeAgentHandoff,
+  subscribeReferenceAgentHandoff,
   takeAgentHandoff,
+  takeReferenceAgentHandoff,
+  type AgentReferenceHandoff,
 } from '../../../../features/canvas/agentHandoff'
 import { loadAssetUrl } from '../../../../features/shared/assets/index'
 import type { TaskLifecycle } from '../../../../features/shared/lifecycle/taskLifecycle'
@@ -37,7 +40,7 @@ export interface AgentAttachmentsControllerInput {
   viewport: Viewport
   library: AssetLibraryStore
   insertMention: (
-    kind: 'node' | 'model' | 'skill',
+    kind: 'node' | 'model' | 'skill' | 'reference',
     id: string,
     label: string,
   ) => void
@@ -58,6 +61,10 @@ export interface AgentAttachmentsControllerInput {
     sessionId: string,
     assetIds: readonly string[],
   ) => void
+  appendReferenceIds: (
+    sessionId: string,
+    referenceIds: readonly string[],
+  ) => Promise<AgentSession | null>
   /** 把追加后的会话回灌到面板（`list` 与 `current` 都跟着更新） */
   applySessionSnapshot: (session: AgentSession) => void
   trackRun: TaskLifecycle['track']
@@ -78,6 +85,7 @@ export function useAgentAttachmentsController(
   input: AgentAttachmentsControllerInput,
 ): AgentAttachmentsController {
   const handoffRef = useRef<string[]>([])
+  const referenceHandoffRef = useRef<AgentReferenceHandoff[]>([])
 
   const flushHandoff = useCallback(() => {
     if (!input.current || handoffRef.current.length === 0) return
@@ -110,6 +118,43 @@ export function useAgentAttachmentsController(
     queue(takeAgentHandoff(input.projectId))
     return subscribeAgentHandoff(input.projectId, queue)
   }, [flushHandoff, input.active, input.projectId])
+
+  const flushReferenceHandoff = useCallback(() => {
+    if (!input.current || referenceHandoffRef.current.length === 0) return
+    const refs = [...referenceHandoffRef.current]
+    referenceHandoffRef.current = []
+    for (const ref of refs) {
+      input.insertMention('reference', ref.id, ref.label)
+    }
+    void input
+      .appendReferenceIds(
+        input.current.id,
+        refs.map((ref) => ref.id),
+      )
+      .then((next) => {
+        if (next) input.applySessionSnapshot(next)
+      })
+      .catch(() => null)
+  }, [
+    input.appendReferenceIds,
+    input.applySessionSnapshot,
+    input.current,
+    input.insertMention,
+  ])
+
+  useEffect(() => {
+    if (!input.active) return
+    const queue = (refs: readonly AgentReferenceHandoff[]) => {
+      const byId = new Map(
+        referenceHandoffRef.current.map((ref) => [ref.id, ref]),
+      )
+      for (const ref of refs) byId.set(ref.id, ref)
+      referenceHandoffRef.current = [...byId.values()]
+      flushReferenceHandoff()
+    }
+    queue(takeReferenceAgentHandoff(input.projectId))
+    return subscribeReferenceAgentHandoff(input.projectId, queue)
+  }, [flushReferenceHandoff, input.active, input.projectId])
 
   const placeAsset = useCallback(
     (asset: ImportedAsset): string | null => {

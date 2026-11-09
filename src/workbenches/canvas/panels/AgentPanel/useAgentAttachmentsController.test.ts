@@ -21,6 +21,8 @@ import {
 const {
   takeHandoff,
   subscribeHandoff,
+  takeReferenceHandoff,
+  subscribeReferenceHandoff,
   importAssetFile,
   isImportableMedia,
   createAssetNode,
@@ -28,6 +30,8 @@ const {
 } = vi.hoisted(() => ({
   takeHandoff: vi.fn(),
   subscribeHandoff: vi.fn(),
+  takeReferenceHandoff: vi.fn(),
+  subscribeReferenceHandoff: vi.fn(),
   importAssetFile: vi.fn(),
   isImportableMedia: vi.fn(),
   createAssetNode: vi.fn(),
@@ -37,6 +41,8 @@ const {
 vi.mock('../../../../features/canvas/agentHandoff', () => ({
   takeAgentHandoff: takeHandoff,
   subscribeAgentHandoff: subscribeHandoff,
+  takeReferenceAgentHandoff: takeReferenceHandoff,
+  subscribeReferenceAgentHandoff: subscribeReferenceHandoff,
 }))
 
 vi.mock('../../../../features/canvas/importAsset', async () => {
@@ -129,6 +135,11 @@ function input(
       pendingAssetIds: [...ids],
     })),
     appendPendingAssetIdsDetached: vi.fn(),
+    appendReferenceIds: vi.fn(async (sessionId: string, ids: readonly string[]) => ({
+      ...session,
+      id: sessionId,
+      referenceIds: [...ids],
+    })),
     applySessionSnapshot: vi.fn(),
     trackRun: <T,>(work: () => Promise<T>) => work(),
     ...patch,
@@ -167,6 +178,8 @@ describe('useAgentAttachmentsController', () => {
     vi.clearAllMocks()
     takeHandoff.mockReturnValue([])
     subscribeHandoff.mockReturnValue(vi.fn())
+    takeReferenceHandoff.mockReturnValue([])
+    subscribeReferenceHandoff.mockReturnValue(vi.fn())
     isImportableMedia.mockReturnValue(true)
     importAssetFile.mockResolvedValue({
       hash: 'hash-file',
@@ -209,6 +222,42 @@ describe('useAgentAttachmentsController', () => {
     act(() => listener?.(['n2']))
     expect(insertMention).toHaveBeenCalledWith('node', 'n2', '节点 n2')
     expect(viewRef.current?.thumbVersion).toBe(0)
+  })
+
+  it('★★ 项目参考 handoff 变成 reference chip，并写入会话持续引用', async () => {
+    takeReferenceHandoff.mockReturnValue([
+      { id: 'ref-1', label: '品牌标准字' },
+    ])
+    const insertMention = vi.fn()
+    const appendReferenceIds = vi.fn(async (
+      sessionId: string,
+      ids: readonly string[],
+    ) => ({
+      ...session,
+      id: sessionId,
+      referenceIds: [...ids],
+    }))
+    const applySessionSnapshot = vi.fn()
+    render(input({
+      insertMention,
+      appendReferenceIds,
+      applySessionSnapshot,
+    }))
+
+    expect(insertMention).toHaveBeenCalledWith(
+      'reference',
+      'ref-1',
+      '品牌标准字',
+    )
+    await vi.waitFor(() => {
+      expect(appendReferenceIds).toHaveBeenCalledWith(
+        'session-1',
+        ['ref-1'],
+      )
+      expect(applySessionSnapshot).toHaveBeenCalledWith(
+        expect.objectContaining({ referenceIds: ['ref-1'] }),
+      )
+    })
   })
 
   it('素材库添加走同一落位链路并写会话附件', async () => {

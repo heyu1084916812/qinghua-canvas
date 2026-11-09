@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   mentionKindOf,
+  mentionIdOf,
   mentionLabel,
   mentionToken,
   parseMentions,
@@ -67,5 +68,17 @@ describe('@ 引用 · 存储形态', () => {
       { kind: 'skill', id: 'skill_1', label: '画面提示词导演' },
     ])
     expect(stripMentionMarkup(`用 ${t} 来写`)).toBe('用 画面提示词导演 来写')
+  })
+
+  it('★★ 项目参考 chip 往返解析，发出去只保留可读名字', () => {
+    const t = mentionToken('reference', 'ref-1', '品牌标准字')
+    expect(mentionKindOf(t)).toBe('reference')
+    expect(mentionIdOf(t)).toBe('ref-1')
+    expect(parseMentions(`参考 ${t} 做一张海报`)).toEqual([
+      { kind: 'reference', id: 'ref-1', label: '品牌标准字' },
+    ])
+    expect(stripMentionMarkup(`参考 ${t} 做一张海报`)).toBe(
+      '参考 @品牌标准字 做一张海报',
+    )
   })
 })

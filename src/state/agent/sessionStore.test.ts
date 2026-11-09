@@ -1350,3 +1350,22 @@ describe('Agent 会话 · 待发送附件的原子追加', () => {
     expect((await s.appendPendingAssetIds(a.id, ['  ']))?.pendingAssetIds).toBeUndefined()
   })
 })
+
+describe('Agent 会话 · 项目参考卡持续引用', () => {
+  it('★★ 参考 id 原子追加、去重并跨读回保留', async () => {
+    const storage = createMemoryPlatform().storage
+    const s = createAgentSessionStore(storage)
+    const a = await s.create({ projectId: 'p1', channelId: 'c1', model: 'm1' })
+
+    const first = await s.appendReferenceIds(a.id, ['ref-1', 'ref-1'])
+    const second = await s.appendReferenceIds(a.id, ['ref-2'])
+
+    expect(first?.referenceIds).toEqual(['ref-1'])
+    expect(second?.referenceIds).toEqual(['ref-1', 'ref-2'])
+    expect((await s.get(a.id))?.referenceIds).toEqual(['ref-1', 'ref-2'])
+    expect((await s.appendReferenceIds(a.id, []) )?.referenceIds).toEqual([
+      'ref-1',
+      'ref-2',
+    ])
+  })
+})

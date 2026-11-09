@@ -21,6 +21,10 @@ const variants = [
   { width: 1024, height: 700, theme: 'dark' },
   { width: 1024, height: 700, theme: 'light' },
 ]
+const ONE_PIXEL_PNG = Buffer.from(
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Wl2n0sAAAAASUVORK5CYII=',
+  'base64',
+)
 
 const pageErrors = (page) => {
   const errors = []
@@ -291,6 +295,22 @@ try {
     await page.locator('[data-my-assets-source="pinterest"]').click()
     await page.locator('[data-pinterest-panel]').waitFor({ timeout: 10_000 }).catch(() => {})
     const pinterestMounted = await page.locator('[data-pinterest-panel]').count()
+    await page.locator('[data-my-assets-source="reference"]').click()
+    await page.locator('[data-my-assets-reference-file]').setInputFiles({
+      name: 'project-reference.png',
+      mimeType: 'image/png',
+      buffer: ONE_PIXEL_PNG,
+    })
+    await page.locator('[data-my-assets-reference]').waitFor({ timeout: 10_000 }).catch(() => {})
+    const referenceCards = await page.locator('[data-my-assets-reference]').count()
+    const referenceUpload = await page.locator('[data-my-assets-reference-upload]').count()
+    const referenceAgentActions = await page.locator('[data-my-assets-reference-agent]').count()
+    await page.screenshot({ path: path.join(out, `${file}-canvas-reference.png`) })
+    await page.locator('[data-my-assets-reference-agent]').first().click()
+    await page.locator('[data-agent-panel]').waitFor({ timeout: 15_000 })
+    await page.locator('[data-agent-composer] [data-mention-kind="reference"]').waitFor({ timeout: 15_000 })
+    const referenceChipMounted = await page.locator('[data-agent-composer] [data-mention-kind="reference"]').count()
+    await page.screenshot({ path: path.join(out, `${file}-canvas-reference-agent.png`) })
     await page.locator('[data-my-assets-source="assets"]').click()
     await page.screenshot({ path: path.join(out, `${file}-canvas-kits.png`) })
     report.push({
@@ -300,6 +320,10 @@ try {
       sourceTabs,
       assetKinds,
       pinterestMounted,
+      referenceCards,
+      referenceUpload,
+      referenceAgentActions,
+      referenceChipMounted,
       stageWidthClosed,
       ...drawerGeometry,
       canvasWidthDelta: stageWidthClosed - drawerGeometry.stageWidthOpen,

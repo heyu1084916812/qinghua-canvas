@@ -12567,3 +12567,12 @@ React 端口 → `invoke` → Rust `check_update` → updater 插件读配置 �
 - `/assets` 只改名为「生成历史」，`NAV` 与 `AssetsPage` 标题、路由注释同步；历史、收藏、瀑布流与筛选功能不动。`data-canvas-context-kits` 保留兼容旧探针，同时新增 `data-canvas-my-assets`。
 - UI 门禁证据：`.playwright-verify/ui-seven-{before,after}` 四视口明暗，改前居中 `[data-context-kits]=1`，改后 `[data-my-assets-drawer]=1`、4 个来源页签、4 类套件、Pinterest 挂载 1、横向/子元素越界 0、page/console error 0；抽屉 421/321px，画布舞台 1361→940 / 945→624，宽度减少量与抽屉完全一致；Impeccable detector 0 findings。
 - 最终门禁：`npm run check` 1099 modules / 4377 deps / 34 tables / 243 registrations，串行全量 Vitest 648 files / 5429 tests，`npm run build` 1231 modules，MyAssetsDrawer / PinterestPanel 独立 lazy chunk。未做套件 chip、项目级套件选择器、套件子面板/筛选器、参考灯箱/拖拽/加入台账/放到画布、Clipper 接收端与画布内浏览器；不要把这些说成已完成。
+
+### 总管2 第二十三轮：Lovart 项目参考闭环第一阶段（2026-11-09）
+
+- 参考上传必须继续走 `importAssetFile` 这一条素材咽喉，字节只落 `assets`；随后写项目隔离 `referenceItems`。没有模型分析结果时，What 只能写“用户上传、等待分析”，禁止伪造主体/风格/构图描述。
+- `MentionKind` 新增 `reference`，chip 仍复用同一 `mentionToken` / `parseMentions` / 删除与只读渲染通道。参考 handoff 归 `agentHandoff.ts`，`CanvasAgentHostBridge` 负责打开 Agent，`useAgentAttachmentsController` 负责插 chip 和 `appendReferenceIds`；不要在每个按钮里各自写一套。
+- `AgentSession.referenceIds` 是会话持续引用，`prepareAgentTurnRequest` 要把“本轮 reference chip + 会话 referenceIds + selectForTask 命中”按 item id 去重合并。显式 chip 没有 usage 时只生成本轮临时 `style` usage；不能把临时 usage 当已分析台账写回。附件和参考 id 的归一化/原子追加归 `agentSessionIds.ts`，`sessionStore.ts` 必须继续守住 790 行预算。
+- 参考 UI 探针不能只截图空态：用抽屉自己的文件输入上传 1×1 PNG，断言 `referenceCards=1 / referenceAgentActions=1 / referenceChipMounted=1`，四视口明暗 page/console error 0。证据 `.playwright-verify/ui-seven-after/*-canvas-reference{,-agent}.png`。
+- 仍缺：What/HowToUse 自动分析工具（curate references）、按任务持久 usage、参考灯箱/拖拽/批量管理、删 chip 同步清会话 referenceIds、套件 chip、Clipper 接收端、画布内浏览器和六类生图流程策略。不要把“显式参考可用”说成 Lovart 全流程完成。
+- 最终门禁：`npm run check` 1100 modules / 4388 deps / 34 tables / 244 registrations，串行全量 Vitest 649 files / 5436 tests，`npm run build` 1232 modules。

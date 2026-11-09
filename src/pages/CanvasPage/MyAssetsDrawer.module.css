@@ -120,6 +120,11 @@
   background: var(--bg-hover);
 }
 
+.kitAction:disabled {
+  color: var(--text-3);
+  cursor: default;
+}
+
 .empty,
 .notice {
   margin: 0;
@@ -162,6 +167,66 @@
   flex: 0 0 auto;
   color: var(--text-3);
   font-size: var(--fs-chip);
+}
+
+.referenceList {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.referenceCard {
+  display: grid;
+  grid-template-columns: 54px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+  padding: var(--space-2);
+  border: 1px solid var(--stroke);
+  border-radius: var(--radius-control);
+  background: var(--bg-subtle);
+}
+
+.referenceThumb {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 54px;
+  height: 42px;
+  overflow: hidden;
+  border: 1px solid var(--stroke);
+  border-radius: var(--radius-control);
+  background: var(--bg-surface);
+  color: var(--text-3);
+  font-size: var(--fs-chip);
+}
+
+.referenceThumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.referenceCopy {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: 2px;
+}
+
+.referenceCopy strong {
+  overflow: hidden;
+  color: var(--text-1);
+  font-size: var(--fs-label);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.referenceCopy span {
+  overflow: hidden;
+  color: var(--text-3);
+  font-size: var(--fs-chip);
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .kinds {

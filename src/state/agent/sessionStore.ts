@@ -32,6 +32,7 @@ import type {
   AgentSession,
   AgentSessionStore,
 } from './agentSessionTypes'
+import { appendAgentSessionIds } from './agentSessionIds'
 
 export type {
   AgentSession,
@@ -53,6 +54,8 @@ export type {
 
 const splitReady = new WeakMap<StoragePort, Promise<void>>()
 export { AGENT_CONTEXT_WINDOW } from '../../domain/agent/modelMessageWindow'
+const saveAgentSession = (target: StoragePort, session: AgentSession): Promise<void> =>
+  target.put('agentSessions', sessionRow(session, session.updatedAt)).then(() => undefined)
 
 export function createAgentSessionStore(
   storage: StoragePort,
@@ -123,6 +126,17 @@ export function createAgentSessionStore(
     await ensureSplit()
     return loadSession(storage, id)
   }
+  const appendIds = (
+    id: string,
+    ids: readonly string[],
+    currentIds: (session: AgentSession) => readonly string[],
+    apply: (session: AgentSession, ids: string[]) => AgentSession,
+  ) =>
+    appendAgentSessionIds({
+      storage, ensureSplit, id, ids, currentIds, apply,
+      load: loadSession,
+      save: saveAgentSession,
+    })
 
   return {
     get: find,
@@ -384,28 +398,14 @@ export function createAgentSessionStore(
     },
 
     async appendPendingAssetIds(id, assetIds) {
-      const additions = [
-        ...new Set(assetIds.filter((assetId) => assetId.trim() !== '')),
-      ]
-      if (additions.length === 0) return find(id)
-      await ensureSplit()
-      return storage.transaction(
-        ['agentSessions', 'agentMessages'],
-        async (tx) => {
-          const latest = await loadSession(tx, id)
-          if (!latest) return null
-          const merged = [
-            ...new Set([...(latest.pendingAssetIds ?? []), ...additions]),
-          ]
-          const next: AgentSession = {
-            ...latest,
-            pendingAssetIds: merged,
-            updatedAt: Date.now(),
-          }
-          await tx.put('agentSessions', sessionRow(next, next.updatedAt))
-          return next
-        },
-      )
+      return appendIds(id, assetIds,
+        (session) => session.pendingAssetIds ?? [],
+        (session, ids) => ({ ...session, pendingAssetIds: ids }))
+    },
+    async appendReferenceIds(id, referenceIds) {
+      return appendIds(id, referenceIds,
+        (session) => session.referenceIds ?? [],
+        (session, ids) => ({ ...session, referenceIds: ids }))
     },
 
     async clearPendingAssetIds(id, assetIds) {

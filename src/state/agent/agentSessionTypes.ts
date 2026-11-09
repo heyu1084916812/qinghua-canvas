@@ -58,6 +58,8 @@ export interface AgentSession {
    * 而不是把图片塞进对话上下文里再让它猜。
    */
   pendingAssetIds?: string[]
+  /** 当前会话持续引用的项目参考卡；参考字节仍在 assets。 */
+  referenceIds?: string[]
   /**
    * 当前回合尚未结束时，用户继续提交的任务。
    *
@@ -185,6 +187,11 @@ export interface AgentSessionStore {
   appendPendingAssetIds(
     id: string,
     assetIds: readonly string[],
+  ): Promise<AgentSession | null>
+  /** 原子追加项目参考卡 id；与参考 chip 同步，后续回合继续读取。 */
+  appendReferenceIds(
+    id: string,
+    referenceIds: readonly string[],
   ): Promise<AgentSession | null>
   clearPendingAssetIds(id: string, assetIds: readonly string[]): Promise<AgentSession | null>
   enqueueTurn(

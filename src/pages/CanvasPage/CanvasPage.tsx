@@ -439,6 +439,8 @@ function CanvasProject({ projectId }: { projectId: string }) {
           {myAssetsOpen ? (
             <Suspense fallback={null}>
               <MyAssetsDrawer
+                projectId={projectId}
+                store={store}
                 onClose={() => setMyAssetsOpen(false)}
                 onOpenKitEditor={() => {
                   setMyAssetsOpen(false)

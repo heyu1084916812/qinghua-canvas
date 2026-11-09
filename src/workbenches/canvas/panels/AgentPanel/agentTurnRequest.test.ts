@@ -284,6 +284,7 @@ describe('prepareAgentTurnRequest', () => {
       ...inputFor({ sessions, session, text: '按参考做一张 KV' }),
       referenceLedger: {
         selectForTask,
+        listItems: vi.fn(async () => []),
       },
     })
     expect(result.kind).toBe('ready')
@@ -305,6 +306,59 @@ describe('prepareAgentTurnRequest', () => {
       detail: expect.stringContaining('保持字形与颜色不变'),
       evidence: ['r1:u1'],
     })
+  })
+
+  it('★★ 正文参考 chip 与会话持续参考都进入本轮上下文，不依赖 usage 预登记', async () => {
+    const { sessions, session } = await createSession({
+      referenceIds: ['r2'],
+    })
+    const listItems = vi.fn(async () => [
+      {
+        id: 'r1',
+        projectId: 'p1',
+        title: '本轮参考',
+        source: 'file' as const,
+        kind: 'image' as const,
+        assetHash: 'hash-r1',
+        what: '用户上传的版式参考',
+        createdAt: 1,
+        updatedAt: 1,
+      },
+      {
+        id: 'r2',
+        projectId: 'p1',
+        title: '会话持续参考',
+        source: 'pinterest' as const,
+        kind: 'image' as const,
+        assetHash: 'hash-r2',
+        what: '用户从 Pinterest 收藏的配色参考',
+        createdAt: 2,
+        updatedAt: 2,
+      },
+    ])
+    const result = await prepareAgentTurnRequest({
+      ...inputFor({
+        sessions,
+        session,
+        text: `${mentionToken('reference', 'r1', '本轮参考')} 做一张海报`,
+      }),
+      referenceLedger: {
+        selectForTask: vi.fn(async () => ({ selected: [], omitted: [] })),
+        listItems,
+      },
+    })
+
+    expect(result.kind).toBe('ready')
+    if (result.kind !== 'ready') return
+    expect(result.contextPrompt).toContain('本轮参考')
+    expect(result.contextPrompt).toContain('会话持续参考')
+    expect(result.contextTrace?.assetRefs).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ hash: 'hash-r1', role: 'reference' }),
+        expect.objectContaining({ hash: 'hash-r2', role: 'reference' }),
+      ]),
+    )
+    expect(listItems).toHaveBeenCalledWith('p1')
   })
 
   it('★★ 查看画布：与视觉验收共用 route + inputTypes 判据，工具声明包含 visualReview', async () => {

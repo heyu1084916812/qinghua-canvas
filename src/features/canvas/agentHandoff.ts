@@ -17,6 +17,20 @@ const listenersByProject = new Map<
   Set<(ids: readonly string[]) => void>
 >()
 
+export interface AgentReferenceHandoff {
+  id: string
+  label: string
+}
+
+const pendingReferencesByProject = new Map<
+  string,
+  AgentReferenceHandoff[]
+>()
+const referenceListenersByProject = new Map<
+  string,
+  Set<(refs: readonly AgentReferenceHandoff[]) => void>
+>()
+
 /** 画布侧调用：把选中的节点交给 agent（多次调用会累积） */
 export function sendSelectionToAgent(
   projectId: string,
@@ -58,8 +72,52 @@ export function subscribeAgentHandoff(
   }
 }
 
+/** 参考卡交给 Agent：一张卡一枚 reference chip；同 id 累积去重。 */
+export function sendReferenceToAgent(
+  projectId: string,
+  refs: readonly AgentReferenceHandoff[],
+): void {
+  if (!projectId || refs.length === 0) return
+  const byId = new Map(
+    (pendingReferencesByProject.get(projectId) ?? []).map((ref) => [ref.id, ref]),
+  )
+  for (const ref of refs) {
+    if (!ref.id) continue
+    byId.set(ref.id, { id: ref.id, label: ref.label.trim() || ref.id })
+  }
+  const pending = [...byId.values()]
+  pendingReferencesByProject.set(projectId, pending)
+  for (const fn of referenceListenersByProject.get(projectId) ?? []) fn(pending)
+}
+
+export function takeReferenceAgentHandoff(
+  projectId: string,
+): AgentReferenceHandoff[] {
+  const out = pendingReferencesByProject.get(projectId) ?? []
+  pendingReferencesByProject.delete(projectId)
+  return out
+}
+
+export function subscribeReferenceAgentHandoff(
+  projectId: string,
+  fn: (refs: readonly AgentReferenceHandoff[]) => void,
+): () => void {
+  let listeners = referenceListenersByProject.get(projectId)
+  if (!listeners) {
+    listeners = new Set()
+    referenceListenersByProject.set(projectId, listeners)
+  }
+  listeners.add(fn)
+  return () => {
+    listeners.delete(fn)
+    if (listeners.size === 0) referenceListenersByProject.delete(projectId)
+  }
+}
+
 /** 项目删除后同时清掉未消费交接与陈旧订阅，恢复项目时会重新注册。 */
 export function clearAgentHandoff(projectId: string): void {
   pendingByProject.delete(projectId)
   listenersByProject.delete(projectId)
+  pendingReferencesByProject.delete(projectId)
+  referenceListenersByProject.delete(projectId)
 }

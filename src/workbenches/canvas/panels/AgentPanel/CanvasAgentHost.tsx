@@ -18,7 +18,10 @@ import {
   disposeAllProjectRuntimes,
   registerProjectRuntime,
 } from '../../../../app/ProjectRuntimeRegistry'
-import { subscribeAgentHandoff } from '../../../../features/canvas/agentHandoff'
+import {
+  subscribeAgentHandoff,
+  subscribeReferenceAgentHandoff,
+} from '../../../../features/canvas/agentHandoff'
 import {
   type TaskShutdownControl,
 } from '../../../../features/shared/lifecycle/taskLifecycle'
@@ -169,6 +172,14 @@ export function CanvasAgentHostBridge({
   useEffect(
     () =>
       subscribeAgentHandoff(projectId, () => {
+        setAgentHostOpen(hostId, true)
+      }),
+    [hostId, projectId],
+  )
+
+  useEffect(
+    () =>
+      subscribeReferenceAgentHandoff(projectId, () => {
         setAgentHostOpen(hostId, true)
       }),
     [hostId, projectId],

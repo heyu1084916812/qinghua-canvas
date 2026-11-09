@@ -1,11 +1,17 @@
 import { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react'
 import { usePlatform } from '../../app/providers/PlatformProvider'
 import { createContextRepository } from '../../state/shared/contextRepository'
+import { createReferenceLedgerRepository } from '../../state/project/referenceLedgerRepository'
 import type {
   ContextKit,
   ContextKitKind,
 } from '../../domain/shared/context'
+import type { CanvasStore } from '../../state/workbenches/canvas/store'
 import { KIT_KINDS } from '../AssetsPage/contextKitDraft'
+import { importAssetFile, IMPORT_ACCEPT } from '../../features/canvas/importAsset'
+import { sendReferenceToAgent } from '../../features/canvas/agentHandoff'
+import { useAsset } from '../../features/shared/assets'
+import { createId } from '../../shared/id'
 import styles from './MyAssetsDrawer.module.css'
 
 const PinterestPanel = lazy(() =>
@@ -23,10 +29,29 @@ const SOURCES: readonly { id: Source; label: string }[] = [
   { id: 'clipper', label: '轻画插件' },
 ]
 
+function ReferenceThumb({
+  hash,
+  title,
+}: {
+  hash?: string
+  title: string
+}) {
+  const url = useAsset(hash ?? '')
+  return (
+    <span className={styles.referenceThumb}>
+      {url ? <img src={url} alt={title} loading="lazy" /> : null}
+    </span>
+  )
+}
+
 export function MyAssetsDrawer({
+  projectId,
+  store,
   onClose,
   onOpenKitEditor,
 }: {
+  projectId: string
+  store: CanvasStore
   onClose: () => void
   onOpenKitEditor: () => void
 }) {
@@ -35,11 +60,20 @@ export function MyAssetsDrawer({
     () => createContextRepository(platform.storage),
     [platform.storage],
   )
+  const referenceRepo = useMemo(
+    () => createReferenceLedgerRepository(platform.storage),
+    [platform.storage],
+  )
   const [source, setSource] = useState<Source>('assets')
   const [kits, setKits] = useState<ContextKit[]>([])
+  const [references, setReferences] = useState<
+    Awaited<ReturnType<typeof referenceRepo.listItems>>
+  >([])
   const [kind, setKind] = useState<ContextKitKind>('brand')
   const [error, setError] = useState('')
   const closeRef = useRef<HTMLButtonElement | null>(null)
+  const referenceInputRef = useRef<HTMLInputElement | null>(null)
+  const [referenceBusy, setReferenceBusy] = useState(false)
 
   useEffect(() => {
     closeRef.current?.focus()
@@ -59,6 +93,49 @@ export function MyAssetsDrawer({
     })
     return () => { active = false }
   }, [contextRepo])
+
+  useEffect(() => {
+    let active = true
+    void referenceRepo.listItems(projectId).then((rows) => {
+      if (active) setReferences(rows)
+    }).catch((cause) => {
+      if (active) setError(cause instanceof Error ? cause.message : '读取项目参考失败')
+    })
+    return () => { active = false }
+  }, [projectId, referenceRepo])
+
+  const uploadReferences = async (files: FileList | null) => {
+    if (!files || files.length === 0 || referenceBusy) return
+    setReferenceBusy(true)
+    setError('')
+    try {
+      const next = [...references]
+      for (const file of Array.from(files)) {
+        const asset = await importAssetFile({ platform, store, projectId }, file)
+        if (!asset || (!asset.mime.startsWith('image/') && !asset.mime.startsWith('video/'))) continue
+        const now = Date.now()
+        const item = {
+          id: createId('ref'),
+          projectId,
+          title: (asset.name ?? '参考素材').replace(/\.[^.]+$/, '').trim() || '参考素材',
+          source: 'file' as const,
+          kind: asset.mime.startsWith('video/') ? 'video' as const : 'image' as const,
+          assetHash: asset.hash,
+          what: `用户上传的${asset.mime.startsWith('video/') ? '视频' : '图片'}参考；等待后续任务分析补充 What / How to use。`,
+          createdAt: now,
+          updatedAt: now,
+        }
+        await referenceRepo.putItem(item)
+        next.push(item)
+      }
+      setReferences(next)
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : '上传项目参考失败')
+    } finally {
+      setReferenceBusy(false)
+      if (referenceInputRef.current) referenceInputRef.current.value = ''
+    }
+  }
 
   const visibleKits = kits.filter((kit) => kit.kind === kind)
 
@@ -90,11 +167,52 @@ export function MyAssetsDrawer({
             <div>
               <div className={styles.subhead}>
                 <span>当前项目的参考台账</span>
-                <span>项目隔离</span>
+                <button
+                  type="button"
+                  className={styles.kitAction}
+                  data-my-assets-reference-upload
+                  disabled={referenceBusy}
+                  onClick={() => referenceInputRef.current?.click()}
+                >
+                  {referenceBusy ? '正在导入…' : '上传参考'}
+                </button>
               </div>
-              <p className={styles.notice}>
-                参考卡片和按任务筛选已进入 Agent 生成上下文。参考灯箱、拖拽到画布与卡片级「添加到对话」正在接入，当前不会把未完成的动作伪装成可用按钮。
-              </p>
+              <input
+                ref={referenceInputRef}
+                type="file"
+                accept={IMPORT_ACCEPT}
+                multiple
+                hidden
+                data-my-assets-reference-file
+                onChange={(event) => void uploadReferences(event.target.files)}
+              />
+              {error ? <p className={styles.notice}>{error}</p> : null}
+              {!error && references.length === 0 ? (
+                <p className={styles.empty} data-my-assets-reference-empty>
+                  这个项目还没有参考。上传图片或视频后，它们会留在项目参考台账里，Agent 按任务或 chip 取用。
+                </p>
+              ) : null}
+              <div className={styles.referenceList}>
+                {references.map((item) => (
+                  <article className={styles.referenceCard} data-my-assets-reference={item.id} key={item.id}>
+                    <ReferenceThumb hash={item.assetHash} title={item.title} />
+                    <div className={styles.referenceCopy}>
+                      <strong title={item.title}>{item.title}</strong>
+                      <span title={item.what}>
+                        {item.what || `${item.kind === 'video' ? '视频参考' : '图片参考'} · 项目台账`}
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      className={styles.kitAction}
+                      data-my-assets-reference-agent={item.id}
+                      onClick={() => sendReferenceToAgent(projectId, [{ id: item.id, label: item.title }])}
+                    >
+                      加入对话
+                    </button>
+                  </article>
+                ))}
+              </div>
             </div>
           ) : null}
           {source === 'assets' ? (

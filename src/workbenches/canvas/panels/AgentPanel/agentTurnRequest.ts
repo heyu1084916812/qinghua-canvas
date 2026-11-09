@@ -2,6 +2,11 @@ import type { GraphSnapshot } from '../../../../domain/canvas/model/graph'
 import type { GenerationContextAsset } from '../../../../domain/canvas/model/node'
 import type { Channel } from '../../../../domain/project/channel'
 import type { GenerationAvailability } from '../../../../domain/project/generationRouting'
+import type {
+  ReferenceItem,
+  ReferenceSelection,
+  ReferenceUsage,
+} from '../../../../domain/project/referenceLedger'
 import type { Skill } from '../../../../domain/prompt/skill'
 import type {
   MentionRef,
@@ -110,6 +115,7 @@ export interface PrepareAgentTurnRequestInput {
   /** 可选：项目参考台账。未接入时行为与旧版完全一致。 */
   referenceLedger?: {
     selectForTask: ReferenceLedgerRepository['selectForTask']
+    listItems: ReferenceLedgerRepository['listItems']
   }
   skills: readonly Skill[]
   channels: readonly Channel[]
@@ -178,11 +184,17 @@ export async function prepareAgentTurnRequest(
 ): Promise<AgentTurnRequestPreparation> {
   const plainText = stripMentionMarkup(input.text)
   const rawMentions = parseMentions(input.text)
+  const referenceIds = [...new Set([
+    ...rawMentions
+      .filter((mention) => mention.kind === 'reference')
+      .map((mention) => mention.id),
+    ...(input.session.referenceIds ?? []),
+  ])]
   const sentAssetIds = [...new Set(input.session.pendingAssetIds ?? [])]
   const mentions = rawMentions
     .filter(
       (mention): mention is MentionRef & { kind: 'node' | 'model' } =>
-        mention.kind !== 'skill',
+        mention.kind === 'node' || mention.kind === 'model',
     )
     .map((mention): AgentTurnMention => {
       if (mention.kind !== 'node') return mention
@@ -284,9 +296,23 @@ export async function prepareAgentTurnRequest(
   let contextPrompt = ''
   let contextTrace: AgentTurnContextTrace | null = null
   try {
-    const selection = input.referenceLedger
+    const taskSelection = input.referenceLedger
       ? await input.referenceLedger.selectForTask(input.projectId, taskKey)
       : null
+    const explicitItems = input.referenceLedger && referenceIds.length > 0
+      ? (await input.referenceLedger.listItems(input.projectId)).filter(
+          (item) => referenceIds.includes(item.id),
+        )
+      : []
+    const selection = taskSelection
+      ? mergeExplicitReferences(taskSelection, explicitItems, taskKey)
+      : explicitItems.length > 0
+        ? mergeExplicitReferences(
+            { selected: [], omitted: [] },
+            explicitItems,
+            taskKey,
+          )
+        : null
     const bundle = await input.memory.read({
       projectId: input.projectId,
       workbench: 'canvas',
@@ -628,5 +654,43 @@ export async function prepareAgentTurnRequest(
     turnTools,
     systemPrompt,
     ...(clearedPendingAssets ? { clearedPendingAssets } : {}),
+  }
+}
+
+function mergeExplicitReferences(
+  selection: ReferenceSelection,
+  explicitItems: readonly ReferenceItem[],
+  taskKey: string,
+): ReferenceSelection {
+  const selectedByItem = new Map(
+    selection.selected.map((row) => [row.item.id, row]),
+  )
+  for (const item of explicitItems) {
+    if (selectedByItem.has(item.id)) continue
+    selectedByItem.set(item.id, {
+      item,
+      usage: explicitReferenceUsage(item, taskKey),
+    })
+  }
+  const explicitIds = new Set(explicitItems.map((item) => item.id))
+  return {
+    selected: [...selectedByItem.values()],
+    omitted: selection.omitted.filter((row) => !explicitIds.has(row.item.id)),
+  }
+}
+
+function explicitReferenceUsage(
+  item: ReferenceItem,
+  taskKey: string,
+): ReferenceUsage {
+  return {
+    id: `explicit:${item.id}:${taskKey}`,
+    itemId: item.id,
+    projectId: item.projectId,
+    taskKey,
+    usage: 'style',
+    howToUse:
+      '用户通过参考 chip 明确选择本轮采用；按当前提示词把它作为视觉参考，不额外复制未要求的文字或身份。',
+    createdAt: item.updatedAt,
   }
 }

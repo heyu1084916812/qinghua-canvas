@@ -9,7 +9,10 @@ import {
   type RefObject,
 } from 'react'
 import type { AgentSession } from '../../../../state/agent/sessionStore'
-import type { MentionEditorHandle } from '../../text/MentionEditor'
+import type {
+  MentionEditorHandle,
+  MentionRef,
+} from '../../text/MentionEditor'
 import {
   parseMentions,
   mentionToken,
@@ -67,7 +70,7 @@ export interface AgentComposerController {
     preventDefault: () => void
   }) => void
   insertMention: (
-    kind: 'node' | 'model' | 'skill',
+    kind: MentionRef['kind'],
     id: string,
     label: string,
   ) => void
@@ -395,7 +398,7 @@ export function useAgentComposerController(
 
   const insertMention = useCallback(
     (
-      kind: 'node' | 'model' | 'skill',
+      kind: MentionRef['kind'],
       id: string,
       label: string,
     ) => {

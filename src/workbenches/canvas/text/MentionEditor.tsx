@@ -17,7 +17,7 @@ import { presetGlyphSvg } from '../icons/presetGlyph'
  * | 组件 | 管什么 chip | 存储形态 |
  * | --- | --- | --- |
  * | `TokenEditor` | 循环 / 批量节点的变量 | `[计数]` |
- * | 本组件 | @ 引用（节点 / 模型 / 技能） | `@[显示名](node:id)` / `@[显示名](model:名字)` / `@[显示名](skill:id)` |
+ * | 本组件 | @ 引用（节点 / 模型 / 技能 / 参考） | `@[显示名](node:id)` / `@[显示名](model:名字)` / `@[显示名](skill:id)` / `@[显示名](reference:id)` |
  *
  * 两者的 chip 都把存储形态写进 `data-token`，于是「DOM → 可发送文本」直接复用
  * `readEditorText` **同一份实现**。这条最要紧：各写一份，迟早出现「界面看着有引用、
@@ -32,13 +32,13 @@ import { presetGlyphSvg } from '../icons/presetGlyph'
  */
 
 /**
- * 引用的存储形态。`kind` 只允许 `node` / `model` / `skill` / `preset` 四种，
+ * 引用的存储形态。`kind` 只允许 `node` / `model` / `skill` / `preset` / `reference`，
  * 别的一律不当引用。
  *
  * `preset` 是 2026-10-05 加的第四种：创作面板里的「预设」要像 @ 引用那样**插在正文里**
  * （用户：「需要像 agent 一样的插入正文 chip 一样的大小和功能，不是单独在一行」）。
  */
-export const MENTION_SPLIT_RE = /(@\[[^\]]*\]\((?:node|model|skill|preset):[^)]*\))/g
+export const MENTION_SPLIT_RE = /(@\[[^\]]*\]\((?:node|model|skill|preset|reference):[^)]*\))/g
 
 /** chip 里那个小图标：节点 = 一张图，模型 = 立体方块，技能 = 魔杖（与工具栏同义） */
 export const MENTION_ICON: Record<MentionKind, string> = {
@@ -47,6 +47,8 @@ export const MENTION_ICON: Record<MentionKind, string> = {
     '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.2 20.2 7.6v8.8L12 20.8 3.8 16.4V7.6z"/><path d="M3.8 7.6 12 12l8.2-4.4"/><path d="M12 12v8.8"/></svg>',
   skill:
     '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3.7 5.2c2.9-.8 5.5.1 8.3 2v12c-2.8-1.9-5.4-2.8-8.3-2Z"/><path d="M20.3 5.2c-2.9-.8-5.5.1-8.3 2v12c2.8-1.9 5.4-2.8 8.3-2Z"/><path d="M12 7.2v12"/></svg>',
+  reference:
+    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4.5" y="3.5" width="15" height="17" rx="2.5"/><path d="M8 8h8M8 12h8M8 16h5"/></svg>',
   /**
    * 预设：**与参数行那枚按钮同一个图形**（四个圆角方块、右上转 45°）。
    *
@@ -56,7 +58,7 @@ export const MENTION_ICON: Record<MentionKind, string> = {
   preset: presetGlyphSvg(),
 }
 
-export type MentionKind = 'node' | 'model' | 'skill' | 'preset'
+export type MentionKind = 'node' | 'model' | 'skill' | 'preset' | 'reference'
 
 /**
  * 拼一条引用的存储形态。
@@ -76,18 +78,19 @@ export function mentionLabel(token: string): string {
 
 /** 存储形态 → 是节点还是模型（读不出来返回 null，不当引用处理） */
 export function mentionKindOf(token: string): MentionKind | null {
-  const m = /^@\[[^\]]*\]\((node|model|skill|preset):/.exec(token)
+  const m = /^@\[[^\]]*\]\((node|model|skill|preset|reference):/.exec(token)
   return m?.[1] === 'node' ||
     m?.[1] === 'model' ||
     m?.[1] === 'skill' ||
-    m?.[1] === 'preset'
+    m?.[1] === 'preset' ||
+    m?.[1] === 'reference'
     ? m[1]
     : null
 }
 
 /** 存储形态 → 它指向的那个标识（节点 id / 模型名 / 技能 id）；读不出来返回 null */
 export function mentionIdOf(token: string): string | null {
-  const m = /^@\[[^\]]*\]\((?:node|model|skill|preset):([^)]*)\)/.exec(token)
+  const m = /^@\[[^\]]*\]\((?:node|model|skill|preset|reference):([^)]*)\)/.exec(token)
   return m?.[1]?.trim() || null
 }
 
@@ -110,7 +113,7 @@ export function parseMentions(text: string): MentionRef[] {
   const out: MentionRef[] = []
   const seen = new Set<string>()
   for (const m of String(text ?? '').matchAll(
-    /@\[([^\]]*)\]\((node|model|skill|preset):([^)]*)\)/g,
+    /@\[([^\]]*)\]\((node|model|skill|preset|reference):([^)]*)\)/g,
   )) {
     const kind = m[2] as MentionKind
     const id = (m[3] ?? '').trim()
@@ -133,7 +136,7 @@ export function parseMentions(text: string): MentionRef[] {
 export function stripMentionMarkup(text: string): string {
   return String(text ?? '')
     /** 节点 / 模型：还原成 `@名字`（读起来就是「引用了谁」） */
-    .replace(/@\[([^\]]*)\]\((?:node|model):[^)]*\)/g, '@$1')
+    .replace(/@\[([^\]]*)\]\((?:node|model|reference):[^)]*\)/g, '@$1')
     /** 技能：它就是「这次用哪条技能」，前面挂个 @ 反而像在引用一个对象，故直接去掉形态 */
     .replace(/@\[([^\]]*)\]\(skill:[^)]*\)/g, '$1')
     /**

@@ -580,6 +580,7 @@ export function useAgentPanelSessionModel({
     nodeLabelOf,
     appendPendingAssetIds,
     appendPendingAssetIdsDetached,
+    appendReferenceIds: sessions.appendReferenceIds,
     applySessionSnapshot,
     trackRun,
   })
