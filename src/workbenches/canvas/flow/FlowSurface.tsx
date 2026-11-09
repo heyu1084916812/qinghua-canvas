@@ -4,7 +4,6 @@ import {
   useMemo,
   useRef,
   useState,
-  type DragEvent as ReactDragEvent,
   type CSSProperties,
   type MouseEvent as ReactMouseEvent,
   type PointerEvent as ReactPointerEvent,
@@ -65,17 +64,15 @@ import { useCanvasStyle } from '../../../app/providers/CanvasStyleProvider'
 import { useTheme } from '../../../app/ThemeProvider'
 import { canvasTonePair } from '../../../domain/project/canvasStyle'
 import { useFonts } from '../../../app/providers/FontProvider'
-import { screenToWorld } from '../../../domain/canvas/geometry/coords'
 import { useEdgeDrag } from '../../../features/canvas/useEdgeDrag'
 import { useSpaceHeld } from '../../../features/canvas/useSpaceHeld'
 import { useViewport as useCanvasViewport } from '../../../features/canvas/useViewport'
 import { useNodeDownload } from '../../../features/canvas/useNodeDownload'
 import {
   clipboardMediaFiles,
-  draggedFiles,
-  hasDraggedFiles,
   importDroppedFiles,
 } from '../../../features/canvas/dropImport'
+import { hasCanvasDrop, useCanvasDrop } from '../../../features/canvas/useCanvasDrop'
 import { batchSlotOf } from '../../../features/canvas/dropReparent'
 import { useNodeDrag } from '../../../features/canvas/useNodeDrag'
 import {
@@ -433,19 +430,7 @@ function FlowSurfaceInner({
     [platform, store, projectId],
   )
 
-  const onDropFiles = async (e: ReactDragEvent<HTMLDivElement>) => {
-    const files = draggedFiles(e)
-    if (files.length === 0) return
-    e.preventDefault()
-    setImportHover(false)
-    const r = e.currentTarget.getBoundingClientRect()
-    const world = screenToWorld(
-      { x: e.clientX, y: e.clientY },
-      store.getViewport(),
-      { x: r.left, y: r.top, w: r.width, h: r.height },
-    )
-    await importFiles(files, world)
-  }
+  const onDropFiles = useCanvasDrop({ platform, store, projectId, importFiles, setImportHover })
 
   /** 系统媒体粘贴：文本输入目标和非媒体剪贴板一律放行。 */
   useEffect(() => {
@@ -770,7 +755,7 @@ function FlowSurfaceInner({
          * （安全限制，`dataTransfer.files` 恒为空）。用 files 判断会让这一支直接 return、
          * 不 preventDefault ⇒ 浏览器认定这里不接收 ⇒ **drop 永远不来**（对账 #551）。
          */
-        if (!hasDraggedFiles(e)) return
+        if (!hasCanvasDrop(e)) return
         e.preventDefault()
         e.dataTransfer.dropEffect = 'copy'
         setImportHover(true)

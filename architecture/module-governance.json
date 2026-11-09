@@ -6565,13 +6565,35 @@
       "budget": 35
     },
     {
+      "module": "src/features/canvas/useCanvasDrop.ts",
+      "owner": "canvas-drop-interaction",
+      "responsibility": "统一画布系统文件拖入与项目参考卡拖入，复用既有导入和素材节点创建链。",
+      "owns": [
+        "系统文件与项目参考的拖放分派",
+        "画布视口坐标落点换算",
+        "参考落画布成功/失败反馈"
+      ],
+      "doesNotOwn": [
+        "素材字节导入、参考台账存储和节点撤销实现",
+        "画布节点渲染与参考卡片视觉"
+      ],
+      "publicApi": [
+        "hasCanvasDrop",
+        "useCanvasDrop"
+      ],
+      "test": [
+        "src/app/uiSevenPoints.test.ts"
+      ],
+      "budget": 120
+    },
+    {
       "module": "src/pages/CanvasPage/MyAssetsDrawer.tsx",
       "owner": "canvas-my-assets-drawer",
       "responsibility": "在画布工作区左列展示四个并列素材来源，复用真实套件、项目参考台账与 Pinterest 数据。",
       "owns": [
         "参考、我的素材、Pinterest、轻画插件四个页签",
         "四类套件列表与真实仓储读取",
-        "项目参考上传、紧凑瀑布列表、灯箱入口与加入 Agent 的 handoff 触发",
+        "项目参考上传、紧凑瀑布列表、灯箱入口、拖到画布的数据源与加入 Agent 的 handoff 触发",
         "现有 PinterestPanel 的抽屉化嵌入与未完成来源的如实状态",
         "在画布工作区左列占用真实布局宽度"
       ],

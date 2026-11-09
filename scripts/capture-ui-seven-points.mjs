@@ -392,6 +392,20 @@ try {
     await page.locator('[data-canvas-my-assets]').click()
     await page.locator('[data-my-assets-drawer]').waitFor({ timeout: 10_000 })
     await page.locator('[data-my-assets-source="reference"]').click()
+    const referenceNodesBeforeDrop = await page.locator('[data-node-id]').count()
+    await page.locator('[data-my-assets-reference-drag]').first().dragTo(
+      page.locator('[data-canvas-surface]'),
+      { targetPosition: { x: 400, y: 300 } },
+    )
+    await page.waitForFunction(
+      (before) => document.querySelectorAll('[data-node-id]').length > before,
+      referenceNodesBeforeDrop,
+      { timeout: 15_000 },
+    )
+    const referenceNodesAfterDrop = await page.locator('[data-node-id]').count()
+    const referenceDroppedTitle =
+      (await page.locator('[data-node-id]').last().textContent({ timeout: 5_000 })) ?? ''
+    await page.screenshot({ path: path.join(out, `${file}-canvas-reference-dropped.png`) })
     await page.locator('[data-my-assets-reference]').first().hover()
     await page.locator('[data-my-assets-reference-agent]').first().click()
     await page.locator('[data-agent-panel]').waitFor({ timeout: 15_000 })
@@ -416,6 +430,9 @@ try {
       referenceLightboxHash: referenceLightbox.referenceLightboxHash,
       referenceLightboxMediaLoaded: referenceLightbox.referenceLightboxMediaLoaded,
       referenceLightboxClosed,
+      referenceNodesBeforeDrop,
+      referenceNodesAfterDrop,
+      referenceDroppedTitle,
       ...referenceLayout,
       stageWidthClosed,
       ...drawerGeometry,

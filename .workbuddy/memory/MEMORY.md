@@ -1,5 +1,12 @@
 # CanvasFlow（轻画）项目记忆
 
+### 总管2 第三十七轮：项目参考拖到画布（2026-11-09）
+
+- 项目参考卡拖拽用 `application/x-qinghua-reference`，不能混进 `Files`；否则系统文件导入会误判。`useCanvasDrop` 统一分派文件与参考，`FlowSurface` 只负责拖放表面，避免继续胀大旧 999 行预算。
+- 参考落点必须先按当前项目回查 `referenceItems`，再以 `assets` 的真实 MIME/宽高复用 `createAssetNode`。素材被清理或类型不是图片/视频时必须在建节点前拒绝；成功后居中、选中，保留既有撤销与尺寸语义。`MyAssetsDrawer.tsx` 当前 318 行、`FlowSurface.tsx` 981 行，均只降不升。
+- 四组 1440×900 / 1024×700 × 明暗真实拖拽均 0→1 节点，标题含 `square-reference / 320×320`，抽屉不关闭，无横向溢出与页面错误；证据 `.playwright-verify/ui-seven-after/*-canvas-reference-dropped.png`。全仓 check（1101 modules / 4398 deps / 34 tables / 245 registrations）、串行全量 Vitest 649 files / 5439 tests（1 skipped）、build 1233 modules、Impeccable detector 0 findings 通过。
+- 仍未完成：Lovart 灯箱右侧信息与底部缩略图、套件文件夹/子面板/筛选、参考台账批量管理、`curate_references` 自动 What/HowToUse 与任务 usage、Clipper。不要把拖拽完成说成整个参考面板一比一完成。
+
 ### 总管2 第三十六轮：参考面板瀑布流与卡片动作（2026-11-09）
 
 - 画布「参考」复用素材页 `MasonryGrid` 时传 `minColumnWidth=132 / gap=10 / scope=my-assets-reference`；不要在抽屉里另写 CSS columns。`MasonryGrid` 的默认 240/20 必须保持，素材页不跟着变。421px 抽屉是两列 189px，321px 抽屉是两列 139px。

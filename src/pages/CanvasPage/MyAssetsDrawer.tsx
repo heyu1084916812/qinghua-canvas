@@ -14,6 +14,7 @@ import { useAsset } from '../../features/shared/assets'
 import { createId } from '../../shared/id'
 import { MasonryGrid } from '../AssetsPage/MasonryGrid'
 import { IconPlus } from '../../workbenches/canvas/toolbar/icons'
+import { setReferenceDragData } from '../../features/canvas/dropImport'
 import styles from './MyAssetsDrawer.module.css'
 
 const PinterestPanel = lazy(() =>
@@ -201,7 +202,7 @@ export function MyAssetsDrawer({
                 scope="my-assets-reference"
               >
                 {references.map((item) => (
-                  <article className={styles.referenceCard} data-my-assets-reference={item.id} key={item.id}>
+                  <article className={styles.referenceCard} data-my-assets-reference={item.id} data-my-assets-reference-drag={item.id} draggable key={item.id} onDragStart={(event) => setReferenceDragData(event.dataTransfer, item.id)}>
                     <div className={styles.referenceMedia}>
                       <button
                         type="button"

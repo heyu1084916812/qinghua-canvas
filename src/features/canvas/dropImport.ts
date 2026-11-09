@@ -7,9 +7,27 @@ import {
   type ImportDeps,
   type ImportedAsset,
 } from './importAsset'
+import { createReferenceLedgerRepository } from '../../state/project/referenceLedgerRepository'
 
 /** 拖入多个文件时，相邻节点的水平间距（产品文档 §6.3） */
 export const IMPORT_GAP = 24
+
+/** 项目参考卡拖到画布时使用的应用内 MIME；不复用 Files，避免被当成系统文件导入。 */
+export const REFERENCE_DRAG_MIME = 'application/x-qinghua-reference'
+
+export function hasDraggedReference(e: { dataTransfer: DataTransfer }): boolean {
+  return Array.from(e.dataTransfer.types ?? []).includes(REFERENCE_DRAG_MIME)
+}
+
+export function setReferenceDragData(dataTransfer: DataTransfer, referenceId: string): void {
+  dataTransfer.setData(REFERENCE_DRAG_MIME, referenceId)
+  dataTransfer.effectAllowed = 'copy'
+}
+
+export function draggedReferenceId(e: { dataTransfer: DataTransfer }): string {
+  if (!hasDraggedReference(e)) return ''
+  return e.dataTransfer.getData(REFERENCE_DRAG_MIME).trim()
+}
 
 /** `dataTransfer` 里带的是文件（而不是画布内的节点拖拽） */
 export function hasDraggedFiles(e: { dataTransfer: DataTransfer }): boolean {
@@ -128,4 +146,60 @@ export async function importDroppedFiles(
   }
   deps.store.endPlan()
   return { ids, rejected }
+}
+
+export type ReferenceDropOutcome =
+  | { ok: true; nodeId: string; title: string }
+  | { ok: false; reason: string }
+
+/**
+ * 项目参考卡落到画布：参考只持有 assets hash，因此先回查素材元数据，再走与文件导入
+ * 相同的 `createAssetNode`。这样节点尺寸、自然比例、撤销与选中语义只有一份实现。
+ */
+export async function dropReferenceToCanvas(
+  deps: ImportDeps,
+  referenceId: string,
+  at: Point,
+): Promise<ReferenceDropOutcome> {
+  const id = referenceId.trim()
+  if (!id) return { ok: false, reason: '参考卡片缺少标识，无法放到画布' }
+
+  const repository = createReferenceLedgerRepository(deps.platform.storage)
+  const item = (await repository.listItems(deps.projectId)).find((row) => row.id === id)
+  if (!item) return { ok: false, reason: '项目里找不到这张参考，可能已经被移除' }
+  if (item.kind !== 'image' && item.kind !== 'video') {
+    return { ok: false, reason: '只有图片或视频参考可以放到画布' }
+  }
+  if (!item.assetHash) return { ok: false, reason: '这条参考没有可放到画布的素材' }
+
+  const [asset] = await deps.platform.storage.query('assets', { id: item.assetHash }, {
+    includePayload: false,
+    fields: ['id', 'mime', 'width', 'height'],
+  })
+  const mime = typeof asset?.mime === 'string' ? asset.mime : ''
+  if (!asset || !isImportableMedia(mime)) {
+    return { ok: false, reason: '参考素材内容不存在或格式已损坏' }
+  }
+
+  const width = positiveNumber(asset.width)
+  const height = positiveNumber(asset.height)
+  const size = assetNodeSize({ width, height })
+  const nodeId = createAssetNode(
+    deps,
+    {
+      hash: item.assetHash,
+      mime,
+      name: item.title,
+      ...(width && height ? { width, height } : {}),
+    },
+    { x: Math.round(at.x - size.w / 2), y: Math.round(at.y - size.h / 2) },
+  )
+  if (!nodeId) return { ok: false, reason: '画布没有建立参考素材节点' }
+
+  deps.store.setSelection([nodeId])
+  return { ok: true, nodeId, title: item.title }
+}
+
+function positiveNumber(value: unknown): number | undefined {
+  return typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : undefined
 }

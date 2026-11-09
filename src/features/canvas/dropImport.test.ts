@@ -1,5 +1,18 @@
-import { describe, expect, it } from 'vitest'
-import { clipboardMediaFiles, draggedFiles, hasDraggedFiles } from './dropImport'
+import { beforeEach, describe, expect, it } from 'vitest'
+import { createMemoryPlatform } from '../../platform/memory'
+import { registerAllSpecs, resetSpecs } from '../../domain/canvas/nodeSpecs'
+import { createCanvasStore } from '../../state/workbenches/canvas/store'
+import type { PlatformKit } from '../../platform/ports'
+import {
+  clipboardMediaFiles,
+  draggedFiles,
+  draggedReferenceId,
+  dropReferenceToCanvas,
+  hasDraggedFiles,
+  hasDraggedReference,
+  REFERENCE_DRAG_MIME,
+  setReferenceDragData,
+} from './dropImport'
 
 /**
  * 这一组钉的是「**怎么判断这是不是一次文件拖拽**」这条判据本身。
@@ -17,10 +30,20 @@ function dt(opts: {
   files?: File[]
   items?: { kind: string; type: string; file: File | null }[]
 }): { dataTransfer: DataTransfer } {
+  const types = [...(opts.types ?? [])]
+  const data = new Map<string, string>()
   const dataTransfer = {
-    types: opts.types ?? [],
+    types,
     files: opts.files ?? [],
     items: (opts.items ?? []).map((i) => ({ ...i, getAsFile: () => i.file })),
+    effectAllowed: 'none',
+    setData(type: string, value: string) {
+      if (!types.includes(type)) types.push(type)
+      data.set(type, value)
+    },
+    getData(type: string) {
+      return data.get(type) ?? ''
+    },
   } as unknown as DataTransfer
   return { dataTransfer }
 }
@@ -42,6 +65,86 @@ describe('拖放判据（dragover 与 drop 两阶段的形状不同）', () => {
   it('drop 阶段：files 里真有文件时才取出来', () => {
     const dropped = new File([new Uint8Array([1, 2])], 'a.png', { type: 'image/png' })
     expect(draggedFiles(dt({ types: ['Files'], files: [dropped] }))).toEqual([dropped])
+  })
+
+  it('项目参考使用独立 MIME，不能被误判成系统文件', () => {
+    const dragging = dt({})
+    setReferenceDragData(dragging.dataTransfer, 'ref-1')
+    expect(hasDraggedReference(dragging)).toBe(true)
+    expect(hasDraggedFiles(dragging)).toBe(false)
+    expect(draggedReferenceId(dragging)).toBe('ref-1')
+    expect(dragging.dataTransfer.types).toContain(REFERENCE_DRAG_MIME)
+  })
+})
+
+describe('项目参考落到画布', () => {
+  let platform: PlatformKit
+
+  beforeEach(() => {
+    resetSpecs()
+    registerAllSpecs()
+    platform = createMemoryPlatform()
+  })
+
+  it('回查资产元数据后建素材节点，按落点居中并选中', async () => {
+    const store = createCanvasStore({ platform, projectId: 'p-ref-drop' })
+    await platform.storage.put('assets', {
+      id: 'asset-1',
+      mime: 'image/png',
+      width: 320,
+      height: 240,
+      bytes: new Uint8Array([1, 2, 3]),
+    })
+    await platform.storage.put('referenceItems', {
+      id: 'ref-1',
+      projectId: 'p-ref-drop',
+      title: '方形参考',
+      source: 'file',
+      kind: 'image',
+      assetHash: 'asset-1',
+      what: '用户上传的图片参考',
+      createdAt: 1,
+      updatedAt: 1,
+    })
+
+    const outcome = await dropReferenceToCanvas(
+      { platform, store, projectId: 'p-ref-drop' },
+      'ref-1',
+      { x: 500, y: 300 },
+    )
+
+    expect(outcome).toMatchObject({ ok: true, title: '方形参考' })
+    if (!outcome.ok) throw new Error(outcome.reason)
+    const node = store.getSnapshot().nodes.find((row) => row.id === outcome.nodeId)!
+    expect(node.title).toBe('方形参考')
+    expect(node.data).toMatchObject({ assetHash: 'asset-1', assetMime: 'image/png' })
+    expect(Math.abs(node.x + node.w / 2 - 500)).toBeLessThanOrEqual(1)
+    expect(Math.abs(node.y + node.h / 2 - 300)).toBeLessThanOrEqual(1)
+    expect(store.getSelection()).toEqual([outcome.nodeId])
+  })
+
+  it('资产已被清理时拒绝建空节点', async () => {
+    const store = createCanvasStore({ platform, projectId: 'p-ref-drop' })
+    await platform.storage.put('referenceItems', {
+      id: 'ref-missing',
+      projectId: 'p-ref-drop',
+      title: '丢失的参考',
+      source: 'file',
+      kind: 'image',
+      assetHash: 'missing',
+      what: '用户上传的图片参考',
+      createdAt: 1,
+      updatedAt: 1,
+    })
+
+    const outcome = await dropReferenceToCanvas(
+      { platform, store, projectId: 'p-ref-drop' },
+      'ref-missing',
+      { x: 100, y: 100 },
+    )
+
+    expect(outcome).toEqual({ ok: false, reason: '参考素材内容不存在或格式已损坏' })
+    expect(store.getSnapshot().nodes).toEqual([])
   })
 })
 
