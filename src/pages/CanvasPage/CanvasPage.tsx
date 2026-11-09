@@ -27,7 +27,9 @@ import { migrateLegacyGeneratedTitles } from '../../domain/canvas/naming/autoTit
 import { rememberActiveCanvas } from '../../state/project/activeCanvas'
 import { createProjectRepository } from '../../state/project/repository'
 import { projectRoute } from '../../domain/shared/workbench'
-import { openContextKitsDialog } from '../../state/ui/contextKitsDialog'
+import {
+  openContextKitsDialog,
+} from '../../state/ui/contextKitsDialog'
 import styles from './CanvasPage.module.css'
 
 const LightboxLayer = lazy(() =>
@@ -43,6 +45,11 @@ const TextEditorLayer = lazy(() =>
 const LogPanel = lazy(() =>
   import('../../workbenches/canvas/panels/LogPanel').then((module) => ({
     default: module.LogPanel,
+  })),
+)
+const MyAssetsDrawer = lazy(() =>
+  import('./MyAssetsDrawer').then((module) => ({
+    default: module.MyAssetsDrawer,
   })),
 )
 const CanvasAgentHostBridge = lazy(() =>
@@ -123,6 +130,7 @@ function CanvasProject({ projectId }: { projectId: string }) {
   const seededRef = useRef(false)
   const [externalEdit, setExternalEdit] = useState(false)
   const [logOpen, setLogOpen] = useState(false)
+  const [myAssetsOpen, setMyAssetsOpen] = useState(false)
   /**
    * 水合完成的计数（只用来**触发重跑**，值本身没意义）。
    *
@@ -428,6 +436,18 @@ function CanvasProject({ projectId }: { projectId: string }) {
           className={styles.page}
           data-canvas-hydrated={cached.hydrated || hydratedAt > 0 ? 'true' : 'false'}
         >
+          {myAssetsOpen ? (
+            <Suspense fallback={null}>
+              <MyAssetsDrawer
+                onClose={() => setMyAssetsOpen(false)}
+                onOpenKitEditor={() => {
+                  setMyAssetsOpen(false)
+                  openContextKitsDialog()
+                }}
+              />
+            </Suspense>
+          ) : null}
+          <div className={styles.canvasStage} data-canvas-stage>
           {/*
             ⛔ 顶部悬浮栏已整体去除（产品文档 §6.2 / 2026-09-27 应用壳改版）。
 
@@ -454,12 +474,14 @@ function CanvasProject({ projectId }: { projectId: string }) {
             <button
               type="button"
               className={styles.topBtn}
+              data-canvas-my-assets
               data-canvas-context-kits
-              aria-label="品牌 / 产品套件"
-              title="品牌 / 产品套件"
-              onClick={openContextKitsDialog}
+              aria-label="我的素材"
+              title="我的素材"
+              aria-pressed={myAssetsOpen}
+              onClick={() => setMyAssetsOpen((current) => !current)}
             >
-              品牌套件
+              我的素材
             </button>
             <button
               type="button"
@@ -530,6 +552,7 @@ function CanvasProject({ projectId }: { projectId: string }) {
               （2026-10-16 搬的，见 store 的 `openRotateEditor` / `openAnnotateEditor`）——
               它们是灯箱的两种模式，不再各占一个全屏层，所以这里没有对应的挂载点。
               与文本编辑灯箱互斥；保存才写数据（一步撤销），关掉即忘 */}
+          </div>
         </div>
       </CanvasExecutionProvider>
     </CanvasStoreProvider>

@@ -110,7 +110,7 @@ export function AppRoutes() {
         <Route path="/hosting" element={<HostingPage />} />
         <Route path="/skills" element={<SkillsPage />} />
         <Route path="/inspiration" element={<InspirationPage />} />
-        {/* 「我的素材」暂为占位页（§2.1 #6 明写「交互后期补齐」） */}
+        {/* 「生成历史」沿用 /assets；新的「我的素材」是画布工作区左侧抽屉 */}
         <Route path="/assets" element={<AssetsPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

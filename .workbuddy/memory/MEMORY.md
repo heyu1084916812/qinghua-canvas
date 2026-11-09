@@ -12559,3 +12559,11 @@ React 端口 → `invoke` → Rust `check_update` → updater 插件读配置 �
 - 用户要求打开桌面开发版时，当前有效流程是 `npm run tauri dev -- --no-dev-server` 复用已健康的 Vite `1420`；Tauri 壳自己启动 `18765` 的 shared-store。用 `Start-Process -WindowStyle Hidden` 拉起后台命令后，必须等 `qinghua.exe` 主窗口与 `18765/health` 同时出现，并把窗口调到前台。孤立端口 `18821` 是上一轮测试隔离库，不要当成开发库。
 - 当前桌面开发窗口为 `src-tauri/target/debug/qinghua.exe`，共享库健康响应是 `sqlite-v2 / data-v2`。外部账号、真实付费生成、四来源抽屉、项目级套件选择器、套件 chip、Pinterest/Clipper 抽屉、技能/网页/模型参数阶段源与六类生图流程仍未完成。
 - 第四阶段最终门禁：全仓 `npm run check` 1097 modules / 4369 deps / 34 tables / 241 registrations，串行全量 Vitest 648 files / 5429 tests，`npm run build` 最大 JS 381.22KB，Impeccable detector 0 findings。四视口取证与产品代码改动都留在同一本地提交链，不把截图夹具的静态展开行当成真实交互行为。
+
+### 总管2 第二十二轮：画布我的素材左侧抽屉（2026-11-09）
+
+- 新「我的素材」是画布工作区左侧分栏，不是 `/assets` 一级页，也不是覆盖画布的全屏遮罩。`CanvasPage` 把 `MyAssetsDrawer` 与 `[data-canvas-stage]` 放在同一 flex 行，打开时抽屉占真实宽度、画布舞台向右让位；关闭/ Esc 收起，关闭按钮自动聚焦。旧 `ContextKitsDialog` 降级为四类套件的创建/版本编辑器，由壳层 `ContextKitsDialogHost` 打开，不复制第二套编辑逻辑。
+- `MyAssetsDrawer` 的四个页签是参考、我的素材、Pinterest、轻画插件。我的素材读真实 `createContextRepository(platform.storage)`；Pinterest 懒加载既有 `PinterestPanel`，只在抽屉内归零其居中遮罩/面板尺寸；参考与轻画插件在能力未接入时如实显示状态，不能摆死按钮。
+- `/assets` 只改名为「生成历史」，`NAV` 与 `AssetsPage` 标题、路由注释同步；历史、收藏、瀑布流与筛选功能不动。`data-canvas-context-kits` 保留兼容旧探针，同时新增 `data-canvas-my-assets`。
+- UI 门禁证据：`.playwright-verify/ui-seven-{before,after}` 四视口明暗，改前居中 `[data-context-kits]=1`，改后 `[data-my-assets-drawer]=1`、4 个来源页签、4 类套件、Pinterest 挂载 1、横向/子元素越界 0、page/console error 0；抽屉 421/321px，画布舞台 1361→940 / 945→624，宽度减少量与抽屉完全一致；Impeccable detector 0 findings。
+- 最终门禁：`npm run check` 1099 modules / 4377 deps / 34 tables / 243 registrations，串行全量 Vitest 648 files / 5429 tests，`npm run build` 1231 modules，MyAssetsDrawer / PinterestPanel 独立 lazy chunk。未做套件 chip、项目级套件选择器、套件子面板/筛选器、参考灯箱/拖拽/加入台账/放到画布、Clipper 接收端与画布内浏览器；不要把这些说成已完成。

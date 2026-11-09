@@ -34,7 +34,7 @@ export const NAV: NavItem[] = [
   { to: '/skills', label: '技能库', icon: IconSkills },
   /* 灵感库（用户 2026-10-14）：外部开源案例的**浏览**入口，与「我的素材」（自己的产出）并列 */
   { to: '/inspiration', label: '灵感库', icon: IconInspiration },
-  { to: '/assets', label: '我的素材', icon: IconAssets },
+  { to: '/assets', label: '生成历史', icon: IconAssets },
 ]
 
 const WORKBENCH_NAV = new Map<string, WorkbenchId>([

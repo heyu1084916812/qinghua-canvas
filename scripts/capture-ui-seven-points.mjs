@@ -256,16 +256,55 @@ try {
     await page.locator('[data-home-new]').click({ timeout: 10_000 }).catch(() => {})
     await page.locator('[data-new-project-choice="canvas"]').click({ timeout: 10_000 })
     await page.waitForURL(/\/canvas\//, { timeout: 20_000 })
-    await page.locator('[data-canvas-context-kits]').waitFor({ timeout: 10_000 })
-    const kitsButtons = await page.locator('[data-canvas-context-kits]').count()
+    await page.locator('[data-canvas-my-assets]').waitFor({ timeout: 10_000 })
+    const kitsButtons = await page.locator('[data-canvas-my-assets]').count()
     const defaultsButtons = await page.locator('[data-canvas-defaults]').count()
+    const stageWidthClosed = await page.locator('[data-canvas-stage]').evaluate((node) => node.getBoundingClientRect().width)
     await page.screenshot({ path: path.join(out, `${file}-canvas.png`) })
-    report.push({ variant, surface: 'canvas', kitsButtons, defaultsButtons, ...(await geometry(page)), errors: [...errors] })
-    await page.locator('[data-canvas-context-kits]').click()
-    await page.locator('[data-context-kits]').waitFor({ timeout: 10_000 })
-    const kitDialog = await page.locator('[data-context-kits]').count().catch(() => 0)
+    report.push({ variant, surface: 'canvas', kitsButtons, defaultsButtons, stageWidthClosed, ...(await geometry(page)), errors: [...errors] })
+    await page.locator('[data-canvas-my-assets]').click()
+    await page.locator('[data-my-assets-drawer]').waitFor({ timeout: 10_000 })
+    const drawer = await page.locator('[data-my-assets-drawer]').count()
+    const sourceTabs = await page.locator('[data-my-assets-source]').count()
+    const assetKinds = await page.locator('[data-my-assets-kind]').count()
+    const drawerGeometry = await page.evaluate(() => {
+      const root = document.querySelector('[data-my-assets-drawer]')
+      const panel = root
+      const stage = document.querySelector('[data-canvas-stage]')
+      const tabs = [...(root?.querySelectorAll('[data-my-assets-source]') ?? [])]
+      const body = root?.querySelector('[data-my-assets-body]')
+      const panelRect = panel?.getBoundingClientRect()
+      return {
+        drawerLeft: panelRect?.left ?? -1,
+        drawerWidth: panelRect?.width ?? 0,
+        stageWidthOpen: stage?.getBoundingClientRect().width ?? -1,
+        tabCount: tabs.length,
+        tabSelected: tabs.filter((tab) => tab.getAttribute('aria-selected') === 'true').length,
+        pageOverflowX: document.documentElement.scrollWidth > document.documentElement.clientWidth + 1,
+        bodyOverflowY: body ? body.scrollHeight > body.clientHeight + 1 : false,
+        childrenOutsideX: [...(panel?.querySelectorAll('*') ?? [])].filter((child) => {
+          const box = child.getBoundingClientRect()
+          return box.width > 0 && panelRect && (box.left < panelRect.left - 1 || box.right > panelRect.right + 1)
+        }).length,
+      }
+    })
+    await page.locator('[data-my-assets-source="pinterest"]').click()
+    await page.locator('[data-pinterest-panel]').waitFor({ timeout: 10_000 }).catch(() => {})
+    const pinterestMounted = await page.locator('[data-pinterest-panel]').count()
+    await page.locator('[data-my-assets-source="assets"]').click()
     await page.screenshot({ path: path.join(out, `${file}-canvas-kits.png`) })
-    report.push({ variant, surface: 'canvasKits', kitDialog, errors: [...errors] })
+    report.push({
+      variant,
+      surface: 'canvasKits',
+      drawer,
+      sourceTabs,
+      assetKinds,
+      pinterestMounted,
+      stageWidthClosed,
+      ...drawerGeometry,
+      canvasWidthDelta: stageWidthClosed - drawerGeometry.stageWidthOpen,
+      errors: [...errors],
+    })
 
     await page.keyboard.press('Escape').catch(() => {})
     await context.close()

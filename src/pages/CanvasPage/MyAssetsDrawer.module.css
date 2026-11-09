@@ -1,0 +1,206 @@
+.drawer {
+  display: flex;
+  flex-direction: column;
+  flex: 0 0 clamp(320px, 30vw, 420px);
+  width: clamp(320px, 30vw, 420px);
+  height: 100%;
+  min-height: 0;
+  border-right: 1px solid var(--stroke);
+  background: var(--bg-surface);
+  color: var(--text-1);
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  min-height: 52px;
+  padding: 0 var(--space-4);
+  border-bottom: 1px solid var(--stroke);
+}
+
+.head h2 {
+  margin: 0;
+  font-size: var(--fs-panel-title);
+  line-height: var(--lh-body);
+}
+
+.close {
+  min-height: 30px;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--stroke);
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--text-2);
+  font: inherit;
+  font-size: var(--fs-chip);
+  cursor: pointer;
+}
+
+.close:hover {
+  background: var(--bg-hover);
+  color: var(--text-1);
+}
+
+.close:focus-visible,
+.tab:focus-visible,
+.kitAction:focus-visible {
+  outline: 1px solid var(--stroke-focus);
+  outline-offset: 1px;
+}
+
+.tabs {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-1);
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--stroke);
+}
+
+.tab,
+.tabOn {
+  min-width: 0;
+  min-height: 32px;
+  padding: 0 var(--space-2);
+  border: 1px solid transparent;
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--text-2);
+  font: inherit;
+  font-size: var(--fs-chip);
+  cursor: pointer;
+}
+
+.tab:hover {
+  background: var(--bg-hover);
+  color: var(--text-1);
+}
+
+.tabOn {
+  border-color: var(--stroke);
+  background: var(--bg-hover);
+  color: var(--text-1);
+  font-weight: var(--fw-title);
+}
+
+.body {
+  min-height: 0;
+  flex: 1 1 auto;
+  overflow-y: auto;
+  padding: var(--space-4);
+}
+
+.subhead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-bottom: var(--space-3);
+}
+
+.subhead span {
+  color: var(--text-3);
+  font-size: var(--fs-chip);
+}
+
+.kitAction {
+  min-height: 30px;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--stroke);
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--text-1);
+  font: inherit;
+  font-size: var(--fs-chip);
+  cursor: pointer;
+}
+
+.kitAction:hover {
+  background: var(--bg-hover);
+}
+
+.empty,
+.notice {
+  margin: 0;
+  padding: var(--space-4);
+  border: 1px dashed var(--stroke);
+  border-radius: var(--radius-control);
+  color: var(--text-2);
+  font-size: var(--fs-chip);
+  line-height: 1.6;
+}
+
+.kitList {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.kitCard {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  min-width: 0;
+  padding: var(--space-3);
+  border: 1px solid var(--stroke);
+  border-radius: var(--radius-control);
+  background: var(--bg-subtle);
+}
+
+.kitName {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text-1);
+  font-size: var(--fs-label);
+  font-weight: var(--fw-title);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.kitMeta {
+  flex: 0 0 auto;
+  color: var(--text-3);
+  font-size: var(--fs-chip);
+}
+
+.kinds {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-bottom: var(--space-4);
+}
+
+.kind {
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--stroke);
+  border-radius: var(--radius-control);
+  color: var(--text-2);
+  font-size: var(--fs-chip);
+}
+
+.embeddedPinterest {
+  margin: calc(-1 * var(--space-4));
+}
+
+.embeddedPinterest > div {
+  position: static;
+  z-index: auto;
+  display: block;
+  padding: 0;
+  background: transparent;
+}
+
+.embeddedPinterest section {
+  width: 100%;
+  height: auto;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.embeddedPinterest :global(.scrim) {
+  position: static;
+}

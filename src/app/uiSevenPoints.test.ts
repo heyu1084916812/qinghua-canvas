@@ -20,18 +20,29 @@ const read = (relative: string) => {
   return source
 }
 describe('seven UI placement fixes', () => {
-  it('moves brand kits and defaults to the canvas workspace left corner', () => {
+  it('opens my assets drawer from the canvas workspace left corner', () => {
     const canvas = read('pages/CanvasPage/CanvasPage.tsx')
     const assets = read('pages/AssetsPage/AssetsPage.tsx')
     const shell = read('app/AppShell.tsx')
-    expect(canvas).toContain('data-canvas-context-kits')
+    const drawer = read('pages/CanvasPage/MyAssetsDrawer.tsx')
+    const nav = read('app/nav.ts')
+    expect(canvas).toContain('data-canvas-my-assets')
     expect(canvas).toContain('data-canvas-defaults')
-    expect(canvas).toContain('onClick={openContextKitsDialog}')
+    expect(canvas).toContain('setMyAssetsOpen((current) => !current)')
+    expect(canvas).toContain('<MyAssetsDrawer')
+    expect(canvas).toContain('data-canvas-stage')
     expect(canvas).not.toContain('AssetsPage/ContextKitsDialog')
     expect(canvas).toContain('styles.topLeftActions')
     expect(assets).not.toContain('data-assets-context-kits-open')
     expect(assets).not.toContain('ContextKitsDialogLazy')
     expect(shell).toContain('<ContextKitsDialogHost />')
+    expect(shell).not.toContain('<MyAssetsDrawerHost />')
+    expect(drawer).toContain('data-my-assets-drawer')
+    expect(drawer).toContain('data-my-assets-source={item.id}')
+    expect(drawer).toContain('createContextRepository(platform.storage)')
+    expect(drawer).toContain('PinterestPanel')
+    expect(nav).toContain("label: '生成历史'")
+    expect(assets).toContain('生成历史')
   })
 
   it('asks which workbench to create before creating a project', () => {

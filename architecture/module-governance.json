@@ -6445,9 +6445,9 @@
     {
       "module": "src/app/ContextKitsDialogHost.tsx",
       "owner": "context-kit-shell-host",
-      "responsibility": "在应用壳层管理品牌套件弹窗的打开事件与 lazy 挂载边界。",
+      "responsibility": "在应用壳层管理套件编辑器弹窗的打开事件与 lazy 挂载边界。",
       "owns": [
-        "品牌套件弹窗事件订阅与关闭状态",
+        "套件编辑器事件订阅与关闭状态",
         "ContextKitsDialog 的异步加载边界"
       ],
       "doesNotOwn": [
@@ -6547,9 +6547,9 @@
     {
       "module": "src/state/ui/contextKitsDialog.ts",
       "owner": "context-kit-dialog-state",
-      "responsibility": "提供品牌套件弹窗的跨页面打开事件与订阅清理。",
+      "responsibility": "提供套件编辑器的跨页面打开事件与订阅清理。",
       "owns": [
-        "品牌套件弹窗打开事件名与订阅生命周期"
+        "套件编辑器打开事件名与订阅生命周期"
       ],
       "doesNotOwn": [
         "弹窗显隐状态与视觉渲染",
@@ -6563,6 +6563,54 @@
         "src/app/uiSevenPoints.test.ts"
       ],
       "budget": 35
+    },
+    {
+      "module": "src/pages/CanvasPage/MyAssetsDrawer.tsx",
+      "owner": "canvas-my-assets-drawer",
+      "responsibility": "在画布工作区左侧展示四个并列素材来源，并复用真实套件与 Pinterest 数据。",
+      "owns": [
+        "参考、我的素材、Pinterest、轻画插件四个页签",
+        "四类套件列表与真实仓储读取",
+        "现有 PinterestPanel 的抽屉化嵌入与未完成来源的如实状态",
+        "在画布工作区左列占用真实布局宽度"
+      ],
+      "doesNotOwn": [
+        "套件创建和版本编辑",
+        "Pinterest OAuth 协议和导入实现",
+        "Agent chip 插入与生成上下文"
+      ],
+      "publicApi": [
+        "MyAssetsDrawer"
+      ],
+      "test": [
+        "src/app/uiSevenPoints.test.ts"
+      ],
+      "budget": 240
+    },
+    {
+      "module": "src/pages/CanvasPage/MyAssetsDrawer.module.css",
+      "owner": "canvas-my-assets-drawer-style",
+      "responsibility": "定义画布我的素材左侧抽屉的布局、页签、滚动和嵌入面板样式。",
+      "owns": [
+        "左侧抽屉与遮罩几何",
+        "四页签和套件列表的深浅主题样式",
+        "Pinterest 面板嵌入抽屉时的局部布局归零"
+      ],
+      "doesNotOwn": [
+        "Pinterest 面板自身控件样式",
+        "套件编辑器弹窗样式",
+        "全局主题令牌"
+      ],
+      "publicApi": [
+        "CSS_MODULE:左侧抽屉与页签布局",
+        "CSS_CLASS:drawer",
+        "CSS_CLASS:tabs",
+        "CSS_CLASS:kitCard"
+      ],
+      "test": [
+        "scripts/capture-ui-seven-points.mjs"
+      ],
+      "budget": 260
     },
     {
       "module": "src/features/settings/cliOutputText.ts",

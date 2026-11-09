@@ -73,13 +73,13 @@ function CardsLayout({ view, children }: { view: AssetsView; children: ReactNode
 }
 
 /**
- * 我的素材（`/assets`）。
+ * 生成历史（`/assets`）。
  *
  * 用户 2026-10-06 第 8 条 + 同日答复定下的结构（参考图五）：
  * - **两个页签**：全部有产物的历史（含未收藏）/ 素材库（用户收藏过的）；
  * - **左侧**：快速筛选（全部 / 收藏 / 最近 7 天）+ 模型生成分组；
  * - **顶部**：搜索 + 类型档（带数量）+ 分组方式 + 网格 / 列表切换；
- * - 大标题仍是**「我的素材」**（用户明确保留，不跟着参考图改叫"素材管理"）。
+ * - 大标题改为**「生成历史」**；新的「我的素材」是画布工作区左侧抽屉。
  *
  * 数据来源仍是两张表：`assetLibrary` 是"用户点头留下的"，`runRecords` 是"跑过的全部"
  *（历史里也列**没收藏但有产物的**记录；失败 RunRecord 保留在底层，不再显示成素材）。
@@ -503,9 +503,9 @@ export function AssetsPage() {
         左栏与内容一起下移到 `.body` 那一排里。
       */}
       <header className={styles.head}>
-        {/* 标题仍是「我的素材」（用户 2026-10-06 明确保留） */}
+        {/* 标题与侧栏统一为「生成历史」 */}
         <h1 className={styles.title} data-assets-heading>
-          我的素材
+          生成历史
         </h1>
         <p className={styles.subtitle}>每一次创作，都在这里。浏览、整理与复用你的生成素材。</p>
       </header>
