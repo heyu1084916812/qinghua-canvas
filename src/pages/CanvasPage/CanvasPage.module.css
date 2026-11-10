@@ -30,6 +30,39 @@
   overflow: hidden;
 }
 
+/* 与 Agent 壳层共用同一组宽度 / 面板曲线；抽屉内容再从左向内收束。 */
+.myAssetsSlot {
+  display: flex;
+  flex: 0 0 auto;
+  align-self: stretch;
+  width: 0;
+  min-width: 0;
+  overflow: hidden;
+  pointer-events: none;
+  transition: width var(--dur-shell) var(--ease-panel);
+  will-change: width;
+}
+
+.myAssetsSlot[data-my-assets-open='true'] {
+  width: clamp(320px, 30vw, 420px);
+  pointer-events: auto;
+}
+
+.myAssetsSlot > :global([data-my-assets-drawer]) {
+  opacity: 0;
+  transform: translateX(-14px) scale(0.995);
+  transform-origin: left center;
+  transition:
+    opacity 160ms var(--ease-out),
+    transform var(--dur-shell) var(--ease-panel);
+  will-change: opacity, transform;
+}
+
+.myAssetsSlot[data-my-assets-open='true'] > :global([data-my-assets-drawer]) {
+  opacity: 1;
+  transform: translateX(0) scale(1);
+}
+
 /*
  * 日志入口（产品文档 §6.2：顶栏去掉后，日志按钮移到画布右上角）。
  *

@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useParams, useLocation, useNavigate } from 'react-router-dom'
 import { usePlatform } from '../../app/providers/PlatformProvider'
 import { openGlobalSettings } from '../../state/ui/globalSettings'
@@ -136,6 +136,9 @@ function CanvasProject({ projectId }: { projectId: string }) {
   const [externalEdit, setExternalEdit] = useState(false)
   const [logOpen, setLogOpen] = useState(false)
   const [myAssetsOpen, setMyAssetsOpen] = useState(false)
+  const [myAssetsMounted, setMyAssetsMounted] = useState(false)
+  const [myAssetsAnimatedOpen, setMyAssetsAnimatedOpen] = useState(false)
+  const myAssetsSlotRef = useRef<HTMLDivElement | null>(null)
   const [canvasBrowserUrl, setCanvasBrowserUrl] = useState('')
   /**
    * 水合完成的计数（只用来**触发重跑**，值本身没意义）。
@@ -145,6 +148,33 @@ function CanvasProject({ projectId }: { projectId: string }) {
    * 那支 effect 会在节点还没读回来时跑一次，然后**再也不会跑**。
    */
   const [hydratedAt, setHydratedAt] = useState(0)
+  useLayoutEffect(() => {
+    if (!myAssetsOpen) return
+    setMyAssetsMounted(true)
+    let firstFrame = 0
+    let secondFrame = 0
+    const waitForDrawer = () => {
+      if (!myAssetsSlotRef.current?.querySelector('[data-my-assets-drawer]')) {
+        firstFrame = window.requestAnimationFrame(waitForDrawer)
+        return
+      }
+      firstFrame = window.requestAnimationFrame(() => {
+        secondFrame = window.requestAnimationFrame(() => setMyAssetsAnimatedOpen(true))
+      })
+    }
+    firstFrame = window.requestAnimationFrame(waitForDrawer)
+    return () => {
+      window.cancelAnimationFrame(firstFrame)
+      window.cancelAnimationFrame(secondFrame)
+    }
+  }, [myAssetsOpen])
+  useLayoutEffect(() => {
+    if (myAssetsOpen) return
+    setMyAssetsAnimatedOpen(false)
+    if (!myAssetsMounted) return
+    const timer = window.setTimeout(() => setMyAssetsMounted(false), 260)
+    return () => window.clearTimeout(timer)
+  }, [myAssetsMounted, myAssetsOpen])
   useEffect(() => {
     if (projectId !== 'demo') rememberActiveCanvas(projectId)
   }, [projectId])
@@ -442,22 +472,29 @@ function CanvasProject({ projectId }: { projectId: string }) {
           className={styles.page}
           data-canvas-hydrated={cached.hydrated || hydratedAt > 0 ? 'true' : 'false'}
         >
-          {myAssetsOpen ? (
-            <Suspense fallback={null}>
-              <MyAssetsDrawer
-                projectId={projectId}
-                store={store}
-                onClose={() => setMyAssetsOpen(false)}
-                onOpenKitEditor={() => {
-                  setMyAssetsOpen(false)
-                  openContextKitsDialog()
-                }}
-                onOpenCanvasBrowser={(url) => {
-                  setMyAssetsOpen(false)
-                  setCanvasBrowserUrl(url)
-                }}
-              />
-            </Suspense>
+          {myAssetsMounted ? (
+            <div
+              ref={myAssetsSlotRef}
+              className={styles.myAssetsSlot}
+              data-my-assets-slot
+              data-my-assets-open={myAssetsAnimatedOpen ? 'true' : 'false'}
+            >
+              <Suspense fallback={null}>
+                <MyAssetsDrawer
+                  projectId={projectId}
+                  store={store}
+                  onClose={() => setMyAssetsOpen(false)}
+                  onOpenKitEditor={() => {
+                    setMyAssetsOpen(false)
+                    openContextKitsDialog()
+                  }}
+                  onOpenCanvasBrowser={(url) => {
+                    setMyAssetsOpen(false)
+                    setCanvasBrowserUrl(url)
+                  }}
+                />
+              </Suspense>
+            </div>
           ) : null}
           <div className={styles.canvasStage} data-canvas-stage>
           {/*

@@ -1,5 +1,18 @@
 # CanvasFlow 不变量详表
 
+## 画布“我的素材”抽屉动效边界（2026-11-10）
+
+- 抽屉必须与 Agent 壳层同节奏：槽宽 `var(--dur-shell)` + `var(--ease-panel)`，内容透明度 `160ms`，
+  并使用同方向的 `translateX + scale` 收束。展开前必须等真实 `[data-my-assets-drawer]` 懒加载挂载，
+  再经过两个 `requestAnimationFrame` 启动；禁止让槽宽先跑而内容后出现。
+- 关闭先撤销打开状态，`260ms` 后卸载；不能立即删除导致退场截断，也不能永久保留已关闭槽。
+  重复打开、快速关闭和首次懒加载都必须只保留一个抽屉。
+- 槽宽过渡有意使用布局属性，因为它代表画布真实向右让位，与 Agent 现有交互一致。不要为了消除
+  Impeccable 的 `layout-transition` warning 改成覆盖式浮层；该 warning 是需要记录的设计例外。
+- UI 证据必须覆盖 1440×900 / 1024×700 × 明暗，记录 `slotWidth / drawerWidth / canvasWidthDelta /
+  slotTransitionDuration / drawerTransitionDuration / drawerOpacity / pageOverflowX /
+  childrenOutsideX / errors`，并保留展开中与稳定态截图。
+
 ## Agent 运行确认闭环（2026-11-10）
 
 - 模型用普通正文问“要不要运行”不等于确认卡。执行层必须用 `agentRunConfirmationGuard.ts` 检查最近一次成功 `applyPlan` 的 `resolvedNodes`，

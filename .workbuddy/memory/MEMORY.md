@@ -1,5 +1,12 @@
 # CanvasFlow（轻画）项目记忆
 
+### 总管2 第五十二轮：我的素材侧栏与 Agent 同节奏（2026-11-10）
+
+- 用户要求侧栏展开与 Agent 壳层一致。`CanvasPage` 现在先挂载 `MyAssetsDrawer`，轮询到懒加载的 `[data-my-assets-drawer]` 后再用两个 `requestAnimationFrame` 打开 `data-my-assets-open`；不能在 Suspense 未完成时先启动槽宽，否则首次打开会“宽度先跑、内容后出现”。
+- 槽宽复用 Agent 的 `--dur-shell 220ms` / `--ease-panel`，内容复用 `opacity 160ms var(--ease-out)` 与 `translateX(-14px) scale(0.995) → 0 / 1`。关闭时先关状态，260ms 后卸载；重复开关不能残留空白 flex 槽。宽度过渡是 Agent 现有的真实挤压语义，Impeccable 的 `layout-transition` warning 是有意例外。
+- 四组 1440×900 / 1024×700 × 明暗实测 `slotWidth=420/320 / drawerWidth=421/321 / canvasWidthDelta=420/320 / slotTransitionDuration=0.22s / drawerTransitionDuration=0.16s, 0.22s / pageOverflowX=false / childrenOutsideX=0 / errors=[]`。证据在 `.playwright-verify/ui-seven-after/report.json`、`.playwright-verify/my-assets-motion/`。
+- 证据：`npm run check` 1134 modules / 4539 deps / 278 registrations；串行全量 Vitest 660 files（659 passed / 1 skipped）/ 5482 tests（5481 passed / 1 skipped）；build 1266 modules。默认并发全量曾只有无关 `App.render.test.ts` 在 60s 超时，单跑 3/3、串行全量通过；阈值未改。未 push。
+
 ### 总管2 第五十一轮：Agent 运行确认闭环（2026-11-10）
 
 - 真实故障不是“模型在等确认”，而是模型只把确认问题写成普通正文，没有调用 `runNode`，所以没有 `pendingConfirmation` 和确认卡；用户手打“允许”会开新回合，导致参考分析重复并显示 `User approved. Run the node.` 这类内部指令。

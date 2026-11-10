@@ -301,6 +301,8 @@ try {
     await page.screenshot({ path: path.join(out, `${file}-canvas.png`) })
     report.push({ variant, surface: 'canvas', kitsButtons, defaultsButtons, stageWidthClosed, ...(await geometry(page)), errors: [...errors] })
     await page.locator('[data-canvas-my-assets]').click()
+    await page.locator('[data-my-assets-slot][data-my-assets-open="true"]').waitFor({ timeout: 10_000 })
+    await page.waitForTimeout(260)
     await page.locator('[data-my-assets-drawer]').waitFor({ timeout: 10_000 })
     const drawer = await page.locator('[data-my-assets-drawer]').count()
     const sourceTabs = await page.locator('[data-my-assets-source]').count()
@@ -308,6 +310,7 @@ try {
     const drawerGeometry = await page.evaluate(() => {
       const root = document.querySelector('[data-my-assets-drawer]')
       const panel = root
+      const slot = root?.closest('[data-my-assets-slot]')
       const stage = document.querySelector('[data-canvas-stage]')
       const tabs = [...(root?.querySelectorAll('[data-my-assets-source]') ?? [])]
       const body = root?.querySelector('[data-my-assets-body]')
@@ -315,6 +318,10 @@ try {
       return {
         drawerLeft: panelRect?.left ?? -1,
         drawerWidth: panelRect?.width ?? 0,
+        slotWidth: slot?.getBoundingClientRect().width ?? 0,
+        slotTransitionDuration: slot ? getComputedStyle(slot).transitionDuration : '',
+        drawerOpacity: root ? getComputedStyle(root).opacity : '',
+        drawerTransitionDuration: root ? getComputedStyle(root).transitionDuration : '',
         stageWidthOpen: stage?.getBoundingClientRect().width ?? -1,
         tabCount: tabs.length,
         tabSelected: tabs.filter((tab) => tab.getAttribute('aria-selected') === 'true').length,
@@ -527,6 +534,8 @@ try {
     }
     await page.locator('[data-my-assets-close]').click()
     await page.locator('[data-canvas-my-assets]').click()
+    await page.locator('[data-my-assets-slot][data-my-assets-open="true"]').waitFor({ timeout: 10_000 })
+    await page.waitForTimeout(260)
     await page.locator('[data-my-assets-drawer]').waitFor({ timeout: 10_000 })
     await page.locator('[data-my-assets-source="reference"]').click()
     await page.locator('[data-my-assets-kit-folder]').waitFor({ timeout: 10_000 })
