@@ -105,6 +105,12 @@
     if (!pageUrl) {
       throw new ClipperError('当前标签页不是可收藏的 HTTP/HTTPS 网页', 0, 'page')
     }
+      const imageUrl = input.imageUrl
+        ? normalizePageUrl(input.imageUrl)
+        : ''
+      if (input.imageUrl && !imageUrl) {
+        throw new ClipperError('拖入的图片地址不是公开 HTTP/HTTPS 地址', 0, 'image')
+      }
     const token = String(input.token || '').trim()
     if (!token) {
       throw new ClipperError('请先填写轻画显示的配对令牌', 0, 'not-paired')
@@ -120,6 +126,7 @@
         body: JSON.stringify({
           url: pageUrl,
           title: cleanTitle(input.title, pageUrl),
+          ...(imageUrl ? { imageUrl } : {}),
         }),
       },
       15_000,

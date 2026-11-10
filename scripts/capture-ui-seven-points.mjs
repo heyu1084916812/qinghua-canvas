@@ -216,6 +216,18 @@ try {
         }
       })
     }
+    for (const host of [
+      'microsoftedge.microsoft.com',
+      'chromewebstore.google.com',
+    ]) {
+      await context.route(`https://${host}/**`, (route) => {
+        return route.fulfill({
+          status: 200,
+          contentType: 'text/html',
+          body: '<!doctype html><title>轻画 Clipper 安装页</title><main>extension store</main>',
+        })
+      })
+    }
     await context.addInitScript((storeBase) => {
       Object.assign(window, { __QINGHUA_SHARED_STORE_PORT__: Number(new URL(storeBase).port) })
     }, STORE)
@@ -320,6 +332,52 @@ try {
     await page.locator('[data-my-assets-source="clipper"]').click()
     await page.locator('[data-clipper-panel]').waitFor({ timeout: 10_000 })
     const clipperMounted = await page.locator('[data-clipper-panel]').count()
+    const clipperInstall = await page.locator('[data-clipper-install-card]').evaluate((card) => {
+      const panel = document.querySelector('[data-clipper-panel]')
+      const panelRect = panel?.getBoundingClientRect()
+      const rect = card.getBoundingClientRect()
+      const actions = [...card.querySelectorAll('[data-clipper-install-action]')]
+      return {
+        mode: card.getAttribute('data-clipper-install-mode'),
+        action: actions[0]?.textContent?.trim() ?? '',
+        browsers: actions.map((action) =>
+          action.getAttribute('data-clipper-install-browser') ?? 'package',
+        ),
+        width: rect.width,
+        insidePanel: Boolean(
+          panelRect &&
+          rect.left >= panelRect.left - 1 &&
+          rect.right <= panelRect.right + 1,
+        ),
+      }
+    })
+    let clipperInstallOpened = false
+    if (clipperInstall.mode === 'store') {
+      const installButtons = page.locator('[data-clipper-install-action]')
+      const installButtonCount = await installButtons.count()
+      await page.evaluate(() => {
+        globalThis.__qinghuaInstallOpenCalls = []
+        globalThis.open = (url, target) => {
+          globalThis.__qinghuaInstallOpenCalls.push({ url: String(url), target })
+          return { opener: null }
+        }
+      })
+      for (let index = 0; index < installButtonCount; index += 1) {
+        await installButtons.nth(index).click()
+      }
+      const openCalls = await page.evaluate(
+        () => globalThis.__qinghuaInstallOpenCalls ?? [],
+      )
+      clipperInstallOpened = installButtonCount > 0
+        && openCalls.length === installButtonCount
+        && openCalls.every((call) => (
+          call.target === '_blank'
+          && (
+            call.url.startsWith('https://microsoftedge.microsoft.com/')
+            || call.url.startsWith('https://chromewebstore.google.com/')
+          )
+        ))
+    }
     await page.locator('[data-clipper-add]').click()
     const clipperComposer = await page.locator('[data-clipper-composer]').count()
     await page.locator('[data-clipper-url]').fill('https://example.com/')
@@ -813,6 +871,8 @@ try {
       assetKinds,
       pinterestMounted,
       clipperMounted,
+      clipperInstall,
+      clipperInstallOpened,
       clipperComposer,
       clipperBrowser,
       clipperFrame,

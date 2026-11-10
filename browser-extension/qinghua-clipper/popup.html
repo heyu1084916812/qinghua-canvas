@@ -14,7 +14,7 @@
           <strong>轻画 Clipper</strong>
           <span>随处收藏灵感，回到画布继续创作</span>
         </div>
-        <span class="version">v0.2</span>
+        <span id="version" class="version">v0.3</span>
       </header>
 
       <section class="connection" aria-live="polite">
@@ -44,6 +44,17 @@
         </svg>
         <span id="clip-label">收藏到轻画</span>
         <kbd>Ctrl+Shift+Y</kbd>
+      </button>
+
+      <button id="drag" class="drag-button" type="button" disabled>
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <rect x="3.5" y="4.5" width="12" height="12" rx="1.5" />
+          <path d="m5.5 14 3.2-3.2 2.4 2.4 2.1-2.1 2.3 2.3" />
+          <path d="M17 11v7a2 2 0 0 1-2 2h-4" />
+          <path d="m15.5 17.5-2 2.5 2 2.5" />
+        </svg>
+        <span id="drag-label">拖拽图片收藏</span>
+        <small>在当前网页开启投放区</small>
       </button>
 
       <p id="last-result" class="last-result" hidden></p>
@@ -111,7 +122,7 @@
       </details>
 
       <footer>
-        <span>只发送网页 URL 与标题，不读取 Cookie</span>
+        <span>只发送网页或图片 URL 与标题，不读取 Cookie</span>
         <span>快捷键可在 chrome://extensions/shortcuts 修改</span>
       </footer>
     </main>

@@ -17,6 +17,7 @@ const MAX_PENDING: usize = 100;
 struct ClipRequest {
     url: String,
     title: Option<String>,
+    image_url: Option<String>,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -25,6 +26,7 @@ pub struct PendingClip {
     pub id: String,
     pub url: String,
     pub title: Option<String>,
+    pub image_url: Option<String>,
     pub received_at: u64,
 }
 
@@ -206,11 +208,16 @@ pub fn clipper_take_pending() -> Vec<PendingClip> {
 
 fn normalize_clip(input: ClipRequest) -> Result<PendingClip, String> {
     let url = parse_public_http_url(&input.url)?;
+    let image_url = input
+        .image_url
+        .map(|value| parse_public_http_url(&value))
+        .transpose()?;
     let title = input.title.unwrap_or_default().trim().chars().take(300).collect::<String>();
     Ok(PendingClip {
         id: format!("clip-{}", NEXT_ID.fetch_add(1, Ordering::Relaxed)),
         url,
         title: (!title.is_empty()).then_some(title),
+        image_url,
         received_at: SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .map(|duration| duration.as_millis() as u64)
@@ -244,6 +251,7 @@ mod tests {
         ClipRequest {
             url: url.to_string(),
             title: title.map(str::to_string),
+            image_url: None,
         }
     }
 
@@ -275,6 +283,21 @@ mod tests {
     }
 
     #[test]
+    fn accepts_a_public_dropped_image_url() {
+        let mut input = request("https://example.com/page", Some("Page"));
+        input.image_url = Some("https://cdn.example.com/image.webp".to_string());
+        let clip = normalize_clip(input).unwrap();
+        assert_eq!(
+            clip.image_url.as_deref(),
+            Some("https://cdn.example.com/image.webp"),
+        );
+
+        let mut invalid = request("https://example.com/page", None);
+        invalid.image_url = Some("file:///tmp/image.png".to_string());
+        assert!(normalize_clip(invalid).is_err());
+    }
+
+    #[test]
     fn receiver_serves_health_and_queues_authorized_clip() {
         let server = Server::http(("127.0.0.1", 0)).unwrap();
         let port = server
@@ -289,7 +312,8 @@ mod tests {
 
         let body = serde_json::json!({
             "url": "https://example.com/clip",
-            "title": "Example"
+            "title": "Example",
+            "imageUrl": "https://example.com/image.webp"
         })
         .to_string();
         let unauthorized = raw_request(
@@ -315,6 +339,9 @@ mod tests {
         assert!(authorized.starts_with("HTTP/1.1 200"));
         let rows = clipper_take_pending();
         assert!(rows.iter().any(|row| row.url == "https://example.com/clip"));
+        assert!(rows.iter().any(|row| {
+            row.image_url.as_deref() == Some("https://example.com/image.webp")
+        }));
     }
 
     fn raw_request(port: u16, method: &str, path: &str, headers: &str, body: &str) -> String {

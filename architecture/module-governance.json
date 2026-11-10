@@ -891,10 +891,11 @@
     {
       "module": "src/pages/CanvasPage/clipper/clipperCapture.ts",
       "owner": "clipper-capture",
-      "responsibility": "把单个公开网页抓取并写入账号级网页收藏，供抽屉和画布浏览器共用。",
+      "responsibility": "把公开网页或拖入图片写入账号级网页收藏，供抽屉和画布浏览器共用。",
       "owns": [
         "单页公开网页抓取",
-        "可收藏图片过滤与收藏写入"
+        "拖入图片地址校验与收藏写入",
+        "待接收任务逐条导入"
       ],
       "doesNotOwn": [
         "网页收藏条目规则",
@@ -903,12 +904,15 @@
       ],
       "publicApi": [
         "ClipperCaptureResult",
-        "captureClipperPage"
+        "captureClipperPage",
+        "captureClipperImage",
+        "capturePendingClipperClip",
+        "capturePendingClipperQueue"
       ],
       "test": [
         "src/pages/CanvasPage/clipper/clipperCapture.test.ts"
       ],
-      "budget": 80
+      "budget": 160
     },
     {
       "module": "src/pages/CanvasPage/clipper/ClipperPanel.tsx",
@@ -954,6 +958,32 @@
         "src/pages/CanvasPage/clipper/ClipperPairing.test.ts"
       ],
       "budget": 100
+    },
+    {
+      "module": "src/pages/CanvasPage/clipper/ClipperInstallCard.tsx",
+      "owner": "clipper-panel",
+      "responsibility": "展示浏览器扩展安装入口、商店/离线模式与失败兜底，并联动配对设置。",
+      "owns": [
+        "扩展安装来源解析与官方商店域名白名单",
+        "一键安装 / 下载扩展包 / 安装说明三种入口状态",
+        "安装失败提示与离线安装步骤"
+      ],
+      "doesNotOwn": [
+        "浏览器静默安装",
+        "接收端 HTTP 服务和配对令牌生成",
+        "扩展商店上架与发布"
+      ],
+      "publicApi": [
+        "ClipperInstallCard",
+        "ClipperBrowser",
+        "ClipperInstallSource",
+        "ClipperStoreLink",
+        "resolveClipperInstallSource"
+      ],
+      "test": [
+        "src/pages/CanvasPage/clipper/ClipperPairing.test.ts"
+      ],
+      "budget": 180
     },
     {
       "module": "src/pages/CanvasPage/clipper/ClipperBrowser.tsx",
@@ -1045,6 +1075,29 @@
         "src/domain/inspiration/clipper.test.ts"
       ],
       "budget": 300
+    },
+    {
+      "module": "src/pages/CanvasPage/clipper/ClipperInstallCard.module.css",
+      "owner": "clipper-panel",
+      "responsibility": "扩展安装卡的紧凑布局、操作层级、焦点与失败/说明状态。",
+      "owns": [
+        "安装卡几何和两行操作布局",
+        "主按钮、配对入口和说明区的交互状态"
+      ],
+      "doesNotOwn": [
+        "安装逻辑和外部链接策略",
+        "共享主题令牌定义"
+      ],
+      "publicApi": [
+        "CSS_MODULE:扩展安装卡与离线说明",
+        "CSS_CLASS:card",
+        "CSS_CLASS:actions",
+        "CSS_CLASS:guide"
+      ],
+      "test": [
+        "src/pages/CanvasPage/clipper/ClipperPairing.test.ts"
+      ],
+      "budget": 140
     },
     {
       "module": "src/features/shared/pinterest/PinterestSetupView.tsx",

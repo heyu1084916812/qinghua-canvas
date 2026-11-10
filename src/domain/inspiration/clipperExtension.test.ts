@@ -22,7 +22,12 @@ describe('qinghua clipper extension contract', () => {
     }
 
     expect(manifest.manifest_version).toBe(3)
-    expect(manifest.permissions).toEqual(['activeTab', 'storage', 'contextMenus'])
+    expect(manifest.permissions).toEqual([
+      'activeTab',
+      'storage',
+      'contextMenus',
+      'scripting',
+    ])
     expect(manifest.host_permissions).toEqual([
       'http://127.0.0.1:53684/*',
     ])
@@ -34,11 +39,19 @@ describe('qinghua clipper extension contract', () => {
   it('sends the URL and token without reading browser cookies', () => {
     const source = readFileSync(new URL('popup.js', extensionRoot), 'utf8')
     const shared = readFileSync(new URL('shared.js', extensionRoot), 'utf8')
+    const dropTarget = readFileSync(
+      new URL('drop-target.js', extensionRoot),
+      'utf8',
+    )
 
     expect(source).toContain('QinghuaClipper')
     expect(shared).toContain('X-Qinghua-Clipper-Token')
     expect(shared).toContain('http://127.0.0.1:53684/clip')
-    expect(`${source}\n${shared}`).not.toMatch(/document\.cookie|chrome\.cookies/)
+    expect(dropTarget).toContain("document.addEventListener('drop'")
+    expect(dropTarget).toContain('qinghua:clip-image')
+    expect(`${source}\n${shared}\n${dropTarget}`).not.toMatch(
+      /document\.cookie|chrome\.cookies/,
+    )
   })
 
   it('keeps background, popup and icon entry points packaged', () => {
@@ -55,6 +68,7 @@ describe('qinghua clipper extension contract', () => {
     expect(popupScript).toContain('dataset.state')
     expect(popup).toContain('id="status-dot"')
     expect(popup).toContain('id="retry"')
+    expect(popup).toContain('id="drag"')
     expect(popup).toContain('id="settings"')
     expect(popup).toContain('id="last-result"')
     for (const size of [16, 32, 48, 128]) {
@@ -84,6 +98,7 @@ describe('qinghua clipper extension contract', () => {
       token: 'secret-token',
       url: 'https://example.com/idea',
       title: '  Long   page title  ',
+      imageUrl: 'https://cdn.example.com/idea.webp',
     })
 
     expect(fetchMock).toHaveBeenCalledTimes(1)
@@ -101,6 +116,7 @@ describe('qinghua clipper extension contract', () => {
     expect(JSON.parse(request.body)).toEqual({
       url: 'https://example.com/idea',
       title: 'Long page title',
+      imageUrl: 'https://cdn.example.com/idea.webp',
     })
   })
 
@@ -150,6 +166,30 @@ describe('qinghua clipper extension contract', () => {
       currentWindow: true,
     })
   })
+
+  it('injects the drag target only after the user starts drag collection', async () => {
+    const harness = loadBackgroundApi(vi.fn(async () => ({
+      ok: true,
+      status: 200,
+      json: async () => ({ ok: true }),
+    })))
+    const response = await new Promise<{ ok: boolean; error?: string }>(
+      (resolve) => {
+        const keepChannel = harness.messageListener(
+          { type: 'qinghua:start-drag' },
+          { tab: { id: 7, url: 'https://example.com/', title: 'Example' } },
+          (value) => resolve(value as { ok: boolean; error?: string }),
+        )
+        expect(keepChannel).toBe(true)
+      },
+    )
+
+    expect(response).toEqual({ ok: true })
+    expect(harness.chrome.scripting.executeScript).toHaveBeenCalledWith({
+      target: { tabId: 7 },
+      files: ['drop-target.js'],
+    })
+  })
 })
 
 function loadSharedApi(fetchMock: ReturnType<typeof vi.fn>) {
@@ -172,12 +212,18 @@ function loadSharedApi(fetchMock: ReturnType<typeof vi.fn>) {
       token: string
       url: string
       title: string
+      imageUrl?: string
     }): Promise<unknown>
   }
 }
 
 function loadBackgroundApi(fetchMock: ReturnType<typeof vi.fn>) {
   let commandListener: (command: string) => void = () => undefined
+  let messageListener: (
+    message: { type?: string },
+    sender: { tab?: { id?: number; url?: string; title?: string } },
+    respond: (value: unknown) => void,
+  ) => boolean = () => false
   const storage = {
     endpoint: 'http://127.0.0.1:53684/clip',
     token: 'secret-token',
@@ -185,6 +231,11 @@ function loadBackgroundApi(fetchMock: ReturnType<typeof vi.fn>) {
   const chrome = {
     runtime: {
       onInstalled: { addListener: vi.fn() },
+      onMessage: {
+        addListener: vi.fn((listener) => {
+          messageListener = listener
+        }),
+      },
     },
     contextMenus: {
       removeAll: vi.fn(async () => undefined),
@@ -215,6 +266,9 @@ function loadBackgroundApi(fetchMock: ReturnType<typeof vi.fn>) {
         url: 'https://example.com/reference',
       }]),
     },
+    scripting: {
+      executeScript: vi.fn(async () => [{ result: true }]),
+    },
   }
   const context = {
     AbortController,
@@ -237,5 +291,5 @@ function loadBackgroundApi(fetchMock: ReturnType<typeof vi.fn>) {
     readFileSync(new URL('background.js', extensionRoot), 'utf8'),
     context,
   )
-  return { chrome, commandListener }
+  return { chrome, commandListener, messageListener }
 }

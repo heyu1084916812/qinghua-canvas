@@ -1,5 +1,14 @@
 # CanvasFlow（轻画）项目记忆
 
+### 总管2 第四十九轮：双商店一键安装与 Billfish 式拖拽收藏（2026-11-10）
+
+- `ClipperInstallCard` 只接受 `microsoftedge.microsoft.com` 与 `chromewebstore.google.com` 的 HTTPS 详情页；`VITE_QINGHUA_CLIPPER_EDGE_STORE_URL` / `VITE_QINGHUA_CLIPPER_CHROME_STORE_URL` 分别控制两个入口。没有商店或 ZIP 地址时只显示离线安装说明，禁止内置假 URL 或声称静默安装。浏览器商店确认必须由用户完成。
+- 扩展仍是同一份 Chrome / Edge MV3 包，版本 0.3.0。权限为 `activeTab + storage + contextMenus + scripting`；没有常驻 content script、`<all_urls>`、Cookie 或历史权限。只有用户点击“拖拽图片收藏”后，才通过 `activeTab` 向当前页临时注入 `drop-target.js`；投放区使用封闭 Shadow DOM。
+- 普通网页收藏发送 `url + title`，桌面端继续读公开页 Open Graph；拖拽与图片右键发送 `pageUrl + imageUrl + title`，接收端 `imageUrl` 也是可选且只收公开 HTTP/HTTPS，前端 `capturePendingClipperQueue` 直接形成单图收藏，不再重抓整页。
+- UI 证据：四组 1440×900 / 1024×700 × 明暗均 `mode=store / browsers=[edge,chrome] / opened=true / width=388/288 / insidePanel=true / overflowX=false / childrenOutsideX=0 / errors=0`。扩展 Chromium 六态含亮暗拖拽投放区，均 `ready=true / status=已收藏 / overflowX=false / errors=[]`，真实消息含 `https://example.com/reference` 与 `https://cdn.example.com/dragged.webp`。
+- 最终门禁：check 1134 modules / 4543 deps / 278 registrations；串行全量 Vitest 660 files（659 passed / 1 skipped）/ 5477 tests（5476 passed / 1 skipped）；Rust 80/80；build 1266 modules；Impeccable detector 0 findings。ZIP `release/qinghua-clipper-0.3.0.zip` 26,478 B，SHA-256 `AE14A99F874C7D355CEE41AF02FBE1082AB734CE93C5604BD565130DBCB84F78`。未 push。
+- 外部条件：Edge Add-ons 免费注册，Chrome Web Store 当前一次性开发者费；公开详情页还需账号主动上架。浏览器商店实际安装与 push 均未执行。
+
 ### 总管2 第四十八轮：轻画 Clipper 浏览器扩展正式版（2026-11-10）
 
 - MV3 包拆为 `shared.js`（本地地址、请求、错误协议）、`popup.js`（UI 状态）、`background.js`（快捷键与右键菜单）。权限只允许 `activeTab/storage/contextMenus` 和 `http://127.0.0.1:53684/*`，禁止 content script、`<all_urls>`、Cookie 与历史权限。

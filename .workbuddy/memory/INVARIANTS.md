@@ -1,5 +1,18 @@
 # CanvasFlow 不变量详表
 
+## 浏览器扩展双商店与拖拽收藏边界（2026-11-10）
+
+- Chrome 与 Edge 共用同一份 MV3 包。权限只能是 `activeTab + storage + contextMenus + scripting`；
+  禁止为了拖拽收藏增加常驻 content script、`<all_urls>`、Cookie 或历史权限。
+- 拖拽投放区只能在用户点击“拖拽图片收藏”后经 `chrome.scripting.executeScript` 临时注入当前 `activeTab`；
+  使用封闭 Shadow DOM，关闭时必须移除页面监听。普通网页收藏发送页面 URL/标题；拖拽和图片右键发送
+  页面 URL/图片 URL/标题，接收端 `imageUrl` 只接受公开 HTTP/HTTPS。
+- 安装卡只接受 `microsoftedge.microsoft.com` 与 `chromewebstore.google.com` 的 HTTPS 详情页。
+  未配置商店或 ZIP 地址时只能显示离线说明，禁止内置假商店 URL、静默安装或把 ZIP 下载写成商店安装。
+- UI 证据必须同时覆盖 Edge / Chrome 两个按钮的四组桌面视口，以及扩展弹窗和拖拽投放区亮暗态；
+  商店点击只能用隔离 `window.open` 记录验证，不能真的提交安装。`capture-clipper-extension.mjs` 的
+  `qinghua:clip-image` 页面 URL 必须是真实 HTTP 页面，不能用 `about:blank` 冒充。
+
 ## 创作面板视图边界（2026-11-06）
 
 - `CreationPanel.tsx` 持有 React state/refs/hooks、DOM 测量、Store、节点动作和所有 handler；`creation/` 视图

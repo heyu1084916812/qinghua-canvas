@@ -1,10 +1,10 @@
 {
   "manifest_version": 3,
   "name": "轻画 Clipper",
-  "version": "0.2.0",
-  "description": "把当前网页图片收藏到本机轻画，随时在画布中使用。",
+  "version": "0.3.0",
+  "description": "收藏当前网页，或把网页图片拖进投放区，保存到本机轻画。",
   "minimum_chrome_version": "102",
-  "permissions": ["activeTab", "storage", "contextMenus"],
+  "permissions": ["activeTab", "storage", "contextMenus", "scripting"],
   "host_permissions": ["http://127.0.0.1:53684/*"],
   "background": {
     "service_worker": "background.js"

@@ -10,6 +10,88 @@ export interface ClipperCaptureResult {
   warnings: string[]
 }
 
+export async function capturePendingClipperClip(input: {
+  pageUrl: string
+  imageUrl?: string
+  title?: string
+  network: NetworkPort
+  collection: ClipperCollectionRepository
+  signal: AbortSignal
+}): Promise<ClipperCaptureResult> {
+  if (input.imageUrl) {
+    return captureClipperImage({
+      pageUrl: input.pageUrl,
+      imageUrl: input.imageUrl,
+      title: input.title,
+      collection: input.collection,
+    })
+  }
+  return captureClipperPage({
+    url: input.pageUrl,
+    network: input.network,
+    collection: input.collection,
+    signal: input.signal,
+  })
+}
+
+export async function capturePendingClipperQueue(input: {
+  clips: readonly {
+    url: string
+    title?: string
+    imageUrl?: string
+  }[]
+  network: NetworkPort
+  collection: ClipperCollectionRepository
+  signal: AbortSignal
+}): Promise<{ collection: ClipperItem[]; imported: number }> {
+  let collection = await input.collection.load()
+  let imported = 0
+  for (const clip of input.clips) {
+    if (!isPublicHttpUrl(clip.url)) continue
+    try {
+      const result = await capturePendingClipperClip({
+        pageUrl: clip.url,
+        imageUrl: clip.imageUrl,
+        title: clip.title,
+        network: input.network,
+        collection: input.collection,
+        signal: input.signal,
+      })
+      collection = result.collection
+      imported += result.items.length
+    } catch {
+      continue
+    }
+  }
+  return { collection, imported }
+}
+
+export async function captureClipperImage(input: {
+  pageUrl: string
+  imageUrl: string
+  title?: string
+  collection: ClipperCollectionRepository
+}): Promise<ClipperCaptureResult> {
+  if (!isPublicHttpUrl(input.pageUrl) || !isPublicHttpUrl(input.imageUrl)) {
+    throw new Error('拖入的图片地址不是公开 HTTP / HTTPS 地址')
+  }
+  const now = Date.now()
+  const item: ClipperItem = {
+    id: `web:dropped:${stableHash(`${input.pageUrl}|${input.imageUrl}`)}`,
+    source: 'web',
+    title: cleanImageTitle(input.title, input.pageUrl),
+    url: input.pageUrl,
+    imageUrl: input.imageUrl,
+    collectedAt: now,
+    category: '未分类',
+  }
+  return {
+    items: [item],
+    collection: await input.collection.upsert([item]),
+    warnings: [],
+  }
+}
+
 export async function captureClipperPage(input: {
   url: string
   network: NetworkPort
@@ -45,4 +127,23 @@ export async function captureClipperPage(input: {
       : await input.collection.load(),
     warnings: result.warnings,
   }
+}
+
+function cleanImageTitle(title: string | undefined, pageUrl: string): string {
+  const cleaned = (title ?? '').replace(/\s+/g, ' ').trim()
+  if (cleaned) return cleaned.slice(0, 300)
+  try {
+    return new URL(pageUrl).hostname
+  } catch {
+    return '网页图片'
+  }
+}
+
+function stableHash(value: string): string {
+  let hash = 0x811c9dc5
+  for (let index = 0; index < value.length; index += 1) {
+    hash ^= value.charCodeAt(index)
+    hash = Math.imul(hash, 0x01000193)
+  }
+  return (hash >>> 0).toString(36)
 }

@@ -1,9 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { invoke, isTauri } from '@tauri-apps/api/core'
+import { openUrl } from '@tauri-apps/plugin-opener'
 import { usePlatform } from '../../../app/providers/PlatformProvider'
-import type {
-  ClipperItem,
-} from '../../../domain/inspiration/clipper'
+import type { ClipperItem } from '../../../domain/inspiration/clipper'
 import { isPublicHttpUrl } from '../../../domain/shared/publicUrl'
 import { sendReferenceToAgent } from '../../../features/canvas/agentHandoff'
 import { createClipperCollectionRepository } from '../../../state/shared/clipperCollectionRepository'
@@ -15,9 +14,10 @@ import {
   IconPlus,
 } from '../../../workbenches/canvas/toolbar/icons'
 import { ClipperBrowser } from './ClipperBrowser'
+import { ClipperInstallCard, resolveClipperInstallSource } from './ClipperInstallCard'
 import { ClipperItemCard } from './ClipperItemCard'
 import { ClipperPairing, type ClipperReceiverInfo } from './ClipperPairing'
-import { captureClipperPage } from './clipperCapture'
+import { captureClipperPage, capturePendingClipperQueue } from './clipperCapture'
 import {
   addClipperReference,
   sendClipperToCanvas,
@@ -30,8 +30,15 @@ interface PendingClip {
   id: string
   url: string
   title?: string
+  imageUrl?: string
   receivedAt: number
 }
+
+const CLIPPER_INSTALL_SOURCE = resolveClipperInstallSource({
+  edgeStoreUrl: import.meta.env.VITE_QINGHUA_CLIPPER_EDGE_STORE_URL,
+  chromeStoreUrl: import.meta.env.VITE_QINGHUA_CLIPPER_CHROME_STORE_URL,
+  packageUrl: import.meta.env.VITE_QINGHUA_CLIPPER_PACKAGE_URL,
+})
 
 export function ClipperPanel({
   projectId,
@@ -149,14 +156,16 @@ export function ClipperPanel({
       if (!info.running) return
       const pending = await invoke<PendingClip[]>('clipper_take_pending')
       if (pending.length === 0) return
-      let imported = 0
-      for (const clip of pending) {
-        const target = normalizedPublicUrl(clip.url)
-        if (!target) continue
-        imported += await collectTarget(target, { background: true })
-      }
+      const result = await capturePendingClipperQueue({
+        clips: pending,
+        network: platform.network,
+        collection,
+        signal: newController().signal,
+      })
+      setItems(result.collection)
+      const imported = result.imported
       if (imported > 0) {
-        setStatus(`已从浏览器扩展接收 ${imported} 张网页图片。`)
+        setStatus(`已从浏览器扩展接收 ${imported} 张图片收藏。`)
       }
     } catch (error) {
       setReceiver((current) => current ? {
@@ -192,6 +201,14 @@ export function ClipperPanel({
     }
     setBrowserUrl('')
     onOpenCanvasBrowser(target)
+  }
+  const openInstallTarget = async (target: string) => {
+    if (isTauri()) {
+      await openUrl(target)
+      return
+    }
+    const opened = window.open(target, '_blank')
+    if (opened) opened.opener = null
   }
 
   const addToReference = async (item: ClipperItem, toAgent: boolean) => {
@@ -318,6 +335,12 @@ export function ClipperPanel({
           </button>
         </div>
       </div>
+
+      <ClipperInstallCard
+        source={CLIPPER_INSTALL_SOURCE}
+        onOpen={openInstallTarget}
+        onPair={() => setPairingOpen(true)}
+      />
 
       {pairingOpen ? <ClipperPairing receiver={receiver} /> : null}
 

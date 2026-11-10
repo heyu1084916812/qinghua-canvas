@@ -279,6 +279,55 @@ summary {
   animation: spin 900ms linear infinite;
 }
 
+.drag-button {
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  min-height: 34px;
+  margin-top: -5px;
+  padding: 0 11px;
+  border: 1px dashed var(--border);
+  border-radius: 7px;
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+  text-align: start;
+}
+
+.drag-button svg {
+  width: 15px;
+  height: 15px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.7;
+}
+
+.drag-button span {
+  font-weight: 640;
+}
+
+.drag-button small {
+  color: var(--muted);
+  font-size: 9.5px;
+}
+
+.drag-button:hover:not(:disabled) {
+  border-color: var(--focus);
+  background: var(--surface-subtle);
+}
+
+.drag-button:disabled {
+  cursor: default;
+  opacity: 0.46;
+}
+
+.drag-button[data-busy="true"] svg {
+  animation: pulse 1s ease-in-out infinite;
+}
+
 .last-result {
   margin: -3px 0 0;
   color: var(--muted);

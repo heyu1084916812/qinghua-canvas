@@ -1,4 +1,4 @@
-/* global chrome, document, navigator, QinghuaClipper, URL */
+/* global chrome, document, navigator, QinghuaClipper, URL, window */
 const api = QinghuaClipper
 
 const elements = {
@@ -12,7 +12,10 @@ const elements = {
   url: document.querySelector('#page-url'),
   clip: document.querySelector('#clip'),
   clipLabel: document.querySelector('#clip-label'),
+  drag: document.querySelector('#drag'),
+  dragLabel: document.querySelector('#drag-label'),
   lastResult: document.querySelector('#last-result'),
+  version: document.querySelector('#version'),
   settings: document.querySelector('#settings'),
   endpoint: document.querySelector('#endpoint'),
   token: document.querySelector('#token'),
@@ -27,6 +30,7 @@ const state = {
   tokenConfigured: false,
   checking: false,
   clipping: false,
+  injecting: false,
   online: false,
 }
 
@@ -35,6 +39,7 @@ elements.toggleToken.addEventListener('click', toggleTokenVisibility)
 elements.save.addEventListener('click', () => void saveSettings())
 elements.clear.addEventListener('click', () => void clearSettings())
 elements.clip.addEventListener('click', () => void clipCurrentPage())
+elements.drag.addEventListener('click', () => void startDragCollection())
 
 if (/Mac|iPhone|iPad/i.test(navigator.platform)) {
   elements.clip.querySelector('kbd').textContent = 'Command+Shift+Y'
@@ -43,6 +48,8 @@ if (/Mac|iPhone|iPad/i.test(navigator.platform)) {
 void initialize()
 
 async function initialize() {
+  const version = chrome.runtime?.getManifest?.().version
+  if (version) elements.version.textContent = `v${version}`
   const config = await chrome.storage.local.get({
     endpoint: api.DEFAULT_ENDPOINT,
     token: '',
@@ -187,6 +194,37 @@ async function clipCurrentPage() {
   }
 }
 
+async function startDragCollection() {
+  if (
+    !state.pageValid
+    || !state.tokenConfigured
+    || !state.online
+    || state.injecting
+  ) {
+    return
+  }
+  state.injecting = true
+  elements.drag.dataset.busy = 'true'
+  elements.dragLabel.textContent = '正在打开投放区…'
+  setStatus('正在当前网页开启拖拽投放区…', 'checking')
+  updateClipButton()
+  try {
+    const result = await chrome.runtime.sendMessage({
+      type: 'qinghua:start-drag',
+    })
+    if (!result?.ok) throw new Error(result?.error || '当前网页无法开启投放区')
+    setStatus('投放区已打开，回到网页把图片拖进去', 'online')
+    window.setTimeout(() => window.close(), 650)
+  } catch (error) {
+    setStatus(api.errorText(error), 'error')
+  } finally {
+    state.injecting = false
+    elements.drag.dataset.busy = 'false'
+    elements.dragLabel.textContent = '拖拽图片收藏'
+    updateClipButton()
+  }
+}
+
 async function saveSettings() {
   const endpoint = api.normalizeEndpoint(elements.endpoint.value)
   const token = elements.token.value.trim()
@@ -247,6 +285,13 @@ function updateClipButton() {
     !state.online ||
     state.checking ||
     state.clipping
+  elements.drag.disabled =
+    !state.pageValid ||
+    !state.tokenConfigured ||
+    !state.online ||
+    state.checking ||
+    state.clipping ||
+    state.injecting
 }
 
 function showLastClip(config) {
