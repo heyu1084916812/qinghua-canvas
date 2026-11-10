@@ -13,8 +13,11 @@ if (-not (Test-Path -LiteralPath $manifestPath -PathType Leaf)) {
   throw "Extension source is incomplete: $source"
 }
 
-$localAppData = [IO.Path]::GetFullPath($env:LOCALAPPDATA).TrimEnd('\')
-$managedRoot = Join-Path $localAppData 'Qinghua\Clipper'
+$documents = [Environment]::GetFolderPath('MyDocuments')
+if (-not $documents) {
+  throw 'The Windows Documents folder could not be resolved.'
+}
+$managedRoot = Join-Path $documents 'QinghuaClipper'
 $target = [IO.Path]::GetFullPath((Join-Path $managedRoot 'extension'))
 $managedPrefix = [IO.Path]::GetFullPath($managedRoot).TrimEnd('\') + '\'
 if (-not $target.StartsWith($managedPrefix, [StringComparison]::OrdinalIgnoreCase)) {

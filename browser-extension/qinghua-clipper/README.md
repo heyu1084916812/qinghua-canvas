@@ -26,7 +26,7 @@
 
 在项目根目录双击 `scripts\install-clipper-local.cmd`，脚本会：
 
-1. 把扩展复制到 `%LOCALAPPDATA%\Qinghua\Clipper\extension`；
+1. 把扩展复制到系统“文档”目录下的 `QinghuaClipper\extension`；
 2. 把稳定目录复制到剪贴板；
 3. 打开 Chrome / Edge 扩展管理页和资源管理器。
 
@@ -39,7 +39,8 @@
 powershell -ExecutionPolicy Bypass -File scripts\install-clipper-local.ps1 -PrepareOnly
 ```
 
-脚本明确拒绝直接向浏览器用户数据目录复制文件，因为 Chrome / Edge 不会把这种复制识别为已安装扩展。
+脚本不会使用隐藏的 `%LOCALAPPDATA%` 目录，因为 Chrome 文件选择器会拒绝进入隐藏目录。
+它也明确拒绝直接向浏览器用户数据目录复制文件，因为 Chrome / Edge 不会把这种复制识别为已安装扩展。
 
 ### 手动安装
 
