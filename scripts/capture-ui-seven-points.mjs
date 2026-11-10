@@ -245,6 +245,85 @@ try {
     await context.addInitScript((storeBase) => {
       Object.assign(window, { __QINGHUA_SHARED_STORE_PORT__: Number(new URL(storeBase).port) })
     }, STORE)
+    await context.addInitScript(({ pngBase64 }) => {
+      if (
+        localStorage.getItem('qinghua:clipper-ui-probe') !== '1'
+        || !location.pathname.startsWith('/canvas/')
+      ) return
+      const updateStatus = {
+        loadedVersion: '0.4.2',
+        bundledVersion: '0.4.4',
+        needsUpdate: true,
+        reloadRequired: false,
+        stableDirectory: 'C:\\Users\\Administrator\\Documents\\QinghuaClipper\\extension',
+      }
+      let pending = [{
+        id: 'clip-ui-probe-1',
+        url: 'https://example.com/clipper-source',
+        title: '娴忚鍣ㄦ敹钘忛獙璇佸浘',
+        imageUrl: 'https://example.com/qinghua-clip.png',
+        receivedAt: Date.now(),
+      }]
+      window.__clipperAckIds = []
+      window.__qinghuaUiPngBase64 = pngBase64
+      window.isTauri = true
+      window.__TAURI_EVENT_PLUGIN_INTERNALS__ = {
+        unregisterListener: async () => undefined,
+      }
+      let nextCallbackId = 1
+      const callbacks = new Map()
+      window.__TAURI_INTERNALS__ = {
+        metadata: {
+          currentWindow: { label: 'main' },
+          currentWebview: { windowLabel: 'main', label: 'main' },
+        },
+        transformCallback: (callback) => {
+          const id = nextCallbackId++
+          callbacks.set(id, callback)
+          return id
+        },
+        unregisterCallback: (id) => callbacks.delete(id),
+        invoke: async (command, args) => {
+          if (command === 'clipper_receiver_info') {
+            return {
+              running: true,
+              endpoint: 'http://127.0.0.1:53684/clip',
+              token: 'ui-probe-token',
+              extension: updateStatus,
+            }
+          }
+          if (command === 'clipper_pending_snapshot') return pending
+          if (command === 'clipper_ack_pending') {
+            const acknowledged = new Set(args?.ids ?? [])
+            window.__clipperAckIds.push(...acknowledged)
+            pending = pending.filter((clip) => !acknowledged.has(clip.id))
+            return pending
+          }
+          if (command === 'fetch_text') {
+            return {
+              status: 200,
+              headers: { 'content-type': 'image/png' },
+              text: '',
+              bodyBase64: window.__qinghuaUiPngBase64,
+              finalUrl: args?.url,
+            }
+          }
+          if (command === 'clipper_extension_update') {
+            return {
+              status: { ...updateStatus, needsUpdate: false, reloadRequired: true },
+              updated: true,
+              openedExtensionPage: true,
+            }
+          }
+          if (command === 'storage_startup_state') return { kind: 'ready' }
+          if (command === 'plugin:app|version') return '0.1.17'
+          if (command === 'plugin:event|listen') return 1
+          if (command.startsWith('plugin:event|unlisten')) return null
+          if (command.startsWith('plugin:window|')) return false
+          throw new Error(`unexpected Tauri command: ${command}`)
+        },
+      }
+    }, { pngBase64: fixtures.square.toString('base64') })
     const page = await context.newPage()
     const errors = pageErrors(page)
     await page.goto(BASE, { waitUntil: 'domcontentloaded', timeout: 60_000 })
@@ -302,13 +381,25 @@ try {
     await page.screenshot({ path: path.join(out, `${file}-defaults.png`) })
     report.push({ variant, surface: 'defaults', defaultNavCount, ...defaultsMetrics, errors: [...errors] })
 
+    await page.evaluate(() => {
+      localStorage.setItem('qinghua:clipper-ui-probe', '1')
+    })
     await page.keyboard.press('Escape')
     await page.goto(BASE, { waitUntil: 'domcontentloaded' })
     await page.locator('[data-home-page]').waitFor({ timeout: 10_000 })
     await page.locator('[data-home-new]').click({ timeout: 10_000 }).catch(() => {})
     await page.locator('[data-new-project-choice="canvas"]').click({ timeout: 10_000 })
     await page.waitForURL(/\/canvas\//, { timeout: 20_000 })
-    await page.locator('[data-canvas-my-assets]').waitFor({ timeout: 10_000 })
+    await page.reload({ waitUntil: 'domcontentloaded' })
+    await page.locator('[data-canvas-my-assets]').waitFor({ timeout: 10_000 }).catch(async (error) => {
+      await page.screenshot({ path: path.join(out, `${file}-canvas-desktop-stub-failed.png`) })
+      console.error({
+        url: page.url(),
+        body: (await page.locator('body').innerText().catch(() => '')).slice(0, 1200),
+        errors: [...errors],
+      })
+      throw error
+    })
     const kitsButtons = await page.locator('[data-canvas-my-assets]').count()
     const defaultsButtons = await page.locator('[data-canvas-defaults]').count()
     const stageWidthClosed = await page.locator('[data-canvas-stage]').evaluate((node) => node.getBoundingClientRect().width)
@@ -381,51 +472,6 @@ try {
       }
     })
     await page.screenshot({ path: path.join(out, `${file}-canvas-pinterest.png`) })
-    await page.evaluate(() => {
-      const updateStatus = {
-        loadedVersion: '0.4.2',
-        bundledVersion: '0.4.3',
-        needsUpdate: true,
-        reloadRequired: false,
-        stableDirectory: 'C:\\Users\\Administrator\\Documents\\QinghuaClipper\\extension',
-      }
-      let pending = [{
-        id: 'clip-ui-probe-1',
-        url: 'https://example.com/clipper-source',
-        title: '浏览器收藏验证图',
-        imageUrl: 'https://example.com/qinghua-clip.png',
-        receivedAt: Date.now(),
-      }]
-      window.__clipperAckIds = []
-      window.isTauri = true
-      window.__TAURI_INTERNALS__ = {
-        invoke: async (command, args) => {
-          if (command === 'clipper_receiver_info') {
-            return {
-              running: true,
-              endpoint: 'http://127.0.0.1:53684/clip',
-              token: 'ui-probe-token',
-              extension: updateStatus,
-            }
-          }
-          if (command === 'clipper_pending_snapshot') return pending
-          if (command === 'clipper_ack_pending') {
-            const acknowledged = new Set(args?.ids ?? [])
-            window.__clipperAckIds.push(...acknowledged)
-            pending = pending.filter((clip) => !acknowledged.has(clip.id))
-            return pending
-          }
-          if (command === 'clipper_extension_update') {
-            return {
-              status: { ...updateStatus, needsUpdate: false, reloadRequired: true },
-              updated: true,
-              openedExtensionPage: true,
-            }
-          }
-          throw new Error(`unexpected Tauri command: ${command}`)
-        },
-      }
-    })
     await page.locator('[data-my-assets-source="clipper"]').click()
     await page.locator('[data-clipper-panel]').waitFor({ timeout: 10_000 })
     await page.waitForFunction(

@@ -110,7 +110,7 @@ try {
     ok:
       permissions.http
       && permissions.https
-      && permissions.manifest === '0.4.3'
+      && permissions.manifest === '0.4.4'
       && permissions.dragMode === true
       && pages[0]?.beforeToggleInjected === false
       && pages.every((page) => page.injected),

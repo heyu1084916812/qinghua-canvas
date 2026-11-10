@@ -1,6 +1,17 @@
-/* global chrome, document, Element, HTMLImageElement, location, URL, window */
+/* global chrome, document, Element, getComputedStyle, location, URL, window */
 (() => {
   const HOST_ID = 'qinghua-clipper-drop-target'
+  const IMAGE_ATTRIBUTES = [
+    'data-original',
+    'data-actualsrc',
+    'data-original-src',
+    'data-src',
+    'data-lazy-src',
+    'data-echo',
+    'data-hi-res-src',
+    'data-large-src',
+    'data-full-src',
+  ]
   if (document.getElementById(HOST_ID)) return
 
   let hideTimer = 0
@@ -111,14 +122,8 @@
   }
 
   const onDragStart = (event) => {
-    const element = event.target instanceof Element ? event.target : null
-    const image = element?.closest('img')
-    if (image instanceof HTMLImageElement) {
-      lastDraggedImage = image.currentSrc || image.src || ''
-    } else {
-      lastDraggedImage = ''
-    }
-    if (!image && !looksLikeImageDrag(event.dataTransfer)) return
+    lastDraggedImage = draggedImageSource(event)
+    if (!lastDraggedImage && !looksLikeImageDrag(event.dataTransfer)) return
     keepAfterDrop = false
     show()
   }
@@ -203,23 +208,111 @@
 
   function imageUrlOf(dataTransfer) {
     if (!dataTransfer) return ''
+    const directImage = imageCandidate(lastDraggedImage)
+    if (directImage) return directImage
     const uriList = dataTransfer.getData('text/uri-list')
       .split(/\r?\n/)
       .find((line) => line && !line.startsWith('#'))
     const html = dataTransfer.getData('text/html')
     const plain = dataTransfer.getData('text/plain')
-    return normalizeImageUrl(uriList)
-      || normalizeImageUrl(htmlImageSource(html))
-      || normalizeImageUrl(plain)
-      || normalizeImageUrl(lastDraggedImage)
+    return htmlImageUrls(html).map(imageCandidate).find(Boolean)
+      || imageCandidate(uriList)
+      || imageCandidate(plain)
   }
 
-  function htmlImageSource(html) {
-    if (!html) return ''
+  function htmlImageUrls(html) {
+    if (!html) return []
     const template = document.createElement('template')
     template.innerHTML = html
-    const image = template.content.querySelector('img')
-    return image?.getAttribute('src') || ''
+    return [...template.content.querySelectorAll('img, input[type="image"]')]
+      .map(imageSourceOf)
+      .filter(Boolean)
+  }
+
+  function draggedImageSource(event) {
+    const target = event.target instanceof Element ? event.target : null
+    const underPointer = document.elementFromPoint(event.clientX, event.clientY)
+    const image = imageElementOf(target) || imageElementOf(underPointer)
+    return image ? imageSourceOf(image) : backgroundImageUrlOf(target)
+  }
+
+  function imageElementOf(node) {
+    if (!(node instanceof Element)) return null
+    const direct = node.closest('img, input[type="image"]')
+    if (direct) return direct
+    return [...node.querySelectorAll('img, input[type="image"]')]
+      .filter((image) => {
+        const rect = image.getBoundingClientRect()
+        return rect.width >= 24 && rect.height >= 24
+      })
+      .sort((left, right) => renderedImageArea(right) - renderedImageArea(left))[0]
+      || null
+  }
+
+  function imageSourceOf(image) {
+    for (const attribute of IMAGE_ATTRIBUTES) {
+      const value = image.getAttribute(attribute)
+      if (value && normalizeImageUrl(value)) return value
+    }
+    const picture = image.closest('picture')
+    if (picture) {
+      const source = [...picture.querySelectorAll('source')]
+        .reverse()
+        .map((item) => item.getAttribute('srcset'))
+        .find(Boolean)
+      if (source) return bestSrcsetUrl(source)
+    }
+    if (image.getAttribute('srcset')) return bestSrcsetUrl(image.getAttribute('srcset'))
+    return image.getAttribute('src') || image.currentSrc || image.src || ''
+  }
+
+  function bestSrcsetUrl(value) {
+    const candidates = String(value || '').split(',').map((candidate) => {
+      const [url, descriptor = '1x'] = candidate.trim().split(/\s+/)
+      const weight = Number.parseFloat(descriptor) || 1
+      return { url, weight: descriptor.endsWith('w') ? weight : weight * 1000 }
+    }).filter((candidate) => candidate.url)
+    candidates.sort((left, right) => right.weight - left.weight)
+    return candidates[0]?.url || ''
+  }
+
+  function backgroundImageUrlOf(node) {
+    let current = node
+    while (current && current !== document.documentElement) {
+      if (current instanceof Element) {
+        const matches = [...getComputedStyle(current).backgroundImage
+          .matchAll(/url\(["']?(.+?)["']?\)/g)]
+        const image = matches.map((match) => match[1]).find((value) => imageCandidate(value))
+        if (image) return image
+      }
+      current = current.parentElement
+    }
+    return ''
+  }
+
+  function renderedImageArea(image) {
+    const rect = image.getBoundingClientRect()
+    return Math.max(0, rect.width) * Math.max(0, rect.height)
+  }
+
+  function imageCandidate(value) {
+    const url = normalizeImageUrl(value)
+    if (!url) return ''
+    try {
+      const candidate = new URL(url)
+      const page = new URL(location.href)
+      if (candidate.href === page.href) return ''
+      if (
+        candidate.hostname === page.hostname
+        && candidate.pathname === page.pathname
+        && candidate.search === page.search
+      ) {
+        return ''
+      }
+    } catch {
+      return ''
+    }
+    return url
   }
 
   function normalizeImageUrl(value) {

@@ -1,5 +1,14 @@
 # CanvasFlow（轻画）项目记忆
 
+### 总管2 第六十四轮：Clipper 取错图、永久坏项与 GitHub 采集实现对照（2026-11-11）
+- 花瓣截图里的笑脸不是用户原图，而是“没拿到真实图片 URL 后抓整页 Open Graph”的后果。旧内容脚本把 `currentSrc/uri-list` 当第一优先，纯网页地址也会进入 `/clip`；旧 capture 又允许 `imageUrl` 缺失时抓整页，这两个口子必须同时关。
+- 对照 GitHub [Image Picka](https://github.com/eight04/image-picka)：拖拽目标可能是链接/卡片，不能只 `closest('img')`；要查容器内最大可见图，并处理 `data-original / data-src / data-actualsrc / data-echo / srcset / picture / background-image`。本仓库已按这些边界实现，并拒绝同页 URL 冒充图片。
+- 应用侧不能只信 URL 后缀或 Content-Type，必须读原始字节；`publicOnly` 在桌面壳会走 Rust `fetch_text` 的 `bodyBase64`，所以 UI 桩也必须提供 `fetch_text`，否则会卡在“未导入并重试”。
+- 队列失败要分永久/临时：缺图、同页地址、非图片、尺寸无效可 ack 淘汰；网络异常、5xx、花瓣 567 抗爬页留队重试。不能把所有失败都无限 3 秒重打，也不能为清提示静默丢临时失败。
+- 真实验证：`.playwright-verify/clipper-extension/report.json` 五组全通过；`.playwright-verify/clipper-all-pages/report.json` 为 `0.4.4 / http=true / https=true`；`.playwright-verify/ui-seven-after/report.json` 四组 `items=1 / ack=clip-ui-probe-1 / updateNotice=1 / overflowX=false / errors=[]`；`.playwright-verify/clipper-update-shell/report.json` 为 `0.4.2→0.4.4 / stagingLeftovers=[]`。
+- 门禁：`npm run check` 1163 modules / 4665 deps / 307 registrations / 25 legacy budgets；串行全量 Vitest 668 files（667 passed / 1 skipped）/ 5510 tests（5509 passed / 1 skipped）；Rust 86/86；build 1295 modules；Tauri release `--no-bundle` 通过并确认资源 manifest `0.4.4`。ZIP `release/qinghua-clipper-0.4.4.zip` 22,988 B，SHA-256 `185A1EF16974923C3F0E81368E4D9A363C343436A3304D1816A8C5072923219B`。未 push。
+- 用户当前若仍运行 `src-tauri/target/debug/qinghua.exe` 的旧进程，必须彻底退出托盘中的轻画再启动最新 release；只关窗口不会换后端。旧的错误收藏也要删除一次，坏队列由新逻辑 ack 清理。
+
 ### 总管2 第六十三轮：旧后端命令兼容与 GitHub 方案对照（2026-11-11）
 
 - 截图 `Command clipper_pending_snapshot not found` 不是收藏数据坏了，而是运行中的 `target/debug/qinghua.exe` 生成于 2026-11-10 01:51，缺少 23:55 后新增的 Tauri 队列命令。前端热更新会比 Rust 后端新，必须为命令协议做版本兼容。

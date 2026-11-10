@@ -51,8 +51,36 @@ try {
     dragMode: true,
     online: false,
   }))
-  report.push(await captureDropTarget('light-drag-target', 'light'))
-  report.push(await captureDropTarget('dark-drag-target', 'dark'))
+  report.push(await captureDropTarget({
+    name: 'light-lazy-image',
+    theme: 'light',
+    viewport: { width: 1440, height: 900 },
+    variant: 'lazy',
+  }))
+  report.push(await captureDropTarget({
+    name: 'dark-lazy-image',
+    theme: 'dark',
+    viewport: { width: 1440, height: 900 },
+    variant: 'lazy',
+  }))
+  report.push(await captureDropTarget({
+    name: 'light-responsive-image',
+    theme: 'light',
+    viewport: { width: 1024, height: 700 },
+    variant: 'picture',
+  }))
+  report.push(await captureDropTarget({
+    name: 'dark-background-image',
+    theme: 'dark',
+    viewport: { width: 1024, height: 700 },
+    variant: 'background',
+  }))
+  report.push(await captureDropTarget({
+    name: 'light-page-without-image',
+    theme: 'light',
+    viewport: { width: 1024, height: 700 },
+    variant: 'page-only',
+  }))
   await writeFile(
     resolve(output, 'report.json'),
     `${JSON.stringify(report, null, 2)}\n`,
@@ -138,9 +166,9 @@ async function capturePopup({ name, theme, dragMode, online }) {
   return { name, theme, errors, ...metrics }
 }
 
-async function captureDropTarget(name, theme) {
+async function captureDropTarget({ name, theme, viewport, variant }) {
   const context = await browser.newContext({
-    viewport: { width: 720, height: 520 },
+    viewport,
     colorScheme: theme,
   })
   const page = await context.newPage()
@@ -156,13 +184,11 @@ async function captureDropTarget(name, theme) {
       h1 { margin: 0; font-size: 20px; }
       .card { overflow: hidden; border-radius: 8px; background: #fff; box-shadow: 0 1px 4px rgba(0,0,0,.08); }
       img { display: block; width: 100%; height: 240px; object-fit: cover; }
+      .background { display: block; width: 100%; height: 240px; background-size: cover; background-position: center; }
     </style>
     <main>
       <h1>Drag an image</h1>
-      <section class="card">
-        <img id="source-image" alt="Reference"
-          src="data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='800' height='480'%3E%3Crect width='800' height='480' fill='%23bfd0c3'/%3E%3Ccircle cx='250' cy='210' r='110' fill='%23d9a36c'/%3E%3Crect x='420' y='90' width='250' height='300' rx='28' fill='%23527b69'/%3E%3C/svg%3E" />
-      </section>
+      ${dropTargetFixture(variant)}
     </main>`
   await context.route('https://example.com/reference', (route) => {
     return route.fulfill({
@@ -171,6 +197,14 @@ async function captureDropTarget(name, theme) {
       body: html,
     })
   })
+  await context.route('https://cdn.example.com/**', (route) => route.fulfill({
+    status: 200,
+    contentType: 'image/png',
+    body: Buffer.from(
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAFgwJ/lYQ7WQAAAABJRU5ErkJggg==',
+      'base64',
+    ),
+  }))
   await page.goto('https://example.com/reference', {
     waitUntil: 'domcontentloaded',
   })
@@ -199,16 +233,18 @@ async function captureDropTarget(name, theme) {
     state: 'attached',
     timeout: 5_000,
   })
-  await page.evaluate(() => {
-    const image = document.querySelector('#source-image')
+  await page.evaluate(({ fixtureVariant }) => {
+    const source = document.querySelector('#drag-source')
     const dataTransfer = new DataTransfer()
-    dataTransfer.setData('text/uri-list', 'https://cdn.example.com/dragged.webp')
-    image.dispatchEvent(new DragEvent('dragstart', {
+    dataTransfer.setData('text/uri-list', fixtureVariant === 'page-only'
+      ? 'https://example.com/reference'
+      : 'https://cdn.example.com/fallback.png')
+    source.dispatchEvent(new DragEvent('dragstart', {
       bubbles: true,
       cancelable: true,
       dataTransfer,
     }))
-  })
+  }, { fixtureVariant: variant })
   await page.waitForFunction(
     () => document.querySelector('[data-qinghua-drop-target]')
       ?.getAttribute('data-qinghua-drop-visible') === 'true',
@@ -216,35 +252,95 @@ async function captureDropTarget(name, theme) {
   )
   await page.waitForTimeout(150)
   await page.screenshot({ path: resolve(output, `${name}-open.png`) })
-  await page.evaluate(() => {
+  await page.evaluate(({ fixtureVariant }) => {
     const host = document.querySelector('[data-qinghua-drop-target]')
     const dataTransfer = new DataTransfer()
-    dataTransfer.setData('text/uri-list', 'https://cdn.example.com/dragged.webp')
+    dataTransfer.setData('text/uri-list', fixtureVariant === 'lazy'
+      ? 'https://cdn.example.com/placeholder.png'
+      : fixtureVariant === 'page-only'
+        ? 'https://example.com/reference'
+        : 'https://cdn.example.com/fallback.png')
     host.dispatchEvent(new DragEvent('drop', {
       bubbles: true,
       cancelable: true,
       composed: true,
       dataTransfer,
     }))
-  })
+  }, { fixtureVariant: variant })
   await page.waitForFunction(
-    () => document.querySelector('[data-qinghua-drop-target]')
-      ?.getAttribute('data-qinghua-drop-status') === '已收藏到轻画',
+    ({ fixtureVariant }) => {
+      const host = document.querySelector('[data-qinghua-drop-target]')
+      return fixtureVariant === 'page-only'
+        ? host?.getAttribute('data-qinghua-drop-error') === 'true'
+        : (globalThis.__qinghuaMessages?.length ?? 0) > 0
+    },
+    { fixtureVariant: variant },
     { timeout: 5_000 },
   )
+  await page.waitForTimeout(100)
   await page.screenshot({ path: resolve(output, `${name}-saved.png`) })
   const metrics = await page.evaluate(() => {
     const host = document.querySelector('[data-qinghua-drop-target]')
+    const messages = globalThis.__qinghuaMessages ?? []
     return {
       ready: host?.getAttribute('data-qinghua-drop-ready') === 'true',
       visible: host?.getAttribute('data-qinghua-drop-visible') === 'true',
       status: host?.getAttribute('data-qinghua-drop-status') ?? '',
       error: host?.getAttribute('data-qinghua-drop-error') === 'true',
-      messages: globalThis.__qinghuaMessages ?? [],
+      messages,
+      selectedImageUrl: messages.at(-1)?.imageUrl ?? '',
       overflowX:
         document.documentElement.scrollWidth > document.documentElement.clientWidth + 1,
     }
   })
   await context.close()
-  return { name, theme, errors, ...metrics }
+  const expectedImageUrl = {
+    lazy: 'https://cdn.example.com/original.jpg',
+    picture: 'https://cdn.example.com/large.webp',
+    background: 'https://cdn.example.com/background.jpg',
+    'page-only': '',
+  }[variant]
+  const passed = variant === 'page-only'
+    ? metrics.error && metrics.messages.length === 0
+    : metrics.selectedImageUrl === expectedImageUrl
+  if (!passed) {
+    throw new Error(
+      `${name}: expected ${expectedImageUrl || 'no message'}, got ${
+        metrics.selectedImageUrl || metrics.status
+      }`,
+    )
+  }
+  return { name, theme, viewport, variant, expectedImageUrl, passed, errors, ...metrics }
+}
+
+function dropTargetFixture(variant) {
+  if (variant === 'lazy') {
+    return `<section class="card">
+      <a id="drag-source" href="https://example.com/pin">
+        <img id="source-image" alt="Huaban-style lazy image"
+          src="https://cdn.example.com/placeholder.png"
+          data-original="https://cdn.example.com/original.jpg" />
+      </a>
+    </section>`
+  }
+  if (variant === 'picture') {
+    return `<section class="card">
+      <picture id="drag-source">
+        <source srcset="https://cdn.example.com/small.webp 480w, https://cdn.example.com/large.webp 1600w" />
+        <img id="source-image" alt="Responsive image"
+          src="https://cdn.example.com/fallback.png" />
+      </picture>
+    </section>`
+  }
+  if (variant === 'background') {
+    return `<section class="card">
+      <a id="drag-source" class="background"
+        style="background-image:url('https://cdn.example.com/background.jpg')"
+        href="https://example.com/background"></a>
+    </section>`
+  }
+  return `<section class="card">
+    <a id="drag-source" href="https://example.com/reference"
+      style="display:block;height:240px;background:#dfe4da"></a>
+  </section>`
 }
