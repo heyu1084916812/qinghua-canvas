@@ -310,9 +310,10 @@ describe('prepareAgentTurnRequest', () => {
     expect(result.contextTrace?.referencePhaseEvent).toEqual({
       phase: 'referenceAnalysis',
       title: '参考分析完成 · 1 项依据',
-      detail: expect.stringContaining('保持字形与颜色不变'),
+      detail: expect.stringContaining('已读取 1 条参考'),
       evidence: ['r1:u1'],
     })
+    expect(result.contextTrace?.referencePhaseEvent?.detail).not.toContain('保持字形与颜色不变')
   })
 
   it('★★ 套件参考把多图资产集合全部并入本轮 assetRefs', async () => {

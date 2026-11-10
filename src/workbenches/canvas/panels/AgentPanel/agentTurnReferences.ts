@@ -54,6 +54,10 @@ export function projectAgentTurnReferences(
     }
   }
   const omitted = selection.omitted.length
+  const visibleSummary = selection.selected.map(({ item }) => {
+    const assetCount = item.assets?.length ?? (item.assetHash ? 1 : 0)
+    return `- ${item.title.trim() || item.id}：${assetCount > 0 ? `${assetCount} 个素材` : '文字参考'}`
+  })
   const prompt = lines.length > 0
     ? [
         '## 本次任务采用的参考台账',
@@ -74,7 +78,10 @@ export function projectAgentTurnReferences(
               title: '参考分析完成',
               evidence,
             }),
-            detail: lines.join('\n'),
+            detail: [
+              `已读取 ${selection.selected.length} 条参考；详细分析已记入参考台账。`,
+              ...visibleSummary,
+            ].join('\n'),
             evidence,
           } satisfies AgentPhaseEvent,
         }

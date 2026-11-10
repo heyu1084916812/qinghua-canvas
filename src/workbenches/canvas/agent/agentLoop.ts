@@ -16,6 +16,7 @@ import {
   hasSuccessfulCanvasMutation,
   toolResultFailed as failedToolValue,
 } from './agentCanvasClaimGuard'
+import { confirmRunNodeFromFinalAnswer, recoverRunNodeConfirmation } from './agentRunConfirmationGuard'
 import { parseJsonAgentAction } from './jsonToolFallback'
 import { parseAgentToolArguments } from './agentToolArgs'
 import { reviewBeforeVisualDenial } from './agentVisualClaimGuard'
@@ -281,6 +282,8 @@ export async function runAgentTurn(
     return { kind: 'error', message: '当前模型没有给出可靠图片描述', messages }
   }
 
+  const recoveredRun = recoverRunNodeConfirmation(messages, allowedToolNames, deps.precheck)
+  if (recoveredRun) return (emitProgress(), recoveredRun)
   for (let step = 0; step < maxSteps; step += 1) {
     await pullSteering()
     emitActivity({ id: `thinking-${step}`, phase: 'thinking', status: 'running' })
@@ -369,6 +372,14 @@ export async function runAgentTurn(
     }
     if (calls.length === 0) {
       if ((await pullSteering()) > 0) continue
+      const pendingRun = confirmRunNodeFromFinalAnswer({
+        messages,
+        allowedToolNames,
+        precheck: deps.precheck,
+        text: showAssistantText ? result.text : '',
+        reasoning: result.reasoning ?? '',
+      })
+      if (pendingRun) return (emitProgress(), pendingRun)
       const visualGuard = await checkVisualDenial(result.text, step)
       if (visualGuard === 'unreliable') return unreliableVisualDescription()
       if (visualGuard === 'retry' || await discoverBeforeCapabilityDenial(result.text, step)) {
@@ -825,13 +836,5 @@ export async function resumeAgentTurn(
   return runAgentTurn(messages, deps)
 }
 
-/**
- * 任意抛出物 → **人能读的一句话**。
- *
- * 实现在 `shared/result.errorTextOf`：2026-10-14 新增的工具能力探测又踩了同一个
- * `[object Object]` 坑（渠道抛的不是 `Error` 实例），说明「谁记得谁写」防不住，
- * 得共用一份。这里保留 `errText` 这个名字，因为画布与漫剧两侧都在用。
- */
-export function errText(e: unknown): string {
-  return errorTextOf(e)
-}
+/** 保留既有公开名；异常转人话的真实实现仍唯一在 `shared/result`。 */
+export const errText = errorTextOf

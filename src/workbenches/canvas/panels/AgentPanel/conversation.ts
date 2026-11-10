@@ -69,6 +69,20 @@ export type ConversationItem =
   | ConversationProcess
   | ConversationStep
 
+const INTERNAL_REASONING_PREFIX =
+  /^(?:user approved|run the node|ask (?:the )?user|now applyPlan|applyPlan|call runNode|call runFrom|first,? call|then call|next,? call|let's|we should)/i
+
+function visibleReasoningText(text: string): string {
+  const trimmed = text.trim()
+  if (
+    trimmed.length <= 240 &&
+    INTERNAL_REASONING_PREFIX.test(trimmed.replace(/\s+/g, ' '))
+  ) {
+    return ''
+  }
+  return trimmed
+}
+
 /**
  * 当前条目之前、同一用户回合内的过程块。
  * 结果上方按它的 startedAt 一直算到当前结果时间；遇到 user 就停，避免串到上一轮。
@@ -716,7 +730,9 @@ export function toConversation(
       if (isAgentPhase(phase)) {
         ensureProcess(m).entries.push({
           id: `phase-event-${messageIndex}`,
-          text: m.phaseEvent.detail?.trim() || m.phaseEvent.title,
+          text: phase === 'referenceAnalysis'
+            ? m.phaseEvent.title
+            : m.phaseEvent.detail?.trim() || m.phaseEvent.title,
           phase,
           collapsedSummary: m.phaseEvent.title,
           ...timeOf(m),
@@ -757,7 +773,7 @@ export function toConversation(
     if (m.role === 'assistant') {
       const hasTools = (m.toolCalls?.length ?? 0) > 0
       const content = m.content.trim()
-      const reasoning = m.reasoning?.trim() ?? ''
+      const reasoning = visibleReasoningText(m.reasoning ?? '')
       if (hasTools && content) {
         ensureProcess(m).entries.push({
           id: `process-${messageIndex}`,
@@ -881,10 +897,11 @@ export function processEntriesOf(
           : {}),
       })
     }
-    if (message.reasoning?.trim()) {
+    const reasoning = visibleReasoningText(message.reasoning ?? '')
+    if (reasoning) {
       rows.push({
         id: `process-${index}-reasoning`,
-        text: displayNodeText(message.reasoning.trim(), nodeTitles),
+        text: displayNodeText(reasoning, nodeTitles),
         source: 'reasoning',
         ...(typeof message.createdAt === 'number' &&
         Number.isFinite(message.createdAt) &&

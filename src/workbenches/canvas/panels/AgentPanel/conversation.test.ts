@@ -542,13 +542,33 @@ describe('消息 → 对话条目', () => {
         kind: 'process',
         entries: [{
           id: 'phase-event-1',
-          text: '本轮采用品牌标准字与文案语气。',
+          text: '参考分析完成 · 2 项依据',
           phase: 'referenceAnalysis',
           collapsedSummary: '参考分析完成 · 2 项依据',
         }],
       },
       { kind: 'text', text: '海报已完成。' },
     ])
+  })
+
+  it('★ 内部英文指令不进入过程正文，中文思考仍保留', () => {
+    const messages: ChatMessage[] = [
+      { role: 'user', content: '继续' },
+      {
+        role: 'assistant',
+        content: '',
+        reasoning: 'User approved. Run the node.',
+        toolCalls: [{ id: 'run', name: 'runNode', args: '{"nodeIds":["n1"]}' }],
+      },
+      {
+        role: 'assistant',
+        content: '',
+        reasoning: '先核对渠道，再执行生成。',
+        toolCalls: [{ id: 'read', name: 'readGraph', args: '{}' }],
+      },
+    ]
+    const rows = processEntriesOf(messages)
+    expect(rows.map((row) => row.text)).toEqual(['先核对渠道，再执行生成。'])
   })
 
   it('★ 系统提示词不进对话流（那是给模型看的，不是给用户看的）', () => {

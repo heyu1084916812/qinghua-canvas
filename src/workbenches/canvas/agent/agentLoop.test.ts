@@ -126,6 +126,95 @@ describe('runAgentTurn · 确认之前的预检', () => {
     if (r.kind === 'confirm') expect(r.request.name).toBe('runNode')
   })
 
+  it('★★ 建图后用正文询问是否运行，必须自动转成 runNode 确认卡', async () => {
+    const executeWrite = vi.fn(async () => ({
+      ok: true,
+      problems: [],
+      createdNodeIds: ['node-generated'],
+      resolvedNodes: [{
+        localId: 'v1',
+        nodeId: 'node-generated',
+        type: 'generation',
+        title: '扁平插画',
+        created: true,
+      }],
+    }))
+    const { deps, adapter } = depsWith(
+      [
+        {
+          toolCalls: [{
+            id: 'plan-call',
+            name: 'applyPlan',
+            args: '{"summary":"设计一张类似的","nodes":[],"edges":[]}',
+          }],
+        },
+        { text: '节点已经建好。你希望我现在就运行这个节点并出图吗？' },
+      ],
+      undefined,
+      executeWrite,
+    )
+    const result = await runAgentTurn(user('设计一张类似的'), {
+      ...deps,
+      precheck: () => ({ ok: true }),
+    })
+
+    expect(adapter.completeText).toHaveBeenCalledTimes(2)
+    expect(result.kind).toBe('confirm')
+    if (result.kind === 'confirm') {
+      expect(result.request.name).toBe('runNode')
+      expect(result.request.args).toEqual({ nodeIds: ['node-generated'] })
+    }
+  })
+
+  it('★★ 上一轮正文问“是否运行”，下一轮只回复“允许”也要找回节点并弹确认卡', async () => {
+    const history: ChatMessage[] = [
+      { role: 'user', content: '设计一张类似的' },
+      {
+        role: 'assistant',
+        content: '',
+        toolCalls: [{
+          id: 'plan-call',
+          name: 'applyPlan',
+          args: '{"summary":"设计一张类似的","nodes":[],"edges":[]}',
+        }],
+      },
+      {
+        role: 'tool',
+        toolCallId: 'plan-call',
+        toolName: 'applyPlan',
+        content: JSON.stringify({
+          ok: true,
+          problems: [],
+          createdNodeIds: ['node-generated'],
+          resolvedNodes: [{
+            localId: 'v1',
+            nodeId: 'node-generated',
+            type: 'generation',
+            title: '扁平插画',
+            created: true,
+          }],
+        }),
+      },
+      {
+        role: 'assistant',
+        content: '你希望我现在就运行这个节点并出图吗？',
+      },
+      { role: 'user', content: '允许' },
+    ]
+    const { deps, adapter } = depsWith([{ text: '不应再请求模型' }])
+    const result = await runAgentTurn(history, {
+      ...deps,
+      precheck: () => ({ ok: true }),
+    })
+
+    expect(adapter.completeText).not.toHaveBeenCalled()
+    expect(result.kind).toBe('confirm')
+    if (result.kind === 'confirm') {
+      expect(result.request.name).toBe('runNode')
+      expect(result.request.args).toEqual({ nodeIds: ['node-generated'] })
+    }
+  })
+
   it('★ 没接预检时行为不变（不能变成静默丢弃）', async () => {
     const { deps } = depsWith([runNodeCall])
     const r = await runAgentTurn(user('建个流程'), deps)

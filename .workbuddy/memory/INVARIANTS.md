@@ -1,5 +1,18 @@
 # CanvasFlow 不变量详表
 
+## Agent 运行确认闭环（2026-11-10）
+
+- 模型用普通正文问“要不要运行”不等于确认卡。执行层必须用 `agentRunConfirmationGuard.ts` 检查最近一次成功 `applyPlan` 的 `resolvedNodes`，
+  只对 `created=true + type=generation` 的真实 nodeId 构造 `runNode` 请求；同回合问句直接转 `confirm`。
+- 下一回合用户只回 `允许 / 同意 / 确认 / 继续` 时，也必须从上一轮问题前的成功 `applyPlan` 找回节点，不得先重新调用模型或重新分析参考。
+- 自动构造 `runNode` 必须同时满足：本回合工具白名单包含 `runNode`，并且 `precheck` 没有失败。任一不满足时不得伪造确认卡，
+  也不能静默执行。
+- `referenceAnalysis` 阶段事件只在过程区显示标题摘要，不渲染完整 `what/howToUse`；完整参考明细留在可折叠的
+  `curateReferences` 步骤中。`User approved. Run the node.`、`Ask user to confirm` 等内部英文 reasoning 前缀不得进入用户可见正文。
+- `agentLoop.ts` 继续受 840 行预算约束；自动确认识别、applyPlan 目标提取和确认请求构造只能放在独立小模块，并登记 module governance。
+- UI 证据必须覆盖 1440×900 / 1024×700 × 明暗，记录 `hasReferenceSummary / leaksReferenceDetail / leaksInternalReasoning /
+  overflowX / panelInside / errors`；确认请求本身还必须由 AgentLoop 集成测试证明，不靠截图猜。
+
 ## 节点选中描边与缩放手柄边界（2026-11-10）
 
 - 节点选中框必须画在节点内部：`.frame.selected` 固定 `outline:none`，由 `::after` 使用 `inset:0`、

@@ -1,5 +1,13 @@
 # CanvasFlow（轻画）项目记忆
 
+### 总管2 第五十一轮：Agent 运行确认闭环（2026-11-10）
+
+- 真实故障不是“模型在等确认”，而是模型只把确认问题写成普通正文，没有调用 `runNode`，所以没有 `pendingConfirmation` 和确认卡；用户手打“允许”会开新回合，导致参考分析重复并显示 `User approved. Run the node.` 这类内部指令。
+- `agentRunConfirmationGuard.ts` 是执行层唯一补口：同回合检测“最近 `applyPlan` 成功创建 generation 节点 + assistant 正文询问运行”时，自动构造真实 `runNode` 确认请求；用户下一次只回允许/确认/继续时，从上一轮成功 `applyPlan.resolvedNodes` 找回目标，不再先请求模型。必须同时满足 `runNode` 在本回合白名单且 precheck 不失败，不能伪造确认卡。
+- `referenceAnalysis` 阶段只显示 `collapsedSummary/title`，不把完整 What/HowToUse 当过程正文。`curateReferences` 的完整明细继续留在可折叠步骤里；`User approved. Run the node.`、`Ask user to confirm` 等内部英文 reasoning 前缀必须过滤。
+- 维护预算：`agentLoop.ts` 保持 ≤840 行，自动确认逻辑独立在 `agentRunConfirmationGuard.ts`；新生产文件已在 module governance 登记。全量门禁为 278 semantic registrations。
+- 证据：真实当前会话四组 1440×900 / 1024×700 × 明暗 `hasReferenceSummary=true / leaksReferenceDetail=false / leaksInternalReasoning=false / overflowX=false / panelInside=true / errors=[]`；`npm run check` 全绿，全量 Vitest 659 passed / 1 skipped（5482 passed / 1 skipped），build 1266 modules，Impeccable detector `[]`。未 push。
+
 ### 总管2 第五十轮：节点选中边缘修复（2026-11-10）
 
 - 回归链：选中态从 2026-09-14 基线起使用节点外侧 `outline`；2026-11-08 `872543e2` 为 React Flow 节点加入 `content-visibility:auto` 后，WebView2 的变换/包含层会把外侧描边渲染成“四角白色弧线 + 黄色矩形”。普通生成节点只有 1 个缩放手柄，截图里的四个黄色框不是手柄，不能按手柄太多去修。
