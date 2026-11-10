@@ -12,6 +12,8 @@
 - UI 证据必须同时覆盖 Edge / Chrome 两个按钮的四组桌面视口，以及扩展弹窗和拖拽投放区亮暗态；
   商店点击只能用隔离 `window.open` 记录验证，不能真的提交安装。`capture-clipper-extension.mjs` 的
   `qinghua:clip-image` 页面 URL 必须是真实 HTTP 页面，不能用 `about:blank` 冒充。
+- 本地辅助安装脚本只能复制到 `%LOCALAPPDATA%\Qinghua\Clipper\extension`，不得写浏览器用户数据目录；
+  脚本可以打开扩展页、Explorer 和复制路径，但最终“加载未打包的扩展程序”必须由用户确认。
 
 ## 创作面板视图边界（2026-11-06）
 

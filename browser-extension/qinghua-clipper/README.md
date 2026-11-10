@@ -22,6 +22,27 @@
 
 ## 安装
 
+### 本地脚本辅助安装
+
+在项目根目录双击 `scripts\install-clipper-local.cmd`，脚本会：
+
+1. 把扩展复制到 `%LOCALAPPDATA%\Qinghua\Clipper\extension`；
+2. 把稳定目录复制到剪贴板；
+3. 打开 Chrome / Edge 扩展管理页和资源管理器。
+
+浏览器安全边界仍要求最后手动确认一次：开启开发者模式，点击“加载未打包的扩展程序”，
+粘贴剪贴板路径并选择该目录。之后浏览器会记住目录，无需重复安装。
+
+也可以仅准备文件而不打开窗口：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\install-clipper-local.ps1 -PrepareOnly
+```
+
+脚本明确拒绝直接向浏览器用户数据目录复制文件，因为 Chrome / Edge 不会把这种复制识别为已安装扩展。
+
+### 手动安装
+
 1. 打开 `chrome://extensions` 或 `edge://extensions`。
 2. 开启“开发者模式”。
 3. 选择“加载已解压的扩展程序”，指向本目录。

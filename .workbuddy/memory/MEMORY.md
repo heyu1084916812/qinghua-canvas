@@ -8,6 +8,7 @@
 - UI 证据：四组 1440×900 / 1024×700 × 明暗均 `mode=store / browsers=[edge,chrome] / opened=true / width=388/288 / insidePanel=true / overflowX=false / childrenOutsideX=0 / errors=0`。扩展 Chromium 六态含亮暗拖拽投放区，均 `ready=true / status=已收藏 / overflowX=false / errors=[]`，真实消息含 `https://example.com/reference` 与 `https://cdn.example.com/dragged.webp`。
 - 最终门禁：check 1134 modules / 4543 deps / 278 registrations；串行全量 Vitest 660 files（659 passed / 1 skipped）/ 5477 tests（5476 passed / 1 skipped）；Rust 80/80；build 1266 modules；Impeccable detector 0 findings。ZIP `release/qinghua-clipper-0.3.0.zip` 26,478 B，SHA-256 `AE14A99F874C7D355CEE41AF02FBE1082AB734CE93C5604BD565130DBCB84F78`。未 push。
 - 外部条件：Edge Add-ons 免费注册，Chrome Web Store 当前一次性开发者费；公开详情页还需账号主动上架。浏览器商店实际安装与 push 均未执行。
+- 商店上架前提供 `scripts/install-clipper-local.ps1` / `.cmd`：只复制到 `%LOCALAPPDATA%\Qinghua\Clipper\extension`，校验关键文件、复制稳定路径到剪贴板，并打开浏览器扩展页和 Explorer。Chrome/Edge 不识别裸复制进用户数据目录的扩展，最后必须由用户在“加载未打包的扩展程序”文件选择框确认一次；之后浏览器会记住该目录。
 
 ### 总管2 第四十八轮：轻画 Clipper 浏览器扩展正式版（2026-11-10）
 
