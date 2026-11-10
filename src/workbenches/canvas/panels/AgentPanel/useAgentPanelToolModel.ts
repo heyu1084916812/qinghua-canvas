@@ -4,6 +4,7 @@ import { resolveDefaults } from '../../../../features/canvas/createNodeWithDefau
 import { cropAsset, extractSelection } from '../../../../features/canvas/extractSelection'
 import { splitNodeToGrid } from '../../../../features/canvas/splitToGrid'
 import { loadInspirationSources } from '../../../../state/project/inspirationSourceStore'
+import { createPresetStore } from '../../../../state/project/presetStore'
 import { runDesignResearch } from '../../../../features/shared/research/designResearchRunner'
 import {
   executeConfirmedTool,
@@ -126,6 +127,7 @@ export function useAgentPanelToolModel({
         remember: (candidate) => memory.remember(candidate),
         readCachedSources: () => inspirationRepository.readAll(),
         readConfiguredSources: () => loadInspirationSources(platform.storage),
+        readWebSearch: () => createPresetStore(platform.storage).loadAgentWebSearch(),
         network: platform.network,
         runResearch: runDesignResearch,
         signal: () =>

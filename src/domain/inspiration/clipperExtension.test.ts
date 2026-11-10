@@ -24,7 +24,7 @@ describe('qinghua clipper extension contract', () => {
     }
 
     expect(manifest.manifest_version).toBe(3)
-    expect(manifest.version).toBe('0.4.4')
+    expect(manifest.version).toBe('0.4.5')
     expect(manifest.permissions).toEqual(['storage', 'scripting'])
     expect(manifest.host_permissions).toEqual([
       'http://127.0.0.1:53684/*',
@@ -62,8 +62,12 @@ describe('qinghua clipper extension contract', () => {
     expect(directImage).toContain('data-qinghua-drop-box')
     expect(directImage).toContain('qinghua:clip-image')
     expect(directImage).toContain("'data-original'")
+    expect(directImage).toContain("'data-zoom-image'")
     expect(directImage).toContain('bestSrcsetUrl')
     expect(directImage).toContain('backgroundImageUrlOf')
+    expect(directImage).toContain('elementsFromPoint')
+    expect(directImage).toContain('upgradeImageUrl')
+    expect(directImage).toContain('imageUrls: draggedImageUrls')
     expect(directImage).toContain('candidate.href === page.href')
     expect(`${popupStyle}\n${directImage}`).not.toMatch(
       /#(?:2f6b4f|80bd99|e7f2eb|25372c|2b4333|3b7b5c)/i,
@@ -134,7 +138,7 @@ describe('qinghua clipper extension contract', () => {
   })
 
   it('normalizes loopback input and posts the image without extra data', async () => {
-    const fetchMock = vi.fn(async () => ({
+    const fetchMock = vi.fn(async (_url: string, _request?: RequestInit) => ({
       ok: true,
       status: 200,
       json: async () => ({ ok: true }),
@@ -153,6 +157,10 @@ describe('qinghua clipper extension contract', () => {
       url: 'https://example.com/idea',
       title: '  Long   page title  ',
       imageUrl: 'https://cdn.example.com/idea.webp',
+      imageUrls: [
+        'https://cdn.example.com/idea.webp',
+        'https://cdn.example.com/original.webp',
+      ],
     })
 
     const [url, request] = fetchMock.mock.calls[0] as unknown as [
@@ -170,6 +178,10 @@ describe('qinghua clipper extension contract', () => {
       url: 'https://example.com/idea',
       title: 'Long page title',
       imageUrl: 'https://cdn.example.com/idea.webp',
+      imageUrls: [
+        'https://cdn.example.com/idea.webp',
+        'https://cdn.example.com/original.webp',
+      ],
     })
   })
 
@@ -179,7 +191,7 @@ describe('qinghua clipper extension contract', () => {
       status: 200,
       json: async () => ({ ok: true, token: 'paired-token' }),
     }))
-    const api = loadSharedApi(fetchMock, '0.4.4')
+    const api = loadSharedApi(fetchMock, '0.4.5')
 
     await expect(api.pairReceiver(
       'http://127.0.0.1:53684/clip',
@@ -191,7 +203,7 @@ describe('qinghua clipper extension contract', () => {
     expect(url).toBe('http://127.0.0.1:53684/pair')
     expect(request.method).toBe('POST')
     expect(request.headers['X-Qinghua-Clipper-Pair']).toBe('1')
-    expect(JSON.parse(request.body)).toEqual({ version: '0.4.4' })
+    expect(JSON.parse(request.body)).toEqual({ version: '0.4.5' })
   })
 
   it('surfaces authentication and health failures with recovery copy', async () => {
@@ -255,11 +267,47 @@ describe('qinghua clipper extension contract', () => {
     expect(response).toMatchObject({ ok: true, paired: true })
     expect(harness.storage.token).toBe('paired-token')
   })
+
+  it('forwards ordered original-image candidates from the page', async () => {
+    const fetchMock = vi.fn(async (_url: string, _request?: RequestInit) => ({
+      ok: true,
+      status: 200,
+      json: async () => ({ ok: true }),
+    }))
+    const harness = loadBackgroundApi(fetchMock)
+    harness.storage.token = 'paired-token'
+    await message(harness, {
+      type: 'qinghua:clip-image',
+      imageUrl: 'https://cdn.example.com/thumb.webp',
+      imageUrls: [
+        'https://cdn.example.com/thumb.webp',
+        'https://cdn.example.com/original.webp',
+      ],
+      title: 'Huaban original',
+    })
+
+    const request = fetchMock.mock.calls[0]?.[1] as unknown as {
+      body: string
+    }
+    expect(JSON.parse(request.body)).toMatchObject({
+      imageUrl: 'https://cdn.example.com/thumb.webp',
+      imageUrls: [
+        'https://cdn.example.com/thumb.webp',
+        'https://cdn.example.com/original.webp',
+      ],
+    })
+  })
 })
 
 function message(
   harness: ReturnType<typeof loadBackgroundApi>,
-  value: { type: string; enabled?: boolean },
+  value: {
+    type: string
+    enabled?: boolean
+    imageUrl?: string
+    imageUrls?: string[]
+    title?: string
+  },
 ): Promise<{ ok: boolean; error?: string; paired?: boolean }> {
   return new Promise((resolve) => {
     const keepChannel = harness.messageListener(
@@ -305,6 +353,7 @@ function loadSharedApi(
       url: string
       title: string
       imageUrl?: string
+      imageUrls?: string[]
     }): Promise<unknown>
   }
 }
@@ -322,7 +371,7 @@ function loadBackgroundApi(fetchMock: ReturnType<typeof vi.fn>) {
   }
   const chrome = {
     runtime: {
-      getManifest: () => ({ version: '0.4.4' }),
+      getManifest: () => ({ version: '0.4.5' }),
       onInstalled: { addListener: vi.fn() },
       onStartup: { addListener: vi.fn() },
       onMessage: {

@@ -137,6 +137,45 @@ describe('captureClipperImage', () => {
     })).rejects.toThrow('没有识别到可导入的图片')
   })
 
+  it('falls back to another original URL for the same dragged image', async () => {
+    const platform = createMemoryPlatform()
+    const collection = createClipperCollectionRepository(platform.storage)
+    const request = vi.fn(async (input: { url: string }) => {
+      if (input.url.endsWith('/blocked-thumb.webp')) {
+        return {
+          ...imageResponse(),
+          status: 403,
+          headers: { 'content-type': 'text/html' },
+          arrayBuffer: async () => new TextEncoder().encode('<html>blocked</html>').buffer,
+        }
+      }
+      return imageResponse()
+    })
+
+    const result = await capturePendingClipperClip({
+      pageUrl: 'https://huaban.com/pins/example',
+      imageUrl: 'https://cdn.example.com/blocked-thumb.webp',
+      imageUrls: [
+        'https://cdn.example.com/blocked-thumb.webp',
+        'https://cdn.example.com/original.webp',
+      ],
+      title: 'Huaban original',
+      network: { request, stream: async function* () {} },
+      signal: new AbortController().signal,
+      collection,
+    })
+
+    expect(request.mock.calls.map((call) => call[0].url)).toEqual([
+      'https://cdn.example.com/blocked-thumb.webp',
+      'https://cdn.example.com/original.webp',
+    ])
+    expect(result.items[0]).toMatchObject({
+      imageUrl: 'https://cdn.example.com/original.webp',
+      imageUrls: ['https://cdn.example.com/blocked-thumb.webp'],
+    })
+    expect(result.warnings).toEqual(['原图地址不可用，已使用备用地址'])
+  })
+
   it('does not fall back to a page preview when the drag has no image', async () => {
     const platform = createMemoryPlatform()
     const collection = createClipperCollectionRepository(platform.storage)
@@ -160,6 +199,7 @@ describe('capturePendingClipperQueue', () => {
           id: 'clip-ok',
           url: 'https://example.com/collection',
           imageUrl: 'https://cdn.example.com/dropped.webp',
+        imageUrls: ['https://cdn.example.com/original.webp'],
           title: 'Dropped reference',
         },
         {

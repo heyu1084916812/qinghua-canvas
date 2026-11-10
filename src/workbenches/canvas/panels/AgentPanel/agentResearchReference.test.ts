@@ -50,6 +50,17 @@ describe('agent research reference', () => {
     })
   })
 
+  it('keeps SearXNG as a distinct public research provider', () => {
+    expect(researchItemOf({
+      id: 'searxng:web:1:https://example.com',
+      title: 'Web result',
+      url: 'https://example.com',
+      imageUrl: '',
+      source: 'searxng',
+      description: 'Public search result',
+    }).source).toBe('searxng')
+  })
+
   it('stores the selected image as an asset and project reference', async () => {
     const platform = platformWithImage()
     const result = await addResearchCandidateToProject(

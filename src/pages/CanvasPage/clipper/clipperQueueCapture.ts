@@ -4,6 +4,8 @@ import type { NetworkPort } from '../../../platform/ports'
 import type { ClipperCollectionRepository } from '../../../state/shared/clipperCollectionRepository'
 import {
   ClipperCaptureError,
+} from './clipperImageValidation'
+import {
   capturePendingClipperClip,
 } from './clipperCapture'
 
@@ -13,6 +15,7 @@ export async function capturePendingClipperQueue(input: {
     url: string
     title?: string
     imageUrl?: string
+    imageUrls?: string[]
   }[]
   network: NetworkPort
   collection: ClipperCollectionRepository
@@ -43,6 +46,7 @@ export async function capturePendingClipperQueue(input: {
       const result = await capturePendingClipperClip({
         pageUrl: clip.url,
         imageUrl: clip.imageUrl,
+        imageUrls: clip.imageUrls,
         title: clip.title,
         network: input.network,
         collection: input.collection,

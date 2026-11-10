@@ -20,6 +20,10 @@ export async function ensureKitCardReference(
     role: item.role,
     name: item.name,
   }))
+  const colors = version.colors.map((item) =>
+    `${item.name.trim() || '颜色'} ${item.value}`)
+  const fonts = version.fonts.map((item) =>
+    `${item.name.trim() || '字体'}${item.detail.trim() ? ` ${item.detail.trim()}` : ''}`)
   return ensureReference(platform, projectId, {
     id: `ref_kit_${kit.id}`,
     title: kit.name,
@@ -30,6 +34,8 @@ export async function ensureKitCardReference(
       kit.description.trim(),
       version.guide.trim(),
       `包含 ${version.resources.length} 张图片、${version.colors.length} 个颜色、${version.fonts.length} 个字体。`,
+      colors.length > 0 ? `颜色：${colors.join('；')}。` : '',
+      fonts.length > 0 ? `字体：${fonts.join('；')}。` : '',
     ].filter(Boolean).join(' '),
     kit,
     version,

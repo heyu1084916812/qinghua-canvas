@@ -50,6 +50,8 @@ describe('kit reference projection', () => {
     ])
     expect(item.kitVersion).toBe(3)
     expect(item.what).toContain('2 张图片')
+    expect(item.what).toContain('主色 #8fc466')
+    expect(item.what).toContain('ABeeZee Regular')
     expect(rows).toHaveLength(1)
     expect(rows[0]).toMatchObject({
       id: item.id,

@@ -20,6 +20,10 @@ import {
   KitFontsSection,
   type KitMenuState,
 } from './MyAssetsKitSections'
+import {
+  KitFilterEmpty,
+  useMyAssetsKitFilters,
+} from './MyAssetsKitFilters'
 import styles from './MyAssetsKitDetail.module.css'
 
 type ImageTarget = { role: ContextKitAsset['role']; replace?: ContextKitAsset }
@@ -73,6 +77,8 @@ export function MyAssetsKitDetail({
 
   const logo = current?.resources.filter((item) => item.role === 'logo') ?? []
   const photos = current?.resources.filter((item) => item.role !== 'logo') ?? []
+  const hasContent = Boolean(logo.length || photos.length || current?.colors.length || current?.fonts.length)
+  const filters = useMyAssetsKitFilters(hasContent)
 
   const saveVersion = async (
     patch: { description?: string; guide?: string; resources?: ContextKitAsset[]; colors?: ContextKitColor[]; fonts?: ContextKitFont[] },
@@ -276,15 +282,18 @@ export function MyAssetsKitDetail({
           <IconChevronLeft size={18} />
         </button>
         <h2>{kit.name}</h2>
-        <button
-          type="button"
-          className={styles.iconButton}
-          aria-label="管理套件"
-          title="管理套件"
-          onClick={onOpenEditor}
-        >
-          <IconMore size={18} />
-        </button>
+        <div className={styles.headActions}>
+          {filters.filterControl}
+          <button
+            type="button"
+            className={styles.iconButton}
+            aria-label="管理套件"
+            title="管理套件"
+            onClick={onOpenEditor}
+          >
+            <IconMore size={18} />
+          </button>
+        </div>
       </header>
 
       <input
@@ -350,7 +359,7 @@ export function MyAssetsKitDetail({
         )}
       </section>
 
-      <KitAssetsSection
+      {filters.showImages ? <KitAssetsSection
         title="Logo"
         role="logo"
         items={logo}
@@ -360,18 +369,18 @@ export function MyAssetsKitDetail({
         onMenu={(key) => setOpenMenu(key)}
         onReupload={(item) => chooseImage({ role: item.role, replace: item })}
         onDelete={(item) => void removeResource(item)}
-      />
+      /> : null}
 
-      <KitColorsSection
+      {filters.showColors ? <KitColorsSection
         colors={current?.colors ?? []}
         openMenu={openMenu}
         onMenu={setOpenMenu}
         onAdd={addColor}
         onUpdate={updateColor}
         onDelete={removeColor}
-      />
+      /> : null}
 
-      <KitFontsSection
+      {filters.showFonts ? <KitFontsSection
         fonts={current?.fonts ?? []}
         fontLibrary={fontLibrary.fonts}
         openMenu={openMenu}
@@ -389,9 +398,9 @@ export function MyAssetsKitDetail({
             '字体已删除',
           )
         }}
-      />
+      /> : null}
 
-      <KitAssetsSection
+      {filters.showImages ? <KitAssetsSection
         title="照片"
         role="reference"
         items={photos}
@@ -401,7 +410,11 @@ export function MyAssetsKitDetail({
         onMenu={(key) => setOpenMenu(key)}
         onReupload={(item) => chooseImage({ role: item.role, replace: item })}
         onDelete={(item) => void removeResource(item)}
-      />
+      /> : null}
+
+      {filters.filterEmpty
+        ? <KitFilterEmpty onClear={filters.clearFilters} />
+        : null}
 
       <p className={styles.status} aria-live="polite">{status}</p>
       <button

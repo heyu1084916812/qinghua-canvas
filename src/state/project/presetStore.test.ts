@@ -122,6 +122,19 @@ describe('Agent 默认模型 · UI 偏好', () => {
     expect(await createPresetStore(platform.storage).loadAgentCanvasReview()).toBe(false)
     expect(await createPresetStore(createMemoryPlatform().storage).loadAgentCanvasReview()).toBe(false)
   })
+
+  it('web search normalizes the SearXNG endpoint and persists it', async () => {
+    const platform = createMemoryPlatform()
+    const presets = createPresetStore(platform.storage)
+
+    expect(await presets.loadAgentWebSearch()).toEqual({
+      endpoint: 'https://www.isci.si/search',
+    })
+    await presets.saveAgentWebSearch({ endpoint: 'https://search.example.com' })
+    expect(await createPresetStore(platform.storage).loadAgentWebSearch()).toEqual({
+      endpoint: 'https://search.example.com/search',
+    })
+  })
 })
 
 /**

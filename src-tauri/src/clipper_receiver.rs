@@ -22,6 +22,8 @@ struct ClipRequest {
     url: String,
     title: Option<String>,
     image_url: Option<String>,
+    #[serde(default)]
+    image_urls: Vec<String>,
 }
 
 #[derive(Clone, Debug, Default, Deserialize)]
@@ -36,6 +38,7 @@ pub struct PendingClip {
     pub url: String,
     pub title: Option<String>,
     pub image_url: Option<String>,
+    pub image_urls: Vec<String>,
     pub received_at: u64,
 }
 
@@ -318,21 +321,37 @@ pub fn clipper_ack_pending(ids: Vec<String>) -> Vec<PendingClip> {
 
 fn normalize_clip(input: ClipRequest) -> Result<PendingClip, String> {
     let url = parse_public_http_url(&input.url)?;
-    let image_url = input
-        .image_url
-        .map(|value| parse_public_http_url(&value))
-        .transpose()?;
+    let mut image_urls = Vec::new();
+    if let Some(value) = input.image_url {
+        push_unique_image_url(&mut image_urls, &value)?;
+    }
+    for value in input.image_urls {
+        push_unique_image_url(&mut image_urls, &value)?;
+        if image_urls.len() >= 8 {
+            break;
+        }
+    }
+    let image_url = image_urls.first().cloned();
     let title = input.title.unwrap_or_default().trim().chars().take(300).collect::<String>();
     Ok(PendingClip {
         id: format!("clip-{}", NEXT_ID.fetch_add(1, Ordering::Relaxed)),
         url,
         title: (!title.is_empty()).then_some(title),
         image_url,
+        image_urls,
         received_at: SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .map(|duration| duration.as_millis() as u64)
             .unwrap_or_default(),
     })
+}
+
+fn push_unique_image_url(urls: &mut Vec<String>, raw: &str) -> Result<(), String> {
+    let normalized = parse_public_http_url(raw)?;
+    if !urls.iter().any(|value| value == &normalized) {
+        urls.push(normalized);
+    }
+    Ok(())
 }
 
 fn parse_public_http_url(raw: &str) -> Result<String, String> {
@@ -362,6 +381,7 @@ mod tests {
             url: url.to_string(),
             title: title.map(str::to_string),
             image_url: None,
+            image_urls: Vec::new(),
         }
     }
 
@@ -396,10 +416,21 @@ mod tests {
     fn accepts_a_public_dropped_image_url() {
         let mut input = request("https://example.com/page", Some("Page"));
         input.image_url = Some("https://cdn.example.com/image.webp".to_string());
+        input.image_urls = vec![
+            "https://cdn.example.com/image.webp".to_string(),
+            "https://cdn.example.com/original.webp".to_string(),
+        ];
         let clip = normalize_clip(input).unwrap();
         assert_eq!(
             clip.image_url.as_deref(),
             Some("https://cdn.example.com/image.webp"),
+        );
+        assert_eq!(
+            clip.image_urls,
+            vec![
+                "https://cdn.example.com/image.webp".to_string(),
+                "https://cdn.example.com/original.webp".to_string(),
+            ],
         );
 
         let mut invalid = request("https://example.com/page", None);

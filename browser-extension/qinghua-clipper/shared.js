@@ -150,6 +150,11 @@
     if (input.imageUrl && !imageUrl) {
       throw new ClipperError('拖入的图片地址不是公开 HTTP/HTTPS 地址', 0, 'image')
     }
+    const imageUrls = [...new Set(
+      [imageUrl, ...(Array.isArray(input.imageUrls) ? input.imageUrls : [])]
+        .map((value) => normalizePageUrl(value))
+        .filter(Boolean),
+    )].slice(0, 8)
     const token = String(input.token || '').trim()
     if (!token) {
       throw new ClipperError('轻画尚未自动配对，请确认轻画已打开', 0, 'not-paired')
@@ -165,7 +170,8 @@
         body: JSON.stringify({
           url: pageUrl,
           title: cleanTitle(input.title, pageUrl),
-          ...(imageUrl ? { imageUrl } : {}),
+          ...(imageUrls[0] ? { imageUrl: imageUrls[0] } : {}),
+          ...(imageUrls.length > 1 ? { imageUrls } : {}),
         }),
       },
       15_000,

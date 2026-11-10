@@ -9,25 +9,15 @@ import { IconChevronLeft } from '../../workbenches/canvas/toolbar/icons'
 import { ReferenceLightbox } from './ReferenceLightbox'
 import { kitItemsOf, ReferenceKitItems, type KitImageItem } from './ReferenceKitItems'
 import {
+  DISABLED_KIT_KINDS,
+  DISABLED_KIT_SOURCES,
   matchesReferenceFilters,
-  ReferenceFilterButton,
-  ReferenceFilterFields,
   toggledReferenceFilter,
   type ReferenceKindFilter,
   type ReferenceSourceFilter,
 } from './ReferenceFilterFields'
+import { ReferenceFilterControl } from './ReferenceFilterControl'
 import styles from './ReferenceKitPanel.module.css'
-
-const DISABLED_KIT_SOURCES = new Set<ReferenceSourceFilter>([
-  'file',
-  'link',
-  'connector',
-])
-const DISABLED_KIT_KINDS = new Set<ReferenceKindFilter>([
-  'video',
-  'document',
-  'audio',
-])
 
 export function ReferenceKitPanel({
   projectId,
@@ -51,7 +41,6 @@ export function ReferenceKitPanel({
     new Set(),
   )
   const [kindFilters, setKindFilters] = useState<Set<ReferenceKindFilter>>(new Set())
-  const [filterOpen, setFilterOpen] = useState(false)
   const [lightbox, setLightbox] = useState<{
     items: ReferenceItem[]
     initialItemId: string
@@ -122,8 +111,7 @@ export function ReferenceKitPanel({
         onKeyDown={(event) => {
           if (event.key !== 'Escape') return
           event.stopPropagation()
-          if (filterOpen) setFilterOpen(false)
-          else onBack()
+          onBack()
         }}
       >
         <header className={styles.head}>
@@ -138,16 +126,9 @@ export function ReferenceKitPanel({
             <IconChevronLeft size={18} />
           </button>
           <h2>{kit.name}</h2>
-          <ReferenceFilterButton
+          <ReferenceFilterControl
             scope="kit"
-            open={filterOpen}
             label="筛选套件内容"
-            onToggle={() => setFilterOpen((current) => !current)}
-          />
-        </header>
-        {filterOpen ? (
-          <ReferenceFilterFields
-            scope="kit"
             sourceValues={sourceFilters}
             kindValues={kindFilters}
             disabledSources={DISABLED_KIT_SOURCES}
@@ -155,7 +136,7 @@ export function ReferenceKitPanel({
             onToggleSource={toggleSource}
             onToggleKind={toggleKind}
           />
-        ) : null}
+        </header>
         {!version ? (
           <p className={styles.empty}>这个套件还没有保存版本。</p>
         ) : visible.length === 0 ? (

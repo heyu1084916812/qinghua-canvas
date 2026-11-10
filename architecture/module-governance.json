@@ -918,6 +918,30 @@
       "budget": 160
     },
     {
+      "module": "src/pages/CanvasPage/clipper/clipperImageValidation.ts",
+      "owner": "clipper-capture",
+      "responsibility": "校验浏览器拖入的主图与备用原图地址，只有真实图片字节才允许进入收藏队列。",
+      "owns": [
+        "图片 HTTP 状态和可重试错误分类",
+        "文件头 MIME、尺寸和像素上限校验",
+        "页面地址冒充图片地址识别"
+      ],
+      "doesNotOwn": [
+        "拖拽图片候选选择",
+        "收藏条目持久化",
+        "面板状态与提示"
+      ],
+      "publicApi": [
+        "ClipperCaptureError",
+        "samePageUrl",
+        "validateClipperImage"
+      ],
+      "test": [
+        "src/pages/CanvasPage/clipper/clipperCapture.test.ts"
+      ],
+      "budget": 80
+    },
+    {
       "module": "src/pages/CanvasPage/clipper/clipperQueueCapture.ts",
       "owner": "clipper-capture",
       "responsibility": "逐条导入浏览器待收快照，只返回成功确认 id，并把失败原因保留给面板重试。",
@@ -6530,6 +6554,29 @@
       "budget": 80
     },
     {
+      "module": "src/features/settings/AgentWebSearchSettings.tsx",
+      "owner": "agent-web-search-settings",
+      "responsibility": "Edits the SearXNG endpoint used by Agent open research.",
+      "owns": [
+        "Search endpoint draft and validation",
+        "Preset persistence",
+        "Built-in provider explanation"
+      ],
+      "doesNotOwn": [
+        "Search execution",
+        "Result projection",
+        "Agent tool routing"
+      ],
+      "publicApi": [
+        "AgentWebSearchSettings"
+      ],
+      "test": [
+        "src/app/uiSevenPoints.test.ts",
+        "scripts/capture-ui-seven-points.mjs"
+      ],
+      "budget": 160
+    },
+    {
       "module": "src/features/settings/CanvasMcpPanel.tsx",
       "owner": "settings-canvas-mcp-panel",
       "responsibility": "展示 Canvas MCP 网关状态、工具范围、验证入口和可复制的 harness 配置。",
@@ -7380,6 +7427,30 @@
       "budget": 450
     },
     {
+      "module": "src/pages/CanvasPage/MyAssetsKitFilters.tsx",
+      "owner": "canvas-my-assets-kit-filters",
+      "responsibility": "Connects the shared filter control to kit section visibility.",
+      "owns": [
+        "Kit source and kind filter state",
+        "Image, color and font section visibility",
+        "Filtered empty state copy"
+      ],
+      "doesNotOwn": [
+        "Kit editing and persistence",
+        "Filter popover interaction",
+        "Agent handoff"
+      ],
+      "publicApi": [
+        "useMyAssetsKitFilters",
+        "KitFilterEmpty"
+      ],
+      "test": [
+        "src/app/uiSevenPoints.test.ts",
+        "scripts/capture-ui-seven-points.mjs"
+      ],
+      "budget": 120
+    },
+    {
       "module": "src/pages/CanvasPage/MyAssetsKitDetail.module.css",
       "owner": "canvas-my-assets-kit-detail-style",
       "responsibility": "Styles the direct kit editor and its item action menus.",
@@ -7602,6 +7673,10 @@
         "ReferenceKindFilter",
         "REFERENCE_SOURCE_FILTERS",
         "REFERENCE_KIND_FILTERS",
+        "KIT_KIND_FILTERS",
+        "DISABLED_KIT_SOURCES",
+        "DISABLED_KIT_KINDS",
+        "kitFilterGroupVisible",
         "ReferenceFilterButton",
         "ReferenceFilterFields",
         "referenceSourceFilter",
@@ -7613,6 +7688,29 @@
         "src/app/uiSevenPoints.test.ts"
       ],
       "budget": 220
+    },
+    {
+      "module": "src/pages/CanvasPage/ReferenceFilterControl.tsx",
+      "owner": "canvas-reference-filter-control",
+      "responsibility": "Owns the shared reference and kit filter popover interaction.",
+      "owns": [
+        "Open and close state",
+        "Outside pointer dismissal",
+        "Escape dismissal and focus-safe event handling"
+      ],
+      "doesNotOwn": [
+        "Filter vocabulary",
+        "Reference or kit item filtering",
+        "Persistence"
+      ],
+      "publicApi": [
+        "ReferenceFilterControl"
+      ],
+      "test": [
+        "src/app/uiSevenPoints.test.ts",
+        "scripts/capture-ui-seven-points.mjs"
+      ],
+      "budget": 120
     },
     {
       "module": "src/pages/CanvasPage/ReferenceFilterFields.module.css",

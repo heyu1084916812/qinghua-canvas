@@ -485,6 +485,16 @@ function CanvasProject({ projectId }: { projectId: string }) {
             >
               默认值
             </button>
+            <button
+              type="button"
+              className={styles.topBtn}
+              data-canvas-browser-open
+              aria-label="打开画布浏览器"
+              title="打开画布浏览器"
+              onClick={() => setCanvasBrowserUrl('https://www.bing.com/')}
+            >
+              浏览器
+            </button>
           </div>
           <div className={styles.topRightActions}>
             <button

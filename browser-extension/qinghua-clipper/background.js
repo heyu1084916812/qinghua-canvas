@@ -123,13 +123,19 @@ async function connectReceiver() {
 async function clipImageFromTab(tab, message) {
   const pageUrl = QinghuaClipper.normalizePageUrl(message.pageUrl)
     || QinghuaClipper.normalizePageUrl(tab?.url)
-  const imageUrl = QinghuaClipper.normalizePageUrl(message.imageUrl)
+  const imageUrls = [...new Set(
+    [message.imageUrl, ...(Array.isArray(message.imageUrls) ? message.imageUrls : [])]
+      .map((value) => QinghuaClipper.normalizePageUrl(value))
+      .filter(Boolean),
+  )].slice(0, 8)
+  const imageUrl = imageUrls[0] || ''
   if (!pageUrl || !imageUrl) {
     throw new Error('没有识别到可收藏的图片地址')
   }
   return sendClip({
     pageUrl,
     imageUrl,
+    imageUrls,
     title: String(message.title || tab?.title || '').trim(),
   })
 }
@@ -152,6 +158,7 @@ async function sendClip(input) {
         url: input.pageUrl,
         title: input.title,
         imageUrl: input.imageUrl,
+        imageUrls: input.imageUrls,
       })
     } catch (error) {
       if (error?.code !== 'auth' && error?.code !== 'not-paired') throw error
@@ -162,6 +169,7 @@ async function sendClip(input) {
         url: input.pageUrl,
         title: input.title,
         imageUrl: input.imageUrl,
+        imageUrls: input.imageUrls,
       })
     }
 

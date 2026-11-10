@@ -5,6 +5,7 @@ export interface ClipperPendingClip {
   url: string
   title?: string
   imageUrl?: string
+  imageUrls?: string[]
   receivedAt: number
 }
 

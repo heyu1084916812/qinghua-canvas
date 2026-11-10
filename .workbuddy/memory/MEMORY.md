@@ -1,5 +1,12 @@
 # CanvasFlow（轻画）项目记忆
 
+### 总管2 第六十五轮：Clipper 主图识别与多候选原图回退（2026-11-11）
+- 用户这次同时遇到“抓到笑脸/头像”和“有时完全进不来”。前者是拖拽候选没有按指针位置与可见面积竞争；后者是花瓣 CDN 对桌面端二次下载可能返回 403/抗爬 HTML，即使扩展端看到图片也不能保证桌面端能重取同一个 URL。
+- 对照的公开实现：MIT [Image Picka](https://github.com/eight04/image-picka) 的 `picture/srcset`、懒加载属性和背景图提取；MIT [Huaban Downloader](https://github.com/dddzzz123-dz/huaban-downloader) 的原图/API 思路；[PickTrue](https://github.com/winkidney/PickTrue) 的花瓣原图 key；GPL [KellyC Image Downloader](https://github.com/NC22/KellyC-Image-Downloader) 的原始图/预览图分类和 Pinterest `originals` 规则。只借鉴行为边界，没有复制 GPL 源码。
+- `drop-target.js` 现在按 `target + elementsFromPoint + 最近卡片容器`收集图片，以“直接命中、指针覆盖、可见面积、自然像素、URL UI 标记”排序；只有赢得竞争的那张图会生成候选 URL。候选顺序把原图属性、`picture/srcset`、`srcset`、`currentSrc/src` 都纳入，并升级花瓣 `_fw*` 与 Pinterest 尺寸路径。
+- 同一张图的候选链通过 `imageUrls` 经过 background、Rust 队列、前端导入和 `saveDesignResearchItem`；桌面端第一次取图失败会继续试原图/备用地址。不要再退化回“只传一个 `imageUrl`”，否则防盗链场景仍会偶发空面板。
+- 回归证据：`.playwright-verify/clipper-extension/report.json` 新增花瓣遮挡卡片组选中 `huaban-original` 而不是头像；`check:clipper-all-pages` 为 `0.4.5 / http=true / https=true`；四组 UI 无横向溢出和页面错误；隔离 release 更新 `0.4.2→0.4.5 / reloadRequired=true / stagingLeftovers=[]`。门禁：`npm run check` 1167 modules / 4688 dependencies / 311 registrations；串行全量 Vitest 668 files（667 passed / 1 skipped）/ 5517 tests（5516 passed / 1 skipped）；Rust 86/86；build 1299 modules；Tauri release `--no-bundle` 资源 manifest `0.4.5`。ZIP `release/qinghua-clipper-0.4.5.zip`，SHA-256 `648C95BAD2CC7567B1D77909BF714B3204B64E7C082E774204B4BCE8FFA9F184`。未 push。
+
 ### 总管2 第六十四轮：Clipper 取错图、永久坏项与 GitHub 采集实现对照（2026-11-11）
 - 花瓣截图里的笑脸不是用户原图，而是“没拿到真实图片 URL 后抓整页 Open Graph”的后果。旧内容脚本把 `currentSrc/uri-list` 当第一优先，纯网页地址也会进入 `/clip`；旧 capture 又允许 `imageUrl` 缺失时抓整页，这两个口子必须同时关。
 - 对照 GitHub [Image Picka](https://github.com/eight04/image-picka)：拖拽目标可能是链接/卡片，不能只 `closest('img')`；要查容器内最大可见图，并处理 `data-original / data-src / data-actualsrc / data-echo / srcset / picture / background-image`。本仓库已按这些边界实现，并拒绝同页 URL 冒充图片。

@@ -81,6 +81,12 @@ try {
     viewport: { width: 1024, height: 700 },
     variant: 'page-only',
   }))
+  report.push(await captureDropTarget({
+    name: 'light-huaban-overlay-original',
+    theme: 'light',
+    viewport: { width: 1440, height: 900 },
+    variant: 'huaban-card',
+  }))
   await writeFile(
     resolve(output, 'report.json'),
     `${JSON.stringify(report, null, 2)}\n`,
@@ -205,6 +211,14 @@ async function captureDropTarget({ name, theme, viewport, variant }) {
       'base64',
     ),
   }))
+  await context.route('https://gd-hbimg.huaban.com/**', (route) => route.fulfill({
+    status: 200,
+    contentType: 'image/png',
+    body: Buffer.from(
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAFgwJ/lYQ7WQAAAABJRU5ErkJggg==',
+      'base64',
+    ),
+  }))
   await page.goto('https://example.com/reference', {
     waitUntil: 'domcontentloaded',
   })
@@ -234,7 +248,11 @@ async function captureDropTarget({ name, theme, viewport, variant }) {
     timeout: 5_000,
   })
   await page.evaluate(({ fixtureVariant }) => {
-    const source = document.querySelector('#drag-source')
+    const source = fixtureVariant === 'huaban-card'
+      ? document.querySelector('[data-card-action]')
+      : document.querySelector('#drag-source')
+    const anchor = document.querySelector('#source-image') || document.querySelector('#drag-source')
+    const bounds = anchor.getBoundingClientRect()
     const dataTransfer = new DataTransfer()
     dataTransfer.setData('text/uri-list', fixtureVariant === 'page-only'
       ? 'https://example.com/reference'
@@ -243,6 +261,8 @@ async function captureDropTarget({ name, theme, viewport, variant }) {
       bubbles: true,
       cancelable: true,
       dataTransfer,
+      clientX: bounds.left + bounds.width / 2,
+      clientY: bounds.top + bounds.height / 2,
     }))
   }, { fixtureVariant: variant })
   await page.waitForFunction(
@@ -298,6 +318,7 @@ async function captureDropTarget({ name, theme, viewport, variant }) {
     lazy: 'https://cdn.example.com/original.jpg',
     picture: 'https://cdn.example.com/large.webp',
     background: 'https://cdn.example.com/background.jpg',
+    'huaban-card': 'https://gd-hbimg.huaban.com/huaban-original',
     'page-only': '',
   }[variant]
   const passed = variant === 'page-only'
@@ -337,6 +358,18 @@ function dropTargetFixture(variant) {
       <a id="drag-source" class="background"
         style="background-image:url('https://cdn.example.com/background.jpg')"
         href="https://example.com/background"></a>
+    </section>`
+  }
+  if (variant === 'huaban-card') {
+    return `<section id="drag-source" class="card" style="position:relative;min-height:300px">
+      <img id="source-image" alt="花瓣采集灵感图"
+        src="https://gd-hbimg.huaban.com/huaban-original_fw192webp"
+        srcset="https://gd-hbimg.huaban.com/huaban-original_fw480webp 2x" />
+      <button data-card-action type="button"
+        style="position:absolute;left:12px;top:12px;width:52px;height:52px;border:0;padding:0;background:transparent">
+        <img class="avatar" alt="用户头像" src="https://cdn.example.com/avatar.png"
+          style="width:44px;height:44px;border-radius:50%" />
+      </button>
     </section>`
   }
   return `<section class="card">

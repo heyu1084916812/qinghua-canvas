@@ -43,6 +43,7 @@ import {
   subscribeAgentCanvasReview,
 } from '../../state/ui/agentCanvasReview'
 import { AgentMemoryPanel } from './AgentMemoryPanel'
+import { AgentWebSearchSettings } from './AgentWebSearchSettings'
 import { ChoicePicker } from '../shared/choicePicker/ChoicePicker'
 import { SettingsRow } from './SettingsRow'
 import styles from './AgentSettingsPanel.module.css'
@@ -417,6 +418,7 @@ export function AgentSettingsPanel({
               <p>工具按来源分组；所有调用都经过 ToolRegistry 的权限与确认检查。</p>
             </div>
             <CanvasReviewSettings />
+            <AgentWebSearchSettings />
             <div className={styles.toolGroups}>
               {visibleToolGroups.map((group) => (
                 <section key={group.title} className={styles.toolGroup}>

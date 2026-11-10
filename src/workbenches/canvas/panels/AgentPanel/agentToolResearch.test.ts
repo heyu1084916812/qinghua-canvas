@@ -87,6 +87,7 @@ const harness = (init: HarnessInit = {}) => {
       if (init.configuredThrows !== undefined) throw init.configuredThrows
       return init.configuredSources ?? []
     },
+    readWebSearch: async () => ({ endpoint: 'https://search.example.com/search' }),
     network,
     runResearch: async (input, deps, signal) => {
       researchCalls.push({ input, deps, signal })
@@ -236,6 +237,7 @@ describe('researchDesign', () => {
         started.push('configured')
         return configuredPromise
       },
+      readWebSearch: async () => ({ endpoint: 'https://search.example.com/search' }),
       network,
       runResearch: async (input) => ({ ok: true, topic: input.topic }),
       signal: () => new AbortController().signal,
@@ -267,6 +269,9 @@ describe('researchDesign', () => {
       maxResults: 5,
     })
     expect(researchCalls[0].deps.network).toBe(network)
+    expect(researchCalls[0].deps.webSearch).toEqual({
+      endpoint: 'https://search.example.com/search',
+    })
     expect(researchCalls[0].signal).toBe(signal)
   })
 

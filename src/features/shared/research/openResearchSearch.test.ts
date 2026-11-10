@@ -13,7 +13,7 @@ function response(payload: unknown) {
 }
 
 describe('searchOpenResearch', () => {
-  it('searches Openverse images and Wikipedia content in parallel', async () => {
+  it('searches Openverse images, Wikipedia content and SearXNG web results in parallel', async () => {
     const request = vi.fn<NetworkPort['request']>(async (input) => {
       if (input.url.startsWith('https://api.openverse.org/')) {
         return response({
@@ -26,6 +26,20 @@ describe('searchOpenResearch', () => {
             creator: 'Example',
             license: 'by',
             license_url: 'https://creativecommons.org/licenses/by/4.0/',
+          }],
+        })
+      }
+      if (input.url.startsWith('https://search.example.com/search')) {
+        if (input.url.includes('categories=images')) {
+          return response({ results: [] })
+        }
+        return response({
+          results: [{
+            title: 'Packaging inspiration',
+            url: 'https://example.com/packaging-inspiration',
+            content: 'A public collection of packaging references.',
+            thumbnail: 'https://example.com/packaging.jpg',
+            engine: 'duckduckgo',
           }],
         })
       }
@@ -50,9 +64,10 @@ describe('searchOpenResearch', () => {
       '可持续包装',
       8,
       new AbortController().signal,
+      { endpoint: 'https://search.example.com/search' },
     )
 
-    expect(request).toHaveBeenCalledTimes(2)
+    expect(request).toHaveBeenCalledTimes(4)
     expect(result.warnings).toEqual([])
     expect(result.items).toEqual([
       expect.objectContaining({
@@ -66,6 +81,11 @@ describe('searchOpenResearch', () => {
         title: '可持续包装',
         imageUrl: 'https://upload.wikimedia.org/example.jpg',
       }),
+      expect.objectContaining({
+        source: 'searxng',
+        title: 'Packaging inspiration',
+        imageUrl: 'https://example.com/packaging.jpg',
+      }),
     ])
   })
 
@@ -73,6 +93,9 @@ describe('searchOpenResearch', () => {
     const request = vi.fn<NetworkPort['request']>(async (input) => {
       if (input.url.startsWith('https://api.openverse.org/')) {
         throw new Error('openverse offline')
+      }
+      if (input.url.startsWith('https://search.example.com/search')) {
+        return response({ results: [] })
       }
       return response({
         query: {
@@ -93,6 +116,7 @@ describe('searchOpenResearch', () => {
       'brand',
       4,
       new AbortController().signal,
+      { endpoint: 'https://search.example.com/search' },
     )
 
     expect(result.items.map((item) => item.source)).toEqual(['wikipedia'])

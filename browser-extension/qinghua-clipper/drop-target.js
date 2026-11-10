@@ -11,11 +11,28 @@
     'data-hi-res-src',
     'data-large-src',
     'data-full-src',
+    'data-zoom-image',
+    'data-origin',
+    'data-image-url',
+    'data-image',
+    'data-pin-media',
   ]
+  const IMAGE_CONTEXT_SELECTOR = [
+    'a',
+    'picture',
+    'figure',
+    'article',
+    'li',
+    '[data-pin-id]',
+    '[data-testid*="pin"]',
+    '[class*="pin"]',
+    '[class*="card"]',
+    '[class*="item"]',
+  ].join(',')
   if (document.getElementById(HOST_ID)) return
 
   let hideTimer = 0
-  let lastDraggedImage = ''
+  let draggedImageUrls = []
   let keepAfterDrop = false
   const host = document.createElement('div')
   host.id = HOST_ID
@@ -122,8 +139,8 @@
   }
 
   const onDragStart = (event) => {
-    lastDraggedImage = draggedImageSource(event)
-    if (!lastDraggedImage && !looksLikeImageDrag(event.dataTransfer)) return
+    draggedImageUrls = imageUrlsForDrag(event)
+    if (draggedImageUrls.length === 0 && !looksLikeImageDrag(event.dataTransfer)) return
     keepAfterDrop = false
     show()
   }
@@ -156,6 +173,7 @@
         type: 'qinghua:clip-image',
         pageUrl: location.href,
         imageUrl,
+        imageUrls: draggedImageUrls,
         title: document.title,
       })
       if (!response?.ok) throw new Error(response?.error || '轻画没有接收这张图片')
@@ -208,7 +226,7 @@
 
   function imageUrlOf(dataTransfer) {
     if (!dataTransfer) return ''
-    const directImage = imageCandidate(lastDraggedImage)
+    const directImage = draggedImageUrls.map(imageCandidate).find(Boolean)
     if (directImage) return directImage
     const uriList = dataTransfer.getData('text/uri-list')
       .split(/\r?\n/)
@@ -220,50 +238,122 @@
       || imageCandidate(plain)
   }
 
+  function imageUrlsForDrag(event) {
+    const point = { x: event.clientX, y: event.clientY }
+    const candidates = []
+    const seenImages = new Set()
+    const seenBackgrounds = new Set()
+
+    const addImage = (image, bonus) => {
+      if (!image || seenImages.has(image)) return
+      seenImages.add(image)
+      const urls = imageSourceUrls(image)
+      if (urls.length === 0) return
+      candidates.push({
+        score: imageScore(image, point, bonus),
+        urls,
+      })
+    }
+    const addBackground = (url, element, bonus) => {
+      const normalized = imageCandidate(url)
+      if (!normalized || seenBackgrounds.has(normalized)) return
+      seenBackgrounds.add(normalized)
+      candidates.push({
+        score: elementScore(element, point, bonus),
+        urls: withUpgradedImageUrl(normalized),
+      })
+    }
+
+    const target = event.target instanceof Element ? event.target : null
+    const underPointer = document.elementFromPoint(point.x, point.y)
+    addImage(imageElementOf(target, point), 50_000_000)
+    addImage(imageElementOf(underPointer, point), 40_000_000)
+
+    for (const element of document.elementsFromPoint(point.x, point.y).slice(0, 8)) {
+      addImage(imageElementOf(element, point), 20_000_000)
+      const background = backgroundImageUrlOf(element)
+      if (background) addBackground(background, element, 10_000_000)
+    }
+
+    let context = target?.closest(IMAGE_CONTEXT_SELECTOR)
+      || (underPointer instanceof Element
+        ? underPointer.closest(IMAGE_CONTEXT_SELECTOR)
+        : null)
+    for (let depth = 0; context && depth < 4; depth += 1) {
+      for (const image of context.querySelectorAll('img, input[type="image"]')) {
+        addImage(image, 0)
+      }
+      context = context.parentElement?.closest(IMAGE_CONTEXT_SELECTOR)
+    }
+
+    candidates.sort((left, right) => right.score - left.score)
+    return candidates[0]?.urls ?? []
+  }
+
   function htmlImageUrls(html) {
     if (!html) return []
     const template = document.createElement('template')
     template.innerHTML = html
     return [...template.content.querySelectorAll('img, input[type="image"]')]
-      .map(imageSourceOf)
+      .flatMap(imageSourceUrls)
       .filter(Boolean)
   }
 
-  function draggedImageSource(event) {
-    const target = event.target instanceof Element ? event.target : null
-    const underPointer = document.elementFromPoint(event.clientX, event.clientY)
-    const image = imageElementOf(target) || imageElementOf(underPointer)
-    return image ? imageSourceOf(image) : backgroundImageUrlOf(target)
-  }
-
-  function imageElementOf(node) {
+  function imageElementOf(node, point) {
     if (!(node instanceof Element)) return null
     const direct = node.closest('img, input[type="image"]')
     if (direct) return direct
+    const bounds = node.getBoundingClientRect()
+    if (
+      bounds.width * bounds.height
+      > Math.max(1, window.innerWidth * window.innerHeight) * 0.55
+    ) {
+      return null
+    }
     return [...node.querySelectorAll('img, input[type="image"]')]
       .filter((image) => {
         const rect = image.getBoundingClientRect()
-        return rect.width >= 24 && rect.height >= 24
+        return rect.width >= 32
+          && rect.height >= 32
+          && rect.bottom > 0
+          && rect.right > 0
+          && rect.top < window.innerHeight
+          && rect.left < window.innerWidth
       })
-      .sort((left, right) => renderedImageArea(right) - renderedImageArea(left))[0]
+      .sort((left, right) => imageScore(right, point) - imageScore(left, point))[0]
       || null
   }
 
-  function imageSourceOf(image) {
+  function imageSourceUrls(image) {
+    const urls = []
+    const add = (value) => {
+      const normalized = imageCandidate(value)
+      if (!normalized) return
+      for (const candidate of withUpgradedImageUrl(normalized)) {
+        if (!urls.includes(candidate)) urls.push(candidate)
+      }
+    }
     for (const attribute of IMAGE_ATTRIBUTES) {
       const value = image.getAttribute(attribute)
-      if (value && normalizeImageUrl(value)) return value
+      if (value) add(value)
     }
     const picture = image.closest('picture')
     if (picture) {
       const source = [...picture.querySelectorAll('source')]
-        .reverse()
-        .map((item) => item.getAttribute('srcset'))
-        .find(Boolean)
-      if (source) return bestSrcsetUrl(source)
+        .map((item) => ({
+          srcset: item.getAttribute('srcset'),
+          media: item.getAttribute('media'),
+        }))
+        .find((item) => item.srcset && !/max-width/i.test(item.media || ''))
+      if (source?.srcset) add(bestSrcsetUrl(source.srcset))
     }
-    if (image.getAttribute('srcset')) return bestSrcsetUrl(image.getAttribute('srcset'))
-    return image.getAttribute('src') || image.currentSrc || image.src || ''
+    if (image.getAttribute('srcset')) add(bestSrcsetUrl(image.getAttribute('srcset')))
+    add(image.currentSrc)
+    add(image.getAttribute('src'))
+    const link = image.closest('a[href]')
+    const href = link?.getAttribute('href')
+    if (href && looksLikeImageUrl(href)) add(href)
+    return urls
   }
 
   function bestSrcsetUrl(value) {
@@ -274,6 +364,36 @@
     }).filter((candidate) => candidate.url)
     candidates.sort((left, right) => right.weight - left.weight)
     return candidates[0]?.url || ''
+  }
+
+  function withUpgradedImageUrl(value) {
+    const upgraded = upgradeImageUrl(value)
+    return upgraded && upgraded !== value ? [upgraded, value] : [value]
+  }
+
+  function upgradeImageUrl(value) {
+    try {
+      const url = new URL(value, location.href)
+      const host = url.hostname.toLowerCase()
+      if (
+        host === 'gd-hbimg.huaban.com'
+        || host === 'gd-hbimg-edge.huaban.com'
+        || host === 'hbimg.huaban.com'
+        || host === 'hbimg.huabanimg.com'
+        || host === 'img.hb.aicdn.com'
+      ) {
+        url.pathname = url.pathname.replace(/_?(?:fw|sq|w|h)\d+[a-z0-9]*$/i, '')
+      }
+      if (host === 'i.pinimg.com') {
+        url.pathname = url.pathname.replace(
+          /\/(?:236x|474x|564x|736x|1200x)\//i,
+          '/originals/',
+        )
+      }
+      return url.toString()
+    } catch {
+      return value
+    }
   }
 
   function backgroundImageUrlOf(node) {
@@ -290,9 +410,59 @@
     return ''
   }
 
-  function renderedImageArea(image) {
+  function imageScore(image, point, bonus = 0) {
     const rect = image.getBoundingClientRect()
-    return Math.max(0, rect.width) * Math.max(0, rect.height)
+    const renderedArea = Math.max(0, rect.width) * Math.max(0, rect.height)
+    if (renderedArea === 0) return Number.NEGATIVE_INFINITY
+    const naturalArea = Math.max(0, image.naturalWidth) * Math.max(0, image.naturalHeight)
+    const pointerInside = point
+      && point.x >= rect.left
+      && point.x <= rect.right
+      && point.y >= rect.top
+      && point.y <= rect.bottom
+    let score = bonus
+      + Math.min(renderedArea, window.innerWidth * window.innerHeight) * 10
+      + Math.min(naturalArea, 20_000_000)
+    if (pointerInside) score += 20_000_000
+    if (rect.width < 64 || rect.height < 64) score -= 8_000_000
+    if (looksLikeUiImage(image) && (rect.width < 120 || rect.height < 120)) {
+      score -= 30_000_000
+    }
+    return score
+  }
+
+  function elementScore(element, point, bonus) {
+    if (!(element instanceof Element)) return Number.NEGATIVE_INFINITY
+    const rect = element.getBoundingClientRect()
+    const area = Math.max(0, rect.width) * Math.max(0, rect.height)
+    const pointerInside = point
+      && point.x >= rect.left
+      && point.x <= rect.right
+      && point.y >= rect.top
+      && point.y <= rect.bottom
+    return bonus
+      + Math.min(area, window.innerWidth * window.innerHeight) * 10
+      + (pointerInside ? 20_000_000 : 0)
+  }
+
+  function looksLikeUiImage(image) {
+    const marker = [
+      image.getAttribute('class'),
+      image.getAttribute('id'),
+      image.getAttribute('alt'),
+      image.getAttribute('role'),
+    ].filter(Boolean).join(' ')
+    return /(?:^|[\s_-])(avatar|logo|icon|emoji|sprite|favicon|profile|badge)(?:$|[\s_-])/i
+      .test(marker)
+  }
+
+  function looksLikeImageUrl(value) {
+    try {
+      const url = new URL(value, location.href)
+      return /\.(?:avif|gif|jpe?g|png|webp)(?:$|[?#])/i.test(url.pathname)
+    } catch {
+      return false
+    }
   }
 
   function imageCandidate(value) {

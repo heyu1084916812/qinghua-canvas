@@ -24,6 +24,11 @@ import {
 } from '../../domain/project/generationPreset'
 import { ROUTE_STRATEGIES, type RouteStrategy } from '../../domain/project/modelRouting'
 import type { PresetModel } from '../../domain/project/modelPresets'
+import {
+  DEFAULT_SEARXNG_ENDPOINT,
+  normalizeSearxngEndpoint,
+  type WebSearchSettings,
+} from '../../domain/inspiration/designResearch'
 
 /**
  * 全局选路策略的保留行 id。
@@ -46,6 +51,7 @@ const AGENT_DEFAULT_SKILL_ROW_ID = 'agent:skill'
 const AGENT_DELIVERY_ROW_ID = 'agent:delivery'
 const AGENT_REVIEW_MODEL_ROW_ID = 'agent:review-model'
 const AGENT_CANVAS_REVIEW_ROW_ID = 'agent:canvas-review'
+const AGENT_WEB_SEARCH_ROW_ID = 'agent:web-search'
 
 /**
  * **技能收藏**的保留行 id（用户 2026-10-03：对话窗的技能菜单要按参考产品分成
@@ -159,6 +165,8 @@ export interface PresetStore {
   /** 是否允许本轮向模型提供画布巡检工具；缺行默认关闭。 */
   loadAgentCanvasReview(): Promise<boolean>
   saveAgentCanvasReview(enabled: boolean): Promise<void>
+  loadAgentWebSearch(): Promise<WebSearchSettings>
+  saveAgentWebSearch(settings: WebSearchSettings): Promise<void>
   /** 读技能收藏（技能 id 列表）；没收藏过返回空数组 */
   loadSkillFavorites(): Promise<string[]>
   /** 写技能收藏（整份覆盖） */
@@ -366,6 +374,24 @@ export function createPresetStore(storage: StoragePort): PresetStore {
       } catch {
         // 偏好写入失败不影响当前会话；下次仍沿用旧值。
       }
+    },
+    async loadAgentWebSearch() {
+      try {
+        const rows = await storage.query('presets', { id: AGENT_WEB_SEARCH_ROW_ID })
+        const endpoint = normalizeSearxngEndpoint(
+          (rows[0] as { endpoint?: unknown } | undefined)?.endpoint,
+        )
+        return { endpoint: endpoint || DEFAULT_SEARXNG_ENDPOINT }
+      } catch {
+        return { endpoint: DEFAULT_SEARXNG_ENDPOINT }
+      }
+    },
+    async saveAgentWebSearch(settings) {
+      const endpoint = normalizeSearxngEndpoint(settings.endpoint)
+      await storage.put(
+        'presets',
+        { id: AGENT_WEB_SEARCH_ROW_ID, endpoint } as never,
+      )
     },
     async loadSkillFavorites() {
       try {

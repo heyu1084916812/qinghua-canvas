@@ -9,6 +9,7 @@ import {
   type DesignResearchItem,
   type DesignResearchReport,
   type ResearchProvider,
+  type WebSearchSettings,
 } from '../../../domain/inspiration/designResearch'
 import type { NetworkPort } from '../../../platform/ports'
 import { isPublicHttpUrl } from '../../../domain/shared/publicUrl'
@@ -26,6 +27,7 @@ export interface DesignResearchRunnerInput {
 export interface DesignResearchRunnerDeps {
   network: NetworkPort
   libraryCases?: readonly InspirationCase[]
+  webSearch?: WebSearchSettings
 }
 
 export interface DesignResearchResult extends DesignResearchReport {
@@ -158,6 +160,7 @@ export async function runDesignResearch(
       request.topic,
       request.maxResults,
       signal,
+      deps.webSearch,
     )
     items.push(...openSearch.items)
     warnings.push(...openSearch.warnings)

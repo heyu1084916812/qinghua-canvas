@@ -156,6 +156,25 @@
   width: 100%;
 }
 
+.textInput {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
+  min-height: 34px;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--stroke);
+  border-radius: var(--radius-control);
+  outline: 0;
+  background: var(--bg-app);
+  color: var(--text-1);
+  font: inherit;
+  font-size: var(--fs-nav);
+}
+
+.textInput:focus-visible {
+  border-color: var(--stroke-focus);
+}
+
 .status {
   color: var(--danger);
 }

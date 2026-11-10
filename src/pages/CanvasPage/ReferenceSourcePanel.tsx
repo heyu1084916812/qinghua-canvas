@@ -19,12 +19,11 @@ import { MasonryGrid } from '../AssetsPage/MasonryGrid'
 import { ReferenceLightbox } from './ReferenceLightbox'
 import {
   matchesReferenceFilters,
-  ReferenceFilterButton,
-  ReferenceFilterFields,
   toggledReferenceFilter,
   type ReferenceKindFilter,
   type ReferenceSourceFilter,
 } from './ReferenceFilterFields'
+import { ReferenceFilterControl } from './ReferenceFilterControl'
 import { ReferenceKitPanel } from './ReferenceKitPanel'
 import { ReferenceCardActionMenu } from './ReferenceCardActionMenu'
 import { ReferenceEmptyState } from './ReferenceEmptyState'
@@ -58,13 +57,11 @@ export function ReferenceSourcePanel({
     [platform.storage],
   )
   const inputRef = useRef<HTMLInputElement | null>(null)
-  const filterAnchorRef = useRef<HTMLDivElement | null>(null)
   const clickTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [references, setReferences] = useState<ReferenceItem[]>([])
   const [versions, setVersions] = useState<Record<string, ContextKitVersion | null>>({})
   const [lightboxId, setLightboxId] = useState<string | null>(null)
   const [selectedKitId, setSelectedKitId] = useState<string | null>(null)
-  const [filterOpen, setFilterOpen] = useState(false)
   const [sourceFilters, setSourceFilters] = useState<Set<ReferenceSourceFilter>>(new Set())
   const [kindFilters, setKindFilters] = useState<Set<ReferenceKindFilter>>(new Set())
   const [busy, setBusy] = useState(false)
@@ -83,17 +80,6 @@ export function ReferenceSourcePanel({
   useEffect(() => () => {
     if (clickTimerRef.current) clearTimeout(clickTimerRef.current)
   }, [])
-
-  useEffect(() => {
-    if (!filterOpen) return
-    const close = (event: PointerEvent) => {
-      if (!filterAnchorRef.current?.contains(event.target as Node)) {
-        setFilterOpen(false)
-      }
-    }
-    document.addEventListener('pointerdown', close, true)
-    return () => document.removeEventListener('pointerdown', close, true)
-  }, [filterOpen])
 
   useEffect(() => {
     let active = true
@@ -251,35 +237,19 @@ export function ReferenceSourcePanel({
     setKindFilters((current) => toggledReferenceFilter(current, value))
   }
   return (
-    <div
-      className={styles.panel}
-      data-reference-source-panel
-      onKeyDown={(event) => {
-        if (event.key === 'Escape' && filterOpen) {
-          event.stopPropagation()
-          setFilterOpen(false)
-        }
-      }}
-    >
-      <div className={styles.filterAnchor} ref={filterAnchorRef}>
+    <div className={styles.panel} data-reference-source-panel>
+      <div className={styles.filterAnchor}>
         <div className={styles.subhead}>
           <span>当前项目的参考</span>
-          <ReferenceFilterButton
+          <ReferenceFilterControl
             scope="source"
-            open={filterOpen}
             label="筛选和排序参考素材"
-            onToggle={() => setFilterOpen((current) => !current)}
-          />
-        </div>
-        {filterOpen ? (
-          <ReferenceFilterFields
-            scope="source"
             sourceValues={sourceFilters}
             kindValues={kindFilters}
             onToggleSource={toggleSource}
             onToggleKind={toggleKind}
           />
-        ) : null}
+        </div>
       </div>
       <input
         ref={inputRef}

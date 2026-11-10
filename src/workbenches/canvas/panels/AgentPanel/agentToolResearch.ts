@@ -6,6 +6,7 @@ import type {
   DesignResearchRunnerDeps,
   DesignResearchRunnerInput,
 } from '../../../../features/shared/research/designResearchRunner'
+import type { WebSearchSettings } from '../../../../domain/inspiration/designResearch'
 
 /** 灵感库缓存里本模块只关心「哪个来源、有哪些案例」。 */
 export interface AgentToolCachedInspirationSource {
@@ -34,6 +35,7 @@ export interface AgentToolResearchPorts<
   readConfiguredSources: () => Promise<
     readonly AgentToolConfiguredInspirationSource[]
   >
+  readWebSearch: () => Promise<WebSearchSettings>
   /** 网络端口，原样交给调研执行器。 */
   network: NetworkPort
   /** `runDesignResearch` 本身。 */
@@ -92,9 +94,10 @@ export function createAgentToolResearch<
       }
     },
     researchDesign: async (input) => {
-      const [cachedSources, configuredSources] = await Promise.all([
+      const [cachedSources, configuredSources, webSearch] = await Promise.all([
         ports.readCachedSources().catch(() => []),
         ports.readConfiguredSources().catch(() => []),
+        ports.readWebSearch().catch(() => undefined),
       ])
       const enabledIds = new Set(
         configuredSources
@@ -109,6 +112,7 @@ export function createAgentToolResearch<
         {
           network: ports.network,
           libraryCases,
+          ...(webSearch ? { webSearch } : {}),
         },
         ports.signal(),
       )

@@ -75,6 +75,7 @@ describe('Agent turn reference projection', () => {
       role: 'logo',
       name: '标准字',
     }])
+    expect(result.warnings).toEqual([])
     expect(result.evidence).toEqual(['r1:u1', 'r2:u2'])
     expect(result.phaseEvent).toEqual({
       phase: 'referenceAnalysis',
@@ -132,5 +133,44 @@ describe('Agent turn reference projection', () => {
       { hash: 'photo-1', mime: 'image/png', role: 'reference', name: '空间一' },
       { hash: 'photo-2', mime: 'image/png', role: 'reference', name: '空间二' },
     ])
+  })
+
+  it('reports a missing kit asset and continues with the remaining images', () => {
+    const result = projectAgentTurnReferences({
+      selected: [{
+        item: {
+          id: 'kit-missing',
+          projectId: 'p1',
+          title: '品牌套件',
+          source: 'kit',
+          kind: 'image',
+          assets: [
+            { hash: 'logo', role: 'logo', name: 'Logo' },
+            { hash: 'missing-photo', role: 'reference', name: '缺失照片' },
+          ],
+          what: '完整套件',
+          createdAt: 1,
+          updatedAt: 1,
+        },
+        usage: {
+          id: 'usage-missing',
+          itemId: 'kit-missing',
+          projectId: 'p1',
+          taskKey: 'kv',
+          usage: 'style',
+          howToUse: '沿用视觉体系',
+          createdAt: 1,
+        },
+      }],
+      omitted: [],
+    }, (hash) => hash === 'logo' ? 'image/png' : null)
+
+    expect(result.assetRefs).toEqual([
+      { hash: 'logo', mime: 'image/png', role: 'logo', name: 'Logo' },
+    ])
+    expect(result.warnings).toEqual([
+      '套件素材「缺失照片」已缺失，本轮已跳过。',
+    ])
+    expect(result.phaseEvent?.detail).toContain('缺失照片')
   })
 })

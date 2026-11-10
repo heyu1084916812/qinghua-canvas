@@ -36,6 +36,11 @@ export function normalizeClipperItems(value: unknown): ClipperItem[] {
     const title = textOf(row.title)
     const url = httpUrlOf(row.url)
     const imageUrl = httpUrlOf(row.imageUrl)
+    const imageUrls = Array.isArray(row.imageUrls)
+      ? [...new Set(row.imageUrls.map(httpUrlOf).filter(Boolean))]
+        .filter((candidate) => candidate !== imageUrl)
+        .slice(0, 7)
+      : []
     const collectedAt = numberOf(row.collectedAt)
     if (!id || !title || !url || !imageUrl || collectedAt === undefined) continue
     const key = `${url}|${imageUrl}`
@@ -47,6 +52,7 @@ export function normalizeClipperItems(value: unknown): ClipperItem[] {
       title,
       url,
       imageUrl,
+      ...(imageUrls.length > 0 ? { imageUrls } : {}),
       ...(textOf(row.description) ? { description: textOf(row.description) } : {}),
       ...(textOf(row.credit) ? { credit: textOf(row.credit) } : {}),
       ...(textOf(row.license) ? { license: textOf(row.license) } : {}),
@@ -70,14 +76,12 @@ export function upsertClipperItems(
   }
   return normalizeClipperItems([...byKey.values()])
 }
-
 export function removeClipperItem(
   items: readonly ClipperItem[],
   itemId: string,
 ): ClipperItem[] {
   return items.filter((item) => item.id !== itemId)
 }
-
 export function removeClipperItems(
   items: readonly ClipperItem[],
   itemIds: readonly string[],
@@ -85,7 +89,6 @@ export function removeClipperItems(
   const removing = new Set(itemIds)
   return items.filter((item) => !removing.has(item.id))
 }
-
 export function moveClipperItems(
   items: readonly ClipperItem[],
   itemIds: readonly string[],
@@ -95,17 +98,14 @@ export function moveClipperItems(
   const target = normalizeClipperCategory(category)
   return items.map((item) => moving.has(item.id) ? { ...item, category: target } : item)
 }
-
 function textOf(value: unknown): string {
   return typeof value === 'string' ? value.replace(/\s+/g, ' ').trim() : ''
 }
-
 function numberOf(value: unknown): number | undefined {
   return typeof value === 'number' && Number.isFinite(value) && value > 0
     ? Math.trunc(value)
     : undefined
 }
-
 function httpUrlOf(value: unknown): string {
   const raw = textOf(value)
   if (!raw) return ''

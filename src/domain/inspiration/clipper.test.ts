@@ -28,6 +28,21 @@ describe('clipper collection rules', () => {
     ])).toEqual([item])
   })
 
+  it('keeps only safe original-image alternatives', () => {
+    expect(normalizeClipperItems([{
+      ...item,
+      imageUrls: [
+        'https://example.com/original.jpg',
+        item.imageUrl,
+        'javascript:alert(1)',
+        'https://example.com/original.jpg',
+      ],
+    }])).toEqual([{
+      ...item,
+      imageUrls: ['https://example.com/original.jpg'],
+    }])
+  })
+
   it('upserts by page + image and keeps latest copy', () => {
     const updated = { ...item, title: 'Updated', collectedAt: 20 }
     expect(upsertClipperItems([item], [updated])).toEqual([updated])

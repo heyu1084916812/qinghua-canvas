@@ -37,6 +37,24 @@ export const REFERENCE_KIND_FILTERS: readonly {
   { value: 'audio', label: '音频' },
 ]
 
+export const KIT_KIND_FILTERS: readonly {
+  value: ReferenceKindFilter
+  label: string
+}[] = REFERENCE_KIND_FILTERS.filter((item) =>
+  item.value === 'image' || item.value === 'color' || item.value === 'font')
+
+export const DISABLED_KIT_SOURCES: ReadonlySet<ReferenceSourceFilter> = new Set([
+  'file',
+  'link',
+  'connector',
+])
+
+export const DISABLED_KIT_KINDS: ReadonlySet<ReferenceKindFilter> = new Set([
+  'video',
+  'document',
+  'audio',
+])
+
 export function ReferenceFilterButton({
   scope,
   open,
@@ -139,6 +157,15 @@ export function ReferenceFilterFields({
       </fieldset>
     </div>
   )
+}
+
+export function kitFilterGroupVisible(
+  sources: ReadonlySet<ReferenceSourceFilter>,
+  kinds: ReadonlySet<ReferenceKindFilter>,
+  kind: 'image' | 'color' | 'font',
+): boolean {
+  return (sources.size === 0 || sources.has('asset'))
+    && (kinds.size === 0 || kinds.has(kind))
 }
 
 export function referenceSourceFilter(source: ReferenceSource): ReferenceSourceFilter {

@@ -20,6 +20,7 @@ function sourceTag(source: DesignResearchItem['source']): string {
   if (source === 'behance') return 'Behance'
   if (source === 'openverse') return 'Openverse'
   if (source === 'wikipedia') return 'Wikipedia'
+  if (source === 'searxng') return 'SearXNG'
   if (source === 'google') return 'Google'
   return '网页'
 }
@@ -44,49 +45,79 @@ export async function saveDesignResearchItem(
   if (!isPublicHttpUrl(item.imageUrl) || !isPublicHttpUrl(item.url)) {
     return { ok: false, message: '来源不是公开互联网地址，已拒绝保存' }
   }
+  const imageUrls = [...new Set([item.imageUrl, ...(item.imageUrls ?? [])])]
+    .filter(isPublicHttpUrl)
+    .slice(0, 8)
+  let downloaded: {
+    bytes: Uint8Array
+    detectedMime: string
+    size: { width: number; height: number }
+  } | null = null
+  let lastFailure = ''
   try {
-    const response = await deps.network.request(
-      {
-        url: item.imageUrl,
-        method: 'GET',
-        publicOnly: true,
-        maxResponseBytes: 32 * 1024 * 1024,
-        timeoutMs: 30_000,
-      },
-      signal,
-    )
-    if (response.status < 200 || response.status >= 300) {
-      return { ok: false, message: `图片读取失败：HTTP ${response.status}` }
+    for (const imageUrl of imageUrls) {
+      try {
+        const response = await deps.network.request(
+          {
+            url: imageUrl,
+            method: 'GET',
+            publicOnly: true,
+            maxResponseBytes: 32 * 1024 * 1024,
+            timeoutMs: 30_000,
+          },
+          signal,
+        )
+        if (response.status < 200 || response.status >= 300) {
+          lastFailure = `图片读取失败：HTTP ${response.status}`
+          continue
+        }
+        const bytes = new Uint8Array(await response.arrayBuffer())
+        if (signal.aborted) return { ok: false, message: '保存已取消' }
+        if (bytes.length === 0) {
+          lastFailure = '图片字节为空'
+          continue
+        }
+        const contentTypeHeader = Object.entries(response.headers).find(
+          ([name]) => name.toLowerCase() === 'content-type',
+        )?.[1]
+        const declaredMime = (contentTypeHeader ?? '').split(';')[0]!.trim().toLowerCase()
+        const detectedMime = imageMimeFromBytes(bytes)
+        if (!detectedMime) {
+          lastFailure = '来源返回的不是图片'
+          continue
+        }
+        if (
+          declaredMime.startsWith('image/') &&
+          declaredMime !== detectedMime &&
+          !(
+            declaredMime === 'image/jpg' &&
+            detectedMime === 'image/jpeg'
+          )
+        ) {
+          lastFailure = '图片响应头与实际文件格式不一致'
+          continue
+        }
+        const size = imageSizeFromHeader(bytes)
+        if (!size) {
+          lastFailure = '无法读取图片尺寸，文件可能已损坏'
+          continue
+        }
+        if (size.width * size.height > DESIGN_RESEARCH_MAX_IMAGE_PIXELS) {
+          lastFailure = '图片超过 2000 万像素，已拒绝保存'
+          continue
+        }
+        downloaded = { bytes, detectedMime, size }
+        break
+      } catch (cause) {
+        if (signal.aborted) return { ok: false, message: '保存已取消' }
+        lastFailure = errorTextOf(cause)
+      }
     }
-    const bytes = new Uint8Array(await response.arrayBuffer())
-    if (signal.aborted) return { ok: false, message: '保存已取消' }
-    if (bytes.length === 0) return { ok: false, message: '图片字节为空' }
+    if (!downloaded) {
+      return { ok: false, message: lastFailure || '没有可用的图片地址' }
+    }
+    const { bytes, detectedMime, size } = downloaded
     const hash = await fingerprintBytes(bytes)
-    const contentTypeHeader = Object.entries(response.headers).find(
-      ([name]) => name.toLowerCase() === 'content-type',
-    )?.[1]
-    const declaredMime = (contentTypeHeader ?? '').split(';')[0]!.trim().toLowerCase()
-    const detectedMime = imageMimeFromBytes(bytes)
-    if (!detectedMime) {
-      return { ok: false, message: '来源返回的不是图片' }
-    }
-    if (
-      declaredMime.startsWith('image/') &&
-      declaredMime !== detectedMime &&
-      !(
-        declaredMime === 'image/jpg' &&
-        detectedMime === 'image/jpeg'
-      )
-    ) {
-      return { ok: false, message: '图片响应头与实际文件格式不一致' }
-    }
-    const size = imageSizeFromHeader(bytes)
-    if (!size) {
-      return { ok: false, message: '无法读取图片尺寸，文件可能已损坏' }
-    }
-    if (size.width * size.height > DESIGN_RESEARCH_MAX_IMAGE_PIXELS) {
-      return { ok: false, message: '图片超过 2000 万像素，已拒绝保存' }
-    }
     const savedAt = Date.now()
     const host = sourceHost(item.url)
     const savedAsset: LibraryAsset = {

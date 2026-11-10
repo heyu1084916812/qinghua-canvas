@@ -128,6 +128,53 @@ describe('saveDesignResearchItem', () => {
     expect(await library.list()).toEqual([])
   })
 
+  it('tries the original-image alternatives before giving up', async () => {
+    const platform = createMemoryPlatform()
+    const requested: string[] = []
+    const network = {
+      async request(req: import('../../../platform/ports').NetworkRequest) {
+        requested.push(req.url)
+        if (req.url.endsWith('/blocked.webp')) {
+          return {
+            status: 403,
+            headers: { 'content-type': 'text/html' },
+            text: async () => '<html>blocked</html>',
+            json: async <T,>() => ({}) as T,
+            arrayBuffer: async () => new TextEncoder().encode('blocked').buffer,
+          }
+        }
+        return {
+          status: 200,
+          headers: { 'content-type': 'image/png' },
+          text: async () => '',
+          json: async <T,>() => ({}) as T,
+          arrayBuffer: async () => Uint8Array.from(PNG).buffer,
+        }
+      },
+      async *stream() {},
+    }
+
+    const result = await saveDesignResearchItem(
+      {
+        id: 'clipper:1',
+        source: 'web',
+        title: 'Huaban original',
+        url: 'https://huaban.com/pins/1',
+        imageUrl: 'https://cdn.example.com/blocked.webp',
+        imageUrls: ['https://cdn.example.com/original.png'],
+      },
+      { network, storage: platform.storage },
+      new AbortController().signal,
+    )
+
+    expect(requested).toEqual([
+      'https://cdn.example.com/blocked.webp',
+      'https://cdn.example.com/original.png',
+    ])
+    expect(result.ok).toBe(true)
+    expect(await platform.storage.query('assets', {})).toHaveLength(1)
+  })
+
   it('rejects a response whose image MIME disagrees with its bytes', async () => {
     const platform = createMemoryPlatform()
     const library = createAssetLibraryRepository(platform.storage)

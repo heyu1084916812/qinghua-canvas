@@ -8,7 +8,7 @@
 
 .head {
   display: grid;
-  grid-template-columns: 30px minmax(0, 1fr) 30px;
+  grid-template-columns: 30px minmax(0, 1fr) auto;
   align-items: center;
   gap: var(--space-2);
 }
@@ -43,6 +43,13 @@
   border-color: var(--stroke);
   background: var(--bg-hover);
   color: var(--text-1);
+}
+
+.headActions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 2px;
 }
 
 .section {
@@ -323,11 +330,34 @@
   cursor: default;
 }
 
+.filteredEmpty {
+  display: grid;
+  justify-items: start;
+  gap: var(--space-2);
+  padding: var(--space-4);
+  border: 1px dashed var(--stroke);
+  border-radius: 6px;
+  color: var(--text-3);
+  font-size: var(--fs-chip);
+}
+
+.filteredEmpty button {
+  min-height: 28px;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--stroke);
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--text-2);
+  font: inherit;
+  cursor: pointer;
+}
+
 .iconButton:focus-visible,
 .textAction:focus-visible,
 .assetAdd:focus-visible,
 .more:focus-visible,
 .addAgent:focus-visible,
+.filteredEmpty button:focus-visible,
 .description:focus-visible,
 .editActions button:focus-visible {
   outline: 1px solid var(--stroke-focus);

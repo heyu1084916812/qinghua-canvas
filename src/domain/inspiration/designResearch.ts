@@ -4,6 +4,7 @@ export type ResearchProvider =
   | 'behance'
   | 'openverse'
   | 'wikipedia'
+  | 'searxng'
   | 'web'
 
 export const DEFAULT_RESEARCH_MAX_RESULTS = 24
@@ -14,6 +15,28 @@ export const DESIGN_RESEARCH_MAX_IMAGE_PIXELS = 20_000_000
 
 export const DESIGN_RESEARCH_RIGHTS_NOTE =
   '仅收集公开页面元数据与来源链接。图片权利归原作者所有，保存或商用前请核对来源许可。'
+
+export const DEFAULT_SEARXNG_ENDPOINT = 'https://www.isci.si/search'
+
+export interface WebSearchSettings {
+  endpoint: string
+}
+
+export function normalizeSearxngEndpoint(value: unknown): string {
+  const raw = typeof value === 'string' ? value.trim() : ''
+  if (!raw) return ''
+  try {
+    const url = new URL(raw)
+    if (url.protocol !== 'http:' && url.protocol !== 'https:') return ''
+    if (url.username || url.password) return ''
+    if (!url.pathname.endsWith('/search')) url.pathname = '/search'
+    url.search = ''
+    url.hash = ''
+    return url.toString()
+  } catch {
+    return ''
+  }
+}
 
 export interface DesignResearchRequest {
   topic: string
@@ -33,6 +56,8 @@ export interface DesignResearchItem {
   title: string
   url: string
   imageUrl: string
+  /** 同一张图的备用原图地址；主地址失效时按顺序尝试。 */
+  imageUrls?: string[]
   description?: string
   credit?: string
   license?: string
@@ -86,6 +111,7 @@ const PROVIDER_TITLES: Record<ResearchProvider, string> = {
   behance: 'Behance',
   openverse: 'Openverse',
   wikipedia: 'Wikipedia',
+  searxng: 'SearXNG',
   web: 'Other references',
 }
 
@@ -94,6 +120,7 @@ const PROVIDER_ORDER: readonly ResearchProvider[] = [
   'behance',
   'openverse',
   'wikipedia',
+  'searxng',
   'google',
   'web',
 ]

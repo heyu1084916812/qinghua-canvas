@@ -46,7 +46,7 @@ export function KitAssetsSection({
   onDelete: (item: ContextKitAsset) => void
 }) {
   return (
-    <section className={styles.section}>
+    <section className={styles.section} data-my-assets-kit-section="image">
       <div className={styles.sectionHead}>
         <h3>{title}</h3>
         <button
@@ -137,7 +137,7 @@ export function KitColorsSection({
   const [colorNameDraft, setColorNameDraft] = useState('')
 
   return (
-    <section className={styles.section}>
+    <section className={styles.section} data-my-assets-kit-section="color">
       <div className={styles.sectionHead}>
         <h3>颜色</h3>
         <ColorPickerPopover
@@ -246,7 +246,7 @@ export function KitFontsSection({
   onDelete: (id: string) => Promise<void>
 }) {
   return (
-    <section className={styles.section}>
+    <section className={styles.section} data-my-assets-kit-section="font">
       <div className={styles.sectionHead}>
         <h3>字体</h3>
         <button

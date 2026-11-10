@@ -87,6 +87,7 @@ export interface AgentTurnContextTrace {
   assetRefs: (GenerationContextAsset & { mime: string })[]
   brief?: string
   referenceEvidence?: string[]
+  referenceWarnings?: string[]
   referencePhaseEvent?: AgentPhaseEvent
   skillPhaseEvent?: AgentPhaseEvent
 }
@@ -379,6 +380,9 @@ export async function prepareAgentTurnRequest(
       ),
       ...(projected?.evidence.length
         ? { referenceEvidence: projected.evidence }
+        : {}),
+      ...(projected?.warnings.length
+        ? { referenceWarnings: projected.warnings }
         : {}),
       ...(projected?.phaseEvent
         ? { referencePhaseEvent: projected.phaseEvent }

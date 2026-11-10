@@ -11,6 +11,7 @@ const BASE = process.env.QH_UI_BASE ?? `http://127.0.0.1:${UI_PORT}`
 const STORE = process.env.QH_UI_STORE ?? `http://127.0.0.1:${STORE_PORT}`
 const phase = process.argv.includes('--after') ? 'after' : 'before'
 const clipperUpdateOnly = process.env.QH_UI_CLIPPER_UPDATE_ONLY === '1'
+const kitOnly = process.env.QH_UI_KIT_ONLY === '1'
 const out = path.join(ROOT, '.playwright-verify', `ui-seven-${phase}`)
 fs.mkdirSync(out, { recursive: true })
 const storeData = path.join(out, 'store')
@@ -252,7 +253,7 @@ try {
       ) return
       const updateStatus = {
         loadedVersion: '0.4.2',
-        bundledVersion: '0.4.4',
+        bundledVersion: '0.4.5',
         needsUpdate: true,
         reloadRequired: false,
         stableDirectory: 'C:\\Users\\Administrator\\Documents\\QinghuaClipper\\extension',
@@ -350,6 +351,30 @@ try {
     const agentMetrics = await geometry(page)
     await page.screenshot({ path: path.join(out, `${file}-agent.png`) })
     report.push({ variant, surface: 'agent', agentMetrics, errors: [...errors] })
+    await page.locator('[data-agent-settings-tab="tools"]').click()
+    await page.locator('[data-agent-web-search]').waitFor({ timeout: 10_000 })
+    const agentWebSearchMetrics = await page.evaluate(() => {
+      const panel = document.querySelector('[data-agent-web-search]')
+      const input = panel?.querySelector('[data-agent-web-search-endpoint]')
+      const rect = panel?.getBoundingClientRect()
+      return {
+        endpoint: input instanceof HTMLInputElement ? input.value : '',
+        saveActions: panel?.querySelectorAll('[data-agent-web-search-save]').length ?? 0,
+        overflowX: panel ? panel.scrollWidth > panel.clientWidth + 1 : true,
+        insideBody:
+          Boolean(rect)
+          && rect.left >= -1
+          && rect.right <= document.documentElement.clientWidth + 1,
+      }
+    })
+    await page.screenshot({ path: path.join(out, `${file}-agent-tools.png`) })
+    report.push({
+      variant,
+      surface: 'agentTools',
+      agentWebSearchMetrics,
+      ...agentMetrics,
+      errors: [...errors],
+    })
 
     await openSettings(page, 'snapshots')
     await page.locator('[data-snapshots-panel]').waitFor({ timeout: 10_000 })
@@ -1203,6 +1228,29 @@ try {
       }
     })
     await page.screenshot({ path: path.join(out, `${file}-canvas-kit-detail.png`) })
+    await page.locator('[data-reference-filter-trigger="kit"]').click()
+    await page.locator('[data-reference-filter-panel="kit"]').waitFor({ timeout: 5_000 })
+    const kitFilterControls = {
+      sources: await page.locator('[data-reference-filter-source]').count(),
+      kinds: await page.locator('[data-reference-filter-kind]').count(),
+    }
+    await page.locator('[data-reference-filter-kind="color"]').check()
+    await page.waitForFunction(() =>
+      document.querySelectorAll('[data-my-assets-kit-section="image"]').length === 0
+      && document.querySelectorAll('[data-my-assets-kit-section="color"]').length === 1
+      && document.querySelectorAll('[data-my-assets-kit-section="font"]').length === 0,
+    { timeout: 5_000 })
+    const kitFilteredSections = await page.evaluate(() => ({
+      image: document.querySelectorAll('[data-my-assets-kit-section="image"]').length,
+      color: document.querySelectorAll('[data-my-assets-kit-section="color"]').length,
+      font: document.querySelectorAll('[data-my-assets-kit-section="font"]').length,
+    }))
+    await page.screenshot({ path: path.join(out, `${file}-canvas-kit-filtered.png`) })
+    await page.locator('[data-reference-filter-kind="color"]').uncheck()
+    await page.waitForFunction(() =>
+      document.querySelectorAll('[data-my-assets-kit-section="image"]').length === 2,
+    { timeout: 5_000 })
+    await page.locator('[data-reference-filter-trigger="kit"]').click()
     const kitAssetCardsBefore = await page.locator('[data-my-assets-kit-asset-add]').count()
     await page.locator('[data-my-assets-kit-description-edit]').click()
     await page.locator('[data-my-assets-kit-description]').fill('用于验证品牌套件直接编辑与多层素材复用。')
@@ -1400,6 +1448,30 @@ try {
     const kitRemovedFromReference =
       kitFoldersAfterReferenceDelete < kitFoldersBeforeReferenceDelete
     await page.screenshot({ path: path.join(out, `${file}-canvas-reference-kit-removed.png`) })
+    if (kitOnly) {
+      report.push({
+        variant,
+        surface: 'kit',
+        shelfDetailSections,
+        shelfDetailTitle,
+        kitCardChrome,
+        kitFilterControls,
+        kitFilteredSections,
+        kitDescriptionSaved,
+        kitAssetCardsBefore,
+        kitAssetCardsAfterUpload,
+        kitAssetCardsAfterDelete,
+        kitAssetReuploaded,
+        kitAssetAgentChipCount,
+        kitAssetChipThumbLoaded,
+        shelfKitClickChipCount,
+        shelfDetailChipCount,
+        kitRemovedFromReference,
+        errors: [...errors],
+      })
+      await context.close()
+      continue
+    }
     const historyCanvasNodeIdsBefore = await page
       .locator('[data-node-id]')
       .evaluateAll((nodes) => nodes.map((node) => node.getAttribute('data-node-id')))
@@ -1571,6 +1643,7 @@ try {
       referenceDoubleClickOpenedLightbox,
       referenceClickChipCount,
       agentGeometry,
+      agentWebSearchMetrics,
       referenceKitClickChipCount,
       referenceKitExpandVisible,
       referenceKitExpandOpenedLightbox,
@@ -1578,6 +1651,8 @@ try {
       shelfDetailSections,
       shelfDetailTitle,
       kitCardChrome,
+      kitFilterControls,
+      kitFilteredSections,
       kitColorMenuGeometry,
       kitFontMenuGeometry,
       kitDescriptionEditorGeometry,

@@ -371,6 +371,9 @@ describe('prepareAgentTurnRequest', () => {
       { hash: 'image-logo', mime: 'image/png', role: 'logo', name: 'Logo' },
       { hash: 'image-room', mime: 'image/png', role: 'reference', name: '空间' },
     ])
+    expect(result.contextTrace?.referenceWarnings).toEqual([
+      '套件素材「缺失图」已缺失，本轮已跳过。',
+    ])
     expect(readAssetMime).toHaveBeenCalledWith('broken-photo')
   })
 

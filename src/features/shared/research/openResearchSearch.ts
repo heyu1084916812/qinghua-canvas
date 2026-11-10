@@ -1,5 +1,11 @@
-import type { DesignResearchItem } from '../../../domain/inspiration/designResearch'
+import {
+  DEFAULT_SEARXNG_ENDPOINT,
+  normalizeSearxngEndpoint,
+  type DesignResearchItem,
+  type WebSearchSettings,
+} from '../../../domain/inspiration/designResearch'
 import type { NetworkPort } from '../../../platform/ports'
+import { isPublicHttpUrl } from '../../../domain/shared/publicUrl'
 import { errorTextOf } from '../../../shared/result'
 
 export interface OpenResearchSearchResult {
@@ -78,6 +84,33 @@ function wikipediaItems(payload: unknown, limit: number): DesignResearchItem[] {
     .slice(0, limit)
 }
 
+function searxngItems(
+  payload: unknown,
+  limit: number,
+  mode: 'web' | 'image',
+): DesignResearchItem[] {
+  return arrayOf(recordOf(payload).results)
+    .map(recordOf)
+    .flatMap((row, index) => {
+      const url = textOf(row.url)
+      const title = textOf(row.title) || url
+      const description = cleanText(textOf(row.content) || title)
+      if (!isPublicHttpUrl(url)) return []
+      const candidateImage = textOf(row.img_src) || textOf(row.thumbnail)
+      const imageUrl = isPublicHttpUrl(candidateImage) ? candidateImage : ''
+      return [{
+        id: `searxng:${mode}:${index}:${url}`,
+        source: 'searxng' as const,
+        title,
+        url,
+        imageUrl,
+        description,
+        credit: textOf(row.engine) || 'SearXNG',
+      }]
+    })
+    .slice(0, limit)
+}
+
 async function requestJson(
   network: NetworkPort,
   url: string,
@@ -108,11 +141,13 @@ export async function searchOpenResearch(
   topic: string,
   maxResults: number,
   signal: AbortSignal,
+  webSearch?: WebSearchSettings,
 ): Promise<OpenResearchSearchResult> {
   const query = topic.trim()
   if (!query) return { items: [], warnings: ['调研主题为空，未执行联网搜索'] }
   const imageLimit = Math.max(2, Math.min(12, Math.ceil(maxResults * 0.6)))
   const contentLimit = Math.max(1, Math.min(6, maxResults - imageLimit))
+  const searxImageLimit = Math.max(2, Math.min(6, Math.ceil(maxResults * 0.25)))
   const openverseUrl = new URL(OPENVERSE_ENDPOINT)
   openverseUrl.searchParams.set('q', query)
   openverseUrl.searchParams.set('page_size', String(imageLimit))
@@ -130,11 +165,20 @@ export async function searchOpenResearch(
   wikipediaUrl.searchParams.set('inprop', 'url')
   wikipediaUrl.searchParams.set('format', 'json')
   wikipediaUrl.searchParams.set('origin', '*')
+  const searxngUrl = new URL(
+    normalizeSearxngEndpoint(webSearch?.endpoint) || DEFAULT_SEARXNG_ENDPOINT,
+  )
+  searxngUrl.searchParams.set('q', query)
+  searxngUrl.searchParams.set('format', 'json')
+  const searxngImageUrl = new URL(searxngUrl)
+  searxngImageUrl.searchParams.set('categories', 'images')
 
   const warnings: string[] = []
-  const [images, content] = await Promise.allSettled([
+  const [images, content, searxngImages, web] = await Promise.allSettled([
     requestJson(network, openverseUrl.toString(), signal),
     requestJson(network, wikipediaUrl.toString(), signal),
+    requestJson(network, searxngImageUrl.toString(), signal),
+    requestJson(network, searxngUrl.toString(), signal),
   ])
   const items: DesignResearchItem[] = []
   if (images.status === 'fulfilled') {
@@ -146,6 +190,16 @@ export async function searchOpenResearch(
     items.push(...wikipediaItems(content.value, contentLimit))
   } else {
     warnings.push(`Wikipedia 搜索失败：${errorTextOf(content.reason)}`)
+  }
+  if (searxngImages.status === 'fulfilled') {
+    items.push(...searxngItems(searxngImages.value, searxImageLimit, 'image'))
+  } else {
+    warnings.push(`SearXNG 图片搜索失败：${errorTextOf(searxngImages.reason)}`)
+  }
+  if (web.status === 'fulfilled') {
+    items.push(...searxngItems(web.value, contentLimit, 'web'))
+  } else {
+    warnings.push(`SearXNG 搜索失败：${errorTextOf(web.reason)}`)
   }
   return { items, warnings }
 }

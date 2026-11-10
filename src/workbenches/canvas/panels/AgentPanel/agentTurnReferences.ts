@@ -9,6 +9,7 @@ export interface AgentTurnReferenceProjection {
   prompt: string
   assetRefs: (GenerationContextAsset & { mime: string })[]
   evidence: string[]
+  warnings: string[]
   phaseEvent?: AgentPhaseEvent
 }
 
@@ -26,6 +27,7 @@ export function projectAgentTurnReferences(
   const lines: string[] = []
   const assetRefs: AgentTurnReferenceProjection['assetRefs'] = []
   const evidence: string[] = []
+  const warnings: string[] = []
   for (const { item, usage } of selection.selected) {
     const label = item.title.trim() || item.id
     lines.push(
@@ -44,7 +46,10 @@ export function projectAgentTurnReferences(
     for (const asset of mediaAssets) {
       if (!asset.hash || assetRefs.some((row) => row.hash === asset.hash)) continue
       const mime = assetMime(asset.hash)
-      if (!mime) continue
+      if (!mime) {
+        warnings.push(`套件素材「${asset.name.trim() || asset.hash}」已缺失，本轮已跳过。`)
+        continue
+      }
       assetRefs.push({
         hash: asset.hash,
         mime,
@@ -69,6 +74,7 @@ export function projectAgentTurnReferences(
     prompt,
     assetRefs,
     evidence,
+    warnings,
     ...(evidence.length > 0
       ? {
           phaseEvent: {
@@ -80,6 +86,7 @@ export function projectAgentTurnReferences(
             }),
             detail: [
               `已读取 ${selection.selected.length} 条参考；详细分析已记入参考台账。`,
+              ...warnings,
               ...visibleSummary,
             ].join('\n'),
             evidence,
