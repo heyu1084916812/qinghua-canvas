@@ -161,15 +161,21 @@
   gap: 4px;
 }
 
-.mediaCard > img,
-.mediaCard > span {
-  display: block;
+.mediaThumb {
+  position: relative;
   width: 100%;
   aspect-ratio: 1.08;
   overflow: hidden;
   border: 1px solid var(--stroke);
   border-radius: 6px;
   background: var(--bg-subtle);
+}
+
+.mediaThumb > img,
+.mediaThumb > span {
+  display: block;
+  width: 100%;
+  height: 100%;
   object-fit: cover;
 }
 
@@ -183,25 +189,21 @@
   white-space: nowrap;
 }
 
-.assetAdd,
-.more {
+.assetAdd {
   position: absolute;
   z-index: 2;
-  background: var(--bg-surface);
-  box-shadow: var(--shadow-float);
-}
-
-.assetAdd {
-  top: 4px;
-  right: 4px;
+  top: 6px;
+  right: 6px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 26px;
-  height: 26px;
+  width: 24px;
+  height: 24px;
   padding: 0;
   border: 1px solid var(--stroke);
   border-radius: var(--radius-control);
+  background: var(--bg-surface);
+  box-shadow: var(--shadow-float);
   color: var(--text-1);
   cursor: pointer;
   opacity: 0;
@@ -213,13 +215,37 @@
   opacity: 1;
 }
 
+.mediaMeta {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+
+.mediaMeta small {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
 .more {
+  position: absolute;
+  z-index: 2;
   right: 2px;
   bottom: 18px;
   width: 26px;
   height: 26px;
   opacity: 0;
   pointer-events: auto;
+}
+
+.moreInline {
+  position: static;
+  flex: 0 0 22px;
+  width: 22px;
+  height: 22px;
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
 }
 
 .mediaCard:hover .more,
@@ -269,44 +295,6 @@
   white-space: nowrap;
 }
 
-.menu {
-  position: absolute;
-  z-index: 8;
-  right: 0;
-  bottom: 44px;
-  display: grid;
-  width: 124px;
-  padding: var(--space-1);
-  border: 1px solid var(--stroke);
-  border-radius: 8px;
-  background: var(--bg-surface);
-  box-shadow: var(--shadow-float);
-}
-
-.menu button {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  min-height: 30px;
-  padding: 0 var(--space-2);
-  border: 0;
-  border-radius: 5px;
-  background: transparent;
-  color: var(--text-1);
-  font: inherit;
-  font-size: var(--fs-chip);
-  text-align: start;
-  cursor: pointer;
-}
-
-.menu button:hover {
-  background: var(--bg-hover);
-}
-
-.menu .danger {
-  color: var(--danger);
-}
-
 .anchor {
   display: block;
   width: 1px;
@@ -342,7 +330,6 @@
 .textAction:focus-visible,
 .assetAdd:focus-visible,
 .more:focus-visible,
-.menu button:focus-visible,
 .addAgent:focus-visible,
 .description:focus-visible,
 .editActions button:focus-visible {

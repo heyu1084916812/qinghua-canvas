@@ -1,5 +1,13 @@
 # CanvasFlow（轻画）项目记忆
 
+### 总管2 第五十七轮：套件图片卡动作与 Agent 参考缩略图（2026-11-10）
+
+- 套件图片卡不能再用一个 absolute 三点盖在图片和描述上。结构固定为 `.mediaThumb`（图片 + 右上 `+`）和 `.mediaMeta`（描述 `flex:1` + `moreInline` 固定预留），`+` 距上/右 `7px`，三点始终位于描述右端。
+- 套件图片/颜色/字体菜单改用 `ReferenceCardActionMenu` 的 viewport portal；菜单状态是 `{key,x,y}`，不再渲染在抽屉滚动容器内部，避免被裁切或压住下一块内容。
+- Agent `reference` chip 的缩略图不能只看 `thumbOf(id)` 拿节点图。`useAgentAttachmentsController` 同时解析 draft、`session.referenceIds` 和消息里的 reference mentions，从 `referenceLedgerRepository.listItems(projectId)` 取 `assetHash`，只对 `kind=image` 缓存 URL。
+- `MentionEditor` 和 `MentionRichText` 都要让 `reference` kind 使用缩略图；CSS 参考 chip 限宽 160px，实测 144×26px、18×18px 缩略图。
+- 四组 UI：`referenceChipThumbLoaded=true / kitAssetChipThumbLoaded=true / addTop=7 / addRight=7 / menuBottom=0 / menuRight=0 / labelBeforeMenu=true / errors=[]`。证据 `.playwright-verify/ui-seven-after/{report.json,1440-dark-canvas-reference-click-agent.png,1024-light-canvas-kit-asset-menu.png,1024-dark-canvas-kit-detail-edited.png}`。check 1149 modules / 4602 deps / 293 registrations；build 1281 modules；全量 Vitest 660 files（659 passed / 1 skipped）/ 5481 tests（5480 passed / 1 skipped）。未 push。
+
 ### 总管2 第五十六轮：参考右键菜单与套件详情直编（2026-11-10）
 
 - 参考卡右键/键盘菜单支持复制、剪切、粘贴、创建副本、打开、添加到对话、重命名、导出、删除；状态在 `useReferenceCardActions`，菜单视图在 `ReferenceCardActionMenu`，卡片在 `ReferenceGridCards`。

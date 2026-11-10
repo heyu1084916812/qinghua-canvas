@@ -582,6 +582,34 @@ try {
     await page.locator('[data-agent-composer] [data-mention-kind="reference"]').first().waitFor({ timeout: 15_000 })
     const referenceClickChipCount =
       await page.locator('[data-agent-composer] [data-mention-kind="reference"]').count()
+    await page.waitForFunction(
+      () => {
+        const chip = document.querySelector('[data-agent-composer] [data-mention-kind="reference"]')
+        return chip?.getAttribute('data-has-thumb') === 'true' &&
+          Boolean(chip.querySelector('img'))
+      },
+      { timeout: 15_000 },
+    )
+    const referenceChipThumbLoaded = await page
+      .locator('[data-agent-composer] [data-mention-kind="reference"]')
+      .first()
+      .evaluate((chip) => {
+        const image = chip.querySelector('img')
+        return image instanceof HTMLImageElement && image.complete && image.naturalWidth > 0
+      })
+    const referenceChipShape = await page
+      .locator('[data-agent-composer] [data-mention-kind="reference"]')
+      .first()
+      .evaluate((chip) => {
+        const chipRect = chip.getBoundingClientRect()
+        const imageRect = chip.querySelector('img')?.getBoundingClientRect()
+        return {
+          width: Math.round(chipRect.width),
+          height: Math.round(chipRect.height),
+          thumbWidth: Math.round(imageRect?.width ?? 0),
+          thumbHeight: Math.round(imageRect?.height ?? 0),
+        }
+      })
     const agentGeometry = await page.evaluate(() => {
       const slot = document.querySelector('[data-agent-shell-slot]')
       const surface = slot?.firstElementChild
@@ -850,6 +878,31 @@ try {
     const shelfDetailSections = await page.locator('[data-my-assets-kit-detail] section').count()
     const shelfDetailTitle =
       (await page.locator('[data-my-assets-kit-detail] h2').textContent({ timeout: 5_000 }))?.trim() ?? ''
+    const kitCardChrome = await page.evaluate(() => {
+      const card = document.querySelector('[data-my-assets-kit-asset-card]')
+      const thumb = card?.querySelector('[data-my-assets-kit-asset-thumb]')
+      const meta = card?.querySelector('[data-my-assets-kit-asset-meta]')
+      const add = card?.querySelector('[data-my-assets-kit-asset-add]')
+      const menu = card?.querySelector('[data-my-assets-kit-menu="asset"]')
+      const label = meta?.querySelector('small')
+      const cardRect = card?.getBoundingClientRect()
+      const thumbRect = thumb?.getBoundingClientRect()
+      const metaRect = meta?.getBoundingClientRect()
+      const addRect = add?.getBoundingClientRect()
+      const menuRect = menu?.getBoundingClientRect()
+      const labelRect = label?.getBoundingClientRect()
+      return {
+        addTop: addRect && thumbRect ? Math.round(addRect.top - thumbRect.top) : -1,
+        addRight: addRect && thumbRect ? Math.round(thumbRect.right - addRect.right) : -1,
+        menuBottom: menuRect && metaRect ? Math.round(metaRect.bottom - menuRect.bottom) : -1,
+        menuRight: menuRect && metaRect ? Math.round(metaRect.right - menuRect.right) : -1,
+        labelBeforeMenu: Boolean(labelRect && menuRect && labelRect.right <= menuRect.left),
+        cardInset:
+          cardRect && thumbRect
+            ? Math.round(thumbRect.left - cardRect.left)
+            : -1,
+      }
+    })
     await page.screenshot({ path: path.join(out, `${file}-canvas-kit-detail.png`) })
     const kitAssetCardsBefore = await page.locator('[data-my-assets-kit-asset-add]').count()
     await page.locator('[data-my-assets-kit-description-edit]').click()
@@ -864,7 +917,7 @@ try {
 
     await page.locator('[data-my-assets-kit-menu="color"]').first().click()
     await page.screenshot({ path: path.join(out, `${file}-canvas-kit-color-menu.png`) })
-    await page.locator('[data-my-assets-kit-color-edit]').click()
+    await page.locator('[data-reference-card-action="edit"]').click()
     await page.locator('[data-color-picker-popover]').waitFor({ timeout: 5_000 })
     const kitColorEditorOpened = (await page.locator('[data-color-picker-popover]').count()) === 1
     await page.screenshot({ path: path.join(out, `${file}-canvas-kit-color-editor.png`) })
@@ -877,7 +930,7 @@ try {
 
     await page.locator('[data-my-assets-kit-menu="font"]').first().click()
     const fontChooserPromise = page.waitForEvent('filechooser')
-    await page.locator('[data-my-assets-kit-font-reupload]').click()
+    await page.locator('[data-reference-card-action="reupload"]').click()
     const fontChooser = await fontChooserPromise
     await fontChooser.setFiles({
       name: 'Fixture.ttf',
@@ -889,7 +942,7 @@ try {
       { timeout: 15_000 },
     )
     await page.locator('[data-my-assets-kit-menu="font"]').first().click()
-    await page.locator('[data-my-assets-kit-font-edit]').click()
+    await page.locator('[data-reference-card-action="edit"]').click()
     await page.locator('[data-my-assets-font-picker]').waitFor({ timeout: 5_000 })
     const kitFontLibraryOptions = await page.locator('[data-my-assets-font-option]').count()
     await page.screenshot({ path: path.join(out, `${file}-canvas-kit-font-picker.png`) })
@@ -916,11 +969,18 @@ try {
     await page.locator('[data-agent-composer] [data-mention-kind="reference"]').first().waitFor({ timeout: 15_000 })
     const kitAssetAgentChipCount =
       await page.locator('[data-agent-composer] [data-mention-kind="reference"]').count()
+    const kitAssetChipThumbLoaded = await page
+      .locator('[data-agent-composer] [data-mention-kind="reference"]')
+      .first()
+      .evaluate((chip) => {
+        const image = chip.querySelector('img')
+        return image instanceof HTMLImageElement && image.complete && image.naturalWidth > 0
+      })
     await page.locator('[data-agent-close]').click()
     await page.locator('[data-agent-panel]').waitFor({ state: 'hidden', timeout: 10_000 })
     await page.locator('[data-my-assets-kit-menu="asset"]').last().click()
     const imageReplaceChooserPromise = page.waitForEvent('filechooser')
-    await page.locator('[data-my-assets-kit-asset-reupload]').click()
+    await page.locator('[data-reference-card-action="reupload"]').click()
     const imageReplaceChooser = await imageReplaceChooserPromise
     await imageReplaceChooser.setFiles({
       name: 'replaced-reference.png',
@@ -935,9 +995,9 @@ try {
       (await page.locator('[data-my-assets-kit-asset-add]').count()) > kitAssetCardsBefore
     await page.screenshot({ path: path.join(out, `${file}-canvas-kit-detail-edited.png`) })
     await page.locator('[data-my-assets-kit-menu="asset"]').last().click()
-    await page.locator('[data-my-assets-kit-asset-reupload]').waitFor({ timeout: 5_000 })
+    await page.locator('[data-reference-card-action="reupload"]').waitFor({ timeout: 5_000 })
     await page.screenshot({ path: path.join(out, `${file}-canvas-kit-asset-menu.png`) })
-    await page.locator('[data-my-assets-kit-asset-delete]').click()
+    await page.locator('[data-reference-card-action="delete"]').click()
     await page.waitForFunction(
       (before) => document.querySelectorAll('[data-my-assets-kit-asset-add]').length === before,
       kitAssetCardsBefore,
@@ -984,6 +1044,8 @@ try {
       referenceExpandActions,
       referenceMenuActions,
       referenceMenuOpenActionWorks,
+      referenceChipThumbLoaded,
+      referenceChipShape,
       referenceFilteredCards,
       referenceFilteredFolders,
       referenceFilterIcon,
@@ -1005,6 +1067,7 @@ try {
       referenceKitDoubleClickOpenedLightbox,
       shelfDetailSections,
       shelfDetailTitle,
+      kitCardChrome,
       kitDescriptionSaved,
       kitColorEditorOpened,
       kitFontLibraryOptions,
@@ -1013,6 +1076,7 @@ try {
       kitAssetCardsAfterDelete,
       kitAssetReuploaded,
       kitAssetAgentChipCount,
+      kitAssetChipThumbLoaded,
       shelfKitClickChipCount,
       shelfDetailChipCount,
       ...shelfState,

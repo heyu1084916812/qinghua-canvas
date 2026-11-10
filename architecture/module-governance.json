@@ -7139,9 +7139,10 @@
     {
       "module": "src/pages/CanvasPage/MyAssetsKitSections.tsx",
       "owner": "canvas-my-assets-kit-sections",
-      "responsibility": "Renders repeated image, color and font sections for direct kit editing.",
+      "responsibility": "Renders repeated image, color and font sections for direct kit editing with stable action placement.",
       "owns": [
-        "Image card hover actions",
+        "Image top-right add and reserved inline menu positions",
+        "Viewport action menus for kit items",
         "Color picker cards",
         "Font cards and font-library previews"
       ],
@@ -7159,7 +7160,7 @@
       "test": [
         "src/app/uiSevenPoints.test.ts"
       ],
-      "budget": 340
+      "budget": 400
     },
     {
       "module": "src/pages/CanvasPage/KitFontPicker.tsx",
@@ -7208,14 +7209,14 @@
     {
       "module": "src/pages/CanvasPage/ReferenceCardActionMenu.tsx",
       "owner": "canvas-reference-card-menu",
-      "responsibility": "Renders the right-click and keyboard action menu for project references.",
+      "responsibility": "Renders viewport-safe right-click, keyboard and kit-item action menus.",
       "owns": [
         "Viewport-safe menu placement",
         "Keyboard focus and Escape close",
         "Menu action semantics"
       ],
       "doesNotOwn": [
-        "Reference mutation",
+        "Reference or kit mutation",
         "Clipboard mode",
         "Reference thumbnails"
       ],

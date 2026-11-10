@@ -1,4 +1,4 @@
-import { useState, type MouseEvent } from 'react'
+import { useState } from 'react'
 import { IconImageUpload } from '../../app/SettingsIcons'
 import type { ContextKitAsset, ContextKitColor, ContextKitFont } from '../../domain/shared/context'
 import type { UserFont } from '../../domain/ui/fonts'
@@ -11,9 +11,18 @@ import {
   IconPlus,
   IconRename,
 } from '../../workbenches/canvas/toolbar/icons'
+import {
+  ReferenceCardActionMenu,
+} from './ReferenceCardActionMenu'
+import type { PickerAnchor } from './KitFontPicker'
 import styles from './MyAssetsKitDetail.module.css'
 
 export type KitMenuKey = `asset:${string}` | `color:${string}` | `font:${string}`
+export interface KitMenuState {
+  key: KitMenuKey
+  x: number
+  y: number
+}
 
 export function KitAssetsSection({
   title,
@@ -29,10 +38,10 @@ export function KitAssetsSection({
   title: string
   role: ContextKitAsset['role']
   items: readonly ContextKitAsset[]
-  openMenu: KitMenuKey | null
+  openMenu: KitMenuState | null
   onUpload: () => void
   onAdd: (item: ContextKitAsset) => void
-  onMenu: (key: KitMenuKey | null) => void
+  onMenu: (state: KitMenuState | null) => void
   onReupload: (item: ContextKitAsset) => void
   onDelete: (item: ContextKitAsset) => void
 }) {
@@ -51,47 +60,57 @@ export function KitAssetsSection({
       </div>
       <div className={styles.mediaGrid}>
         {items.map((item) => (
-          <article className={styles.mediaCard} key={item.hash}>
-            <AssetImage item={item} />
-            <small>{item.name || '套件素材'}</small>
-            <button
-              type="button"
-              className={styles.assetAdd}
-              data-my-assets-kit-asset-add={item.hash}
-              aria-label={`将 ${item.name} 添加到对话`}
-              title="添加到对话"
-              onClick={() => onAdd(item)}
-            >
-              <IconPlus size={14} />
-            </button>
-            <MenuButton
-              keyName={`asset:${item.hash}`}
-              kind="asset"
-              itemId={item.hash}
-              openMenu={openMenu}
-              setOpenMenu={onMenu}
-              label={`编辑 ${item.name}`}
-            />
-            {openMenu === `asset:${item.hash}` ? (
-              <div className={styles.menu} role="menu" data-my-assets-kit-actions>
-                <button
-                  type="button"
-                  role="menuitem"
-                  data-my-assets-kit-asset-reupload
-                  onClick={() => onReupload(item)}
-                >
-                  <IconImageUpload size={14} /> 重新上传
-                </button>
-                <button
-                  type="button"
-                  role="menuitem"
-                  className={styles.danger}
-                  data-my-assets-kit-asset-delete
-                  onClick={() => onDelete(item)}
-                >
-                  <IconDelete size={14} /> 删除
-                </button>
-              </div>
+          <article
+            className={styles.mediaCard}
+            key={item.hash}
+            data-my-assets-kit-asset-card={item.hash}
+          >
+            <div className={styles.mediaThumb} data-my-assets-kit-asset-thumb>
+              <AssetImage item={item} />
+              <button
+                type="button"
+                className={styles.assetAdd}
+                data-my-assets-kit-asset-add={item.hash}
+                aria-label={`将 ${item.name} 添加到对话`}
+                title="添加到对话"
+                onClick={() => onAdd(item)}
+              >
+                <IconPlus size={14} />
+              </button>
+            </div>
+            <div className={styles.mediaMeta} data-my-assets-kit-asset-meta>
+              <small>{item.name || '套件素材'}</small>
+              <MenuButton
+                keyName={`asset:${item.hash}`}
+                kind="asset"
+                itemId={item.hash}
+                openMenu={openMenu}
+                setOpenMenu={onMenu}
+                label={`编辑 ${item.name}`}
+                inline
+              />
+            </div>
+            {openMenu?.key === `asset:${item.hash}` ? (
+              <ReferenceCardActionMenu
+                x={openMenu.x}
+                y={openMenu.y}
+                actions={[
+                  {
+                    id: 'reupload',
+                    label: '重新上传',
+                    icon: <IconImageUpload size={14} />,
+                    onSelect: () => onReupload(item),
+                  },
+                  {
+                    id: 'delete',
+                    label: '删除',
+                    icon: <IconDelete size={14} />,
+                    danger: true,
+                    onSelect: () => onDelete(item),
+                  },
+                ]}
+                onClose={() => onMenu(null)}
+              />
             ) : null}
           </article>
         ))}
@@ -109,8 +128,8 @@ export function KitColorsSection({
   onDelete,
 }: {
   colors: readonly ContextKitColor[]
-  openMenu: KitMenuKey | null
-  onMenu: (key: KitMenuKey | null) => void
+  openMenu: KitMenuState | null
+  onMenu: (state: KitMenuState | null) => void
   onAdd: (value: string, name: string) => Promise<void>
   onUpdate: (id: string, value: string) => Promise<void>
   onDelete: (id: string) => Promise<void>
@@ -165,29 +184,27 @@ export function KitColorsSection({
               setOpenMenu={onMenu}
               label={`编辑颜色 ${color.name}`}
             />
-            {openMenu === `color:${color.id}` ? (
-              <div className={styles.menu} role="menu" data-my-assets-kit-actions>
-                <button
-                  type="button"
-                  role="menuitem"
-                  data-my-assets-kit-color-edit
-                  onClick={() => {
-                    setEditingColorId(color.id)
-                    onMenu(null)
-                  }}
-                >
-                  <IconRename size={14} /> 编辑
-                </button>
-                <button
-                  type="button"
-                  role="menuitem"
-                  className={styles.danger}
-                  data-my-assets-kit-color-delete
-                  onClick={() => void onDelete(color.id)}
-                >
-                  <IconDelete size={14} /> 删除
-                </button>
-              </div>
+            {openMenu?.key === `color:${color.id}` ? (
+              <ReferenceCardActionMenu
+                x={openMenu.x}
+                y={openMenu.y}
+                actions={[
+                  {
+                    id: 'edit',
+                    label: '编辑',
+                    icon: <IconRename size={14} />,
+                    onSelect: () => setEditingColorId(color.id),
+                  },
+                  {
+                    id: 'delete',
+                    label: '删除',
+                    icon: <IconDelete size={14} />,
+                    danger: true,
+                    onSelect: () => void onDelete(color.id),
+                  },
+                ]}
+                onClose={() => onMenu(null)}
+              />
             ) : null}
             {editingColorId === color.id ? (
               <ColorPickerPopover
@@ -220,10 +237,10 @@ export function KitFontsSection({
 }: {
   fonts: readonly ContextKitFont[]
   fontLibrary: readonly UserFont[]
-  openMenu: KitMenuKey | null
-  onMenu: (key: KitMenuKey | null) => void
-  onAdd: (event: MouseEvent<HTMLButtonElement>) => void
-  onEdit: (event: MouseEvent<HTMLButtonElement>, id: string) => void
+  openMenu: KitMenuState | null
+  onMenu: (state: KitMenuState | null) => void
+  onAdd: (anchor: PickerAnchor) => void
+  onEdit: (anchor: PickerAnchor, id: string) => void
   onUpload: (id: string) => void
   onDelete: (id: string) => Promise<void>
 }) {
@@ -236,7 +253,7 @@ export function KitFontsSection({
           className={styles.textAction}
           data-my-assets-kit-font-add
           disabled={fontLibrary.length === 0}
-          onClick={onAdd}
+          onClick={(event) => onAdd(anchorOf(event.currentTarget))}
         >
           + 添加
         </button>
@@ -264,34 +281,42 @@ export function KitFontsSection({
                 setOpenMenu={onMenu}
                 label={`编辑字体 ${font.name}`}
               />
-              {openMenu === `font:${font.id}` ? (
-                <div className={styles.menu} role="menu" data-my-assets-kit-actions>
-                  <button
-                    type="button"
-                    role="menuitem"
-                    data-my-assets-kit-font-edit
-                    onClick={(event) => onEdit(event, font.id)}
-                  >
-                    <IconRename size={14} /> 编辑
-                  </button>
-                  <button
-                    type="button"
-                    role="menuitem"
-                    data-my-assets-kit-font-reupload
-                    onClick={() => onUpload(font.id)}
-                  >
-                    <IconImageUpload size={14} /> 重新上传
-                  </button>
-                  <button
-                    type="button"
-                    role="menuitem"
-                    className={styles.danger}
-                    data-my-assets-kit-font-delete
-                    onClick={() => void onDelete(font.id)}
-                  >
-                    <IconDelete size={14} /> 删除
-                  </button>
-                </div>
+              {openMenu?.key === `font:${font.id}` ? (
+                <ReferenceCardActionMenu
+                  x={openMenu.x}
+                  y={openMenu.y}
+                  actions={[
+                    {
+                      id: 'edit',
+                      label: '编辑',
+                      icon: <IconRename size={14} />,
+                      onSelect: () =>
+                        onEdit(
+                          {
+                            left: openMenu.x,
+                            right: openMenu.x,
+                            top: openMenu.y,
+                            bottom: openMenu.y,
+                          },
+                          font.id,
+                        ),
+                    },
+                    {
+                      id: 'reupload',
+                      label: '重新上传',
+                      icon: <IconImageUpload size={14} />,
+                      onSelect: () => onUpload(font.id),
+                    },
+                    {
+                      id: 'delete',
+                      label: '删除',
+                      icon: <IconDelete size={14} />,
+                      danger: true,
+                      onSelect: () => void onDelete(font.id),
+                    },
+                  ]}
+                  onClose={() => onMenu(null)}
+                />
               ) : null}
             </article>
           )
@@ -313,26 +338,48 @@ function MenuButton({
   openMenu,
   setOpenMenu,
   label,
+  inline = false,
 }: {
   keyName: KitMenuKey
   kind: 'asset' | 'color' | 'font'
   itemId: string
-  openMenu: KitMenuKey | null
-  setOpenMenu: (key: KitMenuKey | null) => void
+  openMenu: KitMenuState | null
+  setOpenMenu: (state: KitMenuState | null) => void
   label: string
+  inline?: boolean
 }) {
   return (
     <button
       type="button"
-      className={styles.more}
+      className={[styles.more, inline ? styles.moreInline : ''].filter(Boolean).join(' ')}
       data-my-assets-kit-actions
       data-my-assets-kit-menu={kind}
       data-my-assets-kit-menu-id={itemId}
       aria-label={label}
-      aria-expanded={openMenu === keyName}
-      onClick={() => setOpenMenu(openMenu === keyName ? null : keyName)}
+      aria-expanded={openMenu?.key === keyName}
+      onClick={(event) => {
+        if (openMenu?.key === keyName) {
+          setOpenMenu(null)
+          return
+        }
+        setOpenMenu({
+          key: keyName,
+          x: event.currentTarget.getBoundingClientRect().left,
+          y: event.currentTarget.getBoundingClientRect().bottom + 4,
+        })
+      }}
     >
       <IconMore size={15} />
     </button>
   )
+}
+
+function anchorOf(element: HTMLElement): PickerAnchor {
+  const rect = element.getBoundingClientRect()
+  return {
+    left: rect.left,
+    right: rect.right,
+    top: rect.top,
+    bottom: rect.bottom,
+  }
 }

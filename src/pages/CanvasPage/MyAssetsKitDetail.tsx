@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type MouseEvent } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { usePlatform } from '../../app/providers/PlatformProvider'
 import { useFonts } from '../../app/providers/FontProvider'
 import type { ContextKit, ContextKitAsset, ContextKitColor, ContextKitFont, ContextKitVersion } from '../../domain/shared/context'
@@ -18,7 +18,7 @@ import {
   KitAssetsSection,
   KitColorsSection,
   KitFontsSection,
-  type KitMenuKey,
+  type KitMenuState,
 } from './MyAssetsKitSections'
 import styles from './MyAssetsKitDetail.module.css'
 
@@ -57,7 +57,7 @@ export function MyAssetsKitDetail({
   const [current, setCurrent] = useState(version)
   const [busy, setBusy] = useState(false)
   const [status, setStatus] = useState('')
-  const [openMenu, setOpenMenu] = useState<KitMenuKey | null>(null)
+  const [openMenu, setOpenMenu] = useState<KitMenuState | null>(null)
   const [imageTarget, setImageTarget] = useState<ImageTarget | null>(null)
   const [fontReplaceId, setFontReplaceId] = useState<string | null>(null)
   const [fontPicker, setFontPicker] = useState<FontPickerState | null>(null)
@@ -70,16 +70,6 @@ export function MyAssetsKitDetail({
     setCurrent(version)
     setDescriptionDraft(version?.guide || kit.description)
   }, [kit.description, version])
-
-  useEffect(() => {
-    if (!openMenu) return
-    const close = (event: PointerEvent) => {
-      if ((event.target as Element | null)?.closest('[data-my-assets-kit-actions]')) return
-      setOpenMenu(null)
-    }
-    document.addEventListener('pointerdown', close, true)
-    return () => document.removeEventListener('pointerdown', close, true)
-  }, [openMenu])
 
   const logo = current?.resources.filter((item) => item.role === 'logo') ?? []
   const photos = current?.resources.filter((item) => item.role !== 'logo') ?? []
@@ -203,16 +193,10 @@ export function MyAssetsKitDetail({
     )
   }
 
-  const chooseFont = (event: MouseEvent<HTMLElement>, replaceId?: string) => {
-    const rect = event.currentTarget.getBoundingClientRect()
+  const chooseFont = (anchor: PickerAnchor, replaceId?: string) => {
     setFontPicker({
       replaceId,
-      anchor: {
-        left: rect.left,
-        right: rect.right,
-        top: rect.top,
-        bottom: rect.bottom,
-      },
+      anchor,
     })
     setOpenMenu(null)
   }
@@ -392,8 +376,8 @@ export function MyAssetsKitDetail({
         fontLibrary={fontLibrary.fonts}
         openMenu={openMenu}
         onMenu={setOpenMenu}
-        onAdd={(event) => chooseFont(event)}
-        onEdit={(event, id) => chooseFont(event, id)}
+        onAdd={(anchor) => chooseFont(anchor)}
+        onEdit={(anchor, id) => chooseFont(anchor, id)}
         onUpload={(id) => {
           setFontReplaceId(id)
           setOpenMenu(null)

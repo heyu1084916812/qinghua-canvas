@@ -24,6 +24,7 @@ import {
   type AgentReferenceHandoff,
 } from '../../../../features/canvas/agentHandoff'
 import { loadAssetUrl } from '../../../../features/shared/assets/index'
+import { createReferenceLedgerRepository } from '../../../../state/project/referenceLedgerRepository'
 import type { TaskLifecycle } from '../../../../features/shared/lifecycle/taskLifecycle'
 import { parseMentions } from '../../text/MentionEditor'
 import { viewportWorldOf } from './agentPanelViewHelpers'
@@ -73,7 +74,7 @@ export interface AgentAttachmentsControllerInput {
 export interface AgentAttachmentsController {
   addFromLibrary: (hash: string) => Promise<void>
   attachFiles: (files: FileList | null) => Promise<void>
-  thumbOf: (nodeId: string) => string | null
+  thumbOf: (id: string) => string | null
   thumbVersion: number
 }
 
@@ -257,14 +258,18 @@ export function useAgentAttachmentsController(
   )
 
   const thumbCacheRef = useRef(new Map<string, string>())
+  const referenceThumbCacheRef = useRef(new Map<string, string>())
   const [thumbVersion, setThumbVersion] = useState(0)
   const thumbOf = useCallback(
-    (nodeId: string) => thumbCacheRef.current.get(nodeId) ?? null,
+    (id: string) =>
+      thumbCacheRef.current.get(id) ??
+      referenceThumbCacheRef.current.get(id) ??
+      null,
     [],
   )
 
   useEffect(() => {
-    const refs = [
+    const nodeRefs = [
       ...parseMentions(input.draft).filter(
         (mention) => mention.kind === 'node',
       ),
@@ -278,11 +283,22 @@ export function useAgentAttachmentsController(
         ),
       ),
     ]
-    if (refs.length === 0) return
+    const referenceIds = [
+      ...parseMentions(input.draft)
+        .filter((mention) => mention.kind === 'reference')
+        .map((mention) => mention.id),
+      ...(input.current?.referenceIds ?? []),
+      ...input.messages.flatMap((message) =>
+        parseMentions(message.display ?? message.content)
+          .filter((mention) => mention.kind === 'reference')
+          .map((mention) => mention.id),
+      ),
+    ]
+    if (nodeRefs.length === 0 && referenceIds.length === 0) return
     let alive = true
     void (async () => {
       let added = false
-      for (const ref of refs) {
+      for (const ref of nodeRefs) {
         if (thumbCacheRef.current.has(ref.id)) continue
         const hash = input.nodeHashes.get(ref.id)
         if (!hash) continue
@@ -291,6 +307,24 @@ export function useAgentAttachmentsController(
         thumbCacheRef.current.set(ref.id, meta.url)
         added = true
       }
+      const missingReferenceIds = [
+        ...new Set(referenceIds),
+      ].filter((id) => !referenceThumbCacheRef.current.has(id))
+      if (missingReferenceIds.length > 0) {
+        const repository = createReferenceLedgerRepository(input.platform.storage)
+        const items = await repository.listItems(input.projectId)
+        const byId = new Map(items.map((item) => [item.id, item]))
+        for (const id of missingReferenceIds) {
+          const item = byId.get(id)
+          if (item?.kind !== 'image') continue
+          const hash = item?.assetHash ?? item?.assets?.[0]?.hash
+          if (!hash) continue
+          const meta = await loadAssetUrl(input.platform, hash)
+          if (!alive || !meta.url) continue
+          referenceThumbCacheRef.current.set(id, meta.url)
+          added = true
+        }
+      }
       if (added && alive) setThumbVersion((version) => version + 1)
     })()
     return () => {
@@ -298,10 +332,12 @@ export function useAgentAttachmentsController(
     }
   }, [
     input.current?.pendingAssetIds,
+    input.current?.referenceIds,
     input.draft,
     input.messages,
     input.nodeHashes,
     input.platform,
+    input.projectId,
   ])
 
   useEffect(
@@ -309,7 +345,11 @@ export function useAgentAttachmentsController(
       for (const url of thumbCacheRef.current.values()) {
         URL.revokeObjectURL(url)
       }
+      for (const url of referenceThumbCacheRef.current.values()) {
+        URL.revokeObjectURL(url)
+      }
       thumbCacheRef.current.clear()
+      referenceThumbCacheRef.current.clear()
     },
     [],
   )

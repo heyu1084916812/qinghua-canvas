@@ -37,7 +37,10 @@ export function MentionRichText({
           const kind = part.startsWith('@[') ? mentionKindOf(part) : null
           if (!kind) return part ? <span key={i}>{part}</span> : null
           const id = mentionIdOf(part) ?? ''
-          const url = kind === 'node' ? (thumbOf?.(id) ?? null) : null
+          const url =
+            kind === 'node' || kind === 'reference'
+              ? (thumbOf?.(id) ?? null)
+              : null
           return (
             <span
               key={i}

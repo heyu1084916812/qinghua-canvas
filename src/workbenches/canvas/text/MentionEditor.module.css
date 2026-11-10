@@ -123,3 +123,25 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
+
+/*
+ * 参考 chip 是「小缩略图 + 短名称」：它承载的是一次明确引用，
+ * 不需要像路径一样铺满整行。缩略图保持方形，名称最多占剩余宽度。
+ */
+.chip[data-mention-kind='reference'] {
+  max-width: 160px;
+  height: 2em;
+  gap: 5px;
+  padding: 2px 5px 2px 2px;
+}
+
+.chip[data-mention-kind='reference'] .chipThumb {
+  width: 1.4em;
+  height: 1.4em;
+  border-radius: 3px;
+}
+
+.chip[data-mention-kind='reference'] .chipLabel {
+  flex: 1 1 auto;
+  max-width: 112px;
+}

@@ -369,6 +369,42 @@ describe('useAgentAttachmentsController', () => {
     expect(revoke).toHaveBeenCalledTimes(3)
   })
 
+  it('reference chips load and cache thumbnails from the project ledger', async () => {
+    const revoke = vi.fn()
+    URL.revokeObjectURL = revoke
+    loadAssetUrl.mockResolvedValue({ url: 'blob:reference-image' })
+    const query = vi.fn(async (table: string) =>
+      table === 'referenceItems'
+        ? [{
+            id: 'ref-1',
+            projectId: 'project-1',
+            title: '参考一',
+            source: 'file',
+            kind: 'image',
+            assetHash: 'hash-ref-1',
+            what: '',
+            createdAt: 1,
+            updatedAt: 1,
+          }]
+        : [],
+    )
+    const { viewRef, renderer } = render(input({
+      draft: mentionToken('reference', 'ref-1', '参考一'),
+      platform: { storage: { query } } as unknown as PlatformKit,
+    }))
+
+    await vi.waitFor(() => {
+      expect(viewRef.current?.thumbOf('ref-1')).toBe('blob:reference-image')
+    })
+    expect(query).toHaveBeenCalledWith('referenceItems', {
+      projectId: 'project-1',
+    })
+    expect(loadAssetUrl).toHaveBeenCalledWith(expect.anything(), 'hash-ref-1')
+
+    act(() => renderer.unmount())
+    expect(revoke).toHaveBeenCalledWith('blob:reference-image')
+  })
+
   /**
    * #919 的 P3 与 #921 的修法（同一个坑的两面）：
    *

@@ -7,6 +7,9 @@
 - 图片资源以 hash 去重；新增相同 hash 必须拒绝。单图卡右上角只添加该图到 Agent，右下角三点菜单负责重新上传/删除。
 - 参考菜单、字体选择器和颜色面板的 Esc 必须捕获阶段 `stopPropagation`，否则会冒泡关闭整个“我的素材”抽屉。
 - UI 探针必须记录菜单项、描述保存、颜色面板、字体库选项、图片 `上传→重传→删除` 数量和单图 Agent chip；四组均要求 `pageOverflowX=false / childrenOutsideX=0 / errors=[]`。
+- 套件图片卡结构固定为图片缩略层 + 下方元信息行：`+` 在图片右上内侧（当前 7px），描述占剩余宽度，三点按钮固定占 22px 并排在描述右侧；禁止再用 absolute 三点覆盖图片或描述。
+- 套件图片/颜色/字体菜单必须走 `ReferenceCardActionMenu` 的 viewport portal（状态 `{key,x,y}`），不能留在抽屉滚动容器内。菜单 Esc 仍要捕获阶段拦截。
+- Agent `reference` chip 必须从项目参考台账取真实 `assetHash` 并显示缩略图；只处理 `kind=image`。chip 最大 160px，当前基线 144×26px、缩略图 18×18px；`node` 和 `reference` 的正文只读渲染都要复用同一 `thumbOf`。
 
 ## 画布“我的素材”抽屉动效边界（2026-11-10）
 

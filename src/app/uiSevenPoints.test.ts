@@ -30,6 +30,12 @@ describe('seven UI placement fixes', () => {
     const kitDetail = read('pages/CanvasPage/MyAssetsKitDetail.tsx')
     const kitSections = read('pages/CanvasPage/MyAssetsKitSections.tsx')
     const kitFontPicker = read('pages/CanvasPage/KitFontPicker.tsx')
+    const agentAttachments = read(
+      'workbenches/canvas/panels/AgentPanel/useAgentAttachmentsController.ts',
+    )
+    const mentionRichText = read(
+      'workbenches/canvas/panels/AgentPanel/MentionRichText.tsx',
+    )
     const referenceSource = read('pages/CanvasPage/ReferenceSourcePanel.tsx')
     const referenceCards = read('pages/CanvasPage/ReferenceGridCards.tsx')
     const referenceMenu = read('pages/CanvasPage/ReferenceCardActionMenu.tsx')
@@ -90,9 +96,17 @@ describe('seven UI placement fixes', () => {
     expect(kitSections).toContain('data-my-assets-kit-upload={role}')
     expect(kitSections).toContain('data-my-assets-kit-asset-add={item.hash}')
     expect(kitSections).toContain('data-my-assets-kit-actions')
+    expect(kitSections).toContain('styles.mediaThumb')
+    expect(kitSections).toContain('styles.mediaMeta')
+    expect(kitSections).toContain('styles.moreInline')
+    expect(kitSections).toContain('<ReferenceCardActionMenu')
     expect(kitSections).toContain('data-my-assets-kit-color-add')
     expect(kitSections).toContain('data-my-assets-kit-font-add')
     expect(kitFontPicker).toContain('data-my-assets-font-option={font.id}')
+    expect(agentAttachments).toContain('createReferenceLedgerRepository')
+    expect(agentAttachments).toContain("mention.kind === 'reference'")
+    expect(agentAttachments).toContain("item?.kind !== 'image'")
+    expect(mentionRichText).toContain("kind === 'node' || kind === 'reference'")
     expect(referenceSource).toContain('data-my-assets-reference-upload')
     expect(referenceSource).toContain('sendReferenceToAgent')
     expect(referenceSource).toContain('<MasonryGrid')
