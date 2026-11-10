@@ -34,13 +34,17 @@ async function mediaFixtures(browser) {
     #tall { width: 240px; height: 420px; background: #a8c8bb; }
     #wide { width: 480px; height: 220px; background: #c4b48c; }
     #portrait { width: 260px; height: 400px; background: #d6b99c; }
-  </style><div id="square"></div><div id="tall"></div><div id="wide"></div><div id="portrait"></div>`)
+    #add { width: 280px; height: 180px; background: #b76e79; }
+    #replace { width: 220px; height: 200px; background: #708090; }
+  </style><div id="square"></div><div id="tall"></div><div id="wide"></div><div id="portrait"></div><div id="add"></div><div id="replace"></div>`)
   const square = await page.locator('#square').screenshot()
   const tall = await page.locator('#tall').screenshot()
   const wide = await page.locator('#wide').screenshot()
   const portrait = await page.locator('#portrait').screenshot()
+  const add = await page.locator('#add').screenshot()
+  const replace = await page.locator('#replace').screenshot()
   await page.close()
-  return { square, tall, wide, portrait }
+  return { square, tall, wide, portrait, add, replace }
 }
 
 const pageErrors = (page) => {
@@ -524,6 +528,16 @@ try {
       }
     })
     await page.screenshot({ path: path.join(out, `${file}-canvas-reference.png`) })
+    await page.locator('[data-my-assets-reference]').first().click({ button: 'right' })
+    await page.locator('[data-reference-card-menu]').waitFor({ timeout: 5_000 })
+    const referenceMenuActions = await page.locator('[data-reference-card-action]').count()
+    await page.screenshot({ path: path.join(out, `${file}-canvas-reference-menu.png`) })
+    await page.locator('[data-reference-card-action="open"]').click()
+    await page.locator('[data-reference-lightbox]').waitFor({ timeout: 10_000 })
+    const referenceMenuOpenActionWorks =
+      (await page.locator('[data-reference-lightbox]').count()) === 1
+    await page.keyboard.press('Escape')
+    await page.locator('[data-reference-lightbox]').waitFor({ state: 'detached', timeout: 5_000 })
     await page.locator('[data-reference-filter-trigger="source"]').click()
     await page.locator('[data-reference-filter-panel="source"]').waitFor({ timeout: 5_000 })
     const referenceFilterIcon = await page.locator('[data-reference-filter-trigger="source"] svg').evaluate((svg) => ({
@@ -837,6 +851,100 @@ try {
     const shelfDetailTitle =
       (await page.locator('[data-my-assets-kit-detail] h2').textContent({ timeout: 5_000 }))?.trim() ?? ''
     await page.screenshot({ path: path.join(out, `${file}-canvas-kit-detail.png`) })
+    const kitAssetCardsBefore = await page.locator('[data-my-assets-kit-asset-add]').count()
+    await page.locator('[data-my-assets-kit-description-edit]').click()
+    await page.locator('[data-my-assets-kit-description]').fill('用于验证品牌套件直接编辑与多层素材复用。')
+    await page.locator('[data-my-assets-kit-description-save]').click()
+    await page.waitForFunction(
+      () => document.querySelector('[data-my-assets-kit-detail] [aria-live="polite"]')?.textContent?.includes('描述已更新'),
+      { timeout: 10_000 },
+    )
+    const kitDescriptionSaved =
+      (await page.getByText('用于验证品牌套件直接编辑与多层素材复用。').count()) === 1
+
+    await page.locator('[data-my-assets-kit-menu="color"]').first().click()
+    await page.screenshot({ path: path.join(out, `${file}-canvas-kit-color-menu.png`) })
+    await page.locator('[data-my-assets-kit-color-edit]').click()
+    await page.locator('[data-color-picker-popover]').waitFor({ timeout: 5_000 })
+    const kitColorEditorOpened = (await page.locator('[data-color-picker-popover]').count()) === 1
+    await page.screenshot({ path: path.join(out, `${file}-canvas-kit-color-editor.png`) })
+    await page.locator('[data-color-hex-input]').fill('112233')
+    await page.locator('[data-color-confirm]').click()
+    await page.waitForFunction(
+      () => document.querySelector('[data-my-assets-kit-detail] [aria-live="polite"]')?.textContent?.includes('颜色已更新'),
+      { timeout: 10_000 },
+    )
+
+    await page.locator('[data-my-assets-kit-menu="font"]').first().click()
+    const fontChooserPromise = page.waitForEvent('filechooser')
+    await page.locator('[data-my-assets-kit-font-reupload]').click()
+    const fontChooser = await fontChooserPromise
+    await fontChooser.setFiles({
+      name: 'Fixture.ttf',
+      mimeType: 'font/ttf',
+      buffer: Buffer.from('00010000001000000000000000000000', 'hex'),
+    })
+    await page.waitForFunction(
+      () => document.querySelector('[data-my-assets-kit-detail] [aria-live="polite"]')?.textContent?.includes('字体已重新上传'),
+      { timeout: 15_000 },
+    )
+    await page.locator('[data-my-assets-kit-menu="font"]').first().click()
+    await page.locator('[data-my-assets-kit-font-edit]').click()
+    await page.locator('[data-my-assets-font-picker]').waitFor({ timeout: 5_000 })
+    const kitFontLibraryOptions = await page.locator('[data-my-assets-font-option]').count()
+    await page.screenshot({ path: path.join(out, `${file}-canvas-kit-font-picker.png`) })
+    await page.keyboard.press('Escape')
+    await page.locator('[data-my-assets-font-picker]').waitFor({ state: 'detached', timeout: 5_000 })
+
+    const imageChooserPromise = page.waitForEvent('filechooser')
+    await page.locator('[data-my-assets-kit-upload="reference"]').click()
+    const imageChooser = await imageChooserPromise
+    await imageChooser.setFiles({
+      name: 'direct-reference.png',
+      mimeType: 'image/png',
+      buffer: fixtures.add,
+    })
+    await page.waitForFunction(
+      (before) => document.querySelectorAll('[data-my-assets-kit-asset-add]').length > before,
+      kitAssetCardsBefore,
+      { timeout: 15_000 },
+    )
+    const kitAssetCardsAfterUpload =
+      await page.locator('[data-my-assets-kit-asset-add]').count()
+    await page.locator('[data-my-assets-kit-asset-add]').first().click()
+    await page.locator('[data-agent-panel]').waitFor({ timeout: 15_000 })
+    await page.locator('[data-agent-composer] [data-mention-kind="reference"]').first().waitFor({ timeout: 15_000 })
+    const kitAssetAgentChipCount =
+      await page.locator('[data-agent-composer] [data-mention-kind="reference"]').count()
+    await page.locator('[data-agent-close]').click()
+    await page.locator('[data-agent-panel]').waitFor({ state: 'hidden', timeout: 10_000 })
+    await page.locator('[data-my-assets-kit-menu="asset"]').last().click()
+    const imageReplaceChooserPromise = page.waitForEvent('filechooser')
+    await page.locator('[data-my-assets-kit-asset-reupload]').click()
+    const imageReplaceChooser = await imageReplaceChooserPromise
+    await imageReplaceChooser.setFiles({
+      name: 'replaced-reference.png',
+      mimeType: 'image/png',
+      buffer: fixtures.replace,
+    })
+    await page.waitForFunction(
+      () => document.querySelector('[data-my-assets-kit-detail] [aria-live="polite"]')?.textContent?.includes('图片已重新上传'),
+      { timeout: 15_000 },
+    )
+    const kitAssetReuploaded =
+      (await page.locator('[data-my-assets-kit-asset-add]').count()) > kitAssetCardsBefore
+    await page.screenshot({ path: path.join(out, `${file}-canvas-kit-detail-edited.png`) })
+    await page.locator('[data-my-assets-kit-menu="asset"]').last().click()
+    await page.locator('[data-my-assets-kit-asset-reupload]').waitFor({ timeout: 5_000 })
+    await page.screenshot({ path: path.join(out, `${file}-canvas-kit-asset-menu.png`) })
+    await page.locator('[data-my-assets-kit-asset-delete]').click()
+    await page.waitForFunction(
+      (before) => document.querySelectorAll('[data-my-assets-kit-asset-add]').length === before,
+      kitAssetCardsBefore,
+      { timeout: 15_000 },
+    )
+    const kitAssetCardsAfterDelete =
+      await page.locator('[data-my-assets-kit-asset-add]').count()
     await page.locator('[data-my-assets-kit-back]').click()
     await page.locator('[data-my-assets-shelf]').waitFor({ timeout: 10_000 })
     await page.locator('[data-my-assets-kit-add]').click()
@@ -874,6 +982,8 @@ try {
       referenceFolders,
       referenceUpload,
       referenceExpandActions,
+      referenceMenuActions,
+      referenceMenuOpenActionWorks,
       referenceFilteredCards,
       referenceFilteredFolders,
       referenceFilterIcon,
@@ -895,6 +1005,14 @@ try {
       referenceKitDoubleClickOpenedLightbox,
       shelfDetailSections,
       shelfDetailTitle,
+      kitDescriptionSaved,
+      kitColorEditorOpened,
+      kitFontLibraryOptions,
+      kitAssetCardsBefore,
+      kitAssetCardsAfterUpload,
+      kitAssetCardsAfterDelete,
+      kitAssetReuploaded,
+      kitAssetAgentChipCount,
       shelfKitClickChipCount,
       shelfDetailChipCount,
       ...shelfState,

@@ -3,20 +3,16 @@ import { usePlatform } from '../../app/providers/PlatformProvider'
 import type { ContextKit, ContextKitVersion } from '../../domain/shared/context'
 import type { ReferenceItem } from '../../domain/project/referenceLedger'
 import { sendReferenceToAgent } from '../../features/canvas/agentHandoff'
-import { setReferenceDragData } from '../../features/canvas/dropImport'
 import { importAssetFile, IMPORT_ACCEPT } from '../../features/canvas/importAsset'
 import { ensureKitCardReference } from '../../features/canvas/kitReference'
-import { useAsset } from '../../features/shared/assets'
 import { createContextRepository } from '../../state/shared/contextRepository'
 import { createReferenceLedgerRepository } from '../../state/project/referenceLedgerRepository'
 import type { CanvasStore } from '../../state/workbenches/canvas/store'
 import { createId } from '../../shared/id'
 import {
-  IconExpand,
   IconPlus,
   IconSpinner,
 } from '../../workbenches/canvas/toolbar/icons'
-import { KIT_KINDS } from '../AssetsPage/contextKitDraft'
 import { MasonryGrid } from '../AssetsPage/MasonryGrid'
 import { ReferenceLightbox } from './ReferenceLightbox'
 import {
@@ -28,7 +24,9 @@ import {
   type ReferenceSourceFilter,
 } from './ReferenceFilterFields'
 import { ReferenceKitPanel } from './ReferenceKitPanel'
-import { ReferenceMedia } from './ReferenceMedia'
+import { ReferenceCardActionMenu } from './ReferenceCardActionMenu'
+import { KitFolder, ReferenceCard } from './ReferenceGridCards'
+import { useReferenceCardActions } from './useReferenceCardActions'
 import styles from './ReferenceSourcePanel.module.css'
 
 export function ReferenceSourcePanel({
@@ -142,7 +140,38 @@ export function ReferenceSourcePanel({
     }
   }
 
+  const addReference = (item: ReferenceItem) => {
+    if (clickTimerRef.current) clearTimeout(clickTimerRef.current)
+    clickTimerRef.current = setTimeout(() => {
+      clickTimerRef.current = null
+      sendReferenceToAgent(projectId, [{ id: item.id, label: item.title }])
+    }, 220)
+  }
+  const openReference = (item: ReferenceItem) => {
+    if (clickTimerRef.current) clearTimeout(clickTimerRef.current)
+    clickTimerRef.current = null
+    setLightboxId(item.id)
+  }
   const selectedKit = kits.find((kit) => kit.id === selectedKitId) ?? null
+  const {
+    contextMenu,
+    setContextMenu,
+    actions: contextActions,
+    renamingId,
+    renameDraft,
+    setRenameDraft,
+    renameReference,
+    cancelRename,
+  } = useReferenceCardActions({
+    projectId,
+    store,
+    platform,
+    repository: referenceRepo,
+    setReferences,
+    openReference,
+    lightboxId,
+    setLightboxId,
+  })
   const visibleReferences = references.filter((item) =>
     matchesReferenceFilters(item.source, item.kind, sourceFilters, kindFilters),
   )
@@ -167,19 +196,6 @@ export function ReferenceSourcePanel({
   const toggleKind = (value: ReferenceKindFilter) => {
     setKindFilters((current) => toggledReferenceFilter(current, value))
   }
-  const addReference = (item: ReferenceItem) => {
-    if (clickTimerRef.current) clearTimeout(clickTimerRef.current)
-    clickTimerRef.current = setTimeout(() => {
-      clickTimerRef.current = null
-      sendReferenceToAgent(projectId, [{ id: item.id, label: item.title }])
-    }, 220)
-  }
-  const openReference = (item: ReferenceItem) => {
-    if (clickTimerRef.current) clearTimeout(clickTimerRef.current)
-    clickTimerRef.current = null
-    setLightboxId(item.id)
-  }
-
   return (
     <div
       className={styles.panel}
@@ -232,44 +248,18 @@ export function ReferenceSourcePanel({
           {busy ? <IconSpinner size={24} /> : <IconPlus size={30} />}
         </button>
         {visibleReferences.map((item) => (
-          <article
-            className={styles.referenceCard}
-            data-my-assets-reference={item.id}
-            data-my-assets-reference-drag={item.id}
-            draggable
+          <ReferenceCard
             key={item.id}
-            onDragStart={(event) => setReferenceDragData(event.dataTransfer, item.id)}
-          >
-            <div className={styles.referenceMedia}>
-              <button
-                type="button"
-                className={styles.referenceOpen}
-                data-my-assets-reference-open={item.id}
-                aria-label={`查看参考 ${item.title}`}
-                onClick={() => addReference(item)}
-                onDoubleClick={() => item.assetHash && openReference(item)}
-              >
-                <ReferenceMedia
-                  hash={item.assetHash}
-                  title={item.title}
-                  kind={item.kind === 'video' ? 'video' : 'image'}
-                />
-              </button>
-              <button
-                type="button"
-                className={styles.referenceExpand}
-                data-my-assets-reference-expand={item.id}
-                aria-label={`放大查看 ${item.title}`}
-                title="放大查看"
-                onClick={() => openReference(item)}
-              >
-                <IconExpand size={14} />
-              </button>
-            </div>
-            <div className={styles.referenceCopy}>
-              <span title={item.what || item.title}>{item.what || item.title}</span>
-            </div>
-          </article>
+            item={item}
+            renaming={renamingId === item.id}
+            renameDraft={renameDraft}
+            onRenameDraft={setRenameDraft}
+            onRename={(target) => void renameReference(target)}
+            onCancelRename={cancelRename}
+            onAdd={addReference}
+            onOpen={openReference}
+            onContextMenu={(target, x, y) => setContextMenu({ item: target, x, y })}
+          />
         ))}
         {visibleKits.map((kit) => (
           <KitFolder
@@ -281,6 +271,14 @@ export function ReferenceSourcePanel({
           />
         ))}
       </MasonryGrid>
+      {contextMenu ? (
+        <ReferenceCardActionMenu
+          x={contextMenu.x}
+          y={contextMenu.y}
+          actions={contextActions}
+          onClose={() => setContextMenu(null)}
+        />
+      ) : null}
       {lightboxId ? (
         <ReferenceLightbox
           projectId={projectId}
@@ -291,62 +289,5 @@ export function ReferenceSourcePanel({
         />
       ) : null}
     </div>
-  )
-}
-
-function KitFolder({
-  kit,
-  version,
-  onAdd,
-  onOpen,
-}: {
-  kit: ContextKit
-  version: ContextKitVersion | null
-  onAdd: () => void
-  onOpen: () => void
-}) {
-  const preview = version?.resources.find((item) => item.role === 'logo') ?? version?.resources[0]
-  const url = useAsset(preview?.hash ?? '')
-  const typeLabel = KIT_KINDS.find((item) => item.value === kit.kind)?.label ?? '套件'
-  return (
-    <article
-      className={styles.kitFolderCard}
-      data-my-assets-kit-folder={kit.id}
-      onClick={onAdd}
-    >
-      <button
-        type="button"
-        className={styles.kitFolderButton}
-        data-my-assets-kit-folder-add={kit.id}
-        aria-label={`将套件 ${kit.name} 加入对话`}
-        onClick={(event) => {
-          event.stopPropagation()
-          onAdd()
-        }}
-      >
-        <span className={styles.kitFolderStack}>
-          <span className={styles.kitFolderLayerBack} />
-          <span className={styles.kitFolderLayerFront} />
-          <span className={styles.kitFolderFace}>
-            {url ? <img src={url} alt="" /> : <span>{kit.name.slice(0, 1)}</span>}
-          </span>
-        </span>
-        <span className={styles.kitFolderCopy}>{kit.name}</span>
-      </button>
-      <button
-        type="button"
-        className={styles.kitFolderOpen}
-        data-my-assets-kit-folder-open={kit.id}
-        aria-label={`打开套件 ${kit.name}`}
-        title="打开套件"
-        onClick={(event) => {
-          event.stopPropagation()
-          onOpen()
-        }}
-      >
-        打开
-      </button>
-      <span className={styles.srOnly}>{typeLabel}</span>
-    </article>
   )
 }

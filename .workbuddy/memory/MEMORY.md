@@ -1,5 +1,14 @@
 # CanvasFlow（轻画）项目记忆
 
+### 总管2 第五十六轮：参考右键菜单与套件详情直编（2026-11-10）
+
+- 参考卡右键/键盘菜单支持复制、剪切、粘贴、创建副本、打开、添加到对话、重命名、导出、删除；状态在 `useReferenceCardActions`，菜单视图在 `ReferenceCardActionMenu`，卡片在 `ReferenceGridCards`。
+- `MyAssetsKitDetail` 负责描述直编和版本保存，`MyAssetsKitSections` 负责 Logo/照片/颜色/字体重复卡，`KitFontPicker` 只消费本机已保存字体。Logo/照片用隐藏 file input 直接上传，不再打开管理弹层。
+- 图片卡右上角 `+` 单独加入 Agent，右下角三点菜单重传/删除；颜色三点菜单编辑/删除；字体三点菜单编辑/重传/删除。所有编辑保存为新 `ContextKitVersion`，同一 hash 的图片拒绝重复加入。
+- 关键坑：浮层内按 Esc 会冒泡关闭整个“我的素材”抽屉；参考菜单、字体选择器必须用 document 捕获阶段拦截 Esc。自动化点击隐藏的三点按钮时，按钮不能长期 `pointer-events:none`，否则图片/色块会拦截点击；改为透明但可命中、hover/focus 显形。
+- 四组 1440×900 / 1024×700 × 明暗：菜单 8 项，描述保存、颜色面板、字体库选择、图片 `4→5→重传→删除回 4`、单图 Agent chip 全通过；`pageOverflowX=false / childrenOutsideX=0 / errors=[]`。
+- 证据：`.playwright-verify/ui-seven-after/{report.json,1440-dark-canvas-reference-menu.png,1440-dark-canvas-kit-color-editor.png,1440-dark-canvas-kit-font-picker.png,1024-light-canvas-kit-asset-menu.png}`。`npm run check` 1149 modules / 4599 deps / 293 registrations；build 1281 modules；串行全量 Vitest 660 files（659 passed / 1 skipped）/ 5480 tests（5479 passed / 1 skipped）。未 push。
+
 ### 总管2 第五十五轮：我的素材四边留白与 Agent 对齐（2026-11-10）
 
 - 左侧 `myAssetsShellSlot` 必须和 Agent 一样复用 `--shell-gap=15px`：默认保留上/下 margin，打开时同时动画 width、margin-left、margin-right；关闭时左右 margin 回到 0，不能永久占出 30px 空白。

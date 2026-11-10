@@ -6966,9 +6966,7 @@
       ],
       "publicApi": [
         "CSS_MODULE:reference-source-cards",
-        "CSS_CLASS:uploadTile",
-        "CSS_CLASS:referenceCard",
-        "CSS_CLASS:kitFolderCard"
+        "CSS_CLASS:uploadTile"
       ],
       "test": [
         "src/app/uiSevenPoints.test.ts"
@@ -7092,6 +7090,232 @@
         "scripts/capture-ui-seven-points.mjs"
       ],
       "budget": 360
+    },
+    {
+      "module": "src/pages/CanvasPage/MyAssetsKitDetail.tsx",
+      "owner": "canvas-my-assets-kit-detail",
+      "responsibility": "Directly edits one saved kit version from the My Assets drawer.",
+      "owns": [
+        "Description, image, color and font mutation orchestration",
+        "Direct image and font upload entry points",
+        "Saving edits as the next ContextKit version"
+      ],
+      "doesNotOwn": [
+        "Context kit persistence internals",
+        "Reference ledger persistence",
+        "Agent panel rendering"
+      ],
+      "publicApi": [
+        "MyAssetsKitDetail"
+      ],
+      "test": [
+        "src/app/uiSevenPoints.test.ts",
+        "scripts/capture-ui-seven-points.mjs"
+      ],
+      "budget": 450
+    },
+    {
+      "module": "src/pages/CanvasPage/MyAssetsKitDetail.module.css",
+      "owner": "canvas-my-assets-kit-detail-style",
+      "responsibility": "Styles the direct kit editor and its item action menus.",
+      "owns": [
+        "Description editor",
+        "Image, color and font item states",
+        "Inline item menus and sticky Agent action"
+      ],
+      "doesNotOwn": [
+        "Drawer shell geometry",
+        "Reference card styles",
+        "Global theme tokens"
+      ],
+      "publicApi": [
+        "CSS_MODULE:MyAssetsKitDetail"
+      ],
+      "test": [
+        "scripts/capture-ui-seven-points.mjs"
+      ],
+      "budget": 400
+    },
+    {
+      "module": "src/pages/CanvasPage/MyAssetsKitSections.tsx",
+      "owner": "canvas-my-assets-kit-sections",
+      "responsibility": "Renders repeated image, color and font sections for direct kit editing.",
+      "owns": [
+        "Image card hover actions",
+        "Color picker cards",
+        "Font cards and font-library previews"
+      ],
+      "doesNotOwn": [
+        "Persistence writes",
+        "Font file import",
+        "Drawer lifecycle"
+      ],
+      "publicApi": [
+        "KitAssetsSection",
+        "KitColorsSection",
+        "KitFontsSection",
+        "KitMenuKey"
+      ],
+      "test": [
+        "src/app/uiSevenPoints.test.ts"
+      ],
+      "budget": 340
+    },
+    {
+      "module": "src/pages/CanvasPage/KitFontPicker.tsx",
+      "owner": "canvas-kit-font-picker",
+      "responsibility": "Selects a saved local font for a kit font slot.",
+      "owns": [
+        "Search and list saved fonts",
+        "Viewport-safe picker placement",
+        "Keyboard close behavior"
+      ],
+      "doesNotOwn": [
+        "Font file storage",
+        "Kit version persistence",
+        "Global font appearance"
+      ],
+      "publicApi": [
+        "KitFontPicker",
+        "PickerAnchor"
+      ],
+      "test": [
+        "src/app/uiSevenPoints.test.ts"
+      ],
+      "budget": 140
+    },
+    {
+      "module": "src/pages/CanvasPage/KitFontPicker.module.css",
+      "owner": "canvas-kit-font-picker-style",
+      "responsibility": "Styles the saved-font picker.",
+      "owns": [
+        "Search field",
+        "Scrollable font list",
+        "Selected and focus states"
+      ],
+      "doesNotOwn": [
+        "Kit detail layout",
+        "Global typography tokens"
+      ],
+      "publicApi": [
+        "CSS_MODULE:KitFontPicker"
+      ],
+      "test": [
+        "scripts/capture-ui-seven-points.mjs"
+      ],
+      "budget": 150
+    },
+    {
+      "module": "src/pages/CanvasPage/ReferenceCardActionMenu.tsx",
+      "owner": "canvas-reference-card-menu",
+      "responsibility": "Renders the right-click and keyboard action menu for project references.",
+      "owns": [
+        "Viewport-safe menu placement",
+        "Keyboard focus and Escape close",
+        "Menu action semantics"
+      ],
+      "doesNotOwn": [
+        "Reference mutation",
+        "Clipboard mode",
+        "Reference thumbnails"
+      ],
+      "publicApi": [
+        "ReferenceCardActionMenu",
+        "ReferenceCardAction"
+      ],
+      "test": [
+        "src/app/uiSevenPoints.test.ts"
+      ],
+      "budget": 130
+    },
+    {
+      "module": "src/pages/CanvasPage/ReferenceCardActionMenu.module.css",
+      "owner": "canvas-reference-card-menu-style",
+      "responsibility": "Styles the reference card action menu.",
+      "owns": [
+        "Menu surface",
+        "Action rows",
+        "Danger and focus states"
+      ],
+      "doesNotOwn": [
+        "Reference card layout",
+        "Global menu tokens"
+      ],
+      "publicApi": [
+        "CSS_MODULE:ReferenceCardActionMenu"
+      ],
+      "test": [
+        "scripts/capture-ui-seven-points.mjs"
+      ],
+      "budget": 120
+    },
+    {
+      "module": "src/pages/CanvasPage/useReferenceCardActions.tsx",
+      "owner": "canvas-reference-card-actions",
+      "responsibility": "Owns project reference context-menu state and real CRUD/clipboard actions.",
+      "owns": [
+        "Copy, cut and paste state",
+        "Rename, duplicate, export and delete actions",
+        "Add-to-Agent from the context menu"
+      ],
+      "doesNotOwn": [
+        "Reference card rendering",
+        "Lightbox rendering",
+        "Reference repository internals"
+      ],
+      "publicApi": [
+        "useReferenceCardActions"
+      ],
+      "test": [
+        "src/app/uiSevenPoints.test.ts",
+        "scripts/capture-ui-seven-points.mjs"
+      ],
+      "budget": 280
+    },
+    {
+      "module": "src/pages/CanvasPage/ReferenceGridCards.tsx",
+      "owner": "canvas-reference-grid-cards",
+      "responsibility": "Renders reference cards and kit folders in the reference masonry.",
+      "owns": [
+        "Reference card actions",
+        "Rename input",
+        "Kit folder preview and open action"
+      ],
+      "doesNotOwn": [
+        "Context-menu positioning",
+        "Reference persistence",
+        "Filtering"
+      ],
+      "publicApi": [
+        "ReferenceCard",
+        "KitFolder"
+      ],
+      "test": [
+        "src/app/uiSevenPoints.test.ts"
+      ],
+      "budget": 200
+    },
+    {
+      "module": "src/pages/CanvasPage/ReferenceGridCards.module.css",
+      "owner": "canvas-reference-grid-cards-style",
+      "responsibility": "Styles reference cards and kit folder cards.",
+      "owns": [
+        "Reference media and hover controls",
+        "Rename input",
+        "Kit folder layers"
+      ],
+      "doesNotOwn": [
+        "Reference panel toolbar",
+        "Context menu styles",
+        "Global tokens"
+      ],
+      "publicApi": [
+        "CSS_MODULE:ReferenceGridCards"
+      ],
+      "test": [
+        "scripts/capture-ui-seven-points.mjs"
+      ],
+      "budget": 280
     },
     {
       "module": "src/pages/CanvasPage/ReferenceFilterFields.tsx",

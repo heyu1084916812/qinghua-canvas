@@ -7,12 +7,11 @@ import { useAsset } from '../../features/shared/assets'
 import { createContextRepository } from '../../state/shared/contextRepository'
 import type { CanvasStore } from '../../state/workbenches/canvas/store'
 import {
-  IconChevronLeft,
   IconChevronRight,
-  IconMore,
   IconPlus,
 } from '../../workbenches/canvas/toolbar/icons'
 import { KIT_KINDS } from '../AssetsPage/contextKitDraft'
+import { MyAssetsKitDetail } from './MyAssetsKitDetail'
 import styles from './MyAssetsShelf.module.css'
 
 export function MyAssetsShelf({
@@ -73,11 +72,16 @@ export function MyAssetsShelf({
   if (selectedKit) {
     return (
       <MyAssetsKitDetail
+        projectId={projectId}
+        store={store}
         kit={selectedKit}
         version={versions[selectedKit.id] ?? null}
         onBack={() => setSelectedKitId(null)}
         onOpenEditor={onOpenKitEditor}
-        onAdd={() => void addKit(selectedKit)}
+        onAddKit={() => addKit(selectedKit)}
+        onVersionChange={(next) =>
+          setVersions((current) => ({ ...current, [selectedKit.id]: next }))
+        }
       />
     )
   }
@@ -170,91 +174,6 @@ function KitShelfCard({
         <IconChevronRight size={16} />
       </button>
     </article>
-  )
-}
-
-function MyAssetsKitDetail({
-  kit,
-  version,
-  onBack,
-  onOpenEditor,
-  onAdd,
-}: {
-  kit: ContextKit
-  version: ContextKitVersion | null
-  onBack: () => void
-  onOpenEditor: () => void
-  onAdd: () => void
-}) {
-  const logo = version?.resources.filter((item) => item.role === 'logo') ?? []
-  const photos = version?.resources.filter((item) => item.role !== 'logo') ?? []
-  return (
-    <section className={styles.detail} data-my-assets-kit-detail={kit.id}>
-      <header className={styles.detailHead}>
-        <button type="button" className={styles.iconButton} data-my-assets-kit-back aria-label="返回套件列表" title="返回套件列表" onClick={onBack}>
-          <IconChevronLeft size={18} />
-        </button>
-        <h2>{kit.name}</h2>
-        <button type="button" className={styles.iconButton} aria-label="管理套件" title="管理套件" onClick={onOpenEditor}>
-          <IconMore size={18} />
-        </button>
-      </header>
-      <section className={styles.detailSection}>
-        <h3>描述</h3>
-        <div className={styles.description}>{version?.guide || kit.description || '暂无描述'}</div>
-      </section>
-      <DetailAssets title="Logo" items={logo} onAdd={onOpenEditor} />
-      <section className={styles.detailSection}>
-        <h3>颜色 <button type="button" onClick={onOpenEditor}>+ 添加</button></h3>
-        <div className={styles.colorList}>
-          {(version?.colors ?? []).map((color) => (
-            <span className={styles.colorItem} key={color.id}>
-              <span style={{ background: color.value }} />
-              <small>{color.name || color.value}</small>
-            </span>
-          ))}
-        </div>
-      </section>
-      <section className={styles.detailSection}>
-        <h3>字体 <button type="button" onClick={onOpenEditor}>+ 添加</button></h3>
-        <div className={styles.fontList}>
-          {(version?.fonts ?? []).map((font) => (
-            <span className={styles.fontItem} key={font.id}>
-              <strong>Aa</strong>
-              <small>{font.name}</small>
-            </span>
-          ))}
-        </div>
-      </section>
-      <DetailAssets title="照片" items={photos} onAdd={onOpenEditor} />
-      <button type="button" className={styles.addAgent} data-my-assets-kit-detail-add onClick={onAdd} disabled={!version}>
-        添加到对话
-      </button>
-    </section>
-  )
-}
-
-function DetailAssets({
-  title,
-  items,
-  onAdd,
-}: {
-  title: string
-  items: readonly { hash: string; name: string }[]
-  onAdd: () => void
-}) {
-  return (
-    <section className={styles.detailSection}>
-      <h3>{title} <button type="button" onClick={onAdd}>+ 添加</button></h3>
-      <div className={styles.detailMedia}>
-        {items.map((item) => (
-          <span className={styles.detailMediaItem} key={item.hash}>
-            <KitThumb hash={item.hash} name={item.name} />
-            <small>{item.name || '套件素材'}</small>
-          </span>
-        ))}
-      </div>
-    </section>
   )
 }
 

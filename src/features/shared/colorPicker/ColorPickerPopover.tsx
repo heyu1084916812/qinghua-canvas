@@ -36,6 +36,7 @@ export interface ColorPickerRenderArgs {
 
 export interface ColorPickerPopoverProps {
   value: string
+  open?: boolean
   label?: string
   target?: string
   disabled?: boolean
@@ -56,6 +57,7 @@ function clamp(value: number, min: number, max: number): number {
 
 export function ColorPickerPopover({
   value,
+  open: controlledOpen,
   label = '选择颜色',
   target,
   disabled = false,
@@ -70,7 +72,8 @@ export function ColorPickerPopover({
   onCommit,
 }: ColorPickerPopoverProps) {
   const normalizedValue = normalizeHex(value) ?? '#000000'
-  const [open, setOpenState] = useState(false)
+  const [internalOpen, setInternalOpen] = useState(false)
+  const open = controlledOpen ?? internalOpen
   const [hsv, setHsv] = useState<HsvColor>(() => hexToHsv(normalizedValue))
   const [hexDraft, setHexDraft] = useState(normalizedValue.slice(1).toUpperCase())
   const [hexInvalid, setHexInvalid] = useState(false)
@@ -80,7 +83,7 @@ export function ColorPickerPopover({
   const nameRef = useRef<HTMLInputElement>(null)
 
   const setOpen = (next: boolean) => {
-    setOpenState(next)
+    if (controlledOpen === undefined) setInternalOpen(next)
     onOpenChange?.(next)
   }
 

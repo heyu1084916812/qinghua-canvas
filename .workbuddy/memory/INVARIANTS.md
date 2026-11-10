@@ -1,5 +1,13 @@
 # CanvasFlow 不变量详表
 
+## 参考右键菜单与套件详情直编（2026-11-10）
+
+- 项目参考卡必须同时支持 `contextmenu` 与 `Shift+F10`；菜单项复制/剪切/粘贴/创建副本/打开/加对话/重命名/导出/删除都必须有真实动作，不能放死菜单。
+- 套件详情编辑只能走 `ContextRepository.saveKitVersion`。Logo/照片上传复用 `importAssetFile`，颜色复用 `ColorPickerPopover`，字体选择只消费本机 `fonts` 表；不能在详情里另建平行存储。
+- 图片资源以 hash 去重；新增相同 hash 必须拒绝。单图卡右上角只添加该图到 Agent，右下角三点菜单负责重新上传/删除。
+- 参考菜单、字体选择器和颜色面板的 Esc 必须捕获阶段 `stopPropagation`，否则会冒泡关闭整个“我的素材”抽屉。
+- UI 探针必须记录菜单项、描述保存、颜色面板、字体库选项、图片 `上传→重传→删除` 数量和单图 Agent chip；四组均要求 `pageOverflowX=false / childrenOutsideX=0 / errors=[]`。
+
 ## 画布“我的素材”抽屉动效边界（2026-11-10）
 
 - 我的素材开关不能放在 `CanvasProject` 的 React state 里。`myAssetsDockStore` 是外部订阅源，
