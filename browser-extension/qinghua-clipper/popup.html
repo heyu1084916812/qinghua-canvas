@@ -7,36 +7,115 @@
     <link rel="stylesheet" href="popup.css" />
   </head>
   <body>
-    <main>
-      <header>
+    <main class="app">
+      <header class="brand">
+        <img src="icons/32.png" width="28" height="28" alt="" />
         <div>
           <strong>轻画 Clipper</strong>
-          <span id="status-dot" class="dot" aria-hidden="true"></span>
+          <span>随处收藏灵感，回到画布继续创作</span>
         </div>
-        <span id="status">正在读取当前网页…</span>
+        <span class="version">v0.2</span>
       </header>
 
-      <section class="page">
-        <span>当前网页</span>
-        <strong id="page-title">—</strong>
+      <section class="connection" aria-live="polite">
+        <span id="status-dot" class="dot" aria-hidden="true"></span>
+        <span id="status">正在检查轻画连接…</span>
+        <button id="retry" class="text-button" type="button">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M20 11a8.1 8.1 0 0 0-15.5-2M4 4v5h5" />
+            <path d="M4 13a8.1 8.1 0 0 0 15.5 2M20 20v-5h-5" />
+          </svg>
+          重新检测
+        </button>
+      </section>
+
+      <section class="page-card" id="page-card">
+        <div class="page-heading">
+          <span id="page-kind">当前网页</span>
+          <span id="page-host">—</span>
+        </div>
+        <strong id="page-title">正在读取当前标签页…</strong>
         <small id="page-url">—</small>
       </section>
 
-      <button id="clip" class="primary" type="button">收藏到轻画</button>
+      <button id="clip" class="primary" type="button" disabled>
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M6 3h12a1 1 0 0 1 1 1v17l-7-4-7 4V4a1 1 0 0 1 1-1Z" />
+        </svg>
+        <span id="clip-label">收藏到轻画</span>
+        <kbd>Ctrl+Shift+Y</kbd>
+      </button>
 
-      <details id="settings">
-        <summary>接收端设置</summary>
-        <label>
-          <span>本机地址</span>
-          <input id="endpoint" value="http://127.0.0.1:53684/clip" />
-        </label>
-        <label>
-          <span>配对令牌</span>
-          <input id="token" type="password" autocomplete="off" />
-        </label>
-        <button id="save" class="secondary" type="button">保存设置</button>
+      <p id="last-result" class="last-result" hidden></p>
+
+      <details id="settings" class="settings">
+        <summary>
+          <span>
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z" />
+              <path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06-2.83 2.83-.06-.06A1.7 1.7 0 0 0 15 19.4a1.7 1.7 0 0 0-1 .6 1.7 1.7 0 0 0-.4 1.1V21h-4v-.09A1.7 1.7 0 0 0 8.6 19.4a1.7 1.7 0 0 0-1.88.34l-.06.06-2.83-2.83.06-.06A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-.6-1 1.7 1.7 0 0 0-1.1-.4H3v-4h.09A1.7 1.7 0 0 0 4.6 8.6a1.7 1.7 0 0 0-.34-1.88l-.06-.06 2.83-2.83.06.06A1.7 1.7 0 0 0 9 4.6a1.7 1.7 0 0 0 1-.6 1.7 1.7 0 0 0 .4-1.1V3h4v.09A1.7 1.7 0 0 0 15.4 4.6a1.7 1.7 0 0 0 1.88-.34l.06-.06 2.83 2.83-.06.06A1.7 1.7 0 0 0 19.4 9c.13.36.34.7.6 1 .3.3.7.45 1.1.4H21v4h-.09a1.7 1.7 0 0 0-1.51.6Z" />
+            </svg>
+            接收端配对
+          </span>
+          <span class="chevron" aria-hidden="true">
+            <svg viewBox="0 0 24 24">
+              <path d="m6 9 6 6 6-6" />
+            </svg>
+          </span>
+        </summary>
+
+        <div class="settings-body">
+          <div class="setup-note">
+            <strong>第一次使用</strong>
+            <span>在轻画「我的素材 → 轻画插件」打开配对设置，复制本机地址与令牌。</span>
+          </div>
+          <label>
+            <span>本机地址</span>
+            <input
+              id="endpoint"
+              value="http://127.0.0.1:53684/clip"
+              spellcheck="false"
+              autocomplete="off"
+            />
+          </label>
+          <label>
+            <span>配对令牌</span>
+            <span class="token-field">
+              <input
+                id="token"
+                type="password"
+                spellcheck="false"
+                autocomplete="off"
+                placeholder="粘贴轻画显示的令牌"
+              />
+              <button
+                id="toggle-token"
+                class="icon-button"
+                type="button"
+                aria-label="显示配对令牌"
+                title="显示配对令牌"
+                aria-pressed="false"
+              >
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12Z" />
+                  <circle cx="12" cy="12" r="2.5" />
+                </svg>
+              </button>
+            </span>
+          </label>
+          <div class="settings-actions">
+            <button id="save" class="secondary" type="button">保存并检测</button>
+            <button id="clear" class="quiet" type="button">清除令牌</button>
+          </div>
+        </div>
       </details>
+
+      <footer>
+        <span>只发送网页 URL 与标题，不读取 Cookie</span>
+        <span>快捷键可在 chrome://extensions/shortcuts 修改</span>
+      </footer>
     </main>
+    <script src="shared.js"></script>
     <script src="popup.js"></script>
   </body>
 </html>

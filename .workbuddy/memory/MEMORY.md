@@ -1,5 +1,13 @@
 # CanvasFlow（轻画）项目记忆
 
+### 总管2 第四十八轮：轻画 Clipper 浏览器扩展正式版（2026-11-10）
+
+- MV3 包拆为 `shared.js`（本地地址、请求、错误协议）、`popup.js`（UI 状态）、`background.js`（快捷键与右键菜单）。权限只允许 `activeTab/storage/contextMenus` 和 `http://127.0.0.1:53684/*`，禁止 content script、`<all_urls>`、Cookie 与历史权限。
+- 后台快捷键、右键菜单和弹窗必须共用同一 `clipPage`；不能为三条入口各写一套 POST。不可收藏页面、401、404、413、离线和超时都要有具体恢复文案。首次未配对使用灰色 idle dot，不能误报离线红色。
+- 弹窗四态截图由 `npm run capture:clipper-extension` 生成，位于 `.playwright-verify/clipper-extension/`：亮色已连接发送成功、暗色首次使用、不可收藏页面、暗色离线；四组 `overflowX=false / errors=[]`。手动对比度：亮色 muted 4.79–5.29、暗色 muted 6.71–7.47。
+- 扩展契约/VM 行为测试 6/6，覆盖地址白名单、POST body、401/offline、快捷键后台链、manifest 与图标。全量串行 Vitest 660 files（659 passed / 1 skipped）/ 5471 tests（5470 passed / 1 skipped）；check 1132 modules / 4538 deps / 276 registrations；build 1264 modules。
+- `npm run package:clipper-extension` 生成 `release/qinghua-clipper-0.2.0.zip`，21,179 B，SHA-256 `3BB9423B4C8B1287D4DD0AAEE0375222EBBB820D00EF1B10C06E04F8150240FE`。Impeccable detector 缺 HTML 解析依赖而降级为正则扫描，不能写成 0 findings；视觉与对比度由真实 Chromium 截图和手工计算补证。未 push。
+
 ### 总管2 第四十七轮：套件上下文、共享筛选、画布浏览器与免费调研（2026-11-10）
 
 - 套件点击取版本必须走 `ContextRepository.currentKitVersion(kit)`，它返回版本表首项，不能按可能过期的 `kit.currentVersion` 回查旧版。文件夹整卡点击加入 Agent，主按钮和“打开”都要 `stopPropagation`，避免重复触发。
