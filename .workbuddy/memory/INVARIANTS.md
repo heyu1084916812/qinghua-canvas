@@ -1,5 +1,17 @@
 # CanvasFlow 不变量详表
 
+## 节点选中描边与缩放手柄边界（2026-11-10）
+
+- 节点选中框必须画在节点内部：`.frame.selected` 固定 `outline:none`，由 `::after` 使用 `inset:0`、
+  `border:2px solid var(--stroke-focus)`、`border-radius:inherit`、`pointer-events:none` 绘制。
+  禁止改回节点外侧 `outline`：React Flow 节点的 `content-visibility:auto` 会在 WebView2 变换层中裁出角弧伪影。
+- 普通生成节点只有右下 1 个缩放手柄；四角黄色矩形是旧选中描边的渲染伪影，不是“四个手柄”。
+  不要据此扩展或删除真实手柄。
+- 缩放手柄是纯指针命中层，必须带 `aria-hidden="true"`、`tabIndex={-1}`、`outline:none`、
+  `appearance:none`，不得进入焦点或辅助技术顺序。`NodeFrame.test.ts` 必须同时覆盖 `nodrag` 和 presentation-only。
+- UI 探针必须记录 `frameOutlineStyle / selectionBorderWidth / selectionBorderStyle / frameBorderRadius /
+  wrapperContentVisibility / resizeHandles / hiddenResizeHandles`，并保留四个桌面视口、明暗和选中节点截图。
+
 ## 浏览器扩展双商店与拖拽收藏边界（2026-11-10）
 
 - Chrome 与 Edge 共用同一份 MV3 包。权限只能是 `activeTab + storage + contextMenus + scripting`；

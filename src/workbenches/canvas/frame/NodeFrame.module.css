@@ -19,9 +19,19 @@
 }
 
 .frame.selected {
-  /* 节点选中：2px 实线焦点色，不用蓝色（§3.3） */
-  outline: 2px solid var(--stroke-focus);
-  outline-offset: 0;
+  /* 选中描边必须画在节点内部：React Flow 的变换层会裁掉向外扩的 outline。 */
+  outline: none;
+}
+
+.frame.selected::after {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  box-sizing: border-box;
+  border: 2px solid var(--stroke-focus);
+  border-radius: inherit;
+  content: "";
+  pointer-events: none;
 }
 
 /*
@@ -186,7 +196,11 @@
   position: absolute;
   width: 14px;
   height: 14px;
+  border: 0;
   background: transparent;
+  outline: none;
+  appearance: none;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .resizeHandle:hover {

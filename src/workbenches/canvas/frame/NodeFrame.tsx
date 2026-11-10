@@ -357,6 +357,8 @@ export function NodeFrame(props: NodeFrameProps) {
               className={`${styles.resizeHandle} ${CORNER_CLASS[corner]} nodrag`}
               {...(corner === 'se' ? { 'data-node-resize-handle': '' } : {})}
               data-node-resize-corner={corner}
+              aria-hidden="true"
+              tabIndex={-1}
               onPointerDown={(e) => onResizePointerDown(e, corner)}
             />
           ))}

@@ -22,7 +22,12 @@ import type { NodeSnapshot } from '../../../domain/canvas/model/node'
 function renderFrame({
   parentId = null,
   corners,
-}: { parentId?: string | null; corners?: readonly ('se' | 'sw' | 'ne' | 'nw')[] } = {}): string {
+  selected = false,
+}: {
+  parentId?: string | null
+  corners?: readonly ('se' | 'sw' | 'ne' | 'nw')[]
+  selected?: boolean
+} = {}): string {
   const node = {
     id: 'node_test',
     projectId: 'proj_test',
@@ -43,7 +48,7 @@ function renderFrame({
       { store } as never,
       createElement(NodeFrame, {
         node,
-        selected: false,
+        selected,
         minSize: { w: 200, h: 160 },
         ...(corners ? { resizeCorners: corners } : {}),
         onFramePointerDown: () => {},
@@ -82,5 +87,16 @@ describe('NodeFrame 缩放手柄', () => {
 
     const one = renderFrame()
     expect([...one.matchAll(/data-node-resize-corner="(\w+)"/g)].map((m) => m[1])).toEqual(['se'])
+  })
+
+  it('缩放手柄是纯指针命中层，不进入焦点或辅助技术顺序', () => {
+    const html = renderFrame({ selected: true, corners: ['se', 'sw', 'ne', 'nw'] })
+    const handles = [...html.matchAll(/<span[^>]*data-node-resize-corner="\w+"[^>]*>/g)]
+
+    expect(handles).toHaveLength(4)
+    for (const [tag] of handles) {
+      expect(tag).toContain('aria-hidden="true"')
+      expect(tag).toContain('tabindex="-1"')
+    }
   })
 })

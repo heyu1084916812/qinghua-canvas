@@ -701,6 +701,30 @@ try {
     const referenceNodesAfterDrop = await page.locator('[data-node-id]').count()
     const referenceDroppedTitle =
       (await page.locator('[data-node-id]').last().textContent({ timeout: 5_000 })) ?? ''
+    const selectionChrome = await page.evaluate(() => {
+      const frame = document.querySelector('[data-node-id][data-node-selected]')
+      if (!frame) return { selectedFrame: 0 }
+      const frameStyle = getComputedStyle(frame)
+      const selectionStyle = getComputedStyle(frame, '::after')
+      const wrapper = frame.closest('.react-flow__node')
+      const handles = [...frame.querySelectorAll('[data-node-resize-corner]')]
+      return {
+        selectedFrame: 1,
+        frameOutlineStyle: frameStyle.outlineStyle,
+        frameBorderRadius: frameStyle.borderRadius,
+        selectionBorderWidth: selectionStyle.borderTopWidth,
+        selectionBorderStyle: selectionStyle.borderTopStyle,
+        selectionBorderColor: selectionStyle.borderTopColor,
+        wrapperContentVisibility: wrapper ? getComputedStyle(wrapper).contentVisibility : '',
+        resizeHandles: handles.length,
+        hiddenResizeHandles: handles.filter(
+          (handle) =>
+            handle.getAttribute('aria-hidden') === 'true'
+            && handle.getAttribute('tabindex') === '-1'
+            && getComputedStyle(handle).outlineStyle === 'none',
+        ).length,
+      }
+    })
     await page.screenshot({ path: path.join(out, `${file}-canvas-reference-dropped.png`) })
     await page.locator('[data-my-assets-reference-open]').first().dblclick()
     await page.locator('[data-reference-lightbox]').waitFor({ timeout: 15_000 })
@@ -934,6 +958,7 @@ try {
       referenceNodesBeforeDrop,
       referenceNodesAfterDrop,
       referenceDroppedTitle,
+      selectionChrome,
       referenceNodesBeforeLightboxAdd,
       referenceNodesAfterLightboxAdd,
       ...referenceLayout,
