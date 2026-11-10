@@ -7899,7 +7899,7 @@
       "test": [
         "src/features/shared/research/openResearchSearch.test.ts"
       ],
-      "budget": 220
+      "budget": 230
     },
     {
       "module": "src/features/shared/research/openCultureSearch.ts",
@@ -7923,6 +7923,28 @@
       ],
       "budget": 180
     },
+      {
+        "module": "src/features/shared/research/museumSearch.ts",
+        "owner": "open-research-search",
+        "responsibility": "通过 Cleveland Museum CC0 与 Met Museum Open Access 免密钥接口检索可复用馆藏图片。",
+        "owns": [
+          "Cleveland CC0 图片与作者许可投影",
+          "Met 公版馆藏对象读取与图片投影",
+          "两家博物馆独立失败与部分失败警告"
+        ],
+        "doesNotOwn": [
+          "Internet Archive、Art Institute 或 SearXNG 调度",
+          "候选保存与项目参考持久化",
+          "Agent 工具路由"
+        ],
+        "publicApi": [
+          "searchMuseumCollections"
+        ],
+        "test": [
+          "src/features/shared/research/museumSearch.test.ts"
+        ],
+        "budget": 220
+      },
     {
       "module": "src/workbenches/canvas/panels/AgentPanel/agentResearchSourceLabel.ts",
       "owner": "agent-research-results-ui",

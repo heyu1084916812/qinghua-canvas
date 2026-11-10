@@ -5,6 +5,8 @@ describe('agentResearchSourceLabel', () => {
   it('maps open collection providers to readable names', () => {
     expect(agentResearchSourceLabel('internetArchive')).toBe('Internet Archive')
     expect(agentResearchSourceLabel('artic')).toBe('Art Institute')
+    expect(agentResearchSourceLabel('cleveland')).toBe('Cleveland Museum')
+    expect(agentResearchSourceLabel('met')).toBe('Met Museum')
     expect(agentResearchSourceLabel('openverse')).toBe('Openverse')
     expect(agentResearchSourceLabel('wikipedia')).toBe('Wikipedia')
   })

@@ -65,6 +65,42 @@ describe('searchOpenResearch', () => {
           }],
         })
       }
+      if (input.url.startsWith('https://openaccess-api.clevelandart.org/')) {
+        return response({
+          data: [{
+            id: 127812,
+            title: 'Yvette Guilbert',
+            creation_date: 'c. 1894',
+            description: 'A poster study for a cabaret performer.',
+            url: 'https://clevelandart.org/art/1950.455',
+            share_license_status: 'CC0',
+            creators: [{ description: 'Henri de Toulouse-Lautrec' }],
+            images: {
+              print: {
+                url: 'https://openaccess-cdn.clevelandart.org/1950.455/1950.455_print.jpg',
+              },
+            },
+          }],
+        })
+      }
+      if (input.url.startsWith(
+        'https://collectionapi.metmuseum.org/public/collection/v1.1/search',
+      )) {
+        return response({ total: 1, objectIDs: [79776] })
+      }
+      if (input.url ===
+        'https://collectionapi.metmuseum.org/public/collection/v1/objects/79776') {
+        return response({
+          objectID: 79776,
+          title: 'Public poster',
+          objectURL: 'https://www.metmuseum.org/art/collection/search/79776',
+          primaryImageSmall: 'https://images.metmuseum.org/poster-small.jpg',
+          isPublicDomain: true,
+          objectDate: '1890',
+          medium: 'Lithograph',
+          artistDisplayName: 'Example Artist',
+        })
+      }
       return response({
         query: {
           pages: {
@@ -89,7 +125,7 @@ describe('searchOpenResearch', () => {
       { endpoint: 'https://search.example.com/search' },
     )
 
-    expect(request).toHaveBeenCalledTimes(6)
+    expect(request).toHaveBeenCalledTimes(9)
     expect(result.warnings).toEqual([])
     expect(result.items).toEqual([
       expect.objectContaining({
@@ -114,6 +150,16 @@ describe('searchOpenResearch', () => {
         imageUrl: 'https://www.artic.edu/iiif/2/image-7962/full/843,/0/default.jpg',
       }),
       expect.objectContaining({
+        id: 'cleveland:127812',
+        source: 'cleveland',
+        license: 'CC0',
+      }),
+      expect.objectContaining({
+        id: 'met:79776',
+        source: 'met',
+        license: 'Public Domain',
+      }),
+      expect.objectContaining({
         source: 'searxng',
         title: 'Packaging inspiration',
         imageUrl: 'https://example.com/packaging.jpg',
@@ -134,6 +180,14 @@ describe('searchOpenResearch', () => {
       }
       if (input.url.startsWith('https://api.artic.edu/')) {
         return response({ data: [] })
+      }
+      if (input.url.startsWith('https://openaccess-api.clevelandart.org/')) {
+        return response({ data: [] })
+      }
+      if (input.url.startsWith(
+        'https://collectionapi.metmuseum.org/public/collection/v1.1/search',
+      )) {
+        return response({ total: 0, objectIDs: [] })
       }
       return response({
         query: {

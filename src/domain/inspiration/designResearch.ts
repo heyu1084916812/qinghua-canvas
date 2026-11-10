@@ -6,6 +6,8 @@ export type ResearchProvider =
   | 'wikipedia'
   | 'internetArchive'
   | 'artic'
+  | 'cleveland'
+  | 'met'
   | 'searxng'
   | 'web'
 
@@ -115,6 +117,8 @@ const PROVIDER_TITLES: Record<ResearchProvider, string> = {
   wikipedia: 'Wikipedia',
   internetArchive: 'Internet Archive',
   artic: 'Art Institute',
+  cleveland: 'Cleveland Museum',
+  met: 'Met Museum',
   searxng: 'SearXNG',
   web: 'Other references',
 }
@@ -126,6 +130,8 @@ const PROVIDER_ORDER: readonly ResearchProvider[] = [
   'wikipedia',
   'internetArchive',
   'artic',
+  'cleveland',
+  'met',
   'searxng',
   'google',
   'web',

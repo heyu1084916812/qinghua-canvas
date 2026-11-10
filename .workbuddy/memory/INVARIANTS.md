@@ -1,5 +1,13 @@
 # CanvasFlow 不变量详表
 
+## 开放调研分源与套件上下文（2026-11-11）
+- 套件进入 Agent 必须保留一枚稳定 reference chip，但 `assets[]` 要携带完整图片集合；读取时 Logo 优先、按 hash 去重、缺图只跳过并 warning。任何入口不得只把套件主图当完整套件。
+- 参考栏、套件详情和我的素材的筛选必须共用 `ReferenceFilterControl` / `referenceSourceFilter` / `referenceKindFilter`；新增入口只允许传选项与禁用项。
+- 开放联网调研是分源的：Openverse、Wikipedia、Internet Archive、Art Institute、Cleveland、Met、SearXNG 各自失败各自 warning，不能因一个来源超时、429 或 Cloudflare 就把整轮判断成无结果。
+- Cleveland Museum 只能接受 `share_license_status === 'CC0'` 的条目；Met 必须使用 `/public/collection/v1.1/search`，旧 v1 search 已 retired，并只接受 `isPublicDomain === true`。
+- 新增 `ResearchProvider` 值必须同时更新领域标题/排序、`saveResearchItem` 标签、Agent 来源显示和候选转参考映射；否则会导致可搜索但保存/展示降级。
+- Lovart 式过程只显示真实事件来源；不得把页面搜索命中、模型正文或内部思考伪装成“参考分析完成”或“思考完成”。
+
 ## Clipper 真实图片与花瓣 Pin 适配（2026-11-11）
 - 网页 Clipper 的“成功”只以真实图片字节落库为准，不以 `/clip` 返回 200、队列已发送或页面有 `og:image` 为准。单图必须经 `validateClipperImage`，网页多图必须经 `validateClipperImageCandidates` 后才能 upsert。
 - `cdn.dancf.com/fe-assets/*` 是花瓣站点界面/分享资源，不得作为收藏主图或备用原图。`normalizeClipperItems` 必须继续过滤该域路径，避免历史错误卡片重新出现。

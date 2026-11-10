@@ -51,6 +51,26 @@ function networkWith(pages: Record<string, string>): NetworkPort {
           arrayBuffer: async () => new ArrayBuffer(0),
         }
       }
+      if (req.url.startsWith('https://openaccess-api.clevelandart.org/')) {
+        return {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+          text: async () => '',
+          json: async <T,>() => ({ data: [] }) as T,
+          arrayBuffer: async () => new ArrayBuffer(0),
+        }
+      }
+      if (req.url.startsWith(
+        'https://collectionapi.metmuseum.org/public/collection/v1.1/search',
+      )) {
+        return {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+          text: async () => '',
+          json: async <T,>() => ({ objectIDs: [] }) as T,
+          arrayBuffer: async () => new ArrayBuffer(0),
+        }
+      }
       const html = pages[req.url]
       if (html === undefined) throw new Error('offline')
       return {

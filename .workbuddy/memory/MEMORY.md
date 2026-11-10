@@ -1,5 +1,14 @@
 # CanvasFlow（轻画）项目记忆
 
+### 总管2 第六十八轮：原目标复验与博物馆联网来源补强（2026-11-11）
+- 套件不是只打开：`ensureKitCardReference` 写入 `assets[]`，`projectAgentTurnReferences` 将套装全部有效图片送入本轮 assetRefs；Logo 优先、hash 去重、缺图 warning 后继续。套件卡主点击与详情底部都生成同一枚稳定 chip；参考栏、套件详情、我的素材筛选仍复用 `ReferenceFilterControl`，不要另建第三套筛选。
+- 本轮重新跑 `QH_UI_KIT_ONLY=1 node scripts/capture-ui-seven-points.mjs --after`，实际仍生成 36 个 surface；四组套件均 `kitChip=3 / detailChip=3 / errors=[] / horizontalOverflow=false`。不要引用旧报告代替当前证据。
+- Lovart 流程证据已落盘：`.playwright-verify/lovart-agent-flow/03-image-flow-a.json` 记录了“技能加载 → 搜索 → 候选 → 参考分析 → 生成”的真实页面内容。轻画只映射真实工具/台账/生成事件，不从模型正文猜“思考”。
+- 真实联网复测发现 Openverse、Wikipedia、Internet Archive 在当前网络下均可能超时，Art Institute 会触发 Cloudflare；因此新增 `museumSearch.ts`，接入免密钥的 Cleveland CC0 和 Met Open Access。两家博物馆各自独立失败，不会拖垮 Openverse、Wikipedia、SearXNG 或其他来源。
+- Cleveland API 必须带 `cc0=1&has_image=1`，并再次检查 `share_license_status === 'CC0'`；Met 旧 `/v1/search` 已 retired，必须使用 `/public/collection/v1.1/search`，再逐对象读取并只接受 `isPublicDomain === true`。真实结果：Cleveland 返回 Toulouse-Lautrec 的 CC0 馆藏；Met 查询 Van Gogh 返回两件公版馆藏。证据 `.playwright-verify/research/museum-live-check.json`。
+- `ResearchProvider` 增加 `cleveland / met` 后，必须同步 `designResearch` 的标题/顺序、`saveResearchItem` 来源标签、`agentResearchSourceLabel` 和 `agentResearchReference.providerOf`，否则候选能搜到但保存或 UI 会降成网页。
+- 门禁：check 1172 modules / 4706 deps / 316 registrations；全量 Vitest 671 files（670 passed / 1 skipped）/ 5529 tests（5528 passed / 1 skipped）；build 1304 modules。Pinterest 真实 OAuth 仍是唯一明确外部缺口，不能用本地测试冒充线上授权。未 push。
+
 ### 总管2 第六十七轮：花瓣 Pin 原图链路与占位图清洗（2026-11-11）
 - #1011 只验证了“拖拽时不选头像”的合成卡片，没有验证真实失败条目来自哪里。数据库中的 32×35 笑脸实际是 `https://cdn.dancf.com/fe-assets/img/*.png`，页面标题被整页 Open Graph 兜底写进收藏。因此“扩展发送成功”不等于“入库真实内容图”。
 - 重新逐份查看 GitHub 后，Huaban Downloader 的有效做法是从页面 `__NEXT_DATA__` 或 `/v3/pins/{id}` 取 `pin.file.url` / `pin.file.key`；Image Picka 的拖拽目标会从链接容器找第一个可见 `<img>`，并覆盖懒加载、`srcset` 和背景图；KellyC 明确区分原图与预览图；PickTrue 也围绕花瓣原图 key。只参考行为，没有复制 GPL 源码。

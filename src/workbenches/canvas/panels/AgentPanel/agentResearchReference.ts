@@ -25,6 +25,8 @@ function providerOf(source: string): ResearchProvider {
     return 'internetArchive'
   }
   if (normalized === 'art institute' || normalized === 'artic') return 'artic'
+  if (normalized === 'cleveland' || normalized === 'cleveland museum') return 'cleveland'
+  if (normalized === 'met' || normalized === 'met museum') return 'met'
   if (normalized === 'searxng') return 'searxng'
   return 'web'
 }

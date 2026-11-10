@@ -76,6 +76,20 @@ describe('agent research reference', () => {
       imageUrl: 'https://www.artic.edu/image.jpg',
       source: 'Art Institute',
     }).source).toBe('artic')
+    expect(researchItemOf({
+      id: 'cleveland:1',
+      title: 'Cleveland poster',
+      url: 'https://clevelandart.org/art/1',
+      imageUrl: 'https://openaccess-cdn.clevelandart.org/1.jpg',
+      source: 'Cleveland Museum',
+    }).source).toBe('cleveland')
+    expect(researchItemOf({
+      id: 'met:1',
+      title: 'Met poster',
+      url: 'https://www.metmuseum.org/art/collection/search/1',
+      imageUrl: 'https://images.metmuseum.org/1.jpg',
+      source: 'Met Museum',
+    }).source).toBe('met')
   })
 
   it('stores the selected image as an asset and project reference', async () => {
