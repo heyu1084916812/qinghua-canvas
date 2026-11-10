@@ -184,7 +184,8 @@ impl SqliteStore {
     ) -> Result<(Vec<Value>, u64), String> {
         validate_table(table)?;
         if table == "assets" {
-            return Err("queryPage does not support assets; use query or scan".into());
+            let conn = self.connection()?;
+            return query_asset_page(&conn, self.root.as_path(), filter, page);
         }
         let conn = self.connection()?;
         let (where_sql, params) = page_where_sql(table, filter, page)?;
@@ -943,6 +944,111 @@ fn query_assets(
         out.push(row);
     }
     Ok(out)
+}
+
+fn query_asset_page(
+    conn: &Connection,
+    root: &Path,
+    filter: &Map<String, Value>,
+    page: &crate::PageQuery,
+) -> Result<(Vec<Value>, u64), String> {
+    if !page.missing_fields.is_empty() || !page.ranges.is_empty() {
+        return Err("asset queryPage only supports id filters and hash ordering".into());
+    }
+    if page
+        .order_by
+        .as_ref()
+        .is_some_and(|order| order.field != "hash")
+    {
+        return Err("asset queryPage only supports hash ordering".into());
+    }
+    for field in filter.keys() {
+        if field != "id" && field != "projectId" {
+            return Err(format!("unsupported asset page filter: {field}"));
+        }
+    }
+
+    let mut conditions = Vec::new();
+    let mut values = Vec::<SqlValue>::new();
+    if let Some(id) = filter.get("id").and_then(Value::as_str) {
+        conditions.push("hash = ?".to_string());
+        values.push(SqlValue::Text(id.to_string()));
+    }
+    if let Some(project_id) = filter.get("projectId").and_then(Value::as_str) {
+        conditions.push("project_id = ?".to_string());
+        values.push(SqlValue::Text(project_id.to_string()));
+    }
+    if !page.ids.is_empty() {
+        conditions.push(format!(
+            "hash IN ({})",
+            vec!["?"; page.ids.len()].join(", ")
+        ));
+        values.extend(page.ids.iter().cloned().map(SqlValue::Text));
+    }
+    let where_sql = if conditions.is_empty() {
+        "1 = 1".to_string()
+    } else {
+        conditions.join(" AND ")
+    };
+    let total_sql = format!("SELECT COUNT(*) FROM assets WHERE {where_sql}");
+    let total: i64 = conn
+        .query_row(&total_sql, params_from_iter(values.iter()), |row| {
+            row.get(0)
+        })
+        .map_err(|err| format!("count asset page rows: {err}"))?;
+
+    let direction = if page
+        .order_by
+        .as_ref()
+        .and_then(|order| order.direction.as_deref())
+        == Some("desc")
+    {
+        "DESC"
+    } else {
+        "ASC"
+    };
+    let limit = page.limit.min(1000);
+    let page_sql = format!(
+        "SELECT hash, content_sha1, mime, metadata_json, media_rel_path,
+                thumb_rel_path, preview_rel_path, remote_url, byte_size
+         FROM assets
+         WHERE {where_sql}
+         ORDER BY hash {direction}
+         LIMIT ? OFFSET ?"
+    );
+    let mut paged_values = values;
+    paged_values.push(SqlValue::Integer(limit as i64));
+    paged_values.push(SqlValue::Integer(page.offset as i64));
+    let mut stmt = conn
+        .prepare(&page_sql)
+        .map_err(|err| format!("prepare asset page query: {err}"))?;
+    let stored = stmt
+        .query_map(params_from_iter(paged_values.iter()), read_asset_columns)
+        .map_err(|err| format!("query asset page rows: {err}"))?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|err| format!("decode asset page rows: {err}"))?;
+    let requested = page.fields.as_deref().map(|raw| {
+        raw.split(',')
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .collect::<Vec<_>>()
+    });
+    let mut rows = Vec::with_capacity(stored.len());
+    for item in stored {
+        let mut row = asset_value(root, item, page.include_payload)?;
+        let fields_wanted = |name: &str| {
+            requested
+                .as_ref()
+                .is_none_or(|fields| fields.contains(&name))
+        };
+        if !fields_wanted("url") {
+            if let Value::Object(fields) = &mut row {
+                fields.remove("url");
+            }
+        }
+        rows.push(row);
+    }
+    Ok((rows, total.max(0) as u64))
 }
 
 type AssetColumns = (
@@ -1711,6 +1817,47 @@ mod tests {
         assert_eq!(total, 2);
         assert_eq!(second_page.len(), 1);
         assert!(binary_marker_bytes(second_page[0].get("bytes")).is_some());
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn asset_query_page_accepts_id_batch_without_reading_payloads() {
+        let root = temp_root("asset-query-page");
+        let store = SqliteStore::open(&root).unwrap();
+        let hashes = [hash_for(b"first"), hash_for(b"second")];
+        for (bytes, width) in [(b"first".as_slice(), 10), (b"second".as_slice(), 20)] {
+            store
+                .put(
+                    "assets",
+                    &json!({
+                        "id":hash_for(bytes),
+                        "mime":"image/png",
+                        "width":width,
+                        "height":width,
+                        "bytes":binary(bytes)
+                    }),
+                )
+                .unwrap();
+        }
+        let page = PageQuery {
+            ids: hashes.to_vec(),
+            missing_fields: Vec::new(),
+            ranges: Vec::new(),
+            order_by: Some(PageOrder {
+                field: "hash".into(),
+                direction: Some("asc".into()),
+            }),
+            offset: 0,
+            limit: 1,
+            include_payload: false,
+            fields: Some("id,mime,width,height,bytesLength".into()),
+        };
+        let (rows, total) = store.query_page("assets", &Map::new(), &page).unwrap();
+        assert_eq!(total, 2);
+        assert_eq!(rows.len(), 1);
+        assert!(rows[0].get("bytes").is_none());
+        assert!(rows[0].get("bytesLength").is_some());
+        assert_eq!(rows[0]["mime"], json!("image/png"));
         let _ = fs::remove_dir_all(root);
     }
 

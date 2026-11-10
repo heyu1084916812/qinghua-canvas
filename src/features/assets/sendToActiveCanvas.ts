@@ -1,6 +1,6 @@
 import type { LibraryAsset } from '../../domain/shared/assetLibrary'
 import { assetNodeSize } from '../../domain/canvas/layout/assetNodeSize'
-import { findFreeRect } from '../../domain/agent/landing'
+import { centeredNodeOrigin } from '../../domain/agent/landing'
 import type { PlatformKit } from '../../platform/ports'
 import { createAssetNode } from '../canvas/importAsset'
 import { activeCanvasId } from '../../state/project/activeCanvas'
@@ -75,23 +75,23 @@ export async function sendAssetToActiveCanvas(
     cached.hydrated = true
   }
 
-  const nodes = store.getSnapshot().nodes
   const size = assetNodeSize({ width: asset.width, height: asset.height })
   const viewport = store.getViewport()
-  const inset = 120 / Math.max(viewport.zoom, 0.01)
-  const spot = findFreeRect(
-    {
-      ...size,
-      x: viewport.x + inset,
-      y: viewport.y + inset,
-    },
-    nodes.map((node) => ({
-      x: node.x,
-      y: node.y,
-      w: node.w,
-      h: node.h,
-    })),
-  )
+  const surface = store.getSurfaceSize()
+  const viewWorld = surface
+    ? {
+        x: viewport.x,
+        y: viewport.y,
+        w: surface.w / Math.max(viewport.zoom, 0.01),
+        h: surface.h / Math.max(viewport.zoom, 0.01),
+      }
+    : {
+        x: viewport.x,
+        y: viewport.y,
+        w: 720 / Math.max(viewport.zoom, 0.01),
+        h: 520 / Math.max(viewport.zoom, 0.01),
+      }
+  const spot = centeredNodeOrigin(size, viewWorld)
   const nodeId = createAssetNode(
     { platform, store, projectId },
     {

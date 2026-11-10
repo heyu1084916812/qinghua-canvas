@@ -2,10 +2,12 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { usePlatform } from '../../app/providers/PlatformProvider'
 import type { ContextKit, ContextKitVersion } from '../../domain/shared/context'
 import type { ReferenceItem } from '../../domain/project/referenceLedger'
+import type { LibraryAsset } from '../../domain/shared/assetLibrary'
 import { sendReferenceToAgent } from '../../features/canvas/agentHandoff'
 import { importAssetFile, IMPORT_ACCEPT } from '../../features/canvas/importAsset'
 import { ensureKitCardReference } from '../../features/canvas/kitReference'
 import { createContextRepository } from '../../state/shared/contextRepository'
+import { createAssetLibraryRepository } from '../../state/project/assetLibraryRepository'
 import { createReferenceLedgerRepository } from '../../state/project/referenceLedgerRepository'
 import type { CanvasStore } from '../../state/workbenches/canvas/store'
 import { createId } from '../../shared/id'
@@ -25,6 +27,8 @@ import {
 } from './ReferenceFilterFields'
 import { ReferenceKitPanel } from './ReferenceKitPanel'
 import { ReferenceCardActionMenu } from './ReferenceCardActionMenu'
+import { ReferenceEmptyState } from './ReferenceEmptyState'
+import { addReferenceAsset, addReferenceLink } from './referenceSourceAdd'
 import { KitFolder, ReferenceCard } from './ReferenceGridCards'
 import { useReferenceCardActions } from './useReferenceCardActions'
 import styles from './ReferenceSourcePanel.module.css'
@@ -33,10 +37,12 @@ export function ReferenceSourcePanel({
   projectId,
   store,
   kits,
+  onOpenSource,
 }: {
   projectId: string
   store: CanvasStore
   kits: readonly ContextKit[]
+  onOpenSource: (source: 'pinterest' | 'clipper') => void
 }) {
   const platform = usePlatform()
   const referenceRepo = useMemo(
@@ -47,7 +53,12 @@ export function ReferenceSourcePanel({
     () => createContextRepository(platform.storage),
     [platform.storage],
   )
+  const assetLibraryRepo = useMemo(
+    () => createAssetLibraryRepository(platform.storage),
+    [platform.storage],
+  )
   const inputRef = useRef<HTMLInputElement | null>(null)
+  const filterAnchorRef = useRef<HTMLDivElement | null>(null)
   const clickTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [references, setReferences] = useState<ReferenceItem[]>([])
   const [versions, setVersions] = useState<Record<string, ContextKitVersion | null>>({})
@@ -72,6 +83,17 @@ export function ReferenceSourcePanel({
   useEffect(() => () => {
     if (clickTimerRef.current) clearTimeout(clickTimerRef.current)
   }, [])
+
+  useEffect(() => {
+    if (!filterOpen) return
+    const close = (event: PointerEvent) => {
+      if (!filterAnchorRef.current?.contains(event.target as Node)) {
+        setFilterOpen(false)
+      }
+    }
+    document.addEventListener('pointerdown', close, true)
+    return () => document.removeEventListener('pointerdown', close, true)
+  }, [filterOpen])
 
   useEffect(() => {
     let active = true
@@ -107,6 +129,17 @@ export function ReferenceSourcePanel({
     }
   }
 
+  const putReference = async (item: ReferenceItem) => {
+    await referenceRepo.putItem(item)
+    setReferences((current) => [...current, item])
+  }
+
+  const addLinkReference = (raw: string) =>
+    addReferenceLink(putReference, projectId, raw)
+
+  const addAssetReference = (asset: LibraryAsset) =>
+    addReferenceAsset(putReference, projectId, asset)
+
   const uploadReferences = async (files: FileList | null) => {
     if (!files || files.length === 0 || busy) return
     setBusy(true)
@@ -128,7 +161,7 @@ export function ReferenceSourcePanel({
           createdAt: now,
           updatedAt: now,
         }
-        await referenceRepo.putItem(item)
+        await putReference(item)
         next.push(item)
       }
       setReferences(next)
@@ -172,12 +205,33 @@ export function ReferenceSourcePanel({
     lightboxId,
     setLightboxId,
   })
-  const visibleReferences = references.filter((item) =>
+  const kitReferenceIdOf = (kitId: string) => `ref_kit_${kitId}`
+  const kitReferences = references.filter(
+    (item) =>
+      item.source === 'kit' &&
+      Boolean(item.kitId) &&
+      item.id === kitReferenceIdOf(item.kitId!),
+  )
+  const kitReferenceByKitId = new Map(
+    kitReferences.map((item) => [item.kitId!, item]),
+  )
+  const regularReferences = references.filter(
+    (item) =>
+      !(
+        item.source === 'kit' &&
+        Boolean(item.kitId) &&
+        item.id === kitReferenceIdOf(item.kitId!)
+      ),
+  )
+  const visibleReferences = regularReferences.filter((item) =>
     matchesReferenceFilters(item.source, item.kind, sourceFilters, kindFilters),
   )
   const visibleKits = (sourceFilters.size === 0 || sourceFilters.has('asset')) && kindFilters.size === 0
-    ? kits
+    ? kits.filter((kit) => kitReferenceByKitId.has(kit.id))
     : []
+  const hasReferenceContent = regularReferences.length > 0 || kitReferences.length > 0
+  const filteredEmpty =
+    hasReferenceContent && visibleReferences.length === 0 && visibleKits.length === 0
   if (selectedKit) {
     return (
       <ReferenceKitPanel
@@ -207,24 +261,26 @@ export function ReferenceSourcePanel({
         }
       }}
     >
-      <div className={styles.subhead}>
-        <span>当前项目的参考</span>
-        <ReferenceFilterButton
-          scope="source"
-          open={filterOpen}
-          label="筛选和排序参考素材"
-          onToggle={() => setFilterOpen((current) => !current)}
-        />
+      <div className={styles.filterAnchor} ref={filterAnchorRef}>
+        <div className={styles.subhead}>
+          <span>当前项目的参考</span>
+          <ReferenceFilterButton
+            scope="source"
+            open={filterOpen}
+            label="筛选和排序参考素材"
+            onToggle={() => setFilterOpen((current) => !current)}
+          />
+        </div>
+        {filterOpen ? (
+          <ReferenceFilterFields
+            scope="source"
+            sourceValues={sourceFilters}
+            kindValues={kindFilters}
+            onToggleSource={toggleSource}
+            onToggleKind={toggleKind}
+          />
+        ) : null}
       </div>
-      {filterOpen ? (
-        <ReferenceFilterFields
-          scope="source"
-          sourceValues={sourceFilters}
-          kindValues={kindFilters}
-          onToggleSource={toggleSource}
-          onToggleKind={toggleKind}
-        />
-      ) : null}
       <input
         ref={inputRef}
         type="file"
@@ -235,6 +291,29 @@ export function ReferenceSourcePanel({
         onChange={(event) => void uploadReferences(event.target.files)}
       />
       {error ? <p className={styles.notice}>{error}</p> : null}
+      {!hasReferenceContent ? (
+        <ReferenceEmptyState
+          busy={busy}
+          onUpload={() => inputRef.current?.click()}
+          onAddLink={addLinkReference}
+          onAddAsset={addAssetReference}
+          onLoadAssets={() => assetLibraryRepo.list()}
+          onOpenSource={onOpenSource}
+        />
+      ) : filteredEmpty ? (
+        <div className={styles.filteredEmpty}>
+          <span>没有符合筛选的参考</span>
+          <button
+            type="button"
+            onClick={() => {
+              setSourceFilters(new Set())
+              setKindFilters(new Set())
+            }}
+          >
+            清除筛选
+          </button>
+        </div>
+      ) : (
       <MasonryGrid minColumnWidth={132} gap={10} scope="my-assets-reference">
         <button
           type="button"
@@ -268,9 +347,14 @@ export function ReferenceSourcePanel({
             version={versions[kit.id] ?? null}
             onAdd={() => void addKit(kit)}
             onOpen={() => setSelectedKitId(kit.id)}
+            onContextMenu={(x, y) => {
+              const item = kitReferenceByKitId.get(kit.id)
+              if (item) setContextMenu({ item, x, y })
+            }}
           />
         ))}
       </MasonryGrid>
+      )}
       {contextMenu ? (
         <ReferenceCardActionMenu
           x={contextMenu.x}

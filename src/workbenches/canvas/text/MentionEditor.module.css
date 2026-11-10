@@ -138,13 +138,24 @@
 
 .chip[data-mention-kind='node'] .chipThumb,
 .chip[data-mention-kind='reference'] .chipThumb {
+  display: inline-flex;
   width: 1.4em;
   height: 1.4em;
   border-radius: 3px;
+  background: var(--bg-subtle);
 }
 
 .chip[data-mention-kind='node'] .chipLabel,
 .chip[data-mention-kind='reference'] .chipLabel {
   flex: 1 1 auto;
   max-width: 112px;
+}
+
+/*
+ * 媒体引用的缩略图未解码完成时只显示同尺寸占位，不先闪一次文件图标。
+ * shell 来自 URL 到达后的 `data-has-thumb`；占位消失与图片出现发生在同一个 DOM 更新里。
+ */
+.chip[data-mention-kind='node'] .chipIcon,
+.chip[data-mention-kind='reference'] .chipIcon {
+  display: none;
 }

@@ -29,6 +29,7 @@ import { activeCanvasId } from '../../state/project/activeCanvas'
 import { AssetCard } from './AssetCard'
 import { AssetPreview } from './AssetPreview'
 import { MasonryGrid } from './MasonryGrid'
+import { cardAssetOf, timeLabelOf } from './assetCardProjection'
 import styles from './AssetsPage.module.css'
 
 /** 左侧“快速筛选”（只展示实际有产物的素材历史）。 */
@@ -139,6 +140,10 @@ export function AssetsPage() {
     groups,
     tags,
     tag: tagFilter,
+    historyHasMore,
+    historyLoadingMore,
+    historyNextOffset,
+    historyTotalRuns,
   } = state
   const total = state.assets.length
   const historyTotal = state.history.length
@@ -183,6 +188,14 @@ export function AssetsPage() {
     setStatusText(text)
     setStatusTone(tone)
   }, [])
+
+  const handleLoadMoreHistory = useCallback(async () => {
+    try {
+      await store.loadMoreHistory()
+    } catch {
+      setStatus('加载更多历史失败，请稍后重试', 'error')
+    }
+  }, [setStatus, store])
 
   const handleSendToCanvas = useCallback(
     async (asset: LibraryAsset) => {
@@ -616,6 +629,7 @@ export function AssetsPage() {
               <span className={styles.railItemLabel}>{item.label}</span>
               <span className={styles.railItemCount} data-assets-quick-count={item.id}>
                 {counts[item.id === 'all' ? 'all' : item.id]}
+                {historyHasMore && item.id !== 'saved' ? '+' : ''}
               </span>
             </button>
           ))}
@@ -651,7 +665,10 @@ export function AssetsPage() {
                 <span className={styles.railItemLabel}>
                   {toLogicalName(allChannels, entry.model)}
                 </span>
-                <span className={styles.railItemCount}>{entry.count}</span>
+                <span className={styles.railItemCount}>
+                  {entry.count}
+                  {historyHasMore ? '+' : ''}
+                </span>
               </button>
             ))
           )}
@@ -720,11 +737,20 @@ export function AssetsPage() {
             }}
           />
         ) : null}
-        <p className={styles.count} data-assets-count>
+        <p
+          className={styles.count}
+          data-assets-count
+          data-assets-history-loaded={historyTotal}
+          data-assets-history-has-more={historyHasMore ? 'true' : 'false'}
+          data-assets-history-runs-loaded={historyNextOffset}
+          data-assets-history-total-runs={historyTotalRuns}
+        >
           {loading
             ? '载入中…'
             : !showLibrary
-              ? `筛选出 ${state.historyVisible.length} / ${historyTotal} 条生成记录`
+              ? `筛选出 ${state.historyVisible.length} 条 · 已加载 ${historyTotal} 条${
+                  historyHasMore ? '（还有更多）' : ''
+                }`
               : assets.length === total
                 ? `共 ${total} 个素材`
                 : `筛选出 ${assets.length} / ${total} 个素材`}
@@ -734,12 +760,15 @@ export function AssetsPage() {
           <div className={styles.empty}>载入中…</div>
         ) : !showLibrary ? (
           state.historyVisible.length === 0 ? (
-            <div className={styles.empty} data-assets-empty={historyTotal > 0 ? 'filtered' : 'none'}>
+            <div
+              className={styles.empty}
+              data-assets-empty={historyTotal > 0 || historyHasMore ? 'filtered' : 'none'}
+            >
               <p className={styles.emptyTitle} data-assets-empty-title>
-                {historyTotal > 0 ? '没有符合条件的记录' : '还没有生成记录'}
+                {historyTotal > 0 || historyHasMore ? '没有符合条件的记录' : '还没有生成记录'}
               </p>
               <p className={styles.emptyHint} data-assets-empty-hint>
-                {historyTotal > 0
+                {historyTotal > 0 || historyHasMore
                   ? '换个关键字或筛选条件试试。'
                   : '在画布里生成一次图片，这里就会有记录。'}
               </p>
@@ -866,6 +895,19 @@ export function AssetsPage() {
           )}
         </section>
         )}
+        {!loading && !showLibrary && historyHasMore && (
+          <div className={styles.empty} data-assets-load-more-row>
+            <button
+              type="button"
+              className={styles.selectAction}
+              data-assets-load-more
+              disabled={historyLoadingMore}
+              onClick={() => void handleLoadMoreHistory()}
+            >
+              {historyLoadingMore ? '加载中…' : '加载更多'}
+            </button>
+          </div>
+        )}
       </main>
       </div>
 
@@ -949,40 +991,4 @@ function AssetsEmptyState({ hasAny }: { hasAny: boolean }) {
       </p>
     </div>
   )
-}
-
-/**
- * 历史条目 → 卡片要的形状。
- *
- * `AssetCard` 认的是 `LibraryAsset`（它只用到 hash / mime / 像素 / 那几项冻结元数据），
- * 所以这里做一次字段映射，而不是让卡片长两套 props —— 卡片是同一张卡片，
- * 差别只在宿主传的 `saved` 与 `onSave`（见 `AssetCard` 的注释）。
- */
-function cardAssetOf(item: HistoryOutput): LibraryAsset {
-  return {
-    hash: item.hash,
-    mime: item.mime,
-    bytes: item.bytes,
-    width: item.width,
-    height: item.height,
-    /** 卡片本身不显示时间（溯源信息都在双击后的灯箱里），这里给产出时间即可 */
-    savedAt: item.createdAt,
-    projectId: item.projectId,
-    prompt: item.prompt,
-    model: item.model,
-    quality: item.quality,
-    ratio: item.ratio,
-    channelId: item.channelId,
-    /* 标签来自收藏关系那一份（没收藏就是空）—— 灯箱里要能直接看见与编辑 */
-    ...(item.tags && item.tags.length > 0 ? { tags: item.tags } : {}),
-  }
-}
-
-/** 失败卡片上的时间：同一页里不需要精确到秒，够认出"哪一次"就行 */
-function timeLabelOf(at: number): string {
-  if (!at) return ''
-  const d = new Date(at)
-  const hh = String(d.getHours()).padStart(2, '0')
-  const mm = String(d.getMinutes()).padStart(2, '0')
-  return `${d.getMonth() + 1}月${d.getDate()}日 ${hh}:${mm}`
 }

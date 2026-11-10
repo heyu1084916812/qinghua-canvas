@@ -156,6 +156,51 @@ export function findFreeRect(
   return out
 }
 
+/**
+ * 中心优先的可见落位：先试视口正中心，再按固定次序在视口内找最近空位。
+ * 不能复用 `findFreeRect` 的「一直向下推」——中心被占用时会把节点推到视口外。
+ */
+export function centeredFreeRect(
+  size: { w: number; h: number },
+  viewport: Rect,
+  existing: readonly Rect[],
+  gap = AGENT_LAYOUT_GAP,
+): Rect {
+  const center = centeredNodeOrigin(size, viewport)
+  const clampX = (x: number) =>
+    Math.max(viewport.x, Math.min(x, viewport.x + viewport.w - size.w))
+  const clampY = (y: number) =>
+    Math.max(viewport.y, Math.min(y, viewport.y + viewport.h - size.h))
+  const stepX = size.w + gap
+  const stepY = size.h + gap
+  const candidates: { x: number; y: number }[] = [
+    center,
+    { x: center.x + stepX, y: center.y },
+    { x: center.x - stepX, y: center.y },
+    { x: center.x, y: center.y + stepY },
+    { x: center.x, y: center.y - stepY },
+    { x: center.x + stepX, y: center.y + stepY },
+    { x: center.x - stepX, y: center.y + stepY },
+    { x: center.x + stepX, y: center.y - stepY },
+    { x: center.x - stepX, y: center.y - stepY },
+  ]
+  for (const candidate of candidates) {
+    const rect = {
+      x: clampX(Math.round(candidate.x)),
+      y: clampY(Math.round(candidate.y)),
+      w: size.w,
+      h: size.h,
+    }
+    if (!existing.some((occupied) => overlaps(rect, occupied))) return rect
+  }
+  return {
+    x: clampX(center.x),
+    y: clampY(center.y),
+    w: size.w,
+    h: size.h,
+  }
+}
+
 export interface LandingCheckInput {
   plan: AgentPlan
   /** localId → 落地后的真实节点 id（attach 的那条指向既有节点 id） */

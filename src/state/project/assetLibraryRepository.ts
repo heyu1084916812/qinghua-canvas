@@ -112,7 +112,29 @@ export function createAssetLibraryRepository(storage: StoragePort): AssetLibrary
 
   return {
     async list() {
-      const rows = await storage.query('assetLibrary', {})
+      const rows = await storage.query(
+        'assetLibrary',
+        {},
+        {
+          includePayload: false,
+          fields: [
+            'id',
+            'hash',
+            'mime',
+            'width',
+            'height',
+            'savedAt',
+            'projectId',
+            'prompt',
+            'model',
+            'quality',
+            'ratio',
+            'resolution',
+            'channelId',
+            'tags',
+          ],
+        },
+      )
       const tagMap = await loadTagMap()
       return toLibraryAssets(rows as unknown as Parameters<typeof toLibraryAssets>[0]).map(
         (asset) => {

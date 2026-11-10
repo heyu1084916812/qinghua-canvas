@@ -29,6 +29,7 @@ import { NewProjectChoiceHost } from '../features/shared/project/NewProjectChoic
 import { ProjectRuntimeRecoveryNotice } from './ProjectRuntimeRecoveryNotice'
 import { subscribeProjectRuntimeCompleted } from './ProjectRuntimeRegistry'
 import { finalizeCommittedProjectRuntimes } from './deletedProjectState'
+import { preloadAssetsPage } from './routes'
 
 /**
  * 应用壳（产品文档 §2.1 / §2.2；架构文档 §5.10）。
@@ -50,6 +51,20 @@ export function AppShell({ children }: { children: ReactNode }) {
   pathnameRef.current = location.pathname
 
   useEffect(() => startUiHeartbeat(), [])
+
+  useEffect(() => {
+    const warm = () => {
+      void preloadAssetsPage().catch(() => {
+        /* 离线或 chunk 暂不可用时，导航时仍会正常重试 */
+      })
+    }
+    if (typeof window.requestIdleCallback === 'function') {
+      const id = window.requestIdleCallback(warm, { timeout: 1500 })
+      return () => window.cancelIdleCallback(id)
+    }
+    const id = window.setTimeout(warm, 800)
+    return () => window.clearTimeout(id)
+  }, [])
 
   useEffect(
     () =>

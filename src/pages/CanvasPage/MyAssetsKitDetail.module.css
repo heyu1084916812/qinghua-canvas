@@ -111,6 +111,8 @@
   width: 100%;
   max-width: 100%;
   min-height: 88px;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
   padding: var(--space-3);
   resize: vertical;
   border: 1px solid var(--stroke-focus);

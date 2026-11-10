@@ -1,0 +1,223 @@
+.empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: clamp(42px, 13vh, 100px) 0 var(--space-5);
+  text-align: center;
+}
+
+.art {
+  position: relative;
+  width: 116px;
+  height: 84px;
+  margin-bottom: var(--space-4);
+}
+
+.sheet {
+  position: absolute;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 62px;
+  height: 72px;
+  border: 1px solid var(--stroke);
+  border-radius: 8px;
+  background: var(--bg-surface);
+  color: var(--text-2);
+}
+
+.back {
+  left: 2px;
+  top: 8px;
+  transform: rotate(-9deg);
+}
+
+.middle {
+  left: 28px;
+  top: 3px;
+  transform: rotate(4deg);
+  background: var(--bg-subtle);
+}
+
+.front {
+  left: 53px;
+  top: 9px;
+  transform: rotate(10deg);
+  color: var(--text-1);
+}
+
+.empty strong {
+  color: var(--text-1);
+  font-size: var(--fs-panel-title);
+  font-weight: var(--fw-title);
+}
+
+.empty > p {
+  max-width: 290px;
+  margin: var(--space-2) 0 var(--space-4);
+  color: var(--text-3);
+  font-size: var(--fs-chip);
+  line-height: 1.6;
+}
+
+.actions {
+  display: grid;
+  width: min(276px, 100%);
+  gap: var(--space-2);
+}
+
+.actions button,
+.popover button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  min-height: 34px;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--stroke);
+  border-radius: var(--radius-control);
+  background: var(--bg-subtle);
+  color: var(--text-1);
+  font: inherit;
+  font-size: var(--fs-label);
+  cursor: pointer;
+}
+
+.actions button:hover,
+.popover button:hover {
+  background: var(--bg-hover);
+}
+
+.actions button:disabled,
+.popover button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.popover {
+  display: grid;
+  width: min(316px, 100%);
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+  padding: var(--space-3);
+  border: 1px solid var(--stroke);
+  border-radius: 8px;
+  background: var(--bg-surface);
+  text-align: start;
+}
+
+.popover label {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.popover label span,
+.popoverHead span {
+  color: var(--text-3);
+  font-size: var(--fs-chip);
+}
+
+.popover input {
+  width: 100%;
+  height: 34px;
+  box-sizing: border-box;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--stroke);
+  border-radius: var(--radius-control);
+  outline: 0;
+  background: var(--bg-subtle);
+  color: var(--text-1);
+  font: inherit;
+  font-size: var(--fs-label);
+}
+
+.popover input:focus {
+  border-color: var(--stroke-focus);
+}
+
+.popoverHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.popoverHead button {
+  min-height: 24px;
+  padding: 0 var(--space-2);
+  border-color: transparent;
+  background: transparent;
+  color: var(--text-2);
+  font-size: var(--fs-chip);
+}
+
+.assetList {
+  display: grid;
+  max-height: 224px;
+  gap: 4px;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+}
+
+.assetList button {
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr);
+  justify-content: stretch;
+  min-height: 38px;
+  padding: 3px var(--space-2) 3px 4px;
+  border-color: transparent;
+  background: transparent;
+  text-align: start;
+}
+
+.assetList button span:last-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.assetThumb {
+  width: 30px;
+  height: 30px;
+  overflow: hidden;
+  border-radius: 4px;
+  background: var(--bg-subtle);
+}
+
+.assetThumb img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.connectors {
+  grid-template-columns: 1fr 1fr;
+}
+
+.hint,
+.error {
+  margin: 0;
+  font-size: var(--fs-chip);
+  line-height: 1.5;
+}
+
+.hint {
+  color: var(--text-3);
+}
+
+.error {
+  color: var(--danger);
+}
+
+.actions button:focus-visible,
+.popover button:focus-visible {
+  outline: 1px solid var(--stroke-focus);
+  outline-offset: 1px;
+}
+
+@media (max-width: 360px) {
+  .connectors {
+    grid-template-columns: 1fr;
+  }
+}

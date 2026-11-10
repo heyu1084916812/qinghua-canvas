@@ -64,9 +64,15 @@ export type AssetsView = 'masonry' | 'grid' | 'list'
 export interface AssetLibraryState {
   assets: LibraryAsset[]
   visible: LibraryAsset[]
-  /** 全部生成历史（含未收藏与失败）—— 与素材库共用同一套筛选条件 */
+  /** 已加载的生成历史（含未收藏与失败）—— 与素材库共用同一套筛选条件 */
   history: HistoryItem[]
   historyVisible: HistoryItem[]
+  /** 首屏只取一页历史；这里记录是否还有下一页。 */
+  historyHasMore: boolean
+  historyLoadingMore: boolean
+  historyNextOffset: number
+  /** runRecords 的原始总数，用于提示还有多少历史没有加载。 */
+  historyTotalRuns: number
   /** 分组视图（日期 / 模型 / 不分组） */
   groups: HistoryGroup[]
   /** 顶部那排数字与左侧"快速筛选"的计数（对全量算） */
@@ -101,6 +107,7 @@ export interface AssetLibraryState {
 
 export interface AssetLibraryActions {
   load: () => Promise<void>
+  loadMoreHistory: () => Promise<void>
   save: (asset: LibraryAsset) => Promise<void>
   setQuery: (query: string) => void
   setFilter: (filter: AssetFilter) => void
@@ -162,6 +169,41 @@ function derive(state: AssetLibraryState): Derived {
   }
 }
 
+function historyItemKey(item: HistoryItem): string {
+  return item.kind === 'output' ? `output:${item.hash}` : `failed:${item.id}`
+}
+
+function mergeHistoryItems(
+  current: readonly HistoryItem[],
+  incoming: readonly HistoryItem[],
+): HistoryItem[] {
+  const merged = new Map<string, HistoryItem>()
+  for (const item of [...current, ...incoming]) {
+    const key = historyItemKey(item)
+    const previous = merged.get(key)
+    if (!previous || item.createdAt >= previous.createdAt) merged.set(key, item)
+  }
+  return [...merged.values()].sort(
+    (left, right) =>
+      right.createdAt - left.createdAt ||
+      historyItemKey(left).localeCompare(historyItemKey(right)),
+  )
+}
+
+function decorateHistory(
+  items: readonly HistoryItem[],
+  hidden: ReadonlySet<string>,
+  tagMap: ReadonlyMap<string, string[]>,
+): HistoryItem[] {
+  return items
+    .filter((item) => item.kind !== 'output' || !hidden.has(item.hash))
+    .map((item) =>
+      item.kind === 'output'
+        ? { ...item, tags: normalizeTags(tagMap.get(item.hash)) }
+        : item,
+    )
+}
+
 /** 同一 hash 在素材库与历史里各有一行，标签计数只能按 hash 去重一次。 */
 function tagRowsOf(state: Pick<AssetLibraryState, 'assets' | 'history'>): { tags?: string[] }[] {
   const rows = new Map<string, { tags?: string[] }>()
@@ -190,6 +232,10 @@ export function createAssetLibraryStore(
     visible: [],
     history: [],
     historyVisible: [],
+    historyHasMore: false,
+    historyLoadingMore: false,
+    historyNextOffset: 0,
+    historyTotalRuns: 0,
     groups: [],
     counts: { all: 0, image: 0, video: 0, audio: 0, other: 0, saved: 0, recent: 0, failed: 0 },
     models: [],
@@ -208,36 +254,80 @@ export function createAssetLibraryStore(
   }))
 
   const load: AssetLibraryActions['load'] = async () => {
+    const before = store.getState()
+    if (before.loading || before.loaded) return
     store.setState({ loading: true })
-    const [rawAssets, rawHistory, tagMap, hidden] = await Promise.all([
+    const [rawAssets, historyPage, hidden] = await Promise.all([
       repo.list(),
-      historyRepo ? historyRepo.list() : Promise.resolve<HistoryItem[]>([]),
-      repo.listTagMap(),
+      historyRepo
+        ? historyRepo.listPage()
+        : Promise.resolve({
+            items: [] as HistoryItem[],
+            nextOffset: 0,
+            hasMore: false,
+            totalRuns: 0,
+          }),
       repo.listHidden(),
     ])
+    const tagMap = new Map(
+      rawAssets
+        .filter((asset) => (asset.tags?.length ?? 0) > 0)
+        .map((asset) => [asset.hash, asset.tags!] as const),
+    )
     const assets = rawAssets.filter((asset) => !hidden.has(asset.hash))
     /**
      * 历史条目的标签是**按 hash 从收藏库拼过来的镜像**（对账 #303）：
      * 标签只有一份真相在 `assetLibrary` 行上，历史那边不另存一份 ——
      * 两份就会分叉（改了标签，历史卡片还挂着旧的）。
      */
-    const history = rawHistory
-      .filter((item) => item.kind !== 'output' || !hidden.has(item.hash))
-      .map((item) =>
-        item.kind === 'output'
-          ? { ...item, tags: normalizeTags(tagMap.get(item.hash)) }
-          : item,
-      )
+    const history = decorateHistory(historyPage.items, hidden, tagMap)
     /** 时间基准取**这一次加载**那一瞬：与派生值用同一个数，跨零点也不会自相矛盾 */
     const now = Date.now()
     store.setState({
       assets,
       history,
+      historyHasMore: historyPage.hasMore,
+      historyLoadingMore: false,
+      historyNextOffset: historyPage.nextOffset,
+      historyTotalRuns: historyPage.totalRuns,
       now,
       loading: false,
       loaded: true,
       ...derive({ ...store.getState(), assets, history, now }),
     })
+  }
+
+  const loadMoreHistory: AssetLibraryActions['loadMoreHistory'] = async () => {
+    if (!historyRepo) return
+    const before = store.getState()
+    if (before.historyLoadingMore || !before.historyHasMore) return
+    store.setState({ historyLoadingMore: true })
+    try {
+      const [page, hidden] = await Promise.all([
+        historyRepo.listPage({ offset: before.historyNextOffset }),
+        repo.listHidden(),
+      ])
+      const tagMap = new Map(
+        before.assets
+          .filter((asset) => (asset.tags?.length ?? 0) > 0)
+          .map((asset) => [asset.hash, asset.tags!] as const),
+      )
+      const incoming = decorateHistory(page.items, hidden, tagMap)
+      store.setState((current) => {
+        const history = mergeHistoryItems(current.history, incoming)
+        return {
+          history,
+          historyHasMore: page.hasMore,
+          historyLoadingMore: false,
+          historyNextOffset: page.nextOffset,
+          historyTotalRuns: page.totalRuns,
+          ...derive({ ...current, history }),
+        }
+      })
+    } catch (error) {
+      store.setState({ historyLoadingMore: false })
+      throw error
+    }
   }
 
   const setQuery: AssetLibraryActions['setQuery'] = (query) => {
@@ -368,6 +458,7 @@ export function createAssetLibraryStore(
   return {
     ...store,
     load,
+    loadMoreHistory,
     save,
     setQuery,
     setFilter,

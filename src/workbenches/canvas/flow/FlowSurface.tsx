@@ -93,7 +93,7 @@ import { CanvasNotice } from '../surface/CanvasNotice'
 import { Minimap } from '../surface/Minimap'
 import { UndoBar } from '../surface/UndoBar'
 import { useCanvasDetailMode } from './useCanvasDetailMode'
-import { sameFlowViewport, VIEWPORT_EPSILON } from './flowSurfaceViewport'
+import { shouldSyncStoreViewport, VIEWPORT_EPSILON } from './flowSurfaceViewport'
 import {
   FLOATING_SELECTORS,
   marqueeBetween,
@@ -161,10 +161,9 @@ function FlowViewportController() {
   useEffect(() => {
     const sync = () => {
       const target = storeViewportToFlow(store.getViewport())
-      if (sameFlowViewport(flow.getViewport(), target)) return
+      if (!shouldSyncStoreViewport(flow.getViewport(), target)) return
       // 缩放手势期间 RF 自己就在改 transform；这里只跟随外部逻辑视口变化，
       // 避免 onViewportChange → setViewport → setViewport 的回写循环。
-      if (Math.abs(flow.getViewport().zoom - target.zoom) < VIEWPORT_EPSILON) return
       void flow.setViewport(target)
     }
     sync()
@@ -252,6 +251,25 @@ function FlowSurfaceInner({
   const customNodeColor = canvasStyle.customNode[theme]
   const { appearance } = useFonts()
   const handleDownload = useNodeDownload(platform, store)
+  const surfaceRef = useRef<HTMLDivElement | null>(null)
+  useEffect(() => {
+    const surface = surfaceRef.current
+    if (!surface) return
+    const measure = () => {
+      const rect = surface.getBoundingClientRect()
+      store.setSurfaceSize({ w: rect.width, h: rect.height })
+    }
+    measure()
+    const observer = typeof ResizeObserver === 'function'
+      ? new ResizeObserver(measure)
+      : null
+    observer?.observe(surface)
+    window.addEventListener('resize', measure)
+    return () => {
+      observer?.disconnect()
+      window.removeEventListener('resize', measure)
+    }
+  }, [store])
   // Ctrl/Cmd + C/V（§4.2）：剪贴板是模块级单例、不订阅，故不参与本组件重渲染
   useClipboardHotkeys(store)
   useCanvasKeyboard(store)
@@ -710,6 +728,7 @@ function FlowSurfaceInner({
 
   return (
     <div
+      ref={surfaceRef}
       className={spaceHeld ? `${styles.surface} ${styles.spaceMode}` : styles.surface}
       data-canvas-surface
       data-canvas-engine="rf"

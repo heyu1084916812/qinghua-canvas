@@ -1,0 +1,31 @@
+.setupIntro,
+.developerHint {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.setupIntro strong {
+  font-size: var(--fs-label);
+  font-weight: var(--fw-title);
+}
+
+.setupIntro p,
+.developerHint p {
+  margin: 0;
+  color: var(--text-2);
+  font-size: var(--fs-label);
+  line-height: 1.6;
+}
+
+.developerHint {
+  padding: var(--space-3);
+  border: 1px solid var(--stroke);
+  border-radius: 8px;
+  background: var(--bg-subtle);
+}
+
+.developerHint summary {
+  color: var(--text-2);
+  font-size: var(--fs-label);
+  cursor: pointer;
+}

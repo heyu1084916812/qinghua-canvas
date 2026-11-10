@@ -1,5 +1,13 @@
 # CanvasFlow（轻画）项目记忆
 
+### 总管2 第五十九轮：生成历史 30 条首屏分页与 sqlite-v2 素材点查（2026-11-10）
+
+- 生成历史页面不能继续调用 `historyRepo.list()` 全量扫 `runRecords`；首屏只走 `listPage({offset:0,limit:30})`，素材元数据只按本页输出 hash 批量点查，底部每次继续 +30。
+- sqlite-v2 的 `queryPage('assets', {}, {ids})` 必须走 `assets` 表 hash 集合，不能整表反序列化或读取图片字节；查询只支持 id/projectId 过滤和 hash 排序，其他分页条件明确报错，避免静默给出错误结果。
+- `AssetLibraryStore.load()` 要先检查 `loading/loaded`，React StrictMode 下两份 effect 不能发起两套 runRecords + assets 请求。跨页合并同 hash 历史时必须保留较新的 `createdAt`，旧页不能覆盖新页元数据。
+- 生成历史路由要空闲预热，侧栏 `/assets` 项在 pointerenter/focus 再预取；用户真正点击后只付数据查询和首屏渲染。
+- 证据：最终四组 1440×900 / 1024×700 × 明暗首屏 133–922ms（后三组 132–275ms）、加载更多 72–223ms，均 `runsLoaded 30→60`，`pageOverflowX=false / errors=[]`。证据 `.playwright-verify/ui-seven-after/{report.json,*-history-first-page.png}`。
+
 ### 总管2 第五十八轮：媒体 chip、套件动作布局与生成历史即时导入（2026-11-10）
 - `node` 与 `reference` 不能用“协议相同但 CSS 各写一套”收尾。`MentionEditor` 的 `mentionChipViewOf` 是唯一媒体引用描述，输入框命令式 DOM、历史正文 `MentionChipView` 和样式都消费这一份；两类 chip 必须同 class、同 144×26px、同 18×18px 缩略图。
 - 图片、颜色、字体三种套件卡统一为“主视觉 + 元信息行”。三点必须 `position:static`，贴元信息行右边，描述/色值/字体名在左侧；描述 textarea 必须 `box-sizing:border-box`，否则 100% 宽再叠 padding/border 会越过抽屉。

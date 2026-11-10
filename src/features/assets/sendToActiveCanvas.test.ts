@@ -101,6 +101,7 @@ describe('sendAssetToActiveCanvas', () => {
     )
     cached.store.hydrate({ projectId: 'p1', nodes: [], edges: [] })
     cached.store.setViewport({ x: 800, y: 600, zoom: 2 })
+    cached.store.setSurfaceSize({ w: 1280, h: 800 })
     cached.hydrated = true
 
     const result = await sendAssetToActiveCanvas(platform, {
@@ -118,8 +119,8 @@ describe('sendAssetToActiveCanvas', () => {
     expect(cached.store.getSnapshot().nodes).toEqual([
       expect.objectContaining({
         id: result.nodeId,
-        x: 860,
-        y: 660,
+        x: 928,
+        y: 704,
       }),
     ])
   })

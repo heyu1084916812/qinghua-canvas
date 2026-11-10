@@ -3,16 +3,21 @@ import styles from './ReferenceSourcePanel.module.css'
 
 export function ReferenceMedia({
   hash,
+  url,
   title,
   kind,
 }: {
   hash?: string
+  url?: string
   title: string
-  kind: 'image' | 'video'
+  kind: 'image' | 'video' | 'document'
 }) {
-  const url = useAsset(hash ?? '')
-  if (!url) return <span className={styles.referenceMediaEmpty} />
+  const assetUrl = useAsset(hash ?? '')
+  const source = assetUrl ?? url
+  if (!source) return <span className={styles.referenceMediaEmpty} />
   return kind === 'video'
-    ? <video src={url} muted playsInline preload="metadata" aria-label={title} />
-    : <img src={url} alt={title} loading="lazy" />
+    ? <video src={source} muted playsInline preload="metadata" aria-label={title} />
+    : kind === 'document'
+      ? <span className={styles.referenceLinkPreview}>{title}</span>
+      : <img src={source} alt={title} loading="lazy" />
 }

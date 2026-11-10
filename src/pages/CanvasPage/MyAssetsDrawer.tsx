@@ -95,7 +95,12 @@ export function MyAssetsDrawer({
         </nav>
         <div className={styles.body} data-my-assets-body={source}>
           {source === 'reference' ? (
-            <ReferenceSourcePanel projectId={projectId} store={store} kits={kits} />
+            <ReferenceSourcePanel
+              projectId={projectId}
+              store={store}
+              kits={kits}
+              onOpenSource={setSource}
+            />
           ) : null}
           {source === 'assets' ? (
             <MyAssetsShelf

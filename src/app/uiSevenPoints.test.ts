@@ -37,6 +37,15 @@ describe('seven UI placement fixes', () => {
       'workbenches/canvas/panels/AgentPanel/MentionRichText.tsx',
     )
     const mentionEditor = read('workbenches/canvas/text/MentionEditor.tsx')
+    const referenceEmpty = read('pages/CanvasPage/ReferenceEmptyState.tsx')
+    const pinterestSetup = read(
+      'features/shared/pinterest/PinterestSetupView.tsx',
+    )
+    const minimap = read('workbenches/canvas/surface/Minimap.tsx')
+    const flowSurface = read('workbenches/canvas/flow/FlowSurface.tsx')
+    const historyRepository = read(
+      'state/project/assetHistoryRepository.ts',
+    )
     const referenceSource = read('pages/CanvasPage/ReferenceSourcePanel.tsx')
     const referenceCards = read('pages/CanvasPage/ReferenceGridCards.tsx')
     const referenceMenu = read('pages/CanvasPage/ReferenceCardActionMenu.tsx')
@@ -109,6 +118,22 @@ describe('seven UI placement fixes', () => {
     expect(agentAttachments).toContain("item?.kind !== 'image'")
     expect(mentionRichText).toContain('<MentionChipView')
     expect(mentionEditor).toContain("kind === 'node' || kind === 'reference'")
+    expect(referenceEmpty).toContain('data-reference-empty')
+    expect(referenceEmpty).toContain('上传文件')
+    expect(referenceEmpty).toContain('选择素材')
+    expect(referenceSource).toContain('<ReferenceEmptyState')
+    expect(referenceSource).toContain('kitReferenceByKitId.has(kit.id)')
+    expect(referenceSource).toContain('document.addEventListener(\'pointerdown\', close, true)')
+    expect(pinterestSetup).toContain('应用编号')
+    expect(pinterestSetup).toContain('应用密钥')
+    expect(pinterestSetup).toContain('回调地址')
+    expect(pinterestSetup).not.toContain('Client ID')
+    expect(pinterestSetup).not.toContain('Client Secret')
+    expect(minimap).toContain('data-canvas-minimap')
+    expect(flowSurface).not.toContain(
+      'Math.abs(flow.getViewport().zoom - target.zoom)',
+    )
+    expect(historyRepository).toContain('includePayload: false')
     expect(referenceSource).toContain('data-my-assets-reference-upload')
     expect(referenceSource).toContain('sendReferenceToAgent')
     expect(referenceSource).toContain('<MasonryGrid')
@@ -171,6 +196,8 @@ describe('seven UI placement fixes', () => {
     expect(drawer).toContain('PinterestPanel')
     expect(nav).toContain("label: '生成历史'")
     expect(assets).toContain('生成历史')
+    expect(assets).toContain('data-assets-load-more')
+    expect(assets).toContain('loadMoreHistory')
   })
 
   it('asks which workbench to create before creating a project', () => {

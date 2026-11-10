@@ -104,13 +104,15 @@ const waitForUrl = async (url, timeoutMs = 30_000) => {
 }
 
 if (!useExternalServices) {
-const storeExe = path.join(
-  ROOT,
-  'shared-store',
-  'target',
-  'debug',
-  process.platform === 'win32' ? 'qinghua-store.exe' : 'qinghua-store',
-)
+const storeExe =
+  process.env.QH_UI_STORE_EXE ??
+  path.join(
+    ROOT,
+    'shared-store',
+    'target',
+    'debug',
+    process.platform === 'win32' ? 'qinghua-store.exe' : 'qinghua-store',
+  )
 if (!fs.existsSync(storeExe)) {
   const built = spawnSync('cargo', ['build', '--manifest-path', 'shared-store/Cargo.toml'], {
     cwd: ROOT,
@@ -122,7 +124,7 @@ const storeProcess = spawn(storeExe, [
   '--data-dir',
   storeData,
   '--backend',
-  'v1',
+  'v2',
   '--port',
   String(STORE_PORT),
 ], { cwd: ROOT, stdio: 'ignore' })
@@ -348,8 +350,29 @@ try {
       }
     })
     await page.locator('[data-my-assets-source="pinterest"]').click()
-    await page.locator('[data-pinterest-panel]').waitFor({ timeout: 10_000 }).catch(() => {})
+    await page.locator('[data-pinterest-panel]').waitFor({ timeout: 10_000 })
     const pinterestMounted = await page.locator('[data-pinterest-panel]').count()
+    const pinterestLayout = await page.evaluate(() => {
+      const panel = document.querySelector('[data-pinterest-panel]')
+      const drawer = document.querySelector('[data-my-assets-drawer]')
+      const panelRect = panel?.getBoundingClientRect()
+      const drawerRect = drawer?.getBoundingClientRect()
+      const text = panel?.textContent ?? ''
+      return {
+        chineseLabels:
+          text.includes('应用编号') &&
+          text.includes('应用密钥') &&
+          text.includes('回调地址'),
+        technicalEnglishLeaked:
+          /Client ID|Client Secret|Redirect URI|Developer App/.test(text),
+        overflowX: panel ? panel.scrollWidth > panel.clientWidth + 1 : true,
+        insideDrawer:
+          Boolean(panelRect && drawerRect) &&
+          panelRect.left >= drawerRect.left - 1 &&
+          panelRect.right <= drawerRect.right + 1,
+      }
+    })
+    await page.screenshot({ path: path.join(out, `${file}-canvas-pinterest.png`) })
     await page.locator('[data-my-assets-source="clipper"]').click()
     await page.locator('[data-clipper-panel]').waitFor({ timeout: 10_000 })
     const clipperMounted = await page.locator('[data-clipper-panel]').count()
@@ -387,6 +410,21 @@ try {
     await page.waitForTimeout(600)
     await page.screenshot({ path: path.join(out, `${file}-canvas-clipper.png`) })
     await page.locator('[data-my-assets-source="reference"]').click()
+    await page.locator('[data-reference-empty]').waitFor({ timeout: 10_000 })
+    const referenceEmptyActions = await page
+      .locator('[data-reference-empty] button')
+      .count()
+    const referenceEmptyKitFolders = await page
+      .locator('[data-my-assets-kit-folder]')
+      .count()
+    await page.screenshot({ path: path.join(out, `${file}-canvas-reference-empty.png`) })
+    await page.locator('[data-reference-filter-trigger="source"]').click()
+    await page.locator('[data-reference-filter-panel="source"]').waitFor({ timeout: 5_000 })
+    await page.locator('[data-my-assets-body]').click({ position: { x: 8, y: 8 } })
+    await page
+      .locator('[data-reference-filter-panel="source"]')
+      .waitFor({ state: 'detached', timeout: 5_000 })
+    const referenceFilterClosedOnOutside = true
     await page.locator('[data-my-assets-reference-file]').setInputFiles([
       {
         name: 'square-reference.png',
@@ -454,9 +492,30 @@ try {
       fonts: [{ id: 'abeezee', name: 'ABeeZee', detail: 'Regular' }],
       createdAt: kitTime,
     }]
+    const projectId = new URL(page.url()).pathname.split('/').filter(Boolean).at(-1)
+    if (!projectId) throw new Error('canvas project id missing')
+    const kitReferenceRows = [{
+      id: `ref_kit_${kitId}`,
+      projectId,
+      title: 'Anbel',
+      source: 'kit',
+      kind: 'image',
+      assetHash: previewHashes[0],
+      assets: previewHashes.map((hash, index) => ({
+        hash,
+        role: index === 0 ? 'logo' : 'reference',
+        name: ['Anbel 标志', '办公空间 1', '办公空间 2', '产品陈列'][index],
+      })),
+      kitId,
+      kitVersion: 1,
+      what: '自然有机风品牌套件。',
+      createdAt: kitTime,
+      updatedAt: kitTime,
+    }]
     for (const [table, rows] of [
       ['contextKits', kitRows],
       ['contextKitVersions', kitVersionRows],
+      ['referenceItems', kitReferenceRows],
     ]) {
       const seeded = await fetch(`${STORE}/bulkPut`, {
         method: 'POST',
@@ -476,6 +535,8 @@ try {
     await page.locator('[data-my-assets-slot][data-my-assets-open="true"]').waitFor({ timeout: 10_000 })
     await page.waitForTimeout(260)
     await page.locator('[data-my-assets-drawer]').waitFor({ timeout: 10_000 })
+    await page.locator('[data-my-assets-source="assets"]').click()
+    await page.locator('[data-my-assets-shelf]').waitFor({ timeout: 10_000 })
     await page.locator('[data-my-assets-source="reference"]').click()
     await page.locator('[data-my-assets-kit-folder]').waitFor({ timeout: 10_000 })
     await page.waitForFunction(
@@ -596,6 +657,14 @@ try {
       .evaluate((chip) => {
         const image = chip.querySelector('img')
         return image instanceof HTMLImageElement && image.complete && image.naturalWidth > 0
+      })
+    const referenceChipNoIconFlash = await page
+      .locator('[data-agent-composer] [data-mention-kind="reference"]')
+      .first()
+      .evaluate((chip) => {
+        const icon = chip.querySelector('[class*="chipIcon"]')
+        const thumb = chip.querySelector('[class*="chipThumb"]')
+        return Boolean(icon && getComputedStyle(icon).display === 'none' && thumb)
       })
     const referenceChipShape = await page
       .locator('[data-agent-composer] [data-mention-kind="reference"]')
@@ -739,6 +808,38 @@ try {
       }
     })
     await page.screenshot({ path: path.join(out, `${file}-canvas-reference-dropped.png`) })
+    const surfaceBoxForBlankClick = await page
+      .locator('[data-canvas-surface]')
+      .boundingBox()
+    if (!surfaceBoxForBlankClick) throw new Error('canvas surface missing')
+    await page.locator('[data-canvas-surface]').click({
+      position: {
+        x: Math.round(surfaceBoxForBlankClick.width * 0.68),
+        y: 120,
+      },
+    })
+    await page.locator('[data-panel-anchor]').waitFor({ state: 'detached', timeout: 5_000 })
+    const viewportTransformBeforeMinimap = await page.evaluate(() => {
+      const viewport = document.querySelector('.react-flow__viewport')
+      return viewport ? getComputedStyle(viewport).transform : ''
+    })
+    const minimapBox = await page.locator('[data-canvas-minimap]').boundingBox()
+    if (!minimapBox) throw new Error('minimap missing')
+    await page.locator('[data-canvas-minimap]').click({
+      position: {
+        x: Math.round(minimapBox.width * 0.72),
+        y: Math.round(minimapBox.height * 0.68),
+      },
+    })
+    await page.waitForTimeout(220)
+    const viewportTransformAfterMinimap = await page.evaluate(() => {
+      const viewport = document.querySelector('.react-flow__viewport')
+      return viewport ? getComputedStyle(viewport).transform : ''
+    })
+    const minimapClickPanned =
+      Boolean(viewportTransformBeforeMinimap) &&
+      viewportTransformBeforeMinimap !== viewportTransformAfterMinimap
+    await page.screenshot({ path: path.join(out, `${file}-canvas-minimap-panned.png`) })
     await page.locator('[data-node-id]').last().click({ position: { x: 24, y: 24 } })
     await page.locator('[data-follow-action="agent"]').waitFor({ timeout: 5_000 })
     await page.locator('[data-follow-action="agent"]').click()
@@ -965,10 +1066,17 @@ try {
     const kitDescriptionEditorGeometry = await page.evaluate(() => {
       const textarea = document.querySelector('[data-my-assets-kit-description]')
       const section = textarea?.closest('section')
+      const beforeRect = textarea?.getBoundingClientRect()
+      if (textarea instanceof HTMLTextAreaElement) textarea.style.height = '180px'
       const textareaRect = textarea?.getBoundingClientRect()
       const sectionRect = section?.getBoundingClientRect()
       return {
         boxSizing: textarea ? getComputedStyle(textarea).boxSizing : '',
+        scrollbarGutter: textarea ? getComputedStyle(textarea).scrollbarGutter : '',
+        widthDelta:
+          beforeRect && textareaRect
+            ? Math.round(Math.abs(textareaRect.width - beforeRect.width) * 10) / 10
+            : -1,
         textareaLeft: textareaRect?.left ?? -1,
         textareaRight: textareaRect?.right ?? -1,
         sectionLeft: sectionRect?.left ?? -1,
@@ -1127,6 +1235,155 @@ try {
       await page.locator('[data-agent-composer] [data-mention-kind="reference"]').count()
     await page.locator('[data-agent-close]').click()
     await page.locator('[data-agent-panel]').waitFor({ state: 'hidden', timeout: 10_000 })
+    await page.locator('[data-my-assets-source="reference"]').click()
+    await page.locator('[data-my-assets-kit-folder]').waitFor({ timeout: 10_000 })
+    const kitFoldersBeforeReferenceDelete = await page
+      .locator('[data-my-assets-kit-folder]')
+      .count()
+    await page.locator('[data-my-assets-kit-folder]').first().click({
+      button: 'right',
+    })
+    await page.locator('[data-reference-card-action="delete"]').waitFor({ timeout: 5_000 })
+    await page.locator('[data-reference-card-action="delete"]').click()
+    await page.waitForFunction(
+      (before) =>
+        document.querySelectorAll('[data-my-assets-kit-folder]').length < before,
+      kitFoldersBeforeReferenceDelete,
+      { timeout: 10_000 },
+    )
+    const kitFoldersAfterReferenceDelete = await page
+      .locator('[data-my-assets-kit-folder]')
+      .count()
+    const kitRemovedFromReference =
+      kitFoldersAfterReferenceDelete < kitFoldersBeforeReferenceDelete
+    await page.screenshot({ path: path.join(out, `${file}-canvas-reference-kit-removed.png`) })
+    const historyCanvasNodeIdsBefore = await page
+      .locator('[data-node-id]')
+      .evaluateAll((nodes) => nodes.map((node) => node.getAttribute('data-node-id')))
+    await page.locator('[data-my-assets-close]').click()
+    const historyRows = Array.from({ length: 600 }, (_, index) => ({
+      id: `history-load-${phase}-${variant.width}-${variant.theme}-${index}`,
+      projectId,
+      createdAt: kitTime + index,
+      outputHashes: [previewHashes[index % previewHashes.length]],
+      outputWidth: 320,
+      outputHeight: 320,
+      params: {
+        prompt: `history fixture ${index}`,
+        model: 'GPT Image 2',
+      },
+      sentModel: 'GPT Image 2',
+    }))
+    const historySeed = await fetch(`${STORE}/bulkPut`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ table: 'runRecords', rows: historyRows }),
+    })
+    if (!historySeed.ok) throw new Error(`history seed failed: HTTP ${historySeed.status}`)
+    const historyLoadStartedAt = Date.now()
+    await page.locator('[data-sidebar-item="/assets"]').click()
+    await page.waitForURL('**/assets', { timeout: 15_000 })
+    const historyCard = page.locator(`[data-asset-card="${previewHashes[0]}"]`).first()
+    await historyCard.waitFor({ timeout: 20_000 })
+    const historyLoadMs = Date.now() - historyLoadStartedAt
+    const historyPaginationBeforeMore = await page
+      .locator('[data-assets-count]')
+      .evaluate((node) => ({
+        runsLoaded: Number(node.getAttribute('data-assets-history-runs-loaded') ?? 0),
+        totalRuns: Number(node.getAttribute('data-assets-history-total-runs') ?? 0),
+        hasMore: node.getAttribute('data-assets-history-has-more') === 'true',
+      }))
+    await page.screenshot({ path: path.join(out, `${file}-history-first-page.png`) })
+    const historyLoadMoreStartedAt = Date.now()
+    const historyLoadMoreButton = page.locator('[data-assets-load-more]')
+    if (historyPaginationBeforeMore.hasMore) {
+      await historyLoadMoreButton.click()
+      await page.waitForFunction(
+        (before) =>
+          Number(
+            document
+              .querySelector('[data-assets-count]')
+              ?.getAttribute('data-assets-history-runs-loaded') ?? 0,
+          ) > before,
+        historyPaginationBeforeMore.runsLoaded,
+        { timeout: 20_000 },
+      )
+    }
+    const historyLoadMoreMs = historyPaginationBeforeMore.hasMore
+      ? Date.now() - historyLoadMoreStartedAt
+      : null
+    const historyPaginationAfterMore = await page
+      .locator('[data-assets-count]')
+      .evaluate((node) => ({
+        runsLoaded: Number(node.getAttribute('data-assets-history-runs-loaded') ?? 0),
+        totalRuns: Number(node.getAttribute('data-assets-history-total-runs') ?? 0),
+        hasMore: node.getAttribute('data-assets-history-has-more') === 'true',
+      }))
+    await historyCard.hover()
+    const historySend = page.locator(`[data-asset-send="${previewHashes[0]}"]`).first()
+    await historySend.waitFor({ state: 'visible', timeout: 10_000 })
+    const historySendStartedAt = Date.now()
+    await historySend.click()
+    await page.waitForFunction(
+      () =>
+        [...document.querySelectorAll('[role="status"]')].some((node) =>
+          node.textContent?.includes('已发送到画布'),
+        ),
+      { timeout: 20_000 },
+    )
+    const historySendMs = Date.now() - historySendStartedAt
+    await page.locator('[data-sidebar-item="/canvas"]').click()
+    await page.waitForURL(`**/canvas/${projectId}`, { timeout: 15_000 })
+    await page.waitForFunction(
+      (before) =>
+        [...document.querySelectorAll('[data-node-id]')].some(
+          (node) => !before.includes(node.getAttribute('data-node-id')),
+        ),
+      historyCanvasNodeIdsBefore,
+      { timeout: 15_000 },
+    )
+    const historyImportPlacement = await page.evaluate((before) => {
+      const surface = document.querySelector('[data-canvas-surface]')
+      const surfaceRect = surface?.getBoundingClientRect()
+      const added = [...document.querySelectorAll('[data-node-id]')].find(
+        (node) => !before.includes(node.getAttribute('data-node-id')),
+      )
+      const nodeRect = added?.getBoundingClientRect()
+      return {
+        added: Boolean(added),
+        imageLoaded:
+          added?.querySelector('img') instanceof HTMLImageElement &&
+          added.querySelector('img').complete &&
+          added.querySelector('img').naturalWidth > 0,
+        centerDeltaX:
+          surfaceRect && nodeRect
+            ? Math.round(
+                Math.abs(
+                  nodeRect.left +
+                    nodeRect.width / 2 -
+                    (surfaceRect.left + surfaceRect.width / 2),
+                ),
+              )
+            : -1,
+        centerDeltaY:
+          surfaceRect && nodeRect
+            ? Math.round(
+                Math.abs(
+                  nodeRect.top +
+                    nodeRect.height / 2 -
+                    (surfaceRect.top + surfaceRect.height / 2),
+                ),
+              )
+            : -1,
+        withinViewport:
+          Boolean(surfaceRect && nodeRect) &&
+          nodeRect.left >= surfaceRect.left - 1 &&
+          nodeRect.right <= surfaceRect.right + 1 &&
+          nodeRect.top >= surfaceRect.top - 1 &&
+          nodeRect.bottom <= surfaceRect.bottom + 1,
+      }
+    }, historyCanvasNodeIdsBefore)
+    await page.screenshot({ path: path.join(out, `${file}-history-import-centered.png`) })
     report.push({
       variant,
       surface: 'canvasKits',
@@ -1134,6 +1391,7 @@ try {
       sourceTabs,
       assetKinds,
       pinterestMounted,
+      pinterestLayout,
       clipperMounted,
       ...clipperState,
       clipperUncategorizedSelected,
@@ -1143,10 +1401,14 @@ try {
       referenceCards,
       referenceFolders,
       referenceUpload,
+      referenceEmptyActions,
+      referenceEmptyKitFolders,
+      referenceFilterClosedOnOutside,
       referenceExpandActions,
       referenceMenuActions,
       referenceMenuOpenActionWorks,
       referenceChipThumbLoaded,
+      referenceChipNoIconFlash,
       referenceChipShape,
       referenceFilteredCards,
       referenceFilteredFolders,
@@ -1184,6 +1446,15 @@ try {
       kitAssetChipThumbLoaded,
       shelfKitClickChipCount,
       shelfDetailChipCount,
+      kitFoldersBeforeReferenceDelete,
+      kitFoldersAfterReferenceDelete,
+      kitRemovedFromReference,
+      historyLoadMs,
+      historyLoadMoreMs,
+      historyPaginationBeforeMore,
+      historyPaginationAfterMore,
+      historySendMs,
+      historyImportPlacement,
       ...shelfState,
       referenceLightboxOpen: referenceLightbox.referenceLightboxOpen,
       referenceLightboxTitle: referenceLightbox.referenceLightboxTitle,
@@ -1209,6 +1480,7 @@ try {
       nodeChipShape,
       referenceChipShapeForCompare,
       nodeReferenceChipsMatch,
+      minimapClickPanned,
       selectionChrome,
       referenceNodesBeforeLightboxAdd,
       referenceNodesAfterLightboxAdd,

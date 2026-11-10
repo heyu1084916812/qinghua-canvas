@@ -1,4 +1,4 @@
-import type { StoragePort, TableName } from '../../platform/ports'
+import type { RowOf, StoragePort, TableName } from '../../platform/ports'
 import type { HistoryItem } from '../../domain/shared/assetHistory'
 import { buildHistory } from '../../domain/shared/assetHistory'
 import { byteLengthOf, normalizeMetaString } from '../../domain/shared/assetLibrary'
@@ -19,6 +19,15 @@ import { byteLengthOf, normalizeMetaString } from '../../domain/shared/assetLibr
  */
 export interface AssetHistoryRepository {
   list(): Promise<HistoryItem[]>
+  listPage(options?: {
+    offset?: number
+    limit?: number
+  }): Promise<{
+    items: HistoryItem[]
+    nextOffset: number
+    hasMore: boolean
+    totalRuns: number
+  }>
 }
 
 /**
@@ -28,14 +37,52 @@ export interface AssetHistoryRepository {
 const SCAN_BATCH = 128
 
 const TABLES: TableName[] = ['runRecords', 'assets', 'assetLibrary', 'projects']
+export const ASSET_HISTORY_PAGE_SIZE = 30
+
+const RUN_FIELDS = [
+  'id',
+  'projectId',
+  'createdAt',
+  'outputHashes',
+  'outputWidth',
+  'outputHeight',
+  'params',
+  'sentModel',
+  'sentChannelId',
+] as const
 
 export function createAssetHistoryRepository(storage: StoragePort): AssetHistoryRepository {
   return {
     async list() {
       const [runs, library, projects] = await Promise.all([
-        storage.query('runRecords', {}),
-        storage.query('assetLibrary', {}),
-        storage.query('projects', {}),
+        storage.query(
+          'runRecords',
+          {},
+          {
+            includePayload: false,
+            fields: [
+              'id',
+              'projectId',
+              'createdAt',
+              'outputHashes',
+              'outputWidth',
+              'outputHeight',
+              'params',
+              'sentModel',
+              'sentChannelId',
+            ],
+          },
+        ),
+        storage.query(
+          'assetLibrary',
+          {},
+          { includePayload: false, fields: ['id', 'hash'] },
+        ),
+        storage.query(
+          'projects',
+          {},
+          { includePayload: false, fields: ['id', 'name'] },
+        ),
       ])
 
       /**
@@ -98,6 +145,117 @@ export function createAssetHistoryRepository(storage: StoragePort): AssetHistory
         projects: projects as never,
         includeFailures: false,
       })
+    },
+    async listPage(options = {}) {
+      const offset = Math.max(0, options.offset ?? 0)
+      const limit = Math.max(1, options.limit ?? ASSET_HISTORY_PAGE_SIZE)
+      let runRows: RowOf<'runRecords'>[]
+      let totalRuns: number
+      if (storage.queryPage) {
+        const page = await storage.queryPage('runRecords', {}, {
+          includePayload: false,
+          fields: RUN_FIELDS,
+          orderBy: { field: 'createdAt', direction: 'desc' },
+          offset,
+          limit,
+        })
+        runRows = page.rows
+        totalRuns = page.total
+      } else {
+        const allRuns = await storage.query('runRecords', {}, {
+          includePayload: false,
+          fields: RUN_FIELDS,
+        })
+        const sorted = [...allRuns].sort(
+          (left, right) =>
+            Number(right.createdAt ?? 0) - Number(left.createdAt ?? 0),
+        )
+        runRows = sorted.slice(offset, offset + limit)
+        totalRuns = sorted.length
+      }
+      const outputHashes = [
+        ...new Set(
+          runRows.flatMap((run) =>
+            Array.isArray(run.outputHashes)
+              ? run.outputHashes.filter(
+                  (hash): hash is string =>
+                    typeof hash === 'string' && hash.length > 0,
+                )
+              : [],
+          ),
+        ),
+      ]
+      const [assetRows, library, projects] = await Promise.all([
+        outputHashes.length === 0
+          ? Promise.resolve([])
+          : storage.queryPage
+            ? storage
+                .queryPage('assets', {}, {
+                  ids: outputHashes,
+                  includePayload: false,
+                  fields: ['id', 'hash', 'mime', 'width', 'height', 'bytesLength'],
+                })
+                .then((page) => page.rows)
+            : storage
+                .query('assets', {}, {
+                  includePayload: false,
+                  fields: ['id', 'hash', 'mime', 'width', 'height', 'bytesLength'],
+                })
+                .then((rows) =>
+                  rows.filter((row) =>
+                    outputHashes.includes(String(row.id)),
+                  ),
+                ),
+        storage.query(
+          'assetLibrary',
+          {},
+          { includePayload: false, fields: ['id', 'hash'] },
+        ),
+        storage.query(
+          'projects',
+          {},
+          { includePayload: false, fields: ['id', 'name'] },
+        ),
+      ])
+      const normalizedAssets = assetRows.map((row) => {
+        const asset = row as {
+          id?: unknown
+          hash?: unknown
+          mime?: unknown
+          width?: unknown
+          height?: unknown
+          bytes?: unknown
+          bytesLength?: unknown
+        }
+        return {
+          hash: normalizeMetaString(asset.hash ?? asset.id),
+          mime: normalizeMetaString(asset.mime),
+          width: typeof asset.width === 'number' ? asset.width : undefined,
+          height: typeof asset.height === 'number' ? asset.height : undefined,
+          bytes: asset.bytesLength ?? asset.bytes,
+        }
+      })
+      const items = buildHistory({
+        runs: runRows as never,
+        assets: normalizedAssets as never,
+        savedHashes: library
+          .map((row) =>
+            normalizeMetaString(
+              (row as { hash?: unknown; id?: unknown }).hash ??
+                (row as { id?: unknown }).id,
+            ),
+          )
+          .filter((hash): hash is string => Boolean(hash)),
+        projects: projects as never,
+        includeFailures: false,
+      })
+      const nextOffset = offset + runRows.length
+      return {
+        items,
+        nextOffset,
+        hasMore: nextOffset < totalRuns,
+        totalRuns,
+      }
     },
   }
 }

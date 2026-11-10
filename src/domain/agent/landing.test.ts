@@ -3,6 +3,7 @@ import type { AgentPlan } from './plan'
 import {
   AGENT_LAYOUT_GAP,
   centeredAgentPlanOrigin,
+  centeredFreeRect,
   centeredNodeOrigin,
   findFreeRect,
   layoutAgentPlan,
@@ -213,5 +214,30 @@ describe('findFreeRect · 单个节点的落位', () => {
     const b = { x: 0, y: 348, w: 400, h: 300 }
     const spot = findFreeRect(rect, [a, b])
     expect(spot.y).toBe(b.y + b.h + AGENT_LAYOUT_GAP)
+  })
+})
+
+describe('centeredFreeRect', () => {
+  const viewport = { x: 100, y: 100, w: 1000, h: 700 }
+  const size = { w: 300, h: 200 }
+
+  it('center first when the viewport center is free', () => {
+    expect(centeredFreeRect(size, viewport, [])).toEqual({
+      x: 450,
+      y: 350,
+      w: 300,
+      h: 200,
+    })
+  })
+
+  it('moves to a visible near-center slot instead of pushing below the viewport', () => {
+    const centerBlock = { x: 450, y: 350, w: 300, h: 200 }
+    const spot = centeredFreeRect(size, viewport, [centerBlock])
+
+    expect(spot.x).toBeGreaterThanOrEqual(viewport.x)
+    expect(spot.y).toBeGreaterThanOrEqual(viewport.y)
+    expect(spot.x + spot.w).toBeLessThanOrEqual(viewport.x + viewport.w)
+    expect(spot.y + spot.h).toBeLessThanOrEqual(viewport.y + viewport.h)
+    expect(spot).not.toEqual(centerBlock)
   })
 })

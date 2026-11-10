@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { createMemoryStorage } from '../../platform/memory'
 import type { Row, TableName } from '../../platform/ports'
 import type { LibraryAsset } from '../../domain/shared/assetLibrary'
@@ -225,6 +225,94 @@ describe('素材库 store', () => {
     expect(store.getState().historyVisible).toHaveLength(0)
     expect(await storage.query('assets', {})).toHaveLength(2)
     expect(await storage.query('runRecords', {})).toHaveLength(0)
+  })
+
+  it('生成历史首屏只查 30 条，加载更多再取下一页', async () => {
+    const runRecords = Array.from({ length: 300 }, (_, index) => ({
+      id: `run-${index}`,
+      projectId: 'p1',
+      createdAt: 10_000 - index,
+      status: 'succeeded',
+      inputs: [],
+      params: { prompt: `历史 ${index}` },
+      outputHashes: [`history-${index}`],
+    }))
+    const { storage, repo } = seedStorage({ runRecords })
+    const queryPage = vi.spyOn(storage, 'queryPage')
+    const store = createAssetLibraryStore(
+      repo,
+      createAssetHistoryRepository(storage),
+    )
+
+    await Promise.all([store.load(), store.load()])
+
+    expect(store.getState().history).toHaveLength(30)
+    expect(store.getState().historyHasMore).toBe(true)
+    expect(store.getState().historyNextOffset).toBe(30)
+    expect(store.getState().historyTotalRuns).toBe(300)
+    expect(queryPage).toHaveBeenCalledWith(
+      'runRecords',
+      {},
+      expect.objectContaining({ offset: 0, limit: 30 }),
+    )
+    expect(
+      queryPage.mock.calls.filter(([table]) => table === 'runRecords'),
+    ).toHaveLength(1)
+
+    await store.loadMoreHistory()
+
+    expect(store.getState().history).toHaveLength(60)
+    expect(store.getState().historyHasMore).toBe(true)
+    expect(store.getState().historyNextOffset).toBe(60)
+    expect(store.getState().historyLoadingMore).toBe(false)
+  })
+
+  it('分页追加载到旧记录时，同一 hash 仍保留最新一次生成元数据', async () => {
+    const runRecords = [
+      {
+        id: 'run-new',
+        projectId: 'p1',
+        createdAt: 1_000,
+        status: 'succeeded',
+        inputs: [],
+        params: { prompt: '新版本' },
+        outputHashes: ['shared-history'],
+      },
+      ...Array.from({ length: 29 }, (_, index) => ({
+        id: `run-${index}`,
+        projectId: 'p1',
+        createdAt: 999 - index,
+        status: 'succeeded',
+        inputs: [],
+        params: { prompt: `历史 ${index}` },
+        outputHashes: [`history-${index}`],
+      })),
+      {
+        id: 'run-old',
+        projectId: 'p1',
+        createdAt: 500,
+        status: 'succeeded',
+        inputs: [],
+        params: { prompt: '旧版本' },
+        outputHashes: ['shared-history'],
+      },
+    ]
+    const { storage, repo } = seedStorage({ runRecords })
+    const store = createAssetLibraryStore(
+      repo,
+      createAssetHistoryRepository(storage),
+    )
+
+    await store.load()
+    await store.loadMoreHistory()
+
+    const shared = store
+      .getState()
+      .history.find(
+        (item) => item.kind === 'output' && item.hash === 'shared-history',
+      )
+    expect(shared?.kind === 'output' ? shared.prompt : undefined).toBe('新版本')
+    expect(store.getState().history).toHaveLength(30)
   })
 })
 

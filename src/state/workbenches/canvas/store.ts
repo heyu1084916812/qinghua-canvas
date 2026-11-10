@@ -249,6 +249,9 @@ export interface CanvasStore extends AppStore<GraphSnapshot, Command> {
   getEdgeSelection(): string[]
   setViewport(vp: Partial<Viewport>): void
   getViewport(): Viewport
+  /** 当前画布可见区尺寸；纯运行时值，用于小地图与跨页面落点。 */
+  setSurfaceSize(size: Size): void
+  getSurfaceSize(): Size | null
   /** 只订阅视口变化；平移 / 缩放帧不唤醒全量的视图订阅者。 */
   subscribeViewport(listener: () => void): () => void
   /** 测试与卸载时手动冲刷防抖持久化 */
@@ -609,6 +612,7 @@ export function createCanvasStore(opts: CanvasStoreOptions): CanvasStore {
    * 收在命令进入 reducer 之前，任何新入口自动继承。
    */
   let nodeScale = 1
+  let surfaceSize: Size | null = null
 
   function dispatch(cmd: Command, txOverride?: TransactionBoundary): CommandResult {
     /** 只在"调用方没给尺寸"时补：显式尺寸是调用方的版面决定，不许被偏好改掉 */
@@ -717,6 +721,13 @@ export function createCanvasStore(opts: CanvasStoreOptions): CanvasStore {
       }
     },
     getViewport: () => store.getState().viewport,
+    setSurfaceSize: (size) => {
+      surfaceSize = {
+        w: Math.max(0, size.w),
+        h: Math.max(0, size.h),
+      }
+    },
+    getSurfaceSize: () => surfaceSize,
     flush: () => persister.flush(),
     hydrate: (snapshot) => {
       store.setState({ graph: snapshot })

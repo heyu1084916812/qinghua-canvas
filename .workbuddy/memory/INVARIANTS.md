@@ -1,5 +1,12 @@
 # CanvasFlow 不变量详表
 
+## 生成历史首屏分页（2026-11-10）
+- 生成历史页面只能从 `AssetHistoryRepository.listPage({offset:0,limit:30})` 进入；首屏不得调用全量 `list()` 或整表扫 `runRecords`。
+- 每页素材元数据必须按该页 `outputHashes` 用 `queryPage('assets', {}, {ids})` 批量点查，`includePayload:false`，不能读图片字节。sqlite-v2 只允许 id/projectId 过滤与 hash 排序，其他条件要明确报错。
+- `AssetLibraryStore.load()` 必须用 `loading/loaded` 做并发幂等，StrictMode 下只能发一套 runRecords + assets 请求。`loadMoreHistory()` 每次 +30，同 hash 跨页合并时保留较新的 `createdAt`。
+- 生成历史路由必须空闲预热，侧栏 `/assets` 在 pointerenter/focus 再预取；真实导航仍要能重试失败 chunk。
+- 性能证据使用 sqlite-v2 和 600 条历史：首屏 30 条、加载更多 60 条；最终四组 1440×900 / 1024×700 × 明暗首屏 133–922ms（后三组 132–275ms）、加载更多 72–223ms，`pageOverflowX=false / errors=[]`。
+
 ## Agent 媒体 chip 与套件卡片动作（2026-11-10）
 - `node` 与 `reference` 是同一类媒体引用：只能从 `MentionEditor.mentionChipViewOf` 取描述，正文用 `MentionChipView`；禁止任一入口单独写图标/名称结构。两类都显示真实缩略图时，基准尺寸为 144×26px、缩略图 18×18px，四组 UI 证据必须同时比较 class 与几何。
 - 套件图片、颜色、字体三点必须在主视觉下方的同一 `mediaMeta` 行：标签 `flex:1`，按钮 `flex:0 0 22px`，按钮 `position:static`。禁止用 `absolute` 三点覆盖色块、字体卡或描述。

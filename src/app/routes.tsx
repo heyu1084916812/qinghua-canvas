@@ -62,9 +62,15 @@ const ProjectsPage = lazy(() =>
   import('../pages/ProjectsPage/ProjectsPage').then((m) => ({ default: m.ProjectsPage })),
 )
 
+const loadAssetsPage = () => import('../pages/AssetsPage/AssetsPage')
 const AssetsPage = lazy(() =>
-  import('../pages/AssetsPage/AssetsPage').then((m) => ({ default: m.AssetsPage })),
+  loadAssetsPage().then((m) => ({ default: m.AssetsPage })),
 )
+
+/** 空闲时预热生成历史页；用户真正点击时只付数据查询和首屏渲染。 */
+export function preloadAssetsPage() {
+  return loadAssetsPage()
+}
 
 const SettingsPage = lazy(() =>
   import('../pages/SettingsPage/SettingsPage').then((m) => ({ default: m.SettingsPage })),

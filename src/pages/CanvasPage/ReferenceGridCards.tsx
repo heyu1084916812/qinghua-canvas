@@ -61,8 +61,15 @@ export function ReferenceCard({
         >
           <ReferenceMedia
             hash={item.assetHash}
+            url={item.url}
             title={item.title}
-            kind={item.kind === 'video' ? 'video' : 'image'}
+            kind={
+              item.kind === 'video'
+                ? 'video'
+                : item.kind === 'document'
+                  ? 'document'
+                  : 'image'
+            }
           />
         </button>
         <button
@@ -110,11 +117,13 @@ export function KitFolder({
   version,
   onAdd,
   onOpen,
+  onContextMenu,
 }: {
   kit: ContextKit
   version: ContextKitVersion | null
   onAdd: () => void
   onOpen: () => void
+  onContextMenu: (x: number, y: number) => void
 }) {
   const preview = version?.resources.find((item) => item.role === 'logo') ?? version?.resources[0]
   const url = useAsset(preview?.hash ?? '')
@@ -124,6 +133,19 @@ export function KitFolder({
       className={styles.kitFolderCard}
       data-my-assets-kit-folder={kit.id}
       onClick={onAdd}
+      onContextMenu={(event) => {
+        event.preventDefault()
+        onContextMenu(event.clientX, event.clientY)
+      }}
+      onKeyDown={(event) => {
+        if (event.key !== 'ContextMenu' && !(event.shiftKey && event.key === 'F10')) return
+        event.preventDefault()
+        const rect = event.currentTarget.getBoundingClientRect()
+        onContextMenu(
+          rect.left + Math.min(32, rect.width / 2),
+          rect.top + Math.min(32, rect.height / 2),
+        )
+      }}
     >
       <button
         type="button"

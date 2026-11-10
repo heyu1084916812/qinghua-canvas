@@ -1036,6 +1036,26 @@
       "budget": 111
     },
     {
+      "module": "src/features/shared/pinterest/PinterestSetupView.module.css",
+      "owner": "pinterest-ui",
+      "responsibility": "Pinterest 连接说明与开发者提示区的局部样式。",
+      "owns": [
+        "setup introduction",
+        "developer hint disclosure"
+      ],
+      "doesNotOwn": [
+        "OAuth network flow",
+        "credential storage"
+      ],
+      "publicApi": [
+        "CSS_MODULE:PinterestSetupView"
+      ],
+      "test": [
+        "scripts/smoke.mjs"
+      ],
+      "budget": 40
+    },
+    {
       "module": "src/features/shared/pinterest/PinterestImportView.tsx",
       "owner": "pinterest-ui",
       "responsibility": "Pinterest 收藏板、Pin 选择与导入动作的受控视图。",
@@ -6927,6 +6947,26 @@
       "budget": 600
     },
     {
+      "module": "src/pages/AssetsPage/assetCardProjection.ts",
+      "owner": "asset-library-ui",
+      "responsibility": "把生成历史产物投影成素材卡片共享数据形状，并格式化失败记录时间。",
+      "owns": [
+        "生成历史到素材卡片的数据映射"
+      ],
+      "doesNotOwn": [
+        "历史分页查询",
+        "素材卡片渲染"
+      ],
+      "publicApi": [
+        "cardAssetOf",
+        "timeLabelOf"
+      ],
+      "test": [
+        "src/pages/AssetsPage/assetCardProjection.test.ts"
+      ],
+      "budget": 60
+    },
+    {
       "module": "src/pages/CanvasPage/ReferenceSourcePanel.tsx",
       "owner": "canvas-reference-source",
       "responsibility": "展示项目参考的上传卡、媒体卡与套件文件夹，处理上传、加入 Agent、灯箱和文件夹导航。",
@@ -6949,6 +6989,68 @@
         "src/app/uiSevenPoints.test.ts"
       ],
       "budget": 380
+    },
+    {
+      "module": "src/pages/CanvasPage/referenceSourceAdd.ts",
+      "owner": "canvas-reference-source",
+      "responsibility": "校验链接并构造项目参考条目，把链接与已收藏素材写入参考台账。",
+      "owns": [
+        "链接协议与媒体类型校验",
+        "链接/素材参考条目投影"
+      ],
+      "doesNotOwn": [
+        "参考台账持久化",
+        "Agent 上下文注入"
+      ],
+      "publicApi": [
+        "addReferenceLink",
+        "addReferenceAsset"
+      ],
+      "test": [
+        "src/pages/CanvasPage/referenceSourceAdd.test.ts"
+      ],
+      "budget": 90
+    },
+    {
+      "module": "src/pages/CanvasPage/ReferenceEmptyState.tsx",
+      "owner": "canvas-reference-source",
+      "responsibility": "项目参考为空时提供上传、链接、已收藏素材和连接器入口。",
+      "owns": [
+        "参考空态菜单",
+        "链接与素材选择表单",
+        "连接器跳转"
+      ],
+      "doesNotOwn": [
+        "参考台账持久化",
+        "项目参考卡片瀑布"
+      ],
+      "publicApi": [
+        "ReferenceEmptyState"
+      ],
+      "test": [
+        "src/pages/CanvasPage/ReferenceEmptyState.test.ts"
+      ],
+      "budget": 230
+    },
+    {
+      "module": "src/pages/CanvasPage/ReferenceEmptyState.module.css",
+      "owner": "canvas-reference-source-style",
+      "responsibility": "定义项目参考空态的插画、入口按钮和选择浮层样式。",
+      "owns": [
+        "空态插画与入口布局",
+        "链接/素材选择浮层"
+      ],
+      "doesNotOwn": [
+        "项目参考卡片瀑布样式",
+        "全局主题令牌"
+      ],
+      "publicApi": [
+        "CSS_MODULE:ReferenceEmptyState"
+      ],
+      "test": [
+        "src/pages/CanvasPage/ReferenceEmptyState.test.ts"
+      ],
+      "budget": 240
     },
     {
       "module": "src/pages/CanvasPage/ReferenceSourcePanel.module.css",

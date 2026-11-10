@@ -52,7 +52,6 @@ export function PinterestPanel({ onClose }: { onClose: () => void }) {
   const [status, setStatus] = useState('')
   const controllerRef = useRef<AbortController | null>(null)
   const activeOauthStateRef = useRef('')
-  const closeRef = useRef<HTMLButtonElement>(null)
   const canvasReady = Boolean(activeCanvasId())
 
   const refresh = useCallback(async () => {
@@ -69,7 +68,6 @@ export function PinterestPanel({ onClose }: { onClose: () => void }) {
   }, [refresh])
 
   useEffect(() => {
-    closeRef.current?.focus()
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') onClose()
     }
@@ -103,7 +101,7 @@ export function PinterestPanel({ onClose }: { onClose: () => void }) {
       })
       setConnection(next)
       setClientSecret('')
-      setStatus('Pinterest OAuth 应用配置已加密保存在本机。')
+      setStatus('Pinterest 应用配置已加密保存在本机。')
     } catch (error) {
       setStatus(`保存失败：${errorText(error)}`)
     } finally {
@@ -113,9 +111,9 @@ export function PinterestPanel({ onClose }: { onClose: () => void }) {
 
   const exchangeCode = async (code: string) => {
     const stored = await loadPinterestConnection(platform.storage, platform.credentials)
-    if (!stored?.hasClientSecret) throw new Error('请先保存 Client Secret')
+    if (!stored?.hasClientSecret) throw new Error('请先保存应用密钥')
     const secret = await platform.credentials.load('oauth:pinterest:client-secret')
-    if (!secret) throw new Error('Client Secret 已丢失，请重新填写')
+    if (!secret) throw new Error('应用密钥已丢失，请重新填写')
     const controller = newController()
     const api = createPinterestApi(platform.network)
     const token = await api.exchangeCode(
@@ -305,7 +303,7 @@ export function PinterestPanel({ onClose }: { onClose: () => void }) {
       await refresh()
       setBoards([])
       setPins([])
-      setStatus('已断开 Pinterest 账号，OAuth 应用配置仍保留。')
+      setStatus('已断开 Pinterest 账号，应用配置仍保留。')
     } catch (error) {
       setStatus(`断开失败：${errorText(error)}`)
     } finally {
@@ -346,16 +344,8 @@ export function PinterestPanel({ onClose }: { onClose: () => void }) {
         <header className={styles.head}>
           <div>
             <h2>Pinterest 收藏</h2>
-            <p>登录你自己的 Pinterest，读取收藏板图片，再保存到素材库或导入当前画布。</p>
+            <p>连接账号后读取收藏板，把图片保存到素材库或当前画布。</p>
           </div>
-          <button
-            ref={closeRef}
-            type="button"
-            className={styles.close}
-            onClick={onClose}
-          >
-            关闭
-          </button>
         </header>
 
         {!connected ? (

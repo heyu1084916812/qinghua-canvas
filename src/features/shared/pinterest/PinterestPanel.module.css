@@ -56,7 +56,6 @@
   line-height: 1.5;
 }
 
-.close,
 .primary,
 .secondary,
 .danger,
@@ -88,7 +87,6 @@
   color: var(--accent);
 }
 
-.close:disabled,
 .primary:disabled,
 .secondary:disabled,
 .danger:disabled {
@@ -101,13 +99,6 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
-}
-
-.step {
-  padding: var(--space-4);
-  border: var(--border);
-  border-radius: var(--radius-control);
-  background: var(--bg-subtle);
 }
 
 .fields {
@@ -123,12 +114,6 @@
   min-width: 0;
   color: var(--text-3);
   font-size: var(--fs-chip);
-}
-
-.fields small {
-  color: var(--text-3);
-  font-size: var(--fs-chip);
-  line-height: 1.5;
 }
 
 .wide {
@@ -147,6 +132,12 @@
   background: var(--bg-surface);
   color: var(--text-1);
   font: inherit;
+  font-size: var(--fs-label);
+}
+
+.fields input::placeholder,
+.manual input::placeholder {
+  color: var(--text-3);
 }
 
 .actions {

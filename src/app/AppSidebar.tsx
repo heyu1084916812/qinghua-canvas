@@ -36,6 +36,7 @@ import {
   getActiveCanvasRevision,
   subscribeActiveCanvas,
 } from '../state/project/activeCanvas'
+import { preloadAssetsPage } from './routes'
 
 /**
  * 应用壳左侧功能栏（产品文档 §2.2 / 架构文档 §5.10）。
@@ -396,6 +397,14 @@ export function AppSidebar() {
         )}
         {NAV.map((item) => {
           const Icon = item.icon
+          const preloadOnIntent =
+            item.to === '/assets'
+              ? () => {
+                  void preloadAssetsPage().catch(() => {
+                    /* 真正导航时仍会重试 */
+                  })
+                }
+              : undefined
           return (
             <Link
               key={item.to}
@@ -418,6 +427,8 @@ export function AppSidebar() {
               }
               data-sidebar-item={item.to}
               title={item.label}
+              onPointerEnter={preloadOnIntent}
+              onFocus={preloadOnIntent}
             >
               <span className={styles.itemIcon} aria-hidden="true">
                 <Icon size={20} />
