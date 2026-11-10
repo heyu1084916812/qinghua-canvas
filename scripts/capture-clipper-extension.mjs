@@ -87,6 +87,7 @@ try {
     viewport: { width: 1440, height: 900 },
     variant: 'huaban-card',
   }))
+  report.push(await captureHuabanApiOriginal())
   await writeFile(
     resolve(output, 'report.json'),
     `${JSON.stringify(report, null, 2)}\n`,
@@ -94,6 +95,169 @@ try {
   console.log(`extension evidence: ${resolve(output, 'report.json')}`)
 } finally {
   await browser.close()
+}
+
+async function captureHuabanApiOriginal() {
+  const context = await browser.newContext({
+    viewport: { width: 1440, height: 900 },
+    colorScheme: 'light',
+  })
+  const page = await context.newPage()
+  const errors = []
+  page.on('pageerror', (error) => errors.push(String(error)))
+  page.on('console', (message) => {
+    if (message.type() === 'error') errors.push(message.text())
+  })
+  await context.route('https://huaban.com/discovery', (route) => route.fulfill({
+    status: 200,
+    contentType: 'text/html; charset=utf-8',
+    body: `<!doctype html>
+      <title>花瓣采集测试</title>
+      <main>
+        <a href="/pins/12345" style="display:block;position:relative">
+          <img id="source-image" alt="内容图占位"
+            src="https://cdn.dancf.com/fe-assets/img/default-smiley.png"
+            style="display:block;width:320px;height:240px;object-fit:cover">
+          <button data-card-action type="button"
+            style="position:absolute;left:12px;top:12px;width:52px;height:52px;border:0;padding:0;background:transparent">
+            <img class="avatar" alt="用户头像" src="https://cdn.example.com/avatar.png"
+              style="width:44px;height:44px;border-radius:50%">
+          </button>
+        </a>
+      </main>`,
+  }))
+  await context.route('https://huaban.com/v3/pins/12345', (route) => route.fulfill({
+    status: 200,
+    contentType: 'application/json; charset=utf-8',
+    body: JSON.stringify({
+      pin: {
+        pin_id: 12345,
+        file: {
+          url: 'https://gd-hbimg.huaban.com/huaban-real-original',
+          key: 'huaban-real-original',
+          type: 'image/webp',
+          width: 1200,
+          height: 1600,
+        },
+      },
+    }),
+  }))
+  await context.route('https://cdn.dancf.com/**', (route) => route.fulfill({
+    status: 200,
+    contentType: 'image/png',
+    body: Buffer.from(
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAFgwJ/lYQ7WQAAAABJRU5ErkJggg==',
+      'base64',
+    ),
+  }))
+  await context.route('https://cdn.example.com/**', (route) => route.fulfill({
+    status: 200,
+    contentType: 'image/png',
+    body: Buffer.from(
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAFgwJ/lYQ7WQAAAABJRU5ErkJggg==',
+      'base64',
+    ),
+  }))
+  await page.goto('https://huaban.com/discovery', { waitUntil: 'domcontentloaded' })
+  await page.evaluate(() => {
+    globalThis.__qinghuaMessages = []
+    Object.defineProperty(globalThis, 'chrome', {
+      configurable: true,
+      value: {
+        runtime: {
+          sendMessage: async (message) => {
+            globalThis.__qinghuaMessages.push(message)
+            return { ok: true }
+          },
+          onMessage: {
+            addListener: () => undefined,
+            removeListener: () => undefined,
+          },
+        },
+      },
+    })
+  })
+  await page.addScriptTag({
+    path: resolve(extensionRoot, 'drop-target.js'),
+  })
+  await page.locator('[data-qinghua-drop-target]').waitFor({
+    state: 'attached',
+    timeout: 5_000,
+  })
+  await page.evaluate(() => {
+    const source = document.querySelector('[data-card-action]')
+    const bounds = source.getBoundingClientRect()
+    const dataTransfer = new DataTransfer()
+    dataTransfer.setData(
+      'text/uri-list',
+      'https://cdn.dancf.com/fe-assets/img/default-smiley.png',
+    )
+    source.dispatchEvent(new DragEvent('dragstart', {
+      bubbles: true,
+      cancelable: true,
+      dataTransfer,
+      clientX: bounds.left + bounds.width / 2,
+      clientY: bounds.top + bounds.height / 2,
+    }))
+  })
+  await page.waitForFunction(
+    () => document.querySelector('[data-qinghua-drop-target]')
+      ?.getAttribute('data-qinghua-drop-visible') === 'true',
+    { timeout: 5_000 },
+  )
+  await page.evaluate(() => {
+    const host = document.querySelector('[data-qinghua-drop-target]')
+    const dataTransfer = new DataTransfer()
+    dataTransfer.setData(
+      'text/uri-list',
+      'https://cdn.dancf.com/fe-assets/img/default-smiley.png',
+    )
+    host.dispatchEvent(new DragEvent('drop', {
+      bubbles: true,
+      cancelable: true,
+      composed: true,
+      dataTransfer,
+    }))
+  })
+  await page.waitForFunction(
+    () => (globalThis.__qinghuaMessages?.length ?? 0) > 0,
+    { timeout: 5_000 },
+  )
+  const metrics = await page.evaluate(() => {
+    const host = document.querySelector('[data-qinghua-drop-target]')
+    const messages = globalThis.__qinghuaMessages ?? []
+    return {
+      status: host?.getAttribute('data-qinghua-drop-status') ?? '',
+      error: host?.getAttribute('data-qinghua-drop-error') === 'true',
+      messages,
+      selectedImageUrl: messages.at(-1)?.imageUrl ?? '',
+      selectedCandidates: messages.at(-1)?.imageUrls ?? [],
+      overflowX:
+        document.documentElement.scrollWidth > document.documentElement.clientWidth + 1,
+    }
+  })
+  await page.screenshot({
+    path: resolve(output, 'light-huaban-api-original-saved.png'),
+  })
+  await context.close()
+  const passed = metrics.selectedImageUrl
+    === 'https://gd-hbimg.huaban.com/huaban-real-original'
+    && metrics.selectedCandidates.includes(
+      'https://gd-hbimg-edge.huaban.com/huaban-real-original',
+    )
+    && !metrics.selectedCandidates.some((url) => url.includes('dancf.com/fe-assets'))
+  if (!passed) {
+    throw new Error(`Huaban API original failed: ${JSON.stringify(metrics)}`)
+  }
+  return {
+    name: 'light-huaban-api-original',
+    theme: 'light',
+    viewport: { width: 1440, height: 900 },
+    variant: 'huaban-api-original',
+    passed,
+    errors,
+    ...metrics,
+  }
 }
 
 async function capturePopup({ name, theme, dragMode, online }) {

@@ -795,6 +795,25 @@
       ],
       "budget": 120
     },
+      {
+        "module": "src/domain/inspiration/clipperPlaceholder.ts",
+        "owner": "clipper-collection-rules",
+        "responsibility": "识别花瓣等站点返回的分享图占位资源，避免其进入网页收藏。",
+        "owns": [
+          "已知站点占位图 URL 判定"
+        ],
+        "doesNotOwn": [
+          "采集编排",
+          "图片字节校验"
+        ],
+        "publicApi": [
+          "isKnownClipperPlaceholderImageUrl"
+        ],
+        "test": [
+          "src/domain/inspiration/clipperPlaceholder.test.ts"
+        ],
+        "budget": 40
+      },
     {
       "module": "src/state/shared/clipperCollectionRepository.ts",
       "owner": "clipper-collection-persistence",
@@ -941,6 +960,27 @@
       ],
       "budget": 80
     },
+      {
+        "module": "src/pages/CanvasPage/clipper/clipperCandidateValidation.ts",
+        "owner": "clipper-capture",
+        "responsibility": "批量校验单页候选图片，汇总有效原图与不可导入原因。",
+        "owns": [
+          "候选图片去重校验",
+          "有效 URL 与警告汇总"
+        ],
+        "doesNotOwn": [
+          "单图字节校验规则",
+          "网页抓取编排",
+          "收藏持久化"
+        ],
+        "publicApi": [
+          "validateClipperImageCandidates"
+        ],
+        "test": [
+          "src/pages/CanvasPage/clipper/clipperCapture.test.ts"
+        ],
+        "budget": 60
+      },
     {
       "module": "src/pages/CanvasPage/clipper/clipperQueueCapture.ts",
       "owner": "clipper-capture",

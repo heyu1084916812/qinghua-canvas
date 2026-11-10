@@ -1,5 +1,14 @@
 # CanvasFlow 不变量详表
 
+## Clipper 真实图片与花瓣 Pin 适配（2026-11-11）
+- 网页 Clipper 的“成功”只以真实图片字节落库为准，不以 `/clip` 返回 200、队列已发送或页面有 `og:image` 为准。单图必须经 `validateClipperImage`，网页多图必须经 `validateClipperImageCandidates` 后才能 upsert。
+- `cdn.dancf.com/fe-assets/*` 是花瓣站点界面/分享资源，不得作为收藏主图或备用原图。`normalizeClipperItems` 必须继续过滤该域路径，避免历史错误卡片重新出现。
+- 花瓣 Pin 适配只允许从当前卡片对应的 `/pins/{id}` 或 `data-pin-id` 取 ID，再请求同源 `/v3/pins/{id}`。`credentials:include` 只使用当前用户已有页面会话，不读取 Cookie、不导出 token、不跨站复用。
+- Pin API 的 `file.url` 优先，`file.key` 生成的边缘 CDN 作为后备；API 失败时只允许使用经过占位图/UI 图过滤的 DOM 候选，不能退回整页分享图。
+- 图片两侧都小于 64 时拒绝导入，按站点图标/占位图处理。若确需小图标，走本地上传；不得为少数场景放宽网页采集门禁。
+- 永久无效的占位图应作为不可重试失败 ack 清理；临时网络错误和 5xx/567 抗爬响应才保留重试。不能把所有失败都留成每 3 秒循环。
+- 扩展文件复制到稳定目录不等于 Chrome 已重载旧代码。浏览器安全边界要求用户在扩展页点击一次“重新加载”；应用不得宣称静默完成。
+
 ## Clipper 全站注入与待收确认（2026-11-11）
 - 普通 HTTP/HTTPS 全站访问必须是固定 `host_permissions`，不能退回 `optional_host_permissions` 逐站授权。全局开关打开后，已打开标签页立即注入，新标签页通过持久 content script 自动注入。
 - `chrome://`、`edge://`、扩展商店等浏览器保护页永远不属于可注入范围；UI/文档不得承诺“所有 URL 无一例外”。

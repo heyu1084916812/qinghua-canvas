@@ -123,13 +123,13 @@ try {
   const report = {
     ok:
       before.extension.stableVersion === '0.4.2'
-      && before.extension.bundledVersion === '0.4.5'
+      && before.extension.bundledVersion === '0.4.6'
       && before.extension.needsUpdate === true
       && update.updated === true
-      && after.extension.stableVersion === '0.4.5'
+      && after.extension.stableVersion === '0.4.6'
       && after.extension.needsUpdate === false
       && after.extension.reloadRequired === true
-      && finalManifest.version === '0.4.5'
+      && finalManifest.version === '0.4.6'
       && stagingLeftovers.length === 0,
     before: before.extension,
     update,

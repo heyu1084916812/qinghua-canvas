@@ -20,7 +20,7 @@ const html = `<!doctype html>
 const PNG = Uint8Array.from([
   0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a,
   0x00, 0x00, 0x00, 0x0d, 0x49, 0x48, 0x44, 0x52,
-  0x00, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00, 0x02,
+  0x00, 0x00, 0x00, 0x40, 0x00, 0x00, 0x00, 0x40,
   0x08, 0x06, 0x00, 0x00, 0x00, 0x1f, 0x15, 0xc4,
   0x89,
 ])
@@ -40,13 +40,16 @@ function imageResponse(bytes = PNG) {
 
 describe('captureClipperPage', () => {
   it('uses one explicit public page and persists its real preview', async () => {
-    const request = vi.fn<NetworkPort['request']>(async () => ({
-      status: 200,
-      headers: { 'content-type': 'text/html' },
-      text: async () => html,
-      json: async <T,>() => ({}) as T,
-      arrayBuffer: async () => new ArrayBuffer(0),
-    }))
+    const request = vi.fn<NetworkPort['request']>(async (input) =>
+      input.url.endsWith('/chair.jpg')
+        ? imageResponse()
+        : {
+            status: 200,
+            headers: { 'content-type': 'text/html' },
+            text: async () => html,
+            json: async <T,>() => ({}) as T,
+            arrayBuffer: async () => new ArrayBuffer(0),
+          })
     const platform = createMemoryPlatform()
     const collection = createClipperCollectionRepository(platform.storage)
 
@@ -57,7 +60,10 @@ describe('captureClipperPage', () => {
       signal: new AbortController().signal,
     })
 
-    expect(request).toHaveBeenCalledTimes(1)
+    expect(request.mock.calls.map((call) => call[0].url)).toEqual([
+      'https://example.com/oak-chair',
+      'https://example.com/chair.jpg',
+    ])
     expect(result.items).toEqual([
       expect.objectContaining({
         title: 'Oak chair',
@@ -65,6 +71,34 @@ describe('captureClipperPage', () => {
       }),
     ])
     expect(result.collection).toHaveLength(1)
+  })
+
+  it('never persists a site-share placeholder as a page image', async () => {
+    const placeholderHtml = [
+      '<meta property="og:title" content="花瓣" />',
+      '<meta property="og:image" content="https://cdn.dancf.com/fe-assets/img/default-smiley.png" />',
+    ].join('')
+    const request = vi.fn<NetworkPort['request']>(async () => ({
+      status: 200,
+      headers: { 'content-type': 'text/html' },
+      text: async () => placeholderHtml,
+      json: async <T,>() => ({}) as T,
+      arrayBuffer: async () => new ArrayBuffer(0),
+    }))
+    const platform = createMemoryPlatform()
+    const collection = createClipperCollectionRepository(platform.storage)
+
+    const result = await captureClipperPage({
+      url: 'https://huaban.com/discovery',
+      network: { request, stream: async function* () {} },
+      collection,
+      signal: new AbortController().signal,
+    })
+
+    expect(request).toHaveBeenCalledTimes(1)
+    expect(result.items).toEqual([])
+    expect(result.collection).toEqual([])
+    expect(result.warnings.join(' ')).toContain('分享图或占位图')
   })
 })
 
@@ -135,6 +169,25 @@ describe('captureClipperImage', () => {
       signal: new AbortController().signal,
       collection,
     })).rejects.toThrow('没有识别到可导入的图片')
+  })
+
+  it('rejects small UI images that are commonly site placeholders', async () => {
+    const platform = createMemoryPlatform()
+    const collection = createClipperCollectionRepository(platform.storage)
+    const tinyPng = PNG.slice()
+    tinyPng.set([0x00, 0x00, 0x00, 0x20], 16)
+    tinyPng.set([0x00, 0x00, 0x00, 0x20], 20)
+
+    await expect(captureClipperImage({
+      pageUrl: 'https://example.com/collection',
+      imageUrl: 'https://cdn.example.com/tiny.png',
+      network: {
+        request: vi.fn(async () => imageResponse(tinyPng)),
+        stream: async function* () {},
+      },
+      signal: new AbortController().signal,
+      collection,
+    })).rejects.toThrow('图片太小')
   })
 
   it('falls back to another original URL for the same dragged image', async () => {

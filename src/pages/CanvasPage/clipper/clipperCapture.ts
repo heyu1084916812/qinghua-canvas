@@ -7,6 +7,7 @@ import {
   samePageUrl,
   validateClipperImage,
 } from './clipperImageValidation'
+import { validateClipperImageCandidates } from './clipperCandidateValidation'
 import type { ClipperCollectionRepository } from '../../../state/shared/clipperCollectionRepository'
 
 export interface ClipperCaptureResult { items: ClipperItem[]; collection: ClipperItem[]; warnings: string[] }
@@ -103,11 +104,26 @@ export async function captureClipperPage(input: PageInput): Promise<ClipperCaptu
     { network: input.network, libraryCases: [] },
     input.signal,
   )
-  const now = Date.now()
-  const items = result.items
+  const candidates = result.items
     .filter((item) =>
       isPublicHttpUrl(item.url) && isPublicHttpUrl(item.imageUrl),
     )
+    .slice(0, input.maxResults ?? 12)
+  const validation = await validateClipperImageCandidates({
+    pageUrl: input.url,
+    imageUrls: candidates.map((item) => item.imageUrl),
+    network: input.network,
+    signal: input.signal,
+  })
+  const warnings = [...result.warnings, ...validation.warnings]
+  const validItems = candidates.filter((item) => validation.validUrls.has(item.imageUrl))
+  if (candidates.length > 0 && validItems.length === 0 && !warnings.some(
+    (warning) => warning.includes('分享图') || warning.includes('占位图'),
+  )) {
+    warnings.push('页面只返回了无法直接保存的图片，请改用轻画 Clipper 从图片本体拖拽')
+  }
+  const now = Date.now()
+  const items = validItems
     .map((item, index): ClipperItem => ({
       ...item,
       source: 'web',
@@ -119,7 +135,7 @@ export async function captureClipperPage(input: PageInput): Promise<ClipperCaptu
     collection: items.length > 0
       ? await input.collection.upsert(items)
       : await input.collection.load(),
-    warnings: result.warnings,
+    warnings,
   }
 }
 

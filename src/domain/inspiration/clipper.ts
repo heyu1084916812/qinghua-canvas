@@ -1,4 +1,5 @@
 import type { DesignResearchItem } from './designResearch'
+import { isKnownClipperPlaceholderImageUrl } from './clipperPlaceholder'
 
 export const CLIPPER_COLLECTION_KEY = 'clipper:collection:v1'
 export const CLIPPER_MAX_ITEMS = 200
@@ -10,8 +11,7 @@ export interface ClipperItem extends DesignResearchItem {
   category: string
 }
 export function normalizeClipperCategory(value: unknown): string {
-  const category = textOf(value).slice(0, CLIPPER_CATEGORY_MAX_LENGTH)
-  return category || CLIPPER_UNCATEGORIZED
+  return textOf(value).slice(0, CLIPPER_CATEGORY_MAX_LENGTH) || CLIPPER_UNCATEGORIZED
 }
 export function normalizeClipperCategories(value: unknown): string[] {
   if (!Array.isArray(value)) return []
@@ -36,8 +36,10 @@ export function normalizeClipperItems(value: unknown): ClipperItem[] {
     const title = textOf(row.title)
     const url = httpUrlOf(row.url)
     const imageUrl = httpUrlOf(row.imageUrl)
+    if (isKnownClipperPlaceholderImageUrl(imageUrl)) continue
     const imageUrls = Array.isArray(row.imageUrls)
       ? [...new Set(row.imageUrls.map(httpUrlOf).filter(Boolean))]
+        .filter((candidate) => !isKnownClipperPlaceholderImageUrl(candidate))
         .filter((candidate) => candidate !== imageUrl)
         .slice(0, 7)
       : []
@@ -102,9 +104,7 @@ function textOf(value: unknown): string {
   return typeof value === 'string' ? value.replace(/\s+/g, ' ').trim() : ''
 }
 function numberOf(value: unknown): number | undefined {
-  return typeof value === 'number' && Number.isFinite(value) && value > 0
-    ? Math.trunc(value)
-    : undefined
+  return typeof value === 'number' && Number.isFinite(value) && value > 0 ? Math.trunc(value) : undefined
 }
 function httpUrlOf(value: unknown): string {
   const raw = textOf(value)

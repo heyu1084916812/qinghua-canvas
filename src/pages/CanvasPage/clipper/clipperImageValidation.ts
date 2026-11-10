@@ -1,7 +1,10 @@
 import { DESIGN_RESEARCH_MAX_IMAGE_PIXELS } from '../../../domain/inspiration/designResearch'
+import { isKnownClipperPlaceholderImageUrl } from '../../../domain/inspiration/clipperPlaceholder'
 import { imageMimeFromBytes } from '../../../domain/shared/imageMime'
 import { imageSizeFromHeader } from '../../../domain/shared/imageSize'
 import type { NetworkPort } from '../../../platform/ports'
+
+const MIN_CLIPPER_IMAGE_EDGE = 64
 
 export class ClipperCaptureError extends Error {
   constructor(message: string, readonly retryable = true) {
@@ -28,6 +31,12 @@ export async function validateClipperImage(input: {
   network: NetworkPort
   signal: AbortSignal
 }) {
+  if (isKnownClipperPlaceholderImageUrl(input.imageUrl)) {
+    throw new ClipperCaptureError(
+      '这是网站的分享图或占位图，不是页面内容图片',
+      false,
+    )
+  }
   const response = await input.network.request({
     url: input.imageUrl,
     method: 'GET',
@@ -51,6 +60,9 @@ export async function validateClipperImage(input: {
   const size = imageSizeFromHeader(bytes)
   if (!size || size.width < 2 || size.height < 2) {
     throw new ClipperCaptureError('图片尺寸无效，无法导入', false)
+  }
+  if (size.width < MIN_CLIPPER_IMAGE_EDGE && size.height < MIN_CLIPPER_IMAGE_EDGE) {
+    throw new ClipperCaptureError('图片太小，可能是站点图标或占位图', false)
   }
   if (size.width * size.height > DESIGN_RESEARCH_MAX_IMAGE_PIXELS) {
     throw new ClipperCaptureError('图片超过 2000 万像素，已拒绝导入', false)

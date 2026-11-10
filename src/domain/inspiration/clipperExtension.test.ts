@@ -24,7 +24,7 @@ describe('qinghua clipper extension contract', () => {
     }
 
     expect(manifest.manifest_version).toBe(3)
-    expect(manifest.version).toBe('0.4.5')
+    expect(manifest.version).toBe('0.4.6')
     expect(manifest.permissions).toEqual(['storage', 'scripting'])
     expect(manifest.host_permissions).toEqual([
       'http://127.0.0.1:53684/*',
@@ -67,7 +67,10 @@ describe('qinghua clipper extension contract', () => {
     expect(directImage).toContain('backgroundImageUrlOf')
     expect(directImage).toContain('elementsFromPoint')
     expect(directImage).toContain('upgradeImageUrl')
-    expect(directImage).toContain('imageUrls: draggedImageUrls')
+    expect(directImage).toContain('huabanOriginalUrls')
+    expect(directImage).toContain('/v3/pins/')
+    expect(directImage).toContain('isRejectedImageUrl')
+    expect(directImage).toContain('imageUrls: candidateUrls')
     expect(directImage).toContain('candidate.href === page.href')
     expect(`${popupStyle}\n${directImage}`).not.toMatch(
       /#(?:2f6b4f|80bd99|e7f2eb|25372c|2b4333|3b7b5c)/i,
@@ -191,7 +194,7 @@ describe('qinghua clipper extension contract', () => {
       status: 200,
       json: async () => ({ ok: true, token: 'paired-token' }),
     }))
-    const api = loadSharedApi(fetchMock, '0.4.5')
+    const api = loadSharedApi(fetchMock, '0.4.6')
 
     await expect(api.pairReceiver(
       'http://127.0.0.1:53684/clip',
@@ -203,7 +206,7 @@ describe('qinghua clipper extension contract', () => {
     expect(url).toBe('http://127.0.0.1:53684/pair')
     expect(request.method).toBe('POST')
     expect(request.headers['X-Qinghua-Clipper-Pair']).toBe('1')
-    expect(JSON.parse(request.body)).toEqual({ version: '0.4.5' })
+    expect(JSON.parse(request.body)).toEqual({ version: '0.4.6' })
   })
 
   it('surfaces authentication and health failures with recovery copy', async () => {
@@ -371,7 +374,7 @@ function loadBackgroundApi(fetchMock: ReturnType<typeof vi.fn>) {
   }
   const chrome = {
     runtime: {
-      getManifest: () => ({ version: '0.4.5' }),
+      getManifest: () => ({ version: '0.4.6' }),
       onInstalled: { addListener: vi.fn() },
       onStartup: { addListener: vi.fn() },
       onMessage: {

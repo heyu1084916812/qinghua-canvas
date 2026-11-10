@@ -43,6 +43,16 @@ describe('clipper collection rules', () => {
     }])
   })
 
+  it('drops legacy site-share placeholders from the saved collection', () => {
+    const placeholder = {
+      ...item,
+      id: 'placeholder',
+      imageUrl: 'https://cdn.dancf.com/fe-assets/img/default-smiley.png',
+    }
+
+    expect(normalizeClipperItems([item, placeholder])).toEqual([item])
+  })
+
   it('upserts by page + image and keeps latest copy', () => {
     const updated = { ...item, title: 'Updated', collectedAt: 20 }
     expect(upsertClipperItems([item], [updated])).toEqual([updated])

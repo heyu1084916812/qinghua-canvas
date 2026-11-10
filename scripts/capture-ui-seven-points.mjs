@@ -253,7 +253,7 @@ try {
       ) return
       const updateStatus = {
         loadedVersion: '0.4.2',
-        bundledVersion: '0.4.5',
+        bundledVersion: '0.4.6',
         needsUpdate: true,
         reloadRequired: false,
         stableDirectory: 'C:\\Users\\Administrator\\Documents\\QinghuaClipper\\extension',

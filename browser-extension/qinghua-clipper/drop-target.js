@@ -1,4 +1,4 @@
-/* global chrome, document, Element, getComputedStyle, location, URL, window */
+/* global chrome, document, Element, fetch, getComputedStyle, location, URL, window */
 (() => {
   const HOST_ID = 'qinghua-clipper-drop-target'
   const IMAGE_ATTRIBUTES = [
@@ -33,6 +33,7 @@
 
   let hideTimer = 0
   let draggedImageUrls = []
+  let draggedHuabanPinId = ''
   let keepAfterDrop = false
   const host = document.createElement('div')
   host.id = HOST_ID
@@ -140,6 +141,7 @@
 
   const onDragStart = (event) => {
     draggedImageUrls = imageUrlsForDrag(event)
+    draggedHuabanPinId = huabanPinIdNearPoint(event)
     if (draggedImageUrls.length === 0 && !looksLikeImageDrag(event.dataTransfer)) return
     keepAfterDrop = false
     show()
@@ -162,9 +164,19 @@
     window.clearTimeout(hideTimer)
     keepAfterDrop = true
     dropbox.dataset.over = 'false'
-    const imageUrl = imageUrlOf(event.dataTransfer)
+    let sourceImageUrls = []
+    if (draggedHuabanPinId) {
+      setStatus('正在读取花瓣原图…')
+      sourceImageUrls = await huabanOriginalUrls(draggedHuabanPinId)
+    }
+    const candidateUrls = uniqueImageUrls([
+      ...sourceImageUrls,
+      ...draggedImageUrls,
+      imageUrlOf(event.dataTransfer),
+    ])
+    const imageUrl = candidateUrls[0] || ''
     if (!imageUrl) {
-      setStatus('没有识别到图片地址，请直接拖动网页图片', true)
+      setStatus('没有识别到内容原图，请拖动图片本体而不是头像或站点图标', true)
       return
     }
     setStatus('正在收藏到轻画…')
@@ -173,7 +185,7 @@
         type: 'qinghua:clip-image',
         pageUrl: location.href,
         imageUrl,
-        imageUrls: draggedImageUrls,
+        imageUrls: candidateUrls,
         title: document.title,
       })
       if (!response?.ok) throw new Error(response?.error || '轻画没有接收这张图片')
@@ -299,6 +311,52 @@
       .filter(Boolean)
   }
 
+  function huabanPinIdNearPoint(event) {
+    if (!isHuabanPage()) return ''
+    const point = { x: event.clientX, y: event.clientY }
+    const elements = [
+      event.target instanceof Element ? event.target : null,
+      document.elementFromPoint(point.x, point.y),
+      ...document.elementsFromPoint(point.x, point.y).slice(0, 8),
+    ].filter((element) => element instanceof Element)
+
+    for (const element of elements) {
+      const link = element.closest('a[href*="/pins/"]')
+      const match = link?.getAttribute('href')?.match(/\/pins\/(\d+)(?:[/?#]|$)/)
+      if (match?.[1]) return match[1]
+      const dataPinId = element.closest('[data-pin-id]')?.getAttribute('data-pin-id')
+      if (/^\d+$/.test(dataPinId || '')) return dataPinId
+    }
+    return ''
+  }
+
+  async function huabanOriginalUrls(pinId) {
+    try {
+      const response = await fetch(`/v3/pins/${encodeURIComponent(pinId)}`, {
+        credentials: 'include',
+        headers: { Accept: 'application/json' },
+      })
+      if (!response.ok) return []
+      const payload = await response.json()
+      const file = payload?.pin?.file
+      if (!file) return []
+      const urls = []
+      if (typeof file.url === 'string') urls.push(file.url)
+      if (typeof file.key === 'string' && file.key.trim()) {
+        const key = file.key.trim().replace(/^\/+/, '')
+        urls.push(`https://gd-hbimg-edge.huaban.com/${key}`)
+      }
+      return uniqueImageUrls(urls)
+    } catch {
+      return []
+    }
+  }
+
+  function isHuabanPage() {
+    const host = location.hostname.toLowerCase()
+    return host === 'huaban.com' || host.endsWith('.huaban.com')
+  }
+
   function imageElementOf(node, point) {
     if (!(node instanceof Element)) return null
     const direct = node.closest('img, input[type="image"]')
@@ -325,6 +383,7 @@
   }
 
   function imageSourceUrls(image) {
+    if (isRejectedImageElement(image)) return []
     const urls = []
     const add = (value) => {
       const normalized = imageCandidate(value)
@@ -468,6 +527,7 @@
   function imageCandidate(value) {
     const url = normalizeImageUrl(value)
     if (!url) return ''
+    if (isRejectedImageUrl(url)) return ''
     try {
       const candidate = new URL(url)
       const page = new URL(location.href)
@@ -495,6 +555,41 @@
         : ''
     } catch {
       return ''
+    }
+  }
+
+  function uniqueImageUrls(values) {
+    const urls = []
+    for (const value of values) {
+      const candidate = imageCandidate(value)
+      if (candidate && !urls.includes(candidate)) urls.push(candidate)
+    }
+    return urls.slice(0, 8)
+  }
+
+  function isRejectedImageElement(image) {
+    if (!image) return true
+    const marker = [
+      image.getAttribute('class'),
+      image.getAttribute('id'),
+      image.getAttribute('alt'),
+      image.getAttribute('role'),
+    ].filter(Boolean).join(' ')
+    const tiny = image.naturalWidth > 0
+      && image.naturalHeight > 0
+      && image.naturalWidth < 64
+      && image.naturalHeight < 64
+    return tiny && /(?:avatar|logo|icon|emoji|sprite|favicon|profile|badge|placeholder|default)/i
+      .test(marker)
+  }
+
+  function isRejectedImageUrl(value) {
+    try {
+      const url = new URL(value, location.href)
+      return url.hostname.toLowerCase() === 'cdn.dancf.com'
+        && url.pathname.toLowerCase().startsWith('/fe-assets/')
+    } catch {
+      return false
     }
   }
 })()

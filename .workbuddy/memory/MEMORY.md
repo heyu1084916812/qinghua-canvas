@@ -1,5 +1,14 @@
 # CanvasFlow（轻画）项目记忆
 
+### 总管2 第六十七轮：花瓣 Pin 原图链路与占位图清洗（2026-11-11）
+- #1011 只验证了“拖拽时不选头像”的合成卡片，没有验证真实失败条目来自哪里。数据库中的 32×35 笑脸实际是 `https://cdn.dancf.com/fe-assets/img/*.png`，页面标题被整页 Open Graph 兜底写进收藏。因此“扩展发送成功”不等于“入库真实内容图”。
+- 重新逐份查看 GitHub 后，Huaban Downloader 的有效做法是从页面 `__NEXT_DATA__` 或 `/v3/pins/{id}` 取 `pin.file.url` / `pin.file.key`；Image Picka 的拖拽目标会从链接容器找第一个可见 `<img>`，并覆盖懒加载、`srcset` 和背景图；KellyC 明确区分原图与预览图；PickTrue 也围绕花瓣原图 key。只参考行为，没有复制 GPL 源码。
+- 扩展 0.4.6 在 `drop-target.js` 中按卡片 `/pins/{id}` 读取同源 API，把 `file.url` 放第一、边缘 CDN 的 `file.key` 放第二；全程不读取 Cookie，也不导出会话。任何 `cdn.dancf.com/fe-assets/*` URL 都直接拒绝。
+- 桌面端 `validateClipperImage` 必须读取真实字节并校验 MIME、尺寸与像素上限；单边都很小且两侧均小于 64 的图标类图片拒绝。`validateClipperImageCandidates` 负责批量汇总，`captureClipperPage` 不再仅凭 Open Graph 或 HTTP 200 入库。
+- 历史错误项不是删数据库硬修：`normalizeClipperItems` 统一过滤已知站点占位图，因此现有笑脸会在收藏视图读取时消失。若以后确实需要收藏小图标，应走本地上传，不要放宽网页 Clipper 的最小尺寸门禁。
+- 稳定目录 `C:\Users\Administrator\Documents\QinghuaClipper\extension` 已更新到 0.4.6；桌面 release 也已重启。Chrome 扩展内部页无法由本轮 Computer Use 自动操作，用户需在 `chrome://extensions` 对轻画 Clipper 点一次“重新加载”。
+- 门禁：`npm run check` 1171 modules / 4701 deps / 315 registrations；全量 Vitest 670 files（669 passed / 1 skipped）/ 5527 tests（5526 passed / 1 skipped）；build 1303 modules；Tauri release 资源 `0.4.6`；`check:clipper-all-pages` 为 `0.4.6 / http=true / https=true`；隔离更新 `0.4.2→0.4.6 / stagingLeftovers=[]`。通用 `capture-ui-seven-points.mjs` 在无关的 600 条生成历史卡片等待超时，不能记作本次 UI 全通过；本次用 `capture:clipper-multiselect` 与扩展 11 组 Chromium 场景验收。未 push。
+
 ### 总管2 第六十六轮：Agent 自动参考分析、过程正文与开放馆藏调研（2026-11-11）
 - `curateReferences` 工具存在不等于“自动分析”：模型漏调用时参考会一直停在等待状态。现在显式 reference chip 在 `prepareAgentTurnRequest` 的路由就绪后、读取任务参考前，通过 `autoCurateReferences` 先跑一次真实分析；失败只写 warning/提示并继续使用显式 chip，不能把整轮 Agent 打断。
 - 自动分析使用 `preferredItemIds` 而不是 `requestedItemIds`：同一 taskKey 已有 usage 时跳过重复调用，任务类型变化后重新分析。仍保留工具入口供用户指定 itemIds 强制重分析。
