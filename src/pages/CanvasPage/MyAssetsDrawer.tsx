@@ -30,11 +30,13 @@ const SOURCES: readonly { id: Source; label: string }[] = [
 export function MyAssetsDrawer({
   projectId,
   store,
+  active,
   onClose,
   onOpenKitEditor,
 }: {
   projectId: string
   store: CanvasStore
+  active: boolean
   onClose: () => void
   onOpenKitEditor: () => void
 }) {
@@ -58,14 +60,15 @@ export function MyAssetsDrawer({
   }, [onClose])
 
   useEffect(() => {
-    let active = true
+    if (!active) return
+    let alive = true
     void contextRepo.listKits().then((rows) => {
-      if (active) setKits(rows)
+      if (alive) setKits(rows)
     }).catch((cause) => {
-      if (active) setError(cause instanceof Error ? cause.message : '读取套件失败')
+      if (alive) setError(cause instanceof Error ? cause.message : '读取套件失败')
     })
-    return () => { active = false }
-  }, [contextRepo])
+    return () => { alive = false }
+  }, [active, contextRepo])
 
   return (
       <aside className={styles.drawer} aria-label="我的素材" data-my-assets-drawer>

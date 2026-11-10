@@ -2,16 +2,30 @@
 
 ## 画布“我的素材”抽屉动效边界（2026-11-10）
 
-- 抽屉展开不能被 `MyAssetsDrawer` 懒加载块阻塞。点击后立即挂载槽与同底色
-  `[data-my-assets-loading]` 占位，经过两个 `requestAnimationFrame` 启动 220ms 宽度动画；
-  真实内容加载后再替换占位。画布挂载、按钮悬停和键盘聚焦都应预取抽屉模块。
-- 关闭先撤销打开状态，宽度/内容退场使用更快曲线（140ms），`160ms` 后卸载；不能立即删除导致退场截断，
-  也不能永久保留已关闭槽。重复打开、快速关闭和首次懒加载都必须只保留一个抽屉。
-- 槽宽过渡有意使用布局属性，因为它代表画布真实向右让位，与 Agent 现有交互一致。不要为了消除
-  Impeccable 的 `layout-transition` warning 改成覆盖式浮层；该 warning 是需要记录的设计例外。
+- 我的素材开关不能放在 `CanvasProject` 的 React state 里。`myAssetsDockStore` 是外部订阅源，
+  `MyAssetsDockButton` 与 `MyAssetsDock` 各自订阅；开关变化不得重绘 React Flow 或整张画布页。
+- 抽屉必须通过 portal 挂到 AppShell 的 `[data-my-assets-shell-slot]` 左侧 flex 插槽，和 Agent 的
+  右侧壳层一样由壳层宽度变化挤压 workspace。不能在画布页内部再放一份宽度过渡槽。
+- 展开先解除 `hidden`，再经过两个 `requestAnimationFrame` 后开启壳层宽度；懒加载内容用同底色占位。
+  收起只把 `data-my-assets-shell-active` 置空并隐藏 `panelFrame`，**不能卸载 `MyAssetsDrawer`**，
+  否则会再次引入整棵内容清理抖动。
+- 真实性能探针必须记录 `openLatencyMs / maxFrameGapMs / closeLatencyMs / framesOver25Ms / longTasks /
+  panelStillMounted / targetHidden`。当前基线为展开 `21.6ms`、最大帧间隔 `6.1ms`；收起 `207.3ms`、
+  最大帧间隔 `12.2ms`、超过 25ms 的帧为 0。
 - UI 证据必须覆盖 1440×900 / 1024×700 × 明暗，记录 `slotWidth / drawerWidth / canvasWidthDelta /
   slotTransitionDuration / drawerTransitionDuration / drawerOpacity / pageOverflowX /
   childrenOutsideX / errors`，并保留展开中与稳定态截图。
+
+## Clipper 分类与多选边界（2026-11-10）
+
+- `clipper:collection:v1` 同时保存 `items` 与 `categories`。分类名必须去空白、限长 24；空名、
+  “全部”和“未分类”不能创建。空分类不能因当前没有条目而丢失。
+- 顶部只允许两个真实动作：新建分类和多选。多选卡片只显示勾选与选中边框；底部左侧显示
+  “已选 N 项”，右侧固定为取消、删除、移动分组，禁止用假按钮或仅改 UI 状态。
+- 批量删除和移动分组必须调用 `ClipperCollectionRepository.removeMany / moveMany`；移动目标包含
+  “未分类”和所有自定义分类，目标分类不存在时应补入分类列表。
+- 多选 UI 证据必须覆盖：真实图片、选中 2 项、移动分类后分类内数量、批量删除后剩余数量、
+  移动菜单和 `errors=[]`；截图与 `report.json` 放在 `.playwright-verify/clipper-multiselect/`。
 
 ## Agent 运行确认闭环（2026-11-10）
 

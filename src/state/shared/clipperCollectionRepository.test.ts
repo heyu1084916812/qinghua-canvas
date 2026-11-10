@@ -21,7 +21,7 @@ function storageWith(rows: Record<string, unknown>[]) {
 }
 
 describe('clipper collection repository', () => {
-  it('loads, upserts and removes account-level collection rows', async () => {
+  it('loads, categorizes, moves and removes multiple account-level rows', async () => {
     const rows: Record<string, unknown>[] = []
     const repository = createClipperCollectionRepository(storageWith(rows))
     const item = {
@@ -33,12 +33,34 @@ describe('clipper collection repository', () => {
       collectedAt: 10,
       category: '未分类',
     }
+    const second = {
+      ...item,
+      id: 'clip-2',
+      title: 'Second reference',
+      imageUrl: 'https://example.com/second.jpg',
+    }
 
-    await repository.upsert([item])
-    expect(await repository.load()).toEqual([item])
+    await repository.upsert([item, second])
+    expect(await repository.load()).toEqual([item, second])
+    expect(await repository.loadState()).toEqual({
+      items: [item, second],
+      categories: [],
+    })
     expect(rows[0]).toMatchObject({ id: CLIPPER_COLLECTION_KEY })
 
-    await repository.remove('clip-1')
-    expect(await repository.load()).toEqual([])
+    expect(await repository.createCategory('灵感')).toMatchObject({
+      categories: ['灵感'],
+    })
+    expect(await repository.moveMany(['clip-1', 'clip-2'], '灵感')).toMatchObject({
+      categories: ['灵感'],
+      items: [
+        expect.objectContaining({ id: 'clip-1', category: '灵感' }),
+        expect.objectContaining({ id: 'clip-2', category: '灵感' }),
+      ],
+    })
+    expect(await repository.removeMany(['clip-1', 'clip-2'])).toEqual({
+      items: [],
+      categories: ['灵感'],
+    })
   })
 })

@@ -1,5 +1,14 @@
 # CanvasFlow（轻画）项目记忆
 
+### 总管2 第五十四轮：Clipper 分类、多选与我的素材壳层（2026-11-10）
+
+- 分类与收藏共用一个 preset 快照：`clipper:collection:v1` 同时保存 `items` 和 `categories`；空分类必须保留，移动分组时目标分类不存在则补进列表。名称去空白、限长 24，拒绝空名、“全部”和“未分类”。
+- “轻画插件”顶部只有两个动作：`+` 新建分类、滑杆进入多选。多选态卡片只显示勾选/选中边框，底部显示“已选 N 项 / 取消 / 删除 / 转到其他分组”；批量动作必须走 repository，不能只改 React state。
+- 关闭卡顿根因是 `CanvasProject` 顶层状态变化导致 React Flow 整页重渲染，且抽屉在画布页内部触发了更重的嵌套宽度布局。现在 `myAssetsDockStore` 是外部订阅源，按钮和 `MyAssetsDock` 独立更新；抽屉 portal 到 AppShell 左侧真实 flex 插槽，收起只隐藏 panelFrame，不卸载内容。
+- 帧探针（真实图片、Chrome）：展开 `21.6ms / maxFrameGap=6.1ms`；收起 `207.3ms / maxFrameGap=12.2ms / >25ms=0`。四组 UI 均为 `createCategoryActions=1 / selectionToggles=1 / emptySelectionText=已选 0 项 / errors=[]`。
+- 多选真实数据探针：选中 2 项 → 移动到“美工部” → 分类内 2 项 → 批量删除 1 项 → 剩 1 项，`errors=[]`。证据 `.playwright-verify/clipper-multiselect/{selected-two,move-menu,moved-category}.png` 与 `report.json`。
+- 证据：check 1139 modules / 4549 deps / 283 registrations；build 1271 modules；串行全量 Vitest 660 files（659 passed / 1 skipped）/ 5480 tests（5479 passed / 1 skipped）。未 push。
+
 ### 总管2 第五十三轮：Clipper 空态、全网页拖拽与抽屉延迟（2026-11-10）
 
 - “轻画插件”面板不再渲染安装卡、配对卡或商店入口。`ClipperPanel` 只保留全部/未分类筛选、全网页空态、3 秒接收轮询和收藏动作；`ClipperInstallCard`、`ClipperPairing` 及测试文件删除，安装说明只在本地脚本/README。不要把安装信息再加回应用。

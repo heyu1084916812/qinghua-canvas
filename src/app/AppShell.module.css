@@ -143,3 +143,22 @@
 .agentShellSlot > * {
   pointer-events: auto;
 }
+
+.myAssetsShellSlot {
+  display: flex;
+  flex: 0 0 auto;
+  align-self: stretch;
+  min-width: 0;
+  width: 0;
+  pointer-events: none;
+  transition: width var(--dur-shell, 220ms) var(--ease-panel, ease-out);
+}
+
+.myAssetsShellSlot[data-my-assets-shell-active='true'] {
+  width: clamp(320px, 30vw, 420px);
+  pointer-events: auto;
+}
+
+.myAssetsShellSlot > * {
+  pointer-events: auto;
+}

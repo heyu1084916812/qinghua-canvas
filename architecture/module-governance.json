@@ -798,10 +798,11 @@
     {
       "module": "src/state/shared/clipperCollectionRepository.ts",
       "owner": "clipper-collection-persistence",
-      "responsibility": "在共享 presets 中读写账号级网页收藏集合，并复用纯规则做去重与清洗。",
+      "responsibility": "持久化账号级图片收藏、分类列表、批量删除和移动分组。",
       "owns": [
-        "clipper:collection:v1 单行读写",
-        "收藏追加和单项移除"
+        "图片收藏与分类列表同表快照",
+        "批量删除、移动分组和创建空分类",
+        "旧收藏条目缺失分类时的补全"
       ],
       "doesNotOwn": [
         "网页解析与素材字节",
@@ -809,6 +810,7 @@
         "React 状态"
       ],
       "publicApi": [
+        "ClipperCollectionState",
         "ClipperCollectionRepository",
         "createClipperCollectionRepository"
       ],
@@ -919,11 +921,12 @@
     {
       "module": "src/pages/CanvasPage/clipper/ClipperPanel.tsx",
       "owner": "clipper-panel",
-      "responsibility": "轮询浏览器拖入图片队列，筛选全部/未分类收藏，并接到参考、Agent 和画布。",
+      "responsibility": "编排图片收藏加载、接收轮询、筛选、多选操作、分类持久化与 Agent/参考/画布动作。",
       "owns": [
-        "接收端状态轮询和拖入图片入库",
-        "全部与未分类筛选",
-        "收藏、移除、加入参考、加入 Agent、放到画布动作"
+        "接收端轮询和拖入图片入库",
+        "全部、未分类和自定义分类筛选",
+        "多选删除、移动分组和分类创建状态",
+        "收藏加入参考、加入 Agent、放到画布动作"
       ],
       "doesNotOwn": [
         "网页扩展权限、拖拽脚本和自动配对协议",
@@ -943,10 +946,11 @@
     {
       "module": "src/pages/CanvasPage/clipper/ClipperItemCard.tsx",
       "owner": "clipper-panel",
-      "responsibility": "渲染单张拖入图片收藏及其加入 Agent、参考、画布和移除动作。",
+      "responsibility": "渲染图片收藏卡及普通动作或多选态，不拥有收藏和分类持久化。",
       "owns": [
         "收藏图、标题与来源展示",
-        "卡片级四个动作入口"
+        "普通态四个动作入口",
+        "多选态勾选与选中边框"
       ],
       "doesNotOwn": [
         "收藏数据和素材持久化",
@@ -988,11 +992,10 @@
     {
       "module": "src/pages/CanvasPage/clipper/ClipperPanel.module.css",
       "owner": "clipper-panel",
-      "responsibility": "定义图片收藏筛选、空态、收藏网格和窄宽度降级样式。",
+      "responsibility": "定义图片收藏面板主体、空态、网格和状态提示样式。",
       "owns": [
-        "全部与未分类筛选",
-        "全网页拖拽收藏空态",
-        "收藏卡网格和窄宽度降级"
+        "面板布局与滚动",
+        "收藏网格空态和状态提示"
       ],
       "doesNotOwn": [
         "组件状态与抓取逻辑",
@@ -1000,11 +1003,11 @@
         "共享主题令牌定义"
       ],
       "publicApi": [
-        "CSS_MODULE:图片收藏筛选与空态",
-        "CSS_CLASS:subhead",
-        "CSS_CLASS:empty",
+        "CSS_MODULE:图片收藏面板",
+        "CSS_CLASS:panel",
         "CSS_CLASS:grid",
-        "CSS_CLASS:item"
+        "CSS_CLASS:empty",
+        "CSS_CLASS:status"
       ],
       "test": [
         "src/domain/inspiration/clipper.test.ts"
@@ -7514,6 +7517,201 @@
         "src/state/agent/agentSessionIds.test.ts"
       ],
       "budget": 100
+    },
+    {
+      "module": "src/pages/CanvasPage/clipper/ClipperToolbar.tsx",
+      "owner": "clipper-toolbar",
+      "responsibility": "渲染收藏筛选、分类创建和进入多选的顶部工具条。",
+      "owns": [
+        "全部、未分类与自定义分类筛选",
+        "新建分类内联表单",
+        "多选模式入口"
+      ],
+      "doesNotOwn": [
+        "收藏数据持久化",
+        "多选批量动作",
+        "收藏卡渲染"
+      ],
+      "publicApi": [
+        "ClipperFilter",
+        "clipperCategoryFilter",
+        "clipperFilterCategory",
+        "ClipperToolbar"
+      ],
+      "test": [
+        "src/app/uiSevenPoints.test.ts"
+      ],
+      "budget": 190
+    },
+    {
+      "module": "src/pages/CanvasPage/clipper/ClipperToolbar.module.css",
+      "owner": "clipper-toolbar-style",
+      "responsibility": "定义收藏筛选、工具按钮和新建分类表单的样式与焦点状态。",
+      "owns": [
+        "筛选页签横向滚动",
+        "工具按钮和创建表单",
+        "窄抽屉下的表单宽度"
+      ],
+      "doesNotOwn": [
+        "分类持久化",
+        "面板空态与网格",
+        "全局主题令牌"
+      ],
+      "publicApi": [
+        "CSS_MODULE:图片收藏顶部工具条",
+        "CSS_CLASS:toolbar",
+        "CSS_CLASS:tabOn",
+        "CSS_CLASS:createPanel",
+        "CSS_CLASS:submit"
+      ],
+      "test": [
+        "src/app/uiSevenPoints.test.ts"
+      ],
+      "budget": 130
+    },
+    {
+      "module": "src/pages/CanvasPage/clipper/ClipperSelectionBar.tsx",
+      "owner": "clipper-selection-bar",
+      "responsibility": "展示多选数量、取消、删除和移动分组操作。",
+      "owns": [
+        "多选数量与底部操作栏",
+        "移动分类菜单",
+        "批量动作按钮状态"
+      ],
+      "doesNotOwn": [
+        "选中集合真相",
+        "收藏持久化",
+        "顶部筛选"
+      ],
+      "publicApi": [
+        "ClipperSelectionBar"
+      ],
+      "test": [
+        "src/app/uiSevenPoints.test.ts"
+      ],
+      "budget": 120
+    },
+    {
+      "module": "src/pages/CanvasPage/clipper/ClipperSelectionBar.module.css",
+      "owner": "clipper-selection-bar-style",
+      "responsibility": "定义多选底部操作栏、图标按钮和移动分类菜单样式。",
+      "owns": [
+        "底部粘性操作栏",
+        "批量动作按钮",
+        "移动分类浮层"
+      ],
+      "doesNotOwn": [
+        "多选业务状态",
+        "收藏卡样式",
+        "全局主题令牌"
+      ],
+      "publicApi": [
+        "CSS_MODULE:图片多选操作栏",
+        "CSS_CLASS:bar",
+        "CSS_CLASS:iconButton",
+        "CSS_CLASS:moveMenu"
+      ],
+      "test": [
+        "src/app/uiSevenPoints.test.ts"
+      ],
+      "budget": 100
+    },
+    {
+      "module": "src/pages/CanvasPage/clipper/ClipperItemCard.module.css",
+      "owner": "clipper-item-card-style",
+      "responsibility": "定义收藏卡、普通动作与多选勾选状态的样式。",
+      "owns": [
+        "图片和标题布局",
+        "普通态动作按钮",
+        "多选勾选与选中边框"
+      ],
+      "doesNotOwn": [
+        "收藏动作业务逻辑",
+        "面板布局",
+        "全局主题令牌"
+      ],
+      "publicApi": [
+        "CSS_MODULE:单张图片收藏卡片",
+        "CSS_CLASS:item",
+        "CSS_CLASS:media",
+        "CSS_CLASS:selectCheck",
+        "CSS_CLASS:action"
+      ],
+      "test": [
+        "src/app/uiSevenPoints.test.ts"
+      ],
+      "budget": 130
+    },
+    {
+      "module": "src/pages/CanvasPage/MyAssetsDock.tsx",
+      "owner": "canvas-my-assets-dock",
+      "responsibility": "独立订阅我的素材开关，管理抽屉挂载、展开、隐藏和模块预取，避免重绘画布页。",
+      "owns": [
+        "我的素材按钮订阅",
+        "抽屉展开与收起生命周期",
+        "懒加载块预取与占位"
+      ],
+      "doesNotOwn": [
+        "画布节点与执行状态",
+        "抽屉内部来源面板",
+        "全局主题令牌"
+      ],
+      "publicApi": [
+        "MyAssetsDockButton",
+        "MyAssetsDock"
+      ],
+      "test": [
+        "src/app/uiSevenPoints.test.ts"
+      ],
+      "budget": 170
+    },
+    {
+      "module": "src/pages/CanvasPage/MyAssetsDock.module.css",
+      "owner": "canvas-my-assets-dock-style",
+      "responsibility": "定义我的素材抽屉槽位、内容收束和加载占位的样式。",
+      "owns": [
+        "真实布局让位宽度",
+        "抽屉内容透明度与位移",
+        "加载占位底色"
+      ],
+      "doesNotOwn": [
+        "抽屉内部页签样式",
+        "画布面板样式",
+        "全局主题令牌"
+      ],
+      "publicApi": [
+        "CSS_MODULE:我的素材抽屉槽位",
+        "CSS_CLASS:panelFrame",
+        "CSS_CLASS:loading"
+      ],
+      "test": [
+        "scripts/capture-ui-seven-points.mjs"
+      ],
+      "budget": 80
+    },
+    {
+      "module": "src/pages/CanvasPage/myAssetsDockStore.ts",
+      "owner": "canvas-my-assets-dock-state",
+      "responsibility": "提供我的素材抽屉的最小外部订阅状态，让按钮和抽屉独立更新。",
+      "owns": [
+        "开关快照",
+        "订阅与通知",
+        "打开、关闭和切换"
+      ],
+      "doesNotOwn": [
+        "React 渲染",
+        "动画帧调度",
+        "抽屉业务数据"
+      ],
+      "publicApi": [
+        "MyAssetsDockStore",
+        "createMyAssetsDockStore"
+      ],
+      "test": [
+        "src/app/uiSevenPoints.test.ts",
+        "src/pages/CanvasPage/myAssetsDockStore.test.ts"
+      ],
+      "budget": 50
     }
   ]
 }

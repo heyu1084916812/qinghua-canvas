@@ -2,12 +2,29 @@ import type { DesignResearchItem } from './designResearch'
 
 export const CLIPPER_COLLECTION_KEY = 'clipper:collection:v1'
 export const CLIPPER_MAX_ITEMS = 200
+export const CLIPPER_UNCATEGORIZED = '未分类'
+export const CLIPPER_CATEGORY_MAX_LENGTH = 24
 
 export interface ClipperItem extends DesignResearchItem {
   collectedAt: number
   category: string
 }
-
+export function normalizeClipperCategory(value: unknown): string {
+  const category = textOf(value).slice(0, CLIPPER_CATEGORY_MAX_LENGTH)
+  return category || CLIPPER_UNCATEGORIZED
+}
+export function normalizeClipperCategories(value: unknown): string[] {
+  if (!Array.isArray(value)) return []
+  const categories: string[] = []
+  const seen = new Set<string>()
+  for (const candidate of value) {
+    const category = normalizeClipperCategory(candidate)
+    if (category === CLIPPER_UNCATEGORIZED || seen.has(category)) continue
+    seen.add(category)
+    categories.push(category)
+  }
+  return categories
+}
 export function normalizeClipperItems(value: unknown): ClipperItem[] {
   if (!Array.isArray(value)) return []
   const seen = new Set<string>()
@@ -35,14 +52,13 @@ export function normalizeClipperItems(value: unknown): ClipperItem[] {
       ...(textOf(row.license) ? { license: textOf(row.license) } : {}),
       ...(httpUrlOf(row.licenseUrl) ? { licenseUrl: httpUrlOf(row.licenseUrl) } : {}),
       collectedAt,
-      category: textOf(row.category) || '未分类',
+      category: normalizeClipperCategory(row.category),
     })
   }
   return items
     .sort((left, right) => right.collectedAt - left.collectedAt || left.id.localeCompare(right.id))
     .slice(0, CLIPPER_MAX_ITEMS)
 }
-
 export function upsertClipperItems(
   current: readonly ClipperItem[],
   incoming: readonly ClipperItem[],
@@ -60,6 +76,24 @@ export function removeClipperItem(
   itemId: string,
 ): ClipperItem[] {
   return items.filter((item) => item.id !== itemId)
+}
+
+export function removeClipperItems(
+  items: readonly ClipperItem[],
+  itemIds: readonly string[],
+): ClipperItem[] {
+  const removing = new Set(itemIds)
+  return items.filter((item) => !removing.has(item.id))
+}
+
+export function moveClipperItems(
+  items: readonly ClipperItem[],
+  itemIds: readonly string[],
+  category: unknown,
+): ClipperItem[] {
+  const moving = new Set(itemIds)
+  const target = normalizeClipperCategory(category)
+  return items.map((item) => moving.has(item.id) ? { ...item, category: target } : item)
 }
 
 function textOf(value: unknown): string {

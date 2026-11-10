@@ -14,6 +14,7 @@
     "check": "tsc --noEmit && eslint . && depcruise src --config .dependency-cruiser.cjs && node scripts/check-architecture-rules.mjs && node scripts/check-module-governance.mjs && node scripts/check-versions.mjs && node scripts/test-canvas-mcp.mjs && node scripts/check-theme.mjs && node scripts/check-contrast.mjs && node scripts/check-shell-geometry.mjs && node scripts/check-rail-buttons.mjs && node scripts/check-doc-index.mjs && node scripts/check-doc-migration.mjs && node scripts/check-libtv-catalog.mjs && node scripts/check-updater-config.mjs",
     "check:ui-freeze": "node scripts/check-tauri-ui-freeze.mjs",
     "capture:clipper-extension": "node scripts/capture-clipper-extension.mjs",
+    "capture:clipper-multiselect": "node scripts/capture-clipper-multiselect.mjs",
     "package:clipper-extension": "node scripts/package-clipper-extension.mjs",
     "test": "vitest run",
     "test:watch": "vitest",

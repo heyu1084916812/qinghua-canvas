@@ -1,0 +1,35 @@
+.panelFrame {
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+}
+
+.panelFrame[hidden] {
+  display: none;
+}
+
+.panelFrame > :global([data-my-assets-drawer]) {
+  flex: 1 1 auto;
+  width: 100%;
+  min-width: 0;
+  opacity: 0;
+  transform: translateX(-14px) scale(0.995);
+  transform-origin: left center;
+  transition: none;
+}
+
+.panelFrame[data-my-assets-open="true"] > :global([data-my-assets-drawer]) {
+  opacity: 1;
+  transform: translateX(0) scale(1);
+  transition:
+    opacity 160ms var(--ease-out),
+    transform var(--dur-shell) var(--ease-panel);
+}
+
+.loading {
+  flex: 1 0 100%;
+  width: 100%;
+  height: 100%;
+  border-right: 1px solid var(--stroke);
+  background: var(--bg-surface);
+}

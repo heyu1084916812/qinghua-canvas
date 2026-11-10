@@ -1,18 +1,24 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { invoke, isTauri } from '@tauri-apps/api/core'
 import { usePlatform } from '../../../app/providers/PlatformProvider'
-import type { ClipperItem } from '../../../domain/inspiration/clipper'
+import {
+  CLIPPER_UNCATEGORIZED,
+  type ClipperItem,
+} from '../../../domain/inspiration/clipper'
 import { sendReferenceToAgent } from '../../../features/canvas/agentHandoff'
 import { createClipperCollectionRepository } from '../../../state/shared/clipperCollectionRepository'
 import { createReferenceLedgerRepository } from '../../../state/project/referenceLedgerRepository'
 import type { CanvasStore } from '../../../state/workbenches/canvas/store'
-import { IconLink } from '../../../workbenches/canvas/toolbar/icons'
 import { ClipperItemCard } from './ClipperItemCard'
+import { ClipperSelectionBar } from './ClipperSelectionBar'
+import {
+  ClipperToolbar,
+  clipperFilterCategory,
+  type ClipperFilter,
+} from './ClipperToolbar'
 import { capturePendingClipperQueue } from './clipperCapture'
 import { addClipperReference, sendClipperToCanvas } from './clipperActions'
 import styles from './ClipperPanel.module.css'
-
-type Filter = 'all' | 'uncategorized'
 
 interface ClipperReceiverInfo {
   running: boolean
@@ -46,20 +52,25 @@ export function ClipperPanel({
     [platform.storage],
   )
   const [items, setItems] = useState<ClipperItem[]>([])
-  const [filter, setFilter] = useState<Filter>('all')
+  const [categories, setCategories] = useState<string[]>([])
+  const [filter, setFilter] = useState<ClipperFilter>('all')
+  const [selectionMode, setSelectionMode] = useState(false)
+  const [selectedIds, setSelectedIds] = useState<string[]>([])
   const [busy, setBusy] = useState('')
   const [status, setStatus] = useState('')
   const controllerRef = useRef<AbortController | null>(null)
   const busyRef = useRef(false)
   const receivingRef = useRef(false)
-  const visible = filter === 'uncategorized'
-    ? items.filter((item) => item.category === '未分类')
+  const activeCategory = clipperFilterCategory(filter)
+  const visible = activeCategory
+    ? items.filter((item) => item.category === activeCategory)
     : items
+  const selectedSet = new Set(selectedIds)
 
   useEffect(() => {
     let active = true
-    void collection.load().then((rows) => {
-      if (active) setItems(rows)
+    void collection.loadState().then((state) => {
+      if (active) applyCollectionState(state)
     }).catch((error) => {
       if (active) setStatus(`读取图片收藏失败：${errorText(error)}`)
     })
@@ -166,36 +177,82 @@ export function ClipperPanel({
     }
   }
 
+  const removeSelected = async () => {
+    if (busyRef.current || selectedIds.length === 0) return
+    busyRef.current = true
+    setBusy('selection:delete')
+    try {
+      applyCollectionState(await collection.removeMany(selectedIds))
+      setStatus(`已删除 ${selectedIds.length} 项。`)
+      exitSelection()
+    } catch (error) {
+      setStatus(`删除失败：${errorText(error)}`)
+    } finally {
+      busyRef.current = false
+      setBusy('')
+    }
+  }
+
+  const moveSelected = async (category: string) => {
+    if (busyRef.current || selectedIds.length === 0) return
+    busyRef.current = true
+    setBusy('selection:move')
+    try {
+      applyCollectionState(await collection.moveMany(selectedIds, category))
+      setStatus(`已移动 ${selectedIds.length} 项到“${category}”。`)
+      exitSelection()
+    } catch (error) {
+      setStatus(`移动失败：${errorText(error)}`)
+    } finally {
+      busyRef.current = false
+      setBusy('')
+    }
+  }
+
+  const createCategory = async (name: string) => {
+    const state = await collection.createCategory(name)
+    applyCollectionState(state)
+    setStatus(`已创建分类“${name.trim()}”。`)
+  }
+
+  const toggleSelect = (itemId: string) => {
+    setSelectedIds((current) => current.includes(itemId)
+      ? current.filter((id) => id !== itemId)
+      : [...current, itemId])
+  }
+
+  const toggleSelectionMode = () => {
+    if (selectionMode) {
+      exitSelection()
+      return
+    }
+    setSelectionMode(true)
+    setSelectedIds([])
+  }
+
+  const exitSelection = () => {
+    setSelectionMode(false)
+    setSelectedIds([])
+  }
+
+  const applyCollectionState = (state: {
+    items: ClipperItem[]
+    categories: string[]
+  }) => {
+    setItems(state.items)
+    setCategories(state.categories)
+  }
+
   return (
     <div className={styles.panel} data-clipper-panel>
-      <div className={styles.subhead}>
-        <div className={styles.filters} role="tablist" aria-label="图片收藏筛选">
-          <button
-            type="button"
-            role="tab"
-            aria-selected={filter === 'all'}
-            className={filter === 'all' ? styles.tabOn : styles.tab}
-            data-clipper-filter="all"
-            onClick={() => setFilter('all')}
-          >
-            全部
-          </button>
-          <button
-            type="button"
-            role="tab"
-            aria-selected={filter === 'uncategorized'}
-            className={filter === 'uncategorized' ? styles.tabOn : styles.tab}
-            data-clipper-filter="uncategorized"
-            onClick={() => setFilter('uncategorized')}
-          >
-            未分类
-          </button>
-        </div>
-        <span className={styles.scope}>
-          <IconLink size={13} />
-          所有网页
-        </span>
-      </div>
+      <ClipperToolbar
+        categories={categories}
+        filter={filter}
+        selectionMode={selectionMode}
+        onFilter={setFilter}
+        onToggleSelection={toggleSelectionMode}
+        onCreateCategory={createCategory}
+      />
 
       {visible.length > 0 ? (
         <div className={styles.grid} data-clipper-items>
@@ -204,6 +261,9 @@ export function ClipperPanel({
               key={item.id}
               item={item}
               busy={Boolean(busy)}
+              selectable={selectionMode}
+              selected={selectedSet.has(item.id)}
+              onToggleSelect={() => toggleSelect(item.id)}
               onAgent={() => void addToReference(item, true)}
               onReference={() => void addToReference(item, false)}
               onCanvas={() => void addToCanvas(item)}
@@ -213,14 +273,8 @@ export function ClipperPanel({
         </div>
       ) : (
         <div className={styles.empty} data-clipper-empty>
-          <strong>
-            {filter === 'uncategorized' ? '没有未分类的图片' : '开始收集灵感吧'}
-          </strong>
-          <p>
-            {filter === 'uncategorized'
-              ? '切换到“全部”查看已收藏的网页图片'
-              : '在任意网页把图片拖到页面中央，松手后会自动收藏到这里'}
-          </p>
+          <strong>{emptyTitle(activeCategory)}</strong>
+          <p>{emptyDescription(activeCategory)}</p>
         </div>
       )}
 
@@ -228,6 +282,16 @@ export function ClipperPanel({
         <p className={styles.status} role="status" aria-live="polite">
           {status}
         </p>
+      ) : null}
+
+      {selectionMode ? (
+        <ClipperSelectionBar
+          selectedCount={selectedIds.length}
+          categories={categories}
+          onCancel={exitSelection}
+          onDelete={() => void removeSelected()}
+          onMove={(category) => void moveSelected(category)}
+        />
       ) : null}
     </div>
   )
@@ -240,6 +304,17 @@ export function ClipperPanel({
   }
 }
 
+function emptyTitle(category: string | null): string {
+  if (category === CLIPPER_UNCATEGORIZED) return '没有未分类的图片'
+  if (category) return `“${category}”还没有图片`
+  return '开始收集灵感吧'
+}
+
+function emptyDescription(category: string | null): string {
+  if (category === CLIPPER_UNCATEGORIZED) return '切换到“全部”查看已收藏的网页图片'
+  if (category) return '选中图片后可以批量转到这个分类'
+  return '在任意网页把图片拖到页面中央，松手后会自动收藏到这里'
+}
 function errorText(error: unknown): string {
   return error instanceof Error ? error.message : String(error)
 }

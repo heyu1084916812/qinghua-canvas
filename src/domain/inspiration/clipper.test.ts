@@ -1,7 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import {
+  moveClipperItems,
+  normalizeClipperCategories,
+  normalizeClipperCategory,
   normalizeClipperItems,
   removeClipperItem,
+  removeClipperItems,
   upsertClipperItems,
 } from './clipper'
 
@@ -31,5 +35,21 @@ describe('clipper collection rules', () => {
 
   it('removes one collection row', () => {
     expect(removeClipperItem([item], item.id)).toEqual([])
+  })
+
+  it('normalizes categories and moves or removes multiple rows', () => {
+    const second = { ...item, id: 'clip-2', category: '灵感' }
+    expect(normalizeClipperCategory('   ')).toBe('未分类')
+    expect(normalizeClipperCategories([
+      '灵感',
+      ' 灵感 ',
+      '未分类',
+      '工作',
+    ])).toEqual(['灵感', '工作'])
+    expect(moveClipperItems([item, second], [item.id], '工作')).toEqual([
+      { ...item, category: '工作' },
+      second,
+    ])
+    expect(removeClipperItems([item, second], [item.id, second.id])).toEqual([])
   })
 })

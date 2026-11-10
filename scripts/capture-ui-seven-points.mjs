@@ -312,7 +312,7 @@ try {
     const drawerGeometry = await page.evaluate(() => {
       const root = document.querySelector('[data-my-assets-drawer]')
       const panel = root
-      const slot = root?.closest('[data-my-assets-slot]')
+      const slot = document.querySelector('[data-my-assets-shell-slot]')
       const stage = document.querySelector('[data-canvas-stage]')
       const tabs = [...(root?.querySelectorAll('[data-my-assets-source]') ?? [])]
       const body = root?.querySelector('[data-my-assets-body]')
@@ -350,6 +350,10 @@ try {
         filters: panel?.querySelectorAll('[data-clipper-filter]').length ?? 0,
         selectedFilters:
           panel?.querySelectorAll('[data-clipper-filter][aria-selected="true"]').length ?? 0,
+        createCategoryActions:
+          panel?.querySelectorAll('[data-clipper-create-category]').length ?? 0,
+        selectionToggles:
+          panel?.querySelectorAll('[data-clipper-selection-toggle]').length ?? 0,
         empty: panel?.querySelectorAll('[data-clipper-empty]').length ?? 0,
         emptyText: panel?.querySelector('[data-clipper-empty]')?.textContent?.replace(/\s+/g, ' ').trim() ?? '',
         overflowX: panel ? panel.scrollWidth > panel.clientWidth + 1 : true,
@@ -361,6 +365,12 @@ try {
       '[data-clipper-filter="uncategorized"][aria-selected="true"]',
     ).count()
     await page.locator('[data-clipper-filter="all"]').click()
+    await page.locator('[data-clipper-selection-toggle]').click()
+    await page.locator('[data-clipper-selection-bar]').waitFor({ timeout: 5_000 })
+    const clipperEmptySelectionText =
+      (await page.locator('[data-clipper-selection-bar]').innerText()).trim()
+    await page.locator('[data-clipper-selection-bar] button').filter({ hasText: '取消' }).click()
+    await page.locator('[data-clipper-selection-bar]').waitFor({ state: 'detached', timeout: 5_000 })
     await page.mouse.move(900, 80)
     await page.waitForTimeout(600)
     await page.screenshot({ path: path.join(out, `${file}-canvas-clipper.png`) })
@@ -445,7 +455,10 @@ try {
     }
     const myAssetsCloseStartedAt = Date.now()
     await page.locator('[data-my-assets-close]').click()
-    await page.locator('[data-my-assets-slot]').waitFor({ state: 'detached', timeout: 10_000 })
+    await page.locator('[data-my-assets-slot][hidden]').waitFor({
+      state: 'attached',
+      timeout: 10_000,
+    })
     const myAssetsCloseLatencyMs = Date.now() - myAssetsCloseStartedAt
     await page.locator('[data-canvas-my-assets]').click()
     await page.locator('[data-my-assets-slot][data-my-assets-open="true"]').waitFor({ timeout: 10_000 })
@@ -820,6 +833,7 @@ try {
       clipperMounted,
       ...clipperState,
       clipperUncategorizedSelected,
+      clipperEmptySelectionText,
       myAssetsOpenLatencyMs,
       myAssetsCloseLatencyMs,
       referenceCards,

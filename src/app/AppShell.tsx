@@ -122,6 +122,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         */}
         <div className={styles.railSlot} data-rail-slot aria-hidden="true" />
         <AppSidebar />
+        <div className={styles.myAssetsShellSlot} data-my-assets-shell-slot />
         {/* 工作台自行注册 renderer；AppShell 只按不透明 host record 渲染。 */}
         <AgentHostOutlet />
         {/*

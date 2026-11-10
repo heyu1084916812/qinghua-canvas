@@ -2,15 +2,19 @@ import { openUrl } from '@tauri-apps/plugin-opener'
 import type { ClipperItem } from '../../../domain/inspiration/clipper'
 import {
   IconChat,
+  IconCheck,
   IconDelete,
   IconImage,
   IconPlus,
 } from '../../../workbenches/canvas/toolbar/icons'
-import styles from './ClipperPanel.module.css'
+import styles from './ClipperItemCard.module.css'
 
 export function ClipperItemCard({
   item,
   busy,
+  selectable = false,
+  selected = false,
+  onToggleSelect,
   onAgent,
   onReference,
   onCanvas,
@@ -18,26 +22,43 @@ export function ClipperItemCard({
 }: {
   item: ClipperItem
   busy: boolean
+  selectable?: boolean
+  selected?: boolean
+  onToggleSelect?: () => void
   onAgent: () => void
   onReference: () => void
   onCanvas: () => void
   onRemove: () => void
 }) {
   return (
-    <article className={styles.item} data-clipper-item={item.id}>
+    <article
+      className={styles.item}
+      data-clipper-item={item.id}
+      data-clipper-selected={selected ? 'true' : 'false'}
+      data-selected={selected ? 'true' : 'false'}
+    >
       <button
         type="button"
         className={styles.media}
-        aria-label={`打开来源：${item.title}`}
-        title={item.title}
-        onClick={() => void openUrl(item.url)}
+        aria-label={selectable ? `选择 ${item.title}` : `打开来源：${item.title}`}
+        aria-pressed={selectable ? selected : undefined}
+        title={selectable ? undefined : item.title}
+        onClick={() => {
+          if (selectable) onToggleSelect?.()
+          else void openUrl(item.url)
+        }}
       >
         <img src={item.imageUrl} alt="" loading="lazy" referrerPolicy="no-referrer" />
+        {selectable && selected ? (
+          <span className={styles.selectCheck} data-clipper-select-check>
+            <IconCheck size={14} />
+          </span>
+        ) : null}
       </button>
       <div className={styles.itemBody}>
         <strong>{item.title}</strong>
-        <span>{hostOf(item.url)}</span>
-        <div className={styles.itemActions}>
+        <span>{selectable ? item.category : hostOf(item.url)}</span>
+        {selectable ? null : <div className={styles.itemActions}>
           <button
             type="button"
             className={styles.action}
@@ -82,7 +103,7 @@ export function ClipperItemCard({
           >
             <IconDelete size={14} />
           </button>
-        </div>
+        </div>}
       </div>
     </article>
   )

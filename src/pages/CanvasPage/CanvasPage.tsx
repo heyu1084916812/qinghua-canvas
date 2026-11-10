@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import { useParams, useLocation, useNavigate } from 'react-router-dom'
 import { usePlatform } from '../../app/providers/PlatformProvider'
 import { openGlobalSettings } from '../../state/ui/globalSettings'
@@ -30,6 +30,11 @@ import { projectRoute } from '../../domain/shared/workbench'
 import {
   openContextKitsDialog,
 } from '../../state/ui/contextKitsDialog'
+import { MyAssetsDock, MyAssetsDockButton } from './MyAssetsDock'
+import {
+  createMyAssetsDockStore,
+  type MyAssetsDockStore,
+} from './myAssetsDockStore'
 import styles from './CanvasPage.module.css'
 
 const LightboxLayer = lazy(() =>
@@ -45,13 +50,6 @@ const TextEditorLayer = lazy(() =>
 const LogPanel = lazy(() =>
   import('../../workbenches/canvas/panels/LogPanel').then((module) => ({
     default: module.LogPanel,
-  })),
-)
-const MY_ASSETS_EXIT_MS = 160
-const loadMyAssetsDrawer = () => import('./MyAssetsDrawer')
-const MyAssetsDrawer = lazy(() =>
-  loadMyAssetsDrawer().then((module) => ({
-    default: module.MyAssetsDrawer,
   })),
 )
 const CanvasAgentHostBridge = lazy(() =>
@@ -137,10 +135,9 @@ function CanvasProject({ projectId }: { projectId: string }) {
   const seededRef = useRef(false)
   const [externalEdit, setExternalEdit] = useState(false)
   const [logOpen, setLogOpen] = useState(false)
-  const [myAssetsOpen, setMyAssetsOpen] = useState(false)
-  const [myAssetsMounted, setMyAssetsMounted] = useState(false)
-  const [myAssetsAnimatedOpen, setMyAssetsAnimatedOpen] = useState(false)
-  const myAssetsSlotRef = useRef<HTMLDivElement | null>(null)
+  const myAssetsDockRef = useRef<MyAssetsDockStore | null>(null)
+  myAssetsDockRef.current ??= createMyAssetsDockStore()
+  const myAssetsDock = myAssetsDockRef.current
   const [canvasBrowserUrl, setCanvasBrowserUrl] = useState('')
   /**
    * 水合完成的计数（只用来**触发重跑**，值本身没意义）。
@@ -150,29 +147,6 @@ function CanvasProject({ projectId }: { projectId: string }) {
    * 那支 effect 会在节点还没读回来时跑一次，然后**再也不会跑**。
    */
   const [hydratedAt, setHydratedAt] = useState(0)
-  useEffect(() => {
-    void loadMyAssetsDrawer()
-  }, [])
-  useLayoutEffect(() => {
-    if (!myAssetsOpen) return
-    setMyAssetsMounted(true)
-    let firstFrame = 0
-    let secondFrame = 0
-    firstFrame = window.requestAnimationFrame(() => {
-      secondFrame = window.requestAnimationFrame(() => setMyAssetsAnimatedOpen(true))
-    })
-    return () => {
-      window.cancelAnimationFrame(firstFrame)
-      window.cancelAnimationFrame(secondFrame)
-    }
-  }, [myAssetsOpen])
-  useLayoutEffect(() => {
-    if (myAssetsOpen) return
-    setMyAssetsAnimatedOpen(false)
-    if (!myAssetsMounted) return
-    const timer = window.setTimeout(() => setMyAssetsMounted(false), MY_ASSETS_EXIT_MS)
-    return () => window.clearTimeout(timer)
-  }, [myAssetsMounted, myAssetsOpen])
   useEffect(() => {
     if (projectId !== 'demo') rememberActiveCanvas(projectId)
   }, [projectId])
@@ -470,34 +444,12 @@ function CanvasProject({ projectId }: { projectId: string }) {
           className={styles.page}
           data-canvas-hydrated={cached.hydrated || hydratedAt > 0 ? 'true' : 'false'}
         >
-          {myAssetsMounted ? (
-            <div
-              ref={myAssetsSlotRef}
-              className={styles.myAssetsSlot}
-              data-my-assets-slot
-              data-my-assets-open={myAssetsAnimatedOpen ? 'true' : 'false'}
-            >
-              <Suspense
-                fallback={(
-                  <div
-                    className={styles.myAssetsLoading}
-                    data-my-assets-loading
-                    aria-busy="true"
-                  />
-                )}
-              >
-                <MyAssetsDrawer
-                  projectId={projectId}
-                  store={store}
-                  onClose={() => setMyAssetsOpen(false)}
-                  onOpenKitEditor={() => {
-                    setMyAssetsOpen(false)
-                    openContextKitsDialog()
-                  }}
-                />
-              </Suspense>
-            </div>
-          ) : null}
+          <MyAssetsDock
+            dock={myAssetsDock}
+            projectId={projectId}
+            store={store}
+            onOpenKitEditor={openContextKitsDialog}
+          />
           <div className={styles.canvasStage} data-canvas-stage>
           {/*
             ⛔ 顶部悬浮栏已整体去除（产品文档 §6.2 / 2026-09-27 应用壳改版）。
@@ -522,23 +474,7 @@ function CanvasProject({ projectId }: { projectId: string }) {
             不再占固定顶栏位置，也不会再挤压日志。
           */}
           <div className={styles.topLeftActions}>
-            <button
-              type="button"
-              className={styles.topBtn}
-              data-canvas-my-assets
-              data-canvas-context-kits
-              aria-label="我的素材"
-              title="我的素材"
-              aria-pressed={myAssetsOpen}
-              onPointerEnter={() => void loadMyAssetsDrawer()}
-              onFocus={() => void loadMyAssetsDrawer()}
-              onClick={() => {
-                void loadMyAssetsDrawer()
-                setMyAssetsOpen((current) => !current)
-              }}
-            >
-              我的素材
-            </button>
+            <MyAssetsDockButton dock={myAssetsDock} className={styles.topBtn} />
             <button
               type="button"
               className={styles.topBtn}
