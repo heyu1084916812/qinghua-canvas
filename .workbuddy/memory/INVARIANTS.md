@@ -1,5 +1,15 @@
 # CanvasFlow 不变量详表
 
+## Agent 媒体 chip 与套件卡片动作（2026-11-10）
+- `node` 与 `reference` 是同一类媒体引用：只能从 `MentionEditor.mentionChipViewOf` 取描述，正文用 `MentionChipView`；禁止任一入口单独写图标/名称结构。两类都显示真实缩略图时，基准尺寸为 144×26px、缩略图 18×18px，四组 UI 证据必须同时比较 class 与几何。
+- 套件图片、颜色、字体三点必须在主视觉下方的同一 `mediaMeta` 行：标签 `flex:1`，按钮 `flex:0 0 22px`，按钮 `position:static`。禁止用 `absolute` 三点覆盖色块、字体卡或描述。
+- 套件描述 textarea 必须 `box-sizing:border-box` 且 `max-width:100%`；编辑态左右边界必须完全落在所在 section 内。
+
+## 生成历史导入画布状态（2026-11-10）
+- `sendToActiveCanvas` 必须复用 `canvasStoreFor(projectId)`，不得创建临时 store；缓存未水合时只读一次 nodes/edges 后标记 hydrated。
+- 项目/素材存在性检查只取 `includePayload:false` 的元数据；新节点从当前 store viewport 向内 120 屏幕像素落位，不得沿整张图最右侧放置。
+- 写入后必须 `await store.flush()` 并 `broadcastWrite(projectId)`；验收要在同一 SPA 会话中从画布切到生成历史再返回，节点计数增加且图片完成解码，刷新不算通过。
+
 ## 参考右键菜单与套件详情直编（2026-11-10）
 
 - 项目参考卡必须同时支持 `contextmenu` 与 `Shift+F10`；菜单项复制/剪切/粘贴/创建副本/打开/加对话/重命名/导出/删除都必须有真实动作，不能放死菜单。

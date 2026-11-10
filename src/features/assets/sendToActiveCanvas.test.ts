@@ -2,10 +2,15 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import { createMemoryPlatform } from '../../platform/memory'
 import type { PlatformKit } from '../../platform/ports'
 import { registerAllSpecs, resetSpecs } from '../../domain/canvas/nodeSpecs'
+import { createStore } from '../../state/createStore'
 import {
   forgetActiveCanvas,
   rememberActiveCanvas,
 } from '../../state/project/activeCanvas'
+import {
+  canvasStoreFor,
+  resetCanvasStoreCache,
+} from '../../state/workbenches/canvas/storeCache'
 import {
   NoActiveCanvasError,
   sendAssetToActiveCanvas,
@@ -17,6 +22,7 @@ beforeEach(() => {
   resetSpecs()
   registerAllSpecs()
   forgetActiveCanvas()
+  resetCanvasStoreCache()
   platform = createMemoryPlatform()
 })
 
@@ -69,5 +75,52 @@ describe('sendAssetToActiveCanvas', () => {
       type: 'generation',
       data: { assetHash: 'h1', assetMime: 'image/png' },
     })
+  })
+
+  it('复用当前画布缓存并立即出现在原视口内，不要求刷新', async () => {
+    rememberActiveCanvas('p1')
+    await platform.storage.put('projects', {
+      id: 'p1',
+      name: '画布 A',
+      workbench: 'canvas',
+      createdAt: 1,
+      updatedAt: 1,
+      extra: {},
+    } as never)
+    await platform.storage.put('assets', {
+      id: 'h2',
+      hash: 'h2',
+      mime: 'image/png',
+      bytes: new Uint8Array([1, 2, 3]),
+      width: 40,
+      height: 20,
+    } as never)
+
+    const cached = canvasStoreFor('p1', () =>
+      createStore({ workbench: 'canvas', platform, projectId: 'p1' }),
+    )
+    cached.store.hydrate({ projectId: 'p1', nodes: [], edges: [] })
+    cached.store.setViewport({ x: 800, y: 600, zoom: 2 })
+    cached.hydrated = true
+
+    const result = await sendAssetToActiveCanvas(platform, {
+      hash: 'h2',
+      mime: 'image/png',
+      bytes: 3,
+      width: 40,
+      height: 20,
+      savedAt: 1,
+    })
+
+    expect(canvasStoreFor('p1', () => {
+      throw new Error('不应重建 store')
+    }).store).toBe(cached.store)
+    expect(cached.store.getSnapshot().nodes).toEqual([
+      expect.objectContaining({
+        id: result.nodeId,
+        x: 860,
+        y: 660,
+      }),
+    ])
   })
 })

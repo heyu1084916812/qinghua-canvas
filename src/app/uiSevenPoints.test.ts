@@ -36,6 +36,7 @@ describe('seven UI placement fixes', () => {
     const mentionRichText = read(
       'workbenches/canvas/panels/AgentPanel/MentionRichText.tsx',
     )
+    const mentionEditor = read('workbenches/canvas/text/MentionEditor.tsx')
     const referenceSource = read('pages/CanvasPage/ReferenceSourcePanel.tsx')
     const referenceCards = read('pages/CanvasPage/ReferenceGridCards.tsx')
     const referenceMenu = read('pages/CanvasPage/ReferenceCardActionMenu.tsx')
@@ -98,7 +99,7 @@ describe('seven UI placement fixes', () => {
     expect(kitSections).toContain('data-my-assets-kit-actions')
     expect(kitSections).toContain('styles.mediaThumb')
     expect(kitSections).toContain('styles.mediaMeta')
-    expect(kitSections).toContain('styles.moreInline')
+    expect(kitSections).toContain('styles.more')
     expect(kitSections).toContain('<ReferenceCardActionMenu')
     expect(kitSections).toContain('data-my-assets-kit-color-add')
     expect(kitSections).toContain('data-my-assets-kit-font-add')
@@ -106,7 +107,8 @@ describe('seven UI placement fixes', () => {
     expect(agentAttachments).toContain('createReferenceLedgerRepository')
     expect(agentAttachments).toContain("mention.kind === 'reference'")
     expect(agentAttachments).toContain("item?.kind !== 'image'")
-    expect(mentionRichText).toContain("kind === 'node' || kind === 'reference'")
+    expect(mentionRichText).toContain('<MentionChipView')
+    expect(mentionEditor).toContain("kind === 'node' || kind === 'reference'")
     expect(referenceSource).toContain('data-my-assets-reference-upload')
     expect(referenceSource).toContain('sendReferenceToAgent')
     expect(referenceSource).toContain('<MasonryGrid')

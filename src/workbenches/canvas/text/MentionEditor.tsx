@@ -150,15 +150,15 @@ export function stripMentionMarkup(text: string): string {
 }
 
 function makeChip(doc: Document, token: string): HTMLElement {
-  const kind = mentionKindOf(token)
+  const view = mentionChipViewOf(token)
   const chip = doc.createElement('span')
   chip.className = styles.chip ?? ''
   chip.setAttribute('contenteditable', 'false')
   chip.setAttribute('data-token', token)
-  if (kind) chip.setAttribute('data-mention-kind', kind)
+  if (view.kind) chip.setAttribute('data-mention-kind', view.kind)
   const icon = doc.createElement('span')
   icon.className = styles.chipIcon ?? ''
-  if (kind) icon.innerHTML = MENTION_ICON[kind]
+  if (view.kind) icon.innerHTML = MENTION_ICON[view.kind]
   /**
    * 缩略图槽：**节点**引用留给宿主往里填图（用户 2026-10-03：「艾特图片的时候需要
    * 和图 6 一样有图片的缩略图，当前只有一个图标和名称」）。
@@ -169,12 +169,77 @@ function makeChip(doc: Document, token: string): HTMLElement {
    */
   const label = doc.createElement('span')
   label.className = styles.chipLabel ?? ''
-  label.textContent = mentionLabel(token)
+  label.textContent = view.label
   const slot = doc.createElement('span')
   slot.className = styles.chipThumb ?? ''
-  slot.setAttribute('data-mention-thumb-slot', mentionIdOf(token) ?? '')
+  slot.setAttribute('data-mention-thumb-slot', view.id)
   chip.append(slot, icon, label)
   return chip
+}
+
+export interface MentionChipViewData {
+  kind: MentionKind | null
+  id: string
+  label: string
+  thumbUrl: string | null
+}
+
+/**
+ * `node` 与 `reference` 是同一类「媒体引用」：只要宿主能给出缩略图，就使用同一套
+ * 紧凑尺寸和真实图片。输入框、历史正文和画布入口都由这里取值，避免某个入口
+ * 继续长成「图标 + 长名字」。
+ */
+export function mentionChipViewOf(
+  token: string,
+  thumbOf?: (id: string) => string | null,
+): MentionChipViewData {
+  const kind = mentionKindOf(token)
+  const id = mentionIdOf(token) ?? ''
+  return {
+    kind,
+    id,
+    label: mentionLabel(token),
+    thumbUrl:
+      (kind === 'node' || kind === 'reference') && id
+        ? thumbOf?.(id) ?? null
+        : null,
+  }
+}
+
+/**
+ * 只读正文与可编辑输入框共享的最小渲染单元。编辑框在命令式 DOM 侧复用
+ * `mentionChipViewOf` 与同一份 CSS，正文侧复用这个 React 视图。
+ */
+export function MentionChipView({
+  token,
+  thumbOf,
+}: {
+  token: string
+  thumbOf?: (id: string) => string | null
+}) {
+  const view = mentionChipViewOf(token, thumbOf)
+  return (
+    <span
+      className={styles.chip}
+      data-token={token}
+      data-mention-kind={view.kind ?? undefined}
+      {...(view.thumbUrl ? { 'data-has-thumb': 'true' } : {})}
+    >
+      <span className={styles.chipThumb}>
+        {view.thumbUrl ? (
+          <img className={styles.chipThumbImg} src={view.thumbUrl} alt="" />
+        ) : null}
+      </span>
+      {view.kind ? (
+        <span
+          className={styles.chipIcon}
+          aria-hidden="true"
+          dangerouslySetInnerHTML={{ __html: MENTION_ICON[view.kind] }}
+        />
+      ) : null}
+      <span className={styles.chipLabel}>{view.label}</span>
+    </span>
+  )
 }
 
 /** 纯文本 → DOM（命中引用的切出来做成 chip，其余转成文本节点、换行转 `<br>`） */

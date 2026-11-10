@@ -87,7 +87,6 @@ export function KitAssetsSection({
                 openMenu={openMenu}
                 setOpenMenu={onMenu}
                 label={`编辑 ${item.name}`}
-                inline
               />
             </div>
             {openMenu?.key === `asset:${item.hash}` ? (
@@ -175,15 +174,17 @@ export function KitColorsSection({
             >
               {color.name}
             </span>
-            <small>{color.value}</small>
-            <MenuButton
-              keyName={`color:${color.id}`}
-              kind="color"
-              itemId={color.id}
-              openMenu={openMenu}
-              setOpenMenu={onMenu}
-              label={`编辑颜色 ${color.name}`}
-            />
+            <div className={styles.mediaMeta}>
+              <small>{color.value}</small>
+              <MenuButton
+                keyName={`color:${color.id}`}
+                kind="color"
+                itemId={color.id}
+                openMenu={openMenu}
+                setOpenMenu={onMenu}
+                label={`编辑颜色 ${color.name}`}
+              />
+            </div>
             {openMenu?.key === `color:${color.id}` ? (
               <ReferenceCardActionMenu
                 x={openMenu.x}
@@ -272,15 +273,17 @@ export function KitFontsSection({
               >
                 Ag
               </strong>
-              <small>{font.name}</small>
-              <MenuButton
-                keyName={`font:${font.id}`}
-                kind="font"
-                itemId={font.id}
-                openMenu={openMenu}
-                setOpenMenu={onMenu}
-                label={`编辑字体 ${font.name}`}
-              />
+              <div className={styles.mediaMeta}>
+                <small>{font.name}</small>
+                <MenuButton
+                  keyName={`font:${font.id}`}
+                  kind="font"
+                  itemId={font.id}
+                  openMenu={openMenu}
+                  setOpenMenu={onMenu}
+                  label={`编辑字体 ${font.name}`}
+                />
+              </div>
               {openMenu?.key === `font:${font.id}` ? (
                 <ReferenceCardActionMenu
                   x={openMenu.x}
@@ -338,7 +341,6 @@ function MenuButton({
   openMenu,
   setOpenMenu,
   label,
-  inline = false,
 }: {
   keyName: KitMenuKey
   kind: 'asset' | 'color' | 'font'
@@ -346,12 +348,11 @@ function MenuButton({
   openMenu: KitMenuState | null
   setOpenMenu: (state: KitMenuState | null) => void
   label: string
-  inline?: boolean
 }) {
   return (
     <button
       type="button"
-      className={[styles.more, inline ? styles.moreInline : ''].filter(Boolean).join(' ')}
+      className={styles.more}
       data-my-assets-kit-actions
       data-my-assets-kit-menu={kind}
       data-my-assets-kit-menu-id={itemId}

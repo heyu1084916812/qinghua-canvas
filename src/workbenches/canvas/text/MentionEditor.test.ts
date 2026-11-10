@@ -1,5 +1,8 @@
+import { createElement } from 'react'
+import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 import {
+  MentionChipView,
   mentionKindOf,
   mentionIdOf,
   mentionLabel,
@@ -80,5 +83,26 @@ describe('@ 引用 · 存储形态', () => {
     expect(stripMentionMarkup(`参考 ${t} 做一张海报`)).toBe(
       '参考 @品牌标准字 做一张海报',
     )
+  })
+  it('uses the same media chip presentation for canvas nodes and references', () => {
+    const node = mentionToken('node', 'node-1', 'canvas image')
+    const reference = mentionToken('reference', 'ref-1', 'reference image')
+    const render = (token: string) =>
+      renderToStaticMarkup(
+        createElement(MentionChipView, {
+          token,
+          thumbOf: () => 'blob:shared-thumb',
+        }),
+      )
+    const nodeHtml = render(node)
+    const referenceHtml = render(reference)
+    const classOf = (html: string) =>
+      /class="([^"]+)"[^>]*data-mention-kind="(?:node|reference)"/.exec(html)?.[1]
+
+    expect(nodeHtml).toContain('data-has-thumb="true"')
+    expect(referenceHtml).toContain('data-has-thumb="true"')
+    expect(nodeHtml).toContain('src="blob:shared-thumb"')
+    expect(referenceHtml).toContain('src="blob:shared-thumb"')
+    expect(classOf(nodeHtml)).toBe(classOf(referenceHtml))
   })
 })

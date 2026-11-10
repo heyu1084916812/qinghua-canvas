@@ -1,5 +1,11 @@
 # CanvasFlow（轻画）项目记忆
 
+### 总管2 第五十八轮：媒体 chip、套件动作布局与生成历史即时导入（2026-11-10）
+- `node` 与 `reference` 不能用“协议相同但 CSS 各写一套”收尾。`MentionEditor` 的 `mentionChipViewOf` 是唯一媒体引用描述，输入框命令式 DOM、历史正文 `MentionChipView` 和样式都消费这一份；两类 chip 必须同 class、同 144×26px、同 18×18px 缩略图。
+- 图片、颜色、字体三种套件卡统一为“主视觉 + 元信息行”。三点必须 `position:static`，贴元信息行右边，描述/色值/字体名在左侧；描述 textarea 必须 `box-sizing:border-box`，否则 100% 宽再叠 padding/border 会越过抽屉。
+- “生成历史 → 当前画布”必须复用 `canvasStoreFor(projectId)`，不能另建临时 store 只写库；否则返回画布时缓存已 `hydrated`，用户必须刷新才看到节点。项目/素材点查用 `includePayload:false` 和字段裁剪，落位以 store 当前 viewport 为原点。
+- 证据：四组 1440×900 / 1024×700 × 明暗 `nodeReferenceChipsMatch=true / description.contained=true / menu position=static / errors=[]`；同会话生成历史发送 67ms、返回画布节点 2→3、图片已解码。check 1149 modules / 4605 deps / 293 registrations；build 1281 modules；全量 Vitest 660 files / 5483 tests；Impeccable `[]`。未 push。
+
 ### 总管2 第五十七轮：套件图片卡动作与 Agent 参考缩略图（2026-11-10）
 
 - 套件图片卡不能再用一个 absolute 三点盖在图片和描述上。结构固定为 `.mediaThumb`（图片 + 右上 `+`）和 `.mediaMeta`（描述 `flex:1` + `moreInline` 固定预留），`+` 距上/右 `7px`，三点始终位于描述右端。

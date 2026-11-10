@@ -237,7 +237,7 @@ try {
     }, STORE)
     const page = await context.newPage()
     const errors = pageErrors(page)
-    await page.goto(BASE, { waitUntil: 'domcontentloaded', timeout: 30_000 })
+    await page.goto(BASE, { waitUntil: 'domcontentloaded', timeout: 60_000 })
     await page.evaluate((theme) => {
       localStorage.setItem('flow:onboarded', '1')
       localStorage.setItem('flow:canvasGuideDismissed', '1')
@@ -604,6 +604,7 @@ try {
         const chipRect = chip.getBoundingClientRect()
         const imageRect = chip.querySelector('img')?.getBoundingClientRect()
         return {
+          className: chip.className,
           width: Math.round(chipRect.width),
           height: Math.round(chipRect.height),
           thumbWidth: Math.round(imageRect?.width ?? 0),
@@ -738,6 +739,60 @@ try {
       }
     })
     await page.screenshot({ path: path.join(out, `${file}-canvas-reference-dropped.png`) })
+    await page.locator('[data-node-id]').last().click({ position: { x: 24, y: 24 } })
+    await page.locator('[data-follow-action="agent"]').waitFor({ timeout: 5_000 })
+    await page.locator('[data-follow-action="agent"]').click()
+    await page.locator('[data-agent-panel]').waitFor({ timeout: 15_000 })
+    const nodeChip = page
+      .locator('[data-agent-composer] [data-mention-kind="node"]')
+      .first()
+    await nodeChip.waitFor({ timeout: 15_000 })
+    await page.waitForFunction(
+      () => {
+        const chip = document.querySelector('[data-agent-composer] [data-mention-kind="node"]')
+        const image = chip?.querySelector('img')
+        return chip?.getAttribute('data-has-thumb') === 'true' &&
+          image instanceof HTMLImageElement &&
+          image.complete &&
+          image.naturalWidth > 0
+      },
+      { timeout: 15_000 },
+    )
+    const nodeChipShape = await nodeChip.evaluate((chip) => {
+      const chipRect = chip.getBoundingClientRect()
+      const imageRect = chip.querySelector('img')?.getBoundingClientRect()
+      return {
+        className: chip.className,
+        width: Math.round(chipRect.width),
+        height: Math.round(chipRect.height),
+        thumbWidth: Math.round(imageRect?.width ?? 0),
+        thumbHeight: Math.round(imageRect?.height ?? 0),
+      }
+    })
+    const referenceChipInSameComposer = page
+      .locator('[data-agent-composer] [data-mention-kind="reference"]')
+      .first()
+    await referenceChipInSameComposer.waitFor({ timeout: 15_000 })
+    const referenceChipShapeForCompare = await referenceChipInSameComposer.evaluate((chip) => {
+      const chipRect = chip.getBoundingClientRect()
+      const imageRect = chip.querySelector('img')?.getBoundingClientRect()
+      return {
+        className: chip.className,
+        width: Math.round(chipRect.width),
+        height: Math.round(chipRect.height),
+        thumbWidth: Math.round(imageRect?.width ?? 0),
+        thumbHeight: Math.round(imageRect?.height ?? 0),
+      }
+    })
+    const nodeReferenceChipsMatch =
+      nodeChipShape.className === referenceChipShapeForCompare.className &&
+      nodeChipShape.width === referenceChipShapeForCompare.width &&
+      nodeChipShape.height === referenceChipShapeForCompare.height &&
+      nodeChipShape.thumbWidth === referenceChipShapeForCompare.thumbWidth &&
+      nodeChipShape.thumbHeight === referenceChipShapeForCompare.thumbHeight
+    await page.screenshot({ path: path.join(out, `${file}-canvas-node-reference-chips.png`) })
+    await page.locator('[data-agent-close]').click()
+    await page.locator('[data-agent-panel]').waitFor({ state: 'hidden', timeout: 10_000 })
     await page.locator('[data-my-assets-reference-open]').first().dblclick()
     await page.locator('[data-reference-lightbox]').waitFor({ timeout: 15_000 })
     await page.locator('[data-reference-lightbox-media]').hover()
@@ -907,6 +962,24 @@ try {
     const kitAssetCardsBefore = await page.locator('[data-my-assets-kit-asset-add]').count()
     await page.locator('[data-my-assets-kit-description-edit]').click()
     await page.locator('[data-my-assets-kit-description]').fill('用于验证品牌套件直接编辑与多层素材复用。')
+    const kitDescriptionEditorGeometry = await page.evaluate(() => {
+      const textarea = document.querySelector('[data-my-assets-kit-description]')
+      const section = textarea?.closest('section')
+      const textareaRect = textarea?.getBoundingClientRect()
+      const sectionRect = section?.getBoundingClientRect()
+      return {
+        boxSizing: textarea ? getComputedStyle(textarea).boxSizing : '',
+        textareaLeft: textareaRect?.left ?? -1,
+        textareaRight: textareaRect?.right ?? -1,
+        sectionLeft: sectionRect?.left ?? -1,
+        sectionRight: sectionRect?.right ?? -1,
+        contained:
+          Boolean(textareaRect && sectionRect) &&
+          textareaRect.left >= sectionRect.left - 1 &&
+          textareaRect.right <= sectionRect.right + 1,
+      }
+    })
+    await page.screenshot({ path: path.join(out, `${file}-canvas-kit-description-editing.png`) })
     await page.locator('[data-my-assets-kit-description-save]').click()
     await page.waitForFunction(
       () => document.querySelector('[data-my-assets-kit-detail] [aria-live="polite"]')?.textContent?.includes('描述已更新'),
@@ -916,6 +989,20 @@ try {
       (await page.getByText('用于验证品牌套件直接编辑与多层素材复用。').count()) === 1
 
     await page.locator('[data-my-assets-kit-menu="color"]').first().click()
+    const kitColorMenuGeometry = await page.evaluate(() => {
+      const button = document.querySelector('[data-my-assets-kit-menu="color"]')
+      const meta = button?.parentElement
+      const label = meta?.querySelector('small')
+      const buttonRect = button?.getBoundingClientRect()
+      const metaRect = meta?.getBoundingClientRect()
+      const labelRect = label?.getBoundingClientRect()
+      return {
+        position: button ? getComputedStyle(button).position : '',
+        menuBottom: buttonRect && metaRect ? Math.round(metaRect.bottom - buttonRect.bottom) : -1,
+        menuRight: buttonRect && metaRect ? Math.round(metaRect.right - buttonRect.right) : -1,
+        labelBeforeMenu: Boolean(labelRect && buttonRect && labelRect.right <= buttonRect.left),
+      }
+    })
     await page.screenshot({ path: path.join(out, `${file}-canvas-kit-color-menu.png`) })
     await page.locator('[data-reference-card-action="edit"]').click()
     await page.locator('[data-color-picker-popover]').waitFor({ timeout: 5_000 })
@@ -929,6 +1016,21 @@ try {
     )
 
     await page.locator('[data-my-assets-kit-menu="font"]').first().click()
+    const kitFontMenuGeometry = await page.evaluate(() => {
+      const button = document.querySelector('[data-my-assets-kit-menu="font"]')
+      const meta = button?.parentElement
+      const label = meta?.querySelector('small')
+      const buttonRect = button?.getBoundingClientRect()
+      const metaRect = meta?.getBoundingClientRect()
+      const labelRect = label?.getBoundingClientRect()
+      return {
+        position: button ? getComputedStyle(button).position : '',
+        menuBottom: buttonRect && metaRect ? Math.round(metaRect.bottom - buttonRect.bottom) : -1,
+        menuRight: buttonRect && metaRect ? Math.round(metaRect.right - buttonRect.right) : -1,
+        labelBeforeMenu: Boolean(labelRect && buttonRect && labelRect.right <= buttonRect.left),
+      }
+    })
+    await page.screenshot({ path: path.join(out, `${file}-canvas-kit-font-menu.png`) })
     const fontChooserPromise = page.waitForEvent('filechooser')
     await page.locator('[data-reference-card-action="reupload"]').click()
     const fontChooser = await fontChooserPromise
@@ -1068,6 +1170,9 @@ try {
       shelfDetailSections,
       shelfDetailTitle,
       kitCardChrome,
+      kitColorMenuGeometry,
+      kitFontMenuGeometry,
+      kitDescriptionEditorGeometry,
       kitDescriptionSaved,
       kitColorEditorOpened,
       kitFontLibraryOptions,
@@ -1101,6 +1206,9 @@ try {
       referenceNodesBeforeDrop,
       referenceNodesAfterDrop,
       referenceDroppedTitle,
+      nodeChipShape,
+      referenceChipShapeForCompare,
+      nodeReferenceChipsMatch,
       selectionChrome,
       referenceNodesBeforeLightboxAdd,
       referenceNodesAfterLightboxAdd,

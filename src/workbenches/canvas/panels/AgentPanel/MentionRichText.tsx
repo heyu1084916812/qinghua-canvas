@@ -1,10 +1,7 @@
-import styles from '../../text/MentionEditor.module.css'
 import {
-  MENTION_ICON,
   MENTION_SPLIT_RE,
-  mentionIdOf,
+  MentionChipView,
   mentionKindOf,
-  mentionLabel,
 } from '../../text/MentionEditor'
 
 /**
@@ -36,29 +33,7 @@ export function MentionRichText({
         .map((part, i) => {
           const kind = part.startsWith('@[') ? mentionKindOf(part) : null
           if (!kind) return part ? <span key={i}>{part}</span> : null
-          const id = mentionIdOf(part) ?? ''
-          const url =
-            kind === 'node' || kind === 'reference'
-              ? (thumbOf?.(id) ?? null)
-              : null
-          return (
-            <span
-              key={i}
-              className={styles.chip}
-              data-mention-kind={kind}
-              {...(url ? { 'data-has-thumb': 'true' } : {})}
-            >
-              <span className={styles.chipThumb}>
-                {url ? <img className={styles.chipThumbImg} src={url} alt="" /> : null}
-              </span>
-              <span
-                className={styles.chipIcon}
-                aria-hidden="true"
-                dangerouslySetInnerHTML={{ __html: MENTION_ICON[kind] }}
-              />
-              <span className={styles.chipLabel}>{mentionLabel(part)}</span>
-            </span>
-          )
+          return <MentionChipView key={i} token={part} thumbOf={thumbOf} />
         })}
     </>
   )

@@ -93,7 +93,7 @@
 }
 
 /*
- * 缩略图槽：**节点**引用取到图之后，这里会多出一个 <img>，
+ * 缩略图槽：**节点**引用取到图之后，这里会多出一个 img 节点，
  * 同时 chip 上打 `data-has-thumb="true"` 把那枚矢量图标收起来 ——
  * 参考产品图 6 里就是「缩略图 + 名字」。
  */
@@ -128,6 +128,7 @@
  * 参考 chip 是「小缩略图 + 短名称」：它承载的是一次明确引用，
  * 不需要像路径一样铺满整行。缩略图保持方形，名称最多占剩余宽度。
  */
+.chip[data-mention-kind='node'],
 .chip[data-mention-kind='reference'] {
   max-width: 160px;
   height: 2em;
@@ -135,12 +136,14 @@
   padding: 2px 5px 2px 2px;
 }
 
+.chip[data-mention-kind='node'] .chipThumb,
 .chip[data-mention-kind='reference'] .chipThumb {
   width: 1.4em;
   height: 1.4em;
   border-radius: 3px;
 }
 
+.chip[data-mention-kind='node'] .chipLabel,
 .chip[data-mention-kind='reference'] .chipLabel {
   flex: 1 1 auto;
   max-width: 112px;

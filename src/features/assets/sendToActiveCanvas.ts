@@ -1,9 +1,13 @@
 import type { LibraryAsset } from '../../domain/shared/assetLibrary'
+import { assetNodeSize } from '../../domain/canvas/layout/assetNodeSize'
+import { findFreeRect } from '../../domain/agent/landing'
 import type { PlatformKit } from '../../platform/ports'
 import { createAssetNode } from '../canvas/importAsset'
 import { activeCanvasId } from '../../state/project/activeCanvas'
 import { rememberCanvasCover } from '../../state/project/cover'
 import { createStore } from '../../state/createStore'
+import { canvasStoreFor } from '../../state/workbenches/canvas/storeCache'
+import { broadcastWrite } from '../../app/session'
 
 export class NoActiveCanvasError extends Error {
   constructor() {
@@ -33,24 +37,61 @@ export async function sendAssetToActiveCanvas(
   if (!projectId) throw new NoActiveCanvasError()
 
   await platform.storage.open()
-  const projectRows = await platform.storage.query('projects', { id: projectId })
+  const [projectRows, assetRows] = await Promise.all([
+    platform.storage.query(
+      'projects',
+      { id: projectId },
+      { includePayload: false, fields: ['id', 'name'] },
+    ),
+    platform.storage.query(
+      'assets',
+      { id: asset.hash },
+      { includePayload: false, fields: ['id', 'mime'] },
+    ),
+  ])
   const project = projectRows[0]
   if (!project) throw new Error('当前画布项目已经不存在')
-  const assetRows = await platform.storage.query('assets', { id: asset.hash })
   if (!assetRows[0]) throw new Error('素材内容不存在，可能已经被清理')
 
-  const nodeRows = await platform.storage.query('nodes', { projectId })
-  const edgeRows = await platform.storage.query('edges', { projectId })
-  const store = createStore({ workbench: 'canvas', platform, projectId })
-  store.hydrate({
-    projectId,
-    nodes: nodeRows as never,
-    edges: edgeRows as never,
-  })
+  /**
+   * 必须复用本次会话里项目对应的 store。旧实现另建一个短生命周期 store，
+   * 只把节点写进数据库；返回画布时缓存已标记 `hydrated`，不会再次水合，
+   * 于是用户眼前看不到新图，必须整页刷新才出现。
+   */
+  const cached = canvasStoreFor(projectId, () =>
+    createStore({ workbench: 'canvas', platform, projectId }),
+  )
+  const store = cached.store
+  if (!cached.hydrated) {
+    const [nodeRows, edgeRows] = await Promise.all([
+      platform.storage.query('nodes', { projectId }),
+      platform.storage.query('edges', { projectId }),
+    ])
+    store.hydrate({
+      projectId,
+      nodes: nodeRows as never,
+      edges: edgeRows as never,
+    })
+    cached.hydrated = true
+  }
 
   const nodes = store.getSnapshot().nodes
-  const maxX = nodes.reduce((max, node) => Math.max(max, node.x + node.w), 0)
-  const minY = nodes.length > 0 ? Math.min(...nodes.map((node) => node.y)) : 0
+  const size = assetNodeSize({ width: asset.width, height: asset.height })
+  const viewport = store.getViewport()
+  const inset = 120 / Math.max(viewport.zoom, 0.01)
+  const spot = findFreeRect(
+    {
+      ...size,
+      x: viewport.x + inset,
+      y: viewport.y + inset,
+    },
+    nodes.map((node) => ({
+      x: node.x,
+      y: node.y,
+      w: node.w,
+      h: node.h,
+    })),
+  )
   const nodeId = createAssetNode(
     { platform, store, projectId },
     {
@@ -60,15 +101,14 @@ export async function sendAssetToActiveCanvas(
       height: asset.height,
       name: asset.prompt?.trim().slice(0, 24) || `素材-${asset.hash.slice(0, 6)}`,
     },
-    { x: nodes.length > 0 ? maxX + 64 : 80, y: minY },
+    { x: spot.x, y: spot.y },
   )
   if (!nodeId) {
-    store.dispose()
     throw new Error('画布没有建立素材节点')
   }
 
   await store.flush()
-  store.dispose()
+  broadcastWrite(projectId)
   void rememberCanvasCover(platform.storage, projectId, asset.hash)
   return {
     projectId,
