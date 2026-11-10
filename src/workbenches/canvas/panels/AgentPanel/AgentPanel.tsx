@@ -138,6 +138,7 @@ export function AgentPanel({
     fileRef: session.fileRef,
     attachFiles: session.attachFiles,
     addFromLibrary: session.addFromLibrary,
+    addResearchReference: session.addResearchReference,
     channels: session.channels,
   })
 

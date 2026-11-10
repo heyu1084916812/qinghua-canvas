@@ -1,5 +1,11 @@
 # CanvasFlow 不变量详表
 
+## Agent 调研候选进入参考（2026-11-10）
+- 调研候选只有点击真实“加入项目参考”动作后才能进入项目台账；搜索结果本身不得自动入库。图片候选必须先过 `saveDesignResearchItem` 的公开 URL、MIME、文件头、尺寸和像素上限门禁；文字候选写为 `kind=text`。
+- 项目参考写入后必须同时追加当前会话 `referenceIds` 并应用当前快照；只写台账不挂会话，下一轮生成不会把它当显式参考。同图按 asset hash 去重，文字按 URL 去重。
+- 来源映射固定：Pinterest → `pinterest`，Behance → `webFetch`，Openverse / Wikipedia / Google / Web → `search`；来源、作者、许可和权利提示写入参考 `what`。
+- UI 证据必须覆盖四组桌面视口和明暗，回读 `referenceItems` 与 `agentSessions.referenceIds`，并断言 `overflowX=false / errors=[]`。当前基线 `.playwright-verify/agent-research-selection-four/`。
+
 ## 生成历史首屏分页（2026-11-10）
 - 生成历史页面只能从 `AssetHistoryRepository.listPage({offset:0,limit:30})` 进入；首屏不得调用全量 `list()` 或整表扫 `runRecords`。
 - 每页素材元数据必须按该页 `outputHashes` 用 `queryPage('assets', {}, {ids})` 批量点查，`includePayload:false`，不能读图片字节。sqlite-v2 只允许 id/projectId 过滤与 hash 排序，其他条件要明确报错。

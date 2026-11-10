@@ -54,6 +54,7 @@ import { useAgentAttachmentsController } from './useAgentAttachmentsController'
 import { useAgentPanelQueueMenu } from './useAgentPanelQueueMenu'
 import { useAgentPanelRunLifecycle } from './useAgentPanelRunLifecycle'
 import { useAgentPanelSessionPresentation } from './useAgentPanelSessionPresentation'
+import { useAgentResearchReferenceController } from './useAgentResearchReferenceController'
 import type { AgentPanelRefs } from './useAgentPanelRefs'
 
 /**
@@ -512,6 +513,16 @@ export function useAgentPanelSessionModel({
     applySessionLifecycleSnapshot(next)
   }, [applySessionLifecycleSnapshot])
 
+  const addResearchReference = useAgentResearchReferenceController({
+    platform,
+    projectId,
+    current,
+    currentIdRef,
+    appendReferenceIds: sessions.appendReferenceIds,
+    applySessionSnapshot,
+    notify: store.notify,
+  })
+
   const {
     graph,
     items,
@@ -691,6 +702,7 @@ export function useAgentPanelSessionModel({
     thumbVersion,
     attachFiles,
     addFromLibrary,
+    addResearchReference,
 
     // ---- 对话展示 ----
     items,

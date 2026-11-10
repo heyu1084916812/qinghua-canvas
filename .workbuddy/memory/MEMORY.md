@@ -1,5 +1,13 @@
 # CanvasFlow（轻画）项目记忆
 
+### 总管2 第六十轮：Agent 调研候选进入项目参考与会话（2026-11-10）
+
+- 调研候选卡不能只有外链。用户点“加入项目参考”时，图片候选必须走 `saveDesignResearchItem` 的公开网、MIME、文件头和尺寸门禁，再写素材库与 `referenceItems`；文字候选保存为 `kind=text`，不能因为没图就丢掉。
+- 项目参考写入后必须把参考 id 追加到当前 Agent 会话 `referenceIds`，并同步当前快照；下一轮 `prepareAgentTurnRequest` 才会把它当显式参考进入上下文。只写参考面板、不挂会话，仍然不会用于生成。
+- 候选选择按图片 hash 或文字 URL 去重；同一候选重复点只保留一条参考。来源与许可信息写入 `what`，搜索来源统一为 `search`，Pinterest 保留 `pinterest`，Behance 用 `webFetch`。
+- 证据：四组 1440×900 / 1024×700 × 明暗点击 265–311ms，`referenceRows=1`、`sessionReferenceIds=[ref_search_text_research-add_1]`、`overflowX=false / errors=[]`。证据 `.playwright-verify/agent-research-selection-four/`。
+- 门禁：check 1156 modules / 4641 deps / 300 registrations；全量 Vitest 666 files（665 passed / 1 skipped）/ 5499 tests（5498 passed / 1 skipped）；build 1288 modules。未 push。
+
 ### 总管2 第五十九轮：生成历史 30 条首屏分页与 sqlite-v2 素材点查（2026-11-10）
 
 - 生成历史页面不能继续调用 `historyRepo.list()` 全量扫 `runRecords`；首屏只走 `listPage({offset:0,limit:30})`，素材元数据只按本页输出 hash 批量点查，底部每次继续 +30。

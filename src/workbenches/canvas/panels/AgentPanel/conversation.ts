@@ -44,6 +44,9 @@ export interface ConversationResearchItem {
   imageUrl: string
   source: string
   description?: string
+  credit?: string
+  license?: string
+  licenseUrl?: string
 }
 
 export interface ConversationProcessEntry {
@@ -352,6 +355,9 @@ export function describeToolResult(
             imageUrl: isPublicHttpUrl(imageUrl) ? imageUrl : '',
             source: String(item.source ?? 'web'),
             description: clean(String(item.description ?? '')),
+            credit: clean(String(item.credit ?? '')),
+            license: clean(String(item.license ?? '')),
+            licenseUrl: clean(String(item.licenseUrl ?? '')),
           }]
         })
         .slice(0, 6)

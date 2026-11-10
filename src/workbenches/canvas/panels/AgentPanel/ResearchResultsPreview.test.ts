@@ -1,6 +1,6 @@
 import { createElement } from 'react'
 import TestRenderer, { act } from 'react-test-renderer'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { ResearchResultsPreview } from './ResearchResultsPreview'
 
 describe('ResearchResultsPreview', () => {
@@ -43,5 +43,45 @@ describe('ResearchResultsPreview', () => {
     expect(
       renderer.root.findAll((node) => node.props['data-agent-research-item'] === 'wikipedia'),
     ).toHaveLength(1)
+  })
+
+  it('lets the user add one public candidate to project references', async () => {
+    const onAdd = vi.fn(async () => ({
+      ok: true,
+      message: '已加入项目参考，并挂到当前 Agent 会话',
+    }))
+    let renderer!: TestRenderer.ReactTestRenderer
+    act(() => {
+      renderer = TestRenderer.create(createElement(ResearchResultsPreview, {
+        limit: 3,
+        onAdd,
+        items: [{
+          id: 'openverse:1',
+          title: 'Packaging reference',
+          url: 'https://example.com/openverse',
+          imageUrl: 'https://example.com/openverse.jpg',
+          source: 'openverse',
+        }],
+      }))
+    })
+
+    const add = renderer.root.findByProps({
+      'data-agent-research-add': 'openverse:1',
+    })
+    await act(async () => {
+      add.props.onClick()
+      await Promise.resolve()
+      await Promise.resolve()
+    })
+
+    expect(onAdd).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'openverse:1' }),
+    )
+    expect(renderer.root.findByProps({
+      'data-agent-research-add': 'openverse:1',
+    }).props['data-added']).toBe('true')
+    expect(
+      renderer.root.findByProps({ role: 'status' }).props.children,
+    ).toContain('已加入项目参考')
   })
 })

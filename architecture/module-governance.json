@@ -7602,11 +7602,12 @@
     {
       "module": "src/workbenches/canvas/panels/AgentPanel/ResearchResultsPreview.tsx",
       "owner": "agent-research-results-ui",
-      "responsibility": "在 Agent 调研步骤中展示有上限的开放来源候选，图片和文本来源共用同一外链卡片。",
+      "responsibility": "在 Agent 调研步骤中展示有上限的开放来源候选，并提供逐条加入项目参考的真实动作。",
       "owns": [
         "调研候选缩略图与文本预览",
         "候选来源标签和外链行为",
-        "折叠态与展开态的数量上限"
+        "折叠态与展开态的数量上限",
+        "逐条加入参考的按钮状态与反馈"
       ],
       "doesNotOwn": [
         "联网搜索请求与结果解析",
@@ -7617,7 +7618,7 @@
         "ResearchResultsPreview"
       ],
       "test": [
-        "src/workbenches/canvas/panels/AgentPanel/ResearchResultsPreview.test.tsx"
+        "src/workbenches/canvas/panels/AgentPanel/ResearchResultsPreview.test.ts"
       ],
       "budget": 100
     },
@@ -7637,14 +7638,62 @@
       ],
       "publicApi": [
         "CSS_MODULE:Agent 联网调研候选",
+        "CSS_CLASS:card",
         "CSS_CLASS:grid",
         "CSS_CLASS:item",
-        "CSS_CLASS:source"
+        "CSS_CLASS:source",
+        "CSS_CLASS:add",
+        "CSS_CLASS:message"
       ],
       "test": [
-        "src/workbenches/canvas/panels/AgentPanel/ResearchResultsPreview.test.tsx"
+        "src/workbenches/canvas/panels/AgentPanel/ResearchResultsPreview.test.ts"
       ],
       "budget": 120
+    },
+    {
+      "module": "src/workbenches/canvas/panels/AgentPanel/agentResearchReference.ts",
+      "owner": "agent-research-reference",
+      "responsibility": "把用户选中的公开调研候选保存为素材和项目参考条目，保留来源与许可信息。",
+      "owns": [
+        "调研候选来源投影",
+        "候选图片落库",
+        "项目参考条目写入"
+      ],
+      "doesNotOwn": [
+        "联网搜索请求",
+        "Agent 会话引用字段",
+        "候选卡片渲染"
+      ],
+      "publicApi": [
+        "addResearchCandidateToProject",
+        "researchItemOf"
+      ],
+      "test": [
+        "src/workbenches/canvas/panels/AgentPanel/agentResearchReference.test.ts"
+      ],
+      "budget": 130
+    },
+    {
+      "module": "src/workbenches/canvas/panels/AgentPanel/useAgentResearchReferenceController.ts",
+      "owner": "agent-research-reference",
+      "responsibility": "把选中的调研候选挂到当前 Agent 会话 referenceIds，并同步快照与提示。",
+      "owns": [
+        "候选选择回调",
+        "当前会话引用追加",
+        "成功与失败提示"
+      ],
+      "doesNotOwn": [
+        "候选图片落库",
+        "参考台账事务",
+        "候选卡片渲染"
+      ],
+      "publicApi": [
+        "useAgentResearchReferenceController"
+      ],
+      "test": [
+        "src/workbenches/canvas/panels/AgentPanel/useAgentResearchReferenceController.test.ts"
+      ],
+      "budget": 100
     },
     {
       "module": "src/features/settings/cliOutputText.ts",

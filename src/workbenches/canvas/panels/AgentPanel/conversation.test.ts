@@ -233,6 +233,9 @@ describe('工具结果 → 人话', () => {
             imageUrl: '',
             source: 'wikipedia',
             description: '开放内容摘要',
+            credit: 'Wikipedia contributors',
+            license: 'CC BY-SA',
+            licenseUrl: 'https://creativecommons.org/licenses/by-sa/4.0/',
           },
         ],
         sources: [{ name: 'pinterest.com' }, { name: 'example.com' }],
@@ -246,7 +249,12 @@ describe('工具结果 → 人话', () => {
     ])
     expect(d.researchItems).toEqual([
       expect.objectContaining({ id: 'pinterest:1', source: 'pinterest' }),
-      expect.objectContaining({ id: 'wikipedia:1', source: 'wikipedia' }),
+      expect.objectContaining({
+        id: 'wikipedia:1',
+        source: 'wikipedia',
+        credit: 'Wikipedia contributors',
+        license: 'CC BY-SA',
+      }),
     ])
   })
 

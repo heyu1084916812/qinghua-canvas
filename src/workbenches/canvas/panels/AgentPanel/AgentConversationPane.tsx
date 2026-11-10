@@ -31,6 +31,7 @@ import {
 import { AgentStepIcon } from './AgentStepIcon'
 import {
   processBefore,
+  type ConversationResearchItem,
   type ConversationItem,
   type ConversationProcessEntry,
 } from './conversation'
@@ -87,6 +88,9 @@ export interface AgentConversationPaneProps {
   onEditingQueueIdChange(id: string | null): void
   onEditingQueueTextChange(value: string): void
   onResumeQueue(): void
+  onAddResearchReference?(
+    item: ConversationResearchItem,
+  ): Promise<{ ok: boolean; message: string }>
 }
 
 export function AgentConversationPane({
@@ -133,6 +137,7 @@ export function AgentConversationPane({
   onEditingQueueIdChange,
   onEditingQueueTextChange,
   onResumeQueue,
+  onAddResearchReference,
 }: AgentConversationPaneProps) {
   return (
     <div className={styles.contentWrap} data-agent-scroll-wrap>
@@ -371,6 +376,7 @@ export function AgentConversationPane({
                   <ResearchResultsPreview
                     items={item.researchItems}
                     limit={isOpen ? 6 : 3}
+                    onAdd={onAddResearchReference}
                   />
                 ) : null}
                 {hasDetail ? (

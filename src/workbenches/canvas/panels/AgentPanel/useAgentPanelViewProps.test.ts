@@ -323,6 +323,7 @@ describe('useAgentPanelViewProps / 字段清单对账', () => {
       'latestUserStartedAt',
       'liveActivities',
       'liveProcess',
+      'onAddResearchReference',
       'onAdvanceToNext',
       'onBeginQueueEdit',
       'onCancel',
