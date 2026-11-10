@@ -1,5 +1,13 @@
 # CanvasFlow（轻画）项目记忆
 
+### 总管2 第五十五轮：我的素材四边留白与 Agent 对齐（2026-11-10）
+
+- 左侧 `myAssetsShellSlot` 必须和 Agent 一样复用 `--shell-gap=15px`：默认保留上/下 margin，打开时同时动画 width、margin-left、margin-right；关闭时左右 margin 回到 0，不能永久占出 30px 空白。
+- 抽屉表面改由 `MyAssetsDock` 的 `panelFrame` 统一承载：1px `--stroke`、`--radius-node=14px`、`--bg-app`，内部抽屉只负责内容布局，不再重复写宽度和右边框。抽屉、加载骨架统一 `box-sizing: border-box`，否则边框会再占 2px。
+- 默认抽屉宽度和 Agent 同为 420px；标题从 15px 对齐到 Agent 的 `--fs-title=14px`。两侧同时打开时由 `.body:has(...)` 等宽收缩并至少给画布留 240px，避免 1024 窗口出现两个 420px 面板把画布挤到 105px。
+- 四组实测单开：四边间距均为 15px、圆角 14px、抽屉宽 420px，画布让位 450px。双开：1440 两侧均 420px、画布 476px；1024 两侧均 330px、画布 240px；四组 `pageOverflowX=false / childrenOutsideX=0 / errors=[]`。
+- 证据：四组 1440×900 / 1024×700 × 明暗均 `pageOverflowX=false / childrenOutsideX=0 / errors=[]`；`.playwright-verify/ui-seven-after/report.json`。check 1139 modules / 4549 deps / 283 registrations；build 1271 modules；串行全量 Vitest 660 files（659 passed / 1 skipped）/ 5480 tests（5479 passed / 1 skipped）。未 push。
+
 ### 总管2 第五十四轮：Clipper 分类、多选与我的素材壳层（2026-11-10）
 
 - 分类与收藏共用一个 preset 快照：`clipper:collection:v1` 同时保存 `items` 和 `categories`；空分类必须保留，移动分组时目标分类不存在则补进列表。名称去空白、限长 24，拒绝空名、“全部”和“未分类”。

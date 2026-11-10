@@ -6,6 +6,9 @@
   `MyAssetsDockButton` 与 `MyAssetsDock` 各自订阅；开关变化不得重绘 React Flow 或整张画布页。
 - 抽屉必须通过 portal 挂到 AppShell 的 `[data-my-assets-shell-slot]` 左侧 flex 插槽，和 Agent 的
   右侧壳层一样由壳层宽度变化挤压 workspace。不能在画布页内部再放一份宽度过渡槽。
+- 左侧插槽与 Agent 共用 `--shell-gap=15px`：上/下间距常驻，打开时同时补齐左/右 margin；
+  关闭时左/右 margin 必须回到 0。抽屉表面使用 `--radius-node=14px`、1px `--stroke` 和 `--bg-app`，
+  不能贴住侧栏、标题栏或画布。
 - 展开先解除 `hidden`，再经过两个 `requestAnimationFrame` 后开启壳层宽度；懒加载内容用同底色占位。
   收起只把 `data-my-assets-shell-active` 置空并隐藏 `panelFrame`，**不能卸载 `MyAssetsDrawer`**，
   否则会再次引入整棵内容清理抖动。
@@ -14,7 +17,11 @@
   最大帧间隔 `12.2ms`、超过 25ms 的帧为 0。
 - UI 证据必须覆盖 1440×900 / 1024×700 × 明暗，记录 `slotWidth / drawerWidth / canvasWidthDelta /
   slotTransitionDuration / drawerTransitionDuration / drawerOpacity / pageOverflowX /
-  childrenOutsideX / errors`，并保留展开中与稳定态截图。
+  drawerGapLeft / drawerGapTop / drawerGapRight / drawerGapBottom / drawerRadius /
+  childrenOutsideX / errors`，并保留展开中与稳定态截图。当前基线四边间距为 15px，
+  圆角 14px；默认抽屉宽度与 Agent 同为 420px，标题统一使用 `--fs-title`。
+- 两侧同时打开时，`.body:has(...)` 必须给两边分配同一宽度，并至少给画布保留 240px。
+  当前基线：1440 为 420/420、画布 476px；1024 为 330/330、画布 240px。
 
 ## Clipper 分类与多选边界（2026-11-10）
 

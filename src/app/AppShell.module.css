@@ -150,13 +150,33 @@
   align-self: stretch;
   min-width: 0;
   width: 0;
+  margin: var(--shell-gap) 0;
   pointer-events: none;
-  transition: width var(--dur-shell, 220ms) var(--ease-panel, ease-out);
+  transition:
+    width var(--dur-shell, 220ms) var(--ease-panel, ease-out),
+    margin-left var(--dur-shell, 220ms) var(--ease-panel, ease-out),
+    margin-right var(--dur-shell, 220ms) var(--ease-panel, ease-out);
 }
 
 .myAssetsShellSlot[data-my-assets-shell-active='true'] {
-  width: clamp(320px, 30vw, 420px);
+  width: min(420px, calc(100vw - var(--sidebar-w, 64px) - var(--shell-gap) * 3));
+  margin-left: var(--shell-gap);
+  margin-right: var(--shell-gap);
   pointer-events: auto;
+}
+
+/*
+ * 两侧同时打开时按同一宽度收缩，至少给画布保留 240px。
+ * 单开时仍各自使用 420px，避免用户切换一个面板时看到宽度跳变。
+ */
+.body:has(> .myAssetsShellSlot[data-my-assets-shell-active='true'])
+  > .agentShellSlot[data-agent-shell-active='true'],
+.body:has(> .agentShellSlot[data-agent-shell-active='true'])
+  > .myAssetsShellSlot[data-my-assets-shell-active='true'] {
+  width: min(
+    420px,
+    calc((100vw - var(--sidebar-w, 64px) - var(--shell-gap) * 4 - 240px) / 2)
+  );
 }
 
 .myAssetsShellSlot > * {

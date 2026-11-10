@@ -314,9 +314,12 @@ try {
       const panel = root
       const slot = document.querySelector('[data-my-assets-shell-slot]')
       const stage = document.querySelector('[data-canvas-stage]')
+      const rail = document.querySelector('[data-rail-slot]')
       const tabs = [...(root?.querySelectorAll('[data-my-assets-source]') ?? [])]
       const body = root?.querySelector('[data-my-assets-body]')
       const panelRect = panel?.getBoundingClientRect()
+      const railRect = rail?.getBoundingClientRect()
+      const stageRect = stage?.getBoundingClientRect()
       return {
         drawerLeft: panelRect?.left ?? -1,
         drawerWidth: panelRect?.width ?? 0,
@@ -325,6 +328,11 @@ try {
         drawerOpacity: root ? getComputedStyle(root).opacity : '',
         drawerTransitionDuration: root ? getComputedStyle(root).transitionDuration : '',
         stageWidthOpen: stage?.getBoundingClientRect().width ?? -1,
+        drawerGapLeft: panelRect && railRect ? panelRect.left - railRect.right : -1,
+        drawerGapRight: panelRect && stageRect ? stageRect.left - panelRect.right : -1,
+        drawerGapTop: panelRect && railRect ? panelRect.top - railRect.top : -1,
+        drawerGapBottom: panelRect && railRect ? railRect.bottom - panelRect.bottom : -1,
+        drawerRadius: root ? getComputedStyle(root).borderRadius : '',
         tabCount: tabs.length,
         tabSelected: tabs.filter((tab) => tab.getAttribute('aria-selected') === 'true').length,
         pageOverflowX: document.documentElement.scrollWidth > document.documentElement.clientWidth + 1,
@@ -560,6 +568,32 @@ try {
     await page.locator('[data-agent-composer] [data-mention-kind="reference"]').first().waitFor({ timeout: 15_000 })
     const referenceClickChipCount =
       await page.locator('[data-agent-composer] [data-mention-kind="reference"]').count()
+    const agentGeometry = await page.evaluate(() => {
+      const slot = document.querySelector('[data-agent-shell-slot]')
+      const surface = slot?.firstElementChild
+      const workspace = document.querySelector('[data-app-workspace]')
+      const rail = document.querySelector('[data-rail-slot]')
+      const myAssets = document.querySelector('[data-my-assets-drawer]')
+      const surfaceRect = surface?.getBoundingClientRect()
+      const workspaceRect = workspace?.getBoundingClientRect()
+      const railRect = rail?.getBoundingClientRect()
+      const myAssetsRect = myAssets?.getBoundingClientRect()
+      return {
+        width: surfaceRect?.width ?? 0,
+        myAssetsWidth: myAssetsRect?.width ?? 0,
+        workspaceWidth: workspaceRect?.width ?? 0,
+        gapLeft:
+          workspaceRect && surfaceRect ? surfaceRect.left - workspaceRect.right : -1,
+        gapRight:
+          surfaceRect ? document.documentElement.clientWidth - surfaceRect.right : -1,
+        gapTop: surfaceRect && railRect ? surfaceRect.top - railRect.top : -1,
+        gapBottom: surfaceRect && railRect ? railRect.bottom - surfaceRect.bottom : -1,
+        radius:
+          (slot?.querySelector('[data-agent-panel]') &&
+            getComputedStyle(slot.querySelector('[data-agent-panel]')).borderRadius) ||
+          '',
+      }
+    })
     await page.waitForTimeout(350)
     await page.screenshot({ path: path.join(out, `${file}-canvas-reference-click-agent.png`) })
     await page.locator('[data-agent-close]').click()
@@ -854,6 +888,7 @@ try {
       referenceExpandOpenedLightbox,
       referenceDoubleClickOpenedLightbox,
       referenceClickChipCount,
+      agentGeometry,
       referenceKitClickChipCount,
       referenceKitExpandVisible,
       referenceKitExpandOpenedLightbox,
