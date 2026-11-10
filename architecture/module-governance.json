@@ -537,7 +537,9 @@
       "budget": 223
     }
   ],
-  "removedModules": [],
+  "removedModules": [
+    "src/pages/CanvasPage/clipper/ClipperBrowser.tsx"
+  ],
   "moduleMoves": [],
   "modules": [
     {
@@ -917,14 +919,14 @@
     {
       "module": "src/pages/CanvasPage/clipper/ClipperPanel.tsx",
       "owner": "clipper-panel",
-      "responsibility": "网页地址抓取、轻画浏览器预览和网页收藏到参考/Agent/画布的交互编排。",
+      "responsibility": "轮询浏览器拖入图片队列，筛选全部/未分类收藏，并接到参考、Agent 和画布。",
       "owns": [
-        "网页收藏地址输入与单页抓取",
-        "全部 / 未分类筛选和嵌入式浏览",
+        "接收端状态轮询和拖入图片入库",
+        "全部与未分类筛选",
         "收藏、移除、加入参考、加入 Agent、放到画布动作"
       ],
       "doesNotOwn": [
-        "网页收藏纯规则与持久化",
+        "网页扩展权限、拖拽脚本和自动配对协议",
         "网络协议、素材下载和参考台账事务",
         "画布节点内部渲染"
       ],
@@ -936,86 +938,19 @@
         "src/state/shared/clipperCollectionRepository.test.ts",
         "src/features/shared/research/designResearchRunner.test.ts"
       ],
-      "budget": 450
-    },
-    {
-      "module": "src/pages/CanvasPage/clipper/ClipperPairing.tsx",
-      "owner": "clipper-panel",
-      "responsibility": "展示并复制浏览器扩展配对所需的本机地址和临时令牌。",
-      "owns": [
-        "接收端地址 / 令牌展示",
-        "本机剪贴板复制反馈"
-      ],
-      "doesNotOwn": [
-        "接收端 HTTP 服务和令牌生成",
-        "扩展安装和发送动作"
-      ],
-      "publicApi": [
-        "ClipperReceiverInfo",
-        "ClipperPairing"
-      ],
-      "test": [
-        "src/pages/CanvasPage/clipper/ClipperPairing.test.ts"
-      ],
-      "budget": 100
-    },
-    {
-      "module": "src/pages/CanvasPage/clipper/ClipperInstallCard.tsx",
-      "owner": "clipper-panel",
-      "responsibility": "展示浏览器扩展安装入口、商店/离线模式与失败兜底，并联动配对设置。",
-      "owns": [
-        "扩展安装来源解析与官方商店域名白名单",
-        "一键安装 / 下载扩展包 / 安装说明三种入口状态",
-        "安装失败提示与离线安装步骤"
-      ],
-      "doesNotOwn": [
-        "浏览器静默安装",
-        "接收端 HTTP 服务和配对令牌生成",
-        "扩展商店上架与发布"
-      ],
-      "publicApi": [
-        "ClipperInstallCard",
-        "ClipperBrowser",
-        "ClipperInstallSource",
-        "ClipperStoreLink",
-        "resolveClipperInstallSource"
-      ],
-      "test": [
-        "src/pages/CanvasPage/clipper/ClipperPairing.test.ts"
-      ],
-      "budget": 180
-    },
-    {
-      "module": "src/pages/CanvasPage/clipper/ClipperBrowser.tsx",
-      "owner": "clipper-panel",
-      "responsibility": "在网页收藏抽屉内提供受限 iframe 预览和系统浏览器兜底。",
-      "owns": [
-        "嵌入式浏览地址栏几何",
-        "关闭和外部打开动作"
-      ],
-      "doesNotOwn": [
-        "跨域页面内容读取",
-        "网页解析与收藏"
-      ],
-      "publicApi": [
-        "ClipperBrowser"
-      ],
-      "test": [
-        "src/app/uiSevenPoints.test.ts"
-      ],
-      "budget": 80
+      "budget": 320
     },
     {
       "module": "src/pages/CanvasPage/clipper/ClipperItemCard.tsx",
       "owner": "clipper-panel",
-      "responsibility": "渲染单个网页收藏卡及其加入 Agent、参考、画布和移除动作。",
+      "responsibility": "渲染单张拖入图片收藏及其加入 Agent、参考、画布和移除动作。",
       "owns": [
         "收藏图、标题与来源展示",
         "卡片级四个动作入口"
       ],
       "doesNotOwn": [
         "收藏数据和素材持久化",
-        "网页抓取与浏览器状态"
+        "图片抓取、扩展和接收端状态"
       ],
       "publicApi": [
         "ClipperItemCard"
@@ -1028,11 +963,11 @@
     {
       "module": "src/pages/CanvasPage/clipper/clipperActions.ts",
       "owner": "clipper-actions",
-      "responsibility": "把网页收藏落为素材、项目参考或当前画布节点，复用现有导入与 Agent handoff。",
+      "responsibility": "把图片收藏落为素材、项目参考或当前画布节点，复用现有导入与 Agent handoff。",
       "owns": [
         "公开图片保存为素材",
-        "网页收藏投影为项目参考",
-        "网页收藏发送到当前画布"
+        "图片收藏投影为项目参考",
+        "图片收藏发送到当前画布"
       ],
       "doesNotOwn": [
         "网络页面解析",
@@ -1053,51 +988,28 @@
     {
       "module": "src/pages/CanvasPage/clipper/ClipperPanel.module.css",
       "owner": "clipper-panel",
-      "responsibility": "网页收藏、地址输入、轻画浏览器和两列收藏网格的样式域。",
+      "responsibility": "定义图片收藏筛选、空态、收藏网格和窄宽度降级样式。",
       "owns": [
-        "收藏筛选与操作按钮",
-        "嵌入式浏览器几何",
+        "全部与未分类筛选",
+        "全网页拖拽收藏空态",
         "收藏卡网格和窄宽度降级"
       ],
       "doesNotOwn": [
         "组件状态与抓取逻辑",
+        "扩展权限与拖拽脚本",
         "共享主题令牌定义"
       ],
       "publicApi": [
-        "CSS_MODULE:网页收藏与轻画浏览器",
-        "CSS_CLASS:panel",
-        "CSS_CLASS:composer",
-        "CSS_CLASS:browser",
+        "CSS_MODULE:图片收藏筛选与空态",
+        "CSS_CLASS:subhead",
+        "CSS_CLASS:empty",
         "CSS_CLASS:grid",
         "CSS_CLASS:item"
       ],
       "test": [
         "src/domain/inspiration/clipper.test.ts"
       ],
-      "budget": 300
-    },
-    {
-      "module": "src/pages/CanvasPage/clipper/ClipperInstallCard.module.css",
-      "owner": "clipper-panel",
-      "responsibility": "扩展安装卡的紧凑布局、操作层级、焦点与失败/说明状态。",
-      "owns": [
-        "安装卡几何和两行操作布局",
-        "主按钮、配对入口和说明区的交互状态"
-      ],
-      "doesNotOwn": [
-        "安装逻辑和外部链接策略",
-        "共享主题令牌定义"
-      ],
-      "publicApi": [
-        "CSS_MODULE:扩展安装卡与离线说明",
-        "CSS_CLASS:card",
-        "CSS_CLASS:actions",
-        "CSS_CLASS:guide"
-      ],
-      "test": [
-        "src/pages/CanvasPage/clipper/ClipperPairing.test.ts"
-      ],
-      "budget": 140
+      "budget": 180
     },
     {
       "module": "src/features/shared/pinterest/PinterestSetupView.tsx",

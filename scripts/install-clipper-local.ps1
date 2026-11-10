@@ -68,7 +68,7 @@ foreach ($name in $requested) {
 }
 
 Write-Host ''
-Write-Host "Qinghua Clipper $($manifest.version) copied to:" -ForegroundColor Green
+Write-Host "Qinghua Clipper $($manifest.version) copied to:"
 Write-Host "  $target"
 Write-Host 'The stable extension path is now on the clipboard.'
 Write-Host ''
@@ -93,9 +93,9 @@ $explorerArgs = '/select,"{0}"' -f $copiedManifest
 Start-Process -FilePath 'explorer.exe' -ArgumentList $explorerArgs
 
 Write-Host 'Final browser-confirmed step:'
-Write-Host '  1. Enable Developer mode on the extensions page.'
-Write-Host '  2. Click Load unpacked.'
-Write-Host '  3. Press Ctrl+L in the folder picker, paste the clipboard path, and select it.'
-Write-Host '  4. Open Qinghua My Assets -> Qinghua Plugin and paste the local endpoint and pairing token.'
+Write-Host '  1. If Clipper is not installed yet, enable Developer mode and click Load unpacked.'
+Write-Host '  2. If Clipper is already installed, click Reload on its extension card.'
+Write-Host '  3. Open the Clipper popup and turn on drag collection.'
+Write-Host '  4. Qinghua and Clipper pair automatically; no endpoint or token entry is needed.'
 Write-Host ''
 Write-Host 'Chrome / Edge will remember this directory; no reinstall is needed on later launches.'

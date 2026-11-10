@@ -32,13 +32,11 @@ export function MyAssetsDrawer({
   store,
   onClose,
   onOpenKitEditor,
-  onOpenCanvasBrowser,
 }: {
   projectId: string
   store: CanvasStore
   onClose: () => void
   onOpenKitEditor: () => void
-  onOpenCanvasBrowser?: (url: string) => void
 }) {
   const platform = usePlatform()
   const contextRepo = useMemo(
@@ -113,12 +111,8 @@ export function MyAssetsDrawer({
             </div>
           ) : null}
           {source === 'clipper' ? (
-            <Suspense fallback={<p className={styles.notice}>正在打开网页收藏…</p>}>
-              <ClipperPanel
-                projectId={projectId}
-                store={store}
-                onOpenCanvasBrowser={onOpenCanvasBrowser}
-              />
+            <Suspense fallback={<p className={styles.notice}>正在打开图片收藏…</p>}>
+              <ClipperPanel projectId={projectId} store={store} />
             </Suspense>
           ) : null}
         </div>

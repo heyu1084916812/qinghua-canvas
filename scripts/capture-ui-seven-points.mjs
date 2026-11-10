@@ -300,8 +300,10 @@ try {
     const stageWidthClosed = await page.locator('[data-canvas-stage]').evaluate((node) => node.getBoundingClientRect().width)
     await page.screenshot({ path: path.join(out, `${file}-canvas.png`) })
     report.push({ variant, surface: 'canvas', kitsButtons, defaultsButtons, stageWidthClosed, ...(await geometry(page)), errors: [...errors] })
+    const myAssetsOpenStartedAt = Date.now()
     await page.locator('[data-canvas-my-assets]').click()
     await page.locator('[data-my-assets-slot][data-my-assets-open="true"]').waitFor({ timeout: 10_000 })
+    const myAssetsOpenLatencyMs = Date.now() - myAssetsOpenStartedAt
     await page.waitForTimeout(260)
     await page.locator('[data-my-assets-drawer]').waitFor({ timeout: 10_000 })
     const drawer = await page.locator('[data-my-assets-drawer]').count()
@@ -339,120 +341,29 @@ try {
     await page.locator('[data-my-assets-source="clipper"]').click()
     await page.locator('[data-clipper-panel]').waitFor({ timeout: 10_000 })
     const clipperMounted = await page.locator('[data-clipper-panel]').count()
-    const clipperInstall = await page.locator('[data-clipper-install-card]').evaluate((card) => {
+    const clipperState = await page.evaluate(() => {
       const panel = document.querySelector('[data-clipper-panel]')
       const panelRect = panel?.getBoundingClientRect()
-      const rect = card.getBoundingClientRect()
-      const actions = [...card.querySelectorAll('[data-clipper-install-action]')]
       return {
-        mode: card.getAttribute('data-clipper-install-mode'),
-        action: actions[0]?.textContent?.trim() ?? '',
-        browsers: actions.map((action) =>
-          action.getAttribute('data-clipper-install-browser') ?? 'package',
-        ),
-        width: rect.width,
-        insidePanel: Boolean(
-          panelRect &&
-          rect.left >= panelRect.left - 1 &&
-          rect.right <= panelRect.right + 1,
-        ),
+        installCards: panel?.querySelectorAll('[data-clipper-install-card]').length ?? 0,
+        pairingCards: panel?.querySelectorAll('[data-clipper-pairing]').length ?? 0,
+        filters: panel?.querySelectorAll('[data-clipper-filter]').length ?? 0,
+        selectedFilters:
+          panel?.querySelectorAll('[data-clipper-filter][aria-selected="true"]').length ?? 0,
+        empty: panel?.querySelectorAll('[data-clipper-empty]').length ?? 0,
+        emptyText: panel?.querySelector('[data-clipper-empty]')?.textContent?.replace(/\s+/g, ' ').trim() ?? '',
+        overflowX: panel ? panel.scrollWidth > panel.clientWidth + 1 : true,
+        insidePanel: Boolean(panelRect),
       }
     })
-    let clipperInstallOpened = false
-    if (clipperInstall.mode === 'store') {
-      const installButtons = page.locator('[data-clipper-install-action]')
-      const installButtonCount = await installButtons.count()
-      await page.evaluate(() => {
-        globalThis.__qinghuaInstallOpenCalls = []
-        globalThis.open = (url, target) => {
-          globalThis.__qinghuaInstallOpenCalls.push({ url: String(url), target })
-          return { opener: null }
-        }
-      })
-      for (let index = 0; index < installButtonCount; index += 1) {
-        await installButtons.nth(index).click()
-      }
-      const openCalls = await page.evaluate(
-        () => globalThis.__qinghuaInstallOpenCalls ?? [],
-      )
-      clipperInstallOpened = installButtonCount > 0
-        && openCalls.length === installButtonCount
-        && openCalls.every((call) => (
-          call.target === '_blank'
-          && (
-            call.url.startsWith('https://microsoftedge.microsoft.com/')
-            || call.url.startsWith('https://chromewebstore.google.com/')
-          )
-        ))
-    }
-    await page.locator('[data-clipper-add]').click()
-    const clipperComposer = await page.locator('[data-clipper-composer]').count()
-    await page.locator('[data-clipper-url]').fill('https://example.com/')
-    await page.locator('[data-clipper-browse]').click()
-    await page.locator('[data-clipper-browser] iframe').waitFor({ timeout: 10_000 })
-    const clipperBrowser = await page.locator('[data-clipper-browser]').count()
-    const clipperFrame = await page.locator('[data-clipper-browser] iframe').count()
+    await page.locator('[data-clipper-filter="uncategorized"]').click()
+    const clipperUncategorizedSelected = await page.locator(
+      '[data-clipper-filter="uncategorized"][aria-selected="true"]',
+    ).count()
+    await page.locator('[data-clipper-filter="all"]').click()
     await page.mouse.move(900, 80)
     await page.waitForTimeout(600)
     await page.screenshot({ path: path.join(out, `${file}-canvas-clipper.png`) })
-    await page.locator('[data-clipper-open-canvas]').click()
-    await page.locator('[data-canvas-browser]').waitFor({ timeout: 10_000 })
-    await page.locator('[data-my-assets-drawer]').waitFor({ state: 'detached', timeout: 10_000 })
-    const canvasBrowserFrame = page.frameLocator('[data-canvas-browser] iframe')
-    await canvasBrowserFrame.locator('body').waitFor({ timeout: 10_000 })
-    const canvasBrowserFrameText = await canvasBrowserFrame.locator('body').innerText()
-    const canvasBrowserBefore = await page.locator('[data-canvas-browser]').evaluate((browser) => {
-      const stage = document.querySelector('[data-canvas-stage]')
-      const rect = browser.getBoundingClientRect()
-      const stageRect = stage?.getBoundingClientRect()
-      return {
-        left: rect.left,
-        top: rect.top,
-        width: rect.width,
-        height: rect.height,
-        inside: Boolean(
-          stageRect &&
-          rect.left >= stageRect.left - 1 &&
-          rect.top >= stageRect.top - 1 &&
-          rect.right <= stageRect.right + 1 &&
-          rect.bottom <= stageRect.bottom + 1,
-        ),
-        frame: browser.querySelectorAll('iframe').length,
-      }
-    })
-    const dragBox = await page.locator('[data-canvas-browser-drag]').boundingBox()
-    if (dragBox) {
-      await page.mouse.move(dragBox.x + 80, dragBox.y + 18)
-      await page.mouse.down()
-      await page.mouse.move(dragBox.x + 130, dragBox.y + 48)
-      await page.mouse.up()
-    }
-    const canvasBrowserMoved = await page.locator('[data-canvas-browser]').evaluate((browser) => {
-      const rect = browser.getBoundingClientRect()
-      return { left: rect.left, top: rect.top }
-    })
-    const resizeBox = await page.locator('[data-canvas-browser-resize]').boundingBox()
-    if (resizeBox) {
-      await page.mouse.move(resizeBox.x + 10, resizeBox.y + 10)
-      await page.mouse.down()
-      await page.mouse.move(resizeBox.x + 50, resizeBox.y + 40)
-      await page.mouse.up()
-    }
-    const canvasBrowserAfter = await page.locator('[data-canvas-browser]').evaluate((browser) => {
-      const rect = browser.getBoundingClientRect()
-      return {
-        width: rect.width,
-        height: rect.height,
-        pageOverflowX: document.documentElement.scrollWidth > document.documentElement.clientWidth + 1,
-      }
-    })
-    await page.screenshot({ path: path.join(out, `${file}-canvas-browser.png`) })
-    await page.locator('[data-canvas-browser-close]').click()
-    await page.locator('[data-canvas-browser]').waitFor({ state: 'detached', timeout: 5_000 })
-    await page.locator('[data-canvas-my-assets]').click()
-    await page.locator('[data-my-assets-drawer]').waitFor({ timeout: 10_000 })
-    await page.locator('[data-my-assets-source="clipper"]').click()
-    await page.locator('[data-clipper-panel]').waitFor({ timeout: 10_000 })
     await page.locator('[data-my-assets-source="reference"]').click()
     await page.locator('[data-my-assets-reference-file]').setInputFiles([
       {
@@ -532,7 +443,10 @@ try {
       })
       if (!seeded.ok) throw new Error(`${table} seed failed: HTTP ${seeded.status}`)
     }
+    const myAssetsCloseStartedAt = Date.now()
     await page.locator('[data-my-assets-close]').click()
+    await page.locator('[data-my-assets-slot]').waitFor({ state: 'detached', timeout: 10_000 })
+    const myAssetsCloseLatencyMs = Date.now() - myAssetsCloseStartedAt
     await page.locator('[data-canvas-my-assets]').click()
     await page.locator('[data-my-assets-slot][data-my-assets-open="true"]').waitFor({ timeout: 10_000 })
     await page.waitForTimeout(260)
@@ -904,21 +818,10 @@ try {
       assetKinds,
       pinterestMounted,
       clipperMounted,
-      clipperInstall,
-      clipperInstallOpened,
-      clipperComposer,
-      clipperBrowser,
-      clipperFrame,
-      canvasBrowserOpened: canvasBrowserBefore.frame === 1,
-      canvasBrowserFrameLoaded: canvasBrowserFrameText.trim().length > 0,
-      canvasBrowserInsideStage: canvasBrowserBefore.inside,
-      canvasBrowserMoved:
-        Math.abs(canvasBrowserMoved.left - canvasBrowserBefore.left) >= 20 &&
-        Math.abs(canvasBrowserMoved.top - canvasBrowserBefore.top) >= 15,
-      canvasBrowserResized:
-        canvasBrowserAfter.width > canvasBrowserBefore.width + 20 &&
-        canvasBrowserAfter.height > canvasBrowserBefore.height + 15,
-      canvasBrowserOverflowX: canvasBrowserAfter.pageOverflowX,
+      ...clipperState,
+      clipperUncategorizedSelected,
+      myAssetsOpenLatencyMs,
+      myAssetsCloseLatencyMs,
       referenceCards,
       referenceFolders,
       referenceUpload,

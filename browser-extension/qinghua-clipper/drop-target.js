@@ -1,123 +1,87 @@
-/* global chrome, CustomEvent, document, Element, HTMLImageElement, location, URL, window */
+/* global chrome, document, Element, HTMLImageElement, location, URL, window */
 (() => {
   const HOST_ID = 'qinghua-clipper-drop-target'
-  const existing = document.getElementById(HOST_ID)
-  if (existing) {
-    existing.dispatchEvent(new CustomEvent('qinghua:drop-flash'))
-    return
-  }
+  if (document.getElementById(HOST_ID)) return
 
+  let hideTimer = 0
   let lastDraggedImage = ''
+  let keepAfterDrop = false
   const host = document.createElement('div')
   host.id = HOST_ID
   host.dataset.qinghuaDropTarget = 'true'
+  host.dataset.qinghuaDropReady = 'true'
   host.style.setProperty('all', 'initial', 'important')
   host.style.setProperty('position', 'fixed', 'important')
-  host.style.setProperty('right', '20px', 'important')
-  host.style.setProperty('bottom', '20px', 'important')
+  host.style.setProperty('inset', '0', 'important')
   host.style.setProperty('z-index', '2147483647', 'important')
+  host.style.setProperty('pointer-events', 'none', 'important')
 
   const shadow = host.attachShadow({ mode: 'closed' })
   shadow.innerHTML = `
     <style>
       :host { color-scheme: light dark; }
       * { box-sizing: border-box; }
-      .target {
-        width: 248px;
-        padding: 13px;
-        border: 1px solid #c9cdc5;
-        border-radius: 9px;
-        background: #fff;
-        box-shadow: 0 10px 30px rgba(22, 24, 20, .18);
-        color: #171814;
-        font: 13px/1.4 ui-sans-serif, system-ui, "Segoe UI", sans-serif;
-        transition: border-color 140ms ease, transform 140ms ease, background 140ms ease;
-      }
-      .target[data-over="true"] {
-        border-color: #39775a;
-        background: #eef7f1;
-        transform: translateY(-3px);
-      }
-      header {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 8px;
-        margin-bottom: 9px;
-      }
-      strong { font-size: 13px; font-weight: 680; }
-      button {
+      .backdrop {
+        position: fixed;
+        inset: 0;
         display: grid;
         place-items: center;
-        width: 24px;
-        height: 24px;
-        padding: 0;
-        border: 0;
-        border-radius: 5px;
-        background: transparent;
-        color: #6c7168;
-        cursor: pointer;
+        background: rgba(18, 20, 17, .26);
+        pointer-events: none;
       }
-      button:hover { background: #eff0eb; color: #171814; }
-      button:focus-visible { outline: 2px solid #4a8267; outline-offset: 1px; }
-      svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
-      .zone {
+      .backdrop[hidden] { display: none; }
+      .dropbox {
         display: grid;
-        grid-template-columns: 34px minmax(0, 1fr);
-        align-items: center;
-        gap: 10px;
-        min-height: 58px;
-        padding: 9px;
-        border: 1px dashed #bfc4ba;
-        border-radius: 7px;
-        background: #f6f6f2;
+        place-items: center;
+        width: min(320px, calc(100vw - 40px));
+        min-height: 136px;
+        padding: 24px;
+        border: 1px solid #d9dbd3;
+        border-radius: 8px;
+        background: #fff;
+        box-shadow: 0 20px 64px rgba(0,0,0,.26);
+        color: #171814;
+        font: 13px/1.45 ui-sans-serif, system-ui, "Segoe UI", sans-serif;
+        text-align: center;
+        pointer-events: auto;
+        transition: border-color 120ms ease, background 120ms ease, transform 120ms ease;
       }
-      .zone svg { width: 22px; height: 22px; color: #39775a; }
-      .zone span { display: grid; gap: 2px; min-width: 0; }
-      .zone b { font-size: 12px; font-weight: 650; }
-      .zone small { color: #6c7168; font-size: 10.5px; line-height: 1.45; }
-      .status { min-height: 15px; margin: 8px 1px 0; color: #6c7168; font-size: 10.5px; }
-      .status[data-error="true"] { color: #a74439; }
+      .dropbox[data-over="true"] {
+        border-color: #171814;
+        background: #f4f4f0;
+        transform: scale(1.01);
+      }
+      strong { display: block; font-size: 16px; font-weight: 680; }
+      p {
+        min-height: 18px;
+        margin: 6px 0 0;
+        color: #666b62;
+        font-size: 12px;
+      }
+      p[data-error="true"] { color: #9b3c32; }
       @media (prefers-color-scheme: dark) {
-        .target { border-color: #3c423a; background: #20231e; color: #f1f2ec; box-shadow: 0 10px 30px rgba(0, 0, 0, .42); }
-        .target[data-over="true"] { border-color: #80bd99; background: #24372b; }
-        button { color: #a5aaa0; }
-        button:hover { background: #2b3029; color: #f1f2ec; }
-        button:focus-visible { outline-color: #8bc9a5; }
-        .zone { border-color: #4c5349; background: #282c26; }
-        .zone svg { color: #80bd99; }
-        .zone small, .status { color: #a5aaa0; }
-        .status[data-error="true"] { color: #e69a90; }
+        .dropbox { border-color: #3a3f37; background: #20231e; color: #f1f2ec; }
+        .dropbox[data-over="true"] { border-color: #f1f2ec; background: #282c26; }
+        p { color: #a5aaa0; }
+        p[data-error="true"] { color: #e69a90; }
       }
       @media (prefers-reduced-motion: reduce) {
-        .target { transition: none; }
+        .dropbox { transition: none; }
       }
     </style>
-    <aside class="target" data-qinghua-drop-zone>
-      <header>
-        <strong>收藏图片到轻画</strong>
-        <button type="button" aria-label="关闭拖拽投放区" title="关闭">
-          <svg viewBox="0 0 24 24"><path d="m6.5 6.5 11 11M17.5 6.5l-11 11"/></svg>
-        </button>
-      </header>
-      <div class="zone">
-        <svg viewBox="0 0 24 24" aria-hidden="true">
-          <path d="M4 5.5h10.5v10H4z"/>
-          <path d="m5.8 13.5 2.8-2.8 2.1 2.1 1.8-1.8 2 2"/>
-          <path d="M18 4v10M14.5 10.5 18 14l3.5-3.5"/>
-        </svg>
-        <span>
-          <b>把图片拖到这里</b>
-          <small>释放后直接收藏到「我的素材 → 轻画插件」</small>
-        </span>
-      </div>
-      <p class="status" role="status" aria-live="polite">只读取图片地址，不读取 Cookie</p>
-    </aside>
+    <div class="backdrop" data-qinghua-drop-backdrop hidden>
+      <section class="dropbox" data-qinghua-drop-box role="region" aria-label="轻画拖拽收藏">
+        <strong>把图片放到这里</strong>
+        <p data-qinghua-drop-status role="status" aria-live="polite">
+          松手后会直接收藏到轻画
+        </p>
+      </section>
+    </div>
   `
 
-  const target = shadow.querySelector('.target')
-  const status = shadow.querySelector('.status')
-  const close = shadow.querySelector('button')
+  const backdrop = shadow.querySelector('.backdrop')
+  const dropbox = shadow.querySelector('.dropbox')
+  const status = shadow.querySelector('[data-qinghua-drop-status]')
 
   const setStatus = (text, error = false) => {
     status.textContent = text
@@ -126,42 +90,62 @@
     host.dataset.qinghuaDropError = String(error)
   }
 
+  const show = () => {
+    window.clearTimeout(hideTimer)
+    backdrop.hidden = false
+    host.dataset.qinghuaDropVisible = 'true'
+    setStatus('松手后会直接收藏到轻画')
+  }
+
+  const hide = () => {
+    window.clearTimeout(hideTimer)
+    backdrop.hidden = true
+    dropbox.dataset.over = 'false'
+    host.dataset.qinghuaDropVisible = 'false'
+  }
+
+  const delayedHide = () => {
+    if (keepAfterDrop) return
+    window.clearTimeout(hideTimer)
+    hideTimer = window.setTimeout(hide, 180)
+  }
+
   const onDragStart = (event) => {
     const element = event.target instanceof Element ? event.target : null
     const image = element?.closest('img')
-    if (!(image instanceof HTMLImageElement)) return
-    lastDraggedImage = image.currentSrc || image.src || ''
-    target.dataset.over = 'true'
-    setStatus('松手后收藏这张图片')
-  }
-
-  const onDragEnd = () => {
-    target.dataset.over = 'false'
+    if (image instanceof HTMLImageElement) {
+      lastDraggedImage = image.currentSrc || image.src || ''
+    } else {
+      lastDraggedImage = ''
+    }
+    if (!image && !looksLikeImageDrag(event.dataTransfer)) return
+    keepAfterDrop = false
+    show()
   }
 
   const onDragOver = (event) => {
-    if (!event.composedPath().includes(host)) return
     event.preventDefault()
+    event.stopPropagation()
     if (event.dataTransfer) event.dataTransfer.dropEffect = 'copy'
-    target.dataset.over = 'true'
+    dropbox.dataset.over = 'true'
   }
 
-  const onDragLeave = (event) => {
-    if (event.relatedTarget && host.contains(event.relatedTarget)) return
-    target.dataset.over = 'false'
+  const onDragLeave = () => {
+    dropbox.dataset.over = 'false'
   }
 
   const onDrop = async (event) => {
-    if (!event.composedPath().includes(host)) return
     event.preventDefault()
     event.stopPropagation()
-    target.dataset.over = 'false'
+    window.clearTimeout(hideTimer)
+    keepAfterDrop = true
+    dropbox.dataset.over = 'false'
     const imageUrl = imageUrlOf(event.dataTransfer)
     if (!imageUrl) {
-      setStatus('没有识别到图片地址，请直接拖动网页里的图片', true)
+      setStatus('没有识别到图片地址，请直接拖动网页图片', true)
       return
     }
-    setStatus('正在发送到轻画…')
+    setStatus('正在收藏到轻画…')
     try {
       const response = await chrome.runtime.sendMessage({
         type: 'qinghua:clip-image',
@@ -170,38 +154,52 @@
         title: document.title,
       })
       if (!response?.ok) throw new Error(response?.error || '轻画没有接收这张图片')
-      setStatus('已收藏到「我的素材 → 轻画插件」')
+      setStatus('已收藏到轻画')
+      hideTimer = window.setTimeout(hide, 900)
     } catch (error) {
       setStatus(error instanceof Error ? error.message : String(error), true)
     }
   }
 
-  const teardown = () => {
-    document.removeEventListener('dragstart', onDragStart, true)
-    document.removeEventListener('dragend', onDragEnd, true)
-    document.removeEventListener('dragover', onDragOver, true)
-    document.removeEventListener('dragleave', onDragLeave, true)
-    document.removeEventListener('drop', onDrop, true)
-    host.remove()
-  }
-  const flash = () => {
-    target.dataset.over = 'true'
-    setStatus('投放区已经打开，直接把图片拖进来')
-    window.setTimeout(() => {
-      target.dataset.over = 'false'
-      setStatus('只读取图片地址，不读取 Cookie')
-    }, 1_200)
+  const onKeyDown = (event) => {
+    if (event.key === 'Escape') hide()
   }
 
-  close.addEventListener('click', teardown)
-  host.addEventListener('qinghua:drop-flash', flash)
+  const onMessage = (message) => {
+    if (message?.type === 'qinghua:disable-drag') teardown()
+  }
+
+  const teardown = () => {
+    window.clearTimeout(hideTimer)
+    document.removeEventListener('dragstart', onDragStart, true)
+    document.removeEventListener('dragend', delayedHide, true)
+    document.removeEventListener('drop', delayedHide, true)
+    document.removeEventListener('keydown', onKeyDown, true)
+    host.removeEventListener('dragover', onDragOver)
+    host.removeEventListener('dragleave', onDragLeave)
+    host.removeEventListener('drop', onDrop)
+    chrome.runtime.onMessage.removeListener(onMessage)
+    host.remove()
+  }
+
   document.addEventListener('dragstart', onDragStart, true)
-  document.addEventListener('dragend', onDragEnd, true)
-  document.addEventListener('dragover', onDragOver, true)
-  document.addEventListener('dragleave', onDragLeave, true)
-  document.addEventListener('drop', onDrop, true)
+  document.addEventListener('dragend', delayedHide, true)
+  document.addEventListener('drop', delayedHide, true)
+  document.addEventListener('keydown', onKeyDown, true)
+  host.addEventListener('dragover', onDragOver)
+  host.addEventListener('dragleave', onDragLeave)
+  host.addEventListener('drop', onDrop)
+  chrome.runtime.onMessage.addListener(onMessage)
   document.documentElement.appendChild(host)
-  host.dataset.qinghuaDropReady = 'true'
+  hide()
+
+  function looksLikeImageDrag(dataTransfer) {
+    if (!dataTransfer) return false
+    const types = [...dataTransfer.types]
+    return types.includes('Files')
+      || types.includes('text/uri-list')
+      || types.includes('text/html')
+  }
 
   function imageUrlOf(dataTransfer) {
     if (!dataTransfer) return ''

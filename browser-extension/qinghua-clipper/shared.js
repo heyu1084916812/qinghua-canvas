@@ -96,6 +96,38 @@
     return true
   }
 
+  async function pairReceiver(endpoint) {
+    const normalized = normalizeEndpoint(endpoint)
+    if (!normalized) {
+      throw new ClipperError('接收端地址无效', 0, 'endpoint')
+    }
+    const pairUrl = new URL(normalized)
+    pairUrl.pathname = '/pair'
+    const response = await request(
+      pairUrl.toString(),
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Qinghua-Clipper-Pair': '1',
+        },
+        body: '{}',
+      },
+      5_000,
+    )
+    const result = await response.json().catch(() => ({}))
+    const token = String(result.token || '').trim()
+    if (response.ok && result.ok === true && token) return token
+    if (response.status === 403) {
+      throw new ClipperError('轻画仅允许浏览器扩展自动配对', 403, 'pair-forbidden')
+    }
+    throw new ClipperError(
+      String(result.error || `自动配对失败：HTTP ${response.status}`),
+      response.status,
+      'pair',
+    )
+  }
+
   async function clipPage(input) {
     const endpoint = normalizeEndpoint(input.endpoint)
     if (!endpoint) {
@@ -105,15 +137,15 @@
     if (!pageUrl) {
       throw new ClipperError('当前标签页不是可收藏的 HTTP/HTTPS 网页', 0, 'page')
     }
-      const imageUrl = input.imageUrl
-        ? normalizePageUrl(input.imageUrl)
-        : ''
-      if (input.imageUrl && !imageUrl) {
-        throw new ClipperError('拖入的图片地址不是公开 HTTP/HTTPS 地址', 0, 'image')
-      }
+    const imageUrl = input.imageUrl
+      ? normalizePageUrl(input.imageUrl)
+      : ''
+    if (input.imageUrl && !imageUrl) {
+      throw new ClipperError('拖入的图片地址不是公开 HTTP/HTTPS 地址', 0, 'image')
+    }
     const token = String(input.token || '').trim()
     if (!token) {
-      throw new ClipperError('请先填写轻画显示的配对令牌', 0, 'not-paired')
+      throw new ClipperError('轻画尚未自动配对，请确认轻画已打开', 0, 'not-paired')
     }
     const response = await request(
       endpoint,
@@ -134,7 +166,7 @@
     const result = await response.json().catch(() => ({}))
     if (response.ok && result.ok === true) return result
     if (response.status === 401) {
-      throw new ClipperError('配对令牌无效，请在轻画重新复制', 401, 'auth')
+      throw new ClipperError('自动配对已失效，请确认轻画已打开后重试', 401, 'auth')
     }
     if (response.status === 404) {
       throw new ClipperError('接收端地址不是轻画 Clipper', 404, 'not-found')
@@ -161,5 +193,6 @@
     errorText,
     normalizeEndpoint,
     normalizePageUrl,
+    pairReceiver,
   })
 })()

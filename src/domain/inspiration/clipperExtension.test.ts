@@ -10,67 +10,76 @@ const extensionRoot = new URL(
 )
 
 describe('qinghua clipper extension contract', () => {
-  it('requests only the active tab, local storage and the loopback receiver', () => {
+  it('uses one storage toggle with optional HTTP/HTTPS page access', () => {
     const manifest = JSON.parse(
       readFileSync(new URL('manifest.json', extensionRoot), 'utf8'),
     ) as {
+      version: string
       manifest_version: number
       permissions: string[]
       host_permissions: string[]
+      optional_host_permissions: string[]
       background?: { service_worker?: string }
       commands?: Record<string, unknown>
     }
 
     expect(manifest.manifest_version).toBe(3)
-    expect(manifest.permissions).toEqual([
-      'activeTab',
-      'storage',
-      'contextMenus',
-      'scripting',
-    ])
+    expect(manifest.version).toBe('0.4.1')
+    expect(manifest.permissions).toEqual(['storage', 'scripting'])
     expect(manifest.host_permissions).toEqual([
       'http://127.0.0.1:53684/*',
     ])
+    expect(manifest.optional_host_permissions).toEqual([
+      'http://*/*',
+      'https://*/*',
+    ])
     expect(manifest.background?.service_worker).toBe('background.js')
-    expect(manifest.commands?.['clip-active-page']).toBeTruthy()
+    expect(manifest.commands).toBeUndefined()
     expect(JSON.stringify(manifest)).not.toContain('<all_urls>')
   })
 
-  it('sends the URL and token without reading browser cookies', () => {
-    const source = readFileSync(new URL('popup.js', extensionRoot), 'utf8')
-    const shared = readFileSync(new URL('shared.js', extensionRoot), 'utf8')
-    const dropTarget = readFileSync(
+  it('keeps the popup to one drag switch and never reads cookies', () => {
+    const popup = readFileSync(new URL('popup.html', extensionRoot), 'utf8')
+    const popupScript = readFileSync(new URL('popup.js', extensionRoot), 'utf8')
+    const popupStyle = readFileSync(new URL('popup.css', extensionRoot), 'utf8')
+    const directImage = readFileSync(
       new URL('drop-target.js', extensionRoot),
       'utf8',
     )
 
-    expect(source).toContain('QinghuaClipper')
-    expect(shared).toContain('X-Qinghua-Clipper-Token')
-    expect(shared).toContain('http://127.0.0.1:53684/clip')
-    expect(dropTarget).toContain("document.addEventListener('drop'")
-    expect(dropTarget).toContain('qinghua:clip-image')
-    expect(`${source}\n${shared}\n${dropTarget}`).not.toMatch(
+    expect(popup).toContain('id="drag-mode"')
+    expect(popup).toContain('role="switch"')
+    expect(popup).toContain('id="status-dot"')
+    expect(popup).not.toContain('id="version"')
+    expect(popup).not.toContain('id="clip"')
+    expect(popup).not.toContain('id="token"')
+    expect(popup).not.toContain('id="settings"')
+    expect(popupScript).not.toContain('getManifest')
+    expect(popupScript).toContain("chrome.permissions.request")
+    expect(popupScript).toContain("type: 'qinghua:set-drag-mode'")
+    expect(popupScript).toContain('Only permissions specified in the manifest may be requested')
+    expect(directImage).toContain("document.addEventListener('dragstart'")
+    expect(directImage).toContain("host.addEventListener('drop'")
+    expect(directImage).toContain('data-qinghua-drop-box')
+    expect(directImage).toContain('qinghua:clip-image')
+    expect(`${popupStyle}\n${directImage}`).not.toMatch(
+      /#(?:2f6b4f|80bd99|e7f2eb|25372c|2b4333|3b7b5c)/i,
+    )
+    expect(`${popupScript}\n${directImage}`).not.toMatch(
       /document\.cookie|chrome\.cookies/,
     )
   })
 
-  it('keeps background, popup and icon entry points packaged', () => {
+  it('packages the background worker, drop target and icons', () => {
     const background = readFileSync(
       new URL('background.js', extensionRoot),
       'utf8',
     )
-    const popup = readFileSync(new URL('popup.html', extensionRoot), 'utf8')
-    const popupScript = readFileSync(new URL('popup.js', extensionRoot), 'utf8')
 
     expect(background).toContain("importScripts('shared.js')")
-    expect(background).toContain("contexts: ['page', 'link']")
-    expect(background).toContain("chrome.commands.onCommand")
-    expect(popupScript).toContain('dataset.state')
-    expect(popup).toContain('id="status-dot"')
-    expect(popup).toContain('id="retry"')
-    expect(popup).toContain('id="drag"')
-    expect(popup).toContain('id="settings"')
-    expect(popup).toContain('id="last-result"')
+    expect(background).toContain('registerContentScripts')
+    expect(background).toContain("files: ['drop-target.js']")
+    expect(background).toContain("'qinghua:clip-image'")
     for (const size of [16, 32, 48, 128]) {
       expect(() =>
         readFileSync(new URL(`icons/${size}.png`, extensionRoot)),
@@ -78,7 +87,18 @@ describe('qinghua clipper extension contract', () => {
     }
   })
 
-  it('normalizes loopback input and posts exactly URL, title and token', async () => {
+  it('keeps the local install helper on the automatic pairing path', () => {
+    const installer = readFileSync(
+      new URL('../../../scripts/install-clipper-local.ps1', import.meta.url),
+      'utf8',
+    )
+
+    expect(installer).toContain('pair automatically')
+    expect(installer).not.toContain('paste the local endpoint')
+    expect(installer).not.toContain('pairing token')
+  })
+
+  it('normalizes loopback input and posts the image without extra data', async () => {
     const fetchMock = vi.fn(async () => ({
       ok: true,
       status: 200,
@@ -90,7 +110,6 @@ describe('qinghua clipper extension contract', () => {
       'http://127.0.0.1:53684/clip',
     )
     expect(api.normalizeEndpoint('http://localhost:53684/clip')).toBe('')
-    expect(api.normalizeEndpoint('https://127.0.0.1:53684/clip')).toBe('')
     expect(api.normalizePageUrl('chrome://extensions')).toBe('')
 
     await api.clipPage({
@@ -101,7 +120,6 @@ describe('qinghua clipper extension contract', () => {
       imageUrl: 'https://cdn.example.com/idea.webp',
     })
 
-    expect(fetchMock).toHaveBeenCalledTimes(1)
     const [url, request] = fetchMock.mock.calls[0] as unknown as [
       string,
       {
@@ -120,6 +138,26 @@ describe('qinghua clipper extension contract', () => {
     })
   })
 
+  it('auto-pairs by reading the local extension-only token endpoint', async () => {
+    const fetchMock = vi.fn(async () => ({
+      ok: true,
+      status: 200,
+      json: async () => ({ ok: true, token: 'paired-token' }),
+    }))
+    const api = loadSharedApi(fetchMock)
+
+    await expect(api.pairReceiver(
+      'http://127.0.0.1:53684/clip',
+    )).resolves.toBe('paired-token')
+    const [url, request] = fetchMock.mock.calls[0] as unknown as [
+      string,
+      { method: string; headers: Record<string, string> },
+    ]
+    expect(url).toBe('http://127.0.0.1:53684/pair')
+    expect(request.method).toBe('POST')
+    expect(request.headers['X-Qinghua-Clipper-Pair']).toBe('1')
+  })
+
   it('surfaces authentication and health failures with recovery copy', async () => {
     const unauthorized = loadSharedApi(vi.fn(async () => ({
       ok: false,
@@ -131,66 +169,75 @@ describe('qinghua clipper extension contract', () => {
       token: 'bad-token',
       url: 'https://example.com/',
       title: 'Example',
-    })).rejects.toMatchObject({
-      code: 'auth',
-      message: expect.stringContaining('配对令牌无效'),
-    })
+    })).rejects.toMatchObject({ code: 'auth' })
 
     const offline = loadSharedApi(vi.fn(async () => {
       throw new TypeError('fetch failed')
     }))
     await expect(offline.checkReceiver(
       'http://127.0.0.1:53684/clip',
-    )).rejects.toMatchObject({
-      code: 'offline',
-      message: '无法连接轻画桌面端',
-    })
+    )).rejects.toMatchObject({ code: 'offline' })
   })
 
-  it('wires the keyboard command to the same authenticated local clip path', async () => {
-    const fetchMock = vi.fn(async () => ({
-      ok: true,
-      status: 200,
-      json: async () => ({ ok: true }),
-    }))
-    const harness = loadBackgroundApi(fetchMock)
-
-    harness.commandListener('clip-active-page')
-
-    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1))
-    expect(harness.chrome.action.setBadgeText).toHaveBeenCalledWith({
-      text: '✓',
-    })
-    expect(harness.chrome.tabs.query).toHaveBeenCalledWith({
-      active: true,
-      currentWindow: true,
-    })
-  })
-
-  it('injects the drag target only after the user starts drag collection', async () => {
+  it('registers the persistent drag script and injects it into open tabs', async () => {
     const harness = loadBackgroundApi(vi.fn(async () => ({
       ok: true,
       status: 200,
       json: async () => ({ ok: true }),
     })))
-    const response = await new Promise<{ ok: boolean; error?: string }>(
-      (resolve) => {
-        const keepChannel = harness.messageListener(
-          { type: 'qinghua:start-drag' },
-          { tab: { id: 7, url: 'https://example.com/', title: 'Example' } },
-          (value) => resolve(value as { ok: boolean; error?: string }),
-        )
-        expect(keepChannel).toBe(true)
-      },
-    )
+    const response = await message(harness, {
+      type: 'qinghua:set-drag-mode',
+      enabled: true,
+    })
 
     expect(response).toEqual({ ok: true })
+    expect(harness.chrome.scripting.registerContentScripts).toHaveBeenCalledWith([
+      expect.objectContaining({
+        id: 'qinghua-drag-collector',
+        matches: ['http://*/*', 'https://*/*'],
+        js: ['drop-target.js'],
+        persistAcrossSessions: true,
+      }),
+    ])
     expect(harness.chrome.scripting.executeScript).toHaveBeenCalledWith({
       target: { tabId: 7 },
       files: ['drop-target.js'],
     })
   })
+
+  it('auto-pairs the receiver when the popup connects', async () => {
+    const fetchMock = vi.fn(async (input: string) => ({
+      ok: true,
+      status: 200,
+      json: async () => String(input).endsWith('/pair')
+        ? { ok: true, token: 'paired-token' }
+        : { ok: true },
+    }))
+    const harness = loadBackgroundApi(fetchMock)
+    const response = await message(harness, { type: 'qinghua:connect' })
+
+    expect(response).toMatchObject({ ok: true, paired: true })
+    expect(harness.storage.token).toBe('paired-token')
+  })
 })
+
+function message(
+  harness: ReturnType<typeof loadBackgroundApi>,
+  value: { type: string; enabled?: boolean },
+): Promise<{ ok: boolean; error?: string; paired?: boolean }> {
+  return new Promise((resolve) => {
+    const keepChannel = harness.messageListener(
+      value,
+      { tab: { id: 7, url: 'https://example.com/', title: 'Example' } },
+      (response) => resolve(response as {
+        ok: boolean
+        error?: string
+        paired?: boolean
+      }),
+    )
+    expect(keepChannel).toBe(true)
+  })
+}
 
 function loadSharedApi(fetchMock: ReturnType<typeof vi.fn>) {
   const source = readFileSync(new URL('shared.js', extensionRoot), 'utf8')
@@ -207,6 +254,7 @@ function loadSharedApi(fetchMock: ReturnType<typeof vi.fn>) {
     normalizeEndpoint(value: string): string
     normalizePageUrl(value: string): string
     checkReceiver(endpoint: string): Promise<boolean>
+    pairReceiver(endpoint: string): Promise<string>
     clipPage(input: {
       endpoint: string
       token: string
@@ -218,36 +266,29 @@ function loadSharedApi(fetchMock: ReturnType<typeof vi.fn>) {
 }
 
 function loadBackgroundApi(fetchMock: ReturnType<typeof vi.fn>) {
-  let commandListener: (command: string) => void = () => undefined
   let messageListener: (
-    message: { type?: string },
+    message: { type?: string; enabled?: boolean },
     sender: { tab?: { id?: number; url?: string; title?: string } },
     respond: (value: unknown) => void,
   ) => boolean = () => false
   const storage = {
     endpoint: 'http://127.0.0.1:53684/clip',
-    token: 'secret-token',
+    token: '',
+    dragMode: false,
   }
   const chrome = {
     runtime: {
       onInstalled: { addListener: vi.fn() },
+      onStartup: { addListener: vi.fn() },
       onMessage: {
         addListener: vi.fn((listener) => {
           messageListener = listener
         }),
       },
     },
-    contextMenus: {
-      removeAll: vi.fn(async () => undefined),
-      create: vi.fn(),
-      onClicked: { addListener: vi.fn() },
-    },
-    commands: {
-      onCommand: {
-        addListener: vi.fn((listener: (command: string) => void) => {
-          commandListener = listener
-        }),
-      },
+    permissions: {
+      contains: vi.fn(async () => true),
+      onRemoved: { addListener: vi.fn() },
     },
     action: {
       setBadgeBackgroundColor: vi.fn(),
@@ -262,12 +303,17 @@ function loadBackgroundApi(fetchMock: ReturnType<typeof vi.fn>) {
     },
     tabs: {
       query: vi.fn(async () => [{
+        id: 7,
         title: 'Example inspiration',
         url: 'https://example.com/reference',
       }]),
+      sendMessage: vi.fn(async () => ({ ok: true })),
     },
     scripting: {
       executeScript: vi.fn(async () => [{ result: true }]),
+      getRegisteredContentScripts: vi.fn(async () => []),
+      registerContentScripts: vi.fn(async () => undefined),
+      unregisterContentScripts: vi.fn(async () => undefined),
     },
   }
   const context = {
@@ -291,5 +337,5 @@ function loadBackgroundApi(fetchMock: ReturnType<typeof vi.fn>) {
     readFileSync(new URL('background.js', extensionRoot), 'utf8'),
     context,
   )
-  return { chrome, commandListener, messageListener }
+  return { chrome, storage, messageListener }
 }

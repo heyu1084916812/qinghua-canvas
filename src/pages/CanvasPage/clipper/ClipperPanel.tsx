@@ -1,30 +1,25 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { invoke, isTauri } from '@tauri-apps/api/core'
-import { openUrl } from '@tauri-apps/plugin-opener'
 import { usePlatform } from '../../../app/providers/PlatformProvider'
 import type { ClipperItem } from '../../../domain/inspiration/clipper'
-import { isPublicHttpUrl } from '../../../domain/shared/publicUrl'
 import { sendReferenceToAgent } from '../../../features/canvas/agentHandoff'
 import { createClipperCollectionRepository } from '../../../state/shared/clipperCollectionRepository'
 import { createReferenceLedgerRepository } from '../../../state/project/referenceLedgerRepository'
 import type { CanvasStore } from '../../../state/workbenches/canvas/store'
-import {
-  IconExpand,
-  IconLink,
-  IconPlus,
-} from '../../../workbenches/canvas/toolbar/icons'
-import { ClipperBrowser } from './ClipperBrowser'
-import { ClipperInstallCard, resolveClipperInstallSource } from './ClipperInstallCard'
+import { IconLink } from '../../../workbenches/canvas/toolbar/icons'
 import { ClipperItemCard } from './ClipperItemCard'
-import { ClipperPairing, type ClipperReceiverInfo } from './ClipperPairing'
-import { captureClipperPage, capturePendingClipperQueue } from './clipperCapture'
-import {
-  addClipperReference,
-  sendClipperToCanvas,
-} from './clipperActions'
+import { capturePendingClipperQueue } from './clipperCapture'
+import { addClipperReference, sendClipperToCanvas } from './clipperActions'
 import styles from './ClipperPanel.module.css'
 
 type Filter = 'all' | 'uncategorized'
+
+interface ClipperReceiverInfo {
+  running: boolean
+  endpoint: string
+  token: string
+  error?: string
+}
 
 interface PendingClip {
   id: string
@@ -34,20 +29,12 @@ interface PendingClip {
   receivedAt: number
 }
 
-const CLIPPER_INSTALL_SOURCE = resolveClipperInstallSource({
-  edgeStoreUrl: import.meta.env.VITE_QINGHUA_CLIPPER_EDGE_STORE_URL,
-  chromeStoreUrl: import.meta.env.VITE_QINGHUA_CLIPPER_CHROME_STORE_URL,
-  packageUrl: import.meta.env.VITE_QINGHUA_CLIPPER_PACKAGE_URL,
-})
-
 export function ClipperPanel({
   projectId,
   store,
-  onOpenCanvasBrowser,
 }: {
   projectId: string
   store: CanvasStore
-  onOpenCanvasBrowser?: (url: string) => void
 }) {
   const platform = usePlatform()
   const collection = useMemo(
@@ -60,23 +47,21 @@ export function ClipperPanel({
   )
   const [items, setItems] = useState<ClipperItem[]>([])
   const [filter, setFilter] = useState<Filter>('all')
-  const [url, setUrl] = useState('')
-  const [browserUrl, setBrowserUrl] = useState('')
-  const [composerOpen, setComposerOpen] = useState(false)
   const [busy, setBusy] = useState('')
   const [status, setStatus] = useState('')
-  const [receiver, setReceiver] = useState<ClipperReceiverInfo | null>(null)
-  const [pairingOpen, setPairingOpen] = useState(false)
   const controllerRef = useRef<AbortController | null>(null)
   const busyRef = useRef(false)
   const receivingRef = useRef(false)
+  const visible = filter === 'uncategorized'
+    ? items.filter((item) => item.category === '未分类')
+    : items
 
   useEffect(() => {
     let active = true
     void collection.load().then((rows) => {
       if (active) setItems(rows)
     }).catch((error) => {
-      if (active) setStatus(`读取网页收藏失败：${errorText(error)}`)
+      if (active) setStatus(`读取图片收藏失败：${errorText(error)}`)
     })
     return () => {
       active = false
@@ -84,76 +69,16 @@ export function ClipperPanel({
     }
   }, [collection])
 
-  const visible = filter === 'uncategorized'
-    ? items.filter((item) => item.category === '未分类')
-    : items
-
-  const collectTarget = useCallback(async (
-    target: string,
-    options: {
-      closeComposer?: boolean
-      background?: boolean
-      statusPrefix?: string
-    } = {},
-  ): Promise<number> => {
-    if (!options.background && busyRef.current) return 0
-    if (!options.background) {
-      busyRef.current = true
-      setBusy('collect')
-      setStatus(options.statusPrefix ?? '正在读取网页图片…')
-    }
-    const controller = newController()
-    try {
-      const result = await captureClipperPage({
-        url: target,
-        network: platform.network,
-        collection,
-        signal: controller.signal,
-      })
-      if (result.items.length === 0) {
-        if (!options.background) {
-          setStatus(result.warnings[0] ?? '这个页面没有可收藏的图片。')
-        }
-        return 0
-      }
-      setItems(result.collection)
-      if (!options.background) {
-        setUrl(target)
-        if (options.closeComposer !== false) setComposerOpen(false)
-        setStatus(
-          `${options.statusPrefix ?? ''}已收藏 ${result.items.length} 张网页图片。`,
-        )
-      }
-      return result.items.length
-    } catch (error) {
-      if (!controller.signal.aborted && !options.background) {
-        setStatus(`网页收藏失败：${errorText(error)}`)
-      }
-      return 0
-    } finally {
-      if (!options.background) {
-        busyRef.current = false
-        setBusy('')
-      }
-    }
-  }, [collection, platform.network])
-
-  const collect = async () => {
-    const target = normalizedPublicUrl(url)
-    if (!target) {
-      setStatus('请输入公开的 http / https 网页地址')
-      return
-    }
-    await collectTarget(target)
-  }
-
   const syncReceiver = useCallback(async () => {
     if (!isTauri() || receivingRef.current) return
     receivingRef.current = true
     try {
       const info = await invoke<ClipperReceiverInfo>('clipper_receiver_info')
-      setReceiver(info)
-      if (!info.running) return
+      if (!info.running) {
+        setStatus(info.error ? `本机接收端未启动：${info.error}` : '本机接收端未启动。')
+        return
+      }
+      setStatus((current) => current.startsWith('本机接收端') ? '' : current)
       const pending = await invoke<PendingClip[]>('clipper_take_pending')
       if (pending.length === 0) return
       const result = await capturePendingClipperQueue({
@@ -163,20 +88,15 @@ export function ClipperPanel({
         signal: newController().signal,
       })
       setItems(result.collection)
-      const imported = result.imported
-      if (imported > 0) {
-        setStatus(`已从浏览器扩展接收 ${imported} 张图片收藏。`)
+      if (result.imported > 0) {
+        setStatus(`已从浏览器接收 ${result.imported} 张图片。`)
       }
     } catch (error) {
-      setReceiver((current) => current ? {
-        ...current,
-        running: false,
-        error: errorText(error),
-      } : null)
+      setStatus(`本机接收端未启动：${errorText(error)}`)
     } finally {
       receivingRef.current = false
     }
-  }, [collectTarget])
+  }, [collection, platform.network])
 
   useEffect(() => {
     if (!isTauri()) return
@@ -185,37 +105,11 @@ export function ClipperPanel({
     return () => window.clearInterval(timer)
   }, [syncReceiver])
 
-  const openBrowser = () => {
-    const target = normalizedPublicUrl(url)
-    if (!target) {
-      setStatus('请输入公开的 http / https 网页地址')
-      return
-    }
-    setBrowserUrl(target)
-  }
-  const openCanvasBrowser = (value: string) => {
-    const target = normalizedPublicUrl(value)
-    if (!target || !onOpenCanvasBrowser) {
-      setStatus('画布浏览器暂不可用')
-      return
-    }
-    setBrowserUrl('')
-    onOpenCanvasBrowser(target)
-  }
-  const openInstallTarget = async (target: string) => {
-    if (isTauri()) {
-      await openUrl(target)
-      return
-    }
-    const opened = window.open(target, '_blank')
-    if (opened) opened.opener = null
-  }
-
   const addToReference = async (item: ClipperItem, toAgent: boolean) => {
     if (busyRef.current) return
     busyRef.current = true
     setBusy(`${item.id}:${toAgent ? 'agent' : 'reference'}`)
-    setStatus('正在保存网页收藏…')
+    setStatus('正在保存图片收藏…')
     try {
       const controller = newController()
       const id = await addClipperReference({
@@ -263,7 +157,7 @@ export function ClipperPanel({
     setBusy(`${item.id}:remove`)
     try {
       setItems(await collection.remove(item.id))
-      setStatus('已从网页收藏移除。')
+      setStatus('已从图片收藏移除。')
     } catch (error) {
       setStatus(`移除失败：${errorText(error)}`)
     } finally {
@@ -275,7 +169,7 @@ export function ClipperPanel({
   return (
     <div className={styles.panel} data-clipper-panel>
       <div className={styles.subhead}>
-        <div className={styles.filters} role="tablist" aria-label="网页收藏筛选">
+        <div className={styles.filters} role="tablist" aria-label="图片收藏筛选">
           <button
             type="button"
             role="tab"
@@ -297,100 +191,11 @@ export function ClipperPanel({
             未分类
           </button>
         </div>
-        <div className={styles.headActions}>
-          {isTauri() ? (
-            <button
-              type="button"
-              className={styles.iconButton}
-              data-clipper-pair
-              aria-label="浏览器扩展配对"
-              title="浏览器扩展配对"
-              aria-expanded={pairingOpen}
-              onClick={() => setPairingOpen((current) => !current)}
-            >
-              <IconLink size={16} />
-            </button>
-          ) : null}
-          <button
-            type="button"
-            className={styles.iconButton}
-            data-clipper-browse-canvas
-            disabled={!onOpenCanvasBrowser || !url.trim()}
-            aria-label="在画布中打开浏览器"
-            title="在画布中打开浏览器"
-            onClick={() => openCanvasBrowser(url)}
-          >
-            <IconExpand size={16} />
-          </button>
-          <button
-            type="button"
-            className={styles.iconButton}
-            data-clipper-add
-            aria-label="收藏网页"
-            title="收藏网页"
-            aria-expanded={composerOpen}
-            onClick={() => setComposerOpen((current) => !current)}
-          >
-            <IconPlus size={16} />
-          </button>
-        </div>
+        <span className={styles.scope}>
+          <IconLink size={13} />
+          所有网页
+        </span>
       </div>
-
-      <ClipperInstallCard
-        source={CLIPPER_INSTALL_SOURCE}
-        onOpen={openInstallTarget}
-        onPair={() => setPairingOpen(true)}
-      />
-
-      {pairingOpen ? <ClipperPairing receiver={receiver} /> : null}
-
-      {composerOpen ? (
-        <div className={styles.composer} data-clipper-composer>
-          <input
-            value={url}
-            data-clipper-url
-            inputMode="url"
-            placeholder="https://"
-            aria-label="网页地址"
-            onChange={(event) => setUrl(event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key === 'Enter') void collect()
-            }}
-          />
-          <div className={styles.composerActions}>
-            <button
-              type="button"
-              className={styles.primary}
-              data-clipper-collect
-              disabled={Boolean(busy) || !url.trim()}
-              onClick={() => void collect()}
-            >
-              {busy === 'collect' ? '读取中…' : '收藏网页'}
-            </button>
-            <button
-              type="button"
-              className={styles.iconButton}
-              data-clipper-browse
-              disabled={Boolean(busy) || !url.trim()}
-              aria-label="在轻画浏览器打开"
-              title="在轻画浏览器打开"
-              onClick={openBrowser}
-            >
-              <IconLink size={16} />
-            </button>
-          </div>
-        </div>
-      ) : null}
-
-      {browserUrl ? (
-        <ClipperBrowser
-          url={browserUrl}
-          onClose={() => setBrowserUrl('')}
-          onOpenCanvas={onOpenCanvasBrowser
-            ? () => openCanvasBrowser(browserUrl)
-            : undefined}
-        />
-      ) : null}
 
       {visible.length > 0 ? (
         <div className={styles.grid} data-clipper-items>
@@ -408,8 +213,14 @@ export function ClipperPanel({
         </div>
       ) : (
         <div className={styles.empty} data-clipper-empty>
-          <IconLink size={20} />
-          <span>{filter === 'uncategorized' ? '没有未分类的网页收藏' : '还没有网页收藏'}</span>
+          <strong>
+            {filter === 'uncategorized' ? '没有未分类的图片' : '开始收集灵感吧'}
+          </strong>
+          <p>
+            {filter === 'uncategorized'
+              ? '切换到“全部”查看已收藏的网页图片'
+              : '在任意网页把图片拖到页面中央，松手后会自动收藏到这里'}
+          </p>
         </div>
       )}
 
@@ -426,17 +237,6 @@ export function ClipperPanel({
     const controller = new AbortController()
     controllerRef.current = controller
     return controller
-  }
-}
-
-function normalizedPublicUrl(value: string): string {
-  const trimmed = value.trim()
-  if (!trimmed) return ''
-  try {
-    const url = new URL(trimmed)
-    return isPublicHttpUrl(url.toString()) ? url.toString() : ''
-  } catch {
-    return ''
   }
 }
 

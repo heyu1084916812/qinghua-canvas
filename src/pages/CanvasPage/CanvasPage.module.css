@@ -39,13 +39,14 @@
   min-width: 0;
   overflow: hidden;
   pointer-events: none;
-  transition: width var(--dur-shell) var(--ease-panel);
+  transition: width 140ms var(--ease-panel);
   will-change: width;
 }
 
 .myAssetsSlot[data-my-assets-open='true'] {
   width: clamp(320px, 30vw, 420px);
   pointer-events: auto;
+  transition-duration: var(--dur-shell);
 }
 
 .myAssetsSlot > :global([data-my-assets-drawer]) {
@@ -53,14 +54,23 @@
   transform: translateX(-14px) scale(0.995);
   transform-origin: left center;
   transition:
-    opacity 160ms var(--ease-out),
-    transform var(--dur-shell) var(--ease-panel);
+    opacity 100ms var(--ease-out),
+    transform 140ms var(--ease-panel);
   will-change: opacity, transform;
 }
 
 .myAssetsSlot[data-my-assets-open='true'] > :global([data-my-assets-drawer]) {
   opacity: 1;
   transform: translateX(0) scale(1);
+  transition-duration: 160ms, var(--dur-shell);
+}
+
+.myAssetsLoading {
+  flex: 1 0 100%;
+  width: 100%;
+  height: 100%;
+  border-right: 1px solid var(--stroke);
+  background: var(--bg-surface);
 }
 
 /*

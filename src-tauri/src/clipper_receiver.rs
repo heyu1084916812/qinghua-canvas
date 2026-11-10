@@ -9,6 +9,7 @@ use tiny_http::{Header, Method, Response, Server, StatusCode};
 const PORT: u16 = 53684;
 const CLIP_PATH: &str = "/clip";
 const HEALTH_PATH: &str = "/health";
+const PAIR_PATH: &str = "/pair";
 const MAX_BODY_BYTES: u64 = 32 * 1024;
 const MAX_PENDING: usize = 100;
 
@@ -68,7 +69,7 @@ fn with_cors<R: Read>(response: Response<R>) -> Response<R> {
         .with_header(cros_header("Access-Control-Allow-Origin", "*"))
         .with_header(cros_header(
             "Access-Control-Allow-Headers",
-            "content-type,x-qinghua-clipper-token",
+            "content-type,x-qinghua-clipper-token,x-qinghua-clipper-pair",
         ))
         .with_header(cros_header(
             "Access-Control-Allow-Methods",
@@ -115,6 +116,59 @@ fn serve(server: Server) {
             }
             if method == Method::Get && path == HEALTH_PATH {
                 let _ = request.respond(json_response(200, r#"{"ok":true}"#));
+                continue;
+            }
+            if method == Method::Post && path == PAIR_PATH {
+                let origin = request
+                    .headers()
+                    .iter()
+                    .find(|header| {
+                        header
+                            .field
+                            .as_str()
+                            .as_str()
+                            .eq_ignore_ascii_case("origin")
+                    })
+                    .map(|header| header.value.as_str().to_string())
+                    .unwrap_or_default();
+                let extension_pair_header = request.headers().iter().any(|header| {
+                    header
+                        .field
+                        .as_str()
+                        .as_str()
+                        .eq_ignore_ascii_case("x-qinghua-clipper-pair")
+                        && header.value.as_str() == "1"
+                });
+                let trusted_extension = origin.starts_with("chrome-extension://")
+                    || origin.starts_with("extension://")
+                    || (origin.is_empty() && extension_pair_header);
+                if !trusted_extension {
+                    let _ = request.respond(json_response(
+                        403,
+                        r#"{"ok":false,"error":"pairing is only available to browser extensions"}"#,
+                    ));
+                    continue;
+                }
+                let body = serde_json::json!({
+                    "ok": true,
+                    "token": token(),
+                })
+                .to_string();
+                let response = Response::from_string(body)
+                    .with_status_code(StatusCode(200))
+                    .with_header(cros_header(
+                        "Content-Type",
+                        "application/json; charset=utf-8",
+                    ))
+                    .with_header(cros_header("Cache-Control", "no-store"));
+                let response = if origin.is_empty() {
+                    response
+                } else {
+                    response
+                        .with_header(cros_header("Access-Control-Allow-Origin", &origin))
+                        .with_header(cros_header("Vary", "Origin"))
+                };
+                let _ = request.respond(response);
                 continue;
             }
             if method != Method::Post || path != CLIP_PATH {
@@ -309,6 +363,24 @@ mod tests {
 
         let health = raw_request(port, "GET", HEALTH_PATH, "", "");
         assert!(health.starts_with("HTTP/1.1 200"));
+
+        let denied_pair = raw_request(
+            port,
+            "POST",
+            PAIR_PATH,
+            "Origin: https://example.com\r\nContent-Length: 0\r\n",
+            "",
+        );
+        assert!(denied_pair.starts_with("HTTP/1.1 403"));
+        let pair = raw_request(
+            port,
+            "POST",
+            PAIR_PATH,
+            "Origin: chrome-extension://test-extension\r\nContent-Length: 0\r\n",
+            "",
+        );
+        assert!(pair.starts_with("HTTP/1.1 200"));
+        assert!(pair.contains("Access-Control-Allow-Origin: chrome-extension://test-extension"));
 
         let body = serde_json::json!({
             "url": "https://example.com/clip",

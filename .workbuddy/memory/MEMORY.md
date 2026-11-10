@@ -1,5 +1,13 @@
 # CanvasFlow（轻画）项目记忆
 
+### 总管2 第五十三轮：Clipper 空态、全网页拖拽与抽屉延迟（2026-11-10）
+
+- “轻画插件”面板不再渲染安装卡、配对卡或商店入口。`ClipperPanel` 只保留全部/未分类筛选、全网页空态、3 秒接收轮询和收藏动作；`ClipperInstallCard`、`ClipperPairing` 及测试文件删除，安装说明只在本地脚本/README。不要把安装信息再加回应用。
+- 扩展 0.4.1 的固定权限是 `storage + scripting` 和本机 loopback host，`optional_host_permissions` 为 `http://*/*`、`https://*/*`。用户开启拖拽后注册持久脚本到所有 HTTP/HTTPS 页面，并注入已打开标签页；Chrome/Edge 内部页不属于网页权限范围。旧包权限报错要映射成“扩展版本过旧，请在扩展管理页重新加载”。
+- 旧扩展报错 `Only permissions specified in the manifest may be requested.` 的根因是浏览器仍在运行未包含 `optional_host_permissions` 的旧 manifest，不是“请求清单”。源码和测试已锁定 0.4.1 清单；本机必须重载扩展。本机解压目录已更新到 `C:\Users\Administrator\Documents\QinghuaClipper\extension`。ZIP `release/qinghua-clipper-0.4.1.zip` 21,359 B，SHA-256 `D15A2744B39B894A3C3D1683B6A60AEA3F8A332EB195C1CB219FE552D602F59A`。
+- 我的素材抽屉禁止再等懒加载块才开始动画。点击先挂载同底色占位并立即启动外壳，真实模块在画布挂载、悬停和聚焦时预取；展开 220ms，收起 140ms，160ms 后卸载。帧探针 `openAt=88.2ms / detachedAt=174.9ms`；四组 UI 探针开 98–136ms、关 232–247ms（含自动化轮询）。
+- 证据：四组 1440×900 / 1024×700 × 明暗 `installCards=0 / pairingCards=0 / filters=2 / empty=1 / overflowX=false / errors=[]`。`npm run check` 1131 modules / 4533 deps / 275 registrations；串行全量 Vitest 659 files（658 passed / 1 skipped）/ 5478 tests（5477 passed / 1 skipped）；build 1263 modules；扩展 Chromium 七态无错误。未 push。
+
 ### 总管2 第五十二轮：我的素材侧栏与 Agent 同节奏（2026-11-10）
 
 - 用户要求侧栏展开与 Agent 壳层一致。`CanvasPage` 现在先挂载 `MyAssetsDrawer`，轮询到懒加载的 `[data-my-assets-drawer]` 后再用两个 `requestAnimationFrame` 打开 `data-my-assets-open`；不能在 Suspense 未完成时先启动槽宽，否则首次打开会“宽度先跑、内容后出现”。

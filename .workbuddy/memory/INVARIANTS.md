@@ -2,11 +2,11 @@
 
 ## 画布“我的素材”抽屉动效边界（2026-11-10）
 
-- 抽屉必须与 Agent 壳层同节奏：槽宽 `var(--dur-shell)` + `var(--ease-panel)`，内容透明度 `160ms`，
-  并使用同方向的 `translateX + scale` 收束。展开前必须等真实 `[data-my-assets-drawer]` 懒加载挂载，
-  再经过两个 `requestAnimationFrame` 启动；禁止让槽宽先跑而内容后出现。
-- 关闭先撤销打开状态，`260ms` 后卸载；不能立即删除导致退场截断，也不能永久保留已关闭槽。
-  重复打开、快速关闭和首次懒加载都必须只保留一个抽屉。
+- 抽屉展开不能被 `MyAssetsDrawer` 懒加载块阻塞。点击后立即挂载槽与同底色
+  `[data-my-assets-loading]` 占位，经过两个 `requestAnimationFrame` 启动 220ms 宽度动画；
+  真实内容加载后再替换占位。画布挂载、按钮悬停和键盘聚焦都应预取抽屉模块。
+- 关闭先撤销打开状态，宽度/内容退场使用更快曲线（140ms），`160ms` 后卸载；不能立即删除导致退场截断，
+  也不能永久保留已关闭槽。重复打开、快速关闭和首次懒加载都必须只保留一个抽屉。
 - 槽宽过渡有意使用布局属性，因为它代表画布真实向右让位，与 Agent 现有交互一致。不要为了消除
   Impeccable 的 `layout-transition` warning 改成覆盖式浮层；该 warning 是需要记录的设计例外。
 - UI 证据必须覆盖 1440×900 / 1024×700 × 明暗，记录 `slotWidth / drawerWidth / canvasWidthDelta /
@@ -40,16 +40,18 @@
 
 ## 浏览器扩展双商店与拖拽收藏边界（2026-11-10）
 
-- Chrome 与 Edge 共用同一份 MV3 包。权限只能是 `activeTab + storage + contextMenus + scripting`；
-  禁止为了拖拽收藏增加常驻 content script、`<all_urls>`、Cookie 或历史权限。
-- 拖拽投放区只能在用户点击“拖拽图片收藏”后经 `chrome.scripting.executeScript` 临时注入当前 `activeTab`；
-  使用封闭 Shadow DOM，关闭时必须移除页面监听。普通网页收藏发送页面 URL/标题；拖拽和图片右键发送
-  页面 URL/图片 URL/标题，接收端 `imageUrl` 只接受公开 HTTP/HTTPS。
-- 安装卡只接受 `microsoftedge.microsoft.com` 与 `chromewebstore.google.com` 的 HTTPS 详情页。
-  未配置商店或 ZIP 地址时只能显示离线说明，禁止内置假商店 URL、静默安装或把 ZIP 下载写成商店安装。
-- UI 证据必须同时覆盖 Edge / Chrome 两个按钮的四组桌面视口，以及扩展弹窗和拖拽投放区亮暗态；
-  商店点击只能用隔离 `window.open` 记录验证，不能真的提交安装。`capture-clipper-extension.mjs` 的
-  `qinghua:clip-image` 页面 URL 必须是真实 HTTP 页面，不能用 `about:blank` 冒充。
+- Chrome 与 Edge 共用同一份 MV3 包，版本至少 0.4.1。固定权限只能是 `storage + scripting` 和本机
+  loopback host；全部网页能力必须通过 `optional_host_permissions` 的 `http://*/*`、`https://*/*`
+  在用户开关动作中申请，不使用 `<all_urls>`、Cookie 或历史权限。
+- 开关开启后，后台用 `chrome.scripting.registerContentScripts` 给所有 HTTP/HTTPS 页面注册持久
+  `drop-target.js`，并注入已打开的匹配标签页；关闭时注销脚本并通知页面移除监听。投放区使用封闭 Shadow DOM。
+- 旧扩展的 `Only permissions specified in the manifest may be requested.` 是旧 manifest 不含可选网页权限。
+  用户可见文案必须提示在扩展管理页重新加载；不能把英文原句直接当产品状态。
+- 应用内“轻画插件”面板不再渲染安装卡、配对卡、商店 URL 或令牌说明。面板只保留全部/未分类筛选、
+  “所有网页”空态、接收轮询和收藏动作；安装说明由 `README.md` 与本地安装脚本承担。
+- UI 证据必须覆盖 1440×900 / 1024×700 × 明暗，断言 `installCards=0 / pairingCards=0 / filters=2 /
+  empty=1 / overflowX=false / errors=[]`；扩展 Chromium 证据必须覆盖开关亮暗、离线、旧权限错误和
+  拖拽投放区，且 `capture-clipper-extension.mjs` 的页面 URL 不得用 `about:blank` 冒充。
 - 本地辅助安装脚本只能复制到系统“文档”目录下的 `QinghuaClipper\extension`，不得使用隐藏的
   `%LOCALAPPDATA%`（Chrome 文件选择器会报“位置不可用”），也不得写浏览器用户数据目录；脚本可以打开
   扩展页、Explorer 和复制路径，但最终“加载未打包的扩展程序”必须由用户确认。

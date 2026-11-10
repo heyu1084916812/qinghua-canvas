@@ -47,8 +47,10 @@ const LogPanel = lazy(() =>
     default: module.LogPanel,
   })),
 )
+const MY_ASSETS_EXIT_MS = 160
+const loadMyAssetsDrawer = () => import('./MyAssetsDrawer')
 const MyAssetsDrawer = lazy(() =>
-  import('./MyAssetsDrawer').then((module) => ({
+  loadMyAssetsDrawer().then((module) => ({
     default: module.MyAssetsDrawer,
   })),
 )
@@ -148,21 +150,17 @@ function CanvasProject({ projectId }: { projectId: string }) {
    * 那支 effect 会在节点还没读回来时跑一次，然后**再也不会跑**。
    */
   const [hydratedAt, setHydratedAt] = useState(0)
+  useEffect(() => {
+    void loadMyAssetsDrawer()
+  }, [])
   useLayoutEffect(() => {
     if (!myAssetsOpen) return
     setMyAssetsMounted(true)
     let firstFrame = 0
     let secondFrame = 0
-    const waitForDrawer = () => {
-      if (!myAssetsSlotRef.current?.querySelector('[data-my-assets-drawer]')) {
-        firstFrame = window.requestAnimationFrame(waitForDrawer)
-        return
-      }
-      firstFrame = window.requestAnimationFrame(() => {
-        secondFrame = window.requestAnimationFrame(() => setMyAssetsAnimatedOpen(true))
-      })
-    }
-    firstFrame = window.requestAnimationFrame(waitForDrawer)
+    firstFrame = window.requestAnimationFrame(() => {
+      secondFrame = window.requestAnimationFrame(() => setMyAssetsAnimatedOpen(true))
+    })
     return () => {
       window.cancelAnimationFrame(firstFrame)
       window.cancelAnimationFrame(secondFrame)
@@ -172,7 +170,7 @@ function CanvasProject({ projectId }: { projectId: string }) {
     if (myAssetsOpen) return
     setMyAssetsAnimatedOpen(false)
     if (!myAssetsMounted) return
-    const timer = window.setTimeout(() => setMyAssetsMounted(false), 260)
+    const timer = window.setTimeout(() => setMyAssetsMounted(false), MY_ASSETS_EXIT_MS)
     return () => window.clearTimeout(timer)
   }, [myAssetsMounted, myAssetsOpen])
   useEffect(() => {
@@ -479,7 +477,15 @@ function CanvasProject({ projectId }: { projectId: string }) {
               data-my-assets-slot
               data-my-assets-open={myAssetsAnimatedOpen ? 'true' : 'false'}
             >
-              <Suspense fallback={null}>
+              <Suspense
+                fallback={(
+                  <div
+                    className={styles.myAssetsLoading}
+                    data-my-assets-loading
+                    aria-busy="true"
+                  />
+                )}
+              >
                 <MyAssetsDrawer
                   projectId={projectId}
                   store={store}
@@ -487,10 +493,6 @@ function CanvasProject({ projectId }: { projectId: string }) {
                   onOpenKitEditor={() => {
                     setMyAssetsOpen(false)
                     openContextKitsDialog()
-                  }}
-                  onOpenCanvasBrowser={(url) => {
-                    setMyAssetsOpen(false)
-                    setCanvasBrowserUrl(url)
                   }}
                 />
               </Suspense>
@@ -528,7 +530,12 @@ function CanvasProject({ projectId }: { projectId: string }) {
               aria-label="我的素材"
               title="我的素材"
               aria-pressed={myAssetsOpen}
-              onClick={() => setMyAssetsOpen((current) => !current)}
+              onPointerEnter={() => void loadMyAssetsDrawer()}
+              onFocus={() => void loadMyAssetsDrawer()}
+              onClick={() => {
+                void loadMyAssetsDrawer()
+                setMyAssetsOpen((current) => !current)
+              }}
             >
               我的素材
             </button>

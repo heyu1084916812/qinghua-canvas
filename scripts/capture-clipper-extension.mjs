@@ -27,61 +27,39 @@ const browser = await chromium.launch({
 const report = []
 
 try {
-  report.push(await capture({
-    name: 'light-connected',
+  report.push(await capturePopup({
+    name: 'light-on',
     theme: 'light',
-    config: {
-      endpoint: 'http://127.0.0.1:53684/clip',
-      token: 'extension-demo-token',
-    },
-    tab: {
-      title: 'Natural inflatable brand campaign references',
-      url: 'https://example.com/inspiration/long-title-for-layout',
-    },
-    fetchMode: 'online',
-    clickClip: true,
+    dragMode: true,
+    online: true,
   }))
-  report.push(await capture({
-    name: 'dark-first-run',
+  report.push(await capturePopup({
+    name: 'dark-on',
     theme: 'dark',
-    config: {
-      endpoint: 'http://127.0.0.1:53684/clip',
-      token: '',
-    },
-    tab: {
-      title: 'Editorial packaging moodboard',
-      url: 'https://example.com/moodboard',
-    },
-    fetchMode: 'offline',
+    dragMode: true,
+    online: true,
+  }))
+  report.push(await capturePopup({
+    name: 'light-off',
+    theme: 'light',
+    dragMode: false,
+    online: true,
+  }))
+  report.push(await capturePopup({
+    name: 'light-permission-error',
+    theme: 'light',
+    dragMode: false,
+    online: true,
+    permissionError: true,
+  }))
+  report.push(await capturePopup({
+    name: 'dark-offline',
+    theme: 'dark',
+    dragMode: true,
+    online: false,
   }))
   report.push(await captureDropTarget('light-drag-target', 'light'))
   report.push(await captureDropTarget('dark-drag-target', 'dark'))
-  report.push(await capture({
-    name: 'light-invalid-page',
-    theme: 'light',
-    config: {
-      endpoint: 'http://127.0.0.1:53684/clip',
-      token: 'extension-demo-token',
-    },
-    tab: {
-      title: 'Extensions',
-      url: 'chrome://extensions',
-    },
-    fetchMode: 'online',
-  }))
-  report.push(await capture({
-    name: 'dark-offline',
-    theme: 'dark',
-    config: {
-      endpoint: 'http://127.0.0.1:53684/clip',
-      token: 'extension-demo-token',
-    },
-    tab: {
-      title: 'Offline reference page',
-      url: 'https://example.com/offline',
-    },
-    fetchMode: 'offline',
-  }))
   await writeFile(
     resolve(output, 'report.json'),
     `${JSON.stringify(report, null, 2)}\n`,
@@ -91,9 +69,9 @@ try {
   await browser.close()
 }
 
-async function capture({ name, theme, config, tab, fetchMode, clickClip = false }) {
+async function capturePopup({ name, theme, dragMode, online, permissionError = false }) {
   const context = await browser.newContext({
-    viewport: { width: 380, height: 720 },
+    viewport: { width: 300, height: 210 },
     colorScheme: theme,
   })
   const page = await context.newPage()
@@ -102,65 +80,83 @@ async function capture({ name, theme, config, tab, fetchMode, clickClip = false 
   page.on('console', (message) => {
     if (message.type() === 'error') errors.push(message.text())
   })
-  await page.addInitScript(({ initialConfig, initialTab, mode }) => {
-    const store = { ...initialConfig }
-    globalThis.chrome = {
-      storage: {
-        local: {
-          get: async (defaults) => ({ ...defaults, ...store }),
-          set: async (values) => Object.assign(store, values),
+  await page.addInitScript(({ initialDragMode, isOnline, failPermission }) => {
+    const store = { dragMode: initialDragMode }
+    Object.defineProperty(globalThis, 'chrome', {
+      configurable: true,
+      value: {
+        storage: {
+          local: {
+            get: async (defaults) => ({ ...defaults, ...store }),
+            set: async (values) => Object.assign(store, values),
+          },
+        },
+        permissions: {
+          request: async () => {
+            if (failPermission) {
+              throw new Error('Only permissions specified in the manifest may be requested.')
+            }
+            return true
+          },
+        },
+        runtime: {
+          sendMessage: async (message) => {
+            if (message?.type === 'qinghua:connect') {
+              return isOnline
+                ? { ok: true, paired: true }
+                : { ok: false, error: '轻画未打开' }
+            }
+            if (message?.type === 'qinghua:set-drag-mode') {
+              store.dragMode = Boolean(message.enabled)
+              return { ok: true }
+            }
+            return { ok: true }
+          },
         },
       },
-      tabs: {
-        query: async () => [initialTab],
-      },
-    }
-    globalThis.fetch = async (input) => {
-      const url = String(input)
-      if (mode === 'offline') throw new TypeError('Failed to fetch')
-      if (url.endsWith('/health')) {
-        return new Response('{"ok":true}', {
-          status: 200,
-          headers: { 'content-type': 'application/json' },
-        })
-      }
-      return new Response('{"ok":true}', {
-        status: 200,
-        headers: { 'content-type': 'application/json' },
-      })
-    }
+    })
   }, {
-    initialConfig: config,
-    initialTab: tab,
-    mode: fetchMode,
+    initialDragMode: dragMode,
+    isOnline: online,
+    failPermission: permissionError,
   })
   await page.goto(popupUrl, { waitUntil: 'load' })
-  await page.locator('#status').waitFor({ timeout: 5_000 })
   await page.waitForFunction(
     () => document.querySelector('#status-dot')?.dataset.state !== 'checking',
     { timeout: 5_000 },
-  ).catch(() => undefined)
-  if (clickClip) {
-    await page.locator('#clip').click()
-    await page.locator('#last-result').waitFor({ state: 'visible', timeout: 5_000 })
+  )
+  if (permissionError) {
+    await page.locator('.control').click()
+    await page.waitForFunction(
+      () => document.querySelector('#status')?.textContent?.includes('扩展版本过旧'),
+      { timeout: 5_000 },
+    )
   }
+  await page.waitForTimeout(200)
   await page.screenshot({
     path: resolve(output, `${name}.png`),
     fullPage: true,
   })
-  const metrics = await page.evaluate(() => ({
-    status: document.querySelector('#status')?.textContent?.trim() ?? '',
-    dotState: document.querySelector('#status-dot')?.dataset.state ?? '',
-    pageInvalid: document.querySelector('#page-card')?.dataset.invalid ?? 'false',
-    settingsOpen: document.querySelector('#settings')?.open ?? false,
-    clipDisabled: document.querySelector('#clip')?.disabled ?? true,
-    dragDisabled: document.querySelector('#drag')?.disabled ?? true,
-    lastResult: document.querySelector('#last-result')?.textContent?.trim() ?? '',
-    width: document.documentElement.scrollWidth,
-    height: document.documentElement.scrollHeight,
-    overflowX:
-      document.documentElement.scrollWidth > document.documentElement.clientWidth + 1,
-  }))
+  const metrics = await page.evaluate(() => {
+    const toggle = document.querySelector('#drag-mode')
+    const switchControl = toggle?.nextElementSibling
+    return {
+      status: document.querySelector('#status')?.textContent?.trim() ?? '',
+      dotState: document.querySelector('#status-dot')?.dataset.state ?? '',
+      dragMode: toggle?.checked ?? false,
+      hint: document.querySelector('#hint')?.textContent?.trim() ?? '',
+      switchBackground: switchControl
+        ? getComputedStyle(switchControl).backgroundColor
+        : '',
+      switchThumbTransform: switchControl
+        ? getComputedStyle(switchControl, '::after').transform
+        : '',
+      width: document.documentElement.scrollWidth,
+      height: document.documentElement.scrollHeight,
+      overflowX:
+        document.documentElement.scrollWidth > document.documentElement.clientWidth + 1,
+    }
+  })
   await context.close()
   return { name, theme, errors, ...metrics }
 }
@@ -185,7 +181,7 @@ async function captureDropTarget(name, theme) {
       img { display: block; width: 100%; height: 240px; object-fit: cover; }
     </style>
     <main>
-      <h1>Billfish-style drag collection</h1>
+      <h1>Drag an image</h1>
       <section class="card">
         <img id="source-image" alt="Reference"
           src="data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='800' height='480'%3E%3Crect width='800' height='480' fill='%23bfd0c3'/%3E%3Ccircle cx='250' cy='210' r='110' fill='%23d9a36c'/%3E%3Crect x='420' y='90' width='250' height='300' rx='28' fill='%23527b69'/%3E%3C/svg%3E" />
@@ -211,6 +207,10 @@ async function captureDropTarget(name, theme) {
             globalThis.__qinghuaMessages.push(message)
             return { ok: true }
           },
+          onMessage: {
+            addListener: () => undefined,
+            removeListener: () => undefined,
+          },
         },
       },
     })
@@ -218,10 +218,12 @@ async function captureDropTarget(name, theme) {
   await page.addScriptTag({
     path: resolve(extensionRoot, 'drop-target.js'),
   })
-  await page.locator('[data-qinghua-drop-target]').waitFor({ timeout: 5_000 })
+  await page.locator('[data-qinghua-drop-target]').waitFor({
+    state: 'attached',
+    timeout: 5_000,
+  })
   await page.evaluate(() => {
     const image = document.querySelector('#source-image')
-    const host = document.querySelector('[data-qinghua-drop-target]')
     const dataTransfer = new DataTransfer()
     dataTransfer.setData('text/uri-list', 'https://cdn.example.com/dragged.webp')
     image.dispatchEvent(new DragEvent('dragstart', {
@@ -229,6 +231,18 @@ async function captureDropTarget(name, theme) {
       cancelable: true,
       dataTransfer,
     }))
+  })
+  await page.waitForFunction(
+    () => document.querySelector('[data-qinghua-drop-target]')
+      ?.getAttribute('data-qinghua-drop-visible') === 'true',
+    { timeout: 5_000 },
+  )
+  await page.waitForTimeout(150)
+  await page.screenshot({ path: resolve(output, `${name}-open.png`) })
+  await page.evaluate(() => {
+    const host = document.querySelector('[data-qinghua-drop-target]')
+    const dataTransfer = new DataTransfer()
+    dataTransfer.setData('text/uri-list', 'https://cdn.example.com/dragged.webp')
     host.dispatchEvent(new DragEvent('drop', {
       bubbles: true,
       cancelable: true,
@@ -238,20 +252,18 @@ async function captureDropTarget(name, theme) {
   })
   await page.waitForFunction(
     () => document.querySelector('[data-qinghua-drop-target]')
-      ?.getAttribute('data-qinghua-drop-status') === '已收藏到「我的素材 → 轻画插件」',
+      ?.getAttribute('data-qinghua-drop-status') === '已收藏到轻画',
     { timeout: 5_000 },
   )
-  await page.screenshot({
-    path: resolve(output, `${name}.png`),
-  })
+  await page.screenshot({ path: resolve(output, `${name}-saved.png`) })
   const metrics = await page.evaluate(() => {
     const host = document.querySelector('[data-qinghua-drop-target]')
-    const messages = globalThis.__qinghuaMessages ?? []
     return {
       ready: host?.getAttribute('data-qinghua-drop-ready') === 'true',
+      visible: host?.getAttribute('data-qinghua-drop-visible') === 'true',
       status: host?.getAttribute('data-qinghua-drop-status') ?? '',
       error: host?.getAttribute('data-qinghua-drop-error') === 'true',
-      messages,
+      messages: globalThis.__qinghuaMessages ?? [],
       overflowX:
         document.documentElement.scrollWidth > document.documentElement.clientWidth + 1,
     }
