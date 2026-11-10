@@ -157,6 +157,7 @@ describe('useAgentPrepareTurnController / 12 个静态依赖原样透传', () =>
     expect(input.routeExecution).toBe(h.input.routeExecution)
     expect(input.projectId).toBe('proj-1')
     expect(input.referenceLedger).toBeTruthy()
+    expect(input.autoCurateReferences).toBeTypeOf('function')
     // 调用参数原样
     expect(input.session).toBe(a.session)
     expect(input.text).toBe('画一张海报')

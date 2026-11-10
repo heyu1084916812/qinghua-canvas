@@ -7,6 +7,7 @@ import {
 import type { NetworkPort } from '../../../platform/ports'
 import { isPublicHttpUrl } from '../../../domain/shared/publicUrl'
 import { errorTextOf } from '../../../shared/result'
+import { searchOpenCulture } from './openCultureSearch'
 
 export interface OpenResearchSearchResult {
   items: DesignResearchItem[]
@@ -174,9 +175,10 @@ export async function searchOpenResearch(
   searxngImageUrl.searchParams.set('categories', 'images')
 
   const warnings: string[] = []
-  const [images, content, searxngImages, web] = await Promise.allSettled([
+  const [images, content, culture, searxngImages, web] = await Promise.allSettled([
     requestJson(network, openverseUrl.toString(), signal),
     requestJson(network, wikipediaUrl.toString(), signal),
+    searchOpenCulture(network, query, contentLimit, signal),
     requestJson(network, searxngImageUrl.toString(), signal),
     requestJson(network, searxngUrl.toString(), signal),
   ])
@@ -190,6 +192,12 @@ export async function searchOpenResearch(
     items.push(...wikipediaItems(content.value, contentLimit))
   } else {
     warnings.push(`Wikipedia 搜索失败：${errorTextOf(content.reason)}`)
+  }
+  if (culture.status === 'fulfilled') {
+    items.push(...culture.value.items)
+    warnings.push(...culture.value.warnings)
+  } else {
+    warnings.push(`开放馆藏搜索失败：${errorTextOf(culture.reason)}`)
   }
   if (searxngImages.status === 'fulfilled') {
     items.push(...searxngItems(searxngImages.value, searxImageLimit, 'image'))

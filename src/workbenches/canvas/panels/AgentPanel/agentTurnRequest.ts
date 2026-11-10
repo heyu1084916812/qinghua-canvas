@@ -79,6 +79,7 @@ import type {
   ReferenceLedgerRepository,
 } from '../../../../state/project/referenceLedgerRepository'
 import type { AgentPhaseEvent } from '../../../../domain/agent/phase'
+import type { ReferenceCurationResult } from '../../../../domain/project/referenceCuration'
 
 export interface AgentTurnContextTrace {
   digest: string
@@ -119,6 +120,16 @@ export interface PrepareAgentTurnRequestInput {
     selectForTask: ReferenceLedgerRepository['selectForTask']
     listItems: ReferenceLedgerRepository['listItems']
   }
+  /** 显式 reference chip 在上下文装配前的自动参考分析。 */
+  autoCurateReferences?: (input: {
+    sessionId: string
+    operationId: string
+    taskKey: string
+    task: string
+    route: AgentChatRoute
+    itemIds: readonly string[]
+    signal: AbortSignal
+  }) => Promise<ReferenceCurationResult>
   skills: readonly Skill[]
   channels: readonly Channel[]
   canvasReviewEnabled: boolean
@@ -294,6 +305,38 @@ export async function prepareAgentTurnRequest(
       lastAssistantTextForTask,
     ),
   })
+  const autoCurationWarnings: string[] = []
+  if (referenceIds.length > 0 && input.autoCurateReferences) {
+    try {
+      const curation = await input.autoCurateReferences({
+        sessionId: input.session.id,
+        operationId,
+        taskKey,
+        task: plainText,
+        route: chatRoute,
+        itemIds: referenceIds,
+        signal: input.signal,
+      })
+      autoCurationWarnings.push(
+        ...curation.failed.map((item) =>
+          `参考「${item.title}」自动分析失败：${item.reason}`,
+        ),
+        ...curation.limitations,
+      )
+      if (curation.failed.length > 0) {
+        input.notifyContextError(
+          `有 ${curation.failed.length} 条参考没有完成自动分析，已按显式 chip 继续。`,
+        )
+      }
+    } catch (error) {
+      const message = `参考自动分析未完成：${errText(error)}`
+      autoCurationWarnings.push(message)
+      input.notifyContextError(`${message}；已按显式 chip 继续。`)
+    }
+  }
+  if (input.signal.aborted) {
+    return { kind: 'aborted_before_job', persistedTurn }
+  }
 
   let contextPrompt = ''
   let contextTrace: AgentTurnContextTrace | null = null
@@ -348,6 +391,29 @@ export async function prepareAgentTurnRequest(
           (hash) => referenceMimeCache.get(hash) ?? null,
         )
       : null
+    const referenceWarnings = [
+      ...autoCurationWarnings,
+      ...(projected?.warnings ?? []),
+    ]
+    const referencePhaseEvent: AgentPhaseEvent | undefined =
+      projected?.phaseEvent
+        ? autoCurationWarnings.length > 0
+          ? {
+              ...projected.phaseEvent,
+              detail: [
+                projected.phaseEvent.detail ?? '',
+                ...autoCurationWarnings,
+              ].filter(Boolean).join('\n'),
+            }
+          : projected.phaseEvent
+        : autoCurationWarnings.length > 0
+          ? {
+              phase: 'referenceAnalysis',
+              title: '参考分析未完成',
+              detail: autoCurationWarnings.join('\n'),
+              evidence: referenceIds,
+            }
+          : undefined
     contextTrace = {
       digest: bundle.digest,
       memoryRefs: bundle.memoryRefs,
@@ -381,11 +447,11 @@ export async function prepareAgentTurnRequest(
       ...(projected?.evidence.length
         ? { referenceEvidence: projected.evidence }
         : {}),
-      ...(projected?.warnings.length
-        ? { referenceWarnings: projected.warnings }
+      ...(referenceWarnings.length > 0
+        ? { referenceWarnings }
         : {}),
-      ...(projected?.phaseEvent
-        ? { referencePhaseEvent: projected.phaseEvent }
+      ...(referencePhaseEvent
+        ? { referencePhaseEvent }
         : {}),
     }
     if (bundle.conflicts.length > 0) {

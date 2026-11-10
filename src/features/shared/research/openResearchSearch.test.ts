@@ -13,7 +13,7 @@ function response(payload: unknown) {
 }
 
 describe('searchOpenResearch', () => {
-  it('searches Openverse images, Wikipedia content and SearXNG web results in parallel', async () => {
+  it('searches open images, Wikipedia, open collections and SearXNG in parallel', async () => {
     const request = vi.fn<NetworkPort['request']>(async (input) => {
       if (input.url.startsWith('https://api.openverse.org/')) {
         return response({
@@ -43,6 +43,28 @@ describe('searchOpenResearch', () => {
           }],
         })
       }
+      if (input.url.startsWith('https://archive.org/advancedsearch.php')) {
+        return response({
+          response: {
+            docs: [{
+              identifier: 'poster-archive',
+              title: 'Historical packaging poster',
+              description: ['Public archive scan'],
+            }],
+          },
+        })
+      }
+      if (input.url.startsWith('https://api.artic.edu/')) {
+        return response({
+          data: [{
+            id: 7962,
+            title: 'Buy a Little Present',
+            image_id: 'image-7962',
+            artist_display: 'Unknown Artist',
+            date_display: '1918',
+          }],
+        })
+      }
       return response({
         query: {
           pages: {
@@ -67,7 +89,7 @@ describe('searchOpenResearch', () => {
       { endpoint: 'https://search.example.com/search' },
     )
 
-    expect(request).toHaveBeenCalledTimes(4)
+    expect(request).toHaveBeenCalledTimes(6)
     expect(result.warnings).toEqual([])
     expect(result.items).toEqual([
       expect.objectContaining({
@@ -80,6 +102,16 @@ describe('searchOpenResearch', () => {
         source: 'wikipedia',
         title: '可持续包装',
         imageUrl: 'https://upload.wikimedia.org/example.jpg',
+      }),
+      expect.objectContaining({
+        id: 'internetArchive:poster-archive',
+        source: 'internetArchive',
+        imageUrl: 'https://archive.org/services/img/poster-archive',
+      }),
+      expect.objectContaining({
+        id: 'artic:7962',
+        source: 'artic',
+        imageUrl: 'https://www.artic.edu/iiif/2/image-7962/full/843,/0/default.jpg',
       }),
       expect.objectContaining({
         source: 'searxng',
@@ -96,6 +128,12 @@ describe('searchOpenResearch', () => {
       }
       if (input.url.startsWith('https://search.example.com/search')) {
         return response({ results: [] })
+      }
+      if (input.url.startsWith('https://archive.org/')) {
+        return response({ response: { docs: [] } })
+      }
+      if (input.url.startsWith('https://api.artic.edu/')) {
+        return response({ data: [] })
       }
       return response({
         query: {

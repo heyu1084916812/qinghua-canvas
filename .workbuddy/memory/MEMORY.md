@@ -1,5 +1,13 @@
 # CanvasFlow（轻画）项目记忆
 
+### 总管2 第六十六轮：Agent 自动参考分析、过程正文与开放馆藏调研（2026-11-11）
+- `curateReferences` 工具存在不等于“自动分析”：模型漏调用时参考会一直停在等待状态。现在显式 reference chip 在 `prepareAgentTurnRequest` 的路由就绪后、读取任务参考前，通过 `autoCurateReferences` 先跑一次真实分析；失败只写 warning/提示并继续使用显式 chip，不能把整轮 Agent 打断。
+- 自动分析使用 `preferredItemIds` 而不是 `requestedItemIds`：同一 taskKey 已有 usage 时跳过重复调用，任务类型变化后重新分析。仍保留工具入口供用户指定 itemIds 强制重分析。
+- “参考分析完成”阶段折叠标题保持短，展开 detail 必须显示每条参考的 What 与本轮 HowToUse。不要再把详细内容藏掉，否则用户看到的还是空泛阶段。阶段事件仍只来自真实台账/工具结果，不伪造 thinking。
+- 公共 SearXNG 可能 429/403；现新增 Internet Archive 与 Art Institute of Chicago 两个免密钥开放 API。Openverse、Wikipedia、IA、AIC、SearXNG 各自独立失败，单个失败只 warning。搜索候选加入项目参考时必须保存剩余候选 URL，并继续走统一素材落库与许可说明。
+- 真实网络探测：Openverse、Internet Archive、Art Institute 返回实际条目；`www.isci.si` 当前 429，所以不能把 SearXNG 当唯一搜索来源。Pinterest 仍是 #962 外部凭据验收项，不能伪造线上登录。
+- 门禁：`npm run check` 1169 modules / 4696 deps / 313 registrations；串行全量 Vitest 669 files（668 passed / 1 skipped）/ 5523 tests（5522 passed / 1 skipped）；`npm run build` 1301 modules；Pinterest Rust OAuth 3/3；Tauri release `--no-bundle` 通过，最新 `release/qinghua.exe` 已启动。隔离 store 四组 UI 36 surfaces：`errors=0 / horizontalOverflow=0`，Agent tools 与套件各 4 组通过。未 push。
+
 ### 总管2 第六十五轮：Clipper 主图识别与多候选原图回退（2026-11-11）
 - 用户这次同时遇到“抓到笑脸/头像”和“有时完全进不来”。前者是拖拽候选没有按指针位置与可见面积竞争；后者是花瓣 CDN 对桌面端二次下载可能返回 403/抗爬 HTML，即使扩展端看到图片也不能保证桌面端能重取同一个 URL。
 - 对照的公开实现：MIT [Image Picka](https://github.com/eight04/image-picka) 的 `picture/srcset`、懒加载属性和背景图提取；MIT [Huaban Downloader](https://github.com/dddzzz123-dz/huaban-downloader) 的原图/API 思路；[PickTrue](https://github.com/winkidney/PickTrue) 的花瓣原图 key；GPL [KellyC Image Downloader](https://github.com/NC22/KellyC-Image-Downloader) 的原始图/预览图分类和 Pinterest `originals` 规则。只借鉴行为边界，没有复制 GPL 源码。

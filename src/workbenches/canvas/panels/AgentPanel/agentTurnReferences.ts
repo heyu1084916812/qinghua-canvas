@@ -59,9 +59,9 @@ export function projectAgentTurnReferences(
     }
   }
   const omitted = selection.omitted.length
-  const visibleSummary = selection.selected.map(({ item }) => {
+  const visibleSummary = selection.selected.map(({ item, usage }) => {
     const assetCount = item.assets?.length ?? (item.assetHash ? 1 : 0)
-    return `- ${item.title.trim() || item.id}：${assetCount > 0 ? `${assetCount} 个素材` : '文字参考'}`
+    return `- ${item.title.trim() || item.id}：${item.what.trim()}；本轮怎么用：${usage.howToUse.trim()}${assetCount > 0 ? `（${assetCount} 个素材）` : ''}`
   })
   const prompt = lines.length > 0
     ? [

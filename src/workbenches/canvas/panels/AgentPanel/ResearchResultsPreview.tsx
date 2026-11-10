@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { IconCheck, IconPlus, IconSpinner } from '../../toolbar/icons'
+import { agentResearchSourceLabel } from './agentResearchSourceLabel'
 import type { ConversationResearchItem } from './conversation'
 import styles from './ResearchResultsPreview.module.css'
 
@@ -61,7 +62,7 @@ export function ResearchResultsPreview({
                   {item.description || item.title}
                 </span>
               )}
-              <span className={styles.source}>{item.source}</span>
+              <span className={styles.source}>{agentResearchSourceLabel(item.source)}</span>
             </a>
             {onAdd ? (
               <button

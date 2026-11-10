@@ -206,7 +206,7 @@ export async function runDesignResearch(
     warnings.push(
       input.includeOpenSearch === false
         ? '页面没有提供可用的 Open Graph 图片或文章内容。'
-        : '开放搜索没有找到可用参考；可以补充公开 Pinterest / Behance / 网页 URL 后重试。',
+        : '开放搜索没有找到可用参考；可以补充公开 Pinterest / Behance / 网页 URL，或在设置中换成可用的 SearXNG 实例后重试。',
     )
   }
 

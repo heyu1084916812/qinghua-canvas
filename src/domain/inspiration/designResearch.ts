@@ -4,6 +4,8 @@ export type ResearchProvider =
   | 'behance'
   | 'openverse'
   | 'wikipedia'
+  | 'internetArchive'
+  | 'artic'
   | 'searxng'
   | 'web'
 
@@ -111,6 +113,8 @@ const PROVIDER_TITLES: Record<ResearchProvider, string> = {
   behance: 'Behance',
   openverse: 'Openverse',
   wikipedia: 'Wikipedia',
+  internetArchive: 'Internet Archive',
+  artic: 'Art Institute',
   searxng: 'SearXNG',
   web: 'Other references',
 }
@@ -120,6 +124,8 @@ const PROVIDER_ORDER: readonly ResearchProvider[] = [
   'behance',
   'openverse',
   'wikipedia',
+  'internetArchive',
+  'artic',
   'searxng',
   'google',
   'web',

@@ -33,6 +33,24 @@ function networkWith(pages: Record<string, string>): NetworkPort {
           arrayBuffer: async () => new ArrayBuffer(0),
         }
       }
+      if (req.url.startsWith('https://archive.org/advancedsearch.php')) {
+        return {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+          text: async () => '',
+          json: async <T,>() => ({ response: { docs: [] } }) as T,
+          arrayBuffer: async () => new ArrayBuffer(0),
+        }
+      }
+      if (req.url.startsWith('https://api.artic.edu/')) {
+        return {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+          text: async () => '',
+          json: async <T,>() => ({ data: [] }) as T,
+          arrayBuffer: async () => new ArrayBuffer(0),
+        }
+      }
       const html = pages[req.url]
       if (html === undefined) throw new Error('offline')
       return {

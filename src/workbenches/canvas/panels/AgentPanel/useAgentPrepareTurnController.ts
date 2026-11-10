@@ -8,6 +8,7 @@ import type {
   AgentTurnRequestPreparation,
   PrepareAgentTurnRequestInput,
 } from './agentTurnRequest'
+import { runAgentReferenceCuration } from './agentReferenceCuration'
 
 type PrepInput = PrepareAgentTurnRequestInput
 
@@ -87,6 +88,28 @@ export function useAgentPrepareTurnController(
             'error',
           ),
         referenceLedger,
+        autoCurateReferences: (curation) =>
+          runAgentReferenceCuration({
+            storage: input.platform.storage,
+            assets: input.platform.assets,
+            routeExecution: input.routeExecution,
+            onRecordWarning: (warning) =>
+              input.store.notify(
+                `参考分析记录写入失败：${warning}`,
+                'error',
+              ),
+          }, {
+            projectId: input.store.getSnapshot().projectId,
+            sessionId: curation.sessionId,
+            operationId: curation.operationId,
+            taskKey: curation.taskKey,
+            task: curation.task,
+            route: curation.route,
+            ...(curation.itemIds.length > 0
+              ? { preferredItemIds: curation.itemIds }
+              : {}),
+            signal: curation.signal,
+          }),
         // 两个顺序回调原样透传：它们的执行时机在发送主体里。
         onPersisted: hooks.onPersisted,
         onRouteReady: hooks.onRouteReady,

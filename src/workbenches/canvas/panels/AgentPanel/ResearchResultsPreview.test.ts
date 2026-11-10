@@ -84,4 +84,32 @@ describe('ResearchResultsPreview', () => {
       renderer.root.findByProps({ role: 'status' }).props.children,
     ).toContain('已加入项目参考')
   })
+
+  it('shows human-readable labels for open collection providers', () => {
+    let renderer!: TestRenderer.ReactTestRenderer
+    act(() => {
+      renderer = TestRenderer.create(createElement(ResearchResultsPreview, {
+        limit: 2,
+        items: [
+          {
+            id: 'internetArchive:1',
+            title: 'Archive poster',
+            url: 'https://archive.org/details/archive',
+            imageUrl: 'https://archive.org/services/img/archive',
+            source: 'internetArchive',
+          },
+          {
+            id: 'artic:1',
+            title: 'Museum poster',
+            url: 'https://www.artic.edu/artworks/1',
+            imageUrl: 'https://www.artic.edu/image.jpg',
+            source: 'artic',
+          },
+        ],
+      }))
+    })
+
+    expect(renderer.root.findAllByType('span').map((node) => node.props.children))
+      .toEqual(['Internet Archive', 'Art Institute'])
+  })
 })

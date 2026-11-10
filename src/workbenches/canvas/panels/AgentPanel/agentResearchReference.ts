@@ -21,6 +21,10 @@ function providerOf(source: string): ResearchProvider {
   if (normalized === 'google') return 'google'
   if (normalized === 'openverse') return 'openverse'
   if (normalized === 'wikipedia') return 'wikipedia'
+  if (normalized === 'internet archive' || normalized === 'internetarchive') {
+    return 'internetArchive'
+  }
+  if (normalized === 'art institute' || normalized === 'artic') return 'artic'
   if (normalized === 'searxng') return 'searxng'
   return 'web'
 }

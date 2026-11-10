@@ -83,8 +83,8 @@ describe('Agent turn reference projection', () => {
       detail: expect.stringContaining('已读取 2 条参考'),
       evidence: ['r1:u1', 'r2:u2'],
     })
-    expect(result.phaseEvent?.detail).not.toContain('保持字形与颜色')
-    expect(result.phaseEvent?.detail).not.toContain('绿色圆角标准字')
+    expect(result.phaseEvent?.detail).toContain('保持字形与颜色')
+    expect(result.phaseEvent?.detail).toContain('绿色圆角标准字')
   })
 
   it('does not turn text cards into image refs', () => {

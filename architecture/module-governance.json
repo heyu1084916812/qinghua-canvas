@@ -7840,10 +7840,11 @@
     {
       "module": "src/features/shared/research/openResearchSearch.ts",
       "owner": "open-research-search",
-      "responsibility": "通过 Openverse 与 Wikipedia 免费开放 API 执行联网图片和内容检索，并统一为设计调研候选。",
+      "responsibility": "并行调度 Openverse、Wikipedia、开放馆藏与 SearXNG，并把成功来源统一为设计调研候选。",
       "owns": [
         "Openverse 图片搜索与许可字段投影",
         "Wikipedia 内容搜索与摘要投影",
+        "开放馆藏和 SearXNG 并行调度",
         "开放来源失败时的分源警告"
       ],
       "doesNotOwn": [
@@ -7859,6 +7860,49 @@
         "src/features/shared/research/openResearchSearch.test.ts"
       ],
       "budget": 220
+    },
+    {
+      "module": "src/features/shared/research/openCultureSearch.ts",
+      "owner": "open-research-search",
+      "responsibility": "通过 Internet Archive 与 Art Institute of Chicago 的免密钥开放 API 检索图片和馆藏内容。",
+      "owns": [
+        "Internet Archive 图片条目与来源链接投影",
+        "Art Institute 馆藏图片与作者信息投影",
+        "各馆藏来源独立失败警告"
+      ],
+      "doesNotOwn": [
+        "Openverse、Wikipedia 或 SearXNG 调度",
+        "设计调研报告排序与去重",
+        "项目参考持久化"
+      ],
+      "publicApi": [
+        "searchOpenCulture"
+      ],
+      "test": [
+        "src/features/shared/research/openResearchSearch.test.ts"
+      ],
+      "budget": 180
+    },
+    {
+      "module": "src/workbenches/canvas/panels/AgentPanel/agentResearchSourceLabel.ts",
+      "owner": "agent-research-results-ui",
+      "responsibility": "把设计调研 provider 标识转换为稳定的用户可读来源名称。",
+      "owns": [
+        "开放来源与 Pinterest / Behance 的显示名称映射"
+      ],
+      "doesNotOwn": [
+        "候选抓取与持久化",
+        "调研结果排序",
+        "来源许可判断"
+      ],
+      "publicApi": [
+        "agentResearchSourceLabel"
+      ],
+      "test": [
+        "src/workbenches/canvas/panels/AgentPanel/agentResearchSourceLabel.test.ts",
+        "src/workbenches/canvas/panels/AgentPanel/ResearchResultsPreview.test.ts"
+      ],
+      "budget": 40
     },
     {
       "module": "src/workbenches/canvas/panels/AgentPanel/ResearchResultsPreview.tsx",

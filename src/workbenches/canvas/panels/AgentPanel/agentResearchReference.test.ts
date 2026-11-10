@@ -61,6 +61,23 @@ describe('agent research reference', () => {
     }).source).toBe('searxng')
   })
 
+  it('keeps open collection sources distinct from generic web pages', () => {
+    expect(researchItemOf({
+      id: 'archive:1',
+      title: 'Archive',
+      url: 'https://archive.org/details/archive',
+      imageUrl: 'https://archive.org/services/img/archive',
+      source: 'Internet Archive',
+    }).source).toBe('internetArchive')
+    expect(researchItemOf({
+      id: 'artic:1',
+      title: 'Poster',
+      url: 'https://www.artic.edu/artworks/1',
+      imageUrl: 'https://www.artic.edu/image.jpg',
+      source: 'Art Institute',
+    }).source).toBe('artic')
+  })
+
   it('stores the selected image as an asset and project reference', async () => {
     const platform = platformWithImage()
     const result = await addResearchCandidateToProject(

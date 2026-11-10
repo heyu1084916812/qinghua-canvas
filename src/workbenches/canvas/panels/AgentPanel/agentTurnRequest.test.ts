@@ -156,6 +156,7 @@ function inputFor(args: {
   prepareRoute?: PrepareAgentTurnRequestInput['prepareRoute']
   memory?: PrepareAgentTurnRequestInput['memory']
   routeExecution?: PrepareAgentTurnRequestInput['routeExecution']
+  autoCurateReferences?: PrepareAgentTurnRequestInput['autoCurateReferences']
 }): PrepareAgentTurnRequestInput {
   const memory =
     args.memory ?? {
@@ -205,6 +206,9 @@ function inputFor(args: {
       video: { ready: true, reason: null },
     },
     routeExecution,
+    ...(args.autoCurateReferences
+      ? { autoCurateReferences: args.autoCurateReferences }
+      : {}),
     signal: new AbortController().signal,
     notifyRecordWarning: vi.fn(),
   }
@@ -313,7 +317,156 @@ describe('prepareAgentTurnRequest', () => {
       detail: expect.stringContaining('已读取 1 条参考'),
       evidence: ['r1:u1'],
     })
-    expect(result.contextTrace?.referencePhaseEvent?.detail).not.toContain('保持字形与颜色不变')
+    expect(result.contextTrace?.referencePhaseEvent?.detail).toContain('保持字形与颜色不变')
+  })
+
+  it('★★ 显式参考 chip 先自动分析，再把当前任务的 usage 接入本轮', async () => {
+    const { sessions, session } = await createSession({
+      referenceIds: ['kit-1'],
+    })
+    const item = {
+      id: 'kit-1',
+      projectId: 'p1',
+      title: '品牌套件',
+      source: 'kit' as const,
+      kind: 'image' as const,
+      assets: [
+        { hash: 'image-logo', role: 'logo' as const, name: 'Logo' },
+        { hash: 'image-photo', role: 'reference' as const, name: '照片' },
+      ],
+      what: '等待自动分析',
+      createdAt: 1,
+      updatedAt: 1,
+    }
+    let curatedTaskKey = ''
+    const autoCurateReferences: NonNullable<
+      PrepareAgentTurnRequestInput['autoCurateReferences']
+    > = vi.fn(async (input) => {
+      curatedTaskKey = input.taskKey
+      return {
+        ok: true,
+        summary: '分析了 1 条参考',
+        taskKey: input.taskKey,
+        analyzed: [{
+          itemId: item.id,
+          title: item.title,
+          what: '完整品牌套件',
+          usage: 'identityAnchor' as const,
+          howToUse: 'Logo 保持原样，照片只作为版式参考',
+        }],
+        failed: [],
+        limitations: [],
+      }
+    })
+    const result = await prepareAgentTurnRequest({
+      ...inputFor({
+        sessions,
+        session,
+        text: '用这个套件做一张新品海报',
+        autoCurateReferences,
+      }),
+      referenceLedger: {
+        selectForTask: vi.fn(async (_projectId, taskKey) => ({
+          selected: curatedTaskKey === taskKey
+            ? [{
+                item: { ...item, what: '完整品牌套件' },
+                usage: {
+                  id: 'usage-kit',
+                  itemId: item.id,
+                  projectId: 'p1',
+                  taskKey,
+                  usage: 'identityAnchor' as const,
+                  howToUse: 'Logo 保持原样，照片只作为版式参考',
+                  identityAnchor: true,
+                  createdAt: 1,
+                },
+              }]
+            : [],
+          omitted: [],
+        })),
+        listItems: vi.fn(async () => [item]),
+      },
+    })
+
+    expect(result.kind).toBe('ready')
+    if (result.kind !== 'ready') return
+    expect(autoCurateReferences).toHaveBeenCalledWith(expect.objectContaining({
+      task: '用这个套件做一张新品海报',
+      itemIds: ['kit-1'],
+    }))
+    expect(result.contextTrace?.assetRefs.map((asset) => asset.hash)).toEqual([
+      'image-logo',
+      'image-photo',
+    ])
+    expect(result.contextPrompt).toContain('Logo 保持原样')
+    expect(result.contextTrace?.referenceEvidence).toEqual(['kit-1:usage-kit'])
+  })
+
+  it('★★ 自动参考分析失败时继续使用显式 chip，并把原因写入可追溯 warning', async () => {
+    const { sessions, session } = await createSession({
+      referenceIds: ['kit-missing'],
+    })
+    const item = {
+      id: 'kit-missing',
+      projectId: 'p1',
+      title: '缺图套件',
+      source: 'kit' as const,
+      kind: 'image' as const,
+      assets: [
+        { hash: 'image-ok', role: 'logo' as const, name: 'Logo' },
+        { hash: 'image-missing', role: 'reference' as const, name: '照片' },
+      ],
+      what: '完整套件',
+      createdAt: 1,
+      updatedAt: 1,
+    }
+    const notifyContextError = vi.fn()
+    const result = await prepareAgentTurnRequest({
+      ...inputFor({
+        sessions,
+        session,
+        text: '用这个套件做海报',
+        autoCurateReferences: vi.fn(async () => ({
+          ok: false,
+          summary: '1 条失败',
+          taskKey: 'simple_generate',
+          analyzed: [],
+          failed: [{
+            itemId: item.id,
+            title: item.title,
+            reason: '视觉模型不可用',
+          }],
+          limitations: ['照片缺失'],
+        })),
+      }),
+      notifyContextError,
+      readAssetMime: vi.fn(async (hash: string) =>
+        hash === 'image-ok' ? 'image/png' : null,
+      ),
+      referenceLedger: {
+        selectForTask: vi.fn(async (): Promise<ReferenceSelection> => ({
+          selected: [],
+          omitted: [],
+        })),
+        listItems: vi.fn(async () => [item]),
+      },
+    })
+
+    expect(result.kind).toBe('ready')
+    if (result.kind !== 'ready') return
+    expect(notifyContextError).toHaveBeenCalledWith(
+      '有 1 条参考没有完成自动分析，已按显式 chip 继续。',
+    )
+    expect(result.contextTrace?.assetRefs.map((asset) => asset.hash))
+      .toEqual(['image-ok'])
+    expect(result.contextTrace?.referenceWarnings).toEqual(expect.arrayContaining([
+      '参考「缺图套件」自动分析失败：视觉模型不可用',
+      '照片缺失',
+      '套件素材「照片」已缺失，本轮已跳过。',
+    ]))
+    expect(result.contextTrace?.referencePhaseEvent?.detail).toContain(
+      '视觉模型不可用',
+    )
   })
 
   it('★★ 套件参考把多图资产集合全部并入本轮 assetRefs', async () => {

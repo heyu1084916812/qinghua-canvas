@@ -20,6 +20,8 @@ function sourceTag(source: DesignResearchItem['source']): string {
   if (source === 'behance') return 'Behance'
   if (source === 'openverse') return 'Openverse'
   if (source === 'wikipedia') return 'Wikipedia'
+  if (source === 'internetArchive') return 'Internet Archive'
+  if (source === 'artic') return 'Art Institute'
   if (source === 'searxng') return 'SearXNG'
   if (source === 'google') return 'Google'
   return '网页'

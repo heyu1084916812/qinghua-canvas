@@ -52,7 +52,8 @@ export function AgentWebSearchSettings() {
       <div className={styles.capabilityHead}>
         <h4>联网调研</h4>
         <p>
-          Openverse 与 Wikipedia 会直接检索图片和公开内容；SearXNG 是开源元搜索，
+          Openverse、Wikipedia、Internet Archive 与 Art Institute 会直接检索图片和公开内容；
+          SearXNG 是开源元搜索，
           用于补充普通网页结果。公共实例不可用时，其余来源仍会继续。
         </p>
       </div>
@@ -86,7 +87,7 @@ export function AgentWebSearchSettings() {
         </button>
       </div>
       <p className={styles.hint}>
-        默认使用公共 SearXNG 实例；你也可以填写自己部署的 `/search` 地址。
+        公共 SearXNG 实例可能限流；你也可以填写自己部署的 `/search` 地址。
       </p>
       {status ? <p className={styles.status} role="status">{status}</p> : null}
     </section>
