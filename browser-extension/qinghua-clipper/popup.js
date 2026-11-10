@@ -1,6 +1,5 @@
 /* global chrome, document, QinghuaClipper, window */
 const api = QinghuaClipper
-const HOST_ORIGINS = ['http://*/*', 'https://*/*']
 
 const elements = {
   status: document.querySelector('#status'),
@@ -47,10 +46,6 @@ async function connect() {
 async function setDragMode(enabled) {
   elements.toggle.disabled = true
   try {
-    if (enabled) {
-      const granted = await chrome.permissions.request({ origins: HOST_ORIGINS })
-      if (!granted) throw new Error('需要允许轻画访问网页才能拖拽收藏')
-    }
     const result = await chrome.runtime.sendMessage({
       type: 'qinghua:set-drag-mode',
       enabled,
@@ -75,7 +70,7 @@ function dragModeError(error) {
 
 function updateHint() {
   if (!elements.toggle.checked) {
-    elements.hint.textContent = '开启后，把网页图片拖到页面中间'
+    elements.hint.textContent = '开启一次，所有普通网页都可拖拽'
     return
   }
   elements.hint.textContent = state.connected

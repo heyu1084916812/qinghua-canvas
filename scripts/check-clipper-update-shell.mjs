@@ -55,7 +55,7 @@ copyDirectory(extensionSource, stableExtension)
 trace('copied release executable and resources')
 const seededManifestPath = path.join(stableExtension, 'manifest.json')
 const seededManifest = JSON.parse(readFileSync(seededManifestPath, 'utf8'))
-seededManifest.version = '0.4.1'
+seededManifest.version = '0.4.2'
 writeFileSync(seededManifestPath, `${JSON.stringify(seededManifest, null, 2)}\n`)
 trace(`seeded stable extension ${seededManifest.version}`)
 
@@ -122,14 +122,14 @@ try {
     : []
   const report = {
     ok:
-      before.extension.stableVersion === '0.4.1'
-      && before.extension.bundledVersion === '0.4.2'
+      before.extension.stableVersion === '0.4.2'
+      && before.extension.bundledVersion === '0.4.3'
       && before.extension.needsUpdate === true
       && update.updated === true
-      && after.extension.stableVersion === '0.4.2'
+      && after.extension.stableVersion === '0.4.3'
       && after.extension.needsUpdate === false
       && after.extension.reloadRequired === true
-      && finalManifest.version === '0.4.2'
+      && finalManifest.version === '0.4.3'
       && stagingLeftovers.length === 0,
     before: before.extension,
     update,

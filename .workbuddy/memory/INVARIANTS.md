@@ -1,5 +1,12 @@
 # CanvasFlow 不变量详表
 
+## Clipper 全站注入与待收确认（2026-11-11）
+- 普通 HTTP/HTTPS 全站访问必须是固定 `host_permissions`，不能退回 `optional_host_permissions` 逐站授权。全局开关打开后，已打开标签页立即注入，新标签页通过持久 content script 自动注入。
+- `chrome://`、`edge://`、扩展商店等浏览器保护页永远不属于可注入范围；UI/文档不得承诺“所有 URL 无一例外”。
+- 待收队列读取必须无副作用：`clipper_pending_snapshot` 只复制，`clipper_ack_pending` 只删除成功导入 id。禁止恢复“先 take 清空、失败就丢”的链路。
+- 收藏页必须先完成 `loadState()` 再轮询待收队列。成功导入先刷新卡片，再 ack；ack 失败只提示重试，不能把已落库收藏重新显示为空。
+- 真实证据必须覆盖切换前未注入、切换后两个不同域名均注入，以及四组 UI 的 `items=1 / ack id / overflow=false / errors=[]`。当前基线 `.playwright-verify/clipper-all-pages/` 与 `.playwright-verify/ui-seven-after/`。
+
 ## Agent 调研候选进入参考（2026-11-10）
 - 调研候选只有点击真实“加入项目参考”动作后才能进入项目台账；搜索结果本身不得自动入库。图片候选必须先过 `saveDesignResearchItem` 的公开 URL、MIME、文件头、尺寸和像素上限门禁；文字候选写为 `kind=text`。
 - 项目参考写入后必须同时追加当前会话 `referenceIds` 并应用当前快照；只写台账不挂会话，下一轮生成不会把它当显式参考。同图按 asset hash 去重，文字按 URL 去重。

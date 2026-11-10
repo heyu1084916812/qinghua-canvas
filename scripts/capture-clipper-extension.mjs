@@ -46,13 +46,6 @@ try {
     online: true,
   }))
   report.push(await capturePopup({
-    name: 'light-permission-error',
-    theme: 'light',
-    dragMode: false,
-    online: true,
-    permissionError: true,
-  }))
-  report.push(await capturePopup({
     name: 'dark-offline',
     theme: 'dark',
     dragMode: true,
@@ -69,7 +62,7 @@ try {
   await browser.close()
 }
 
-async function capturePopup({ name, theme, dragMode, online, permissionError = false }) {
+async function capturePopup({ name, theme, dragMode, online }) {
   const context = await browser.newContext({
     viewport: { width: 300, height: 210 },
     colorScheme: theme,
@@ -80,7 +73,7 @@ async function capturePopup({ name, theme, dragMode, online, permissionError = f
   page.on('console', (message) => {
     if (message.type() === 'error') errors.push(message.text())
   })
-  await page.addInitScript(({ initialDragMode, isOnline, failPermission }) => {
+  await page.addInitScript(({ initialDragMode, isOnline }) => {
     const store = { dragMode: initialDragMode }
     Object.defineProperty(globalThis, 'chrome', {
       configurable: true,
@@ -89,14 +82,6 @@ async function capturePopup({ name, theme, dragMode, online, permissionError = f
           local: {
             get: async (defaults) => ({ ...defaults, ...store }),
             set: async (values) => Object.assign(store, values),
-          },
-        },
-        permissions: {
-          request: async () => {
-            if (failPermission) {
-              throw new Error('Only permissions specified in the manifest may be requested.')
-            }
-            return true
           },
         },
         runtime: {
@@ -118,20 +103,12 @@ async function capturePopup({ name, theme, dragMode, online, permissionError = f
   }, {
     initialDragMode: dragMode,
     isOnline: online,
-    failPermission: permissionError,
   })
   await page.goto(popupUrl, { waitUntil: 'load' })
   await page.waitForFunction(
     () => document.querySelector('#status-dot')?.dataset.state !== 'checking',
     { timeout: 5_000 },
   )
-  if (permissionError) {
-    await page.locator('.control').click()
-    await page.waitForFunction(
-      () => document.querySelector('#status')?.textContent?.includes('扩展版本过旧'),
-      { timeout: 5_000 },
-    )
-  }
   await page.waitForTimeout(200)
   await page.screenshot({
     path: resolve(output, `${name}.png`),

@@ -10,7 +10,7 @@ const extensionRoot = new URL(
 )
 
 describe('qinghua clipper extension contract', () => {
-  it('uses one storage toggle with optional HTTP/HTTPS page access', () => {
+  it('uses one storage toggle with required HTTP/HTTPS page access', () => {
     const manifest = JSON.parse(
       readFileSync(new URL('manifest.json', extensionRoot), 'utf8'),
     ) as {
@@ -18,21 +18,20 @@ describe('qinghua clipper extension contract', () => {
       manifest_version: number
       permissions: string[]
       host_permissions: string[]
-      optional_host_permissions: string[]
+      optional_host_permissions?: string[]
       background?: { service_worker?: string }
       commands?: Record<string, unknown>
     }
 
     expect(manifest.manifest_version).toBe(3)
-    expect(manifest.version).toBe('0.4.2')
+    expect(manifest.version).toBe('0.4.3')
     expect(manifest.permissions).toEqual(['storage', 'scripting'])
     expect(manifest.host_permissions).toEqual([
       'http://127.0.0.1:53684/*',
-    ])
-    expect(manifest.optional_host_permissions).toEqual([
       'http://*/*',
       'https://*/*',
     ])
+    expect(manifest.optional_host_permissions).toBeUndefined()
     expect(manifest.background?.service_worker).toBe('background.js')
     expect(manifest.commands).toBeUndefined()
     expect(JSON.stringify(manifest)).not.toContain('<all_urls>')
@@ -55,7 +54,7 @@ describe('qinghua clipper extension contract', () => {
     expect(popup).not.toContain('id="token"')
     expect(popup).not.toContain('id="settings"')
     expect(popupScript).not.toContain('getManifest')
-    expect(popupScript).toContain("chrome.permissions.request")
+    expect(popupScript).not.toContain("chrome.permissions.request")
     expect(popupScript).toContain("type: 'qinghua:set-drag-mode'")
     expect(popupScript).toContain('Only permissions specified in the manifest may be requested')
     expect(directImage).toContain("document.addEventListener('dragstart'")
@@ -80,6 +79,9 @@ describe('qinghua clipper extension contract', () => {
     expect(background).toContain('registerContentScripts')
     expect(background).toContain("files: ['drop-target.js']")
     expect(background).toContain("'qinghua:clip-image'")
+    expect(background).not.toContain('chrome.permissions.request')
+    expect(background).not.toContain('permissions.contains')
+    expect(background).not.toContain('permissions.onRemoved')
     for (const size of [16, 32, 48, 128]) {
       expect(() =>
         readFileSync(new URL(`icons/${size}.png`, extensionRoot)),
@@ -173,7 +175,7 @@ describe('qinghua clipper extension contract', () => {
       status: 200,
       json: async () => ({ ok: true, token: 'paired-token' }),
     }))
-    const api = loadSharedApi(fetchMock, '0.4.2')
+    const api = loadSharedApi(fetchMock, '0.4.3')
 
     await expect(api.pairReceiver(
       'http://127.0.0.1:53684/clip',
@@ -185,7 +187,7 @@ describe('qinghua clipper extension contract', () => {
     expect(url).toBe('http://127.0.0.1:53684/pair')
     expect(request.method).toBe('POST')
     expect(request.headers['X-Qinghua-Clipper-Pair']).toBe('1')
-    expect(JSON.parse(request.body)).toEqual({ version: '0.4.2' })
+    expect(JSON.parse(request.body)).toEqual({ version: '0.4.3' })
   })
 
   it('surfaces authentication and health failures with recovery copy', async () => {
@@ -316,7 +318,7 @@ function loadBackgroundApi(fetchMock: ReturnType<typeof vi.fn>) {
   }
   const chrome = {
     runtime: {
-      getManifest: () => ({ version: '0.4.2' }),
+      getManifest: () => ({ version: '0.4.3' }),
       onInstalled: { addListener: vi.fn() },
       onStartup: { addListener: vi.fn() },
       onMessage: {
@@ -324,10 +326,6 @@ function loadBackgroundApi(fetchMock: ReturnType<typeof vi.fn>) {
           messageListener = listener
         }),
       },
-    },
-    permissions: {
-      contains: vi.fn(async () => true),
-      onRemoved: { addListener: vi.fn() },
     },
     action: {
       setBadgeBackgroundColor: vi.fn(),

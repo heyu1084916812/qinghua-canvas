@@ -16,11 +16,6 @@ chrome.runtime.onStartup.addListener(() => {
   void ensureDragRegistration()
 })
 
-chrome.permissions.onRemoved.addListener((permissions) => {
-  if (!permissions.origins?.length) return
-  void setDragMode(false)
-})
-
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message?.type === 'qinghua:connect') {
     connectReceiver()
@@ -61,11 +56,6 @@ async function ensureDragRegistration() {
     await unregisterDragScript()
     return { ok: true, enabled: false }
   }
-  const granted = await chrome.permissions.contains({ origins: DRAG_MATCHES })
-  if (!granted) {
-    await chrome.storage.local.set({ dragMode: false })
-    return { ok: false, enabled: false }
-  }
   await registerDragScript()
   await injectIntoOpenTabs()
   return { ok: true, enabled: true }
@@ -77,10 +67,6 @@ async function setDragMode(enabled) {
     await unregisterDragScript()
     await notifyOpenTabs({ type: 'qinghua:disable-drag' })
     return
-  }
-  const granted = await chrome.permissions.contains({ origins: DRAG_MATCHES })
-  if (!granted) {
-    throw new Error('需要允许轻画访问网页，才能开启拖拽收藏')
   }
   await registerDragScript()
   await injectIntoOpenTabs()

@@ -15,6 +15,7 @@
     "check:ui-freeze": "node scripts/check-tauri-ui-freeze.mjs",
     "capture:clipper-extension": "node scripts/capture-clipper-extension.mjs",
     "capture:clipper-multiselect": "node scripts/capture-clipper-multiselect.mjs",
+    "check:clipper-all-pages": "node scripts/check-clipper-all-pages.mjs",
     "check:clipper-update": "node scripts/check-clipper-update-shell.mjs",
     "package:clipper-extension": "node scripts/package-clipper-extension.mjs",
     "test": "vitest run",

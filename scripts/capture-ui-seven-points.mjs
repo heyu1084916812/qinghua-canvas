@@ -185,6 +185,13 @@ try {
       deviceScaleFactor: 1,
     })
     const storeTarget = new URL(STORE)
+    await context.route('https://example.com/qinghua-clip.png', (route) => {
+      return route.fulfill({
+        status: 200,
+        contentType: 'image/png',
+        body: fixtures.square,
+      })
+    })
     for (const origin of new Set(['http://127.0.0.1:18765', storeTarget.origin])) {
       await context.route(`${origin}/**`, async (route) => {
         const request = route.request()
@@ -376,15 +383,23 @@ try {
     await page.screenshot({ path: path.join(out, `${file}-canvas-pinterest.png`) })
     await page.evaluate(() => {
       const updateStatus = {
-        loadedVersion: '0.4.1',
-        bundledVersion: '0.4.2',
+        loadedVersion: '0.4.2',
+        bundledVersion: '0.4.3',
         needsUpdate: true,
         reloadRequired: false,
         stableDirectory: 'C:\\Users\\Administrator\\Documents\\QinghuaClipper\\extension',
       }
+      let pending = [{
+        id: 'clip-ui-probe-1',
+        url: 'https://example.com/clipper-source',
+        title: '浏览器收藏验证图',
+        imageUrl: 'https://example.com/qinghua-clip.png',
+        receivedAt: Date.now(),
+      }]
+      window.__clipperAckIds = []
       window.isTauri = true
       window.__TAURI_INTERNALS__ = {
-        invoke: async (command) => {
+        invoke: async (command, args) => {
           if (command === 'clipper_receiver_info') {
             return {
               running: true,
@@ -393,7 +408,13 @@ try {
               extension: updateStatus,
             }
           }
-          if (command === 'clipper_take_pending') return []
+          if (command === 'clipper_pending_snapshot') return pending
+          if (command === 'clipper_ack_pending') {
+            const acknowledged = new Set(args?.ids ?? [])
+            window.__clipperAckIds.push(...acknowledged)
+            pending = pending.filter((clip) => !acknowledged.has(clip.id))
+            return pending
+          }
           if (command === 'clipper_extension_update') {
             return {
               status: { ...updateStatus, needsUpdate: false, reloadRequired: true },
@@ -407,8 +428,14 @@ try {
     })
     await page.locator('[data-my-assets-source="clipper"]').click()
     await page.locator('[data-clipper-panel]').waitFor({ timeout: 10_000 })
+    await page.waitForFunction(
+      () => (window.__clipperAckIds?.length ?? 0) > 0,
+      { timeout: 10_000 },
+    )
+    await page.locator('[data-clipper-item]').first().waitFor({ timeout: 10_000 })
     await page.locator('[data-clipper-extension-update]').waitFor({ timeout: 5_000 })
     const clipperMounted = await page.locator('[data-clipper-panel]').count()
+    const clipperAckIds = await page.evaluate(() => window.__clipperAckIds ?? [])
     const clipperState = await page.evaluate(() => {
       const panel = document.querySelector('[data-clipper-panel]')
       const panelRect = panel?.getBoundingClientRect()
@@ -426,6 +453,7 @@ try {
           panel?.querySelectorAll('[data-clipper-extension-update]').length ?? 0,
         updateAction:
           panel?.querySelectorAll('[data-clipper-extension-update-action]').length ?? 0,
+        items: panel?.querySelectorAll('[data-clipper-item]').length ?? 0,
         empty: panel?.querySelectorAll('[data-clipper-empty]').length ?? 0,
         emptyText: panel?.querySelector('[data-clipper-empty]')?.textContent?.replace(/\s+/g, ' ').trim() ?? '',
         overflowX: panel ? panel.scrollWidth > panel.clientWidth + 1 : true,
@@ -470,6 +498,7 @@ try {
         surface: 'clipperExtensionUpdate',
         clipperMounted,
         ...clipperState,
+        clipperAckIds,
         clipperUpdateMessage,
         clipperUpdateOverflowX,
         errors: [...errors],
@@ -1461,6 +1490,7 @@ try {
       pinterestMounted,
       pinterestLayout,
       clipperMounted,
+      clipperAckIds,
       ...clipperState,
       clipperUpdateMessage,
       clipperUpdateOverflowX,

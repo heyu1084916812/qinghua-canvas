@@ -296,6 +296,26 @@ pub fn clipper_take_pending() -> Vec<PendingClip> {
         .unwrap_or_default()
 }
 
+#[tauri::command]
+pub fn clipper_pending_snapshot() -> Vec<PendingClip> {
+    pending()
+        .lock()
+        .map(|rows| rows.clone())
+        .unwrap_or_default()
+}
+
+#[tauri::command]
+pub fn clipper_ack_pending(ids: Vec<String>) -> Vec<PendingClip> {
+    let acknowledged = ids.into_iter().collect::<std::collections::HashSet<_>>();
+    pending()
+        .lock()
+        .map(|mut rows| {
+            rows.retain(|row| !acknowledged.contains(&row.id));
+            rows.clone()
+        })
+        .unwrap_or_default()
+}
+
 fn normalize_clip(input: ClipRequest) -> Result<PendingClip, String> {
     let url = parse_public_http_url(&input.url)?;
     let image_url = input
@@ -465,11 +485,17 @@ mod tests {
             &body,
         );
         assert!(authorized.starts_with("HTTP/1.1 200"));
-        let rows = clipper_take_pending();
-        assert!(rows.iter().any(|row| row.url == "https://example.com/clip"));
+        let rows = clipper_pending_snapshot();
+        let clip_id = rows
+            .iter()
+            .find(|row| row.url == "https://example.com/clip")
+            .map(|row| row.id.clone())
+            .expect("queued clip must be visible without taking it");
         assert!(rows.iter().any(|row| {
             row.image_url.as_deref() == Some("https://example.com/image.webp")
         }));
+        let remaining = clipper_ack_pending(vec![clip_id]);
+        assert!(!remaining.iter().any(|row| row.url == "https://example.com/clip"));
     }
 
     fn raw_request(port: u16, method: &str, path: &str, headers: &str, body: &str) -> String {

@@ -1,5 +1,13 @@
 # CanvasFlow（轻画）项目记忆
 
+### 总管2 第六十二轮：Clipper 全站一次授权与待收队列确认（2026-11-11）
+
+- 逐网页开关的根因不是“没有开关”，而是全站权限在 `optional_host_permissions`，Chrome 会按站点授权。0.4.3 起 `http://*/*`、`https://*/*` 进入固定 `host_permissions`；安装/升级确认一次，之后 popup 里只有一个全局拖拽开关。`chrome://`、`edge://`、扩展商店等保护页仍不可注入。
+- 全局开关打开后必须同时处理两类页面：`injectIntoOpenTabs()` 给已打开标签页立即注入，`registerContentScripts(persistAcrossSessions)` 保证之后的新页面自动注入。真实 Chromium 门禁必须记录切换前未注入、切换后两个不同域名都注入。
+- “扩展显示成功但轻画为空”的根因有两个：旧 `/clip` 队列先 take 后导入，异常被 catch 后静默丢失；首次 `loadState()` 与待收导入并发，旧空快照可覆盖新卡片。队列改为 `clipper_pending_snapshot` 读取快照，导入成功后 `clipper_ack_pending(ids)`；失败项留队重试。
+- 失败项不要在 UI 层重组成第二个队列；`capturePendingClipperQueue` 返回 `importedIds / failed`，控制器先 `setItems(result.collection)` 再 ack，ack 临时失败只提示重试，不回退成空态。
+- 验证证据：`.playwright-verify/clipper-all-pages/report.json`（切换前 false、两站 true）、`.playwright-verify/ui-seven-after/report.json`（四组 items=1 / ack=clip-ui-probe-1）、`.playwright-verify/clipper-update-shell/report.json`（0.4.2→0.4.3）。Rust 86/86；串行全量 Vitest 5503 tests（5502 passed / 1 skipped）；check 1162 modules / 4660 deps / 306 registrations；build 1294 modules；detector `[]`。ZIP `release/qinghua-clipper-0.4.3.zip` 21,991 B，SHA-256 `4E9DC868B5A1FBD857BDADCFF7A74E04DE125AE32880CC70482B8E8FE47D61E9`。未 push。
+
 ### 总管2 第六十一轮：Clipper 本地安装版版本检测与稳定目录更新（2026-11-10）
 
 - 扩展配对不能只领 token，还要在 `/pair` 请求体带 `chrome.runtime.getManifest().version`；接收端保存最后连接版本。旧扩展不报版本时必须用 `Documents\QinghuaClipper\extension/manifest.json` 兜底，否则老 0.4.1 永远检测不到新 0.4.2。Tauri `clipper_receiver_info` 返回已加载版本、稳定目录版本、应用内置版本和 `needsUpdate`，面板只在内置版本更新时显示紧凑提示。

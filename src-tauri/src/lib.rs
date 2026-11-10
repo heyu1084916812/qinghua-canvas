@@ -4294,6 +4294,8 @@ pub fn run() {
             canvas_gateway::canvas_gateway_respond,
             clipper_receiver::clipper_receiver_info,
             clipper_receiver::clipper_take_pending,
+            clipper_receiver::clipper_pending_snapshot,
+            clipper_receiver::clipper_ack_pending,
             clipper_update::clipper_extension_update,
             pinterest_oauth::pinterest_oauth_listen,
             pinterest_oauth::pinterest_oauth_wait,

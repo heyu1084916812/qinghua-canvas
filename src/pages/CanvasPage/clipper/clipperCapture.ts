@@ -34,38 +34,6 @@ export async function capturePendingClipperClip(input: {
   })
 }
 
-export async function capturePendingClipperQueue(input: {
-  clips: readonly {
-    url: string
-    title?: string
-    imageUrl?: string
-  }[]
-  network: NetworkPort
-  collection: ClipperCollectionRepository
-  signal: AbortSignal
-}): Promise<{ collection: ClipperItem[]; imported: number }> {
-  let collection = await input.collection.load()
-  let imported = 0
-  for (const clip of input.clips) {
-    if (!isPublicHttpUrl(clip.url)) continue
-    try {
-      const result = await capturePendingClipperClip({
-        pageUrl: clip.url,
-        imageUrl: clip.imageUrl,
-        title: clip.title,
-        network: input.network,
-        collection: input.collection,
-        signal: input.signal,
-      })
-      collection = result.collection
-      imported += result.items.length
-    } catch {
-      continue
-    }
-  }
-  return { collection, imported }
-}
-
 export async function captureClipperImage(input: {
   pageUrl: string
   imageUrl: string

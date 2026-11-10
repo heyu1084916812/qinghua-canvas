@@ -6,6 +6,7 @@ import {
   captureClipperImage,
   captureClipperPage,
 } from './clipperCapture'
+import { capturePendingClipperQueue } from './clipperQueueCapture'
 
 const html = `<!doctype html>
 <html>
@@ -76,5 +77,38 @@ describe('captureClipperImage', () => {
       imageUrl: 'file:///tmp/local.png',
       collection,
     })).rejects.toThrow('不是公开 HTTP / HTTPS 地址')
+  })
+})
+
+describe('capturePendingClipperQueue', () => {
+  it('acks only imported clips and reports retryable failures', async () => {
+    const platform = createMemoryPlatform()
+    const collection = createClipperCollectionRepository(platform.storage)
+    const result = await capturePendingClipperQueue({
+      clips: [
+        {
+          id: 'clip-ok',
+          url: 'https://example.com/collection',
+          imageUrl: 'https://cdn.example.com/dropped.webp',
+          title: 'Dropped reference',
+        },
+        {
+          id: 'clip-failed',
+          url: 'https://example.com/collection',
+          imageUrl: 'file:///tmp/local.png',
+          title: 'Invalid local image',
+        },
+      ],
+      network: { request: vi.fn(), stream: async function* () {} },
+      collection,
+      signal: new AbortController().signal,
+    })
+
+    expect(result.imported).toBe(1)
+    expect(result.importedIds).toEqual(['clip-ok'])
+    expect(result.failed).toEqual([
+      expect.objectContaining({ id: 'clip-failed' }),
+    ])
+    expect(result.collection).toHaveLength(1)
   })
 })

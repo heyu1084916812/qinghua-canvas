@@ -3,7 +3,8 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::{Mutex, OnceLock};
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::thread;
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use tauri::{AppHandle, Manager};
 use tauri_plugin_opener::OpenerExt;
 
@@ -335,6 +336,7 @@ fn replace_extension_atomically(
         return Err("扩展更新临时目录冲突，请重试".into());
     }
 
+    let had_target = target.exists();
     let result = (|| {
         copy_extension_tree(source, &staging)?;
         let copied_version = manifest_version(&staging)?;
@@ -344,16 +346,23 @@ fn replace_extension_atomically(
             ));
         }
 
-        let had_target = target.exists();
         if had_target {
-            fs::rename(target, &backup)
+            rename_with_retry(target, &backup)
                 .map_err(|error| format!("无法备份现有扩展目录：{error}"))?;
         }
-        if let Err(error) = fs::rename(&staging, target) {
-            if had_target {
-                let _ = fs::rename(&backup, target);
+        if let Err(directory_error) = rename_with_retry(&staging, target) {
+            copy_extension_tree(&staging, target).map_err(|copy_error| {
+                format!(
+                    "无法启用新版扩展目录：目录替换 {directory_error}；文件复制 {copy_error}"
+                )
+            })?;
+            let copied_version = manifest_version(target)?;
+            if copied_version != expected_version {
+                return Err(format!(
+                    "扩展启用后版本不一致：期望 {expected_version}，实际 {copied_version}"
+                ));
             }
-            return Err(format!("无法启用新版扩展目录：{error}"));
+            let _ = fs::remove_dir_all(&staging);
         }
         if had_target {
             let _ = fs::remove_dir_all(&backup);
@@ -361,13 +370,36 @@ fn replace_extension_atomically(
         Ok(())
     })();
 
-    if result.is_err() {
+    if let Err(error) = &result {
         let _ = fs::remove_dir_all(&staging);
-        if backup.exists() && !target.exists() {
-            let _ = fs::rename(&backup, target);
+        if backup.exists() {
+            if target.exists() {
+                let _ = fs::remove_dir_all(target);
+            }
+            if let Err(restore_error) = rename_with_retry(&backup, target) {
+                return Err(format!(
+                    "{error}；旧扩展恢复失败：{restore_error}"
+                ));
+            }
         }
     }
     result
+}
+
+fn rename_with_retry(source: &Path, destination: &Path) -> std::io::Result<()> {
+    for attempt in 0..5 {
+        match fs::rename(source, destination) {
+            Ok(()) => return Ok(()),
+            Err(error)
+                if attempt < 4
+                    && matches!(error.kind(), std::io::ErrorKind::PermissionDenied) =>
+            {
+                thread::sleep(Duration::from_millis(120));
+            }
+            Err(error) => return Err(error),
+        }
+    }
+    unreachable!("rename retry loop always returns")
 }
 
 fn copy_extension_tree(source: &Path, destination: &Path) -> Result<(), String> {

@@ -910,13 +910,34 @@
         "ClipperCaptureResult",
         "captureClipperPage",
         "captureClipperImage",
-        "capturePendingClipperClip",
-        "capturePendingClipperQueue"
+        "capturePendingClipperClip"
       ],
       "test": [
         "src/pages/CanvasPage/clipper/clipperCapture.test.ts"
       ],
       "budget": 160
+    },
+    {
+      "module": "src/pages/CanvasPage/clipper/clipperQueueCapture.ts",
+      "owner": "clipper-capture",
+      "responsibility": "逐条导入浏览器待收快照，只返回成功确认 id，并把失败原因保留给面板重试。",
+      "owns": [
+        "待收快照逐条导入",
+        "成功 id 与失败原因收集",
+        "收藏集合最终状态返回"
+      ],
+      "doesNotOwn": [
+        "接收端队列快照与确认命令",
+        "图片页面抓取与单图落库",
+        "面板状态和视觉提示"
+      ],
+      "publicApi": [
+        "capturePendingClipperQueue"
+      ],
+      "test": [
+        "src/pages/CanvasPage/clipper/clipperCapture.test.ts"
+      ],
+      "budget": 100
     },
     {
       "module": "src/pages/CanvasPage/clipper/ClipperPanel.tsx",
@@ -966,6 +987,29 @@
         "scripts/capture-ui-seven-points.mjs"
       ],
       "budget": 100
+    },
+    {
+      "module": "src/pages/CanvasPage/clipper/useClipperLiveCollection.ts",
+      "owner": "clipper-panel",
+      "responsibility": "先加载收藏快照，再轮询浏览器待收队列；成功导入的条目确认移除，失败项留队重试。",
+      "owns": [
+        "收藏初始快照与就绪状态",
+        "待收队列快照、导入与确认",
+        "浏览器接收状态和重试提示"
+      ],
+      "doesNotOwn": [
+        "图片下载和素材落库投影",
+        "收藏分类、删除和移动动作",
+        "扩展权限与内容脚本注册"
+      ],
+      "publicApi": [
+        "useClipperLiveCollection"
+      ],
+      "test": [
+        "src/pages/CanvasPage/clipper/clipperCapture.test.ts",
+        "scripts/capture-ui-seven-points.mjs"
+      ],
+      "budget": 180
     },
     {
       "module": "src/pages/CanvasPage/clipper/ClipperExtensionUpdateNotice.tsx",

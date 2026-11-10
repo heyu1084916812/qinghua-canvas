@@ -1,12 +1,15 @@
 {
   "manifest_version": 3,
   "name": "轻画 Clipper",
-  "version": "0.4.2",
+  "version": "0.4.3",
   "description": "拖动网页图片，自动收藏到本机轻画。",
   "minimum_chrome_version": "102",
   "permissions": ["storage", "scripting"],
-  "host_permissions": ["http://127.0.0.1:53684/*"],
-  "optional_host_permissions": ["http://*/*", "https://*/*"],
+  "host_permissions": [
+    "http://127.0.0.1:53684/*",
+    "http://*/*",
+    "https://*/*"
+  ],
   "background": {
     "service_worker": "background.js"
   },

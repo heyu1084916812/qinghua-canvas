@@ -1,5 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { invoke, isTauri } from '@tauri-apps/api/core'
+import { useMemo, useRef, useState } from 'react'
 import { usePlatform } from '../../../app/providers/PlatformProvider'
 import {
   type ClipperItem,
@@ -16,27 +15,11 @@ import {
   clipperFilterCategory,
   type ClipperFilter,
 } from './ClipperToolbar'
-import { capturePendingClipperQueue } from './clipperCapture'
 import { addClipperReference, sendClipperToCanvas } from './clipperActions'
 import { clipperEmptyDescription, clipperEmptyTitle } from './clipperEmptyCopy'
 import { useClipperExtensionUpdate } from './useClipperExtensionUpdate'
+import { useClipperLiveCollection } from './useClipperLiveCollection'
 import styles from './ClipperPanel.module.css'
-
-interface ClipperReceiverInfo {
-  running: boolean
-  endpoint: string
-  token: string
-  error?: string
-  extension: Parameters<ReturnType<typeof useClipperExtensionUpdate>['accept']>[0]
-}
-
-interface PendingClip {
-  id: string
-  url: string
-  title?: string
-  imageUrl?: string
-  receivedAt: number
-}
 
 export function ClipperPanel({
   projectId,
@@ -54,72 +37,24 @@ export function ClipperPanel({
     () => createReferenceLedgerRepository(platform.storage),
     [platform.storage],
   )
-  const [items, setItems] = useState<ClipperItem[]>([])
-  const [categories, setCategories] = useState<string[]>([])
   const [filter, setFilter] = useState<ClipperFilter>('all')
   const [selectionMode, setSelectionMode] = useState(false)
   const [selectedIds, setSelectedIds] = useState<string[]>([])
   const [busy, setBusy] = useState('')
-  const [status, setStatus] = useState('')
   const extensionUpdate = useClipperExtensionUpdate()
+  const live = useClipperLiveCollection({
+    collection,
+    network: platform.network,
+    onExtensionInfo: extensionUpdate.accept,
+  })
+  const { items, categories, status, setItems, setStatus, applyState } = live
   const controllerRef = useRef<AbortController | null>(null)
   const busyRef = useRef(false)
-  const receivingRef = useRef(false)
   const activeCategory = clipperFilterCategory(filter)
   const visible = activeCategory
     ? items.filter((item) => item.category === activeCategory)
     : items
   const selectedSet = new Set(selectedIds)
-
-  useEffect(() => {
-    let active = true
-    void collection.loadState().then((state) => {
-      if (active) applyCollectionState(state)
-    }).catch((error) => {
-      if (active) setStatus(`读取图片收藏失败：${errorText(error)}`)
-    })
-    return () => {
-      active = false
-      controllerRef.current?.abort()
-    }
-  }, [collection])
-
-  const syncReceiver = useCallback(async () => {
-    if (!isTauri() || receivingRef.current) return
-    receivingRef.current = true
-    try {
-      const info = await invoke<ClipperReceiverInfo>('clipper_receiver_info')
-      extensionUpdate.accept(info.extension)
-      if (!info.running) {
-        setStatus(info.error ? `本机接收端未启动：${info.error}` : '本机接收端未启动。')
-        return
-      }
-      setStatus((current) => current.startsWith('本机接收端') ? '' : current)
-      const pending = await invoke<PendingClip[]>('clipper_take_pending')
-      if (pending.length === 0) return
-      const result = await capturePendingClipperQueue({
-        clips: pending,
-        network: platform.network,
-        collection,
-        signal: newController().signal,
-      })
-      setItems(result.collection)
-      if (result.imported > 0) {
-        setStatus(`已从浏览器接收 ${result.imported} 张图片。`)
-      }
-    } catch (error) {
-      setStatus(`本机接收端未启动：${errorText(error)}`)
-    } finally {
-      receivingRef.current = false
-    }
-  }, [collection, extensionUpdate.accept, platform.network])
-
-  useEffect(() => {
-    if (!isTauri()) return
-    void syncReceiver()
-    const timer = window.setInterval(() => void syncReceiver(), 3_000)
-    return () => window.clearInterval(timer)
-  }, [syncReceiver])
 
   const addToReference = async (item: ClipperItem, toAgent: boolean) => {
     if (busyRef.current) return
@@ -187,7 +122,7 @@ export function ClipperPanel({
     busyRef.current = true
     setBusy('selection:delete')
     try {
-      applyCollectionState(await collection.removeMany(selectedIds))
+      applyState(await collection.removeMany(selectedIds))
       setStatus(`已删除 ${selectedIds.length} 项。`)
       exitSelection()
     } catch (error) {
@@ -203,7 +138,7 @@ export function ClipperPanel({
     busyRef.current = true
     setBusy('selection:move')
     try {
-      applyCollectionState(await collection.moveMany(selectedIds, category))
+      applyState(await collection.moveMany(selectedIds, category))
       setStatus(`已移动 ${selectedIds.length} 项到“${category}”。`)
       exitSelection()
     } catch (error) {
@@ -216,7 +151,7 @@ export function ClipperPanel({
 
   const createCategory = async (name: string) => {
     const state = await collection.createCategory(name)
-    applyCollectionState(state)
+    applyState(state)
     setStatus(`已创建分类“${name.trim()}”。`)
   }
 
@@ -238,14 +173,6 @@ export function ClipperPanel({
   const exitSelection = () => {
     setSelectionMode(false)
     setSelectedIds([])
-  }
-
-  const applyCollectionState = (state: {
-    items: ClipperItem[]
-    categories: string[]
-  }) => {
-    setItems(state.items)
-    setCategories(state.categories)
   }
 
   return (
