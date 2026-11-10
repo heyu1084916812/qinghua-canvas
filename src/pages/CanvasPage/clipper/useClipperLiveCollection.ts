@@ -4,15 +4,8 @@ import type { ClipperItem } from '../../../domain/inspiration/clipper'
 import type { NetworkPort } from '../../../platform/ports'
 import type { ClipperCollectionRepository } from '../../../state/shared/clipperCollectionRepository'
 import { capturePendingClipperQueue } from './clipperQueueCapture'
+import { readClipperPendingQueue } from './clipperQueueClient'
 import type { ClipperExtensionStatus } from './useClipperExtensionUpdate'
-
-interface PendingClip {
-  id: string
-  url: string
-  title?: string
-  imageUrl?: string
-  receivedAt: number
-}
 
 export function useClipperLiveCollection(input: {
   collection: ClipperCollectionRepository
@@ -65,16 +58,16 @@ export function useClipperLiveCollection(input: {
         return
       }
       setStatus((current) => current.startsWith('本机接收端') ? '' : current)
-      const pending = await invoke<PendingClip[]>('clipper_pending_snapshot')
-      if (pending.length === 0) return
+      const queue = await readClipperPendingQueue()
+      if (queue.clips.length === 0) return
       const result = await capturePendingClipperQueue({
-        clips: pending,
+        clips: queue.clips,
         network: input.network,
         collection: input.collection,
         signal: newController().signal,
       })
       setItems(result.collection)
-      if (result.importedIds.length > 0) {
+      if (!queue.legacy && result.importedIds.length > 0) {
         try {
           await invoke('clipper_ack_pending', { ids: result.importedIds })
         } catch {
@@ -82,7 +75,7 @@ export function useClipperLiveCollection(input: {
           return
         }
       }
-      setStatus(importStatus(result))
+      setStatus(importStatus(result, queue.legacy))
     } catch (error) {
       setStatus(`处理浏览器收藏失败：${errorText(error)}`)
     } finally {
@@ -114,11 +107,19 @@ export function useClipperLiveCollection(input: {
   }
 }
 
-function importStatus(result: Awaited<ReturnType<typeof capturePendingClipperQueue>>) {
+function importStatus(
+  result: Awaited<ReturnType<typeof capturePendingClipperQueue>>,
+  legacy: boolean,
+) {
   if (result.imported > 0 && result.failed.length > 0) {
-    return `已接收 ${result.imported} 张图片，${result.failed.length} 张暂未完成，将自动重试。`
+    const suffix = legacy ? '；重启桌面版后启用可靠重试' : '，将自动重试'
+    return `已接收 ${result.imported} 张图片，${result.failed.length} 张暂未完成${suffix}。`
   }
-  if (result.imported > 0) return `已从浏览器接收 ${result.imported} 张图片。`
+  if (result.imported > 0) {
+    return legacy
+      ? `已从浏览器接收 ${result.imported} 张图片；重启桌面版后启用可靠队列。`
+      : `已从浏览器接收 ${result.imported} 张图片。`
+  }
   return `浏览器收藏暂未导入：${result.failed[0]?.message || '素材读取失败'}，将自动重试。`
 }
 

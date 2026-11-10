@@ -940,6 +940,29 @@
       "budget": 100
     },
     {
+      "module": "src/pages/CanvasPage/clipper/clipperQueueClient.ts",
+      "owner": "clipper-capture",
+      "responsibility": "读取桌面端待收队列；新版使用无副作用快照，旧壳缺少命令时回退到 take_pending。",
+      "owns": [
+        "待收队列命令选择",
+        "旧后端命令缺失识别",
+        "legacy 队列读取标记"
+      ],
+      "doesNotOwn": [
+        "图片导入与收藏落库",
+        "队列确认删除",
+        "React 状态与提示"
+      ],
+      "publicApi": [
+        "ClipperPendingClip",
+        "readClipperPendingQueue"
+      ],
+      "test": [
+        "src/pages/CanvasPage/clipper/clipperQueueClient.test.ts"
+      ],
+      "budget": 80
+    },
+    {
       "module": "src/pages/CanvasPage/clipper/ClipperPanel.tsx",
       "owner": "clipper-panel",
       "responsibility": "编排图片收藏加载、接收轮询、筛选、多选操作、分类持久化与 Agent/参考/画布动作。",

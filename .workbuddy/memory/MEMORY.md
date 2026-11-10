@@ -1,12 +1,19 @@
 # CanvasFlow（轻画）项目记忆
 
+### 总管2 第六十三轮：旧后端命令兼容与 GitHub 方案对照（2026-11-11）
+
+- 截图 `Command clipper_pending_snapshot not found` 不是收藏数据坏了，而是运行中的 `target/debug/qinghua.exe` 生成于 2026-11-10 01:51，缺少 23:55 后新增的 Tauri 队列命令。前端热更新会比 Rust 后端新，必须为命令协议做版本兼容。
+- `readClipperPendingQueue` 先调 `clipper_pending_snapshot`；只有错误同时包含该命令和 `not found` 时才回退 `clipper_take_pending`，并标记 `legacy`。旧壳不发送 ack，状态提示重启桌面版后启用可靠队列；权限错误等其他异常不得被吞掉。
+- GitHub 对照结论：[Image Picka](https://github.com/eight04/image-picka) 固定全站权限 + content script + 后台集中收图；[Browserpass](https://github.com/browserpass/browserpass-extension) 固定 host permissions + Native Messaging，[native host](https://github.com/browserpass/browserpass-native) 需要系统注册。Native Messaging 更封闭但安装/跨浏览器成本高，轻画暂继续 loopback 接收端。
+- 门禁：兼容专项 23/23；check 1163 modules / 4662 deps / 307 registrations；串行全量 Vitest 668 files（667 passed / 1 skipped）/ 5505 tests（5504 passed / 1 skipped）；build 1295 modules；Rust 86/86；release 真机更新再次 `0.4.2→0.4.3`。未 push。
+
 ### 总管2 第六十二轮：Clipper 全站一次授权与待收队列确认（2026-11-11）
 
 - 逐网页开关的根因不是“没有开关”，而是全站权限在 `optional_host_permissions`，Chrome 会按站点授权。0.4.3 起 `http://*/*`、`https://*/*` 进入固定 `host_permissions`；安装/升级确认一次，之后 popup 里只有一个全局拖拽开关。`chrome://`、`edge://`、扩展商店等保护页仍不可注入。
 - 全局开关打开后必须同时处理两类页面：`injectIntoOpenTabs()` 给已打开标签页立即注入，`registerContentScripts(persistAcrossSessions)` 保证之后的新页面自动注入。真实 Chromium 门禁必须记录切换前未注入、切换后两个不同域名都注入。
 - “扩展显示成功但轻画为空”的根因有两个：旧 `/clip` 队列先 take 后导入，异常被 catch 后静默丢失；首次 `loadState()` 与待收导入并发，旧空快照可覆盖新卡片。队列改为 `clipper_pending_snapshot` 读取快照，导入成功后 `clipper_ack_pending(ids)`；失败项留队重试。
 - 失败项不要在 UI 层重组成第二个队列；`capturePendingClipperQueue` 返回 `importedIds / failed`，控制器先 `setItems(result.collection)` 再 ack，ack 临时失败只提示重试，不回退成空态。
-- 验证证据：`.playwright-verify/clipper-all-pages/report.json`（切换前 false、两站 true）、`.playwright-verify/ui-seven-after/report.json`（四组 items=1 / ack=clip-ui-probe-1）、`.playwright-verify/clipper-update-shell/report.json`（0.4.2→0.4.3）。Rust 86/86；串行全量 Vitest 5503 tests（5502 passed / 1 skipped）；check 1162 modules / 4660 deps / 306 registrations；build 1294 modules；detector `[]`。ZIP `release/qinghua-clipper-0.4.3.zip` 21,991 B，SHA-256 `4E9DC868B5A1FBD857BDADCFF7A74E04DE125AE32880CC70482B8E8FE47D61E9`。未 push。
+- 验证证据：`.playwright-verify/clipper-all-pages/report.json`（切换前 false、两站 true）、`.playwright-verify/ui-seven-after/report.json`（四组 items=1 / ack=clip-ui-probe-1）、`.playwright-verify/clipper-update-shell/report.json`（0.4.2→0.4.3）。Rust 86/86；串行全量 Vitest 5503 tests（5502 passed / 1 skipped）；check 1162 modules / 4660 deps / 306 registrations；build 1294 modules；detector `[]`。ZIP `release/qinghua-clipper-0.4.3.zip` 22,110 B，SHA-256 `76F130AF11C69EB65EAA0545DFC1B912E0445D6FA41F22D7151410E66234E71B`。未 push。
 
 ### 总管2 第六十一轮：Clipper 本地安装版版本检测与稳定目录更新（2026-11-10）
 
