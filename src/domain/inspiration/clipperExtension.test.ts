@@ -24,7 +24,7 @@ describe('qinghua clipper extension contract', () => {
     }
 
     expect(manifest.manifest_version).toBe(3)
-    expect(manifest.version).toBe('0.4.1')
+    expect(manifest.version).toBe('0.4.2')
     expect(manifest.permissions).toEqual(['storage', 'scripting'])
     expect(manifest.host_permissions).toEqual([
       'http://127.0.0.1:53684/*',
@@ -98,6 +98,35 @@ describe('qinghua clipper extension contract', () => {
     expect(installer).not.toContain('pairing token')
   })
 
+  it('bundles the extension source into the desktop application resources', () => {
+    const config = JSON.parse(
+      readFileSync(
+        new URL('../../../src-tauri/tauri.conf.json', import.meta.url),
+        'utf8',
+      ),
+    ) as { bundle: { resources: Record<string, string> } }
+
+    expect(config.bundle.resources['../browser-extension/qinghua-clipper/'])
+      .toBe('resources/qinghua-clipper/')
+  })
+
+  it('keeps release probes capable of copying nested extension resources', () => {
+    const releaseProbe = readFileSync(
+      new URL('../../../scripts/check-release-shell.mjs', import.meta.url),
+      'utf8',
+    )
+    const updateProbe = readFileSync(
+      new URL('../../../scripts/check-clipper-update-shell.mjs', import.meta.url),
+      'utf8',
+    )
+
+    expect(releaseProbe).toContain('function copyDirectory(source, destination)')
+    expect(releaseProbe).toContain('copyDirectory(RESOURCE_SRC, resourceTarget)')
+    expect(updateProbe).toContain("invoke('clipper_receiver_info')")
+    expect(updateProbe).toContain("invoke('clipper_extension_update')")
+    expect(updateProbe).toContain('QINGHUA_CLIPPER_MANAGED_ROOT')
+  })
+
   it('normalizes loopback input and posts the image without extra data', async () => {
     const fetchMock = vi.fn(async () => ({
       ok: true,
@@ -144,18 +173,19 @@ describe('qinghua clipper extension contract', () => {
       status: 200,
       json: async () => ({ ok: true, token: 'paired-token' }),
     }))
-    const api = loadSharedApi(fetchMock)
+    const api = loadSharedApi(fetchMock, '0.4.2')
 
     await expect(api.pairReceiver(
       'http://127.0.0.1:53684/clip',
     )).resolves.toBe('paired-token')
     const [url, request] = fetchMock.mock.calls[0] as unknown as [
       string,
-      { method: string; headers: Record<string, string> },
+      { method: string; headers: Record<string, string>; body: string },
     ]
     expect(url).toBe('http://127.0.0.1:53684/pair')
     expect(request.method).toBe('POST')
     expect(request.headers['X-Qinghua-Clipper-Pair']).toBe('1')
+    expect(JSON.parse(request.body)).toEqual({ version: '0.4.2' })
   })
 
   it('surfaces authentication and health failures with recovery copy', async () => {
@@ -239,12 +269,20 @@ function message(
   })
 }
 
-function loadSharedApi(fetchMock: ReturnType<typeof vi.fn>) {
+function loadSharedApi(
+  fetchMock: ReturnType<typeof vi.fn>,
+  manifestVersion = '',
+) {
   const source = readFileSync(new URL('shared.js', extensionRoot), 'utf8')
   const context = {
     AbortController,
     URL,
     clearTimeout,
+    chrome: {
+      runtime: {
+        getManifest: () => ({ version: manifestVersion }),
+      },
+    },
     fetch: fetchMock,
     setTimeout,
   } as Record<string, unknown>
@@ -278,6 +316,7 @@ function loadBackgroundApi(fetchMock: ReturnType<typeof vi.fn>) {
   }
   const chrome = {
     runtime: {
+      getManifest: () => ({ version: '0.4.2' }),
       onInstalled: { addListener: vi.fn() },
       onStartup: { addListener: vi.fn() },
       onMessage: {

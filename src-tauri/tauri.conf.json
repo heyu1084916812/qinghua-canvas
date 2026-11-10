@@ -34,13 +34,14 @@
     "active": true,
     "targets": ["nsis", "msi"],
     "createUpdaterArtifacts": true,
-    "resources": [
-      "resources/ffmpeg.exe",
-      "resources/FFMPEG-LICENSE.txt",
-      "resources/FFMPEG-NOTICE.txt",
-      "resources/ffmpeg-build.json",
-      "resources/canvas-mcp.ps1"
-    ],
+    "resources": {
+      "resources/ffmpeg.exe": "resources/ffmpeg.exe",
+      "resources/FFMPEG-LICENSE.txt": "resources/FFMPEG-LICENSE.txt",
+      "resources/FFMPEG-NOTICE.txt": "resources/FFMPEG-NOTICE.txt",
+      "resources/ffmpeg-build.json": "resources/ffmpeg-build.json",
+      "resources/canvas-mcp.ps1": "resources/canvas-mcp.ps1",
+      "../browser-extension/qinghua-clipper/": "resources/qinghua-clipper/"
+    },
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",

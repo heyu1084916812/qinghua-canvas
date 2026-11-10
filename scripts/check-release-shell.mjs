@@ -91,6 +91,19 @@ const WASM_REF = [
 ].find((p) => existsSync(p))
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 
+function copyDirectory(source, destination) {
+  mkdirSync(destination, { recursive: true })
+  for (const entry of readdirSync(source, { withFileTypes: true })) {
+    const from = path.join(source, entry.name)
+    const to = path.join(destination, entry.name)
+    if (entry.isDirectory()) {
+      copyDirectory(from, to)
+    } else if (entry.isFile()) {
+      copyFileSync(from, to)
+    }
+  }
+}
+
 if (
   !Number.isInteger(SHARED_STORE_PORT) ||
   SHARED_STORE_PORT < 1 ||
@@ -123,10 +136,7 @@ mkdirSync(localAppData, { recursive: true })
 copyFileSync(EXE_SRC, exePath)
 if (existsSync(RESOURCE_SRC)) {
   const resourceTarget = path.join(appDir, 'resources')
-  mkdirSync(resourceTarget, { recursive: true })
-  for (const name of readdirSync(RESOURCE_SRC)) {
-    copyFileSync(path.join(RESOURCE_SRC, name), path.join(resourceTarget, name))
-  }
+  copyDirectory(RESOURCE_SRC, resourceTarget)
 }
 console.log(`临时布局：${scratch}`)
 console.log(`  程序 ${exePath}（${statSync(exePath).size} B）`)

@@ -2,13 +2,13 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { invoke, isTauri } from '@tauri-apps/api/core'
 import { usePlatform } from '../../../app/providers/PlatformProvider'
 import {
-  CLIPPER_UNCATEGORIZED,
   type ClipperItem,
 } from '../../../domain/inspiration/clipper'
 import { sendReferenceToAgent } from '../../../features/canvas/agentHandoff'
 import { createClipperCollectionRepository } from '../../../state/shared/clipperCollectionRepository'
 import { createReferenceLedgerRepository } from '../../../state/project/referenceLedgerRepository'
 import type { CanvasStore } from '../../../state/workbenches/canvas/store'
+import { ClipperExtensionUpdateNotice } from './ClipperExtensionUpdateNotice'
 import { ClipperItemCard } from './ClipperItemCard'
 import { ClipperSelectionBar } from './ClipperSelectionBar'
 import {
@@ -18,6 +18,8 @@ import {
 } from './ClipperToolbar'
 import { capturePendingClipperQueue } from './clipperCapture'
 import { addClipperReference, sendClipperToCanvas } from './clipperActions'
+import { clipperEmptyDescription, clipperEmptyTitle } from './clipperEmptyCopy'
+import { useClipperExtensionUpdate } from './useClipperExtensionUpdate'
 import styles from './ClipperPanel.module.css'
 
 interface ClipperReceiverInfo {
@@ -25,6 +27,7 @@ interface ClipperReceiverInfo {
   endpoint: string
   token: string
   error?: string
+  extension: Parameters<ReturnType<typeof useClipperExtensionUpdate>['accept']>[0]
 }
 
 interface PendingClip {
@@ -58,6 +61,7 @@ export function ClipperPanel({
   const [selectedIds, setSelectedIds] = useState<string[]>([])
   const [busy, setBusy] = useState('')
   const [status, setStatus] = useState('')
+  const extensionUpdate = useClipperExtensionUpdate()
   const controllerRef = useRef<AbortController | null>(null)
   const busyRef = useRef(false)
   const receivingRef = useRef(false)
@@ -85,6 +89,7 @@ export function ClipperPanel({
     receivingRef.current = true
     try {
       const info = await invoke<ClipperReceiverInfo>('clipper_receiver_info')
+      extensionUpdate.accept(info.extension)
       if (!info.running) {
         setStatus(info.error ? `本机接收端未启动：${info.error}` : '本机接收端未启动。')
         return
@@ -107,7 +112,7 @@ export function ClipperPanel({
     } finally {
       receivingRef.current = false
     }
-  }, [collection, platform.network])
+  }, [collection, extensionUpdate.accept, platform.network])
 
   useEffect(() => {
     if (!isTauri()) return
@@ -245,6 +250,12 @@ export function ClipperPanel({
 
   return (
     <div className={styles.panel} data-clipper-panel>
+      <ClipperExtensionUpdateNotice
+        status={extensionUpdate.status}
+        updating={extensionUpdate.updating}
+        message={extensionUpdate.message}
+        onUpdate={extensionUpdate.update}
+      />
       <ClipperToolbar
         categories={categories}
         filter={filter}
@@ -273,8 +284,8 @@ export function ClipperPanel({
         </div>
       ) : (
         <div className={styles.empty} data-clipper-empty>
-          <strong>{emptyTitle(activeCategory)}</strong>
-          <p>{emptyDescription(activeCategory)}</p>
+          <strong>{clipperEmptyTitle(activeCategory)}</strong>
+          <p>{clipperEmptyDescription(activeCategory)}</p>
         </div>
       )}
 
@@ -304,17 +315,6 @@ export function ClipperPanel({
   }
 }
 
-function emptyTitle(category: string | null): string {
-  if (category === CLIPPER_UNCATEGORIZED) return '没有未分类的图片'
-  if (category) return `“${category}”还没有图片`
-  return '开始收集灵感吧'
-}
-
-function emptyDescription(category: string | null): string {
-  if (category === CLIPPER_UNCATEGORIZED) return '切换到“全部”查看已收藏的网页图片'
-  if (category) return '选中图片后可以批量转到这个分类'
-  return '在任意网页把图片拖到页面中央，松手后会自动收藏到这里'
-}
 function errorText(error: unknown): string {
   return error instanceof Error ? error.message : String(error)
 }

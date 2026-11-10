@@ -5,6 +5,9 @@ use std::sync::{Mutex, OnceLock};
 use std::thread;
 use std::time::{SystemTime, UNIX_EPOCH};
 use tiny_http::{Header, Method, Response, Server, StatusCode};
+use tauri::AppHandle;
+
+use crate::clipper_update::{self, ClipperExtensionStatus};
 
 const PORT: u16 = 53684;
 const CLIP_PATH: &str = "/clip";
@@ -19,6 +22,11 @@ struct ClipRequest {
     url: String,
     title: Option<String>,
     image_url: Option<String>,
+}
+
+#[derive(Clone, Debug, Default, Deserialize)]
+struct PairRequest {
+    version: Option<String>,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -38,6 +46,7 @@ pub struct ClipperReceiverInfo {
     pub endpoint: String,
     pub token: String,
     pub error: Option<String>,
+    pub extension: ClipperExtensionStatus,
 }
 
 static TOKEN: OnceLock<String> = OnceLock::new();
@@ -149,6 +158,32 @@ fn serve(server: Server) {
                     ));
                     continue;
                 }
+                let mut body = String::new();
+                if request
+                    .as_reader()
+                    .take(MAX_BODY_BYTES + 1)
+                    .read_to_string(&mut body)
+                    .is_err()
+                {
+                    let _ = request.respond(json_response(
+                        400,
+                        r#"{"ok":false,"error":"invalid pair request body"}"#,
+                    ));
+                    continue;
+                }
+                if body.len() as u64 > MAX_BODY_BYTES {
+                    let _ = request.respond(json_response(
+                        413,
+                        r#"{"ok":false,"error":"pair request body too large"}"#,
+                    ));
+                    continue;
+                }
+                let pair_request = if body.trim().is_empty() {
+                    PairRequest::default()
+                } else {
+                    serde_json::from_str::<PairRequest>(&body).unwrap_or_default()
+                };
+                clipper_update::record_connected_version(pair_request.version.as_deref());
                 let body = serde_json::json!({
                     "ok": true,
                     "token": token(),
@@ -243,12 +278,13 @@ fn serve(server: Server) {
 }
 
 #[tauri::command]
-pub fn clipper_receiver_info() -> ClipperReceiverInfo {
+pub fn clipper_receiver_info(app: AppHandle) -> ClipperReceiverInfo {
     ClipperReceiverInfo {
         running: STARTED.load(Ordering::Acquire) && START_ERROR.get().is_none(),
         endpoint: format!("http://127.0.0.1:{PORT}{CLIP_PATH}"),
         token: token().to_string(),
         error: START_ERROR.get().cloned(),
+        extension: clipper_update::status(&app),
     }
 }
 
@@ -376,11 +412,31 @@ mod tests {
             port,
             "POST",
             PAIR_PATH,
-            "Origin: chrome-extension://test-extension\r\nContent-Length: 0\r\n",
-            "",
+            "Origin: chrome-extension://test-extension\r\nContent-Type: application/json\r\nContent-Length: 19\r\n",
+            r#"{"version":"0.4.1"}"#,
         );
         assert!(pair.starts_with("HTTP/1.1 200"));
         assert!(pair.contains("Access-Control-Allow-Origin: chrome-extension://test-extension"));
+        assert_eq!(clipper_update::tests_support::connected_version().as_deref(), Some("0.4.1"));
+        clipper_update::tests_support::mark_reload_required("0.4.2");
+        let stale_pair = raw_request(
+            port,
+            "POST",
+            PAIR_PATH,
+            "Origin: chrome-extension://test-extension\r\nContent-Type: application/json\r\nContent-Length: 19\r\n",
+            r#"{"version":"0.4.1"}"#,
+        );
+        assert!(stale_pair.starts_with("HTTP/1.1 200"));
+        assert!(clipper_update::tests_support::reload_required());
+        let current_pair = raw_request(
+            port,
+            "POST",
+            PAIR_PATH,
+            "Origin: chrome-extension://test-extension\r\nContent-Type: application/json\r\nContent-Length: 19\r\n",
+            r#"{"version":"0.4.2"}"#,
+        );
+        assert!(current_pair.starts_with("HTTP/1.1 200"));
+        assert!(!clipper_update::tests_support::reload_required());
 
         let body = serde_json::json!({
             "url": "https://example.com/clip",
@@ -397,7 +453,7 @@ mod tests {
         );
         assert!(unauthorized.starts_with("HTTP/1.1 401"));
 
-        let token = clipper_receiver_info().token;
+        let token = token();
         let authorized = raw_request(
             port,
             "POST",

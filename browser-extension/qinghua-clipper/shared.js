@@ -101,6 +101,13 @@
     if (!normalized) {
       throw new ClipperError('接收端地址无效', 0, 'endpoint')
     }
+    const manifestVersion = (() => {
+      try {
+        return String(globalThis.chrome?.runtime?.getManifest?.().version || '').trim()
+      } catch {
+        return ''
+      }
+    })()
     const pairUrl = new URL(normalized)
     pairUrl.pathname = '/pair'
     const response = await request(
@@ -111,7 +118,7 @@
           'Content-Type': 'application/json',
           'X-Qinghua-Clipper-Pair': '1',
         },
-        body: '{}',
+        body: JSON.stringify(manifestVersion ? { version: manifestVersion } : {}),
       },
       5_000,
     )

@@ -56,6 +56,9 @@ describe('seven UI placement fixes', () => {
     const referenceLightbox = read('pages/CanvasPage/ReferenceLightbox.tsx')
     const canvasBrowser = read('pages/CanvasPage/browser/CanvasBrowserLayer.tsx')
     const clipperPanel = read('pages/CanvasPage/clipper/ClipperPanel.tsx')
+    const clipperExtensionUpdate = read(
+      'pages/CanvasPage/clipper/ClipperExtensionUpdateNotice.tsx',
+    )
     const clipperToolbar = read('pages/CanvasPage/clipper/ClipperToolbar.tsx')
     const clipperSelection = read('pages/CanvasPage/clipper/ClipperSelectionBar.tsx')
     const clipperItem = read('pages/CanvasPage/clipper/ClipperItemCard.tsx')
@@ -174,7 +177,12 @@ describe('seven UI placement fixes', () => {
     expect(clipperPanel).not.toContain('ClipperPairing')
     expect(clipperPanel).toContain('<ClipperToolbar')
     expect(clipperPanel).toContain('<ClipperSelectionBar')
-    expect(clipperPanel).toContain('在任意网页把图片拖到页面中央')
+    expect(read('pages/CanvasPage/clipper/clipperEmptyCopy.ts'))
+      .toContain('在任意网页把图片拖到页面中央')
+    expect(clipperExtensionUpdate).toContain('data-clipper-extension-update')
+    expect(clipperExtensionUpdate).toContain('data-clipper-extension-update-action')
+    expect(read('pages/CanvasPage/clipper/useClipperExtensionUpdate.ts'))
+      .toContain('扩展文件已更新，请在扩展页点击“重新加载”。')
     expect(clipperToolbar).toContain('data-clipper-create-category')
     expect(clipperToolbar).toContain('data-clipper-selection-toggle')
     expect(clipperToolbar).toContain('data-clipper-filter={value}')

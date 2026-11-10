@@ -944,6 +944,102 @@
       "budget": 320
     },
     {
+      "module": "src/pages/CanvasPage/clipper/useClipperExtensionUpdate.ts",
+      "owner": "clipper-panel",
+      "responsibility": "读取扩展版本更新结果，并维护更新中、成功提示和失败提示状态。",
+      "owns": [
+        "已加载与内置扩展版本状态接收",
+        "扩展更新命令调用",
+        "更新结果和恢复提示"
+      ],
+      "doesNotOwn": [
+        "扩展文件复制与目录替换",
+        "浏览器扩展管理页启动",
+        "更新提示的视觉渲染"
+      ],
+      "publicApi": [
+        "ClipperExtensionStatus",
+        "useClipperExtensionUpdate"
+      ],
+      "test": [
+        "src/app/uiSevenPoints.test.ts",
+        "scripts/capture-ui-seven-points.mjs"
+      ],
+      "budget": 100
+    },
+    {
+      "module": "src/pages/CanvasPage/clipper/ClipperExtensionUpdateNotice.tsx",
+      "owner": "clipper-panel",
+      "responsibility": "仅在已加载扩展落后于应用内置版本时显示紧凑更新提示和重载引导。",
+      "owns": [
+        "版本落后条件渲染",
+        "已加载与内置版本文案",
+        "更新按钮和提示状态"
+      ],
+      "doesNotOwn": [
+        "更新命令调用和状态机",
+        "扩展文件替换",
+        "浏览器扩展管理页控制"
+      ],
+      "publicApi": [
+        "ClipperExtensionUpdateNotice"
+      ],
+      "test": [
+        "src/app/uiSevenPoints.test.ts",
+        "scripts/capture-ui-seven-points.mjs"
+      ],
+      "budget": 80
+    },
+    {
+      "module": "src/pages/CanvasPage/clipper/ClipperExtensionUpdateNotice.module.css",
+      "owner": "clipper-panel",
+      "responsibility": "定义扩展更新提示的紧凑布局、换行、按钮焦点和窄面板降级。",
+      "owns": [
+        "版本信息与更新按钮网格",
+        "长版本和错误提示换行",
+        "窄抽屉单列降级"
+      ],
+      "doesNotOwn": [
+        "更新提示条件与动作",
+        "收藏卡和工具栏样式",
+        "全局主题令牌"
+      ],
+      "publicApi": [
+        "CSS_MODULE:扩展更新提示",
+        "CSS_CLASS:notice",
+        "CSS_CLASS:copy",
+        "CSS_CLASS:action",
+        "CSS_CLASS:message"
+      ],
+      "test": [
+        "scripts/capture-ui-seven-points.mjs"
+      ],
+      "budget": 100
+    },
+    {
+      "module": "src/pages/CanvasPage/clipper/clipperEmptyCopy.ts",
+      "owner": "clipper-panel",
+      "responsibility": "根据全部、未分类或命名分类生成收藏面板的空态标题和说明。",
+      "owns": [
+        "全部收藏空态文案",
+        "未分类筛选空态文案",
+        "命名分类空态文案"
+      ],
+      "doesNotOwn": [
+        "收藏数据筛选",
+        "扩展更新状态",
+        "空态布局与样式"
+      ],
+      "publicApi": [
+        "clipperEmptyTitle",
+        "clipperEmptyDescription"
+      ],
+      "test": [
+        "src/pages/CanvasPage/clipper/clipperEmptyCopy.test.ts"
+      ],
+      "budget": 40
+    },
+    {
       "module": "src/pages/CanvasPage/clipper/ClipperItemCard.tsx",
       "owner": "clipper-panel",
       "responsibility": "渲染图片收藏卡及普通动作或多选态，不拥有收藏和分类持久化。",

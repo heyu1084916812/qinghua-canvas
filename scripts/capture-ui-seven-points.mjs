@@ -10,6 +10,7 @@ const STORE_PORT = Number(process.env.QH_UI_STORE_PORT ?? 18821)
 const BASE = process.env.QH_UI_BASE ?? `http://127.0.0.1:${UI_PORT}`
 const STORE = process.env.QH_UI_STORE ?? `http://127.0.0.1:${STORE_PORT}`
 const phase = process.argv.includes('--after') ? 'after' : 'before'
+const clipperUpdateOnly = process.env.QH_UI_CLIPPER_UPDATE_ONLY === '1'
 const out = path.join(ROOT, '.playwright-verify', `ui-seven-${phase}`)
 fs.mkdirSync(out, { recursive: true })
 const storeData = path.join(out, 'store')
@@ -373,8 +374,40 @@ try {
       }
     })
     await page.screenshot({ path: path.join(out, `${file}-canvas-pinterest.png`) })
+    await page.evaluate(() => {
+      const updateStatus = {
+        loadedVersion: '0.4.1',
+        bundledVersion: '0.4.2',
+        needsUpdate: true,
+        reloadRequired: false,
+        stableDirectory: 'C:\\Users\\Administrator\\Documents\\QinghuaClipper\\extension',
+      }
+      window.isTauri = true
+      window.__TAURI_INTERNALS__ = {
+        invoke: async (command) => {
+          if (command === 'clipper_receiver_info') {
+            return {
+              running: true,
+              endpoint: 'http://127.0.0.1:53684/clip',
+              token: 'ui-probe-token',
+              extension: updateStatus,
+            }
+          }
+          if (command === 'clipper_take_pending') return []
+          if (command === 'clipper_extension_update') {
+            return {
+              status: { ...updateStatus, needsUpdate: false, reloadRequired: true },
+              updated: true,
+              openedExtensionPage: true,
+            }
+          }
+          throw new Error(`unexpected Tauri command: ${command}`)
+        },
+      }
+    })
     await page.locator('[data-my-assets-source="clipper"]').click()
     await page.locator('[data-clipper-panel]').waitFor({ timeout: 10_000 })
+    await page.locator('[data-clipper-extension-update]').waitFor({ timeout: 5_000 })
     const clipperMounted = await page.locator('[data-clipper-panel]').count()
     const clipperState = await page.evaluate(() => {
       const panel = document.querySelector('[data-clipper-panel]')
@@ -389,12 +422,30 @@ try {
           panel?.querySelectorAll('[data-clipper-create-category]').length ?? 0,
         selectionToggles:
           panel?.querySelectorAll('[data-clipper-selection-toggle]').length ?? 0,
+        updateNotice:
+          panel?.querySelectorAll('[data-clipper-extension-update]').length ?? 0,
+        updateAction:
+          panel?.querySelectorAll('[data-clipper-extension-update-action]').length ?? 0,
         empty: panel?.querySelectorAll('[data-clipper-empty]').length ?? 0,
         emptyText: panel?.querySelector('[data-clipper-empty]')?.textContent?.replace(/\s+/g, ' ').trim() ?? '',
         overflowX: panel ? panel.scrollWidth > panel.clientWidth + 1 : true,
         insidePanel: Boolean(panelRect),
       }
     })
+    await page.locator('[data-clipper-extension-update-action]').click()
+    await page.waitForFunction(
+      () => document.querySelector('[data-clipper-extension-update]')
+        ?.textContent?.includes('扩展文件已更新'),
+      { timeout: 5_000 },
+    )
+    const clipperUpdateMessage = await page
+      .locator('[data-clipper-extension-update]')
+      .innerText()
+    const clipperUpdateOverflowX = await page.evaluate(() => {
+      const notice = document.querySelector('[data-clipper-extension-update]')
+      return notice ? notice.scrollWidth > notice.clientWidth + 1 : true
+    })
+    await page.screenshot({ path: path.join(out, `${file}-canvas-clipper-update.png`) })
     await page.locator('[data-clipper-filter="uncategorized"]').click()
     const clipperUncategorizedSelected = await page.locator(
       '[data-clipper-filter="uncategorized"][aria-selected="true"]',
@@ -409,6 +460,23 @@ try {
     await page.mouse.move(900, 80)
     await page.waitForTimeout(600)
     await page.screenshot({ path: path.join(out, `${file}-canvas-clipper.png`) })
+    await page.evaluate(() => {
+      delete window.isTauri
+      delete window.__TAURI_INTERNALS__
+    })
+    if (clipperUpdateOnly) {
+      report.push({
+        variant,
+        surface: 'clipperExtensionUpdate',
+        clipperMounted,
+        ...clipperState,
+        clipperUpdateMessage,
+        clipperUpdateOverflowX,
+        errors: [...errors],
+      })
+      await context.close()
+      continue
+    }
     await page.locator('[data-my-assets-source="reference"]').click()
     await page.locator('[data-reference-empty]').waitFor({ timeout: 10_000 })
     const referenceEmptyActions = await page
@@ -1394,6 +1462,8 @@ try {
       pinterestLayout,
       clipperMounted,
       ...clipperState,
+      clipperUpdateMessage,
+      clipperUpdateOverflowX,
       clipperUncategorizedSelected,
       clipperEmptySelectionText,
       myAssetsOpenLatencyMs,

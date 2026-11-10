@@ -1,5 +1,15 @@
 # CanvasFlow（轻画）项目记忆
 
+### 总管2 第六十一轮：Clipper 本地安装版版本检测与稳定目录更新（2026-11-10）
+
+- 扩展配对不能只领 token，还要在 `/pair` 请求体带 `chrome.runtime.getManifest().version`；接收端保存最后连接版本。旧扩展不报版本时必须用 `Documents\QinghuaClipper\extension/manifest.json` 兜底，否则老 0.4.1 永远检测不到新 0.4.2。Tauri `clipper_receiver_info` 返回已加载版本、稳定目录版本、应用内置版本和 `needsUpdate`，面板只在内置版本更新时显示紧凑提示。
+- 扩展源码只认 `browser-extension/qinghua-clipper/` 一份。`src-tauri/tauri.conf.json` 用资源映射把它落到 `$RESOURCE/resources/qinghua-clipper/`；构建后要实际检查 `target/release/resources/qinghua-clipper/manifest.json`，不能只看配置存在。
+- 更新器 `clipper_update.rs` 只写 `Documents\QinghuaClipper\extension`：先在同一管理目录内 staging 完整复制，校验 manifest 和必需文件，再把旧目录改名备份、启用 staging；失败恢复旧目录。现有稳定目录若是符号链接/目录联接指到别处必须拒绝覆盖。
+- 不得写浏览器 `User Data`，也不能声称静默重载扩展。更新文件后只能打开 Chrome/Edge 扩展页与稳定目录，最后一步由用户点“重新加载”；用户若从别的目录加载过扩展，只能引导改回稳定目录。
+- 文件更新完成不等于浏览器已重载。`reloadRequired` 必须在更新成功后保持为真，直到扩展下一次 `/pair` 上报的版本达到待重载目标；否则旧扩展不报版本时，提示会在复制完成的瞬间消失，用户看不到重载引导。
+- 测试覆盖独立临时目录，不能碰真实 Documents。四组 1440×900 / 1024×700 × 明暗 `updateNotice=1 / clipperUpdateOverflowX=false / errors=[]`。扩展升到 `0.4.2`，ZIP 21,771 B，SHA-256 `79B14403D7514344F783919A0D6678EA4887438412C67C1EF221EBDE445CA85B`。Rust 86/86；串行全量 Vitest 5502 tests（5501 passed / 1 skipped）；check 1160 modules / 4649 deps / 304 registrations；build 1292 modules；Tauri `--no-bundle` 成功。
+- `npm run check:clipper-update` 用隔离 release 壳实测真实命令：临时稳定目录 `0.4.1 → 0.4.2`，`needsUpdate=false / reloadRequired=true / stagingLeftovers=[]`。release 自检脚本复制 `resources/` 时必须递归处理目录（`qinghua-clipper/`），不能继续假设全是单文件；节点 v24 在本机实测 `fs.cpSync` 会异常退出，脚本统一用手写目录递归复制。证据 `.playwright-verify/clipper-update-shell/report.json`。未 push。
+
 ### 总管2 第六十轮：Agent 调研候选进入项目参考与会话（2026-11-10）
 
 - 调研候选卡不能只有外链。用户点“加入项目参考”时，图片候选必须走 `saveDesignResearchItem` 的公开网、MIME、文件头和尺寸门禁，再写素材库与 `referenceItems`；文字候选保存为 `kind=text`，不能因为没图就丢掉。

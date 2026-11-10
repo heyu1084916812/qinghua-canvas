@@ -31,6 +31,7 @@ use tauri_plugin_updater::UpdaterExt;
 
 mod canvas_gateway;
 mod clipper_receiver;
+mod clipper_update;
 mod cli_output_tests;
 mod pinterest_oauth;
 
@@ -4293,6 +4294,7 @@ pub fn run() {
             canvas_gateway::canvas_gateway_respond,
             clipper_receiver::clipper_receiver_info,
             clipper_receiver::clipper_take_pending,
+            clipper_update::clipper_extension_update,
             pinterest_oauth::pinterest_oauth_listen,
             pinterest_oauth::pinterest_oauth_wait,
             pinterest_oauth::pinterest_oauth_cancel

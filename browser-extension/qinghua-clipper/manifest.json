@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "轻画 Clipper",
-  "version": "0.4.1",
+  "version": "0.4.2",
   "description": "拖动网页图片，自动收藏到本机轻画。",
   "minimum_chrome_version": "102",
   "permissions": ["storage", "scripting"],
