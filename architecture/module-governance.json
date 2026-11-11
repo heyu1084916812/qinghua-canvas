@@ -543,6 +543,27 @@
   "moduleMoves": [],
   "modules": [
     {
+      "module": "src/domain/project/referenceTitle.ts",
+      "owner": "project-reference-curation-rules",
+      "responsibility": "判断参考卡标题是否为文件名式自动标题，并整理参考分析给出的语义短名。",
+      "owns": [
+        "自动标题识别",
+        "语义短名清洗与截断"
+      ],
+      "doesNotOwn": [
+        "参考分析调用",
+        "台账写入"
+      ],
+      "publicApi": [
+        "isAutoReferenceTitle",
+        "curatedTitleOf"
+      ],
+      "test": [
+        "src/domain/project/referenceCuration.test.ts"
+      ],
+      "budget": 60
+    },
+    {
       "module": "src/domain/agent/seriesOrchestration.ts",
       "owner": "agent-runtime",
       "responsibility": "回合级编排提示：识别整套 / 先定 Logo 指令并维护任务的系列阶段，侧栏多张未提及且无用法的参考图时提示先发问题卡。",

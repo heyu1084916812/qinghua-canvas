@@ -3,6 +3,7 @@ import type {
   ReferenceUsage,
   ReferenceUsageKind,
 } from './referenceLedger'
+import { curatedTitleOf } from './referenceTitle'
 
 export const REFERENCE_CURATION_PROMPT_VERSION = 1
 
@@ -16,6 +17,8 @@ export const REFERENCE_USAGE_KINDS: readonly ReferenceUsageKind[] = [
 ]
 
 export interface ReferenceCurationAnalysis {
+  /** C1：按主体 / 用途起的短名；模型没给或给成文件名时为空串。 */
+  title: string
   what: string
   usage: ReferenceUsageKind
   howToUse: string
@@ -49,6 +52,7 @@ export type ParsedReferenceCuration =
 export const REFERENCE_CURATION_SYSTEM_PROMPT = [
   '你是轻画的项目参考分析子代理。',
   '你只能分析随消息提供的真实参考图和参考卡文字，不能修改画布、生成图片或假装看过未提供的素材。',
+  'title 按画面主体或用途起一个 2～12 字的短名（如「拿铁杯产品图」「极简海报排版」「品牌 Logo」），不要用文件名。',
   'What 只写可核对的主体、结构、材质、颜色、字体、构图和视觉风格，不要编造品牌故事或用途。',
   'HowToUse 必须针对本次任务说明具体借鉴什么、避开什么、是否锁定身份。',
   'usage 只能是 subject / style / composition / identityAnchor / avoid / textGuide。',
@@ -58,7 +62,7 @@ export const REFERENCE_CURATION_SYSTEM_PROMPT = [
   '色彩规范、字体规范、文案规范用 textGuide。看不清或信息不足写进 limitations，不能猜。',
   '只输出一个 JSON 对象，不要 Markdown、代码围栏或额外说明。',
   'JSON 形状：',
-  '{"what":"客观素材说明","usage":"subject|style|composition|identityAnchor|avoid|textGuide",',
+  '{"title":"主体或用途短名","what":"客观素材说明","usage":"subject|style|composition|identityAnchor|avoid|textGuide",',
   '"howToUse":"当前任务如何使用","identityAnchor":false,"limitations":["无法确认的内容"]}',
 ].join('\n')
 
@@ -113,6 +117,7 @@ export function parseReferenceCurationText(
   return {
     ok: true,
     analysis: {
+      title: curatedTitleOf(parsed.title),
       what,
       usage,
       howToUse,

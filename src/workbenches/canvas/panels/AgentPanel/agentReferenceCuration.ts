@@ -11,6 +11,7 @@ import {
   referenceUsageId,
   type ReferenceCurationResult,
 } from '../../../../domain/project/referenceCuration'
+import { isAutoReferenceTitle } from '../../../../domain/project/referenceTitle'
 import { imageSizeFromHeader } from '../../../../domain/shared/imageSize'
 import type { PlatformKit } from '../../../../platform/ports'
 import type { RouteExecutionPort } from '../../../../features/shared/agent/RouteExecutionPort'
@@ -142,8 +143,13 @@ export async function runAgentReferenceCuration(
         continue
       }
       const now = Date.now()
+      // C1：文件名式标题换成分析给出的语义短名；用户自己起的标题不动。
+      const title = parsed.analysis.title && isAutoReferenceTitle(item.title)
+        ? parsed.analysis.title
+        : item.title
       const nextItem: ReferenceItem = {
         ...item,
+        title,
         what: parsed.analysis.what,
         updatedAt: now,
       }
@@ -166,7 +172,7 @@ export async function runAgentReferenceCuration(
       await repository.putUsage(usage)
       analyzed.push({
         itemId: item.id,
-        title: item.title,
+        title,
         what: parsed.analysis.what,
         usage: parsed.analysis.usage,
         howToUse: parsed.analysis.howToUse,

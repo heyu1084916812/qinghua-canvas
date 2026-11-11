@@ -165,4 +165,42 @@ describe('runAgentReferenceCuration', () => {
     expect(result.summary).toContain('已是最新')
     expect(execute).not.toHaveBeenCalled()
   })
+
+  it('C1：文件名标题换成分析给出的语义短名；用户起过的标题保持不变', async () => {
+    const run = async (title: string) => {
+      const storage = storageWith({ referenceItems: [item({ title, assets: undefined })] })
+      const execute = vi.fn(async (_request: unknown) => ({
+        text: JSON.stringify({
+          title: '拿铁杯产品图',
+          what: '白色拿铁杯，杯身有绿色字标。',
+          usage: 'subject',
+          howToUse: '借：杯子外形；避：原图背景。',
+        }),
+      }))
+      const result = await runAgentReferenceCuration({
+        storage: storage as never,
+        assets: { read: vi.fn(async () => ({ bytes: png, mime: 'image/png' })) },
+        routeExecution: { execute },
+        onRecordWarning: vi.fn(),
+      }, {
+        projectId: 'p1',
+        sessionId: 's1',
+        operationId: 'op1',
+        taskKey: 'task:t1',
+        task: '做一张拿铁海报',
+        route: {
+          channelId: 'c1',
+          logicalModel: 'Vision',
+          upstreamModel: 'vision-upstream',
+          routePlanId: 'plan',
+          candidates: [{ channelId: 'c1', model: 'vision-upstream' }],
+        },
+        preferredItemIds: ['ref-kit-1'],
+      })
+      return { stored: storage.tables.referenceItems?.[0]?.title, reported: result.analyzed[0]?.title }
+    }
+    expect(await run('_Image 17.jpg')).toEqual({ stored: '拿铁杯产品图', reported: '拿铁杯产品图' })
+    expect(await run('我的杯子')).toEqual({ stored: '我的杯子', reported: '我的杯子' })
+  })
 })
+

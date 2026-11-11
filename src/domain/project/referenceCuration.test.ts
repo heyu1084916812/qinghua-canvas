@@ -4,6 +4,7 @@ import {
   parseReferenceCurationText,
   referenceUsageId,
 } from './referenceCuration'
+import { curatedTitleOf, isAutoReferenceTitle } from './referenceTitle'
 
 describe('reference curation rules', () => {
   it('解析真实 What、usage、HowToUse 和身份锚点', () => {
@@ -18,6 +19,7 @@ describe('reference curation rules', () => {
     expect(parsed).toEqual({
       ok: true,
       analysis: {
+        title: '',
         what: '深绿色品牌标志，横向字标，留白充足。',
         usage: 'identityAnchor',
         howToUse: '本任务保持标志字形和比例不变，只适配背景与留白。',
@@ -68,3 +70,27 @@ describe('reference curation rules', () => {
     )
   })
 })
+
+describe('C1 参考卡语义标题', () => {
+  it('文件名 / Image 17 / 截图 这类算自动标题；用户起的名不算', () => {
+    for (const title of ['_Image 17.jpg', 'IMG_2031', 'image 3', '截图 2026-11-11', '微信图片_20261111', '', 'cup.png']) {
+      expect(isAutoReferenceTitle(title), title).toBe(true)
+    }
+    for (const title of ['拿铁杯产品图', 'Anbel', '品牌 Logo']) {
+      expect(isAutoReferenceTitle(title), title).toBe(false)
+    }
+  })
+
+  it('模型短名去引号、截断；给成文件名就丢弃', () => {
+    expect(curatedTitleOf('「拿铁杯产品图」')).toBe('拿铁杯产品图')
+    expect(curatedTitleOf('一张非常非常非常长的极简风格海报排版参考图')).toHaveLength(16)
+    expect(curatedTitleOf('IMG_001.jpg')).toBe('')
+    expect(curatedTitleOf(42)).toBe('')
+    const parsed = parseReferenceCurationText(JSON.stringify({
+      title: '极简海报排版', what: 'x', usage: 'composition', howToUse: 'y',
+    }))
+    expect(parsed).toMatchObject({ ok: true, analysis: { title: '极简海报排版' } })
+    expect(REFERENCE_CURATION_SYSTEM_PROMPT).toContain('不要用文件名')
+  })
+})
+
