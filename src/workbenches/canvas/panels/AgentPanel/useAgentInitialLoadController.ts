@@ -51,7 +51,11 @@ export interface AgentInitialLoadControllerInput {
     chat: string[]
   }
   logicalModelOf: (model: string, channels?: readonly Channel[]) => string
-  defaultModelFor: (options: readonly string[], saved?: string) => string
+  defaultModelFor: (
+    options: readonly string[],
+    preferred?: string,
+    channels?: readonly Channel[],
+  ) => string
   removeSession: (sessionId: string) => Promise<void>
   setList: (sessions: AgentSession[]) => void
   setCurrent: (session: AgentSession) => void
@@ -111,7 +115,7 @@ export function useAgentInitialLoadController(
             return input.createSession({
               projectId: input.projectId,
               channelId: '',
-              model: input.defaultModelFor(liveOptions.chat, savedModel),
+              model: input.defaultModelFor(liveOptions.chat, savedModel, liveChannels),
               imageModel: liveOptions.image[0] ?? '',
               videoModel: liveOptions.video[0] ?? '',
             })

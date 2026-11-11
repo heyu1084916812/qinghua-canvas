@@ -220,18 +220,26 @@ describe('useAgentModelSelectionController', () => {
       'Image A',
       'Video A',
     ])
+    const live = [{ ...channel(), enabled: true } as Channel]
     expect(
       viewRef.current!.defaultModelFor(
         ['Image A', 'Video A'],
         'Video A',
+        live,
       ),
     ).toBe('Video A')
     expect(
       viewRef.current!.defaultModelFor(
         ['Image A', 'Video A'],
         'Missing',
+        live,
       ),
     ).toBe('Image A')
+    /* A4：渠道停用时绝不回落到它提供的模型 */
+    const off = [{ ...channel(), enabled: false } as Channel]
+    expect(
+      viewRef.current!.defaultModelFor(['Image A', 'Video A'], 'Video A', off),
+    ).toBe('')
   })
 
   it('selectedModelOf 按类别读取 Canvas 节点，不过滤未知类别', () => {

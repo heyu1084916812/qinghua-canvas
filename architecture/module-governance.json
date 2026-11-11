@@ -8713,6 +8713,26 @@
         "src/features/settings/defaultRecipeTarget.test.ts"
       ],
       "budget": 60
+    },
+    {
+      "module": "src/workbenches/canvas/panels/AgentPanel/agentChatModelDefault.ts",
+      "owner": "canvas-agent-session",
+      "responsibility": "给新建 Agent 会话挑对话模型：沿用当前/保存的偏好，只认启用渠道能提供的模型，绝不回落到停用渠道。",
+      "owns": [
+        "新会话对话模型的偏好顺序与可用性判定"
+      ],
+      "doesNotOwn": [
+        "会话持久化与切换",
+        "模型下拉清单的构成"
+      ],
+      "publicApi": [
+        "SessionChatModelInput",
+        "pickSessionChatModel"
+      ],
+      "test": [
+        "src/workbenches/canvas/panels/AgentPanel/agentChatModelDefault.test.ts"
+      ],
+      "budget": 60
     }
   ]
 }

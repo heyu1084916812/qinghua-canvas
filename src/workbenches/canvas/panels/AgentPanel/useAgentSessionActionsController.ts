@@ -28,7 +28,7 @@ export interface AgentSessionActionsControllerInput {
   logicalModelOf: (model: string) => string
   defaultModelFor: (
     options: readonly string[],
-    saved?: string,
+    preferred?: string | readonly string[],
   ) => string
   selectedModelOf: (kind: 'image' | 'video') => string
   refresh: () => Promise<AgentSessionRefreshResult>
@@ -82,10 +82,14 @@ export function useAgentSessionActionsController(
         const created = await input.createSession({
           projectId: input.projectId,
           channelId: '',
-          model: input.defaultModelFor(
-            input.chatModelOptions,
+          /*
+           * 新会话沿用**当前会话**已选的对话模型，其次才是保存的默认；
+           * defaultModelFor 只认启用渠道能提供的，绝不回落到停用渠道（A4）。
+           */
+          model: input.defaultModelFor(input.chatModelOptions, [
+            input.logicalModelOf(input.current?.model ?? ''),
             savedModel,
-          ),
+          ]),
           imageModel:
             input.selectedModelOf('image') ||
             input.imageModelOptions[0] ||
@@ -101,6 +105,7 @@ export function useAgentSessionActionsController(
     [
       input.chatModelOptions,
       input.createSession,
+      input.current?.model,
       input.defaultModelFor,
       input.imageModelOptions,
       input.loadAgentDefault,

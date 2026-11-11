@@ -14,6 +14,7 @@ import {
 import type { AgentSession } from '../../../../state/agent/sessionStore'
 import type { ChannelStore } from '../../../../state/channel/channelStore'
 import { parseMentions } from '../../text/MentionEditor'
+import { pickSessionChatModel } from './agentChatModelDefault'
 
 export interface AgentModelSelectionControllerInput {
   current: AgentSession | null
@@ -53,9 +54,14 @@ export interface AgentModelSelectionController {
   chatModelOptions: string[]
   mentionedModels: ReadonlySet<string>
   shownModel: string
+  /**
+   * 新会话的对话模型：按偏好顺序（当前会话 → 保存默认）取第一个有**启用**渠道
+   * 提供的；都不行再取清单里第一个可用的；绝不回落到停用渠道（A4）。
+   */
   defaultModelFor: (
     options: readonly string[],
-    saved?: string,
+    preferred?: string | readonly string[],
+    channels?: readonly Channel[],
   ) => string
   logicalModelOf: (
     model: string,
@@ -134,9 +140,18 @@ export function useAgentModelSelectionController(
   )
 
   const defaultModelFor = useCallback(
-    (options: readonly string[], saved?: string) =>
-      saved && options.includes(saved) ? saved : (options[0] ?? ''),
-    [],
+    (
+      options: readonly string[],
+      preferred?: string | readonly string[],
+      channels: readonly Channel[] = input.allChannels,
+    ) =>
+      pickSessionChatModel({
+        options,
+        preferred:
+          typeof preferred === 'string' ? [preferred] : (preferred ?? []),
+        channels,
+      }),
+    [input.allChannels],
   )
   const logicalModelOf = useCallback(
     (

@@ -206,8 +206,7 @@ describe('useAgentSessionLifecycle', () => {
         createSession: async () => session('new-session'),
         loadAgentDefault: async () => null,
         logicalModelOf: (model) => model,
-        defaultModelFor: (options, saved) =>
-          saved && options.includes(saved) ? saved : (options[0] ?? ''),
+        defaultModelFor: (options) => options[0] ?? '',
         selectedModelOf: () => '',
         refresh: lifecycle.refresh,
         switchTo: lifecycle.switchTo,
@@ -305,8 +304,7 @@ describe('useAgentSessionLifecycle', () => {
         createSession: async () => session('new-session'),
         loadAgentDefault: async () => null,
         logicalModelOf: (model) => model,
-        defaultModelFor: (options, saved) =>
-          saved && options.includes(saved) ? saved : (options[0] ?? ''),
+        defaultModelFor: (options) => options[0] ?? '',
         selectedModelOf: () => '',
         refresh: lifecycle.refresh,
         switchTo: lifecycle.switchTo,

@@ -47,8 +47,10 @@ function input(
     })),
     loadAgentDefault: vi.fn(async () => ({ model: 'Saved Chat' })),
     logicalModelOf: vi.fn((model) => model),
-    defaultModelFor: (options, saved) =>
-      saved && options.includes(saved) ? saved : (options[0] ?? ''),
+    defaultModelFor: (options, preferred) => {
+      const list = typeof preferred === 'string' ? [preferred] : (preferred ?? [])
+      return list.find((model) => model && options.includes(model)) ?? options[0] ?? ''
+    },
     selectedModelOf: vi.fn((kind) =>
       kind === 'image' ? 'Selected Image' : 'Selected Video',
     ),
@@ -110,6 +112,8 @@ describe('useAgentSessionActionsController', () => {
     const switchTo = vi.fn(async () => undefined)
     const setCurrent = vi.fn()
     const props = input({
+      /* 当前会话的模型不在清单里 ⇒ 落到保存的默认 */
+      current: { ...session('s1'), model: 'Retired Chat' },
       createSession,
       refresh,
       switchTo,
@@ -548,5 +552,36 @@ describe('useAgentSessionActionsController', () => {
     act(() => viewRef.current!.resetForSessionSwitch())
     expect(viewRef.current?.renaming).toBe(false)
     expect(viewRef.current?.confirmDelete).toBe(false)
+  })
+})
+
+describe('useAgentSessionActionsController · 新会话的对话模型（A4）', () => {
+  it('★ 新会话优先沿用当前会话的对话模型，其次才是保存的默认', async () => {
+    const createSession = vi.fn(async (value) => ({ ...session('n'), ...value }))
+    const defaultModelFor = vi.fn(
+      (options: readonly string[], preferred?: string | readonly string[]) => {
+        const list = typeof preferred === 'string' ? [preferred] : (preferred ?? [])
+        return list.find((m) => m && options.includes(m)) ?? options[0] ?? ''
+      },
+    )
+    const current = { ...session('s1'), model: 'Deepseek 4.1 Flash' }
+    const { viewRef } = render(
+      input({
+        current,
+        chatModelOptions: ['Agnes 2.5 Flash', 'Saved Chat', 'Deepseek 4.1 Flash'],
+        createSession,
+        defaultModelFor,
+      }),
+    )
+    await act(async () => {
+      await viewRef.current!.newSession()
+    })
+    expect(defaultModelFor).toHaveBeenCalledWith(
+      ['Agnes 2.5 Flash', 'Saved Chat', 'Deepseek 4.1 Flash'],
+      ['Deepseek 4.1 Flash', 'Saved Chat'],
+    )
+    expect(createSession).toHaveBeenCalledWith(
+      expect.objectContaining({ model: 'Deepseek 4.1 Flash' }),
+    )
   })
 })

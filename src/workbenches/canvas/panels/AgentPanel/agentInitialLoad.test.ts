@@ -86,8 +86,7 @@ function mountHarness(config: {
       createSession: config.createUserSession,
       loadAgentDefault: async () => null,
       logicalModelOf: (model) => model,
-      defaultModelFor: (options, saved) =>
-        saved && options.includes(saved) ? saved : (options[0] ?? ''),
+      defaultModelFor: (options) => options[0] ?? '',
       selectedModelOf: () => '',
       refresh: lifecycle.refresh,
       switchTo: lifecycle.switchTo,
