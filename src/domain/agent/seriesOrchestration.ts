@@ -1,10 +1,8 @@
-import type { ReferenceItem } from '../project/referenceLedger'
-
 /**
- * 回合级编排提示（G5 + 系列锚点），全部确定性：只看用户原话、任务状态与参考栏条目。
+ * 回合级编排提示（系列锚点），全部确定性：只看用户原话、任务状态与参考栏条目。
  *
  * Lovart 对照（review/lovart-ref-flow-interview.md、lovart-image-gen-interview.md）：
- * 1. 侧栏有多张没被提到、用途也不明的参考图时，先发问题卡问每张怎么配合，不自己猜；
+ * 1. （参考图的「先分析、拿不准才问」已移到 referenceReview.ts）
  * 2. 整套（Logo + 包装 + 海报）默认串行一口气做完：先 Logo，再拿 Logo 做包装，最后带着两者出海报；
  * 3. 用户说「先定 Logo」时只做 Logo 并停下等确认，确认后再接着做后续。
  *
@@ -91,46 +89,6 @@ export function seriesOrchestrationPrompt(input: {
     ].join('\n')
   }
   return ''
-}
-
-const REFERENCE_QUESTION_MIN = 2
-const WHAT_LIMIT = 40
-
-function hasImageAsset(item: ReferenceItem): boolean {
-  return item.kind === 'image' && Boolean(item.assetHash || item.assets?.length)
-}
-
-/**
- * G5：参考栏里有 ≥2 张图既没被本轮 / 本任务提到、对当前任务也没有用法时，提示模型先发问题卡。
- * 回答问题卡的那一回合不再提示（避免问完又问）。
- */
-export function unmentionedReferencesPrompt(input: {
-  omitted: readonly { item: ReferenceItem; reason: string }[]
-  mentionedIds: readonly string[]
-  answeringQuestionCard: boolean
-  internalControl?: boolean
-}): { prompt: string; itemIds: string[] } {
-  if (input.answeringQuestionCard || input.internalControl) return { prompt: '', itemIds: [] }
-  const mentioned = new Set(input.mentionedIds)
-  const candidates = input.omitted
-    .filter((row) => row.reason === 'no_usage' && hasImageAsset(row.item) && !mentioned.has(row.item.id))
-    .map((row) => row.item)
-  if (candidates.length < REFERENCE_QUESTION_MIN) return { prompt: '', itemIds: [] }
-  const lines = candidates.slice(0, 8).map((item, index) => {
-    const what = normalized(item.what).slice(0, WHAT_LIMIT)
-    return `- 第 ${index + 1} 张【${item.title.trim() || item.id}】${what ? `：${what}` : ''}`
-  })
-  return {
-    itemIds: candidates.map((item) => item.id),
-    prompt: [
-      '## 参考栏里还有未提到、用途不明的图',
-      `参考栏有 ${candidates.length} 张图用户本轮没有提到，当前任务也还没有它们的用法：`,
-      ...lines,
-      '如果本次要出图 / 改图，且这些图可能和任务有关：先调用 `askQuestions` 发问题卡，问每张图怎么配合',
-      '（候选项如「管排版」「锁定产品 / 主体」「只借配色」「借风格」「不用」，可多选并允许自由输入），本回合不要生成。',
-      '不要自己猜它们的用途，也不要把它们混进生成参数；与任务明显无关（闲聊、纯画布操作）时忽略本段。',
-    ].join('\n'),
-  }
 }
 
 /** 把阶段写回任务：没有阶段时去掉该键（不留 undefined）。 */

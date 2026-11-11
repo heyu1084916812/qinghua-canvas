@@ -44,6 +44,8 @@ export interface AgentReferenceCurationInput {
   route: AgentChatRoute | null
   preferredItemIds?: readonly string[]
   requestedItemIds?: readonly string[]
+  /** 用户显式带上的参考：即使分析判为与任务无关也照写用法（用户点名要用）。 */
+  explicitItemIds?: readonly string[]
   signal?: AbortSignal
 }
 
@@ -65,6 +67,7 @@ export async function runAgentReferenceCuration(
       .filter(Boolean),
   )
   const usageByItem = new Map(existingUsages.map((usage) => [usage.itemId, usage]))
+  const explicit = new Set(input.explicitItemIds ?? [])
   const allCandidates = requested.size > 0
     ? items.filter((item) => requested.has(item.id))
     : items
@@ -179,13 +182,17 @@ export async function runAgentReferenceCuration(
         updatedAt: now,
       }
       await repository.putItem(nextItem)
-      await repository.putUsage(usage)
+      // G5：侧栏里与本任务无关的图不写用法（不进生成）；用户点名的照写。
+      const keepUsage = parsed.analysis.relevant || explicit.has(item.id)
+      if (keepUsage) await repository.putUsage(usage)
       analyzed.push({
         itemId: item.id,
         title,
         what: whatWithPalette,
         usage: parsed.analysis.usage,
         howToUse: parsed.analysis.howToUse,
+        roleClear: parsed.analysis.roleClear,
+        relevant: keepUsage,
       })
       limitations.push(
         ...parsed.analysis.limitations.map(

@@ -25,6 +25,8 @@ describe('reference curation rules', () => {
         usage: 'identityAnchor',
         howToUse: '本任务保持标志字形和比例不变，只适配背景与留白。',
         identityAnchor: true,
+        roleClear: true,
+        relevant: true,
         limitations: [],
       },
     })
@@ -112,3 +114,19 @@ describe('C4 「怎么用」只写借什么、避什么', () => {
   })
 })
 
+
+describe('参考分析的 roleClear / relevant（G5 修订）', () => {
+  it('模型给出 false 时如实保留；缺省按 true（不凭空发问）', () => {
+    const base = { what: 'x', usage: 'style', howToUse: '借：配色；避：文字' }
+    expect(parseReferenceCurationText(JSON.stringify({ ...base, roleClear: false, relevant: false })))
+      .toMatchObject({ ok: true, analysis: { roleClear: false, relevant: false } })
+    expect(parseReferenceCurationText(JSON.stringify(base)))
+      .toMatchObject({ ok: true, analysis: { roleClear: true, relevant: true } })
+  })
+
+  it('系统提示词要求判断不出就写 roleClear=false、不要硬猜', () => {
+    expect(REFERENCE_CURATION_SYSTEM_PROMPT).toContain('roleClear')
+    expect(REFERENCE_CURATION_SYSTEM_PROMPT).toContain('不要硬猜')
+    expect(REFERENCE_CURATION_SYSTEM_PROMPT).toContain('relevant')
+  })
+})

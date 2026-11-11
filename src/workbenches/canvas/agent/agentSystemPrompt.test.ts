@@ -152,6 +152,8 @@ describe('组装', () => {
     expect(p).toContain('缺少会改变结果、又无法从画布 / 参考 / 记忆判断的关键信息')
     expect(p).toContain('先调用 `askQuestions` 发问题卡一次问清')
     expect(p).toContain('用 `askQuestions` 问每张图怎么配合')
+    expect(p).toContain('系统会先自动分析并写入用法；能判断分工就直接按用法用')
+    expect(p).not.toContain('不要自己猜用途')
     expect(p).toContain('用户说「先定 Logo」时只做 Logo，出图后停下等用户确认')
     expect(p).toContain('不要只在正文里说')
     expect(p).toContain('一次只推进一个步骤')

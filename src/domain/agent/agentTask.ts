@@ -1,3 +1,5 @@
+import { normalizeReferenceReview, type ReferenceReviewState } from './referenceReview'
+
 /**
  * Agent 会话里的「任务」标识（参考用法按任务存，而不是按请求模式存）。
  *
@@ -40,6 +42,10 @@ export interface AgentTaskRef {
    * 同一任务内跨回合保留，直到用户放行；新任务不继承。
    */
   seriesStage?: 'logo_first'
+  /**
+   * 参考侧栏的自动分析 / 待确认状态（见 referenceReview.ts）：同任务内保留，新任务从空开始。
+   */
+  referenceReview?: ReferenceReviewState
 }
 
 export interface AgentTaskSignals {
@@ -181,6 +187,7 @@ export function normalizeAgentTaskRef(value: unknown): AgentTaskRef | undefined 
   const row = value as Record<string, unknown>
   if (typeof row.id !== 'string' || !row.id) return undefined
   const startedAt = typeof row.startedAt === 'number' ? row.startedAt : 0
+  const review = normalizeReferenceReview(row.referenceReview)
   return {
     id: row.id,
     brief: typeof row.brief === 'string' ? row.brief.slice(0, BRIEF_LIMIT + 1) : '',
@@ -196,5 +203,6 @@ export function normalizeAgentTaskRef(value: unknown): AgentTaskRef | undefined 
         ))]
       : [],
     ...(row.seriesStage === 'logo_first' ? { seriesStage: 'logo_first' as const } : {}),
+    ...(review ? { referenceReview: review } : {}),
   }
 }

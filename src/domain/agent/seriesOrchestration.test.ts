@@ -1,26 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import type { ReferenceItem } from '../project/referenceLedger'
 import {
   nextSeriesStage,
   seriesDirectiveOf,
   seriesOrchestrationPrompt,
   seriesStageReleased,
-  unmentionedReferencesPrompt,
   withSeriesStage,
 } from './seriesOrchestration'
-
-const item = (id: string, patch: Partial<ReferenceItem> = {}): ReferenceItem => ({
-  id,
-  projectId: 'p1',
-  title: `${id}.jpg`,
-  source: 'file',
-  kind: 'image',
-  assetHash: `hash-${id}`,
-  what: `${id} 画面`,
-  createdAt: 1,
-  updatedAt: 1,
-  ...patch,
-})
 
 describe('seriesDirectiveOf', () => {
   it('「先定 Logo」各种说法 → logo_first', () => {
@@ -63,29 +48,5 @@ describe('seriesOrchestrationPrompt', () => {
     expect(seriesOrchestrationPrompt({ stage: undefined, directive: null, released: true })).toContain('继续延展')
     expect(seriesOrchestrationPrompt({ stage: undefined, directive: 'full_series', released: false })).toContain('整套串行')
     expect(seriesOrchestrationPrompt({ stage: undefined, directive: null, released: false })).toBe('')
-  })
-})
-
-describe('unmentionedReferencesPrompt（G5）', () => {
-  const omitted = [
-    { item: item('a'), reason: 'no_usage' },
-    { item: item('b'), reason: 'no_usage' },
-    { item: item('c'), reason: 'avoid' },
-    { item: item('t', { kind: 'text', assetHash: undefined }), reason: 'no_usage' },
-  ]
-
-  it('≥2 张未提及、无用法的图 → 提示先发问题卡', () => {
-    const result = unmentionedReferencesPrompt({ omitted, mentionedIds: [], answeringQuestionCard: false })
-    expect(result.itemIds).toEqual(['a', 'b'])
-    expect(result.prompt).toContain('askQuestions')
-    expect(result.prompt).toContain('第 1 张【a.jpg】：a 画面')
-  })
-
-  it('只剩 1 张、或已被提及、或正在回答问题卡 / 内部续跑 → 不提示', () => {
-    expect(unmentionedReferencesPrompt({ omitted, mentionedIds: ['a'], answeringQuestionCard: false }).prompt).toBe('')
-    expect(unmentionedReferencesPrompt({ omitted, mentionedIds: [], answeringQuestionCard: true }).prompt).toBe('')
-    expect(
-      unmentionedReferencesPrompt({ omitted, mentionedIds: [], answeringQuestionCard: false, internalControl: true }).prompt,
-    ).toBe('')
   })
 })

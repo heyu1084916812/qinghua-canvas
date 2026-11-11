@@ -1087,7 +1087,13 @@ describe('prepareAgentTurnRequest', () => {
     expect(edit.taskKey).toBe(first.taskKey)
     expect(series.taskKey).toBe(first.taskKey)
     expect(unrelated.taskKey).not.toBe(first.taskKey)
-    expect(keys).toEqual([first.taskKey, first.taskKey, first.taskKey, unrelated.taskKey])
+    // 每回合读两次任务参考：分析前挑侧栏待分析图、分析后装配上下文。
+    expect(keys).toEqual([
+      first.taskKey, first.taskKey,
+      first.taskKey, first.taskKey,
+      first.taskKey, first.taskKey,
+      unrelated.taskKey, unrelated.taskKey,
+    ])
     // 同一任务后续回合没再 @，产品图仍随任务进入参考分析；新任务不带旧参考。
     expect(autoCurated).toEqual([['ref-product'], ['ref-product'], ['ref-product']])
     expect(unrelated.agentTask.referenceIds).toEqual([])
@@ -1127,7 +1133,7 @@ describe('prepareAgentTurnRequest', () => {
     ])
   })
 
-  it('★★ G5 参考栏多张未提及且无用法的图：上下文提示先发问题卡；回答问题卡那一回合不再提示', async () => {
+  it('★★ G5 参考栏多张无用法的图且无法分析：退回提示先发问题卡；回答问题卡那一回合不再提示', async () => {
     const { sessions, session } = await createSession()
     const image = (id: string) => ({
       item: {
@@ -1152,9 +1158,9 @@ describe('prepareAgentTurnRequest', () => {
       referenceLedger: ledger,
     })
     if (result.kind !== 'ready') throw new Error(result.kind)
-    expect(result.contextPrompt).toContain('参考栏里还有未提到、用途不明的图')
+    expect(result.contextPrompt).toContain('参考图的分工拿不准，先问用户')
     expect(result.contextPrompt).toContain('askQuestions')
-    expect(result.contextPrompt).toContain('【a.jpg】')
+    expect(result.contextPrompt).toContain('【a.jpg】（referenceItemId: a）')
 
     const card = JSON.stringify({ ok: true, awaitingAnswers: true, questions: [{ id: 'r', question: '怎么用？' }] })
     const asked = await sessions.saveMessages(session.id, [
@@ -1170,7 +1176,61 @@ describe('prepareAgentTurnRequest', () => {
     })
     if (answer.kind !== 'ready') throw new Error(answer.kind)
     expect(answer.agentTaskReason).toBe('continuation')
-    expect(answer.contextPrompt).not.toContain('参考栏里还有未提到')
+    expect(answer.contextPrompt).not.toContain('参考图的分工拿不准')
+  })
+
+  it('★★ G5 修订：侧栏无用法的图先自动分析；分工清楚就直接用、不提示问题卡，同任务不重复分析', async () => {
+    const { sessions, session } = await createSession()
+    const image = (id: string) => ({
+      item: {
+        id,
+        projectId: 'p1',
+        title: `${id}.jpg`,
+        source: 'file' as const,
+        kind: 'image' as const,
+        assetHash: `hash-${id}`,
+        what: `${id} 的画面`,
+        createdAt: 1,
+        updatedAt: 1,
+      },
+      reason: 'no_usage' as const,
+    })
+    const ledger = {
+      selectForTask: vi.fn(async () => ({ selected: [], omitted: [image('cup'), image('mood')] })),
+      listItems: vi.fn(async () => []),
+    }
+    const autoCurateReferences = vi.fn(async (args: { taskKey: string; itemIds: readonly string[] }) => ({
+      ok: true,
+      summary: '',
+      taskKey: args.taskKey,
+      analyzed: [
+        { itemId: 'cup', title: '杯子', what: '白底杯', usage: 'subject' as const, howToUse: '借：杯形；避：白底', roleClear: true, relevant: true },
+        { itemId: 'mood', title: '氛围', what: '暖色海报', usage: 'style' as const, howToUse: '借：暖色；避：文字', roleClear: true, relevant: true },
+      ],
+      failed: [],
+      limitations: [],
+    }))
+    const result = await prepareAgentTurnRequest({
+      ...inputFor({ sessions, session, text: '帮我做一张新品海报', autoCurateReferences }),
+      referenceLedger: ledger,
+    })
+    if (result.kind !== 'ready') throw new Error(result.kind)
+    expect(autoCurateReferences).toHaveBeenCalledOnce()
+    expect(autoCurateReferences.mock.calls[0]![0].itemIds).toEqual(['cup', 'mood'])
+    expect(result.contextPrompt).toContain('参考图已自动分析')
+    expect(result.contextPrompt).not.toContain('参考图的分工拿不准')
+    expect(result.agentTask.referenceReview).toEqual({ analyzedIds: ['cup', 'mood'], pendingIds: [] })
+
+    clearToolSupportCache()
+    const latest = (await sessions.get(session.id)) ?? session
+    expect(latest.agentTask?.referenceReview?.analyzedIds).toEqual(['cup', 'mood'])
+    const again = await prepareAgentTurnRequest({
+      ...inputFor({ sessions, session: latest, text: '标题再大一点', autoCurateReferences }),
+      referenceLedger: ledger,
+    })
+    if (again.kind !== 'ready') throw new Error(again.kind)
+    expect(again.agentTaskReason).toBe('refinement')
+    expect(autoCurateReferences).toHaveBeenCalledOnce()
   })
 
   it('★★ 「先定 Logo」只做 Logo 并停下：阶段随任务保留，用户放行后转为串行延展', async () => {

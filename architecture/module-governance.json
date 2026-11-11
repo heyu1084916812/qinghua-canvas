@@ -611,12 +611,11 @@
     {
       "module": "src/domain/agent/seriesOrchestration.ts",
       "owner": "agent-runtime",
-      "responsibility": "回合级编排提示：识别整套 / 先定 Logo 指令并维护任务的系列阶段，侧栏多张未提及且无用法的参考图时提示先发问题卡。",
+      "responsibility": "回合级编排提示：识别整套 / 先定 Logo 指令并维护任务的系列阶段。",
       "owns": [
         "整套 / 先定 Logo 指令识别",
         "先定 Logo 阶段的保留与放行",
-        "系列编排上下文段落",
-        "未提及参考图的问题卡提示"
+        "系列编排上下文段落"
       ],
       "doesNotOwn": [
         "任务延续判定",
@@ -630,7 +629,6 @@
         "nextSeriesStage",
         "seriesStageReleased",
         "seriesOrchestrationPrompt",
-        "unmentionedReferencesPrompt",
         "withSeriesStage"
       ],
       "test": [
@@ -672,7 +670,7 @@
       "test": [
         "src/domain/agent/questionCard.test.ts"
       ],
-      "budget": 240
+      "budget": 300
     },
     {
       "module": "src/workbenches/canvas/panels/AgentPanel/QuestionCardForm.tsx",
@@ -1111,25 +1109,25 @@
       ],
       "budget": 120
     },
-      {
-        "module": "src/domain/inspiration/clipperPlaceholder.ts",
-        "owner": "clipper-collection-rules",
-        "responsibility": "识别花瓣等站点返回的分享图占位资源，避免其进入网页收藏。",
-        "owns": [
-          "已知站点占位图 URL 判定"
-        ],
-        "doesNotOwn": [
-          "采集编排",
-          "图片字节校验"
-        ],
-        "publicApi": [
-          "isKnownClipperPlaceholderImageUrl"
-        ],
-        "test": [
-          "src/domain/inspiration/clipperPlaceholder.test.ts"
-        ],
-        "budget": 40
-      },
+    {
+      "module": "src/domain/inspiration/clipperPlaceholder.ts",
+      "owner": "clipper-collection-rules",
+      "responsibility": "识别花瓣等站点返回的分享图占位资源，避免其进入网页收藏。",
+      "owns": [
+        "已知站点占位图 URL 判定"
+      ],
+      "doesNotOwn": [
+        "采集编排",
+        "图片字节校验"
+      ],
+      "publicApi": [
+        "isKnownClipperPlaceholderImageUrl"
+      ],
+      "test": [
+        "src/domain/inspiration/clipperPlaceholder.test.ts"
+      ],
+      "budget": 40
+    },
     {
       "module": "src/state/shared/clipperCollectionRepository.ts",
       "owner": "clipper-collection-persistence",
@@ -1276,27 +1274,27 @@
       ],
       "budget": 80
     },
-      {
-        "module": "src/pages/CanvasPage/clipper/clipperCandidateValidation.ts",
-        "owner": "clipper-capture",
-        "responsibility": "批量校验单页候选图片，汇总有效原图与不可导入原因。",
-        "owns": [
-          "候选图片去重校验",
-          "有效 URL 与警告汇总"
-        ],
-        "doesNotOwn": [
-          "单图字节校验规则",
-          "网页抓取编排",
-          "收藏持久化"
-        ],
-        "publicApi": [
-          "validateClipperImageCandidates"
-        ],
-        "test": [
-          "src/pages/CanvasPage/clipper/clipperCapture.test.ts"
-        ],
-        "budget": 60
-      },
+    {
+      "module": "src/pages/CanvasPage/clipper/clipperCandidateValidation.ts",
+      "owner": "clipper-capture",
+      "responsibility": "批量校验单页候选图片，汇总有效原图与不可导入原因。",
+      "owns": [
+        "候选图片去重校验",
+        "有效 URL 与警告汇总"
+      ],
+      "doesNotOwn": [
+        "单图字节校验规则",
+        "网页抓取编排",
+        "收藏持久化"
+      ],
+      "publicApi": [
+        "validateClipperImageCandidates"
+      ],
+      "test": [
+        "src/pages/CanvasPage/clipper/clipperCapture.test.ts"
+      ],
+      "budget": 60
+    },
     {
       "module": "src/pages/CanvasPage/clipper/clipperQueueCapture.ts",
       "owner": "clipper-capture",
@@ -6965,7 +6963,9 @@
         "工具条布局"
       ],
       "publicApi": [
-        "CSS_MODULE: Agent 输入框联网开关样式", "CSS_CLASS:toggle", "CSS_CLASS:on"
+        "CSS_MODULE: Agent 输入框联网开关样式",
+        "CSS_CLASS:toggle",
+        "CSS_CLASS:on"
       ],
       "test": [
         "src/workbenches/canvas/panels/AgentPanel/AgentComposerPane.test.ts"
@@ -8324,28 +8324,28 @@
       ],
       "budget": 180
     },
-      {
-        "module": "src/features/shared/research/museumSearch.ts",
-        "owner": "open-research-search",
-        "responsibility": "通过 Cleveland Museum CC0 与 Met Museum Open Access 免密钥接口检索可复用馆藏图片。",
-        "owns": [
-          "Cleveland CC0 图片与作者许可投影",
-          "Met 公版馆藏对象读取与图片投影",
-          "两家博物馆独立失败与部分失败警告"
-        ],
-        "doesNotOwn": [
-          "Internet Archive、Art Institute 或 SearXNG 调度",
-          "候选保存与项目参考持久化",
-          "Agent 工具路由"
-        ],
-        "publicApi": [
-          "searchMuseumCollections"
-        ],
-        "test": [
-          "src/features/shared/research/museumSearch.test.ts"
-        ],
-        "budget": 220
-      },
+    {
+      "module": "src/features/shared/research/museumSearch.ts",
+      "owner": "open-research-search",
+      "responsibility": "通过 Cleveland Museum CC0 与 Met Museum Open Access 免密钥接口检索可复用馆藏图片。",
+      "owns": [
+        "Cleveland CC0 图片与作者许可投影",
+        "Met 公版馆藏对象读取与图片投影",
+        "两家博物馆独立失败与部分失败警告"
+      ],
+      "doesNotOwn": [
+        "Internet Archive、Art Institute 或 SearXNG 调度",
+        "候选保存与项目参考持久化",
+        "Agent 工具路由"
+      ],
+      "publicApi": [
+        "searchMuseumCollections"
+      ],
+      "test": [
+        "src/features/shared/research/museumSearch.test.ts"
+      ],
+      "budget": 220
+    },
     {
       "module": "src/features/shared/research/tavilySearch.ts",
       "owner": "open-research-search",
@@ -8620,7 +8620,7 @@
       "test": [
         "src/domain/project/referenceCuration.test.ts"
       ],
-      "budget": 200
+      "budget": 230
     },
     {
       "module": "src/state/project/referenceLedgerRepository.ts",
@@ -8690,7 +8690,7 @@
       "test": [
         "src/workbenches/canvas/panels/AgentPanel/agentReferenceCuration.test.ts"
       ],
-      "budget": 300
+      "budget": 360
     },
     {
       "module": "src/state/agent/agentSessionIds.ts",
@@ -9059,6 +9059,61 @@
         "src/workbenches/canvas/agent/agentPlanEndpoints.test.ts"
       ],
       "budget": 80
+    },
+    {
+      "module": "src/domain/agent/referenceReview.ts",
+      "owner": "agent-runtime",
+      "responsibility": "参考侧栏「先分析、拿不准才问」：挑出要自动分析的侧栏图，判定分工是否有歧义，维护任务内待确认状态与回合上下文段落。",
+      "owns": [
+        "侧栏待分析参考的挑选",
+        "参考分工歧义判定",
+        "任务内参考审阅状态",
+        "参考问题卡上下文段落"
+      ],
+      "doesNotOwn": [
+        "调用模型做参考分析",
+        "任务延续判定",
+        "问题卡解析与渲染"
+      ],
+      "publicApi": [
+        "ReferenceReviewState",
+        "ReviewedReference",
+        "emptyReferenceReview",
+        "looksLikeImageWork",
+        "textAssignsReferenceRoles",
+        "sidebarReferencesToAnalyze",
+        "ambiguousReferenceIds",
+        "nextReferenceReview",
+        "normalizeReferenceReview",
+        "referenceReviewPrompt"
+      ],
+      "test": [
+        "src/domain/agent/referenceReview.test.ts"
+      ],
+      "budget": 300
+    },
+    {
+      "module": "src/workbenches/canvas/panels/AgentPanel/agentTurnReferenceReview.ts",
+      "owner": "agent-runtime",
+      "responsibility": "回合准备阶段编排参考审阅：显式参考与侧栏无用法图先自动分析，再交给 referenceReview 判定待确认参考并写回任务状态。",
+      "owns": [
+        "回合内参考自动分析的调用编排",
+        "参考审阅结果写回任务"
+      ],
+      "doesNotOwn": [
+        "参考分析提示词与解析",
+        "歧义规则",
+        "上下文段落文字"
+      ],
+      "publicApi": [
+        "TurnReferenceReviewInput",
+        "TurnReferenceReview",
+        "reviewTurnReferences"
+      ],
+      "test": [
+        "src/workbenches/canvas/panels/AgentPanel/agentTurnReferenceReview.test.ts"
+      ],
+      "budget": 220
     }
   ]
 }

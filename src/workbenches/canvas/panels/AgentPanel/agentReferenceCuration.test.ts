@@ -239,5 +239,43 @@ describe('runAgentReferenceCuration', () => {
     expect(storage.tables.referenceItems?.[0]?.what).toBe(expected)
     expect(result.analyzed[0]?.what).toBe(expected)
   })
-})
 
+  it('G5：侧栏图判为与任务无关时不写用法（不进生成）；用户点名的照写', async () => {
+    const run = async (explicit: boolean) => {
+      const storage = storageWith({ referenceItems: [item({ assets: undefined })] })
+      const execute = vi.fn(async (_request: unknown) => ({
+        text: JSON.stringify({
+          what: '一只猫。', usage: 'style', howToUse: '借：毛色；避：背景。', roleClear: false, relevant: false,
+        }),
+      }))
+      const result = await runAgentReferenceCuration({
+        storage: storage as never,
+        assets: { read: vi.fn(async () => ({ bytes: png, mime: 'image/png' })) },
+        routeExecution: { execute },
+        onRecordWarning: vi.fn(),
+      }, {
+        projectId: 'p1',
+        sessionId: 's1',
+        operationId: 'op1',
+        taskKey: 'task:t1',
+        task: '做一张咖啡海报',
+        route: {
+          channelId: 'c1',
+          logicalModel: 'Vision',
+          upstreamModel: 'vision-upstream',
+          routePlanId: 'plan',
+          candidates: [{ channelId: 'c1', model: 'vision-upstream' }],
+        },
+        preferredItemIds: ['ref-kit-1'],
+        ...(explicit ? { explicitItemIds: ['ref-kit-1'] } : {}),
+      })
+      return { usages: storage.tables.referenceUsages ?? [], row: result.analyzed[0] }
+    }
+    const sidebar = await run(false)
+    expect(sidebar.usages).toHaveLength(0)
+    expect(sidebar.row).toMatchObject({ relevant: false, roleClear: false })
+    const mentioned = await run(true)
+    expect(mentioned.usages).toHaveLength(1)
+    expect(mentioned.row).toMatchObject({ relevant: true })
+  })
+})

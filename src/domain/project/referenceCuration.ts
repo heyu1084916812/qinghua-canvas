@@ -23,6 +23,10 @@ export interface ReferenceCurationAnalysis {
   usage: ReferenceUsageKind
   howToUse: string
   identityAnchor: boolean
+  /** G5：这张图在本任务里的角色能否判断清楚；缺省按 true（模型没给时不凭空发问）。 */
+  roleClear: boolean
+  /** G5：与本任务是否相关；false 时侧栏图不写用法、不进生成。缺省 true。 */
+  relevant: boolean
   limitations: string[]
 }
 
@@ -36,6 +40,9 @@ export interface ReferenceCurationResult {
     what: string
     usage: ReferenceUsage['usage']
     howToUse: string
+    /** 缺省视为 true（旧结果 / 测试桩没有这两个字段）。 */
+    roleClear?: boolean
+    relevant?: boolean
   }[]
   failed: {
     itemId: string
@@ -62,10 +69,14 @@ export const REFERENCE_CURATION_SYSTEM_PROMPT = [
   'Logo、标志、角色身份等必须原样保留时用 identityAnchor，并把 identityAnchor 写为 true。',
   '只是氛围、色彩或质感参考时用 style；构图和版式参考用 composition；明确不该沿用的内容用 avoid。',
   '色彩规范、字体规范、文案规范用 textGuide。看不清或信息不足写进 limitations，不能猜。',
+  'roleClear：结合本次任务能判断这张图该怎么用就写 true；它在任务里可能有多种合理用法',
+  '（做主体还是只借风格、合进同一张还是另做一张）而任务描述没有说清时写 false，不要硬猜。',
+  'relevant：这张图与本次任务明显无关时写 false，否则 true。',
   '只输出一个 JSON 对象，不要 Markdown、代码围栏或额外说明。',
   'JSON 形状：',
   '{"title":"主体或用途短名","what":"客观素材说明","usage":"subject|style|composition|identityAnchor|avoid|textGuide",',
-  '"howToUse":"当前任务如何使用","identityAnchor":false,"limitations":["无法确认的内容"]}',
+  '"howToUse":"当前任务如何使用","identityAnchor":false,"roleClear":true,"relevant":true,',
+  '"limitations":["无法确认的内容"]}',
 ].join('\n')
 
 export function buildReferenceCurationPrompt(input: {
@@ -126,6 +137,8 @@ export function parseReferenceCurationText(
       howToUse,
       identityAnchor:
         parsed.identityAnchor === true || usage === 'identityAnchor',
+      roleClear: parsed.roleClear !== false,
+      relevant: parsed.relevant !== false,
       limitations,
     },
   }

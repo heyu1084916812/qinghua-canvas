@@ -92,9 +92,10 @@ import {
   seriesDirectiveOf,
   seriesOrchestrationPrompt,
   seriesStageReleased,
-  unmentionedReferencesPrompt,
   withSeriesStage,
 } from '../../../../domain/agent/seriesOrchestration'
+import { referenceReviewPrompt } from '../../../../domain/agent/referenceReview'
+import { reviewTurnReferences } from './agentTurnReferenceReview'
 
 export interface AgentTurnContextTrace {
   digest: string
@@ -143,6 +144,8 @@ export interface PrepareAgentTurnRequestInput {
     task: string
     route: AgentChatRoute
     itemIds: readonly string[]
+    /** 用户显式带上的参考（其余为侧栏自动补分析的图）。 */
+    explicitItemIds?: readonly string[]
     signal: AbortSignal
   }) => Promise<ReferenceCurationResult>
   skills: readonly Skill[]
@@ -359,44 +362,51 @@ export async function prepareAgentTurnRequest(
         continued: taskDecision.continued,
         text: plainText,
       })
-  const agentTask = withSeriesStage(taskDecision.task, seriesStage)
+  const stagedTask = withSeriesStage(taskDecision.task, seriesStage)
   const seriesPrompt = seriesOrchestrationPrompt({
     stage: seriesStage,
     directive: input.internalControl === true ? null : seriesDirectiveOf(plainText),
     released: seriesStageReleased(previousSeriesStage, seriesStage),
   })
-  const taskKey = referenceTaskKey(agentTask)
-  const referenceIds = agentTask.referenceIds
-  await input.sessions.updateFields?.(input.session.id, { agentTask })
+  const taskKey = referenceTaskKey(stagedTask)
+  const referenceIds = stagedTask.referenceIds
+  await input.sessions.updateFields?.(input.session.id, { agentTask: stagedTask })
     .catch(() => null)
-  const autoCurationWarnings: string[] = []
-  if (referenceIds.length > 0 && input.autoCurateReferences) {
-    try {
-      const curation = await input.autoCurateReferences({
-        sessionId: input.session.id,
-        operationId,
-        taskKey,
-        task: plainText,
-        route: chatRoute,
-        itemIds: referenceIds,
-        signal: input.signal,
-      })
-      autoCurationWarnings.push(
-        ...curation.failed.map((item) =>
-          `参考「${item.title}」自动分析失败：${item.reason}`,
-        ),
-        ...curation.limitations,
-      )
-      if (curation.failed.length > 0) {
-        input.notifyContextError(
-          `有 ${curation.failed.length} 条参考没有完成自动分析，已按显式 chip 继续。`,
-        )
-      }
-    } catch (error) {
-      const message = `参考自动分析未完成：${errText(error)}`
-      autoCurationWarnings.push(message)
-      input.notifyContextError(`${message}；已按显式 chip 继续。`)
-    }
+  // G5：显式参考 + 侧栏无用法的图先自动分析，拿不准分工的才进问题卡（agentTurnReferenceReview.ts）。
+  const referenceReview = await reviewTurnReferences({
+    task: stagedTask,
+    text: plainText,
+    requestMode,
+    internalControl: input.internalControl === true,
+    answersQuestionCard,
+    ...(input.referenceLedger
+      ? { selectForTask: () => input.referenceLedger!.selectForTask(input.projectId, taskKey) }
+      : {}),
+    ...(input.autoCurateReferences
+      ? {
+          curate: ({ itemIds, explicitItemIds }: { itemIds: readonly string[]; explicitItemIds: readonly string[] }) =>
+            input.autoCurateReferences!({
+              sessionId: input.session.id,
+              operationId,
+              taskKey,
+              task: plainText,
+              route: chatRoute,
+              itemIds,
+              explicitItemIds,
+              signal: input.signal,
+            }),
+        }
+      : {}),
+  })
+  const agentTask = referenceReview.task
+  if (agentTask !== stagedTask) {
+    await input.sessions.updateFields?.(input.session.id, { agentTask }).catch(() => null)
+  }
+  const autoCurationWarnings = referenceReview.warnings
+  if (referenceReview.failedCount > 0) {
+    input.notifyContextError(
+      `有 ${referenceReview.failedCount} 条参考没有完成自动分析，已按显式 chip 继续。`,
+    )
   }
   if (input.signal.aborted) {
     return { kind: 'aborted_before_job', persistedTurn }
@@ -532,18 +542,23 @@ export async function prepareAgentTurnRequest(
         contextTrace,
       }
     }
-    const referenceQuestion = taskSelection
-      ? unmentionedReferencesPrompt({
-          omitted: taskSelection.omitted,
-          mentionedIds: referenceIds,
-          answeringQuestionCard: answersQuestionCard,
-          internalControl: input.internalControl === true,
-        })
-      : { prompt: '', itemIds: [] }
+    const knownItems = new Map(
+      [...(taskSelection?.selected ?? []), ...(taskSelection?.omitted ?? [])]
+        .map((row) => [row.item.id, row.item] as const),
+    )
+    const referenceQuestion = referenceReviewPrompt({
+      pending: referenceReview.pendingIds.flatMap((id) => {
+        const item = knownItems.get(id)
+        return item ? [item] : []
+      }),
+      clearCount: referenceReview.clearCount,
+      answeringQuestionCard: answersQuestionCard,
+      internalControl: input.internalControl === true,
+    })
     contextPrompt = [
       formatContextBundleForPrompt(bundle),
       projected?.prompt ?? '',
-      referenceQuestion.prompt,
+      referenceQuestion,
       seriesPrompt,
     ]
       .filter(Boolean)
