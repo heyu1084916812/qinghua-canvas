@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  REFERENCE_CURATION_SYSTEM_PROMPT,
   parseReferenceCurationText,
   referenceUsageId,
 } from './referenceCuration'
@@ -24,6 +25,21 @@ describe('reference curation rules', () => {
         limitations: [],
       },
     })
+  })
+
+  it('G3：subject（主体 / 产品锁定）是独立用法，中文别名产品 / 主体映射到它', () => {
+    const parsed = parseReferenceCurationText(JSON.stringify({
+      what: '白色保温杯，哑光杯身，银色杯盖。',
+      usage: 'subject',
+      howToUse: '借：杯子外形与配色，原样放进海报；避：原图的白底与阴影。',
+    }))
+    expect(parsed).toMatchObject({ ok: true, analysis: { usage: 'subject', identityAnchor: false } })
+    for (const alias of ['产品', '主体', '商品']) {
+      expect(parseReferenceCurationText(JSON.stringify({
+        what: 'x', usage: alias, howToUse: 'y',
+      }))).toMatchObject({ ok: true, analysis: { usage: 'subject' } })
+    }
+    expect(REFERENCE_CURATION_SYSTEM_PROMPT).toContain('subject')
   })
 
   it('拒绝缺少 What 或 HowToUse 的假分析', () => {

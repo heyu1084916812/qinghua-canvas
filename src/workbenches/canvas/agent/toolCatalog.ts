@@ -67,7 +67,7 @@ export const AGENT_TOOLS: readonly ToolDeclaration[] = [
           maxItems: 12,
           items: { type: 'string' },
           description:
-            '可选：只分析指定参考 id。通常省略，默认分析当前会话加入的参考；没有会话参考时分析项目参考。',
+            '可选：只分析指定参考 id。通常省略，默认分析当前任务带过的参考；当前任务没有参考时分析项目参考。',
         },
       },
       required: ['task'],

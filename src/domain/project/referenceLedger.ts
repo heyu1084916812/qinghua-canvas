@@ -26,6 +26,7 @@ export type ReferenceKind =
   | 'text'
 
 export type ReferenceUsageKind =
+  | 'subject'
   | 'style'
   | 'composition'
   | 'identityAnchor'
@@ -137,6 +138,8 @@ export function selectReferencesForTask(input: {
 
 function rankUsage(usage: ReferenceUsage): number {
   if (usage.usage === 'identityAnchor' || usage.identityAnchor) return 4
+  // 主体 / 产品锁定（G3）：和身份锚点一样必须保真，排在版式与风格参考之前。
+  if (usage.usage === 'subject') return 4
   if (usage.usage === 'composition') return 3
   if (usage.usage === 'textGuide') return 2
   if (usage.usage === 'style') return 1
