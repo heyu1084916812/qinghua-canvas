@@ -128,7 +128,7 @@ describe('searchTavily', () => {
       new AbortController().signal,
     )
     expect(result.needsKey).toBe(true)
-    expect(result.warnings[0]).toContain('设置 → Agent → 联网调研')
+    expect(result.warnings[0]).toContain('设置 → Agent → 工具 → 联网调研')
     expect(JSON.stringify(result)).not.toContain('tvly-secret-value')
   })
 

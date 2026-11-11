@@ -14,13 +14,13 @@ import { asAppError } from '../../../shared/result'
  * Key 只出现在 Authorization 头里：不进日志、不进错误文案、不进工具结果。
  */
 export const TAVILY_SEARCH_ENDPOINT = 'https://api.tavily.com/search'
-/** 凭据端口里的引用名；值由用户在 设置 → Agent → 联网调研 填写。 */
+/** 凭据端口里的引用名；值由用户在 设置 → Agent → 工具 → 联网调研 填写。 */
 export const TAVILY_API_KEY_REF = 'research:tavily:api-key'
 /** Tavily `max_results` 官方上限。 */
 const TAVILY_MAX_RESULTS = 20
 
 export const TAVILY_KEY_MISSING_MESSAGE =
-  '联网搜索需要 Tavily API Key：请到 设置 → Agent → 联网调研 填写（免费额度每月 1000 次）。' +
+  '联网搜索需要 Tavily API Key：请到 设置 → Agent → 工具 → 联网调研 填写（免费额度每月 1000 次）。' +
   '在此之前只能读取你直接给出的网页链接。'
 
 export interface TavilySearchResult {
@@ -124,7 +124,7 @@ export function tavilyErrorText(error: unknown): { text: string; needsKey: boole
   if (app?.kind === 'http') {
     if (app.status === 401 || app.status === 403) {
       return {
-        text: 'Tavily 拒绝了 API Key（401/403）：请到 设置 → Agent → 联网调研 检查 Key 是否填对。',
+        text: 'Tavily 拒绝了 API Key（401/403）：请到 设置 → Agent → 工具 → 联网调研 检查 Key 是否填对。',
         needsKey: true,
       }
     }

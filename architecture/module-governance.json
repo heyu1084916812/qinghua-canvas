@@ -6654,8 +6654,9 @@
     {
       "module": "src/features/settings/AgentWebSearchSettings.tsx",
       "owner": "agent-web-search-settings",
-      "responsibility": "Edits the SearXNG endpoint used by Agent open research.",
+      "responsibility": "Edits the Tavily API key (credential port) and the optional SearXNG endpoint used by Agent web research.",
       "owns": [
+        "Tavily key entry, replace and removal without echoing the key",
         "Search endpoint draft and validation",
         "Preset persistence",
         "Built-in provider explanation"
@@ -6672,7 +6673,7 @@
         "src/app/uiSevenPoints.test.ts",
         "scripts/capture-ui-seven-points.mjs"
       ],
-      "budget": 160
+      "budget": 190
     },
     {
       "module": "src/features/settings/CanvasMcpPanel.tsx",

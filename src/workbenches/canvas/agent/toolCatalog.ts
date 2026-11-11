@@ -80,7 +80,7 @@ export const AGENT_TOOLS: readonly ToolDeclaration[] = [
       '也可从用户提供的公开网页、Pinterest Pin / Board 或 Behance 页面提取参考图与出处（要读正文请用 readPage）。' +
       '只读取公开页面，不使用任何账号 Cookie，不声称完成私密内容或无限制全站搜索。' +
       '搜索结果只是候选，不会自动加入项目参考、也不会喂给生图；保留原链接与来源。' +
-      '结果里 needsTavilyKey 为 true 时，如实告诉用户去 设置 → Agent → 联网调研 填写 Tavily Key。',
+      '结果里 needsTavilyKey 为 true 时，如实告诉用户去 设置 → Agent → 工具 → 联网调研 填写 Tavily Key。',
     parameters: {
       type: 'object',
       properties: {
