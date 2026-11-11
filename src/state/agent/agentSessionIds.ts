@@ -1,5 +1,12 @@
 import type { StoragePort } from '../../platform/ports'
 import type { AgentSession } from './agentSessionTypes'
+import { normalizeAgentTaskRef } from '../../domain/agent/agentTask'
+
+/** 会话当前任务字段；坏数据 / 旧数据返回空对象。 */
+export function agentTaskFieldOf(value: unknown): Pick<AgentSession, 'agentTask'> {
+  const agentTask = normalizeAgentTaskRef(value)
+  return agentTask ? { agentTask } : {}
+}
 
 export function normalizeAgentSessionIds(value: unknown): string[] {
   if (!Array.isArray(value)) return []

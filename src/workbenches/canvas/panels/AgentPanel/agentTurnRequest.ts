@@ -81,6 +81,11 @@ import type {
 } from '../../../../state/project/referenceLedgerRepository'
 import type { AgentPhaseEvent } from '../../../../domain/agent/phase'
 import type { ReferenceCurationResult } from '../../../../domain/project/referenceCuration'
+import {
+  referenceTaskKey,
+  resolveAgentTask,
+  type AgentTaskDecision,
+} from '../../../../domain/agent/agentTask'
 
 export interface AgentTurnContextTrace {
   digest: string
@@ -108,7 +113,7 @@ export interface PrepareAgentTurnRequestInput {
   sessions: Pick<
     AgentSessionStore,
     'messagesFor' | 'saveMessages' | 'clearPendingAssetIds'
-  >
+  > & Partial<Pick<AgentSessionStore, 'updateFields'>>
   prepareRoute: () => Promise<ChatRoutePreparation>
   onPersisted: (turn: PersistedAgentUserTurn) => void
   onRouteReady: (operationId: string) => Promise<void>
@@ -161,6 +166,11 @@ export interface PreparedAgentTurnRequest {
   explicitMediaModels: ExplicitMediaModels
   perImage: boolean
   requestMode: AgentRequestMode
+  /** 参考台账 usage 的任务键（按任务，不按请求模式）。 */
+  taskKey: string
+  /** 本轮判定后的任务；调用方据此刷新会话快照。 */
+  agentTask: AgentTaskDecision['task']
+  agentTaskReason: AgentTaskDecision['reason']
   promptProfile: AgentPromptProfile
   toolMode: AgentToolMode
   turnTools: ToolDeclaration[]
@@ -200,11 +210,15 @@ export async function prepareAgentTurnRequest(
 ): Promise<AgentTurnRequestPreparation> {
   const plainText = stripMentionMarkup(input.text)
   const rawMentions = parseMentions(input.text)
-  const referenceIds = [...new Set([
+  /**
+   * 本轮显式 @ 的参考卡（按提及顺序）。会话里旧的 referenceIds 只在「同一任务」内沿用，
+   * 见下方 resolveAgentTask；旧会话没有任务记录时一次性迁入。
+   */
+  const mentionedReferenceIds = [...new Set([
     ...rawMentions
       .filter((mention) => mention.kind === 'reference')
       .map((mention) => mention.id),
-    ...(input.session.referenceIds ?? []),
+    ...(input.session.agentTask ? [] : input.session.referenceIds ?? []),
   ])]
   const sentAssetIds = [...new Set(input.session.pendingAssetIds ?? [])]
   const mentions = rawMentions
@@ -268,7 +282,7 @@ export async function prepareAgentTurnRequest(
   const operationId = createId('op')
   await input.onRouteReady(operationId)
 
-  // 台账按任务类型登记用法；operationId 是每次随机生成，不能当 taskKey。
+  // 请求模式只决定提示词档位与工具集；台账按「任务」登记用法（agentTask.ts）。
   const mentionedImageIds = imageNodeIdsAmong(
     input.graph.nodes,
     mentions
@@ -289,7 +303,7 @@ export async function prepareAgentTurnRequest(
     (message) => message.role === 'assistant',
   )
   const lastAssistantTextForTask = lastAssistantForTask?.content ?? ''
-  const taskKey = classifyAgentRequest({
+  const requestMode = classifyAgentRequest({
     text: plainText,
     hasMentionedImage: mentionedImageIds.length > 0,
     hasSelectedNodes: input.selection.length > 0,
@@ -308,6 +322,25 @@ export async function prepareAgentTurnRequest(
       lastAssistantTextForTask,
     ),
   })
+  const taskDecision = resolveAgentTask(
+    input.session.agentTask,
+    {
+      text: plainText,
+      internalControl: input.internalControl === true,
+      hasActiveTaskPlan: Boolean(activeTaskPlanForTask),
+      hasPendingConfirmation: input.session.pendingConfirmation !== undefined,
+      hasActiveContinuation: input.session.continuation !== undefined,
+      refersToCanvasImage:
+        mentionedImageIds.length > 0 || selectedImageIds.length > 0,
+      referenceIds: mentionedReferenceIds,
+    },
+    { now: Date.now(), newId: () => createId('task') },
+  )
+  const agentTask = taskDecision.task
+  const taskKey = referenceTaskKey(agentTask)
+  const referenceIds = agentTask.referenceIds
+  await input.sessions.updateFields?.(input.session.id, { agentTask })
+    .catch(() => null)
   const autoCurationWarnings: string[] = []
   if (referenceIds.length > 0 && input.autoCurateReferences) {
     try {
@@ -637,7 +670,6 @@ export async function prepareAgentTurnRequest(
   const lastAssistantFailed = /HTTP\s*50\d|服务端返回错误|生成失败|运行失败|请求失败|上游/.test(
     lastAssistantTextForTask,
   )
-  const requestMode = taskKey
   const promptProfile = promptProfileForMode(requestMode)
   const sessionBrief = requestMode === 'complex_plan'
     ? sessionBriefForContinuation({
@@ -736,6 +768,9 @@ export async function prepareAgentTurnRequest(
     explicitMediaModels,
     perImage,
     requestMode,
+    taskKey,
+    agentTask,
+    agentTaskReason: taskDecision.reason,
     promptProfile,
     toolMode: decision.mode,
     turnTools,

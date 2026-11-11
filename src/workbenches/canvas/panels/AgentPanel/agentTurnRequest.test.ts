@@ -300,7 +300,10 @@ describe('prepareAgentTurnRequest', () => {
     })
     expect(result.kind).toBe('ready')
     if (result.kind !== 'ready') return
-    expect(selectForTask).toHaveBeenCalledWith('p1', 'simple_generate')
+    // G1：台账按任务键选用法，不再按请求模式（simple_generate）。
+    expect(selectForTask).toHaveBeenCalledWith('p1', result.taskKey)
+    expect(result.taskKey).toBe(`task:${result.agentTask.id}`)
+    expect(result.requestMode).toBe('simple_generate')
     expect(selectForTask.mock.calls[0]?.[1]).not.toBe(result.operationId)
     expect(result.contextPrompt).toContain('本次任务采用的参考台账')
     expect(result.contextPrompt).toContain('保持字形与颜色不变')
@@ -1047,5 +1050,47 @@ describe('prepareAgentTurnRequest', () => {
       role: 'user',
       content: text,
     })
+  })
+  it('★★ G1 参考用法按任务存：同任务改图沿用任务键与参考，换无关新需求开新任务', async () => {
+    const { sessions, session } = await createSession()
+    const keys: string[] = []
+    const autoCurated: string[][] = []
+    const run = async (text: string) => {
+      clearToolSupportCache()
+      const latest = (await sessions.get(session.id)) ?? session
+      const result = await prepareAgentTurnRequest({
+        ...inputFor({
+          sessions,
+          session: latest,
+          text,
+          autoCurateReferences: vi.fn(async (input) => {
+            autoCurated.push([...input.itemIds])
+            return { ok: true, summary: '', taskKey: input.taskKey, analyzed: [], failed: [], limitations: [] }
+          }),
+        }),
+        referenceLedger: {
+          selectForTask: vi.fn(async (_projectId: string, taskKey: string) => {
+            keys.push(taskKey)
+            return { selected: [], omitted: [] }
+          }),
+          listItems: vi.fn(async () => []),
+        },
+      })
+      if (result.kind !== 'ready') throw new Error(result.kind)
+      return result
+    }
+    const first = await run(`${mentionToken('reference', 'ref-product', '产品图')} 帮我做一张咖啡店海报`)
+    const edit = await run('logo 再大一点')
+    const series = await run('再出一张横版的')
+    const unrelated = await run('画一只在月球上的猫')
+    expect(first.agentTaskReason).toBe('first')
+    expect(edit.taskKey).toBe(first.taskKey)
+    expect(series.taskKey).toBe(first.taskKey)
+    expect(unrelated.taskKey).not.toBe(first.taskKey)
+    expect(keys).toEqual([first.taskKey, first.taskKey, first.taskKey, unrelated.taskKey])
+    // 同一任务后续回合没再 @，产品图仍随任务进入参考分析；新任务不带旧参考。
+    expect(autoCurated).toEqual([['ref-product'], ['ref-product'], ['ref-product']])
+    expect(unrelated.agentTask.referenceIds).toEqual([])
+    expect((await sessions.get(session.id))?.agentTask?.id).toBe(unrelated.agentTask.id)
   })
 })

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { usePlatform } from '../../app/providers/PlatformProvider'
 import { screenToWorld } from '../../domain/canvas/geometry/coords'
-import type { ReferenceItem, ReferenceUsage } from '../../domain/project/referenceLedger'
+import { latestUsageForItem, type ReferenceItem, type ReferenceUsage } from '../../domain/project/referenceLedger'
 import { sendReferenceToAgent } from '../../features/canvas/agentHandoff'
 import { dropReferenceToCanvas } from '../../features/canvas/dropImport'
 import { useAsset, useAssetMeta } from '../../features/shared/assets'
@@ -55,9 +55,7 @@ export function ReferenceLightbox({
   const meta = useAssetMeta(item?.assetHash)
   const mediaUrl = meta.url ?? item?.url ?? null
   const isVideo = item?.kind === 'video' || (meta.mime ?? '').startsWith('video/')
-  const usage = usages
-    .filter((row) => row.itemId === item?.id)
-    .sort((a, b) => b.createdAt - a.createdAt)[0]
+  const usage = latestUsageForItem(usages, item?.id)
   const dimensionText = size
     ? `${formatNumber(size.width)} × ${formatNumber(size.height)}`
     : mediaUrl || item?.assetHash ? '读取尺寸…' : '尺寸未知'

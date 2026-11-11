@@ -160,6 +160,7 @@ export async function runAgentReferenceCuration(
         howToUse: parsed.analysis.howToUse,
         ...(parsed.analysis.identityAnchor ? { identityAnchor: true } : {}),
         createdAt: usageByItem.get(item.id)?.createdAt ?? now,
+        updatedAt: now,
       }
       await repository.putItem(nextItem)
       await repository.putUsage(usage)

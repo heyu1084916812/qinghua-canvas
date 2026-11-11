@@ -543,6 +543,34 @@
   "moduleMoves": [],
   "modules": [
     {
+      "module": "src/domain/agent/agentTask.ts",
+      "owner": "agent-runtime",
+      "responsibility": "判定 Agent 会话内的任务延续还是新开，并给参考台账提供按任务的 taskKey。",
+      "owns": [
+        "任务延续 / 新任务的确定性规则",
+        "任务内参考卡 id 的沿用"
+      ],
+      "doesNotOwn": [
+        "参考分析与台账存储",
+        "请求模式（提示词档位）分类"
+      ],
+      "publicApi": [
+        "AgentTaskRef",
+        "resolveAgentTask",
+        "classifyAgentTaskTurn",
+        "referenceTaskKey",
+        "isTaskReferenceKey",
+        "normalizeAgentTaskRef",
+        "AgentTaskSignals",
+        "AgentTaskDecision",
+        "AgentTaskDecisionReason"
+      ],
+      "test": [
+        "src/domain/agent/agentTask.test.ts"
+      ],
+      "budget": 240
+    },
+    {
       "module": "src/workbenches/canvas/flow/FlowNodeHeaderLayer.tsx",
       "owner": "canvas-flow-ui",
       "responsibility": "Computes visible node labels and renders editable title/pixel rows above React Flow nodes.",

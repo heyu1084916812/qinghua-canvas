@@ -88,6 +88,7 @@ export interface AgentLoopDepsArgs {
   operationId: string
   toolMode?: AgentToolMode
   requestMode?: AgentRequestMode
+  taskKey?: string
   visualNodeIds?: readonly string[]
   onProgress?: (messages: readonly ChatMessage[]) => void
   turnTools?: readonly ToolDeclaration[]
@@ -292,8 +293,17 @@ export async function runAgentSendTurn(
   )
   ui.setPerImage(session.id, prepared.perImage)
   refs.turnTools.current.set(session.id, turnAgentTools)
+  // 任务判定已写库；回灌到面板快照，让确认 / 续跑入口读到同一个任务。
+  const agentTask = prepared.agentTask
+  if (agentTask) {
+    ui.setList((prev) =>
+      prev.map((item) => (item.id === session.id ? { ...item, agentTask } : item)),
+    )
+  }
   if (prepared.clearedPendingAssets) {
-    const cleared = prepared.clearedPendingAssets
+    const cleared = agentTask
+      ? { ...prepared.clearedPendingAssets, agentTask }
+      : prepared.clearedPendingAssets
     ui.setList((prev) =>
       prev.map((item) => (item.id === cleared.id ? cleared : item)),
     )
@@ -311,6 +321,7 @@ export async function runAgentSendTurn(
     operationId,
     toolMode,
     requestMode: prepared.requestMode,
+    taskKey: prepared.taskKey,
     visualNodeIds: prepared.visualNodeIds,
     onProgress: (next) => {
       if (ui.currentIdRef.current !== session.id) return

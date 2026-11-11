@@ -21,6 +21,7 @@ export interface AgentLoopDepsArgs {
   route?: AgentChatRoute
   toolMode?: 'native' | 'json'
   requestMode?: AgentRequestMode
+  taskKey?: string
   visualNodeIds?: readonly string[]
   onProgress?: (messages: readonly ChatMessage[]) => void
   turnTools?: readonly ToolDeclaration[]
@@ -135,6 +136,7 @@ export function useAgentLoopDepsController(
           ...(args.route ? { route: args.route } : {}),
           toolMode: args.toolMode ?? 'native',
           ...(args.requestMode ? { requestMode: args.requestMode } : {}),
+          ...(args.taskKey ? { taskKey: args.taskKey } : {}),
           visualNodeIds: args.visualNodeIds ?? [],
           onProgress: args.onProgress,
           turnTools: args.turnTools ?? input.activeAgentTools,
