@@ -17,6 +17,7 @@ const ALWAYS_KEYS = [
   'recipeForGenerated',
   'rememberMemory',
   'researchDesign',
+  'readPage',
   'resolveNodeIds',
   'runNodes',
   'selectedIds',
@@ -59,6 +60,7 @@ function harness(
   const research = {
     rememberMemory: vi.fn(),
     researchDesign: vi.fn(),
+    readPage: vi.fn(),
   }
   const defaults = { defaultsForNewNode: vi.fn() }
   const canvasOps = {
@@ -94,7 +96,7 @@ function harness(
 }
 
 describe('composeAgentToolContext / 键集合', () => {
-  it('21 个键一个不多一个不少（条件键全开）', () => {
+  it('22 个键一个不多一个不少（条件键全开）', () => {
     const { ctx } = harness()
 
     expect(Object.keys(ctx).sort()).toEqual(
@@ -102,7 +104,7 @@ describe('composeAgentToolContext / 键集合', () => {
     )
   })
 
-  it('条件都不成立时只剩 18 个键，三个条件键连键都不存在', () => {
+  it('条件都不成立时只剩 19 个键，三个条件键连键都不存在', () => {
     const { ctx } = harness(
       {
         sessionId: '',

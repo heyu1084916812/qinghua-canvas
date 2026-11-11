@@ -27,6 +27,7 @@ import {
   runFromNodeIds,
   type AgentToolContext,
 } from '../../agent/tools'
+import { getAgentWebResearch } from '../../../../state/ui/agentWebResearch'
 import { runPreflightProblems } from '../../agent/runPreflight'
 import { stripMentionMarkup } from '../../text/MentionEditor'
 import { originOf } from './agentPanelViewHelpers'
@@ -332,6 +333,8 @@ export function assembleAgentLoopDeps(
         query,
         agentToolsForCapabilities({
           canvasReview: ports.canvasReviewEnabled,
+          // 关掉「联网」后，能力发现也不能把联网工具再加载回来。
+          webResearch: getAgentWebResearch(),
         }),
       )
       const loaded = [

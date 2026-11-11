@@ -7,6 +7,7 @@ import {
   readableConfirmationLines,
   toConversation,
   toolLabel,
+  toolLabelOf,
   type ConversationItem,
 } from './conversation'
 
@@ -211,6 +212,24 @@ describe('工具结果 → 人话', () => {
     expect(toolLabel('runNode')).toBe('已运行生成')
     expect(toolLabel('researchDesign')).toBe('联网调研完成')
     expect(toolLabel('someFutureTool')).toContain('someFutureTool')
+  })
+
+  it('readPage 步骤：成功给标题与字数，失败如实给原因与退路', () => {
+    expect(toolLabel('readPage')).toBe('已读网页')
+    const ok = describeToolResult(
+      'readPage',
+      JSON.stringify({ ok: true, url: 'https://a.example.com', title: '文章', content: 'x', truncated: true, totalChars: 12000 }),
+    )
+    expect(ok.failed).toBe(false)
+    expect(ok.lines).toEqual(['文章', '正文 12000 字（已截断）'])
+    const bad = describeToolResult(
+      'readPage',
+      JSON.stringify({ ok: false, url: 'https://x.example.com', error: '页面要求登录或人机验证，读不到正文', hint: '可以改为搜索公开来源，或请用户把页面截图 / 关键文字直接贴进对话。' }),
+    )
+    expect(bad.failed).toBe(true)
+    expect(bad.lines[0]).toContain('登录')
+    expect(bad.lines[1]).toContain('截图')
+    expect(toolLabelOf('readPage', true)).toBe('网页没读到')
   })
 
   it('设计调研步骤只汇总参考和来源数量，不把整份报告塞进步骤卡', () => {

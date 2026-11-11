@@ -6,6 +6,9 @@ import { splitNodeToGrid } from '../../../../features/canvas/splitToGrid'
 import { loadInspirationSources } from '../../../../state/project/inspirationSourceStore'
 import { createPresetStore } from '../../../../state/project/presetStore'
 import { runDesignResearch } from '../../../../features/shared/research/designResearchRunner'
+import { TAVILY_API_KEY_REF } from '../../../../features/shared/research/tavilySearch'
+import { readWebPage } from '../../../../features/shared/research/webPageReader'
+import { getAgentWebResearch } from '../../../../state/ui/agentWebResearch'
 import {
   executeConfirmedTool,
   type AgentToolContext,
@@ -128,6 +131,10 @@ export function useAgentPanelToolModel({
         readCachedSources: () => inspirationRepository.readAll(),
         readConfiguredSources: () => loadInspirationSources(platform.storage),
         readWebSearch: () => createPresetStore(platform.storage).loadAgentWebSearch(),
+        /** Key 走凭据端口（桌面壳为 DPAPI），只在 Tavily 请求头里出现。 */
+        readTavilyKey: () => platform.credentials.load(TAVILY_API_KEY_REF),
+        webEnabled: getAgentWebResearch,
+        readPage: readWebPage,
         network: platform.network,
         runResearch: runDesignResearch,
         signal: () =>

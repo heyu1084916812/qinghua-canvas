@@ -30,6 +30,7 @@ import {
 } from '../../../domain/shared/memoryOrganizer'
 import type { VisualReviewResult } from '../../../domain/agent/visualReview'
 import type { ReferenceCurationResult } from '../../../domain/project/referenceCuration'
+import { readPageUrlOf, researchDesignArgsOf } from './agentToolArgs'
 import {
   approveAgentTaskPlanReview,
   markAgentTaskPlanResultsReady,
@@ -196,9 +197,12 @@ export interface AgentToolContext {
   /** 设计调研；由界面层注入网络与灵感库读取能力。 */
   researchDesign?: (input: {
     topic: string
+    queries?: readonly string[]
     urls?: readonly string[]
     maxResults?: number
   }) => Promise<unknown>
+  /** 读公开网页正文（Jina Reader）；由界面层注入网络与联网开关。 */
+  readPage?: (input: { url: string }) => Promise<unknown>
   /** 真实参考分析；由界面层注入视觉模型、台账和素材读取能力。 */
   curateReferences?: (input: {
     task: string
@@ -292,24 +296,16 @@ export async function executeReadTool(
     case 'readResult':
       return { results: readResults(ctx.store, a.nodeIds, ctx.nodeRunStateOf) }
     case 'researchDesign': {
-      const topic = typeof a.topic === 'string' ? a.topic.trim() : ''
-      if (!topic) return { ok: false, error: '设计调研缺少 topic' }
-      if (!ctx.researchDesign) {
-        return { ok: false, error: '当前会话没有接入设计调研服务' }
-      }
-      const urls = asStringArray(a.urls)
-        .map((url) => url.trim())
-        .filter((url) => /^https?:\/\//i.test(url))
-        .slice(0, 8)
-      const maxResults =
-        typeof a.maxResults === 'number' && Number.isFinite(a.maxResults)
-          ? Math.min(24, Math.max(1, Math.round(a.maxResults)))
-          : undefined
-      return ctx.researchDesign({
-        topic,
-        ...(urls.length > 0 ? { urls } : {}),
-        ...(maxResults ? { maxResults } : {}),
-      })
+      const input = researchDesignArgsOf(a)
+      if (!input) return { ok: false, error: '设计调研缺少 topic' }
+      if (!ctx.researchDesign) return { ok: false, error: '当前会话没有接入设计调研服务' }
+      return ctx.researchDesign(input)
+    }
+    case 'readPage': {
+      const url = readPageUrlOf(a)
+      if (!url) return { ok: false, error: 'readPage 需要一个 http / https 网址' }
+      if (!ctx.readPage) return { ok: false, error: '当前会话没有接入网页读取服务' }
+      return ctx.readPage({ url })
     }
     case 'visualReview': {
       const rawIds = asStringArray(a.nodeIds)

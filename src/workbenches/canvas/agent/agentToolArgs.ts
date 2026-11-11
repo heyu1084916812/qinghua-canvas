@@ -64,3 +64,40 @@ export function escapeControlCharactersInStrings(text: string): string {
   }
   return out
 }
+
+function stringList(value: unknown): string[] {
+  return Array.isArray(value)
+    ? value.filter((item): item is string => typeof item === 'string').map((item) => item.trim()).filter(Boolean)
+    : []
+}
+
+export interface ResearchDesignArgs {
+  topic: string
+  queries?: string[]
+  urls?: string[]
+  maxResults?: number
+}
+
+/** `researchDesign` 参数清洗：topic 必填；queries ≤4、urls ≤8（只留 http/https）、maxResults 1–24。 */
+export function researchDesignArgsOf(a: Record<string, unknown>): ResearchDesignArgs | null {
+  const topic = typeof a.topic === 'string' ? a.topic.trim() : ''
+  if (!topic) return null
+  const urls = stringList(a.urls).filter((url) => /^https?:\/\//i.test(url)).slice(0, 8)
+  const queries = stringList(a.queries).slice(0, 4)
+  const maxResults =
+    typeof a.maxResults === 'number' && Number.isFinite(a.maxResults)
+      ? Math.min(24, Math.max(1, Math.round(a.maxResults)))
+      : undefined
+  return {
+    topic,
+    ...(queries.length > 0 ? { queries } : {}),
+    ...(urls.length > 0 ? { urls } : {}),
+    ...(maxResults ? { maxResults } : {}),
+  }
+}
+
+/** `readPage` 参数清洗：只接受 http / https 网址。 */
+export function readPageUrlOf(a: Record<string, unknown>): string | null {
+  const url = typeof a.url === 'string' ? a.url.trim() : ''
+  return /^https?:\/\//i.test(url) ? url : null
+}

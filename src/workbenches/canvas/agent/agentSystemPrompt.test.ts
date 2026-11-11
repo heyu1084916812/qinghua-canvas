@@ -223,6 +223,32 @@ describe('素材段与技能段', () => {
     expect(p).toContain('不要把巡检当成持久化后台任务')
   })
 
+  it('联网开启：给出主动搜索、多角度/英文检索、读不到如实说、候选不自动入参考的指引', () => {
+    const p = buildAgentSystemPromptWithContext(empty, undefined, {
+      webResearchEnabled: true,
+    })
+    expect(p).toContain('## 本轮可以联网')
+    expect(p).toContain('真实品牌 / 产品 / 地标 / 人物')
+    expect(p).toContain('「流行」「趋势」「最新」')
+    expect(p).toContain('不要搜索，直接做')
+    expect(p).toContain('1–4 个覆盖不同角度')
+    expect(p).toContain('英文')
+    expect(p).toContain('`readPage`')
+    expect(p).toContain('贴截图')
+    expect(p).toContain('用户挑选并加入参考后才能用于生成')
+    expect(p).toContain('Tavily API Key')
+    expect(p).not.toContain('## 本轮联网已关闭')
+  })
+
+  it('联网关闭：明确禁止调用联网工具', () => {
+    const p = buildAgentSystemPromptWithContext(empty, undefined, {
+      webResearchEnabled: false,
+    })
+    expect(p).toContain('## 本轮联网已关闭')
+    expect(p).toContain('不要调用 `researchDesign` 或 `readPage`')
+    expect(p).not.toContain('## 本轮可以联网')
+  })
+
   it('★★ 选了技能 → 名字与正文真的进了系统提示词（不是只存在选择框里）', () => {
     const p = buildAgentSystemPromptWithContext(empty, undefined, {
       skill: { name: '电商详情页策划', content: '第一步：提炼卖点\n第二步：排布信息' },

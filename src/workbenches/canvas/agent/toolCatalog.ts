@@ -76,15 +76,26 @@ export const AGENT_TOOLS: readonly ToolDeclaration[] = [
   {
     name: 'researchDesign',
     description:
-      '做联网调研：自动检索 Openverse、Wikipedia、Internet Archive、Art Institute、轻画灵感库，并可从用户提供的公开网页、Pinterest Pin / Board 或 Behance 页面提取参考图与出处。' +
+      '做联网调研：用 Tavily 搜索网页与图片（每个检索角度一次），附带轻画本地灵感库；Tavily 不可用时回退到 Openverse、Wikipedia 与开放馆藏。' +
+      '也可从用户提供的公开网页、Pinterest Pin / Board 或 Behance 页面提取参考图与出处（要读正文请用 readPage）。' +
       '只读取公开页面，不使用任何账号 Cookie，不声称完成私密内容或无限制全站搜索。' +
-      '搜索结果只是候选，不会自动加入项目参考；结果用于形成 Moodboard、来源报告和设计方向，并保留原链接、作者与权利状态。',
+      '搜索结果只是候选，不会自动加入项目参考、也不会喂给生图；保留原链接与来源。' +
+      '结果里 needsTavilyKey 为 true 时，如实告诉用户去 设置 → Agent → 联网调研 填写 Tavily Key。',
     parameters: {
       type: 'object',
       properties: {
         topic: {
           type: 'string',
           description: '这次要研究的设计主题、风格、品类或用户目标。',
+        },
+        queries: {
+          type: 'array',
+          minItems: 1,
+          maxItems: 4,
+          items: { type: 'string' },
+          description:
+            '1–4 个覆盖不同角度的检索词（如品牌现状、风格趋势、同类案例、配色字体）。' +
+            '主题有国际性时至少写一条英文检索词。省略时只用 topic 搜一次。',
         },
         urls: {
           type: 'array',
@@ -101,6 +112,21 @@ export const AGENT_TOOLS: readonly ToolDeclaration[] = [
         },
       },
       required: ['topic'],
+    },
+  },
+  {
+    name: 'readPage',
+    description:
+      '读取一个公开网页的正文（标题、链接与清洗后的正文，最多约 8000 字）。' +
+      '用于用户给出的链接，或对 researchDesign 找到的 1–2 个关键来源做深入阅读。' +
+      '页面需要登录、有验证码或打不开时会返回 ok:false 与 error；此时如实告诉用户读不到，' +
+      '并建议改搜公开来源或请用户贴截图 / 文字，不要编造页面内容。',
+    parameters: {
+      type: 'object',
+      properties: {
+        url: { type: 'string', description: '要读取的公开 http / https 页面地址。' },
+      },
+      required: ['url'],
     },
   },
   {
@@ -548,13 +574,23 @@ export const AGENT_TOOLS: readonly ToolDeclaration[] = [
   },
 ]
 
+/** 「联网」开关控制的工具：关闭时整组不暴露给模型。 */
+export const AGENT_WEB_TOOL_NAMES: ReadonlySet<string> = new Set(['researchDesign', 'readPage'])
+
 export function agentToolsForCapabilities({
   canvasReview,
+  webResearch = true,
 }: {
   canvasReview: boolean
+  /** Agent 输入框的「联网」开关；缺省视为开启（旧调用方行为不变）。 */
+  webResearch?: boolean
 }): readonly ToolDeclaration[] {
-  if (canvasReview) return AGENT_TOOLS
-  return AGENT_TOOLS.filter((tool) => tool.name !== 'visualReview')
+  if (canvasReview && webResearch) return AGENT_TOOLS
+  return AGENT_TOOLS.filter(
+    (tool) =>
+      (canvasReview || tool.name !== 'visualReview') &&
+      (webResearch || !AGENT_WEB_TOOL_NAMES.has(tool.name)),
+  )
 }
 
 const CAPABILITY_QUERY_GROUPS: readonly {
@@ -617,6 +653,10 @@ const CAPABILITY_QUERY_GROUPS: readonly {
   {
     terms: ['调研', '参考', '灵感', 'moodboard', '套件', '品牌', '怎么用'],
     names: ['researchDesign', 'curateReferences'],
+  },
+  {
+    terms: ['联网', '搜索', '网页', '链接', '网址', '读取页面', '阅读文章', 'url'],
+    names: ['researchDesign', 'readPage'],
   },
   {
     terms: ['验收', '检查', '巡检', '是否一致', '一致性', '质量把关'],
@@ -791,6 +831,7 @@ const REFERENCE_EDIT_TOOLS = new Set([
 const DESIGN_RESEARCH_TOOLS = new Set([
   'readGraph',
   'researchDesign',
+  'readPage',
   'curateReferences',
   'applyPlan',
   'runNode',
@@ -819,7 +860,7 @@ const CANVAS_OPERATION_TOOLS = new Set([
 
 export function agentToolsForRequestMode(
   mode: 'simple_generate' | 'reference_edit' | 'design_research' | 'canvas_operation' | 'complex_plan',
-  capabilities: { canvasReview: boolean },
+  capabilities: { canvasReview: boolean; webResearch?: boolean },
 ): readonly ToolDeclaration[] {
   if (mode === 'complex_plan') return agentToolsForCapabilities(capabilities)
   const allowed =

@@ -83,6 +83,7 @@ describe('工具声明', () => {
       'readAsset',
       'readCapabilities',
       'readGraph',
+      'readPage',
       'readResult',
       'rememberMemory',
       'requestTaskConfirmation',
@@ -109,6 +110,41 @@ describe('工具声明', () => {
     const tools = agentToolsForCapabilities({ canvasReview: false })
     expect(tools.some((tool) => tool.name === 'visualReview')).toBe(false)
     expect(agentToolsForCapabilities({ canvasReview: true })).toBe(AGENT_TOOLS)
+  })
+
+  it('关闭「联网」时 researchDesign / readPage 整组不暴露，任何档位都一样', () => {
+    const off = agentToolsForCapabilities({ canvasReview: true, webResearch: false }).map((t) => t.name)
+    expect(off).not.toContain('researchDesign')
+    expect(off).not.toContain('readPage')
+    expect(off).toContain('visualReview')
+    const research = agentToolsForRequestMode('design_research', {
+      canvasReview: false,
+      webResearch: false,
+    }).map((t) => t.name)
+    expect(research).not.toContain('researchDesign')
+    expect(research).not.toContain('readPage')
+    expect(research).toContain('curateReferences')
+    const on = agentToolsForRequestMode('design_research', { canvasReview: false }).map((t) => t.name)
+    expect(on).toEqual(expect.arrayContaining(['researchDesign', 'readPage']))
+  })
+
+  it('能力发现：「读网页 / 联网」能加载 readPage；关闭联网后的候选里不再出现联网工具', () => {
+    expect(discoverAgentTools('帮我读一下这个网页链接').tools.map((t) => t.name)).toContain('readPage')
+    const off = discoverAgentTools(
+      '联网搜索',
+      agentToolsForCapabilities({ canvasReview: false, webResearch: false }),
+    )
+    expect(off.tools.map((t) => t.name)).not.toContain('researchDesign')
+    expect(off.tools.map((t) => t.name)).not.toContain('readPage')
+  })
+
+  it('readPage 只接受 http(s) 网址并转给注入的读取服务', async () => {
+    const readPage = vi.fn(async () => ({ ok: true }))
+    const ctx: AgentToolContext = { ...setup().ctx, readPage }
+    expect(await executeReadTool('readPage', { url: 'ftp://x' }, ctx)).toMatchObject({ ok: false })
+    expect(readPage).not.toHaveBeenCalled()
+    await executeReadTool('readPage', { url: ' https://example.com/a ' }, ctx)
+    expect(readPage).toHaveBeenCalledWith({ url: 'https://example.com/a' })
   })
 
   it('★ 按请求档位裁剪工具，简单出图不再拿到全量工具', () => {

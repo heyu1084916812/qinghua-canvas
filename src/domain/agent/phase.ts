@@ -66,6 +66,7 @@ export function agentPhaseForTool(tool: string): AgentPhase | undefined {
     readResult: 'align',
     curateReferences: 'referenceAnalysis',
     researchDesign: 'research',
+    readPage: 'research',
     visualReview: 'review',
     proposeTaskPlan: 'plan',
     updateTaskStep: 'plan',

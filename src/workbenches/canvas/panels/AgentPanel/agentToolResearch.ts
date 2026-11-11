@@ -7,6 +7,14 @@ import type {
   DesignResearchRunnerInput,
 } from '../../../../features/shared/research/designResearchRunner'
 import type { WebSearchSettings } from '../../../../domain/inspiration/designResearch'
+import type { ReadWebPageResult } from '../../../../features/shared/research/webPageReader'
+
+/** 联网开关关闭时，两个联网工具统一返回的结果（模型据此如实告诉用户）。 */
+export const WEB_RESEARCH_OFF_RESULT = {
+  ok: false,
+  webDisabled: true,
+  error: '联网已关闭：用户在 Agent 输入框关掉了「联网」。不要搜索或读取网页；如需联网，请用户先打开开关。',
+} as const
 
 /** 灵感库缓存里本模块只关心「哪个来源、有哪些案例」。 */
 export interface AgentToolCachedInspirationSource {
@@ -36,6 +44,16 @@ export interface AgentToolResearchPorts<
     readonly AgentToolConfiguredInspirationSource[]
   >
   readWebSearch: () => Promise<WebSearchSettings>
+  /** 读用户在设置里填的 Tavily Key；没有返回 null。Key 只往下传给请求头。 */
+  readTavilyKey: () => Promise<string | null>
+  /** Agent 输入框「联网」开关的当前值（调用时现取）。 */
+  webEnabled: () => boolean
+  /** `readWebPage` 本身（Jina Reader）。 */
+  readPage: (
+    network: NetworkPort,
+    url: string,
+    signal: AbortSignal,
+  ) => Promise<ReadWebPageResult>
   /** 网络端口，原样交给调研执行器。 */
   network: NetworkPort
   /** `runDesignResearch` 本身。 */
@@ -64,7 +82,12 @@ export interface AgentToolResearch<
     text?: string
     reason?: string
   }>
-  researchDesign: (input: DesignResearchRunnerInput) => Promise<TReport>
+  researchDesign: (
+    input: DesignResearchRunnerInput,
+  ) => Promise<TReport | typeof WEB_RESEARCH_OFF_RESULT>
+  readPage: (input: {
+    url: string
+  }) => Promise<ReadWebPageResult | typeof WEB_RESEARCH_OFF_RESULT>
 }
 
 /**
@@ -94,10 +117,12 @@ export function createAgentToolResearch<
       }
     },
     researchDesign: async (input) => {
-      const [cachedSources, configuredSources, webSearch] = await Promise.all([
+      if (!ports.webEnabled()) return WEB_RESEARCH_OFF_RESULT
+      const [cachedSources, configuredSources, webSearch, tavilyApiKey] = await Promise.all([
         ports.readCachedSources().catch(() => []),
         ports.readConfiguredSources().catch(() => []),
         ports.readWebSearch().catch(() => undefined),
+        ports.readTavilyKey().catch(() => null),
       ])
       const enabledIds = new Set(
         configuredSources
@@ -113,9 +138,14 @@ export function createAgentToolResearch<
           network: ports.network,
           libraryCases,
           ...(webSearch ? { webSearch } : {}),
+          tavilyApiKey,
         },
         ports.signal(),
       )
+    },
+    readPage: async ({ url }) => {
+      if (!ports.webEnabled()) return WEB_RESEARCH_OFF_RESULT
+      return ports.readPage(ports.network, url, ports.signal())
     },
   }
 }

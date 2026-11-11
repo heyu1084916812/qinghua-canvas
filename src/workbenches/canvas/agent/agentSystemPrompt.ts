@@ -18,6 +18,25 @@ import type { AgentPromptProfile, AgentRequestMode } from './agentContextPolicy'
  * 所以 ①③ 两段整个从 `nodeSpecs` 读出来。改了节点，词表跟着改。
  */
 
+/** 「联网」开启：何时主动搜、怎么搜、读不到怎么办（对齐 Lovart 的调研行为，不额外调用模型）。 */
+export const WEB_RESEARCH_ON_PROMPT = [
+  '## 本轮可以联网',
+  '- 请求涉及真实品牌 / 产品 / 地标 / 人物，或出现「流行」「趋势」「最新」「今年」这类时效风格词时，即使用户没说「调研」，也先调用 `researchDesign`。',
+  '- 泛化或想象类场景（如「一只在月球钓鱼的猫」），或用户已经给了足够的参考素材时，不要搜索，直接做。',
+  '- `researchDesign.queries` 给 1–4 个覆盖不同角度的检索词（现状 / 风格趋势 / 同类案例 / 配色字体等）；主题有国际性时至少一条用英文。',
+  '- 用户给了网页链接时，用 `readPage` 读正文；需要深入时最多再读 1–2 个搜索到的关键来源。',
+  '- `readPage` 返回 ok:false（要登录、验证码、打不开）时，如实说读不到，并建议改搜公开来源或请用户贴截图 / 文字；不要编造页面内容。',
+  '- 搜索结果只是对话里的候选图卡：用户挑选并加入参考后才能用于生成，不要声称已加入参考或已用于生图。回答时带上来源链接。',
+  '- 结果里 `needsTavilyKey` 为 true 时，直接告诉用户：到 设置 → Agent → 联网调研 填写 Tavily API Key（免费每月 1000 次）。',
+].join('\n')
+
+/** 「联网」关闭：不暴露联网工具，并明确告诉模型。 */
+export const WEB_RESEARCH_OFF_PROMPT = [
+  '## 本轮联网已关闭',
+  '用户关掉了输入框里的「联网」。不要调用 `researchDesign` 或 `readPage`，也不要声称搜索过或读过网页。',
+  '如果任务确实需要最新资料或用户给了链接，请说明需要先打开输入框里的「联网」开关。',
+].join('\n')
+
 /** ① 身份 + ② 硬规则：固定不变 */
 const IDENTITY_AND_RULES = [
   '你是「轻画」这张无限画布上的助理。用户要什么，你就把它做成画布上的工作流。',
@@ -30,8 +49,8 @@ const IDENTITY_AND_RULES = [
   '  调用 `visualReview`。它会读取真实图片和当前项目绑定的套件素材，返回问题、证据和修改建议。',
   '  视觉验收是只读检查：验收后不要在同一轮自动修改画布或调用 runNode；先让用户决定。',
   '- 用户要做联网调研、找参考、整理 Moodboard，或收集公开 Pinterest / Behance / 网页案例时，',
-  '  调用 `researchDesign`。可自动检索 Openverse、Wikipedia、Internet Archive、Art Institute 与轻画本地灵感库；用户提供或明确点名的',
-  '  公开 URL 才放进 `urls`。搜索结果只是候选，不得声称读取了私密 Pin / Board、账号 Cookie，',
+  '  调用 `researchDesign`（Tavily 网页 + 图片搜索，附轻画本地灵感库）；用户提供或明确点名的',
+  '  公开 URL 才放进 `urls`，要读正文用 `readPage`。搜索结果只是候选，不得声称读取了私密 Pin / Board、账号 Cookie，',
   '  也不得声称完成了无限制全站搜索或已把候选自动加入项目参考。',
   '- 准备使用品牌套件、产品、角色、风格参考或本轮 reference chip 做生成 / 改图时，',
   '  先调用 `curateReferences`，把当前任务真实传入。它会读取参考图和套件多图，',
@@ -331,7 +350,7 @@ const LIGHT_IDENTITY_AND_RULES = [
   '- 需要建图时，用 applyPlan 一次给出完整节点与连线；需要出图时，再用 runNode 执行本次新建的生成节点。',
   '- 本档只带与当前请求相关的节点，不附完整画布词表；只有信息不足或请求转成画布操作时，才调用 readGraph。',
   '- 用户要联网调研、找参考、做 Moodboard 或收集公开 Pinterest / Behance / 网页案例时，调用 researchDesign；',
-  '  有公开 URL 就放进 urls，没有 URL 也会检索 Openverse、Wikipedia、Internet Archive、Art Institute 与轻画本地灵感库。',
+  '  有公开 URL 就放进 urls，没有 URL 也会用 Tavily 搜索网页与图片（附轻画本地灵感库）。',
   '  搜索结果只作为候选，并明确说明私密内容和全站搜索没有执行。',
 ].join('\n')
 
@@ -509,6 +528,8 @@ export interface AgentPromptExtras {
   promptProfile?: AgentPromptProfile
   /** 画布巡检是否允许由 Agent 主动调用；false 时必须在提示词里明确禁止。 */
   canvasReviewEnabled?: boolean
+  /** Agent 输入框「联网」开关；true 给出何时搜索的指引，false 明确告知联网已关。 */
+  webResearchEnabled?: boolean
   /** 当前聊天 route 的渠道能力，与视觉验收使用同一判据。 */
   imageInputAccepted?: boolean
   /**
@@ -625,6 +646,12 @@ export function buildAgentSystemPromptWithContext(
         '删除、改已有节点、记忆写入等破坏性或长期副作用仍必须等待用户亲自确认。',
       ].join('\n'),
     )
+  }
+
+  if (extras.webResearchEnabled === true) {
+    parts.push(WEB_RESEARCH_ON_PROMPT)
+  } else if (extras.webResearchEnabled === false) {
+    parts.push(WEB_RESEARCH_OFF_PROMPT)
   }
 
   if (extras.canvasReviewEnabled === true) {

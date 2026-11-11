@@ -118,6 +118,7 @@ const TOOL_LABEL: Record<string, string> = {
   readResult: '已读结果',
   curateReferences: '参考分析完成',
   researchDesign: '联网调研完成',
+  readPage: '已读网页',
   visualReview: '视觉验收完成',
   proposeTaskPlan: '执行计划已确认',
   updateTaskStep: '计划进度已更新',
@@ -142,6 +143,7 @@ const TOOL_RUNNING_LABEL: Record<string, string> = {
   readResult: '正在读取结果',
   curateReferences: '正在分析参考',
   researchDesign: '正在联网调研',
+  readPage: '正在读取网页',
   visualReview: '正在视觉验收',
   proposeTaskPlan: '正在整理任务计划',
   updateTaskStep: '正在更新任务进度',
@@ -174,6 +176,7 @@ const TOOL_LABEL_FAILED: Record<string, string> = {
   readResult: '读结果失败',
   curateReferences: '参考分析没完成',
   researchDesign: '联网调研没完成',
+  readPage: '网页没读到',
   visualReview: '视觉验收没完成',
   proposeTaskPlan: '执行计划未确认',
   updateTaskStep: '计划进度没更新',
@@ -369,6 +372,25 @@ export function describeToolResult(
         nodeIds: [],
         researchItems,
         failed: r.ok === false,
+      }
+    }
+    case 'readPage': {
+      const title = clean(String(r.title ?? ''))
+      const url = String(r.url ?? '')
+      if (r.ok === false) {
+        return {
+          lines: [clean(String(r.error ?? '网页读取失败')), clean(String(r.hint ?? ''))].filter(Boolean),
+          nodeIds: [],
+          failed: true,
+        }
+      }
+      return {
+        lines: [
+          `${title || url}`,
+          `正文 ${Number(r.totalChars ?? 0)} 字${r.truncated === true ? '（已截断）' : ''}`,
+        ],
+        nodeIds: [],
+        failed: false,
       }
     }
     case 'curateReferences': {

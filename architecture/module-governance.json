@@ -7167,6 +7167,29 @@
       "budget": 35
     },
     {
+      "module": "src/state/ui/agentWebResearch.ts",
+      "owner": "agent-runtime-preferences",
+      "responsibility": "保存 Agent「联网」开关的运行时值并通知订阅者；持久化由 presetStore 负责。",
+      "owns": [
+        "联网开关当前值与默认开启",
+        "订阅与通知"
+      ],
+      "doesNotOwn": [
+        "开关持久化",
+        "联网工具的执行与过滤"
+      ],
+      "publicApi": [
+        "getAgentWebResearch",
+        "setAgentWebResearch",
+        "subscribeAgentWebResearch",
+        "__resetAgentWebResearchForTest"
+      ],
+      "test": [
+        "src/state/ui/agentWebResearch.test.ts"
+      ],
+      "budget": 60
+    },
+    {
       "module": "src/features/canvas/useCanvasDrop.ts",
       "owner": "canvas-drop-interaction",
       "responsibility": "统一画布系统文件拖入与项目参考卡拖入，复用既有导入和素材节点创建链。",

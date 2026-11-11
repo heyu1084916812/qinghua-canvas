@@ -6,6 +6,7 @@ export type AgentToolName =
   | 'readAsset'
   | 'curateReferences'
   | 'researchDesign'
+  | 'readPage'
   | 'applyPlan'
   | 'updateNode'
   | 'proposeTaskPlan'
@@ -66,6 +67,12 @@ export const AGENT_TOOL_DEFINITIONS: readonly AgentToolDefinition[] = [
   },
   {
     name: 'researchDesign',
+    category: 'host-service',
+    access: 'read',
+    sideEffect: 'none',
+  },
+  {
+    name: 'readPage',
     category: 'host-service',
     access: 'read',
     sideEffect: 'none',

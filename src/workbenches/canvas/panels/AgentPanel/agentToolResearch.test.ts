@@ -8,6 +8,7 @@ import type {
 } from '../../../../features/shared/research/designResearchRunner'
 import {
   createAgentToolResearch,
+  WEB_RESEARCH_OFF_RESULT,
   type AgentToolCachedInspirationSource,
   type AgentToolConfiguredInspirationSource,
 } from './agentToolResearch'
@@ -59,6 +60,8 @@ interface HarnessInit {
   configuredThrows?: unknown
   signal?: AbortSignal
   describeError?: (error: unknown) => string
+  tavilyKey?: string | null
+  webEnabled?: boolean
 }
 
 const harness = (init: HarnessInit = {}) => {
@@ -68,6 +71,7 @@ const harness = (init: HarnessInit = {}) => {
     signal: AbortSignal
   }[] = []
   const remembers: MemoryCandidate[] = []
+  const pageCalls: string[] = []
   const state = {
     signal: init.signal ?? new AbortController().signal,
     signalCalls: 0,
@@ -88,6 +92,12 @@ const harness = (init: HarnessInit = {}) => {
       return init.configuredSources ?? []
     },
     readWebSearch: async () => ({ endpoint: 'https://search.example.com/search' }),
+    readTavilyKey: async () => init.tavilyKey ?? null,
+    webEnabled: () => init.webEnabled ?? true,
+    readPage: async (_network, url) => {
+      pageCalls.push(url)
+      return { ok: true, url, title: 't', content: 'c', truncated: false, totalChars: 1 }
+    },
     network,
     runResearch: async (input, deps, signal) => {
       researchCalls.push({ input, deps, signal })
@@ -102,7 +112,7 @@ const harness = (init: HarnessInit = {}) => {
       ((error) => (error instanceof Error ? error.message : String(error))),
   })
 
-  return { tool, researchCalls, remembers, state }
+  return { tool, researchCalls, remembers, state, pageCalls }
 }
 
 describe('rememberMemory', () => {
@@ -238,6 +248,9 @@ describe('researchDesign', () => {
         return configuredPromise
       },
       readWebSearch: async () => ({ endpoint: 'https://search.example.com/search' }),
+      readTavilyKey: async () => null,
+      webEnabled: () => true,
+      readPage: async () => ({ ok: false, url: '', title: '', content: '', truncated: false, totalChars: 0 }),
       network,
       runResearch: async (input) => ({ ok: true, topic: input.topic }),
       signal: () => new AbortController().signal,
@@ -287,5 +300,33 @@ describe('researchDesign', () => {
     expect(researchCalls[0].signal).toBe(first)
     expect(researchCalls[1].signal).toBe(second)
     expect(state.signalCalls).toBe(2)
+  })
+})
+
+describe('联网开关与 Tavily Key', () => {
+  it('开关关闭时 researchDesign / readPage 都直接返回「联网已关闭」，不触发任何请求', async () => {
+    const { tool, researchCalls, pageCalls } = harness({ webEnabled: false })
+    const research = await tool.researchDesign({ topic: '咖啡海报' })
+    const page = await tool.readPage({ url: 'https://example.com/a' })
+    expect(research).toEqual(WEB_RESEARCH_OFF_RESULT)
+    expect(page).toEqual(WEB_RESEARCH_OFF_RESULT)
+    expect(researchCalls).toHaveLength(0)
+    expect(pageCalls).toHaveLength(0)
+  })
+
+  it('把设置里的 Tavily Key 只交给调研执行器的 deps，而不是输入', async () => {
+    const { tool, researchCalls } = harness({ tavilyKey: 'tvly-k' })
+    await tool.researchDesign({ topic: '咖啡海报', queries: ['a', 'b'] })
+    expect(researchCalls[0]?.deps.tavilyApiKey).toBe('tvly-k')
+    expect(researchCalls[0]?.input).toEqual({ topic: '咖啡海报', queries: ['a', 'b'] })
+  })
+
+  it('没有 Key 时仍然调用执行器（由执行器给出明确提示），readPage 不需要 Key', async () => {
+    const { tool, researchCalls, pageCalls } = harness({ tavilyKey: null })
+    await tool.researchDesign({ topic: 'x' })
+    expect(researchCalls[0]?.deps.tavilyApiKey).toBeNull()
+    const page = await tool.readPage({ url: 'https://example.com/b' })
+    expect(page).toMatchObject({ ok: true })
+    expect(pageCalls).toEqual(['https://example.com/b'])
   })
 })

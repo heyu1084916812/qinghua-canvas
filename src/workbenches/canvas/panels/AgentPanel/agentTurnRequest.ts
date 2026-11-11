@@ -61,6 +61,7 @@ import {
 } from '../../agent/agentSystemPrompt'
 import { sessionBriefForContinuation } from './agentSessionBrief'
 import { agentToolsForRequestMode } from '../../agent/tools'
+import { getAgentWebResearch } from '../../../../state/ui/agentWebResearch'
 import { errText } from '../../agent/agentLoop'
 import type {
   AgentChatRoute,
@@ -133,6 +134,8 @@ export interface PrepareAgentTurnRequestInput {
   skills: readonly Skill[]
   channels: readonly Channel[]
   canvasReviewEnabled: boolean
+  /** Agent 输入框「联网」开关；缺省读全局开关当前值。 */
+  webResearchEnabled?: boolean
   activeAgentTools: readonly ToolDeclaration[]
   generationAvailability: {
     image?: GenerationAvailability
@@ -654,9 +657,11 @@ export async function prepareAgentTurnRequest(
         },
       })
     : undefined
+  const webResearchEnabled = input.webResearchEnabled ?? getAgentWebResearch()
   const turnTools = [
     ...agentToolsForRequestMode(requestMode, {
       canvasReview: input.canvasReviewEnabled,
+      webResearch: webResearchEnabled,
     }),
   ]
   const referenceRootIds =
@@ -677,6 +682,7 @@ export async function prepareAgentTurnRequest(
       requestMode,
       promptProfile,
       canvasReviewEnabled: input.canvasReviewEnabled,
+      webResearchEnabled,
       imageInputAccepted: chatModelAcceptsImages(
         capabilityOfLogical(
           input.channels,

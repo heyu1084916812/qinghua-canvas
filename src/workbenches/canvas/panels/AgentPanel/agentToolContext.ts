@@ -85,5 +85,6 @@ export function composeAgentToolContext(
     ...input.recipe,
     rememberMemory: input.research.rememberMemory,
     researchDesign: input.research.researchDesign,
+    readPage: input.research.readPage,
   }
 }
