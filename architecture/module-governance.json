@@ -543,6 +543,29 @@
   "moduleMoves": [],
   "modules": [
     {
+      "module": "src/domain/canvas/nodeSpecs/contextAssetRoles.ts",
+      "owner": "canvas-generation-spec",
+      "responsibility": "把生成节点随附参考图按真实输入顺序编号，并写出每张图在本任务里的分工与约束。",
+      "owns": [
+        "参考图分工提示词（Logo / 产品主体 / 排版 / 风格 / 规范）",
+        "套件素材去重与可用性规则"
+      ],
+      "doesNotOwn": [
+        "参考台账与用法分析",
+        "图片输入的收集顺序（generationSpec.collectInputs）"
+      ],
+      "publicApi": [
+        "contextAssetRolePrompt",
+        "contextAssetRoleLine",
+        "usableContextAssets",
+        "LOGO_RULE"
+      ],
+      "test": [
+        "src/domain/canvas/nodeSpecs/contextAssetRoles.test.ts"
+      ],
+      "budget": 180
+    },
+    {
       "module": "src/domain/agent/agentTask.ts",
       "owner": "agent-runtime",
       "responsibility": "判定 Agent 会话内的任务延续还是新开，并给参考台账提供按任务的 taskKey。",

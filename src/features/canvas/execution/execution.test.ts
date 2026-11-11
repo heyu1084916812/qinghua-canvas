@@ -173,7 +173,7 @@ describe('buildRunPlan（单点生成）', () => {
       nodeId: 'n-prompt',
       text: PROMPT_TEXT,
     })
-    expect(plan.tasks[0]!.request.prompt).toContain('第 1 张随附图片是品牌 Logo「Sogami Logo」')
+    expect(plan.tasks[0]!.request.prompt).toContain('图 1：品牌 Logo「Sogami Logo」')
     expect(plan.tasks[0]!.request.prompt).toContain('不得重画或改成相似字样')
     expect(dataOf(store, genId)).not.toHaveProperty('contextAssets')
   })

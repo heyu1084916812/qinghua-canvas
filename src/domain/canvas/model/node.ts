@@ -73,7 +73,22 @@ export interface GenerationContextAsset {
   mime: string
   role: 'logo' | 'reference'
   name: string
+  /**
+   * 这张参考在本任务里的分工（来自参考台账的 usage）。缺省 = 旧数据 / 套件素材，
+   * 提示词按「品牌素材」兜底说明。见 `nodeSpecs/contextAssetRoles.ts`。
+   */
+  usage?: GenerationContextAssetUsage
+  /** 台账里「本任务怎么用」的原话（提示词里会截短）。 */
+  howToUse?: string
 }
+
+export type GenerationContextAssetUsage =
+  | 'subject'
+  | 'identityAnchor'
+  | 'composition'
+  | 'style'
+  | 'textGuide'
+  | 'avoid'
 
 export interface GenerationData {
   mode: 'image' | 'video'

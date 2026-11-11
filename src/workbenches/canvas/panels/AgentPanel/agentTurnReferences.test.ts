@@ -130,8 +130,8 @@ describe('Agent turn reference projection', () => {
 
     expect(result.assetRefs).toEqual([
       { hash: 'logo-hash', mime: 'image/png', role: 'logo', name: 'Logo' },
-      { hash: 'photo-1', mime: 'image/png', role: 'reference', name: '空间一' },
-      { hash: 'photo-2', mime: 'image/png', role: 'reference', name: '空间二' },
+      { hash: 'photo-1', mime: 'image/png', role: 'reference', name: '空间一', usage: 'style', howToUse: '沿用品牌图片' },
+      { hash: 'photo-2', mime: 'image/png', role: 'reference', name: '空间二', usage: 'style', howToUse: '沿用品牌图片' },
     ])
   })
 
@@ -172,5 +172,35 @@ describe('Agent turn reference projection', () => {
       '套件素材「缺失照片」已缺失，本轮已跳过。',
     ])
     expect(result.phaseEvent?.detail).toContain('缺失照片')
+  })
+  it('G2：非 Logo 图带上台账分工与本任务用法；未分析的显式 chip 不冒充分工', () => {
+    const image = (id: string, hash: string) => ({
+      id,
+      projectId: 'p1',
+      title: id,
+      source: 'asset' as const,
+      kind: 'image' as const,
+      assetHash: hash,
+      what: id,
+      createdAt: 1,
+      updatedAt: 1,
+    })
+    const result = projectAgentTurnReferences({
+      selected: [
+        {
+          item: image('排版', 'h-layout'),
+          usage: { id: 'u-layout', itemId: '排版', projectId: 'p1', taskKey: 'task:t', usage: 'composition', howToUse: '借分栏', createdAt: 1 },
+        },
+        {
+          item: image('手选', 'h-pick'),
+          usage: { id: 'explicit:手选:task:t', itemId: '手选', projectId: 'p1', taskKey: 'task:t', usage: 'style', howToUse: '兜底', createdAt: 1 },
+        },
+      ],
+      omitted: [],
+    }, () => 'image/png')
+    expect(result.assetRefs).toEqual([
+      { hash: 'h-layout', mime: 'image/png', role: 'reference', name: '排版', usage: 'composition', howToUse: '借分栏' },
+      { hash: 'h-pick', mime: 'image/png', role: 'reference', name: '手选' },
+    ])
   })
 })

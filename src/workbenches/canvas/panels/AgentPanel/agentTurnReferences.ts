@@ -34,6 +34,7 @@ export function projectAgentTurnReferences(
       `- 【${label}】这是什么：${item.what.trim()}；本轮怎么用：${usage.howToUse.trim()}；用法类型：${usage.usage}。`,
     )
     evidence.push(`${item.id}:${usage.id}`)
+    const analyzed = !usage.id.startsWith('explicit:')
     const mediaAssets = item.assets?.length
       ? item.assets
       : item.assetHash
@@ -55,6 +56,12 @@ export function projectAgentTurnReferences(
         mime,
         role: asset.role,
         name: asset.name.trim() || label,
+        // G2：把台账分工带到生成节点，生图提示词据此写「图 N：排版参考 / 产品主体…」。
+        // 未经分析的显式 chip（explicit: 兜底用法）不冒充分工，按通用素材说明。
+        ...(asset.role === 'logo' || !analyzed ? {} : { usage: usage.usage }),
+        ...(asset.role !== 'logo' && analyzed && usage.howToUse.trim()
+          ? { howToUse: usage.howToUse.trim() }
+          : {}),
       })
     }
   }

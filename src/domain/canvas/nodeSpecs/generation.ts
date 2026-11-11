@@ -9,36 +9,15 @@ import { batchItemsOf } from './batch'
 import { generationParams } from './params'
 import { presetPromptSuffix } from '../layout/presets'
 import { nodeContentUsable } from '../execution/disabledNode'
+import { contextAssetRolePrompt, usableContextAssets } from './contextAssetRoles'
 
 function contextAssetInputs(data: GenerationData): NodeInput[] {
-  return (data.contextAssets ?? []).flatMap((asset) => {
-    const hash = asset.hash.trim()
-    if (!hash || !asset.mime.startsWith('image/')) return []
-    return [{
-      kind: 'asset' as const,
-      nodeId: `context-kit:${hash}`,
-      assetHash: hash,
-      mime: asset.mime,
-    }]
-  })
-}
-
-function contextAssetPrompt(data: GenerationData): string {
-  const assets = (data.contextAssets ?? []).filter(
-    (asset) => asset.hash.trim() && asset.mime.startsWith('image/'),
-  )
-  if (assets.length === 0) return ''
-  const logoIndex = assets.findIndex((asset) => asset.role === 'logo')
-  const lines = [
-    '品牌素材约束：',
-    logoIndex >= 0
-      ? `第 ${logoIndex + 1} 张随附图片是品牌 Logo${
-          assets[logoIndex]!.name.trim() ? `「${assets[logoIndex]!.name.trim()}」` : ''
-        }，必须按原图保留字形、比例、颜色和标志结构，不得重画或改成相似字样。`
-      : '随附品牌素材中的标志必须按原图使用，不得重画或改成相似字样。',
-    '其余随附品牌素材用于核对颜色、字体气质、版式语言和画面规范，不要照抄无关内容。',
-  ]
-  return lines.join('\n')
+  return usableContextAssets(data.contextAssets).map((asset) => ({
+    kind: 'asset' as const,
+    nodeId: `context-kit:${asset.hash.trim()}`,
+    assetHash: asset.hash.trim(),
+    mime: asset.mime,
+  }))
 }
 
 /**
@@ -228,7 +207,7 @@ export const generationSpec: NodeSpec<GenerationData> = {
     const prompt = [
       data.prompt.trim() || upstreamText.trim(),
       presetPromptSuffix(data),
-      contextAssetPrompt(data),
+      contextAssetRolePrompt(data.contextAssets, inputs),
     ]
       .filter(Boolean)
       .join('\n')

@@ -525,7 +525,7 @@ describe('prepareAgentTurnRequest', () => {
     if (result.kind !== 'ready') return
     expect(result.contextTrace?.assetRefs).toEqual([
       { hash: 'image-logo', mime: 'image/png', role: 'logo', name: 'Logo' },
-      { hash: 'image-room', mime: 'image/png', role: 'reference', name: '空间' },
+      { hash: 'image-room', mime: 'image/png', role: 'reference', name: '空间', usage: 'style', howToUse: '沿用完整套件' },
     ])
     expect(result.contextTrace?.referenceWarnings).toEqual([
       '套件素材「缺失图」已缺失，本轮已跳过。',
@@ -1092,5 +1092,38 @@ describe('prepareAgentTurnRequest', () => {
     expect(autoCurated).toEqual([['ref-product'], ['ref-product'], ['ref-product']])
     expect(unrelated.agentTask.referenceIds).toEqual([])
     expect((await sessions.get(session.id))?.agentTask?.id).toBe(unrelated.agentTask.id)
+  })
+  it('★★ G2 显式参考按提及顺序进入图片输入（编号与「第 1 张 / 第 2 张」一致）', async () => {
+    const { sessions, session } = await createSession()
+    const image = (id: string, createdAt: number) => ({
+      id,
+      projectId: 'p1',
+      title: id,
+      source: 'file' as const,
+      kind: 'image' as const,
+      assetHash: `hash-${id}`,
+      what: id,
+      createdAt,
+      updatedAt: createdAt,
+    })
+    const result = await prepareAgentTurnRequest({
+      ...inputFor({
+        sessions,
+        session,
+        text:
+          `用${mentionToken('reference', 'layout', '排版')}的排版，` +
+          `把${mentionToken('reference', 'cup', '产品')}放进去做一张海报`,
+      }),
+      referenceLedger: {
+        selectForTask: vi.fn(async () => ({ selected: [], omitted: [] })),
+        // 台账按创建时间返回：产品图更早，但用户先提的是排版图。
+        listItems: vi.fn(async () => [image('cup', 1), image('layout', 2)]),
+      },
+    })
+    if (result.kind !== 'ready') throw new Error(result.kind)
+    expect(result.contextTrace?.assetRefs.map((row) => row.hash)).toEqual([
+      'hash-layout',
+      'hash-cup',
+    ])
   })
 })

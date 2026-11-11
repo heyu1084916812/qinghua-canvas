@@ -380,11 +380,14 @@ export async function prepareAgentTurnRequest(
     const taskSelection = input.referenceLedger
       ? await input.referenceLedger.selectForTask(input.projectId, taskKey)
       : null
-    const explicitItems = input.referenceLedger && referenceIds.length > 0
-      ? (await input.referenceLedger.listItems(input.projectId)).filter(
-          (item) => referenceIds.includes(item.id),
-        )
+    // 按用户提及顺序排列（G2：图片编号与提及顺序对齐）。
+    const ledgerItems = input.referenceLedger && referenceIds.length > 0
+      ? await input.referenceLedger.listItems(input.projectId)
       : []
+    const explicitItems = referenceIds.flatMap((id) => {
+      const item = ledgerItems.find((row) => row.id === id)
+      return item ? [item] : []
+    })
     const selection = taskSelection
       ? mergeExplicitReferences(taskSelection, explicitItems, taskKey)
       : explicitItems.length > 0
@@ -787,16 +790,17 @@ function mergeExplicitReferences(
   const selectedByItem = new Map(
     selection.selected.map((row) => [row.item.id, row]),
   )
-  for (const item of explicitItems) {
-    if (selectedByItem.has(item.id)) continue
-    selectedByItem.set(item.id, {
+  const explicitIds = new Set(explicitItems.map((item) => item.id))
+  // 显式提及的参考按提及顺序排在前面，其余本任务已选的参考保持台账排序。
+  const ordered = [
+    ...explicitItems.map((item) => selectedByItem.get(item.id) ?? {
       item,
       usage: explicitReferenceUsage(item, taskKey),
-    })
-  }
-  const explicitIds = new Set(explicitItems.map((item) => item.id))
+    }),
+    ...selection.selected.filter((row) => !explicitIds.has(row.item.id)),
+  ]
   return {
-    selected: [...selectedByItem.values()],
+    selected: ordered,
     omitted: selection.omitted.filter((row) => !explicitIds.has(row.item.id)),
   }
 }

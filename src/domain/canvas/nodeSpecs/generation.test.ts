@@ -198,8 +198,9 @@ describe('生成节点规格 / 输入收集（M6-12）', () => {
       params: g.nodes[0]!.data,
       graph: g,
     })
-    expect(req?.prompt).toContain('第 1 张随附图片是品牌 Logo「Sogami Logo」')
+    expect(req?.prompt).toContain('图 1：品牌 Logo「Sogami Logo」')
     expect(req?.prompt).toContain('不得重画或改成相似字样')
+    expect(req?.prompt).toContain('图 2：品牌素材「目录参考」')
   })
 })
 
