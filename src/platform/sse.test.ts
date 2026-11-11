@@ -81,4 +81,13 @@ describe('OpenAI-compatible SSE parser', () => {
       error: { kind: 'http', status: 502, body: 'upstream overloaded' },
     })
   })
+
+  it('ignores the trailing usage-only chunk instead of leaking it as reply text (65535)', () => {
+    expect(parseSSELine(
+      'data: {"choices":[],"id":"chatcmpl-1","model":"gemini-3.8-flash","object":"chat.completion.chunk","usage":{"completion_tokens":21,"prompt_tokens":35,"total_tokens":56}}',
+    )).toBeNull()
+    expect(parseSSELine(
+      'data: {"id":"chatcmpl-1","object":"chat.completion.chunk","usage":{"total_tokens":3}}',
+    )).toBeNull()
+  })
 })

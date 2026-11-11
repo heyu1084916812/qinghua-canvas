@@ -124,6 +124,18 @@ export function parseSSELine(line: string): StreamChunk | null {
         ...(toolCalls.length > 0 ? { toolCallDeltas: toolCalls } : {}),
       }
     }
+    /**
+     * OpenAI 兼容流的协议元数据（例如 `stream_options` / 网关自带的末尾 usage 块：
+     * `{"choices":[],"usage":{...}}`）没有可见内容，不能当正文。旧逻辑把整段 JSON
+     * 当成 delta 文本拼进回复末尾（65535 每次对话都会带这一块），
+     * 结果回复里混进一串 JSON，Agent 解析工具/计划时随之失败。
+     */
+    if (
+      Array.isArray(parsed.choices) ||
+      (typeof parsed.object === 'string' && parsed.object.startsWith('chat.completion'))
+    ) {
+      return null
+    }
     return { type: 'delta', text: payload }
   } catch {
     return { type: 'delta', text: payload }
