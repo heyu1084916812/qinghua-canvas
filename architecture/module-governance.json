@@ -543,6 +543,30 @@
   "moduleMoves": [],
   "modules": [
     {
+      "module": "src/domain/agent/seriesAnchors.ts",
+      "owner": "agent-runtime",
+      "responsibility": "判定 Agent 计划里生成节点的用途（Logo / 包装 / 海报），按用途分配参考图，并检查整套任务后续节点是否以锚点节点为上游。",
+      "owns": [
+        "节点用途识别规则",
+        "按节点分配参考图（Logo 节点不拿产品图）",
+        "整套任务锚点连线检查"
+      ],
+      "doesNotOwn": [
+        "计划落地与连线解析",
+        "参考台账用法分析"
+      ],
+      "publicApi": [
+        "SeriesNodePurpose",
+        "seriesNodePurpose",
+        "allocateContextAssetsForNode",
+        "seriesAnchorProblems"
+      ],
+      "test": [
+        "src/domain/agent/seriesAnchors.test.ts"
+      ],
+      "budget": 200
+    },
+    {
       "module": "src/domain/canvas/nodeSpecs/contextAssetRoles.ts",
       "owner": "canvas-generation-spec",
       "responsibility": "把生成节点随附参考图按真实输入顺序编号，并写出每张图在本任务里的分工与约束。",

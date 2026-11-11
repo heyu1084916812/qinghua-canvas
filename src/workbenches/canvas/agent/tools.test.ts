@@ -1972,3 +1972,40 @@ describe('★★ applyPlan：多张图要各自一条流程（perImage）', () =
     expect(r.ok).toBe(true)
   })
 })
+
+describe('★★ applyPlan：整套任务先定锚点（G4）', () => {
+  const seriesPlan = (edges: AgentPlan['edges']): AgentPlan => ({
+    summary: '奶茶店整套',
+    nodes: [
+      { localId: 'logo', type: 'generation', title: '奶茶店 Logo', data: { prompt: '极简字标' }, order: 0 },
+      { localId: 'pack', type: 'generation', title: '杯身包装', data: { prompt: '杯身印 Logo' }, order: 1 },
+      { localId: 'poster', type: 'generation', title: '开业海报', data: { prompt: '开业海报' }, order: 2 },
+    ],
+    edges,
+  })
+
+  it('包装 / 海报没连到前一锚点 → 退回让模型补连线，画布不落地', async () => {
+    const { store, ctx } = setup()
+    const before = store.getSnapshot().nodes.length
+    const r = (await executeConfirmedTool('applyPlan', seriesPlan([]), ctx)) as {
+      ok: boolean
+      problems?: string[]
+    }
+    expect(r.ok).toBe(false)
+    expect(r.problems?.join(' ')).toContain('logo → pack')
+    expect(store.getSnapshot().nodes.length).toBe(before)
+  })
+
+  it('Logo → 包装 → 海报串起来就放行', async () => {
+    const { ctx } = setup()
+    const r = (await executeConfirmedTool(
+      'applyPlan',
+      seriesPlan([
+        { source: 'logo', target: 'pack' },
+        { source: 'pack', target: 'poster' },
+      ]),
+      ctx,
+    )) as { ok: boolean }
+    expect(r.ok).toBe(true)
+  })
+})

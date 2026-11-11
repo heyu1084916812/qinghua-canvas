@@ -80,7 +80,26 @@ describe('buildLandingCommand', () => {
     const prompt = r.command.nodes.find((node) => node.type === 'prompt')
     const generation = r.command.nodes.find((node) => node.type === 'generation')
     expect(prompt?.data).not.toHaveProperty('contextAssets')
-    expect(generation?.data).toMatchObject({ contextAssets })
+    expect(generation?.data).toMatchObject({ contextAssets, contextAssetScope: 'node' })
+  })
+
+  it('G4：节点分到空参考时仍标记为已按节点分配，运行时不再整批补齐', () => {
+    seq = 0
+    const plan: AgentPlan = {
+      summary: 'Logo',
+      nodes: [{ localId: 'g1', type: 'generation', title: 'Logo', data: {}, order: 0 }],
+      edges: [],
+    }
+    const r = buildLandingCommand({
+      plan,
+      graph: graph(),
+      origin: { x: 0, y: 0 },
+      newId,
+      contextAssetsFor: () => [],
+    })
+    const data = r.command.nodes[0]?.data as Record<string, unknown>
+    expect(data.contextAssetScope).toBe('node')
+    expect(data).not.toHaveProperty('contextAssets')
   })
 
   it('纯新建计划按当前视口的世界包围盒居中', () => {

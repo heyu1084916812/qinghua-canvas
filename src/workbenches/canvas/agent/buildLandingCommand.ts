@@ -359,7 +359,11 @@ export function buildLandingCommand(input: BuildLandingInput): LandingPayload {
         ...(node.type === 'generation'
           ? (() => {
               const contextAssets = input.contextAssetsFor?.(node.type, node)
-              return contextAssets && contextAssets.length > 0 ? { contextAssets } : {}
+              if (!contextAssets) return {}
+              // 已按节点分配（可能为空，例如 Logo 节点不拿产品图）：运行时不再整批补齐。
+              return contextAssets.length > 0
+                ? { contextAssets, contextAssetScope: 'node' as const }
+                : { contextAssetScope: 'node' as const }
             })()
           : {}),
       } as NodeData,

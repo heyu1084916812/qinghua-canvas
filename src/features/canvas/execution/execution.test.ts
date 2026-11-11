@@ -178,6 +178,19 @@ describe('buildRunPlan（单点生成）', () => {
     expect(dataOf(store, genId)).not.toHaveProperty('contextAssets')
   })
 
+  it('★★ G4 已按节点分配参考的生成节点，运行时不再并入本轮全部素材', () => {
+    const { store, promptId, genId } = setup()
+    store.dispatch({ kind: 'node.updateData', id: genId, patch: { contextAssetScope: 'node' } })
+    const plan = buildRunPlan(
+      'node',
+      { originNodeId: promptId },
+      store.getSnapshot(),
+      'single',
+      { contextAssets: [{ hash: 'cup', mime: 'image/png', role: 'reference', name: '产品' }] },
+    )
+    expect(plan.tasks[0]!.request.inputs.some((input) => input.kind === 'asset')).toBe(false)
+  })
+
   it('★ 已运行中的空下游节点不再被第二条计划复用', () => {
     const { store, promptId, genId } = setup()
     const plan = buildRunPlan(

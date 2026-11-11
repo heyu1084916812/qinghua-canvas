@@ -94,6 +94,11 @@ export interface GenerationData {
   mode: 'image' | 'video'
   /** 项目品牌 / 产品套件素材；按 Logo 优先、再 Reference 的顺序进入图片输入。 */
   contextAssets?: GenerationContextAsset[]
+  /**
+   * 'node' = Agent 建节点时已按节点用途分配好参考（G4），运行时不再把本轮全部参考并进来。
+   * 缺省 = 旧节点 / 手动节点：运行时仍按 Agent 本轮素材补齐。
+   */
+  contextAssetScope?: 'node'
   assetHash?: string
   /**
    * 节点当前产物的真实 MIME。

@@ -341,6 +341,24 @@ describe('contextAssetsForGenerated', () => {
 
     expect(ctx.contextAssetsForGenerated('generation')).toEqual([])
   })
+
+  it('G4：按节点用途分配，Logo 节点不拿产品图，Logo 永远排第一', () => {
+    const { ctx } = harness({
+      contextAssets: [
+        { ...asset('cup', 'image/png'), usage: 'subject' },
+        { ...asset('logo', 'image/png'), role: 'logo' },
+        { ...asset('mood', 'image/png'), usage: 'style' },
+      ],
+    })
+    expect(
+      ctx.contextAssetsForGenerated('generation', { title: '奶茶店 Logo', data: {} })
+        ?.map((item) => item.hash),
+    ).toEqual(['logo', 'mood'])
+    expect(
+      ctx.contextAssetsForGenerated('generation', { title: '开业海报', data: {} })
+        ?.map((item) => item.hash),
+    ).toEqual(['logo', 'cup', 'mood'])
+  })
 })
 
 describe('categoryOfModel / channelIdForModel', () => {

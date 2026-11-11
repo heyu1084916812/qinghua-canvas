@@ -1,3 +1,4 @@
+import { seriesAnchorProblems } from '../../../domain/agent/seriesAnchors'
 import {
   alignGenerationMode,
   type AgentNodeType,
@@ -490,6 +491,9 @@ export async function executeConfirmedTool(
           }
         }
       }
+      /** 整套任务（Logo → 包装 → 海报）后续节点必须以锚点节点为上游（G4，见 seriesAnchors.ts）。 */
+      const anchorProblems = seriesAnchorProblems(plan)
+      if (anchorProblems.length > 0) return { ok: false, problems: anchorProblems }
       /**
        * 生成节点的 `mode` **以模型自己的类别为准**（详见 `alignGenerationMode`）：
        * 真模型常把视频节点写成 `mode:"image"`，不纠正的话请求都组不出来。

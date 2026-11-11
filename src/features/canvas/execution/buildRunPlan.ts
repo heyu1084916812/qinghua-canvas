@@ -293,7 +293,9 @@ export function buildRunPlan(
   ordered.forEach((node) => {
     const spec = getSpec(node.type)!
     const effectiveNode =
-      node.type === 'generation' && (opts.contextAssets?.length ?? 0) > 0
+      node.type === 'generation' &&
+      (opts.contextAssets?.length ?? 0) > 0 &&
+      (node.data as GenerationData).contextAssetScope !== 'node'
         ? {
             ...node,
             data: {
