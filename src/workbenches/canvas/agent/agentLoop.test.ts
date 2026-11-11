@@ -1535,3 +1535,55 @@ describe('runAgentTurn · 刹车与失败回填', () => {
     if (r.kind === 'error') expect(r.message).toContain('401')
   })
 })
+
+describe('runAgentTurn · 完成说明核对（A7）', () => {
+  const ranHistory = (): ChatMessage[] => [
+    { role: 'user', content: '可以，生成吧' },
+    { role: 'assistant', content: '', toolCalls: [{ id: 'run-call', name: 'runNode', args: '{"nodeIds":["n1"]}' }] },
+    {
+      role: 'tool',
+      toolCallId: 'run-call',
+      toolName: 'runNode',
+      content: '{"ok":true,"outcomes":[{"nodeId":"n1","ok":true,"model":"gpt-image-2.5"}]}',
+    },
+  ]
+  const realResult = {
+    results: [{ nodeId: 'n1', title: '海报', status: 'ok', outputs: [{ hash: 'h1', mime: 'image/png', width: 1086, height: 1448 }] }],
+  }
+
+  it('★★ 运行后没 readResult 就说 2K → 打回；核对后改口属实 → 放行原文', async () => {
+    const executeRead = vi.fn(async () => realResult) as never
+    const { deps, adapter } = depsWith(
+      [
+        { text: '海报已经生成完成（3:4 竖版 2K）。' },
+        { toolCalls: [{ id: 'rr', name: 'readResult', args: '{"nodeIds":["n1"]}' }] },
+        { text: '海报已经生成完成，实际 1086×1448。' },
+      ],
+      executeRead,
+    )
+    const result = await runAgentTurn(ranHistory(), deps)
+    expect(adapter.completeText).toHaveBeenCalledTimes(3)
+    expect(result.kind).toBe('message')
+    if (result.kind === 'message') expect(result.text).toBe('海报已经生成完成，实际 1086×1448。')
+    const gate = result.messages.find((m) => m.role === 'system' && m.content.includes('完成说明与本轮真实结果不符'))
+    expect(gate?.content).toContain('readResult')
+  })
+
+  it('★★ 核对后仍坚持 2K → 不再打转，回答末尾附上 readResult 的真实尺寸与张数', async () => {
+    const executeRead = vi.fn(async () => realResult) as never
+    const { deps } = depsWith(
+      [
+        { toolCalls: [{ id: 'rr', name: 'readResult', args: '{"nodeIds":["n1"]}' }] },
+        { text: '海报已生成，2K 高清。' },
+        { text: '海报已生成，2K 高清。' },
+      ],
+      executeRead,
+    )
+    const result = await runAgentTurn(ranHistory(), deps)
+    expect(result.kind).toBe('message')
+    if (result.kind === 'message') {
+      expect(result.text).toContain('海报已生成，2K 高清。')
+      expect(result.text).toContain('实际结果（readResult 核对）：「海报」1086×1448；共 1 张。')
+    }
+  })
+})

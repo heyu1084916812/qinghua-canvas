@@ -4,6 +4,11 @@ import {
   AGENT_WRITE_TOOL_NAMES,
 } from '../../../domain/agent/toolRegistry'
 import { errorTextOf } from '../../../shared/result'
+import { resultClaimProblems, resultFactsLine, turnResultFacts } from './agentResultClaimGuard'
+
+/** 声称完成却没有执行证据时，拦下回答给用户的说明（两条收尾路径共用） */
+export const BLOCKED_CLAIM_MESSAGE =
+  '模型声称画布动作已完成（或承诺了当前不存在的能力），但本轮没有对应的成功执行记录；已拦下这次回答。请重试，或换一个对话模型。'
 
 export type CanvasActionCategory =
   | 'rename'
@@ -186,6 +191,8 @@ export interface AgentCanvasClaimGuard {
     step: number,
   ): Promise<'ok' | 'continue' | 'blocked'>
   noteCapabilityDiscoveryRan(): void
+  /** 核对后仍与真实结果不符时，在回答末尾附上 readResult 的真实尺寸 / 张数（A7） */
+  verifiedFinalText(text: string): string
 }
 
 /**
@@ -200,6 +207,7 @@ export function createAgentCanvasClaimGuard(
   let capabilityDiscoveryRan = false
   let promiseGateRan = false
   let completionGateRan = false
+  let resultGateRan = false
 
   const lastUserRequestOf = (): string =>
     [...ports.messages]
@@ -278,6 +286,28 @@ export function createAgentCanvasClaimGuard(
     return true
   }
 
+  /**
+   * 完成说明里的尺寸 / 张数 / 出图模型必须与本轮真实结果一致（Agent 实测 Bug A7）。
+   * 第一次不符：回填真实差异，要求先 readResult 再改写；仍不符由 verifiedFinalText 附事实行。
+   */
+  const guardResultClaims = (text: string): 'ok' | 'continue' => {
+    if (resultGateRan) return 'ok'
+    const problems = resultClaimProblems(text, turnResultFacts(ports.messages))
+    if (problems.length === 0) return 'ok'
+    resultGateRan = true
+    ports.messages.push({
+      role: 'system',
+      content:
+        '完成说明与本轮真实结果不符，不能作为最终回答：\n' +
+        problems.map((problem) => `- ${problem}`).join('\n') +
+        '\n尺寸、张数、出图模型只能照 runNode 的 outcomes 与运行后 readResult 的真实结果写；' +
+        '还没调用 readResult 就先调用它，再改写回答。不确定的不写。',
+      createdAt: Date.now(),
+    })
+    ports.emitProgress()
+    return 'continue'
+  }
+
   const guardFinalCanvasClaims = async (
     text: string,
     step: number,
@@ -321,8 +351,9 @@ export function createAgentCanvasClaimGuard(
       }
     }
     const claim = claimsCanvasActionDone(text)
-    if (!claim) return 'ok'
-    if (hasSuccessfulCanvasMutation(ports.messages, claim.category)) return 'ok'
+    if (!claim || hasSuccessfulCanvasMutation(ports.messages, claim.category)) {
+      return guardResultClaims(text)
+    }
     if (completionGateRan) return 'blocked'
     completionGateRan = true
     ports.messages.push({
@@ -343,6 +374,12 @@ export function createAgentCanvasClaimGuard(
     guardFinalCanvasClaims,
     noteCapabilityDiscoveryRan: () => {
       capabilityDiscoveryRan = true
+    },
+    verifiedFinalText: (text) => {
+      const facts = turnResultFacts(ports.messages)
+      return resultClaimProblems(text, facts).length === 0
+        ? text
+        : `${text}\n\n${resultFactsLine(facts)}`
     },
   }
 }

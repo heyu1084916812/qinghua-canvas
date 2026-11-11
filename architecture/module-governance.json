@@ -8755,6 +8755,32 @@
         "src/workbenches/canvas/panels/AgentPanel/agentVisibleText.test.ts"
       ],
       "budget": 110
+    },
+    {
+      "module": "src/workbenches/canvas/agent/agentResultClaimGuard.ts",
+      "owner": "canvas-agent-claim-guard",
+      "responsibility": "完成说明核对：从本轮 runNode outcomes 与运行后 readResult 提取真实尺寸、张数与出图模型，判定回答里的说法是否属实并给出事实行。",
+      "owns": [
+        "本轮真实结果事实提取",
+        "尺寸 / 张数 / 模型说法的比对规则",
+        "核对事实行文案"
+      ],
+      "doesNotOwn": [
+        "主循环重试与收尾顺序",
+        "画布读取与执行"
+      ],
+      "publicApi": [
+        "ResultOutputFact",
+        "TurnResultFacts",
+        "turnResultFacts",
+        "resultClaimProblems",
+        "resultFactsLine"
+      ],
+      "test": [
+        "src/workbenches/canvas/agent/agentResultClaimGuard.test.ts",
+        "src/workbenches/canvas/agent/agentLoop.test.ts"
+      ],
+      "budget": 190
     }
   ]
 }

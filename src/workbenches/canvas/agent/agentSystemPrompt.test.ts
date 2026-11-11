@@ -606,3 +606,15 @@ describe('运行确认由程序负责（A6）', () => {
     expect(prompt).toContain('正文不要再问「要不要现在跑」')
   })
 })
+
+describe('完成说明核对（A7）', () => {
+  it('★ 完整档与轻量档都要求按 readResult 真实结果报尺寸 / 张数 / 模型', () => {
+    for (const prompt of [
+      buildAgentSystemPrompt(summarizeForPrompt([])),
+      buildLightAgentSystemPrompt(summarizeForPrompt([])),
+    ]) {
+      expect(prompt).toContain('完成说明只照真实结果写')
+      expect(prompt).toContain('不要拿节点参数（如 2K）冒充结果')
+    }
+  })
+})

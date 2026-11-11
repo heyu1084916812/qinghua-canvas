@@ -11,6 +11,7 @@ import { errorTextOf } from '../../../shared/result'
 import { createId } from '../../../shared/id'
 import { AgentToolEffectBlockedError } from '../../../features/shared/agent/AgentToolEffectLedger'
 import {
+  BLOCKED_CLAIM_MESSAGE,
   claimsCanvasActionDone,
   createAgentCanvasClaimGuard,
   hasSuccessfulCanvasMutation,
@@ -261,7 +262,7 @@ export async function runAgentTurn(
     emitActivity,
     emitProgress,
   })
-  const { discoverBeforeCapabilityDenial, guardFinalCanvasClaims } =
+  const { discoverBeforeCapabilityDenial, guardFinalCanvasClaims, verifiedFinalText } =
     canvasClaimGuard
   const checkVisualDenial = async (
     text: string, step: number,
@@ -330,20 +331,16 @@ export async function runAgentTurn(
         }
         if (guard === 'blocked') {
           deps.onProcessReset?.()
-          return {
-            kind: 'error',
-            message:
-              '模型声称画布动作已完成（或承诺了当前不存在的能力），但本轮没有对应的成功执行记录；已拦下这次回答。请重试，或换一个对话模型。',
-            messages,
-          }
+          return { kind: 'error', message: BLOCKED_CLAIM_MESSAGE, messages }
         }
+        const verified = verifiedFinalText(message) // A7：尺寸 / 张数 / 模型仍不实时附真实结果
         messages.push({
           role: 'assistant',
-          content: message,
+          content: verified,
           ...(result.reasoning ? { reasoning: result.reasoning } : {}),
           createdAt: Date.now(),
         })
-        return { kind: 'message', text: message, messages }
+        return { kind: 'message', text: verified, messages }
       }
       if (!action) {
         messages.push({
@@ -391,20 +388,16 @@ export async function runAgentTurn(
       }
       if (guard === 'blocked') {
         deps.onProcessReset?.()
-        return {
-          kind: 'error',
-          message:
-            '模型声称画布动作已完成（或承诺了当前不存在的能力），但本轮没有对应的成功执行记录；已拦下这次回答。请重试，或换一个对话模型。',
-          messages,
-        }
+        return { kind: 'error', message: BLOCKED_CLAIM_MESSAGE, messages }
       }
+      const verified = verifiedFinalText(result.text) // A7
       messages.push({
         role: 'assistant',
-        content: result.text,
+        content: verified,
         ...(result.reasoning ? { reasoning: result.reasoning } : {}),
         createdAt: Date.now(),
       })
-      return { kind: 'message', text: result.text, messages }
+      return { kind: 'message', text: verified, messages }
     }
 
     const isPostReviewBlocked = (name: string) =>

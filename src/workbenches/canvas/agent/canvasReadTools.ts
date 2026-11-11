@@ -293,6 +293,21 @@ export function readResults(
       const hash = carrier ? asRecord(carrier.data).assetHash : undefined
       if (typeof hash === 'string') hashes.push(hash)
     }
+    /**
+     * 产物条目：hash + mime，外加承载它的节点记录下来的真实像素（`naturalSize`）。
+     * 完成说明里的尺寸只能来自这里（Agent 实测 Bug A7：说 2K、实际 1086×1448）；
+     * 没记就不给，不猜。
+     */
+    const outputOf = (hash: string) => {
+      const holder =
+        hash === own
+          ? node
+          : graph.nodes.find((carrier) => asRecord(carrier.data).assetHash === hash)
+      const size = asRecord(asRecord(holder?.data).naturalSize)
+      const width = typeof size.width === 'number' ? size.width : undefined
+      const height = typeof size.height === 'number' ? size.height : undefined
+      return { hash, mime: assetMimeOf(holder), ...(width && height ? { width, height } : {}) }
+    }
     const state = nodeRunStateOf?.(id)
     const failedReason =
       state?.kind === 'failed'
@@ -306,16 +321,7 @@ export function readResults(
         reason: failedReason,
         ...(hashes.length > 0
           ? {
-              outputs: hashes.map((hash) => ({
-                hash,
-                mime: assetMimeOf(
-                  hash === own
-                    ? node
-                    : graph.nodes.find(
-                        (carrier) => asRecord(carrier.data).assetHash === hash,
-                      ),
-                ),
-              })),
+              outputs: hashes.map(outputOf),
               note: '这些是之前成功留下的产物，不是最近一次失败运行的新结果。',
             }
           : {}),
@@ -326,16 +332,7 @@ export function readResults(
           nodeId: id,
           ...(title ? { title } : {}),
           status: 'ok' as const,
-          outputs: hashes.map((hash) => ({
-            hash,
-            mime: assetMimeOf(
-              hash === own
-                ? node
-                : graph.nodes.find(
-                    (carrier) => asRecord(carrier.data).assetHash === hash,
-                  ),
-            ),
-          })),
+          outputs: hashes.map(outputOf),
           /** 产物散在哪些节点上 —— 模型据此知道该去改哪一张，而不是再来问一遍 */
           ...(carrierIds.length > 0 ? { carrierNodeIds: carrierIds } : {}),
         }
