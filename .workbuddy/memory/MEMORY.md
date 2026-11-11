@@ -1,5 +1,13 @@
 # CanvasFlow（轻画）项目记忆
 
+### 总管2 第六十九轮：65535 瞬时 5xx、批量预览、Agent 宽度与最终 prompt（2026-11-11）
+- 65535 的 `gemini-3.8-flash` 生图正常但对话 502，真实 Key 复测显示第一次 502、紧接着同模型 200；同故障下 Gemini 原生 `generateContent` 也 502。因此不能把普通 5xx 当“协议错误”切原生入口，正确做法是同步与流式入口都做两次退避重试。官方 `/v1/pricing` 的 `endpoints` 只说明能力存在，不证明账号的上游当前健康。
+- 最终 prompt 现在统一由 `features/shared/execution/runPrompt.ts#actualPromptOf` 计算；`RunRecord.params.prompt`、日志、结果卡 `lastRunPrompt` 和渠道请求必须同源。不要再让 UI 或 channel adapter 各自追加“第 n 次”。
+- 循环节点语义改为：所有上游提示词每轮作为共享上下文保留，本节点 `prompts` 按轮追加变量；`generationSpec.collectInputs` 按最终文本去重，避免同一份详情提示词既从直连提示词节点又从循环节点进入。最近一轮显示在 `lastRoundIndex / lastRoundPrompt / lastRoundAssets`。
+- 批量内部生成子项输出预览写 `batchResultHash`，批量容器写 `batchResultHashes`，不覆盖子项 `assetHash`；这些字段全部从节点指纹排除。Agent 宽度恢复 `360–720px`，手柄常驻半透明且仍持久化。
+- 四组 UI 证据 `.playwright-verify/current-bugs/four/report.json`：结果卡、循环节点、日志三处 prompt 一致；Agent handle `36px / opacity 0.45`，拖宽 `420→576`；`horizontalOverflow=false / errors=[]`。
+- 门禁：`npm run check` 1173 modules / 4711 dependencies / 317 registrations；全量串行 Vitest 672 files（671 passed / 1 skipped）/ 5540 tests（5539 passed / 1 skipped）；`npm run build` 1305 modules。未 push。
+
 ### 总管2 第六十八轮：原目标复验与博物馆联网来源补强（2026-11-11）
 - 套件不是只打开：`ensureKitCardReference` 写入 `assets[]`，`projectAgentTurnReferences` 将套装全部有效图片送入本轮 assetRefs；Logo 优先、hash 去重、缺图 warning 后继续。套件卡主点击与详情底部都生成同一枚稳定 chip；参考栏、套件详情、我的素材筛选仍复用 `ReferenceFilterControl`，不要另建第三套筛选。
 - 本轮重新跑 `QH_UI_KIT_ONLY=1 node scripts/capture-ui-seven-points.mjs --after`，实际仍生成 36 个 surface；四组套件均 `kitChip=3 / detailChip=3 / errors=[] / horizontalOverflow=false`。不要引用旧报告代替当前证据。

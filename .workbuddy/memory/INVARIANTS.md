@@ -1,5 +1,14 @@
 # CanvasFlow 不变量详表
 
+## 执行 prompt、循环与批量结果投影（2026-11-11）
+- 最终发送文案只能由 `actualPromptOf(task, request)` / `applyCallOrdinal(task, request)` 计算。渠道请求、RunRecord 的 `params.prompt`、日志显示和结果节点 `lastRunPrompt` 必须来自同一份结果，禁止任一层再补序号或重新拼接。
+- 循环节点的上游提示词每轮都保留为共享上下文；本节点 `prompts` 按轮次取模后追加。`generationSpec.collectInputs` 按最终文本去重，循环文本已含某条直连提示词时不能二次发送。
+- 循环最近一轮事实写入 `lastRoundIndex / lastRoundPrompt / lastRoundAssets`；`__roundPrompt / __roundAssets` 只允许是当轮执行瞬态，不能当持久记录。
+- 批量运行的历史承载节点必须保留真实产物；内部生成子项只能写展示态 `batchResultHash`，批量容器写 `batchResultHashes`。禁止用结果覆盖子项 `assetHash`，否则会破坏下一次图生图输入。
+- `lastRunPrompt`、`lastRound*`、`batchResultHash(es)` 都是产物/展示态，必须排除在节点输入指纹之外，否则生成成功会立刻把自己标成陈旧。
+- Agent 面板恢复历史宽度范围 `360–720px`；左侧拖拽柄默认半透明可见，`aria`/键盘与 localStorage 持久化保留。1024×700 下仍要给画布保留可用宽度。
+- 65535 的 502/503/504 是上游瞬时失败：同步和流式入口各允许两次退避重试。只有服务端明确返回 Gemini native migration 错误时才切换 `generateContent`；普通 5xx 不得切换协议。
+
 ## 开放调研分源与套件上下文（2026-11-11）
 - 套件进入 Agent 必须保留一枚稳定 reference chip，但 `assets[]` 要携带完整图片集合；读取时 Logo 优先、按 hash 去重、缺图只跳过并 warning。任何入口不得只把套件主图当完整套件。
 - 参考栏、套件详情和我的素材的筛选必须共用 `ReferenceFilterControl` / `referenceSourceFilter` / `referenceKindFilter`；新增入口只允许传选项与禁用项。
