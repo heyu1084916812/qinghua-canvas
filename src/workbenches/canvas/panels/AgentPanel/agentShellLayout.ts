@@ -48,7 +48,8 @@ export const AGENT_ORB_SIZE = 64
 /** 与 AppShell 的 `--shell-gap` 保持一致；面板是壳层 slot 的绝对定位子项。 */
 export const AGENT_SHELL_GAP = 15
 export const AGENT_SHELL_WIDTH_DEFAULT = 420
-export const AGENT_SHELL_WIDTH_MIN = 320
+export const AGENT_SHELL_WIDTH_MIN = 360
+export const AGENT_SHELL_WIDTH_MAX = 720
 export const AGENT_SHELL_SNAP_RATIOS = [0.3, 0.6, 0.8] as const
 export const AGENT_SHELL_SNAP_THRESHOLD = 36
 export const AGENT_SHELL_STORAGE_KEY = 'qinghua.canvas.agentShell.v2'
@@ -103,7 +104,7 @@ export function agentShellMaxWidth(
 ): number {
   return Math.max(
     AGENT_SHELL_WIDTH_MIN,
-    Math.round(availableWidth - AGENT_SHELL_GAP * 2),
+    Math.min(AGENT_SHELL_WIDTH_MAX, Math.round(availableWidth - AGENT_SHELL_GAP * 2)),
   )
 }
 

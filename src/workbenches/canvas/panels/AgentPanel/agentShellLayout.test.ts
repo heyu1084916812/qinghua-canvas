@@ -69,27 +69,27 @@ describe('Agent shell layout', () => {
 
   it('keeps panel width between the minimum and the current viewport width', () => {
     expect(agentShellWidth(100, 1440)).toBe(AGENT_SHELL_WIDTH_MIN)
-    expect(agentShellMaxWidth(1920)).toBe(1890)
-    expect(agentShellWidth(5000, 1920)).toBe(1890)
+    expect(agentShellMaxWidth(1920)).toBe(720)
+    expect(agentShellWidth(5000, 1920)).toBe(720)
     expect(resizedAgentShellWidth(420, 800, 700, 1440)).toBe(520)
   })
 
   it('uses the shell available width for 30/60/80 snap levels', () => {
     const available = agentShellAvailableWidth(1440, 64)
     expect(available).toBe(1361)
-    expect(agentShellSnapWidths(available)).toEqual([399, 799, 1065])
-    expect(nearestAgentShellSnap(785, available)).toBe(799)
-    expect(nearestAgentShellSnap(750, available)).toBeNull()
+    expect(agentShellSnapWidths(available)).toEqual([360, 432, 576])
+    expect(nearestAgentShellSnap(570, available)).toBe(576)
+    expect(nearestAgentShellSnap(500, available)).toBeNull()
   })
 
   it('dampens dragging near a snap level without changing the stored value', () => {
     const available = agentShellAvailableWidth(1440, 64)
-    const snap = nearestAgentShellSnap(785, available)
-    expect(snap).toBe(799)
-    expect(dampAgentShellWidth(785, available)).toBeGreaterThan(785)
-    expect(dampAgentShellWidth(785, available)).toBeLessThan(799)
-    expect(dampAgentShellWidth(799 + AGENT_SHELL_SNAP_THRESHOLD * 2, available)).toBe(
-      799 + AGENT_SHELL_SNAP_THRESHOLD * 2,
+    const snap = nearestAgentShellSnap(570, available)
+    expect(snap).toBe(576)
+    expect(dampAgentShellWidth(570, available)).toBeGreaterThan(570)
+    expect(dampAgentShellWidth(570, available)).toBeLessThan(576)
+    expect(dampAgentShellWidth(576 + AGENT_SHELL_SNAP_THRESHOLD * 2, available)).toBe(
+      576 + AGENT_SHELL_SNAP_THRESHOLD * 2,
     )
   })
 
@@ -101,7 +101,7 @@ describe('Agent shell layout', () => {
     )
     expect(state.orb.x + AGENT_ORB_SIZE).toBeLessThanOrEqual(AREA.x + AREA.width - AGENT_SHELL_GAP)
     expect(state.orb.y).toBe(AREA.y + AGENT_SHELL_GAP)
-    expect(state.width).toBe(994)
+    expect(state.width).toBe(720)
   })
 
   it('重新激活时对既有 shell 按 1024 surface 重新 clamp', () => {

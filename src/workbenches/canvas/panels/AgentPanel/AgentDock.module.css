@@ -193,8 +193,9 @@
 .resizeHandle {
   position: absolute;
   top: 50%;
-  left: -20px;
-  width: 40px;
+  left: -18px;
+  z-index: 3;
+  width: 36px;
   height: clamp(96px, 36vh, 220px);
   padding: 0;
   border: 0;
@@ -208,12 +209,12 @@
   position: absolute;
   top: 50%;
   left: 50%;
-  width: 3px;
-  height: 32px;
+  width: 4px;
+  height: 42px;
   border-radius: var(--radius-pill);
   background: var(--stroke);
   content: '';
-  opacity: 0;
+  opacity: 0.45;
   transform: translate(-50%, -50%);
   transition: opacity var(--dur-hover) var(--ease-out);
 }
@@ -221,7 +222,7 @@
 .resizeHandle:hover::before,
 .resizeHandle:focus-visible::before,
 .panelFrame[data-agent-dragging='resize'] .resizeHandle::before {
-  background: var(--text-3);
+  background: var(--text-2);
   opacity: 1;
 }
 
