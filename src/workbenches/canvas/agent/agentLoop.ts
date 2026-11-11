@@ -313,12 +313,10 @@ export async function runAgentTurn(
       const action = parseJsonAgentAction(result.text)
       if (action?.name === 'final') {
         if ((await pullSteering()) > 0) continue
-        const message =
-          action.args &&
-          typeof action.args === 'object' &&
-          typeof (action.args as { message?: unknown }).message === 'string'
-            ? String((action.args as { message: string }).message)
-            : result.text
+        const finalArgs = (action.args ?? {}) as { message?: unknown }
+        const message = typeof finalArgs.message === 'string' ? finalArgs.message : result.text
+        const pendingJsonRun = confirmRunNodeFromFinalAnswer({ messages, allowedToolNames, precheck: deps.precheck, text: message }) // A6：JSON 模式收尾同样由程序弹运行确认
+        if (pendingJsonRun) return (emitProgress(), pendingJsonRun)
         const visualGuard = await checkVisualDenial(message, step)
         if (visualGuard === 'unreliable') return unreliableVisualDescription()
         if (visualGuard === 'retry' || await discoverBeforeCapabilityDenial(message, step)) {

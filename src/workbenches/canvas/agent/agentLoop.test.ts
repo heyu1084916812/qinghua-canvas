@@ -166,6 +166,75 @@ describe('runAgentTurn · 确认之前的预检', () => {
     }
   })
 
+  /**
+   * Agent 实测 Bug A6（2026-11-11 场景 1）：模型写「要现在跑这张图吗？」就结束，
+   * 措辞没命中问句正则 → 无确认卡。生成必须由程序弹确认卡、用户点批准后执行，
+   * 不能靠模型自觉调用 runNode，也不能靠措辞匹配。
+   */
+  const planWrite = (ids: string[]) =>
+    vi.fn(async () => ({
+      ok: true,
+      problems: [],
+      createdNodeIds: ids,
+      resolvedNodes: ids.map((nodeId, index) => ({
+        localId: `v${index}`,
+        nodeId,
+        type: 'generation',
+        title: `节点${index}`,
+        created: true,
+      })),
+    }))
+  const planCall = {
+    toolCalls: [{ id: 'plan-call', name: 'applyPlan', args: '{"summary":"s","nodes":[],"edges":[]}' }],
+  }
+
+  it('★★ A6：本轮新建了生成节点却没跑，无论正文怎么写，回合结束都由程序弹 runNode 确认卡（含全部节点）', async () => {
+    const { deps } = depsWith(
+      [planCall, { text: '海报节点已建在画布上。要现在跑这张图吗？确认后我就执行。' }],
+      undefined,
+      planWrite(['a', 'b', 'c']),
+    )
+    const result = await runAgentTurn(user('做三张海报'), { ...deps, precheck: () => ({ ok: true }) })
+    expect(result.kind).toBe('confirm')
+    if (result.kind === 'confirm') {
+      expect(result.request.name).toBe('runNode')
+      expect(result.request.args).toEqual({ nodeIds: ['a', 'b', 'c'] })
+    }
+  })
+
+  it('★ A6：正文没问也照样弹（陈述句收尾）', async () => {
+    const { deps } = depsWith([planCall, { text: '已建好 1 个生成节点。' }], undefined, planWrite(['a']))
+    const result = await runAgentTurn(user('做一张海报'), { ...deps, precheck: () => ({ ok: true }) })
+    expect(result.kind).toBe('confirm')
+  })
+
+  it('★ A6：用户明确说先别跑 → 不弹', async () => {
+    const { deps } = depsWith([planCall, { text: '已建好，先不跑。' }], undefined, planWrite(['a']))
+    const result = await runAgentTurn(user('先搭好流程，先别跑'), { ...deps, precheck: () => ({ ok: true }) })
+    expect(result.kind).toBe('message')
+  })
+
+  it('★ A6：本轮已经对这些节点执行过 runNode → 收尾不重复弹', async () => {
+    const history: ChatMessage[] = [
+      { role: 'user', content: '做一张海报' },
+      { role: 'assistant', content: '', toolCalls: [{ id: 'plan-call', name: 'applyPlan', args: '{}' }] },
+      {
+        role: 'tool',
+        toolCallId: 'plan-call',
+        toolName: 'applyPlan',
+        content: JSON.stringify({
+          ok: true,
+          resolvedNodes: [{ localId: 'v0', nodeId: 'a', type: 'generation', title: 'x', created: true }],
+        }),
+      },
+      { role: 'assistant', content: '', toolCalls: [{ id: 'run-call', name: 'runNode', args: '{"nodeIds":["a"]}' }] },
+      { role: 'tool', toolCallId: 'run-call', toolName: 'runNode', content: '{"ok":true,"outcomes":[{"nodeId":"a","ok":true}]}' },
+    ]
+    const { deps } = depsWith([{ text: '已出图。' }])
+    const result = await runAgentTurn(history, { ...deps, precheck: () => ({ ok: true }) })
+    expect(result.kind).toBe('message')
+  })
+
   it('★★ 上一轮正文问“是否运行”，下一轮只回复“允许”也要找回节点并弹确认卡', async () => {
     const history: ChatMessage[] = [
       { role: 'user', content: '设计一张类似的' },
@@ -1297,6 +1366,26 @@ describe('runAgentTurn · JSON 工具调用降级（路线 B）', () => {
     )
     expect(r.kind).toBe('message')
     if (r.kind === 'message') expect(r.text).toBe('建好了')
+  })
+
+  it('★ A6：JSON 模式建了生成节点后 final 收尾，同样由程序弹 runNode 确认卡', async () => {
+    const executeWrite = vi.fn(async () => ({
+      ok: true,
+      problems: [],
+      createdNodeIds: ['g1'],
+      resolvedNodes: [{ localId: 'v1', nodeId: 'g1', type: 'generation', title: '海报', created: true }],
+    }))
+    const { deps } = depsWith(
+      [
+        { text: '{"tool":"applyPlan","args":{"summary":"x","nodes":[],"edges":[]}}' },
+        { text: '{"tool":"final","args":{"message":"建好了"}}' },
+      ],
+      undefined,
+      executeWrite,
+    )
+    const r = await runAgentTurn(user('做张海报'), { ...deps, toolMode: 'json', precheck: () => ({ ok: true }) })
+    expect(r.kind).toBe('confirm')
+    if (r.kind === 'confirm') expect(r.request.args).toEqual({ nodeIds: ['g1'] })
   })
 
   it('模型连 JSON 都不给：如实报错，不把“无法调用工具”当最终回答', async () => {

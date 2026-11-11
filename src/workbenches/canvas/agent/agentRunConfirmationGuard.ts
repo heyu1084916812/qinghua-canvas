@@ -61,6 +61,57 @@ function applyPlanGenerationTargets(
   return []
 }
 
+/** 用户这一轮明确说了只搭不跑（「先别跑」「只建流程」…）→ 收尾不弹运行确认 */
+const USER_DEFERS_RUN =
+  /(?:先?别|不要|不用|暂时不|暂不|先不)(?:跑|运行|生成|出图|执行)|只(?:建|搭|做)(?:好)?(?:流程|节点|工作流)/
+
+/** 本轮 [start, end) 内模型已经提交过运行的节点（runNode / runFrom 的 nodeIds） */
+function nodeIdsRunInRange(
+  messages: readonly ChatMessage[],
+  start: number,
+  end: number,
+): Set<string> {
+  const ran = new Set<string>()
+  for (let index = start; index < end; index += 1) {
+    const message = messages[index]!
+    if (message.role !== 'assistant') continue
+    for (const call of message.toolCalls ?? []) {
+      if (call.name !== 'runNode' && call.name !== 'runFrom') continue
+      try {
+        const args = JSON.parse(call.args || '{}') as { nodeIds?: unknown }
+        for (const id of Array.isArray(args.nodeIds) ? args.nodeIds : []) {
+          if (typeof id === 'string') ran.add(id)
+        }
+      } catch {
+        // 参数坏了的调用不算已运行
+      }
+    }
+  }
+  return ran
+}
+
+/**
+ * 回合收尾的运行确认（Agent 实测 Bug A6，2026-11-11）：
+ * 本轮 applyPlan 新建的生成节点只要还没被 runNode / runFrom 提交，就由**程序**
+ * 弹出 runNode 确认卡，用户点批准后由确认流程执行 —— 不再依赖模型自觉调用
+ * runNode，也不再依赖正文问句的措辞（实测「要现在跑这张图吗？」没命中正则）。
+ */
+export function turnEndRunTargets(messages: readonly ChatMessage[]): string[] {
+  let lastUserIndex = -1
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    if (messages[index]!.role === 'user') {
+      lastUserIndex = index
+      break
+    }
+  }
+  if (lastUserIndex < 0) return []
+  if (USER_DEFERS_RUN.test(messages[lastUserIndex]!.content.replace(/\s+/g, ''))) return []
+  const created = applyPlanGenerationTargets(messages, lastUserIndex + 1, messages.length)
+  if (created.length === 0) return []
+  const ran = nodeIdsRunInRange(messages, lastUserIndex + 1, messages.length)
+  return created.filter((id) => !ran.has(id))
+}
+
 /**
  * 模型有时把“是否运行”写成普通正文，导致用户只能再发一句「允许」，
  * 从新回合重跑参考分析。这里把这种文本询问和执行层真正的 `runNode`
@@ -109,8 +160,12 @@ export function runNodeConfirmation(input: {
   finalText?: string
   content?: string
   reasoning?: string
+  /** 回合收尾：按「本轮新建且未运行的生成节点」确定目标，不看措辞（A6） */
+  turnEnding?: boolean
 }): AgentLoopOutcome | null {
-  const targets = runNodeConfirmationTargets(input.messages, input.finalText)
+  const targets = input.turnEnding
+    ? turnEndRunTargets(input.messages)
+    : runNodeConfirmationTargets(input.messages, input.finalText)
   if (targets.length === 0 || !input.allowedToolNames.has('runNode')) return null
   const args = { nodeIds: targets }
   const pre = input.precheck?.('runNode', args)
@@ -156,5 +211,6 @@ export function confirmRunNodeFromFinalAnswer(input: {
     finalText: input.text,
     content: input.text,
     reasoning: input.reasoning,
+    turnEnding: true,
   })
 }

@@ -598,3 +598,11 @@ describe('ContextBundle', () => {
     expect(prompt).not.toContain('## 本会话启用的技能')
   })
 })
+
+describe('运行确认由程序负责（A6）', () => {
+  it('★ 提示词说明收尾时系统自动弹确认卡，正文不要再问是否运行', () => {
+    const prompt = buildAgentSystemPrompt(summarizeForPrompt([]))
+    expect(prompt).toContain('系统会在你收尾时自动对它们弹出确认卡')
+    expect(prompt).toContain('正文不要再问「要不要现在跑」')
+  })
+})

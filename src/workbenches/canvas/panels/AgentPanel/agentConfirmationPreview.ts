@@ -1,3 +1,7 @@
+import {
+  channelIdForLogical,
+  type CatalogChannelLike,
+} from '../../../../domain/project/modelCatalog'
 import type { CanvasStore } from '../../../../state/workbenches/canvas/store'
 import { runFromNodeIds } from '../../agent/tools'
 import type { AgentPanelStatus } from './AgentActivityViews'
@@ -11,6 +15,23 @@ export interface AgentConfirmationPreview {
 }
 
 type GraphReader = Pick<CanvasStore, 'getSnapshot'>
+/** 确认卡只需要渠道的名字与选路字段 */
+export type PreviewChannel = CatalogChannelLike & { name: string }
+
+/**
+ * 运行确认卡逐节点写明「渠道 · 模型」（Agent 实测 Bug A6：卡片不显示渠道 / 模型，
+ * 用户看不出会用哪个模型花钱）。渠道按与执行同一条选路（启用渠道里能提供该模型的，
+ * 同优先度时偏好节点上记录的渠道）解析。
+ */
+function runRouteLine(title: string, data: unknown, channels: readonly PreviewChannel[]): string {
+  const row = (data && typeof data === 'object' ? data : {}) as Record<string, unknown>
+  const model = typeof row.model === 'string' ? row.model.trim() : ''
+  const owned = typeof row.channelId === 'string' ? row.channelId : undefined
+  const enabled = channels.filter((channel) => channel.enabled)
+  const channelId = model ? channelIdForLogical(enabled, model, owned) : undefined
+  const channelName = enabled.find((channel) => channel.id === channelId)?.name
+  return `「${title}」：渠道 ${channelName ?? '未找到可用渠道'} · 模型 ${model || '未选择'}`
+}
 
 /**
  * 确认卡里要显示什么，必须在花钱和写画布之前说清楚。
@@ -20,6 +41,7 @@ type GraphReader = Pick<CanvasStore, 'getSnapshot'>
 export function previewOf(
   status: AgentPanelStatus,
   store: GraphReader,
+  channels: readonly PreviewChannel[] = [],
 ): AgentConfirmationPreview | null {
   if (status.kind !== 'awaitingConfirm') return null
   const { name, args } = status.request
@@ -78,18 +100,24 @@ export function previewOf(
     }
   }
   if (name === 'runNode') {
-    const ids = Array.isArray(a.nodeIds) ? a.nodeIds.length : 0
-    const nodeId =
-      Array.isArray(a.nodeIds) && typeof a.nodeIds[0] === 'string'
-        ? a.nodeIds[0]
-        : ''
-    const node = store.getSnapshot().nodes.find((item) => item.id === nodeId)
+    const ids = Array.isArray(a.nodeIds)
+      ? a.nodeIds.filter((id): id is string => typeof id === 'string')
+      : []
+    const nodes = ids.flatMap((id) => {
+      const node = store.getSnapshot().nodes.find((item) => item.id === id)
+      return node ? [node] : []
+    })
+    const titleOf = (node: (typeof nodes)[number]) => node.title ?? '未命名'
     return {
       tool: name,
-      title: node
-        ? `是否运行节点「${node.title ?? '未命名'}」生成图片？`
+      /* 多节点时标题列出全部节点（A6：实测只写第一个却跑 3 个） */
+      title: nodes.length > 0
+        ? `是否运行节点${nodes.map((node) => `「${titleOf(node)}」`).join('')}生成图片？`
         : '要开始生成',
-      lines: [`跑 ${ids} 个节点（会花钱）`],
+      lines: [
+        ...nodes.map((node) => runRouteLine(titleOf(node), node.data, channels)),
+        `跑 ${ids.length} 个节点（会花钱）`,
+      ],
       action: '批准运行',
     }
   }

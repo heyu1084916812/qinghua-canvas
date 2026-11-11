@@ -42,6 +42,48 @@ describe('previewOf', () => {
     expect(preview?.action).toBe('批准运行')
   })
 
+  it('★ A6：多节点时标题列出全部节点，并逐个写明渠道名与模型名', () => {
+    const channels = [
+      {
+        id: 'xssr',
+        name: 'XSSR 生图站',
+        enabled: true,
+        models: [{ id: 'gpt-image-2.5', category: 'image' as const, inputTypes: ['text' as const] }],
+        modelCache: [],
+        modelMap: {},
+      },
+      {
+        id: 'off',
+        name: '停用站',
+        enabled: false,
+        models: [{ id: 'gpt-image-2.5', category: 'image' as const, inputTypes: ['text' as const] }],
+        modelCache: [],
+        modelMap: {},
+      },
+    ]
+    const preview = previewOf(
+      {
+        kind: 'awaitingConfirm',
+        request: { callId: 'c', name: 'runNode', args: { nodeIds: ['a', 'b', 'c'] } },
+      },
+      storeOf({
+        nodes: [
+          { id: 'a', title: '山野｜Logo 标识', type: 'generation', data: { model: 'gpt-image-2.5', channelId: 'off' } },
+          { id: 'b', title: '山野｜产品包装', type: 'generation', data: { model: 'gpt-image-2.5', channelId: 'xssr' } },
+          { id: 'c', title: '山野｜社媒海报', type: 'generation', data: { model: '' } },
+        ],
+      }),
+      channels,
+    )
+    expect(preview?.title).toBe('是否运行节点「山野｜Logo 标识」「山野｜产品包装」「山野｜社媒海报」生成图片？')
+    expect(preview?.lines).toEqual([
+      '「山野｜Logo 标识」：渠道 XSSR 生图站 · 模型 gpt-image-2.5',
+      '「山野｜产品包装」：渠道 XSSR 生图站 · 模型 gpt-image-2.5',
+      '「山野｜社媒海报」：渠道 未找到可用渠道 · 模型 未选择',
+      '跑 3 个节点（会花钱）',
+    ])
+  })
+
   it('删除节点时列出名字和素材库不受影响的边界', () => {
     const preview = previewOf(
       {

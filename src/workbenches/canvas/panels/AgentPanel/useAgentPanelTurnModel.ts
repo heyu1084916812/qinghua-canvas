@@ -385,7 +385,7 @@ export function useAgentPanelTurnModel({
     trackRun,
   })
 
-  const pendingPlan = previewOf(status, store)
+  const pendingPlan = previewOf(status, store, session.allChannels)
   const advancingTaskPlan = current
     ? isAdvancingTaskPlan(current.id)
     : false

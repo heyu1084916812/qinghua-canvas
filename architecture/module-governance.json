@@ -1410,7 +1410,7 @@
     {
       "module": "src/workbenches/canvas/agent/agentRunConfirmationGuard.ts",
       "owner": "canvas-agent-run-confirmation",
-      "responsibility": "把模型正文里的运行询问收敛成 runNode 确认请求，并从肯定回复恢复上一轮生成目标。",
+      "responsibility": "回合收尾把本轮新建且未运行的生成节点收敛成程序发起的 runNode 确认请求，并从肯定回复恢复上一轮生成目标。",
       "owns": [
         "运行询问识别",
         "applyPlan 生成节点目标提取",
@@ -1425,12 +1425,13 @@
         "runNodeConfirmationTargets",
         "runNodeConfirmation",
         "recoverRunNodeConfirmation",
-        "confirmRunNodeFromFinalAnswer"
+        "confirmRunNodeFromFinalAnswer",
+        "turnEndRunTargets"
       ],
       "test": [
         "src/workbenches/canvas/agent/agentLoop.test.ts"
       ],
-      "budget": 170
+      "budget": 230
     },
     {
       "module": "src/state/channel/channelCredentials.ts",
