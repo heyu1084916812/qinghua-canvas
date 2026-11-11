@@ -8694,6 +8694,25 @@
         "src/platform/desktop/tauriCredentials.test.ts"
       ],
       "budget": 120
+    },
+    {
+      "module": "src/features/settings/defaultRecipeTarget.ts",
+      "owner": "settings-default-params",
+      "responsibility": "默认参数保存时按所选模型找真正提供它的启用渠道，避免把生图配方记到对话渠道上。",
+      "owns": [
+        "默认配方目标渠道的纯判定（启用渠道、类别一致）"
+      ],
+      "doesNotOwn": [
+        "配方持久化与 ChannelStore 状态",
+        "设置页渲染与文案"
+      ],
+      "publicApi": [
+        "defaultRecipeChannelFor"
+      ],
+      "test": [
+        "src/features/settings/defaultRecipeTarget.test.ts"
+      ],
+      "budget": 60
     }
   ]
 }

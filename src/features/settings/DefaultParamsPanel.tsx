@@ -4,6 +4,7 @@ import { capabilityOfLogical, panelModelOptions } from '../../domain/project/mod
 import { RATIO_CHOICES } from '../../domain/canvas/layout/ratioChoices'
 import { ChoicePicker } from '../shared/choicePicker/ChoicePicker'
 import styles from './DefaultParamsPanel.module.css'
+import { defaultRecipeChannelFor } from './defaultRecipeTarget'
 import { SettingsRow } from './SettingsRow'
 
 /**
@@ -116,10 +117,24 @@ export function DefaultParamsPanel() {
       setStatus('还没有可用的模型服务 —— 先去「模型服务」添加一条、勾上模型')
       return
     }
+    /*
+     * 配方记在**真正提供所选模型**的启用渠道上，而不是 resolved.channelId
+     * （那条可能是对话渠道，见 defaultRecipeTarget.ts / 对账 A1）。
+     */
+    const targetChannelId = defaultRecipeChannelFor(
+      channels.enabledChannels(),
+      model,
+      category,
+      resolved.channelId,
+    )
+    if (!targetChannelId) {
+      setStatus('还没有可用的模型服务 —— 先去「模型服务」添加一条、勾上模型')
+      return
+    }
     const params: Record<string, unknown> = { ...resolved.params }
     if (category === 'chat') {
       /* 对话模型没有比例 / 画质 / 张数这几档，别把生成参数塞进对话那条默认里 */
-      await channels.setDefaultRecipe(resolved.channelId, model, params)
+      await channels.setDefaultRecipe(targetChannelId, model, params)
       setStatus('已保存为对话默认模型')
       return
     }
@@ -127,7 +142,7 @@ export function DefaultParamsPanel() {
     if (ratio) params.ratio = ratio
     if (quality) params.quality = quality
     params.count = count
-    await channels.setDefaultRecipe(resolved.channelId, model, params)
+    await channels.setDefaultRecipe(targetChannelId, model, params)
     setStatus(`已保存为${DEFAULT_CATEGORY_LABELS[category]}默认参数`)
   }
 
