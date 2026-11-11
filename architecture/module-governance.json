@@ -8004,6 +8004,59 @@
         "budget": 220
       },
     {
+      "module": "src/features/shared/research/tavilySearch.ts",
+      "owner": "open-research-search",
+      "responsibility": "调用 Tavily 搜索接口（用户自填 Key）获取网页与图片候选，并把错误映射成不含 Key 的可读文案。",
+      "owns": [
+        "Tavily 请求体与 Bearer 鉴权头",
+        "results / images 到调研候选的投影",
+        "Key 缺失、无效、额度用尽的提示"
+      ],
+      "doesNotOwn": [
+        "Key 的存储与读取",
+        "开放来源回退调度",
+        "项目参考持久化"
+      ],
+      "publicApi": [
+        "searchTavily",
+        "tavilyItemsOf",
+        "tavilyErrorText",
+        "TAVILY_SEARCH_ENDPOINT",
+        "TAVILY_API_KEY_REF",
+        "TAVILY_KEY_MISSING_MESSAGE"
+      ],
+      "test": [
+        "src/features/shared/research/tavilySearch.test.ts"
+      ],
+      "budget": 240
+    },
+    {
+      "module": "src/features/shared/research/webPageReader.ts",
+      "owner": "open-research-search",
+      "responsibility": "经 Jina Reader 读取公开网页正文并截断，登录墙、验证码、非 2xx 如实失败并给出退路。",
+      "owns": [
+        "公开地址校验",
+        "Jina 文本格式解析",
+        "正文截断与登录墙识别"
+      ],
+      "doesNotOwn": [
+        "Agent 工具开关",
+        "搜索调度",
+        "参考入栏"
+      ],
+      "publicApi": [
+        "readWebPage",
+        "parseJinaReaderText",
+        "JINA_READER_ENDPOINT",
+        "DEFAULT_READ_PAGE_MAX_CHARS",
+        "READ_PAGE_FALLBACK_HINT"
+      ],
+      "test": [
+        "src/features/shared/research/webPageReader.test.ts"
+      ],
+      "budget": 200
+    },
+    {
       "module": "src/workbenches/canvas/panels/AgentPanel/agentResearchSourceLabel.ts",
       "owner": "agent-research-results-ui",
       "responsibility": "把设计调研 provider 标识转换为稳定的用户可读来源名称。",

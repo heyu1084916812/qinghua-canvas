@@ -5,6 +5,7 @@ export function agentResearchSourceLabel(source: string): string {
   if (normalized === 'cleveland') return 'Cleveland Museum'
   if (normalized === 'met') return 'Met Museum'
   if (normalized === 'searxng') return 'SearXNG'
+  if (normalized === 'tavily') return 'Tavily'
   if (normalized === 'openverse') return 'Openverse'
   if (normalized === 'wikipedia') return 'Wikipedia'
   if (normalized === 'pinterest') return 'Pinterest'

@@ -9,6 +9,7 @@ export type ResearchProvider =
   | 'cleveland'
   | 'met'
   | 'searxng'
+  | 'tavily'
   | 'web'
 
 export const DEFAULT_RESEARCH_MAX_RESULTS = 24
@@ -120,10 +121,12 @@ const PROVIDER_TITLES: Record<ResearchProvider, string> = {
   cleveland: 'Cleveland Museum',
   met: 'Met Museum',
   searxng: 'SearXNG',
+  tavily: 'Tavily 网页搜索',
   web: 'Other references',
 }
 
 const PROVIDER_ORDER: readonly ResearchProvider[] = [
+  'tavily',
   'pinterest',
   'behance',
   'openverse',
