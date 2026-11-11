@@ -1,6 +1,5 @@
-import { useEffect, useRef, useState } from 'react'
+import { useRef } from 'react'
 import type { ReactNode, PointerEvent as ReactPointerEvent } from 'react'
-import { useSyncExternalStore } from 'react'
 import type { NodeSnapshot } from '../../../domain/canvas/model/node'
 import type { Rect } from '../../../domain/canvas/geometry/rect'
 import type { ResizeLock } from '../../../domain/canvas/nodeSpecs/resizeLock'
@@ -11,7 +10,6 @@ import {
   type ResizeCorner,
 } from '../../../domain/canvas/nodeSpecs/resizeLock'
 import { useCanvasStore } from '../storeContext'
-import { assetPixelsOf, formatPixels } from './assetPixels'
 import styles from './NodeFrame.module.css'
 
 export type ResizePhase = 'begin' | 'move' | 'end'
@@ -80,7 +78,6 @@ export interface NodeFrameProps {
   selfPositioned?: boolean
   /** 缩放手柄提交绝对矩形（命令层 coalesce 合并） */
   onResize: (rect: Rect, phase: ResizePhase) => void
-  onRename: (title: string) => void
   children?: ReactNode
   /**
    * 画在**框上**（`.body` 之外、`overflow: visible`）的额外内容。
@@ -111,9 +108,9 @@ export interface NodeFrameProps {
  * `.frame` 的 `user-select: none` 已从源头避免选中，这里再挡一道原生拖拽（防御节点内
  * 将来嵌入选区型内容）。节点内的 `<img>` 本来就都是 `draggable={false}`。
  *
- * 2026-11-11: titles and pixel labels now render inside every frame. The React Flow
- * wrapper keeps content-visibility:auto for large-image performance, and its paint
- * containment clips anything drawn outside the frame.
+ * 2026-11-11: titles and pixel labels render in FlowNodeHeaderLayer, outside this
+ * frame. The React Flow wrapper keeps content-visibility:auto for large-image
+ * performance, while the overlay avoids its paint-containment clipping.
  */
 export function NodeFrame(props: NodeFrameProps) {
   const { node, selected, minSize } = props
@@ -136,9 +133,6 @@ export function NodeFrame(props: NodeFrameProps) {
     resizeLock !== 'free' || props.heightFromContent === true
       ? ['se']
       : props.resizeCorners ?? ['se']
-  const [editing, setEditing] = useState(false)
-  const [draft, setDraft] = useState(node.title)
-  const inputRef = useRef<HTMLInputElement>(null)
   const store = useCanvasStore()
   /**
    * 产物像素（用户 2026-09-17）：**挂在节点外**的右上角、与节点名同一排。
@@ -147,38 +141,10 @@ export function NodeFrame(props: NodeFrameProps) {
    * 那一排是「描述这个节点」的位置（名字 + 读数），画进节点内部会压住素材本身。
    * 取值规则在 `./assetPixels`（纯函数，可单测），本层只渲染。
    */
-  const pixels = assetPixelsOf(node)
-
   // 容器（分组 / 批量）的子节点：缩放手柄不渲染（尺寸由容器布局决定），标题仍保留。
   const inContainer = node.parentId !== null
 
   // 右键菜单「重命名」（§4.1）/ 标题单击进入编辑：store 置 renamingId 时本节点切入编辑态
-  const renamingId = useSyncExternalStore(store.subscribe, store.getRenamingId, store.getRenamingId)
-  useEffect(() => {
-    if (renamingId === node.id) {
-      setDraft(node.title)
-      setEditing(true)
-      store.endRename()
-    }
-  }, [renamingId, node.id, node.title, store])
-
-  useEffect(() => {
-    if (editing) {
-      inputRef.current?.focus()
-      inputRef.current?.select()
-    }
-  }, [editing])
-
-  const commit = () => {
-    const next = draft.trim()
-    props.onRename(next || node.title)
-    setEditing(false)
-  }
-  const cancel = () => {
-    setDraft(node.title)
-    setEditing(false)
-  }
-
   const onResizePointerDown = (e: ReactPointerEvent, corner: ResizeCorner) => {
     e.stopPropagation()
     const startX = e.clientX
@@ -288,7 +254,6 @@ export function NodeFrame(props: NodeFrameProps) {
        * 节点视图在自己的 module 里选不到它。`data-node-stale` 早先就是同一套做法。
        */
       data-node-selected={selected ? '' : undefined}
-      data-node-header-inside=""
       onPointerDown={props.onFramePointerDown}
       onDragStart={(e) => e.preventDefault()}
     >
@@ -298,42 +263,6 @@ export function NodeFrame(props: NodeFrameProps) {
         就成了九个没有名字的格子，一眼看不出哪张是哪张。缩放手柄仍然只有顶层节点有
         （尺寸由容器布局决定）。
       */}
-      <div
-        className={`${styles.header} ${styles.headerInside}`}
-        data-node-header
-      >
-          {editing ? (
-            <input
-              ref={inputRef}
-              className={styles.titleInput}
-              value={draft}
-              onChange={(e) => setDraft(e.target.value)}
-              onBlur={commit}
-              onPointerDown={(e) => e.stopPropagation()}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') commit()
-                else if (e.key === 'Escape') cancel()
-              }}
-            />
-          ) : (
-            <span
-              className={styles.title}
-              data-node-title
-              onDoubleClick={() => {
-                setDraft(node.title)
-                setEditing(true)
-              }}
-            >
-              {node.title}
-            </span>
-          )}
-          {pixels && (
-            <span className={styles.pixels} data-node-pixels>
-              {formatPixels(pixels)}
-            </span>
-          )}
-      </div>
-
       {node.disabled && (
         <span className={styles.disabledBadge} data-node-disabled-badge>
           已禁用

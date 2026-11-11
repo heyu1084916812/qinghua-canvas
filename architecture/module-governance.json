@@ -543,6 +543,64 @@
   "moduleMoves": [],
   "modules": [
     {
+      "module": "src/workbenches/canvas/flow/FlowNodeHeaderLayer.tsx",
+      "owner": "canvas-flow-ui",
+      "responsibility": "Computes visible node labels and renders editable title/pixel rows above React Flow nodes.",
+      "owns": [
+        "Node header overlay rendering and rename interaction"
+      ],
+      "doesNotOwn": [
+        "Node geometry persistence",
+        "Canvas execution"
+      ],
+      "publicApi": [
+        "FlowNodeHeaderLayer"
+      ],
+      "test": [
+        "src/workbenches/canvas/flow/nodeHeaders.test.ts"
+      ],
+      "budget": 220
+    },
+    {
+      "module": "src/workbenches/canvas/flow/FlowNodeHeaderLayer.module.css",
+      "owner": "canvas-flow-ui",
+      "responsibility": "Styles the external node header overlay without covering node content.",
+      "owns": [
+        "Node header overlay visual tokens"
+      ],
+      "doesNotOwn": [
+        "Node content sizing"
+      ],
+      "publicApi": [
+        "CSS_MODULE: external node header overlay"
+      ],
+      "test": [
+        "src/workbenches/canvas/flow/nodeHeaders.test.ts"
+      ],
+      "budget": 100
+    },
+    {
+      "module": "src/workbenches/canvas/flow/nodeHeaders.ts",
+      "owner": "canvas-flow-ui",
+      "responsibility": "Projects graph nodes, container children and viewport visibility into label rows.",
+      "owns": [
+        "Node label geometry",
+        "Header viewport culling"
+      ],
+      "doesNotOwn": [
+        "Node persistence",
+        "React rendering"
+      ],
+      "publicApi": [
+        "nodeHeaderLabels",
+        "nodeHeadersInView"
+      ],
+      "test": [
+        "src/workbenches/canvas/flow/nodeHeaders.test.ts"
+      ],
+      "budget": 160
+    },
+    {
       "module": "src/domain/inspiration/pinterest.ts",
       "owner": "pinterest-domain",
       "responsibility": "Pinterest OAuth、账号、收藏板与 Pin 的纯规范化规则。",

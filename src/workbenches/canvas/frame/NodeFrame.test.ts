@@ -57,7 +57,6 @@ function renderFrame({
         ...(corners ? { resizeCorners: corners } : {}),
         onFramePointerDown: () => {},
         onResize: () => {},
-        onRename: () => {},
       }),
     ),
   )
@@ -105,33 +104,28 @@ describe('NodeFrame 缩放手柄', () => {
   })
 })
 
-describe('NodeFrame in-frame headers', () => {
-  it('keeps the top-level header inside the virtualized wrapper', () => {
+describe('NodeFrame external headers', () => {
+  it('leaves top-level labels to the external header layer', () => {
     const html = renderFrame({
       type: 'generation',
       data: { assetHash: 'asset_test', naturalSize: { width: 1087, height: 1446 } },
     })
-    const headerTag = html.match(/<div class="([^"]*)" data-node-header="true"/)?.[1] ?? ''
 
-    expect(html).toContain('data-node-title')
-    expect(html).toContain('data-node-header-inside')
-    expect(headerTag).toContain('headerInside')
-    expect(html).toContain('data-node-pixels')
-    expect(html).toContain('1087')
+    expect(html).not.toContain('data-node-header')
+    expect(html).not.toContain('data-node-title')
+    expect(html).not.toContain('data-node-pixels')
+    expect(html).not.toContain('data-node-header-inside')
   })
 
-  it('renders container child headers inside the card so they are not clipped', () => {
+  it('leaves container child labels to the same external header layer', () => {
     const html = renderFrame({
       parentId: 'node_parent',
       type: 'generation',
       data: { assetHash: 'asset_test', naturalSize: { width: 1024, height: 1024 } },
     })
-    const headerTag = html.match(/<div class="([^"]*)" data-node-header="true"/)?.[1] ?? ''
-
-    expect(html).toContain('data-node-header-inside')
-    expect(headerTag).toContain('headerInside')
-    expect(html).toContain('data-node-title')
-    expect(html).toContain('data-node-pixels')
-    expect(html).toContain('1024')
+    expect(html).not.toContain('data-node-header')
+    expect(html).not.toContain('data-node-title')
+    expect(html).not.toContain('data-node-pixels')
+    expect(html).not.toContain('data-node-header-inside')
   })
 })

@@ -130,7 +130,6 @@ function Card({
           minSize={def.sizing.min}
           onFramePointerDown={() => {}}
           onResize={() => {}}
-          onRename={() => {}}
         >
           <View
             node={node}
@@ -153,7 +152,6 @@ function Card({
                       minSize={getNodeDefinition(child.type).sizing.min}
                       onFramePointerDown={() => {}}
                       onResize={() => {}}
-                      onRename={() => {}}
                     >
                       <ChildView node={child} />
                     </NodeFrame>

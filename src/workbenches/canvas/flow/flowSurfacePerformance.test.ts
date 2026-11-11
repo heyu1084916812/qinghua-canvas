@@ -12,10 +12,8 @@ describe('canvas detail virtualization', () => {
     )
   })
 
-  it('keeps all node labels inside that paint-containment boundary', () => {
-    expect(frameCss).toMatch(
-      /\.frame\[data-node-header-inside\] \.body\s*\{[^}]*padding-top:\s*22px;/s,
-    )
+  it('does not put label rows back inside node frames', () => {
+    expect(frameCss).not.toMatch(/data-node-header-inside/)
     expect(frameCss).not.toMatch(/\.body\s*\{[^}]*content-visibility:/s)
   })
 })

@@ -50,6 +50,7 @@ import { FlowChildEdgeLayer } from './FlowChildEdgeLayer'
 import { FlowCoarseEdgeLayer } from './FlowCoarseEdgeLayer'
 import { FlowGroupBoardLayer } from './FlowGroupBoardLayer'
 import { FlowPortLayer } from './FlowPortLayer'
+import { FlowNodeHeaderLayer } from './FlowNodeHeaderLayer'
 import { FlowDraftLayer } from './FlowDraftLayer'
 import { FlowSnapLayer } from './FlowSnapLayer'
 import { EmptyCanvasGuide } from '../surface/EmptyCanvasGuide'
@@ -68,10 +69,7 @@ import { useEdgeDrag } from '../../../features/canvas/useEdgeDrag'
 import { useSpaceHeld } from '../../../features/canvas/useSpaceHeld'
 import { useViewport as useCanvasViewport } from '../../../features/canvas/useViewport'
 import { useNodeDownload } from '../../../features/canvas/useNodeDownload'
-import {
-  clipboardMediaFiles,
-  importDroppedFiles,
-} from '../../../features/canvas/dropImport'
+import { clipboardMediaFiles, importDroppedFiles } from '../../../features/canvas/dropImport'
 import { hasCanvasDrop, useCanvasDrop } from '../../../features/canvas/useCanvasDrop'
 import { batchSlotOf } from '../../../features/canvas/dropReparent'
 import { useNodeDrag } from '../../../features/canvas/useNodeDrag'
@@ -921,6 +919,7 @@ function FlowSurfaceInner({
           />
         )}
       </ReactFlow>
+      <FlowNodeHeaderLayer coarse={detailMode === 'coarse'} />
       <Hud count={graph.nodes.length} ids={nodes.map((n) => n.id)} />
       {/* 空画布 + 还没看过新手引导时，给三个模板直达（对账 #388 / E7） */}
       <EmptyCanvasGuide />

@@ -152,7 +152,6 @@ function FlowNodeInner({ data, selected }: NodeProps) {
       overlay={handleNodes}
       onFramePointerDown={() => {}}
       onResize={resize}
-      onRename={(title) => emit({ type: 'rename', title })}
     >
       <def.View
         node={node}
@@ -251,7 +250,6 @@ export function FlowChildFrame({
       heightFromContent={heightFromContentOf(child)}
       onFramePointerDown={onFramePointerDown}
       onResize={resize}
-      onRename={(title) => emit({ type: 'rename', title })}
     >
       <def.View
         node={child}

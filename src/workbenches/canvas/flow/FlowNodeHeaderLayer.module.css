@@ -1,0 +1,67 @@
+.clip {
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.layer {
+  position: absolute;
+  left: 0;
+  top: 0;
+  transform-origin: 0 0;
+  pointer-events: none;
+}
+
+.header {
+  position: absolute;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: 0 2px;
+  box-sizing: border-box;
+  pointer-events: none;
+}
+
+.title {
+  min-width: 0;
+  color: var(--text-1);
+  font-size: var(--node-title-size, var(--fs-title));
+  font-weight: var(--fw-title);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: text;
+  user-select: none;
+  pointer-events: auto;
+}
+
+.pixels {
+  flex: 0 0 auto;
+  color: var(--text-3);
+  font-family: var(--font-sans);
+  font-size: var(--fs-chip);
+  font-weight: var(--fw-chip);
+  line-height: 1;
+  white-space: nowrap;
+  user-select: none;
+  pointer-events: none;
+}
+
+.titleInput {
+  width: 100%;
+  border: none;
+  outline: none;
+  background: var(--node-control);
+  border-radius: var(--radius-control);
+  padding: 2px var(--space-2);
+  color: var(--text-1);
+  font-family: var(--font-sans);
+  font-size: var(--node-title-size, var(--fs-title));
+  font-weight: var(--fw-title);
+  user-select: text;
+  pointer-events: auto;
+}
