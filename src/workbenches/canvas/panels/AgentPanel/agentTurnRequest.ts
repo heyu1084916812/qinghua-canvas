@@ -87,6 +87,14 @@ import {
   type AgentTaskDecision,
 } from '../../../../domain/agent/agentTask'
 import { latestQuestionCard } from '../../../../domain/agent/questionCard'
+import {
+  nextSeriesStage,
+  seriesDirectiveOf,
+  seriesOrchestrationPrompt,
+  seriesStageReleased,
+  unmentionedReferencesPrompt,
+  withSeriesStage,
+} from '../../../../domain/agent/seriesOrchestration'
 
 export interface AgentTurnContextTrace {
   digest: string
@@ -323,6 +331,8 @@ export async function prepareAgentTurnRequest(
       lastAssistantTextForTask,
     ),
   })
+  const answersQuestionCard =
+    latestQuestionCard(previousMessagesForTask)?.answered === false
   const taskDecision = resolveAgentTask(
     input.session.agentTask,
     {
@@ -331,15 +341,30 @@ export async function prepareAgentTurnRequest(
       hasActiveTaskPlan: Boolean(activeTaskPlanForTask),
       hasPendingConfirmation: input.session.pendingConfirmation !== undefined,
       hasActiveContinuation: input.session.continuation !== undefined,
-      answersQuestionCard:
-        latestQuestionCard(previousMessagesForTask)?.answered === false,
+      answersQuestionCard,
       refersToCanvasImage:
         mentionedImageIds.length > 0 || selectedImageIds.length > 0,
       referenceIds: mentionedReferenceIds,
     },
     { now: Date.now(), newId: () => createId('task') },
   )
-  const agentTask = taskDecision.task
+  // 系列编排阶段（「先定 Logo」）：同任务跨回合保留，用户放行才解除；内部续跑不改阶段。
+  const previousSeriesStage = taskDecision.continued
+    ? taskDecision.task.seriesStage
+    : undefined
+  const seriesStage = input.internalControl === true
+    ? previousSeriesStage
+    : nextSeriesStage({
+        previous: previousSeriesStage,
+        continued: taskDecision.continued,
+        text: plainText,
+      })
+  const agentTask = withSeriesStage(taskDecision.task, seriesStage)
+  const seriesPrompt = seriesOrchestrationPrompt({
+    stage: seriesStage,
+    directive: input.internalControl === true ? null : seriesDirectiveOf(plainText),
+    released: seriesStageReleased(previousSeriesStage, seriesStage),
+  })
   const taskKey = referenceTaskKey(agentTask)
   const referenceIds = agentTask.referenceIds
   await input.sessions.updateFields?.(input.session.id, { agentTask })
@@ -507,9 +532,19 @@ export async function prepareAgentTurnRequest(
         contextTrace,
       }
     }
+    const referenceQuestion = taskSelection
+      ? unmentionedReferencesPrompt({
+          omitted: taskSelection.omitted,
+          mentionedIds: referenceIds,
+          answeringQuestionCard: answersQuestionCard,
+          internalControl: input.internalControl === true,
+        })
+      : { prompt: '', itemIds: [] }
     contextPrompt = [
       formatContextBundleForPrompt(bundle),
       projected?.prompt ?? '',
+      referenceQuestion.prompt,
+      seriesPrompt,
     ]
       .filter(Boolean)
       .join('\n\n')

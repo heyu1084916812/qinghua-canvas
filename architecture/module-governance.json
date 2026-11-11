@@ -543,6 +543,36 @@
   "moduleMoves": [],
   "modules": [
     {
+      "module": "src/domain/agent/seriesOrchestration.ts",
+      "owner": "agent-runtime",
+      "responsibility": "回合级编排提示：识别整套 / 先定 Logo 指令并维护任务的系列阶段，侧栏多张未提及且无用法的参考图时提示先发问题卡。",
+      "owns": [
+        "整套 / 先定 Logo 指令识别",
+        "先定 Logo 阶段的保留与放行",
+        "系列编排上下文段落",
+        "未提及参考图的问题卡提示"
+      ],
+      "doesNotOwn": [
+        "任务延续判定",
+        "applyPlan 锚点连线检查",
+        "问题卡渲染与解析"
+      ],
+      "publicApi": [
+        "SeriesStage",
+        "SeriesDirective",
+        "seriesDirectiveOf",
+        "nextSeriesStage",
+        "seriesStageReleased",
+        "seriesOrchestrationPrompt",
+        "unmentionedReferencesPrompt",
+        "withSeriesStage"
+      ],
+      "test": [
+        "src/domain/agent/seriesOrchestration.test.ts"
+      ],
+      "budget": 200
+    },
+    {
       "module": "src/domain/agent/questionCard.ts",
       "owner": "agent-runtime",
       "responsibility": "问题卡（askQuestions）的参数解析、兜底正文、回答选择与整理成用户消息，以及在历史里找最近一张问题卡。",

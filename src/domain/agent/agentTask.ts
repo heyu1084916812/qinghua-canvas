@@ -35,6 +35,11 @@ export interface AgentTaskRef {
    * 新任务从空开始：旧任务的参考只有被再次提到才会重新进入（并按新任务重新分析用法）。
    */
   referenceIds: string[]
+  /**
+   * 系列编排阶段（见 seriesOrchestration.ts）：用户说「先定 Logo」后为 logo_first，
+   * 同一任务内跨回合保留，直到用户放行；新任务不继承。
+   */
+  seriesStage?: 'logo_first'
 }
 
 export interface AgentTaskSignals {
@@ -190,5 +195,6 @@ export function normalizeAgentTaskRef(value: unknown): AgentTaskRef | undefined 
           (id): id is string => typeof id === 'string' && id.length > 0,
         ))]
       : [],
+    ...(row.seriesStage === 'logo_first' ? { seriesStage: 'logo_first' as const } : {}),
   }
 }

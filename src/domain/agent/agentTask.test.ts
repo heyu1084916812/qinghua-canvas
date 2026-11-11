@@ -119,3 +119,17 @@ describe('agentTask 延续 vs 新任务', () => {
     })
   })
 })
+
+describe('AgentTaskRef.seriesStage', () => {
+  it('normalize 保留合法阶段、丢弃未知值；延续任务继承阶段，新任务不继承', async () => {
+    const { normalizeAgentTaskRef, resolveAgentTask } = await import('./agentTask')
+    const base = { id: 't1', brief: '', startedAt: 1, updatedAt: 1, turns: 1, referenceIds: [] }
+    expect(normalizeAgentTaskRef({ ...base, seriesStage: 'logo_first' })?.seriesStage).toBe('logo_first')
+    expect(normalizeAgentTaskRef({ ...base, seriesStage: 'x' })).not.toHaveProperty('seriesStage')
+    const previous = { ...base, seriesStage: 'logo_first' as const }
+    const env = { now: 2, newId: () => 't2' }
+    expect(resolveAgentTask(previous, { text: '再大一点' }, env).task.seriesStage).toBe('logo_first')
+    expect(resolveAgentTask(previous, { text: '画一只猫' }, env).task).not.toHaveProperty('seriesStage')
+  })
+})
+

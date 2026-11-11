@@ -1126,4 +1126,83 @@ describe('prepareAgentTurnRequest', () => {
       'hash-cup',
     ])
   })
+
+  it('★★ G5 参考栏多张未提及且无用法的图：上下文提示先发问题卡；回答问题卡那一回合不再提示', async () => {
+    const { sessions, session } = await createSession()
+    const image = (id: string) => ({
+      item: {
+        id,
+        projectId: 'p1',
+        title: `${id}.jpg`,
+        source: 'file' as const,
+        kind: 'image' as const,
+        assetHash: `hash-${id}`,
+        what: `${id} 的画面`,
+        createdAt: 1,
+        updatedAt: 1,
+      },
+      reason: 'no_usage' as const,
+    })
+    const ledger = {
+      selectForTask: vi.fn(async () => ({ selected: [], omitted: [image('a'), image('b')] })),
+      listItems: vi.fn(async () => []),
+    }
+    const result = await prepareAgentTurnRequest({
+      ...inputFor({ sessions, session, text: '帮我做一张新品海报' }),
+      referenceLedger: ledger,
+    })
+    if (result.kind !== 'ready') throw new Error(result.kind)
+    expect(result.contextPrompt).toContain('参考栏里还有未提到、用途不明的图')
+    expect(result.contextPrompt).toContain('askQuestions')
+    expect(result.contextPrompt).toContain('【a.jpg】')
+
+    const card = JSON.stringify({ ok: true, awaitingAnswers: true, questions: [{ id: 'r', question: '怎么用？' }] })
+    const asked = await sessions.saveMessages(session.id, [
+      { role: 'user', content: '帮我做一张新品海报' },
+      { role: 'assistant', content: '', toolCalls: [{ id: 'q', name: 'askQuestions', args: '{}' }] },
+      { role: 'tool', toolCallId: 'q', toolName: 'askQuestions', content: card },
+      { role: 'assistant', content: '先问一下' },
+    ])
+    clearToolSupportCache()
+    const answer = await prepareAgentTurnRequest({
+      ...inputFor({ sessions, session: asked ?? session, text: '问题卡回答：\n1. 怎么用？ → 都不用' }),
+      referenceLedger: ledger,
+    })
+    if (answer.kind !== 'ready') throw new Error(answer.kind)
+    expect(answer.agentTaskReason).toBe('continuation')
+    expect(answer.contextPrompt).not.toContain('参考栏里还有未提到')
+  })
+
+  it('★★ 「先定 Logo」只做 Logo 并停下：阶段随任务保留，用户放行后转为串行延展', async () => {
+    const { sessions, session } = await createSession()
+    const run = async (text: string) => {
+      clearToolSupportCache()
+      const latest = (await sessions.get(session.id)) ?? session
+      const result = await prepareAgentTurnRequest(inputFor({ sessions, session: latest, text }))
+      if (result.kind !== 'ready') throw new Error(result.kind)
+      return result
+    }
+    const first = await run('帮我做一套咖啡品牌：Logo、包装和海报，先定 Logo')
+    expect(first.agentTask.seriesStage).toBe('logo_first')
+    expect(first.contextPrompt).toContain('本回合**只做 Logo**')
+    const tweak = await run('Logo 再大一点')
+    expect(tweak.agentTask.seriesStage).toBe('logo_first')
+    expect(tweak.contextPrompt).toContain('只做 Logo')
+    const released = await run('Logo 可以了，继续')
+    expect(released.agentTask.id).toBe(first.agentTask.id)
+    expect(released.agentTask.seriesStage).toBeUndefined()
+    expect(released.contextPrompt).toContain('Logo 已确认，继续延展')
+    expect((await sessions.get(session.id))?.agentTask?.seriesStage).toBeUndefined()
+  })
+
+  it('★★ 整套（Logo + 包装 + 海报）默认串行：上下文写明锚点顺序', async () => {
+    const { sessions, session } = await createSession()
+    const result = await prepareAgentTurnRequest(
+      inputFor({ sessions, session, text: '帮我设计咖啡品牌的 Logo、包装和海报' }),
+    )
+    if (result.kind !== 'ready') throw new Error(result.kind)
+    expect(result.agentTask.seriesStage).toBeUndefined()
+    expect(result.contextPrompt).toContain('整套串行')
+  })
 })
+
