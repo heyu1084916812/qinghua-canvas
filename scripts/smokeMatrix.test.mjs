@@ -1,3 +1,4 @@
+import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 import {
   CRITICAL_SMOKE_GROUPS,
@@ -18,7 +19,7 @@ describe('smoke-matrix isolation plan', () => {
     const plan1 = groupPlan(1, 'E:/tmp/run', 18800, 'g44')
     expect(plan0.storeArgs).toEqual([
       '--data-dir',
-      'E:\\tmp\\run\\000-g8\\localappdata\\com.qinghua.canvas\\shared-store-v1',
+      path.join('E:/tmp/run', '000-g8', 'localappdata', 'com.qinghua.canvas', 'shared-store-v1'),
       '--backend',
       'v1',
       '--port',
@@ -31,8 +32,8 @@ describe('smoke-matrix isolation plan', () => {
     expect(plan1.smokeEnv.SMOKE_STORE_BASE).toBe('http://127.0.0.1:18801')
     expect(plan0.port).not.toBe(plan1.port)
     expect(plan0.dataDir).not.toBe(plan1.dataDir)
-    expect(plan0.groupRoot).toBe('E:\\tmp\\run\\000-g8')
-    expect(plan1.groupRoot).toBe('E:\\tmp\\run\\001-g44')
+    expect(plan0.groupRoot).toBe(path.join('E:/tmp/run', '000-g8'))
+    expect(plan1.groupRoot).toBe(path.join('E:/tmp/run', '001-g44'))
   })
 
   it('never plans a port on a known resident service', () => {
