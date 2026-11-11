@@ -666,12 +666,13 @@
         "toggleQuestionOption",
         "setQuestionFreeText",
         "questionCardAnswerable",
+        "questionCardTurn",
         "latestQuestionCard"
       ],
       "test": [
         "src/domain/agent/questionCard.test.ts"
       ],
-      "budget": 220
+      "budget": 240
     },
     {
       "module": "src/workbenches/canvas/panels/AgentPanel/QuestionCardForm.tsx",

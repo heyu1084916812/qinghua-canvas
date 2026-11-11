@@ -79,6 +79,30 @@ export function parseQuestionCardArgs(args: unknown): ParsedQuestionCard {
   return { ok: true, questions, intro: clip(record.intro, QUESTION_LIMIT) }
 }
 
+/**
+ * Agent 循环里处理一次 askQuestions：返回要写入历史的工具结果，以及本回合结束时的正文。
+ * 参数不合法时 text 为 null：把问题回填给模型，让它改了再问（回合不结束）。
+ */
+export function questionCardTurn(
+  callId: string,
+  args: unknown,
+): { toolMessage: ChatMessage; text: string | null } {
+  const card = parseQuestionCardArgs(args)
+  const result = card.ok
+    ? { ok: true, awaitingAnswers: true, intro: card.intro, questions: card.questions }
+    : { ok: false, problems: card.problems }
+  return {
+    toolMessage: {
+      role: 'tool',
+      toolCallId: callId,
+      toolName: QUESTION_CARD_TOOL,
+      content: JSON.stringify(result),
+      createdAt: Date.now(),
+    },
+    text: card.ok ? questionCardText(card.intro, card.questions) : null,
+  }
+}
+
 /** 本回合结束时显示的正文；不渲染问题卡的环境（导出、JSON 模式）也能看懂。 */
 export function questionCardText(intro: string, questions: readonly AgentQuestion[]): string {
   return [

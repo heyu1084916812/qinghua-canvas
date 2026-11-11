@@ -6,6 +6,7 @@ import {
   parseQuestionCardArgs,
   questionCardAnswerable,
   questionCardText,
+  questionCardTurn,
   setQuestionFreeText,
   toggleQuestionOption,
   type AgentQuestion,
@@ -124,3 +125,16 @@ describe('latestQuestionCard', () => {
     expect(latestQuestionCard([{ role: 'user', content: 'hi' }])).toBeNull()
   })
 })
+
+describe('questionCardTurn', () => {
+  it('合法 → 工具结果 awaitingAnswers + 正文；不合法 → 问题回填、正文为 null', () => {
+    const ok = questionCardTurn('c1', { questions: [{ question: '尺寸？', options: ['3:4'] }] })
+    expect(ok.toolMessage).toMatchObject({ role: 'tool', toolCallId: 'c1', toolName: 'askQuestions' })
+    expect(JSON.parse(ok.toolMessage.content)).toMatchObject({ ok: true, awaitingAnswers: true })
+    expect(ok.text).toContain('1. 尺寸？（3:4 / 或直接写）')
+    const bad = questionCardTurn('c2', { questions: [] })
+    expect(bad.text).toBeNull()
+    expect(JSON.parse(bad.toolMessage.content)).toMatchObject({ ok: false })
+  })
+})
+
