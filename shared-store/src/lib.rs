@@ -660,6 +660,54 @@ fn origin_allowed(origin: &str) -> bool {
     )
 }
 
+/// DNS rebinding 防护：只接受指向回环地址的 Host（端口不限）。
+/// 攻击者域名重绑到 127.0.0.1 时，浏览器发来的 Host 仍是攻击者域名，会在这里被拒。
+fn host_allowed(host: Option<&str>) -> bool {
+    let Some(host) = host.map(str::trim) else {
+        // HTTP/1.0 等无 Host 的本机工具请求：浏览器总会带 Host，放行不影响网页侧防护。
+        return true;
+    };
+    let name = if let Some(rest) = host.strip_prefix('[') {
+        match rest.split_once(']') {
+            Some((inner, _)) => inner,
+            None => return false,
+        }
+    } else {
+        host.rsplit_once(':').map(|(name, _)| name).unwrap_or(host)
+    };
+    matches!(name.to_ascii_lowercase().as_str(), "127.0.0.1" | "localhost" | "::1")
+}
+
+/// 跨站请求防护（CSRF）：
+/// - 带 Origin 的请求必须来自白名单（应用自身 / 开发服务器）；
+/// - 写入类 POST 必须是 `application/json`，迫使浏览器先走预检，
+///   而预检只对白名单 Origin 放行，网页无法再用 `text/plain` 简单请求直接写库。
+fn request_guard(
+    method: &Method,
+    host: Option<&str>,
+    origin: Option<&str>,
+    content_type: Option<&str>,
+) -> Result<(), &'static str> {
+    if !host_allowed(host) {
+        return Err("forbidden host");
+    }
+    if let Some(origin) = origin {
+        if !origin_allowed(origin) {
+            return Err("forbidden origin");
+        }
+    }
+    if method == &Method::Post {
+        let json = content_type
+            .and_then(|value| value.split(';').next())
+            .map(|value| value.trim().eq_ignore_ascii_case("application/json"))
+            .unwrap_or(false);
+        if !json {
+            return Err("content-type must be application/json");
+        }
+    }
+    Ok(())
+}
+
 fn respond_json(
     request: Request,
     status: StatusCode,
@@ -1209,6 +1257,14 @@ fn body_json<T: for<'de> Deserialize<'de>>(request: &mut Request) -> Result<T, S
     serde_json::from_slice(&raw).map_err(|error| format!("parse body: {error}"))
 }
 
+fn request_header(request: &Request, name: &'static str) -> Option<String> {
+    request
+        .headers()
+        .iter()
+        .find(|item| item.field.equiv(name))
+        .map(|item| item.value.as_str().to_string())
+}
+
 fn handle(backends: Arc<RwLock<Arc<dyn StoreBackend>>>, mut request: Request) {
     let origin = request
         .headers()
@@ -1228,6 +1284,22 @@ fn handle(backends: Arc<RwLock<Arc<dyn StoreBackend>>>, mut request: Request) {
                         .filter(|value| origin_allowed(value))
                         .unwrap_or("null"),
                 )),
+        );
+        return;
+    }
+    let host = request_header(&request, "host");
+    let content_type = request_header(&request, "content-type");
+    if let Err(reason) = request_guard(
+        request.method(),
+        host.as_deref(),
+        origin.as_deref(),
+        content_type.as_deref(),
+    ) {
+        let _ = request.respond(
+            Response::from_string(json!({ "ok": false, "error": reason }).to_string())
+                .with_status_code(StatusCode(403))
+                .with_header(header("content-type", "application/json; charset=utf-8"))
+                .with_header(header("cache-control", "no-store")),
         );
         return;
     }
@@ -2167,5 +2239,41 @@ mod tests {
             .flatten()
             .all(|entry| !entry.file_name().to_string_lossy().ends_with(".tmp")));
         let _ = fs::remove_dir_all(root);
+    }
+}
+
+
+#[cfg(test)]
+mod request_guard_tests {
+    use super::*;
+
+    #[test]
+    fn host_must_be_loopback() {
+        assert!(host_allowed(Some("127.0.0.1:18765")));
+        assert!(host_allowed(Some("localhost:18765")));
+        assert!(host_allowed(Some("[::1]:18765")));
+        assert!(host_allowed(None));
+        assert!(!host_allowed(Some("evil.example.com:18765")));
+        assert!(!host_allowed(Some("127.0.0.1.evil.com")));
+        assert!(!host_allowed(Some("[::1")));
+    }
+
+    #[test]
+    fn foreign_origin_is_rejected() {
+        let host = Some("127.0.0.1:18765");
+        let json = Some("application/json");
+        assert!(request_guard(&Method::Get, host, Some("https://evil.example.com"), None).is_err());
+        assert!(request_guard(&Method::Post, host, Some("https://evil.example.com"), json).is_err());
+        assert!(request_guard(&Method::Post, host, Some("http://tauri.localhost"), json).is_ok());
+        assert!(request_guard(&Method::Get, host, None, None).is_ok());
+    }
+
+    #[test]
+    fn post_requires_json_content_type() {
+        let host = Some("127.0.0.1:18765");
+        assert!(request_guard(&Method::Post, host, None, Some("text/plain")).is_err());
+        assert!(request_guard(&Method::Post, host, None, None).is_err());
+        assert!(request_guard(&Method::Post, host, None, Some("application/x-www-form-urlencoded")).is_err());
+        assert!(request_guard(&Method::Post, host, None, Some("Application/JSON; charset=utf-8")).is_ok());
     }
 }
