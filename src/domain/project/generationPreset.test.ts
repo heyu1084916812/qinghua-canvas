@@ -37,25 +37,45 @@ describe('生成配方（新建节点的默认渠道 / 模型 / 参数）', () =
   })
 
   /**
-   * ★ 勾选为空时**回落到 modelCache**（2026-09-18 实测踩到）。
+   * ★ Agent 实测 Bug A2（2026-11-11，用户口径）：**只能选启用渠道里用户勾选的模型**。
    *
-   * 「拉取模型」只把模型放进缓存，**不等于勾选**——用户还得在设置页的
-   * 「选择模型」里勾上并点应用。于是「只配一个渠道、点了拉取、直接回画布建节点」
-   * 这条最常见的路径下 `models` 是空的；不回落到缓存就什么都拿不到，
-   * 表现成「明明配好了渠道，新建节点还是空的」。
+   * 旧规则（2026-09-18）在勾选为空 / 本类别无勾选时回落到 `modelCache`，
+   * 实测选中了用户没勾的 `global:hy-image-3.5`，请求被上游以「模型未启用」拒绝。
+   * 拉取回来的缓存只供设置页展示，不再参与默认值兜底。
    */
-  it('★ 已勾选为空 → 回落到 modelCache 的第一个', () => {
+  it('★ 已勾选为空 → 不回落 modelCache，给不出默认值（不猜）', () => {
     const ch: PresetChannelLike = {
       id: 'ch1',
       models: [],
       modelCache: [{ id: 'from-cache' }, { id: 'second' }],
     }
-    expect(firstUsableChannel([ch])).toEqual({
-      channelId: 'ch1',
-      model: 'from-cache',
+    expect(firstUsableChannel([ch])).toBeNull()
+  })
+
+  it('★ 本类别没有勾选 → 不拿缓存里同类别的未勾选模型，而是去下一条渠道找勾选的', () => {
+    const chatSite: PresetChannelLike = {
+      id: 'chat-site',
+      models: [{ id: 'cn:deepseek-v4.1-flash', category: 'chat' }],
+      modelCache: [
+        { id: 'cn:deepseek-v4.1-flash', category: 'chat' },
+        { id: 'global:hy-image-3.5', category: 'image' },
+      ],
+    }
+    const imageSite: PresetChannelLike = {
+      id: 'xssr',
+      models: [{ id: 'gpt-image-2.5', category: 'image' }],
+    }
+    expect(firstUsableChannel([chatSite, imageSite], 'image')).toEqual({
+      channelId: 'xssr',
+      model: 'gpt-image-2.5',
       params: {},
       substituted: true,
     })
+    expect(firstUsableChannel([chatSite], 'image')).toBeNull()
+    expect(
+      resolveForNode({ channelId: 'chat-site' }, [chatSite, imageSite], () => NO_RECIPE, 'image')
+        ?.model,
+    ).not.toBe('global:hy-image-3.5')
   })
 
   it('★ 有勾选时以勾选为准（不再看缓存，否则用户筛掉的模型会冒出来）', () => {
@@ -67,18 +87,21 @@ describe('生成配方（新建节点的默认渠道 / 模型 / 参数）', () =
     expect(firstUsableChannel([ch])?.model).toBe('picked')
   })
 
-  it('★ 配方里的模型仍在该渠道的缓存里 → 视为有效（不算失效）', () => {
+  it('★ 配方里的模型只在缓存里（用户没勾）→ 视为失效，不沿用', () => {
     const ch: PresetChannelLike = {
       id: 'ch1',
-      models: [],
-      modelCache: [{ id: 'kept' }],
+      models: [{ id: 'picked' }],
+      modelCache: [{ id: 'kept' }, { id: 'picked' }],
     }
     expect(resolveRecipe({ channelId: 'ch1', model: 'kept', params: {}, savedAt: 0 }, [ch])).toEqual({
       channelId: 'ch1',
-      model: 'kept',
+      model: 'picked',
       params: {},
-      substituted: false,
+      substituted: true,
     })
+    expect(
+      resolveForNode({ channelId: 'ch1', model: 'kept' }, [ch], () => NO_RECIPE)?.model,
+    ).toBe('picked')
   })
 
   it('★ 渠道 + 模型都有值才记（半份配方比没有更糟）', () => {

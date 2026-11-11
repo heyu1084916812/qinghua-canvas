@@ -226,7 +226,7 @@ export interface ResolvedRecipe {
  *
  * `models` = 用户**已勾选**的（画布下拉的数据源）；
  * `modelCache` = 「拉取模型」拉回来的**全部**（选择面板的数据源）。
- * 两者都要：优先用勾选的，勾选为空时回落到缓存（见 `pickModel`）。
+ * 默认值解析只认 `models`（勾选的）；`modelCache` 仅供设置页展示（见 `pickModel`，A2）。
  */
 export interface PresetChannelLike {
   id: string
@@ -249,17 +249,11 @@ export interface PresetChannelLike {
 }
 
 /**
- * 挑一个能用的模型：**先看已勾选，再看拉取回来的缓存**。
+ * 挑一个能用的模型：**只看用户已勾选的**（2026-11-11 Agent 实测 Bug A2 起）。
  *
- * 为什么必须回落到 `modelCache`（2026-09-18 实测踩到）：
- * 「拉取模型」只是把模型放进缓存，**不等于勾选**——用户还得在「选择模型」面板里
- * 勾上并点应用，那次操作才写进 `models`。于是「我只配了一个渠道、点了拉取、
- * 就直接回画布建节点」这条**最常见**的路径下，`models` 是空的，
- * 默认值就什么都拿不到，表现成「明明配好了渠道，新建节点还是空的」。
- *
- * 原先不回落的理由是「缓存可能几十上百个，拿第一个等于随机」——那只在
- * **多模型**时成立；一个都不勾选的情况下，退回第一个（也就是列表里最靠前的那个）
- * 显然比留空更符合用户预期。
+ * 历史：2026-09-18 曾为「拉取了却没勾」的渠道回落到 `modelCache`；
+ * 2026-11-11 实测这条回落选中了用户没勾的模型（`global:hy-image-3.5`），
+ * 用户口径改为「只能选启用渠道里用户勾选的模型」，回落已删除。
  */
 function pickModel(
   channel: PresetChannelLike,
@@ -267,7 +261,12 @@ function pickModel(
 ): { id: string } | undefined {
   const byCategory = (list: readonly { id: string }[]) =>
     category ? list.find((m) => (m as { category?: string }).category === category) : list[0]
-  const hit = byCategory(channel.models) ?? byCategory(channel.modelCache ?? [])
+  /**
+   * ⚠️ 只看**用户勾选的** `models`（Agent 实测 Bug A2，2026-11-11 用户口径：
+   * 「只能选启用渠道里用户勾选的模型」）。曾经回落到 `modelCache`，实测选中了
+   * 用户没勾的 `global:hy-image-3.5`，请求被上游拒绝。缓存只供设置页展示。
+   */
+  const hit = byCategory(channel.models)
   /**
    * **对话类**默认取固定显示名的第一个（用户 2026-09-27 第 8 轮：
    * 「目前需要一个默认的显示，不是 advanced-voice」）。
@@ -294,9 +293,7 @@ function pickModel(
      * 命中说明「这条渠道本来就以这个模型的形式存在」。都不命中才退回第一项
      * （保持既有兜底：总要给个非空的默认值，让用户能改）。
      */
-    const available = new Set(
-      [...channel.models, ...(channel.modelCache ?? [])].map((m) => m.id),
-    )
+    const available = new Set(channel.models.map((m) => m.id))
     const presets = presetModelsOf('chat')
     const preset =
       presets.find((p) => (p.aliases ?? []).some((a) => available.has(a))) ?? presets[0]
@@ -326,7 +323,8 @@ export function resolveRecipe(
    * 两边都查：勾选列表是用户显式选择的，但「拉取了却没勾」的渠道里
    * 那个模型仍然出现在缓存里——只看勾选会把一个完全可用的记录判成失效。
    */
-  const available = [...channel.models, ...(channel.modelCache ?? [])]
+  /** 只认勾选的（A2）：缓存里有、用户没勾的模型不算「渠道还提供」。 */
+  const available = channel.models
   /**
    * M7-4：记录/节点上的模型是**逻辑名**，可能与渠道里的上游 ID 不同名
    * （`逻辑名 → 上游ID` 映射）。直接按原名比会判成「渠道没有这个模型」，
@@ -431,7 +429,8 @@ export function resolveForNode(
   if (channelId) {
     const channel = channels.find((c) => c.id === channelId)
     if (channel) {
-      const available = [...channel.models, ...(channel.modelCache ?? [])]
+      /** 只认勾选的（A2）。 */
+      const available = channel.models
       /** 节点上的模型若仍可用，原样保留（连参数一起给回）。 */
       /**
        * 同上方 `resolveRecipe` 的理由：节点上存的是逻辑名，
