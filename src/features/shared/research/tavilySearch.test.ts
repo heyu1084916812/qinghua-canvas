@@ -66,6 +66,18 @@ describe('tavilyItemsOf', () => {
     expect(new Set(items.map((item) => item.id)).size).toBe(items.length)
   })
 
+  it('falls back to the image title when its description is empty', () => {
+    const items = tavilyItemsOf({
+      results: [],
+      images: [
+        { url: 'https://img.example.com/a.jpg', title: '咖啡海报 A', description: '' },
+        { url: 'https://img.example.com/b.jpg', title: '咖啡海报 B', description: '暖色手冲咖啡海报' },
+      ],
+    })
+    expect(items.map((item) => item.title)).toEqual(['咖啡海报 A', '暖色手冲咖啡海报'])
+    expect(items[0].description).toBe('咖啡海报 A')
+  })
+
   it('tolerates an empty or malformed payload', () => {
     expect(tavilyItemsOf(null)).toEqual([])
     expect(tavilyItemsOf({ results: 'x', images: {} })).toEqual([])

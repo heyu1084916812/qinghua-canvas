@@ -9,7 +9,7 @@ import { asAppError } from '../../../shared/result'
  * 字段只认官方文档 https://docs.tavily.com/documentation/api-reference/endpoint/search
  * 列出的：请求 `query / max_results / search_depth / include_images /
  * include_image_descriptions / include_answer`；响应 `results[{title,url,content,score,images?}]`
- * 与顶层 `images[{url,description}]`（未开 description 时也可能是字符串数组）。
+ * 与顶层 `images[{url,title?,description}]`（未开 description 时也可能是字符串数组）。
  *
  * Key 只出现在 Authorization 头里：不进日志、不进错误文案、不进工具结果。
  */
@@ -71,7 +71,9 @@ function imagesOf(value: unknown): TavilyImage[] {
     const row = recordOf(entry)
     const url = textOf(row.url)
     if (!isPublicHttpUrl(url)) return []
-    return [{ url, description: textOf(row.description) }]
+    // 实测（2026-11-11）：开 include_image_descriptions 后对象为 {url,title,description}，
+    // description 偶尔为空而 title 有值，此时用 title 兜底。
+    return [{ url, description: textOf(row.description) || textOf(row.title) }]
   })
 }
 
