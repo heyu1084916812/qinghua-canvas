@@ -50,8 +50,10 @@ describe('nextSeriesStage', () => {
   })
 
   it('withSeriesStage 无阶段时去掉键', () => {
-    expect(withSeriesStage({ id: 't', seriesStage: 'logo_first' as const }, undefined)).toEqual({ id: 't' })
-    expect(withSeriesStage({ id: 't' }, 'logo_first')).toEqual({ id: 't', seriesStage: 'logo_first' })
+    const staged: { id: string; seriesStage?: 'logo_first' } = { id: 't', seriesStage: 'logo_first' }
+    const plain: { id: string; seriesStage?: 'logo_first' } = { id: 't' }
+    expect(withSeriesStage(staged, undefined)).toEqual({ id: 't' })
+    expect(withSeriesStage(plain, 'logo_first')).toEqual({ id: 't', seriesStage: 'logo_first' })
   })
 })
 
