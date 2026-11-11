@@ -55,6 +55,7 @@ import { useAgentPanelQueueMenu } from './useAgentPanelQueueMenu'
 import { useAgentPanelRunLifecycle } from './useAgentPanelRunLifecycle'
 import { useAgentPanelSessionPresentation } from './useAgentPanelSessionPresentation'
 import { useAgentResearchReferenceController } from './useAgentResearchReferenceController'
+import { useAgentWebResearchPersistence } from './useAgentWebResearchPersistence'
 import type { AgentPanelRefs } from './useAgentPanelRefs'
 
 /**
@@ -246,6 +247,7 @@ export function useAgentPanelSessionModel({
     setQueueMenuId,
     setQueueMenuPosition,
   } = useAgentPanelQueueMenu(current?.id ?? null)
+  useAgentWebResearchPersistence(presets)
   useEffect(() => {
     let alive = true
     void presets

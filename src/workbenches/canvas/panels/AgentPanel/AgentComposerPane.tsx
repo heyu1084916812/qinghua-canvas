@@ -40,6 +40,7 @@ import {
   type MentionRef,
 } from '../../text/MentionEditor'
 import { SkillMenu } from './SkillMenu'
+import { AgentWebResearchToggle } from './AgentWebResearchToggle'
 import baseStyles from './AgentPanel.module.css'
 import composerStyles from './AgentComposerPane.module.css'
 
@@ -648,6 +649,9 @@ export function AgentComposerPane({
               onClose={() => setOpenPicker(null)}
               onSelect={(v) => void setAutoRun(v === 'auto')}
             />
+
+            {/* 联网开关（用户 2026-11-11）：关掉后 Agent 不搜索、不读网页。 */}
+            <AgentWebResearchToggle />
           </div>
 
           {/*

@@ -6676,6 +6676,66 @@
       "budget": 190
     },
     {
+      "module": "src/workbenches/canvas/panels/AgentPanel/AgentWebResearchToggle.tsx",
+      "owner": "agent-composer-ui",
+      "responsibility": "Agent 输入框工具条里的「联网」开关按钮，读写全局联网状态。",
+      "owns": [
+        "开关按钮渲染与 aria-pressed",
+        "切换联网状态"
+      ],
+      "doesNotOwn": [
+        "开关持久化",
+        "联网工具过滤与执行"
+      ],
+      "publicApi": [
+        "AgentWebResearchToggle"
+      ],
+      "test": [
+        "src/workbenches/canvas/panels/AgentPanel/AgentComposerPane.test.ts"
+      ],
+      "budget": 60
+    },
+    {
+      "module": "src/workbenches/canvas/panels/AgentPanel/AgentWebResearchToggle.module.css",
+      "owner": "agent-composer-ui",
+      "responsibility": "「联网」开关的开/关两态样式，复用输入框工具条的尺寸与视觉令牌。",
+      "owns": [
+        "开关尺寸、边框与强调色态"
+      ],
+      "doesNotOwn": [
+        "工具条布局"
+      ],
+      "publicApi": [
+        "CSS_MODULE: Agent 输入框联网开关样式", "CSS_CLASS:toggle", "CSS_CLASS:on"
+      ],
+      "test": [
+        "src/workbenches/canvas/panels/AgentPanel/AgentComposerPane.test.ts"
+      ],
+      "budget": 60
+    },
+    {
+      "module": "src/workbenches/canvas/panels/AgentPanel/useAgentWebResearchPersistence.ts",
+      "owner": "agent-runtime-preferences",
+      "responsibility": "把「联网」开关与 presets 持久化绑定：启动读回、切换写回。",
+      "owns": [
+        "启动读回且不回写",
+        "用户切换后写回"
+      ],
+      "doesNotOwn": [
+        "开关运行时状态",
+        "联网工具执行"
+      ],
+      "publicApi": [
+        "useAgentWebResearchPersistence",
+        "bindAgentWebResearchPersistence",
+        "AgentWebResearchPresets"
+      ],
+      "test": [
+        "src/workbenches/canvas/panels/AgentPanel/useAgentWebResearchPersistence.test.ts"
+      ],
+      "budget": 60
+    },
+    {
       "module": "src/features/settings/CanvasMcpPanel.tsx",
       "owner": "settings-canvas-mcp-panel",
       "responsibility": "展示 Canvas MCP 网关状态、工具范围、验证入口和可复制的 harness 配置。",

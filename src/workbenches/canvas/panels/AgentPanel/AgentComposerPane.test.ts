@@ -4,6 +4,10 @@ import { describe, expect, it, vi } from 'vitest'
 import type { MentionEditorHandle } from '../../text/MentionEditor'
 import type { AgentSession } from '../../../../state/agent/sessionStore'
 import { AgentComposerPane } from './AgentComposerPane'
+import {
+  __resetAgentWebResearchForTest,
+  setAgentWebResearch,
+} from '../../../../state/ui/agentWebResearch'
 
 const session: AgentSession = {
   id: 'session-1',
@@ -125,5 +129,18 @@ describe('AgentComposerPane', () => {
     })
     expect(expanded).toContain('计划需你确认，之后自动执行并扣费')
     expect(expanded).not.toContain('自动确认计划并直接消耗积分')
+  })
+
+  it('工具条里有「联网」开关，开关状态来自全局联网设置', () => {
+    __resetAgentWebResearchForTest()
+    const on = renderComposer()
+    expect(on).toContain('data-agent-web-toggle="on"')
+    expect(on).toContain('aria-pressed="true"')
+    expect(on).toContain('联网')
+    setAgentWebResearch(false)
+    const off = renderComposer()
+    expect(off).toContain('data-agent-web-toggle="off"')
+    expect(off).toContain('aria-pressed="false"')
+    __resetAgentWebResearchForTest()
   })
 })

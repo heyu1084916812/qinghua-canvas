@@ -768,6 +768,17 @@ export function IconAuto(props: IconProps) {
   )
 }
 
+/** 联网：地球（Agent 输入框的「联网」开关） */
+export function IconGlobe(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <circle cx="12" cy="12" r="8.4" />
+      <path d="M3.6 12h16.8" />
+      <path d="M12 3.6c2.3 2.3 3.4 5.1 3.4 8.4s-1.1 6.1-3.4 8.4c-2.3-2.3-3.4-5.1-3.4-8.4s1.1-6.1 3.4-8.4z" />
+    </Svg>
+  )
+}
+
 /** 引用（@）：在输入框里引用画布节点或模型 */
 export function IconMention(props: IconProps) {
   return (
