@@ -6,7 +6,7 @@
 const TITLE_LIMIT = 16
 const FILE_EXTENSION = /\.(?:jpe?g|png|webp|gif|bmp|heic|avif|tiff?|svg)$/i
 const AUTO_TITLE =
-  /^[_\s-]*(?:image|img|pic|photo|picture|screenshot|dsc|dcim|untitled|截图|屏幕截图|微信图片|图片|未命名|参考图?)[\s_\-]*[\d_\-\s()（）]*$/i
+  /^[_\s-]*(?:image|img|pic|photo|picture|screenshot|dsc|dcim|untitled|截图|屏幕截图|微信图片|图片|未命名|参考图?)[\s_-]*[\d_\s()（）-]*$/i
 
 /**
  * 参考卡标题是不是「自动标题」：空、文件名（带扩展名）、或 Image 17 / 截图_2026… 这类无语义名。

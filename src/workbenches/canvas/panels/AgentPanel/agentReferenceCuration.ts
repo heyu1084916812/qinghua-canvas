@@ -12,10 +12,7 @@ import {
   type ReferenceCurationResult,
 } from '../../../../domain/project/referenceCuration'
 import { isAutoReferenceTitle } from '../../../../domain/project/referenceTitle'
-import {
-  paletteSentence,
-  type PaletteColor,
-} from '../../../../domain/project/referencePalette'
+import { paletteSentence, type PaletteColor } from '../../../../domain/project/referencePalette'
 import { sampleImagePalette } from './agentReferencePalette'
 import { imageSizeFromHeader } from '../../../../domain/shared/imageSize'
 import type { PlatformKit } from '../../../../platform/ports'
@@ -98,11 +95,8 @@ export async function runAgentReferenceCuration(
   const failed: ReferenceCurationResult['failed'] = []
   for (const item of candidates) {
     if (input.signal?.aborted) break
-    const prepared = await prepareItemImages(
-      item,
-      deps.assets,
-      deps.samplePalette ?? ((bytes, mime) => sampleImagePalette(bytes, mime)),
-    )
+    const sampler = deps.samplePalette ?? ((bytes, mime) => sampleImagePalette(bytes, mime))
+    const prepared = await prepareItemImages(item, deps.assets, sampler)
     limitations.push(
       ...prepared.limitations.map((reason) => `「${item.title}」${reason}`),
     )
