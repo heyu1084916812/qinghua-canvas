@@ -33,6 +33,7 @@ mod canvas_gateway;
 mod clipper_receiver;
 mod clipper_update;
 mod credential_vault;
+mod folder_grants;
 mod cli_output_tests;
 mod pinterest_oauth;
 
@@ -53,7 +54,19 @@ async fn pick_folder(app: tauri::AppHandle) -> Option<String> {
     if let Err(err) = app.fs_scope().allow_directory(&dir, true) {
         eprintln!("[assetFolder] 授权素材目录失败：{err}");
     }
+    if let Ok(ledger) = folder_ledger_path(&app) {
+        if let Err(err) = folder_grants::remember(&ledger, std::path::Path::new(&dir)) {
+            eprintln!("[assetFolder] 记录授权目录失败：{err}");
+        }
+    }
     Some(dir)
+}
+
+fn folder_ledger_path(app: &tauri::AppHandle) -> Result<std::path::PathBuf, String> {
+    app.path()
+        .app_local_data_dir()
+        .map(|dir| dir.join(folder_grants::LEDGER_FILE))
+        .map_err(|err| err.to_string())
 }
 
 /// **重新**授权一个"记住的"素材目录（应用重启后作用域是空的）。
@@ -66,8 +79,23 @@ async fn pick_folder(app: tauri::AppHandle) -> Option<String> {
 /// 返回 `false` = 这个目录**已经不在了**（被移动 / 删除 / 拔盘）⇒ 前端当作"没选目录"，如实回落内置库。
 #[tauri::command]
 async fn grant_folder(app: tauri::AppHandle, path: String) -> Result<bool, String> {
-    if !std::path::Path::new(&path).is_dir() {
+    let dir = std::path::Path::new(&path);
+    if !dir.is_dir() {
         return Ok(false);
+    }
+    // 只重新授权用户在对话框里选过的目录（台账），不接受前端随意指定的路径。
+    let ledger_file = folder_ledger_path(&app)?;
+    let ledger = folder_grants::read_ledger(&ledger_file);
+    let home = folder_grants::home_dir_from_env();
+    match folder_grants::decide(
+        ledger.as_deref(),
+        dir,
+        home.as_deref(),
+        &folder_grants::system_dirs_from_env(),
+    ) {
+        folder_grants::GrantDecision::Deny => return Ok(false),
+        folder_grants::GrantDecision::Migrate => folder_grants::remember(&ledger_file, dir)?,
+        folder_grants::GrantDecision::Known => {}
     }
     app.fs_scope()
         .allow_directory(&path, true)
