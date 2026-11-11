@@ -1,5 +1,6 @@
 import type { ChatMessage } from '../../../domain/shared/execution/types'
 import { createId } from '../../../shared/id'
+import { latestQuestionCard } from '../../../domain/agent/questionCard'
 import type { AgentLoopOutcome } from './agentLoop'
 
 const RUN_PERMISSION_QUESTION =
@@ -163,6 +164,9 @@ export function runNodeConfirmation(input: {
   /** 回合收尾：按「本轮新建且未运行的生成节点」确定目标，不看措辞（A6） */
   turnEnding?: boolean
 }): AgentLoopOutcome | null {
+  // 问题卡还没回答时不弹运行确认：问题卡调用后本回合就该结束，答案回来前不跑生成（A6 × 问题卡）
+  const card = latestQuestionCard(input.messages)
+  if (card && !card.answered) return null
   const targets = input.turnEnding
     ? turnEndRunTargets(input.messages)
     : runNodeConfirmationTargets(input.messages, input.finalText)

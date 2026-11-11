@@ -13,6 +13,7 @@ import {
   resumeAgentTurn,
   runAgentTurn,
 } from './agentLoop'
+import { confirmRunNodeFromFinalAnswer } from './agentRunConfirmationGuard'
 import { AGENT_TOOLS } from './tools'
 
 /**
@@ -1589,6 +1590,61 @@ describe('runAgentTurn · 完成说明核对（A7）', () => {
 })
 
 describe('runAgentTurn · 问题卡（askQuestions）', () => {
+  /**
+   * A6（回合结束由程序弹 runNode 确认卡）× 问题卡（调 askQuestions 后结束回合）：
+   * 同一回合先 applyPlan 建了生成节点、再发问题卡 → 只出问题卡，不弹运行确认；
+   * 用户答完问题卡之前，收尾兜底也不能替它弹确认卡。
+   */
+  const createdGeneration = vi.fn(async () => ({
+    ok: true,
+    problems: [],
+    createdNodeIds: ['g1'],
+    resolvedNodes: [{ localId: 'v0', nodeId: 'g1', type: 'generation', title: '海报', created: true }],
+  }))
+  const cardArgs = JSON.stringify({ questions: [{ id: 'size', question: '海报尺寸用哪个？', options: ['3:4', '9:16'] }] })
+
+  it('★★ 本轮建了生成节点后又发问题卡 → 回合以问题卡结束，不弹 runNode 确认卡', async () => {
+    const { deps, adapter } = depsWith(
+      [
+        { toolCalls: [{ id: 'plan-call', name: 'applyPlan', args: '{"summary":"s","nodes":[],"edges":[]}' }] },
+        { toolCalls: [{ id: 'q1', name: 'askQuestions', args: cardArgs }] },
+        { text: '不应该走到这里' },
+      ],
+      undefined,
+      createdGeneration,
+    )
+    const r = await runAgentTurn(user('做一张海报'), { ...deps, precheck: () => ({ ok: true }) })
+    expect(r.kind).toBe('message')
+    if (r.kind !== 'message') return
+    expect(adapter.completeText).toHaveBeenCalledTimes(2)
+    expect(r.text).toContain('海报尺寸用哪个？')
+    expect(r.messages.some((m) => m.toolCalls?.some((c) => c.name === 'runNode'))).toBe(false)
+  })
+
+  it('★ 历史里最近一张问题卡未回答 → 收尾不弹运行确认；回答后照常按本轮新建节点判断', () => {
+    const pending: ChatMessage[] = [
+      { role: 'user', content: '做一张海报' },
+      { role: 'assistant', content: '', toolCalls: [{ id: 'plan-call', name: 'applyPlan', args: '{}' }] },
+      {
+        role: 'tool',
+        toolCallId: 'plan-call',
+        toolName: 'applyPlan',
+        content: JSON.stringify({ ok: true, resolvedNodes: [{ nodeId: 'g1', type: 'generation', created: true }] }),
+      },
+      { role: 'assistant', content: '', toolCalls: [{ id: 'q1', name: 'askQuestions', args: cardArgs }] },
+      {
+        role: 'tool',
+        toolCallId: 'q1',
+        toolName: 'askQuestions',
+        content: JSON.stringify({ ok: true, awaitingAnswers: true, intro: '', questions: [{ id: 'size', question: '海报尺寸用哪个？', options: ['3:4', '9:16'] }] }),
+      },
+    ]
+    const allowed = new Set(['runNode'])
+    expect(confirmRunNodeFromFinalAnswer({ messages: [...pending], allowedToolNames: allowed, text: '' })).toBeNull()
+    const withoutCard = pending.slice(0, 3)
+    expect(confirmRunNodeFromFinalAnswer({ messages: withoutCard, allowedToolNames: allowed, text: '' })?.kind).toBe('confirm')
+  })
+
   it('★★ 发出问题卡后本回合结束，不再请求模型、不碰写工具', async () => {
     const args = JSON.stringify({
       intro: '先确认用法',
