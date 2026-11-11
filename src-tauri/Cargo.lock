@@ -2975,6 +2975,7 @@ dependencies = [
 name = "qinghua"
 version = "0.1.17"
 dependencies = [
+ "base64 0.22.1",
  "qinghua-shared-store",
  "reqwest",
  "serde",
@@ -2989,6 +2990,7 @@ dependencies = [
  "tauri-plugin-updater",
  "tiny_http",
  "tokio",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]

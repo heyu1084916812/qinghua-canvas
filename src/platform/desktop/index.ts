@@ -2,6 +2,7 @@ import type { PlatformKit } from '../ports'
 import { createWebPlatform } from '../web/index'
 import { createTauriAssetFolder } from './tauriAssetFolder'
 import { createTauriCli } from './tauriCli'
+import { createTauriCredentials } from './tauriCredentials'
 import { createTauriFiles } from './tauriFiles'
 import { createTauriNotify } from './tauriNotify'
 import { createTauriRemoteBytes } from './tauriRemoteBytes'
@@ -33,5 +34,7 @@ export function createDesktopPlatform(): PlatformKit {
     remoteBytes: createTauriRemoteBytes(),
     // 壳里多出来的一档能力（对账 #392）：真的系统通知（官方插件）
     notify: createTauriNotify(),
+    // API Key 交给 Windows DPAPI 加密（绑定当前用户），旧格式读取时自动迁移
+    credentials: createTauriCredentials(),
   })
 }

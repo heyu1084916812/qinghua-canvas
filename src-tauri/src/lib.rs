@@ -32,6 +32,7 @@ use tauri_plugin_updater::UpdaterExt;
 mod canvas_gateway;
 mod clipper_receiver;
 mod clipper_update;
+mod credential_vault;
 mod cli_output_tests;
 mod pinterest_oauth;
 
@@ -4289,6 +4290,8 @@ pub fn run() {
             cli_write_out,
             cli_import_asset,
             rh_set_api_key,
+            credential_vault::credential_protect,
+            credential_vault::credential_unprotect,
             ui_heartbeat,
             canvas_gateway::canvas_gateway_info,
             canvas_gateway::canvas_gateway_respond,

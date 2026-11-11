@@ -8536,6 +8536,27 @@
         "src/pages/CanvasPage/myAssetsDockStore.test.ts"
       ],
       "budget": 50
+    },
+    {
+      "module": "src/platform/desktop/tauriCredentials.ts",
+      "owner": "platform-desktop-credentials",
+      "responsibility": "桌面壳凭据端口：API Key 经 Windows DPAPI 加密后存共享存储，读到旧格式时一次性迁移。",
+      "owns": [
+        "DPAPI 凭据记录格式",
+        "旧格式一次性迁移"
+      ],
+      "doesNotOwn": [
+        "渠道凭据分组业务",
+        "共享存储传输"
+      ],
+      "publicApi": [
+        "createTauriCredentials",
+        "createTauriCredentialsWith"
+      ],
+      "test": [
+        "src/platform/desktop/tauriCredentials.test.ts"
+      ],
+      "budget": 120
     }
   ]
 }
