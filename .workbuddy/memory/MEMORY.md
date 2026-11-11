@@ -1,5 +1,11 @@
 # CanvasFlow（轻画）项目记忆
 
+### Hark：参考问题卡对齐 Lovart（G8 / G9，2026-11-11）
+- 参考侧栏「Agent 如何参考」为空：回合准备阶段先跑参考分析（`AgentPanel/agentTurnReferenceReview.ts` → `runAgentReferenceCuration`），只有分工拿不准才提示 `askQuestions`。歧义规则在 `domain/agent/referenceReview.ts`（roleClear=false / 未确认的图 ≥2 张同为 subject 或 composition 且原话没逐张点名 / 分析失败 ≥2）。侧栏分析只在像出图改图的句子、非画布操作 / 回答问题卡 / 内部续跑时做，单回合 ≤6 张；尝试过的图记 `AgentTaskRef.referenceReview.analyzedIds`，同任务不再调模型。
+- 问题卡回答**不是**原样写进 howToUse：题目带 `referenceItemId`，回答作为 `userConstraints` 交给参考分析结合图片重写完整「借/避」，写入的用法 `confirmedByUser`，任何自动分析（含 requestedItemIds）跳过它。重写失败时原话存 `referenceReview.answers` 作为约束段落。
+- `prepareAgentTurnRequest` 现在每回合调两次 `selectForTask`（分析前挑图、分析后装配），相关测试按两次断言。
+- 全量 Vitest 超 120 秒：用 `--shard=i/12` 逐片跑，每片约 40–60 秒。未用真模型实跑。未 push。
+
 ### 总管2 第七十轮：节点标题旧参数与批量标题带（2026-11-11）
 - “昨天的标题行”不是与图片同宽：普通节点标题排相对节点左右各 `-8px`，行高 `22px`，内边距 `2px`；标题 `14px`、像素 `12px`（再由画布字号设置覆盖）。用户这次要求照旧，不能为了看似不越界而改成 `0/0` 或 `padding:6px`。
 - 批量多行只修纵向：`packContainerChildren(..., reserveTitleRow=true)` 会为每行加 `22px` 标题带；分组必须保持无标题带，否则分组高度会无故增加。`ContainerBody` 按 `kind` 传这个开关，`nodeHeaders` 与批量格位始终传 `true`。
@@ -12663,7 +12669,8 @@ React 端口 → `invoke` → Rust `check_update` → updater 插件读配置 �
 
 - 总日志首屏只取最近 50 条候选 + 1 探针，hasMore 表示可继续加载；不再为精确总数继续扫描全表。
 - 画布日志当前项目 60 条首屏，IntersectionObserver 续载；分页 offset 必须用已加载记录数，清空只删除当前已加载记录，不误删未加载历史。
-- 快速分页逻辑归 unLogFastPage.ts 和 canvasLogQuery.ts，组件只负责状态、订阅和渲染；治理已登记两模块。
+- 快速分页逻辑归 
+unLogFastPage.ts 和 canvasLogQuery.ts，组件只负责状态、订阅和渲染；治理已登记两模块。
 - 验证：定向 5 files / 20 tests 通过；全量 5251 passed / 1 skipped，唯一失败为另一线 storageOverviewRefresh 缺登记；check 被另一线 deliveryBuild.test node types 错误阻断，不是本刀回归。
 
 
