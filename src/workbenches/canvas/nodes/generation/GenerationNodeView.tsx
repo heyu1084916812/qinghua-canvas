@@ -39,7 +39,6 @@ export function assetIsVideo(mime: string | null, mode: GenerationData['mode']):
  */
 export function GenerationNodeView(props: NodeViewProps) {
   const data = props.node.data as GenerationData
-  const lastRunPrompt = data.lastRunPrompt?.trim() ?? ''
   /**
    * 节点本体是**小尺寸显示**（约 240×192）⇒ 走缩略图那条路（对账 #231）：
    * 拿 4K 原图解码给一个 240px 的框看，一张就是 33MB —— 可见几十张就是 GB 级。
@@ -247,16 +246,6 @@ export function GenerationNodeView(props: NodeViewProps) {
           )}
         </div>
       )}
-
-      {data.assetHash && lastRunPrompt ? (
-        <div
-          className={styles.lastPrompt}
-          data-generation-last-prompt
-          title={lastRunPrompt}
-        >
-          {lastRunPrompt}
-        </div>
-      ) : null}
 
       {batchResult.url ? (
         <div className={styles.batchResult} data-generation-batch-result>

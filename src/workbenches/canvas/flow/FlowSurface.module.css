@@ -44,6 +44,11 @@
  * release 诊断显示，让视口外节点跳过内容布局与绘制可把 P95 压到约 14ms；
  * 不隐藏图片、不删节点、不改节点结构或可见样式。
  */
+/*
+ * Off-screen node content must stay virtualized for large real-image canvases.
+ * NodeFrame keeps all title/pixel rows inside the frame so paint containment
+ * cannot clip user-visible labels.
+ */
 .flow :global(.react-flow__node) {
   content-visibility: auto;
   contain-intrinsic-size: auto 240px 160px;

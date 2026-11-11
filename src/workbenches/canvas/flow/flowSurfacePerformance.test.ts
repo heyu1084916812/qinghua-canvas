@@ -1,13 +1,21 @@
-// @ts-expect-error -- 项目刻意不引入 @types/node；fs 静态取证只属于测试。
+// @ts-expect-error -- tests read source CSS without adding Node types to the app
 import fs from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
-const css = fs.readFileSync(new URL('./FlowSurface.module.css', import.meta.url), 'utf8')
+const flowCss = fs.readFileSync(new URL('./FlowSurface.module.css', import.meta.url), 'utf8')
+const frameCss = fs.readFileSync(new URL('../frame/NodeFrame.module.css', import.meta.url), 'utf8')
 
-describe('FlowSurface 大画布视口外内容门禁', () => {
-  it('每个 React Flow 节点保留视口外内容跳过绘制，避免真实图片画布缩放长帧', () => {
-    expect(css).toMatch(
-      /\.flow :global\(\.react-flow__node\)\s*\{\s*content-visibility:\s*auto;\s*contain-intrinsic-size:/,
+describe('canvas detail virtualization', () => {
+  it('virtualizes the React Flow node wrapper for large real-image canvases', () => {
+    expect(flowCss).toMatch(
+      /\.flow :global\(\.react-flow__node\)\s*\{[^}]*content-visibility:\s*auto;[^}]*contain-intrinsic-size:/s,
     )
+  })
+
+  it('keeps all node labels inside that paint-containment boundary', () => {
+    expect(frameCss).toMatch(
+      /\.frame\[data-node-header-inside\] \.body\s*\{[^}]*padding-top:\s*22px;/s,
+    )
+    expect(frameCss).not.toMatch(/\.body\s*\{[^}]*content-visibility:/s)
   })
 })

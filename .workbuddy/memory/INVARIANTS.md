@@ -118,7 +118,7 @@
 
 - 节点选中框必须画在节点内部：`.frame.selected` 固定 `outline:none`，由 `::after` 使用 `inset:0`、
   `border:2px solid var(--stroke-focus)`、`border-radius:inherit`、`pointer-events:none` 绘制。
-  禁止改回节点外侧 `outline`：React Flow 节点的 `content-visibility:auto` 会在 WebView2 变换层中裁出角弧伪影。
+  禁止改回节点外侧 `outline`：React Flow / WebView2 的变换与包含层会裁出角弧伪影；标题外置不等于选中框也要外扩。
 - 普通生成节点只有右下 1 个缩放手柄；四角黄色矩形是旧选中描边的渲染伪影，不是“四个手柄”。
   不要据此扩展或删除真实手柄。
 - 缩放手柄是纯指针命中层，必须带 `aria-hidden="true"`、`tabIndex={-1}`、`outline:none`、
@@ -932,7 +932,7 @@
   展开时以球为锚点重新计算浮窗位置，并统一走 `clampAgentPanel()`。真实回归要求拖动后
   关闭再打开，球的 rect 前后一致。
 - **执行引擎**：`runEngine<TTask,TCommand>` 对工作台命令零认知，**落位/写回全委托注入的 `ExecutionPlacement`**（canvas → `CanvasPlacement`，comic → `ComicPlacement`）。
-- **生成节点本体 = 媒体框（§6.8）**：参数/提示词/生成按钮全在下方创作面板；标题浮出节点外（`.header` `bottom:100%`，`HEADER_H` 高度补偿须同步删）。**发现「两套 UI」时修法是减重，不是给旧的那套加壳。**
+- **生成节点本体 = 媒体框（§6.8）**：参数/提示词/生成按钮全在下方创作面板；标题与像素在卡片内顶部 22px 行，`.body` 从该行下方开始。不得移回卡外：React Flow 外层的 `content-visibility:auto` paint containment 会裁掉。**发现「两套 UI」时修法是减重，不是给旧的那套加壳。**
 - **节点内部统一 `--node-fill`**：浅色 `#ececec`、深色 `#222222`；素材舞台用 `--node-inset`、控件用 `--node-control`，边框用 `--node-border` / `--node-border-inner`，主操作用 `--node-action`。不要让单个节点重新写 `--bg-surface`，否则同屏会出现白卡与灰卡两套语言。循环的开关使用中性控件，不是整块亮白主按钮。批量空态 / 边界用实线，不再画虚线。节点 UI 无投影、1px 细描边、选中黑边框（非蓝）、参数文字 600、`max-content`。
 - **可拖动把手内的文字必须 `user-select:none`**：否则原生文本拖拽（`dragstart`→`pointercancel`）掐断自定义指针流（G15/G16/G17 根因）。判据：捕获事件流看有没有 `pointerup`。
 - **`beginPlan/endPlan` 不可嵌套**（`activePlan` 是单个变量）⇒ 批量落节点由调用方整批开一次计划，且计划区间内不夹 `await`。
@@ -1155,7 +1155,7 @@
 
 ## 真实图片视口外内容与 CLI 残余边界（2026-11-08 第十四轮）
 
-- `FlowSurface.module.css` 的 `.flow :global(.react-flow__node)` 必须保留 `content-visibility: auto` 与 `contain-intrinsic-size`。真实图片 300/500 的 release 诊断显示，节点内容合成是主成本；`will-change` 候选边界不稳定，不能替代该策略。不得隐藏图片或减少节点，且每次 UI 改动后必须保留四视图截图/几何/像素 diff 证据。
+- `FlowSurface.module.css` 的 `.flow :global(.react-flow__node)` 必须保留 `content-visibility:auto` + `contain-intrinsic-size`。该属性同时建立 paint containment，所以 `NodeFrame` 的标题 / 像素必须全部画在卡片内顶部 22px 行，`.body` 从该行下方开始；顶层节点和容器子节点一致。不得把标签移回卡片外，否则会被外层裁掉。`flowSurfacePerformance.test.ts` 锁住这组边界。
 - 性能判定只看正式 `npm run perf:canvas:production`：150 张图片必须全部 rendered/decoded、300/500 全挂载、P95 ≤20ms、page/console error 0。两次当前 release 报告均已通过；隐藏元素/诊断探针不得写成正式验收。
 - `diagnose-canvas-images.mjs` 必须每轮 reload 并只保留一条 style，避免 cumulative CSS 污染读数；`run-canvas-image-diagnosis.mjs` 只启动并清理自己的 app pid，端口保留集合是 1420/18765/18766/18791。
 - CLI 死控件、cwd、运行 id、按 id `cli.kill` 和浏览器禁用提示已有证据；真实已登录 CLI、进程树终止、媒体导出、清空 `statusArgs` 后自动查状态以及窗口结束后自动重检仍属 #972，不得把图三判成全完成。

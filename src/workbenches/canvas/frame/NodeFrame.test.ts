@@ -23,22 +23,26 @@ function renderFrame({
   parentId = null,
   corners,
   selected = false,
+  type = 'prompt',
+  data = {},
 }: {
   parentId?: string | null
   corners?: readonly ('se' | 'sw' | 'ne' | 'nw')[]
   selected?: boolean
+  type?: NodeSnapshot['type']
+  data?: Record<string, unknown>
 } = {}): string {
   const node = {
     id: 'node_test',
     projectId: 'proj_test',
-    type: 'prompt',
+    type,
     title: '提示词',
     x: 0,
     y: 0,
     w: 240,
     h: 160,
     parentId,
-    data: {},
+    data,
     disabled: false,
   } as unknown as NodeSnapshot
   const store = createCanvasStore({ platform: createMemoryPlatform(), projectId: 'proj_test', debounceMs: 0 })
@@ -98,5 +102,36 @@ describe('NodeFrame 缩放手柄', () => {
       expect(tag).toContain('aria-hidden="true"')
       expect(tag).toContain('tabindex="-1"')
     }
+  })
+})
+
+describe('NodeFrame in-frame headers', () => {
+  it('keeps the top-level header inside the virtualized wrapper', () => {
+    const html = renderFrame({
+      type: 'generation',
+      data: { assetHash: 'asset_test', naturalSize: { width: 1087, height: 1446 } },
+    })
+    const headerTag = html.match(/<div class="([^"]*)" data-node-header="true"/)?.[1] ?? ''
+
+    expect(html).toContain('data-node-title')
+    expect(html).toContain('data-node-header-inside')
+    expect(headerTag).toContain('headerInside')
+    expect(html).toContain('data-node-pixels')
+    expect(html).toContain('1087')
+  })
+
+  it('renders container child headers inside the card so they are not clipped', () => {
+    const html = renderFrame({
+      parentId: 'node_parent',
+      type: 'generation',
+      data: { assetHash: 'asset_test', naturalSize: { width: 1024, height: 1024 } },
+    })
+    const headerTag = html.match(/<div class="([^"]*)" data-node-header="true"/)?.[1] ?? ''
+
+    expect(html).toContain('data-node-header-inside')
+    expect(headerTag).toContain('headerInside')
+    expect(html).toContain('data-node-title')
+    expect(html).toContain('data-node-pixels')
+    expect(html).toContain('1024')
   })
 })

@@ -123,17 +123,18 @@ describe('GenerationNodeView · 状态 B（有内容）', () => {
     expect(render(baseProps({ node }))).toContain('data-node-asset-loading')
   })
 
-  it('★★ 有结果时在卡片下方显示实际提交的 prompt', () => {
+  it('★★ 结果图本体不显示 prompt，文案只进入创作面板', () => {
     const node = genNode({
       data: {
         ...generationSpec.createDefaultData(),
         assetHash: 'h1',
+        prompt: '详情页规范\n现在生成第 2 张主图',
         lastRunPrompt: '详情页规范\n现在生成第 2 张主图',
       },
     })
     const html = render(baseProps({ node }))
-    expect(html).toContain('data-generation-last-prompt')
-    expect(html).toContain('现在生成第 2 张主图')
+    expect(html).not.toContain('data-generation-last-prompt')
+    expect(html).not.toContain('现在生成第 2 张主图')
   })
 })
 

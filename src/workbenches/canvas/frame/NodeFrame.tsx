@@ -110,6 +110,10 @@ export interface NodeFrameProps {
  * 后续 pointermove / pointerup 全部丢失，节点只挪起手第一拍就停住、松手也不触发归属判定。
  * `.frame` 的 `user-select: none` 已从源头避免选中，这里再挡一道原生拖拽（防御节点内
  * 将来嵌入选区型内容）。节点内的 `<img>` 本来就都是 `draggable={false}`。
+ *
+ * 2026-11-11: titles and pixel labels now render inside every frame. The React Flow
+ * wrapper keeps content-visibility:auto for large-image performance, and its paint
+ * containment clips anything drawn outside the frame.
  */
 export function NodeFrame(props: NodeFrameProps) {
   const { node, selected, minSize } = props
@@ -145,7 +149,7 @@ export function NodeFrame(props: NodeFrameProps) {
    */
   const pixels = assetPixelsOf(node)
 
-  // 容器（分组 / 批量）的子节点：缩放手柄与标题都不渲染（尺寸由容器布局决定）。
+  // 容器（分组 / 批量）的子节点：缩放手柄不渲染（尺寸由容器布局决定），标题仍保留。
   const inContainer = node.parentId !== null
 
   // 右键菜单「重命名」（§4.1）/ 标题单击进入编辑：store 置 renamingId 时本节点切入编辑态
@@ -284,6 +288,7 @@ export function NodeFrame(props: NodeFrameProps) {
        * 节点视图在自己的 module 里选不到它。`data-node-stale` 早先就是同一套做法。
        */
       data-node-selected={selected ? '' : undefined}
+      data-node-header-inside=""
       onPointerDown={props.onFramePointerDown}
       onDragStart={(e) => e.preventDefault()}
     >
@@ -293,7 +298,10 @@ export function NodeFrame(props: NodeFrameProps) {
         就成了九个没有名字的格子，一眼看不出哪张是哪张。缩放手柄仍然只有顶层节点有
         （尺寸由容器布局决定）。
       */}
-      <div className={styles.header} data-node-header>
+      <div
+        className={`${styles.header} ${styles.headerInside}`}
+        data-node-header
+      >
           {editing ? (
             <input
               ref={inputRef}

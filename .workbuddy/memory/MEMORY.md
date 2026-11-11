@@ -157,9 +157,10 @@
 ### 总管2 第五十轮：节点选中边缘修复（2026-11-10）
 
 - 回归链：选中态从 2026-09-14 基线起使用节点外侧 `outline`；2026-11-08 `872543e2` 为 React Flow 节点加入 `content-visibility:auto` 后，WebView2 的变换/包含层会把外侧描边渲染成“四角白色弧线 + 黄色矩形”。普通生成节点只有 1 个缩放手柄，截图里的四个黄色框不是手柄，不能按手柄太多去修。
-- 最终实现：`.frame.selected` 只设 `outline:none`，用 `.frame.selected::after { inset:0; border:2px solid var(--stroke-focus); border-radius:inherit; pointer-events:none }` 在节点内部绘制连续选中框。不要恢复外侧 `outline`；外层 `content-visibility:auto` 性能优化必须保留。
+- 最终实现：`.frame.selected` 只设 `outline:none`，用 `.frame.selected::after { inset:0; border:2px solid var(--stroke-focus); border-radius:inherit; pointer-events:none }` 在节点内部绘制连续选中框。不要恢复外侧 `outline`。2026-11-11 又确认 `.react-flow__node` 的 `content-visibility:auto` 会裁掉卡外标题 / 像素；性能虚拟化仍保留在外层，标题 / 像素统一放卡片内顶部 22px 行。
 - 缩放手柄仍是纯指针命中层，但补 `aria-hidden="true"` / `tabIndex={-1}` / `outline:none` / `appearance:none`，避免进入焦点或辅助技术顺序。`NodeFrame.test.ts` 已锁住四角手柄均为 presentation-only。
-- 证据：四组 1440×900 / 1024×700 × 明暗 `frameOutlineStyle=none / selectionBorderWidth=2px / selectionBorderStyle=solid / frameBorderRadius=14px / wrapperContentVisibility=auto / resizeHandles=1 / hiddenResizeHandles=1`，选中节点四边连续、无黄色矩形、错误 0；`npm run check` 全绿，全量 Vitest 659 passed / 1 skipped（5479 passed / 1 skipped），build 1265 modules，Impeccable detector `[]`。一次并发全量让无关 `App.render.test.ts` 在 60s 超时，单文件 3/3、第二次全量通过，阈值未改。
+- 证据：四组 1440×900 / 1024×700 × 明暗 `frameOutlineStyle=none / selectionBorderWidth=2px / selectionBorderStyle=solid / frameBorderRadius=14px / wrapperContentVisibility=auto / headerInside=true / resizeHandles=1 / hiddenResizeHandles=1`；外置节点标题 / 像素和三个批量子节点标题 / 像素均可见，`titleHitIsTitle=true / errors=[]`。证据 `.playwright-verify/current-bugs/title-pixels/`。
+- 同日性能复验仍触发已知的真实图片门禁：#1021 在 300 节点 / 500 连线 / 150 图下 P95 为 48–67ms；把全部 `[data-node-header]` 隐藏后结果不变，故不能把这次性能问题归到标题 / 像素层，必须另查节点内容合成链路。
 
 ### 总管2 第四十九轮：双商店一键安装与 Billfish 式拖拽收藏（2026-11-10）
 

@@ -91,6 +91,7 @@
  * `pointer-events: none` 加在**排**上：它整体浮在节点外，不该抢画布的指针事件；
  * 标题要能双击改名，故标题自己收回 `auto`（见 `.title`）。
  */
+/* Every NodeFrame adds .headerInside; this base keeps the shared row metrics. */
 .header {
   position: absolute;
   left: -8px;
@@ -105,6 +106,22 @@
   margin-bottom: 2px;
   box-sizing: border-box;
   pointer-events: none;
+}
+
+.headerInside {
+  top: 0;
+  right: 0;
+  bottom: auto;
+  left: 0;
+  z-index: 2;
+  height: 22px;
+  margin: 0;
+  padding: 0 6px;
+}
+
+.frame[data-node-header-inside] .body {
+  box-sizing: border-box;
+  padding-top: 22px;
 }
 
 .title {

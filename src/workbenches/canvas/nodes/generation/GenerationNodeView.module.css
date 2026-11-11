@@ -113,32 +113,6 @@
   user-select: none;
 }
 
-/*
- * 结果卡下方的实际 prompt：只读、最多两行，完整内容留在 title 里。
- * 它贴在素材底部但不改节点几何，避免生成完成后节点尺寸再跳一次。
- */
-.lastPrompt {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  z-index: 1;
-  box-sizing: border-box;
-  padding: 14px 8px 6px;
-  background: linear-gradient(to top, var(--overlay-scrim), transparent);
-  color: var(--overlay-text);
-  font-size: 10px;
-  line-height: 1.35;
-  white-space: pre-wrap;
-  overflow: hidden;
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-  line-clamp: 2;
-  word-break: break-word;
-  pointer-events: none;
-}
-
 .batchResult {
   position: absolute;
   top: 5px;

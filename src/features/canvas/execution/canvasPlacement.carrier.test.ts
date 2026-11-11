@@ -48,6 +48,7 @@ describe('canvas placement carrier provenance', () => {
     expect(create?.kind).toBe('node.create')
     if (create?.kind !== 'node.create') throw new Error('expected node.create')
     expect((create.data as Record<string, unknown>).__carrierOf).toBe(nodeId)
+    expect((create.data as Record<string, unknown>).prompt).toBe('rerun this image')
   })
 
   it('does not mark reused source nodes as their own carriers', () => {
@@ -144,6 +145,15 @@ describe('canvas placement carrier provenance', () => {
         lastRunPrompt: '统一要求',
       },
       transient: true,
+    })
+    const carrierUpdate = commands.find(
+      (command) => command.kind === 'node.updateData' && command.id === 'carrier-1',
+    )
+    expect(carrierUpdate).toMatchObject({
+      patch: {
+        prompt: '统一要求',
+        lastRunPrompt: '统一要求',
+      },
     })
     expect(batchProjection).toMatchObject({
       patch: { batchResultHashes: ['output-hash'] },

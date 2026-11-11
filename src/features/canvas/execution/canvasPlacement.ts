@@ -99,6 +99,7 @@ export function createCanvasPlacement(getProjectId: () => string): ExecutionPlac
        *    新节点应回到「等待生成」的空态，而不是一开始就顶着旧图。
        */
       const data = structuredClone(task.sourceData) as unknown as Record<string, unknown>
+      data.prompt = actualPromptOf(task, task.request)
       delete data.assetHash
       delete data.naturalSize
       data.thumbOrder = []
@@ -179,6 +180,7 @@ export function createCanvasPlacement(getProjectId: () => string): ExecutionPlac
         assetMime: first?.mime ?? null,
         thumbOrder: assets.map((a) => a.hash),
         naturalSize: natural,
+        prompt: actualPromptOf(task, task.request),
         lastRunPrompt: actualPromptOf(task, task.request),
       }
       /**
