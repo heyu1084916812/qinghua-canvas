@@ -64,11 +64,22 @@ fn pending() -> &'static Mutex<Vec<PendingClip>> {
 
 fn token() -> &'static str {
     TOKEN.get_or_init(|| {
+        // 旧实现是「pid + 纳秒时间」，可被同机进程推算。RandomState 的 SipHash 密钥
+        // 来自操作系统随机源，每次 new 都不同；四段拼出 256 位不可预测令牌。
+        use std::collections::hash_map::RandomState;
+        use std::hash::{BuildHasher, Hasher};
         let nanos = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .map(|duration| duration.as_nanos())
             .unwrap_or_default();
-        format!("{:x}{:x}", std::process::id(), nanos)
+        (0..4u8)
+            .map(|round| {
+                let mut hasher = RandomState::new().build_hasher();
+                hasher.write_u8(round);
+                hasher.write_u128(nanos);
+                format!("{:016x}", hasher.finish())
+            })
+            .collect::<String>()
     })
 }
 
