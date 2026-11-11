@@ -1,0 +1,112 @@
+/* 问题卡：与确认卡同一档的轻卡片，只用现有令牌，不新增颜色 */
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin: var(--space-2) 0;
+  padding: var(--space-3);
+  border: 1px solid var(--stroke);
+  border-radius: var(--radius-control);
+  background: var(--bg-surface);
+  color: var(--text-1);
+}
+
+.question {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: none;
+}
+
+.questionTitle {
+  padding: 0;
+  font-size: var(--fs-label);
+  font-weight: var(--fw-title);
+  line-height: 1.5;
+  color: var(--text-1);
+  overflow-wrap: anywhere;
+}
+
+.questionHint {
+  margin-left: var(--space-1);
+  font-weight: normal;
+  color: var(--text-3);
+}
+
+.options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-2);
+}
+
+.option {
+  max-width: 100%;
+  min-height: 28px;
+  padding: 3px var(--space-3);
+  border: 1px solid var(--stroke);
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--text-2);
+  font-size: var(--fs-chip);
+  line-height: 1.4;
+  text-align: left;
+  overflow-wrap: anywhere;
+  cursor: pointer;
+}
+
+.option:hover:not(:disabled) {
+  background: var(--bg-hover);
+  color: var(--text-1);
+}
+
+.option[aria-pressed='true'] {
+  border-color: var(--stroke-focus);
+  background: var(--bg-hover);
+  color: var(--text-1);
+}
+
+.option:focus-visible,
+.input:focus-visible {
+  outline: 1px solid var(--stroke-focus);
+  outline-offset: 1px;
+}
+
+.option:disabled,
+.input:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.input {
+  box-sizing: border-box;
+  width: 100%;
+  height: 30px;
+  padding: 0 var(--space-2);
+  border: 1px solid var(--stroke);
+  border-radius: var(--radius-control);
+  background: var(--bg-subtle);
+  color: var(--text-1);
+  font: inherit;
+  font-size: var(--fs-chip);
+}
+
+.input::placeholder {
+  color: var(--text-3);
+}
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.actions button {
+  flex: 0 0 auto;
+}
+
+.actions button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}

@@ -325,6 +325,7 @@ describe('useAgentPanelViewProps / 字段清单对账', () => {
       'liveProcess',
       'onAddResearchReference',
       'onAdvanceToNext',
+      'onAnswerQuestionCard',
       'onBeginQueueEdit',
       'onCancel',
       'onCommitQueueEdit',

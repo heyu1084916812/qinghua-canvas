@@ -81,6 +81,20 @@ import type {
 } from '../../../../state/project/referenceLedgerRepository'
 import type { AgentPhaseEvent } from '../../../../domain/agent/phase'
 import type { ReferenceCurationResult } from '../../../../domain/project/referenceCuration'
+import {
+  referenceTaskKey,
+  resolveAgentTask,
+  type AgentTaskDecision,
+} from '../../../../domain/agent/agentTask'
+import { latestQuestionCard } from '../../../../domain/agent/questionCard'
+import {
+  nextSeriesStage,
+  seriesDirectiveOf,
+  seriesOrchestrationPrompt,
+  seriesStageReleased,
+  unmentionedReferencesPrompt,
+  withSeriesStage,
+} from '../../../../domain/agent/seriesOrchestration'
 
 export interface AgentTurnContextTrace {
   digest: string
@@ -108,7 +122,7 @@ export interface PrepareAgentTurnRequestInput {
   sessions: Pick<
     AgentSessionStore,
     'messagesFor' | 'saveMessages' | 'clearPendingAssetIds'
-  >
+  > & Partial<Pick<AgentSessionStore, 'updateFields'>>
   prepareRoute: () => Promise<ChatRoutePreparation>
   onPersisted: (turn: PersistedAgentUserTurn) => void
   onRouteReady: (operationId: string) => Promise<void>
@@ -161,6 +175,11 @@ export interface PreparedAgentTurnRequest {
   explicitMediaModels: ExplicitMediaModels
   perImage: boolean
   requestMode: AgentRequestMode
+  /** 参考台账 usage 的任务键（按任务，不按请求模式）。 */
+  taskKey: string
+  /** 本轮判定后的任务；调用方据此刷新会话快照。 */
+  agentTask: AgentTaskDecision['task']
+  agentTaskReason: AgentTaskDecision['reason']
   promptProfile: AgentPromptProfile
   toolMode: AgentToolMode
   turnTools: ToolDeclaration[]
@@ -200,11 +219,15 @@ export async function prepareAgentTurnRequest(
 ): Promise<AgentTurnRequestPreparation> {
   const plainText = stripMentionMarkup(input.text)
   const rawMentions = parseMentions(input.text)
-  const referenceIds = [...new Set([
+  /**
+   * 本轮显式 @ 的参考卡（按提及顺序）。会话里旧的 referenceIds 只在「同一任务」内沿用，
+   * 见下方 resolveAgentTask；旧会话没有任务记录时一次性迁入。
+   */
+  const mentionedReferenceIds = [...new Set([
     ...rawMentions
       .filter((mention) => mention.kind === 'reference')
       .map((mention) => mention.id),
-    ...(input.session.referenceIds ?? []),
+    ...(input.session.agentTask ? [] : input.session.referenceIds ?? []),
   ])]
   const sentAssetIds = [...new Set(input.session.pendingAssetIds ?? [])]
   const mentions = rawMentions
@@ -268,7 +291,7 @@ export async function prepareAgentTurnRequest(
   const operationId = createId('op')
   await input.onRouteReady(operationId)
 
-  // 台账按任务类型登记用法；operationId 是每次随机生成，不能当 taskKey。
+  // 请求模式只决定提示词档位与工具集；台账按「任务」登记用法（agentTask.ts）。
   const mentionedImageIds = imageNodeIdsAmong(
     input.graph.nodes,
     mentions
@@ -289,7 +312,7 @@ export async function prepareAgentTurnRequest(
     (message) => message.role === 'assistant',
   )
   const lastAssistantTextForTask = lastAssistantForTask?.content ?? ''
-  const taskKey = classifyAgentRequest({
+  const requestMode = classifyAgentRequest({
     text: plainText,
     hasMentionedImage: mentionedImageIds.length > 0,
     hasSelectedNodes: input.selection.length > 0,
@@ -308,6 +331,44 @@ export async function prepareAgentTurnRequest(
       lastAssistantTextForTask,
     ),
   })
+  const answersQuestionCard =
+    latestQuestionCard(previousMessagesForTask)?.answered === false
+  const taskDecision = resolveAgentTask(
+    input.session.agentTask,
+    {
+      text: plainText,
+      internalControl: input.internalControl === true,
+      hasActiveTaskPlan: Boolean(activeTaskPlanForTask),
+      hasPendingConfirmation: input.session.pendingConfirmation !== undefined,
+      hasActiveContinuation: input.session.continuation !== undefined,
+      answersQuestionCard,
+      refersToCanvasImage:
+        mentionedImageIds.length > 0 || selectedImageIds.length > 0,
+      referenceIds: mentionedReferenceIds,
+    },
+    { now: Date.now(), newId: () => createId('task') },
+  )
+  // 系列编排阶段（「先定 Logo」）：同任务跨回合保留，用户放行才解除；内部续跑不改阶段。
+  const previousSeriesStage = taskDecision.continued
+    ? taskDecision.task.seriesStage
+    : undefined
+  const seriesStage = input.internalControl === true
+    ? previousSeriesStage
+    : nextSeriesStage({
+        previous: previousSeriesStage,
+        continued: taskDecision.continued,
+        text: plainText,
+      })
+  const agentTask = withSeriesStage(taskDecision.task, seriesStage)
+  const seriesPrompt = seriesOrchestrationPrompt({
+    stage: seriesStage,
+    directive: input.internalControl === true ? null : seriesDirectiveOf(plainText),
+    released: seriesStageReleased(previousSeriesStage, seriesStage),
+  })
+  const taskKey = referenceTaskKey(agentTask)
+  const referenceIds = agentTask.referenceIds
+  await input.sessions.updateFields?.(input.session.id, { agentTask })
+    .catch(() => null)
   const autoCurationWarnings: string[] = []
   if (referenceIds.length > 0 && input.autoCurateReferences) {
     try {
@@ -347,11 +408,14 @@ export async function prepareAgentTurnRequest(
     const taskSelection = input.referenceLedger
       ? await input.referenceLedger.selectForTask(input.projectId, taskKey)
       : null
-    const explicitItems = input.referenceLedger && referenceIds.length > 0
-      ? (await input.referenceLedger.listItems(input.projectId)).filter(
-          (item) => referenceIds.includes(item.id),
-        )
+    // 按用户提及顺序排列（G2：图片编号与提及顺序对齐）。
+    const ledgerItems = input.referenceLedger && referenceIds.length > 0
+      ? await input.referenceLedger.listItems(input.projectId)
       : []
+    const explicitItems = referenceIds.flatMap((id) => {
+      const item = ledgerItems.find((row) => row.id === id)
+      return item ? [item] : []
+    })
     const selection = taskSelection
       ? mergeExplicitReferences(taskSelection, explicitItems, taskKey)
       : explicitItems.length > 0
@@ -468,9 +532,19 @@ export async function prepareAgentTurnRequest(
         contextTrace,
       }
     }
+    const referenceQuestion = taskSelection
+      ? unmentionedReferencesPrompt({
+          omitted: taskSelection.omitted,
+          mentionedIds: referenceIds,
+          answeringQuestionCard: answersQuestionCard,
+          internalControl: input.internalControl === true,
+        })
+      : { prompt: '', itemIds: [] }
     contextPrompt = [
       formatContextBundleForPrompt(bundle),
       projected?.prompt ?? '',
+      referenceQuestion.prompt,
+      seriesPrompt,
     ]
       .filter(Boolean)
       .join('\n\n')
@@ -637,7 +711,6 @@ export async function prepareAgentTurnRequest(
   const lastAssistantFailed = /HTTP\s*50\d|服务端返回错误|生成失败|运行失败|请求失败|上游/.test(
     lastAssistantTextForTask,
   )
-  const requestMode = taskKey
   const promptProfile = promptProfileForMode(requestMode)
   const sessionBrief = requestMode === 'complex_plan'
     ? sessionBriefForContinuation({
@@ -736,6 +809,9 @@ export async function prepareAgentTurnRequest(
     explicitMediaModels,
     perImage,
     requestMode,
+    taskKey,
+    agentTask,
+    agentTaskReason: taskDecision.reason,
     promptProfile,
     toolMode: decision.mode,
     turnTools,
@@ -752,16 +828,17 @@ function mergeExplicitReferences(
   const selectedByItem = new Map(
     selection.selected.map((row) => [row.item.id, row]),
   )
-  for (const item of explicitItems) {
-    if (selectedByItem.has(item.id)) continue
-    selectedByItem.set(item.id, {
+  const explicitIds = new Set(explicitItems.map((item) => item.id))
+  // 显式提及的参考按提及顺序排在前面，其余本任务已选的参考保持台账排序。
+  const ordered = [
+    ...explicitItems.map((item) => selectedByItem.get(item.id) ?? {
       item,
       usage: explicitReferenceUsage(item, taskKey),
-    })
-  }
-  const explicitIds = new Set(explicitItems.map((item) => item.id))
+    }),
+    ...selection.selected.filter((row) => !explicitIds.has(row.item.id)),
+  ]
   return {
-    selected: [...selectedByItem.values()],
+    selected: ordered,
     omitted: selection.omitted.filter((row) => !explicitIds.has(row.item.id)),
   }
 }

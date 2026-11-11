@@ -194,4 +194,30 @@ describe('AgentConversationPane', () => {
     expect(html).not.toContain('data-agent-queue')
     expect(html).not.toContain('正在运行的手帕种草图')
   })
+
+  it('最后一张未回答的问题卡渲染成可交互表单；用户接话后不再显示', () => {
+    const step = {
+      kind: 'step' as const,
+      id: 'call-q',
+      tool: 'askQuestions',
+      label: '问题卡已发出',
+      lines: ['1. 尺寸？'],
+      nodeIds: [],
+      failed: false,
+      questions: [
+        { id: 'size', question: '尺寸？', options: ['3:4'], multiple: false, allowFreeText: true },
+      ],
+    }
+    const onAnswerQuestionCard = vi.fn()
+    const html = renderPane({ items: [step], visibleItems: [step], onAnswerQuestionCard })
+    expect(html).toContain('data-agent-question-card="call-q"')
+    expect(html).toContain('data-agent-question-option="size:3:4"')
+    const answered = [step, { kind: 'user' as const, text: '3:4' }]
+    expect(
+      renderPane({ items: answered, visibleItems: answered, onAnswerQuestionCard }),
+    ).not.toContain('data-agent-question-card')
+    expect(renderPane({ items: [step], visibleItems: [step] })).not.toContain(
+      'data-agent-question-card',
+    )
+  })
 })

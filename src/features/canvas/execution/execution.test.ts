@@ -173,9 +173,22 @@ describe('buildRunPlan（单点生成）', () => {
       nodeId: 'n-prompt',
       text: PROMPT_TEXT,
     })
-    expect(plan.tasks[0]!.request.prompt).toContain('第 1 张随附图片是品牌 Logo「Sogami Logo」')
+    expect(plan.tasks[0]!.request.prompt).toContain('图 1：品牌 Logo「Sogami Logo」')
     expect(plan.tasks[0]!.request.prompt).toContain('不得重画或改成相似字样')
     expect(dataOf(store, genId)).not.toHaveProperty('contextAssets')
+  })
+
+  it('★★ G4 已按节点分配参考的生成节点，运行时不再并入本轮全部素材', () => {
+    const { store, promptId, genId } = setup()
+    store.dispatch({ kind: 'node.updateData', id: genId, patch: { contextAssetScope: 'node' } })
+    const plan = buildRunPlan(
+      'node',
+      { originNodeId: promptId },
+      store.getSnapshot(),
+      'single',
+      { contextAssets: [{ hash: 'cup', mime: 'image/png', role: 'reference', name: '产品' }] },
+    )
+    expect(plan.tasks[0]!.request.inputs.some((input) => input.kind === 'asset')).toBe(false)
   })
 
   it('★ 已运行中的空下游节点不再被第二条计划复用', () => {

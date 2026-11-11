@@ -30,12 +30,14 @@ import {
 } from './AgentQueuePanel'
 import { AgentStepIcon } from './AgentStepIcon'
 import {
+  pendingQuestionCard,
   processBefore,
   type ConversationResearchItem,
   type ConversationItem,
   type ConversationProcessEntry,
 } from './conversation'
 import { MentionRichText } from './MentionRichText'
+import { QuestionCardForm } from './QuestionCardForm'
 import { ResearchResultsPreview } from './ResearchResultsPreview'
 import { TaskPlanCard } from './TaskPlanCard'
 import baseStyles from './AgentPanel.module.css'
@@ -91,6 +93,8 @@ export interface AgentConversationPaneProps {
   onAddResearchReference?(
     item: ConversationResearchItem,
   ): Promise<{ ok: boolean; message: string }>
+  /** 问题卡提交：回答整理成一条用户消息发回。 */
+  onAnswerQuestionCard?(text: string): void
 }
 
 export function AgentConversationPane({
@@ -138,7 +142,9 @@ export function AgentConversationPane({
   onEditingQueueTextChange,
   onResumeQueue,
   onAddResearchReference,
+  onAnswerQuestionCard,
 }: AgentConversationPaneProps) {
+  const questionCard = onAnswerQuestionCard ? pendingQuestionCard(visibleItems) : null
   return (
     <div className={styles.contentWrap} data-agent-scroll-wrap>
       {current?.taskPlan && (
@@ -420,6 +426,16 @@ export function AgentConversationPane({
             )
           })}
         </div>
+
+        {questionCard && onAnswerQuestionCard ? (
+          <QuestionCardForm
+            key={questionCard.stepId}
+            cardId={questionCard.stepId}
+            questions={questionCard.questions}
+            disabled={statusIsBusy(status)}
+            onSubmit={onAnswerQuestionCard}
+          />
+        ) : null}
 
         {runTasks &&
           runTasks.length > 0 &&

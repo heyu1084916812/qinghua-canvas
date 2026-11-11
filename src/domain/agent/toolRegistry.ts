@@ -12,6 +12,7 @@ export type AgentToolName =
   | 'proposeTaskPlan'
   | 'updateTaskStep'
   | 'requestTaskConfirmation'
+  | 'askQuestions'
   | 'runNode'
   | 'runFrom'
   | 'readResult'
@@ -112,6 +113,13 @@ export const AGENT_TOOL_DEFINITIONS: readonly AgentToolDefinition[] = [
     name: 'requestTaskConfirmation',
     category: 'agent-internal',
     access: 'confirm',
+    sideEffect: 'none',
+  },
+  {
+    /** 问题卡：本回合到此结束，用户回答作为下一条消息（不是确认卡，见 questionCard.ts）。 */
+    name: 'askQuestions',
+    category: 'agent-internal',
+    access: 'read',
     sideEffect: 'none',
   },
   {

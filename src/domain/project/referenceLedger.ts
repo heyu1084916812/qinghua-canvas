@@ -26,6 +26,7 @@ export type ReferenceKind =
   | 'text'
 
 export type ReferenceUsageKind =
+  | 'subject'
   | 'style'
   | 'composition'
   | 'identityAnchor'
@@ -70,6 +71,22 @@ export interface ReferenceUsage {
   /** 身份锚点必须排在普通风格参考之前。 */
   identityAnchor?: boolean
   createdAt: number
+  /** 最近一次（重新）分析写入的时间；同图多任务时卡片显示最新写入的那条。 */
+  updatedAt?: number
+}
+
+/** 一张参考卡的「当前」用法：多任务各自保留，卡片显示最近写入的一条。 */
+export function latestUsageForItem(
+  usages: readonly ReferenceUsage[],
+  itemId: string | undefined,
+): ReferenceUsage | undefined {
+  let latest: ReferenceUsage | undefined
+  for (const usage of usages) {
+    if (usage.itemId !== itemId) continue
+    const at = usage.updatedAt ?? usage.createdAt
+    if (!latest || at >= (latest.updatedAt ?? latest.createdAt)) latest = usage
+  }
+  return latest
 }
 
 export interface SelectedReference {
@@ -121,6 +138,8 @@ export function selectReferencesForTask(input: {
 
 function rankUsage(usage: ReferenceUsage): number {
   if (usage.usage === 'identityAnchor' || usage.identityAnchor) return 4
+  // 主体 / 产品锁定（G3）：和身份锚点一样必须保真，排在版式与风格参考之前。
+  if (usage.usage === 'subject') return 4
   if (usage.usage === 'composition') return 3
   if (usage.usage === 'textGuide') return 2
   if (usage.usage === 'style') return 1

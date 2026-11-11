@@ -71,7 +71,8 @@ describe('Agent 工具与循环模块结构护栏', () => {
     expect(sources.claimGuard, '没读到 agentCanvasClaimGuard.ts 原文').toBeTypeOf(
       'string',
     )
-    expect(countLines(sources.agentLoop)).toBeLessThanOrEqual(840)
+    // 840 → 854（2026-11-11）：问题卡 askQuestions 结束回合的分支（12 行 + 空行）与 1 行 import；解析与结果组装已下沉 questionCard.ts 的 questionCardTurn。
+    expect(countLines(sources.agentLoop)).toBeLessThanOrEqual(854)
     expect(countLines(sources.claimGuard)).toBeLessThanOrEqual(420)
   })
 

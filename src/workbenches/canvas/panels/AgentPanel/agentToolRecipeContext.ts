@@ -4,7 +4,11 @@ import {
   capabilityOfLogical,
   channelIdForLogical,
 } from '../../../../domain/project/modelCatalog'
-import type { AgentNodeType } from '../../../../domain/agent/plan'
+import type { AgentNodeType, AgentPlanNode } from '../../../../domain/agent/plan'
+import {
+  allocateContextAssetsForNode,
+  seriesNodePurpose,
+} from '../../../../domain/agent/seriesAnchors'
 import { imageContextAssets } from './agentToolContextAssets'
 import { preferredGeneratedModel } from './mediaMentions'
 
@@ -51,6 +55,7 @@ export interface AgentToolRecipeContext {
   ) => { channelId: string; model: string } | undefined
   contextAssetsForGenerated: (
     type: AgentNodeType,
+    node?: Pick<AgentPlanNode, 'title' | 'data'>,
   ) => readonly (GenerationContextAsset & { mime: string })[] | undefined
   categoryOfModel: (
     model: string,
@@ -109,9 +114,13 @@ export function createAgentToolRecipeContext(
       )
       return { channelId: channelId ?? '', model }
     },
-    contextAssetsForGenerated: (type) => {
+    contextAssetsForGenerated: (type, node) => {
       if (type !== 'generation') return undefined
-      return imageContextAssets(input.getContextAssets())
+      // G4：按节点用途分配（Logo 节点不拿产品主体 / 排版参考），Logo 永远排第一。
+      return allocateContextAssetsForNode(
+        node ? seriesNodePurpose(node) : 'other',
+        imageContextAssets(input.getContextAssets()),
+      )
     },
     categoryOfModel: (model) => {
       const category = capabilityOfLogical(

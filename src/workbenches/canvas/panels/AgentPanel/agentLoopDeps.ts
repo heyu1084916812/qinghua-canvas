@@ -38,6 +38,7 @@ import {
 } from './agentLoopTrace'
 import type { AgentChatRoute } from './agentChatRoute'
 import type { AgentTurnContextTrace } from './agentTurnRequest'
+import { referenceTaskKey } from '../../../../domain/agent/agentTask'
 import type { AgentRequestMode } from '../../agent/agentContextPolicy'
 import {
   runAgentVisualReview,
@@ -124,6 +125,8 @@ export interface AssembleAgentLoopInput {
   route?: AgentChatRoute
   toolMode?: 'native' | 'json'
   requestMode?: AgentRequestMode
+  /** 参考台账任务键；缺省按会话当前任务，旧会话回落到请求模式。 */
+  taskKey?: string
   visualNodeIds?: readonly string[]
   onProgress?: (messages: readonly ChatMessage[]) => void
   turnTools: readonly ToolDeclaration[]
@@ -224,6 +227,12 @@ export function assembleAgentLoopDeps(
       review,
     })
   }
+  const referenceTaskKeyFor =
+    input.taskKey ??
+    (session.agentTask ? referenceTaskKey(session.agentTask) : requestMode)
+  const preferredReferenceIds = session.agentTask
+    ? session.agentTask.referenceIds
+    : session.referenceIds ?? []
   const runReferenceCuration = (curation: {
     task: string
     itemIds?: readonly string[]
@@ -237,11 +246,11 @@ export function assembleAgentLoopDeps(
       projectId: ports.store.getSnapshot().projectId,
       sessionId: session.id,
       operationId,
-      taskKey: requestMode,
+      taskKey: referenceTaskKeyFor,
       task: curation.task,
       route: ports.cachedChatRoute(session) ?? route,
-      ...(session.referenceIds?.length
-        ? { preferredItemIds: session.referenceIds }
+      ...(preferredReferenceIds.length
+        ? { preferredItemIds: preferredReferenceIds }
         : {}),
       ...(curation.itemIds?.length
         ? { requestedItemIds: curation.itemIds }

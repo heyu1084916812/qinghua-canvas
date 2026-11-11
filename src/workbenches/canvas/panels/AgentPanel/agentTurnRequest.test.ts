@@ -300,7 +300,10 @@ describe('prepareAgentTurnRequest', () => {
     })
     expect(result.kind).toBe('ready')
     if (result.kind !== 'ready') return
-    expect(selectForTask).toHaveBeenCalledWith('p1', 'simple_generate')
+    // G1：台账按任务键选用法，不再按请求模式（simple_generate）。
+    expect(selectForTask).toHaveBeenCalledWith('p1', result.taskKey)
+    expect(result.taskKey).toBe(`task:${result.agentTask.id}`)
+    expect(result.requestMode).toBe('simple_generate')
     expect(selectForTask.mock.calls[0]?.[1]).not.toBe(result.operationId)
     expect(result.contextPrompt).toContain('本次任务采用的参考台账')
     expect(result.contextPrompt).toContain('保持字形与颜色不变')
@@ -522,7 +525,7 @@ describe('prepareAgentTurnRequest', () => {
     if (result.kind !== 'ready') return
     expect(result.contextTrace?.assetRefs).toEqual([
       { hash: 'image-logo', mime: 'image/png', role: 'logo', name: 'Logo' },
-      { hash: 'image-room', mime: 'image/png', role: 'reference', name: '空间' },
+      { hash: 'image-room', mime: 'image/png', role: 'reference', name: '空间', usage: 'style', howToUse: '沿用完整套件' },
     ])
     expect(result.contextTrace?.referenceWarnings).toEqual([
       '套件素材「缺失图」已缺失，本轮已跳过。',
@@ -1048,4 +1051,158 @@ describe('prepareAgentTurnRequest', () => {
       content: text,
     })
   })
+  it('★★ G1 参考用法按任务存：同任务改图沿用任务键与参考，换无关新需求开新任务', async () => {
+    const { sessions, session } = await createSession()
+    const keys: string[] = []
+    const autoCurated: string[][] = []
+    const run = async (text: string) => {
+      clearToolSupportCache()
+      const latest = (await sessions.get(session.id)) ?? session
+      const result = await prepareAgentTurnRequest({
+        ...inputFor({
+          sessions,
+          session: latest,
+          text,
+          autoCurateReferences: vi.fn(async (input) => {
+            autoCurated.push([...input.itemIds])
+            return { ok: true, summary: '', taskKey: input.taskKey, analyzed: [], failed: [], limitations: [] }
+          }),
+        }),
+        referenceLedger: {
+          selectForTask: vi.fn(async (_projectId: string, taskKey: string) => {
+            keys.push(taskKey)
+            return { selected: [], omitted: [] }
+          }),
+          listItems: vi.fn(async () => []),
+        },
+      })
+      if (result.kind !== 'ready') throw new Error(result.kind)
+      return result
+    }
+    const first = await run(`${mentionToken('reference', 'ref-product', '产品图')} 帮我做一张咖啡店海报`)
+    const edit = await run('logo 再大一点')
+    const series = await run('再出一张横版的')
+    const unrelated = await run('画一只在月球上的猫')
+    expect(first.agentTaskReason).toBe('first')
+    expect(edit.taskKey).toBe(first.taskKey)
+    expect(series.taskKey).toBe(first.taskKey)
+    expect(unrelated.taskKey).not.toBe(first.taskKey)
+    expect(keys).toEqual([first.taskKey, first.taskKey, first.taskKey, unrelated.taskKey])
+    // 同一任务后续回合没再 @，产品图仍随任务进入参考分析；新任务不带旧参考。
+    expect(autoCurated).toEqual([['ref-product'], ['ref-product'], ['ref-product']])
+    expect(unrelated.agentTask.referenceIds).toEqual([])
+    expect((await sessions.get(session.id))?.agentTask?.id).toBe(unrelated.agentTask.id)
+  })
+  it('★★ G2 显式参考按提及顺序进入图片输入（编号与「第 1 张 / 第 2 张」一致）', async () => {
+    const { sessions, session } = await createSession()
+    const image = (id: string, createdAt: number) => ({
+      id,
+      projectId: 'p1',
+      title: id,
+      source: 'file' as const,
+      kind: 'image' as const,
+      assetHash: `hash-${id}`,
+      what: id,
+      createdAt,
+      updatedAt: createdAt,
+    })
+    const result = await prepareAgentTurnRequest({
+      ...inputFor({
+        sessions,
+        session,
+        text:
+          `用${mentionToken('reference', 'layout', '排版')}的排版，` +
+          `把${mentionToken('reference', 'cup', '产品')}放进去做一张海报`,
+      }),
+      referenceLedger: {
+        selectForTask: vi.fn(async () => ({ selected: [], omitted: [] })),
+        // 台账按创建时间返回：产品图更早，但用户先提的是排版图。
+        listItems: vi.fn(async () => [image('cup', 1), image('layout', 2)]),
+      },
+    })
+    if (result.kind !== 'ready') throw new Error(result.kind)
+    expect(result.contextTrace?.assetRefs.map((row) => row.hash)).toEqual([
+      'hash-layout',
+      'hash-cup',
+    ])
+  })
+
+  it('★★ G5 参考栏多张未提及且无用法的图：上下文提示先发问题卡；回答问题卡那一回合不再提示', async () => {
+    const { sessions, session } = await createSession()
+    const image = (id: string) => ({
+      item: {
+        id,
+        projectId: 'p1',
+        title: `${id}.jpg`,
+        source: 'file' as const,
+        kind: 'image' as const,
+        assetHash: `hash-${id}`,
+        what: `${id} 的画面`,
+        createdAt: 1,
+        updatedAt: 1,
+      },
+      reason: 'no_usage' as const,
+    })
+    const ledger = {
+      selectForTask: vi.fn(async () => ({ selected: [], omitted: [image('a'), image('b')] })),
+      listItems: vi.fn(async () => []),
+    }
+    const result = await prepareAgentTurnRequest({
+      ...inputFor({ sessions, session, text: '帮我做一张新品海报' }),
+      referenceLedger: ledger,
+    })
+    if (result.kind !== 'ready') throw new Error(result.kind)
+    expect(result.contextPrompt).toContain('参考栏里还有未提到、用途不明的图')
+    expect(result.contextPrompt).toContain('askQuestions')
+    expect(result.contextPrompt).toContain('【a.jpg】')
+
+    const card = JSON.stringify({ ok: true, awaitingAnswers: true, questions: [{ id: 'r', question: '怎么用？' }] })
+    const asked = await sessions.saveMessages(session.id, [
+      { role: 'user', content: '帮我做一张新品海报' },
+      { role: 'assistant', content: '', toolCalls: [{ id: 'q', name: 'askQuestions', args: '{}' }] },
+      { role: 'tool', toolCallId: 'q', toolName: 'askQuestions', content: card },
+      { role: 'assistant', content: '先问一下' },
+    ])
+    clearToolSupportCache()
+    const answer = await prepareAgentTurnRequest({
+      ...inputFor({ sessions, session: asked ?? session, text: '问题卡回答：\n1. 怎么用？ → 都不用' }),
+      referenceLedger: ledger,
+    })
+    if (answer.kind !== 'ready') throw new Error(answer.kind)
+    expect(answer.agentTaskReason).toBe('continuation')
+    expect(answer.contextPrompt).not.toContain('参考栏里还有未提到')
+  })
+
+  it('★★ 「先定 Logo」只做 Logo 并停下：阶段随任务保留，用户放行后转为串行延展', async () => {
+    const { sessions, session } = await createSession()
+    const run = async (text: string) => {
+      clearToolSupportCache()
+      const latest = (await sessions.get(session.id)) ?? session
+      const result = await prepareAgentTurnRequest(inputFor({ sessions, session: latest, text }))
+      if (result.kind !== 'ready') throw new Error(result.kind)
+      return result
+    }
+    const first = await run('帮我做一套咖啡品牌：Logo、包装和海报，先定 Logo')
+    expect(first.agentTask.seriesStage).toBe('logo_first')
+    expect(first.contextPrompt).toContain('本回合**只做 Logo**')
+    const tweak = await run('Logo 再大一点')
+    expect(tweak.agentTask.seriesStage).toBe('logo_first')
+    expect(tweak.contextPrompt).toContain('只做 Logo')
+    const released = await run('Logo 可以了，继续')
+    expect(released.agentTask.id).toBe(first.agentTask.id)
+    expect(released.agentTask.seriesStage).toBeUndefined()
+    expect(released.contextPrompt).toContain('Logo 已确认，继续延展')
+    expect((await sessions.get(session.id))?.agentTask?.seriesStage).toBeUndefined()
+  })
+
+  it('★★ 整套（Logo + 包装 + 海报）默认串行：上下文写明锚点顺序', async () => {
+    const { sessions, session } = await createSession()
+    const result = await prepareAgentTurnRequest(
+      inputFor({ sessions, session, text: '帮我设计咖啡品牌的 Logo、包装和海报' }),
+    )
+    if (result.kind !== 'ready') throw new Error(result.kind)
+    expect(result.agentTask.seriesStage).toBeUndefined()
+    expect(result.contextPrompt).toContain('整套串行')
+  })
 })
+

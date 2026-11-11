@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { selectReferencesForTask, type ReferenceItem, type ReferenceUsage } from './referenceLedger'
+import { latestUsageForItem, selectReferencesForTask, type ReferenceItem, type ReferenceUsage } from './referenceLedger'
 
 const item = (id: string, projectId = 'p1'): ReferenceItem => ({
   id,
@@ -57,5 +57,35 @@ describe('project reference ledger rules', () => {
     })
     expect(result.selected.map((x) => x.item.id)).toEqual(['logo', 'style'])
     expect(result.omitted).toEqual([{ item: item('avoid'), reason: 'avoid' }])
+  })
+})
+
+describe('G3 subject 排序', () => {
+  it('主体 / 产品锁定与身份锚点同档，排在构图与风格参考之前', () => {
+    const result = selectReferencesForTask({
+      projectId: 'p1',
+      taskKey: 'task:t',
+      items: [item('mood'), item('layout'), item('cup')],
+      usages: [
+        usage('u1', 'mood', 'task:t', 'style'),
+        usage('u2', 'layout', 'task:t', 'composition'),
+        usage('u3', 'cup', 'task:t', 'subject'),
+      ],
+    })
+    expect(result.selected.map((row) => row.item.id)).toEqual(['cup', 'layout', 'mood'])
+  })
+})
+
+describe('latestUsageForItem（同图多任务保留各自用法，卡片显示最新）', () => {
+  const base = { projectId: 'p', usage: 'style' as const, howToUse: '' }
+  it('按最近写入时间取，旧任务的用法仍保留在台账里', () => {
+    const usages = [
+      { ...base, id: 'a', itemId: 'i', taskKey: 'task:a', createdAt: 1, updatedAt: 50 },
+      { ...base, id: 'b', itemId: 'i', taskKey: 'task:b', createdAt: 10 },
+      { ...base, id: 'c', itemId: 'other', taskKey: 'task:b', createdAt: 99 },
+    ]
+    expect(latestUsageForItem(usages, 'i')?.id).toBe('a')
+    expect(latestUsageForItem(usages.slice(1), 'i')?.id).toBe('b')
+    expect(latestUsageForItem(usages, 'missing')).toBeUndefined()
   })
 })

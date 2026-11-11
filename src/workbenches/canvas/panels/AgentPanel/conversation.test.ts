@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type { ChatMessage } from '../../../../domain/shared/execution/types'
 import {
   describeToolResult,
+  pendingQuestionCard,
   processBefore,
   processEntriesOf,
   readableConfirmationLines,
@@ -839,5 +840,36 @@ describe('processBefore', () => {
     ]
 
     expect(processBefore(items, 4)).toBeNull()
+  })
+})
+
+describe('问题卡（askQuestions）步骤', () => {
+  const card = {
+    ok: true,
+    awaitingAnswers: true,
+    questions: [{ id: 'size', question: '尺寸？', options: ['3:4', '9:16'] }],
+  }
+
+  it('步骤带上整理好的问题列表；失败结果不带', () => {
+    const d = describeToolResult('askQuestions', JSON.stringify(card))
+    expect(d.failed).toBe(false)
+    expect(d.lines).toEqual(['1. 尺寸？'])
+    expect(d.questions?.[0]).toMatchObject({ id: 'size', options: ['3:4', '9:16'], allowFreeText: true })
+    const bad = describeToolResult('askQuestions', JSON.stringify({ ok: false, problems: ['questions 至少要有 1 题'] }))
+    expect(bad.failed).toBe(true)
+    expect(bad.questions).toBeUndefined()
+  })
+
+  it('pendingQuestionCard 只认最后一个用户消息之后的问题卡', () => {
+    const messages: ChatMessage[] = [
+      { role: 'user', content: '做海报' },
+      { role: 'assistant', content: '', toolCalls: [{ id: 'q1', name: 'askQuestions', args: '{}' }] },
+      { role: 'tool', toolCallId: 'q1', toolName: 'askQuestions', content: JSON.stringify(card) },
+      { role: 'assistant', content: '先问一下' },
+    ]
+    const items = toConversation(messages)
+    expect(pendingQuestionCard(items)).toMatchObject({ stepId: 'q1' })
+    expect(pendingQuestionCard(toConversation([...messages, { role: 'user', content: '3:4' }]))).toBeNull()
+    expect(pendingQuestionCard([])).toBeNull()
   })
 })

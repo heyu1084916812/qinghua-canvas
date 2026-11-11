@@ -74,6 +74,7 @@ describe('工具声明', () => {
     expect(AGENT_TOOLS.map((t) => t.name).sort()).toEqual([
       'applyPlan',
       'arrangeNodes',
+      'askQuestions',
       'compareNodes',
       'curateReferences',
       'deleteEdges',
@@ -128,6 +129,15 @@ describe('工具声明', () => {
     expect(on).toEqual(expect.arrayContaining(['researchDesign', 'readPage']))
   })
 
+  it('问题卡在简单生成 / 参考改图 / 设计调研三档都可用，画布操作档不给', () => {
+    for (const mode of ['simple_generate', 'reference_edit', 'design_research'] as const) {
+      expect(agentToolsForRequestMode(mode, { canvasReview: false }).map((t) => t.name)).toContain('askQuestions')
+    }
+    expect(
+      agentToolsForRequestMode('canvas_operation', { canvasReview: false }).map((t) => t.name),
+    ).not.toContain('askQuestions')
+  })
+
   it('能力发现：「读网页 / 联网」能加载 readPage；关闭联网后的候选里不再出现联网工具', () => {
     expect(discoverAgentTools('帮我读一下这个网页链接').tools.map((t) => t.name)).toContain('readPage')
     const off = discoverAgentTools(
@@ -153,6 +163,7 @@ describe('工具声明', () => {
     }).map((tool) => tool.name)
     expect(simple.sort()).toEqual([
       'applyPlan',
+      'askQuestions',
       'curateReferences',
       'readCapabilities',
       'readGraph',
@@ -1969,6 +1980,43 @@ describe('★★ applyPlan：多张图要各自一条流程（perImage）', () =
   it('★ 用户没说「各自」（perImage 未设）时不拦 —— 合并成一张是合法需求', async () => {
     const { ctx, ids } = twoImageCtx()
     const r = (await executeConfirmedTool('applyPlan', planFor(1, ids), ctx)) as { ok: boolean }
+    expect(r.ok).toBe(true)
+  })
+})
+
+describe('★★ applyPlan：整套任务先定锚点（G4）', () => {
+  const seriesPlan = (edges: AgentPlan['edges']): AgentPlan => ({
+    summary: '奶茶店整套',
+    nodes: [
+      { localId: 'logo', type: 'generation', title: '奶茶店 Logo', data: { prompt: '极简字标' }, order: 0 },
+      { localId: 'pack', type: 'generation', title: '杯身包装', data: { prompt: '杯身印 Logo' }, order: 1 },
+      { localId: 'poster', type: 'generation', title: '开业海报', data: { prompt: '开业海报' }, order: 2 },
+    ],
+    edges,
+  })
+
+  it('包装 / 海报没连到前一锚点 → 退回让模型补连线，画布不落地', async () => {
+    const { store, ctx } = setup()
+    const before = store.getSnapshot().nodes.length
+    const r = (await executeConfirmedTool('applyPlan', seriesPlan([]), ctx)) as {
+      ok: boolean
+      problems?: string[]
+    }
+    expect(r.ok).toBe(false)
+    expect(r.problems?.join(' ')).toContain('logo → pack')
+    expect(store.getSnapshot().nodes.length).toBe(before)
+  })
+
+  it('Logo → 包装 → 海报串起来就放行', async () => {
+    const { ctx } = setup()
+    const r = (await executeConfirmedTool(
+      'applyPlan',
+      seriesPlan([
+        { source: 'logo', target: 'pack' },
+        { source: 'pack', target: 'poster' },
+      ]),
+      ctx,
+    )) as { ok: boolean }
     expect(r.ok).toBe(true)
   })
 })

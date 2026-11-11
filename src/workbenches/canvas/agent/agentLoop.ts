@@ -21,6 +21,7 @@ import { confirmRunNodeFromFinalAnswer, recoverRunNodeConfirmation } from './age
 import { parseJsonAgentAction } from './jsonToolFallback'
 import { parseAgentToolArguments } from './agentToolArgs'
 import { reviewBeforeVisualDenial } from './agentVisualClaimGuard'
+import { QUESTION_CARD_TOOL, questionCardTurn } from '../../../domain/agent/questionCard'
 
 /**
  * Agent 循环（设计文档 §4）。
@@ -518,6 +519,19 @@ export async function runAgentTurn(
         )
         handledCallIds.add(call.id)
         continue
+      }
+
+      if (call.name === QUESTION_CARD_TOOL) {
+        // 问题卡：不暂停工具；发出后本回合结束，回答作为下一条用户消息回来（questionCard.ts）。
+        const card = questionCardTurn(call.id, args)
+        handledCallIds.add(call.id)
+        messages.push(card.toolMessage)
+        if (card.text === null) continue
+        emitActivity({ id: call.id, phase: 'tool', status: 'done', tool: call.name })
+        const asked = finishWithUnexecutedResults({ kind: 'message', text: card.text, messages }, handledCallIds, call.id)
+        messages.splice(0, messages.length, ...asked.messages, { role: 'assistant', content: card.text, createdAt: Date.now() })
+        emitProgress()
+        return { kind: 'message', text: card.text, messages }
       }
 
       if (call.name === 'readCapabilities' && deps.discoverCapabilities) {

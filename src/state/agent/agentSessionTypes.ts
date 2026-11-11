@@ -4,6 +4,7 @@ import type { AgentSteer } from '../../domain/agent/steering'
 import type { AgentTaskPlan } from '../../domain/agent/taskPlan'
 import type { ConfirmationRequestRef } from '../../domain/agent/confirmation'
 import type { AgentToolName } from '../../domain/agent/toolRegistry'
+import type { AgentTaskRef } from '../../domain/agent/agentTask'
 
 export interface AgentSession {
   id: string
@@ -60,6 +61,11 @@ export interface AgentSession {
   pendingAssetIds?: string[]
   /** 当前会话持续引用的项目参考卡；参考字节仍在 assets。 */
   referenceIds?: string[]
+  /**
+   * 当前任务（参考用法按任务存，见 `domain/agent/agentTask.ts`）。
+   * 同一任务内改图 / 出系列沿用参考与用法；换无关新需求开新任务。
+   */
+  agentTask?: AgentTaskRef
   /**
    * 当前回合尚未结束时，用户继续提交的任务。
    *

@@ -85,6 +85,7 @@ export function AgentPanel({
     confirm: turn.confirm,
     cancel: turn.cancel,
     retry: turn.retry,
+    answerQuestionCard: turn.answerQuestionCard,
 
     // ---- 队列 ----
     queueMenuId: session.queueMenuId,

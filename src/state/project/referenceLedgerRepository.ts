@@ -85,6 +85,7 @@ function usageOf(row: Record<string, unknown>): ReferenceUsage | null {
     howToUse: row.howToUse,
     ...(row.identityAnchor === true ? { identityAnchor: true } : {}),
     createdAt: row.createdAt,
+    ...(typeof row.updatedAt === 'number' ? { updatedAt: row.updatedAt } : {}),
   }
 }
 
