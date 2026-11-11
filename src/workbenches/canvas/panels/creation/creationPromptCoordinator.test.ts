@@ -4,6 +4,7 @@ import { mentionToken } from '../../text/MentionEditor'
 import type { RecipeSnapshot } from '../panelModel'
 import {
   applyPromptValueChange,
+  buildRecipeSnapshot,
   creationModelSelectionEvent,
   creationParamSections,
   createPromptCommitScheduler,
@@ -187,7 +188,7 @@ describe('creationPromptCoordinator · 模型与工具', () => {
       type: 'setModel',
       model: 'next-model',
       channelId: 'next-channel',
-      recipe: { ...recipe, channelId: 'next-channel' },
+      recipe: { ...recipe, channelId: 'next-channel', model: 'next-model' },
     })
 
     expect(
@@ -201,8 +202,43 @@ describe('creationPromptCoordinator · 模型与工具', () => {
     ).toEqual({
       type: 'setModel',
       model: 'next-model',
-      recipe: { ...recipe, channelId: 'old' },
+      recipe: { ...recipe, channelId: 'old', model: 'next-model' },
     })
+  })
+
+  it('★ A3：切模型时配方记的是**新**模型（buildRecipeSnapshot 尊重 overrides.model）', () => {
+    const snapshot = buildRecipeSnapshot({
+      data: { mode: 'image' } as never,
+      overrides: { model: 'gpt-image-2.5' },
+      channelId: 'old-channel',
+      model: 'GPT Image 2',
+    })
+    expect(snapshot.model).toBe('gpt-image-2.5')
+
+    const event = creationModelSelectionEvent({
+      modelName: 'gpt-image-2.5',
+      provider: 'xssr',
+      ownedChannelId: 'old-channel',
+      shownChannelId: 'old-channel',
+      recipe: snapshot,
+    })
+    expect(event).toMatchObject({
+      type: 'setModel',
+      model: 'gpt-image-2.5',
+      channelId: 'xssr',
+      recipe: { channelId: 'xssr', model: 'gpt-image-2.5' },
+    })
+  })
+
+  it('改别的参数时，配方仍沿用面板当前显示的模型', () => {
+    const snapshot = buildRecipeSnapshot({
+      data: { mode: 'image' } as never,
+      overrides: { ratio: '3:4' },
+      channelId: 'c',
+      model: 'shown-model',
+    })
+    expect(snapshot).toMatchObject({ channelId: 'c', model: 'shown-model' })
+    expect(snapshot.params.ratio).toBe('3:4')
   })
 
   it('prompt tool 只消费 render 快照 target，缺失时保留守卫输入', () => {

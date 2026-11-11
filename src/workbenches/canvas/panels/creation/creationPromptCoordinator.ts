@@ -163,7 +163,7 @@ export function buildRecipeSnapshot(input: RecipeSnapshotInput): RecipeSnapshot 
   const mode = merged.mode ?? 'image'
   return {
     channelId: input.channelId,
-    model: input.model,
+    model: input.overrides?.model || input.model, // A3：切模型时记新模型，不是旧显示值
     mode,
     params: { mode, ...generationParams(merged) },
   }
@@ -186,10 +186,7 @@ export function creationModelSelectionEvent(input: ModelSelectionInput): PanelEv
     ...(input.provider && input.provider !== input.ownedChannelId
       ? { channelId: input.provider }
       : {}),
-    recipe: {
-      ...input.recipe,
-      channelId: nextChannelId || input.shownChannelId,
-    },
+    recipe: { ...input.recipe, channelId: nextChannelId || input.shownChannelId, model: input.modelName },
   }
 }
 
