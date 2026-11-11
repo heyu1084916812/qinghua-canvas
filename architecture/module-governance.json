@@ -8733,6 +8733,27 @@
         "src/workbenches/canvas/panels/AgentPanel/agentChatModelDefault.test.ts"
       ],
       "budget": 60
+    },
+    {
+      "module": "src/workbenches/canvas/panels/AgentPanel/agentVisibleText.ts",
+      "owner": "canvas-agent-conversation",
+      "responsibility": "对话显示收口：过程文字只留给用户看的中文句子，最终正文剥掉工具调用 JSON 与协议标记，防止内部指令和推理泄漏。",
+      "owns": [
+        "过程文字逐句可见性规则",
+        "最终正文的工具协议残留剥离"
+      ],
+      "doesNotOwn": [
+        "消息持久化与协议层 reasoning 剥离",
+        "对话渲染与样式"
+      ],
+      "publicApi": [
+        "publicProcessText",
+        "visibleAssistantReply"
+      ],
+      "test": [
+        "src/workbenches/canvas/panels/AgentPanel/agentVisibleText.test.ts"
+      ],
+      "budget": 110
     }
   ]
 }

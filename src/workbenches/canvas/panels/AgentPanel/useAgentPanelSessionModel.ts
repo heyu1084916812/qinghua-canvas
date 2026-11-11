@@ -5,6 +5,7 @@ import {
   useRef,
   useSyncExternalStore,
 } from 'react'
+import { publicProcessText } from './agentVisibleText'
 import { usePlatform } from '../../../../app/providers/PlatformProvider'
 import { useChannels } from '../../../../app/providers/ChannelStoreProvider'
 import { useSkillsOptional } from '../../../../app/providers/SkillStoreProvider'
@@ -219,8 +220,9 @@ export function useAgentPanelSessionModel({
   const liveActivities = current
     ? runPresentation.liveActivitiesFor(current.id)
     : []
+  /** 实时过程流同样只显示给用户该看的句子（A5：DeepSeek 原始推理会混进来） */
   const liveProcess = current
-    ? runPresentation.liveProcessFor(current.id)
+    ? publicProcessText(runPresentation.liveProcessFor(current.id))
     : ''
   const deliveryMode = useSyncExternalStore(
     subscribeAgentDeliveryMode,

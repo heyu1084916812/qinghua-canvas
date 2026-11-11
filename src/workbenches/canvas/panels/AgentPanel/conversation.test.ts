@@ -598,6 +598,33 @@ describe('消息 → 对话条目', () => {
     expect(rows.map((row) => row.text)).toEqual(['先核对渠道，再执行生成。'])
   })
 
+  it('★ A5：实测泄漏的推理（Report concisely / Let me run it）不进对话过程', () => {
+    const messages: ChatMessage[] = [
+      { role: 'user', content: '做一套山野品牌视觉' },
+      {
+        role: 'assistant',
+        content: 'Let me run it.',
+        reasoning: 'Report concisely. Ask if run.',
+        toolCalls: [{ id: 'read', name: 'readGraph', args: '{}' }],
+      },
+      { role: 'tool', toolCallId: 'read', content: '{"nodes":[],"edges":[]}' },
+      { role: 'assistant', content: '已建好 3 个节点。', reasoning: 'Report concisely. Ask if run.' },
+    ]
+    expect(processEntriesOf(messages)).toEqual([])
+    const texts = JSON.stringify(toConversation(messages))
+    expect(texts).not.toContain('Report concisely')
+    expect(texts).not.toContain('Let me run it')
+    expect(texts).toContain('已建好 3 个节点。')
+  })
+
+  it('★ A5：最终正文若只是工具调用 JSON，不当正文气泡显示', () => {
+    const items = toConversation([
+      { role: 'user', content: '跑吧' },
+      { role: 'assistant', content: '{"tool":"runNode","args":{"nodeIds":["n1"]}}' },
+    ])
+    expect(items).toEqual([{ kind: 'user', text: '跑吧' }])
+  })
+
   it('★ 系统提示词不进对话流（那是给模型看的，不是给用户看的）', () => {
     const items = toConversation([
       { role: 'system', content: '你是「轻画」这张无限画布上的助手…' },

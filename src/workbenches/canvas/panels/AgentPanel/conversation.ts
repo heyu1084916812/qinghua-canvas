@@ -1,3 +1,4 @@
+import { publicProcessText, visibleAssistantReply } from './agentVisibleText'
 import { agentPhaseForTool, agentPhaseTitle, isAgentPhase, type AgentPhase } from '../../../../domain/agent/phase'
 import type { ChatMessage } from '../../../../domain/shared/execution/types'
 import { isPublicHttpUrl } from '../../../../domain/shared/publicUrl'
@@ -72,19 +73,8 @@ export type ConversationItem =
   | ConversationProcess
   | ConversationStep
 
-const INTERNAL_REASONING_PREFIX =
-  /^(?:user approved|run the node|ask (?:the )?user|now applyPlan|applyPlan|call runNode|call runFrom|first,? call|then call|next,? call|let's|we should)/i
-
-function visibleReasoningText(text: string): string {
-  const trimmed = text.trim()
-  if (
-    trimmed.length <= 240 &&
-    INTERNAL_REASONING_PREFIX.test(trimmed.replace(/\s+/g, ' '))
-  ) {
-    return ''
-  }
-  return trimmed
-}
+/** 推理 / 工具旁白只显示给用户该看的句子（A5，见 agentVisibleText.ts）。 */
+const visibleReasoningText = publicProcessText
 
 /**
  * 当前条目之前、同一用户回合内的过程块。
@@ -800,7 +790,9 @@ export function toConversation(
 
     if (m.role === 'assistant') {
       const hasTools = (m.toolCalls?.length ?? 0) > 0
-      const content = m.content.trim()
+      const content = hasTools
+        ? publicProcessText(m.content)
+        : visibleAssistantReply(m.content)
       const reasoning = visibleReasoningText(m.reasoning ?? '')
       if (hasTools && content) {
         ensureProcess(m).entries.push({
@@ -913,10 +905,11 @@ export function processEntriesOf(
     if (message.role !== 'assistant') return []
     const hasTools = (message.toolCalls?.length ?? 0) > 0
     const rows: ConversationProcessEntry[] = []
-    if (hasTools && message.content.trim()) {
+    const intent = hasTools ? publicProcessText(message.content) : ''
+    if (intent) {
       rows.push({
         id: `process-${index}`,
-        text: displayNodeText(message.content.trim(), nodeTitles),
+        text: displayNodeText(intent, nodeTitles),
         source: 'intent',
         ...(typeof message.createdAt === 'number' &&
         Number.isFinite(message.createdAt) &&
