@@ -5,6 +5,8 @@ import type { NodeType } from '../model/node'
 export const GAP = 16
 export const CONTAINER_PADDING = 20
 export const CONTAINER_GAP = 16
+/** 批量子节点每一行保留的标题带高度（节点框外）。 */
+export const CONTAINER_HEADER = 22
 export const RESULT_GROUP_OFFSET = 32
 export const RESULT_GROUP_PADDING = 16
 export const RESULT_GROUP_GAP = 16

@@ -46,7 +46,10 @@ export function ContainerBody(props: ContainerBodyProps) {
   const { node, kind, children = [], renderChild, bg, resultHashes = [] } = props
   const childIds = (node.data as { childIds?: string[] }).childIds ?? []
   const ordered = useMemo(() => orderChildren(children, childIds), [children, childIds])
-  const packs = useMemo(() => packContainerChildren(ordered.length), [ordered.length])
+  const packs = useMemo(
+    () => packContainerChildren(ordered.length, undefined, kind === 'batch'),
+    [kind, ordered.length],
+  )
   const min = containerMinSize(kind, ordered.length)
   /**
    * ★★ 放大容器 ⇒ **里面的单元与素材同步放大**（用户第 15 批 #335-①：

@@ -103,7 +103,12 @@ export type Command =
    *
    * 两种都**保持孩子的世界位置不变**：需要时连原点一起挪，并同步改写每个孩子的 local 坐标。
    */
-  | { kind: 'node.refitContainer'; id: string; mode?: 'hug' | 'tight' }
+  | {
+      kind: 'node.refitContainer'
+      id: string
+      mode?: 'hug' | 'tight'
+      transient?: boolean
+    }
   /**
    * 建一条边。
    *

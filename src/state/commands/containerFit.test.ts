@@ -42,7 +42,7 @@ describe('批量：贴住网格内容（#319 / 第 14 批第 2 条）', () => {
     expect(sizeOf(g, containerId)).toEqual({ x: 0, y: 0, w: 240, h: 192 })
     const next = reduce({ kind: 'node.reparent', id: kidIds[0]!, toParent: containerId }, g).next
     expect(sizeOf(next, containerId)).toMatchObject(containerMinSize('batch', 1))
-    expect(sizeOf(next, containerId)).toEqual({ x: 0, y: 0, w: 240, h: 200 })
+    expect(sizeOf(next, containerId)).toEqual({ x: 0, y: 0, w: 240, h: 222 })
   })
 
   it('★★ 两个子节点：456×200（不是旧口径的 456×365，下方空 183px）', () => {
@@ -51,7 +51,7 @@ describe('批量：贴住网格内容（#319 / 第 14 批第 2 条）', () => {
     const kidIds = g.nodes.filter((n) => n.type === 'prompt').map((n) => n.id)
     for (const id of kidIds.slice(0, 2)) g = reduce({ kind: 'node.reparent', id, toParent: containerId }, g).next
     expect(sizeOf(g, containerId).w).toBe(456)
-    expect(sizeOf(g, containerId).h).toBe(200)
+    expect(sizeOf(g, containerId).h).toBe(222)
   })
 
   /**
@@ -66,7 +66,7 @@ describe('批量：贴住网格内容（#319 / 第 14 批第 2 条）', () => {
     expect(sizeOf(next, containerId)).toEqual({ x: 0, y: 0, w: 800, h: 600 })
     /** 手动「整理节点」才回到网格尺寸 */
     const tight = reduce({ kind: 'node.refitContainer', id: containerId, mode: 'tight' }, next).next
-    expect(sizeOf(tight, containerId)).toEqual({ x: 0, y: 0, w: 240, h: 200 })
+    expect(sizeOf(tight, containerId)).toEqual({ x: 0, y: 0, w: 240, h: 222 })
   })
 
   it('子节点拖出后框收回；删掉子节点也一样（并清掉 childIds 死引用）', () => {

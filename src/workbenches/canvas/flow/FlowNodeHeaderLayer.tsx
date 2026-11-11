@@ -10,8 +10,8 @@ import {
 import type { CSSProperties, PointerEvent as ReactPointerEvent } from 'react'
 import { useStore } from '@xyflow/react'
 import { useCanvasStore, useGraph } from '../storeContext'
+import { containerMinSize } from '../../../domain/canvas/layout/packContainer'
 import {
-  NODE_HEADER_GAP,
   NODE_HEADER_HEIGHT,
   NODE_HEADER_SIDE_INSET,
   nodeHeaderLabels,
@@ -20,10 +20,24 @@ import {
   type NodeHeaderLabel,
 } from './nodeHeaders'
 import styles from './FlowNodeHeaderLayer.module.css'
-
 export function FlowNodeHeaderLayer({ coarse = false }: { coarse?: boolean }) {
   const graph = useGraph()
+  const store = useCanvasStore()
   const labels = useMemo(() => nodeHeaderLabels(graph.nodes), [graph])
+  useEffect(() => {
+    const counts = new Map<string, number>()
+    for (const node of graph.nodes) {
+      if (node.parentId) counts.set(node.parentId, (counts.get(node.parentId) ?? 0) + 1)
+    }
+    for (const node of graph.nodes) {
+      if (node.type !== 'batch') continue
+      const count = counts.get(node.id) ?? 0
+      if (count === 0) continue
+      const fit = containerMinSize('batch', count)
+      if (node.w >= fit.w && node.h >= fit.h) continue
+      store.dispatch({ kind: 'node.refitContainer', id: node.id, mode: 'hug', transient: true })
+    }
+  }, [graph, store])
   if (coarse) return null
   return <HeaderViewport labels={labels} />
 }
@@ -161,9 +175,11 @@ const HeaderLabel = memo(function HeaderLabel({
     <div
       className={styles.header}
       style={{
-        left: label.x - NODE_HEADER_SIDE_INSET,
-        top: label.y - NODE_HEADER_HEIGHT - NODE_HEADER_GAP,
-        width: label.w + NODE_HEADER_SIDE_INSET * 2,
+        left: label.x - NODE_HEADER_SIDE_INSET * label.scale,
+        top: label.y - (NODE_HEADER_HEIGHT + label.gap) * label.scale,
+        width: label.w / label.scale + NODE_HEADER_SIDE_INSET * 2,
+        transform: `scale(${label.scale})`,
+        transformOrigin: 'top left',
       }}
       data-flow-node-header={label.id}
     >

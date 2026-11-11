@@ -559,9 +559,10 @@ function handle(cmd: Command, graph: GraphSnapshot): Handled {
        */
       return {
         patches,
-        transaction: patches.length === 0
-          ? { mode: 'silent' }
-          : { mode: 'standalone', label: cmd.mode === 'tight' ? '整理节点' : '贴合容器' },
+        transaction:
+          patches.length === 0 || cmd.transient
+            ? { mode: 'silent' }
+            : { mode: 'standalone', label: cmd.mode === 'tight' ? '整理节点' : '贴合容器' },
       }
     }
 

@@ -1,5 +1,12 @@
 # CanvasFlow（轻画）项目记忆
 
+### 总管2 第七十轮：节点标题旧参数与批量标题带（2026-11-11）
+- “昨天的标题行”不是与图片同宽：普通节点标题排相对节点左右各 `-8px`，行高 `22px`，内边距 `2px`；标题 `14px`、像素 `12px`（再由画布字号设置覆盖）。用户这次要求照旧，不能为了看似不越界而改成 `0/0` 或 `padding:6px`。
+- 批量多行只修纵向：`packContainerChildren(..., reserveTitleRow=true)` 会为每行加 `22px` 标题带；分组必须保持无标题带，否则分组高度会无故增加。`ContainerBody` 按 `kind` 传这个开关，`nodeHeaders` 与批量格位始终传 `true`。
+- 旧批量节点如果高度小于新网格要求，`FlowNodeHeaderLayer` 用 transient `node.refitContainer` 只长不缩；`packedCellAt` 默认带标题带，因为它的真实调用方只有批量。
+- 四组证据 `.playwright-verify/current-bugs/node-header-rows/report.json`：普通标题左右各越界 `8px`；五项批量 `200→420px`；第二行标题不压上一行，`pageOverflowX=false / errors=[]`。
+- 门禁：check 1176 modules / 4722 deps / 320 registrations；全量串行 Vitest 673 files / 5548 passed / 1 skipped；build 1308 modules。未 push。
+
 ### 总管2 第六十九轮：65535 瞬时 5xx、批量预览、Agent 宽度与最终 prompt（2026-11-11）
 - 65535 的 `gemini-3.8-flash` 生图正常但对话 502，真实 Key 复测显示第一次 502、紧接着同模型 200；同故障下 Gemini 原生 `generateContent` 也 502。因此不能把普通 5xx 当“协议错误”切原生入口，正确做法是同步与流式入口都做两次退避重试。官方 `/v1/pricing` 的 `endpoints` 只说明能力存在，不证明账号的上游当前健康。
 - 最终 prompt 现在统一由 `features/shared/execution/runPrompt.ts#actualPromptOf` 计算；`RunRecord.params.prompt`、日志、结果卡 `lastRunPrompt` 和渠道请求必须同源。不要再让 UI 或 channel adapter 各自追加“第 n 次”。

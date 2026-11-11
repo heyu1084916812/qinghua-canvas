@@ -161,8 +161,8 @@ describe('freeResize / 四角自由缩放', () => {
  */
 describe('aspectLockedResize / 批量框的等比锁', () => {
   /** 3 格的网格基准（= `containerMinSize('batch', 3)`）*/
-  const grid = { w: 672, h: 200 }
-  const start: Rect = { x: 100, y: 100, w: 672, h: 200 }
+  const grid = { w: 672, h: 222 }
+  const start: Rect = { x: 100, y: 100, w: 672, h: 222 }
 
   it('★★ 只有一轴被拉长时，另一轴按网格比例跟着长（不留死白）', () => {
     /** 往右拉 328、往下拉 400：宽比 1.488、高比 3 ⇒ 取小的那个（宽比） */

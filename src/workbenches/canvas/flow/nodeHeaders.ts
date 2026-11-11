@@ -17,6 +17,8 @@ export interface NodeHeaderLabel {
   x: number
   y: number
   w: number
+  scale: number
+  gap: number
 }
 
 export function nodeHeaderLabels(nodes: readonly NodeSnapshot[]): NodeHeaderLabel[] {
@@ -28,11 +30,14 @@ export function nodeHeaderLabels(nodes: readonly NodeSnapshot[]): NodeHeaderLabe
     list.push(node)
     children.set(node.parentId, list)
   }
-  const batchRects = new Map<string, { x: number; y: number; w: number }>()
+  const batchRects = new Map<
+    string,
+    { x: number; y: number; w: number; scale: number; gap: number }
+  >()
   for (const parent of nodes) {
     if (parent.type !== 'batch') continue
     const ordered = orderedChildren(children.get(parent.id) ?? [], parent)
-    const packs = packContainerChildren(ordered.length)
+    const packs = packContainerChildren(ordered.length, undefined, true)
     const scale = containerScale('batch', ordered.length, { w: parent.w, h: parent.h })
     ordered.forEach((child, index) => {
       const cell = packs.positions[index]
@@ -41,6 +46,8 @@ export function nodeHeaderLabels(nodes: readonly NodeSnapshot[]): NodeHeaderLabe
         x: parent.x + cell.x * scale,
         y: parent.y + cell.y * scale,
         w: packs.cellSize.w * scale,
+        scale,
+        gap: 0,
       })
     })
   }
@@ -52,10 +59,16 @@ export function nodeHeaderLabels(nodes: readonly NodeSnapshot[]): NodeHeaderLabe
     const rect = batchRect
       ? batchRect
       : parent?.type === 'group'
-        ? { x: parent.x + node.x, y: parent.y + node.y, w: node.w }
+        ? {
+            x: parent.x + node.x,
+            y: parent.y + node.y,
+            w: node.w,
+            scale: 1,
+            gap: NODE_HEADER_GAP,
+          }
         : node.parentId
-          ? { x: node.x, y: node.y, w: node.w }
-          : { x: node.x, y: node.y, w: node.w }
+          ? { x: node.x, y: node.y, w: node.w, scale: 1, gap: NODE_HEADER_GAP }
+          : { x: node.x, y: node.y, w: node.w, scale: 1, gap: NODE_HEADER_GAP }
     return {
       id: node.id,
       title: node.title,
@@ -115,7 +128,9 @@ export function sameHeaderLabels(
       left.pixels !== right.pixels ||
       left.x !== right.x ||
       left.y !== right.y ||
-      left.w !== right.w
+      left.w !== right.w ||
+      left.scale !== right.scale ||
+      left.gap !== right.gap
     ) {
       return false
     }
@@ -124,10 +139,11 @@ export function sameHeaderLabels(
 }
 
 export function nodeHeaderRect(label: NodeHeaderLabel): Rect {
+  const scale = label.scale
   return {
-    x: label.x - NODE_HEADER_SIDE_INSET,
-    y: label.y - NODE_HEADER_HEIGHT - NODE_HEADER_GAP,
-    w: label.w + NODE_HEADER_SIDE_INSET * 2,
-    h: NODE_HEADER_HEIGHT,
+    x: label.x - NODE_HEADER_SIDE_INSET * scale,
+    y: label.y - (NODE_HEADER_HEIGHT + label.gap) * scale,
+    w: label.w + NODE_HEADER_SIDE_INSET * 2 * scale,
+    h: NODE_HEADER_HEIGHT * scale,
   }
 }

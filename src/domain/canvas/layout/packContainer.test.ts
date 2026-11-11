@@ -6,7 +6,13 @@ import {
   containerMinSize,
   containerScale,
 } from './packContainer'
-import { PACKED_CELL, NODE_MINIMUMS, CONTAINER_PADDING, CONTAINER_GAP } from './constants'
+import {
+  PACKED_CELL,
+  NODE_MINIMUMS,
+  CONTAINER_PADDING,
+  CONTAINER_GAP,
+  CONTAINER_HEADER,
+} from './constants'
 
 describe('分组 / 批量打包', () => {
   it('空容器给出类型最小尺寸', () => {
@@ -57,14 +63,32 @@ describe('分组 / 批量打包', () => {
 
   it('两个单元不再被撑成 5:4（用户实测的"下方空 183px"现场）', () => {
     const r = packContainerChildren(2)
-    expect(r.containerMin).toEqual({ w: 2 * PACKED_CELL.w + CONTAINER_GAP + CONTAINER_PADDING * 2, h: PACKED_CELL.h + CONTAINER_PADDING * 2 })
+    expect(r.containerMin).toEqual({
+      w: 2 * PACKED_CELL.w + CONTAINER_GAP + CONTAINER_PADDING * 2,
+      h: PACKED_CELL.h + CONTAINER_PADDING * 2,
+    })
     expect(r.containerMin.h).toBe(200)
+    expect(packContainerChildren(2, undefined, true).containerMin.h).toBe(222)
+  })
+
+  it('多行批量节点为每行标题预留独立标题带，不压住上一行图片', () => {
+    const r = packContainerChildren(4, undefined, true)
+    const first = r.positions[0]!
+    const secondRow = r.positions[3]!
+
+    expect(first.y).toBe(CONTAINER_PADDING + CONTAINER_HEADER)
+    expect(secondRow.y - (first.y + PACKED_CELL.h)).toBe(
+      CONTAINER_HEADER + CONTAINER_GAP,
+    )
+    expect(r.containerMin.h).toBe(
+      CONTAINER_PADDING * 2 + PACKED_CELL.h * 2 + CONTAINER_HEADER * 2 + CONTAINER_GAP,
+    )
   })
 })
 
 describe('packedCellAt / packedMinSize（§6.11 尺寸）', () => {
   it('packedCellAt 与 packContainerChildren 的位置完全一致', () => {
-    const r = packContainerChildren(7)
+    const r = packContainerChildren(7, undefined, true)
     for (let i = 0; i < 7; i += 1) expect(packedCellAt(i)).toEqual(r.positions[i])
   })
 
@@ -85,9 +109,9 @@ describe('packedCellAt / packedMinSize（§6.11 尺寸）', () => {
   it('packedMinSize = 内容 + 四边等距（拖缩小手柄停在这里，再拖会遮住子节点）', () => {
     const four = packedMinSize(4)
     expect(four.w).toBeGreaterThan(240)
-    expect(four).toEqual(containerMinSize('group', 4))
+    expect(four).toEqual(containerMinSize('batch', 4))
     // 2 个单元：456×200（而不是 5:4 归一后的 456×365）
-    expect(packedMinSize(2)).toEqual({ w: 456, h: 200 })
+    expect(packedMinSize(2)).toEqual({ w: 456, h: 222 })
   })
 
   /**

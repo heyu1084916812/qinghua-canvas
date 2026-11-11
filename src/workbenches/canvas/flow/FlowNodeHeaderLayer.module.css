@@ -1,7 +1,7 @@
 .clip {
   position: absolute;
   inset: 0;
-  z-index: 6;
+  z-index: 12;
   overflow: hidden;
   pointer-events: none;
 }
