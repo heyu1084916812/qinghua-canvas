@@ -105,6 +105,7 @@ export interface AgentPanelViewPropsInput {
   attachFiles: (files: FileList | null) => Promise<unknown>
   addFromLibrary: (hash: string) => Promise<unknown>
   addResearchReference: Conversation['onAddResearchReference']
+  answerQuestionCard: (text: string) => void
   pickModel: (name: string) => Promise<unknown>
   setModelKind: (
     key: 'imageModel' | 'videoModel',
@@ -202,6 +203,7 @@ export function useAgentPanelViewProps(
       onEditingQueueTextChange: input.setEditingQueueText,
       onResumeQueue: () => run(input.resumeQueue(), '恢复队列失败'),
       onAddResearchReference: input.addResearchReference,
+      onAnswerQuestionCard: input.answerQuestionCard,
     },
     composerProps: {
       current: input.current,

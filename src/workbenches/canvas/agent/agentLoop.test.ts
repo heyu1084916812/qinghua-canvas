@@ -1446,3 +1446,37 @@ describe('runAgentTurn · 刹车与失败回填', () => {
     if (r.kind === 'error') expect(r.message).toContain('401')
   })
 })
+
+describe('runAgentTurn · 问题卡（askQuestions）', () => {
+  it('★★ 发出问题卡后本回合结束，不再请求模型、不碰写工具', async () => {
+    const args = JSON.stringify({
+      intro: '先确认用法',
+      questions: [{ id: 'refs', question: '这 3 张参考怎么用？', options: ['管排版', '锁产品'], multiple: true }],
+    })
+    const { deps, adapter, executeWrite } = depsWith([
+      { toolCalls: [{ id: 'q1', name: 'askQuestions', args }] },
+      { text: '不应该走到这里' },
+    ])
+    const r = await runAgentTurn(user('做一张海报'), deps)
+    expect(r.kind).toBe('message')
+    if (r.kind !== 'message') return
+    expect(adapter.completeText).toHaveBeenCalledTimes(1)
+    expect(executeWrite).not.toHaveBeenCalled()
+    expect(r.text).toContain('这 3 张参考怎么用？')
+    const toolMsg = r.messages.find((m) => m.role === 'tool' && m.toolName === 'askQuestions')
+    expect(JSON.parse(String(toolMsg?.content))).toMatchObject({ ok: true, awaitingAnswers: true })
+    expect(r.messages.at(-1)).toMatchObject({ role: 'assistant', content: r.text })
+  })
+
+  it('参数不合法 → 把问题回填给模型，让它改了再问', async () => {
+    const { deps, adapter } = depsWith([
+      { toolCalls: [{ id: 'q1', name: 'askQuestions', args: '{"questions":[]}' }] },
+      { text: '好，我直接做' },
+    ])
+    const r = await runAgentTurn(user('做一张海报'), deps)
+    expect(adapter.completeText).toHaveBeenCalledTimes(2)
+    expect(r.kind).toBe('message')
+    const toolMsg = r.messages.find((m) => m.role === 'tool')
+    expect(String(toolMsg?.content)).toContain('至少要有 1 题')
+  })
+})

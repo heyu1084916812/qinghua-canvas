@@ -71,6 +71,7 @@ export function agentPhaseForTool(tool: string): AgentPhase | undefined {
     proposeTaskPlan: 'plan',
     updateTaskStep: 'plan',
     requestTaskConfirmation: 'plan',
+    askQuestions: 'align',
     applyPlan: 'plan',
     runNode: 'generate',
     runFrom: 'generate',

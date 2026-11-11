@@ -543,6 +543,92 @@
   "moduleMoves": [],
   "modules": [
     {
+      "module": "src/domain/agent/questionCard.ts",
+      "owner": "agent-runtime",
+      "responsibility": "问题卡（askQuestions）的参数解析、兜底正文、回答选择与整理成用户消息，以及在历史里找最近一张问题卡。",
+      "owns": [
+        "问题卡参数校验与裁剪",
+        "单选/多选与自由输入的回答状态",
+        "回答整理成下一条用户消息",
+        "最近问题卡是否已回答"
+      ],
+      "doesNotOwn": [
+        "问题卡渲染",
+        "Agent 循环结束回合",
+        "任务延续判定"
+      ],
+      "publicApi": [
+        "QUESTION_CARD_TOOL",
+        "QUESTION_CARD_MAX_QUESTIONS",
+        "QUESTION_CARD_MAX_OPTIONS",
+        "AgentQuestion",
+        "AgentQuestionAnswer",
+        "ParsedQuestionCard",
+        "parseQuestionCardArgs",
+        "questionCardText",
+        "formatQuestionAnswers",
+        "toggleQuestionOption",
+        "setQuestionFreeText",
+        "questionCardAnswerable",
+        "latestQuestionCard"
+      ],
+      "test": [
+        "src/domain/agent/questionCard.test.ts"
+      ],
+      "budget": 220
+    },
+    {
+      "module": "src/workbenches/canvas/panels/AgentPanel/QuestionCardForm.tsx",
+      "owner": "agent-conversation-ui",
+      "responsibility": "在 Agent 对话流底部渲染待回答的问题卡：多题、选项可点、自由输入、提交回答。",
+      "owns": [
+        "问题卡表单渲染与 aria-pressed",
+        "本地回答状态",
+        "提交按钮可用态"
+      ],
+      "doesNotOwn": [
+        "回答发送与排队",
+        "问题卡参数解析"
+      ],
+      "publicApi": [
+        "QuestionCardForm"
+      ],
+      "test": [
+        "src/workbenches/canvas/panels/AgentPanel/QuestionCardForm.test.ts"
+      ],
+      "budget": 140
+    },
+    {
+      "module": "src/workbenches/canvas/panels/AgentPanel/QuestionCardForm.module.css",
+      "owner": "agent-conversation-ui-style",
+      "responsibility": "问题卡的卡片、题目、选项胶囊、自由输入与提交区样式，只用现有视觉令牌。",
+      "owns": [
+        "问题卡卡片外观",
+        "选项按下/悬停/焦点/禁用态",
+        "自由输入框外观"
+      ],
+      "doesNotOwn": [
+        "对话流布局",
+        "全局主题令牌",
+        "主按钮样式"
+      ],
+      "publicApi": [
+        "CSS_MODULE:Agent 问题卡",
+        "CSS_CLASS:card",
+        "CSS_CLASS:question",
+        "CSS_CLASS:questionTitle",
+        "CSS_CLASS:questionHint",
+        "CSS_CLASS:options",
+        "CSS_CLASS:option",
+        "CSS_CLASS:input",
+        "CSS_CLASS:actions"
+      ],
+      "test": [
+        "src/workbenches/canvas/panels/AgentPanel/QuestionCardForm.test.ts"
+      ],
+      "budget": 130
+    },
+    {
       "module": "src/domain/agent/seriesAnchors.ts",
       "owner": "agent-runtime",
       "responsibility": "判定 Agent 计划里生成节点的用途（Logo / 包装 / 海报），按用途分配参考图，并检查整套任务后续节点是否以锚点节点为上游。",

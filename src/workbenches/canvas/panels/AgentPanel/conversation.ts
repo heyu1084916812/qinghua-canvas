@@ -1,6 +1,7 @@
 import { agentPhaseForTool, agentPhaseTitle, isAgentPhase, type AgentPhase } from '../../../../domain/agent/phase'
 import type { ChatMessage } from '../../../../domain/shared/execution/types'
 import { isPublicHttpUrl } from '../../../../domain/shared/publicUrl'
+import { parseQuestionCardArgs, type AgentQuestion } from '../../../../domain/agent/questionCard'
 
 /**
  * 对话流（设计文档 §8「输出：计划预览 + 普通对话」）。
@@ -32,6 +33,8 @@ export interface ConversationStep {
   /** 这一步牵扯到的节点 id：面板据此把它们产出的图**内嵌**显示 */
   nodeIds: string[]
   researchItems?: ConversationResearchItem[]
+  /** askQuestions 成功时的问题卡（G5 / questions[]）。 */
+  questions?: AgentQuestion[]
   failed: boolean
   /** 该步骤来自哪个真实阶段；旧消息可以没有。 */
   phase?: AgentPhase
@@ -87,6 +90,29 @@ function visibleReasoningText(text: string): string {
 }
 
 /**
+ * 还在等回答的问题卡：最后一个用户消息之后、最近一张成功发出的 askQuestions 步骤。
+ * 用户已经接着说话（选项提交或直接打字）就不再显示可交互的卡片。
+ */
+export function pendingQuestionCard(
+  items: readonly ConversationItem[],
+): { stepId: string; questions: AgentQuestion[] } | null {
+  for (let at = items.length - 1; at >= 0; at -= 1) {
+    const item = items[at]!
+    if (item.kind === 'user') return null
+    if (
+      item.kind === 'step' &&
+      item.tool === 'askQuestions' &&
+      !item.failed &&
+      item.questions &&
+      item.questions.length > 0
+    ) {
+      return { stepId: item.id, questions: item.questions }
+    }
+  }
+  return null
+}
+
+/**
  * 当前条目之前、同一用户回合内的过程块。
  * 结果上方按它的 startedAt 一直算到当前结果时间；遇到 user 就停，避免串到上一轮。
  */
@@ -117,6 +143,7 @@ const TOOL_LABEL: Record<string, string> = {
   readAsset: '已读素材',
   readResult: '已读结果',
   curateReferences: '参考分析完成',
+  askQuestions: '问题卡已发出',
   researchDesign: '联网调研完成',
   readPage: '已读网页',
   visualReview: '视觉验收完成',
@@ -142,6 +169,7 @@ const TOOL_RUNNING_LABEL: Record<string, string> = {
   readAsset: '正在读取素材',
   readResult: '正在读取结果',
   curateReferences: '正在分析参考',
+  askQuestions: '正在整理问题',
   researchDesign: '正在联网调研',
   readPage: '正在读取网页',
   visualReview: '正在视觉验收',
@@ -175,6 +203,7 @@ const TOOL_LABEL_FAILED: Record<string, string> = {
   readAsset: '读素材失败',
   readResult: '读结果失败',
   curateReferences: '参考分析没完成',
+  askQuestions: '问题卡没发出',
   researchDesign: '联网调研没完成',
   readPage: '网页没读到',
   visualReview: '视觉验收没完成',
@@ -276,6 +305,7 @@ export function describeToolResult(
   summaryLines?: string[]
   nodeIds: string[]
   researchItems?: ConversationResearchItem[]
+  questions?: AgentQuestion[]
   failed: boolean
   activityLabel?: string
   activityKind?: 'tool' | 'image'
@@ -577,6 +607,17 @@ export function describeToolResult(
         nodeIds: [],
         failed,
       }
+    }
+    case 'askQuestions': {
+      const card = failed ? null : parseQuestionCardArgs(r)
+      return card?.ok
+        ? {
+            lines: card.questions.map((question, index) => `${index + 1}. ${question.question}`),
+            questions: card.questions,
+            nodeIds: [],
+            failed: false,
+          }
+        : { lines: problems, nodeIds: [], failed: true }
     }
     case 'requestTaskConfirmation': {
       return {

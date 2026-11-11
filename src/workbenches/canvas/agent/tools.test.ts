@@ -74,6 +74,7 @@ describe('工具声明', () => {
     expect(AGENT_TOOLS.map((t) => t.name).sort()).toEqual([
       'applyPlan',
       'arrangeNodes',
+      'askQuestions',
       'compareNodes',
       'curateReferences',
       'deleteEdges',
@@ -128,6 +129,15 @@ describe('工具声明', () => {
     expect(on).toEqual(expect.arrayContaining(['researchDesign', 'readPage']))
   })
 
+  it('问题卡在简单生成 / 参考改图 / 设计调研三档都可用，画布操作档不给', () => {
+    for (const mode of ['simple_generate', 'reference_edit', 'design_research'] as const) {
+      expect(agentToolsForRequestMode(mode, { canvasReview: false }).map((t) => t.name)).toContain('askQuestions')
+    }
+    expect(
+      agentToolsForRequestMode('canvas_operation', { canvasReview: false }).map((t) => t.name),
+    ).not.toContain('askQuestions')
+  })
+
   it('能力发现：「读网页 / 联网」能加载 readPage；关闭联网后的候选里不再出现联网工具', () => {
     expect(discoverAgentTools('帮我读一下这个网页链接').tools.map((t) => t.name)).toContain('readPage')
     const off = discoverAgentTools(
@@ -153,6 +163,7 @@ describe('工具声明', () => {
     }).map((tool) => tool.name)
     expect(simple.sort()).toEqual([
       'applyPlan',
+      'askQuestions',
       'curateReferences',
       'readCapabilities',
       'readGraph',

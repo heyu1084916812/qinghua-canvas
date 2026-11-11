@@ -308,6 +308,22 @@ export function useAgentPanelTurnModel({
   ])
 
   /**
+   * 问题卡提交：回答作为一条普通用户消息发出（同一任务延续，见 agentTask 的 answersQuestionCard）。
+   * 忙时与重试一样进队列，不打断当前回合。
+   */
+  const answerQuestionCard = useCallback(
+    (text: string) => {
+      if (!text.trim()) return
+      if (statusIsBusy(status) || (current && isSessionActivityActive(current.id))) {
+        runPromiseDetached(queueText(text), '排队失败')
+      } else {
+        runPromiseDetached(sendText(text), '发送失败')
+      }
+    },
+    [current, queueText, runPromiseDetached, sendText, status],
+  )
+
+  /**
    * 确认卡的两个动作（确认 / 取消）走同一个控制器：它们共用 `confirmingRef`，
    * 互斥语义必须待在一个文件里才看得见。`confirmRef` 仍在这里赋值，
    * 供自动执行路径的 `confirmLatest` 调用。
@@ -467,6 +483,7 @@ export function useAgentPanelTurnModel({
   return {
     send,
     retry,
+    answerQuestionCard,
     stop,
     confirm,
     cancel,

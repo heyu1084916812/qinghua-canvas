@@ -86,6 +86,7 @@ import {
   resolveAgentTask,
   type AgentTaskDecision,
 } from '../../../../domain/agent/agentTask'
+import { latestQuestionCard } from '../../../../domain/agent/questionCard'
 
 export interface AgentTurnContextTrace {
   digest: string
@@ -330,6 +331,8 @@ export async function prepareAgentTurnRequest(
       hasActiveTaskPlan: Boolean(activeTaskPlanForTask),
       hasPendingConfirmation: input.session.pendingConfirmation !== undefined,
       hasActiveContinuation: input.session.continuation !== undefined,
+      answersQuestionCard:
+        latestQuestionCard(previousMessagesForTask)?.answered === false,
       refersToCanvasImage:
         mentionedImageIds.length > 0 || selectedImageIds.length > 0,
       referenceIds: mentionedReferenceIds,

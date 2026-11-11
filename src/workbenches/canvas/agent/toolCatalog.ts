@@ -329,6 +329,42 @@ export const AGENT_TOOLS: readonly ToolDeclaration[] = [
     },
   },
   {
+    name: 'askQuestions',
+    description:
+      '发一张问题卡：开工前缺少会改变成品方向、且无法从画布 / 参考 / 记忆判断的关键信息时，一次问清 1～4 题，' +
+      '每题给 2～6 个可直接选的候选项，并默认附自由输入。调用后本回合结束，用户的回答会作为下一条消息发回。' +
+      '典型场景：尺寸 / 平台未定、核心文案未给、参考栏有多张没被提到的图且用途不明（问每张图怎么配合）。' +
+      '不要用它问费用确认（runNode 自己会确认），也不要和别的写画布工具同一批调用。',
+    parameters: {
+      type: 'object',
+      properties: {
+        intro: { type: 'string', description: '可选：一句话说明为什么要先问' },
+        questions: {
+          type: 'array',
+          minItems: 1,
+          maxItems: 4,
+          items: {
+            type: 'object',
+            properties: {
+              id: { type: 'string', description: '可选：稳定 id，如 size / copy / ref-usage' },
+              question: { type: 'string', description: '一个具体问题' },
+              options: {
+                type: 'array',
+                maxItems: 6,
+                items: { type: 'string' },
+                description: '候选项（短语），把最可能的放第一个',
+              },
+              multiple: { type: 'boolean', description: '是否允许多选；缺省单选' },
+              allowFreeText: { type: 'boolean', description: '是否附自由输入；缺省 true' },
+            },
+            required: ['question'],
+          },
+        },
+      },
+      required: ['questions'],
+    },
+  },
+  {
     name: 'runNode',
     description:
       '跑指定的节点（会花钱，先让用户确认）。nodeIds 必须是画布上的真实 id：' +
@@ -811,6 +847,7 @@ export function discoverAgentTools(
 
 const SIMPLE_GENERATE_TOOLS = new Set([
   'readGraph',
+  'askQuestions',
   'curateReferences',
   'applyPlan',
   'runNode',
@@ -820,6 +857,7 @@ const SIMPLE_GENERATE_TOOLS = new Set([
 
 const REFERENCE_EDIT_TOOLS = new Set([
   'readGraph',
+  'askQuestions',
   'readAsset',
   'curateReferences',
   'applyPlan',
@@ -830,6 +868,7 @@ const REFERENCE_EDIT_TOOLS = new Set([
 
 const DESIGN_RESEARCH_TOOLS = new Set([
   'readGraph',
+  'askQuestions',
   'researchDesign',
   'readPage',
   'curateReferences',
