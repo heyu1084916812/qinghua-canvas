@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { ReferenceItem } from '../../../../domain/project/referenceLedger'
+import { referenceUsageId } from '../../../../domain/project/referenceCuration'
 import { runAgentReferenceCuration } from './agentReferenceCuration'
 
 const png = new Uint8Array([
@@ -278,4 +279,51 @@ describe('runAgentReferenceCuration', () => {
     expect(mentioned.usages).toHaveLength(1)
     expect(mentioned.row).toMatchObject({ relevant: true })
   })
+
+  it('G9：用户回答强制按回答重写已有的初步用法，写入 confirmedByUser；之后的强制重分析也不覆盖', async () => {
+    const storage = storageWith({ referenceItems: [item({ assets: undefined })] })
+    storage.tables.referenceUsages?.push({
+      id: referenceUsageId({ projectId: 'p1', taskKey: 'task:t1', itemId: 'ref-kit-1' }),
+      itemId: 'ref-kit-1', projectId: 'p1', taskKey: 'task:t1',
+      usage: 'style', howToUse: '借：配色；避：文字', createdAt: 2,
+    })
+    const execute = vi.fn(async (_request: unknown) => ({
+      text: JSON.stringify({
+        what: '白色保温杯。', usage: 'subject',
+        howToUse: '借：杯身外形、银色杯盖与哑光质感，原样放进画面；避：原图白底与投影。',
+      }),
+    }))
+    const deps = {
+      storage: storage as never,
+      assets: { read: vi.fn(async () => ({ bytes: png, mime: 'image/png' })) },
+      routeExecution: { execute },
+      onRecordWarning: vi.fn(),
+    }
+    const base = {
+      projectId: 'p1', sessionId: 's1', operationId: 'op1', taskKey: 'task:t1', task: '做一张新品海报',
+      route: {
+        channelId: 'c1', logicalModel: 'Vision', upstreamModel: 'vision-upstream', routePlanId: 'plan',
+        candidates: [{ channelId: 'c1', model: 'vision-upstream' }],
+      },
+    }
+    const result = await runAgentReferenceCuration(deps, {
+      ...base,
+      userConstraints: { 'ref-kit-1': '这张图怎么用？ → 锁定产品' },
+    })
+    expect(execute).toHaveBeenCalledOnce()
+    const request = execute.mock.calls[0]![0] as { messages: { content: string }[] }
+    expect(request.messages[1]!.content).toContain('用户在问题卡里回答：这张图怎么用？ → 锁定产品')
+    const usages = storage.tables.referenceUsages ?? []
+    expect(usages).toHaveLength(1)
+    expect(usages[0]).toMatchObject({ usage: 'subject', confirmedByUser: true })
+    expect(String(usages[0]!.howToUse)).not.toBe('这张图怎么用？ → 锁定产品')
+    expect(result.analyzed[0]).toMatchObject({ confirmedByUser: true, roleClear: true })
+
+    execute.mockClear()
+    const again = await runAgentReferenceCuration(deps, { ...base, requestedItemIds: ['ref-kit-1'] })
+    expect(execute).not.toHaveBeenCalled()
+    expect(again.summary).toContain('已是最新')
+    expect(storage.tables.referenceUsages?.[0]).toMatchObject({ confirmedByUser: true, usage: 'subject' })
+  })
 })
+

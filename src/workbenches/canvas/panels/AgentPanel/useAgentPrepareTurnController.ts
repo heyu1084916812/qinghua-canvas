@@ -111,6 +111,9 @@ export function useAgentPrepareTurnController(
             ...(curation.explicitItemIds?.length
               ? { explicitItemIds: curation.explicitItemIds }
               : {}),
+            ...(curation.userConstraints
+              ? { userConstraints: curation.userConstraints }
+              : {}),
             signal: curation.signal,
           }),
         // 两个顺序回调原样透传：它们的执行时机在发送主体里。

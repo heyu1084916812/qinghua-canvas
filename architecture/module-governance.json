@@ -665,7 +665,8 @@
         "setQuestionFreeText",
         "questionCardAnswerable",
         "questionCardTurn",
-        "latestQuestionCard"
+        "latestQuestionCard",
+        "questionAnswersByReference"
       ],
       "test": [
         "src/domain/agent/questionCard.test.ts"
@@ -8620,7 +8621,7 @@
       "test": [
         "src/domain/project/referenceCuration.test.ts"
       ],
-      "budget": 230
+      "budget": 260
     },
     {
       "module": "src/state/project/referenceLedgerRepository.ts",
@@ -9068,7 +9069,8 @@
         "侧栏待分析参考的挑选",
         "参考分工歧义判定",
         "任务内参考审阅状态",
-        "参考问题卡上下文段落"
+        "参考问题卡上下文段落",
+        "用户回答到参考卡的约束映射"
       ],
       "doesNotOwn": [
         "调用模型做参考分析",
@@ -9085,7 +9087,8 @@
         "ambiguousReferenceIds",
         "nextReferenceReview",
         "normalizeReferenceReview",
-        "referenceReviewPrompt"
+        "referenceReviewPrompt",
+        "referenceConstraintsForTurn"
       ],
       "test": [
         "src/domain/agent/referenceReview.test.ts"

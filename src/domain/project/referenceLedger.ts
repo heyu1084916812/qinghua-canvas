@@ -70,6 +70,8 @@ export interface ReferenceUsage {
   howToUse: string
   /** 身份锚点必须排在普通风格参考之前。 */
   identityAnchor?: boolean
+  /** 按用户问题卡回答重写过的用法（G9）：最高优先级，后续自动分析不得覆盖。 */
+  confirmedByUser?: true
   createdAt: number
   /** 最近一次（重新）分析写入的时间；同图多任务时卡片显示最新写入的那条。 */
   updatedAt?: number

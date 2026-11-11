@@ -7,6 +7,7 @@ import {
   questionCardAnswerable,
   questionCardText,
   questionCardTurn,
+  questionAnswersByReference,
   setQuestionFreeText,
   toggleQuestionOption,
   type AgentQuestion,
@@ -138,3 +139,32 @@ describe('questionCardTurn', () => {
   })
 })
 
+describe('G9：问题卡题目关联参考卡', () => {
+  it('referenceItemId 被解析并保留；没给时不出现该键', () => {
+    const parsed = parseQuestionCardArgs({
+      questions: [
+        { question: '第 1 张怎么用？', options: ['锁定产品', '借风格'], referenceItemId: 'ref-cup' },
+        { question: '合成一张还是各做一张？', options: ['合成一张', '各做一张'] },
+      ],
+    })
+    if (!parsed.ok) throw new Error(parsed.problems.join())
+    expect(parsed.questions[0]?.referenceItemId).toBe('ref-cup')
+    expect(parsed.questions[1]).not.toHaveProperty('referenceItemId')
+  })
+
+  it('questionAnswersByReference：按题号取回答原话，跳过未回答与未关联的题', () => {
+    const questions: AgentQuestion[] = [
+      { ...refs, id: 'a', question: '第 1 张怎么用？', referenceItemId: 'ref-cup' },
+      { ...size, id: 'b' },
+      { ...refs, id: 'c', question: '第 2 张怎么用？', referenceItemId: 'ref-mood' },
+    ]
+    const text = formatQuestionAnswers(questions, [
+      { questionId: 'a', selected: ['锁产品'], freeText: '杯盖颜色别变' },
+      { questionId: 'b', selected: ['3:4'], freeText: '' },
+    ])
+    expect(questionAnswersByReference(questions, text)).toEqual({
+      'ref-cup': '第 1 张怎么用？ → 锁产品；杯盖颜色别变',
+    })
+    expect(questionAnswersByReference(questions, '第 2 张锁定产品')).toEqual({})
+  })
+})

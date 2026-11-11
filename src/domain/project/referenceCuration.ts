@@ -43,6 +43,8 @@ export interface ReferenceCurationResult {
     /** 缺省视为 true（旧结果 / 测试桩没有这两个字段）。 */
     roleClear?: boolean
     relevant?: boolean
+    /** G9：按用户问题卡回答重写的用法。 */
+    confirmedByUser?: boolean
   }[]
   failed: {
     itemId: string
@@ -83,6 +85,8 @@ export function buildReferenceCurationPrompt(input: {
   item: ReferenceItem
   task: string
   imageLabels: readonly string[]
+  /** G9：用户在问题卡里对这张图的回答（原话），作为最高优先级约束。 */
+  userAnswer?: string
 }): string {
   const item = input.item
   const lines = [
@@ -102,6 +106,7 @@ export function buildReferenceCurationPrompt(input: {
     ...(input.imageLabels.length > 0
       ? input.imageLabels.map((label, index) => `- 图片 ${index + 1}: ${label}`)
       : ['- 没有图片；只能依据参考卡文字分析，并在 limitations 中说明。']),
+    ...userAnswerSection(input.userAnswer),
     '',
     '## 输出要求',
     'what 和 howToUse 都必须非空，并直接对应当前任务。',
@@ -109,6 +114,19 @@ export function buildReferenceCurationPrompt(input: {
     '不要把搜索结果、项目其他参考或画布节点当成这条参考的一部分。',
   ]
   return lines.join('\n')
+}
+
+function userAnswerSection(answer: string | undefined): string[] {
+  const text = answer?.replace(/\s+/g, ' ').trim().slice(0, 500)
+  if (!text) return []
+  return [
+    '',
+    '## 用户对这张图的确认（最高优先级）',
+    `用户在问题卡里回答：${text}`,
+    '结合这句回答和图片内容，重写这张图在本任务里的完整 howToUse（仍是「借：…；避：…」），usage 也按回答选；',
+    '不得与回答矛盾，也不要把回答原文照抄成 howToUse。回答说不用这张图时 usage 写 avoid。',
+    '这是用户已确认的用法：roleClear 写 true，relevant 写 true。',
+  ]
 }
 
 export function parseReferenceCurationText(

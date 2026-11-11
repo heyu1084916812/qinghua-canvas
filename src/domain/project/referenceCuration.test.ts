@@ -130,3 +130,21 @@ describe('参考分析的 roleClear / relevant（G5 修订）', () => {
     expect(REFERENCE_CURATION_SYSTEM_PROMPT).toContain('relevant')
   })
 })
+
+describe('G9：按用户回答重写用法的提示词', () => {
+  const item = {
+    id: 'ref-cup', projectId: 'p1', title: '杯子', source: 'file' as const, kind: 'image' as const,
+    what: '白色杯子', createdAt: 1, updatedAt: 1,
+  }
+  it('带回答时写明最高优先级、不得矛盾、不照抄原文，仍按借/避格式', () => {
+    const prompt = buildReferenceCurationPrompt({ item, task: '做海报', imageLabels: ['参考图 1'], userAnswer: '第 2 张锁定产品' })
+    expect(prompt).toContain('用户对这张图的确认（最高优先级）')
+    expect(prompt).toContain('用户在问题卡里回答：第 2 张锁定产品')
+    expect(prompt).toContain('不得与回答矛盾')
+    expect(prompt).toContain('不要把回答原文照抄成 howToUse')
+    expect(prompt).toContain('「借：…；避：…」')
+  })
+  it('没有回答时不出现该段', () => {
+    expect(buildReferenceCurationPrompt({ item, task: '做海报', imageLabels: [] })).not.toContain('最高优先级')
+  })
+})

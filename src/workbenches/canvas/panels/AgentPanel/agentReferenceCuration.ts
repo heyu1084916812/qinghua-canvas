@@ -46,6 +46,11 @@ export interface AgentReferenceCurationInput {
   requestedItemIds?: readonly string[]
   /** 用户显式带上的参考：即使分析判为与任务无关也照写用法（用户点名要用）。 */
   explicitItemIds?: readonly string[]
+  /**
+   * G9：用户问题卡回答（itemId → 原话）。这些图强制重分析，回答作为最高优先级约束，
+   * 写入的用法标记 confirmedByUser；其余路径（含 requestedItemIds 强制重分析）不得覆盖已确认用法。
+   */
+  userConstraints?: Readonly<Record<string, string>>
   signal?: AbortSignal
 }
 
@@ -62,9 +67,13 @@ export async function runAgentReferenceCuration(
     repository.listItems(projectId),
     repository.listUsages(projectId, input.taskKey),
   ])
+  const constraints = input.userConstraints ?? {}
   const requested = new Set(
-    [...(input.requestedItemIds ?? []), ...(input.preferredItemIds ?? [])]
-      .filter(Boolean),
+    [
+      ...(input.requestedItemIds ?? []),
+      ...(input.preferredItemIds ?? []),
+      ...Object.keys(constraints),
+    ].filter(Boolean),
   )
   const usageByItem = new Map(existingUsages.map((usage) => [usage.itemId, usage]))
   const explicit = new Set(input.explicitItemIds ?? [])
@@ -73,7 +82,10 @@ export async function runAgentReferenceCuration(
     : items
   const reanalyze = (input.requestedItemIds?.length ?? 0) > 0
   const candidates = allCandidates
-    .filter((item) => reanalyze || !usageByItem.has(item.id))
+    .filter((item) =>
+      Boolean(constraints[item.id]) ||
+      (usageByItem.get(item.id)?.confirmedByUser !== true &&
+        (reanalyze || !usageByItem.has(item.id))))
     .slice(0, MAX_ITEMS_PER_CALL)
   const limitations: string[] = []
   if (allCandidates.length > candidates.length) {
@@ -107,6 +119,7 @@ export async function runAgentReferenceCuration(
       item,
       task: input.task,
       imageLabels: prepared.labels,
+      ...(constraints[item.id] ? { userAnswer: constraints[item.id] } : {}),
     })
     try {
       const result = await deps.routeExecution.execute({
@@ -151,6 +164,7 @@ export async function runAgentReferenceCuration(
         continue
       }
       const now = Date.now()
+      const confirmed = Boolean(constraints[item.id])
       // C3：颜色给本地采样的真实色值，不让模型猜 HEX。
       const palette = paletteSentence(prepared.palette)
       const whatWithPalette = palette
@@ -178,12 +192,13 @@ export async function runAgentReferenceCuration(
         usage: parsed.analysis.usage,
         howToUse: parsed.analysis.howToUse,
         ...(parsed.analysis.identityAnchor ? { identityAnchor: true } : {}),
+        ...(confirmed ? { confirmedByUser: true as const } : {}),
         createdAt: usageByItem.get(item.id)?.createdAt ?? now,
         updatedAt: now,
       }
       await repository.putItem(nextItem)
       // G5：侧栏里与本任务无关的图不写用法（不进生成）；用户点名的照写。
-      const keepUsage = parsed.analysis.relevant || explicit.has(item.id)
+      const keepUsage = parsed.analysis.relevant || explicit.has(item.id) || confirmed
       if (keepUsage) await repository.putUsage(usage)
       analyzed.push({
         itemId: item.id,
@@ -191,8 +206,9 @@ export async function runAgentReferenceCuration(
         what: whatWithPalette,
         usage: parsed.analysis.usage,
         howToUse: parsed.analysis.howToUse,
-        roleClear: parsed.analysis.roleClear,
+        roleClear: parsed.analysis.roleClear || confirmed,
         relevant: keepUsage,
+        ...(confirmed ? { confirmedByUser: true } : {}),
       })
       limitations.push(
         ...parsed.analysis.limitations.map(

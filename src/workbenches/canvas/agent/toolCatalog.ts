@@ -356,6 +356,10 @@ export const AGENT_TOOLS: readonly ToolDeclaration[] = [
               },
               multiple: { type: 'boolean', description: '是否允许多选；缺省单选' },
               allowFreeText: { type: 'boolean', description: '是否附自由输入；缺省 true' },
+              referenceItemId: {
+                type: 'string',
+                description: '可选：这题问的是哪张参考卡的用法时填该参考的 id（上下文会列出）；回答会写回那张卡的用法',
+              },
             },
             required: ['question'],
           },

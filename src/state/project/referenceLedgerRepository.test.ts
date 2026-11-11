@@ -55,3 +55,15 @@ describe('reference ledger repository', () => {
     expect(await repo.listUsages('p1')).toEqual([])
   })
 })
+
+describe('reference ledger repository · G9 用户确认标记', () => {
+  it('confirmedByUser 能存能读，旧行没有该字段', async () => {
+    const repo = createReferenceLedgerRepository(createMemoryPlatform().storage)
+    const base = { itemId: 'r1', projectId: 'p1', taskKey: 'task:t1', usage: 'subject' as const, howToUse: '借：杯形；避：白底', createdAt: 1 }
+    await repo.putUsage({ ...base, id: 'u1', confirmedByUser: true })
+    await repo.putUsage({ ...base, id: 'u2', itemId: 'r2' })
+    const rows = await repo.listUsages('p1', 'task:t1')
+    expect(rows.find((row) => row.id === 'u1')?.confirmedByUser).toBe(true)
+    expect(rows.find((row) => row.id === 'u2')).not.toHaveProperty('confirmedByUser')
+  })
+})

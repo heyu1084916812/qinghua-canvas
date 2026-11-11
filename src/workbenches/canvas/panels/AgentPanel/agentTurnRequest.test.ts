@@ -1233,6 +1233,99 @@ describe('prepareAgentTurnRequest', () => {
     expect(autoCurateReferences).toHaveBeenCalledOnce()
   })
 
+  it('★★ G9 问题卡回答在本回合准备阶段（模型与生图之前）交给参考分析重写用法；同任务后续回合不再问', async () => {
+    const { sessions, session } = await createSession()
+    const confirmed = new Set<string>()
+    const image = (id: string) => ({
+      id,
+      projectId: 'p1',
+      title: `${id}.jpg`,
+      source: 'file' as const,
+      kind: 'image' as const,
+      assetHash: `hash-${id}`,
+      what: `${id} 的画面`,
+      createdAt: 1,
+      updatedAt: 1,
+    })
+    const ledger = {
+      selectForTask: vi.fn(async (_projectId: string, taskKey: string) => ({
+        selected: [...confirmed].map((id) => ({
+          item: image(id),
+          usage: {
+            id: `u-${id}`, itemId: id, projectId: 'p1', taskKey, usage: 'subject' as const,
+            howToUse: '借：杯形与杯盖；避：白底', confirmedByUser: true as const, createdAt: 2,
+          },
+        })),
+        omitted: ['cup', 'can'].filter((id) => !confirmed.has(id))
+          .map((id) => ({ item: image(id), reason: 'no_usage' as const })),
+      })),
+      listItems: vi.fn(async () => []),
+    }
+    const autoCurateReferences = vi.fn(async (args: {
+      taskKey: string
+      itemIds: readonly string[]
+      userConstraints?: Readonly<Record<string, string>>
+    }) => {
+      const constraints = args.userConstraints ?? {}
+      Object.keys(constraints).forEach((id) => confirmed.add(id))
+      return {
+        ok: true,
+        summary: '',
+        taskKey: args.taskKey,
+        analyzed: args.itemIds.map((itemId) => ({
+          itemId, title: itemId, what: itemId, usage: 'subject' as const, howToUse: '借：外形；避：背景',
+          roleClear: true, relevant: true,
+          ...(constraints[itemId] ? { confirmedByUser: true } : {}),
+        })),
+        failed: [],
+        limitations: [],
+      }
+    })
+    const run = async (text: string) => {
+      clearToolSupportCache()
+      const latest = (await sessions.get(session.id)) ?? session
+      const result = await prepareAgentTurnRequest({
+        ...inputFor({ sessions, session: latest, text, autoCurateReferences }),
+        referenceLedger: ledger,
+      })
+      if (result.kind !== 'ready') throw new Error(result.kind)
+      return result
+    }
+
+    const first = await run('帮我做一张新品海报')
+    expect(first.contextPrompt).toContain('参考图的分工拿不准，先问用户')
+    expect(first.agentTask.referenceReview?.pendingIds).toEqual(['cup', 'can'])
+
+    const card = JSON.stringify({
+      ok: true,
+      awaitingAnswers: true,
+      questions: [
+        { id: 'q1', question: '第 1 张怎么用？', options: ['锁定产品', '借风格'], referenceItemId: 'cup' },
+        { id: 'q2', question: '第 2 张怎么用？', options: ['锁定产品', '不用'], referenceItemId: 'can' },
+      ],
+    })
+    const history = await sessions.messagesFor(session.id)
+    await sessions.saveMessages(session.id, [
+      ...history,
+      { role: 'assistant', content: '', toolCalls: [{ id: 'q', name: 'askQuestions', args: '{}' }] },
+      { role: 'tool', toolCallId: 'q', toolName: 'askQuestions', content: card },
+      { role: 'assistant', content: '先问一下' },
+    ])
+    autoCurateReferences.mockClear()
+    const answer = await run('问题卡回答：\n1. 第 1 张怎么用？ → 锁定产品\n2. 第 2 张怎么用？ → 未回答')
+    expect(answer.agentTaskReason).toBe('continuation')
+    expect(autoCurateReferences).toHaveBeenCalledOnce()
+    expect(autoCurateReferences.mock.calls[0]![0].userConstraints).toEqual({ cup: '第 1 张怎么用？ → 锁定产品' })
+    expect(answer.contextPrompt).toContain('1 张参考已按用户的回答重写用法')
+    expect(answer.agentTask.referenceReview?.pendingIds).toEqual([])
+
+    autoCurateReferences.mockClear()
+    const later = await run('再出一张横版的')
+    expect(later.agentTaskReason).toBe('series')
+    expect(autoCurateReferences).not.toHaveBeenCalled()
+    expect(later.contextPrompt).not.toContain('参考图的分工拿不准')
+  })
+
   it('★★ 「先定 Logo」只做 Logo 并停下：阶段随任务保留，用户放行后转为串行延展', async () => {
     const { sessions, session } = await createSession()
     const run = async (text: string) => {

@@ -89,7 +89,7 @@ describe('reviewTurnReferences（G5 修订：先分析，拿不准才问）', ()
     expect(second.pendingIds).toEqual(['cup', 'mood'])
   })
 
-  it('回答问题卡的回合：不分析侧栏，先前待确认的移出', async () => {
+  it('回答问题卡的回合：不分析侧栏新图；题目没关联参考时整条回答作用于先前待确认的图，并移出待确认', async () => {
     const curate = vi.fn(async () => curation([]))
     const result = await reviewTurnReferences(input({
       curate,
@@ -97,7 +97,11 @@ describe('reviewTurnReferences（G5 修订：先分析，拿不准才问）', ()
       task: task({ referenceReview: { analyzedIds: ['cup', 'mood'], pendingIds: ['cup', 'mood'] } }),
       selectForTask: async () => selection(['new']),
     }))
-    expect(curate).not.toHaveBeenCalled()
+    expect(curate).toHaveBeenCalledWith({
+      itemIds: ['cup', 'mood'],
+      explicitItemIds: [],
+      userConstraints: { cup: '帮我做一张新品海报', mood: '帮我做一张新品海报' },
+    })
     expect(result.pendingIds).toEqual([])
   })
 
@@ -134,4 +138,47 @@ describe('reviewTurnReferences（G5 修订：先分析，拿不准才问）', ()
     expect(result.failedCount).toBe(2)
     expect(result.pendingIds).toEqual(['cup', 'mood'])
   })
+
+  it('G9：回答问题卡 → 按 referenceItemId 把回答交给参考分析重写，写回后移出待确认', async () => {
+    const curate = vi.fn(async () => curation([{ itemId: 'cup', usage: 'subject', confirmedByUser: true }]))
+    const questions = [
+      { id: 'q1', question: '第 1 张怎么用？', options: ['锁定产品', '借风格'], multiple: false, allowFreeText: true, referenceItemId: 'cup' },
+    ]
+    const result = await reviewTurnReferences(input({
+      curate,
+      answersQuestionCard: true,
+      questionCard: questions,
+      text: '问题卡回答：\n1. 第 1 张怎么用？ → 锁定产品',
+      task: task({ referenceReview: { analyzedIds: ['cup', 'mood'], pendingIds: ['cup', 'mood'] } }),
+    }))
+    expect(curate).toHaveBeenCalledWith({
+      itemIds: ['cup'],
+      explicitItemIds: [],
+      userConstraints: { cup: '第 1 张怎么用？ → 锁定产品' },
+    })
+    expect(result.confirmedIds).toEqual(['cup'])
+    expect(result.pendingIds).toEqual([])
+    expect(result.answers).toEqual({})
+    expect(result.clearCount).toBe(0)
+  })
+
+  it('G9 回退：按回答重写失败 → 保留用户原话当约束，不再追问', async () => {
+    const curate = vi.fn(async (): Promise<ReferenceCurationResult> => ({
+      ...curation([]),
+      ok: false,
+      failed: [{ itemId: 'cup', title: 'cup.jpg', reason: '模型没有返回可解析的 JSON' }],
+    }))
+    const result = await reviewTurnReferences(input({
+      curate,
+      answersQuestionCard: true,
+      questionCard: [],
+      text: '第 2 张锁定产品',
+      task: task({ referenceReview: { analyzedIds: ['cup'], pendingIds: ['cup'] } }),
+    }))
+    expect(result.confirmedIds).toEqual([])
+    expect(result.pendingIds).toEqual([])
+    expect(result.answers).toEqual({ cup: '第 2 张锁定产品' })
+    expect(result.task.referenceReview?.answers).toEqual({ cup: '第 2 张锁定产品' })
+  })
 })
+

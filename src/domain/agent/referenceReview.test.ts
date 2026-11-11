@@ -5,6 +5,7 @@ import {
   looksLikeImageWork,
   nextReferenceReview,
   normalizeReferenceReview,
+  referenceConstraintsForTurn,
   referenceReviewPrompt,
   sidebarReferencesToAnalyze,
   textAssignsReferenceRoles,
@@ -152,5 +153,53 @@ describe('意图判定', () => {
     expect(textAssignsReferenceRoles('第 2 张锁定产品')).toBe(true)
     expect(textAssignsReferenceRoles('图1做主体，图2参考配色')).toBe(true)
     expect(textAssignsReferenceRoles('用这两张做海报')).toBe(false)
+  })
+})
+
+describe('G9：用户回答写回', () => {
+  it('referenceConstraintsForTurn：问题卡按题关联；未关联时整条回答作用于待确认图', () => {
+    expect(referenceConstraintsForTurn({
+      answersQuestionCard: true, byQuestion: { a: '锁产品' }, pendingIds: ['a', 'b'], text: '问题卡回答：…',
+    })).toEqual({ a: '锁产品' })
+    expect(referenceConstraintsForTurn({
+      answersQuestionCard: true, byQuestion: {}, pendingIds: ['a', 'b'], text: '第 2 张锁定产品',
+    })).toEqual({ a: '第 2 张锁定产品', b: '第 2 张锁定产品' })
+  })
+
+  it('没回答问题卡：只有逐张点明分工才算回答；没有待确认图时不写回', () => {
+    expect(referenceConstraintsForTurn({
+      answersQuestionCard: false, byQuestion: {}, pendingIds: ['a'], text: '图1做主体',
+    })).toEqual({ a: '图1做主体' })
+    expect(referenceConstraintsForTurn({
+      answersQuestionCard: false, byQuestion: {}, pendingIds: ['a'], text: '再大一点',
+    })).toEqual({})
+    expect(referenceConstraintsForTurn({
+      answersQuestionCard: true, byQuestion: {}, pendingIds: [], text: '随便',
+    })).toEqual({})
+  })
+
+  it('nextReferenceReview：重写失败的回答留作约束，重写成功的移除；normalize 保留 answers', () => {
+    const failed = nextReferenceReview(
+      { analyzedIds: ['a', 'b'], pendingIds: ['a', 'b'] },
+      { attemptedIds: ['a', 'b'], ambiguousIds: [], resolvedIds: ['a', 'b'], fallbackAnswers: { b: '只借配色' }, confirmedIds: ['a'] },
+    )
+    expect(failed).toEqual({ analyzedIds: ['a', 'b'], pendingIds: [], answers: { b: '只借配色' } })
+    expect(normalizeReferenceReview(failed)).toEqual(failed)
+    expect(nextReferenceReview(failed, { attemptedIds: [], ambiguousIds: [], confirmedIds: ['b'] }))
+      .toEqual({ analyzedIds: ['a', 'b'], pendingIds: [] })
+  })
+
+  it('referenceReviewPrompt：回答问题卡的回合也给出「已确认」段，回退项带用户原话', () => {
+    const prompt = referenceReviewPrompt({
+      pending: [],
+      clearCount: 0,
+      answeringQuestionCard: true,
+      confirmedCount: 1,
+      answered: [{ item: item('b'), answer: '只借配色' }],
+    })
+    expect(prompt).toContain('用户已确认的参考用法（最高优先级）')
+    expect(prompt).toContain('1 张参考已按用户的回答重写用法')
+    expect(prompt).toContain('【b.jpg】用户回答：只借配色')
+    expect(prompt).not.toContain('askQuestions')
   })
 })

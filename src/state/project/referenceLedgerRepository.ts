@@ -84,6 +84,7 @@ function usageOf(row: Record<string, unknown>): ReferenceUsage | null {
     usage: row.usage as ReferenceUsage['usage'],
     howToUse: row.howToUse,
     ...(row.identityAnchor === true ? { identityAnchor: true } : {}),
+    ...(row.confirmedByUser === true ? { confirmedByUser: true as const } : {}),
     createdAt: row.createdAt,
     ...(typeof row.updatedAt === 'number' ? { updatedAt: row.updatedAt } : {}),
   }

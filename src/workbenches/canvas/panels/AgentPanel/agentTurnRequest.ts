@@ -146,6 +146,8 @@ export interface PrepareAgentTurnRequestInput {
     itemIds: readonly string[]
     /** 用户显式带上的参考（其余为侧栏自动补分析的图）。 */
     explicitItemIds?: readonly string[]
+    /** G9：用户问题卡回答（itemId → 原话），按回答重写这些图的用法。 */
+    userConstraints?: Readonly<Record<string, string>>
     signal: AbortSignal
   }) => Promise<ReferenceCurationResult>
   skills: readonly Skill[]
@@ -334,8 +336,8 @@ export async function prepareAgentTurnRequest(
       lastAssistantTextForTask,
     ),
   })
-  const answersQuestionCard =
-    latestQuestionCard(previousMessagesForTask)?.answered === false
+  const previousQuestionCard = latestQuestionCard(previousMessagesForTask)
+  const answersQuestionCard = previousQuestionCard?.answered === false
   const taskDecision = resolveAgentTask(
     input.session.agentTask,
     {
@@ -379,12 +381,19 @@ export async function prepareAgentTurnRequest(
     requestMode,
     internalControl: input.internalControl === true,
     answersQuestionCard,
+    ...(answersQuestionCard && previousQuestionCard
+      ? { questionCard: previousQuestionCard.questions }
+      : {}),
     ...(input.referenceLedger
       ? { selectForTask: () => input.referenceLedger!.selectForTask(input.projectId, taskKey) }
       : {}),
     ...(input.autoCurateReferences
       ? {
-          curate: ({ itemIds, explicitItemIds }: { itemIds: readonly string[]; explicitItemIds: readonly string[] }) =>
+          curate: ({ itemIds, explicitItemIds, userConstraints }: {
+            itemIds: readonly string[]
+            explicitItemIds: readonly string[]
+            userConstraints?: Readonly<Record<string, string>>
+          }) =>
             input.autoCurateReferences!({
               sessionId: input.session.id,
               operationId,
@@ -393,6 +402,7 @@ export async function prepareAgentTurnRequest(
               route: chatRoute,
               itemIds,
               explicitItemIds,
+              ...(userConstraints ? { userConstraints } : {}),
               signal: input.signal,
             }),
         }
@@ -552,6 +562,11 @@ export async function prepareAgentTurnRequest(
         return item ? [item] : []
       }),
       clearCount: referenceReview.clearCount,
+      confirmedCount: referenceReview.confirmedIds.length,
+      answered: Object.entries(referenceReview.answers).flatMap(([id, answer]) => {
+        const item = knownItems.get(id)
+        return item ? [{ item, answer }] : []
+      }),
       answeringQuestionCard: answersQuestionCard,
       internalControl: input.internalControl === true,
     })

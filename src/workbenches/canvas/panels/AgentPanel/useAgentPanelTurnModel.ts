@@ -309,6 +309,8 @@ export function useAgentPanelTurnModel({
 
   /**
    * 问题卡提交：回答作为一条普通用户消息发出（同一任务延续，见 agentTask 的 answersQuestionCard）。
+   * G9：该回合的准备阶段（模型与生图之前）会按题目的 referenceItemId 把回答交给参考分析，
+   * 重写对应参考卡当前任务的 howToUse 并标记用户确认（agentTurnReferenceReview.ts）。
    * 忙时与重试一样进队列，不打断当前回合。
    */
   const answerQuestionCard = useCallback(

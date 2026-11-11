@@ -9,6 +9,7 @@ import type { ChatMessage } from '../shared/execution/types'
  *
  * 问题卡不是确认卡：它不暂停工具、不走确认执行路径。Agent 调用 `askQuestions` 后本回合结束，
  * 用户的回答作为下一条普通消息发回（同一任务的延续，见 agentTask.ts 的 answersQuestionCard）。
+ * 题目可带 referenceItemId（G9）：回答会作为最高优先级约束交给参考分析，重写那张参考卡的用法。
  */
 
 export const QUESTION_CARD_TOOL = 'askQuestions'
@@ -25,6 +26,8 @@ export interface AgentQuestion {
   multiple: boolean
   /** 是否附自由输入框；缺省 true（Lovart：候选之外可直接填写）。 */
   allowFreeText: boolean
+  /** G9：这题问的是哪张参考卡的用法；回答会写回该卡当前任务的 howToUse。 */
+  referenceItemId?: string
 }
 
 export interface AgentQuestionAnswer {
@@ -73,7 +76,15 @@ export function parseQuestionCardArgs(args: unknown): ParsedQuestionCard {
     let id = clip(row.id, 40) || `q${index + 1}`
     if (seen.has(id)) id = `${id}-${index + 1}`
     seen.add(id)
-    questions.push({ id, question, options, multiple: row.multiple === true, allowFreeText })
+    const referenceItemId = clip(row.referenceItemId, 80)
+    questions.push({
+      id,
+      question,
+      options,
+      multiple: row.multiple === true,
+      allowFreeText,
+      ...(referenceItemId ? { referenceItemId } : {}),
+    })
   })
   if (problems.length > 0) return { ok: false, problems }
   return { ok: true, questions, intro: clip(record.intro, QUESTION_LIMIT) }
@@ -218,4 +229,30 @@ export function latestQuestionCard(
     return { callId: message.toolCallId ?? '', questions: parsed.questions, answered }
   }
   return null
+}
+
+const ANSWER_LINE = /^(\d+)\.\s.*?\s→\s(.+)$/
+
+/**
+ * G9：从问题卡回答消息（formatQuestionAnswers 的格式）里取出每张参考卡的回答原话。
+ * 只认带 referenceItemId 的题；「未回答」不算。消息不是问题卡格式（用户直接在输入框里答）时返回空，
+ * 由调用方决定是否把整句当作回答。
+ */
+export function questionAnswersByReference(
+  questions: readonly AgentQuestion[],
+  text: string,
+): Record<string, string> {
+  const answers: Record<string, string> = {}
+  for (const line of text.split(/\r?\n/)) {
+    const match = ANSWER_LINE.exec(line.trim())
+    if (!match) continue
+    const question = questions[Number(match[1]) - 1]
+    const answer = match[2]!.trim()
+    if (!question?.referenceItemId || !answer || answer === '未回答') continue
+    const previous = answers[question.referenceItemId]
+    answers[question.referenceItemId] = previous
+      ? `${previous}；${question.question} → ${answer}`
+      : `${question.question} → ${answer}`
+  }
+  return answers
 }

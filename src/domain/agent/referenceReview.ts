@@ -8,6 +8,8 @@ import type { ReferenceItem, ReferenceUsageKind } from '../project/referenceLedg
  * 2. 只有多张图的分工 / 组合有多种合理可能、无法替用户拍板时才提示发问题卡；
  *    用户在对话里提了图但没说用途也一样：看得出分工就直接用，看不出才问；
  * 3. 已问过、待回答的图记在 pendingIds，回答后移出；新任务（agentTask 判定）从空开始。
+ * 4. 用户的回答（问题卡，或在输入框里逐张点明分工）由参考分析结合图片重写该图的完整用法（G9），
+ *    写入的用法标记 confirmedByUser；重写失败时把原话留在 answers 里当约束。
  *
  * 「有歧义」的判定（确定性，规则顺序即优先级）：
  * - 分析给出 roleClear=false（模型自己判断不出这张图在本任务里的角色）→ 有歧义；
@@ -22,6 +24,11 @@ export interface ReferenceReviewState {
   analyzedIds: string[]
   /** 本任务里判定有歧义、等待问题卡回答的参考。 */
   pendingIds: string[]
+  /**
+   * G9 回退：用户回答了、但按回答重写用法的分析失败的参考（itemId → 用户原话）。
+   * 同任务每回合作为最高优先级约束提示给模型，不再追问。
+   */
+  answers?: Record<string, string>
 }
 
 export interface ReviewedReference {
@@ -101,14 +108,42 @@ function unique(ids: readonly string[]): string[] {
 /** 合并本回合的分析结果进任务状态。resolvedIds = 本回合已得到用户回答的参考。 */
 export function nextReferenceReview(
   previous: ReferenceReviewState | undefined,
-  update: { attemptedIds: readonly string[]; ambiguousIds: readonly string[]; resolvedIds?: readonly string[] },
+  update: {
+    attemptedIds: readonly string[]
+    ambiguousIds: readonly string[]
+    resolvedIds?: readonly string[]
+    /** 本回合用户回答但重写失败的参考（原话）；重写成功的应从 answers 里去掉（confirmedIds）。 */
+    fallbackAnswers?: Readonly<Record<string, string>>
+    confirmedIds?: readonly string[]
+  },
 ): ReferenceReviewState {
   const base = previous ?? emptyReferenceReview()
   const resolved = new Set(update.resolvedIds ?? [])
+  const answers: Record<string, string> = { ...(base.answers ?? {}), ...(update.fallbackAnswers ?? {}) }
+  for (const id of update.confirmedIds ?? []) delete answers[id]
   return {
     analyzedIds: unique([...base.analyzedIds, ...update.attemptedIds]),
     pendingIds: unique([...base.pendingIds, ...update.ambiguousIds]).filter((id) => !resolved.has(id)),
+    ...(Object.keys(answers).length > 0 ? { answers } : {}),
   }
+}
+
+/**
+ * G9：本回合要按用户回答重写用法的参考（itemId → 回答原话）。
+ * - 回答问题卡：优先按题目的 referenceItemId 对应；题目没标 id 时，整条回答作用于所有待确认的图；
+ * - 没回答问题卡、但有待确认的图且用户在输入框里逐张点明了分工：整句作用于所有待确认的图。
+ */
+export function referenceConstraintsForTurn(input: {
+  answersQuestionCard: boolean
+  byQuestion: Readonly<Record<string, string>>
+  pendingIds: readonly string[]
+  text: string
+}): Record<string, string> {
+  if (input.answersQuestionCard && Object.keys(input.byQuestion).length > 0) return { ...input.byQuestion }
+  const text = input.text.trim()
+  if (!text || input.pendingIds.length === 0) return {}
+  if (!input.answersQuestionCard && !textAssignsReferenceRoles(text)) return {}
+  return Object.fromEntries(input.pendingIds.map((id) => [id, text]))
 }
 
 export function normalizeReferenceReview(value: unknown): ReferenceReviewState | undefined {
@@ -116,8 +151,17 @@ export function normalizeReferenceReview(value: unknown): ReferenceReviewState |
   const row = value as Record<string, unknown>
   const ids = (raw: unknown) =>
     Array.isArray(raw) ? unique(raw.filter((id): id is string => typeof id === 'string')) : []
-  const review = { analyzedIds: ids(row.analyzedIds), pendingIds: ids(row.pendingIds) }
-  return review.analyzedIds.length > 0 || review.pendingIds.length > 0 ? review : undefined
+  const answers = row.answers && typeof row.answers === 'object' && !Array.isArray(row.answers)
+    ? Object.fromEntries(Object.entries(row.answers as Record<string, unknown>)
+        .filter((entry): entry is [string, string] => typeof entry[1] === 'string' && entry[1].trim().length > 0)
+        .map(([id, text]) => [id, text.slice(0, 500)]))
+    : {}
+  const review: ReferenceReviewState = {
+    analyzedIds: ids(row.analyzedIds),
+    pendingIds: ids(row.pendingIds),
+    ...(Object.keys(answers).length > 0 ? { answers } : {}),
+  }
+  return review.analyzedIds.length > 0 || review.pendingIds.length > 0 || review.answers ? review : undefined
 }
 
 /**
@@ -130,8 +174,35 @@ export function referenceReviewPrompt(input: {
   clearCount: number
   answeringQuestionCard: boolean
   internalControl?: boolean
+  /** G9：本回合已按用户回答重写用法的参考数。 */
+  confirmedCount?: number
+  /** G9 回退：重写失败、只能把用户原话当约束的参考。 */
+  answered?: readonly { item: ReferenceItem; answer: string }[]
 }): string {
-  if (input.answeringQuestionCard || input.internalControl) return ''
+  const confirmed = confirmedSection(input.confirmedCount ?? 0, input.answered ?? [])
+  if (input.answeringQuestionCard || input.internalControl) return confirmed
+  const open = openSection(input)
+  return [confirmed, open].filter(Boolean).join('\n\n')
+}
+
+function confirmedSection(
+  confirmedCount: number,
+  answered: readonly { item: ReferenceItem; answer: string }[],
+): string {
+  const lines: string[] = []
+  if (confirmedCount > 0) {
+    lines.push(`${confirmedCount} 张参考已按用户的回答重写用法（见上方参考段落），以它为准执行，不要再为这些图发问题卡。`)
+  }
+  if (answered.length > 0) {
+    lines.push('下列参考按回答重写用法没有成功，用户原话就是最高优先级约束，照它使用、不要与之矛盾、也不要再问：')
+    for (const row of answered.slice(0, 8)) {
+      lines.push(`- 【${row.item.title.trim() || row.item.id}】用户回答：${row.answer.replace(/\s+/g, ' ').trim().slice(0, 200)}`)
+    }
+  }
+  return lines.length > 0 ? ['## 用户已确认的参考用法（最高优先级）', ...lines].join('\n') : ''
+}
+
+function openSection(input: { pending: readonly ReferenceItem[]; clearCount: number }): string {
   if (input.pending.length > 0) {
     const lines = input.pending.slice(0, 8).map((item, index) => {
       const what = item.what.replace(/\s+/g, ' ').trim().slice(0, WHAT_LIMIT)
