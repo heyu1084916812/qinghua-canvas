@@ -461,7 +461,7 @@ export async function executeConfirmedTool(
         id: n.id,
         type: n.type,
       }))
-      const { problems, plan } = planProblems(a, existing)
+      const { problems, plan } = planProblems(a, existing, ctx.resolveNodeIds)
       if (!plan) return { ok: false, problems }
       /**
        * **「每张图各自一条流程」的确定性检查**（用户 2026-10-06 第七批 #183）。

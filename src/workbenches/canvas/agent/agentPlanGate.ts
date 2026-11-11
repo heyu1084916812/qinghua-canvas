@@ -4,6 +4,7 @@ import {
   type AgentNodeType,
   type AgentPlan,
 } from '../../../domain/agent/plan'
+import { completeEndpointRows } from './agentPlanEndpoints'
 import { asRecord } from './canvasReadTools'
 
 /**
@@ -125,6 +126,7 @@ function alignAttachedNodeTypes(
 export function planProblems(
   args: unknown,
   existingNodes: readonly (string | ExistingAgentNode)[],
+  resolveNodeIds?: (ids: readonly string[]) => string[],
 ): { problems: string[]; plan: AgentPlan | null } {
   const existingNodeIds = existingNodes.map((node) =>
     typeof node === 'string' ? node : node.id,
@@ -135,10 +137,8 @@ export function planProblems(
     ),
   )
   const aligned = alignAttachedNodeTypes(args, existingTypes)
-  const { plan } = normalizeAgentPlan(
-    disambiguateAttachAliases(aligned),
-  )
-  const checked = validateAgentPlan(plan, existingNodeIds)
+  const { plan } = normalizeAgentPlan(disambiguateAttachAliases(aligned))
+  const checked = validateAgentPlan(completeEndpointRows(plan, existingTypes, resolveNodeIds), existingNodeIds)
   if (!checked.ok) return { problems: checked.errors, plan: null }
   const attachedLocalIds = new Set((checked.plan.attach ?? []).map((item) => item.localId))
   if (checked.plan.nodes.every((node) => attachedLocalIds.has(node.localId))) {

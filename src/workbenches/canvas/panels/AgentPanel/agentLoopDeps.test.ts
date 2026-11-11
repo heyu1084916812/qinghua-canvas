@@ -409,8 +409,39 @@ describe('assembleAgentLoopDeps', () => {
       'call-apply',
     )
 
+    // A8 起别名并入：harness 预置的 ref1 保留，新写入 v1
     expect(h.planAliasesStore.get(session.id)).toEqual(
-      new Map([['v1', 'node-real']]),
+      new Map([
+        ['ref1', 'node-9'],
+        ['v1', 'node-real'],
+      ]),
+    )
+  })
+
+  it('★★ A8：后一次 applyPlan 的别名并入而不是覆盖，前一份计划的 localId 仍可解析', async () => {
+    const h = harness({
+      applyPlanResult: {
+        ok: true,
+        problems: [],
+        createdNodeIds: ['node-2'],
+        resolvedNodes: [
+          { localId: 'v2', nodeId: 'node-2', type: 'generation', created: true },
+        ],
+      },
+    })
+    h.planAliasesStore.set(session.id, new Map([['v1', 'node-1']]))
+
+    await h.deps.executeWrite(
+      'applyPlan',
+      { summary: '第二份', nodes: [], edges: [] },
+      'call-apply-2',
+    )
+
+    expect(h.planAliasesStore.get(session.id)).toEqual(
+      new Map([
+        ['v1', 'node-1'],
+        ['v2', 'node-2'],
+      ]),
     )
   })
 

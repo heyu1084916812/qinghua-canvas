@@ -8781,6 +8781,26 @@
         "src/workbenches/canvas/agent/agentLoop.test.ts"
       ],
       "budget": 190
+    },
+    {
+      "module": "src/workbenches/canvas/agent/agentPlanEndpoints.ts",
+      "owner": "canvas-agent-plan-gate",
+      "responsibility": "applyPlan 连线端点补全：attach 的 localId 未写进 nodes[]、或端点是本轮前一次 applyPlan 的 localId 时，按画布真节点补复用节点行与 attach。",
+      "owns": [
+        "attach 端点补行规则",
+        "本轮 localId 别名解析成复用节点"
+      ],
+      "doesNotOwn": [
+        "计划归一化与校验",
+        "别名表的存取"
+      ],
+      "publicApi": [
+        "completeEndpointRows"
+      ],
+      "test": [
+        "src/workbenches/canvas/agent/agentPlanEndpoints.test.ts"
+      ],
+      "budget": 80
     }
   ]
 }

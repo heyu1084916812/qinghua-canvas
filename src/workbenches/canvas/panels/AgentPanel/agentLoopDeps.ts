@@ -414,16 +414,18 @@ export function assembleAgentLoopDeps(
           }
         ).resolvedNodes
         if (Array.isArray(resolved)) {
+          // A8：并入而非覆盖 —— 前一份计划的 localId 在后一份里仍可当连线端点
           ports.setPlanAliases(
             session.id,
-            new Map(
-              resolved.flatMap((node) =>
+            new Map([
+              ...(ports.planAliasesFor(session.id) ?? []),
+              ...resolved.flatMap((node) =>
                 typeof node.localId === 'string' &&
                 typeof node.nodeId === 'string'
                   ? [[node.localId, node.nodeId] as const]
                   : [],
               ),
-            ),
+            ]),
           )
         }
       }
