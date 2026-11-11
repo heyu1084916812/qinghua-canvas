@@ -300,6 +300,50 @@
   text-overflow: ellipsis;
 }
 
+.lastRound {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+  padding-top: 7px;
+  border-top: 1px solid var(--node-border-inner);
+}
+
+.lastRoundHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+}
+
+.lastRoundTitle,
+.lastRoundIndex {
+  color: var(--text-3);
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.lastRoundIndex {
+  font-variant-numeric: tabular-nums;
+}
+
+.lastRoundPrompt {
+  margin: 0;
+  min-width: 0;
+  color: var(--text-2);
+  font-size: 10px;
+  line-height: 1.4;
+  white-space: pre-wrap;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+  word-break: break-word;
+}
+
 /* ── 提示词列表（大雄 .loop-smart-prompt-item / .loop-smart-text） ── */
 .promptList {
   display: flex;

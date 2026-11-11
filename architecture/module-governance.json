@@ -8433,6 +8433,29 @@
       "budget": 80
     },
     {
+      "module": "src/features/shared/execution/runPrompt.ts",
+      "owner": "shared-execution-run-prompt",
+      "responsibility": "统一计算实际发往渠道的最终提示词，并提供执行期序号修饰。",
+      "owns": [
+        "集合项与调用次数后缀",
+        "最终 prompt 的唯一计算入口",
+        "不修改计划快照的不可变修饰"
+      ],
+      "doesNotOwn": [
+        "渠道网络请求",
+        "RunRecord 持久化",
+        "节点界面渲染"
+      ],
+      "publicApi": [
+        "applyCallOrdinal",
+        "actualPromptOf"
+      ],
+      "test": [
+        "src/features/shared/execution/runPrompt.test.ts"
+      ],
+      "budget": 50
+    },
+    {
       "module": "src/pages/CanvasPage/myAssetsDockStore.ts",
       "owner": "canvas-my-assets-dock-state",
       "responsibility": "提供我的素材抽屉的最小外部订阅状态，让按钮和抽屉独立更新。",

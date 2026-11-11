@@ -86,7 +86,8 @@ export function applyLoopVariables(
  * 把循环展开成逐轮计划。
  *
  * `upstreamImages` 是「上游素材并集」——由调用方收集好（本模块不读图结构）。
- * `upstreamPrompts` 是上游提示词；它与 `params.prompts` 合并后**取模轮换**。
+ * `upstreamPrompts` 是上游上下文，每轮都保留；`params.prompts` 是本轮变量，
+ * 按轮次取模轮换后追加在上游上下文之后。
  *
  * ⚠️ **素材用切片、提示词用取模**（与原实现一致，且是有意的）：
  * - 素材取完就没有了：第 4 轮不该再拿第 1 张图（`slice` 越界自然是空）；
@@ -107,10 +108,19 @@ export function expandLoopRounds(input: {
   const usePrompt = input.usePrompt !== false
   const useImageInput = input.useImageInput !== false
 
-  // 提示词池：上游在前、本节点在后（与「上游是上下文、本节点是本次指令」的直觉一致）
-  const promptPool = usePrompt
-    ? [...(input.upstreamPrompts ?? []), ...params.prompts].map((s) => String(s ?? '').trim()).filter(Boolean)
-    : []
+  const uniqueTexts = (values: readonly string[]): string[] =>
+    [...new Set(values.map((value) => String(value ?? '').trim()).filter(Boolean))]
+  /**
+   * 上游是每轮共享的上下文，本节点才是本轮变量指令。
+   *
+   * 此前把两者放进同一个池里轮换，会让「上游详情提示词 + 第 N 张主图」
+   * 变成二选一：奇数轮丢变量指令，偶数轮丢上游上下文。现在固定为
+   * `上游上下文 + 本轮变量`，并在这里就去掉完全相同的文本。
+   */
+  const upstreamContext = usePrompt
+    ? uniqueTexts(input.upstreamPrompts ?? []).join('\n')
+    : ''
+  const roundPrompts = usePrompt ? uniqueTexts(params.prompts) : []
 
   const rounds: LoopRound[] = []
   for (let i = 0; i < total; i += 1) {
@@ -124,7 +134,8 @@ export function expandLoopRounds(input: {
     const from = useImageInput ? params.loopStart - 1 + i * params.batch : 0
     const to = useImageInput ? from + params.batch : 0
 
-    const rawPrompt = promptPool.length ? promptPool[i % promptPool.length] : ''
+    const variable = roundPrompts.length ? roundPrompts[i % roundPrompts.length] : ''
+    const rawPrompt = [upstreamContext, variable].filter(Boolean).join('\n')
     rounds.push({
       index,
       imageFrom: Math.max(0, Math.min(from, input.upstreamImages)),

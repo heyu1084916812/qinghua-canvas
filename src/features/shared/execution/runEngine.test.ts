@@ -52,6 +52,42 @@ function makePlan(): RunPlan<RunTask> {
 }
 
 describe('runEngine / 回调参数契约', () => {
+  it('★★ RunRecord.params.prompt 保存实际提交后的最终文案', async () => {
+    const plan = makePlan()
+    plan.tasks[0]!.seq = 2
+    plan.tasks[0]!.collectionItemId = 'item-3'
+    plan.tasks[0]!.params = { model: 'logical-model', prompt: '' }
+    let sentPrompt = ''
+    const summary = await runEngine(plan, {
+      signal: new AbortController().signal,
+      projectId: 'p1',
+      recordScope: scopeOf,
+      channelResolver: () =>
+        ({
+          protocol: 'mock',
+          async generateImage(request: RunRequest) {
+            sentPrompt = request.prompt
+            return [{ hash: 'h1', mime: 'image/png', bytes: new Uint8Array([1]) }]
+          },
+        }) as never,
+      writeBack: () => {},
+      placement: {
+        begin: () => ({ targetId: CARRIER, commands: [] }),
+        commit: () => [],
+        shouldCollect: () => false,
+        record: () => null,
+        finalize: () => [],
+      },
+      now: () => 0,
+    })
+
+    expect(sentPrompt).toBe('p（第 3 项）')
+    expect(summary.records[0]?.params).toMatchObject({
+      model: 'logical-model',
+      prompt: 'p（第 3 项）',
+    })
+  })
+
   it('★★ 生图网络超时只调用一次，不自动重复提交付费请求', async () => {
     const plan = makePlan()
     let calls = 0

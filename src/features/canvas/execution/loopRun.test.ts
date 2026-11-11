@@ -112,7 +112,11 @@ describe('planLoopRounds · 逐轮展开', () => {
       [],
       ['up1', 'up2'],
     )
-    expect(rounds.map((r) => r.prompt)).toEqual(['up1', 'up2', 'mine'])
+    expect(rounds.map((r) => r.prompt)).toEqual([
+      'up1\nup2\nmine',
+      'up1\nup2\nmine',
+      'up1\nup2\nmine',
+    ])
   })
 
   it('参数越界先归一化（count=0 当作 1 轮）', () => {

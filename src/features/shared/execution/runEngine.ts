@@ -23,6 +23,7 @@ import {
 } from '../../../domain/shared/task'
 import { createId } from '../../../shared/id'
 import type { CollectedAsset, ExecutionPlacement } from './placement'
+import { actualPromptOf, applyCallOrdinal } from './runPrompt'
 
 /**
  * 执行引擎（架构 §5.5）。**跨工作台共享**（本文件位于 features/shared/execution）。
@@ -231,27 +232,6 @@ function callChannel(
         .then((asset) => [asset])
     }
   }
-}
-
-/**
- * 给批量展开出的后续调用加「第 n 项」序号（§6.12）。
- *
- * 为什么需要：真实渠道多以 (model, prompt) 作为素材种子/缓存键。集合里有 2 张**不同**素材
- * 时提示词天然不同，但同一张素材被执行 2 次、或同一提示词连发 2 次时，
- * 请求完全一样 → 产出同一个素材 hash → N 张结果退化成 1 张。
- *
- * 只在 seq > 0 时追加，第 1 次调用保持原样：
- * - 单张场景（seq=0）路径与 M2 完全一致，回归测试的 hash 断言不受影响
- * - 批量场景每次调用的 prompt 互不相同，素材必然各不相同
- *
- * 注意这里是**执行期**行为，不改 plan：指纹与 RunRecord.inputs 仍按真实输入记录，
- * 序号只是发给渠道的请求修饰（渠道侧会把它当作素材差异化依据）。
- */
-function applyCallOrdinal(task: RunTask, request = task.request): RunRequest {
-  const seq = task.seq ?? 0
-  if (seq <= 0) return request
-  const mark = task.collectionItemId ? `第 ${seq + 1} 项` : `第 ${seq + 1} 次`
-  return { ...request, prompt: `${request.prompt}（${mark}）` }
 }
 
 function credentialGroupAt(request: RunRequest, attempt: number): string | undefined {
@@ -744,6 +724,7 @@ function makeRecord(
   attempts: RunAttemptRecord[] = [],
 ): ScopedRunRecord {
   const lastAttempt = attempts.at(-1)
+  const actualPrompt = actualPromptOf(task, task.request)
   return createRunRecord({
     id: createId('rec'),
     nodeId: targetId,
@@ -752,7 +733,10 @@ function makeRecord(
     createdAt: startedAt,
     status,
     inputs: task.request.inputs,
-    params: task.params,
+    params: {
+      ...(task.params && typeof task.params === 'object' ? task.params : {}),
+      ...(actualPrompt.trim() ? { prompt: actualPrompt } : {}),
+    },
     /**
      * 实际发出的渠道 / 模型（M7-3）。
      *

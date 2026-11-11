@@ -1,7 +1,4 @@
-/**
- * 循环节点运行计划：逐轮冻结输入、合并下游任务并统一重排输出槽位。
- * 不拥有 store、引擎或取消控制器；所有副作用由显式端口执行。
- */
+/** 循环节点逐轮冻结输入、合并下游任务并统一重排输出槽位。 */
 import {
   buildRunPlan,
   type CanvasRunTask,
@@ -22,11 +19,7 @@ import type {
   NodeSnapshot,
 } from '../../../../domain/canvas/model/node'
 import { createId } from '../../../../shared/id'
-import {
-  canceledRun,
-  failedRun,
-  type CanvasRunLaunchResult,
-} from '../canvasRunPreflight'
+import { canceledRun, failedRun, type CanvasRunLaunchResult } from '../canvasRunPreflight'
 
 export interface CanvasLoopRunPorts {
   graph: GraphSnapshot
@@ -135,7 +128,13 @@ export async function runCanvasLoop(
       ports.dispatch({
         kind: 'node.updateData',
         id: loopNode.id,
-        patch: { __roundPrompt: round.prompt, __roundAssets: round.assetHashes },
+        patch: {
+          __roundPrompt: round.prompt,
+          __roundAssets: round.assetHashes,
+          lastRoundIndex: round.index,
+          lastRoundPrompt: round.prompt,
+          lastRoundAssets: round.assetHashes,
+        },
         transient: true,
       })
       let added = 0

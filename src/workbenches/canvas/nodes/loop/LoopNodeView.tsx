@@ -106,6 +106,8 @@ export function LoopNodeView(props: NodeViewProps) {
   }
 
   const p = normalizeLoopParams(data)
+  const lastRoundAssets = data.lastRoundAssets ?? []
+  const lastRoundPrompt = data.lastRoundPrompt?.trim() ?? ''
   /** 本轮会输出的素材张数（最后一轮可能不足 batch） */
   const willOutput = data.useImageInput
     ? Math.max(0, Math.min(p.batch, upstreamImages - (p.loopStart - 1)))
@@ -366,6 +368,33 @@ export function LoopNodeView(props: NodeViewProps) {
               <IconPlus />
             </button>
           </div>
+        </div>
+      )}
+
+      {(lastRoundPrompt || lastRoundAssets.length > 0) && (
+        <div className={styles.lastRound} data-loop-last-round>
+          <div className={styles.lastRoundHead}>
+            <span className={styles.lastRoundTitle}>最近一轮</span>
+            {data.lastRoundIndex ? (
+              <span className={styles.lastRoundIndex}>第 {data.lastRoundIndex} 轮</span>
+            ) : null}
+          </div>
+          {lastRoundAssets.length > 0 && (
+            <div className={styles.thumbRow} data-loop-last-thumbs>
+              {lastRoundAssets.map((hash, i) => (
+                <UpstreamThumb key={`${hash}:${i}`} hash={hash} index={i + 1} />
+              ))}
+            </div>
+          )}
+          {lastRoundPrompt ? (
+            <p
+              className={styles.lastRoundPrompt}
+              data-loop-last-prompt
+              title={lastRoundPrompt}
+            >
+              {lastRoundPrompt}
+            </p>
+          ) : null}
         </div>
       )}
 

@@ -99,13 +99,31 @@ describe('expandLoopRounds · 提示词取模', () => {
     expect(rounds.map((r) => r.prompt)).toEqual(['A', 'B', 'C', 'A', 'B', 'C'])
   })
 
-  it('★ 上游提示词在前、本节点提示词在后（同一池子里轮换）', () => {
+  it('★ 上游上下文每轮保留，本节点变量提示词按轮次追加', () => {
     const rounds = expandLoopRounds({
       params: { count: 3, prompts: ['本地'] },
       upstreamImages: 0,
       upstreamPrompts: ['上游'],
     })
-    expect(rounds.map((r) => r.prompt)).toEqual(['上游', '本地', '上游'])
+    expect(rounds.map((r) => r.prompt)).toEqual([
+      '上游\n本地',
+      '上游\n本地',
+      '上游\n本地',
+    ])
+  })
+
+  it('多个上游提示词作为共享上下文，自身变量按轮次取模', () => {
+    const rounds = expandLoopRounds({
+      params: { count: 4, prompts: ['第[计数]张', '补充镜头'] },
+      upstreamImages: 0,
+      upstreamPrompts: ['详情页规范', '统一品牌色'],
+    })
+    expect(rounds.map((r) => r.prompt)).toEqual([
+      '详情页规范\n统一品牌色\n第1张',
+      '详情页规范\n统一品牌色\n补充镜头',
+      '详情页规范\n统一品牌色\n第3张',
+      '详情页规范\n统一品牌色\n补充镜头',
+    ])
   })
 
   it('★ 与素材的区别：素材取完为空，提示词取完回到开头', () => {

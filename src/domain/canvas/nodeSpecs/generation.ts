@@ -77,7 +77,7 @@ export const generationSpec: NodeSpec<GenerationData> = {
   collectInputs({ node, graph }: InputContext<GenerationData>): NodeInput[] {
     const index = indexNodes(graph.nodes)
     const hidden = new Set(node.data.upstreamHidden ?? [])
-    const inputs: NodeInput[] = []
+    let inputs: NodeInput[] = []
     const seenAssetHashes = new Set<string>()
     /**
      * 套件素材必须是生图请求的真实图片输入，并排在用户上游素材之前：
@@ -162,6 +162,48 @@ export const generationSpec: NodeSpec<GenerationData> = {
         })
       }
     }
+    /**
+     * 循环节点可能同时把上游提示词和本轮变量带进 `__roundPrompt`，而同一个
+     * 上游提示词节点又可能直连生图节点。这里按**最终文本**去掉重复：
+     * - 循环文本已包含某条直连提示词时，直连那条不再重复发送；
+     * - 完全相同的文本只保留一次。
+     *
+     * 不能只按 nodeId 去重：循环节点的 nodeId 与提示词节点不同，但它们产出的
+     * 是同一段上下文。
+     */
+    const loopTexts = inputs
+      .filter((input): input is Extract<NodeInput, { kind: 'text' }> => input.kind === 'text')
+      .filter((input) => index.get(input.nodeId)?.type === 'loop')
+      .map((input) => input.text.trim())
+      .filter(Boolean)
+    const seenTexts = new Set<string>()
+    const orderedTexts: string[] = []
+    const textInputs = inputs.filter(
+      (input): input is Extract<NodeInput, { kind: 'text' }> => input.kind === 'text',
+    )
+    for (const input of textInputs) {
+      if (index.get(input.nodeId)?.type === 'loop') continue
+      const text = input.text.trim()
+      if (!text || seenTexts.has(text) || loopTexts.some((loopText) => loopText.includes(text))) {
+        continue
+      }
+      seenTexts.add(text)
+      orderedTexts.push(text)
+    }
+    for (const text of loopTexts) {
+      if (seenTexts.has(text)) continue
+      seenTexts.add(text)
+      orderedTexts.push(text)
+    }
+    const emittedTexts = new Set<string>()
+    inputs = inputs.filter((input) => {
+      if (input.kind !== 'text') return true
+      const text = input.text.trim()
+      if (!text) return false
+      if (!orderedTexts.includes(text) || emittedTexts.has(text)) return false
+      emittedTexts.add(text)
+      return true
+    })
     return inputs
   },
 
@@ -170,10 +212,14 @@ export const generationSpec: NodeSpec<GenerationData> = {
     const data = node.data
     if (!data.channelId || !data.model) return null
 
-    const upstreamText = inputs
-      .filter((i): i is Extract<NodeInput, { kind: 'text' }> => i.kind === 'text')
-      .map((i) => i.text)
-      .join('\n')
+    const upstreamText = [
+      ...new Set(
+        inputs
+          .filter((i): i is Extract<NodeInput, { kind: 'text' }> => i.kind === 'text')
+          .map((i) => i.text.trim())
+          .filter(Boolean),
+      ),
+    ].join('\n')
     /**
      * 「预设 / 情绪」（用户 2026-10-05 第 14 条）拼在提示词**后面**：
      * 先描述画面，再给输出规格 —— 与批量节点「统一要求在尾部」同一条读法。

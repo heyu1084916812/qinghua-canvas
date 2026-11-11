@@ -122,6 +122,19 @@ describe('GenerationNodeView · 状态 B（有内容）', () => {
     const node = genNode({ data: { ...generationSpec.createDefaultData(), assetHash: 'h1' } })
     expect(render(baseProps({ node }))).toContain('data-node-asset-loading')
   })
+
+  it('★★ 有结果时在卡片下方显示实际提交的 prompt', () => {
+    const node = genNode({
+      data: {
+        ...generationSpec.createDefaultData(),
+        assetHash: 'h1',
+        lastRunPrompt: '详情页规范\n现在生成第 2 张主图',
+      },
+    })
+    const html = render(baseProps({ node }))
+    expect(html).toContain('data-generation-last-prompt')
+    expect(html).toContain('现在生成第 2 张主图')
+  })
 })
 
 describe('GenerationNodeView · 本体不含参数（§6.8：参数归创作面板）', () => {

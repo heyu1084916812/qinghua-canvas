@@ -97,7 +97,13 @@ describe('canvas loop run plan', () => {
     expect(ports.dispatch).toHaveBeenNthCalledWith(1, {
       kind: 'node.updateData',
       id: 'loop-1',
-      patch: { __roundPrompt: 'round-a', __roundAssets: [] },
+      patch: {
+        __roundPrompt: 'round-a',
+        __roundAssets: [],
+        lastRoundIndex: 1,
+        lastRoundPrompt: 'round-a',
+        lastRoundAssets: [],
+      },
       transient: true,
     })
     expect(ports.dispatch).toHaveBeenLastCalledWith({

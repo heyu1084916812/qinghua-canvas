@@ -97,6 +97,45 @@ describe('生成节点规格 / 输入收集（M6-12）', () => {
     expect(inputs.map((i) => i.kind)).toEqual(['text', 'asset'])
   })
 
+  it('★★ 循环本轮文本已包含直连提示词时，只发送一次完整上下文', () => {
+    const g = graph(
+      [
+        node({
+          id: 'down',
+          type: 'generation',
+          data: { mode: 'image', channelId: 'c', model: 'm', prompt: '' } as never,
+        }),
+        node({ id: 'txt', type: 'prompt', data: { text: '五张主图详情规范' } as never }),
+        node({
+          id: 'loop',
+          type: 'loop',
+          data: {
+            __roundPrompt: '五张主图详情规范\n现在生成第1张主图',
+            __roundAssets: [],
+          } as never,
+        }),
+      ],
+      [
+        { id: 'e1', projectId: 'p1', source: 'txt', target: 'down' },
+        { id: 'e2', projectId: 'p1', source: 'loop', target: 'down' },
+      ],
+    )
+    const inputs = getSpec('generation')!.collectInputs({ node: g.nodes[0]!, graph: g })
+    expect(inputs).toEqual([{
+      kind: 'text',
+      nodeId: 'loop',
+      text: '五张主图详情规范\n现在生成第1张主图',
+    }])
+    const req = getSpec('generation')!.toRunRequest!({
+      node: g.nodes[0]!,
+      inputs,
+      params: g.nodes[0]!.data,
+      graph: g,
+    })
+    expect(req?.prompt).toBe('五张主图详情规范\n现在生成第1张主图')
+    expect(req?.prompt.match(/五张主图详情规范/g)).toHaveLength(1)
+  })
+
   it('被「隐藏上游」勾选的图不参与输入（§6.8 小眼睛语义一致）', () => {
     const g = graph(
       [
