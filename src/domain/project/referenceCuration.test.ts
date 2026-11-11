@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   REFERENCE_CURATION_SYSTEM_PROMPT,
+  buildReferenceCurationPrompt,
   parseReferenceCurationText,
   referenceUsageId,
 } from './referenceCuration'
@@ -91,6 +92,23 @@ describe('C1 参考卡语义标题', () => {
     }))
     expect(parsed).toMatchObject({ ok: true, analysis: { title: '极简海报排版' } })
     expect(REFERENCE_CURATION_SYSTEM_PROMPT).toContain('不要用文件名')
+  })
+})
+
+describe('C4 「怎么用」只写借什么、避什么', () => {
+  it('系统提示词与单条提示都限定借 / 避，并禁止图里没有的设计建议', () => {
+    expect(REFERENCE_CURATION_SYSTEM_PROMPT).toContain('格式「借：…；避：…」')
+    expect(REFERENCE_CURATION_SYSTEM_PROMPT).toContain('不要提出图里没有的新设计建议')
+    expect(REFERENCE_CURATION_SYSTEM_PROMPT).not.toContain('是否锁定身份。')
+    const prompt = buildReferenceCurationPrompt({
+      item: {
+        id: 'r1', projectId: 'p1', title: 't', source: 'file', kind: 'image',
+        what: '', createdAt: 1, updatedAt: 1,
+      },
+      task: '做一张海报',
+      imageLabels: ['参考图 1'],
+    })
+    expect(prompt).toContain('不写图里没有的设计建议')
   })
 })
 
