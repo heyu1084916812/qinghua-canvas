@@ -214,4 +214,19 @@ describe('searchOpenResearch', () => {
     expect(result.items.map((item) => item.source)).toEqual(['wikipedia'])
     expect(result.warnings).toEqual([expect.stringContaining('Openverse')])
   })
+
+  it('skips SearXNG silently when no endpoint is configured (no public default)', async () => {
+    const request = vi.fn<NetworkPort['request']>(async () => response({}))
+    const result = await searchOpenResearch(
+      { request, stream: async function* () {} },
+      'brand',
+      4,
+      new AbortController().signal,
+      { endpoint: '' },
+    )
+    const urls = request.mock.calls.map(([input]) => input.url)
+    expect(urls.some((url) => url.includes('isci.si'))).toBe(false)
+    expect(urls.some((url) => url.includes('format=json') && url.includes('/search?q='))).toBe(false)
+    expect(result.warnings.some((warning) => warning.includes('SearXNG'))).toBe(false)
+  })
 })

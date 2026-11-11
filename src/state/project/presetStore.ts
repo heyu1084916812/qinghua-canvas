@@ -26,6 +26,7 @@ import { ROUTE_STRATEGIES, type RouteStrategy } from '../../domain/project/model
 import type { PresetModel } from '../../domain/project/modelPresets'
 import {
   DEFAULT_SEARXNG_ENDPOINT,
+  LEGACY_PUBLIC_SEARXNG_ENDPOINT,
   normalizeSearxngEndpoint,
   type WebSearchSettings,
 } from '../../domain/inspiration/designResearch'
@@ -52,6 +53,8 @@ const AGENT_DELIVERY_ROW_ID = 'agent:delivery'
 const AGENT_REVIEW_MODEL_ROW_ID = 'agent:review-model'
 const AGENT_CANVAS_REVIEW_ROW_ID = 'agent:canvas-review'
 const AGENT_WEB_SEARCH_ROW_ID = 'agent:web-search'
+/** Agent 输入框「联网」开关；全局一份，与画布巡检开关同住 presets。 */
+const AGENT_WEB_RESEARCH_ROW_ID = 'agent:web-research'
 
 /**
  * **技能收藏**的保留行 id（用户 2026-10-03：对话窗的技能菜单要按参考产品分成
@@ -165,8 +168,12 @@ export interface PresetStore {
   /** 是否允许本轮向模型提供画布巡检工具；缺行默认关闭。 */
   loadAgentCanvasReview(): Promise<boolean>
   saveAgentCanvasReview(enabled: boolean): Promise<void>
+  /** SearXNG 地址；空串表示未配置（不再有公共默认实例）。 */
   loadAgentWebSearch(): Promise<WebSearchSettings>
   saveAgentWebSearch(settings: WebSearchSettings): Promise<void>
+  /** Agent「联网」开关；缺行默认开启（没填 Tavily Key 时工具会如实提示去设置）。 */
+  loadAgentWebResearch(): Promise<boolean>
+  saveAgentWebResearch(enabled: boolean): Promise<void>
   /** 读技能收藏（技能 id 列表）；没收藏过返回空数组 */
   loadSkillFavorites(): Promise<string[]>
   /** 写技能收藏（整份覆盖） */
@@ -381,6 +388,10 @@ export function createPresetStore(storage: StoragePort): PresetStore {
         const endpoint = normalizeSearxngEndpoint(
           (rows[0] as { endpoint?: unknown } | undefined)?.endpoint,
         )
+        // 旧版本把公共实例当默认值写进过设置；它长期 429，读到按“未配置”处理。
+        if (endpoint === LEGACY_PUBLIC_SEARXNG_ENDPOINT) {
+          return { endpoint: DEFAULT_SEARXNG_ENDPOINT }
+        }
         return { endpoint: endpoint || DEFAULT_SEARXNG_ENDPOINT }
       } catch {
         return { endpoint: DEFAULT_SEARXNG_ENDPOINT }
@@ -392,6 +403,25 @@ export function createPresetStore(storage: StoragePort): PresetStore {
         'presets',
         { id: AGENT_WEB_SEARCH_ROW_ID, endpoint } as never,
       )
+    },
+    async loadAgentWebResearch() {
+      try {
+        const rows = await storage.query('presets', { id: AGENT_WEB_RESEARCH_ROW_ID })
+        const enabled = (rows[0] as { enabled?: unknown } | undefined)?.enabled
+        return typeof enabled === 'boolean' ? enabled : true
+      } catch {
+        return true
+      }
+    },
+    async saveAgentWebResearch(enabled) {
+      try {
+        await storage.put(
+          'presets',
+          { id: AGENT_WEB_RESEARCH_ROW_ID, enabled } as never,
+        )
+      } catch {
+        // 偏好写入失败不影响当前会话；下次仍沿用旧值。
+      }
     },
     async loadSkillFavorites() {
       try {

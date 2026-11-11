@@ -1,5 +1,4 @@
 import {
-  DEFAULT_SEARXNG_ENDPOINT,
   normalizeSearxngEndpoint,
   type DesignResearchItem,
   type WebSearchSettings,
@@ -167,13 +166,14 @@ export async function searchOpenResearch(
   wikipediaUrl.searchParams.set('inprop', 'url')
   wikipediaUrl.searchParams.set('format', 'json')
   wikipediaUrl.searchParams.set('origin', '*')
-  const searxngUrl = new URL(
-    normalizeSearxngEndpoint(webSearch?.endpoint) || DEFAULT_SEARXNG_ENDPOINT,
-  )
-  searxngUrl.searchParams.set('q', query)
-  searxngUrl.searchParams.set('format', 'json')
-  const searxngImageUrl = new URL(searxngUrl)
-  searxngImageUrl.searchParams.set('categories', 'images')
+  // SearXNG 只在用户自己配置了实例时才查；未配置静默跳过，不刷警告。
+  const searxngEndpoint = normalizeSearxngEndpoint(webSearch?.endpoint)
+  const searxngUrl = searxngEndpoint ? new URL(searxngEndpoint) : null
+  searxngUrl?.searchParams.set('q', query)
+  searxngUrl?.searchParams.set('format', 'json')
+  const searxngImageUrl = searxngUrl ? new URL(searxngUrl) : null
+  searxngImageUrl?.searchParams.set('categories', 'images')
+  const skipped = Promise.resolve(null)
 
   const warnings: string[] = []
   const [images, content, culture, museums, searxngImages, web] = await Promise.allSettled([
@@ -181,8 +181,8 @@ export async function searchOpenResearch(
     requestJson(network, wikipediaUrl.toString(), signal),
     searchOpenCulture(network, query, contentLimit, signal),
     searchMuseumCollections(network, query, contentLimit, signal),
-    requestJson(network, searxngImageUrl.toString(), signal),
-    requestJson(network, searxngUrl.toString(), signal),
+    searxngImageUrl ? requestJson(network, searxngImageUrl.toString(), signal) : skipped,
+    searxngUrl ? requestJson(network, searxngUrl.toString(), signal) : skipped,
   ])
   const items: DesignResearchItem[] = []
   if (images.status === 'fulfilled') {
@@ -208,12 +208,14 @@ export async function searchOpenResearch(
     warnings.push(`博物馆搜索失败：${errorTextOf(museums.reason)}`)
   }
   if (searxngImages.status === 'fulfilled') {
-    items.push(...searxngItems(searxngImages.value, searxImageLimit, 'image'))
+    if (searxngImages.value !== null) {
+      items.push(...searxngItems(searxngImages.value, searxImageLimit, 'image'))
+    }
   } else {
     warnings.push(`SearXNG 图片搜索失败：${errorTextOf(searxngImages.reason)}`)
   }
   if (web.status === 'fulfilled') {
-    items.push(...searxngItems(web.value, contentLimit, 'web'))
+    if (web.value !== null) items.push(...searxngItems(web.value, contentLimit, 'web'))
   } else {
     warnings.push(`SearXNG 搜索失败：${errorTextOf(web.reason)}`)
   }

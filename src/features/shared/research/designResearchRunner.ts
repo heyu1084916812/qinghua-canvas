@@ -15,6 +15,7 @@ import type { NetworkPort } from '../../../platform/ports'
 import { isPublicHttpUrl } from '../../../domain/shared/publicUrl'
 import { errorTextOf } from '../../../shared/result'
 import { searchOpenResearch } from './openResearchSearch'
+import { searchTavily, TAVILY_KEY_MISSING_MESSAGE } from './tavilySearch'
 
 export interface DesignResearchRunnerInput {
   topic: string
@@ -22,17 +23,36 @@ export interface DesignResearchRunnerInput {
   maxResults?: number
   /** Clipper 等单页抓取只读用户给出的 URL，不额外做开放图片/百科搜索。 */
   includeOpenSearch?: boolean
+  /** 模型给出的 1–4 个检索角度（可含英文）；缺省时用 topic。 */
+  queries?: readonly string[]
 }
 
 export interface DesignResearchRunnerDeps {
   network: NetworkPort
   libraryCases?: readonly InspirationCase[]
   webSearch?: WebSearchSettings
+  /** 用户在设置里填的 Tavily Key；只在请求头里使用，绝不回传。 */
+  tavilyApiKey?: string | null
 }
 
 export interface DesignResearchResult extends DesignResearchReport {
   ok: boolean
   warnings: string[]
+  /** 没填 / 填错 Tavily Key 或额度用尽：模型应如实告诉用户去设置里处理。 */
+  needsTavilyKey?: boolean
+  /** 需要用户处理的问题（目前只有 Tavily Key）。 */
+  error?: string
+}
+
+/** 规范化检索角度：去空、去重、最多 4 个；没有就用主题本身。 */
+export function researchQueriesOf(topic: string, queries?: readonly string[]): string[] {
+  const out: string[] = []
+  for (const raw of queries ?? []) {
+    const query = raw.replace(/\s+/g, ' ').trim().slice(0, 200)
+    if (query && !out.includes(query)) out.push(query)
+    if (out.length >= 4) break
+  }
+  return out.length > 0 ? out : [topic.trim()].filter(Boolean)
 }
 
 function providerOf(url: string): ResearchProvider {
@@ -149,12 +169,31 @@ export async function runDesignResearch(
     if (isPublicHttpUrl(url)) safeUrls.push(url)
     else warnings.push(`${url} 不是公开互联网地址，已跳过。`)
   }
-  const items = libraryItems(
-    deps.libraryCases ?? [],
-    request.topic,
-    Math.min(request.maxResults, 12),
-  )
+  /**
+   * 排序：用户给的 URL → Tavily → 本地灵感库 → 开放来源回退。
+   * Tavily 拿到结果时不再并发 Openverse / Wikipedia / 馆藏：它们对中文设计查询几乎全是噪声，
+   * 还会把 Tavily 结果挤出 maxResults；只有 Tavily 不可用（没 Key / 失败 / 0 条）时才回退。
+   */
+  const searchItems: DesignResearchItem[] = []
+  let needsTavilyKey = false
   if (input.includeOpenSearch !== false) {
+    const tavily = await searchTavily(
+      deps.network,
+      {
+        apiKey: deps.tavilyApiKey,
+        queries: researchQueriesOf(request.topic, input.queries),
+        maxResults: request.maxResults,
+      },
+      signal,
+    )
+    searchItems.push(...tavily.items)
+    warnings.push(...tavily.warnings)
+    needsTavilyKey = tavily.needsKey === true
+  }
+  searchItems.push(
+    ...libraryItems(deps.libraryCases ?? [], request.topic, Math.min(request.maxResults, 12)),
+  )
+  if (input.includeOpenSearch !== false && !searchItems.some((item) => item.source === 'tavily')) {
     const openSearch = await searchOpenResearch(
       deps.network,
       request.topic,
@@ -162,9 +201,10 @@ export async function runDesignResearch(
       signal,
       deps.webSearch,
     )
-    items.push(...openSearch.items)
+    searchItems.push(...openSearch.items)
     warnings.push(...openSearch.warnings)
   }
+  const items: DesignResearchItem[] = []
 
   const pages = await Promise.allSettled(
     safeUrls.map(async (url) => {
@@ -201,12 +241,13 @@ export async function runDesignResearch(
       )
     }
   }
+  items.push(...searchItems)
 
   if (items.length === 0) {
     warnings.push(
       input.includeOpenSearch === false
         ? '页面没有提供可用的 Open Graph 图片或文章内容。'
-        : '开放搜索没有找到可用参考；可以补充公开 Pinterest / Behance / 网页 URL，或在设置中换成可用的 SearXNG 实例后重试。',
+        : '联网搜索没有找到可用参考；可以换个角度或英文关键词再搜，或补充公开网页 URL。',
     )
   }
 
@@ -218,5 +259,11 @@ export async function runDesignResearch(
     ok: !signal.aborted && items.length > 0,
     ...report,
     warnings,
+    ...(needsTavilyKey
+      ? {
+          needsTavilyKey: true,
+          error: warnings.find((warning) => warning.includes('Tavily')) ?? TAVILY_KEY_MISSING_MESSAGE,
+        }
+      : {}),
   }
 }

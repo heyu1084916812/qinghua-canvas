@@ -21,7 +21,13 @@ export const DESIGN_RESEARCH_MAX_IMAGE_PIXELS = 20_000_000
 export const DESIGN_RESEARCH_RIGHTS_NOTE =
   '仅收集公开页面元数据与来源链接。图片权利归原作者所有，保存或商用前请核对来源许可。'
 
-export const DEFAULT_SEARXNG_ENDPOINT = 'https://www.isci.si/search'
+/**
+ * SearXNG 不再有内置公共实例（2026-11-11）：唯一的默认实例 `www.isci.si` 对 JSON API 长期 429，
+ * 等于每轮都白发两次请求、刷一条警告。现在留空 = 跳过；用户自建实例时再填。
+ */
+export const DEFAULT_SEARXNG_ENDPOINT = ''
+/** 旧版本写进设置里的公共默认实例；读到它按“未配置”处理。 */
+export const LEGACY_PUBLIC_SEARXNG_ENDPOINT = 'https://www.isci.si/search'
 
 export interface WebSearchSettings {
   endpoint: string

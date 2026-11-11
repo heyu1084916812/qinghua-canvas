@@ -123,17 +123,34 @@ describe('Agent 默认模型 · UI 偏好', () => {
     expect(await createPresetStore(createMemoryPlatform().storage).loadAgentCanvasReview()).toBe(false)
   })
 
-  it('web search normalizes the SearXNG endpoint and persists it', async () => {
+  it('web search has no public SearXNG default and persists a user endpoint', async () => {
     const platform = createMemoryPlatform()
     const presets = createPresetStore(platform.storage)
 
-    expect(await presets.loadAgentWebSearch()).toEqual({
-      endpoint: 'https://www.isci.si/search',
-    })
+    expect(await presets.loadAgentWebSearch()).toEqual({ endpoint: '' })
     await presets.saveAgentWebSearch({ endpoint: 'https://search.example.com' })
     expect(await createPresetStore(platform.storage).loadAgentWebSearch()).toEqual({
       endpoint: 'https://search.example.com/search',
     })
+    await presets.saveAgentWebSearch({ endpoint: '' })
+    expect(await presets.loadAgentWebSearch()).toEqual({ endpoint: '' })
+  })
+
+  it('treats the legacy public SearXNG default saved by old versions as unset', async () => {
+    const platform = createMemoryPlatform()
+    const presets = createPresetStore(platform.storage)
+    await presets.saveAgentWebSearch({ endpoint: 'https://www.isci.si/search' })
+    expect(await presets.loadAgentWebSearch()).toEqual({ endpoint: '' })
+  })
+
+  it('web research toggle defaults on and persists an explicit off', async () => {
+    const platform = createMemoryPlatform()
+    const presets = createPresetStore(platform.storage)
+    expect(await presets.loadAgentWebResearch()).toBe(true)
+    await presets.saveAgentWebResearch(false)
+    expect(await createPresetStore(platform.storage).loadAgentWebResearch()).toBe(false)
+    await presets.saveAgentWebResearch(true)
+    expect(await createPresetStore(platform.storage).loadAgentWebResearch()).toBe(true)
   })
 })
 

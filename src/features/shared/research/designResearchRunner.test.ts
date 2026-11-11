@@ -1,7 +1,8 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { InspirationCase } from '../../../domain/inspiration/cases'
 import type { NetworkPort } from '../../../platform/ports'
-import { runDesignResearch } from './designResearchRunner'
+import { researchQueriesOf, runDesignResearch } from './designResearchRunner'
+import { TAVILY_KEY_MISSING_MESSAGE, TAVILY_SEARCH_ENDPOINT } from './tavilySearch'
 
 function networkWith(pages: Record<string, string>): NetworkPort {
   return {
@@ -119,8 +120,10 @@ describe('runDesignResearch', () => {
 
     expect(result.ok).toBe(true)
     expect(result.totalItems).toBe(2)
-    expect(result.items.map((item) => item.source)).toEqual(['web', 'pinterest'])
-    expect(result.warnings).toEqual([])
+    // 用户给的 URL 排在最前，本地灵感库在后。
+    expect(result.items.map((item) => item.source)).toEqual(['pinterest', 'web'])
+    expect(result.warnings).toEqual([TAVILY_KEY_MISSING_MESSAGE])
+    expect(result.needsTavilyKey).toBe(true)
   })
 
   it('keeps successful pages and reports failed URLs without fabricating items', async () => {
@@ -148,8 +151,7 @@ describe('runDesignResearch', () => {
       url: 'https://example.com/project',
       imageUrl: 'https://example.com/cover.jpg',
     })
-    expect(result.warnings).toHaveLength(1)
-    expect(result.warnings[0]).toContain('offline')
+    expect(result.warnings.filter((warning) => warning.includes('offline'))).toHaveLength(1)
   })
 
   it('uses the final redirect URL to resolve relative image metadata', async () => {
@@ -312,6 +314,58 @@ describe('runDesignResearch', () => {
 
     expect(result.ok).toBe(false)
     expect(result.items).toEqual([])
-    expect(result.warnings[0]).toContain('aborted')
+    expect(result.warnings.join(' ')).toContain('aborted')
+  })
+
+  it('puts Tavily results first and skips the open-source fallback when Tavily answers', async () => {
+    const seen: string[] = []
+    const request = vi.fn<NetworkPort['request']>(async (req) => {
+      seen.push(req.url)
+      if (req.url === TAVILY_SEARCH_ENDPOINT) {
+        return {
+          status: 200,
+          headers: {},
+          text: async () => '',
+          json: async <T,>() => ({
+            results: [{ title: 'Coffee trends', url: 'https://t.example.com/a', content: 'c', score: 1 }],
+            images: [{ url: 'https://t.example.com/a.jpg', description: 'poster' }],
+          }) as T,
+          arrayBuffer: async () => new ArrayBuffer(0),
+        }
+      }
+      throw new Error(`unexpected ${req.url}`)
+    })
+    const result = await runDesignResearch(
+      { topic: '咖啡海报', queries: ['咖啡海报 趋势', 'coffee poster trend 2026'], maxResults: 8 },
+      { network: { request, stream: async function* () {} }, libraryCases: library, tavilyApiKey: 'k' },
+      new AbortController().signal,
+    )
+    expect(result.ok).toBe(true)
+    expect(result.items[0]?.source).toBe('tavily')
+    // 两个角度返回同样的链接，去重后只剩一份网页 + 一张图。
+    expect(result.items.map((item) => item.source)).toEqual(['tavily', 'tavily'])
+    expect(seen.every((url) => url === TAVILY_SEARCH_ENDPOINT)).toBe(true)
+    expect(seen).toHaveLength(2)
+    expect(result.needsTavilyKey).toBeUndefined()
+    expect(JSON.stringify(result)).not.toContain('Bearer')
+  })
+
+  it('without a Tavily key reports needsTavilyKey and still falls back to open sources', async () => {
+    const network = networkWith({})
+    const result = await runDesignResearch(
+      { topic: 'bakery' },
+      { network, libraryCases: library, tavilyApiKey: null },
+      new AbortController().signal,
+    )
+    expect(result.needsTavilyKey).toBe(true)
+    expect(result.error).toBe(TAVILY_KEY_MISSING_MESSAGE)
+    expect(result.items.some((item) => item.source === 'tavily')).toBe(false)
+  })
+})
+
+describe('researchQueriesOf', () => {
+  it('dedupes, trims and caps angles at four, falling back to the topic', () => {
+    expect(researchQueriesOf('主题', [' a ', 'a', 'b', '', 'c', 'd', 'e'])).toEqual(['a', 'b', 'c', 'd'])
+    expect(researchQueriesOf(' 主题 ')).toEqual(['主题'])
   })
 })
