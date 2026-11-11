@@ -202,5 +202,42 @@ describe('runAgentReferenceCuration', () => {
     expect(await run('_Image 17.jpg')).toEqual({ stored: '拿铁杯产品图', reported: '拿铁杯产品图' })
     expect(await run('我的杯子')).toEqual({ stored: '我的杯子', reported: '我的杯子' })
   })
+
+  it('C3：单图参考的 What 追加本地像素采样的主色 HEX', async () => {
+    const storage = storageWith({ referenceItems: [item({ title: '杯子', assets: undefined })] })
+    const samplePalette = vi.fn(async () => [
+      { hex: '#1F3D2B', share: 0.62 },
+      { hex: '#F4EFE6', share: 0.3 },
+    ])
+    const result = await runAgentReferenceCuration({
+      storage: storage as never,
+      assets: { read: vi.fn(async () => ({ bytes: png, mime: 'image/png' })) },
+      routeExecution: {
+        execute: vi.fn(async () => ({
+          text: JSON.stringify({ what: '深绿色杯子，米色背景。', usage: 'subject', howToUse: '借：杯子；避：背景。' }),
+        })),
+      },
+      onRecordWarning: vi.fn(),
+      samplePalette,
+    }, {
+      projectId: 'p1',
+      sessionId: 's1',
+      operationId: 'op1',
+      taskKey: 'task:t1',
+      task: '做海报',
+      route: {
+        channelId: 'c1',
+        logicalModel: 'Vision',
+        upstreamModel: 'vision-upstream',
+        routePlanId: 'plan',
+        candidates: [{ channelId: 'c1', model: 'vision-upstream' }],
+      },
+      preferredItemIds: ['ref-kit-1'],
+    })
+    expect(samplePalette).toHaveBeenCalledWith(png, 'image/png')
+    const expected = '深绿色杯子，米色背景。主色（本地像素采样）：#1F3D2B 62%、#F4EFE6 30%。'
+    expect(storage.tables.referenceItems?.[0]?.what).toBe(expected)
+    expect(result.analyzed[0]?.what).toBe(expected)
+  })
 })
 

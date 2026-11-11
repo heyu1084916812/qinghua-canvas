@@ -12,6 +12,11 @@ import {
   type ReferenceCurationResult,
 } from '../../../../domain/project/referenceCuration'
 import { isAutoReferenceTitle } from '../../../../domain/project/referenceTitle'
+import {
+  paletteSentence,
+  type PaletteColor,
+} from '../../../../domain/project/referencePalette'
+import { sampleImagePalette } from './agentReferencePalette'
 import { imageSizeFromHeader } from '../../../../domain/shared/imageSize'
 import type { PlatformKit } from '../../../../platform/ports'
 import type { RouteExecutionPort } from '../../../../features/shared/agent/RouteExecutionPort'
@@ -29,6 +34,8 @@ export interface AgentReferenceCurationDeps {
   assets: Pick<PlatformKit['assets'], 'read'>
   routeExecution: RouteExecutionPort
   onRecordWarning(warning: string): void
+  /** C3：本地像素采样主色；缺省用浏览器解码，测试可注入。 */
+  samplePalette?(bytes: Uint8Array, mime: string): Promise<PaletteColor[] | null>
 }
 
 export interface AgentReferenceCurationInput {
@@ -91,7 +98,11 @@ export async function runAgentReferenceCuration(
   const failed: ReferenceCurationResult['failed'] = []
   for (const item of candidates) {
     if (input.signal?.aborted) break
-    const prepared = await prepareItemImages(item, deps.assets)
+    const prepared = await prepareItemImages(
+      item,
+      deps.assets,
+      deps.samplePalette ?? ((bytes, mime) => sampleImagePalette(bytes, mime)),
+    )
     limitations.push(
       ...prepared.limitations.map((reason) => `「${item.title}」${reason}`),
     )
@@ -143,6 +154,11 @@ export async function runAgentReferenceCuration(
         continue
       }
       const now = Date.now()
+      // C3：颜色给本地采样的真实色值，不让模型猜 HEX。
+      const palette = paletteSentence(prepared.palette)
+      const whatWithPalette = palette
+        ? `${parsed.analysis.what.replace(/[。.]?\s*$/, '')}。${palette}。`
+        : parsed.analysis.what
       // C1：文件名式标题换成分析给出的语义短名；用户自己起的标题不动。
       const title = parsed.analysis.title && isAutoReferenceTitle(item.title)
         ? parsed.analysis.title
@@ -150,7 +166,7 @@ export async function runAgentReferenceCuration(
       const nextItem: ReferenceItem = {
         ...item,
         title,
-        what: parsed.analysis.what,
+        what: whatWithPalette,
         updatedAt: now,
       }
       const usage: ReferenceUsage = {
@@ -173,7 +189,7 @@ export async function runAgentReferenceCuration(
       analyzed.push({
         itemId: item.id,
         title,
-        what: parsed.analysis.what,
+        what: whatWithPalette,
         usage: parsed.analysis.usage,
         howToUse: parsed.analysis.howToUse,
       })
@@ -210,10 +226,12 @@ export async function runAgentReferenceCuration(
 async function prepareItemImages(
   item: ReferenceItem,
   assets: AgentReferenceCurationDeps['assets'],
+  samplePalette: NonNullable<AgentReferenceCurationDeps['samplePalette']>,
 ): Promise<{
   inputs: NodeInput[]
   labels: string[]
   limitations: string[]
+  palette: PaletteColor[]
 }> {
   const refs = item.assets?.length
     ? item.assets
@@ -227,6 +245,7 @@ async function prepareItemImages(
   const inputs: NodeInput[] = []
   const labels: string[] = []
   const limitations: string[] = []
+  let palette: PaletteColor[] = []
   const seen = new Set<string>()
   for (const [index, ref] of refs.entries()) {
     if (inputs.length >= MAX_IMAGES_PER_ITEM) {
@@ -255,8 +274,12 @@ async function prepareItemImages(
         : {}),
     })
     labels.push(assetLabel(ref, index))
+    // 只采第一张可读的非 Logo 图（套件里 Logo 的颜色另有规范）；单图卡就是它本身。
+    if (palette.length === 0 && (ref.role !== 'logo' || refs.length === 1)) {
+      palette = (await samplePalette(payload.bytes, payload.mime).catch(() => null)) ?? []
+    }
   }
-  return { inputs, labels, limitations }
+  return { inputs, labels, limitations, palette }
 }
 
 function assetLabel(asset: ReferenceAssetRef, index: number): string {

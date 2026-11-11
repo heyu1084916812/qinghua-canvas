@@ -543,6 +543,51 @@
   "moduleMoves": [],
   "modules": [
     {
+      "module": "src/domain/project/referencePalette.ts",
+      "owner": "project-reference-curation-rules",
+      "responsibility": "从 RGBA 像素本地统计参考图主色并输出 HEX 与占比，生成写进参考卡的色值句。",
+      "owns": [
+        "像素量化与相近色合并",
+        "主色 HEX 与占比",
+        "色值句格式"
+      ],
+      "doesNotOwn": [
+        "图片解码",
+        "参考分析调用"
+      ],
+      "publicApi": [
+        "PaletteColor",
+        "dominantHexColors",
+        "paletteSentence"
+      ],
+      "test": [
+        "src/domain/project/referencePalette.test.ts"
+      ],
+      "budget": 100
+    },
+    {
+      "module": "src/workbenches/canvas/panels/AgentPanel/agentReferencePalette.ts",
+      "owner": "agent-reference-curation",
+      "responsibility": "在浏览器 / WebView 本地把参考图解码缩小后采样像素，得到主色；环境不支持时返回 null。",
+      "owns": [
+        "createImageBitmap + OffscreenCanvas 解码采样",
+        "失败静默降级"
+      ],
+      "doesNotOwn": [
+        "主色统计规则",
+        "参考卡写回"
+      ],
+      "publicApi": [
+        "RgbaDecoder",
+        "decodeImageToRgba",
+        "sampleImagePalette"
+      ],
+      "test": [
+        "src/workbenches/canvas/panels/AgentPanel/agentReferencePalette.test.ts"
+      ],
+      "budget": 60
+    },
+    {
       "module": "src/domain/project/referenceTitle.ts",
       "owner": "project-reference-curation-rules",
       "responsibility": "判断参考卡标题是否为文件名式自动标题，并整理参考分析给出的语义短名。",
