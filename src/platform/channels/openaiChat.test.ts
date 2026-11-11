@@ -104,6 +104,104 @@ describe('openaiChat adapter / 基础契约', () => {
     expect(calls).toBe(2)
   })
 
+  it('★★★ 65535 Gemini 前两次网关 502 后第三次成功，不切换协议', async () => {
+    const calls: string[] = []
+    const net = createMemoryNetwork({
+      handler: async (req) => {
+        calls.push(`${req.method} ${req.url}`)
+        if (calls.length < 3) {
+          return resp(502, { error: { message: 'upstream gateway unavailable' } })
+        }
+        return resp(200, {
+          choices: [{ message: { content: '第三次成功' }, finish_reason: 'stop' }],
+        })
+      },
+    })
+    const adapter = createOpenAiChatAdapter(
+      {
+        ...cfg,
+        protocol: '65535',
+        baseUrl: 'https://api2-cn.65535.space',
+      },
+      { network: net, assets: platformWith([]).assets },
+    )
+    const result = await adapter.completeText(
+      {
+        ...request([]),
+        model: 'gemini-3.8-flash',
+        tools: [{
+          name: 'readGraph',
+          description: '读取当前画布图',
+          parameters: {
+            type: 'object',
+            properties: { scope: { type: 'string' } },
+          },
+        }],
+      },
+      signal,
+    )
+
+    expect(calls).toEqual([
+      'POST https://api2-cn.65535.space/v1/chat/completions',
+      'POST https://api2-cn.65535.space/v1/chat/completions',
+      'POST https://api2-cn.65535.space/v1/chat/completions',
+    ])
+    expect(result).toMatchObject({
+      text: '第三次成功',
+      finishReason: 'stop',
+    })
+  })
+
+  it('65535 的 502 只做有限重试，不会误切 Gemini 原生协议', async () => {
+    let calls = 0
+    const net = createMemoryNetwork({
+      handler: async () => {
+        calls += 1
+        return resp(502, { error: { message: 'gateway' } })
+      },
+    })
+    const adapter = createOpenAiChatAdapter(
+      {
+        ...cfg,
+        protocol: '65535',
+        baseUrl: 'https://api2.65535.space',
+      },
+      { network: net, assets: platformWith([]).assets },
+    )
+    await expect(
+      adapter.completeText({ ...request([]), model: 'gpt-5.5' }, signal),
+    ).rejects.toBeInstanceOf(ChannelError)
+    expect(calls).toBe(3)
+  })
+
+  it('65535 Gemini 连续三次 502 后如实失败，不再切到同样不可用的原生入口', async () => {
+    const calls: string[] = []
+    const net = createMemoryNetwork({
+      handler: async (req) => {
+        calls.push(req.url)
+        return resp(502, {
+          error: { message: 'all upstream channels failed for model gemini-3.8-flash' },
+        })
+      },
+    })
+    const adapter = createOpenAiChatAdapter(
+      {
+        ...cfg,
+        protocol: '65535',
+        baseUrl: 'https://api2-cn.65535.space',
+      },
+      { network: net, assets: platformWith([]).assets },
+    )
+    await expect(
+      adapter.completeText({ ...request([]), model: 'gemini-3.8-flash' }, signal),
+    ).rejects.toMatchObject({ appError: { kind: 'http', status: 502 } })
+    expect(calls).toEqual([
+      'https://api2-cn.65535.space/v1/chat/completions',
+      'https://api2-cn.65535.space/v1/chat/completions',
+      'https://api2-cn.65535.space/v1/chat/completions',
+    ])
+  })
+
   it('streamChat 发送 stream=true，并原样转发正文、推理和工具参数分片', async () => {
     let body: Record<string, unknown> | null = null
     const net = createMemoryNetwork({ handler: async () => resp(200, {}) })
@@ -154,6 +252,50 @@ describe('openaiChat adapter / 基础契约', () => {
       },
       { type: 'done' },
     ])
+  })
+
+  it('★★ 65535 流式入口在首包前遇到 502 会退避重试', async () => {
+    let calls = 0
+    const net = createMemoryNetwork({ handler: async () => resp(200, {}) })
+    const streamNet = {
+      ...net,
+      async *stream(): AsyncIterable<StreamChunk> {
+        calls += 1
+        if (calls === 1) {
+          yield {
+            type: 'error',
+            error: {
+              kind: 'http',
+              status: 502,
+              body: 'all upstream channels failed for model gemini-3.8-flash',
+            },
+          }
+          return
+        }
+        yield { type: 'delta', text: '流式重试成功' }
+        yield { type: 'done' }
+      },
+    }
+    const adapter = createOpenAiChatAdapter(
+      {
+        ...cfg,
+        protocol: '65535',
+        baseUrl: 'https://api2-cn.65535.space',
+      },
+      { network: streamNet, assets: platformWith([]).assets },
+    )
+    const chunks: StreamChunk[] = []
+    for await (const chunk of adapter.streamChat!(
+      { ...request([]), model: 'gemini-3.8-flash' },
+      signal,
+    )) {
+      chunks.push(chunk)
+    }
+    expect(chunks).toEqual([
+      { type: 'delta', text: '流式重试成功' },
+      { type: 'done' },
+    ])
+    expect(calls).toBe(2)
   })
 })
 

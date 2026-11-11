@@ -21,6 +21,8 @@ import {
 } from './openaiCommon'
 import { prepareModelImageInput } from './chatImageInput'
 
+const S65535_CHAT_RETRY_DELAYS_MS = [250, 900] as const
+
 export interface OpenAiChatConfig extends SafeChannelConfig {
   apiKey: string | null
 }
@@ -252,10 +254,18 @@ function toBase64(bytes: Uint8Array): string {
 type GeminiPart =
   | { text: string }
   | { inlineData: { mimeType: string; data: string } }
+  | { functionCall: { name: string; args: Record<string, unknown> } }
+  | { functionResponse: { name: string; response: Record<string, unknown> } }
 
 interface GeminiNativeBody {
   candidates?: {
-    content?: { parts?: { text?: unknown; thought?: unknown }[] }
+    content?: {
+      parts?: {
+        text?: unknown
+        thought?: unknown
+        functionCall?: { name?: unknown; args?: unknown }
+      }[]
+    }
     finishReason?: string
   }[]
 }
@@ -283,14 +293,15 @@ function geminiNativeBody(
   request: TextRunRequest,
   imageParts: readonly ContentPart[],
 ): Record<string, unknown> {
-  const source =
-    request.messages && request.messages.length > 0
-      ? request.messages.map((message) => ({
-          role: message.role,
-          content: message.content,
-          imageNodeIds: message.imageNodeIds,
-        }))
-      : [{ role: 'user' as const, content: request.prompt, imageNodeIds: undefined }]
+  const source = request.messages?.length
+    ? request.messages
+    : [{ role: 'user' as const, content: request.prompt }]
+  const toolNames = new Map<string, string>()
+  for (const message of source) {
+    for (const call of message.toolCalls ?? []) {
+      if (call.id && call.name) toolNames.set(call.id, call.name)
+    }
+  }
   const systemInstruction = source
     .filter((message) => message.role === 'system')
     .map((message) => message.content.trim())
@@ -298,17 +309,59 @@ function geminiNativeBody(
     .join('\n\n')
   const inline = imageParts.map(geminiInlinePart).filter((part): part is GeminiPart => !!part)
   const lastUser = source.reduce((acc, message, index) => (message.role === 'user' ? index : acc), -1)
-  const contents = source.flatMap((message, index) =>
-    message.role === 'system'
-      ? []
-      : [{
-        role: message.role === 'assistant' ? 'model' : 'user',
-        parts: [{ text: message.content || ' ' }, ...(index === lastUser ? inline : [])],
-      }],
-  )
+  const contents = source.flatMap((message, index) => {
+    if (message.role === 'system') return []
+    if (message.role === 'tool') {
+      const name =
+        message.toolName ||
+        (message.toolCallId ? toolNames.get(message.toolCallId) : undefined) ||
+        'tool'
+      return [{
+        role: 'user',
+        parts: [{
+          functionResponse: {
+            name,
+            response: { content: message.content },
+          },
+        }],
+      }]
+    }
+    const parts: GeminiPart[] = []
+    if (message.content.trim()) parts.push({ text: message.content })
+    for (const call of message.toolCalls ?? []) {
+      let args: Record<string, unknown> = {}
+      try {
+        const parsed = JSON.parse(call.args) as unknown
+        if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+          args = parsed as Record<string, unknown>
+        }
+      } catch {
+        args = { raw: call.args }
+      }
+      parts.push({ functionCall: { name: call.name, args } })
+    }
+    if (index === lastUser) parts.push(...inline)
+    if (parts.length === 0) parts.push({ text: ' ' })
+    return [{
+      role: message.role === 'assistant' ? 'model' : 'user',
+      parts,
+    }]
+  })
   return {
     ...(systemInstruction ? { systemInstruction: { parts: [{ text: systemInstruction }] } } : {}),
     contents,
+    ...(request.tools?.length
+      ? {
+          tools: [{
+            functionDeclarations: request.tools.map((tool) => ({
+              name: tool.name,
+              ...(tool.description ? { description: tool.description } : {}),
+              parameters: tool.parameters,
+            })),
+          }],
+          toolConfig: { functionCallingConfig: { mode: 'AUTO' } },
+        }
+      : {}),
   }
 }
 
@@ -457,6 +510,74 @@ export function createOpenAiChatAdapter(config: OpenAiChatConfig, deps: ChannelD
     return parts
   }
 
+  const completeGeminiNative = async (
+    request: TextRunRequest,
+    signal: AbortSignal,
+  ): Promise<TextResult> => {
+    const parts = await imageParts(request)
+    const root = openAiBaseUrl(config).replace(/\/v\d+$/i, '')
+    const nativeRes = await postTextRequest(
+      deps,
+      {
+        url: `${root}/v1beta/models/${encodeURIComponent(request.model)}:generateContent`,
+        headers: { 'Content-Type': 'application/json', ...authHeader(config.apiKey) },
+        body: geminiNativeBody(request, parts),
+        timeoutMs: request.timeoutMs ?? CHAT_TIMEOUT_MS,
+      },
+      signal,
+    )
+    const nativeRaw = await nativeRes.text().catch(() => '')
+    if (nativeRes.status < 200 || nativeRes.status >= 300) {
+      const { error } = classifyError(null, nativeRes.status, nativeRaw)
+      throw new ChannelError(error)
+    }
+    let nativeBody: GeminiNativeBody | null = null
+    try {
+      nativeBody = JSON.parse(nativeRaw) as GeminiNativeBody
+    } catch {
+      nativeBody = null
+    }
+    const nativeParts = nativeBody?.candidates?.[0]?.content?.parts ?? []
+    const nativeText = nativeParts
+      .filter((part) => part.thought !== true && !part.functionCall)
+      .map((part) => (typeof part.text === 'string' ? part.text : ''))
+      .join('')
+    const nativeReasoning = nativeParts
+      .filter((part) => part.thought === true)
+      .map((part) => (typeof part.text === 'string' ? part.text : ''))
+      .join('')
+    const toolCalls = nativeParts.flatMap((part, index) => {
+      const name = part.functionCall?.name
+      if (typeof name !== 'string' || !name) return []
+      const args = part.functionCall?.args
+      return [{
+        id: `gemini_call_${index}_${name}`,
+        name,
+        args: JSON.stringify(args && typeof args === 'object' ? args : {}),
+      }]
+    })
+    if (!nativeText.trim() && !nativeReasoning.trim() && toolCalls.length === 0) {
+      throw new ChannelError({
+        kind: 'parse',
+        raw: nativeRaw || 'Gemini 原生响应里没有 candidates[0].content.parts',
+      })
+    }
+    const finish = nativeBody?.candidates?.[0]?.finishReason
+    return {
+      text: nativeText,
+      ...(nativeReasoning.trim() ? { reasoning: nativeReasoning.trim() } : {}),
+      ...(toolCalls.length > 0 ? { toolCalls } : {}),
+      finishReason:
+        toolCalls.length > 0
+          ? 'tool_calls'
+          : finish === 'MAX_TOKENS'
+            ? 'length'
+            : finish === 'STOP'
+              ? 'stop'
+              : undefined,
+    }
+  }
+
   const streamChat: NonNullable<ChannelAdapter['streamChat']> = async function* (
     request,
     signal,
@@ -516,57 +637,89 @@ export function createOpenAiChatAdapter(config: OpenAiChatConfig, deps: ChannelD
             : request.prompt,
         }]
 
-    for await (const chunk of deps.network.stream(
-      {
-        url: chatUrl,
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          accept: 'text/event-stream',
-          ...authHeader(config.apiKey),
-        },
-        body: {
-          model: request.model,
-          messages,
-          stream: true,
-          ...(request.tools?.length
-            ? {
-                tools: request.tools.map((tool) => ({
-                  type: 'function',
-                  function: {
-                    name: tool.name,
-                    ...(tool.description ? { description: tool.description } : {}),
-                    parameters: tool.parameters,
-                  },
-                })),
-                tool_choice: 'auto',
-              }
-            : {}),
-        },
-        timeoutMs: request.timeoutMs ?? CHAT_TIMEOUT_MS,
+    const streamRequest = {
+      url: chatUrl,
+      method: 'POST' as const,
+      headers: {
+        'Content-Type': 'application/json',
+        accept: 'text/event-stream',
+        ...authHeader(config.apiKey),
       },
-      signal,
-    )) {
-      if (chunk.type === 'error') {
-        const appError = chunk.error
-        if (
-          !request.tools?.length &&
-          /gemini/i.test(request.model) &&
-          appError?.kind === 'http' &&
-          geminiNativeRequired(appError.status, appError.body ?? '')
-        ) {
-          const result = await completeText(request, signal)
-          if (result.reasoning) yield { type: 'delta', reasoning: result.reasoning }
-          if (result.text) yield { type: 'delta', text: result.text }
-          yield { type: 'done' }
-          return
+      body: {
+        model: request.model,
+        messages,
+        stream: true,
+        ...(request.tools?.length
+          ? {
+              tools: request.tools.map((tool) => ({
+                type: 'function',
+                function: {
+                  name: tool.name,
+                  ...(tool.description ? { description: tool.description } : {}),
+                  parameters: tool.parameters,
+                },
+              })),
+              tool_choice: 'auto',
+            }
+          : {}),
+      },
+      timeoutMs: request.timeoutMs ?? CHAT_TIMEOUT_MS,
+    }
+
+    for (let attempt = 0; attempt <= S65535_CHAT_RETRY_DELAYS_MS.length; attempt += 1) {
+      let yieldedOutput = false
+      let retry = false
+      for await (const chunk of deps.network.stream(streamRequest, signal)) {
+        if (chunk.type === 'error') {
+          const appError = chunk.error
+          const retryable65535 =
+            config.protocol === '65535' &&
+            appError?.kind === 'http' &&
+            [502, 503, 504].includes(appError.status)
+          if (
+            /gemini/i.test(request.model) &&
+            appError?.kind === 'http' &&
+            geminiNativeRequired(appError.status, appError.body ?? '')
+          ) {
+            const result = await completeGeminiNative(request, signal)
+            if (result.reasoning) yield { type: 'delta', reasoning: result.reasoning }
+            if (result.text) yield { type: 'delta', text: result.text }
+            if (result.toolCalls?.length) {
+              yield {
+                type: 'tool_call',
+                toolCallDeltas: result.toolCalls.map((call, index) => ({
+                  index,
+                  id: call.id,
+                  name: call.name,
+                  arguments: call.args,
+                })),
+              }
+            }
+            yield { type: 'done' }
+            return
+          }
+          if (
+            retryable65535 &&
+            !yieldedOutput &&
+            attempt < S65535_CHAT_RETRY_DELAYS_MS.length
+          ) {
+            retry = true
+            break
+          }
+          throw new ChannelError(
+            appError ?? { kind: 'network', detail: 'dns', sendPhase: 'unknown' },
+          )
         }
-        throw new ChannelError(
-          appError ?? { kind: 'network', detail: 'dns', sendPhase: 'unknown' },
-        )
+        if (chunk.type !== 'done') yieldedOutput = true
+        yield chunk
+        if (chunk.type === 'done') return
       }
-      yield chunk
-      if (chunk.type === 'done') return
+      if (!retry) return
+      await new Promise((resolve) => setTimeout(
+        resolve,
+        S65535_CHAT_RETRY_DELAYS_MS[attempt],
+      ))
+      if (signal.aborted) throw new DOMException('Aborted', 'AbortError')
     }
   }
 
@@ -681,22 +834,19 @@ export function createOpenAiChatAdapter(config: OpenAiChatConfig, deps: ChannelD
        */
       timeoutMs: request.timeoutMs ?? CHAT_TIMEOUT_MS,
     }
-    let res = await postTextRequest(
-      deps,
-      chatRequest,
-      signal,
-    )
+    let res = await postTextRequest(deps, chatRequest, signal)
     /**
-     * 65535 的对话网关会偶发 502 / 503 / 504，通常是网关没有拿到有效响应。
-     * 这里只对该站点重试一次；请求体逐字节不变，仍遵守 abort。
+     * 65535 的 Gemini 上游会出现短暂「all upstream channels failed」。
+     * 同一个 Key / 模型稍后重发即可成功，因此只对网关 5xx 做两次退避重试；
+     * 业务 4xx、超时和已提交未知结果都不走这里。
      */
-    if (
-      config.protocol === '65535' &&
-      (res.status === 502 || res.status === 503 || res.status === 504)
-    ) {
-      await new Promise((resolve) => setTimeout(resolve, 180))
-      if (signal.aborted) throw new DOMException('Aborted', 'AbortError')
-      res = await postTextRequest(deps, chatRequest, signal)
+    if (config.protocol === '65535') {
+      for (const delay of S65535_CHAT_RETRY_DELAYS_MS) {
+        if (res.status !== 502 && res.status !== 503 && res.status !== 504) break
+        await new Promise((resolve) => setTimeout(resolve, delay))
+        if (signal.aborted) throw new DOMException('Aborted', 'AbortError')
+        res = await postTextRequest(deps, chatRequest, signal)
+      }
     }
     if (res.status < 200 || res.status >= 300) {
       const detail = await res.text().catch(() => '')
@@ -706,53 +856,10 @@ export function createOpenAiChatAdapter(config: OpenAiChatConfig, deps: ChannelD
        * 并按原生长相转回 `TextResult`，上层无需感知协议差异。
        */
       if (
-        !request.tools?.length &&
         /gemini/i.test(request.model) &&
         geminiNativeRequired(res.status, detail)
       ) {
-        const root = openAiBaseUrl(config).replace(/\/v\d+$/i, '')
-        const nativeRes = await postTextRequest(
-          deps,
-          {
-            url: `${root}/v1beta/models/${encodeURIComponent(request.model)}:generateContent`,
-            headers: { 'Content-Type': 'application/json', ...authHeader(config.apiKey) },
-            body: geminiNativeBody(request, parts),
-            timeoutMs: request.timeoutMs ?? CHAT_TIMEOUT_MS,
-          },
-          signal,
-        )
-        const nativeRaw = await nativeRes.text().catch(() => '')
-        if (nativeRes.status < 200 || nativeRes.status >= 300) {
-          const { error } = classifyError(null, nativeRes.status, nativeRaw)
-          throw new ChannelError(error)
-        }
-        let nativeBody: GeminiNativeBody | null = null
-        try {
-          nativeBody = JSON.parse(nativeRaw) as GeminiNativeBody
-        } catch {
-          nativeBody = null
-        }
-        const nativeParts = nativeBody?.candidates?.[0]?.content?.parts ?? []
-        const nativeText = nativeParts
-          .filter((part) => part.thought !== true)
-          .map((part) => (typeof part.text === 'string' ? part.text : ''))
-          .join('')
-        const nativeReasoning = nativeParts
-          .filter((part) => part.thought === true)
-          .map((part) => (typeof part.text === 'string' ? part.text : ''))
-          .join('')
-        if (!nativeText.trim() && !nativeReasoning.trim()) {
-          throw new ChannelError({
-            kind: 'parse',
-            raw: nativeRaw || 'Gemini 原生响应里没有 candidates[0].content.parts[].text',
-          })
-        }
-        const finish = nativeBody?.candidates?.[0]?.finishReason
-        return {
-          text: nativeText,
-          ...(nativeReasoning.trim() ? { reasoning: nativeReasoning.trim() } : {}),
-          finishReason: finish === 'MAX_TOKENS' ? 'length' : finish === 'STOP' ? 'stop' : undefined,
-        }
+        return completeGeminiNative(request, signal)
       }
       const { error } = classifyError(null, res.status, detail)
       throw new ChannelError(error)
