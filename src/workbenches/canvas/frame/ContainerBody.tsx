@@ -8,6 +8,7 @@ import {
 } from '../../../domain/canvas/layout/packContainer'
 import styles from './ContainerBody.module.css'
 import { useDraggingId } from '../storeContext'
+import { useAssetThumbUrl } from '../../../features/shared/assets/index'
 
 export interface ContainerBodyProps {
   /** 容器节点自身（取类型与 data.childIds 作排序键） */
@@ -27,6 +28,8 @@ export interface ContainerBodyProps {
    * 值来自 `groupBgOf(node)`（缺字段 / 非法值已经在那边归一过）。
    */
   bg?: GroupBgTone
+  /** 批量运行后投影到容器上的结果缩略图；分组不传 */
+  resultHashes?: string[]
 }
 
 /**
@@ -40,7 +43,7 @@ export interface ContainerBodyProps {
  * 子节点的 local x/y 由网格决定，故渲染时归零（见 画布表面）。
  */
 export function ContainerBody(props: ContainerBodyProps) {
-  const { node, kind, children = [], renderChild, bg } = props
+  const { node, kind, children = [], renderChild, bg, resultHashes = [] } = props
   const childIds = (node.data as { childIds?: string[] }).childIds ?? []
   const ordered = useMemo(() => orderChildren(children, childIds), [children, childIds])
   const packs = useMemo(() => packContainerChildren(ordered.length), [ordered.length])
@@ -104,6 +107,14 @@ export function ContainerBody(props: ContainerBodyProps) {
         })}
       </div>
 
+      {resultHashes.length > 0 && (
+        <div className={styles.resultStrip} data-batch-result-strip>
+          {resultHashes.slice(0, 6).map((hash, index) => (
+            <ResultThumb key={`${hash}:${index}`} hash={hash} />
+          ))}
+        </div>
+      )}
+
       {ordered.length === 0 && (
         <div className={styles.empty} data-container-empty {...{ [`data-${kind}-empty`]: '' }}>
           <span className={styles.emptyText}>{props.emptyText}</span>
@@ -111,6 +122,15 @@ export function ContainerBody(props: ContainerBodyProps) {
         </div>
       )}
     </div>
+  )
+}
+
+function ResultThumb({ hash }: { hash: string }) {
+  const url = useAssetThumbUrl(hash)
+  return (
+    <span className={styles.resultThumb} data-batch-result-thumb={hash}>
+      {url ? <img src={url} alt="" draggable={false} /> : null}
+    </span>
   )
 }
 

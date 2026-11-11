@@ -20,6 +20,12 @@ const DATA_EXCLUDED: ReadonlySet<string> = new Set([
    */
   'naturalSize',
   'thumbOrder', // 展示顺序
+  'lastRunPrompt', // 上次实际发出的文案，是产物描述，不是输入
+  'lastRoundIndex',
+  'lastRoundPrompt',
+  'lastRoundAssets',
+  'batchResultHash',
+  'batchResultHashes',
   'upstreamHidden', // 显示开关
   'hiddenIds',
   'hiddenPromptIds',

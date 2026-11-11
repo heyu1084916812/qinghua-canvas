@@ -18,6 +18,7 @@ import type { GenerationData } from '../../../domain/canvas/model/node'
 import { isGenericGenerationTitle } from '../../../domain/canvas/naming/autoTitle'
 import { createId } from '../../../shared/id'
 import type { ExecutionPlacement } from '../../shared/execution/placement'
+import { actualPromptOf } from '../../shared/execution/runPrompt'
 import type { CanvasRunTask } from './buildRunPlan'
 import { rememberFreshAsset } from '../../../platform/freshAssets'
 
@@ -178,6 +179,7 @@ export function createCanvasPlacement(getProjectId: () => string): ExecutionPlac
         assetMime: first?.mime ?? null,
         thumbOrder: assets.map((a) => a.hash),
         naturalSize: natural,
+        lastRunPrompt: actualPromptOf(task, task.request),
       }
       /**
        * **一律按产物真实比例定尺寸**（用户 2026-09-17 报「白框」）。
@@ -229,6 +231,30 @@ export function createCanvasPlacement(getProjectId: () => string): ExecutionPlac
         task.autoTitle !== task.targetTitle
           ? [{ kind: 'node.rename' as const, id: targetId, title: task.autoTitle }]
           : []
+      const resultHashes = assets.map((asset) => asset.hash)
+      const childPreview =
+        task.collectionItemType === 'generation' &&
+        task.collectionItemId &&
+        task.collectionItemId !== targetId
+          ? {
+              kind: 'node.updateData' as const,
+              id: task.collectionItemId,
+              patch: {
+                batchResultHash: first?.hash ?? null,
+                lastRunPrompt: patch.lastRunPrompt,
+              },
+              transient: true,
+            }
+          : null
+      const batchPreview =
+        task.sourceType === 'batch' && task.nodeId !== targetId
+          ? {
+              kind: 'node.updateData' as const,
+              id: task.nodeId,
+              patch: { batchResultHashes: resultHashes },
+              transient: true,
+            }
+          : null
       return [
         ...stored,
         ...rename,
@@ -242,6 +268,8 @@ export function createCanvasPlacement(getProjectId: () => string): ExecutionPlac
           // reducer 的 updateData 以 cmd.transient 决定 silent 事务。
           transient: true,
         },
+        ...(childPreview ? [childPreview] : []),
+        ...(batchPreview ? [batchPreview] : []),
       ]
     },
 

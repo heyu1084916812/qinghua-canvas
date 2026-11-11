@@ -100,6 +100,18 @@ export interface GenerationData {
    * （退回节点当前尺寸），**不猜**。
    */
   naturalSize?: { width: number; height: number }
+  /**
+   * 最近一次真实渠道请求的最终 prompt（含执行期序号 / 循环变量）。
+   *
+   * `prompt` 存的是节点输入意图；这个字段存的是“实际发出去的那段字”。
+   * 日志、结果卡展示与排查都读它，避免每层各自重拼。
+   */
+  lastRunPrompt?: string
+  /**
+   * 批量运行时投影给内部生成子项的最近一张结果缩略图。
+   * 只用于展示，不覆盖子项自己的 assetHash（它仍可能是下一次生成的输入图）。
+   */
+  batchResultHash?: string
   prompt: string
   linkedPromptNodeIds: string[]
   channelId: string
@@ -251,6 +263,8 @@ export interface BatchData extends GenerationData {
   contentType: 'media' | 'prompt'
   childIds: string[]
   hiddenIds: string[]
+  /** 最近一次本批量运行产出的缩略图（供嵌套批量外层显示） */
+  batchResultHashes?: string[]
 }
 
 /**
@@ -278,6 +292,12 @@ export interface LoopData {
   usePrompt: boolean
   /** 本节点的提示词，多条：按轮次取模轮换 */
   prompts: string[]
+  /** 最近一次循环实际采用的第几轮（1 基，按 loopStart 计数） */
+  lastRoundIndex?: number
+  /** 最近一次循环实际交给下游的完整提示词 */
+  lastRoundPrompt?: string
+  /** 最近一次循环实际交给下游的图片 hash */
+  lastRoundAssets?: string[]
 }
 
 /** 矩形（原图像素坐标，整数） */

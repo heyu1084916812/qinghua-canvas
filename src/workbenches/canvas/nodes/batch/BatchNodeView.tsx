@@ -25,6 +25,7 @@ export function BatchNodeView(props: NodeViewProps) {
       kind="batch"
       children={props.childNodes}
       renderChild={props.renderChild}
+      resultHashes={data.batchResultHashes}
       emptyText={kind === 'prompt' ? '拖入提示词节点' : '拖入图片 / 视频素材'}
       emptyHint={
         kind === 'prompt'

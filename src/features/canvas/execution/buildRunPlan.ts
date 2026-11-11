@@ -105,6 +105,8 @@ export interface CanvasRunTask extends SharedRunTask {
    * 新建承载节点时带上它，新节点即可独立重跑，而不是一个空壳。
    */
   sourceData: NodeData
+  /** 集合项节点类型；用于把结果缩略图安全投影回批量子节点 */
+  collectionItemType?: NodeType | null
 }
 
 /**
@@ -502,6 +504,9 @@ export function buildRunPlan(
           sourceData: node.data,
           // 集合项来源（用于结果溯源）；非批量场景为 null
           collectionItemId: expansion.itemNodeId,
+          collectionItemType: expansion.itemNodeId
+            ? (index.get(expansion.itemNodeId)?.type ?? null)
+            : null,
           // 跨「集合展开 × 张数」连续编号：applyCallOrdinal 用它给 prompt
           // 加「第 n 次/项」后缀，保证多次调用的产物 hash 互不相同
           seq: seq * callsPerRunOf(node) + c,

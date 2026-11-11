@@ -5,6 +5,7 @@ import { createMemoryPlatform } from '../../../platform/memory'
 import { createCanvasStore } from '../../../state/workbenches/canvas/store'
 import { buildRunPlan } from './buildRunPlan'
 import { createCanvasPlacement } from './canvasPlacement'
+import { batchSpec } from '../../../domain/canvas/nodeSpecs/batch'
 
 describe('canvas placement carrier provenance', () => {
   beforeEach(() => {
@@ -81,5 +82,73 @@ describe('canvas placement carrier provenance', () => {
 
     expect(began.targetId).toBe(nodeId)
     expect(began.commands).toEqual([])
+  })
+
+  it('projects a batch item result back to the child as a preview without replacing its input', () => {
+    const platform = createMemoryPlatform()
+    const store = createCanvasStore({ platform, projectId: 'p1', debounceMs: 0 })
+    store.dispatch({
+      kind: 'node.create',
+      projectId: 'p1',
+      type: 'generation',
+      at: { x: 0, y: 0 },
+      id: 'item-1',
+      parentId: 'batch-1',
+      data: {
+        ...generationSpec.createDefaultData(),
+        assetHash: 'input-hash',
+      },
+    })
+    store.dispatch({
+      kind: 'node.create',
+      projectId: 'p1',
+      type: 'batch',
+      at: { x: 100, y: 0 },
+      id: 'batch-1',
+      data: {
+        ...batchSpec.createDefaultData(),
+        channelId: 'channel-1',
+        model: 'image-1',
+        prompt: '统一要求',
+        childIds: ['item-1'],
+        contentType: 'media',
+      },
+    })
+
+    const plan = buildRunPlan('node', { originNodeId: 'batch-1' }, store.getSnapshot(), 'single')
+    const task = plan.tasks[0]!
+    expect(task).toMatchObject({
+      nodeId: 'batch-1',
+      collectionItemId: 'item-1',
+      collectionItemType: 'generation',
+    })
+
+    const placement = createCanvasPlacement(() => 'p1')
+    const commands = placement.commit(task, 'carrier-1', [{
+      hash: 'output-hash',
+      mime: 'image/png',
+      bytes: new Uint8Array([1]),
+      width: 64,
+      height: 64,
+    }])
+    const projection = commands.find(
+      (command) => command.kind === 'node.updateData' && command.id === 'item-1',
+    )
+    const batchProjection = commands.find(
+      (command) => command.kind === 'node.updateData' && command.id === 'batch-1',
+    )
+
+    expect(projection).toMatchObject({
+      patch: {
+        batchResultHash: 'output-hash',
+        lastRunPrompt: '统一要求',
+      },
+      transient: true,
+    })
+    expect(batchProjection).toMatchObject({
+      patch: { batchResultHashes: ['output-hash'] },
+      transient: true,
+    })
+    expect((projection as { patch: Record<string, unknown> }).patch).not.toHaveProperty('assetHash')
   })
 })
