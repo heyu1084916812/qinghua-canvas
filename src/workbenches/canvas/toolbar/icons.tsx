@@ -441,6 +441,17 @@ export function IconExpand(props: IconProps) {
   )
 }
 
+/** 放大镜（带 +）：调研图片「查看大图」。 */
+export function IconZoomIn(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <circle cx="11" cy="11" r="6.5" />
+      <path d="M20 20l-4.2-4.2" />
+      <path d="M11 8.5v5M8.5 11h5" />
+    </Svg>
+  )
+}
+
 export function IconCollapse(props: IconProps) {
   return (
     <Svg {...props}>

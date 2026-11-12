@@ -91,7 +91,10 @@
   padding: 0;
   border: 0;
   background: transparent;
-  cursor: zoom-in;
+  cursor: pointer;
+}
+.imageButton:disabled {
+  cursor: default;
 }
 .imageButton img {
   display: block;
@@ -142,88 +145,78 @@
   opacity: 1;
   transform: translateY(0);
 }
-.add {
+/* G-R2：点图 = 勾选。选中态用强调色描边 + 右上角实心勾，未选时悬停才露出空心框。 */
+.tile[data-selected='true'] {
+  box-shadow: 0 0 0 2px var(--accent);
+}
+.check {
   position: absolute;
   top: 9px;
   right: 9px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 30px;
-  height: 30px;
+  box-sizing: border-box;
+  width: 22px;
+  height: 22px;
+  border: 1.5px solid color-mix(in srgb, var(--control-inverse-text) 86%, transparent);
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--control-inverse-bg) 40%, transparent);
+  color: var(--accent-text);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 140ms var(--ease-out);
+}
+.tile:hover .check,
+.tile:focus-within .check,
+.check[data-checked='true'] {
+  opacity: 1;
+}
+.check[data-checked='true'] {
+  border-color: var(--accent);
+  background: var(--accent);
+}
+.zoom {
+  position: absolute;
+  right: 9px;
+  bottom: 9px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
   padding: 0;
   border: 1px solid color-mix(in srgb, var(--control-inverse-text) 36%, transparent);
   border-radius: 999px;
   background: color-mix(in srgb, var(--control-inverse-bg) 70%, transparent);
   color: var(--control-inverse-text);
-  cursor: pointer;
+  cursor: zoom-in;
   opacity: 0;
   transition: opacity 140ms var(--ease-out);
 }
-.tile:hover .add,
-.tile:focus-within .add,
-.add[data-added='true'] {
+.tile:hover .zoom,
+.tile:focus-within .zoom {
   opacity: 1;
 }
-.add:hover,
-.add:focus-visible {
+.zoom:hover,
+.zoom:focus-visible {
   background: color-mix(in srgb, var(--control-inverse-bg) 92%, transparent);
-}
-.add[data-added='true'] {
-  color: var(--accent-text);
-}
-.add[data-busy='true'] {
-  opacity: 1;
-  cursor: wait;
 }
 .busySpinner {
   animation: research-gallery-spin 0.8s linear infinite;
 }
-.addConfirm {
-  position: absolute;
-  top: 46px;
-  right: 9px;
-  z-index: 3;
-  display: flex;
-  flex-direction: column;
-  gap: 7px;
-  width: 136px;
-  padding: 9px;
-  border: 1px solid var(--stroke);
-  border-radius: var(--radius-control);
-  background: var(--bg-surface);
-  box-shadow: var(--shadow-float);
-  color: var(--text-1);
-  font-size: var(--fs-chip);
-}
-.addConfirm div {
-  display: flex;
-  gap: 6px;
-}
-.addConfirm button {
-  flex: 1 1 0;
-  min-height: 26px;
-  border: 1px solid var(--stroke);
-  border-radius: 6px;
-  background: var(--bg-hover);
-  color: var(--text-1);
-  cursor: pointer;
-}
-.addConfirm button:first-child {
-  border-color: var(--accent);
-  background: var(--accent);
-  color: var(--accent-text);
-}
+/* 已发送过的图：悬停在图中央给两个动作（竖排，窄列也不与右下角放大镜相撞）。 */
 .hoverActions {
   position: absolute;
-  right: 50%;
-  bottom: 10px;
+  top: 50%;
+  left: 50%;
   display: flex;
-  align-items: center;
+  flex-direction: column;
+  align-items: stretch;
   gap: 6px;
   opacity: 0;
   pointer-events: none;
-  transform: translate(50%, 5px);
+  transform: translate(-50%, calc(-50% + 5px));
   transition:
     opacity 150ms var(--ease-out),
     transform 150ms var(--ease-out);
@@ -232,7 +225,7 @@
 .tile:focus-within .hoverActions {
   opacity: 1;
   pointer-events: auto;
-  transform: translate(50%, 0);
+  transform: translate(-50%, -50%);
 }
 .hoverActions button {
   min-height: 30px;
@@ -253,10 +246,9 @@
 .hoverActions button:focus-visible {
   background: color-mix(in srgb, var(--control-inverse-bg) 94%, transparent);
 }
-.hoverActions .download {
-  width: 30px;
-  padding: 0;
-  border-radius: 999px;
+.hoverActions button:disabled {
+  cursor: default;
+  opacity: 0.78;
 }
 .empty {
   margin: auto;

@@ -525,7 +525,6 @@ export function useAgentPanelSessionModel({
     appendReferenceIds: sessions.appendReferenceIds,
     applySessionSnapshot,
     notify: store.notify,
-    insertMention,
   })
 
   const {
@@ -675,7 +674,7 @@ export function useAgentPanelSessionModel({
     insertMention,
     addResearchReference: researchActions.addResearchReference,
     downloadResearchImage: researchActions.downloadResearchImage,
-    sendResearchToChat: researchActions.sendResearchToChat,
+    commitResearchSelection: researchActions.commitResearchSelection,
     cancelPendingAssetSync,
     writeDraftForSession,
     clearDraftForSession,

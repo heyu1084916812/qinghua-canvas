@@ -31,6 +31,7 @@ import { useAgentConfirmationController } from './useAgentConfirmationController
 import { useAgentContinuationController } from './useAgentContinuationController'
 import { useAgentStopController } from './useAgentStopController'
 import { useAgentPanelTurnCore } from './useAgentPanelTurnCore'
+import { useAgentResearchSelectionSend } from './useAgentResearchSelectionSend'
 import type { AgentPanelRefs } from './useAgentPanelRefs'
 import type { AgentPanelSessionModel } from './useAgentPanelSessionModel'
 import type { AgentPanelToolModel } from './useAgentPanelToolModel'
@@ -94,6 +95,7 @@ export function useAgentPanelTurnModel({
     writeDraftForSession,
     cancelPendingAssetSync,
     setQueueMenuId,
+    commitResearchSelection,
   } = session
   const { executeConfirmedToolWithLedger } = tool
   const {
@@ -246,11 +248,11 @@ export function useAgentPanelTurnModel({
       notify: store.notify,
     })
 
-  /** 输入框发送：空闲直接跑；忙碌时按当前“排队 / 引导”模式投递。 */
-  const send = useCallback(
-    (requestedMode: AgentDeliveryMode = deliveryMode) => {
-      if (!draft.trim()) return
-      if (current?.taskPlan && isAdvanceTaskCommand(draft)) {
+  /** 投递一条正文：空闲直接跑；忙碌时按当前“排队 / 引导”模式投递。 */
+  const dispatchText = useCallback(
+    (text: string, requestedMode: AgentDeliveryMode) => {
+      if (!text.trim()) return
+      if (current?.taskPlan && isAdvanceTaskCommand(text)) {
         setDraft('')
         writeDraftForSession(current.id, '')
         runPromiseDetached(
@@ -264,26 +266,36 @@ export function useAgentPanelTurnModel({
         (current && isSessionActivityActive(current.id))
       ) {
         if (requestedMode === 'steer' && statusCanSteer(status)) {
-          runPromiseDetached(guideDraft(draft), '发送引导失败')
+          runPromiseDetached(guideDraft(text), '发送引导失败')
         } else {
-          runPromiseDetached(queueText(draft), '排队失败')
+          runPromiseDetached(queueText(text), '排队失败')
         }
         return
       }
-      runPromiseDetached(sendText(draft), '发送失败')
+      runPromiseDetached(sendText(text), '发送失败')
     },
     [
       advanceTaskPlan,
       current,
-      deliveryMode,
-      draft,
       guideDraft,
       queueText,
       runPromiseDetached,
       sendText,
+      setDraft,
       status,
+      writeDraftForSession,
     ],
   )
+
+  /** 输入框发送；带调研勾选图片时先存台账再发（G-R2 / G-R4，见 useAgentResearchSelectionSend）。 */
+  const send = useAgentResearchSelectionSend({
+    sessionId: current?.id ?? '',
+    draft,
+    deliveryMode,
+    commitResearchSelection,
+    dispatchText,
+    runPromiseDetached,
+  })
 
   /**
    * 重试：把**上一条用户消息**原样再发一次（用户 2026-10-14 第 1 条）。

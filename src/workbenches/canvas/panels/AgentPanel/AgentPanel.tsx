@@ -141,7 +141,6 @@ export function AgentPanel({
     addFromLibrary: session.addFromLibrary,
     addResearchReference: session.addResearchReference,
     downloadResearchImage: session.downloadResearchImage,
-    sendResearchToChat: session.sendResearchToChat,
     channels: session.channels,
   })
 

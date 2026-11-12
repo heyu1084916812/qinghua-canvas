@@ -106,7 +106,6 @@ export interface AgentPanelViewPropsInput {
   addFromLibrary: (hash: string) => Promise<unknown>
   addResearchReference: Conversation['onAddResearchReference']
   downloadResearchImage: Conversation['onDownloadResearchImage']
-  sendResearchToChat: Conversation['onSendResearchToChat']
   answerQuestionCard: (text: string) => void
   pickModel: (name: string) => Promise<unknown>
   setModelKind: (
@@ -206,7 +205,6 @@ export function useAgentPanelViewProps(
       onResumeQueue: () => run(input.resumeQueue(), '恢复队列失败'),
       onAddResearchReference: input.addResearchReference,
       onDownloadResearchImage: input.downloadResearchImage,
-      onSendResearchToChat: input.sendResearchToChat,
       onAnswerQuestionCard: input.answerQuestionCard,
     },
     composerProps: {

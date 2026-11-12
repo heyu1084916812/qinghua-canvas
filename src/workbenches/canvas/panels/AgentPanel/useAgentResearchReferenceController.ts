@@ -1,5 +1,6 @@
 import { useCallback, type MutableRefObject } from 'react'
 import type { AgentSession } from '../../../../state/agent/sessionStore'
+import type { ReferenceItem } from '../../../../domain/project/referenceLedger'
 import type { PlatformKit } from '../../../../platform/ports'
 import type { NoticeTone } from '../../../../domain/ui/notice'
 import { safeFilePrefix } from '../../../../features/shared/assets/downloadAsset'
@@ -9,12 +10,18 @@ import {
   type AddResearchReferenceResult,
 } from './agentResearchReference'
 import type { ConversationResearchItem } from './conversation'
-import type { AgentAttachmentsControllerInput } from './useAgentAttachmentsController'
+import { mentionToken } from '../../text/MentionEditor'
 import { addResearchSourceReferenceToProject } from './researchSourceReference'
 import { raceWithResearchAbort, runResearchAction } from './researchActionAbort'
 
 export { RESEARCH_IMAGE_SAVE_TIMEOUT_MS } from './researchActionAbort'
 export interface ResearchActionResult { ok: boolean; message: string }
+export interface ResearchSelectionCommit {
+  committed: { candidate: ConversationResearchItem; reference: ReferenceItem }[]
+  failed: { candidate: ConversationResearchItem; message: string }[]
+  /** 按勾选顺序的 `@[标题](reference:id)`，追加到用户消息末尾。 */
+  mentions: string[]
+}
 
 export function useAgentResearchReferenceController(input: {
   platform: PlatformKit
@@ -24,7 +31,6 @@ export function useAgentResearchReferenceController(input: {
   appendReferenceIds: (sessionId: string, ids: readonly string[]) => Promise<AgentSession | null>
   applySessionSnapshot: (session: AgentSession) => void
   notify: (message: string, tone?: NoticeTone) => void
-  insertMention: AgentAttachmentsControllerInput['insertMention']
 }) {
   const saveAndAttach = useCallback(async (
     candidate: ConversationResearchItem,
@@ -91,23 +97,43 @@ export function useAgentResearchReferenceController(input: {
     })
   }, [input.notify, input.platform.files])
 
-  const sendToChat = useCallback((
-    candidate: ConversationResearchItem,
+  /**
+   * G-R2 / G-R4：发送带勾选图片的消息时才调用 —— 逐张存进参考台账并挂到会话
+   * （图片存不下来时退回来源文字参考），返回要追加到消息末尾的 reference 引用。
+   * 勾选阶段不写台账、不分析；分析由回合准备阶段的参考审阅（G5/G8）负责。
+   * 每张图各有 12 秒总时限；失败的图不阻断其他图和这条消息，只汇总一条提示。
+   */
+  const commitSelection = useCallback(async (
+    candidates: readonly ConversationResearchItem[],
     parent?: AbortSignal,
-  ): Promise<ResearchActionResult> => runResearchAction(parent, '发送到对话失败', input.notify,
-    async (signal) => {
-      const saved = await saveAndAttach(candidate, signal, true)
-      if (!saved.ok || !saved.item) return { ok: false, message: saved.message }
-      input.insertMention('reference', saved.item.id, saved.item.title)
-      return {
-        ok: true,
-        message: saved.item.kind === 'image' ? '已把图片引用放入当前对话' : saved.message,
-      }
-    }), [input.insertMention, input.notify, saveAndAttach])
+  ): Promise<ResearchSelectionCommit> => {
+    const committed: ResearchSelectionCommit['committed'] = []
+    const failed: ResearchSelectionCommit['failed'] = []
+    for (const candidate of candidates) {
+      if (parent?.aborted) break
+      const result = await runResearchAction(parent, '参考图片保存失败', () => {},
+        (signal) => saveAndAttach(candidate, signal, true))
+      const item = 'item' in result ? result.item : undefined
+      if (result.ok && item) committed.push({ candidate, reference: item })
+      else failed.push({ candidate, message: result.message })
+    }
+    if (failed.length > 0 && !parent?.aborted) {
+      input.notify(
+        `${failed.length} 张参考图片没能加入：${failed[0]!.message}`,
+        'error',
+      )
+    }
+    return {
+      committed,
+      failed,
+      mentions: committed.map(({ reference }) =>
+        mentionToken('reference', reference.id, reference.title || '参考图片')),
+    }
+  }, [input.notify, saveAndAttach])
 
   return {
     addResearchReference: addReference,
     downloadResearchImage: downloadImage,
-    sendResearchToChat: sendToChat,
+    commitResearchSelection: commitSelection,
   }
 }

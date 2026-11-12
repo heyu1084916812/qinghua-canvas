@@ -41,6 +41,8 @@ import {
 } from '../../text/MentionEditor'
 import { SkillMenu } from './SkillMenu'
 import { AgentWebResearchToggle } from './AgentWebResearchToggle'
+import { ResearchSelectionChips } from './ResearchSelectionChips'
+import { researchSelectionActions, useResearchSelection } from './researchSelection'
 import baseStyles from './AgentPanel.module.css'
 import composerStyles from './AgentComposerPane.module.css'
 
@@ -161,6 +163,9 @@ export function AgentComposerPane({
   channels,
   library,
 }: AgentComposerPaneProps) {
+  const selectionSessionId = current?.id ?? ''
+  const researchSelection = useResearchSelection(selectionSessionId)
+  const hasResearchSelection = researchSelection.selected.length > 0
   return (
     <>
       {/*
@@ -236,6 +241,14 @@ export function AgentComposerPane({
             effect）；技能设置照常生效，但必须由用户主动选择后才显示 chip。
         */}
 
+        {/*
+          G-R2：调研勾选的图片是「待发送的附件」，不进正文：它们发送时才存进参考台账，
+          此前没有 reference id，不能落成正文里的 `reference:` chip。
+        */}
+        <ResearchSelectionChips
+          items={researchSelection.selected}
+          onRemove={researchSelectionActions(selectionSessionId).remove}
+        />
         <MentionEditor
           ref={editorRef}
           value={draft}
@@ -671,7 +684,7 @@ export function AgentComposerPane({
               <IconClose size={16} />
             </button>
           )}
-          {draft.trim() ? (
+          {draft.trim() || hasResearchSelection ? (
             <button
               type="button"
               className={`${styles.send} ${styles.sendActive}`}

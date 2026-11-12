@@ -3,7 +3,7 @@ import { IconChevronRight, IconImage, IconLink } from '../../toolbar/icons'
 import { agentResearchSourceLabel } from './agentResearchSourceLabel'
 import type { ConversationResearchItem } from './conversation'
 import type { ResearchMode } from '../../../../domain/inspiration/designResearch'
-import { ResearchGalleryOverlay } from './ResearchGalleryOverlay'
+import { ResearchGalleryOverlay, type ResearchGallerySelection } from './ResearchGalleryOverlay'
 import { researchHostOf, researchImageItems, researchPreviewItems, researchWebItems } from './researchGallery'
 import { ResearchSourcesDrawer } from './ResearchSourcesDrawer'
 import styles from './ResearchResultsPreview.module.css'
@@ -18,14 +18,14 @@ export function ResearchResultsPreview({
   researchMode,
   onAdd,
   onDownload,
-  onSendToChat,
+  selection,
 }: {
   items: readonly ConversationResearchItem[]
   /** 旧会话没有模式时按 mixed 处理，保留原有网页来源入口。 */
   researchMode?: ResearchMode
   onAdd?: (item: ConversationResearchItem) => Promise<ActionResult>
   onDownload?: (item: ConversationResearchItem) => Promise<ActionResult>
-  onSendToChat?: (item: ConversationResearchItem) => Promise<ActionResult>
+  selection?: ResearchGallerySelection // G-R2：按会话分桶的勾选状态（researchSelection.ts）
 }) {
   const [galleryOpen, setGalleryOpen] = useState(false)
   const [sourcesOpen, setSourcesOpen] = useState(false)
@@ -122,7 +122,7 @@ export function ResearchResultsPreview({
           onClose={() => setGalleryOpen(false)}
           onAdd={onAdd}
           onDownload={onDownload}
-          onSendToChat={onSendToChat}
+          selection={selection}
         />
       ) : null}
     </div>

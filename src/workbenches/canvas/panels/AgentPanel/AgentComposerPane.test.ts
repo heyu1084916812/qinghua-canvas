@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from 'vitest'
 import type { MentionEditorHandle } from '../../text/MentionEditor'
 import type { AgentSession } from '../../../../state/agent/sessionStore'
 import { AgentComposerPane } from './AgentComposerPane'
+import { researchSelectionActions, researchSelectionStore } from './researchSelection'
 import {
   __resetAgentWebResearchForTest,
   setAgentWebResearch,
@@ -87,6 +88,26 @@ function renderComposer(
 }
 
 describe('AgentComposerPane', () => {
+  it('G-R2: 调研勾选的图片以可移除小标签挂在输入框里，只有勾选也能发送', () => {
+    researchSelectionActions('session-1').toggle({
+      id: 'bing:0', title: '咖啡海报', url: 'https://www.behance.net/a',
+      imageUrl: 'https://img.example.com/a.png', source: 'bing',
+    })
+    try {
+      const html = renderComposer()
+      expect(html).toContain('data-agent-research-selection-chip="bing:0"')
+      expect(html).toContain('data-agent-research-selection-remove="bing:0"')
+      expect(html).toContain('图片 1')
+      expect(html).toContain('data-agent-send')
+      expect(html).not.toContain('data-agent-send-idle')
+      // 正文里不落 reference chip（发送前还没有台账 id）
+      expect(html).not.toContain('reference:')
+    } finally {
+      researchSelectionStore.reset()
+    }
+    expect(renderComposer()).not.toContain('data-agent-research-selection-chip')
+  })
+
   it('保留输入区、工具条、文件入口和高度锚点', () => {
     const html = renderComposer()
 

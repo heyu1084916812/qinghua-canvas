@@ -56,7 +56,6 @@ describe('useAgentResearchReferenceController', () => {
     const appendReferenceIds = vi.fn(async () => nextSession)
     const applySessionSnapshot = vi.fn()
     const notify = vi.fn()
-    const insertMention = vi.fn()
     let research!: ReturnType<typeof useAgentResearchReferenceController>
     function Harness() {
       research = useAgentResearchReferenceController({
@@ -67,7 +66,6 @@ describe('useAgentResearchReferenceController', () => {
         appendReferenceIds,
         applySessionSnapshot,
         notify,
-        insertMention,
       })
       return null
     }
@@ -84,7 +82,7 @@ describe('useAgentResearchReferenceController', () => {
     expect(notify).toHaveBeenCalledWith('saved', 'info')
   })
 
-  it('inserts a saved reference chip when sending a research image to chat', async () => {
+  it('G-R2: commits staged images on send and returns reference mentions, without touching the draft', async () => {
     const reference = {
       id: 'ref_search_hash',
       projectId: 'project-1',
@@ -101,7 +99,6 @@ describe('useAgentResearchReferenceController', () => {
       message: 'saved',
       item: reference,
     } satisfies AddResearchReferenceResult)
-    const insertMention = vi.fn()
     let research!: ReturnType<typeof useAgentResearchReferenceController>
     function Harness() {
       research = useAgentResearchReferenceController({
@@ -112,7 +109,6 @@ describe('useAgentResearchReferenceController', () => {
         appendReferenceIds: vi.fn(async () => ({ id: 'session-1' }) as AgentSession),
         applySessionSnapshot: vi.fn(),
         notify: vi.fn(),
-        insertMention,
       })
       return null
     }
@@ -120,10 +116,13 @@ describe('useAgentResearchReferenceController', () => {
       TestRenderer.create(createElement(Harness))
     })
 
+    let commit!: Awaited<ReturnType<typeof research.commitResearchSelection>>
     await act(async () => {
-      await research.sendResearchToChat(candidate)
+      commit = await research.commitResearchSelection([candidate])
     })
-    expect(insertMention).toHaveBeenCalledWith('reference', reference.id, reference.title)
+    expect(commit.mentions).toEqual([`@[${reference.title}](reference:${reference.id})`])
+    expect(commit.committed.map((row) => row.reference.id)).toEqual([reference.id])
+    expect(commit.failed).toEqual([])
   })
 
   it('sends source context to chat when the image cannot be saved', async () => {
@@ -148,7 +147,6 @@ describe('useAgentResearchReferenceController', () => {
       item: fallback,
     })
     const appendReferenceIds = vi.fn(async () => ({ id: 'session-1' }) as AgentSession)
-    const insertMention = vi.fn()
     let research!: ReturnType<typeof useAgentResearchReferenceController>
     function Harness() {
       research = useAgentResearchReferenceController({
@@ -159,7 +157,6 @@ describe('useAgentResearchReferenceController', () => {
         appendReferenceIds,
         applySessionSnapshot: vi.fn(),
         notify: vi.fn(),
-        insertMention,
       })
       return null
     }
@@ -167,11 +164,9 @@ describe('useAgentResearchReferenceController', () => {
       TestRenderer.create(createElement(Harness))
     })
 
+    let commit!: Awaited<ReturnType<typeof research.commitResearchSelection>>
     await act(async () => {
-      expect(await research.sendResearchToChat(candidate)).toEqual({
-        ok: true,
-        message: '图片未能保存，已把来源信息发送到对话',
-      })
+      commit = await research.commitResearchSelection([candidate])
     })
 
     expect(addResearchSourceReferenceToProject).toHaveBeenCalledWith(
@@ -179,7 +174,7 @@ describe('useAgentResearchReferenceController', () => {
       expect.objectContaining({ projectId: 'project-1' }),
     )
     expect(appendReferenceIds).toHaveBeenCalledWith('session-1', [fallback.id])
-    expect(insertMention).toHaveBeenCalledWith('reference', fallback.id, fallback.title)
+    expect(commit.mentions).toEqual([`@[${fallback.title}](reference:${fallback.id})`])
   })
 
   it('does not downgrade an explicit add-to-project failure into a text reference', async () => {
@@ -197,7 +192,6 @@ describe('useAgentResearchReferenceController', () => {
         appendReferenceIds: vi.fn(),
         applySessionSnapshot: vi.fn(),
         notify: vi.fn(),
-        insertMention: vi.fn(),
       })
       return null
     }
@@ -231,7 +225,6 @@ describe('useAgentResearchReferenceController', () => {
           appendReferenceIds: vi.fn(),
           applySessionSnapshot: vi.fn(),
           notify,
-          insertMention: vi.fn(),
         })
         return null
       }
@@ -272,7 +265,6 @@ describe('useAgentResearchReferenceController', () => {
         appendReferenceIds: vi.fn(),
         applySessionSnapshot: vi.fn(),
         notify: vi.fn(),
-        insertMention: vi.fn(),
       })
       return null
     }
@@ -301,7 +293,6 @@ describe('useAgentResearchReferenceController', () => {
       }
     })
     const appendReferenceIds = vi.fn(async () => ({ id: 'session-1' }) as AgentSession)
-    const insertMention = vi.fn()
     const notify = vi.fn()
     let research!: ReturnType<typeof useAgentResearchReferenceController>
     function Harness() {
@@ -313,21 +304,20 @@ describe('useAgentResearchReferenceController', () => {
         appendReferenceIds,
         applySessionSnapshot: vi.fn(),
         notify,
-        insertMention,
       })
       return null
     }
     act(() => {
       TestRenderer.create(createElement(Harness))
     })
-    let result: { ok: boolean; message: string } | undefined
+    let commit!: Awaited<ReturnType<typeof research.commitResearchSelection>>
     await act(async () => {
-      result = await research.sendResearchToChat(candidate, parent.signal)
+      commit = await research.commitResearchSelection([candidate], parent.signal)
     })
-    expect(result).toMatchObject({ ok: false })
-    expect(result?.message).toContain('已取消')
+    expect(commit.committed).toEqual([])
+    expect(commit.mentions).toEqual([])
+    expect(commit.failed[0]?.message).toContain('已取消')
     expect(appendReferenceIds).not.toHaveBeenCalled()
-    expect(insertMention).not.toHaveBeenCalled()
     expect(notify).not.toHaveBeenCalled()
   })
 
@@ -344,7 +334,6 @@ describe('useAgentResearchReferenceController', () => {
         appendReferenceIds: vi.fn(),
         applySessionSnapshot: vi.fn(),
         notify: vi.fn(),
-        insertMention: vi.fn(),
       })
       return null
     }

@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { noticeA11y } from '../../../../domain/ui/notice'
-import { IconCheck, IconClose, IconDownload, IconPlus, IconSpinner } from '../../toolbar/icons'
+import { IconCheck, IconClose, IconDownload, IconSpinner, IconZoomIn } from '../../toolbar/icons'
 import { agentResearchSourceLabel } from './agentResearchSourceLabel'
 import type { ConversationResearchItem } from './conversation'
 import { researchImageItems, researchHostOf } from './researchGallery'
+import { researchSelectionKey } from './researchSelection'
 import styles from './ResearchGalleryOverlay.module.css'
 import { useResearchGalleryActions } from './useResearchGalleryActions'
 import { containResearchTabFocus, useResearchOverlay } from './useResearchOverlay'
@@ -14,55 +15,50 @@ interface ActionResult {
   message: string
 }
 
+/**
+ * G-R2：点图 = 勾选（可多选），勾选只挂到输入框；发送时才进参考台账并分析（G-R4）。
+ * 发送过的图不再显示勾选框，悬停给「发送至对话 / 添加到参考」。
+ */
+export interface ResearchGallerySelection {
+  selectedKeys: ReadonlySet<string>
+  sentKeys: ReadonlySet<string>
+  onToggle(item: ConversationResearchItem): void
+  onStage(item: ConversationResearchItem): void
+}
+
 export function ResearchGalleryOverlay({
   items,
   onClose,
   onAdd,
   onDownload,
-  onSendToChat,
+  selection,
 }: {
   items: readonly ConversationResearchItem[]
   onClose: () => void
   onAdd?: (item: ConversationResearchItem, signal?: AbortSignal) => Promise<ActionResult>
   onDownload?: (item: ConversationResearchItem, signal?: AbortSignal) => Promise<ActionResult>
-  onSendToChat?: (item: ConversationResearchItem, signal?: AbortSignal) => Promise<ActionResult>
+  selection?: ResearchGallerySelection
 }) {
   const images = researchImageItems(items)
   const [preview, setPreview] = useState<ConversationResearchItem | null>(null)
-  const [pendingAddId, setPendingAddId] = useState<string | null>(null)
   const [addedIds, setAddedIds] = useState<Set<string>>(() => new Set())
-  const [sentId, setSentId] = useState<string | null>(null)
   const actions = useResearchGalleryActions()
   const { busy, status, statusTone } = actions
   const surfaceRef = useRef<HTMLElement>(null)
   const previewRef = useRef<HTMLDivElement>(null)
-  const addButtonRefs = useRef(new Map<string, HTMLButtonElement>())
-  const imageButtonRefs = useRef(new Map<string, HTMLButtonElement>())
-  const restoreButtonFocus = useCallback(
-    (buttons: { current: Map<string, HTMLButtonElement> }, itemId: string) => {
-      window.requestAnimationFrame(() => buttons.current.get(itemId)?.focus())
-    },
-    [],
-  )
-  const closePendingAdd = useCallback(() => {
-    const itemId = pendingAddId
-    setPendingAddId(null)
-    if (itemId) restoreButtonFocus(addButtonRefs, itemId)
-  }, [pendingAddId, restoreButtonFocus])
+  const zoomButtonRefs = useRef(new Map<string, HTMLButtonElement>())
   const closePreview = useCallback(() => {
     const itemId = preview?.id
     setPreview(null)
-    if (itemId) restoreButtonFocus(imageButtonRefs, itemId)
-  }, [preview, restoreButtonFocus])
+    if (itemId) window.requestAnimationFrame(() => zoomButtonRefs.current.get(itemId)?.focus())
+  }, [preview])
   const requestClose = useCallback(() => {
     if (preview) closePreview()
-    else if (actions.abort()) {
-      setPendingAddId(null)
+    else {
+      actions.abort()
       onClose()
     }
-    else if (pendingAddId) closePendingAdd()
-    else onClose()
-  }, [actions, closePendingAdd, closePreview, onClose, pendingAddId, preview])
+  }, [actions, closePreview, onClose, preview])
   const overlayBounds = useResearchOverlay(surfaceRef, requestClose)
   useEffect(() => {
     if (preview) {
@@ -74,17 +70,14 @@ export function ResearchGalleryOverlay({
   const add = (item: ConversationResearchItem) => void actions.run(
     item, 'add', onAdd,
     (result) => { if (result.ok) setAddedIds((current) => new Set([...current, item.id])) },
-    () => { setPendingAddId(null); restoreButtonFocus(addButtonRefs, item.id) },
-    '加入失败',
+    undefined,
+    '添加到参考失败',
   )
   const download = (item: ConversationResearchItem) =>
     void actions.run(item, 'download', onDownload, undefined, undefined, '下载失败')
-  const send = (item: ConversationResearchItem) => void actions.run(
-    item, 'send', onSendToChat,
-    (result) => { if (result.ok) setSentId(item.id) },
-    undefined,
-    '发送到对话失败',
-  )
+  const selectedCount = selection
+    ? images.filter((item) => selection.selectedKeys.has(researchSelectionKey(item))).length
+    : 0
   return createPortal(
     <div
       className={styles.layer}
@@ -102,7 +95,11 @@ export function ResearchGalleryOverlay({
         <header className={styles.head}>
           <div className={styles.heading}>
             <h2>查看图片搜索结果</h2>
-            <p>{images.length} 张图片 · 双击图片放大</p>
+            <p data-agent-research-gallery-hint>
+              {images.length} 张图片 · {selectedCount > 0
+                ? `已选 ${selectedCount} 张，发送消息时一起分析`
+                : '点击图片勾选，可多选'}
+            </p>
           </div>
           <button
             type="button"
@@ -119,34 +116,29 @@ export function ResearchGalleryOverlay({
             <div className={styles.masonry} data-agent-research-gallery-grid>
               {images.map((item) => {
               const host = researchHostOf(item.url)
+              const key = researchSelectionKey(item)
+              const selected = selection?.selectedKeys.has(key) === true
+              const sent = selection?.sentKeys.has(key) === true
+              const added = addedIds.has(item.id)
+              const addBusy = busy?.id === item.id && busy.action === 'add'
               return (
                 <figure
                   key={item.id}
                   className={styles.tile}
                   data-agent-research-gallery-image={item.id}
-                  onKeyDown={(event) => {
-                    const confirm =
-                      pendingAddId === item.id
-                        ? event.currentTarget.querySelector<HTMLElement>('[role="dialog"]')
-                        : null
-                    if (confirm) containResearchTabFocus(confirm, event)
-                  }}
+                  data-selected={selected ? 'true' : 'false'}
+                  data-sent={sent ? 'true' : 'false'}
                 >
                   <button
-                    ref={(element) => {
-                      if (element) imageButtonRefs.current.set(item.id, element)
-                      else imageButtonRefs.current.delete(item.id)
-                    }}
                     type="button"
                     className={styles.imageButton}
-                    aria-label={`放大查看 ${item.title}`}
-                    title="双击放大"
-                    onDoubleClick={() => setPreview(item)}
-                    onKeyDown={(event) => {
-                      if (event.key !== 'Enter' && event.key !== ' ') return
-                      event.preventDefault()
-                      setPreview(item)
-                    }}
+                    data-agent-research-gallery-toggle={item.id}
+                    aria-pressed={sent ? undefined : selected}
+                    aria-label={sent
+                      ? `${item.title}（已发送到对话）`
+                      : `${selected ? '取消勾选' : '勾选'} ${item.title}`}
+                    disabled={!selection || sent}
+                    onClick={() => { if (selection && !sent) selection.onToggle(item) }}
                   >
                     <img
                       src={item.imageUrl}
@@ -162,62 +154,55 @@ export function ResearchGalleryOverlay({
                       {host ? ` · ${host}` : ''}
                     </small>
                   </figcaption>
-                  {onAdd ? (
-                    <button
-                      ref={(element) => { if (element) addButtonRefs.current.set(item.id, element); else addButtonRefs.current.delete(item.id) }}
-                      type="button" className={styles.add}
-                      data-agent-research-gallery-add={item.id}
-                      data-added={addedIds.has(item.id) ? 'true' : 'false'}
-                      data-busy={busy?.id === item.id && busy.action === 'add' ? 'true' : 'false'}
-                      aria-label={addedIds.has(item.id) ? '已加入项目参考' : '加入项目参考'}
-                      aria-busy={busy?.id === item.id && busy.action === 'add'}
-                      title={addedIds.has(item.id) ? '已加入项目参考' : '加入项目参考'}
-                      disabled={busy !== null}
-                      onClick={() => pendingAddId === item.id ? closePendingAdd() : setPendingAddId(item.id)}
+                  {selection && !sent ? (
+                    <span
+                      className={styles.check}
+                      data-agent-research-gallery-check={item.id}
+                      data-checked={selected ? 'true' : 'false'}
+                      aria-hidden="true"
                     >
-                      {busy?.id === item.id && busy.action === 'add' ? <IconSpinner size={14} className={styles.busySpinner} />
-                        : addedIds.has(item.id) ? <IconCheck size={14} /> : <IconPlus size={14} />}
-                    </button>
+                      {selected ? <IconCheck size={13} /> : null}
+                    </span>
                   ) : null}
-                  {pendingAddId === item.id ? (
-                    <div className={styles.addConfirm} role="dialog" aria-label="加入项目参考">
-                      <span>加入项目参考？</span>
-                      <div>
-                        <button type="button" autoFocus
-                          aria-busy={busy?.id === item.id && busy.action === 'add'}
-                          disabled={busy !== null} onClick={() => add(item)}>
-                          {busy?.id === item.id && busy.action === 'add' ? (
-                            <><IconSpinner size={12} className={styles.busySpinner} />加入中</>
-                          ) : '加入'}
+                  <button
+                    ref={(element) => {
+                      if (element) zoomButtonRefs.current.set(item.id, element)
+                      else zoomButtonRefs.current.delete(item.id)
+                    }}
+                    type="button"
+                    className={styles.zoom}
+                    data-agent-research-gallery-zoom={item.id}
+                    aria-label={`查看大图 ${item.title}`}
+                    title="查看大图"
+                    onClick={() => setPreview(item)}
+                  >
+                    <IconZoomIn size={15} />
+                  </button>
+                  {sent && selection ? (
+                    <div className={styles.hoverActions} data-agent-research-gallery-sent-actions>
+                      <button
+                        type="button"
+                        data-agent-research-gallery-stage={item.id}
+                        disabled={selected}
+                        onClick={() => selection.onStage(item)}
+                      >
+                        {selected ? '已在输入框' : '发送至对话'}
+                      </button>
+                      {onAdd ? (
+                        <button
+                          type="button"
+                          data-agent-research-gallery-add={item.id}
+                          aria-busy={addBusy}
+                          disabled={busy !== null || added}
+                          onClick={() => add(item)}
+                        >
+                          {addBusy ? (
+                            <><IconSpinner size={13} className={styles.busySpinner} />添加中</>
+                          ) : added ? '已添加到参考' : '添加到参考'}
                         </button>
-                        <button type="button" disabled={busy !== null} onClick={closePendingAdd}>取消</button>
-                      </div>
+                      ) : null}
                     </div>
                   ) : null}
-                  <div className={styles.hoverActions}>
-                    {onSendToChat ? (
-                      <button
-                        type="button" data-agent-research-gallery-send={item.id}
-                        aria-busy={busy?.id === item.id && busy.action === 'send'}
-                        disabled={busy !== null} onClick={() => send(item)}
-                      >
-                        {busy?.id === item.id && busy.action === 'send' ? (
-                          <><IconSpinner size={13} className={styles.busySpinner} />发送中</>
-                        ) : sentId === item.id ? '已发送到对话' : '发送到对话'}
-                      </button>
-                    ) : null}
-                    {onDownload ? (
-                      <button
-                        type="button" className={styles.download}
-                        data-agent-research-gallery-download={item.id} aria-label={`下载 ${item.title}`}
-                        aria-busy={busy?.id === item.id && busy.action === 'download'}
-                        title="下载图片" disabled={busy !== null} onClick={() => download(item)}
-                      >
-                        {busy?.id === item.id && busy.action === 'download'
-                          ? <IconSpinner size={15} className={styles.busySpinner} /> : <IconDownload size={15} />}
-                      </button>
-                    ) : null}
-                  </div>
                 </figure>
               )
               })}
@@ -237,7 +222,8 @@ export function ResearchGalleryOverlay({
             <div className={styles.previewBar}>
               <span>{preview.title}</span>
               {onDownload ? (
-                <button type="button" aria-busy={busy?.id === preview.id && busy.action === 'download'}
+                <button type="button" data-agent-research-gallery-preview-download
+                  aria-busy={busy?.id === preview.id && busy.action === 'download'}
                   disabled={busy !== null} onClick={() => download(preview)}>
                   {busy?.id === preview.id && busy.action === 'download'
                     ? <IconSpinner size={15} className={styles.busySpinner} /> : <IconDownload size={15} />}

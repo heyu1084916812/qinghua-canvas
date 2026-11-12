@@ -343,7 +343,6 @@ describe('useAgentPanelViewProps / 字段清单对账', () => {
       'onRemoveQueued',
       'onResumeQueue',
       'onRetry',
-      'onSendResearchToChat',
       'onToggleStep',
       'pendingPlan',
       'pendingTaskStepId',

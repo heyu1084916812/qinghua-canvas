@@ -1,4 +1,10 @@
-import type { RefObject } from 'react'
+import { useMemo, type RefObject } from 'react'
+import type { ResearchGallerySelection } from './ResearchGalleryOverlay'
+import {
+  researchSelectionActions,
+  researchSelectionKey,
+  useResearchSelection,
+} from './researchSelection'
 import type { AgentSession } from '../../../../state/agent/sessionStore'
 import type { AgentLoopActivity } from '../../agent/agentLoop'
 import {
@@ -96,9 +102,6 @@ export interface AgentConversationPaneProps {
   onDownloadResearchImage?(
     item: ConversationResearchItem,
   ): Promise<{ ok: boolean; message: string }>
-  onSendResearchToChat?(
-    item: ConversationResearchItem,
-  ): Promise<{ ok: boolean; message: string }>
   /** 问题卡提交：回答整理成一条用户消息发回。 */
   onAnswerQuestionCard?(text: string): void
 }
@@ -149,9 +152,19 @@ export function AgentConversationPane({
   onResumeQueue,
   onAddResearchReference,
   onDownloadResearchImage,
-  onSendResearchToChat,
   onAnswerQuestionCard,
 }: AgentConversationPaneProps) {
+  const selectionSessionId = current?.id ?? ''
+  const selectionState = useResearchSelection(selectionSessionId)
+  const researchSelection = useMemo<ResearchGallerySelection>(() => {
+    const act = researchSelectionActions(selectionSessionId)
+    return {
+      selectedKeys: new Set(selectionState.selected.map(researchSelectionKey)),
+      sentKeys: selectionState.sentKeys,
+      onToggle: act.toggle,
+      onStage: act.stage,
+    }
+  }, [selectionSessionId, selectionState])
   const questionCard = onAnswerQuestionCard ? pendingQuestionCard(visibleItems) : null
   return (
     <div className={styles.contentWrap} data-agent-scroll-wrap>
@@ -392,7 +405,7 @@ export function AgentConversationPane({
                     researchMode={item.researchMode}
                     onAdd={onAddResearchReference}
                     onDownload={onDownloadResearchImage}
-                    onSendToChat={onSendResearchToChat}
+                    selection={researchSelection}
                   />
                 ) : null}
                 {hasDetail ? (

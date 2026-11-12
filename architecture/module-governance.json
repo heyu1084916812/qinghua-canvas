@@ -8686,12 +8686,12 @@
     {
       "module": "src/workbenches/canvas/panels/AgentPanel/ResearchGalleryOverlay.tsx",
       "owner": "agent-research-results-ui",
-      "responsibility": "用瀑布流浏览调研图片，提供双击放大、下载、发送到对话和加入参考确认。",
+      "responsibility": "用瀑布流浏览调研图片：点图勾选（可多选）、放大镜开大图（大图内下载）；已发送图片悬停「发送至对话 / 添加到参考」。",
       "owns": [
         "瀑布流弹层",
+        "勾选交互",
         "大图预览与下载入口",
-        "发送到对话",
-        "加入参考二次确认"
+        "已发送图片的发送至对话 / 添加到参考"
       ],
       "doesNotOwn": [
         "搜索请求",
@@ -8735,11 +8735,11 @@
     {
       "module": "src/workbenches/canvas/panels/AgentPanel/ResearchGalleryOverlay.module.css",
       "owner": "agent-research-results-ui-style",
-      "responsibility": "定义调研图片瀑布流、悬停动作、加入参考确认与大图预览的视觉样式。",
+      "responsibility": "定义调研图片瀑布流、勾选态、放大镜、已发送图片悬停动作与大图预览的视觉样式。",
       "owns": [
         "瀑布流列布局",
-        "图片悬停动作",
-        "参考确认浮层",
+        "勾选框与选中描边",
+        "放大镜按钮与已发送悬停动作",
         "全屏图片预览"
       ],
       "doesNotOwn": [
@@ -9626,6 +9626,98 @@
         "src/workbenches/canvas/agent/agentResearchProjection.test.ts"
       ],
       "budget": 110
+    },
+    {
+      "module": "src/workbenches/canvas/panels/AgentPanel/researchSelection.ts",
+      "owner": "agent-research-results-ui",
+      "responsibility": "调研图片「勾选」状态（G-R2）：按会话分桶的已选 / 已发送集合，浮层与输入框共读；以及带勾选发送时的正文拼装。",
+      "owns": [
+        "勾选 / 取消 / 再次挂到输入框 / 标记已发送的纯状态转换",
+        "按会话分桶的内存 store 与订阅 hook",
+        "带勾选图片发送时的正文拼装"
+      ],
+      "doesNotOwn": [
+        "参考台账写入",
+        "参考分析",
+        "浮层与输入框渲染"
+      ],
+      "publicApi": [
+        "researchSelectionKey",
+        "toggleResearchSelection",
+        "stageResearchSelection",
+        "removeResearchSelection",
+        "markResearchSelectionSent",
+        "researchSelectionStore",
+        "researchSelectionActions",
+        "useResearchSelection",
+        "composeResearchSelectionText",
+        "RESEARCH_SELECTION_DEFAULT_TEXT"
+      ],
+      "test": [
+        "src/workbenches/canvas/panels/AgentPanel/researchSelection.test.ts"
+      ],
+      "budget": 140
+    },
+    {
+      "module": "src/workbenches/canvas/panels/AgentPanel/ResearchSelectionChips.tsx",
+      "owner": "agent-research-results-ui",
+      "responsibility": "在 Agent 输入框里以可移除小标签展示调研勾选的图片（G-R2），只是待发送附件。",
+      "owns": [
+        "勾选图片小标签与移除按钮"
+      ],
+      "doesNotOwn": [
+        "勾选状态",
+        "发送与台账写入",
+        "正文 mention chip"
+      ],
+      "publicApi": [
+        "ResearchSelectionChips"
+      ],
+      "test": [
+        "src/workbenches/canvas/panels/AgentPanel/AgentComposerPane.test.ts"
+      ],
+      "budget": 60
+    },
+    {
+      "module": "src/workbenches/canvas/panels/AgentPanel/ResearchSelectionChips.module.css",
+      "owner": "agent-research-results-ui-style",
+      "responsibility": "调研勾选图片小标签的视觉样式。",
+      "owns": [
+        "小标签行与缩略图",
+        "移除按钮"
+      ],
+      "doesNotOwn": [
+        "全局主题令牌",
+        "输入框布局"
+      ],
+      "publicApi": [
+        "CSS_MODULE:Agent 输入框调研勾选小标签"
+      ],
+      "test": [
+        "src/workbenches/canvas/panels/AgentPanel/AgentComposerPane.test.ts"
+      ],
+      "budget": 80
+    },
+    {
+      "module": "src/workbenches/canvas/panels/AgentPanel/useAgentResearchSelectionSend.ts",
+      "owner": "agent-turn",
+      "responsibility": "输入框发送入口（G-R2 / G-R4）：带调研勾选图片时先存参考台账拿到 reference 引用，再按原投递路径发出；无勾选时原样投递。",
+      "owns": [
+        "带勾选发送的先后顺序：存台账 → 标记已发送 → 追加引用投递",
+        "存台账期间的重复发送保护"
+      ],
+      "doesNotOwn": [
+        "参考台账写入实现",
+        "参考分析",
+        "直发 / 排队 / 引导的判定"
+      ],
+      "publicApi": [
+        "useAgentResearchSelectionSend"
+      ],
+      "test": [
+        "src/workbenches/canvas/panels/AgentPanel/useAgentResearchSelectionSend.test.ts"
+      ],
+      "budget": 70
     }
   ]
 }

@@ -31,16 +31,25 @@ const item = {
   source: 'tavily',
 }
 
-function mount(
-  onAdd: (item: ConversationResearchItem) => Promise<{ ok: boolean; message: string }>,
-) {
+const item2 = { ...item, id: 'behance:2', imageUrl: 'https://cdn.example.com/poster-2.jpg' }
+
+function selectionOf(selectedKeys: string[] = [], sentKeys: string[] = []) {
+  return {
+    selectedKeys: new Set(selectedKeys),
+    sentKeys: new Set(sentKeys),
+    onToggle: vi.fn(),
+    onStage: vi.fn(),
+  }
+}
+
+function mount(props: Partial<Parameters<typeof ResearchGalleryOverlay>[0]> = {}) {
   let renderer!: TestRenderer.ReactTestRenderer
   act(() => {
     renderer = TestRenderer.create(
       createElement(ResearchGalleryOverlay, {
-        items: [item],
+        items: [item, item2],
         onClose: vi.fn(),
-        onAdd,
+        ...props,
       }),
     )
   })
@@ -68,131 +77,92 @@ describe('ResearchGalleryOverlay actions', () => {
     vi.clearAllMocks()
   })
 
-  it('shows aria-busy and the shared spinner class, then clears both on failure', async () => {
+  it('G-R2: clicking an image toggles selection; no add confirm popover or send button', () => {
+    const selection = selectionOf([item2.imageUrl])
+    const renderer = mount({ selection, onAdd: vi.fn(), onDownload: vi.fn() })
+    act(() => renderer.root.findByProps({
+      'data-agent-research-gallery-toggle': item.id,
+    }).props.onClick())
+    expect(selection.onToggle).toHaveBeenCalledWith(item)
+    const tiles = renderer.root.findAll((node) =>
+      node.props['data-agent-research-gallery-image'] !== undefined && node.type === 'figure')
+    expect(tiles.map((tile) => tile.props['data-selected'])).toEqual(['false', 'true'])
+    expect(renderer.root.findByProps({ 'data-agent-research-gallery-check': item2.id })
+      .props['data-checked']).toBe('true')
+    expect(renderer.root.findByProps({ 'data-agent-research-gallery-toggle': item2.id })
+      .props['aria-pressed']).toBe(true)
+    // 选中不调任何保存动作，也没有确认弹窗 / 单独的发送按钮 / 平铺下载按钮
+    expect(renderer.root.findAll((node) => node.props['data-agent-research-gallery-add'] !== undefined)).toHaveLength(0)
+    expect(renderer.root.findAll((node) => node.props['data-agent-research-gallery-send'] !== undefined)).toHaveLength(0)
+    expect(renderer.root.findAll((node) => node.props['data-agent-research-gallery-download'] !== undefined)).toHaveLength(0)
+    expect(renderer.root.findAllByProps({ role: 'dialog', 'aria-label': '加入项目参考' })).toHaveLength(0)
+    expect(renderer.root.findByProps({ 'data-agent-research-gallery-hint': true }).children.join(''))
+      .toContain('已选 1 张')
+  })
+
+  it('G-R2: the magnifier opens the large preview and download lives inside it', async () => {
+    const onDownload = vi.fn(async () => ({ ok: true, message: '图片已保存' }))
+    const renderer = mount({ selection: selectionOf(), onDownload })
+    act(() => renderer.root.findByProps({
+      'data-agent-research-gallery-zoom': item.id,
+    }).props.onClick())
+    const preview = renderer.root.findByProps({ 'data-agent-research-gallery-preview': true })
+    const download = preview.findByProps({ 'data-agent-research-gallery-preview-download': true })
+    await act(async () => {
+      download.props.onClick()
+      await Promise.resolve()
+    })
+    expect(onDownload).toHaveBeenCalledWith(item, expect.anything())
+  })
+
+  it('G-R2: a sent image has no checkbox; hover offers send-to-chat and add-to-reference', async () => {
+    const selection = selectionOf([], [item.imageUrl])
     let resolveAdd!: (value: { ok: boolean; message: string }) => void
     const onAdd = vi.fn(() => new Promise<{ ok: boolean; message: string }>((resolve) => {
       resolveAdd = resolve
     }))
-    const renderer = mount(onAdd)
-    const addButton = renderer.root.findByProps({
-      'data-agent-research-gallery-add': item.id,
-    })
+    const renderer = mount({ selection, onAdd })
+    expect(renderer.root.findAll((node) =>
+      node.props['data-agent-research-gallery-check'] === item.id)).toHaveLength(0)
+    expect(renderer.root.findByProps({ 'data-agent-research-gallery-toggle': item.id })
+      .props.disabled).toBe(true)
+    act(() => renderer.root.findByProps({ 'data-agent-research-gallery-stage': item.id }).props.onClick())
+    expect(selection.onStage).toHaveBeenCalledWith(item)
 
-    act(() => addButton.props.onClick())
-    const confirm = renderer.root.findByProps({
-      role: 'dialog',
-      'aria-label': '加入项目参考',
-    })
-    act(() => confirm.findAllByType('button')[0]!.props.onClick())
-
-    const busyAddButton = renderer.root.findByProps({
-      'data-agent-research-gallery-add': item.id,
-    })
-    expect(busyAddButton.props['aria-busy']).toBe(true)
-    expect(busyAddButton.props['data-busy']).toBe('true')
-    expect(busyAddButton.props.disabled).toBe(true)
-    expect(renderer.root.findAllByType(IconSpinner).length).toBeGreaterThan(0)
-    expect(
-      renderer.root.findAllByType(IconSpinner)
-        .every((spinner) => spinner.props.className === 'css-busySpinner'),
-    ).toBe(true)
-
+    act(() => renderer.root.findByProps({ 'data-agent-research-gallery-add': item.id }).props.onClick())
+    const busy = renderer.root.findByProps({ 'data-agent-research-gallery-add': item.id })
+    expect(busy.props['aria-busy']).toBe(true)
+    expect(busy.props.disabled).toBe(true)
+    expect(renderer.root.findAllByType(IconSpinner)
+      .every((spinner) => spinner.props.className === 'css-busySpinner')).toBe(true)
     await act(async () => {
-      resolveAdd({ ok: false, message: '加入失败：网络超时' })
+      resolveAdd({ ok: false, message: '添加到参考失败：网络超时' })
       await Promise.resolve()
     })
-
-    const clearedAddButton = renderer.root.findByProps({
-      'data-agent-research-gallery-add': item.id,
-    })
-    expect(clearedAddButton.props['aria-busy']).toBe(false)
-    expect(clearedAddButton.props['data-busy']).toBe('false')
-    expect(clearedAddButton.props.disabled).toBe(false)
-    expect(renderer.root.findAllByProps({
-      role: 'dialog',
-      'aria-label': '加入项目参考',
-    })).toHaveLength(0)
-    expect(renderer.root.findByProps({ role: 'alert' }).children.join('')).toContain(
-      '加入失败：网络超时',
-    )
+    const cleared = renderer.root.findByProps({ 'data-agent-research-gallery-add': item.id })
+    expect(cleared.props['aria-busy']).toBe(false)
+    expect(cleared.props.disabled).toBe(false)
+    expect(renderer.root.findByProps({ role: 'alert' }).children.join('')).toContain('网络超时')
+    // 未发送过的图仍是勾选框，没有悬停动作
+    expect(renderer.root.findAll((node) =>
+      node.props['data-agent-research-gallery-stage'] === item2.id)).toHaveLength(0)
   })
 
   it('aborts the active callback when the overlay closes', () => {
     let signal: AbortSignal | undefined
     const onClose = vi.fn()
-    const onSend = vi.fn((_item, nextSignal?: AbortSignal) => {
+    const onAdd = vi.fn((_item: ConversationResearchItem, nextSignal?: AbortSignal) => {
       signal = nextSignal
       return new Promise<{ ok: boolean; message: string }>(() => {})
     })
-    let renderer!: TestRenderer.ReactTestRenderer
-    act(() => {
-      renderer = TestRenderer.create(
-        createElement(ResearchGalleryOverlay, {
-          items: [item],
-          onClose,
-          onSendToChat: onSend,
-        }),
-      )
-    })
-
-    act(() => renderer.root.findByProps({
-      'data-agent-research-gallery-send': item.id,
-    }).props.onClick())
+    const renderer = mount({ onClose, onAdd, selection: selectionOf([], [item.imageUrl]) })
+    act(() => renderer.root.findByProps({ 'data-agent-research-gallery-add': item.id }).props.onClick())
     expect(signal?.aborted).toBe(false)
-    expect(renderer.root.findByProps({
-      'data-agent-research-gallery-send': item.id,
-    }).props['aria-busy']).toBe(true)
-    expect(
-      renderer.root.findAllByType(IconSpinner)
-        .every((spinner) => spinner.props.className === 'css-busySpinner'),
-    ).toBe(true)
-
     act(() => renderer.root.findByProps({
       'aria-label': '关闭图片搜索结果',
     }).props.onClick())
-
     expect(signal?.aborted).toBe(true)
     expect(onClose).toHaveBeenCalledTimes(1)
-  })
-
-  it('clears download busy state after a rejected save', async () => {
-    let rejectDownload!: (reason: Error) => void
-    const onDownload = vi.fn(() => new Promise<{ ok: boolean; message: string }>(
-      (_resolve, reject) => {
-        rejectDownload = reject
-      },
-    ))
-    let renderer!: TestRenderer.ReactTestRenderer
-    act(() => {
-      renderer = TestRenderer.create(
-        createElement(ResearchGalleryOverlay, {
-          items: [item],
-          onClose: vi.fn(),
-          onDownload,
-        }),
-      )
-    })
-
-    act(() => renderer.root.findByProps({
-      'data-agent-research-gallery-download': item.id,
-    }).props.onClick())
-    expect(renderer.root.findByProps({
-      'data-agent-research-gallery-download': item.id,
-    }).props['aria-busy']).toBe(true)
-
-    await act(async () => {
-      rejectDownload(new Error('网络被拦截'))
-      await Promise.resolve()
-    })
-
-    const downloadButton = renderer.root.findByProps({
-      'data-agent-research-gallery-download': item.id,
-    })
-    expect(downloadButton.props['aria-busy']).toBe(false)
-    expect(downloadButton.props.disabled).toBe(false)
-    expect(renderer.root.findByProps({ role: 'alert' }).children.join('')).toContain(
-      '下载失败：网络被拦截',
-    )
   })
 
   it('keeps the large preview inside the canvas surface', () => {
