@@ -36,6 +36,7 @@ mod credential_vault;
 mod folder_grants;
 mod cli_output_tests;
 mod pinterest_oauth;
+mod system_proxy;
 
 /// 「选一个目录当素材文件夹」：弹系统目录选择框 → 把该目录**递归**加进 fs 作用域 → 返回绝对路径。
 ///
@@ -1570,7 +1571,7 @@ async fn fetch_bytes(url: String, timeout_ms: Option<u64>) -> Result<FetchedByte
     if !(url.starts_with("https://") || url.starts_with("http://")) {
         return Err("只支持 http / https 地址".into());
     }
-    let client = reqwest::Client::builder()
+    let client = system_proxy::apply_to_builder(reqwest::Client::builder())
         .timeout(std::time::Duration::from_millis(timeout_ms.unwrap_or(8000)))
         .build()
         .map_err(|err| err.to_string())?;
@@ -1698,7 +1699,7 @@ async fn fetch_stream(
         .map_err(|_| "流式请求状态锁已损坏".to_string())?
         .insert(stream_id.clone(), cancelled.clone());
 
-    let client = reqwest::Client::builder()
+    let client = system_proxy::apply_to_builder(reqwest::Client::builder())
         .timeout(Duration::from_millis(timeout_ms.unwrap_or(180_000)))
         .build()
         .map_err(|err| err.to_string())?;
@@ -1951,7 +1952,43 @@ fn is_public_ip(ip: IpAddr) -> bool {
     }
 }
 
-async fn validate_public_url(raw: &str) -> Result<(String, Vec<SocketAddr>), String> {
+/// Clash / Surge 等代理的 fake-ip 段（RFC 2544 基准测试段 198.18.0.0/15）。
+/// 本地 DNS 被代理接管时，公网域名会解析成这里的地址；只有**走代理**时才放行，
+/// 因为真正的连接由代理按主机名建立，本机不会直连这个地址。
+fn is_proxy_fake_ip(ip: IpAddr) -> bool {
+    match ip {
+        IpAddr::V4(value) => {
+            let octets = value.octets();
+            octets[0] == 198 && (octets[1] == 18 || octets[1] == 19)
+        }
+        IpAddr::V6(value) => value
+            .to_ipv4_mapped()
+            .is_some_and(|mapped| is_proxy_fake_ip(IpAddr::V4(mapped))),
+    }
+}
+
+/// 公网校验通过的一跳目标。
+struct PublicTarget {
+    host: String,
+    addresses: Vec<SocketAddr>,
+    /// 按系统 / 环境代理设置，这一跳应走的代理；`None` 为直连（DNS 钉死到 `addresses`）。
+    proxy: Option<String>,
+}
+
+/**
+ * publicOnly 的每一跳校验（对账：免 Key 联网 · 跟随系统代理）。
+ *
+ * - 直连：本机解析 DNS，所有地址必须是公网，然后 `resolve_to_addrs` 把连接钉死在这些地址上，
+ *   杜绝「校验时公网、连接时内网」的 DNS rebinding。
+ * - 走代理：仍然先在本机解析并要求公网（fake-ip 段除外），但连接由代理按主机名完成，
+ *   **无法钉死 DNS**——代理端解析结果理论上可能与本机不同。这是跟随系统代理的已知取舍：
+ *   字面 IP、localhost、内网后缀和本机解析到内网的域名照旧拒绝；本机与内网字面地址
+ *   永远不走代理（见 `system_proxy::ProxySettings::proxy_for`）。
+ */
+async fn validate_public_url(
+    raw: &str,
+    proxies: &system_proxy::ProxySettings,
+) -> Result<PublicTarget, String> {
     let parsed = reqwest::Url::parse(raw).map_err(|error| error.to_string())?;
     if parsed.scheme() != "http" && parsed.scheme() != "https" {
         return Err("只支持 http / https 地址".into());
@@ -1973,9 +2010,14 @@ async fn validate_public_url(raw: &str) -> Result<(String, Vec<SocketAddr>), Str
     let port = parsed
         .port_or_known_default()
         .ok_or_else(|| "无法确定目标端口".to_string())?;
+    let proxy = proxies.proxy_for(parsed.scheme(), &host).map(str::to_string);
     if let Ok(ip) = host.parse::<IpAddr>() {
         return if is_public_ip(ip) {
-            Ok((host, vec![SocketAddr::new(ip, port)]))
+            Ok(PublicTarget {
+                host,
+                addresses: vec![SocketAddr::new(ip, port)],
+                proxy,
+            })
         } else {
             Err("设计调研拒绝本机、内网或链路本地地址".into())
         };
@@ -1992,10 +2034,22 @@ async fn validate_public_url(raw: &str) -> Result<(String, Vec<SocketAddr>), Str
     if addresses.is_empty() {
         return Err("目标域名没有解析到地址".into());
     }
-    if addresses.iter().any(|address| !is_public_ip(address.ip())) {
+    if !resolved_addresses_allowed(&addresses, proxy.is_some()) {
         return Err("目标域名解析到了本机、内网或链路本地地址".into());
     }
-    Ok((host, addresses))
+    Ok(PublicTarget {
+        host,
+        addresses,
+        proxy,
+    })
+}
+
+/// 解析结果是否可用：全部公网；走代理时额外容忍代理 fake-ip 段。
+fn resolved_addresses_allowed(addresses: &[SocketAddr], proxied: bool) -> bool {
+    !addresses.is_empty()
+        && addresses
+            .iter()
+            .all(|address| is_public_ip(address.ip()) || (proxied && is_proxy_fake_ip(address.ip())))
 }
 
 #[tauri::command]
@@ -2024,37 +2078,33 @@ async fn fetch_text(
     if public_only && verb != "GET" && verb != "HEAD" {
         return Err("公开互联网请求只允许 GET / HEAD".into());
     }
-    let client = reqwest::Client::builder()
-        .timeout(std::time::Duration::from_millis(
-            timeout_ms.unwrap_or(10000),
-        ))
-        .redirect(if public_only {
-            reqwest::redirect::Policy::none()
-        } else {
-            reqwest::redirect::Policy::default()
-        })
-        .build()
-        .map_err(|err| err.to_string())?;
-
     if public_only {
+        // 每次请求读一次代理设置（环境变量优先，其次 Windows 系统代理），用户开关代理即时生效。
+        let proxies = system_proxy::current();
         let mut current = url.clone();
         let mut response = None;
         for _ in 0..=5 {
-            let (host, addresses) = if let Some(request_id) = request_id.as_deref() {
+            let target = if let Some(request_id) = request_id.as_deref() {
                 tokio::select! {
-                    resolved = validate_public_url(&current) => resolved?,
+                    resolved = validate_public_url(&current, &proxies) => resolved?,
                     _ = wait_for_fetch_cancel(request_id) => return Err("请求已取消".into()),
                 }
             } else {
-                validate_public_url(&current).await?
+                validate_public_url(&current, &proxies).await?
             };
             let builder = reqwest::Client::builder()
                 .timeout(std::time::Duration::from_millis(
                     timeout_ms.unwrap_or(10000),
                 ))
-                .redirect(reqwest::redirect::Policy::none())
-                .no_proxy()
-                .resolve_to_addrs(&host, &addresses);
+                .redirect(reqwest::redirect::Policy::none());
+            let builder = match target.proxy.as_deref() {
+                Some(proxy_url) => builder.proxy(
+                    reqwest::Proxy::all(proxy_url).map_err(|err| format!("代理地址无效：{err}"))?,
+                ),
+                None => builder
+                    .no_proxy()
+                    .resolve_to_addrs(&target.host, &target.addresses),
+            };
             let hop_client = builder.build().map_err(|err| err.to_string())?;
             let mut request = if verb == "HEAD" {
                 hop_client.head(&current)
@@ -2086,6 +2136,13 @@ async fn fetch_text(
         let response = response.ok_or_else(|| "公开页面重定向次数过多".to_string())?;
         return collect_fetched_text(response, max_response_bytes, request_id.as_deref()).await;
     }
+
+    let client = system_proxy::apply_to_builder(reqwest::Client::builder())
+        .timeout(std::time::Duration::from_millis(
+            timeout_ms.unwrap_or(10000),
+        ))
+        .build()
+        .map_err(|err| err.to_string())?;
 
     let mut req = match verb.as_str() {
         "GET" => client.get(&url),
@@ -2204,8 +2261,54 @@ async fn collect_fetched_text(
  */
 #[cfg(test)]
 mod fetch_text_tests {
-    use super::{cancel_fetch_text, fetch_text_is_cancelled, is_public_ip, FetchTextCancelGuard};
-    use std::net::IpAddr;
+    use super::{
+        cancel_fetch_text, fetch_text_is_cancelled, is_proxy_fake_ip, is_public_ip,
+        resolved_addresses_allowed, validate_public_url, FetchTextCancelGuard,
+    };
+    use crate::system_proxy::{from_windows_values, ProxySettings};
+    use std::net::{IpAddr, SocketAddr};
+
+    fn addr(value: &str) -> SocketAddr {
+        SocketAddr::new(value.parse().unwrap(), 443)
+    }
+
+    #[test]
+    fn proxied_targets_tolerate_fake_ip_but_never_private_ranges() {
+        let fake = [addr("198.18.0.7")];
+        let public = [addr("8.8.8.8")];
+        let private = [addr("8.8.8.8"), addr("192.168.1.2")];
+        assert!(is_proxy_fake_ip("198.19.255.1".parse().unwrap()));
+        assert!(!is_proxy_fake_ip("198.20.0.1".parse().unwrap()));
+        assert!(resolved_addresses_allowed(&public, false));
+        assert!(!resolved_addresses_allowed(&fake, false));
+        assert!(resolved_addresses_allowed(&fake, true));
+        assert!(!resolved_addresses_allowed(&private, true));
+        assert!(!resolved_addresses_allowed(&[], true));
+    }
+
+    #[test]
+    fn public_url_validation_keeps_rejecting_local_targets_when_proxied() {
+        let proxies = from_windows_values(1, "127.0.0.1:7890", "");
+        let block_on = |raw: &str| tauri::async_runtime::block_on(validate_public_url(raw, &proxies));
+        for raw in [
+            "http://127.0.0.1:18765/state",
+            "http://localhost/x",
+            "http://printer.local/",
+            "http://10.0.0.1/",
+            "http://[::1]/",
+        ] {
+            assert!(block_on(raw).is_err(), "{raw}");
+        }
+        let target = block_on("https://8.8.8.8/dns-query").expect("public literal");
+        assert_eq!(target.proxy.as_deref(), Some("http://127.0.0.1:7890"));
+        let direct = tauri::async_runtime::block_on(validate_public_url(
+            "https://8.8.8.8/dns-query",
+            &ProxySettings::default(),
+        ))
+        .expect("public literal");
+        assert_eq!(direct.proxy, None);
+        assert_eq!(direct.addresses, vec![SocketAddr::new("8.8.8.8".parse().unwrap(), 443)]);
+    }
 
     #[test]
     fn public_only_ip_guard_rejects_local_and_private_ranges() {

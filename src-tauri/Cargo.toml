@@ -44,4 +44,5 @@ base64 = "0.22"
 
 # Windows DPAPI：渠道 API Key 绑定当前 Windows 用户加密（credential_vault.rs）
 [target.'cfg(windows)'.dependencies]
-windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_Security_Cryptography"] }
+# Win32_System_Registry：读当前用户的系统代理（Internet Settings · ProxyEnable / ProxyServer / ProxyOverride，system_proxy.rs）
+windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_Security_Cryptography", "Win32_System_Registry"] }
