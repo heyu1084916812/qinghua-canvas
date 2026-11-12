@@ -70,3 +70,8 @@ export function usePlatform(): PlatformKit {
   if (!p) throw new Error('PlatformProvider 未挂载')
   return p
 }
+
+/** 可选读取：独立渲染的面板（测试、取证壳）没有 Provider 时返回 null，由调用方降级。 */
+export function usePlatformOptional(): PlatformKit | null {
+  return useContext(PlatformContext)
+}

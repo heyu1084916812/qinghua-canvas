@@ -45,6 +45,7 @@ import { ResearchSelectionChips } from './ResearchSelectionChips'
 import { researchSelectionActions, useResearchSelection } from './researchSelection'
 import baseStyles from './AgentPanel.module.css'
 import composerStyles from './AgentComposerPane.module.css'
+import { useAgentKitMentionOptions } from './useAgentKitMentionOptions'
 
 const styles = { ...baseStyles, ...composerStyles }
 
@@ -166,6 +167,7 @@ export function AgentComposerPane({
   const selectionSessionId = current?.id ?? ''
   const researchSelection = useResearchSelection(selectionSessionId)
   const hasResearchSelection = researchSelection.selected.length > 0
+  const kitOptions = useAgentKitMentionOptions(openPicker === 'agent-mention')
   return (
     <>
       {/*
@@ -422,6 +424,24 @@ export function AgentComposerPane({
                  * ③ 选一枚 = **往正文里插一枚 chip**（与创作面板的模型 chip 同一套），
                  *    可以连着插多枚 —— 那就是「多个模型参与的流程」的输入方式。
                  */
+                /**
+                 * 套件（2026-11-12）：@ 一个品牌 / 产品 / 角色套件 = 本会话按它的**当前版本**注入
+                 * （与项目绑定同一口径：指南与颜色字体作约束，Logo / 参考图作视觉输入）。
+                 * chip id 冻结版本，之后套件再保存新版本也不会改变这次对话。
+                 */
+                {
+                  name: 'kit',
+                  label: '套件',
+                  variant: 'list',
+                  maxRows: 5,
+                  options: kitOptions,
+                  value: '',
+                  emptyHint: '还没有套件，可在套件库创建',
+                  onSelect: (v) => {
+                    const hit = kitOptions.find((option) => option.value === v)
+                    insertMention('kit', v.slice('kit:'.length), hit?.label ?? '套件')
+                  },
+                },
                 {
                   name: 'image',
                   label: '图片',

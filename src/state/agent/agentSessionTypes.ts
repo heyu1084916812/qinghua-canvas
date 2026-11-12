@@ -1,3 +1,4 @@
+import type { SessionKitRef } from '../../domain/shared/kitMention'
 import type { ChatMessage } from '../../domain/shared/execution/types'
 import type { QueuedAgentTurn } from '../../domain/agent/queuedTurn'
 import type { AgentSteer } from '../../domain/agent/steering'
@@ -61,6 +62,8 @@ export interface AgentSession {
   pendingAssetIds?: string[]
   /** 当前会话持续引用的项目参考卡；参考字节仍在 assets。 */
   referenceIds?: string[]
+  /** 本会话里用户 @ 选中的套件（冻结版本）；与项目绑定同一口径注入，但不写绑定表。 */
+  kitRefs?: SessionKitRef[]
   /**
    * 当前任务（参考用法按任务存，见 `domain/agent/agentTask.ts`）。
    * 同一任务内改图 / 出系列沿用参考与用法；换无关新需求开新任务。

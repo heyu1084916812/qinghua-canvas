@@ -38,7 +38,7 @@ import { presetGlyphSvg } from '../icons/presetGlyph'
  * `preset` 是 2026-10-05 加的第四种：创作面板里的「预设」要像 @ 引用那样**插在正文里**
  * （用户：「需要像 agent 一样的插入正文 chip 一样的大小和功能，不是单独在一行」）。
  */
-export const MENTION_SPLIT_RE = /(@\[[^\]]*\]\((?:node|model|skill|preset|reference):[^)]*\))/g
+export const MENTION_SPLIT_RE = /(@\[[^\]]*\]\((?:node|model|skill|preset|reference|kit):[^)]*\))/g
 
 /** chip 里那个小图标：节点 = 一张图，模型 = 立体方块，技能 = 魔杖（与工具栏同义） */
 export const MENTION_ICON: Record<MentionKind, string> = {
@@ -56,9 +56,11 @@ export const MENTION_ICON: Record<MentionKind, string> = {
    * 这里拿字符串形态（命令式建 DOM 吃不了 React 元素）。改形状只改那一个文件。
    */
   preset: presetGlyphSvg(),
+  /** 套件（2026-11-12）：叠放的两张卡 + 色点，表示「一整套品牌 / 产品规范」。 */
+  kit: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="6.5" width="13" height="13" rx="2.5"/><path d="M7.5 6.5V5a1.5 1.5 0 0 1 1.5-1.5h10A1.5 1.5 0 0 1 20.5 5v10a1.5 1.5 0 0 1-1.5 1.5h-2.5"/><circle cx="10" cy="13" r="2.2"/></svg>',
 }
 
-export type MentionKind = 'node' | 'model' | 'skill' | 'preset' | 'reference'
+export type MentionKind = 'node' | 'model' | 'skill' | 'preset' | 'reference' | 'kit'
 
 /**
  * 拼一条引用的存储形态。
@@ -78,19 +80,20 @@ export function mentionLabel(token: string): string {
 
 /** 存储形态 → 是节点还是模型（读不出来返回 null，不当引用处理） */
 export function mentionKindOf(token: string): MentionKind | null {
-  const m = /^@\[[^\]]*\]\((node|model|skill|preset|reference):/.exec(token)
+  const m = /^@\[[^\]]*\]\((node|model|skill|preset|reference|kit):/.exec(token)
   return m?.[1] === 'node' ||
     m?.[1] === 'model' ||
     m?.[1] === 'skill' ||
     m?.[1] === 'preset' ||
-    m?.[1] === 'reference'
+    m?.[1] === 'reference' ||
+    m?.[1] === 'kit'
     ? m[1]
     : null
 }
 
 /** 存储形态 → 它指向的那个标识（节点 id / 模型名 / 技能 id）；读不出来返回 null */
 export function mentionIdOf(token: string): string | null {
-  const m = /^@\[[^\]]*\]\((?:node|model|skill|preset|reference):([^)]*)\)/.exec(token)
+  const m = /^@\[[^\]]*\]\((?:node|model|skill|preset|reference|kit):([^)]*)\)/.exec(token)
   return m?.[1]?.trim() || null
 }
 
@@ -113,7 +116,7 @@ export function parseMentions(text: string): MentionRef[] {
   const out: MentionRef[] = []
   const seen = new Set<string>()
   for (const m of String(text ?? '').matchAll(
-    /@\[([^\]]*)\]\((node|model|skill|preset|reference):([^)]*)\)/g,
+    /@\[([^\]]*)\]\((node|model|skill|preset|reference|kit):([^)]*)\)/g,
   )) {
     const kind = m[2] as MentionKind
     const id = (m[3] ?? '').trim()
@@ -136,7 +139,7 @@ export function parseMentions(text: string): MentionRef[] {
 export function stripMentionMarkup(text: string): string {
   return String(text ?? '')
     /** 节点 / 模型：还原成 `@名字`（读起来就是「引用了谁」） */
-    .replace(/@\[([^\]]*)\]\((?:node|model|reference):[^)]*\)/g, '@$1')
+    .replace(/@\[([^\]]*)\]\((?:node|model|reference|kit):[^)]*\)/g, '@$1')
     /** 技能：它就是「这次用哪条技能」，前面挂个 @ 反而像在引用一个对象，故直接去掉形态 */
     .replace(/@\[([^\]]*)\]\(skill:[^)]*\)/g, '$1')
     /**

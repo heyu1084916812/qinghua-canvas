@@ -1,4 +1,5 @@
 import type { GraphSnapshot } from '../../../../domain/canvas/model/graph'
+import { mergeSessionKits, sameSessionKits } from '../../../../domain/shared/kitMention'
 import type { GenerationContextAsset } from '../../../../domain/canvas/model/node'
 import type { Channel } from '../../../../domain/project/channel'
 import type { GenerationAvailability } from '../../../../domain/project/generationRouting'
@@ -451,11 +452,23 @@ export async function prepareAgentTurnRequest(
             taskKey,
           )
         : null
+    // 本会话 @ 选中的套件：冻结版本随会话保留，按项目绑定同一口径注入（不写绑定表）。
+    const sessionKits = mergeSessionKits(
+      input.session.kitRefs,
+      rawMentions.filter((mention) => mention.kind === 'kit'),
+    )
+    if (!sameSessionKits(input.session.kitRefs, sessionKits)) {
+      await input.sessions.updateFields?.(input.session.id, { kitRefs: sessionKits })
+        .catch(() => null)
+    }
     const bundle = await input.memory.read({
       projectId: input.projectId,
       workbench: 'canvas',
       request: plainText,
       sessionId: input.session.id,
+      ...(sessionKits.length > 0
+        ? { extraKits: sessionKits.map(({ kitId, version }) => ({ kitId, version })) }
+        : {}),
     })
     const referenceMimes = selection
       ? await Promise.all(

@@ -109,7 +109,38 @@ export interface ContextRepository {
     taskId?: string
     skill?: { name: string; content: string }
     memoryCharBudget?: number
+    /**
+     * 本会话 @ 选中的套件（冻结版本）。按项目绑定同一口径装配，但只在本次读取里生效，
+     * 不写 `projectContextBindings`；同一套件已绑定项目时以这里的版本为准（用户显式选择）。
+     */
+    extraKits?: readonly { kitId: string; version: number }[]
   }): Promise<ContextBundle>
+}
+
+/** 项目绑定 + 会话选中套件 → 本次装配用的绑定列表（会话选择覆盖同一套件的项目绑定）。 */
+export function sessionKitBindings(
+  projectId: string,
+  bindings: readonly ProjectContextBinding[],
+  extraKits: readonly { kitId: string; version: number }[],
+): ProjectContextBinding[] {
+  const picked = new Map(
+    extraKits
+      .filter((ref) => ref.kitId && Number.isInteger(ref.version) && ref.version > 0)
+      .map((ref) => [ref.kitId, ref.version] as const),
+  )
+  if (picked.size === 0) return [...bindings]
+  return [
+    ...bindings.filter((binding) => !picked.has(binding.kitId)),
+    ...[...picked].map(([kitId, kitVersion]): ProjectContextBinding => ({
+      id: `session-kit:${kitId}@v${kitVersion}`,
+      projectId,
+      kitId,
+      kitVersion,
+      mode: 'locked',
+      createdAt: 0,
+      updatedAt: 0,
+    })),
+  ]
 }
 
 function textOf(value: unknown): string {
@@ -863,12 +894,17 @@ export function createContextRepository(storage: StoragePort): ContextRepository
     },
 
     async bundleForProject(input) {
-      const [memories, memoryRevisions, kits, bindings] = await Promise.all([
+      const [memories, memoryRevisions, kits, projectBindings] = await Promise.all([
         listMemories(),
         listMemoryRevisions(),
         listKits(),
         listProjectBindings(input.projectId),
       ])
+      const bindings = sessionKitBindings(
+        input.projectId,
+        projectBindings,
+        input.extraKits ?? [],
+      )
       const bound = new Set(bindings.map((binding) => binding.kitId))
       const versions = (
         await Promise.all(

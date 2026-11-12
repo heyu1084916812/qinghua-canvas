@@ -10007,6 +10007,55 @@
         "src/pages/AssetsPage/assetsPageCssArchitecture.test.ts"
       ],
       "budget": 260
+    },
+    {
+      "module": "src/domain/shared/kitMention.ts",
+      "owner": "context-kit-session",
+      "responsibility": "Agent 对话里 @ 套件的纯规则：chip id 冻结套件版本、合并会话已选套件、校验落库行。",
+      "owns": [
+        "套件 chip id 的版本冻结格式",
+        "会话套件列表的去重与版本覆盖",
+        "会话套件落库行的归一"
+      ],
+      "doesNotOwn": [
+        "上下文装配",
+        "会话持久化事务",
+        "@ 菜单渲染"
+      ],
+      "publicApi": [
+        "SessionKitRef",
+        "kitMentionId",
+        "parseKitMentionId",
+        "mergeSessionKits",
+        "sameSessionKits",
+        "normalizeSessionKits"
+      ],
+      "test": [
+        "src/domain/shared/kitMention.test.ts"
+      ],
+      "budget": 120
+    },
+    {
+      "module": "src/workbenches/canvas/panels/AgentPanel/useAgentKitMentionOptions.ts",
+      "owner": "agent-composer",
+      "responsibility": "为 Agent 输入框 @ 菜单的「套件」分组读取套件库并投影成冻结版本的选项。",
+      "owns": [
+        "菜单打开时读取套件库",
+        "套件选项排序与类型 / 版本提示"
+      ],
+      "doesNotOwn": [
+        "套件编辑与版本保存",
+        "上下文注入"
+      ],
+      "publicApi": [
+        "useAgentKitMentionOptions",
+        "kitMentionOptions",
+        "KitMentionOption"
+      ],
+      "test": [
+        "src/workbenches/canvas/panels/AgentPanel/useAgentKitMentionOptions.test.ts"
+      ],
+      "budget": 100
     }
   ]
 }

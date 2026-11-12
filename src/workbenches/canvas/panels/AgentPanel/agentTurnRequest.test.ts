@@ -1364,3 +1364,44 @@ describe('prepareAgentTurnRequest', () => {
   })
 })
 
+
+describe('prepareAgentTurnRequest · @ 套件', () => {
+  beforeEach(() => {
+    clearToolSupportCache()
+  })
+
+  it('★★ @ 套件按冻结版本注入本轮，并随会话保留到后续回合', async () => {
+    const { createContextRepository } = await import('../../../../state/shared/contextRepository')
+    const { createAgentMemoryPort } = await import('../../../../features/shared/agent/MemoryPort')
+    const { kitMentionId } = await import('../../../../domain/shared/kitMention')
+    const repo = createContextRepository(createMemoryPlatform().storage)
+    const created = await repo.createKit({ kind: 'brand', name: 'Anbel', guide: 'v1 指南：主色墨绿。' })
+    await repo.saveKitVersion(created.kit.id, { guide: 'v2 指南：主色橙色。' })
+    const memory = createAgentMemoryPort(repo)
+    const { sessions, session } = await createSession()
+
+    const first = await prepareAgentTurnRequest(inputFor({
+      sessions,
+      session,
+      memory,
+      text: `按 ${mentionToken('kit', kitMentionId(created.kit.id, 1), 'Anbel')} 做一张海报`,
+    }))
+    expect(first.kind).toBe('ready')
+    if (first.kind !== 'ready') return
+    expect(first.systemPrompt).toContain('v1 指南：主色墨绿。')
+    expect(first.systemPrompt).not.toContain('v2 指南')
+    expect(first.contextTrace?.kitVersionRefs).toEqual([{ kitId: created.kit.id, version: 1 }])
+    const stored = await sessions.get(session.id)
+    expect(stored?.kitRefs).toEqual([{ kitId: created.kit.id, version: 1, name: 'Anbel' }])
+    expect(await repo.listProjectBindings('p1')).toEqual([])
+
+    clearToolSupportCache()
+    const second = await prepareAgentTurnRequest(inputFor({
+      sessions,
+      session: stored!,
+      memory,
+      text: '再出一张横版',
+    }))
+    expect(second.kind === 'ready' && second.systemPrompt).toContain('v1 指南：主色墨绿。')
+  })
+})
