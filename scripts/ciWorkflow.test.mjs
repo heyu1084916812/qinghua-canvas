@@ -132,6 +132,11 @@ it('Linux verify job runs the required Node delivery gates', () => {
   ]) {
     assert.ok(runs.includes(command), `Linux verify job is missing: ${command}`)
   }
+  assert.match(
+    verify.lines.join('\n'),
+    /uses:\s*actions\/checkout@v4\s*\n\s+with:\s*\n\s+fetch-depth:\s*0/,
+    'Linux verify job needs full history for module-governance baseline checks',
+  )
 })
 
 it('Windows job runs Tauri Rust and both MCP harnesses', () => {
@@ -141,12 +146,18 @@ it('Windows job runs Tauri Rust and both MCP harnesses', () => {
 
   for (const command of [
     'npm ci',
+    'npm run prepare:ffmpeg',
     'cargo test --manifest-path src-tauri/Cargo.toml',
     'npm run test:canvas-mcp',
     'npm run test:canvas-mcp:inspector',
   ]) {
     assert.ok(runs.includes(command), `Windows job is missing: ${command}`)
   }
+  assert.ok(
+    runs.indexOf('npm run prepare:ffmpeg') <
+      runs.indexOf('cargo test --manifest-path src-tauri/Cargo.toml'),
+    'Windows job must prepare Tauri resources before cargo test',
+  )
 })
 
 it('a Linux job runs the shared-store Rust suite', () => {
