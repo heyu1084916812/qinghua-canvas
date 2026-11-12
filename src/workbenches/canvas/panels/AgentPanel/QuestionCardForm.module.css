@@ -5,7 +5,8 @@
 .card {
   display: flex;
   flex-direction: column;
-  max-height: 400px;
+  /* 约 360–420px：大屏 400px；矮视口按 50vh 收，避免卡片头被对话区顶出 */
+  max-height: min(400px, 50vh);
   margin: var(--space-2) 0;
   border: 1px solid var(--stroke);
   border-radius: var(--radius-node);

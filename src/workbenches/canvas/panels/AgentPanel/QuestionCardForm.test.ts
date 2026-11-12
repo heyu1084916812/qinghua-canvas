@@ -60,6 +60,8 @@ describe('QuestionCardForm（Lovart 样式 2026-11-12）', () => {
     expect(questionIndexInView([0, 200, 420], 190, false)).toBe(1)
     expect(questionIndexInView([0, 200, 420], 300, true)).toBe(2)
     expect(questionIndexInView([], 0, false)).toBe(0)
+    // 下一题顶边进入可视区上 1/3 就算翻到它
+    expect(questionIndexInView([0, 200, 420], 100, false, 110)).toBe(1)
   })
 })
 

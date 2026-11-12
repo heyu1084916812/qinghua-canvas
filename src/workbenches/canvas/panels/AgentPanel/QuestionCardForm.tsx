@@ -56,7 +56,7 @@ export function QuestionCardForm({
     if (!body) return
     const offsets = questionRefs.current.map((node) => node?.offsetTop ?? 0)
     const atBottom = body.scrollTop + body.clientHeight >= body.scrollHeight - 2 && body.scrollTop > 0
-    setCurrent(questionIndexInView(offsets, body.scrollTop, atBottom))
+    setCurrent(questionIndexInView(offsets, body.scrollTop, atBottom, Math.max(24, body.clientHeight / 3)))
   }, [])
 
   useEffect(() => {

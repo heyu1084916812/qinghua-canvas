@@ -6,19 +6,20 @@ export function questionOptionLetter(index: number): string {
 }
 
 /**
- * 滚动区里「当前在看第几题」：最后一个顶边已经滚到可视区顶部（留 24px 容差）的题；
+ * 滚动区里「当前在看第几题」：最后一个顶边已进入可视区上部（threshold，默认 24px；面板传可视高度的 1/3）的题；
  * 已滚到底时算最后一题（最后一题较短、顶边永远到不了顶部时，页码也要能走到 N）。
  */
 export function questionIndexInView(
   offsets: readonly number[],
   scrollTop: number,
   atBottom: boolean,
+  threshold = 24,
 ): number {
   if (offsets.length === 0) return 0
   if (atBottom) return offsets.length - 1
   let current = 0
   offsets.forEach((top, index) => {
-    if (top - scrollTop <= 24) current = index
+    if (top - scrollTop <= threshold) current = index
   })
   return current
 }
