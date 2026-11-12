@@ -67,7 +67,8 @@ export const GENERATION_ACTIVITY_PHRASES = [
 ] as const
 
 export function statusIsBusy(status: AgentPanelStatus): boolean {
-  return status.kind !== 'idle' && status.kind !== 'error'
+  // 修复：等待确认/问题回答时不应该被视为"忙碌"，用户需要交互
+  return status.kind !== 'idle' && status.kind !== 'error' && status.kind !== 'awaitingConfirm'
 }
 
 export function statusCanSteer(status: AgentPanelStatus): boolean {

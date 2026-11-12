@@ -16,7 +16,8 @@
 .backdrop {
   position: absolute;
   inset: 0;
-  background: var(--overlay-scrim);
+  /* 修复：降低遮罩透明度，避免背景过度变暗 */
+  background: rgba(0, 0, 0, 0.3);
 }
 
 .dialog {
