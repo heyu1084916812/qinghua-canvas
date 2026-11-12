@@ -19,6 +19,7 @@ import {
   SkillStarIcon,
 } from './SkillLibraryIcons'
 import styles from './SkillsPage.module.css'
+import detailStyles from './SkillsDetailEditor.module.css'
 
 export type SkillDetailSource =
   | { kind: 'libtv'; skill: LibtvSkill }
@@ -33,6 +34,7 @@ export function SkillDetailDialog({
   onToggleFavorite,
   onAddToAgent,
   onEdit,
+  contained = false,
 }: {
   source: SkillDetailSource
   favorite: boolean
@@ -41,6 +43,8 @@ export function SkillDetailDialog({
   onToggleFavorite: () => void
   onAddToAgent: () => void
   onEdit?: () => void
+  /** 收在外层浮层里（画布技能浮层）：遮罩只盖住浮层，不铺满窗口、不锁 body 滚动 */
+  contained?: boolean
 }) {
   const closeRef = useRef<HTMLButtonElement>(null)
   const filePickerRef = useRef<HTMLDivElement>(null)
@@ -67,7 +71,7 @@ export function SkillDetailDialog({
   useEffect(() => {
     closeRef.current?.focus()
     const previousOverflow = document.body.style.overflow
-    document.body.style.overflow = 'hidden'
+    if (!contained) document.body.style.overflow = 'hidden'
     const onKey = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
         event.preventDefault()
@@ -77,9 +81,9 @@ export function SkillDetailDialog({
     window.addEventListener('keydown', onKey)
     return () => {
       window.removeEventListener('keydown', onKey)
-      document.body.style.overflow = previousOverflow
+      if (!contained) document.body.style.overflow = previousOverflow
     }
-  }, [onClose])
+  }, [contained, onClose])
 
   useEffect(() => {
     setPreviewFailed(false)
@@ -132,8 +136,8 @@ export function SkillDetailDialog({
 
   return (
     <div
-      className={styles.detailScrim}
-      data-skill-detail-scrim
+      className={contained ? `${styles.detailScrim} ${detailStyles.detailScrimContained}` : styles.detailScrim}
+      data-skill-detail-scrim={contained ? 'contained' : ''}
       onPointerDown={(event) => {
         if (event.target === event.currentTarget) onClose()
       }}

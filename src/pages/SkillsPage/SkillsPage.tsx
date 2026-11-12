@@ -1,57 +1,38 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
-import { usePlatform } from '../../app/providers/PlatformProvider'
+import { useState } from 'react'
 import { usePresetText } from '../../app/providers/PresetTextProvider'
-import { useSkills } from '../../app/providers/SkillStoreProvider'
 import { sendSkillToAgent } from '../../features/canvas/agentSkillHandoff'
 import { presetTextEntries } from '../../domain/prompt/presetText'
 import type { BuiltinSkill, UserSkill } from '../../domain/prompt/skill'
-import {
-  libtvAgentContentOf,
-  libtvCategoryOf,
-  libtvHasBody,
-  type LibtvCategory,
-  type LibtvSourceGroup,
-} from '../../domain/prompt/libtvSkill'
 import { noticeA11y } from '../../domain/ui/notice'
-import { createPresetStore } from '../../state/project/presetStore'
-import { loadLibtvSkillFiles } from '../../state/project/libtvSkillCatalog'
 import { activeCanvasId } from '../../state/project/activeCanvas'
 import { PresetTextSection } from './PresetTextSection'
-import { SkillDetailDialog, type SkillDetailSource } from './SkillDetailDialog'
 import { SkillEditor } from './SkillEditor'
-import { SkillsBrowser, type SkillCardPick } from './SkillsBrowser'
+import { SkillLibraryView } from './SkillLibraryView'
+import type { SkillCardPick } from './SkillsBrowser'
+import type { AgentSkillTarget } from './skillAgentResolve'
+import { useSkillLibraryState } from './useSkillLibraryState'
 import styles from './SkillsPage.module.css'
 
 type Draft = Omit<UserSkill, 'id' | 'updatedAt' | 'source'>
 
+/** 技能页的「加入 Agent」：跨页 handoff，打开画布对话后作为技能 chip 加入。 */
+function handOffToActiveCanvas(skill: AgentSkillTarget): string | { error: string } {
+  const projectId = activeCanvasId()
+  if (!projectId) return { error: '还没有可接收技能的画布，请先打开一个画布项目。' }
+  sendSkillToAgent(projectId, skill.id)
+  return `已将「${skill.name}」交给 Agent，打开画布对话后会作为技能 chip 加入。`
+}
+
 export function SkillsPage() {
-  const platform = usePlatform()
   const presetText = usePresetText()
-  const skills = useSkills()
-  const presets = useMemo(() => createPresetStore(platform.storage), [platform])
   const presetsList = presetTextEntries(presetText.overrides)
+  const library = useSkillLibraryState(handOffToActiveCanvas)
+  const { notice } = library
 
   const [level, setLevel] = useState<'browse' | 'edit' | 'presets'>('browse')
-  const [source, setSource] = useState<LibtvSourceGroup>('libtv')
-  const [category, setCategory] = useState<LibtvCategory>('全部')
-  const [query, setQuery] = useState('')
-  const [favorites, setFavorites] = useState<string[]>([])
-  const [detail, setDetail] = useState<SkillCardPick | null>(null)
-  const [busy, setBusy] = useState(false)
-  const [notice, setNotice] = useState<{ kind: 'ok' | 'error'; text: string } | null>(null)
   const [draft, setDraft] = useState<Draft | null>(null)
   const [originalId, setOriginalId] = useState<string | null>(null)
   const [builtin, setBuiltin] = useState<BuiltinSkill | null>(null)
-
-  useEffect(() => {
-    let alive = true
-    void presets.loadSkillFavorites().then((ids) => {
-      if (alive) setFavorites(ids)
-    })
-    return () => {
-      alive = false
-    }
-  }, [presets])
 
   const openSkill = (pick: SkillCardPick) => {
     if (pick.kind === 'libtv') return
@@ -66,13 +47,13 @@ export function SkillsPage() {
     })
     setBuiltin(pick.kind === 'builtin' ? pick.skill : null)
     setOriginalId(pick.kind === 'user' ? pick.skill.id : null)
-    setDetail(null)
+    library.setDetail(null)
     setLevel('edit')
   }
 
   const openNew = (empty: Draft) => {
-    setSource('mine')
-    setQuery('')
+    library.setSource('mine')
+    library.setQuery('')
     setDraft(empty)
     setOriginalId(null)
     setBuiltin(null)
@@ -85,84 +66,6 @@ export function SkillsPage() {
     setOriginalId(null)
     setBuiltin(null)
   }
-
-  const closeDetail = useCallback(() => setDetail(null), [])
-
-  const toggleFavorite = async (pick: SkillCardPick) => {
-    const id = pick.skill.id
-    const next = favorites.includes(id)
-      ? favorites.filter((item) => item !== id)
-      : [...favorites, id]
-    setFavorites(next)
-    await presets.saveSkillFavorites(next)
-  }
-
-  const useSkill = async (pick: SkillCardPick) => {
-    setBusy(true)
-    setNotice(null)
-    try {
-      let agentSkillId = pick.skill.id
-      if (pick.kind === 'libtv') {
-        if (!libtvHasBody(pick.skill)) {
-          setNotice({ kind: 'error', text: '这条目录没有可执行的 Skill 正文，暂不能添加到 Agent。' })
-          return
-        }
-        const existing = skills.userSkills.find((skill) => skill.libtvId === pick.skill.id)
-        if (existing) {
-          agentSkillId = existing.id
-        } else {
-          const files = await loadLibtvSkillFiles(pick.skill)
-          const content = files ? libtvAgentContentOf(files) : ''
-          if (!content) {
-            setNotice({ kind: 'error', text: '读取 Skill 正文失败，暂不能添加到 Agent。' })
-            return
-          }
-          const created = await skills.create({
-            name: pick.skill.name,
-            description: pick.skill.description,
-            content,
-            inputMode: 'any',
-            tags: [libtvCategoryOf(pick.skill)],
-            image: pick.skill.coverUrl ?? undefined,
-            libtvId: pick.skill.id,
-          })
-          agentSkillId = created.id
-        }
-      }
-      const projectId = activeCanvasId()
-      if (!projectId) {
-        setNotice({
-          kind: 'error',
-          text: '还没有可接收技能的画布，请先打开一个画布项目。',
-        })
-        return
-      }
-      sendSkillToAgent(projectId, agentSkillId)
-      setNotice({
-        kind: 'ok',
-        text: `已将「${pick.skill.name}」交给 Agent，打开画布对话后会作为技能 chip 加入。`,
-      })
-    } catch (error) {
-      setNotice({
-        kind: 'error',
-        text: error instanceof Error ? error.message : String(error),
-      })
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  const detailSource: SkillDetailSource | null = useMemo(
-    () =>
-      detail?.kind === 'libtv'
-        ? { kind: 'libtv', skill: detail.skill }
-        : detail?.kind === 'builtin'
-          ? { kind: 'builtin', skill: detail.skill }
-          : detail?.kind === 'user'
-            ? { kind: 'user', skill: detail.skill }
-            : null,
-    [detail],
-  )
 
   return (
     <div className={styles.page} data-skills-page>
@@ -224,36 +127,13 @@ export function SkillsPage() {
 
       {level === 'browse' ? (
         <div className={styles.browserStage} data-skills-browser-stage>
-          <SkillsBrowser
-            source={source}
-            category={category}
-            query={query}
-            favorites={favorites}
-            onSource={(next) => {
-              setSource(next)
-              setQuery('')
-            }}
-            onCategory={setCategory}
-            onQuery={setQuery}
-            onToggleFavorite={(pick) => void toggleFavorite(pick)}
-            onOpenDetail={setDetail}
-            onUse={(pick) => void useSkill(pick)}
+          <SkillLibraryView
+            state={library}
             onNew={openNew}
             onOpenPresets={() => setLevel('presets')}
+            onEdit={openSkill}
           />
         </div>
-      ) : null}
-
-      {detail && detailSource ? (
-        <SkillDetailDialog
-          source={detailSource}
-          favorite={favorites.includes(detail.skill.id)}
-          busy={busy}
-          onClose={closeDetail}
-          onToggleFavorite={() => void toggleFavorite(detail)}
-          onAddToAgent={() => void useSkill(detail)}
-          onEdit={detail.kind === 'libtv' ? undefined : () => openSkill(detail)}
-        />
       ) : null}
     </div>
   )

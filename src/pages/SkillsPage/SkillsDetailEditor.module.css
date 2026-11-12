@@ -62,6 +62,14 @@
   background: var(--overlay-scrim);
 }
 
+/* 画布技能浮层里的详情：遮罩只盖住外层浮层（外层自带 position: relative） */
+.detailScrimContained {
+  position: absolute;
+  z-index: 5;
+  padding: var(--space-3);
+  border-radius: inherit;
+}
+
 .detailDialog {
   display: flex;
   flex-direction: column;

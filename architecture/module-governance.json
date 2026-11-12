@@ -3347,7 +3347,7 @@
       "test": [
         "src/pages/SkillsPage/skillsPageCssArchitecture.test.ts"
       ],
-      "budget": 402
+      "budget": 410
     },
     {
       "module": "src/pages/SkillsPage/SkillsPageCards.module.css",
@@ -10218,6 +10218,72 @@
         "src/pages/AssetsPage/ContextKitPdfPages.test.ts"
       ],
       "budget": 160
+    },
+    {
+      "module": "src/pages/SkillsPage/skillAgentResolve.ts",
+      "owner": "skills-ui",
+      "responsibility": "把技能库卡片（内置、我的、LibTV 目录）解析成 Agent 可引用的技能 id，LibTV 条目按需读取正文落成我的技能。",
+      "owns": [
+        "LibTV 条目到我的技能的去重（按 libtvId）",
+        "无正文与读取失败的中文错误"
+      ],
+      "doesNotOwn": [
+        "Agent 会话与草稿 chip",
+        "技能持久化实现"
+      ],
+      "publicApi": [
+        "resolveSkillForAgent",
+        "AgentSkillTarget",
+        "ResolveAgentSkillOutcome",
+        "ResolveAgentSkillDeps"
+      ],
+      "test": [
+        "src/pages/SkillsPage/skillAgentResolve.test.ts"
+      ],
+      "budget": 120
+    },
+    {
+      "module": "src/pages/SkillsPage/useSkillLibraryState.ts",
+      "owner": "skills-ui",
+      "responsibility": "技能库浏览态 hook：来源、分类、搜索、收藏、详情与加入 Agent 的忙碌和提示，技能页与画布技能浮层共用。",
+      "owns": [
+        "收藏读写",
+        "加入 Agent 的解析与提示状态"
+      ],
+      "doesNotOwn": [
+        "技能投递目标（由调用方的出口决定）",
+        "技能编辑与功能预设词"
+      ],
+      "publicApi": [
+        "useSkillLibraryState",
+        "SkillLibraryState",
+        "SkillLibraryNotice",
+        "SkillLibraryAddToAgent"
+      ],
+      "test": [
+        "src/pages/SkillsPage/SkillLibraryView.test.ts"
+      ],
+      "budget": 160
+    },
+    {
+      "module": "src/pages/SkillsPage/SkillLibraryView.tsx",
+      "owner": "skills-ui",
+      "responsibility": "技能库浏览视图：来源页签、分类、搜索、卡片与详情弹窗的组合，技能页与画布 Agent 技能浮层共用同一份界面。",
+      "owns": [
+        "浏览器与详情弹窗的接线",
+        "contained 模式下详情收在外层浮层"
+      ],
+      "doesNotOwn": [
+        "浏览态持有（useSkillLibraryState）",
+        "技能编辑页与浮层外壳"
+      ],
+      "publicApi": [
+        "SkillLibraryView"
+      ],
+      "test": [
+        "src/pages/SkillsPage/SkillLibraryView.test.ts"
+      ],
+      "budget": 120
     }
   ]
 }
