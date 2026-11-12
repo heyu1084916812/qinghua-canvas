@@ -130,7 +130,7 @@ describe('agent research reference', () => {
       .toEqual([expect.objectContaining({ mime: 'image/png' })])
     const [reference] = await createReferenceLedgerRepository(platform.storage)
       .listItems('project-1')
-    expect(reference?.what).toContain('图源：查看图片搜索结果')
+    expect(reference?.what).not.toContain('查看图片搜索结果')
     expect(reference?.what).toContain('来源页面：https://example.com/source')
     expect(reference?.what).toContain('图片地址：https://example.com/image.png')
   })
@@ -160,7 +160,7 @@ describe('agent research reference', () => {
         url: 'https://example.com/source',
       },
     })
-    expect(result.item?.what).toContain('图源：查看图片搜索结果')
+    expect(result.item?.what).not.toContain('查看图片搜索结果')
     expect(result.item?.what).toContain('图片地址：https://example.com/blocked.png')
     expect(await platform.storage.query('assets', {})).toEqual([])
   })

@@ -42,7 +42,6 @@ export function researchReferenceSourceOf(provider: ResearchProvider): Reference
 export function researchReferenceWhatOf(candidate: ConversationResearchItem): string {
   return [
     candidate.description || candidate.title,
-    candidate.imageUrl ? '图源：查看图片搜索结果' : '',
     `来源页面：${candidate.url}`,
     candidate.imageUrl ? `图片地址：${candidate.imageUrl}` : '',
     candidate.credit ? `作者：${candidate.credit}` : '',

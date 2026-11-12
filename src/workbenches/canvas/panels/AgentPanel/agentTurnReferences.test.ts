@@ -202,8 +202,44 @@ describe('Agent turn reference projection', () => {
       omitted: [],
     }, () => 'image/png')
 
-    expect(result.prompt).toContain('图源：查看图片搜索结果')
+    expect(result.prompt).not.toContain('查看图片搜索结果')
     expect(result.prompt).toContain('来源页面：https://www.behance.net/gallery/1/poster')
+  })
+
+  it('B6：调研图带真实原图地址，来源页只出现一次，多行 what 不拆散 bullet', () => {
+    const result = projectAgentTurnReferences({
+      selected: [{
+        item: {
+          id: 'search-image-2',
+          projectId: 'p1',
+          title: '咖啡海报',
+          source: 'search',
+          kind: 'image',
+          assetHash: 'h2',
+          url: 'https://www.pinterest.com/pin/1/',
+          what: [
+            '暖色咖啡海报',
+            '图源：查看图片搜索结果',
+            '来源页面：https://www.pinterest.com/pin/1/',
+            '图片地址：https://i.pinimg.com/originals/a.jpg',
+            '作者：pinterest.com',
+          ].join('\n'),
+          createdAt: 1,
+          updatedAt: 1,
+        },
+        usage: {
+          id: 'u2', itemId: 'search-image-2', projectId: 'p1', taskKey: 'task:t',
+          usage: 'style', howToUse: '借配色', createdAt: 1,
+        },
+      }],
+      omitted: [],
+    }, () => 'image/png')
+    const line = result.prompt.split('\n').find((row) => row.startsWith('- 【咖啡海报】')) ?? ''
+    expect(line).toContain('图源：https://i.pinimg.com/originals/a.jpg；')
+    expect(line).toContain('这是什么：暖色咖啡海报；作者：pinterest.com；本轮怎么用')
+    expect(line.split('来源页面：').length).toBe(2)
+    expect(result.prompt).not.toContain('查看图片搜索结果')
+    expect(result.prompt.split('\n').filter((row) => row.startsWith('作者'))).toEqual([])
   })
 
   it('G2：非 Logo 图带上台账分工与本任务用法；未分析的显式 chip 不冒充分工', () => {

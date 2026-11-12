@@ -9581,6 +9581,26 @@
         "src/features/shared/research/bingSearch.test.ts"
       ],
       "budget": 120
+    },
+    {
+      "module": "src/domain/project/researchReferenceText.ts",
+      "owner": "agent-research-reference",
+      "responsibility": "把参考台账 what 文本整理成提示词片段：取出调研图真实原图地址，去掉重复来源页与旧占位文字，多行压成一行。",
+      "owns": [
+        "what 文本里「图片地址：」行的解析",
+        "旧占位文字「图源：查看图片搜索结果」的剔除"
+      ],
+      "doesNotOwn": [
+        "台账写入",
+        "提示词整体装配"
+      ],
+      "publicApi": [
+        "referenceWhatForPrompt"
+      ],
+      "test": [
+        "src/workbenches/canvas/panels/AgentPanel/agentTurnReferences.test.ts"
+      ],
+      "budget": 40
     }
   ]
 }

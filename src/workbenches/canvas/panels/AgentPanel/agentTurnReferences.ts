@@ -4,6 +4,7 @@ import {
   type AgentPhaseEvent,
   agentPhaseCollapsedSummary,
 } from '../../../../domain/agent/phase'
+import { referenceWhatForPrompt } from '../../../../domain/project/researchReferenceText'
 
 export interface AgentTurnReferenceProjection {
   prompt: string
@@ -30,13 +31,14 @@ export function projectAgentTurnReferences(
   const warnings: string[] = []
   for (const { item, usage } of selection.selected) {
     const label = item.title.trim() || item.id
-    const provenance = item.source === 'search' && item.kind === 'image'
-      ? `图源：查看图片搜索结果；来源页面：${item.url}；`
-      : item.url
-        ? `来源页面：${item.url}；`
-        : ''
+    const { imageUrl, what } = referenceWhatForPrompt(item.what)
+    // B6：给模型真实的原图地址与来源页（不再是固定文字「图源：查看图片搜索结果」），且各只出现一次。
+    const provenance = [
+      imageUrl ? `图源：${imageUrl}；` : '',
+      item.url ? `来源页面：${item.url}；` : '',
+    ].join('')
     lines.push(
-      `- 【${label}】${provenance}这是什么：${item.what.trim()}；本轮怎么用：${usage.howToUse.trim()}；用法类型：${usage.usage}。`,
+      `- 【${label}】${provenance}这是什么：${what}；本轮怎么用：${usage.howToUse.trim()}；用法类型：${usage.usage}。`,
     )
     evidence.push(`${item.id}:${usage.id}`)
     const analyzed = !usage.id.startsWith('explicit:')
