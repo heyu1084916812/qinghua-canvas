@@ -8902,7 +8902,8 @@
       "owns": [
         "12 秒保存 deadline",
         "AbortSignal 合并",
-        "取消/超时失败文案"
+        "取消/超时失败文案",
+        "动作结束释放定时器与 parent 监听"
       ],
       "doesNotOwn": [
         "图片落库",
@@ -8914,10 +8915,12 @@
         "ResearchActionSignal",
         "raceWithResearchAbort",
         "researchActionFailure",
-        "researchActionSignal"
+        "researchActionSignal",
+        "runResearchAction"
       ],
       "test": [
-        "src/workbenches/canvas/panels/AgentPanel/useAgentResearchReferenceController.test.ts"
+        "src/workbenches/canvas/panels/AgentPanel/useAgentResearchReferenceController.test.ts",
+        "src/workbenches/canvas/panels/AgentPanel/researchActionAbort.test.ts"
       ],
       "budget": 80
     },

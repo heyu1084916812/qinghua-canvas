@@ -308,8 +308,10 @@ export interface FilePort {
    * - `saved`：取到了字节，已按 `saveFile` 落盘；
    * - `opened`：托管域不给 CORS 头，字节进不了页面，只能把地址交给浏览器
    *   （新标签页里用播放器自带的下载）—— 如实上报，别假装存好了。
+   *
+   * `signal`（可选）：取消后不再落盘、也不再交给浏览器，直接以 AbortError 拒绝。
    */
-  saveFromUrl(url: string, name: string): Promise<'saved' | 'opened'>
+  saveFromUrl(url: string, name: string, signal?: AbortSignal): Promise<'saved' | 'opened'>
 }
 
 export type LogLevel = 'debug' | 'info' | 'warn' | 'error'

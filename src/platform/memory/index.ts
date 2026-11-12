@@ -210,8 +210,9 @@ export function createMemoryFiles(): FilePort {
     async saveFile() {
       /* 内存实现不落盘 */
     },
-    async saveFromUrl() {
+    async saveFromUrl(_url, _name, signal) {
       /* 内存实现不落盘：按「已存好」上报，真实落盘只在 web 层发生 */
+      if (signal?.aborted) throw signal.reason ?? new DOMException('已取消', 'AbortError')
       return 'saved'
     },
   }

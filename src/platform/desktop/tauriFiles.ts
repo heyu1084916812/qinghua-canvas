@@ -82,18 +82,31 @@ export function createTauriFiles(): FilePort {
      * **交给系统默认浏览器**（`openUrl`）——桌面壳里那才是"用户自己去下载"的正确出口，
      * 而不是在应用内新开一个窗口。
      */
-    async saveFromUrl(url, name) {
+    async saveFromUrl(url, name, signal) {
       try {
-        const res = await fetch(url)
+        const res = await fetch(url, signal ? { signal } : undefined)
         if (res.ok) {
-          await saveBlob(name, await res.blob())
+          const blob = await res.blob()
+          throwIfSaveAborted(signal)
+          await saveBlob(name, blob)
           return 'saved'
         }
-      } catch {
+      } catch (error) {
+        if (signal?.aborted) throw abortErrorOf(signal, error)
         /* 被 CORS 拦下：字节这条路走不通，落到下面的"交给系统浏览器" */
       }
+      throwIfSaveAborted(signal)
       await openUrl(url)
       return 'opened'
     },
   }
+}
+
+function abortErrorOf(signal: AbortSignal, error: unknown): unknown {
+  return signal.reason ?? error ?? new DOMException('已取消', 'AbortError')
+}
+
+/** 取消后不落盘、不打开新窗口（研究图片下载的取消 / 超时，B6）。 */
+function throwIfSaveAborted(signal: AbortSignal | undefined): void {
+  if (signal?.aborted) throw abortErrorOf(signal, undefined)
 }

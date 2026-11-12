@@ -15,6 +15,9 @@ import { addResearchSourceReferenceToProject } from './researchSourceReference'
 
 vi.mock('./agentResearchReference', () => ({
   addResearchCandidateToProject: vi.fn(),
+  throwIfResearchAborted: (signal?: AbortSignal) => {
+    if (signal?.aborted) throw signal.reason ?? new Error('aborted')
+  },
   researchItemOf: vi.fn(),
   researchReferenceWhatOf: vi.fn(),
 }))
@@ -282,5 +285,80 @@ describe('useAgentResearchReferenceController', () => {
         ok: true,
       })
     })
+  })
+
+  it('B6: a cancel after the image was saved does not attach it to the session', async () => {
+    const parent = new AbortController()
+    vi.mocked(addResearchCandidateToProject).mockImplementation(async () => {
+      parent.abort()
+      return {
+        ok: true,
+        message: 'saved',
+        item: {
+          id: 'ref_late', projectId: 'project-1', title: 'Late', source: 'search', kind: 'image',
+          assetHash: 'h', what: 'x', createdAt: 1, updatedAt: 1,
+        },
+      }
+    })
+    const appendReferenceIds = vi.fn(async () => ({ id: 'session-1' }) as AgentSession)
+    const insertMention = vi.fn()
+    const notify = vi.fn()
+    let research!: ReturnType<typeof useAgentResearchReferenceController>
+    function Harness() {
+      research = useAgentResearchReferenceController({
+        platform: createMemoryPlatform(),
+        projectId: 'project-1',
+        current: { id: 'session-1' } as AgentSession,
+        currentIdRef: { current: 'session-1' },
+        appendReferenceIds,
+        applySessionSnapshot: vi.fn(),
+        notify,
+        insertMention,
+      })
+      return null
+    }
+    act(() => {
+      TestRenderer.create(createElement(Harness))
+    })
+    let result: { ok: boolean; message: string } | undefined
+    await act(async () => {
+      result = await research.sendResearchToChat(candidate, parent.signal)
+    })
+    expect(result).toMatchObject({ ok: false })
+    expect(result?.message).toContain('已取消')
+    expect(appendReferenceIds).not.toHaveBeenCalled()
+    expect(insertMention).not.toHaveBeenCalled()
+    expect(notify).not.toHaveBeenCalled()
+  })
+
+  it('B6: passes the action signal to the file port so a canceled download never lands', async () => {
+    const platform = createMemoryPlatform()
+    const saveFromUrl = vi.spyOn(platform.files, 'saveFromUrl')
+    let research!: ReturnType<typeof useAgentResearchReferenceController>
+    function Harness() {
+      research = useAgentResearchReferenceController({
+        platform,
+        projectId: 'project-1',
+        current: { id: 'session-1' } as AgentSession,
+        currentIdRef: { current: 'session-1' },
+        appendReferenceIds: vi.fn(),
+        applySessionSnapshot: vi.fn(),
+        notify: vi.fn(),
+        insertMention: vi.fn(),
+      })
+      return null
+    }
+    act(() => {
+      TestRenderer.create(createElement(Harness))
+    })
+    const parent = new AbortController()
+    parent.abort()
+    let result: { ok: boolean; message: string } | undefined
+    await act(async () => {
+      result = await research.downloadResearchImage(candidate, parent.signal)
+    })
+    expect(saveFromUrl.mock.calls[0]?.[2]).toBeInstanceOf(AbortSignal)
+    expect(saveFromUrl.mock.calls[0]?.[2]?.aborted).toBe(true)
+    expect(result).toMatchObject({ ok: false })
   })
 })

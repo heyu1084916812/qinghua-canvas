@@ -138,16 +138,20 @@ export function createFileAccessFiles(): FilePort {
      * **绝不能**用 `<a download>` 裸点：跨域时 `download` 会被忽略，等于把
      * 整个画布页面导航走（浏览器实测：当前页直接跳到视频地址）。
      */
-    async saveFromUrl(url, name) {
+    async saveFromUrl(url, name, signal) {
       try {
-        const res = await fetch(url)
+        const res = await fetch(url, signal ? { signal } : undefined)
         if (res.ok) {
-          await saveBlob(name, await res.blob())
+          const blob = await res.blob()
+          throwIfSaveAborted(signal)
+          await saveBlob(name, blob)
           return 'saved'
         }
-      } catch {
+      } catch (error) {
+        if (signal?.aborted) throw abortErrorOf(signal, error)
         /* 被 CORS 拦下：字节这条路走不通，落到下面的新标签页 */
       }
+      throwIfSaveAborted(signal)
       const a = document.createElement('a')
       a.href = url
       a.target = '_blank'
@@ -157,4 +161,13 @@ export function createFileAccessFiles(): FilePort {
       return 'opened'
     },
   }
+}
+
+function abortErrorOf(signal: AbortSignal, error: unknown): unknown {
+  return signal.reason ?? error ?? new DOMException('已取消', 'AbortError')
+}
+
+/** 取消后不落盘、不打开新窗口（研究图片下载的取消 / 超时，B6）。 */
+function throwIfSaveAborted(signal: AbortSignal | undefined): void {
+  if (signal?.aborted) throw abortErrorOf(signal, undefined)
 }

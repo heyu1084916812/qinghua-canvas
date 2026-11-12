@@ -6,6 +6,7 @@ import {
   researchItemOf,
   researchReferenceWhatOf,
   researchReferenceSourceOf,
+  throwIfResearchAborted,
   type AddResearchReferenceResult,
 } from './agentResearchReference'
 import type { ConversationResearchItem } from './conversation'
@@ -16,7 +17,7 @@ import type { ConversationResearchItem } from './conversation'
  */
 export async function addResearchSourceReferenceToProject(
   candidate: ConversationResearchItem,
-  input: { platform: PlatformKit; projectId: string },
+  input: { platform: PlatformKit; projectId: string; signal?: AbortSignal },
 ): Promise<AddResearchReferenceResult> {
   if (!isPublicHttpUrl(candidate.url)) {
     return { ok: false, message: '来源不是公开互联网地址，已拒绝发送' }
@@ -46,6 +47,7 @@ export async function addResearchSourceReferenceToProject(
     createdAt: now,
     updatedAt: now,
   }
+  throwIfResearchAborted(input.signal)
   await repository.putItem(item)
   return {
     ok: true,

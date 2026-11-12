@@ -194,4 +194,20 @@ describe('agent research reference', () => {
     expect(await createReferenceLedgerRepository(platform.storage)
       .listItems('project-1')).toHaveLength(1)
   })
+
+  it('B6: writes nothing to the ledger once the action was canceled', async () => {
+    const platform = createMemoryPlatform()
+    const controller = new AbortController()
+    controller.abort()
+    await expect(addResearchCandidateToProject(
+      { id: 'w:1', title: 'T', url: 'https://example.com/page', imageUrl: '', source: 'web' },
+      { platform, projectId: 'project-1', signal: controller.signal },
+    )).rejects.toBeTruthy()
+    await expect(addResearchSourceReferenceToProject(
+      { id: 'w:2', title: 'T', url: 'https://example.com/p2', imageUrl: '', source: 'web' },
+      { platform, projectId: 'project-1', signal: controller.signal },
+    )).rejects.toBeTruthy()
+    expect(await createReferenceLedgerRepository(platform.storage).listItems('project-1'))
+      .toEqual([])
+  })
 })

@@ -67,6 +67,11 @@ export function researchItemOf(candidate: ConversationResearchItem): DesignResea
   }
 }
 
+/** 取消后抛 AbortError，调用方据此报「已取消 / 超时」而不是写入。 */
+export function throwIfResearchAborted(signal: AbortSignal | undefined): void {
+  if (signal?.aborted) throw signal.reason ?? new DOMException('已取消', 'AbortError')
+}
+
 export async function addResearchCandidateToProject(
   candidate: ConversationResearchItem,
   input: {
@@ -89,6 +94,8 @@ export async function addResearchCandidateToProject(
       )
     : null
   if (saved && (!saved.ok || !saved.asset)) return saved
+  // B6：取消 / 超时后不再写台账（图片字节可能已入素材库，但不生成参考卡）。
+  throwIfResearchAborted(input.signal)
   const existing = existingItems.find((item) =>
     saved?.asset
       ? item.assetHash === saved.asset.hash
@@ -111,6 +118,7 @@ export async function addResearchCandidateToProject(
     createdAt: existing?.createdAt ?? now,
     updatedAt: now,
   }
+  throwIfResearchAborted(input.signal)
   await repository.putItem(item)
   return {
     ok: true,
