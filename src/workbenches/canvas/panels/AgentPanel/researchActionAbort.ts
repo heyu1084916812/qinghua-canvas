@@ -10,15 +10,15 @@ export interface ResearchActionSignal {
 export function researchActionSignal(parent?: AbortSignal): ResearchActionSignal {
   const controller = new AbortController()
   let timedOut = false
-  let timer: ReturnType<typeof setTimeout> | undefined
+  const pending: { timer?: ReturnType<typeof setTimeout> } = {} // 提前 abort 时 dispose 读到 undefined，不碰 TDZ
   const dispose = () => {
-    clearTimeout(timer)
+    clearTimeout(pending.timer)
     parent?.removeEventListener('abort', abort)
   }
   const abort = () => (controller.abort(parent?.reason), dispose())
   if (parent?.aborted) return { signal: (abort(), controller.signal), timedOut: () => false, dispose }
   parent?.addEventListener('abort', abort, { once: true })
-  timer = setTimeout(() => {
+  pending.timer = setTimeout(() => {
     timedOut = true
     controller.abort()
     dispose()

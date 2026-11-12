@@ -89,9 +89,9 @@ describe('G-R1 image research projection', () => {
 describe('G-R1 runAgentTurn: image research has no prose reply', () => {
   function deps(replies: { text?: string; toolCalls?: { id: string; name: string; args: string }[] }[], report: unknown) {
     let index = 0
-    const seen: ChatMessage[][] = []
+    const seen: (readonly ChatMessage[])[] = []
     const adapter = {
-      completeText: vi.fn(async (request: { messages?: ChatMessage[] }) => {
+      completeText: vi.fn(async (request: { messages?: readonly ChatMessage[] }) => {
         seen.push(request.messages ?? [])
         const reply = replies[Math.min(index++, replies.length - 1)]!
         return { text: reply.text ?? '', ...(reply.toolCalls ? { toolCalls: reply.toolCalls } : {}) }
