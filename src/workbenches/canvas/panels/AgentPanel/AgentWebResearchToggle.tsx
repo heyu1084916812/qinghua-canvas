@@ -26,7 +26,7 @@ export function AgentWebResearchToggle() {
       aria-pressed={enabled}
       title={
         enabled
-          ? '联网已开启：Agent 可以搜索网页和读取链接（Tavily Key 在 设置 → Agent → 工具 → 联网调研）'
+          ? '联网已开启：Agent 可以免 Key 搜索网页和读取链接（可选的 Tavily 备用 Key 在 设置 → Agent → 工具 → 联网调研）'
           : '联网已关闭：Agent 不会搜索或读取网页'
       }
       data-agent-web-toggle={enabled ? 'on' : 'off'}

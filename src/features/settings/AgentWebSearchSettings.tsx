@@ -8,10 +8,10 @@ import styles from './AgentSettingsPanel.module.css'
 /**
  * 联网调研设置（2026-11-11 重做）。
  *
- * - Tavily API Key：内置网页 + 图片搜索。Key 走凭据端口（桌面壳为 Windows DPAPI），
- *   界面只显示“已保存”，不回显任何字符。
+ * - 默认免 Key 搜索（Bing 结果页，桌面壳原生请求）；Tavily API Key 改为可选备用，
+ *   只在免费通道失败时使用。Key 走凭据端口（桌面壳为 Windows DPAPI），界面只显示“已保存”，不回显任何字符。
  * - SearXNG：可选的自建元搜索地址；留空即跳过（不再有公共默认实例）。
- * - 网页正文读取走 Jina Reader，不需要 Key。
+ * - 网页正文读取走 Jina Reader，不需要 Key；读不到时直接读取原网页。
  */
 export function AgentWebSearchSettings() {
   const platform = usePlatform()
@@ -87,13 +87,13 @@ export function AgentWebSearchSettings() {
       <div className={styles.capabilityHead}>
         <h4>联网调研</h4>
         <p>
-          Agent 输入框里的「联网」打开时，用 Tavily 搜索网页与图片、用 Jina Reader 读取网页正文。
+          Agent 输入框里的「联网」打开时，免 Key 搜索固定设计站点的网页与图片，用 Jina Reader 读取网页正文（读不到时直接读取原网页）。
           搜到的图只作为对话里的候选，你选中后才会加入参考。
         </p>
       </div>
       <label className={styles.field}>
         <span className={styles.fieldLabel}>
-          Tavily API Key{hasKey ? '（已保存）' : '（未填写）'}
+          Tavily API Key{hasKey ? '（可选，已保存）' : '（可选，未填写）'}
         </span>
         <input
           className={styles.textInput}
@@ -129,7 +129,7 @@ export function AgentWebSearchSettings() {
         ) : null}
       </div>
       <p className={styles.hint}>
-        在 tavily.com 注册即可获得免费 Key（每月 1000 次）。Key 只保存在本机，不会写进项目或日志。
+        可选：免费搜索被验证码或限流拦住时才改用 Tavily。在 tavily.com 注册可获得免费 Key（每月 1000 次）。Key 只保存在本机，不会写进项目或日志。
       </p>
       <label className={styles.field}>
         <span className={styles.fieldLabel}>SearXNG 地址（可选）</span>
