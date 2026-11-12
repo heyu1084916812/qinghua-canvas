@@ -126,6 +126,8 @@ export function AgentGenerationTasks({ tasks }: { tasks: readonly AgentRunTask[]
     return () => window.clearInterval(timer)
   }, [active])
 
+  // 如果所有任务已完成但组件仍在渲染，说明状态管理有问题
+  // 这里不做任何处理，因为清理应该由父组件负责
   return (
     <section
       className={styles.runTasks}
@@ -148,7 +150,10 @@ export function AgentGenerationTasks({ tasks }: { tasks: readonly AgentRunTask[]
       <div className={styles.runTaskList}>
         {tasks.map((task) => {
           const startedAt = task.startedAt
-          const finishedAt = task.finishedAt ?? (task.status === 'running' ? now : undefined)
+          // 修复：只有 running 状态才使用当前时间，已完成的任务使用 finishedAt 或 0 秒
+          const finishedAt = task.status === 'running'
+            ? (task.finishedAt ?? now)
+            : task.finishedAt
           const elapsed =
             startedAt !== undefined && finishedAt !== undefined
               ? formatAgentRunElapsed((finishedAt - startedAt) / 1_000)

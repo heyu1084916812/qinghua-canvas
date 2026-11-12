@@ -478,7 +478,9 @@ export function AgentConversationPane({
         {runTasks &&
           runTasks.length > 0 &&
           status.kind === 'executing' &&
-          (status.tool === 'runNode' || status.tool === 'runFrom') && (
+          (status.tool === 'runNode' || status.tool === 'runFrom') &&
+          // 修复：只有当还有未完成的任务时才显示任务列表
+          runTasks.some((task) => task.status === 'running' || task.status === 'queued') && (
             <AgentGenerationTasks tasks={runTasks} />
           )}
 
