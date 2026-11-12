@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 'react'
 import { useChannels } from '../../app/providers/ChannelStoreProvider'
-import { capabilityOfLogical, panelModelOptions } from '../../domain/project/modelCatalog'
+import { capabilityOfLogical } from '../../domain/project/modelCatalog'
 import { RATIO_CHOICES } from '../../domain/canvas/layout/ratioChoices'
 import { ChoicePicker } from '../shared/choicePicker/ChoicePicker'
 import styles from './DefaultParamsPanel.module.css'
@@ -68,13 +68,7 @@ export function DefaultParamsPanel() {
   const [status, setStatus] = useState('')
 
   const options = useMemo(
-    () =>
-      category === 'chat'
-        ? panelModelOptions('chat', uncommonModelIds).flatMap((id) => {
-            const model = channels.globalModelOf(id)
-            return model ? [model] : []
-          })
-        : channels.globalModelsOf(category),
+    () => channels.globalModelsOf(category),
     [category, channels, customModels, uncommonModelIds],
   )
 

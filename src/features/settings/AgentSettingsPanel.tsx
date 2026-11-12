@@ -12,7 +12,6 @@ import { useSkillsOptional } from '../../app/providers/SkillStoreProvider'
 import {
   capabilityOfLogical,
   channelIdForLogical,
-  panelModelOptions,
   toLogicalName,
 } from '../../domain/project/modelCatalog'
 import type { AgentDeliveryMode } from '../../domain/agent/delivery'
@@ -233,6 +232,16 @@ function ReviewModelSettings() {
     () => channels.getState().channels,
     () => channels.getState().channels,
   )
+  const customModels = useSyncExternalStore(
+    channels.subscribe,
+    () => channels.getState().customModels,
+    () => [],
+  )
+  const uncommonModelIds = useSyncExternalStore(
+    channels.subscribe,
+    () => channels.getState().uncommonModelIds,
+    () => [],
+  )
   const [status, setStatus] = useState('')
 
   useEffect(() => {
@@ -254,11 +263,14 @@ function ReviewModelSettings() {
 
   const options = useMemo(() => {
     const enabled = channelRows.filter((channel) => channel.enabled)
-    return panelModelOptions('chat').filter((model) => {
-      if (!channelIdForLogical(enabled, model)) return false
-      return capabilityOfLogical(channelRows, model)?.inputTypes.includes('image') === true
-    })
-  }, [channelRows])
+    return channels
+      .globalModelsOf('chat')
+      .map((model) => model.id)
+      .filter((model) => {
+        if (!channelIdForLogical(enabled, model)) return false
+        return capabilityOfLogical(channelRows, model)?.inputTypes.includes('image') === true
+      })
+  }, [channelRows, channels, customModels, uncommonModelIds])
 
   const choose = async (next: string) => {
     setAgentReviewModel(next)

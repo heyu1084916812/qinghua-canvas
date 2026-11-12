@@ -1,5 +1,13 @@
 # CanvasFlow（轻画）项目记忆
 
+### 2026-11-12 #1024：全局前端模型的分类投影与自定义对话模型
+- 自定义前端模型是项目级全局目录（`presets.models:custom`），分类只认每条记录自己的 `category`；不要再用渠道列表或名字猜分类。
+- `6.1` 的现场数据实际是 `{ id: '6.1', category: 'image', vendor: 'openai' }`，所以出现在 Agent 图片模型区不是渲染串类。根因是新增表单的 `newModelCategory` 固定默认 `image`，进入“对话”映射页后打开新增表单仍默认生图。
+- 新增模型表单现在打开时继承当前映射分类；映射页分类切换时若表单已展开，也同步更新待新增分类。保存后仍由 `addGlobalModel({ category })` 写入并切到对应映射分类。
+- 全局模型消费统一走 `ChannelStore.globalModelsOf(category)`。Agent 对话模型、创作面板、默认参数、视觉验收和电商规划都必须消费 `globalModelsOf('chat')`，不能再调用只含内置项的 `panelModelOptions('chat')`。
+- 隔离真实页面证据 `.playwright-verify/current-bugs/custom-chat-model/after-report.json`：四组 `1440×900 / 1024×700 × 明暗`，自定义对话模型在对话下拉为 `true`，在图片生成 picker 为 `false`，`overflowX=false / pageErrors=[]`。
+- 定向测试 21/21；`npm run check` 1200 modules / 4800 dependencies / 344 semantic registrations；全量 Vitest 693 files passed + 1 skipped，5773 passed + 1 skipped；`npm run build` 1332 modules。
+
 ### Hark：参考问题卡对齐 Lovart（G8 / G9，2026-11-11）
 - 参考侧栏「Agent 如何参考」为空：回合准备阶段先跑参考分析（`AgentPanel/agentTurnReferenceReview.ts` → `runAgentReferenceCuration`），只有分工拿不准才提示 `askQuestions`。歧义规则在 `domain/agent/referenceReview.ts`（roleClear=false / 未确认的图 ≥2 张同为 subject 或 composition 且原话没逐张点名 / 分析失败 ≥2）。侧栏分析只在像出图改图的句子、非画布操作 / 回答问题卡 / 内部续跑时做，单回合 ≤6 张；尝试过的图记 `AgentTaskRef.referenceReview.analyzedIds`，同任务不再调模型。
 - 问题卡回答**不是**原样写进 howToUse：题目带 `referenceItemId`，回答作为 `userConstraints` 交给参考分析结合图片重写完整「借/避」，写入的用法 `confirmedByUser`，任何自动分析（含 requestedItemIds）跳过它。重写失败时原话存 `referenceReview.answers` 作为约束段落。

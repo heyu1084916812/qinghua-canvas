@@ -8,7 +8,6 @@ import type { Channel } from '../../../../domain/project/channel'
 import {
   capabilityOfLogical,
   channelIdForLogical,
-  panelModelOptions,
   toLogicalName,
 } from '../../../../domain/project/modelCatalog'
 import type { AgentSession } from '../../../../state/agent/sessionStore'
@@ -121,13 +120,25 @@ export function useAgentModelSelectionController(
       uncommonModelIds,
     ],
   )
+  const globalChatModels = useMemo(
+    () =>
+      input.channels
+        .globalModelsOf('chat')
+        .map((model) => model.id),
+    [
+      input.channels,
+      input.allChannels,
+      customModels,
+      uncommonModelIds,
+    ],
+  )
   const modelOptionsByKind = useMemo(
     () => ({
       image: globalImageModels,
       video: globalVideoModels,
-      chat: panelModelOptions('chat', uncommonModelIds),
+      chat: globalChatModels,
     }),
-    [globalImageModels, globalVideoModels, uncommonModelIds],
+    [globalChatModels, globalImageModels, globalVideoModels],
   )
   const mentionedModels = useMemo(
     () =>
@@ -194,17 +205,22 @@ export function useAgentModelSelectionController(
     (channels: readonly Channel[]) => {
       const enabled = channels.filter((item) => item.enabled)
       const pick = (category: 'image' | 'video') =>
-        panelModelOptions(category).filter(
-          (model) =>
-            channelIdForLogical(enabled, model) !== undefined,
-        )
+        input.channels
+          .globalModelsOf(category)
+          .map((model) => model.id)
+          .filter(
+            (model) =>
+              channelIdForLogical(enabled, model) !== undefined,
+          )
       return {
         image: pick('image'),
         video: pick('video'),
-        chat: panelModelOptions('chat'),
+        chat: input.channels
+          .globalModelsOf('chat')
+          .map((model) => model.id),
       }
     },
-    [],
+    [input.channels],
   )
 
   const enqueueWrite = useCallback(

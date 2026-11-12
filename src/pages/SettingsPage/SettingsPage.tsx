@@ -801,12 +801,12 @@ export function SettingsPage({ embedded = false }: { embedded?: boolean } = {}) 
                 onWeightChange={(weight) =>
                   void channels.setRouteTuning(selectedId!, { weight })
                 }
-                onModelAddOpenChange={setModelAddOpen}
+                onModelAddOpenChange={(open) => { setNewModelCategory(open ? mapCategory : newModelCategory); setModelAddOpen(open) }}
                 onNewModelNameChange={setNewModelName}
                 onNewModelCategoryChange={setNewModelCategory}
                 onNewModelVendorChange={setNewModelVendor}
                 onAddGlobalModel={() => void handleAddGlobalModel()}
-                onMapCategoryChange={setMapCategory}
+                onMapCategoryChange={(category) => { setMapCategory(category); if (modelAddOpen) setNewModelCategory(category) }}
                 onShowUncommonModelsChange={setShowUncommonModels}
                 onDraftChange={(id, value) =>
                   setMapDrafts((previous) => ({ ...previous, [id]: value }))

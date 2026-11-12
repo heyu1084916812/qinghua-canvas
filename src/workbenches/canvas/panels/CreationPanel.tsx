@@ -116,7 +116,7 @@ export function CreationPanel(props: CreationPanelProps) {
     () => channels.getState().channels,
     () => channels.getState().channels,
   )
-  useSyncExternalStore(
+  const customModels = useSyncExternalStore(
     channels.subscribe,
     () => channels.getState().customModels,
     () => [],
@@ -485,24 +485,23 @@ export function CreationPanel(props: CreationPanelProps) {
    */
   const globalModelIds = useMemo(
     () => channels.globalModelsOf(wantedCategory).map((model) => model.id),
-    [channels, wantedCategory],
+    [channels, customModels, uncommonModelIds, wantedCategory],
   )
   const logicalModelNames = useMemo(
-    () => creationModelNames({ wantedCategory, uncommonModelIds, globalModelIds }),
-    [wantedCategory, uncommonModelIds, globalModelIds],
+    () => creationModelNames({ wantedCategory, globalModelIds }),
+    [wantedCategory, globalModelIds],
   )
   const modelOptions = useMemo(
     () =>
       creationModelOptions({
         wantedCategory,
-        uncommonModelIds,
         globalModelIds,
         iconFor: (name) => {
           const preset = channels.globalModelOf(name)
           return preset ? <ModelIcon vendor={preset.vendor} /> : undefined
         },
       }),
-    [channels, wantedCategory, uncommonModelIds, globalModelIds],
+    [channels, globalModelIds],
   )
 /** 节点上存的模型名 → 逻辑名（老数据迁移）：见 `logicalModelNames` 处的说明 */
   const shownLogicalModel = toLogicalName(allChannels, shownModel)

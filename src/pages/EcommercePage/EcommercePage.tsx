@@ -24,7 +24,6 @@ import type { EcommerceIntentDraft } from '../../domain/ecommerce/chatParse'
 import {
   capabilityOfLogical,
   logicalNames,
-  panelModelOptions,
 } from '../../domain/project/modelCatalog'
 import { projectRoute } from '../../domain/shared/workbench'
 import { downloadAsset } from '../../features/shared/assets/downloadAsset'
@@ -622,8 +621,8 @@ function StudioHost({ projectId }: { projectId: string }) {
     () => channels.getState().routeStrategy,
   )
   const intentModelOptions = useMemo(
-    () => panelModelOptions('chat', uncommonModelIds),
-    [uncommonModelIds],
+    () => channels.globalModelsOf('chat').map((model) => model.id),
+    [channels, customModels, uncommonModelIds],
   )
   const [intentModel, setIntentModel] = useState('')
   const chatTarget = useMemo(

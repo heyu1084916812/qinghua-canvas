@@ -692,6 +692,11 @@ describe('channelStore', () => {
       category: 'image',
       vendor: 'openai',
     })
+    await store.addGlobalModel({
+      name: '6.1',
+      category: 'chat',
+      vendor: 'openai',
+    })
 
     const reloaded = createChannelStore(p, { seedBuiltins: false })
     await reloaded.load()
@@ -699,6 +704,8 @@ describe('channelStore', () => {
       'My Image Pro',
     )
     expect(reloaded.globalModelOf('My Image Pro')?.vendor).toBe('openai')
+    expect(reloaded.globalModelsOf('image').map((model) => model.id)).not.toContain('6.1')
+    expect(reloaded.globalModelsOf('chat').map((model) => model.id)).toContain('6.1')
 
     await reloaded.setModelUncommon('My Image Pro', true)
     expect(reloaded.globalModelsOf('image').map((model) => model.id)).not.toContain(

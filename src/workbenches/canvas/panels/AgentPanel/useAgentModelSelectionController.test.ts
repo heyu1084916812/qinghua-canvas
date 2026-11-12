@@ -2,7 +2,7 @@ import { createElement } from 'react'
 import TestRenderer, { act } from 'react-test-renderer'
 import { describe, expect, it, vi } from 'vitest'
 import type { Channel } from '../../../../domain/project/channel'
-import { panelModelOptions } from '../../../../domain/project/modelCatalog'
+import type { PresetModel } from '../../../../domain/project/modelPresets'
 import type { AgentSession } from '../../../../state/agent/sessionStore'
 import {
   useAgentModelSelectionController,
@@ -67,7 +67,7 @@ function channel(
 
 function createChannelsStore(initial: {
   channels?: Channel[]
-  customModels?: string[]
+  customModels?: PresetModel[]
   uncommonModelIds?: string[]
 }) {
   let state = {
@@ -82,14 +82,16 @@ function createChannelsStore(initial: {
       return () => listeners.delete(listener)
     },
     getState: () => state,
-    globalModelsOf: vi.fn((category: 'image' | 'video') => {
+    globalModelsOf: vi.fn((category: 'image' | 'video' | 'chat') => {
       const base = state.channels.flatMap((item) =>
         item.models
           .filter((model) => model.category === category)
           .map((model) => model.id),
       )
       const custom =
-        category === 'image' ? state.customModels : []
+        state.customModels
+          .filter((model) => model.category === category)
+          .map((model) => model.id)
       return [...base, ...custom]
         .filter((id) => !state.uncommonModelIds.includes(id))
         .map((id) => ({ id }))
@@ -168,8 +170,11 @@ describe('useAgentModelSelectionController', () => {
 
     act(() => {
       channels.update({
-        customModels: ['Image Custom'],
-        uncommonModelIds: ['Image A', 'Video A'],
+        customModels: [
+          { id: 'Image Custom', category: 'image', vendor: 'openai' },
+          { id: 'Chat Custom', category: 'chat', vendor: 'openai' },
+        ],
+        uncommonModelIds: ['Image A', 'Video A', 'Chat Hidden'],
       })
     })
     expect(viewRef.current!.globalImageModels).toEqual([
@@ -177,9 +182,7 @@ describe('useAgentModelSelectionController', () => {
       'Image Custom',
     ])
     expect(viewRef.current!.globalVideoModels).toEqual(['Video U'])
-    expect(viewRef.current!.chatModelOptions).toEqual(
-      panelModelOptions('chat', ['Image A', 'Video A']),
-    )
+    expect(viewRef.current!.chatModelOptions).toEqual(['Chat Custom'])
 
     const nextChannel = channel(
       'channel-2',

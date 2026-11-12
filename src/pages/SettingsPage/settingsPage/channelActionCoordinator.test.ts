@@ -183,6 +183,23 @@ describe('channelActionCoordinator', () => {
     expect(ports.setBusy).toHaveBeenLastCalledWith(false)
   })
 
+  it('新增前端模型按表单当前分类保存，并切到对应映射分类', async () => {
+    const { actions, state, ports, channels } = harness({
+      newModelName: '6.1',
+      newModelCategory: 'chat',
+      newModelVendor: 'openai',
+    })
+    await actions.addGlobalModel(state)
+    expect(channels.addGlobalModel).toHaveBeenCalledWith({
+      name: '6.1',
+      category: 'chat',
+      vendor: 'openai',
+    })
+    expect(ports.setNewModelName).toHaveBeenCalledWith('')
+    expect(ports.setModelAddOpen).toHaveBeenCalledWith(false)
+    expect(ports.setMapCategory).toHaveBeenCalledWith('chat')
+  })
+
   it('模型应用和渠道拖动保留既有排序与 busy/finally 顺序', async () => {
     const { actions, state, ports, channels, calls } = harness()
     ports.setBusy = vi.fn((value) => calls.push(`busy:${value}`))
