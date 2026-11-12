@@ -311,9 +311,10 @@ export function AgentActivityStrip({
   const [now, setNow] = useState(() => Date.now())
   const busy = live && statusIsBusy(status)
   const reasoningHistory = history.filter((entry) => entry.source !== 'intent')
+  // 阶段条目（如「参考分析未完成」）不是模型的意图正文，不能顶到加粗的意图位（2026-11-12）
   const intent =
     history.find((entry) => entry.source === 'intent') ??
-    (history[0]?.source ? undefined : history[0])
+    (history[0]?.source || history[0]?.phase ? undefined : history[0])
   const liveDetail = [...activities]
     .reverse()
     .find(
@@ -322,9 +323,8 @@ export function AgentActivityStrip({
     )?.detail?.trim()
   const latestHistory = reasoningHistory.at(-1) ?? history.at(-1)
   const collapsedHeadline = collapsedProcessHeadline(history, processText || latestHistory?.text || '')
-  const completedPhase = !live ? [...history]
-    .reverse()
-    .find((entry) => entry.phase && entry.collapsedSummary)
+  const completedPhase = !live
+    ? history.find((entry) => entry.phase && entry.collapsedSummary === collapsedHeadline)
     : undefined
   const processHistory = reasoningHistory
   const expandedProcess = expandedProcessView(

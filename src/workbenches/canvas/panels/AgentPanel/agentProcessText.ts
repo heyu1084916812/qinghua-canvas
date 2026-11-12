@@ -50,6 +50,8 @@ export function isAdvanceTaskCommand(text: string): boolean {
   ]).has(normalized)
 }
 
+const GENERIC_PHASES = new Set(['align', 'understand'])
+
 /**
  * 已完成阶段优先用事实摘要做折叠标题；没有阶段事件时保留原来的「最新过程行」。
  * 运行中不用它，避免把尚未完成的阶段包装成结论。
@@ -58,8 +60,8 @@ export function collapsedProcessHeadline(
   history: readonly ConversationProcessEntry[],
   processText: string,
 ): string {
-  const phaseEntry = [...history]
-    .reverse()
-    .find((entry) => entry.phase && entry.collapsedSummary)
+  const phases = [...history].reverse().filter((entry) => entry.phase && entry.collapsedSummary)
+  // 「对齐信息」这类泛阶段不抢标题：有参考分析 / 调研等具体阶段时显示具体的那一行
+  const phaseEntry = phases.find((entry) => !GENERIC_PHASES.has(String(entry.phase))) ?? phases[0]
   return phaseEntry?.collapsedSummary || latestProcessLine(processText)
 }

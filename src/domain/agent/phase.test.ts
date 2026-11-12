@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   AGENT_PHASES,
   agentPhaseCollapsedSummary,
+  agentPhaseStepLine,
   agentPhaseForTool,
   agentPhaseRunningTitle,
   agentPhaseTitle,
@@ -57,5 +58,12 @@ describe('Agent phase contract', () => {
     expect(agentPhaseRunningTitle('referenceAnalysis')).toBe('参考素材分析中')
     expect(agentPhaseTitle('referenceAnalysis')).toBe('参考素材分析结束')
     expect(agentPhaseRunningTitle('generate')).toBeUndefined()
+  })
+})
+
+describe('agentPhaseStepLine（2026-11-12 去重）', () => {
+  it('工具标题已含阶段名时只留一行；否则「阶段：工具」', () => {
+    expect(agentPhaseStepLine('research', '联网调研完成')).toEqual({ text: '联网调研完成', collapsedSummary: '联网调研完成' })
+    expect(agentPhaseStepLine('align', '问题卡已发出')).toEqual({ text: '对齐信息：问题卡已发出', collapsedSummary: '对齐信息' })
   })
 })

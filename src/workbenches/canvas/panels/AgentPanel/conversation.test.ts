@@ -612,9 +612,9 @@ describe('消息 → 对话条目', () => {
     expect(process?.entries).toEqual([
       {
         id: 'phase-research',
-      text: '调研完成：联网调研完成',
+      text: '联网调研完成',
         phase: 'research',
-        collapsedSummary: '调研完成',
+        collapsedSummary: '联网调研完成',
       },
     ])
   })

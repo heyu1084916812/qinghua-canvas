@@ -1,5 +1,5 @@
 import { publicProcessText, visibleAssistantReply } from './agentVisibleText'
-import { agentPhaseForTool, agentPhaseTitle, isAgentPhase, type AgentPhase } from '../../../../domain/agent/phase'
+import { agentPhaseForTool, agentPhaseStepLine, agentPhaseTitle, isAgentPhase, type AgentPhase } from '../../../../domain/agent/phase'
 import type { ChatMessage } from '../../../../domain/shared/execution/types'
 import { isPublicHttpUrl } from '../../../../domain/shared/publicUrl'
 import { researchModeOf, type ResearchMode } from '../../../../domain/inspiration/designResearch'
@@ -812,7 +812,8 @@ export function toConversation(
             ? m.phaseEvent.title
             : m.phaseEvent.detail?.trim() || m.phaseEvent.title,
           phase,
-          collapsedSummary: m.phaseEvent.title,
+          // 参考分析始终折成「参考素材分析结束…」一行；「未完成」等原因留在展开区（2026-11-12）
+          collapsedSummary: phase === 'referenceAnalysis' && !m.phaseEvent.title.startsWith(agentPhaseTitle(phase)) ? agentPhaseTitle(phase) : m.phaseEvent.title,
           ...timeOf(m),
         })
       }
@@ -838,7 +839,7 @@ export function toConversation(
             ),
           ),
         ]
-        const questionAnswers = parseQuestionCardAnswerMessage(m.content)
+        const questionAnswers = parseQuestionCardAnswerMessage(m.content) // 问题卡回答 → 折叠摘要
         out.push({
           kind: 'user',
           text: shown,
@@ -918,9 +919,8 @@ export function toConversation(
     if (phase) {
       ensureProcess(m).entries.push({
         id: `phase-${m.toolCallId ?? at}`,
-        text: `${agentPhaseTitle(phase)}：${toolLabelOf(item.tool, described.failed)}`,
+        ...agentPhaseStepLine(phase, toolLabelOf(item.tool, described.failed)),
         phase,
-        collapsedSummary: agentPhaseTitle(phase),
         ...timeOf(m),
       })
     }

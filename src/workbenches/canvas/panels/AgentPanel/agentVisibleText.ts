@@ -28,9 +28,16 @@ function publicSentence(sentence: string): boolean {
 }
 
 /** 过程文字（推理、工具旁白、实时过程流）里只留给用户看的句子。 */
+/**
+ * 原始字段 / 参数行（如 `Options: "我给你品牌名和口味", …`、`question: …`、`{"questions": …}`）：
+ * 模型在推理里起草工具参数时留下的，含汉字也不是给用户看的过程（用户 2026-11-12 截图）。
+ */
+const RAW_FIELD_LINE = /^\s*(?:[-*]\s*)?(?:[A-Za-z_][\w.]{0,30}\s*[:：=]\s*["“'[{]|[{[]\s*["“])/
+
 export function publicProcessText(text: string): string {
   const lines: string[] = []
   for (const line of text.split('\n')) {
+    if (RAW_FIELD_LINE.test(line)) continue
     const kept = (line.match(SENTENCE) ?? [])
       .filter(publicSentence)
       .map((sentence) => sentence.trim())

@@ -65,3 +65,17 @@ describe('实时过程流接线', () => {
     expect(sessionModelSource).toMatch(/publicProcessText\(runPresentation\.liveProcessFor\(/)
   })
 })
+
+describe('过程行不泄漏原始字段（2026-11-12）', () => {
+  it('Options: "…" / question: / JSON 片段整行不显示，正常中文过程保留', () => {
+    const text = [
+      '用户要月饼详情，先看画布。',
+      'Options: "我给你品牌名和口味", "用占位通用文字（如流心奶黄）"',
+      'question: "这套详情页按什么尺寸出图？"',
+      '{"questions": [{"question": "尺寸？"}]}',
+      '- options: ["3:4", "1:1"]',
+      '再决定要问哪几件事。',
+    ].join('\n')
+    expect(publicProcessText(text)).toBe('用户要月饼详情，先看画布。\n再决定要问哪几件事。')
+  })
+})

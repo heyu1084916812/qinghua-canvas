@@ -22,6 +22,28 @@ describe('AgentActivityViews', () => {
     expect(activityTextOf({ kind: 'thinking' }, 0, [], [])).toBe('正在理解你的要求')
   })
 
+  it('2026-11-12：阶段条目不顶到意图位；参考分析 / 调研折成一行，不显示 Options 等原始字段', () => {
+    const html = renderToStaticMarkup(
+      createElement(AgentActivityStrip, {
+        status: { kind: 'idle' },
+        items: [],
+        activities: [],
+        history: [
+          { id: 'pe', text: '参考分析未完成', phase: 'referenceAnalysis', collapsedSummary: '参考素材分析结束' },
+          { id: 'ph', text: '联网调研完成', phase: 'research', collapsedSummary: '联网调研完成' },
+          { id: 'pa', text: '对齐信息：问题卡已发出', phase: 'align', collapsedSummary: '对齐信息' },
+        ],
+        processText: '',
+        live: false,
+      }),
+    )
+    expect(html).not.toContain('data-agent-process-intent')
+    expect(html).toContain('联网调研完成')
+    expect(html).not.toContain('调研完成：')
+    expect(html).not.toContain('Options')
+    expect(html).not.toMatch(/data-agent-process-current[^>]*>[^<]*<span aria-hidden="true">对齐信息/)
+  })
+
   it('保留状态忙闲判断与生成中文案', () => {
     expect(statusIsBusy({ kind: 'thinking' })).toBe(true)
     expect(statusIsBusy({ kind: 'idle' })).toBe(false)

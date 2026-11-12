@@ -59,6 +59,19 @@ export function agentPhaseRunningTitle(phase: AgentPhase): string | undefined {
   return titles[phase]
 }
 
+/**
+ * 工具结果对应的阶段行：工具标题已经说清阶段时（「联网调研完成」⊃「调研完成」）只留一行，
+ * 不再出现「调研完成：联网调研完成」+「调研完成」这种重复对（用户 2026-11-12）。
+ */
+export function agentPhaseStepLine(
+  phase: AgentPhase,
+  label: string,
+): { text: string; collapsedSummary: string } {
+  const title = agentPhaseTitle(phase)
+  if (label.includes(title) || title.includes(label)) return { text: label, collapsedSummary: label }
+  return { text: `${title}：${label}`, collapsedSummary: title }
+}
+
 /** 折叠态只显示阶段标题与可核实的证据数量，不展开过程正文。 */
 export function agentPhaseCollapsedSummary(event: AgentPhaseEvent): string {
   const evidence = event.evidence?.filter(Boolean) ?? []

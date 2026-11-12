@@ -7,6 +7,16 @@ import {
 } from './agentProcessText'
 
 describe('agent process headline', () => {
+  it('2026-11-12：泛阶段「对齐信息」不抢折叠标题，显示参考分析 / 调研这类具体阶段', () => {
+    expect(collapsedProcessHeadline([
+      { id: 'a', text: '参考分析未完成', phase: 'referenceAnalysis', collapsedSummary: '参考素材分析结束' },
+      { id: 'b', text: '对齐信息：问题卡已发出', phase: 'align', collapsedSummary: '对齐信息' },
+    ], '')).toBe('参考素材分析结束')
+    expect(collapsedProcessHeadline([
+      { id: 'b', text: '对齐信息：已看画布', phase: 'align', collapsedSummary: '对齐信息' },
+    ], '')).toBe('对齐信息')
+  })
+
   it('shows only the latest sentence while full text remains in the fold', () => {
     expect(latestProcessLine('先核对参考图。然后检查 Logo 比例。最后准备下一步。'))
       .toBe('最后准备下一步。')
