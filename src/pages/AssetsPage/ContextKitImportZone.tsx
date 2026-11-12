@@ -3,6 +3,8 @@ import { usePlatform } from '../../app/providers/PlatformProvider'
 import type { ContextKitAsset, ContextKitAssetRole } from '../../domain/shared/context'
 import { fetchKitUrl } from '../../features/shared/context/kitWebImport'
 import type { KitPageExtract } from '../../features/shared/context/kitWebPage'
+import { isPdfFile, pdfPageFileName, readKitPdf, type KitPdfExtract, type KitPdfPage } from '../../features/shared/context/kitPdfImport'
+import { ContextKitPdfPages } from './ContextKitPdfPages'
 import { ContextKitWebCandidates, type ContextKitWebCandidatesProps } from './ContextKitWebCandidates'
 import baseStyles from './ContextKitsDialog.module.css'
 import contextKitsAssetsStyles from './ContextKitsAssets.module.css'
@@ -10,6 +12,8 @@ import contextKitsAssetsStyles from './ContextKitsAssets.module.css'
 const styles = { ...baseStyles, ...contextKitsAssetsStyles } as Record<string, string>
 
 export const KIT_IMAGE_ACCEPT = 'image/png,image/jpeg,image/webp,image/gif,image/svg+xml'
+/** 导入区的本机文件选择：图片之外再收 PDF 品牌手册（`.pdf` 供桌面原生对话框按扩展名过滤）。 */
+export const KIT_IMPORT_ACCEPT = `${KIT_IMAGE_ACCEPT},application/pdf,.pdf`
 
 export interface ContextKitImportZoneProps {
   busy: boolean
@@ -42,15 +46,74 @@ export function ContextKitImportZone({
   const [urlOpen, setUrlOpen] = useState(false)
   const [urlDraft, setUrlDraft] = useState('')
   const [webResult, setWebResult] = useState<{ url: string; page: KitPageExtract } | null>(null)
+  const [pdfResult, setPdfResult] = useState<KitPdfExtract | null>(null)
   const dropDepth = useRef(0)
   const urlAbortRef = useRef<AbortController | null>(null)
+  const pdfAbortRef = useRef<AbortController | null>(null)
 
-  useEffect(() => () => urlAbortRef.current?.abort(), [])
+  useEffect(() => () => {
+    urlAbortRef.current?.abort()
+    pdfAbortRef.current?.abort()
+  }, [])
+
+  const importPdf = async (file: File) => {
+    if (busy) return
+    const controller = new AbortController()
+    pdfAbortRef.current?.abort()
+    pdfAbortRef.current = controller
+    setBusy(true)
+    setPdfResult(null)
+    setStatus('正在读取 PDF…')
+    try {
+      const pdf = await readKitPdf(file, {
+        signal: controller.signal,
+        onProgress: (done, total) => setStatus(`正在读取 PDF… ${done}/${total} 页`),
+      })
+      if (controller.signal.aborted) return
+      setPdfResult(pdf)
+      setStatus(`已读取 PDF：${pdf.pages.length} 页可选${pdf.text ? `，${pdf.text.length} 字文字` : ''}`)
+    } catch (error) {
+      if (!controller.signal.aborted) setStatus(error instanceof Error ? error.message : '读取 PDF 失败')
+    } finally {
+      if (pdfAbortRef.current === controller) pdfAbortRef.current = null
+      setBusy(false)
+    }
+  }
+
+  /** 拖入 / 选中的文件：PDF 走选页面板（一次一个），图片照旧直接加为参考素材。 */
+  const importLocalFiles = async (files: readonly File[]) => {
+    const pdf = files.find(isPdfFile)
+    const images = files.filter((file) => !isPdfFile(file))
+    if (images.length > 0) await importFiles(images, 'reference')
+    if (pdf) await importPdf(pdf)
+  }
 
   const pickFiles = async () => {
-    const picked = await platform.files.pickFile(KIT_IMAGE_ACCEPT)
+    const picked = await platform.files.pickFile(KIT_IMPORT_ACCEPT)
     if (!picked) return
-    await importFiles([new File([picked.blob], picked.name, { type: picked.mime })], 'reference')
+    await importLocalFiles([new File([picked.blob], picked.name, { type: picked.mime })])
+  }
+
+  const addFromPdf = async (picked: { pages: KitPdfPage[]; text: string }) => {
+    if (!pdfResult) return
+    setBusy(true)
+    try {
+      const resources: ContextKitAsset[] = []
+      for (const page of picked.pages) {
+        resources.push(await persistImage(page.blob, pdfPageFileName(pdfResult.name, page.pageNumber, page.blob.type), 'reference'))
+      }
+      addResources(resources)
+      if (picked.text) addSourceText({ label: `PDF ${pdfResult.name}`, text: picked.text })
+      setStatus(
+        [resources.length ? `${resources.length} 页参考图` : '', picked.text ? 'PDF 文字资料' : '']
+          .filter(Boolean).join('、').replace(/^/, '已加入 '),
+      )
+      setPdfResult(null)
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : '加入套件失败')
+    } finally {
+      setBusy(false)
+    }
   }
 
   const importUrl = async () => {
@@ -124,7 +187,7 @@ export function ContextKitImportZone({
     dropDepth.current = 0
     setDragging(false)
     const files = [...event.dataTransfer.files]
-    if (files.length > 0) void importFiles(files, 'reference')
+    if (files.length > 0) void importLocalFiles(files)
   }
 
   return (
@@ -151,8 +214,8 @@ export function ContextKitImportZone({
         <span />
       </div>
       <div className={styles.dropCopy}>
-        <strong>拖拽或上传图片</strong>
-        <span>PNG、JPG、WebP，最大 20MB</span>
+        <strong>拖拽或上传图片 / PDF 品牌手册</strong>
+        <span>PNG、JPG、WebP、PDF，最大 20MB</span>
       </div>
       <div className={styles.dropActions}>
         <button
@@ -161,7 +224,7 @@ export function ContextKitImportZone({
           disabled={busy}
           onClick={() => void pickFiles()}
         >
-          选择本机图片
+          选择本机文件
         </button>
         <button
           type="button"
@@ -195,6 +258,14 @@ export function ContextKitImportZone({
             导入
           </button>
         </div>
+      ) : null}
+      {pdfResult ? (
+        <ContextKitPdfPages
+          pdf={pdfResult}
+          busy={busy}
+          onCancel={() => setPdfResult(null)}
+          onAdd={(picked) => void addFromPdf(picked)}
+        />
       ) : null}
       {webResult ? (
         <ContextKitWebCandidates

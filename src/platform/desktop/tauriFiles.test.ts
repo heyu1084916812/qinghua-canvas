@@ -31,6 +31,8 @@ describe('accept → 对话框扩展名', () => {
     expect(acceptToExtensions('image/*')).toEqual(['png', 'jpg', 'jpeg', 'webp', 'gif'])
     expect(acceptToExtensions('application/pdf,text/wat')).toEqual([])
     expect(acceptToExtensions(undefined)).toEqual([])
+    // 套件导入区的 PDF 品牌手册：mime 认不出，靠同串里的裸 .pdf 过滤
+    expect(acceptToExtensions('image/png,application/pdf,.pdf')).toEqual(['png', 'pdf'])
   })
 })
 

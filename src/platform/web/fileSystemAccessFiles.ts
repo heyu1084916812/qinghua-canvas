@@ -27,6 +27,8 @@ const EXT_BY_MIME: Record<string, string[]> = {
   ),
   'application/json': ['.json'],
   'text/plain': ['.txt'],
+  // 套件导入区收 PDF 品牌手册（2026-11-12）
+  'application/pdf': ['.pdf'],
 }
 
 /**

@@ -9966,10 +9966,11 @@
     {
       "module": "src/pages/AssetsPage/ContextKitImportZone.tsx",
       "owner": "context-kit-ui",
-      "responsibility": "套件弹窗顶部的拖拽、本机文件选择和 URL 导入区，把外部来源转换为套件素材。",
+      "responsibility": "套件弹窗顶部的拖拽、本机文件选择、PDF 品牌手册和 URL 导入区，把外部来源转换为套件素材。",
       "owns": [
         "拖拽悬停状态",
-        "本机文件选择入口",
+        "本机文件选择入口（图片 / PDF 分流）",
+        "PDF 读取进度与取消",
         "URL 导入输入与结果提示"
       ],
       "doesNotOwn": [
@@ -9978,7 +9979,8 @@
       ],
       "publicApi": [
         "ContextKitImportZone",
-        "KIT_IMAGE_ACCEPT"
+        "KIT_IMAGE_ACCEPT",
+        "KIT_IMPORT_ACCEPT"
       ],
       "test": [
         "src/pages/AssetsPage/contextKitsPublicApi.test.ts"
@@ -9992,7 +9994,8 @@
       "owns": [
         "生成中旋转指示",
         "指南提示条与按钮",
-        "生成错误与说明文字样式"
+        "生成错误与说明文字样式",
+        "PDF 选页面板的全选按钮"
       ],
       "doesNotOwn": [
         "套件弹窗整体布局",
@@ -10133,6 +10136,88 @@
         "src/pages/AssetsPage/ContextKitWebCandidates.test.ts"
       ],
       "budget": 260
+    },
+    {
+      "module": "src/features/shared/context/kitPdfImport.ts",
+      "owner": "context-kit-import",
+      "responsibility": "品牌手册 PDF 导入的读取编排：20MB 与魔数校验、只读前 20 页、逐页渲染与抽字、进度与取消、错误转中文；渲染引擎可注入。",
+      "owns": [
+        "PDF 大小 / 页数 / 文字上限",
+        "逐页渲染与文字抽取的顺序、失败页记录",
+        "密码 / 损坏等错误的用户提示"
+      ],
+      "doesNotOwn": [
+        "pdfjs 加载与 worker 配置",
+        "选页交互",
+        "素材字节仓储"
+      ],
+      "publicApi": [
+        "readKitPdf",
+        "isPdfFile",
+        "looksLikePdf",
+        "describePdfError",
+        "normalizePdfText",
+        "pdfPageFileName",
+        "KIT_PDF_MAX_BYTES",
+        "KIT_PDF_MAX_PAGES",
+        "KIT_PDF_PAGE_EDGE",
+        "KIT_PDF_TEXT_MAX_CHARS",
+        "KitPdfEngine",
+        "KitPdfEngineDocument",
+        "KitPdfEnginePage",
+        "KitPdfExtract",
+        "KitPdfPage",
+        "ReadKitPdfOptions"
+      ],
+      "test": [
+        "src/features/shared/context/kitPdfImport.test.ts"
+      ],
+      "budget": 200
+    },
+    {
+      "module": "src/features/shared/context/kitPdfEngine.ts",
+      "owner": "context-kit-import",
+      "responsibility": "pdfjs-dist 的浏览器适配器（懒加载）：同源 worker、打包内 CMap / 标准字体 / wasm 的 BinaryDataFactory、页面渲染为 JPEG 与文字抽取。",
+      "owns": [
+        "pdfjs worker 地址",
+        "CMap / 字体 / wasm 资源映射",
+        "canvas 渲染与回收"
+      ],
+      "doesNotOwn": [
+        "页数与大小上限",
+        "选页交互"
+      ],
+      "publicApi": [
+        "createPdfjsEngine"
+      ],
+      "test": [
+        "src/features/shared/context/kitPdfImport.test.ts"
+      ],
+      "budget": 140
+    },
+    {
+      "module": "src/pages/AssetsPage/ContextKitPdfPages.tsx",
+      "owner": "context-kit-ui",
+      "responsibility": "PDF 导入后的选页面板：页图本地预览、勾选要加入的参考页（默认前 8 页）、PDF 文字作为生成指南资料的开关。",
+      "owns": [
+        "页图 blob 预览地址的创建与回收",
+        "页 / 文字的勾选状态",
+        "页数上限与失败页提示"
+      ],
+      "doesNotOwn": [
+        "PDF 读取与渲染",
+        "套件版本保存"
+      ],
+      "publicApi": [
+        "ContextKitPdfPages",
+        "ContextKitPdfPagesProps",
+        "PDF_DEFAULT_PICKED_PAGES",
+        "defaultPickedPages"
+      ],
+      "test": [
+        "src/pages/AssetsPage/ContextKitPdfPages.test.ts"
+      ],
+      "budget": 160
     }
   ]
 }

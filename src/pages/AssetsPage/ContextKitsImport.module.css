@@ -225,3 +225,21 @@
   color: var(--text-3);
   font-size: var(--fs-chip);
 }
+
+/* PDF 品牌手册选页面板（复用网页候选面板的网格与勾选样式） */
+.pdfSelectAll {
+  flex: 0 0 auto;
+  margin-left: auto;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text-2);
+  font: inherit;
+  font-size: var(--fs-chip);
+  cursor: pointer;
+}
+
+.pdfSelectAll:hover {
+  color: var(--text-1);
+  text-decoration: underline;
+}

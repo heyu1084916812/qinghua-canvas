@@ -24,6 +24,8 @@ describe('ContextKitsDialog 公共导出与页面锚点', () => {
       'data-context-kits',
       'data-context-kit-name',
       'data-context-asset-dropzone',
+      'data-context-pdf-pages',
+      'data-context-pdf-add',
       'data-context-kit-guide',
       'data-context-kit-guide-generate',
       'data-context-logo-add',

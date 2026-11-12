@@ -20,6 +20,12 @@ describe('acceptToTypes（File System Access 的 types 构造）', () => {
     expect(types[0]!.accept['video/quicktime']).toEqual(['.mov'])
   })
 
+  it('套件导入区的 PDF 品牌手册：application/pdf 映射到 .pdf，裸扩展名跳过', () => {
+    expect(acceptToTypes('image/png,application/pdf,.pdf')).toEqual([
+      { accept: { 'image/png': ['.png'], 'application/pdf': ['.pdf'] } },
+    ])
+  })
+
   it('映射表里没有的类型跳过（不把野 key 丢给浏览器报错）', () => {
     expect(acceptToTypes('application/x-foo,image/png')).toEqual([{ accept: { 'image/png': ['.png'] } }])
   })
