@@ -2,7 +2,7 @@
 
 ### 2026-11-12 #1024：全局前端模型的分类投影与自定义对话模型
 - 自定义前端模型是项目级全局目录（`presets.models:custom`），分类只认每条记录自己的 `category`；不要再用渠道列表或名字猜分类。
-- `6.1` 的现场数据实际是 `{ id: '6.1', category: 'image', vendor: 'openai' }`，所以出现在 Agent 图片模型区不是渲染串类。根因是新增表单的 `newModelCategory` 固定默认 `image`，进入“对话”映射页后打开新增表单仍默认生图。
+- `6.1` 的现场数据原为 `{ id: '6.1', category: 'image', vendor: 'openai' }`，所以出现在 Agent 图片模型区不是渲染串类。根因是新增表单的 `newModelCategory` 固定默认 `image`，进入“对话”映射页后打开新增表单仍默认生图；该本地历史记录随后已纠正为 `chat`。
 - 新增模型表单现在打开时继承当前映射分类；映射页分类切换时若表单已展开，也同步更新待新增分类。保存后仍由 `addGlobalModel({ category })` 写入并切到对应映射分类。
 - 全局模型消费统一走 `ChannelStore.globalModelsOf(category)`。Agent 对话模型、创作面板、默认参数、视觉验收和电商规划都必须消费 `globalModelsOf('chat')`，不能再调用只含内置项的 `panelModelOptions('chat')`。
 - 隔离真实页面证据 `.playwright-verify/current-bugs/custom-chat-model/after-report.json`：四组 `1440×900 / 1024×700 × 明暗`，自定义对话模型在对话下拉为 `true`，在图片生成 picker 为 `false`，`overflowX=false / pageErrors=[]`。
