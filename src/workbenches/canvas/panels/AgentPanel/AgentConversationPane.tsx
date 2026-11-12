@@ -93,6 +93,12 @@ export interface AgentConversationPaneProps {
   onAddResearchReference?(
     item: ConversationResearchItem,
   ): Promise<{ ok: boolean; message: string }>
+  onDownloadResearchImage?(
+    item: ConversationResearchItem,
+  ): Promise<{ ok: boolean; message: string }>
+  onSendResearchToChat?(
+    item: ConversationResearchItem,
+  ): Promise<{ ok: boolean; message: string }>
   /** 问题卡提交：回答整理成一条用户消息发回。 */
   onAnswerQuestionCard?(text: string): void
 }
@@ -142,6 +148,8 @@ export function AgentConversationPane({
   onEditingQueueTextChange,
   onResumeQueue,
   onAddResearchReference,
+  onDownloadResearchImage,
+  onSendResearchToChat,
   onAnswerQuestionCard,
 }: AgentConversationPaneProps) {
   const questionCard = onAnswerQuestionCard ? pendingQuestionCard(visibleItems) : null
@@ -381,8 +389,9 @@ export function AgentConversationPane({
                 {item.tool === 'researchDesign' && item.researchItems?.length ? (
                   <ResearchResultsPreview
                     items={item.researchItems}
-                    limit={isOpen ? 6 : 3}
                     onAdd={onAddResearchReference}
+                    onDownload={onDownloadResearchImage}
+                    onSendToChat={onSendResearchToChat}
                   />
                 ) : null}
                 {hasDetail ? (

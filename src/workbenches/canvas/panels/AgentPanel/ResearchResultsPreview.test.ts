@@ -1,115 +1,72 @@
 import { createElement } from 'react'
 import TestRenderer, { act } from 'react-test-renderer'
-import { describe, expect, it, vi } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import { ResearchResultsPreview } from './ResearchResultsPreview'
 
 describe('ResearchResultsPreview', () => {
-  it('renders bounded public candidates with source labels', () => {
+  it('shows compact web-source and image-gallery entries', () => {
     let renderer!: TestRenderer.ReactTestRenderer
     act(() => {
-      renderer = TestRenderer.create(createElement(ResearchResultsPreview, {
-        limit: 2,
-        items: [
-          {
-            id: 'openverse:1',
-            title: 'Packaging reference',
-            url: 'https://example.com/openverse',
-            imageUrl: 'https://example.com/openverse.jpg',
-            source: 'openverse',
-          },
-          {
-            id: 'wikipedia:1',
-            title: 'Sustainable packaging',
-            url: 'https://zh.wikipedia.org/wiki/Packaging',
-            imageUrl: '',
-            source: 'wikipedia',
-            description: '材料、回收与生命周期',
-          },
-          {
-            id: 'openverse:3',
-            title: 'Hidden by limit',
-            url: 'https://example.com/hidden',
-            imageUrl: 'https://example.com/hidden.jpg',
-            source: 'openverse',
-          },
-        ],
-      }))
+      renderer = TestRenderer.create(
+        createElement(ResearchResultsPreview, {
+          items: [
+            {
+              id: 'behance:1',
+              title: 'Poster reference',
+              url: 'https://www.behance.net/gallery/1/poster',
+              imageUrl: 'https://cdn.example.com/poster.jpg',
+              source: 'tavily',
+            },
+            {
+              id: 'dribbble:1',
+              title: '色板参考',
+              url: 'https://dribbble.com/shots/1',
+              imageUrl: 'https://cdn.example.com/palette.jpg',
+              source: 'tavily',
+            },
+          ],
+        }),
+      )
     })
 
-    const grid = renderer.root.findByProps({ 'data-agent-research-results': true })
-    expect(grid.props['data-agent-research-count']).toBe(3)
-    expect(renderer.root.findAllByType('a')).toHaveLength(2)
-    expect(renderer.root.findAllByType('img')).toHaveLength(1)
     expect(
-      renderer.root.findAll((node) => node.props['data-agent-research-item'] === 'wikipedia'),
-    ).toHaveLength(1)
+      renderer.root.findByProps({ 'data-agent-research-count': 2 }),
+    ).toBeTruthy()
+    expect(
+      renderer.root.findByProps({ 'data-agent-research-sources-open': true }),
+    ).toBeTruthy()
+    expect(
+      renderer.root.findByProps({ 'data-agent-research-gallery-open': true }),
+    ).toBeTruthy()
+    const previewImages = renderer.root.findAllByType('img')
+    expect(previewImages).toHaveLength(2)
+    expect(previewImages.every((image) => image.props.loading === 'eager')).toBe(true)
+    expect(previewImages.every((image) => image.props.decoding === 'sync')).toBe(true)
   })
 
-  it('lets the user add one public candidate to project references', async () => {
-    const onAdd = vi.fn(async () => ({
-      ok: true,
-      message: '已加入项目参考，并挂到当前 Agent 会话',
-    }))
+  it('renders a text-only source list when there are no images', () => {
     let renderer!: TestRenderer.ReactTestRenderer
     act(() => {
-      renderer = TestRenderer.create(createElement(ResearchResultsPreview, {
-        limit: 3,
-        onAdd,
-        items: [{
-          id: 'openverse:1',
-          title: 'Packaging reference',
-          url: 'https://example.com/openverse',
-          imageUrl: 'https://example.com/openverse.jpg',
-          source: 'openverse',
-        }],
-      }))
+      renderer = TestRenderer.create(
+        createElement(ResearchResultsPreview, {
+          items: [
+            {
+              id: 'text:1',
+              title: '包装趋势',
+              url: 'https://www.thedieline.com/blog/post',
+              imageUrl: '',
+              source: 'tavily',
+            },
+          ],
+        }),
+      )
     })
 
-    const add = renderer.root.findByProps({
-      'data-agent-research-add': 'openverse:1',
-    })
-    await act(async () => {
-      add.props.onClick()
-      await Promise.resolve()
-      await Promise.resolve()
-    })
-
-    expect(onAdd).toHaveBeenCalledWith(
-      expect.objectContaining({ id: 'openverse:1' }),
-    )
-    expect(renderer.root.findByProps({
-      'data-agent-research-add': 'openverse:1',
-    }).props['data-added']).toBe('true')
     expect(
-      renderer.root.findByProps({ role: 'status' }).props.children,
-    ).toContain('已加入项目参考')
-  })
-
-  it('shows human-readable labels for open collection providers', () => {
-    let renderer!: TestRenderer.ReactTestRenderer
-    act(() => {
-      renderer = TestRenderer.create(createElement(ResearchResultsPreview, {
-        limit: 2,
-        items: [
-          {
-            id: 'internetArchive:1',
-            title: 'Archive poster',
-            url: 'https://archive.org/details/archive',
-            imageUrl: 'https://archive.org/services/img/archive',
-            source: 'internetArchive',
-          },
-          {
-            id: 'artic:1',
-            title: 'Museum poster',
-            url: 'https://www.artic.edu/artworks/1',
-            imageUrl: 'https://www.artic.edu/image.jpg',
-            source: 'artic',
-          },
-        ],
-      }))
-    })
-
-    expect(renderer.root.findAllByType('span').map((node) => node.props.children))
-      .toEqual(['Internet Archive', 'Art Institute'])
+      renderer.root.findByProps({ 'data-agent-research-sources-open': true }),
+    ).toBeTruthy()
+    expect(
+      renderer.root.findAllByProps({ 'data-agent-research-gallery-open': true }),
+    ).toHaveLength(0)
   })
 })

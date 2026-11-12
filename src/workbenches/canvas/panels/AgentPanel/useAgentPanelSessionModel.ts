@@ -517,7 +517,7 @@ export function useAgentPanelSessionModel({
     applySessionLifecycleSnapshot(next)
   }, [applySessionLifecycleSnapshot])
 
-  const addResearchReference = useAgentResearchReferenceController({
+  const researchActions = useAgentResearchReferenceController({
     platform,
     projectId,
     current,
@@ -525,6 +525,7 @@ export function useAgentPanelSessionModel({
     appendReferenceIds: sessions.appendReferenceIds,
     applySessionSnapshot,
     notify: store.notify,
+    insertMention,
   })
 
   const {
@@ -672,6 +673,9 @@ export function useAgentPanelSessionModel({
     setOpenPicker,
     composerHeight,
     insertMention,
+    addResearchReference: researchActions.addResearchReference,
+    downloadResearchImage: researchActions.downloadResearchImage,
+    sendResearchToChat: researchActions.sendResearchToChat,
     cancelPendingAssetSync,
     writeDraftForSession,
     clearDraftForSession,
@@ -706,7 +710,6 @@ export function useAgentPanelSessionModel({
     thumbVersion,
     attachFiles,
     addFromLibrary,
-    addResearchReference,
 
     // ---- 对话展示 ----
     items,

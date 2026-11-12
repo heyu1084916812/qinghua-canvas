@@ -6,6 +6,7 @@ import {
   TAVILY_KEY_MISSING_MESSAGE,
   TAVILY_SEARCH_ENDPOINT,
 } from './tavilySearch'
+import { DESIGN_REFERENCE_DOMAINS } from './designReferenceSites'
 
 function response(payload: unknown, status = 200) {
   return {
@@ -123,6 +124,7 @@ describe('searchTavily', () => {
         include_images: true,
         include_image_descriptions: true,
         include_answer: false,
+        include_domains: DESIGN_REFERENCE_DOMAINS,
       },
     })
     expect(seen[0]?.publicOnly).toBeUndefined()

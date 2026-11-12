@@ -14,7 +14,6 @@ import {
 import type { NetworkPort } from '../../../platform/ports'
 import { isPublicHttpUrl } from '../../../domain/shared/publicUrl'
 import { errorTextOf } from '../../../shared/result'
-import { searchOpenResearch } from './openResearchSearch'
 import { searchTavily, TAVILY_KEY_MISSING_MESSAGE } from './tavilySearch'
 
 export interface DesignResearchRunnerInput {
@@ -169,11 +168,7 @@ export async function runDesignResearch(
     if (isPublicHttpUrl(url)) safeUrls.push(url)
     else warnings.push(`${url} 不是公开互联网地址，已跳过。`)
   }
-  /**
-   * 排序：用户给的 URL → Tavily → 本地灵感库 → 开放来源回退。
-   * Tavily 拿到结果时不再并发 Openverse / Wikipedia / 馆藏：它们对中文设计查询几乎全是噪声，
-   * 还会把 Tavily 结果挤出 maxResults；只有 Tavily 不可用（没 Key / 失败 / 0 条）时才回退。
-   */
+  /** 排序：用户给的 URL → Tavily 固定设计站 → 本地灵感库。 */
   const searchItems: DesignResearchItem[] = []
   let needsTavilyKey = false
   if (input.includeOpenSearch !== false) {
@@ -193,17 +188,6 @@ export async function runDesignResearch(
   searchItems.push(
     ...libraryItems(deps.libraryCases ?? [], request.topic, Math.min(request.maxResults, 12)),
   )
-  if (input.includeOpenSearch !== false && !searchItems.some((item) => item.source === 'tavily')) {
-    const openSearch = await searchOpenResearch(
-      deps.network,
-      request.topic,
-      request.maxResults,
-      signal,
-      deps.webSearch,
-    )
-    searchItems.push(...openSearch.items)
-    warnings.push(...openSearch.warnings)
-  }
   const items: DesignResearchItem[] = []
 
   const pages = await Promise.allSettled(

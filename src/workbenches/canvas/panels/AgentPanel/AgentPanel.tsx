@@ -140,6 +140,8 @@ export function AgentPanel({
     attachFiles: session.attachFiles,
     addFromLibrary: session.addFromLibrary,
     addResearchReference: session.addResearchReference,
+    downloadResearchImage: session.downloadResearchImage,
+    sendResearchToChat: session.sendResearchToChat,
     channels: session.channels,
   })
 

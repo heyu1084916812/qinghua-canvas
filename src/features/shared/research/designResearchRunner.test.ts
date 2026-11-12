@@ -213,59 +213,20 @@ describe('runDesignResearch', () => {
     expect(result.warnings.join(' ')).toContain('没有找到可用参考')
   })
 
-  it('discovers Openverse and Wikipedia results without user-provided URLs', async () => {
-    const network: NetworkPort = {
-      async request(req) {
-        if (req.url.startsWith('https://api.openverse.org/')) {
-          return {
-            status: 200,
-            headers: { 'content-type': 'application/json' },
-            text: async () => '',
-            json: async <T,>() => ({
-              results: [{
-                id: 'ov-1',
-                title: 'Sustainable packaging',
-                thumbnail: 'https://api.openverse.org/v1/images/ov-1/thumb/',
-                foreign_landing_url: 'https://example.com/openverse-1',
-              }],
-            }) as T,
-            arrayBuffer: async () => new ArrayBuffer(0),
-          }
-        }
-        return {
-          status: 200,
-          headers: { 'content-type': 'application/json' },
-          text: async () => '',
-          json: async <T,>() => ({
-            query: {
-              pages: {
-                9: {
-                  pageid: 9,
-                  title: '可持续包装',
-                  fullurl: 'https://zh.wikipedia.org/wiki/可持续包装',
-                  extract: '材料与回收',
-                },
-              },
-            },
-          }) as T,
-          arrayBuffer: async () => new ArrayBuffer(0),
-        }
-      },
-      async *stream() {},
-    }
-
+  it('does not fall back to unapproved open search providers', async () => {
+    const request = vi.fn<NetworkPort['request']>(async () => {
+      throw new Error('no network request expected without Tavily key')
+    })
     const result = await runDesignResearch(
       { topic: '可持续包装', maxResults: 6 },
-      { network },
+      { network: { request, stream: async function* () {} } },
       new AbortController().signal,
     )
 
-    expect(result.ok).toBe(true)
-    expect(result.items.map((item) => item.source)).toEqual([
-      'openverse',
-      'wikipedia',
-    ])
-    expect(result.items[1]?.description).toContain('材料')
+    expect(result.ok).toBe(false)
+    expect(result.items).toEqual([])
+    expect(result.needsTavilyKey).toBe(true)
+    expect(request).not.toHaveBeenCalled()
   })
 
   it('Clipper mode reads only the requested page and skips open search', async () => {
@@ -350,7 +311,7 @@ describe('runDesignResearch', () => {
     expect(JSON.stringify(result)).not.toContain('Bearer')
   })
 
-  it('without a Tavily key reports needsTavilyKey and still falls back to open sources', async () => {
+  it('without a Tavily key reports needsTavilyKey and only keeps the local library', async () => {
     const network = networkWith({})
     const result = await runDesignResearch(
       { topic: 'bakery' },
@@ -360,6 +321,8 @@ describe('runDesignResearch', () => {
     expect(result.needsTavilyKey).toBe(true)
     expect(result.error).toBe(TAVILY_KEY_MISSING_MESSAGE)
     expect(result.items.some((item) => item.source === 'tavily')).toBe(false)
+    expect(result.items.some((item) => item.source === 'openverse')).toBe(false)
+    expect(result.items.some((item) => item.source === 'wikipedia')).toBe(false)
   })
 })
 

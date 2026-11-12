@@ -383,7 +383,7 @@ export function describeToolResult(
             licenseUrl: clean(String(item.licenseUrl ?? '')),
           }]
         })
-        .slice(0, 6)
+        .slice(0, 48)
       return {
         lines: [
           `找到 ${items.length} 条参考，覆盖 ${sources.length} 个来源`,

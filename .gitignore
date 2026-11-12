@@ -11,6 +11,7 @@ target/
 # 测试与验证产物
 coverage/
 .playwright-verify/
+.impeccable/
 .market-research/
 .vitest/
 

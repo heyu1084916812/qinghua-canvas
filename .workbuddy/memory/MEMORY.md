@@ -1,5 +1,16 @@
 # CanvasFlow（轻画）项目记忆
 
+### 2026-11-12 #1025–#1029：调研结果入口、来源抽屉与瀑布流收口
+
+- 长文本越界不是单一 contenteditable 问题：`MentionEditor`、创作提示词区和面板容器同时要 `min-width:0 / max-width:100% / overflow-wrap:anywhere`，外层只保留纵向滚动。Agent 对话横滚同理，消息行和内容块都要允许 flex 子项收缩，横向溢出不能只藏不查。
+- 调研结果现在是两级入口：步骤内显示真实网页来源和三张缩略图摘要；来源抽屉使用原生 `<a>`，Tauri 再走系统浏览器并对失败给 `role=alert`；图片瀑布流支持下载、双击/回车放大、悬停发送到对话、加入参考二次确认和 Esc 关闭。
+- 焦点不能只锁最外层。加入参考确认框与大图预览都要各自做 Tab 闭环，并在关闭后把焦点还给触发按钮；否则 Tab 会跑回后面被遮住的瀑布流控件。
+- CSS 多列瀑布流不能直接放进有固定高度的滚动容器：浏览器会把剩余卡片排成右侧隐式列，视觉上像一条残影，DOM 里 `scrollWidth` 也会远大于 `clientWidth`。正确结构是“外层纵向滚动 + 内层无固定高度 CSS columns”；1440 三列、1024 两列，实测内部宽度 1005/1005、589/589，所有 tile 都在可视边界内。
+- 入口缩略图不能只依赖网络即时解码：每格给 `IconImage` 兜底并 `loading=eager / decoding=sync`，图片失败时隐藏 img 仍保留稳定占位。
+- `researchDesign` 的固定站点只认 `designReferenceSites.ts` 的 12 家，Tavily 统一传 `include_domains`；设计调研不再回退 Openverse/Wikipedia 等非指定来源。
+- 证据：`.impeccable/review/after-creation-prompt-report.json`、`.impeccable/review/final-research-report.json` 与 `final-research-{entry,gallery}-*.png`。四组 `1440×900 / 1024×700 × 明暗` 均无页面/内部横向溢出、无页面错误；确认框/预览焦点进入、Tab 闭环、关闭恢复全为 true。Impeccable detector `[]`，复审 disposition=`ship`。
+- 门禁：定向测试 11/11；12 分片最终 `FAILED_SHARDS=`，合计 5783 passed / 1 skipped；`npm run check` 1207 modules / 4827 dependencies / 351 registrations；`npm run build` 1336 modules。未 push。
+
 ### 2026-11-12 #1024：全局前端模型的分类投影与自定义对话模型
 - 自定义前端模型是项目级全局目录（`presets.models:custom`），分类只认每条记录自己的 `category`；不要再用渠道列表或名字猜分类。
 - `6.1` 的现场数据原为 `{ id: '6.1', category: 'image', vendor: 'openai' }`，所以出现在 Agent 图片模型区不是渲染串类。根因是新增表单的 `newModelCategory` 固定默认 `image`，进入“对话”映射页后打开新增表单仍默认生图；该本地历史记录随后已纠正为 `chat`。

@@ -5,6 +5,7 @@
   display: flex;
   flex-direction: column;
   flex: 1 1 auto;
+  min-width: 0;
   min-height: 0;
   gap: var(--space-2);
 }
@@ -58,6 +59,8 @@
 .prompt {
   --prompt-scrollbar-size: 6px;
   width: 100%;
+  max-width: 100%;
+  min-width: 0;
   /**
    * **高度跟着内容长**（用户 2026-09-24 第 1 条）。
    *
@@ -163,6 +166,8 @@
   display: flex;
   flex-direction: column;
   gap: 6px;
+  min-width: 0;
+  max-width: 100%;
   min-height: 0;
 }
 
@@ -313,6 +318,10 @@
  * 面板这边的效果才不会被一次无关的导入顺序调整掀翻。
  */
 .promptEditor {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
   min-height: 1lh;
   max-height: min(
     420px,
@@ -327,6 +336,9 @@
   font-size: 20px;
   line-height: var(--lh-body);
   overflow-y: auto;
+  overflow-x: hidden;
+  overflow-wrap: anywhere;
+  word-break: break-word;
   /* contenteditable 默认 `overflow: visible`：不写这条，超出上限的内容会画到面板外 */
   overscroll-behavior: contain;
 }

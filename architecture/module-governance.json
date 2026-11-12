@@ -8375,6 +8375,30 @@
       "budget": 240
     },
     {
+      "module": "src/features/shared/research/designReferenceSites.ts",
+      "owner": "open-research-search",
+      "responsibility": "维护图片与风格调研固定的设计站点清单，并把结果 URL 映射成稳定的来源名称。",
+      "owns": [
+        "12 个固定设计站点与顺序",
+        "Tavily include_domains 数据源",
+        "结果域名到站点显示名映射"
+      ],
+      "doesNotOwn": [
+        "Tavily 请求与错误处理",
+        "候选保存与项目参考",
+        "Agent 结果界面"
+      ],
+      "publicApi": [
+        "DESIGN_REFERENCE_SITES",
+        "DESIGN_REFERENCE_DOMAINS",
+        "designReferenceSiteLabel"
+      ],
+      "test": [
+        "src/features/shared/research/designReferenceSites.test.ts"
+      ],
+      "budget": 80
+    },
+    {
       "module": "src/features/shared/research/webPageReader.ts",
       "owner": "open-research-search",
       "responsibility": "经 Jina Reader 读取公开网页正文并截断，登录墙、验证码、非 2xx 如实失败并给出退路。",
@@ -8424,12 +8448,11 @@
     {
       "module": "src/workbenches/canvas/panels/AgentPanel/ResearchResultsPreview.tsx",
       "owner": "agent-research-results-ui",
-      "responsibility": "在 Agent 调研步骤中展示有上限的开放来源候选，并提供逐条加入项目参考的真实动作。",
+      "responsibility": "在 Agent 调研步骤中提供网页来源与图片瀑布流入口，不直接铺满对话流。",
       "owns": [
-        "调研候选缩略图与文本预览",
-        "候选来源标签和外链行为",
-        "折叠态与展开态的数量上限",
-        "逐条加入参考的按钮状态与反馈"
+        "调研结果入口组合",
+        "网页来源抽屉与图片瀑布流的打开状态",
+        "候选动作向浏览层透传"
       ],
       "doesNotOwn": [
         "联网搜索请求与结果解析",
@@ -8442,16 +8465,16 @@
       "test": [
         "src/workbenches/canvas/panels/AgentPanel/ResearchResultsPreview.test.ts"
       ],
-      "budget": 100
+      "budget": 130
     },
     {
       "module": "src/workbenches/canvas/panels/AgentPanel/ResearchResultsPreview.module.css",
       "owner": "agent-research-results-ui-style",
-      "responsibility": "定义 Agent 调研候选的三列缩略网格、文本预览、来源标签和焦点样式。",
+      "responsibility": "定义 Agent 调研结果入口的网页来源行、图片入口和缩略拼图样式。",
       "owns": [
-        "调研候选固定三列网格",
-        "图片与文本候选外观",
-        "来源标签和键盘焦点"
+        "紧凑网页来源入口",
+        "图片瀑布流入口",
+        "入口缩略拼图与键盘焦点"
       ],
       "doesNotOwn": [
         "Agent 活动步骤外壳",
@@ -8460,17 +8483,155 @@
       ],
       "publicApi": [
         "CSS_MODULE:Agent 联网调研候选",
-        "CSS_CLASS:card",
-        "CSS_CLASS:grid",
-        "CSS_CLASS:item",
-        "CSS_CLASS:source",
-        "CSS_CLASS:add",
-        "CSS_CLASS:message"
+        "CSS_CLASS:wrap",
+        "CSS_CLASS:webRow",
+        "CSS_CLASS:galleryEntry",
+        "CSS_CLASS:thumbs",
+        "CSS_CLASS:hosts"
+      ],
+      "test": [
+        "src/workbenches/canvas/panels/AgentPanel/ResearchResultsPreview.test.ts"
+      ],
+      "budget": 130
+    },
+    {
+      "module": "src/workbenches/canvas/panels/AgentPanel/researchGallery.ts",
+      "owner": "agent-research-results-ui",
+      "responsibility": "把调研候选拆成可去重的图片集合与网页来源集合，供预览入口和瀑布流共用。",
+      "owns": [
+        "图片候选去重",
+        "网页来源去重",
+        "来源 host 与预览数量投影"
+      ],
+      "doesNotOwn": [
+        "联网搜索请求",
+        "候选保存",
+        "弹层状态"
+      ],
+      "publicApi": [
+        "researchHostOf",
+        "researchImageItems",
+        "researchWebItems",
+        "researchPreviewItems"
+      ],
+      "test": [
+        "src/workbenches/canvas/panels/AgentPanel/researchGallery.test.ts"
+      ],
+      "budget": 80
+    },
+    {
+      "module": "src/workbenches/canvas/panels/AgentPanel/ResearchGalleryOverlay.tsx",
+      "owner": "agent-research-results-ui",
+      "responsibility": "用瀑布流浏览调研图片，提供双击放大、下载、发送到对话和加入参考确认。",
+      "owns": [
+        "瀑布流弹层",
+        "大图预览与下载入口",
+        "发送到对话",
+        "加入参考二次确认"
+      ],
+      "doesNotOwn": [
+        "搜索请求",
+        "参考持久化事务",
+        "Agent 工具调用"
+      ],
+      "publicApi": [
+        "ResearchGalleryOverlay"
+      ],
+      "test": [
+        "src/workbenches/canvas/panels/AgentPanel/ResearchResultsPreview.test.ts"
+      ],
+      "budget": 280
+    },
+    {
+      "module": "src/workbenches/canvas/panels/AgentPanel/ResearchGalleryOverlay.module.css",
+      "owner": "agent-research-results-ui-style",
+      "responsibility": "定义调研图片瀑布流、悬停动作、加入参考确认与大图预览的视觉样式。",
+      "owns": [
+        "瀑布流列布局",
+        "图片悬停动作",
+        "参考确认浮层",
+        "全屏图片预览"
+      ],
+      "doesNotOwn": [
+        "全局主题令牌",
+        "Agent 侧栏宽度",
+        "网页来源抽屉"
+      ],
+      "publicApi": [
+        "CSS_MODULE:Agent 调研图片瀑布流"
+      ],
+      "test": [
+        "src/workbenches/canvas/panels/AgentPanel/ResearchResultsPreview.test.ts"
+      ],
+      "budget": 360
+    },
+    {
+      "module": "src/workbenches/canvas/panels/AgentPanel/useResearchOverlay.ts",
+      "owner": "agent-research-results-ui",
+      "responsibility": "为调研抽屉和瀑布流保留右侧 Agent 上下文，并统一焦点陷阱、Esc 关闭与焦点恢复。",
+      "owns": [
+        "Agent 面板右侧保留宽度测量",
+        "模态焦点陷阱与首次聚焦",
+        "关闭后的焦点恢复"
+      ],
+      "doesNotOwn": [
+        "调研结果内容",
+        "外链打开错误文案",
+        "图片瀑布流布局"
+      ],
+      "publicApi": [
+        "researchOverlayReservedRight",
+        "useResearchOverlay"
+      ],
+      "test": [
+        "src/workbenches/canvas/panels/AgentPanel/useResearchOverlay.test.ts"
+      ],
+      "budget": 140
+    },
+    {
+      "module": "src/workbenches/canvas/panels/AgentPanel/ResearchSourcesDrawer.tsx",
+      "owner": "agent-research-results-ui",
+      "responsibility": "从右侧打开调研网页来源列表，并把用户选择的页面交给系统浏览器。",
+      "owns": [
+        "网页来源抽屉",
+        "来源标题与域名展示",
+        "真实链接语义与系统浏览器跳转",
+        "打开失败的可恢复提示"
+      ],
+      "doesNotOwn": [
+        "图片瀑布流",
+        "联网搜索结果解析",
+        "参考持久化"
+      ],
+      "publicApi": [
+        "ResearchSourcesDrawer"
       ],
       "test": [
         "src/workbenches/canvas/panels/AgentPanel/ResearchResultsPreview.test.ts"
       ],
       "budget": 120
+    },
+    {
+      "module": "src/workbenches/canvas/panels/AgentPanel/ResearchSourcesDrawer.module.css",
+      "owner": "agent-research-results-ui-style",
+      "responsibility": "定义调研网页来源右侧抽屉的桌面布局、列表和焦点状态。",
+      "owns": [
+        "右侧抽屉布局",
+        "来源列表样式",
+        "窄屏宽度回退"
+      ],
+      "doesNotOwn": [
+        "全局主题令牌",
+        "图片瀑布流",
+        "网页外链行为"
+      ],
+      "publicApi": [
+        "CSS_MODULE:Agent 调研网页来源抽屉"
+      ],
+      "test": [
+        "src/workbenches/canvas/panels/AgentPanel/ResearchResultsPreview.test.ts"
+      ],
+      "budget": 160
     },
     {
       "module": "src/workbenches/canvas/panels/AgentPanel/agentResearchReference.ts",
@@ -8498,10 +8659,11 @@
     {
       "module": "src/workbenches/canvas/panels/AgentPanel/useAgentResearchReferenceController.ts",
       "owner": "agent-research-reference",
-      "responsibility": "把选中的调研候选挂到当前 Agent 会话 referenceIds，并同步快照与提示。",
+      "responsibility": "把选中的调研候选挂到当前 Agent 会话，并提供下载与发送到对话的真实动作。",
       "owns": [
         "候选选择回调",
         "当前会话引用追加",
+        "远程图片下载与引用 chip 插入",
         "成功与失败提示"
       ],
       "doesNotOwn": [
@@ -8515,7 +8677,7 @@
       "test": [
         "src/workbenches/canvas/panels/AgentPanel/useAgentResearchReferenceController.test.ts"
       ],
-      "budget": 100
+      "budget": 140
     },
     {
       "module": "src/features/settings/cliOutputText.ts",

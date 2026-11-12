@@ -43,9 +43,10 @@ describe('useAgentResearchReferenceController', () => {
     const appendReferenceIds = vi.fn(async () => nextSession)
     const applySessionSnapshot = vi.fn()
     const notify = vi.fn()
-    let add!: ReturnType<typeof useAgentResearchReferenceController>
+    const insertMention = vi.fn()
+    let research!: ReturnType<typeof useAgentResearchReferenceController>
     function Harness() {
-      add = useAgentResearchReferenceController({
+      research = useAgentResearchReferenceController({
         platform: createMemoryPlatform(),
         projectId: 'project-1',
         current: nextSession,
@@ -53,6 +54,7 @@ describe('useAgentResearchReferenceController', () => {
         appendReferenceIds,
         applySessionSnapshot,
         notify,
+        insertMention,
       })
       return null
     }
@@ -61,11 +63,80 @@ describe('useAgentResearchReferenceController', () => {
     })
 
     await act(async () => {
-      await add(candidate)
+      await research.addResearchReference(candidate)
     })
 
     expect(appendReferenceIds).toHaveBeenCalledWith('session-1', [reference.id])
     expect(applySessionSnapshot).toHaveBeenCalledWith(nextSession)
     expect(notify).toHaveBeenCalledWith('saved', 'info')
+  })
+
+  it('inserts a saved reference chip when sending a research image to chat', async () => {
+    const reference = {
+      id: 'ref_search_hash',
+      projectId: 'project-1',
+      title: 'Reference',
+      source: 'search' as const,
+      kind: 'image' as const,
+      assetHash: 'hash',
+      what: 'Reference',
+      createdAt: 1,
+      updatedAt: 1,
+    }
+    vi.mocked(addResearchCandidateToProject).mockResolvedValue({
+      ok: true,
+      message: 'saved',
+      item: reference,
+    } satisfies AddResearchReferenceResult)
+    const insertMention = vi.fn()
+    let research!: ReturnType<typeof useAgentResearchReferenceController>
+    function Harness() {
+      research = useAgentResearchReferenceController({
+        platform: createMemoryPlatform(),
+        projectId: 'project-1',
+        current: { id: 'session-1' } as AgentSession,
+        currentIdRef: { current: 'session-1' },
+        appendReferenceIds: vi.fn(async () => ({ id: 'session-1' }) as AgentSession),
+        applySessionSnapshot: vi.fn(),
+        notify: vi.fn(),
+        insertMention,
+      })
+      return null
+    }
+    act(() => {
+      TestRenderer.create(createElement(Harness))
+    })
+
+    await act(async () => {
+      await research.sendResearchToChat(candidate)
+    })
+    expect(insertMention).toHaveBeenCalledWith('reference', reference.id, reference.title)
+  })
+
+  it('downloads the selected research image through the file port', async () => {
+    const platform = createMemoryPlatform()
+    let research!: ReturnType<typeof useAgentResearchReferenceController>
+    function Harness() {
+      research = useAgentResearchReferenceController({
+        platform,
+        projectId: 'project-1',
+        current: { id: 'session-1' } as AgentSession,
+        currentIdRef: { current: 'session-1' },
+        appendReferenceIds: vi.fn(),
+        applySessionSnapshot: vi.fn(),
+        notify: vi.fn(),
+        insertMention: vi.fn(),
+      })
+      return null
+    }
+    act(() => {
+      TestRenderer.create(createElement(Harness))
+    })
+
+    await act(async () => {
+      expect(await research.downloadResearchImage(candidate)).toMatchObject({
+        ok: true,
+      })
+    })
   })
 })

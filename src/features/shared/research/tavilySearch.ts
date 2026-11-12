@@ -2,6 +2,7 @@ import type { DesignResearchItem } from '../../../domain/inspiration/designResea
 import type { NetworkPort } from '../../../platform/ports'
 import { isPublicHttpUrl } from '../../../domain/shared/publicUrl'
 import { asAppError } from '../../../shared/result'
+import { DESIGN_REFERENCE_DOMAINS } from './designReferenceSites'
 
 /**
  * Tavily 通用网页 + 图片搜索（用户 2026-11-11 拍板的内置联网来源）。
@@ -190,6 +191,7 @@ export async function searchTavily(
             include_images: true,
             include_image_descriptions: true,
             include_answer: false,
+            include_domains: DESIGN_REFERENCE_DOMAINS,
           },
           timeoutMs: 30_000,
           maxResponseBytes: 4 * 1024 * 1024,
