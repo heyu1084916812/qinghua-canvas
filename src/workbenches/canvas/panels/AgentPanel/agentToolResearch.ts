@@ -48,7 +48,7 @@ export interface AgentToolResearchPorts<
   readTavilyKey: () => Promise<string | null>
   /** Agent 输入框「联网」开关的当前值（调用时现取）。 */
   webEnabled: () => boolean
-  /** `readWebPage` 本身（Jina Reader）。 */
+  /** `readWebPage` 本身（Jina Reader；失败时经桌面壳直读原网页）。 */
   readPage: (
     network: NetworkPort,
     url: string,

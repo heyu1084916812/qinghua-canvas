@@ -8516,10 +8516,11 @@
     {
       "module": "src/features/shared/research/webPageReader.ts",
       "owner": "open-research-search",
-      "responsibility": "经 Jina Reader 读取公开网页正文并截断，登录墙、验证码、非 2xx 如实失败并给出退路。",
+      "responsibility": "经 Jina Reader 读取公开网页正文；Jina 失败、限流或无正文时经桌面壳直读原网页兜底，统一截断，登录墙、验证码、非 2xx 如实失败并给出退路。",
       "owns": [
         "公开地址校验",
         "Jina 文本格式解析",
+        "Jina 失败到本机直读的回退决策",
         "正文截断与登录墙识别"
       ],
       "doesNotOwn": [
@@ -8537,7 +8538,54 @@
       "test": [
         "src/features/shared/research/webPageReader.test.ts"
       ],
-      "budget": 200
+      "budget": 240
+    },
+    {
+      "module": "src/features/shared/research/htmlReadableText.ts",
+      "owner": "open-research-search",
+      "responsibility": "把原网页 HTML 转成可读正文：去掉脚本样式与导航页脚，优先最长 article、其次 main / role=main、最后 body，块级换行与列表保留。",
+      "owns": [
+        "正文区域选择与同名标签配平",
+        "噪声标签剔除",
+        "块级换行、列表项与标题空行的文本化"
+      ],
+      "doesNotOwn": [
+        "网络请求与公网校验",
+        "登录墙判定与截断",
+        "Jina Reader 解析"
+      ],
+      "publicApi": [
+        "htmlToReadableText",
+        "ReadableHtml"
+      ],
+      "test": [
+        "src/features/shared/research/htmlReadableText.test.ts"
+      ],
+      "budget": 160
+    },
+    {
+      "module": "src/features/shared/research/directPageReader.ts",
+      "owner": "open-research-search",
+      "responsibility": "Jina Reader 失败时经 publicOnly GET 直接抓原网页，只接受 HTML / 纯文本响应并转换成可读正文与最终地址。",
+      "owns": [
+        "直读请求头与 publicOnly 约束",
+        "响应类型判断",
+        "HTML 到正文的调用"
+      ],
+      "doesNotOwn": [
+        "何时回退的决策",
+        "登录墙判定与截断",
+        "错误文案"
+      ],
+      "publicApi": [
+        "readPageDirect",
+        "DirectPageText",
+        "DirectPageOutcome"
+      ],
+      "test": [
+        "src/features/shared/research/webPageReader.test.ts"
+      ],
+      "budget": 90
     },
     {
       "module": "src/workbenches/canvas/panels/AgentPanel/agentResearchSourceLabel.ts",
