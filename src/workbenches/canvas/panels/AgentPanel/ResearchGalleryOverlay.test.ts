@@ -213,6 +213,19 @@ describe('ResearchGalleryOverlay actions', () => {
     expect(css).toContain('@keyframes research-gallery-spin')
   })
 
+  it('G-R3: masonry auto-fits ~200px columns from the overlay width and caps tile height', () => {
+    const css = readFileSync(
+      new URL('./ResearchGalleryOverlay.module.css', import.meta.url),
+      'utf8',
+    )
+    const masonry = css.match(/\.masonry\s*\{([^}]*)\}/)?.[1] ?? ''
+    expect(masonry).toMatch(/columns:\s*auto\s+200px\s*;/)
+    expect(css).not.toMatch(/columns:\s*[123]\s*;/)
+    const img = css.match(/\.imageButton img\s*\{([^}]*)\}/)?.[1] ?? ''
+    expect(img).toMatch(/max-height:\s*360px\s*;/)
+    expect(img).toMatch(/object-fit:\s*cover\s*;/)
+  })
+
   it('clears busy after the StrictMode effect replay', async () => {
     let actions!: ReturnType<typeof useResearchGalleryActions>
     function Harness() {

@@ -66,9 +66,13 @@
   overflow-y: auto;
   padding: var(--space-4);
 }
+/*
+ * G-R3：按目标列宽约 200px 自动分列。列数由浮层（= 画布区）真实宽度决定，不看窗口宽度；
+ * 浮层只覆盖画布，侧栏 / Agent 栏越宽列越少。
+ */
 .masonry {
   width: 100%;
-  columns: 3;
+  columns: auto 200px;
   column-gap: 10px;
 }
 .tile {
@@ -94,6 +98,7 @@
   width: 100%;
   height: auto;
   min-height: 120px;
+  max-height: 360px;
   background: var(--bg-subtle);
   object-fit: cover;
 }
@@ -333,21 +338,11 @@
     animation-duration: 1.6s;
   }
 }
-@media (max-width: 1180px) {
-  .masonry {
-    columns: 2;
-  }
-}
 @media (max-width: 760px) {
   .head {
     padding: 0 var(--space-3);
   }
   .gallery {
     padding: var(--space-3);
-  }
-}
-@media (max-width: 520px) {
-  .masonry {
-    columns: 1;
   }
 }
