@@ -1,0 +1,82 @@
+/* 问题卡已提交 / 已跳过的一行摘要（可展开看答案）与「?」图标；只用现有令牌。 */
+.headIcon {
+  flex: 0 0 auto;
+}
+
+.summary {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: var(--space-1);
+  margin: var(--space-1) 0;
+}
+
+.summaryToggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 var(--space-2);
+  border: 1px solid var(--stroke);
+  border-radius: var(--radius-pill);
+  background: var(--bg-subtle);
+  color: var(--text-2);
+  font: inherit;
+  font-size: var(--fs-chip);
+  cursor: pointer;
+}
+
+.summaryToggle:hover {
+  background: var(--bg-hover);
+  color: var(--text-1);
+}
+
+.summaryToggle:focus-visible {
+  outline: 1px solid var(--stroke-focus);
+  outline-offset: 1px;
+}
+
+.summaryChevron {
+  display: inline-flex;
+  transition: transform 120ms ease;
+}
+
+.summaryChevronOpen {
+  transform: rotate(90deg);
+}
+
+.summaryList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  box-sizing: border-box;
+  width: min(100%, 360px);
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--stroke);
+  border-radius: var(--radius-control);
+  background: var(--bg-surface);
+  list-style: none;
+  font-size: var(--fs-chip);
+}
+
+.summaryRow {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.summaryQuestion {
+  color: var(--text-2);
+  overflow-wrap: anywhere;
+}
+
+.summaryAnswer {
+  color: var(--text-1);
+  overflow-wrap: anywhere;
+}
+
+.summaryAnswerEmpty,
+.summaryNote {
+  color: var(--text-3);
+}

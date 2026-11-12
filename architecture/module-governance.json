@@ -639,7 +639,7 @@
     {
       "module": "src/domain/agent/questionCard.ts",
       "owner": "agent-runtime",
-      "responsibility": "问题卡（askQuestions）的参数解析、兜底正文、回答选择与整理成用户消息，以及在历史里找最近一张问题卡。",
+      "responsibility": "问题卡（askQuestions）的参数解析、回合正文（只留一句引导）、回答选择与整理成用户消息，以及在历史里找最近一张问题卡。",
       "owns": [
         "问题卡参数校验与裁剪",
         "单选/多选与自由输入的回答状态",
@@ -659,6 +659,7 @@
         "AgentQuestionAnswer",
         "ParsedQuestionCard",
         "parseQuestionCardArgs",
+        "QUESTION_CARD_DEFAULT_LEAD",
         "questionCardText",
         "formatQuestionAnswers",
         "toggleQuestionOption",
@@ -676,11 +677,11 @@
     {
       "module": "src/workbenches/canvas/panels/AgentPanel/QuestionCardForm.tsx",
       "owner": "agent-conversation-ui",
-      "responsibility": "在 Agent 对话流底部渲染待回答的问题卡：多题、选项可点、自由输入、提交回答。",
+      "responsibility": "在 Agent 对话流底部渲染待回答的问题卡（Lovart 样式）：固定高度滚动区、‹ 1/N › 翻页跟随、A/B/C 字母行选项与行内自由输入、跳过与提交 ↵。",
       "owns": [
         "问题卡表单渲染与 aria-pressed",
-        "本地回答状态",
-        "提交按钮可用态"
+        "本地回答状态与当前题页码",
+        "提交 / 跳过按钮可用态与 Enter 提交"
       ],
       "doesNotOwn": [
         "回答发送与排队",
@@ -692,16 +693,16 @@
       "test": [
         "src/workbenches/canvas/panels/AgentPanel/QuestionCardForm.test.ts"
       ],
-      "budget": 140
+      "budget": 240
     },
     {
       "module": "src/workbenches/canvas/panels/AgentPanel/QuestionCardForm.module.css",
       "owner": "agent-conversation-ui-style",
-      "responsibility": "问题卡的卡片、题目、选项胶囊、自由输入与提交区样式，只用现有视觉令牌。",
+      "responsibility": "问题卡的紧凑卡片、头部翻页、滚动区、字母行选项、行内自由输入与跳过 / 提交底栏样式，只用现有视觉令牌，明暗自动跟随。",
       "owns": [
-        "问题卡卡片外观",
-        "选项按下/悬停/焦点/禁用态",
-        "自由输入框外观"
+        "问题卡卡片外观与固定最大高度",
+        "字母行按下/悬停/焦点/禁用态",
+        "行内自由输入与底栏按钮外观"
       ],
       "doesNotOwn": [
         "对话流布局",
@@ -711,18 +712,139 @@
       "publicApi": [
         "CSS_MODULE:Agent 问题卡",
         "CSS_CLASS:card",
+        "CSS_CLASS:head",
+        "CSS_CLASS:pager",
+        "CSS_CLASS:body",
         "CSS_CLASS:question",
         "CSS_CLASS:questionTitle",
         "CSS_CLASS:questionHint",
         "CSS_CLASS:options",
         "CSS_CLASS:option",
-        "CSS_CLASS:input",
-        "CSS_CLASS:actions"
+        "CSS_CLASS:letter",
+        "CSS_CLASS:freeRow",
+        "CSS_CLASS:freeInput",
+        "CSS_CLASS:footer",
+        "CSS_CLASS:skip",
+        "CSS_CLASS:submit"
       ],
       "test": [
         "src/workbenches/canvas/panels/AgentPanel/QuestionCardForm.test.ts"
       ],
-      "budget": 130
+      "budget": 280
+    },
+    {
+      "module": "src/domain/agent/questionCardReply.ts",
+      "owner": "agent-runtime",
+      "responsibility": "问题卡回合的正文与回答投影：剥掉正文里复述卡片题目 / 选项的清单，整理「跳过」消息，并把回答消息还原成题 → 答供折叠摘要显示。",
+      "owns": [
+        "正文复述题目清单的剥离规则",
+        "跳过消息格式与识别",
+        "回答消息解析成摘要"
+      ],
+      "doesNotOwn": [
+        "问题卡参数解析",
+        "问题卡渲染",
+        "参考用法重写"
+      ],
+      "publicApi": [
+        "CardQuestionText",
+        "stripQuestionCardEcho",
+        "QUESTION_CARD_ANSWER_HEADER",
+        "QUESTION_CARD_SKIP_HEADER",
+        "formatQuestionSkip",
+        "isQuestionCardSkip",
+        "QuestionCardAnswerSummary",
+        "parseQuestionCardAnswerMessage"
+      ],
+      "test": [
+        "src/domain/agent/questionCard.test.ts"
+      ],
+      "budget": 160
+    },
+    {
+      "module": "src/workbenches/canvas/panels/AgentPanel/QuestionCardSummary.tsx",
+      "owner": "agent-conversation-ui",
+      "responsibility": "已提交 / 已跳过的问题卡折成一行「已回答 N 题 ›」/「已跳过 ›」，点开显示每题的回答；以及问题卡共用的问号图标。",
+      "owns": [
+        "问题卡折叠摘要渲染与展开态",
+        "问题卡问号图标"
+      ],
+      "doesNotOwn": [
+        "回答消息解析",
+        "待回答问题卡表单"
+      ],
+      "publicApi": [
+        "QuestionHelpIcon",
+        "QuestionCardSummary"
+      ],
+      "test": [
+        "src/workbenches/canvas/panels/AgentPanel/QuestionCardForm.test.ts"
+      ],
+      "budget": 100
+    },
+    {
+      "module": "src/workbenches/canvas/panels/AgentPanel/QuestionCardSummary.module.css",
+      "owner": "agent-conversation-ui-style",
+      "responsibility": "问题卡折叠摘要的胶囊按钮、展开列表与问号图标样式，只用现有视觉令牌。",
+      "owns": [
+        "摘要胶囊外观与悬停焦点态",
+        "展开答案列表外观"
+      ],
+      "doesNotOwn": [
+        "问题卡表单样式",
+        "全局主题令牌"
+      ],
+      "publicApi": [
+        "CSS_MODULE:Agent 问题卡摘要",
+        "CSS_CLASS:summary",
+        "CSS_CLASS:summaryToggle",
+        "CSS_CLASS:summaryList",
+        "CSS_CLASS:summaryRow"
+      ],
+      "test": [
+        "src/workbenches/canvas/panels/AgentPanel/QuestionCardForm.test.ts"
+      ],
+      "budget": 100
+    },
+    {
+      "module": "src/workbenches/canvas/panels/AgentPanel/questionCardView.ts",
+      "owner": "agent-conversation-ui",
+      "responsibility": "问题卡的纯视图计算：选项字母序（A/B/C…）与滚动时当前可见题目的页码。",
+      "owns": [
+        "选项字母序",
+        "滚动位置到当前题的换算"
+      ],
+      "doesNotOwn": [
+        "问题卡渲染",
+        "滚动动画"
+      ],
+      "publicApi": [
+        "questionOptionLetter",
+        "questionIndexInView"
+      ],
+      "test": [
+        "src/workbenches/canvas/panels/AgentPanel/QuestionCardForm.test.ts"
+      ],
+      "budget": 40
+    },
+    {
+      "module": "src/workbenches/canvas/panels/AgentPanel/questionCardProjection.ts",
+      "owner": "agent-conversation-ui",
+      "responsibility": "对话投影里的问题卡守卫：发问题卡的那个用户回合，正文与过程旁白里复述卡片题目 / 选项的清单被剥掉，正文只留引导句。",
+      "owns": [
+        "问题卡回合的正文 / 旁白剥离范围"
+      ],
+      "doesNotOwn": [
+        "剥离规则本身",
+        "对话条目生成"
+      ],
+      "publicApi": [
+        "stripQuestionCardEchoes"
+      ],
+      "test": [
+        "src/workbenches/canvas/panels/AgentPanel/conversation.test.ts"
+      ],
+      "budget": 60
     },
     {
       "module": "src/domain/agent/seriesAnchors.ts",

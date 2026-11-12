@@ -5,6 +5,8 @@ import { isPublicHttpUrl } from '../../../../domain/shared/publicUrl'
 import { researchModeOf, type ResearchMode } from '../../../../domain/inspiration/designResearch'
 import { researchSiteCount, researchSourceHostCount, researchWebPageCount } from './agentResearchSourceLabel'
 import { parseQuestionCardArgs, type AgentQuestion } from '../../../../domain/agent/questionCard'
+import { parseQuestionCardAnswerMessage, type QuestionCardAnswerSummary } from '../../../../domain/agent/questionCardReply'
+import { stripQuestionCardEchoes } from './questionCardProjection'
 
 /**
  * 对话流（设计文档 §8「输出：计划预览 + 普通对话」）。
@@ -75,7 +77,7 @@ export interface ConversationProcess {
 }
 
 export type ConversationItem =
-  | { kind: 'user'; text: string; createdAt?: number; imageNodeIds?: string[] }
+  | { kind: 'user'; text: string; createdAt?: number; imageNodeIds?: string[]; questionAnswers?: QuestionCardAnswerSummary }
   | { kind: 'text'; text: string; createdAt?: number }
   | ConversationProcess
   | ConversationStep
@@ -836,11 +838,13 @@ export function toConversation(
             ),
           ),
         ]
+        const questionAnswers = parseQuestionCardAnswerMessage(m.content)
         out.push({
           kind: 'user',
           text: shown,
           ...timeOf(m),
           ...(imageNodeIds.length > 0 ? { imageNodeIds } : {}),
+          ...(questionAnswers ? { questionAnswers } : {}),
         })
       }
       continue
@@ -922,6 +926,7 @@ export function toConversation(
     }
   }
 
+  stripQuestionCardEchoes(out) // 问题卡回合：正文 / 旁白不复述题目（questionCardProjection.ts）
   /**
    * **中间失败只是重试过程，不该留在对话里**（用户 2026-10-06 第七批 #182）。
    *

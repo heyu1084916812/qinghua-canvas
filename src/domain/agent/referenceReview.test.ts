@@ -1,4 +1,4 @@
-import { formatQuestionSkip } from './questionCard'
+import { formatQuestionSkip } from './questionCardReply'
 import { describe, expect, it } from 'vitest'
 import type { ReferenceItem } from '../project/referenceLedger'
 import {
@@ -172,7 +172,7 @@ describe('G9：用户回答写回', () => {
       answersQuestionCard: true,
       byQuestion: {},
       pendingIds: ['a', 'b'],
-      text: formatQuestionSkip([{ id: 'r', question: '这张图怎么用？', options: ['锁产品'], multiple: false, allowFreeText: true, referenceItemId: 'a' }]),
+      text: formatQuestionSkip([{ question: '这张图怎么用？', options: ['锁产品'] }]),
     })).toEqual({})
   })
 

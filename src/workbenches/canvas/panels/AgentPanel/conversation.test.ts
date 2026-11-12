@@ -943,3 +943,68 @@ describe('问题卡（askQuestions）步骤', () => {
     expect(pendingQuestionCard([])).toBeNull()
   })
 })
+
+describe('问题卡回合的正文与回答投影（2026-11-12 Lovart 样式）', () => {
+  const card = {
+    ok: true,
+    awaitingAnswers: true,
+    questions: [
+      { id: 'size', question: '这套详情页按什么形式/尺寸出图？', options: ['3:4 竖版', '1:1 方图'] },
+      { id: 'style', question: '视觉风格走哪个方向？', options: ['国潮新中式', '高端极简'] },
+    ],
+  }
+  const turn: ChatMessage[] = [
+    { role: 'user', content: '设计一套月饼的详情' },
+    {
+      role: 'assistant',
+      content: '我先确认两件事：\n1. 这套详情页按什么形式/尺寸出图？\n2. 视觉风格走哪个方向？',
+      toolCalls: [{ id: 'q1', name: 'askQuestions', args: '{}' }],
+    },
+    { role: 'tool', toolCallId: 'q1', toolName: 'askQuestions', content: JSON.stringify(card) },
+    {
+      role: 'assistant',
+      content: '画布上没有月饼素材。开工前先定 2 件事。\n1. 这套详情页按什么形式/尺寸出图？（3:4 竖版 / 1:1 方图 / 或直接写）\n2. 视觉风格走哪个方向？（国潮新中式 / 高端极简 / 或直接写）\n在下方问题卡里选择或填写后提交，我再接着做。',
+    },
+  ]
+
+  it('正文只留引导句：与卡片重复的编号清单和提交提示被剥掉', () => {
+    const items = toConversation(turn)
+    const texts = items.filter((item) => item.kind === 'text')
+    expect(texts).toHaveLength(1)
+    expect(texts[0]).toMatchObject({ text: '画布上没有月饼素材。开工前先定 2 件事。' })
+  })
+
+  it('过程旁白里复述的题目也剥掉，只留非重复的句子', () => {
+    const items = toConversation(turn)
+    const process = items.find((item) => item.kind === 'process')
+    const intents = process?.kind === 'process' ? process.entries.filter((entry) => entry.source === 'intent') : []
+    expect(intents.map((entry) => entry.text)).toEqual(['我先确认两件事：'])
+  })
+
+  it('没有问题卡的回合不受影响', () => {
+    const plain: ChatMessage[] = [
+      { role: 'user', content: '调研' },
+      { role: 'assistant', content: '结论：\n1. 这套详情页按什么形式/尺寸出图？' },
+    ]
+    expect(toConversation(plain).find((item) => item.kind === 'text')).toMatchObject({
+      text: '结论：\n1. 这套详情页按什么形式/尺寸出图？',
+    })
+  })
+
+  it('回答 / 跳过消息带上折叠摘要；普通用户消息不带', () => {
+    const answered = toConversation([
+      ...turn,
+      { role: 'user', content: '问题卡回答：\n1. 这套详情页按什么形式/尺寸出图？ → 3:4 竖版\n2. 视觉风格走哪个方向？ → 未回答' },
+    ])
+    expect(answered.at(-1)).toMatchObject({
+      kind: 'user',
+      questionAnswers: { skipped: false, answeredCount: 1 },
+    })
+    const skipped = toConversation([
+      ...turn,
+      { role: 'user', content: '问题卡回答：已跳过，按你的判断继续，同一任务不要再问这些问题。\n1. 这套详情页按什么形式/尺寸出图？ → 未回答' },
+    ])
+    expect(skipped.at(-1)).toMatchObject({ kind: 'user', questionAnswers: { skipped: true } })
+    expect(toConversation([{ role: 'user', content: '3:4' }])[0]).not.toHaveProperty('questionAnswers')
+  })
+})

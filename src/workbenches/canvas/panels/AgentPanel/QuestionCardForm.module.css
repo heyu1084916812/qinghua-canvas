@@ -1,27 +1,99 @@
-/* 问题卡：与确认卡同一档的轻卡片，只用现有令牌，不新增颜色 */
+/*
+ * 问题卡（Lovart 样式，2026-11-12）：紧凑卡片、固定最大高度、内部滚动；
+ * 只用现有令牌（描边 / 表面 / 悬停 / 选中 / 强调），明暗两套自动跟随。
+ */
 .card {
   display: flex;
   flex-direction: column;
-  gap: var(--space-3);
+  max-height: 400px;
   margin: var(--space-2) 0;
-  padding: var(--space-3);
   border: 1px solid var(--stroke);
-  border-radius: var(--radius-control);
+  border-radius: var(--radius-node);
   background: var(--bg-surface);
   color: var(--text-1);
+  overflow: hidden;
+}
+
+.head {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  color: var(--text-2);
+  font-size: var(--fs-chip);
+}
+
+.headTitle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.pager {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  font-variant-numeric: tabular-nums;
+}
+
+.pagerText {
+  min-width: 28px;
+  text-align: center;
+}
+
+.pagerButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-2);
+  cursor: pointer;
+}
+
+.pagerButton:hover:not(:disabled) {
+  background: var(--bg-hover);
+  color: var(--text-1);
+}
+
+.pagerButton:disabled {
+  cursor: default;
+  opacity: 0.35;
+}
+
+.body {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  padding: 0 var(--space-3) var(--space-2);
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 .question {
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
+  gap: var(--space-1);
   min-width: 0;
-  margin: 0;
+  margin: 0 0 var(--space-3);
   padding: 0;
   border: none;
 }
 
+.question:last-child {
+  margin-bottom: 0;
+}
+
 .questionTitle {
+  float: left;
+  width: 100%;
+  margin-bottom: var(--space-1);
   padding: 0;
   font-size: var(--fs-label);
   font-weight: var(--fw-title);
@@ -31,82 +103,163 @@
 }
 
 .questionHint {
-  margin-left: var(--space-1);
+  margin-left: var(--space-2);
+  font-size: var(--fs-chip);
   font-weight: normal;
   color: var(--text-3);
 }
 
 .options {
+  clear: both;
   display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-1) var(--space-2);
+  flex-direction: column;
+  gap: 2px;
 }
 
 .option {
-  max-width: 100%;
-  min-height: 28px;
-  padding: 3px var(--space-3);
-  border: 1px solid var(--stroke);
-  border-radius: var(--radius-pill);
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 34px;
+  padding: 5px var(--space-2);
+  border: 1px solid transparent;
+  border-radius: var(--radius-control);
   background: transparent;
-  color: var(--text-2);
-  font-size: var(--fs-chip);
-  line-height: 1.4;
+  color: var(--text-1);
+  font: inherit;
+  font-size: var(--fs-label);
+  line-height: 1.45;
   text-align: left;
-  overflow-wrap: anywhere;
   cursor: pointer;
 }
 
 .option:hover:not(:disabled) {
   background: var(--bg-hover);
-  color: var(--text-1);
 }
 
-.option[aria-pressed='true'] {
-  border-color: var(--stroke-focus);
-  background: var(--bg-hover);
+.option[aria-pressed='true'],
+.freeRow[data-filled='true'] {
+  border-color: var(--stroke);
+  background: var(--bg-selected);
+}
+
+.letter {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border: 1px solid var(--stroke);
+  border-radius: 6px;
+  color: var(--text-2);
+  font-size: 11px;
+  font-weight: var(--fw-title);
+  line-height: 1;
+}
+
+.option[aria-pressed='true'] .letter,
+.freeRow[data-filled='true'] .letter {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--accent-text);
+}
+
+.optionText {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.freeRow {
+  cursor: text;
+}
+
+.freeInput {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 22px;
+  padding: 0;
+  border: none;
+  outline: none;
+  background: transparent;
   color: var(--text-1);
+  font: inherit;
+  font-size: var(--fs-label);
+}
+
+.freeInput::placeholder {
+  color: var(--text-3);
 }
 
 .option:focus-visible,
-.input:focus-visible {
+.freeRow:focus-within,
+.pagerButton:focus-visible,
+.skip:focus-visible,
+.submit:focus-visible {
   outline: 1px solid var(--stroke-focus);
   outline-offset: 1px;
 }
 
 .option:disabled,
-.input:disabled {
+.freeRow[data-disabled='true'] {
   cursor: not-allowed;
   opacity: 0.6;
 }
 
-.input {
-  box-sizing: border-box;
-  width: 100%;
-  height: 30px;
-  padding: 0 var(--space-2);
-  border: 1px solid var(--stroke);
-  border-radius: var(--radius-control);
-  background: var(--bg-subtle);
-  color: var(--text-1);
-  font: inherit;
-  font-size: var(--fs-chip);
-}
-
-.input::placeholder {
-  color: var(--text-3);
-}
-
-.actions {
+.footer {
   display: flex;
-  justify-content: flex-end;
-}
-
-.actions button {
   flex: 0 0 auto;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border-top: 1px solid var(--stroke);
 }
 
-.actions button:disabled {
+.skip,
+.submit {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 30px;
+  padding: 0 var(--space-3);
+  border-radius: var(--radius-control);
+  font: inherit;
+  font-size: var(--fs-label);
+  font-weight: var(--fw-title);
+  cursor: pointer;
+}
+
+.skip {
+  border: 1px solid var(--stroke);
+  background: transparent;
+  color: var(--text-1);
+}
+
+.skip:hover:not(:disabled) {
+  background: var(--bg-hover);
+}
+
+.submit {
+  border: 1px solid var(--accent);
+  background: var(--accent);
+  color: var(--accent-text);
+}
+
+.submit:disabled {
+  border-color: var(--stroke);
+  background: var(--bg-hover);
+  color: var(--text-3);
+  cursor: not-allowed;
+}
+
+.skip:disabled {
   cursor: not-allowed;
   opacity: 0.55;
+}
+
+.enterHint {
+  font-size: var(--fs-chip);
+  opacity: 0.8;
 }

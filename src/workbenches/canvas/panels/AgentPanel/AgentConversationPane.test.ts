@@ -220,4 +220,18 @@ describe('AgentConversationPane', () => {
       'data-agent-question-card',
     )
   })
+
+  it('问题卡回答 / 跳过的用户消息折成一行摘要，不再铺开整段「问题卡回答：…」气泡', () => {
+    const answered = {
+      kind: 'user' as const,
+      text: '问题卡回答：\n1. 尺寸？ → 3:4',
+      questionAnswers: { skipped: false, answeredCount: 1, rows: [{ question: '尺寸？', answer: '3:4' }] },
+    }
+    const html = renderPane({ items: [answered], visibleItems: [answered] })
+    expect(html).toContain('data-agent-question-summary="answered"')
+    expect(html).toContain('已回答 1 题')
+    expect(html).not.toContain('data-agent-bubble="user"')
+    const skipped = { ...answered, questionAnswers: { ...answered.questionAnswers, skipped: true, answeredCount: 0 } }
+    expect(renderPane({ items: [skipped], visibleItems: [skipped] })).toContain('已跳过')
+  })
 })

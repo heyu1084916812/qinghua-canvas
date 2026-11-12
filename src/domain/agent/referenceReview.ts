@@ -1,5 +1,5 @@
 import type { ReferenceItem, ReferenceUsageKind } from '../project/referenceLedger'
-import { isQuestionCardSkip } from './questionCard'
+import { isQuestionCardSkip } from './questionCardReply'
 
 /**
  * 参考侧栏的「先分析、拿不准才问」（G5 修订，Lovart 对照 review/lovart-qcard-interview.md）。

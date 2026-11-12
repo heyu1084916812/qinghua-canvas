@@ -44,6 +44,7 @@ import {
 } from './conversation'
 import { MentionRichText } from './MentionRichText'
 import { QuestionCardForm } from './QuestionCardForm'
+import { QuestionCardSummary } from './QuestionCardSummary'
 import { ResearchResultsPreview } from './ResearchResultsPreview'
 import { TaskPlanCard } from './TaskPlanCard'
 import baseStyles from './AgentPanel.module.css'
@@ -201,6 +202,19 @@ export function AgentConversationPane({
             </p>
           )}
           {visibleItems.map((item, index) => {
+            if (item.kind === 'user' && item.questionAnswers) {
+              // 问题卡回答 / 跳过：折成一行摘要，不再整段铺开「问题卡回答：1. … → …」
+              return (
+                <div
+                  key={index}
+                  className={`${styles.msgTurn} ${styles.msgTurnUser}`}
+                  data-agent-message="user"
+                  data-agent-question-answer
+                >
+                  <QuestionCardSummary summary={item.questionAnswers} />
+                </div>
+              )
+            }
             if (item.kind === 'user') {
               const copied = copiedKey === index
               return (
