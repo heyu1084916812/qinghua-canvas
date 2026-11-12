@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type DragEvent } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { usePlatform } from '../../app/providers/PlatformProvider'
 import { useFonts } from '../../app/providers/FontProvider'
 import type {
@@ -38,6 +38,11 @@ import {
   type Draft,
 } from './contextKitDraft'
 import { persistContextKitImage } from './contextKitPersistence'
+import { ContextKitImportZone, KIT_IMAGE_ACCEPT } from './ContextKitImportZone'
+import { ContextKitGuideSection } from './ContextKitGuideSection'
+import { useChannels } from '../../app/providers/ChannelStoreProvider'
+import { createPresetStore } from '../../state/project/presetStore'
+import { generateKitGuide, type KitGuideDeps } from '../../features/shared/context/kitGuideGenerator'
 
 const styles = {
   ...baseStyles,
@@ -80,6 +85,12 @@ export function ContextKitsDialog({ onClose }: { onClose: () => void }) {
   const fontLibrary = useFonts()
   const contextRepo = useMemo(() => createContextRepository(platform.storage), [platform])
   const projectRepo = useMemo(() => createProjectRepository(platform.storage), [platform])
+  const channels = useChannels()
+  const guideDeps = useMemo<KitGuideDeps>(() => ({
+    channels,
+    presets: createPresetStore(platform.storage),
+    assets: platform.assets,
+  }), [channels, platform])
   const [kind, setKind] = useState<ContextKitKind>('brand')
   const [kits, setKits] = useState<ContextKit[]>([])
   const [versions, setVersions] = useState<Record<string, ContextKitVersion[]>>({})
@@ -90,9 +101,7 @@ export function ContextKitsDialog({ onClose }: { onClose: () => void }) {
   const [draft, setDraft] = useState<Draft>(EMPTY_DRAFT)
   const [busy, setBusy] = useState(false)
   const [status, setStatus] = useState('')
-  const [dragging, setDragging] = useState(false)
-  const [urlOpen, setUrlOpen] = useState(false)
-  const [urlDraft, setUrlDraft] = useState('')
+  const [guideOffer, setGuideOffer] = useState(false)
   const [colorNameDraft, setColorNameDraft] = useState('')
   const [lastColor, setLastColor] = useState('#9acd32')
   const [fontAddOpen, setFontAddOpen] = useState(false)
@@ -100,7 +109,6 @@ export function ContextKitsDialog({ onClose }: { onClose: () => void }) {
   const [fontBusy, setFontBusy] = useState(false)
   const [renamingFontId, setRenamingFontId] = useState<string | null>(null)
   const [fontRenameDraft, setFontRenameDraft] = useState('')
-  const dropDepth = useRef(0)
   const fontFileRef = useRef<HTMLInputElement | null>(null)
   const replaceFontIdRef = useRef<string | null>(null)
 
@@ -145,8 +153,7 @@ export function ContextKitsDialog({ onClose }: { onClose: () => void }) {
     setSelectedId(null)
     setDraft(EMPTY_DRAFT)
     setStatus('')
-    setUrlOpen(false)
-    setUrlDraft('')
+    setGuideOffer(false)
     setFontAddOpen(false)
     setFontLibraryOpen(false)
     setRenamingFontId(null)
@@ -156,7 +163,7 @@ export function ContextKitsDialog({ onClose }: { onClose: () => void }) {
     setSelectedId(kit.id)
     setDraft(draftFromVersion(kit, versions[kit.id]?.[0] ?? null))
     setStatus('')
-    setUrlOpen(false)
+    setGuideOffer(false)
     setFontAddOpen(false)
     setFontLibraryOpen(false)
     setRenamingFontId(null)
@@ -175,6 +182,7 @@ export function ContextKitsDialog({ onClose }: { onClose: () => void }) {
     persistContextKitImage(blob, name, role, projectId, platform.storage)
 
   const addResources = (next: readonly ContextKitAsset[]) => {
+    if (next.length > 0 && draft.resources.length === 0 && !draft.guide.trim()) setGuideOffer(true)
     setDraft((current) => {
       const byHash = new Map(current.resources.map((resource) => [resource.hash, resource]))
       for (const resource of next) byHash.set(resource.hash, resource)
@@ -199,59 +207,10 @@ export function ContextKitsDialog({ onClose }: { onClose: () => void }) {
   }
 
   const pickFiles = async (role: ContextKitAssetRole) => {
-    const picked = await platform.files.pickFile(
-      'image/png,image/jpeg,image/webp,image/gif,image/svg+xml',
-    )
+    const picked = await platform.files.pickFile(KIT_IMAGE_ACCEPT)
     if (!picked) return
     const file = new File([picked.blob], picked.name, { type: picked.mime })
     await importFiles([file], role)
-  }
-
-  const importUrl = async () => {
-    const url = urlDraft.trim()
-    if (!url || busy) return
-    let parsed: URL
-    try {
-      parsed = new URL(url)
-      if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') throw new Error()
-    } catch {
-      setStatus('请输入完整的 http 或 https 图片地址')
-      return
-    }
-    setBusy(true)
-    setStatus('')
-    try {
-      const response = await platform.network.request(
-        { url, method: 'GET', timeoutMs: 30_000 },
-        new AbortController().signal,
-      )
-      if (response.status < 200 || response.status >= 300) {
-        throw new Error(`图片地址返回 HTTP ${response.status}`)
-      }
-      const mime = Object.entries(response.headers).find(
-        ([name]) => name.toLowerCase() === 'content-type',
-      )?.[1]?.split(';')[0]?.trim() ?? 'image/png'
-      if (!mime.startsWith('image/')) throw new Error('这个地址返回的不是图片')
-      const bytes = new Uint8Array(await response.arrayBuffer())
-      const name = decodeURIComponent(parsed.pathname.split('/').filter(Boolean).pop() ?? '网页图片')
-      const resource = await persistImage(new Blob([bytes], { type: mime }), name, 'reference')
-      addResources([resource])
-      setUrlDraft('')
-      setUrlOpen(false)
-      setStatus('已从网址添加参考素材')
-    } catch (error) {
-      setStatus(error instanceof Error ? error.message : '从网址导入失败')
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  const onDrop = (event: DragEvent<HTMLDivElement>) => {
-    event.preventDefault()
-    dropDepth.current = 0
-    setDragging(false)
-    const files = [...event.dataTransfer.files]
-    if (files.length > 0) void importFiles(files, 'reference')
   }
 
   const createOrSave = async () => {
@@ -553,87 +512,29 @@ export function ContextKitsDialog({ onClose }: { onClose: () => void }) {
               主素材与参考图片作为真实视觉输入。
             </p>
 
-            <div
-              className={dragging ? styles.dropzoneOn : styles.dropzone}
-              data-context-asset-dropzone
-              onDragEnter={(event) => {
-                event.preventDefault()
-                dropDepth.current += 1
-                setDragging(true)
-              }}
-              onDragOver={(event) => {
-                event.preventDefault()
-                event.dataTransfer.dropEffect = 'copy'
-              }}
-              onDragLeave={(event) => {
-                event.preventDefault()
-                dropDepth.current = Math.max(0, dropDepth.current - 1)
-                if (dropDepth.current === 0) setDragging(false)
-              }}
-              onDrop={onDrop}
-            >
-              <div className={styles.uploadIcon} aria-hidden>
-                <span />
-              </div>
-              <div className={styles.dropCopy}>
-                <strong>拖拽或上传图片</strong>
-                <span>PNG、JPG、WebP，最大 20MB</span>
-              </div>
-              <div className={styles.dropActions}>
-                <button
-                  type="button"
-                  className={styles.smallButton}
-                  disabled={busy}
-                  onClick={() => void pickFiles('reference')}
-                >
-                  选择本机图片
-                </button>
-                <button
-                  type="button"
-                  className={styles.smallButton}
-                  aria-expanded={urlOpen}
-                  onClick={() => setUrlOpen((current) => !current)}
-                >
-                  导入 URL
-                </button>
-              </div>
-              {urlOpen ? (
-                <div className={styles.urlRow}>
-                  <input
-                    value={urlDraft}
-                    placeholder="https://example.com/reference.jpg"
-                    aria-label="图片网址"
-                    onChange={(event) => setUrlDraft(event.target.value)}
-                    onKeyDown={(event) => {
-                      if (event.key === 'Enter') void importUrl()
-                    }}
-                  />
-                  <button
-                    type="button"
-                    className={styles.urlConfirm}
-                    disabled={busy || !urlDraft.trim()}
-                    onClick={() => void importUrl()}
-                  >
-                    导入
-                  </button>
-                </div>
-              ) : null}
-            </div>
+            <ContextKitImportZone
+              busy={busy}
+              setBusy={setBusy}
+              setStatus={setStatus}
+              persistImage={persistImage}
+              addResources={addResources}
+              importFiles={importFiles}
+            />
 
-            <section className={styles.section}>
-              <div className={styles.sectionHead}>
-                <h3>{copy.guideLabel}</h3>
-              </div>
-              <textarea
-                className={styles.guide}
-                value={draft.guide}
-                placeholder={copy.guidePlaceholder}
-                data-context-kit-guide
-                onChange={(event) =>
-                  setDraft((current) => ({ ...current, guide: event.target.value }))
-                }
-              />
-            </section>
+            <ContextKitGuideSection
+              label={copy.guideLabel}
+              placeholder={copy.guidePlaceholder}
+              guide={draft.guide}
+              onGuideChange={(guide) => setDraft((current) => ({ ...current, guide }))}
+              canGenerate={draft.resources.length > 0 || draft.colors.length > 0}
+              offer={guideOffer}
+              onDismissOffer={() => setGuideOffer(false)}
+              generate={(signal) => generateKitGuide(guideDeps, {
+                kitId: selectedKit?.id ?? '', projectId, kind, name: draft.name,
+                description: draft.description, resources: draft.resources,
+                colors: draft.colors, fonts: draft.fonts, signal,
+              })}
+            />
 
             <section className={styles.section}>
               <div className={styles.sectionHead}>

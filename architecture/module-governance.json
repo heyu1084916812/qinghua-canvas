@@ -9885,6 +9885,128 @@
         "src/workbenches/canvas/panels/AgentPanel/ResearchResultsPreview.test.ts"
       ],
       "budget": 80
+    },
+    {
+      "module": "src/domain/shared/kitGuide.ts",
+      "owner": "context-kit-guide",
+      "responsibility": "套件设计指南生成的纯规则：构造看图提示词、把模型 JSON 解析成八个小节并格式化为可编辑指南文本。",
+      "owns": [
+        "设计指南八个小节的标题与顺序",
+        "资料文字的边界标记与字符预算",
+        "模型输出 JSON 的容错解析与颜色归一",
+        "错误信息里的疑似密钥抹除"
+      ],
+      "doesNotOwn": [
+        "渠道路由与网络请求",
+        "套件持久化",
+        "React 界面"
+      ],
+      "publicApi": [
+        "KIT_GUIDE_HEADINGS",
+        "KIT_GUIDE_SYSTEM_PROMPT",
+        "KIT_GUIDE_SOURCE_CHAR_BUDGET",
+        "buildKitGuidePrompt",
+        "parseKitGuideText",
+        "formatKitGuide",
+        "redactSecrets"
+      ],
+      "test": [
+        "src/domain/shared/kitGuide.test.ts"
+      ],
+      "budget": 260
+    },
+    {
+      "module": "src/features/shared/context/kitGuideGenerator.ts",
+      "owner": "context-kit-guide",
+      "responsibility": "选择用户配置的看图对话模型并经现有渠道执行层发送套件图片、颜色、字体和资料文字，返回结构化设计指南。",
+      "owns": [
+        "看图模型的选择顺序（视觉验收模型、Agent 默认模型、首个看图模型）",
+        "套件图片到 NodeInput 的投影与张数上限",
+        "生成请求的取消与错误归一"
+      ],
+      "doesNotOwn": [
+        "凭据读取与渠道协议",
+        "RunRecord 落库",
+        "套件弹窗交互"
+      ],
+      "publicApi": [
+        "MAX_KIT_GUIDE_IMAGES",
+        "resolveKitVisionRoute",
+        "generateKitGuide",
+        "KitGuideDeps",
+        "KitGuideOutcome"
+      ],
+      "test": [
+        "src/features/shared/context/kitGuideGenerator.test.ts"
+      ],
+      "budget": 300
+    },
+    {
+      "module": "src/pages/AssetsPage/ContextKitGuideSection.tsx",
+      "owner": "context-kit-ui",
+      "responsibility": "套件弹窗里的设计指南区：可编辑文本、根据素材生成按钮、覆盖确认、停止生成和错误提示。",
+      "owns": [
+        "生成中 / 确认替换 / 空闲三种界面状态",
+        "首次添加素材后的生成提示",
+        "卸载时中止生成请求"
+      ],
+      "doesNotOwn": [
+        "模型选择与请求发送",
+        "套件版本保存"
+      ],
+      "publicApi": [
+        "ContextKitGuideSection",
+        "ContextKitGuideSectionProps"
+      ],
+      "test": [
+        "src/pages/AssetsPage/ContextKitGuideSection.test.ts"
+      ],
+      "budget": 220
+    },
+    {
+      "module": "src/pages/AssetsPage/ContextKitImportZone.tsx",
+      "owner": "context-kit-ui",
+      "responsibility": "套件弹窗顶部的拖拽、本机文件选择和 URL 导入区，把外部来源转换为套件素材。",
+      "owns": [
+        "拖拽悬停状态",
+        "本机文件选择入口",
+        "URL 导入输入与结果提示"
+      ],
+      "doesNotOwn": [
+        "套件版本保存与项目绑定",
+        "素材字节仓储实现"
+      ],
+      "publicApi": [
+        "ContextKitImportZone",
+        "KIT_IMAGE_ACCEPT"
+      ],
+      "test": [
+        "src/pages/AssetsPage/contextKitsPublicApi.test.ts"
+      ],
+      "budget": 420
+    },
+    {
+      "module": "src/pages/AssetsPage/ContextKitsImport.module.css",
+      "owner": "context-kit-ui",
+      "responsibility": "套件弹窗中设计指南生成、PDF 与网页导入相关控件的局部样式。",
+      "owns": [
+        "生成中旋转指示",
+        "指南提示条与按钮",
+        "生成错误与说明文字样式"
+      ],
+      "doesNotOwn": [
+        "套件弹窗整体布局",
+        "全局视觉令牌"
+      ],
+      "publicApi": [
+        "CSS_MODULE:ContextKitsImport 的页面局部样式域",
+        "CSS_CLASS:guideNotice",
+        "CSS_CLASS:guideError"
+      ],
+      "test": [
+        "src/pages/AssetsPage/assetsPageCssArchitecture.test.ts"
+      ],
+      "budget": 260
     }
   ]
 }

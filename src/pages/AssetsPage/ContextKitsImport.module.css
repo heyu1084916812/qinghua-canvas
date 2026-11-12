@@ -1,0 +1,85 @@
+/* 套件弹窗：设计指南生成、PDF / 网页导入的局部样式（2026-11-12）。 */
+
+.guideSpinner {
+  width: 10px;
+  height: 10px;
+  box-sizing: border-box;
+  border: 1.5px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: guideSpin 0.8s linear infinite;
+}
+
+@keyframes guideSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .guideSpinner {
+    animation: none;
+  }
+}
+
+.guideNotice {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border: var(--border);
+  border-radius: var(--radius-control);
+  background: var(--bg-surface);
+  color: var(--text-2);
+  font-size: var(--fs-chip);
+}
+
+.guideNotice > span {
+  flex: 1 1 200px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.guideNoticeAction,
+.guideNoticeQuiet {
+  height: 26px;
+  padding: 0 var(--space-3);
+  border: var(--border);
+  border-radius: var(--radius-control);
+  font: inherit;
+  font-size: var(--fs-chip);
+  cursor: pointer;
+}
+
+.guideNoticeAction {
+  border-color: var(--control-inverse-bg);
+  background: var(--control-inverse-bg);
+  color: var(--control-inverse-text);
+}
+
+.guideNoticeQuiet {
+  background: transparent;
+  color: var(--text-2);
+}
+
+.guideNoticeQuiet:hover {
+  background: var(--bg-hover);
+  color: var(--text-1);
+}
+
+.guideError,
+.guideNote {
+  margin: var(--space-2) 0 0;
+  font-size: var(--fs-chip);
+  overflow-wrap: anywhere;
+}
+
+.guideError {
+  color: var(--danger);
+}
+
+.guideNote {
+  color: var(--text-3);
+}
