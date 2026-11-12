@@ -32,10 +32,24 @@ function providerOf(source: string): ResearchProvider {
   return 'web'
 }
 
-function referenceSourceOf(provider: ResearchProvider): ReferenceSource {
+export function researchReferenceSourceOf(provider: ResearchProvider): ReferenceSource {
   if (provider === 'pinterest') return 'pinterest'
   if (provider === 'behance') return 'webFetch'
   return 'search'
+}
+
+export function researchReferenceWhatOf(candidate: ConversationResearchItem): string {
+  return [
+    candidate.description || candidate.title,
+    candidate.imageUrl ? '图源：查看图片搜索结果' : '',
+    `来源页面：${candidate.url}`,
+    candidate.imageUrl ? `图片地址：${candidate.imageUrl}` : '',
+    candidate.credit ? `作者：${candidate.credit}` : '',
+    candidate.license
+      ? `许可：${candidate.license}${candidate.licenseUrl ? ` ${candidate.licenseUrl}` : ''}`
+      : '',
+    DESIGN_RESEARCH_RIGHTS_NOTE,
+  ].filter(Boolean).join('\n')
 }
 
 export function researchItemOf(candidate: ConversationResearchItem): DesignResearchItem {
@@ -88,18 +102,11 @@ export async function addResearchCandidateToProject(
         : `ref_search_text_${candidate.id.replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 80)}`),
     projectId: input.projectId,
     title: candidate.title.trim() || '联网调研参考',
-    source: referenceSourceOf(researchItem.source),
+    source: researchReferenceSourceOf(researchItem.source),
     kind: saved?.asset ? 'image' : 'text',
     ...(saved?.asset ? { assetHash: saved.asset.hash } : {}),
     url: candidate.url,
-    what: [
-      candidate.description || candidate.title,
-      candidate.credit ? `作者：${candidate.credit}` : '',
-      candidate.license
-        ? `许可：${candidate.license}${candidate.licenseUrl ? ` ${candidate.licenseUrl}` : ''}`
-        : '',
-      DESIGN_RESEARCH_RIGHTS_NOTE,
-    ].filter(Boolean).join('\n'),
+    what: researchReferenceWhatOf(candidate),
     createdAt: existing?.createdAt ?? now,
     updatedAt: now,
   }

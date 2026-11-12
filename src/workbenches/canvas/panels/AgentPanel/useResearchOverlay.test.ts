@@ -1,20 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import {
-  researchOverlayReservedRight,
-  researchTabDestination,
-} from './useResearchOverlay'
-
-describe('researchOverlayReservedRight', () => {
-  it('leaves the open Agent column visible beside research overlays', () => {
-    expect(researchOverlayReservedRight(1440, { left: 1000, width: 420 })).toBe(440)
-    expect(researchOverlayReservedRight(1024, { left: 604, width: 420 })).toBe(420)
-  })
-
-  it('uses the full viewport when there is no measured Agent panel', () => {
-    expect(researchOverlayReservedRight(1024, null)).toBe(0)
-    expect(researchOverlayReservedRight(1024, { left: 0, width: 0 })).toBe(0)
-  })
-})
+import { researchTabDestination } from './useResearchOverlay'
 
 describe('researchTabDestination', () => {
   it('wraps keyboard focus inside the active nested dialog', () => {

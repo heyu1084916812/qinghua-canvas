@@ -1,31 +1,21 @@
 ﻿import { describe, expect, it } from 'vitest'
 import { creationStyles } from './creationStyles'
+// @ts-expect-error Vitest runs this structural test in Node; the web tsconfig omits Node globals.
+import { readFileSync } from 'node:fs'
 
 const inlineModules = import.meta.glob('./*.module.css', {
   eager: true,
   query: '?inline',
 }) as Record<string, unknown>
-const mainModules = import.meta.glob('../CreationPanel.module.css', {
-  eager: true,
-  query: '?inline',
-}) as Record<string, unknown>
 
-const sourceOf = (value: unknown): string => {
-  if (typeof value === 'string') return value
-  if (value && typeof value === 'object') {
-    for (const nested of Object.values(value)) {
-      if (typeof nested === 'string' && nested.length > 0) return nested
-    }
-  }
-  return ''
-}
+const readCss = (url: URL): string => readFileSync(url, 'utf8')
 
 const sources = {
-  main: sourceOf(mainModules['../CreationPanel.module.css']),
-  base: sourceOf(inlineModules['./CreationPanelBase.module.css']),
-  assets: sourceOf(inlineModules['./CreationPanelAssets.module.css']),
-  prompt: sourceOf(inlineModules['./CreationPanelPrompt.module.css']),
-  params: sourceOf(inlineModules['./CreationPanelParams.module.css']),
+  main: readCss(new URL('../CreationPanel.module.css', import.meta.url)),
+  base: readCss(new URL('./CreationPanelBase.module.css', import.meta.url)),
+  assets: readCss(new URL('./CreationPanelAssets.module.css', import.meta.url)),
+  prompt: readCss(new URL('./CreationPanelPrompt.module.css', import.meta.url)),
+  params: readCss(new URL('./CreationPanelParams.module.css', import.meta.url)),
 }
 
 const countLines = (source: string): number => {
@@ -35,6 +25,21 @@ const countLines = (source: string): number => {
 
 const braceDelta = (source: string): number =>
   (source.match(/\{/g) ?? []).length - (source.match(/\}/g) ?? []).length
+
+const ruleBody = (source: string, selector: string): string => {
+  const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  return source.match(new RegExp(`${escaped}[^\\s,{]*\\s*\\{([^}]*)\\}`))?.[1] ?? ''
+}
+
+const expectFlexFill = (source: string, selector: string): void => {
+  const body = ruleBody(source, selector)
+  expect(body, `${selector} 未声明 flex: 1 1 0`).toMatch(
+    /flex:\s*1\s+1\s+0(?:px|%)?\s*;/,
+  )
+  expect(body, `${selector} 未允许在固定外壳内收缩`).toMatch(
+    /min-height:\s*0(?:px|%)?\s*;/,
+  )
+}
 
 describe('CreationPanel CSS 组件域拆分', () => {
   it('四个模块都在预算内，主模块不再长回千行', () => {
@@ -73,5 +78,46 @@ describe('CreationPanel CSS 组件域拆分', () => {
     ]) {
       expect(all, `${selector} 丢失`).toContain(selector)
     }
+  })
+
+  it('固定高度链的每个中间层都使用 flex-basis: 0', () => {
+    for (const [source, selector] of [
+      [sources.main, '.promptSection'],
+      [sources.main, '.promptSectionComfort'],
+      [sources.base, '.promptSection'],
+      [sources.base, '.promptSectionComfort'],
+      [sources.prompt, '.promptRow'],
+      [sources.prompt, '.promptBox'],
+      [sources.prompt, '.promptBoxComfort'],
+    ]) {
+      expectFlexFill(source, selector)
+    }
+
+    const editor = ruleBody(sources.prompt, '.prompt.promptEditor')
+    expect(editor).toMatch(/flex:\s*1\s+1\s+0(?:px|%)?\s*;/)
+    expect(editor).toMatch(/min-height:\s*0(?:px|%)?\s*;/)
+    expect(editor).toMatch(/max-height:\s*none\s*;/)
+    expect(editor).toMatch(/overflow-y:\s*auto\s*;/)
+  })
+
+  it('不再使用 field-sizing 让编辑器内容反向撑高固定面板', () => {
+    expect(sources.prompt).not.toContain('field-sizing')
+  })
+
+  it('组件域之间不重复导出同名 CSS 类键', () => {
+    const owners = new Map<string, string[]>()
+    for (const domain of ['base', 'assets', 'prompt', 'params'] as const) {
+      const source = sources[domain]
+      const withoutComments = source.replace(/\/\*[\s\S]*?\*\//g, '')
+      for (const match of withoutComments.matchAll(/\.([A-Za-z_][\w-]*)/g)) {
+        const classNames = owners.get(match[1]) ?? []
+        if (!classNames.includes(domain)) classNames.push(domain)
+        owners.set(match[1], classNames)
+      }
+    }
+    const duplicates = [...owners]
+      .filter(([, domains]) => domains.length > 1)
+      .map(([className, domains]) => `${className}: ${domains.join(', ')}`)
+    expect(duplicates).toEqual([])
   })
 })

@@ -1,4 +1,8 @@
-import type { DesignResearchItem } from '../../../domain/inspiration/designResearch'
+import {
+  DEFAULT_RESEARCH_IMAGE_RESULTS,
+  type DesignResearchItem,
+  type ResearchMode,
+} from '../../../domain/inspiration/designResearch'
 import type { NetworkPort } from '../../../platform/ports'
 import { isPublicHttpUrl } from '../../../domain/shared/publicUrl'
 import { asAppError } from '../../../shared/result'
@@ -152,6 +156,9 @@ export interface TavilySearchInput {
   apiKey: string | null | undefined
   queries: readonly string[]
   maxResults: number
+  /** 缺省按图片调研处理，避免找图请求退化成默认 12 条网页结果。 */
+  mode?: ResearchMode
+  imageMaxResults?: number
 }
 
 /**
@@ -169,10 +176,16 @@ export async function searchTavily(
   if (!apiKey) {
     return { items: [], warnings: [TAVILY_KEY_MISSING_MESSAGE], needsKey: true }
   }
+  const mode = input.mode ?? 'image'
+  const requestedImages = input.imageMaxResults ?? DEFAULT_RESEARCH_IMAGE_RESULTS
+  const resultTarget = mode === 'web'
+    ? input.maxResults
+    : Math.max(input.maxResults, requestedImages)
   const perQuery = Math.max(
     1,
-    Math.min(TAVILY_MAX_RESULTS, Math.ceil(input.maxResults / queries.length)),
+    Math.min(TAVILY_MAX_RESULTS, Math.ceil(resultTarget / queries.length)),
   )
+  const includeImages = mode !== 'web'
   const settled = await Promise.allSettled(
     queries.map(async (query) => {
       const response = await network.request(
@@ -188,8 +201,8 @@ export async function searchTavily(
             query,
             max_results: perQuery,
             search_depth: 'basic',
-            include_images: true,
-            include_image_descriptions: true,
+            include_images: includeImages,
+            include_image_descriptions: includeImages,
             include_answer: false,
             include_domains: DESIGN_REFERENCE_DOMAINS,
           },

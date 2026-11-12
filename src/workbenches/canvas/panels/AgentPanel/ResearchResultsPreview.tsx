@@ -1,18 +1,10 @@
 import { useState } from 'react'
-import {
-  IconChevronRight,
-  IconImage,
-  IconLink,
-} from '../../toolbar/icons'
+import { IconChevronRight, IconImage, IconLink } from '../../toolbar/icons'
 import { agentResearchSourceLabel } from './agentResearchSourceLabel'
 import type { ConversationResearchItem } from './conversation'
+import type { ResearchMode } from '../../../../domain/inspiration/designResearch'
 import { ResearchGalleryOverlay } from './ResearchGalleryOverlay'
-import {
-  researchHostOf,
-  researchImageItems,
-  researchPreviewItems,
-  researchWebItems,
-} from './researchGallery'
+import { researchHostOf, researchImageItems, researchPreviewItems, researchWebItems } from './researchGallery'
 import { ResearchSourcesDrawer } from './ResearchSourcesDrawer'
 import styles from './ResearchResultsPreview.module.css'
 
@@ -23,11 +15,14 @@ interface ActionResult {
 
 export function ResearchResultsPreview({
   items,
+  researchMode,
   onAdd,
   onDownload,
   onSendToChat,
 }: {
   items: readonly ConversationResearchItem[]
+  /** 旧会话没有模式时按 mixed 处理，保留原有网页来源入口。 */
+  researchMode?: ResearchMode
   onAdd?: (item: ConversationResearchItem) => Promise<ActionResult>
   onDownload?: (item: ConversationResearchItem) => Promise<ActionResult>
   onSendToChat?: (item: ConversationResearchItem) => Promise<ActionResult>
@@ -38,12 +33,19 @@ export function ResearchResultsPreview({
   const webItems = researchWebItems(items)
   const previewItems = researchPreviewItems(items)
   const firstSource = webItems[0]
+  const mode = researchMode ?? 'mixed'
+  const showWebSources = mode !== 'image' && webItems.length > 0
 
   if (items.length === 0) return null
 
   return (
-    <div className={styles.wrap} data-agent-research-results data-agent-research-count={items.length}>
-      {webItems.length > 0 ? (
+    <div
+      className={styles.wrap}
+      data-agent-research-results
+      data-agent-research-count={items.length}
+      data-agent-research-mode={mode}
+    >
+      {showWebSources ? (
         <button
           type="button"
           className={styles.webRow}
@@ -93,14 +95,14 @@ export function ResearchResultsPreview({
             <strong>查看图片搜索结果</strong>
             <small>
               {images.length} 张图片
-              {webItems.length > 0 ? ` · ${webItems.length} 个网页` : ''}
+              {showWebSources ? ` · ${webItems.length} 个网页` : ''}
             </small>
           </span>
           <IconChevronRight size={15} />
         </button>
       ) : null}
 
-      {images.length === 0 && webItems.length > 0 ? (
+      {images.length === 0 && showWebSources ? (
         <div className={styles.hosts}>
           {[...new Set(webItems.map((item) => researchHostOf(item.url)).filter(Boolean))]
             .slice(0, 4)
@@ -108,7 +110,7 @@ export function ResearchResultsPreview({
         </div>
       ) : null}
 
-      {sourcesOpen ? (
+      {showWebSources && sourcesOpen ? (
         <ResearchSourcesDrawer
           items={webItems}
           onClose={() => setSourcesOpen(false)}

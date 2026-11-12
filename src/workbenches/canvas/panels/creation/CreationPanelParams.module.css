@@ -372,7 +372,7 @@
  * ⚠️ 这里用 `[data-token]` 这个**属性选择器**：chip 是编辑器命令式建的 DOM，
  * 类名在 `MentionEditor.module.css` 里，跨文件选不到。
  */
-.promptBox [data-token] {
+:global([data-panel-prompt-box]) [data-token] {
   height: 38px;
   padding: 0 10px;
   gap: 8px;
@@ -380,7 +380,7 @@
   font-size: 20px;
 }
 
-.promptBox [data-token] svg {
+:global([data-panel-prompt-box]) [data-token] svg {
   width: 24px;
   height: 24px;
 }

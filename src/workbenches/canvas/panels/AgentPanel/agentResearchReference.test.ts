@@ -2,7 +2,11 @@ import { describe, expect, it } from 'vitest'
 import { createMemoryPlatform } from '../../../../platform/memory'
 import { createAssetLibraryRepository } from '../../../../state/project/assetLibraryRepository'
 import { createReferenceLedgerRepository } from '../../../../state/project/referenceLedgerRepository'
-import { addResearchCandidateToProject, researchItemOf } from './agentResearchReference'
+import {
+  addResearchCandidateToProject,
+  researchItemOf,
+} from './agentResearchReference'
+import { addResearchSourceReferenceToProject } from './researchSourceReference'
 
 const PNG = Uint8Array.from([
   0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a,
@@ -124,6 +128,41 @@ describe('agent research reference', () => {
       .toHaveLength(1)
     expect((await createAssetLibraryRepository(platform.storage).list()))
       .toEqual([expect.objectContaining({ mime: 'image/png' })])
+    const [reference] = await createReferenceLedgerRepository(platform.storage)
+      .listItems('project-1')
+    expect(reference?.what).toContain('图源：查看图片搜索结果')
+    expect(reference?.what).toContain('来源页面：https://example.com/source')
+    expect(reference?.what).toContain('图片地址：https://example.com/image.png')
+  })
+
+  it('creates a source-only conversation reference without downloading the image', async () => {
+    const platform = createMemoryPlatform()
+    const result = await addResearchSourceReferenceToProject(
+      {
+        id: 'openverse:blocked',
+        title: 'Blocked image',
+        url: 'https://example.com/source',
+        imageUrl: 'https://example.com/blocked.png',
+        source: 'openverse',
+      },
+      {
+        platform,
+        projectId: 'project-1',
+      },
+    )
+
+    expect(result).toMatchObject({
+      ok: true,
+      item: {
+        projectId: 'project-1',
+        source: 'search',
+        kind: 'text',
+        url: 'https://example.com/source',
+      },
+    })
+    expect(result.item?.what).toContain('图源：查看图片搜索结果')
+    expect(result.item?.what).toContain('图片地址：https://example.com/blocked.png')
+    expect(await platform.storage.query('assets', {})).toEqual([])
   })
 
   it('creates a text reference when the candidate has no image', async () => {

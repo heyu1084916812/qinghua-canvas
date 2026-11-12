@@ -30,8 +30,13 @@ export function projectAgentTurnReferences(
   const warnings: string[] = []
   for (const { item, usage } of selection.selected) {
     const label = item.title.trim() || item.id
+    const provenance = item.source === 'search' && item.kind === 'image'
+      ? `图源：查看图片搜索结果；来源页面：${item.url}；`
+      : item.url
+        ? `来源页面：${item.url}；`
+        : ''
     lines.push(
-      `- 【${label}】这是什么：${item.what.trim()}；本轮怎么用：${usage.howToUse.trim()}；用法类型：${usage.usage}。`,
+      `- 【${label}】${provenance}这是什么：${item.what.trim()}；本轮怎么用：${usage.howToUse.trim()}；用法类型：${usage.usage}。`,
     )
     evidence.push(`${item.id}:${usage.id}`)
     const analyzed = !usage.id.startsWith('explicit:')

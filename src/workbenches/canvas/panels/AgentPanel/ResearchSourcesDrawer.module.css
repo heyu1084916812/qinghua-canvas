@@ -1,11 +1,12 @@
 .layer {
   position: fixed;
-  inset: 0;
   z-index: 90;
   display: flex;
+  align-items: flex-start;
   justify-content: flex-end;
+  box-sizing: border-box;
+  padding-block: var(--space-4);
 }
-
 .backdrop {
   position: absolute;
   inset: 0;
@@ -13,19 +14,20 @@
   background: color-mix(in srgb, var(--bg-canvas) 28%, transparent);
   cursor: default;
 }
-
 .drawer {
   position: relative;
   z-index: 1;
   display: flex;
   flex-direction: column;
-  width: min(380px, calc(100vw - 40px));
-  height: 100%;
-  border-left: 1px solid var(--stroke);
+  width: min(380px, calc(100% - 2 * var(--space-4)));
+  max-height: min(428px, calc(100% - 2 * var(--space-4)));
+  overflow: hidden;
+  border: 1px solid var(--stroke);
+  border-right: 0;
+  border-radius: var(--radius-node) 0 0 var(--radius-node);
   background: var(--bg-surface);
   box-shadow: var(--shadow-float);
 }
-
 .head {
   flex: 0 0 auto;
   display: flex;
@@ -35,20 +37,17 @@
   padding: var(--space-5) var(--space-4) var(--space-3);
   border-bottom: 1px solid var(--stroke);
 }
-
 .head h2 {
   margin: 0;
   color: var(--text-1);
   font-size: var(--fs-title);
   line-height: 1.35;
 }
-
 .head p {
   margin: 4px 0 0;
   color: var(--text-3);
   font-size: var(--fs-chip);
 }
-
 .close {
   flex: 0 0 auto;
   display: inline-flex;
@@ -63,7 +62,6 @@
   color: var(--text-2);
   cursor: pointer;
 }
-
 .close:hover,
 .close:focus-visible {
   border-color: var(--stroke);
@@ -72,19 +70,23 @@
 }
 
 .list {
+  box-sizing: border-box;
   min-height: 0;
   overflow-y: auto;
   padding: var(--space-3);
+  /* Six 52px rows + five 8px gaps + top padding, without a seventh-row sliver. */
+  max-height: 368px;
 }
 
 .source {
   box-sizing: border-box;
   width: 100%;
+  min-height: 52px;
   display: grid;
   grid-template-columns: 28px minmax(0, 1fr) auto;
   align-items: center;
   gap: var(--space-2);
-  padding: 11px 10px;
+  padding: 6px 10px;
   border: 1px solid var(--stroke);
   border-radius: var(--radius-control);
   background: var(--bg-subtle);

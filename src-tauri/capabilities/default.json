@@ -16,6 +16,7 @@
     "fs:allow-exists",
     "fs:allow-read-dir",
     "opener:allow-open-url",
+    "opener:allow-default-urls",
     "notification:default"
   ]
 }

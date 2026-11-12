@@ -6,6 +6,7 @@ import {
   MAX_RESEARCH_URLS,
   normalizeResearchRequest,
   parsePinterestHtml,
+  type ResearchMode,
   type DesignResearchItem,
   type DesignResearchReport,
   type ResearchProvider,
@@ -20,6 +21,10 @@ export interface DesignResearchRunnerInput {
   topic: string
   urls?: readonly string[]
   maxResults?: number
+  /** 图片 / 网页 / 图文混合；缺省由关键词推断，找图片请求默认 image。 */
+  mode?: ResearchMode
+  /** 图片模式独立目标数量；不会占用 maxResults 的网页条数。 */
+  imageMaxResults?: number
   /** Clipper 等单页抓取只读用户给出的 URL，不额外做开放图片/百科搜索。 */
   includeOpenSearch?: boolean
   /** 模型给出的 1–4 个检索角度（可含英文）；缺省时用 topic。 */
@@ -158,7 +163,10 @@ export async function runDesignResearch(
   deps: DesignResearchRunnerDeps,
   signal: AbortSignal,
 ): Promise<DesignResearchResult> {
-  const request = normalizeResearchRequest(input.topic, input.urls, input.maxResults)
+  const request = normalizeResearchRequest(input.topic, input.urls, input.maxResults, {
+    mode: input.mode,
+    imageMaxResults: input.imageMaxResults,
+  })
   const warnings: string[] = []
   if ((input.urls?.length ?? 0) > MAX_RESEARCH_URLS) {
     warnings.push(`一次最多读取 ${MAX_RESEARCH_URLS} 个公开页面，多出的 URL 已忽略。`)
@@ -178,6 +186,8 @@ export async function runDesignResearch(
         apiKey: deps.tavilyApiKey,
         queries: researchQueriesOf(request.topic, input.queries),
         maxResults: request.maxResults,
+        mode: request.mode,
+        imageMaxResults: request.imageMaxResults,
       },
       signal,
     )
@@ -185,9 +195,10 @@ export async function runDesignResearch(
     warnings.push(...tavily.warnings)
     needsTavilyKey = tavily.needsKey === true
   }
-  searchItems.push(
-    ...libraryItems(deps.libraryCases ?? [], request.topic, Math.min(request.maxResults, 12)),
-  )
+  const libraryLimit = request.mode === 'web'
+    ? Math.min(request.maxResults, 12)
+    : Math.max(request.imageMaxResults, Math.min(request.maxResults, 12))
+  searchItems.push(...libraryItems(deps.libraryCases ?? [], request.topic, libraryLimit))
   const items: DesignResearchItem[] = []
 
   const pages = await Promise.allSettled(
@@ -240,7 +251,7 @@ export async function runDesignResearch(
     items,
   })
   return {
-    ok: !signal.aborted && items.length > 0,
+    ok: !signal.aborted && report.totalItems > 0,
     ...report,
     warnings,
     ...(needsTavilyKey

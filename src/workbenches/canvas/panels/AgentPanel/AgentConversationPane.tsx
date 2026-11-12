@@ -389,6 +389,7 @@ export function AgentConversationPane({
                 {item.tool === 'researchDesign' && item.researchItems?.length ? (
                   <ResearchResultsPreview
                     items={item.researchItems}
+                    researchMode={item.researchMode}
                     onAdd={onAddResearchReference}
                     onDownload={onDownloadResearchImage}
                     onSendToChat={onSendResearchToChat}

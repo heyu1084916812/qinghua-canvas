@@ -288,7 +288,13 @@ describe('runDesignResearch', () => {
           headers: {},
           text: async () => '',
           json: async <T,>() => ({
-            results: [{ title: 'Coffee trends', url: 'https://t.example.com/a', content: 'c', score: 1 }],
+            results: [{
+              title: 'Coffee trends',
+              url: 'https://t.example.com/a',
+              content: 'c',
+              score: 1,
+              images: [{ url: 'https://t.example.com/hero.jpg', description: 'hero' }],
+            }],
             images: [{ url: 'https://t.example.com/a.jpg', description: 'poster' }],
           }) as T,
           arrayBuffer: async () => new ArrayBuffer(0),
@@ -309,6 +315,58 @@ describe('runDesignResearch', () => {
     expect(seen).toHaveLength(2)
     expect(result.needsTavilyKey).toBeUndefined()
     expect(JSON.stringify(result)).not.toContain('Bearer')
+  })
+
+  it('image mode fills an independent 40-image target and dedupes merged page/top-level images', async () => {
+    const seenRequests: Array<{ query: string; maxResults: number }> = []
+    const request = vi.fn<NetworkPort['request']>(async (req) => {
+      if (req.url !== TAVILY_SEARCH_ENDPOINT) throw new Error(`unexpected ${req.url}`)
+      const body = req.body as { query: string; max_results: number }
+      seenRequests.push({ query: body.query, maxResults: body.max_results })
+      const prefix = body.query.replace(/\s+/g, '-')
+      return {
+        status: 200,
+        headers: {},
+        text: async () => '',
+        json: async <T,>() => ({
+          results: [
+            {
+              title: 'Shared hero',
+              url: `https://pages.example.com/${prefix}`,
+              content: 'shared',
+              images: [{ url: 'https://cdn.example.com/shared.jpg' }],
+            },
+          ],
+          images: [
+            { url: 'https://cdn.example.com/shared.jpg', description: 'shared hero' },
+            ...Array.from({ length: 20 }, (_, index) => ({
+              url: `https://cdn.example.com/${prefix}-${index}.jpg`,
+              description: `${prefix} ${index}`,
+            })),
+          ],
+        }) as T,
+        arrayBuffer: async () => new ArrayBuffer(0),
+      }
+    })
+
+    const result = await runDesignResearch(
+      {
+        topic: '复古海报素材',
+        queries: ['retro poster one', 'retro poster two'],
+        maxResults: 12,
+        mode: 'image',
+        imageMaxResults: 40,
+      },
+      { network: { request, stream: async function* () {} }, tavilyApiKey: 'k' },
+      new AbortController().signal,
+    )
+
+    expect(seenRequests).toHaveLength(2)
+    expect(seenRequests.every((entry) => entry.maxResults === 20)).toBe(true)
+    expect(result.request).toMatchObject({ mode: 'image', imageMaxResults: 40, maxResults: 12 })
+    expect(result.totalItems).toBe(40)
+    expect(new Set(result.items.map((item) => item.imageUrl)).size).toBe(40)
+    expect(result.items.filter((item) => item.imageUrl === 'https://cdn.example.com/shared.jpg')).toHaveLength(1)
   })
 
   it('without a Tavily key reports needsTavilyKey and only keeps the local library', async () => {

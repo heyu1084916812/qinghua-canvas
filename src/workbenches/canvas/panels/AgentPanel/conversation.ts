@@ -2,6 +2,7 @@ import { publicProcessText, visibleAssistantReply } from './agentVisibleText'
 import { agentPhaseForTool, agentPhaseTitle, isAgentPhase, type AgentPhase } from '../../../../domain/agent/phase'
 import type { ChatMessage } from '../../../../domain/shared/execution/types'
 import { isPublicHttpUrl } from '../../../../domain/shared/publicUrl'
+import { researchModeOf, type ResearchMode } from '../../../../domain/inspiration/designResearch'
 import { parseQuestionCardArgs, type AgentQuestion } from '../../../../domain/agent/questionCard'
 
 /**
@@ -34,6 +35,8 @@ export interface ConversationStep {
   /** 这一步牵扯到的节点 id：面板据此把它们产出的图**内嵌**显示 */
   nodeIds: string[]
   researchItems?: ConversationResearchItem[]
+  /** 新调研结果携带；旧会话没有该字段时 UI 按 mixed 保留原入口。 */
+  researchMode?: ResearchMode
   /** askQuestions 成功时的问题卡（G5 / questions[]）。 */
   questions?: AgentQuestion[]
   failed: boolean
@@ -295,6 +298,7 @@ export function describeToolResult(
   summaryLines?: string[]
   nodeIds: string[]
   researchItems?: ConversationResearchItem[]
+  researchMode?: ResearchMode
   questions?: AgentQuestion[]
   failed: boolean
   activityLabel?: string
@@ -365,6 +369,7 @@ export function describeToolResult(
     case 'researchDesign': {
       const items = asArray(r.items).map(asRecord)
       const sources = asArray(r.sources).map(asRecord)
+      const researchMode = researchModeOf(r.mode) ?? researchModeOf(asRecord(r.request).mode)
       const warnings = asArray(r.warnings).map((item) => clean(item))
       const researchItems = items
         .flatMap((item): ConversationResearchItem[] => {
@@ -383,7 +388,7 @@ export function describeToolResult(
             licenseUrl: clean(String(item.licenseUrl ?? '')),
           }]
         })
-        .slice(0, 48)
+        .slice(0, researchMode === 'image' ? 50 : researchMode === 'mixed' ? 64 : 48)
       return {
         lines: [
           `找到 ${items.length} 条参考，覆盖 ${sources.length} 个来源`,
@@ -391,6 +396,7 @@ export function describeToolResult(
         ],
         nodeIds: [],
         researchItems,
+        ...(researchMode ? { researchMode } : {}),
         failed: r.ok === false,
       }
     }

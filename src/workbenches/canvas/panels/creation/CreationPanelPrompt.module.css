@@ -4,7 +4,7 @@
   position: relative;
   display: flex;
   flex-direction: column;
-  flex: 1 1 auto;
+  flex: 1 1 0;
   min-width: 0;
   min-height: 0;
   gap: var(--space-2);
@@ -61,41 +61,10 @@
   width: 100%;
   max-width: 100%;
   min-width: 0;
-  /**
-   * **高度跟着内容长**（用户 2026-09-24 第 1 条）。
-   *
-   * 此前是 `flex: 1 1 auto`：textarea 只会**撑满**父级给它的高度，
-   * 内容超出时它自己内部滚动 —— 于是面板永远 360px、里面一条滚动条。
-   * 用户明确不要这个（「文字太多的时候右边出现滚动条，自适应就好」）。
-   *
-   * `field-sizing: content` 让表单控件按内容定高（Chromium 123+ 标准属性）。
-   * 配合下面的 `max-height` 兜底：粘一篇超长文章进来时，
-   * 面板长到某个高度就停住，剩下的由 textarea 自己滚 ——
-   * 用户要的「输入框可以有滚动条」正是这个状态。
-   *
-   * 不再需要 `flex: 1 1 auto`：面板高度由内容决定，
-   * 短内容时靠 `.panel` 的 `min-height` 撑出原来那块 21:9 的大面板。
-   */
-  flex: 0 0 auto;
-  field-sizing: content;
-  /** 下限只保一行；短提示词下方不再留固定高度。 */
-  min-height: 1lh;
-  /**
-   * 文字区的高度上限（设计值，zoom 0.75 后屏幕上 ×0.75）。
-   *
-   * 两个约束取**更小**的那个：
-   *  - 固定的 420：常见长提示词都装得下，且不会长得离谱；
-   *  - **面板可用高度减去其它几行**：面板高度被 `--panel-available-h` 钳住时，
-   *    文字区必须跟着收，否则它会顶破面板（面板现在是 `overflow: visible`，
-   *    顶破了就真的画到屏幕上、盖住下面的东西）。
-   *
-   * 减掉的约 190px 是「素材行 + 参数行 + 内距 + 间距」的设计值合计；
-   * 取 160 留一点余量，宁可文字区小一点，也不要面板溢出。
-   */
-  max-height: min(
-    420px,
-    calc(var(--panel-available-h, 480px) - 160px)
-  );
+  /* 面板外壳拥有高度，编辑器只填充父级；内容超长时在编辑器内部滚动。 */
+  flex: 1 1 0;
+  min-height: 0;
+  max-height: none;
   /**
    * 去掉右下角的拖拽手柄（用户 2026-09-24：「下拉按钮目前好像是一个死功能」）。
    *
@@ -165,6 +134,7 @@
   position: relative;
   display: flex;
   flex-direction: column;
+  flex: 1 1 0;
   gap: 6px;
   min-width: 0;
   max-width: 100%;
@@ -172,7 +142,8 @@
 }
 
 .promptBoxComfort {
-  flex: 1 1 auto;
+  flex: 1 1 0;
+  min-height: 0;
 }
 
 .promptExpand {
@@ -317,16 +288,15 @@
  * 而两个 CSS module 的先后顺序由打包顺序决定 —— 各写一份、谁也别指望谁，
  * 面板这边的效果才不会被一次无关的导入顺序调整掀翻。
  */
-.promptEditor {
+.prompt.promptEditor {
   box-sizing: border-box;
   width: 100%;
   max-width: 100%;
   min-width: 0;
-  min-height: 1lh;
-  max-height: min(
-    420px,
-    calc(var(--panel-available-h, 480px) - 160px)
-  );
+  flex: 1 1 0;
+  min-height: 0;
+  /* 覆盖 MentionEditor 的通用高度上限，填满创作面板留给它的空间。 */
+  max-height: none;
   /**
    * 左边 10px、右边 4px：滚动条自己占 6px，
    * 合计后文字到两侧的视觉间距接近相等，不再多出右侧空带。
@@ -345,7 +315,7 @@
 
 .promptEditorComfort {
   flex: 1 1 0;
-  min-height: 72px;
+  min-height: 0;
 }
 
   /**

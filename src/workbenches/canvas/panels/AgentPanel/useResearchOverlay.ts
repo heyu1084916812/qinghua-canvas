@@ -1,12 +1,8 @@
 import { useEffect, useRef, useState, type RefObject } from 'react'
-
-export function researchOverlayReservedRight(
-  viewportWidth: number,
-  panel: Pick<DOMRect, 'left' | 'width'> | null,
-): number {
-  if (!panel || panel.width <= 0) return 0
-  return Math.max(0, Math.min(viewportWidth, Math.round(viewportWidth - panel.left)))
-}
+import {
+  researchOverlayBounds,
+  type ResearchOverlayBounds,
+} from './researchOverlayGeometry'
 
 export function researchTabDestination(
   activeIndex: number,
@@ -46,33 +42,32 @@ export function containResearchTabFocus(
 export function useResearchOverlay(
   containerRef: RefObject<HTMLElement>,
   onRequestClose: () => void,
-): number {
+): ResearchOverlayBounds {
   const closeRef = useRef(onRequestClose)
   const returnFocusRef = useRef<HTMLElement | null>(
     typeof document === 'undefined' ? null : (document.activeElement as HTMLElement | null),
   )
-  const [reservedRight, setReservedRight] = useState(0)
+  const [bounds, setBounds] = useState<ResearchOverlayBounds>(
+    () => researchOverlayBounds(0, 0, null),
+  )
   closeRef.current = onRequestClose
 
   useEffect(() => {
     const measure = () => {
-      const panel = document.querySelector<HTMLElement>(
-        '[data-agent-shell-panel][data-agent-shell-open="true"]:not([hidden])',
-      )
-      setReservedRight(
-        researchOverlayReservedRight(
+      const surface = document.querySelector<HTMLElement>('[data-canvas-surface]')
+      setBounds(
+        researchOverlayBounds(
           window.innerWidth,
-          panel?.getBoundingClientRect() ?? null,
+          window.innerHeight,
+          surface?.getBoundingClientRect() ?? null,
         ),
       )
     }
     measure()
     window.addEventListener('resize', measure)
     const observer = new ResizeObserver(measure)
-    const panel = document.querySelector<HTMLElement>(
-      '[data-agent-shell-panel][data-agent-shell-open="true"]:not([hidden])',
-    )
-    if (panel) observer.observe(panel)
+    const surface = document.querySelector<HTMLElement>('[data-canvas-surface]')
+    if (surface) observer.observe(surface)
     return () => {
       window.removeEventListener('resize', measure)
       observer.disconnect()
@@ -106,5 +101,5 @@ export function useResearchOverlay(
     }
   }, [containerRef])
 
-  return reservedRight
+  return bounds
 }

@@ -12,7 +12,13 @@ export type ResearchProvider =
   | 'tavily'
   | 'web'
 
-export const DEFAULT_RESEARCH_MAX_RESULTS = 24
+export type ResearchMode = 'image' | 'web' | 'mixed'
+
+export const DEFAULT_RESEARCH_MODE: ResearchMode = 'image'
+export const DEFAULT_RESEARCH_MAX_RESULTS = 12
+export const DEFAULT_RESEARCH_IMAGE_RESULTS = 40
+export const MIN_RESEARCH_IMAGE_RESULTS = 30
+export const MAX_RESEARCH_IMAGE_RESULTS = 50
 export const MIN_RESEARCH_MAX_RESULTS = 1
 export const MAX_RESEARCH_MAX_RESULTS = 100
 export const MAX_RESEARCH_URLS = 8
@@ -53,6 +59,8 @@ export interface DesignResearchRequest {
   topic: string
   urls: string[]
   maxResults: number
+  mode: ResearchMode
+  imageMaxResults: number
 }
 
 export interface PlannedResearchQuery {
@@ -115,6 +123,13 @@ const TRACKING_QUERY_PARAMS = new Set([
   'referrer',
   'source',
 ])
+
+const IMAGE_RESEARCH_INTENT =
+  /(图片|图像|照片|海报|封面|视觉|风格|参考|灵感|moodboard|配色|颜色|字体|logo|包装|插画|摄影|构图|排版|ui|网页设计|品牌视觉)/i
+const WEB_RESEARCH_INTENT =
+  /(网页|网站|文章|新闻|报道|行业|市场|深度报告|数据分析|竞品分析|价格|评测|百科|文献|教程|研究方法|事实|资料查询|report|article|news|research)/i
+const MIXED_RESEARCH_INTENT =
+  /(图文|既要.{0,8}图片.{0,8}也要|图片.{0,8}(?:和|与|及|加).{0,8}(?:网页|文章|报道|资料)|(?:网页|文章|报道|资料).{0,8}(?:和|与|及|加).{0,8}图片)/i
 
 const PROVIDER_TITLES: Record<ResearchProvider, string> = {
   google: 'Web references',
@@ -389,10 +404,47 @@ function clampMaxResults(value: number | undefined): number {
   )
 }
 
+export function isResearchMode(value: unknown): value is ResearchMode {
+  return value === 'image' || value === 'web' || value === 'mixed'
+}
+
+export function researchModeOf(value: unknown): ResearchMode | undefined {
+  return isResearchMode(value) ? value : undefined
+}
+
+/**
+ * 模式推断只用于模型漏传 mode 的情况。图片/风格/参考类请求是 researchDesign
+ * 的主路径，所以无法判定时回退 image；显式网页或图文混合意图才切到 web / mixed。
+ */
+export function inferResearchMode(input: {
+  mode?: unknown
+  topic?: string
+  queries?: readonly string[]
+}): ResearchMode {
+  const explicit = researchModeOf(input.mode)
+  if (explicit) return explicit
+  const text = [input.topic ?? '', ...(input.queries ?? [])].join(' ')
+  if (MIXED_RESEARCH_INTENT.test(text)) return 'mixed'
+  if (IMAGE_RESEARCH_INTENT.test(text)) return 'image'
+  if (WEB_RESEARCH_INTENT.test(text)) return 'web'
+  return DEFAULT_RESEARCH_MODE
+}
+
+export function normalizeResearchImageResults(value: number | undefined): number {
+  if (value === undefined || !Number.isFinite(value)) {
+    return DEFAULT_RESEARCH_IMAGE_RESULTS
+  }
+  return Math.min(
+    MAX_RESEARCH_IMAGE_RESULTS,
+    Math.max(MIN_RESEARCH_IMAGE_RESULTS, Math.trunc(value)),
+  )
+}
+
 export function normalizeResearchRequest(
   topic: string,
   urls: string | readonly string[] | null | undefined = [],
   maxResults?: number,
+  options: { mode?: unknown; imageMaxResults?: number } = {},
 ): DesignResearchRequest {
   const candidates = typeof urls === 'string' ? [urls] : urls ?? []
   const normalizedUrls: string[] = []
@@ -411,6 +463,11 @@ export function normalizeResearchRequest(
     topic: normalizeWhitespace(topic),
     urls: normalizedUrls,
     maxResults: clampMaxResults(maxResults),
+    mode: inferResearchMode({
+      mode: options.mode,
+      topic,
+    }),
+    imageMaxResults: normalizeResearchImageResults(options.imageMaxResults),
   }
 }
 
@@ -578,11 +635,53 @@ export function dedupeResearchItems(
   return out
 }
 
+function selectedItemsForMode(
+  request: DesignResearchRequest,
+  items: readonly DesignResearchItem[],
+): DesignResearchItem[] {
+  const deduped = dedupeResearchItems(items)
+  if (request.mode === 'image') {
+    return deduped
+      .filter((item) => item.imageUrl.length > 0)
+      .slice(0, request.imageMaxResults)
+  }
+  if (request.mode === 'web') {
+    return deduped.slice(0, request.maxResults)
+  }
+
+  const seenIds = new Set<string>()
+  const selected: DesignResearchItem[] = []
+  const push = (item: DesignResearchItem) => {
+    if (seenIds.has(item.id)) return false
+    seenIds.add(item.id)
+    selected.push(item)
+    return true
+  }
+  for (const item of deduped.filter((candidate) => candidate.imageUrl.length > 0)) {
+    if (selected.length >= request.imageMaxResults) break
+    push(item)
+  }
+  let textOnlyCount = 0
+  for (const item of deduped) {
+    if (item.imageUrl.length > 0) continue
+    if (textOnlyCount >= request.maxResults) break
+    if (push(item)) textOnlyCount += 1
+  }
+  return selected
+}
+
 export function buildDesignResearchReport(
   input: BuildDesignResearchReportInput,
 ): DesignResearchReport {
   const limit = clampMaxResults(input.request.maxResults)
-  const items = dedupeResearchItems(input.items).slice(0, limit)
+  const imageLimit = normalizeResearchImageResults(input.request.imageMaxResults)
+  const normalizedRequest: DesignResearchRequest = {
+    ...input.request,
+    maxResults: limit,
+    mode: researchModeOf(input.request.mode) ?? DEFAULT_RESEARCH_MODE,
+    imageMaxResults: imageLimit,
+  }
+  const items = selectedItemsForMode(normalizedRequest, input.items)
   const queries = input.queries
     ? [...input.queries]
     : planResearchQueries(input.request.topic)
@@ -623,10 +722,9 @@ export function buildDesignResearchReport(
 
   return {
     request: {
-      ...input.request,
-      topic: normalizeWhitespace(input.request.topic),
-      urls: [...input.request.urls],
-      maxResults: limit,
+      ...normalizedRequest,
+      topic: normalizeWhitespace(normalizedRequest.topic),
+      urls: [...normalizedRequest.urls],
     },
     queries,
     items,

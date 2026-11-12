@@ -238,6 +238,7 @@ describe('工具结果 → 人话', () => {
       'researchDesign',
       JSON.stringify({
         ok: true,
+        request: { mode: 'image', imageMaxResults: 40 },
         items: [
           {
             id: 'pinterest:1',
@@ -263,6 +264,7 @@ describe('工具结果 → 人话', () => {
       }),
     )
     expect(d.failed).toBe(false)
+    expect(d.researchMode).toBe('image')
     expect(d.lines).toEqual([
       '找到 2 条参考，覆盖 2 个来源',
       '没有提供公开页面 URL；本次只检索了轻画本地灵感库。',
@@ -276,6 +278,28 @@ describe('工具结果 → 人话', () => {
         license: 'CC BY-SA',
       }),
     ])
+  })
+
+  it('旧调研结果没有 mode 时保持兼容，不擅自改判成图片模式', () => {
+    const legacy = describeToolResult(
+      'researchDesign',
+      JSON.stringify({
+        ok: true,
+        items: [
+          {
+            id: 'web:1',
+            title: 'Legacy source',
+            url: 'https://example.com/source',
+            imageUrl: '',
+            source: 'web',
+          },
+        ],
+        sources: [{ name: 'example.com' }],
+      }),
+    )
+
+    expect(legacy.researchMode).toBeUndefined()
+    expect(legacy.researchItems).toHaveLength(1)
   })
 
   it('★ 计划工具由进度卡承接，不重复刷一屏步骤', () => {

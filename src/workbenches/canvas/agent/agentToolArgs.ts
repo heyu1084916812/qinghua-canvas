@@ -1,3 +1,9 @@
+import {
+  inferResearchMode,
+  normalizeResearchImageResults,
+  type ResearchMode,
+} from '../../../domain/inspiration/designResearch'
+
 /**
  * 解析模型返回的工具参数。
  *
@@ -76,23 +82,32 @@ export interface ResearchDesignArgs {
   queries?: string[]
   urls?: string[]
   maxResults?: number
+  mode: ResearchMode
+  imageMaxResults?: number
 }
 
-/** `researchDesign` 参数清洗：topic 必填；queries ≤4、urls ≤8（只留 http/https）、maxResults 1–24。 */
+/** `researchDesign` 参数清洗：topic 必填；queries ≤4、urls ≤8、mode 明确；图片目标独立夹到 30–50。 */
 export function researchDesignArgsOf(a: Record<string, unknown>): ResearchDesignArgs | null {
   const topic = typeof a.topic === 'string' ? a.topic.trim() : ''
   if (!topic) return null
   const urls = stringList(a.urls).filter((url) => /^https?:\/\//i.test(url)).slice(0, 8)
   const queries = stringList(a.queries).slice(0, 4)
+  const mode = inferResearchMode({ mode: a.mode, topic, queries })
   const maxResults =
     typeof a.maxResults === 'number' && Number.isFinite(a.maxResults)
       ? Math.min(24, Math.max(1, Math.round(a.maxResults)))
       : undefined
+  const imageMaxResults =
+    typeof a.imageMaxResults === 'number' && Number.isFinite(a.imageMaxResults)
+      ? normalizeResearchImageResults(a.imageMaxResults)
+      : undefined
   return {
     topic,
+    mode,
     ...(queries.length > 0 ? { queries } : {}),
     ...(urls.length > 0 ? { urls } : {}),
     ...(maxResults ? { maxResults } : {}),
+    ...(imageMaxResults ? { imageMaxResults } : {}),
   }
 }
 

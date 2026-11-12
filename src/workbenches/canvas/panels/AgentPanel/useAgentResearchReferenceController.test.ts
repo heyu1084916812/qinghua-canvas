@@ -7,10 +7,20 @@ import {
   addResearchCandidateToProject,
   type AddResearchReferenceResult,
 } from './agentResearchReference'
-import { useAgentResearchReferenceController } from './useAgentResearchReferenceController'
+import {
+  RESEARCH_IMAGE_SAVE_TIMEOUT_MS,
+  useAgentResearchReferenceController,
+} from './useAgentResearchReferenceController'
+import { addResearchSourceReferenceToProject } from './researchSourceReference'
 
 vi.mock('./agentResearchReference', () => ({
   addResearchCandidateToProject: vi.fn(),
+  researchItemOf: vi.fn(),
+  researchReferenceWhatOf: vi.fn(),
+}))
+
+vi.mock('./researchSourceReference', () => ({
+  addResearchSourceReferenceToProject: vi.fn(),
 }))
 
 const candidate = {
@@ -111,6 +121,140 @@ describe('useAgentResearchReferenceController', () => {
       await research.sendResearchToChat(candidate)
     })
     expect(insertMention).toHaveBeenCalledWith('reference', reference.id, reference.title)
+  })
+
+  it('sends source context to chat when the image cannot be saved', async () => {
+    vi.mocked(addResearchCandidateToProject).mockResolvedValue({
+      ok: false,
+      message: '图片读取失败：HTTP 403',
+    })
+    const fallback = {
+      id: 'ref_search_source_candidate',
+      projectId: 'project-1',
+      title: 'Reference',
+      source: 'search' as const,
+      kind: 'text' as const,
+      url: candidate.url,
+      what: '图源：查看图片搜索结果',
+      createdAt: 1,
+      updatedAt: 1,
+    }
+    vi.mocked(addResearchSourceReferenceToProject).mockResolvedValue({
+      ok: true,
+      message: '图片未能保存，已把来源信息发送到对话',
+      item: fallback,
+    })
+    const appendReferenceIds = vi.fn(async () => ({ id: 'session-1' }) as AgentSession)
+    const insertMention = vi.fn()
+    let research!: ReturnType<typeof useAgentResearchReferenceController>
+    function Harness() {
+      research = useAgentResearchReferenceController({
+        platform: createMemoryPlatform(),
+        projectId: 'project-1',
+        current: { id: 'session-1' } as AgentSession,
+        currentIdRef: { current: 'session-1' },
+        appendReferenceIds,
+        applySessionSnapshot: vi.fn(),
+        notify: vi.fn(),
+        insertMention,
+      })
+      return null
+    }
+    act(() => {
+      TestRenderer.create(createElement(Harness))
+    })
+
+    await act(async () => {
+      expect(await research.sendResearchToChat(candidate)).toEqual({
+        ok: true,
+        message: '图片未能保存，已把来源信息发送到对话',
+      })
+    })
+
+    expect(addResearchSourceReferenceToProject).toHaveBeenCalledWith(
+      candidate,
+      expect.objectContaining({ projectId: 'project-1' }),
+    )
+    expect(appendReferenceIds).toHaveBeenCalledWith('session-1', [fallback.id])
+    expect(insertMention).toHaveBeenCalledWith('reference', fallback.id, fallback.title)
+  })
+
+  it('does not downgrade an explicit add-to-project failure into a text reference', async () => {
+    vi.mocked(addResearchCandidateToProject).mockResolvedValue({
+      ok: false,
+      message: '图片读取失败：HTTP 403',
+    })
+    let research!: ReturnType<typeof useAgentResearchReferenceController>
+    function Harness() {
+      research = useAgentResearchReferenceController({
+        platform: createMemoryPlatform(),
+        projectId: 'project-1',
+        current: { id: 'session-1' } as AgentSession,
+        currentIdRef: { current: 'session-1' },
+        appendReferenceIds: vi.fn(),
+        applySessionSnapshot: vi.fn(),
+        notify: vi.fn(),
+        insertMention: vi.fn(),
+      })
+      return null
+    }
+    act(() => {
+      TestRenderer.create(createElement(Harness))
+    })
+
+    await act(async () => {
+      expect(await research.addResearchReference(candidate)).toMatchObject({
+        ok: false,
+      })
+    })
+
+    expect(addResearchSourceReferenceToProject).not.toHaveBeenCalled()
+  })
+
+  it('puts a total deadline on the image save chain and aborts it', async () => {
+    vi.useFakeTimers()
+    try {
+      vi.mocked(addResearchCandidateToProject).mockImplementation(
+        async () => new Promise(() => {}),
+      )
+      const notify = vi.fn()
+      let research!: ReturnType<typeof useAgentResearchReferenceController>
+      function Harness() {
+        research = useAgentResearchReferenceController({
+          platform: createMemoryPlatform(),
+          projectId: 'project-1',
+          current: { id: 'session-1' } as AgentSession,
+          currentIdRef: { current: 'session-1' },
+          appendReferenceIds: vi.fn(),
+          applySessionSnapshot: vi.fn(),
+          notify,
+          insertMention: vi.fn(),
+        })
+        return null
+      }
+      act(() => {
+        TestRenderer.create(createElement(Harness))
+      })
+
+      let result: AddResearchReferenceResult | undefined
+      await act(async () => {
+        const pending = research.addResearchReference(candidate)
+        await vi.advanceTimersByTimeAsync(RESEARCH_IMAGE_SAVE_TIMEOUT_MS + 1)
+        result = await pending
+      })
+
+      expect(result).toMatchObject({ ok: false })
+      expect(result?.message).toContain('超时')
+      const signal = vi.mocked(addResearchCandidateToProject).mock.calls[0]?.[1]
+        ?.signal
+      expect(signal?.aborted).toBe(true)
+      expect(notify).toHaveBeenCalledWith(
+        expect.stringContaining('超时'),
+        'error',
+      )
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('downloads the selected research image through the file port', async () => {

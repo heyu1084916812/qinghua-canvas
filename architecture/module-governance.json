@@ -8538,9 +8538,34 @@
         "ResearchGalleryOverlay"
       ],
       "test": [
-        "src/workbenches/canvas/panels/AgentPanel/ResearchResultsPreview.test.ts"
+        "src/workbenches/canvas/panels/AgentPanel/ResearchResultsPreview.test.ts",
+        "src/workbenches/canvas/panels/AgentPanel/ResearchGalleryOverlay.test.ts"
       ],
       "budget": 280
+    },
+    {
+      "module": "src/workbenches/canvas/panels/AgentPanel/useResearchGalleryActions.ts",
+      "owner": "agent-research-results-ui",
+      "responsibility": "统一管理调研图片动作的 busy、失败提示、AbortController 与收尾状态。",
+      "owns": [
+        "逐动作 AbortController",
+        "try/catch/finally 收尾",
+        "按钮 busy 与状态提示"
+      ],
+      "doesNotOwn": [
+        "参考持久化",
+        "瀑布流布局",
+        "Agent 工具调用"
+      ],
+      "publicApi": [
+        "ResearchGalleryAction",
+        "ResearchGalleryBusy",
+        "useResearchGalleryActions"
+      ],
+      "test": [
+        "src/workbenches/canvas/panels/AgentPanel/ResearchGalleryOverlay.test.ts"
+      ],
+      "budget": 120
     },
     {
       "module": "src/workbenches/canvas/panels/AgentPanel/ResearchGalleryOverlay.module.css",
@@ -8566,6 +8591,29 @@
       "budget": 360
     },
     {
+      "module": "src/workbenches/canvas/panels/AgentPanel/researchOverlayGeometry.ts",
+      "owner": "agent-research-results-ui",
+      "responsibility": "把 canvas 工作区的真实矩形换算为调研弹层可使用的视口内边界。",
+      "owns": [
+        "canvas bounds 换算",
+        "视口边界夹取"
+      ],
+      "doesNotOwn": [
+        "弹层焦点管理",
+        "瀑布流布局",
+        "Agent 面板宽度"
+      ],
+      "publicApi": [
+        "ResearchOverlayBounds",
+        "ResearchOverlayRect",
+        "researchOverlayBounds"
+      ],
+      "test": [
+        "src/workbenches/canvas/panels/AgentPanel/researchOverlayGeometry.test.ts"
+      ],
+      "budget": 80
+    },
+    {
       "module": "src/workbenches/canvas/panels/AgentPanel/useResearchOverlay.ts",
       "owner": "agent-research-results-ui",
       "responsibility": "为调研抽屉和瀑布流保留右侧 Agent 上下文，并统一焦点陷阱、Esc 关闭与焦点恢复。",
@@ -8580,7 +8628,6 @@
         "图片瀑布流布局"
       ],
       "publicApi": [
-        "researchOverlayReservedRight",
         "useResearchOverlay"
       ],
       "test": [
@@ -8604,10 +8651,16 @@
         "参考持久化"
       ],
       "publicApi": [
-        "ResearchSourcesDrawer"
+        "RESEARCH_SOURCE_PREVIEW_ROWS",
+        "ResearchSourceOpenEnvironment",
+        "ResearchSourceOpenResult",
+        "ResearchSourceRow",
+        "ResearchSourcesDrawer",
+        "openResearchSource"
       ],
       "test": [
-        "src/workbenches/canvas/panels/AgentPanel/ResearchResultsPreview.test.ts"
+        "src/workbenches/canvas/panels/AgentPanel/ResearchResultsPreview.test.ts",
+        "src/workbenches/canvas/panels/AgentPanel/ResearchSourcesDrawer.test.ts"
       ],
       "budget": 120
     },
@@ -8649,12 +8702,61 @@
       ],
       "publicApi": [
         "addResearchCandidateToProject",
-        "researchItemOf"
+        "researchItemOf",
+        "researchReferenceSourceOf",
+        "researchReferenceWhatOf"
       ],
       "test": [
         "src/workbenches/canvas/panels/AgentPanel/agentResearchReference.test.ts"
       ],
       "budget": 130
+    },
+    {
+      "module": "src/workbenches/canvas/panels/AgentPanel/researchSourceReference.ts",
+      "owner": "agent-research-reference",
+      "responsibility": "图片保存失败时把公开搜索结果的来源上下文写成 text 参考，供发送到对话继续使用。",
+      "owns": [
+        "来源降级参考",
+        "来源 URL 回退写入"
+      ],
+      "doesNotOwn": [
+        "图片字节下载",
+        "Agent 会话引用追加",
+        "搜索结果渲染"
+      ],
+      "publicApi": [
+        "addResearchSourceReferenceToProject"
+      ],
+      "test": [
+        "src/workbenches/canvas/panels/AgentPanel/agentResearchReference.test.ts"
+      ],
+      "budget": 80
+    },
+    {
+      "module": "src/workbenches/canvas/panels/AgentPanel/researchActionAbort.ts",
+      "owner": "agent-research-reference",
+      "responsibility": "为调研图片保存与下载提供统一总时限、取消竞争和失败文案。",
+      "owns": [
+        "12 秒保存 deadline",
+        "AbortSignal 合并",
+        "取消/超时失败文案"
+      ],
+      "doesNotOwn": [
+        "图片落库",
+        "候选 UI 状态",
+        "Agent 会话写入"
+      ],
+      "publicApi": [
+        "RESEARCH_IMAGE_SAVE_TIMEOUT_MS",
+        "ResearchActionSignal",
+        "raceWithResearchAbort",
+        "researchActionFailure",
+        "researchActionSignal"
+      ],
+      "test": [
+        "src/workbenches/canvas/panels/AgentPanel/useAgentResearchReferenceController.test.ts"
+      ],
+      "budget": 80
     },
     {
       "module": "src/workbenches/canvas/panels/AgentPanel/useAgentResearchReferenceController.ts",

@@ -109,6 +109,7 @@ describe('searchTavily', () => {
         apiKey: 'tvly-test-key',
         queries: ['a', 'b', ' ', 'c', 'd', 'e'],
         maxResults: 12,
+        mode: 'web',
       },
       new AbortController().signal,
     )
@@ -121,8 +122,8 @@ describe('searchTavily', () => {
         query: 'a',
         max_results: 3,
         search_depth: 'basic',
-        include_images: true,
-        include_image_descriptions: true,
+        include_images: false,
+        include_image_descriptions: false,
         include_answer: false,
         include_domains: DESIGN_REFERENCE_DOMAINS,
       },
@@ -130,6 +131,33 @@ describe('searchTavily', () => {
     expect(seen[0]?.publicOnly).toBeUndefined()
     expect(result.items.length).toBeGreaterThan(0)
     expect(result.warnings).toEqual([])
+  })
+
+  it('uses the independent image target instead of the 12-result web cap', async () => {
+    const seen: NetworkRequest[] = []
+    const network = networkOf((req) => {
+      seen.push(req)
+      return response({ results: [], images: [] })
+    })
+    await searchTavily(
+      network,
+      {
+        apiKey: 'tvly-test-key',
+        queries: ['poster one', 'poster two'],
+        maxResults: 12,
+        mode: 'image',
+        imageMaxResults: 40,
+      },
+      new AbortController().signal,
+    )
+
+    expect(seen).toHaveLength(2)
+    expect(seen[0]?.body).toMatchObject({
+      max_results: 20,
+      include_images: true,
+      include_image_descriptions: true,
+      include_domains: DESIGN_REFERENCE_DOMAINS,
+    })
   })
 
   it('maps 401 to a settings hint and never echoes the key', async () => {

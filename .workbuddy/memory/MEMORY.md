@@ -1,5 +1,24 @@
 # CanvasFlow（轻画）项目记忆
 
+### 2026-11-12 #1032–#1033：调研图片动作的取消、超时与画布 bounds
+
+- 弹层动作卡死不是单一网络慢：`ResearchGalleryOverlay` 的 add/download/send 没有 `finally`，失败或异常会留下 busy 和确认框；控制器又给图片保存传了永不取消的 `new AbortController().signal`，于是 8 个候选地址各等 30 秒时 UI 无法收口。
+- 现在 `useResearchGalleryActions` 为每个动作持有自己的 `AbortController`，弹层关闭/卸载会 abort；控制器经 `researchActionAbort` 把外部 signal 与 12 秒总 deadline 合成后透传给 `saveDesignResearchItem`。`aria-busy`、禁用态、`styles.busySpinner` 和失败 `role=alert` 由同一份 busy/status 状态驱动，`finally` 必须同时清 busy 和确认框。
+- StrictMode 的 effect replay 会先执行 cleanup 再 setup；任何 `mountedRef` 都必须在 setup 里恢复 `true`。只在 cleanup 置 `false` 会让开发版动作完成后误判“已卸载”，再次造成 busy 永久卡住；`ResearchGalleryOverlay.test.ts` 已用 StrictMode Harness 锁住。
+- “发送到对话”不能复用严格“加入项目参考”的全有全无语义。图片字节保存失败时，`researchSourceReference` 可在同一 `referenceItems` 台账写入 `kind=text` 的来源降级项，再追加会话 `referenceIds` 并插入 mention；绝不能伪造 `assetHash` 或把降级说成图片已保存。
+- 调研图片的来源必须可回溯：`ReferenceItem.what` 写“图源：查看图片搜索结果”+来源页面+图片地址，`projectAgentTurnReferences` 也把来源页面带进 turn prompt。
+- 大图预览必须留在 canvas bounds 内：`.preview` 用 `position:absolute; inset:0`，容器 `overflow:hidden`，`img max-width:100% / max-height:calc(100% - 60px)`；只改容器不够，子图用 `92vw` 仍会横向溢出。`fixed + 100vh` 会覆盖右侧 Agent，四组证据要求 `previewInsideSurface=true`。
+- 证据 `.playwright-verify/current-bugs/research-gallery-actions/{report.json,preview-report.json}`：四组 `1440×900 / 1024×700 × 明暗` 均 3/2 列、无横向溢出、busy spinner 生效、失败后确认框清零、关闭发送弹层 abort、大图不覆盖 Agent、`errors=[]`。定向 21/21，AgentPanel 110 files / 860 tests，`npm run check` 1211 modules / 4844 dependencies / 355 semantic registrations，build 1340 modules。未提交、未 push。
+- 创作面板长提示词压工具行不是继续调 flex 就能解决：`creationStyles` 平铺合并四个 CSS Module 时，参数域的 `.promptBox` 键覆盖了提示词域同名类，DOM 实际只挂参数类，`display:flex/position:relative` 整组丢失。已把参数域规则改为 `:global([data-panel-prompt-box])` 锚点并加跨域同名类测试；四组证据 `after-creation-prompt-report.json` 均为 `editorWithinPromptBox=true / promptBoxWithinRow=true / promptBoxDisplay=flex`。
+- 最终统一门禁：12 分片 Vitest **700 files / 5811 tests（5810 passed / 1 skipped）**。`npm run check` 1211 modules / 4844 deps / 355 registrations、`npm run build` 1340 modules、Impeccable detector `[]`、`git diff --check` 全过。
+
+### 2026-11-12 #1031：调研模式与图片数量
+
+- `researchDesign` 现在必须区分 `image / web / mixed`。找图片、照片、海报、风格参考、灵感或 Moodboard 是 `image`，也是漏传模式时的默认值；网页资料用 `web`，两者都要才用 `mixed`。
+- 图片数量不能复用网页 `maxResults`。`imageMaxResults` 默认 40、夹在 30–50；图片/混合模式让 Tavily 每查询按图片目标申请结果（单次仍受官方 20 上限），并发 1–4 个角度后合并网页结果首图与顶层 `images`。固定 12 个 `include_domains` 不变。
+- `buildDesignResearchReport` 在图片模式只保留含图候选并把上限切到 `imageMaxResults`；旧结果没有 `request.mode` 时对话层不补猜，`ResearchResultsPreview` 按 `mixed` 展示，避免历史会话突然丢掉网页来源入口。
+- 真实页面证据 `.impeccable/review/after-research-mode-report.json`：四组 `1440×900 / 1024×700 × 明暗` 的 image/mixed 共 8 次，image 均为 `sourceButtons=0 / galleryButtons=1`，mixed 均为 `1/1`；缩略图 `3/3`、无重叠和横向溢出、`errors=[]`。定向 10 files / 224 tests 通过。
+
 ### 2026-11-12 #1025–#1029：调研结果入口、来源抽屉与瀑布流收口
 
 - 长文本越界不是单一 contenteditable 问题：`MentionEditor`、创作提示词区和面板容器同时要 `min-width:0 / max-width:100% / overflow-wrap:anywhere`，外层只保留纵向滚动。Agent 对话横滚同理，消息行和内容块都要允许 flex 子项收缩，横向溢出不能只藏不查。

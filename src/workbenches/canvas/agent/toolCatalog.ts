@@ -76,7 +76,10 @@ export const AGENT_TOOLS: readonly ToolDeclaration[] = [
   {
     name: 'researchDesign',
     description:
-      '做联网调研：用 Tavily 搜索网页与图片（每个检索角度一次），附带轻画本地灵感库；Tavily 不可用时回退到 Openverse、Wikipedia 与开放馆藏。' +
+      '做联网调研：用 Tavily 在固定 12 个设计站点检索图片与网页（每个检索角度并发一次），附带轻画本地灵感库。' +
+      '必须按用户意图选择 mode：找图片、照片、海报、风格参考、灵感或 Moodboard 用 image（缺省也是 image）；' +
+      '只要网页资料、文章、报告、新闻或公开来源用 web；既要参考图又要网页资料用 mixed。' +
+      'image 模式使用独立的 imageMaxResults 目标（默认 40，允许 30–50），不占用 maxResults 的网页条数。' +
       '也可从用户提供的公开网页、Pinterest Pin / Board 或 Behance 页面提取参考图与出处（要读正文请用 readPage）。' +
       '只读取公开页面，不使用任何账号 Cookie，不声称完成私密内容或无限制全站搜索。' +
       '搜索结果只是候选，不会自动加入项目参考、也不会喂给生图；保留原链接与来源。' +
@@ -87,6 +90,12 @@ export const AGENT_TOOLS: readonly ToolDeclaration[] = [
         topic: {
           type: 'string',
           description: '这次要研究的设计主题、风格、品类或用户目标。',
+        },
+        mode: {
+          type: 'string',
+          enum: ['image', 'web', 'mixed'],
+          description:
+            '调研模式。找图片/风格/海报/参考用 image；查网页文章/报告用 web；两者都要用 mixed。省略时按 image。',
         },
         queries: {
           type: 'array',
@@ -108,7 +117,14 @@ export const AGENT_TOOLS: readonly ToolDeclaration[] = [
           type: 'integer',
           minimum: 1,
           maximum: 24,
-          description: '最多返回多少条参考，默认 12。',
+          description: 'web / mixed 模式的网页来源条数上限，默认 12；不会限制 image 模式的图片目标。',
+        },
+        imageMaxResults: {
+          type: 'integer',
+          minimum: 30,
+          maximum: 50,
+          description:
+            'image / mixed 模式的独立图片目标，默认 40；图片候选会合并各角度与网页首图并按原图去重。',
         },
       },
       required: ['topic'],

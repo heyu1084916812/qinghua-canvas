@@ -173,6 +173,39 @@ describe('Agent turn reference projection', () => {
     ])
     expect(result.phaseEvent?.detail).toContain('缺失照片')
   })
+
+  it('tells the model that a search image came from the image-results gallery', () => {
+    const result = projectAgentTurnReferences({
+      selected: [{
+        item: {
+          id: 'search-image',
+          projectId: 'p1',
+          title: '搜索结果图',
+          source: 'search',
+          kind: 'image',
+          assetHash: 'search-hash',
+          url: 'https://www.behance.net/gallery/1/poster',
+          what: '旧台账没有记录来源类型',
+          createdAt: 1,
+          updatedAt: 1,
+        },
+        usage: {
+          id: 'explicit:search-image:task:t',
+          itemId: 'search-image',
+          projectId: 'p1',
+          taskKey: 'task:t',
+          usage: 'style',
+          howToUse: '参考配色',
+          createdAt: 1,
+        },
+      }],
+      omitted: [],
+    }, () => 'image/png')
+
+    expect(result.prompt).toContain('图源：查看图片搜索结果')
+    expect(result.prompt).toContain('来源页面：https://www.behance.net/gallery/1/poster')
+  })
+
   it('G2：非 Logo 图带上台账分工与本任务用法；未分析的显式 chip 不冒充分工', () => {
     const image = (id: string, hash: string) => ({
       id,

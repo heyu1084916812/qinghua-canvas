@@ -1,9 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import {
+  DEFAULT_RESEARCH_IMAGE_RESULTS,
   DEFAULT_RESEARCH_MAX_RESULTS,
   DESIGN_RESEARCH_RIGHTS_NOTE,
+  MAX_RESEARCH_IMAGE_RESULTS,
   MAX_RESEARCH_MAX_RESULTS,
   MAX_RESEARCH_URLS,
+  MIN_RESEARCH_IMAGE_RESULTS,
   buildDesignResearchReport,
   dedupeResearchItems,
   extractOpenGraphImages,
@@ -30,6 +33,8 @@ describe('normalizeResearchRequest', () => {
       topic: 'handmade soap',
       urls: ['https://www.example.com/moodboard/'],
       maxResults: MAX_RESEARCH_MAX_RESULTS,
+      mode: 'image',
+      imageMaxResults: DEFAULT_RESEARCH_IMAGE_RESULTS,
     })
   })
 
@@ -38,7 +43,25 @@ describe('normalizeResearchRequest', () => {
       topic: 'brand system',
       urls: [],
       maxResults: DEFAULT_RESEARCH_MAX_RESULTS,
+      mode: 'image',
+      imageMaxResults: DEFAULT_RESEARCH_IMAGE_RESULTS,
     })
+  })
+
+  it('keeps image target independent and clamps it to 30–50', () => {
+    expect(normalizeResearchRequest('poster', [], 12, { mode: 'image' })).toMatchObject({
+      maxResults: 12,
+      mode: 'image',
+      imageMaxResults: DEFAULT_RESEARCH_IMAGE_RESULTS,
+    })
+    expect(
+      normalizeResearchRequest('poster', [], 12, { mode: 'image', imageMaxResults: 1 })
+        .imageMaxResults,
+    ).toBe(MIN_RESEARCH_IMAGE_RESULTS)
+    expect(
+      normalizeResearchRequest('poster', [], 12, { mode: 'image', imageMaxResults: 999 })
+        .imageMaxResults,
+    ).toBe(MAX_RESEARCH_IMAGE_RESULTS)
   })
 
   it('caps seed URLs so a pasted list cannot fan out without bound', () => {
@@ -208,7 +231,7 @@ describe('dedupeResearchItems', () => {
 
 describe('buildDesignResearchReport', () => {
   it('summarizes actual sources, query plans, moodboard groups, and rights', () => {
-    const request = normalizeResearchRequest('minimal bakery identity', [], 2)
+    const request = normalizeResearchRequest('minimal bakery identity', [], 2, { mode: 'web' })
     const items: DesignResearchItem[] = [
       {
         id: 'pinterest:1',
@@ -268,12 +291,39 @@ describe('buildDesignResearchReport', () => {
   })
 
   it('accepts an explicit query plan without changing it', () => {
-    const request = normalizeResearchRequest('packaging')
+    const request = normalizeResearchRequest('packaging', [], 12, { mode: 'web' })
     const queries = planResearchQueries('packaging').slice(0, 3)
     const report = buildDesignResearchReport({ request, items: [], queries })
 
     expect(report.queries).toEqual(queries)
     expect(report.sources).toEqual([])
     expect(report.moodboard).toEqual([])
+  })
+
+  it('image mode ignores the web result cap and keeps image-bearing candidates up to its own target', () => {
+    const request = normalizeResearchRequest('poster references', [], 12, {
+      mode: 'image',
+      imageMaxResults: 30,
+    })
+    const items: DesignResearchItem[] = Array.from({ length: 35 }, (_, index) => ({
+      id: `image:${index}`,
+      source: 'tavily',
+      title: `Poster ${index}`,
+      url: `https://example.com/poster-${index}`,
+      imageUrl: `https://cdn.example.com/poster-${index}.jpg`,
+    }))
+    items.push({
+      id: 'text:ignored',
+      source: 'tavily',
+      title: 'Text only',
+      url: 'https://example.com/article',
+      imageUrl: '',
+    })
+
+    const report = buildDesignResearchReport({ request, items })
+
+    expect(report.request.mode).toBe('image')
+    expect(report.totalItems).toBe(30)
+    expect(report.items.every((item) => item.imageUrl.length > 0)).toBe(true)
   })
 })

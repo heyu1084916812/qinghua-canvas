@@ -167,6 +167,13 @@
 .add[data-added='true'] {
   color: var(--accent-text);
 }
+.add[data-busy='true'] {
+  opacity: 1;
+  cursor: wait;
+}
+.busySpinner {
+  animation: research-gallery-spin 0.8s linear infinite;
+}
 .addConfirm {
   position: absolute;
   top: 46px;
@@ -261,13 +268,15 @@
   font-size: var(--fs-chip);
 }
 .preview {
-  position: fixed;
+  position: absolute;
   inset: 0;
   z-index: 3;
+  box-sizing: border-box;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
+  overflow: hidden;
   padding: 52px 24px 64px;
 }
 .previewBackdrop {
@@ -279,8 +288,8 @@
 .preview img {
   position: relative;
   z-index: 1;
-  max-width: min(92vw, 1600px);
-  max-height: calc(100vh - 132px);
+  max-width: 100%;
+  max-height: calc(100% - 60px);
   object-fit: contain;
   border-radius: 4px;
   box-shadow: var(--shadow-float);
@@ -291,7 +300,7 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  max-width: min(92vw, 1600px);
+  max-width: 100%;
   margin-top: 12px;
   color: var(--control-inverse-text);
 }
@@ -313,6 +322,16 @@
   background: color-mix(in srgb, var(--control-inverse-bg) 70%, transparent);
   color: var(--control-inverse-text);
   cursor: pointer;
+}
+@keyframes research-gallery-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .busySpinner {
+    animation-duration: 1.6s;
+  }
 }
 @media (max-width: 1180px) {
   .masonry {

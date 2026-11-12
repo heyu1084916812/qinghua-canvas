@@ -244,8 +244,10 @@ describe('工具声明', () => {
       'researchDesign',
       {
         topic: '  bakery identity  ',
+        mode: 'image',
         urls: ['https://www.pinterest.com/pin/42/', 'not-a-url'],
         maxResults: 99,
+        imageMaxResults: 50,
       },
       {
         ...setup().ctx,
@@ -256,8 +258,10 @@ describe('工具声明', () => {
     expect(result).toEqual({ ok: true, items: [] })
     expect(researchDesign).toHaveBeenCalledWith({
       topic: 'bakery identity',
+      mode: 'image',
       urls: ['https://www.pinterest.com/pin/42/'],
       maxResults: 24,
+      imageMaxResults: 50,
     })
   })
 
