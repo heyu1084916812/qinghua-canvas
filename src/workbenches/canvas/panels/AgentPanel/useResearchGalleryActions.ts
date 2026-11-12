@@ -60,19 +60,24 @@ export function useResearchGalleryActions() {
     busyRef.current = { id: item.id, action }
     setStatus('')
     setBusy({ id: item.id, action })
+    /**
+     * B6：abort() 后可以立刻开始新动作；旧动作晚到的结果、状态文案和 finally
+     * 都只在它仍是“当前动作”时生效，否则会清掉新动作的 busy、覆盖新文案。
+     */
+    const isCurrent = () => mountedRef.current && actionAbortRef.current === controller
     try {
       const result = await callback(item, controller.signal)
-      if (!mountedRef.current) return
+      if (!isCurrent()) return
       setStatusTone(result.ok ? 'info' : 'error')
       setStatus(result.message)
       onResult?.(result, item)
     } catch (error) {
-      if (!mountedRef.current) return
+      if (!isCurrent()) return
       setStatusTone('error')
       setStatus(error instanceof Error ? `${failurePrefix}：${error.message}` : failurePrefix)
     } finally {
-      if (actionAbortRef.current === controller) actionAbortRef.current = null
-      if (mountedRef.current) {
+      if (isCurrent()) {
+        actionAbortRef.current = null
         busyRef.current = null
         setBusy(null)
         onSettled?.()

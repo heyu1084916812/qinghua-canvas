@@ -8726,7 +8726,8 @@
         "useResearchGalleryActions"
       ],
       "test": [
-        "src/workbenches/canvas/panels/AgentPanel/ResearchGalleryOverlay.test.ts"
+        "src/workbenches/canvas/panels/AgentPanel/ResearchGalleryOverlay.test.ts",
+        "src/workbenches/canvas/panels/AgentPanel/useResearchGalleryActions.test.ts"
       ],
       "budget": 120
     },
