@@ -126,7 +126,7 @@ const TRACKING_QUERY_PARAMS = new Set([
 ])
 
 const IMAGE_RESEARCH_INTENT =
-  /(图片|图像|照片|海报|封面|视觉|风格|参考|灵感|moodboard|配色|颜色|字体|logo|包装|插画|摄影|构图|排版|ui|网页设计|品牌视觉)/i
+  /(图片|图像|照片|海报|封面|视觉|风格|参考|灵感|moodboard|配色|颜色|字体|logo|包装|插画|摄影|构图|排版|\bui\b|网页设计|品牌视觉)/i
 const WEB_RESEARCH_INTENT =
   /(网页|网站|文章|新闻|报道|行业|市场|深度报告|数据分析|竞品分析|价格|评测|百科|文献|教程|研究方法|事实|资料查询|report|article|news|research)/i
 const MIXED_RESEARCH_INTENT =

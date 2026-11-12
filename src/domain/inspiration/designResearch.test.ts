@@ -10,6 +10,7 @@ import {
   buildDesignResearchReport,
   dedupeResearchItems,
   extractOpenGraphImages,
+  inferResearchMode,
   normalizeResearchRequest,
   parsePinterestHtml,
   planResearchQueries,
@@ -325,5 +326,18 @@ describe('buildDesignResearchReport', () => {
     expect(report.request.mode).toBe('image')
     expect(report.totalItems).toBe(30)
     expect(report.items.every((item) => item.imageUrl.length > 0)).toBe(true)
+  })
+})
+
+describe('inferResearchMode (B6: bare "ui" no longer matches inside English words)', () => {
+  it('does not treat build / guide / quick as an image request', () => {
+    expect(inferResearchMode({ topic: 'build guide for a quick market research report' })).toBe('web')
+    expect(inferResearchMode({ topic: 'industry news article' })).toBe('web')
+  })
+
+  it('still treats UI as an image / visual request', () => {
+    expect(inferResearchMode({ topic: 'mobile UI trends' })).toBe('image')
+    expect(inferResearchMode({ topic: '外卖 App UI 设计' })).toBe('image')
+    expect(inferResearchMode({ topic: '找一些ui参考' })).toBe('image')
   })
 })
