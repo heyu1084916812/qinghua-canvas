@@ -10,6 +10,7 @@ export type ResearchProvider =
   | 'met'
   | 'searxng'
   | 'tavily'
+  | 'bing'
   | 'web'
 
 export type ResearchMode = 'image' | 'web' | 'mixed'
@@ -143,10 +144,12 @@ const PROVIDER_TITLES: Record<ResearchProvider, string> = {
   met: 'Met Museum',
   searxng: 'SearXNG',
   tavily: 'Tavily 网页搜索',
+  bing: 'Bing 免 Key 搜索',
   web: 'Other references',
 }
 
 const PROVIDER_ORDER: readonly ResearchProvider[] = [
+  'bing',
   'tavily',
   'pinterest',
   'behance',

@@ -9,6 +9,7 @@ describe('agentResearchSourceLabel', () => {
     expect(agentResearchSourceLabel('met')).toBe('Met Museum')
     expect(agentResearchSourceLabel('openverse')).toBe('Openverse')
     expect(agentResearchSourceLabel('wikipedia')).toBe('Wikipedia')
+    expect(agentResearchSourceLabel('bing')).toBe('Bing')
   })
 
   it('keeps unknown sources unchanged instead of inventing a provider', () => {

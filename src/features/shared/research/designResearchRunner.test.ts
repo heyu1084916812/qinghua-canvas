@@ -2,7 +2,31 @@ import { describe, expect, it, vi } from 'vitest'
 import type { InspirationCase } from '../../../domain/inspiration/cases'
 import type { NetworkPort } from '../../../platform/ports'
 import { researchQueriesOf, runDesignResearch } from './designResearchRunner'
-import { TAVILY_KEY_MISSING_MESSAGE, TAVILY_SEARCH_ENDPOINT } from './tavilySearch'
+import { TAVILY_SEARCH_ENDPOINT } from './tavilySearch'
+import { BING_IMAGE_ENDPOINT, BING_WEB_ENDPOINT } from './bingSearch'
+import { TAVILY_OPTIONAL_HINT } from './fixedSiteSearch'
+
+const FIXTURES = import.meta.glob('./fixtures/*.html', {
+  eager: true,
+  query: '?raw',
+  import: 'default',
+}) as Record<string, string>
+const fixture = (name: string): string => {
+  const html = FIXTURES[`./fixtures/${name}`]
+  if (html === undefined) throw new Error(`missing fixture ${name}`)
+  return html
+}
+const isBing = (url: string) =>
+  url.startsWith(BING_WEB_ENDPOINT) || url.startsWith(BING_IMAGE_ENDPOINT)
+function htmlResponse(html: string) {
+  return {
+    status: 200,
+    headers: { 'content-type': 'text/html' },
+    text: async () => html,
+    json: async <T,>() => ({}) as T,
+    arrayBuffer: async () => new ArrayBuffer(0),
+  }
+}
 
 function networkWith(pages: Record<string, string>): NetworkPort {
   return {
@@ -122,8 +146,10 @@ describe('runDesignResearch', () => {
     expect(result.totalItems).toBe(2)
     // 用户给的 URL 排在最前，本地灵感库在后。
     expect(result.items.map((item) => item.source)).toEqual(['pinterest', 'web'])
-    expect(result.warnings).toEqual([TAVILY_KEY_MISSING_MESSAGE])
-    expect(result.needsTavilyKey).toBe(true)
+    // 免费通道离线、也没填 Tavily Key：只提示“可选”，不再当作必须处理的错误。
+    expect(result.warnings).toHaveLength(1)
+    expect(result.warnings[0]).toContain(TAVILY_OPTIONAL_HINT)
+    expect(result.needsTavilyKey).toBeUndefined()
   })
 
   it('keeps successful pages and reports failed URLs without fabricating items', async () => {
@@ -215,7 +241,7 @@ describe('runDesignResearch', () => {
 
   it('does not fall back to unapproved open search providers', async () => {
     const request = vi.fn<NetworkPort['request']>(async () => {
-      throw new Error('no network request expected without Tavily key')
+      throw new Error('offline')
     })
     const result = await runDesignResearch(
       { topic: '可持续包装', maxResults: 6 },
@@ -225,8 +251,13 @@ describe('runDesignResearch', () => {
 
     expect(result.ok).toBe(false)
     expect(result.items).toEqual([])
-    expect(result.needsTavilyKey).toBe(true)
-    expect(request).not.toHaveBeenCalled()
+    expect(result.needsTavilyKey).toBeUndefined()
+    // 只请求了免 Key 的 Bing 结果页（publicOnly），没有 Openverse / Wikipedia 等未指定来源。
+    expect(request).toHaveBeenCalled()
+    for (const [req] of request.mock.calls) {
+      expect(isBing(req.url)).toBe(true)
+      expect(req.publicOnly).toBe(true)
+    }
   })
 
   it('Clipper mode reads only the requested page and skips open search', async () => {
@@ -278,6 +309,60 @@ describe('runDesignResearch', () => {
     expect(result.warnings.join(' ')).toContain('aborted')
   })
 
+  it('uses free Bing results first and never spends Tavily credits when Bing answers', async () => {
+    const seen: string[] = []
+    const request = vi.fn<NetworkPort['request']>(async (req) => {
+      seen.push(req.url)
+      if (req.url.startsWith(BING_WEB_ENDPOINT)) return htmlResponse(fixture('bing-web.html'))
+      if (req.url.startsWith(BING_IMAGE_ENDPOINT)) return htmlResponse(fixture('bing-images.html'))
+      throw new Error(`unexpected ${req.url}`)
+    })
+    const result = await runDesignResearch(
+      { topic: '茶包装', queries: ['tea packaging'], mode: 'mixed', maxResults: 8 },
+      { network: { request, stream: async function* () {} }, tavilyApiKey: 'k' },
+      new AbortController().signal,
+    )
+    expect(result.ok).toBe(true)
+    expect(seen.some((url) => url === TAVILY_SEARCH_ENDPOINT)).toBe(false)
+    expect(result.items.every((item) => item.source === 'bing')).toBe(true)
+    // 只保留固定设计站：Behance 网页 + 两张 Pinterest 图；99designs / pexels 被过滤。
+    expect(result.items.map((item) => new URL(item.url).hostname).sort()).toEqual([
+      'id.pinterest.com',
+      'tr.pinterest.com',
+      'www.behance.net',
+    ])
+    expect(result.warnings).toEqual([])
+  })
+
+  it('falls back to Tavily only when the free Bing path hits a captcha', async () => {
+    const seen: string[] = []
+    const request = vi.fn<NetworkPort['request']>(async (req) => {
+      seen.push(req.url)
+      if (isBing(req.url)) {
+        return htmlResponse('<html><title>Verify</title><body>One last step: solve the captcha</body></html>')
+      }
+      if (req.url === TAVILY_SEARCH_ENDPOINT) {
+        return {
+          ...htmlResponse(''),
+          json: async <T,>() => ({
+            results: [{ title: 'Tea', url: 'https://www.behance.net/gallery/1/tea', content: 'tea' }],
+          }) as T,
+        }
+      }
+      throw new Error(`unexpected ${req.url}`)
+    })
+    const result = await runDesignResearch(
+      { topic: '茶包装', queries: ['tea packaging'], mode: 'web' },
+      { network: { request, stream: async function* () {} }, tavilyApiKey: 'k' },
+      new AbortController().signal,
+    )
+    expect(result.ok).toBe(true)
+    expect(result.items.map((item) => item.source)).toEqual(['tavily'])
+    expect(result.warnings[0]).toContain('人机验证')
+    expect(result.warnings[0]).toContain('已改用 Tavily')
+    expect(seen.filter((url) => url === TAVILY_SEARCH_ENDPOINT)).toHaveLength(1)
+  })
+
   it('puts Tavily results first and skips the open-source fallback when Tavily answers', async () => {
     const seen: string[] = []
     const request = vi.fn<NetworkPort['request']>(async (req) => {
@@ -311,8 +396,9 @@ describe('runDesignResearch', () => {
     expect(result.items[0]?.source).toBe('tavily')
     // 两个角度返回同样的链接，去重后只剩一份网页 + 一张图。
     expect(result.items.map((item) => item.source)).toEqual(['tavily', 'tavily'])
-    expect(seen.every((url) => url === TAVILY_SEARCH_ENDPOINT)).toBe(true)
-    expect(seen).toHaveLength(2)
+    const nonBing = seen.filter((url) => !isBing(url))
+    expect(nonBing.every((url) => url === TAVILY_SEARCH_ENDPOINT)).toBe(true)
+    expect(nonBing).toHaveLength(2)
     expect(result.needsTavilyKey).toBeUndefined()
     expect(JSON.stringify(result)).not.toContain('Bearer')
   })
@@ -320,6 +406,7 @@ describe('runDesignResearch', () => {
   it('image mode fills an independent 40-image target and dedupes merged page/top-level images', async () => {
     const seenRequests: Array<{ query: string; maxResults: number }> = []
     const request = vi.fn<NetworkPort['request']>(async (req) => {
+      if (isBing(req.url)) throw { kind: 'http', status: 429 }
       if (req.url !== TAVILY_SEARCH_ENDPOINT) throw new Error(`unexpected ${req.url}`)
       const body = req.body as { query: string; max_results: number }
       seenRequests.push({ query: body.query, maxResults: body.max_results })
@@ -369,15 +456,16 @@ describe('runDesignResearch', () => {
     expect(result.items.filter((item) => item.imageUrl === 'https://cdn.example.com/shared.jpg')).toHaveLength(1)
   })
 
-  it('without a Tavily key reports needsTavilyKey and only keeps the local library', async () => {
+  it('without a Tavily key keeps the local library and only hints that Tavily is optional', async () => {
     const network = networkWith({})
     const result = await runDesignResearch(
       { topic: 'bakery' },
       { network, libraryCases: library, tavilyApiKey: null },
       new AbortController().signal,
     )
-    expect(result.needsTavilyKey).toBe(true)
-    expect(result.error).toBe(TAVILY_KEY_MISSING_MESSAGE)
+    expect(result.needsTavilyKey).toBeUndefined()
+    expect(result.error).toBeUndefined()
+    expect(result.warnings.join(' ')).toContain('Tavily API Key 作为备用搜索（可选）')
     expect(result.items.some((item) => item.source === 'tavily')).toBe(false)
     expect(result.items.some((item) => item.source === 'openverse')).toBe(false)
     expect(result.items.some((item) => item.source === 'wikipedia')).toBe(false)

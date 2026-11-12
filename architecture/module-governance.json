@@ -8377,26 +8377,141 @@
     {
       "module": "src/features/shared/research/designReferenceSites.ts",
       "owner": "open-research-search",
-      "responsibility": "维护图片与风格调研固定的设计站点清单，并把结果 URL 映射成稳定的来源名称。",
+      "responsibility": "维护图片与风格调研固定的设计站点清单，生成 Bing site: 限定子句、按域名过滤结果，并把结果 URL 映射成稳定的来源名称。",
       "owns": [
         "12 个固定设计站点与顺序",
-        "Tavily include_domains 数据源",
+        "Bing site: OR 子句与 Tavily include_domains 数据源",
+        "结果 URL 是否属于固定站点的判定",
         "结果域名到站点显示名映射"
       ],
       "doesNotOwn": [
-        "Tavily 请求与错误处理",
+        "Bing / Tavily 请求与错误处理",
         "候选保存与项目参考",
         "Agent 结果界面"
       ],
       "publicApi": [
         "DESIGN_REFERENCE_SITES",
         "DESIGN_REFERENCE_DOMAINS",
-        "designReferenceSiteLabel"
+        "designReferenceSiteLabel",
+        "isDesignReferenceUrl",
+        "designReferenceSiteQuery"
       ],
       "test": [
         "src/features/shared/research/designReferenceSites.test.ts"
       ],
       "budget": 80
+    },
+    {
+      "module": "src/features/shared/research/htmlText.ts",
+      "owner": "open-research-search",
+      "responsibility": "把抓来的不可信 HTML 片段转成纯文本：实体解码、行内标签去除、属性解析与截断，供免 Key 搜索解析与网页正文兜底共用。",
+      "owns": [
+        "HTML 命名与数字实体解码",
+        "行内标签直接删除以保持中文连写",
+        "开始标签属性串解析"
+      ],
+      "doesNotOwn": [
+        "Bing 结果页结构识别",
+        "网络请求与公网校验",
+        "正文区域选择与截断策略"
+      ],
+      "publicApi": [
+        "decodeHtmlEntities",
+        "inlineTextOf",
+        "parseTagAttributes",
+        "clipText",
+        "INLINE_TAG"
+      ],
+      "test": [
+        "src/features/shared/research/htmlText.test.ts"
+      ],
+      "budget": 120
+    },
+    {
+      "module": "src/features/shared/research/bingResultParser.ts",
+      "owner": "open-research-search",
+      "responsibility": "把 Bing 网页与图片结果页 HTML 解析为标题、真实链接、摘要与原图/缩略图命中，并识别验证码、无结果与无法识别的页面。",
+      "owns": [
+        "b_algo 网页结果块切分与标题摘要提取",
+        "/ck/a 跳转链接的 base64url 解码",
+        "iusc 图片 m= JSON 解析",
+        "验证码 / 空结果 / 改版页面分类"
+      ],
+      "doesNotOwn": [
+        "发请求与限流处理",
+        "固定设计站点过滤",
+        "调研候选投影与 Tavily 回退"
+      ],
+      "publicApi": [
+        "parseBingWebResults",
+        "parseBingImageResults",
+        "decodeBingRedirect",
+        "BingWebHit",
+        "BingImageHit",
+        "BingPageStatus",
+        "BingParseResult"
+      ],
+      "test": [
+        "src/features/shared/research/bingResultParser.test.ts"
+      ],
+      "budget": 220
+    },
+    {
+      "module": "src/features/shared/research/bingSearch.ts",
+      "owner": "open-research-search",
+      "responsibility": "免 Key 抓取 Bing 网页与图片结果页（publicOnly 经桌面壳原生 HTTP），按固定设计站点过滤并投影为调研候选，失败时给出可回退的主因。",
+      "owns": [
+        "Bing 结果页 URL 与浏览器请求头",
+        "site: OR 子句拼接与解析后域名二次过滤",
+        "验证码 / 限流 / 不可用 / 空结果的失败归类"
+      ],
+      "doesNotOwn": [
+        "HTML 结构解析",
+        "Tavily 回退决策",
+        "调研报告排序与去重上限"
+      ],
+      "publicApi": [
+        "searchBing",
+        "bingSearchUrl",
+        "bingWebItemsOf",
+        "bingImageItemsOf",
+        "bingFailureText",
+        "BING_WEB_ENDPOINT",
+        "BING_IMAGE_ENDPOINT",
+        "BingFailure",
+        "BingSearchResult",
+        "BingSearchInput"
+      ],
+      "test": [
+        "src/features/shared/research/bingSearch.test.ts"
+      ],
+      "budget": 250
+    },
+    {
+      "module": "src/features/shared/research/fixedSiteSearch.ts",
+      "owner": "open-research-search",
+      "responsibility": "调度固定 12 个设计站的联网搜索：默认免 Key Bing，只有免费通道没有任何可用结果且用户填了 Tavily Key 时才回退 Tavily，并如实写出原因。",
+      "owns": [
+        "免费通道优先、Tavily 可选回退的顺序",
+        "回退与失败时的警告文案",
+        "Tavily Key 被拒信号透传"
+      ],
+      "doesNotOwn": [
+        "Bing / Tavily 请求细节",
+        "Key 的存储与读取",
+        "用户 URL 页面抓取与本地灵感库"
+      ],
+      "publicApi": [
+        "searchFixedDesignSites",
+        "TAVILY_OPTIONAL_HINT",
+        "FixedSiteSearchInput",
+        "FixedSiteSearchDeps",
+        "FixedSiteSearchResult"
+      ],
+      "test": [
+        "src/features/shared/research/fixedSiteSearch.test.ts"
+      ],
+      "budget": 110
     },
     {
       "module": "src/features/shared/research/webPageReader.ts",

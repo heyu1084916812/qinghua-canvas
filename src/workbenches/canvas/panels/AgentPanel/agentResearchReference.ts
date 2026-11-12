@@ -29,6 +29,7 @@ function providerOf(source: string): ResearchProvider {
   if (normalized === 'met' || normalized === 'met museum') return 'met'
   if (normalized === 'searxng') return 'searxng'
   if (normalized === 'tavily') return 'tavily'
+  if (normalized === 'bing') return 'bing'
   return 'web'
 }
 

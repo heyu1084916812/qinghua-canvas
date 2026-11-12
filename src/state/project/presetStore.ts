@@ -171,7 +171,7 @@ export interface PresetStore {
   /** SearXNG 地址；空串表示未配置（不再有公共默认实例）。 */
   loadAgentWebSearch(): Promise<WebSearchSettings>
   saveAgentWebSearch(settings: WebSearchSettings): Promise<void>
-  /** Agent「联网」开关；缺行默认开启（没填 Tavily Key 时工具会如实提示去设置）。 */
+  /** Agent「联网」开关；缺行默认开启（默认免 Key 搜索，Tavily Key 只是可选备用）。 */
   loadAgentWebResearch(): Promise<boolean>
   saveAgentWebResearch(enabled: boolean): Promise<void>
   /** 读技能收藏（技能 id 列表）；没收藏过返回空数组 */

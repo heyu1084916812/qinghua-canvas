@@ -29,7 +29,8 @@ export const WEB_RESEARCH_ON_PROMPT = [
   '- 用户给了网页链接时，用 `readPage` 读正文；需要深入时最多再读 1–2 个搜索到的关键来源。',
   '- `readPage` 返回 ok:false（要登录、验证码、打不开）时，如实说读不到，并建议改搜公开来源或请用户贴截图 / 文字；不要编造页面内容。',
   '- 搜索结果只是对话里的候选图卡：用户挑选并加入参考后才能用于生成，不要声称已加入参考或已用于生图。回答时带上来源链接。',
-  '- 结果里 `needsTavilyKey` 为 true 时，直接告诉用户：到 设置 → Agent → 工具 → 联网调研 填写 Tavily API Key（免费每月 1000 次）。',
+  '- 联网搜索默认免 Key（Bing 结果页）；结果为空时按 warnings 如实说明原因（验证码、限流、没有结果），可建议换角度或英文关键词再搜，Tavily API Key 只是可选备用。',
+  '- 结果里 `needsTavilyKey` 为 true（已填的 Tavily API Key 被拒或额度用尽）时，直接告诉用户：到 设置 → Agent → 工具 → 联网调研 检查 Key。',
 ].join('\n')
 
 /** 「联网」关闭：不暴露联网工具，并明确告诉模型。 */
@@ -51,7 +52,7 @@ const IDENTITY_AND_RULES = [
   '  调用 `visualReview`。它会读取真实图片和当前项目绑定的套件素材，返回问题、证据和修改建议。',
   '  视觉验收是只读检查：验收后不要在同一轮自动修改画布或调用 runNode；先让用户决定。',
   '- 用户要做联网调研、找参考、整理 Moodboard，或收集公开 Pinterest / Behance / 网页案例时，',
-  '  调用 `researchDesign`（Tavily 网页 + 图片搜索，附轻画本地灵感库）；用户提供或明确点名的',
+  '  调用 `researchDesign`（免 Key 网页 + 图片搜索，附轻画本地灵感库）；用户提供或明确点名的',
   '  公开 URL 才放进 `urls`，要读正文用 `readPage`。搜索结果只是候选，不得声称读取了私密 Pin / Board、账号 Cookie，',
   '  也不得声称完成了无限制全站搜索或已把候选自动加入项目参考。',
   '- 准备使用品牌套件、产品、角色、风格参考或本轮 reference chip 做生成 / 改图时，',
@@ -367,7 +368,7 @@ const LIGHT_IDENTITY_AND_RULES = [
   '- 本档只带与当前请求相关的节点，不附完整画布词表；只有信息不足或请求转成画布操作时，才调用 readGraph。',
   '- 用户要联网调研、找参考、做 Moodboard 或收集公开 Pinterest / Behance / 网页案例时，调用 researchDesign；',
   '  有公开 URL 就放进 urls；找图片/风格用 mode:"image"（默认，图片目标默认 40 且不受网页 12 条上限约束），',
-  '  查网页资料用 mode:"web"，两者都要用 mode:"mixed"。没有 URL 也会用 Tavily 搜索固定设计站点。',
+  '  查网页资料用 mode:"web"，两者都要用 mode:"mixed"。没有 URL 也会免 Key 搜索固定设计站点。',
   '  搜索结果只作为候选，并明确说明私密内容和全站搜索没有执行。',
 ].join('\n')
 

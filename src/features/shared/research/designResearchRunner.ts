@@ -15,7 +15,8 @@ import {
 import type { NetworkPort } from '../../../platform/ports'
 import { isPublicHttpUrl } from '../../../domain/shared/publicUrl'
 import { errorTextOf } from '../../../shared/result'
-import { searchTavily, TAVILY_KEY_MISSING_MESSAGE } from './tavilySearch'
+import { TAVILY_KEY_MISSING_MESSAGE } from './tavilySearch'
+import { searchFixedDesignSites } from './fixedSiteSearch'
 
 export interface DesignResearchRunnerInput {
   topic: string
@@ -35,16 +36,16 @@ export interface DesignResearchRunnerDeps {
   network: NetworkPort
   libraryCases?: readonly InspirationCase[]
   webSearch?: WebSearchSettings
-  /** 用户在设置里填的 Tavily Key；只在请求头里使用，绝不回传。 */
+  /** 用户在设置里填的 Tavily Key（可选）：只在免费通道失败时使用，只进请求头，绝不回传。 */
   tavilyApiKey?: string | null
 }
 
 export interface DesignResearchResult extends DesignResearchReport {
   ok: boolean
   warnings: string[]
-  /** 没填 / 填错 Tavily Key 或额度用尽：模型应如实告诉用户去设置里处理。 */
+  /** 已填的 Tavily Key 被拒或额度用尽：模型应如实告诉用户去设置里处理。没填 Key 不算。 */
   needsTavilyKey?: boolean
-  /** 需要用户处理的问题（目前只有 Tavily Key）。 */
+  /** 需要用户处理的问题（目前只有已填 Tavily Key 无效 / 额度用尽）。 */
   error?: string
 }
 
@@ -176,14 +177,13 @@ export async function runDesignResearch(
     if (isPublicHttpUrl(url)) safeUrls.push(url)
     else warnings.push(`${url} 不是公开互联网地址，已跳过。`)
   }
-  /** 排序：用户给的 URL → Tavily 固定设计站 → 本地灵感库。 */
+  /** 排序：用户给的 URL → 免 Key Bing（失败时可选 Tavily）固定设计站 → 本地灵感库。 */
   const searchItems: DesignResearchItem[] = []
   let needsTavilyKey = false
   if (input.includeOpenSearch !== false) {
-    const tavily = await searchTavily(
-      deps.network,
+    const web = await searchFixedDesignSites(
+      deps,
       {
-        apiKey: deps.tavilyApiKey,
         queries: researchQueriesOf(request.topic, input.queries),
         maxResults: request.maxResults,
         mode: request.mode,
@@ -191,9 +191,9 @@ export async function runDesignResearch(
       },
       signal,
     )
-    searchItems.push(...tavily.items)
-    warnings.push(...tavily.warnings)
-    needsTavilyKey = tavily.needsKey === true
+    searchItems.push(...web.items)
+    warnings.push(...web.warnings)
+    needsTavilyKey = web.needsTavilyKey
   }
   const libraryLimit = request.mode === 'web'
     ? Math.min(request.maxResults, 12)
@@ -257,7 +257,7 @@ export async function runDesignResearch(
     ...(needsTavilyKey
       ? {
           needsTavilyKey: true,
-          error: warnings.find((warning) => warning.includes('Tavily')) ?? TAVILY_KEY_MISSING_MESSAGE,
+          error: warnings.find((warning) => /Tavily (拒绝|本月)/.test(warning)) ?? TAVILY_KEY_MISSING_MESSAGE,
         }
       : {}),
   }

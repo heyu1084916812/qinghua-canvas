@@ -247,6 +247,7 @@ describe('素材段与技能段', () => {
     expect(p).toContain('贴截图')
     expect(p).toContain('用户挑选并加入参考后才能用于生成')
     expect(p).toContain('Tavily API Key')
+    expect(p).toContain('免 Key')
     expect(p).not.toContain('## 本轮联网已关闭')
   })
 

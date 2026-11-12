@@ -26,6 +26,7 @@ function sourceTag(source: DesignResearchItem['source']): string {
   if (source === 'met') return 'Met Museum'
   if (source === 'searxng') return 'SearXNG'
   if (source === 'tavily') return 'Tavily'
+  if (source === 'bing') return 'Bing'
   if (source === 'google') return 'Google'
   return '网页'
 }

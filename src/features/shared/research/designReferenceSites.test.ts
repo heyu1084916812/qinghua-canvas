@@ -3,6 +3,8 @@ import {
   DESIGN_REFERENCE_DOMAINS,
   DESIGN_REFERENCE_SITES,
   designReferenceSiteLabel,
+  designReferenceSiteQuery,
+  isDesignReferenceUrl,
 } from './designReferenceSites'
 
 describe('designReferenceSites', () => {
@@ -28,5 +30,21 @@ describe('designReferenceSites', () => {
     expect(designReferenceSiteLabel('https://www.pinterest.com/pin/1')).toBe('Pinterest')
     expect(designReferenceSiteLabel('https://gallery.behance.net/x')).toBe('Behance')
     expect(designReferenceSiteLabel('https://notpinterest.com/x')).toBe('notpinterest.com')
+  })
+
+  it('filters result URLs to the fixed sites, including subdomains', () => {
+    expect(isDesignReferenceUrl('https://id.pinterest.com/pin/445856431851923588/')).toBe(true)
+    expect(isDesignReferenceUrl('https://www.zcool.com.cn/work/abc.html')).toBe(true)
+    expect(isDesignReferenceUrl('https://i.pinimg.com/originals/a.jpg')).toBe(false)
+    expect(isDesignReferenceUrl('https://notpinterest.com/x')).toBe(false)
+    expect(isDesignReferenceUrl('not a url')).toBe(false)
+  })
+
+  it('builds one site: OR clause for Bing over all fixed sites', () => {
+    const clause = designReferenceSiteQuery()
+    expect(clause.startsWith('(site:pinterest.com OR site:behance.net')).toBe(true)
+    expect(clause.endsWith('site:xiaohongshu.com)')).toBe(true)
+    expect(clause.match(/site:/g)).toHaveLength(12)
+    expect(designReferenceSiteQuery(['a.com', 'b.com'])).toBe('(site:a.com OR site:b.com)')
   })
 })

@@ -76,14 +76,14 @@ export const AGENT_TOOLS: readonly ToolDeclaration[] = [
   {
     name: 'researchDesign',
     description:
-      '做联网调研：用 Tavily 在固定 12 个设计站点检索图片与网页（每个检索角度并发一次），附带轻画本地灵感库。' +
+      '做联网调研：免 Key 抓 Bing 结果页，在固定 12 个设计站点检索图片与网页（每个检索角度并发一次；失败且用户填了 Tavily Key 时改用 Tavily），附带轻画本地灵感库。' +
       '必须按用户意图选择 mode：找图片、照片、海报、风格参考、灵感或 Moodboard 用 image（缺省也是 image）；' +
       '只要网页资料、文章、报告、新闻或公开来源用 web；既要参考图又要网页资料用 mixed。' +
       'image 模式使用独立的 imageMaxResults 目标（默认 40，允许 30–50），不占用 maxResults 的网页条数。' +
       '也可从用户提供的公开网页、Pinterest Pin / Board 或 Behance 页面提取参考图与出处（要读正文请用 readPage）。' +
       '只读取公开页面，不使用任何账号 Cookie，不声称完成私密内容或无限制全站搜索。' +
       '搜索结果只是候选，不会自动加入项目参考、也不会喂给生图；保留原链接与来源。' +
-      '结果里 needsTavilyKey 为 true 时，如实告诉用户去 设置 → Agent → 工具 → 联网调研 填写 Tavily Key。',
+      '结果为空时按 warnings 如实说明原因；needsTavilyKey 为 true（已填的 Tavily Key 被拒或额度用尽）时，如实告诉用户去 设置 → Agent → 工具 → 联网调研 检查 Key。',
     parameters: {
       type: 'object',
       properties: {

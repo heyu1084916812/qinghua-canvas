@@ -6,9 +6,13 @@ import { createCanvasStore } from '../../../../state/workbenches/canvas/store'
 import { runDesignResearch } from '../../../../features/shared/research/designResearchRunner'
 import { readWebPage } from '../../../../features/shared/research/webPageReader'
 import { TAVILY_SEARCH_ENDPOINT } from '../../../../features/shared/research/tavilySearch'
+import { BING_IMAGE_ENDPOINT, BING_WEB_ENDPOINT } from '../../../../features/shared/research/bingSearch'
 import { executeReadTool, type AgentToolContext } from '../../agent/tools'
 import { describeToolResult } from './conversation'
 import { createAgentToolResearch } from './agentToolResearch'
+
+const isBingResultPage = (url: string) =>
+  url.startsWith(BING_WEB_ENDPOINT) || url.startsWith(BING_IMAGE_ENDPOINT)
 
 /**
  * 护栏（用户 2026-11-11 拍板，对齐 Lovart）：联网搜到的图只是对话里的候选，
@@ -68,6 +72,8 @@ describe('联网搜索结果只是候选', () => {
 
   it('真实执行一次 researchDesign：画布不变，结果只作为对话候选图卡返回', async () => {
     const request = vi.fn<NetworkPort['request']>(async (req) => {
+      // 免 Key 的 Bing 结果页离线 → 回退到已填 Key 的 Tavily。
+      if (isBingResultPage(req.url)) throw new Error('offline')
       if (req.url !== TAVILY_SEARCH_ENDPOINT) throw new Error(`unexpected ${req.url}`)
       return {
         status: 200,
@@ -106,7 +112,9 @@ describe('联网搜索结果只是候选', () => {
     const summary = describeToolResult('researchDesign', JSON.stringify(result))
     expect(summary.researchItems?.map((item) => item.imageUrl)).toContain('https://t.example.com/poster.jpg')
     expect(summary.nodeIds).toEqual([])
-    // 网络只碰了 Tavily：没有任何素材下载或保存请求。
-    expect(request.mock.calls.every(([req]) => req.url === TAVILY_SEARCH_ENDPOINT)).toBe(true)
+    // 网络只碰了搜索（Bing 结果页 + Tavily 备用）：没有任何素材下载或保存请求。
+    expect(
+      request.mock.calls.every(([req]) => req.url === TAVILY_SEARCH_ENDPOINT || isBingResultPage(req.url)),
+    ).toBe(true)
   })
 })
