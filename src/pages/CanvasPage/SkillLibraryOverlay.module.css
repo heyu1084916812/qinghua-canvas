@@ -1,0 +1,104 @@
+/*
+ * 画布技能库浮层（2026-11-12）：铺满画布舞台（`.canvasStage` 自带 position: relative），
+ * 对话框居中在画布区域 —— 不盖住 Agent 面板，加入的技能 chip 实时可见。
+ */
+.layer {
+  position: absolute;
+  inset: 0;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-4);
+  box-sizing: border-box;
+}
+
+.backdrop {
+  position: absolute;
+  inset: 0;
+  background: var(--overlay-scrim);
+}
+
+.dialog {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  width: min(1080px, 100%);
+  height: min(780px, 100%);
+  min-width: 0;
+  min-height: 0;
+  box-sizing: border-box;
+  padding: var(--space-4) var(--space-5);
+  overflow: hidden;
+  border: var(--border);
+  border-radius: var(--radius-node);
+  background: var(--bg-surface);
+  color: var(--text-1);
+  font-family: var(--font-sans);
+  box-shadow: var(--shadow-float);
+  outline: none;
+}
+
+.head {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.title {
+  margin: 0;
+  font-size: var(--fs-label);
+  font-weight: 600;
+  color: var(--text-1);
+  white-space: nowrap;
+}
+
+.hint {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  font-size: var(--fs-chip);
+  color: var(--text-3);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.close {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--text-2);
+  cursor: pointer;
+}
+
+.close:hover {
+  background: var(--bg-hover);
+  color: var(--text-1);
+}
+
+.close:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.body {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/* 浮层比技能页窄：卡片按可用宽度自动排列，窄画布（1024×700 时约 520px）退成单列 */
+.dialog [data-skills-cards] {
+  grid-template-columns: repeat(auto-fill, minmax(min(300px, 100%), 1fr));
+}

@@ -11,10 +11,11 @@ import {
   type AgentSkillsControllerInput,
 } from './useAgentSkillsController'
 
-const { navigateMock, takeHandoff, subscribeHandoff } = vi.hoisted(() => ({
+const { navigateMock, takeHandoff, subscribeHandoff, requestLibrary } = vi.hoisted(() => ({
   navigateMock: vi.fn(),
   takeHandoff: vi.fn(),
   subscribeHandoff: vi.fn(),
+  requestLibrary: vi.fn(),
 }))
 
 vi.mock('react-router-dom', () => ({
@@ -22,8 +23,9 @@ vi.mock('react-router-dom', () => ({
 }))
 
 vi.mock('../../../../features/canvas/agentSkillHandoff', () => ({
-  takeAgentSkillHandoff: takeHandoff,
+  takeAgentSkillHandoffs: takeHandoff,
   subscribeAgentSkillHandoff: subscribeHandoff,
+  requestAgentSkillLibrary: requestLibrary,
 }))
 
 type Hook = ReturnType<typeof useAgentSkillsController>
@@ -87,8 +89,9 @@ function input(
 describe('useAgentSkillsController', () => {
   beforeEach(() => {
     navigateMock.mockClear()
-    takeHandoff.mockReset().mockReturnValue(undefined)
+    takeHandoff.mockReset().mockReturnValue([])
     subscribeHandoff.mockReset().mockReturnValue(vi.fn())
+    requestLibrary.mockReset().mockReturnValue(false)
   })
 
   it('技能名称跟随当前会话，setSkill 显式保存 id', async () => {
@@ -113,7 +116,7 @@ describe('useAgentSkillsController', () => {
   })
 
   it('技能 handoff 用同一解析器追加，同技能不重复', () => {
-    takeHandoff.mockReturnValue('skill-1')
+    takeHandoff.mockReturnValue(['skill-1'])
     subscribeHandoff.mockReturnValue(vi.fn())
     let draft = ''
     const viewRef: { current: Hook | null } = { current: null }
@@ -205,6 +208,43 @@ describe('useAgentSkillsController', () => {
     expect(reload).toHaveBeenCalledTimes(1)
     expect(setOpenPicker).toHaveBeenCalledWith(null)
     expect(notify).toHaveBeenCalledWith('已导入 1 条技能', 'info')
+  })
+
+  it('浮层连续加入多个技能：按顺序追加 chip，只取认得的 id', () => {
+    takeHandoff.mockImplementation((_project: string, accept: (id: string) => boolean) =>
+      ['skill-2', 'skill-1', 'not-loaded-yet'].filter(accept))
+    let draft = ''
+    const base = input()
+    function Probe() {
+      const [value, setValue] = useState('做一张海报')
+      draft = value
+      useAgentSkillsController({ ...base, setDraft: setValue })
+      return null
+    }
+    act(() => {
+      TestRenderer.create(createElement(Probe))
+    })
+    expect(draft).toBe('做一张海报 @[技能二](skill:skill-2) @[技能一](skill:skill-1) ')
+  })
+
+  it('在画布页时技能按钮打开画布技能浮层，不跳技能页', () => {
+    requestLibrary.mockReturnValue(true)
+    const setOpenPicker = vi.fn()
+    const viewRef: { current: Hook | null } = { current: null }
+    const props = input({ setOpenPicker })
+    function Probe() {
+      viewRef.current = useAgentSkillsController(props)
+      return null
+    }
+    act(() => {
+      TestRenderer.create(createElement(Probe))
+    })
+    act(() => {
+      viewRef.current!.openSkillLibrary()
+    })
+    expect(requestLibrary).toHaveBeenCalledWith('p1')
+    expect(setOpenPicker).toHaveBeenCalledWith(null)
+    expect(navigateMock).not.toHaveBeenCalled()
   })
 
   it('打开技能库先收浮层再导航', () => {

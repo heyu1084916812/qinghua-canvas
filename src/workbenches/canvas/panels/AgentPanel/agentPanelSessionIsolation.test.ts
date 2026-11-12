@@ -17,14 +17,15 @@ const reactActEnvironment = globalThis as typeof globalThis & {
 reactActEnvironment.IS_REACT_ACT_ENVIRONMENT = true
 
 const { takeHandoff, subscribeHandoff } = vi.hoisted(() => ({
-  takeHandoff: vi.fn(() => null),
+  takeHandoff: vi.fn(() => [] as string[]),
   subscribeHandoff: vi.fn(() => () => {}),
 }))
 
 vi.mock('react-router-dom', () => ({ useNavigate: () => vi.fn() }))
 vi.mock('../../../../features/canvas/agentSkillHandoff', () => ({
-  takeAgentSkillHandoff: takeHandoff,
+  takeAgentSkillHandoffs: takeHandoff,
   subscribeAgentSkillHandoff: subscribeHandoff,
+  requestAgentSkillLibrary: () => false,
 }))
 
 /**

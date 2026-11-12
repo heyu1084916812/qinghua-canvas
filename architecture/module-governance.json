@@ -3347,7 +3347,7 @@
       "test": [
         "src/pages/SkillsPage/skillsPageCssArchitecture.test.ts"
       ],
-      "budget": 410
+      "budget": 415
     },
     {
       "module": "src/pages/SkillsPage/SkillsPageCards.module.css",
@@ -10284,6 +10284,95 @@
         "src/pages/SkillsPage/SkillLibraryView.test.ts"
       ],
       "budget": 120
+    },
+    {
+      "module": "src/pages/CanvasPage/skillLibraryFocus.ts",
+      "owner": "canvas-skill-library-ui",
+      "responsibility": "画布技能库浮层的焦点陷阱纯规则与 DOM 适配：Tab 到末尾回到开头、Shift+Tab 到开头回到末尾。",
+      "owns": [
+        "可聚焦元素选择器",
+        "焦点循环目标计算"
+      ],
+      "doesNotOwn": [
+        "浮层开关状态",
+        "技能投递"
+      ],
+      "publicApi": [
+        "focusTrapTarget",
+        "trapTabKey",
+        "FOCUSABLE_SELECTOR"
+      ],
+      "test": [
+        "src/pages/CanvasPage/skillLibraryOverlay.test.ts"
+      ],
+      "budget": 80
+    },
+    {
+      "module": "src/pages/CanvasPage/SkillLibraryOverlay.tsx",
+      "owner": "canvas-skill-library-ui",
+      "responsibility": "画布舞台里居中的技能库模态浮层：复用技能页的 SkillLibraryView，「使用」把技能投递给本项目 Agent 输入框成为技能 chip。",
+      "owns": [
+        "浮层外壳、标题、关闭与背景点击",
+        "Esc 关闭（详情打开时只关详情）与焦点陷阱、焦点归还",
+        "加入 Agent 的成功提示"
+      ],
+      "doesNotOwn": [
+        "技能库浏览态与卡片界面",
+        "Agent 草稿与会话持久化"
+      ],
+      "publicApi": [
+        "SkillLibraryOverlay"
+      ],
+      "test": [
+        "src/pages/CanvasPage/skillLibraryOverlay.test.ts"
+      ],
+      "budget": 200
+    },
+    {
+      "module": "src/pages/CanvasPage/SkillLibraryOverlay.module.css",
+      "owner": "canvas-skill-library-ui",
+      "responsibility": "画布技能库浮层的局部样式：铺满画布舞台的背景层、居中对话框、标题栏与窄画布下的卡片列数。",
+      "owns": [
+        "浮层层级与背景遮罩",
+        "对话框尺寸与内边距",
+        "窄画布卡片自适应列"
+      ],
+      "doesNotOwn": [
+        "技能卡片与详情样式",
+        "全局视觉令牌"
+      ],
+      "publicApi": [
+        "CSS_MODULE:SkillLibraryOverlay 的页面局部样式域",
+        "CSS_CLASS:layer",
+        "CSS_CLASS:backdrop",
+        "CSS_CLASS:dialog",
+        "CSS_CLASS:close"
+      ],
+      "test": [
+        "src/pages/CanvasPage/skillLibraryOverlay.test.ts"
+      ],
+      "budget": 140
+    },
+    {
+      "module": "src/pages/CanvasPage/CanvasSkillLibraryHost.tsx",
+      "owner": "canvas-skill-library-ui",
+      "responsibility": "画布页里接住 Agent 技能按钮「打开技能库」请求的宿主：按项目订阅请求，在画布舞台挂载懒加载的技能库浮层。",
+      "owns": [
+        "浮层开关状态",
+        "切换项目时收起浮层",
+        "去完整技能页的导航"
+      ],
+      "doesNotOwn": [
+        "浮层内容",
+        "Agent 面板渲染"
+      ],
+      "publicApi": [
+        "CanvasSkillLibraryHost"
+      ],
+      "test": [
+        "src/pages/CanvasPage/skillLibraryOverlay.test.ts"
+      ],
+      "budget": 80
     }
   ]
 }

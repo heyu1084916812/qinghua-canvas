@@ -39,7 +39,6 @@ import {
   type MentionEditorHandle,
   type MentionRef,
 } from '../../text/MentionEditor'
-import { SkillMenu } from './SkillMenu'
 import { AgentWebResearchToggle } from './AgentWebResearchToggle'
 import { ResearchSelectionChips } from './ResearchSelectionChips'
 import { researchSelectionActions, useResearchSelection } from './researchSelection'
@@ -131,10 +130,7 @@ export function AgentComposerPane({
   mentionedModels,
   graph,
   libraryAssets,
-  allSkills,
   skillLabel,
-  skillFavs,
-  skills,
   thumbVersion,
   editorRef,
   composerRef,
@@ -151,14 +147,11 @@ export function AgentComposerPane({
   addFromLibrary,
   pickModel,
   setModelKind,
-  setSkill,
-  toggleSkillFavorite,
   openSkillLibrary,
   importSkills,
   patchSession,
   setAutoRun,
   insertMention,
-  setDraft,
   setOpenPicker,
   thumbOf,
   channels,
@@ -547,9 +540,11 @@ export function AgentComposerPane({
             />
 
             {/*
-              技能：图标按钮 + **技能菜单**（用户 2026-10-03，参考产品图三 / 图四）。
-              菜单里能按「通用 / 我的」分类、搜索、创建、导入（.md 或文件夹）；
-              「全部」去技能库那一页。
+              技能：图标按钮 → **画布居中的技能库浮层**（用户 2026-11-12：「外面我有一个 skill
+              面板了，请把内容也加在 agent 的 skill 弹出的面板里面，点击 agent 的 skill 面板是
+              调用一个居中画布的浮层面板」）。浮层与技能页共用 SkillLibraryView；在里面「使用」
+              的技能经技能 handoff 落成正文里的技能 chip（可多枚，可删）。
+              原先的下拉技能菜单（2026-10-03）由浮层取代；不在画布页时回落到技能页。
             */}
             <span className={styles.addWrap}>
               <button
@@ -557,39 +552,12 @@ export function AgentComposerPane({
                 className={styles.iconBtn}
                 title={current?.skillId ? `技能：${skillLabel}` : '选择技能'}
                 aria-label={`这份技能决定 agent 把哪些阶段建到画布上（当前：${skillLabel}）`}
+                aria-haspopup="dialog"
                 data-agent-skill-open
-                onClick={() => setOpenPicker(openPicker === 'agent-skill' ? null : 'agent-skill')}
+                onClick={openSkillLibrary}
               >
                 <IconSkill size={16} />
               </button>
-              {openPicker === 'agent-skill' && (
-                <SkillMenu
-                  builtin={skills.builtinSkills}
-                  user={skills.userSkills}
-                  favorites={skillFavs}
-                  activeId={current?.skillId ?? null}
-                  onSelect={(id) => {
-                    void setSkill(id ?? '')
-                    /**
-                     * 技能也落成**正文里的一枚 chip**（用户 2026-10-02：「agent 的 skill
-                     * 选择后不要出现在图三的地方……我需要全部出现在正文里面，全部保持和
-                     * 艾特的出现的地方一样」）。取消选择时把那枚 chip 一并抹掉。
-                     */
-                    if (id) {
-                      const hit = allSkills.find((s) => s.id === id)
-                      insertMention('skill', id, hit?.name ?? '技能')
-                    } else {
-                      setDraft((prev) => prev.replace(/\s*@\[[^\]]*\]\(skill:[^)]*\)/g, '').trim())
-                    }
-                    setOpenPicker(null)
-                  }}
-                  onToggleFavorite={(id) => void toggleSkillFavorite(id)}
-                  onCreateNew={openSkillLibrary}
-                  onImportFiles={() => skillFileRef.current?.click()}
-                  onImportFolder={() => skillDirRef.current?.click()}
-                  onClose={() => setOpenPicker(null)}
-                />
-              )}
               <input
                 ref={skillFileRef}
                 type="file"

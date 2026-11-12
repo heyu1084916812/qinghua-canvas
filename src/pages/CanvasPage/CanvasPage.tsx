@@ -35,6 +35,7 @@ import {
   createMyAssetsDockStore,
   type MyAssetsDockStore,
 } from './myAssetsDockStore'
+import { CanvasSkillLibraryHost } from './CanvasSkillLibraryHost'
 import styles from './CanvasPage.module.css'
 
 const LightboxLayer = lazy(() =>
@@ -543,6 +544,8 @@ function CanvasProject({ projectId }: { projectId: string }) {
               />
             </Suspense>
           ) : null}
+          {/* Agent 技能按钮打开的技能库浮层：居中在画布舞台里（2026-11-12） */}
+          <CanvasSkillLibraryHost projectId={projectId} />
           {logOpen && (
             <Suspense fallback={null}>
               <LogPanel onClose={() => setLogOpen(false)} />

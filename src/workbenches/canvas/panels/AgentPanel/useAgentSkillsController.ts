@@ -17,8 +17,9 @@ import {
   type SkillEntity,
 } from '../../../../domain/prompt/skill'
 import {
+  requestAgentSkillLibrary,
   subscribeAgentSkillHandoff,
-  takeAgentSkillHandoff,
+  takeAgentSkillHandoffs,
 } from '../../../../features/canvas/agentSkillHandoff'
 import type { TaskLifecycle } from '../../../../features/shared/lifecycle/taskLifecycle'
 import { mentionToken, parseMentions } from '../../text/MentionEditor'
@@ -72,19 +73,23 @@ export function useAgentSkillsController(
   useEffect(() => {
     if (!input.active || !currentId) return
     const consumePendingSkill = () => {
-      const skillId = takeAgentSkillHandoff(input.projectId)
-      if (!skillId) return
-      const skill = input.allSkills.find((item) => item.id === skillId)
-      if (!skill) return
+      const known = new Map(input.allSkills.map((skill) => [skill.id, skill]))
+      const ids = takeAgentSkillHandoffs(input.projectId, (id) => known.has(id))
+      if (ids.length === 0) return
       setDraftRef.current((previous) => {
-        const already = parseMentions(previous).some(
-          (mention) => mention.kind === 'skill' && mention.id === skill.id,
-        )
-        if (already) return previous
-        const marker = mentionToken('skill', skill.id, skill.name)
-        return previous.trim()
-          ? `${previous.replace(/\s+$/, '')} ${marker} `
-          : `${marker} `
+        let next = previous
+        for (const id of ids) {
+          const skill = known.get(id)!
+          const already = parseMentions(next).some(
+            (mention) => mention.kind === 'skill' && mention.id === skill.id,
+          )
+          if (already) continue
+          const marker = mentionToken('skill', skill.id, skill.name)
+          next = next.trim()
+            ? `${next.replace(/\s+$/, '')} ${marker} `
+            : `${marker} `
+        }
+        return next
       })
     }
     consumePendingSkill()
@@ -145,10 +150,15 @@ export function useAgentSkillsController(
     [input.notify, input.setOpenPicker, input.skills, input.trackRun],
   )
 
+  /**
+   * 技能按钮（2026-11-12 用户：「点击 agent 的 skill 面板是调用一个居中画布的浮层面板」）：
+   * 在画布页时交给画布页打开居中的技能库浮层；不在画布页（没有订阅者）才去技能页。
+   */
   const openSkillLibrary = useCallback(() => {
     input.setOpenPicker(null)
+    if (requestAgentSkillLibrary(input.projectId)) return
     navigate('/skills')
-  }, [input.setOpenPicker, navigate])
+  }, [input.projectId, input.setOpenPicker, navigate])
 
   const toggleSkillFavorite = useCallback(
     (id: string) =>
