@@ -16,6 +16,8 @@ export interface ContextKitGuideSectionProps {
   /** 首次添加素材且指南为空时，在指南上方主动提示一次。 */
   offer: boolean
   onDismissOffer(): void
+  /** 生成时会一并参考的资料（网页 / PDF 文字）标签。 */
+  sourceLabels?: readonly string[]
   generate(signal: AbortSignal): Promise<KitGuideOutcome>
 }
 
@@ -36,6 +38,7 @@ export function ContextKitGuideSection({
   canGenerate,
   offer,
   onDismissOffer,
+  sourceLabels = [],
   generate,
 }: ContextKitGuideSectionProps) {
   const [phase, setPhase] = useState<Phase>('idle')
@@ -150,6 +153,11 @@ export function ContextKitGuideSection({
         data-context-kit-guide
         onChange={(event) => onGuideChange(event.target.value)}
       />
+      {sourceLabels.length > 0 ? (
+        <p className={styles.sourceNote} data-context-kit-guide-sources>
+          生成时会参考：{sourceLabels.join('、')}
+        </p>
+      ) : null}
       {error ? (
         <p className={styles.guideError} role="alert" data-context-kit-guide-error>
           {error}

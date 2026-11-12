@@ -10056,6 +10056,83 @@
         "src/workbenches/canvas/panels/AgentPanel/useAgentKitMentionOptions.test.ts"
       ],
       "budget": 100
+    },
+    {
+      "module": "src/features/shared/context/kitWebPage.ts",
+      "owner": "context-kit-import",
+      "responsibility": "把品牌官网 HTML 解析为套件候选：Logo 与图片候选、主题色和可读正文，只做字符串解析不执行脚本。",
+      "owns": [
+        "Logo 候选的来源识别与排序",
+        "主题色的提取顺序与中性色过滤",
+        "候选与颜色数量上限"
+      ],
+      "doesNotOwn": [
+        "网络请求与公网校验",
+        "套件持久化",
+        "候选勾选界面"
+      ],
+      "publicApi": [
+        "extractKitPage",
+        "extractPageCandidates",
+        "extractPageColors",
+        "KitPageExtract",
+        "KitPageCandidate",
+        "MAX_PAGE_CANDIDATES",
+        "MAX_PAGE_COLORS"
+      ],
+      "test": [
+        "src/features/shared/context/kitWebPage.test.ts"
+      ],
+      "budget": 220
+    },
+    {
+      "module": "src/features/shared/context/kitWebImport.ts",
+      "owner": "context-kit-import",
+      "responsibility": "套件导入 URL 的网络读取：公网校验与 publicOnly 直读，区分图片直链与网页，网页直读失败时经 Jina Reader 取 HTML 兜底，并下载校验候选图片。",
+      "owns": [
+        "图片 / 网页的响应类型判定",
+        "直读与 Jina 兜底的顺序和错误汇总",
+        "候选图片下载的 20MB 上限与魔数识别"
+      ],
+      "doesNotOwn": [
+        "HTML 解析规则",
+        "套件弹窗交互",
+        "素材字节仓储"
+      ],
+      "publicApi": [
+        "fetchKitUrl",
+        "downloadKitImage",
+        "KIT_URL_MAX_BYTES",
+        "KitUrlFetch"
+      ],
+      "test": [
+        "src/features/shared/context/kitWebImport.test.ts"
+      ],
+      "budget": 220
+    },
+    {
+      "module": "src/pages/AssetsPage/ContextKitWebCandidates.tsx",
+      "owner": "context-kit-ui",
+      "responsibility": "网页导入后的候选面板：下载预览候选图片，让用户勾选图片、主题色和网页文字后再加入套件。",
+      "owns": [
+        "候选预览的并发下载与 blob 回收",
+        "图片 / 颜色 / 资料文字的勾选状态",
+        "候选到 Logo 或参考角色的映射"
+      ],
+      "doesNotOwn": [
+        "网页读取与解析",
+        "套件版本保存"
+      ],
+      "publicApi": [
+        "ContextKitWebCandidates",
+        "roleOfCandidate",
+        "PickedWebImage",
+        "ContextKitWebCandidatesProps"
+      ],
+      "test": [
+        "src/pages/AssetsPage/ContextKitWebCandidates.test.ts"
+      ],
+      "budget": 260
     }
   ]
 }

@@ -83,3 +83,145 @@
 .guideNote {
   color: var(--text-3);
 }
+
+/* 网页导入候选面板 */
+.webPanel {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: var(--space-3);
+  margin-top: var(--space-2);
+  padding: var(--space-3);
+  border: var(--border);
+  border-radius: var(--radius-control);
+  background: var(--bg-surface);
+  min-width: 0;
+}
+
+.webHead {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  min-width: 0;
+  font-size: var(--fs-chip);
+  color: var(--text-3);
+}
+
+.webHead strong {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text-1);
+  font-size: var(--fs-body);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.webHead span {
+  flex: 0 0 auto;
+}
+
+.webGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+  gap: var(--space-2);
+}
+
+.webTile,
+.webTileOn {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  padding: 4px;
+  border: var(--border);
+  border-radius: var(--radius-control);
+  background: var(--bg-subtle);
+  color: var(--text-2);
+  font: inherit;
+  cursor: pointer;
+}
+
+.webTileOn {
+  border-color: var(--focus-ring);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--focus-ring) 24%, transparent);
+  color: var(--text-1);
+}
+
+.webTile:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.webThumb {
+  display: grid;
+  place-items: center;
+  aspect-ratio: 1;
+  overflow: hidden;
+  border-radius: calc(var(--radius-control) - 2px);
+  background: var(--bg-surface);
+}
+
+.webThumb img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+
+.webThumb small {
+  color: var(--text-3);
+  font-size: var(--fs-chip);
+}
+
+.webTileLabel {
+  overflow: hidden;
+  font-size: var(--fs-chip);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.webColors {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.webColor,
+.webColorOn {
+  height: 28px;
+  padding: 0 var(--space-3);
+  border: var(--border);
+  border-radius: 999px;
+  font: inherit;
+  font-size: var(--fs-chip);
+  cursor: pointer;
+  opacity: 0.55;
+}
+
+.webColorOn {
+  opacity: 1;
+  box-shadow: 0 0 0 2px var(--focus-ring);
+}
+
+.webText {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--text-2);
+  font-size: var(--fs-chip);
+}
+
+.webEmpty {
+  margin: 0;
+  color: var(--text-3);
+  font-size: var(--fs-chip);
+}
+
+.webActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
+}
+
+.sourceNote {
+  margin: var(--space-2) 0 0;
+  color: var(--text-3);
+  font-size: var(--fs-chip);
+}

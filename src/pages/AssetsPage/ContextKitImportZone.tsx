@@ -1,6 +1,9 @@
-import { useRef, useState, type DragEvent } from 'react'
+import { useEffect, useRef, useState, type DragEvent } from 'react'
 import { usePlatform } from '../../app/providers/PlatformProvider'
 import type { ContextKitAsset, ContextKitAssetRole } from '../../domain/shared/context'
+import { fetchKitUrl } from '../../features/shared/context/kitWebImport'
+import type { KitPageExtract } from '../../features/shared/context/kitWebPage'
+import { ContextKitWebCandidates, type ContextKitWebCandidatesProps } from './ContextKitWebCandidates'
 import baseStyles from './ContextKitsDialog.module.css'
 import contextKitsAssetsStyles from './ContextKitsAssets.module.css'
 
@@ -15,6 +18,9 @@ export interface ContextKitImportZoneProps {
   persistImage(blob: Blob, name: string, role: ContextKitAssetRole): Promise<ContextKitAsset>
   addResources(next: readonly ContextKitAsset[]): void
   importFiles(files: readonly File[], role: ContextKitAssetRole): Promise<void>
+  addColors(colors: readonly { name: string; value: string }[]): void
+  /** 网页 / PDF 抽出的文字：只作为生成设计指南的资料，不写进套件版本。 */
+  addSourceText(source: { label: string; text: string }): void
 }
 
 /**
@@ -28,12 +34,18 @@ export function ContextKitImportZone({
   persistImage,
   addResources,
   importFiles,
+  addColors,
+  addSourceText,
 }: ContextKitImportZoneProps) {
   const platform = usePlatform()
   const [dragging, setDragging] = useState(false)
   const [urlOpen, setUrlOpen] = useState(false)
   const [urlDraft, setUrlDraft] = useState('')
+  const [webResult, setWebResult] = useState<{ url: string; page: KitPageExtract } | null>(null)
   const dropDepth = useRef(0)
+  const urlAbortRef = useRef<AbortController | null>(null)
+
+  useEffect(() => () => urlAbortRef.current?.abort(), [])
 
   const pickFiles = async () => {
     const picked = await platform.files.pickFile(KIT_IMAGE_ACCEPT)
@@ -44,37 +56,64 @@ export function ContextKitImportZone({
   const importUrl = async () => {
     const url = urlDraft.trim()
     if (!url || busy) return
-    let parsed: URL
-    try {
-      parsed = new URL(url)
-      if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') throw new Error()
-    } catch {
-      setStatus('请输入完整的 http 或 https 图片地址')
-      return
-    }
+    const controller = new AbortController()
+    urlAbortRef.current?.abort()
+    urlAbortRef.current = controller
     setBusy(true)
-    setStatus('')
+    setStatus('正在读取网址…')
+    setWebResult(null)
     try {
-      const response = await platform.network.request(
-        { url, method: 'GET', timeoutMs: 30_000 },
-        new AbortController().signal,
-      )
-      if (response.status < 200 || response.status >= 300) {
-        throw new Error(`图片地址返回 HTTP ${response.status}`)
+      const result = await fetchKitUrl(platform.network, url, controller.signal)
+      if (result.kind === 'image') {
+        const resource = await persistImage(
+          new Blob([result.bytes as BlobPart], { type: result.mime }),
+          result.name,
+          'reference',
+        )
+        addResources([resource])
+        setUrlDraft('')
+        setUrlOpen(false)
+        setStatus('已从网址添加参考素材')
+        return
       }
-      const mime = Object.entries(response.headers).find(
-        ([name]) => name.toLowerCase() === 'content-type',
-      )?.[1]?.split(';')[0]?.trim() ?? 'image/png'
-      if (!mime.startsWith('image/')) throw new Error('这个地址返回的不是图片')
-      const bytes = new Uint8Array(await response.arrayBuffer())
-      const name = decodeURIComponent(parsed.pathname.split('/').filter(Boolean).pop() ?? '网页图片')
-      const resource = await persistImage(new Blob([bytes], { type: mime }), name, 'reference')
-      addResources([resource])
+      setWebResult({ url: result.url, page: result.page })
+      setStatus(
+        `已读取网页${result.via === 'jina' ? '（经 Jina Reader）' : ''}：找到 ${result.page.candidates.length} 个图片候选、${result.page.colors.length} 个颜色`,
+      )
+    } catch (error) {
+      if (!controller.signal.aborted) {
+        setStatus(error instanceof Error ? error.message : '从网址导入失败')
+      }
+    } finally {
+      if (urlAbortRef.current === controller) urlAbortRef.current = null
+      setBusy(false)
+    }
+  }
+
+  const addFromWeb = async (picked: Parameters<ContextKitWebCandidatesProps['onAdd']>[0]) => {
+    setBusy(true)
+    try {
+      const resources: ContextKitAsset[] = []
+      for (const image of picked.images) {
+        resources.push(
+          await persistImage(new Blob([image.bytes as BlobPart], { type: image.mime }), image.name, image.role),
+        )
+      }
+      addResources(resources)
+      if (picked.colors.length > 0) addColors(picked.colors)
+      if (picked.text && webResult) addSourceText({ label: `网页 ${webResult.page.title || webResult.url}`, text: picked.text })
+      setStatus(
+        [
+          resources.length ? `${resources.length} 张图片` : '',
+          picked.colors.length ? `${picked.colors.length} 个颜色` : '',
+          picked.text ? '网页文字资料' : '',
+        ].filter(Boolean).join('、').replace(/^/, '已加入 '),
+      )
+      setWebResult(null)
       setUrlDraft('')
       setUrlOpen(false)
-      setStatus('已从网址添加参考素材')
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : '从网址导入失败')
+      setStatus(error instanceof Error ? error.message : '加入套件失败')
     } finally {
       setBusy(false)
     }
@@ -138,8 +177,8 @@ export function ContextKitImportZone({
         <div className={styles.urlRow}>
           <input
             value={urlDraft}
-            placeholder="https://example.com/reference.jpg"
-            aria-label="图片网址"
+            placeholder="图片地址或品牌官网，例如 https://example.com"
+            aria-label="图片或网页地址"
             data-context-url-input
             onChange={(event) => setUrlDraft(event.target.value)}
             onKeyDown={(event) => {
@@ -156,6 +195,15 @@ export function ContextKitImportZone({
             导入
           </button>
         </div>
+      ) : null}
+      {webResult ? (
+        <ContextKitWebCandidates
+          url={webResult.url}
+          page={webResult.page}
+          busy={busy}
+          onCancel={() => setWebResult(null)}
+          onAdd={(picked) => void addFromWeb(picked)}
+        />
       ) : null}
     </div>
   )

@@ -102,6 +102,8 @@ export function ContextKitsDialog({ onClose }: { onClose: () => void }) {
   const [busy, setBusy] = useState(false)
   const [status, setStatus] = useState('')
   const [guideOffer, setGuideOffer] = useState(false)
+  /** 网页 / PDF 抽出的文字，只在本次编辑里作为生成指南的资料，不进套件版本。 */
+  const [sourceTexts, setSourceTexts] = useState<{ label: string; text: string }[]>([])
   const [colorNameDraft, setColorNameDraft] = useState('')
   const [lastColor, setLastColor] = useState('#9acd32')
   const [fontAddOpen, setFontAddOpen] = useState(false)
@@ -154,6 +156,7 @@ export function ContextKitsDialog({ onClose }: { onClose: () => void }) {
     setDraft(EMPTY_DRAFT)
     setStatus('')
     setGuideOffer(false)
+    setSourceTexts([])
     setFontAddOpen(false)
     setFontLibraryOpen(false)
     setRenamingFontId(null)
@@ -164,6 +167,7 @@ export function ContextKitsDialog({ onClose }: { onClose: () => void }) {
     setDraft(draftFromVersion(kit, versions[kit.id]?.[0] ?? null))
     setStatus('')
     setGuideOffer(false)
+    setSourceTexts([])
     setFontAddOpen(false)
     setFontLibraryOpen(false)
     setRenamingFontId(null)
@@ -519,6 +523,19 @@ export function ContextKitsDialog({ onClose }: { onClose: () => void }) {
               persistImage={persistImage}
               addResources={addResources}
               importFiles={importFiles}
+              addColors={(colors) => setDraft((current) => ({
+                ...current,
+                colors: [
+                  ...current.colors,
+                  ...colors
+                    .filter((color) => !current.colors.some((item) => item.value.toLowerCase() === color.value))
+                    .map((color) => ({ id: createId('kitcolor'), ...color })),
+                ],
+              }))}
+              addSourceText={(source) => {
+                setSourceTexts((current) => [...current.filter((item) => item.label !== source.label), source])
+                if (!draft.guide.trim()) setGuideOffer(true)
+              }}
             />
 
             <ContextKitGuideSection
@@ -526,13 +543,14 @@ export function ContextKitsDialog({ onClose }: { onClose: () => void }) {
               placeholder={copy.guidePlaceholder}
               guide={draft.guide}
               onGuideChange={(guide) => setDraft((current) => ({ ...current, guide }))}
-              canGenerate={draft.resources.length > 0 || draft.colors.length > 0}
+              canGenerate={draft.resources.length > 0 || draft.colors.length > 0 || sourceTexts.length > 0}
+              sourceLabels={sourceTexts.map((source) => source.label)}
               offer={guideOffer}
               onDismissOffer={() => setGuideOffer(false)}
               generate={(signal) => generateKitGuide(guideDeps, {
                 kitId: selectedKit?.id ?? '', projectId, kind, name: draft.name,
                 description: draft.description, resources: draft.resources,
-                colors: draft.colors, fonts: draft.fonts, signal,
+                colors: draft.colors, fonts: draft.fonts, sourceTexts, signal,
               })}
             />
 
