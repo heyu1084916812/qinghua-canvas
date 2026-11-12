@@ -4,7 +4,8 @@ import { agentResearchSourceLabel } from './agentResearchSourceLabel'
 import type { ConversationResearchItem } from './conversation'
 import type { ResearchMode } from '../../../../domain/inspiration/designResearch'
 import { ResearchGalleryOverlay, type ResearchGallerySelection } from './ResearchGalleryOverlay'
-import { researchHostOf, researchImageItems, researchPreviewItems, researchWebItems } from './researchGallery'
+import { researchImageItems, researchPreviewItems, researchWebItems } from './researchGallery'
+import { ResearchSourcePreviewList } from './ResearchSourcePreviewList'
 import { ResearchSourcesDrawer } from './ResearchSourcesDrawer'
 import styles from './ResearchResultsPreview.module.css'
 
@@ -19,6 +20,7 @@ export function ResearchResultsPreview({
   onAdd,
   onDownload,
   selection,
+  sourcesExpanded = false,
 }: {
   items: readonly ConversationResearchItem[]
   /** 旧会话没有模式时按 mixed 处理，保留原有网页来源入口。 */
@@ -26,6 +28,7 @@ export function ResearchResultsPreview({
   onAdd?: (item: ConversationResearchItem) => Promise<ActionResult>
   onDownload?: (item: ConversationResearchItem) => Promise<ActionResult>
   selection?: ResearchGallerySelection // G-R2：按会话分桶的勾选状态（researchSelection.ts）
+  sourcesExpanded?: boolean // G-R5：「N 个网页」步骤展开时列前 5 条来源
 }) {
   const [galleryOpen, setGalleryOpen] = useState(false)
   const [sourcesOpen, setSourcesOpen] = useState(false)
@@ -45,6 +48,10 @@ export function ResearchResultsPreview({
       data-agent-research-count={items.length}
       data-agent-research-mode={mode}
     >
+      {showWebSources && sourcesExpanded ? (
+        <ResearchSourcePreviewList items={webItems} onMore={() => setSourcesOpen(true)} />
+      ) : null}
+
       {showWebSources ? (
         <button
           type="button"
@@ -56,11 +63,10 @@ export function ResearchResultsPreview({
             <IconLink size={14} />
           </span>
           <span className={styles.webText}>
-            <strong>{webItems.length} 个网页</strong>
+            <strong>联网搜索结果</strong>
             <small>
-              {firstSource
-                ? `${agentResearchSourceLabel(firstSource.source, firstSource.url)} 等来源`
-                : '查看网页来源'}
+              {webItems.length} 个网页
+              {firstSource ? ` · ${agentResearchSourceLabel(firstSource.source, firstSource.url)} 等来源` : ''}
             </small>
           </span>
           <IconChevronRight size={14} />
@@ -100,14 +106,6 @@ export function ResearchResultsPreview({
           </span>
           <IconChevronRight size={15} />
         </button>
-      ) : null}
-
-      {images.length === 0 && showWebSources ? (
-        <div className={styles.hosts}>
-          {[...new Set(webItems.map((item) => researchHostOf(item.url)).filter(Boolean))]
-            .slice(0, 4)
-            .join(' · ')}
-        </div>
       ) : null}
 
       {showWebSources && sourcesOpen ? (

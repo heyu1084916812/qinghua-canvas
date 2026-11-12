@@ -31,3 +31,21 @@ export function researchSiteCount(items: readonly { url: string; imageUrl: strin
   }
   return hosts.size
 }
+
+/** 结果覆盖多少个来源网站（按来源页主机名去重，图文都算）；工具没回 sources 时用它兜底。 */
+export function researchSourceHostCount(items: readonly { url: string }[]): number {
+  const hosts = new Set<string>()
+  for (const item of items) {
+    try {
+      hosts.add(new URL(item.url).hostname.replace(/^www\./, ''))
+    } catch {
+      /* 已在解析时校验为公开地址 */
+    }
+  }
+  return hosts.size
+}
+
+/** 网页 / 混合调研的「N 个网页」：可打开的来源页数（按地址去重，原图地址不算网页）。 */
+export function researchWebPageCount(items: readonly { url: string; imageUrl: string }[]): number {
+  return new Set(items.filter((item) => item.url && item.url !== item.imageUrl).map((item) => item.url)).size
+}

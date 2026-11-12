@@ -406,6 +406,7 @@ export function AgentConversationPane({
                     onAdd={onAddResearchReference}
                     onDownload={onDownloadResearchImage}
                     selection={researchSelection}
+                    sourcesExpanded={isOpen}
                   />
                 ) : null}
                 {hasDetail ? (

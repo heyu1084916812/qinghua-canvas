@@ -8601,13 +8601,15 @@
       ],
       "publicApi": [
         "agentResearchSourceLabel",
-        "researchSiteCount"
+        "researchSiteCount",
+        "researchSourceHostCount",
+        "researchWebPageCount"
       ],
       "test": [
         "src/workbenches/canvas/panels/AgentPanel/agentResearchSourceLabel.test.ts",
         "src/workbenches/canvas/panels/AgentPanel/ResearchResultsPreview.test.ts"
       ],
-      "budget": 40
+      "budget": 70
     },
     {
       "module": "src/workbenches/canvas/panels/AgentPanel/ResearchResultsPreview.tsx",
@@ -8650,8 +8652,7 @@
         "CSS_CLASS:wrap",
         "CSS_CLASS:webRow",
         "CSS_CLASS:galleryEntry",
-        "CSS_CLASS:thumbs",
-        "CSS_CLASS:hosts"
+        "CSS_CLASS:thumbs"
       ],
       "test": [
         "src/workbenches/canvas/panels/AgentPanel/ResearchResultsPreview.test.ts"
@@ -9719,6 +9720,49 @@
         "src/workbenches/canvas/panels/AgentPanel/useAgentResearchSelectionSend.test.ts"
       ],
       "budget": 70
+    },
+    {
+      "module": "src/workbenches/canvas/panels/AgentPanel/ResearchSourcePreviewList.tsx",
+      "owner": "agent-research-results-ui",
+      "responsibility": "网页 / 混合调研「N 个网页」步骤展开后的来源预览（G-R5）：前 5 条可打开链接 + 「+N 更多」打开来源面板。",
+      "owns": [
+        "前 5 条来源链接",
+        "「+N 更多」入口",
+        "桌面端用系统浏览器打开来源"
+      ],
+      "doesNotOwn": [
+        "全部来源面板",
+        "调研执行",
+        "步骤展开状态"
+      ],
+      "publicApi": [
+        "ResearchSourcePreviewList",
+        "RESEARCH_SOURCE_INLINE_LIMIT"
+      ],
+      "test": [
+        "src/workbenches/canvas/panels/AgentPanel/ResearchResultsPreview.test.ts"
+      ],
+      "budget": 80
+    },
+    {
+      "module": "src/workbenches/canvas/panels/AgentPanel/ResearchSourcePreviewList.module.css",
+      "owner": "agent-research-results-ui-style",
+      "responsibility": "调研步骤内来源预览列表的视觉样式。",
+      "owns": [
+        "单行来源链接（标题 + 主机名）布局",
+        "「+N 更多」胶囊按钮样式"
+      ],
+      "doesNotOwn": [
+        "全局主题令牌",
+        "来源面板"
+      ],
+      "publicApi": [
+        "CSS_MODULE:Agent 调研来源预览列表"
+      ],
+      "test": [
+        "src/workbenches/canvas/panels/AgentPanel/ResearchResultsPreview.test.ts"
+      ],
+      "budget": 80
     }
   ]
 }

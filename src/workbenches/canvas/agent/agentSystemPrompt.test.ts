@@ -252,6 +252,11 @@ describe('素材段与技能段', () => {
     expect(p).toContain('结果卡（「查看图片搜索结果」）就是本轮回答：不写正文')
     expect(p).toContain('`mode:"web"` / `mode:"mixed"` 的回答才带来源链接')
     expect(p).not.toContain('回答时带上来源链接')
+    // G-R5：网页调研报告形态 + 结尾问题卡。
+    expect(p).toContain('约 700 字')
+    expect(p).toContain('`## 维度` 小标题')
+    expect(p).toContain('不放图片')
+    expect(p).toContain('调用 `askQuestions` 发一个问题卡问「接下来推进哪个方向」')
     expect(p).toContain('Tavily API Key')
     expect(p).toContain('免 Key')
     expect(p).not.toContain('## 本轮联网已关闭')

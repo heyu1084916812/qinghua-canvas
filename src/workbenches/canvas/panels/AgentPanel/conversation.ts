@@ -3,7 +3,7 @@ import { agentPhaseForTool, agentPhaseTitle, isAgentPhase, type AgentPhase } fro
 import type { ChatMessage } from '../../../../domain/shared/execution/types'
 import { isPublicHttpUrl } from '../../../../domain/shared/publicUrl'
 import { researchModeOf, type ResearchMode } from '../../../../domain/inspiration/designResearch'
-import { researchSiteCount } from './agentResearchSourceLabel'
+import { researchSiteCount, researchSourceHostCount, researchWebPageCount } from './agentResearchSourceLabel'
 import { parseQuestionCardArgs, type AgentQuestion } from '../../../../domain/agent/questionCard'
 
 /**
@@ -392,13 +392,17 @@ export function describeToolResult(
           }]
         })
         .slice(0, researchMode === 'image' ? 50 : researchMode === 'mixed' ? 64 : 48)
-      const pageCount = researchMode === 'image' && r.ok !== false
-        ? researchSiteCount(researchItems)
-        : 0
+      // G-R1：图片模式数来源网站；G-R5：网页 / 混合模式数可打开的网页（与「N 个网页」展开列表一致）。
+      const pageCount = r.ok === false
+        ? 0
+        : researchMode === 'image'
+          ? researchSiteCount(researchItems)
+          : researchWebPageCount(researchItems)
+      const sourceCount = sources.length || researchSourceHostCount(researchItems)
       return {
         ...(pageCount > 0 ? { stepLabel: `${pageCount} 个网页` } : {}),
         lines: [
-          `找到 ${items.length} 条参考，覆盖 ${sources.length} 个来源`,
+          `找到 ${items.length} 条参考，覆盖 ${sourceCount} 个来源`,
           ...warnings.slice(0, 2),
         ],
         nodeIds: [],

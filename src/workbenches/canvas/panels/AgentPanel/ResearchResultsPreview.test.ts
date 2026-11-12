@@ -4,6 +4,31 @@ import { describe, expect, it } from 'vitest'
 import { ResearchResultsPreview } from './ResearchResultsPreview'
 
 describe('ResearchResultsPreview', () => {
+  it('G-R5: web mode lists the first 5 sources when the step is expanded, the rest behind +N 更多', () => {
+    const items = Array.from({ length: 18 }, (_, i) => ({
+      id: `web:${i}`, title: `来源 ${i}`, url: `https://site${i}.example.com/p`, imageUrl: '', source: 'bing',
+    }))
+    const render = (sourcesExpanded: boolean) => {
+      let renderer!: TestRenderer.ReactTestRenderer
+      act(() => {
+        renderer = TestRenderer.create(createElement(ResearchResultsPreview, {
+          items, researchMode: 'web', sourcesExpanded,
+        }))
+      })
+      return renderer
+    }
+    const collapsed = render(false)
+    expect(collapsed.root.findAll((n) => n.props['data-agent-research-source-link'] !== undefined)).toHaveLength(0)
+    const open = render(true)
+    const links = open.root.findAll((n) => n.type === 'a' && n.props['data-agent-research-source-link'] !== undefined)
+    expect(links.map((n) => n.props.href)).toEqual(items.slice(0, 5).map((i) => i.url))
+    expect(open.root.findByProps({ 'data-agent-research-more': true }).children.join('')).toBe('+13 更多')
+    // 「联网搜索结果」块仍可打开全部来源
+    const row = open.root.findByProps({ 'data-agent-research-sources-open': true })
+    expect(JSON.stringify(row.findByType('strong').children)).toContain('联网搜索结果')
+    expect(open.root.findAll((n) => n.props['data-agent-research-gallery-open'] !== undefined)).toHaveLength(0)
+  })
+
   it('shows compact web-source and image-gallery entries', () => {
     let renderer!: TestRenderer.ReactTestRenderer
     act(() => {

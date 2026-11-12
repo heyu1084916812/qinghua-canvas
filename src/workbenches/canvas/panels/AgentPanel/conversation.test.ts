@@ -312,6 +312,20 @@ describe('工具结果 → 人话', () => {
     expect(failed.stepLabel).toBeUndefined()
   })
 
+  it('G-R5：网页调研步骤标题是「N 个网页」（可打开的来源页数）；工具没回 sources 时按主机名兜底来源数', () => {
+    const web = (i: number, host: string) => ({
+      id: `w:${i}`, title: `t${i}`, url: `https://${host}/a/${i}`, imageUrl: '', source: 'bing',
+    })
+    const result = describeToolResult('researchDesign', JSON.stringify({
+      ok: true,
+      request: { mode: 'web' },
+      items: [web(1, 'www.cnr.cn'), web(2, 'cnr.cn'), web(3, 'www.iimedia.cn'), web(3, 'www.iimedia.cn')],
+      sources: [],
+    }))
+    expect(result.stepLabel).toBe('3 个网页')
+    expect(result.lines[0]).toBe('找到 4 条参考，覆盖 2 个来源')
+  })
+
   it('旧调研结果没有 mode 时保持兼容，不擅自改判成图片模式', () => {
     const legacy = describeToolResult(
       'researchDesign',
