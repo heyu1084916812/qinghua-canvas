@@ -1617,7 +1617,9 @@ describe('runAgentTurn · 问题卡（askQuestions）', () => {
     expect(r.kind).toBe('message')
     if (r.kind !== 'message') return
     expect(adapter.completeText).toHaveBeenCalledTimes(2)
-    expect(r.text).toContain('海报尺寸用哪个？')
+    // 2026-11-12：正文只留一句引导，题目只在问题卡（工具结果）里
+    expect(r.text).toBe('开工前先定几件事。')
+    expect(r.text).not.toContain('海报尺寸用哪个？')
     expect(r.messages.some((m) => m.toolCalls?.some((c) => c.name === 'runNode'))).toBe(false)
   })
 
@@ -1659,7 +1661,7 @@ describe('runAgentTurn · 问题卡（askQuestions）', () => {
     if (r.kind !== 'message') return
     expect(adapter.completeText).toHaveBeenCalledTimes(1)
     expect(executeWrite).not.toHaveBeenCalled()
-    expect(r.text).toContain('这 3 张参考怎么用？')
+    expect(r.text).toBe('先确认用法')
     const toolMsg = r.messages.find((m) => m.role === 'tool' && m.toolName === 'askQuestions')
     expect(JSON.parse(String(toolMsg?.content))).toMatchObject({ ok: true, awaitingAnswers: true })
     expect(r.messages.at(-1)).toMatchObject({ role: 'assistant', content: r.text })

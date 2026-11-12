@@ -354,7 +354,7 @@ export const AGENT_TOOLS: readonly ToolDeclaration[] = [
     parameters: {
       type: 'object',
       properties: {
-        intro: { type: 'string', description: '可选：一句话说明为什么要先问' },
+        intro: { type: 'string', description: '可选：一句短引导（如「开工前先定几件事」）；不要在这里或正文里列题目与选项' },
         questions: {
           type: 'array',
           minItems: 1,

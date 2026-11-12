@@ -1,3 +1,4 @@
+import { formatQuestionSkip } from './questionCard'
 import { describe, expect, it } from 'vitest'
 import type { ReferenceItem } from '../project/referenceLedger'
 import {
@@ -164,6 +165,15 @@ describe('G9：用户回答写回', () => {
     expect(referenceConstraintsForTurn({
       answersQuestionCard: true, byQuestion: {}, pendingIds: ['a', 'b'], text: '第 2 张锁定产品',
     })).toEqual({ a: '第 2 张锁定产品', b: '第 2 张锁定产品' })
+  })
+
+  it('问题卡「跳过」：不把跳过这句话写成任何参考的用法约束（按推断继续）', () => {
+    expect(referenceConstraintsForTurn({
+      answersQuestionCard: true,
+      byQuestion: {},
+      pendingIds: ['a', 'b'],
+      text: formatQuestionSkip([{ id: 'r', question: '这张图怎么用？', options: ['锁产品'], multiple: false, allowFreeText: true, referenceItemId: 'a' }]),
+    })).toEqual({})
   })
 
   it('没回答问题卡：只有逐张点明分工才算回答；没有待确认图时不写回', () => {

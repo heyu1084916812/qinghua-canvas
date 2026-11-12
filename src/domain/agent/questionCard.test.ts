@@ -2,6 +2,11 @@ import { describe, expect, it } from 'vitest'
 import type { ChatMessage } from '../shared/execution/types'
 import {
   formatQuestionAnswers,
+  formatQuestionSkip,
+  isQuestionCardSkip,
+  parseQuestionCardAnswerMessage,
+  QUESTION_CARD_DEFAULT_LEAD,
+  stripQuestionCardEcho,
   latestQuestionCard,
   parseQuestionCardArgs,
   questionCardAnswerable,
@@ -67,11 +72,54 @@ describe('parseQuestionCardArgs', () => {
 })
 
 describe('问题卡兜底文案与回答整理', () => {
-  it('兜底正文列出题目与选项，不渲染问题卡的环境也能看懂', () => {
-    const text = questionCardText('', [size, refs])
-    expect(text).toContain('开始之前')
-    expect(text).toContain('1. 尺寸？（3:4 / 9:16 / 或直接写）')
-    expect(text).toContain('2. 参考图怎么用？（管排版 / 锁产品 / 借配色）')
+  it('正文只留一句引导，不复述题目与选项（2026-11-12 问题卡 UI）', () => {
+    expect(questionCardText('', [size, refs])).toBe(QUESTION_CARD_DEFAULT_LEAD)
+    expect(questionCardText('画布上还没有素材，开工前先定 2 件事。', [size, refs])).toBe(
+      '画布上还没有素材，开工前先定 2 件事。',
+    )
+    const echoed = questionCardText(
+      '先确认：\n1. 尺寸？（3:4 / 9:16）\n2. 参考图怎么用？\n在下方问题卡里选择或填写后提交，我再接着做。',
+      [size, refs],
+    )
+    expect(echoed).toBe('先确认：')
+    expect(echoed).not.toContain('3:4')
+  })
+
+  it('投影守卫剥掉与卡片重复的编号清单、选项子行和提交提示，保留其他正文', () => {
+    const prose = [
+      '画布上没有月饼素材。开工前先定 2 件事，直接影响走向。',
+      '1. **尺寸？**（3:4 / 9:16 / 或直接写）',
+      '   - 3:4',
+      '   - 9:16',
+      '2. 参考图怎么用？（可多选）',
+      '- 管排版 / 锁产品 / 借配色',
+      '在下方问题卡里选择或填写后提交，我再接着做。',
+    ].join('\n')
+    expect(stripQuestionCardEcho(prose, [size, refs])).toBe('画布上没有月饼素材。开工前先定 2 件事，直接影响走向。')
+    const unrelated = '先说结论：\n1. 新茶饮在健康化\n2. 联名周期变短'
+    expect(stripQuestionCardEcho(unrelated, [size, refs])).toBe(unrelated)
+  })
+
+  it('跳过：逐题写未回答，可被识别；折叠摘要能还原题 → 答', () => {
+    const skip = formatQuestionSkip([size, refs])
+    expect(isQuestionCardSkip(skip)).toBe(true)
+    expect(skip).toContain('1. 尺寸？ → 未回答')
+    expect(parseQuestionCardAnswerMessage(skip)).toMatchObject({ skipped: true, answeredCount: 0 })
+    const answered = formatQuestionAnswers([size, refs], [
+      { questionId: 'size', selected: ['3:4'], freeText: '' },
+    ])
+    expect(isQuestionCardSkip(answered)).toBe(false)
+    expect(parseQuestionCardAnswerMessage(answered)).toEqual({
+      skipped: false,
+      answeredCount: 1,
+      rows: [
+        { question: '尺寸？', answer: '3:4' },
+        { question: '参考图怎么用？', answer: '未回答' },
+      ],
+    })
+    expect(parseQuestionCardAnswerMessage('随便说一句')).toBeNull()
+    // 跳过消息不产生任何 G9 参考约束
+    expect(questionAnswersByReference([{ ...refs, referenceItemId: 'ref_1' }], skip)).toEqual({})
   })
 
   it('单选再点取消、点别的替换；多选按选项原顺序', () => {
@@ -132,7 +180,7 @@ describe('questionCardTurn', () => {
     const ok = questionCardTurn('c1', { questions: [{ question: '尺寸？', options: ['3:4'] }] })
     expect(ok.toolMessage).toMatchObject({ role: 'tool', toolCallId: 'c1', toolName: 'askQuestions' })
     expect(JSON.parse(ok.toolMessage.content)).toMatchObject({ ok: true, awaitingAnswers: true })
-    expect(ok.text).toContain('1. 尺寸？（3:4 / 或直接写）')
+    expect(ok.text).toBe(QUESTION_CARD_DEFAULT_LEAD)
     const bad = questionCardTurn('c2', { questions: [] })
     expect(bad.text).toBeNull()
     expect(JSON.parse(bad.toolMessage.content)).toMatchObject({ ok: false })

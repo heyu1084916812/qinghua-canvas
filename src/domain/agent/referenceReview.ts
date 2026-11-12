@@ -1,4 +1,5 @@
 import type { ReferenceItem, ReferenceUsageKind } from '../project/referenceLedger'
+import { isQuestionCardSkip } from './questionCard'
 
 /**
  * 参考侧栏的「先分析、拿不准才问」（G5 修订，Lovart 对照 review/lovart-qcard-interview.md）。
@@ -139,6 +140,8 @@ export function referenceConstraintsForTurn(input: {
   pendingIds: readonly string[]
   text: string
 }): Record<string, string> {
+  // 「跳过」= 按推断继续：不把跳过这句话当成任何参考的用法约束（2026-11-12 问题卡 UI）。
+  if (input.answersQuestionCard && isQuestionCardSkip(input.text)) return {}
   if (input.answersQuestionCard && Object.keys(input.byQuestion).length > 0) return { ...input.byQuestion }
   const text = input.text.trim()
   if (!text || input.pendingIds.length === 0) return {}
