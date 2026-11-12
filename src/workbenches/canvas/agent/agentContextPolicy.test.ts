@@ -6,6 +6,7 @@ import {
   imageNodeIdsAmong,
   promptProfileForMode,
   resolveAgentSkillForTurn,
+  resolveAgentSkillsForTurn,
   requestsVisualReview,
   summaryForAgentRequest,
 } from './agentContextPolicy'
@@ -272,5 +273,15 @@ describe('Per-turn skill injection', () => {
     expect(
       resolveAgentSkillForTurn(['skill_current', 'skill_second'], 'skill_current'),
     ).toBe('skill_current')
+  })
+})
+
+describe('Per-turn multi-skill injection（技能浮层，2026-11-12）', () => {
+  it('全部 chip 去重注入，会话选中的排第一，超出上限截断', () => {
+    expect(resolveAgentSkillsForTurn([], 'a')).toEqual([])
+    expect(resolveAgentSkillsForTurn(['a', 'b', 'a'])).toEqual(['a', 'b'])
+    expect(resolveAgentSkillsForTurn(['a', 'b'], 'b')).toEqual(['b', 'a'])
+    expect(resolveAgentSkillsForTurn(['a', 'b', 'c', 'd', 'e'])).toHaveLength(4)
+    expect(resolveAgentSkillsForTurn(['a', 'b', 'c'], undefined, 2)).toEqual(['a', 'b'])
   })
 })

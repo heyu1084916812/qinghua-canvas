@@ -605,6 +605,8 @@ export interface AgentPromptExtras {
   assetIds?: readonly string[]
   /** 本会话启用的技能（§14 M4）。正文按 id 现取 —— 技能改了，这次规划跟着变 */
   skill?: { name: string; content: string }
+  /** 本轮同时启用的多个技能（2026-11-12 技能浮层可加入多枚 chip）；给了就取代 `skill` */
+  skills?: readonly { name: string; content: string }[]
   /**
    * 用户在这句话里 **@ 引用**到的画布节点 / 模型（用户 2026-10-02）。
    *
@@ -772,7 +774,20 @@ export function buildAgentSystemPromptWithContext(
     )
   }
 
-  if (extras.skill) {
+  if (extras.skills && extras.skills.length > 1) {
+    parts.push(
+      [
+        `## 本轮启用的技能（${extras.skills.length} 个）`,
+        '同时满足这些技能的要求来规划；它们给出的阶段都要建到画布上，彼此冲突时以排在前面的为准。',
+        ...extras.skills.flatMap((item, index) => [
+          '',
+          `### 技能 ${index + 1}：${item.name}`,
+          '',
+          item.content,
+        ]),
+      ].join('\n'),
+    )
+  } else if (extras.skill) {
     parts.push(
       [
         '## 本会话启用的技能',

@@ -53,6 +53,15 @@ const SKILLS: Skill[] = [
     tags: [],
     updatedAt: 1,
   },
+  {
+    id: 'skill-poster',
+    name: '海报技能',
+    description: '测试技能二',
+    content: '技能正文：竖版 3:4，标题占上三分之一。',
+    inputMode: 'any',
+    tags: [],
+    updatedAt: 1,
+  },
 ]
 
 function emptyBundle(
@@ -255,6 +264,26 @@ describe('prepareAgentTurnRequest', () => {
         detail: '已加载技能「品牌技能」。',
         evidence: ['skill-brand'],
       })
+    }
+  })
+
+  it('★★ 技能浮层加入的多枚技能 chip 本轮全部注入（2026-11-12）', async () => {
+    const { sessions, session } = await createSession()
+    const ready = await prepareAgentTurnRequest(
+      inputFor({
+        sessions,
+        session,
+        text: `${mentionToken('skill', 'skill-brand', '品牌技能')} ${mentionToken('skill', 'skill-poster', '海报技能')} 做一张新品海报`,
+      }),
+    )
+    expect(ready.kind).toBe('ready')
+    if (ready.kind === 'ready') {
+      expect(ready.skill?.id).toBe('skill-brand')
+      expect(ready.skills?.map((item) => item.id)).toEqual(['skill-brand', 'skill-poster'])
+      expect(ready.systemPrompt).toContain('## 本轮启用的技能（2 个）')
+      expect(ready.systemPrompt).toContain('技能正文：保留品牌字形和主色。')
+      expect(ready.systemPrompt).toContain('技能正文：竖版 3:4，标题占上三分之一。')
+      expect(ready.contextTrace?.skillPhaseEvent?.evidence).toEqual(['skill-brand', 'skill-poster'])
     }
   })
 

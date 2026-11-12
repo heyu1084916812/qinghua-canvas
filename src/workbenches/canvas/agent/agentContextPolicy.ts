@@ -203,3 +203,21 @@ export function resolveAgentSkillForTurn(
     ? selectedSkillId
     : skillChipIds[0]
 }
+
+/** 一轮最多注入的技能数（2026-11-12：技能浮层可连续加入多枚技能 chip）。 */
+export const MAX_AGENT_SKILLS_PER_TURN = 4
+
+/**
+ * 本轮要注入的全部技能：只认这句话里的技能 chip（与单技能口径一致：会话里存的旧技能不算），
+ * 去重、按 chip 顺序，会话当前选中的那枚排第一；超过上限的丢掉。
+ */
+export function resolveAgentSkillsForTurn(
+  skillChipIds: readonly string[],
+  selectedSkillId?: string,
+  max = MAX_AGENT_SKILLS_PER_TURN,
+): string[] {
+  const unique = [...new Set(skillChipIds.filter((id) => id))]
+  const first = resolveAgentSkillForTurn(unique, selectedSkillId)
+  if (!first) return []
+  return [first, ...unique.filter((id) => id !== first)].slice(0, Math.max(1, max))
+}

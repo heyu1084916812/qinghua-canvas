@@ -281,6 +281,21 @@ describe('素材段与技能段', () => {
     expect(p).toContain('第二步：排布信息')
   })
 
+  it('★★ 多个技能同时启用 → 每个技能的名字与正文都进系统提示词，按顺序编号', () => {
+    const p = buildAgentSystemPromptWithContext(empty, undefined, {
+      skill: { name: '品牌', content: '甲正文' },
+      skills: [
+        { name: '品牌', content: '甲正文' },
+        { name: '海报', content: '乙正文' },
+      ],
+    })
+    expect(p).toContain('## 本轮启用的技能（2 个）')
+    expect(p).toContain('### 技能 1：品牌')
+    expect(p).toContain('### 技能 2：海报')
+    expect(p.indexOf('甲正文')).toBeLessThan(p.indexOf('乙正文'))
+    expect(p).not.toContain('## 本会话启用的技能')
+  })
+
   it('★ 没选技能时那一段不出现（不留空标题）', () => {
     const p = buildAgentSystemPromptWithContext(empty)
     expect(p).not.toContain('本会话启用的技能')

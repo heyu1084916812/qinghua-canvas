@@ -49,7 +49,7 @@ import {
   classifyAgentRequest,
   imageNodeIdsAmong,
   promptProfileForMode,
-  resolveAgentSkillForTurn,
+  resolveAgentSkillsForTurn,
   summaryForAgentRequest,
   type AgentPromptProfile,
   type AgentRequestMode,
@@ -180,6 +180,8 @@ export interface PreparedAgentTurnRequest {
   contextPrompt: string
   contextTrace: AgentTurnContextTrace | null
   skill?: Skill
+  /** 本轮注入的全部技能（多于一个时才有；第一个即 `skill`） */
+  skills?: Skill[]
   explicitMediaModels: ExplicitMediaModels
   perImage: boolean
   requestMode: AgentRequestMode
@@ -723,19 +725,21 @@ export async function prepareAgentTurnRequest(
   const skillChipIds = rawMentions
     .filter((mention) => mention.kind === 'skill')
     .map((mention) => mention.id)
-  const skillId = resolveAgentSkillForTurn(
+  const turnSkills = resolveAgentSkillsForTurn(
     skillChipIds,
     input.session.skillId,
   )
-  const skill = skillId
-    ? input.skills.find((item) => item.id === skillId)
-    : undefined
+    .map((id) => input.skills.find((item) => item.id === id))
+    .filter((item): item is Skill => item !== undefined)
+  const skill = turnSkills[0]
   if (contextTrace && skill) {
     contextTrace.skillPhaseEvent = {
       phase: 'skillLoaded',
       title: '技能加载完成',
-      detail: `已加载技能「${skill.name}」。`,
-      evidence: [skill.id],
+      detail: turnSkills.length > 1
+        ? `已加载 ${turnSkills.length} 个技能：${turnSkills.map((item) => `「${item.name}」`).join('、')}。`
+        : `已加载技能「${skill.name}」。`,
+      evidence: turnSkills.map((item) => item.id),
     }
   }
   const explicitMediaModels = explicitMediaModelsFromMentions(
@@ -828,6 +832,9 @@ export async function prepareAgentTurnRequest(
       ...(skill
         ? { skill: { name: skill.name, content: skill.content } }
         : {}),
+      ...(turnSkills.length > 1
+        ? { skills: turnSkills.map((item) => ({ name: item.name, content: item.content })) }
+        : {}),
       ...(mentions.length > 0 ? { mentions } : {}),
       ...(Object.keys(mediaModels).length > 0 ? { mediaModels } : {}),
       generationAvailability: input.generationAvailability,
@@ -855,6 +862,7 @@ export async function prepareAgentTurnRequest(
     contextPrompt,
     contextTrace,
     ...(skill ? { skill } : {}),
+    ...(turnSkills.length > 1 ? { skills: turnSkills } : {}),
     explicitMediaModels,
     perImage,
     requestMode,
