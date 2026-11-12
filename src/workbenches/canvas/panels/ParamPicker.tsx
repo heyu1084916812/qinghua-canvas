@@ -193,6 +193,25 @@ const POPUP_EDGE = 12
 const MIN_POPUP_H = 96
 
 /**
+ * 浮层水平方向收进边界框所需的**屏幕像素位移**（2026-11-12）。
+ *
+ * 浮层默认以 chip 中线居中；Agent 输入框左侧的 @ 按钮离面板左边缘不到半个浮层宽，
+ * 居中后会越过 Agent 面板盖到画布上。这里只算「往里推多少」：放得下就 0，
+ * 比边界框还宽时优先贴左边（与阅读起点对齐）。
+ */
+export function popupShiftIntoBounds(
+  pop: { left: number; right: number },
+  bounds: { left: number; right: number },
+  edge = 8,
+): number {
+  const minLeft = bounds.left + edge
+  const maxRight = bounds.right - edge
+  if (pop.left < minLeft) return minLeft - pop.left
+  if (pop.right > maxRight) return Math.max(minLeft - pop.left, maxRight - pop.right)
+  return 0
+}
+
+/**
  * 分段控件里那块**滑块**的几何（相对轨道的**布局像素**，见组件里 `thumbs` 的说明）。
  *
  * `animate`：这一块是不是「已经量到过、这次是换值」—— 第一次量到的那块不加过渡，
@@ -283,6 +302,9 @@ export function ParamPicker(props: ParamPickerProps) {
    * 见下面那段 `useIsoLayoutEffect` 的说明：装得下就完整显示，装不下才滚。
    */
   const [maxHeight, setMaxHeight] = useState<number | null>(null)
+  /** 收进 `[data-agent-panel]` 的水平位移（布局像素；不在 Agent 面板里恒为 0） */
+  const [shiftX, setShiftX] = useState(0)
+  const shiftXRef = useRef(0)
   /** 「加载更多」展开过的段（关掉浮层就忘掉：下次打开仍从收起态开始） */
   const [expanded, setExpanded] = useState<Record<string, boolean>>({})
   /**
@@ -389,6 +411,8 @@ export function ParamPicker(props: ParamPickerProps) {
     if (!open) {
       setBelow(false)
       setMaxHeight(null)
+      shiftXRef.current = 0
+      setShiftX(0)
       return
     }
     const wrap = wrapRef.current
@@ -403,6 +427,18 @@ export function ParamPicker(props: ParamPickerProps) {
     const scale = wrap.offsetHeight > 0 ? anchor.height / wrap.offsetHeight : 1
     const room = Math.max(0, (flipDown ? roomBelow : roomAbove) - POPUP_EDGE)
     setMaxHeight(Math.max(MIN_POPUP_H, Math.round(room / (scale || 1))))
+    const bounds = wrap.closest('[data-agent-panel]')?.getBoundingClientRect()
+    if (bounds) {
+      const rect = pop.getBoundingClientRect()
+      const applied = shiftXRef.current * (scale || 1)
+      const shift = popupShiftIntoBounds(
+        { left: rect.left - applied, right: rect.right - applied },
+        bounds,
+      )
+      const next = Math.round(shift / (scale || 1))
+      shiftXRef.current = next
+      setShiftX(next)
+    }
   }, [open, totalOptions])
 
   /**
@@ -463,7 +499,15 @@ export function ParamPicker(props: ParamPickerProps) {
           data-param-variant={grouped ? 'grouped' : sections[0]!.variant}
           data-param-placement={below ? 'below' : 'above'}
           /* 高度上限按锚点剩余空间算（见上面的 layout effect）：装得下就完整显示 */
-          style={maxHeight ? { maxHeight: `${maxHeight}px` } : undefined}
+          style={
+            maxHeight || shiftX
+              ? {
+                  ...(maxHeight ? { maxHeight: `${maxHeight}px` } : {}),
+                  /* 用 margin 而不是 transform：transform 归居中与入场动画所有 */
+                  ...(shiftX ? { marginLeft: `${shiftX}px` } : {}),
+                }
+              : undefined
+          }
           /*
            * 「这块自己吃滚轮」（见 `features/shared/wheelTarget`）：浮层开着的时候
            * 滚轮不该穿到底下的画布去缩放 —— 哪怕这个菜单当前没得滚。

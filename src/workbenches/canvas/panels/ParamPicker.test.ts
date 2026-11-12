@@ -189,3 +189,19 @@ describe('ParamPicker · 图标与文字的比例', () => {
     expect(html).toContain('data-model-icon="openai"')
   })
 })
+
+describe('popupShiftIntoBounds（@ 浮层不越出 Agent 面板，2026-11-12）', async () => {
+  const { popupShiftIntoBounds } = await import('./ParamPicker')
+  it('放得下不位移', () => {
+    expect(popupShiftIntoBounds({ left: 700, right: 860 }, { left: 629, right: 1009 })).toBe(0)
+  })
+  it('越过左边缘时往右推到边距内', () => {
+    expect(popupShiftIntoBounds({ left: 620, right: 779 }, { left: 629, right: 1009 })).toBe(17)
+  })
+  it('越过右边缘时往左推', () => {
+    expect(popupShiftIntoBounds({ left: 900, right: 1020 }, { left: 629, right: 1009 })).toBe(-19)
+  })
+  it('比边界还宽时贴左', () => {
+    expect(popupShiftIntoBounds({ left: 600, right: 1100 }, { left: 629, right: 1009 })).toBe(37)
+  })
+})
