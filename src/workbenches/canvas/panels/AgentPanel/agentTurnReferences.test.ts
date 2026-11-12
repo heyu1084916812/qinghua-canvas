@@ -79,7 +79,7 @@ describe('Agent turn reference projection', () => {
     expect(result.evidence).toEqual(['r1:u1', 'r2:u2'])
     expect(result.phaseEvent).toEqual({
       phase: 'referenceAnalysis',
-      title: '参考分析完成 · 2 项依据',
+      title: '参考素材分析结束 · 2 项依据',
       detail: expect.stringContaining('已读取 2 条参考'),
       evidence: ['r1:u1', 'r2:u2'],
     })

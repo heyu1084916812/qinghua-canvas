@@ -38,12 +38,23 @@ export function agentPhaseTitle(phase: AgentPhase): string {
     align: '对齐信息',
     skillLoaded: '技能加载完成',
     research: '调研完成',
-    referenceAnalysis: '参考分析完成',
+    referenceAnalysis: '参考素材分析结束',
     plan: '交付物已规划',
     generate: '生成完成',
     review: '验收完成',
     iterate: '迭代完成',
     done: '本轮完成',
+  }
+  return titles[phase]
+}
+
+/**
+ * 阶段进行中的状态文案（G-R4：带参考图发送时先显示「参考素材分析中」，
+ * 分析完写入用法后显示「参考素材分析结束」，然后才出回复）。没有进行中文案的阶段返回空。
+ */
+export function agentPhaseRunningTitle(phase: AgentPhase): string | undefined {
+  const titles: Partial<Record<AgentPhase, string>> = {
+    referenceAnalysis: '参考素材分析中',
   }
   return titles[phase]
 }

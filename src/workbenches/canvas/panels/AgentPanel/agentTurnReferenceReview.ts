@@ -34,6 +34,8 @@ export interface TurnReferenceReviewInput {
     explicitItemIds: readonly string[]
     userConstraints?: Readonly<Record<string, string>>
   }) => Promise<ReferenceCurationResult>
+  /** G-R4：真的要调参考分析前回调一次（界面显示「参考素材分析中」）；不分析就不调。 */
+  onAnalysisStart?: () => void
 }
 
 export interface TurnReferenceReview {
@@ -48,6 +50,8 @@ export interface TurnReferenceReview {
   confirmedIds: string[]
   /** G9 回退：重写失败、以用户原话为约束的参考（本任务累计）。 */
   answers: Record<string, string>
+  /** 本回合是否真的跑了参考分析（G-R4：决定是否显示「参考素材分析结束」）。 */
+  analyzed: boolean
 }
 
 export async function reviewTurnReferences(
@@ -82,7 +86,9 @@ export async function reviewTurnReferences(
   let failedIds: string[] = []
   let failedCount = 0
   let attemptedIds: string[] = []
-  if (itemIds.length > 0 && input.curate) {
+  const analyzed = itemIds.length > 0 && Boolean(input.curate)
+  if (analyzed && input.curate) {
+    input.onAnalysisStart?.()
     try {
       const curation = await input.curate({
         itemIds,
@@ -152,5 +158,6 @@ export async function reviewTurnReferences(
     pendingIds: review.pendingIds,
     confirmedIds,
     answers: review.answers ?? {},
+    analyzed,
   }
 }

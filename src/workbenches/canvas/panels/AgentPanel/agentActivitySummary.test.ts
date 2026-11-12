@@ -19,6 +19,11 @@ describe('Agent activity summaries', () => {
     expect(Array.from(summary).length).toBeLessThanOrEqual(49)
   })
 
+  it('G-R4: strips reference mention markup (research images sent with a message)', () => {
+    expect(conciseAgentRequest('好的 @[咖啡海报 1](reference:ref_1) @[咖啡海报 3](reference:ref_3)'))
+      .toBe('好的 咖啡海报 1 咖啡海报 3')
+  })
+
   it('names the current tool step when available', () => {
     expect(agentToolActivitySummary('已看画布')).toBe('正在核对画布：已看画布')
     expect(agentToolActivitySummary(undefined)).toBe('正在查看画布和结果')

@@ -95,7 +95,7 @@ export function projectAgentTurnReferences(
             phase: 'referenceAnalysis',
             title: agentPhaseCollapsedSummary({
               phase: 'referenceAnalysis',
-              title: '参考分析完成',
+              title: '参考素材分析结束',
               evidence,
             }),
             detail: [

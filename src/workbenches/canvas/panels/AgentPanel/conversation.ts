@@ -136,7 +136,7 @@ const TOOL_LABEL: Record<string, string> = {
   readGraph: '已看画布',
   readAsset: '已读素材',
   readResult: '已读结果',
-  curateReferences: '参考分析完成',
+  curateReferences: '参考素材分析结束',
   askQuestions: '问题卡已发出',
   researchDesign: '联网调研完成',
   readPage: '已读网页',

@@ -3,6 +3,7 @@ import {
   AGENT_PHASES,
   agentPhaseCollapsedSummary,
   agentPhaseForTool,
+  agentPhaseRunningTitle,
   agentPhaseTitle,
   isAgentPhase,
 } from './phase'
@@ -35,9 +36,9 @@ describe('Agent phase contract', () => {
   it('collapses to a factful headline without inventing thinking text', () => {
     expect(agentPhaseCollapsedSummary({
       phase: 'referenceAnalysis',
-      title: '参考分析完成',
+      title: '参考素材分析结束',
       evidence: ['ref-a', 'ref-b'],
-    })).toBe('参考分析完成 · 2 项依据')
+    })).toBe('参考素材分析结束 · 2 项依据')
     expect(agentPhaseCollapsedSummary({
       phase: 'skillLoaded',
       title: '技能加载完成',
@@ -50,5 +51,11 @@ describe('Agent phase contract', () => {
     expect(agentPhaseForTool('runNode')).toBe('generate')
     expect(agentPhaseForTool('visualReview')).toBe('review')
     expect(agentPhaseForTool('unknownTool')).toBeUndefined()
+  })
+
+  it('G-R4：参考分析有进行中 / 结束两段文案，其它阶段没有进行中文案', () => {
+    expect(agentPhaseRunningTitle('referenceAnalysis')).toBe('参考素材分析中')
+    expect(agentPhaseTitle('referenceAnalysis')).toBe('参考素材分析结束')
+    expect(agentPhaseRunningTitle('generate')).toBeUndefined()
   })
 })

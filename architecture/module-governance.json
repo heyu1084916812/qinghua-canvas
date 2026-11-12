@@ -8990,12 +8990,13 @@
         "AgentPhaseEvent",
         "isAgentPhase",
         "agentPhaseTitle",
-        "agentPhaseCollapsedSummary"
+        "agentPhaseCollapsedSummary",
+        "agentPhaseRunningTitle"
       ],
       "test": [
         "src/domain/agent/phase.test.ts"
       ],
-      "budget": 90
+      "budget": 110
     },
     {
       "module": "src/domain/project/referenceLedger.ts",

@@ -39,7 +39,7 @@ const styles = { ...baseStyles, ...activityStyles }
 
 export type AgentPanelStatus =
   | { kind: 'idle' }
-  | { kind: 'thinking' }
+  | { kind: 'thinking'; label?: string }
   | { kind: 'toolRunning' }
   | { kind: 'awaitingConfirm'; request: AgentToolRequest }
   | { kind: 'paused'; message: string }
@@ -94,6 +94,8 @@ export function activityTextOf(
     return '正在执行这一步操作'
   }
   if (status.kind === 'thinking') {
+    // G-R4：准备阶段的真实阶段文案（参考素材分析中 / 结束）优先。
+    if (status.label) return status.label
     const lastUser = [...items].reverse().find((item) => item.kind === 'user')
     const request = conciseAgentRequest(lastUser?.kind === 'user' ? lastUser.text : '')
     return request ? `正在理解你的要求：${request}` : '正在理解你的要求'

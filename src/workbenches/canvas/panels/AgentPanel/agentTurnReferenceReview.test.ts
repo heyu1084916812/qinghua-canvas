@@ -105,6 +105,19 @@ describe('reviewTurnReferences（G5 修订：先分析，拿不准才问）', ()
     expect(result.pendingIds).toEqual([])
   })
 
+  it('G-R4：只有真的调参考分析时才回调 onAnalysisStart，并标记 analyzed', async () => {
+    const order: string[] = []
+    const curate = vi.fn(async () => { order.push('curate'); return curation([{ itemId: 'cup' }]) })
+    const onAnalysisStart = vi.fn(() => { order.push('start') })
+    const ran = await reviewTurnReferences(input({ curate, onAnalysisStart, task: task({ referenceIds: ['cup'] }) }))
+    expect(order).toEqual(['start', 'curate'])
+    expect(ran.analyzed).toBe(true)
+    onAnalysisStart.mockClear()
+    const idle = await reviewTurnReferences(input({ curate, onAnalysisStart, text: '你好', selectForTask: async () => selection([]) }))
+    expect(onAnalysisStart).not.toHaveBeenCalled()
+    expect(idle.analyzed).toBe(false)
+  })
+
   it('闲聊 / 画布操作不分析侧栏图（不白调模型）', async () => {
     const curate = vi.fn(async () => curation([]))
     await reviewTurnReferences(input({ curate, text: '你好' }))

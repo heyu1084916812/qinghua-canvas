@@ -127,6 +127,8 @@ export interface PrepareAgentTurnRequestInput {
   prepareRoute: () => Promise<ChatRoutePreparation>
   onPersisted: (turn: PersistedAgentUserTurn) => void
   onRouteReady: (operationId: string) => Promise<void>
+  /** G-R4：参考分析开始 / 结束（只在本回合真的分析参考时调用）。 */
+  onReferenceAnalysis?: (state: 'running' | 'done') => void
   memory: Pick<AgentMemoryPort, 'read'>
   projectId: string
   readAssetMime: (hash: string) => Promise<string | null>
@@ -376,6 +378,9 @@ export async function prepareAgentTurnRequest(
     .catch(() => null)
   // G5：显式参考 + 侧栏无用法的图先自动分析，拿不准分工的才进问题卡（agentTurnReferenceReview.ts）。
   const referenceReview = await reviewTurnReferences({
+    ...(input.onReferenceAnalysis
+      ? { onAnalysisStart: () => input.onReferenceAnalysis!('running') }
+      : {}),
     task: stagedTask,
     text: plainText,
     requestMode,
@@ -408,6 +413,7 @@ export async function prepareAgentTurnRequest(
         }
       : {}),
   })
+  if (referenceReview.analyzed && !input.signal.aborted) input.onReferenceAnalysis?.('done')
   const agentTask = referenceReview.task
   if (agentTask !== stagedTask) {
     await input.sessions.updateFields?.(input.session.id, { agentTask }).catch(() => null)

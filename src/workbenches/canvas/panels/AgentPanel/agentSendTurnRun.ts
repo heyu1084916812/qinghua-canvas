@@ -6,6 +6,7 @@ import type { TaskLifecycle } from '../../../../features/shared/lifecycle/taskLi
 import type { AgentSession } from '../../../../state/agent/sessionStore'
 import { errText, type AgentLoopDeps, type AgentLoopOutcome } from '../../agent/agentLoop'
 import type { AgentPanelStatus } from './AgentActivityViews'
+import { agentPhaseRunningTitle, agentPhaseTitle } from '../../../../domain/agent/phase'
 import {
   buildAgentModelMessages,
   composeAgentOutcomeMessages,
@@ -73,6 +74,8 @@ export interface AgentSendTurnUi {
 export interface AgentPrepareHooks {
   onPersisted: (turn: PersistedAgentUserTurn) => void
   onRouteReady: (operationId: string) => Promise<void>
+  /** G-R4：参考素材分析中 / 结束 → 本会话的状态行。 */
+  onReferenceAnalysis?: (state: 'running' | 'done') => void
 }
 
 export interface AgentPrepareArgs {
@@ -238,6 +241,14 @@ export async function runAgentSendTurn(
             undefined,
             turnOrigin,
           )
+        },
+        onReferenceAnalysis: (state) => {
+          ui.setStatusFor(session.id, {
+            kind: 'thinking',
+            label: state === 'running'
+              ? agentPhaseRunningTitle('referenceAnalysis') ?? ''
+              : agentPhaseTitle('referenceAnalysis'),
+          })
         },
       },
     })

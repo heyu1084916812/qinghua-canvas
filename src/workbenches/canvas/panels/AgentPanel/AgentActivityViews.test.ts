@@ -16,6 +16,12 @@ describe('AgentActivityViews', () => {
     vi.unstubAllGlobals()
   })
 
+  it('G-R4：准备阶段的真实阶段文案优先于「正在理解你的要求」', () => {
+    expect(activityTextOf({ kind: 'thinking', label: '参考素材分析中' }, 0, [], [])).toBe('参考素材分析中')
+    expect(activityTextOf({ kind: 'thinking', label: '参考素材分析结束' }, 0, [], [])).toBe('参考素材分析结束')
+    expect(activityTextOf({ kind: 'thinking' }, 0, [], [])).toBe('正在理解你的要求')
+  })
+
   it('保留状态忙闲判断与生成中文案', () => {
     expect(statusIsBusy({ kind: 'thinking' })).toBe(true)
     expect(statusIsBusy({ kind: 'idle' })).toBe(false)
@@ -96,7 +102,7 @@ describe('AgentActivityViews', () => {
             id: 'phase-ref',
             text: '按当前任务匹配到 3 张参考。',
             phase: 'referenceAnalysis',
-            collapsedSummary: '参考分析完成 · 3 项依据',
+            collapsedSummary: '参考素材分析结束 · 3 项依据',
             createdAt: 2,
           },
         ],
@@ -107,8 +113,8 @@ describe('AgentActivityViews', () => {
       }),
     )
 
-    expect(html).toContain('参考分析完成 · 3 项依据')
-    expect(html).not.toContain('先核对参考图。参考分析完成')
+    expect(html).toContain('参考素材分析结束 · 3 项依据')
+    expect(html).not.toContain('先核对参考图。参考素材分析结束')
     expect(html).toContain('data-agent-activity-toggle')
   })
 

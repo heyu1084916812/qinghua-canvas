@@ -119,6 +119,7 @@ export function useAgentPrepareTurnController(
         // 两个顺序回调原样透传：它们的执行时机在发送主体里。
         onPersisted: hooks.onPersisted,
         onRouteReady: hooks.onRouteReady,
+        ...(hooks.onReferenceAnalysis ? { onReferenceAnalysis: hooks.onReferenceAnalysis } : {}),
       }),
     [
       input.activeAgentTools,

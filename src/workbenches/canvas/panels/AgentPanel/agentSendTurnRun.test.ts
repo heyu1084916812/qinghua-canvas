@@ -361,7 +361,7 @@ describe('A-5 #3 / #4 / #5 / #6 / #9：保存与准备之间的顺序', () => {
           referenceEvidence: ['r1:u1'],
           referencePhaseEvent: {
             phase: 'referenceAnalysis',
-            title: '参考分析完成 · 1 项依据',
+            title: '参考素材分析结束 · 1 项依据',
             detail: '本轮怎么用：保持字形与颜色不变',
             evidence: ['r1:u1'],
           },
@@ -392,7 +392,7 @@ describe('A-5 #3 / #4 / #5 / #6 / #9：保存与准备之间的顺序', () => {
     })
     expect((messages?.[2] as ChatMessage).phaseEvent).toEqual({
       phase: 'referenceAnalysis',
-      title: '参考分析完成 · 1 项依据',
+      title: '参考素材分析结束 · 1 项依据',
       detail: '本轮怎么用：保持字形与颜色不变',
       evidence: ['r1:u1'],
     })

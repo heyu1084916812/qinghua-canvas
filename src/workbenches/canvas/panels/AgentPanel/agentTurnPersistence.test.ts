@@ -18,7 +18,7 @@ describe('persistAgentUserTurnBeforeRequest', () => {
         content: '',
         phaseEvent: {
           phase: 'referenceAnalysis',
-          title: '参考分析完成 · 1 项依据',
+          title: '参考素材分析结束 · 1 项依据',
           evidence: ['r1:u1'],
         },
       }],

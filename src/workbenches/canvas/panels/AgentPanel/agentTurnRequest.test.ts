@@ -316,7 +316,7 @@ describe('prepareAgentTurnRequest', () => {
     expect(result.contextTrace?.referenceEvidence).toEqual(['r1:u1'])
     expect(result.contextTrace?.referencePhaseEvent).toEqual({
       phase: 'referenceAnalysis',
-      title: '参考分析完成 · 1 项依据',
+      title: '参考素材分析结束 · 1 项依据',
       detail: expect.stringContaining('已读取 1 条参考'),
       evidence: ['r1:u1'],
     })
@@ -342,10 +342,12 @@ describe('prepareAgentTurnRequest', () => {
       updatedAt: 1,
     }
     let curatedTaskKey = ''
+    const events: string[] = []
     const autoCurateReferences: NonNullable<
       PrepareAgentTurnRequestInput['autoCurateReferences']
     > = vi.fn(async (input) => {
       curatedTaskKey = input.taskKey
+      events.push('curate')
       return {
         ok: true,
         summary: '分析了 1 条参考',
@@ -368,6 +370,7 @@ describe('prepareAgentTurnRequest', () => {
         text: '用这个套件做一张新品海报',
         autoCurateReferences,
       }),
+      onReferenceAnalysis: (state) => { events.push(state) },
       referenceLedger: {
         selectForTask: vi.fn(async (_projectId, taskKey) => ({
           selected: curatedTaskKey === taskKey
@@ -403,6 +406,8 @@ describe('prepareAgentTurnRequest', () => {
     ])
     expect(result.contextPrompt).toContain('Logo 保持原样')
     expect(result.contextTrace?.referenceEvidence).toEqual(['kit-1:usage-kit'])
+    // G-R4：先「参考素材分析中」→ 分析 → 「参考素材分析结束」，都在模型请求之前
+    expect(events).toEqual(['running', 'curate', 'done'])
   })
 
   it('★★ 自动参考分析失败时继续使用显式 chip，并把原因写入可追溯 warning', async () => {

@@ -613,7 +613,7 @@ describe('消息 → 对话条目', () => {
         content: '',
         phaseEvent: {
           phase: 'referenceAnalysis',
-          title: '参考分析完成 · 2 项依据',
+          title: '参考素材分析结束 · 2 项依据',
           detail: '本轮采用品牌标准字与文案语气。',
           evidence: ['r1:u1', 'r2:u2'],
         },
@@ -626,9 +626,9 @@ describe('消息 → 对话条目', () => {
         kind: 'process',
         entries: [{
           id: 'phase-event-1',
-          text: '参考分析完成 · 2 项依据',
+          text: '参考素材分析结束 · 2 项依据',
           phase: 'referenceAnalysis',
-          collapsedSummary: '参考分析完成 · 2 项依据',
+          collapsedSummary: '参考素材分析结束 · 2 项依据',
         }],
       },
       { kind: 'text', text: '海报已完成。' },

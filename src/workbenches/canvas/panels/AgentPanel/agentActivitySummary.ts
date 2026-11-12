@@ -2,7 +2,7 @@ const SUMMARY_LIMIT = 48
 
 export function conciseAgentRequest(text: string): string {
   const normalized = text
-    .replace(/@\[([^\]]*)\]\((?:node|model|skill|preset):[^)]*\)/g, '$1')
+    .replace(/@\[([^\]]*)\]\((?:node|model|skill|preset|reference):[^)]*\)/g, '$1')
     .replace(/\s+/g, ' ')
     .trim()
   if (!normalized) return ''
