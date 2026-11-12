@@ -12895,3 +12895,10 @@ unLogFastPage.ts 和 canvasLogQuery.ts，组件只负责状态、订阅和渲染
 - 参考 UI 探针不能只截图空态：用抽屉自己的文件输入上传 1×1 PNG，断言 `referenceCards=1 / referenceAgentActions=1 / referenceChipMounted=1`，四视口明暗 page/console error 0。证据 `.playwright-verify/ui-seven-after/*-canvas-reference{,-agent}.png`。
 - 仍缺：What/HowToUse 自动分析工具（curate references）、按任务持久 usage、参考灯箱/拖拽/批量管理、删 chip 同步清会话 referenceIds、套件 chip、Clipper 接收端、画布内浏览器和六类生图流程策略。不要把“显式参考可用”说成 Lovart 全流程完成。
 - 最终门禁：`npm run check` 1100 modules / 4388 deps / 34 tables / 244 registrations，串行全量 Vitest 649 files / 5436 tests，`npm run build` 1232 modules。
+
+## 2026-11-12 品牌套件 PDF 导入（pdfjs-dist 5.7）教训
+
+- `import.meta.glob` 的选项**必须写成字面量**：传变量（`const OPTS = {...}`）Vite / rolldown 不做静态分析，`?url` query 丢失，二进制 `.bcmap` 被当源码加载，构建报 `UNLOADABLE_DEPENDENCY ... not valid UTF-8`。
+- pdfjs 资源文件被 Vite 加哈希，不能给 `cMapUrl` 目录前缀；用自定义 `BinaryDataFactory`（`fetch({ kind, filename })`）按文件名映射到 glob 出的 URL，并设 `useWorkerFetch: false`。<4KB 的 bcmap 会被内联成 `data:`，依赖 CSP `connect-src data:`（已有）。
+- pdfjs v5 已无 eval / `new Function`，`isEvalSupported` 选项不存在（tsc 会报）；现有 Tauri CSP 不用改。验证法：`vite build` 一个只引 `kitPdfImport` 的探针页，用 node http 服务把 tauri.conf 的 CSP 作为**响应头**下发，Chromium 监听 `securitypolicyviolation`（0 条）。
+- dev 模式首次引入 pdfjs 会触发依赖预构建并整页 reload，截图脚本第一张可能超时，重跑即可。
