@@ -280,6 +280,38 @@ describe('工具结果 → 人话', () => {
     ])
   })
 
+  it('G-R1：图片调研成功时步骤标题是「N 个网页」（按来源网站去重），网页 / 失败保持原标题', () => {
+    const image = (url: string, i: number) => ({
+      id: `b:${i}`, title: `t${i}`, url, imageUrl: `https://img.example.com/${i}.jpg`, source: 'bing',
+    })
+    const items = toConversation([
+      { role: 'user', content: '找咖啡海报参考图' },
+      { role: 'assistant', content: '', toolCalls: [{ id: 'r', name: 'researchDesign', args: '{}' }] },
+      {
+        role: 'tool',
+        toolCallId: 'r',
+        content: JSON.stringify({
+          ok: true,
+          request: { mode: 'image' },
+          items: [
+            image('https://www.pinterest.com/pin/1/', 1),
+            image('https://pinterest.com/pin/2/', 2),
+            image('https://www.behance.net/gallery/3', 3),
+          ],
+          sources: [],
+        }),
+      },
+      { role: 'assistant', content: '' },
+    ])
+    const step = items.find((item) => item.kind === 'step')
+    expect(step).toMatchObject({ label: '2 个网页', researchMode: 'image' })
+    expect(step && 'stepLabel' in step).toBe(false)
+    // 没有文字回复气泡。
+    expect(items.filter((item) => item.kind === 'text')).toEqual([])
+    const failed = describeToolResult('researchDesign', JSON.stringify({ ok: false, request: { mode: 'image' }, items: [] }))
+    expect(failed.stepLabel).toBeUndefined()
+  })
+
   it('旧调研结果没有 mode 时保持兼容，不擅自改判成图片模式', () => {
     const legacy = describeToolResult(
       'researchDesign',

@@ -19,6 +19,7 @@ import {
 } from './agentCanvasClaimGuard'
 import { confirmRunNodeFromFinalAnswer, recoverRunNodeConfirmation } from './agentRunConfirmationGuard'
 import { parseJsonAgentAction } from './jsonToolFallback'
+import { lastBatchWasImageResearch, projectToolMessageForModel } from './agentResearchProjection'
 import { parseAgentToolArguments } from './agentToolArgs'
 import { reviewBeforeVisualDenial } from './agentVisualClaimGuard'
 import { QUESTION_CARD_TOOL, questionCardTurn } from '../../../domain/agent/questionCard'
@@ -165,6 +166,10 @@ export interface AgentLoopDeps {
   maxSteps?: number
 }
 
+/** G-R1：图片调研成功后结果卡就是回答，模型的收尾正文不进对话。 */
+const finalTextAfterImageResearch = (messages: readonly ChatMessage[], text: string): string =>
+  lastBatchWasImageResearch(messages) ? '' : text
+
 const PARSE_FAILED = Symbol('parse-failed')
 
 /** 参数解析失败**不抛**：把错误回填给模型让它重发，这是它能自己修的问题（§4） */
@@ -202,8 +207,9 @@ async function askModel(
     inputs: [...(deps.inputs ?? [])],
     params: {},
     tools: deps.toolMode === 'json' ? [] : tools,
-    messages: history.map((message) => {
-      const protocolMessage = { ...message }
+    // G-R1：图片调研结果只给模型一句摘要（落盘的 tool 消息不变，画廊照常渲染）。
+    messages: history.map((original) => {
+      const protocolMessage = { ...projectToolMessageForModel(original) }
       delete protocolMessage.createdAt
       delete protocolMessage.reasoning
       delete protocolMessage.hiddenFromConversation
@@ -334,7 +340,7 @@ export async function runAgentTurn(
           deps.onProcessReset?.()
           return { kind: 'error', message: BLOCKED_CLAIM_MESSAGE, messages }
         }
-        const verified = verifiedFinalText(message) // A7：尺寸 / 张数 / 模型仍不实时附真实结果
+        const verified = finalTextAfterImageResearch(messages, verifiedFinalText(message)) // A7 + G-R1
         messages.push({
           role: 'assistant',
           content: verified,
@@ -391,7 +397,7 @@ export async function runAgentTurn(
         deps.onProcessReset?.()
         return { kind: 'error', message: BLOCKED_CLAIM_MESSAGE, messages }
       }
-      const verified = verifiedFinalText(result.text) // A7
+      const verified = finalTextAfterImageResearch(messages, verifiedFinalText(result.text)) // A7 + G-R1
       messages.push({
         role: 'assistant',
         content: verified,

@@ -3,6 +3,7 @@ import { agentPhaseForTool, agentPhaseTitle, isAgentPhase, type AgentPhase } fro
 import type { ChatMessage } from '../../../../domain/shared/execution/types'
 import { isPublicHttpUrl } from '../../../../domain/shared/publicUrl'
 import { researchModeOf, type ResearchMode } from '../../../../domain/inspiration/designResearch'
+import { researchSiteCount } from './agentResearchSourceLabel'
 import { parseQuestionCardArgs, type AgentQuestion } from '../../../../domain/agent/questionCard'
 
 /**
@@ -303,6 +304,8 @@ export function describeToolResult(
   failed: boolean
   activityLabel?: string
   activityKind?: 'tool' | 'image'
+  /** 步骤标题覆盖（G-R1：调研成功显示「N 个网页」，对齐 Lovart 的状态标签）。 */
+  stepLabel?: string
 } {
   let parsed: unknown
   try {
@@ -389,7 +392,11 @@ export function describeToolResult(
           }]
         })
         .slice(0, researchMode === 'image' ? 50 : researchMode === 'mixed' ? 64 : 48)
+      const pageCount = researchMode === 'image' && r.ok !== false
+        ? researchSiteCount(researchItems)
+        : 0
       return {
+        ...(pageCount > 0 ? { stepLabel: `${pageCount} 个网页` } : {}),
         lines: [
           `找到 ${items.length} 条参考，覆盖 ${sources.length} 个来源`,
           ...warnings.slice(0, 2),
@@ -897,7 +904,8 @@ export function toConversation(
      * 标题也要跟着结果改：**先**见到 toolCalls 时只能按工具名猜，等结果回来
      * 才知道成没成。失败还顶着「工作流已创建」是最误导人的一处。
      */
-    out[at] = { ...item, ...described, label: toolLabelOf(item.tool, described.failed) }
+    const { stepLabel, ...describedFields } = described
+    out[at] = { ...item, ...describedFields, label: stepLabel ?? toolLabelOf(item.tool, described.failed) }
     const phase = item.phase
     if (phase) {
       ensureProcess(m).entries.push({

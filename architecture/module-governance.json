@@ -8600,7 +8600,8 @@
         "来源许可判断"
       ],
       "publicApi": [
-        "agentResearchSourceLabel"
+        "agentResearchSourceLabel",
+        "researchSiteCount"
       ],
       "test": [
         "src/workbenches/canvas/panels/AgentPanel/agentResearchSourceLabel.test.ts",
@@ -9601,6 +9602,30 @@
         "src/workbenches/canvas/panels/AgentPanel/agentTurnReferences.test.ts"
       ],
       "budget": 40
+    },
+    {
+      "module": "src/workbenches/canvas/agent/agentResearchProjection.ts",
+      "owner": "agent-loop",
+      "responsibility": "图片模式调研（G-R1）发给模型的投影：结果卡已展示给用户时只给一句摘要，并判定本轮收尾正文是否应隐藏。",
+      "owns": [
+        "图片调研结果 → 一句摘要的模型投影",
+        "最后一批工具是否只有成功的图片调研"
+      ],
+      "doesNotOwn": [
+        "落盘的 tool 消息",
+        "调研执行",
+        "界面渲染"
+      ],
+      "publicApi": [
+        "imageResearchFactsOf",
+        "imageResearchSummary",
+        "projectToolMessageForModel",
+        "lastBatchWasImageResearch"
+      ],
+      "test": [
+        "src/workbenches/canvas/agent/agentResearchProjection.test.ts"
+      ],
+      "budget": 110
     }
   ]
 }
