@@ -9544,6 +9544,39 @@
         "src/workbenches/canvas/panels/AgentPanel/agentTurnReferenceReview.test.ts"
       ],
       "budget": 220
+    },
+    {
+      "module": "src/features/shared/research/bingPerSite.ts",
+      "owner": "open-research-search",
+      "responsibility": "Bing 匿名请求忽略 site: OR 子句时的逐站补查：选主力站、拼单站查询、顺序加间隔执行、够数或遇拦截即停。",
+      "owns": [
+        "逐站补查阈值与主力站顺序",
+        "单站查询拼接（站名关键词偏置 + 单个 site:）",
+        "补查间隔、取消与停止条件",
+        "候选去重合并"
+      ],
+      "doesNotOwn": [
+        "Bing 结果页抓取与解析",
+        "域名二次过滤",
+        "失败归类文案"
+      ],
+      "publicApi": [
+        "BING_MIN_ON_SITE",
+        "BING_PER_SITE_PRIORITY",
+        "BING_PER_SITE_LIMIT",
+        "BING_PER_SITE_DELAY_MS",
+        "BING_PER_SITE_STOP",
+        "BingPageKind",
+        "BingPerSitePassInput",
+        "bingPerSiteDomains",
+        "bingPerSiteQuery",
+        "mergeBingItems",
+        "runBingPerSitePass"
+      ],
+      "test": [
+        "src/features/shared/research/bingSearch.test.ts"
+      ],
+      "budget": 120
     }
   ]
 }

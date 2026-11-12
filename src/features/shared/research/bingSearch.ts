@@ -12,6 +12,12 @@ import {
   type BingPageStatus,
   type BingWebHit,
 } from './bingResultParser'
+import {
+  BING_PER_SITE_DELAY_MS,
+  BING_PER_SITE_STOP,
+  mergeBingItems,
+  runBingPerSitePass,
+} from './bingPerSite'
 import { designReferenceSiteQuery, isDesignReferenceUrl } from './designReferenceSites'
 
 /**
@@ -21,6 +27,7 @@ import { designReferenceSiteQuery, isDesignReferenceUrl } from './designReferenc
  *   浏览器开发模式下 publicOnly 失败关闭，本通道如实报“只在桌面应用可用”，由调用方回退。
  * - 查询拼 `(site:a OR site:b …)` 限定到 12 个固定设计站；Bing 对匿名请求可能忽略 `site:`，
  *   因此解析后**再按域名过滤一次**，绝不把指定站点以外的结果混进来。
+ * - OR 查询站内命中不足时逐站补查（`bingPerSite.ts`），域名过滤照旧。
  * - 尽力而为：验证码、限流、改版都会失败，失败原因写进 `failure`，不抛错。
  */
 export const BING_WEB_ENDPOINT = 'https://www.bing.com/search'
@@ -57,6 +64,8 @@ export interface BingSearchInput {
   mode?: ResearchMode
   /** 站点限定；缺省为 12 个固定设计站。 */
   domains?: readonly string[]
+  /** 逐站补查之间的间隔（毫秒），缺省 {@link BING_PER_SITE_DELAY_MS}；测试传 0。 */
+  perSiteDelayMs?: number
 }
 
 const FAILURE_PRIORITY: readonly BingFailure[] = [
@@ -199,7 +208,7 @@ async function fetchPage(
   }
 }
 
-/** 每个检索角度按模式抓网页 / 图片结果页（并发），合并去重；全部落空时给出主因。 */
+/** 每个角度按模式并发抓网页 / 图片结果页，合并去重；某类站内命中不足时逐站补查；全部落空时给出主因。 */
 export async function searchBing(
   network: NetworkPort,
   input: BingSearchInput,
@@ -216,14 +225,23 @@ export async function searchBing(
   const outcomes = await Promise.all(jobs)
   const items: DesignResearchItem[] = []
   const seen = new Set<string>()
-  for (const outcome of outcomes) {
-    for (const item of outcome.items) {
-      const key = item.imageUrl ? `img:${item.imageUrl}` : `url:${item.url}`
-      if (seen.has(key)) continue
-      seen.add(key)
-      items.push(item)
-    }
-  }
+  for (const outcome of outcomes) mergeBingItems(items, seen, outcome.items)
+
+  await runBingPerSitePass({
+    kinds,
+    query: queries[0]!,
+    ...(input.domains ? { domains: input.domains } : {}),
+    delayMs: input.perSiteDelayMs ?? BING_PER_SITE_DELAY_MS,
+    signal,
+    countOf: (kind) => items.filter((item) => (kind === 'image') === Boolean(item.imageUrl)).length,
+    fetchPage: async (kind, query, siteIndex) => {
+      const outcome = await fetchPage(network, kind, query, 100 + siteIndex, signal)
+      outcomes.push(outcome)
+      mergeBingItems(items, seen, outcome.items)
+      return outcome.failure !== null && BING_PER_SITE_STOP.has(outcome.failure)
+    },
+  })
+
   if (items.length > 0) return { items }
   const failures = new Set(outcomes.map((outcome) => outcome.failure).filter(Boolean))
   const failure = FAILURE_PRIORITY.find((candidate) => failures.has(candidate)) ?? 'empty'

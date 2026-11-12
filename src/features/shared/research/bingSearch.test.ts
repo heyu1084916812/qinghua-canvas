@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { NetworkPort, NetworkRequest } from '../../../platform/ports'
+import { BING_MIN_ON_SITE, bingPerSiteDomains, bingPerSiteQuery } from './bingPerSite'
 import {
   BING_IMAGE_ENDPOINT,
   BING_WEB_ENDPOINT,
@@ -109,11 +110,12 @@ describe('searchBing', () => {
     )
     const result = await searchBing(
       port,
-      { queries: ['tea packaging', 'tea packaging'], mode: 'mixed' },
+      { queries: ['tea packaging', 'tea packaging'], mode: 'mixed', perSiteDelayMs: 0 },
       new AbortController().signal,
     )
-    expect(request).toHaveBeenCalledTimes(4)
-    for (const [req] of request.mock.calls) {
+    // 4 次 OR 查询（2 角度 × 网页/图片）；站内命中不足，再逐站补查（每类 4 站）。
+    expect(request).toHaveBeenCalledTimes(12)
+    for (const [req] of request.mock.calls.slice(0, 4)) {
       expect(req.publicOnly).toBe(true)
       expect(req.method).toBe('GET')
       expect(req.headers?.['User-Agent']).toMatch(/Mozilla\/5\.0/)
@@ -132,10 +134,11 @@ describe('searchBing', () => {
       seen.push(req.url)
       return html(fixture('bing-images.html'))
     })
-    await searchBing(port, { queries: ['a'], mode: 'image' }, new AbortController().signal)
-    await searchBing(port, { queries: ['a'], mode: 'web' }, new AbortController().signal)
-    expect(seen[0]?.startsWith(BING_IMAGE_ENDPOINT)).toBe(true)
-    expect(seen[1]?.startsWith(BING_WEB_ENDPOINT)).toBe(true)
+    await searchBing(port, { queries: ['a'], mode: 'image', perSiteDelayMs: 0 }, new AbortController().signal)
+    const imageCalls = seen.length
+    await searchBing(port, { queries: ['a'], mode: 'web', perSiteDelayMs: 0 }, new AbortController().signal)
+    expect(seen.slice(0, imageCalls).every((url) => url.startsWith(BING_IMAGE_ENDPOINT))).toBe(true)
+    expect(seen.slice(imageCalls).every((url) => url.startsWith(BING_WEB_ENDPOINT))).toBe(true)
   })
 
   it.each([
@@ -150,7 +153,7 @@ describe('searchBing', () => {
     ['only off-site hits', async () => html(fixture('bing-web-zh.html')), 'off-site'],
   ] as const)('reports %s as a failure the caller can fall back on', async (_label, handler, failure) => {
     const { port } = network(handler as () => Promise<ReturnType<typeof html>>)
-    const result = await searchBing(port, { queries: ['咖啡 包装'], mode: 'web' }, new AbortController().signal)
+    const result = await searchBing(port, { queries: ['咖啡 包装'], mode: 'web', perSiteDelayMs: 0 }, new AbortController().signal)
     expect(result.items).toEqual([])
     expect(result.failure).toBe(failure)
     expect(result.failureText).toBeTruthy()
@@ -162,7 +165,106 @@ describe('searchBing', () => {
       call += 1
       return call === 1 ? html(fixture('bing-images-empty.html')) : html(fixture('bing-captcha.html'))
     })
-    const result = await searchBing(port, { queries: ['a', 'b'], mode: 'image' }, new AbortController().signal)
+    const result = await searchBing(port, { queries: ['a', 'b'], mode: 'image', perSiteDelayMs: 0 }, new AbortController().signal)
     expect(result.failure).toBe('captcha')
+  })
+})
+
+/** 合成一页 Bing 图片结果（与真实页相同的 `a.iusc[m]` 结构），每条落在给定来源页。 */
+function imagePage(pages: readonly string[], tag: string): string {
+  const tiles = pages.map((page, index) => {
+    const m = JSON.stringify({
+      purl: page,
+      murl: `https://img.example-cdn.com/${tag}-${index}.jpg`,
+      turl: `https://ts1.mm.bing.net/th?id=${tag}-${index}`,
+      t: `${tag} ${index}`,
+    }).replace(/"/g, '&quot;')
+    return `<li><div class="imgpt"><a class="iusc" m="${m}" href="#"></a></div></li>`
+  })
+  return `<html><body><div id="mmComponent_images_1" class="dgControl"><ul class="dgControl_list">${tiles.join('')}</ul></div></body></html>`
+}
+
+describe('searchBing per-site fallback (Bing ignores site: OR for anonymous requests)', () => {
+  it('picks the top fixed sites, honouring an explicit domain list', () => {
+    expect(bingPerSiteDomains()).toEqual(['pinterest.com', 'behance.net', 'dribbble.com', 'huaban.com'])
+    expect(bingPerSiteDomains(['thedieline.com', 'behance.net'])).toEqual(['behance.net', 'thedieline.com'])
+    expect(bingPerSiteQuery('咖啡 海报', 'huaban.com')).toBe('咖啡 海报 huaban site:huaban.com')
+  })
+
+  it('runs sequential per-site queries when the OR query yields too few on-site hits, keeping the host filter', async () => {
+    const order: string[] = []
+    const { request, port } = network(async (req) => {
+      const q = new URL(req.url).searchParams.get('q') ?? ''
+      order.push(q)
+      if (q.includes(' OR ')) {
+        // Bing 忽略了 OR 子句：只有 1 条站内，其余是 pexels。
+        return html(imagePage(['https://www.pinterest.com/pin/1/', 'https://www.pexels.com/p/1'], 'or'))
+      }
+      const site = /site:(\S+)/.exec(q)?.[1] ?? ''
+      // 逐站结果里混一条站外，验证域名过滤仍生效。
+      return html(imagePage([
+        ...Array.from({ length: 5 }, (_, i) => `https://www.${site}/item/${i}`),
+        'https://unsplash.com/photos/x',
+      ], site))
+    })
+    const result = await searchBing(
+      port,
+      { queries: ['咖啡 海报'], mode: 'image', perSiteDelayMs: 0 },
+      new AbortController().signal,
+    )
+    expect(order[0]).toContain('(site:pinterest.com OR')
+    // 1 + 5 + 5 = 11 < 12 → 第三站补齐 16 条后停（不查第 4 站）。
+    expect(order.slice(1)).toEqual([
+      '咖啡 海报 pinterest site:pinterest.com',
+      '咖啡 海报 behance site:behance.net',
+      '咖啡 海报 dribbble site:dribbble.com',
+    ])
+    expect(request).toHaveBeenCalledTimes(4)
+    expect(result.items.length).toBeGreaterThanOrEqual(BING_MIN_ON_SITE.image)
+    expect(result.items.every((item) => !/pexels|unsplash/.test(item.url))).toBe(true)
+    expect(result.failure).toBeUndefined()
+  })
+
+  it('skips the per-site pass when the OR query already has enough on-site hits', async () => {
+    const pages = Array.from({ length: 14 }, (_, i) => `https://www.behance.net/gallery/${i}`)
+    const { request, port } = network(async () => html(imagePage(pages, 'enough')))
+    const result = await searchBing(port, { queries: ['a'], mode: 'image', perSiteDelayMs: 0 }, new AbortController().signal)
+    expect(request).toHaveBeenCalledTimes(1)
+    expect(result.items).toHaveLength(14)
+  })
+
+  it('waits between per-site requests and stops immediately on captcha', async () => {
+    vi.useFakeTimers()
+    try {
+      let call = 0
+      const { request, port } = network(async () => {
+        call += 1
+        if (call === 1) return html(fixture('bing-images-empty.html'))
+        return call === 2 ? html(imagePage(['https://dribbble.com/shots/1'], 'p')) : html(fixture('bing-captcha.html'))
+      })
+      const pending = searchBing(port, { queries: ['a'], mode: 'image', perSiteDelayMs: 300 }, new AbortController().signal)
+      await vi.advanceTimersByTimeAsync(0)
+      expect(request).toHaveBeenCalledTimes(2) // OR + 第一站，无需等待
+      await vi.advanceTimersByTimeAsync(299)
+      expect(request).toHaveBeenCalledTimes(2)
+      await vi.advanceTimersByTimeAsync(1)
+      expect(request).toHaveBeenCalledTimes(3) // 第二站：验证码 → 停
+      await vi.advanceTimersByTimeAsync(2000)
+      const result = await pending
+      expect(request).toHaveBeenCalledTimes(3)
+      expect(result.items).toHaveLength(1)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('stops the per-site pass when aborted', async () => {
+    const controller = new AbortController()
+    const { request, port } = network(async () => {
+      controller.abort()
+      return html(fixture('bing-images-empty.html'))
+    })
+    await searchBing(port, { queries: ['a'], mode: 'image', perSiteDelayMs: 0 }, controller.signal)
+    expect(request).toHaveBeenCalledTimes(1)
   })
 })
