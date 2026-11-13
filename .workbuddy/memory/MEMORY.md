@@ -1,5 +1,13 @@
 # CanvasFlow（轻画）项目记忆
 
+### 2026-11-13 #1076 方案 D：图片调研改走花瓣 / 站酷站点适配器（分支 site-adapters）
+
+- 花瓣 `huaban.com/v3/search/pins?q=&per_page=40` 免登录 JSON。`file.url`（`gd-hbimg-edge…?auth_key=<过期戳>-…`）约一天过期，且边缘节点对沙箱 / 外站 Referer 回 **567 拦截页**；稳定可用的是**免签名** `gd-hbimg.huaban.com/<key>_fw658webp`（及原图 `<key>`）。该图床对 `curl/*` UA 回 403，**空 UA 与浏览器 UA 都 200**，外站 Referer 567 / 403 —— 画廊 `<img referrerPolicy="no-referrer">` 正好满足，`saveResearchItem` 不带 UA 也能下。
+- 站酷搜索页卡片是 `role="button"`，**卡片里没有作品链接**；作品页、标题、封面都在页内 RSC 负载 `self.__next_f.push([1,"…"])` 的 `initialItems` 里（拼接所有段后按字符串感知的括号配对截数组）。`objectType 3`=作品，8=文章，其它是运营位。封面 `img.zcool.cn/…?k=&t=<十六进制过期时间>` 签名约一天，外站 Referer 403。
+- 图片模式**不再调用 Bing 图片**；网页仍走 Bing 网页。适配器 0 条才回退 Tavily。#1029 口径仍在：**不**回退 Openverse 等非指定来源。
+- `conversation.ts` 正好卡在 1000 行（超千行必须进 legacy 白名单，`scripts/module-governance.test.mjs` 会红），往里加逻辑要先挪出去（本次 `researchStepLabel` 放在 `agentResearchSourceLabel.ts`）。
+- worktree 里给 `node_modules` 建软链时，`.gitignore` 的 `node_modules/`（带斜杠）不匹配软链，`git add -A` 会把它加进去；已在公共 `info/exclude` 加 `/node_modules`。
+
 ### 2026-11-13 本仓库可能有**另一个代理/会话同时在工作** —— 不要用 git stash
 
 - 现象：一次「看起来工作区是干净的」`git stash push -q && … && git stash pop -q`，push 因为无改动没有建条目，pop 却把**别人留下的** `stash@{0}`（日志分页 WIP）弹了出来，产生 4 个 UU 冲突，还差点覆盖别的会话的改动。

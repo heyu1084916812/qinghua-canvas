@@ -5,6 +5,10 @@ import { researchQueriesOf, runDesignResearch } from './designResearchRunner'
 import { TAVILY_SEARCH_ENDPOINT } from './tavilySearch'
 import { BING_IMAGE_ENDPOINT, BING_WEB_ENDPOINT } from './bingSearch'
 import { TAVILY_OPTIONAL_HINT } from './fixedSiteSearch'
+import { HUABAN_SEARCH_ENDPOINT } from './siteAdapters/huabanAdapter'
+import { ZCOOL_SEARCH_ENDPOINT } from './siteAdapters/zcoolAdapter'
+import huabanFixture from './siteAdapters/fixtures/huaban-search-pins.json?raw'
+import zcoolFixture from './siteAdapters/fixtures/zcool-search-content.html?raw'
 
 const FIXTURES = import.meta.glob('./fixtures/*.html', {
   eager: true,
@@ -18,6 +22,8 @@ const fixture = (name: string): string => {
 }
 const isBing = (url: string) =>
   url.startsWith(BING_WEB_ENDPOINT) || url.startsWith(BING_IMAGE_ENDPOINT)
+const isSiteAdapter = (url: string) =>
+  url.startsWith(HUABAN_SEARCH_ENDPOINT) || url.startsWith(ZCOOL_SEARCH_ENDPOINT)
 function htmlResponse(html: string) {
   return {
     status: 200,
@@ -252,10 +258,10 @@ describe('runDesignResearch', () => {
     expect(result.ok).toBe(false)
     expect(result.items).toEqual([])
     expect(result.needsTavilyKey).toBeUndefined()
-    // 只请求了免 Key 的 Bing 结果页（publicOnly），没有 Openverse / Wikipedia 等未指定来源。
+    // 图片模式只请求了花瓣 / 站酷适配器（publicOnly）；不走 Bing 图片，也没有 Openverse / Wikipedia 等未指定来源。
     expect(request).toHaveBeenCalled()
     for (const [req] of request.mock.calls) {
-      expect(isBing(req.url)).toBe(true)
+      expect(isSiteAdapter(req.url)).toBe(true)
       expect(req.publicOnly).toBe(true)
     }
   })
@@ -309,12 +315,13 @@ describe('runDesignResearch', () => {
     expect(result.warnings.join(' ')).toContain('aborted')
   })
 
-  it('uses free Bing results first and never spends Tavily credits when Bing answers', async () => {
+  it('mixed mode takes images from 花瓣 / 站酷 adapters and web pages from Bing, without Tavily or Bing images', async () => {
     const seen: string[] = []
     const request = vi.fn<NetworkPort['request']>(async (req) => {
       seen.push(req.url)
+      if (req.url.startsWith(HUABAN_SEARCH_ENDPOINT)) return htmlResponse(huabanFixture)
+      if (req.url.startsWith(ZCOOL_SEARCH_ENDPOINT)) return htmlResponse(zcoolFixture)
       if (req.url.startsWith(BING_WEB_ENDPOINT)) return htmlResponse(fixture('bing-web.html'))
-      if (req.url.startsWith(BING_IMAGE_ENDPOINT)) return htmlResponse(fixture('bing-images.html'))
       throw new Error(`unexpected ${req.url}`)
     })
     const result = await runDesignResearch(
@@ -324,14 +331,65 @@ describe('runDesignResearch', () => {
     )
     expect(result.ok).toBe(true)
     expect(seen.some((url) => url === TAVILY_SEARCH_ENDPOINT)).toBe(false)
-    expect(result.items.every((item) => item.source === 'bing')).toBe(true)
-    // 只保留固定设计站：Behance 网页 + 两张 Pinterest 图；99designs / pexels 被过滤。
-    expect(result.items.map((item) => new URL(item.url).hostname).sort()).toEqual([
-      'id.pinterest.com',
-      'tr.pinterest.com',
-      'www.behance.net',
-    ])
+    expect(seen.some((url) => url.startsWith(BING_IMAGE_ENDPOINT))).toBe(false)
+    const sources = new Set(result.items.map((item) => item.source))
+    expect(sources).toEqual(new Set(['huaban', 'zcool', 'bing']))
+    // Bing 只出网页，且只留固定设计站。
+    const bingItems = result.items.filter((item) => item.source === 'bing')
+    expect(bingItems.every((item) => item.imageUrl === '')).toBe(true)
+    expect(bingItems.map((item) => new URL(item.url).hostname)).toEqual(['www.behance.net'])
+    expect(result.usedSources).toEqual(['花瓣', '站酷', 'Bing'])
     expect(result.warnings).toEqual([])
+  })
+
+  it('image mode uses only the site adapters and never spends Tavily credits when they answer', async () => {
+    const seen: string[] = []
+    const request = vi.fn<NetworkPort['request']>(async (req) => {
+      seen.push(req.url)
+      if (req.url.startsWith(HUABAN_SEARCH_ENDPOINT)) return htmlResponse(huabanFixture)
+      if (req.url.startsWith(ZCOOL_SEARCH_ENDPOINT)) return htmlResponse(zcoolFixture)
+      throw new Error(`unexpected ${req.url}`)
+    })
+    const result = await runDesignResearch(
+      { topic: '包装', queries: ['包装'], mode: 'image', imageMaxResults: 30 },
+      { network: { request, stream: async function* () {} }, tavilyApiKey: 'k', siteAdapterDelayMs: 0 },
+      new AbortController().signal,
+    )
+    expect(result.ok).toBe(true)
+    expect(seen.every(isSiteAdapter)).toBe(true)
+    expect(result.items.every((item) => item.imageUrl !== '')).toBe(true)
+    expect(result.items.slice(0, 2).map((item) => item.source)).toEqual(['huaban', 'zcool'])
+    expect(result.usedSources).toEqual(['花瓣', '站酷'])
+  })
+
+  it('image mode falls back to Tavily when the adapters return nothing (#1076)', async () => {
+    const seen: string[] = []
+    const request = vi.fn<NetworkPort['request']>(async (req) => {
+      seen.push(req.url)
+      if (req.url.startsWith(HUABAN_SEARCH_ENDPOINT)) return htmlResponse('{"pins":[]}')
+      if (req.url.startsWith(ZCOOL_SEARCH_ENDPOINT)) return htmlResponse('<div class="zm02cG_grid"></div>')
+      if (req.url === TAVILY_SEARCH_ENDPOINT) {
+        return {
+          ...htmlResponse(''),
+          json: async <T,>() => ({
+            results: [],
+            images: [{ url: 'https://cdn.example.com/box.jpg', description: 'box' }],
+          }) as T,
+        }
+      }
+      throw new Error(`unexpected ${req.url}`)
+    })
+    const result = await runDesignResearch(
+      { topic: '包装', queries: ['包装'], mode: 'image' },
+      { network: { request, stream: async function* () {} }, tavilyApiKey: 'k' },
+      new AbortController().signal,
+    )
+    expect(result.ok).toBe(true)
+    expect(result.items.map((item) => item.source)).toEqual(['tavily'])
+    expect(result.warnings[0]).toContain('花瓣没有找到相关结果')
+    expect(result.warnings[0]).toContain('已改用 Tavily')
+    expect(result.usedSources).toEqual(['Tavily'])
+    expect(seen.some(isBing)).toBe(false)
   })
 
   it('falls back to Tavily only when the free Bing path hits a captcha', async () => {
@@ -396,9 +454,9 @@ describe('runDesignResearch', () => {
     expect(result.items[0]?.source).toBe('tavily')
     // 两个角度返回同样的链接，去重后只剩一份网页 + 一张图。
     expect(result.items.map((item) => item.source)).toEqual(['tavily', 'tavily'])
-    const nonBing = seen.filter((url) => !isBing(url))
-    expect(nonBing.every((url) => url === TAVILY_SEARCH_ENDPOINT)).toBe(true)
-    expect(nonBing).toHaveLength(2)
+    const paid = seen.filter((url) => !isSiteAdapter(url))
+    expect(paid.every((url) => url === TAVILY_SEARCH_ENDPOINT)).toBe(true)
+    expect(paid).toHaveLength(2)
     expect(result.needsTavilyKey).toBeUndefined()
     expect(JSON.stringify(result)).not.toContain('Bearer')
   })

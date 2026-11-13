@@ -326,6 +326,36 @@ describe('工具结果 → 人话', () => {
     expect(result.lines[0]).toBe('找到 4 条参考，覆盖 2 个来源')
   })
 
+  it('#1076：步骤标题写明实际来源「花瓣 · 站酷」，失败结果不带来源', () => {
+    const pin = (url: string, i: number, source: string) => ({
+      id: `${source}:${i}`, title: `t${i}`, url, imageUrl: `https://img.example.com/${i}.jpg`, source,
+    })
+    const ok = describeToolResult('researchDesign', JSON.stringify({
+      ok: true,
+      request: { mode: 'image' },
+      usedSources: ['花瓣', '站酷', '花瓣'],
+      items: [
+        pin('https://huaban.com/pins/1', 1, 'huaban'),
+        pin('https://www.zcool.com.cn/work/a.html', 2, 'zcool'),
+        pin('https://huaban.com/pins/3', 3, 'huaban'),
+      ],
+      sources: [],
+    }))
+    expect(ok.stepLabel).toBe('花瓣 · 站酷 · 2 个网页')
+    const web = describeToolResult('researchDesign', JSON.stringify({
+      ok: true,
+      request: { mode: 'web' },
+      usedSources: ['Bing'],
+      items: [{ id: 'w', title: 't', url: 'https://www.behance.net/a', imageUrl: '', source: 'bing' }],
+      sources: [],
+    }))
+    expect(web.stepLabel).toBe('Bing · 1 个网页')
+    const failed = describeToolResult('researchDesign', JSON.stringify({
+      ok: false, request: { mode: 'image' }, usedSources: ['花瓣'], items: [],
+    }))
+    expect(failed.stepLabel).toBeUndefined()
+  })
+
   it('旧调研结果没有 mode 时保持兼容，不擅自改判成图片模式', () => {
     const legacy = describeToolResult(
       'researchDesign',

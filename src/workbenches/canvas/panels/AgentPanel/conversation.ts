@@ -3,7 +3,7 @@ import { agentPhaseForTool, agentPhaseStepLine, agentPhaseTitle, isAgentPhase, t
 import type { ChatMessage } from '../../../../domain/shared/execution/types'
 import { isPublicHttpUrl } from '../../../../domain/shared/publicUrl'
 import { researchModeOf, type ResearchMode } from '../../../../domain/inspiration/designResearch'
-import { researchSiteCount, researchSourceHostCount, researchWebPageCount } from './agentResearchSourceLabel'
+import { researchSiteCount, researchSourceHostCount, researchStepLabel, researchWebPageCount } from './agentResearchSourceLabel'
 import { parseQuestionCardArgs, type AgentQuestion } from '../../../../domain/agent/questionCard'
 import { parseQuestionCardAnswerMessage, type QuestionCardAnswerSummary } from '../../../../domain/agent/questionCardReply'
 import { stripQuestionCardEchoes } from './questionCardProjection'
@@ -402,7 +402,7 @@ export function describeToolResult(
           : researchWebPageCount(researchItems)
       const sourceCount = sources.length || researchSourceHostCount(researchItems)
       return {
-        ...(pageCount > 0 ? { stepLabel: `${pageCount} 个网页` } : {}),
+        ...(pageCount > 0 ? { stepLabel: researchStepLabel(r.usedSources, pageCount) } : {}),
         lines: [
           `找到 ${items.length} 条参考，覆盖 ${sourceCount} 个来源`,
           ...warnings.slice(0, 2),

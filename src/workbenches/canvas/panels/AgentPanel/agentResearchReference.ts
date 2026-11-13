@@ -30,6 +30,8 @@ function providerOf(source: string): ResearchProvider {
   if (normalized === 'searxng') return 'searxng'
   if (normalized === 'tavily') return 'tavily'
   if (normalized === 'bing') return 'bing'
+  if (normalized === 'huaban' || normalized === '花瓣') return 'huaban'
+  if (normalized === 'zcool' || normalized === '站酷') return 'zcool'
   return 'web'
 }
 

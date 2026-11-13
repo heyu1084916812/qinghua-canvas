@@ -1,0 +1,244 @@
+{
+ "query": {
+  "text": "包装",
+  "type": "pin",
+  "sort": "all",
+  "page": 1
+ },
+ "pin_count": 10000,
+ "pins": [
+  {
+   "pin_id": 6603684802,
+   "board_id": 51908327,
+   "file_id": 864835215,
+   "media_type": 0,
+   "source": null,
+   "link": null,
+   "raw_text": "独立包装",
+   "created_at": 1744189487,
+   "like_count": 10,
+   "repin_count": 88,
+   "file": {
+    "bucket": "gd-hbimg",
+    "key": "8f9ff933270d15e23f0f8a945859d4e4bf3b36d831b7-GCMrtC",
+    "type": "image/png",
+    "width": 512,
+    "height": 512,
+    "url": "https://gd-hbimg-edge.huaban.com/8f9ff933270d15e23f0f8a945859d4e4bf3b36d831b7-GCMrtC?auth_key=1794585600-5b5fee4e3a5e4da8a9c343fea2027947-0-e8b5ffb41895377b87129ddd742218cb"
+   },
+   "user": {
+    "user_id": 23862622,
+    "username": "嗷嗷嗷嗷哥",
+    "urlname": "gydb0qrr04"
+   },
+   "board": {
+    "board_id": 51908327,
+    "title": "免抠素材"
+   }
+  },
+  {
+   "pin_id": 5454784233,
+   "board_id": 84456521,
+   "file_id": 627783534,
+   "media_type": 0,
+   "source": null,
+   "link": null,
+   "raw_text": "纸箱矢量",
+   "created_at": 1682322393,
+   "like_count": 14,
+   "repin_count": 289,
+   "file": {
+    "bucket": "gd-hbimg",
+    "key": "c7e42d2573068641dde76ec68022066fcb1a5aa611617-6vo4Sx",
+    "type": "image/png",
+    "width": 1880,
+    "height": 1800,
+    "url": "https://gd-hbimg-edge.huaban.com/c7e42d2573068641dde76ec68022066fcb1a5aa611617-6vo4Sx?auth_key=1794585600-5b5fee4e3a5e4da8a9c343fea2027947-0-9a78297b5871bd72be56e6ca748c822c"
+   },
+   "user": {
+    "user_id": 32394225,
+    "username": "你不懂执着",
+    "urlname": "g9gufrjnpl"
+   },
+   "board": {
+    "board_id": 84456521,
+    "title": "自制小素材"
+   }
+  },
+  {
+   "pin_id": 6729260887,
+   "board_id": 97037513,
+   "file_id": 874185033,
+   "media_type": 0,
+   "source": null,
+   "link": "",
+   "raw_text": "",
+   "created_at": 1751798023,
+   "like_count": 2,
+   "repin_count": 9,
+   "file": {
+    "bucket": "gd-hbimg",
+    "key": "9ba15932801b968100e285cfe8b6365051abfe0146a26-HK65UF",
+    "type": "image/jpeg",
+    "width": 1280,
+    "height": 1672,
+    "url": "https://gd-hbimg-edge.huaban.com/9ba15932801b968100e285cfe8b6365051abfe0146a26-HK65UF?auth_key=1794585600-5b5fee4e3a5e4da8a9c343fea2027947-0-2f75efcbae87e1ee0a7c345edabbf4b7"
+   },
+   "user": {
+    "user_id": 29736813,
+    "username": "x骑着蚂蚁去看海",
+    "urlname": "mbp3ygekin"
+   },
+   "board": {
+    "board_id": 97037513,
+    "title": "采集"
+   }
+  },
+  {
+   "pin_id": 6725238530,
+   "board_id": 94602263,
+   "file_id": 882510477,
+   "media_type": 0,
+   "source": null,
+   "link": null,
+   "raw_text": "10311",
+   "created_at": 1751513254,
+   "like_count": 15,
+   "repin_count": 296,
+   "file": {
+    "bucket": "gd-hbimg",
+    "key": "57575632f49abdc29d0c166bd14cd4c5e6ed19ae22559-GYdReH",
+    "type": "image/png",
+    "width": 480,
+    "height": 480,
+    "url": "https://gd-hbimg-edge.huaban.com/57575632f49abdc29d0c166bd14cd4c5e6ed19ae22559-GYdReH?auth_key=1794585600-5b5fee4e3a5e4da8a9c343fea2027947-0-96786f20827c0180fdd6668edfbead4c"
+   },
+   "user": {
+    "user_id": 33057568,
+    "username": "玛卡巴巴卡卡",
+    "urlname": "cc5ugjvzqm"
+   },
+   "board": {
+    "board_id": 94602263,
+    "title": "免扣素材（png）"
+   }
+  },
+  {
+   "pin_id": 6615747532,
+   "board_id": 96048817,
+   "file_id": 866414291,
+   "media_type": 0,
+   "source": "detail.tmall.com",
+   "link": "https://detail.tmall.com/item.htm?id=745735471560&ns=1&pisk=gs9mcz4l3I5XR0uRwL6jtdBW5XlJHt61-FeOWOQZaa77MOhXXGAkAFbxfj6vZNYyrZyxcnLlbFx6Mm1tllqXEe2THqGXbRXOQ23KpvKbDO6ZJBG5AYzfbMQZB1SN4tsTDX7y1vKXcNZ07DdrplxjmhZa_N8NUTSAxOSVQZ5rqGjh7O7V_zPPYaWNQZ5NzaShjrr",
+   "raw_text": "",
+   "created_at": 1744878388,
+   "like_count": 5,
+   "repin_count": 51,
+   "file": {
+    "bucket": "gd-hbimg",
+    "key": "17a637f094877e7a5252d89e3d035a5a7af12508282d5-XQKU7p",
+    "type": "image/jpeg",
+    "width": 790,
+    "height": 534,
+    "url": "https://gd-hbimg-edge.huaban.com/17a637f094877e7a5252d89e3d035a5a7af12508282d5-XQKU7p?auth_key=1794585600-5b5fee4e3a5e4da8a9c343fea2027947-0-89fe0642e9b7ee855ed3a6eb9086af28"
+   },
+   "user": {
+    "user_id": 34875889,
+    "username": "7NJBkvWc",
+    "urlname": "birflicabm"
+   },
+   "board": {
+    "board_id": 96048817,
+    "title": "升级/对比"
+   }
+  },
+  {
+   "pin_id": 5880281662,
+   "board_id": 77632821,
+   "file_id": 692540016,
+   "media_type": 0,
+   "source": null,
+   "link": null,
+   "raw_text": "润致娃娃针-02",
+   "created_at": 1703239841,
+   "like_count": 12,
+   "repin_count": 107,
+   "file": {
+    "bucket": "gd-hbimg",
+    "key": "2ac63e0ff5556c1c658052ec9382aad493a2b9c771526a-dPSne2",
+    "type": "image/png",
+    "width": 2353,
+    "height": 5792,
+    "url": "https://gd-hbimg-edge.huaban.com/2ac63e0ff5556c1c658052ec9382aad493a2b9c771526a-dPSne2?auth_key=1794585600-5b5fee4e3a5e4da8a9c343fea2027947-0-ae5ebafa51dd9199b26cf228e251d187"
+   },
+   "user": {
+    "user_id": 8494486,
+    "username": "LuuukeeeLabs",
+    "urlname": "luuukeee"
+   },
+   "board": {
+    "board_id": 77632821,
+    "title": "MR素材-医美·药械（全球）"
+   }
+  },
+  {
+   "pin_id": 6406683522,
+   "board_id": 91529256,
+   "file_id": 831483395,
+   "media_type": 0,
+   "source": "alibaba.com",
+   "link": "https://www.alibaba.com/product-detail/Car-Mud-Flaps-Mudguard-Official-Original_1601150260139.html?spm=a2700.galleryofferlist.normal_offer.d_image.48da13a0ehLjju",
+   "raw_text": "",
+   "created_at": 1731919857,
+   "like_count": 1,
+   "repin_count": 39,
+   "file": {
+    "bucket": "gd-hbimg",
+    "key": "5d3651aea2fff1047163aa1f0be92acdc0052cb41c314-IYgqr5",
+    "type": "image/jpeg",
+    "width": 600,
+    "height": 800,
+    "url": "https://gd-hbimg-edge.huaban.com/5d3651aea2fff1047163aa1f0be92acdc0052cb41c314-IYgqr5?auth_key=1794585600-5b5fee4e3a5e4da8a9c343fea2027947-0-e2374ed559debba737d7601938d895e4"
+   },
+   "user": {
+    "user_id": 35937721,
+    "username": "用户b3VJqUQL",
+    "urlname": "pidxeoob1j"
+   },
+   "board": {
+    "board_id": 91529256,
+    "title": "挡泥板"
+   }
+  },
+  {
+   "pin_id": 6878228747,
+   "board_id": 98098277,
+   "file_id": 900894263,
+   "media_type": 0,
+   "source": null,
+   "link": "",
+   "raw_text": "嗨体2.5新包装",
+   "created_at": 1761298132,
+   "like_count": 0,
+   "repin_count": 3,
+   "file": {
+    "bucket": "gd-hbimg",
+    "key": "3b0a52159f259a749b83708794d46690dd6425fc5c067-LcfjxE",
+    "type": "image/png",
+    "width": 2880,
+    "height": 1920,
+    "url": "https://gd-hbimg-edge.huaban.com/3b0a52159f259a749b83708794d46690dd6425fc5c067-LcfjxE?auth_key=1794585600-5b5fee4e3a5e4da8a9c343fea2027947-0-0dfae06abf36a1dc7cf528f9b02106ad"
+   },
+   "user": {
+    "user_id": 31158706,
+    "username": "我是一切的根源",
+    "urlname": "yudk6rbf0q"
+   },
+   "board": {
+    "board_id": 98098277,
+    "title": "医美-素材"
+   }
+  }
+ ],
+ "page": 1
+}

@@ -76,7 +76,7 @@ export const AGENT_TOOLS: readonly ToolDeclaration[] = [
   {
     name: 'researchDesign',
     description:
-      '【设计搜索的首选工具】做联网调研：免 Key 抓 Bing 结果页，在固定 12 个设计站点检索图片与网页（每个检索角度并发一次；失败且用户填了 Tavily Key 时改用 Tavily），附带轻画本地灵感库。' +
+      '【设计搜索的首选工具】做联网调研：图片直接去设计站搜索（目前是花瓣 · 站酷；Dribbble / The Dieline / Packaging of the World / Pinterest 需浏览器、暂未接入），网页资料免 Key 抓 Bing 结果页；所需结果为空且用户填了 Tavily Key 时改用 Tavily；结果的 usedSources 写明实际用到的来源。附带轻画本地灵感库。' +
       '**用户说「找/搜/查」设计、灵感、参考、案例时，直接调用此工具，不要先发问题卡询问偏好。** ' +
       '必须按用户意图选择 mode：找图片、照片、海报、风格参考、灵感或 Moodboard 用 image（缺省也是 image）；' +
       '只要网页资料、文章、报告、新闻或公开来源用 web；既要参考图又要网页资料用 mixed。' +

@@ -52,7 +52,8 @@ export const WEB_RESEARCH_ON_PROMPT = [
   '  最后一句承接，并调用 `askQuestions` 发一个问题卡问「接下来推进哪个方向」（2–4 个选项，用户也可自由填写）。',
   '',
   '### API Key 说明',
-  '- 联网搜索默认免 Key（Bing 结果页）；结果为空时按 warnings 如实说明原因（验证码、限流、没有结果），可建议换角度或英文关键词再搜，Tavily API Key 只是可选备用。',
+  '- 联网搜索默认免 Key：找图直接去设计站搜（目前是花瓣 · 站酷），网页资料用 Bing 结果页；结果为空时按 warnings 如实说明原因（限流、没有结果、连不上），可建议换角度或中英文关键词再搜，Tavily API Key 只是可选备用。',
+  '- 说结果来自哪些站时以 `usedSources` 为准（如「花瓣 · 站酷」）；没在 usedSources 里的站（Dribbble、Behance、Pinterest 等）不要说搜过。',
   '- 结果里 `needsTavilyKey` 为 true（已填的 Tavily API Key 被拒或额度用尽）时，直接告诉用户：到 设置 → Agent → 工具 → 联网调研 检查 Key。',
 ].join('\n')
 
@@ -398,7 +399,7 @@ const LIGHT_IDENTITY_AND_RULES = [
   '- 本档只带与当前请求相关的节点，不附完整画布词表；只有信息不足或请求转成画布操作时，才调用 readGraph。',
   '- 用户要联网调研、找参考、做 Moodboard 或收集公开 Pinterest / Behance / 网页案例时，调用 researchDesign；',
   '  有公开 URL 就放进 urls；找图片/风格用 mode:"image"（默认，图片目标默认 40 且不受网页 12 条上限约束），',
-  '  查网页资料用 mode:"web"，两者都要用 mode:"mixed"。没有 URL 也会免 Key 搜索固定设计站点。',
+  '  查网页资料用 mode:"web"，两者都要用 mode:"mixed"。没有 URL 也会免 Key 搜索：图片来自花瓣 · 站酷，网页来自 Bing。',
   '  搜索结果只作为候选。mode:"image" 成功时结果卡就是回答，不写正文、不列链接；',
   '  web / mixed 才带来源链接，并说明私密内容和全站搜索没有执行。',
   '  mode:"web" 的报告：一句引言 + 3–5 个维度小标题与要点（约 700 字、不出图），结尾用 askQuestions 问下一步方向。',
