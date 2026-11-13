@@ -38,6 +38,8 @@ export interface DesignResearchRunnerDeps {
   webSearch?: WebSearchSettings
   /** 用户在设置里填的 Tavily Key（可选）：只在免费通道失败时使用，只进请求头，绝不回传。 */
   tavilyApiKey?: string | null
+  /** 站点适配器同站相邻请求间隔（毫秒）；缺省 400，测试传 0。 */
+  siteAdapterDelayMs?: number
 }
 
 export interface DesignResearchResult extends DesignResearchReport {
@@ -47,6 +49,8 @@ export interface DesignResearchResult extends DesignResearchReport {
   needsTavilyKey?: boolean
   /** 需要用户处理的问题（目前只有已填 Tavily Key 无效 / 额度用尽）。 */
   error?: string
+  /** 联网搜索实际产出结果的来源名（如 `['花瓣', '站酷']`）；没联网搜索或全空时缺省。 */
+  usedSources?: string[]
 }
 
 /** 规范化检索角度：去空、去重、最多 4 个；没有就用主题本身。 */
@@ -177,9 +181,10 @@ export async function runDesignResearch(
     if (isPublicHttpUrl(url)) safeUrls.push(url)
     else warnings.push(`${url} 不是公开互联网地址，已跳过。`)
   }
-  /** 排序：用户给的 URL → 免 Key Bing（失败时可选 Tavily）固定设计站 → 本地灵感库。 */
+  /** 排序：用户给的 URL → 设计站（图片走花瓣 / 站酷适配器，网页走 Bing；落空时可选 Tavily）→ 本地灵感库。 */
   const searchItems: DesignResearchItem[] = []
   let needsTavilyKey = false
+  let usedSources: string[] = []
   if (input.includeOpenSearch !== false) {
     const web = await searchFixedDesignSites(
       deps,
@@ -194,6 +199,7 @@ export async function runDesignResearch(
     searchItems.push(...web.items)
     warnings.push(...web.warnings)
     needsTavilyKey = web.needsTavilyKey
+    usedSources = web.usedSources
   }
   const libraryLimit = request.mode === 'web'
     ? Math.min(request.maxResults, 12)
@@ -254,6 +260,7 @@ export async function runDesignResearch(
     ok: !signal.aborted && report.totalItems > 0,
     ...report,
     warnings,
+    ...(usedSources.length > 0 ? { usedSources } : {}),
     ...(needsTavilyKey
       ? {
           needsTavilyKey: true,

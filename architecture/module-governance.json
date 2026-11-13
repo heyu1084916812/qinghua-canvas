@@ -8703,14 +8703,16 @@
     {
       "module": "src/features/shared/research/fixedSiteSearch.ts",
       "owner": "open-research-search",
-      "responsibility": "调度固定 12 个设计站的联网搜索：默认免 Key Bing，只有免费通道没有任何可用结果且用户填了 Tavily Key 时才回退 Tavily，并如实写出原因。",
+      "responsibility": "调度固定设计站的联网搜索：图片走花瓣 / 站酷直连适配器（不再用 Bing 图片），网页走免 Key Bing；所需结果为空且用户填了 Tavily Key 时才回退 Tavily，并如实写出原因与实际来源。",
       "owns": [
-        "免费通道优先、Tavily 可选回退的顺序",
+        "图片 / 网页 / 混合模式的通道选择",
+        "适配器与 Bing 落空时的 Tavily 回退顺序",
         "回退与失败时的警告文案",
+        "usedSources 与站点状态透传",
         "Tavily Key 被拒信号透传"
       ],
       "doesNotOwn": [
-        "Bing / Tavily 请求细节",
+        "站点适配器 / Bing / Tavily 请求细节",
         "Key 的存储与读取",
         "用户 URL 页面抓取与本地灵感库"
       ],
@@ -8724,7 +8726,7 @@
       "test": [
         "src/features/shared/research/fixedSiteSearch.test.ts"
       ],
-      "budget": 110
+      "budget": 150
     },
     {
       "module": "src/features/shared/research/siteAdapters/types.ts",
