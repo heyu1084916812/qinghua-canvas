@@ -29,6 +29,8 @@ use tauri_plugin_fs::FsExt;
 use tauri_plugin_opener::OpenerExt;
 use tauri_plugin_updater::UpdaterExt;
 
+mod browser_view;
+mod browser_view_rules;
 mod canvas_gateway;
 mod clipper_receiver;
 mod clipper_update;
@@ -4433,7 +4435,17 @@ pub fn run() {
             clipper_update::clipper_extension_update,
             pinterest_oauth::pinterest_oauth_listen,
             pinterest_oauth::pinterest_oauth_wait,
-            pinterest_oauth::pinterest_oauth_cancel
+            pinterest_oauth::pinterest_oauth_cancel,
+            browser_view::browser_view_open,
+            browser_view::browser_view_navigate,
+            browser_view::browser_view_back,
+            browser_view::browser_view_forward,
+            browser_view::browser_view_reload,
+            browser_view::browser_view_stop,
+            browser_view::browser_view_set_bounds,
+            browser_view::browser_view_show,
+            browser_view::browser_view_hide,
+            browser_view::browser_view_close
         ])
         .setup(move |app| {
             apply_data_dir_config(app.handle());

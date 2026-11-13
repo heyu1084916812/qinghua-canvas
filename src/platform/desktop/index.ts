@@ -1,6 +1,7 @@
 import type { PlatformKit } from '../ports'
 import { createWebPlatform } from '../web/index'
 import { createTauriAssetFolder } from './tauriAssetFolder'
+import { createTauriBrowserView } from './tauriBrowserView'
 import { createTauriCli } from './tauriCli'
 import { createTauriCredentials } from './tauriCredentials'
 import { createTauriFiles } from './tauriFiles'
@@ -34,6 +35,8 @@ export function createDesktopPlatform(): PlatformKit {
     remoteBytes: createTauriRemoteBytes(),
     // 壳里多出来的一档能力（对账 #392）：真的系统通知（官方插件）
     notify: createTauriNotify(),
+    // 壳里多出来的一档能力（2026-11-13）：系统 WebView 子视图，画布浏览器与 Agent 共用登录目录
+    browserView: createTauriBrowserView(),
     // API Key 交给 Windows DPAPI 加密（绑定当前用户），旧格式读取时自动迁移
     credentials: createTauriCredentials(),
   })

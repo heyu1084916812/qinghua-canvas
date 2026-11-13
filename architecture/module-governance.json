@@ -1395,7 +1395,7 @@
       "owner": "canvas-browser-overlay",
       "responsibility": "在画布舞台内组装可拖动、可缩放的浏览器浮层：工具条、起始页 / 错误态 / 网页内容与当前页收藏。",
       "owns": [
-        "浏览器窗口外框与内容区切换",
+        "浏览器窗口外框与内容区切换（桌面壳原生 webview / 浏览器开发版 iframe）",
         "窗口拖动、缩放与重置",
         "当前页网页收藏动作"
       ],
@@ -10619,7 +10619,8 @@
       ],
       "publicApi": [
         "CanvasBrowserStartPage",
-        "CanvasBrowserError"
+        "CanvasBrowserError",
+        "CanvasBrowserCovered"
       ],
       "test": [
         "src/pages/CanvasPage/browser/browserQuickSites.test.ts",
@@ -10651,6 +10652,101 @@
         "src/app/uiSevenPoints.test.ts"
       ],
       "budget": 175
+    },
+    {
+      "module": "src/platform/browserView.ts",
+      "owner": "platform-browser-view-port",
+      "responsibility": "定义原生网页视图端口：画布浏览器与后续 Agent 浏览器共用的打开、导航、定位、显隐与事件订阅接口。",
+      "owns": [
+        "BrowserViewPort 接口与事件形状",
+        "视图 id 规则与坐标取整"
+      ],
+      "doesNotOwn": [
+        "Tauri 命令的具体调用",
+        "画布浏览器的界面与导航状态"
+      ],
+      "publicApi": [
+        "BrowserViewBounds",
+        "BrowserViewEvent",
+        "BrowserViewOpenOptions",
+        "BrowserViewPort",
+        "CANVAS_BROWSER_VIEW_ID",
+        "isBrowserViewId",
+        "roundBrowserViewBounds",
+        "sameBrowserViewBounds"
+      ],
+      "test": [
+        "src/platform/browserView.test.ts"
+      ],
+      "budget": 100
+    },
+    {
+      "module": "src/platform/desktop/tauriBrowserView.ts",
+      "owner": "desktop-browser-view",
+      "responsibility": "用 Tauri 的 browser_view_* 命令与 browser-view:event 事件实现原生网页视图端口。",
+      "owns": [
+        "命令名与参数名到 Rust 侧的映射",
+        "按视图 id 过滤事件与退订"
+      ],
+      "doesNotOwn": [
+        "子 webview 的创建与数据目录（Rust 侧）",
+        "前端导航状态"
+      ],
+      "publicApi": [
+        "BROWSER_VIEW_EVENT",
+        "toBrowserViewEvent",
+        "createTauriBrowserView"
+      ],
+      "test": [
+        "src/platform/desktop/tauriBrowserView.test.ts"
+      ],
+      "budget": 100
+    },
+    {
+      "module": "src/pages/CanvasPage/browser/browserOcclusion.ts",
+      "owner": "canvas-browser-occlusion",
+      "responsibility": "判断是否有 DOM 浮层压在画布浏览器内容区上，供原生视图让位。",
+      "owns": [
+        "浮层选择器清单",
+        "矩形相交与自身浮层排除规则"
+      ],
+      "doesNotOwn": [
+        "原生视图的显隐命令",
+        "浮层自身的渲染"
+      ],
+      "publicApi": [
+        "PlainRect",
+        "BROWSER_OCCLUDER_SELECTOR",
+        "rectsOverlap",
+        "findBrowserOccluder",
+        "domBrowserOccluder"
+      ],
+      "test": [
+        "src/pages/CanvasPage/browser/browserOcclusion.test.ts"
+      ],
+      "budget": 80
+    },
+    {
+      "module": "src/pages/CanvasPage/browser/useNativeBrowserView.ts",
+      "owner": "canvas-browser-native-view",
+      "responsibility": "把画布浏览器内容区交给原生 webview：跟随 DOM 矩形、被浮层盖住时让位，并把导航动作转成端口命令、把加载事件回填导航状态。",
+      "owns": [
+        "原生视图的打开、定位、显隐与关闭时机",
+        "用户导航动作到端口命令的映射"
+      ],
+      "doesNotOwn": [
+        "导航状态迁移规则",
+        "Tauri 命令实现"
+      ],
+      "publicApi": [
+        "useNativeBrowserView"
+      ],
+      "test": [
+        "src/pages/CanvasPage/browser/browserOcclusion.test.ts",
+        "src/platform/desktop/tauriBrowserView.test.ts",
+        "src/domain/canvas/browserNavigation.test.ts"
+      ],
+      "budget": 190
     }
   ]
 }

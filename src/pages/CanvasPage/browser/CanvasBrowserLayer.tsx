@@ -18,8 +18,9 @@ import { canGoBack, canGoForward } from '../../../domain/canvas/browserNavigatio
 import { createClipperCollectionRepository } from '../../../state/shared/clipperCollectionRepository'
 import { captureClipperPage } from '../clipper/clipperCapture'
 import { CanvasBrowserToolbar } from './CanvasBrowserToolbar'
-import { CanvasBrowserError, CanvasBrowserStartPage } from './CanvasBrowserStates'
+import { CanvasBrowserCovered, CanvasBrowserError, CanvasBrowserStartPage } from './CanvasBrowserStates'
 import { useCanvasBrowserNav } from './useCanvasBrowserNav'
+import { useNativeBrowserView } from './useNativeBrowserView'
 import styles from './CanvasBrowserLayer.module.css'
 
 type GestureMode = 'move' | 'resize'
@@ -54,6 +55,16 @@ export function CanvasBrowserLayer({
   const [rect, setRect] = useState<BrowserWindowRect | null>(null)
   const nav = useCanvasBrowserNav(url)
   const currentUrl = nav.url
+  const contentRef = useRef<HTMLDivElement | null>(null)
+  /** 桌面壳：系统 WebView 子视图；浏览器开发版没有这个端口 ⇒ 退回 iframe */
+  const native = useNativeBrowserView({
+    port: platform.browserView,
+    state: nav.state,
+    url: currentUrl,
+    dispatch: nav.dispatch,
+    contentRef,
+    rootRef,
+  })
   const [busy, setBusy] = useState(false)
   const [status, setStatus] = useState('')
 
@@ -219,9 +230,23 @@ export function CanvasBrowserLayer({
             canForward={canGoForward(nav.state)}
             saving={busy}
             onNavigate={go}
-            onBack={() => nav.dispatch({ type: 'back' })}
-            onForward={() => nav.dispatch({ type: 'forward' })}
-            onReloadOrStop={() => nav.dispatch({ type: nav.state.phase === 'loading' ? 'stop' : 'reload' })}
+            onBack={() => {
+              native.markAction('back')
+              nav.dispatch({ type: 'back' })
+            }}
+            onForward={() => {
+              native.markAction('forward')
+              nav.dispatch({ type: 'forward' })
+            }}
+            onReloadOrStop={() => {
+              if (nav.state.phase === 'loading') {
+                native.stop()
+                nav.dispatch({ type: 'stop' })
+                return
+              }
+              native.markAction('reload')
+              nav.dispatch({ type: 'reload' })
+            }}
             onSave={() => void savePage()}
             onOpenExternal={openExternal}
             onResetWindow={() => setRect(fitBrowserWindow(stage))}
@@ -230,15 +255,26 @@ export function CanvasBrowserLayer({
             onDragStart={(event) => beginGesture(event, 'move')}
             onDragKey={moveWithKeyboard}
           />
-          <div className={styles.viewport} data-canvas-browser-content>
+          <div
+            ref={contentRef}
+            className={styles.viewport}
+            data-canvas-browser-content
+            data-backend={native.native ? 'native' : 'iframe'}
+          >
             {nav.state.phase === 'blank' ? (
               <CanvasBrowserStartPage onOpen={go} />
             ) : nav.state.phase === 'error' ? (
               <CanvasBrowserError
                 message={nav.state.error}
-                onRetry={() => nav.dispatch({ type: 'reload' })}
+                onRetry={() => {
+                  native.markAction('reload')
+                  nav.dispatch({ type: 'reload' })
+                }}
                 onOpenExternal={openExternal}
               />
+            ) : native.native ? (
+              // 原生视图叠在这块区域上方；这里只在它让位（被浮层盖住）时露出说明
+              native.covered ? <CanvasBrowserCovered title={nav.state.title} /> : null
             ) : (
               <iframe
                 key={nav.state.revision}
@@ -250,11 +286,6 @@ export function CanvasBrowserLayer({
               />
             )}
           </div>
-          {status ? (
-            <p className={styles.status} role="status" aria-live="polite">
-              {status}
-            </p>
-          ) : null}
           <button
             type="button"
             className={styles.resizeHandle}
@@ -266,8 +297,33 @@ export function CanvasBrowserLayer({
           />
         </section>
       ) : null}
+      {status && rect ? (
+        // 提示放在窗口外（上方，放不下就下方）：原生视图会盖住窗口内容区里的任何 DOM
+        <p
+          className={styles.status}
+          role="status"
+          aria-live="polite"
+          style={statusPosition(rect, stage)}
+        >
+          {status}
+        </p>
+      ) : null}
     </div>
   )
+}
+
+const STATUS_GAP = 8
+const STATUS_HEIGHT = 32
+
+function statusPosition(rect: BrowserWindowRect, stage: BrowserWindowStage) {
+  const left = rect.x + rect.width / 2
+  if (rect.y >= STATUS_HEIGHT + STATUS_GAP * 2) {
+    return { left, top: rect.y - STATUS_HEIGHT - STATUS_GAP }
+  }
+  const below = rect.y + rect.height + STATUS_GAP
+  return below + STATUS_HEIGHT <= stage.height
+    ? { left, top: below }
+    : { left, top: rect.y + 52 }
 }
 
 function keyboardDelta(key: string, step: number) {

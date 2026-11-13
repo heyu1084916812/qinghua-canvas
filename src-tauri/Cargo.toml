@@ -19,7 +19,8 @@ tauri-build = { version = "2", features = [] }
 
 [dependencies]
 qinghua-shared-store = { path = "../shared-store" }
-tauri = { version = "2", features = ["tray-icon"] }
+# `unstable`：画布浏览器用 `Window::add_child` 把系统 WebView 作为子视图叠进主窗口（browser_view.rs）
+tauri = { version = "2", features = ["tray-icon", "unstable"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 tauri-plugin-dialog = "2"

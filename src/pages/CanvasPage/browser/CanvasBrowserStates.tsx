@@ -62,3 +62,11 @@ export function CanvasBrowserError({
     </div>
   )
 }
+/** 原生视图被 DOM 浮层盖住时的占位（原生层永远画在 DOM 之上，只能先藏起来） */
+export function CanvasBrowserCovered({ title }: { title: string }) {
+  return (
+    <div className={styles.covered} data-canvas-browser-covered>
+      <p className={styles.hint}>{title ? `「${title}」` : '网页'}已暂时隐藏，关闭上层菜单后恢复。</p>
+    </div>
+  )
+}

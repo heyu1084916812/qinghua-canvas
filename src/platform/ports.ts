@@ -1,3 +1,4 @@
+import type { BrowserViewPort } from './browserView'
 import type { AppError } from '../shared/result'
 import type { DetectorFaceRect } from '../shared/faceDetect'
 import type { ModelCapability } from '../domain/shared/capability'
@@ -827,6 +828,11 @@ export interface PlatformKit {
    * 调用方按"没有端口"退回页面自带的 `Notification`。
    */
   notify?: NotifyPort
+  /**
+   * 原生网页视图（2026-11-13，画布浏览器换系统 WebView）。**可选**：只有桌面壳有；
+   * 浏览器开发版缺席时画布浏览器退回 iframe。端口定义见 `./browserView`。
+   */
+  browserView?: BrowserViewPort
   /** 素材传输（图床）：把本地字节换成公网直链；没配图床时 `upload` 返回 null */
   hosting: HostingPort
   credentials: CredentialPort

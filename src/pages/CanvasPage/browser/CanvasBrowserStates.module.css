@@ -153,3 +153,14 @@
   outline: 1px solid var(--stroke-focus);
   outline-offset: 1px;
 }
+
+.covered {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-6);
+  background: var(--bg-subtle);
+  text-align: center;
+}
