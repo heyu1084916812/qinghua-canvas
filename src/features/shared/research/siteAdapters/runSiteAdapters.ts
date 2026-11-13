@@ -1,7 +1,9 @@
 import type { DesignResearchItem } from '../../../../domain/inspiration/designResearch'
 import type { NetworkPort } from '../../../../platform/ports'
 import { BROWSER_SITE_ADAPTERS } from './browserSiteAdapters'
+import { cosmosAdapter } from './cosmosAdapter'
 import { huabanAdapter } from './huabanAdapter'
+import { lovelyPackageAdapter } from './lovelyPackageAdapter'
 import { siteFailureText } from './siteFetch'
 import type {
   BrowserSiteAdapter,
@@ -12,10 +14,21 @@ import type {
   SiteAdapterId,
   SiteQueryLanguage,
 } from './types'
+import { bpandoAdapter, theDielineAdapter } from './wordpressAdapter'
 import { zcoolAdapter } from './zcoolAdapter'
 
-/** 图片调研默认直连的站点（顺序即合并时的轮转顺序）。 */
-export const DIRECT_SITE_ADAPTERS: readonly DirectSiteAdapter[] = [huabanAdapter, zcoolAdapter]
+/**
+ * 图片调研默认直连的站点（顺序即合并时的轮转顺序）。2026-11-14 加 Cosmos / BP&O / Lovely Package，
+ * The Dieline 由浏览器站改为 REST 直连（无头浏览器会被 hashcash 验证挡，REST 不会）。
+ */
+export const DIRECT_SITE_ADAPTERS: readonly DirectSiteAdapter[] = [
+  huabanAdapter,
+  zcoolAdapter,
+  cosmosAdapter,
+  theDielineAdapter,
+  bpandoAdapter,
+  lovelyPackageAdapter,
+]
 
 /** 同一站点相邻两次请求的间隔（毫秒）：多个检索角度时不连发，降低被限流概率。 */
 export const SITE_ADAPTER_DELAY_MS = 400

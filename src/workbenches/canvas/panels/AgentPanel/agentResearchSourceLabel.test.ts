@@ -17,6 +17,9 @@ describe('agentResearchSourceLabel', () => {
   it('names the agent-browser design sites (#1087)', () => {
     expect(['dribbble', 'thedieline', 'packagingoftheworld'].map((source) => agentResearchSourceLabel(source)))
       .toEqual(['Dribbble', 'The Dieline', 'Packaging of the World'])
+    expect(['cosmos', 'bpando', 'lovelypackage'].map((source) => agentResearchSourceLabel(source)))
+      .toEqual(['Cosmos', 'BP&O', 'Lovely Package'])
+    expect(agentResearchSourceLabel('web', 'https://www.cosmos.so/e/1')).toBe('Cosmos')
   })
 
   it('keeps unknown sources unchanged instead of inventing a provider', () => {

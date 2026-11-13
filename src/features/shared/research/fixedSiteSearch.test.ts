@@ -8,6 +8,21 @@ import { HUABAN_SEARCH_ENDPOINT } from './siteAdapters/huabanAdapter'
 import { ZCOOL_SEARCH_ENDPOINT } from './siteAdapters/zcoolAdapter'
 import huabanFixture from './siteAdapters/fixtures/huaban-search-pins.json?raw'
 import zcoolFixture from './siteAdapters/fixtures/zcool-search-content.html?raw'
+import cosmosFixture from './siteAdapters/fixtures/cosmos-search-elements.html?raw'
+import dielineFixture from './siteAdapters/fixtures/thedieline-wp-posts.json?raw'
+import bpandoFixture from './siteAdapters/fixtures/bpando-wp-posts.json?raw'
+import lovelyFixture from './siteAdapters/fixtures/lovelypackage-search.html?raw'
+
+/** 六个直连设计站的实录响应（2026-11-13 / 11-14）；认不出的地址返回 null。 */
+function directSiteFixture(url: string): string | null {
+  if (url.startsWith(HUABAN_SEARCH_ENDPOINT)) return huabanFixture
+  if (url.startsWith(ZCOOL_SEARCH_ENDPOINT)) return zcoolFixture
+  if (url.startsWith('https://www.cosmos.so/search/elements/')) return cosmosFixture
+  if (url.startsWith('https://thedieline.com/wp-json/')) return dielineFixture
+  if (url.startsWith('https://bpando.org/wp-json/')) return bpandoFixture
+  if (url.startsWith('https://lovelypackage.com/?s=')) return lovelyFixture
+  return null
+}
 
 const FIXTURES = import.meta.glob('./fixtures/*.html', {
   eager: true,
@@ -34,10 +49,10 @@ const isBing = (url: string) =>
   url.startsWith(BING_WEB_ENDPOINT) || url.startsWith(BING_IMAGE_ENDPOINT)
 
 describe('searchFixedDesignSites', () => {
-  it('image mode returns 花瓣 + 站酷 adapter results without touching Bing or Tavily even when a key is set', async () => {
+  it('image mode returns the direct design-site adapter results without touching Bing or Tavily even when a key is set', async () => {
     const request = vi.fn<NetworkPort['request']>(async (req) => {
-      if (req.url.startsWith(HUABAN_SEARCH_ENDPOINT)) return response(huabanFixture)
-      if (req.url.startsWith(ZCOOL_SEARCH_ENDPOINT)) return response(zcoolFixture)
+      const text = directSiteFixture(req.url)
+      if (text !== null) return response(text)
       throw new Error(`unexpected ${req.url}`)
     })
     const result = await searchFixedDesignSites(
@@ -46,12 +61,12 @@ describe('searchFixedDesignSites', () => {
       new AbortController().signal,
     )
     expect(result.via).toBe('sites')
-    expect(result.usedSources).toEqual(['花瓣', '站酷'])
+    expect(result.usedSources).toEqual(['花瓣', '站酷', 'Cosmos', 'The Dieline', 'BP&O', 'Lovely Package'])
     expect(result.items.length).toBeGreaterThan(10)
     expect(result.warnings).toEqual([])
     expect(request.mock.calls.some(([req]) => isBing(req.url) || req.url === TAVILY_SEARCH_ENDPOINT)).toBe(false)
     expect(result.siteStatuses.filter((status) => status.status === 'needs-browser').map((status) => status.label))
-      .toEqual(['Dribbble', 'The Dieline', 'Packaging of the World', 'Pinterest'])
+      .toEqual(['Dribbble', 'Packaging of the World', 'Pinterest'])
   })
 
   it('desktop agent browser: browser-only sites run too and report their own statuses (#1087)', async () => {
@@ -86,8 +101,12 @@ describe('searchFixedDesignSites', () => {
     )
     expect(result.usedSources).toEqual(['花瓣', '站酷', 'Dribbble'])
     expect(result.items.some((item) => item.source === 'dribbble')).toBe(true)
-    expect(loads.map((row) => row.split(' ')[0])).toEqual(['dribbble', 'thedieline', 'packagingoftheworld', 'pinterest'])
-    expect(result.siteStatuses.map((status) => status.status)).toEqual(['ok', 'ok', 'ok', 'empty', 'empty', 'empty'])
+    // The Dieline 改走 REST 直连，不再开浏览器窗口
+    expect(loads.map((row) => row.split(' ')[0])).toEqual(['dribbble', 'packagingoftheworld', 'pinterest'])
+    expect(result.siteStatuses.map((status) => [status.label, status.status])).toEqual([
+      ['花瓣', 'ok'], ['站酷', 'ok'], ['Cosmos', 'network'], ['The Dieline', 'network'], ['BP&O', 'network'], ['Lovely Package', 'network'],
+      ['Dribbble', 'ok'], ['Packaging of the World', 'empty'], ['Pinterest', 'empty'],
+    ])
   })
 
   it('web mode keeps the free Bing web path and does not call the image adapters', async () => {

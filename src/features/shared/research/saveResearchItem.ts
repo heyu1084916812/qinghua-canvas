@@ -32,6 +32,9 @@ function sourceTag(source: DesignResearchItem['source']): string {
   if (source === 'dribbble') return 'Dribbble'
   if (source === 'thedieline') return 'The Dieline'
   if (source === 'packagingoftheworld') return 'Packaging of the World'
+  if (source === 'cosmos') return 'Cosmos'
+  if (source === 'bpando') return 'BP&O'
+  if (source === 'lovelypackage') return 'Lovely Package'
   if (source === 'google') return 'Google'
   return '网页'
 }

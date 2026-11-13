@@ -22,6 +22,9 @@ describe('designReferenceSites', () => {
       'gtn9.com',
       'huaban.com',
       'xiaohongshu.com',
+      'cosmos.so',
+      'bpando.org',
+      'lovelypackage.com',
     ])
     expect(DESIGN_REFERENCE_SITES.map((site) => site.label)).toContain('古田路9号')
   })
@@ -43,8 +46,8 @@ describe('designReferenceSites', () => {
   it('builds one site: OR clause for Bing over all fixed sites', () => {
     const clause = designReferenceSiteQuery()
     expect(clause.startsWith('(site:pinterest.com OR site:behance.net')).toBe(true)
-    expect(clause.endsWith('site:xiaohongshu.com)')).toBe(true)
-    expect(clause.match(/site:/g)).toHaveLength(12)
+    expect(clause.endsWith('site:lovelypackage.com)')).toBe(true)
+    expect(clause.match(/site:/g)).toHaveLength(15)
     expect(designReferenceSiteQuery(['a.com', 'b.com'])).toBe('(site:a.com OR site:b.com)')
   })
 })

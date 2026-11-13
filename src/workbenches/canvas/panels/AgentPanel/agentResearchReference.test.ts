@@ -71,6 +71,8 @@ describe('agent research reference', () => {
       .toEqual(['dribbble', 'thedieline', 'packagingoftheworld', 'pinterest'])
     expect(of('The Dieline')).toBe('thedieline')
     expect(of('Packaging of the World')).toBe('packagingoftheworld')
+    expect(['cosmos', 'bpando', 'lovelypackage', 'BP&O', 'Lovely Package'].map(of))
+      .toEqual(['cosmos', 'bpando', 'lovelypackage', 'bpando', 'lovelypackage'])
     expect(of('behance')).toBe('behance')
   })
 

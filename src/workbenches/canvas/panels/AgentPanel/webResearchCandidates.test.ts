@@ -7,6 +7,7 @@ import { runDesignResearch } from '../../../../features/shared/research/designRe
 import { readWebPage } from '../../../../features/shared/research/webPageReader'
 import { TAVILY_SEARCH_ENDPOINT } from '../../../../features/shared/research/tavilySearch'
 import { BING_IMAGE_ENDPOINT, BING_WEB_ENDPOINT } from '../../../../features/shared/research/bingSearch'
+import { DIRECT_SITE_ADAPTERS } from '../../../../features/shared/research/siteAdapters/runSiteAdapters'
 import { executeReadTool, type AgentToolContext } from '../../agent/tools'
 import { describeToolResult } from './conversation'
 import { createAgentToolResearch } from './agentToolResearch'
@@ -15,7 +16,7 @@ const isBingResultPage = (url: string) =>
   url.startsWith(BING_WEB_ENDPOINT) || url.startsWith(BING_IMAGE_ENDPOINT)
 /** 图片模式先走的花瓣 / 站酷适配器（#1076 方案 D）。 */
 const isFreePage = (url: string) =>
-  isBingResultPage(url) || url.startsWith('https://huaban.com/v3/search/pins') || url.startsWith('https://www.zcool.com.cn/search/content')
+  isBingResultPage(url) || DIRECT_SITE_ADAPTERS.some((adapter) => new URL(url).hostname.endsWith(adapter.domain))
 
 /**
  * 护栏（用户 2026-11-11 拍板，对齐 Lovart）：联网搜到的图只是对话里的候选，

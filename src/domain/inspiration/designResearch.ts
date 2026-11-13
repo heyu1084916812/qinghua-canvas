@@ -15,10 +15,14 @@ export type ResearchProvider =
   | 'huaban'
   /** 站酷直连适配器（#1076 方案 D）。 */
   | 'zcool'
-  /** Agent 后台浏览器适配器（#1087）：Dribbble / The Dieline / Packaging of the World（Pinterest 沿用 `pinterest`）。 */
+  /** Dribbble / Packaging of the World 走 Agent 后台浏览器（#1087，Pinterest 沿用 `pinterest`）；The Dieline 2026-11-14 起 REST 直连。 */
   | 'dribbble'
   | 'thedieline'
   | 'packagingoftheworld'
+  /** 直连适配器（2026-11-14）：Cosmos / BP&O / Lovely Package（The Dieline 改走 REST 直连，沿用 `thedieline`）。 */
+  | 'cosmos'
+  | 'bpando'
+  | 'lovelypackage'
   | 'web'
 
 export type ResearchMode = 'image' | 'web' | 'mixed'
@@ -158,6 +162,9 @@ const PROVIDER_TITLES: Record<ResearchProvider, string> = {
   dribbble: 'Dribbble',
   thedieline: 'The Dieline',
   packagingoftheworld: 'Packaging of the World',
+  cosmos: 'Cosmos',
+  bpando: 'BP&O',
+  lovelypackage: 'Lovely Package',
   web: 'Other references',
 }
 
@@ -167,6 +174,9 @@ const PROVIDER_ORDER: readonly ResearchProvider[] = [
   'dribbble',
   'thedieline',
   'packagingoftheworld',
+  'cosmos',
+  'bpando',
+  'lovelypackage',
   'pinterest',
   'bing',
   'tavily',

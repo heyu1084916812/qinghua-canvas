@@ -3,7 +3,7 @@
  *
  * 桌面壳里是一个**隐藏的独立 WebviewWindow**（label `agent-browser-<id>`），与画布浏览器
  * **共用同一份浏览器数据目录**：用户在画布浏览器里登录过的站，Agent 这边直接带登录态。
- * 用来抓只能在真实浏览器里打开的设计站（Dribbble / The Dieline / Packaging of the World / Pinterest）。
+ * 用来抓只能在真实浏览器里打开的设计站（Dribbble / Packaging of the World / Pinterest；The Dieline 2026-11-14 起改为 REST 直连）。
  *
  * - `load`：导航 → 等加载完成 → 往下滚几屏（懒加载）→ 执行 `script`（必须同步返回
  *   `JSON.stringify(...)` 字符串），把脚本结果原样交回；

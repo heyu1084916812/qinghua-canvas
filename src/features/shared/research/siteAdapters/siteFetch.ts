@@ -72,6 +72,10 @@ export async function fetchSiteText(
   return response.text()
 }
 
+function safeCodePoint(code: number): string {
+  return Number.isInteger(code) && code > 0 && code <= 0x10ffff && (code < 0xd800 || code > 0xdfff) ? String.fromCodePoint(code) : ''
+}
+
 /** 去掉高亮标签、解码常见实体、压空白。 */
 export function plainTitle(value: string): string {
   return value
@@ -81,6 +85,9 @@ export function plainTitle(value: string): string {
     .replace(/&gt;/g, '>')
     .replace(/&quot;/g, '"')
     .replace(/&#39;|&#x27;/g, "'")
+    // WordPress 标题常带数字实体（&#8217; ’、&#038; &）
+    .replace(/&#(\d{2,7});/g, (_, code: string) => safeCodePoint(Number(code)))
+    .replace(/&#x([0-9a-f]{2,6});/gi, (_, code: string) => safeCodePoint(Number.parseInt(code, 16)))
     .replace(/&amp;/g, '&')
     .replace(/\s+/g, ' ')
     .trim()

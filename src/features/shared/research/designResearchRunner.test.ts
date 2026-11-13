@@ -6,6 +6,7 @@ import { TAVILY_SEARCH_ENDPOINT } from './tavilySearch'
 import { BING_IMAGE_ENDPOINT, BING_WEB_ENDPOINT } from './bingSearch'
 import { TAVILY_OPTIONAL_HINT } from './fixedSiteSearch'
 import { HUABAN_SEARCH_ENDPOINT } from './siteAdapters/huabanAdapter'
+import { DIRECT_SITE_ADAPTERS } from './siteAdapters/runSiteAdapters'
 import { ZCOOL_SEARCH_ENDPOINT } from './siteAdapters/zcoolAdapter'
 import huabanFixture from './siteAdapters/fixtures/huaban-search-pins.json?raw'
 import zcoolFixture from './siteAdapters/fixtures/zcool-search-content.html?raw'
@@ -22,8 +23,11 @@ const fixture = (name: string): string => {
 }
 const isBing = (url: string) =>
   url.startsWith(BING_WEB_ENDPOINT) || url.startsWith(BING_IMAGE_ENDPOINT)
-const isSiteAdapter = (url: string) =>
-  url.startsWith(HUABAN_SEARCH_ENDPOINT) || url.startsWith(ZCOOL_SEARCH_ENDPOINT)
+/** 设计站直连适配器（花瓣 / 站酷 / Cosmos / The Dieline / BP&O / Lovely Package）的请求。 */
+const isSiteAdapter = (url: string) => {
+  const host = new URL(url).hostname
+  return DIRECT_SITE_ADAPTERS.some((adapter) => host === adapter.domain || host.endsWith(`.${adapter.domain}`))
+}
 function htmlResponse(html: string) {
   return {
     status: 200,
@@ -258,7 +262,7 @@ describe('runDesignResearch', () => {
     expect(result.ok).toBe(false)
     expect(result.items).toEqual([])
     expect(result.needsTavilyKey).toBeUndefined()
-    // 图片模式只请求了花瓣 / 站酷适配器（publicOnly）；不走 Bing 图片，也没有 Openverse / Wikipedia 等未指定来源。
+    // 图片模式只请求了设计站直连适配器（publicOnly）；不走 Bing 图片，也没有 Openverse / Wikipedia 等未指定来源。
     expect(request).toHaveBeenCalled()
     for (const [req] of request.mock.calls) {
       expect(isSiteAdapter(req.url)).toBe(true)

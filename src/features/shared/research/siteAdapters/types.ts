@@ -11,7 +11,16 @@ import type { NetworkPort } from '../../../../platform/ports'
  * - `browser`：只在真实浏览器里能打开（Cloudflare / Sucuri / JS 渲染 / 需登录）：桌面壳经
  *   Agent 后台浏览器（隐藏 WebviewWindow，#1087）打开并提取；网页版没有这个端口，如实报 `needs-browser`。
  */
-export type SiteAdapterId = 'huaban' | 'zcool' | 'dribbble' | 'thedieline' | 'packagingoftheworld' | 'pinterest'
+export type SiteAdapterId =
+  | 'huaban'
+  | 'zcool'
+  | 'cosmos'
+  | 'thedieline'
+  | 'bpando'
+  | 'lovelypackage'
+  | 'dribbble'
+  | 'packagingoftheworld'
+  | 'pinterest'
 
 export type SiteAdapterStatus =
   /** 拿到了结果。 */

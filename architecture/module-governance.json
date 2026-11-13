@@ -8849,7 +8849,7 @@
     {
       "module": "src/features/shared/research/siteAdapters/browserSiteAdapters.ts",
       "owner": "open-research-search",
-      "responsibility": "登记只能在真实浏览器里检索的设计站（Dribbble、The Dieline、Packaging of the World、Pinterest）及实测原因，供调度层如实标记 needs-browser。",
+      "responsibility": "登记只能在真实浏览器里检索的设计站（Dribbble、Packaging of the World、Pinterest；The Dieline 模板保留但默认改走 REST 直连）及实测原因，供调度层经 Agent 后台浏览器检索或如实标记 needs-browser。",
       "owns": [
         "浏览器专用站点清单",
         "每站不能直连的实测原因"
@@ -8870,7 +8870,7 @@
     {
       "module": "src/features/shared/research/siteAdapters/runSiteAdapters.ts",
       "owner": "open-research-search",
-      "responsibility": "并发调度设计站点适配器：各站按检索角度顺序请求、够数即停、硬失败即停，轮转合并结果并汇报实际使用的站点与各站状态。",
+      "responsibility": "并发调度设计站点适配器：六个直连站与浏览器站同时跑、各站按语言排好的检索角度顺序请求、够数即停、硬失败即停、到点交出已有结果，轮转合并结果并汇报实际使用的站点与各站状态。",
       "owns": [
         "直连站点默认清单与请求间隔",
         "每站目标数与停止条件",
@@ -9264,7 +9264,7 @@
       "test": [
         "src/workbenches/canvas/panels/AgentPanel/agentResearchReference.test.ts"
       ],
-      "budget": 130
+      "budget": 140
     },
     {
       "module": "src/workbenches/canvas/panels/AgentPanel/researchSourceReference.ts",
@@ -11201,6 +11201,111 @@
         "src/workbenches/canvas/panels/AgentPanel/useAgentAttachmentsController.test.ts"
       ],
       "budget": 80
+    },
+    {
+      "module": "src/features/shared/research/siteAdapters/wordpressAdapter.ts",
+      "owner": "open-research-search",
+      "responsibility": "WordPress 设计博客（The Dieline、BP&O）直连适配器：调用站点自带 REST 文章搜索并嵌入题图，投影为调研图片候选。",
+      "owns": [
+        "WordPress REST 搜索地址（relevance 排序、只嵌题图）",
+        "文章与题图解析、本站 / wp.com 图床校验",
+        "The Dieline 与 BP&O 两个站点实例",
+        "请求前去泛词、结果过题目相关性闸门"
+      ],
+      "doesNotOwn": [
+        "多站调度与合并",
+        "候选保存",
+        "画廊展示"
+      ],
+      "publicApi": [
+        "WordPressSiteSpec",
+        "wordpressSearchUrl",
+        "WordPressParseResult",
+        "parseWordPressPosts",
+        "wordpressAdapter",
+        "theDielineAdapter",
+        "bpandoAdapter"
+      ],
+      "test": [
+        "src/features/shared/research/siteAdapters/wordpressAdapter.test.ts"
+      ],
+      "budget": 150
+    },
+    {
+      "module": "src/features/shared/research/siteAdapters/cosmosAdapter.ts",
+      "owner": "open-research-search",
+      "responsibility": "Cosmos 直连适配器：抓取服务端渲染的搜索页，解析页面内 Apollo 补水数据里的搜索结果，跳过 AI 生成与非安全图，投影为调研图片候选。",
+      "owns": [
+        "Cosmos 搜索地址（词在路径里）",
+        "Apollo 补水脚本提取与 undefined 兼容",
+        "结果筛选、图址与标题选择"
+      ],
+      "doesNotOwn": [
+        "多站调度与合并",
+        "候选保存",
+        "画廊展示"
+      ],
+      "publicApi": [
+        "COSMOS_SEARCH_ENDPOINT",
+        "cosmosSearchUrl",
+        "cosmosApolloPayloads",
+        "CosmosParseResult",
+        "parseCosmosSearch",
+        "cosmosAdapter"
+      ],
+      "test": [
+        "src/features/shared/research/siteAdapters/cosmosAdapter.test.ts"
+      ],
+      "budget": 145
+    },
+    {
+      "module": "src/features/shared/research/siteAdapters/lovelyPackageAdapter.ts",
+      "owner": "open-research-search",
+      "responsibility": "Lovely Package 直连适配器：解析站内搜索结果页的文章卡片，取文章链接、标题与题图，投影为调研图片候选。",
+      "owns": [
+        "Lovely Package 搜索地址",
+        "文章卡片、标题与题图解析",
+        "没有结果页与认不出页的区分"
+      ],
+      "doesNotOwn": [
+        "多站调度与合并",
+        "候选保存",
+        "画廊展示"
+      ],
+      "publicApi": [
+        "LOVELY_PACKAGE_ORIGIN",
+        "lovelyPackageSearchUrl",
+        "LovelyPackageParseResult",
+        "parseLovelyPackageSearch",
+        "lovelyPackageAdapter"
+      ],
+      "test": [
+        "src/features/shared/research/siteAdapters/lovelyPackageAdapter.test.ts"
+      ],
+      "budget": 110
+    },
+    {
+      "module": "src/features/shared/research/siteAdapters/siteRelevance.ts",
+      "owner": "open-research-search",
+      "responsibility": "英文设计博客结果的题目相关性闸门：发请求前去掉泛词，结果标题里至少有一个非泛词关键词才收。",
+      "owns": [
+        "泛词表与请求前去噪",
+        "关键词提取",
+        "整词含复数匹配"
+      ],
+      "doesNotOwn": [
+        "站点请求与解析",
+        "多站调度"
+      ],
+      "publicApi": [
+        "siteSearchQuery",
+        "queryKeyTerms",
+        "mentionsKeyTerm"
+      ],
+      "test": [
+        "src/features/shared/research/siteAdapters/siteRelevance.test.ts"
+      ],
+      "budget": 60
     }
   ]
 }

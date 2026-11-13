@@ -16,7 +16,7 @@ export interface AddResearchReferenceResult {
 
 function providerOf(source: string): ResearchProvider {
   const normalized = source.trim().toLowerCase()
-  const same = ['pinterest', 'behance', 'google', 'openverse', 'wikipedia', 'dribbble', 'thedieline', 'packagingoftheworld'] as const // 名字即 id（含 #1087 浏览器站点）
+  const same = ['pinterest', 'behance', 'google', 'openverse', 'wikipedia', 'dribbble', 'thedieline', 'packagingoftheworld', 'cosmos', 'bpando', 'lovelypackage'] as const // 名字即 id（含 #1087 浏览器站点、2026-11-14 直连站）
   const hit = same.find((id) => id === normalized)
   if (hit) return hit
   if (normalized === 'internet archive' || normalized === 'internetarchive') {
@@ -32,6 +32,8 @@ function providerOf(source: string): ResearchProvider {
   if (normalized === 'zcool' || normalized === '站酷') return 'zcool'
   if (normalized === 'the dieline' || normalized === 'dieline') return 'thedieline'
   if (normalized === 'packaging of the world') return 'packagingoftheworld'
+  if (normalized === 'bp&o' || normalized === 'bp&amp;o') return 'bpando'
+  if (normalized === 'lovely package') return 'lovelypackage'
   return 'web'
 }
 

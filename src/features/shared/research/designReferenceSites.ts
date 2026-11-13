@@ -23,6 +23,10 @@ export const DESIGN_REFERENCE_SITES: readonly DesignReferenceSite[] = [
   { domain: 'gtn9.com', label: '古田路9号' },
   { domain: 'huaban.com', label: '花瓣' },
   { domain: 'xiaohongshu.com', label: '小红书' },
+  // 2026-11-14 新增的直连图片站（实测免登录、站内搜索相关性正常）
+  { domain: 'cosmos.so', label: 'Cosmos' },
+  { domain: 'bpando.org', label: 'BP&O' },
+  { domain: 'lovelypackage.com', label: 'Lovely Package' },
 ] as const
 
 export const DESIGN_REFERENCE_DOMAINS: readonly string[] =

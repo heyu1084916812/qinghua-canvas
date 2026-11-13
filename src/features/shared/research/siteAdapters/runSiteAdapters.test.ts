@@ -8,6 +8,10 @@ import type { BrowserSiteAdapter, BrowserSiteContext, DirectSiteAdapter, SiteAda
 import { ZCOOL_SEARCH_ENDPOINT } from './zcoolAdapter'
 import huabanFixture from './fixtures/huaban-search-pins.json?raw'
 import zcoolFixture from './fixtures/zcool-search-content.html?raw'
+import cosmosFixture from './fixtures/cosmos-search-elements.html?raw'
+import dielineFixture from './fixtures/thedieline-wp-posts.json?raw'
+import bpandoFixture from './fixtures/bpando-wp-posts.json?raw'
+import lovelyFixture from './fixtures/lovelypackage-search.html?raw'
 
 function response(text: string, status = 200) {
   return {
@@ -47,24 +51,39 @@ function fakeAdapter(id: 'huaban' | 'zcool', label: string, results: SiteAdapter
 }
 
 describe('runSiteAdapters', () => {
-  it('defaults to 花瓣 + 站酷 direct adapters; browser-only sites run through the agent browser (#1087)', () => {
-    expect(DIRECT_SITE_ADAPTERS.map((adapter) => adapter.label)).toEqual(['花瓣', '站酷'])
-    expect(BROWSER_SITE_ADAPTERS.map((adapter) => adapter.id)).toEqual(['dribbble', 'thedieline', 'packagingoftheworld', 'pinterest'])
+  it('defaults to six direct adapters; browser-only sites run through the agent browser (#1087)', () => {
+    // 2026-11-14：加 Cosmos / BP&O / Lovely Package，The Dieline 从浏览器站改为 REST 直连
+    expect(DIRECT_SITE_ADAPTERS.map((adapter) => adapter.label)).toEqual(['花瓣', '站酷', 'Cosmos', 'The Dieline', 'BP&O', 'Lovely Package'])
+    expect(DIRECT_SITE_ADAPTERS.filter((adapter) => adapter.queryLanguage === 'en').map((adapter) => adapter.id))
+      .toEqual(['thedieline', 'bpando', 'lovelypackage'])
+    expect(BROWSER_SITE_ADAPTERS.map((adapter) => adapter.id)).toEqual(['dribbble', 'packagingoftheworld', 'pinterest'])
     expect(BROWSER_SITE_ADAPTERS.every((adapter) => adapter.kind === 'browser' && typeof adapter.search === 'function')).toBe(true)
   })
 
-  it('runs the real adapters against recorded fixtures and interleaves both sites', async () => {
+  it('runs the real adapters against recorded fixtures and interleaves all six sites', async () => {
     const request = vi.fn<NetworkPort['request']>(async (req) => {
       if (req.url.startsWith(HUABAN_SEARCH_ENDPOINT)) return response(huabanFixture)
       if (req.url.startsWith(ZCOOL_SEARCH_ENDPOINT)) return response(zcoolFixture)
+      if (req.url.startsWith('https://www.cosmos.so/search/elements/')) return response(cosmosFixture)
+      if (req.url.startsWith('https://thedieline.com/wp-json/')) return response(dielineFixture)
+      if (req.url.startsWith('https://bpando.org/wp-json/')) return response(bpandoFixture)
+      if (req.url.startsWith('https://lovelypackage.com/?s=')) return response(lovelyFixture)
       throw new Error(`unexpected ${req.url}`)
     })
-    const result = await runSiteAdapters(net(request), { queries: ['包装'], imageMaxResults: 10, delayMs: 0 }, new AbortController().signal)
-    expect(result.usedSources).toEqual(['花瓣', '站酷'])
-    expect(result.items).toHaveLength(10)
-    expect(result.items.slice(0, 4).map((item) => item.source)).toEqual(['huaban', 'zcool', 'huaban', 'zcool'])
+    const result = await runSiteAdapters(net(request), { queries: ['包装', 'tea packaging'], imageMaxResults: 24, delayMs: 0 }, new AbortController().signal)
+    expect(result.usedSources).toEqual(['花瓣', '站酷', 'Cosmos', 'The Dieline', 'BP&O', 'Lovely Package'])
+    // 目标 24 ⇒ 每站 4；BP&O 过相关性闸门后只剩 2 篇讲茶的，换中文角度（不设闸门）再补
+    expect(result.items.length).toBeGreaterThanOrEqual(22)
+    expect(result.items.length).toBeLessThanOrEqual(24)
+    expect(result.items.slice(0, 6).map((item) => item.source)).toEqual(['huaban', 'zcool', 'cosmos', 'thedieline', 'bpando', 'lovelypackage'])
     expect(result.failures).toEqual([])
-    expect(result.statuses.filter((status) => status.status === 'needs-browser')).toHaveLength(4)
+    expect(result.statuses.filter((status) => status.status === 'needs-browser')).toHaveLength(3)
+    // 英文站先用英文角度（WordPress / Lovely Package 中文词 0 条）；够数就不再发中文那条
+    const urls = request.mock.calls.map(([req]) => req.url)
+    for (const host of ['thedieline.com', 'bpando.org', 'lovelypackage.com']) {
+      expect(urls.find((url) => url.includes(host))).toMatch(/tea(%20|\+)packaging/)
+    }
+    expect(urls.filter((url) => url.includes('thedieline.com'))).toHaveLength(1)
     expect(request.mock.calls.every(([req]) => req.publicOnly === true)).toBe(true)
     expect(request.mock.calls.some(([req]) => req.url.includes('bing.com'))).toBe(false)
   })
@@ -92,7 +111,7 @@ describe('runSiteAdapters', () => {
     )
     expect(result.items).toEqual([])
     expect(result.usedSources).toEqual([])
-    expect(result.failures).toHaveLength(2)
+    expect(result.failures).toHaveLength(DIRECT_SITE_ADAPTERS.length)
     expect(result.failures.join(' ')).toContain('只在桌面应用里可用')
   })
 

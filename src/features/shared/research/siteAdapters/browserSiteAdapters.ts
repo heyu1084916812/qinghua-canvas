@@ -30,5 +30,10 @@ function adapterOf(spec: BrowserSiteSpec): BrowserSiteAdapter {
   }
 }
 
-/** 顺序即「花瓣 + 站酷」之后的图片排序。 */
-export const BROWSER_SITE_ADAPTERS: readonly BrowserSiteAdapter[] = BROWSER_SITE_SPECS.map(adapterOf)
+/**
+ * 顺序即直连站之后的图片排序。The Dieline 的模板仍保留（画布浏览器 / 以后要用浏览器抓时可用），
+ * 但默认不再走浏览器：2026-11-14 起改为 WordPress REST 直连（`wordpressAdapter.ts`），不会撞 hashcash 验证。
+ */
+export const BROWSER_SITE_ADAPTERS: readonly BrowserSiteAdapter[] = BROWSER_SITE_SPECS
+  .filter((spec) => spec.id !== 'thedieline')
+  .map(adapterOf)

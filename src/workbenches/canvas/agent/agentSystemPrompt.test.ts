@@ -262,7 +262,8 @@ describe('素材段与技能段', () => {
     // #1076：图片来自花瓣 · 站酷，来源以 usedSources 为准，不再说 Bing 结果页找图。
     expect(p).toContain('花瓣 · 站酷')
     // #1087：桌面应用另用内置浏览器查 Dribbble 等站
-    expect(p).toContain('内置浏览器查 Dribbble / The Dieline / Packaging of the World / Pinterest')
+    expect(p).toContain('内置浏览器查 Dribbble / Packaging of the World / Pinterest')
+    expect(p).toContain('花瓣 · 站酷 · Cosmos · The Dieline · BP&O · Lovely Package') // 2026-11-14 新增直连站
     expect(p).toContain('usedSources')
     expect(p).toContain('skippedSites') // live-run bug 4：被挡住的站如实说明
     expect(p).not.toContain('联网搜索默认免 Key（Bing 结果页）')
