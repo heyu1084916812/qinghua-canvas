@@ -1,0 +1,98 @@
+[
+  {
+    "name": "1440x900-light-skills",
+    "icons": 42,
+    "overflowX": false,
+    "errors": []
+  },
+  {
+    "name": "1440x900-light-assets",
+    "icons": 12,
+    "overflowX": false,
+    "errors": []
+  },
+  {
+    "name": "1440x900-light-inspiration",
+    "icons": 36,
+    "overflowX": false,
+    "errors": []
+  },
+  {
+    "name": "1440x900-light-storyboard",
+    "icons": 12,
+    "overflowX": false,
+    "errors": []
+  },
+  {
+    "name": "1440x900-dark-skills",
+    "icons": 42,
+    "overflowX": false,
+    "errors": []
+  },
+  {
+    "name": "1440x900-dark-assets",
+    "icons": 12,
+    "overflowX": false,
+    "errors": []
+  },
+  {
+    "name": "1440x900-dark-inspiration",
+    "icons": 36,
+    "overflowX": false,
+    "errors": []
+  },
+  {
+    "name": "1440x900-dark-storyboard",
+    "icons": 12,
+    "overflowX": false,
+    "errors": []
+  },
+  {
+    "name": "1024x700-light-skills",
+    "icons": 42,
+    "overflowX": false,
+    "errors": []
+  },
+  {
+    "name": "1024x700-light-assets",
+    "icons": 12,
+    "overflowX": false,
+    "errors": []
+  },
+  {
+    "name": "1024x700-light-inspiration",
+    "icons": 36,
+    "overflowX": false,
+    "errors": []
+  },
+  {
+    "name": "1024x700-light-storyboard",
+    "icons": 12,
+    "overflowX": false,
+    "errors": []
+  },
+  {
+    "name": "1024x700-dark-skills",
+    "icons": 42,
+    "overflowX": false,
+    "errors": []
+  },
+  {
+    "name": "1024x700-dark-assets",
+    "icons": 12,
+    "overflowX": false,
+    "errors": []
+  },
+  {
+    "name": "1024x700-dark-inspiration",
+    "icons": 36,
+    "overflowX": false,
+    "errors": []
+  },
+  {
+    "name": "1024x700-dark-storyboard",
+    "icons": 12,
+    "overflowX": false,
+    "errors": []
+  }
+]
