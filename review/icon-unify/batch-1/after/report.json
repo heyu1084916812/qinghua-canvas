@@ -1,0 +1,402 @@
+[
+  {
+    "variant": "1440x900-light",
+    "theme": "light",
+    "items": 8,
+    "icons": [
+      {
+        "w": null,
+        "h": null,
+        "stroke": null,
+        "tier": null,
+        "cls": "_wordmarkSvg_1ypsx_347"
+      },
+      {
+        "w": "20",
+        "h": "20",
+        "stroke": "1.8",
+        "tier": "lg",
+        "cls": "lucide lucide-panel-left lucide-sidebar"
+      },
+      {
+        "w": "16",
+        "h": "16",
+        "stroke": "2.25",
+        "tier": "md",
+        "cls": "lucide lucide-plus"
+      },
+      {
+        "w": "20",
+        "h": "20",
+        "stroke": "1.8",
+        "tier": "lg",
+        "cls": "lucide lucide-house lucide-home"
+      },
+      {
+        "w": "20",
+        "h": "20",
+        "stroke": "1.8",
+        "tier": "lg",
+        "cls": "lucide lucide-layout-dashboard"
+      },
+      {
+        "w": "20",
+        "h": "20",
+        "stroke": "1.8",
+        "tier": "lg",
+        "cls": "lucide lucide-workflow"
+      },
+      {
+        "w": "20",
+        "h": "20",
+        "stroke": "1.8",
+        "tier": "lg",
+        "cls": "lucide lucide-shopping-bag"
+      },
+      {
+        "w": "20",
+        "h": "20",
+        "stroke": "1.8",
+        "tier": "lg",
+        "cls": "lucide lucide-clapperboard"
+      },
+      {
+        "w": "20",
+        "h": "20",
+        "stroke": "1.8",
+        "tier": "lg",
+        "cls": "lucide lucide-book-open"
+      },
+      {
+        "w": "20",
+        "h": "20",
+        "stroke": "1.8",
+        "tier": "lg",
+        "cls": "lucide lucide-sparkles lucide-stars"
+      },
+      {
+        "w": "20",
+        "h": "20",
+        "stroke": "1.8",
+        "tier": "lg",
+        "cls": "lucide lucide-image"
+      },
+      {
+        "w": "15",
+        "h": "15",
+        "stroke": "1.6",
+        "tier": null,
+        "cls": null
+      },
+      {
+        "w": "20",
+        "h": "20",
+        "stroke": "1.8",
+        "tier": "lg",
+        "cls": "lucide lucide-sliders-horizontal"
+      }
+    ],
+    "overflowX": false,
+    "errors": []
+  },
+  {
+    "variant": "1440x900-dark",
+    "theme": "dark",
+    "items": 8,
+    "icons": [
+      {
+        "w": null,
+        "h": null,
+        "stroke": null,
+        "tier": null,
+        "cls": "_wordmarkSvg_1ypsx_347"
+      },
+      {
+        "w": "20",
+        "h": "20",
+        "stroke": "1.8",
+        "tier": "lg",
+        "cls": "lucide lucide-panel-left lucide-sidebar"
+      },
+      {
+        "w": "16",
+        "h": "16",
+        "stroke": "2.25",
+        "tier": "md",
+        "cls": "lucide lucide-plus"
+      },
+      {
+        "w": "20",
+        "h": "20",
+        "stroke": "1.8",
+        "tier": "lg",
+        "cls": "lucide lucide-house lucide-home"
+      },
+      {
+        "w": "20",
+        "h": "20",
+        "stroke": "1.8",
+        "tier": "lg",
+        "cls": "lucide lucide-layout-dashboard"
+      },
+      {
+        "w": "20",
+        "h": "20",
+        "stroke": "1.8",
+        "tier": "lg",
+        "cls": "lucide lucide-workflow"
+      },
+      {
+        "w": "20",
+        "h": "20",
+        "stroke": "1.8",
+        "tier": "lg",
+        "cls": "lucide lucide-shopping-bag"
+      },
+      {
+        "w": "20",
+        "h": "20",
+        "stroke": "1.8",
+        "tier": "lg",
+        "cls": "lucide lucide-clapperboard"
+      },
+      {
+        "w": "20",
+        "h": "20",
+        "stroke": "1.8",
+        "tier": "lg",
+        "cls": "lucide lucide-book-open"
+      },
+      {
+        "w": "20",
+        "h": "20",
+        "stroke": "1.8",
+        "tier": "lg",
+        "cls": "lucide lucide-sparkles lucide-stars"
+      },
+      {
+        "w": "20",
+        "h": "20",
+        "stroke": "1.8",
+        "tier": "lg",
+        "cls": "lucide lucide-image"
+      },
+      {
+        "w": "15",
+        "h": "15",
+        "stroke": "1.6",
+        "tier": null,
+        "cls": null
+      },
+      {
+        "w": "20",
+        "h": "20",
+        "stroke": "1.8",
+        "tier": "lg",
+        "cls": "lucide lucide-sliders-horizontal"
+      }
+    ],
+    "overflowX": false,
+    "errors": []
+  },
+  {
+    "variant": "1024x700-light",
+    "theme": "light",
+    "items": 8,
+    "icons": [
+      {
+        "w": null,
+        "h": null,
+        "stroke": null,
+        "tier": null,
+        "cls": "_wordmarkSvg_1ypsx_347"
+      },
+      {
+        "w": "20",
+        "h": "20",
+        "stroke": "1.8",
+        "tier": "lg",
+        "cls": "lucide lucide-panel-left lucide-sidebar"
+      },
+      {
+        "w": "16",
+        "h": "16",
+        "stroke": "2.25",
+        "tier": "md",
+        "cls": "lucide lucide-plus"
+      },
+      {
+        "w": "20",
+        "h": "20",
+        "stroke": "1.8",
+        "tier": "lg",
+        "cls": "lucide lucide-house lucide-home"
+      },
+      {
+        "w": "20",
+        "h": "20",
+        "stroke": "1.8",
+        "tier": "lg",
+        "cls": "lucide lucide-layout-dashboard"
+      },
+      {
+        "w": "20",
+        "h": "20",
+        "stroke": "1.8",
+        "tier": "lg",
+        "cls": "lucide lucide-workflow"
+      },
+      {
+        "w": "20",
+        "h": "20",
+        "stroke": "1.8",
+        "tier": "lg",
+        "cls": "lucide lucide-shopping-bag"
+      },
+      {
+        "w": "20",
+        "h": "20",
+        "stroke": "1.8",
+        "tier": "lg",
+        "cls": "lucide lucide-clapperboard"
+      },
+      {
+        "w": "20",
+        "h": "20",
+        "stroke": "1.8",
+        "tier": "lg",
+        "cls": "lucide lucide-book-open"
+      },
+      {
+        "w": "20",
+        "h": "20",
+        "stroke": "1.8",
+        "tier": "lg",
+        "cls": "lucide lucide-sparkles lucide-stars"
+      },
+      {
+        "w": "20",
+        "h": "20",
+        "stroke": "1.8",
+        "tier": "lg",
+        "cls": "lucide lucide-image"
+      },
+      {
+        "w": "15",
+        "h": "15",
+        "stroke": "1.6",
+        "tier": null,
+        "cls": null
+      },
+      {
+        "w": "20",
+        "h": "20",
+        "stroke": "1.8",
+        "tier": "lg",
+        "cls": "lucide lucide-sliders-horizontal"
+      }
+    ],
+    "overflowX": false,
+    "errors": []
+  },
+  {
+    "variant": "1024x700-dark",
+    "theme": "dark",
+    "items": 8,
+    "icons": [
+      {
+        "w": null,
+        "h": null,
+        "stroke": null,
+        "tier": null,
+        "cls": "_wordmarkSvg_1ypsx_347"
+      },
+      {
+        "w": "20",
+        "h": "20",
+        "stroke": "1.8",
+        "tier": "lg",
+        "cls": "lucide lucide-panel-left lucide-sidebar"
+      },
+      {
+        "w": "16",
+        "h": "16",
+        "stroke": "2.25",
+        "tier": "md",
+        "cls": "lucide lucide-plus"
+      },
+      {
+        "w": "20",
+        "h": "20",
+        "stroke": "1.8",
+        "tier": "lg",
+        "cls": "lucide lucide-house lucide-home"
+      },
+      {
+        "w": "20",
+        "h": "20",
+        "stroke": "1.8",
+        "tier": "lg",
+        "cls": "lucide lucide-layout-dashboard"
+      },
+      {
+        "w": "20",
+        "h": "20",
+        "stroke": "1.8",
+        "tier": "lg",
+        "cls": "lucide lucide-workflow"
+      },
+      {
+        "w": "20",
+        "h": "20",
+        "stroke": "1.8",
+        "tier": "lg",
+        "cls": "lucide lucide-shopping-bag"
+      },
+      {
+        "w": "20",
+        "h": "20",
+        "stroke": "1.8",
+        "tier": "lg",
+        "cls": "lucide lucide-clapperboard"
+      },
+      {
+        "w": "20",
+        "h": "20",
+        "stroke": "1.8",
+        "tier": "lg",
+        "cls": "lucide lucide-book-open"
+      },
+      {
+        "w": "20",
+        "h": "20",
+        "stroke": "1.8",
+        "tier": "lg",
+        "cls": "lucide lucide-sparkles lucide-stars"
+      },
+      {
+        "w": "20",
+        "h": "20",
+        "stroke": "1.8",
+        "tier": "lg",
+        "cls": "lucide lucide-image"
+      },
+      {
+        "w": "15",
+        "h": "15",
+        "stroke": "1.6",
+        "tier": null,
+        "cls": null
+      },
+      {
+        "w": "20",
+        "h": "20",
+        "stroke": "1.8",
+        "tier": "lg",
+        "cls": "lucide lucide-sliders-horizontal"
+      }
+    ],
+    "overflowX": false,
+    "errors": []
+  }
+]

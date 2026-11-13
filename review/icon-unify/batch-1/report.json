@@ -1,0 +1,402 @@
+[
+  {
+    "variant": "1440x900-light",
+    "theme": "light",
+    "items": 8,
+    "icons": [
+      {
+        "w": null,
+        "h": null,
+        "stroke": null,
+        "tier": null,
+        "cls": "_wordmarkSvg_1ypsx_347"
+      },
+      {
+        "w": "20",
+        "h": "20",
+        "stroke": "1.6",
+        "tier": null,
+        "cls": null
+      },
+      {
+        "w": "18",
+        "h": "18",
+        "stroke": "1.6",
+        "tier": null,
+        "cls": null
+      },
+      {
+        "w": "20",
+        "h": "20",
+        "stroke": "1.6",
+        "tier": null,
+        "cls": null
+      },
+      {
+        "w": "20",
+        "h": "20",
+        "stroke": "1.6",
+        "tier": null,
+        "cls": null
+      },
+      {
+        "w": "20",
+        "h": "20",
+        "stroke": "1.6",
+        "tier": null,
+        "cls": null
+      },
+      {
+        "w": "20",
+        "h": "20",
+        "stroke": "1.6",
+        "tier": null,
+        "cls": null
+      },
+      {
+        "w": "20",
+        "h": "20",
+        "stroke": "1.6",
+        "tier": null,
+        "cls": null
+      },
+      {
+        "w": "20",
+        "h": "20",
+        "stroke": "1.6",
+        "tier": null,
+        "cls": null
+      },
+      {
+        "w": "20",
+        "h": "20",
+        "stroke": "1.6",
+        "tier": null,
+        "cls": null
+      },
+      {
+        "w": "20",
+        "h": "20",
+        "stroke": "1.6",
+        "tier": null,
+        "cls": null
+      },
+      {
+        "w": "15",
+        "h": "15",
+        "stroke": "1.6",
+        "tier": null,
+        "cls": null
+      },
+      {
+        "w": "20",
+        "h": "20",
+        "stroke": "1.6",
+        "tier": null,
+        "cls": null
+      }
+    ],
+    "overflowX": false,
+    "errors": []
+  },
+  {
+    "variant": "1440x900-dark",
+    "theme": "dark",
+    "items": 8,
+    "icons": [
+      {
+        "w": null,
+        "h": null,
+        "stroke": null,
+        "tier": null,
+        "cls": "_wordmarkSvg_1ypsx_347"
+      },
+      {
+        "w": "20",
+        "h": "20",
+        "stroke": "1.6",
+        "tier": null,
+        "cls": null
+      },
+      {
+        "w": "18",
+        "h": "18",
+        "stroke": "1.6",
+        "tier": null,
+        "cls": null
+      },
+      {
+        "w": "20",
+        "h": "20",
+        "stroke": "1.6",
+        "tier": null,
+        "cls": null
+      },
+      {
+        "w": "20",
+        "h": "20",
+        "stroke": "1.6",
+        "tier": null,
+        "cls": null
+      },
+      {
+        "w": "20",
+        "h": "20",
+        "stroke": "1.6",
+        "tier": null,
+        "cls": null
+      },
+      {
+        "w": "20",
+        "h": "20",
+        "stroke": "1.6",
+        "tier": null,
+        "cls": null
+      },
+      {
+        "w": "20",
+        "h": "20",
+        "stroke": "1.6",
+        "tier": null,
+        "cls": null
+      },
+      {
+        "w": "20",
+        "h": "20",
+        "stroke": "1.6",
+        "tier": null,
+        "cls": null
+      },
+      {
+        "w": "20",
+        "h": "20",
+        "stroke": "1.6",
+        "tier": null,
+        "cls": null
+      },
+      {
+        "w": "20",
+        "h": "20",
+        "stroke": "1.6",
+        "tier": null,
+        "cls": null
+      },
+      {
+        "w": "15",
+        "h": "15",
+        "stroke": "1.6",
+        "tier": null,
+        "cls": null
+      },
+      {
+        "w": "20",
+        "h": "20",
+        "stroke": "1.6",
+        "tier": null,
+        "cls": null
+      }
+    ],
+    "overflowX": false,
+    "errors": []
+  },
+  {
+    "variant": "1024x700-light",
+    "theme": "light",
+    "items": 8,
+    "icons": [
+      {
+        "w": null,
+        "h": null,
+        "stroke": null,
+        "tier": null,
+        "cls": "_wordmarkSvg_1ypsx_347"
+      },
+      {
+        "w": "20",
+        "h": "20",
+        "stroke": "1.6",
+        "tier": null,
+        "cls": null
+      },
+      {
+        "w": "18",
+        "h": "18",
+        "stroke": "1.6",
+        "tier": null,
+        "cls": null
+      },
+      {
+        "w": "20",
+        "h": "20",
+        "stroke": "1.6",
+        "tier": null,
+        "cls": null
+      },
+      {
+        "w": "20",
+        "h": "20",
+        "stroke": "1.6",
+        "tier": null,
+        "cls": null
+      },
+      {
+        "w": "20",
+        "h": "20",
+        "stroke": "1.6",
+        "tier": null,
+        "cls": null
+      },
+      {
+        "w": "20",
+        "h": "20",
+        "stroke": "1.6",
+        "tier": null,
+        "cls": null
+      },
+      {
+        "w": "20",
+        "h": "20",
+        "stroke": "1.6",
+        "tier": null,
+        "cls": null
+      },
+      {
+        "w": "20",
+        "h": "20",
+        "stroke": "1.6",
+        "tier": null,
+        "cls": null
+      },
+      {
+        "w": "20",
+        "h": "20",
+        "stroke": "1.6",
+        "tier": null,
+        "cls": null
+      },
+      {
+        "w": "20",
+        "h": "20",
+        "stroke": "1.6",
+        "tier": null,
+        "cls": null
+      },
+      {
+        "w": "15",
+        "h": "15",
+        "stroke": "1.6",
+        "tier": null,
+        "cls": null
+      },
+      {
+        "w": "20",
+        "h": "20",
+        "stroke": "1.6",
+        "tier": null,
+        "cls": null
+      }
+    ],
+    "overflowX": false,
+    "errors": []
+  },
+  {
+    "variant": "1024x700-dark",
+    "theme": "dark",
+    "items": 8,
+    "icons": [
+      {
+        "w": null,
+        "h": null,
+        "stroke": null,
+        "tier": null,
+        "cls": "_wordmarkSvg_1ypsx_347"
+      },
+      {
+        "w": "20",
+        "h": "20",
+        "stroke": "1.6",
+        "tier": null,
+        "cls": null
+      },
+      {
+        "w": "18",
+        "h": "18",
+        "stroke": "1.6",
+        "tier": null,
+        "cls": null
+      },
+      {
+        "w": "20",
+        "h": "20",
+        "stroke": "1.6",
+        "tier": null,
+        "cls": null
+      },
+      {
+        "w": "20",
+        "h": "20",
+        "stroke": "1.6",
+        "tier": null,
+        "cls": null
+      },
+      {
+        "w": "20",
+        "h": "20",
+        "stroke": "1.6",
+        "tier": null,
+        "cls": null
+      },
+      {
+        "w": "20",
+        "h": "20",
+        "stroke": "1.6",
+        "tier": null,
+        "cls": null
+      },
+      {
+        "w": "20",
+        "h": "20",
+        "stroke": "1.6",
+        "tier": null,
+        "cls": null
+      },
+      {
+        "w": "20",
+        "h": "20",
+        "stroke": "1.6",
+        "tier": null,
+        "cls": null
+      },
+      {
+        "w": "20",
+        "h": "20",
+        "stroke": "1.6",
+        "tier": null,
+        "cls": null
+      },
+      {
+        "w": "20",
+        "h": "20",
+        "stroke": "1.6",
+        "tier": null,
+        "cls": null
+      },
+      {
+        "w": "15",
+        "h": "15",
+        "stroke": "1.6",
+        "tier": null,
+        "cls": null
+      },
+      {
+        "w": "20",
+        "h": "20",
+        "stroke": "1.6",
+        "tier": null,
+        "cls": null
+      }
+    ],
+    "overflowX": false,
+    "errors": []
+  }
+]

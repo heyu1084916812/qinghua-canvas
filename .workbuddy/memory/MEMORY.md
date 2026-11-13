@@ -9,6 +9,8 @@
 - `dependency-cruiser` 的 `ui-stateless` 把 `node_modules` 当越界：没有 `path: '^src/'` 限制时，ui 引任何第三方库都报 warn。收紧后只查 src 内部。
 - 陈列室 `PreviewPage.module.css` 一直在用不存在的 `--stroke-soft / --radius-* / --text-muted / --surface-raised`，卡片其实**没有边框**（var 取不到值整条声明作废）。给 dev 页加样式要用真实令牌：`--stroke`、`--radius-control`、`--text-1/2`、`--fs-*`。
 - `npm run check` 在本次开工前的 HEAD 上已经红了三处：`PinterestSetupView.module.css` 引用未定义 `--font-mono`、`SkillLibraryOverlay.module.css` 写死 `rgba(0,0,0,.3)`、Pinterest 样式行数 72 > 治理预算 40。先修存量红灯再判断自己的改动，别把既有失败当回归。
+- 把图标换成三档 API 时，`size={number}` 会沿着类型一路顶到 `nav.ts` 的 `NavItem.icon`、项目树的 `WorkbenchIcon`、`PROJECT_ICON`；这些是**同一条类型链**，要一起改成 `IconSize`，否则 tsc 逐个报 `number not assignable`。`toolbar/icons`（画布第 6 批）仍是数字尺寸，误改它们的调用点会立刻类型报错 —— 说明这层替换要按批走、不能全局 sed。
+- 真实应用外壳截图不要另起 vite：CORS 白名单只认 `127.0.0.1:1420` / `localhost:1420`（`shared-store` 的 `origin_allowed`）。本机 dev 服务在 1420 时直接连它；起别的端口会被浏览器 CORS 拦掉（表现为 store 请求全红、界面空白）。截图前删掉 `[role="dialog"]` 新手引导层即可，不写入任何状态。
 - 全量 `npx vitest run` 在冷 transform 下会因 60s 超时误报（`App.render.test.ts` 单跑 3/3 通过）；按 12 分片 `--shard=i/12` 串行跑才是本项目可信口径。
 
 ### 2026-11-12 #1032–#1033：调研图片动作的取消、超时与画布 bounds
