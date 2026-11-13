@@ -324,6 +324,7 @@ describe('useAgentResearchReferenceController', () => {
   it('B6: passes the action signal to the file port so a canceled download never lands', async () => {
     const platform = createMemoryPlatform()
     const saveFromUrl = vi.spyOn(platform.files, 'saveFromUrl')
+    const saveFile = vi.spyOn(platform.files, 'saveFile')
     let research!: ReturnType<typeof useAgentResearchReferenceController>
     function Harness() {
       research = useAgentResearchReferenceController({
@@ -346,8 +347,37 @@ describe('useAgentResearchReferenceController', () => {
     await act(async () => {
       result = await research.downloadResearchImage(candidate, parent.signal)
     })
-    expect(saveFromUrl.mock.calls[0]?.[2]).toBeInstanceOf(AbortSignal)
-    expect(saveFromUrl.mock.calls[0]?.[2]?.aborted).toBe(true)
+    // 2026-11-14：先走公开网络直取字节；已取消时两条路都不落盘、不打开浏览器
+    expect(saveFromUrl).not.toHaveBeenCalled()
+    expect(saveFile).not.toHaveBeenCalled()
     expect(result).toMatchObject({ ok: false })
+  })
+
+  it('2026-11-14：公开网络通道（桌面 reqwest）拿到图片字节就直接按实际格式落盘，不再走受 CORS 限制的 saveFromUrl', async () => {
+    const platform = createMemoryPlatform()
+    const webp = Uint8Array.from([0x52, 0x49, 0x46, 0x46, 4, 0, 0, 0, 0x57, 0x45, 0x42, 0x50, 0x56, 0x50, 0x38, 0x20])
+    const request = vi.spyOn(platform.network, 'request').mockResolvedValue({
+      status: 200, headers: { 'content-type': 'image/webp' }, text: async () => '', json: async <T,>() => ({}) as T,
+      arrayBuffer: async () => webp.buffer.slice(0),
+    })
+    const saveFromUrl = vi.spyOn(platform.files, 'saveFromUrl')
+    const saveFile = vi.spyOn(platform.files, 'saveFile')
+    let research!: ReturnType<typeof useAgentResearchReferenceController>
+    function Harness() {
+      research = useAgentResearchReferenceController({
+        platform, projectId: 'project-1', current: { id: 'session-1' } as AgentSession, currentIdRef: { current: 'session-1' },
+        appendReferenceIds: vi.fn(), applySessionSnapshot: vi.fn(), notify: vi.fn(),
+      })
+      return null
+    }
+    act(() => { TestRenderer.create(createElement(Harness)) })
+    await act(async () => {
+      expect(await research.downloadResearchImage({ ...candidate, imageUrl: 'https://bpando.org/wp-content/uploads/tea_fw658webp' }))
+        .toEqual({ ok: true, message: '图片已保存' })
+    })
+    expect(request.mock.calls[0]?.[0]).toMatchObject({ publicOnly: true, method: 'GET' })
+    expect(saveFile.mock.calls[0]?.[0]).toBe('Reference.webp')
+    expect(saveFile.mock.calls[0]?.[1].type).toBe('image/webp')
+    expect(saveFromUrl).not.toHaveBeenCalled()
   })
 })

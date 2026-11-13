@@ -11306,6 +11306,27 @@
         "src/features/shared/research/siteAdapters/siteRelevance.test.ts"
       ],
       "budget": 60
+    },
+    {
+      "module": "src/workbenches/canvas/panels/AgentPanel/researchImageDownload.ts",
+      "owner": "agent-research-reference",
+      "responsibility": "调研图片下载先走公开网络通道（桌面 reqwest）直取图片字节并按实际格式落盘，拿不到再交回 saveFromUrl。",
+      "owns": [
+        "调研图片字节直取",
+        "图片格式校验与扩展名"
+      ],
+      "doesNotOwn": [
+        "动作取消与时限",
+        "saveFromUrl 退路",
+        "提示文案"
+      ],
+      "publicApi": [
+        "downloadResearchImageBytes"
+      ],
+      "test": [
+        "src/workbenches/canvas/panels/AgentPanel/researchImageDownload.test.ts"
+      ],
+      "budget": 60
     }
   ]
 }

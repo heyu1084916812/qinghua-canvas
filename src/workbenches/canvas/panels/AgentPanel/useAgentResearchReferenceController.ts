@@ -13,6 +13,7 @@ import type { ConversationResearchItem } from './conversation'
 import { mentionToken } from '../../text/MentionEditor'
 import { addResearchSourceReferenceToProject } from './researchSourceReference'
 import { raceWithResearchAbort, runResearchAction } from './researchActionAbort'
+import { downloadResearchImageBytes } from './researchImageDownload'
 
 export { RESEARCH_IMAGE_SAVE_TIMEOUT_MS } from './researchActionAbort'
 export interface ResearchActionResult { ok: boolean; message: string }
@@ -77,14 +78,13 @@ export function useAgentResearchReferenceController(input: {
     parent?: AbortSignal,
   ): Promise<ResearchActionResult> => {
     if (!candidate.imageUrl) return Promise.resolve({ ok: false, message: '这条结果没有可下载的图片' })
-    let extension = 'jpg'
-    try {
-      extension = /\.([a-zA-Z0-9]{2,5})$/.exec(new URL(candidate.imageUrl).pathname)?.[1]
-        ?.toLowerCase() ?? extension
-    } catch {
-      /* URL 已在调研层校验；取不到扩展名时使用 jpg 兜底 */
-    }
+    // URL 已在调研层校验；取不到扩展名时用 jpg 兜底（只给 saveFromUrl 退路用，直取字节按实际格式命名）
+    const extension = /\.([a-zA-Z0-9]{2,5})$/.exec(URL.canParse(candidate.imageUrl)
+      ? new URL(candidate.imageUrl).pathname : '')?.[1]?.toLowerCase() ?? 'jpg'
     return runResearchAction(parent, '下载失败', input.notify, async (signal) => {
+      const direct = await raceWithResearchAbort(downloadResearchImageBytes(input.platform,
+        candidate.imageUrl, safeFilePrefix(candidate.title || '轻画调研图片'), signal), signal)
+      if (direct) return { ok: true, message: '图片已保存' }
       const via = await raceWithResearchAbort(input.platform.files.saveFromUrl(
         candidate.imageUrl,
         `${safeFilePrefix(candidate.title || '轻画调研图片')}.${extension}`,
@@ -95,7 +95,7 @@ export function useAgentResearchReferenceController(input: {
         message: via === 'saved' ? '图片已保存' : '浏览器不允许直接读取图片，已在新标签页打开',
       }
     })
-  }, [input.notify, input.platform.files])
+  }, [input.notify, input.platform])
 
   /**
    * G-R2 / G-R4：发送带勾选图片的消息时才调用 —— 逐张存进参考台账并挂到会话
