@@ -12,9 +12,9 @@ module.exports = {
     },
     {
       name: 'ui-stateless',
-      comment: 'ui 层无业务状态，只依赖 ui 与 shared',
+      comment: 'ui 层无业务状态，只依赖 ui 与 shared（第三方包不算违规；图标库 lucide-react 即属此类）',
       from: { path: '^src/ui' },
-      to: { pathNot: '^src/(ui|shared)' },
+      to: { path: '^src/', pathNot: '^src/(ui|shared)' },
     },
     {
       name: 'no-upward',

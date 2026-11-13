@@ -17,7 +17,105 @@ import { PREVIEW_ASSET_HASHES } from './assets'
 import type { NodeSnapshot } from '../../domain/canvas/model/node'
 import type { ProjectListItem } from '../../domain/project/project'
 import type { RunMode } from '../../domain/canvas/model/runRecord'
+import {
+  ArrowUp,
+  BookOpen,
+  Check,
+  ChevronDown,
+  ChevronRight,
+  Clapperboard,
+  Copy,
+  Download,
+  Folder,
+  House,
+  Icon,
+  ICON_SIZE_PX,
+  ICON_STROKE,
+  Image,
+  LayoutDashboard,
+  Minus,
+  PanelLeft,
+  Plug,
+  Plus,
+  RefreshCw,
+  Search,
+  Settings,
+  ShoppingBag,
+  SlidersHorizontal,
+  Sparkles,
+  Square,
+  Trash2,
+  Workflow,
+  X,
+  type IconGlyph,
+} from '../../ui/icon'
 import styles from './PreviewPage.module.css'
+
+/** 图标对照表（轻画-图标统一方案 §8）：线宽在真实界面上确认后才开替换批次。 */
+const ICON_SHEET: Array<[string, IconGlyph]> = [
+  ['ArrowUp', ArrowUp],
+  ['BookOpen', BookOpen],
+  ['Check', Check],
+  ['ChevronDown', ChevronDown],
+  ['ChevronRight', ChevronRight],
+  ['Clapperboard', Clapperboard],
+  ['Copy', Copy],
+  ['Download', Download],
+  ['Folder', Folder],
+  ['House', House],
+  ['Image', Image],
+  ['LayoutDashboard', LayoutDashboard],
+  ['Minus', Minus],
+  ['PanelLeft', PanelLeft],
+  ['Plug', Plug],
+  ['Plus', Plus],
+  ['RefreshCw', RefreshCw],
+  ['Search', Search],
+  ['Settings', Settings],
+  ['ShoppingBag', ShoppingBag],
+  ['SlidersHorizontal', SlidersHorizontal],
+  ['Sparkles', Sparkles],
+  ['Square', Square],
+  ['Trash2', Trash2],
+  ['Workflow', Workflow],
+  ['X', X],
+]
+
+function IconSheetSection() {
+  return (
+    <div className={styles.iconSection} data-icon-sheet-section>
+      <h2 className={styles.h2}>图标对照表（轻画-图标统一方案 §8）</h2>
+      <div className={styles.card}>
+        <div className={styles.cardLabel}>
+          三档尺寸 · 屏幕线宽 {ICON_STROKE}px（sm {ICON_SIZE_PX.sm} / md {ICON_SIZE_PX.md} / lg{' '}
+          {ICON_SIZE_PX.lg}）
+        </div>
+        <div className={styles.iconSheet}>
+          {ICON_SHEET.map(([name, glyph]) => (
+            <div key={name} className={styles.iconCell} data-icon-cell={name}>
+              <div className={styles.iconSizes}>
+                {(['sm', 'md', 'lg'] as const).map((size) => (
+                  <Icon key={size} icon={glyph} size={size} />
+                ))}
+              </div>
+              <span className={styles.iconName}>{name}</span>
+            </div>
+          ))}
+        </div>
+        <div className={styles.iconPairs}>
+          {(['sm', 'md'] as const).map((size) => (
+            <span key={size} className={styles.iconPair} data-icon-pair={size}>
+              <Icon icon={Search} size={size} />
+              搜索
+              <Icon icon={Settings} size={size} />
+              设置
+            </span>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
 
 const HEADER_H = 32
 
@@ -245,6 +343,8 @@ export function PreviewPage() {
       <p className={styles.desc}>
         各组件状态并排预览。打磨流程：改组件 → 看本页 → 比对截图 → 提交（架构 §5.7）。
       </p>
+
+      <IconSheetSection />
 
       <h2 className={styles.h2}>首页 · 项目卡片（产品文档 §5.3）</h2>
       <div className={styles.grid}>

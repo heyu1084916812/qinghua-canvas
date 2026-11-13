@@ -543,6 +543,97 @@
   "moduleMoves": [],
   "modules": [
     {
+      "module": "src/ui/icon/Icon.tsx",
+      "owner": "ui-icon",
+      "responsibility": "全站唯一图标出口组件：三档尺寸、按屏幕像素换算的固定线宽、currentColor 与默认装饰性无障碍属性。",
+      "owns": [
+        "图标尺寸档位到像素的落地",
+        "图标线宽换算与 aria 默认值"
+      ],
+      "doesNotOwn": [
+        "具体图标几何",
+        "按钮的可访问名称"
+      ],
+      "publicApi": [
+        "Icon",
+        "IconProps"
+      ],
+      "test": [
+        "src/ui/icon/Icon.test.ts"
+      ],
+      "budget": 60
+    },
+    {
+      "module": "src/ui/icon/iconTokens.ts",
+      "owner": "ui-icon",
+      "responsibility": "图标规范的 JS 常量（尺寸三档、线宽、图文间距）与 24 网格线宽换算，与 tokens.css 的 --icon-* 同值。",
+      "owns": [
+        "图标尺寸与线宽常量",
+        "网格线宽换算公式"
+      ],
+      "doesNotOwn": [
+        "CSS 令牌文件本身",
+        "图标渲染"
+      ],
+      "publicApi": [
+        "IconSize",
+        "ICON_SIZE_PX",
+        "ICON_STROKE",
+        "ICON_GAP_PX",
+        "ICON_GRID",
+        "gridStrokeWidth"
+      ],
+      "test": [
+        "src/ui/icon/Icon.test.ts"
+      ],
+      "budget": 50
+    },
+    {
+      "module": "src/ui/icon/svgString.ts",
+      "owner": "ui-icon",
+      "responsibility": "把 Lucide 图标组件的几何数据序列化成 SVG 字符串，供命令式 DOM（如提及 chip）使用，线宽与 React 形态一致。",
+      "owns": [
+        "图标几何数据读取",
+        "SVG 字符串序列化"
+      ],
+      "doesNotOwn": [
+        "命令式 DOM 的插入时机",
+        "图标选择"
+      ],
+      "publicApi": [
+        "iconDataOf",
+        "iconSvgString"
+      ],
+      "test": [
+        "src/ui/icon/Icon.test.ts"
+      ],
+      "budget": 80
+    },
+    {
+      "module": "src/ui/icon/index.ts",
+      "owner": "ui-icon",
+      "responsibility": "图标唯一入口：re-export 统一 Icon 组件、令牌常量与本项目用到的 Lucide 图标子集，业务代码不直接引 lucide-react。",
+      "owns": [
+        "允许使用的图标清单",
+        "图标模块公共出口"
+      ],
+      "doesNotOwn": [
+        "图标渲染细节",
+        "业务语义到图标的映射"
+      ],
+      "publicApi": [
+        "Icon",
+        "iconSvgString",
+        "ICON_SIZE_PX",
+        "Search",
+        "Plus"
+      ],
+      "test": [
+        "src/ui/icon/Icon.test.ts"
+      ],
+      "budget": 80
+    },
+    {
       "module": "src/domain/project/referencePalette.ts",
       "owner": "project-reference-curation-rules",
       "responsibility": "从 RGBA 像素本地统计参考图主色并输出 HEX 与占比，生成写进参考卡的色值句。",
@@ -1717,7 +1808,7 @@
       "test": [
         "scripts/smoke.mjs"
       ],
-      "budget": 40
+      "budget": 80
     },
     {
       "module": "src/features/shared/pinterest/PinterestImportView.tsx",

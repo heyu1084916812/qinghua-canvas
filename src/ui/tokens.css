@@ -192,6 +192,8 @@
   --control-inverse-text-hover: #ffffff;
   /* 遮罩（日志 / 确认框 / 灯箱背后的整屏压暗层） */
   --scrim: rgba(0, 0, 0, 0.18);
+  /* 居中浮层（技能库等）的轻遮罩：明暗同值，避免文字/面板背后的画面过度变暗。 */
+  --scrim-backdrop: rgba(0, 0, 0, 0.3);
 
   /* —— 圆角（§3.2） —— */
   --radius-node: 14px;
@@ -203,6 +205,8 @@
 
   /* —— 字号与字重（§3.2） —— */
   --font-sans: "Segoe UI Variable", "Microsoft YaHei UI", "PingFang SC", sans-serif;
+  /* 等宽：密钥、路径、代码片段。以前 Pinterest 说明区引用了未定义的 --font-mono，整条声明静默作废。 */
+  --font-mono: "Cascadia Code", "Consolas", "SF Mono", monospace;
   /**
    * ★ 字号整体上调一档（用户 2026-09-27：「文字看起来没有参考站那么清晰」）。
    *
@@ -240,6 +244,18 @@
   --space-6: 24px;
   --space-8: 32px;
   --space-sidebar-group: 20px;
+
+  /* —— 图标（轻画-图标统一方案 §3） ——
+     三档尺寸与一种线宽；JS 侧的同名常量在 `ui/icon/iconTokens.ts`，两边须同值
+     （由 `iconTokens.test.ts` 读本文件逐项比对）。线宽是**屏幕像素**口径
+     （Lucide `absoluteStrokeWidth`），三档尺寸视觉粗细一致。 */
+  --icon-sm: 14px;
+  --icon-md: 16px;
+  --icon-lg: 20px;
+  --icon-stroke: 1.5;
+  --icon-gap-sm: 6px;
+  --icon-gap-md: 8px;
+  --icon-gap-lg: 8px;
 
   /* —— 应用壳几何（对账 #269 / #274，2026-10-06 第 11 批改过口径）——
      `--shell-gap`：工作区四周留白，**只在上 / 下 / 右**（左侧紧贴侧栏）。

@@ -655,3 +655,24 @@ describe('完成说明核对（A7）', () => {
     }
   })
 })
+
+describe('工具选择：搜索优先、问题卡不抢跑', () => {
+  // 这几条只在「本轮可以联网」那一段里，必须按联网开启装配，不能只拼基础提示词。
+  const prompt = () =>
+    buildAgentSystemPromptWithContext(summarizeForPrompt([]), undefined, {
+      webResearchEnabled: true,
+    })
+
+  it('★ 纯搜索直接调 researchDesign，搜索前不发问题卡', () => {
+    expect(prompt()).toContain('先只调用 `researchDesign`，搜索前不发问题卡')
+    expect(prompt()).toContain('不问用户风格、不问品类')
+  })
+
+  it('★★ 禁止组合只管「搜索前或同时」，web 报告结尾的「下一步方向」问题卡留作唯一例外', () => {
+    const text = prompt()
+    expect(text).toContain('不得在搜索**之前或同时**调用 `askQuestions`')
+    expect(text).toContain('web 报告结尾那一次「下一步方向」问题卡是唯一例外')
+    // 两条规则不能互相顶掉：既要有例外说明，又保留 web 报告结尾发卡的要求。
+    expect(text).toContain('调用 `askQuestions` 发一个问题卡问「接下来推进哪个方向」')
+  })
+})

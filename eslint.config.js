@@ -3,6 +3,60 @@ import tseslint from 'typescript-eslint'
 import importPlugin from 'eslint-plugin-import'
 import globals from 'globals'
 
+/**
+ * 图标统一门禁的豁免清单（轻画-图标统一方案 §4.1 / §5 / §6）。
+ * `ICON_KEEP`：明确保留的图形（品牌 Logo、连线层、用户指定形状的预设），永久豁免。
+ * `ICON_PENDING`：尚未迁移的文件，每迁完一批从这里删掉对应文件，清空后删除本常量。
+ */
+const ICON_KEEP = [
+  'src/app/QinghuaWordmark.tsx',
+  'src/features/settings/MemoryGraph.tsx',
+  'src/features/shared/channelIcon/ChannelIcon.tsx',
+  'src/features/shared/modelIcon/ModelIcon.tsx',
+  'src/workbenches/canvas/flow/FlowChildEdgeLayer.tsx',
+  'src/workbenches/canvas/flow/FlowCoarseEdgeLayer.tsx',
+  'src/workbenches/canvas/flow/FlowDraftLayer.tsx',
+  'src/workbenches/canvas/flow/FlowSnapLayer.tsx',
+  'src/workbenches/canvas/icons/presetGlyph.tsx',
+  'src/workbenches/canvas/panels/presetIcons.tsx',
+]
+
+const ICON_PENDING = [
+  'src/app/AppSidebarIcons.tsx',
+  'src/app/ProjectTreeIcons.tsx',
+  'src/app/SettingsIcons.tsx',
+  'src/app/TitleBar.tsx',
+  'src/app/UpdateNotice.tsx',
+  'src/features/shared/choicePicker/ChoicePicker.tsx',
+  'src/pages/AssetsPage/AssetCard.tsx',
+  'src/pages/AssetsPage/AssetPreview.tsx',
+  'src/pages/CanvasPage/SkillLibraryOverlay.tsx',
+  'src/pages/EcommercePage/EcommerceWorkbenchViews.tsx',
+  'src/pages/EcommercePage/LongImagePanel.tsx',
+  'src/pages/InspirationPage/InspirationPage.tsx',
+  'src/pages/ProjectsPage/ProjectsPage.tsx',
+  'src/pages/ProjectsPage/ProjectsPageViews.tsx',
+  'src/pages/SettingsPage/SettingsPicker.tsx',
+  'src/pages/SkillsPage/SkillLibraryIcons.tsx',
+  'src/pages/StoryboardPage/StoryboardIcons.tsx',
+  'src/workbenches/canvas/menu/ContextMenu.tsx',
+  'src/workbenches/canvas/nodes/fusion/FusionNodeView.tsx',
+  'src/workbenches/canvas/nodes/generation/GenerationNodeView.tsx',
+  'src/workbenches/canvas/nodes/loop/LoopNodeView.tsx',
+  'src/workbenches/canvas/panels/AgentPanel/AgentStepIcon.tsx',
+  'src/workbenches/canvas/panels/AgentPanel/QuestionCardSummary.tsx',
+  'src/workbenches/canvas/panels/AssetMenu.tsx',
+  'src/workbenches/canvas/panels/ParamPicker.tsx',
+  'src/workbenches/canvas/panels/creation/CreationRunActionsView.tsx',
+  'src/workbenches/canvas/surface/Minimap.tsx',
+  'src/workbenches/canvas/text/MentionEditor.tsx',
+  'src/workbenches/canvas/toolbar/icons.tsx',
+  'src/workbenches/ecommerce/EcommerceSelect.tsx',
+  'src/workbenches/ecommerce/studio/EcommerceStudioModeParametersProduct.tsx',
+  'src/workbenches/ecommerce/studio/EcommerceStudioStatusViews.tsx',
+  'src/workbenches/ecommerce/studio/studioSharedViews.tsx',
+]
+
 export default tseslint.config(
   {
     /**
@@ -71,6 +125,44 @@ export default tseslint.config(
       '@typescript-eslint/no-unused-vars': [
         'error',
         { argsIgnorePattern: '^_', varsIgnorePattern: '^_', caughtErrorsIgnorePattern: '^_' },
+      ],
+    },
+  },
+  /**
+   * 图标统一门禁（轻画-图标统一方案 §4.1 / §7）：
+   * 业务代码不得手写 `<svg>`，一律走 `src/ui/icon` 的 `<Icon>`；
+   * 也不得直接 import `lucide-react`，只从 `src/ui/icon` 取图标。
+   * ⚠️ 本块必须排在下面 `src/domain/**` 的配置**之前**：flat config 里后出现的规则
+   * 会整条覆盖前面的 `no-restricted-imports`，排在后面会把 domain 层「禁止 import 上层」
+   * 那组约束悄悄顶掉。
+   */
+  {
+    files: ['src/**/*.tsx'],
+    ignores: ['**/*.test.tsx', 'src/ui/icon/**', ...ICON_KEEP, ...ICON_PENDING],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector: 'JSXOpeningElement[name.name="svg"]',
+          message: '禁止手写 <svg>：改用 src/ui/icon 的 <Icon>（轻画-图标统一方案 §2）。',
+        },
+      ],
+    },
+  },
+  {
+    files: ['src/**/*.{ts,tsx}'],
+    ignores: ['src/domain/**', 'src/ui/icon/**'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: ['lucide-react', 'lucide-react/*'],
+              message: '图标只从 src/ui/icon 取（轻画-图标统一方案 §4.1）。',
+            },
+          ],
+        },
       ],
     },
   },

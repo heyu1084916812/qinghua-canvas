@@ -47,6 +47,61 @@
   color: var(--text-strong);
 }
 
+/* 图标对照表：每个图标并排三档尺寸，便于比对线宽与大小 */
+.iconSection {
+  padding-top: 4px;
+}
+
+.iconSheet {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(108px, 1fr));
+  gap: 12px;
+}
+
+.iconCell {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 8px;
+  border: 1px solid var(--stroke);
+  border-radius: var(--radius-control);
+}
+
+.iconSizes {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--text-1);
+}
+
+.iconName {
+  font-size: var(--fs-chip);
+  color: var(--text-2);
+  overflow-wrap: anywhere;
+}
+
+.iconPairs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+  padding-top: 4px;
+}
+
+/* 图文间距取令牌：sm 6px / md 8px（§3） */
+.iconPair {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--icon-gap-md);
+  font-size: var(--fs-body);
+  color: var(--text-1);
+}
+
+.iconPair[data-icon-pair='sm'] {
+  gap: var(--icon-gap-sm);
+  font-size: var(--fs-label);
+}
+
 .stage {
   position: relative;
   width: 100%;

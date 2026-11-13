@@ -16,8 +16,8 @@
 .backdrop {
   position: absolute;
   inset: 0;
-  /* 修复：降低遮罩透明度，避免背景过度变暗 */
-  background: rgba(0, 0, 0, 0.3);
+  /* 修复：降低遮罩透明度，避免背景过度变暗（取值走 --scrim-backdrop 令牌） */
+  background: var(--scrim-backdrop);
 }
 
 .dialog {
