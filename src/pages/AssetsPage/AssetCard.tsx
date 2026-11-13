@@ -7,6 +7,7 @@ import {
 import type { LibraryAsset } from '../../domain/shared/assetLibrary'
 import type { AssetsView } from '../../state/project/assetLibraryStore'
 import { useAssetMeta } from '../../features/shared/assets/index'
+import { Check, Heart, Icon, Send } from '../../ui/icon'
 import styles from './AssetsPage.module.css'
 
 /**
@@ -119,15 +120,7 @@ export function AssetCard({
           }}
         >
           {checked && (
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-              <path
-                d="m5 12 4.5 4.5L19 7"
-                stroke="currentColor"
-                strokeWidth="2.4"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
+            <Icon icon={Check} size="sm" />
           )}
         </button>
       )}
@@ -215,18 +208,7 @@ export function AssetCard({
           onToggleFavorite?.()
         }}
       >
-        <svg
-          width="15"
-          height="15"
-          viewBox="0 0 24 24"
-          fill={saved ? 'currentColor' : 'none'}
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinejoin="round"
-          aria-hidden="true"
-        >
-          <path d="M12 20.5 3.8 12.3a5 5 0 0 1 7.1-7.1l1.1 1.1 1.1-1.1a5 5 0 0 1 7.1 7.1Z" />
-        </svg>
+        <Icon icon={Heart} size="sm" fill={saved ? 'currentColor' : 'none'} />
       </button>
 
       <div className={styles.cardActions}>
@@ -243,16 +225,7 @@ export function AssetCard({
               onSendToCanvas?.()
             }}
           >
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-              <path
-                d="m21 3-7.8 18-3.1-7.2L3 10.8 21 3Z"
-                stroke="currentColor"
-                strokeWidth="1.8"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-              <path d="m10.1 13.9 5.2-5.2" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-            </svg>
+            <Icon icon={Send} size="sm" />
           </button>
         )}
         {confirming ? (

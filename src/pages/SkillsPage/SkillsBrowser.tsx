@@ -392,7 +392,7 @@ export function SkillsBrowser({
                     }}
                     onDoubleClick={(event) => event.stopPropagation()}
                   >
-                    <SkillStarIcon size={15} filled={favorite} />
+                    <SkillStarIcon size="sm" filled={favorite} />
                   </button>
                   <button
                     type="button"

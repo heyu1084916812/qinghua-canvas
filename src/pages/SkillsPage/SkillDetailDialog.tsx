@@ -181,7 +181,7 @@ export function SkillDetailDialog({
             data-skill-detail-close
             onClick={onClose}
           >
-            <SkillCloseIcon size={16} />
+            <SkillCloseIcon size="md" />
           </button>
         </header>
 
@@ -226,7 +226,7 @@ export function SkillDetailDialog({
                   data-skill-detail-canvas-case
                 >
                   创作详情
-                  <SkillExternalIcon size={12} />
+                  <SkillExternalIcon size="sm" />
                 </a>
               ) : null}
               {mediaLabel ? (
@@ -304,9 +304,9 @@ export function SkillDetailDialog({
                       setFilePickerOpen(true)
                     }}
                   >
-                    <SkillFileIcon size={14} />
+                    <SkillFileIcon size="sm" />
                     <span>{viewMode === 'json' ? '全部文件' : selectedFile?.path ?? '选择文件'}</span>
-                    <SkillChevronIcon size={13} />
+                    <SkillChevronIcon size="sm" />
                   </button>
                   {filePickerOpen ? (
                     <div
@@ -337,7 +337,7 @@ export function SkillDetailDialog({
                             setFilePickerOpen(false)
                           }}
                         >
-                          <SkillFileIcon size={14} />
+                          <SkillFileIcon size="sm" />
                           <span>{file.path}</span>
                         </button>
                       ))}
@@ -358,7 +358,7 @@ export function SkillDetailDialog({
                     data-skill-view="document"
                     onClick={() => setViewMode('document')}
                   >
-                    <SkillEyeIcon size={16} />
+                    <SkillEyeIcon size="md" />
                   </button>
                   <button
                     type="button"
@@ -376,7 +376,7 @@ export function SkillDetailDialog({
                       setViewMode('json')
                     }}
                   >
-                    <SkillCodeIcon size={16} />
+                    <SkillCodeIcon size="md" />
                   </button>
                 </div>
               </div>

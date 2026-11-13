@@ -631,7 +631,7 @@
       "test": [
         "src/ui/icon/Icon.test.ts"
       ],
-      "budget": 80
+      "budget": 160
     },
     {
       "module": "src/domain/project/referencePalette.ts",

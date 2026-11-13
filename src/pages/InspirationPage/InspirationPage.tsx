@@ -21,6 +21,7 @@ import {
   InspirationSourcesPanel,
   type NewInspirationSourceInput,
 } from './InspirationSourcesPanel'
+import { Heart, Icon } from '../../ui/icon'
 import styles from './InspirationPage.module.css'
 
 /** 一屏先摆多少张（541 条一次全渲染会把图片请求和 DOM 一起打爆） */
@@ -658,17 +659,11 @@ export function InspirationPage() {
                         aria-pressed={favs.has(c.id)}
                         onClick={() => toggleFav(c.id)}
                       >
-                        <svg
-                          width="14"
-                          height="14"
-                          viewBox="0 0 24 24"
+                        <Icon
+                          icon={Heart}
+                          size="sm"
                           fill={favs.has(c.id) ? 'currentColor' : 'none'}
-                          stroke="currentColor"
-                          strokeWidth="2"
-                          strokeLinejoin="round"
-                        >
-                          <path d="M12 20.5 3.8 12.3a5 5 0 0 1 7.1-7.1l1.1 1.1 1.1-1.1a5 5 0 0 1 7.1 7.1Z" />
-                        </svg>
+                        />
                       </button>
                       <span className={styles.badge}>
                         {c.kind === 'video' ? '视频 · ' : ''}

@@ -1,85 +1,52 @@
-import type { SVGProps } from 'react'
+import {
+  ChevronDown,
+  Code,
+  ExternalLink,
+  Eye,
+  FileText,
+  Icon,
+  Play,
+  Star,
+  X,
+  type IconSize,
+} from '../../ui/icon'
 
-type IconProps = SVGProps<SVGSVGElement> & { size?: number }
-
-function base({ size = 16, ...props }: IconProps) {
-  return {
-    width: size,
-    height: size,
-    viewBox: '0 0 24 24',
-    fill: 'none',
-    stroke: 'currentColor',
-    strokeWidth: 1.8,
-    strokeLinecap: 'round' as const,
-    strokeLinejoin: 'round' as const,
-    'aria-hidden': true,
-    ...props,
-  }
+/**
+ * 技能库图标的统一出口（第 4 批起几何来自 Lucide）。
+ * 语义名保持不变，调用点不用改名；`filled` 仍用于收藏星与播放三角的实心态。
+ */
+interface IconProps {
+  size?: IconSize
 }
 
-export function SkillStarIcon({ filled = false, ...props }: IconProps & { filled?: boolean }) {
-  return (
-    <svg {...base(props)} fill={filled ? 'currentColor' : 'none'}>
-      <path d="m12 3 2.7 5.46 6.03.88-4.36 4.25 1.03 6-5.4-2.84L6.6 19.6l1.03-6L3.27 9.34l6.03-.88L12 3Z" />
-    </svg>
-  )
+export function SkillStarIcon({ filled = false, size = 'md' }: IconProps & { filled?: boolean }) {
+  return <Icon icon={Star} size={size} fill={filled ? 'currentColor' : 'none'} />
 }
 
-export function SkillCloseIcon(props: IconProps) {
-  return (
-    <svg {...base(props)}>
-      <path d="m6 6 12 12M18 6 6 18" />
-    </svg>
-  )
+export function SkillCloseIcon({ size = 'md' }: IconProps) {
+  return <Icon icon={X} size={size} />
 }
 
-export function SkillExternalIcon(props: IconProps) {
-  return (
-    <svg {...base(props)}>
-      <path d="M14 4h6v6M20 4l-9 9" />
-      <path d="M18 13v5a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h5" />
-    </svg>
-  )
+export function SkillExternalIcon({ size = 'md' }: IconProps) {
+  return <Icon icon={ExternalLink} size={size} />
 }
 
-export function SkillPlayIcon(props: IconProps) {
-  return (
-    <svg {...base(props)}>
-      <path d="m8 5 11 7-11 7V5Z" fill="currentColor" stroke="none" />
-    </svg>
-  )
+export function SkillPlayIcon({ size = 'md' }: IconProps) {
+  return <Icon icon={Play} size={size} fill="currentColor" />
 }
 
-export function SkillFileIcon(props: IconProps) {
-  return (
-    <svg {...base(props)}>
-      <path d="M7 3h7l4 4v14H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2Z" />
-      <path d="M14 3v5h5M9 13h6M9 17h5" />
-    </svg>
-  )
+export function SkillFileIcon({ size = 'md' }: IconProps) {
+  return <Icon icon={FileText} size={size} />
 }
 
-export function SkillEyeIcon(props: IconProps) {
-  return (
-    <svg {...base(props)}>
-      <path d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6Z" />
-      <circle cx="12" cy="12" r="2.5" />
-    </svg>
-  )
+export function SkillEyeIcon({ size = 'md' }: IconProps) {
+  return <Icon icon={Eye} size={size} />
 }
 
-export function SkillCodeIcon(props: IconProps) {
-  return (
-    <svg {...base(props)}>
-      <path d="m8.5 8-4 4 4 4M15.5 8l4 4-4 4" />
-    </svg>
-  )
+export function SkillCodeIcon({ size = 'md' }: IconProps) {
+  return <Icon icon={Code} size={size} />
 }
 
-export function SkillChevronIcon(props: IconProps) {
-  return (
-    <svg {...base(props)}>
-      <path d="m7 9.5 5 5 5-5" />
-    </svg>
-  )
+export function SkillChevronIcon({ size = 'md' }: IconProps) {
+  return <Icon icon={ChevronDown} size={size} />
 }

@@ -18,6 +18,7 @@ import {
   paletteTextFor,
 } from '../../domain/shared/colorPalette'
 import { useAssetMeta } from '../../features/shared/assets/index'
+import { Check, Icon, type IconSize } from '../../ui/icon'
 import styles from './AssetsPage.module.css'
 
 /**
@@ -476,22 +477,8 @@ export function AssetPreview({
  * 而它要**居中压在一个 28px 的色块上** —— 那是几何要求，字形给不了确定的中心
  * （同 §3.3「图标一律用矢量图」那条口径）。
  */
-function IconCheck({ size = 14 }: { size?: number }) {
-  return (
-    <svg
-      width={size}
-      height={size}
-      viewBox="0 0 16 16"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={2.2}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <path d="m3 8.3 3.1 3.1L13 4.7" />
-    </svg>
-  )
+function IconCheck({ size = 'sm' }: { size?: IconSize }) {
+  return <Icon icon={Check} size={size} />
 }
 
 function formatDateTime(at: number): string {

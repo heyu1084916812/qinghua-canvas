@@ -23,14 +23,8 @@ const ICON_KEEP = [
 
 const ICON_PENDING = [
   'src/app/TitleBar.tsx',
-  'src/pages/AssetsPage/AssetCard.tsx',
-  'src/pages/AssetsPage/AssetPreview.tsx',
-  'src/pages/CanvasPage/SkillLibraryOverlay.tsx',
   'src/pages/EcommercePage/EcommerceWorkbenchViews.tsx',
   'src/pages/EcommercePage/LongImagePanel.tsx',
-  'src/pages/InspirationPage/InspirationPage.tsx',
-  'src/pages/SkillsPage/SkillLibraryIcons.tsx',
-  'src/pages/StoryboardPage/StoryboardIcons.tsx',
   'src/workbenches/canvas/menu/ContextMenu.tsx',
   'src/workbenches/canvas/nodes/fusion/FusionNodeView.tsx',
   'src/workbenches/canvas/nodes/generation/GenerationNodeView.tsx',

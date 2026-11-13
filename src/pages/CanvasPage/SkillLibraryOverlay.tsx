@@ -6,6 +6,7 @@ import type { AgentSkillTarget } from '../SkillsPage/skillAgentResolve'
 import { useSkillLibraryState } from '../SkillsPage/useSkillLibraryState'
 import pageStyles from '../SkillsPage/SkillsPage.module.css'
 import { trapTabKey } from './skillLibraryFocus'
+import { Icon, X } from '../../ui/icon'
 import styles from './SkillLibraryOverlay.module.css'
 
 /**
@@ -103,9 +104,7 @@ export function SkillLibraryOverlay({
             data-skill-library-close
             onClick={onClose}
           >
-            <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
-              <path d="M3 3l8 8M11 3l-8 8" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-            </svg>
+            <Icon icon={X} size="sm" />
           </button>
         </header>
         {library.notice ? (
