@@ -3,6 +3,7 @@ import { getVersion } from '@tauri-apps/api/app'
 import { getCurrentWindow } from '@tauri-apps/api/window'
 import { isTauri } from '@tauri-apps/api/core'
 import { openUrl } from '@tauri-apps/plugin-opener'
+import { Copy, Icon, Minus, Square, X } from '../ui/icon'
 import { IconSidebarToggle } from './AppSidebarIcons'
 import { getSidebarPinned, subscribeSidebar, toggleSidebarPin } from './sidebarState'
 import { AppMenuContent, EditShortcuts } from './titleBarMenus'
@@ -193,9 +194,7 @@ export function TitleBar() {
            */
           onClick={() => void getCurrentWindow().minimize().catch(() => {})}
         >
-          <svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true">
-            <path d="M0 5h10" stroke="currentColor" strokeWidth="1" />
-          </svg>
+          <Icon icon={Minus} px={14} strokePx={1} />
         </button>
         <button
           type="button"
@@ -206,14 +205,9 @@ export function TitleBar() {
           onClick={() => void getCurrentWindow().toggleMaximize().catch(() => {})}
         >
           {maximized ? (
-            <svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true">
-              <rect x="2.5" y="0.5" width="7" height="7" fill="none" stroke="currentColor" />
-              <path d="M2.5 2.5H0.5v7h7v-2" fill="none" stroke="currentColor" />
-            </svg>
+            <Icon icon={Copy} px={14} strokePx={1} />
           ) : (
-            <svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true">
-              <rect x="0.5" y="0.5" width="9" height="9" fill="none" stroke="currentColor" />
-            </svg>
+            <Icon icon={Square} px={14} strokePx={1} />
           )}
         </button>
         <button
@@ -224,9 +218,7 @@ export function TitleBar() {
           title="关闭"
           onClick={() => void getCurrentWindow().close().catch(() => {})}
         >
-          <svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true">
-            <path d="M0.5 0.5l9 9M9.5 0.5l-9 9" stroke="currentColor" strokeWidth="1" />
-          </svg>
+          <Icon icon={X} px={14} strokePx={1} />
         </button>
       </div>
     </header>

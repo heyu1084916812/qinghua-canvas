@@ -1,5 +1,5 @@
 import type { LucideIcon, LucideProps } from 'lucide-react'
-import { gridStrokeWidth, ICON_SIZE_PX, type IconSize } from './iconTokens'
+import { gridStrokeWidth, ICON_SIZE_PX, ICON_STROKE, type IconSize } from './iconTokens'
 
 /**
  * 全站唯一的图标出口（轻画-图标统一方案 §2）。
@@ -24,11 +24,16 @@ export interface IconProps
    * 那是缩放口径，不是三档之一。业务界面仍应只用 `size`。
    */
   px?: number
+  /**
+   * 覆盖屏幕线宽（默认 `ICON_STROKE` = 1.5）。只给**系统窗口徽标**这类
+   * 必须比正文图标更细的场合用：标题栏三枚在 14px 下用 1px，才像 OS 原生。
+   */
+  strokePx?: number
   /** 有意义的独立图形才传；按钮内的图标不要传，名字写在按钮上。 */
   label?: string
 }
 
-export function Icon({ icon: Glyph, size = 'md', px: pxProp, label, ...rest }: IconProps) {
+export function Icon({ icon: Glyph, size = 'md', px: pxProp, strokePx = ICON_STROKE, label, ...rest }: IconProps) {
   const px = pxProp ?? ICON_SIZE_PX[size]
   const a11y = label
     ? { role: 'img', 'aria-label': label }
@@ -40,7 +45,7 @@ export function Icon({ icon: Glyph, size = 'md', px: pxProp, label, ...rest }: I
       data-icon-size={pxProp ? 'px' : size}
       data-icon-px={pxProp ?? undefined}
       size={px}
-      strokeWidth={gridStrokeWidth(px)}
+      strokeWidth={gridStrokeWidth(px, strokePx)}
       color="currentColor"
     />
   )

@@ -22,9 +22,6 @@ const ICON_KEEP = [
   'src/workbenches/canvas/icons/presetGlyph.tsx',
   // 生成节点的「素材交换」徽标是用户指定形状（两根圆角轴 + 实心头，上下镜像），换库会破坏既有几何测试
   'src/workbenches/canvas/nodes/generation/GenerationNodeView.tsx',
-  // 自绘 Windows 标题栏图标：最小化 / 最大化 / 关闭都是 10px 的 OS 窗口徽标，
-  // 三档里没有 10px，套 14px 会把按钮顶大（方案 §3 之外的唯一例外）。
-  'src/app/TitleBar.tsx',
   // 图标集本身只为「预设」保留一份手绘形状（用户 2026-10-06 指定，且有 React / 字符串
   // 两种形态逐字一致的测试）；其余图标已全部走 Lucide。
   'src/workbenches/canvas/toolbar/icons.tsx',

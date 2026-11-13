@@ -208,8 +208,9 @@ describe('seven UI placement fixes', () => {
     expect(referenceKitItems).toContain('data-reference-kit-item-expand')
     expect(referenceKit).toContain('ensureKitAssetReference')
     expect(icons).toContain('两条带滑块的横线')
-    expect(icons).toContain('<circle cx="11.5" cy="8" r="2" />')
-    expect(icons).toContain('<circle cx="15.5" cy="16" r="2" />')
+    // 第 6 批起图标集走 Lucide：「两条带滑块」那枚映射到 SlidersHorizontal，
+    // 不再在 toolbar/icons.tsx 里手写两个圆（断言从「有几条 path」改为「映射到哪枚」）。
+    expect(icons).toContain('SlidersHorizontal')
     expect(referenceLightbox).toContain('data-reference-lightbox-thumbs')
     expect(referenceLightbox).toContain('data-reference-lightbox-add-canvas')
     expect(referenceLightbox).toContain('data-reference-lightbox-add-agent')
