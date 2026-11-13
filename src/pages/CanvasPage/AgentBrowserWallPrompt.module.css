@@ -1,0 +1,115 @@
+/* 「需要你处理一下验证/登录」提示卡（#1088）：画布舞台底部居中、底部工具条上方；按钮令牌同 CanvasBrowserStates */
+.card {
+  position: absolute;
+  z-index: 70;
+  bottom: calc(var(--space-4) + 64px);
+  left: 50%;
+  display: flex;
+  gap: var(--space-3);
+  box-sizing: border-box;
+  width: min(460px, calc(100% - var(--space-6) * 2));
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--stroke);
+  border-radius: var(--radius-node);
+  background: var(--bg-surface);
+  box-shadow: var(--shadow-float);
+  transform: translateX(-50%);
+}
+
+.icon {
+  display: inline-flex;
+  flex: none;
+  margin-top: 1px;
+  color: var(--warn);
+}
+
+.body {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.title {
+  margin: 0;
+  color: var(--text-1);
+  font-size: var(--fs-label);
+  font-weight: 600;
+  line-height: 1.5;
+}
+
+.more {
+  margin-left: var(--space-2);
+  color: var(--text-3);
+  font-size: var(--fs-chip);
+  font-weight: 400;
+}
+
+.detail,
+.error {
+  margin: var(--space-1) 0 0;
+  font-size: var(--fs-chip);
+  line-height: 1.55;
+}
+
+.detail {
+  color: var(--text-2);
+}
+
+.error {
+  color: var(--warn);
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+}
+
+.primary,
+.secondary,
+.ghost {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--stroke);
+  border-radius: var(--radius-control);
+  font: inherit;
+  font-size: var(--fs-label);
+  cursor: pointer;
+  transition: background var(--dur-hover) var(--ease-out);
+}
+
+.primary {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--accent-text);
+}
+
+.secondary {
+  background: var(--bg-surface);
+  color: var(--text-1);
+}
+
+.secondary:hover {
+  background: var(--bg-hover);
+}
+
+.ghost {
+  border-color: transparent;
+  background: transparent;
+  color: var(--text-2);
+}
+
+.ghost:hover {
+  background: var(--bg-hover);
+  color: var(--text-1);
+}
+
+.primary:focus-visible,
+.secondary:focus-visible,
+.ghost:focus-visible {
+  outline: 1px solid var(--stroke-focus);
+  outline-offset: 1px;
+}

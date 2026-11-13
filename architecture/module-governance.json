@@ -11061,6 +11061,81 @@
         "src/platform/desktop/tauriAgentBrowser.test.ts"
       ],
       "budget": 60
+    },
+    {
+      "module": "src/features/shared/research/agentBrowserWall.ts",
+      "owner": "agent-browser-wall",
+      "responsibility": "交接 Agent 后台浏览器遇到验证 / 登录墙时的「需要你处理」待办：调研侧挂待办等回答，界面侧读待办并回答继续或取消，调研停止时自动撤掉。",
+      "owns": [
+        "待办队列与订阅",
+        "继续 / 取消回答",
+        "中止即取消",
+        "提示卡标题与说明文案"
+      ],
+      "doesNotOwn": [
+        "墙判定口径",
+        "浏览器窗口的显示与隐藏",
+        "提示卡界面"
+      ],
+      "publicApi": [
+        "requestBrowserWall",
+        "answerBrowserWall",
+        "browserWallStore",
+        "BROWSER_WALL_HEADLINE",
+        "browserWallDetail",
+        "BrowserWallPrompt"
+      ],
+      "test": [
+        "src/features/shared/research/agentBrowserWall.test.ts",
+        "src/pages/CanvasPage/AgentBrowserWallPrompt.test.ts"
+      ],
+      "budget": 110
+    },
+    {
+      "module": "src/pages/CanvasPage/AgentBrowserWallPrompt.tsx",
+      "owner": "agent-browser-wall-prompt",
+      "responsibility": "在画布舞台底部显示「需要你处理一下验证/登录，完成后点继续」提示卡，提供继续、显示窗口与取消。",
+      "owns": [
+        "提示卡渲染",
+        "继续 / 显示窗口 / 取消三个动作",
+        "显示窗口失败提示"
+      ],
+      "doesNotOwn": [
+        "待办队列",
+        "Agent 浏览器窗口实现",
+        "墙判定口径"
+      ],
+      "publicApi": [
+        "AgentBrowserWallPrompt"
+      ],
+      "test": [
+        "src/pages/CanvasPage/AgentBrowserWallPrompt.test.ts"
+      ],
+      "budget": 100
+    },
+    {
+      "module": "src/pages/CanvasPage/AgentBrowserWallPrompt.module.css",
+      "owner": "agent-browser-wall-prompt-style",
+      "responsibility": "定义「需要你处理」提示卡的位置、卡片与按钮样式。",
+      "owns": [
+        "提示卡定位与卡片",
+        "继续 / 显示窗口 / 取消按钮样式"
+      ],
+      "doesNotOwn": [
+        "全局颜色和间距令牌",
+        "画布工具条样式"
+      ],
+      "publicApi": [
+        "CSS_MODULE:agent-browser-wall-prompt",
+        "CSS_CLASS:card",
+        "CSS_CLASS:primary",
+        "CSS_CLASS:secondary",
+        "CSS_CLASS:ghost"
+      ],
+      "test": [
+        "src/pages/CanvasPage/AgentBrowserWallPrompt.test.ts"
+      ],
+      "budget": 130
     }
   ]
 }

@@ -12,6 +12,7 @@ import { fitCanvasView, focusCanvasNode } from '../../workbenches/canvas/surface
 import { CanvasExecutionProvider } from '../../workbenches/canvas/execution/CanvasExecutionProvider'
 import { CanvasGatewayBridge } from '../../workbenches/canvas/agent/CanvasGatewayBridge'
 import { CanvasToolbar } from '../../workbenches/canvas/toolbar/CanvasToolbar'
+import { AgentBrowserWallPrompt } from './AgentBrowserWallPrompt'
 import { screenToWorld } from '../../domain/canvas/geometry/coords'
 import { NODE_MINIMUMS } from '../../domain/canvas/layout/constants'
 import { assetNodeSize } from '../../domain/canvas/layout/assetNodeSize'
@@ -544,6 +545,8 @@ function CanvasProject({ projectId }: { projectId: string }) {
               />
             </Suspense>
           ) : null}
+          {/* Agent 后台浏览器遇到验证 / 登录墙时的「需要你处理一下」提示（#1088） */}
+          <AgentBrowserWallPrompt />
           {/* Agent 技能按钮打开的技能库浮层：居中在画布舞台里（2026-11-12） */}
           <CanvasSkillLibraryHost projectId={projectId} />
           {logOpen && (

@@ -1,0 +1,130 @@
+[
+  {
+    "file": "1440x900-light-wall.png",
+    "geo": {
+      "toolbar": null,
+      "agentBtn": null,
+      "wall": {
+        "x": 515,
+        "y": 656,
+        "w": 460,
+        "h": 149
+      },
+      "wallOverflow": false,
+      "wallButtons": [
+        "继续",
+        "显示窗口",
+        "取消"
+      ],
+      "agentPanel": null,
+      "chips": 0,
+      "draft": null,
+      "calls": [],
+      "docOverflow": false,
+      "showCall": [
+        "agent.show",
+        "pinterest",
+        "轻画 · Pinterest：请登录"
+      ],
+      "decision": "continue",
+      "wallAfterContinue": 0
+    },
+    "errors": []
+  },
+  {
+    "file": "1440x900-dark-wall.png",
+    "geo": {
+      "toolbar": null,
+      "agentBtn": null,
+      "wall": {
+        "x": 515,
+        "y": 656,
+        "w": 460,
+        "h": 149
+      },
+      "wallOverflow": false,
+      "wallButtons": [
+        "继续",
+        "显示窗口",
+        "取消"
+      ],
+      "agentPanel": null,
+      "chips": 0,
+      "draft": null,
+      "calls": [],
+      "docOverflow": false,
+      "showCall": [
+        "agent.show",
+        "pinterest",
+        "轻画 · Pinterest：请登录"
+      ],
+      "decision": "continue",
+      "wallAfterContinue": 0
+    },
+    "errors": []
+  },
+  {
+    "file": "1024x700-light-wall.png",
+    "geo": {
+      "toolbar": null,
+      "agentBtn": null,
+      "wall": {
+        "x": 307,
+        "y": 456,
+        "w": 460,
+        "h": 149
+      },
+      "wallOverflow": false,
+      "wallButtons": [
+        "继续",
+        "显示窗口",
+        "取消"
+      ],
+      "agentPanel": null,
+      "chips": 0,
+      "draft": null,
+      "calls": [],
+      "docOverflow": false,
+      "showCall": [
+        "agent.show",
+        "pinterest",
+        "轻画 · Pinterest：请登录"
+      ],
+      "decision": "continue",
+      "wallAfterContinue": 0
+    },
+    "errors": []
+  },
+  {
+    "file": "1024x700-dark-wall.png",
+    "geo": {
+      "toolbar": null,
+      "agentBtn": null,
+      "wall": {
+        "x": 307,
+        "y": 456,
+        "w": 460,
+        "h": 149
+      },
+      "wallOverflow": false,
+      "wallButtons": [
+        "继续",
+        "显示窗口",
+        "取消"
+      ],
+      "agentPanel": null,
+      "chips": 0,
+      "draft": null,
+      "calls": [],
+      "docOverflow": false,
+      "showCall": [
+        "agent.show",
+        "pinterest",
+        "轻画 · Pinterest：请登录"
+      ],
+      "decision": "continue",
+      "wallAfterContinue": 0
+    },
+    "errors": []
+  }
+]

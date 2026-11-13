@@ -8,6 +8,7 @@ import { createPresetStore } from '../../../../state/project/presetStore'
 import { runDesignResearch } from '../../../../features/shared/research/designResearchRunner'
 import { TAVILY_API_KEY_REF } from '../../../../features/shared/research/tavilySearch'
 import { readWebPage } from '../../../../features/shared/research/webPageReader'
+import { requestBrowserWall } from '../../../../features/shared/research/agentBrowserWall'
 import { getAgentWebResearch } from '../../../../state/ui/agentWebResearch'
 import {
   executeConfirmedTool,
@@ -136,9 +137,14 @@ export function useAgentPanelToolModel({
         webEnabled: getAgentWebResearch,
         readPage: readWebPage,
         network: platform.network,
-        /** 桌面壳：Agent 后台浏览器抓 Dribbble / Dieline / POTW / Pinterest（#1087） */
+        /**
+         * 桌面壳：Agent 后台浏览器抓 Dribbble / Dieline / POTW / Pinterest（#1087）；
+         * 遇到验证 / 登录墙时在画布上挂「需要你处理一下」提示卡（#1088）。
+         */
         browserSites: () =>
-          platform.agentBrowser ? { browser: platform.agentBrowser } : undefined,
+          platform.agentBrowser
+            ? { browser: platform.agentBrowser, resolveWall: requestBrowserWall }
+            : undefined,
         runResearch: runDesignResearch,
         signal: () =>
           abortRefs.current.get(sessionId)?.signal ??
