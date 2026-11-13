@@ -1,3 +1,4 @@
+import type { AgentBrowserPort } from './agentBrowser'
 import type { BrowserViewPort } from './browserView'
 import type { AppError } from '../shared/result'
 import type { DetectorFaceRect } from '../shared/faceDetect'
@@ -833,6 +834,11 @@ export interface PlatformKit {
    * 浏览器开发版缺席时画布浏览器退回 iframe。端口定义见 `./browserView`。
    */
   browserView?: BrowserViewPort
+  /**
+   * Agent 后台浏览器（2026-11-13，#1087）：隐藏的系统 WebView 窗口，与画布浏览器共用登录目录，
+   * 抓只能在真实浏览器里打开的设计站。**可选**：只有桌面壳有。端口定义见 `./agentBrowser`。
+   */
+  agentBrowser?: AgentBrowserPort
   /** 素材传输（图床）：把本地字节换成公网直链；没配图床时 `upload` 返回 null */
   hosting: HostingPort
   credentials: CredentialPort

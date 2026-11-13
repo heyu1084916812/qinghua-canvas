@@ -11,6 +11,9 @@
 //!   所以这里不需要改 capability；只能由主窗口调这些命令。
 //! - 事件统一发到主窗口：`browser-view:event`，payload `{ id, kind, url?, title? }`。
 //!
+//! - `browser_view_extract`：在当前页执行前端给的提取脚本（同 Agent 浏览器那份），
+//!   画布浏览器的「交给 Agent」用它把当前网页的图片带进对话（2026-11-13 #1089）。
+//!
 //! Windows 上创建 webview 不能在同步命令里做（WebView2 会死锁，见 wry#583），
 //! 所以所有命令都是 `async`。
 
@@ -54,13 +57,13 @@ struct ViewEvent<'a> {
 }
 
 /// macOS（WKWebView 不支持 data_directory）用的固定数据仓库 id；其他平台忽略。
-const MAC_DATA_STORE_ID: [u8; 16] = *b"qinghua-browser1";
+pub(crate) const MAC_DATA_STORE_ID: [u8; 16] = *b"qinghua-browser1";
 
 fn emit(app: &AppHandle, event: ViewEvent<'_>) {
     let _ = app.emit_to("main", EVENT_NAME, event);
 }
 
-fn parse_target(raw: &str) -> Result<Url, String> {
+pub(crate) fn parse_target(raw: &str) -> Result<Url, String> {
     let url = Url::parse(raw).map_err(|e| format!("网址无效：{e}"))?;
     if !is_allowed_navigation(url.scheme(), url.host_str()) {
         return Err("只能打开公开的 http / https 网页".into());
@@ -74,7 +77,7 @@ fn find(app: &AppHandle, id: &str) -> Result<Webview, String> {
         .ok_or_else(|| format!("浏览器视图 {id} 还没打开"))
 }
 
-fn profile_dir(app: &AppHandle) -> Result<std::path::PathBuf, String> {
+pub(crate) fn profile_dir(app: &AppHandle) -> Result<std::path::PathBuf, String> {
     let base = app
         .path()
         .app_local_data_dir()
@@ -226,4 +229,21 @@ pub async fn browser_view_close(app: AppHandle, id: String) -> Result<(), String
         Some(view) => view.close().map_err(|e| e.to_string()),
         None => Ok(()),
     }
+}
+
+/// 在当前页执行提取脚本并取回结果（脚本须同步返回 `JSON.stringify(...)` 字符串）。
+/// 只有主窗口（本地源）能调这个命令；远端页面没有 IPC 权限。
+#[tauri::command]
+pub async fn browser_view_extract(
+    app: AppHandle,
+    id: String,
+    script: String,
+) -> Result<String, String> {
+    let view = find(&app, &id)?;
+    let raw = crate::agent_browser::eval_capture(
+        |callback| view.eval_with_callback(script, callback),
+        std::time::Duration::from_secs(8),
+    )
+    .await?;
+    crate::agent_browser::decode_script_result(&raw)
 }

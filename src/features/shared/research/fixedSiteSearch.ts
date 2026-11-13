@@ -2,13 +2,15 @@ import type { DesignResearchItem, ResearchMode } from '../../../domain/inspirati
 import type { NetworkPort } from '../../../platform/ports'
 import { searchBing } from './bingSearch'
 import { runSiteAdapters, type SiteAdapterRunStatus } from './siteAdapters/runSiteAdapters'
+import type { BrowserSiteContext } from './siteAdapters/types'
 import { searchTavily } from './tavilySearch'
 
 /**
  * 固定设计站的联网搜索调度（#1076 方案 D，2026-11-13 改）：
  *
  * - **图片**：直连站点适配器（花瓣 + 站酷，`siteAdapters/`）→ 浏览器站点（Dribbble / Dieline /
- *   POTW / Pinterest）目前只记 `needs-browser` → 适配器**一张都没拿到**且填了 Tavily Key 时改用 Tavily。
+ *   POTW / Pinterest，桌面壳经 Agent 后台浏览器抓，#1087；网页版记 `needs-browser`）
+ *   → 适配器**一张都没拿到**且填了 Tavily Key 时改用 Tavily。
  *   **不再用 Bing 图片搜索**：Bing 图片接口在 `site:` 子句下不理查询词，只按域名过滤会把站内无关图当成功。
  * - **网页**：免 Key 的 Bing 网页结果页（相关性实测正常）→ 没有结果且填了 Key 时改用 Tavily。
  * - **图文混合**：两路并发；适配器没有图片、或两路都空时，才调用 Tavily。
@@ -29,6 +31,8 @@ export interface FixedSiteSearchDeps {
   tavilyApiKey?: string | null
   /** 站点适配器同站相邻请求间隔；缺省 400ms，测试传 0。 */
   siteAdapterDelayMs?: number
+  /** 桌面壳的 Agent 后台浏览器（#1087）；缺省 = 浏览器站点只记 `needs-browser`。 */
+  browserSites?: BrowserSiteContext
 }
 
 export interface FixedSiteSearchResult {
@@ -92,6 +96,7 @@ export async function searchFixedDesignSites(
             queries: input.queries,
             imageMaxResults: input.imageMaxResults ?? DEFAULT_IMAGE_TARGET,
             ...(deps.siteAdapterDelayMs !== undefined ? { delayMs: deps.siteAdapterDelayMs } : {}),
+            ...(deps.browserSites ? { browserContext: deps.browserSites } : {}),
           },
           signal,
         )

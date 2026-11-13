@@ -5,6 +5,7 @@ import { huabanAdapter } from './huabanAdapter'
 import { siteFailureText } from './siteFetch'
 import type {
   BrowserSiteAdapter,
+  BrowserSiteContext,
   DirectSiteAdapter,
   SiteAdapterOutcome,
   SiteAdapterStatus,
@@ -29,6 +30,8 @@ export interface SiteAdapterRunInput {
   delayMs?: number
   direct?: readonly DirectSiteAdapter[]
   browser?: readonly BrowserSiteAdapter[]
+  /** 桌面壳的 Agent 后台浏览器（#1087）；缺省 = 网页版，浏览器站点只记 `needs-browser`。 */
+  browserContext?: BrowserSiteContext
 }
 
 export interface SiteAdapterRunStatus {
@@ -104,6 +107,49 @@ async function runOneSite(
   }
 }
 
+/** 浏览器站点每站至少要几张（一页搜索结果通常 20–40 张，取前若干）。 */
+const BROWSER_SITE_MIN_TARGET = 8
+
+/**
+ * 直连站点在前、浏览器站点在后（#1087「花瓣 + 站酷之后」）。报告会按图片目标数截断，
+ * 所以浏览器站点有结果时直连只占前一半名额，保证后面的站也能露面；剩下的再按原顺序补齐。
+ */
+export function mergeSiteItems(
+  direct: readonly DesignResearchItem[],
+  browser: readonly DesignResearchItem[],
+  total: number,
+): DesignResearchItem[] {
+  const directQuota = browser.length > 0 ? Math.min(direct.length, Math.ceil(Math.max(1, total) / 2)) : direct.length
+  const browserQuota = Math.min(browser.length, Math.max(0, total - directQuota))
+  return [
+    ...direct.slice(0, directQuota),
+    ...browser.slice(0, browserQuota),
+    ...direct.slice(directQuota),
+    ...browser.slice(browserQuota),
+  ]
+}
+
+async function runBrowserAdapter(
+  adapter: BrowserSiteAdapter,
+  context: BrowserSiteContext,
+  queries: readonly string[],
+  target: number,
+  signal: AbortSignal,
+): Promise<SiteAdapterOutcome> {
+  let last: SiteAdapterOutcome = { id: adapter.id, label: adapter.label, status: 'empty', items: [] }
+  // 一页搜索结果就够多：先用第一个检索角度，没有命中再换第二个
+  for (const [queryIndex, query] of queries.slice(0, 2).entries()) {
+    if (signal.aborted || !adapter.search) break
+    try {
+      last = await adapter.search(context, { query, limit: target, queryIndex }, signal)
+    } catch {
+      last = { id: adapter.id, label: adapter.label, status: 'network', items: [], failureText: siteFailureText(adapter.label, 'network') }
+    }
+    if (last.status !== 'empty') break
+  }
+  return last
+}
+
 /** 轮转合并：花瓣 1、站酷 1、花瓣 2…，让画廊前几格就能看到两个站。 */
 function interleave(lists: readonly DesignResearchItem[][]): DesignResearchItem[] {
   const out: DesignResearchItem[] = []
@@ -118,7 +164,8 @@ function interleave(lists: readonly DesignResearchItem[][]): DesignResearchItem[
 }
 
 /**
- * 并发跑直连站点（各站内部按检索角度顺序请求、够数即停）；浏览器站点只记 `needs-browser`。
+ * 并发跑直连站点（各站内部按检索角度顺序请求、够数即停）；有 Agent 后台浏览器时浏览器站点同时开跑
+ * （#1087），没有就只记 `needs-browser`。
  * 不做相关性闸门：结果来自站点自己的搜索，相关性由站点负责（#1076 实测花瓣 / 站酷命中正常）。
  */
 export async function runSiteAdapters(
@@ -130,6 +177,12 @@ export async function runSiteAdapters(
   const direct = input.direct ?? DIRECT_SITE_ADAPTERS
   const browser = input.browser ?? BROWSER_SITE_ADAPTERS
   const target = Math.max(1, Math.ceil(Math.max(1, input.imageMaxResults) / Math.max(1, direct.length)))
+  const browserContext = input.browserContext
+  const browserTarget = Math.max(BROWSER_SITE_MIN_TARGET, Math.ceil(Math.max(1, input.imageMaxResults) / Math.max(1, browser.length)))
+  // 浏览器站点与直连站点同时开跑（各开一个隐藏窗口）；合并时排在直连之后
+  const browserRunsPromise = browserContext && queries.length > 0
+    ? Promise.all(browser.map((adapter) => runBrowserAdapter(adapter, browserContext, queries, browserTarget, signal)))
+    : null
   const runs = queries.length === 0
     ? direct.map((adapter) => ({
         items: [] as DesignResearchItem[],
@@ -140,7 +193,10 @@ export async function runSiteAdapters(
           runOneSite(adapter, network, queries, target, input.delayMs ?? SITE_ADAPTER_DELAY_MS, signal),
         ),
       )
-  const items = interleave(runs.map((run) => run.items))
+  const directItems = interleave(runs.map((run) => run.items))
+  const browserRuns = browserRunsPromise ? await browserRunsPromise : null
+  const browserItems = interleave((browserRuns ?? []).map((outcome) => outcome.items))
+  const items = mergeSiteItems(directItems, browserItems, input.imageMaxResults)
   const statuses: SiteAdapterRunStatus[] = [
     ...runs.map(({ outcome }) => ({
       id: outcome.id,
@@ -149,20 +205,34 @@ export async function runSiteAdapters(
       itemCount: outcome.items.length,
       ...(outcome.failureText ? { failureText: outcome.failureText } : {}),
     })),
-    ...browser.map((adapter) => ({
-      id: adapter.id,
-      label: adapter.label,
-      status: 'needs-browser' as const,
-      itemCount: 0,
-      failureText: `${siteFailureText(adapter.label, 'needs-browser')}（${adapter.reason}）`,
-    })),
+    ...(browserRuns
+      ? browserRuns.map((outcome) => ({
+          id: outcome.id,
+          label: outcome.label,
+          status: outcome.status,
+          itemCount: outcome.items.length,
+          ...(outcome.failureText ? { failureText: outcome.failureText } : {}),
+        }))
+      : browser.map((adapter) => ({
+          id: adapter.id,
+          label: adapter.label,
+          status: 'needs-browser' as const,
+          itemCount: 0,
+          failureText: `${siteFailureText(adapter.label, 'needs-browser')}（${adapter.reason}）`,
+        }))),
   ]
   return {
     items,
-    usedSources: runs.filter((run) => run.items.length > 0).map((run) => run.outcome.label),
+    usedSources: [
+      ...runs.filter((run) => run.items.length > 0).map((run) => run.outcome.label),
+      ...(browserRuns ?? []).filter((outcome) => outcome.items.length > 0).map((outcome) => outcome.label),
+    ],
     statuses,
     failures: items.length > 0
       ? []
-      : runs.map(({ outcome }) => outcome.failureText ?? siteFailureText(outcome.label, outcome.status)),
+      : [
+          ...runs.map(({ outcome }) => outcome.failureText ?? siteFailureText(outcome.label, outcome.status)),
+          ...(browserRuns ?? []).map((outcome) => outcome.failureText ?? siteFailureText(outcome.label, outcome.status)),
+        ],
   }
 }

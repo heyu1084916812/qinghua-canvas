@@ -136,6 +136,9 @@ export function useAgentPanelToolModel({
         webEnabled: getAgentWebResearch,
         readPage: readWebPage,
         network: platform.network,
+        /** 桌面壳：Agent 后台浏览器抓 Dribbble / Dieline / POTW / Pinterest（#1087） */
+        browserSites: () =>
+          platform.agentBrowser ? { browser: platform.agentBrowser } : undefined,
         runResearch: runDesignResearch,
         signal: () =>
           abortRefs.current.get(sessionId)?.signal ??

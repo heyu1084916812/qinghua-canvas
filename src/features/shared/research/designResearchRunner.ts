@@ -17,6 +17,7 @@ import { isPublicHttpUrl } from '../../../domain/shared/publicUrl'
 import { errorTextOf } from '../../../shared/result'
 import { TAVILY_KEY_MISSING_MESSAGE } from './tavilySearch'
 import { searchFixedDesignSites } from './fixedSiteSearch'
+import type { BrowserSiteContext } from './siteAdapters/types'
 
 export interface DesignResearchRunnerInput {
   topic: string
@@ -40,6 +41,8 @@ export interface DesignResearchRunnerDeps {
   tavilyApiKey?: string | null
   /** 站点适配器同站相邻请求间隔（毫秒）；缺省 400，测试传 0。 */
   siteAdapterDelayMs?: number
+  /** 桌面壳的 Agent 后台浏览器（#1087）：抓 Dribbble / Dieline / POTW / Pinterest。 */
+  browserSites?: BrowserSiteContext
 }
 
 export interface DesignResearchResult extends DesignResearchReport {

@@ -8754,7 +8754,7 @@
       "test": [
         "src/features/shared/research/siteAdapters/runSiteAdapters.test.ts"
       ],
-      "budget": 90
+      "budget": 115
     },
     {
       "module": "src/features/shared/research/siteAdapters/siteFetch.ts",
@@ -8888,7 +8888,7 @@
       "test": [
         "src/features/shared/research/siteAdapters/runSiteAdapters.test.ts"
       ],
-      "budget": 190
+      "budget": 245
     },
     {
       "module": "src/features/shared/research/webPageReader.ts",
@@ -10912,6 +10912,155 @@
         "src/domain/canvas/browserNavigation.test.ts"
       ],
       "budget": 190
+    },
+    {
+      "module": "src/features/shared/research/siteAdapters/pageSnapshot.ts",
+      "owner": "open-research-search",
+      "responsibility": "在原生 webview 里执行的页面图片提取脚本（自包含，可 toString 注入）以及脚本返回快照的不可信校验。",
+      "owns": [
+        "页面图片 / 背景图 / srcset 选图与尺寸过滤",
+        "验证页标记、密码框与被遮挡结果计数",
+        "注入脚本拼装与快照结构校验"
+      ],
+      "doesNotOwn": [
+        "站点结果过滤与调研候选投影",
+        "墙的判定",
+        "窗口导航与等待"
+      ],
+      "publicApi": [
+        "PageExtractOptions",
+        "PageSnapshotImage",
+        "PageSnapshotSignals",
+        "PageSnapshot",
+        "DEFAULT_PAGE_EXTRACT_OPTIONS",
+        "extractPageSnapshot",
+        "pageExtractScript",
+        "parsePageSnapshot",
+        "isPageSnapshot"
+      ],
+      "test": [
+        "src/features/shared/research/siteAdapters/browserSites.test.ts"
+      ],
+      "budget": 350
+    },
+    {
+      "module": "src/features/shared/research/siteAdapters/pageWall.ts",
+      "owner": "open-research-search",
+      "responsibility": "按页面快照识别人机验证页与登录墙；拿到站点结果即不算墙，页面只有登录链接也不算。",
+      "owns": [
+        "验证页标题与标记口径",
+        "登录跳转与空结果密码框口径",
+        "被遮挡结果视为登录墙"
+      ],
+      "doesNotOwn": [
+        "快照提取",
+        "请用户处理的交互",
+        "站点规则"
+      ],
+      "publicApi": [
+        "PageWallKind",
+        "PageWall",
+        "PageWallInput",
+        "classifyPageWall"
+      ],
+      "test": [
+        "src/features/shared/research/siteAdapters/browserSiteRun.test.ts"
+      ],
+      "budget": 75
+    },
+    {
+      "module": "src/features/shared/research/siteAdapters/browserSites.ts",
+      "owner": "open-research-search",
+      "responsibility": "浏览器专用设计站的搜索地址模板与提取规则，并把页面快照投影成与花瓣、站酷相同的调研候选结构。",
+      "owns": [
+        "Dribbble / The Dieline / Packaging of the World / Pinterest 搜索地址",
+        "各站卡片、链接、标题、背景图选择器",
+        "站点图床与原帖链接过滤"
+      ],
+      "doesNotOwn": [
+        "窗口加载与等待",
+        "墙的处理",
+        "多站合并"
+      ],
+      "publicApi": [
+        "BrowserSiteSpec",
+        "BROWSER_SITE_SPECS",
+        "browserSiteSpec",
+        "browserSiteItems"
+      ],
+      "test": [
+        "src/features/shared/research/siteAdapters/browserSites.test.ts"
+      ],
+      "budget": 180
+    },
+    {
+      "module": "src/features/shared/research/siteAdapters/browserSiteRun.ts",
+      "owner": "open-research-search",
+      "responsibility": "用 Agent 后台浏览器跑一个设计站：打开、提取、等待验证自动放行、遇墙请用户处理后重试，跑完关窗口，同站串行。",
+      "owns": [
+        "单站加载与提取流程",
+        "验证页等待轮次与提示次数上限",
+        "用户取消后本次运行不再打扰",
+        "同站互斥与关窗"
+      ],
+      "doesNotOwn": [
+        "页面提取脚本",
+        "墙判定口径",
+        "提示界面"
+      ],
+      "publicApi": [
+        "runBrowserSite",
+        "resetBrowserSiteState"
+      ],
+      "test": [
+        "src/features/shared/research/siteAdapters/browserSiteRun.test.ts"
+      ],
+      "budget": 225
+    },
+    {
+      "module": "src/platform/agentBrowser.ts",
+      "owner": "platform-agent-browser-port",
+      "responsibility": "声明 Agent 后台浏览器端口：隐藏窗口加载并执行提取脚本、亮出给用户、隐藏、关闭与关闭事件订阅。",
+      "owns": [
+        "Agent 浏览器加载参数",
+        "端口方法与事件形状"
+      ],
+      "doesNotOwn": [
+        "壳内命令实现",
+        "站点规则",
+        "验证页与登录墙的识别和处理"
+      ],
+      "publicApi": [
+        "AgentBrowserLoadOptions",
+        "AgentBrowserEvent",
+        "AgentBrowserPort"
+      ],
+      "test": [
+        "src/platform/desktop/tauriAgentBrowser.test.ts"
+      ],
+      "budget": 50
+    },
+    {
+      "module": "src/platform/desktop/tauriAgentBrowser.ts",
+      "owner": "desktop-agent-browser",
+      "responsibility": "把 Agent 后台浏览器端口转发到桌面壳 agent_browser 命令，前端先校验窗口 id，并把壳的关闭事件按窗口分发。",
+      "owns": [
+        "agent_browser 命令名与参数映射",
+        "agent-browser 事件监听与解绑"
+      ],
+      "doesNotOwn": [
+        "Rust 侧窗口与导航规则",
+        "提取脚本",
+        "站点调度"
+      ],
+      "publicApi": [
+        "AGENT_BROWSER_EVENT",
+        "createTauriAgentBrowser"
+      ],
+      "test": [
+        "src/platform/desktop/tauriAgentBrowser.test.ts"
+      ],
+      "budget": 60
     }
   ]
 }

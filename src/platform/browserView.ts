@@ -47,6 +47,11 @@ export interface BrowserViewPort {
   show(id: string): Promise<void>
   hide(id: string): Promise<void>
   close(id: string): Promise<void>
+  /**
+   * 在当前页执行提取脚本（脚本须同步返回 `JSON.stringify(...)`），原样交回脚本结果。
+   * 画布浏览器「交给 Agent」用它带上当前网页的图片（#1089）。可选：旧实现 / 测试替身可缺。
+   */
+  extract?(id: string, script: string): Promise<string>
   /** 订阅某个视图的事件；返回取消函数（同步可调，内部异步解绑） */
   subscribe(id: string, listener: (event: BrowserViewEvent) => void): () => void
 }

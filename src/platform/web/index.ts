@@ -10,6 +10,7 @@ import type {
   StorageAdminPort,
   UpdatePort,
 } from '../ports'
+import type { AgentBrowserPort } from '../agentBrowser'
 import type { BrowserViewPort } from '../browserView'
 import { createFetchNetwork } from './fetchNetwork'
 import { createFileAccessFiles } from './fileSystemAccessFiles'
@@ -49,6 +50,8 @@ export function createWebPlatform(
     notify?: NotifyPort
     /** 原生网页视图：只有壳传 `tauriBrowserView`；浏览器里缺席 ⇒ 画布浏览器退回 iframe */
     browserView?: BrowserViewPort
+    /** Agent 后台浏览器：只有壳传 `tauriAgentBrowser`；浏览器里缺席 ⇒ 浏览器站点报 needs-browser */
+    agentBrowser?: AgentBrowserPort
     /** 所有运行时共用的权威存储；测试可显式换成 memory。 */
     storage?: StoragePort
     /** 凭据也跟权威库走，不再按 origin 落 localStorage。 */
@@ -90,6 +93,7 @@ export function createWebPlatform(
     // 系统通知：只有壳接了插件（对账 #392）
     notify: overrides.notify,
     browserView: overrides.browserView,
+    agentBrowser: overrides.agentBrowser,
     /**
      * 素材传输要三样：配置行（storage）、密钥（credentials）、发请求（network）。
      * 三者都由这里装配 —— **不在端口实现里各自 new 一份**（凭据层换实现时，

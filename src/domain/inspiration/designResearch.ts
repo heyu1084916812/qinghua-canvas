@@ -15,6 +15,10 @@ export type ResearchProvider =
   | 'huaban'
   /** 站酷直连适配器（#1076 方案 D）。 */
   | 'zcool'
+  /** Agent 后台浏览器适配器（#1087）：Dribbble / The Dieline / Packaging of the World（Pinterest 沿用 `pinterest`）。 */
+  | 'dribbble'
+  | 'thedieline'
+  | 'packagingoftheworld'
   | 'web'
 
 export type ResearchMode = 'image' | 'web' | 'mixed'
@@ -151,15 +155,21 @@ const PROVIDER_TITLES: Record<ResearchProvider, string> = {
   bing: 'Bing 免 Key 搜索',
   huaban: '花瓣',
   zcool: '站酷',
+  dribbble: 'Dribbble',
+  thedieline: 'The Dieline',
+  packagingoftheworld: 'Packaging of the World',
   web: 'Other references',
 }
 
 const PROVIDER_ORDER: readonly ResearchProvider[] = [
   'huaban',
   'zcool',
+  'dribbble',
+  'thedieline',
+  'packagingoftheworld',
+  'pinterest',
   'bing',
   'tavily',
-  'pinterest',
   'behance',
   'openverse',
   'wikipedia',

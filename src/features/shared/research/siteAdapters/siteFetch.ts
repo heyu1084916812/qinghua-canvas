@@ -41,7 +41,9 @@ const FAILURE_TEXT: Record<SiteFetchFailure, string> = {
 export function siteFailureText(label: string, status: SiteAdapterStatus): string {
   if (status === 'empty') return `${label}没有找到相关结果`
   if (status === 'unrecognized') return `${label}搜索结果无法识别（可能被拦截或页面改版）`
-  if (status === 'needs-browser') return `${label}需要浏览器环境才能检索，暂未接入`
+  if (status === 'needs-browser') return `${label}需要桌面应用的内置浏览器才能检索`
+  if (status === 'needs-login') return `${label}需要登录后才能检索（可在画布浏览器里登录一次）`
+  if (status === 'blocked') return `${label}弹出了人机验证，这次没有通过`
   if (status === 'ok') return ''
   return `${label}${FAILURE_TEXT[status]}`
 }

@@ -16,11 +16,9 @@ export interface AddResearchReferenceResult {
 
 function providerOf(source: string): ResearchProvider {
   const normalized = source.trim().toLowerCase()
-  if (normalized === 'pinterest') return 'pinterest'
-  if (normalized === 'behance') return 'behance'
-  if (normalized === 'google') return 'google'
-  if (normalized === 'openverse') return 'openverse'
-  if (normalized === 'wikipedia') return 'wikipedia'
+  const same = ['pinterest', 'behance', 'google', 'openverse', 'wikipedia', 'dribbble', 'thedieline', 'packagingoftheworld'] as const // 名字即 id（含 #1087 浏览器站点）
+  const hit = same.find((id) => id === normalized)
+  if (hit) return hit
   if (normalized === 'internet archive' || normalized === 'internetarchive') {
     return 'internetArchive'
   }
@@ -32,6 +30,8 @@ function providerOf(source: string): ResearchProvider {
   if (normalized === 'bing') return 'bing'
   if (normalized === 'huaban' || normalized === '花瓣') return 'huaban'
   if (normalized === 'zcool' || normalized === '站酷') return 'zcool'
+  if (normalized === 'the dieline' || normalized === 'dieline') return 'thedieline'
+  if (normalized === 'packaging of the world') return 'packagingoftheworld'
   return 'web'
 }
 

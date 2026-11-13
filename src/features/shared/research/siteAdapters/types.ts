@@ -1,4 +1,5 @@
 import type { DesignResearchItem } from '../../../../domain/inspiration/designResearch'
+import type { AgentBrowserPort } from '../../../../platform/agentBrowser'
 import type { NetworkPort } from '../../../../platform/ports'
 
 /**
@@ -7,8 +8,8 @@ import type { NetworkPort } from '../../../../platform/ports'
  *
  * - `direct`：应用 HTTP 客户端直连可用（花瓣 JSON 接口、站酷搜索页 HTML），经桌面壳原生请求
  *   （publicOnly：公网校验、跟随系统代理）。
- * - `browser`：只在真实浏览器里能打开（Cloudflare / Sucuri / JS 渲染 / 需登录），留待隐藏 webview 实现；
- *   目前只声明接口并如实报 `needs-browser`，不发请求。
+ * - `browser`：只在真实浏览器里能打开（Cloudflare / Sucuri / JS 渲染 / 需登录）：桌面壳经
+ *   Agent 后台浏览器（隐藏 WebviewWindow，#1087）打开并提取；网页版没有这个端口，如实报 `needs-browser`。
  */
 export type SiteAdapterId = 'huaban' | 'zcool' | 'dribbble' | 'thedieline' | 'packagingoftheworld' | 'pinterest'
 
@@ -25,8 +26,12 @@ export type SiteAdapterStatus =
   | 'unavailable'
   /** 连不上 / 超时 / 非 2xx。 */
   | 'network'
-  /** 需要真实浏览器（隐藏 webview）才能抓，尚未实现。 */
+  /** 需要真实浏览器（隐藏 webview）才能抓，当前环境没有（网页版）。 */
   | 'needs-browser'
+  /** 站点要求登录，用户没有处理（取消 / 跳过）。 */
+  | 'needs-login'
+  /** 人机验证没有通过（用户没有处理或处理后仍被挡）。 */
+  | 'blocked'
 
 export interface SiteAdapterOutcome {
   id: SiteAdapterId
@@ -59,9 +64,33 @@ export interface DirectSiteAdapter {
   ) => Promise<SiteAdapterOutcome>
 }
 
+/** 遇到验证 / 登录墙时请用户处理的请求（#1088）。 */
+export interface BrowserWallRequest {
+  siteId: SiteAdapterId
+  label: string
+  kind: 'challenge' | 'login'
+  /** 一句话原因（「需要登录」「弹出了人机验证」）。 */
+  reason: string
+  url: string
+}
+
+export type BrowserWallDecision = 'continue' | 'cancel'
+
+/** 浏览器站点运行时：Agent 后台浏览器端口 + 可选的「请用户处理」回调。 */
+export interface BrowserSiteContext {
+  browser: AgentBrowserPort
+  /**
+   * 把验证 / 登录墙交给用户处理（界面提示「完成后点继续」）。`signal` 中止时提示要撤掉。
+   * 缺省 = 不打扰用户，直接记 `blocked` / `needs-login`。
+   */
+  resolveWall?: (request: BrowserWallRequest, signal: AbortSignal) => Promise<BrowserWallDecision>
+  /** 测试注入：等待验证页自动放行时的计时器。 */
+  sleep?: (ms: number, signal: AbortSignal) => Promise<void>
+}
+
 /**
- * 只能在真实浏览器里抓的站点（以后经隐藏 webview 实现）。
- * `search` 缺省 = 还没实现，调度层直接记 `needs-browser`，不发请求。
+ * 只能在真实浏览器里抓的站点（经 Agent 后台浏览器实现，#1087）。
+ * 没有浏览器端口（网页版）或 `search` 缺省时，调度层记 `needs-browser`，不发请求。
  */
 export interface BrowserSiteAdapter {
   kind: 'browser'
@@ -71,6 +100,7 @@ export interface BrowserSiteAdapter {
   /** 为什么只能走浏览器（实测原因，写进报告与状态）。 */
   reason: string
   search?: (
+    context: BrowserSiteContext,
     request: SiteSearchRequest,
     signal: AbortSignal,
   ) => Promise<SiteAdapterOutcome>

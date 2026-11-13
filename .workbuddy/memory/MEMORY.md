@@ -1,5 +1,13 @@
 # CanvasFlow（轻画）项目记忆
 
+### 2026-11-13 #1087 Agent 后台浏览器（隐藏 WebviewWindow + eval 提取）
+
+- 提取脚本 `siteAdapters/pageSnapshot.ts#extractPageSnapshot` 会被 `toString()` 注入页面：**必须自包含**（不能引用模块变量 / import），DOM 能力先判断再用。测试用 linkedom（devDependency）执行**同一段脚本字符串**。脚本要**同步**返回 `JSON.stringify`：WebView2 `ExecuteScript` 不等 Promise，异常也被吞（返回 null），所以脚本内部 try/catch 返回 `{error}`。
+- `eval_with_callback` 的回调拿到的是结果再 JSON 序列化一次的字符串（返回字符串时带引号）；页面跳转中回调可能永远不来 ⇒ 每次 eval 都要超时。
+- 全局 `Builder::on_window_event` 对**所有窗口**生效：新开的窗口会被「记窗口位置」和「关闭→托盘隐藏」逻辑接管，`lib.rs` 已跳过 `agent-browser-*`。
+- 真实 DOM（2026-11-13）：Dribbble 图与原帖链接是**兄弟节点**（`li#screenshot-<id>` 里 `figure img` + `a.shot-thumbnail-link`）；POTW 缩略图是 **CSS 背景图** `a.thumb[data-bg]`；Pinterest 未登录是 `[data-test-id="gated-pin-rep"]` + 登录弹层密码框、没有 `/pin/` 链接；The Dieline 每张卡都有 `/wp-login.php` 的收藏链接（不能据此判登录墙）。
+- 沙箱里跑真实 Chromium：`npx playwright install chromium` + `sudo -n npx playwright install-deps chromium`，launch 要传 `proxy`（从 `HTTPS_PROXY` 拆 server / username / password）并 `ignoreHTTPSErrors`。无头 Chromium 能过 Dribbble 的 AWS WAF 和 POTW 的 Sucuri，但 The Dieline 会出 hashcash「Checking your browser...」（curl 反而能直接拿到 HTML）。
+
 ### 2026-11-13 #1076 方案 D：图片调研改走花瓣 / 站酷站点适配器（分支 site-adapters）
 
 - 花瓣 `huaban.com/v3/search/pins?q=&per_page=40` 免登录 JSON。`file.url`（`gd-hbimg-edge…?auth_key=<过期戳>-…`）约一天过期，且边缘节点对沙箱 / 外站 Referer 回 **567 拦截页**；稳定可用的是**免签名** `gd-hbimg.huaban.com/<key>_fw658webp`（及原图 `<key>`）。该图床对 `curl/*` UA 回 403，**空 UA 与浏览器 UA 都 200**，外站 Referer 567 / 403 —— 画廊 `<img referrerPolicy="no-referrer">` 正好满足，`saveResearchItem` 不带 UA 也能下。

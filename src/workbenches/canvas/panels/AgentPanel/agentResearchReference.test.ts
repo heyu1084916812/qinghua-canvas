@@ -65,6 +65,15 @@ describe('agent research reference', () => {
     }).source).toBe('searxng')
   })
 
+  it('maps agent-browser design sites to their own providers (#1087)', () => {
+    const of = (source: string) => researchItemOf({ id: 'x', title: 't', url: 'https://a.com', imageUrl: '', source }).source
+    expect(['dribbble', 'thedieline', 'packagingoftheworld', 'pinterest'].map(of))
+      .toEqual(['dribbble', 'thedieline', 'packagingoftheworld', 'pinterest'])
+    expect(of('The Dieline')).toBe('thedieline')
+    expect(of('Packaging of the World')).toBe('packagingoftheworld')
+    expect(of('behance')).toBe('behance')
+  })
+
   it('keeps open collection sources distinct from generic web pages', () => {
     expect(researchItemOf({
       id: 'archive:1',

@@ -1,0 +1,45 @@
+<!-- 2026-11-13 curl 实录 https://dribbble.com/search/tea-packaging（HTTP 202，AWS WAF 挑战页，完整） -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title></title>
+    <style>
+        body {
+            font-family: "Arial";
+        }
+    </style>
+    <script type="text/javascript">
+    window.awsWafCookieDomainList = ['dribbble.com'];
+    window.gokuProps = {
+"key":"AQIDAHjcYu/GjX+QlghicBgQ/7bFaQZ+m5FKCMDnO+vTbNg96AEEDy99CkVyhJJ1EUOvbG6VAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMJSadiRPxJI/ItFgQAgEQgDtCbyqR5+hle5ErTg77qTjAKLebQuqkToGYLt0ttiVEEKAhVHInSiCm89xEh8Nb5hTk7gQtb9IDr7KOig==",
+          "iv":"CgAGKTIpwwAACYYa",
+          "context":"E965KsYuX0701tkjhJi3GnbLN5/RFRND9HyA54wEkYXQHey7GeN6D9wj1au1wEoYbjg+jlbFMtJFfO+AHyA6g8zRDrpyZe7zq89SKgkopb9iOK8RdB5zDAy4Itd4g1I43Iz6YvHs9uHPVHnIoz+B3FUxhfV1NkCVMRPNrRYoV5u+i5aS9bUHKCdMXPA6Da1bInpfVLzBsZf0I7S7Olscpf4/lTARD7RknbZdTb+5iXOUWCh+wXheRSN29wvSCHpEuQn1z9z0+q0Aj0rvXrFyVs7ChukyOiZkfBkqow21zADAkmxgYROL/GOSx3BRXdkeQPKuvPgbNwhZM+8z0Ecjo5HL2TN/DyUT6d1h/DgMCLQLYI8st7V6ZLitMbrZAsLek7JZ0+L5"
+};
+    </script>
+    <script src="https://043df3d55a9e.947e1d2c.us-east-1.token.awswaf.com/043df3d55a9e/c9933a44d03a/a6adabef7897/challenge.js"></script>
+</head>
+<body>
+    <div id="challenge-container"></div>
+    <script type="text/javascript">
+        AwsWafIntegration.saveReferrer();
+        AwsWafIntegration.checkForceRefresh().then((forceRefresh) => {
+            if (forceRefresh) {
+                AwsWafIntegration.forceRefreshToken().then(() => {
+                    window.location.reload(true);
+                });
+            } else {
+                AwsWafIntegration.getToken().then(() => {
+                    window.location.reload(true);
+                });
+            }
+        });
+    </script>
+    <noscript>
+        <h1>JavaScript is disabled</h1>
+        In order to continue, we need to verify that you're not a robot.
+        This requires JavaScript. Enable JavaScript and then reload the page.
+    </noscript>
+</body>
+</html>

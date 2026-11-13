@@ -3,8 +3,8 @@ import type { DesignResearchItem } from '../../../../domain/inspiration/designRe
 import type { NetworkPort } from '../../../../platform/ports'
 import { BROWSER_SITE_ADAPTERS } from './browserSiteAdapters'
 import { HUABAN_SEARCH_ENDPOINT } from './huabanAdapter'
-import { DIRECT_SITE_ADAPTERS, runSiteAdapters } from './runSiteAdapters'
-import type { DirectSiteAdapter, SiteAdapterOutcome } from './types'
+import { DIRECT_SITE_ADAPTERS, mergeSiteItems, runSiteAdapters } from './runSiteAdapters'
+import type { BrowserSiteAdapter, BrowserSiteContext, DirectSiteAdapter, SiteAdapterOutcome } from './types'
 import { ZCOOL_SEARCH_ENDPOINT } from './zcoolAdapter'
 import huabanFixture from './fixtures/huaban-search-pins.json?raw'
 import zcoolFixture from './fixtures/zcool-search-content.html?raw'
@@ -47,10 +47,10 @@ function fakeAdapter(id: 'huaban' | 'zcool', label: string, results: SiteAdapter
 }
 
 describe('runSiteAdapters', () => {
-  it('defaults to 花瓣 + 站酷 direct adapters and declares browser-only sites without requesting them', () => {
+  it('defaults to 花瓣 + 站酷 direct adapters; browser-only sites run through the agent browser (#1087)', () => {
     expect(DIRECT_SITE_ADAPTERS.map((adapter) => adapter.label)).toEqual(['花瓣', '站酷'])
     expect(BROWSER_SITE_ADAPTERS.map((adapter) => adapter.id)).toEqual(['dribbble', 'thedieline', 'packagingoftheworld', 'pinterest'])
-    expect(BROWSER_SITE_ADAPTERS.every((adapter) => adapter.kind === 'browser' && !adapter.search)).toBe(true)
+    expect(BROWSER_SITE_ADAPTERS.every((adapter) => adapter.kind === 'browser' && typeof adapter.search === 'function')).toBe(true)
   })
 
   it('runs the real adapters against recorded fixtures and interleaves both sites', async () => {
@@ -107,5 +107,52 @@ describe('runSiteAdapters', () => {
     }
     await runSiteAdapters(net(async () => { throw new Error('unused') }), { queries: ['a', 'b'], imageMaxResults: 4, delayMs: 0, direct: [huaban], browser: [] }, controller.signal)
     expect(huaban.calls).toEqual(['a'])
+  })
+
+  it('with the agent browser: browser sites run after 花瓣 + 站酷 and keep half of the slots', async () => {
+    const huaban = fakeAdapter('huaban', '花瓣', ['ok', 'ok'], 10)
+    const zcool = fakeAdapter('zcool', '站酷', ['ok', 'ok'], 10)
+    const browserCalls: string[] = []
+    const browserSite = (id: 'dribbble' | 'pinterest', label: string, status: SiteAdapterOutcome['status']): BrowserSiteAdapter => ({
+      kind: 'browser',
+      id,
+      label,
+      domain: `${id}.test`,
+      reason: 'test',
+      async search(_context, request) {
+        browserCalls.push(`${id}:${request.query}:${request.limit}`)
+        const items: DesignResearchItem[] = status === 'ok'
+          ? Array.from({ length: 6 }, (_, i) => ({ id: `${id}:${i}`, source: id, title: `${label}${i}`, url: `https://${id}.test/${i}`, imageUrl: `https://img.${id}.test/${i}.jpg` }))
+          : []
+        return { id, label, status, items, ...(status === 'ok' ? {} : { failureText: `${label} ${status}` }) }
+      },
+    })
+    const context = { browser: {} } as unknown as BrowserSiteContext
+    const result = await runSiteAdapters(net(vi.fn()), {
+      queries: ['tea', 'tea box'],
+      imageMaxResults: 20,
+      delayMs: 0,
+      direct: [huaban, zcool],
+      browser: [browserSite('dribbble', 'Dribbble', 'ok'), browserSite('pinterest', 'Pinterest', 'needs-login')],
+      browserContext: context,
+    }, new AbortController().signal)
+    expect(result.usedSources).toEqual(['花瓣', '站酷', 'Dribbble'])
+    // 前 10 张（一半名额）给直连站，接着是浏览器站点
+    expect(result.items.slice(0, 10).every((item) => item.source === 'huaban' || item.source === 'zcool')).toBe(true)
+    expect(result.items.slice(10, 16).map((item) => item.source)).toEqual(Array(6).fill('dribbble'))
+    expect(result.statuses.map((status) => [status.label, status.status])).toEqual([
+      ['花瓣', 'ok'], ['站酷', 'ok'], ['Dribbble', 'ok'], ['Pinterest', 'needs-login'],
+    ])
+    // 浏览器站点每站至少 8 张目标；needs-login 不是 empty，不换第二个检索角度
+    expect(browserCalls).toEqual(['dribbble:tea:10', 'pinterest:tea:10'])
+  })
+
+  it('mergeSiteItems: without browser results the direct order is untouched', () => {
+    const make = (source: 'huaban' | 'dribbble', n: number) =>
+      Array.from({ length: n }, (_, i) => ({ id: `${source}${i}`, source, title: '', url: '', imageUrl: `${source}${i}` }) as DesignResearchItem)
+    expect(mergeSiteItems(make('huaban', 5), [], 4).map((item) => item.id)).toEqual(['huaban0', 'huaban1', 'huaban2', 'huaban3', 'huaban4'])
+    expect(mergeSiteItems(make('huaban', 5), make('dribbble', 5), 4).map((item) => item.id))
+      .toEqual(['huaban0', 'huaban1', 'dribbble0', 'dribbble1', 'huaban2', 'huaban3', 'huaban4', 'dribbble2', 'dribbble3', 'dribbble4'])
+    expect(mergeSiteItems([], make('dribbble', 2), 4).map((item) => item.id)).toEqual(['dribbble0', 'dribbble1'])
   })
 })

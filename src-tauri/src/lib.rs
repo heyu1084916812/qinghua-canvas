@@ -29,6 +29,8 @@ use tauri_plugin_fs::FsExt;
 use tauri_plugin_opener::OpenerExt;
 use tauri_plugin_updater::UpdaterExt;
 
+mod agent_browser;
+mod agent_browser_rules;
 mod browser_view;
 mod browser_view_rules;
 mod canvas_gateway;
@@ -4358,6 +4360,11 @@ pub fn run() {
          * - `CloseRequested`：关窗口前再记一次（保证最后一次一定落盘）。
          */
         .on_window_event(|window, event| {
+            // Agent 后台浏览器（agent-browser-*）不归这里管：它的位置不能记成主窗口状态，
+            // 关闭也由 agent_browser.rs 自己处理（隐藏 + 通知前端）。
+            if window.label().starts_with(agent_browser_rules::AGENT_LABEL_PREFIX) {
+                return;
+            }
             match event {
                 tauri::WindowEvent::Resized(_) | tauri::WindowEvent::Moved(_) => {
                     let app = window.app_handle();
@@ -4445,7 +4452,13 @@ pub fn run() {
             browser_view::browser_view_set_bounds,
             browser_view::browser_view_show,
             browser_view::browser_view_hide,
-            browser_view::browser_view_close
+            browser_view::browser_view_close,
+            browser_view::browser_view_extract,
+            agent_browser::agent_browser_load,
+            agent_browser::agent_browser_snapshot,
+            agent_browser::agent_browser_show,
+            agent_browser::agent_browser_hide,
+            agent_browser::agent_browser_close
         ])
         .setup(move |app| {
             apply_data_dir_config(app.handle());

@@ -8,6 +8,7 @@ import type {
 } from '../../../../features/shared/research/designResearchRunner'
 import type { WebSearchSettings } from '../../../../domain/inspiration/designResearch'
 import type { ReadWebPageResult } from '../../../../features/shared/research/webPageReader'
+import type { BrowserSiteContext } from '../../../../features/shared/research/siteAdapters/types'
 
 /** 联网开关关闭时，两个联网工具统一返回的结果（模型据此如实告诉用户）。 */
 export const WEB_RESEARCH_OFF_RESULT = {
@@ -56,6 +57,8 @@ export interface AgentToolResearchPorts<
   ) => Promise<ReadWebPageResult>
   /** 网络端口，原样交给调研执行器。 */
   network: NetworkPort
+  /** 桌面壳的 Agent 后台浏览器运行时（#1087）；网页版缺省。调用时现取。 */
+  browserSites?: () => BrowserSiteContext | undefined
   /** `runDesignResearch` 本身。 */
   runResearch: (
     input: DesignResearchRunnerInput,
@@ -129,6 +132,7 @@ export function createAgentToolResearch<
           .filter((source) => source.enabled)
           .map((source) => source.id),
       )
+      const browserSites = ports.browserSites?.()
       const libraryCases = cachedSources
         .filter((source) => enabledIds.has(source.sourceId))
         .flatMap((source) => source.cases)
@@ -139,6 +143,7 @@ export function createAgentToolResearch<
           libraryCases,
           ...(webSearch ? { webSearch } : {}),
           tavilyApiKey,
+          ...(browserSites ? { browserSites } : {}),
         },
         ports.signal(),
       )

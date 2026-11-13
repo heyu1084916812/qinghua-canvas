@@ -261,6 +261,8 @@ describe('素材段与技能段', () => {
     expect(p).toContain('免 Key')
     // #1076：图片来自花瓣 · 站酷，来源以 usedSources 为准，不再说 Bing 结果页找图。
     expect(p).toContain('花瓣 · 站酷')
+    // #1087：桌面应用另用内置浏览器查 Dribbble 等站
+    expect(p).toContain('内置浏览器查 Dribbble / The Dieline / Packaging of the World / Pinterest')
     expect(p).toContain('usedSources')
     expect(p).not.toContain('联网搜索默认免 Key（Bing 结果页）')
     expect(p).not.toContain('## 本轮联网已关闭')

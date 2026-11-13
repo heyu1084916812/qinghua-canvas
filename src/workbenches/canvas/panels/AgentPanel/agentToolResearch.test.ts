@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import type { BrowserSiteContext } from '../../../../features/shared/research/siteAdapters/types'
 import type { InspirationCase } from '../../../../domain/inspiration/cases'
 import type { MemoryCandidate } from '../../../../domain/shared/memoryOrganizer'
 import type { NetworkPort } from '../../../../platform/ports'
@@ -62,6 +63,7 @@ interface HarnessInit {
   describeError?: (error: unknown) => string
   tavilyKey?: string | null
   webEnabled?: boolean
+  browserSites?: () => BrowserSiteContext | undefined
 }
 
 const harness = (init: HarnessInit = {}) => {
@@ -99,6 +101,7 @@ const harness = (init: HarnessInit = {}) => {
       return { ok: true, url, title: 't', content: 'c', truncated: false, totalChars: 1 }
     },
     network,
+    ...(init.browserSites ? { browserSites: init.browserSites } : {}),
     runResearch: async (input, deps, signal) => {
       researchCalls.push({ input, deps, signal })
       return { ok: true, topic: input.topic }
@@ -286,6 +289,17 @@ describe('researchDesign', () => {
       endpoint: 'https://search.example.com/search',
     })
     expect(researchCalls[0].signal).toBe(signal)
+  })
+
+  it('桌面壳的 Agent 后台浏览器运行时调用时现取并交给调研执行器；网页版不带（#1087）', async () => {
+    const context = { browser: {} } as unknown as BrowserSiteContext
+    let available = false
+    const { tool, researchCalls } = harness({ browserSites: () => (available ? context : undefined) })
+    await tool.researchDesign({ topic: '无浏览器' })
+    available = true
+    await tool.researchDesign({ topic: '有浏览器' })
+    expect('browserSites' in researchCalls[0].deps).toBe(false)
+    expect(researchCalls[1].deps.browserSites).toBe(context)
   })
 
   it('每次调用都现取信号（不是创建时快照）', async () => {

@@ -14,6 +14,11 @@ describe('agentResearchSourceLabel', () => {
     expect(agentResearchSourceLabel('zcool')).toBe('站酷')
   })
 
+  it('names the agent-browser design sites (#1087)', () => {
+    expect(['dribbble', 'thedieline', 'packagingoftheworld'].map((source) => agentResearchSourceLabel(source)))
+      .toEqual(['Dribbble', 'The Dieline', 'Packaging of the World'])
+  })
+
   it('keeps unknown sources unchanged instead of inventing a provider', () => {
     expect(agentResearchSourceLabel('custom-source')).toBe('custom-source')
   })

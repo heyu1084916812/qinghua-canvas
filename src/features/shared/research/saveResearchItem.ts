@@ -29,6 +29,9 @@ function sourceTag(source: DesignResearchItem['source']): string {
   if (source === 'bing') return 'Bing'
   if (source === 'huaban') return '花瓣'
   if (source === 'zcool') return '站酷'
+  if (source === 'dribbble') return 'Dribbble'
+  if (source === 'thedieline') return 'The Dieline'
+  if (source === 'packagingoftheworld') return 'Packaging of the World'
   if (source === 'google') return 'Google'
   return '网页'
 }

@@ -53,6 +53,10 @@ export function createTauriBrowserView(): BrowserViewPort {
     show: (id) => call('browser_view_show', id),
     hide: (id) => call('browser_view_hide', id),
     close: (id) => call('browser_view_close', id),
+    extract: (id, script) => {
+      if (!isBrowserViewId(id)) return Promise.reject(new Error(`无效的浏览器视图 id：${id}`))
+      return invoke<string>('browser_view_extract', { id, script })
+    },
     subscribe(id, listener) {
       let disposed = false
       let unlisten: UnlistenFn | null = null
