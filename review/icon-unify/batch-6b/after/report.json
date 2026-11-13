@@ -1,0 +1,26 @@
+[
+  {
+    "variant": "1440x900-light",
+    "menus": 0,
+    "overflowX": false,
+    "errors": []
+  },
+  {
+    "variant": "1440x900-dark",
+    "menus": 0,
+    "overflowX": false,
+    "errors": []
+  },
+  {
+    "variant": "1024x700-light",
+    "menus": 0,
+    "overflowX": false,
+    "errors": []
+  },
+  {
+    "variant": "1024x700-dark",
+    "menus": 0,
+    "overflowX": false,
+    "errors": []
+  }
+]

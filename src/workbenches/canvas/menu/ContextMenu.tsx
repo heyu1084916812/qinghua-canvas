@@ -18,6 +18,7 @@ import { createNodeWithDefaults } from '../../../features/canvas/createNodeWithD
 import { useAssetFolderActions } from '../../../features/canvas/useAssetFolderActions'
 import { noOverlapDelta } from '../../../features/canvas/duplicatePlacement'
 import { saveAssetToLibrary } from '../../../features/canvas/saveAssetToLibrary'
+import { Download, Icon } from '../../../ui/icon'
 import styles from './ContextMenu.module.css'
 import {
   IconBatch,
@@ -75,13 +76,7 @@ const MENU_ICON: Record<string, ReactNode> = {
   extractSelection: <IconScan size={MENU_ICON_SIZE} />,
   /** 裁剪：与功能栏取同一份图标组件（与提取选区刻意不同形，见 IconCrop 说明） */
   crop: <IconCrop size={MENU_ICON_SIZE} />,
-  saveLibrary: (
-    <svg width={MENU_ICON_SIZE} height={MENU_ICON_SIZE} viewBox="0 0 18 18" fill="none" aria-hidden>
-      <path d="M9 2.5v8" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-      <path d="m5.8 7.6 3.2 3.2 3.2-3.2" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
-      <path d="M3 12.2v1.6a1.8 1.8 0 0 0 1.8 1.8h8.4a1.8 1.8 0 0 0 1.8-1.8v-1.6" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-    </svg>
-  ),
+  saveLibrary: <Icon icon={Download} px={MENU_ICON_SIZE} />,
   resetView: <IconReset size={MENU_ICON_SIZE} />,
   /** 禁用 / 启用共用同一枚电源图标（只列另一侧那一项，见 contextMenu.ts） */
   disable: <IconPower size={MENU_ICON_SIZE} />,

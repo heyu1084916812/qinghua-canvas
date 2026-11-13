@@ -11,6 +11,7 @@
  * （由父级持有 `openId` 保证，不在这里各自为政）。
  */
 import { useEffect, useRef } from 'react'
+import { History, Icon, LayoutGrid, Upload, X } from '../../../ui/icon'
 import styles from './AssetMenu.module.css'
 
 export interface AssetMenuItem {
@@ -35,42 +36,17 @@ export interface AssetMenuItem {
 
 /** 菜单项图标（14px 线框，与全局图标风格一致） */
 function MenuIcon({ name }: { name: AssetMenuItem['icon'] }) {
-  if (name === 'upload') {
-    return (
-      <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden>
-        <path d="M8 10.5V2.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-        <path d="M4.8 5.4 8 2.2l3.2 3.2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-        <path d="M2.5 10.5v2a1.5 1.5 0 0 0 1.5 1.5h8a1.5 1.5 0 0 0 1.5-1.5v-2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-      </svg>
-    )
-  }
-  if (name === 'history') {
-    return (
-      <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden>
-        <circle cx="8" cy="8" r="5.6" stroke="currentColor" strokeWidth="1.5" />
-        <path d="M8 5.2V8l2 1.4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-      </svg>
-    )
-  }
-  if (name === 'clear') {
-    return (
-      <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden>
-        <path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-      </svg>
-    )
-  }
-  if (name === 'library') {
-    return (
-      <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden>
-        {/* 一格一格收在架子上的素材：两条竖线 + 三个方块 */}
-        <rect x="2.4" y="3.2" width="4.4" height="4.4" rx="1" stroke="currentColor" strokeWidth="1.4" />
-        <rect x="9.2" y="3.2" width="4.4" height="4.4" rx="1" stroke="currentColor" strokeWidth="1.4" />
-        <rect x="2.4" y="9.4" width="4.4" height="4.4" rx="1" stroke="currentColor" strokeWidth="1.4" />
-        <path d="M9.2 11.6h4.4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
-      </svg>
-    )
-  }
-  return null
+  const glyph =
+    name === 'upload'
+      ? Upload
+      : name === 'history'
+        ? History
+        : name === 'clear'
+          ? X
+          : name === 'library'
+            ? LayoutGrid
+            : null
+  return glyph ? <Icon icon={glyph} size="sm" /> : null
 }
 
 export function AssetMenu({

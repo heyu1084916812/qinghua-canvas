@@ -11,6 +11,8 @@ import globals from 'globals'
 const ICON_KEEP = [
   'src/app/QinghuaWordmark.tsx',
   'src/features/settings/MemoryGraph.tsx',
+  // 小地图是数据可视化（节点点阵 + 视口框），不是图标，按方案 §6 保留手写 SVG
+  'src/workbenches/canvas/surface/Minimap.tsx',
   'src/features/shared/channelIcon/ChannelIcon.tsx',
   'src/features/shared/modelIcon/ModelIcon.tsx',
   'src/workbenches/canvas/flow/FlowChildEdgeLayer.tsx',
@@ -25,14 +27,9 @@ const ICON_PENDING = [
   'src/app/TitleBar.tsx',
   'src/pages/EcommercePage/EcommerceWorkbenchViews.tsx',
   'src/pages/EcommercePage/LongImagePanel.tsx',
-  'src/workbenches/canvas/menu/ContextMenu.tsx',
   'src/workbenches/canvas/nodes/fusion/FusionNodeView.tsx',
   'src/workbenches/canvas/nodes/generation/GenerationNodeView.tsx',
   'src/workbenches/canvas/nodes/loop/LoopNodeView.tsx',
-  'src/workbenches/canvas/panels/AssetMenu.tsx',
-  'src/workbenches/canvas/panels/ParamPicker.tsx',
-  'src/workbenches/canvas/panels/creation/CreationRunActionsView.tsx',
-  'src/workbenches/canvas/surface/Minimap.tsx',
   'src/workbenches/canvas/toolbar/icons.tsx',
   'src/workbenches/ecommerce/EcommerceSelect.tsx',
   'src/workbenches/ecommerce/studio/EcommerceStudioModeParametersProduct.tsx',

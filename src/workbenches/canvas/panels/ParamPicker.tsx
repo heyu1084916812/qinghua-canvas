@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
+import { Copy, Icon } from '../../../ui/icon'
 import styles from './ParamPicker.module.css'
 import { RATIO_FOLLOW_SOURCE } from '../../../domain/canvas/layout/constants'
 
@@ -821,24 +822,12 @@ function RatioGlyph({ ratio }: { ratio: string }) {
    */
   if (ratio === RATIO_FOLLOW_SOURCE) {
     return (
-      <svg
+      <Icon
+        icon={Copy}
+        px={18}
         className={styles.ratioGlyph}
         data-ratio-glyph={ratio}
-        width="18"
-        height="18"
-        viewBox="0 0 18 18"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.4"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        aria-hidden="true"
-        focusable="false"
-      >
-        {/* 后一张（虚线框）+ 前一张（实线框），表达「跟随后面那张的比例」 */}
-        <rect x="6" y="2.5" width="9.5" height="9.5" rx="2" strokeDasharray="2.4 2.2" />
-        <rect x="2.5" y="6" width="9.5" height="9.5" rx="2" />
-      </svg>
+      />
     )
   }
   /**

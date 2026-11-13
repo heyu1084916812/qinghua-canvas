@@ -1,27 +1,11 @@
 import type { PanelModel } from '../panelModel'
 import { IconPreset, IconSpinner, IconStop } from '../../toolbar/icons'
 import { PresetMenu, PresetOptions } from '../PresetMenu'
+import { ArrowUp, Icon } from '../../../../ui/icon'
 import { creationStyles as styles } from './creationStyles'
 
 function RunArrow() {
-  return (
-    <svg
-      className={styles.runArrow}
-      width="18"
-      height="18"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={2.2}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-      focusable="false"
-    >
-      <path d="M12 20.5V4.5" />
-      <path d="M5.5 11 12 4.5 18.5 11" />
-    </svg>
-  )
+  return <Icon icon={ArrowUp} px={18} className={styles.runArrow} />
 }
 
 interface CreationRunActionsViewProps {
