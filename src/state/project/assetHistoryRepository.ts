@@ -149,29 +149,60 @@ export function createAssetHistoryRepository(storage: StoragePort): AssetHistory
     async listPage(options = {}) {
       const offset = Math.max(0, options.offset ?? 0)
       const limit = Math.max(1, options.limit ?? ASSET_HISTORY_PAGE_SIZE)
-      let runRows: RowOf<'runRecords'>[]
-      let totalRuns: number
-      if (storage.queryPage) {
-        const page = await storage.queryPage('runRecords', {}, {
-          includePayload: false,
-          fields: RUN_FIELDS,
-          orderBy: { field: 'createdAt', direction: 'desc' },
-          offset,
-          limit,
-        })
-        runRows = page.rows
+      /**
+       * 拉 run 的一页；`queryPage` 缺席时退回整表（小库两条路等价），
+       * 整表**只读一次**，否则下面的补页循环会反复查同一张表。
+       */
+      let allRunsCache: RowOf<'runRecords'>[] | null = null
+      const fetchRuns = async (from: number, count: number) => {
+        if (storage.queryPage) {
+          const page = await storage.queryPage('runRecords', {}, {
+            includePayload: false,
+            fields: RUN_FIELDS,
+            orderBy: { field: 'createdAt', direction: 'desc' },
+            offset: from,
+            limit: count,
+          })
+          return { rows: page.rows, total: page.total }
+        }
+        if (!allRunsCache) {
+          const allRuns = await storage.query('runRecords', {}, {
+            includePayload: false,
+            fields: RUN_FIELDS,
+          })
+          allRunsCache = [...allRuns].sort(
+            (left, right) =>
+              Number(right.createdAt ?? 0) - Number(left.createdAt ?? 0),
+          )
+        }
+        return { rows: allRunsCache.slice(from, from + count), total: allRunsCache.length }
+      }
+
+      const runRows: RowOf<'runRecords'>[] = []
+      let totalRuns = 0
+      let cursor = offset
+      let nextLimit = limit
+      /**
+       * 分页要跳过「整页都没有产物」的空窗。
+       *
+       * `buildHistory(includeFailures:false)` 会丢掉没有 `outputHashes` 的 run
+       * （失败、或只记了一笔的 run）—— 但分页原来按 run 行数取 30 行，第一页若
+       * 恰好全是这种 run，列表就是「0 条 + 还有更多」，用户得点一次「加载更多」
+       * 才看得到图（用户 2026-11-13 报；实测 2,298 条 run 里最新 30 条全无产物，
+       * 第一条有产物的在第 35 位）。
+       */
+      for (;;) {
+        const page = await fetchRuns(cursor, nextLimit)
         totalRuns = page.total
-      } else {
-        const allRuns = await storage.query('runRecords', {}, {
-          includePayload: false,
-          fields: RUN_FIELDS,
-        })
-        const sorted = [...allRuns].sort(
-          (left, right) =>
-            Number(right.createdAt ?? 0) - Number(left.createdAt ?? 0),
+        runRows.push(...page.rows)
+        cursor += page.rows.length
+        const produced = runRows.some(
+          (run) =>
+            Array.isArray(run.outputHashes) && run.outputHashes.length > 0,
         )
-        runRows = sorted.slice(offset, offset + limit)
-        totalRuns = sorted.length
+        const moreRuns = page.rows.length > 0 && cursor < page.total
+        if (produced || !moreRuns) break
+        nextLimit = SCAN_BATCH
       }
       const outputHashes = [
         ...new Set(

@@ -12928,4 +12928,6 @@ unLogFastPage.ts 和 canvasLogQuery.ts，组件只负责状态、订阅和渲染
 - **26px 方形图标按钮必须显式 `padding: 0`**：`<button>` 的 UA 内边距（Chrome `1px 6px`）会把内容区压成 14px，16px 的 SVG 被 flex 横向压成 14×16，绘制等比缩到 14×14。`GenerationNodeView.assetMenuTrigger` 与 `AgentPanel.iconBtn` 都踩过同一个坑；新增固定尺寸图标按钮时先量 DOM（`getComputedStyle(svg).width` 应为声明的 px）。
 - 同一行内的图标尺寸不能混：Agent 输入框那一行原先混着 14 / 16 两档，视觉上「＋ / 技能」明显小一圈。统一到 16（`IconChat` / `IconGlobe` 也从 14 改 16）。
 - **生成历史的标签栏计数取「收藏 ∪ 已加载历史」，列表只筛当前页签**：调研保存的参考图只有收藏关系、没有 `runRecords`，`buildHistory` 不会生成对应条目 ⇒ 在「生成历史」点这类标签必然是 0 条。`assetLibraryStore.setTag` 现在会在「当前页签注定为空、另一页签有命中」时切过去；两边都有命中时仍不切（对账 #303 原意）。
+- **分页不能按 run 行数算**：`assetHistoryRepository.listPage` 原来取 30 条 `runRecords`，而 `buildHistory(includeFailures:false)` 只把有 `outputHashes` 的 run 变成记录 ⇒ 第一页整页无产物时界面是「0 条 + 还有更多」，要点「加载更多」才出图。开发库实测 2,298 条 run 里最新 30 条全无产物、第一条有产物在第 35 位。现在第一页取完后若没有任何产物会按 128 行续取，`nextOffset` 跟实际游标走。改任何分页前先用 `python -I` 只读查 `data-v2/manifest.sqlite` 的 `rows` 表核对。
+- **同一行图标颜色要同档**：`.iconBtn` 默认 `--text-2`、`ParamPicker` 的 chip 是 `--text-1`，混排时图标按钮会暗一档；已经用 `.barPills .iconBtn` 局部改掉，不要再把面板头部的次要动作一起提亮。
 - 复现/取证脚本放在 `.playwright-verify/bug-probe/`（gitignored）：`capture.mjs` + `after.mjs`，四组视口×主题，用系统 Chrome（`chromium.launch({ channel: 'chrome' })`），本机 Playwright 自带的 chromium 版本不匹配。

@@ -172,4 +172,90 @@ describe('asset history repository', () => {
     expect(page.items).toHaveLength(1)
     expect(page.items[0]).toMatchObject({ kind: 'output', bytes: 12 })
   })
+
+  it('skips a first page made only of runs without outputs instead of showing an empty list', async () => {
+    /* 用户 2026-11-13 报：一开始右侧空白，点「加载更多」才出现 —— 因为最新 30 条
+       run 都没有产物，而分页按 run 行数算。这里钉住：第一次 listPage 就要拿到图。 */
+    const runs = [
+      ...Array.from({ length: 30 }, (_, index) => ({
+        id: `failed-${index}`,
+        projectId: 'project-1',
+        createdAt: 100 - index,
+        params: { prompt: '没有产物' },
+      })),
+      {
+        id: 'run-with-output',
+        projectId: 'project-1',
+        createdAt: 50,
+        outputHashes: ['image-late'],
+        params: { prompt: '这条有图' },
+      },
+    ]
+    const queryPage = vi.fn(async (table: string, _query, options: { offset?: number; limit?: number }) => {
+      if (table === 'runRecords') {
+        const offset = options.offset ?? 0
+        const limit = options.limit ?? 30
+        return { rows: runs.slice(offset, offset + limit), total: runs.length }
+      }
+      if (table === 'assets') {
+        return {
+          rows: [
+            {
+              id: 'image-late',
+              hash: 'image-late',
+              mime: 'image/png',
+              width: 64,
+              height: 64,
+              bytesLength: 8,
+            },
+          ],
+          total: 1,
+        }
+      }
+      return { rows: [], total: 0 }
+    })
+    const query = vi.fn(async (table: string) => {
+      if (table === 'projects') return [{ id: 'project-1', name: '画布' }]
+      return []
+    })
+    const storage = { query, queryPage } as unknown as StoragePort
+
+    const page = await createAssetHistoryRepository(storage).listPage()
+
+    expect(page.items.map((item) => item.kind === 'output' && item.hash)).toEqual(['image-late'])
+    expect(page).toMatchObject({ nextOffset: 31, hasMore: false, totalRuns: 31 })
+    /* 第一页仍然按调用方给的 30 行取，之后才用更大的批次补页 */
+    expect(queryPage).toHaveBeenNthCalledWith(
+      1,
+      'runRecords',
+      {},
+      expect.objectContaining({ offset: 0, limit: 30 }),
+    )
+  })
+
+  it('returns an empty page without looping when every run lacks outputs', async () => {
+    const runs = Array.from({ length: 5 }, (_, index) => ({
+      id: `failed-${index}`,
+      projectId: 'project-1',
+      createdAt: 10 - index,
+      params: { prompt: '失败' },
+    }))
+    const calls: number[] = []
+    const queryPage = vi.fn(async (table: string, _query, options: { offset?: number; limit?: number }) => {
+      if (table === 'runRecords') {
+        const offset = options.offset ?? 0
+        calls.push(offset)
+        return { rows: runs.slice(offset, offset + (options.limit ?? 30)), total: runs.length }
+      }
+      return { rows: [], total: 0 }
+    })
+    const query = vi.fn(async () => [])
+    const storage = { query, queryPage } as unknown as StoragePort
+
+    const page = await createAssetHistoryRepository(storage).listPage()
+
+    expect(page.items).toHaveLength(0)
+    expect(page).toMatchObject({ nextOffset: 5, hasMore: false, totalRuns: 5 })
+    expect(calls).toEqual([0])
+  })
 })
