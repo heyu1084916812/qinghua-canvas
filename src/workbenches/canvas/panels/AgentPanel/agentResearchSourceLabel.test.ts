@@ -37,8 +37,17 @@ describe('agentResearchSourceLabel', () => {
 
   it('#1076：步骤标题前缀实际来源，去重且最多 4 个；没有来源时只显示网页数', () => {
     expect(researchStepLabel(['花瓣', '站酷', '花瓣'], 2)).toBe('花瓣 · 站酷 · 2 个网页')
-    expect(researchStepLabel(['a', 'b', 'c', 'd', 'e'], 1)).toBe('a · b · c · d · 1 个网页')
     expect(researchStepLabel(undefined, 3)).toBe('3 个网页')
     expect(researchStepLabel(['', '  '], 3)).toBe('3 个网页')
+    // live-run bug 3：站名截断时用「等 N 个」收尾，数字就是站名的总数
+    expect(researchStepLabel(['a', 'b', 'c', 'd', 'e'], 1)).toBe('a · b · c 等 5 个来源 · 1 个网页')
+  })
+
+  it('图片模式写站不写「网页」（live-run bug 3）', () => {
+    expect(researchStepLabel(['花瓣', '站酷', 'Dribbble', 'Packaging of the World', 'Cosmos', 'BP&O'], 9, 'image'))
+      .toBe('花瓣 · 站酷 · Dribbble 等 6 个站')
+    expect(researchStepLabel(['花瓣', '站酷'], 2, 'image')).toBe('花瓣 · 站酷')
+    expect(researchStepLabel(undefined, 4, 'image')).toBe('4 个站')
+    expect(researchStepLabel(['花瓣', '站酷', 'Cosmos', 'Bing'], 5, 'mixed')).toBe('花瓣 · 站酷 · Cosmos 等 4 个来源 · 5 个网页')
   })
 })

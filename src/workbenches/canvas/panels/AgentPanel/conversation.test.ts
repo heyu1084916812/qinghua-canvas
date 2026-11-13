@@ -280,7 +280,7 @@ describe('工具结果 → 人话', () => {
     ])
   })
 
-  it('G-R1：图片调研成功时步骤标题是「N 个网页」（按来源网站去重），网页 / 失败保持原标题', () => {
+  it('G-R1：图片调研成功时步骤标题是「N 个站」（按来源网站去重；2026-11-14 起图片模式不写「网页」），网页 / 失败保持原标题', () => {
     const image = (url: string, i: number) => ({
       id: `b:${i}`, title: `t${i}`, url, imageUrl: `https://img.example.com/${i}.jpg`, source: 'bing',
     })
@@ -304,7 +304,7 @@ describe('工具结果 → 人话', () => {
       { role: 'assistant', content: '' },
     ])
     const step = items.find((item) => item.kind === 'step')
-    expect(step).toMatchObject({ label: '2 个网页', researchMode: 'image' })
+    expect(step).toMatchObject({ label: '2 个站', researchMode: 'image' })
     expect(step && 'stepLabel' in step).toBe(false)
     // 没有文字回复气泡。
     expect(items.filter((item) => item.kind === 'text')).toEqual([])
@@ -341,7 +341,7 @@ describe('工具结果 → 人话', () => {
       ],
       sources: [],
     }))
-    expect(ok.stepLabel).toBe('花瓣 · 站酷 · 2 个网页')
+    expect(ok.stepLabel).toBe('花瓣 · 站酷')
     const web = describeToolResult('researchDesign', JSON.stringify({
       ok: true,
       request: { mode: 'web' },

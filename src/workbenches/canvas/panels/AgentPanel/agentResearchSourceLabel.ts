@@ -58,13 +58,23 @@ export function researchWebPageCount(items: readonly { url: string; imageUrl: st
   return new Set(items.filter((item) => item.url && item.url !== item.imageUrl).map((item) => item.url)).size
 }
 
+/** 步骤标题里最多写出几个站名，多出的用「等 N 个站」收尾。 */
+const STEP_LABEL_MAX_NAMES = 3
+
 /**
- * 调研步骤标题（#1076）：写明实际用到的来源再接「N 个网页」，如「花瓣 · 站酷 · 2 个网页」。
- * 旧结果没有 `usedSources` 时只显示「N 个网页」；来源去重、最多 4 个。
+ * 调研步骤标题（#1076；2026-11-14 live-run bug 3 改）：站名与数字说的是同一件事。
+ *
+ * - **图片模式**写站，不写「网页」：`花瓣 · 站酷`、`花瓣 · 站酷 · Dribbble 等 6 个站`（数字 = 实际出图的站数，
+ *   即 `usedSources` 去重后的个数）；旧结果没有 `usedSources` 时写「N 个站」（按来源页主机名数）。
+ * - **网页 / 混合模式**仍以可打开的网页数收尾：`Bing · 3 个网页`、`花瓣 · 站酷 · Cosmos 等 7 个来源 · 5 个网页`。
  */
-export function researchStepLabel(usedSources: unknown, pageCount: number): string {
+export function researchStepLabel(usedSources: unknown, count: number, mode: 'image' | 'web' | 'mixed' = 'web'): string {
   const names = Array.isArray(usedSources)
-    ? [...new Set(usedSources.map((name) => String(name ?? '').replace(/\s+/g, ' ').trim()).filter(Boolean))].slice(0, 4)
+    ? [...new Set(usedSources.map((name) => String(name ?? '').replace(/\s+/g, ' ').trim()).filter(Boolean))]
     : []
-  return `${names.length > 0 ? `${names.join(' · ')} · ` : ''}${pageCount} 个网页`
+  const unit = mode === 'image' ? '个站' : '个来源'
+  const shown = names.slice(0, STEP_LABEL_MAX_NAMES).join(' · ')
+  const sources = names.length > STEP_LABEL_MAX_NAMES ? `${shown} 等 ${names.length} ${unit}` : shown
+  if (mode === 'image') return sources || `${count} 个站`
+  return `${sources ? `${sources} · ` : ''}${count} 个网页`
 }

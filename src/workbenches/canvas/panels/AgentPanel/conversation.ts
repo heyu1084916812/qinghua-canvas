@@ -402,7 +402,7 @@ export function describeToolResult(
           : researchWebPageCount(researchItems)
       const sourceCount = sources.length || researchSourceHostCount(researchItems)
       return {
-        ...(pageCount > 0 ? { stepLabel: researchStepLabel(r.usedSources, pageCount) } : {}),
+        ...(pageCount > 0 ? { stepLabel: researchStepLabel(r.usedSources, pageCount, researchMode === 'image' ? 'image' : researchMode === 'mixed' ? 'mixed' : 'web') } : {}),
         lines: [
           `找到 ${items.length} 条参考，覆盖 ${sourceCount} 个来源`,
           ...warnings.slice(0, 2),
