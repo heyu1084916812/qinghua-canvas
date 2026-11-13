@@ -1,5 +1,16 @@
 # CanvasFlow（轻画）项目记忆
 
+### 2026-11-13 图标统一 第 0 批（Lucide + Icon 出口）
+
+- `lucide-react` 1.x 把 `absoluteStrokeWidth` 标成 deprecated（换成 `nonScalingStroke`，语义不同）。要「屏幕线宽恒定」就自己算：`strokeWidth = 1.5 * 24 / size`，React 形态与 `iconSvgString` 共用 `gridStrokeWidth`，单测比对两者逐字一致。
+- 命令行 DOM 里要用 SVG 字符串时，别手抄 path：`iconDataOf()` 调一次组件的 `render({}, null)` 取 `props.icon.node` 即可拿到同一份几何，不经过 React 渲染器。
+- eslint flat config 的 `no-restricted-imports` 是**整条覆盖**：后出现的配置块会把前面的同规则整条替掉。图标 import 门禁必须排在 `src/domain/**` 那块**之前**，否则 domain 层「禁止 import 上层」会被无声顶掉（实测：排在后面时 domain 规则还能报，是因为 domain 块排在它后面；顺序反过来就丢）。
+- 同一配置块里 `files + ignores` 的 `ignores` 只排除该块，不是全局忽略；`ICON_PENDING` 白名单就靠这个逐批收缩。
+- `dependency-cruiser` 的 `ui-stateless` 把 `node_modules` 当越界：没有 `path: '^src/'` 限制时，ui 引任何第三方库都报 warn。收紧后只查 src 内部。
+- 陈列室 `PreviewPage.module.css` 一直在用不存在的 `--stroke-soft / --radius-* / --text-muted / --surface-raised`，卡片其实**没有边框**（var 取不到值整条声明作废）。给 dev 页加样式要用真实令牌：`--stroke`、`--radius-control`、`--text-1/2`、`--fs-*`。
+- `npm run check` 在本次开工前的 HEAD 上已经红了三处：`PinterestSetupView.module.css` 引用未定义 `--font-mono`、`SkillLibraryOverlay.module.css` 写死 `rgba(0,0,0,.3)`、Pinterest 样式行数 72 > 治理预算 40。先修存量红灯再判断自己的改动，别把既有失败当回归。
+- 全量 `npx vitest run` 在冷 transform 下会因 60s 超时误报（`App.render.test.ts` 单跑 3/3 通过）；按 12 分片 `--shard=i/12` 串行跑才是本项目可信口径。
+
 ### 2026-11-12 #1032–#1033：调研图片动作的取消、超时与画布 bounds
 
 - 弹层动作卡死不是单一网络慢：`ResearchGalleryOverlay` 的 add/download/send 没有 `finally`，失败或异常会留下 busy 和确认框；控制器又给图片保存传了永不取消的 `new AbortController().signal`，于是 8 个候选地址各等 30 秒时 UI 无法收口。
