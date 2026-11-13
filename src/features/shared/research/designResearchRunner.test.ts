@@ -360,6 +360,11 @@ describe('runDesignResearch', () => {
     expect(result.items.every((item) => item.imageUrl !== '')).toBe(true)
     expect(result.items.slice(0, 2).map((item) => item.source)).toEqual(['huaban', 'zcool'])
     expect(result.usedSources).toEqual(['花瓣', '站酷'])
+    // live-run bug 4：各站状态进工具结果，模型才知道哪些站没搜成
+    expect(result.siteStatuses?.find((row) => row.site === '花瓣')).toMatchObject({ status: 'ok' })
+    expect(result.siteStatuses?.find((row) => row.site === '花瓣')).not.toHaveProperty('note')
+    expect(result.siteStatuses?.find((row) => row.site === 'Pinterest')).toMatchObject({ status: 'needs-browser', itemCount: 0 })
+    expect(result.siteStatuses?.find((row) => row.site === 'Pinterest')?.note).toContain('内置浏览器')
   })
 
   it('image mode falls back to Tavily when the adapters return nothing (#1076)', async () => {

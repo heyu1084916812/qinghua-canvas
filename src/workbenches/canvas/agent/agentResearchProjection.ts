@@ -10,6 +10,27 @@ import type { ChatMessage } from '../../../domain/shared/execution/types'
 interface ImageResearchFacts {
   totalItems: number
   hosts: string[]
+  /** 工具写明的实际来源名（`usedSources`）；旧结果没有时用主机名。 */
+  sources: string[]
+  /** 这次没搜成的站与一句原因（`siteStatuses` 里不是 ok 的，网页版的 needs-browser 不算）。 */
+  skipped: string[]
+}
+
+function textList(value: unknown): string[] {
+  return Array.isArray(value) ? value.map((item) => String(item ?? '').trim()).filter(Boolean) : []
+}
+
+/** 被挡 / 失败的站：给模型一句「站名：原因」，空结果与网页版的 needs-browser 不算（不是问题）。 */
+function skippedSitesOf(value: unknown): string[] {
+  if (!Array.isArray(value)) return []
+  return value.flatMap((raw) => {
+    const row = (raw ?? {}) as Record<string, unknown>
+    const site = String(row.site ?? '').trim()
+    const status = String(row.status ?? '')
+    if (!site || status === 'ok' || status === 'empty' || status === 'needs-browser') return []
+    const note = String(row.note ?? '').trim()
+    return [note || `${site}：${status}`]
+  })
 }
 
 function hostOf(url: unknown): string {
@@ -37,12 +58,15 @@ export function imageResearchFactsOf(message: ChatMessage): ImageResearchFacts |
   const images = items.filter((item) => typeof item?.imageUrl === 'string' && item.imageUrl.length > 0)
   if (images.length === 0) return null
   const hosts = [...new Set(images.map((item) => hostOf(item.url)).filter(Boolean))]
-  return { totalItems: images.length, hosts }
+  const used = [...new Set(textList(parsed.usedSources))]
+  return { totalItems: images.length, hosts, sources: used.length > 0 ? used : hosts, skipped: skippedSitesOf(parsed.siteStatuses) }
 }
 
 export function imageResearchSummary(facts: ImageResearchFacts): string {
-  const from = facts.hosts.length > 0 ? `（来自 ${facts.hosts.slice(0, 4).join('、')}${facts.hosts.length > 4 ? ' 等' : ''}）` : ''
-  return `已找到 ${facts.totalItems} 张参考图${from}，已作为「查看图片搜索结果」卡片展示给用户。`
+  const sources = facts.sources
+  const from = sources.length > 0 ? `（来自 ${sources.slice(0, 4).join('、')}${sources.length > 4 ? ' 等' : ''}）` : ''
+  const skipped = facts.skipped.length > 0 ? `这次没搜成：${facts.skipped.join('；')}。` : ''
+  return `已找到 ${facts.totalItems} 张参考图${from}，已作为「查看图片搜索结果」卡片展示给用户。${skipped}`
 }
 
 /** 发给模型前的投影：图片调研结果换成一句摘要 + 不要复述的约束。 */
@@ -55,6 +79,8 @@ export function projectToolMessageForModel(message: ChatMessage): ChatMessage {
       ok: true,
       mode: 'image',
       totalItems: facts.totalItems,
+      usedSources: facts.sources,
+      ...(facts.skipped.length > 0 ? { skippedSites: facts.skipped } : {}),
       shownToUser: true,
       summary: imageResearchSummary(facts),
       note: '不要逐条复述标题、链接或做分析；用户只要找图时本轮不写正文，直接结束。用户勾选并发送后才会进入参考。',

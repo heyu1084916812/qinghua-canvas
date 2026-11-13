@@ -17,7 +17,7 @@ import { isPublicHttpUrl } from '../../../domain/shared/publicUrl'
 import { errorTextOf } from '../../../shared/result'
 import { TAVILY_KEY_MISSING_MESSAGE } from './tavilySearch'
 import { searchFixedDesignSites } from './fixedSiteSearch'
-import type { BrowserSiteContext } from './siteAdapters/types'
+import type { BrowserSiteContext, SiteAdapterStatus } from './siteAdapters/types'
 
 export interface DesignResearchRunnerInput {
   topic: string
@@ -54,6 +54,19 @@ export interface DesignResearchResult extends DesignResearchReport {
   error?: string
   /** 联网搜索实际产出结果的来源名（如 `['花瓣', '站酷']`）；没联网搜索或全空时缺省。 */
   usedSources?: string[]
+  /**
+   * 图片 / 混合模式各设计站这次的检索状态（2026-11-14 live-run bug 4）：模型据此如实说
+   * 「Pinterest 需要登录 / The Dieline 被验证挡住」。网页模式或没联网搜索时缺省。
+   */
+  siteStatuses?: DesignResearchSiteStatus[]
+}
+
+export interface DesignResearchSiteStatus {
+  site: string
+  status: SiteAdapterStatus
+  itemCount: number
+  /** 没成功时的一句话原因。 */
+  note?: string
 }
 
 /** 规范化检索角度：去空、去重、最多 4 个；没有就用主题本身。 */
@@ -188,6 +201,7 @@ export async function runDesignResearch(
   const searchItems: DesignResearchItem[] = []
   let needsTavilyKey = false
   let usedSources: string[] = []
+  let siteStatuses: DesignResearchSiteStatus[] = []
   if (input.includeOpenSearch !== false) {
     const web = await searchFixedDesignSites(
       deps,
@@ -203,6 +217,12 @@ export async function runDesignResearch(
     warnings.push(...web.warnings)
     needsTavilyKey = web.needsTavilyKey
     usedSources = web.usedSources
+    siteStatuses = web.siteStatuses.map((row) => ({
+      site: row.label,
+      status: row.status,
+      itemCount: row.itemCount,
+      ...(row.status !== 'ok' && row.failureText ? { note: row.failureText } : {}),
+    }))
   }
   const libraryLimit = request.mode === 'web'
     ? Math.min(request.maxResults, 12)
@@ -264,6 +284,7 @@ export async function runDesignResearch(
     ...report,
     warnings,
     ...(usedSources.length > 0 ? { usedSources } : {}),
+    ...(siteStatuses.length > 0 ? { siteStatuses } : {}),
     ...(needsTavilyKey
       ? {
           needsTavilyKey: true,

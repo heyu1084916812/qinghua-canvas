@@ -54,6 +54,7 @@ export const WEB_RESEARCH_ON_PROMPT = [
   '### API Key 说明',
   '- 联网搜索默认免 Key：找图直接去设计站搜（花瓣 · 站酷；桌面应用另用内置浏览器查 Dribbble / The Dieline / Packaging of the World / Pinterest），网页资料用 Bing 结果页；结果为空时按 warnings 如实说明原因（限流、没有结果、连不上），可建议换角度或中英文关键词再搜，Tavily API Key 只是可选备用。',
   '- 说结果来自哪些站时以 `usedSources` 为准（如「花瓣 · 站酷」）；没在 usedSources 里的站（如 Behance，或这次被验证 / 登录挡住的站）不要说搜过。',
+  '- `siteStatuses` / `skippedSites` 写明了哪些站这次被验证或登录挡住（needs-login / blocked）、太慢或连不上；用户问起或结果偏少时如实说明，需要登录的站可提示「在画布浏览器里登录一次」。',
   '- 结果里 `needsTavilyKey` 为 true（已填的 Tavily API Key 被拒或额度用尽）时，直接告诉用户：到 设置 → Agent → 工具 → 联网调研 检查 Key。',
 ].join('\n')
 

@@ -48,6 +48,29 @@ describe('G-R1 image research projection', () => {
     expect(original.content).toContain('https://img.example.com/0.jpg')
   })
 
+  it('uses the tool-reported sources and tells the model which sites were blocked (live-run bug 4)', () => {
+    const projected = projectToolMessageForModel(toolMessage({
+      ...imageReport(12),
+      usedSources: ['花瓣', '站酷', 'Dribbble'],
+      siteStatuses: [
+        { site: '花瓣', status: 'ok', itemCount: 6 },
+        { site: 'Pinterest', status: 'needs-login', itemCount: 0, note: 'Pinterest需要登录后才能检索（可在画布浏览器里登录一次）' },
+        { site: 'Packaging of the World', status: 'empty', itemCount: 0, note: 'Packaging of the World没有找到相关结果' },
+        { site: 'The Dieline', status: 'blocked', itemCount: 0, note: 'The Dieline弹出了人机验证，这次没有通过' },
+      ],
+    }))
+    const body = JSON.parse(projected.content) as Record<string, unknown>
+    expect(body.usedSources).toEqual(['花瓣', '站酷', 'Dribbble'])
+    expect(body.skippedSites).toEqual([
+      'Pinterest需要登录后才能检索（可在画布浏览器里登录一次）',
+      'The Dieline弹出了人机验证，这次没有通过',
+    ])
+    expect(String(body.summary)).toBe(
+      '已找到 12 张参考图（来自 花瓣、站酷、Dribbble），已作为「查看图片搜索结果」卡片展示给用户。' +
+      '这次没搜成：Pinterest需要登录后才能检索（可在画布浏览器里登录一次）；The Dieline弹出了人机验证，这次没有通过。',
+    )
+  })
+
   it('keeps web / mixed / failed / empty results untouched', () => {
     for (const value of [
       imageReport(5, 'web'),
