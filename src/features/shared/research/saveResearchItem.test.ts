@@ -84,6 +84,28 @@ describe('saveDesignResearchItem', () => {
     ])
   })
 
+  it('2026-11-14：长站名来源（Packaging of the World 等）标签不超 16 字，图片照常入库', async () => {
+    for (const source of ['packagingoftheworld', 'internetArchive', 'cleveland', 'lovelypackage', 'thedieline', 'cosmos', 'bpando', 'dribbble'] as const) {
+      const platform = createMemoryPlatform()
+      const library = createAssetLibraryRepository(platform.storage)
+      const network = {
+        async request() {
+          return { status: 200, headers: { 'content-type': 'image/png' }, text: async () => '', json: async <T,>() => ({}) as T, arrayBuffer: async () => PNG.buffer.slice(0) }
+        },
+        async *stream() {},
+      }
+      const result = await saveDesignResearchItem(
+        { id: `${source}:1`, source, title: 'Tea box', url: 'https://packagingoftheworld.com/2026/10/tea.html', imageUrl: 'https://i0.wp.com/packagingoftheworld.com/tea.jpg?fit=711%2C400' },
+        { network, storage: platform.storage },
+        new AbortController().signal,
+      )
+      expect(result, source).toMatchObject({ ok: true, message: '已保存到素材库' })
+      const [row] = await library.list()
+      expect(row?.tags?.[0], source).toBe('设计调研')
+      expect(row?.tags?.every((tag) => tag.length <= 16), source).toBe(true)
+    }
+  })
+
   it('rejects non-image and missing-image sources without writing', async () => {
     const platform = createMemoryPlatform()
     const library = createAssetLibraryRepository(platform.storage)

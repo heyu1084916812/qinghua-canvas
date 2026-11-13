@@ -8,7 +8,7 @@ import { imageMimeFromBytes } from '../../../domain/shared/imageMime'
 import { imageSizeFromHeader } from '../../../domain/shared/imageSize'
 import { isPublicHttpUrl } from '../../../domain/shared/publicUrl'
 import type { NetworkPort, StoragePort } from '../../../platform/ports'
-import type { LibraryAsset } from '../../../domain/shared/assetLibrary'
+import { normalizeTag, type LibraryAsset } from '../../../domain/shared/assetLibrary'
 import { errorTextOf } from '../../../shared/result'
 import {
   ASSET_LIBRARY_TAGS_KEY,
@@ -31,7 +31,8 @@ function sourceTag(source: DesignResearchItem['source']): string {
   if (source === 'zcool') return '站酷'
   if (source === 'dribbble') return 'Dribbble'
   if (source === 'thedieline') return 'The Dieline'
-  if (source === 'packagingoftheworld') return 'Packaging of the World'
+  // 标签上限 MAX_TAG_LEN = 16 字：写全名会被截成「Packaging of the」，回读校验永远失败（2026-11-14 实测）
+  if (source === 'packagingoftheworld') return 'Packaging World'
   if (source === 'cosmos') return 'Cosmos'
   if (source === 'bpando') return 'BP&O'
   if (source === 'lovelypackage') return 'Lovely Package'
@@ -221,7 +222,7 @@ export async function saveDesignResearchItem(
       const tagRows = await tx.query('presets', { id: ASSET_LIBRARY_TAGS_KEY })
       const tagMap = (tagRows[0]?.tags ?? {}) as Record<string, unknown>
       const storedTags = Array.isArray(tagMap[hash]) ? tagMap[hash] as string[] : []
-      if (!storedTags.includes('设计调研') || !storedTags.includes(sourceTag(item.source))) {
+      if (!storedTags.includes('设计调研') || !storedTags.includes(normalizeTag(sourceTag(item.source)))) {
         throw new Error('素材标签回读校验失败')
       }
       if (signal.aborted) throw new DOMException('保存已取消', 'AbortError')
