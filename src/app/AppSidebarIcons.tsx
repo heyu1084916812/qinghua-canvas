@@ -17,13 +17,13 @@ import {
   Icon,
   Image,
   LayoutDashboard,
+  Network,
   PanelLeft,
   Plug,
   Plus,
   ShoppingBag,
   SlidersHorizontal,
   Sparkles,
-  Workflow,
   X,
   type IconSize,
 } from '../ui/icon'
@@ -62,9 +62,9 @@ export function IconStoryboard({ size = 'lg' }: IconProps) {
   return <Icon icon={Clapperboard} size={size} />
 }
 
-/** 画布：节点与连线 */
+/** 画布：节点与连线（用户 2026-11-13 从 Workflow 改选 Network） */
 export function IconCanvas({ size = 'lg' }: IconProps) {
-  return <Icon icon={Workflow} size={size} />
+  return <Icon icon={Network} size={size} />
 }
 
 /** 技能库：一本打开的书 */

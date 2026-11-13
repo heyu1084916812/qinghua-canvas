@@ -1,0 +1,26 @@
+[
+  {
+    "variant": "1440x900-light",
+    "icons": 13,
+    "overflowX": false,
+    "errors": []
+  },
+  {
+    "variant": "1440x900-dark",
+    "icons": 13,
+    "overflowX": false,
+    "errors": []
+  },
+  {
+    "variant": "1024x700-light",
+    "icons": 13,
+    "overflowX": false,
+    "errors": []
+  },
+  {
+    "variant": "1024x700-dark",
+    "icons": 13,
+    "overflowX": false,
+    "errors": []
+  }
+]

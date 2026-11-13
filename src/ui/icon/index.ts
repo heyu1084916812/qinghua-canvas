@@ -17,6 +17,7 @@ export type { LucideIcon as IconGlyph } from 'lucide-react'
 
 export {
   ArrowUp,
+  Network,
   BookOpen,
   Check,
   ChevronDown,
@@ -40,6 +41,5 @@ export {
   Sparkles,
   Square,
   Trash2,
-  Workflow,
   X,
 } from 'lucide-react'

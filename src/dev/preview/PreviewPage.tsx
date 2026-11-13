@@ -45,7 +45,7 @@ import {
   Sparkles,
   Square,
   Trash2,
-  Workflow,
+  Network,
   X,
   type IconGlyph,
 } from '../../ui/icon'
@@ -77,7 +77,7 @@ const ICON_SHEET: Array<[string, IconGlyph]> = [
   ['Sparkles', Sparkles],
   ['Square', Square],
   ['Trash2', Trash2],
-  ['Workflow', Workflow],
+  ['Network', Network],
   ['X', X],
 ]
 
