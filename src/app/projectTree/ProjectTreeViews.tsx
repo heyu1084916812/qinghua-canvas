@@ -84,11 +84,11 @@ export function GroupRow({
         onClick={onToggle}
       >
         <span className={styles.groupIcon}>
-          <IconFolder size={16} />
+          <IconFolder size="md" />
         </span>
         <span className={styles.groupLabel}>{label}</span>
         <span className={collapsed ? styles.chevron : `${styles.chevron} ${styles.chevronOpen}`}>
-          <IconChevron size={13} />
+          <IconChevron size="sm" />
         </span>
         <span className={styles.groupCount}>{count}</span>
       </button>
@@ -102,7 +102,7 @@ export function GroupRow({
               aria-label={pinned ? '取消置顶' : '置顶'}
               onClick={onTogglePin}
             >
-              <IconPin size={14} />
+              <IconPin size="sm" />
             </button>
           )}
           {onMore && (
@@ -113,7 +113,7 @@ export function GroupRow({
               aria-label="更多"
               onClick={(event) => onMore(event.currentTarget)}
             >
-              <IconMore size={15} />
+              <IconMore size="sm" />
             </button>
           )}
         </div>
@@ -194,7 +194,7 @@ export function ProjectRow({
           aria-label={project.pinnedAt ? '取消置顶' : '置顶'}
           onClick={onTogglePin}
         >
-          <IconPin size={14} />
+          <IconPin size="sm" />
         </button>
         <button
           type="button"
@@ -203,7 +203,7 @@ export function ProjectRow({
           aria-label="更多"
           onClick={(event) => onMore(event.currentTarget)}
         >
-          <IconMore size={15} />
+          <IconMore size="sm" />
         </button>
       </div>
     </li>

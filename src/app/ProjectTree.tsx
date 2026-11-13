@@ -352,7 +352,7 @@ export function ProjectTree({ open, activeProjectId }: ProjectTreeProps) {
           data-project-tree-new-folder
           onClick={() => void createFolder()}
         >
-          <IconPlus size={15} />
+          <IconPlus size="sm" />
         </button>
       </div>
 
@@ -568,7 +568,7 @@ export function ProjectTree({ open, activeProjectId }: ProjectTreeProps) {
                     />
                   ))}
                   <MenuButton
-                    icon={<IconChevron size={16} />}
+                    icon={<IconChevron size="md" />}
                     label={collapsed.has(`folder:${menuFolder.id}`) ? '展开文件夹' : '收起文件夹'}
                     onClick={() => {
                       setMenu(null)

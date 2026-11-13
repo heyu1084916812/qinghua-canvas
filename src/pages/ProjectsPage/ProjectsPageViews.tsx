@@ -1,4 +1,5 @@
 import { formatRelative } from '../../domain/shared/time'
+import { Check, Icon, ListChecks, Trash2, type IconSize } from '../../ui/icon'
 import type { ProjectListItem } from '../../domain/project/project'
 import { useAssetMeta } from '../../features/shared/assets/index'
 import styles from './ProjectsPage.module.css'
@@ -222,62 +223,15 @@ export function ProjectCard(props: {
   )
 }
 
-/** 顶栏选择模式入口与批量栏复用的一组轻量图标 */
-export function IconSelect({ size = 18 }: { size?: number }) {
-  return (
-    <svg
-      width={size}
-      height={size}
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={1.7}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden
-    >
-      <rect x="4" y="5" width="6" height="6" rx="1.5" />
-      <path d="m5.4 8 1.2 1.2L9 7.1" />
-      <path d="M14 6.5h6M14 10.5h5" />
-      <rect x="4" y="14" width="6" height="6" rx="1.5" />
-      <path d="M14 16.5h6M14 20h5" />
-    </svg>
-  )
+/** 顶栏选择模式入口与批量栏复用的一组轻量图标（几何来自 Lucide） */
+export function IconSelect({ size = 'lg' }: { size?: IconSize }) {
+  return <Icon icon={ListChecks} size={size} />
 }
 
-export function IconCheck({ size = 13 }: { size?: number }) {
-  return (
-    <svg
-      width={size}
-      height={size}
-      viewBox="0 0 16 16"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={2.2}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden
-    >
-      <path d="m3 8.3 3.1 3.1L13 4.7" />
-    </svg>
-  )
+export function IconCheck({ size = 'sm' }: { size?: IconSize }) {
+  return <Icon icon={Check} size={size} />
 }
 
-export function IconTrash({ size = 15 }: { size?: number }) {
-  return (
-    <svg
-      width={size}
-      height={size}
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={1.8}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden
-    >
-      <path d="M4.5 7h15M9 4.5h6M7 7l.8 12h8.4L17 7" />
-      <path d="M10 10.5v5M14 10.5v5" />
-    </svg>
-  )
+export function IconTrash({ size = 'md' }: { size?: IconSize }) {
+  return <Icon icon={Trash2} size={size} />
 }

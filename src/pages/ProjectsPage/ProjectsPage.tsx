@@ -13,6 +13,7 @@ import { formatRelative } from '../../domain/shared/time'
 import { toggleProjectSelection } from '../../domain/project/selection'
 import { TEMPLATES, type TemplateId } from '../../state/project/templates'
 import type { ProjectListItem } from '../../domain/project/project'
+import { Check, Icon } from '../../ui/icon'
 import styles from './ProjectsPage.module.css'
 import { ChoicePicker } from '../../features/shared/choicePicker/ChoicePicker'
 import {
@@ -754,15 +755,7 @@ export function ProjectsPage() {
                         onClick={(event) => toggleTrashItem(p.id, event.shiftKey)}
                       >
                         {trashSelectedIds.has(p.id) && (
-                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                            <path
-                              d="m5 12 4.5 4.5L19 7"
-                              stroke="currentColor"
-                              strokeWidth="2.4"
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                            />
-                          </svg>
+                          <Icon icon={Check} size="sm" />
                         )}
                       </button>
                       <span className={styles.trashName}>{p.name}</span>

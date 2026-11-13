@@ -22,7 +22,6 @@ const ICON_KEEP = [
 ]
 
 const ICON_PENDING = [
-  'src/app/ProjectTreeIcons.tsx',
   'src/app/TitleBar.tsx',
   'src/pages/AssetsPage/AssetCard.tsx',
   'src/pages/AssetsPage/AssetPreview.tsx',
@@ -30,8 +29,6 @@ const ICON_PENDING = [
   'src/pages/EcommercePage/EcommerceWorkbenchViews.tsx',
   'src/pages/EcommercePage/LongImagePanel.tsx',
   'src/pages/InspirationPage/InspirationPage.tsx',
-  'src/pages/ProjectsPage/ProjectsPage.tsx',
-  'src/pages/ProjectsPage/ProjectsPageViews.tsx',
   'src/pages/SkillsPage/SkillLibraryIcons.tsx',
   'src/pages/StoryboardPage/StoryboardIcons.tsx',
   'src/workbenches/canvas/menu/ContextMenu.tsx',
