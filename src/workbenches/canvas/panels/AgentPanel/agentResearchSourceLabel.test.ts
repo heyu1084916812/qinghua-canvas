@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { agentResearchSourceLabel } from './agentResearchSourceLabel'
+import { agentResearchSourceLabel, researchStepLabel } from './agentResearchSourceLabel'
 
 describe('agentResearchSourceLabel', () => {
   it('maps open collection providers to readable names', () => {
@@ -25,5 +25,12 @@ describe('agentResearchSourceLabel', () => {
     expect(
       agentResearchSourceLabel('tavily', 'https://www.packagingoftheworld.com/2026/01/box.html'),
     ).toBe('Packaging of the World')
+  })
+
+  it('#1076：步骤标题前缀实际来源，去重且最多 4 个；没有来源时只显示网页数', () => {
+    expect(researchStepLabel(['花瓣', '站酷', '花瓣'], 2)).toBe('花瓣 · 站酷 · 2 个网页')
+    expect(researchStepLabel(['a', 'b', 'c', 'd', 'e'], 1)).toBe('a · b · c · d · 1 个网页')
+    expect(researchStepLabel(undefined, 3)).toBe('3 个网页')
+    expect(researchStepLabel(['', '  '], 3)).toBe('3 个网页')
   })
 })

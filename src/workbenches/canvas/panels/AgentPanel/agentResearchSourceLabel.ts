@@ -51,3 +51,14 @@ export function researchSourceHostCount(items: readonly { url: string }[]): numb
 export function researchWebPageCount(items: readonly { url: string; imageUrl: string }[]): number {
   return new Set(items.filter((item) => item.url && item.url !== item.imageUrl).map((item) => item.url)).size
 }
+
+/**
+ * 调研步骤标题（#1076）：写明实际用到的来源再接「N 个网页」，如「花瓣 · 站酷 · 2 个网页」。
+ * 旧结果没有 `usedSources` 时只显示「N 个网页」；来源去重、最多 4 个。
+ */
+export function researchStepLabel(usedSources: unknown, pageCount: number): string {
+  const names = Array.isArray(usedSources)
+    ? [...new Set(usedSources.map((name) => String(name ?? '').replace(/\s+/g, ' ').trim()).filter(Boolean))].slice(0, 4)
+    : []
+  return `${names.length > 0 ? `${names.join(' · ')} · ` : ''}${pageCount} 个网页`
+}
