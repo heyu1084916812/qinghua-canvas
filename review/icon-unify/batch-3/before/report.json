@@ -1,0 +1,26 @@
+[
+  {
+    "variant": "1440x900-light",
+    "treeIcons": 32,
+    "overflowX": false,
+    "errors": []
+  },
+  {
+    "variant": "1440x900-dark",
+    "treeIcons": 32,
+    "overflowX": false,
+    "errors": []
+  },
+  {
+    "variant": "1024x700-light",
+    "treeIcons": 32,
+    "overflowX": false,
+    "errors": []
+  },
+  {
+    "variant": "1024x700-dark",
+    "treeIcons": 32,
+    "overflowX": false,
+    "errors": []
+  }
+]
