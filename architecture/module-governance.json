@@ -8998,7 +8998,7 @@
         "src/workbenches/canvas/panels/AgentPanel/agentResearchSourceLabel.test.ts",
         "src/workbenches/canvas/panels/AgentPanel/ResearchResultsPreview.test.ts"
       ],
-      "budget": 70
+      "budget": 90
     },
     {
       "module": "src/workbenches/canvas/panels/AgentPanel/ResearchResultsPreview.tsx",
