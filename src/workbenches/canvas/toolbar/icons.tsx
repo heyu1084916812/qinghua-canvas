@@ -13,6 +13,8 @@
  *   - `viewBox` 一律 24×24、`strokeLinecap/Join = round`，保证视觉重量一致。
  */
 import type { ReactNode, SVGProps } from 'react'
+import { ArrowUp, AtSign, Bold, BookOpen, Box, Check, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Columns2, Columns3, Combine, Copy, CornerUpRight, Crop, Download, Ellipsis, FlipHorizontal2, FlipVertical2, Globe, Grid3x3, Hand, Heading1, Heading2, Heading3, Icon, Image, Images, Italic, Layers, Lightbulb, Link, List, ListOrdered, LoaderCircle, Maximize2, MessageCircle, Minimize2, Minus, Palette, Pause, PenLine, Pencil, Pilcrow, Play, Plus, Power, Redo2, RefreshCw, Repeat2, RotateCcw, RotateCw, Rows3, Scan, Settings, SlidersHorizontal, Smile, Square, SquareDashed, Trash2, Type, Undo2, Ungroup, Upload, WandSparkles, Workflow, X, ZoomIn } from '../../../ui/icon'
+
 import {
   PRESET_GLYPH_STROKE_WIDTH,
   PresetGlyphShapes,
@@ -43,185 +45,80 @@ function Svg({ size = 16, children, ...rest }: IconProps & { children: ReactNode
 }
 
 /** 提示词：灯泡（「灵光一现」，与参考产品一致） */
-export function IconPrompt(props: IconProps) {
-  return (
-    <Svg {...props}>
-      <path d="M9 18h6" />
-      <path d="M10 21h4" />
-      <path d="M12 3a6 6 0 0 0-3.5 10.9c.4.3.5.8.5 1.2v.4h6v-.4c0-.4.1-.9.5-1.2A6 6 0 0 0 12 3Z" />
-    </Svg>
-  )
+export function IconPrompt({ size = 16, ...props }: IconProps) {
+  return <Icon icon={Lightbulb} px={size} {...props} />
 }
 
 /** 生成：魔杖 + 星点 */
-export function IconGeneration(props: IconProps) {
-  return (
-    <Svg {...props}>
-      <path d="M4 20 16.5 7.5" />
-      <path d="M15 6 18 9" />
-      <path d="M17.5 3.5v2M20.5 6.5h-2M20.7 4.3l-1.4 1.4" />
-      <path d="M7 15l1.5 1.5" />
-    </Svg>
-  )
+export function IconGeneration({ size = 16, ...props }: IconProps) {
+  return <Icon icon={WandSparkles} px={size} {...props} />
 }
 
 /** 对比：左右两半，一半实心 */
-export function IconCompare(props: IconProps) {
-  return (
-    <Svg {...props}>
-      <rect x="4" y="5" width="7" height="14" rx="1.6" fill="currentColor" stroke="none" />
-      <rect x="13" y="5" width="7" height="14" rx="1.6" />
-    </Svg>
-  )
+export function IconCompare({ size = 16, ...props }: IconProps) {
+  return <Icon icon={Columns2} px={size} {...props} />
 }
 
 /** 分组：带角标的方框（「把若干节点框进出」） */
-export function IconGroup(props: IconProps) {
-  return (
-    <Svg {...props}>
-      <path d="M4 8V5.5A1.5 1.5 0 0 1 5.5 4H8" />
-      <path d="M16 4h2.5A1.5 1.5 0 0 1 20 5.5V8" />
-      <path d="M20 16v2.5a1.5 1.5 0 0 1-1.5 1.5H16" />
-      <path d="M8 20H5.5A1.5 1.5 0 0 1 4 18.5V16" />
-      <rect x="8.5" y="8.5" width="7" height="7" rx="1.2" />
-    </Svg>
-  )
+export function IconGroup({ size = 16, ...props }: IconProps) {
+  return <Icon icon={SquareDashed} px={size} {...props} />
 }
 
 /** 背景色：一块色卡 + 三颗色点（"挑一块底色"） */
-export function IconPalette(props: IconProps) {
-  return (
-    <Svg {...props}>
-      <rect x="3.5" y="4.5" width="17" height="15" rx="3" />
-      <circle cx="8" cy="9.5" r="1.4" />
-      <circle cx="12" cy="9.5" r="1.4" />
-      <circle cx="8" cy="14.5" r="1.4" />
-      <path d="M12 14.5h5" />
-    </Svg>
-  )
+export function IconPalette({ size = 16, ...props }: IconProps) {
+  return <Icon icon={Palette} px={size} {...props} />
 }
 
 /** 解组：三个角撑 + 一个"走出来"的箭头（分组的反面） */
-export function IconUngroup(props: IconProps) {
-  return (
-    <Svg {...props}>
-      <path d="M4 8V5.5A1.5 1.5 0 0 1 5.5 4H8" />
-      <path d="M16 4h2.5A1.5 1.5 0 0 1 20 5.5V8" />
-      <path d="M4 16v2.5A1.5 1.5 0 0 0 5.5 20H8" />
-      <path d="M14 14h6v6" />
-      <path d="M20 14l-5 5" />
-    </Svg>
-  )
+export function IconUngroup({ size = 16, ...props }: IconProps) {
+  return <Icon icon={Ungroup} px={size} {...props} />
 }
 
 /** 批量：叠起来的多份文件 */
-export function IconBatch(props: IconProps) {
-  return (
-    <Svg {...props}>
-      <path d="M8 4h6l4 4v8a1.5 1.5 0 0 1-1.5 1.5H8A1.5 1.5 0 0 1 6.5 16V5.5A1.5 1.5 0 0 1 8 4Z" />
-      <path d="M14 4v4h4" />
-      <path d="M4 8v10.5A1.5 1.5 0 0 0 5.5 20H15" />
-    </Svg>
-  )
+export function IconBatch({ size = 16, ...props }: IconProps) {
+  return <Icon icon={Layers} px={size} {...props} />
 }
 
 /** 重置视图：逆时针回转箭头 */
-export function IconReset(props: IconProps) {
-  return (
-    <Svg {...props}>
-      <path d="M4 10a8 8 0 1 1 1.6 6" />
-      <path d="M4 5v5h5" />
-    </Svg>
-  )
+export function IconReset({ size = 16, ...props }: IconProps) {
+  return <Icon icon={RotateCcw} px={size} {...props} />
 }
 
 /**
  * 宫格排列：九宫格。
  * 方格比等分略小、彼此留缝，这样才像「排成格子」而不是「一张底纹」。
  */
-export function IconGridArrange(props: IconProps) {
-  return (
-    <Svg {...props}>
-      <rect x="3.5" y="3.5" width="5" height="5" rx="1" />
-      <rect x="9.5" y="3.5" width="5" height="5" rx="1" />
-      <rect x="15.5" y="3.5" width="5" height="5" rx="1" />
-      <rect x="3.5" y="9.5" width="5" height="5" rx="1" />
-      <rect x="9.5" y="9.5" width="5" height="5" rx="1" />
-      <rect x="15.5" y="9.5" width="5" height="5" rx="1" />
-      <rect x="3.5" y="15.5" width="5" height="5" rx="1" />
-      <rect x="9.5" y="15.5" width="5" height="5" rx="1" />
-      <rect x="15.5" y="15.5" width="5" height="5" rx="1" />
-    </Svg>
-  )
+export function IconGridArrange({ size = 16, ...props }: IconProps) {
+  return <Icon icon={Grid3x3} px={size} {...props} />
 }
 
 /** 水平排列：三条**竖条**（并排成一行） */
-export function IconRowArrange(props: IconProps) {
-  return (
-    <Svg {...props}>
-      <rect x="4" y="3.5" width="4.6" height="17" rx="1.2" />
-      <rect x="9.7" y="3.5" width="4.6" height="17" rx="1.2" />
-      <rect x="15.4" y="3.5" width="4.6" height="17" rx="1.2" />
-    </Svg>
-  )
+export function IconRowArrange({ size = 16, ...props }: IconProps) {
+  return <Icon icon={Columns3} px={size} {...props} />
 }
 
 /** 垂直排列：三条**横条**（叠成一列） */
-export function IconColumnArrange(props: IconProps) {
-  return (
-    <Svg {...props}>
-      <rect x="3.5" y="4" width="17" height="4.6" rx="1.2" />
-      <rect x="3.5" y="9.7" width="17" height="4.6" rx="1.2" />
-      <rect x="3.5" y="15.4" width="17" height="4.6" rx="1.2" />
-    </Svg>
-  )
+export function IconColumnArrange({ size = 16, ...props }: IconProps) {
+  return <Icon icon={Rows3} px={size} {...props} />
 }
 
 /** 整理节点：左右两列节点 + 一条指向右的箭头（「按连线分层」） */
-export function IconTidy(props: IconProps) {
-  return (
-    <Svg {...props}>
-      <rect x="3" y="3.5" width="5" height="4" rx="1" />
-      <rect x="3" y="10" width="5" height="4" rx="1" />
-      <rect x="3" y="16.5" width="5" height="4" rx="1" />
-      <rect x="16" y="6.5" width="5" height="4" rx="1" />
-      <rect x="16" y="13.5" width="5" height="4" rx="1" />
-      <path d="M8 5.5h4.5a3 3 0 0 1 3 3v0" />
-      <path d="M8 18.5h4.5a3 3 0 0 0 3-3v0" />
-      <path d="M12 12h6" />
-      <path d="M16 9.6 18.4 12 16 14.4" />
-    </Svg>
-  )
+export function IconTidy({ size = 16, ...props }: IconProps) {
+  return <Icon icon={Workflow} px={size} {...props} />
 }
 
 /** 撤销 / 重做（生成按钮的箭头也用它，见 §6.8） */
-export function IconUndo(props: IconProps) {
-  return (
-    <Svg {...props}>
-      <path d="M9 7H4v-5" />
-      <path d="M4.6 7a8 8 0 1 1-1.3 6" />
-    </Svg>
-  )
+export function IconUndo({ size = 16, ...props }: IconProps) {
+  return <Icon icon={Undo2} px={size} {...props} />
 }
 
-export function IconRedo(props: IconProps) {
-  return (
-    <Svg {...props}>
-      <path d="M15 7h5v-5" />
-      <path d="M19.4 7a8 8 0 1 0 1.3 6" />
-    </Svg>
-  )
+export function IconRedo({ size = 16, ...props }: IconProps) {
+  return <Icon icon={Redo2} px={size} {...props} />
 }
 
 /** 导入素材：向上箭头入盘 */
-export function IconImport(props: IconProps) {
-  return (
-    <Svg {...props}>
-      <path d="M12 3v10" />
-      <path d="M8 9.5 12 13.5 16 9.5" />
-      <path d="M4 15v4.5A1.5 1.5 0 0 0 5.5 21h13a1.5 1.5 0 0 0 1.5-1.5V15" />
-    </Svg>
-  )
+export function IconImport({ size = 16, ...props }: IconProps) {
+  return <Icon icon={Upload} px={size} {...props} />
 }
 
 /** 连接到已有节点：两个节点块之间一条连线（§6.14「连接已有节点」区分于「新建」） */
@@ -231,16 +128,8 @@ export function IconImport(props: IconProps) {
  * 形状取「截图取景」这一通用符号：四个直角 + 中间一个实心小块，
  * 一眼能与「导入」「全屏」区分开（那两个也是四角，但没有中间那块）。
  */
-export function IconScan(props: IconProps) {
-  return (
-    <Svg {...props}>
-      <path d="M4 9V5.5A1.5 1.5 0 0 1 5.5 4H9" />
-      <path d="M15 4h3.5A1.5 1.5 0 0 1 20 5.5V9" />
-      <path d="M20 15v3.5a1.5 1.5 0 0 1-1.5 1.5H15" />
-      <path d="M9 20H5.5A1.5 1.5 0 0 1 4 18.5V15" />
-      <rect x="9" y="9" width="6" height="6" rx="1" fill="currentColor" stroke="none" />
-    </Svg>
-  )
+export function IconScan({ size = 16, ...props }: IconProps) {
+  return <Icon icon={Scan} px={size} {...props} />
 }
 
 /**
@@ -250,23 +139,12 @@ export function IconScan(props: IconProps) {
  * 那个读「框一块出来、带选区上下文」，这个读「就切这一块、不带上下文」。
  * 两者在 16px 下也不会混（这个没有中间那块实心）。
  */
-export function IconCrop(props: IconProps) {
-  return (
-    <Svg {...props}>
-      <path d="M6 2.5v15a1.5 1.5 0 0 0 1.5 1.5h15" />
-      <path d="M18 21.5v-15A1.5 1.5 0 0 0 16.5 5h-15" />
-    </Svg>
-  )
+export function IconCrop({ size = 16, ...props }: IconProps) {
+  return <Icon icon={Crop} px={size} {...props} />
 }
 
-export function IconLink(props: IconProps) {
-  return (
-    <Svg {...props}>
-      <rect x="2.5" y="7.5" width="6" height="9" rx="1.4" />
-      <rect x="15.5" y="7.5" width="6" height="9" rx="1.4" />
-      <path d="M8.5 12h7" />
-    </Svg>
-  )
+export function IconLink({ size = 16, ...props }: IconProps) {
+  return <Icon icon={Link} px={size} {...props} />
 }
 
 /* ────────────────────────────────────────────────────────────
@@ -287,111 +165,50 @@ export function IconLink(props: IconProps) {
  * 现在取 15 并把基线抬到 19，字形高度接近 14/24，与线性图标等重。
  * `fontWeight=700` 同理：线性图标有 1.6 的描边重量，细字压不住。
  */
-function HeadingGlyph({ level, ...rest }: IconProps & { level: 1 | 2 | 3 }) {
-  return (
-    <Svg {...rest}>
-      <text
-        x="12"
-        y="18.6"
-        textAnchor="middle"
-        fontSize="15.5"
-        fontWeight="700"
-        fill="currentColor"
-        stroke="none"
-        fontFamily="var(--font-sans)"
-        letterSpacing="-0.4"
-      >
-        H{level}
-      </text>
-    </Svg>
-  )
-}
 
-export function IconH1(props: IconProps) {
-  return <HeadingGlyph level={1} {...props} />
+export function IconH1({ size = 16, ...props }: IconProps) {
+  return <Icon icon={Heading1} px={size} {...props} />
 }
-export function IconH2(props: IconProps) {
-  return <HeadingGlyph level={2} {...props} />
+export function IconH2({ size = 16, ...props }: IconProps) {
+  return <Icon icon={Heading2} px={size} {...props} />
 }
-export function IconH3(props: IconProps) {
-  return <HeadingGlyph level={3} {...props} />
+export function IconH3({ size = 16, ...props }: IconProps) {
+  return <Icon icon={Heading3} px={size} {...props} />
 }
 
 /** 正文：一个段落符号（¶），表示「取消标题 / 列表，回到普通段落」 */
-export function IconParagraph(props: IconProps) {
-  return (
-    <Svg {...props}>
-      <path d="M13 4v16" />
-      <path d="M17 4v16" />
-      <path d="M13 4h-3a4 4 0 0 0 0 8h3" />
-    </Svg>
-  )
+export function IconParagraph({ size = 16, ...props }: IconProps) {
+  return <Icon icon={Pilcrow} px={size} {...props} />
 }
 
 /** 粗体：字形 B */
-export function IconBold(props: IconProps) {
-  return (
-    <Svg {...props}>
-      <path d="M7 4h6a4 4 0 0 1 0 8H7Z" />
-      <path d="M7 12h7a4 4 0 0 1 0 8H7Z" />
-    </Svg>
-  )
+export function IconBold({ size = 16, ...props }: IconProps) {
+  return <Icon icon={Bold} px={size} {...props} />
 }
 
 /** 斜体：字形 I（带倾角的竖笔） */
-export function IconItalic(props: IconProps) {
-  return (
-    <Svg {...props}>
-      <path d="M14.5 4h-5" />
-      <path d="M14.5 20h-5" />
-      <path d="M14 4 10 20" />
-    </Svg>
-  )
+export function IconItalic({ size = 16, ...props }: IconProps) {
+  return <Icon icon={Italic} px={size} {...props} />
 }
 
 /** 无序列表：三行，行首为圆点 */
-export function IconBulletList(props: IconProps) {
-  return (
-    <Svg {...props}>
-      <circle cx="5" cy="7" r="1.4" fill="currentColor" stroke="none" />
-      <circle cx="5" cy="12" r="1.4" fill="currentColor" stroke="none" />
-      <circle cx="5" cy="17" r="1.4" fill="currentColor" stroke="none" />
-      <path d="M10 7h9M10 12h9M10 17h9" />
-    </Svg>
-  )
+export function IconBulletList({ size = 16, ...props }: IconProps) {
+  return <Icon icon={List} px={size} {...props} />
 }
 
 /** 有序列表：三行，行首为数字 */
-export function IconOrderedList(props: IconProps) {
-  return (
-    <Svg {...props}>
-      <path d="M4 5.5 5.5 4.5V9" />
-      <path d="M4 12.5h2.2L4 15h2.2" />
-      <path d="M4 17h1.6a1.2 1.2 0 0 1 0 2.4H4" />
-      <path d="M10 7h9M10 12h9M10 17h9" />
-    </Svg>
-  )
+export function IconOrderedList({ size = 16, ...props }: IconProps) {
+  return <Icon icon={ListOrdered} px={size} {...props} />
 }
 
 /** 分隔线：一条横线，两侧短竖线示意「上下断开」 */
-export function IconDivider(props: IconProps) {
-  return (
-    <Svg {...props}>
-      <path d="M3 12h18" />
-      <path d="M7 7v2M12 7v2M17 7v2" opacity="0.35" />
-      <path d="M7 15v2M12 15v2M17 15v2" opacity="0.35" />
-    </Svg>
-  )
+export function IconDivider({ size = 16, ...props }: IconProps) {
+  return <Icon icon={Minus} px={size} {...props} />
 }
 
 /** 复制：两层叠放的方框（与跟随栏「复制」同一形状，语义一致） */
-export function IconCopyText(props: IconProps) {
-  return (
-    <Svg {...props}>
-      <rect x="9" y="9" width="11" height="11" rx="1.6" />
-      <path d="M5 15V6a2 2 0 0 1 2-2h9" />
-    </Svg>
-  )
+export function IconCopyText({ size = 16, ...props }: IconProps) {
+  return <Icon icon={Copy} px={size} {...props} />
 }
 
 /** 全屏编辑：四角向外（进入）/ 向内（退出）由调用方翻转 */
@@ -401,15 +218,8 @@ export function IconCopyText(props: IconProps) {
  * 形状取「环形箭头」这一通用符号——两端各一个箭头，中段断开，
  * 一眼能读成「重复」。不画整圆，否则在 16px 下会与「对比」「分组」的圆角方块混淆。
  */
-export function IconLoop(props: IconProps) {
-  return (
-    <Svg {...props}>
-      <path d="M4.5 12a7.5 7.5 0 0 1 12.3-5.8" />
-      <path d="M19.5 12a7.5 7.5 0 0 1-12.3 5.8" />
-      <path d="M17.2 3.2v3.2h-3.2" />
-      <path d="M6.8 20.8v-3.2h3.2" />
-    </Svg>
-  )
+export function IconLoop({ size = 16, ...props }: IconProps) {
+  return <Icon icon={Repeat2} px={size} {...props} />
 }
 
 /**
@@ -419,48 +229,21 @@ export function IconLoop(props: IconProps) {
  * 与「整理节点」「连接」那几枚箭头图标几乎分不出来。叠图一眼就是
  * 「两张图合成一张」，正是这个节点做的事（§6.23）。
  */
-export function IconFusion(props: IconProps) {
-  return (
-    <Svg {...props}>
-      <rect x="3.5" y="6.5" width="11" height="11" rx="1.6" />
-      <path d="M9 6.5V5.5A1.5 1.5 0 0 1 10.5 4h8A1.5 1.5 0 0 1 20 5.5v8a1.5 1.5 0 0 1-1.5 1.5h-1" />
-      <path d="M14.5 12.5 17 15l-2.5 2.5" />
-      <path d="M12 15h5" />
-    </Svg>
-  )
+export function IconFusion({ size = 16, ...props }: IconProps) {
+  return <Icon icon={Combine} px={size} {...props} />
 }
 
-export function IconExpand(props: IconProps) {
-  return (
-    <Svg {...props}>
-      <path d="M4 9V5a1 1 0 0 1 1-1h4" />
-      <path d="M20 9V5a1 1 0 0 0-1-1h-4" />
-      <path d="M4 15v4a1 1 0 0 0 1 1h4" />
-      <path d="M20 15v4a1 1 0 0 1-1 1h-4" />
-    </Svg>
-  )
+export function IconExpand({ size = 16, ...props }: IconProps) {
+  return <Icon icon={Maximize2} px={size} {...props} />
 }
 
 /** 放大镜（带 +）：调研图片「查看大图」。 */
-export function IconZoomIn(props: IconProps) {
-  return (
-    <Svg {...props}>
-      <circle cx="11" cy="11" r="6.5" />
-      <path d="M20 20l-4.2-4.2" />
-      <path d="M11 8.5v5M8.5 11h5" />
-    </Svg>
-  )
+export function IconZoomIn({ size = 16, ...props }: IconProps) {
+  return <Icon icon={ZoomIn} px={size} {...props} />
 }
 
-export function IconCollapse(props: IconProps) {
-  return (
-    <Svg {...props}>
-      <path d="M9 4v4a1 1 0 0 1-1 1H4" />
-      <path d="M15 4v4a1 1 0 0 0 1 1h4" />
-      <path d="M9 20v-4a1 1 0 0 0-1-1H4" />
-      <path d="M15 20v-4a1 1 0 0 1 1-1h4" />
-    </Svg>
-  )
+export function IconCollapse({ size = 16, ...props }: IconProps) {
+  return <Icon icon={Minimize2} px={size} {...props} />
 }
 
 /**
@@ -476,16 +259,8 @@ export function IconCollapse(props: IconProps) {
  *
  * 形状：两条等长的正交线段，端点圆头——与工具栏其它线性图标同一套约定。
  */
-export function IconPlus(props: IconProps) {
-  return (
-    <Svg {...props} strokeWidth={2}>
-      {/* 字形占 24×24 viewBox 的 5..19（居中，四周各留 5）。
-          视觉大小由调用方的尺寸 + CSS 的 padding 决定，这里只保证**几何居中**：
-          5..19 的中点正是 12，与 viewBox 中心重合——旋转时绕的就是自己的中心。 */}
-      <path d="M12 5v14" />
-      <path d="M5 12h14" />
-    </Svg>
-  )
+export function IconPlus({ size = 16, ...props }: IconProps) {
+  return <Icon icon={Plus} px={size} {...props} />
 }
 
 /**
@@ -500,160 +275,82 @@ export function IconPlus(props: IconProps) {
  */
 
 /** 生成 / 运行：三角形（与暂停 / 停止成对） */
-export function IconPlay(props: IconProps) {
-  return (
-    <Svg {...props}>
-      <path d="M8.5 5.8 18 12l-9.5 6.2z" />
-    </Svg>
-  )
+export function IconPlay({ size = 16, ...props }: IconProps) {
+  return <Icon icon={Play} px={size} {...props} />
 }
 
 /** 暂停（视频播放中的那一下） */
-export function IconPause(props: IconProps) {
-  return (
-    <Svg {...props}>
-      <path d="M9.5 6v12" />
-      <path d="M14.5 6v12" />
-    </Svg>
-  )
+export function IconPause({ size = 16, ...props }: IconProps) {
+  return <Icon icon={Pause} px={size} {...props} />
 }
 
 /** 停止 / 取消生成：方块 */
-export function IconStop(props: IconProps) {
-  return (
-    <Svg {...props}>
-      <rect x="7" y="7" width="10" height="10" rx="1.6" />
-    </Svg>
-  )
+export function IconStop({ size = 16, ...props }: IconProps) {
+  return <Icon icon={Square} px={size} {...props} />
 }
 
 /** 重命名：铅笔 */
-export function IconRename(props: IconProps) {
-  return (
-    <Svg {...props}>
-      <path d="M4.5 19.5h4L19 9l-4-4L4.5 15.5z" />
-      <path d="m13.5 6.5 4 4" />
-    </Svg>
-  )
+export function IconRename({ size = 16, ...props }: IconProps) {
+  return <Icon icon={Pencil} px={size} {...props} />
 }
 
 /** 复制节点：两张叠起来的纸 */
-export function IconDuplicate(props: IconProps) {
-  return (
-    <Svg {...props}>
-      <rect x="8.5" y="8.5" width="11" height="11" rx="2.2" />
-      <path d="M15.5 5.5h-9a2 2 0 0 0-2 2v9" />
-    </Svg>
-  )
+export function IconDuplicate({ size = 16, ...props }: IconProps) {
+  return <Icon icon={Copy} px={size} {...props} />
 }
 
 /** 下载：向下箭头落进托盘 */
-export function IconDownload(props: IconProps) {
-  return (
-    <Svg {...props}>
-      <path d="M12 4v9" />
-      <path d="m8 9.5 4 3.8 4-3.8" />
-      <path d="M4.5 16v2.2a1.8 1.8 0 0 0 1.8 1.8h11.4a1.8 1.8 0 0 0 1.8-1.8V16" />
-    </Svg>
-  )
+export function IconDownload({ size = 16, ...props }: IconProps) {
+  return <Icon icon={Download} px={size} {...props} />
 }
 
 /** 删除：垃圾桶（功能栏里是危险操作，形状要与普通操作区分开） */
-export function IconDelete(props: IconProps) {
-  return (
-    <Svg {...props}>
-      <path d="M4.5 7h15" />
-      <path d="M9.5 7V5.2h5V7" />
-      <path d="m6.8 7 1 12.2h8.4L17.2 7" />
-      <path d="M10.5 10.5v6M13.5 10.5v6" />
-    </Svg>
-  )
+export function IconDelete({ size = 16, ...props }: IconProps) {
+  return <Icon icon={Trash2} px={size} {...props} />
 }
 
 /** 收起 / 展开：向下的折角 */
-export function IconChevronDown(props: IconProps) {
-  return (
-    <Svg {...props}>
-      <path d="m6 9.5 6 6 6-6" />
-    </Svg>
-  )
+export function IconChevronDown({ size = 16, ...props }: IconProps) {
+  return <Icon icon={ChevronDown} px={size} {...props} />
 }
 
 /** 向上展开：与向下折角同一套线性重量 */
-export function IconChevronUp(props: IconProps) {
-  return (
-    <Svg {...props}>
-      <path d="m6 14.5 6-6 6 6" />
-    </Svg>
-  )
+export function IconChevronUp({ size = 16, ...props }: IconProps) {
+  return <Icon icon={ChevronUp} px={size} {...props} />
 }
 
 /** 灯箱上一张 / 下一张：与展开箭头同一套线性重量 */
-export function IconChevronLeft(props: IconProps) {
-  return (
-    <Svg {...props}>
-      <path d="m14.5 6-6 6 6 6" />
-    </Svg>
-  )
+export function IconChevronLeft({ size = 16, ...props }: IconProps) {
+  return <Icon icon={ChevronLeft} px={size} {...props} />
 }
 
-export function IconChevronRight(props: IconProps) {
-  return (
-    <Svg {...props}>
-      <path d="m9.5 6 6 6-6 6" />
-    </Svg>
-  )
+export function IconChevronRight({ size = 16, ...props }: IconProps) {
+  return <Icon icon={ChevronRight} px={size} {...props} />
 }
 
 /** 多选灯箱：叠放的两张画面 */
-export function IconGallery(props: IconProps) {
-  return (
-    <Svg {...props}>
-      <rect x="7.2" y="5" width="11.8" height="9.4" rx="1.8" />
-      <path d="M5 8.6v7.9A2.5 2.5 0 0 0 7.5 19h8.6" />
-      <path d="m9.2 11.1 1.7-1.7 1.5 1.5 1.2-1.2 2.1 2.1" />
-    </Svg>
-  )
+export function IconGallery({ size = 16, ...props }: IconProps) {
+  return <Icon icon={Images} px={size} {...props} />
 }
 
 /** 渠道设置：齿轮（线性画法，与其余图标同一套重量） */
-export function IconSettings(props: IconProps) {
-  return (
-    <Svg {...props}>
-      <circle cx="12" cy="12" r="3.1" />
-      <path d="M12 3.6v2.2M12 18.2v2.2M3.6 12h2.2M18.2 12h2.2M6.1 6.1l1.6 1.6M16.3 16.3l1.6 1.6M17.9 6.1l-1.6 1.6M7.7 16.3l-1.6 1.6" />
-    </Svg>
-  )
+export function IconSettings({ size = 16, ...props }: IconProps) {
+  return <Icon icon={Settings} px={size} {...props} />
 }
 
 /** 筛选与排序：两条带滑块的横线，对应参考栏右上角入口。 */
-export function IconSliders(props: IconProps) {
-  return (
-    <Svg {...props}>
-      <path d="M4 8h5M14 8h6M4 16h9M18 16h2" />
-      <circle cx="11.5" cy="8" r="2" />
-      <circle cx="15.5" cy="16" r="2" />
-    </Svg>
-  )
+export function IconSliders({ size = 16, ...props }: IconProps) {
+  return <Icon icon={SlidersHorizontal} px={size} {...props} />
 }
 
 /** 关闭 / 移除：叉（标签上的「✕」也用它，字号不再决定形状） */
-export function IconClose(props: IconProps) {
-  return (
-    <Svg {...props}>
-      <path d="m6.5 6.5 11 11" />
-      <path d="m17.5 6.5-11 11" />
-    </Svg>
-  )
+export function IconClose({ size = 16, ...props }: IconProps) {
+  return <Icon icon={X} px={size} {...props} />
 }
 
 /** 进行中：一段圆弧（配合 CSS 旋转，替代文本 `◌`） */
-export function IconSpinner(props: IconProps) {
-  return (
-    <Svg {...props}>
-      <path d="M12 4.6a7.4 7.4 0 1 0 7.4 7.4" />
-    </Svg>
-  )
+export function IconSpinner({ size = 16, ...props }: IconProps) {
+  return <Icon icon={LoaderCircle} px={size} {...props} />
 }
 
 /**
@@ -663,53 +360,26 @@ export function IconSpinner(props: IconProps) {
  * 而且它在本项目里不与任何现有图标撞形 —— 工具栏的 `IconPlay` 是三角、
  * `IconImport` 是向下入盒，含义各不相干。
  */
-export function IconArrowUp(props: IconProps) {
-  return (
-    <Svg {...props}>
-      <path d="M12 19.5V5.2" />
-      <path d="m5.8 11.4 6.2-6.2 6.2 6.2" />
-    </Svg>
-  )
+export function IconArrowUp({ size = 16, ...props }: IconProps) {
+  return <Icon icon={ArrowUp} px={size} {...props} />
 }
 
-export function IconSteer(props: IconProps) {
-  return (
-    <Svg {...props}>
-      <path d="M5 7h9.5a4.5 4.5 0 0 1 0 9H11" />
-      <path d="m8 4-3 3 3 3" />
-      <path d="m14 13-3 3 3 3" />
-    </Svg>
-  )
+export function IconSteer({ size = 16, ...props }: IconProps) {
+  return <Icon icon={CornerUpRight} px={size} {...props} />
 }
 
-export function IconMore(props: IconProps) {
-  return (
-    <Svg {...props}>
-      <circle cx="5" cy="12" r="1.4" fill="currentColor" stroke="none" />
-      <circle cx="12" cy="12" r="1.4" fill="currentColor" stroke="none" />
-      <circle cx="19" cy="12" r="1.4" fill="currentColor" stroke="none" />
-    </Svg>
-  )
+export function IconMore({ size = 16, ...props }: IconProps) {
+  return <Icon icon={Ellipsis} px={size} {...props} />
 }
 
 /** 图片：山与日。步骤卡上代表「这一步产出的是一张图」 */
-export function IconImage(props: IconProps) {
-  return (
-    <Svg {...props}>
-      <rect x="3.4" y="4.6" width="17.2" height="14.8" rx="2.6" />
-      <circle cx="8.6" cy="9.6" r="1.5" />
-      <path d="m4.4 17.4 4.6-4.6 3.4 3.4 3-3 4.2 4.2" />
-    </Svg>
-  )
+export function IconImage({ size = 16, ...props }: IconProps) {
+  return <Icon icon={Image} px={size} {...props} />
 }
 
 /** 确认：对勾（就地改名的「保存」用它，不再用文字按钮） */
-export function IconCheck(props: IconProps) {
-  return (
-    <Svg {...props}>
-      <path d="m5.4 12.6 4.2 4.2 9-9.6" />
-    </Svg>
-  )
+export function IconCheck({ size = 16, ...props }: IconProps) {
+  return <Icon icon={Check} px={size} {...props} />
 }
 
 /**
@@ -720,14 +390,8 @@ export function IconCheck(props: IconProps) {
  * 为什么不用「芯片」「大脑」那类通用 AI 图标：这里是**模型**这一档的固定符号，
  * 它旁边还有技能 / 手动 / 自动三枚，形状必须一眼可分。
  */
-export function IconModelCube(props: IconProps) {
-  return (
-    <Svg {...props}>
-      <path d="M12 3.2 20.2 7.6v8.8L12 20.8 3.8 16.4V7.6z" />
-      <path d="M3.8 7.6 12 12l8.2-4.4" />
-      <path d="M12 12v8.8" />
-    </Svg>
-  )
+export function IconModelCube({ size = 16, ...props }: IconProps) {
+  return <Icon icon={Box} px={size} {...props} />
 }
 
 /**
@@ -736,68 +400,33 @@ export function IconModelCube(props: IconProps) {
  * 与「模型」那个立体方块刻意分开画 —— 方块回答「用谁**建**」，
  * 气泡回答「跟谁**说**」（用户 2026-10-02：对话模型要单独放一个地方）。
  */
-export function IconChat(props: IconProps) {
-  return (
-    <Svg {...props}>
-      <path d="M20.4 12.4c0 3.9-3.7 7-8.3 7-1 0-1.9-.1-2.8-.4L4.7 20.5l1.2-3.3a6.7 6.7 0 0 1-2.4-4.8c0-3.9 3.7-7 8.3-7s8.6 3.1 8.6 7z" />
-      <path d="M8.8 12.4h.01" />
-      <path d="M12 12.4h.01" />
-      <path d="M15.2 12.4h.01" />
-    </Svg>
-  )
+export function IconChat({ size = 16, ...props }: IconProps) {
+  return <Icon icon={MessageCircle} px={size} {...props} />
 }
 
 /** 技能：一本打开的书。与「模型」的立体方块分开：那一个是「谁来做」，这一个是「怎么做」。 */
-export function IconSkill(props: IconProps) {
-  return (
-    <Svg {...props}>
-      <path d="M3.7 5.2c2.9-.8 5.5.1 8.3 2v12c-2.8-1.9-5.4-2.8-8.3-2Z" />
-      <path d="M20.3 5.2c-2.9-.8-5.5.1-8.3 2v12c2.8-1.9 5.4-2.8 8.3-2Z" />
-      <path d="M12 7.2v12" />
-    </Svg>
-  )
+export function IconSkill({ size = 16, ...props }: IconProps) {
+  return <Icon icon={BookOpen} px={size} {...props} />
 }
 
 /** 手动生成：一只手（参考产品同一个符号）。语义 = 每次生成前问你一句 */
-export function IconManual(props: IconProps) {
-  return (
-    <Svg {...props}>
-      <path d="M8.6 12.2V6.1a1.4 1.4 0 0 1 2.8 0V11" />
-      <path d="M11.4 11V5a1.4 1.4 0 0 1 2.8 0v6" />
-      <path d="M14.2 11V6.6a1.4 1.4 0 0 1 2.8 0V14a5.4 5.4 0 0 1-5.4 5.4h-.8a4.6 4.6 0 0 1-3.3-1.4l-2.6-2.7a1.5 1.5 0 0 1 2.1-2.1l1.6 1.6" />
-    </Svg>
-  )
+export function IconManual({ size = 16, ...props }: IconProps) {
+  return <Icon icon={Hand} px={size} {...props} />
 }
 
 /** 自动生成：循环箭头（同一个符号的「不必问你」那一档） */
-export function IconAuto(props: IconProps) {
-  return (
-    <Svg {...props}>
-      <path d="M20.2 12a8.2 8.2 0 1 1-2.4-5.8" />
-      <path d="M20.4 4.4v4.2h-4.2" />
-    </Svg>
-  )
+export function IconAuto({ size = 16, ...props }: IconProps) {
+  return <Icon icon={RefreshCw} px={size} {...props} />
 }
 
 /** 联网：地球（Agent 输入框的「联网」开关） */
-export function IconGlobe(props: IconProps) {
-  return (
-    <Svg {...props}>
-      <circle cx="12" cy="12" r="8.4" />
-      <path d="M3.6 12h16.8" />
-      <path d="M12 3.6c2.3 2.3 3.4 5.1 3.4 8.4s-1.1 6.1-3.4 8.4c-2.3-2.3-3.4-5.1-3.4-8.4s1.1-6.1 3.4-8.4z" />
-    </Svg>
-  )
+export function IconGlobe({ size = 16, ...props }: IconProps) {
+  return <Icon icon={Globe} px={size} {...props} />
 }
 
 /** 引用（@）：在输入框里引用画布节点或模型 */
-export function IconMention(props: IconProps) {
-  return (
-    <Svg {...props}>
-      <circle cx="12" cy="12" r="3.4" />
-      <path d="M15.4 12v1.5a2.4 2.4 0 0 0 4.8 0V12a8.2 8.2 0 1 0-3.4 6.6" />
-    </Svg>
-  )
+export function IconMention({ size = 16, ...props }: IconProps) {
+  return <Icon icon={AtSign} px={size} {...props} />
 }
 
 /**
@@ -833,86 +462,41 @@ export function IconPreset(props: IconProps) {
 }
 
 /** 情绪：一张脸（用户 2026-10-05 第 14 条后半那份「情绪调节」） */
-export function IconEmotion(props: IconProps) {
-  return (
-    <Svg {...props}>
-      <circle cx="12" cy="12" r="8.4" />
-      <path d="M9.2 10.2h.01M14.8 10.2h.01" />
-      <path d="M8.8 14.4c.9 1.2 2 1.8 3.2 1.8s2.3-.6 3.2-1.8" />
-    </Svg>
-  )
+export function IconEmotion({ size = 16, ...props }: IconProps) {
+  return <Icon icon={Smile} px={size} {...props} />
 }
 
 /** 旋转：一个方块 + 绕它一圈的箭头（用户 2026-10-05 第 10 条的「旋转」入口） */
-export function IconRotate(props: IconProps) {
-  return (
-    <Svg {...props}>
-      <rect x="8.4" y="8.4" width="7.2" height="7.2" rx="1.4" />
-      <path d="M19.4 12a7.4 7.4 0 1 1-2.2-5.2" />
-      <path d="M19.8 3.6v3.6h-3.6" />
-    </Svg>
-  )
+export function IconRotate({ size = 16, ...props }: IconProps) {
+  return <Icon icon={RotateCw} px={size} {...props} />
 }
 
 /** 标注：一支笔 + 一道下划线（用户 2026-10-05 第 10 条的「标注」入口） */
-export function IconAnnotate(props: IconProps) {
-  return (
-    <Svg {...props}>
-      <path d="M4.4 15.8 14.2 6l3.8 3.8-9.8 9.8H4.4z" />
-      <path d="m12.8 7.4 2-2a1.6 1.6 0 0 1 2.3 0l1.5 1.5a1.6 1.6 0 0 1 0 2.3l-2 2" />
-      <path d="M4.4 21h15.2" />
-    </Svg>
-  )
+export function IconAnnotate({ size = 16, ...props }: IconProps) {
+  return <Icon icon={PenLine} px={size} {...props} />
 }
 
 /** 左右镜像：一条竖虚线 + 两侧的三角（用户 2026-10-05 第 10 条的「左右镜像」） */
-export function IconMirrorH(props: IconProps) {
-  return (
-    <Svg {...props}>
-      <path d="M12 3.6v16.8" strokeDasharray="2.4 2.4" />
-      <path d="M9 7.6 4.6 12 9 16.4z" />
-      <path d="M15 7.6 19.4 12 15 16.4z" />
-    </Svg>
-  )
+export function IconMirrorH({ size = 16, ...props }: IconProps) {
+  return <Icon icon={FlipHorizontal2} px={size} {...props} />
 }
 
 /** 上下镜像：一条横虚线 + 上下两个三角 */
-export function IconMirrorV(props: IconProps) {
-  return (
-    <Svg {...props}>
-      <path d="M3.6 12h16.8" strokeDasharray="2.4 2.4" />
-      <path d="M7.6 9 12 4.6 16.4 9z" />
-      <path d="M7.6 15 12 19.4 16.4 15z" />
-    </Svg>
-  )
+export function IconMirrorV({ size = 16, ...props }: IconProps) {
+  return <Icon icon={FlipVertical2} px={size} {...props} />
 }
 
 /** 矩形（标注工具里那枚「画框」） */
-export function IconRect(props: IconProps) {
-  return (
-    <Svg {...props}>
-      <rect x="4" y="5.4" width="16" height="13.2" rx="2" />
-    </Svg>
-  )
+export function IconRect({ size = 16, ...props }: IconProps) {
+  return <Icon icon={Square} px={size} {...props} />
 }
 
 /** 文字（标注工具里那枚「T」） */
-export function IconText(props: IconProps) {
-  return (
-    <Svg {...props}>
-      <path d="M5 6.4h14" />
-      <path d="M12 6.4v11.2" />
-      <path d="M9 17.6h6" />
-    </Svg>
-  )
+export function IconText({ size = 16, ...props }: IconProps) {
+  return <Icon icon={Type} px={size} {...props} />
 }
 
 /** 禁用 / 启用：电源符号（顶部竖线 + 带缺口的圆环） */
-export function IconPower(props: IconProps) {
-  return (
-    <Svg {...props}>
-      <path d="M12 3.6v7.2" />
-      <path d="M7.3 6.3a7.2 7.2 0 1 0 9.4 0" />
-    </Svg>
-  )
+export function IconPower({ size = 16, ...props }: IconProps) {
+  return <Icon icon={Power} px={size} {...props} />
 }

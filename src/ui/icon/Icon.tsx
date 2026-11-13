@@ -17,12 +17,19 @@ export interface IconProps
   /** 来自 `ui/icon` 的图标组件（Lucide 或 `custom/` 自绘）。 */
   icon: LucideIcon
   size?: IconSize
+  /**
+   * 直接给像素尺寸（优先于 `size`）。
+   *
+   * 只给**画布工具栏**用：它按「原设计值 × 1.5」换算（图标 27px、按钮 54px），
+   * 那是缩放口径，不是三档之一。业务界面仍应只用 `size`。
+   */
+  px?: number
   /** 有意义的独立图形才传；按钮内的图标不要传，名字写在按钮上。 */
   label?: string
 }
 
-export function Icon({ icon: Glyph, size = 'md', label, ...rest }: IconProps) {
-  const px = ICON_SIZE_PX[size]
+export function Icon({ icon: Glyph, size = 'md', px: pxProp, label, ...rest }: IconProps) {
+  const px = pxProp ?? ICON_SIZE_PX[size]
   const a11y = label
     ? { role: 'img', 'aria-label': label }
     : { 'aria-hidden': true as const, focusable: 'false' as const }
@@ -30,7 +37,8 @@ export function Icon({ icon: Glyph, size = 'md', label, ...rest }: IconProps) {
     <Glyph
       {...rest}
       {...a11y}
-      data-icon-size={size}
+      data-icon-size={pxProp ? 'px' : size}
+      data-icon-px={pxProp ?? undefined}
       size={px}
       strokeWidth={gridStrokeWidth(px)}
       color="currentColor"
