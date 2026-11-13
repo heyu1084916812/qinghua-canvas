@@ -9,11 +9,12 @@ import {
   IconStoryboard,
 } from './AppSidebarIcons'
 import { projectRoute, type WorkbenchId } from '../domain/shared/workbench'
+import type { IconSize } from '../ui/icon'
 
 export interface NavItem {
   to: string
   label: string
-  icon: (p: { size?: number }) => JSX.Element
+  icon: (p: { size?: IconSize }) => JSX.Element
 }
 
 /**

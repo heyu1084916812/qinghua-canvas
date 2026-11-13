@@ -8,6 +8,7 @@ import {
   subscribeUpdate,
 } from './updateState'
 import { shouldNotify, type UpdateVerdict } from './updateVerdict'
+import { Icon, RefreshCw, type IconSize } from '../ui/icon'
 import styles from './update.module.css'
 
 /**
@@ -120,22 +121,7 @@ export function UpdateButton({ open }: { open: boolean }) {
   )
 }
 
-/** 循环箭头：与侧栏其它图标同一套画法（细线 + currentColor） */
-function IconUpdate({ size = 20 }: { size?: number }) {
-  return (
-    <svg
-      width={size}
-      height={size}
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={1.7}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden
-    >
-      <path d="M20 12a8 8 0 1 1-2.6-5.9" />
-      <path d="M20 4v4.2h-4.2" />
-    </svg>
-  )
+/** 循环箭头：更新提示里的「重试 / 检查更新」 */
+function IconUpdate({ size = 'lg' }: { size?: IconSize }) {
+  return <Icon icon={RefreshCw} size={size} />
 }

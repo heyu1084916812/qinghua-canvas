@@ -2,6 +2,7 @@ import type { ReactNode } from 'react'
 import { formatRelative } from '../../domain/shared/time'
 import type { ProjectListItem } from '../../domain/project/project'
 import type { WorkbenchId } from '../../domain/shared/workbench'
+import type { IconSize } from '../../ui/icon'
 import {
   IconCanvas,
   IconEcommerce,
@@ -15,7 +16,7 @@ import {
 } from '../ProjectTreeIcons'
 import styles from '../ProjectTree.module.css'
 
-export const PROJECT_ICON: Record<WorkbenchId, (props: { size?: number }) => JSX.Element> = {
+export const PROJECT_ICON: Record<WorkbenchId, (props: { size?: IconSize }) => JSX.Element> = {
   canvas: IconCanvas,
   ecommerce: IconEcommerce,
   storyboard: IconStoryboard,
@@ -52,7 +53,7 @@ export function ProjectDeleteConfirmActions({
   )
 }
 
-export function WorkbenchIcon({ workbench, size = 16 }: { workbench: WorkbenchId; size?: number }) {
+export function WorkbenchIcon({ workbench, size = 'md' }: { workbench: WorkbenchId; size?: IconSize }) {
   const Icon = PROJECT_ICON[workbench]
   return <Icon size={size} />
 }
@@ -174,7 +175,7 @@ export function ProjectRow({
         aria-current={active ? 'page' : undefined}
       >
         <span className={styles.projectIcon}>
-          <Icon size={15} />
+          <Icon size="sm" />
         </span>
         <span className={styles.projectName}>{project.name}</span>
         <span className={styles.projectTime} title={new Date(project.updatedAt).toLocaleString('zh-CN')}>

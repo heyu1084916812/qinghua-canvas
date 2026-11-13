@@ -22,11 +22,9 @@ const ICON_KEEP = [
 ]
 
 const ICON_PENDING = [
-  'src/app/AppSidebarIcons.tsx',
   'src/app/ProjectTreeIcons.tsx',
   'src/app/SettingsIcons.tsx',
   'src/app/TitleBar.tsx',
-  'src/app/UpdateNotice.tsx',
   'src/features/shared/choicePicker/ChoicePicker.tsx',
   'src/pages/AssetsPage/AssetCard.tsx',
   'src/pages/AssetsPage/AssetPreview.tsx',

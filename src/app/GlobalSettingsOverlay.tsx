@@ -245,7 +245,7 @@ export function GlobalSettingsOverlay() {
             title="关闭"
             onClick={() => closeGlobalSettings()}
           >
-            <IconClose size={18} />
+            <IconClose size="md" />
           </button>
         </header>
         <div className={styles.body} data-global-settings-body>
@@ -278,7 +278,7 @@ export function GlobalSettingsOverlay() {
                   title="清空"
                   onClick={() => setQuery('')}
                 >
-                  <IconClose size={14} />
+                  <IconClose size="sm" />
                 </button>
               ) : null}
             </div>

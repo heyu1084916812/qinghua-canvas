@@ -356,7 +356,7 @@ export function AppSidebar() {
             title={pinned ? '取消常驻展开' : '常驻展开'}
             onClick={() => toggleSidebarPin()}
           >
-            <IconSidebarToggle size={20} />
+            <IconSidebarToggle size="lg" />
           </button>
         )}
       </div>
@@ -431,7 +431,7 @@ export function AppSidebar() {
               onFocus={preloadOnIntent}
             >
               <span className={styles.itemIcon} aria-hidden="true">
-                <Icon size={20} />
+                <Icon size="lg" />
               </span>
               <span className={styles.itemText} data-sidebar-text data-sidebar-label>
                 {item.label}
@@ -462,7 +462,7 @@ export function AppSidebar() {
           onClick={() => openGlobalSettings('channels')}
         >
           <span className={styles.itemIcon} aria-hidden="true">
-            <IconSettings size={20} />
+            <IconSettings size="lg" />
           </span>
           <span className={styles.footBtnText} data-sidebar-text data-sidebar-label>
             全局设置

@@ -136,7 +136,7 @@ export function TitleBar() {
         title={pinned ? '取消常驻展开' : '常驻展开'}
         onClick={() => toggleSidebarPin()}
       >
-        <IconSidebarToggle size={16} />
+        <IconSidebarToggle size="md" />
       </button>
 
       {/*
