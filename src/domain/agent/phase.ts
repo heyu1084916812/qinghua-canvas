@@ -48,6 +48,12 @@ export function agentPhaseTitle(phase: AgentPhase): string {
   return titles[phase]
 }
 
+/** 阶段没走通时的标题（#1096：搜不到东西不能显示「调研完成」）。 */
+export function agentPhaseFailedTitle(phase: AgentPhase): string {
+  const special: Partial<Record<AgentPhase, string>> = { skillLoaded: '技能没加载上', plan: '交付物没规划好', align: '对齐信息没完成' }
+  return special[phase] ?? agentPhaseTitle(phase).replace(/(完成|结束)$/, '没完成')
+}
+
 /**
  * 阶段进行中的状态文案（G-R4：带参考图发送时先显示「参考素材分析中」，
  * 分析完写入用法后显示「参考素材分析结束」，然后才出回复）。没有进行中文案的阶段返回空。
@@ -66,8 +72,10 @@ export function agentPhaseRunningTitle(phase: AgentPhase): string | undefined {
 export function agentPhaseStepLine(
   phase: AgentPhase,
   label: string,
+  failed = false,
 ): { text: string; collapsedSummary: string } {
-  const title = agentPhaseTitle(phase)
+  /** #1096：工具没成功时不能折叠成「调研完成」——标题与折叠摘要都用失败口径。 */
+  const title = failed ? agentPhaseFailedTitle(phase) : agentPhaseTitle(phase)
   if (label.includes(title) || title.includes(label)) return { text: label, collapsedSummary: label }
   return { text: `${title}：${label}`, collapsedSummary: title }
 }

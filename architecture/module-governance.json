@@ -9386,7 +9386,7 @@
       "test": [
         "src/domain/agent/phase.test.ts"
       ],
-      "budget": 110
+      "budget": 120
     },
     {
       "module": "src/domain/project/referenceLedger.ts",

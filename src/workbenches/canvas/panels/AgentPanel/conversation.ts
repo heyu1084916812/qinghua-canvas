@@ -919,7 +919,7 @@ export function toConversation(
     if (phase) {
       ensureProcess(m).entries.push({
         id: `phase-${m.toolCallId ?? at}`,
-        ...agentPhaseStepLine(phase, toolLabelOf(item.tool, described.failed)),
+        ...agentPhaseStepLine(phase, toolLabelOf(item.tool, described.failed), described.failed),
         phase,
         ...timeOf(m),
       })

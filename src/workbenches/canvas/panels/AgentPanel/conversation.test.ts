@@ -649,6 +649,19 @@ describe('消息 → 对话条目', () => {
     ])
   })
 
+  it('#1096：调研一条都没找到时阶段行与折叠摘要都写「联网调研没完成」，不折叠成「调研完成」', () => {
+    const items = toConversation([
+      { role: 'user', content: '调研一下 2026 年茶饮包装设计趋势' },
+      { role: 'assistant', content: '', toolCalls: [{ id: 'research', name: 'researchDesign', args: '{}' }] },
+      { role: 'tool', toolCallId: 'research', content: JSON.stringify({ ok: false, request: { mode: 'web' }, items: [] }) },
+    ])
+    const process = items.find((item) => item.kind === 'process')
+    expect(process?.entries).toEqual([
+      { id: 'phase-research', text: '联网调研没完成', phase: 'research', collapsedSummary: '联网调研没完成' },
+    ])
+    expect(JSON.stringify(process)).not.toContain('"调研完成"')
+  })
+
   it('★★ 真实参考选择阶段事件进入当前回合过程块，不伪造 assistant 正文', () => {
     const items = toConversation([
       { role: 'user', content: '按项目参考做一张海报' },
