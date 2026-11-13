@@ -20,7 +20,9 @@ import type {
  *    完成后点继续」；用户点继续（或直接关掉那个窗口）就隐藏窗口、重新打开搜索页再提取。
  *    **每个站本次应用运行期间最多提示一次**（2026-11-14 live-run bug 1：Pinterest 没登录过时
  *    不能每次找图都弹）；之后再遇墙直接记 `needs-login` / `blocked` 跳过。
- * 4. 跑完关掉窗口（登录在共用数据目录里，下次仍在）。同一个站同一时刻只跑一份（窗口 id 固定）。
+ * 4. 仍被挡 ⇒ 记 `needs-login` / `blocked`，**不带任何条目**（bug 2：被遮挡的 Pin 图链接只是搜索页，
+ *    不能让这个站算「搜到了」）。
+ * 5. 跑完关掉窗口（登录在共用数据目录里，下次仍在）。同一个站同一时刻只跑一份（窗口 id 固定）。
  */
 const CHALLENGE_WAIT_MS = 4_000
 const CHALLENGE_ROUNDS = 3
@@ -157,11 +159,11 @@ async function runUnlocked(
     })
     return { snapshot: parsed, items, wall }
   }
-  const fail = (status: SiteAdapterOutcome['status'], items: DesignResearchItem[] = []): SiteAdapterOutcome => ({
+  const fail = (status: SiteAdapterOutcome['status']): SiteAdapterOutcome => ({
     ...base,
-    status: items.length > 0 ? 'ok' : status,
-    items,
-    ...(items.length > 0 ? {} : { failureText: siteFailureText(spec.label, status) }),
+    status,
+    items: [],
+    failureText: siteFailureText(spec.label, status),
   })
   const wallStatus = (reading: Reading | null): SiteAdapterOutcome['status'] =>
     reading?.wall.kind === 'login' ? 'needs-login' : 'blocked'
@@ -206,6 +208,5 @@ async function runUnlocked(
     }
     return fail('network')
   }
-  // 被挡住时仍保留已经看到的那几张（Pinterest 未登录时的 gated pin）
-  return fail(wallStatus(last), last?.items ?? [])
+  return fail(wallStatus(last))
 }

@@ -129,7 +129,7 @@ describe('runBrowserSite：Agent 后台浏览器跑一个站', () => {
     expect(outcome.failureText).toContain('人机验证')
   })
 
-  it('Pinterest 未登录被挡、用户取消：保留挡住的那几张作部分结果', async () => {
+  it('Pinterest 未登录被挡、用户取消：needs-login 且不带被遮挡的 Pin 图（不能算「搜到了」）', async () => {
     const gated = snap({
       url: 'https://www.pinterest.com/search/pins/?q=tea',
       images: [{ src: 'https://i.pinimg.com/736x/aa/bb/cc/x.jpg', width: 236, height: 400, alt: 'Pin', link: '', title: '' }],
@@ -137,8 +137,7 @@ describe('runBrowserSite：Agent 后台浏览器跑一个站', () => {
     })
     const { port } = fakePort([gated])
     const outcome = await runBrowserSite(spec('pinterest'), { browser: port, sleep: noSleep, resolveWall: async () => 'cancel' }, request, new AbortController().signal)
-    expect(outcome.status).toBe('ok')
-    expect(outcome.items).toHaveLength(1)
+    expect(outcome).toMatchObject({ status: 'needs-login', items: [] })
   })
 
   it('每个站本次运行只提示一次：点了继续仍被挡 ⇒ 不再弹，下次检索也不弹', async () => {

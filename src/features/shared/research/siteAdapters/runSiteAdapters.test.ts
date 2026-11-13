@@ -147,6 +147,29 @@ describe('runSiteAdapters', () => {
     expect(browserCalls).toEqual(['dribbble:tea:10', 'pinterest:tea:10'])
   })
 
+  it('被验证 / 登录挡住的站即使留了零星条目也不算「搜到了」（bug 2）', async () => {
+    const huaban = fakeAdapter('huaban', '花瓣', ['ok'], 4)
+    const gated: BrowserSiteAdapter = {
+      kind: 'browser',
+      id: 'pinterest',
+      label: 'Pinterest',
+      domain: 'pinterest.test',
+      reason: 'test',
+      search: async () => ({
+        id: 'pinterest',
+        label: 'Pinterest',
+        status: 'needs-login',
+        items: [{ id: 'p', source: 'pinterest', title: 'Pin 图', url: 'https://pinterest.test/search', imageUrl: 'https://img.pinterest.test/p.jpg' }],
+        failureText: 'Pinterest 需要登录',
+      }),
+    }
+    const result = await runSiteAdapters(net(vi.fn()), {
+      queries: ['tea'], imageMaxResults: 8, delayMs: 0, direct: [huaban], browser: [gated], browserContext: { browser: {} as never },
+    }, new AbortController().signal)
+    expect(result.usedSources).toEqual(['花瓣'])
+    expect(result.statuses.find((status) => status.id === 'pinterest')!.status).toBe('needs-login')
+  })
+
   it('一个站在等用户处理登录时，其它站跑完后只宽限一会儿：撤掉提示、先交出花瓣 / 站酷的结果（bug 1）', async () => {
     const huaban = fakeAdapter('huaban', '花瓣', ['ok'], 4)
     let promptSignal: AbortSignal | null = null

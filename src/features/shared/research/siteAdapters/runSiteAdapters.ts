@@ -313,10 +313,8 @@ export async function runSiteAdapters(
   ]
   return {
     items,
-    usedSources: [
-      ...runs.filter((run) => run.items.length > 0).map((run) => run.outcome.label),
-      ...(browserOutcomes ?? []).filter((outcome) => outcome.items.length > 0).map((outcome) => outcome.label),
-    ],
+    // 只有 `ok` 的站算「搜到了」（被验证 / 登录挡住的站即使留了零星条目也不算）
+    usedSources: statuses.filter((status) => status.status === 'ok' && status.itemCount > 0).map((status) => status.label),
     statuses,
     failures: items.length > 0
       ? []
