@@ -129,8 +129,29 @@ describe('工具声明', () => {
     expect(on).toEqual(expect.arrayContaining(['researchDesign', 'readPage']))
   })
 
-  it('问题卡在简单生成 / 参考改图 / 设计调研三档都可用，画布操作档不给', () => {
-    for (const mode of ['simple_generate', 'reference_edit', 'design_research'] as const) {
+  it('★★ 联网开着时，任何请求档位都带搜索 / 读页（用户 2026-11-13：找图被答成「没有搜索工具」）', () => {
+    for (const mode of [
+      'simple_generate',
+      'reference_edit',
+      'design_research',
+      'canvas_operation',
+      'complex_plan',
+    ] as const) {
+      const names = agentToolsForRequestMode(mode, {
+        canvasReview: false,
+        webResearch: true,
+      }).map((tool) => tool.name)
+      expect(names).toEqual(expect.arrayContaining(['researchDesign', 'readPage']))
+    }
+    const off = agentToolsForRequestMode('reference_edit', {
+      canvasReview: false,
+      webResearch: false,
+    }).map((tool) => tool.name)
+    expect(off).not.toContain('researchDesign')
+    expect(off).not.toContain('readPage')
+  })
+
+  it('问题卡在简单生成 / 参考改图 / 设计调研三档都可用，画布操作档不给', () => {    for (const mode of ['simple_generate', 'reference_edit', 'design_research'] as const) {
       expect(agentToolsForRequestMode(mode, { canvasReview: false }).map((t) => t.name)).toContain('askQuestions')
     }
     expect(
@@ -158,8 +179,10 @@ describe('工具声明', () => {
   })
 
   it('★ 按请求档位裁剪工具，简单出图不再拿到全量工具', () => {
+    /* 联网工具由上面那条专门覆盖；这里只钉「档位本身的裁剪」 */
     const simple = agentToolsForRequestMode('simple_generate', {
       canvasReview: false,
+      webResearch: false,
     }).map((tool) => tool.name)
     expect(simple.sort()).toEqual([
       'applyPlan',
@@ -180,6 +203,7 @@ describe('工具声明', () => {
 
     const operation = agentToolsForRequestMode('canvas_operation', {
       canvasReview: false,
+      webResearch: false,
     }).map((tool) => tool.name)
     expect(operation).toContain('moveNodes')
     expect(operation).toContain('rememberMemory')

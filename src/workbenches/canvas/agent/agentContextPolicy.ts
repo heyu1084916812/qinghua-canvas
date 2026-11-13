@@ -37,6 +37,17 @@ const DESIGN_RESEARCH_PATTERN =
 const RESEARCH_SOURCE_PATTERN = /pinterest|behance|pixiv|p站/i
 const RESEARCH_ACTION_PATTERN = /找|收集|看看|调研|参考|灵感|案例|mood\s*board|情绪板/i
 
+/**
+ * 「找 / 搜 / 查」+ 具体对象（图片、素材、参考、灵感……）。
+ *
+ * 上面那条只认「找参考」「搜索」「调研」这类固定说法：用户 2026-11-13 的
+ * 「帮我找一些好看的包装图片」、以及提示词自己举的例子「帮我找包装设计」都没命中，
+ * 于是落到 simple_generate / reference_edit，联网工具随之整组消失。
+ * 画布动作词出现时不抢（「把画布上的图片找出来排成一排」仍是画布操作）。
+ */
+const SEARCH_INTENT_PATTERN =
+  /(?:找|搜|查找|搜罗)[^，。！？；\n]{0,12}?(?:图片|照片|海报|素材|参考|灵感|案例|设计|插画|视觉)/i
+
 const CANVAS_ACTION_PATTERN =
   /移动|挪动|拖到|排列|排成|对齐|布局|整理|缩放|调整大小|改大小|居中|放到|移到|删除(?:节点|连线)|取消连线|新建连线|选中|框选/
 
@@ -95,6 +106,9 @@ export function classifyAgentRequest(signals: AgentRequestSignals): AgentRequest
     return 'complex_plan'
   }
   if (DESIGN_RESEARCH_PATTERN.test(text)) {
+    return 'design_research'
+  }
+  if (SEARCH_INTENT_PATTERN.test(text) && !CANVAS_ACTION_PATTERN.test(text)) {
     return 'design_research'
   }
   if (

@@ -933,7 +933,24 @@ export function agentToolsForRequestMode(
         : mode === 'design_research'
           ? DESIGN_RESEARCH_TOOLS
           : CANVAS_OPERATION_TOOLS
-  const tools = agentToolsForCapabilities(capabilities).filter((tool) => allowed.has(tool.name))
+  const available = agentToolsForCapabilities(capabilities)
+  const tools = available.filter((tool) => allowed.has(tool.name))
+  /**
+   * 联网开着时，**任何模式都保留搜索 / 读页**。
+   *
+   * 分类器只认「找参考 / 设计调研 / 搜索」这类说法：用户 2026-11-13 的
+   * 「帮我找一些好看的包装图片」落到 simple_generate / reference_edit，工具被
+   * mode 过滤掉后，模型查能力索引只能拿到「参考分析」，于是如实回答
+   * 「联网检索工具不在这一轮可调用的能力里」—— 明明开关是开的。
+   * 开关是用户显式给的能力授权，什么时候用由 `WEB_RESEARCH_ON_PROMPT` 约束。
+   */
+  if (capabilities.webResearch !== false) {
+    for (const name of AGENT_WEB_TOOL_NAMES) {
+      if (tools.some((tool) => tool.name === name)) continue
+      const tool = available.find((candidate) => candidate.name === name)
+      if (tool) tools.push(tool)
+    }
+  }
   return tools.some((tool) => tool.name === 'readCapabilities')
     ? tools
     : [

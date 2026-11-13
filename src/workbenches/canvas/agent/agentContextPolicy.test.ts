@@ -140,6 +140,28 @@ describe('Agent request classification', () => {
     )).toEqual({ nodes: [], edges: [] })
   })
 
+  it('★★ 「找图片 / 找设计」也算联网调研，不再落进简单生成或参考改图', () => {
+    /* 用户 2026-11-13：「帮我找一些好看的包装图片」被答成「能力索引里没有搜索工具」 */
+    expect(
+      classifyAgentRequest({ ...noSignals, text: '帮我找一些好看的包装图片' }),
+    ).toBe('design_research')
+    expect(classifyAgentRequest({ ...noSignals, text: '帮我找包装设计' })).toBe(
+      'design_research',
+    )
+    /* 附了参考图也还是「找更多」，不是改图 */
+    expect(
+      classifyAgentRequest({
+        ...noSignals,
+        text: '帮我找一些好看的包装图片',
+        hasMentionedImage: true,
+      }),
+    ).toBe('design_research')
+    /* 画布动作优先：「找一张图片放到画布上」仍是画布操作 */
+    expect(
+      classifyAgentRequest({ ...noSignals, text: '找一张图片放到画布上' }),
+    ).toBe('canvas_operation')
+  })
+
   it('uses selected nodes to resolve a short canvas command', () => {
     expect(
       classifyAgentRequest({

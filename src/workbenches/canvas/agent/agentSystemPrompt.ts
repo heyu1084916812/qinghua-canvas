@@ -560,7 +560,7 @@ export function buildLightAgentSystemPrompt(
     mode === 'reference_edit'
       ? '本次按参考改图处理：只使用被引用节点及其必要上游。'
       : mode === 'design_research'
-        ? '本次按联网调研处理：先收集 Openverse、Wikipedia 与公开来源，不扫描无关画布内容。'
+        ? '本次按联网调研处理：先收集公开来源的设计参考（免 Key 搜索 + 本地灵感库），不扫描无关画布内容。'
       : '本次按简单生成处理：不加载无关画布内容。'
   return [
     LIGHT_IDENTITY_AND_RULES,
