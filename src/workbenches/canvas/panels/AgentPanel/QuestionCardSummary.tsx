@@ -1,28 +1,12 @@
 import { useState } from 'react'
 import type { QuestionCardAnswerSummary } from '../../../../domain/agent/questionCardReply'
 import { IconChevronRight } from '../../toolbar/icons'
+import { CircleHelp, Icon } from '../../../../ui/icon'
 import styles from './QuestionCardSummary.module.css'
 
-/** 头部 / 摘要里的「?」图标（圆角方框问号，与 Lovart 提问卡一致）。 */
+/** 头部 / 摘要里的「?」图标（第 5 批起几何来自 Lucide）。 */
 export function QuestionHelpIcon() {
-  return (
-    <svg
-      className={styles.headIcon}
-      width="14"
-      height="14"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.8"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <rect x="3.5" y="3.5" width="17" height="17" rx="4" />
-      <path d="M9.6 9.4a2.5 2.5 0 0 1 4.8.9c0 1.6-2.4 2-2.4 3.4" />
-      <path d="M12 16.9h.01" />
-    </svg>
-  )
+  return <Icon className={styles.headIcon} icon={CircleHelp} size="sm" />
 }
 
 /**

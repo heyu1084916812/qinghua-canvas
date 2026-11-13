@@ -394,7 +394,7 @@ export function AgentConversationPane({
                   }
                 >
                   <span className={styles.stepIcon} aria-hidden="true">
-                    <AgentStepIcon tool={item.tool} size={16} />
+                    <AgentStepIcon tool={item.tool} size="md" />
                   </span>
                   <span className={styles.stepLabel}>{item.label}</span>
                   {hasDetail && (

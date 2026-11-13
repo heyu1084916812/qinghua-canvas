@@ -2,6 +2,7 @@ import { forwardRef, useEffect, useImperativeHandle, useRef } from 'react'
 import styles from './MentionEditor.module.css'
 import { readEditorText } from './TokenEditor'
 import { presetGlyphSvg } from '../icons/presetGlyph'
+import { BookOpen, Box, Copy, FileText, Image, iconSvgString } from '../../../ui/icon'
 
 /**
  * 带「@ 引用芯片」的输入框（用户 2026-10-02：参考产品图三 / 图四 ——
@@ -40,24 +41,21 @@ import { presetGlyphSvg } from '../icons/presetGlyph'
  */
 export const MENTION_SPLIT_RE = /(@\[[^\]]*\]\((?:node|model|skill|preset|reference|kit):[^)]*\))/g
 
-/** chip 里那个小图标：节点 = 一张图，模型 = 立体方块，技能 = 魔杖（与工具栏同义） */
+/**
+ * chip 里那个小图标（第 5 批起几何来自 Lucide）。
+ *
+ * chip 是命令式 DOM，吃不了 React 元素，所以用 `iconSvgString` 拿字符串形态 ——
+ * 与 `<Icon>` 同一份几何、同一条屏幕线宽，不再手抄 path。
+ * 预设仍走 `presetGlyph`（方案 §5：用户指定形状，保留原样）。
+ */
 export const MENTION_ICON: Record<MentionKind, string> = {
-  node: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/><circle cx="9" cy="10" r="1.4"/><path d="m4.5 17 4.5-4.5 3.4 3.4 3-3 4.1 4.1"/></svg>',
-  model:
-    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.2 20.2 7.6v8.8L12 20.8 3.8 16.4V7.6z"/><path d="M3.8 7.6 12 12l8.2-4.4"/><path d="M12 12v8.8"/></svg>',
-  skill:
-    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3.7 5.2c2.9-.8 5.5.1 8.3 2v12c-2.8-1.9-5.4-2.8-8.3-2Z"/><path d="M20.3 5.2c-2.9-.8-5.5.1-8.3 2v12c2.8-1.9 5.4-2.8 8.3-2Z"/><path d="M12 7.2v12"/></svg>',
-  reference:
-    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4.5" y="3.5" width="15" height="17" rx="2.5"/><path d="M8 8h8M8 12h8M8 16h5"/></svg>',
-  /**
-   * 预设：**与参数行那枚按钮同一个图形**（四个圆角方块、右上转 45°）。
-   *
-   * 不再在这里另写一份路径：几何在 `../icons/presetGlyph` 定义一次，
-   * 这里拿字符串形态（命令式建 DOM 吃不了 React 元素）。改形状只改那一个文件。
-   */
+  node: iconSvgString(Image, 'sm'),
+  model: iconSvgString(Box, 'sm'),
+  skill: iconSvgString(BookOpen, 'sm'),
+  reference: iconSvgString(FileText, 'sm'),
   preset: presetGlyphSvg(),
-  /** 套件（2026-11-12）：叠放的两张卡 + 色点，表示「一整套品牌 / 产品规范」。 */
-  kit: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="6.5" width="13" height="13" rx="2.5"/><path d="M7.5 6.5V5a1.5 1.5 0 0 1 1.5-1.5h10A1.5 1.5 0 0 1 20.5 5v10a1.5 1.5 0 0 1-1.5 1.5h-2.5"/><circle cx="10" cy="13" r="2.2"/></svg>',
+  /** 套件（2026-11-12）：叠放的两张卡，表示「一整套品牌 / 产品规范」。 */
+  kit: iconSvgString(Copy, 'sm'),
 }
 
 export type MentionKind = 'node' | 'model' | 'skill' | 'preset' | 'reference' | 'kit'
