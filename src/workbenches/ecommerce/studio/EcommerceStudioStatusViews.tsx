@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { EcommerceGenerationStage } from '../../../domain/ecommerce/progress'
 import type { EcommerceResultItem } from './studioContracts'
+import { CircleAlert, Icon } from '../../../ui/icon'
 import { styles } from './studioStyles'
 
 export function ResultStatusOverlay({ item }: { item: EcommerceResultItem }) {
@@ -28,21 +29,7 @@ export function ResultStatusOverlay({ item }: { item: EcommerceResultItem }) {
         role="alert"
       >
         <span className={styles.resultFailure}>
-          <svg
-            width="24"
-            height="24"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.7"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            aria-hidden="true"
-          >
-            <circle cx="12" cy="12" r="9" />
-            <path d="M12 7.5v5.5" />
-            <path d="M12 16.8h.01" />
-          </svg>
+          <Icon icon={CircleAlert} px={24} />
           <span className={styles.resultFailureTitle}>
             {retrySave ? '已生成，待保存' : '生成失败'}
           </span>

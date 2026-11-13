@@ -9,53 +9,51 @@ import {
   useAssetMeta,
   useAssetPreview,
 } from '../../features/shared/assets/index'
+import {
+  Bookmark,
+  Download,
+  FileText,
+  Hand,
+  Icon,
+  MousePointer2,
+  Redo2,
+  RefreshCw,
+  RotateCw,
+  Type,
+  Undo2,
+  Upload,
+  X,
+} from '../../ui/icon'
 import styles from './EcommerceWorkbench.module.css'
 
 export type WorkbenchTool = 'select' | 'hand'
 
 export function ToolIcon({ name }: { name: WorkbenchTool | 'upload' | 'text' | 'undo' | 'redo' | 'log' | 'close' | 'download' | 'rotate' | 'save' | 'retry' }) {
-  const common = {
-    width: 17,
-    height: 17,
-    viewBox: '0 0 24 24',
-    fill: 'none',
-    stroke: 'currentColor',
-    strokeWidth: 1.8,
-    strokeLinecap: 'round' as const,
-    strokeLinejoin: 'round' as const,
-    'aria-hidden': true,
-  }
-  if (name === 'select') {
-    return <svg {...common}><path d="m5 3 11 8-5.2 1.3L8 18Z" /><path d="m12.5 14 3.2 5" /></svg>
-  }
-  if (name === 'hand') {
-    return <svg {...common}><path d="M7 11V6.5a1.5 1.5 0 0 1 3 0V11" /><path d="M10 10V5.5a1.5 1.5 0 0 1 3 0V11" /><path d="M13 10V7a1.5 1.5 0 0 1 3 0v4" /><path d="M16 11V9a1.5 1.5 0 0 1 3 0v5a6 6 0 0 1-6 6h-1.2a5 5 0 0 1-3.3-1.2L5 15.5a1.6 1.6 0 0 1 2.2-2.3L9 15" /></svg>
-  }
-  if (name === 'upload') {
-    return <svg {...common}><path d="M12 16V4" /><path d="m7.5 8.5 4.5-4.5 4.5 4.5" /><path d="M4 15v4a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-4" /></svg>
-  }
-  if (name === 'text') {
-    return <svg {...common}><path d="M5 5h14" /><path d="M12 5v14" /><path d="M8 19h8" /></svg>
-  }
-  if (name === 'undo' || name === 'redo') {
-    return <svg {...common}><path d={name === 'undo' ? 'M9 7 4 12l5 5' : 'm15 7 5 5-5 5'} /><path d={name === 'undo' ? 'M4 12h9a6 6 0 0 1 6 6' : 'M20 12h-9a6 6 0 0 0-6 6'} /></svg>
-  }
-  if (name === 'log') {
-    return <svg {...common}><path d="M5 4h14v16H5z" /><path d="M8 8h8M8 12h8M8 16h5" /></svg>
-  }
-  if (name === 'close') {
-    return <svg {...common}><path d="m6 6 12 12M18 6 6 18" /></svg>
-  }
-  if (name === 'download') {
-    return <svg {...common}><path d="M12 4v11" /><path d="m7.5 10.5 4.5 4.5 4.5-4.5" /><path d="M5 19h14" /></svg>
-  }
-  if (name === 'rotate') {
-    return <svg {...common}><path d="M20 11a8 8 0 1 0-2.4 5.7" /><path d="M20 5v6h-6" /></svg>
-  }
-  if (name === 'retry') {
-    return <svg {...common}><path d="M20 11a8 8 0 1 0-2.4 5.7" /><path d="M20 5v6h-6" /></svg>
-  }
-  return <svg {...common}><path d="M5 4h14v16l-7-3-7 3z" /></svg>
+  const glyph =
+    name === 'select'
+      ? MousePointer2
+      : name === 'hand'
+        ? Hand
+        : name === 'upload'
+          ? Upload
+          : name === 'text'
+            ? Type
+            : name === 'undo'
+              ? Undo2
+              : name === 'redo'
+                ? Redo2
+                : name === 'log'
+                  ? FileText
+                  : name === 'close'
+                    ? X
+                    : name === 'download'
+                      ? Download
+                      : name === 'rotate'
+                        ? RotateCw
+                        : name === 'retry'
+                          ? RefreshCw
+                          : Bookmark
+  return <Icon icon={glyph} px={17} />
 }
 
 type WorkbenchMediaSource = 'preview' | 'original'

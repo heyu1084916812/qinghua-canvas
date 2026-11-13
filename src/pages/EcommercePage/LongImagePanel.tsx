@@ -3,6 +3,7 @@ import { usePlatform } from '../../app/providers/PlatformProvider'
 import type { EcommerceLongImageTools } from '../../workbenches/ecommerce/EcommerceStudio'
 import { loadAssetUrl } from '../../features/shared/assets/index'
 import { addTile, moveTile, planLongImage, removeTile } from '../../domain/ecommerce/longImage'
+import { ArrowDown, ArrowUp, Icon, Pencil, X } from '../../ui/icon'
 import styles from './LongImagePanel.module.css'
 
 /**
@@ -347,37 +348,17 @@ export function LongImagePanel({
  * 按钮的语义落在 `aria-label` + `title` 上，图标本身 `aria-hidden`。
  */
 function IconArrowUp() {
-  return (
-    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M12 19V5" />
-      <path d="M6 11l6-6 6 6" />
-    </svg>
-  )
+  return <Icon icon={ArrowUp} size="md" />
 }
 
 function IconArrowDown() {
-  return (
-    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M12 5v14" />
-      <path d="M18 13l-6 6-6-6" />
-    </svg>
-  )
+  return <Icon icon={ArrowDown} size="md" />
 }
 
 function IconCross() {
-  return (
-    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M6 6l12 12" />
-      <path d="M18 6L6 18" />
-    </svg>
-  )
+  return <Icon icon={X} size="md" />
 }
 
 function IconEdit() {
-  return (
-    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M12 20h9" />
-      <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" />
-    </svg>
-  )
+  return <Icon icon={Pencil} size="md" />
 }

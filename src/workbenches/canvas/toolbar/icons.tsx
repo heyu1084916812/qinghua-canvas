@@ -13,7 +13,7 @@
  *   - `viewBox` 一律 24×24、`strokeLinecap/Join = round`，保证视觉重量一致。
  */
 import type { ReactNode, SVGProps } from 'react'
-import { ArrowUp, AtSign, Bold, BookOpen, Box, Check, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Columns2, Columns3, Combine, Copy, CornerUpRight, Crop, Download, Ellipsis, FlipHorizontal2, FlipVertical2, Globe, Grid3x3, Hand, Heading1, Heading2, Heading3, Icon, Image, Images, Italic, Layers, Lightbulb, Link, List, ListOrdered, LoaderCircle, Maximize2, MessageCircle, Minimize2, Minus, Palette, Pause, PenLine, Pencil, Pilcrow, Play, Plus, Power, Redo2, RefreshCw, Repeat2, RotateCcw, RotateCw, Rows3, Scan, Settings, SlidersHorizontal, Smile, Square, SquareDashed, Trash2, Type, Undo2, Ungroup, Upload, WandSparkles, Workflow, X, ZoomIn } from '../../../ui/icon'
+import { ArrowUp, AtSign, Bold, BookOpen, Box, Check, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Columns2, Columns3, Combine, Copy, CornerUpRight, Crop, Download, Ellipsis, FlipHorizontal2, FlipVertical2, Globe, Grid3x3, Hand, Heading1, Heading2, Heading3, Icon, Image, Images, Italic, Layers, Lightbulb, Link, List, ListOrdered, LoaderCircle, Maximize2, MessageCircle, Minimize2, Minus, Palette, Pause, PenLine, Pencil, Pilcrow, Play, Plus, Power, Redo2, RefreshCw, Repeat2, RotateCcw, RotateCw, Rows3, Scan, Settings, SlidersHorizontal, Smile, Square, SquareDashed, Star, Trash2, Type, Undo2, Ungroup, Upload, WandSparkles, Workflow, X, ZoomIn } from '../../../ui/icon'
 
 import {
   PRESET_GLYPH_STROKE_WIDTH,
@@ -433,12 +433,8 @@ export function IconMention({ size = 16, ...props }: IconProps) {
  * 星标（收藏用）。`filled` = 已收藏 —— 同一个形状两种填充，
  * 比「实心星 / 空心星」画两遍更不容易走样。
  */
-export function IconStar({ filled = false, ...props }: IconProps & { filled?: boolean }) {
-  return (
-    <Svg {...props} fill={filled ? 'currentColor' : 'none'}>
-      <path d="M12 3.6l2.6 5.3 5.8.8-4.2 4.1 1 5.8-5.2-2.7-5.2 2.7 1-5.8L3.6 9.7l5.8-.8z" />
-    </Svg>
-  )
+export function IconStar({ filled = false, size = 16, ...props }: IconProps & { filled?: boolean }) {
+  return <Icon icon={Star} px={size} fill={filled ? 'currentColor' : 'none'} {...props} />
 }
 
 /**

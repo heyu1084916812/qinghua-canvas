@@ -11,6 +11,7 @@ import {
   whiteBgCountsOf,
 } from '../../../domain/ecommerce/modeOptions'
 import { ColorPickerPopover } from '../../../features/shared/colorPicker/ColorPickerPopover'
+import { Check, Icon } from '../../../ui/icon'
 import { styles } from './studioStyles'
 import { OptionCheck, OptionContent } from './studioSharedViews'
 
@@ -102,19 +103,7 @@ export function ProductModeParameters({
                     onClick={() => toggleSetCount(item.id)}
                   >
                     {count > 0 ? (
-                      <svg
-                        width="12"
-                        height="12"
-                        viewBox="0 0 16 16"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        aria-hidden="true"
-                      >
-                        <path d="m3.2 8.2 3.1 3.1 6.5-6.6" />
-                      </svg>
+                      <Icon icon={Check} px={12} />
                     ) : null}
                   </button>
                   <span className={styles.setCountBody}>
@@ -282,19 +271,7 @@ export function ProductModeParameters({
                   onClick={() => setCount(item.id, count > 0 ? 0 : 1)}
                 >
                   {count > 0 ? (
-                    <svg
-                      width="12"
-                      height="12"
-                      viewBox="0 0 16 16"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      aria-hidden="true"
-                    >
-                      <path d="m3.2 8.2 3.1 3.1 6.5-6.6" />
-                    </svg>
+                    <Icon icon={Check} px={12} />
                   ) : null}
                 </button>
                 <span className={styles.setCountBody}>

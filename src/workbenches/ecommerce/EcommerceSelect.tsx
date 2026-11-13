@@ -9,6 +9,7 @@ import {
   type ReactNode,
 } from 'react'
 import { createPortal } from 'react-dom'
+import { Check, ChevronDown, Icon } from '../../ui/icon'
 import styles from './EcommerceSelect.module.css'
 
 export interface EcommerceSelectOption {
@@ -245,20 +246,7 @@ export function EcommerceSelect({
               {option.icon ? <span className={styles.optionIcon}>{option.icon}</span> : null}
               <span className={styles.optionLabel}>{option.label}</span>
               {selected ? (
-                <svg
-                  className={styles.check}
-                  width="16"
-                  height="16"
-                  viewBox="0 0 16 16"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.8"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  aria-hidden="true"
-                >
-                  <path d="m3.2 8.2 3.1 3.1 6.5-6.6" />
-                </svg>
+                <Icon icon={Check} px={16} className={styles.check} />
               ) : null}
             </button>
           )
@@ -291,20 +279,7 @@ export function EcommerceSelect({
       >
         {current?.icon ? <span className={styles.currentIcon}>{current.icon}</span> : null}
         <span className={styles.currentLabel}>{current?.label ?? placeholder}</span>
-        <svg
-          className={styles.chevron}
-          width="14"
-          height="14"
-          viewBox="0 0 16 16"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="1.7"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          aria-hidden="true"
-        >
-          <path d="m4 6 4 4 4-4" />
-        </svg>
+        <Icon icon={ChevronDown} px={14} className={styles.chevron} />
       </button>
       {menu && typeof document !== 'undefined' ? createPortal(menu, document.body) : null}
     </span>
