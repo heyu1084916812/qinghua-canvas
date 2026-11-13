@@ -11,6 +11,10 @@ export type ResearchProvider =
   | 'searxng'
   | 'tavily'
   | 'bing'
+  /** 花瓣直连适配器（#1076 方案 D）。 */
+  | 'huaban'
+  /** 站酷直连适配器（#1076 方案 D）。 */
+  | 'zcool'
   | 'web'
 
 export type ResearchMode = 'image' | 'web' | 'mixed'
@@ -145,10 +149,14 @@ const PROVIDER_TITLES: Record<ResearchProvider, string> = {
   searxng: 'SearXNG',
   tavily: 'Tavily 网页搜索',
   bing: 'Bing 免 Key 搜索',
+  huaban: '花瓣',
+  zcool: '站酷',
   web: 'Other references',
 }
 
 const PROVIDER_ORDER: readonly ResearchProvider[] = [
+  'huaban',
+  'zcool',
   'bing',
   'tavily',
   'pinterest',

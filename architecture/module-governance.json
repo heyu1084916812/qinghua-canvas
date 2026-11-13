@@ -8727,6 +8727,168 @@
       "budget": 110
     },
     {
+      "module": "src/features/shared/research/siteAdapters/types.ts",
+      "owner": "open-research-search",
+      "responsibility": "声明设计站点适配器契约：直连适配器与只能走浏览器的适配器两种形态，以及每站检索状态与结果结构。",
+      "owns": [
+        "直连 / 浏览器两类适配器接口",
+        "站点检索状态枚举（含 needs-browser）",
+        "单站检索请求与结果结构"
+      ],
+      "doesNotOwn": [
+        "具体站点的请求与解析",
+        "多站调度与合并",
+        "Tavily 或 Bing 回退"
+      ],
+      "publicApi": [
+        "SiteAdapterId",
+        "SiteAdapterStatus",
+        "SiteAdapterOutcome",
+        "SiteSearchRequest",
+        "DirectSiteAdapter",
+        "BrowserSiteAdapter",
+        "SiteAdapter"
+      ],
+      "test": [
+        "src/features/shared/research/siteAdapters/runSiteAdapters.test.ts"
+      ],
+      "budget": 90
+    },
+    {
+      "module": "src/features/shared/research/siteAdapters/siteFetch.ts",
+      "owner": "open-research-search",
+      "responsibility": "站点适配器共用的公开网络抓取：publicOnly 原生请求、浏览器请求头、失败归类与面向用户的失败文案。",
+      "owns": [
+        "适配器请求头与超时、字节上限",
+        "限流 / 仅桌面可用 / 网络失败归类",
+        "站点失败文案与标题清洗"
+      ],
+      "doesNotOwn": [
+        "站点结构解析",
+        "多站调度",
+        "调研报告排序"
+      ],
+      "publicApi": [
+        "SITE_BROWSER_HEADERS",
+        "SiteFetchFailure",
+        "SiteFetchError",
+        "siteFetchFailureOf",
+        "siteFailureText",
+        "fetchSiteText",
+        "plainTitle"
+      ],
+      "test": [
+        "src/features/shared/research/siteAdapters/huabanAdapter.test.ts"
+      ],
+      "budget": 100
+    },
+    {
+      "module": "src/features/shared/research/siteAdapters/huabanAdapter.ts",
+      "owner": "open-research-search",
+      "responsibility": "花瓣直连适配器：调用免 Key 的 v3 搜索接口，把采集投影为调研图片候选，主图用免签名缩略图并保留原图与签名地址备用。",
+      "owns": [
+        "花瓣搜索接口 URL 与分页上限",
+        "采集 JSON 解析与文件 key 安全校验",
+        "花瓣图址选择（免签名缩略图优先）"
+      ],
+      "doesNotOwn": [
+        "多站调度与合并",
+        "候选保存",
+        "画廊展示"
+      ],
+      "publicApi": [
+        "HUABAN_SEARCH_ENDPOINT",
+        "HUABAN_IMAGE_HOST",
+        "huabanSearchUrl",
+        "HuabanParseResult",
+        "parseHuabanSearch",
+        "huabanAdapter"
+      ],
+      "test": [
+        "src/features/shared/research/siteAdapters/huabanAdapter.test.ts"
+      ],
+      "budget": 130
+    },
+    {
+      "module": "src/features/shared/research/siteAdapters/zcoolAdapter.ts",
+      "owner": "open-research-search",
+      "responsibility": "站酷直连适配器：抓取搜索结果页，优先解析页面内 RSC 的作品列表，认不出时退回卡片 HTML，投影为调研图片候选。",
+      "owns": [
+        "站酷搜索页 URL",
+        "RSC 负载拼接与 initialItems 截取",
+        "作品筛选、封面与作品页校验",
+        "卡片 HTML 兜底解析"
+      ],
+      "doesNotOwn": [
+        "多站调度与合并",
+        "候选保存",
+        "画廊展示"
+      ],
+      "publicApi": [
+        "ZCOOL_SEARCH_ENDPOINT",
+        "zcoolSearchUrl",
+        "zcoolRscText",
+        "zcoolInitialItems",
+        "zcoolCardItems",
+        "ZcoolParseResult",
+        "parseZcoolSearch",
+        "zcoolAdapter"
+      ],
+      "test": [
+        "src/features/shared/research/siteAdapters/zcoolAdapter.test.ts"
+      ],
+      "budget": 200
+    },
+    {
+      "module": "src/features/shared/research/siteAdapters/browserSiteAdapters.ts",
+      "owner": "open-research-search",
+      "responsibility": "登记只能在真实浏览器里检索的设计站（Dribbble、The Dieline、Packaging of the World、Pinterest）及实测原因，供调度层如实标记 needs-browser。",
+      "owns": [
+        "浏览器专用站点清单",
+        "每站不能直连的实测原因"
+      ],
+      "doesNotOwn": [
+        "隐藏 webview 抓取实现",
+        "直连站点",
+        "调研报告"
+      ],
+      "publicApi": [
+        "BROWSER_SITE_ADAPTERS"
+      ],
+      "test": [
+        "src/features/shared/research/siteAdapters/runSiteAdapters.test.ts"
+      ],
+      "budget": 60
+    },
+    {
+      "module": "src/features/shared/research/siteAdapters/runSiteAdapters.ts",
+      "owner": "open-research-search",
+      "responsibility": "并发调度设计站点适配器：各站按检索角度顺序请求、够数即停、硬失败即停，轮转合并结果并汇报实际使用的站点与各站状态。",
+      "owns": [
+        "直连站点默认清单与请求间隔",
+        "每站目标数与停止条件",
+        "结果轮转合并与去重",
+        "usedSources 与站点状态汇总"
+      ],
+      "doesNotOwn": [
+        "单站请求与解析",
+        "Tavily / 开放来源回退",
+        "调研报告排序"
+      ],
+      "publicApi": [
+        "DIRECT_SITE_ADAPTERS",
+        "SITE_ADAPTER_DELAY_MS",
+        "SiteAdapterRunInput",
+        "SiteAdapterRunStatus",
+        "SiteAdapterRunResult",
+        "runSiteAdapters"
+      ],
+      "test": [
+        "src/features/shared/research/siteAdapters/runSiteAdapters.test.ts"
+      ],
+      "budget": 190
+    },
+    {
       "module": "src/features/shared/research/webPageReader.ts",
       "owner": "open-research-search",
       "responsibility": "经 Jina Reader 读取公开网页正文；Jina 失败、限流或无正文时经桌面壳直读原网页兜底，统一截断，登录墙、验证码、非 2xx 如实失败并给出退路。",

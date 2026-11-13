@@ -81,6 +81,20 @@ describe('agent research reference', () => {
       source: 'Art Institute',
     }).source).toBe('artic')
     expect(researchItemOf({
+      id: 'huaban:0:1',
+      title: '独立包装',
+      url: 'https://huaban.com/pins/1',
+      imageUrl: 'https://gd-hbimg.huaban.com/abcdefgh12345678_fw658webp',
+      source: '花瓣',
+    }).source).toBe('huaban')
+    expect(researchItemOf({
+      id: 'zcool:0:1',
+      title: '品牌包装',
+      url: 'https://www.zcool.com.cn/work/a.html',
+      imageUrl: 'https://img.zcool.cn/community/a.jpg',
+      source: 'zcool',
+    }).source).toBe('zcool')
+    expect(researchItemOf({
       id: 'cleveland:1',
       title: 'Cleveland poster',
       url: 'https://clevelandart.org/art/1',

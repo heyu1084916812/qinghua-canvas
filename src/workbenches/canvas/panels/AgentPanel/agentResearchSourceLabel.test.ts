@@ -10,6 +10,8 @@ describe('agentResearchSourceLabel', () => {
     expect(agentResearchSourceLabel('openverse')).toBe('Openverse')
     expect(agentResearchSourceLabel('wikipedia')).toBe('Wikipedia')
     expect(agentResearchSourceLabel('bing')).toBe('Bing')
+    expect(agentResearchSourceLabel('huaban')).toBe('花瓣')
+    expect(agentResearchSourceLabel('zcool')).toBe('站酷')
   })
 
   it('keeps unknown sources unchanged instead of inventing a provider', () => {
