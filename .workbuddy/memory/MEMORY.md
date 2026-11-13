@@ -12955,3 +12955,10 @@ unLogFastPage.ts 和 canvasLogQuery.ts，组件只负责状态、订阅和渲染
 - **输入框挂两行图片 chip 会溢出**：`.composer` 高度是固定变量（默认 104px），chip 行最高 62px + 正文保底 44px 装不下；有勾选图时用 `data-agent-research-staged` 把最小高度提到 174px。看几何要量面板 body 的 `scrollHeight`，肉眼只看到发送行被切。
 - `useAgentAttachmentsController.test.ts` 的 `render().update(next)` 以前**不会把新 props 传进 hook**（Probe 只读闭包），已改成读传入的 props；写「切会话」类用例时别再假设旧行为。
 - 沙箱 8G 内存：**vitest 四分片不能并行**（OOM，exit 137），也别和 `npm run check` / `vite build` / 开着的 dev 服务器同时跑；串行 `--shard=i/4 --maxWorkers=2` 用 `setsid nohup` 挂后台再轮询。
+
+## 2026-11-14 调研图片存参考 / 下载（#1097 / #1098）
+
+- 素材标签上限 `MAX_TAG_LEN = 16`：`saveResearchItem.sourceTag` 新增来源必须 ≤16 字（「Packaging of the World」被截断 ⇒ 标签回读校验失败 ⇒ 整张图回滚、退成文字参考）。回读现按 `normalizeTag` 比对。
+- 调研「下载」先走 `network.request publicOnly`（桌面 Rust reqwest，无 UA / Referer、不受 CORS），BP&O、Lovely Package 图床不给 ACAO，WebView fetch 读不到。
+- harness 验证存参考 / 下载：web 平台 `publicOnly` 无壳时失败关闭；要装 `remoteBytes.request`（Playwright `exposeFunction` + curl 仿 reqwest）才能走同一条 viaShell 路径。脚本 `work/more-sites/save-place.mjs`、`download-check.mjs`。
+- `pkill -f <pattern>` 会匹配到执行它的 bash 命令行而把自己杀掉：用 `pkill -x qinghua-store` 或单独一条命令。
