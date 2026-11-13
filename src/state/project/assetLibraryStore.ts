@@ -218,6 +218,40 @@ function tagRowsOf(state: Pick<AssetLibraryState, 'assets' | 'history'>): { tags
 }
 
 /**
+ * 点标签时该停在哪个页签。
+ *
+ * 标签栏的计数取「收藏 ∪ 已加载历史」，而列表只筛**当前这一页**：只在收藏里的标签
+ * （联网调研保存的参考图就是这样 —— 它们没有生成记录）在「生成历史」页点开只会是
+ * 一片空白（用户 2026-11-13 报「生成历史右边完全不出现图片」）。
+ *
+ * 口径：**两边都有命中时不替你切页签**（对账 #303 的原意），只有当前页签注定为空、
+ * 另一页签有命中时才切过去 —— 与「模型生成分组」那条同一个取舍，只是方向对称。
+ */
+function quickForTag(
+  state: Pick<AssetLibraryState, 'assets' | 'history' | 'query' | 'filter' | 'quick' | 'model' | 'now'>,
+  tag: string,
+): QuickFilter {
+  const historyMatches = filterHistory(state.history, {
+    query: state.query,
+    kind: state.filter,
+    quick: 'all',
+    model: state.model,
+    tag,
+    now: state.now,
+  }).length
+  const libraryMatches = filterLibraryAssets(
+    state.assets,
+    state.query,
+    state.filter === 'audio' ? 'other' : state.filter,
+    tag,
+  ).length
+  if (state.quick === 'saved') {
+    return libraryMatches === 0 && historyMatches > 0 ? 'all' : state.quick
+  }
+  return historyMatches === 0 && libraryMatches > 0 ? 'saved' : state.quick
+}
+
+/**
  * 素材页 store：**收藏库 + 全部生成历史**两张列表共用一套筛选。
  *
  * 第二个仓储（历史）是可选的：老调用点（AgentPanel 保存素材）只关心收藏，
@@ -351,7 +385,10 @@ export function createAssetLibraryStore(
   }
 
   const setTag: AssetLibraryActions['setTag'] = (tag) => {
-    store.setState((s) => ({ tag, ...derive({ ...s, tag }) }))
+    store.setState((s) => {
+      const quick = tag ? quickForTag(s, tag) : s.quick
+      return { tag, quick, ...derive({ ...s, tag, quick }) }
+    })
   }
 
   const setTags: AssetLibraryActions['setTags'] = async (hash, tags) => {

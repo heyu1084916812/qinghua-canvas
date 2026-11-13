@@ -32,7 +32,7 @@ export function AgentWebResearchToggle() {
       data-agent-web-toggle={enabled ? 'on' : 'off'}
       onClick={() => setAgentWebResearch(!enabled)}
     >
-      <IconGlobe size={14} />
+      <IconGlobe size={16} />
       <span>联网</span>
     </button>
   )

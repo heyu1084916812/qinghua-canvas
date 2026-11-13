@@ -12922,3 +12922,10 @@ unLogFastPage.ts 和 canvasLogQuery.ts，组件只负责状态、订阅和渲染
 - pdfjs 资源文件被 Vite 加哈希，不能给 `cMapUrl` 目录前缀；用自定义 `BinaryDataFactory`（`fetch({ kind, filename })`）按文件名映射到 glob 出的 URL，并设 `useWorkerFetch: false`。<4KB 的 bcmap 会被内联成 `data:`，依赖 CSP `connect-src data:`（已有）。
 - pdfjs v5 已无 eval / `new Function`，`isEvalSupported` 选项不存在（tsc 会报）；现有 Tauri CSP 不用改。验证法：`vite build` 一个只引 `kitPdfImport` 的探针页，用 node http 服务把 tauri.conf 的 CSP 作为**响应头**下发，Chromium 监听 `securitypolicyviolation`（0 条）。
 - dev 模式首次引入 pdfjs 会触发依赖预构建并整页 reload，截图脚本第一张可能超时，重跑即可。
+
+## 2026-11-13 Agent 输入框图标 / 生成历史空列表
+
+- **26px 方形图标按钮必须显式 `padding: 0`**：`<button>` 的 UA 内边距（Chrome `1px 6px`）会把内容区压成 14px，16px 的 SVG 被 flex 横向压成 14×16，绘制等比缩到 14×14。`GenerationNodeView.assetMenuTrigger` 与 `AgentPanel.iconBtn` 都踩过同一个坑；新增固定尺寸图标按钮时先量 DOM（`getComputedStyle(svg).width` 应为声明的 px）。
+- 同一行内的图标尺寸不能混：Agent 输入框那一行原先混着 14 / 16 两档，视觉上「＋ / 技能」明显小一圈。统一到 16（`IconChat` / `IconGlobe` 也从 14 改 16）。
+- **生成历史的标签栏计数取「收藏 ∪ 已加载历史」，列表只筛当前页签**：调研保存的参考图只有收藏关系、没有 `runRecords`，`buildHistory` 不会生成对应条目 ⇒ 在「生成历史」点这类标签必然是 0 条。`assetLibraryStore.setTag` 现在会在「当前页签注定为空、另一页签有命中」时切过去；两边都有命中时仍不切（对账 #303 原意）。
+- 复现/取证脚本放在 `.playwright-verify/bug-probe/`（gitignored）：`capture.mjs` + `after.mjs`，四组视口×主题，用系统 Chrome（`chromium.launch({ channel: 'chrome' })`），本机 Playwright 自带的 chromium 版本不匹配。

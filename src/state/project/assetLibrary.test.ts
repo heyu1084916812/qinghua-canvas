@@ -408,4 +408,83 @@ describe('素材标签', () => {
       'h1',
     ])
   })
+
+  it('★★★ 只在收藏里的标签：在生成历史页点它 ⇒ 自动切到收藏内容（否则一片空白）', async () => {
+    /* 联网调研保存的参考图就是这样：只有收藏关系，没有任何生成记录 */
+    const { storage, repo } = seedStorage({
+      assets: [{ id: 'i1', hash: 'i1', mime: 'image/png', bytes: 5 }],
+      assetLibrary: [{ id: 'i1', hash: 'i1', mime: 'image/png', bytes: 5, savedAt: 20 }],
+    })
+    const store = createAssetLibraryStore(repo, createAssetHistoryRepository(storage))
+    await store.load()
+    await store.setTags('i1', ['设计调研'])
+    expect(store.getState().quick).toBe('all')
+
+    store.setTag('设计调研')
+    const state = store.getState()
+    expect(state.quick).toBe('saved')
+    expect(state.visible.map((asset) => asset.hash)).toEqual(['i1'])
+    expect(state.historyVisible).toHaveLength(0)
+  })
+
+  it('★★★ 只在历史里的标签：在收藏内容页点它 ⇒ 切回全部历史', async () => {
+    const { storage, repo } = seedStorage({
+      assets: [{ id: 'h1', hash: 'h1', mime: 'image/png', bytes: 5 }],
+      runRecords: [
+        {
+          id: 'r3',
+          nodeId: 'n3',
+          projectId: 'p1',
+          version: 1,
+          createdAt: 7,
+          status: 'succeeded',
+          inputs: [],
+          params: { prompt: '未收藏' },
+          outputHashes: ['h1'],
+        },
+      ],
+    })
+    const store = createAssetLibraryStore(repo, createAssetHistoryRepository(storage))
+    await store.load()
+    await store.setTags('h1', ['客户B'])
+    store.setQuick('saved')
+    expect(store.getState().visible).toHaveLength(0)
+
+    store.setTag('客户B')
+    const state = store.getState()
+    expect(state.quick).toBe('all')
+    expect(state.historyVisible.map((item) => item.kind === 'output' && item.hash)).toEqual(['h1'])
+  })
+
+  it('★★ 两页都有这条标签时**不替你切页签**（对账 #303 的原意）', async () => {
+    const { storage, repo } = seedStorage({
+      assets: [{ id: 'i1', hash: 'i1', mime: 'image/png', bytes: 5 }],
+      assetLibrary: [{ id: 'i1', hash: 'i1', mime: 'image/png', bytes: 5, savedAt: 20 }],
+      runRecords: [
+        {
+          id: 'r4',
+          nodeId: 'n4',
+          projectId: 'p1',
+          version: 1,
+          createdAt: 8,
+          status: 'succeeded',
+          inputs: [],
+          params: { prompt: '已收藏' },
+          outputHashes: ['i1'],
+        },
+      ],
+    })
+    const store = createAssetLibraryStore(repo, createAssetHistoryRepository(storage))
+    await store.load()
+    await store.setTags('i1', ['客户A'])
+
+    store.setTag('客户A')
+    expect(store.getState().quick).toBe('all')
+    expect(store.getState().historyVisible).toHaveLength(1)
+
+    store.setQuick('saved')
+    store.setTag('客户A')
+    expect(store.getState().quick).toBe('saved')
+    expect(store.getState().visible.map((asset) => asset.hash)).toEqual(['i1'])
+  })
 })

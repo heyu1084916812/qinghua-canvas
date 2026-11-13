@@ -80,6 +80,13 @@
 .iconBtn {
   width: 26px;
   height: 26px;
+  /*
+   * ⚠️ **必须显式给 0**（2026-11-13 实测踩到，与 `GenerationNodeView` 的
+   * `.assetMenuTrigger` 是同一个坑）：`<button>` 的 UA 内边距（Chrome 为 `1px 6px`）
+   * 会把 26px 按钮的内容区挤成 14px，16px 的图标被横向压到 14×16 ——
+   * 同一行里「＋ / 技能」因此比「@ / 模型 / 参数 / 手动」小一圈（用户 2026-11-13 指出）。
+   */
+  padding: 0;
   display: inline-flex;
   align-items: center;
   justify-content: center;

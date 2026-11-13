@@ -172,7 +172,7 @@ export function AgentComposerPane({
           name="agent-chat-model"
           ariaLabel={`对话模型（agent 自己的 LLM，当前：${shownModel || '未选'}）`}
           label={shownModel || '选择对话模型'}
-          triggerIcon={<IconChat size={14} />}
+          triggerIcon={<IconChat size={16} />}
           size="compact"
           options={withModelIcons(chatModelOptions)}
           value={shownModel}
