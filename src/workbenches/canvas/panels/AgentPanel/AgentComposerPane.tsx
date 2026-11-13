@@ -203,6 +203,7 @@ export function AgentComposerPane({
         data-agent-composer-height={composerHeight}
         data-agent-composer-resizing={composerResizing ? 'true' : 'false'}
         data-agent-delivery-mode={deliveryMode}
+        data-agent-research-staged={researchSelection.selected.length > 0 ? 'true' : undefined}
         style={{
           ['--agent-composer-height' as string]: `${composerHeight}px`,
         }}

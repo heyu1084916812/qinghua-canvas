@@ -21,6 +21,7 @@ import {
 import {
   subscribeAgentHandoff,
   subscribeReferenceAgentHandoff,
+  subscribeWebPageAgentHandoff,
 } from '../../../../features/canvas/agentHandoff'
 import {
   type TaskShutdownControl,
@@ -180,6 +181,15 @@ export function CanvasAgentHostBridge({
   useEffect(
     () =>
       subscribeReferenceAgentHandoff(projectId, () => {
+        setAgentHostOpen(hostId, true)
+      }),
+    [hostId, projectId],
+  )
+
+  /** 画布浏览器「交给 Agent」（#1089）：同样把对话窗打开 */
+  useEffect(
+    () =>
+      subscribeWebPageAgentHandoff(projectId, () => {
         setAgentHostOpen(hostId, true)
       }),
     [hostId, projectId],

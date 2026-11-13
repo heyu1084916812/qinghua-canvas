@@ -17,7 +17,10 @@ import {
 import { canGoBack, canGoForward } from '../../../domain/canvas/browserNavigation'
 import { createClipperCollectionRepository } from '../../../state/shared/clipperCollectionRepository'
 import { captureClipperPage } from '../clipper/clipperCapture'
-import { CanvasBrowserToolbar } from './CanvasBrowserToolbar'
+import { CANVAS_BROWSER_VIEW_ID } from '../../../platform/browserView'
+import { sendWebPageToAgent } from '../../../features/canvas/agentHandoff'
+import { CanvasBrowserAgentButton, CanvasBrowserToolbar } from './CanvasBrowserToolbar'
+import { browserAgentStatus, readBrowserPageForAgent } from './browserAgentHandoff'
 import { CanvasBrowserCovered, CanvasBrowserError, CanvasBrowserStartPage } from './CanvasBrowserStates'
 import { useCanvasBrowserNav } from './useCanvasBrowserNav'
 import { useNativeBrowserView } from './useNativeBrowserView'
@@ -37,9 +40,12 @@ interface Gesture {
  * 起始页（设计站点快捷入口）、错误态。`url` 为空时打开起始页。
  */
 export function CanvasBrowserLayer({
+  projectId,
   url,
   onClose,
 }: {
+  /** 「交给 Agent」交给哪个项目的对话窗（#1089） */
+  projectId: string
   url: string
   onClose: () => void
 }) {
@@ -66,6 +72,7 @@ export function CanvasBrowserLayer({
     rootRef,
   })
   const [busy, setBusy] = useState(false)
+  const [handing, setHanding] = useState(false)
   const [status, setStatus] = useState('')
 
   useLayoutEffect(() => {
@@ -204,6 +211,27 @@ export function CanvasBrowserLayer({
     }
   }
 
+  /**
+   * 「交给 Agent」（#1089）：原生视图在当前页执行提取脚本带上页面图片；
+   * iframe 退回 / 脚本没回来时只交地址与标题。对话窗由交接订阅方打开。
+   */
+  const handToAgent = async () => {
+    if (handing || !currentUrl) return
+    setHanding(true)
+    try {
+      const result = await readBrowserPageForAgent({
+        url: currentUrl,
+        title: nav.state.title,
+        viewId: CANVAS_BROWSER_VIEW_ID,
+        view: native.native ? platform.browserView ?? null : null,
+      })
+      const sent = sendWebPageToAgent(projectId, result.page)
+      setStatus(browserAgentStatus(result.extracted, sent))
+    } finally {
+      setHanding(false)
+    }
+  }
+
   return (
     <div
       ref={rootRef}
@@ -248,6 +276,13 @@ export function CanvasBrowserLayer({
               nav.dispatch({ type: 'reload' })
             }}
             onSave={() => void savePage()}
+            agentAction={
+              <CanvasBrowserAgentButton
+                disabled={!currentUrl || nav.state.phase === 'blank'}
+                busy={handing}
+                onClick={() => void handToAgent()}
+              />
+            }
             onOpenExternal={openExternal}
             onResetWindow={() => setRect(fitBrowserWindow(stage))}
             onClose={onClose}

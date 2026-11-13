@@ -540,6 +540,7 @@ function CanvasProject({ projectId }: { projectId: string }) {
           {canvasBrowserOpen ? (
             <Suspense fallback={null}>
               <CanvasBrowserLayer
+                projectId={projectId}
                 url=""
                 onClose={() => setCanvasBrowserOpen(false)}
               />

@@ -1,0 +1,306 @@
+[
+  {
+    "file": "1440x900-light-browser.png",
+    "geo": {
+      "toolbar": {
+        "x": 386,
+        "y": 191,
+        "w": 720,
+        "h": 45
+      },
+      "agentBtn": {
+        "x": 895,
+        "y": 198,
+        "w": 104,
+        "h": 30
+      },
+      "wall": null,
+      "wallOverflow": null,
+      "wallButtons": null,
+      "agentPanel": null,
+      "status": null,
+      "chips": 0,
+      "draft": null,
+      "calls": [
+        [
+          "open",
+          "canvas",
+          "https://packagingoftheworld.com/tea"
+        ]
+      ],
+      "docOverflow": false
+    },
+    "errors": []
+  },
+  {
+    "file": "1440x900-light-handoff.png",
+    "geo": {
+      "toolbar": {
+        "x": 168,
+        "y": 191,
+        "w": 720,
+        "h": 45
+      },
+      "agentBtn": {
+        "x": 678,
+        "y": 198,
+        "w": 104,
+        "h": 30
+      },
+      "wall": null,
+      "wallOverflow": null,
+      "wallButtons": null,
+      "agentPanel": {
+        "x": 1005,
+        "y": 15,
+        "w": 420,
+        "h": 870
+      },
+      "status": "已交给 Agent：网页地址 + 6 张图片（发送前可在输入框里删掉不要的）。",
+      "chips": 6,
+      "draft": "参考网页「Tea packaging – Packaging Of The World」 https://packagingoftheworld.com/tea",
+      "calls": [
+        [
+          "open",
+          "canvas",
+          "https://packagingoftheworld.com/tea"
+        ],
+        [
+          "extract",
+          "canvas",
+          6431
+        ]
+      ],
+      "docOverflow": false
+    },
+    "errors": []
+  },
+  {
+    "file": "1440x900-dark-browser.png",
+    "geo": {
+      "toolbar": {
+        "x": 386,
+        "y": 191,
+        "w": 720,
+        "h": 45
+      },
+      "agentBtn": {
+        "x": 895,
+        "y": 198,
+        "w": 104,
+        "h": 30
+      },
+      "wall": null,
+      "wallOverflow": null,
+      "wallButtons": null,
+      "agentPanel": null,
+      "status": null,
+      "chips": 0,
+      "draft": null,
+      "calls": [
+        [
+          "open",
+          "canvas",
+          "https://packagingoftheworld.com/tea"
+        ]
+      ],
+      "docOverflow": false
+    },
+    "errors": []
+  },
+  {
+    "file": "1440x900-dark-handoff.png",
+    "geo": {
+      "toolbar": {
+        "x": 168,
+        "y": 191,
+        "w": 720,
+        "h": 45
+      },
+      "agentBtn": {
+        "x": 678,
+        "y": 198,
+        "w": 104,
+        "h": 30
+      },
+      "wall": null,
+      "wallOverflow": null,
+      "wallButtons": null,
+      "agentPanel": {
+        "x": 1005,
+        "y": 15,
+        "w": 420,
+        "h": 870
+      },
+      "status": "已交给 Agent：网页地址 + 6 张图片（发送前可在输入框里删掉不要的）。",
+      "chips": 6,
+      "draft": "参考网页「Tea packaging – Packaging Of The World」 https://packagingoftheworld.com/tea",
+      "calls": [
+        [
+          "open",
+          "canvas",
+          "https://packagingoftheworld.com/tea"
+        ],
+        [
+          "extract",
+          "canvas",
+          6431
+        ]
+      ],
+      "docOverflow": false
+    },
+    "errors": []
+  },
+  {
+    "file": "1024x700-light-browser.png",
+    "geo": {
+      "toolbar": {
+        "x": 178,
+        "y": 91,
+        "w": 720,
+        "h": 45
+      },
+      "agentBtn": {
+        "x": 687,
+        "y": 98,
+        "w": 104,
+        "h": 30
+      },
+      "wall": null,
+      "wallOverflow": null,
+      "wallButtons": null,
+      "agentPanel": null,
+      "status": null,
+      "chips": 0,
+      "draft": null,
+      "calls": [
+        [
+          "open",
+          "canvas",
+          "https://packagingoftheworld.com/tea"
+        ]
+      ],
+      "docOverflow": false
+    },
+    "errors": []
+  },
+  {
+    "file": "1024x700-light-handoff.png",
+    "geo": {
+      "toolbar": {
+        "x": 77,
+        "y": 91,
+        "w": 486,
+        "h": 45
+      },
+      "agentBtn": {
+        "x": 353,
+        "y": 98,
+        "w": 104,
+        "h": 30
+      },
+      "wall": null,
+      "wallOverflow": null,
+      "wallButtons": null,
+      "agentPanel": {
+        "x": 589,
+        "y": 15,
+        "w": 420,
+        "h": 670
+      },
+      "status": "已交给 Agent：网页地址 + 6 张图片（发送前可在输入框里删掉不要的）。",
+      "chips": 6,
+      "draft": "参考网页「Tea packaging – Packaging Of The World」 https://packagingoftheworld.com/tea",
+      "calls": [
+        [
+          "open",
+          "canvas",
+          "https://packagingoftheworld.com/tea"
+        ],
+        [
+          "extract",
+          "canvas",
+          6431
+        ]
+      ],
+      "docOverflow": false
+    },
+    "errors": []
+  },
+  {
+    "file": "1024x700-dark-browser.png",
+    "geo": {
+      "toolbar": {
+        "x": 178,
+        "y": 91,
+        "w": 720,
+        "h": 45
+      },
+      "agentBtn": {
+        "x": 687,
+        "y": 98,
+        "w": 104,
+        "h": 30
+      },
+      "wall": null,
+      "wallOverflow": null,
+      "wallButtons": null,
+      "agentPanel": null,
+      "status": null,
+      "chips": 0,
+      "draft": null,
+      "calls": [
+        [
+          "open",
+          "canvas",
+          "https://packagingoftheworld.com/tea"
+        ]
+      ],
+      "docOverflow": false
+    },
+    "errors": []
+  },
+  {
+    "file": "1024x700-dark-handoff.png",
+    "geo": {
+      "toolbar": {
+        "x": 77,
+        "y": 91,
+        "w": 486,
+        "h": 45
+      },
+      "agentBtn": {
+        "x": 353,
+        "y": 98,
+        "w": 104,
+        "h": 30
+      },
+      "wall": null,
+      "wallOverflow": null,
+      "wallButtons": null,
+      "agentPanel": {
+        "x": 589,
+        "y": 15,
+        "w": 420,
+        "h": 670
+      },
+      "status": "已交给 Agent：网页地址 + 6 张图片（发送前可在输入框里删掉不要的）。",
+      "chips": 6,
+      "draft": "参考网页「Tea packaging – Packaging Of The World」 https://packagingoftheworld.com/tea",
+      "calls": [
+        [
+          "open",
+          "canvas",
+          "https://packagingoftheworld.com/tea"
+        ],
+        [
+          "extract",
+          "canvas",
+          6431
+        ]
+      ],
+      "docOverflow": false
+    },
+    "errors": []
+  }
+]

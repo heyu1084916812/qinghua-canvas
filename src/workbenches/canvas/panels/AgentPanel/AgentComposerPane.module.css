@@ -14,6 +14,14 @@
   background: var(--bg-surface);
 }
 
+/*
+ * 挂着调研 / 网页图片 chip 时（G-R2、#1089）：chip 行最高 62px 加一个间距，
+ * 正文仍保底 44px。否则默认 104px 的盒子装不下，正文和发送行被挤到盒子外（2026-11-13 截图实测）。
+ */
+.composer[data-agent-research-staged='true'] {
+  min-height: calc(104px + 62px + var(--space-2));
+}
+
 .composerEditor {
   flex: 1 1 auto;
   min-height: 44px;

@@ -13,6 +13,7 @@ import type { CanvasStore } from '../../../../state/workbenches/canvas/store'
 import type { PlatformKit } from '../../../../platform/ports'
 import type { AssetLibraryStore } from '../../../../state/project/assetLibraryStore'
 import { mentionToken } from '../../text/MentionEditor'
+import { researchSelectionStore } from './researchSelection'
 import {
   useAgentAttachmentsController,
   type AgentAttachmentsControllerInput,
@@ -23,6 +24,8 @@ const {
   subscribeHandoff,
   takeReferenceHandoff,
   subscribeReferenceHandoff,
+  takeWebPageHandoff,
+  subscribeWebPageHandoff,
   importAssetFile,
   isImportableMedia,
   createAssetNode,
@@ -32,13 +35,20 @@ const {
   subscribeHandoff: vi.fn(),
   takeReferenceHandoff: vi.fn(),
   subscribeReferenceHandoff: vi.fn(),
+  takeWebPageHandoff: vi.fn(),
+  subscribeWebPageHandoff: vi.fn(),
   importAssetFile: vi.fn(),
   isImportableMedia: vi.fn(),
   createAssetNode: vi.fn(),
   loadAssetUrl: vi.fn(),
 }))
 
-vi.mock('../../../../features/canvas/agentHandoff', () => ({
+vi.mock('../../../../features/canvas/agentHandoff', async () => ({
+  normalizeWebPageHandoff: (await vi.importActual<
+    typeof import('../../../../features/canvas/agentHandoff')
+  >('../../../../features/canvas/agentHandoff')).normalizeWebPageHandoff,
+  takeWebPageAgentHandoff: takeWebPageHandoff,
+  subscribeWebPageAgentHandoff: subscribeWebPageHandoff,
   takeAgentHandoff: takeHandoff,
   subscribeAgentHandoff: subscribeHandoff,
   takeReferenceAgentHandoff: takeReferenceHandoff,
@@ -129,6 +139,7 @@ function input(
     library,
     insertMention: vi.fn(),
     nodeLabelOf: (id) => `节点 ${id}`,
+    setDraft: vi.fn(),
     appendPendingAssetIds: vi.fn(async (sessionId: string, ids: readonly string[]) => ({
       ...session,
       id: sessionId,
@@ -156,13 +167,15 @@ function render(
   update: (next: AgentAttachmentsControllerInput) => void
 } {
   const viewRef: { current: Hook | null } = { current: null }
-  function Probe() {
-    viewRef.current = useAgentAttachmentsController(props)
+  function Probe(next: Partial<AgentAttachmentsControllerInput>) {
+    viewRef.current = useAgentAttachmentsController(
+      'projectId' in next ? next as AgentAttachmentsControllerInput : props,
+    )
     return null
   }
   let renderer!: TestRenderer.ReactTestRenderer
   act(() => {
-    renderer = TestRenderer.create(createElement(Probe))
+    renderer = TestRenderer.create(createElement(Probe, {}))
   })
   return {
     viewRef,
@@ -180,6 +193,9 @@ describe('useAgentAttachmentsController', () => {
     subscribeHandoff.mockReturnValue(vi.fn())
     takeReferenceHandoff.mockReturnValue([])
     subscribeReferenceHandoff.mockReturnValue(vi.fn())
+    takeWebPageHandoff.mockReturnValue([])
+    subscribeWebPageHandoff.mockReturnValue(vi.fn())
+    researchSelectionStore.reset()
     isImportableMedia.mockReturnValue(true)
     importAssetFile.mockResolvedValue({
       hash: 'hash-file',
@@ -222,6 +238,50 @@ describe('useAgentAttachmentsController', () => {
     act(() => listener?.(['n2']))
     expect(insertMention).toHaveBeenCalledWith('node', 'n2', '节点 n2')
     expect(viewRef.current?.thumbVersion).toBe(0)
+  })
+
+  it('★ 画布浏览器「交给 Agent」：页面图片挂成调研勾选 chip、参考网页一行接到草稿末尾（#1089）', () => {
+    const page = {
+      url: 'https://packagingoftheworld.com/tea',
+      title: 'Tea packaging',
+      images: [
+        { imageUrl: 'https://cdn.example.com/a.jpg', link: 'https://packagingoftheworld.com/a.html', title: 'A' },
+        { imageUrl: 'https://cdn.example.com/a.jpg' },
+        { imageUrl: 'data:image/png;base64,xx' },
+        { imageUrl: 'https://cdn.example.com/b.jpg' },
+      ],
+    }
+    takeWebPageHandoff.mockReturnValueOnce([page]).mockReturnValue([])
+    let draft = '先看看这些'
+    const setDraft = vi.fn((next: string | ((previous: string) => string)) => {
+      draft = typeof next === 'function' ? next(draft) : next
+    })
+    render(input({ setDraft }))
+    const staged = researchSelectionStore.get('session-1').selected
+    expect(staged.map((item) => item.imageUrl)).toEqual([
+      'https://cdn.example.com/a.jpg',
+      'https://cdn.example.com/b.jpg',
+    ])
+    expect(staged[0]).toMatchObject({ url: 'https://packagingoftheworld.com/a.html', title: 'A', source: 'packagingoftheworld.com' })
+    expect(staged[1]).toMatchObject({ url: 'https://packagingoftheworld.com/tea', title: 'Tea packaging' })
+    expect(draft).toBe('先看看这些\n参考网页「Tea packaging」 https://packagingoftheworld.com/tea')
+    // 同一页再交一次：不重复挂图、不重复写那一行
+    const listener = subscribeWebPageHandoff.mock.calls[0]?.[1] as (() => void) | undefined
+    takeWebPageHandoff.mockReturnValueOnce([page])
+    act(() => listener?.())
+    expect(researchSelectionStore.get('session-1').selected).toHaveLength(2)
+    expect(draft).toBe('先看看这些\n参考网页「Tea packaging」 https://packagingoftheworld.com/tea')
+  })
+
+  it('★ 「交给 Agent」时还没有会话：先攒着，会话就绪再落', () => {
+    takeWebPageHandoff.mockReturnValueOnce([{ url: 'https://example.com/', title: '', images: [] }]).mockReturnValue([])
+    const setDraft = vi.fn()
+    const { update } = render(input({ current: null, setDraft }))
+    expect(setDraft).not.toHaveBeenCalled()
+    update(input({ setDraft }))
+    expect(setDraft).toHaveBeenCalledTimes(1)
+    const updater = setDraft.mock.calls[0]?.[0] as (previous: string) => string
+    expect(updater('')).toBe('参考网页 https://example.com/')
   })
 
   it('★★ 项目参考 handoff 变成 reference chip，并写入会话持续引用', async () => {

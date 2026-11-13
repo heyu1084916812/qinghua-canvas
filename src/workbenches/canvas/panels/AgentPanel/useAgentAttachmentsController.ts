@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react'
 import type { AgentSession } from '../../../../state/agent/sessionStore'
 import type { ChatMessage } from '../../../../domain/shared/execution/types'
 import type { CanvasStore } from '../../../../state/workbenches/canvas/store'
@@ -21,13 +21,18 @@ import {
   subscribeReferenceAgentHandoff,
   takeAgentHandoff,
   takeReferenceAgentHandoff,
+  subscribeWebPageAgentHandoff,
+  takeWebPageAgentHandoff,
   type AgentReferenceHandoff,
+  type WebPageAgentHandoff,
 } from '../../../../features/canvas/agentHandoff'
 import { loadAssetUrl } from '../../../../features/shared/assets/index'
 import { createReferenceLedgerRepository } from '../../../../state/project/referenceLedgerRepository'
 import type { TaskLifecycle } from '../../../../features/shared/lifecycle/taskLifecycle'
 import { parseMentions } from '../../text/MentionEditor'
 import { viewportWorldOf } from './agentPanelViewHelpers'
+import { researchSelectionActions } from './researchSelection'
+import { appendWebPageLine, webPageDraftLine, webPageResearchItems } from './webPageHandoff'
 
 export interface AgentAttachmentsControllerInput {
   active: boolean
@@ -46,6 +51,8 @@ export interface AgentAttachmentsControllerInput {
     label: string,
   ) => void
   nodeLabelOf: (nodeId: string) => string
+  /** 画布浏览器「交给 Agent」把参考网页一行写进输入框（#1089） */
+  setDraft: Dispatch<SetStateAction<string>>
   /**
    * 追加待发送附件（store 侧原子读改写，见 `sessionStore.appendPendingAssetIds`）。
    *
@@ -156,6 +163,36 @@ export function useAgentAttachmentsController(
     queue(takeReferenceAgentHandoff(input.projectId))
     return subscribeReferenceAgentHandoff(input.projectId, queue)
   }, [flushReferenceHandoff, input.active, input.projectId])
+
+  /**
+   * 画布浏览器「交给 Agent」（#1089）：页面图片挂成调研勾选 chip（发送时才进参考台账），
+   * 「参考网页「标题」 地址」接到输入框末尾。没有会话时先攒着，会话就绪再落。
+   */
+  const pageHandoffRef = useRef<WebPageAgentHandoff[]>([])
+  const flushPageHandoff = useCallback(() => {
+    if (!input.current || pageHandoffRef.current.length === 0) return
+    const pages = pageHandoffRef.current
+    pageHandoffRef.current = []
+    const selection = researchSelectionActions(input.current.id)
+    for (const page of pages) {
+      for (const item of webPageResearchItems(page)) selection.stage(item)
+      const line = webPageDraftLine(page)
+      input.setDraft((previous) => appendWebPageLine(previous, line))
+    }
+  }, [input.current, input.setDraft])
+
+  useEffect(() => {
+    if (!input.active) return
+    const queue = (pages: readonly WebPageAgentHandoff[]) => {
+      const byUrl = new Map(pageHandoffRef.current.map((page) => [page.url, page]))
+      for (const page of pages) byUrl.set(page.url, page)
+      pageHandoffRef.current = [...byUrl.values()]
+      flushPageHandoff()
+    }
+    queue(takeWebPageAgentHandoff(input.projectId))
+    return subscribeWebPageAgentHandoff(input.projectId, () =>
+      queue(takeWebPageAgentHandoff(input.projectId)))
+  }, [flushPageHandoff, input.active, input.projectId])
 
   const placeAsset = useCallback(
     (asset: ImportedAsset): string | null => {

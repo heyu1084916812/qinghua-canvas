@@ -1393,16 +1393,19 @@
     {
       "module": "src/pages/CanvasPage/browser/CanvasBrowserLayer.tsx",
       "owner": "canvas-browser-overlay",
-      "responsibility": "在画布舞台内组装可拖动、可缩放的浏览器浮层：工具条、起始页 / 错误态 / 网页内容与当前页收藏。",
+      "responsibility": "在画布舞台内组装可拖动、可缩放的浏览器浮层：工具条、起始页 / 错误态 / 网页内容、当前页收藏与「交给 Agent」。",
       "owns": [
         "浏览器窗口外框与内容区切换（桌面壳原生 webview / 浏览器开发版 iframe）",
         "窗口拖动、缩放与重置",
-        "当前页网页收藏动作"
+        "当前页网页收藏动作",
+        "「交给 Agent」动作（读当前页并交给对话窗）"
       ],
       "doesNotOwn": [
         "iframe 内跨域导航读取",
         "网页收藏持久化规则",
-        "参考、Agent 和画布动作"
+        "页面图片提取脚本",
+        "对话窗如何挂 chip 与写草稿",
+        "参考和画布动作"
       ],
       "publicApi": [
         "CanvasBrowserLayer"
@@ -1410,9 +1413,10 @@
       "test": [
         "src/domain/canvas/browserWindow.test.ts",
         "src/pages/CanvasPage/clipper/clipperCapture.test.ts",
-        "src/app/uiSevenPoints.test.ts"
+        "src/app/uiSevenPoints.test.ts",
+        "src/pages/CanvasPage/browser/browserAgentHandoff.test.ts"
       ],
-      "budget": 340
+      "budget": 390
     },
     {
       "module": "src/pages/CanvasPage/browser/CanvasBrowserLayer.module.css",
@@ -10729,7 +10733,8 @@
       "responsibility": "渲染画布浏览器的单行工具条：拖动柄、前进后退刷新、地址栏、收藏与关闭等动作和加载进度条。",
       "owns": [
         "地址栏聚焦全选、回车跳转与主机名显示",
-        "工具条按钮与 Agent 按钮预留位"
+        "工具条按钮与 Agent 按钮位",
+        "「交给 Agent」按钮"
       ],
       "doesNotOwn": [
         "导航状态与网页加载",
@@ -10737,7 +10742,8 @@
       ],
       "publicApi": [
         "CanvasBrowserToolbarProps",
-        "CanvasBrowserToolbar"
+        "CanvasBrowserToolbar",
+        "CanvasBrowserAgentButton"
       ],
       "test": [
         "src/pages/CanvasPage/browser/browserQuickSites.test.ts",
@@ -10745,7 +10751,7 @@
         "src/domain/canvas/browserAddress.test.ts",
         "src/app/uiSevenPoints.test.ts"
       ],
-      "budget": 220
+      "budget": 260
     },
     {
       "module": "src/pages/CanvasPage/browser/CanvasBrowserToolbar.module.css",
@@ -10753,7 +10759,8 @@
       "responsibility": "定义画布浏览器工具条、地址栏胶囊与加载进度条的样式。",
       "owns": [
         "工具条按钮与地址栏外观",
-        "加载进度条动画"
+        "加载进度条动画",
+        "「交给 Agent」带文字按钮"
       ],
       "doesNotOwn": [
         "全局颜色和间距令牌",
@@ -10763,12 +10770,13 @@
         "CSS_MODULE:canvas-browser-toolbar",
         "CSS_CLASS:toolbar",
         "CSS_CLASS:address",
-        "CSS_CLASS:progress"
+        "CSS_CLASS:progress",
+        "CSS_CLASS:agentButton"
       ],
       "test": [
         "src/app/uiSevenPoints.test.ts"
       ],
-      "budget": 230
+      "budget": 280
     },
     {
       "module": "src/pages/CanvasPage/browser/CanvasBrowserStates.tsx",
@@ -11136,6 +11144,54 @@
         "src/pages/CanvasPage/AgentBrowserWallPrompt.test.ts"
       ],
       "budget": 130
+    },
+    {
+      "module": "src/pages/CanvasPage/browser/browserAgentHandoff.ts",
+      "owner": "canvas-browser-agent-handoff",
+      "responsibility": "画布浏览器「交给 Agent」读当前网页：原生视图在当前页执行提取脚本拿图片与原帖链接，读不到时退回只给地址与标题，并给出状态文案。",
+      "owns": [
+        "原生视图提取与退回规则",
+        "交给 Agent 后的状态文案"
+      ],
+      "doesNotOwn": [
+        "页面提取脚本本身",
+        "交接队列",
+        "对话窗挂 chip 与写草稿"
+      ],
+      "publicApi": [
+        "readBrowserPageForAgent",
+        "browserAgentStatus",
+        "BrowserAgentPageResult",
+        "BROWSER_AGENT_EXTRACT_LIMIT"
+      ],
+      "test": [
+        "src/pages/CanvasPage/browser/browserAgentHandoff.test.ts"
+      ],
+      "budget": 90
+    },
+    {
+      "module": "src/workbenches/canvas/panels/AgentPanel/webPageHandoff.ts",
+      "owner": "agent-web-page-handoff",
+      "responsibility": "把画布浏览器交来的网页转成对话窗的调研勾选项与输入框里的「参考网页」一行。",
+      "owns": [
+        "网页图片到调研勾选项的映射与稳定 id",
+        "参考网页草稿行与追加去重"
+      ],
+      "doesNotOwn": [
+        "交接队列",
+        "勾选 store",
+        "发送时写参考台账"
+      ],
+      "publicApi": [
+        "webPageResearchItems",
+        "webPageDraftLine",
+        "appendWebPageLine"
+      ],
+      "test": [
+        "src/workbenches/canvas/panels/AgentPanel/webPageHandoff.test.ts",
+        "src/workbenches/canvas/panels/AgentPanel/useAgentAttachmentsController.test.ts"
+      ],
+      "budget": 80
     }
   ]
 }

@@ -593,6 +593,7 @@ export function useAgentPanelSessionModel({
     library,
     insertMention,
     nodeLabelOf,
+    setDraft,
     appendPendingAssetIds,
     appendPendingAssetIdsDetached,
     appendReferenceIds: sessions.appendReferenceIds,

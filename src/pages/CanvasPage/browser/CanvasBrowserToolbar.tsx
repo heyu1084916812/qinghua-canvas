@@ -10,6 +10,7 @@ import {
   ImageDown,
   Lock,
   RotateCw,
+  Sparkles,
   X,
   type IconGlyph,
 } from '../../../ui/icon'
@@ -37,7 +38,7 @@ export interface CanvasBrowserToolbarProps {
   onAddressError: (message: string) => void
   onDragStart: (event: React.PointerEvent) => void
   onDragKey: (event: React.KeyboardEvent) => void
-  /** 预留给「交给 Agent」按钮（下一步接线）；不传就不占位 */
+  /** 「交给 Agent」按钮（#1089，见 `CanvasBrowserAgentButton`）；不传就不占位 */
   agentAction?: ReactNode
 }
 
@@ -156,6 +157,37 @@ export function CanvasBrowserToolbar(props: CanvasBrowserToolbarProps) {
       </div>
       <span className={styles.progress} aria-hidden="true" />
     </header>
+  )
+}
+
+/**
+ * 「交给 Agent」（对账 #1089）：把当前网页的地址、标题与页面图片交给对话窗。
+ * 带文字而不是纯图标：这是工具条里唯一一个会把东西送到别处的动作，要一眼认得出来。
+ */
+export function CanvasBrowserAgentButton({
+  disabled,
+  busy,
+  onClick,
+}: {
+  disabled: boolean
+  busy: boolean
+  onClick: () => void
+}) {
+  return (
+    <button
+      type="button"
+      className={styles.agentButton}
+      title="把当前网页（地址、标题与页面图片）交给 Agent"
+      aria-label="交给 Agent：把当前网页的地址、标题与页面图片交给对话"
+      aria-busy={busy || undefined}
+      disabled={disabled || busy}
+      onClick={onClick}
+      data-canvas-browser-action="agent"
+      data-canvas-browser-agent
+    >
+      <Icon icon={Sparkles} size="sm" />
+      <span>交给 Agent</span>
+    </button>
   )
 }
 
