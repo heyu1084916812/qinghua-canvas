@@ -1,7 +1,8 @@
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   answerBrowserWall,
   BROWSER_WALL_HEADLINE,
+  BROWSER_WALL_TIMEOUT_MS,
   browserWallDetail,
   browserWallStore,
   requestBrowserWall,
@@ -40,6 +41,21 @@ describe('Agent 浏览器「需要你处理」待办', () => {
     await expect(requestBrowserWall(REQUEST, controller.signal)).resolves.toBe('cancel')
     expect(browserWallStore.get()).toEqual([])
     answerBrowserWall('wall-404', 'continue')
+  })
+
+  it('没人回答：超时后按取消处理并撤掉待办（调研不能一直卡住）', async () => {
+    vi.useFakeTimers()
+    try {
+      const pending = requestBrowserWall(REQUEST, new AbortController().signal)
+      expect(browserWallStore.get()).toHaveLength(1)
+      await vi.advanceTimersByTimeAsync(BROWSER_WALL_TIMEOUT_MS - 1)
+      expect(browserWallStore.get()).toHaveLength(1)
+      await vi.advanceTimersByTimeAsync(1)
+      await expect(pending).resolves.toBe('cancel')
+      expect(browserWallStore.get()).toEqual([])
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('文案：固定标题 + 站点与下一步', () => {

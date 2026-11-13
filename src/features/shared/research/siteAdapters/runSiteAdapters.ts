@@ -19,6 +19,18 @@ export const DIRECT_SITE_ADAPTERS: readonly DirectSiteAdapter[] = [huabanAdapter
 /** 同一站点相邻两次请求的间隔（毫秒）：多个检索角度时不连发，降低被限流概率。 */
 export const SITE_ADAPTER_DELAY_MS = 400
 
+/**
+ * 每站时限（2026-11-14 live-run bug 1）：到点就叫停这个站，交出已经拿到的结果，不让一个慢站拖住整次调研。
+ * 直连站：一次请求 15s 上限，最多 4 个角度；浏览器站：加载 + 等验证放行 + 一次请用户处理（提示自身 45s 超时）。
+ */
+export const DIRECT_SITE_DEADLINE_MS = 30_000
+export const BROWSER_SITE_DEADLINE_MS = 70_000
+/**
+ * 其它站都跑完后，还在等用户处理验证 / 登录的站最多再等多久；到点撤掉提示，按 needs-login / blocked 记，
+ * 先把花瓣 / 站酷等已经拿到的结果交出去（用户可以之后在画布浏览器里登录，下次检索带登录态）。
+ */
+export const WALL_GRACE_MS = 15_000
+
 /** 这些失败说明同一站点再换检索角度也没用，立即停止该站。 */
 const STOP_STATUSES: ReadonlySet<SiteAdapterStatus> = new Set(['rate-limited', 'unavailable', 'network', 'unrecognized'])
 
@@ -32,6 +44,8 @@ export interface SiteAdapterRunInput {
   browser?: readonly BrowserSiteAdapter[]
   /** 桌面壳的 Agent 后台浏览器（#1087）；缺省 = 网页版，浏览器站点只记 `needs-browser`。 */
   browserContext?: BrowserSiteContext
+  /** 测试注入：每站时限与等用户的宽限（毫秒）。 */
+  deadlines?: { direct?: number; browser?: number; wallGrace?: number }
 }
 
 export interface SiteAdapterRunStatus {
@@ -62,6 +76,31 @@ function waitFor(ms: number, signal: AbortSignal): Promise<void> {
     }
     signal.addEventListener('abort', done, { once: true })
   })
+}
+
+/** 子信号：父信号中止或本站到点都中止；`timedOut()` 区分是不是时限到了。 */
+function siteSignal(parent: AbortSignal, deadlineMs: number): { signal: AbortSignal; timedOut: () => boolean; done: () => void } {
+  const controller = new AbortController()
+  let expired = false
+  const onAbort = () => controller.abort()
+  parent.addEventListener('abort', onAbort, { once: true })
+  if (parent.aborted) controller.abort()
+  const timer = setTimeout(() => {
+    expired = true
+    controller.abort()
+  }, Math.max(0, deadlineMs))
+  return {
+    signal: controller.signal,
+    timedOut: () => expired,
+    done: () => {
+      clearTimeout(timer)
+      parent.removeEventListener('abort', onAbort)
+    },
+  }
+}
+
+function slowText(label: string): string {
+  return `${label}响应太慢，这次先跳过`
 }
 
 async function runOneSite(
@@ -179,40 +218,91 @@ export async function runSiteAdapters(
   const target = Math.max(1, Math.ceil(Math.max(1, input.imageMaxResults) / Math.max(1, direct.length)))
   const browserContext = input.browserContext
   const browserTarget = Math.max(BROWSER_SITE_MIN_TARGET, Math.ceil(Math.max(1, input.imageMaxResults) / Math.max(1, browser.length)))
-  // 浏览器站点与直连站点同时开跑（各开一个隐藏窗口）；合并时排在直连之后
-  const browserRunsPromise = browserContext && queries.length > 0
-    ? Promise.all(browser.map((adapter) => runBrowserAdapter(adapter, browserContext, queries, browserTarget, signal)))
-    : null
-  const runs = queries.length === 0
-    ? direct.map((adapter) => ({
+  const directDeadline = input.deadlines?.direct ?? DIRECT_SITE_DEADLINE_MS
+  const browserDeadline = input.deadlines?.browser ?? BROWSER_SITE_DEADLINE_MS
+  const wallGrace = input.deadlines?.wallGrace ?? WALL_GRACE_MS
+
+  // 所有站同时开跑，各自带时限；谁也不等谁（Promise.allSettled 语义：单站出错只影响它自己）。
+  const tasks: Promise<unknown>[] = []
+  const othersSettled = (self: Promise<unknown>) =>
+    Promise.allSettled(tasks.filter((task) => task !== self)).then(() => undefined)
+
+  const directRuns = queries.length === 0
+    ? direct.map((adapter) => Promise.resolve({
         items: [] as DesignResearchItem[],
-        outcome: { id: adapter.id, label: adapter.label, status: 'empty' as const, items: [], failureText: siteFailureText(adapter.label, 'empty') },
+        outcome: { id: adapter.id, label: adapter.label, status: 'empty' as const, items: [], failureText: siteFailureText(adapter.label, 'empty') } as SiteAdapterOutcome,
       }))
-    : await Promise.all(
-        direct.map((adapter) =>
-          runOneSite(adapter, network, queries, target, input.delayMs ?? SITE_ADAPTER_DELAY_MS, signal),
-        ),
-      )
+    : direct.map(async (adapter) => {
+        const site = siteSignal(signal, directDeadline)
+        try {
+          const run = await runOneSite(adapter, network, queries, target, input.delayMs ?? SITE_ADAPTER_DELAY_MS, site.signal)
+          if (site.timedOut() && run.items.length === 0) {
+            return { items: run.items, outcome: { ...run.outcome, status: 'network' as const, failureText: slowText(adapter.label) } }
+          }
+          return run
+        } finally {
+          site.done()
+        }
+      })
+  tasks.push(...directRuns)
+
+  const browserRuns = browserContext && queries.length > 0
+    ? browser.map((adapter) => {
+        const site = siteSignal(signal, browserDeadline)
+        let self: Promise<SiteAdapterOutcome> = Promise.resolve(null as unknown as SiteAdapterOutcome)
+        const outerResolve = browserContext.resolveWall
+        // 等用户处理时：其它站都跑完再宽限 WALL_GRACE_MS，到点撤掉提示（按取消处理）
+        const context: BrowserSiteContext = outerResolve
+          ? {
+              ...browserContext,
+              resolveWall: (request, promptSignal) => {
+                const prompt = new AbortController()
+                const stop = () => prompt.abort()
+                promptSignal.addEventListener('abort', stop, { once: true })
+                if (promptSignal.aborted) prompt.abort()
+                let graceTimer: ReturnType<typeof setTimeout> | undefined
+                void othersSettled(self).then(() => {
+                  graceTimer = setTimeout(stop, Math.max(0, wallGrace))
+                })
+                return outerResolve(request, prompt.signal).finally(() => {
+                  if (graceTimer) clearTimeout(graceTimer)
+                  promptSignal.removeEventListener('abort', stop)
+                })
+              },
+            }
+          : browserContext
+        self = (async () => {
+          try {
+            const outcome = await runBrowserAdapter(adapter, context, queries, browserTarget, site.signal)
+            if (site.timedOut() && outcome.items.length === 0 && (outcome.status === 'empty' || outcome.status === 'network')) {
+              return { ...outcome, status: 'network' as const, failureText: slowText(adapter.label) }
+            }
+            return outcome
+          } finally {
+            site.done()
+          }
+        })()
+        return self
+      })
+    : null
+  if (browserRuns) tasks.push(...browserRuns)
+
+  const runs = await Promise.all(directRuns)
+  const browserOutcomes = browserRuns ? await Promise.all(browserRuns) : null
   const directItems = interleave(runs.map((run) => run.items))
-  const browserRuns = browserRunsPromise ? await browserRunsPromise : null
-  const browserItems = interleave((browserRuns ?? []).map((outcome) => outcome.items))
+  const browserItems = interleave((browserOutcomes ?? []).map((outcome) => outcome.items))
   const items = mergeSiteItems(directItems, browserItems, input.imageMaxResults)
+  const statusOf = (outcome: SiteAdapterOutcome): SiteAdapterRunStatus => ({
+    id: outcome.id,
+    label: outcome.label,
+    status: outcome.status,
+    itemCount: outcome.items.length,
+    ...(outcome.failureText ? { failureText: outcome.failureText } : {}),
+  })
   const statuses: SiteAdapterRunStatus[] = [
-    ...runs.map(({ outcome }) => ({
-      id: outcome.id,
-      label: outcome.label,
-      status: outcome.status,
-      itemCount: outcome.items.length,
-      ...(outcome.failureText ? { failureText: outcome.failureText } : {}),
-    })),
-    ...(browserRuns
-      ? browserRuns.map((outcome) => ({
-          id: outcome.id,
-          label: outcome.label,
-          status: outcome.status,
-          itemCount: outcome.items.length,
-          ...(outcome.failureText ? { failureText: outcome.failureText } : {}),
-        }))
+    ...runs.map(({ outcome }) => statusOf(outcome)),
+    ...(browserOutcomes
+      ? browserOutcomes.map(statusOf)
       : browser.map((adapter) => ({
           id: adapter.id,
           label: adapter.label,
@@ -225,14 +315,14 @@ export async function runSiteAdapters(
     items,
     usedSources: [
       ...runs.filter((run) => run.items.length > 0).map((run) => run.outcome.label),
-      ...(browserRuns ?? []).filter((outcome) => outcome.items.length > 0).map((outcome) => outcome.label),
+      ...(browserOutcomes ?? []).filter((outcome) => outcome.items.length > 0).map((outcome) => outcome.label),
     ],
     statuses,
     failures: items.length > 0
       ? []
       : [
           ...runs.map(({ outcome }) => outcome.failureText ?? siteFailureText(outcome.label, outcome.status)),
-          ...(browserRuns ?? []).map((outcome) => outcome.failureText ?? siteFailureText(outcome.label, outcome.status)),
+          ...(browserOutcomes ?? []).map((outcome) => outcome.failureText ?? siteFailureText(outcome.label, outcome.status)),
         ],
   }
 }

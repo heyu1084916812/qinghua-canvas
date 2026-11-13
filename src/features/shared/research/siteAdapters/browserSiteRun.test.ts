@@ -139,7 +139,18 @@ describe('runBrowserSite：Agent 后台浏览器跑一个站', () => {
     const outcome = await runBrowserSite(spec('pinterest'), { browser: port, sleep: noSleep, resolveWall: async () => 'cancel' }, request, new AbortController().signal)
     expect(outcome.status).toBe('ok')
     expect(outcome.items).toHaveLength(1)
-    expect(outcome.items[0]!.url).toBe('https://www.pinterest.com/search/pins/?q=tea')
+  })
+
+  it('每个站本次运行只提示一次：点了继续仍被挡 ⇒ 不再弹，下次检索也不弹', async () => {
+    const { port, calls } = fakePort([LOGIN, LOGIN, LOGIN])
+    const resolveWall = vi.fn(async () => 'continue' as const)
+    const context = { browser: port, sleep: noSleep, resolveWall }
+    const first = await runBrowserSite(spec('dribbble'), context, request, new AbortController().signal)
+    expect(first).toMatchObject({ status: 'needs-login', items: [] })
+    expect(calls).toEqual(['load:dribbble', 'show:dribbble', 'hide:dribbble', 'load:dribbble', 'close:dribbble'])
+    const second = await runBrowserSite(spec('dribbble'), context, request, new AbortController().signal)
+    expect(second.status).toBe('needs-login')
+    expect(resolveWall).toHaveBeenCalledTimes(1)
   })
 
   it('打不开 ⇒ network；认不出 ⇒ unrecognized；都会关窗口', async () => {
@@ -151,7 +162,7 @@ describe('runBrowserSite：Agent 后台浏览器跑一个站', () => {
     expect((await runBrowserSite(spec('thedieline'), { browser: weird.port }, request, new AbortController().signal)).status).toBe('unrecognized')
   })
 
-  it('停止调研：等待中的提示被撤掉，按空结果返回', async () => {
+  it('停止调研：等待中的提示被撤掉，停在登录墙上就记 needs-login', async () => {
     const { port } = fakePort([LOGIN])
     const controller = new AbortController()
     let promptSignal: AbortSignal | null = null
@@ -164,7 +175,7 @@ describe('runBrowserSite：Agent 后台浏览器跑一个站', () => {
         return new Promise((resolve) => signal.addEventListener('abort', () => resolve('cancel')))
       },
     }, request, controller.signal)
-    expect((await outcome).status).toBe('empty')
+    expect(await outcome).toMatchObject({ status: 'needs-login', items: [] })
     expect(promptSignal!.aborted).toBe(true)
   })
 

@@ -36,18 +36,33 @@ function settle(key: string, decision: BrowserWallDecision) {
   entry.resolve(decision)
 }
 
-/** 调研侧：挂一条待办，等用户点「继续 / 取消」。 */
+/**
+ * 提示最多挂多久（2026-11-14 live-run bug 1）：没人回答就按「取消」处理，调研不能一直卡在这里。
+ */
+export const BROWSER_WALL_TIMEOUT_MS = 45_000
+
+/** 调研侧：挂一条待办，等用户点「继续 / 取消」；超时或中止都按取消。 */
 export function requestBrowserWall(
   request: BrowserWallRequest,
   signal: AbortSignal,
+  timeoutMs: number = BROWSER_WALL_TIMEOUT_MS,
 ): Promise<BrowserWallDecision> {
   if (signal.aborted) return Promise.resolve('cancel')
   seq += 1
   const key = `wall-${seq}`
   return new Promise<BrowserWallDecision>((resolve) => {
-    entries = [...entries, { prompt: { ...request, key }, resolve }]
+    const timer = setTimeout(() => settle(key, 'cancel'), Math.max(0, timeoutMs))
+    const onAbort = () => settle(key, 'cancel')
+    entries = [...entries, {
+      prompt: { ...request, key },
+      resolve: (decision) => {
+        clearTimeout(timer)
+        signal.removeEventListener('abort', onAbort)
+        resolve(decision)
+      },
+    }]
     emit()
-    signal.addEventListener('abort', () => settle(key, 'cancel'), { once: true })
+    signal.addEventListener('abort', onAbort, { once: true })
   })
 }
 

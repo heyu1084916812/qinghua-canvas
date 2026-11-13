@@ -17,22 +17,21 @@ import type {
  * 2. 快照 → 站点规则过滤成调研候选；
  * 3. 识别墙：人机验证先**等它自己放行**（WAF / Sucuri / hashcash 在真实浏览器里多半几秒内自动过），
  *    最多等 3 轮；仍挡着、或是登录墙 ⇒ 把窗口亮给用户，界面提示「需要你处理一下验证/登录，
- *    完成后点继续」；用户点继续（或直接关掉那个窗口）就隐藏窗口、重新打开搜索页再提取；
- *    取消 ⇒ 本次应用运行期间不再为这个站打扰用户。
+ *    完成后点继续」；用户点继续（或直接关掉那个窗口）就隐藏窗口、重新打开搜索页再提取。
+ *    **每个站本次应用运行期间最多提示一次**（2026-11-14 live-run bug 1：Pinterest 没登录过时
+ *    不能每次找图都弹）；之后再遇墙直接记 `needs-login` / `blocked` 跳过。
  * 4. 跑完关掉窗口（登录在共用数据目录里，下次仍在）。同一个站同一时刻只跑一份（窗口 id 固定）。
  */
 const CHALLENGE_WAIT_MS = 4_000
 const CHALLENGE_ROUNDS = 3
-/** 同一次检索最多请用户处理几次。 */
-const MAX_WALL_PROMPTS = 2
 
-/** 本次应用运行期间用户选了「取消」的站：不再弹提示，直接记 needs-login / blocked。 */
-const declinedSites = new Set<string>()
+/** 本次应用运行期间已经为之弹过提示的站：不再弹，直接记 needs-login / blocked。 */
+const promptedSites = new Set<string>()
 const siteLocks = new Map<string, Promise<unknown>>()
 
 /** 测试用。 */
 export function resetBrowserSiteState(): void {
-  declinedSites.clear()
+  promptedSites.clear()
   siteLocks.clear()
 }
 
@@ -164,8 +163,9 @@ async function runUnlocked(
     items,
     ...(items.length > 0 ? {} : { failureText: siteFailureText(spec.label, status) }),
   })
+  const wallStatus = (reading: Reading | null): SiteAdapterOutcome['status'] =>
+    reading?.wall.kind === 'login' ? 'needs-login' : 'blocked'
 
-  let prompts = 0
   let last: Reading | null = null
   try {
     for (;;) {
@@ -173,38 +173,39 @@ async function runUnlocked(
         context.browser.load(spec.id, url, script, { scrollSteps: spec.scrollSteps ?? 3 }),
         signal,
       ))
+      last = reading
       // 人机验证：先等它自己放行（页面会自己刷新），再在当前页重新提取
       for (let round = 0; round < CHALLENGE_ROUNDS && reading.wall.kind === 'challenge'; round += 1) {
         await sleep(CHALLENGE_WAIT_MS, signal)
         if (signal.aborted) throw new AbortedError('aborted')
         try {
           reading = read(await abortable(context.browser.snapshot(spec.id, script), signal))
+          last = reading
         } catch (error) {
           if (error instanceof AbortedError) throw error
           // 页面正在刷新时脚本可能没响应，下一轮再看
         }
       }
-      last = reading
       if (!reading.snapshot) return fail('unrecognized')
       if (reading.wall.kind === 'none') {
         return reading.items.length > 0
           ? { ...base, status: 'ok', items: reading.items }
           : fail('empty')
       }
-      if (declinedSites.has(spec.id) || prompts >= MAX_WALL_PROMPTS || !context.resolveWall) break
-      prompts += 1
+      if (promptedSites.has(spec.id) || !context.resolveWall) break
+      promptedSites.add(spec.id)
       const decision = await askUser(spec, context, reading.wall, url, signal)
       if (signal.aborted) throw new AbortedError('aborted')
-      if (decision === 'cancel') {
-        declinedSites.add(spec.id)
-        break
-      }
+      if (decision === 'cancel') break
     }
   } catch (error) {
-    if (error instanceof AbortedError || signal.aborted) return fail('empty', last?.items ?? [])
+    if (error instanceof AbortedError || signal.aborted) {
+      // 被叫停（用户停止 / 本站超时）：停在墙上就照墙记，否则交出已经拿到的结果
+      if (last && last.wall.kind !== 'none') return fail(wallStatus(last))
+      return last && last.items.length > 0 ? { ...base, status: 'ok', items: last.items } : fail('empty')
+    }
     return fail('network')
   }
-  const status = last?.wall.kind === 'login' ? 'needs-login' : 'blocked'
   // 被挡住时仍保留已经看到的那几张（Pinterest 未登录时的 gated pin）
-  return fail(status, last?.items ?? [])
+  return fail(wallStatus(last), last?.items ?? [])
 }

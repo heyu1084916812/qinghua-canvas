@@ -147,6 +147,60 @@ describe('runSiteAdapters', () => {
     expect(browserCalls).toEqual(['dribbble:tea:10', 'pinterest:tea:10'])
   })
 
+  it('一个站在等用户处理登录时，其它站跑完后只宽限一会儿：撤掉提示、先交出花瓣 / 站酷的结果（bug 1）', async () => {
+    const huaban = fakeAdapter('huaban', '花瓣', ['ok'], 4)
+    let promptSignal: AbortSignal | null = null
+    const walled: BrowserSiteAdapter = {
+      kind: 'browser',
+      id: 'pinterest',
+      label: 'Pinterest',
+      domain: 'pinterest.test',
+      reason: 'test',
+      async search(context, _request, signal) {
+        const decision = await context.resolveWall!({ siteId: 'pinterest', label: 'Pinterest', kind: 'login', reason: '需要登录', url: 'https://pinterest.test' }, signal)
+        return { id: 'pinterest', label: 'Pinterest', status: decision === 'cancel' ? 'needs-login' : 'ok', items: [], failureText: 'Pinterest 需要登录' }
+      },
+    }
+    // 提示自己永远不回答（用户走开了）；只有被撤掉（signal 中止）时才按取消返回
+    const resolveWall = vi.fn((_request: unknown, signal: AbortSignal) => {
+      promptSignal = signal
+      return new Promise<'continue' | 'cancel'>((resolve) => signal.addEventListener('abort', () => resolve('cancel')))
+    })
+    const started = Date.now()
+    const result = await runSiteAdapters(net(vi.fn()), {
+      queries: ['tea'],
+      imageMaxResults: 8,
+      delayMs: 0,
+      direct: [huaban],
+      browser: [walled],
+      browserContext: { browser: {} as never, resolveWall },
+      deadlines: { wallGrace: 20 },
+    }, new AbortController().signal)
+    expect(Date.now() - started).toBeLessThan(1_000)
+    expect(resolveWall).toHaveBeenCalledTimes(1)
+    expect(promptSignal!.aborted).toBe(true)
+    expect(result.usedSources).toEqual(['花瓣'])
+    expect(result.statuses.find((status) => status.id === 'pinterest')).toMatchObject({ status: 'needs-login', itemCount: 0 })
+  })
+
+  it('每站时限：慢站到点被叫停并记「响应太慢」，不拖住其它站', async () => {
+    const huaban = fakeAdapter('huaban', '花瓣', ['ok'], 4)
+    const slow: DirectSiteAdapter = {
+      kind: 'direct',
+      id: 'zcool',
+      label: '站酷',
+      domain: 'zcool.test',
+      search: (_network, _request, signal) => new Promise((resolve) => {
+        signal.addEventListener('abort', () => resolve({ id: 'zcool', label: '站酷', status: 'network', items: [], failureText: '站酷连不上' }))
+      }),
+    }
+    const result = await runSiteAdapters(net(vi.fn()), {
+      queries: ['tea'], imageMaxResults: 8, delayMs: 0, direct: [huaban, slow], browser: [], deadlines: { direct: 20 },
+    }, new AbortController().signal)
+    expect(result.usedSources).toEqual(['花瓣'])
+    expect(result.statuses.find((status) => status.id === 'zcool')).toMatchObject({ status: 'network', failureText: '站酷响应太慢，这次先跳过' })
+  })
+
   it('mergeSiteItems: without browser results the direct order is untouched', () => {
     const make = (source: 'huaban' | 'dribbble', n: number) =>
       Array.from({ length: n }, (_, i) => ({ id: `${source}${i}`, source, title: '', url: '', imageUrl: `${source}${i}` }) as DesignResearchItem)

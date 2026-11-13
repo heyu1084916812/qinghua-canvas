@@ -8874,7 +8874,8 @@
         "直连站点默认清单与请求间隔",
         "每站目标数与停止条件",
         "结果轮转合并与去重",
-        "usedSources 与站点状态汇总"
+        "usedSources 与站点状态汇总",
+        "每站时限与等用户处理的宽限（到点交出已有结果）"
       ],
       "doesNotOwn": [
         "单站请求与解析",
@@ -8887,12 +8888,15 @@
         "SiteAdapterRunInput",
         "SiteAdapterRunStatus",
         "SiteAdapterRunResult",
-        "runSiteAdapters"
+        "runSiteAdapters",
+        "DIRECT_SITE_DEADLINE_MS",
+        "BROWSER_SITE_DEADLINE_MS",
+        "WALL_GRACE_MS"
       ],
       "test": [
         "src/features/shared/research/siteAdapters/runSiteAdapters.test.ts"
       ],
-      "budget": 245
+      "budget": 345
     },
     {
       "module": "src/features/shared/research/webPageReader.ts",
@@ -11007,8 +11011,8 @@
       "responsibility": "用 Agent 后台浏览器跑一个设计站：打开、提取、等待验证自动放行、遇墙请用户处理后重试，跑完关窗口，同站串行。",
       "owns": [
         "单站加载与提取流程",
-        "验证页等待轮次与提示次数上限",
-        "用户取消后本次运行不再打扰",
+        "验证页等待轮次",
+        "每站每次应用运行最多提示一次",
         "同站互斥与关窗"
       ],
       "doesNotOwn": [
@@ -11078,7 +11082,8 @@
         "待办队列与订阅",
         "继续 / 取消回答",
         "中止即取消",
-        "提示卡标题与说明文案"
+        "提示卡标题与说明文案",
+        "提示超时即取消"
       ],
       "doesNotOwn": [
         "墙判定口径",
@@ -11091,7 +11096,8 @@
         "browserWallStore",
         "BROWSER_WALL_HEADLINE",
         "browserWallDetail",
-        "BrowserWallPrompt"
+        "BrowserWallPrompt",
+        "BROWSER_WALL_TIMEOUT_MS"
       ],
       "test": [
         "src/features/shared/research/agentBrowserWall.test.ts",
