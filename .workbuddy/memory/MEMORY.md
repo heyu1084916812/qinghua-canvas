@@ -12948,3 +12948,10 @@ unLogFastPage.ts 和 canvasLogQuery.ts，组件只负责状态、订阅和渲染
 - **「Agent 说没有搜索工具」先分两步查**：① 输入框「联网」开关是否开着 —— 关掉时 `agentToolsForCapabilities` 会把 `researchDesign` / `readPage` 整组移除，系统提示词也明说不要调用（可从截图 pill 判别：开启态是强调色 12% 填充 + 强调色文字，关闭态是透明 + `--text-2`）；② 开着时还缺，就看请求模式 —— `simple_generate` / `reference_edit` / `canvas_operation` 原本都不带联网工具，只能靠 `readCapabilities` 二次发现。现在联网开着时任何档位都补回这两枚；分类器也补了「找/搜/查 + 图片/素材/参考/灵感/案例/设计」意图（有画布动作词时不抢）。Tavily Key 与工具暴露无关。
 - **同一行图标颜色要同档**：`.iconBtn` 默认 `--text-2`、`ParamPicker` 的 chip 是 `--text-1`，混排时图标按钮会暗一档；已经用 `.barPills .iconBtn` 局部改掉，不要再把面板头部的次要动作一起提亮。
 - 复现/取证脚本放在 `.playwright-verify/bug-probe/`（gitignored）：`capture.mjs` + `after.mjs`，四组视口×主题，用系统 Chrome（`chromium.launch({ channel: 'chrome' })`），本机 Playwright 自带的 chromium 版本不匹配。
+
+## 2026-11-13 Agent 浏览器墙提示 / 交给 Agent（#1088 / #1089）
+
+- **真实 `<App/>` 截图带假原生端口**：不改业务代码，用一份 Vite 配置（`root` 指仓库）+ `resolveId` 插件，只在 `src/platform/index.ts` 解析 `./web/index` 时换成 shim，shim 调真 `createWebPlatform({...overrides, browserView, agentBrowser})`。必须跑在 **1420 端口**（共享存储 `qinghua-store` 的 CORS 只放 1420），数据目录用临时目录 `QINGHUA_DATA_DIR=/tmp/xxx QINGHUA_STORE_BACKEND=v1`。存档：项目 `work/harness-archive/agent-browser-harness/`，抓图 `work/agent-browser/capture.mjs`。
+- **输入框挂两行图片 chip 会溢出**：`.composer` 高度是固定变量（默认 104px），chip 行最高 62px + 正文保底 44px 装不下；有勾选图时用 `data-agent-research-staged` 把最小高度提到 174px。看几何要量面板 body 的 `scrollHeight`，肉眼只看到发送行被切。
+- `useAgentAttachmentsController.test.ts` 的 `render().update(next)` 以前**不会把新 props 传进 hook**（Probe 只读闭包），已改成读传入的 props；写「切会话」类用例时别再假设旧行为。
+- 沙箱 8G 内存：**vitest 四分片不能并行**（OOM，exit 137），也别和 `npm run check` / `vite build` / 开着的 dev 服务器同时跑；串行 `--shard=i/4 --maxWorkers=2` 用 `setsid nohup` 挂后台再轮询。
