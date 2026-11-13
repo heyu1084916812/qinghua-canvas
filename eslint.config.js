@@ -23,9 +23,7 @@ const ICON_KEEP = [
 
 const ICON_PENDING = [
   'src/app/ProjectTreeIcons.tsx',
-  'src/app/SettingsIcons.tsx',
   'src/app/TitleBar.tsx',
-  'src/features/shared/choicePicker/ChoicePicker.tsx',
   'src/pages/AssetsPage/AssetCard.tsx',
   'src/pages/AssetsPage/AssetPreview.tsx',
   'src/pages/CanvasPage/SkillLibraryOverlay.tsx',
@@ -34,7 +32,6 @@ const ICON_PENDING = [
   'src/pages/InspirationPage/InspirationPage.tsx',
   'src/pages/ProjectsPage/ProjectsPage.tsx',
   'src/pages/ProjectsPage/ProjectsPageViews.tsx',
-  'src/pages/SettingsPage/SettingsPicker.tsx',
   'src/pages/SkillsPage/SkillLibraryIcons.tsx',
   'src/pages/StoryboardPage/StoryboardIcons.tsx',
   'src/workbenches/canvas/menu/ContextMenu.tsx',

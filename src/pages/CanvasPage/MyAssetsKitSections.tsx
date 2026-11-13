@@ -97,7 +97,7 @@ export function KitAssetsSection({
                   {
                     id: 'reupload',
                     label: '重新上传',
-                    icon: <IconImageUpload size={14} />,
+                    icon: <IconImageUpload size="sm" />,
                     onSelect: () => onReupload(item),
                   },
                   {
@@ -307,7 +307,7 @@ export function KitFontsSection({
                     {
                       id: 'reupload',
                       label: '重新上传',
-                      icon: <IconImageUpload size={14} />,
+                      icon: <IconImageUpload size="sm" />,
                       onSelect: () => onUpload(font.id),
                     },
                     {

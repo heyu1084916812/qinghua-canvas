@@ -2,337 +2,191 @@
  * 全局设置左导航的线性图标（用户 2026-10-10 #8：
  * 「全局设置里面具体的功能需要在前面加图标，参考图五，要风格一样，配套的矢量图标」）。
  *
- * 与 `AppSidebarIcons`（一级导航那套）**同一套语言**：统一 1.6 描边、`currentColor`、
- * 不填充、24 视窗，尺寸由外层 CSS 给。两套分开住是有意的 ——
+ * 与 `AppSidebarIcons`（一级导航那套）**同一套语言**：尺寸三档、`currentColor`、
+ * 不填充、24 视窗、屏幕线宽 1.5。两套分开住是有意的 ——
  * 一级导航是"去哪儿"，设置是"调什么"，同形不同义。
  *
- * 为什么不引第三方图标库：这里只要 11 个形状，引入一套库等于多一份依赖 +
- * 与既有自建图标风格打架；手写这几个 path 换来的是"描边粗细、圆角、留白"完全一致。
+ * 第 2 批起几何全部来自 Lucide（`src/ui/icon`），本文件只做「语义名 → 图标」映射。
  */
-interface IconProps {
-  size?: number
-}
+import {
+  Bell,
+  Cable,
+  Camera,
+  CircleHelp,
+  CloudUpload,
+  Database,
+  Download,
+  Droplet,
+  EllipsisVertical,
+  Funnel,
+  GripVertical,
+  History,
+  Icon,
+  ImageUp,
+  Info,
+  Keyboard,
+  List,
+  NotebookText,
+  Package,
+  Palette,
+  Pencil,
+  Plug,
+  RotateCcw,
+  Search,
+  Settings,
+  SlidersHorizontal,
+  SquareTerminal,
+  Trash2,
+  Type,
+  X,
+  type IconSize,
+} from '../ui/icon'
 
-const BASE = {
-  fill: 'none',
-  stroke: 'currentColor',
-  strokeWidth: 1.6,
-  strokeLinecap: 'round' as const,
-  strokeLinejoin: 'round' as const,
-  'aria-hidden': true,
-  focusable: 'false' as const,
+interface IconProps {
+  size?: IconSize
 }
 
 /** 渠道配置：电源插头（"连到哪个站"） */
-export function IconChannels({ size = 16 }: IconProps) {
-  return (
-    <svg {...BASE} width={size} height={size} viewBox="0 0 24 24">
-      <path d="M9 3v5M15 3v5" />
-      <path d="M6.5 8h11v3.5a5.5 5.5 0 0 1-11 0Z" />
-      <path d="M12 17v4" />
-    </svg>
-  )
+export function IconChannels({ size = 'md' }: IconProps) {
+  return <Icon icon={Plug} size={size} />
 }
 
 /** CLI：终端提示符 */
-export function IconCli({ size = 16 }: IconProps) {
-  return (
-    <svg {...BASE} width={size} height={size} viewBox="0 0 24 24">
-      <rect x="3" y="4.5" width="18" height="15" rx="2" />
-      <path d="M7 9.5 10 12l-3 2.5M12.5 15h4" />
-    </svg>
-  )
+export function IconCli({ size = 'md' }: IconProps) {
+  return <Icon icon={SquareTerminal} size={size} />
 }
 
 /** 素材传输：云上传 */
-export function IconHosting({ size = 16 }: IconProps) {
-  return (
-    <svg {...BASE} width={size} height={size} viewBox="0 0 24 24">
-      <path d="M7 18h9.5a3.5 3.5 0 0 0 .3-7 5 5 0 0 0-9.6-1.4A3.8 3.8 0 0 0 7 18Z" />
-      <path d="M12 15v-4.5M10 12.5 12 10.5l2 2" />
-    </svg>
-  )
+export function IconHosting({ size = 'md' }: IconProps) {
+  return <Icon icon={CloudUpload} size={size} />
 }
 
 /** Canvas MCP：本机画布与外部 harness 之间的双向链路。 */
-export function IconMcpLink({ size = 16 }: IconProps) {
-  return (
-    <svg {...BASE} width={size} height={size} viewBox="0 0 24 24">
-      <rect x="3" y="5" width="8" height="7" rx="1.5" />
-      <rect x="13" y="12" width="8" height="7" rx="1.5" />
-      <path d="M11 8.5h3.5a2 2 0 0 1 2 2V12" />
-      <path d="M13 15.5H9.5a2 2 0 0 1-2-2V12" />
-      <path d="m14.3 10.3 1.4 1.4-1.4 1.4M9.7 11.3 8.3 12.7l1.4 1.4" />
-    </svg>
-  )
+export function IconMcpLink({ size = 'md' }: IconProps) {
+  return <Icon icon={Cable} size={size} />
 }
 
-/** 存储：数据库柱体 */
-export function IconStorage({ size = 16 }: IconProps) {
-  return (
-    <svg {...BASE} width={size} height={size} viewBox="0 0 24 24">
-      <ellipse cx="12" cy="6.5" rx="7" ry="2.8" />
-      <path d="M5 6.5v11c0 1.55 3.13 2.8 7 2.8s7-1.25 7-2.8v-11" />
-      <path d="M5 12c0 1.55 3.13 2.8 7 2.8s7-1.25 7-2.8" />
-    </svg>
-  )
+/** 存储：数据库 */
+export function IconStorage({ size = 'md' }: IconProps) {
+  return <Icon icon={Database} size={size} />
 }
 
-/** 总日志：带时间线的记录列表。 */
-export function IconLogs({ size = 16 }: IconProps) {
-  return (
-    <svg {...BASE} width={size} height={size} viewBox="0 0 24 24">
-      <path d="M5 5h14M5 12h14M5 19h14" />
-      <circle cx="3" cy="5" r="0.7" />
-      <circle cx="3" cy="12" r="0.7" />
-      <circle cx="3" cy="19" r="0.7" />
-    </svg>
-  )
+/** 总日志：记录列表。 */
+export function IconLogs({ size = 'md' }: IconProps) {
+  return <Icon icon={List} size={size} />
 }
 
 /** 外观与体验：调色板 */
-export function IconAppearance({ size = 16 }: IconProps) {
-  return (
-    <svg {...BASE} width={size} height={size} viewBox="0 0 24 24">
-      <path d="M12 3.5a8.5 8.5 0 0 0 0 17c1.4 0 2-.9 2-1.8 0-1.6-1.5-1.7-1.5-3 0-1 .8-1.7 2-1.7h1.6A4.4 4.4 0 0 0 20.5 10 8.5 8.5 0 0 0 12 3.5Z" />
-      <circle cx="8.4" cy="9" r="1" />
-      <circle cx="12" cy="7.4" r="1" />
-      <circle cx="15.6" cy="9" r="1" />
-    </svg>
-  )
+export function IconAppearance({ size = 'md' }: IconProps) {
+  return <Icon icon={Palette} size={size} />
 }
 
-/** 备份与恢复：时钟 + 回转箭头（回到某个时间点） */
-export function IconBackup({ size = 16 }: IconProps) {
-  return (
-    <svg {...BASE} width={size} height={size} viewBox="0 0 24 24">
-      <path d="M4.5 12a7.5 7.5 0 1 0 2.3-5.4" />
-      <path d="M4 4.5v3.2h3.2" />
-      <path d="M12 8v4.2l3 1.8" />
-    </svg>
-  )
+/** 备份与恢复：回到某个时间点（时钟 + 回转箭头） */
+export function IconBackup({ size = 'md' }: IconProps) {
+  return <Icon icon={History} size={size} />
 }
 
-/** 默认参数：三条滑杆 */
-export function IconDefaults({ size = 16 }: IconProps) {
-  return (
-    <svg {...BASE} width={size} height={size} viewBox="0 0 24 24">
-      <path d="M4 7.5h5M13 7.5h7M4 16.5h7M15 16.5h5" />
-      <circle cx="11" cy="7.5" r="2" />
-      <circle cx="13" cy="16.5" r="2" />
-    </svg>
-  )
+/** 默认参数：滑杆 */
+export function IconDefaults({ size = 'md' }: IconProps) {
+  return <Icon icon={SlidersHorizontal} size={size} />
 }
 
-/** Agent 与记忆：带折角的记忆卡。 */
-export function IconMemory({ size = 16 }: IconProps) {
-  return (
-    <svg {...BASE} width={size} height={size} viewBox="0 0 24 24">
-      <path d="M6 4.5h9l3 3v12H6Z" />
-      <path d="M15 4.5v3h3M9 11h6M9 14.5h6" />
-      <path d="M3.5 8.5v11h10" />
-    </svg>
-  )
+/** Agent 与记忆：记忆卡 */
+export function IconMemory({ size = 'md' }: IconProps) {
+  return <Icon icon={NotebookText} size={size} />
 }
 
 /** 扩展包：包裹盒 */
-export function IconPacks({ size = 16 }: IconProps) {
-  return (
-    <svg {...BASE} width={size} height={size} viewBox="0 0 24 24">
-      <path d="M12 3.5 20 7.5v9L12 20.5 4 16.5v-9Z" />
-      <path d="M4 7.5 12 11.5l8-4M12 11.5v9" />
-    </svg>
-  )
+export function IconPacks({ size = 'md' }: IconProps) {
+  return <Icon icon={Package} size={size} />
 }
 
 /** 通知：铃铛 */
-export function IconNotify({ size = 16 }: IconProps) {
-  return (
-    <svg {...BASE} width={size} height={size} viewBox="0 0 24 24">
-      <path d="M6.5 16.5v-5a5.5 5.5 0 0 1 11 0v5" />
-      <path d="M5 16.5h14" />
-      <path d="M10.3 19.2a1.9 1.9 0 0 0 3.4 0" />
-    </svg>
-  )
+export function IconNotify({ size = 'md' }: IconProps) {
+  return <Icon icon={Bell} size={size} />
 }
 
 /** 帮助：疑问圈 */
-export function IconHelp({ size = 16 }: IconProps) {
-  return (
-    <svg {...BASE} width={size} height={size} viewBox="0 0 24 24">
-      <circle cx="12" cy="12" r="8.5" />
-      <path d="M9.7 9.6a2.4 2.4 0 1 1 3.3 2.2c-.7.3-1 .8-1 1.6v.3" />
-      <path d="M12 16.6h.01" />
-    </svg>
-  )
+export function IconHelp({ size = 'md' }: IconProps) {
+  return <Icon icon={CircleHelp} size={size} />
 }
 
 /** 快捷键：键盘。 */
-export function IconKeyboard({ size = 16 }: IconProps) {
-  return (
-    <svg {...BASE} width={size} height={size} viewBox="0 0 24 24">
-      <rect x="3" y="7" width="18" height="10" rx="2" />
-      <path d="M7 10h.01M11 10h.01M15 10h.01M7 14h10" />
-    </svg>
-  )
+export function IconKeyboard({ size = 'md' }: IconProps) {
+  return <Icon icon={Keyboard} size={size} />
 }
 
-/** 快照：相机快门。 */
-export function IconSnapshot({ size = 16 }: IconProps) {
-  return (
-    <svg {...BASE} width={size} height={size} viewBox="0 0 24 24">
-      <rect x="3.5" y="7" width="17" height="13" rx="2" />
-      <path d="M8 7l1.2-2h5.6L16 7" />
-      <circle cx="12" cy="13.5" r="3.4" />
-    </svg>
-  )
+/** 快照：相机。 */
+export function IconSnapshot({ size = 'md' }: IconProps) {
+  return <Icon icon={Camera} size={size} />
 }
 
-/** 主题与颜色：色滴。 */
-export function IconPalette({ size = 16 }: IconProps) {
-  return (
-    <svg {...BASE} width={size} height={size} viewBox="0 0 24 24">
-      <path d="M12 3.5a8.5 8.5 0 0 0 0 17c1.4 0 2-.9 2-1.8 0-1.6-1.5-1.7-1.5-3 0-1 .8-1.7 2-1.7h1.6A4.4 4.4 0 0 0 20.5 10 8.5 8.5 0 0 0 12 3.5Z" />
-      <circle cx="8.4" cy="9" r="1" />
-      <circle cx="12" cy="7.4" r="1" />
-      <circle cx="15.6" cy="9" r="1" />
-    </svg>
-  )
+/** 主题与颜色：色滴（与「外观」的调色板区分开）。 */
+export function IconPalette({ size = 'md' }: IconProps) {
+  return <Icon icon={Droplet} size={size} />
 }
 
 /** 字体与文字：排版 T。 */
-export function IconTypography({ size = 16 }: IconProps) {
-  return (
-    <svg {...BASE} width={size} height={size} viewBox="0 0 24 24">
-      <path d="M5 7V5h14v2M12 5v14M9 19h6" />
-    </svg>
-  )
+export function IconTypography({ size = 'md' }: IconProps) {
+  return <Icon icon={Type} size={size} />
 }
 
 /** 关于与隐私：信息圈 */
-export function IconAbout({ size = 16 }: IconProps) {
-  return (
-    <svg {...BASE} width={size} height={size} viewBox="0 0 24 24">
-      <circle cx="12" cy="12" r="8.5" />
-      <path d="M12 10.6v5.6" />
-      <path d="M12 7.6h.01" />
-    </svg>
-  )
+export function IconAbout({ size = 'md' }: IconProps) {
+  return <Icon icon={Info} size={size} />
 }
 
 /** 编辑服务名称与连接配置。 */
-export function IconEdit({ size = 16 }: IconProps) {
-  return (
-    <svg {...BASE} width={size} height={size} viewBox="0 0 24 24">
-      <path d="m4.5 19.5 4.1-1 10-10a2.1 2.1 0 0 0-3-3l-10 10Z" />
-      <path d="m14.2 6.9 3 3" />
-    </svg>
-  )
+export function IconEdit({ size = 'md' }: IconProps) {
+  return <Icon icon={Pencil} size={size} />
 }
 
 /** 删除自定义模型服务。 */
-export function IconDelete({ size = 16 }: IconProps) {
-  return (
-    <svg {...BASE} width={size} height={size} viewBox="0 0 24 24">
-      <path d="M4.5 7h15M9 7V4.5h6V7M7 7l.8 12h8.4L17 7" />
-      <path d="M10 10.5v5M14 10.5v5" />
-    </svg>
-  )
+export function IconDelete({ size = 'md' }: IconProps) {
+  return <Icon icon={Trash2} size={size} />
 }
 
 /** 下载用户导入的协议文件。 */
-export function IconDownload({ size = 16 }: IconProps) {
-  return (
-    <svg {...BASE} width={size} height={size} viewBox="0 0 24 24">
-      <path d="M12 3v11M8 10l4 4 4-4" />
-      <path d="M5 18.5h14" />
-    </svg>
-  )
+export function IconDownload({ size = 'md' }: IconProps) {
+  return <Icon icon={Download} size={size} />
 }
 
 /** 打开服务行菜单。 */
-export function IconMoreVertical({ size = 16 }: IconProps) {
-  return (
-    <svg {...BASE} width={size} height={size} viewBox="0 0 24 24">
-      <circle cx="12" cy="5" r="1" fill="currentColor" stroke="none" />
-      <circle cx="12" cy="12" r="1" fill="currentColor" stroke="none" />
-      <circle cx="12" cy="19" r="1" fill="currentColor" stroke="none" />
-    </svg>
-  )
+export function IconMoreVertical({ size = 'md' }: IconProps) {
+  return <Icon icon={EllipsisVertical} size={size} />
 }
 
 /** 拖动排序把手。 */
-export function IconGrip({ size = 16 }: IconProps) {
-  return (
-    <svg {...BASE} width={size} height={size} viewBox="0 0 24 24">
-      <circle cx="8.5" cy="7" r="1" fill="currentColor" stroke="none" />
-      <circle cx="15.5" cy="7" r="1" fill="currentColor" stroke="none" />
-      <circle cx="8.5" cy="12" r="1" fill="currentColor" stroke="none" />
-      <circle cx="15.5" cy="12" r="1" fill="currentColor" stroke="none" />
-      <circle cx="8.5" cy="17" r="1" fill="currentColor" stroke="none" />
-      <circle cx="15.5" cy="17" r="1" fill="currentColor" stroke="none" />
-    </svg>
-  )
+export function IconGrip({ size = 'md' }: IconProps) {
+  return <Icon icon={GripVertical} size={size} />
 }
 
 /** 搜索模型服务。 */
-export function IconSearch({ size = 16 }: IconProps) {
-  return (
-    <svg {...BASE} width={size} height={size} viewBox="0 0 24 24">
-      <circle cx="10.8" cy="10.8" r="6.3" />
-      <path d="m15.5 15.5 4 4" />
-    </svg>
-  )
+export function IconSearch({ size = 'md' }: IconProps) {
+  return <Icon icon={Search} size={size} />
 }
 
 /** 按启用状态筛选。 */
-export function IconFilter({ size = 16 }: IconProps) {
-  return (
-    <svg {...BASE} width={size} height={size} viewBox="0 0 24 24">
-      <path d="M4.5 5.5h15l-6 7v5.2l-3 1.3v-6.5Z" />
-      <path d="M8 9h8M10 12h4" />
-    </svg>
-  )
+export function IconFilter({ size = 'md' }: IconProps) {
+  return <Icon icon={Funnel} size={size} />
 }
 
 /** 上传渠道头像。 */
-export function IconImageUpload({ size = 16 }: IconProps) {
-  return (
-    <svg {...BASE} width={size} height={size} viewBox="0 0 24 24">
-      <rect x="3.5" y="4.5" width="17" height="15" rx="2" />
-      <circle cx="8.5" cy="9" r="1.4" />
-      <path d="m5.5 17 4.4-4.2 3.2 2.8 2.5-2.2 2.9 3.6M17 3.5v5M14.5 6h5" />
-    </svg>
-  )
+export function IconImageUpload({ size = 'md' }: IconProps) {
+  return <Icon icon={ImageUp} size={size} />
 }
 
 /** 恢复内置头像。 */
-export function IconResetAvatar({ size = 16 }: IconProps) {
-  return (
-    <svg {...BASE} width={size} height={size} viewBox="0 0 24 24">
-      <path d="M5.2 8.2A7.5 7.5 0 1 1 4.5 13" />
-      <path d="M4.5 4.8v3.8h3.8" />
-      <circle cx="12" cy="10" r="2.2" />
-      <path d="M8.4 17a4.2 4.2 0 0 1 7.2 0" />
-    </svg>
-  )
+export function IconResetAvatar({ size = 'md' }: IconProps) {
+  return <Icon icon={RotateCcw} size={size} />
 }
 
 /** 打开服务资料编辑。 */
-export function IconGear({ size = 16 }: IconProps) {
-  return (
-    <svg {...BASE} width={size} height={size} viewBox="0 0 24 24">
-      <circle cx="12" cy="12" r="3" />
-      <path d="M19.2 13.2a7.6 7.6 0 0 0 0-2.4l2-1.5-2-3.4-2.4 1a8 8 0 0 0-2-1.2L14.5 3h-4l-.3 2.7a8 8 0 0 0-2 1.2l-2.4-1-2 3.4 2 1.5a7.6 7.6 0 0 0 0 2.4l-2 1.5 2 3.4 2.4-1a8 8 0 0 0 2 1.2l.3 2.7h4l.3-2.7a8 8 0 0 0 2-1.2l2.4 1 2-3.4Z" />
-    </svg>
-  )
+export function IconGear({ size = 'md' }: IconProps) {
+  return <Icon icon={Settings} size={size} />
 }
 
 /** 关闭浮层。 */
-export function IconClose({ size = 16 }: IconProps) {
-  return (
-    <svg {...BASE} width={size} height={size} viewBox="0 0 24 24">
-      <path d="m6 6 12 12M18 6 6 18" />
-    </svg>
-  )
+export function IconClose({ size = 'md' }: IconProps) {
+  return <Icon icon={X} size={size} />
 }

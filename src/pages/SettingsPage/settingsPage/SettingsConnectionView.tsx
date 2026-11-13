@@ -143,7 +143,7 @@ export function SettingsConnectionView({
                     key: 'download',
                     label: `下载协议 ${item.name}`,
                     title: '下载协议',
-                    icon: <IconDownload size={14} />,
+                    icon: <IconDownload size="sm" />,
                     onSelect: () => onDownloadProtocol(item),
                   },
                   {
@@ -152,7 +152,7 @@ export function SettingsConnectionView({
                     title: referencedProtocolIds.has(item.id)
                       ? '仍有渠道使用，先切换渠道协议再删除'
                       : '删除协议',
-                    icon: <IconDelete size={14} />,
+                    icon: <IconDelete size="sm" />,
                     danger: true,
                     disabled: referencedProtocolIds.has(item.id),
                     onSelect: () => onRemoveProtocol(item),

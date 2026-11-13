@@ -67,7 +67,7 @@ export function KitFontPicker({
       data-my-assets-font-picker
     >
       <label className={styles.search}>
-        <IconSearch size={14} />
+        <IconSearch size="sm" />
         <input
           ref={searchRef}
           value={query}

@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
+import { ChevronDown, Icon } from '../../../ui/icon'
 import styles from './ChoicePicker.module.css'
 
 export interface ChoiceOption {
@@ -115,20 +116,11 @@ export function ChoicePicker({
         ) : (
           <>
             <span className={styles.triggerLabel}>{current?.label ?? placeholder}</span>
-            <svg
+            <Icon
               className={open ? `${styles.chevron} ${styles.chevronOpen}` : styles.chevron}
-              width="14"
-              height="14"
-              viewBox="0 0 14 14"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.6"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              aria-hidden
-            >
-              <path d="M3.5 5.25 7 8.75l3.5-3.5" />
-            </svg>
+              icon={ChevronDown}
+              size="sm"
+            />
           </>
         )}
       </button>

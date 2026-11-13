@@ -38,7 +38,7 @@ export function SettingsProviderHeaderView({
           title="编辑服务资料"
           onClick={() => onEditProfile(channelId)}
         >
-          <IconGear size={16} />
+          <IconGear size="md" />
         </button>
       </div>
       <label className={styles.switch} title={enabled ? '停用模型服务' : '启用模型服务'}>

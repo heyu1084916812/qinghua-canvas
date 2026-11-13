@@ -86,7 +86,7 @@ export function ReferenceEmptyState({
           <IconImage size={20} />
         </span>
         <span className={`${styles.sheet} ${styles.front}`}>
-          <IconImageUpload size={22} />
+          <IconImageUpload size="lg" />
         </span>
       </div>
       <strong>从参考素材开始</strong>
@@ -98,7 +98,7 @@ export function ReferenceEmptyState({
           disabled={busy}
           onClick={onUpload}
         >
-          <IconImageUpload size={17} />
+          <IconImageUpload size="md" />
           上传文件
         </button>
         <button
@@ -122,7 +122,7 @@ export function ReferenceEmptyState({
           data-reference-empty-connector
           onClick={() => setMenu(menu === 'connector' ? null : 'connector')}
         >
-          <IconMcpLink size={17} />
+          <IconMcpLink size="md" />
           连接器
         </button>
       </div>

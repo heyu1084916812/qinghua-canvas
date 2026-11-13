@@ -57,7 +57,7 @@ export function SettingsChannelContextMenuView({
             disabled={busy}
             onClick={() => onConfirmDelete(channelId)}
           >
-            <IconDelete size={16} />
+            <IconDelete size="md" />
             确认删除
           </button>
           <button
@@ -79,7 +79,7 @@ export function SettingsChannelContextMenuView({
             data-channel-menu-edit={channelId}
             onClick={() => onEdit(channelId)}
           >
-            <IconEdit size={16} />
+            <IconEdit size="md" />
             编辑
           </button>
           {!builtin ? (
@@ -90,7 +90,7 @@ export function SettingsChannelContextMenuView({
               data-channel-menu-delete={channelId}
               onClick={onRequestDelete}
             >
-              <IconDelete size={16} />
+              <IconDelete size="md" />
               删除
             </button>
           ) : null}

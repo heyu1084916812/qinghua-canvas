@@ -20,6 +20,7 @@ import {
   IconStorage,
   IconTypography,
 } from './SettingsIcons'
+import type { IconSize } from '../ui/icon'
 import {
   GLOBAL_SETTINGS_BRIDGE_KEY,
   GLOBAL_SETTINGS_GROUPS,
@@ -114,7 +115,7 @@ const BackupPanel = lazy(() =>
  * 是数据、`state/ui` 里不该出现 JSX；映射放在这里，新增栏目忘了配图标会被 TS 立刻指出
  * （`Record<GlobalSettingsSection, …>` 少一个键就报错）。
  */
-const SECTION_ICONS: Record<GlobalSettingsSection, ComponentType<{ size?: number }>> = {
+const SECTION_ICONS: Record<GlobalSettingsSection, ComponentType<{ size?: IconSize }>> = {
   channels: IconChannels,
   cli: IconCli,
   hosting: IconHosting,
@@ -312,7 +313,7 @@ export function GlobalSettingsOverlay() {
                         onClick={() => openGlobalSettings(item.id)}
                       >
                         <span className={styles.navIcon} aria-hidden>
-                          <Icon size={16} />
+                          <Icon size="md" />
                         </span>
                         {item.label}
                       </button>

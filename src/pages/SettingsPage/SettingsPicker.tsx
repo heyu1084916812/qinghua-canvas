@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { ChevronDown, Icon } from '../../ui/icon'
 import styles from './SettingsPicker.module.css'
 
 /**
@@ -79,25 +80,9 @@ function usePickerMenu(open: boolean) {
   return { wrapRef, popRef, above, closeRef: setOpenRef }
 }
 
-/** V 形 chevron：展开时由 CSS 旋转 180° */
+/** V 形 chevron：展开时由 CSS 旋转 180°（几何走统一图标，尺寸 sm=14） */
 function Chevron({ className }: { className?: string }) {
-  return (
-    <svg
-      className={className}
-      width="14"
-      height="14"
-      viewBox="0 0 14 14"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.6"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-      focusable="false"
-    >
-      <path d="M3.5 5.25 7 8.75l3.5-3.5" />
-    </svg>
-  )
+  return <Icon icon={ChevronDown} size="sm" className={className} />
 }
 
 export interface StrategyPickerProps {

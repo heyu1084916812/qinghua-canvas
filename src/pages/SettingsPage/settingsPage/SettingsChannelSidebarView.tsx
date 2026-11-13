@@ -73,7 +73,7 @@ export function SettingsChannelSidebarView({
     <aside className={styles.sidebar} data-settings-sidebar>
       <div className={styles.sidebarTools} data-channel-tools>
         <div className={styles.channelSearch}>
-          <IconSearch size={16} />
+          <IconSearch size="md" />
           <input
             value={channelSearch}
             data-channel-search
@@ -87,7 +87,7 @@ export function SettingsChannelSidebarView({
             compact
             iconOnly
             alignEnd
-            triggerIcon={<IconFilter size={16} />}
+            triggerIcon={<IconFilter size="md" />}
             ariaLabel="筛选模型服务"
             options={CHANNEL_FILTER_OPTIONS}
             onChange={(value) => onFilterChange(value as ChannelFilterKey)}
@@ -149,7 +149,7 @@ export function SettingsChannelSidebarView({
                       }}
                       onDragEnd={onDragEnd}
                     >
-                      <IconGrip size={15} />
+                      <IconGrip size="sm" />
                     </button>
                   ) : null}
                 </span>
@@ -204,7 +204,7 @@ export function SettingsChannelSidebarView({
                     onPointerDown={(event) => event.stopPropagation()}
                     onClick={(event) => onOpenChannelMenuFromButton(event, ch.id)}
                   >
-                    <IconMoreVertical size={17} />
+                    <IconMoreVertical size="md" />
                   </button>
                 </span>
               </div>

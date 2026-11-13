@@ -64,7 +64,7 @@ export function SettingsProfileDrawerView({
             title="关闭"
             onClick={onClose}
           >
-            <IconClose size={18} />
+            <IconClose size="md" />
           </button>
         </header>
         <div className={styles.profileDrawerBody}>
@@ -78,7 +78,7 @@ export function SettingsProfileDrawerView({
           </div>
           <div className={styles.profileAvatarActions}>
             <label className={styles.profileAvatarButton} data-settings-profile-upload>
-              <IconImageUpload size={16} />
+              <IconImageUpload size="md" />
               图片上传
               <input
                 ref={fileInputRef}
@@ -97,7 +97,7 @@ export function SettingsProfileDrawerView({
               data-settings-profile-builtin
               onClick={onUseBuiltin}
             >
-              <IconChannels size={16} />
+              <IconChannels size="md" />
               内置头像
             </button>
             <button
@@ -106,7 +106,7 @@ export function SettingsProfileDrawerView({
               data-settings-profile-reset
               onClick={() => onResetIcon()}
             >
-              <IconResetAvatar size={16} />
+              <IconResetAvatar size="md" />
               重置头像
             </button>
           </div>
