@@ -3,7 +3,7 @@ import type { DesignResearchItem } from '../../../../domain/inspiration/designRe
 import type { NetworkPort } from '../../../../platform/ports'
 import { BROWSER_SITE_ADAPTERS } from './browserSiteAdapters'
 import { HUABAN_SEARCH_ENDPOINT } from './huabanAdapter'
-import { DIRECT_SITE_ADAPTERS, mergeSiteItems, runSiteAdapters } from './runSiteAdapters'
+import { DIRECT_SITE_ADAPTERS, mergeSiteItems, queriesForSite, runSiteAdapters } from './runSiteAdapters'
 import type { BrowserSiteAdapter, BrowserSiteContext, DirectSiteAdapter, SiteAdapterOutcome } from './types'
 import { ZCOOL_SEARCH_ENDPOINT } from './zcoolAdapter'
 import huabanFixture from './fixtures/huaban-search-pins.json?raw'
@@ -222,6 +222,28 @@ describe('runSiteAdapters', () => {
     }, new AbortController().signal)
     expect(result.usedSources).toEqual(['花瓣'])
     expect(result.statuses.find((status) => status.id === 'zcool')).toMatchObject({ status: 'network', failureText: '站酷响应太慢，这次先跳过' })
+  })
+
+  it('英文站先用模型给的英文角度；没有英文角度就照原顺序（第一个打头）', async () => {
+    expect(queriesForSite(['茶叶包装设计', 'tea packaging design', '茶叶礼盒包装', 'tea packaging'], 'en'))
+      .toEqual(['tea packaging design', 'tea packaging', '茶叶包装设计', '茶叶礼盒包装'])
+    expect(queriesForSite(['茶叶包装设计', '茶叶礼盒'], 'en')).toEqual(['茶叶包装设计', '茶叶礼盒'])
+    expect(queriesForSite(['茶叶包装设计', 'tea packaging'])).toEqual(['茶叶包装设计', 'tea packaging'])
+    expect(BROWSER_SITE_ADAPTERS.every((adapter) => adapter.queryLanguage === 'en')).toBe(true)
+
+    const calls: string[] = []
+    const english: BrowserSiteAdapter = {
+      kind: 'browser', id: 'packagingoftheworld', label: 'POTW', domain: 'potw.test', reason: 'test', queryLanguage: 'en',
+      async search(_context, request) {
+        calls.push(request.query)
+        return { id: 'packagingoftheworld', label: 'POTW', status: 'empty', items: [] }
+      },
+    }
+    await runSiteAdapters(net(vi.fn()), {
+      queries: ['茶叶包装设计', '茶叶礼盒包装', 'tea packaging'], imageMaxResults: 8, delayMs: 0, direct: [], browser: [english], browserContext: { browser: {} as never },
+    }, new AbortController().signal)
+    // 浏览器站只跑两个角度：英文那条一定在里面，而且排第一
+    expect(calls).toEqual(['tea packaging', '茶叶包装设计'])
   })
 
   it('mergeSiteItems: without browser results the direct order is untouched', () => {

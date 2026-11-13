@@ -51,12 +51,19 @@ export interface SiteSearchRequest {
   queryIndex: number
 }
 
+/**
+ * 站内搜索认哪种语言的检索词：`en` = 英文站（中文词基本搜不到，先用模型给的英文角度）；
+ * 缺省 / `any` = 按模型给的顺序。
+ */
+export type SiteQueryLanguage = 'en' | 'any'
+
 /** 应用 HTTP 客户端可直连的站点。 */
 export interface DirectSiteAdapter {
   kind: 'direct'
   id: SiteAdapterId
   label: string
   domain: string
+  queryLanguage?: SiteQueryLanguage
   search: (
     network: NetworkPort,
     request: SiteSearchRequest,
@@ -99,6 +106,7 @@ export interface BrowserSiteAdapter {
   domain: string
   /** 为什么只能走浏览器（实测原因，写进报告与状态）。 */
   reason: string
+  queryLanguage?: SiteQueryLanguage
   search?: (
     context: BrowserSiteContext,
     request: SiteSearchRequest,

@@ -24,6 +24,8 @@ function adapterOf(spec: BrowserSiteSpec): BrowserSiteAdapter {
     label: spec.label,
     domain: spec.domain,
     reason: REASONS[spec.id],
+    // 四站都是英文站：先用模型给的英文角度（live-run：POTW 中文词 0 条）
+    queryLanguage: 'en',
     search: (context, request, signal) => runBrowserSite(spec, context, request, signal),
   }
 }

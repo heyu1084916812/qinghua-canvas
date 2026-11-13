@@ -8753,12 +8753,13 @@
         "SiteSearchRequest",
         "DirectSiteAdapter",
         "BrowserSiteAdapter",
-        "SiteAdapter"
+        "SiteAdapter",
+        "SiteQueryLanguage"
       ],
       "test": [
         "src/features/shared/research/siteAdapters/runSiteAdapters.test.ts"
       ],
-      "budget": 115
+      "budget": 140
     },
     {
       "module": "src/features/shared/research/siteAdapters/siteFetch.ts",
@@ -8875,7 +8876,8 @@
         "每站目标数与停止条件",
         "结果轮转合并与去重",
         "usedSources 与站点状态汇总",
-        "每站时限与等用户处理的宽限（到点交出已有结果）"
+        "每站时限与等用户处理的宽限（到点交出已有结果）",
+        "按站点语言排检索角度（英文站优先英文角度）"
       ],
       "doesNotOwn": [
         "单站请求与解析",
@@ -8891,12 +8893,13 @@
         "runSiteAdapters",
         "DIRECT_SITE_DEADLINE_MS",
         "BROWSER_SITE_DEADLINE_MS",
-        "WALL_GRACE_MS"
+        "WALL_GRACE_MS",
+        "queriesForSite"
       ],
       "test": [
         "src/features/shared/research/siteAdapters/runSiteAdapters.test.ts"
       ],
-      "budget": 345
+      "budget": 360
     },
     {
       "module": "src/features/shared/research/webPageReader.ts",

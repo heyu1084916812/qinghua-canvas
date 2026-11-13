@@ -10,6 +10,7 @@ import type {
   SiteAdapterOutcome,
   SiteAdapterStatus,
   SiteAdapterId,
+  SiteQueryLanguage,
 } from './types'
 import { zcoolAdapter } from './zcoolAdapter'
 
@@ -146,6 +147,18 @@ async function runOneSite(
   }
 }
 
+const CJK = /[\u3400-\u9fff\uf900-\ufaff]/
+
+/**
+ * 给一个站排检索角度（2026-11-14）：英文站把模型给的英文角度排前面（中文词在 POTW / Dieline 基本搜不到；
+ * 离线没有翻译，只能用模型给的英文角度），没有英文角度就照原顺序（第一个角度打头）。
+ */
+export function queriesForSite(queries: readonly string[], language: SiteQueryLanguage = 'any'): string[] {
+  if (language !== 'en') return [...queries]
+  const english = queries.filter((query) => !CJK.test(query))
+  return english.length > 0 ? [...english, ...queries.filter((query) => CJK.test(query))] : [...queries]
+}
+
 /** 浏览器站点每站至少要几张（一页搜索结果通常 20–40 张，取前若干）。 */
 const BROWSER_SITE_MIN_TARGET = 8
 
@@ -176,8 +189,8 @@ async function runBrowserAdapter(
   signal: AbortSignal,
 ): Promise<SiteAdapterOutcome> {
   let last: SiteAdapterOutcome = { id: adapter.id, label: adapter.label, status: 'empty', items: [] }
-  // 一页搜索结果就够多：先用第一个检索角度，没有命中再换第二个
-  for (const [queryIndex, query] of queries.slice(0, 2).entries()) {
+  // 一页搜索结果就够多：先用第一个检索角度（英文站优先英文角度），没有命中再换第二个
+  for (const [queryIndex, query] of queriesForSite(queries, adapter.queryLanguage).slice(0, 2).entries()) {
     if (signal.aborted || !adapter.search) break
     try {
       last = await adapter.search(context, { query, limit: target, queryIndex }, signal)
@@ -235,7 +248,7 @@ export async function runSiteAdapters(
     : direct.map(async (adapter) => {
         const site = siteSignal(signal, directDeadline)
         try {
-          const run = await runOneSite(adapter, network, queries, target, input.delayMs ?? SITE_ADAPTER_DELAY_MS, site.signal)
+          const run = await runOneSite(adapter, network, queriesForSite(queries, adapter.queryLanguage), target, input.delayMs ?? SITE_ADAPTER_DELAY_MS, site.signal)
           if (site.timedOut() && run.items.length === 0) {
             return { items: run.items, outcome: { ...run.outcome, status: 'network' as const, failureText: slowText(adapter.label) } }
           }
