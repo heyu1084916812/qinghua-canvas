@@ -39,6 +39,7 @@ import type { LoopData } from '../../../../domain/canvas/model/node'
 import { normalizeLoopParams } from '../../../../domain/canvas/loop/loopPlan'
 import { useAssetThumbUrl } from '../../../../features/shared/assets/index'
 import { TokenEditor, type TokenEditorHandle } from '../../text/TokenEditor'
+import { Icon, Image, Plus, TextCursor, X } from '../../../../ui/icon'
 import styles from './LoopNodeView.module.css'
 import { loopImageStatusText } from '../../../../domain/canvas/loop/loopImageStatus'
 
@@ -657,13 +658,7 @@ function NumberControl({
  * 形状照 lucide 手写，笔画由坐标定义。 */
 
 function IconImage() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} aria-hidden="true">
-      <rect x="3" y="3" width="18" height="18" rx="2" />
-      <circle cx="9" cy="9" r="2" />
-      <path d="m21 15-3.5-3.5L9 20" />
-    </svg>
-  )
+  return <Icon icon={Image} size="sm" />
 }
 
 /*
@@ -672,43 +667,13 @@ function IconImage() {
  * （用户 2026-09-28：文本符号「＋ / ×」在圆形按钮里看起来始终偏，故换成矢量图标）。
  */
 function IconPlus() {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={2}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <path d="M12 5v14M5 12h14" />
-    </svg>
-  )
+  return <Icon icon={Plus} size="sm" />
 }
 
 function IconClose() {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={2}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <path d="M18 6 6 18M6 6l12 12" />
-    </svg>
-  )
+  return <Icon icon={X} size="sm" />
 }
 
 function IconTextCursor() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} aria-hidden="true">
-      <path d="M4 7V5h16v2" />
-      <path d="M12 5v14" />
-      <path d="M9 19h6" />
-    </svg>
-  )
+  return <Icon icon={TextCursor} size="sm" />
 }

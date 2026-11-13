@@ -37,6 +37,7 @@
 import type { InputPortAsset, NodeViewProps } from '../registry'
 import type { FusionData } from '../../../../domain/canvas/model/node'
 import { useAssetThumbUrl } from '../../../../features/shared/assets/index'
+import { Check, Circle, Icon, Image, TriangleAlert } from '../../../../ui/icon'
 import styles from './FusionNodeView.module.css'
 
 export function FusionNodeView(props: NodeViewProps) {
@@ -265,29 +266,15 @@ function PatchPane({
 /* ── 内联 SVG 图标（一律矢量、24×24 居中 viewBox） ── */
 
 function IconCheck() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="m4 12.5 5 5L20 6.5" />
-    </svg>
-  )
+  return <Icon icon={Check} size="sm" />
 }
 
 function IconDot() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.4} aria-hidden="true">
-      <circle cx="12" cy="12" r="8" />
-    </svg>
-  )
+  return <Icon icon={Circle} size="sm" />
 }
 
 function IconImage() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinejoin="round" aria-hidden="true">
-      <rect x="3" y="4" width="18" height="16" rx="2" />
-      <circle cx="8.5" cy="9.5" r="1.6" />
-      <path d="m4 17 5-5 4 4 3-3 4 4" />
-    </svg>
-  )
+  return <Icon icon={Image} size="sm" />
 }
 
 function shortContextReason(kind: InputPortAsset['missingContextKind']): string {
@@ -299,11 +286,5 @@ function shortContextReason(kind: InputPortAsset['missingContextKind']): string 
 }
 
 function IconAlert() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M12 3 2.8 20h18.4L12 3Z" />
-      <path d="M12 9v5" />
-      <circle cx="12" cy="17.2" r=".8" fill="currentColor" stroke="none" />
-    </svg>
-  )
+  return <Icon icon={TriangleAlert} size="sm" />
 }

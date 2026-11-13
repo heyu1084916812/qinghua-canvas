@@ -20,6 +20,8 @@ const ICON_KEEP = [
   'src/workbenches/canvas/flow/FlowDraftLayer.tsx',
   'src/workbenches/canvas/flow/FlowSnapLayer.tsx',
   'src/workbenches/canvas/icons/presetGlyph.tsx',
+  // 生成节点的「素材交换」徽标是用户指定形状（两根圆角轴 + 实心头，上下镜像），换库会破坏既有几何测试
+  'src/workbenches/canvas/nodes/generation/GenerationNodeView.tsx',
   'src/workbenches/canvas/panels/presetIcons.tsx',
 ]
 
@@ -27,9 +29,6 @@ const ICON_PENDING = [
   'src/app/TitleBar.tsx',
   'src/pages/EcommercePage/EcommerceWorkbenchViews.tsx',
   'src/pages/EcommercePage/LongImagePanel.tsx',
-  'src/workbenches/canvas/nodes/fusion/FusionNodeView.tsx',
-  'src/workbenches/canvas/nodes/generation/GenerationNodeView.tsx',
-  'src/workbenches/canvas/nodes/loop/LoopNodeView.tsx',
   'src/workbenches/canvas/toolbar/icons.tsx',
   'src/workbenches/ecommerce/EcommerceSelect.tsx',
   'src/workbenches/ecommerce/studio/EcommerceStudioModeParametersProduct.tsx',
