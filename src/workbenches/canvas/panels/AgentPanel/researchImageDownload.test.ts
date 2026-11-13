@@ -15,7 +15,7 @@ describe('downloadResearchImageBytes（2026-11-14 调研图片下载走公开网
     const request = vi.fn(async () => response(JPEG))
     const { platform, saveFile } = platformWith(request)
     expect(await downloadResearchImageBytes(platform, 'https://cdn.cosmos.so/abc?format=jpeg', 'Tea', new AbortController().signal)).toBe('saved')
-    expect(request.mock.calls[0]?.[0]).toMatchObject({ publicOnly: true, method: 'GET' })
+    expect((request.mock.calls[0] as unknown[] | undefined)?.[0]).toMatchObject({ publicOnly: true, method: 'GET' })
     expect(saveFile).toHaveBeenCalledWith('Tea.jpg', expect.any(Blob))
   })
 
