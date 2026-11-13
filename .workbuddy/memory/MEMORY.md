@@ -1,5 +1,12 @@
 # CanvasFlow（轻画）项目记忆
 
+### 2026-11-13 本仓库可能有**另一个代理/会话同时在工作** —— 不要用 git stash
+
+- 现象：一次「看起来工作区是干净的」`git stash push -q && … && git stash pop -q`，push 因为无改动没有建条目，pop 却把**别人留下的** `stash@{0}`（日志分页 WIP）弹了出来，产生 4 个 UU 冲突，还差点覆盖别的会话的改动。
+- 结论：共享 checkout 里**禁止用 stash 做「临时回退看旧版」**，除非先 `git stash list` 并确认没有别人的条目。要看旧版就用 `git show HEAD:path` 或临时 worktree；要回退自己的改动就 `git checkout -- <自己改过的文件>`。
+- 如果已经弹错：`git stash list` 确认对方条目还在，对冲突文件 `git checkout --ours -- <files>` + `git reset`，把工作区恢复成 HEAD；**不要** `git stash drop` 别人的条目。
+- 提交前先 `git log --oneline -3` 和 `git status` 复看 —— HEAD 可能已被另一会话推进，自己的提交应在自己的 HEAD 之后。
+
 ### 2026-11-13 图标统一 第 0 批（Lucide + Icon 出口）
 
 - `lucide-react` 1.x 把 `absoluteStrokeWidth` 标成 deprecated（换成 `nonScalingStroke`，语义不同）。要「屏幕线宽恒定」就自己算：`strokeWidth = 1.5 * 24 / size`，React 形态与 `iconSvgString` 共用 `gridStrokeWidth`，单测比对两者逐字一致。

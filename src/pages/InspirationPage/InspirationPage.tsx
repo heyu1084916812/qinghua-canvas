@@ -121,6 +121,9 @@ export function InspirationPage() {
   const [query, setQuery] = useState('')
   const [sourceId, setSourceId] = useState<string | null>(null)
   const [modelCategory, setModelCategory] = useState<string | null>(null)
+  /** 筛选条是否被压缩到需要横滚（窄窗口）：只有这时才加右侧渐隐，避免宽屏把最后一枚 chip 也淡掉。 */
+  const modelStripRef = useRef<HTMLDivElement | null>(null)
+  const [modelStripOverflow, setModelStripOverflow] = useState(false)
   const [tag, setTag] = useState<string | null>(null)
   const [tagsCollapsed, setTagsCollapsed] = useState(false)
   const [limit, setLimit] = useState(PAGE_SIZE)
@@ -332,6 +335,15 @@ export function InspirationPage() {
   useEffect(() => {
     if (modelCategory && !modelCategories.includes(modelCategory)) setModelCategory(null)
   }, [modelCategory, modelCategories])
+  useEffect(() => {
+    const el = modelStripRef.current
+    if (!el) return
+    const update = () => setModelStripOverflow(el.scrollWidth > el.clientWidth + 1)
+    update()
+    const observer = new ResizeObserver(update)
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [modelCategories.length])
   const sourceNameOf = useCallback(
     (id: string) => sources.find((source) => source.id === id)?.name ?? id,
     [sources],
@@ -447,7 +459,13 @@ export function InspirationPage() {
           aria-label="搜索灵感案例"
           data-inspiration-search
         />
-        <div className={styles.modelButtons} role="group" aria-label="模型分类">
+        <div
+          className={styles.modelButtons}
+          role="group"
+          aria-label="模型分类"
+          ref={modelStripRef}
+          data-overflow={modelStripOverflow ? 'true' : undefined}
+        >
           <button
             type="button"
             className={modelCategory === null ? styles.modelButtonOn : styles.modelButton}

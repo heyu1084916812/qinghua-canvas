@@ -56,7 +56,9 @@
   flex: none;
   padding: 0 var(--space-6) var(--space-3);
   display: flex;
-  flex-wrap: wrap;
+  /* 筛选与管理按钮**同一行**：搜索框可缩、筛选条自身横向滚动，
+     右侧按钮永远留在原位（1024 宽度下不会掉到第二行）。 */
+  flex-wrap: nowrap;
   align-items: center;
   gap: var(--space-3);
   border-bottom: var(--border);
@@ -64,6 +66,9 @@
 
 .search {
   flex: 0 1 320px;
+  /* 空间不够时**先缩搜索框**（系数远大于筛选条），筛选条尽量保持完整、放不下才横滚 */
+  flex-shrink: 1000;
+  min-width: 100px;
   height: 34px;
   padding: 0 var(--space-3);
   border: var(--border);
@@ -75,12 +80,24 @@
 
 .modelButtons {
   display: flex;
-  flex-wrap: wrap;
+  flex: 1 1 auto;
+  min-width: 0;
+  /* 窄窗口下只让这一条横滚，不把右侧管理按钮挤到下一行 */
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
   gap: var(--space-1);
+}
+
+/* 真的滚起来时才渐隐右缘，提示「还有筛选没露出来」 */
+.modelButtons[data-overflow='true'] {
+  mask-image: linear-gradient(to right, currentColor calc(100% - 20px), transparent);
 }
 
 .modelButton,
 .modelButtonOn {
+  flex: 0 0 auto;
+  white-space: nowrap;
   height: 30px;
   padding: 0 var(--space-3);
   border: var(--border);
@@ -104,14 +121,36 @@
 }
 
 .toolbarActions {
-  margin-left: auto;
+  flex: 0 0 auto;
   display: flex;
   gap: var(--space-2);
 }
 
+/*
+ * 窄窗口（≤1180）：搜索框独占一行，筛选条与右侧管理按钮**同一行**。
+ * 用户 2026-11-13 反馈「筛选和管理排成两行」—— 掉下去的是管理按钮那一组；
+ * 现在搜索框让出整行，筛选条自己横滚，管理按钮始终贴着筛选条。
+ */
+@media (max-width: 1180px) {
+  .toolbar {
+    flex-wrap: wrap;
+  }
+
+  .search {
+    flex: 1 1 100%;
+  }
+
+  .modelButtons {
+    /* basis 0：只吃剩余宽度（再横滚），不占满整行把管理按钮挤下去 */
+    flex: 1 1 0;
+  }
+}
+
 .count {
+  flex: 0 0 auto;
   font-size: var(--fs-chip);
   color: var(--text-3);
+  white-space: nowrap;
 }
 
 .warn {
