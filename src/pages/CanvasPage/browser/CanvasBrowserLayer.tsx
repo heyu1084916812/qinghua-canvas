@@ -14,15 +14,12 @@ import {
   type BrowserWindowRect,
   type BrowserWindowStage,
 } from '../../../domain/canvas/browserWindow'
-import { isPublicHttpUrl } from '../../../domain/shared/publicUrl'
+import { canGoBack, canGoForward } from '../../../domain/canvas/browserNavigation'
 import { createClipperCollectionRepository } from '../../../state/shared/clipperCollectionRepository'
-import {
-  IconClose,
-  IconExpand,
-  IconImage,
-  IconLink,
-} from '../../../workbenches/canvas/toolbar/icons'
 import { captureClipperPage } from '../clipper/clipperCapture'
+import { CanvasBrowserToolbar } from './CanvasBrowserToolbar'
+import { CanvasBrowserError, CanvasBrowserStartPage } from './CanvasBrowserStates'
+import { useCanvasBrowserNav } from './useCanvasBrowserNav'
 import styles from './CanvasBrowserLayer.module.css'
 
 type GestureMode = 'move' | 'resize'
@@ -34,6 +31,10 @@ interface Gesture {
   start: BrowserWindowRect
 }
 
+/**
+ * 画布浏览器浮层（2026-11-13 重做）：单行工具条（导航 + 地址栏 + 动作）、加载进度条、
+ * 起始页（设计站点快捷入口）、错误态。`url` 为空时打开起始页。
+ */
 export function CanvasBrowserLayer({
   url,
   onClose,
@@ -51,9 +52,8 @@ export function CanvasBrowserLayer({
   const controllerRef = useRef<AbortController | null>(null)
   const [stage, setStage] = useState<BrowserWindowStage>({ width: 0, height: 0 })
   const [rect, setRect] = useState<BrowserWindowRect | null>(null)
-  const [currentUrl, setCurrentUrl] = useState(url)
-  const [draftUrl, setDraftUrl] = useState(url)
-  const [browserKey, setBrowserKey] = useState(0)
+  const nav = useCanvasBrowserNav(url)
+  const currentUrl = nav.url
   const [busy, setBusy] = useState(false)
   const [status, setStatus] = useState('')
 
@@ -71,16 +71,15 @@ export function CanvasBrowserLayer({
   }, [])
 
   useEffect(() => {
-    setCurrentUrl(url)
-    setDraftUrl(url)
-    setBrowserKey((value) => value + 1)
-    setStatus('')
-  }, [url])
-
-  useEffect(() => {
     if (stage.width <= 0 || stage.height <= 0) return
     setRect(fitBrowserWindow(stage))
-  }, [stage.height, stage.width, url])
+  }, [stage.height, stage.width])
+
+  useEffect(() => {
+    if (!status) return
+    const timer = window.setTimeout(() => setStatus(''), 4000)
+    return () => window.clearTimeout(timer)
+  }, [status])
 
   useEffect(() => {
     const move = (event: PointerEvent) => {
@@ -155,20 +154,16 @@ export function CanvasBrowserLayer({
     setRect(resizeBrowserWindow(rect, delta.x, delta.y, stage))
   }
 
-  const navigate = () => {
-    const target = normalizeUrl(draftUrl)
-    if (!target) {
-      setStatus('请输入公开的 http / https 网页地址')
-      return
-    }
-    setCurrentUrl(target)
-    setDraftUrl(target)
-    setBrowserKey((value) => value + 1)
+  const go = (target: string) => {
+    nav.dispatch({ type: 'go', url: target })
     setStatus('')
+  }
+  const openExternal = () => {
+    if (currentUrl) void openUrl(currentUrl)
   }
 
   const savePage = async () => {
-    if (busy) return
+    if (busy || !currentUrl) return
     setBusy(true)
     setStatus('正在读取当前网页…')
     const controller = new AbortController()
@@ -214,83 +209,46 @@ export function CanvasBrowserLayer({
             height: rect.height,
           }}
           data-canvas-browser
+          data-state={nav.state.phase}
           aria-label="画布浏览器"
         >
-          <header
-            className={styles.dragBar}
-            data-canvas-browser-drag
-            tabIndex={0}
-            aria-label="画布浏览器标题栏，可用方向键移动"
-            onPointerDown={(event) => beginGesture(event, 'move')}
-            onKeyDown={moveWithKeyboard}
-          >
-            <span>轻画浏览器</span>
-            <div className={styles.actions}>
-              <button
-                type="button"
-                className={styles.iconButton}
-                data-canvas-browser-save
-                aria-label="收藏当前网页"
-                title="收藏当前网页"
-                disabled={busy}
-                onClick={() => void savePage()}
-              >
-                <IconImage size={15} />
-              </button>
-              <button
-                type="button"
-                className={styles.iconButton}
-                aria-label="重置浏览器窗口"
-                title="重置浏览器窗口"
-                onClick={() => setRect(fitBrowserWindow(stage))}
-              >
-                <IconExpand size={15} />
-              </button>
-              <button
-                type="button"
-                className={styles.iconButton}
-                aria-label="在系统浏览器打开"
-                title="在系统浏览器打开"
-                onClick={() => void openUrl(currentUrl)}
-              >
-                <IconLink size={15} />
-              </button>
-              <button
-                type="button"
-                className={styles.iconButton}
-                data-canvas-browser-close
-                aria-label="关闭画布浏览器"
-                title="关闭画布浏览器"
-                onClick={onClose}
-              >
-                <IconClose size={15} />
-              </button>
-            </div>
-          </header>
-          <form
-            className={styles.address}
-            onSubmit={(event) => {
-              event.preventDefault()
-              navigate()
-            }}
-          >
-            <input
-              value={draftUrl}
-              data-canvas-browser-url
-              inputMode="url"
-              aria-label="画布浏览器地址"
-              onChange={(event) => setDraftUrl(event.target.value)}
-            />
-            <button type="submit">打开</button>
-          </form>
-          <div className={styles.viewport}>
-            <iframe
-              key={browserKey}
-              src={currentUrl}
-              title="轻画画布浏览器"
-              referrerPolicy="no-referrer"
-              sandbox="allow-forms allow-popups allow-scripts"
-            />
+          <CanvasBrowserToolbar
+            url={currentUrl}
+            loading={nav.state.phase === 'loading'}
+            canBack={canGoBack(nav.state)}
+            canForward={canGoForward(nav.state)}
+            saving={busy}
+            onNavigate={go}
+            onBack={() => nav.dispatch({ type: 'back' })}
+            onForward={() => nav.dispatch({ type: 'forward' })}
+            onReloadOrStop={() => nav.dispatch({ type: nav.state.phase === 'loading' ? 'stop' : 'reload' })}
+            onSave={() => void savePage()}
+            onOpenExternal={openExternal}
+            onResetWindow={() => setRect(fitBrowserWindow(stage))}
+            onClose={onClose}
+            onAddressError={setStatus}
+            onDragStart={(event) => beginGesture(event, 'move')}
+            onDragKey={moveWithKeyboard}
+          />
+          <div className={styles.viewport} data-canvas-browser-content>
+            {nav.state.phase === 'blank' ? (
+              <CanvasBrowserStartPage onOpen={go} />
+            ) : nav.state.phase === 'error' ? (
+              <CanvasBrowserError
+                message={nav.state.error}
+                onRetry={() => nav.dispatch({ type: 'reload' })}
+                onOpenExternal={openExternal}
+              />
+            ) : (
+              <iframe
+                key={nav.state.revision}
+                src={currentUrl}
+                title={nav.state.title || '轻画画布浏览器'}
+                referrerPolicy="no-referrer"
+                sandbox="allow-forms allow-popups allow-scripts"
+                onLoad={() => nav.dispatch({ type: 'loaded' })}
+              />
+            )}
           </div>
           {status ? (
             <p className={styles.status} role="status" aria-live="polite">
@@ -310,15 +268,6 @@ export function CanvasBrowserLayer({
       ) : null}
     </div>
   )
-}
-
-function normalizeUrl(value: string): string {
-  try {
-    const url = new URL(value.trim())
-    return isPublicHttpUrl(url.toString()) ? url.toString() : ''
-  } catch {
-    return ''
-  }
 }
 
 function keyboardDelta(key: string, step: number) {

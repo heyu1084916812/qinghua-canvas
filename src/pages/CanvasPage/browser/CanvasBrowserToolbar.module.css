@@ -1,0 +1,206 @@
+.toolbar {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-width: 0;
+  height: 44px;
+  padding: 0 var(--space-2) 0 var(--space-1);
+  border-bottom: 1px solid var(--stroke);
+  background: var(--bg-surface);
+  cursor: move;
+  user-select: none;
+}
+
+.grip {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 28px;
+  border-radius: var(--radius-control);
+  color: var(--text-3);
+  cursor: grab;
+}
+
+.grip:hover {
+  color: var(--text-2);
+}
+
+.group {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 2px;
+}
+
+.toolButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--text-2);
+  cursor: pointer;
+  transition: background var(--dur-hover) var(--ease-out), color var(--dur-hover) var(--ease-out);
+}
+
+.toolButton:hover:not(:disabled) {
+  background: var(--bg-hover);
+  color: var(--text-1);
+}
+
+.toolButton:disabled {
+  color: var(--text-3);
+  cursor: default;
+  opacity: 0.5;
+}
+
+.agentSlot {
+  display: inline-flex;
+  align-items: center;
+}
+
+.address {
+  position: relative;
+  display: flex;
+  flex: 1 1 auto;
+  align-items: center;
+  min-width: 0;
+  height: 30px;
+  margin: 0 var(--space-1);
+  border: 1px solid transparent;
+  border-radius: var(--radius-pill);
+  background: var(--bg-subtle);
+  cursor: text;
+  transition: border-color var(--dur-hover) var(--ease-out), background var(--dur-hover) var(--ease-out);
+}
+
+.address:hover {
+  background: var(--bg-hover);
+}
+
+.address[data-focused='true'] {
+  border-color: var(--stroke-focus);
+  background: var(--bg-surface);
+}
+
+.addressIcon {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  padding: 0 6px 0 10px;
+  color: var(--text-3);
+}
+
+.addressIcon[data-secure='true'] {
+  color: var(--text-2);
+}
+
+.address input {
+  flex: 1 1 auto;
+  width: 100%;
+  min-width: 0;
+  height: 100%;
+  padding: 0 12px 0 0;
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: var(--text-1);
+  font: inherit;
+  font-size: var(--fs-label);
+  user-select: text;
+}
+
+.address input::placeholder {
+  color: var(--text-3);
+}
+
+.address[data-focused='false'] input:not(:placeholder-shown) {
+  color: transparent;
+}
+
+.addressDisplay {
+  position: absolute;
+  top: 0;
+  right: 12px;
+  bottom: 0;
+  left: 32px;
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text-3);
+  font-size: var(--fs-label);
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.addressDisplay strong {
+  flex: none;
+  color: var(--text-1);
+  font-weight: 500;
+}
+
+.addressDisplay span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.progress {
+  position: absolute;
+  right: 0;
+  bottom: -1px;
+  left: 0;
+  height: 2px;
+  overflow: hidden;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 200ms var(--ease-out);
+}
+
+.progress::after {
+  position: absolute;
+  inset: 0;
+  background: var(--text-1);
+  content: '';
+  transform: scaleX(0.08);
+  transform-origin: left center;
+}
+
+.toolbar[data-loading='true'] .progress {
+  opacity: 1;
+}
+
+.toolbar[data-loading='true'] .progress::after {
+  animation: browser-progress 8s cubic-bezier(0.1, 0.7, 0.2, 1) forwards;
+}
+
+@keyframes browser-progress {
+  from {
+    transform: scaleX(0.08);
+  }
+
+  to {
+    transform: scaleX(0.9);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .toolbar[data-loading='true'] .progress::after {
+    animation: none;
+    transform: scaleX(0.5);
+  }
+}
+
+.grip:focus-visible,
+.toolButton:focus-visible {
+  outline: 1px solid var(--stroke-focus);
+  outline-offset: -1px;
+}

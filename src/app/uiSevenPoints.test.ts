@@ -59,6 +59,7 @@ describe('seven UI placement fixes', () => {
     const agentWebSearch = read('features/settings/AgentWebSearchSettings.tsx')
     const referenceLightbox = read('pages/CanvasPage/ReferenceLightbox.tsx')
     const canvasBrowser = read('pages/CanvasPage/browser/CanvasBrowserLayer.tsx')
+    const canvasBrowserToolbar = read('pages/CanvasPage/browser/CanvasBrowserToolbar.tsx')
     const clipperPanel = read('pages/CanvasPage/clipper/ClipperPanel.tsx')
     const clipperExtensionUpdate = read(
       'pages/CanvasPage/clipper/ClipperExtensionUpdateNotice.tsx',
@@ -82,7 +83,7 @@ describe('seven UI placement fixes', () => {
     expect(myAssetsDock).not.toContain("querySelector('[data-my-assets-drawer]')")
     expect(canvas).toContain('data-canvas-stage')
     expect(canvas).toContain('CanvasBrowserLayer')
-    expect(canvas).toContain('canvasBrowserUrl')
+    expect(canvas).toContain('canvasBrowserOpen')
     expect(canvas).toContain('data-canvas-browser-open')
     expect(canvas).not.toContain('AssetsPage/ContextKitsDialog')
     expect(canvas).toContain('styles.topLeftActions')
@@ -185,7 +186,7 @@ describe('seven UI placement fixes', () => {
     expect(referenceKit).toContain('disabledKinds={DISABLED_KIT_KINDS}')
     expect(referenceKit).not.toContain('const KIT_KIND_OPTIONS')
     expect(canvasBrowser).toContain('data-canvas-browser-layer')
-    expect(canvasBrowser).toContain('data-canvas-browser-save')
+    expect(canvasBrowserToolbar).toContain('data-canvas-browser-save')
     expect(canvasBrowser).toContain('captureClipperPage')
     expect(clipperPanel).not.toContain('ClipperInstallCard')
     expect(clipperPanel).not.toContain('ClipperPairing')

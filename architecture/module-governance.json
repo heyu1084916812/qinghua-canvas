@@ -1393,9 +1393,9 @@
     {
       "module": "src/pages/CanvasPage/browser/CanvasBrowserLayer.tsx",
       "owner": "canvas-browser-overlay",
-      "responsibility": "在画布舞台内渲染可拖动、可缩放、可收藏当前页的浏览器浮层。",
+      "responsibility": "在画布舞台内组装可拖动、可缩放的浏览器浮层：工具条、起始页 / 错误态 / 网页内容与当前页收藏。",
       "owns": [
-        "画布浏览器地址栏和 iframe",
+        "浏览器窗口外框与内容区切换",
         "窗口拖动、缩放与重置",
         "当前页网页收藏动作"
       ],
@@ -10464,6 +10464,193 @@
         "src/pages/CanvasPage/skillLibraryOverlay.test.ts"
       ],
       "budget": 80
+    },
+    {
+      "module": "src/domain/canvas/browserAddress.ts",
+      "owner": "canvas-browser-address",
+      "responsibility": "把画布浏览器地址栏的输入规范成公开 http/https 网址，并拆出主机名与路径供地址栏显示。",
+      "owns": [
+        "补 https 协议、拒绝非网址与内网地址的规则",
+        "地址栏的主机名 / 路径拆分"
+      ],
+      "doesNotOwn": [
+        "搜索引擎兜底（明确不做）",
+        "浏览器窗口与导航状态"
+      ],
+      "publicApi": [
+        "BrowserAddressResult",
+        "normalizeBrowserAddress",
+        "browserAddressError",
+        "BrowserAddressParts",
+        "describeBrowserAddress"
+      ],
+      "test": [
+        "src/domain/canvas/browserAddress.test.ts"
+      ],
+      "budget": 90
+    },
+    {
+      "module": "src/domain/canvas/browserNavigation.ts",
+      "owner": "canvas-browser-navigation",
+      "responsibility": "用纯 reducer 维护画布浏览器的历史栈、加载阶段、标题与错误，供 iframe 与原生 webview 两种后端共用。",
+      "owns": [
+        "前进 / 后退 / 刷新 / 停止的状态迁移",
+        "把后端回报的地址提交合并进历史栈"
+      ],
+      "doesNotOwn": [
+        "真正的网页加载与渲染",
+        "地址规范化规则"
+      ],
+      "publicApi": [
+        "BrowserPhase",
+        "BrowserNavState",
+        "BrowserNavAction",
+        "INITIAL_BROWSER_NAV",
+        "currentBrowserUrl",
+        "canGoBack",
+        "canGoForward",
+        "browserNavReducer"
+      ],
+      "test": [
+        "src/domain/canvas/browserNavigation.test.ts"
+      ],
+      "budget": 160
+    },
+    {
+      "module": "src/pages/CanvasPage/browser/useCanvasBrowserNav.ts",
+      "owner": "canvas-browser-nav-hook",
+      "responsibility": "把导航 reducer 接到 React，并在加载超时后把画布浏览器切到错误态。",
+      "owns": [
+        "画布浏览器导航状态的 React 绑定",
+        "加载超时判定"
+      ],
+      "doesNotOwn": [
+        "导航状态迁移规则",
+        "后端（iframe / 原生视图）的具体调用"
+      ],
+      "publicApi": [
+        "BROWSER_LOAD_TIMEOUT_MS",
+        "CanvasBrowserNav",
+        "useCanvasBrowserNav"
+      ],
+      "test": [
+        "src/domain/canvas/browserNavigation.test.ts"
+      ],
+      "budget": 70
+    },
+    {
+      "module": "src/pages/CanvasPage/browser/browserQuickSites.ts",
+      "owner": "canvas-browser-quick-sites",
+      "responsibility": "从调研固定来源里挑出画布浏览器起始页的六个设计站点快捷入口。",
+      "owns": [
+        "起始页快捷站点的落地网址与徽记"
+      ],
+      "doesNotOwn": [
+        "设计站点名单本身",
+        "起始页的渲染"
+      ],
+      "publicApi": [
+        "BrowserQuickSite",
+        "BROWSER_QUICK_SITES"
+      ],
+      "test": [
+        "src/pages/CanvasPage/browser/browserQuickSites.test.ts"
+      ],
+      "budget": 45
+    },
+    {
+      "module": "src/pages/CanvasPage/browser/CanvasBrowserToolbar.tsx",
+      "owner": "canvas-browser-toolbar",
+      "responsibility": "渲染画布浏览器的单行工具条：拖动柄、前进后退刷新、地址栏、收藏与关闭等动作和加载进度条。",
+      "owns": [
+        "地址栏聚焦全选、回车跳转与主机名显示",
+        "工具条按钮与 Agent 按钮预留位"
+      ],
+      "doesNotOwn": [
+        "导航状态与网页加载",
+        "窗口拖动几何"
+      ],
+      "publicApi": [
+        "CanvasBrowserToolbarProps",
+        "CanvasBrowserToolbar"
+      ],
+      "test": [
+        "src/pages/CanvasPage/browser/browserQuickSites.test.ts",
+        "src/domain/canvas/browserNavigation.test.ts",
+        "src/domain/canvas/browserAddress.test.ts",
+        "src/app/uiSevenPoints.test.ts"
+      ],
+      "budget": 220
+    },
+    {
+      "module": "src/pages/CanvasPage/browser/CanvasBrowserToolbar.module.css",
+      "owner": "canvas-browser-toolbar-style",
+      "responsibility": "定义画布浏览器工具条、地址栏胶囊与加载进度条的样式。",
+      "owns": [
+        "工具条按钮与地址栏外观",
+        "加载进度条动画"
+      ],
+      "doesNotOwn": [
+        "全局颜色和间距令牌",
+        "浏览器窗口外框"
+      ],
+      "publicApi": [
+        "CSS_MODULE:canvas-browser-toolbar",
+        "CSS_CLASS:toolbar",
+        "CSS_CLASS:address",
+        "CSS_CLASS:progress"
+      ],
+      "test": [
+        "src/app/uiSevenPoints.test.ts"
+      ],
+      "budget": 230
+    },
+    {
+      "module": "src/pages/CanvasPage/browser/CanvasBrowserStates.tsx",
+      "owner": "canvas-browser-states",
+      "responsibility": "渲染画布浏览器内容区的起始页（设计站点快捷入口）与加载失败的错误态。",
+      "owns": [
+        "起始页快捷入口",
+        "错误态的重试与系统浏览器打开"
+      ],
+      "doesNotOwn": [
+        "快捷站点名单",
+        "网页内容本身"
+      ],
+      "publicApi": [
+        "CanvasBrowserStartPage",
+        "CanvasBrowserError"
+      ],
+      "test": [
+        "src/pages/CanvasPage/browser/browserQuickSites.test.ts",
+        "src/domain/canvas/browserNavigation.test.ts",
+        "src/domain/canvas/browserAddress.test.ts",
+        "src/app/uiSevenPoints.test.ts"
+      ],
+      "budget": 100
+    },
+    {
+      "module": "src/pages/CanvasPage/browser/CanvasBrowserStates.module.css",
+      "owner": "canvas-browser-states-style",
+      "responsibility": "定义画布浏览器起始页磁贴与错误态的样式。",
+      "owns": [
+        "起始页磁贴网格",
+        "错误态按钮与提示"
+      ],
+      "doesNotOwn": [
+        "全局颜色和间距令牌",
+        "工具条样式"
+      ],
+      "publicApi": [
+        "CSS_MODULE:canvas-browser-states",
+        "CSS_CLASS:start",
+        "CSS_CLASS:quick",
+        "CSS_CLASS:error"
+      ],
+      "test": [
+        "src/app/uiSevenPoints.test.ts"
+      ],
+      "budget": 175
     }
   ]
 }

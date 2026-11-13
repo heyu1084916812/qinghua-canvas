@@ -17,7 +17,9 @@ export type { LucideIcon as IconGlyph } from 'lucide-react'
 
 export {
   ArrowDown,
+  ArrowLeft,
   ArrowLeftRight,
+  ArrowRight,
   ArrowUp,
   AtSign,
   Bell,
@@ -72,6 +74,7 @@ export {
   History,
   House,
   Image,
+  ImageDown,
   Images,
   ImageUp,
   Info,
@@ -86,6 +89,7 @@ export {
   ListChecks,
   ListOrdered,
   LoaderCircle,
+  Lock,
   Maximize2,
   MessageCircle,
   Minimize2,

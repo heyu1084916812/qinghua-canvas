@@ -139,7 +139,7 @@ function CanvasProject({ projectId }: { projectId: string }) {
   const myAssetsDockRef = useRef<MyAssetsDockStore | null>(null)
   myAssetsDockRef.current ??= createMyAssetsDockStore()
   const myAssetsDock = myAssetsDockRef.current
-  const [canvasBrowserUrl, setCanvasBrowserUrl] = useState('')
+  const [canvasBrowserOpen, setCanvasBrowserOpen] = useState(false)
   /**
    * 水合完成的计数（只用来**触发重跑**，值本身没意义）。
    *
@@ -492,7 +492,7 @@ function CanvasProject({ projectId }: { projectId: string }) {
               data-canvas-browser-open
               aria-label="打开画布浏览器"
               title="打开画布浏览器"
-              onClick={() => setCanvasBrowserUrl('https://www.bing.com/')}
+              onClick={() => setCanvasBrowserOpen(true)}
             >
               浏览器
             </button>
@@ -536,11 +536,11 @@ function CanvasProject({ projectId }: { projectId: string }) {
             onCreateNode={addNodeAtCenter}
             onImportAsset={() => void importAssetAtCenter()}
           />
-          {canvasBrowserUrl ? (
+          {canvasBrowserOpen ? (
             <Suspense fallback={null}>
               <CanvasBrowserLayer
-                url={canvasBrowserUrl}
-                onClose={() => setCanvasBrowserUrl('')}
+                url=""
+                onClose={() => setCanvasBrowserOpen(false)}
               />
             </Suspense>
           ) : null}
