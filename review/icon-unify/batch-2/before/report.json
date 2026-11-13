@@ -1,0 +1,30 @@
+[
+  {
+    "variant": "1440x900-light",
+    "sidebarIcons": 11,
+    "overlayIcons": 17,
+    "overflowX": false,
+    "errors": []
+  },
+  {
+    "variant": "1440x900-dark",
+    "sidebarIcons": 11,
+    "overlayIcons": 17,
+    "overflowX": false,
+    "errors": []
+  },
+  {
+    "variant": "1024x700-light",
+    "sidebarIcons": 11,
+    "overlayIcons": 17,
+    "overflowX": false,
+    "errors": []
+  },
+  {
+    "variant": "1024x700-dark",
+    "sidebarIcons": 11,
+    "overlayIcons": 17,
+    "overflowX": false,
+    "errors": []
+  }
+]
