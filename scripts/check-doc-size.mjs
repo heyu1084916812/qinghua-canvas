@@ -39,7 +39,6 @@ export const MAX_LINE_CHARS = 12000
 export const LEGACY = {
   '轻画-架构设计文档.md': 4968,
   '轻画-产品设计文档.md': 4513,
-  'RELEASE_NOTES.md': 1378,
   '轻画-工作台解耦与公共能力重构方案.md': 1354,
   '轻画-Agent设计文档.md': 1259,
   '轻画-画布引擎替换方案.md': 891,
@@ -56,7 +55,7 @@ export const LEGACY = {
   '轻画-交付功能与设置梳理.md': 252,
   '轻画-设置页清单与稿子.md': 250,
   '轻画-方向调研与可行性判断.md': 197,
-  '文档总索引.md': 213,
+  '文档总索引.md': 215,
   '轻画-下一步实施设计.md': 187,
   '轻画-电商参数区一比一复刻设计.md': 141,
   '轻画-图标统一方案.md': 140,
@@ -69,7 +68,41 @@ export const LEGACY = {
   'ledger/02-缺口汇总主表.md': 1471,
   'ledger/按批记录-2026-09.md': 625,
   'ledger/按批记录-2026-10.md': 5141,
-  'ledger/按批记录-2026-11.md': 3172,
+  'ledger/按批记录-2026-11.md': 3180,
+  // 发行说明：一个版本一篇（2026-11-14 拆分）。旧版本文件只读。
+  'release-notes/archive-0.1.0-and-earlier.md': 900,
+  'release-notes/v0.1.1.md': 34,
+  'release-notes/v0.1.2.md': 36,
+  'release-notes/v0.1.3.md': 18,
+  'release-notes/v0.1.4.md': 35,
+  'release-notes/v0.1.6.md': 26,
+  'release-notes/v0.1.7.md': 30,
+  'release-notes/v0.1.8.md': 28,
+  'release-notes/v0.1.9.md': 33,
+  'release-notes/v0.1.10.md': 26,
+  'release-notes/v0.1.11.md': 20,
+  'release-notes/v0.1.12.md': 28,
+  'release-notes/v0.1.13.md': 31,
+  'release-notes/v0.1.14.md': 56,
+  'release-notes/v0.1.16.md': 33,
+  'release-notes/v0.1.17.md': 46,
+  // 项目记忆（2026-11-14 拆分）：MEMORY.md 只留索引，必读四节在 ESSENTIALS，历史按月归档。
+  '.workbuddy/memory/2026-09-04.md': 223,
+  '.workbuddy/memory/2026-09-05.md': 56,
+  '.workbuddy/memory/2026-09-06.md': 77,
+  '.workbuddy/memory/2026-09-08.md': 39,
+  '.workbuddy/memory/2026-09-09.md': 86,
+  '.workbuddy/memory/2026-09-10.md': 185,
+  '.workbuddy/memory/2026-09-11.md': 507,
+  '.workbuddy/memory/2026-09-12.md': 777,
+  '.workbuddy/memory/2026-09-13.md': 108,
+  '.workbuddy/memory/2026-09-14.md': 171,
+  '.workbuddy/memory/2026-09-15.md': 186,
+  '.workbuddy/memory/ESSENTIALS.md': 3735,
+  '.workbuddy/memory/INVARIANTS.md': 1217,
+  '.workbuddy/memory/archive/2026-09.md': 290,
+  '.workbuddy/memory/archive/2026-10.md': 6903,
+  '.workbuddy/memory/archive/2026-11.md': 2067,
 }
 
 /**
@@ -78,10 +111,16 @@ export const LEGACY = {
 export const BUDGET = {
   // 拆分后只剩「未结项 + 图例 + 规则」；历史在 ledger/。
   '轻画-功能对账清单.md': 400,
+  // 拆分后只剩「版本索引 + 写新版本说明的规矩」；每个版本在 release-notes/。
+  'RELEASE_NOTES.md': 200,
+  // 拆分后只剩索引；必读四节在 ESSENTIALS.md，历史在 .workbuddy/memory/archive/。
+  '.workbuddy/memory/MEMORY.md': 300,
 }
 
-/** 递归收集文档：根目录 + 这几个约定目录（`review/`、`.workbuddy/` 等历史证据目录不进闸门）。 */
-const TRACKED_SUBDIRS = ['ledger', 'release-notes', 'docs']
+/** 递归收集文档：根目录 + 这几个目录（`review/` 等一次性证据目录不进闸门）。 */
+const TRACKED_SUBDIRS = ['ledger', 'release-notes', 'docs', '.workbuddy/memory']
+
+const tracked = (rel) => TRACKED_SUBDIRS.some((t) => rel === t || t.startsWith(`${rel}/`))
 
 /** 纯函数：文本 → { lineCount, maxLine, maxLineNo }（末尾换行不计行） */
 export function measureText(text) {
@@ -136,7 +175,7 @@ function walk(dir, out = []) {
   for (const e of entries) {
     const rel = dir ? `${dir}/${e.name}` : e.name
     if (e.isDirectory()) {
-      if (dir === '' && TRACKED_SUBDIRS.includes(e.name)) walk(e.name, out)
+      if (tracked(rel)) walk(rel, out)
       continue
     }
     if (e.name.toLowerCase().endsWith('.md')) out.push(rel)

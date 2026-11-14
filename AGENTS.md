@@ -9,7 +9,7 @@ AI 的上下文会压缩、不会累积，新会话从零开始。**故项目状
 1. `轻画-功能对账清单.md` —— 唯一的真相源。**重点看「五、缺口汇总（当前未结项）」**，那里就是当前欠着的事；
    历史逐批记录与已结项证据在 `ledger/`（编号索引见 `ledger/README.md`，用 `rg "编号" ledger/` 查）
 2. `轻画-架构设计文档.md` —— 代码该怎么组织
-3. `.workbuddy/memory/MEMORY.md` —— 操作教训与环境坑；改 canvas / comic 内部前必读同目录 `INVARIANTS.md`
+3. `.workbuddy/memory/MEMORY.md`（索引）→ 同目录 `ESSENTIALS.md`（必读四节原文：架构 / 节奏 / 进度 / 工具教训）；改 canvas / comic 内部前必读同目录 `INVARIANTS.md`
 
 产品需求细节再查 `轻画-产品设计文档.md`。**文档与代码冲突时，以对账清单为准。**
 

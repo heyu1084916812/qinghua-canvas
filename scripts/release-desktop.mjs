@@ -35,16 +35,28 @@ const valueOf = (name) => {
   return i >= 0 ? args[i + 1] : null
 }
 
+/**
+ * 取某个版本的更新说明。
+ * 2026-11-14 起发行说明按版本拆成 `release-notes/v<版本>.md`（见 #1099），
+ * 所以先找那一份；找不到再回退旧的单文件写法（老版本 / 手工补的情况）。
+ */
 function releaseNotesFor(version) {
-  const lines = readFileSync(path.join(ROOT, 'RELEASE_NOTES.md'), 'utf8').split(/\r?\n/)
-  const start = lines.findIndex((line) => line.startsWith(`## ${version} `))
-  if (start < 0) return `轻画 ${version}`
-  const section = []
-  for (const line of lines.slice(start + 1)) {
-    if (line.trim() === '---') break
-    section.push(line)
+  const splitFile = path.join(ROOT, 'release-notes', `v${version}.md`)
+  const candidates = [splitFile, path.join(ROOT, 'RELEASE_NOTES.md')]
+  for (const file of candidates) {
+    if (!existsSync(file)) continue
+    const lines = readFileSync(file, 'utf8').split(/\r?\n/)
+    const start = lines.findIndex((line) => line.startsWith(`## ${version} `))
+    if (start < 0) continue
+    const section = []
+    for (const line of lines.slice(start + 1)) {
+      if (line.trim() === '---') break
+      section.push(line)
+    }
+    const text = section.join('\n').trim()
+    if (text) return text
   }
-  return section.join('\n').trim() || `轻画 ${version}`
+  return `轻画 ${version}`
 }
 
 /** 产物名**必须 ASCII**：中文名在 URL 里要百分号编码，换一个宿主就可能取不到文件 */
