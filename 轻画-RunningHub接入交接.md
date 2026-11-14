@@ -52,6 +52,8 @@ RunningHub 的**四种 API 已摸清并落了两层代码**（领域参数模型
 | `src/platform/channels/runninghubAccount.ts` | `accountStatus` → 状态行一句事实（金额 / RH 币 / 积分 / 账号类型） | `runninghub.test.ts`（`rhAccountNote`） |
 | `src/state/channel/workflowEntryStore.ts` | 工作流条目按渠道存 `presets` 一行（`workflow:entries:<channelId>`） | `workflowEntryStore.test.ts` 4 |
 | `src/features/settings/SettingsWorkflowEntries.tsx` | RunningHub 渠道里的「工作流条目」区块：从市场（只列运行时长）/ 手填 id 添加 → 拉参数 → 注册 `workflow:<id>` 模型 → 删除 / 重新拉参数 | `SettingsWorkflowEntries.test.ts` + `scripts/probe-workflow-entries.mjs`（四组视口×主题截图） |
+| `src/domain/project/workflowFieldKinds.ts` | 字段候选值字典（采样器 / 调度器 / 比例 / 分辨率…）+ 类型标签（复刻 canvas-xiong） | `workflowFieldKinds.test.ts` 4 |
+| `src/features/settings/WorkflowFieldEditor.tsx` | 参数暴露编辑器：**左预览 / 右清单**（勾选 / 显示名 / 类型 / 候选 / 范围 / 图序 / 随机 / 必填 + 全部暴露·全部隐藏） | `SettingsWorkflowEntries.test.ts` |
 
 ### 改动
 
@@ -76,7 +78,7 @@ npx vitest run src/domain/project/workflowParams.test.ts src/domain/project/work
 | --- | --- | --- | --- |
 | **1104** | 工作流条目端到端 | 🧩 代码链路已通（设置页入口 + 执行接线已上） | 缺：节点上的参数渲染与「暴露/隐藏」面板（#1105 / #1106）、媒体字段 `fileName` 接线、**真机跑通**（仍卡付费积分） |
 | **1105** | 生成节点「来源」切换（api / runninghub / cli） | 📝 未做（UI） | `data.source` 默认 `api`，**api 分支行为必须一字不变**；不新建节点类型 |
-| **1106** | 参数「暴露 / 隐藏」面板 | 📝 待你定 UI 落点 | 我建议放**设置 → 渠道 → RunningHub → 条目详情**；字段需要 `enabled / label / group / 类型 / min·max·step / options / seed / bind_prompt` |
+| **1106** | 参数「暴露 / 隐藏」面板 | 🧩 **设置页已落地**（复刻 canvas-xiong 左预览/右清单） | 缺：节点侧渲染（#1105）、可选图 `prune-workflow / skip` 两种模式 |
 | **1107** | AI 应用参数如实化 | 🧩 领域+平台已落地 | 缺 UI；`runApp()` 里那四个写死字段名（`prompt / aspectRatio / resolution / duration`）应改成读字段表 |
 | **1111** | 吃官方 `developer-kit`（500+ 模型 + 参数枚举 + CNY 参考价） | 📝 未做 | 生成脚本改吃 `model-registry.public.json`；`options` 自动填；**参考价不许当积分显示** |
 | **1112** | 接第四种路线 `LLM` | 📝 未做 | 标准 OpenAI 兼容 ⇒ 走现有 `openai-compatible` 族，**不需要新适配器** |

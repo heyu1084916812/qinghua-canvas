@@ -18,6 +18,7 @@ import {
   type RhMarketEntry,
 } from '../../platform/channels/runninghubMarket'
 import { fetchWorkflowFields } from '../../platform/channels/runninghubWorkflow'
+import { WorkflowFieldEditor } from './WorkflowFieldEditor'
 import styles from './SettingsWorkflowEntries.module.css'
 
 /**
@@ -54,6 +55,7 @@ export function SettingsWorkflowEntries({
   const [marketLoading, setMarketLoading] = useState(false)
   const [market, setMarket] = useState<RhMarketEntry[]>([])
   const [manualId, setManualId] = useState('')
+  const [editingId, setEditingId] = useState<string | null>(null)
 
   useEffect(() => {
     let alive = true
@@ -222,6 +224,19 @@ export function SettingsWorkflowEntries({
     [entries, persist, pullFields],
   )
 
+  /** 参数面板保存：字段表整份替换，`workflow:<id>` 的类别跟着「暴露出来的媒体」重算 */
+  const saveFields = useCallback(
+    async (entry: WorkflowEntry, fields: WorkflowEntry['fields']) => {
+      const next = entries.map((item) => (item.id === entry.id ? { ...item, fields } : item))
+      await persist(next)
+      const updated = next.find((item) => item.id === entry.id)
+      if (updated) await registerModel(updated)
+      setEditingId(null)
+      setNotice(`「${entry.title}」参数已保存：暴露 ${fields.filter((field) => field.enabled).length} 个`)
+    },
+    [entries, persist, registerModel],
+  )
+
   return (
     <section className={styles.block} data-workflow-entries>
       <div className={styles.head}>
@@ -306,6 +321,14 @@ export function SettingsWorkflowEntries({
                   type="button"
                   className={styles.linkBtn}
                   disabled={busy}
+                  onClick={() => setEditingId((current) => (current === entry.id ? null : entry.id))}
+                >
+                  {editingId === entry.id ? '收起参数' : '参数'}
+                </button>
+                <button
+                  type="button"
+                  className={styles.linkBtn}
+                  disabled={busy}
                   onClick={() => void refreshEntry(entry)}
                 >
                   重新拉参数
@@ -319,6 +342,14 @@ export function SettingsWorkflowEntries({
                   删除
                 </button>
               </div>
+              {editingId === entry.id ? (
+                <WorkflowFieldEditor
+                  entry={entry}
+                  busy={busy}
+                  onClose={() => setEditingId(null)}
+                  onSave={(fields) => saveFields(entry, fields)}
+                />
+              ) : null}
             </li>
           ))}
         </ul>

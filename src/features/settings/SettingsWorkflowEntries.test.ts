@@ -5,6 +5,7 @@ import { createMemoryPlatform } from '../../platform/memory'
 import type { Channel } from '../../domain/project/channel'
 import type { ChannelStore } from '../../state/channel/channelStore'
 import { SettingsWorkflowEntries } from './SettingsWorkflowEntries'
+import { WorkflowFieldEditor } from './WorkflowFieldEditor'
 
 const channel = {
   id: 'ch-rh',
@@ -38,5 +39,86 @@ describe('SettingsWorkflowEntries', () => {
     expect(html).toContain('还没有工作流条目')
     /* 市场面板默认收起（点按钮才拉目录） */
     expect(html).not.toContain('data-workflow-market')
+  })
+})
+
+describe('WorkflowFieldEditor（复刻 canvas-xiong 的参数暴露编辑器）', () => {
+  const entry = {
+    id: 'w1',
+    title: 'Z-Image 文生图',
+    provider: 'runninghub' as const,
+    fetchedAt: 0,
+    fields: [
+      {
+        id: '6::text',
+        nodeId: '6',
+        fieldName: 'text',
+        type: 'textarea' as const,
+        label: '提示词',
+        value: '一只橘猫',
+        enabled: true,
+        group: 'CLIP',
+        options: [],
+        min: null,
+        max: null,
+        step: null,
+        seed: false,
+        required: true,
+        mediaOrder: 0,
+      },
+      {
+        id: '7::ratio',
+        nodeId: '7',
+        fieldName: 'ratio',
+        type: 'select' as const,
+        label: '比例',
+        value: '16:9',
+        enabled: false,
+        group: 'Empty Latent',
+        options: ['1:1', '16:9'],
+        min: null,
+        max: null,
+        step: null,
+        seed: false,
+        required: false,
+        mediaOrder: 0,
+      },
+    ],
+  }
+
+  it('左侧只预览已暴露字段；右侧按节点分组列出全部字段', () => {
+    const html = renderToStaticMarkup(
+      createElement(WorkflowFieldEditor, {
+        entry,
+        onSave: () => {},
+        onClose: () => {},
+      }),
+    )
+    expect(html).toContain('data-workflow-field-editor')
+    /* 预览：已暴露的 textarea 出现在左栏 */
+    expect(html).toContain('一只橘猫')
+    /* 清单：两个分组、两个字段都在 */
+    expect(html).toContain('data-workflow-group="CLIP"')
+    expect(html).toContain('data-workflow-group="Empty Latent"')
+    expect(html).toContain('data-workflow-field="7::ratio"')
+    /* 批量操作在（默认全隐藏时的兜底） */
+    expect(html).toContain('全部暴露')
+    expect(html).toContain('全部隐藏')
+  })
+
+  it('空候选的常见字段会被补成下拉（采样器 / 比例这类）', () => {
+    const html = renderToStaticMarkup(
+      createElement(WorkflowFieldEditor, {
+        entry: {
+          ...entry,
+          fields: [
+            { ...entry.fields[1]!, fieldName: 'sampler_name', options: [], type: 'text' as const, id: '3::sampler_name' },
+          ],
+        },
+        onSave: () => {},
+        onClose: () => {},
+      }),
+    )
+    expect(html).toContain('euler_ancestral')
   })
 })

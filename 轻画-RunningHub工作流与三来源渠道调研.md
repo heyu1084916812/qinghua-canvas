@@ -655,3 +655,44 @@ FAQ 两条关键答复：**计费**「按账号、实际调用模型和生成参
 与轻画 canvas MCP 的「技能不是新机制」思路同源，值得在后续做画布 MCP 工具时逐条对照。
 
 **⑥ 据此登记**：**#1115**（竞品 CLI 对标结论；**不立项接入**，等用户决定是否抄交互）。
+
+---
+
+### K. 复刻来源：`1685901916/canvas-xiong`（大熊改的画布）的工作流参数编辑器（2026-11-14）
+
+> 用户原话：「看看 GitHub 上大熊画布这个功能是如何做的，把他复刻下来」。
+> 仓库：`1685901916/canvas-xiong`（Python + 原生 JS，`main.py` 990 KB / `static/js/api-settings.js` 212 KB）
+> —— 与 `Infinite-Canvas` 同源的一支改造版。**下面只抄结构，不抄它的单文件写法**（我们有分层与行数门禁）。
+
+**① 它的入口与形态**：设置页（`static/api-settings.html`）→ RunningHub 卡片 → 「参数」→ **全屏编辑器**：
+
+- **左栏 = 节点预览**：按已勾选字段渲染成画布节点上的样子（文本/数字/开关/下拉/滑块/图片槽/视频槽/音频槽），
+  图片槽还标「图 N · 必选/可选」；没有勾选时显示空态提示。
+- **右栏 = 字段清单**：按 `nodeId::group` 分组折叠；每行可改 `enabled / label / fieldType / options / min·max·step /
+  imageOrder / random_enabled / required / sourceFromUpstream`。
+- 顶部有名称/备注编辑与「保存」；保存走 `PUT /api/runninghub/workflows/{workflowId}`（应用走 provider 配置）。
+
+**② 它解决的两个真问题**（值得抄）：
+
+1. **候选值推不出来** → 一张按字段名的字典 `RH_EDITOR_KNOWN_FIELD_OPTIONS`
+   （`sampler_name` / `sampler` / `scheduler` / `ratio` / `aspectRatio` / `resolution` / `size` …），
+   拉回来的字段没有候选时自动补成下拉。判据是字段名相等（大小写不敏感），不做模糊匹配。
+2. **可选图片为空**：`optionalImageMode = 'prune-workflow' | 'skip'` —— 要么把 workflow JSON 里该图
+   及相关连线**裁掉**，要么**不提交该字段**。这是"可选参考图"工作流能不能跑通的分水岭。
+
+**③ 它的默认值与我们的差异**：`normalizeFetchedRhWorkflowField` 把拉回来的字段 **`enabled: true`（默认全开）**；
+我们按 #1106 的口径**默认全隐藏**（工作流会把整份 `inputs` 给出来，全开等于把几十个无关参数摊到节点上），
+面板里给「全部暴露 / 全部隐藏」兜底。
+
+**④ 我们复刻成了什么**：
+
+| 参考实现 | 轻画落点 |
+| --- | --- |
+| `RH_EDITOR_KNOWN_FIELD_OPTIONS` + `rhKnownOptionsForField` | `domain/project/workflowFieldKinds.ts`（`KNOWN_FIELD_OPTIONS` / `knownOptionsForField` / `withKnownOptions`，含单测） |
+| 左预览（`renderRhMappedPreviewHtml` / `renderRhPreviewControl`） | `features/settings/WorkflowFieldEditor.tsx` 的左栏（按 `type` 渲染只读控件） |
+| 右清单（分组折叠 + 每字段 8 个属性 + 批量） | 同一组件的右栏（勾选 / 显示名 / 类型 / 候选 / min·max·step / 图序 / 随机 / 必填 + 全部暴露·全部隐藏） |
+| 保存回 provider / workflow | 保存回 `workflowEntryStore`（`presets` 一行），并把 `workflow:<id>` 的模型类别按暴露出来的媒体重算 |
+
+**⑤ 还没复刻的两条**（登记在 #1105 / #1106）：
+1. **节点侧渲染**：参考实现把同一套控件直接画在画布节点上（`static/js/canvas.js`），我们这一步还没做；
+2. **`optionalImageMode`**（可选图裁剪 / 不提交）：要等媒体字段接线一起做（#1104 的剩余项）。

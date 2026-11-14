@@ -11565,7 +11565,7 @@
       "test": [
         "src/features/settings/SettingsWorkflowEntries.test.ts"
       ],
-      "budget": 240
+      "budget": 460
     },
     {
       "module": "src/platform/channels/runninghubAccount.ts",
@@ -11610,6 +11610,55 @@
         "src/platform/channels/runninghub.test.ts"
       ],
       "budget": 200
+    },
+    {
+      "module": "src/domain/project/workflowFieldKinds.ts",
+      "owner": "project-workflow-channel-params",
+      "responsibility": "工作流参数的常见候选值字典（采样器 / 调度器 / 比例 / 分辨率…）与类型标签，用于把拉回来的字段直接变成下拉。",
+      "owns": [
+        "按字段名给候选值",
+        "类型标签与可选类型顺序",
+        "给空候选字段补候选（不动已有候选）"
+      ],
+      "doesNotOwn": [
+        "字段表结构与解析（workflowParams.ts）",
+        "候选值的界面渲染（features/settings）",
+        "服务端真实节点定义（/proxy 的 object_info，未接入）"
+      ],
+      "publicApi": [
+        "KNOWN_FIELD_OPTIONS",
+        "knownOptionsForField",
+        "workflowFieldTypeLabel",
+        "WORKFLOW_FIELD_TYPES",
+        "withKnownOptions"
+      ],
+      "test": [
+        "src/domain/project/workflowFieldKinds.test.ts"
+      ],
+      "budget": 160
+    },
+    {
+      "module": "src/features/settings/WorkflowFieldEditor.tsx",
+      "owner": "settings-workflow-entries",
+      "responsibility": "工作流条目的参数暴露编辑器：左侧按已勾选字段渲染节点预览，右侧按节点分组逐项配置暴露 / 名称 / 类型 / 候选 / 范围 / 图序 / 随机 / 必填。",
+      "owns": [
+        "字段草稿与勾选状态",
+        "按类型渲染预览控件",
+        "字段分组的折叠与批量暴露"
+      ],
+      "doesNotOwn": [
+        "字段表持久化（SettingsWorkflowEntries + workflowEntryStore）",
+        "生成节点上的参数运行（后续 #1105）",
+        "服务端参数校验"
+      ],
+      "publicApi": [
+        "WorkflowFieldEditor",
+        "WorkflowFieldEditorProps"
+      ],
+      "test": [
+        "src/features/settings/SettingsWorkflowEntries.test.ts"
+      ],
+      "budget": 420
     }
   ]
 }
