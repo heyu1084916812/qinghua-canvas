@@ -10,7 +10,7 @@ interface ActionState {
   message?: string
   latency?: number
   modelCount?: number
-  protocol?: string | null
+  protocol?: string | null; note?: string /* 验证成功时渠道带回的事实（余额 / 账号类型） */
 }
 
 export interface SettingsStatusInput {
@@ -92,7 +92,7 @@ export function settingsStatusPresentation(input: SettingsStatusInput): {
   }
   if (verify.status === 'ok') {
     return {
-      line: `${isCli ? '✓ 本机命令就绪' : '✓ 地址可达'} · ${label}${typeof verify.latency === 'number' ? ` · ${verify.latency}ms` : ''}`,
+      line: `${isCli ? '✓ 本机命令就绪' : '✓ 地址可达'} · ${label}${typeof verify.latency === 'number' ? ` · ${verify.latency}ms` : ''}${verify.note ? ` · ${verify.note}` : ''}`,
       tone: 'info',
       showMockNote,
     }

@@ -91,11 +91,11 @@ export interface CliTool {
    *
    * - `'stdin'`：把密钥喂给 `keyLoginArgs` 那条命令的 stdin（Codex 的
    *   `login --with-api-key` 就是这条）；
-   * - `'config'`：写进**该工具自己的配置文件**——现在只有 RunningHub：它的
-   *   `rh auth set-key <KEY>` 把 Key 当**位置参数**读（源码 `account`/`main` 实测），
-   *   而本机约定是"密钥不进 argv" ⇒ 由壳写它认的 `%APPDATA%\rh\config.toml`
-   *   （`rh_cli/config.py` 的 `resolve_api_key` 认这一行），效果与手敲那条命令一致，
-   *   而且是持久的：用户自己终端里的 `rh` 也立刻变成登录态；
+ * - `'config'`：写进**该工具自己的配置文件**（工具把 Key 当**位置参数**读、
+ *   而本机约定是"密钥不进 argv"时的落点）。**当前没有工具用这一档**：
+ *   RunningHub 那条 CLI 已于 2026-11-14 删除（它跑不了工作流，生成能力与
+ *   `runninghub-api` 渠道完全重复，见对账 #1114 / #1115）。机制保留给以后
+ *   需要"写文件登录"的工具，`platform/ports.ts` 的 `rhSetApiKey` 仍在；
    * - `''`：这个工具不支持密钥登录（只能走可见窗口那条路，或者根本没有官方 CLI）。
    */
   keyLoginKind: 'stdin' | 'config' | ''
@@ -117,8 +117,8 @@ export interface CliTool {
    * 空格分隔、`"引号"` 可包住含空格的一段（与 `argsTemplate` 同一套切词，走 `parseArgs`）；
    * 第一个 token 是程序名（`npm` / `winget` / `brew`…），其余是参数。
    *
-   * **空串是有意义的值**：「这个工具没有能自动装的官方途径」（即梦 / RunningHub 都是
-   * 社区封装或纯网站），这时面板只显示 `installHint`，不给一个按下去必然失败的按钮。
+ * **空串是有意义的值**：「这个工具没有能自动装的官方途径」，这时面板只显示
+ * `installHint`，不给一个按下去必然失败的按钮。
    */
   installCommand: string
   /** 额度 / 余额**到底在哪儿看** —— 工具自己不报时，这句话就是答案 */
@@ -144,7 +144,12 @@ export const CLI_TOOLS_ROW_ID = 'cli:tools'
 const MINUTE = 60 * 1000
 
 /**
- * 四个默认工具。顺序 = 用户点名顺序（Codex → 即梦 → Gemini → RunningHub）。
+ * 三个默认工具。顺序 = 用户点名顺序（Codex → 即梦 → Gemini）。
+ *
+ * **RunningHub 已于 2026-11-14 移除**（用户拍板，对账 #1114）：它的生成能力
+ * 与 `runninghub-api` 渠道完全重复（同一把 Key、同一本账），却要额外装 Python +
+ * `pip install`，且**跑不了 ComfyUI 工作流**——留着只会让人以为那是第二份额度。
+ * 余额改由渠道「验证地址」顺带显示（见 `runninghub.ts` 的 verify note）。
  *
  * ⚠️ `program` 与 `argsTemplate` 是**起点**：用户装的那份 CLI 如果子命令不同，
  * 在面板里改就行（改完点「检测」和「测试运行」各验一次）。
@@ -217,69 +222,6 @@ export function defaultCliTools(): CliTool[] {
       installCommand: 'npm install -g @google/gemini-cli',
       quotaWhere: '用量在 Google 账号的用量页看；CLI 只报版本。',
     },
-    {
-      id: 'runninghub',
-      name: 'RunningHub',
-      /**
-       * 命令名是 **`rh`**（官方 CLI 装完注册的就是它）。
-       *
-       * ⚠️ 这一条以前写的是 `runninghub` + 「官方没有 CLI」—— **2026-10-08 实测推翻了**：
-       * 官方有了（`HM-RunningHub/RH_CLI`，Apache-2.0），`python -m pip install .` 装完注册 `rh`，
-       * 本机已装并跑通 `rh --json check`（读到余额与 RH 币）。故照实改。
-       */
-      program: 'rh',
-      /*
-       * 走 `model run --task {model}`（不写 `--endpoint`）：
-       *  - `--task` 由**官方目录**挑该任务下最优的端点，用户不必记端点 id；
-       *  - 关键是它**不会弹交互式选择** —— 而 `rh image` / `rh video` 在没给 `-m` 时走
-       *    `typer.prompt`，非交互调用会被挂住（集成到应用里就是「点了没反应」）。
-       *
-       * ⚠️ `{out}` **不能省**：出的是图 / 视频，媒体只能落在文件里 ——
-       * 模板里没有 `{out}`，产物就无处落地（适配器会直接拒绝并指出这一点，
-       * 而不是让你等到「命令跑完了但读不到产物」）。
-       */
-      argsTemplate: 'model run --task {model} --prompt {prompt} --output {out}',
-      /**
-       * 模型 = 它自己的**任务名**（`--task` 的取值）。只列文生两类：
-       * 图生那两类要 `-i 参考图`，而本机的参数模板还没有图片占位符 ——
-       * 列出来只会让用户选中一个必然失败的档。
-       */
-      models: [
-        { id: 'text-to-image', category: 'image' },
-        { id: 'text-to-video', category: 'video' },
-      ],
-      timeoutMs: 20 * MINUTE,
-      needsCwd: false,
-      cwd: '',
-      docUrl: 'https://github.com/HM-RunningHub/RH_CLI',
-      note: '官方 CLI（`rh`）。模型那两行是它的任务名，`--task` 会按官方目录自动挑端点；要图生图 / 图生视频得带 `-i 参考图`，本机模板暂时没有图片占位符。',
-      /**
-       * 实测（2026-10-08）：`rh --json check` 回 `balance` 与 `coins` ——
-       * 四个默认工具里**唯一真能读到额度的**（Codex 只报登录态、Gemini 只报版本、
-       * 即梦没有官方 CLI）。用 `--json` 而不是默认输出：那行中文在非 UTF-8 控制台会乱码。
-       */
-      statusArgs: '--json check',
-      /**
-       * 一键登录：**空串**是如实回答 —— 官方 CLI 的 `rh auth set-key <KEY>` 把 Key 当
-       * **位置参数**读（不是 stdin），而本机的约定是「密钥只走 stdin、不进 argv」，
-       * 所以"打开一个窗口让它自己登录"这条路走不通。
-       *
-       * ⇒ 登录改走 `keyLoginKind: 'config'`（壳写它的配置文件，等效于手敲那条命令，
-       * 见 `keyLoginKind` 与 `platform/ports.ts` 的 `rhSetApiKey`）。这一格保持空串，
-       * 是为了**别给用户一个按下去没用的按钮**。
-       */
-      loginArgs: '',
-      keyLoginArgs: '',
-      /**
-       * **由壳写它的配置文件**（见 `keyLoginKind` 的说明）——
-       * 这是本轮把"RunningHub 登录不了"变成"点一下就好"的落点。
-       */
-      keyLoginKind: 'config',
-      loginHint: '把 API Key 粘到右边点「用密钥登录」：写进它自己的配置，之后一直是登录态。',
-      installHint: '装它：先有 Python 3.10+，再 `python -m pip install git+https://github.com/HM-RunningHub/RH_CLI.git`；装完在本机跑一次 `rh auth set-key <你的Key>`（Key 在 https://www.runninghub.cn/enterprise-api/sharedApi 取），之后一直是登录态。',
-      installCommand: 'python -m pip install git+https://github.com/HM-RunningHub/RH_CLI.git',
-      quotaWhere: '`rh check` 能直接读余额与 RH 币（上面那个按钮跑的就是它）。',
-    },
   ]
 }
 
@@ -331,7 +273,6 @@ export const CLI_PROTOCOL_TOOL: Record<string, string> = {
   'gpt-cli': 'codex',
   'jimeng-cli': 'jimeng',
   'gemini-cli': 'gemini',
-  runninghub: 'runninghub',
 }
 
 /** 这条协议该用哪个工具；不是 CLI 协议就返回 null（调用方据此走别的链路） */
@@ -469,9 +410,8 @@ function text(value: unknown, fallback: string): string {
  * 为什么需要它：库里只存"用户改过的字段"，但**旧目录的默认值当年也是写进库里的** ——
  * 用户没动过它，可它已经过时，而读取时它照样会**压过新默认**。
  *
- * 2026-10-08 真机实测踩到：RunningHub 的 CLI 从"官方没有 CLI"改成官方 `rh` 之后，
- * 老库里存着 `program: 'runninghub'` 与旧参数模板 ⇒ 面板上点「检测 / 查状态」
- * 报「找不到命令「runninghub」」，而**用户从没填过这个名字**（那是上一版目录给的）。
+ * 2026-10-08 真机实测踩到：某个工具的默认程序名改过之后，老库里存着**上一版的
+ * 默认值**（用户从没改过）⇒ 面板上点「检测 / 查状态」报「找不到命令」。
  *
  * 判据因此是"**存的值等于旧默认 ⇒ 当作没改过**，用现默认；等于别的值才认作用户自定义"。
  * 加新条目时把**旧默认原样**抄进来（一个字符不同就不生效）。
@@ -491,12 +431,7 @@ const SUPERSEDED_DEFAULTS: Record<
     installCommand?: string[]
   }
 > = {
-  runninghub: {
-    program: ['runninghub'],
-    argsTemplate: ['run --workflow {workflow} --out {out} --prompt {prompt}'],
-    statusArgs: [''],
-    installCommand: [''],
-  },
+  /* 目前没有条目：RunningHub 那条 CLI 已随工具一起删除（2026-11-14，见 `defaultCliTools`）。 */
 }
 
 /** 存的值是旧默认就往回落（见 `SUPERSEDED_DEFAULTS`）；否则原样认。 */

@@ -8,6 +8,8 @@ import {
   RUNNINGHUB_ENDPOINT_SPECS,
   RUNNINGHUB_MODELS,
 } from './runninghub'
+import { rhAccountNote } from './runninghubAccount'
+import { workflowNodeListOf } from './runninghubWorkflowRun'
 import { ChannelError, type ImageRunRequest, type VideoRunRequest } from './types'
 import type { ResolvedChannelConfig } from './registry'
 import { presetIdForUpstream } from '../../domain/project/modelPresets'
@@ -1345,7 +1347,25 @@ describe('RunningHub 适配器 / verify 与模型清单', () => {
     const r = await adapter.verify(config, signal)
     expect(calls[0]!.endsWith('/uc/openapi/accountStatus')).toBe(true)
     expect(r.ok).toBe(true)
-    if (r.ok) expect(r.models.length).toBeGreaterThanOrEqual(RUNNINGHUB_MODELS.length)
+    if (r.ok) {
+      expect(r.models.length).toBeGreaterThanOrEqual(RUNNINGHUB_MODELS.length)
+      /**
+       * 余额跟着验证结果回来（原 `rh check` 的职责搬到这里，对账 #1114）：
+       * 币与账号类型都写进 note，积分那句必须带「免费积分不能用于 API」的警示。
+       */
+      expect(r.note).toContain('RH 币 473')
+      expect(r.note).toContain('企业共享 Key')
+    }
+  })
+
+  it('rhAccountNote：三种余额分开写、不换算；积分带"免费积分不能用"提醒', () => {
+    expect(
+      rhAccountNote({ remainMoney: null, remainCoins: '84', remainPoint: '30.000', apiType: 'NORMAL' }),
+    ).toBe('RH 币 84 · 积分 30.000（免费积分不能用于 API） · 消费级账号')
+    expect(rhAccountNote({ remainMoney: 12.5, apiType: 'SHARED' })).toBe('金额 ¥12.5 · 企业共享 Key')
+    /* 什么都没有就不编一句"余额 0" */
+    expect(rhAccountNote(undefined)).toBe('')
+    expect(rhAccountNote({ remainCoins: '' })).toBe('')
   })
 
   it('Key 不认账 → ok:false，且消息带服务端原话', async () => {
@@ -1594,3 +1614,125 @@ describe('RunningHub 适配器 / 模型表与端点规格（按官方目录建�
     expect(payload.resolution).toBe('720p')
   })
 })
+
+describe('RunningHub 工作流条目（workflow: 前缀，#1113 / #1104）', () => {
+  const WORKFLOW_ID = '2039234647940194305'
+  const wfRequest = (params: Record<string, unknown> = {}): ImageRunRequest => ({
+    kind: 'image',
+    channelId: 'c1',
+    model: `workflow:${WORKFLOW_ID}`,
+    prompt: '',
+    inputs: [],
+    params,
+  })
+  const binaryPng = () => ({
+    status: 200,
+    headers: { 'content-type': 'image/png' },
+    async text() {
+      return ''
+    },
+    async json<T>() {
+      return {} as T
+    },
+    async arrayBuffer() {
+      return PNG_BYTES.slice().buffer
+    },
+  })
+
+  it('★ 提交 /task/openapi/create → 轮询 v2 query → 下载产物（简易式不带 nodeInfoList）', async () => {
+    const bodies: unknown[] = []
+    let polls = 0
+    const platform = createMemoryPlatform({
+      handler: async (req: NetworkRequest) => {
+        if (req.url.endsWith('/task/openapi/create')) {
+          bodies.push(req.body)
+          return json(200, { code: 0, data: { taskId: 't-wf' } })
+        }
+        if (req.url.endsWith('/openapi/v2/query')) {
+          polls += 1
+          return polls < 2
+            ? json(200, { status: 'RUNNING' })
+            : json(200, { status: 'SUCCESS', results: [{ url: 'https://files.runninghub.cn/wf.png' }] })
+        }
+        return binaryPng()
+      },
+    })
+    const adapter = createRunningHubAdapter(config, platform, FAST)
+    const assets = await adapter.generateImage(wfRequest(), signal)
+    expect(polls).toBe(2)
+    expect(assets).toHaveLength(1)
+    expect(assets[0]!.mime).toBe('image/png')
+    expect(assets[0]!.hash).toBe(await fingerprintBytes(PNG_BYTES))
+    expect(bodies[0]).toMatchObject({ workflowId: WORKFLOW_ID })
+    /* 官方「简易式」：不改参数时**不许**塞一个空 nodeInfoList */
+    expect((bodies[0] as Record<string, unknown>).nodeInfoList).toBeUndefined()
+  })
+
+  it('★ 节点下发的 params.workflow 原样进 nodeInfoList（脏行丢掉，数字转字符串）', async () => {
+    const bodies: unknown[] = []
+    const platform = createMemoryPlatform({
+      handler: async (req: NetworkRequest) => {
+        if (req.url.endsWith('/task/openapi/create')) {
+          bodies.push(req.body)
+          return json(200, { code: 0, data: { taskId: 't-wf' } })
+        }
+        if (req.url.endsWith('/openapi/v2/query')) {
+          return json(200, { status: 'SUCCESS', results: [{ url: 'https://files.runninghub.cn/wf.png' }] })
+        }
+        return binaryPng()
+      },
+    })
+    const adapter = createRunningHubAdapter(config, platform, FAST)
+    await adapter.generateImage(
+      wfRequest({
+        workflow: [
+          { nodeId: '6', fieldName: 'text', fieldValue: '一只橘猫' },
+          { nodeId: '7', fieldName: 'seed', fieldValue: 42 },
+          { nodeId: '', fieldName: 'x', fieldValue: 'y' },
+          'nope',
+        ],
+      }),
+      signal,
+    )
+    expect((bodies[0] as { nodeInfoList: unknown[] }).nodeInfoList).toEqual([
+      { nodeId: '6', fieldName: 'text', fieldValue: '一只橘猫' },
+      { nodeId: '7', fieldName: 'seed', fieldValue: '42' },
+    ])
+  })
+
+  it('失败终态把上游原文与失败码一起带出来（不换成通用解释）', async () => {
+    const platform = createMemoryPlatform({
+      handler: async (req: NetworkRequest) => {
+        if (req.url.endsWith('/task/openapi/create')) {
+          return json(200, { code: 0, data: { taskId: 't-wf' } })
+        }
+        if (req.url.endsWith('/openapi/v2/query')) {
+          return json(200, {
+            status: 'FAILED',
+            errorCode: '1007',
+            errorMessage: "field 'prompt' length 3 is less than the minimum length 5",
+          })
+        }
+        return binaryPng()
+      },
+    })
+    const adapter = createRunningHubAdapter(config, platform, FAST)
+    const err = await adapter
+      .generateImage(wfRequest(), signal)
+      .then(() => null)
+      .catch((e: unknown) => e as ChannelError)
+    expect(err!.appError.kind).toBe('execution')
+    const message = 'message' in err!.appError ? String(err!.appError.message) : ''
+    expect(message).toContain('minimum length 5')
+    expect(message).toContain('1007')
+  })
+
+  it('workflowNodeListOf：只认三元组，别的形状一律丢', () => {
+    expect(workflowNodeListOf(null)).toEqual([])
+    expect(workflowNodeListOf([{ nodeId: 6, fieldName: 'text', fieldValue: 'x' }])).toEqual([])
+    expect(
+      workflowNodeListOf([{ nodeId: '6', fieldName: 'text', fieldValue: true }]),
+    ).toEqual([{ nodeId: '6', fieldName: 'text', fieldValue: '' }])
+  })
+})
+

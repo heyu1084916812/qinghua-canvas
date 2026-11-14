@@ -5,10 +5,13 @@ import {
   videoInputsOf,
 } from '../../domain/shared/execution/inputs'
 import type { ModelCapability } from '../../domain/shared/capability'
+import { WORKFLOW_MODEL_PREFIX } from '../../domain/project/workflowParams'
 import { asAppError, describeError, errorTextOf } from '../../shared/result'
 import { bytesToBase64 } from './base64'
 import { prepareModelImageInput } from './chatImageInput'
-import { webappIdPayload } from './runninghubWorkflow'
+import { submitWorkflowTask, webappIdPayload } from './runninghubWorkflow'
+import { runWorkflowTask, workflowNodeListOf } from './runninghubWorkflowRun'
+import { rhAccountNote } from './runninghubAccount'
 import type { NetworkResponse, SafeChannelConfig } from '../ports'
 import {
   ChannelError,
@@ -194,6 +197,9 @@ export function runningHubCapability(model: RunningHubModel): ModelCapability {
 
 /** AI 应用（`app:` 前缀）的模型 id 前缀 */
 const APP_PREFIX = 'app:'
+
+/** 工作流条目的模型 id 前缀：从 domain 引，设置页与执行端必须认同同一个字面量 */
+const WORKFLOW_PREFIX = WORKFLOW_MODEL_PREFIX
 
 /**
  * 产物条目。**三种形状都收**，因为 RunningHub 有三个地方回它们：
@@ -854,6 +860,38 @@ export function createRunningHubAdapter(
     )
   }
 
+  /** 自建工作流（`workflow:`）：提交 → 等结果 → 下载（等待循环在 `runninghubWorkflowRun`） */
+  const runWorkflow = async (
+    workflowId: string,
+    request: ImageRunRequest | VideoRunRequest,
+    signal: AbortSignal,
+  ): Promise<GeneratedAsset[]> => {
+    const endpoint = { host, apiKey: key }
+    const nodeInfoList = workflowNodeListOf(request.params?.workflow)
+    let taskId: string
+    try {
+      const input = { workflowId, ...(nodeInfoList.length > 0 ? { nodeInfoList } : {}) }
+      taskId = await submitWorkflowTask({ network: deps.network }, endpoint, input, signal)
+    } catch (e) {
+      if (signal.aborted) throw e
+      if (!submitOutcomeUnknown(e)) throw e
+      throw acceptedAfterSubmit(`RunningHub 工作流提交结果未知：${errorTextOf(e)}`)
+    }
+    const urls = await runWorkflowTask({ network: deps.network }, endpoint, taskId, {
+      signal,
+      pollIntervalMs: pollInterval,
+      pollTimeoutMs: pollTimeout,
+      sleep: sleepFn,
+      now,
+    })
+    const fallback = request.kind === 'video' ? 'video/mp4' : 'image/png'
+    const assets: GeneratedAsset[] = []
+    for (const url of urls) {
+      const { bytes, mime } = await download(url, signal, fallback)
+      assets.push({ hash: await fingerprintBytes(bytes), mime, bytes, url })
+    }
+    return assets
+  }
   const generate = async (
     request: ImageRunRequest | VideoRunRequest,
     signal: AbortSignal,
@@ -863,6 +901,9 @@ export function createRunningHubAdapter(
     }
     if (request.model.startsWith(APP_PREFIX)) {
       return runApp(request.model.slice(APP_PREFIX.length), request, signal)
+    }
+    if (request.model.startsWith(WORKFLOW_PREFIX)) {
+      return runWorkflow(request.model.slice(WORKFLOW_PREFIX.length), request, signal)
     }
     /**
      * **有参考图就走图生档**（模型表里成对），没有就走文生档 —— 这一步是
@@ -928,18 +969,24 @@ export function createRunningHubAdapter(
       if (!key) {
         return { ok: false, error: { kind: 'channel', detail: 'missingKey' } }
       }
+      /** 这次 `accountStatus` 的 data：既用来判通不通，也顺手给状态行补一句余额事实 */
+      let account: unknown
       try {
         const res = await readJson(await json(`${host}${ACCOUNT_PATH}`, { apikey: key }, signal, VERIFY_TIMEOUT_MS))
         if (res.code !== 0) {
           const message = describeRhError(res, 'Key 验证失败')
           return { ok: false, error: { kind: 'http', status: 401, body: message }, message }
         }
+        account = res.data
       } catch (e) {
         const appError = asAppError(e)
         if (!appError) throw e
         return { ok: false, error: appError, message: describeError(appError) }
       }
-      return { ok: true, models: await listModels(signal, true) }
+      /* 余额跟着验证结果回来（原 `rh check` 的职责，CLI 已删除）；只带 note，不写 modelCache */
+      const note = rhAccountNote(account)
+      const models = await listModels(signal, true)
+      return note ? { ok: true, models, note } : { ok: true, models }
     },
     listModels: (_cfg, signal) => listModels(signal),
     generateImage: (request, signal) => generate(request, signal),

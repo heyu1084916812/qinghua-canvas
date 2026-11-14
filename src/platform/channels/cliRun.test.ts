@@ -276,13 +276,14 @@ describe('本机 CLI 适配器 · 图 / 视频', () => {
       id: CLI_TOOLS_ROW_ID,
       tools: [
         {
-          id: 'runninghub',
+          /* RunningHub 的 CLI 工具 2026-11-14 已删除（#1114）⇒ 借用即梦那条验视频占位符 */
+          id: 'jimeng',
           argsTemplate: 'run --task {model} --video {video} --prompt {prompt} --out {out}',
         },
       ],
     } as never)
     const cli = fakeCli({ write: () => mp4Bytes() })
-    const adapter = createCliRunAdapter(configOf('runninghub'), { ...platform, cli: cli.port })
+    const adapter = createCliRunAdapter(configOf('jimeng-cli'), { ...platform, cli: cli.port })
     const outputs = await adapter.generateVideo(
       {
         kind: 'video',
@@ -354,8 +355,14 @@ describe('本机 CLI 适配器 · 图 / 视频', () => {
 
   it('★ 纯文本模板不再宣称支持图片，且视频素材同样拒绝', async () => {
     const cli = fakeCli({})
-    const adapter = createCliRunAdapter(configOf('runninghub'), depsOf(cli.port))
-    const models = await adapter.listModels(configOf('runninghub'), new AbortController().signal)
+    /* 用「即梦」那条协议 + 一份**纯文本**模板（RunningHub 的 CLI 工具 2026-11-14 已删除） */
+    const platform = createMemoryPlatform()
+    await platform.storage.put('presets', {
+      id: CLI_TOOLS_ROW_ID,
+      tools: [{ id: 'jimeng', argsTemplate: 'generate --prompt {prompt} --out {out}' }],
+    } as never)
+    const adapter = createCliRunAdapter(configOf('jimeng-cli'), { ...platform, cli: cli.port })
+    const models = await adapter.listModels(configOf('jimeng-cli'), new AbortController().signal)
     expect(models.find((model) => model.category === 'image')?.inputTypes).toEqual(['text'])
     expect(models.find((model) => model.category === 'video')?.inputTypes).toEqual(['text'])
     const app = await cliErrorOf(
@@ -363,7 +370,7 @@ describe('本机 CLI 适配器 · 图 / 视频', () => {
         {
           kind: 'video',
           channelId: 'ch-1',
-          model: 'text-to-video',
+          model: 'jimeng-video',
           prompt: '参考这段视频',
           inputs: [assetInput('video-1', 'video/mp4')],
           params: {},
@@ -412,9 +419,9 @@ describe('本机 CLI 适配器 · 图 / 视频', () => {
 
   it('视频产物同理（MP4 的 ftyp）', async () => {
     const cli = fakeCli({ write: () => mp4Bytes() })
-    const adapter = createCliRunAdapter(configOf('runninghub'), depsOf(cli.port))
+    const adapter = createCliRunAdapter(configOf('jimeng-cli'), depsOf(cli.port))
     const assets = await adapter.generateVideo(
-      { kind: 'video', channelId: 'ch-1', model: 'runninghub-video', prompt: 'x', inputs: [], params: {} },
+      { kind: 'video', channelId: 'ch-1', model: 'jimeng-video', prompt: 'x', inputs: [], params: {} },
       new AbortController().signal,
     )
     expect(assets[0]?.mime).toBe('video/mp4')

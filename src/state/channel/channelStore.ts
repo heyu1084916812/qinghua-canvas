@@ -70,6 +70,8 @@ export interface ChannelVerify {
   status: 'idle' | 'checking' | 'ok' | 'error'
   message?: string
   latency?: number
+  /** 验证成功时渠道顺带报回的事实（如 RunningHub 的余额 / 账号类型） */
+  note?: string
 }
 
 /** 「拉取模型」的结果：与验证分开，关心的是拿到了几个模型。 */
@@ -678,7 +680,8 @@ export function createChannelStore(
         const updated = await repo.update(id, { lastTestAt: Date.now(), lastTestLatency: elapsed() })
         store.setState((s) => ({
           channels: s.channels.map((c) => (c.id === id ? updated : c)),
-          verify: { status: 'ok', latency: elapsed() },
+          /* 渠道顺带报回的事实（RunningHub 的余额 / 账号类型）跟着状态行走，不落库 */
+          verify: { status: 'ok', latency: elapsed(), ...(res.note ? { note: res.note } : {}) },
         }))
       } else {
         await repo.update(id, { lastTestAt: Date.now(), lastTestLatency: elapsed() })

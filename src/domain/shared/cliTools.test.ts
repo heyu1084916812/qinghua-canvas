@@ -90,9 +90,9 @@ describe('CLI 工具配置的归一化', () => {
     expect(clampToolTimeout(12_345.6, 5_000)).toBe(12_346)
   })
 
-  it('默认四个工具都在，且 id 不重复', () => {
+  it('默认三个工具都在，且 id 不重复（RunningHub 已于 2026-11-14 删除，#1114）', () => {
     const tools = defaultCliTools()
-    expect(tools.map((t) => t.id)).toEqual(['codex', 'jimeng', 'gemini', 'runninghub'])
+    expect(tools.map((t) => t.id)).toEqual(['codex', 'jimeng', 'gemini'])
     expect(new Set(tools.map((t) => t.id)).size).toBe(tools.length)
     // 用户点名的改名：GPT CLI → Codex
     expect(tools.find((t) => t.id === 'codex')?.name).toBe('Codex')
@@ -108,12 +108,8 @@ describe('CLI 工具配置的归一化', () => {
     // 没存过的字段：默认值原样
     expect(codex?.timeoutMs).toBe(defaultCliTools()[0]?.timeoutMs)
     expect(codex?.name).toBe('Codex')
-    /**
-     * 没被改过的其它工具也在（目录以代码为准）。
-     * ⚠️ 这里量的程序名 2026-10-08 从 `runninghub` 改成 **`rh`** ——
-     * 官方 CLI（`HM-RunningHub/RH_CLI`）装完注册的就是 `rh`，本机已装上跑通。
-     */
-    expect(tools.find((t) => t.id === 'runninghub')?.program).toBe('rh')
+    /* 没被改过的其它工具也在（目录以代码为准） */
+    expect(tools.find((t) => t.id === 'gemini')?.program).toBe('gemini')
   })
 
   it('坏值回落默认，认不出的 id 直接丢掉', () => {
@@ -132,38 +128,17 @@ describe('CLI 工具配置的归一化', () => {
   })
 
   /**
-   * ★★ **旧目录的默认值不许把新默认钉住**（2026-10-08 真机实测踩到）。
+   * ★★ 老库里**残留的已删除工具**（`runninghub`）不许把幽灵行带回来。
    *
-   * 库里存的是"用户改过的字段"，可**上一版目录的默认值当年也被存了进去** ——
-   * RunningHub 的 CLI 从"官方没有 CLI"改成官方 `rh` 之后，老库里的
-   * `program: 'runninghub'` 会压过新默认 ⇒ 面板点「检测 / 查状态」报
-   * 「找不到命令「runninghub」」，而用户从没填过这个名字。
-   * 判据：**存的值等于旧默认 ⇒ 当作没改过**；等于别的值照旧认用户自定义。
+   * 判据：`mergeTools` 只按当前目录映射 —— 目录里没有的 id 一律忽略，
+   * 于是"删掉一个工具"这件事**不需要迁移脚本**，旧补丁自然失效。
    */
-  it('★★ 存着旧默认（runninghub / 旧参数模板）⇒ 用新默认；用户真改过的值照旧认', () => {
-    const stale = mergeTools({
-      tools: [
-        {
-          id: 'runninghub',
-          program: 'runninghub',
-          argsTemplate: 'run --workflow {workflow} --out {out} --prompt {prompt}',
-          /* 老目录里这两格都是空串（"它没有可查的命令 / 没有能自动装的途径"）——
-             实测推翻后才改成 --json check 与官方 pip 一行 */
-          statusArgs: '',
-          installCommand: '',
-        },
-      ],
-    }).find((t) => t.id === 'runninghub')
-    expect(stale?.program).toBe('rh')
-    expect(stale?.argsTemplate).toBe('model run --task {model} --prompt {prompt} --output {out}')
-    expect(stale?.statusArgs).toBe('--json check')
-    expect(stale?.installCommand).toBe('python -m pip install git+https://github.com/HM-RunningHub/RH_CLI.git')
-
-    const custom = mergeTools({
-      tools: [{ id: 'runninghub', program: 'D:/tools/rh.cmd', argsTemplate: 'my {prompt}' }],
-    }).find((t) => t.id === 'runninghub')
-    expect(custom?.program).toBe('D:/tools/rh.cmd')
-    expect(custom?.argsTemplate).toBe('my {prompt}')
+  it('★★ 库里残留已删除工具（runninghub）⇒ 直接忽略，不复活', () => {
+    const tools = mergeTools({
+      tools: [{ id: 'runninghub', program: 'rh', argsTemplate: 'model run --prompt {prompt}' }],
+    })
+    expect(tools.map((t) => t.id)).toEqual(['codex', 'jimeng', 'gemini'])
+    expect(tools.some((t) => t.id === 'runninghub')).toBe(false)
   })
 
   it('读不懂的行（null / 字符串 / 缺 tools）等价于"全默认"', () => {
@@ -199,16 +174,7 @@ describe('CLI 工具配置的归一化', () => {
     ])
     /* 即梦官方没有 CLI ⇒ 空串（面板据此不给「一键安装」按钮） */
     expect(tools.find((t) => t.id === 'jimeng')!.installCommand).toBe('')
-    /**
-     * ⚠️ RunningHub **有**官方 CLI（2026-10-08 实测推翻旧结论）：`HM-RunningHub/RH_CLI`，
-     * pip 装、注册 `rh`。所以它从"空串"改成真命令 —— 而"空串合法"这条规则本身
-     * 仍由上面那句 jimeng 与下一条用例守着。
-     */
-    expect(parseArgs(tools.find((t) => t.id === 'runninghub')!.installCommand).slice(0, 3)).toEqual([
-      'python',
-      '-m',
-      'pip',
-    ])
+    /* "空串合法"这条规则由上面 jimgeng 那句与下一条用例守着 */
   })
 
   it('★ 安装命令也是"空串合法"：用户清空后不许自己长回默认', () => {
@@ -235,13 +201,8 @@ describe('CLI 工具配置的归一化', () => {
     for (const tool of defaultCliTools()) {
       expect(tool.quotaWhere.trim().length).toBeGreaterThan(10)
     }
-    /**
-     * 即梦没有官方 CLI ⇒ 不给「查状态」命令（面板会直说，而不是给个假按钮）。
-     * ⚠️ RunningHub 相反：官方 CLI 的 `rh --json check` **真能读到额度**
-     * （余额 + RH 币，2026-10-08 本机实测），所以这里断言的是"它必须挂着查额度命令"。
-     */
+    /** 即梦没有官方 CLI ⇒ 不给「查状态」命令（面板会直说，而不是给个假按钮）。 */
     expect(defaultCliTools().find((t) => t.id === 'jimeng')?.statusArgs).toBe('')
-    expect(defaultCliTools().find((t) => t.id === 'runninghub')?.statusArgs).toBe('--json check')
     // Codex 支持密钥登录（官方 help 里写明 `login --with-api-key` 从 stdin 读）
     expect(defaultCliTools().find((t) => t.id === 'codex')?.keyLoginArgs).toContain('--with-api-key')
   })

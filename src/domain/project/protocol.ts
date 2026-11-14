@@ -430,19 +430,25 @@ export const BUILTIN_PROTOCOLS: ProtocolDefinition[] = [
   },
   {
     id: 'runninghub',
-    name: 'RunningHub（本机 CLI）',
+    name: 'RunningHub（本机 CLI · 已停用）',
     short: 'RH',
     /*
      * `family: 'cli-gateway'`（2026-10-06 改）：桌面壳里由 `cliRun.ts` **直接起本机命令**，
      * 浏览器里回落到"访问用户自建网关"（`cliGateway.ts`）。此前是 `async-task` + pending
      * —— 那条 HTTP 适配器从未实现，等于挂着一个跑不通的入口。
+     *
+     * **2026-11-14 停用**（用户拍板，对账 #1114）：`rh` 那条 CLI 已从工具目录删除
+     * （它跑不了 ComfyUI 工作流，生成能力与 `runninghub-api` 完全重复，还要多装
+     * Python + pip），`CLI_PROTOCOL_TOOL` 里的映射一并去掉。协议条目保留只为让
+     * 老渠道的 `protocol: 'runninghub'` 仍能读出名字而不是变成「未知协议」；
+     * 它没有能力、不参与选路，请改用下面的 `runninghub-api`。
      */
     family: 'cli-gateway',
     kind: 'hidden',
-    status: 'ready',
-    capabilities: cliCapabilities('runninghub'),
+    status: 'pending',
+    capabilities: [],
     docUrl: 'https://www.runninghub.cn/enterprise-api/sharedApi',
-    note: '桌面壳里直接跑你本机那条命令（命令名与参数在「全局设置 → CLI」里配）；浏览器里要自建网关。',
+    note: '已停用：RunningHub 改用「RunningHub（API）」那条渠道（同一把 Key，能跑标准模型 / AI 应用 / 自建工作流）。本机 CLI 那条 2026-11-14 已删除。',
     },
     {
       /**

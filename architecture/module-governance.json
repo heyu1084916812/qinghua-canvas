@@ -11472,6 +11472,144 @@
         "src/workbenches/canvas/panels/AgentPanel/researchImageDownload.test.ts"
       ],
       "budget": 60
+    },
+    {
+      "module": "src/platform/channels/runninghubMarket.ts",
+      "owner": "runninghub-market",
+      "responsibility": "RunningHub API 市场目录（免 Key）：读 /api/sku/list 的条目、把 SKU 翻成「计费标签 + 真实 workflowId（relatedDataId）」。",
+      "owns": [
+        "市场列表读取与记录映射",
+        "priceType 1/2 → 只扣运行时长 / 另加第三方模型费",
+        "SKU id → relatedDataId 的解析"
+      ],
+      "doesNotOwn": [
+        "工作流参数拉取（runninghubWorkflow.ts）",
+        "条目落库（state/channel/workflowEntryStore.ts）",
+        "设置页渲染"
+      ],
+      "publicApi": [
+        "RhMarketKind",
+        "RhMarketBilling",
+        "RhMarketEntry",
+        "RH_MARKET_DEFAULT_HOST",
+        "billingOf",
+        "mapSkuRecord",
+        "runtimeOnly",
+        "fetchRhMarketEntries",
+        "fetchRhMarketRelatedId"
+      ],
+      "test": [
+        "src/platform/channels/runninghubMarket.test.ts"
+      ],
+      "budget": 260
+    },
+    {
+      "module": "src/state/channel/workflowEntryStore.ts",
+      "owner": "workflow-entry-store",
+      "responsibility": "工作流条目的读写：按渠道存进 presets 一行（workflow:entries:<channelId>），读回时走 normalizeWorkflowEntries。",
+      "owns": [
+        "条目清单的存取",
+        "坏条目归一"
+      ],
+      "doesNotOwn": [
+        "条目字段表的结构（domain/project/workflowParams.ts）",
+        "拉参数与提交（platform 层）",
+        "设置页交互"
+      ],
+      "publicApi": [
+        "WorkflowEntryStore",
+        "createWorkflowEntryStore"
+      ],
+      "test": [
+        "src/state/channel/workflowEntryStore.test.ts"
+      ],
+      "budget": 80
+    },
+    {
+      "module": "src/features/settings/SettingsWorkflowEntries.tsx",
+      "owner": "settings-workflow-entries",
+      "responsibility": "RunningHub 渠道里的「工作流条目」区块：从市场（只扣运行时长）或填 workflowId 添加、重新拉参数、删除，并把 workflow:<id> 写进渠道模型清单。",
+      "owns": [
+        "条目的添加 / 删除 / 重新拉参数",
+        "市场列表的展示与筛选（只扣运行时长）",
+        "条目对应的模型条目注册"
+      ],
+      "doesNotOwn": [
+        "参数暴露 / 隐藏面板（#1106）",
+        "生成节点上的参数渲染（#1105）",
+        "HTTP 细节（platform/channels/*）"
+      ],
+      "publicApi": [
+        "SettingsWorkflowEntries",
+        "SettingsWorkflowEntriesProps"
+      ],
+      "test": [
+        "src/features/settings/SettingsWorkflowEntries.test.ts"
+      ],
+      "budget": 420
+    },
+    {
+      "module": "src/features/settings/SettingsWorkflowEntries.module.css",
+      "owner": "settings-workflow-entries",
+      "responsibility": "RunningHub「工作流条目」区块的局部样式：标题行、手填输入、市场列表与条目行的滚动与边界。",
+      "owns": [
+        "该区块的局部样式"
+      ],
+      "doesNotOwn": [
+        "全局设置页布局与主题令牌",
+        "条目数据与网络请求"
+      ],
+      "publicApi": [
+        "CSS_MODULE:工作流条目区块（block / head / market / list / item / btn）"
+      ],
+      "test": [
+        "src/features/settings/SettingsWorkflowEntries.test.ts"
+      ],
+      "budget": 240
+    },
+    {
+      "module": "src/platform/channels/runninghubAccount.ts",
+      "owner": "runninghub-market",
+      "responsibility": "把 accountStatus 的三种余额与账号类型读成状态行上的一句事实（金额 / RH 币 / 积分分开写，积分带免费积分提示）。",
+      "owns": [
+        "余额与账号类型的文案格式化",
+        "空值不编造 0"
+      ],
+      "doesNotOwn": [
+        "accountStatus 请求（runninghub.ts）",
+        "状态行渲染（settingsStatusPresentation.ts）"
+      ],
+      "publicApi": [
+        "rhAccountNote"
+      ],
+      "test": [
+        "src/platform/channels/runninghub.test.ts"
+      ],
+      "budget": 80
+    },
+    {
+      "module": "src/platform/channels/runninghubWorkflowRun.ts",
+      "owner": "runninghub-market",
+      "responsibility": "工作流执行的两段纯逻辑：params.workflow 三元组归一（workflowNodeListOf）与提交之后的 V2 轮询（runWorkflowTask）。",
+      "owns": [
+        "nodeInfoList 形状校验",
+        "提交后的轮询与终态判定",
+        "已提交后失败的 accepted 语义"
+      ],
+      "doesNotOwn": [
+        "提交请求本身（runninghubWorkflow.ts）",
+        "产物下载与落库（runninghub.ts）",
+        "渠道编排与选路"
+      ],
+      "publicApi": [
+        "workflowNodeListOf",
+        "runWorkflowTask",
+        "RunWorkflowOptions"
+      ],
+      "test": [
+        "src/platform/channels/runninghub.test.ts"
+      ],
+      "budget": 200
     }
   ]
 }

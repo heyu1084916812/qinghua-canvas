@@ -47,6 +47,11 @@ RunningHub 的**四种 API 已摸清并落了两层代码**（领域参数模型
 | `src/domain/project/workflowParamValues.ts` | 取值回落（空串=不下发）、必填只校验暴露字段、种子归一与随机、`nodeInfoList` 提交体、条目出图/出视频分类 | 同上文件 |
 | `src/domain/project/workflowAppParams.ts` | `apiCallDemo` 的 `nodeInfoList` → 字段表（**默认全暴露**、中文名当标签、`fieldData` 取候选与多行）、`parseAppMeta`（名称 / 封面 / 加密标记） | `workflowAppParams.test.ts` 15 |
 | `src/platform/channels/runninghubWorkflow.ts` | `getJsonApiFormat` 拉参、`apiCallDemo` 拉应用（含 bundle）、`task/openapi/create` 与 `ai-app/run` 提交、上传换 `fileName`、`openapi/v2/query` 查任务、`webappIdPayload` | `runninghubWorkflow.test.ts` 17 / `runninghubResults.test.ts` 5 / `runninghubErrors.test.ts` 6 |
+| `src/platform/channels/runninghubMarket.ts` | 市场目录（**免 Key**）：`/api/sku/list` → 条目 + 计费标签（`priceType 1` 只扣运行时长）；`/api/sku/detail` → `relatedDataId`（真实 `workflowId`） | `runninghubMarket.test.ts` 5 |
+| `src/platform/channels/runninghubWorkflowRun.ts` | `params.workflow` → `nodeInfoList` 的归一（`workflowNodeListOf`）+ 提交后的 V2 轮询（`runWorkflowTask`，终态/超时都归成 accepted） | `runninghub.test.ts`（4 条工作流用例） |
+| `src/platform/channels/runninghubAccount.ts` | `accountStatus` → 状态行一句事实（金额 / RH 币 / 积分 / 账号类型） | `runninghub.test.ts`（`rhAccountNote`） |
+| `src/state/channel/workflowEntryStore.ts` | 工作流条目按渠道存 `presets` 一行（`workflow:entries:<channelId>`） | `workflowEntryStore.test.ts` 4 |
+| `src/features/settings/SettingsWorkflowEntries.tsx` | RunningHub 渠道里的「工作流条目」区块：从市场（只列运行时长）/ 手填 id 添加 → 拉参数 → 注册 `workflow:<id>` 模型 → 删除 / 重新拉参数 | `SettingsWorkflowEntries.test.ts` + `scripts/probe-workflow-entries.mjs`（四组视口×主题截图） |
 
 ### 改动
 
@@ -69,14 +74,14 @@ npx vitest run src/domain/project/workflowParams.test.ts src/domain/project/work
 
 | # | 事项 | 状态 | 关键点 |
 | --- | --- | --- | --- |
-| **1104** | 工作流条目端到端 | 🧩 领域+平台已落地 | 缺：设置页「加工作流 → 拉参数 → 勾选暴露」与执行接线（`params.workflow` 下发、素材 upload 换 name、多产物落库） |
+| **1104** | 工作流条目端到端 | 🧩 代码链路已通（设置页入口 + 执行接线已上） | 缺：节点上的参数渲染与「暴露/隐藏」面板（#1105 / #1106）、媒体字段 `fileName` 接线、**真机跑通**（仍卡付费积分） |
 | **1105** | 生成节点「来源」切换（api / runninghub / cli） | 📝 未做（UI） | `data.source` 默认 `api`，**api 分支行为必须一字不变**；不新建节点类型 |
 | **1106** | 参数「暴露 / 隐藏」面板 | 📝 待你定 UI 落点 | 我建议放**设置 → 渠道 → RunningHub → 条目详情**；字段需要 `enabled / label / group / 类型 / min·max·step / options / seed / bind_prompt` |
 | **1107** | AI 应用参数如实化 | 🧩 领域+平台已落地 | 缺 UI；`runApp()` 里那四个写死字段名（`prompt / aspectRatio / resolution / duration`）应改成读字段表 |
 | **1111** | 吃官方 `developer-kit`（500+ 模型 + 参数枚举 + CNY 参考价） | 📝 未做 | 生成脚本改吃 `model-registry.public.json`；`options` 自动填；**参考价不许当积分显示** |
 | **1112** | 接第四种路线 `LLM` | 📝 未做 | 标准 OpenAI 兼容 ⇒ 走现有 `openai-compatible` 族，**不需要新适配器** |
-| **1113** | 接国内站 API 市场的目录 / 搜索（`/api/sku/list`） | 📝 未做 | 免 Key；`STANDARD_MODEL 280 / WEBAPP 15 / WORKFLOW 18`，能按关键词搜；**市场 id 是 SKU id，`relatedDataId` 才是 `webappId`**（见 §五 15） |
-| **1114** | 补齐 CLI 模板（`-i` 图生 / `rh app run`）+ 面板写明额度同源 | 📝 未做 | 官方 `rh` 还有 `app run --node/--file` 与 `image`/`video` 快捷菜单；但**没有 `workflow` 命令** ⇒ 工作流只能走 API。见 §五 16 |
+| **1113** | 接国内站 API 市场的目录 / 搜索（`/api/sku/list`） | ✅ 已交付（设置页「从市场添加」只列运行时长费用） | 见 §三 与 §五 15；SKU id → `relatedDataId` 在「添加」里解析掉 |
+| **1114** | 删除 RunningHub 本机 CLI + 余额搬进渠道验证 | ✅ 已交付（用户选 A） | `cliTools` 只剩 Codex / 即梦 / Gemini；`runninghub` 协议标 `pending`（老渠道能读名字）；余额见 §五 16 |
 
 **建议分组**：第三组=设置页（1104+1106+自检），第四组=生成节点（1105+1107 收尾），第五组=1111/1112。
 

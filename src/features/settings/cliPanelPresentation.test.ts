@@ -8,6 +8,8 @@ import {
 
 const tools = defaultCliTools()
 const tool = (id: string) => tools.find((item) => item.id === id)!
+/** `keyLoginKind: 'config'` 的夹具（原借 RunningHub；它 2026-11-14 已删除，#1114）。 */
+const configTool = { ...tool('codex'), id: 'config-fixture', keyLoginKind: 'config' as const }
 
 describe('CLI panel presentation', () => {
   it('shows detection before asking for any action', () => {
@@ -37,7 +39,7 @@ describe('CLI panel presentation', () => {
 
   it('routes installed tools to the smallest required login action', () => {
     const found = { kind: 'found' as const, detail: '已找到' }
-    expect(primaryCliAction(tool('runninghub'), found)).toMatchObject({
+    expect(primaryCliAction(configTool, found)).toMatchObject({
       kind: 'key',
       opensDetails: true,
     })

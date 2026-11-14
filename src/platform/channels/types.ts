@@ -69,7 +69,18 @@ export interface TextResult {
 }
 
 export type VerifyResult =
-  | { ok: true; models: ModelCapability[] }
+  | {
+      ok: true
+      models: ModelCapability[]
+      /**
+       * 验证成功时顺带回来的**事实补充**（如余额 / 账号类型）。
+       *
+       * 为什么挂在 verify 上而不是另开接口：`accountStatus` 本来就已经打了，
+       * 再为"显示余额"多发一次请求没有意义；但**不许**因此写 modelCache
+       * ——「验证」与「拉模型」仍是两件事（§7.4）。
+       */
+      note?: string
+    }
   | { ok: false; error: AppError; message?: string }
 
 /**

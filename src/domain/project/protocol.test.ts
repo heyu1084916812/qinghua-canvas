@@ -135,11 +135,14 @@ describe('能力查询', () => {
     // Codex 只有对话（它是个写代码的 agent，不产图）
     expect(protocolSupports('gpt-cli', 'chat')).toBe(true)
     expect(protocolSupports('gpt-cli', 'image')).toBe(false)
-    // 四条都是 ready 且单独一组（`cli`），不再是"待支持 + 灰掉"
-    for (const id of ['jimeng-cli', 'gpt-cli', 'gemini-cli', 'runninghub']) {
+    // 三条都是 ready 且单独一组（`cli`），不再是"待支持 + 灰掉"
+    // （`runninghub` 那条 2026-11-14 已停用：工具删除后没有能力，见 #1114）
+    for (const id of ['jimeng-cli', 'gpt-cli', 'gemini-cli']) {
       expect(protocolById(id)?.status).toBe('ready')
       expect(protocolById(id)?.kind).toBe('hidden')
     }
+    expect(protocolById('runninghub')?.status).toBe('pending')
+    expect(protocolById('runninghub')?.capabilities).toEqual([])
   })
 
   it('requiresBaseUrl：mock 不用地址，其余都要（空地址会被 SPA 兜底页骗过）', () => {
