@@ -136,16 +136,6 @@ export interface GenerationData {
   linkedPromptNodeIds: string[]
   channelId: string
   model: string
-  /**
-   * RunningHub 工作流 / AI 应用的**暴露字段值**（提交体原样存这里）。
-   *
-   * 为什么存"提交体"而不是存"字段值表"：条目字段表在 `presets` 里（异步、按渠道），
-   * 而执行期（`nodeSpecs/params.ts`）是纯函数、不能读库。面板在改值时已经知道
-   * 字段表与值的对应关系，直接把它拼成 `nodeInfoList` 落进节点 —— 执行期只做转发。
-   */
-  workflowNodeInfoList?: { nodeId: string; fieldName: string; fieldValue: string }[]
-  /** RunningHub 实例规格（24G / 48G）；缺省 = default */
-  workflowInstance?: 'default' | 'plus'
   // 图片模式
   ratio?: string
   /**

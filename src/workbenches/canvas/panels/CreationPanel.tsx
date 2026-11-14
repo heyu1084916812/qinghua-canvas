@@ -70,7 +70,6 @@ import { CreationParameterControls } from './creation/CreationParameterControls'
 import { CreationPromptToolsView } from './creation/CreationPromptToolsView'
 import { CreationPromptView } from './creation/CreationPromptView'
 import { CreationRunActionsView } from './creation/CreationRunActionsView'
-import { CreationWorkflowBar } from './creation/CreationWorkflowBar'
 import type { CreationPanelProps } from './creation/creationPanelTypes'
 
 export type { CreationPanelProps, PanelPromptTools } from './creation/creationPanelTypes'
@@ -904,7 +903,10 @@ export function CreationPanel(props: CreationPanelProps) {
         onTogglePrompt={() => onEvent({ type: 'togglePrompt' })}
       />
 
-      <section className={`${styles.section} ${styles.params} ${styles.paramsSection}`} data-panel-part="params">
+      <section
+        className={`${styles.section} ${styles.params} ${styles.paramsSection}`}
+        data-panel-part="params"
+      >
         <CreationParameterControls
           noPlatform={noPlatform}
           platformGap={platformGap}
@@ -942,7 +944,6 @@ export function CreationPanel(props: CreationPanelProps) {
           onOpenSkills={props.onOpenSkills}
           onRunTool={runPromptTool}
         />
-        <CreationWorkflowBar data={data} onEvent={onEvent} disabled={props.disabled} />
         <CreationRunActionsView
           promptMode={promptMode}
           activePreset={activePreset}
