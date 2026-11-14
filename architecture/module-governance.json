@@ -11565,7 +11565,7 @@
       "test": [
         "src/features/settings/SettingsWorkflowEntries.test.ts"
       ],
-      "budget": 460
+      "budget": 560
     },
     {
       "module": "src/platform/channels/runninghubAccount.ts",
@@ -11845,6 +11845,29 @@
         "src/workbenches/canvas/panels/creation/creationWorkflowMode.test.ts"
       ],
       "budget": 120
+    },
+{
+      "module": "src/features/settings/SettingsWorkflowManager.tsx",
+      "owner": "settings-workflow-entries",
+      "responsibility": "RunningHub 的「AI 应用和工作流」管理页与条目设置页：粘贴链接/id 导入、两栏卡片（封面/名称/备注/设置/删除）、条目设置（元信息 + 参数暴露编辑器）。",
+      "owns": [
+        "条目导入与删除",
+        "两栏卡片列表",
+        "条目设置页装配"
+      ],
+      "doesNotOwn": [
+        "工作流参数结构（domain/project/workflowParams）",
+        "字段编辑器本体（WorkflowFieldEditor）",
+        "HTTP 细节"
+      ],
+      "publicApi": [
+        "SettingsWorkflowManager",
+        "SettingsWorkflowManagerProps"
+      ],
+      "test": [
+        "src/features/settings/SettingsWorkflowEntries.test.ts"
+      ],
+      "budget": 450
     }
   ]
 }

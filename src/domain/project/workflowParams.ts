@@ -112,6 +112,12 @@ export interface WorkflowEntry {
   id: string
   title: string
   provider: WorkflowProviderKind
+  /** 条目类型：工作流 / AI 应用（同一个清单里两栏展示，执行时用不同前缀） */
+  kind?: 'workflow' | 'app'
+  /** 备注（用户可写用途 / 参数说明） */
+  note?: string
+  /** 输出类型（工作流设置页可改；缺省按暴露媒体推断） */
+  outputKind?: 'image' | 'video'
   fields: WorkflowParamField[]
   /** 最近一次拉到参数的时间（毫秒）；0 = 从没拉过 */
   fetchedAt: number
@@ -353,10 +359,16 @@ export function normalizeWorkflowEntries(raw: unknown): WorkflowEntry[] {
           .filter((field): field is WorkflowParamField => field !== null)
       : []
     const coverUrl = str(record.coverUrl).trim()
+    const note = str(record.note).trim()
+    const kind = record.kind === 'app' ? 'app' : 'workflow'
+    const outputKind = record.outputKind === 'video' ? 'video' : record.outputKind === 'image' ? 'image' : undefined
     out.push({
       id,
       title: str(record.title).trim() || id,
       provider,
+      kind,
+      ...(note ? { note } : {}),
+      ...(outputKind ? { outputKind } : {}),
       fields,
       fetchedAt: Number.isFinite(Number(record.fetchedAt)) ? Number(record.fetchedAt) : 0,
       ...(coverUrl ? { coverUrl } : {}),

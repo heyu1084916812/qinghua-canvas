@@ -53,6 +53,7 @@ import { SettingsChannelSidebarView } from './settingsPage/SettingsChannelSideba
 import { SettingsProviderHeaderView } from './settingsPage/SettingsProviderHeaderView'
 import { SettingsConnectionView } from './settingsPage/SettingsConnectionView'
 import { SettingsModelsView } from './settingsPage/SettingsModelsView'
+import { SettingsWorkflowManager } from '../../features/settings/SettingsWorkflowManager'
 import { SettingsWorkflowEntries } from '../../features/settings/SettingsWorkflowEntries'
 import { SettingsChannelRouteView } from './settingsPage/SettingsChannelRouteView'
 import { SettingsProfileDrawerView } from './settingsPage/SettingsProfileDrawerView'
@@ -718,17 +719,11 @@ export function SettingsPage({ embedded = false }: { embedded?: boolean } = {}) 
                   void channels.renameCredentialGroup(selected.id, groupId, nextName)
                 }
                 onSetKeyGroupPriority={(groupId, priority) =>
-                  void channels.setCredentialGroupPriority(
-                    selected.id,
-                    groupId,
-                    priority,
-                  )
+                  void channels.setCredentialGroupPriority(selected.id, groupId, priority)
                 }
                 onProtocolChange={handleProtocolChange}
                 onDownloadProtocol={downloadProtocol}
-                onRemoveProtocol={(protocolOption) =>
-                  void handleRemoveProtocol(protocolOption)
-                }
+                onRemoveProtocol={(protocolOption) => void handleRemoveProtocol(protocolOption)}
                 onDetect={handleDetect}
                 onVerify={handleVerify}
                 onToggleNewProtocol={toggleNewProtocol}
@@ -773,6 +768,10 @@ export function SettingsPage({ embedded = false }: { embedded?: boolean } = {}) 
                 onDropSelectedModel={(modelId) => void dropSelectedModel(modelId)}
                 onApplyDraft={() => void applyDraft()}
               />
+
+              {selected.protocol === 'runninghub-api' ? (
+                <SettingsWorkflowManager channel={selected} groupId={activeGroup?.id} channels={channels} platform={platform} />
+              ) : null}
 
               {/* RunningHub 专有的「工作流条目」（#1113）：只挂在 runninghub-api 上，组件自己管存储与网络 */}
               {selected.protocol === 'runninghub-api' ? <SettingsWorkflowEntries channel={selected} groupId={activeGroup?.id} channels={channels} platform={platform} /> : null}

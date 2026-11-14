@@ -156,7 +156,8 @@
 .marketItem,
 .item {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  align-items: flex-start;
   align-items: center;
   justify-content: space-between;
   gap: var(--space-2);
@@ -169,6 +170,7 @@
 .marketText,
 .text {
   display: flex;
+  flex: 1 1 auto;
   flex-direction: column;
   gap: 2px;
   min-width: 0;
@@ -424,8 +426,120 @@
   cursor: default;
 }
 
+.manager {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  box-sizing: border-box;
+  padding: var(--space-4);
+  border-radius: 8px;
+  background: var(--bg-subtle);
+}
+
+/* 管理页卡片：与左侧列表行分开写，避免 `.item` 的旧规则互相覆盖 */
+.card {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  min-width: 0;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-control);
+  background: var(--bg-surface);
+}
+
+.cardText {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.columns {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.column {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.columnHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.cover {
+  flex: none;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-control);
+  object-fit: cover;
+}
+
+.coverPlaceholder {
+  flex: none;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-control);
+  background: var(--bg-hover);
+}
+
+.noteArea {
+  box-sizing: border-box;
+  width: 100%;
+  padding: 2px var(--space-1);
+  border: var(--border);
+  border-radius: var(--radius-control);
+  background: var(--bg-surface);
+  color: var(--text-1);
+  font: inherit;
+  font-size: var(--fs-label);
+  resize: vertical;
+}
+
+.countRow {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.countBox {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 96px;
+  padding: var(--space-2);
+  border: var(--border);
+  border-radius: var(--radius-control);
+  background: var(--bg-surface);
+  color: var(--text-3);
+  font-size: var(--fs-label);
+}
+
+.countBox b {
+  color: var(--text-1);
+  font-size: var(--fs-title);
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
 @media (max-width: 900px) {
   .editor {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .columns {
     grid-template-columns: minmax(0, 1fr);
   }
 }
