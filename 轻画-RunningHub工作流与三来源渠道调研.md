@@ -409,3 +409,95 @@ RunningHub 侧真正需要的只有**三条接口路线**，轻画已经接了 1
 ### D. 据此新增的缺口
 
 **#1111**：把官方 `developer-kit` 的两份 JSON 接进来（模型目录 + 参考价），见对账清单。
+### E. 第四种路线：`LLM`（用户截图确认，2026-11-14）
+
+用户在 RunningHub API 控制台截图里，顶部「资源」下拉是**四项**：
+
+| 资源 | 说明（原文） | 端点 | 计费 |
+| --- | --- | --- | --- |
+| **模型 API** | 调用生图、视频、音频、3D 等标准模型（可灵 / Qwen / 海螺等） | `POST /openapi/v2/{endpoint}` | 金额（CNY） |
+| **LLM**（标了 `NEW`） | 调用 Qwen、DeepSeek 等大语言模型 | **OpenAI 兼容**：`https://llm.runninghub.cn/v1/chat/completions`（CN）/ `https://llm.runninghub.ai/v1/chat/completions`（国际） | 按 token：`CNY/1K` 或 `USD/1K`，有阶梯价 |
+| **AI 应用** | 用 API 调用平台全站已上线的 AI 应用 | `GET /api/webapp/apiCallDemo` + `POST /task/openapi/ai-app/run` | 付费积分 |
+| **ComfyUI 工作流** | 用 API 调用平台全站已上线的 ComfyUI 工作流 | `POST /api/openapi/getJsonApiFormat` + `POST /task/openapi/create` | 付费积分（+ 若工作流里含第三方模型，另计标准模型调用费） |
+
+**LLM 真机只读实测**（同一把消费级 Key）：
+
+```
+GET https://llm.runninghub.cn/v1/models   → 200
+  {id:"qwen/qwen3.8-flash-next", context_length:262144,
+   capabilities:{chat,tools,vision,reasoning,streaming,contextCache,structuredOutputs},
+   pricing:{billingType:"TOKEN_SIMPLE", input:{amount:0.0008, unit:"CNY/1K"}, output:{amount:0.0027, unit:"CNY/1K"}}}
+
+GET https://llm.runninghub.ai/v1/models   → 200（国际站，计价 USD/1K，`billingType:"TOKEN_INPUT_TIERED"` 阶梯价）
+POST https://llm.runninghub.cn/v1/chat/completions → 429
+  {"error":{"message":"Insufficient balance. Please recharge and try again.","type":"insufficient_quota"}}
+```
+
+⇒ **LLM 是标准 OpenAI 兼容接口**，`/v1/models` 连"能力（tools/vision/reasoning）与计价"一起给，
+对轻画意义明确：**可以直接当一条"对话渠道"接进现有的 openai-compatible 族**（连验证都用同一条 `/models`），
+不需要为它写专用适配器。真跑 chat 仍被余额挡住（`429 insufficient_quota`）。
+
+### F. 结算口径的最终更正：**按"算力时长 vs 第三方模型调用"分，不是按模型分类分**
+
+用户在同一个页面截到了工作流卡片的**计费标签**，只有两种：
+
+| 卡片标签 | 含义 |
+| --- | --- |
+| **运行时长费用** | 整条工作流都跑在 RunningHub 自有算力上 ⇒ **只按你占用的运行时长收费**（消费级用积分结算） |
+| **标准模型API调用费用 + 运行时长费用** | 工作流里**调用了闭源/第三方模型** ⇒ 除运行时长外，**另加第三方模型的调用费（CNY）** |
+
+⇒ 所以"积分跑自部署、金额跑闭源"这个直觉**基本对，但要精确一档**：
+不是"某个模型属于积分、某个属于金额"，而是**一条工作流里可能两种费用同时存在** ——
+**算力时长**（积分）＋ **第三方模型调用**（金额）。这也解释了为什么 `usage` 里
+`consumeMoney / consumeCoins / chargedPoint` 会同时回：它们记的是**不同性质的费用**，不是"两本账二选一"。
+
+**四种路线 + 真机门禁一览（同一把消费级 Key）**：
+
+| 路线 | 只读接口 | 真跑 | 卡在哪 |
+| --- | --- | --- | --- |
+| 模型 API | ✅ 可查（但 `price-preview` 也 1014） | ❌ | `1014` 只对企业级-共享 Key |
+| LLM | ✅ `/v1/models` 200 | ❌ | `429 insufficient_quota`（余额不足） |
+| AI 应用 | ✅ `apiCallDemo` 200 | ❌ | `821` 付费积分不足 |
+| ComfyUI 工作流 | ✅ `getJsonApiFormat` 200 | ❌ | `821` 付费积分不足 |
+### G. 「自部署」徽标 + 工作流市场页：把积分/金额彻底说清（2026-11-14 用户给了页面）
+
+用户给的页面 `https://www.runninghub.cn/call-api/search-api/workflow`（服务端渲染，正文可抓）看到两件事：
+
+**① 市场卡片只有两种计费标签**（与 §九 F 一致，这里是官方页面的原话）：
+
+- 绝大多数卡片：**「运行时长费用」**
+- 用到第三方模型的卡片：**「标准模型API调用费用 + 运行时长费用」**
+
+**② 模型/应用详情页 `https://www.runninghub.cn/call-api/api-detail/<19位id>` 会打能力徽标**，其中最关键的是 **`自部署`**：
+
+> 实例：`api-detail/2102407820434608129`（`/rhart-video/minimax-h3-rh-enhanced/ref2va`）的徽标是
+> `自部署` / `reference-to-video` / `audio-to-video`。
+
+⇒ **`自部署` = 跑在 RunningHub 自有算力上 ⇒ 按运行时长（积分）计费**；
+**没有这个徽标 = 调第三方闭源模型 ⇒ 另收标准模型调用费（CNY 金额）**。
+这就是用户最初那个直觉的**准确版本**：
+
+| 用户说法 | 精确口径 |
+| --- | --- |
+| 「积分用的是本地部署的那些模型」 | 积分付的是**运行时长**（自有算力），标了 `自部署` 的模型/工作流属于这一类 |
+| 「金额用的是闭源的哪些」 | 金额付的是**第三方模型的调用费**，按 /次 /秒 /张 /token 计价（`pricing.public.json` 511 条全是 CNY） |
+| —（原先没意识到） | **同一条工作流里可能两者同时发生**：卡片写「标准模型API调用费用+运行时长费用」就是这个意思 |
+
+**顺带拿到一份现成的"参数渲染样例"**（详情页 Playground 区，可直接照这个做设置页/节点参数区）：
+
+```
+prompt*        （多行文本）
+aspectRatio*   9:16 (Portrait Widescreen)
+resolution*    1080p
+duration*
+refImage1..9   上传图片（支持JPG/PNG格式, 文件不超过10MB）
+refVideo1..3
+driveAudio*    （必填）
+audioMode*     native（模型自己出声）
+refAudio1..3 / refVideoAudio1..2
+```
+
+它同时演示了三件我们要做的事：**必填用 `*` 标**、**多媒体槽按序号排列**、**每个媒体槽带格式与体积上限**。
+
+**注意**：这个市场列表是客户端渲染的（卡片 id 在 `__NUXT__` 里），页面上没有可直接调的公开 JSON 接口 ——
+所以「填 id 抓取」仍是主路径（稳定、可验证），关键词搜索只能作为以后的可选增强。
