@@ -46,13 +46,13 @@ RunningHub 侧真正需要的只有**三条接口路线**，轻画已经接了 1
 | 用途 | 方法与路径 | 请求体要点 | 响应要点 |
 | --- | --- | --- | --- |
 | 校验 Key / 读余额 | `POST /uc/openapi/accountStatus` | `{apikey}` | `code:0`；`data.remainCoins`（RH 币）/ 金额余额 |
-| **标准模型**（扣金额） | `POST /openapi/v2/{endpoint}` | 提示词 + 媒体字段 + 档位，见目录 | `{code:0, data.taskId}` |
+| **标准模型**（结算见 §五点五 E） | `POST /openapi/v2/{endpoint}` | 提示词 + 媒体字段 + 档位，见目录 | `{code:0, data.taskId}` |
 | 轮询（标准模型） | `POST /openapi/v2/query` | `{apiKey, taskId}` | `code`：`804` 运行 / `813` 排队 / `805` 失败 / `0` 完成；`results[]` |
 | **AI 应用列表** | `POST /openapi/v2/aiapp/list` | `{current,size,sort}` | `data.records[]`（`invokeExample` 里有 `/run/ai-app/<id>`） |
 | **AI 应用可改字段** | `GET /api/webapp/apiCallDemo?apiKey=&webappId=` | — | `data.nodeInfoList[]`（**只有作者开放过的字段**） |
-| **AI 应用提交**（扣币） | `POST /task/openapi/ai-app/run` | `{apiKey, webappId, nodeInfoList, instanceType?}` | `data.taskId`、`data.promptTips`（含 `node_errors` 即工作流校验失败） |
+| **AI 应用提交** | `POST /task/openapi/ai-app/run` | `{apiKey, webappId, nodeInfoList, instanceType?}` | `data.taskId`、`data.promptTips`（含 `node_errors` 即工作流校验失败） |
 | **工作流 JSON（Api 格式）** | `POST /api/openapi/getJsonApiFormat` | `{apiKey, workflowId}` | `data.prompt` = **整份工作流 JSON 的字符串** → 每个节点的 `inputs` 就是「所有可动参数」 |
-| **工作流提交**（扣金额） | `POST /task/openapi/create` | `{apiKey, workflowId, nodeInfoList, addMetadata?, instanceType?}` | `data.taskId` |
+| **工作流提交** | `POST /task/openapi/create` | `{apiKey, workflowId, nodeInfoList, addMetadata?, instanceType?}` | `data.taskId` |
 | 任务状态 | `POST /task/openapi/status` | `{apiKey, taskId}` | 状态码同上 |
 | 取结果 | `POST /task/openapi/outputs` | `{apiKey, taskId}` | `data[]`：`{url / outputUrl, outputType, text}`，**可能多份** |
 | 上传素材 | `POST /task/openapi/upload`（multipart） | `apiKey`、`fileType=input`、`file` | `data.fileName` —— **工作流 / AI 应用的媒体字段吃的是这个 fileName，不是 URL、不是 data URI** |
@@ -165,7 +165,7 @@ RunningHub 侧真正需要的只有**三条接口路线**，轻画已经接了 1
 ### 4.7 与现有「路由 / 分组 / 停止」的边界
 
 - 工作流条目**不参与** `modelMap` 映射（它是条目 id，不是上游模型名）；
-- 一条 RunningHub 渠道可以同时挂标准模型、AI 应用、工作流三类条目，**币 / 金额两本账**照旧由接口路线决定（`ai-app` 扣币、`create` 扣金额），错误码 `812` 的文案已按这个口径翻译过（#363）；
+- 一条 RunningHub 渠道可以同时挂标准模型、AI 应用、工作流三类条目；**计费别再按"两本账 = 两条路"讲**：V2 query 的 `usage` 里 `consumeMoney / consumeCoins / thirdPartyConsumeMoney / chargedPoint + settleMode` 同时回，实际结算看账号/Key 类型（见 §五点五 E）；错误码 `812` 的文案已按旧口径翻译过（#363），收敛口径时一并核对；
 - 停止 = 现有 `AbortSignal`（中止轮询即可；**RunningHub 侧任务不会因此取消**，要如实提示"本地已停止、云端仍在跑/仍计费"——这一条以前在别处没写清，属于要补的文案）。
 
 ---
@@ -185,19 +185,113 @@ RunningHub 侧真正需要的只有**三条接口路线**，轻画已经接了 1
 
 ---
 
-## 六、未实测项（**不许当结论用**）
+## 五点五、官方文档核对结果（2026-11-14 第二轮，用户给了可读入口）
+
+> 第一轮我抓不到文档正文（SPA + Notion），只能靠官方源码互证。用户给了两个地址后**正文全部读到了**：
+>
+> - 文档站：`https://www.runninghub.cn/runninghub-api-doc-cn/`（导航 480 个链接，正文服务端渲染）
+> - API 详情页：`https://www.runninghub.cn/call-api/api-detail/2120340341193793538?apiType=4`
+>
+> 下面每一条都能在上述文档里点开核对（页 id 我写在括号里）。
+
+### A. 文档结构（能直接对上的页面）
+
+| 页面 | 路径 | 我用来定什么 |
+| --- | --- | --- |
+| 开始 | `/runninghub-api-doc-cn/doc-8287334` | Key 类型限制（消费级 Key 需**基础版及以上会员**；企业级共享/独占不受限） |
+| 关于 nodeInfoList | `…/doc-8287336` | **nodeId / fieldName / fieldValue 的官方定义**（下面 B 节） |
+| 原生 ComfyUI 接口支持 | `…/doc-8287337` | **`/proxy/{apiKey}` 与 `/proxy-plus/{apiKey}`**（把云端当本地 ComfyUI 用，见 C 节） |
+| 接口错误码说明 | `…/doc-8287338` | 错误码含义 |
+| 工作流完整接入示例 | `…/doc-8287342` | 官方给的完整跑通流程（含结果字段形状） |
+| AI 应用完整接入示例 | `…/doc-8287339`、`…/doc-8287340`（高阶） | 应用接入与进度显示 |
+| 发起 ComfyUI 任务 1-简易 | `…/api-425749012` | `POST /task/openapi/create`，**只传 apiKey + workflowId = 不改任何参数直接跑** |
+| 发起 ComfyUI 任务 2-高级 | `…/api-425749013` | 加 `nodeInfoList` + `instanceType` / `retainSeconds` / `usePersonalQueue` / `webhookUrl` |
+| 获取工作流 Json | `…/api-425749014` | `POST /api/openapi/getJsonApiFormat`，`data.prompt` = 工作流 JSON **字符串**（官方样例带 `_meta.title`） |
+| 发起 AI 应用任务 | `…/api-425749010` | `POST /task/openapi/ai-app/run`（`webappId` 是**数字**） |
+| 获取 AI 应用 API 调用示例 | `…/api-425749011` | **`apiCallDemo` 的真实返回体**（这是第一轮缺的那块，见 D 节） |
+| 查询任务生成结果 V2 | `…/api-425767306` | **`POST /openapi/v2/query`：一个接口查所有任务类型**（见 E 节） |
+| 查询任务状态 / 生成结果 | `…/api-425749003`、`…/api-425749004` | 两者**都标了「将废弃」**，新代码别再用 |
+| 文件上传 | `…/api-425749007` | `POST /task/openapi/upload`，回 `{fileName, fileType}` |
+
+### B. nodeInfoList 的官方定义（这条第一轮只能靠源码猜）
+
+- 工作流界面上每个节点右上角的数字 = **nodeId**；
+- 节点在 **api_format** 里的 `inputs` 的 key = **fieldName**，值 = **fieldValue**；
+- 官方示例里 `fieldValue` **一律是字符串**（`"nodeId": "6"`、`"fieldValue": "1231231"`）；
+- **`[]` 包裹的值一般是连线，官方明说"不建议修改"**（与我的 `isWorkflowLinkValue` 一致）；
+- 找不到的 `fieldName` = **纯前端逻辑**（如 `control_after_generate`、group 相关），API 里根本不存在；
+- ⚠️ **「API 调用会强制重置 seed 值」**，要保住 seed 必须把它放进 `nodeInfoList`；
+- 图片两条路：① 自建图床 + `LoadImageFromUrl` 节点（**直接吃公网 URL**）；② 上传后把 `fileName` 写进 `LoadImage`。
+
+### C. 一个第一轮完全没发现的入口：原生 ComfyUI 代理
+
+官方原话：`https://www.runninghub.cn/proxy/{你的apiKey}`（24G）与 `/proxy-plus/{你的apiKey}`（48G），
+**功能等同本地 `http://127.0.0.1:8188`**，已适配 EasyAI / SillyTavern / Krita 插件。
+
+对轻画的意义很大：**「工作流渠道」的两种执行端可以共用一套协议**——
+本地 ComfyUI 用 `http://127.0.0.1:8188`，云端用 `/proxy/{key}`，都是原生 ComfyUI API
+（`POST /prompt`、`/history/{id}`、`/object_info`）。这比"云端走 task/openapi/*、本地走 ComfyUI"两套实现省一半代码，
+而且 `/object_info` 能拿到**下拉候选与数值范围**，正好补上"工作流 JSON 推不出 options"的短板。
+注意它是个**新方向**（第一轮没核到），要先实测再决定是否采用，别直接当结论写进代码。
+
+### D. `apiCallDemo` 的真实返回体（第一轮列的「未实测第 1 条」已解决）
+
+`GET /api/webapp/apiCallDemo?apiKey=&webappId=` → `data` 里有：
+
+| 字段 | 内容 |
+| --- | --- |
+| `nodeInfoList[]` | 每个可改参数一项：`nodeId`、**`nodeName`**（如 `LoadImage` / `RH_Translator`）、`fieldName`、`fieldValue`、**`fieldType`**（`IMAGE` / `LIST` / `STRING`…）、**`description`**（中文名，如「上传图像」「图像编辑文本输入框」）、`descriptionEn`、**`fieldData`**（字符串化 JSON） |
+| `fieldData` 三种形状 | IMAGE：`'[["a.png","b.png","example.png"], {"image_upload": true}]'`；LIST：`'[{"name","index","description"},…,{"default":…,"description":"忽略"}]'`；STRING：`'["STRING", {"default":"", "multiline": true}]'` |
+| `webappName` | 应用名 |
+| `covers[]` | 示例图（`url` / `thumbnailUri` / 宽高）→ **可直接当下拉里的缩略图** |
+| `tags[]` / `statisticsInfo` | 标签与用量（`useCount` / `likeCount`…） |
+| `curl` | 官方给的完整调用示例 |
+
+⇒ 结论：**AI 应用的参数根本不用猜**——有中文名、有候选列表、有「多行文本」标记、有缩略图；
+`LIST` 里那条 `{"default":…, "description":"忽略"}` 是哨兵项，必须跳过。
+
+### E. 任务查询与计费：V2 一个接口管全部
+
+`POST /openapi/v2/query`（**查询任务生成结果 V2**）body 只有 `{taskId}`，Header 带 Bearer：
+
+```json
+{ "taskId": "…", "status": "SUCCESS", "errorCode": "", "errorMessage": "",
+  "results": [{ "url": "…", "outputType": "jpg" }], "clientId": "", "promptTips": "",
+  "usage": { "taskCostTime": "12", "consumeMoney": null, "consumeCoins": null,
+             "thirdPartyConsumeMoney": null, "settleMode": "POINT", "chargedPoint": "1.28" },
+  "taskUsageList": [ … ] }
+```
+
+⇒ 两个修正：
+
+1. **「工作流扣金额、AI 应用扣币」这个说法过于绝对**。真实情况是同一个任务结果里
+   `consumeMoney`（金额）/ `consumeCoins`（币）/ `thirdPartyConsumeMoney`（第三方成本）/
+   `chargedPoint`（积分）+ `settleMode`（如 `POINT`）**同时存在**，实际按账号/Key 类型结算。
+   旧记录里"两把 Key = 两本账"的描述要按这条收敛（轻画现有适配器已经用 V2 query，方向是对的）。
+2. 旧的 `/task/openapi/status`、`/task/openapi/outputs` **都标注「将废弃」**，且回的是
+   `[{fileUrl, fileType, nodeId}]` 形状 —— 轻画已经改用 V2，但**产物解析要同时兼容
+   `url` / `outputUrl` / `fileUrl`**（已按这条补了 `resultUrlsOf` + 5 条单测）。
+
+---
+
+## 六、仍未实测的项（**不许当结论用**）
+
+> 第一轮列的 5 条已有 2 条被官方文档解决（`apiCallDemo` 的字段、`fieldValue` 的类型），
+> 见 §五点五 D / B。下面剩 3 条 + 2 条新增，仍必须真机或真人确认。
 
 | 项 | 现状 | 怎么补 |
 | --- | --- | --- |
-| `apiCallDemo` 返回的字段是否含 `description` / `nodeName` | 两个官方实现只用到 `nodeId` / `fieldName` / `fieldValue` / `fieldType`；参考项目还读了 `label` / `title`（**来源未经官方文档确认**） | 用你自己的 Key 跑一次 `GET /api/webapp/apiCallDemo`，把原始 JSON 存成夹具再定类型；**不要先按猜的字段写死** |
-| 工作流 `nodeInfoList` 的 `fieldValue` 该传字符串还是原类型 | `Infinite-Canvas` 全转字符串；官方插件传原值 | 拿一条真工作流各试一次（数字 / 布尔 / 下拉），以服务端接受为准 |
 | 自建工作流的「AI 应用开放参数」网页流程细节 | 只知道 `apiCallDemo` 只回开放字段；网页端具体在哪个页面勾 | 登录 RunningHub → 建一个 AI 应用走一遍，截图存档 |
-| 工作流提交的真实耗时 / 超时 | 官方文档提示视频任务可能较长 | 真跑一条视频工作流，记录耗时与超时阈值是否需要按条目可配 |
-| 金额 Key 余额为 0 时的行为 | 已知标准模型报 `812 企业版余额不足` | 工作流路（`create`）是否同一错误码，待测 |
+| 工作流提交的真实耗时 / 超时 | 官方文档提示视频任务可能较长（`taskCostTime` 单位是秒） | 真跑一条视频工作流，决定超时阈值是否要按条目可配 |
+| 余额为 0 时的行为 | 已知标准模型报 `812 企业版余额不足`；`create` 是否同一错误码未验 | 用余额为 0 的 Key 打一次 `/task/openapi/create` |
+| **新增**：原生 ComfyUI 代理（`/proxy/{key}`）是否真能跑通整条链路 | 官方文档写了"等同本地 8188"，我**没有实测**；它是否支持 `/object_info`、推流、并发限制都未知 | 本机用 curl 打 `/proxy/{key}/object_info` 与 `/prompt` 各一次，再决定 P1 走 task/openapi 还是这条 |
+| **新增**：`apiCallDemo` 的 `accessEncrypted: true` 应用 | 示例里是 `false`；加密应用的 `fieldValue` 是否要特殊处理未知 | 找一个加密应用看返回体 |
 
-**官方文档入口**（都是 SPA / Notion，抓取只能拿到标题，需要人眼看）：
-- 标准模型 API 页：`https://www.runninghub.cn/call-api/standard-api`
-- 官方插件 README 里给的 API 文档（Notion）：`https://gold-spleen-bf1.notion.site/RunningHub-API-1432ece0cf5f8026aaa8e4b9190f6f8e`
+**可读的官方文档入口**（2026-11-14 起可读；第一轮我抓不到是因为用错了地址）：
+- **中文文档站（正文可读）**：`https://www.runninghub.cn/runninghub-api-doc-cn/`
+- API 详情示例页：`https://www.runninghub.cn/call-api/api-detail/2120340341193793538?apiType=4`
+- 标准模型 API 落地页：`https://www.runninghub.cn/call-api/standard-api`
+- 官方插件 README 里另有一份 Notion 文档（JS 渲染，抓不到正文）：`https://gold-spleen-bf1.notion.site/RunningHub-API-1432ece0cf5f8026aaa8e4b9190f6f8e`
 - 取 Key：`https://www.runninghub.cn/enterprise-api/sharedApi`
 - 调用记录 / 账单：`https://www.runninghub.cn/call-api/call-record`
 

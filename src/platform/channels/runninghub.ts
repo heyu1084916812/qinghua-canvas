@@ -176,6 +176,22 @@ export function runningHubCapability(model: RunningHubModel): ModelCapability {
 /** AI 应用（**币**路）的模型 id 前缀 */
 const APP_PREFIX = 'app:'
 
+/**
+ * 产物条目。**三种形状都收**，因为 RunningHub 有三个地方回它们：
+ * - `POST /openapi/v2/query`（V2，现行）：`{url, outputType}`；
+ * - `POST /task/openapi/outputs`（官方文档标注「将废弃」）：`{fileUrl, fileType}`；
+ * - webhook 的 `eventData`（同上，`fileUrl/fileType`）。
+ * 只认第一种会在旧接口/回调那条路上把"明明成功、有产物"判成"没有产物"。
+ */
+export interface RhResultItem {
+  url?: string
+  outputUrl?: string
+  outputType?: string
+  fileUrl?: string
+  fileType?: string
+  text?: string
+}
+
 interface RhResponse {
   code?: number
   msg?: string
@@ -193,8 +209,14 @@ interface RhResponse {
     fileName?: string
     [k: string]: unknown
   }
-  results?: { url?: string; outputUrl?: string; outputType?: string; text?: string }[] | null
-  usage?: { consumeMoney?: string | number; thirdPartyConsumeMoney?: string | number } | null
+  results?: RhResultItem[] | null
+  usage?: {
+    consumeMoney?: string | number
+    consumeCoins?: string | number
+    thirdPartyConsumeMoney?: string | number
+    settleMode?: string
+    chargedPoint?: string | number
+  } | null
 }
 
 interface RhNode {
@@ -202,6 +224,20 @@ interface RhNode {
   fieldName: string
   fieldType?: string
   fieldValue?: unknown
+}
+
+/**
+ * 产物条目 → 可下载地址（**纯函数**，三种形状都认，见 `RhResponse.results` 的注释）。
+ *
+ * 顺序即服务端给的顺序：多产物落库时 `thumbOrder` 依赖它，"第一张是主图"这条不能乱。
+ */
+export function resultUrlsOf(items: readonly RhResultItem[]): string[] {
+  const out: string[] = []
+  for (const item of items) {
+    const url = item.url ?? item.outputUrl ?? item.fileUrl
+    if (typeof url === 'string' && url.length > 0) out.push(url)
+  }
+  return out
 }
 
 /**
@@ -446,9 +482,7 @@ export function createRunningHubAdapter(
     fallbackMime = 'image/png',
   ): Promise<GeneratedAsset[]> => {
     const items = res.results ?? []
-    const urls = items
-      .map((i) => i.url ?? i.outputUrl)
-      .filter((u): u is string => typeof u === 'string' && u.length > 0)
+    const urls = resultUrlsOf(items)
     if (urls.length === 0) {
       const text = items.map((i) => i.text).filter(Boolean).join('\n')
       throw new ChannelError({
