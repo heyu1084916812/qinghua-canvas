@@ -284,6 +284,19 @@ RunningHub 侧真正需要的只有**三条接口路线**，轻画已经接了 1
 | `POST /openapi/v2/query {taskId:"1"}` | `{taskId:"1", status:"", errorCode:"1004", errorMessage:"Task not found…", results:null, promptTips:"", failedReason:{}}` | **错误在顶层 `errorCode/errorMessage`**，没有 `code/msg`；解析必须按这条 |
 | `GET /proxy/{apiKey}/object_info` | **HTTP 200**，拿到完整节点定义（`KSampler.input.required.seed` 带 `min/max/control_after_generate`、`tooltip`…） | **原生 ComfyUI 代理真的可用**；这是"下拉候选 / 数值范围"的权威来源 |
 | `GET /proxy/{apiKey}/system_stats` | `comfyui_version 0.3.27`、`pytorch 2.5.1+cu124`、`RTX 4090`(24G) | 代理后面是真机 ComfyUI，不是桩 |
+### G. 第三轮：计价的两种单位 + Key 等级门槛（2026-11-14，同一把消费级 Key）
+
+| 探测 | 结果 | 结论 |
+| --- | --- | --- |
+| `POST /openapi/v2/price-preview/{route}`（官方「模型 API 价格预估」，页 `api-454850620`） | 返回体同时有 **`estimatedPrice`** 与 **`estimatedPoint`**（另有 `currency`、`freeLimit*`、`isFreeThisCall`） | **报价本身就有两种单位**：金额（闭源/第三方模型按次计费）与积分（自有算力跑的开源模型）—— 与用户说的"积分跑自部署、金额跑闭源"**一致** |
+| 同接口打 `rhart-image-n-pro/text-to-image` / `rhart-image-g-2-official/...` / `rhart-video-v3.1-fast/...` | 全部 `errorCode 1014`：**"Standard Model API is restricted to Enterprise-Shared API Keys only"** | **标准模型 API 只对企业级-共享 Key 开放**；消费级（`apiType: NORMAL`）Key 只能走 **AI 应用 / 工作流** |
+| `POST /openapi/v2/models` | `errorCode 1001 Invalid URL` | 没有"模型目录"这个公开接口（目录要靠官方文档/插件里的 `capabilities.json`） |
+
+⇒ 三条产品口径因此要写进界面：
+
+1. **一条渠道一个 Key**（#1108）；
+2. **标准模型只对企业级-共享 Key 开放**（1014 已在适配器里翻成人话）；
+3. **消费级 Key 的可用面 = AI 应用 + 工作流**，所以"工作流渠道"对这类用户不是锦上添花，而是**唯一能用自定义工作流的路**。
 
 **对方案的影响（两处）**：
 

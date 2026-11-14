@@ -8,6 +8,7 @@ import type { ModelCapability } from '../../domain/shared/capability'
 import { asAppError, describeError, errorTextOf } from '../../shared/result'
 import { bytesToBase64 } from './base64'
 import { prepareModelImageInput } from './chatImageInput'
+import { webappIdPayload } from './runninghubWorkflow'
 import type { NetworkResponse, SafeChannelConfig } from '../ports'
 import {
   ChannelError,
@@ -302,6 +303,15 @@ function describeRhError(res: RhResponse, fallback: string): string {
   }
   if (/auth|token|key|401|403/i.test(`${code} ${message}`)) {
     return `${message}（检查这一行的 Key：一条渠道只需要一个 Key，标准模型 / app: / workflow: 全用它）`
+  }
+  /**
+   * `1014` = **标准模型 API 只对企业级-共享 Key 开放**（2026-11-14 真机实测：
+   * 消费级 Key 打 `price-preview` 与标准模型端点都回这句原文
+   * "Standard Model API is restricted to Enterprise-Shared API Keys only"）。
+   * 这是**账号等级**问题，不是配错了 —— 所以文案要指向"换用 app: / 工作流"或"升级 Key"。
+   */
+  if (code === '1014') {
+    return `${message}（这条是账号等级限制：标准模型 API 只对企业级-共享 Key 开放；消费级 Key 请改用 app: 应用或工作流）`
   }
   /**
    * `1007` = **输入没过服务端的参数校验**（2026-10-08 实测两次：坏掉的 base64 图
@@ -804,7 +814,8 @@ export function createRunningHubAdapter(
       submitted = await readJson(
         await json(
           `${host}${APP_RUN_PATH}`,
-          { apiKey: key, webappId: Number(webappId), nodeInfoList: nodes2 },
+          /* 19 位应用 id 不能转 Number：`Number()` 会丢精度、跑到别的应用上（见 `webappIdPayload`） */
+          { apiKey: key, webappId: webappIdPayload(webappId), nodeInfoList: nodes2 },
           signal,
           SUBMIT_TIMEOUT_MS,
         ),

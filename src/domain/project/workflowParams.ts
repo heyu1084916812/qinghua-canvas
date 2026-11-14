@@ -137,7 +137,6 @@ export function workflowEntryIdOf(modelId: string): string | null {
 
 /**
  * 条目清单存在 `presets` 表的哪一行（按渠道分开）。
- *
  * 与「CLI 工具配置」同一条理由（`state/project/cliToolStore.ts`）：`presets` 就是
  * 「按 id 存一条 JSON」，新建表要动 Dexie schema，为一份同构的配置付这个代价不值得。
  */
@@ -390,4 +389,3 @@ export function mergeRefetchedFields(
  * 字段的取值 / 必填校验 / 种子归一 / 提交体在 `workflowParamValues.ts`
  * —— 那份是「这一次发什么」，这份是「字段表怎么来、怎么存、怎么合并」。
  */
-

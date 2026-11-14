@@ -731,6 +731,23 @@
       "budget": 120
     },
     {
+      "module": "src/domain/project/workflowAppParams.ts",
+      "owner": "project-workflow-channel-params",
+      "responsibility": "把 RunningHub apiCallDemo 回来的 nodeInfoList 解析成参数字段表（默认全暴露、中文名当标签、fieldData 里的候选与多行标记），与自建工作流的「默认全隐藏」口径明确区分。",
+      "owns": [
+        "应用字段 → 字段表（含 fieldType 映射）",
+        "fieldData 的候选值 / 多行解析与哨兵项过滤"
+      ],
+      "doesNotOwn": [
+        "工作流 JSON 的解析（workflowParams.ts）",
+        "HTTP 请求",
+        "参数面板渲染"
+      ],
+      "publicApi": ["parseAppNodeInfoList", "parseAppFieldData"],
+      "test": ["src/domain/project/workflowAppParams.test.ts"],
+      "budget": 200
+    },
+    {
       "module": "src/domain/project/referencePalette.ts",
       "owner": "project-reference-curation-rules",
       "responsibility": "从 RGBA 像素本地统计参考图主色并输出 HEX 与占比，生成写进参考卡的色值句。",
@@ -3620,6 +3637,37 @@
         "src/pages/SkillsPage/skillsPageCssArchitecture.test.ts"
       ],
       "budget": 539
+    },
+    {
+      "module": "src/platform/channels/runninghubWorkflow.ts",
+      "owner": "channel-runninghub-workflow",
+      "responsibility": "RunningHub 工作流 / AI 应用的 HTTP 对接：拉全量参数、拉应用字段、上传素材换 fileName、提交任务、查任务；错误形状两套（task/openapi 的 code/msg 与 v2 query 的 errorCode/errorMessage）都归一。",
+      "owns": [
+        "getJsonApiFormat / apiCallDemo 的取参与解析入口",
+        "task/openapi/create 与 ai-app/run 的提交体",
+        "素材上传换 fileName",
+        "openapi/v2/query 的状态与产物地址归一"
+      ],
+      "doesNotOwn": [
+        "字段表数据结构与提交体拼装（domain/project/workflow*）",
+        "轮询节奏与产物落库（执行层）",
+        "设置页与生成节点的界面"
+      ],
+      "publicApi": [
+        "WorkflowEndpoint",
+        "WorkflowTaskResult",
+        "WORKFLOW_POLL_INTERVAL_MS",
+        "WORKFLOW_POLL_MAX_MS",
+        "fetchWorkflowFields",
+        "fetchAppFields",
+        "uploadWorkflowAsset",
+        "submitWorkflowTask",
+        "submitAppTask",
+        "queryWorkflowTask",
+        "webappIdPayload"
+      ],
+      "test": ["src/platform/channels/runninghubWorkflow.test.ts"],
+      "budget": 450
     },
     {
       "module": "src/platform/channels/openaiImages/chatImageProtocol.ts",

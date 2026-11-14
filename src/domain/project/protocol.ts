@@ -472,7 +472,7 @@ export const BUILTIN_PROTOCOLS: ProtocolDefinition[] = [
       capabilities: ['image', 'video'],
       defaultBaseUrl: 'https://www.runninghub.cn',
       docUrl: 'https://www.runninghub.cn/runninghub-api-doc-cn/',
-      note: 'RunningHub 的 OpenAPI（提交任务 + 轮询取结果）。标准模型直接用显示名，AI 应用用 app: 前缀，工作流用 workflow: 前缀；有参考图时自动走该模型的图生档。',
+      note: 'RunningHub 的 OpenAPI（提交任务 + 轮询取结果）。标准模型直接用显示名，AI 应用用 app: 前缀，工作流用 workflow: 前缀；有参考图时自动走该模型的图生档。⚠️ 标准模型 API 只对企业级-共享 Key 开放（消费级 Key 会回 1014），AI 应用 / 工作流不受此限。',
       /**
        * **一把钥匙**（2026-11-14 真机更正：以前这里声明了两把，是错的）。
        *
