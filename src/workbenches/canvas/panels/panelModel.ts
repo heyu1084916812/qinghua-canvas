@@ -152,6 +152,17 @@ export type PanelEvent =
   /** 视频「生成音频」开关（图三/图六） */
   | { type: 'setGenerateAudio'; generateAudio: boolean; recipe?: RecipeSnapshot }
   /**
+   * 工作流条目：面板把「暴露字段 + 值」拼成整份提交体交给节点。
+   *
+   * 为什么整份而不是逐字段：字段表在 `presets`（异步），执行期是纯函数读不到；
+   * 面板改值时正好握着字段表与值，一次落库最省事，也不会出现"字段表与值不同步"。
+   */
+  | {
+      type: 'setWorkflowRun'
+      list: { nodeId: string; fieldName: string; fieldValue: string }[]
+      instance?: 'default' | 'plus'
+    }
+  /**
    * **Midjourney 独有的风格参数**（用户 2026-10-03 图二那份「高级设置」）。
    *
    * ⚠️ 事件名与节点字段**同名**（`setMjStylize` ↔ `mjStylize`）：

@@ -868,9 +868,10 @@ export function createRunningHubAdapter(
   ): Promise<GeneratedAsset[]> => {
     const endpoint = { host, apiKey: key }
     const nodeInfoList = workflowNodeListOf(request.params?.workflow)
+    const instance = request.params?.instanceType === 'plus' ? ('plus' as const) : undefined
     let taskId: string
     try {
-      const input = { workflowId, ...(nodeInfoList.length > 0 ? { nodeInfoList } : {}) }
+      const input = { workflowId, ...(nodeInfoList.length > 0 ? { nodeInfoList } : {}), ...(instance ? { instanceType: instance } : {}) }
       taskId = await submitWorkflowTask({ network: deps.network }, endpoint, input, signal)
     } catch (e) {
       if (signal.aborted) throw e
