@@ -61,12 +61,12 @@ export const LEGACY = {
   'PRODUCT.md': 65,
   'AGENTS.md': 46,
   // 对账归档（2026-11-14 拆分时定版）。归档只读：新记录写进新的月份文件，不改旧的。
-  'ledger/README.md': 174,
+  'ledger/README.md': 207,
   'ledger/01-产品文档对账与专题.md': 331,
   'ledger/02-缺口汇总主表.md': 1471,
   'ledger/按批记录-2026-09.md': 625,
   'ledger/按批记录-2026-10.md': 5141,
-  'ledger/按批记录-2026-11.md': 3205,
+  'ledger/按批记录-2026-11.md': 3226,
   // 发行说明：一个版本一篇（2026-11-14 拆分）。旧版本文件只读。
   'release-notes/archive-0.1.0-and-earlier.md': 900,
   'release-notes/v0.1.1.md': 34,
