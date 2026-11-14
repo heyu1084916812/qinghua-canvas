@@ -22,18 +22,34 @@
  * 用法：node scripts/check-doc-migration.mjs
  * 已接入 `npm run check`（与 check-doc-index.mjs 同层）。
  */
-import { readFileSync } from 'node:fs'
+import { readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url))
 const INDEX = '文档总索引.md'
 const LEDGER = '轻画-功能对账清单.md'
+/** 2026-11-14 起，编号条目分散在根清单与 ledger/ 归档里，两处一起算 */
+const LEDGER_DIR = 'ledger'
 const ANCHOR = '### 3.1'
 const EXEMPT_ANCHOR = '### 3.2'
 
 const indexText = readFileSync(join(ROOT, INDEX), 'utf8')
-const ledgerText = readFileSync(join(ROOT, LEDGER), 'utf8')
+
+function ledgerTextOf() {
+  const parts = [readFileSync(join(ROOT, LEDGER), 'utf8')]
+  try {
+    for (const name of readdirSync(join(ROOT, LEDGER_DIR)).sort()) {
+      if (!name.toLowerCase().endsWith('.md') || name === 'README.md') continue
+      parts.push(readFileSync(join(ROOT, LEDGER_DIR, name), 'utf8'))
+    }
+  } catch {
+    // 没有归档目录时只看根清单 —— 但那属于拆分尚未完成的状态，check-ledger 会另报
+  }
+  return parts.join('\n')
+}
+
+const ledgerText = ledgerTextOf()
 
 /** ① 索引第二节「当前文档清单」里，状态列写着「已被取代」的文档 */
 const allLines = indexText.split(/\r?\n/)
