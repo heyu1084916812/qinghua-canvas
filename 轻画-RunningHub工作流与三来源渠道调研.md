@@ -370,3 +370,42 @@ RunningHub 侧真正需要的只有**三条接口路线**，轻画已经接了 1
 - `HM-RunningHub/ComfyUI_RH_OpenAPI`（标准模型）：<https://github.com/HM-RunningHub/ComfyUI_RH_OpenAPI>
 - `hero8152/Infinite-Canvas`（用户指定参考）：<https://github.com/hero8152/Infinite-Canvas>
 - `Work-Fisher/AIFISHER`（同赛道）：<https://github.com/Work-Fisher/AIFISHER>
+
+---
+
+## 九、GitHub 官方仓库的改版（2026-11-14 核对）
+
+> 用户问「GitHub 改版了啥」。以下全部来自仓库提交记录与文件原文，不是印象。
+
+### A. 时间线（官方三个仓库）
+
+| 仓库 | 最近提交 | 说明 |
+| --- | --- | --- |
+| `HM-RunningHub/ComfyUI_RH_OpenAPI` | **2026-11-10**「publish **62** OpenAPI nodes and **verified price summaries**」；**2026-11-02**「publish 18 API nodes and refresh public model contracts」；2026-10-09「refreshed OpenAPI catalog and image alpha fix」 | 标准模型这条线在持续发版，且**开始公开价格摘要** |
+| `HM-RunningHub/ComfyUI_RH_APICall` | 2026-05-09「**fix: allow larger node info ids**」 | 官方也在修"id 太长"——与轻画 #1109（19 位 `webappId` 精度）同一个坑 |
+| `HM-RunningHub/RH_CLI` | 最后 2026-06-01（初始发布） | CLI **没有跟上 v2 路由**，用的还是 `/task/openapi/ai-app/run`；轻画不能只信它 |
+
+### B. 新增的大块头：`developer-kit/`（专给 AI 编程代理用的）
+
+`ComfyUI_RH_OpenAPI/developer-kit/` 下新增：
+
+| 文件 | 内容 | 对轻画的价值 |
+| --- | --- | --- |
+| `llms.txt` | **22 条硬规则**：Bearer 鉴权、媒体先 `POST /media/upload/binary` 再提交、提交只回 `taskId`、轮询 `/query`、`SUCCESS/FAILED/CANCEL` 是终态、**不许编端点/参数/枚举**、布尔要真布尔、必填先校验、只重试 429/5xx、价格只作参考 | 与我们踩过的坑逐条对上（尤其"不许编默认值/枚举"） |
+| `rh-api-contract.md` | 生命周期契约（提交 → 轮询 → 结果解析 → 重试 → 日志脱敏） | 与我们 `runninghubWorkflow.ts` 的实现基本一致，可当验收清单 |
+| `model-registry.public.json` | **约 2 MB / 500+ 模型**：`endpoint / output_type / category / name_cn / params[{fieldKey,type,required,label,description,defaultValue,options[{value,description}],accept,maxSize}]` | **可以把轻画手挑的 49 个模型升级成官方全量，且参数枚举/媒体限制自动就有**（现在 `options` 靠人工配） |
+| `pricing.public.json` | **511 条价格**：`currency` 全为 **CNY**，`unit` = `/次` `/秒` `/张` `/1000字符` …，`pricing_type` = `fixed`(196) / `parameter_based`(243) / `rate`(8) / `starting_at`(38) / `unparsed`(26) | 可做"跑之前先报参考价"；但**只是 CNY 口径**（见 §九 C） |
+| `examples/python/*` + `tests/test_contract.py` | 无依赖最小客户端 + mock 一致性测试 | 可当我们适配器的对照实现 |
+
+### C. 「积分」到底是什么（用官方公开数据能说到哪一步）
+
+1. `pricing.public.json` 里 **511 条价格全部 `currency: CNY`**，没有任何积分/点数单位 ⇒ **官方公开的价格体系是"金额（人民币）"**。
+2. 该 kit 的 README 明确写：`pricing.public.json`「**does not include internal billing IDs, raw expressions, or database fields**」，`model-registry.public.json`「Internal fields such as **pricing metadata** are removed」⇒ **积分那套是内部计费层，官方没公开**。
+3. 真机侧看到的是另一层：`accountStatus` 回 `remainMoney / remainCoins / remainPoint`，任务结果 `usage` 回 `consumeMoney / consumeCoins / chargedPoint + settleMode:"POINT"`；消费级 Key（`apiType:"NORMAL"`）提交时被 `821 付费积分余额不足` 拦 —— 其中 `remainPoint` 里的 30 是**免费积分，API 不认**。
+
+⇒ 结论（可确认部分）：**积分是消费级/会员那条线的预付费点数**，与"金额（CNY）"是两套计费层，官方 API 文档只公开后者；**积分与人民币的换算比例、每个模型多少积分，官方没有公开**，只能在 runninghub 网页的「积分明细」里看。
+⇒ 对轻画的要求：**不要把 CNY 价格当积分数显示**，也不要把 `remainPoint` 当成"能跑几次"。
+
+### D. 据此新增的缺口
+
+**#1111**：把官方 `developer-kit` 的两份 JSON 接进来（模型目录 + 参考价），见对账清单。
