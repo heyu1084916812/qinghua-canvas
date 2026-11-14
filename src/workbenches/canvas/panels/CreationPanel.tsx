@@ -70,6 +70,8 @@ import { CreationParameterControls } from './creation/CreationParameterControls'
 import { CreationPromptToolsView } from './creation/CreationPromptToolsView'
 import { CreationPromptView } from './creation/CreationPromptView'
 import { CreationRunActionsView } from './creation/CreationRunActionsView'
+import { WorkflowParameterControls } from './creation/WorkflowParameterControls'
+import { workflowChannelsOf } from './creation/workflowPanelSources'
 import type { CreationPanelProps } from './creation/creationPanelTypes'
 
 export type { CreationPanelProps, PanelPromptTools } from './creation/creationPanelTypes'
@@ -907,33 +909,21 @@ export function CreationPanel(props: CreationPanelProps) {
         className={`${styles.section} ${styles.params} ${styles.paramsSection}`}
         data-panel-part="params"
       >
+        {props.workflowSources && String(data.model ?? '').startsWith('workflow:') && workflowChannelsOf(props.workflowSources).length > 0 ? (
+          <WorkflowParameterControls data={data} sources={props.workflowSources} openPicker={openPicker} onTogglePicker={togglePicker} onClosePicker={closePicker} onEvent={onEvent} disabled={props.disabled} />
+        ) : (
         <CreationParameterControls
-          noPlatform={noPlatform}
-          platformGap={platformGap}
-          categoryLabel={categoryLabel}
-          modelLabel={shownLogicalModel || defaultModelLabel}
-          modelOptions={modelOptions}
-          modelValue={shownLogicalModel}
-          modelOpen={openPicker === 'model'}
-          videoModeLabel={VIDEO_MODE_LABELS[quality.videoModeValue].label}
-          promptMode={promptMode}
-          videoMode={videoMode}
-          quality={quality}
-          paramSections={paramSections}
-          isMj={isMj}
-          mjSections={mjSections}
-          openPicker={openPicker}
-          onOpenSettings={() => onEvent({ type: 'openSettings' })}
-          onTogglePicker={togglePicker}
-          onClosePicker={closePicker}
-          onSelectModel={selectModel}
-          onSelectVideoMode={selectVideoMode}
-          onSelectRatio={selectRatio}
-          onSelectSize={selectSize}
-          onDurationChange={setDurationSeconds}
-          onSelectGenerateAudio={selectGenerateAudio}
-          onSelectCount={selectCount}
+          noPlatform={noPlatform} platformGap={platformGap} categoryLabel={categoryLabel}
+          modelLabel={shownLogicalModel || defaultModelLabel} modelOptions={modelOptions} modelValue={shownLogicalModel}
+          modelOpen={openPicker === 'model'} videoModeLabel={VIDEO_MODE_LABELS[quality.videoModeValue].label}
+          promptMode={promptMode} videoMode={videoMode} quality={quality} paramSections={paramSections}
+          isMj={isMj} mjSections={mjSections} openPicker={openPicker}
+          onOpenSettings={() => onEvent({ type: 'openSettings' })} onTogglePicker={togglePicker}
+          onClosePicker={closePicker} onSelectModel={selectModel} onSelectVideoMode={selectVideoMode}
+          onSelectRatio={selectRatio} onSelectSize={selectSize} onDurationChange={setDurationSeconds}
+          onSelectGenerateAudio={selectGenerateAudio} onSelectCount={selectCount}
         />
+        )}
         <CreationPromptToolsView
           promptMode={promptMode}
           tools={tools}

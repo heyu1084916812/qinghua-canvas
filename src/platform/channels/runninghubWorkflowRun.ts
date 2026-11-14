@@ -1,6 +1,10 @@
 import { queryWorkflowTask, WORKFLOW_POLL_INTERVAL_MS, WORKFLOW_POLL_MAX_MS, type WorkflowEndpoint, type WorkflowTaskResult } from './runninghubWorkflow'
 import type { PlatformKit } from '../ports'
 import { ChannelError } from './types'
+import { imageInputsOf, videoInputsOf } from '../../domain/shared/execution/inputs'
+import type { NodeInput } from '../../domain/shared/execution/types'
+import { UPSTREAM_MEDIA_VALUE } from '../../domain/project/workflowParamValues'
+import { uploadWorkflowAsset } from './runninghubWorkflow'
 
 /**
  * 工作流"跑起来"的那一段：参数三元组归一 + 提交之后的等待。
@@ -36,6 +40,45 @@ export function workflowNodeListOf(raw: unknown): {
           ? String(record.fieldValue)
           : ''
     if (nodeId && fieldName) out.push({ nodeId, fieldName, fieldValue })
+  }
+  return out
+}
+
+/**
+ * 把提交体里的「用上游素材」哨兵换成**上传后的文件名**（对账 #1104 媒体接线）。
+ *
+ * 顺序口径：先图片、后视频，按面板上的出现顺序各取一张；没有素材就**丢掉这一项**
+ * （让工作流自己的默认值生效），不塞空串——空串在 RunningHub 是"清空该参数"。
+ */
+export async function resolveWorkflowMedia(
+  deps: Pick<PlatformKit, 'network' | 'assets'>,
+  endpoint: WorkflowEndpoint,
+  list: { nodeId: string; fieldName: string; fieldValue: string }[],
+  inputs: readonly NodeInput[],
+  signal: AbortSignal,
+): Promise<{ nodeId: string; fieldName: string; fieldValue: string }[]> {
+  if (!list.some((item) => item.fieldValue === UPSTREAM_MEDIA_VALUE)) return list
+  const refs = [...imageInputsOf([...inputs]), ...videoInputsOf([...inputs])]
+  let index = 0
+  const out: { nodeId: string; fieldName: string; fieldValue: string }[] = []
+  for (const item of list) {
+    if (item.fieldValue !== UPSTREAM_MEDIA_VALUE) {
+      out.push(item)
+      continue
+    }
+    const ref = refs[index]
+    index += 1
+    if (!ref) continue
+    const payload = await deps.assets.read(ref.assetHash).catch(() => null)
+    if (!payload || payload.bytes.length === 0) continue
+    const fileName = await uploadWorkflowAsset(
+      deps,
+      endpoint,
+      { bytes: payload.bytes, mime: payload.mime || ref.mime },
+      ref.mime.startsWith('video/') ? 'ref.mp4' : 'ref.png',
+      signal,
+    )
+    out.push({ ...item, fieldValue: fileName })
   }
   return out
 }

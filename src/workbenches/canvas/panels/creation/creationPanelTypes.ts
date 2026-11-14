@@ -25,7 +25,7 @@ export interface CreationPanelProps {
   promptTools?: PanelPromptTools | null
   onOpenSkills?: () => void
   promptImageCount?: number
-  showCategoryToggle?: boolean
-  hasSourceImage?: boolean
+  workflowSources?: import('./workflowPanelSources').WorkflowPanelSources | null
+  showCategoryToggle?: boolean; hasSourceImage?: boolean
   runsDownstream?: boolean
 }

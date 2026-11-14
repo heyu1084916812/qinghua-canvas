@@ -11738,6 +11738,113 @@
         "src/dev/panelDemo/SourceRowDemo.test.ts"
       ],
       "budget": 200
+    },
+{
+      "module": "src/workbenches/canvas/panels/creation/creationWorkflowMode.ts",
+      "owner": "canvas-creation-ui",
+      "responsibility": "创作面板来源模式判定（模型 id 反推 API/AI 应用/工作流）与工作流提交体拼装（只发暴露字段、媒体发上游哨兵）。",
+      "owns": [
+        "模型 id → 模式",
+        "节点提交体 → 字段值映射",
+        "暴露字段 + 值 → nodeInfoList"
+      ],
+      "doesNotOwn": [
+        "字段表结构与候选",
+        "面板渲染与事件派发",
+        "渠道适配器提交"
+      ],
+      "publicApi": [
+        "CreationSourceMode",
+        "modeOfModel",
+        "workflowValueMap",
+        "workflowSubmitList"
+      ],
+      "test": [
+        "src/workbenches/canvas/panels/creation/creationWorkflowMode.test.ts"
+      ],
+      "budget": 120
+    },
+    {
+      "module": "src/workbenches/canvas/panels/creation/workflowPanelSources.ts",
+      "owner": "canvas-creation-ui",
+      "responsibility": "创作面板可选的「工作流来源」类型：RunningHub 渠道 + 各自条目。",
+      "owns": [
+        "来源类型与过滤"
+      ],
+      "doesNotOwn": [
+        "条目读取",
+        "面板渲染"
+      ],
+      "publicApi": [
+        "WorkflowPanelChannel",
+        "WorkflowPanelSources",
+        "workflowChannelsOf"
+      ],
+      "test": [
+        "src/workbenches/canvas/panels/creation/creationWorkflowMode.test.ts"
+      ],
+      "budget": 80
+    },
+    {
+      "module": "src/workbenches/canvas/panels/creation/useWorkflowPanelSources.ts",
+      "owner": "canvas-creation-ui",
+      "responsibility": "装配工作流来源：订阅渠道店、按渠道从 presets 读条目；无 Provider 时返回 null。",
+      "owns": [
+        "来源装配",
+        "条目加载与刷新"
+      ],
+      "doesNotOwn": [
+        "条目编辑",
+        "渠道配置"
+      ],
+      "publicApi": [
+        "useWorkflowPanelSources"
+      ],
+      "test": [
+        "src/workbenches/canvas/panels/creation/creationWorkflowMode.test.ts"
+      ],
+      "budget": 120
+    },
+    {
+      "module": "src/workbenches/canvas/panels/creation/WorkflowParameterControls.tsx",
+      "owner": "canvas-creation-ui",
+      "responsibility": "工作流模式的参数区：渠道 / 条目 / 实例 / 暴露字段 / 媒体位，全部复用 ParamPicker 的 chip 与浮层。",
+      "owns": [
+        "工作流模式参数行",
+        "字段值编辑与提交体下发"
+      ],
+      "doesNotOwn": [
+        "参数暴露配置（设置页）",
+        "路由与提交",
+        "节点数据模型"
+      ],
+      "publicApi": [
+        "WorkflowParameterControls",
+        "WorkflowParameterControlsProps"
+      ],
+      "test": [
+        "src/workbenches/canvas/panels/creation/creationWorkflowMode.test.ts"
+      ],
+      "budget": 380
+    },
+    {
+      "module": "src/workbenches/canvas/panels/creation/WorkflowParameterControls.module.css",
+      "owner": "canvas-creation-ui",
+      "responsibility": "工作流参数区里媒体位 chip 的局部样式（描边/圆角/悬停沿用面板参数 chip 的令牌）。",
+      "owns": [
+        "媒体位 chip 样式"
+      ],
+      "doesNotOwn": [
+        "ParamPicker 自身样式",
+        "主题令牌"
+      ],
+      "publicApi": [
+        "CSS_MODULE:工作流媒体位（mediaChip / mediaState）"
+      ],
+      "test": [
+        "src/workbenches/canvas/panels/creation/creationWorkflowMode.test.ts"
+      ],
+      "budget": 120
     }
   ]
 }

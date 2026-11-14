@@ -8,7 +8,7 @@ import { generationSpec } from '../../domain/canvas/nodeSpecs/generation'
 import { workflowEntriesRowId, type WorkflowEntry } from '../../domain/project/workflowParams'
 import { CreationPanel } from '../../workbenches/canvas/panels/CreationPanel'
 import type { PanelModel } from '../../workbenches/canvas/panels/panelModel'
-import { WorkflowPanelDesign } from './WorkflowPanelDesign'
+import type { WorkflowPanelSources } from '../../workbenches/canvas/panels/creation/workflowPanelSources'
 import '../../ui/tokens.css'
 import '../../ui/base.css'
 import './demo.css'
@@ -141,6 +141,16 @@ async function boot() {
     model: 'GPT Image 2',
     prompt: panelModel.prompt,
   }
+  const workflowData = {
+    ...generationSpec.createDefaultData(),
+    mode: 'video' as const,
+    channelId: CHANNEL_ID,
+    model: `workflow:${WORKFLOW_ID}`,
+    prompt: panelModel.prompt,
+  }
+  const workflowSources: WorkflowPanelSources = {
+    channels: [{ id: CHANNEL_ID, name: 'RunningHub', entries: [ENTRY] }],
+  }
 
   const container = document.getElementById('root')!
   createRoot(container).render(
@@ -165,9 +175,19 @@ async function boot() {
                 </div>
               </section>
               <section className="demo-col">
-                <h2 className="demo-caption">工作流模式（设计稿 v2 · 单生成按钮 / 只留工作流参数）</h2>
+                <h2 className="demo-caption">工作流模式（真实面板 · 只留工作流参数）</h2>
                 <div className="demo-panel">
-                  <WorkflowPanelDesign entry={ENTRY} />
+                  <CreationPanel
+                    data={workflowData}
+                    model={{ ...panelModel, prompt: panelModel.prompt }}
+                    running={false}
+                    globalRunning={false}
+                    error={null}
+                    onEvent={() => {}}
+                    onClose={() => {}}
+                    showCategoryToggle
+                    workflowSources={workflowSources}
+                  />
                 </div>
               </section>
             </div>

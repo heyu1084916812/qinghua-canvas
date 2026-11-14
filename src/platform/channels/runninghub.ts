@@ -10,7 +10,7 @@ import { asAppError, describeError, errorTextOf } from '../../shared/result'
 import { bytesToBase64 } from './base64'
 import { prepareModelImageInput } from './chatImageInput'
 import { submitWorkflowTask, webappIdPayload } from './runninghubWorkflow'
-import { runWorkflowTask, workflowNodeListOf } from './runninghubWorkflowRun'
+import { resolveWorkflowMedia, runWorkflowTask, workflowNodeListOf } from './runninghubWorkflowRun'
 import { rhAccountNote } from './runninghubAccount'
 import type { NetworkResponse, SafeChannelConfig } from '../ports'
 import {
@@ -867,7 +867,7 @@ export function createRunningHubAdapter(
     signal: AbortSignal,
   ): Promise<GeneratedAsset[]> => {
     const endpoint = { host, apiKey: key }
-    const nodeInfoList = workflowNodeListOf(request.params?.workflow)
+    const nodeInfoList = await resolveWorkflowMedia(deps, endpoint, workflowNodeListOf(request.params?.workflow), request.inputs, signal)
     let taskId: string
     try {
       const input = { workflowId, ...(nodeInfoList.length > 0 ? { nodeInfoList } : {}) }

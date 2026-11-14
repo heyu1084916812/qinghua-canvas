@@ -136,6 +136,15 @@ export interface GenerationData {
   linkedPromptNodeIds: string[]
   channelId: string
   model: string
+  /**
+   * RunningHub 工作流 / AI 应用的**暴露字段提交体**（`nodeInfoList` 原样存）。
+   *
+   * 存提交体而不是存"字段值表"：字段表在 `presets`（异步、按渠道），执行期是纯函数读不到；
+   * 面板改值时正好握着字段表与值，一次落库，执行期只做转发（`generationParams`）。
+   */
+  workflowNodeInfoList?: { nodeId: string; fieldName: string; fieldValue: string }[]
+  /** RunningHub 实例规格（24G / 48G）；缺省 = default */
+  workflowInstance?: 'default' | 'plus'
   // 图片模式
   ratio?: string
   /**

@@ -10,6 +10,7 @@ import { imageAssetInputsOf } from '../../../domain/shared/execution/inputs'
 import { describeError } from '../../../shared/result'
 import { clampDuration } from '../../../domain/shared/capability'
 import { CreationPanel } from './CreationPanel'
+import { useWorkflowPanelSources } from './creation/useWorkflowPanelSources'
 import { EmotionPanel } from './EmotionPanel'
 import type { PanelEvent, PanelModel, PanelThumb, RecipeSnapshot } from './panelModel'
 import type { MentionCandidate } from '../text/mentionValue'
@@ -81,6 +82,7 @@ export function PanelLayer({
   const platform = usePlatform()
   /** 配方记忆（用户 2026-09-23）：面板里改完参数即写回该渠道的配方 */
   const channels = useChannels()
+const workflowSources = useWorkflowPanelSources()
   /** 功能预设词（后台中枢）：改了要立刻生效，见 PresetTextProvider 的注释 */
   const presetText = usePresetTextOptional()
   // §6.15：拖动期间面板立即隐藏；发生**真实位移**的拖动，松手后保持隐藏，
@@ -300,6 +302,7 @@ export function PanelLayer({
         promptTools={promptTools}
         onOpenSkills={onOpenSkills}
         promptImageCount={promptImageInputs.length}
+        workflowSources={workflowSources}
       />
       )}
     </div>
@@ -709,6 +712,12 @@ function handlePanelEvent(
     case 'setGenerateAudio':
       patch({ generateAudio: event.generateAudio })
       remember(event.type, event.recipe)
+      break
+    case 'setWorkflowRun':
+      patch({
+        workflowNodeInfoList: event.list,
+        ...(event.instance ? { workflowInstance: event.instance } : {}),
+      })
       break
     /**
      * Midjourney 独有的风格参数（用户 2026-10-03 图二）。

@@ -10,6 +10,7 @@ import {
 } from './runninghub'
 import { rhAccountNote } from './runninghubAccount'
 import { workflowNodeListOf } from './runninghubWorkflowRun'
+import { UPSTREAM_MEDIA_VALUE } from '../../domain/project/workflowParamValues'
 import { ChannelError, type ImageRunRequest, type VideoRunRequest } from './types'
 import type { ResolvedChannelConfig } from './registry'
 import { presetIdForUpstream } from '../../domain/project/modelPresets'
@@ -1733,6 +1734,42 @@ describe('RunningHub 工作流条目（workflow: 前缀，#1113 / #1104）', () 
     expect(
       workflowNodeListOf([{ nodeId: '6', fieldName: 'text', fieldValue: true }]),
     ).toEqual([{ nodeId: '6', fieldName: 'text', fieldValue: '' }])
+  })
+
+  it('★ 媒体字段的「用上游」哨兵 → 先上传、再把 fileName 写进提交体', async () => {
+    const creates: unknown[] = []
+    const uploads: unknown[] = []
+    const platform = createMemoryPlatform({
+      rows: { assets: [{ id: 'asset-1', bytes: PNG_BYTES, mime: 'image/png' }] },
+      handler: async (req: NetworkRequest) => {
+        if (req.url.endsWith('/task/openapi/upload')) {
+          uploads.push(req.body)
+          return json(200, { code: 0, data: { fileName: 'uploaded-1.png' } })
+        }
+        if (req.url.endsWith('/task/openapi/create')) {
+          creates.push(req.body)
+          return json(200, { code: 0, data: { taskId: 't-wf' } })
+        }
+        if (req.url.endsWith('/openapi/v2/query')) {
+          return json(200, { status: 'SUCCESS', results: [{ url: 'https://files.runninghub.cn/wf.png' }] })
+        }
+        return binaryPng()
+      },
+    })
+    const adapter = createRunningHubAdapter(config, platform, FAST)
+    await adapter.generateImage(
+      {
+        ...wfRequest({
+          workflow: [{ nodeId: '16', fieldName: 'video', fieldValue: UPSTREAM_MEDIA_VALUE }],
+        }),
+        inputs: [{ kind: 'asset', assetHash: 'asset-1', mime: 'image/png' } as never],
+      },
+      signal,
+    )
+    expect(uploads).toHaveLength(1)
+    expect((creates[0] as { nodeInfoList: { fieldValue: string }[] }).nodeInfoList[0]?.fieldValue).toBe(
+      'uploaded-1.png',
+    )
   })
 })
 

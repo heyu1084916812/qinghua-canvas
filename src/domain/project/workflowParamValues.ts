@@ -16,6 +16,9 @@ import {
  */
 
 /** 暴露给节点的那几个字段（顺序即面板顺序） */
+/** 媒体字段的「用上游素材」哨兵：面板发它，执行期按顺序取上游素材、上传、换成 `fileName`。 */
+export const UPSTREAM_MEDIA_VALUE = '__upstream__'
+
 export function exposedFields(fields: readonly WorkflowParamField[]): WorkflowParamField[] {
   return fields.filter((field) => field.enabled)
 }

@@ -17,8 +17,19 @@ import { mjSettingsOf } from '../layout/mjParams'
  * 却收到的是视频请求，只会让人猜哪几个字段有效）。
  */
 export function generationParams(data: GenerationData): Record<string, unknown> {
+  /** 工作流条目：面板拼好的提交体与实例规格原样下发（别的模型不带这两个字段） */
+  const workflow =
+    data.model?.startsWith('workflow:') && data.workflowNodeInfoList?.length
+      ? { workflow: data.workflowNodeInfoList }
+      : {}
+  const instanceType =
+    data.model?.startsWith('workflow:') && data.workflowInstance === 'plus'
+      ? { instanceType: 'plus' }
+      : {}
   if (data.mode === 'video') {
     return {
+      ...workflow,
+      ...instanceType,
       ratio: data.ratio ?? null,
       size: data.size ?? null,
       resolution: data.resolution ?? null,
@@ -36,6 +47,8 @@ export function generationParams(data: GenerationData): Record<string, unknown> 
     }
   }
   return {
+    ...workflow,
+    ...instanceType,
     count: data.count ?? 1,
     ratio: data.ratio ?? null,
     // `'auto'` 是「不指定」，不是「1K」——原样下发会让渠道收到一个它不认的档位值。
