@@ -12,6 +12,7 @@ import { createChannel } from '../../domain/project/channel'
 import {
   BUILTIN_CHANNEL_IDS,
   BUILTIN_CHANNELS,
+  LEGACY_BUILTIN_NAMES,
   RETIRED_BUILTIN_CHANNEL_IDS,
   createBuiltinChannel,
   isBuiltinChannelId,
@@ -284,8 +285,18 @@ export function createChannelRepository(storage: StoragePort, credentials: Crede
      */
     for (const spec of BUILTIN_CHANNELS) {
       const existing = current.find((channel) => channel.id === spec.id)
-      if (!existing || existing.protocol === spec.protocol) continue
-      const next = { ...existing, protocol: spec.protocol }
+      if (!existing) continue
+      /**
+       * RunningHub 拆成「国内站 / 国际站」后，老装机上那条还叫「RunningHub」。
+       * 只在**名字仍是旧默认值**时跟着改 —— 用户自己改成别的名字说明他有主意，不动。
+       */
+      const renameToSiteName = (LEGACY_BUILTIN_NAMES[spec.id] ?? []).includes(existing.name)
+      if (existing.protocol === spec.protocol && !renameToSiteName) continue
+      const next = {
+        ...existing,
+        protocol: spec.protocol,
+        ...(renameToSiteName ? { name: spec.name } : {}),
+      }
       await storage.put('channels', {
         ...next,
       } as unknown as RowOf<TableName>)

@@ -24,6 +24,7 @@ export const BUILTIN_CHANNEL_IDS = [
   'ch_builtin_modelscope',
   'ch_builtin_agnes',
   'ch_builtin_runninghub',
+  'ch_builtin_runninghub_global',
   'ch_builtin_soonstudio',
   'ch_builtin_65535_chat',
 ] as const
@@ -46,13 +47,49 @@ export interface BuiltinChannelSpec {
   name: string
   /** 固定协议（用户改不了） */
   protocol: string
+  /**
+   * 固定初始地址（可选）。
+   *
+   * 只有「同一条协议、两个站」的内置渠道才需要它（RunningHub 国内站 / 国际站）：
+   * 协议目录里只有一个 `defaultBaseUrl`，第二条渠道必须自带地址，否则会落到国内站。
+   * 地址仍**可改**（用户可能指到自建反代），这里只是初始值。
+   */
+  baseUrl?: string
+}
+
+/**
+ * 内置渠道**历史默认名**（按 id）。
+ *
+ * 名称本来是用户可改的资料，我们不做"每次启动都覆盖"。但内置渠道自己改名时
+ * （例如 RunningHub 拆成国内站 / 国际站），老装机上那条还叫旧名字，
+ * 用户会看到「RunningHub」和一个新名字并列。折中：**只在名字仍是某个历史默认值**时跟着改；
+ * 用户自己改成别的名字说明他有主意，不动。
+ */
+export const LEGACY_BUILTIN_NAMES: Record<string, readonly string[]> = {
+  ch_builtin_runninghub: ['RunningHub', 'RunningHub 国内站'],
+  ch_builtin_runninghub_global: ['RunningHub 国际站'],
 }
 
 export const BUILTIN_CHANNELS: readonly BuiltinChannelSpec[] = [
   { id: 'ch_builtin_modelscope', name: 'ModelScope 魔搭', protocol: 'modelscope' },
   { id: 'ch_builtin_agnes', name: 'Agnes', protocol: 'agnes' },
   /** RunningHub 用 **API** 那条（用户：「runninghub它也有api」）；CLI 那条仍留给本机用法 */
-  { id: 'ch_builtin_runninghub', name: 'RunningHub', protocol: 'runninghub-api' },
+  /**
+   * 名字**把站放在品牌前面**：侧栏那一行只有十来个字宽，`RunningHub 国内站 / 国际站`
+   * 截断后两行都变成「RunningHub 国…」，等于没分；`国内站 · RunningHub` 截断后
+   * 第一眼就能看出是哪一站（品牌留在后半段，需要时看抬头那行）。
+   */
+  { id: 'ch_builtin_runninghub', name: '国内站 · RunningHub', protocol: 'runninghub-api' },
+  /**
+   * 国际站：**同一条协议、另一个站**。两个站是两个账号、两把 Key（用户 2026-11-14），
+   * 所以做成两条内置渠道而不是一个下拉 —— 各自的 Key、余额、模型与工作流都分开。
+   */
+  {
+    id: 'ch_builtin_runninghub_global',
+    name: '国际站 · RunningHub',
+    protocol: 'runninghub-api',
+    baseUrl: 'https://www.runninghub.ai',
+  },
   { id: 'ch_builtin_soonstudio', name: 'SoonStudio', protocol: 'soonstudio' },
   /** id 沿用旧的 `_chat`，只为让已存在的内置行原地升级成合并协议 */
   { id: 'ch_builtin_65535_chat', name: '65535', protocol: '65535' },
@@ -82,7 +119,7 @@ export function createBuiltinChannel(
   const input: CreateChannelInput = {
     name: spec.name,
     protocol: spec.protocol,
-    baseUrl: def?.defaultBaseUrl ?? '',
+    baseUrl: spec.baseUrl ?? def?.defaultBaseUrl ?? '',
     order: BUILTIN_ORDER_BASE + index,
   }
   const ch = createChannel(input)

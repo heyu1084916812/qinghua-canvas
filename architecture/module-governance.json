@@ -11973,6 +11973,30 @@
         "src/features/settings/SettingsChannelQuickTest.test.ts"
       ],
       "budget": 120
+    },
+    {
+      "module": "src/domain/project/runninghubSite.ts",
+      "owner": "canvas-creation-ui",
+      "responsibility": "RunningHub 两个站（国内/国际）的判定与按站点改写的协议说明（两站两个账号、两把 Key、能力不同）。",
+      "owns": [
+        "按地址判站点",
+        "按站点生成说明文案"
+      ],
+      "doesNotOwn": [
+        "渠道凭据存储",
+        "请求与路由",
+        "界面渲染"
+      ],
+      "publicApi": [
+        "runninghubSiteOf",
+        "runninghubSiteNote",
+        "RunningHubSite",
+        "RUNNINGHUB_SITES"
+      ],
+      "test": [
+        "src/domain/project/runninghubSite.test.ts"
+      ],
+      "budget": 90
     }
   ]
 }

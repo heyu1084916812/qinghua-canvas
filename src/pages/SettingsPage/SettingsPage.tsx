@@ -55,6 +55,7 @@ import { SettingsConnectionView } from './settingsPage/SettingsConnectionView'
 import { SettingsModelsView } from './settingsPage/SettingsModelsView'
 import { SettingsWorkflowManager } from '../../features/settings/SettingsWorkflowManager'
 import { SettingsChannelQuickTest } from '../../features/settings/SettingsChannelQuickTest'
+import { runninghubSiteNote } from '../../domain/project/runninghubSite'
 import { SettingsChannelRouteView } from './settingsPage/SettingsChannelRouteView'
 import { SettingsProfileDrawerView } from './settingsPage/SettingsProfileDrawerView'
 import { SettingsChannelContextMenuView } from './settingsPage/SettingsChannelContextMenuView'
@@ -701,7 +702,7 @@ export function SettingsPage({ embedded = false }: { embedded?: boolean } = {}) 
                 statusLine={statusLine}
                 statusTone={statusTone}
                 showMockNote={showMockNote}
-                selectedProtocolNote={selectedProtocolNote}
+                selectedProtocolNote={runninghubSiteNote(selected, selectedProtocolNote)}
                 newProtoOpen={newProtoOpen}
                 hiddenBuiltinProtocolCount={hiddenBuiltinProtocolIds.length}
                 npNotice={npNotice}
