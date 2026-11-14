@@ -600,3 +600,58 @@ refAudio1..3 / refVideoAudio1..2
 3. CLI 与 API 共用同一把 Key、同一本账 ⇒ 面板上应写明「和渠道共用额度，不是免费通道」。
 
 **⑥ 据此登记的缺口**：**#1114**（CLI 模板补齐图生 / 应用两条，并在面板写清额度同源）。
+
+---
+
+### J. 用户看到的那个「CLI」其实是 `rhtvcli`（RHTV 画布 CLI），跟 `rh` 是两回事（2026-11-14）
+
+> 用户给的地址：`https://rhtv.runninghub.cn/projects/mcp?agent=codex&mode=cli&client=cli`。
+> 页面标题「rhTV MCP — 在 AI 助手中创作图片与视频」，**默认选中 Codex + CLI**。这是 **RunningHub 自家另一个产品（RHTV 无限画布）**的接入页，
+> **不是** §九 I 那个 `rh` 模型 CLI。两者同名"CLI"，但一个管**模型调用**、一个管**画布**。
+
+**① 页面上原话（Codex + CLI 页签）**：
+
+1. 下载安装包：`https://rh-canvas-files-1252422369.cos.ap-beijing.myqcloud.com/rhtv-clients/rhtv-canvas-clients-0.7.1-build-11.zip`
+2. 安装配置：按包内说明为 Codex 安装 rhTV CLI，完成所需配置
+3. **引导我在浏览器登录并确认账号授权**，检查版本、环境和账号后告诉我结果
+   —— 小字：「安装后运行 `login`，在浏览器确认授权，再用 `account` 核对账号。」
+
+FAQ 两条关键答复：**计费**「按账号、实际调用模型和生成参数的当前规则计费；安装与连接不代表生成免费；发起生成前先核对模型、参数与费用」；
+**三者关系**「MCP 是让 AI 助手连接外部工具的通用协议。Codex 插件、通用 MCP 和 CLI 是**同一套画布能力的不同接入方式**；选一个即可，不需要同时装三种」。
+
+**② 安装包里是什么**（当轮下载核对，520 KB，`rhtv-canvas-clients-0.7.1-build-11.zip`）：
+`README.md` + `SHA256SUMS` + `rhtv-bootstrap-<hash>.zip` + 三个组件包 `rhtvcli-0.7.1.zip` / `rhtv-mcp-0.7.1.zip` / `rhtv-codex-plugin-0.7.1.zip`。
+组件包自带 Ed25519 签名清单（`package-manifest.sig`），bootstrap 在加载代码前先验签。`rhtvcli` 包里有 `USAGE.md`（944 行）与 `payload/scripts/*.mjs`
+（`rh-canvas.mjs`、`protocol.mjs`、`mcp-tools.mjs`、`cos-upload.mjs`、`credential-dpapi.ps1`…）。**注**：页面链接是 `build-11`，包内 README 却写 `build 15` —— 版本号别当真。
+
+**③ `rhtvcli` 的命令面**（USAGE.md「命令导航」原文）：
+
+| 命令组 | 操作 |
+| --- | --- |
+| `workspace` | create / list / ls / update / use / unuse（个人与团队目录） |
+| `project` | create / list / ls / update / use / unuse；`project [ID]` 出图摘要；query / permissions / capabilities / preview / apply / estimate / run |
+| `node` | create / list / ls / get / update / delete / connect / disconnect / estimate / run / outputs |
+| `edge` / `group` | 连线；分组 create / move / disband / use / run（分组可整组跑） |
+| `model` / `image` / `video` / `script` | 模型检索与 schema、图片快捷场景、视频 HD/正片、分镜脚本（storyboard） |
+| `upload` / `download` / `operation` | 本地文件直传 COS 并挂节点；授权产物下载；`operation get/resume/cancel` 恢复与取消 |
+
+设计上值得抄的几条：**`estimate` 先报价、`--dry-run` 只校验不扣费**；**每次写操作带 `--command-id` + 恢复回执**（`~/.runninghub-canvas/receipts/`，只存 ID/路由/hash，不存 prompt 与凭据）；
+**cwd 绑定** `${cwd}/.rhtv/project.json`（只存 site/origin/actorId/projectId，**不存 Token**）；**选择器歧义直接报错**（不选第一个）；**参数只认服务端实时 schema**（禁止跨模型猜 `aspectRatio`）。
+
+**④ 登录与凭据**：`rhtvcli login` 走**浏览器授权**（不是粘 API Key），`account` 核账号、`env` 切环境（site/origin）；
+凭据存系统凭据助手（Windows 用 DPAPI 的 `credential-dpapi.ps1`），**不入配置文件**。
+
+**⑤ 和 `rh` / 轻画 的关系**：
+
+| | `rh`（模型 CLI） | `rhtvcli`（画布 CLI） | 轻画的 canvas MCP |
+| --- | --- | --- | --- |
+| 管什么 | 标准模型 / AI 应用 | 画布：目录、项目、节点、连线、分组、生成、上传下载 | 画布：`canvas_text_ops` / `image_ops` / `video_ops` / `audio_ops` / `timeline_ops` / `run_node…` |
+| 登录 | API Key（写 `%APPDATA%\rh\config.toml`） | 浏览器授权 + 系统凭据 | 本机网关 token（`QINGHUA_CANVAS_TOKEN`） |
+| 能不能跑工作流 | ❌ | ❌（跑的是画布节点，不是 ComfyUI workflowId） | ❌ |
+| 计费 | 同一本账（余额/积分） | 按画布内模型与参数计费，先 estimate | 走轻画自己的渠道 |
+
+⇒ 结论：**用户看到的这个 CLI 是竞品（RunningHub 自家无限画布 RHTV）的客户端**，跟我们要做的「工作流条目」无关，也不影响 #1114 的结论
+（`rh` 仍然跑不了 ComfyUI 工作流）。它的价值是**对标**：`estimate`/`dry-run`、恢复回执、cwd 绑定、schema 驱动参数这四条，
+与轻画 canvas MCP 的「技能不是新机制」思路同源，值得在后续做画布 MCP 工具时逐条对照。
+
+**⑥ 据此登记**：**#1115**（竞品 CLI 对标结论；**不立项接入**，等用户决定是否抄交互）。
