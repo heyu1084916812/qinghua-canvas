@@ -66,7 +66,7 @@ export const LEGACY = {
   'ledger/02-缺口汇总主表.md': 1471,
   'ledger/按批记录-2026-09.md': 625,
   'ledger/按批记录-2026-10.md': 5141,
-  'ledger/按批记录-2026-11.md': 3188,
+  'ledger/按批记录-2026-11.md': 3205,
   // 发行说明：一个版本一篇（2026-11-14 拆分）。旧版本文件只读。
   'release-notes/archive-0.1.0-and-earlier.md': 900,
   'release-notes/v0.1.1.md': 34,
