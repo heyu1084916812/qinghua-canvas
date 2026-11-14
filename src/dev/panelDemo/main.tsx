@@ -8,7 +8,7 @@ import { generationSpec } from '../../domain/canvas/nodeSpecs/generation'
 import { workflowEntriesRowId, type WorkflowEntry } from '../../domain/project/workflowParams'
 import { CreationPanel } from '../../workbenches/canvas/panels/CreationPanel'
 import type { PanelModel } from '../../workbenches/canvas/panels/panelModel'
-import { SourceRowDemo } from './SourceRowDemo'
+import { WorkflowPanelDesign } from './WorkflowPanelDesign'
 import '../../ui/tokens.css'
 import '../../ui/base.css'
 import './demo.css'
@@ -137,7 +137,8 @@ async function boot() {
     ...generationSpec.createDefaultData(),
     mode: 'video' as const,
     channelId: CHANNEL_ID,
-    model: `workflow:${WORKFLOW_ID}`,
+    /* 左栏对照用：普通模型（API 模式）的现状 */
+    model: 'GPT Image 2',
     prompt: panelModel.prompt,
   }
 
@@ -147,21 +148,28 @@ async function boot() {
       <ChannelStoreContext.Provider value={channels}>
         <SkillStoreContext.Provider value={emptySkills}>
           <div className="demo-stage">
-            <p className="demo-caption">
-              下面是现有的创作面板组件（真实 CreationPanel + 假数据）；底部那条是「来源行」示例。
-            </p>
-            <div className="demo-panel">
-              <CreationPanel
-                data={data}
-                model={panelModel}
-                running={false}
-                globalRunning={false}
-                error={null}
-                onEvent={() => {}}
-                onClose={() => {}}
-                showCategoryToggle
-              />
-              <SourceRowDemo channelId={CHANNEL_ID} entries={[ENTRY]} />
+            <div className="demo-columns">
+              <section className="demo-col">
+                <h2 className="demo-caption">现状（真实面板 · API 模式）</h2>
+                <div className="demo-panel">
+                  <CreationPanel
+                    data={data}
+                    model={panelModel}
+                    running={false}
+                    globalRunning={false}
+                    error={null}
+                    onEvent={() => {}}
+                    onClose={() => {}}
+                    showCategoryToggle
+                  />
+                </div>
+              </section>
+              <section className="demo-col">
+                <h2 className="demo-caption">工作流模式（设计稿 v2 · 单生成按钮 / 只留工作流参数）</h2>
+                <div className="demo-panel">
+                  <WorkflowPanelDesign entry={ENTRY} />
+                </div>
+              </section>
             </div>
           </div>
         </SkillStoreContext.Provider>

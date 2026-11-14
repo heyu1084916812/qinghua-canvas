@@ -11717,7 +11717,27 @@
       "test": [
         "src/dev/panelDemo/SourceRowDemo.test.ts"
       ],
-      "budget": 220
+      "budget": 380
+    },
+{
+      "module": "src/dev/panelDemo/WorkflowPanelDesign.tsx",
+      "owner": "dev-panel-demo",
+      "responsibility": "工作流模式面板设计稿 v2：单生成按钮、只显示工作流暴露参数、渠道收进底部模型位。",
+      "owns": [
+        "设计稿的布局与本地交互"
+      ],
+      "doesNotOwn": [
+        "产品面板实现（CreationPanel）",
+        "节点数据写入",
+        "真实请求"
+      ],
+      "publicApi": [
+        "WorkflowPanelDesign"
+      ],
+      "test": [
+        "src/dev/panelDemo/SourceRowDemo.test.ts"
+      ],
+      "budget": 200
     }
   ]
 }
