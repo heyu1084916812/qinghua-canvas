@@ -743,8 +743,15 @@
         "HTTP 请求",
         "参数面板渲染"
       ],
-      "publicApi": ["parseAppNodeInfoList", "parseAppFieldData", "parseAppMeta", "WorkflowAppMeta"],
-      "test": ["src/domain/project/workflowAppParams.test.ts"],
+      "publicApi": [
+        "parseAppNodeInfoList",
+        "parseAppFieldData",
+        "parseAppMeta",
+        "WorkflowAppMeta"
+      ],
+      "test": [
+        "src/domain/project/workflowAppParams.test.ts"
+      ],
       "budget": 200
     },
     {
@@ -3666,7 +3673,9 @@
         "queryWorkflowTask",
         "webappIdPayload"
       ],
-      "test": ["src/platform/channels/runninghubWorkflow.test.ts"],
+      "test": [
+        "src/platform/channels/runninghubWorkflow.test.ts"
+      ],
       "budget": 450
     },
     {
@@ -11526,29 +11535,6 @@
       "budget": 80
     },
     {
-      "module": "src/features/settings/SettingsWorkflowEntries.tsx",
-      "owner": "settings-workflow-entries",
-      "responsibility": "RunningHub 渠道里的「工作流条目」区块：从市场（只扣运行时长）或填 workflowId 添加、重新拉参数、删除，并把 workflow:<id> 写进渠道模型清单。",
-      "owns": [
-        "条目的添加 / 删除 / 重新拉参数",
-        "市场列表的展示与筛选（只扣运行时长）",
-        "条目对应的模型条目注册"
-      ],
-      "doesNotOwn": [
-        "参数暴露 / 隐藏面板（#1106）",
-        "生成节点上的参数渲染（#1105）",
-        "HTTP 细节（platform/channels/*）"
-      ],
-      "publicApi": [
-        "SettingsWorkflowEntries",
-        "SettingsWorkflowEntriesProps"
-      ],
-      "test": [
-        "src/features/settings/SettingsWorkflowEntries.test.ts"
-      ],
-      "budget": 420
-    },
-    {
       "module": "src/features/settings/SettingsWorkflowEntries.module.css",
       "owner": "settings-workflow-entries",
       "responsibility": "RunningHub「工作流条目」区块的局部样式：标题行、手填输入、市场列表与条目行的滚动与边界。",
@@ -11563,7 +11549,7 @@
         "CSS_MODULE:工作流条目区块（block / head / market / list / item / btn）"
       ],
       "test": [
-        "src/features/settings/SettingsWorkflowEntries.test.ts"
+        "src/features/settings/SettingsWorkflowManager.test.ts"
       ],
       "budget": 560
     },
@@ -11647,7 +11633,7 @@
         "字段分组的折叠与批量暴露"
       ],
       "doesNotOwn": [
-        "字段表持久化（SettingsWorkflowEntries + workflowEntryStore）",
+        "字段表持久化（SettingsWorkflowManager + workflowEntryStore）",
         "生成节点上的参数运行（后续 #1105）",
         "服务端参数校验"
       ],
@@ -11656,14 +11642,14 @@
         "WorkflowFieldEditorProps"
       ],
       "test": [
-        "src/features/settings/SettingsWorkflowEntries.test.ts"
+        "src/features/settings/SettingsWorkflowManager.test.ts"
       ],
       "budget": 420
     },
-{
+    {
       "module": "src/dev/panelDemo/main.tsx",
       "owner": "dev-panel-demo",
-      "responsibility": "创作面板演示入口：用内存平台与假数据挂载真实 CreationPanel，并在底部拼一条「来源行」示例（只读，不进产品链路）。",
+      "responsibility": "创作面板演示入口：用内存平台与假数据挂载真实 CreationPanel（工作流模式），只读、不进产品链路。",
       "owns": [
         "演示页的装配与假数据",
         "演示用的渠道与工作流条目种子"
@@ -11677,33 +11663,14 @@
         "NO_EXPORT:演示入口脚本（无对外导出）"
       ],
       "test": [
-        "src/dev/panelDemo/SourceRowDemo.test.ts"
+        "src/dev/panelDemo/panelDemo.test.ts"
       ],
       "budget": 220
     },
     {
-      "module": "src/dev/panelDemo/SourceRowDemo.tsx",
-      "owner": "dev-panel-demo",
-      "responsibility": "演示用的「渠道 · 模式 · 条目 · 实例 · 暴露参数」一行：本地 state，只渲染不写节点。",
-      "owns": [
-        "来源行的演示交互与展示"
-      ],
-      "doesNotOwn": [
-        "节点数据写入",
-        "渠道请求与路由"
-      ],
-      "publicApi": [
-        "SourceRowDemo"
-      ],
-      "test": [
-        "src/dev/panelDemo/SourceRowDemo.test.ts"
-      ],
-      "budget": 200
-    },
-    {
       "module": "src/dev/panelDemo/demo.css",
       "owner": "dev-panel-demo",
-      "responsibility": "演示页布局与来源行样式（只用主题令牌）。",
+      "responsibility": "演示页布局：只给真实面板一个居中落点（样式全部来自产品代码）。",
       "owns": [
         "演示页局部样式"
       ],
@@ -11712,34 +11679,14 @@
         "面板组件自身样式"
       ],
       "publicApi": [
-        "CSS_MODULE:演示页（demo-stage / demo-source / demo-row / demo-fields）"
+        "CSS_MODULE:演示页（demo-stage / demo-col / demo-panel）"
       ],
       "test": [
-        "src/dev/panelDemo/SourceRowDemo.test.ts"
+        "src/dev/panelDemo/panelDemo.test.ts"
       ],
-      "budget": 380
+      "budget": 120
     },
-{
-      "module": "src/dev/panelDemo/WorkflowPanelDesign.tsx",
-      "owner": "dev-panel-demo",
-      "responsibility": "工作流模式面板设计稿 v2：单生成按钮、只显示工作流暴露参数、渠道收进底部模型位。",
-      "owns": [
-        "设计稿的布局与本地交互"
-      ],
-      "doesNotOwn": [
-        "产品面板实现（CreationPanel）",
-        "节点数据写入",
-        "真实请求"
-      ],
-      "publicApi": [
-        "WorkflowPanelDesign"
-      ],
-      "test": [
-        "src/dev/panelDemo/SourceRowDemo.test.ts"
-      ],
-      "budget": 200
-    },
-{
+    {
       "module": "src/workbenches/canvas/panels/creation/creationWorkflowMode.ts",
       "owner": "canvas-creation-ui",
       "responsibility": "创作面板来源模式判定（模型 id 反推 API/AI 应用/工作流）与工作流提交体拼装（只发暴露字段、媒体发上游哨兵）。",
@@ -11808,7 +11755,7 @@
     {
       "module": "src/workbenches/canvas/panels/creation/WorkflowParameterControls.tsx",
       "owner": "canvas-creation-ui",
-      "responsibility": "工作流模式的参数区：渠道 / 条目 / 实例 / 暴露字段 / 媒体位，全部复用 ParamPicker 的 chip 与浮层。",
+      "responsibility": "工作流模式的参数行：条目（带渠道品牌图标）/ 实例 / 暴露字段摘要，全部复用 ParamPicker 的 chip 与浮层；不另设「运行」按钮。",
       "owns": [
         "工作流模式参数行",
         "字段值编辑与提交体下发"
@@ -11816,11 +11763,13 @@
       "doesNotOwn": [
         "参数暴露配置（设置页）",
         "路由与提交",
-        "节点数据模型"
+        "节点数据模型",
+        "媒体字段的取值（走上游连线与素材条）"
       ],
       "publicApi": [
         "WorkflowParameterControls",
-        "WorkflowParameterControlsProps"
+        "WorkflowParameterControlsProps",
+        "workflowSummaryLabel"
       ],
       "test": [
         "src/workbenches/canvas/panels/creation/creationWorkflowMode.test.ts"
@@ -11828,25 +11777,6 @@
       "budget": 380
     },
     {
-      "module": "src/workbenches/canvas/panels/creation/WorkflowParameterControls.module.css",
-      "owner": "canvas-creation-ui",
-      "responsibility": "工作流参数区里媒体位 chip 的局部样式（描边/圆角/悬停沿用面板参数 chip 的令牌）。",
-      "owns": [
-        "媒体位 chip 样式"
-      ],
-      "doesNotOwn": [
-        "ParamPicker 自身样式",
-        "主题令牌"
-      ],
-      "publicApi": [
-        "CSS_MODULE:工作流媒体位（mediaChip / mediaState）"
-      ],
-      "test": [
-        "src/workbenches/canvas/panels/creation/creationWorkflowMode.test.ts"
-      ],
-      "budget": 120
-    },
-{
       "module": "src/features/settings/SettingsWorkflowManager.tsx",
       "owner": "settings-workflow-entries",
       "responsibility": "RunningHub 的「AI 应用和工作流」管理页与条目设置页：粘贴链接/id 导入、两栏卡片（封面/名称/备注/设置/删除）、条目设置（元信息 + 参数暴露编辑器）。",
@@ -11865,7 +11795,7 @@
         "SettingsWorkflowManagerProps"
       ],
       "test": [
-        "src/features/settings/SettingsWorkflowEntries.test.ts"
+        "src/features/settings/SettingsWorkflowManager.test.ts"
       ],
       "budget": 450
     }

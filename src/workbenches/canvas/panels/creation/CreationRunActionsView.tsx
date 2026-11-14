@@ -9,6 +9,13 @@ function RunArrow() {
 }
 
 interface CreationRunActionsViewProps {
+  /**
+   * 隐藏「预设」入口（工作流模式）。
+   *
+   * 预设是 **API 生图**那套「分镜叙事 / 空间与机体 / 设定图」的风格配方，
+   * 工作流的参数由条目自己决定，摆着一个点不出东西的按钮只会让人以为漏了功能。
+   */
+  hidePreset?: boolean
   promptMode: boolean
   activePreset: { id: string } | undefined
   presetOptionsAvailable: boolean
@@ -32,6 +39,7 @@ interface CreationRunActionsViewProps {
 }
 
 export function CreationRunActionsView({
+  hidePreset = false,
   promptMode,
   activePreset,
   presetOptionsAvailable,
@@ -55,7 +63,7 @@ export function CreationRunActionsView({
 }: CreationRunActionsViewProps) {
   return (
     <>
-      {!promptMode && (
+      {!promptMode && !hidePreset && (
         <span className={styles.presetAnchor}>
           <button
             type="button"

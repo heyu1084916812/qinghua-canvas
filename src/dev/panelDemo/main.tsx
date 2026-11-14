@@ -15,7 +15,8 @@ import './demo.css'
 
 /**
  * 创作面板示例（**只读演示**，不进产品代码）：
- * 用现有的 `CreationPanel` + 假数据渲染真面板，底部接一条"来源行"示意。
+ * 用**真实的 `CreationPanel`** 渲染「工作流模式」——
+ * 参数行就是产品里那一行（条目 / 实例 / 参数摘要 + 原来那枚生成按钮）。
  *
  * 打开：`npm run dev:vite` 后访问 `/dev/panel-demo.html`。
  */
@@ -28,6 +29,8 @@ const ENTRY: WorkflowEntry = {
   title: '视频超分与补帧',
   provider: 'runninghub',
   fetchedAt: Date.now(),
+  kind: 'workflow',
+  outputKind: 'video',
   fields: [
     {
       id: '16::video',
@@ -128,28 +131,23 @@ async function boot() {
     await channels.setEnabled(CHANNEL_ID, true)
     await channels.setModels(CHANNEL_ID, [
       { id: 'GPT Image 2', category: 'image', inputTypes: ['text'] },
-      { id: 'app:1877265245566922753', category: 'image', inputTypes: ['text', 'image'] },
       { id: `workflow:${WORKFLOW_ID}`, category: 'video', inputTypes: ['text', 'image'] },
     ])
   }
 
-  const data = {
-    ...generationSpec.createDefaultData(),
-    mode: 'video' as const,
-    channelId: CHANNEL_ID,
-    /* 左栏对照用：普通模型（API 模式）的现状 */
-    model: 'GPT Image 2',
-    prompt: panelModel.prompt,
-  }
   const workflowData = {
     ...generationSpec.createDefaultData(),
     mode: 'video' as const,
     channelId: CHANNEL_ID,
     model: `workflow:${WORKFLOW_ID}`,
     prompt: panelModel.prompt,
+    workflowNodeInfoList: [
+      { nodeId: '65', fieldName: 'strength', fieldValue: '0.8' },
+      { nodeId: '20', fieldName: 'ratio', fieldValue: '16:9' },
+    ],
   }
   const workflowSources: WorkflowPanelSources = {
-    channels: [{ id: CHANNEL_ID, name: 'RunningHub', entries: [ENTRY] }],
+    channels: [{ id: CHANNEL_ID, name: 'RunningHub', protocol: 'runninghub-api', entries: [ENTRY] }],
   }
 
   const container = document.getElementById('root')!
@@ -158,38 +156,21 @@ async function boot() {
       <ChannelStoreContext.Provider value={channels}>
         <SkillStoreContext.Provider value={emptySkills}>
           <div className="demo-stage">
-            <div className="demo-columns">
-              <section className="demo-col">
-                <h2 className="demo-caption">现状（真实面板 · API 模式）</h2>
-                <div className="demo-panel">
-                  <CreationPanel
-                    data={data}
-                    model={panelModel}
-                    running={false}
-                    globalRunning={false}
-                    error={null}
-                    onEvent={() => {}}
-                    onClose={() => {}}
-                    showCategoryToggle
-                  />
-                </div>
-              </section>
-              <section className="demo-col">
-                <h2 className="demo-caption">工作流模式（真实面板 · 只留工作流参数）</h2>
-                <div className="demo-panel">
-                  <CreationPanel
-                    data={workflowData}
-                    model={{ ...panelModel, prompt: panelModel.prompt }}
-                    running={false}
-                    globalRunning={false}
-                    error={null}
-                    onEvent={() => {}}
-                    onClose={() => {}}
-                    showCategoryToggle
-                    workflowSources={workflowSources}
-                  />
-                </div>
-              </section>
+            <div className="demo-col">
+              <h2 className="demo-caption">创作面板 · 工作流模式（真实组件）</h2>
+              <div className="demo-panel">
+                <CreationPanel
+                  data={workflowData}
+                  model={panelModel}
+                  running={false}
+                  globalRunning={false}
+                  error={null}
+                  onEvent={() => {}}
+                  onClose={() => {}}
+                  showCategoryToggle
+                  workflowSources={workflowSources}
+                />
+              </div>
             </div>
           </div>
         </SkillStoreContext.Provider>

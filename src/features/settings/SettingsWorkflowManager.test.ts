@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest'
 import { createMemoryPlatform } from '../../platform/memory'
 import type { Channel } from '../../domain/project/channel'
 import type { ChannelStore } from '../../state/channel/channelStore'
-import { SettingsWorkflowEntries } from './SettingsWorkflowEntries'
+import { SettingsWorkflowManager } from './SettingsWorkflowManager'
 import { WorkflowFieldEditor } from './WorkflowFieldEditor'
 
 const channel = {
@@ -20,24 +20,23 @@ const channel = {
 /**
  * 服务端静态渲染只覆盖**初始形态**：数据要等 effect 里的存储读取与网络请求，
  * 那些由 `workflowEntryStore.test.ts` / `runninghubMarket.test.ts` 单独钉。
- * 这里钉的是「入口真的在页面上」——模块治理的 test 证据也指这一条。
+ * 这里钉的是「管理页真的在页面上、只有这一个入口」。
  */
-describe('SettingsWorkflowEntries', () => {
-  it('渲染出标题、市场入口、手填 workflowId 与空态说明', () => {
+describe('SettingsWorkflowManager', () => {
+  it('收起态是一条入口（标题 + 已加条目数 + 进入管理）', () => {
     const html = renderToStaticMarkup(
-      createElement(SettingsWorkflowEntries, {
+      createElement(SettingsWorkflowManager, {
         channel,
         channels: {} as ChannelStore,
         platform: createMemoryPlatform(),
       }),
     )
-    expect(html).toContain('data-workflow-entries')
-    expect(html).toContain('工作流条目')
-    expect(html).toContain('只列「运行时长费用」那批')
-    expect(html).toContain('从市场添加')
-    expect(html).toContain('workflowId')
-    expect(html).toContain('还没有工作流条目')
-    /* 市场面板默认收起（点按钮才拉目录） */
+    expect(html).toContain('data-workflow-manager-entry')
+    expect(html).toContain('AI 应用和工作流')
+    expect(html).toContain('进入管理')
+    expect(html).toContain('已添加 0 个应用 · 0 条工作流')
+    /* 展开后的两栏与市场面板都不在收起态里（点进去才渲染、才拉目录） */
+    expect(html).not.toContain('data-workflow-column')
     expect(html).not.toContain('data-workflow-market')
   })
 })
@@ -104,6 +103,21 @@ describe('WorkflowFieldEditor（复刻 canvas-xiong 的参数暴露编辑器）'
     /* 批量操作在（默认全隐藏时的兜底） */
     expect(html).toContain('全部暴露')
     expect(html).toContain('全部隐藏')
+  })
+
+  it('条目设置页关掉预览栏时只剩字段清单（不出三栏窄条）', () => {
+    const html = renderToStaticMarkup(
+      createElement(WorkflowFieldEditor, {
+        entry,
+        showPreview: false,
+        onSave: () => {},
+        onClose: () => {},
+      }),
+    )
+    expect(html).toContain('data-preview="off"')
+    expect(html).not.toContain('data-workflow-preview')
+    /* 清单仍在 */
+    expect(html).toContain('data-workflow-field="7::ratio"')
   })
 
   it('空候选的常见字段会被补成下拉（采样器 / 比例这类）', () => {

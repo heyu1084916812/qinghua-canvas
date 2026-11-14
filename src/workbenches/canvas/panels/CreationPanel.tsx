@@ -70,7 +70,7 @@ import { CreationParameterControls } from './creation/CreationParameterControls'
 import { CreationPromptToolsView } from './creation/CreationPromptToolsView'
 import { CreationPromptView } from './creation/CreationPromptView'
 import { CreationRunActionsView } from './creation/CreationRunActionsView'
-import { WorkflowParameterControls } from './creation/WorkflowParameterControls'
+import { WorkflowEntryLauncher, WorkflowParameterControls } from './creation/WorkflowParameterControls'
 import { workflowChannelsOf } from './creation/workflowPanelSources'
 import type { CreationPanelProps } from './creation/creationPanelTypes'
 
@@ -132,6 +132,8 @@ export function CreationPanel(props: CreationPanelProps) {
   const promptMode = props.mode === 'prompt'
   /** 视频是生成节点的功能类别（`data.mode`），参数集与图片模式不同（§6.8） */
   const videoMode = !promptMode && data.mode === 'video'
+  /** 工作流模式：参数 / 类别 / 预设全由条目决定，生成仍是原来那一枚按钮（不另设「运行」） */
+  const workflowMode = Boolean(props.workflowSources && String(data.model ?? '').startsWith('workflow:') && workflowChannelsOf(props.workflowSources).length > 0)
   /** 仅在节点模型为空时解析并写回默认配方，已有模型绝不覆盖。 */
   const [fallback, setFallback] = useState<{ channelId: string; model: string } | null>(null)
   /** onEvent 每次渲染都会新建，effect 通过 ref 读取最新值。 */
@@ -860,7 +862,8 @@ export function CreationPanel(props: CreationPanelProps) {
         thumbs={model.thumbs}
         dragIndex={dragIndex}
         mode={data.mode}
-        showCategoryToggle={props.showCategoryToggle}
+        /** 工作流模式下类别由条目输出类型决定，没有可切的「图片 / 视频」 */
+        showCategoryToggle={props.showCategoryToggle && !workflowMode}
         onDragStart={setDragIndex}
         onDrop={reorderThumb}
         onToggleCollection={(id) => onEvent({ type: 'toggleCollection', id })}
@@ -909,8 +912,8 @@ export function CreationPanel(props: CreationPanelProps) {
         className={`${styles.section} ${styles.params} ${styles.paramsSection}`}
         data-panel-part="params"
       >
-        {props.workflowSources && String(data.model ?? '').startsWith('workflow:') && workflowChannelsOf(props.workflowSources).length > 0 ? (
-          <WorkflowParameterControls data={data} sources={props.workflowSources} openPicker={openPicker} onTogglePicker={togglePicker} onClosePicker={closePicker} onEvent={onEvent} disabled={props.disabled} />
+        {workflowMode && props.workflowSources ? (
+          <WorkflowParameterControls data={data} sources={props.workflowSources} apiOptions={modelOptions} openPicker={openPicker} onTogglePicker={togglePicker} onClosePicker={closePicker} onEvent={onEvent} disabled={props.disabled} />
         ) : (
         <CreationParameterControls
           noPlatform={noPlatform} platformGap={platformGap} categoryLabel={categoryLabel}
@@ -934,7 +937,14 @@ export function CreationPanel(props: CreationPanelProps) {
           onOpenSkills={props.onOpenSkills}
           onRunTool={runPromptTool}
         />
+        {/* 工作流入口：`workflow:<id>` 不在模型下拉里，没这枚 chip 就挑不到工作流 */}
+        <WorkflowEntryLauncher
+          sources={promptMode || workflowMode ? null : props.workflowSources}
+          openPicker={openPicker} onTogglePicker={togglePicker} onClosePicker={closePicker}
+          onEvent={onEvent} disabled={props.disabled}
+        />
         <CreationRunActionsView
+          hidePreset={workflowMode}
           promptMode={promptMode}
           activePreset={activePreset}
           presetOptionsAvailable={activePreset?.options != null}

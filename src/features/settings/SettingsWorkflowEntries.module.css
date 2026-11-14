@@ -213,6 +213,11 @@
   background: var(--bg-surface);
 }
 
+/* 不画预览栏时（条目设置页）只剩一栏：别让字段清单掉进那条 240px 的窄格里 */
+.editor[data-preview='off'] {
+  grid-template-columns: minmax(0, 1fr);
+}
+
 .previewPane {
   display: flex;
   flex-direction: column;
@@ -314,6 +319,7 @@
 .fieldHead {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: var(--space-2);
 }
 
@@ -455,6 +461,26 @@
   min-width: 0;
 }
 
+.cardTitle {
+  color: var(--text-1);
+  font-size: var(--fs-body);
+  font-weight: 600;
+  line-height: 1.4;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 备注在卡片上只作一行提示（改它去「设置」），长了就省略 */
+.cardNote {
+  color: var(--text-2);
+  font-size: var(--fs-label);
+  line-height: 1.5;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .columns {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -489,19 +515,6 @@
   height: 40px;
   border-radius: var(--radius-control);
   background: var(--bg-hover);
-}
-
-.noteArea {
-  box-sizing: border-box;
-  width: 100%;
-  padding: 2px var(--space-1);
-  border: var(--border);
-  border-radius: var(--radius-control);
-  background: var(--bg-surface);
-  color: var(--text-1);
-  font: inherit;
-  font-size: var(--fs-label);
-  resize: vertical;
 }
 
 .countRow {

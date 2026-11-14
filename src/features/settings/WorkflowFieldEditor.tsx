@@ -22,6 +22,15 @@ import styles from './SettingsWorkflowEntries.module.css'
 export type WorkflowFieldEditorProps = {
   entry: WorkflowEntry
   busy?: boolean
+  /**
+   * 是否画左边那栏「节点上的样子」。
+   *
+   * 条目设置页（`SettingsWorkflowManager`）自己已经有一整栏「名称 / 备注 / 输出类型」，
+   * 再塞一栏预览就会在三栏里被挤成一条缝（用户 2026-11-14：「完全不好看」）。
+   * 参考产品那一格放的是**工作流节点图**，等节点图做出来再回到这里；
+   * 在那之前这一页只留「左信息、右参数」两栏。
+   */
+  showPreview?: boolean
   onSave: (fields: WorkflowParamField[]) => void | Promise<void>
   onClose: () => void
 }
@@ -101,7 +110,13 @@ function PreviewControl({ field }: { field: WorkflowParamField }) {
   )
 }
 
-export function WorkflowFieldEditor({ entry, busy, onSave, onClose }: WorkflowFieldEditorProps) {
+export function WorkflowFieldEditor({
+  entry,
+  busy,
+  showPreview = true,
+  onSave,
+  onClose,
+}: WorkflowFieldEditorProps) {
   const [draft, setDraft] = useState<WorkflowParamField[]>(() => withKnownOptions(entry.fields))
   const [closedGroups, setClosedGroups] = useState<Set<string>>(new Set())
 
@@ -124,7 +139,8 @@ export function WorkflowFieldEditor({ entry, busy, onSave, onClose }: WorkflowFi
   const setAll = (value: boolean) => setDraft((previous) => previous.map((field) => ({ ...field, enabled: value })))
 
   return (
-    <div className={styles.editor} data-workflow-field-editor>
+    <div className={styles.editor} data-workflow-field-editor data-preview={showPreview ? 'on' : 'off'}>
+      {showPreview ? (
       <div className={styles.previewPane} data-workflow-preview>
         <div className={styles.previewTitle}>{entry.title}</div>
         {enabled.length === 0 ? (
@@ -137,6 +153,7 @@ export function WorkflowFieldEditor({ entry, busy, onSave, onClose }: WorkflowFi
           </div>
         )}
       </div>
+      ) : null}
 
       <div className={styles.fieldPane}>
         <div className={styles.fieldHead}>

@@ -288,6 +288,7 @@ export function SettingsWorkflowManager({
             <WorkflowFieldEditor
               entry={editing}
               busy={busy}
+              showPreview={false}
               onClose={() => setEditingId(null)}
               onSave={async (fields) => {
                 await patchEntry(editing, { fields })
@@ -389,19 +390,14 @@ export function SettingsWorkflowManager({
                     <span className={styles.coverPlaceholder} aria-hidden="true" />
                   )}
                   <div className={styles.cardText}>
-                    <input
-                      className={styles.inputSm}
-                      value={entry.title}
-                      onChange={(event) => void patchEntry(entry, { title: event.target.value })}
-                    />
-                    <span className={styles.meta}>{entry.id} · {entry.fields.length} 个参数</span>
-                    <textarea
-                      className={styles.noteArea}
-                      rows={2}
-                      placeholder="备注、用途、参数说明"
-                      value={entry.note ?? ''}
-                      onChange={(event) => void patchEntry(entry, { note: event.target.value })}
-                    />
+                    {/*
+                      卡片只**读**：名称与备注都在「设置」里改（参考产品就是这样的分工）。
+                      原来这里挂着输入框和备注框，一张卡被撑成半屏，还容易改到一半就走人。
+                    */}
+                    <span className={styles.cardTitle}>{entry.title}</span>
+                    {/* id 太长会把窄栏挤成两行，这里只留「几个参数」；完整 id 在设置页抬头 */}
+                    <span className={styles.meta}>{entry.fields.length} 个参数</span>
+                    {entry.note ? <span className={styles.cardNote}>{entry.note}</span> : null}
                   </div>
                   <div className={styles.actions}>
                     <button type="button" className={styles.linkBtn} onClick={() => setEditingId(entry.id)}>
