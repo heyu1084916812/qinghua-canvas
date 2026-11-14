@@ -104,6 +104,14 @@ export const LEGACY = {
 }
 
 /**
+ * 生成物：内容由脚本决定，**不受行数上限**（由 `scripts/ledger-index.mjs --check` 保证「必须是最新的」）。
+ * 2026-11-14 用户拍板：新增归档文件必然让索引涨 5 行，若索引也钉死行数就形成
+ * 「归档冻结 vs 索引生成」的死结 —— 于是索引豁免行数、改用「新鲜度」校验。
+ * 仍然受单行长度上限约束。
+ */
+export const GENERATED = new Set(['ledger/README.md'])
+
+/**
  * 已拆分文档的目标上限。拆分完成的文件在这里登记，基线从 `LEGACY` 移过来。
  */
 export const BUDGET = {
@@ -142,6 +150,7 @@ export function measureText(text) {
 
 /** 纯函数：某个文档适用的上限与来源 */
 export function limitsFor(rel) {
+  if (GENERATED.has(rel)) return { limit: Number.POSITIVE_INFINITY, kind: '生成物' }
   if (BUDGET[rel] !== undefined) return { limit: BUDGET[rel], kind: '目标' }
   if (LEGACY[rel] !== undefined) return { limit: LEGACY[rel], kind: '冻结基线' }
   return { limit: DEFAULT_BUDGET, kind: '默认' }
@@ -151,11 +160,11 @@ export function limitsFor(rel) {
 export function judgeDoc({ rel, bytes, lineCount, maxLine, maxLineNo }) {
   const problems = []
   const { limit, kind } = limitsFor(rel)
+  const isArchive = rel.startsWith('ledger/') || rel.startsWith('release-notes/') || rel.includes('/archive/')
   if (lineCount > limit) {
     problems.push(
       `${rel}：${lineCount} 行 > ${kind} ${limit} 行（超 ${lineCount - limit} 行，${Math.round(bytes / 1024)} KB）` +
-        `\n      处理：把新内容写进新的子文件（ledger/ · release-notes/ · docs/），` +
-        `或把已经交付 / 过期的段落移进归档。文档只加不改的旧习就到此为止。`,
+        `\n      处理：${isArchive ? archiveHint(rel) : chunkHint(rel)}`,
     )
   }
   if (maxLine > MAX_LINE_CHARS) {
@@ -165,6 +174,21 @@ export function judgeDoc({ rel, bytes, lineCount, maxLine, maxLineNo }) {
     )
   }
   return problems
+}
+
+/** 归档类文件的处置建议：当月可追加（同步基线），跨月换新文件 */
+function archiveHint(rel) {
+  const monthMatch = rel.match(/20\d{2}-\d{2}/)
+  return (
+    `归档可以长，但要长在**新的月份 / 续文件**里：新建 \`${rel.replace(/\.md$/, '-b.md')}\`（当月续档）` +
+    `或下一个月的文件，然后 \`node scripts/ledger-index.mjs\` 重建索引（索引不受行数上限）。` +
+    `若确实要往同一份归档里追加：同一次提交里把 \`scripts/check-doc-size.mjs\` 的该文件基线改成新值` +
+    `${monthMatch ? `（当前 ${monthMatch[0]} 是当月，允许这样追加）` : '（非当月文件应视为只读，别改）'}。`
+  )
+}
+
+function chunkHint() {
+  return '把新内容写进新的子文件（ledger/ · release-notes/ · docs/），或把已交付 / 过期的段落移进归档。'
 }
 
 function walk(dir, out = []) {

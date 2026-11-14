@@ -49,6 +49,13 @@ export default tseslint.config(
       '.workbuddy',
       '.playwright-verify',
       /**
+       * `.probe-tmp/` 是**临时探针的工作目录**（`.gitignore` 里的 `.probe-*` 同口径，不入库）：
+       * 里面常驻原样下载的第三方前端 chunk（压缩过的 bundle）、截图、对拍出来的 JSON。
+       * 和 `.market-research` 同一类：让 lint 解析压缩过的第三方代码只会淹掉真错误。
+       * 2026-11-14 由该目录里的一批 `StudioI18n` / `window` 未定义把 `npm run check` 打红后才补上。
+       */
+      '.probe-tmp',
+      /**
        * `.market-research/` 是**一次性调研产物**：原样下载的第三方前端 chunk
        * （压缩过的 minified bundle）、官方 API 规格快照等。它们既不入库
        * （见 `.gitignore`）也不归本项目规范管 —— 让 lint 去解析压缩过的第三方

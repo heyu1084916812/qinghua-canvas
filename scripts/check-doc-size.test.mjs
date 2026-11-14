@@ -45,9 +45,49 @@ describe('limitsFor', () => {
   it('falls back to the default budget for unregistered documents', () => {
     expect(limitsFor('docs/新章节.md')).toEqual({ limit: DEFAULT_BUDGET, kind: '默认' })
   })
+
+  it('never puts a line budget on a generated file', () => {
+    expect(limitsFor('ledger/README.md')).toEqual({ limit: Number.POSITIVE_INFINITY, kind: '生成物' })
+  })
 })
 
 describe('judgeDoc', () => {
+  it('lets a generated index grow without a line budget', () => {
+    expect(
+      judgeDoc({
+        rel: 'ledger/README.md',
+        bytes: 4096,
+        lineCount: 900,
+        maxLine: 120,
+        maxLineNo: 1,
+      }),
+    ).toEqual([])
+  })
+
+  it('still fails a generated file with an absurd single line', () => {
+    const problems = judgeDoc({
+      rel: 'ledger/README.md',
+      bytes: 4096,
+      lineCount: 900,
+      maxLine: MAX_LINE_CHARS + 1,
+      maxLineNo: 3,
+    })
+    expect(problems).toHaveLength(1)
+    expect(problems[0]).toContain('第 3 行')
+  })
+
+  it('tells archives they may append in the current month or start a new file', () => {
+    const problems = judgeDoc({
+      rel: 'ledger/按批记录-2026-11.md',
+      bytes: 2048,
+      lineCount: LEGACY['ledger/按批记录-2026-11.md'] + 5,
+      maxLine: 100,
+      maxLineNo: 1,
+    })
+    expect(problems).toHaveLength(1)
+    expect(problems[0]).toContain('新建')
+    expect(problems[0]).toContain('ledger-index.mjs')
+  })
   it('passes a document at exactly its baseline', () => {
     const rel = '轻画-开发计划.md'
     expect(
