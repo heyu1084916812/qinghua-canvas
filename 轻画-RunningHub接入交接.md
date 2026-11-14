@@ -76,6 +76,7 @@ npx vitest run src/domain/project/workflowParams.test.ts src/domain/project/work
 | **1111** | 吃官方 `developer-kit`（500+ 模型 + 参数枚举 + CNY 参考价） | 📝 未做 | 生成脚本改吃 `model-registry.public.json`；`options` 自动填；**参考价不许当积分显示** |
 | **1112** | 接第四种路线 `LLM` | 📝 未做 | 标准 OpenAI 兼容 ⇒ 走现有 `openai-compatible` 族，**不需要新适配器** |
 | **1113** | 接国内站 API 市场的目录 / 搜索（`/api/sku/list`） | 📝 未做 | 免 Key；`STANDARD_MODEL 280 / WEBAPP 15 / WORKFLOW 18`，能按关键词搜；**市场 id 是 SKU id，`relatedDataId` 才是 `webappId`**（见 §五 15） |
+| **1114** | 补齐 CLI 模板（`-i` 图生 / `rh app run`）+ 面板写明额度同源 | 📝 未做 | 官方 `rh` 还有 `app run --node/--file` 与 `image`/`video` 快捷菜单；但**没有 `workflow` 命令** ⇒ 工作流只能走 API。见 §五 16 |
 
 **建议分组**：第三组=设置页（1104+1106+自检），第四组=生成节点（1105+1107 收尾），第五组=1111/1112。
 
@@ -98,6 +99,7 @@ npx vitest run src/domain/project/workflowParams.test.ts src/domain/project/work
 13. **新文件先登记再写**：`architecture/module-governance.json` 要有职责 / owns / doesNotOwn / publicApi / test；新 TS ≤ **450 行**，超了**拆文件**（`workflowParams.ts` 就因此把"取值"拆到了 `workflowParamValues.ts`），**不要调高预算**。
 14. **文档闸门**：新文档必须登记进《文档总索引.md》；根清单 ≤400 行、新文档 ≤800 行（`check-doc-size`）；改编号要重跑 `node scripts/ledger-index.mjs`。
 15. **市场页上的 id 是 SKU id，不是 `webappId`**（2026-11-14 核对 `/call-api/search-api/webapp`）：`POST /api/sku/list` 回的是 **SKU**，`POST /api/sku/detail {id}` 里的 `relatedDataId` 才是真实的 `webappId` / `workflowId`（例：`2039234115011928065` → `2037457807762526209`）。用户从市场页抄 id 填进设置页**会填错**。这部目录**免登录免 Key**（`categoryType: STANDARD_MODEL|WEBAPP|WORKFLOW`，`search` 关键词真能用，`pageSize:999` 一次取全：280 / 15 / 18 条），所以设置页「加条目」可以做成搜索选择，而不是手填。**别用 `/api/search/model`、`/api/search/workflow`**（那是资源市场，传 WEBAPP 会被忽略）。
+16. **CLI 不是"免费额度"，也跑不了工作流**（2026-11-14 核对官网 + GitHub）：中国官网**没有 CLI 文档**（`runninghub-api-doc-cn` 全文 0 次 "CLI"），唯一权威是 `HM-RunningHub/RH_CLI`（2026-06-01 后无新提交）。它能干的是 `check` / `model list·info·run`（`-i` 参考图可重复、`--param` 带类型转换）/ `image`·`video` 精选菜单（**不给 `--model` 会走交互菜单，非交互调用会挂住**）/ `app list·info·run`（`--node`、`--file`、`--instance-type`）；**没有 `workflow` 命令**。而且它解析的 Key 与渠道是**同一把**（`--api-key` > `RUNNINGHUB_API_KEY` > `%APPDATA%\rh\config.toml`）⇒ **同一本账**，别把它当第二份额度用。
 
 ---
 

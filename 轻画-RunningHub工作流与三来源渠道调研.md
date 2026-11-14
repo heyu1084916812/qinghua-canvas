@@ -561,3 +561,42 @@ refAudio1..3 / refVideoAudio1..2
 （`/openapi/v2/aiapp/list` 要 Key，回的是全站应用清单）—— 选应用入口用市场清单还是全站清单，**待拍板**。
 
 **⑦ 据此登记的缺口**：**#1113**（把这部目录接进来：搜索 / 分类 / 计费标签 / SKU↔`webappId` 映射）。
+
+---
+
+### I. 官方 CLI（`rh`）现状：中国官网没有文档，能力比轻画模板以为的多（2026-11-14 核对）
+
+> 用户问「runninghub 的 cli 目前有什么作用？去中国官网上看」。以下两边都查了：**官网 + GitHub 源码**。
+
+**① 中国官网没有 CLI 文档**（如实说）：
+`https://www.runninghub.cn/runninghub-api-doc-cn/` 全文 **0 次出现「CLI」**，导航里也没有「命令行 / 开发者工具」这一项
+（只有 开始 / 更新日志 / 指引 / 模型 API / 错误码 / nodeInfoList / 原生 ComfyUI 接口 / 接入示例 / AI 应用 / ComfyUI 工作流 / 模型API）。
+全站搜索 `/search?keyword=CLI` 是**内容搜索**（应用 / 工作流 / 模型 / 作者 / 作品），不搜文档。
+⇒ 唯一权威来源是 **GitHub `HM-RunningHub/RH_CLI`**（官方组织，Apache-2.0，32★）：2026-06-01 初始发布 + 同一天重写 README，
+之后**没有新提交**（仓库元数据 2026-11-12 有更新，代码没动）。它比 API 文档"旧"得多，**别拿它当接口契约**（v2 路由它就没跟上）。
+
+**② 它实际能干什么**（README 与 `src/rh_cli/**/commands.py` 双证）：
+
+| 命令 | 能力 |
+| --- | --- |
+| `rh check` | 校验 Key + 读余额 / RH 币 / 在跑任务数；`--json` 给稳定结构（含 `api_type`、`key_source`） |
+| `rh auth set-key / show / set-output-dir` | 管理 Key 与默认输出目录（Key 走**位置参数**，不进 stdin） |
+| `rh model list / info / run` | 78+ 端点；`--type image|video|audio|3d|string`、`--task …` 过滤；`run` 支持 `-e` 指定端点、`-t/--task` 自动挑端点、`-p` 提示词、`-i` 参考图（**可重复**）、`--video`、`--audio`、`--param key=value`（按端点定义转 INT/FLOAT/BOOLEAN）、`-o` 输出 |
+| `rh image` / `rh video` | 5 个精选图片模型 / 8 个精选视频模型的快捷菜单；`--model` 编号或别名可跳过菜单，`video` 另有 `--duration`。**不给 `--model` 会走 `typer.prompt` 交互菜单** ⇒ 非交互调用会挂住（我们踩过，模板里才坚持用 `model run --task`） |
+| `rh app list / info / run` | 浏览 `--sort RECOMMEND|HOTTEST|NEWEST`；`info` 列可改节点；`run` 用 `--node "52:prompt=…"`、`--file "39:image=./a.jpg"`、`--instance-type default|plus`，自动拉节点 → 上传 → 提交 → 轮询 → 下载全部结果 |
+| **没有 `workflow` 命令** | ⇒ **CLI 跑不了 ComfyUI 工作流**（截图里「运行时长费用」那批绝大多数正是工作流） |
+
+**③ Key 与额度**：解析顺序 `--api-key` > `RUNNINGHUB_API_KEY` > 配置文件（Windows `%APPDATA%\rh\config.toml`）> 兼容读 `~/.openclaw/openclaw.json`。
+⇒ 轻画「写配置文件」这条登录落点是对的，**同一把 Key = 同一本账**，CLI 不是第二份额度、更不是"免费额度"。
+
+**④ 输出 / 错误**：默认写 `~/rh-output`（多文件自动 `_1`/`_2`，视频做 MP4 头修补）；`--json` 生成结果统一 `{files,texts,cost,duration,task_id}`；
+失败非零退出 + `{error,message,detail}`（`NO_API_KEY` / `AUTH_FAILED` / `INSUFFICIENT_BALANCE` / `ENDPOINT_NOT_FOUND` / `INVALID_PARAM` / `TASK_FAILED|TIMEOUT` / `UPLOAD_FAILED` / `DOWNLOAD_FAILED`）。
+
+**⑤ 对轻画的结论**：
+
+1. 我们 `domain/shared/cliTools.ts` 的 RunningHub 模板只写了一条 `rh model run --task {model} --prompt {prompt} --output {out}` ——
+   **低估了它**：它还有 `-i` 图生（多张）、`rh app run` 带节点参数跑 AI 应用、`rh image/video` 精选菜单；
+2. 但**没有 workflow** ⇒ 想跑「只扣运行时长」的工作流条目，**只有 API 这一条路**，CLI 顶不上；
+3. CLI 与 API 共用同一把 Key、同一本账 ⇒ 面板上应写明「和渠道共用额度，不是免费通道」。
+
+**⑥ 据此登记的缺口**：**#1114**（CLI 模板补齐图生 / 应用两条，并在面板写清额度同源）。
