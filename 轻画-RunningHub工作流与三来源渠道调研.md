@@ -1,0 +1,224 @@
+# 轻画 · RunningHub 工作流 / AI 应用 / 本机 CLI 三来源接入调研与落地方案
+
+> **性质：调研 + 落地方案（建议稿）**，不构成排期承诺。要办的事已经登记进
+> 《轻画-功能对账清单.md》§五（#1104–#1107），进度只认那张表。
+>
+> 起因（用户 2026-11-14 原话要点）：想做一个 RunningHub 节点，**更倾向做进现有的「生成节点」**，
+> 通过**加一个渠道控制**（现在的 api 渠道 / RunningHub 工作流 / 以后把 codex、即梦等 CLI 也接进来，
+> 用它们的额度拉模型、出图出视频出音频）；工作流的**可动参数**要能在后台页面里**暴露 / 隐藏**。
+> 参考项目：<https://github.com/hero8152/Infinite-Canvas>。
+>
+> 调研方法：RunningHub 官方 CLI（`HM-RunningHub/RH_CLI`）源码、官方 ComfyUI 插件
+> （`ComfyUI_RH_APICall` / `ComfyUI_RH_OpenAPI`）源码与 README、参考项目 Infinite-Canvas 的
+> `main.py` 与前端源码逐条核对；轻画侧逐条对照现有代码。**凡未实测的都在 §6 单列，不当结论用。**
+
+---
+
+## 〇、一句话结论
+
+RunningHub 侧真正需要的只有**三条接口路线**，轻画已经接了 1.5 条；
+「参数暴露 / 隐藏」在 RunningHub 上是**两层东西**（AI 应用由作者在网页端开放字段；自建工作流没有这个概念，
+得轻画自己拉全量参数再勾选），所以**不需要新建一种节点类型**，把来源做成生成节点上的一个选择项即可。
+
+---
+
+## 一、轻画现状（代码实况，2026-11-14 核对）
+
+| 能力 | 落点 | 状态 |
+| --- | --- | --- |
+| RunningHub **标准模型 API**（`/openapi/v2/{endpoint}` → `/openapi/v2/query`） | `src/platform/channels/runninghub.ts` + `runninghubEndpoints/`（62 端点 / 49 模型，由官方目录生成） | 已接，真机验过（#368 / #363） |
+| RunningHub **AI 应用**（`app:<webappId>` → `/task/openapi/ai-app/run`） | 同上 `runApp()` | 接了，但参数是**按字段名猜**：`prompt` / `aspectRatio` / `resolution` / `duration` 四个名字硬写（`runninghub.ts:702-713`），其余字段一律不下发 |
+| **自建工作流**（`workflowId` + `/task/openapi/create`） | 无 | **没有**，代码里搜不到 `task/openapi/create` |
+| 渠道 → 模型的选路 | `domain/project/generationRouting.ts` + `modelRouting.ts` + `routePlan.ts` | 已通（优先级 / 权重 / 多 Key 分组 / 候选轮询） |
+| 本机 CLI 真起子进程 | `platform/channels/cliRun.ts`（+ `src-tauri/src/lib.rs`） | 能跑、能停、能吃本地媒体、能收多产物；**缺「用 CLI 的额度直接出图」的参数模板与产物回填**（#972 剩余项） |
+| 生成节点的参数区 | `workbenches/canvas/panels/CreationPanel.tsx` + `domain/canvas/nodeSpecs/params.ts` | 参数**固定**（ratio/resolution/duration…），没有「按模型动态出控件」的能力 |
+
+**关键结论：缺口不在「再写一个 RunningHub 适配器」，而在**
+① 工作流那条 HTTP 路没接；② 参数是写死的，无法按条目动态渲染；③ 生成节点上没地方选「来源」。
+
+---
+
+## 二、RunningHub 侧到底有几条路（逐条核对过的接口）
+
+基址：`https://www.runninghub.cn`（国际站 `https://www.runninghub.ai`，路径一致）。
+所有 Key 都走请求体 / query 的 `apiKey`（官方 CLI 另有 `Authorization: Bearer`，两条都认）。
+
+| 用途 | 方法与路径 | 请求体要点 | 响应要点 |
+| --- | --- | --- | --- |
+| 校验 Key / 读余额 | `POST /uc/openapi/accountStatus` | `{apikey}` | `code:0`；`data.remainCoins`（RH 币）/ 金额余额 |
+| **标准模型**（扣金额） | `POST /openapi/v2/{endpoint}` | 提示词 + 媒体字段 + 档位，见目录 | `{code:0, data.taskId}` |
+| 轮询（标准模型） | `POST /openapi/v2/query` | `{apiKey, taskId}` | `code`：`804` 运行 / `813` 排队 / `805` 失败 / `0` 完成；`results[]` |
+| **AI 应用列表** | `POST /openapi/v2/aiapp/list` | `{current,size,sort}` | `data.records[]`（`invokeExample` 里有 `/run/ai-app/<id>`） |
+| **AI 应用可改字段** | `GET /api/webapp/apiCallDemo?apiKey=&webappId=` | — | `data.nodeInfoList[]`（**只有作者开放过的字段**） |
+| **AI 应用提交**（扣币） | `POST /task/openapi/ai-app/run` | `{apiKey, webappId, nodeInfoList, instanceType?}` | `data.taskId`、`data.promptTips`（含 `node_errors` 即工作流校验失败） |
+| **工作流 JSON（Api 格式）** | `POST /api/openapi/getJsonApiFormat` | `{apiKey, workflowId}` | `data.prompt` = **整份工作流 JSON 的字符串** → 每个节点的 `inputs` 就是「所有可动参数」 |
+| **工作流提交**（扣金额） | `POST /task/openapi/create` | `{apiKey, workflowId, nodeInfoList, addMetadata?, instanceType?}` | `data.taskId` |
+| 任务状态 | `POST /task/openapi/status` | `{apiKey, taskId}` | 状态码同上 |
+| 取结果 | `POST /task/openapi/outputs` | `{apiKey, taskId}` | `data[]`：`{url / outputUrl, outputType, text}`，**可能多份** |
+| 上传素材 | `POST /task/openapi/upload`（multipart） | `apiKey`、`fileType=input`、`file` | `data.fileName` —— **工作流 / AI 应用的媒体字段吃的是这个 fileName，不是 URL、不是 data URI** |
+
+`nodeInfoList` 的元素形状（两个官方实现一致）：
+`{ nodeId, fieldName, fieldValue, fieldType? }`；`fieldType` 取值见过 `TEXT` / `IMAGE` / `VIDEO` / `AUDIO` / `NUMBER` / `BOOLEAN`。
+`instanceType: "plus"` = 4090 48G 更高规格实例（`ComfyUI_RH_APICall` 里就是这么传的）。
+
+> 依据：`RH_CLI/src/rh_cli/app/{client.py,nodes.py,http.py}`、
+> `ComfyUI_RH_APICall/RH_ExecuteNode.py:327,1800,1868,1956,2047`、
+> 参考项目 `Infinite-Canvas/main.py:12588-12690, 12760-12800`。三份独立实现互相印证。
+
+### 2.1 「参数暴露 / 隐藏」在 RunningHub 上是两件不同的事
+
+| 路线 | 谁能决定"哪些参数可动" | 轻画要做什么 |
+| --- | --- | --- |
+| **AI 应用**（`webappId`） | **作者在 RunningHub 网页端建应用时勾选的「开放参数」**。`apiCallDemo` 只回这些，别的一律拿不到 | 只需**如实渲染**拿到的那几个字段，不要自己发明参数名 |
+| **自建工作流**（`workflowId`） | **没有任何"暴露"机制** —— `getJsonApiFormat` 把整份工作流的每个 `inputs` 都给你 | 必须自己做「发现 → 全部默认隐藏 → 用户勾选暴露」这层面板 |
+
+参考项目 Infinite-Canvas 把这两层都做了：
+- 应用：`rh_apps[].fields[]`，每个字段落成
+  `{id:"<nodeId>::<fieldName>", nodeId, fieldName, fieldType, fieldValue, label, enabled, group, note, options[], min, max, step, random_enabled, imageOrder, required, sourceFromUpstream}`；
+- 工作流：`workflows/*.json` + 同名 `*.config.json` 侧车文件声明暴露哪些 `{node, input, name, type, default, min, max, step, options, bind_prompt}`；
+  拉全量参数时**默认 `enabled: false`**（`main.py` 的 `runninghub_collect_workflow_fields`），用户勾一个才暴露一个。
+- 它连 ComfyUI 工作流 JSON 里"链接值"（`["<nodeId>", slot]`）都会跳过，不当参数 —— 这条轻画照抄。
+
+---
+
+## 三、参考项目对照（可以直接借鉴什么）
+
+| 项目 | 星标 | 与本需求的关系 | 值得抄 / 不值得抄 |
+| --- | --- | --- | --- |
+| `hero8152/Infinite-Canvas` | 3184 | **用户指定的参考**：无限画布 + ComfyUI/API + RunningHub 工作流/AI 应用 + CLI(Codex/即梦/Gemini) + Chrome 插件 | 抄：**字段模型**（上面的 fields 结构）、两层暴露策略、`app:`/`workflow:` 双入口、素材先 upload 换 fileName、seed 归一 32 位。**别抄**：`main.py` 88 万字节单文件（前端 96 万字节单 js），轻画是分层架构，照抄会把 depcruise 门禁全撞红 |
+| `HM-RunningHub/RH_CLI` | 32 | **官方 CLI**：`rh check` / `rh image|video` / `rh model run` / `rh app run` | 抄：端点与错误码映射、`requiredDefaults`（必填+有默认值的补齐）、"没有可改节点 = 先在网页端成功跑一次"的文案。轻画适配器已按它实现过一轮 |
+| `HM-RunningHub/ComfyUI_RH_APICall` | 304 | 官方 **工作流** 插件 | 抄：`/task/openapi/create` 请求体、`getJsonApiFormat` 拉参数与节点数、WebSocket 断线转 HTTP 轮询。别抄：ComfyUI 节点形态（轻画不是 ComfyUI 宿主） |
+| `HM-RunningHub/ComfyUI_RH_OpenAPI` | 164 | 官方标准模型 API 的 ComfyUI 实现（551 节点） | 抄：模型注册表思路（轻画已用官方 `capabilities.json` 生成 62 端点目录） |
+| `Work-Fisher/AIFISHER` | 354 | 最像轻画的竞品：本地画布 + 本地 ComfyUI + RunningHub + "API 工作流导入与参数配置" | 看：它的「API 工作流导入 + 参数配置」入口形态（Electron + React）。闭源主体，无可抄代码 |
+| `WLDFC/lumen-light` | 28 | 无限画布 + ComfyUI（本地/RunningHub 云端）+ agent | 看：同赛道形态，不必细读 |
+| `colorAi/RunningHub-AI-Client`、`XIAOTsune/PixelRunner`、`liangtongt/RH_Helper`、`jacky9920084/runninghub-nodes-database`（9633+ 节点参数库） | 108 / 87 / 103 / 14 | 第三方客户端 / PS 插件 / 节点参数库 | 参数库那个可以当"字段名 → 中文标签"的兜底字典（可选，先不做） |
+
+---
+
+## 四、落地方案：做进生成节点，不新建节点类型
+
+### 4.1 概念：把节点上的「渠道」升级成「来源 → 条目 → 参数」三层
+
+```
+来源 Source       api（现有 HTTP 渠道） | runninghub（应用/工作流） | cli（本机 CLI）
+   └ 条目 Entry   渠道 id（现有）        | app:<webappId> / workflow:<workflowId> | 工具 id（codex/即梦/gemini/rh）
+        └ 参数 Params 现有固定参数       | 暴露字段（动态渲染）                    | 现有模板占位符
+```
+
+**为什么这样切**：现有渠道抽象（`Channel` + `ProtocolDefinition.family` + 适配器 + `RoutePlan`）已经把
+「多 Key、优先级、轮询、错误归一、取消、日志」全部解决。新来源只要能被表达成**同一渠道里的一条模型条目**，
+就自动继承这些能力 —— 这与仓库既有口径一致（`ESSENTIALS.md`「技能不是新机制，是既有链路的参数化」）。
+`app:<id>` 已经是这么做的（`runninghub.ts` 的 `APP_PREFIX`），新工作流条目就是 `workflow:<id>`，同构。
+
+### 4.2 领域层新增（纯函数，先写测试）
+
+| 文件 | 内容 |
+| --- | --- |
+| `src/domain/project/workflowParams.ts` | `WorkflowParamField` 类型（对齐 §2.1 的字段结构，剪掉用不上的）；`parseWorkflowJsonToFields()`（吃 `getJsonApiFormat` 的 `data.prompt`，跳过链接值，全默认 `enabled:false`）；`toNodeInfoList()`（只把 `enabled` 的字段拼成提交体，值统一转字符串）；`normalizeSeed()`（32 位）；`fieldValueSummary()`（日志/结果卡用的脱敏摘要） |
+| `src/domain/project/generationSource.ts` | `GenerationSource = 'api' \| 'runninghub' \| 'cli'`；`sourceOfModel(model)`（按 `app:` / `workflow:` / 工具前缀反推）；`entryIdOfModel()`；`entryKindOfModel()` |
+| `src/domain/canvas/nodeSpecs/params.ts` | 增一路：`workflow` 条目下把 `data.workflowParams` 原样带上（`params.workflow = { entryId, kind, fields }`），**其余固定参数照旧**（工作流里没人要 ratio 就不发，别塞） |
+
+### 4.3 平台层（适配器）
+
+`src/platform/channels/runninghub.ts` 增加 `workflow:` 分支（与现有 `app:` 分支并列）：
+
+1. 取条目参数 schema（见 4.4 的存储）→ 校验必填项；
+2. 每个 `IMAGE` / `VIDEO` / `AUDIO` 字段：素材 `prepareModelImageInput() → /task/openapi/upload → fileName` 写入 `fieldValue`
+   （**端点路要内联 data URI、应用/工作流路要 fileName，两条不能混**，这条以前已经踩过一次，见 #691）；
+3. `POST /task/openapi/create`（`addMetadata: true`，必要时 `instanceType`）；
+4. 轮询沿用现有 `waitForTask()`；`results[]` 多份产物沿用现有 `thumbOrder` 逻辑（#972 第十八轮已做）。
+
+### 4.4 存储：**不动 Dexie schema**
+
+参数 schema 与条目清单都挂在既有 `presets` 表（对齐「技能不是新机制」那次的做法）：
+
+| 键 | 值 |
+| --- | --- |
+| `presets/rh:entries:<channelId>` | `[{ kind:'app'\|'workflow', id, title, note, thumbnail?, fields: WorkflowParamField[], updatedAt }]` |
+| `presets/rh:defaults:<channelId>:<entryId>` | 最近一次运行的字段值（"上次用的参数"，节点新建时据此预填） |
+
+> 不建议把 schema 塞进 `Channel.models[].` —— `ModelCapability` 是**能力声明**（image/video/chat + 输入类型），
+> 塞参数 schema 会让"渠道能不能跑"和"参数长什么样"两件事耦合，`channelIsRoutable` 那类判据也会被污染。
+
+### 4.5 生成节点 UI（**涉及 UI，必须走 UI 门禁**）
+
+在 `CreationPanel.tsx` 现有参数区之上加一行「**来源**」，其余不动：
+
+- 来源选中 `api` → 现在的行为一字不变（零回归风险，默认值仍是 `api`）；
+- 选中 `runninghub` → 模型下拉换成「AI 应用 / 工作流」两段清单，选中条目后**在参数区下方展开该条目的暴露字段**：
+  - `TEXT` → 单行 / 多行（`bind_prompt` 的那个字段跟节点提示词双向同步）；
+  - `NUMBER` → 数字输入 + `min/max/step` + 可选「随机」（种子类字段用）；
+  - `BOOLEAN` → 开关；`options[]` 非空 → 下拉；
+  - `IMAGE` / `VIDEO` / `AUDIO` → 走现有素材缩略图行（含「用上游」）；
+  - **隐藏字段不出现在节点上**，也不下发（服务端工作流自己用默认值）。
+- 「哪些字段暴露」这件事放在**后台（设置页）**而不是节点上（用户原话就是"在后台页面里暴露和隐藏"）：
+  设置 → 渠道 → RunningHub → 条目详情 → 参数面板（勾选 / 改名 / 分组 / 类型 / 范围 / 选项 / 顺序）。
+  节点上只呈现已暴露的字段。理由：节点空间有限，且暴露规则是"一次性配置、长期复用"。
+
+### 4.6 执行链路（要改的地方只有两处）
+
+1. `collectInputs` / `toRunRequest`（`nodeSpecs/generation.ts`）：把 `data.workflowParams` 并进 `params.workflow`；
+2. `generationClient` / 执行器：`RunRequest.params.workflow` 原样透传给适配器（现有 `params` 已经是 `Record<string, unknown>`，无需改契约）。
+
+`resolveGenerationTarget()` **不需要改**：`app:` / `workflow:` 都是 RunningHub 渠道里的模型条目，仍按现有优先级选路。
+
+### 4.7 与现有「路由 / 分组 / 停止」的边界
+
+- 工作流条目**不参与** `modelMap` 映射（它是条目 id，不是上游模型名）；
+- 一条 RunningHub 渠道可以同时挂标准模型、AI 应用、工作流三类条目，**币 / 金额两本账**照旧由接口路线决定（`ai-app` 扣币、`create` 扣金额），错误码 `812` 的文案已按这个口径翻译过（#363）；
+- 停止 = 现有 `AbortSignal`（中止轮询即可；**RunningHub 侧任务不会因此取消**，要如实提示"本地已停止、云端仍在跑/仍计费"——这一条以前在别处没写清，属于要补的文案）。
+
+---
+
+## 五、CLI 来源（codex / 即梦 / gemini / rh）：复用什么、缺什么
+
+现有 `cliRun.ts` 已经解决最难的几件事：真起子进程（不过 shell、参数是数组）、可见窗口登录、
+`cli-in` 受控媒体导出（hash → 本地路径 → `{image}` / `{video}` 占位符）、进程树终止、多产物读回（#308 / #972 各轮）。
+
+**仍缺的**（这就是"用它们的额度出图"的最后一公里）：
+1. **产物回填**：CLI 输出目录里的新文件要按 hash 进 `assets`、落成生成节点的产物（现在只支持 stdout 里的路径 / 指定 `-o`）；
+2. **每个工具的出图参数模板**：Codex（`gpt-image-2` skill）、即梦（无官方 CLI，走交互式，需可见窗口）、Gemini、`rh`（`rh image --model N -p …`）各自一条；
+3. **音频产物**：现有 `GeneratedAsset` 只有 image/video，音频要么补 MIME 白名单，要么先只允许 mp3/wav 落素材；
+4. **额度读取**：只有 `rh --json check` 真正能读余额（#367 实测），其余工具如实说"这条工具没有可查命令"。
+
+→ 建议：**CLI 来源先只做「来源可选 + 模板跑通 + 产物回填」**，不追求一次把四个工具全做齐。
+
+---
+
+## 六、未实测项（**不许当结论用**）
+
+| 项 | 现状 | 怎么补 |
+| --- | --- | --- |
+| `apiCallDemo` 返回的字段是否含 `description` / `nodeName` | 两个官方实现只用到 `nodeId` / `fieldName` / `fieldValue` / `fieldType`；参考项目还读了 `label` / `title`（**来源未经官方文档确认**） | 用你自己的 Key 跑一次 `GET /api/webapp/apiCallDemo`，把原始 JSON 存成夹具再定类型；**不要先按猜的字段写死** |
+| 工作流 `nodeInfoList` 的 `fieldValue` 该传字符串还是原类型 | `Infinite-Canvas` 全转字符串；官方插件传原值 | 拿一条真工作流各试一次（数字 / 布尔 / 下拉），以服务端接受为准 |
+| 自建工作流的「AI 应用开放参数」网页流程细节 | 只知道 `apiCallDemo` 只回开放字段；网页端具体在哪个页面勾 | 登录 RunningHub → 建一个 AI 应用走一遍，截图存档 |
+| 工作流提交的真实耗时 / 超时 | 官方文档提示视频任务可能较长 | 真跑一条视频工作流，记录耗时与超时阈值是否需要按条目可配 |
+| 金额 Key 余额为 0 时的行为 | 已知标准模型报 `812 企业版余额不足` | 工作流路（`create`）是否同一错误码，待测 |
+
+**官方文档入口**（都是 SPA / Notion，抓取只能拿到标题，需要人眼看）：
+- 标准模型 API 页：`https://www.runninghub.cn/call-api/standard-api`
+- 官方插件 README 里给的 API 文档（Notion）：`https://gold-spleen-bf1.notion.site/RunningHub-API-1432ece0cf5f8026aaa8e4b9190f6f8e`
+- 取 Key：`https://www.runninghub.cn/enterprise-api/sharedApi`
+- 调用记录 / 账单：`https://www.runninghub.cn/call-api/call-record`
+
+---
+
+## 七、分期建议（每期都有可红的验收判据）
+
+| 期 | 内容 | 验收判据（要能变红） |
+| --- | --- | --- |
+| **P1 工作流条目能跑** | 领域 `workflowParams.ts` + 适配器 `workflow:` 分支 + 设置页「加一条工作流（填 workflowId）→ 拉参数 → 勾选暴露」 | 单测：`parseWorkflowJsonToFields` 对固定夹具逐字断言（含跳过链接值、默认全隐藏）；适配器单测：请求体只含 exposed 字段、媒体字段是 upload 回来的 `fileName`；真机：一条真工作流跑出图 |
+| **P2 生成节点参数区** | 来源行 + 动态参数渲染 + `params.workflow` 下发 | 冒烟：选一条带 6 个字段的工作流 → 节点上只出现 4 个（隐藏的 2 个不在 DOM）→ 运行记录里请求体恰好 4 项；`api` 来源回归全绿 |
+| **P3 AI 应用参数如实化** | 用 `apiCallDemo` 的字段替换现在按名字猜的写法 | 单测：字段名改成作者自定的中文名时仍能下发（现在会静默丢弃）；真机：一个非英文命名的应用跑通 |
+| **P4 CLI 来源** | 来源可选 `cli` + 四个工具模板 + 产物回填 | 冒烟：桌面版跑 `rh image` 出一条真图并落成节点产物；浏览器版如实禁用 |
+
+---
+
+## 八、参考链接
+
+- RunningHub 官网 / 取 Key / 标准模型 API / 调用记录：见 §6
+- `HM-RunningHub/RH_CLI`：<https://github.com/HM-RunningHub/RH_CLI>
+- `HM-RunningHub/ComfyUI_RH_APICall`（工作流）：<https://github.com/HM-RunningHub/ComfyUI_RH_APICall>
+- `HM-RunningHub/ComfyUI_RH_OpenAPI`（标准模型）：<https://github.com/HM-RunningHub/ComfyUI_RH_OpenAPI>
+- `hero8152/Infinite-Canvas`（用户指定参考）：<https://github.com/hero8152/Infinite-Canvas>
+- `Work-Fisher/AIFISHER`（同赛道）：<https://github.com/Work-Fisher/AIFISHER>
