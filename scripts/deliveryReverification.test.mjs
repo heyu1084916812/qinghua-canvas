@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs'
+import { readdirSync, readFileSync } from 'node:fs'
 import { fileURLToPath, URL } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
@@ -6,6 +6,16 @@ const read = (relative) => readFileSync(
   fileURLToPath(new URL(`../${relative}`, import.meta.url)),
   'utf8',
 )
+
+/** 目录下全部 .md 拼起来（分卷文档用：判据针对「整份文档」而不是某一个文件） */
+const readAll = (relativeDir) => {
+  const dir = fileURLToPath(new URL(`../${relativeDir}`, import.meta.url))
+  return readdirSync(dir)
+    .filter((name) => name.endsWith('.md'))
+    .sort()
+    .map((name) => readFileSync(`${dir}/${name}`, 'utf8'))
+    .join('\n')
+}
 
 describe('production first-paint probe evidence contract', () => {
   it('records the current HEAD, test seed, measured phases and geometry in result.json', () => {
@@ -38,7 +48,9 @@ describe('production first-paint probe evidence contract', () => {
 
   it('keeps README and product storage descriptions on the current shared-store truth', () => {
     const readme = read('README.md')
-    const product = read('轻画-产品设计文档.md')
+    // 2026-11-14 起产品设计文档按章分卷（docs/product/），断言改成读全部分卷，
+    // 判据不变：整份产品文档里仍然只能出现 shared-store 这套口径。
+    const product = readAll('docs/product')
 
     expect(readme).toContain('本地 0.1.17 安装包已构建并通过 release 壳自检')
     expect(readme).not.toContain('本轮未构建安装包')

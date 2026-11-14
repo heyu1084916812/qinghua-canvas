@@ -37,7 +37,7 @@ describe('limitsFor', () => {
   })
 
   it('keeps an un-split document on its frozen baseline', () => {
-    const rel = '轻画-产品设计文档.md'
+    const rel = '轻画-Agent设计文档.md'
     expect(LEGACY[rel]).toBeGreaterThan(0)
     expect(limitsFor(rel)).toEqual({ limit: LEGACY[rel], kind: '冻结基线' })
   })

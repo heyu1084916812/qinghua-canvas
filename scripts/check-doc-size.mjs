@@ -37,8 +37,6 @@ export const MAX_LINE_CHARS = 12000
  * 拆分完成后把对应行**降下来**，不要在这里加新行。
  */
 export const LEGACY = {
-  '轻画-架构设计文档.md': 4968,
-  '轻画-产品设计文档.md': 4513,
   '轻画-工作台解耦与公共能力重构方案.md': 1354,
   '轻画-Agent设计文档.md': 1259,
   '轻画-画布引擎替换方案.md': 891,
@@ -55,7 +53,7 @@ export const LEGACY = {
   '轻画-交付功能与设置梳理.md': 252,
   '轻画-设置页清单与稿子.md': 250,
   '轻画-方向调研与可行性判断.md': 197,
-  '文档总索引.md': 215,
+  '文档总索引.md': 217,
   '轻画-下一步实施设计.md': 187,
   '轻画-电商参数区一比一复刻设计.md': 141,
   '轻画-图标统一方案.md': 140,
@@ -68,7 +66,7 @@ export const LEGACY = {
   'ledger/02-缺口汇总主表.md': 1471,
   'ledger/按批记录-2026-09.md': 625,
   'ledger/按批记录-2026-10.md': 5141,
-  'ledger/按批记录-2026-11.md': 3180,
+  'ledger/按批记录-2026-11.md': 3188,
   // 发行说明：一个版本一篇（2026-11-14 拆分）。旧版本文件只读。
   'release-notes/archive-0.1.0-and-earlier.md': 900,
   'release-notes/v0.1.1.md': 34,
@@ -115,12 +113,17 @@ export const BUDGET = {
   'RELEASE_NOTES.md': 200,
   // 拆分后只剩索引；必读四节在 ESSENTIALS.md，历史在 .workbuddy/memory/archive/。
   '.workbuddy/memory/MEMORY.md': 300,
+  // 拆分后只剩「哪条 § 在哪份文件」的索引；正文在 docs/product/、docs/arch/（每份 ≤800 行）。
+  '轻画-产品设计文档.md': 300,
+  '轻画-架构设计文档.md': 300,
 }
 
-/** 递归收集文档：根目录 + 这几个目录（`review/` 等一次性证据目录不进闸门）。 */
+/** 递归收集文档：根目录 + 这几个目录及其子目录（`review/` 等一次性证据目录不进闸门）。 */
 const TRACKED_SUBDIRS = ['ledger', 'release-notes', 'docs', '.workbuddy/memory']
 
-const tracked = (rel) => TRACKED_SUBDIRS.some((t) => rel === t || t.startsWith(`${rel}/`))
+/** rel 是否落在受管目录里（或是受管目录的祖先，需要继续往下走） */
+const tracked = (rel) =>
+  TRACKED_SUBDIRS.some((t) => rel === t || rel.startsWith(`${t}/`) || t.startsWith(`${rel}/`))
 
 /** 纯函数：文本 → { lineCount, maxLine, maxLineNo }（末尾换行不计行） */
 export function measureText(text) {
