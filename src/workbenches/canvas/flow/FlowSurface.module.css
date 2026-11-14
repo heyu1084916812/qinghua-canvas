@@ -54,6 +54,30 @@
   contain-intrinsic-size: auto 240px 160px;
 }
 
+/*
+ * ★ 循环节点的节点外层**必须退出 content-visibility**（用户 2026-11-14：
+ *   「循环节点的参数点击后的浮层面板被遮住了」）。
+ *
+ * `content-visibility: auto` 除了「视口外跳过渲染」，还**常驻 paint containment**——
+ * 它把后代**裁剪到节点框**，且被裁掉的部分连点击都拿不到（命中测试一并被裁）。
+ * 这正是循环节点数字浮层的死因：浮层是从底栏向上浮出的 `position:absolute` 层，
+ * 宽 172 而触发器只有 67 ⇒ 天然越出节点框（实测：左溢 40px、上溢 29px，
+ * 节点两个通道都关时最明显）。上一个版本是在 `.body` 上放开 `overflow: clip`
+ * 来解决的（见 NodeFrame.module.css 的 `.body:has([data-loop-node])`），
+ * 但收不到效 —— 裁剪它的不是 `.body`，而是更高一层的 RF 节点包装。
+ * 实测（1440×900 / zoom=1）：只把这一层的 content-visibility 关掉，
+ * 8 个快捷档位 + 自定义输入从「1/2/3/4/5 点不到」变成**全部可点**。
+ *
+ * 为什么可以不心疼性能：这条只作用于**循环节点**（`[data-loop-node]`），
+ * 它是 240 宽的小参数卡，绘制成本与一张缩略图不在一个量级；
+ * 300 节点大画布的性能门禁（#1021）压的是图片节点的解码与绘制。
+ * 若以后还有别的节点要「画出框外」，别加例外清单 —— 让它自己也带上
+ * 一个「本节点会出框」的 data 锚点，再在这里平级补一条。
+ */
+.flow :global(.react-flow__node:has([data-loop-node])) {
+  content-visibility: visible;
+}
+
 /* 空格按住 = 平移模式（§6.3，与老表面同一套光标反馈） */
 .spaceMode {
   cursor: grab;

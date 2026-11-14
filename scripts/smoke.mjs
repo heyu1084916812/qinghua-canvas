@@ -11517,6 +11517,42 @@ async function g67(browser) {
   await node.locator('[data-loop-quick="count:3"]').waitFor({ state: 'visible', timeout: 5000 })
   const quickCount = await node.locator('[data-loop-quick^="count:"]').count()
   rec(g, '★ 数字控件点开后浮出快捷档位（复刻大雄）', quickCount >= 6, `${quickCount} 档`)
+  /**
+   * ★★ 用户 2026-11-14：「循环节点的参数点击后的浮层面板被遮住了」。
+   *
+   * 根因是**性能那一刀**：`content-visibility:auto`（2026-11-08 `872543e2` 为 300 节点
+   * 大画布加的）常驻 paint containment，把**越出节点框**的后代裁掉 —— 而浮层宽 172、
+   * 控件只有 67，天生要越出节点框（实测左溢 40px）。被裁掉的档位连**点击**都没有：
+   * 修复前实测 `batch:1 / batch:5` 点不到（左列整列失效），用户看到的就是「被遮住」。
+   *
+   * 判据用**命中测试**，不是「有没有这个元素」：每个档位、自定义输入、加号
+   * 都得是 `elementFromPoint(自己中心)` 拿到的那一个。这条断言在修复前是红的
+   * （`1 / 5` 两格拿不到），所以它能真的拦住回归。
+   */
+  const popoverHit = await node.evaluate((el) => {
+    const pop = el.querySelector('[data-loop-number-popover="count"]')
+    if (!pop) return { missing: true }
+    const hitSelf = (target) => {
+      const b = target.getBoundingClientRect()
+      const top = document.elementFromPoint(b.left + b.width / 2, b.top + b.height / 2)
+      return top === target || target.contains(top)
+    }
+    const failed = [...pop.querySelectorAll('[data-loop-quick]')]
+      .filter((cell) => !hitSelf(cell))
+      .map((cell) => cell.getAttribute('data-loop-quick'))
+    return {
+      failed,
+      custom: hitSelf(pop.querySelector('[data-loop-number-input="count"]')),
+      increment: hitSelf(pop.querySelector('[data-loop-number-increment="count"]')),
+      placement: pop.getAttribute('data-loop-popover-placement'),
+    }
+  })
+  rec(
+    g,
+    '★★ 浮层里每个档位 / 自定义 / 加号都能点到（不被节点框裁掉）',
+    !popoverHit.missing && popoverHit.failed.length === 0 && popoverHit.custom && popoverHit.increment,
+    popoverHit.missing ? '浮层没开' : JSON.stringify(popoverHit),
+  )
   /*
    * ★ 用户 2026-09-28：「那个加号的中心没有和圆形的中心一致，偏移了，
    *   xx 的符号好像也偏移了」。
@@ -11874,6 +11910,47 @@ async function g67(browser) {
     heightBothOff < heightBothOn - 100,
     `都开 ${heightBothOn} → 都关 ${heightBothOff}`,
   )
+  /**
+   * ★★ 最短节点（两个通道都关，只剩 164 高）时，浮层**改朝下弹**（用户 2026-11-14）。
+   *
+   * 控件上方只剩 86px，装不下 111 高的浮层；照旧朝上就会越过节点上沿，
+   * 而节点上沿之外是**节点标题排**（`FlowNodeHeaderLayer` 整层压在节点层之上）：
+   * 标题既画在浮层上、又把那一格点击吞掉（实测 `batch:2` 点不到）。
+   * 朝下时它落在节点下方的空白画布上，没有任何东西盖它。
+   *
+   * 判据仍是命中测试 + 方向锚点，两件都是用户会看到的事。
+   */
+  await page.mouse.move(60, 60)
+  await sleep(300)
+  await node.locator('[data-loop-number-trigger="batch"]').click()
+  await sleep(400)
+  const shortPopover = await node.evaluate((el) => {
+    const pop = el.querySelector('[data-loop-number-popover="batch"]')
+    if (!pop) return { missing: true }
+    const hitSelf = (target) => {
+      const b = target.getBoundingClientRect()
+      const top = document.elementFromPoint(b.left + b.width / 2, b.top + b.height / 2)
+      return top === target || target.contains(top)
+    }
+    return {
+      placement: pop.getAttribute('data-loop-popover-placement'),
+      failed: [...pop.querySelectorAll('[data-loop-quick]')]
+        .filter((cell) => !hitSelf(cell))
+        .map((cell) => cell.getAttribute('data-loop-quick')),
+      custom: hitSelf(pop.querySelector('[data-loop-number-input="batch"]')),
+    }
+  })
+  rec(
+    g,
+    '★★ 最短节点时浮层改朝下弹，8 个档位与自定义输入都点得到',
+    !shortPopover.missing &&
+      shortPopover.placement === 'below' &&
+      shortPopover.failed.length === 0 &&
+      shortPopover.custom,
+    shortPopover.missing ? '浮层没开' : JSON.stringify(shortPopover),
+  )
+  await page.keyboard.press('Escape')
+  await sleep(300)
   // 还原成两个都开（先把鼠标移开，让 hover 浮层收起，避免挡住开关）
   await page.mouse.move(60, 60)
   await sleep(300)
@@ -12327,13 +12404,25 @@ async function g67(browser) {
    * 只断言「节点数 +2」是不够的 —— 那正是上一版的状态：两个槽位算在同一格位、
    * 叠在一起，数量对了但用户看到的是「只有一个」。
    */
-  const layout2 = await page.evaluate(() => {
+  const nodeRows = await sharedRows(page, 'nodes')
+  const layout2 = await page.evaluate((rows) => {
+    /**
+     * ⚠️ 标题不在节点框里，而且**不是每个节点都有**：
+     * 2026-11-11 起标题由 `FlowNodeHeaderLayer` 画在节点框**外**（这样
+     * `content-visibility:auto` 的 paint containment 不会把它裁掉），那一层还会
+     * **只渲染可视区里的节点标题**。所以：
+     *  - `el.querySelector('[data-node-title]')` 恒为空（标题已不在框内）；
+     *  - 去 `[data-flow-node-header]` 那一层取也不稳（落在视口外的槽位没有标题 DOM）。
+     * 名字的真相在**库里**（这也是用户看到的名字最终来源），几何仍从 DOM 量。
+     */
+    const titles = new Map(rows.map((row) => [row.id, String(row.title ?? '').trim()]))
     const list = [...document.querySelectorAll('[data-node-id]')].map((el) => {
       const b = el.getBoundingClientRect()
+      const id = el.getAttribute('data-node-id')
       return {
-        id: el.getAttribute('data-node-id'),
+        id,
         type: el.getAttribute('data-node-type'),
-        title: el.querySelector('[data-node-title]')?.textContent ?? '',
+        title: titles.get(id) ?? '',
         left: Math.round(b.left),
         right: Math.round(b.right),
       }
@@ -12345,7 +12434,7 @@ async function g67(browser) {
      */
     const carriers = list.filter((n) => n.type === 'generation' && n.title !== '生成')
     return { gen, carriers }
-  })
+  }, nodeRows)
   rec(
     g,
     '★★ 普通画布出图按提示词自动命名，并保留同批序号',
@@ -12388,9 +12477,23 @@ async function g67(browser) {
   }
   await page.reload({ waitUntil: 'networkidle' })
   await sleep(1200)
-  const migratedTitles = await page
-    .locator('[data-node-type="generation"] [data-node-title]')
-    .evaluateAll((els) => els.map((el) => (el.textContent ?? '').trim()))
+  /**
+   * 界面侧的名字：标题层只渲染可视区内的节点，视口外的槽位没有标题 DOM，
+   * 所以这里既取 DOM（能取到就说明**用户真的看得见这个新名字**），
+   * 也留着库里的值做交叉比对 —— 判据只用库里的（真相），DOM 值进证据串。
+   */
+  const migratedTitles = await page.evaluate(() => {
+    const titles = new Map(
+      [...document.querySelectorAll('[data-flow-node-header]')].map((el) => [
+        el.getAttribute('data-flow-node-header'),
+        (el.querySelector('[data-node-title]')?.textContent ?? '').trim(),
+      ]),
+    )
+    return [...document.querySelectorAll('[data-node-id]')]
+      .filter((el) => el.getAttribute('data-node-type') === 'generation')
+      .map((el) => titles.get(el.getAttribute('data-node-id')) ?? '')
+      .filter(Boolean)
+  })
   const migratedDbTitles = (
     await Promise.all(legacyIds.map((id) => sharedRow(page, 'nodes', id)))
   ).map((row) => String(row?.title ?? ''))
@@ -12398,9 +12501,12 @@ async function g67(browser) {
     g,
     '★★★ 旧的 image 输出链刷新后按提示词成组修正并落库',
     legacyIds.length === 2 &&
-      migratedTitles.includes('狗狗体型缩小50%-01') &&
-      migratedTitles.includes('狗狗体型缩小50%-02') &&
-      migratedDbTitles.sort().join('|') === '狗狗体型缩小50%-01|狗狗体型缩小50%-02',
+      /* 真相在库里：两个承载节点必须成组改名 */
+      migratedDbTitles.sort().join('|') === '狗狗体型缩小50%-01|狗狗体型缩小50%-02' &&
+      /* 界面上**渲染出来的**名字一个都不许还是旧链式名（`生成` 是来源节点，本来就该叫这个） */
+      migratedTitles.length > 0 &&
+      migratedTitles.every((title) => title === '生成' || /^狗狗体型缩小50%-\d{2}$/.test(title)) &&
+      migratedTitles.some((title) => /^狗狗体型缩小50%-\d{2}$/.test(title)),
     `DOM=${migratedTitles.join('｜')}｜DB=${migratedDbTitles.join('｜')}`,
   )
 

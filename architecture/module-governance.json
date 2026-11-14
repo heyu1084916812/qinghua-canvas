@@ -634,6 +634,29 @@
       "budget": 160
     },
     {
+      "module": "src/ui/popoverPlacement.ts",
+      "owner": "ui-popover",
+      "responsibility": "浮层定位的纯几何：按触发控件、容器上沿与可视边界，算出该朝上还是朝下弹、以及左右要不要收进边界。不认识节点与画布，只吃矩形。",
+      "owns": [
+        "上下翻转判据",
+        "水平收进边界的位移"
+      ],
+      "doesNotOwn": [
+        "浮层的渲染与开合状态",
+        "节点 / 画布几何的采集"
+      ],
+      "publicApi": [
+        "placePopover",
+        "shiftIntoBounds",
+        "POPOVER_GAP",
+        "POPOVER_EDGE"
+      ],
+      "test": [
+        "src/ui/popoverPlacement.test.ts"
+      ],
+      "budget": 130
+    },
+    {
       "module": "src/domain/project/referencePalette.ts",
       "owner": "project-reference-curation-rules",
       "responsibility": "从 RGBA 像素本地统计参考图主色并输出 HEX 与占比，生成写进参考卡的色值句。",

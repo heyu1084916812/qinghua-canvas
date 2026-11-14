@@ -42,6 +42,7 @@ import { TokenEditor, type TokenEditorHandle } from '../../text/TokenEditor'
 import { Icon, Image, Plus, TextCursor, X } from '../../../../ui/icon'
 import styles from './LoopNodeView.module.css'
 import { loopImageStatusText } from '../../../../domain/canvas/loop/loopImageStatus'
+import { placePopover } from '../../../../ui/popoverPlacement'
 
 /**
  * 数字控件的快捷档位（照抄大雄的 `quick:[1,2,3,4,5,6,8,10]`）。
@@ -50,6 +51,7 @@ import { loopImageStatusText } from '../../../../domain/canvas/loop/loopImageSta
  * 档位也照顾到「每轮 6 / 8 / 10 张」这类批量场景。
  */
 const QUICK_VALUES = [1, 2, 3, 4, 5, 6, 8, 10] as const
+
 
 export function LoopNodeView(props: NodeViewProps) {
   const data = props.node.data as LoopData
@@ -510,6 +512,20 @@ function NumberControl({
   const [shownValue, setShownValue] = useState(value)
   const [draft, setDraft] = useState(String(value))
   const rootRef = useRef<HTMLDivElement | null>(null)
+  const popRef = useRef<HTMLDivElement | null>(null)
+  /**
+   * 浮层朝**下**弹（默认朝上）。
+   *
+   * 为什么要分方向（用户 2026-11-14：「循环节点的参数点击后的浮层面板被遮住了」）：
+   * 浮层是从控件向上浮出的 `position:absolute` 层，高 111 —— 节点一旦变矮
+   * （两个通道都关时节点只有 164 高，控件上方只剩 86），它就会**越过节点上沿**。
+   * 而上沿之外是**节点标题排**（`FlowNodeHeaderLayer`，它整层压在节点层之上）：
+   * 标题文字既会画在浮层上，又会把那一格点击吞掉（实测 `batch:2` 点不到）。
+   * 下方没有这层东西，所以「装不下就往下弹」是唯一既不遮、也不裁的选择。
+   */
+  const [below, setBelow] = useState(false)
+  /** 水平方向收进画布视口所需的位移（世界坐标，直接当 margin-left 用） */
+  const [shiftX, setShiftX] = useState(0)
 
   /** 自定义输入的上限：1–99（档位固定到 10，见上面的说明） */
   const CUSTOM_MAX = 99
@@ -553,6 +569,41 @@ function NumberControl({
   const draftBase =
     draft.trim() && Number.isFinite(Number(draft)) ? Number(draft) : shownValue
   const canIncrement = clampValue(draftBase + 1) !== clampValue(draftBase)
+
+  /**
+   * 打开时量一次「上方还剩多少、左右还剩多少」，定下浮层朝哪边弹、要不要横着挪。
+   *
+   * 用 `useLayoutEffect`：在浏览器绘制前定下来，不会先朝上弹一帧再跳下来。
+   * 判据的数学在 `placePopover`（`ui/popoverPlacement`，纯函数，有单测），这里只量矩形：
+   * `ceiling` = 节点框（上沿之上是标题排，不能越过去）、`bounds` = 画布视口。
+   */
+  useLayoutEffect(() => {
+    if (!open) {
+      setBelow(false)
+      setShiftX(0)
+      return
+    }
+    const root = rootRef.current
+    const pop = popRef.current
+    const trigger = root?.querySelector('[data-loop-number-trigger]') as HTMLElement | null
+    const node = root?.closest('[data-node-id]')
+    const surface = root?.closest('[data-canvas-surface]')
+    if (!root || !pop || !trigger || !node || !surface) return
+    const triggerRect = trigger.getBoundingClientRect()
+    /** 画布缩放：按钮的屏幕高 ÷ 它的布局高（与 ParamPicker 同一个口径，不猜常量） */
+    const zoom = trigger.offsetHeight > 0 ? triggerRect.height / trigger.offsetHeight : 1
+    const placement = placePopover(
+      {
+        anchor: triggerRect,
+        ceiling: node.getBoundingClientRect(),
+        bounds: surface.getBoundingClientRect(),
+        popover: pop.getBoundingClientRect(),
+      },
+      zoom,
+    )
+    setBelow(placement.below)
+    setShiftX(placement.shiftX)
+  }, [open, dataKey])
 
   /**
    * 点外部关闭。
@@ -599,7 +650,15 @@ function NumberControl({
         <strong data-loop-number={dataKey}>{shownValue}</strong>
       </button>
       {open && (
-        <div className={styles.numPopover} data-loop-number-popover={dataKey}>
+        <div
+          ref={popRef}
+          className={below ? `${styles.numPopover} ${styles.numPopoverBelow}` : styles.numPopover}
+          data-loop-number-popover={dataKey}
+          /* 只读方向锚点：探针 / 冒烟按它断言「装不下时没有越过节点上沿」 */
+          data-loop-popover-placement={below ? 'below' : 'above'}
+          /* 左右收进画布视口（世界坐标位移；transform 归居中与入场动画所有） */
+          style={shiftX ? { marginLeft: `${shiftX}px` } : undefined}
+        >
           <div className={styles.numGrid}>
             {QUICK_VALUES.filter((v) => v <= max).map((v) => (
               <button

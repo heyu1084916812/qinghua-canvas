@@ -715,6 +715,21 @@
   transform: translateX(-50%);
 }
 
+/*
+ * 装不下时朝下弹（方向由 `LoopNodeView` 量出来，见 `.numPopover` 与组件里 `below` 的说明）。
+ *
+ * 为什么不再死守「一律朝上」：朝上时浮层会越过节点上沿，而节点上沿之外是
+ * **节点标题排**（`FlowNodeHeaderLayer` 整层压在节点层之上）—— 标题既画在浮层上，
+ * 又把那一格的点击吞掉（实测「批次」在最短节点下 `batch:2` 点不到）。
+ * 朝下时它落在节点下方的空白画布上，没有任何东西盖它。
+ *
+ * 间距仍是 4px，与 `POPOVER_GAP` 成对；改一处必须改另一处。
+ */
+.numPopoverBelow {
+  top: calc(100% + 4px);
+  bottom: auto;
+}
+
 .numGrid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);

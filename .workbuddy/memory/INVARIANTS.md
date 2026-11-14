@@ -1155,7 +1155,7 @@
 
 ## 真实图片视口外内容与 CLI 残余边界（2026-11-08 第十四轮）
 
-- `FlowSurface.module.css` 的 `.flow :global(.react-flow__node)` 必须保留 `content-visibility:auto` + `contain-intrinsic-size`。该属性同时建立 paint containment，所以标题 / 像素统一由 React Flow 外的 `FlowNodeHeaderLayer` 绘制：名称左上、像素右上，均位于节点框外；`NodeFrame` 不得再为标题预留内部 padding。顶层、批量/分组容器及其子节点必须共用同一套标签几何。
+- `FlowSurface.module.css` 的 `.flow :global(.react-flow__node)` 必须保留 `content-visibility:auto` + `contain-intrinsic-size`。该属性同时建立 paint containment，所以标题 / 像素统一由 React Flow 外的 `FlowNodeHeaderLayer` 绘制：名称左上、像素右上，均位于节点框外；`NodeFrame` 不得再为标题预留内部 padding。顶层、批量/分组容器及其子节点必须共用同一套标签几何。**唯一例外（2026-11-14 #1100）**：会画出节点框的节点类型（`:has([data-loop-node])`）必须在同一份 CSS 里退出 `content-visibility` —— paint containment 是常驻的、被裁的后代连 `elementFromPoint` 都拿不到，循环节点数字浮层（宽 172 / 控件 67）因此整列点不到；给新节点类型加出框浮层时照此平级补一条带注释的规则，不要往例外清单里硬塞。
 - 性能判定只看正式 `npm run perf:canvas:production`：150 张图片必须全部 rendered/decoded、300/500 全挂载、P95 ≤20ms、page/console error 0。两次当前 release 报告均已通过；隐藏元素/诊断探针不得写成正式验收。
 - `diagnose-canvas-images.mjs` 必须每轮 reload 并只保留一条 style，避免 cumulative CSS 污染读数；`run-canvas-image-diagnosis.mjs` 只启动并清理自己的 app pid，端口保留集合是 1420/18765/18766/18791。
 - CLI 死控件、cwd、运行 id、按 id `cli.kill` 和浏览器禁用提示已有证据；真实已登录 CLI、进程树终止、媒体导出、清空 `statusArgs` 后自动查状态以及窗口结束后自动重检仍属 #972，不得把图三判成全完成。
