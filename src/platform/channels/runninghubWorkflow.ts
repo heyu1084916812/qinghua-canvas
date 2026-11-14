@@ -1,4 +1,4 @@
-import { parseAppNodeInfoList } from '../../domain/project/workflowAppParams'
+import { parseAppMeta, parseAppNodeInfoList, type WorkflowAppMeta } from '../../domain/project/workflowAppParams'
 import { parseWorkflowJsonToFields, type WorkflowParamField } from '../../domain/project/workflowParams'
 import { prepareModelImageInput } from './chatImageInput'
 import type { NetworkResponse, PlatformKit } from '../ports'
@@ -182,13 +182,13 @@ export async function fetchWorkflowFields(
   return fields
 }
 
-/** AI 应用 → 字段表（**默认全部暴露**：应用返回的就是作者开放的那几个） */
-export async function fetchAppFields(
+/** 一次抓齐：应用元信息（名称 / 封面）+ 可改字段。设置页「填 id 就保存」就调这一个。 */
+export async function fetchAppBundle(
   deps: Pick<PlatformKit, 'network'>,
   endpoint: WorkflowEndpoint,
   webappId: string,
   signal: AbortSignal,
-): Promise<WorkflowParamField[]> {
+): Promise<{ meta: WorkflowAppMeta; fields: WorkflowParamField[] }> {
   const res = await deps.network.request(
     {
       url: `${hostOf(endpoint)}${APP_NODE_PATH}?apiKey=${encodeURIComponent(endpoint.apiKey)}&webappId=${encodeURIComponent(webappId)}`,
@@ -200,17 +200,33 @@ export async function fetchAppFields(
   const envelope = await readJson(res)
   if (res.status >= 400) throw httpError(res.status, await res.text())
   if (envelope.code !== 0) {
-    throw new ChannelError({ kind: 'http', status: 400, body: failureOf(envelope, '拉取应用参数失败') })
+    throw new ChannelError({ kind: 'http', status: 400, body: failureOf(envelope, '拉取应用失败') })
   }
   const data = (envelope.data ?? {}) as { nodeInfoList?: unknown }
+  const meta = parseAppMeta(data)
   const fields = parseAppNodeInfoList(data.nodeInfoList)
   if (fields.length === 0) {
-    throw new ChannelError({
-      kind: 'channel',
-      detail: 'unsupported',
-    })
+    /** 官方口径：没有可改节点 = 这个应用还没在网页端成功跑过一次 */
+    throw new ChannelError({ kind: 'channel', detail: 'unsupported' })
   }
-  return fields
+  return { meta, fields }
+}
+
+
+/**
+ * AI 应用 → 只要字段表（设置页 / 节点都用不到封面时走这条）。
+ *
+ * **刻意委托给 `fetchAppBundle`**：两条路各写一份"怎么拉、怎么判空"的实现，
+ * 迟早会漂移成"设置页能拉到、节点上拉不到"这种最难查的故障。
+ */
+export async function fetchAppFields(
+  deps: Pick<PlatformKit, 'network'>,
+  endpoint: WorkflowEndpoint,
+  webappId: string,
+  signal: AbortSignal,
+): Promise<WorkflowParamField[]> {
+  const bundle = await fetchAppBundle(deps, endpoint, webappId, signal)
+  return bundle.fields
 }
 
 /**

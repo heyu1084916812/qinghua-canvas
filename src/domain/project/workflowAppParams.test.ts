@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { parseAppFieldData, parseAppNodeInfoList } from './workflowAppParams'
+import { parseAppFieldData, parseAppMeta, parseAppNodeInfoList } from './workflowAppParams'
 
 /**
  * 夹具照 **真机返回体**抄（2026-11-14 实测，`GET /api/webapp/apiCallDemo`）：
@@ -135,5 +135,32 @@ describe('parseAppNodeInfoList', () => {
   it('不是数组时回空（坏响应不该让面板炸）', () => {
     expect(parseAppNodeInfoList(null)).toEqual([])
     expect(parseAppNodeInfoList({})).toEqual([])
+  })
+})
+
+describe('parseAppMeta（填 id 抓回来要存的东西）', () => {
+  it('名称 / 封面（优先缩略图）/ 说明 / 加密标记都取到', () => {
+    const meta = parseAppMeta({
+      webappName: '文生图（麦橘Flux模型）',
+      description: '<p>说明</p>',
+      accessEncrypted: true,
+      covers: [{ url: 'https://a/big.png', thumbnailUri: 'https://a/thumb.png' }],
+    })
+    expect(meta).toEqual({
+      title: '文生图（麦橘Flux模型）',
+      coverUrl: 'https://a/thumb.png',
+      description: '<p>说明</p>',
+      accessEncrypted: true,
+    })
+  })
+
+  it('坏响应一律给空值，不抛（保存一个残缺应用也不该让设置页炸）', () => {
+    expect(parseAppMeta(null)).toEqual({
+      title: '',
+      coverUrl: '',
+      description: '',
+      accessEncrypted: false,
+    })
+    expect(parseAppMeta({ covers: [{ url: 'https://a/b.png' }] }).coverUrl).toBe('https://a/b.png')
   })
 })

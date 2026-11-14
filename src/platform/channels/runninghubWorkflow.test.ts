@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { NetworkRequest, NetworkResponse } from '../ports'
 import {
+  fetchAppBundle,
   fetchAppFields,
   fetchWorkflowFields,
   queryWorkflowTask,
@@ -251,5 +252,61 @@ describe('uploadWorkflowAsset', () => {
     await expect(
       uploadWorkflowAsset(deps, endpoint, { bytes: new Uint8Array([1]), mime: 'image/png' }, 'a.png', signal),
     ).rejects.toBeInstanceOf(ChannelError)
+  })
+})
+
+describe('fetchAppBundle（填 id 就抓：名称 + 封面 + 参数）', () => {
+  const liveData = {
+    webappName: '文生图（麦橘Flux模型）',
+    description: '<p>说明</p>',
+    descriptionEn: '<p>desc</p>',
+    accessEncrypted: false,
+    covers: [
+      {
+        url: 'https://rh-images.example/big.png',
+        thumbnailUri: 'https://rh-images.example/thumb.png',
+        imageWidth: '1104',
+        imageHeight: '1472',
+      },
+    ],
+    nodeInfoList: [
+      {
+        nodeId: '122',
+        nodeName: 'SeargePromptText',
+        fieldName: 'prompt',
+        fieldValue: '女孩',
+        fieldType: 'STRING',
+        fieldData: '["STRING", {"default": "", "multiline": true}]',
+        description: 'prompt提示词',
+      },
+    ],
+  }
+
+  it('★ 一次拿到元信息（名称 / 封面优先缩略图）与字段表', async () => {
+    const { deps, calls } = fakeNet(() => ({ body: { code: 0, data: liveData } }))
+    const bundle = await fetchAppBundle(deps, endpoint, '1877265245566922753', signal)
+    expect(calls[0]?.url).toContain('webappId=1877265245566922753')
+    expect(bundle.meta).toEqual({
+      title: '文生图（麦橘Flux模型）',
+      coverUrl: 'https://rh-images.example/thumb.png',
+      description: '<p>说明</p>',
+      accessEncrypted: false,
+    })
+    expect(bundle.fields.map((field) => field.id)).toEqual(['122::prompt'])
+    expect(bundle.fields[0]?.label).toBe('prompt提示词')
+  })
+
+  it('没有 thumbnailUri 时回落 covers[0].url', async () => {
+    const { deps } = fakeNet(() => ({
+      body: { code: 0, data: { webappName: 'x', covers: [{ url: 'https://a/big.png' }], nodeInfoList: liveData.nodeInfoList } },
+    }))
+    const bundle = await fetchAppBundle(deps, endpoint, '1', signal)
+    expect(bundle.meta.coverUrl).toBe('https://a/big.png')
+    expect(bundle.meta.accessEncrypted).toBe(false)
+  })
+
+  it('没有可改节点的应用：抛 unsupported（提示先在网页端跑一次）', async () => {
+    const { deps } = fakeNet(() => ({ body: { code: 0, data: { webappName: 'x', nodeInfoList: [] } } }))
+    expect(await errorBodyOf(fetchAppBundle(deps, endpoint, '1', signal))).toBe('unsupported')
   })
 })

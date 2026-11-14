@@ -108,13 +108,20 @@ export interface WorkflowParamField {
 
 /** 工作流渠道里的一个条目（= 节点模型下拉里的一行） */
 export interface WorkflowEntry {
-  /** RunningHub 的 workflowId（本地 ComfyUI 时是工作流文件名 / 标识） */
+  /** RunningHub 的 workflowId / AI 应用的 webappId（本地 ComfyUI 时是工作流文件名 / 标识） */
   id: string
   title: string
   provider: WorkflowProviderKind
   fields: WorkflowParamField[]
   /** 最近一次拉到参数的时间（毫秒）；0 = 从没拉过 */
   fetchedAt: number
+  /**
+   * 封面图地址（只有 AI 应用有 —— `apiCallDemo` 的 `covers[]`）。
+   *
+   * 存下来而不每次现拉：条目清单在设置页要能"一眼认出是哪个应用"，
+   * 而拉一次封面要一次网络请求 + 上游那张图可能很大（`thumbnailUri` 更小，但都要联网）。
+   */
+  coverUrl?: string
 }
 
 /**
@@ -345,12 +352,14 @@ export function normalizeWorkflowEntries(raw: unknown): WorkflowEntry[] {
           .map((field) => normalizeWorkflowField(field))
           .filter((field): field is WorkflowParamField => field !== null)
       : []
+    const coverUrl = str(record.coverUrl).trim()
     out.push({
       id,
       title: str(record.title).trim() || id,
       provider,
       fields,
       fetchedAt: Number.isFinite(Number(record.fetchedAt)) ? Number(record.fetchedAt) : 0,
+      ...(coverUrl ? { coverUrl } : {}),
     })
   }
   return out

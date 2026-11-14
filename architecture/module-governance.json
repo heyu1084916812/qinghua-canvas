@@ -743,7 +743,7 @@
         "HTTP 请求",
         "参数面板渲染"
       ],
-      "publicApi": ["parseAppNodeInfoList", "parseAppFieldData"],
+      "publicApi": ["parseAppNodeInfoList", "parseAppFieldData", "parseAppMeta", "WorkflowAppMeta"],
       "test": ["src/domain/project/workflowAppParams.test.ts"],
       "budget": 200
     },

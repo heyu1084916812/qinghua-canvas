@@ -131,3 +131,36 @@ export function parseAppNodeInfoList(items: unknown): WorkflowParamField[] {
   }
   return out
 }
+
+export interface WorkflowAppMeta {
+  /** 应用名（`webappName`），设置页与生成节点都用它当标题 */
+  title: string
+  /** 封面：优先 `covers[0].thumbnailUri`（小图），没有就 `covers[0].url` */
+  coverUrl: string
+  /** 作者写的说明（HTML 富文本，**原样存**，渲染时再决定要不要显示） */
+  description: string
+  /** 加密应用的参数值可能另有约定 —— 如实存下来，别假装没有这回事 */
+  accessEncrypted: boolean
+}
+
+/**
+ * `apiCallDemo` 的 `data` → 应用元信息（用户 2026-11-14：**填 id 就能抓取到应用、保存好，
+ * 要有封面以及里面的参数**）。
+ *
+ * 真机返回体的相关键（2026-11-14 实测）：
+ * `webappName` / `covers[{url, thumbnailUri, imageWidth, imageHeight}]` / `description` /
+ * `descriptionEn` / `accessEncrypted` / `tags[]` / `statisticsInfo{useCount, likeCount…}`。
+ */
+export function parseAppMeta(data: unknown): WorkflowAppMeta {
+  const record = (data && typeof data === 'object' ? data : {}) as Record<string, unknown>
+  const covers = Array.isArray(record.covers) ? record.covers : []
+  const first = (covers[0] && typeof covers[0] === 'object' ? covers[0] : {}) as Record<string, unknown>
+  /** 缩略图优先：设置页只是"认个脸"，没必要为首屏拉整张大图 */
+  const coverUrl = asText(first.thumbnailUri).trim() || asText(first.url).trim()
+  return {
+    title: asText(record.webappName).trim() || asText(record.workflowName).trim(),
+    coverUrl,
+    description: asText(record.description).trim() || asText(record.descriptionEn).trim(),
+    accessEncrypted: record.accessEncrypted === true,
+  }
+}
