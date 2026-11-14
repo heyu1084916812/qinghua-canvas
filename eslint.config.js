@@ -19,6 +19,8 @@ const ICON_KEEP = [
   'src/workbenches/canvas/flow/FlowCoarseEdgeLayer.tsx',
   'src/workbenches/canvas/flow/FlowDraftLayer.tsx',
   'src/workbenches/canvas/flow/FlowSnapLayer.tsx',
+  // 工作流节点图的连线层：每条线对应上游 JSON 的一条 inputs 连线，同样是数据可视化而非图标
+  'src/features/settings/WorkflowGraphEdges.tsx',
   'src/workbenches/canvas/icons/presetGlyph.tsx',
   // 生成节点的「素材交换」徽标是用户指定形状（两根圆角轴 + 实心头，上下镜像），换库会破坏既有几何测试
   'src/workbenches/canvas/nodes/generation/GenerationNodeView.tsx',

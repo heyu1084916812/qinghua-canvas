@@ -218,6 +218,27 @@
   grid-template-columns: minmax(0, 1fr);
 }
 
+/* 有节点图时：上方信息排成一行，下方整行留给图 */
+.editor[data-graph='on'] {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.editor[data-graph='on'] > .previewPane {
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: flex-start;
+}
+
+.editor[data-graph='on'] > .previewPane > .field {
+  flex: 1 1 200px;
+  min-width: 0;
+}
+
+.editor[data-graph='on'] > .previewPane > .countRow {
+  flex: 0 0 auto;
+  align-self: flex-end;
+}
+
 .previewPane {
   display: flex;
   flex-direction: column;
@@ -329,6 +350,14 @@
   gap: var(--space-2);
   max-height: 320px;
   overflow-y: auto;
+}
+
+/*
+ * `hidden` 属性必须真的隐身：`.groupList` 自己声明了 `display:flex`，
+ * 会盖掉浏览器默认的 `[hidden]{display:none}` —— 有节点图时清单会从图底下冒出来。
+ */
+.groupList[hidden] {
+  display: none;
 }
 
 .group {

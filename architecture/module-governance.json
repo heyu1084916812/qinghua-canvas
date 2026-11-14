@@ -11551,7 +11551,7 @@
       "test": [
         "src/features/settings/SettingsWorkflowManager.test.ts"
       ],
-      "budget": 560
+      "budget": 600
     },
     {
       "module": "src/platform/channels/runninghubAccount.ts",
@@ -11772,7 +11772,7 @@
         "workflowSummaryLabel"
       ],
       "test": [
-        "src/workbenches/canvas/panels/creation/creationWorkflowMode.test.ts"
+        "src/workbenches/canvas/panels/creation/WorkflowParameterControls.test.ts"
       ],
       "budget": 380
     },
@@ -11798,6 +11798,117 @@
         "src/features/settings/SettingsWorkflowManager.test.ts"
       ],
       "budget": 450
+    },
+    {
+      "module": "src/domain/project/workflowGraph.ts",
+      "owner": "canvas-creation-ui",
+      "responsibility": "工作流节点图：从 workflow JSON 抽节点与连线、按依赖深度自动分层布局、取输出节点、归一化快照。",
+      "owns": [
+        "节点/连线抽取",
+        "自动布局（分层 + 重心排序）",
+        "输出节点判定",
+        "图的归一化"
+      ],
+      "doesNotOwn": [
+        "参数类型推断（workflowParams）",
+        "网络请求",
+        "节点图的绘制与交互"
+      ],
+      "publicApi": [
+        "WorkflowGraph",
+        "WorkflowGraphNode",
+        "WorkflowGraphEdge",
+        "buildWorkflowGraph",
+        "layoutWorkflowGraph",
+        "workflowOutputNodeIds",
+        "normalizeWorkflowGraph",
+        "isWorkflowLinkValue"
+      ],
+      "test": [
+        "src/domain/project/workflowGraph.test.ts"
+      ],
+      "budget": 280
+    },
+    {
+      "module": "src/features/settings/WorkflowFieldRow.tsx",
+      "owner": "settings-ui",
+      "responsibility": "一个工作流参数的可编辑行：暴露开关 / 显示名 / 控件类型 / 候选值 / 范围 / 图序 / 随机 / 必填。",
+      "owns": [
+        "单个参数字段的编辑控件"
+      ],
+      "doesNotOwn": [
+        "字段表持久化",
+        "分组与批量操作",
+        "节点图布局"
+      ],
+      "publicApi": [
+        "WorkflowFieldRow"
+      ],
+      "test": [
+        "src/features/settings/WorkflowGraphView.test.ts"
+      ],
+      "budget": 160
+    },
+    {
+      "module": "src/features/settings/WorkflowGraphView.tsx",
+      "owner": "settings-ui",
+      "responsibility": "工作流节点图视图：自适应缩放、拖动平移、点节点弹出该节点参数（复用 WorkflowFieldRow）。",
+      "owns": [
+        "节点图绘制与选中态",
+        "节点弹层定位与点外关闭",
+        "视图缩放/平移"
+      ],
+      "doesNotOwn": [
+        "布局算法（workflowGraph）",
+        "字段编辑控件",
+        "条目持久化与保存"
+      ],
+      "publicApi": [
+        "WorkflowGraphView"
+      ],
+      "test": [
+        "src/features/settings/WorkflowGraphView.test.ts"
+      ],
+      "budget": 300
+    },
+    {
+      "module": "src/features/settings/WorkflowGraphView.module.css",
+      "owner": "settings-ui",
+      "responsibility": "节点图与节点弹层的局部样式（1px 描边、无投影、悬停底色，全部走令牌）。",
+      "owns": [
+        "节点/连线/弹层样式"
+      ],
+      "doesNotOwn": [
+        "主题令牌定义",
+        "参数行样式（SettingsWorkflowEntries）"
+      ],
+      "publicApi": [
+        "CSS_MODULE:节点图（viewport / node / edges / popup）"
+      ],
+      "test": [
+        "src/features/settings/WorkflowGraphView.test.ts"
+      ],
+      "budget": 260
+    },
+    {
+      "module": "src/features/settings/WorkflowGraphEdges.tsx",
+      "owner": "settings-ui",
+      "responsibility": "工作流节点图的连线层：按布局把每条 inputs 连线画成一条三次贝塞尔（数据可视化，按图标方案 §6 保留手写 SVG）。",
+      "owns": [
+        "连线绘制"
+      ],
+      "doesNotOwn": [
+        "布局计算（workflowGraph）",
+        "节点与弹层",
+        "主题令牌定义"
+      ],
+      "publicApi": [
+        "WorkflowGraphEdges"
+      ],
+      "test": [
+        "src/features/settings/WorkflowGraphView.test.ts"
+      ],
+      "budget": 120
     }
   ]
 }

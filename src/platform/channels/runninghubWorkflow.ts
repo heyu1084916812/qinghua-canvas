@@ -1,5 +1,6 @@
 import { parseAppMeta, parseAppNodeInfoList, type WorkflowAppMeta } from '../../domain/project/workflowAppParams'
 import { parseWorkflowJsonToFields, type WorkflowParamField } from '../../domain/project/workflowParams'
+import { buildWorkflowGraph, type WorkflowGraph } from '../../domain/project/workflowGraph'
 import { prepareModelImageInput } from './chatImageInput'
 import type { NetworkResponse, PlatformKit } from '../ports'
 import { ChannelError } from './types'
@@ -148,6 +149,22 @@ export async function fetchWorkflowFields(
   workflowId: string,
   signal: AbortSignal,
 ): Promise<WorkflowParamField[]> {
+  const bundle = await fetchWorkflowBundle(deps, endpoint, workflowId, signal)
+  return bundle.fields
+}
+
+/**
+ * 一次拉齐「字段表 + 节点图」。
+ *
+ * 同一个响应里两样东西都在（`data.prompt` 就是整份图），分成两次请求纯属浪费；
+ * 节点图给设置页画（#1116 ②），字段表给节点/暴露开关用。
+ */
+export async function fetchWorkflowBundle(
+  deps: Pick<PlatformKit, 'network'>,
+  endpoint: WorkflowEndpoint,
+  workflowId: string,
+  signal: AbortSignal,
+): Promise<{ fields: WorkflowParamField[]; graph: WorkflowGraph }> {
   const envelope = await postJson(
     deps,
     endpoint,
@@ -179,7 +196,7 @@ export async function fetchWorkflowFields(
       raw: '这个工作流没有可改参数（可能还没在网页端成功跑过一次，或全部输入都是连线）',
     })
   }
-  return fields
+  return { fields, graph: buildWorkflowGraph(workflowJson) }
 }
 
 /** 一次抓齐：应用元信息（名称 / 封面）+ 可改字段。设置页「填 id 就保存」就调这一个。 */

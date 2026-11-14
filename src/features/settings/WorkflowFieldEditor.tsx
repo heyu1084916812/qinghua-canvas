@@ -1,11 +1,9 @@
 import { useMemo, useState } from 'react'
 import type { WorkflowEntry, WorkflowParamField, WorkflowParamType } from '../../domain/project/workflowParams'
-import {
-  withKnownOptions,
-  WORKFLOW_FIELD_TYPES,
-  workflowFieldTypeLabel,
-} from '../../domain/project/workflowFieldKinds'
+import { withKnownOptions } from '../../domain/project/workflowFieldKinds'
 import styles from './SettingsWorkflowEntries.module.css'
+import { WorkflowFieldRow } from './WorkflowFieldRow'
+import { WorkflowGraphView } from './WorkflowGraphView'
 
 /**
  * 工作流条目的「参数暴露 / 隐藏」编辑器（对账 #1106）。
@@ -119,6 +117,10 @@ export function WorkflowFieldEditor({
 }: WorkflowFieldEditorProps) {
   const [draft, setDraft] = useState<WorkflowParamField[]>(() => withKnownOptions(entry.fields))
   const [closedGroups, setClosedGroups] = useState<Set<string>>(new Set())
+  /** 节点图 / 参数清单两种看法（有图默认看图 —— 参考产品那一格就是图） */
+  const [listMode, setListMode] = useState(false)
+  const [selectedNode, setSelectedNode] = useState<string | null>(null)
+  const graph = entry.graph && entry.graph.nodes.length > 0 ? entry.graph : null
 
   const enabled = useMemo(() => sortFields(draft.filter((field) => field.enabled)), [draft])
   const groups = useMemo(() => {
@@ -158,6 +160,11 @@ export function WorkflowFieldEditor({
       <div className={styles.fieldPane}>
         <div className={styles.fieldHead}>
           <span className={styles.marketTitle}>参数（{draft.length}）· 已暴露 {enabled.length}</span>
+          {graph ? (
+            <button type="button" className={styles.linkBtn} onClick={() => setListMode((value) => !value)}>
+              {listMode ? '按节点图看' : '按清单看'}
+            </button>
+          ) : null}
           <button type="button" className={styles.linkBtn} onClick={() => setAll(true)}>
             全部暴露
           </button>
@@ -166,7 +173,17 @@ export function WorkflowFieldEditor({
           </button>
         </div>
 
-        <div className={styles.groupList}>
+        {graph && !listMode ? (
+          <WorkflowGraphView
+            graph={graph}
+            fields={draft}
+            selectedId={selectedNode}
+            onSelect={setSelectedNode}
+            onPatch={patch}
+          />
+        ) : null}
+
+        <div className={styles.groupList} hidden={Boolean(graph) && !listMode}>
           {groups.map(([group, fields]) => {
             const open = !closedGroups.has(group)
             return (
@@ -186,118 +203,7 @@ export function WorkflowFieldEditor({
                   {open ? '▾' : '▸'} {group}（{fields.length}）
                 </button>
                 {open
-                  ? fields.map((field) => (
-                      <div key={field.id} className={styles.fieldRow} data-workflow-field={field.id}>
-                        <label className={styles.fieldToggle}>
-                          <input
-                            type="checkbox"
-                            checked={field.enabled}
-                            onChange={(event) => patch(field.id, { enabled: event.target.checked })}
-                          />
-                          <span className={styles.fieldName}>{field.label || field.fieldName}</span>
-                        </label>
-                        <div className={styles.fieldControls}>
-                          <input
-                            className={styles.inputSm}
-                            value={field.label}
-                            placeholder="显示名"
-                            onChange={(event) => patch(field.id, { label: event.target.value })}
-                          />
-                          <select
-                            className={styles.selectSm}
-                            value={field.type}
-                            onChange={(event) =>
-                              patch(field.id, { type: event.target.value as WorkflowParamType })
-                            }
-                          >
-                            {WORKFLOW_FIELD_TYPES.map((type) => (
-                              <option key={type} value={type}>
-                                {workflowFieldTypeLabel(type)}
-                              </option>
-                            ))}
-                          </select>
-                          {field.type === 'select' ? (
-                            <input
-                              className={styles.inputSm}
-                              value={field.options.join(', ')}
-                              placeholder="候选值，逗号分隔"
-                              onChange={(event) =>
-                                patch(field.id, {
-                                  options: event.target.value
-                                    .split(/[,，\n]/)
-                                    .map((item) => item.trim())
-                                    .filter(Boolean),
-                                })
-                              }
-                            />
-                          ) : null}
-                          {field.type === 'number' ? (
-                            <>
-                              <input
-                                className={styles.numSm}
-                                value={field.min ?? ''}
-                                placeholder="min"
-                                onChange={(event) =>
-                                  patch(field.id, {
-                                    min: event.target.value === '' ? null : Number(event.target.value),
-                                  })
-                                }
-                              />
-                              <input
-                                className={styles.numSm}
-                                value={field.max ?? ''}
-                                placeholder="max"
-                                onChange={(event) =>
-                                  patch(field.id, {
-                                    max: event.target.value === '' ? null : Number(event.target.value),
-                                  })
-                                }
-                              />
-                              <input
-                                className={styles.numSm}
-                                value={field.step ?? ''}
-                                placeholder="step"
-                                onChange={(event) =>
-                                  patch(field.id, {
-                                    step: event.target.value === '' ? null : Number(event.target.value),
-                                  })
-                                }
-                              />
-                            </>
-                          ) : null}
-                          {isMedia(field.type) ? (
-                            <input
-                              className={styles.numSm}
-                              type="number"
-                              min={1}
-                              value={field.mediaOrder || 1}
-                              title="图序"
-                              onChange={(event) =>
-                                patch(field.id, {
-                                  mediaOrder: Math.max(1, Number(event.target.value) || 1),
-                                })
-                              }
-                            />
-                          ) : null}
-                          <label className={styles.miniToggle}>
-                            <input
-                              type="checkbox"
-                              checked={field.seed}
-                              onChange={(event) => patch(field.id, { seed: event.target.checked })}
-                            />
-                            随机
-                          </label>
-                          <label className={styles.miniToggle}>
-                            <input
-                              type="checkbox"
-                              checked={field.required}
-                              onChange={(event) => patch(field.id, { required: event.target.checked })}
-                            />
-                            必填
-                          </label>
-                        </div>
-                      </div>
-                    ))
+                  ? fields.map((field) => <WorkflowFieldRow key={field.id} field={field} onPatch={patch} />)
                   : null}
               </section>
             )

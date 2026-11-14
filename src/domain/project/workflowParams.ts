@@ -24,6 +24,10 @@
  * 发请求是平台层的事（`platform/channels/runninghubWorkflow.ts`），画界面是 UI 的事。
  */
 
+import { isWorkflowLinkValue, normalizeWorkflowGraph, type WorkflowGraph } from './workflowGraph'
+
+export { isWorkflowLinkValue }
+
 /** 执行端：先只支持云端 RunningHub，本地 ComfyUI 留同构的口子（用户 2026-11-14 口径） */
 export type WorkflowProviderKind = 'runninghub' | 'comfyui-local'
 
@@ -119,6 +123,13 @@ export interface WorkflowEntry {
   /** 输出类型（工作流设置页可改；缺省按暴露媒体推断） */
   outputKind?: 'image' | 'video'
   fields: WorkflowParamField[]
+  /**
+   * 节点图快照（`getJsonApiFormat` 的 `prompt` 抽出来的节点与连线）。
+   *
+   * 设置页条目设置区要**点开就画**，所以随条目一起存（只留画图要用的那几个字段）；
+   * 老条目没有这一份时退回「按节点分组的参数清单」—— 不因为缺图就整块不能编辑。
+   */
+  graph?: WorkflowGraph
   /** 最近一次拉到参数的时间（毫秒）；0 = 从没拉过 */
   fetchedAt: number
   /**
@@ -157,16 +168,6 @@ export const WORKFLOW_ENTRIES_ROW_PREFIX = 'workflow:entries:'
 
 export function workflowEntriesRowId(channelId: string): string {
   return `${WORKFLOW_ENTRIES_ROW_PREFIX}${channelId}`
-}
-
-/** `inputs` 里的「连线值」：`["<上游 nodeId>", 输出槽位号]` —— 它是连接，不是参数 */
-export function isWorkflowLinkValue(value: unknown): boolean {
-  return (
-    Array.isArray(value) &&
-    value.length === 2 &&
-    typeof value[0] === 'string' &&
-    typeof value[1] === 'number'
-  )
 }
 
 const MEDIA_KEYS: Record<'image' | 'video' | 'audio', RegExp> = {
@@ -362,6 +363,7 @@ export function normalizeWorkflowEntries(raw: unknown): WorkflowEntry[] {
     const note = str(record.note).trim()
     const kind = record.kind === 'app' ? 'app' : 'workflow'
     const outputKind = record.outputKind === 'video' ? 'video' : record.outputKind === 'image' ? 'image' : undefined
+    const graph = normalizeWorkflowGraph(record.graph)
     out.push({
       id,
       title: str(record.title).trim() || id,
@@ -370,6 +372,7 @@ export function normalizeWorkflowEntries(raw: unknown): WorkflowEntry[] {
       ...(note ? { note } : {}),
       ...(outputKind ? { outputKind } : {}),
       fields,
+      ...(graph ? { graph } : {}),
       fetchedAt: Number.isFinite(Number(record.fetchedAt)) ? Number(record.fetchedAt) : 0,
       ...(coverUrl ? { coverUrl } : {}),
     })

@@ -9,7 +9,7 @@ import {
 import { workflowEntryCategory } from '../../domain/project/workflowParamValues'
 import type { ModelCapability } from '../../domain/shared/capability'
 import { createWorkflowEntryStore } from '../../state/channel/workflowEntryStore'
-import { fetchWorkflowFields, fetchAppBundle } from '../../platform/channels/runninghubWorkflow'
+import { fetchWorkflowBundle, fetchAppBundle } from '../../platform/channels/runninghubWorkflow'
 import {
   fetchRhMarketEntries,
   fetchRhMarketRelatedId,
@@ -105,9 +105,12 @@ export function SettingsWorkflowManager({
           fields: bundle.fields,
           title: bundle.meta.title,
           coverUrl: bundle.meta.coverUrl,
+          graph: undefined,
         }
       }
-      return { fields: await fetchWorkflowFields({ network: platform.network }, endpoint, id, signal), title: '', coverUrl: undefined }
+      /** 工作流一次拿齐字段 + 节点图（同一个响应里都有，别请求两遍） */
+      const bundle = await fetchWorkflowBundle({ network: platform.network }, endpoint, id, signal)
+      return { fields: bundle.fields, title: '', coverUrl: undefined, graph: bundle.graph }
     },
     [channel.baseUrl, channel.id, channels, platform.network],
   )
@@ -125,6 +128,7 @@ export function SettingsWorkflowManager({
           title: title || pulled.title || `${kind === 'app' ? 'AI 应用' : '工作流'} ${id}`,
           provider: 'runninghub',
           fields: pulled.fields,
+          ...(pulled.graph ? { graph: pulled.graph } : {}),
           fetchedAt: Date.now(),
           ...(note ? { note } : {}),
           ...(coverUrl || pulled.coverUrl ? { coverUrl: coverUrl ?? pulled.coverUrl } : {}),
@@ -239,7 +243,11 @@ export function SettingsWorkflowManager({
             返回列表
           </button>
         </div>
-        <div className={styles.editor}>
+        {/*
+          有节点图时整块改成「上信息 / 下图」：设置弹窗只有六百多像素宽，
+          左右并排会把图挤成三百多像素 —— 节点图要占满整行才看得清（#1116 ②）。
+        */}
+        <div className={styles.editor} data-graph={editing.graph ? 'on' : 'off'}>
           <div className={styles.previewPane}>
             <label className={styles.field}>
               <span className={styles.label}>名称</span>
