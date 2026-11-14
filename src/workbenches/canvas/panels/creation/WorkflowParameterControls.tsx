@@ -3,7 +3,7 @@ import type { PanelEvent } from '../panelModel'
 import { ParamPicker, type ParamOption, type ParamSection } from '../ParamPicker'
 import { ChannelIcon } from '../../../../features/shared/channelIcon/ChannelIcon'
 import {
-  workflowEntryIdOf,
+  entryIdOfModel,
   workflowModelId,
   type WorkflowEntry,
   type WorkflowParamField,
@@ -113,7 +113,7 @@ export function WorkflowParameterControls({
   const rows = sourceRows(sources)
   if (rows.length === 0) return null
 
-  const entryId = workflowEntryIdOf(data.model)
+  const entryId = entryIdOfModel(data.model ?? '')
   const current =
     rows.find((row) => row.channelId === data.channelId && row.entry.id === entryId) ??
     rows.find((row) => row.entry.id === entryId) ??
@@ -291,8 +291,8 @@ export function WorkflowEntryLauncher({
   onEvent,
   disabled,
 }: WorkflowEntryLauncherProps) {
-  /** AI 应用暂不进这条链路（它自己那条执行路径还没接），先只列工作流条目 */
-  const rows = sources ? sourceRows(sources).filter((row) => row.entry.kind !== 'app') : []
+  /** 工作流与 AI 应用**同一条链路**：执行端都收 `nodeInfoList`（应用走 `app:` 前缀） */
+  const rows = sources ? sourceRows(sources) : []
   if (rows.length === 0) return null
 
   const valueOf = (row: WorkflowSourceRow) => `${row.channelId}::${workflowEntryModelId(row.entry)}`

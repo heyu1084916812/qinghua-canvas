@@ -10,7 +10,7 @@ import { asAppError, describeError, errorTextOf } from '../../shared/result'
 import { bytesToBase64 } from './base64'
 import { prepareModelImageInput } from './chatImageInput'
 import { submitWorkflowTask, webappIdPayload } from './runninghubWorkflow'
-import { resolveWorkflowMedia, runWorkflowTask, workflowNodeListOf } from './runninghubWorkflowRun'
+import { fillAppNodeValues, resolveWorkflowMedia, runWorkflowTask, workflowNodeListOf } from './runninghubWorkflowRun'
 import { rhAccountNote } from './runninghubAccount'
 import type { NetworkResponse, SafeChannelConfig } from '../ports'
 import {
@@ -782,25 +782,9 @@ export function createRunningHubAdapter(
     if (info.code !== 0 || nodes.length === 0) {
       throw upstreamError(null, describeRhError(info, '这个 AI 应用没有可修改节点（先在网页端成功跑一次）'))
     }
-    /** 按**字段名**找节点，不写死 nodeId（不同应用的 id 不一样） */
     const nodes2 = nodes.map((n) => ({ ...n }))
-    const setField = (fieldName: string, value: unknown, index = 0) => {
-      const hits = nodes2.filter((n) => n.fieldType === fieldName || n.fieldName === fieldName)
-      const target = hits[index] ?? hits[0]
-      if (target) target.fieldValue = value
-    }
-    setField('prompt', request.prompt)
-    /**
-     * AI 应用的**节点字段名**各家不同（都是应用作者起的），所以这边不设白名单：
-     * 非空就写进去，认不认识由应用自己判定 —— 写死了反而会把某些应用能改的档位挡在外面。
-     */
-    const putField = (fieldName: string, raw: unknown) => {
-      const value = typeof raw === 'number' ? String(raw) : typeof raw === 'string' ? raw : ''
-      if (value !== '') setField(fieldName, value)
-    }
-    putField('aspectRatio', request.params?.ratio)
-    putField('resolution', request.params?.resolution)
-    putField('duration', request.params?.duration)
+    /** 提示词 + 常用三档 + **面板暴露字段**（按 nodeId+fieldName 精确覆盖，见 `fillAppNodeValues`） */
+    fillAppNodeValues(nodes2, request.prompt, request.params)
 
     /** 参考图：应用要吃**上传后的文件名**（与端点路的内联不同，见 `media.py`） */
     const refs = imageInputsOf(request.inputs)

@@ -45,6 +45,42 @@ export function workflowNodeListOf(raw: unknown): {
 }
 
 /**
+ * AI 应用的节点参数：**默认值 + 面板暴露字段**一次填好（对账 #1107）。
+ *
+ * 三层的顺序是刻意的：
+ * ① 先按字段名填「提示词」与应用最常用的三档（老路径；一个字段都没暴露时靠它）；
+ * ② 再把面板下发的 `nodeInfoList` 按 `nodeId + fieldName` **精确覆盖** —— 应用作者起的
+ *    字段名千奇百怪，按名字猜只能碰上几个，按 id 覆盖才是准的；
+ * ③ 没传的项**一个都不动**（保持应用自己的默认值），不塞空串（空串在 RunningHub 是
+ *    「清空该参数」，不是「用默认」）。
+ */
+export function fillAppNodeValues(
+  nodes: { nodeId?: unknown; fieldName?: unknown; fieldType?: unknown; fieldValue?: unknown }[],
+  prompt: string,
+  params?: Record<string, unknown>,
+): void {
+  const setField = (fieldName: string, value: unknown) => {
+    const target = nodes.find((node) => node.fieldType === fieldName || node.fieldName === fieldName)
+    if (target) target.fieldValue = value
+  }
+  setField('prompt', prompt)
+  const putField = (fieldName: string, raw: unknown) => {
+    const value = typeof raw === 'number' ? String(raw) : typeof raw === 'string' ? raw : ''
+    if (value !== '') setField(fieldName, value)
+  }
+  putField('aspectRatio', params?.ratio)
+  putField('resolution', params?.resolution)
+  putField('duration', params?.duration)
+
+  for (const item of workflowNodeListOf(params?.workflow)) {
+    const target = nodes.find(
+      (node) => String(node.nodeId) === item.nodeId && String(node.fieldName) === item.fieldName,
+    )
+    if (target) target.fieldValue = item.fieldValue
+  }
+}
+
+/**
  * 把提交体里的「用上游素材」哨兵换成**上传后的文件名**（对账 #1104 媒体接线）。
  *
  * 顺序口径：先图片、后视频，按面板上的出现顺序各取一张；没有素材就**丢掉这一项**

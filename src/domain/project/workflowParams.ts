@@ -159,6 +159,23 @@ export function workflowEntryIdOf(modelId: string): string | null {
   return id || null
 }
 
+/** AI 应用的模型 id 前缀（与应用作者暴露字段那条路同源） */
+export const APP_MODEL_PREFIX = 'app:'
+
+/**
+ * 模型 id → 条目 id（工作流 `workflow:` 与 AI 应用 `app:` 两种前缀都认）。
+ *
+ * 面板只知道「这一格是某个条目的模型 id」；两栏（应用 / 工作流）在设置页是分开的，
+ * 在执行与参数渲染上是同一条路 —— 认这两条前缀的只有这一个函数。
+ */
+export function entryIdOfModel(modelId: string): string | null {
+  const workflow = workflowEntryIdOf(modelId)
+  if (workflow) return workflow
+  if (!modelId.startsWith(APP_MODEL_PREFIX)) return null
+  const id = modelId.slice(APP_MODEL_PREFIX.length).trim()
+  return id || null
+}
+
 /**
  * 条目清单存在 `presets` 表的哪一行（按渠道分开）。
  * 与「CLI 工具配置」同一条理由（`state/project/cliToolStore.ts`）：`presets` 就是

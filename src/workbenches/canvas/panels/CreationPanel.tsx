@@ -133,7 +133,7 @@ export function CreationPanel(props: CreationPanelProps) {
   /** 视频是生成节点的功能类别（`data.mode`），参数集与图片模式不同（§6.8） */
   const videoMode = !promptMode && data.mode === 'video'
   /** 工作流模式：参数 / 类别 / 预设全由条目决定，生成仍是原来那一枚按钮（不另设「运行」） */
-  const workflowMode = Boolean(props.workflowSources && String(data.model ?? '').startsWith('workflow:') && workflowChannelsOf(props.workflowSources).length > 0)
+  const workflowMode = Boolean(props.workflowSources && /^(workflow|app):/.test(String(data.model ?? '')) && workflowChannelsOf(props.workflowSources).length > 0)
   /** 仅在节点模型为空时解析并写回默认配方，已有模型绝不覆盖。 */
   const [fallback, setFallback] = useState<{ channelId: string; model: string } | null>(null)
   /** onEvent 每次渲染都会新建，effect 通过 ref 读取最新值。 */

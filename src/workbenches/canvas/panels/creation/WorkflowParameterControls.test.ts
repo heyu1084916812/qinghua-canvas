@@ -143,6 +143,46 @@ describe('工作流入口 chip（API 模式下挑条目）', () => {
     )
     expect(html).toBe('')
   })
+
+  it('AI 应用也在这条链路上：入口 chip 里能选到它', () => {
+    const app: WorkflowEntry = {
+      id: '1877265245566922753',
+      title: '风格迁移',
+      provider: 'runninghub',
+      fetchedAt: 0,
+      kind: 'app',
+      fields: [],
+    }
+    const html = renderToStaticMarkup(
+      createElement(WorkflowEntryLauncher, {
+        sources: { channels: [{ id: 'ch-rh', name: 'RunningHub', protocol: 'runninghub-api', entries: [ENTRY, app] }] },
+        openPicker: 'workflowEntry',
+        onTogglePicker: noop,
+        onClosePicker: noop,
+        onEvent: noop,
+      }),
+    )
+    expect(html).toContain('data-param-option="ch-rh::app:1877265245566922753"')
+    expect(html).toContain('风格迁移')
+  })
+})
+
+describe('AI 应用的参数行', () => {
+  it('`app:` 模型也能认出条目（面板按条目渲染，而不是按前缀分支）', () => {
+    const app: WorkflowEntry = { ...ENTRY, id: '1877265245566922753', title: '风格迁移', kind: 'app' }
+    const html = renderToStaticMarkup(
+      createElement(WorkflowParameterControls, {
+        data: { ...generationSpec.createDefaultData(), model: 'app:1877265245566922753', channelId: 'ch-rh' },
+        sources: { channels: [{ id: 'ch-rh', name: 'RunningHub', protocol: 'runninghub-api', entries: [app] }] },
+        openPicker: null,
+        onTogglePicker: noop,
+        onClosePicker: noop,
+        onEvent: noop,
+      }),
+    )
+    expect(html).toContain('风格迁移')
+    expect(html).toContain('data-param-chip="workflowInstance"')
+  })
 })
 
 describe('要读条目的渠道 id', () => {

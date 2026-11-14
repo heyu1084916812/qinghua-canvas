@@ -11595,7 +11595,7 @@
       "test": [
         "src/platform/channels/runninghub.test.ts"
       ],
-      "budget": 200
+      "budget": 230
     },
     {
       "module": "src/domain/project/workflowFieldKinds.ts",
