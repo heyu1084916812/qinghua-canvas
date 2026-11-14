@@ -657,6 +657,80 @@
       "budget": 130
     },
     {
+      "module": "src/domain/project/workflowParams.ts",
+      "owner": "project-workflow-channel-params",
+      "responsibility": "工作流渠道的参数模型：把 getJsonApiFormat 回来的工作流 JSON 摊平成可暴露/隐藏的字段表（默认全隐藏）、保留用户配置的重新拉取合并、算 nodeInfoList 提交体与 32 位种子归一。",
+      "owns": [
+        "工作流 JSON → 参数字段表",
+        "暴露/隐藏状态与用户改动的合并",
+        "提交体（nodeInfoList）与必填校验",
+        "种子归一与随机取值",
+        "条目 id ↔ 模型 id 的约定"
+      ],
+      "doesNotOwn": [
+        "发 HTTP 请求（platform/channels/runninghubWorkflow.ts）",
+        "参数面板的渲染",
+        "工作流 JSON 的来源与拉取时机"
+      ],
+      "publicApi": [
+        "WorkflowProviderKind",
+        "WorkflowParamType",
+        "WorkflowParamField",
+        "WorkflowEntry",
+        "WORKFLOW_PROVIDERS",
+        "WORKFLOW_MODEL_PREFIX",
+        "WORKFLOW_ENTRIES_ROW_PREFIX",
+        "isWorkflowProvider",
+        "workflowProviderLabel",
+        "workflowModelId",
+        "workflowEntryIdOf",
+        "workflowEntriesRowId",
+        "isWorkflowLinkValue",
+        "isSeedFieldName",
+        "inferWorkflowParamType",
+        "parseWorkflowJsonToFields",
+        "normalizeWorkflowField",
+        "normalizeWorkflowEntries",
+        "mergeRefetchedFields"
+      ],
+      "test": [
+        "src/domain/project/workflowParams.test.ts"
+      ],
+      "budget": 450
+    },
+    {
+      "module": "src/domain/project/workflowParamValues.ts",
+      "owner": "project-workflow-channel-params",
+      "responsibility": "工作流参数的取值与提交：暴露字段的取值回落、必填校验、uint32 种子归一与随机、nodeInfoList 提交体拼装、条目出图/出视频分类。",
+      "owns": [
+        "字段取值与显式清空的语义",
+        "必填校验（只校验暴露字段）",
+        "种子归一与随机",
+        "nodeInfoList 提交体",
+        "条目类别的推定"
+      ],
+      "doesNotOwn": [
+        "字段表的解析与合并（workflowParams.ts）",
+        "HTTP 请求与素材上传",
+        "参数面板渲染"
+      ],
+      "publicApi": [
+        "exposedFields",
+        "fieldValueOf",
+        "missingRequiredFields",
+        "WORKFLOW_SEED_MAX",
+        "normalizeWorkflowSeed",
+        "randomWorkflowSeed",
+        "workflowNodeInfoList",
+        "workflowEntryCategory",
+        "workflowModelIdOfEntry"
+      ],
+      "test": [
+        "src/domain/project/workflowParams.test.ts"
+      ],
+      "budget": 120
+    },
+    {
       "module": "src/domain/project/referencePalette.ts",
       "owner": "project-reference-curation-rules",
       "responsibility": "从 RGBA 像素本地统计参考图主色并输出 HEX 与占比，生成写进参考卡的色值句。",
