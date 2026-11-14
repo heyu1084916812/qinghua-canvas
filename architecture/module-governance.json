@@ -11659,6 +11659,65 @@
         "src/features/settings/SettingsWorkflowEntries.test.ts"
       ],
       "budget": 420
+    },
+{
+      "module": "src/dev/panelDemo/main.tsx",
+      "owner": "dev-panel-demo",
+      "responsibility": "创作面板演示入口：用内存平台与假数据挂载真实 CreationPanel，并在底部拼一条「来源行」示例（只读，不进产品链路）。",
+      "owns": [
+        "演示页的装配与假数据",
+        "演示用的渠道与工作流条目种子"
+      ],
+      "doesNotOwn": [
+        "面板本体（workbenches/canvas/panels）",
+        "生产路由与产品行为",
+        "真实渠道请求"
+      ],
+      "publicApi": [
+        "NO_EXPORT:演示入口脚本（无对外导出）"
+      ],
+      "test": [
+        "src/dev/panelDemo/SourceRowDemo.test.ts"
+      ],
+      "budget": 220
+    },
+    {
+      "module": "src/dev/panelDemo/SourceRowDemo.tsx",
+      "owner": "dev-panel-demo",
+      "responsibility": "演示用的「渠道 · 模式 · 条目 · 实例 · 暴露参数」一行：本地 state，只渲染不写节点。",
+      "owns": [
+        "来源行的演示交互与展示"
+      ],
+      "doesNotOwn": [
+        "节点数据写入",
+        "渠道请求与路由"
+      ],
+      "publicApi": [
+        "SourceRowDemo"
+      ],
+      "test": [
+        "src/dev/panelDemo/SourceRowDemo.test.ts"
+      ],
+      "budget": 200
+    },
+    {
+      "module": "src/dev/panelDemo/demo.css",
+      "owner": "dev-panel-demo",
+      "responsibility": "演示页布局与来源行样式（只用主题令牌）。",
+      "owns": [
+        "演示页局部样式"
+      ],
+      "doesNotOwn": [
+        "主题令牌定义",
+        "面板组件自身样式"
+      ],
+      "publicApi": [
+        "CSS_MODULE:演示页（demo-stage / demo-source / demo-row / demo-fields）"
+      ],
+      "test": [
+        "src/dev/panelDemo/SourceRowDemo.test.ts"
+      ],
+      "budget": 220
     }
   ]
 }

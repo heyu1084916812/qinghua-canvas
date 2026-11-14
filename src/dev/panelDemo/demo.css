@@ -1,0 +1,140 @@
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: var(--bg-canvas);
+  color: var(--text-1);
+}
+
+.demo-stage {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-3);
+  padding: 40px 24px;
+}
+
+.demo-caption {
+  margin: 0;
+  color: var(--text-3);
+  font-size: var(--fs-label);
+}
+
+.demo-panel {
+  display: flex;
+  flex-direction: column;
+  width: 720px;
+  max-width: 100%;
+  border: var(--border);
+  border-radius: var(--radius-control);
+  background: var(--bg-surface);
+  overflow: hidden;
+}
+
+/* 面板自带的外层间距在演示里不要重复，让来源行贴着它 */
+.demo-panel > :first-child {
+  position: static !important;
+  transform: none !important;
+  box-shadow: none !important;
+}
+
+.demo-source {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3) var(--space-3);
+  border-top: var(--border);
+  background: var(--bg-surface);
+}
+
+.demo-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.demo-pick,
+.demo-field {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.demo-label {
+  flex: none;
+  color: var(--text-3);
+  font-size: var(--fs-label);
+}
+
+.demo-select,
+.demo-input {
+  box-sizing: border-box;
+  min-width: 0;
+  max-width: 180px;
+  padding: 2px var(--space-1);
+  border: var(--border);
+  border-radius: var(--radius-control);
+  background: var(--bg-surface);
+  color: var(--text-1);
+  font-size: var(--fs-label);
+}
+
+.demo-input {
+  width: 96px;
+}
+
+.demo-seg {
+  display: inline-flex;
+  gap: 2px;
+  padding: 2px;
+  border-radius: var(--radius-pill);
+  background: var(--bg-subtle);
+}
+
+.demo-seg button {
+  padding: 2px 8px;
+  border: none;
+  border-radius: var(--radius-pill);
+  background: none;
+  color: var(--text-3);
+  font-size: var(--fs-label);
+  cursor: pointer;
+}
+
+.demo-seg button[aria-pressed='true'] {
+  background: var(--bg-selected);
+  color: var(--text-1);
+}
+
+.demo-run {
+  margin-left: auto;
+  padding: var(--space-1) var(--space-3);
+  border: var(--border);
+  border-radius: var(--radius-pill);
+  background: var(--bg-selected);
+  color: var(--text-1);
+  font-size: var(--fs-label);
+  cursor: pointer;
+}
+
+.demo-fields {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-3);
+  align-items: center;
+}
+
+.demo-media {
+  padding: 1px 6px;
+  border-radius: var(--radius-pill);
+  background: var(--bg-hover);
+  color: var(--text-3);
+  font-size: var(--fs-label);
+}
+
+.demo-note {
+  margin: 0;
+  color: var(--text-3);
+  font-size: var(--fs-label);
+}
