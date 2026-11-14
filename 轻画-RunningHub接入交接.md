@@ -1,4 +1,4 @@
-# 轻画 · RunningHub 接入交接（2026-11-14 截止 `ac7cc2d`）
+# 轻画 · RunningHub 接入交接（2026-11-14 截止 `af6844d`）
 
 > **这是一份"专项交接"，不是全局交接本。**
 >
@@ -7,7 +7,8 @@
 > 做到哪、还差什么、哪些坑别再踩。
 >
 > - **状态真相源**：《轻画-功能对账清单.md》§五（编号 #1104–#1112）+ `ledger/按批记录-2026-11-b.md`。
-> - **本文有效期**：截止提交 `ac7cc2d`。之后任何代码/口径变化，**先改清单与调研文档，再改本文**。
+> - **本文有效期**：截止提交 `af6844d`（RunningHub 的**代码**最后一次改动仍是 `ac7cc2d`，之后都是文档）。
+>   之后任何代码/口径变化，**先改清单与调研文档，再改本文**。
 > - **调研与证据**：《轻画-RunningHub工作流与三来源渠道调研.md》§二 / §五点五 / §九。
 
 ---
@@ -32,6 +33,7 @@ RunningHub 的**四种 API 已摸清并落了两层代码**（领域参数模型
 | `db614ba` | `fetchAppBundle`（填 id → 名称+封面+参数）；**修缺陷 #1110**：821 文案 + 错误码分支顺序（新增 `runninghubErrors.test.ts`） |
 | `4c2b064` | GitHub 官方 `developer-kit` 核对（模型 registry / 价格 / llms.txt），新登记 #1111 |
 | `ac7cc2d` | **四种 API 确认**（模型 / LLM / 应用 / 工作流）+ 积分与金额的准确口径，新登记 #1112 |
+| `af6844d` | 本文（专项交接，用户要求）；同时把**国内站 API 市场页**核了一遍，新登记 **#1113**（免鉴权目录接口 / SKU id 坑，见 §五 15 与调研文档 §九 H） |
 
 ---
 
@@ -73,6 +75,7 @@ npx vitest run src/domain/project/workflowParams.test.ts src/domain/project/work
 | **1107** | AI 应用参数如实化 | 🧩 领域+平台已落地 | 缺 UI；`runApp()` 里那四个写死字段名（`prompt / aspectRatio / resolution / duration`）应改成读字段表 |
 | **1111** | 吃官方 `developer-kit`（500+ 模型 + 参数枚举 + CNY 参考价） | 📝 未做 | 生成脚本改吃 `model-registry.public.json`；`options` 自动填；**参考价不许当积分显示** |
 | **1112** | 接第四种路线 `LLM` | 📝 未做 | 标准 OpenAI 兼容 ⇒ 走现有 `openai-compatible` 族，**不需要新适配器** |
+| **1113** | 接国内站 API 市场的目录 / 搜索（`/api/sku/list`） | 📝 未做 | 免 Key；`STANDARD_MODEL 280 / WEBAPP 15 / WORKFLOW 18`，能按关键词搜；**市场 id 是 SKU id，`relatedDataId` 才是 `webappId`**（见 §五 15） |
 
 **建议分组**：第三组=设置页（1104+1106+自检），第四组=生成节点（1105+1107 收尾），第五组=1111/1112。
 
@@ -94,6 +97,7 @@ npx vitest run src/domain/project/workflowParams.test.ts src/domain/project/work
 12. **UI 门禁**：第三/四组都是界面改动，必须按 `AGENTS.md` 的 UI 门禁做 1440×900 / 1024×700 × 明暗四组截图 + 几何断言，不能只凭单测判绿。
 13. **新文件先登记再写**：`architecture/module-governance.json` 要有职责 / owns / doesNotOwn / publicApi / test；新 TS ≤ **450 行**，超了**拆文件**（`workflowParams.ts` 就因此把"取值"拆到了 `workflowParamValues.ts`），**不要调高预算**。
 14. **文档闸门**：新文档必须登记进《文档总索引.md》；根清单 ≤400 行、新文档 ≤800 行（`check-doc-size`）；改编号要重跑 `node scripts/ledger-index.mjs`。
+15. **市场页上的 id 是 SKU id，不是 `webappId`**（2026-11-14 核对 `/call-api/search-api/webapp`）：`POST /api/sku/list` 回的是 **SKU**，`POST /api/sku/detail {id}` 里的 `relatedDataId` 才是真实的 `webappId` / `workflowId`（例：`2039234115011928065` → `2037457807762526209`）。用户从市场页抄 id 填进设置页**会填错**。这部目录**免登录免 Key**（`categoryType: STANDARD_MODEL|WEBAPP|WORKFLOW`，`search` 关键词真能用，`pageSize:999` 一次取全：280 / 15 / 18 条），所以设置页「加条目」可以做成搜索选择，而不是手填。**别用 `/api/search/model`、`/api/search/workflow`**（那是资源市场，传 WEBAPP 会被忽略）。
 
 ---
 
@@ -120,4 +124,5 @@ npx vitest run src/domain/project/workflowParams.test.ts src/domain/project/work
 3. 自建工作流在网页端"开放参数"的具体操作路径（只知道接口只回开放字段）；
 4. 视频工作流真实耗时（决定超时是否要按条目可配）；
 5. 余额为 0 的**企业级 Key** 打 `/task/openapi/create` 是否也是 `821`；
-6. 关键词搜索工作流：市场页是客户端渲染，**没有公开 JSON 接口**，别去猜端点。
+6. ~~关键词搜索：市场页是客户端渲染、没有公开 JSON 接口~~ —— **2026-11-14 已推翻**：搜索 / 分类走免 Key 的 `POST /api/sku/list`（见 §五 15 与调研文档 §九 H）。
+7. **市场页的 SKU id ↔ `webappId` 映射**：`/api/sku/detail` 的 `relatedDataId` 看着就是 `webappId`，但**提交时到底吃 SKU id 还是 `relatedDataId` 没验过**（`apiCallDemo` 缺 Key 回 `500 UNKNOWN_ERROR`、假 Key 回 `332 USER_DOES_NOT_EXIST`，鉴权早于资源存在性检查，反推不出来）。拿到可用 Key 后第一件事就验这个，否则用户按市场页填 id 会稳定失败。

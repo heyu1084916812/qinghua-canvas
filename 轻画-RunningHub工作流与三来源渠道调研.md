@@ -499,5 +499,65 @@ refAudio1..3 / refVideoAudio1..2
 
 它同时演示了三件我们要做的事：**必填用 `*` 标**、**多媒体槽按序号排列**、**每个媒体槽带格式与体积上限**。
 
-**注意**：这个市场列表是客户端渲染的（卡片 id 在 `__NUXT__` 里），页面上没有可直接调的公开 JSON 接口 ——
-所以「填 id 抓取」仍是主路径（稳定、可验证），关键词搜索只能作为以后的可选增强。
+**注意（2026-11-14 当日更正，见 §九 H）**：当时以为「市场列表没有公开 JSON 接口」，只对了一半 ——
+页面确实是 SPA（首屏卡片是 SSR 出来的，`__NUXT__` 里只有查询参数），但**列表数据来自免鉴权的
+`POST /api/sku/list`**，能搜索、能分类、能一次取全。所以「关键词搜索」不是"以后再说"，现在就能做。
+
+---
+
+### H. 国内站 API 市场页（`/call-api/search-api/webapp`）的实际结构（2026-11-14 免 Key 核对）
+
+> 用户给了 `https://www.runninghub.cn/call-api/search-api/webapp`，要求"详细看一下"。以下每条都能免 Key 复现（全是公开接口）。
+> **这段推翻了 §九 G 末尾那句「没有可直接调的公开 JSON 接口」——那条结论是从"页面是 SPA"推出来的，没查底层请求。**
+
+**① 页面本身**：路由 `/call-api/search-api/:categoryType`（`webapp` / `workflow` / `standard-model`）；
+首屏 10 张卡片是**服务端渲染**的（分类、名称、描述、计费标签），筛选 / 排序 / 无限滚动在前端。
+卡片只有两种计费标签，与 §九 F 一致：`运行时长费用` 与 `标准模型API调用费用+运行时长费用`。
+
+**② 列表接口（★ 免登录、免 Key）**：`POST https://www.runninghub.cn/api/sku/list`
+
+| 项 | 内容 |
+| --- | --- |
+| 请求体 | `{categoryType, tagIds:[], search:"", categoryTagIds:[], owners:[], isCollected:false, region:"", isWhitelist:false, pageNum, pageSize}` |
+| `categoryType` | `STANDARD_MODEL` / `WEBAPP` / `WORKFLOW`（站点 JS 里的枚举就是这三个；页面路由 `webapp` / `workflow` / `standard-model` 映射到它） |
+| 实测规模 | 标准模型 **280** 条（24 个 `categoryName`，如 `text-to-image` / `reference-to-video` / `video-extend` …）、AI 应用 **15** 条（8 类：视频生视频 · 图生视频 · 文生视频 · 图生图 · 人像写真 · 数字人 · 盲盒手办 · 新奇创意）、工作流 **18** 条（8 类）。`pageSize:999` 可一次取全 |
+| 搜索 | `search:"BJD"` → 1 条（真能用）；热词 `POST /api/sku/search/hotWords {}` → `["h3","seedance","minimax","gpt","全能图片"]` |
+| 返回 | `data.page = {records[], current, size, total, pages, hasNext}` |
+
+`records[]` 的字段（轻画要用的都在这里，不需要再猜）：
+
+| 字段 | 例 / 含义 |
+| --- | --- |
+| `id` | **SKU id**（19 位字符串），**不是** `webappId` —— 见 ⑤ |
+| `name` / `description` | 中文名与描述（描述里可能夹 `<a>` 链接） |
+| `categoryName` / `categoryType` | 如 `图生视频` / `WEBAPP` |
+| `sourceTypeName` | `rh-ai` |
+| `modelHighlights` | 如 `RH Enhanced 多参考｜最多9图3视频｜驱动音频必填｜自部署` —— **§九 G 那个 `自部署` 徽标就在这个字段里** |
+| `priceType` + `price{}` | `1` ⇒ 卡片写「运行时长费用」；`2` ⇒ 「标准模型API调用费用 + 运行时长费用」（拿 SSR 卡片逐条对过）。标准模型的 `price` 形如 `{price:0.18, currency:"CNY", unitName:"秒", unitKey:"SECONDS", priceMode:"UNIT"}`；**AI 应用 / 工作流的 `price` 是 `null`**（按运行时长结积分，页面不报价） |
+| `runCount` / `dailyFreeLimit` / `backgroundUrl` | 用量 / 每日免费次数 / 封面（图或 mp4） |
+| `capabilityTagIds` / `vendorTagId` / `productLineTagIds` | 页面筛选用的 id；文案由 `/api/sku/tag/query` 给（需 `parentId + showType + 层级`，本轮没调通，**别猜参数名**） |
+
+**③ 详情接口（免 Key）**：`POST /api/sku/detail {id:"<SKU id>"}` →
+
+- `relatedDataId` = **真实业务 id**（AI 应用是 `webappId`，工作流是 `workflowId`）；
+- `owner:"HYBRID"`、`queueSize:1000`、`concurrencyLimit:500`、`instanceType:null`、`relationTags[]`（分类 / `rh-ai` / `AI应用` / `最近上新`）；
+- 中英双份文案（`name/nameEn`、`description/descriptionEn`、`cover/coverEn`）+ `modelHighlights` / `priceType` / `dailyFreeLimit` / `fastTemplateCode`。
+
+**④ API 首页配置（免 Key）**：`POST /api/secondary-page/api-home/published {}` → 五个模块
+`CAPABILITIES` / `RECOMMENDED_MODELS`（12 个模型，带 `￥` 单价与"企业价"）/ `API_GROUPS`
+（**视频 322 + 图像 189 + 音频 47 + 3D 16 = 574 个模型**）/ `USE_CASES` / `FAQ`。
+⇒ 除 #1111 那份 `pricing.public.json` 外，**站点配置里也公开 CNY 参考价**，可交叉校验。
+
+**⑤ 两个坑**
+
+1. **市场页上的 id 是 SKU id，不是 `webappId`**：`2039234115011928065`（SKU）→ `relatedDataId 2037457807762526209`（webappId）。
+   轻画现在让用户填 `webappId`，用户若从市场页抄 id 就会填错。**提交到底吃哪个 id 未实测**：`apiCallDemo`
+   缺 Key 回 `500 UNKNOWN_ERROR`、假 Key 回 `332 USER_DOES_NOT_EXIST` ⇒ **鉴权早于资源存在性检查**，没法用它反推 id 对不对。
+2. **别拿 `/api/search/model`、`/api/search/workflow` 当 API 目录**：它们是**资源市场**（模型 / 工作流分享社区）的搜索，
+   body 里传 `categoryType:"WEBAPP"` 会被忽略，仍回 `CHECKPOINT` / `LORA` 资源。
+
+**⑥ 与「四条路线」的关系**：市场里只有三类（标准模型 / AI 应用 / 工作流），**LLM 不在这个市场页**
+（它在 `/call-api/llm/models`，见 §九 E）。另外「AI 应用市场只上架 15 条」≠「全站只有 15 个应用」
+（`/openapi/v2/aiapp/list` 要 Key，回的是全站应用清单）—— 选应用入口用市场清单还是全站清单，**待拍板**。
+
+**⑦ 据此登记的缺口**：**#1113**（把这部目录接进来：搜索 / 分类 / 计费标签 / SKU↔`webappId` 映射）。
