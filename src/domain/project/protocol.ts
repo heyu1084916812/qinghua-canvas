@@ -471,22 +471,30 @@ export const BUILTIN_PROTOCOLS: ProtocolDefinition[] = [
        */
       capabilities: ['image', 'video'],
       defaultBaseUrl: 'https://www.runninghub.cn',
-      docUrl: 'https://www.runninghub.cn/enterprise-api/sharedApi',
-      note: 'RunningHub 的 OpenAPI（提交任务 + 轮询取结果）。标准模型直接用显示名（扣金额），AI 应用用 app: 前缀（扣 RH 币）；有参考图时自动走该模型的图生档。',
+      docUrl: 'https://www.runninghub.cn/runninghub-api-doc-cn/',
+      note: 'RunningHub 的 OpenAPI（提交任务 + 轮询取结果）。标准模型直接用显示名，AI 应用用 app: 前缀，工作流用 workflow: 前缀；有参考图时自动走该模型的图生档。',
       /**
-       * RunningHub 要**两把钥匙**（用户第 22 批第 3 条：「有两个令牌，一个是币的，一个是金额的」）：
-       * - `balance`（主槽）：**账户余额 Key（金额）** ⇒ 标准模型 API，出图 / 出片按金额计费；
-       * - `coin`（备用槽）：**RH 币 Key** ⇒ 工作流 API（跑工作流按币扣）。
-       * 两把都存进同一条渠道，用哪把由适配器按任务类型决定（见 §7.3 的口径）。
+       * **一把钥匙**（2026-11-14 真机更正：以前这里声明了两把，是错的）。
+       *
+       * 旧口径（2026-10-08）认为「币 Key 打 AI 应用、金额 Key 打标准模型」，于是给了两个槽。
+       * 实测与官方文档都推翻了它：
+       * - `POST /uc/openapi/accountStatus` 同一把 Key 回 `{remainMoney, remainCoins, remainPoint, apiType}`；
+       * - 任务结果 `usage` 里 `consumeMoney / consumeCoins / thirdPartyConsumeMoney /
+       *   chargedPoint + settleMode` **同时存在**，扣哪本账由**账号类型**（个人 `NORMAL` /
+       *   团队共享 / 独占）与结算方式决定，**不由"用哪把 Key"决定**；
+       * - 官方文档只区分「消费级-会员 Key」与「企业级-共享/独占 Key」（后者才能调模型 API / LLM），
+       *   从来没有"币 Key / 金额 Key"这两种东西。
+       *
+       * ⇒ 备用槽（`coin`）已删。老库里存着的 `altCredentialRef` 不会被删（不迁移数据），
+       * 但界面不再为 RunningHub 渲染第二行令牌；那一行残留的 Key 可以直接删掉。
        */
       credentials: [
         {
           id: 'balance',
-          label: '账户余额 Key（金额）',
-          hint: '标准模型 API：出图 / 出片按金额计费',
+          label: 'API Key',
+          hint: '一个 Key 调全部接口；扣金额 / RH 币 / 积分由账号类型决定',
           required: true,
         },
-        { id: 'coin', label: 'RH 币 Key', hint: '工作流 API：跑工作流按币扣', required: false },
       ],
     },
   {

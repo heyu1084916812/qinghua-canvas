@@ -272,6 +272,28 @@ RunningHub 侧真正需要的只有**三条接口路线**，轻画已经接了 1
    `[{fileUrl, fileType, nodeId}]` 形状 —— 轻画已经改用 V2，但**产物解析要同时兼容
    `url` / `outputUrl` / `fileUrl`**（已按这条补了 `resultUrlsOf` + 5 条单测）。
 
+### F. 真机只读实测（2026-11-14，用户提供 Key，**没花一分钱**）
+
+| 探测 | 结果 | 结论 |
+| --- | --- | --- |
+| `POST /uc/openapi/accountStatus` | `{apiType:"NORMAL", remainCoins:"84", remainPoint:30.000, remainMoney:null, currentTaskCounts:"0"}` | **金额 / RH 币 / 积分是同一个账号的账**；`apiType` 才是"账号形态"（个人 `NORMAL` / 企业共享 / 独占）。⇒ 用户说的"金额和积分合并了"成立 |
+| `GET /api/webapp/apiCallDemo?webappId=…` | `data` 键 = `descriptionEn, curl, accessEncrypted, webappName, description, statisticsInfo, nodeInfoList, covers, tags`；`nodeInfoList[0]` = `{nodeId:"122", nodeName:"SeargePromptText", fieldName:"prompt", fieldValue:"…", fieldType:"STRING", fieldData:'["STRING", {"default":"", "multiline":true}]', description:"prompt提示词"}` | **§五点五 D 的字段全部实测成立**；`fieldData` 用来判控件（多行文本等） |
+| `POST /openapi/v2/aiapp/list` | 回 85 460 个应用；`invokeExample` 里的提交地址是 **`POST /openapi/v2/run/ai-app/{id}`** | 官方新形态（v2 run 路由）已经在用它自己的示例里 |
+| `GET /openapi/v2/run/ai-app/{id}`、`GET /openapi/v2/run/workflow/{id}` | 都回 `{code:301, msg:"PARAMS_INVALID"}` | **两条 v2 run 路由都真实存在**（GET 不该被接受，所以是参数错而非 404）⇒ "两种 API 形态"确认：旧 `/task/openapi/*` + 新 `/openapi/v2/run/*` |
+| `POST /api/openapi/getJsonApiFormat` | 别人的公共 workflowId 也能拿到整份工作流 JSON | 拉参数不需要"自己的"工作流，但**提交**必须是自己账号里能跑的那条 |
+| `POST /openapi/v2/query {taskId:"1"}` | `{taskId:"1", status:"", errorCode:"1004", errorMessage:"Task not found…", results:null, promptTips:"", failedReason:{}}` | **错误在顶层 `errorCode/errorMessage`**，没有 `code/msg`；解析必须按这条 |
+| `GET /proxy/{apiKey}/object_info` | **HTTP 200**，拿到完整节点定义（`KSampler.input.required.seed` 带 `min/max/control_after_generate`、`tooltip`…） | **原生 ComfyUI 代理真的可用**；这是"下拉候选 / 数值范围"的权威来源 |
+| `GET /proxy/{apiKey}/system_stats` | `comfyui_version 0.3.27`、`pytorch 2.5.1+cu124`、`RTX 4090`(24G) | 代理后面是真机 ComfyUI，不是桩 |
+
+**对方案的影响（两处）**：
+
+1. **渠道令牌槽从 2 个改回 1 个**（对账 #1108，已修）：`runninghub-api` 只声明一个 `API Key`，
+   界面上不再出现"账户余额 Key（金额）/ RH 币 Key"两行；错误文案里的"别混用两把 Key"一并改掉。
+2. **工作流渠道的执行端多了一条更优选择**：云端 `/proxy/{apiKey}` + 本地 `127.0.0.1:8188`
+   都是原生 ComfyUI API，能用 `/object_info` 拿到每个参数的**候选集与范围**（工作流 JSON 里没有这些），
+   比走 `getJsonApiFormat` + 人工配 options 精确得多。**仍未验证**：`/prompt` 提交、`/history` 取结果、
+   并发与计费口径（见 §六）。
+
 ---
 
 ## 六、仍未实测的项（**不许当结论用**）
@@ -284,7 +306,7 @@ RunningHub 侧真正需要的只有**三条接口路线**，轻画已经接了 1
 | 自建工作流的「AI 应用开放参数」网页流程细节 | 只知道 `apiCallDemo` 只回开放字段；网页端具体在哪个页面勾 | 登录 RunningHub → 建一个 AI 应用走一遍，截图存档 |
 | 工作流提交的真实耗时 / 超时 | 官方文档提示视频任务可能较长（`taskCostTime` 单位是秒） | 真跑一条视频工作流，决定超时阈值是否要按条目可配 |
 | 余额为 0 时的行为 | 已知标准模型报 `812 企业版余额不足`；`create` 是否同一错误码未验 | 用余额为 0 的 Key 打一次 `/task/openapi/create` |
-| **新增**：原生 ComfyUI 代理（`/proxy/{key}`）是否真能跑通整条链路 | 官方文档写了"等同本地 8188"，我**没有实测**；它是否支持 `/object_info`、推流、并发限制都未知 | 本机用 curl 打 `/proxy/{key}/object_info` 与 `/prompt` 各一次，再决定 P1 走 task/openapi 还是这条 |
+| 原生 ComfyUI 代理（`/proxy/{key}`）**写入面** | **读面已实测通过**（`/object_info`、`/system_stats` 都是 200，见 §五点五 F）；**写面（`/prompt` 提交、`/history` 取结果、并发上限、与 WebSocket 推流）没验** | 用一条最小工作流打一次 `/prompt` + `/history`，再决定 P1 走 `task/openapi/create` 还是这条（若通，云端与本地 ComfyUI 可共用一套协议） |
 | **新增**：`apiCallDemo` 的 `accessEncrypted: true` 应用 | 示例里是 `false`；加密应用的 `fieldValue` 是否要特殊处理未知 | 找一个加密应用看返回体 |
 
 **可读的官方文档入口**（2026-11-14 起可读；第一轮我抓不到是因为用错了地址）：

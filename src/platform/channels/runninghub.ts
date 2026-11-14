@@ -46,16 +46,23 @@ import {
  * | AI 应用提交 | `POST {host}/task/openapi/ai-app/run` | `app/client.py` |
  * | AI 应用上传 | `POST {host}/task/openapi/upload`（multipart + `apiKey`/`fileType=input`） | `media.py` |
  *
- * ## 两条计费路，两把钥匙（与用户口径一一对应）
+ * ## 一把钥匙，三种结算（2026-11-14 真机更正）
  *
- * - **标准模型 / 金额**：端点是 `{host}/openapi/v2/{endpoint}`（78 图片 + 198 视频…），
- *   扣**金额**。实测这把"币 Key"打它会返回 `errorCode 812 企业版余额不足` —— 正好印证
- *   "币"和"金额"是两套账。
- * - **AI 应用 / 币**：`aiapp/list` + `ai-app/run`，扣**币**（实测同一把 Key 列表 82 872 个应用 ✓）。
+ * 旧结论（2026-10-08）是「币 Key 打 AI 应用、金额 Key 打标准模型 ⇒ 两把钥匙」，
+ * **实测推翻了**：同一把 Key 打 `POST /uc/openapi/accountStatus` 回
+ * `{apiType:"NORMAL", remainCoins:"84", remainPoint:30.000, remainMoney:null}` ——
+ * 金额 / RH 币 / 积分三个池子是**同一个账号的账**，扣哪个由账号类型与 `settleMode` 决定；
+ * 任务结果 `usage` 里 `consumeMoney / consumeCoins / chargedPoint` 也是同时回的。
+ * 官方文档只区分「消费级-会员 Key」与「企业级-共享/独占 Key」（后者才能调模型 API / LLM），
+ * 从来没有"币 Key / 金额 Key"。⇒ 渠道只剩一个令牌槽（见 `domain/project/protocol.ts`）。
+ *
+ * 结算口径的现场证据：`POST /openapi/v2/query` 的 `usage` =
+ * `{taskCostTime, consumeMoney, consumeCoins, thirdPartyConsumeMoney, settleMode, chargedPoint}`。
  *
  * 所以模型 id 分成两拨：**标准模型用显示名**（全能图片PRO / 可灵 v3.0 Pro…，见
- * `runninghubEndpoints.ts`），**AI 应用用 `app:` + 应用 id**。生成时按「是不是 `app:` 开头」分派
- * —— 用户不需要理解「这次扣哪本账」，也不会把请求发到它走不通的那条路上。
+ * `runninghubEndpoints.ts`），**AI 应用用 `app:` + 应用 id**（工作流用 `workflow:` + workflowId，
+ * 见 `domain/project/workflowParams.ts`）。生成时按前缀分派 —— 这是**打哪个端点**的区别，
+ * 与"扣哪本账"无关。
  *
  * ## 模型 / 端点两层（2026-10-08 补）
  *
@@ -77,8 +84,19 @@ import {
  *  - 图生视频 v3.1-fast → `1007 参数校验`（提示词只有 3 个字，服务端要求 ≥5）——
  *    图片与档位都过了，这条错误由 `describeRhError` 翻成人话。
  *
- * 没有一条是网络 / 鉴权 / 端点不存在 —— 这是当前余额下能拿到的最强验证；
- * **真正出图**要等「金额」充值（或走 `app:` 那条币路）。
+ * 没有一条是网络 / 鉴权 / 端点不存在 —— 这是当时余额下能拿到的最强验证。
+ *
+ * ## 2026-11-14 第二轮真机（同一站点，账号已变）
+ *
+ * `accountStatus` 回 `{apiType:"NORMAL", remainCoins:"84", remainPoint:30.000, remainMoney:null}`
+ * ⇒ **金额与积分/币已经合成同一个账号的账**，一把 Key 全通（这正是"两把钥匙"那条旧口径作废的现场证据）。
+ * 同轮还实测到三件事实（都只读，没花钱）：
+ *  - `GET /proxy/{apiKey}/object_info` 与 `/system_stats` **都能通**（真起了一个 RTX 4090 的
+ *    ComfyUI 0.3.27）⇒ 官方"原生 ComfyUI 代理"是可用的，将来工作流/本地 ComfyUI 可能共用一套协议；
+ *  - `GET /openapi/v2/run/ai-app/{id}` 与 `/openapi/v2/run/workflow/{id}` **都存在**
+ *    （GET 回 `code:301 PARAMS_INVALID`）⇒ v2 有新的一套 run 路由，旧 `/task/openapi/*` 是另一形态；
+ *  - `/openapi/v2/query` 的错误形状是 **顶层 `errorCode/errorMessage`**（如 `1004 Task not found`），
+ *    没有 `code/msg` —— 解析必须按这条读（本适配器已如此）。
  */
 
 const DEFAULT_HOST = 'https://www.runninghub.cn'
@@ -173,7 +191,7 @@ export function runningHubCapability(model: RunningHubModel): ModelCapability {
   }
 }
 
-/** AI 应用（**币**路）的模型 id 前缀 */
+/** AI 应用（`app:` 前缀）的模型 id 前缀 */
 const APP_PREFIX = 'app:'
 
 /**
@@ -274,10 +292,16 @@ function describeRhError(res: RhResponse, fallback: string): string {
   const message = res.errorMessage || res.msg || res.message || fallback
   const code = String(res.errorCode ?? res.code ?? '')
   if (code === '812' || /余额|balance|insufficient/i.test(message)) {
-    return `${message}（标准模型 API 扣的是「金额」，去 runninghub.cn 充值；用「RH 币」请改选 app: 开头的应用模型）`
+    /**
+     * 812 = 这一行 Key 所属账号的额度不足。**别再讲"金额 Key / 币 Key"**（2026-11-14 实测作废）：
+     * 一把 Key 同时管标准模型与 `app:` 应用，扣哪本账看账号类型与 `settleMode`。
+     * 末尾仍提一句 `app:`，是因为用户手里可能只有币/积分、没有对应额度，
+     * 换个入口（应用 vs 标准模型）确实可能跑得通 —— 但那是"换个更便宜的入口"，不是"换把钥匙"。
+     */
+    return `${message}（这个账号的额度不够：去 runninghub.cn 充值 / 看积分；同一条 Key 也能跑 app: 应用，价格不同）`
   }
   if (/auth|token|key|401|403/i.test(`${code} ${message}`)) {
-    return `${message}（检查这一行的 Key；金额 Key 与币 Key 是两把，别混用）`
+    return `${message}（检查这一行的 Key：一条渠道只需要一个 Key，标准模型 / app: / workflow: 全用它）`
   }
   /**
    * `1007` = **输入没过服务端的参数校验**（2026-10-08 实测两次：坏掉的 base64 图
@@ -660,7 +684,7 @@ export function createRunningHubAdapter(
     return payload
   }
 
-  /** 标准模型端点：建请求体 → 提交 → 轮询 → 下载（两条计费路里的**金额**那条） */
+  /** 标准模型端点：建请求体 → 提交 → 轮询 → 下载 */
   const runSpec = async (
     spec: RunningHubEndpointSpec,
     request: ImageRunRequest | VideoRunRequest,
@@ -706,7 +730,7 @@ export function createRunningHubAdapter(
     )
   }
 
-  /** AI 应用（**币**）：拉节点 → 填提示词 / 图 → 跑 → 轮询 */
+  /** AI 应用（`app:`）：拉节点 → 填提示词 / 图 → 跑 → 轮询 */
   const runApp = async (
     webappId: string,
     request: ImageRunRequest | VideoRunRequest,
@@ -827,10 +851,10 @@ export function createRunningHubAdapter(
   }
 
   /**
-   * 模型清单 = **标准模型**（金额路，来自官方目录）+ **推荐 AI 应用**（币路）。
+   * 模型清单 = **标准模型**（来自官方目录）+ **推荐 AI 应用**（`app:` 前缀）。
    *
    * 应用那一拉是 best-effort：拉不到就只给模型，不让整次验证失败 ——
-   * 用户手里若是「金额 Key」，`aiapp/list` 本来就是空的，那不该被当成「渠道没配好」。
+   * 有些账号 `aiapp/list` 本来就是空的（没发布过/没权限），那不该被当成「渠道没配好」。
    */
   const assertAccountReady = async (signal: AbortSignal): Promise<void> => {
     if (!key) throw new ChannelError({ kind: 'channel', detail: 'missingKey' })

@@ -81,8 +81,24 @@ describe('能力查询', () => {
     expect(protocolSupports('openai-compatible', 'image')).toBe(true)
   })
 
-  it('65535 拆成对话与任务两条协议，能力不互相冒充', () => {
-    expect(protocolSupports('65535', 'chat')).toBe(true)
+  /**
+   * 对账 #1108（2026-11-14 真机更正）：RunningHub **只需要一个 Key**。
+   *
+   * 旧口径（2026-10-08）以为「币 Key 打 AI 应用、金额 Key 打标准模型」，于是声明了两个槽，
+   * 设置页给每条 RunningHub 渠道渲染两行令牌。实测 `accountStatus` 同一把 Key 回
+   * `{apiType, remainMoney, remainCoins, remainPoint}`，任务结果 `usage` 里三种消费字段同时回
+   * ⇒ 扣哪本账由账号类型与 `settleMode` 决定，**不由用哪把 Key 决定**。这条测试钉住"只留一个槽"。
+   */
+  it('★ RunningHub 只有一把钥匙（金额 / 币 / 积分是同一账号的账，不是两个 Key）', () => {
+    const rh = protocolById('runninghub-api')
+    expect(rh?.credentials?.map((item) => item.id)).toEqual(['balance'])
+    expect(rh?.credentials?.[0]?.required).toBe(true)
+    expect(rh?.credentials?.[0]?.label).toBe('API Key')
+    /** 文案里不许再出现"币 Key / 金额 Key"这种过时说法 */
+    expect(JSON.stringify(rh?.credentials)).not.toContain('币 Key')
+  })
+
+  it('65535 拆成对话与任务两条协议，能力不互相冒充', () => {    expect(protocolSupports('65535', 'chat')).toBe(true)
     expect(protocolSupports('65535', 'image')).toBe(true)
     expect(protocolById('65535')?.credentials?.map((item) => item.id)).toEqual([
       'chat',
