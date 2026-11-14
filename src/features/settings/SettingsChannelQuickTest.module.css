@@ -1,0 +1,81 @@
+/*
+ * 「快速测试」那一块的局部样式（对账 #1117）。
+ * 外壳（分区 / 标题 / 按钮）复用 `SettingsWorkflowEntries.module.css` 的同名类，
+ * 这里只放测试自己那几件东西：输入区、模型行、结果区。
+ */
+.input {
+  box-sizing: border-box;
+  width: 100%;
+  padding: var(--space-2);
+  border: var(--border);
+  border-radius: var(--radius-control);
+  background: var(--bg-surface);
+  color: var(--text-1);
+  font-family: var(--font-sans);
+  font-size: var(--fs-body);
+  line-height: 1.6;
+  resize: vertical;
+}
+
+.input::placeholder {
+  color: var(--text-3);
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.select {
+  flex: 1 1 auto;
+  min-width: 0;
+  max-width: 320px;
+  padding: 4px var(--space-2);
+  border: var(--border);
+  border-radius: var(--radius-control);
+  background: var(--bg-surface);
+  color: var(--text-1);
+  font-family: var(--font-sans);
+  font-size: var(--fs-label);
+}
+
+/* 结果区：文本 / 图 / 视频都走「卡面 + 1px 描边」，与设置页其它块一致（不用投影） */
+.text {
+  margin: 0;
+  max-height: 220px;
+  padding: var(--space-2);
+  overflow: auto;
+  border: var(--border);
+  border-radius: var(--radius-control);
+  background: var(--bg-subtle);
+  color: var(--text-1);
+  font-family: var(--font-mono, monospace);
+  font-size: var(--fs-label);
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.media {
+  display: flex;
+  justify-content: center;
+  padding: var(--space-2);
+  border: var(--border);
+  border-radius: var(--radius-control);
+  background: var(--bg-subtle);
+}
+
+.mediaBody {
+  max-width: 100%;
+  max-height: 260px;
+  border-radius: var(--radius-control);
+}
+
+.error {
+  margin: 0;
+  color: var(--danger);
+  font-size: var(--fs-label);
+  line-height: 1.6;
+  word-break: break-word;
+}

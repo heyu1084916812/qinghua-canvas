@@ -11909,6 +11909,70 @@
         "src/features/settings/WorkflowGraphView.test.ts"
       ],
       "budget": 120
+    },
+    {
+      "module": "src/state/channel/channelQuickTest.ts",
+      "owner": "channel-facade",
+      "responsibility": "渠道快速测试的一次真实调用：按模型类别挑适配器方法（图片 / 视频 / 对话），如实回产物或抛错。",
+      "owns": [
+        "类别→适配器方法",
+        "最小请求拼装"
+      ],
+      "doesNotOwn": [
+        "明文 Key 的读取（调用方给）",
+        "界面与结果渲染",
+        "路由与重试"
+      ],
+      "publicApi": [
+        "runChannelQuickTest",
+        "quickTestCategory",
+        "QuickTestOutcome"
+      ],
+      "test": [
+        "src/state/channel/channelQuickTest.test.ts"
+      ],
+      "budget": 140
+    },
+    {
+      "module": "src/features/settings/SettingsChannelQuickTest.tsx",
+      "owner": "settings-ui",
+      "responsibility": "渠道页底部的「快速测试」区块：费用说明 + 输入 + 选模型 + 运行 + 就地显示结果（每个渠道都有）。",
+      "owns": [
+        "测试输入的本地状态",
+        "调用与结果展示",
+        "取消与清理 objectURL"
+      ],
+      "doesNotOwn": [
+        "适配器实现",
+        "凭据存储",
+        "路由策略"
+      ],
+      "publicApi": [
+        "SettingsChannelQuickTest"
+      ],
+      "test": [
+        "src/features/settings/SettingsChannelQuickTest.test.ts"
+      ],
+      "budget": 230
+    },
+    {
+      "module": "src/features/settings/SettingsChannelQuickTest.module.css",
+      "owner": "settings-ui",
+      "responsibility": "「快速测试」块的局部样式（输入区 / 模型行 / 结果区，全部走令牌）。",
+      "owns": [
+        "测试块局部样式"
+      ],
+      "doesNotOwn": [
+        "主题令牌定义",
+        "分区外壳样式（SettingsWorkflowEntries）"
+      ],
+      "publicApi": [
+        "CSS_MODULE:快速测试（input / row / select / text / media / error）"
+      ],
+      "test": [
+        "src/features/settings/SettingsChannelQuickTest.test.ts"
+      ],
+      "budget": 120
     }
   ]
 }

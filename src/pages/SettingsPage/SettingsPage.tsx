@@ -54,6 +54,7 @@ import { SettingsProviderHeaderView } from './settingsPage/SettingsProviderHeade
 import { SettingsConnectionView } from './settingsPage/SettingsConnectionView'
 import { SettingsModelsView } from './settingsPage/SettingsModelsView'
 import { SettingsWorkflowManager } from '../../features/settings/SettingsWorkflowManager'
+import { SettingsChannelQuickTest } from '../../features/settings/SettingsChannelQuickTest'
 import { SettingsChannelRouteView } from './settingsPage/SettingsChannelRouteView'
 import { SettingsProfileDrawerView } from './settingsPage/SettingsProfileDrawerView'
 import { SettingsChannelContextMenuView } from './settingsPage/SettingsChannelContextMenuView'
@@ -771,6 +772,9 @@ export function SettingsPage({ embedded = false }: { embedded?: boolean } = {}) 
               {selected.protocol === 'runninghub-api' ? (
                 <SettingsWorkflowManager channel={selected} groupId={activeGroup?.id} channels={channels} platform={platform} />
               ) : null}
+
+              {/* 快速测试是**渠道公共能力**（#1117）：每条渠道页都有，真的调一次生成接口 */}
+              <SettingsChannelQuickTest channel={selected} groupId={activeGroup?.id} channels={channels} platform={platform} />
 
               <SettingsChannelRouteView
                 priority={selected.priority}
