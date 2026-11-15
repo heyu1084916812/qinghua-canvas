@@ -448,3 +448,17 @@ describe('会话互不串味与实时取值', () => {
       .toBe('explicit-img')
   })
 })
+describe('Agent 只用 API 来源（#1133 逻辑 6）', () => {
+  it('选中节点 / 会话 / 显式里的 cli: / workflow: 模型都不进候选，落到下一层的 API 模型', () => {
+    const ch = catalogChannel({ id: 'ch-a', models: [cap('selected-img'), cap('cli:jimeng'), cap('workflow:9')] })
+    const { ctx } = harness({
+      explicit: { image: 'cli:jimeng' },
+      session: { id: 's1', channelId: 'ch-a', imageModel: 'workflow:9' },
+      selected: { image: 'selected-img' },
+      enabledChannels: [ch],
+      allChannels: [ch],
+    })
+    expect(ctx.recipeForGenerated('generation', genNode({ model: 'app:1' }))).toEqual({ channelId: 'ch-a', model: 'selected-img' })
+    expect(ctx.explicitRecipeForGenerated('generation', genNode({}))).toBeUndefined()
+  })
+})

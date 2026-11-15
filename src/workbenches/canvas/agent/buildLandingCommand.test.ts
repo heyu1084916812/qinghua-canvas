@@ -564,3 +564,36 @@ describe('buildLandingCommand：落在原素材右边 + 参考图必须有连线
     expect(r.command.edges).toEqual([{ source: 'p-old', target: r.idOf.g1 }])
   })
 })
+
+describe('buildLandingCommand：Agent 生成只用 API 来源（#1133 逻辑 6）', () => {
+  const planOf = (planned: Record<string, unknown>, attach = false): AgentPlan => ({
+    summary: 'x',
+    nodes: [
+      ...(attach ? [{ localId: 'src', type: 'generation' as const, data: {}, order: 0 }] : []),
+      { localId: 'g1', type: 'generation', data: planned, order: 1 },
+    ],
+    edges: attach ? [{ source: 'src', target: 'g1' }] : [],
+    ...(attach ? { attach: [{ localId: 'src', existingNodeId: 'old-1' }] } : {}),
+  })
+  const dataFor = () => ({ channelId: 'ch-def', model: '默认模型' })
+  const landedData = (plan: AgentPlan, nodes: NodeSnapshot[] = [], extra = {}) => {
+    seq = 0
+    const r = buildLandingCommand({ plan, graph: graph(nodes), origin: { x: 0, y: 0 }, newId, dataFor, ...extra })
+    return r.command.nodes.find((node) => node.type === 'generation')!.data as Record<string, unknown>
+  }
+
+  it('计划里写了 cli: / workflow: 模型 → 不采用，落回渠道默认，并标 source: api', () => {
+    expect(landedData(planOf({ model: 'cli:jimeng', channelId: 'cli:jimeng' }))).toMatchObject({ model: '默认模型', channelId: 'ch-def', source: 'api' })
+    expect(landedData(planOf({ model: 'workflow:9', channelId: 'rh' }))).toMatchObject({ model: '默认模型', source: 'api' })
+  })
+
+  it('引用的参考图节点是 CLI / 工作流来源 → 不继承它的渠道与模型', () => {
+    const src = { ...existing('old-1', 'generation'), data: { source: 'cli', channelId: 'cli:jimeng', model: 'cli:jimeng' } } as NodeSnapshot
+    expect(landedData(planOf({}, true), [src])).toMatchObject({ model: '默认模型', channelId: 'ch-def', source: 'api' })
+  })
+
+  it('本轮显式选的若是条目模型也不采用；普通 API 模型照常压上去', () => {
+    expect(landedData(planOf({}), [], { explicitFor: () => ({ channelId: 'rh', model: 'app:1' }) })).toMatchObject({ model: '默认模型' })
+    expect(landedData(planOf({}), [], { explicitFor: () => ({ channelId: 'ch-u', model: 'GPT Image 2' }) })).toMatchObject({ model: 'GPT Image 2', channelId: 'ch-u' })
+  })
+})

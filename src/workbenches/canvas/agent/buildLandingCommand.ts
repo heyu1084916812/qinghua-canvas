@@ -15,6 +15,7 @@ import type {
 import { getSpec } from '../../../domain/canvas/nodeSpecs/registry'
 import { toWorldRectInGraph } from '../../../domain/canvas/geometry/coords'
 import { RECIPE_TRACKED_KEYS } from '../../../domain/project/generationPreset'
+import { NON_API_MODEL } from '../../../domain/canvas/model/generationSource'
 import type { Command } from '../../../state/commands'
 
 /**
@@ -107,6 +108,18 @@ function nonEmptyPlannedData(data: Record<string, unknown>): Record<string, unkn
       return typeof value !== 'string' || value.trim() !== ''
     }),
   )
+}
+
+/**
+ * Agent 生成**只用 API 来源**（对账 #1133 逻辑 6）：哪一层带来的是工作流条目 / 本机 CLI 模型
+ * （计划里写的、参考图节点继承的、会话选过的），这一层的渠道 + 模型都不要，交给下一层 / 渠道默认。
+ */
+function apiOnly(data: Record<string, unknown> | undefined): Record<string, unknown> {
+  if (!data || typeof data.model !== 'string' || !NON_API_MODEL.test(data.model)) return data ?? {}
+  const { channelId: _channelId, model: _model, ...rest } = data
+  void _channelId
+  void _model
+  return rest
 }
 
 /** 每种节点的默认尺寸 —— 从 `nodeSpecs` 取，不写第二份（词表同理，见 §5.2） */
@@ -348,14 +361,15 @@ export function buildLandingCommand(input: BuildLandingInput): LandingPayload {
        */
       data: {
         ...(spec?.createDefaultData() ?? {}),
-        ...(input.dataFor?.(node.type, node) ?? {}),
+        ...apiOnly(input.dataFor?.(node.type, node)),
         /**
          * 「沿用你 @ 的那张图的模型与参数」——压在渠道默认**之上**、计划数据**之下**。
          * 所以用户点名要换的东西照样赢，只有他没提的那些才继承。
          */
-        ...recipeFromAttached({ plan, graph, node }),
-        ...nonEmptyPlannedData(node.data),
-        ...(input.explicitFor?.(node.type, node) ?? {}),
+        ...apiOnly(recipeFromAttached({ plan, graph, node })),
+        ...apiOnly(nonEmptyPlannedData(node.data)),
+        ...apiOnly(input.explicitFor?.(node.type, node)),
+        ...(node.type === 'generation' || node.type === 'batch' ? { source: 'api' } : {}),
         ...(node.type === 'generation'
           ? (() => {
               const contextAssets = input.contextAssetsFor?.(node.type, node)

@@ -11,6 +11,11 @@ import {
 } from '../../../../domain/agent/seriesAnchors'
 import { imageContextAssets } from './agentToolContextAssets'
 import { preferredGeneratedModel } from './mediaMentions'
+import { NON_API_MODEL } from '../../../../domain/canvas/model/generationSource'
+
+/** Agent 只用 API 来源（#1133）：条目 / 本机 CLI 模型不进候选，落到下一层 */
+const apiModel = (model: string | undefined): string | undefined =>
+  model && !NON_API_MODEL.test(model) ? model : undefined
 
 export interface AgentToolRecipeSession {
   id: string
@@ -81,11 +86,11 @@ export function createAgentToolRecipeContext(
           : input.session?.imageModel
       const stored = input.getStickyModels()[kind]
       const model = preferredGeneratedModel({
-        explicit,
-        planned,
-        sessionPicked,
-        sticky: stored,
-        selected: input.selectedModelOf(kind),
+        explicit: apiModel(explicit),
+        planned: apiModel(planned),
+        sessionPicked: apiModel(sessionPicked),
+        sticky: apiModel(stored),
+        selected: apiModel(input.selectedModelOf(kind)),
       })
       if (!model) return undefined
       const channelId = channelIdForLogical(
@@ -105,7 +110,7 @@ export function createAgentToolRecipeContext(
     explicitRecipeForGenerated: (type, node) => {
       if (type !== 'generation') return undefined
       const kind = node.data.mode === 'video' ? 'video' : 'image'
-      const model = input.getExplicitMediaModels()?.[kind]
+      const model = apiModel(input.getExplicitMediaModels()?.[kind])
       if (!model) return undefined
       const channelId = channelIdForLogical(
         input.enabledChannels,

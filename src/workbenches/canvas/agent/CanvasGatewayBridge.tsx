@@ -1,3 +1,4 @@
+import { NON_API_MODEL } from '../../../domain/canvas/model/generationSource'
 import { useEffect } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
@@ -149,7 +150,8 @@ export function CanvasGatewayBridge({
             const kind = node.data.mode === 'video' ? 'video' : 'image'
             const planned =
               typeof node.data.model === 'string' ? node.data.model.trim() : ''
-            const model = planned || selectedModelOf(kind)
+            /** 外部 MCP 建的生成节点同样只用 API 来源（#1133）：条目 / CLI 模型不当配方 */
+            const model = [planned, selectedModelOf(kind)].find((item) => item && !NON_API_MODEL.test(item))
             if (!model) return undefined
             const channelId = channelIdForLogical(channels.enabledChannels(), model)
             return channelId ? { channelId, model } : undefined
