@@ -11,6 +11,7 @@ import {
 } from '../../../domain/project/modelRouting'
 import type { RoutePlanResult } from '../../../domain/project/routePlan'
 import type { ChannelAdapter } from '../../../platform/channels/types'
+import { isCliTaskModel, routeCliTasks, type CliRouteDeps } from './cliSourceRoute'
 import {
   asAppError,
   describeError,
@@ -72,6 +73,8 @@ export interface CanvasRunPreflightInput {
     credentialGroupId?: string
   }) => Promise<ChannelAdapter>
   random?: number
+  /** 本机 CLI 来源（`cli:<tool>`）的工具表与命令检测；不传 = 当作没有本机 CLI（#1133） */
+  cli?: CliRouteDeps
 }
 
 export function canceledRun(): CanvasRunLaunchFailure {
@@ -177,9 +180,16 @@ export async function prepareCanvasRun(
   }))
   const strategy = input.routeStrategy()
   const failures: CanvasRunPreflightFailure[] = []
+  /** `cli:` 任务不经渠道表选路：就地改写成合成的 CLI 渠道，拦截原因先收进来（#1133） */
+  const cliRoute = await routeCliTasks(plan.tasks, input.cli ?? { hasLocalCli: false, loadTools: async () => [], which: async () => null })
+  for (const failure of cliRoute.failures) {
+    failures.push({ ...failure, error: { kind: 'validation', field: '本机 CLI', reason: failure.message } })
+  }
+  if (signal?.aborted) return canceledRun()
 
   for (const task of plan.tasks) {
     if (signal?.aborted) return canceledRun()
+    if (cliRoute.channels.has(task.request.channelId) || isCliTaskModel(task.request.model)) continue
     const logical = task.request.model
     const explicitChannelId = task.request.channelId.trim()
     const routed = resolveNodeRoute(sources, logical, explicitChannelId, {
@@ -292,7 +302,7 @@ export async function prepareCanvasRun(
             model: task.request.model,
           }))
     for (const candidate of candidates) {
-      const channel = all.find((item) => item.id === candidate.channelId)
+      const channel = all.find((item) => item.id === candidate.channelId) ?? cliRoute.channels.get(candidate.channelId)
       if (!channel) continue
       const mapKey = adapterKey(
         candidate.channelId,
@@ -338,7 +348,7 @@ export async function prepareCanvasRun(
     const usedChannels = task.request.routeCandidates?.length
       ? task.request.routeCandidates.map((candidate) => candidate.channelId)
       : [task.request.channelId]
-    return usedChannels.some((channelId) => !currentChannels.has(channelId))
+    return usedChannels.some((channelId) => !currentChannels.has(channelId) && !cliRoute.channels.has(channelId))
   })
   if (vanished.length > 0) {
     return failedPreflight(

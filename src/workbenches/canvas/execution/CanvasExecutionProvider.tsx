@@ -58,10 +58,8 @@ import {
   subscribeCanvasRunStates,
   updateCanvasRunStates,
 } from './canvasRunState'
-import {
-  activateCanvasExecutionRuntime,
-  peekCanvasExecutionRuntime,
-} from './canvasExecutionRuntime'
+import { activateCanvasExecutionRuntime, peekCanvasExecutionRuntime } from './canvasExecutionRuntime'
+import { cliRouteDepsOf } from './cliSourceRoute'
 import {
   adapterKey,
   canceledRun,
@@ -444,6 +442,7 @@ export function CanvasExecutionProvider({
         currentChannels: () => channels.getState().channels,
         routeStrategy: () => channels.getState().routeStrategy,
         hasLocalCli: platform.cli != null,
+        cli: cliRouteDepsOf(platform),
         loadCredential: (credentialRef) => repo.credentials.load(credentialRef),
         planGenerationRoute: (opts) => channels.planGenerationRoute(opts),
         resolveAdapter: async ({

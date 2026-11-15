@@ -12462,6 +12462,33 @@
         "src/domain/canvas/model/generationSource.test.ts"
       ],
       "budget": 220
+    },
+    {
+      "module": "src/workbenches/canvas/execution/cliSourceRoute.ts",
+      "owner": "canvas-execution",
+      "responsibility": "本机 CLI 来源（cli:<tool>）的运行前检查与选路：网页版 / 工具不存在 / 能力不符 / 未检测到命令就拦截，否则合成 CLI 渠道视图交给原适配器工厂（对账 #1133）。",
+      "owns": [
+        "cli: 任务的拦截文案",
+        "合成 CLI 渠道视图",
+        "执行宿主的 CLI 检查依赖装配"
+      ],
+      "doesNotOwn": [
+        "子进程执行（platform/channels/cliRun）",
+        "工具配置读写（state/project/cliToolStore）",
+        "普通渠道选路"
+      ],
+      "publicApi": [
+        "routeCliTasks",
+        "cliRouteDepsOf",
+        "cliChannelFor",
+        "isCliTaskModel",
+        "CliRouteDeps"
+      ],
+      "test": [
+        "src/workbenches/canvas/execution/cliSourceRoute.test.ts",
+        "src/workbenches/canvas/execution/provider/cliSourceExecution.test.ts"
+      ],
+      "budget": 170
     }
   ]
 }
