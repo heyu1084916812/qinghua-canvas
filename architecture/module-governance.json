@@ -11869,6 +11869,29 @@
       "budget": 450
     },
     {
+      "module": "src/features/settings/useWorkflowEntries.ts",
+      "owner": "settings-workflow-entries",
+      "responsibility": "AI 应用 / 工作流条目的读写钩子：首次读取门闩、按 Transform 串行写库（store.update）再同步界面、导入 / 重新拉取 / 删除 / 保存参数 / 市场导入与模型注册（独立页面与渠道页共用）。",
+      "owns": [
+        "条目读写与并发口径",
+        "导入与模型注册"
+      ],
+      "doesNotOwn": [
+        "条目存储格式（state/channel/workflowEntryStore）",
+        "页面渲染"
+      ],
+      "publicApi": [
+        "useWorkflowEntries",
+        "WorkflowEntriesState",
+        "UseWorkflowEntriesArgs",
+        "sameEntry"
+      ],
+      "test": [
+        "src/features/settings/useWorkflowEntries.test.ts"
+      ],
+      "budget": 320
+    },
+    {
       "module": "src/domain/project/workflowGraph.ts",
       "owner": "canvas-creation-ui",
       "responsibility": "工作流节点图：从 workflow JSON 抽节点与连线、按依赖深度自动分层布局、取输出节点、归一化快照。",

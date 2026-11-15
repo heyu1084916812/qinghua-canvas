@@ -1,26 +1,9 @@
-import { parseWorkflowEntryRef } from '../../domain/project/workflowEntryRef'
-import { errorTextOf } from '../../shared/result'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useState } from 'react'
 import type { Channel } from '../../domain/project/channel'
 import type { ChannelStore } from '../../state/channel/channelStore'
 import type { PlatformKit } from '../../platform/ports'
-import {
-  mergeRefetchedFields,
-  workflowModelId,
-  type WorkflowEntry,
-  type WorkflowParamField,
-} from '../../domain/project/workflowParams'
-import { workflowEntryCategory } from '../../domain/project/workflowParamValues'
-import type { ModelCapability } from '../../domain/shared/capability'
-import { createWorkflowEntryStore } from '../../state/channel/workflowEntryStore'
-import { fetchWorkflowBundle, fetchAppBundle } from '../../platform/channels/runninghubWorkflow'
-import {
-  fetchRhMarketEntries,
-  fetchRhMarketRelatedId,
-  runtimeOnly,
-  RH_MARKET_DEFAULT_HOST,
-  type RhMarketEntry,
-} from '../../platform/channels/runninghubMarket'
+import type { WorkflowParamField } from '../../domain/project/workflowParams'
+import { useWorkflowEntries } from './useWorkflowEntries'
 import { SettingsWorkflowEntryPage } from './SettingsWorkflowEntryPage'
 import styles from './SettingsWorkflowEntries.module.css'
 
@@ -49,195 +32,15 @@ export function SettingsWorkflowManager({
   open: openProp,
   onOpenChange,
 }: SettingsWorkflowManagerProps) {
-  const store = useMemo(() => createWorkflowEntryStore(platform.storage), [platform.storage])
   const [internalOpen, setInternalOpen] = useState(false)
   const open = openProp ?? internalOpen
   const setOpen = onOpenChange ?? setInternalOpen
-  const [entries, setEntries] = useState<WorkflowEntry[]>([])
+  const state = useWorkflowEntries({ channel, groupId, channels, platform })
+  const { apps, workflows, entries, busy, ready, error, notice, patchEntry } = state
   const [editingId, setEditingId] = useState<string | null>(null)
   const [input, setInput] = useState('')
-  const [busy, setBusy] = useState(false)
-  const [error, setError] = useState('')
-  const [notice, setNotice] = useState('')
-  const [marketOpen, setMarketOpen] = useState(false)
-  const [market, setMarket] = useState<RhMarketEntry[]>([])
-
-  useEffect(() => {
-    void store.load(channel.id).then(setEntries)
-  }, [channel.id, store])
-
-  const persist = useCallback(
-    async (next: WorkflowEntry[]) => {
-      setEntries(next)
-      await store.save(channel.id, next)
-    },
-    [channel.id, store],
-  )
-
-  const modelsNow = useCallback(() => {
-    const group = groupId ? channel.credentialGroups.find((item) => item.id === groupId) : null
-    return group ? group.models : channel.models
-  }, [channel, groupId])
-
-  const registerModel = useCallback(
-    async (entry: WorkflowEntry, remove = false) => {
-      const id = entry.kind === 'app' ? `app:${entry.id}` : workflowModelId(entry.id)
-      const current = modelsNow()
-      const next = remove
-        ? current.filter((model) => model.id !== id)
-        : current.some((model) => model.id === id)
-          ? current
-          : [...current, { id, category: workflowEntryCategory(entry), inputTypes: ['text', 'image'] as ModelCapability['inputTypes'] }]
-      await channels.setModels(channel.id, [...next], groupId)
-    },
-    [channel.id, channels, groupId, modelsNow],
-  )
-
-  const pullFields = useCallback(
-    async (id: string, kind: 'workflow' | 'app') => {
-      /** 读 Key 可能抛（例如桌面壳保存的 DPAPI 凭据在 Web 环境解不开）—— 一律当"没 Key"，给同一句人话 */
-      let key: string | null = null
-      try {
-        key = await channels.loadToken(channel.id)
-      } catch {
-        key = null
-      }
-      if (!key) throw new Error('先在上面填好这条渠道的 API Key —— 拉参数要用它')
-      const endpoint = { host: channel.baseUrl || RH_MARKET_DEFAULT_HOST, apiKey: key }
-      const signal = AbortSignal.timeout(30_000)
-      if (kind === 'app') {
-        const bundle = await fetchAppBundle({ network: platform.network }, endpoint, id, signal)
-        return {
-          fields: bundle.fields,
-          title: bundle.meta.title,
-          coverUrl: bundle.meta.coverUrl,
-          graph: undefined,
-        }
-      }
-      /** 工作流一次拿齐字段 + 节点图（同一个响应里都有，别请求两遍） */
-      const bundle = await fetchWorkflowBundle({ network: platform.network }, endpoint, id, signal)
-      return { fields: bundle.fields, title: '', coverUrl: undefined, graph: bundle.graph }
-    },
-    [channel.baseUrl, channel.id, channels, platform.network],
-  )
-
-  const addEntry = useCallback(
-    async (id: string, kind: 'workflow' | 'app', title?: string, coverUrl?: string, note?: string, quiet = false) => {
-      setBusy(true)
-      setError('')
-      setNotice('')
-      try {
-        const pulled = await pullFields(id, kind)
-        const entry: WorkflowEntry = {
-          id,
-          kind,
-          title: title || pulled.title || `${kind === 'app' ? 'AI 应用' : '工作流'} ${id}`,
-          provider: 'runninghub',
-          fields: pulled.fields,
-          ...(pulled.graph ? { graph: pulled.graph } : {}),
-          fetchedAt: Date.now(),
-          ...(note ? { note } : {}),
-          ...(coverUrl || pulled.coverUrl ? { coverUrl: coverUrl ?? pulled.coverUrl } : {}),
-        }
-        const next = [...entries.filter((item) => !(item.id === id && (item.kind ?? 'workflow') === kind)), entry]
-        await persist(next)
-        await registerModel(entry)
-        setNotice(`已导入「${entry.title}」：${pulled.fields.length} 个可改参数`)
-        setInput('')
-        return true
-      } catch (e) {
-        if (!quiet) setError(errorTextOf(e))
-        return false
-      } finally {
-        setBusy(false)
-      }
-    },
-    [entries, persist, pullFields, registerModel],
-  )
-
-  const removeEntry = useCallback(
-    async (entry: WorkflowEntry) => {
-      await persist(entries.filter((item) => !(item.id === entry.id && (item.kind ?? 'workflow') === (entry.kind ?? 'workflow'))))
-      await registerModel(entry, true)
-      setNotice(`已删除「${entry.title}」`)
-    },
-    [entries, persist, registerModel],
-  )
-
-  const patchEntry = useCallback(
-    async (entry: WorkflowEntry, patch: Partial<WorkflowEntry>) => {
-      const next = entries.map((item) =>
-        item.id === entry.id && (item.kind ?? 'workflow') === (entry.kind ?? 'workflow')
-          ? { ...item, ...patch }
-          : item,
-      )
-      await persist(next)
-    },
-    [entries, persist],
-  )
-
-  /**
-   * 重新拉取（参考图五右上角那颗）：用**上游此刻返回的**节点与参数覆盖快照。
-   *
-   * 与首次导入走同一个 `pullFields`（真实 `getJsonApiFormat`），差别只在合并策略：
-   * 用户勾过的暴露状态 / 改过的显示名要保留（`mergeRefetchedFields`），节点图整份换新。
-   */
-  const refetch = async (entry: WorkflowEntry) => {
-    setBusy(true)
-    setError('')
-    setNotice('')
-    try {
-      const pulled = await pullFields(entry.id, entry.kind ?? 'workflow')
-      await patchEntry(entry, {
-        fields: mergeRefetchedFields(entry.fields, pulled.fields),
-        fetchedAt: Date.now(),
-        ...(pulled.graph ? { graph: pulled.graph } : {}),
-      })
-      setNotice(`已重新拉取：${pulled.fields.length} 个参数`)
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e))
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  const openMarket = useCallback(async () => {
-    setMarketOpen(true)
-    setError('')
-    try {
-      const list = await fetchRhMarketEntries(
-        platform,
-        { kind: 'WORKFLOW', host: channel.baseUrl || RH_MARKET_DEFAULT_HOST },
-        AbortSignal.timeout(30_000),
-      )
-      setMarket(runtimeOnly(list))
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e))
-    }
-  }, [channel.baseUrl, platform])
-
-  const addFromMarket = useCallback(
-    async (item: RhMarketEntry) => {
-      setBusy(true)
-      try {
-        const workflowId = await fetchRhMarketRelatedId(
-          platform,
-          item.skuId,
-          { host: channel.baseUrl || RH_MARKET_DEFAULT_HOST },
-          AbortSignal.timeout(30_000),
-        )
-        await addEntry(workflowId, 'workflow', item.title, item.coverUrl)
-      } catch (e) {
-        setError(e instanceof Error ? e.message : String(e))
-      } finally {
-        setBusy(false)
-      }
-    },
-    [addEntry, channel.baseUrl, platform],
-  )
-
-  const apps = entries.filter((entry) => entry.kind === 'app')
-  const workflows = entries.filter((entry) => (entry.kind ?? 'workflow') === 'workflow')
+  const marketOpen = state.market !== null
+  const market = state.market ?? []
   const editing = entries.find((entry) => entry.id === editingId) ?? null
 
   if (!open) {
@@ -268,13 +71,10 @@ export function SettingsWorkflowManager({
         channels={channels}
         platform={platform}
         onBack={() => setEditingId(null)}
-        onRefetch={() => void refetch(editing)}
+        onRefetch={() => void state.refetch(editing)}
         onPatch={patchEntry}
         onSaveFields={async (fields: WorkflowParamField[]) => {
-          await patchEntry(editing, { fields })
-          await registerModel({ ...editing, fields })
-          setEditingId(null)
-          setNotice(`「${editing.title}」参数已保存`)
+          if (await state.saveFields(editing, fields)) setEditingId(null)
         }}
       />
     )
@@ -301,21 +101,12 @@ export function SettingsWorkflowManager({
         <button
           type="button"
           className={styles.btnPrimary}
-          disabled={busy || !input.trim()}
-          onClick={() => {
-            const parsed = parseWorkflowEntryRef(input)
-            if (!parsed) {
-              setError('认不出这个链接：要 /ai-detail/…、/run/ai-app/… 或 /run/workflow/…，或纯数字 id')
-              return
-            }
-            /* 纯数字 id 种类不定：先按工作流拉，拉不到再按应用试（#1128 L4） */
-            if (parsed.kind) void addEntry(parsed.id, parsed.kind)
-            else void addEntry(parsed.id, 'workflow', undefined, undefined, undefined, true).then((ok) => (ok ? true : addEntry(parsed.id, 'app')))
-          }}
+          disabled={busy || !ready || !input.trim()}
+          onClick={() => void state.importRef(input).then((entry) => entry && setInput(''))}
         >
           导入
         </button>
-        <button type="button" className={styles.btn} disabled={busy} onClick={() => void openMarket()}>
+        <button type="button" className={styles.btn} disabled={busy || !ready} onClick={() => void state.openMarket()}>
           从市场导入
         </button>
       </div>
@@ -327,7 +118,7 @@ export function SettingsWorkflowManager({
         <div className={styles.market} data-workflow-market>
           <div className={styles.marketHead}>
             <span className={styles.marketTitle}>市场 · 工作流（只扣运行时长）</span>
-            <button type="button" className={styles.linkBtn} onClick={() => setMarketOpen(false)}>
+            <button type="button" className={styles.linkBtn} onClick={state.closeMarket}>
               收起
             </button>
           </div>
@@ -338,7 +129,7 @@ export function SettingsWorkflowManager({
                   <span className={styles.marketName}>{item.title}</span>
                   <span className={styles.marketMeta}>{item.categoryName} · 运行时长费用</span>
                 </div>
-                <button type="button" className={styles.btn} disabled={busy} onClick={() => void addFromMarket(item)}>
+                <button type="button" className={styles.btn} disabled={busy || !ready} onClick={() => void state.addFromMarket(item)}>
                   导入
                 </button>
               </li>
@@ -395,7 +186,7 @@ export function SettingsWorkflowManager({
                     <button type="button" className={styles.linkBtn} onClick={() => setEditingId(entry.id)}>
                       设置
                     </button>
-                    <button type="button" className={styles.linkBtn} onClick={() => void removeEntry(entry)}>
+                    <button type="button" className={styles.linkBtn} onClick={() => void state.removeEntry(entry)}>
                       删除
                     </button>
                   </div>
