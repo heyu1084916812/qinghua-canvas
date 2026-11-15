@@ -18,6 +18,7 @@ import {
   type RhMarketEntry,
 } from '../../platform/channels/runninghubMarket'
 import { WorkflowFieldEditor } from './WorkflowFieldEditor'
+import { SettingsWorkflowTestRun } from './SettingsWorkflowTestRun'
 import styles from './SettingsWorkflowEntries.module.css'
 
 /**
@@ -32,6 +33,9 @@ export type SettingsWorkflowManagerProps = {
   groupId?: string
   channels: ChannelStore
   platform: PlatformKit
+  /** 受控展开（渠道页的「AI 应用和工作流」按钮用它把这块打开）；不传就自己管 */
+  open?: boolean
+  onOpenChange?: (open: boolean) => void
 }
 
 function kindOfId(raw: string): { id: string; kind: 'workflow' | 'app' } | null {
@@ -50,9 +54,13 @@ export function SettingsWorkflowManager({
   groupId,
   channels,
   platform,
+  open: openProp,
+  onOpenChange,
 }: SettingsWorkflowManagerProps) {
   const store = useMemo(() => createWorkflowEntryStore(platform.storage), [platform.storage])
-  const [open, setOpen] = useState(false)
+  const [internalOpen, setInternalOpen] = useState(false)
+  const open = openProp ?? internalOpen
+  const setOpen = onOpenChange ?? setInternalOpen
   const [entries, setEntries] = useState<WorkflowEntry[]>([])
   const [editingId, setEditingId] = useState<string | null>(null)
   const [input, setInput] = useState('')
@@ -291,6 +299,8 @@ export function SettingsWorkflowManager({
                 </select>
               </label>
             ) : null}
+            {/* 参考图四 / 图五：左栏底部就是「测试运行」 */}
+            <SettingsWorkflowTestRun channel={channel} entry={editing} groupId={groupId} channels={channels} platform={platform} />
           </div>
           <div className={styles.fieldPane}>
             <WorkflowFieldEditor
@@ -399,13 +409,26 @@ export function SettingsWorkflowManager({
                   )}
                   <div className={styles.cardText}>
                     {/*
-                      卡片只**读**：名称与备注都在「设置」里改（参考产品就是这样的分工）。
-                      原来这里挂着输入框和备注框，一张卡被撑成半屏，还容易改到一半就走人。
+                      参考图三：名称与备注**就在卡片上改**（左侧封面、右侧名称 / 路由 / 备注，
+                      最右是齿轮与删除）。上一版把它们收进设置页，扫列表时反而要多点一次。
                     */}
-                    <span className={styles.cardTitle}>{entry.title}</span>
-                    {/* id 太长会把窄栏挤成两行，这里只留「几个参数」；完整 id 在设置页抬头 */}
-                    <span className={styles.meta}>{entry.fields.length} 个参数</span>
-                    {entry.note ? <span className={styles.cardNote}>{entry.note}</span> : null}
+                    <span className={styles.meta}>名称</span>
+                    <input
+                      className={styles.inputSm}
+                      value={entry.title}
+                      onChange={(event) => void patchEntry(entry, { title: event.target.value })}
+                    />
+                    <span className={styles.meta}>
+                      #{entry.kind === 'app' ? '/run/ai-app/' : '/run/workflow/'}
+                      {entry.id} · {entry.fields.length} 个参数
+                    </span>
+                    <textarea
+                      className={styles.input}
+                      rows={2}
+                      placeholder="备注、用途、参数说明"
+                      value={entry.note ?? ''}
+                      onChange={(event) => void patchEntry(entry, { note: event.target.value })}
+                    />
                   </div>
                   <div className={styles.actions}>
                     <button type="button" className={styles.linkBtn} onClick={() => setEditingId(entry.id)}>

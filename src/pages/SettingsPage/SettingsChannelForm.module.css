@@ -555,3 +555,7 @@
 .disclosure > summary { padding: var(--space-2) var(--space-3); color: var(--text-2); font-size: var(--fs-label); font-weight: 600; cursor: pointer; list-style: none; }
 .disclosure > summary::-webkit-details-marker { display: none; }
 .disclosure[open] > summary { border-bottom: var(--border); }
+
+/* 打开「代码映射 · 应用与工作流」时整页只留它：参考图三那是**整页**，不是表单里的一块 */
+/* 条目设置页是同一块的「下一页」，所以两个根属性都算这一页 */
+.form[data-workflow-manager-open='true'] > :not([data-workflow-manager]):not([data-workflow-entry-settings]) { display: none; }

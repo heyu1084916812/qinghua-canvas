@@ -11997,6 +11997,50 @@
         "src/domain/project/runninghubSite.test.ts"
       ],
       "budget": 90
+    },
+    {
+      "module": "src/pages/SettingsPage/settingsPage/SettingsKeyGroupView.tsx",
+      "owner": "settings-ui",
+      "responsibility": "渠道连接区的 Key 分组：标签页、令牌字段、以及默认折叠的分组设置（名称/优先级/删除）。",
+      "owns": [
+        "Key 分组的展示与切换",
+        "分组设置的折叠编辑"
+      ],
+      "doesNotOwn": [
+        "凭据读写（ChannelTokenField / channelStore）",
+        "渠道页布局",
+        "协议选择"
+      ],
+      "publicApi": [
+        "SettingsKeyGroupView",
+        "SettingsKeyGroupViewProps"
+      ],
+      "test": [
+        "src/pages/SettingsPage/settingsPage/SettingsPageViews.test.ts"
+      ],
+      "budget": 200
+    },
+    {
+      "module": "src/features/settings/SettingsWorkflowTestRun.tsx",
+      "owner": "settings-ui",
+      "responsibility": "条目设置页的「测试运行」：用该条目已暴露字段的默认值，通过渠道适配器真实跑一次并就地回结果。",
+      "owns": [
+        "测试运行的本地状态",
+        "按条目拼 nodeInfoList",
+        "结果与错误展示"
+      ],
+      "doesNotOwn": [
+        "适配器实现",
+        "凭据存储",
+        "参数暴露配置"
+      ],
+      "publicApi": [
+        "SettingsWorkflowTestRun"
+      ],
+      "test": [
+        "src/features/settings/SettingsWorkflowManager.test.ts"
+      ],
+      "budget": 150
     }
   ]
 }

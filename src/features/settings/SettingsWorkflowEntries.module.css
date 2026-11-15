@@ -585,3 +585,6 @@
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+/* 卡片里那两行要铺满（图三：名称与备注都是整行）；flex 列里 basis:auto 会按内容缩 */
+.cardText input, .cardText textarea { width: 100%; box-sizing: border-box; }

@@ -31,6 +31,8 @@ export interface QuickTestInput {
   model: string
   category: QuickTestCategory
   prompt: string
+  /** 额外下发参数（工作流 / AI 应用的 `nodeInfoList` 走这里） */
+  params?: Record<string, unknown>
   signal: AbortSignal
 }
 
@@ -51,7 +53,7 @@ export async function runChannelQuickTest(input: QuickTestInput): Promise<QuickT
     model: input.model,
     prompt: input.prompt,
     inputs: [],
-    params: {},
+    params: input.params ?? {},
   }
 
   if (input.category === 'chat') {
