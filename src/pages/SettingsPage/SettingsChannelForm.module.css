@@ -559,3 +559,8 @@
 /* 打开「代码映射 · 应用与工作流」时整页只留它：参考图三那是**整页**，不是表单里的一块 */
 /* 条目设置页是同一块的「下一页」，所以两个根属性都算这一页 */
 .form[data-workflow-manager-open='true'] > :not([data-workflow-manager]):not([data-workflow-entry-settings]) { display: none; }
+
+/* 渠道页底部：删除（左） / 保存（右），与参考图一一致 */
+.formActions { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); padding-top: var(--space-2); border-top: var(--border); }
+.formActions button { padding: var(--space-1) var(--space-3); border: var(--border); border-radius: var(--radius-control); background: var(--bg-surface); color: var(--text-1); font-size: var(--fs-label); cursor: pointer; }
+.formActions .danger { color: var(--danger); }

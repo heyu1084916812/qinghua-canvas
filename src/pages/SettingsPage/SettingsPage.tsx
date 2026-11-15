@@ -56,6 +56,7 @@ import { SettingsModelsView } from './settingsPage/SettingsModelsView'
 import { SettingsWorkflowManager } from '../../features/settings/SettingsWorkflowManager'
 import { SettingsChannelQuickTest } from '../../features/settings/SettingsChannelQuickTest'
 import { runninghubSiteNote } from '../../domain/project/runninghubSite'
+import { SettingsChannelActionBar } from './settingsPage/SettingsChannelActionBar'
 import { SettingsChannelRouteView } from './settingsPage/SettingsChannelRouteView'
 import { SettingsProfileDrawerView } from './settingsPage/SettingsProfileDrawerView'
 import { SettingsChannelContextMenuView } from './settingsPage/SettingsChannelContextMenuView'
@@ -748,8 +749,6 @@ export function SettingsPage({ embedded = false }: { embedded?: boolean } = {}) 
                 <SettingsWorkflowManager channel={selected} groupId={activeGroup?.id} channels={channels} platform={platform} open={workflowManagerOpen} onOpenChange={setWorkflowManagerOpen} />
               ) : null}
 
-              <SettingsChannelQuickTest channel={selected} groupId={activeGroup?.id} channels={channels} platform={platform} />
-
               <SettingsModelsView
                 busy={busy}
                 activeGroup={activeGroup}
@@ -771,6 +770,8 @@ export function SettingsPage({ embedded = false }: { embedded?: boolean } = {}) 
                 onApplyDraft={() => void applyDraft()}
               />
 
+              {/* 参考图一的顺序：模型在上、快速测试在下 */}
+              <SettingsChannelQuickTest channel={selected} groupId={activeGroup?.id} channels={channels} platform={platform} />
 
               {/* 路由 / 权重 / 模型映射是**高级**设置：默认收起，渠道页不再一路铺到底 */}
               <details className={styles.disclosure} data-settings-advanced-disclosure>
@@ -822,6 +823,7 @@ export function SettingsPage({ embedded = false }: { embedded?: boolean } = {}) 
                 onRemoveGlobalModel={(id) => void handleRemoveGlobalModel(id)}
               />
               </details>
+              <SettingsChannelActionBar busy={busy} canDelete={!builtinSelected} onSave={() => void persistForm()} onDelete={() => void handleRemove(selected.id)} />
             </div>
           )}
         </section>
@@ -839,10 +841,8 @@ export function SettingsPage({ embedded = false }: { embedded?: boolean } = {}) 
               fileInputRef={profileFileRef}
               onBackdropClose={() => setProfileDrawerOpen(false)}
               onClose={() => setProfileDrawerOpen(false)}
-              onIconFile={(file) => void handleProfileIconFile(file)}
-              onUseBuiltin={() => setProfileIconDraft(null)}
-              onResetIcon={() => setProfileIconDraft(selected.icon)}
-              onNameChange={setProfileNameDraft}
+              onIconFile={(file) => void handleProfileIconFile(file)} onUseBuiltin={() => setProfileIconDraft(null)}
+              onResetIcon={() => setProfileIconDraft(selected.icon)} onNameChange={setProfileNameDraft}
               onSave={() => void saveProfileDrawer()}
             />,
             document.body,

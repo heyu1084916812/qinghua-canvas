@@ -89,14 +89,28 @@
   white-space: nowrap;
 }
 
-.fit {
+/* 工具条：参考图五右上角那颗「- 98% + 适应」 */
+.toolbar {
   position: absolute;
   right: 8px;
   top: 8px;
-  padding: 2px 8px;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px;
   border: var(--border);
   border-radius: var(--radius-pill);
   background: var(--bg-surface);
+}
+
+.zoomBtn,
+.fit {
+  min-width: 22px;
+  height: 22px;
+  padding: 0 6px;
+  border: none;
+  border-radius: var(--radius-pill);
+  background: none;
   color: var(--text-2);
   font-family: var(--font-sans);
   font-size: var(--fs-chip);
@@ -104,9 +118,25 @@
   transition: background var(--dur-hover) var(--ease-out);
 }
 
+.zoomLabel {
+  min-width: 38px;
+  color: var(--text-3);
+  font-size: var(--fs-chip);
+  text-align: center;
+}
+
+.zoomBtn:hover,
 .fit:hover {
   background: var(--bg-hover);
   color: var(--text-1);
+}
+
+/* 旧的独立「适应」按钮位置由工具条接管 */
+.fit {
+  position: static;
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+  background: var(--bg-surface);
 }
 
 /* 点开节点后的参数弹层：与参数下拉同一套（1px 描边 + 卡面底 + 无投影） */

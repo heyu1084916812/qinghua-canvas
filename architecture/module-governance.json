@@ -12041,6 +12041,26 @@
         "src/features/settings/SettingsWorkflowManager.test.ts"
       ],
       "budget": 150
+    },
+    {
+      "module": "src/pages/SettingsPage/settingsPage/SettingsChannelActionBar.tsx",
+      "owner": "settings-ui",
+      "responsibility": "渠道页底部的删除 / 保存操作条（参考图一），让页面有头有尾、删除不必翻右键菜单。",
+      "owns": [
+        "底部操作条的展示与禁用态"
+      ],
+      "doesNotOwn": [
+        "保存逻辑（persistForm）",
+        "删除逻辑（handleRemove）",
+        "渠道列表"
+      ],
+      "publicApi": [
+        "SettingsChannelActionBar"
+      ],
+      "test": [
+        "src/pages/SettingsPage/settingsPage/SettingsPageViews.test.ts"
+      ],
+      "budget": 90
     }
   ]
 }

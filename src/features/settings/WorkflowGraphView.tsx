@@ -81,6 +81,19 @@ export function WorkflowGraphView({
     })
   }
 
+  /** 工具条上的 ±：以视口中心为锚缩放（参考图五的「- 98% + 适应」） */
+  const zoomBy = (factor: number) => {
+    const el = viewportRef.current
+    if (!el) return
+    setView((current) => {
+      const next = Math.max(MIN_SCALE, Math.min(2, current.scale * factor))
+      const cx = el.clientWidth / 2
+      const cy = el.clientHeight / 2
+      const ratio = next / current.scale
+      return { scale: next, x: cx - (cx - current.x) * ratio, y: cy - (cy - current.y) * ratio }
+    })
+  }
+
   /** 量视口：方向选择与自适应都要宽度/高度先说得出话 */
   useEffect(() => {
     const el = viewportRef.current
@@ -213,9 +226,18 @@ export function WorkflowGraphView({
         })}
       </div>
 
-      <button type="button" className={styles.fit} onClick={() => fit()} title="把整张图放回视野">
-        适应
-      </button>
+      <div className={styles.toolbar}>
+        <button type="button" className={styles.zoomBtn} onClick={() => zoomBy(0.8)} title="缩小" data-graph-zoom-out>
+          −
+        </button>
+        <span className={styles.zoomLabel}>{Math.round(view.scale * 100)}%</span>
+        <button type="button" className={styles.zoomBtn} onClick={() => zoomBy(1.25)} title="放大" data-graph-zoom-in>
+          +
+        </button>
+        <button type="button" className={styles.fit} onClick={() => fit()} title="把整张图放回视野">
+          适应
+        </button>
+      </div>
 
       {popup && selectedNode ? (
         <div
