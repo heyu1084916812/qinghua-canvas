@@ -1275,8 +1275,10 @@ describe('RunningHub 适配器 / 标准模型（金额路）', () => {
 })
 
 describe('RunningHub 适配器 / AI 应用（币路）', () => {
-  it('★ 拉节点 → 填 prompt → ai-app/run → 轮询 → 产物', async () => {
+  it('★ 拉节点 → 填 prompt → v2 run/ai-app（Bearer，体内无 apiKey）→ 轮询 → 产物', async () => {
     const calls: string[] = []
+    const appBodies: unknown[] = []
+    const appHeaders: Record<string, string>[] = []
     const platform = createMemoryPlatform({
       handler: async (req: NetworkRequest) => {
         calls.push(req.url)
@@ -1291,8 +1293,10 @@ describe('RunningHub 适配器 / AI 应用（币路）', () => {
             },
           })
         }
-        if (req.url.endsWith('/task/openapi/ai-app/run')) {
-          return json(200, { code: 0, data: { taskId: 'app-task-1' } })
+        if (req.url.endsWith('/openapi/v2/run/ai-app/2046794551444119554')) {
+          appBodies.push(req.body)
+          appHeaders.push(req.headers ?? {})
+          return json(200, { taskId: 'app-task-1', status: 'QUEUED', errorCode: '', errorMessage: '' })
         }
         if (req.url.endsWith('/openapi/v2/query')) {
           return json(200, {
@@ -1308,9 +1312,16 @@ describe('RunningHub 适配器 / AI 应用（币路）', () => {
     const assets = await adapter.generateImage(imageRequest('app:2046794551444119554'), signal)
 
     expect(assets).toHaveLength(1)
-    /** 应用路走的是 `/task/openapi/ai-app/run`，不是标准模型的 v2 端点 */
-    expect(calls.some((u) => u.endsWith('/task/openapi/ai-app/run'))).toBe(true)
+    /** 应用路先走 v2 `run/ai-app/{id}`（#1126：全 Bearer），旧 `/task/openapi/ai-app/run` 不再打 */
+    expect(calls.some((u) => u.endsWith('/openapi/v2/run/ai-app/2046794551444119554'))).toBe(true)
+    expect(calls.some((u) => u.endsWith('/task/openapi/ai-app/run'))).toBe(false)
     expect(calls.some((u) => u.includes('/api/webapp/apiCallDemo'))).toBe(true)
+    expect(appHeaders[0]?.Authorization).toMatch(/^Bearer /)
+    expect(appBodies[0]).not.toHaveProperty('apiKey')
+    expect((appBodies[0] as { nodeInfoList: { fieldName: string; fieldValue: string }[] }).nodeInfoList).toEqual([
+      { nodeId: '18', fieldName: 'prompt', fieldValue: imageRequest('app:1').prompt },
+      { nodeId: '19', fieldName: 'aspectRatio', fieldValue: '1:1' },
+    ])
   })
 
   it('应用没有可改节点 → 报上游的话，而不是假装成功', async () => {
@@ -1640,14 +1651,14 @@ describe('RunningHub 工作流条目（workflow: 前缀，#1113 / #1104）', () 
     },
   })
 
-  it('★ 提交 /task/openapi/create → 轮询 v2 query → 下载产物（简易式不带 nodeInfoList）', async () => {
+  it('★ 提交 v2 run/workflow → 轮询 v2 query → 下载产物（简易式不带 nodeInfoList）', async () => {
     const bodies: unknown[] = []
     let polls = 0
     const platform = createMemoryPlatform({
       handler: async (req: NetworkRequest) => {
-        if (req.url.endsWith('/task/openapi/create')) {
+        if (req.url.endsWith(`/openapi/v2/run/workflow/${WORKFLOW_ID}`)) {
           bodies.push(req.body)
-          return json(200, { code: 0, data: { taskId: 't-wf' } })
+          return json(200, { taskId: 't-wf', status: 'QUEUED', errorCode: '' })
         }
         if (req.url.endsWith('/openapi/v2/query')) {
           polls += 1
@@ -1664,7 +1675,8 @@ describe('RunningHub 工作流条目（workflow: 前缀，#1113 / #1104）', () 
     expect(assets).toHaveLength(1)
     expect(assets[0]!.mime).toBe('image/png')
     expect(assets[0]!.hash).toBe(await fingerprintBytes(PNG_BYTES))
-    expect(bodies[0]).toMatchObject({ workflowId: WORKFLOW_ID })
+    /* v2：workflowId 在路径里、Key 在 Header 里，体内没有 apiKey */
+    expect(bodies[0]).not.toHaveProperty('apiKey')
     /* 官方「简易式」：不改参数时**不许**塞一个空 nodeInfoList */
     expect((bodies[0] as Record<string, unknown>).nodeInfoList).toBeUndefined()
   })
@@ -1673,9 +1685,9 @@ describe('RunningHub 工作流条目（workflow: 前缀，#1113 / #1104）', () 
     const bodies: unknown[] = []
     const platform = createMemoryPlatform({
       handler: async (req: NetworkRequest) => {
-        if (req.url.endsWith('/task/openapi/create')) {
+        if (req.url.endsWith(`/openapi/v2/run/workflow/${WORKFLOW_ID}`)) {
           bodies.push(req.body)
-          return json(200, { code: 0, data: { taskId: 't-wf' } })
+          return json(200, { taskId: 't-wf', status: 'QUEUED', errorCode: '' })
         }
         if (req.url.endsWith('/openapi/v2/query')) {
           return json(200, { status: 'SUCCESS', results: [{ url: 'https://files.runninghub.cn/wf.png' }] })
@@ -1704,8 +1716,8 @@ describe('RunningHub 工作流条目（workflow: 前缀，#1113 / #1104）', () 
   it('失败终态把上游原文与失败码一起带出来（不换成通用解释）', async () => {
     const platform = createMemoryPlatform({
       handler: async (req: NetworkRequest) => {
-        if (req.url.endsWith('/task/openapi/create')) {
-          return json(200, { code: 0, data: { taskId: 't-wf' } })
+        if (req.url.endsWith(`/openapi/v2/run/workflow/${WORKFLOW_ID}`)) {
+          return json(200, { taskId: 't-wf', status: 'QUEUED', errorCode: '' })
         }
         if (req.url.endsWith('/openapi/v2/query')) {
           return json(200, {
@@ -1742,13 +1754,13 @@ describe('RunningHub 工作流条目（workflow: 前缀，#1113 / #1104）', () 
     const platform = createMemoryPlatform({
       rows: { assets: [{ id: 'asset-1', bytes: PNG_BYTES, mime: 'image/png' }] },
       handler: async (req: NetworkRequest) => {
-        if (req.url.endsWith('/task/openapi/upload')) {
+        if (req.url.endsWith('/openapi/v2/media/upload/binary')) {
           uploads.push(req.body)
-          return json(200, { code: 0, data: { fileName: 'uploaded-1.png' } })
+          return json(200, { code: 0, msg: 'success', data: { fileName: 'uploaded-1.png', type: 'image' } })
         }
-        if (req.url.endsWith('/task/openapi/create')) {
+        if (req.url.endsWith(`/openapi/v2/run/workflow/${WORKFLOW_ID}`)) {
           creates.push(req.body)
-          return json(200, { code: 0, data: { taskId: 't-wf' } })
+          return json(200, { taskId: 't-wf', status: 'QUEUED', errorCode: '' })
         }
         if (req.url.endsWith('/openapi/v2/query')) {
           return json(200, { status: 'SUCCESS', results: [{ url: 'https://files.runninghub.cn/wf.png' }] })

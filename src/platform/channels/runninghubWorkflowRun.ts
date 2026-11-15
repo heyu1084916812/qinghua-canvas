@@ -1,6 +1,7 @@
 import { queryWorkflowTask, WORKFLOW_POLL_INTERVAL_MS, WORKFLOW_POLL_MAX_MS, type WorkflowEndpoint, type WorkflowTaskResult } from './runninghubWorkflow'
 import type { PlatformKit } from '../ports'
 import { ChannelError } from './types'
+import { asAppError, errorTextOf } from '../../shared/result'
 import { imageInputsOf, videoInputsOf } from '../../domain/shared/execution/inputs'
 import type { NodeInput } from '../../domain/shared/execution/types'
 import { UPSTREAM_MEDIA_VALUE } from '../../domain/project/workflowParamValues'
@@ -119,6 +120,12 @@ export async function resolveWorkflowMedia(
   return out
 }
 
+/** `params.instanceType` → 提交体字段（只认官方三档；`default` 不发） */
+export function instanceTypeOf(params: Record<string, unknown> | undefined): { instanceType?: 'plus' | 'ultra' } {
+  const raw = params?.instanceType
+  return raw === 'plus' || raw === 'ultra' ? { instanceType: raw } : {}
+}
+
 export interface RunWorkflowOptions {
   signal: AbortSignal
   pollIntervalMs?: number
@@ -127,17 +134,22 @@ export interface RunWorkflowOptions {
   now?: () => number
 }
 
+/** 正常醒来要摘掉 abort 监听（20 分钟能攒 240 个，#1126 L3）；已取消的 signal 立刻拒绝，不白睡一轮 */
 const defaultSleep = (ms: number, signal: AbortSignal): Promise<void> =>
   new Promise((resolve, reject) => {
-    const timer = setTimeout(resolve, ms)
-    signal.addEventListener(
-      'abort',
-      () => {
-        clearTimeout(timer)
-        reject(new ChannelError({ kind: 'network', detail: 'aborted' }))
-      },
-      { once: true },
-    )
+    if (signal.aborted) {
+      reject(new ChannelError({ kind: 'network', detail: 'aborted' }))
+      return
+    }
+    const onAbort = () => {
+      clearTimeout(timer)
+      reject(new ChannelError({ kind: 'network', detail: 'aborted' }))
+    }
+    const timer = setTimeout(() => {
+      signal.removeEventListener('abort', onAbort)
+      resolve()
+    }, ms)
+    signal.addEventListener('abort', onAbort, { once: true })
   })
 
 /**
@@ -165,10 +177,13 @@ export async function runWorkflowTask(
       task = await queryWorkflowTask(deps, endpoint, taskId, signal)
     } catch (e) {
       if (signal.aborted) throw e
-      const appError = (e as { appError?: { kind?: string; status?: number } }).appError
+      /**
+       * `fetchNetwork` 对非 2xx 抛的是**普通 AppError 对象**（不是 ChannelError），
+       * 只读 `.appError` 会把 401/403/404 当成抖动、白等 20 分钟（#1126 M5）。
+       */
+      const appError = asAppError(e)
       if (
         appError?.kind === 'http' &&
-        appError.status !== undefined &&
         appError.status !== 408 &&
         appError.status !== 429 &&
         appError.status < 500
@@ -176,7 +191,7 @@ export async function runWorkflowTask(
         throw new ChannelError({
           kind: 'execution',
           detail: 'accepted',
-          message: `RunningHub 任务 ${taskId} 已提交，但查询失败：${String((e as Error).message ?? e).slice(0, 200)}`,
+          message: `RunningHub 任务 ${taskId} 已提交，但查询失败：${errorTextOf(e).slice(0, 200)}`,
         })
       }
       /* 网络抖动 / 5xx：继续等下一次轮询 */
@@ -197,6 +212,17 @@ export async function runWorkflowTask(
         kind: 'execution',
         detail: 'accepted',
         message: `RunningHub 工作流 ${taskId} 已提交但失败：${detail}${code}`,
+      })
+    }
+    /**
+     * v2 query 以 HTTP 200 + 顶层 `errorCode` 报错（真机 `1004 Task not found`），`status` 为空。
+     * 不认它就当"还在跑"，同样要白等 20 分钟（#1126 M5）。
+     */
+    if (task && task.status === 'UNKNOWN' && task.errorCode && task.errorCode !== '0') {
+      throw new ChannelError({
+        kind: 'execution',
+        detail: 'accepted',
+        message: `RunningHub 任务 ${taskId} 已提交，但查询报错：${task.errorMessage || '未知错误'}（${task.errorCode}）`,
       })
     }
     if (now() - started + pollInterval >= pollTimeout) {

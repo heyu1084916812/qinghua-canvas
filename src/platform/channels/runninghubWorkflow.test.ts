@@ -8,10 +8,12 @@ import {
   submitAppTask,
   submitWorkflowTask,
   uploadWorkflowAsset,
+  fileNameForMime,
   webappIdPayload,
   type WorkflowEndpoint,
 } from './runninghubWorkflow'
 import { ChannelError } from './types'
+import { runWorkflowTask } from './runninghubWorkflowRun'
 
 /**
  * 一个只记请求、按回调回包的假网络。刻意不引 `createMemoryPlatform`：
@@ -123,6 +125,8 @@ describe('fetchAppFields', () => {
     const fields = await fetchAppFields(deps, endpoint, '1877265245566922753', signal)
     expect(calls[0]?.method).toBe('GET')
     expect(calls[0]?.url).toContain('/api/webapp/apiCallDemo?apiKey=k&webappId=1877265245566922753')
+    /** #1126：取参仍是旧接口（官方没有 v2 版），Header 同时带 Bearer */
+    expect(calls[0]?.headers?.Authorization).toBe('Bearer k')
     expect(fields[0]).toMatchObject({ type: 'textarea', label: 'prompt提示词', enabled: true })
   })
 
@@ -132,17 +136,86 @@ describe('fetchAppFields', () => {
   })
 })
 
-describe('提交', () => {
+/** v2 路由不存在（1001）的回包：用它让提交 / 上传退回旧接口 */
+const V2_MISSING = { taskId: '', status: '', errorCode: '1001', errorMessage: 'Invalid URL, please check your link' }
+const legacyOnly = (legacy: unknown) => (req: NetworkRequest) =>
+  req.url.includes('/openapi/v2/') ? { body: V2_MISSING } : { body: legacy }
+
+describe('提交 · v2 全 Bearer（#1126 真机：run/workflow / run/ai-app 都在）', () => {
+  it('★ 工作流先走 /openapi/v2/run/workflow/{id}：Key 只在 Header，体内只有 nodeInfoList / instanceType', async () => {
+    const { deps, calls } = fakeNet(() => ({ body: { taskId: '2001', status: 'QUEUED', errorCode: '', errorMessage: '' } }))
+    const taskId = await submitWorkflowTask(
+      deps,
+      endpoint,
+      { workflowId: 'w1', nodeInfoList: [{ nodeId: '6', fieldName: 'text', fieldValue: 'a' }], instanceType: 'plus' },
+      signal,
+    )
+    expect(taskId).toBe('2001')
+    expect(calls).toHaveLength(1)
+    expect(calls[0]?.url).toBe('https://www.runninghub.cn/openapi/v2/run/workflow/w1')
+    expect(calls[0]?.headers?.Authorization).toBe('Bearer k')
+    expect(calls[0]?.body).toEqual({ nodeInfoList: [{ nodeId: '6', fieldName: 'text', fieldValue: 'a' }], instanceType: 'plus' })
+  })
+
+  it('★ 应用走 /openapi/v2/run/ai-app/{id}，19 位 id 在路径里原样（不经 Number），也带 instanceType', async () => {
+    const { deps, calls } = fakeNet(() => ({ body: { taskId: '2002', errorCode: '' } }))
+    await submitAppTask(deps, endpoint, { webappId: '1877265245566922753', nodeInfoList: [], instanceType: 'plus' }, signal)
+    expect(calls[0]?.url).toBe('https://www.runninghub.cn/openapi/v2/run/ai-app/1877265245566922753')
+    expect(calls[0]?.body).toEqual({ nodeInfoList: [], instanceType: 'plus' })
+  })
+
+  it('★ 真机 821（付费积分不足）在 v2 顶层 errorCode：报人话，不退回旧接口（那会再提交一次）', async () => {
+    const { deps, calls } = fakeNet(() => ({
+      body: { taskId: '', status: '', errorCode: '821', errorMessage: '付费积分余额不足，消费级 API 调用仅支持使用付费积分，免费积分不可用于 API 调用' },
+    }))
+    const text = await errorBodyOf(submitWorkflowTask(deps, endpoint, { workflowId: 'w1' }, signal))
+    expect(text).toContain('付费积分')
+    expect(text).toContain('免费积分')
+    expect(calls).toHaveLength(1)
+  })
+
+  it('★ 1001（站点没有 v2 路由）才退回 /task/openapi/create', async () => {
+    const { deps, calls } = fakeNet(legacyOnly({ code: 0, data: { taskId: 't-old' } }))
+    expect(await submitWorkflowTask(deps, endpoint, { workflowId: 'w1' }, signal)).toBe('t-old')
+    expect(calls.map((c) => c.url)).toEqual([
+      'https://www.runninghub.cn/openapi/v2/run/workflow/w1',
+      'https://www.runninghub.cn/task/openapi/create',
+    ])
+  })
+
+  it('★ 上传先走 /openapi/v2/media/upload/binary（multipart 只有 file，无 apiKey）', async () => {
+    const { deps, calls } = fakeNet(() => ({
+      body: { code: 0, msg: 'success', data: { fileName: 'openapi/abc.png', type: 'image', download_url: 'https://x' } },
+    }))
+    const name = await uploadWorkflowAsset(deps, endpoint, { bytes: new Uint8Array([1, 2]), mime: 'image/png' }, 'ref.png', signal)
+    expect(name).toBe('openapi/abc.png')
+    expect(calls[0]?.url).toBe('https://www.runninghub.cn/openapi/v2/media/upload/binary')
+    const form = calls[0]?.body as FormData
+    expect(form.get('apiKey')).toBeNull()
+    expect(form.get('file')).toBeInstanceOf(Blob)
+  })
+
+  it('视频不进图片压缩器，文件名按 mime 改后缀', async () => {
+    const { deps, calls } = fakeNet(() => ({ body: { code: 0, data: { fileName: 'openapi/v.mp4' } } }))
+    await uploadWorkflowAsset(deps, endpoint, { bytes: new Uint8Array([0, 0, 0, 24]), mime: 'video/mp4' }, 'ref.mp4', signal)
+    const file = (calls[0]?.body as FormData).get('file') as File
+    expect(file.name).toBe('ref.mp4')
+    expect(file.type).toBe('video/mp4')
+    expect(fileNameForMime('ref.png', 'image/webp')).toBe('ref.webp')
+  })
+})
+
+describe('提交 · 旧接口（v2 回 1001 时）', () => {
   it('简易式：不传 nodeInfoList（= 不改任何参数直接跑）', async () => {
-    const { deps, calls } = fakeNet(() => ({ body: { code: 0, data: { taskId: '1904737800233889793' } } }))
+    const { deps, calls } = fakeNet(legacyOnly({ code: 0, data: { taskId: '1904737800233889793' } }))
     const taskId = await submitWorkflowTask(deps, endpoint, { workflowId: 'w1' }, signal)
     expect(taskId).toBe('1904737800233889793')
-    expect(calls[0]?.url).toBe('https://www.runninghub.cn/task/openapi/create')
-    expect(calls[0]?.body).toEqual({ apiKey: 'k', workflowId: 'w1' })
+    expect(calls[1]?.url).toBe('https://www.runninghub.cn/task/openapi/create')
+    expect(calls[1]?.body).toEqual({ apiKey: 'k', workflowId: 'w1' })
   })
 
   it('高级式：带 nodeInfoList；instanceType 只有非 default 才发', async () => {
-    const { deps, calls } = fakeNet(() => ({ body: { code: 0, data: { taskId: 't' } } }))
+    const { deps, calls } = fakeNet(legacyOnly({ code: 0, data: { taskId: 't' } }))
     await submitWorkflowTask(
       deps,
       endpoint,
@@ -153,37 +226,35 @@ describe('提交', () => {
       },
       signal,
     )
-    expect(calls[0]?.body).toEqual({
+    expect(calls[1]?.body).toEqual({
       apiKey: 'k',
       workflowId: 'w1',
       nodeInfoList: [{ nodeId: '6', fieldName: 'text', fieldValue: 'a girl' }],
       instanceType: 'plus',
     })
-    const second = fakeNet(() => ({ body: { code: 0, data: { taskId: 't' } } }))
+    const second = fakeNet(legacyOnly({ code: 0, data: { taskId: 't' } }))
     await submitWorkflowTask(second.deps, endpoint, { workflowId: 'w1', instanceType: 'default' }, signal)
-    expect(second.calls[0]?.body).toEqual({ apiKey: 'k', workflowId: 'w1' })
+    expect(second.calls[1]?.body).toEqual({ apiKey: 'k', workflowId: 'w1' })
   })
 
   it('★ 应用提交：19 位 webappId 不能转 Number（转了就丢精度，会跑到别的应用上）', async () => {
-    const { deps, calls } = fakeNet(() => ({ body: { code: 0, data: { taskId: 't' } } }))
+    const { deps, calls } = fakeNet(legacyOnly({ code: 0, data: { taskId: 't' } }))
     await submitAppTask(
       deps,
       endpoint,
       { webappId: '1877265245566922753', nodeInfoList: [{ nodeId: '122', fieldName: 'prompt', fieldValue: 'x' }] },
       signal,
     )
-    expect(calls[0]?.url).toBe('https://www.runninghub.cn/task/openapi/ai-app/run')
+    expect(calls[1]?.url).toBe('https://www.runninghub.cn/task/openapi/ai-app/run')
     /** 发字符串，位数一个不少；若 `Number()` 过就会变成 …800 */
-    expect((calls[0]?.body as Record<string, unknown>).webappId).toBe('1877265245566922753')
+    expect((calls[1]?.body as Record<string, unknown>).webappId).toBe('1877265245566922753')
     expect(webappIdPayload('1877265245566922753')).toBe('1877265245566922753')
     /** 安全整数仍发数字（与官方示例一致） */
     expect(webappIdPayload('123456789')).toBe(123456789)
   })
 
   it('没有 taskId 时把 promptTips 原话带出来（那里通常写着哪个节点挂了）', async () => {
-    const { deps } = fakeNet(() => ({
-      body: { code: 0, data: { promptTips: '{"result": false, "node_errors": {"6": "bad"}}' } },
-    }))
+    const { deps } = fakeNet(legacyOnly({ code: 0, data: { promptTips: '{"result": false, "node_errors": {"6": "bad"}}' } }))
     expect(await errorBodyOf(submitWorkflowTask(deps, endpoint, { workflowId: 'w' }, signal))).toContain(
       'node_errors',
     )
@@ -235,16 +306,14 @@ describe('queryWorkflowTask', () => {
 })
 
 describe('uploadWorkflowAsset', () => {
-  it('走 /task/openapi/upload，回 fileName（媒体字段只认这个）', async () => {
-    const { deps, calls } = fakeNet(() => ({
-      body: { code: 0, data: { fileName: 'api/abc.png', fileType: 'input' } },
-    }))
+  it('v2 回 1001 时走 /task/openapi/upload，回 fileName（媒体字段只认这个）', async () => {
+    const { deps, calls } = fakeNet(legacyOnly({ code: 0, data: { fileName: 'api/abc.png', fileType: 'input' } }))
     const bytes = new Uint8Array([1, 2, 3])
     const fileName = await uploadWorkflowAsset(deps, endpoint, { bytes, mime: 'image/png' }, 'ref.png', signal)
     expect(fileName).toBe('api/abc.png')
-    expect(calls[0]?.url).toBe('https://www.runninghub.cn/task/openapi/upload')
-    expect(calls[0]?.method).toBe('POST')
-    expect(calls[0]?.body).toBeInstanceOf(FormData)
+    expect(calls[1]?.url).toBe('https://www.runninghub.cn/task/openapi/upload')
+    expect(calls[1]?.method).toBe('POST')
+    expect(calls[1]?.body).toBeInstanceOf(FormData)
   })
 
   it('上游不给 fileName 就报错，不返回空串继续跑', async () => {
@@ -308,5 +377,44 @@ describe('fetchAppBundle（填 id 就抓：名称 + 封面 + 参数）', () => {
   it('没有可改节点的应用：抛 unsupported（提示先在网页端跑一次）', async () => {
     const { deps } = fakeNet(() => ({ body: { code: 0, data: { webappName: 'x', nodeInfoList: [] } } }))
     expect(await errorBodyOf(fetchAppBundle(deps, endpoint, '1', signal))).toBe('unsupported')
+  })
+})
+describe('runWorkflowTask 等待（#1126 M5：别把真错误当抖动白等 20 分钟）', () => {
+  const opts = (polls: { n: number }) => ({
+    signal,
+    pollIntervalMs: 10,
+    pollTimeoutMs: 60_000,
+    sleep: async () => {
+      polls.n += 1
+    },
+  })
+  it('★ 查询回 HTTP 401（fetchNetwork 抛普通 AppError 对象）→ 立刻以 accepted 结束', async () => {
+    const polls = { n: 0 }
+    const network = {
+      async request() {
+        throw { kind: 'http', status: 401, body: 'unauthorized' }
+      },
+    }
+    const err = await runWorkflowTask({ network } as never, endpoint, 't1', opts(polls)).catch((e: ChannelError) => e)
+    expect((err as ChannelError).appError).toMatchObject({ kind: 'execution', detail: 'accepted' })
+    expect(String(((err as ChannelError).appError as { message?: string }).message)).not.toContain('[object Object]')
+    expect(polls.n).toBe(0)
+  })
+  it('★ v2 query 200 + 顶层 errorCode 1004（status 为空）→ 立刻报错', async () => {
+    const polls = { n: 0 }
+    const { deps } = fakeNet(() => ({ body: { taskId: 't1', status: '', errorCode: '1004', errorMessage: 'Task not found' } }))
+    const err = await runWorkflowTask(deps, endpoint, 't1', opts(polls)).catch((e: ChannelError) => e)
+    expect(String(((err as ChannelError).appError as { message?: string }).message)).toContain('1004')
+    expect(polls.n).toBe(0)
+  })
+  it('RUNNING / 空状态无错误码 → 继续等', async () => {
+    const polls = { n: 0 }
+    let i = 0
+    const { deps } = fakeNet(() => {
+      i += 1
+      return { body: i < 3 ? { status: i === 1 ? '' : 'RUNNING', errorCode: '' } : { status: 'SUCCESS', results: [{ url: 'https://x/a.png' }] } }
+    })
+    expect(await runWorkflowTask(deps, endpoint, 't1', opts(polls))).toEqual(['https://x/a.png'])
+    expect(polls.n).toBe(2)
   })
 })

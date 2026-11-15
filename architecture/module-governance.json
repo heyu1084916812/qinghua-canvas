@@ -11595,7 +11595,7 @@
       "test": [
         "src/platform/channels/runninghub.test.ts"
       ],
-      "budget": 230
+      "budget": 300
     },
     {
       "module": "src/domain/project/workflowFieldKinds.ts",
@@ -12082,6 +12082,102 @@
         "src/features/settings/SettingsWorkflowManager.test.ts"
       ],
       "budget": 180
+    },
+    {
+      "module": "src/platform/channels/runninghubV2.ts",
+      "owner": "channel-runninghub-workflow",
+      "responsibility": "RunningHub v2 全 Bearer 的提交（run/workflow、run/ai-app）与二进制上传；站点回 1001（无此路由）时告诉调用方退回旧接口。",
+      "owns": [
+        "/openapi/v2/run/{workflow|ai-app}/{id} 的请求体与 taskId 解析",
+        "/openapi/v2/media/upload/binary 的上传与 fileName 解析",
+        "1001 路由缺失判定"
+      ],
+      "doesNotOwn": [
+        "旧接口 /task/openapi/* 的请求体（runninghubWorkflowSubmit）",
+        "错误码翻译（runninghubErrorText）",
+        "轮询与产物下载"
+      ],
+      "publicApi": [
+        "V2_ROUTE_MISSING",
+        "V2Endpoint",
+        "V2SubmitOutcome",
+        "isV2RouteMissing",
+        "submitV2Task",
+        "uploadV2Binary"
+      ],
+      "test": [
+        "src/platform/channels/runninghubWorkflow.test.ts"
+      ],
+      "budget": 220
+    },
+    {
+      "module": "src/platform/channels/runninghubErrorText.ts",
+      "owner": "channel-runninghub",
+      "responsibility": "RunningHub 错误码（821/1014/812/鉴权/1007）翻成用户看得懂的话，分支顺序即规格；适配器、v2 提交与工作流模块共用。",
+      "owns": [
+        "错误码到人话的映射与分支顺序"
+      ],
+      "doesNotOwn": [
+        "HTTP 请求与重试",
+        "界面展示"
+      ],
+      "publicApi": [
+        "RhErrorEnvelope",
+        "describeRhError"
+      ],
+      "test": [
+        "src/platform/channels/runninghubErrors.test.ts"
+      ],
+      "budget": 120
+    },
+    {
+      "module": "src/platform/channels/runninghubWorkflowHttp.ts",
+      "owner": "channel-runninghub-workflow",
+      "responsibility": "RunningHub 工作流 / 应用旧接口共用的 HTTP 小件：基址归一、读 JSON、两套错误形状归一、带 Bearer 的 JSON POST。",
+      "owns": [
+        "WorkflowEndpoint 类型",
+        "旧接口的 code/msg 与 errorCode/errorMessage 归一"
+      ],
+      "doesNotOwn": [
+        "提交与取参的业务字段",
+        "v2 接口"
+      ],
+      "publicApi": [
+        "WorkflowEndpoint",
+        "RhEnvelope",
+        "hostOf",
+        "readJson",
+        "failureOf",
+        "httpError",
+        "postJson"
+      ],
+      "test": [
+        "src/platform/channels/runninghubWorkflow.test.ts"
+      ],
+      "budget": 120
+    },
+    {
+      "module": "src/platform/channels/runninghubWorkflowSubmit.ts",
+      "owner": "channel-runninghub-workflow",
+      "responsibility": "RunningHub 工作流 / AI 应用的任务提交：先 v2 Bearer，1001 才退回 /task/openapi/create 与 ai-app/run；19 位 webappId 的精度保护。",
+      "owns": [
+        "submitWorkflowTask / submitAppTask 的回退顺序",
+        "旧接口提交体与 taskId 解析",
+        "webappIdPayload"
+      ],
+      "doesNotOwn": [
+        "v2 请求细节（runninghubV2）",
+        "轮询（runninghubWorkflowRun）"
+      ],
+      "publicApi": [
+        "submitWorkflowTask",
+        "submitAppTask",
+        "webappIdPayload"
+      ],
+      "test": [
+        "src/platform/channels/runninghubWorkflow.test.ts"
+      ],
+      "budget": 200
     }
   ]
 }
