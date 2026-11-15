@@ -1,6 +1,8 @@
 import type { GenerationData } from '../../../../domain/canvas/model/node'
 import type { PanelEvent } from '../panelModel'
 import { ParamPicker, type ParamOption, type ParamSection } from '../ParamPicker'
+import { MANAGE_WORKFLOWS_OPTION, useOpenWorkflowsPage } from './useOpenWorkflowsPage'
+import { Icon, Settings } from '../../../../ui/icon'
 import { ChannelIcon } from '../../../../features/shared/channelIcon/ChannelIcon'
 import { workflowModelId, type WorkflowEntry, type WorkflowParamField } from '../../../../domain/project/workflowParams'
 import { workflowSubmitList, workflowValueMap } from './creationWorkflowMode'
@@ -120,6 +122,7 @@ export function WorkflowParameterControls({
   const rows = workflowSourceRows(sources)
   /** 找不到条目就**明说**（#1128 H3），不拿 `rows[0]` 顶替——那会显示并改写另一个条目 */
   const current = findWorkflowSourceRow(sources, data.model, data.channelId)
+  const openWorkflows = useOpenWorkflowsPage()
   const values = workflowValueMap(data)
   const instance = data.workflowInstance === 'plus' ? 'plus' : 'default'
   const channelCount = new Set(rows.map((row) => row.channelId)).size
@@ -203,6 +206,7 @@ export function WorkflowParameterControls({
       icon: <ChannelIcon protocol={row.protocol} size={18} />,
     })),
     ...apiOptions.map((option) => ({ ...option, hint: 'API 模型' })),
+    { value: MANAGE_WORKFLOWS_OPTION, label: '管理 AI 应用 / 工作流…', hint: '打开管理页', icon: <Icon icon={Settings} px={18} /> },
   ]
 
   const isApp = current?.entry.kind === 'app'
@@ -220,6 +224,10 @@ export function WorkflowParameterControls({
         onToggle={() => onTogglePicker('model')}
         onClose={onClosePicker}
         onSelect={(next: string) => {
+          if (next === MANAGE_WORKFLOWS_OPTION) {
+            openWorkflows(current ? { channelId: current.channelId, tab: isApp ? 'app' : 'workflow', entryId: current.entry.id } : {})
+            return
+          }
           /* 不带 `::` 的是普通 API 模型：直接换模型，行会自动回到 API 模式 */
           if (next.includes('::')) selectEntry(next)
           else if (onSelectApiModel) onSelectApiModel(next)
@@ -298,6 +306,7 @@ export function WorkflowEntryLauncher({
 }: WorkflowEntryLauncherProps) {
   /** 工作流与 AI 应用**同一条链路**：执行端都收 `nodeInfoList`（应用走 `app:` 前缀） */
   const rows = workflowSourceRows(sources)
+  const openWorkflows = useOpenWorkflowsPage()
   if (rows.length === 0) return null
 
   const valueOf = (row: WorkflowSourceRow) => `${row.channelId}::${workflowEntryModelId(row.entry)}`
@@ -309,17 +318,24 @@ export function WorkflowEntryLauncher({
         ariaLabel="工作流条目"
         label="工作流"
         variant="list"
-        options={rows.map((row) => ({
-          value: valueOf(row),
-          label: row.entry.title,
-          hint: row.channelName,
-          icon: <ChannelIcon protocol={row.protocol} size={18} />,
-        }))}
+        options={[
+          ...rows.map((row) => ({
+            value: valueOf(row),
+            label: row.entry.title,
+            hint: row.channelName,
+            icon: <ChannelIcon protocol={row.protocol} size={18} />,
+          })),
+          { value: MANAGE_WORKFLOWS_OPTION, label: '管理 AI 应用 / 工作流…', hint: '打开管理页', icon: <Icon icon={Settings} px={18} /> },
+        ]}
         value=""
         open={openPicker === 'workflowEntry'}
         onToggle={() => onTogglePicker('workflowEntry')}
         onClose={onClosePicker}
         onSelect={(next: string) => {
+          if (next === MANAGE_WORKFLOWS_OPTION) {
+            openWorkflows({})
+            return
+          }
           const row = rows.find((item) => valueOf(item) === next)
           if (!row) return
           onEvent({ type: 'setModel', model: workflowEntryModelId(row.entry), channelId: row.channelId })

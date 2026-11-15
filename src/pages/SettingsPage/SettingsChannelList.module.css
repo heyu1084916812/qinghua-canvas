@@ -544,7 +544,3 @@
   background: var(--success);
   color: var(--accent-text);
 }
-
-/* 打开「应用与工作流 / 条目设置」时当成整页：收起渠道列表，编辑区用满（用户 2026-11-15） */
-:is(.layout, .layoutEmbedded)[data-workflow-manager-open='true'] .sidebar { display: none; }
-:is(.layout, .layoutEmbedded)[data-workflow-manager-open='true'] .workarea { grid-template-columns: minmax(0, 1fr); }

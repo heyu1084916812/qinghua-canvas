@@ -11579,7 +11579,7 @@
     {
       "module": "src/features/settings/SettingsWorkflowEntries.module.css",
       "owner": "settings-workflow-entries",
-      "responsibility": "RunningHub「工作流条目」区块的局部样式：标题行、手填输入、市场列表与条目行的滚动与边界。",
+      "responsibility": "RunningHub 条目相关局部样式：渠道页入口块、快速测试 / 测试运行外壳、条目设置页与参数暴露编辑器（列表与卡片样式已随管理页迁到 WorkflowsPage.module.css）。",
       "owns": [
         "该区块的局部样式"
       ],
@@ -11588,12 +11588,12 @@
         "条目数据与网络请求"
       ],
       "publicApi": [
-        "CSS_MODULE:工作流条目区块（block / head / market / list / item / btn）"
+        "CSS_MODULE:工作流条目区块（block / head / btn / editor / fieldRow / preview*）"
       ],
       "test": [
         "src/features/settings/SettingsWorkflowManager.test.ts"
       ],
-      "budget": 600
+      "budget": 480
     },
     {
       "module": "src/platform/channels/runninghubAccount.ts",
@@ -11846,18 +11846,39 @@
       "budget": 380
     },
     {
-      "module": "src/features/settings/SettingsWorkflowManager.tsx",
-      "owner": "settings-workflow-entries",
-      "responsibility": "RunningHub 的「AI 应用和工作流」管理页与条目设置页：粘贴链接/id 导入、两栏卡片（封面/名称/备注/设置/删除）、条目设置（元信息 + 参数暴露编辑器）。",
+      "module": "src/workbenches/canvas/panels/creation/useOpenWorkflowsPage.ts",
+      "owner": "canvas-creation-ui",
+      "responsibility": "创作面板跳「AI 应用 / 工作流」页：条目下拉末尾「管理…」的选项值与跳转钩子，路由外退回整页跳转。",
       "owns": [
-        "条目导入与删除",
-        "两栏卡片列表",
-        "条目设置页装配"
+        "「管理 AI 应用 / 工作流…」选项值",
+        "面板内跳转与路由外回退"
       ],
       "doesNotOwn": [
-        "工作流参数结构（domain/project/workflowParams）",
-        "字段编辑器本体（WorkflowFieldEditor）",
-        "HTTP 细节"
+        "下拉渲染（WorkflowParameterControls）",
+        "地址拼装（domain/project/workflowsPage）",
+        "条目管理页本身"
+      ],
+      "publicApi": [
+        "MANAGE_WORKFLOWS_OPTION",
+        "useOpenWorkflowsPage"
+      ],
+      "test": [
+        "src/workbenches/canvas/panels/creation/workflowsPageEntry.test.ts"
+      ],
+      "budget": 50
+    },
+    {
+      "module": "src/features/settings/SettingsWorkflowManager.tsx",
+      "owner": "settings-workflow-entries",
+      "responsibility": "渠道页上的「AI 应用和工作流」入口：一行已添加应用 / 工作流计数 + 「打开管理页」按钮（跳 /workflows）；条目管理本身在独立页。",
+      "owns": [
+        "渠道页入口的展示",
+        "入口处的条目计数读取"
+      ],
+      "doesNotOwn": [
+        "条目导入 / 删除 / 设置（pages/WorkflowsPage + useWorkflowEntries）",
+        "跳转地址与浮层关闭（workflowsPageLink）",
+        "条目存储格式（state/channel/workflowEntryStore）"
       ],
       "publicApi": [
         "SettingsWorkflowManager",
@@ -11866,7 +11887,7 @@
       "test": [
         "src/features/settings/SettingsWorkflowManager.test.ts"
       ],
-      "budget": 450
+      "budget": 120
     },
     {
       "module": "src/features/settings/useWorkflowEntries.ts",
@@ -11890,6 +11911,78 @@
         "src/features/settings/useWorkflowEntries.test.ts"
       ],
       "budget": 320
+    },
+    {
+      "module": "src/pages/WorkflowsPage/WorkflowsPage.tsx",
+      "owner": "settings-workflow-entries",
+      "responsibility": "「AI 应用 / 工作流」独立页（/workflows）：两个标签、国内站 / 国际站切换、导入与市场入口、卡片网格与条目设置页的装配，并按地址参数落到指定渠道 / 标签 / 条目。",
+      "owns": [
+        "页面装配与标签 / 站点切换",
+        "地址参数与页面状态同步"
+      ],
+      "doesNotOwn": [
+        "条目读写与并发口径（useWorkflowEntries）",
+        "条目设置页本体（SettingsWorkflowEntryPage）",
+        "渠道连接与 Key（设置页）"
+      ],
+      "publicApi": [
+        "workflowChannelsOf",
+        "workflowChannelLabel",
+        "WorkflowsPage"
+      ],
+      "test": [
+        "src/pages/WorkflowsPage/WorkflowsPage.test.ts"
+      ],
+      "budget": 300
+    },
+    {
+      "module": "src/pages/WorkflowsPage/WorkflowEntryGrid.tsx",
+      "owner": "settings-workflow-entries",
+      "responsibility": "「AI 应用 / 工作流」页的卡片网格与市场列表：封面 / 名称 / 备注或路由 id / 参数计数，点卡片进设置、右上角删除、市场条目导入。",
+      "owns": [
+        "卡片网格与空态",
+        "市场列表展示"
+      ],
+      "doesNotOwn": [
+        "条目写库与删除确认逻辑",
+        "条目设置页",
+        "市场目录拉取（platform/channels/runninghubMarket）"
+      ],
+      "publicApi": [
+        "WorkflowEntryGrid"
+      ],
+      "test": [
+        "src/pages/WorkflowsPage/WorkflowsPage.test.ts"
+      ],
+      "budget": 160
+    },
+    {
+      "module": "src/pages/WorkflowsPage/WorkflowsPage.module.css",
+      "owner": "settings-workflow-entries",
+      "responsibility": "「AI 应用 / 工作流」页的局部样式：顶栏标签与站点切换、导入工具条、卡片网格、市场列表、提示与条目设置舞台。",
+      "owns": [
+        "该页的局部样式"
+      ],
+      "doesNotOwn": [
+        "全局主题令牌",
+        "条目设置页内部样式（SettingsWorkflowEntries.module.css）",
+        "数据与网络请求"
+      ],
+      "publicApi": [
+        "CSS_MODULE:WorkflowsPage 的页面局部样式域",
+        "CSS_CLASS:page",
+        "CSS_CLASS:tabs",
+        "CSS_CLASS:sites",
+        "CSS_CLASS:toolbar",
+        "CSS_CLASS:cards",
+        "CSS_CLASS:card",
+        "CSS_CLASS:market",
+        "CSS_CLASS:editStage"
+      ],
+      "test": [
+        "src/pages/WorkflowsPage/WorkflowsPage.test.ts"
+      ],
+      "budget": 500
     },
     {
       "module": "src/domain/project/workflowGraph.ts",
@@ -12091,6 +12184,31 @@
       "budget": 90
     },
     {
+      "module": "src/domain/project/workflowsPage.ts",
+      "owner": "canvas-creation-ui",
+      "responsibility": "「AI 应用 / 工作流」独立页的地址约定：/workflows 路径与渠道 / 标签 / 条目查询参数的拼装与解析（缺省落在 AI 应用标签）。",
+      "owns": [
+        "/workflows 地址与查询参数口径",
+        "非法标签回落到 AI 应用"
+      ],
+      "doesNotOwn": [
+        "路由注册（app/routes）",
+        "页面渲染与跳转实现",
+        "条目存储"
+      ],
+      "publicApi": [
+        "WorkflowsTab",
+        "WORKFLOWS_PAGE_PATH",
+        "WorkflowsPageQuery",
+        "workflowsPagePath",
+        "parseWorkflowsPageQuery"
+      ],
+      "test": [
+        "src/domain/project/workflowsPage.test.ts"
+      ],
+      "budget": 60
+    },
+    {
       "module": "src/pages/SettingsPage/settingsPage/SettingsKeyGroupView.tsx",
       "owner": "settings-ui",
       "responsibility": "渠道连接区的 Key 分组：标签页、令牌字段、以及默认折叠的分组设置（名称/优先级/删除）。",
@@ -12178,6 +12296,28 @@
       "budget": 90
     },
     {
+      "module": "src/pages/SettingsPage/settingsPage/workflowsPageLink.ts",
+      "owner": "settings-ui",
+      "responsibility": "渠道页与「AI 应用 / 工作流」页互跳：带渠道 id 打开 /workflows（嵌在全局设置浮层里先关浮层），以及 /settings?channel= 回跳时的初始选中渠道。",
+      "owns": [
+        "渠道页到管理页的跳转",
+        "回跳时的初始渠道"
+      ],
+      "doesNotOwn": [
+        "全局设置浮层状态本身（state/ui/globalSettings）",
+        "管理页渲染",
+        "渠道选中后的复位逻辑"
+      ],
+      "publicApi": [
+        "useWorkflowsPageOpener",
+        "initialSelectedChannelId"
+      ],
+      "test": [
+        "src/pages/SettingsPage/settingsPage/workflowsPageLink.test.ts"
+      ],
+      "budget": 50
+    },
+    {
       "module": "src/features/settings/SettingsWorkflowEntryPage.tsx",
       "owner": "settings-ui",
       "responsibility": "条目设置整页：名称/备注/计数/输出类型/测试运行 + 重新拉取，右侧参数卡或节点图。",
@@ -12186,7 +12326,7 @@
         "拉取时间与操作入口"
       ],
       "doesNotOwn": [
-        "拉取与合并逻辑（SettingsWorkflowManager）",
+        "拉取与合并逻辑（useWorkflowEntries）",
         "字段编辑器",
         "节点图渲染"
       ],

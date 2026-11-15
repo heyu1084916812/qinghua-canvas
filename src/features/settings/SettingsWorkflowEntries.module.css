@@ -36,13 +36,6 @@
   line-height: 1.5;
 }
 
-.manualRow {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  min-width: 0;
-}
-
 .input {
   flex: 1 1 auto;
   min-width: 0;
@@ -98,7 +91,6 @@
 }
 
 .error,
-.notice,
 .muted {
   margin: 0;
   padding: var(--space-2) var(--space-3);
@@ -113,26 +105,8 @@
   border: var(--border);
 }
 
-.notice,
 .muted {
   color: var(--text-3);
-}
-
-.market {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-  padding: var(--space-3);
-  border: var(--border);
-  border-radius: var(--radius-control);
-  background: var(--bg-surface);
-}
-
-.marketHead {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-2);
 }
 
 .marketTitle {
@@ -141,56 +115,12 @@
   font-weight: 600;
 }
 
-.marketList,
-.list {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-  margin: 0;
-  padding: 0;
-  list-style: none;
-  max-height: 260px;
-  overflow-y: auto;
-}
-
-.marketItem,
-.item {
-  display: flex;
-  flex-wrap: nowrap;
-  align-items: flex-start;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-2);
-  min-width: 0;
-  padding: var(--space-2) var(--space-3);
-  border-radius: var(--radius-control);
-  background: var(--bg-subtle);
-}
-
-.marketText,
 .text {
   display: flex;
   flex: 1 1 auto;
   flex-direction: column;
   gap: 2px;
   min-width: 0;
-}
-
-.marketName,
-.name {
-  color: var(--text-1);
-  font-size: var(--fs-label);
-  line-height: 1.5;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.marketMeta,
-.meta {
-  color: var(--text-3);
-  font-size: var(--fs-label);
-  line-height: 1.5;
 }
 
 .actions {
@@ -470,84 +400,6 @@
   background: var(--bg-subtle);
 }
 
-/* 管理页卡片：与左侧列表行分开写，避免 `.item` 的旧规则互相覆盖 */
-.card {
-  display: flex;
-  align-items: flex-start;
-  gap: var(--space-3);
-  min-width: 0;
-  padding: var(--space-3) var(--space-4);
-  border: var(--border);
-  border-radius: var(--radius-control);
-  background: var(--bg-surface);
-}
-
-.cardText {
-  display: flex;
-  flex: 1 1 auto;
-  flex-direction: column;
-  gap: 4px;
-  min-width: 0;
-}
-
-.cardTitle {
-  color: var(--text-1);
-  font-size: var(--fs-body);
-  font-weight: 600;
-  line-height: 1.4;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-/* 备注在卡片上只作一行提示（改它去「设置」），长了就省略 */
-.cardNote {
-  color: var(--text-2);
-  font-size: var(--fs-label);
-  line-height: 1.5;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.columns {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: var(--space-5);
-  min-width: 0;
-}
-
-.column {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-  min-width: 0;
-}
-
-.columnHead {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding-bottom: var(--space-2);
-  border-bottom: var(--border);
-}
-
-.cover {
-  flex: none;
-  width: 56px;
-  height: 56px;
-  border-radius: var(--radius-control);
-  object-fit: cover;
-}
-
-.coverPlaceholder {
-  flex: none;
-  width: 56px;
-  height: 56px;
-  border-radius: var(--radius-control);
-  background: var(--bg-hover);
-}
-
 .countRow {
   display: flex;
   gap: var(--space-2);
@@ -582,15 +434,4 @@
   .editor {
     grid-template-columns: minmax(0, 1fr);
   }
-
-  .columns {
-    grid-template-columns: minmax(0, 1fr);
-  }
 }
-
-/*
- * 卡片里那两行要铺满（图三：名称与备注都是整行）：
- * flex 列里 `flex: 1 1 90px` 作用在**高度**上，会把输入框拉成 90px 高；
- * 这里显式 `flex: none` + 宽度 100%。
- */
-.cardText input, .cardText textarea { width: 100%; box-sizing: border-box; flex: none; }

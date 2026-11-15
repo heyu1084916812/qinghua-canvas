@@ -56,6 +56,7 @@ import { SettingsModelsView } from './settingsPage/SettingsModelsView'
 import { SettingsWorkflowManager } from '../../features/settings/SettingsWorkflowManager'
 import { SettingsChannelQuickTest } from '../../features/settings/SettingsChannelQuickTest'
 import { runninghubSiteNote } from '../../domain/project/runninghubSite'
+import { initialSelectedChannelId, useWorkflowsPageOpener } from './settingsPage/workflowsPageLink'
 import { SettingsChannelActionBar } from './settingsPage/SettingsChannelActionBar'
 import { SettingsChannelRouteView } from './settingsPage/SettingsChannelRouteView'
 import { SettingsProfileDrawerView } from './settingsPage/SettingsProfileDrawerView'
@@ -183,7 +184,7 @@ export function SettingsPage({ embedded = false }: { embedded?: boolean } = {}) 
     () => channels.getState().routingPolicy,
   )
 
-  const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [selectedId, setSelectedId] = useState<string | null>(initialSelectedChannelId)
   const [activeGroupId, setActiveGroupId] = useState<string | null>(null)
   const [channelMenu, setChannelMenu] = useState<{
     channelId: string
@@ -236,7 +237,6 @@ export function SettingsPage({ embedded = false }: { embedded?: boolean } = {}) 
   // 这样中途取消（或点遮罩外）不会把半成品状态写进渠道——与画布「编辑中不落库」同一口径。
   const [panelOpen, setPanelOpen] = useState(false)
   /** 「AI 应用和工作流」由连接区的动作按钮控制展开（图一的按钮位） */
-  const [workflowManagerOpen, setWorkflowManagerOpen] = useState(false)
   const [draftChecked, setDraftChecked] = useState<ReadonlySet<string>>(new Set())
   const [draftCategory, setDraftCategory] = useState<CategoryFilter>('all')
   const [draftKeyword, setDraftKeyword] = useState('')
@@ -283,6 +283,7 @@ export function SettingsPage({ embedded = false }: { embedded?: boolean } = {}) 
   const [catalogVersion, setCatalogVersion] = useState(0)
   const catalog = useMemo(() => channels.protocolCatalog(), [channels, catalogVersion])
   const platform = usePlatform()
+  const openWorkflowsPage = useWorkflowsPageOpener(embedded)
   /** 桌面壳里才有本机命令（对账 #308）：状态行文案据此区分"本机命令"与"地址" */
   const hasLocalCli = platform.cli != null
   const {
@@ -620,13 +621,12 @@ export function SettingsPage({ embedded = false }: { embedded?: boolean } = {}) 
         于是这个页面现在就是**渠道配置本身**，从内容直接开始。
       */}
       {(
-      <div className={embedded ? styles.layoutEmbedded : styles.layout} data-settings-card data-workflow-manager-open={workflowManagerOpen ? 'true' : 'false'}>
+      <div className={embedded ? styles.layoutEmbedded : styles.layout} data-settings-card>
         {/*
           **选路策略默认收起**（用户 2026-11-15：「后台渠道的位置不要全部塞在一起了」）：
           它是**全局**设置，不是这条渠道的字段，常驻展开会把渠道页顶掉半屏。
           收起来后只留一行摘要，要用时点开 —— 与参考站「渠道页从渠道自己开始」一致。
         */}
-        {!workflowManagerOpen ? (
         <details className={styles.disclosure} data-settings-routing-disclosure>
           <summary>选路策略 · {ROUTE_PLAN_STRATEGIES.find((item) => item.value === routingPolicy.strategy)?.label ?? routingPolicy.strategy} · 最多 {routingPolicy.maxAttempts} 次 · 路由范围 {selectedRoutingCandidateKeys.size}/{routingCandidates.length}</summary>
         <SettingsGlobalRouteView
@@ -648,7 +648,6 @@ export function SettingsPage({ embedded = false }: { embedded?: boolean } = {}) 
           onToggleRoutingCandidate={toggleRoutingCandidate}
         />
         </details>
-        ) : null}
 
         <div className={styles.workarea} data-settings-workarea>
           <SettingsChannelSidebarView
@@ -675,7 +674,7 @@ export function SettingsPage({ embedded = false }: { embedded?: boolean } = {}) 
           {!selected ? (
             <div className={styles.placeholder}>从左侧选择，或新增一个模型服务</div>
           ) : (
-            <div className={styles.form} data-settings-form data-workflow-manager-open={workflowManagerOpen ? 'true' : 'false'}>
+            <div className={styles.form} data-settings-form>
               <SettingsProviderHeaderView
                 channelId={selected.id}
                 protocol={protocol}
@@ -742,11 +741,12 @@ export function SettingsPage({ embedded = false }: { embedded?: boolean } = {}) 
                 onCheckImportedProtocol={checkImportedProtocol}
                 onSaveImportedProtocol={handleSaveImportedProtocol}
                 onRefreshModels={() => void handleRefresh()}
-                onOpenWorkflowManager={() => setWorkflowManagerOpen(true)}
+                onOpenWorkflowManager={() => openWorkflowsPage(selected.id)}
               />
 
-              {workflowManagerOpen && selected.protocol === 'runninghub-api' ? (
-                <SettingsWorkflowManager channel={selected} groupId={activeGroup?.id} channels={channels} platform={platform} open={workflowManagerOpen} onOpenChange={setWorkflowManagerOpen} />
+              {/* AI 应用 / 工作流在独立页管理（#1131）：渠道页只留连接、Key 和这条入口 */}
+              {selected.protocol === 'runninghub-api' ? (
+                <SettingsWorkflowManager channel={selected} platform={platform} onOpen={() => openWorkflowsPage(selected.id)} />
               ) : null}
 
               <SettingsModelsView

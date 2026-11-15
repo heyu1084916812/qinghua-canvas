@@ -8,6 +8,7 @@ import { HomePage } from '../pages/HomePage/HomePage'
  * - /canvas/:id      → 画布工作台页（按 projectId 从 IndexedDB 读回图）
  * - /settings        → 设置页（渠道配置）
  * - /skills          → 技能库（用户 2026-09-24：自己写给文本模型用的系统指令）
+ * - /workflows       → AI 应用 / 工作流（RunningHub 条目管理，#1131）
  * - *                → 兜底回首页
  * dev 的 /_preview 由 main.tsx 在挂载 App 之前拦截，不走这里。
  *
@@ -56,6 +57,14 @@ const InspirationPage = lazy(() =>
   import('../pages/InspirationPage/InspirationPage').then((m) => ({
     default: m.InspirationPage,
   })),
+)
+
+/**
+ * 「AI 应用 / 工作流」单独成页（#1131，用户 2026-11-15）：与技能库同一种版式（两个标签），
+ * 原来塞在渠道表单里，打开要把整个设置页藏掉。渠道页只留连接、Key 和入口。
+ */
+const WorkflowsPage = lazy(() =>
+  import('../pages/WorkflowsPage/WorkflowsPage').then((m) => ({ default: m.WorkflowsPage })),
 )
 
 const ProjectsPage = lazy(() =>
@@ -115,6 +124,7 @@ export function AppRoutes() {
         <Route path="/settings" element={<SettingsPage />} />
         <Route path="/hosting" element={<HostingPage />} />
         <Route path="/skills" element={<SkillsPage />} />
+        <Route path="/workflows" element={<WorkflowsPage />} />
         <Route path="/inspiration" element={<InspirationPage />} />
         {/* 「生成历史」沿用 /assets；新的「我的素材」是画布工作区左侧抽屉 */}
         <Route path="/assets" element={<AssetsPage />} />

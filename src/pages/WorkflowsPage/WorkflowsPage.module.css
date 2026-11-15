@@ -1,0 +1,438 @@
+/*
+ * 「AI 应用 / 工作流」页（#1131）。版式与技能库（SkillsPageShell）同一套：
+ * 顶部下划线标签、一行工具条、三列卡片（左封面右文字）；只用设计令牌，不写死颜色。
+ */
+.page {
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-5);
+  background: var(--bg-canvas);
+  color: var(--text-1);
+  font-family: var(--font-sans);
+  overflow: hidden;
+}
+
+.editStage {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.topBar {
+  flex: none;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-4);
+  border-bottom: var(--border);
+}
+
+.tabs {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--space-5);
+}
+
+.tab,
+.tabOn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  height: 42px;
+  padding: 0 2px;
+  border: none;
+  background: transparent;
+  color: var(--text-2);
+  font-family: var(--font-sans);
+  font-size: var(--fs-panel-title);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.tab::after,
+.tabOn::after {
+  content: "";
+  position: absolute;
+  right: 0;
+  bottom: -1px;
+  left: 0;
+  height: 2px;
+  background: transparent;
+}
+
+.tab:hover,
+.tabOn {
+  color: var(--text-1);
+}
+
+.tabOn::after {
+  background: var(--text-1);
+}
+
+.tab span,
+.tabOn span {
+  color: var(--text-3);
+  font-size: var(--fs-chip);
+  font-weight: 500;
+}
+
+/* 站点切换：分段按钮，与标签同一行靠右，下沿对齐标签基线 */
+.sites {
+  display: inline-flex;
+  margin-bottom: var(--space-2);
+  padding: 2px;
+  border: var(--border);
+  border-radius: var(--radius-control);
+  background: var(--bg-subtle);
+}
+
+.site,
+.siteOn {
+  height: 28px;
+  padding: 0 var(--space-3);
+  border: none;
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--text-2);
+  font-family: var(--font-sans);
+  font-size: var(--fs-chip);
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.site:hover {
+  color: var(--text-1);
+}
+
+.siteOn {
+  background: var(--bg-surface);
+  color: var(--text-1);
+  box-shadow: 0 0 0 1px var(--stroke);
+}
+
+.toolbar {
+  flex: none;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.importInput {
+  flex: 0 1 460px;
+  width: min(460px, 100%);
+  min-width: 0;
+  height: 34px;
+  box-sizing: border-box;
+  padding: 0 var(--space-3);
+  border: var(--border);
+  border-radius: var(--radius-control);
+  background: var(--bg-surface);
+  color: var(--text-1);
+  font-family: var(--font-sans);
+  font-size: var(--fs-label);
+}
+
+.importInput::placeholder {
+  color: var(--text-3);
+}
+
+.toolbarSpacer {
+  flex: 1 1 auto;
+}
+
+.ghost,
+.primary {
+  flex: none;
+  height: 32px;
+  padding: 0 var(--space-3);
+  border-radius: var(--radius-control);
+  font-family: var(--font-sans);
+  font-size: var(--fs-chip);
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.ghost {
+  border: var(--border);
+  background: var(--bg-surface);
+  color: var(--text-1);
+}
+
+.ghost:hover:not(:disabled) {
+  background: var(--bg-hover);
+}
+
+.primary {
+  border: 1px solid var(--accent);
+  background: var(--accent);
+  color: var(--accent-text);
+}
+
+.primary:hover:not(:disabled) {
+  opacity: 0.9;
+}
+
+.ghost:disabled,
+.primary:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.link {
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--text-2);
+  font-family: var(--font-sans);
+  font-size: var(--fs-label);
+  cursor: pointer;
+}
+
+.link:hover {
+  color: var(--text-1);
+}
+
+.banner {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border: var(--border);
+  border-radius: var(--radius-control);
+  background: var(--bg-subtle);
+  color: var(--text-1);
+  font-size: var(--fs-label);
+  line-height: 1.5;
+}
+
+.error,
+.notice,
+.muted,
+.empty {
+  margin: 0;
+  font-size: var(--fs-label);
+  line-height: 1.5;
+}
+
+.error {
+  flex: none;
+  padding: var(--space-2) var(--space-3);
+  border: var(--border);
+  border-radius: var(--radius-control);
+  background: var(--bg-surface);
+  color: var(--text-1);
+}
+
+.notice {
+  flex: none;
+  color: var(--text-2);
+}
+
+.muted,
+.empty {
+  color: var(--text-3);
+}
+
+.body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding-bottom: var(--space-4);
+}
+
+.cards {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  align-content: start;
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+@media (max-width: 1180px) {
+  .cards {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.cardItem {
+  position: relative;
+  min-width: 0;
+}
+
+.card {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  min-height: 116px;
+  padding: 0;
+  overflow: hidden;
+  border: var(--border);
+  border-radius: var(--radius-control);
+  background: var(--bg-surface);
+  color: var(--text-1);
+  font-family: var(--font-sans);
+  text-align: left;
+  cursor: pointer;
+}
+
+.card:hover,
+.card:focus-visible {
+  border-color: var(--stroke-focus);
+  background: var(--bg-hover);
+  outline: none;
+}
+
+.cardShot {
+  position: relative;
+  flex: 0 0 38%;
+  min-width: 0;
+  overflow: hidden;
+  background: var(--bg-subtle);
+}
+
+.cardShotImg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.cardShotEmpty {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  color: var(--text-3);
+  font-size: var(--fs-chip);
+}
+
+.cardBody {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: var(--space-3);
+  padding-right: 56px;
+}
+
+.cardName,
+.cardDesc {
+  display: -webkit-box;
+  min-width: 0;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.cardName {
+  font-size: var(--fs-label);
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.cardDesc {
+  color: var(--text-2);
+  font-size: var(--fs-chip);
+  line-height: 1.45;
+}
+
+.cardRoute {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text-3);
+  font-size: var(--fs-chip);
+  line-height: 1.45;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cardMeta {
+  margin-top: auto;
+  color: var(--text-3);
+  font-size: var(--fs-chip);
+}
+
+.cardRemove {
+  position: absolute;
+  top: var(--space-2);
+  right: var(--space-2);
+  height: 24px;
+  padding: 0 var(--space-2);
+  border: var(--border);
+  border-radius: var(--radius-control);
+  background: var(--bg-surface);
+  color: var(--text-2);
+  font-family: var(--font-sans);
+  font-size: var(--fs-chip);
+  cursor: pointer;
+}
+
+.cardRemove:hover:not(:disabled) {
+  color: var(--text-1);
+  background: var(--bg-hover);
+}
+
+.market {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: var(--border);
+  border-radius: var(--radius-control);
+  background: var(--bg-surface);
+}
+
+.marketHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.marketTitle {
+  font-size: var(--fs-label);
+  font-weight: 600;
+}
+
+.marketList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  max-height: 260px;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.marketItem {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.marketName {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  font-size: var(--fs-label);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

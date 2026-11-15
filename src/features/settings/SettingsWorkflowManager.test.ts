@@ -23,20 +23,14 @@ const channel = {
  * 那些由 `workflowEntryStore.test.ts` / `runninghubMarket.test.ts` 单独钉。
  * 这里钉的是「管理页真的在页面上、只有这一个入口」。
  */
-describe('SettingsWorkflowManager', () => {
-  it('收起态是一条入口（标题 + 已加条目数 + 进入管理）', () => {
+describe('SettingsWorkflowManager（渠道页入口，#1131）', () => {
+  it('只是一条入口：标题 + 说明 + 打开管理页；不再在渠道页里渲染两栏与市场', () => {
     const html = renderToStaticMarkup(
-      createElement(SettingsWorkflowManager, {
-        channel,
-        channels: {} as ChannelStore,
-        platform: createMemoryPlatform(),
-      }),
+      createElement(SettingsWorkflowManager, { channel, platform: createMemoryPlatform(), onOpen: () => {} }),
     )
     expect(html).toContain('data-workflow-manager-entry')
     expect(html).toContain('AI 应用和工作流')
-    expect(html).toContain('进入管理')
-    expect(html).toContain('已添加 0 个应用 · 0 条工作流')
-    /* 展开后的两栏与市场面板都不在收起态里（点进去才渲染、才拉目录） */
+    expect(html).toContain('打开管理页')
     expect(html).not.toContain('data-workflow-column')
     expect(html).not.toContain('data-workflow-market')
   })
