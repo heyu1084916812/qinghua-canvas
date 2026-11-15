@@ -1,10 +1,13 @@
 import { errorTextOf } from '../../shared/result'
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { Channel } from '../../domain/project/channel'
 import type { ChannelStore } from '../../state/channel/channelStore'
 import type { PlatformKit } from '../../platform/ports'
 import type { WorkflowEntry } from '../../domain/project/workflowParams'
 import { quickTestCategory, runChannelQuickTest } from '../../state/channel/channelQuickTest'
+import { submittedTaskIdOf } from '../../platform/channels/runninghubWorkflowRun'
+import { RH_MARKET_DEFAULT_HOST } from '../../platform/channels/runninghubMarket'
+import { loadEntryKey, recheckWorkflowTask } from './workflowTaskRecheck'
 import shell from './SettingsWorkflowEntries.module.css'
 import styles from './SettingsChannelQuickTest.module.css'
 
@@ -34,25 +37,46 @@ export function SettingsWorkflowTestRun({
   const [running, setRunning] = useState(false)
   const [result, setResult] = useState('')
   const [error, setError] = useState('')
+  /** 已提交、但停止等待了的任务 id（超时 / 点停止）：凭它「再查一次」，不重新提交 */
+  const [pendingTask, setPendingTask] = useState<string | null>(null)
+  const [checking, setChecking] = useState(false)
   const abortRef = useRef<AbortController | null>(null)
+  /** 卸载就停止等待（任务仍在上游，id 已在界面上说过） */
+  useEffect(() => () => abortRef.current?.abort(), [])
+
+  const loadKey = () => loadEntryKey(channels, channel.id, groupId)
+
+  const recheck = async (taskId: string) => {
+    setChecking(true)
+    setError('')
+    setResult('')
+    try {
+      const outcome = await recheckWorkflowTask(
+        { network: platform.network },
+        { host: channel.baseUrl || RH_MARKET_DEFAULT_HOST, apiKey: await loadKey() },
+        taskId,
+        AbortSignal.timeout(30_000),
+      )
+      if (outcome.kind === 'failed') setError(outcome.text)
+      else setResult(outcome.text)
+      if (outcome.kind !== 'pending') setPendingTask(null)
+    } catch (e) {
+      setError(errorTextOf(e))
+    } finally {
+      setChecking(false)
+    }
+  }
 
   const run = async () => {
     setRunning(true)
     setError('')
     setResult('')
+    setPendingTask(null)
     const controller = new AbortController()
     abortRef.current = controller
     const timer = setTimeout(() => controller.abort(), 180_000)
     try {
-      let apiKey: string | null = null
-      try {
-        apiKey = groupId
-          ? await channels.loadCredentialGroupToken(channel.id, groupId)
-          : await channels.loadToken(channel.id)
-      } catch {
-        apiKey = null
-      }
-      if (!apiKey) throw new Error('这条渠道还没存 API Key —— 先在连接区填好 Key，再测试')
+      const apiKey = await loadKey()
 
       const workflow = entry.fields
         .filter((field) => field.enabled)
@@ -76,6 +100,7 @@ export function SettingsWorkflowTestRun({
           : `已返回 ${outcome.mime}${outcome.bytes ? ` · ${Math.round(outcome.bytes.length / 1024)} KB` : ''}`,
       )
     } catch (e) {
+      setPendingTask(submittedTaskIdOf(e))
       setError(errorTextOf(e))
     } finally {
       clearTimeout(timer)
@@ -95,12 +120,25 @@ export function SettingsWorkflowTestRun({
       >
         {running ? '运行中…' : '测试运行'}
       </button>
+      {running ? (
+        <button type="button" className={shell.linkBtn} onClick={() => abortRef.current?.abort()} data-workflow-test-run-stop>
+          停止等待（任务照常在上游跑）
+        </button>
+      ) : null}
       <p className={shell.muted}>会调用正式接口并计费；用条目里已暴露字段的当前值跑一次。</p>
       {result ? <p className={styles.result}>{result}</p> : null}
       {error ? (
         <p className={styles.error} data-workflow-test-run-error>
           {error}
         </p>
+      ) : null}
+      {pendingTask && !running ? (
+        <div className={shell.actions} data-workflow-test-run-task={pendingTask}>
+          <span className={shell.muted}>任务 id：{pendingTask}</span>
+          <button type="button" className={shell.btn} disabled={checking} onClick={() => void recheck(pendingTask)} data-workflow-test-run-recheck>
+            {checking ? '查询中…' : '再查一次'}
+          </button>
+        </div>
       ) : null}
     </div>
   )

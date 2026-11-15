@@ -12130,9 +12130,32 @@
         "SettingsWorkflowTestRun"
       ],
       "test": [
-        "src/features/settings/SettingsWorkflowManager.test.ts"
+        "src/features/settings/SettingsWorkflowManager.test.ts",
+        "src/features/settings/SettingsWorkflowTestRun.test.ts"
       ],
       "budget": 150
+    },
+    {
+      "module": "src/features/settings/workflowTaskRecheck.ts",
+      "owner": "settings-ui",
+      "responsibility": "测试运行停止等待之后凭任务 id 只查一次 v2 query（不重新提交）、读条目 Key 的统一口径。",
+      "owns": [
+        "再查一次结果归类",
+        "读 Key 兜底"
+      ],
+      "doesNotOwn": [
+        "轮询与提交（platform/channels/runninghubWorkflowRun）",
+        "测试运行的界面与状态（SettingsWorkflowTestRun.tsx）"
+      ],
+      "publicApi": [
+        "recheckWorkflowTask",
+        "RecheckOutcome",
+        "loadEntryKey"
+      ],
+      "test": [
+        "src/features/settings/SettingsWorkflowTestRun.test.ts"
+      ],
+      "budget": 60
     },
     {
       "module": "src/pages/SettingsPage/settingsPage/SettingsChannelActionBar.tsx",
