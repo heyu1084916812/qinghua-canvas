@@ -15,10 +15,10 @@ import {
  * 分层：仍然只有纯函数；发请求在 `platform/channels/runninghubWorkflow.ts`。
  */
 
-/** 暴露给节点的那几个字段（顺序即面板顺序） */
 /** 媒体字段的「用上游素材」哨兵：面板发它，执行期按顺序取上游素材、上传、换成 `fileName`。 */
 export const UPSTREAM_MEDIA_VALUE = '__upstream__'
 
+/** 暴露给节点的那几个字段（顺序即面板顺序） */
 export function exposedFields(fields: readonly WorkflowParamField[]): WorkflowParamField[] {
   return fields.filter((field) => field.enabled)
 }
@@ -57,21 +57,21 @@ export function missingRequiredFields(
   )
 }
 
-export const WORKFLOW_SEED_MAX = 0xffffffff
+/** 种子上限按 ComfyUI 口径 uint64（#1127 M9：上一版按 uint32 取模会改掉用户的种子） */
+export const WORKFLOW_SEED_MAX = 0xffffffffffffffffn
 
-/** 种子归一：非数字回落 `0`，负数取绝对值，超 32 位取模（ComfyUI 的 seed 是 uint32） */
+/** 种子归一：非整数回落 `0`，负数取绝对值，超 uint64 取模；**全程用字符串 / BigInt**，19 位也不丢精度 */
 export function normalizeWorkflowSeed(value: unknown): string {
-  const text = typeof value === 'number' ? String(value) : typeof value === 'string' ? value.trim() : ''
-  const n = Number(text)
-  if (!Number.isFinite(n)) return '0'
-  const abs = Math.abs(Math.trunc(n))
-  return String(abs > WORKFLOW_SEED_MAX ? abs % (WORKFLOW_SEED_MAX + 1) : abs)
+  const text = typeof value === 'number' && Number.isFinite(value) ? String(Math.trunc(value)) : typeof value === 'string' ? value.trim() : ''
+  const digits = /^-?\d+$/.test(text) ? text.replace(/^-/, '') : /^-?\d+\.\d*$/.test(text) ? text.replace(/^-/, '').split('.')[0]! : ''
+  if (!digits) return '0'
+  const n = BigInt(digits)
+  return String(n > WORKFLOW_SEED_MAX ? n % (WORKFLOW_SEED_MAX + 1n) : n)
 }
 
-/** 给种子字段抽一个新值 */
+/** 给种子字段抽一个新值（落在 uint32 内：够随机，也不会在任何 JSON 里丢精度） */
 export function randomWorkflowSeed(random: () => number = Math.random): string {
-  const value = Math.floor(random() * (WORKFLOW_SEED_MAX + 1))
-  return String(Math.min(Math.max(value, 0), WORKFLOW_SEED_MAX))
+  return String(Math.min(Math.max(Math.floor(random() * 0x100000000), 0), 0xffffffff))
 }
 
 /**

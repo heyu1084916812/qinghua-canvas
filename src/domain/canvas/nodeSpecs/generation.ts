@@ -211,7 +211,8 @@ export const generationSpec: NodeSpec<GenerationData> = {
     ]
       .filter(Boolean)
       .join('\n')
-    if (!prompt) return null
+    /** 工作流 / AI 应用的参数在条目字段里，主提示词可以空着（#1127：上一版空着点生成什么都不发生） */
+    if (!prompt && !/^(workflow|app):/.test(data.model)) return null
 
     return {
       kind: data.mode,

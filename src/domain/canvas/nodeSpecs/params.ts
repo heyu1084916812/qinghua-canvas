@@ -17,15 +17,13 @@ import { mjSettingsOf } from '../layout/mjParams'
  * 却收到的是视频请求，只会让人猜哪几个字段有效）。
  */
 export function generationParams(data: GenerationData): Record<string, unknown> {
-  /** 工作流条目：面板拼好的提交体与实例规格原样下发（别的模型不带这两个字段） */
-  const workflow =
-    data.model?.startsWith('workflow:') && data.workflowNodeInfoList?.length
-      ? { workflow: data.workflowNodeInfoList }
-      : {}
-  const instanceType =
-    data.model?.startsWith('workflow:') && data.workflowInstance === 'plus'
-      ? { instanceType: 'plus' }
-      : {}
+  /**
+   * 工作流 / AI 应用条目：面板拼好的提交体与实例规格原样下发（别的模型不带这两个字段）。
+   * 两种前缀都认（#1127 H1：上一版只认 `workflow:`，应用参数在面板上改了也发不出去）。
+   */
+  const entryModel = /^(workflow|app):/.test(data.model ?? '')
+  const workflow = entryModel && data.workflowNodeInfoList?.length ? { workflow: data.workflowNodeInfoList } : {}
+  const instanceType = entryModel && data.workflowInstance === 'plus' ? { instanceType: 'plus' } : {}
   if (data.mode === 'video') {
     return {
       ...workflow,

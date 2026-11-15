@@ -2,9 +2,11 @@ import { queryWorkflowTask, WORKFLOW_POLL_INTERVAL_MS, WORKFLOW_POLL_MAX_MS, typ
 import type { PlatformKit } from '../ports'
 import { ChannelError } from './types'
 import { asAppError, errorTextOf } from '../../shared/result'
-import { imageInputsOf, videoInputsOf } from '../../domain/shared/execution/inputs'
+import { audioInputsOf, imageInputsOf, videoInputsOf, type ImageInput } from '../../domain/shared/execution/inputs'
 import type { NodeInput } from '../../domain/shared/execution/types'
 import { UPSTREAM_MEDIA_VALUE } from '../../domain/project/workflowParamValues'
+import { workflowRunList, type WorkflowRunItem } from '../../domain/project/workflowRunList'
+import { normalizeWorkflowEntries, workflowEntriesRowId } from '../../domain/project/workflowParams'
 import { uploadWorkflowAsset } from './runninghubWorkflow'
 
 /**
@@ -64,7 +66,8 @@ export function fillAppNodeValues(
     const target = nodes.find((node) => node.fieldType === fieldName || node.fieldName === fieldName)
     if (target) target.fieldValue = value
   }
-  setField('prompt', prompt)
+  /** 空提示词**不覆盖**：否则应用里 `prompt` 节点的默认值被清成空串（#1127 M10） */
+  if (prompt.trim()) setField('prompt', prompt)
   const putField = (fieldName: string, raw: unknown) => {
     const value = typeof raw === 'number' ? String(raw) : typeof raw === 'string' ? raw : ''
     if (value !== '') setField(fieldName, value)
@@ -82,40 +85,90 @@ export function fillAppNodeValues(
 }
 
 /**
- * 把提交体里的「用上游素材」哨兵换成**上传后的文件名**（对账 #1104 媒体接线）。
+ * 执行期按**最新条目**重拼提交体（#1127 M9 / H3）。
  *
- * 顺序口径：先图片、后视频，按面板上的出现顺序各取一张；没有素材就**丢掉这一项**
- * （让工作流自己的默认值生效），不塞空串——空串在 RunningHub 是"清空该参数"。
+ * - 有 `storage`：读 `workflow:entries:<channelId>`，找不到这个条目（被删了 / 属于另一条渠道）
+ *   就**拦下不提交**——上一版会拿面板兜底的另一个条目的 nodeId 去跑，花钱跑错东西；
+ *   必填项为空也在这里拦（服务端只会回一句看不懂的 1007）。
+ * - 没有 `storage`、或这条渠道从没存过条目行：按节点存的三元组原样发。
+ */
+export async function latestRunList(
+  storage: { query(table: 'presets', filter: { id: string }): Promise<unknown[]> } | undefined,
+  input: { channelId: string; kind: 'workflow' | 'app'; entryId: string; raw: unknown; prompt: string },
+): Promise<WorkflowRunItem[]> {
+  const nodeList = workflowNodeListOf(input.raw)
+  if (!storage) return nodeList
+  const rows = await storage.query('presets', { id: workflowEntriesRowId(input.channelId) }).catch(() => null)
+  /** 读不到 / 这条渠道从没存过条目行（老数据、旁路）：按节点存的原样发，不凭空拦 */
+  if (rows === null || rows.length === 0) return nodeList
+  const entries = normalizeWorkflowEntries((rows[0] as { entries?: unknown } | undefined)?.entries)
+  const entry = entries.find((item) => item.id === input.entryId && (item.kind ?? 'workflow') === input.kind)
+  const label = input.kind === 'app' ? 'AI 应用' : '工作流'
+  if (!entry) {
+    throw new ChannelError({
+      kind: 'validation',
+      field: `${label}条目`,
+      reason: `这条渠道里没有${label} ${input.entryId}（可能已删除或属于另一条渠道），去「AI 应用和工作流」页重新导入，或在节点上换一个条目`,
+    })
+  }
+  const { list, missing } = workflowRunList(entry, nodeList, input.prompt)
+  if (missing.length > 0) {
+    throw new ChannelError({
+      kind: 'validation',
+      field: entry.title,
+      reason: `必填参数没填：${missing.map((field) => field.label || field.fieldName).join('、')}`,
+    })
+  }
+  return list
+}
+
+/**
+ * 把提交体里的「用上游素材」哨兵换成**上传后的文件名**（对账 #1104 媒体接线 / #1127 M3）。
+ *
+ * **按字段类型各取一条队列**：图片槽只拿上游图片、视频槽只拿视频、音频槽只拿音频，
+ * 同类型内按 `mediaOrder`（面板上的图序）分配。没有类型信息的老提交项按「先图后视频」的
+ * 旧顺序兜底。没有素材就**丢掉这一项**（让工作流 / 应用自己的默认值生效），不塞空串。
  */
 export async function resolveWorkflowMedia(
   deps: Pick<PlatformKit, 'network' | 'assets'>,
   endpoint: WorkflowEndpoint,
-  list: { nodeId: string; fieldName: string; fieldValue: string }[],
+  list: readonly WorkflowRunItem[],
   inputs: readonly NodeInput[],
   signal: AbortSignal,
 ): Promise<{ nodeId: string; fieldName: string; fieldValue: string }[]> {
-  if (!list.some((item) => item.fieldValue === UPSTREAM_MEDIA_VALUE)) return list
-  const refs = [...imageInputsOf([...inputs]), ...videoInputsOf([...inputs])]
-  let index = 0
+  const strip = (item: WorkflowRunItem) => ({ nodeId: item.nodeId, fieldName: item.fieldName, fieldValue: item.fieldValue })
+  if (!list.some((item) => item.fieldValue === UPSTREAM_MEDIA_VALUE)) return list.map(strip)
+  const all = [...inputs]
+  const queues: Record<'image' | 'video' | 'audio' | 'any', ImageInput[]> = {
+    image: [...imageInputsOf(all)],
+    video: [...videoInputsOf(all)],
+    audio: [...audioInputsOf(all)],
+    any: [...imageInputsOf(all), ...videoInputsOf(all)],
+  }
+  /** 同类型内按图序排好再依次取（原顺序作次序） */
+  const slots = list
+    .map((item, index) => ({ item, index }))
+    .filter(({ item }) => item.fieldValue === UPSTREAM_MEDIA_VALUE)
+    .sort((a, b) => (a.item.mediaOrder ?? 0) - (b.item.mediaOrder ?? 0) || a.index - b.index)
+  const picked = new Map<number, ImageInput | undefined>()
+  for (const { item, index } of slots) {
+    const kind = item.type === 'image' || item.type === 'video' || item.type === 'audio' ? item.type : 'any'
+    picked.set(index, queues[kind].shift())
+  }
   const out: { nodeId: string; fieldName: string; fieldValue: string }[] = []
-  for (const item of list) {
+  for (const [index, item] of list.entries()) {
     if (item.fieldValue !== UPSTREAM_MEDIA_VALUE) {
-      out.push(item)
+      out.push(strip(item))
       continue
     }
-    const ref = refs[index]
-    index += 1
+    const ref = picked.get(index)
     if (!ref) continue
     const payload = await deps.assets.read(ref.assetHash).catch(() => null)
     if (!payload || payload.bytes.length === 0) continue
-    const fileName = await uploadWorkflowAsset(
-      deps,
-      endpoint,
-      { bytes: payload.bytes, mime: payload.mime || ref.mime },
-      ref.mime.startsWith('video/') ? 'ref.mp4' : 'ref.png',
-      signal,
-    )
-    out.push({ ...item, fieldValue: fileName })
+    const mime = payload.mime || ref.mime
+    const name = mime.startsWith('video/') ? 'ref.mp4' : mime.startsWith('audio/') ? 'ref.mp3' : 'ref.png'
+    const fileName = await uploadWorkflowAsset(deps, endpoint, { bytes: payload.bytes, mime }, name, signal)
+    out.push({ ...strip(item), fieldValue: fileName })
   }
   return out
 }
@@ -179,7 +232,7 @@ export async function runWorkflowTask(
       if (signal.aborted) throw e
       /**
        * `fetchNetwork` 对非 2xx 抛的是**普通 AppError 对象**（不是 ChannelError），
-       * 只读 `.appError` 会把 401/403/404 当成抖动、白等 20 分钟（#1126 M5）。
+       * 只读 `.appError` 会把 401/403/404 当成抖动、白等 20 分钟（#1127 M5）。
        */
       const appError = asAppError(e)
       if (
@@ -216,7 +269,7 @@ export async function runWorkflowTask(
     }
     /**
      * v2 query 以 HTTP 200 + 顶层 `errorCode` 报错（真机 `1004 Task not found`），`status` 为空。
-     * 不认它就当"还在跑"，同样要白等 20 分钟（#1126 M5）。
+     * 不认它就当"还在跑"，同样要白等 20 分钟（#1127 M5）。
      */
     if (task && task.status === 'UNKNOWN' && task.errorCode && task.errorCode !== '0') {
       throw new ChannelError({

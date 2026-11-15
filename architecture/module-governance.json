@@ -701,7 +701,7 @@
     {
       "module": "src/domain/project/workflowParamValues.ts",
       "owner": "project-workflow-channel-params",
-      "responsibility": "工作流参数的取值与提交：暴露字段的取值回落、必填校验、uint32 种子归一与随机、nodeInfoList 提交体拼装、条目出图/出视频分类。",
+      "responsibility": "工作流参数的取值与提交：暴露字段的取值回落、必填校验、uint64（ComfyUI 口径）种子归一与随机、nodeInfoList 提交体拼装、条目出图/出视频分类。",
       "owns": [
         "字段取值与显式清空的语义",
         "必填校验（只校验暴露字段）",
@@ -729,6 +729,28 @@
         "src/domain/project/workflowParams.test.ts"
       ],
       "budget": 120
+    },
+    {
+      "module": "src/domain/project/workflowRunList.ts",
+      "owner": "project-workflow-channel-params",
+      "responsibility": "执行期按最新条目字段表重拼提交体：只发当前暴露字段、媒体字段发上游哨兵并带类型/图序、非媒体空值不下发、必填缺失返回给调用方、主提示词填进首个 text/prompt 字段。",
+      "owns": [
+        "执行期提交项（带类型与图序）",
+        "主提示词落位规则"
+      ],
+      "doesNotOwn": [
+        "读存储与拦截（runninghubWorkflowRun.ts）",
+        "素材上传",
+        "字段表解析"
+      ],
+      "test": [
+        "src/platform/channels/runninghubWorkflowExec.test.ts"
+      ],
+      "budget": 120,
+      "publicApi": [
+        "WorkflowRunItem",
+        "workflowRunList"
+      ]
     },
     {
       "module": "src/domain/project/workflowAppParams.ts",

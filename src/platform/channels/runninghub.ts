@@ -10,7 +10,7 @@ import { asAppError, describeError, errorTextOf } from '../../shared/result'
 import { bytesToBase64 } from './base64'
 import { prepareModelImageInput } from './chatImageInput'
 import { submitAppTask, submitWorkflowTask, uploadWorkflowAsset } from './runninghubWorkflow'
-import { fillAppNodeValues, instanceTypeOf, resolveWorkflowMedia, runWorkflowTask, workflowNodeListOf } from './runninghubWorkflowRun'
+import { fillAppNodeValues, instanceTypeOf, latestRunList, resolveWorkflowMedia, runWorkflowTask } from './runninghubWorkflowRun'
 import { rhAccountNote } from './runninghubAccount'
 import { describeRhError } from './runninghubErrorText'
 import type { NetworkResponse, SafeChannelConfig } from '../ports'
@@ -728,12 +728,17 @@ export function createRunningHubAdapter(
       throw upstreamError(null, describeRhError(info, '这个 AI 应用没有可修改节点（先在网页端成功跑一次）'))
     }
     const nodes2 = nodes.map((n) => ({ ...n }))
-    /** 提示词 + 常用三档 + **面板暴露字段**（按 nodeId+fieldName 精确覆盖，见 `fillAppNodeValues`） */
-    fillAppNodeValues(nodes2, request.prompt, request.params)
-
-    /** 参考图：应用要吃**上传后的文件名**（v2 二进制上传优先，见 `uploadWorkflowAsset`） */
     const endpoint = { host, apiKey: key }
-    const refs = imageInputsOf(request.inputs)
+    /**
+     * 面板暴露字段 → 按最新条目重拼，媒体哨兵按类型换成上传后的文件名（#1127 H1 / M3 / M9）；
+     * 再按 nodeId+fieldName 精确覆盖到应用节点上（`fillAppNodeValues`）。
+     */
+    const runList = await latestRunList(deps.storage, { channelId: config.id, kind: 'app', entryId: webappId, raw: request.params?.workflow, prompt: '' })
+    const exposed = await resolveWorkflowMedia(deps, endpoint, runList, request.inputs, signal)
+    fillAppNodeValues(nodes2, request.prompt, { ...request.params, workflow: exposed })
+
+    /** 没有暴露媒体字段的老节点：参考图按旧口径依次塞进 IMAGE 节点 */
+    const refs = runList.some((item) => item.type === 'image' || item.type === 'video' || item.type === 'audio') ? [] : imageInputsOf(request.inputs)
     for (const [i, ref] of refs.entries()) {
       const payload = await deps.assets.read(ref.assetHash).catch(() => null)
       if (!payload || payload.bytes.length === 0) continue
@@ -771,7 +776,9 @@ export function createRunningHubAdapter(
     signal: AbortSignal,
   ): Promise<GeneratedAsset[]> => {
     const endpoint = { host, apiKey: key }
-    const nodeInfoList = await resolveWorkflowMedia(deps, endpoint, workflowNodeListOf(request.params?.workflow), request.inputs, signal)
+    /* 执行期按最新条目重拼（取消暴露的不发、新暴露的带默认值、必填拦截、提示词填进 text 字段，#1127 M9） */
+    const runList = await latestRunList(deps.storage, { channelId: config.id, kind: 'workflow', entryId: workflowId, raw: request.params?.workflow, prompt: request.prompt })
+    const nodeInfoList = await resolveWorkflowMedia(deps, endpoint, runList, request.inputs, signal)
     let taskId: string
     try {
       const input = { workflowId, ...(nodeInfoList.length > 0 ? { nodeInfoList } : {}), ...instanceTypeOf(request.params) }

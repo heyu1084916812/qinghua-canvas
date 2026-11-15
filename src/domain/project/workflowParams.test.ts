@@ -292,14 +292,20 @@ describe('种子与取值', () => {
   it('normalizeWorkflowSeed 四种边界', () => {
     expect(normalizeWorkflowSeed('42')).toBe('42')
     expect(normalizeWorkflowSeed('-7')).toBe('7')
-    expect(normalizeWorkflowSeed(String(WORKFLOW_SEED_MAX + 3))).toBe('2')
+    expect(normalizeWorkflowSeed(String(WORKFLOW_SEED_MAX + 3n))).toBe('2')
     expect(normalizeWorkflowSeed('abc')).toBe('0')
+  })
+
+  it('★ #1127 M9：种子按 ComfyUI uint64，超 uint32 的真实种子不被改、19 位不丢精度', () => {
+    expect(normalizeWorkflowSeed('669816362794144')).toBe('669816362794144')
+    expect(normalizeWorkflowSeed('1125899906842624123')).toBe('1125899906842624123')
+    expect(normalizeWorkflowSeed('18446744073709551615')).toBe('18446744073709551615')
   })
 
   it('randomWorkflowSeed 落在 uint32 区间内', () => {
     expect(randomWorkflowSeed(() => 0)).toBe('0')
-    expect(randomWorkflowSeed(() => 0.999999)).toBe(String(Math.floor(0.999999 * (WORKFLOW_SEED_MAX + 1))))
-    expect(Number(randomWorkflowSeed())).toBeLessThanOrEqual(WORKFLOW_SEED_MAX)
+    expect(randomWorkflowSeed(() => 0.999999)).toBe(String(Math.floor(0.999999 * 0x100000000)))
+    expect(Number(randomWorkflowSeed())).toBeLessThanOrEqual(0xffffffff)
   })
 
   it('fieldValueOf：填过用节点的，没填过用工作流现值，显式空串就是空串', () => {
