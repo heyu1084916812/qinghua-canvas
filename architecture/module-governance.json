@@ -12061,6 +12061,27 @@
         "src/pages/SettingsPage/settingsPage/SettingsPageViews.test.ts"
       ],
       "budget": 90
+    },
+    {
+      "module": "src/features/settings/SettingsWorkflowEntryPage.tsx",
+      "owner": "settings-ui",
+      "responsibility": "条目设置整页：名称/备注/计数/输出类型/测试运行 + 重新拉取，右侧参数卡或节点图。",
+      "owns": [
+        "条目设置页的布局",
+        "拉取时间与操作入口"
+      ],
+      "doesNotOwn": [
+        "拉取与合并逻辑（SettingsWorkflowManager）",
+        "字段编辑器",
+        "节点图渲染"
+      ],
+      "publicApi": [
+        "SettingsWorkflowEntryPage"
+      ],
+      "test": [
+        "src/features/settings/SettingsWorkflowManager.test.ts"
+      ],
+      "budget": 180
     }
   ]
 }

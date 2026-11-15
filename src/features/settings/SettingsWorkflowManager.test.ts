@@ -5,6 +5,7 @@ import { createMemoryPlatform } from '../../platform/memory'
 import type { Channel } from '../../domain/project/channel'
 import type { ChannelStore } from '../../state/channel/channelStore'
 import { SettingsWorkflowManager } from './SettingsWorkflowManager'
+import { SettingsWorkflowEntryPage } from './SettingsWorkflowEntryPage'
 import { WorkflowFieldEditor } from './WorkflowFieldEditor'
 
 const channel = {
@@ -134,5 +135,36 @@ describe('WorkflowFieldEditor（复刻 canvas-xiong 的参数暴露编辑器）'
       }),
     )
     expect(html).toContain('euler_ancestral')
+  })
+})
+
+describe('SettingsWorkflowEntryPage（条目设置整页）', () => {
+  const pageEntry = {
+    id: 'w9',
+    title: '文生图工作流',
+    provider: 'runninghub' as const,
+    fetchedAt: 1794663828459,
+    fields: [],
+  }
+
+  it('抬头有三件事：拉取时间 / 重新拉取 / 返回列表；左侧有测试运行', () => {
+    const html = renderToStaticMarkup(
+      createElement(SettingsWorkflowEntryPage, {
+        entry: pageEntry,
+        busy: false,
+        channel: channel,
+        channels: {} as ChannelStore,
+        platform: createMemoryPlatform(),
+        onBack: () => {},
+        onRefetch: () => {},
+        onPatch: () => {},
+        onSaveFields: () => {},
+      }),
+    )
+    expect(html).toContain('data-workflow-entry-settings="w9"')
+    expect(html).toContain('参数拉取自')
+    expect(html).toContain('重新拉取')
+    expect(html).toContain('返回列表')
+    expect(html).toContain('data-workflow-test-run')
   })
 })

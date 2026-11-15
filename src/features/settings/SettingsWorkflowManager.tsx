@@ -3,8 +3,10 @@ import type { Channel } from '../../domain/project/channel'
 import type { ChannelStore } from '../../state/channel/channelStore'
 import type { PlatformKit } from '../../platform/ports'
 import {
+  mergeRefetchedFields,
   workflowModelId,
   type WorkflowEntry,
+  type WorkflowParamField,
 } from '../../domain/project/workflowParams'
 import { workflowEntryCategory } from '../../domain/project/workflowParamValues'
 import type { ModelCapability } from '../../domain/shared/capability'
@@ -17,8 +19,7 @@ import {
   RH_MARKET_DEFAULT_HOST,
   type RhMarketEntry,
 } from '../../platform/channels/runninghubMarket'
-import { WorkflowFieldEditor } from './WorkflowFieldEditor'
-import { SettingsWorkflowTestRun } from './SettingsWorkflowTestRun'
+import { SettingsWorkflowEntryPage } from './SettingsWorkflowEntryPage'
 import styles from './SettingsWorkflowEntries.module.css'
 
 /**
@@ -103,7 +104,13 @@ export function SettingsWorkflowManager({
 
   const pullFields = useCallback(
     async (id: string, kind: 'workflow' | 'app') => {
-      const key = await channels.loadToken(channel.id)
+      /** 读 Key 可能抛（例如桌面壳保存的 DPAPI 凭据在 Web 环境解不开）—— 一律当"没 Key"，给同一句人话 */
+      let key: string | null = null
+      try {
+        key = await channels.loadToken(channel.id)
+      } catch {
+        key = null
+      }
       if (!key) throw new Error('先在上面填好这条渠道的 API Key —— 拉参数要用它')
       const endpoint = { host: channel.baseUrl || RH_MARKET_DEFAULT_HOST, apiKey: key }
       const signal = AbortSignal.timeout(30_000)
@@ -178,6 +185,31 @@ export function SettingsWorkflowManager({
     [entries, persist],
   )
 
+  /**
+   * 重新拉取（参考图五右上角那颗）：用**上游此刻返回的**节点与参数覆盖快照。
+   *
+   * 与首次导入走同一个 `pullFields`（真实 `getJsonApiFormat`），差别只在合并策略：
+   * 用户勾过的暴露状态 / 改过的显示名要保留（`mergeRefetchedFields`），节点图整份换新。
+   */
+  const refetch = async (entry: WorkflowEntry) => {
+    setBusy(true)
+    setError('')
+    setNotice('')
+    try {
+      const pulled = await pullFields(entry.id, entry.kind ?? 'workflow')
+      await patchEntry(entry, {
+        fields: mergeRefetchedFields(entry.fields, pulled.fields),
+        fetchedAt: Date.now(),
+        ...(pulled.graph ? { graph: pulled.graph } : {}),
+      })
+      setNotice(`已重新拉取：${pulled.fields.length} 个参数`)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+    } finally {
+      setBusy(false)
+    }
+  }
+
   const openMarket = useCallback(async () => {
     setMarketOpen(true)
     setError('')
@@ -236,88 +268,24 @@ export function SettingsWorkflowManager({
   }
 
   if (editing) {
-    const exposed = editing.fields.filter((field) => field.enabled).length
     return (
-      <section className={styles.manager} data-workflow-entry-settings={editing.id}>
-        <div className={styles.head}>
-          <div className={styles.headText}>
-            <span className={styles.title}>{editing.title}</span>
-            <span className={styles.sub}>
-              {editing.kind === 'app' ? '/run/ai-app/' : '/run/workflow/'}
-              {editing.id} · {editing.fetchedAt ? `参数拉取自 ${new Date(editing.fetchedAt).toLocaleString()}` : '未拉取参数'}
-            </span>
-          </div>
-          <button type="button" className={styles.linkBtn} onClick={() => setEditingId(null)}>
-            返回列表
-          </button>
-        </div>
-        {/*
-          有节点图时整块改成「上信息 / 下图」：设置弹窗只有六百多像素宽，
-          左右并排会把图挤成三百多像素 —— 节点图要占满整行才看得清（#1116 ②）。
-        */}
-        <div className={styles.editor} data-graph={editing.graph ? 'on' : 'off'}>
-          <div className={styles.previewPane}>
-            <label className={styles.field}>
-              <span className={styles.label}>名称</span>
-              <input
-                className={styles.input}
-                value={editing.title}
-                onChange={(event) => void patchEntry(editing, { title: event.target.value })}
-              />
-            </label>
-            <label className={styles.field}>
-              <span className={styles.label}>备注</span>
-              <textarea
-                className={styles.previewTextarea}
-                rows={4}
-                value={editing.note ?? ''}
-                onChange={(event) => void patchEntry(editing, { note: event.target.value })}
-              />
-            </label>
-            <div className={styles.countRow}>
-              <span className={styles.countBox}>
-                <b>{editing.fields.length}</b>
-                <span>全部参数</span>
-              </span>
-              <span className={styles.countBox}>
-                <b>{exposed}</b>
-                <span>已暴露参数</span>
-              </span>
-            </div>
-            {editing.kind !== 'app' ? (
-              <label className={styles.field}>
-                <span className={styles.label}>输出类型</span>
-                <select
-                  className={styles.selectSm}
-                  value={editing.outputKind ?? workflowEntryCategory(editing)}
-                  onChange={(event) =>
-                    void patchEntry(editing, { outputKind: event.target.value === 'video' ? 'video' : 'image' })
-                  }
-                >
-                  <option value="image">图片</option>
-                  <option value="video">视频</option>
-                </select>
-              </label>
-            ) : null}
-            {/* 参考图四 / 图五：左栏底部就是「测试运行」 */}
-            <SettingsWorkflowTestRun channel={channel} entry={editing} groupId={groupId} channels={channels} platform={platform} />
-          </div>
-          <div className={styles.fieldPane}>
-            <WorkflowFieldEditor
-              entry={editing}
-              busy={busy}
-              showPreview={false}
-              onClose={() => setEditingId(null)}
-              onSave={async (fields) => {
-                await patchEntry(editing, { fields })
-                await registerModel({ ...editing, fields })
-                setEditingId(null)
-                setNotice(`「${editing.title}」参数已保存`)
-              }}
-            />
-          </div>
-        </div>
-      </section>
+      <SettingsWorkflowEntryPage
+        entry={editing}
+        busy={busy}
+        channel={channel}
+        groupId={groupId}
+        channels={channels}
+        platform={platform}
+        onBack={() => setEditingId(null)}
+        onRefetch={() => void refetch(editing)}
+        onPatch={patchEntry}
+        onSaveFields={async (fields: WorkflowParamField[]) => {
+          await patchEntry(editing, { fields })
+          await registerModel({ ...editing, fields })
+          setEditingId(null)
+          setNotice(`「${editing.title}」参数已保存`)
+        }}
+      />
     )
   }
 
