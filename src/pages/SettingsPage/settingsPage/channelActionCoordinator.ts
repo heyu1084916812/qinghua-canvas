@@ -100,7 +100,7 @@ async function persistForm(state: ChannelActionState, ports: ChannelActionPorts)
 
 /** 页面只传递 React 状态和平台端口；渠道写操作仍全部经 ChannelStore。 */
 export function createChannelActions(ports: ChannelActionPorts) {
-  return {
+  const coordinator = {
     create: async (state: ChannelActionState) => {
       const fallbackProtocol =
         state.catalog.all.find(
@@ -221,6 +221,15 @@ export function createChannelActions(ports: ChannelActionPorts) {
       ports.setChannelMenu(null)
       ports.setMenuConfirmDelete(false)
     },
+    /**
+     * 渠道页底部「删除」按钮（#1129 M8）：一点就删、连同全部 Key 与条目，不可撤销——
+     * 与右键菜单一样先确认（菜单那条有自己的就地二次确认，所以确认只放在这一个入口）。
+     */
+    confirmRemove: async (state: ChannelActionState, channelId: string, name: string) => {
+      if (isBuiltinChannelId(channelId)) return
+      if (!ports.confirm(`删除渠道「${name}」？它的全部 Key、AI 应用和工作流条目会一起删除，不能撤销。`)) return
+      await coordinator.remove(state, channelId)
+    },
     remove: async (state: ChannelActionState, channelId: string) => {
       if (isBuiltinChannelId(channelId)) return
       ports.setBusy(true)
@@ -331,4 +340,5 @@ export function createChannelActions(ports: ChannelActionPorts) {
       await ports.channels.reorder(ids)
     },
   }
+  return coordinator
 }

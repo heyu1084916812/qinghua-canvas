@@ -363,3 +363,30 @@ describe('条目与模型 id', () => {
     expect(exposedFields(fields).map((f) => f.id)).toEqual(fields.filter((_, i) => i % 2 === 0).map((f) => f.id))
   })
 })
+
+describe('#1129 M6 数字参数不再被判成媒体槽 + 重新拉取纠正旧类型', () => {
+  it('名字带媒体词的数字参数 → number', () => {
+    expect(inferWorkflowParamType('frame_rate', '24')).toBe('number')
+    expect(inferWorkflowParamType('num_frames', '81')).toBe('number')
+    expect(inferWorkflowParamType('frames_number', '16')).toBe('number')
+    expect(inferWorkflowParamType('mask_blur', '4')).toBe('number')
+    expect(inferWorkflowParamType('image_width', '1024')).toBe('number')
+    expect(inferWorkflowParamType('stop_at_clip_layer', '-1')).toBe('number')
+    expect(inferWorkflowParamType('voice_speed', '1.0')).toBe('number')
+    /* 真媒体槽照旧 */
+    expect(inferWorkflowParamType('image', 'example.png')).toBe('image')
+    expect(inferWorkflowParamType('video', 'in.mp4')).toBe('video')
+  })
+
+  const field = (patch: Record<string, unknown>) => normalizeWorkflowField({ nodeId: '18', fieldName: 'clip_name', value: 'qwen.safetensors', ...patch })!
+  it('旧数据里被误判的类型，重新拉取时按新推断纠正（必填也跟着走）', () => {
+    const stale = field({ type: 'video', required: true, enabled: true, label: 'CLIP' })
+    const [merged] = mergeRefetchedFields([stale], [field({})])
+    expect(merged).toMatchObject({ type: 'text', required: false, enabled: true, label: 'CLIP' })
+  })
+  it('用户手动改过的类型（typeEdited）重新拉取时保留', () => {
+    const edited = field({ type: 'select', typeEdited: true, options: ['a', 'b'] })
+    const [merged] = mergeRefetchedFields([edited], [field({})])
+    expect(merged).toMatchObject({ type: 'select', typeEdited: true, options: ['a', 'b'] })
+  })
+})

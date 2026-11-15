@@ -11632,12 +11632,32 @@
       "publicApi": [
         "workflowNodeListOf",
         "runWorkflowTask",
-        "RunWorkflowOptions"
+        "RunWorkflowOptions",
+        "submittedTaskIdOf"
       ],
       "test": [
         "src/platform/channels/runninghub.test.ts"
       ],
       "budget": 300
+    },
+    {
+      "module": "src/platform/channels/runninghubWorkflowRunList.ts",
+      "owner": "runninghub-market",
+      "responsibility": "执行期读最新条目行并重拼提交体：条目不存在 / 必填缺失时在提交前拦下（从 runninghubWorkflowRun.ts 拆出，守 300 行预算）。",
+      "owns": [
+        "读条目行与提交前拦截"
+      ],
+      "doesNotOwn": [
+        "提交体拼装规则（workflowRunList.ts）",
+        "轮询与素材上传（runninghubWorkflowRun.ts）"
+      ],
+      "publicApi": [
+        "latestRunList"
+      ],
+      "test": [
+        "src/platform/channels/runninghubWorkflowExec.test.ts"
+      ],
+      "budget": 80
     },
     {
       "module": "src/domain/project/workflowFieldKinds.ts",

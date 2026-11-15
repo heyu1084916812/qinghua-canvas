@@ -1,7 +1,4 @@
-import type {
-  ChannelActions,
-  ChannelActionState,
-} from './channelActionCoordinator'
+import type { ChannelActions, ChannelActionState } from './channelActionCoordinator'
 import type { ModelMappingActions } from './modelMappingActionCoordinator'
 import type {
   ProtocolActions,
@@ -38,6 +35,7 @@ export function createSettingsActionDelegates(sources: SettingsActionDelegateSou
     openChannelMenuFromButton: channelActions.openChannelMenuFromButton,
     editChannel: fromChannel(channelActions.editChannel),
     handleRemove: fromChannel(channelActions.remove),
+    handleConfirmRemove: fromChannel(channelActions.confirmRemove),
     handleAddKeyGroup: fromChannel(channelActions.addKeyGroup),
     handleRemoveKeyGroup: fromChannel(channelActions.removeKeyGroup),
     flushModelMapping: mappingActions.flush,

@@ -210,4 +210,21 @@ describe('channelActionCoordinator', () => {
     expect(channels.reorder).toHaveBeenCalledWith(['c2', 'c1'])
     expect(calls).toEqual(['busy:true', 'busy:false'])
   })
+
+  it('★ #1129 M8：底部删除按钮先确认；取消不删，确认才删；内置渠道直接不动', async () => {
+    const { actions, state, ports, channels } = harness()
+    ports.confirm = vi.fn(() => false)
+    await actions.confirmRemove(state, 'c2', '第二服务')
+    expect(ports.confirm).toHaveBeenCalledWith(expect.stringContaining('第二服务'))
+    expect(channels.remove).not.toHaveBeenCalled()
+    ports.confirm = vi.fn(() => true)
+    await actions.confirmRemove(state, 'c2', '第二服务')
+    expect(channels.remove).toHaveBeenCalledWith('c2')
+    const confirmBuiltin = vi.fn(() => true)
+    ports.confirm = confirmBuiltin
+    await actions.confirmRemove(state, 'ch_builtin_runninghub', 'RunningHub')
+    expect(confirmBuiltin).not.toHaveBeenCalled()
+    expect(channels.remove).toHaveBeenCalledTimes(1)
+  })
 })
+

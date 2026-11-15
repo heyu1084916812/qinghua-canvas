@@ -541,7 +541,7 @@ export function SettingsPage({ embedded = false }: { embedded?: boolean } = {}) 
   const {
     handleCreate, handleEnableChange, handleProfileIconFile, saveProfileDrawer,
     persistForm, handleVerify, handleDetect, handleRefresh,
-    openChannelMenu, openChannelMenuFromButton, editChannel, handleRemove,
+    openChannelMenu, openChannelMenuFromButton, editChannel, handleRemove, handleConfirmRemove,
     handleAddKeyGroup, handleRemoveKeyGroup, flushModelMapping, scheduleModelMapping,
     testModelMapping, handleAddGlobalModel, handleRemoveGlobalModel, openPanel,
     toggleDraft, applyDraft, dropSelectedModel, dropOnChannel,
@@ -823,7 +823,7 @@ export function SettingsPage({ embedded = false }: { embedded?: boolean } = {}) 
                 onRemoveGlobalModel={(id) => void handleRemoveGlobalModel(id)}
               />
               </details>
-              <SettingsChannelActionBar busy={busy} canDelete={!builtinSelected} onSave={() => void persistForm()} onDelete={() => void handleRemove(selected.id)} />
+              <SettingsChannelActionBar busy={busy} canDelete={!builtinSelected} onSave={() => void persistForm()} onDelete={() => void handleConfirmRemove(selected.id, selected.name)} />
             </div>
           )}
         </section>

@@ -19,6 +19,7 @@ import {
   builtinSpecOf,
 } from '../../domain/project/builtinChannels'
 import { createId } from '../../shared/id'
+import { workflowEntriesRowId } from '../../domain/project/workflowParams'
 import { normalizeModelMap } from '../../domain/project/modelMapping'
 import { ROUTE_STRATEGIES } from '../../domain/project/modelRouting'
 
@@ -411,6 +412,8 @@ export function createChannelRepository(storage: StoragePort, credentials: Crede
     )
     for (const ref of refs) await credentialAccess.remove(ref)
     await storage.delete('channels', id)
+    /* 这条渠道的 AI 应用 / 工作流条目行一起清掉，不留孤儿（#1129 M8）；表缺失之类不挡删除 */
+    await storage.delete('presets', workflowEntriesRowId(id)).catch(() => undefined)
   }
 
   const saveToken = async (ref: string, token: string): Promise<void> => {

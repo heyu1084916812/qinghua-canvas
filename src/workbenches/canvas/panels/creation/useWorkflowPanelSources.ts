@@ -39,7 +39,7 @@ export function useWorkflowPanelSources(): WorkflowPanelSources | null {
     let alive = true
     const store = createWorkflowEntryStore(platform.storage)
     const ids = idsKey ? idsKey.split(',') : []
-    void Promise.all(ids.map(async (id) => [id, await store.load(id)] as const)).then((pairs) => {
+    void Promise.all(ids.map(async (id) => [id, await store.load(id).catch(() => [])] as const)).then((pairs) => {
       if (alive) setEntriesByChannel(Object.fromEntries(pairs))
     })
     return () => {

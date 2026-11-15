@@ -13,7 +13,7 @@ import {
   type WorkflowEndpoint,
 } from './runninghubWorkflow'
 import { ChannelError } from './types'
-import { runWorkflowTask } from './runninghubWorkflowRun'
+import { runWorkflowTask, submittedTaskIdOf } from './runninghubWorkflowRun'
 
 /**
  * 一个只记请求、按回调回包的假网络。刻意不引 `createMemoryPlatform`：
@@ -427,5 +427,25 @@ describe('runWorkflowTask 等待（#1126 M5：别把真错误当抖动白等 20 
     })
     expect(await runWorkflowTask(deps, endpoint, 't1', opts(polls))).toEqual(['https://x/a.png'])
     expect(polls.n).toBe(2)
+  })
+  it('★ #1129 M10.1：调用方停止等待（abort）→ accepted + 带任务 id，submittedTaskIdOf 能取回', async () => {
+    const controller = new AbortController()
+    const { deps } = fakeNet(() => ({ body: { taskId: 't-77', status: 'RUNNING', errorCode: '' } }))
+    const err = await runWorkflowTask(deps, endpoint, 't-77', {
+      signal: controller.signal,
+      pollIntervalMs: 10,
+      pollTimeoutMs: 60_000,
+      sleep: async (_ms, s) => {
+        controller.abort()
+        if (s.aborted) throw new ChannelError({ kind: 'network', detail: 'aborted' })
+      },
+    }).catch((e: unknown) => e)
+    expect((err as ChannelError).appError).toMatchObject({ kind: 'execution', detail: 'accepted' })
+    expect(String(((err as ChannelError).appError as { message?: string }).message)).toContain('t-77')
+    expect(submittedTaskIdOf(err)).toBe('t-77')
+  })
+  it('submittedTaskIdOf：提交前的错误 / 网络错误不认', () => {
+    expect(submittedTaskIdOf(new ChannelError({ kind: 'network', detail: 'aborted' }))).toBeNull()
+    expect(submittedTaskIdOf(new ChannelError({ kind: 'execution', detail: 'accepted', message: 'RunningHub 工作流 w9 已提交但失败：x' }))).toBe('w9')
   })
 })

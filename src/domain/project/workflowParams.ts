@@ -108,6 +108,8 @@ export interface WorkflowParamField {
   required: boolean
   /** 同一节点有多个媒体槽时，按这个顺序取上游素材 */
   mediaOrder: number
+  /** 用户在编辑器里**手动改过类型**：重新拉取时保留它；没改过就采用新推断（#1129 M6） */
+  typeEdited?: boolean
 }
 
 /** 工作流渠道里的一个条目（= 节点模型下拉里的一行） */
@@ -228,6 +230,8 @@ export function inferWorkflowParamType(fieldName: string, value: string): Workfl
    * 节点图上就多出一个"视频输入"—— 这是字段名误判，不是上游真有视频口。
    */
   if (/^clip(?:_|$)/i.test(key)) return 'text'
+  /** 数字先于媒体（#1129 M6：`frame_rate=24`、`mask_blur=4` 被认成媒体槽）；媒体槽的值是文件名，不会是数 */
+  if (text !== '' && Number.isFinite(Number(text))) return 'number'
   for (const kind of ['image', 'video', 'audio'] as const) {
     if (MEDIA_KEYS[kind].test(key) || MEDIA_EXT[kind].test(text)) return kind
   }
@@ -348,6 +352,7 @@ export function normalizeWorkflowField(raw: unknown): WorkflowParamField | null 
     seed: record.seed === true || isSeedFieldName(fieldName),
     required: record.required === true,
     mediaOrder: Number.isFinite(Number(record.mediaOrder)) ? Math.max(0, Number(record.mediaOrder)) : 0,
+    ...(record.typeEdited === true ? { typeEdited: true } : {}),
   }
 }
 
@@ -417,17 +422,20 @@ export function mergeRefetchedFields(
   return refetched.map((fresh) => {
     const kept = byId.get(fresh.id)
     if (!kept) return fresh
+    /** 类型：手动改过才保留，否则采用新推断，旧误判能自愈；类型换了必填跟新的走（#1129 M6） */
+    const keepType = kept.typeEdited === true
     return {
       ...fresh,
       label: kept.label,
-      type: kept.type,
+      type: keepType ? kept.type : fresh.type,
+      ...(keepType ? { typeEdited: true } : {}),
       enabled: kept.enabled,
       options: kept.options,
       min: kept.min,
       max: kept.max,
       step: kept.step,
       seed: kept.seed,
-      required: kept.required,
+      required: keepType || kept.type === fresh.type ? kept.required : fresh.required,
     }
   })
 }

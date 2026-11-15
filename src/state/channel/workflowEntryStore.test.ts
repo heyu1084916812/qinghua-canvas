@@ -47,3 +47,46 @@ describe('workflowEntryStore', () => {
     expect(loaded.map((item) => item.id)).toEqual(['w1'])
   })
 })
+
+describe('#1129 M7 / M12 / M8', () => {
+  const e2 = { ...entry, id: 'w2', title: '第二条' }
+  it('★ M12：读失败抛错（不是回 []），update 读失败时不写', async () => {
+    const platform = createMemoryPlatform()
+    const store = createWorkflowEntryStore(platform.storage)
+    await store.save('ch-1', [entry])
+    const realQuery = platform.storage.query.bind(platform.storage)
+    let puts = 0
+    const realPut = platform.storage.put.bind(platform.storage)
+    platform.storage.query = (() => Promise.reject(new Error('idb broken'))) as typeof platform.storage.query
+    platform.storage.put = ((t: never, r: never) => { puts += 1; return realPut(t, r) }) as typeof platform.storage.put
+    await expect(store.load('ch-1')).rejects.toThrow(/读不到/)
+    await expect(store.update('ch-1', () => [])).rejects.toThrow(/读不到/)
+    expect(puts).toBe(0)
+    platform.storage.query = realQuery
+    await expect(store.load('ch-1')).resolves.toHaveLength(1)
+  })
+
+  it('★ M12：写失败抛错（界面据此报错，不再提示「已保存」）', async () => {
+    const platform = createMemoryPlatform()
+    platform.storage.put = (() => Promise.reject(new Error('quota'))) as typeof platform.storage.put
+    await expect(createWorkflowEntryStore(platform.storage).save('ch-1', [entry])).rejects.toThrow('quota')
+  })
+
+  it('★ M7：两次并发 update 都基于最新数据（导入期间删掉的条目不会复活）', async () => {
+    const store = createWorkflowEntryStore(createMemoryPlatform().storage)
+    await store.save('ch-1', [entry])
+    await Promise.all([
+      store.update('ch-1', (list) => [...list, e2]),
+      store.update('ch-1', (list) => list.filter((item) => item.id !== 'w1')),
+    ])
+    expect((await store.load('ch-1')).map((item) => item.id)).toEqual(['w2'])
+  })
+
+  it('★ M8：removeAll 清掉这条渠道的条目行', async () => {
+    const platform = createMemoryPlatform()
+    const store = createWorkflowEntryStore(platform.storage)
+    await store.save('ch-1', [entry])
+    await store.removeAll('ch-1')
+    expect(await platform.storage.query('presets', { id: workflowEntriesRowId('ch-1') })).toHaveLength(0)
+  })
+})

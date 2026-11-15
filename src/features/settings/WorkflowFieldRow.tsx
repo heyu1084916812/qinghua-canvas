@@ -38,7 +38,7 @@ export function WorkflowFieldRow({
         <select
           className={styles.selectSm}
           value={field.type}
-          onChange={(event) => patch(field.id, { type: event.target.value as WorkflowParamType })}
+          onChange={(event) => patch(field.id, { type: event.target.value as WorkflowParamType, typeEdited: true })}
         >
           {WORKFLOW_FIELD_TYPES.map((type) => (
             <option key={type} value={type}>

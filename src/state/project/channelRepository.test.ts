@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from 'vitest'
 import { createMemoryPlatform } from '../../platform/memory'
 import { BUILTIN_CHANNEL_IDS } from '../../domain/project/builtinChannels'
 import { createChannelRepository } from './channelRepository'
+import { workflowEntriesRowId } from '../../domain/project/workflowParams'
 
 describe('channelRepository', () => {
   it('首次补齐内置渠道只批量写一次，不逐行放大存储请求', async () => {
@@ -131,6 +132,18 @@ describe('channelRepository', () => {
     const ch = await repo.create({ name: 'A', protocol: 'mock', baseUrl: '' })
     await repo.saveToken(ch.credentialRef!, 'sk-test')
     expect(await repo.loadToken(ch.credentialRef!)).toBe('sk-test')
+  })
+
+  it('★ #1129 M8：remove 一并清掉这条渠道的 AI 应用 / 工作流条目行，别的渠道不动', async () => {
+    const p = createMemoryPlatform()
+    const repo = createChannelRepository(p.storage, p.credentials)
+    const a = await repo.create({ name: 'A', protocol: 'mock', baseUrl: '' })
+    const b = await repo.create({ name: 'B', protocol: 'mock', baseUrl: '' })
+    await p.storage.put('presets', { id: workflowEntriesRowId(a.id), entries: [] } as never)
+    await p.storage.put('presets', { id: workflowEntriesRowId(b.id), entries: [] } as never)
+    await repo.remove(a.id)
+    expect(await p.storage.query('presets', { id: workflowEntriesRowId(a.id) })).toHaveLength(0)
+    expect(await p.storage.query('presets', { id: workflowEntriesRowId(b.id) })).toHaveLength(1)
   })
 
   it('remove 同时清理主凭据、备用凭据与新增分组凭据', async () => {
