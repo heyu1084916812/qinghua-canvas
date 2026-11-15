@@ -244,7 +244,7 @@ export function SettingsWorkflowManager({
             <span className={styles.title}>{editing.title}</span>
             <span className={styles.sub}>
               {editing.kind === 'app' ? '/run/ai-app/' : '/run/workflow/'}
-              {editing.id}
+              {editing.id} · {editing.fetchedAt ? `参数拉取自 ${new Date(editing.fetchedAt).toLocaleString()}` : '未拉取参数'}
             </span>
           </div>
           <button type="button" className={styles.linkBtn} onClick={() => setEditingId(null)}>
