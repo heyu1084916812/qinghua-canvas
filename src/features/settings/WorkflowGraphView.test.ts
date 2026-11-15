@@ -3,7 +3,7 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 import type { WorkflowParamField } from '../../domain/project/workflowParams'
 import type { WorkflowGraph } from '../../domain/project/workflowGraph'
-import { WorkflowGraphView } from './WorkflowGraphView'
+import { GRAPH_CONTROL_SELECTOR, shouldStartGraphDrag, WorkflowGraphView } from './WorkflowGraphView'
 
 /**
  * 节点图（#1116 ②）的静态形态：节点按图快照画出来、暴露数按**草稿**算、
@@ -107,5 +107,17 @@ describe('工作流节点图', () => {
       }),
     )
     expect(html).toContain('这个节点没有可改参数')
+  })
+})
+
+describe('图上点击手势', () => {
+  it('点节点 / 参数弹层 / 工具条都不算"点空白"（否则弹层会在勾选前被关掉）', () => {
+    const target = (match: boolean) => ({ closest: () => (match ? {} : null) })
+    expect(shouldStartGraphDrag(target(false))).toBe(true)
+    expect(shouldStartGraphDrag(target(true))).toBe(false)
+    /* 三块控件缺一不可：漏掉弹层 = 勾不上暴露（用户报的那个 bug） */
+    expect(GRAPH_CONTROL_SELECTOR).toContain('[data-wf-node]')
+    expect(GRAPH_CONTROL_SELECTOR).toContain('[data-workflow-graph-panel]')
+    expect(GRAPH_CONTROL_SELECTOR).toContain('[data-graph-toolbar]')
   })
 })

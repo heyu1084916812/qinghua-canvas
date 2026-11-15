@@ -22,6 +22,20 @@ const MIN_SCALE = 0.3
 const READABLE_SCALE = 0.7
 
 /**
+ * 图上**属于控件**的区域：节点本体、参数弹层、右上工具条。
+ *
+ * 点这些地方的 `pointerdown` 绝不能当成"点空白拖动"——否则弹层会在 checkbox 的
+ * click 之前先被关掉（用户报的「节点里的参数勾不上」就是这个）。
+ */
+export const GRAPH_CONTROL_SELECTOR =
+  '[data-wf-node], [data-workflow-graph-panel], [data-graph-toolbar]'
+
+export function shouldStartGraphDrag(target: { closest?: (selector: string) => unknown } | null): boolean {
+  if (!target?.closest) return true
+  return !target.closest(GRAPH_CONTROL_SELECTOR)
+}
+
+/**
  * 工作流**节点图**（对账 #1116 ②）：按连线自动排布，点节点在它旁边弹出该节点的参数。
  *
  * 交互与观感一律沿用项目自身那套（用户 2026-11-14：「点击怎么点、下拉菜单怎么选、
@@ -179,7 +193,14 @@ export function WorkflowGraphView({
       data-workflow-graph
       data-graph-direction={vertical ? 'tb' : 'lr'}
       onPointerDown={(event) => {
-        if (event.button !== 0 || (event.target as HTMLElement).closest('[data-wf-node]')) return
+        /**
+         * 只有**点空白**才算拖动/取消选中。
+         *
+         * 节点、参数弹层、右上工具条都是"图上的控件"，点它们绝不能落到这条分支：
+         * 之前漏了弹层 ⇒ 点「暴露」勾选框的 pointerdown 先把弹层关掉，click 落在空气上，
+         * 表现就是「节点里的参数根本勾不上」。
+         */
+        if (event.button !== 0 || !shouldStartGraphDrag(event.target as HTMLElement)) return
         dragRef.current = { id: event.pointerId, x: event.clientX, y: event.clientY, viewX: view.x, viewY: view.y }
         ;(event.currentTarget as HTMLElement).setPointerCapture(event.pointerId)
         onSelect(null)
@@ -234,7 +255,7 @@ export function WorkflowGraphView({
         })}
       </div>
 
-      <div className={styles.toolbar}>
+      <div className={styles.toolbar} data-graph-toolbar>
         <button type="button" className={styles.zoomBtn} onClick={() => zoomBy(0.8)} title="缩小" data-graph-zoom-out>
           −
         </button>
