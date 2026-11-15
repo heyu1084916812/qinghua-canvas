@@ -1,3 +1,4 @@
+import { errorTextOf } from '../../shared/result'
 import { useRef, useState } from 'react'
 import type { Channel } from '../../domain/project/channel'
 import type { ChannelStore } from '../../state/channel/channelStore'
@@ -75,7 +76,7 @@ export function SettingsWorkflowTestRun({
           : `已返回 ${outcome.mime}${outcome.bytes ? ` · ${Math.round(outcome.bytes.length / 1024)} KB` : ''}`,
       )
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e))
+      setError(errorTextOf(e))
     } finally {
       clearTimeout(timer)
       abortRef.current = null

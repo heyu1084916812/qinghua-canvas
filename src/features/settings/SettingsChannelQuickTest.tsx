@@ -1,3 +1,4 @@
+import { errorTextOf } from '../../shared/result'
 import { useEffect, useRef, useState } from 'react'
 import { protocolNeedsNoToken, type Channel, type ChannelCredentialGroup } from '../../domain/project/channel'
 import type { ChannelStore } from '../../state/channel/channelStore'
@@ -124,7 +125,7 @@ export function SettingsChannelQuickTest({
         setMedia({ kind: outcome.mime.startsWith('video') ? 'video' : 'image', src })
       }
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e))
+      setError(errorTextOf(e))
     } finally {
       clearTimeout(timer)
       abortRef.current = null
