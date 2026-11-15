@@ -8,6 +8,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { deflateSync, crc32 } from 'node:zlib'
 /* CDP 的 `dragData.files` **只认绝对路径**（相对路径会以 NotReadableError 抛成页面异常） */
 import { resolve as resolvePath } from 'node:path'
+import { assertIsolatedStore } from './storeIsolation.mjs'
 
 const BASE = process.env.SMOKE_BASE ?? 'http://127.0.0.1:1420'
 const STORE_BASE = String(process.env.SMOKE_STORE_BASE ?? 'http://127.0.0.1:18765').replace(
@@ -8955,6 +8956,9 @@ async function g53(browser) {
 function norm0(s) {
   return String(s).replace(/\s+/g, '')
 }
+
+/* 冒烟会建项目 / 写预设 / 删行：开写前确认是隔离库，绝不碰用户真实数据（#1130 H4） */
+await assertIsolatedStore(STORE_BASE)
 
 const browser = await chromium.launch({
   channel: 'chrome',
