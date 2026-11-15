@@ -1551,7 +1551,8 @@ async function configureMockChannel(
 
   let pulled = false
   if (pick) {
-    await page.getByRole('button', { name: '拉取模型' }).click()
+    /* 渠道页有两枚「拉取模型」（连接动作行 + 模型列表头，#1122），按锚点取连接行那枚，免得严格模式报错 */
+    await page.locator('[data-settings-refresh-models]').click()
     pulled = await page
       .getByText(/已拉取模型/)
       .waitFor({ state: 'visible', timeout: 8000 })
@@ -1800,6 +1801,17 @@ async function newCtx(browser, opts = {}) {
   await ctx.addInitScript((storeBase) => {
     globalThis.STORE_BASE = storeBase
   }, STORE_BASE)
+  /**
+   * 渠道页「高级设置 · 渠道权重与模型映射」#1122 起默认折叠（`<details>`）。冒烟里配映射、
+   * 加前端模型、测映射的组都写在折叠之前：输入框在 DOM 里却不可见，`fill` / `click` 等满 30s 超时
+   * （#1131 门禁实测 G74 卡在这）。夹具统一把它展开——没有任何组断言它的折叠态。
+   */
+  await ctx.addInitScript(() => {
+    const openAll = () => {
+      for (const el of document.querySelectorAll('details[data-settings-advanced-disclosure]:not([open])')) el.open = true
+    }
+    new MutationObserver(openAll).observe(document, { subtree: true, childList: true })
+  })
   /**
    * `SMOKE_STORE_BASE` 不仅供脚本直连，也要把页面默认写死的 18765 请求转过去。
    * 这样桌面开发壳继续占用 18765 时，冒烟仍可复用热 Vite，并只写隔离库。
@@ -2462,7 +2474,7 @@ async function g8(browser) {
   rec(g, '验证不写模型缓存（仍是「还没拉取过」空态）', (await page.locator('[data-models-empty]').count()) === 1)
 
   // 拉取模型 → 缓存到位，但**不**替用户勾选
-  await page.getByRole('button', { name: '拉取模型' }).click()
+  await page.locator('[data-settings-refresh-models]').click()
   await page.getByText(/已拉取模型/).waitFor({ state: 'visible', timeout: 8000 }).catch(() => {})
   const pulledText = (await page.locator('[data-settings-status]').innerText()).replace(/\s+/g, '')
   const pulledCount = Number(/发现(\d+)个模型/.exec(pulledText)?.[1] ?? 0)
@@ -6721,10 +6733,11 @@ async function g44(browser) {
    * ⚠️ 口径改过（2026-10-08）：不再是「起始无渠道」——内置渠道常驻列表，
    * 起始状态是**内置渠道 + 用户 0 条**。断言拆成两条，各自守一件事：
    * 内置确实在，用户侧确实是干净的（本组做的排序 / 删除才有意义）。
+   * 内置条数 6（#1121 起 RunningHub 拆成国内站 / 国际站两条，原为 5）。
    */
   const builtinRows = await page.locator('[data-channel-item][data-channel-id^="ch_builtin_"]').count()
   const emptyHint = await page.locator(USER_CHANNEL).count()
-  rec(g, '起始：内置渠道常驻 + 用户侧无渠道（本组自带状态）', builtinRows === 5 && emptyHint === 0, `内置=${builtinRows} 用户=${emptyHint}`)
+  rec(g, '起始：内置渠道常驻 + 用户侧无渠道（本组自带状态）', builtinRows === 6 && emptyHint === 0, `内置=${builtinRows} 用户=${emptyHint}`)
 
   // ① 建两条：新渠道排在**末尾**（与下方「+ 添加服务商」按钮的位置一致）
   await page.getByRole('button', { name: /添加服务商/ }).click()
@@ -12658,7 +12671,7 @@ async function g69(browser) {
   await sleep(400)
   await page.getByRole('button', { name: '验证地址' }).click()
   await page.getByText(/地址可达/).waitFor({ state: 'visible', timeout: 8000 }).catch(() => {})
-  await page.getByRole('button', { name: '拉取模型' }).click()
+  await page.locator('[data-settings-refresh-models]').click()
   await page.getByText(/已拉取模型/).waitFor({ state: 'visible', timeout: 8000 }).catch(() => {})
   await pickAllModels(page)
   await enableSwitch(page).check({ timeout: 5000 }).catch(() => {})

@@ -607,7 +607,7 @@ export function SettingsPage({ embedded = false }: { embedded?: boolean } = {}) 
     menuConfirmDelete,
   )
   return (
-    <div className={styles.page} data-settings-page data-settings-card>
+    <div className={styles.page} data-settings-page>
       {/*
         ⛔ 页内标题「后台设置」与左侧二级菜单**已删除**（用户 2026-09-27 第 9 轮）：
         「后台设置这几个词贴边了，不需要了，后台设置工作区里面左边的几个菜单也不需要了」。

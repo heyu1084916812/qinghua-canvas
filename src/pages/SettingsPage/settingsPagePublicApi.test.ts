@@ -135,4 +135,9 @@ describe('SettingsPage 公共导出与页面锚点', () => {
     for (const anchor of anchors) expect(settingsSurfaceSource, anchor).toContain(anchor)
     expect(TOKEN_SOURCE).toContain('data-settings-token-row')
   })
+
+  it('★ data-settings-card 只挂一处：冒烟与几何门禁按它取唯一的渠道卡片（根改用 data-settings-page，浮层 980 豁免见 GlobalSettingsOverlay.module.css）', () => {
+    expect(SETTINGS_SOURCE.match(/data-settings-card(?![-\w])/g) ?? []).toHaveLength(1)
+    expect(SETTINGS_SOURCE).toContain('data-settings-page')
+  })
 })

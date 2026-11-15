@@ -304,7 +304,12 @@
   max-width: 980px;
 }
 
-.sectionBody > [data-settings-card] {
+/*
+ * 渠道配置页根（`data-settings-page`）与内层卡片都要豁免 980：根是 `.page`，只豁免内层不够（#1123）。
+ * 豁免根用 `data-settings-page`，**不再给根挂第二个 `data-settings-card`**——冒烟按它取唯一的渠道卡片，
+ * 两个同名锚点会让 `locator('[data-settings-card]')` 严格模式直接报错（#1131 门禁时发现）。
+ */
+.sectionBody > :is([data-settings-card], [data-settings-page]) {
   max-width: none;
 }
 
