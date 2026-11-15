@@ -618,13 +618,19 @@ export function SettingsPage({ embedded = false }: { embedded?: boolean } = {}) 
       */}
       {(
       <div className={embedded ? styles.layoutEmbedded : styles.layout} data-settings-card>
+        {/*
+          **选路策略默认收起**（用户 2026-11-15：「后台渠道的位置不要全部塞在一起了」）：
+          它是**全局**设置，不是这条渠道的字段，常驻展开会把渠道页顶掉半屏。
+          收起来后只留一行摘要，要用时点开 —— 与参考站「渠道页从渠道自己开始」一致。
+        */}
+        <details className={styles.disclosure} data-settings-routing-disclosure>
+          <summary>
+            选路策略 · {ROUTE_PLAN_STRATEGIES.find((item) => item.value === routingPolicy.strategy)?.label ?? routingPolicy.strategy}
+            {' '}· 最多 {routingPolicy.maxAttempts} 次 · 路由范围 {selectedRoutingCandidateKeys.size}/{routingCandidates.length}
+          </summary>
         <SettingsGlobalRouteView
           strategy={routingPolicy.strategy}
-          strategyOptions={ROUTE_PLAN_STRATEGIES.map((strategy) => ({
-            value: strategy.value,
-            label: strategy.label,
-            hint: strategy.hint,
-          }))}
+          strategyOptions={ROUTE_PLAN_STRATEGIES.map((strategy) => ({ value: strategy.value, label: strategy.label, hint: strategy.hint }))}
           maxAttempts={routingPolicy.maxAttempts}
           scopeOpen={routingScopeOpen}
           allowedCandidatesCount={routingPolicy.allowedCandidates.length}
@@ -632,22 +638,15 @@ export function SettingsPage({ embedded = false }: { embedded?: boolean } = {}) 
           selectedRoutingCandidateKeys={selectedRoutingCandidateKeys}
           routingChannelGroups={routingChannelGroups}
           expandedRoutingChannels={expandedRoutingChannels}
-          onStrategyChange={(value) =>
-            void channels.setRoutingPolicy({
-              strategy: value as RoutePlanStrategy,
-            })
-          }
-          onMaxAttemptsChange={(value) =>
-            void channels.setRoutingPolicy({ maxAttempts: Number(value) })
-          }
+          onStrategyChange={(value) => void channels.setRoutingPolicy({ strategy: value as RoutePlanStrategy })}
+          onMaxAttemptsChange={(value) => void channels.setRoutingPolicy({ maxAttempts: Number(value) })}
           onToggleScope={() => setRoutingScopeOpen((open) => !open)}
-          onResetScope={() =>
-            void channels.setRoutingPolicy({ allowedCandidates: [] })
-          }
+          onResetScope={() => void channels.setRoutingPolicy({ allowedCandidates: [] })}
           onToggleRoutingChannel={toggleRoutingChannel}
           onToggleRoutingChannelExpanded={toggleRoutingChannelExpanded}
           onToggleRoutingCandidate={toggleRoutingCandidate}
         />
+        </details>
 
         <div className={styles.workarea} data-settings-workarea>
           <SettingsChannelSidebarView
@@ -742,6 +741,12 @@ export function SettingsPage({ embedded = false }: { embedded?: boolean } = {}) 
                 onSaveImportedProtocol={handleSaveImportedProtocol}
               />
 
+              {selected.protocol === 'runninghub-api' ? (
+                <SettingsWorkflowManager channel={selected} groupId={activeGroup?.id} channels={channels} platform={platform} />
+              ) : null}
+
+              <SettingsChannelQuickTest channel={selected} groupId={activeGroup?.id} channels={channels} platform={platform} />
+
               <SettingsModelsView
                 busy={busy}
                 activeGroup={activeGroup}
@@ -758,25 +763,15 @@ export function SettingsPage({ embedded = false }: { embedded?: boolean } = {}) 
                 onDraftCategoryChange={setDraftCategory}
                 onDraftKeywordChange={setDraftKeyword}
                 onToggleDraft={toggleDraft}
-                onModelCategoryChange={(modelId, category) =>
-                  void channels.setModelCategory(
-                    selected.id,
-                    modelId,
-                    category,
-                    activeGroup?.id,
-                  )
-                }
+                onModelCategoryChange={(modelId, category) => void channels.setModelCategory(selected.id, modelId, category, activeGroup?.id)}
                 onDropSelectedModel={(modelId) => void dropSelectedModel(modelId)}
                 onApplyDraft={() => void applyDraft()}
               />
 
-              {selected.protocol === 'runninghub-api' ? (
-                <SettingsWorkflowManager channel={selected} groupId={activeGroup?.id} channels={channels} platform={platform} />
-              ) : null}
 
-              {/* 快速测试是**渠道公共能力**（#1117）：每条渠道页都有，真的调一次生成接口 */}
-              <SettingsChannelQuickTest channel={selected} groupId={activeGroup?.id} channels={channels} platform={platform} />
-
+              {/* 路由 / 权重 / 模型映射是**高级**设置：默认收起，渠道页不再一路铺到底 */}
+              <details className={styles.disclosure} data-settings-advanced-disclosure>
+                <summary>高级设置 · 渠道权重与模型映射</summary>
               <SettingsChannelRouteView
                 priority={selected.priority}
                 weight={selected.weight}
@@ -823,6 +818,7 @@ export function SettingsPage({ embedded = false }: { embedded?: boolean } = {}) 
                 }
                 onRemoveGlobalModel={(id) => void handleRemoveGlobalModel(id)}
               />
+              </details>
             </div>
           )}
         </section>

@@ -549,3 +549,9 @@
   line-height: 1.7;
   color: var(--text-3);
 }
+
+/* 折叠分区（原生 details）：收起只占一行、展开才铺开 —— 渠道页不再一路塞到底（用户 2026-11-15） */
+.disclosure { border: var(--border); border-radius: var(--radius-control); background: var(--bg-surface); }
+.disclosure > summary { padding: var(--space-2) var(--space-3); color: var(--text-2); font-size: var(--fs-label); font-weight: 600; cursor: pointer; list-style: none; }
+.disclosure > summary::-webkit-details-marker { display: none; }
+.disclosure[open] > summary { border-bottom: var(--border); }
