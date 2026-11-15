@@ -255,7 +255,8 @@ export interface PresetChannelLike {
  * 2026-11-11 实测这条回落选中了用户没勾的模型（`global:hy-image-3.5`），
  * 用户口径改为「只能选启用渠道里用户勾选的模型」，回落已删除。
  */
-const ENTRY_MODEL = /^(workflow|app):/
+/** 条目与本机 CLI（`cli:`）都不当新节点默认（#1128 / #1133） */
+const ENTRY_MODEL = /^(workflow|app|cli):/
 
 function pickModel(
   channel: PresetChannelLike,

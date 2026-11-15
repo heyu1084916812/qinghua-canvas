@@ -1,3 +1,4 @@
+import type { GenerationSource, SourceSlots } from './generationSource'
 export type NodeType =
   | 'prompt'
   | 'generation'
@@ -145,6 +146,13 @@ export interface GenerationData {
   workflowNodeInfoList?: { nodeId: string; fieldName: string; fieldValue: string }[]
   /** RunningHub 实例规格（24G / 48G）；缺省 = default */
   workflowInstance?: 'default' | 'plus'
+  /**
+   * 生成来源（API / 工作流 / 本机 CLI，对账 #1133）。缺省 = 老节点，按模型前缀 / 渠道协议推断
+   * （`generationSource.inferSource`）；新节点默认 API。
+   */
+  source?: GenerationSource
+  /** 非当前来源各自「上次选的项 + 参数」：切走时收进来，切回来放回顶层（见 `switchSourcePatch`） */
+  sourceSlots?: SourceSlots
   // 图片模式
   ratio?: string
   /**

@@ -12433,6 +12433,35 @@
         "src/platform/channels/runninghubWorkflow.test.ts"
       ],
       "budget": 200
+    },
+    {
+      "module": "src/domain/canvas/model/generationSource.ts",
+      "owner": "canvas-domain",
+      "responsibility": "生成节点来源（API / 工作流 / 本机 CLI）的判定、老节点推断、按来源分存参数与切换补丁（对账 #1133）。",
+      "owns": [
+        "来源类型与 cli:<tool> 模型前缀",
+        "老节点来源推断",
+        "切换来源补丁（参数存档 / 恢复）"
+      ],
+      "doesNotOwn": [
+        "菜单渲染",
+        "执行路由",
+        "CLI 工具目录"
+      ],
+      "publicApi": [
+        "GenerationSource",
+        "nodeSource",
+        "inferSource",
+        "switchSourcePatch",
+        "sourceSlotOf",
+        "cliModelId",
+        "toolIdOfCliModel",
+        "NON_API_MODEL"
+      ],
+      "test": [
+        "src/domain/canvas/model/generationSource.test.ts"
+      ],
+      "budget": 220
     }
   ]
 }

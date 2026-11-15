@@ -1,6 +1,7 @@
 import type { GenerationData } from '../model/node'
 import { imageParamsFor } from '../layout/imageParams'
 import { mjSettingsOf } from '../layout/mjParams'
+import { isGenerationSource } from '../model/generationSource'
 
 /**
  * 生成请求的参数集（产品文档 §6.8 第三部分）。
@@ -24,6 +25,15 @@ export function generationParams(data: GenerationData): Record<string, unknown> 
   const entryModel = /^(workflow|app):/.test(data.model ?? '')
   const workflow = entryModel && data.workflowNodeInfoList?.length ? { workflow: data.workflowNodeInfoList } : {}
   const instanceType = entryModel && data.workflowInstance === 'plus' ? { instanceType: 'plus' } : {}
+  /**
+   * 按来源只发**这个来源自己的**参数（对账 #1133 逻辑 3）：
+   * 工作流来源不带 API 的比例 / 清晰度（RunningHub 应用会把 `ratio` 填进 `aspectRatio` 节点，
+   * 上一版切到条目后残留的 API 比例就这样串进了提交体）；CLI 来源的参数在全局参数模板里，节点不带。
+   * 没存来源的老节点保持原样（两份都发），由面板打开时补写来源。
+   */
+  const source = isGenerationSource(data.source) ? data.source : data.model?.startsWith('workflow:') ? 'workflow' : null
+  if (source === 'workflow') return { ...workflow, ...instanceType }
+  if (source === 'cli') return {}
   if (data.mode === 'video') {
     return {
       ...workflow,

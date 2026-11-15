@@ -12,6 +12,7 @@
  */
 import type { NodeType } from '../model/node'
 import { getSpec } from './registry'
+import { NON_API_MODEL } from '../model/generationSource'
 
 /** 会用到「渠道 + 模型」的节点类型 */
 const GENERATING: ReadonlySet<NodeType> = new Set<NodeType>(['generation', 'batch'])
@@ -55,7 +56,7 @@ export function newGeneratingNodeData(
    * 之后每个新建节点都直接进了工作流模式）。条目要用户在这个节点上自己挑；
    * 新节点回到 spec 默认，由面板按平台解析出普通模型。
    */
-  if (/^(workflow|app):/.test(recipe.model)) return {}
+  if (NON_API_MODEL.test(recipe.model)) return {}
   /**
    * **必须基于 spec 的默认数据再叠加**，不能只返回这几个字段。
    *
@@ -72,5 +73,6 @@ export function newGeneratingNodeData(
     const v = recipe.params?.[k]
     if (v !== undefined && v !== null) params[k] = v
   }
-  return { ...base, channelId: recipe.channelId, model: recipe.model, ...params }
+  /** 新节点来源一律 API（对账 #1133：条目 / CLI 要用户在节点上自己挑） */
+  return { ...base, source: 'api', channelId: recipe.channelId, model: recipe.model, ...params }
 }
