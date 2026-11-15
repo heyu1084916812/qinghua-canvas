@@ -15,6 +15,11 @@ import styles from './WorkflowGraphView.module.css'
 /** 视口内边距（设计像素）：留出来给描边与「适应」按钮 */
 const PAD = 16
 const MIN_SCALE = 0.3
+/**
+ * 首屏最小缩放：39 个节点的大图「适应」只剩 30%，字完全看不清。
+ * 默认按 70% 打开（超出的部分靠拖动/缩放看），点「适应」才真正缩到全图。
+ */
+const READABLE_SCALE = 0.7
 
 /**
  * 工作流**节点图**（对账 #1116 ②）：按连线自动排布，点节点在它旁边弹出该节点的参数。
@@ -67,18 +72,20 @@ export function WorkflowGraphView({
   const vertical = layout === tb
 
   /** 自适应：整张图塞进视口（最多 1:1，再大就缩） */
-  const fit = (target: WorkflowGraphLayout = layout) => {
+  const fit = (target: WorkflowGraphLayout = layout, minScale = MIN_SCALE) => {
     const el = viewportRef.current
     if (!el || target.width === 0) return
     const raw = Math.min(
       (el.clientWidth - PAD * 2) / target.width,
       (el.clientHeight - PAD * 2) / target.height,
     )
-    const scale = Math.max(MIN_SCALE, Math.min(1, Number.isFinite(raw) ? raw : 1))
+    const scale = Math.max(minScale, Math.min(1, Number.isFinite(raw) ? raw : 1))
+    const overflow = target.width * scale > el.clientWidth || target.height * scale > el.clientHeight
     setView({
       scale,
-      x: (el.clientWidth - target.width * scale) / 2,
-      y: Math.max(PAD, (el.clientHeight - target.height * scale) / 2),
+      /** 放不下时从左上角开始，别把图心摆进来 —— 那样左右都看不到起点 */
+      x: overflow ? PAD : (el.clientWidth - target.width * scale) / 2,
+      y: overflow ? PAD : Math.max(PAD, (el.clientHeight - target.height * scale) / 2),
     })
   }
 
@@ -108,7 +115,7 @@ export function WorkflowGraphView({
   }, [])
 
   useLayoutEffect(() => {
-    fit(layout)
+    fit(layout, READABLE_SCALE)
   }, [layout.width, layout.height, dims.width, dims.height])
 
   /** 点外关闭（捕获阶段：面板自己的 stopPropagation 挡不住它） */

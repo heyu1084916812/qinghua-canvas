@@ -100,6 +100,13 @@ describe('inferWorkflowParamType', () => {
     expect(inferWorkflowParamType('steps', '30')).toBe('number')
   })
 
+  it('`clip_name` 是 CLIP 模型文件名，不是视频槽（真拉 Z-Image 时踩过）', () => {
+    expect(inferWorkflowParamType('clip_name', 'umt5_xxl_fp8.safetensors')).toBe('text')
+    expect(inferWorkflowParamType('clip', '')).toBe('text')
+    /* 真的视频字段照旧 */
+    expect(inferWorkflowParamType('ref_video', '')).toBe('video')
+  })
+
   it('★ 推不出就回落 text —— 不许猜成下拉（候选集不在 API 格式里）', () => {
     expect(inferWorkflowParamType('resize_method', 'maintain aspect ratio')).toBe('text')
     expect(inferWorkflowParamType('sampler', '')).toBe('text')

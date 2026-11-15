@@ -222,6 +222,12 @@ export function inferWorkflowParamType(fieldName: string, value: string): Workfl
    * 而这个参数实际只吃 `true` / `false`（实测踩过一次）。
    */
   if (/^(true|false)$/i.test(text)) return 'boolean'
+  /**
+   * `clip_name` 是 **CLIP 模型文件名**（CLIPLoader），不是视频片段。
+   * 视频那条正则里有 `clip`，真拉 Z-Image 时把 `18::clip_name` 认成了「视频」，
+   * 节点图上就多出一个"视频输入"—— 这是字段名误判，不是上游真有视频口。
+   */
+  if (/^clip(?:_|$)/i.test(key)) return 'text'
   for (const kind of ['image', 'video', 'audio'] as const) {
     if (MEDIA_KEYS[kind].test(key) || MEDIA_EXT[kind].test(text)) return kind
   }
