@@ -6,7 +6,8 @@
  */
 .viewport {
   position: relative;
-  height: 340px;
+  /* 条目页现在是整页：图给足高度，链式图常见 4–6 个节点能一屏看完 */
+  height: clamp(360px, 48vh, 560px);
   overflow: hidden;
   border: var(--border);
   border-radius: var(--radius-control);

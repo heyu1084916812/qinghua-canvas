@@ -163,7 +163,12 @@
   flex: 1;
   min-width: 0;
   min-height: 0;
-  max-width: 1120px;
+  /**
+   * 2026-11-15：设置浮层抬到 1480 后，这里仍钉在 1120 ⇒ 右侧空出一大条，
+   * 「应用与工作流」两栏卡片和节点图继续被挤。放到 1344（浮层内宽），
+   * 普通渠道页由 `.form` 自己收在 960，只有整页视图会真正用满。
+   */
+  max-width: 1344px;
   width: 100%;
   display: grid;
   /**
@@ -539,3 +544,7 @@
   background: var(--success);
   color: var(--accent-text);
 }
+
+/* 打开「应用与工作流 / 条目设置」时当成整页：收起渠道列表，编辑区用满（用户 2026-11-15） */
+:is(.layout, .layoutEmbedded)[data-workflow-manager-open='true'] .sidebar { display: none; }
+:is(.layout, .layoutEmbedded)[data-workflow-manager-open='true'] .workarea { grid-template-columns: minmax(0, 1fr); }

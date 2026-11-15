@@ -22,8 +22,13 @@
    * 面板尺寸：留出四周的呼吸（与壳层留白同族），并给上下限 ——
    * 小窗不至于把面板挤扁、大屏不至于铺成整屏（那就不像"浮层"了）。
    */
-  width: min(1240px, calc(100vw - var(--space-6) * 2));
-  height: min(852px, calc(100vh - var(--space-6) * 2));
+  /*
+   * 2026-11-15（用户：「挤在一个小小的设置页面去了」）：渠道后台已经是一整页
+   * 「渠道 / 应用与工作流 / 条目设置」，1240×852 装不下两栏卡片与节点图。
+   * 上限抬到 1480×940，小屏仍按视口留边。
+   */
+  width: min(1480px, calc(100vw - var(--space-6) * 2));
+  height: min(940px, calc(100vh - var(--space-6) * 2));
   background: var(--bg-canvas);
   border-radius: var(--radius-node);
   box-shadow: var(--shadow-float);

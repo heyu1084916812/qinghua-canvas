@@ -326,10 +326,10 @@ export function SettingsWorkflowManager({
       <div className={styles.head}>
         <div className={styles.headText}>
           <span className={styles.title}>AI 应用和工作流</span>
-          <span className={styles.sub}>粘贴 /run/ai-app/… 或 /run/workflow/… 导入；设置会保存到本条渠道</span>
+          <span className={styles.sub}>粘贴 /run/ai-app/… 或 /run/workflow/… 导入；卡片上可直接改名称与备注</span>
         </div>
         <button type="button" className={styles.linkBtn} onClick={() => setOpen(false)}>
-          收起
+          返回渠道
         </button>
       </div>
       <div className={styles.manualRow}>

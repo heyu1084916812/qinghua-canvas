@@ -205,7 +205,8 @@
 .editor {
   flex-basis: 100%;
   display: grid;
-  grid-template-columns: minmax(180px, 240px) minmax(0, 1fr);
+  /* 面板放大后左栏跟着放宽：名称/备注/计数不再被挤成一列小方块 */
+  grid-template-columns: minmax(240px, 320px) minmax(0, 1fr);
   gap: var(--space-3);
   padding: var(--space-3);
   border: var(--border);
@@ -220,23 +221,21 @@
 
 /* 有节点图时：上方信息排成一行，下方整行留给图 */
 .editor[data-graph='on'] {
-  grid-template-columns: minmax(0, 1fr);
+  /* 参考图五：左边信息栏（名称/备注/计数/输出类型/测试运行），右边整幅节点图 */
+  grid-template-columns: minmax(280px, 320px) minmax(0, 1fr);
 }
 
 .editor[data-graph='on'] > .previewPane {
-  flex-direction: row;
-  flex-wrap: wrap;
-  align-items: flex-start;
+  flex-direction: column;
+  align-items: stretch;
 }
 
 .editor[data-graph='on'] > .previewPane > .field {
-  flex: 1 1 200px;
   min-width: 0;
 }
 
 .editor[data-graph='on'] > .previewPane > .countRow {
-  flex: 0 0 auto;
-  align-self: flex-end;
+  flex: none;
 }
 
 .previewPane {
@@ -464,9 +463,9 @@
 .manager {
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
+  gap: var(--space-3);
   box-sizing: border-box;
-  padding: var(--space-4);
+  padding: var(--space-5);
   border-radius: 8px;
   background: var(--bg-subtle);
 }
@@ -475,9 +474,10 @@
 .card {
   display: flex;
   align-items: flex-start;
-  gap: var(--space-2);
+  gap: var(--space-3);
   min-width: 0;
-  padding: var(--space-2) var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border: var(--border);
   border-radius: var(--radius-control);
   background: var(--bg-surface);
 }
@@ -513,14 +513,14 @@
 .columns {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: var(--space-3);
+  gap: var(--space-5);
   min-width: 0;
 }
 
 .column {
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
+  gap: var(--space-3);
   min-width: 0;
 }
 
@@ -528,20 +528,22 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
+  padding-bottom: var(--space-2);
+  border-bottom: var(--border);
 }
 
 .cover {
   flex: none;
-  width: 40px;
-  height: 40px;
+  width: 56px;
+  height: 56px;
   border-radius: var(--radius-control);
   object-fit: cover;
 }
 
 .coverPlaceholder {
   flex: none;
-  width: 40px;
-  height: 40px;
+  width: 56px;
+  height: 56px;
   border-radius: var(--radius-control);
   background: var(--bg-hover);
 }
@@ -586,5 +588,9 @@
   }
 }
 
-/* 卡片里那两行要铺满（图三：名称与备注都是整行）；flex 列里 basis:auto 会按内容缩 */
-.cardText input, .cardText textarea { width: 100%; box-sizing: border-box; }
+/*
+ * 卡片里那两行要铺满（图三：名称与备注都是整行）：
+ * flex 列里 `flex: 1 1 90px` 作用在**高度**上，会把输入框拉成 90px 高；
+ * 这里显式 `flex: none` + 宽度 100%。
+ */
+.cardText input, .cardText textarea { width: 100%; box-sizing: border-box; flex: none; }

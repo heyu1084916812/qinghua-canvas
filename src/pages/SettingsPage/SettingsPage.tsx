@@ -606,7 +606,7 @@ export function SettingsPage({ embedded = false }: { embedded?: boolean } = {}) 
     menuConfirmDelete,
   )
   return (
-    <div className={styles.page}>
+    <div className={styles.page} data-settings-page data-settings-card>
       {/*
         ⛔ 页内标题「后台设置」与左侧二级菜单**已删除**（用户 2026-09-27 第 9 轮）：
         「后台设置这几个词贴边了，不需要了，后台设置工作区里面左边的几个菜单也不需要了」。
@@ -620,7 +620,7 @@ export function SettingsPage({ embedded = false }: { embedded?: boolean } = {}) 
         于是这个页面现在就是**渠道配置本身**，从内容直接开始。
       */}
       {(
-      <div className={embedded ? styles.layoutEmbedded : styles.layout} data-settings-card>
+      <div className={embedded ? styles.layoutEmbedded : styles.layout} data-settings-card data-workflow-manager-open={workflowManagerOpen ? 'true' : 'false'}>
         {/*
           **选路策略默认收起**（用户 2026-11-15：「后台渠道的位置不要全部塞在一起了」）：
           它是**全局**设置，不是这条渠道的字段，常驻展开会把渠道页顶掉半屏。

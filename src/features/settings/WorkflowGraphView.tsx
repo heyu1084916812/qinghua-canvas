@@ -58,10 +58,11 @@ export function WorkflowGraphView({
   const dragRef = useRef<{ id: number; x: number; y: number; viewX: number; viewY: number } | null>(null)
 
   const scoreOf = (layout: WorkflowGraphLayout) =>
-    Math.min(
+    /** 封顶 1：两边都能 1:1 放下时**优先横排**（宽屏上图横着铺更像工作流，也不留大片空白） */
+    Math.min(1, Math.min(
       (dims.width - PAD * 2) / Math.max(1, layout.width),
       (dims.height - PAD * 2) / Math.max(1, layout.height),
-    )
+    ))
   const layout = scoreOf(tb) > scoreOf(lr) ? tb : lr
   const vertical = layout === tb
 
