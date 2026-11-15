@@ -1,3 +1,5 @@
+import { parseWorkflowEntryRef } from '../../domain/project/workflowEntryRef'
+import { errorTextOf } from '../../shared/result'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { Channel } from '../../domain/project/channel'
 import type { ChannelStore } from '../../state/channel/channelStore'
@@ -37,17 +39,6 @@ export type SettingsWorkflowManagerProps = {
   /** 受控展开（渠道页的「AI 应用和工作流」按钮用它把这块打开）；不传就自己管 */
   open?: boolean
   onOpenChange?: (open: boolean) => void
-}
-
-function kindOfId(raw: string): { id: string; kind: 'workflow' | 'app' } | null {
-  const text = raw.trim()
-  if (!text) return null
-  const app = /(?:ai-app|webapp)\/(\d{6,})/.exec(text)
-  if (app) return { id: app[1], kind: 'app' }
-  const flow = /workflow\/(\d{6,})/.exec(text)
-  if (flow) return { id: flow[1], kind: 'workflow' }
-  const bare = /^(\d{6,})$/.exec(text)
-  return bare ? { id: bare[1], kind: 'workflow' } : null
 }
 
 export function SettingsWorkflowManager({
@@ -131,7 +122,7 @@ export function SettingsWorkflowManager({
   )
 
   const addEntry = useCallback(
-    async (id: string, kind: 'workflow' | 'app', title?: string, coverUrl?: string, note?: string) => {
+    async (id: string, kind: 'workflow' | 'app', title?: string, coverUrl?: string, note?: string, quiet = false) => {
       setBusy(true)
       setError('')
       setNotice('')
@@ -155,7 +146,7 @@ export function SettingsWorkflowManager({
         setInput('')
         return true
       } catch (e) {
-        setError(e instanceof Error ? e.message : String(e))
+        if (!quiet) setError(errorTextOf(e))
         return false
       } finally {
         setBusy(false)
@@ -312,12 +303,14 @@ export function SettingsWorkflowManager({
           className={styles.btnPrimary}
           disabled={busy || !input.trim()}
           onClick={() => {
-            const parsed = kindOfId(input)
+            const parsed = parseWorkflowEntryRef(input)
             if (!parsed) {
-              setError('认不出这个链接：要 /run/ai-app/… 或 /run/workflow/…，或纯数字 id')
+              setError('认不出这个链接：要 /ai-detail/…、/run/ai-app/… 或 /run/workflow/…，或纯数字 id')
               return
             }
-            void addEntry(parsed.id, parsed.kind)
+            /* 纯数字 id 种类不定：先按工作流拉，拉不到再按应用试（#1128 L4） */
+            if (parsed.kind) void addEntry(parsed.id, parsed.kind)
+            else void addEntry(parsed.id, 'workflow', undefined, undefined, undefined, true).then((ok) => (ok ? true : addEntry(parsed.id, 'app')))
           }}
         >
           导入

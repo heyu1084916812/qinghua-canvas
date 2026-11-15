@@ -28,6 +28,16 @@
   background: var(--stroke);
 }
 
+/* 工作流条目已不在时的一句说明（#1128 H3）：与 chip 同一行、次级文字色，不抢生成按钮 */
+.paramHint {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text-2);
+  font-size: var(--fs-chip);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 /*
  * 无可用平台时的引导条（§6.8）。独占一行（与 .error 同一排版位）、可点击，
  * 视觉上仍遵守「1px 细描边 + 背景明度区分」：不做强调色，避免与生成按钮抢注意力。

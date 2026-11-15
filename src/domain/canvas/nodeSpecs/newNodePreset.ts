@@ -51,6 +51,12 @@ export function newGeneratingNodeData(
   if (!GENERATING.has(type)) return {}
   if (!recipe) return {}
   /**
+   * 工作流 / AI 应用条目**不当新节点的默认**（#1128，实测：上一个节点选了工作流，
+   * 之后每个新建节点都直接进了工作流模式）。条目要用户在这个节点上自己挑；
+   * 新节点回到 spec 默认，由面板按平台解析出普通模型。
+   */
+  if (/^(workflow|app):/.test(recipe.model)) return {}
+  /**
    * **必须基于 spec 的默认数据再叠加**，不能只返回这几个字段。
    *
    * `node.create` 的 reducer 是 `cmd.data ?? spec.createDefaultData()` ——

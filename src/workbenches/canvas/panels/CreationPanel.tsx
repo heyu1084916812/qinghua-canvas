@@ -71,7 +71,7 @@ import { CreationPromptToolsView } from './creation/CreationPromptToolsView'
 import { CreationPromptView } from './creation/CreationPromptView'
 import { CreationRunActionsView } from './creation/CreationRunActionsView'
 import { WorkflowEntryLauncher, WorkflowParameterControls } from './creation/WorkflowParameterControls'
-import { workflowChannelsOf } from './creation/workflowPanelSources'
+import { isWorkflowPanelModel } from './creation/workflowPanelSources'
 import type { CreationPanelProps } from './creation/creationPanelTypes'
 
 export type { CreationPanelProps, PanelPromptTools } from './creation/creationPanelTypes'
@@ -133,7 +133,8 @@ export function CreationPanel(props: CreationPanelProps) {
   /** 视频是生成节点的功能类别（`data.mode`），参数集与图片模式不同（§6.8） */
   const videoMode = !promptMode && data.mode === 'video'
   /** 工作流模式：参数 / 类别 / 预设全由条目决定，生成仍是原来那一枚按钮（不另设「运行」） */
-  const workflowMode = Boolean(props.workflowSources && /^(workflow|app):/.test(String(data.model ?? '')) && workflowChannelsOf(props.workflowSources).length > 0)
+  /** 只认**导入过的条目**：渠道推荐的 `app:` 模型按普通模型走 API 参数行（#1128 H3） */
+  const workflowMode = isWorkflowPanelModel(props.workflowSources, data.model, data.channelId)
   /** 仅在节点模型为空时解析并写回默认配方，已有模型绝不覆盖。 */
   const [fallback, setFallback] = useState<{ channelId: string; model: string } | null>(null)
   /** onEvent 每次渲染都会新建，effect 通过 ref 读取最新值。 */
@@ -913,7 +914,7 @@ export function CreationPanel(props: CreationPanelProps) {
         data-panel-part="params"
       >
         {workflowMode && props.workflowSources ? (
-          <WorkflowParameterControls data={data} sources={props.workflowSources} apiOptions={modelOptions} openPicker={openPicker} onTogglePicker={togglePicker} onClosePicker={closePicker} onEvent={onEvent} disabled={props.disabled} />
+          <WorkflowParameterControls data={data} sources={props.workflowSources} apiOptions={modelOptions} onSelectApiModel={selectModel} openPicker={openPicker} onTogglePicker={togglePicker} onClosePicker={closePicker} onEvent={onEvent} disabled={props.disabled} />
         ) : (
         <CreationParameterControls
           noPlatform={noPlatform} platformGap={platformGap} categoryLabel={categoryLabel}

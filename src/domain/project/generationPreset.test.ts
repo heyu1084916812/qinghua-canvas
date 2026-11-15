@@ -409,3 +409,17 @@ describe('isRecipeEdit · 哪些改动算「改了配方」', () => {
     }
   })
 })
+
+describe('#1128 工作流 / 应用条目不当新节点默认', () => {
+  const rh = { id: 'ch_rh', models: [{ id: 'workflow:1997246493079834625', category: 'image' }, { id: 'app:1877265245566922753', category: 'image' }, { id: 'rhart-image/z-image/turbo', category: 'image' }] }
+  it('渠道第一个勾选模型是 workflow: → 跳过，取第一个普通模型', () => {
+    expect(firstUsableChannel([rh], 'image')?.model).toBe('rhart-image/z-image/turbo')
+  })
+  it('配方记的是 workflow: → 不原样带进新节点', () => {
+    const r = resolveRecipe({ channelId: 'ch_rh', model: 'workflow:1997246493079834625', params: {}, savedAt: 1 }, [rh], 'image')
+    expect(r?.model).toBe('rhart-image/z-image/turbo')
+  })
+  it('只有条目、没有普通模型的渠道 → 不给默认', () => {
+    expect(firstUsableChannel([{ id: 'ch_rh', models: [{ id: 'workflow:1', category: 'image' }] }], 'image')).toBeNull()
+  })
+})

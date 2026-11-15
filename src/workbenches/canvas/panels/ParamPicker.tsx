@@ -171,6 +171,11 @@ export interface ParamPickerProps {
    * Agent 的生成模型选择使用后者，避免图片与视频同时铺满浮层。
    */
   jumpMode?: 'scroll' | 'filter'
+  /**
+   * 浮层最高占视口高度的比例（0–1，可选）。默认按锚点剩余空间放满；
+   * 段很多的浮层（工作流参数）传它，免得一打开就顶到屏幕边（#1128）。
+   */
+  capHeight?: number
 }
 
 /**
@@ -427,7 +432,8 @@ export function ParamPicker(props: ParamPickerProps) {
     setBelow(flipDown)
     const scale = wrap.offsetHeight > 0 ? anchor.height / wrap.offsetHeight : 1
     const room = Math.max(0, (flipDown ? roomBelow : roomAbove) - POPUP_EDGE)
-    setMaxHeight(Math.max(MIN_POPUP_H, Math.round(room / (scale || 1))))
+    const capped = props.capHeight ? Math.min(room, window.innerHeight * props.capHeight) : room
+    setMaxHeight(Math.max(MIN_POPUP_H, Math.round(capped / (scale || 1))))
     const bounds = wrap.closest('[data-agent-panel]')?.getBoundingClientRect()
     if (bounds) {
       const rect = pop.getBoundingClientRect()
@@ -440,7 +446,7 @@ export function ParamPicker(props: ParamPickerProps) {
       shiftXRef.current = next
       setShiftX(next)
     }
-  }, [open, totalOptions])
+  }, [open, totalOptions, props.capHeight])
 
   /**
    * 点击浮层外关闭。

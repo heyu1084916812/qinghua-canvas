@@ -174,6 +174,17 @@ describe('提交 · v2 全 Bearer（#1126 真机：run/workflow / run/ai-app 都
     expect(calls).toHaveLength(1)
   })
 
+  it('★ #1128 鉴权网关 {code:1602, msg}：当成「没受理」报 Key 的人话，不是「已受理没 taskId」', async () => {
+    const { deps, calls } = fakeNet(() => ({ body: { code: 1602, msg: 'HEADER_API_KEY_NOT_FOUND' } }))
+    const error = await submitWorkflowTask(deps, endpoint, { workflowId: 'w1' }, signal).catch((e: unknown) => e)
+    const text = await errorBodyOf(Promise.reject(error))
+    expect(text).toContain('HEADER_API_KEY_NOT_FOUND')
+    expect(text).toContain('Key')
+    expect(text).not.toContain('已受理')
+    expect((error as { appError?: { status?: number } }).appError?.status).toBe(400)
+    expect(calls).toHaveLength(1)
+  })
+
   it('★ 1001（站点没有 v2 路由）才退回 /task/openapi/create', async () => {
     const { deps, calls } = fakeNet(legacyOnly({ code: 0, data: { taskId: 't-old' } }))
     expect(await submitWorkflowTask(deps, endpoint, { workflowId: 'w1' }, signal)).toBe('t-old')

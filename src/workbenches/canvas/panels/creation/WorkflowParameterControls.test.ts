@@ -3,8 +3,8 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 import { generationSpec } from '../../../../domain/canvas/nodeSpecs/generation'
 import type { WorkflowEntry } from '../../../../domain/project/workflowParams'
-import { WorkflowEntryLauncher, WorkflowParameterControls } from './WorkflowParameterControls'
-import { runninghubChannelIds, type WorkflowPanelSources } from './workflowPanelSources'
+import { entrySelectionEvents, WorkflowEntryLauncher, WorkflowParameterControls } from './WorkflowParameterControls'
+import { findWorkflowSourceRow, isWorkflowPanelModel, runninghubChannelIds, workflowSourceRows, type WorkflowPanelSources } from './workflowPanelSources'
 
 /**
  * 工作流参数行（对账 #1105 / #1116）。
@@ -181,7 +181,8 @@ describe('AI 应用的参数行', () => {
       }),
     )
     expect(html).toContain('风格迁移')
-    expect(html).toContain('data-param-chip="workflowInstance"')
+    /* #1128：应用的提交体不吃实例规格，chip 不显示（#1127 M1） */
+    expect(html).not.toContain('data-param-chip="workflowInstance"')
   })
 })
 
@@ -193,5 +194,47 @@ describe('要读条目的渠道 id', () => {
         { id: 'ch_agnes', protocol: 'agnes' },
       ]),
     ).toEqual(['ch_builtin_runninghub'])
+  })
+})
+
+describe('#1128 条目下拉 / 找不到条目', () => {
+  const APP: WorkflowEntry = { ...ENTRY, id: '1877265245566922753', kind: 'app', title: '风格迁移' }
+  const BOTH: WorkflowPanelSources = {
+    channels: [{ id: 'ch-rh', name: 'RunningHub', protocol: 'runninghub-api', entries: [ENTRY, APP] }],
+  }
+  const render = (data: ReturnType<typeof workflowData>, sources = BOTH) =>
+    renderToStaticMarkup(
+      createElement(WorkflowParameterControls, { data, sources, openPicker: null, onTogglePicker: noop, onClosePicker: noop, onEvent: noop }),
+    )
+
+  it('★ M2：下拉选 AI 应用 → 模型是 app:<id>（不是 workflow:），实例回默认', () => {
+    const events = entrySelectionEvents(workflowSourceRows(BOTH), `ch-rh::app:${APP.id}`, 'plus')
+    expect(events[0]).toEqual({ type: 'setModel', model: `app:${APP.id}`, channelId: 'ch-rh' })
+    expect(events[1]).toMatchObject({ type: 'setWorkflowRun', instance: 'default' })
+    expect(entrySelectionEvents(workflowSourceRows(BOTH), `ch-rh::workflow:${APP.id}`, 'plus')).toEqual([])
+  })
+
+  it('★ H3：workflow:X 条目不在 → 写「条目不存在」，不借用别的条目的标题与参数', () => {
+    const html = render({ ...workflowData(), model: 'workflow:404' })
+    expect(html).toContain('条目不存在')
+    expect(html).toContain('data-workflow-missing')
+    expect(html).not.toContain('视频超分与补帧</')
+    expect(html).not.toContain('data-param-chip="workflowParams"')
+    expect(findWorkflowSourceRow(BOTH, 'workflow:404', 'ch-rh')).toBeNull()
+  })
+
+  it('★ H3：渠道推荐的 app: 模型（没导入）不进工作流模式；导入过的才进', () => {
+    expect(isWorkflowPanelModel(BOTH, 'app:999', 'ch-rh')).toBe(false)
+    expect(isWorkflowPanelModel(BOTH, `app:${APP.id}`, 'ch-rh')).toBe(true)
+    expect(isWorkflowPanelModel(BOTH, 'workflow:404', 'ch-rh')).toBe(true)
+    expect(isWorkflowPanelModel(BOTH, 'GPT Image 2', 'ch-rh')).toBe(false)
+    /** 同 id 的应用不能冒充工作流 */
+    expect(findWorkflowSourceRow(BOTH, `workflow:${APP.id}`, 'ch-rh')).toBeNull()
+  })
+
+  it('AI 应用不显示 24G/48G（应用提交体不吃实例规格）', () => {
+    const html = render({ ...workflowData(), model: `app:${APP.id}` })
+    expect(html).toContain('风格迁移')
+    expect(html).not.toContain('data-param-chip="workflowInstance"')
   })
 })

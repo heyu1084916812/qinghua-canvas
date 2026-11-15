@@ -186,6 +186,15 @@
   gap: var(--space-1);
 }
 
+/*
+ * 浮层被限高时（`capHeight` / 剩余空间不够）**整块滚动，不压扁**（#1128 实测：
+ * 段和行是 flex 子项，默认可收缩，限高后每行被挤到 17px、文字叠在一起）。
+ */
+.grouped > .section,
+.list > .row {
+  flex-shrink: 0;
+}
+
 .sectionTitle {
   padding: 0 var(--space-1) 2px;
   font-family: var(--font-sans);
@@ -494,6 +503,21 @@
    * 等那两支真的分开时，选中行要跟着**选中**那支走，而不是继续跟着悬停走。
    */
   background: var(--bg-selected);
+}
+
+/*
+ * 带副标题的行（名字 + 「AI 应用 / API 模型」）：两行字塞进 46px 会挤成一团（#1128 实测
+ * 条目下拉），改成按内容长高、上下留 8px；不带副标题的行仍是 46px，别处不受影响。
+ */
+.row:has(> .rowBody) {
+  height: auto;
+  min-height: 56px;
+  padding-block: 8px;
+}
+
+.row:has(> .rowBody) .rowBody {
+  gap: 3px;
+  line-height: 1.25;
 }
 
 .rowText {

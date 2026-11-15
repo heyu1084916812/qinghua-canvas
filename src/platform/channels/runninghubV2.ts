@@ -79,6 +79,12 @@ function errorCodeOf(envelope: V2Envelope): string {
   return text === '0' ? '' : text
 }
 
+/** 顶层 `code`：非 0 才算错（成功的提交没有这一项，或是 0） */
+function topLevelCodeOf(envelope: V2Envelope): string {
+  const text = String(envelope.code ?? '').trim()
+  return text === '' || text === '0' ? '' : text
+}
+
 export function isV2RouteMissing(envelope: { errorCode?: unknown }): boolean {
   return String(envelope.errorCode ?? '').trim() === V2_ROUTE_MISSING
 }
@@ -125,14 +131,21 @@ export async function submitV2Task(
   )
   const envelope = await envelopeOf(res)
   if (isV2RouteMissing(envelope)) return { routeMissing: true }
-  const code = errorCodeOf(envelope)
+  /**
+   * 两种失败形状都认：v2 顶层 `errorCode`（821 / 1101…），以及**鉴权网关**的 `{code:1602, msg}`
+   * （#1128 实测：Key 没带上时回 `1602 HEADER_API_KEY_NOT_FOUND`，上一版当成「已受理没 taskId」，
+   * 节点上只剩一句「结果暂时无法确认」）。这两种都说明**没受理**，不会扣费。
+   */
   const taskId = String(envelope.taskId ?? envelope.data?.taskId ?? '').trim()
+  /** 顶层 `code` 只在**没有 taskId** 时算错：成功形状没真见过，别把可能的 `code:200` 误判成失败 */
+  const code = errorCodeOf(envelope) || (taskId ? '' : topLevelCodeOf(envelope))
   if (code) {
+    const message = envelope.errorMessage || envelope.msg || envelope.message
     throw new ChannelError({
       kind: 'http',
       status: 400,
       body: describeRhError(
-        { errorCode: code, ...(envelope.errorMessage ? { errorMessage: envelope.errorMessage } : {}) },
+        { errorCode: code, ...(message ? { errorMessage: message } : {}) },
         `提交任务失败（${input.id}）`,
       ),
     })

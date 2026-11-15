@@ -255,6 +255,8 @@ export interface PresetChannelLike {
  * 2026-11-11 实测这条回落选中了用户没勾的模型（`global:hy-image-3.5`），
  * 用户口径改为「只能选启用渠道里用户勾选的模型」，回落已删除。
  */
+const ENTRY_MODEL = /^(workflow|app):/
+
 function pickModel(
   channel: PresetChannelLike,
   category?: string,
@@ -266,7 +268,8 @@ function pickModel(
    * 「只能选启用渠道里用户勾选的模型」）。曾经回落到 `modelCache`，实测选中了
    * 用户没勾的 `global:hy-image-3.5`，请求被上游拒绝。缓存只供设置页展示。
    */
-  const hit = byCategory(channel.models)
+  /** 工作流 / AI 应用条目不当默认（#1128：新建节点一律进了工作流模式），只能用户自己在节点上挑 */
+  const hit = byCategory(channel.models.filter((m) => !ENTRY_MODEL.test(m.id)))
   /**
    * **对话类**默认取固定显示名的第一个（用户 2026-09-27 第 8 轮：
    * 「目前需要一个默认的显示，不是 advanced-voice」）。
@@ -316,6 +319,11 @@ export function resolveRecipe(
 ): ResolvedRecipe | null {
   if (!recipe.channelId) return null
   const channel = channels.find((c) => c.id === recipe.channelId)
+  /** 配方记成条目（上一个节点挑了工作流）→ 只当「这个渠道」可用，模型按普通兜底取（#1128） */
+  if (channel && ENTRY_MODEL.test(recipe.model)) {
+    const first = pickModel(channel, category)
+    return first ? { channelId: recipe.channelId, model: first.id, params: {}, substituted: true } : null
+  }
   if (!channel) return null
   /**
    * 记录里的模型如果**这个渠道还提供**（已勾选或已在缓存里），就用它。

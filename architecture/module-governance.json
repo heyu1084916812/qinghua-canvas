@@ -753,6 +753,26 @@
       ]
     },
     {
+      "module": "src/domain/project/workflowEntryRef.ts",
+      "owner": "project-workflow-channel-params",
+      "responsibility": "导入输入框（链接 / id）→ 条目 id 与种类：认 /ai-detail、/run/ai-app、/run/workflow、webappId=、workflowId=；纯数字 id 种类不定。",
+      "owns": [
+        "导入链接解析"
+      ],
+      "doesNotOwn": [
+        "拉取字段（runninghubWorkflow.ts）",
+        "条目持久化（workflowEntryStore.ts）"
+      ],
+      "publicApi": [
+        "WorkflowEntryRef",
+        "parseWorkflowEntryRef"
+      ],
+      "test": [
+        "src/domain/project/workflowEntryRef.test.ts"
+      ],
+      "budget": 60
+    },
+    {
       "module": "src/domain/project/workflowAppParams.ts",
       "owner": "project-workflow-channel-params",
       "responsibility": "把 RunningHub apiCallDemo 回来的 nodeInfoList 解析成参数字段表（默认全暴露、中文名当标签、fieldData 里的候选与多行标记），与自建工作流的「默认全隐藏」口径明确区分。",
@@ -11736,7 +11756,7 @@
     {
       "module": "src/workbenches/canvas/panels/creation/workflowPanelSources.ts",
       "owner": "canvas-creation-ui",
-      "responsibility": "创作面板可选的「工作流来源」类型：RunningHub 渠道 + 各自条目。",
+      "responsibility": "创作面板可选的「工作流来源」类型：RunningHub 渠道 + 各自条目；按节点模型找条目（找不到回 null，不兜底到别的条目）与是否进工作流模式的判定。",
       "owns": [
         "来源类型与过滤"
       ],
@@ -11747,12 +11767,18 @@
       "publicApi": [
         "WorkflowPanelChannel",
         "WorkflowPanelSources",
-        "workflowChannelsOf"
+        "workflowChannelsOf",
+        "WorkflowSourceRow",
+        "workflowSourceRows",
+        "findWorkflowSourceRow",
+        "isWorkflowPanelModel",
+        "runninghubChannelIds"
       ],
       "test": [
-        "src/workbenches/canvas/panels/creation/creationWorkflowMode.test.ts"
+        "src/workbenches/canvas/panels/creation/creationWorkflowMode.test.ts",
+        "src/workbenches/canvas/panels/creation/WorkflowParameterControls.test.ts"
       ],
-      "budget": 80
+      "budget": 120
     },
     {
       "module": "src/workbenches/canvas/panels/creation/useWorkflowPanelSources.ts",
@@ -11791,7 +11817,8 @@
       "publicApi": [
         "WorkflowParameterControls",
         "WorkflowParameterControlsProps",
-        "workflowSummaryLabel"
+        "workflowSummaryLabel",
+        "entrySelectionEvents"
       ],
       "test": [
         "src/workbenches/canvas/panels/creation/WorkflowParameterControls.test.ts"

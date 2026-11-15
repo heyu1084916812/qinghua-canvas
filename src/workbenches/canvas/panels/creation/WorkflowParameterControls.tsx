@@ -2,14 +2,9 @@ import type { GenerationData } from '../../../../domain/canvas/model/node'
 import type { PanelEvent } from '../panelModel'
 import { ParamPicker, type ParamOption, type ParamSection } from '../ParamPicker'
 import { ChannelIcon } from '../../../../features/shared/channelIcon/ChannelIcon'
-import {
-  entryIdOfModel,
-  workflowModelId,
-  type WorkflowEntry,
-  type WorkflowParamField,
-} from '../../../../domain/project/workflowParams'
+import { workflowModelId, type WorkflowEntry, type WorkflowParamField } from '../../../../domain/project/workflowParams'
 import { workflowSubmitList, workflowValueMap } from './creationWorkflowMode'
-import { workflowChannelsOf, type WorkflowPanelSources } from './workflowPanelSources'
+import { findWorkflowSourceRow, workflowSourceRows, type WorkflowPanelSources, type WorkflowSourceRow } from './workflowPanelSources'
 import { creationStyles } from './creationStyles'
 
 /**
@@ -39,30 +34,16 @@ export type WorkflowParameterControlsProps = {
    * 否则一旦进了工作流模式就没有出口了。用 `hint` 标成「API 模型」。
    */
   apiOptions?: ParamOption[]
+  /**
+   * 从条目下拉**换回 API 模型**走面板自己的 `selectModel`（按逻辑模型重新选路 + 配方快照，#1128 M11）；
+   * 不传时退回只换模型 id（单测用）。
+   */
+  onSelectApiModel?: (model: string) => void
   openPicker: string | null
   onTogglePicker: (key: string) => void
   onClosePicker: () => void
   onEvent: (event: PanelEvent) => void
   disabled?: boolean
-}
-
-/** 一条可选来源：哪个渠道下的哪个条目（面板不认「RunningHub」这件事，只认这份清单） */
-interface WorkflowSourceRow {
-  channelId: string
-  channelName: string
-  protocol: string
-  entry: WorkflowEntry
-}
-
-function sourceRows(sources: WorkflowPanelSources): WorkflowSourceRow[] {
-  return workflowChannelsOf(sources).flatMap((channel) =>
-    channel.entries.map((entry) => ({
-      channelId: channel.id,
-      channelName: channel.name,
-      protocol: channel.protocol,
-      entry,
-    })),
-  )
 }
 
 /** 条目 → 节点上存的模型 id（AI 应用是 `app:` 前缀，工作是 `workflow:`） */
@@ -73,6 +54,12 @@ export function workflowEntryModelId(entry: WorkflowEntry): string {
 function isMediaField(field: WorkflowParamField): boolean {
   return field.type === 'image' || field.type === 'video' || field.type === 'audio'
 }
+
+/** 候选很多的下拉（采样器 20+ 项）只露几行、段内滚动，别把浮层撑满屏（#1128） */
+const LONG_LIST = 6
+const LONG_LIST_ROWS = 5
+/** 参数浮层最高占视口的这一比例（实测 1440×900 上原来几乎顶满） */
+const PARAMS_CAP = 0.62
 
 /**
  * chip 上那行摘要：「源视频 · 0.8 · 16:9」。
@@ -100,29 +87,45 @@ export function workflowSummaryLabel(
   return parts.join(' · ')
 }
 
+/**
+ * 条目下拉选中一项 → 要发的事件（导出供单测）。
+ *
+ * 应用与工作流同一口径（#1128 M2：上一版固定拼 `workflow:`，应用永远匹配不上；
+ * 匹配上也会被当工作流提交）。换了条目就换成它自己的默认值：旧条目填过的值不该跟着串门。
+ */
+export function entrySelectionEvents(
+  rows: readonly WorkflowSourceRow[],
+  value: string,
+  instance: 'default' | 'plus',
+): PanelEvent[] {
+  const row = rows.find((item) => `${item.channelId}::${workflowEntryModelId(item.entry)}` === value)
+  if (!row) return []
+  return [
+    { type: 'setModel', model: workflowEntryModelId(row.entry), channelId: row.channelId },
+    { type: 'setWorkflowRun', list: workflowSubmitList(row.entry, {}), instance: row.entry.kind === 'app' ? 'default' : instance },
+  ]
+}
+
 export function WorkflowParameterControls({
   data,
   sources,
   apiOptions = [],
+  onSelectApiModel,
   openPicker,
   onTogglePicker,
   onClosePicker,
   onEvent,
   disabled,
 }: WorkflowParameterControlsProps) {
-  const rows = sourceRows(sources)
-  if (rows.length === 0) return null
-
-  const entryId = entryIdOfModel(data.model ?? '')
-  const current =
-    rows.find((row) => row.channelId === data.channelId && row.entry.id === entryId) ??
-    rows.find((row) => row.entry.id === entryId) ??
-    rows[0]!
+  const rows = workflowSourceRows(sources)
+  /** 找不到条目就**明说**（#1128 H3），不拿 `rows[0]` 顶替——那会显示并改写另一个条目 */
+  const current = findWorkflowSourceRow(sources, data.model, data.channelId)
   const values = workflowValueMap(data)
   const instance = data.workflowInstance === 'plus' ? 'plus' : 'default'
   const channelCount = new Set(rows.map((row) => row.channelId)).size
 
   const emit = (nextValues: Record<string, string>, nextInstance: 'default' | 'plus' = instance) => {
+    if (!current) return
     onEvent({
       type: 'setWorkflowRun',
       list: workflowSubmitList(current.entry, nextValues),
@@ -131,18 +134,10 @@ export function WorkflowParameterControls({
   }
 
   const selectEntry = (value: string) => {
-    const row = rows.find((item) => `${item.channelId}::${workflowModelId(item.entry.id)}` === value)
-    if (!row) return
-    onEvent({ type: 'setModel', model: workflowModelId(row.entry.id), channelId: row.channelId })
-    /** 换了条目就换成它自己的默认值：旧条目填过的值不该跟着串门 */
-    onEvent({
-      type: 'setWorkflowRun',
-      list: workflowSubmitList(row.entry, {}),
-      instance,
-    })
+    for (const event of entrySelectionEvents(rows, value, instance)) onEvent(event)
   }
 
-  const exposed = current.entry.fields.filter((field) => field.enabled)
+  const exposed = (current?.entry.fields ?? []).filter((field) => field.enabled)
   const editable = exposed.filter((field) => !isMediaField(field))
   const label = workflowSummaryLabel(exposed, values)
 
@@ -158,6 +153,7 @@ export function WorkflowParameterControls({
         variant: 'list',
         options: field.options.map((option) => ({ value: option, label: option })),
         value,
+        ...(field.options.length > LONG_LIST ? { maxRows: LONG_LIST_ROWS } : {}),
         onSelect: select,
       }
     }
@@ -209,28 +205,36 @@ export function WorkflowParameterControls({
     ...apiOptions.map((option) => ({ ...option, hint: 'API 模型' })),
   ]
 
+  const isApp = current?.entry.kind === 'app'
   return (
     <>
       <ParamPicker
         name="model"
         ariaLabel="工作流条目"
-        triggerIcon={<ChannelIcon protocol={current.protocol} size={18} />}
-        label={current.entry.title}
+        triggerIcon={<ChannelIcon protocol={current?.protocol ?? rows[0]?.protocol ?? 'runninghub-api'} size={18} />}
+        label={current ? current.entry.title : '条目不存在'}
         options={options}
-        value={`${current.channelId}::${workflowEntryModelId(current.entry)}`}
+        value={current ? `${current.channelId}::${workflowEntryModelId(current.entry)}` : ''}
         variant="list"
         open={openPicker === 'model'}
         onToggle={() => onTogglePicker('model')}
         onClose={onClosePicker}
         onSelect={(next: string) => {
           /* 不带 `::` 的是普通 API 模型：直接换模型，行会自动回到 API 模式 */
-          if (!next.includes('::')) onEvent({ type: 'setModel', model: next, channelId: data.channelId })
-          else selectEntry(next)
+          if (next.includes('::')) selectEntry(next)
+          else if (onSelectApiModel) onSelectApiModel(next)
+          else onEvent({ type: 'setModel', model: next, channelId: data.channelId })
         }}
         disabled={disabled === true}
       />
-      <span className={creationStyles.paramDivider} data-param-divider aria-hidden="true" />
-      <ParamPicker
+      {!current ? (
+        <span className={creationStyles.paramHint} data-workflow-missing>
+          这个条目已被删除或不在当前渠道，换一个条目再生成
+        </span>
+      ) : null}
+      {/* AI 应用的提交体不吃实例规格：只给工作流显示（#1127 M1） */}
+      {current && !isApp ? <span className={creationStyles.paramDivider} data-param-divider aria-hidden="true" /> : null}
+      {current && !isApp ? <ParamPicker
         name="workflowInstance"
         ariaLabel="实例规格"
         label={instance === 'plus' ? '48G' : '24G'}
@@ -245,13 +249,14 @@ export function WorkflowParameterControls({
         onClose={onClosePicker}
         onSelect={(next: string) => emit(values, next === 'plus' ? 'plus' : 'default')}
         disabled={disabled === true}
-      />
+      /> : null}
       {sections.length > 0 ? (
         <ParamPicker
           name="workflowParams"
           ariaLabel="工作流参数"
           label={label === '' ? `${sections.length} 项参数` : label}
           sections={sections}
+          capHeight={PARAMS_CAP}
           open={openPicker === 'workflowParams'}
           onToggle={() => onTogglePicker('workflowParams')}
           onClose={onClosePicker}
@@ -292,7 +297,7 @@ export function WorkflowEntryLauncher({
   disabled,
 }: WorkflowEntryLauncherProps) {
   /** 工作流与 AI 应用**同一条链路**：执行端都收 `nodeInfoList`（应用走 `app:` 前缀） */
-  const rows = sources ? sourceRows(sources) : []
+  const rows = workflowSourceRows(sources)
   if (rows.length === 0) return null
 
   const valueOf = (row: WorkflowSourceRow) => `${row.channelId}::${workflowEntryModelId(row.entry)}`

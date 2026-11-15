@@ -592,7 +592,7 @@ export function CanvasExecutionProvider({
             .filter(([id]) => id !== plan.id)
             .flatMap(([, m]) => [...m.values()]),
         )
-        for (const nid of touched) if (!stillRunning.has(nid)) n.delete(nid)
+        for (const nid of touched) if (!stillRunning.has(nid) && n.get(nid)?.kind !== 'failed') n.delete(nid) // 失败态留着显示原因（#1128）
         return n
       })
       } finally {

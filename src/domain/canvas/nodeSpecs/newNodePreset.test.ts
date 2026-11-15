@@ -51,3 +51,11 @@ describe('新建节点的默认数据（用户 2026-09-17）', () => {
     }
   })
 })
+
+describe('#1128 工作流 / 应用条目不当新节点默认', () => {
+  it('配方是 workflow: / app: → 回到 spec 默认（面板再按平台解析普通模型）', () => {
+    expect(newGeneratingNodeData('generation', { channelId: 'ch_rh', model: 'workflow:1997246493079834625' })).toEqual({})
+    expect(newGeneratingNodeData('batch', { channelId: 'ch_rh', model: 'app:1877265245566922753' })).toEqual({})
+    expect(newGeneratingNodeData('generation', { channelId: 'ch1', model: 'm1' })).toMatchObject({ model: 'm1' })
+  })
+})

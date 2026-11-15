@@ -1,4 +1,4 @@
-import type { WorkflowEntry } from '../../../../domain/project/workflowParams'
+import { entryIdOfModel, type WorkflowEntry } from '../../../../domain/project/workflowParams'
 
 /**
  * 创作面板能选到的「工作流来源」：RunningHub 渠道 + 各自的工作流条目。
@@ -37,4 +37,50 @@ export function runninghubChannelIds(
   channels: readonly { id: string; protocol: string }[],
 ): string[] {
   return channels.filter((channel) => channel.protocol === 'runninghub-api').map((channel) => channel.id)
+}
+
+/** 一条可选来源：哪个渠道下的哪个条目 */
+export interface WorkflowSourceRow {
+  channelId: string
+  channelName: string
+  protocol: string
+  entry: WorkflowEntry
+}
+
+export function workflowSourceRows(sources: WorkflowPanelSources | null | undefined): WorkflowSourceRow[] {
+  return workflowChannelsOf(sources).flatMap((channel) =>
+    channel.entries.map((entry) => ({ channelId: channel.id, channelName: channel.name, protocol: channel.protocol, entry })),
+  )
+}
+
+/**
+ * 节点模型对应的条目行；**找不到就是 null**（#1128 H3：上一版落到 `rows[0]`，
+ * 显示并编辑的是另一个条目）。前缀要和条目种类对上：`app:` 只认应用条目、`workflow:` 只认工作流。
+ */
+export function findWorkflowSourceRow(
+  sources: WorkflowPanelSources | null | undefined,
+  model: string | undefined,
+  channelId: string | undefined,
+): WorkflowSourceRow | null {
+  const text = String(model ?? '')
+  const kind = text.startsWith('app:') ? 'app' : text.startsWith('workflow:') ? 'workflow' : null
+  const id = kind ? entryIdOfModel(text) : null
+  if (!kind || !id) return null
+  const rows = workflowSourceRows(sources).filter((row) => row.entry.id === id && (row.entry.kind ?? 'workflow') === kind)
+  return rows.find((row) => row.channelId === channelId) ?? rows[0] ?? null
+}
+
+/**
+ * 面板该不该进「工作流模式」：`workflow:` 一律进（条目丢了也要在这一行说清楚，而不是露出 API 控件）；
+ * `app:` **只有导入过的应用条目**才进 —— 渠道推荐的 `app:` 模型不是条目，按普通模型走 API 参数行。
+ */
+export function isWorkflowPanelModel(
+  sources: WorkflowPanelSources | null | undefined,
+  model: string | undefined,
+  channelId: string | undefined,
+): boolean {
+  if (!sources) return false
+  const text = String(model ?? '')
+  if (text.startsWith('workflow:')) return true
+  return text.startsWith('app:') && findWorkflowSourceRow(sources, text, channelId) !== null
 }

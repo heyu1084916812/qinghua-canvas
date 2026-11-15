@@ -1,3 +1,5 @@
+import { describeError } from '../../../shared/result'
+import { ChannelError } from '../../../platform/channels/types'
 import { createElement, type ReactNode } from 'react'
 import TestRenderer, { act } from 'react-test-renderer'
 import {
@@ -524,5 +526,27 @@ describe('CanvasExecutionProvider run preflight behavior', () => {
       kind: 'failed',
       error: { kind: 'parse', raw: 'Error: adapter down' },
     })
+  })
+
+  it('★ #1128 渠道拒绝提交：跑完后失败态**留在节点上**（节点显示可读原因，不只躲在日志里）', async () => {
+    const { store, channels } = setup()
+    const nodeId = createNode(store, 'generation', {
+      mode: 'image',
+      prompt: '画一只猫',
+      channelId: 'ch-valid',
+      model: 'image-model',
+    })
+    generationMocks.resolve.mockResolvedValue({
+      adapter: {
+        generateImage: vi.fn().mockRejectedValue(new ChannelError({ kind: 'http', status: 400, body: 'HEADER_API_KEY_NOT_FOUND（检查这一行的 Key）' })),
+      },
+    })
+    const getApi = await mountProvider({ store, channels })
+    await act(async () => {
+      await getApi().runNode(nodeId).catch(() => undefined)
+    })
+    const state = getApi().nodeStateOf(nodeId)
+    expect(state?.kind).toBe('failed')
+    expect(state?.kind === 'failed' ? describeError(state.error) : '').toContain('HEADER_API_KEY_NOT_FOUND')
   })
 })
