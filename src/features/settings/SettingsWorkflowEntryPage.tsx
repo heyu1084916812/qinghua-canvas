@@ -8,6 +8,13 @@ import { SettingsWorkflowTestRun } from './SettingsWorkflowTestRun'
 import styles from './SettingsWorkflowEntries.module.css'
 
 /**
+ * 编辑器的 draft 只在挂载时从 `entry.fields` 初始化一次；「重新拉取」写入新字段表后必须**换一个 key 重挂**，
+ * 否则编辑器里还是旧 draft，再点「保存参数」就把刚拉到的字段表整份覆盖回旧快照（审查 H2）。
+ */
+export const fieldEditorKey = (entry: Pick<WorkflowEntry, 'id' | 'kind' | 'fetchedAt'>) =>
+  `${entry.kind ?? 'workflow'}:${entry.id}:${entry.fetchedAt ?? 0}`
+
+/**
  * 条目设置**整页**（参考图四 / 图五）。
  *
  * 从管理页拆出来的理由：这一页本身就是一组独立交互（名称 / 备注 / 计数 / 输出类型 /
@@ -104,7 +111,7 @@ export function SettingsWorkflowEntryPage({
           <SettingsWorkflowTestRun channel={channel} entry={entry} groupId={groupId} channels={channels} platform={platform} />
         </div>
         <div className={styles.fieldPane}>
-          <WorkflowFieldEditor entry={entry} busy={busy} showPreview={false} onClose={onBack} onSave={onSaveFields} />
+          <WorkflowFieldEditor key={fieldEditorKey(entry)} entry={entry} busy={busy} showPreview={false} onClose={onBack} onSave={onSaveFields} />
         </div>
       </div>
     </section>
