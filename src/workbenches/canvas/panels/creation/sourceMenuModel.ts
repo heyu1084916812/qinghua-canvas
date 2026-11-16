@@ -98,25 +98,31 @@ export function cliProtocolOf(toolId: string): string {
 }
 
 function apiTab(input: SourceMenuInput): SourceMenuTab {
-  const groups = new Map<string, SourceMenuGroup>()
-  for (const option of input.apiModels) {
-    const label = option.channelName || '未配置渠道'
-    const group = groups.get(label) ?? { label, rows: [] }
-    group.rows.push({
-      value: `api::${option.name}`,
-      label: option.name,
-      /** 分组标题已是渠道名，行上不再重复；只有没人提供时才说一句 */
-      hint: option.channelId ? '' : '还没有渠道提供',
-      icon: { kind: 'model', name: option.name },
-      pick: { source: 'api', model: option.name, channelId: option.channelId },
-    })
-    groups.set(label, group)
-  }
+  /**
+   * 平铺、按全局模型名去重，**不按渠道分组、不写渠道名**：同一模型可由多个渠道提供，
+   * 跑的时候按全局路由选渠道（#1133 目检）。顺序跟全局模型清单一致；没有渠道提供的放末尾。
+   * `pick.channelId` 留空：选哪条渠道由面板按路由补（与改动前单列下拉同一口径）。
+   */
+  const provided = new Map<string, boolean>()
+  for (const option of input.apiModels) provided.set(option.name, (provided.get(option.name) ?? false) || Boolean(option.channelId))
+  const rowOf = (name: string, ok: boolean): SourceMenuRow => ({
+    value: `api::${name}`,
+    label: name,
+    hint: ok ? '' : '还没有渠道提供',
+    icon: { kind: 'model', name },
+    pick: { source: 'api', model: name, channelId: '' },
+  })
+  const names = [...provided.keys()]
+  const ready = names.filter((name) => provided.get(name)).map((name) => rowOf(name, true))
+  const missing = names.filter((name) => !provided.get(name)).map((name) => rowOf(name, false))
   return {
     source: 'api',
     label: 'API',
-    count: input.apiModels.length,
-    groups: [...groups.values()],
+    count: names.length,
+    groups: [
+      ...(ready.length ? [{ label: '', rows: ready }] : []),
+      ...(missing.length ? [{ label: '未配置', rows: missing }] : []),
+    ],
     empty: '还没有可用的 API 模型：先去渠道设置里配好 Key 并勾选模型。',
     footer: { label: '渠道设置…', action: 'channels' },
   }
@@ -185,14 +191,14 @@ export function buildSourceMenu(input: SourceMenuInput): SourceMenuTab[] {
   return [apiTab(input), workflowTab(input), cliTab(input)]
 }
 
-/** API 标签的搜索：按名字 / 渠道名包含，忽略大小写；空查询原样返回 */
+/** API 标签的搜索：按模型名包含，忽略大小写；空查询原样返回 */
 export function filterGroups(groups: readonly SourceMenuGroup[], query: string): SourceMenuGroup[] {
   const needle = query.trim().toLowerCase()
   if (!needle) return [...groups]
   return groups
     .map((group) => ({
       ...group,
-      rows: group.rows.filter((row) => `${row.label} ${group.label}`.toLowerCase().includes(needle)),
+      rows: group.rows.filter((row) => row.label.toLowerCase().includes(needle)),
     }))
     .filter((group) => group.rows.length > 0)
 }

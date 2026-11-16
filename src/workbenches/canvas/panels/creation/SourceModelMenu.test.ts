@@ -114,7 +114,7 @@ describe('模型菜单（内嵌来源切换）', () => {
       ...api[0]!,
       groups: [
         ...api[0]!.groups,
-        { label: '未配置渠道', rows: [{ value: 'api::Midjourney', label: 'Midjourney', hint: '还没有渠道提供', icon: { kind: 'model', name: 'Midjourney' }, pick: { source: 'api', model: 'Midjourney', channelId: '' } }] },
+        { label: '未配置', rows: [{ value: 'api::Midjourney', label: 'Midjourney', hint: '还没有渠道提供', icon: { kind: 'model', name: 'Midjourney' }, pick: { source: 'api', model: 'Midjourney', channelId: '' } }] },
       ],
     }
     const { find } = mount({ tabs: api })
@@ -125,6 +125,27 @@ describe('模型菜单（内嵌来源切换）', () => {
     const plain = find('data-source-option', 'api::GPT Image 2')[0]!
     expect(plain.findAll((node) => node.type === 'span' && Array.isArray(node.props.children))).toHaveLength(0)
     expect(texts('api::Midjourney')).toEqual(['Midjourney', '还没有渠道提供'])
+  })
+
+  it('API 平铺：同名模型多渠道只一行，菜单里不出现渠道名', () => {
+    const api = buildSourceMenu({
+      apiModels: [
+        { name: 'GPT Image 2', channelId: 'ch-a', channelName: '渠道 A' },
+        { name: 'GPT Image 2', channelId: 'ch-b', channelName: '渠道 B' },
+      ],
+      workflowRows: [],
+      siteOf: () => '国内站',
+      cli: null,
+      wantedCategory: 'image',
+      currentModel: '',
+      currentInstance: 'default',
+    })
+    const { find, onPick } = mount({ tabs: api })
+    expect(find('data-source-option', 'api::GPT Image 2')).toHaveLength(1)
+    const strings = find('data-source-menu', 'api')[0]!.findAll((node) => typeof node.props.children === 'string').map((node) => node.props.children)
+    expect(strings.join('|')).not.toMatch(/渠道 A|渠道 B/)
+    act(() => find('data-source-option', 'api::GPT Image 2')[0]!.props.onClick())
+    expect(onPick.mock.calls[0]![0].pick).toEqual({ source: 'api', model: 'GPT Image 2', channelId: '' })
   })
 
   it('工作流 / CLI 行的副标题保留', () => {

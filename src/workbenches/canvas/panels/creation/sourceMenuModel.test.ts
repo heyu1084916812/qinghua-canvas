@@ -6,7 +6,7 @@ import { workflowSourceRows } from './workflowPanelSources'
 
 /**
  * 模型菜单「API · 工作流 · CLI」三个标签的数据（对账 #1133，设计稿 work/source-mock）。
- * 钉：标签顺序与计数、API 按渠道分组 + 搜索、工作流分「AI 应用 / 工作流」两组与副标题、
+ * 钉：标签顺序与计数、API 平铺去重（不按渠道分组）+ 搜索、工作流分「AI 应用 / 工作流」两组与副标题、
  * CLI 状态 / 能力置灰 / 网页版锁住、每行点了切成什么（`pick`）、末行设置入口。
  */
 const FLOW: WorkflowEntry = {
@@ -71,26 +71,34 @@ describe('标签', () => {
 })
 
 describe('API 标签', () => {
-  it('按渠道分组，没有渠道提供的归「未配置渠道」；点了切成 API + 选路渠道', () => {
-    const api = buildSourceMenu(input())[0]!
+  it('平铺、同名模型多渠道只出一行、不含渠道名；没有渠道提供的放末尾「未配置」；点了只写模型名', () => {
+    const api = buildSourceMenu(input({
+      apiModels: [
+        { name: 'GPT Image 2', channelId: 'ch-a', channelName: '渠道 A' },
+        { name: '孤儿模型', channelId: '', channelName: '' },
+        { name: 'Seedream 4', channelId: 'ch-b', channelName: '渠道 B' },
+        { name: 'GPT Image 2', channelId: 'ch-b', channelName: '渠道 B' },
+        { name: 'Flux Pro', channelId: 'ch-a', channelName: '渠道 A' },
+      ],
+    }))[0]!
+    expect(api.count).toBe(4)
     expect(api.groups.map((group) => [group.label, group.rows.map((row) => row.label)])).toEqual([
-      ['渠道 A', ['GPT Image 2', 'Flux Pro']],
-      ['渠道 B', ['Seedream 4']],
-      ['未配置渠道', ['孤儿模型']],
+      ['', ['GPT Image 2', 'Seedream 4', 'Flux Pro']],
+      ['未配置', ['孤儿模型']],
     ])
+    expect(JSON.stringify(api.groups)).not.toMatch(/渠道 A|渠道 B|ch-a|ch-b/)
     const row = api.groups[0]!.rows[0]!
     expect(row.value).toBe('api::GPT Image 2')
-    expect(row.pick).toEqual({ source: 'api', model: 'GPT Image 2', channelId: 'ch-a' })
-    /** 组标题就是渠道名，行上不重复；没人提供时才说一句 */
+    expect(row.pick).toEqual({ source: 'api', model: 'GPT Image 2', channelId: '' })
     expect(row.hint).toBe('')
-    expect(api.groups[2]!.rows[0]!.hint).toBe('还没有渠道提供')
+    expect(api.groups[1]!.rows[0]!.hint).toBe('还没有渠道提供')
   })
 
-  it('搜索：按模型名 / 渠道名，忽略大小写；空查询原样；没匹配的分组去掉', () => {
+  it('搜索：只按模型名，忽略大小写；空查询原样；没匹配的分组去掉', () => {
     const groups = buildSourceMenu(input())[0]!.groups
     expect(filterGroups(groups, '  ')).toEqual(groups)
     expect(filterGroups(groups, 'flux').flatMap((group) => group.rows.map((row) => row.label))).toEqual(['Flux Pro'])
-    expect(filterGroups(groups, '渠道 b').map((group) => group.label)).toEqual(['渠道 B'])
+    expect(filterGroups(groups, '渠道')).toEqual([])
     expect(filterGroups(groups, '不存在')).toEqual([])
   })
 })
