@@ -10,7 +10,7 @@
   position: absolute;
   inset: 0;
   border: 0;
-  background: var(--overlay-scrim);
+  background: var(--scrim-backdrop);
   cursor: default;
 }
 
@@ -46,6 +46,21 @@
   align-items: baseline;
   justify-content: space-between;
   gap: var(--space-3);
+}
+
+.modelsManageButton {
+  width: var(--settings-control-height, 34px);
+  flex: 0 0 var(--settings-control-height, 34px);
+  padding: 0;
+}
+
+.modelsManageButtonOn {
+  background: var(--bg-selected);
+  border-color: var(--stroke-focus);
+}
+
+.modelMappingHead {
+  align-items: center;
 }
 
 .customModelList {

@@ -38,9 +38,7 @@ export function SettingsProtocolDetailsView({
   onSaveImportedProtocol,
 }: SettingsProtocolDetailsViewProps) {
   const showProtocolNote =
-    selectedProtocolNote !== '' &&
-    protocol !== 'mock' &&
-    protocol !== 'openai-compatible'
+    selectedProtocolNote !== '' && protocol === 'runninghub-api'
 
   return (
     <>

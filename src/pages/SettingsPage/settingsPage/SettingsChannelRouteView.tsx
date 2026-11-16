@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { Settings2 } from 'lucide-react'
 import type { ModelCapability } from '../../../domain/shared/capability'
 import type { PresetModel, PresetVendor } from '../../../domain/project/modelPresets'
 import { categoryLabel } from '../../../domain/project/modelSelection'
@@ -69,14 +70,16 @@ export function SettingsChannelRouteView({
   closeManagerRef.current = onModelAddOpenChange
   const [activeCategory, setActiveCategory] = useState<PresetModel['category'] | null>(null)
   const uncommon = new Set(uncommonModelIds)
-  const activeCategories = new Set(activeModels.map((model) => model.category))
+  // `unknown` 可映射到任意前端模型，但不能因此把全部分类都显示出来。
+  const activeCategories = new Set(
+    activeModels
+      .map((model) => model.category)
+      .filter((category) => category !== 'unknown'),
+  )
   const rows = allGlobalModels
     .filter((preset) => {
       const upstream = modelMap[preset.id]?.trim()
-      const relevantToGroup =
-        Boolean(upstream) ||
-        activeCategories.has('unknown') ||
-        activeCategories.has(preset.category)
+      const relevantToGroup = Boolean(upstream) || activeCategories.has(preset.category)
       return relevantToGroup && (showUncommonModels || !uncommon.has(preset.id))
     })
     .map((preset) => {
@@ -141,19 +144,23 @@ export function SettingsChannelRouteView({
 
   return (
     <section className={styles.editorSection} data-settings-channel-route>
-      <div className={styles.modelsHead}>
-        <div className={styles.modelsTitleBox}>
-          <span className={styles.cardTitle}>模型映射</span>
-          <span className={styles.cardSub}>
-            将当前分组的真实模型绑定到画布使用的全局前端模型
-          </span>
-        </div>
+      <div className={`${styles.modelsHead} ${styles.modelMappingHead}`}>
+        <span className={styles.cardTitle}>模型映射</span>
         <button
-          className={styles.ghostBtn}
+          type="button"
+          className={
+            modelAddOpen
+              ? `${styles.ghostBtn} ${styles.modelsManageButton} ${styles.modelsManageButtonOn}`
+              : `${styles.ghostBtn} ${styles.modelsManageButton}`
+          }
           data-global-model-add-toggle
+          aria-label="管理前端模型"
+          aria-expanded={modelAddOpen}
+          aria-controls="settings-global-model-dialog"
+          title="管理前端模型"
           onClick={() => onModelAddOpenChange(!modelAddOpen)}
         >
-          {modelAddOpen ? '收起管理' : '管理前端模型'}
+          <Settings2 size={17} strokeWidth={1.8} aria-hidden />
         </button>
       </div>
 
@@ -166,6 +173,7 @@ export function SettingsChannelRouteView({
             onClick={() => onModelAddOpenChange(false)}
           />
           <section
+            id="settings-global-model-dialog"
             ref={managerRef}
             className={styles.modelManagerPanel}
             role="dialog"
@@ -282,11 +290,6 @@ export function SettingsChannelRouteView({
       )}
 
       <div className={styles.mapToolbar}>
-        <span className={styles.cardSub}>
-          {activeRows.length > 0
-            ? `${activeRows.filter((row) => row.upstream).length}/${activeRows.length} 个前端模型已绑定真实模型`
-            : '前端模型目录为空'}
-        </span>
         <label className={styles.showUncommonToggle}>
           <input
             type="checkbox"

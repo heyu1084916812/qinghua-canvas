@@ -57,7 +57,6 @@ import { SettingsWorkflowManager } from '../../features/settings/SettingsWorkflo
 import { SettingsChannelQuickTest } from '../../features/settings/SettingsChannelQuickTest'
 import { runninghubSiteNote } from '../../domain/project/runninghubSite'
 import { initialSelectedChannelId, useWorkflowsPageOpener } from './settingsPage/workflowsPageLink'
-import { SettingsChannelActionBar } from './settingsPage/SettingsChannelActionBar'
 import { SettingsChannelRouteView } from './settingsPage/SettingsChannelRouteView'
 import { SettingsProfileDrawerView } from './settingsPage/SettingsProfileDrawerView'
 import { SettingsChannelContextMenuView } from './settingsPage/SettingsChannelContextMenuView'
@@ -525,7 +524,7 @@ export function SettingsPage({ embedded = false }: { embedded?: boolean } = {}) 
   const {
     handleCreate, handleEnableChange, handleProfileIconFile, saveProfileDrawer,
     persistForm, handleVerify, handleDetect, handleRefresh,
-    openChannelMenu, openChannelMenuFromButton, editChannel, handleRemove, handleConfirmRemove,
+    openChannelMenu, openChannelMenuFromButton, editChannel, handleRemove,
     handleAddKeyGroup, handleRemoveKeyGroup,
     handleAddGlobalModel, handleRemoveGlobalModel, openPanel,
     toggleDraft, applyDraft, dropSelectedModel, dropOnChannel,
@@ -813,7 +812,6 @@ export function SettingsPage({ embedded = false }: { embedded?: boolean } = {}) 
                 channels={channels}
                 platform={platform}
               />
-              <SettingsChannelActionBar busy={busy} canDelete={!builtinSelected} onSave={() => void persistForm()} onDelete={() => void handleConfirmRemove(selected.id, selected.name)} />
             </div>
           )}
         </section>
