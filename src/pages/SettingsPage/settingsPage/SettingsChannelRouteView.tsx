@@ -81,18 +81,10 @@ export function SettingsChannelRouteView({
   closeManagerRef.current = onModelAddOpenChange
   const [activeCategory, setActiveCategory] = useState<MappingCategory | null>(null)
   const uncommon = new Set(uncommonModelIds)
-  // `unknown` 可映射到任意前端模型，但不能因此把全部分类都显示出来。
-  const activeCategories = new Set(
-    activeModels
-      .map((model) => model.category)
-      .filter((category) => category !== 'unknown'),
-  )
   const rows = allGlobalModels
     .filter((preset) => {
       if (!isMappingCategory(preset.category)) return false
-      const upstream = modelMap[preset.id]?.trim()
-      const relevantToGroup = Boolean(upstream) || activeCategories.has(preset.category)
-      return relevantToGroup && (showUncommonModels || !uncommon.has(preset.id))
+      return showUncommonModels || !uncommon.has(preset.id)
     })
     .map((preset) => {
       const upstream = modelMap[preset.id]?.trim() ?? ''
@@ -327,13 +319,7 @@ export function SettingsChannelRouteView({
         </label>
       </div>
 
-      {activeRows.length === 0 ? (
-        <p className={styles.modelsEmpty} data-route-map-empty>
-          {rows.length === 0
-            ? '先在上方选择当前分组可用的真实模型，再回来绑定前端模型。'
-            : '当前分类没有可映射的前端模型。'}
-        </p>
-      ) : (
+      {activeRows.length > 0 ? (
         <div
           className={styles.mappingTable}
           data-route-map-table
@@ -390,7 +376,7 @@ export function SettingsChannelRouteView({
                 )
           })}
         </div>
-      )}
+      ) : null}
     </section>
   )
 }

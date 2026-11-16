@@ -694,117 +694,121 @@ export function SettingsPage({ embedded = false }: { embedded?: boolean } = {}) 
                   void channels.setRouteTuning(selected.id, { weight })
                 }
               />
-              <SettingsConnectionView
-                baseUrl={baseUrl}
-                busy={busy}
-                protocol={protocol}
-                builtinSelected={builtinSelected}
-                visibleProtocolOptions={visibleProtocolOptions}
-                pendingProtocols={pendingProtocols}
-                referencedProtocolIds={referencedProtocolIds}
-                statusLine={statusLine}
-                statusTone={statusTone}
-                showMockNote={showMockNote}
-                selectedProtocolNote={runninghubSiteNote(selected, selectedProtocolNote)}
-                newProtoOpen={newProtoOpen}
-                hiddenBuiltinProtocolCount={hiddenBuiltinProtocolIds.length}
-                npNotice={npNotice}
-                protoManageNotice={protoManageNotice}
-                protoRemoveError={protoRemoveError}
-                npImportText={npImportText}
-                npImported={npImported}
-                npError={npError}
-                onBaseUrlChange={setBaseUrl}
-                onPersistForm={persistForm}
-                onProtocolChange={handleProtocolChange}
-                onDownloadProtocol={downloadProtocol}
-                onRemoveProtocol={(protocolOption) => void handleRemoveProtocol(protocolOption)}
-                onDetect={handleDetect}
-                onVerify={handleVerify}
-                onToggleNewProtocol={toggleNewProtocol}
-                onRestoreBuiltinProtocols={() =>
-                  void handleRestoreBuiltinProtocols()
-                }
-                onDownloadProtocolTemplate={downloadProtocolTemplate}
-                onImportProtocolFile={(file) =>
-                  void handleImportProtocolFile(file)
-                }
-                onImportTextChange={setNpImportText}
-                onClearImported={() => setNpImported(null)}
-                onClearImportError={() => setNpError('')}
-                onCheckImportedProtocol={checkImportedProtocol}
-                onSaveImportedProtocol={handleSaveImportedProtocol}
-              />
+              <div className={styles.settingsCard} data-settings-card="connection">
+                <SettingsConnectionView
+                  baseUrl={baseUrl}
+                  busy={busy}
+                  protocol={protocol}
+                  builtinSelected={builtinSelected}
+                  visibleProtocolOptions={visibleProtocolOptions}
+                  pendingProtocols={pendingProtocols}
+                  referencedProtocolIds={referencedProtocolIds}
+                  statusLine={statusLine}
+                  statusTone={statusTone}
+                  showMockNote={showMockNote}
+                  selectedProtocolNote={runninghubSiteNote(selected, selectedProtocolNote)}
+                  newProtoOpen={newProtoOpen}
+                  hiddenBuiltinProtocolCount={hiddenBuiltinProtocolIds.length}
+                  npNotice={npNotice}
+                  protoManageNotice={protoManageNotice}
+                  protoRemoveError={protoRemoveError}
+                  npImportText={npImportText}
+                  npImported={npImported}
+                  npError={npError}
+                  onBaseUrlChange={setBaseUrl}
+                  onPersistForm={persistForm}
+                  onProtocolChange={handleProtocolChange}
+                  onDownloadProtocol={downloadProtocol}
+                  onRemoveProtocol={(protocolOption) => void handleRemoveProtocol(protocolOption)}
+                  onDetect={handleDetect}
+                  onVerify={handleVerify}
+                  onToggleNewProtocol={toggleNewProtocol}
+                  onRestoreBuiltinProtocols={() =>
+                    void handleRestoreBuiltinProtocols()
+                  }
+                  onDownloadProtocolTemplate={downloadProtocolTemplate}
+                  onImportProtocolFile={(file) =>
+                    void handleImportProtocolFile(file)
+                  }
+                  onImportTextChange={setNpImportText}
+                  onClearImported={() => setNpImported(null)}
+                  onClearImportError={() => setNpError('')}
+                  onCheckImportedProtocol={checkImportedProtocol}
+                  onSaveImportedProtocol={handleSaveImportedProtocol}
+                />
 
-              <SettingsKeyGroupView
-                channels={channels}
-                selected={selected}
-                activeGroup={activeGroup}
-                selectedKeyGroups={selectedKeyGroups}
-                credentialSlots={credentialSlots}
-                busy={busy}
-                docUrl={docUrl}
-                onAddKeyGroup={handleAddKeyGroup}
-                onRemoveKeyGroup={handleRemoveKeyGroup}
-                onActiveGroupChange={setActiveGroupId}
-                onRenameKeyGroup={(groupId, nextName) =>
-                  void channels.renameCredentialGroup(selected.id, groupId, nextName)
-                }
-                onSetKeyGroupPriority={(groupId, priority) =>
-                  void channels.setCredentialGroupPriority(selected.id, groupId, priority)
-                }
-              />
+                <SettingsKeyGroupView
+                  channels={channels}
+                  selected={selected}
+                  activeGroup={activeGroup}
+                  selectedKeyGroups={selectedKeyGroups}
+                  credentialSlots={credentialSlots}
+                  busy={busy}
+                  docUrl={docUrl}
+                  onAddKeyGroup={handleAddKeyGroup}
+                  onRemoveKeyGroup={handleRemoveKeyGroup}
+                  onActiveGroupChange={setActiveGroupId}
+                  onRenameKeyGroup={(groupId, nextName) =>
+                    void channels.renameCredentialGroup(selected.id, groupId, nextName)
+                  }
+                  onSetKeyGroupPriority={(groupId, priority) =>
+                    void channels.setCredentialGroupPriority(selected.id, groupId, priority)
+                  }
+                />
+
+                <SettingsModelsView
+                  busy={busy}
+                  activeGroup={activeGroup}
+                  activeModelCache={activeModelCache}
+                  selectedGroups={selectedGroups}
+                  panelOpen={panelOpen}
+                  draftCategory={draftCategory}
+                  draftChecked={draftChecked}
+                  draftList={draftList}
+                  onRefresh={() => void handleRefresh()}
+                  onOpenPanel={() => void openPanel()}
+                  onClosePanel={() => setPanelOpen(false)}
+                  onDraftCategoryChange={setDraftCategory}
+                  onToggleDraft={toggleDraft}
+                  onModelCategoryChange={(modelId, category) => void channels.setModelCategory(selected.id, modelId, category, activeGroup?.id)}
+                  onDropSelectedModel={(modelId) => void dropSelectedModel(modelId)}
+                  onApplyDraft={() => void applyDraft()}
+                />
+              </div>
 
               {/* AI 应用 / 工作流在独立页管理（#1131）：渠道页只留连接、Key 和这条入口 */}
               {selected.protocol === 'runninghub-api' ? (
                 <SettingsWorkflowManager channel={selected} platform={platform} onOpen={() => openWorkflowsPage(selected.id)} />
               ) : null}
 
-              <SettingsModelsView
-                busy={busy}
-                activeGroup={activeGroup}
-                activeModelCache={activeModelCache}
-                selectedGroups={selectedGroups}
-                panelOpen={panelOpen}
-                draftCategory={draftCategory}
-                draftChecked={draftChecked}
-                draftList={draftList}
-                onRefresh={() => void handleRefresh()}
-                onOpenPanel={() => void openPanel()}
-                onClosePanel={() => setPanelOpen(false)}
-                onDraftCategoryChange={setDraftCategory}
-                onToggleDraft={toggleDraft}
-                onModelCategoryChange={(modelId, category) => void channels.setModelCategory(selected.id, modelId, category, activeGroup?.id)}
-                onDropSelectedModel={(modelId) => void dropSelectedModel(modelId)}
-                onApplyDraft={() => void applyDraft()}
-              />
-
-              <SettingsChannelRouteView
-                allGlobalModels={allGlobalModels}
-                customModels={customModels}
-                uncommonModelIds={uncommonModelIds}
-                activeModels={activeModels}
-                modelAddOpen={modelAddOpen}
-                newModelName={newModelName}
-                newModelCategory={newModelCategory}
-                newModelVendor={newModelVendor}
-                showUncommonModels={showUncommonModels}
-                modelMap={activeModelMap}
-                mapSaveNotice={mapSaveNotice}
-                onModelAddOpenChange={setModelAddOpen}
-                onNewModelNameChange={setNewModelName}
-                onNewModelCategoryChange={setNewModelCategory}
-                onNewModelVendorChange={setNewModelVendor}
-                onAddGlobalModel={() => void handleAddGlobalModel()}
-                onShowUncommonModelsChange={setShowUncommonModels}
-                onBindModel={(upstreamId, logicalName) =>
-                  void handleBindModel(upstreamId, logicalName)
-                }
-                onModelUncommonChange={(id, uncommon) =>
-                  void channels.setModelUncommon(id, uncommon)
-                }
-                onRemoveGlobalModel={(id) => void handleRemoveGlobalModel(id)}
-              />
+              <div className={styles.settingsCard} data-settings-card="mapping">
+                <SettingsChannelRouteView
+                  allGlobalModels={allGlobalModels}
+                  customModels={customModels}
+                  uncommonModelIds={uncommonModelIds}
+                  activeModels={activeModels}
+                  modelAddOpen={modelAddOpen}
+                  newModelName={newModelName}
+                  newModelCategory={newModelCategory}
+                  newModelVendor={newModelVendor}
+                  showUncommonModels={showUncommonModels}
+                  modelMap={activeModelMap}
+                  mapSaveNotice={mapSaveNotice}
+                  onModelAddOpenChange={setModelAddOpen}
+                  onNewModelNameChange={setNewModelName}
+                  onNewModelCategoryChange={setNewModelCategory}
+                  onNewModelVendorChange={setNewModelVendor}
+                  onAddGlobalModel={() => void handleAddGlobalModel()}
+                  onShowUncommonModelsChange={setShowUncommonModels}
+                  onBindModel={(upstreamId, logicalName) =>
+                    void handleBindModel(upstreamId, logicalName)
+                  }
+                  onModelUncommonChange={(id, uncommon) =>
+                    void channels.setModelUncommon(id, uncommon)
+                  }
+                  onRemoveGlobalModel={(id) => void handleRemoveGlobalModel(id)}
+                />
+              </div>
 
               <SettingsChannelQuickTest
                 channel={selected}

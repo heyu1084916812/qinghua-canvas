@@ -104,7 +104,7 @@
 .mappingTable {
   display: flex;
   flex-direction: column;
-  border-top: var(--border);
+  gap: var(--space-1);
 }
 
 .mappingTableHead,
@@ -124,8 +124,8 @@
 
 .mappingRow {
   min-height: 48px;
-  padding: var(--space-1) var(--space-2);
-  border-top: var(--border);
+  padding: var(--space-2);
+  border-radius: var(--radius-control);
 }
 
 .mappingRow:hover {
