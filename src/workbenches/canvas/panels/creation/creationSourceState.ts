@@ -24,6 +24,8 @@ export interface CreationSourceInput {
   wantedCategory: CliCapability
   /** API 模型 id → 菜单里那一行的显示名（老数据可能存的是上游 id） */
   apiLabelOf: (model: string) => string
+  /** 节点还没存模型时 API 实际生效的默认模型（chip 上显示的那个）：勾它，别让 API 标签一行都不勾 */
+  apiDefault?: string
 }
 
 export interface CreationSourceState {
@@ -74,6 +76,7 @@ export function creationSourceState(input: CreationSourceInput): CreationSourceS
   const selected: Partial<Record<GenerationSource, string>> = {}
   const api = sourceSlotOf(data, 'api', context)
   if (api) selected.api = `api::${input.apiLabelOf(api.model)}`
+  else if (source === 'api' && input.apiDefault) selected.api = `api::${input.apiDefault}`
   const flow = sourceSlotOf(data, 'workflow', context)
   if (flow) selected.workflow = `${flow.channelId}::${flow.model}`
   const cliSlot = sourceSlotOf(data, 'cli', context)

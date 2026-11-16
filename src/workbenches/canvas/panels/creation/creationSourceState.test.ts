@@ -79,6 +79,12 @@ describe('每个标签的勾 = 这个来源上次选的那一项', () => {
   it('从没去过的来源不打勾', () => {
     expect(state({ source: 'api', model: 'gpt-image-2', channelId: 'ch-a' }).selected).toEqual({ api: 'api::GPT Image 2' })
   })
+  it('新建节点还没存模型 → API 勾实际生效的默认模型（chip 上那个）', () => {
+    expect(state({ model: '', channelId: '' }, { apiDefault: 'Agnes Image 2.5 Flash' }).selected).toEqual({ api: 'api::Agnes Image 2.5 Flash' })
+    /** 存了模型就勾存的，不被默认覆盖；当前在别的来源时 API 也不凭空勾默认 */
+    expect(state({ model: 'gpt-image-2', channelId: 'ch-a' }, { apiDefault: 'Agnes Image 2.5 Flash' }).selected.api).toBe('api::GPT Image 2')
+    expect(state({ model: 'workflow:w1', channelId: 'rh' }, { apiDefault: 'Agnes Image 2.5 Flash' }).selected.api).toBeUndefined()
+  })
 })
 
 describe('老节点补写来源（只在判得准时）', () => {

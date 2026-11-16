@@ -48,7 +48,7 @@ export function useCreationSourceMenu(input: CreationSourceMenuInput) {
   const apiLabelOf = (model: string) => toLogicalName(allChannels, model)
   const peek = creationSourceState({ data, workflowSources, channels: allChannels, cli: null, wantedCategory: input.wantedCategory, apiLabelOf })
   const cli = useCliPanelSources(input.enabledMenu && (open || peek.source === 'cli'))
-  const state = creationSourceState({ data, workflowSources, channels: allChannels, cli, wantedCategory: input.wantedCategory, apiLabelOf })
+  const state = creationSourceState({ data, workflowSources, channels: allChannels, cli, wantedCategory: input.wantedCategory, apiLabelOf, apiDefault: input.apiLabel })
 
   /** 老节点补写来源：每个节点只发一次（判得准时，见 `creationSourceState.adopt`） */
   const adopted = useRef<string>('')
