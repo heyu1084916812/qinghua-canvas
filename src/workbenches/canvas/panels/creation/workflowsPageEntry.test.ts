@@ -4,14 +4,14 @@ import { MemoryRouter, useLocation } from 'react-router-dom'
 import { describe, expect, it } from 'vitest'
 import { generationSpec } from '../../../../domain/canvas/nodeSpecs/generation'
 import type { WorkflowEntry } from '../../../../domain/project/workflowParams'
-import { ParamPicker } from '../ParamPicker'
-import { WorkflowEntryLauncher, WorkflowParameterControls } from './WorkflowParameterControls'
-import { MANAGE_WORKFLOWS_OPTION } from './useOpenWorkflowsPage'
+import type { GenerationData } from '../../../../domain/canvas/model/node'
+import { SourceModelMenu } from './SourceModelMenu'
+import { useCreationSourceMenu } from './useCreationSourceMenu'
 import type { WorkflowPanelSources } from './workflowPanelSources'
 
 ;(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
-/** 创作面板 → 「AI 应用 / 工作流」页的入口（#1131）：条目下拉与 API 模式的入口 chip 末尾各有一行「管理…」 */
+/** 创作面板 → 「AI 应用 / 工作流」页的入口（#1131）：模型菜单「工作流」标签末行「管理…」（#1133 起入口 chip 并入菜单） */
 const ENTRY: WorkflowEntry = {
   id: '1997246493079834625',
   title: '视频超分与补帧',
@@ -67,25 +67,33 @@ function Where() {
   seen = `${location.pathname}${location.search}`
   return null
 }
-function pick(element: ReturnType<typeof createElement>, name: string) {
+function Harness({ data }: { data: GenerationData }) {
+  const menu = useCreationSourceMenu({
+    data, workflowSources: SOURCES, enabled: [], allChannels: [], globalModelIds: [], wantedCategory: 'image', categoryLabel: '生图模型', ownedChannelId: '',
+    apiLabel: 'GPT Image 2', iconForModel: () => undefined, recipeFor: () => ({}) as never, openPicker: null,
+    onTogglePicker: noop, onClosePicker: noop, onEvent: () => { throw new Error('选「管理」不该改节点') }, enabledMenu: true,
+  })
+  return menu.picker
+}
+function manage(data: GenerationData) {
   let renderer!: TestRenderer.ReactTestRenderer
   act(() => {
-    renderer = TestRenderer.create(createElement(MemoryRouter, { initialEntries: ['/canvas/p1'] }, element, createElement(Where)))
+    renderer = TestRenderer.create(createElement(MemoryRouter, { initialEntries: ['/canvas/p1'] }, createElement(Harness, { data }), createElement(Where)))
   })
-  const picker = renderer.root.findAll((node) => node.type === ParamPicker && node.props.name === name)[0]!
-  expect(picker.props.options.at(-1)).toMatchObject({ value: MANAGE_WORKFLOWS_OPTION, label: '管理 AI 应用 / 工作流…' })
-  act(() => picker.props.onSelect(MANAGE_WORKFLOWS_OPTION))
+  const menu = renderer.root.findByType(SourceModelMenu)
+  const tab = menu.props.tabs.find((item: { source: string }) => item.source === 'workflow')
+  expect(tab.footer).toEqual({ label: '管理 AI 应用 / 工作流…', action: 'workflows' })
+  act(() => menu.props.onFooter('workflows'))
   return seen
 }
 
-describe('创作面板里的「管理 AI 应用 / 工作流…」（#1131）', () => {
-  it('★ 工作流模式：条目下拉末行 → 跳到管理页并落在当前条目', () => {
+describe('创作面板里的「管理 AI 应用 / 工作流…」（#1131 / #1133）', () => {
+  it('★ 工作流来源：菜单末行 → 跳到管理页并落在当前条目', () => {
     const data = { ...generationSpec.createDefaultData(), model: `workflow:${ENTRY.id}`, channelId: 'ch-rh' }
-    const where = pick(createElement(WorkflowParameterControls, { data, sources: SOURCES, openPicker: null, onTogglePicker: noop, onClosePicker: noop, onEvent: () => { throw new Error('选「管理」不该改节点') } }), 'model')
-    expect(where).toBe(`/workflows?channel=ch-rh&tab=workflow&entry=${ENTRY.id}`)
+    expect(manage(data)).toBe(`/workflows?channel=ch-rh&tab=workflow&entry=${ENTRY.id}`)
   })
-  it('★ API 模式：「工作流」入口 chip 末行 → 跳到管理页', () => {
-    const where = pick(createElement(WorkflowEntryLauncher, { sources: SOURCES, openPicker: null, onTogglePicker: noop, onClosePicker: noop, onEvent: () => { throw new Error('选「管理」不该改节点') } }), 'workflowEntry')
-    expect(where).toBe('/workflows')
+  it('★ API 来源：菜单「工作流」标签末行 → 跳到管理页首页', () => {
+    const data = { ...generationSpec.createDefaultData(), model: 'GPT Image 2', channelId: 'ch-x' }
+    expect(manage(data)).toBe('/workflows')
   })
 })

@@ -6,6 +6,7 @@ import { toWorldRectInGraph } from '../../../domain/canvas/geometry/coords'
 import { childIdsOf } from '../../../domain/canvas/nodeSpecs/group'
 import { batchItemsOf, externalInputsOf } from '../../../domain/canvas/nodeSpecs/batch'
 import { promptSpec } from '../../../domain/canvas/nodeSpecs/prompt'
+import { switchSourcePatch } from '../../../domain/canvas/model/generationSource'
 import { imageAssetInputsOf } from '../../../domain/shared/execution/inputs'
 import { describeError } from '../../../shared/result'
 import { clampDuration } from '../../../domain/shared/capability'
@@ -712,6 +713,14 @@ function handlePanelEvent(
     case 'setGenerateAudio':
       patch({ generateAudio: event.generateAudio })
       remember(event.type, event.recipe)
+      break
+    case 'selectSource':
+      /* 按来源分存参数：当前来源收进存档、目标来源放回（#1133）；只有 API 那一档记配方 */
+      patch(switchSourcePatch({ ...(node.data as GenerationData), source: event.from }, event.pick))
+      if (event.pick.source === 'api') remember('setModel', event.recipe)
+      break
+    case 'adoptSource':
+      patch({ source: event.source })
       break
     case 'setWorkflowRun':
       patch({

@@ -3,7 +3,7 @@ import { creationStyles } from './creationStyles'
 // @ts-expect-error Vitest runs this structural test in Node; the web tsconfig omits Node globals.
 import { readFileSync } from 'node:fs'
 
-const inlineModules = import.meta.glob('./*.module.css', {
+const inlineModules = import.meta.glob('./CreationPanel*.module.css', {
   eager: true,
   query: '?inline',
 }) as Record<string, unknown>

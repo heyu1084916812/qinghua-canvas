@@ -15,6 +15,8 @@ export function useWorkflowPanelSources(): WorkflowPanelSources | null {
   const channels = useContext(ChannelStoreContext)
   const platform = usePlatformOptional()
   const [entriesByChannel, setEntriesByChannel] = useState<Record<string, WorkflowEntry[]>>({})
+  /** 读完的是哪一组渠道（换了渠道组要重新算「读完」） */
+  const [loadedKey, setLoadedKey] = useState<string | null>(null)
   const [tick, setTick] = useState(0)
 
   useEffect(
@@ -40,7 +42,9 @@ export function useWorkflowPanelSources(): WorkflowPanelSources | null {
     const store = createWorkflowEntryStore(platform.storage)
     const ids = idsKey ? idsKey.split(',') : []
     void Promise.all(ids.map(async (id) => [id, await store.load(id).catch(() => [])] as const)).then((pairs) => {
-      if (alive) setEntriesByChannel(Object.fromEntries(pairs))
+      if (!alive) return
+      setEntriesByChannel(Object.fromEntries(pairs))
+      setLoadedKey(ids.join(','))
     })
     return () => {
       alive = false
@@ -55,7 +59,9 @@ export function useWorkflowPanelSources(): WorkflowPanelSources | null {
       id: channel.id,
       name: channel.name,
       protocol: channel.protocol,
+      baseUrl: channel.baseUrl,
       entries: entriesByChannel[channel.id] ?? [],
     })),
+    loaded: loadedKey === idsKey,
   }
 }

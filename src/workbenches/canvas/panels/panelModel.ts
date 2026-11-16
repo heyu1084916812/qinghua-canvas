@@ -1,4 +1,5 @@
-﻿import type { NodeSnapshot } from '../../../domain/canvas/model/node'
+﻿import type { GenerationSource, SourcePick } from '../../../domain/canvas/model/generationSource'
+import type { NodeSnapshot } from '../../../domain/canvas/model/node'
 import type { MentionCandidate } from '../text/mentionValue'
 
 /**
@@ -162,6 +163,13 @@ export type PanelEvent =
       list: { nodeId: string; fieldName: string; fieldValue: string }[]
       instance?: 'default' | 'plus'
     }
+  /**
+   * 模型菜单里点了一行（对账 #1133）：可能是同来源换一项，也可能跨来源。
+   * `from` 是面板判定的**当前来源**（老节点没存来源时，只有面板手上的条目表判得出 `app:` 的身份）。
+   */
+  | { type: 'selectSource'; pick: SourcePick; from: GenerationSource; recipe?: RecipeSnapshot }
+  /** 老节点打开时补写来源（判得准才发，见 `creationSourceState.adopt`） */
+  | { type: 'adoptSource'; source: GenerationSource }
   /**
    * **Midjourney 独有的风格参数**（用户 2026-10-03 图二那份「高级设置」）。
    *

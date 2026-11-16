@@ -1,4 +1,4 @@
-import { entryIdOfModel, type WorkflowEntry } from '../../../../domain/project/workflowParams'
+import { entryIdOfModel, workflowModelId, type WorkflowEntry } from '../../../../domain/project/workflowParams'
 
 /**
  * 创作面板能选到的「工作流来源」：RunningHub 渠道 + 各自的工作流条目。
@@ -16,11 +16,25 @@ export interface WorkflowPanelChannel {
    * 与设置页那张 `ChannelIcon` 共用同一份映射。
    */
   protocol: string
+  /** 渠道地址：用来分国内站 / 国际站（面板副标题） */
+  baseUrl?: string
   entries: WorkflowEntry[]
 }
 
 export interface WorkflowPanelSources {
   channels: WorkflowPanelChannel[]
+  /** 条目已读完（读完之前「app: 是不是导入过的条目」判不出，别据此给老节点补写来源，#1133） */
+  loaded?: boolean
+}
+
+/** 条目 → 节点上存的模型 id（AI 应用是 `app:` 前缀，工作流是 `workflow:`） */
+export function workflowEntryModelId(entry: WorkflowEntry): string {
+  return entry.kind === 'app' ? `app:${entry.id}` : workflowModelId(entry.id)
+}
+
+/** RunningHub 两站：`runninghub.ai` 是国际站，其余（`.cn` / 自定义）按国内站 */
+export function runninghubSiteOf(baseUrl: string | undefined): string {
+  return /runninghub\.ai/i.test(String(baseUrl ?? '')) ? '国际站' : '国内站'
 }
 
 export function workflowChannelsOf(sources: WorkflowPanelSources | null | undefined): WorkflowPanelChannel[] {

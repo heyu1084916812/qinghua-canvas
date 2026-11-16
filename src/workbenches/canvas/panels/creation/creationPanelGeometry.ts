@@ -20,6 +20,8 @@ export function panelGeometryFor(input: {
   disabled: boolean
   enabledChannelCount: number
   allChannelCount: number
+  /** 当前来源不能生成的原因（条目没了 / 网页版 CLI / 未检测到命令…，#1133）；能生成为 null */
+  sourceBlockedReason?: string | null
 }): CreationPanelGeometry {
   const {
     data,
@@ -44,14 +46,16 @@ export function panelGeometryFor(input: {
     ? null
     : disabled
       ? '节点已禁用'
-      : enabledChannelCount === 0
-        ? platformGap
-        : null
+      : input.sourceBlockedReason
+        ? input.sourceBlockedReason
+        : enabledChannelCount === 0
+          ? platformGap
+          : null
   const runDisabled = blockedReason !== null
   const runTitle = disabled
     ? '节点已禁用 —— 先启用再生成；它的内容（含已生成的图）不会作为上游输入'
     : blockedReason
-      ? `${blockedReason}，去后台设置后再生成`
+      ? blockedReason === input.sourceBlockedReason ? blockedReason : `${blockedReason}，去后台设置后再生成`
       : runLabel
   void data
   return { promptExpanded, runLabel, blockedReason, runDisabled, runTitle, platformGap }

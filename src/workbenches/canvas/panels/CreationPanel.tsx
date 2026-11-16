@@ -70,8 +70,9 @@ import { CreationParameterControls } from './creation/CreationParameterControls'
 import { CreationPromptToolsView } from './creation/CreationPromptToolsView'
 import { CreationPromptView } from './creation/CreationPromptView'
 import { CreationRunActionsView } from './creation/CreationRunActionsView'
-import { WorkflowEntryLauncher, WorkflowParameterControls } from './creation/WorkflowParameterControls'
-import { isWorkflowPanelModel } from './creation/workflowPanelSources'
+import { WorkflowParameterControls } from './creation/WorkflowParameterControls'
+import { CliParameterControls } from './creation/CliParameterControls'
+import { useCreationSourceMenu } from './creation/useCreationSourceMenu'
 import type { CreationPanelProps } from './creation/creationPanelTypes'
 
 export type { CreationPanelProps, PanelPromptTools } from './creation/creationPanelTypes'
@@ -132,9 +133,6 @@ export function CreationPanel(props: CreationPanelProps) {
   const promptMode = props.mode === 'prompt'
   /** 视频是生成节点的功能类别（`data.mode`），参数集与图片模式不同（§6.8） */
   const videoMode = !promptMode && data.mode === 'video'
-  /** 工作流模式：参数 / 类别 / 预设全由条目决定，生成仍是原来那一枚按钮（不另设「运行」） */
-  /** 只认**导入过的条目**：渠道推荐的 `app:` 模型按普通模型走 API 参数行（#1128 H3） */
-  const workflowMode = isWorkflowPanelModel(props.workflowSources, data.model, data.channelId)
   /** 仅在节点模型为空时解析并写回默认配方，已有模型绝不覆盖。 */
   const [fallback, setFallback] = useState<{ channelId: string; model: string } | null>(null)
   /** onEvent 每次渲染都会新建，effect 通过 ref 读取最新值。 */
@@ -468,15 +466,7 @@ export function CreationPanel(props: CreationPanelProps) {
    */
   const wantedCategory = promptMode ? 'chat' : videoMode ? 'video' : 'image'
   const models: ModelCapability[] = channelModels.filter((m) => m.category === wantedCategory)
-  /**
- * M7-4：下拉列的是**逻辑名**，不是各站点的上游 ID。
- *
- * 同一个模型在不同站点 ID 不同（`gpt-image-2` / `image-2`），
- * 用户眼里却只有一个模型 —— 下拉就该只出一个名字；
- * 真正发请求时用哪个 ID 由渠道的 `modelMap` 决定（M7-3 已接好）。
- *
- * 零迁移：没有任何映射时逻辑名 = 上游 ID，列表与加此功能前一字不差。
-   */
+  /** M7-4：下拉列的是**逻辑名**（同一模型各站 ID 不同），真正发哪个 ID 由渠道 `modelMap` 决定。 */
   /**
    * 模型下拉的数据源。
    *
@@ -520,16 +510,23 @@ export function CreationPanel(props: CreationPanelProps) {
       fallbackModel: shownLogicalModel,
       tools,
     })
+  /** 类别名：写进占位文案与空态提示，让「没模型」这件事说得出是**哪一类**没有 */
+  const categoryLabel = promptMode ? '文本模型' : videoMode ? '视频模型' : '生图模型'
   /** 未选模型时用固定清单第一项作为可执行默认提示。 */
-  const defaultModelLabel =
-    logicalModelNames[0] ??
-    (promptMode ? '文本模型' : videoMode ? '视频模型' : '生图模型')
+  const defaultModelLabel = logicalModelNames[0] ?? categoryLabel
+  /** 来源（API / 工作流 / 本机 CLI，#1133）：模型菜单、参数行、运行前拦截都按它走 */
+  const sourceMenu = useCreationSourceMenu({
+    data, workflowSources: props.workflowSources, enabled, allChannels, globalModelIds, wantedCategory, categoryLabel, ownedChannelId,
+    apiLabel: shownLogicalModel || defaultModelLabel, iconForModel: (name) => modelOptions.find((option) => option.value === name)?.icon,
+    recipeFor: (overrides) => recipeSnapshot(overrides), openPicker, onTogglePicker: togglePicker, onClosePicker: closePicker,
+    onEvent, enabledMenu: !promptMode, disabled: props.disabled,
+  })
+  /** 工作流模式：参数 / 类别 / 预设全由条目决定，生成仍是原来那一枚按钮（不另设「运行」） */
+  const workflowMode = sourceMenu.source === 'workflow'
   /** 能力先按站点模型 ID 查，再按逻辑名归一；顺序反转会让切类别帧丢能力。 */
   const activeModel =
     models.find((m) => m.id === shownModel) ??
     capabilityOfLogical(allChannels, shownLogicalModel, shownChannelId || undefined)
-  /** 类别名：写进占位文案与空态提示，让「没模型」这件事说得出是**哪一类**没有 */
-  const categoryLabel = promptMode ? '文本模型' : videoMode ? '视频模型' : '生图模型'
   /** 未声明 maxCount 表示不设限；图片参数有规格时只渲染模型真实支持的档位。 */
   const imageSpec =
     !promptMode && !videoMode
@@ -718,6 +715,7 @@ export function CreationPanel(props: CreationPanelProps) {
     disabled: props.disabled === true,
     enabledChannelCount: enabled.length,
     allChannelCount: allChannels.length,
+    sourceBlockedReason: sourceMenu.blockedReason,
   })
   const {
     runLabel,
@@ -737,7 +735,8 @@ export function CreationPanel(props: CreationPanelProps) {
     onEvent({
       type: 'setMode',
       mode,
-      keepModel: modelBelongsTo(mode),
+      /** 条目 / CLI 不按 API 模型类别清：类别不符由来源自己的运行前检查说清（#1133） */
+      keepModel: sourceMenu.source !== 'api' || modelBelongsTo(mode),
       recipe: recipeSnapshot({ mode }),
     })
   }
@@ -913,12 +912,14 @@ export function CreationPanel(props: CreationPanelProps) {
         className={`${styles.section} ${styles.params} ${styles.paramsSection}`}
         data-panel-part="params"
       >
-        {workflowMode && props.workflowSources ? (
-          <WorkflowParameterControls data={data} sources={props.workflowSources} apiOptions={modelOptions} onSelectApiModel={selectModel} openPicker={openPicker} onTogglePicker={togglePicker} onClosePicker={closePicker} onEvent={onEvent} disabled={props.disabled} />
+        {workflowMode ? (
+          <WorkflowParameterControls data={data} sources={props.workflowSources ?? { channels: [] }} modelPicker={sourceMenu.picker} openPicker={openPicker} onTogglePicker={togglePicker} onClosePicker={closePicker} onEvent={onEvent} disabled={props.disabled} />
+        ) : sourceMenu.source === 'cli' ? (
+          <>{sourceMenu.picker}<CliParameterControls tool={sourceMenu.cliTool} blockedReason={sourceMenu.blockedReason} open={openPicker === 'cliTemplate'} onToggle={() => togglePicker('cliTemplate')} onClose={closePicker} onOpenCliSettings={sourceMenu.openCliSettings} disabled={props.disabled} /></>
         ) : (
         <CreationParameterControls
           noPlatform={noPlatform} platformGap={platformGap} categoryLabel={categoryLabel}
-          modelLabel={shownLogicalModel || defaultModelLabel} modelOptions={modelOptions} modelValue={shownLogicalModel}
+          modelPicker={sourceMenu.picker} modelLabel={shownLogicalModel || defaultModelLabel} modelOptions={modelOptions} modelValue={shownLogicalModel}
           modelOpen={openPicker === 'model'} videoModeLabel={VIDEO_MODE_LABELS[quality.videoModeValue].label}
           promptMode={promptMode} videoMode={videoMode} quality={quality} paramSections={paramSections}
           isMj={isMj} mjSections={mjSections} openPicker={openPicker}
@@ -937,12 +938,6 @@ export function CreationPanel(props: CreationPanelProps) {
           onSelectSkill={(skillId) => onEvent({ type: 'selectSkill', skillId })}
           onOpenSkills={props.onOpenSkills}
           onRunTool={runPromptTool}
-        />
-        {/* 工作流入口：`workflow:<id>` 不在模型下拉里，没这枚 chip 就挑不到工作流 */}
-        <WorkflowEntryLauncher
-          sources={promptMode || workflowMode ? null : props.workflowSources}
-          openPicker={openPicker} onTogglePicker={togglePicker} onClosePicker={closePicker}
-          onEvent={onEvent} disabled={props.disabled}
         />
         <CreationRunActionsView
           hidePreset={workflowMode}

@@ -176,6 +176,12 @@ export interface ParamPickerProps {
    * 段很多的浮层（工作流参数）传它，免得一打开就顶到屏幕边（#1128）。
    */
   capHeight?: number
+  /**
+   * 自定义浮层内容（模型菜单的「API · 工作流 · CLI」标签页，对账 #1133）：传了就不画选项，
+   * 定位 / 翻转 / 限高 / 点外关闭照旧。`bodyKey` 变化时重新量高度（例如切了标签）。
+   */
+  body?: ReactNode
+  bodyKey?: string
 }
 
 /**
@@ -446,7 +452,7 @@ export function ParamPicker(props: ParamPickerProps) {
       shiftXRef.current = next
       setShiftX(next)
     }
-  }, [open, totalOptions, props.capHeight])
+  }, [open, totalOptions, props.capHeight, props.bodyKey])
 
   /**
    * 点击浮层外关闭。
@@ -495,7 +501,7 @@ export function ParamPicker(props: ParamPickerProps) {
           ref={popRef}
           className={[
             styles.popup,
-            grouped ? styles.grouped : VARIANT_CLASS[sections[0]!.variant],
+            grouped || props.body ? styles.grouped : VARIANT_CLASS[sections[0]!.variant],
             /** 滑块接管之后，选中的那一块自己不再画底（避免「旧的先灭、新的先亮」破坏滑动） */
             singleThumb ? styles.pillThumbReady : '',
             below ? styles.below : styles.above,
@@ -523,7 +529,9 @@ export function ParamPicker(props: ParamPickerProps) {
           role="listbox"
           aria-label={ariaLabel}
         >
-          {totalOptions === 0 ? (
+          {props.body ? (
+            props.body
+          ) : totalOptions === 0 ? (
             <span className={styles.empty} data-param-empty={name}>
               {sections[0]?.emptyHint ?? '没有可选项'}
             </span>

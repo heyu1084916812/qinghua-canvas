@@ -1,13 +1,11 @@
-import type { ParamSection } from '../ParamPicker'
-import { ParamPicker } from '../ParamPicker'
-import {
-  isAutoRatio,
-  type VideoModeId,
-} from '../../../../domain/canvas/layout/videoParams'
+import { ParamPicker, type ParamSection } from '../ParamPicker'
+import { isAutoRatio, type VideoModeId } from '../../../../domain/canvas/layout/videoParams'
 import { creationStyles as styles } from './creationStyles'
 import type { deriveCreationQualityParams } from './creationQualityParams'
 
 interface CreationParameterControlsProps {
+  /** 来源菜单（#1133）：给了就用它当模型 chip；提示词面板不给，仍是单列模型下拉 */
+  modelPicker?: React.ReactNode
   noPlatform: boolean
   platformGap: string
   categoryLabel: string
@@ -36,6 +34,7 @@ interface CreationParameterControlsProps {
 }
 
 export function CreationParameterControls({
+  modelPicker,
   noPlatform,
   platformGap,
   categoryLabel,
@@ -99,7 +98,7 @@ export function CreationParameterControls({
           <span className={styles.setupHintGo}>去后台设置 →</span>
         </button>
       )}
-      <ParamPicker
+      {modelPicker ?? <ParamPicker
         name="model"
         ariaLabel={categoryLabel}
         label={modelLabel}
@@ -111,10 +110,8 @@ export function CreationParameterControls({
         onClose={onClosePicker}
         onSelect={onSelectModel}
         disabled={false}
-      />
-      {!promptMode && (
-        <span className={styles.paramDivider} data-param-divider aria-hidden="true" />
-      )}
+      />}
+      {!promptMode && <span className={styles.paramDivider} data-param-divider aria-hidden="true" />}
       {!promptMode && (
         <>
           {videoMode ? (

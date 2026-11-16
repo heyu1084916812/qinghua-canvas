@@ -3,8 +3,8 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 import { generationSpec } from '../../../../domain/canvas/nodeSpecs/generation'
 import type { WorkflowEntry } from '../../../../domain/project/workflowParams'
-import { entrySelectionEvents, WorkflowEntryLauncher, WorkflowParameterControls } from './WorkflowParameterControls'
-import { findWorkflowSourceRow, isWorkflowPanelModel, runninghubChannelIds, workflowSourceRows, type WorkflowPanelSources } from './workflowPanelSources'
+import { WorkflowParameterControls } from './WorkflowParameterControls'
+import { findWorkflowSourceRow, isWorkflowPanelModel, runninghubChannelIds, type WorkflowPanelSources } from './workflowPanelSources'
 
 /**
  * 工作流参数行（对账 #1105 / #1116）。
@@ -65,6 +65,8 @@ const SOURCES: WorkflowPanelSources = {
 }
 
 const noop = () => {}
+/** 模型菜单由面板传入（#1133 `SourceModelMenu`），这里只钉它被放在行首 */
+const MODEL_PICKER = createElement('span', { 'data-stub-model-picker': '' })
 
 function workflowData() {
   return {
@@ -80,14 +82,16 @@ describe('工作流参数行', () => {
       createElement(WorkflowParameterControls, {
         data: workflowData(),
         sources: SOURCES,
+        modelPicker: MODEL_PICKER,
         openPicker: null,
         onTogglePicker: noop,
         onClosePicker: noop,
         onEvent: noop,
       }),
     )
-    expect(html).toContain('data-param-chip="model"')
-    expect(html).toContain('视频超分与补帧')
+    /* 条目 chip = 面板传入的模型菜单（换条目 / 换回 API / CLI 都在那里），这里不再另画条目下拉 */
+    expect(html.startsWith('<span data-stub-model-picker')).toBe(true)
+    expect(html).not.toContain('data-param-chip="model"')
     expect(html).toContain('data-param-chip="workflowInstance"')
     expect(html).toContain('data-param-chip="workflowParams"')
     /* 摘要写当前值（媒体字段写名字） */
@@ -98,73 +102,6 @@ describe('工作流参数行', () => {
     expect(html).not.toContain('必选 · 用上游')
     expect(html).not.toContain('扣积分')
   })
-
-  it('条目列表里能换回普通模型（否则进了工作流就没有出口）', () => {
-    const html = renderToStaticMarkup(
-      createElement(WorkflowParameterControls, {
-        data: workflowData(),
-        sources: SOURCES,
-        apiOptions: [{ value: 'GPT Image 2', label: 'GPT Image 2' }],
-        openPicker: 'model',
-        onTogglePicker: noop,
-        onClosePicker: noop,
-        onEvent: noop,
-      }),
-    )
-    expect(html).toContain('data-param-option="GPT Image 2"')
-    expect(html).toContain('API 模型')
-  })
-})
-
-describe('工作流入口 chip（API 模式下挑条目）', () => {
-  it('有条目时画一枚「工作流」chip', () => {
-    const html = renderToStaticMarkup(
-      createElement(WorkflowEntryLauncher, {
-        sources: SOURCES,
-        openPicker: null,
-        onTogglePicker: noop,
-        onClosePicker: noop,
-        onEvent: noop,
-      }),
-    )
-    expect(html).toContain('data-param-chip="workflowEntry"')
-    expect(html).toContain('工作流')
-  })
-
-  it('没有来源（提示词面板 / 已在工作流模式）时不画', () => {
-    const html = renderToStaticMarkup(
-      createElement(WorkflowEntryLauncher, {
-        sources: null,
-        openPicker: null,
-        onTogglePicker: noop,
-        onClosePicker: noop,
-        onEvent: noop,
-      }),
-    )
-    expect(html).toBe('')
-  })
-
-  it('AI 应用也在这条链路上：入口 chip 里能选到它', () => {
-    const app: WorkflowEntry = {
-      id: '1877265245566922753',
-      title: '风格迁移',
-      provider: 'runninghub',
-      fetchedAt: 0,
-      kind: 'app',
-      fields: [],
-    }
-    const html = renderToStaticMarkup(
-      createElement(WorkflowEntryLauncher, {
-        sources: { channels: [{ id: 'ch-rh', name: 'RunningHub', protocol: 'runninghub-api', entries: [ENTRY, app] }] },
-        openPicker: 'workflowEntry',
-        onTogglePicker: noop,
-        onClosePicker: noop,
-        onEvent: noop,
-      }),
-    )
-    expect(html).toContain('data-param-option="ch-rh::app:1877265245566922753"')
-    expect(html).toContain('风格迁移')
-  })
 })
 
 describe('AI 应用的参数行', () => {
@@ -174,13 +111,14 @@ describe('AI 应用的参数行', () => {
       createElement(WorkflowParameterControls, {
         data: { ...generationSpec.createDefaultData(), model: 'app:1877265245566922753', channelId: 'ch-rh' },
         sources: { channels: [{ id: 'ch-rh', name: 'RunningHub', protocol: 'runninghub-api', entries: [app] }] },
+        modelPicker: MODEL_PICKER,
         openPicker: null,
         onTogglePicker: noop,
         onClosePicker: noop,
         onEvent: noop,
       }),
     )
-    expect(html).toContain('风格迁移')
+    expect(html).toContain('data-param-chip="workflowParams"')
     /* #1128：应用的提交体不吃实例规格，chip 不显示（#1127 M1） */
     expect(html).not.toContain('data-param-chip="workflowInstance"')
   })
@@ -204,20 +142,13 @@ describe('#1128 条目下拉 / 找不到条目', () => {
   }
   const render = (data: ReturnType<typeof workflowData>, sources = BOTH) =>
     renderToStaticMarkup(
-      createElement(WorkflowParameterControls, { data, sources, openPicker: null, onTogglePicker: noop, onClosePicker: noop, onEvent: noop }),
+      createElement(WorkflowParameterControls, { data, sources, modelPicker: MODEL_PICKER, openPicker: null, onTogglePicker: noop, onClosePicker: noop, onEvent: noop }),
     )
-
-  it('★ M2：下拉选 AI 应用 → 模型是 app:<id>（不是 workflow:），实例回默认', () => {
-    const events = entrySelectionEvents(workflowSourceRows(BOTH), `ch-rh::app:${APP.id}`, 'plus')
-    expect(events[0]).toEqual({ type: 'setModel', model: `app:${APP.id}`, channelId: 'ch-rh' })
-    expect(events[1]).toMatchObject({ type: 'setWorkflowRun', instance: 'default' })
-    expect(entrySelectionEvents(workflowSourceRows(BOTH), `ch-rh::workflow:${APP.id}`, 'plus')).toEqual([])
-  })
 
   it('★ H3：workflow:X 条目不在 → 写「条目不存在」，不借用别的条目的标题与参数', () => {
     const html = render({ ...workflowData(), model: 'workflow:404' })
-    expect(html).toContain('条目不存在')
     expect(html).toContain('data-workflow-missing')
+    expect(html).toContain('这个条目已被删除或不在当前渠道')
     expect(html).not.toContain('视频超分与补帧</')
     expect(html).not.toContain('data-param-chip="workflowParams"')
     expect(findWorkflowSourceRow(BOTH, 'workflow:404', 'ch-rh')).toBeNull()
@@ -234,7 +165,7 @@ describe('#1128 条目下拉 / 找不到条目', () => {
 
   it('AI 应用不显示 24G/48G（应用提交体不吃实例规格）', () => {
     const html = render({ ...workflowData(), model: `app:${APP.id}` })
-    expect(html).toContain('风格迁移')
+    expect(html).not.toContain('data-workflow-missing')
     expect(html).not.toContain('data-param-chip="workflowInstance"')
   })
 })
