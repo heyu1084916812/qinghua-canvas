@@ -3539,13 +3539,39 @@
       "publicApi": [
         "CSS_MODULE:SettingsModelBinding 的模型绑定样式域",
         "CSS_CLASS:mappingTable",
-        "CSS_CLASS:mappingRow",
-        "CSS_CLASS:globalCommonButton"
+        "CSS_CLASS:mappingRow"
       ],
       "test": [
         "src/pages/SettingsPage/settingsPageCssArchitecture.test.ts"
       ],
       "budget": 213
+    },
+    {
+      "module": "src/pages/SettingsPage/SettingsModelCategory.module.css",
+      "owner": "settings-ui",
+      "responsibility": "Defines category group headings and the global common-model switch in the channel model mapping surface.",
+      "owns": [
+        "category group headings and counts",
+        "common and uncommon switch states",
+        "responsive placement of the common-model switch"
+      ],
+      "doesNotOwn": [
+        "model mapping persistence",
+        "model routing decisions",
+        "frontend model catalog CRUD"
+      ],
+      "publicApi": [
+        "CSS_MODULE:SettingsModelCategory category and common-switch styles",
+        "CSS_CLASS:mappingGroup",
+        "CSS_CLASS:mappingGroupHead",
+        "CSS_CLASS:globalCommonButton",
+        "CSS_CLASS:globalCommonSwitch"
+      ],
+      "test": [
+        "src/pages/SettingsPage/settingsPageCssArchitecture.test.ts",
+        "scripts/smoke.mjs#映射表按模型分类分组"
+      ],
+      "budget": 120
     },
     {
       "module": "src/pages/SettingsPage/settingsPageConstants.ts",

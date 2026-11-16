@@ -13897,11 +13897,26 @@ async function g74(browser) {
   )
   await page.locator('[data-global-model-close]').first().click()
   await page.locator('[data-global-model-form]').waitFor({ state: 'detached', timeout: 5000 })
+  const mapGroups = await page
+    .locator('[data-route-map-group]')
+    .evaluateAll((els) => els.map((el) => el.getAttribute('data-route-map-group')))
+  rec(
+    g,
+    '映射表按模型分类分组',
+    mapGroups.length >= 2 && new Set(mapGroups).size === mapGroups.length,
+    mapGroups.join(','),
+  )
   const firstMapRow = page.locator('[data-route-map-row]').first()
   await firstMapRow.waitFor({ state: 'visible', timeout: 5000 })
   const firstMapId = await firstMapRow.getAttribute('data-route-map-row')
   const firstLogical = firstMapId ?? ''
   const uncommonButton = page.locator(`[data-route-map-uncommon="${firstLogical}"]`)
+  rec(
+    g,
+    '常用状态是可操作的开关',
+    (await uncommonButton.getAttribute('role')) === 'switch' &&
+      (await uncommonButton.getAttribute('aria-checked')) === 'true',
+  )
   if (await uncommonButton.isEnabled().catch(() => false)) {
     await uncommonButton.click()
     await page
@@ -16557,6 +16572,8 @@ async function g83(browser) {
    */
   await configureMockChannel(page)
   await sleep(600)
+  await page.locator(USER_CHANNEL).first().click()
+  await sleep(300)
 
   rec(
     g,

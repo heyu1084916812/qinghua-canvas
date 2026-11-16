@@ -498,6 +498,9 @@ describe('SettingsPage 视图拆分', () => {
     expect(html).toContain('data-route-map-row="My Image"')
     expect(html).toContain('data-route-map-frontend="My Image"')
     expect(html).toContain('data-route-map-real="My Image"')
+    expect(html).toContain('data-route-map-group="image"')
+    expect(html).toContain('role="switch"')
+    expect(html).toContain('aria-checked="true"')
     expect(html.indexOf('data-route-map-frontend="My Image"')).toBeLessThan(
       html.indexOf('data-route-map-real="My Image"'),
     )
@@ -530,6 +533,48 @@ describe('SettingsPage 视图拆分', () => {
       onRemoveGlobalModel: () => {},
     })
     expect(hidden).not.toContain('data-route-map-row="My Image"')
+
+    const chatPreset = {
+      id: 'My Chat',
+      category: 'chat',
+      vendor: 'openai',
+    } as const
+    const grouped = render(SettingsChannelRouteView, {
+      allGlobalModels: [preset, chatPreset],
+      customModels: [{ id: 'My Image' }, { id: 'My Chat' }],
+      uncommonModelIds: [],
+      activeModels: [
+        { id: 'image-upstream', category: 'image', inputTypes: ['text'] },
+        { id: 'chat-upstream', category: 'chat', inputTypes: ['text'] },
+      ],
+      modelAddOpen: false,
+      newModelName: '',
+      newModelCategory: 'image',
+      newModelVendor: 'openai',
+      showUncommonModels: false,
+      modelMap: {},
+      mapSaveNotice: null,
+      onModelAddOpenChange: () => {},
+      onNewModelNameChange: () => {},
+      onNewModelCategoryChange: () => {},
+      onNewModelVendorChange: () => {},
+      onAddGlobalModel: () => {},
+      onShowUncommonModelsChange: () => {},
+      onBindModel: () => {},
+      onModelUncommonChange: () => {},
+      onRemoveGlobalModel: () => {},
+    })
+    expect(grouped).toContain('data-route-map-group="image"')
+    expect(grouped).toContain('data-route-map-group="chat"')
+    expect(grouped.indexOf('data-route-map-group="image"')).toBeLessThan(
+      grouped.indexOf('data-route-map-row="My Image"'),
+    )
+    expect(grouped.indexOf('data-route-map-row="My Image"')).toBeLessThan(
+      grouped.indexOf('data-route-map-group="chat"'),
+    )
+    expect(grouped.indexOf('data-route-map-group="chat"')).toBeLessThan(
+      grouped.indexOf('data-route-map-row="My Chat"'),
+    )
 
     const irrelevantCategory = render(SettingsChannelRouteView, {
       allGlobalModels: [preset],

@@ -1,0 +1,318 @@
+{
+  "capturedAt": "2026-11-16T14:48:00.596Z",
+  "groups": [
+    {
+      "theme": "dark",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "metrics": {
+        "groups": [
+          {
+            "category": "image",
+            "label": "生图5",
+            "rows": 5,
+            "rowCategories": [
+              "image",
+              "image",
+              "image",
+              "image",
+              "image"
+            ]
+          },
+          {
+            "category": "chat",
+            "label": "对话4",
+            "rows": 4,
+            "rowCategories": [
+              "chat",
+              "chat",
+              "chat",
+              "chat"
+            ]
+          }
+        ],
+        "switches": [
+          {
+            "role": "switch",
+            "checked": "true",
+            "text": "常用",
+            "label": "GPT Image 2.5 Sunburst · 常用模型"
+          },
+          {
+            "role": "switch",
+            "checked": "true",
+            "text": "常用",
+            "label": "GPT Image 2 · 常用模型"
+          },
+          {
+            "role": "switch",
+            "checked": "true",
+            "text": "常用",
+            "label": "Nano Banana Pro · 常用模型"
+          },
+          {
+            "role": "switch",
+            "checked": "true",
+            "text": "常用",
+            "label": "Nano Banana 2.1 · 常用模型"
+          },
+          {
+            "role": "switch",
+            "checked": "true",
+            "text": "常用",
+            "label": "Midjourney · 常用模型"
+          },
+          {
+            "role": "switch",
+            "checked": "true",
+            "text": "常用",
+            "label": "Gemini 3.8 Flash · 常用模型"
+          }
+        ],
+        "tableWidth": 960,
+        "horizontalOverflow": false
+      },
+      "errors": []
+    },
+    {
+      "theme": "dark",
+      "viewport": {
+        "width": 1024,
+        "height": 700
+      },
+      "metrics": {
+        "groups": [
+          {
+            "category": "image",
+            "label": "生图5",
+            "rows": 5,
+            "rowCategories": [
+              "image",
+              "image",
+              "image",
+              "image",
+              "image"
+            ]
+          },
+          {
+            "category": "chat",
+            "label": "对话4",
+            "rows": 4,
+            "rowCategories": [
+              "chat",
+              "chat",
+              "chat",
+              "chat"
+            ]
+          }
+        ],
+        "switches": [
+          {
+            "role": "switch",
+            "checked": "true",
+            "text": "常用",
+            "label": "GPT Image 2.5 Sunburst · 常用模型"
+          },
+          {
+            "role": "switch",
+            "checked": "true",
+            "text": "常用",
+            "label": "GPT Image 2 · 常用模型"
+          },
+          {
+            "role": "switch",
+            "checked": "true",
+            "text": "常用",
+            "label": "Nano Banana Pro · 常用模型"
+          },
+          {
+            "role": "switch",
+            "checked": "true",
+            "text": "常用",
+            "label": "Nano Banana 2.1 · 常用模型"
+          },
+          {
+            "role": "switch",
+            "checked": "true",
+            "text": "常用",
+            "label": "Midjourney · 常用模型"
+          },
+          {
+            "role": "switch",
+            "checked": "true",
+            "text": "常用",
+            "label": "Gemini 3.8 Flash · 常用模型"
+          }
+        ],
+        "tableWidth": 613,
+        "horizontalOverflow": false
+      },
+      "errors": []
+    },
+    {
+      "theme": "light",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "metrics": {
+        "groups": [
+          {
+            "category": "image",
+            "label": "生图5",
+            "rows": 5,
+            "rowCategories": [
+              "image",
+              "image",
+              "image",
+              "image",
+              "image"
+            ]
+          },
+          {
+            "category": "chat",
+            "label": "对话4",
+            "rows": 4,
+            "rowCategories": [
+              "chat",
+              "chat",
+              "chat",
+              "chat"
+            ]
+          }
+        ],
+        "switches": [
+          {
+            "role": "switch",
+            "checked": "true",
+            "text": "常用",
+            "label": "GPT Image 2.5 Sunburst · 常用模型"
+          },
+          {
+            "role": "switch",
+            "checked": "true",
+            "text": "常用",
+            "label": "GPT Image 2 · 常用模型"
+          },
+          {
+            "role": "switch",
+            "checked": "true",
+            "text": "常用",
+            "label": "Nano Banana Pro · 常用模型"
+          },
+          {
+            "role": "switch",
+            "checked": "true",
+            "text": "常用",
+            "label": "Nano Banana 2.1 · 常用模型"
+          },
+          {
+            "role": "switch",
+            "checked": "true",
+            "text": "常用",
+            "label": "Midjourney · 常用模型"
+          },
+          {
+            "role": "switch",
+            "checked": "true",
+            "text": "常用",
+            "label": "Gemini 3.8 Flash · 常用模型"
+          }
+        ],
+        "tableWidth": 960,
+        "horizontalOverflow": false
+      },
+      "errors": []
+    },
+    {
+      "theme": "light",
+      "viewport": {
+        "width": 1024,
+        "height": 700
+      },
+      "metrics": {
+        "groups": [
+          {
+            "category": "image",
+            "label": "生图5",
+            "rows": 5,
+            "rowCategories": [
+              "image",
+              "image",
+              "image",
+              "image",
+              "image"
+            ]
+          },
+          {
+            "category": "chat",
+            "label": "对话4",
+            "rows": 4,
+            "rowCategories": [
+              "chat",
+              "chat",
+              "chat",
+              "chat"
+            ]
+          }
+        ],
+        "switches": [
+          {
+            "role": "switch",
+            "checked": "true",
+            "text": "常用",
+            "label": "GPT Image 2.5 Sunburst · 常用模型"
+          },
+          {
+            "role": "switch",
+            "checked": "true",
+            "text": "常用",
+            "label": "GPT Image 2 · 常用模型"
+          },
+          {
+            "role": "switch",
+            "checked": "true",
+            "text": "常用",
+            "label": "Nano Banana Pro · 常用模型"
+          },
+          {
+            "role": "switch",
+            "checked": "true",
+            "text": "常用",
+            "label": "Nano Banana 2.1 · 常用模型"
+          },
+          {
+            "role": "switch",
+            "checked": "true",
+            "text": "常用",
+            "label": "Midjourney · 常用模型"
+          },
+          {
+            "role": "switch",
+            "checked": "true",
+            "text": "常用",
+            "label": "Gemini 3.8 Flash · 常用模型"
+          }
+        ],
+        "tableWidth": 613,
+        "horizontalOverflow": false
+      },
+      "errors": []
+    }
+  ],
+  "interaction": {
+    "id": "GPT Image 2.5 Sunburst",
+    "before": {
+      "role": "switch",
+      "checked": "true",
+      "text": "常用"
+    },
+    "hidden": true,
+    "afterRestore": {
+      "checked": "false",
+      "text": "不常用"
+    }
+  }
+}

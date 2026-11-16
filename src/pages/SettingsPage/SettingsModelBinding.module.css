@@ -116,13 +116,8 @@
   gap: var(--space-2);
 }
 
-.mappingFrontendModel > span {
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-}
-
 .mappingFrontendModel b {
+  flex: 1;
   min-width: 0;
   overflow: hidden;
   color: var(--text-1);
@@ -132,60 +127,12 @@
   white-space: nowrap;
 }
 
-.mappingFrontendModel small {
-  color: var(--text-3);
-  font-size: var(--fs-chip);
-}
-
 .mappingRealModel {
   min-width: 0;
 }
 
 .mappingRealModel > * {
   width: 100%;
-}
-
-.globalCommonButton {
-  min-width: 88px;
-  min-height: 28px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: var(--space-1);
-  border: 0;
-  border-radius: var(--radius-control);
-  background: transparent;
-  color: var(--text-2);
-  padding: 0 var(--space-1);
-  font: inherit;
-  font-size: var(--fs-label);
-  cursor: pointer;
-}
-
-.globalCommonButton span {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: var(--success);
-}
-
-.globalCommonButton:hover:not(:disabled) {
-  background: var(--bg-hover);
-  color: var(--text-1);
-}
-
-.globalCommonButtonOff {
-  color: var(--text-3);
-}
-
-.globalCommonButtonOff span {
-  background: var(--text-3);
-}
-
-.globalCommonButton:disabled {
-  justify-content: flex-end;
-  opacity: 0.55;
-  cursor: default;
 }
 
 .mappingInlineError {
@@ -208,6 +155,5 @@
   .globalCommonButton {
     grid-column: 2;
     justify-self: end;
-    min-height: 24px;
   }
 }

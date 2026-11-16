@@ -7,6 +7,7 @@ const PART_NAMES = [
   'SettingsChannelWorkspace',
   'SettingsModelBinding',
   'SettingsModelMapping',
+  'SettingsModelCategory',
   'SettingsAppearanceSystem',
 ] as const
 const rawModules = import.meta.glob('./*.module.css', {
@@ -53,7 +54,7 @@ describe('SettingsPage CSS 模块结构护栏', () => {
   })
 
   it('组件样式拆成八份且每份不超过预算', () => {
-    expect(Object.keys(PART_SOURCES)).toHaveLength(8)
+    expect(Object.keys(PART_SOURCES)).toHaveLength(9)
     for (const [path, source] of Object.entries(PART_SOURCES)) {
       expect(source, path).toBeTypeOf('string')
       if (source) {

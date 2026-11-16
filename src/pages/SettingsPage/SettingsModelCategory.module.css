@@ -1,0 +1,119 @@
+.mappingGroup {
+  display: flex;
+  flex-direction: column;
+}
+
+.mappingGroup + .mappingGroup {
+  margin-top: var(--space-2);
+}
+
+.mappingGroupHead {
+  min-height: 34px;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 0 var(--space-2);
+  color: var(--text-2);
+  font-size: var(--fs-label);
+  font-weight: var(--fw-title);
+}
+
+.mappingGroup + .mappingGroup .mappingGroupHead {
+  border-top: var(--border);
+}
+
+.mappingGroupCount {
+  min-width: 20px;
+  min-height: 20px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 var(--space-1);
+  border-radius: var(--radius-pill);
+  background: var(--bg-subtle);
+  color: var(--text-3);
+  font-size: var(--fs-chip);
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
+}
+
+.globalCommonButton {
+  min-width: 76px;
+  min-height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: var(--space-2);
+  border: 0;
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--text-2);
+  padding: 0 var(--space-2);
+  font: inherit;
+  font-size: var(--fs-label);
+  cursor: pointer;
+}
+
+.globalCommonSwitch {
+  position: relative;
+  width: 28px;
+  height: 16px;
+  flex: 0 0 28px;
+  border-radius: var(--radius-pill);
+  background: var(--accent);
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+
+.globalCommonSwitch::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--bg-surface);
+  transform: translateX(12px);
+  transition: transform var(--dur-hover) var(--ease-out);
+}
+
+.globalCommonButton:hover:not(:disabled) {
+  background: var(--bg-hover);
+  color: var(--text-1);
+}
+
+.globalCommonButton:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.globalCommonButtonOff {
+  color: var(--text-3);
+}
+
+.globalCommonButtonOff .globalCommonSwitch {
+  background: var(--bg-hover);
+  box-shadow: inset 0 0 0 1px var(--stroke);
+}
+
+.globalCommonButtonOff .globalCommonSwitch::after {
+  transform: none;
+}
+
+.globalCommonButton:disabled {
+  justify-content: flex-end;
+  opacity: 0.55;
+  cursor: default;
+}
+
+@media (max-width: 1100px) {
+  .globalCommonButton {
+    min-height: 24px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .globalCommonSwitch::after {
+    transition: none;
+  }
+}

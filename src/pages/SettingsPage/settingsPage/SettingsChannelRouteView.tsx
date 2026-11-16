@@ -15,6 +15,8 @@ type MapSaveNotice = {
 
 type NewModelCategory = Exclude<PresetModel['category'], 'unknown'>
 
+const MODEL_CATEGORY_ORDER = ['image', 'chat', 'video', 'audio'] as const
+
 export type SettingsChannelRouteViewProps = {
   allGlobalModels: PresetModel[]
   customModels: readonly { id: string }[]
@@ -105,22 +107,22 @@ export function SettingsChannelRouteView({
         isUncommon: uncommon.has(preset.id),
       }
     })
+  const groups = MODEL_CATEGORY_ORDER.map((category) => ({
+    category,
+    label: categoryLabel(category),
+    rows: rows.filter((row) => row.preset.category === category),
+  })).filter((group) => group.rows.length > 0)
 
   useEffect(() => {
     if (!modelAddOpen) return
     const previous = document.activeElement instanceof HTMLElement
       ? document.activeElement
       : null
-    const input = managerRef.current?.querySelector<HTMLInputElement>(
-      '[data-global-model-name]',
-    )
+    const input = managerRef.current?.querySelector<HTMLInputElement>('[data-global-model-name]')
     input?.focus()
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key !== 'Escape') return
-      const picker =
-        event.target instanceof Element
-          ? event.target.closest('[data-choice-picker]')
-          : null
+      const picker = event.target instanceof Element ? event.target.closest('[data-choice-picker]') : null
       if (picker?.querySelector('[role="listbox"]')) return
       event.preventDefault()
       closeManagerRef.current(false)
@@ -300,60 +302,59 @@ export function SettingsChannelRouteView({
           <div className={styles.mappingTableHead} aria-hidden>
             <span>前端显示模型</span>
             <span>真实模型</span>
-            <span>常用状态</span>
+            <span>常用设置</span>
           </div>
-          {rows.map(({ preset, upstream, options, isUncommon }) => {
-            const save = mapSaveNotice?.id === preset.id ? mapSaveNotice : null
-            return (
-              <div
-                key={preset.id}
-                className={styles.mappingRow}
-                data-route-map-row={preset.id}
-                data-route-map-category={preset.category}
-              >
-                <div
-                  className={styles.mappingFrontendModel}
-                  title={preset.id}
-                  data-route-map-frontend={preset.id}
-                >
-                  <ModelIcon vendor={preset.vendor} size={18} />
-                  <span>
-                    <b data-route-map-label>{preset.id}</b>
-                    <small>{categoryLabel(preset.category)}</small>
-                  </span>
-                </div>
-                <div className={styles.mappingRealModel} data-route-map-real={preset.id}>
-                  <ChoicePicker
-                    name={`mapping-${preset.id}`}
-                    value={upstream}
-                    ariaLabel={`${preset.id} 对应的真实模型`}
-                    placeholder="未映射"
-                    onChange={(value) => onBindModel(value, preset.id)}
-                    options={options}
-                  />
-                </div>
-                <button
-                  type="button"
-                  className={
-                    !isUncommon
-                      ? styles.globalCommonButton
-                      : `${styles.globalCommonButton} ${styles.globalCommonButtonOff}`
-                  }
-                  data-route-map-uncommon={preset.id}
-                  title="全局设置，影响所有分组和前端模型选择"
-                  onClick={() => onModelUncommonChange(preset.id, !isUncommon)}
-                >
-                  <span aria-hidden />
-                  {isUncommon ? '不常用 · 全局' : '常用 · 全局'}
-                </button>
-                {save?.tone === 'error' ? (
-                  <p className={styles.mappingInlineError} role="alert">
-                    {save.text}
-                  </p>
-                ) : null}
+          {groups.map((group) => (
+            <div key={group.category} className={styles.mappingGroup} data-route-map-group={group.category}>
+              <div className={styles.mappingGroupHead}>
+                <span>{group.label}</span>
+                <span className={styles.mappingGroupCount}>{group.rows.length}</span>
               </div>
-            )
-          })}
+              {group.rows.map(({ preset, upstream, options, isUncommon }) => {
+                const save = mapSaveNotice?.id === preset.id ? mapSaveNotice : null
+                return (
+                  <div key={preset.id} className={styles.mappingRow} data-route-map-row={preset.id} data-route-map-category={preset.category}>
+                    <div className={styles.mappingFrontendModel} title={preset.id} data-route-map-frontend={preset.id}>
+                      <ModelIcon vendor={preset.vendor} size={18} />
+                      <b data-route-map-label>{preset.id}</b>
+                    </div>
+                    <div className={styles.mappingRealModel} data-route-map-real={preset.id}>
+                      <ChoicePicker
+                        name={`mapping-${preset.id}`}
+                        value={upstream}
+                        ariaLabel={`${preset.id} 对应的真实模型`}
+                        placeholder="未映射"
+                        onChange={(value) => onBindModel(value, preset.id)}
+                        options={options}
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={!isUncommon}
+                      aria-label={`${preset.id} · 常用模型`}
+                      className={
+                        !isUncommon
+                          ? styles.globalCommonButton
+                          : `${styles.globalCommonButton} ${styles.globalCommonButtonOff}`
+                      }
+                      data-route-map-uncommon={preset.id}
+                      title="全局设置，影响所有分组和前端模型选择"
+                      onClick={() => onModelUncommonChange(preset.id, !isUncommon)}
+                    >
+                      <span className={styles.globalCommonSwitch} aria-hidden />
+                      <span>{isUncommon ? '不常用' : '常用'}</span>
+                    </button>
+                    {save?.tone === 'error' ? (
+                      <p className={styles.mappingInlineError} role="alert">
+                        {save.text}
+                      </p>
+                    ) : null}
+                  </div>
+                )
+              })}
+            </div>
+          ))}
         </div>
       )}
     </section>

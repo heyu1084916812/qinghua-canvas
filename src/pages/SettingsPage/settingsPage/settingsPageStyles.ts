@@ -6,6 +6,7 @@ import settingsChannelFormStyles from '../SettingsChannelForm.module.css'
 import settingsChannelWorkspaceStyles from '../SettingsChannelWorkspace.module.css'
 import settingsModelBindingStyles from '../SettingsModelBinding.module.css'
 import settingsModelMappingStyles from '../SettingsModelMapping.module.css'
+import settingsModelCategoryStyles from '../SettingsModelCategory.module.css'
 import settingsAppearanceSystemStyles from '../SettingsAppearanceSystem.module.css'
 
 export const settingsPageStyles = {
@@ -16,9 +17,8 @@ export const settingsPageStyles = {
   ...settingsChannelFormStyles,
   ...settingsChannelWorkspaceStyles,
   ...settingsModelBindingStyles,
-  ...settingsModelMappingStyles,
+  ...settingsModelMappingStyles, ...settingsModelCategoryStyles,
   ...settingsAppearanceSystemStyles,
-  // The facade composes both `.item` rules in CSS order; object spread would
-  // otherwise replace it with only the later details-row override.
+  // The facade composes both `.item` rules in CSS order; object spread would otherwise replace the details-row override.
   item: baseStyles.item,
 } as Record<string, string>
