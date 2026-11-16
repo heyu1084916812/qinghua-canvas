@@ -5,6 +5,7 @@ import type { Channel, ChannelCredentialGroup } from '../../../domain/project/ch
 import type { ProtocolCatalog, ProtocolDefinition } from '../../../domain/project/protocol'
 import type { ModelCapability } from '../../../domain/shared/capability'
 import type { ChannelStore } from '../../../state/channel/channelStore'
+import { ChannelTokenField } from '../SettingsChannelTokenField'
 import { SettingsChannelContextMenuView } from './SettingsChannelContextMenuView'
 import { SettingsChannelRouteView } from './SettingsChannelRouteView'
 import { SettingsChannelSidebarView } from './SettingsChannelSidebarView'
@@ -420,6 +421,22 @@ describe('SettingsPage 视图拆分', () => {
     expect(html).toContain('data-settings-token-tail="primary"')
     expect(html).toContain('data-key-group-name')
     expect(html).toContain('data-key-group-priority')
+  })
+
+  it('Key 分组官网入口使用短文案', () => {
+    const channels = {} as ChannelStore
+    const html = render(ChannelTokenField, {
+      channels,
+      channelId: 'channel-1',
+      slot: 'primary',
+      label: 'API Key',
+      docUrl: 'https://docs.example.com',
+      savedTail: '1234',
+      saved: true,
+    })
+
+    expect(html).toContain('获取令牌')
+    expect(html).not.toContain('去官网获取令牌')
   })
 
   it('模型面板覆盖已选模型、缓存模型和草稿切换结构', () => {

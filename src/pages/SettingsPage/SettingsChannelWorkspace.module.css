@@ -21,7 +21,8 @@
 
 .providerRouteField input {
   width: 68px;
-  min-height: 30px;
+  height: var(--settings-control-height, 34px);
+  min-height: var(--settings-control-height, 34px);
   box-sizing: border-box;
   border: 1px solid transparent;
   border-radius: var(--radius-control);
@@ -80,8 +81,8 @@
 
 .tokenInput {
   width: 100%;
-  min-height: 34px;
-  height: 34px;
+  min-height: var(--settings-control-height, 34px);
+  height: var(--settings-control-height, 34px);
   padding-right: 34px;
 }
 
@@ -141,7 +142,8 @@
 
 .keyGroupTab {
   flex: 0 0 auto;
-  min-height: 30px;
+  height: var(--settings-control-height, 34px);
+  min-height: var(--settings-control-height, 34px);
   display: inline-flex;
   align-items: center;
   gap: var(--space-2);
@@ -192,7 +194,7 @@
   display: flex;
   align-items: center;
   gap: var(--space-3);
-  min-height: 30px;
+  min-height: var(--settings-control-height, 34px);
 }
 
 .groupPropertyField {
@@ -206,7 +208,8 @@
 
 .groupPropertyField input {
   width: 140px;
-  min-height: 30px;
+  height: var(--settings-control-height, 34px);
+  min-height: var(--settings-control-height, 34px);
   box-sizing: border-box;
   padding: 0 var(--space-2);
   border: 1px solid transparent;
@@ -237,7 +240,11 @@
 }
 
 .dangerTextButton {
-  min-height: 28px;
+  height: var(--settings-control-height, 34px);
+  min-height: var(--settings-control-height, 34px);
+  display: inline-flex;
+  align-items: center;
+  box-sizing: border-box;
   border: 0;
   border-radius: var(--radius-control);
   background: transparent;

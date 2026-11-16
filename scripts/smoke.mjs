@@ -13893,6 +13893,49 @@ async function g74(browser) {
           .querySelector('[data-quick-test-model] [data-choice-picker] > button svg')
           ?.getBoundingClientRect()
       : null
+    const searchWrap = document.querySelector('[data-channel-search]')?.parentElement
+    const standardSelectors = [
+      '[data-settings-detect]',
+      '[data-settings-verify]',
+      '[data-proto-add-toggle]',
+      '[data-settings-baseurl]',
+      '[data-choice-picker="settings-protocol"] > button',
+      '[data-key-group-tab]',
+      '[data-key-group-add]',
+      '[data-settings-token-tail]',
+      '[data-settings-token-save]',
+      '[data-settings-doc-link]',
+      '[data-key-group-name]',
+      '[data-key-group-priority]',
+      '[data-key-group-remove]',
+      '[data-settings-refresh-models]',
+      '[data-global-model-add-toggle]',
+      '[data-route-map-filter]',
+      '[data-route-map-real] [data-choice-picker] > button',
+      '[data-route-map-uncommon]',
+      '[data-quick-test-model] [data-choice-picker] > button',
+      '[data-quick-test-run]',
+      '[data-settings-delete]',
+      '[data-settings-save]',
+      '[data-channel-add]',
+    ]
+    const standardHeights = standardSelectors.flatMap((selector) =>
+      Array.from(document.querySelectorAll(selector))
+        .filter((node) => {
+          const box = node.getBoundingClientRect()
+          return box.width > 0 && box.height > 0
+        })
+        .map((node) => Math.round(node.getBoundingClientRect().height)),
+    )
+    if (searchWrap) standardHeights.push(Math.round(searchWrap.getBoundingClientRect().height))
+    const controlRect = (selector) => rect(selector)
+    const gearHeight = controlRect('[data-settings-profile-edit]')?.height ?? 0
+    const eyeHeight = controlRect('[data-settings-token-reveal]')?.height ?? 0
+    const enableTrackHeight =
+      controlRect('[data-channel-enabled] + span')?.height ?? 0
+    const commonTrackHeight =
+      controlRect('[data-route-map-uncommon] span:first-child')?.height ?? 0
+    const quickInputHeight = controlRect('[data-quick-test-input]')?.height ?? 0
     const centerY = (box) => (box ? Math.round(box.top + box.height / 2) : -999)
     return {
       routeInline: document.querySelectorAll('[data-settings-provider-route-inline]').length,
@@ -13918,6 +13961,15 @@ async function g74(browser) {
       ).some((node) => node.textContent?.trim() === '已保存'),
       genericProtocolNote:
         document.querySelectorAll('[data-settings-proto-note]').length,
+      standardHeights,
+      standardCount: standardHeights.length,
+      nonStandardHeights: standardHeights.filter((height) => height !== 34),
+      gearHeight: Math.round(gearHeight),
+      eyeHeight: Math.round(eyeHeight),
+      enableTrackHeight: Math.round(enableTrackHeight),
+      commonTrackHeight: Math.round(commonTrackHeight),
+      quickInputHeight: Math.round(quickInputHeight),
+      tokenLinkText: text('[data-settings-doc-link]'),
     }
   })
   rec(
@@ -13946,6 +13998,40 @@ async function g74(browser) {
       channelPolish.quickTriggerHeight >= 34 &&
       channelPolish.quickChevronRightGap >= 10,
     JSON.stringify(channelPolish),
+  )
+  rec(
+    g,
+    '渠道设置全部标准矩形控件统一 34px',
+    channelPolish.standardCount >= 18 &&
+      channelPolish.nonStandardHeights.length === 0,
+    JSON.stringify({
+      count: channelPolish.standardCount,
+      heights: [...new Set(channelPolish.standardHeights)],
+      outliers: channelPolish.nonStandardHeights,
+    }),
+  )
+  rec(
+    g,
+    '图标、内嵌眼睛、开关轨与多行输入保持各自档位',
+    channelPolish.gearHeight === 28 &&
+      channelPolish.eyeHeight === 26 &&
+      channelPolish.enableTrackHeight === 20 &&
+      channelPolish.commonTrackHeight === 20 &&
+      channelPolish.quickInputHeight >= 84 &&
+      channelPolish.quickInputHeight <= 86,
+    JSON.stringify({
+      gear: channelPolish.gearHeight,
+      eye: channelPolish.eyeHeight,
+      enable: channelPolish.enableTrackHeight,
+      common: channelPolish.commonTrackHeight,
+      textarea: channelPolish.quickInputHeight,
+    }),
+  )
+  rec(
+    g,
+    'Key 分组入口使用短文案“获取令牌”',
+    channelPolish.tokenLinkText !== '去官网获取令牌',
+    channelPolish.tokenLinkText,
   )
   const quickInput = page.locator('[data-channel-quick-test] [data-quick-test-input]')
   const quickTrigger = page.locator(

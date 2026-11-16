@@ -28,6 +28,7 @@
   /* 普通渠道页收在 960（一行读得完）；打开应用与工作流 / 条目设置时放开到整宽 */
   max-width: 960px;
   margin-inline: auto;
+  --settings-control-height: 34px; --settings-icon-control-size: 28px; --settings-inline-icon-height: 26px; --settings-switch-height: 20px;
   display: flex;
   flex-direction: column;
   gap: var(--space-6);
@@ -146,7 +147,7 @@
 }
 
 .input {
-  min-height: 34px;
+  height: var(--settings-control-height, 34px); min-height: var(--settings-control-height, 34px);
   box-sizing: border-box;
   border: var(--border);
   border-radius: var(--radius-control);
@@ -170,9 +171,7 @@
   align-items: center;
 }
 
-.tokenRow .ghostBtn {
-  min-height: 34px;
-}
+.tokenRow .ghostBtn { height: var(--settings-control-height, 34px); min-height: var(--settings-control-height, 34px); }
 
 .saved {
   font-size: var(--fs-label);
@@ -273,6 +272,8 @@
   align-items: flex-end;
   gap: var(--space-2);
 }
+
+.protocolPicker > button { height: var(--settings-control-height, 34px); min-height: var(--settings-control-height, 34px); box-sizing: border-box; background: var(--bg-surface); }
 
 .protoTools {
   display: flex;
@@ -444,6 +445,9 @@
 
 .dangerBtn {
   width: 100%;
+  height: var(--settings-control-height, 34px);
+  min-height: var(--settings-control-height, 34px);
+  box-sizing: border-box;
   border: var(--border);
   border-radius: var(--radius-control);
   background: var(--bg-surface);
@@ -483,6 +487,9 @@
 }
 
 .dangerSolid {
+  height: var(--settings-control-height, 34px);
+  min-height: var(--settings-control-height, 34px);
+  box-sizing: border-box;
   border: var(--border);
   border-radius: var(--radius-control);
   background: var(--danger);
@@ -499,7 +506,7 @@
 }
 
 .primary {
-  min-height: 32px;
+  height: var(--settings-control-height, 34px); min-height: var(--settings-control-height, 34px); display: inline-flex; align-items: center; justify-content: center; box-sizing: border-box;
   border: var(--border);
   border-radius: var(--radius-control);
   background: var(--accent);
@@ -516,7 +523,7 @@
 }
 
 .ghostBtn {
-  min-height: 32px;
+  height: var(--settings-control-height, 34px); min-height: var(--settings-control-height, 34px); display: inline-flex; align-items: center; justify-content: center; box-sizing: border-box;
   border: var(--border);
   border-radius: var(--radius-control);
   background: var(--bg-surface);
@@ -558,5 +565,5 @@
 .disclosure[open] > summary { border-bottom: var(--border); }
 
 .formActions { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); padding-top: var(--space-2); border-top: var(--border); }
-.formActions button { padding: var(--space-1) var(--space-3); border: var(--border); border-radius: var(--radius-control); background: var(--bg-surface); color: var(--text-1); font-size: var(--fs-label); cursor: pointer; }
+.formActions button { height: var(--settings-control-height, 34px); min-height: var(--settings-control-height, 34px); display: inline-flex; align-items: center; justify-content: center; box-sizing: border-box; padding: 0 var(--space-3); border: var(--border); border-radius: var(--radius-control); background: var(--bg-surface); color: var(--text-1); font-size: var(--fs-label); cursor: pointer; }
 .formActions .danger { color: var(--danger); }

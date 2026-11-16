@@ -148,7 +148,7 @@ export function ChannelTokenField({
             target="_blank"
             rel="noreferrer"
           >
-            去官网获取令牌
+            获取令牌
           </a>
         )}
       </div>

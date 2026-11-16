@@ -37,14 +37,22 @@
   width: 100%;
 }
 
+.modelPicker > div > button {
+  height: var(--settings-control-height, 34px);
+  min-height: var(--settings-control-height, 34px);
+  box-sizing: border-box;
+  background: var(--bg-surface);
+}
+
 .run {
-  min-height: 34px;
-  height: 34px;
+  min-height: var(--settings-control-height, 34px);
+  height: var(--settings-control-height, 34px);
+  box-sizing: border-box;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   padding: 0 var(--space-3);
-  line-height: 1;
+  line-height: 1.4;
 }
 
 /* 结果区：文本 / 图 / 视频都走「卡面 + 1px 描边」，与设置页其它块一致（不用投影） */

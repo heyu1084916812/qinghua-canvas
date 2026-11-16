@@ -233,7 +233,9 @@
 .channelSearch {
   flex: 1;
   min-width: 0;
-  min-height: 32px;
+  height: var(--settings-control-height, 34px);
+  min-height: var(--settings-control-height, 34px);
+  box-sizing: border-box;
   display: flex;
   align-items: center;
   gap: var(--space-2);
@@ -290,11 +292,11 @@
 
 .sidebarFoot .addBtn {
   width: 100%;
-  min-height: 32px;
+  min-height: var(--settings-control-height, 34px);
 }
 
 .addBtn {
-  height: 32px;
+  height: var(--settings-control-height, 34px);
   box-sizing: border-box;
   border: var(--border);
   border-radius: var(--radius-control);

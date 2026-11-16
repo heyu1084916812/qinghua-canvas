@@ -1,0 +1,417 @@
+{
+  "capturedAt": "2026-11-16T16:28:26.809Z",
+  "cases": [
+    {
+      "width": 1440,
+      "height": 900,
+      "theme": "light",
+      "metrics": {
+        "standardHeights": [
+          34
+        ],
+        "standardOutliers": [],
+        "standardCount": 37,
+        "address": {
+          "h": 34,
+          "bg": "rgb(255, 255, 255)",
+          "border": "rgb(226, 226, 226)",
+          "padding": "8px/8px",
+          "line": "normal",
+          "font": "13px",
+          "box": "border-box"
+        },
+        "protocol": {
+          "h": 34,
+          "bg": "rgb(255, 255, 255)",
+          "border": "rgb(226, 226, 226)",
+          "padding": "0px/0px",
+          "line": "normal",
+          "font": "13px",
+          "box": "border-box"
+        },
+        "key": {
+          "h": 34,
+          "bg": "rgb(255, 255, 255)",
+          "border": "rgb(226, 226, 226)",
+          "padding": "8px/8px",
+          "line": "normal",
+          "font": "13px",
+          "box": "border-box"
+        },
+        "keySave": {
+          "h": 34,
+          "bg": "rgb(255, 255, 255)",
+          "border": "rgb(226, 226, 226)",
+          "padding": "0px/0px",
+          "line": "normal",
+          "font": "13px",
+          "box": "border-box"
+        },
+        "token": {
+          "h": 34,
+          "bg": "rgb(255, 255, 255)",
+          "border": "rgb(226, 226, 226)",
+          "padding": "0px/0px",
+          "line": "normal",
+          "font": "13px",
+          "box": "border-box"
+        },
+        "quickPicker": {
+          "h": 34,
+          "bg": "rgb(255, 255, 255)",
+          "border": "rgb(226, 226, 226)",
+          "padding": "0px/0px",
+          "line": "normal",
+          "font": "13px",
+          "box": "border-box"
+        },
+        "quickRun": {
+          "h": 34,
+          "bg": "rgb(226, 226, 226)",
+          "border": "rgb(226, 226, 226)",
+          "padding": "0px/0px",
+          "line": "18.2px",
+          "font": "13px",
+          "box": "border-box"
+        },
+        "bottomDelete": {
+          "h": 34,
+          "bg": "rgb(255, 255, 255)",
+          "border": "rgb(226, 226, 226)",
+          "padding": "0px/0px",
+          "line": "normal",
+          "font": "13px",
+          "box": "border-box"
+        },
+        "bottomSave": {
+          "h": 34,
+          "bg": "rgb(255, 255, 255)",
+          "border": "rgb(226, 226, 226)",
+          "padding": "0px/0px",
+          "line": "normal",
+          "font": "13px",
+          "box": "border-box"
+        },
+        "exceptions": {
+          "gear": 28,
+          "eye": 26,
+          "enable": 20,
+          "common": 20,
+          "textarea": 85.17
+        },
+        "tokenText": "获取令牌",
+        "overflow": false
+      },
+      "errors": []
+    },
+    {
+      "width": 1440,
+      "height": 900,
+      "theme": "dark",
+      "metrics": {
+        "standardHeights": [
+          34
+        ],
+        "standardOutliers": [],
+        "standardCount": 37,
+        "address": {
+          "h": 34,
+          "bg": "rgb(34, 34, 34)",
+          "border": "rgb(58, 58, 58)",
+          "padding": "8px/8px",
+          "line": "normal",
+          "font": "13px",
+          "box": "border-box"
+        },
+        "protocol": {
+          "h": 34,
+          "bg": "rgb(34, 34, 34)",
+          "border": "rgb(58, 58, 58)",
+          "padding": "0px/0px",
+          "line": "normal",
+          "font": "13px",
+          "box": "border-box"
+        },
+        "key": {
+          "h": 34,
+          "bg": "rgb(34, 34, 34)",
+          "border": "rgb(58, 58, 58)",
+          "padding": "8px/8px",
+          "line": "normal",
+          "font": "13px",
+          "box": "border-box"
+        },
+        "keySave": {
+          "h": 34,
+          "bg": "rgb(34, 34, 34)",
+          "border": "rgb(58, 58, 58)",
+          "padding": "0px/0px",
+          "line": "normal",
+          "font": "13px",
+          "box": "border-box"
+        },
+        "token": {
+          "h": 34,
+          "bg": "rgb(34, 34, 34)",
+          "border": "rgb(58, 58, 58)",
+          "padding": "0px/0px",
+          "line": "normal",
+          "font": "13px",
+          "box": "border-box"
+        },
+        "quickPicker": {
+          "h": 34,
+          "bg": "rgb(34, 34, 34)",
+          "border": "rgb(58, 58, 58)",
+          "padding": "0px/0px",
+          "line": "normal",
+          "font": "13px",
+          "box": "border-box"
+        },
+        "quickRun": {
+          "h": 34,
+          "bg": "rgb(51, 51, 51)",
+          "border": "rgb(58, 58, 58)",
+          "padding": "0px/0px",
+          "line": "18.2px",
+          "font": "13px",
+          "box": "border-box"
+        },
+        "bottomDelete": {
+          "h": 34,
+          "bg": "rgb(34, 34, 34)",
+          "border": "rgb(58, 58, 58)",
+          "padding": "0px/0px",
+          "line": "normal",
+          "font": "13px",
+          "box": "border-box"
+        },
+        "bottomSave": {
+          "h": 34,
+          "bg": "rgb(34, 34, 34)",
+          "border": "rgb(58, 58, 58)",
+          "padding": "0px/0px",
+          "line": "normal",
+          "font": "13px",
+          "box": "border-box"
+        },
+        "exceptions": {
+          "gear": 28,
+          "eye": 26,
+          "enable": 20,
+          "common": 20,
+          "textarea": 85.17
+        },
+        "tokenText": "获取令牌",
+        "overflow": false
+      },
+      "errors": []
+    },
+    {
+      "width": 1024,
+      "height": 700,
+      "theme": "light",
+      "metrics": {
+        "standardHeights": [
+          34
+        ],
+        "standardOutliers": [],
+        "standardCount": 37,
+        "address": {
+          "h": 34,
+          "bg": "rgb(255, 255, 255)",
+          "border": "rgb(226, 226, 226)",
+          "padding": "8px/8px",
+          "line": "normal",
+          "font": "13px",
+          "box": "border-box"
+        },
+        "protocol": {
+          "h": 34,
+          "bg": "rgb(255, 255, 255)",
+          "border": "rgb(226, 226, 226)",
+          "padding": "0px/0px",
+          "line": "normal",
+          "font": "13px",
+          "box": "border-box"
+        },
+        "key": {
+          "h": 34,
+          "bg": "rgb(255, 255, 255)",
+          "border": "rgb(226, 226, 226)",
+          "padding": "8px/8px",
+          "line": "normal",
+          "font": "13px",
+          "box": "border-box"
+        },
+        "keySave": {
+          "h": 34,
+          "bg": "rgb(255, 255, 255)",
+          "border": "rgb(226, 226, 226)",
+          "padding": "0px/0px",
+          "line": "normal",
+          "font": "13px",
+          "box": "border-box"
+        },
+        "token": {
+          "h": 34,
+          "bg": "rgb(255, 255, 255)",
+          "border": "rgb(226, 226, 226)",
+          "padding": "0px/0px",
+          "line": "normal",
+          "font": "13px",
+          "box": "border-box"
+        },
+        "quickPicker": {
+          "h": 34,
+          "bg": "rgb(255, 255, 255)",
+          "border": "rgb(226, 226, 226)",
+          "padding": "0px/0px",
+          "line": "normal",
+          "font": "13px",
+          "box": "border-box"
+        },
+        "quickRun": {
+          "h": 34,
+          "bg": "rgb(226, 226, 226)",
+          "border": "rgb(226, 226, 226)",
+          "padding": "0px/0px",
+          "line": "18.2px",
+          "font": "13px",
+          "box": "border-box"
+        },
+        "bottomDelete": {
+          "h": 34,
+          "bg": "rgb(255, 255, 255)",
+          "border": "rgb(226, 226, 226)",
+          "padding": "0px/0px",
+          "line": "normal",
+          "font": "13px",
+          "box": "border-box"
+        },
+        "bottomSave": {
+          "h": 34,
+          "bg": "rgb(255, 255, 255)",
+          "border": "rgb(226, 226, 226)",
+          "padding": "0px/0px",
+          "line": "normal",
+          "font": "13px",
+          "box": "border-box"
+        },
+        "exceptions": {
+          "gear": 28,
+          "eye": 26,
+          "enable": 20,
+          "common": 20,
+          "textarea": 85.17
+        },
+        "tokenText": "获取令牌",
+        "overflow": false
+      },
+      "errors": []
+    },
+    {
+      "width": 1024,
+      "height": 700,
+      "theme": "dark",
+      "metrics": {
+        "standardHeights": [
+          34
+        ],
+        "standardOutliers": [],
+        "standardCount": 37,
+        "address": {
+          "h": 34,
+          "bg": "rgb(34, 34, 34)",
+          "border": "rgb(58, 58, 58)",
+          "padding": "8px/8px",
+          "line": "normal",
+          "font": "13px",
+          "box": "border-box"
+        },
+        "protocol": {
+          "h": 34,
+          "bg": "rgb(34, 34, 34)",
+          "border": "rgb(58, 58, 58)",
+          "padding": "0px/0px",
+          "line": "normal",
+          "font": "13px",
+          "box": "border-box"
+        },
+        "key": {
+          "h": 34,
+          "bg": "rgb(34, 34, 34)",
+          "border": "rgb(58, 58, 58)",
+          "padding": "8px/8px",
+          "line": "normal",
+          "font": "13px",
+          "box": "border-box"
+        },
+        "keySave": {
+          "h": 34,
+          "bg": "rgb(34, 34, 34)",
+          "border": "rgb(58, 58, 58)",
+          "padding": "0px/0px",
+          "line": "normal",
+          "font": "13px",
+          "box": "border-box"
+        },
+        "token": {
+          "h": 34,
+          "bg": "rgb(34, 34, 34)",
+          "border": "rgb(58, 58, 58)",
+          "padding": "0px/0px",
+          "line": "normal",
+          "font": "13px",
+          "box": "border-box"
+        },
+        "quickPicker": {
+          "h": 34,
+          "bg": "rgb(34, 34, 34)",
+          "border": "rgb(58, 58, 58)",
+          "padding": "0px/0px",
+          "line": "normal",
+          "font": "13px",
+          "box": "border-box"
+        },
+        "quickRun": {
+          "h": 34,
+          "bg": "rgb(51, 51, 51)",
+          "border": "rgb(58, 58, 58)",
+          "padding": "0px/0px",
+          "line": "18.2px",
+          "font": "13px",
+          "box": "border-box"
+        },
+        "bottomDelete": {
+          "h": 34,
+          "bg": "rgb(34, 34, 34)",
+          "border": "rgb(58, 58, 58)",
+          "padding": "0px/0px",
+          "line": "normal",
+          "font": "13px",
+          "box": "border-box"
+        },
+        "bottomSave": {
+          "h": 34,
+          "bg": "rgb(34, 34, 34)",
+          "border": "rgb(58, 58, 58)",
+          "padding": "0px/0px",
+          "line": "normal",
+          "font": "13px",
+          "box": "border-box"
+        },
+        "exceptions": {
+          "gear": 28,
+          "eye": 26,
+          "enable": 20,
+          "common": 20,
+          "textarea": 85.17
+        },
+        "tokenText": "获取令牌",
+        "overflow": false
+      },
+      "errors": []
+    }
+  ]
+}

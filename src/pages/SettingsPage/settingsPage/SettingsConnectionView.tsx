@@ -185,6 +185,7 @@ export function SettingsConnectionView({
             name="settings-protocol"
             value={protocol}
             ariaLabel="渠道协议"
+            className={styles.protocolPicker}
             disabled={builtinSelected}
             onChange={onProtocolChange}
             options={protocolChoices}
