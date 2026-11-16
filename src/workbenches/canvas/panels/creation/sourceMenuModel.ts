@@ -1,0 +1,198 @@
+import {
+  cliModelId,
+  type GenerationSource,
+  type SourcePick,
+} from '../../../../domain/canvas/model/generationSource'
+import { capabilityLabel, CLI_PROTOCOL_TOOL, type CliCapability, type CliTool } from '../../../../domain/shared/cliTools'
+import { workflowSubmitList } from './creationWorkflowMode'
+import { workflowEntryModelId, type WorkflowSourceRow } from './workflowPanelSources'
+
+/**
+ * 模型菜单「API · 工作流 · CLI」三个标签的数据（对账 #1133，设计稿 work/source-mock）。
+ *
+ * 纯函数：只把面板手上的三份来源投影成「标签 → 分组 → 行」，不渲染、不读库；
+ * 每一行带好「点了要切成什么」（`SourcePick`），菜单组件只管画和转发。
+ */
+
+export type CliToolStatus = 'checking' | 'ok' | 'missing'
+
+export interface CliPanelTool {
+  tool: CliTool
+  status: CliToolStatus
+}
+
+export interface CliPanelSources {
+  /** 桌面壳才有子进程能力；网页版 CLI 标签锁住 */
+  desktop: boolean
+  tools: CliPanelTool[]
+}
+
+export type SourceMenuIcon =
+  | { kind: 'model'; name: string }
+  | { kind: 'channel'; protocol: string }
+
+export interface SourceMenuRow {
+  /** 行的稳定值（测试锚点 `data-source-option`） */
+  value: string
+  label: string
+  hint: string
+  icon: SourceMenuIcon
+  status?: CliToolStatus
+  disabled?: boolean
+  title?: string
+  pick: SourcePick
+}
+
+export interface SourceMenuGroup {
+  label: string
+  rows: SourceMenuRow[]
+}
+
+export type SourceFooterAction = 'channels' | 'workflows' | 'cli'
+
+export interface SourceMenuTab {
+  source: GenerationSource
+  label: string
+  count: number
+  /** 锁住的原因（网页版 CLI）；锁住的标签点不开 */
+  locked?: string
+  groups: SourceMenuGroup[]
+  empty: string
+  footer: { label: string; action: SourceFooterAction }
+}
+
+export interface ApiModelOption {
+  name: string
+  /** 能提供它的渠道（选路结果）；没有渠道提供时为空 */
+  channelId: string
+  channelName: string
+}
+
+export interface SourceMenuInput {
+  apiModels: readonly ApiModelOption[]
+  workflowRows: readonly WorkflowSourceRow[]
+  /** 渠道 id → 国内站 / 国际站（只有 RunningHub 两站之分） */
+  siteOf: (channelId: string) => string
+  cli: CliPanelSources | null
+  /** 节点要的类别：CLI 工具报不出这一类时那一行置灰 */
+  wantedCategory: CliCapability
+  /** 当前工作流条目的实例规格（只用来写副标题 24G / 48G） */
+  currentModel: string
+  currentInstance: 'default' | 'plus'
+}
+
+const STATUS_TEXT: Record<CliToolStatus, string> = { checking: '检测中', ok: '可用', missing: '未检测到' }
+
+export function cliStatusText(status: CliToolStatus): string {
+  return STATUS_TEXT[status]
+}
+
+/** 只给它报得出的类别（Codex / Gemini 只能对话）；不另写一份能力表 */
+export function cliCapabilityText(tool: CliTool): string {
+  const caps = [...new Set(tool.models.map((model) => model.category))]
+  return caps.map(capabilityLabel).join(' / ') || '无'
+}
+
+export function cliProtocolOf(toolId: string): string {
+  return Object.entries(CLI_PROTOCOL_TOOL).find(([, tool]) => tool === toolId)?.[0] ?? ''
+}
+
+function apiTab(input: SourceMenuInput): SourceMenuTab {
+  const groups = new Map<string, SourceMenuGroup>()
+  for (const option of input.apiModels) {
+    const label = option.channelName || '未配置渠道'
+    const group = groups.get(label) ?? { label, rows: [] }
+    group.rows.push({
+      value: `api::${option.name}`,
+      label: option.name,
+      /** 分组标题已是渠道名，行上不再重复；只有没人提供时才说一句 */
+      hint: option.channelId ? '' : '还没有渠道提供',
+      icon: { kind: 'model', name: option.name },
+      pick: { source: 'api', model: option.name, channelId: option.channelId },
+    })
+    groups.set(label, group)
+  }
+  return {
+    source: 'api',
+    label: 'API',
+    count: input.apiModels.length,
+    groups: [...groups.values()],
+    empty: '还没有可用的 API 模型：先去渠道设置里配好 Key 并勾选模型。',
+    footer: { label: '渠道设置…', action: 'channels' },
+  }
+}
+
+function workflowTab(input: SourceMenuInput): SourceMenuTab {
+  const rowOf = (row: WorkflowSourceRow): SourceMenuRow => {
+    const model = workflowEntryModelId(row.entry)
+    const params = row.entry.fields.filter((field) => field.enabled).length
+    const instance = row.entry.kind === 'app' ? '' : model === input.currentModel && input.currentInstance === 'plus' ? '48G' : '24G'
+    return {
+      value: `${row.channelId}::${model}`,
+      label: row.entry.title,
+      hint: [input.siteOf(row.channelId), `${params} 个参数`, instance].filter(Boolean).join(' · '),
+      icon: { kind: 'channel', protocol: row.protocol },
+      pick: {
+        source: 'workflow',
+        model,
+        channelId: row.channelId,
+        defaults: { workflowNodeInfoList: workflowSubmitList(row.entry, {}), workflowInstance: 'default' },
+      },
+    }
+  }
+  const apps = input.workflowRows.filter((row) => row.entry.kind === 'app').map(rowOf)
+  const flows = input.workflowRows.filter((row) => row.entry.kind !== 'app').map(rowOf)
+  return {
+    source: 'workflow',
+    label: '工作流',
+    count: apps.length + flows.length,
+    groups: [
+      ...(apps.length ? [{ label: 'AI 应用', rows: apps }] : []),
+      ...(flows.length ? [{ label: '工作流', rows: flows }] : []),
+    ],
+    empty: '还没有导入 AI 应用或工作流：去管理页贴一个 RunningHub 链接就能导入。',
+    footer: { label: '管理 AI 应用 / 工作流…', action: 'workflows' },
+  }
+}
+
+function cliTab(input: SourceMenuInput): SourceMenuTab {
+  const cli = input.cli
+  const rows: SourceMenuRow[] = (cli?.tools ?? []).map(({ tool, status }) => {
+    const able = tool.models.some((model) => model.category === input.wantedCategory)
+    const id = cliModelId(tool.id)
+    return {
+      value: `cli::${tool.id}`,
+      label: tool.name,
+      hint: `本机账号额度 · ${cliCapabilityText(tool)}`,
+      icon: { kind: 'channel', protocol: cliProtocolOf(tool.id) },
+      status,
+      ...(able ? {} : { disabled: true, title: `「${tool.name}」不能${capabilityLabel(input.wantedCategory)}` }),
+      pick: { source: 'cli', model: id, channelId: id },
+    }
+  })
+  return {
+    source: 'cli',
+    label: 'CLI',
+    count: rows.length,
+    ...(cli?.desktop ? {} : { locked: '本机 CLI 需要桌面版：网页版没有起本机命令的能力' }),
+    groups: rows.length ? [{ label: '', rows }] : [],
+    empty: '还没有本机 CLI 工具：去本机 CLI 设置里装好并登录。',
+    footer: { label: '本机 CLI 设置…', action: 'cli' },
+  }
+}
+
+export function buildSourceMenu(input: SourceMenuInput): SourceMenuTab[] {
+  return [apiTab(input), workflowTab(input), cliTab(input)]
+}
+
+/** API 标签的搜索：按名字 / 渠道名包含，忽略大小写；空查询原样返回 */
+export function filterGroups(groups: readonly SourceMenuGroup[], query: string): SourceMenuGroup[] {
+  const needle = query.trim().toLowerCase()
+  if (!needle) return [...groups]
+  return groups
+    .map((group) => ({
+      ...group,
+      rows: group.rows.filter((row) => `${row.label} ${group.label}`.toLowerCase().includes(needle)),
+    }))
+    .filter((group) => group.rows.length > 0)
+}

@@ -1,0 +1,214 @@
+/*
+ * 模型菜单（内嵌来源切换，对账 #1133）。行 / 分组标题 / 勾 复用 ParamPicker.module.css，
+ * 这里只有：顶部分段标签、搜索框、CLI 状态点、末行设置入口、空态、chip 前的来源角标。
+ * 尺寸都是面板内部单位（创作面板整体 zoom 0.75），与 ParamPicker 同一套口径。
+ */
+.menu {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 380px;
+  max-width: 100%;
+}
+
+/* 分段标签：灰底轨道 + 选中那块白底（与参数面板的分段控件同一种形状） */
+.tabs {
+  position: sticky;
+  top: -14px;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 3px;
+  padding: 3px;
+  border-radius: var(--radius-control);
+  background: var(--bg-subtle);
+}
+
+.tab {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 40px;
+  border: none;
+  border-radius: calc(var(--radius-control) - 3px);
+  background: transparent;
+  color: var(--text-2);
+  font-family: var(--font-sans);
+  font-size: var(--picker-option-fs, 16px);
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.tab:hover:not(:disabled) {
+  color: var(--text-1);
+}
+
+.tab:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.tabOn {
+  background: var(--bg-surface);
+  color: var(--text-1);
+  font-weight: 600;
+}
+
+.tab:disabled {
+  color: var(--text-3);
+  cursor: not-allowed;
+}
+
+.count {
+  color: var(--text-3);
+  font-weight: 500;
+}
+
+.search {
+  box-sizing: border-box;
+  width: 100%;
+  height: 40px;
+  padding: 0 12px;
+  border: 1px solid var(--stroke);
+  border-radius: var(--radius-control);
+  background: var(--bg-surface);
+  color: var(--text-1);
+  font-family: var(--font-sans);
+  font-size: var(--picker-option-fs, 16px);
+}
+
+.search::placeholder {
+  color: var(--text-3);
+}
+
+.search:focus-visible {
+  outline: none;
+  border-color: var(--text-2);
+}
+
+.groups {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.group {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.group > * {
+  flex-shrink: 0;
+}
+
+/* CLI 行右侧状态：可用（绿）/ 检测中（灰）/ 未检测到（浅灰，整行字变淡但仍可选，运行前会拦） */
+.status {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-2);
+  font-size: var(--picker-hint-fs, var(--fs-chip));
+  font-weight: 500;
+}
+
+.dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--text-3);
+}
+
+.status[data-cli-status='ok'] .dot {
+  background: var(--success);
+}
+
+.status[data-cli-status='missing'] {
+  color: var(--text-3);
+}
+
+.rowMissing {
+  color: var(--text-2);
+}
+
+.footer {
+  border-top: 1px solid var(--stroke);
+  border-radius: 0;
+  margin-top: 2px;
+  justify-content: flex-start;
+}
+
+.empty {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 6px;
+  color: var(--text-2);
+  font-family: var(--font-sans);
+  font-size: var(--picker-hint-fs, var(--fs-chip));
+  line-height: 1.5;
+  white-space: normal;
+}
+
+.emptyGo {
+  height: 34px;
+  padding: 0 14px;
+  border: 1px solid var(--stroke);
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--text-1);
+  font-family: var(--font-sans);
+  font-size: var(--picker-hint-fs, var(--fs-chip));
+  cursor: pointer;
+}
+
+.emptyGo:hover {
+  background: var(--bg-hover);
+}
+
+/* chip 前的来源角标（API / 工作流 / CLI）：小号反色胶囊 */
+.trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 5px;
+  background: var(--control-inverse-bg);
+  color: var(--control-inverse-text);
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.badge[data-source-badge='workflow'] {
+  background: var(--success);
+  color: var(--accent-text);
+}
+
+/* CLI 参数模板（只读）：等宽、可换行，长模板不撑宽浮层 */
+.template {
+  box-sizing: border-box;
+  display: block;
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--stroke);
+  border-radius: var(--radius-control);
+  background: var(--bg-subtle);
+  color: var(--text-1);
+  font-family: var(--font-mono);
+  font-size: var(--picker-hint-fs, var(--fs-chip));
+  line-height: 1.5;
+  white-space: normal;
+  word-break: break-all;
+}
