@@ -170,10 +170,6 @@
   align-items: center;
 }
 
-.tokenRow .input {
-  flex: 1;
-}
-
 .saved {
   font-size: var(--fs-label);
   color: var(--success);

@@ -56,11 +56,9 @@ function harness(overrides: Partial<ChannelActionState> = {}) {
     setPanelOpen: vi.fn(),
     setDraftChecked: vi.fn(),
     setDraftCategory: vi.fn(),
-    setDraftKeyword: vi.fn(),
     setDragId: vi.fn(),
     setNewModelName: vi.fn(),
     setModelAddOpen: vi.fn(),
-    setMapCategory: vi.fn(),
     alert: vi.fn(),
     confirm: vi.fn(() => true),
   } as unknown as ChannelActionPorts
@@ -183,7 +181,7 @@ describe('channelActionCoordinator', () => {
     expect(ports.setBusy).toHaveBeenLastCalledWith(false)
   })
 
-  it('新增前端模型按表单当前分类保存，并切到对应映射分类', async () => {
+  it('新增前端模型按表单当前分类保存', async () => {
     const { actions, state, ports, channels } = harness({
       newModelName: '6.1',
       newModelCategory: 'chat',
@@ -197,7 +195,6 @@ describe('channelActionCoordinator', () => {
     })
     expect(ports.setNewModelName).toHaveBeenCalledWith('')
     expect(ports.setModelAddOpen).toHaveBeenCalledWith(false)
-    expect(ports.setMapCategory).toHaveBeenCalledWith('chat')
   })
 
   it('模型应用和渠道拖动保留既有排序与 busy/finally 顺序', async () => {

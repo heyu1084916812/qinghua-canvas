@@ -107,7 +107,7 @@ describe('channelStore/modelProjections', () => {
     const groupA = {
       id: 'group-a', name: 'A', credentialRef: 'cred-a', tokenTail: null,
       hasToken: true, priority: 1, models: [capability('a-selected')],
-      modelCache: [capability('a-cached')], createdAt: 1,
+      modelCache: [capability('a-cached')], modelMap: {}, createdAt: 1,
     }
     const groupB = { ...groupA, id: 'group-b', name: 'B' }
     const source = channel({ credentialGroups: [groupA, groupB], models: [], modelCache: [] })
@@ -124,7 +124,8 @@ describe('channelStore/modelProjections', () => {
       models: [capability('stale')], modelCache: [capability('stale-cache')],
       credentialGroups: [{
         id: 'g', name: 'G', credentialRef: 'cred', tokenTail: null, hasToken: false,
-        priority: 0, models: [capability('g-stale')], modelCache: [capability('g-cache')], createdAt: 1,
+        priority: 0, models: [capability('g-stale')], modelCache: [capability('g-cache')],
+        modelMap: {}, createdAt: 1,
       }],
     })
     const configured = channel({ id: 'rh-ok', protocol: 'runninghub-api', hasToken: true })
@@ -140,7 +141,7 @@ describe('channelStore/modelProjections', () => {
       id: 'cli', protocol: 'cli-gateway', baseUrl: 'http://127.0.0.1:1', hasToken: false,
       credentialGroups: [{
         id: 'g', name: 'G', credentialRef: 'cred', tokenTail: null, hasToken: false,
-        priority: 0, models: [], modelCache: [], createdAt: 1,
+        priority: 0, models: [], modelCache: [], modelMap: {}, createdAt: 1,
       }],
     })
     const projected = tokenlessRoutableChannels([source], true, (protocol) => protocol === 'cli-gateway')

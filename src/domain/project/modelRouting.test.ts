@@ -529,16 +529,76 @@ describe('routeCandidatesFor', () => {
       'gpt-image-2',
       resolveUpstreamModel,
     )
-    expect(out).toHaveLength(1)
+    expect(out).toHaveLength(2)
     expect(out[0]).toMatchObject({
       channelId: 'A',
       credentialGroupId: 'image-pro',
-      credentialGroupIds: ['image-pro', 'image-std'],
+      credentialGroupIds: ['image-pro'],
     })
     expect(selectRoute(out, 'priority')).toMatchObject({
       channelId: 'A',
       credentialGroupId: 'image-pro',
-      credentialGroupIds: ['image-pro', 'image-std'],
+      credentialGroupIds: ['image-pro'],
+    })
+  })
+
+  it('★★ 同一渠道的不同分组可把不同真实 ID 映射到同一前端模型，并按分组优先级与模型覆盖选路', () => {
+    const channel = ch({
+      id: 'A',
+      modelMap: {
+        Gemini: 'gemini-standard',
+        GPT: 'gpt-4o',
+      },
+      credentialGroups: [
+        {
+          id: 'standard',
+          hasToken: true,
+          priority: 20,
+          modelIds: ['gemini-standard', 'gpt-4o'],
+          modelMap: {
+            Gemini: 'gemini-standard',
+            GPT: 'gpt-4o',
+          },
+        },
+        {
+          id: 'premium',
+          hasToken: true,
+          priority: 10,
+          modelIds: ['gemini-premium'],
+          modelMap: {
+            Gemini: 'gemini-premium',
+          },
+        },
+      ],
+    })
+
+    const gemini = routeCandidatesFor([channel], 'Gemini', resolveUpstreamModel)
+    expect(gemini).toHaveLength(2)
+    expect(selectRoute(gemini, 'priority')).toMatchObject({
+      credentialGroupId: 'standard',
+      upstreamModel: 'gemini-standard',
+    })
+
+    const premiumFirst = routeCandidatesFor(
+      [{
+        ...channel,
+        credentialGroups: channel.credentialGroups!.map((group) =>
+          group.id === 'standard' ? { ...group, priority: 0 } : { ...group, priority: 30 },
+        ),
+      }],
+      'Gemini',
+      resolveUpstreamModel,
+    )
+    expect(selectRoute(premiumFirst, 'priority')).toMatchObject({
+      credentialGroupId: 'premium',
+      upstreamModel: 'gemini-premium',
+    })
+
+    const gpt = routeCandidatesFor([channel], 'GPT', resolveUpstreamModel)
+    expect(gpt).toHaveLength(1)
+    expect(selectRoute(gpt, 'priority')).toMatchObject({
+      credentialGroupId: 'standard',
+      upstreamModel: 'gpt-4o',
     })
   })
 
@@ -623,10 +683,9 @@ describe('routeCandidatesFor', () => {
       resolveUpstreamModel,
     )
 
-    expect(out[0]).toMatchObject({
+    expect(selectRoute(out, 'priority')).toMatchObject({
       credentialGroupId: 'usable-fallback',
       credentialGroupIds: ['usable-fallback'],
-      hasToken: true,
     })
   })
 })

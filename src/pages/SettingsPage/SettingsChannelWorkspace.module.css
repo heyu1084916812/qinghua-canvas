@@ -1,0 +1,296 @@
+.pageUtilityBar {
+  width: 100%;
+  max-width: 1344px;
+  min-height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.pageUtilityCopy {
+  color: var(--text-2);
+  font-size: var(--fs-label);
+}
+
+.pageUtilityCount {
+  margin-left: var(--space-2);
+  color: var(--text-3);
+  font-variant-numeric: tabular-nums;
+}
+
+.pageUtilityBar .ghostBtn {
+  border-color: transparent;
+  background: transparent;
+  color: var(--text-2);
+}
+
+.pageUtilityBar .ghostBtn:hover,
+.pageUtilityBar .ghostBtn:focus-visible {
+  border-color: var(--stroke);
+  background: var(--bg-hover);
+  color: var(--text-1);
+}
+
+.providerEditorBlock {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.providerGearOn {
+  background: var(--bg-hover);
+  color: var(--text-1);
+}
+
+.providerRouteStrip {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--space-3);
+  padding: var(--space-2) 0 var(--space-3);
+  border-bottom: var(--border);
+}
+
+.providerRouteField {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--text-3);
+  font-size: var(--fs-label);
+  white-space: nowrap;
+}
+
+.providerRouteField input {
+  width: 82px;
+  min-height: 30px;
+  box-sizing: border-box;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-1);
+  padding: 0 var(--space-2);
+  font: inherit;
+}
+
+.providerRouteField input:hover,
+.providerRouteField input:focus {
+  border-color: var(--stroke);
+  background: var(--bg-surface);
+  outline: none;
+}
+
+.cardHeadRow {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.connectionActions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.connectionActions .ghostBtn,
+.mutedAction {
+  border-color: transparent;
+  background: transparent;
+  color: var(--text-2);
+}
+
+.connectionActions .ghostBtn:hover,
+.connectionActions .ghostBtn:focus-visible {
+  border-color: var(--stroke);
+  background: var(--bg-hover);
+  color: var(--text-1);
+}
+
+.mutedAction {
+  font-size: var(--fs-label);
+}
+
+.tokenInputWrap {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+}
+
+.tokenInputWrap .input {
+  width: 100%;
+  padding-right: 34px;
+}
+
+.tokenEye {
+  position: absolute;
+  top: 50%;
+  right: 4px;
+  width: 28px;
+  height: 26px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--text-3);
+  transform: translateY(-50%);
+  cursor: pointer;
+}
+
+.tokenEye:hover:not(:disabled),
+.tokenEye:focus-visible {
+  background: var(--bg-hover);
+  color: var(--text-1);
+}
+
+.tokenEye:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.keyGroupSurface {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding-bottom: var(--space-5);
+  border-bottom: var(--border);
+}
+
+.keyGroupSwitcher {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.keyGroupTabs {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+
+.keyGroupTab {
+  flex: 0 0 auto;
+  min-height: 30px;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 0 var(--space-3);
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-2);
+  font: inherit;
+  font-size: var(--fs-label);
+  cursor: pointer;
+}
+
+.keyGroupTab:hover {
+  background: var(--bg-hover);
+  color: var(--text-1);
+}
+
+.keyGroupTabOn {
+  border-color: var(--stroke);
+  background: var(--bg-hover);
+  color: var(--text-1);
+}
+
+.keyGroupDotOn,
+.keyGroupDotOff {
+  width: 7px;
+  height: 7px;
+  flex: 0 0 7px;
+  border-radius: 50%;
+}
+
+.keyGroupDotOn {
+  background: var(--success);
+}
+
+.keyGroupDotOff {
+  background: var(--status-off-dot);
+}
+
+.keyGroupBody {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.groupPropertyStrip {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 30px;
+}
+
+.groupPropertyField {
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--text-3);
+  font-size: var(--fs-label);
+}
+
+.groupPropertyField input {
+  width: 140px;
+  min-height: 30px;
+  box-sizing: border-box;
+  padding: 0 var(--space-2);
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-1);
+  font: inherit;
+}
+
+.groupPriorityField input {
+  width: 64px;
+}
+
+.groupPropertyField input:hover,
+.groupPropertyField input:focus {
+  border-color: var(--stroke);
+  background: var(--bg-surface);
+  outline: none;
+}
+
+.groupDanger {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--text-3);
+  font-size: var(--fs-label);
+}
+
+.dangerTextButton {
+  min-height: 28px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--danger);
+  padding: 0 var(--space-2);
+  font: inherit;
+  font-size: var(--fs-label);
+  cursor: pointer;
+}
+
+.dangerTextButton:hover:not(:disabled) {
+  background: var(--bg-hover);
+}
+
+.dangerTextButton:disabled {
+  opacity: 0.45;
+  cursor: default;
+}

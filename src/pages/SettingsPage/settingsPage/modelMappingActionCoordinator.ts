@@ -38,7 +38,12 @@ export function createModelMappingActions(ports: ModelMappingPorts) {
     if (timer !== undefined) ports.clearTimeout(timer)
     ports.timers.delete(logicalName)
     try {
-      await ports.channels.setModelMapping(selectedId, logicalName, upstreamId)
+      await ports.channels.setModelMapping(
+        selectedId,
+        logicalName,
+        upstreamId,
+        ports.activeGroupId(),
+      )
       ports.setMapDrafts((previous) => {
         if (previous[logicalName] !== upstreamId) return previous
         const next = { ...previous }

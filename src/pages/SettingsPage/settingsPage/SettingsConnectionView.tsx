@@ -1,8 +1,6 @@
 import type { ReactNode } from 'react'
 import type { ProtocolDefinition } from '../../../domain/project/protocol'
 import type { DeclarativeProtocolPackage } from '../../../domain/project/protocolRecipe'
-import type { Channel, ChannelCredentialGroup } from '../../../domain/project/channel'
-import type { ChannelStore } from '../../../state/channel/channelStore'
 import {
   IconDelete,
   IconDownload,
@@ -11,25 +9,11 @@ import { noticeA11y } from '../../../domain/ui/notice'
 import { ChoicePicker } from '../../../features/shared/choicePicker/ChoicePicker'
 import { PROTOCOL_GROUPS } from '../settingsPageConstants'
 import { SettingsProtocolDetailsView } from './SettingsProtocolDetailsView'
-import { SettingsKeyGroupView } from './SettingsKeyGroupView'
 import { settingsPageStyles as styles } from './settingsPageStyles'
 
-type CredentialSlot = {
-  id: string
-  label: string
-  hint?: string
-  required?: boolean
-}
-
 export type SettingsConnectionViewProps = {
-  channels: ChannelStore
-  selected: Channel
   baseUrl: string
   busy: boolean
-  activeGroup: ChannelCredentialGroup | null
-  selectedKeyGroups: ChannelCredentialGroup[]
-  credentialSlots: CredentialSlot[]
-  docUrl: string
   protocol: string
   builtinSelected: boolean
   visibleProtocolOptions: ProtocolDefinition[]
@@ -49,18 +33,11 @@ export type SettingsConnectionViewProps = {
   npError: string
   onBaseUrlChange: (value: string) => void
   onPersistForm: () => unknown
-  onAddKeyGroup: () => Promise<void>
-  onRemoveKeyGroup: () => Promise<void>
-  onActiveGroupChange: (groupId: string) => void
-  onRenameKeyGroup: (groupId: string, name: string) => void
-  onSetKeyGroupPriority: (groupId: string, priority: number) => void
   onProtocolChange: (protocol: string) => void
   onDownloadProtocol: (protocol: ProtocolDefinition) => void
   onRemoveProtocol: (protocol: ProtocolDefinition) => void
   onDetect: () => void
   onVerify: () => void
-  /** 拉一次模型清单（与「模型」区那颗按钮同一个动作） */
-  onRefreshModels: () => void
   /** 打开「AI 应用和工作流」管理页 */
   onOpenWorkflowManager: () => void
   onToggleNewProtocol: () => void
@@ -75,14 +52,8 @@ export type SettingsConnectionViewProps = {
 }
 
 export function SettingsConnectionView({
-  channels,
-  selected,
   baseUrl,
   busy,
-  activeGroup,
-  selectedKeyGroups,
-  credentialSlots,
-  docUrl,
   protocol,
   builtinSelected,
   visibleProtocolOptions,
@@ -102,17 +73,11 @@ export function SettingsConnectionView({
   npError,
   onBaseUrlChange,
   onPersistForm,
-  onAddKeyGroup,
-  onRemoveKeyGroup,
-  onActiveGroupChange,
-  onRenameKeyGroup,
-  onSetKeyGroupPriority,
   onProtocolChange,
   onDownloadProtocol,
   onRemoveProtocol,
   onDetect,
   onVerify,
-  onRefreshModels,
   onOpenWorkflowManager,
   onToggleNewProtocol,
   onRestoreBuiltinProtocols,
@@ -171,9 +136,37 @@ export function SettingsConnectionView({
 
   return (
     <section className={styles.editorSection} data-settings-connection>
-      <div className={styles.cardHead}>
-        <span className={styles.cardTitle}>连接与鉴权</span>
-        <span className={styles.cardSub}>站点地址、API Key 与协议</span>
+      <div className={styles.cardHeadRow}>
+        <div className={styles.cardHead}>
+          <span className={styles.cardTitle}>连接与鉴权</span>
+          <span className={styles.cardSub}>站点地址与协议</span>
+        </div>
+        <div className={styles.connectionActions}>
+          <button
+            className={styles.ghostBtn}
+            data-settings-detect
+            disabled={busy}
+            onClick={onDetect}
+            title="按候选协议逐个试打，第一个通的自动选中"
+          >
+            验证协议
+          </button>
+          <button
+            className={styles.ghostBtn}
+            data-settings-verify
+            disabled={busy}
+            onClick={onVerify}
+          >
+            验证地址
+          </button>
+          <button
+            className={styles.ghostBtn}
+            data-proto-add-toggle
+            onClick={onToggleNewProtocol}
+          >
+            {newProtoOpen ? '收起导入' : '导入协议'}
+          </button>
+        </div>
       </div>
 
       {/* 参考图一：地址与协议**同一行**（地址占满剩余宽度，协议在右） */}
@@ -220,48 +213,7 @@ export function SettingsConnectionView({
         onSaveImportedProtocol={onSaveImportedProtocol}
       />
 
-      <SettingsKeyGroupView
-        channels={channels}
-        selected={selected}
-        activeGroup={activeGroup}
-        selectedKeyGroups={selectedKeyGroups}
-        credentialSlots={credentialSlots}
-        busy={busy}
-        docUrl={docUrl}
-        onAddKeyGroup={onAddKeyGroup}
-        onRemoveKeyGroup={onRemoveKeyGroup}
-        onActiveGroupChange={onActiveGroupChange}
-        onRenameKeyGroup={onRenameKeyGroup}
-        onSetKeyGroupPriority={onSetKeyGroupPriority}
-      />
-
-      {/* 参考图一的动作行：验证协议 · 验证地址 · 拉取模型 · AI 应用和工作流 */}
       <div className={styles.protocolRow} data-settings-actions>
-        <button
-          className={styles.ghostBtn}
-          data-settings-detect
-          disabled={busy}
-          onClick={onDetect}
-          title="按候选协议逐个试打，第一个通的自动选中"
-        >
-          验证协议
-        </button>
-        <button
-          className={styles.ghostBtn}
-          data-settings-verify
-          disabled={busy}
-          onClick={onVerify}
-        >
-          验证地址
-        </button>
-        <button
-          className={styles.ghostBtn}
-          data-settings-refresh-models
-          disabled={busy}
-          onClick={onRefreshModels}
-        >
-          拉取模型
-        </button>
         <button
           className={styles.ghostBtn}
           data-settings-open-workflows
@@ -269,6 +221,7 @@ export function SettingsConnectionView({
         >
           AI 应用和工作流
         </button>
+        <span className={styles.mutedAction}>模型在当前 Key 分组中拉取和选择</span>
       </div>
 
       <div
@@ -281,13 +234,6 @@ export function SettingsConnectionView({
       </div>
 
       <div className={styles.protoTools}>
-        <button
-          className={styles.ghostBtn}
-          data-proto-add-toggle
-          onClick={onToggleNewProtocol}
-        >
-          {newProtoOpen ? '收起 AI 协议导入' : '导入 AI 协议'}
-        </button>
         {hiddenBuiltinProtocolCount > 0 && (
           <button
             type="button"

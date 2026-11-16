@@ -292,7 +292,7 @@
       "test": [
         "src/pages/SettingsPage/customProtocolDraft.test.ts"
       ],
-      "budget": 876
+      "budget": 882
     },
     {
       "module": "src/pages/SkillsPage/SkillsPage.module.css",
@@ -367,7 +367,7 @@
       "test": [
         "src/state/channel/channelStore.test.ts"
       ],
-      "budget": 926
+      "budget": 969
     },
     {
       "module": "src/state/project/ecommerceTaskRepository.ts",
@@ -3394,6 +3394,32 @@
       "budget": 571
     },
     {
+      "module": "src/pages/SettingsPage/SettingsChannelWorkspace.module.css",
+      "owner": "settings-ui",
+      "responsibility": "定义渠道头部路由属性、连接工具、Key 分组切换器和当前分组编辑条样式。",
+      "owns": [
+        "渠道头部的悬停型路由设置",
+        "Key 分组切换器与状态点",
+        "当前分组 Key、名称、优先级与删除布局"
+      ],
+      "doesNotOwn": [
+        "渠道或分组状态写入",
+        "凭证明文存储",
+        "模型映射逻辑"
+      ],
+      "publicApi": [
+        "CSS_MODULE:SettingsChannelWorkspace 的渠道工作区样式域",
+        "CSS_CLASS:keyGroupSwitcher",
+        "CSS_CLASS:keyGroupTab",
+        "CSS_CLASS:groupPropertyStrip",
+        "CSS_CLASS:providerRouteStrip"
+      ],
+      "test": [
+        "src/pages/SettingsPage/settingsPageCssArchitecture.test.ts"
+      ],
+      "budget": 296
+    },
+    {
       "module": "src/pages/SettingsPage/SettingsChannelList.module.css",
       "owner": "settings-ui",
       "responsibility": "定义设置页渠道列表、预设渠道栏、搜索、工作区和侧栏布局样式。",
@@ -3495,6 +3521,31 @@
         "src/pages/SettingsPage/settingsPageCssArchitecture.test.ts"
       ],
       "budget": 433
+    },
+    {
+      "module": "src/pages/SettingsPage/SettingsModelBinding.module.css",
+      "owner": "settings-ui",
+      "responsibility": "定义当前分组真实模型到全局前端模型的绑定表、全局常用按钮与窄屏重排。",
+      "owns": [
+        "模型绑定表三列布局",
+        "映射行悬停与错误提示",
+        "全局常用状态按钮和 1024px 重排"
+      ],
+      "doesNotOwn": [
+        "模型映射持久化",
+        "路由候选生成",
+        "全局前端模型目录"
+      ],
+      "publicApi": [
+        "CSS_MODULE:SettingsModelBinding 的模型绑定样式域",
+        "CSS_CLASS:mappingTable",
+        "CSS_CLASS:mappingRow",
+        "CSS_CLASS:globalCommonButton"
+      ],
+      "test": [
+        "src/pages/SettingsPage/settingsPageCssArchitecture.test.ts"
+      ],
+      "budget": 213
     },
     {
       "module": "src/pages/SettingsPage/settingsPageConstants.ts",
@@ -5593,7 +5644,7 @@
       "test": [
         "src/state/channel/channelStore/modelProjections.test.ts"
       ],
-      "budget": 286
+      "budget": 295
     },
     {
       "module": "src/state/channel/channelStore/recipeCache.ts",
@@ -7066,10 +7117,11 @@
     {
       "module": "src/pages/SettingsPage/settingsPage/SettingsProviderHeaderView.tsx",
       "owner": "pages-settings-provider-header-view",
-      "responsibility": "渲染当前渠道头像、名称、资料编辑入口和启停开关。",
+      "responsibility": "渲染当前渠道头像、名称、资料入口、渠道路由属性和启停开关。",
       "owns": [
         "provider header 结构与文案顺序",
-        "资料编辑、启停开关锚点和 aria/title"
+        "资料编辑、启停开关锚点和 aria/title",
+        "渠道优先级与权重的就地编辑"
       ],
       "doesNotOwn": [
         "渠道名称、头像和启用状态写入",
@@ -7082,15 +7134,15 @@
       "test": [
         "src/pages/SettingsPage/settingsPage/SettingsPageViews.test.ts"
       ],
-      "budget": 57
+      "budget": 111
     },
     {
       "module": "src/pages/SettingsPage/settingsPage/SettingsConnectionView.tsx",
       "owner": "pages-settings-connection-view",
-      "responsibility": "渲染渠道地址、Key 分组、令牌字段、协议探测和连接状态区域。",
+      "responsibility": "渲染渠道地址、协议探测、协议导入与连接状态区域。",
       "owns": [
-        "连接与鉴权 section、分组编辑器顺序",
-        "地址、令牌、探测按钮和状态提示锚点"
+        "连接与鉴权 section 与工具按钮顺序",
+        "地址、协议、探测按钮和状态提示锚点"
       ],
       "doesNotOwn": [
         "凭据持久化、验证请求和协议探测",
@@ -7229,7 +7281,7 @@
       "test": [
         "src/pages/SettingsPage/settingsPageCssArchitecture.test.ts"
       ],
-      "budget": 20
+      "budget": 24
     },
     {
       "module": "src/features/settings/storageOverviewRefresh.ts",
@@ -12261,10 +12313,10 @@
     {
       "module": "src/pages/SettingsPage/settingsPage/SettingsKeyGroupView.tsx",
       "owner": "settings-ui",
-      "responsibility": "渠道连接区的 Key 分组：标签页、令牌字段、以及默认折叠的分组设置（名称/优先级/删除）。",
+      "responsibility": "渠道 Key 分组切换器与当前分组编辑区：状态点、令牌、名称、优先级和删除确认。",
       "owns": [
         "Key 分组的展示与切换",
-        "分组设置的折叠编辑"
+        "当前分组属性的就地编辑"
       ],
       "doesNotOwn": [
         "凭据读写（ChannelTokenField / channelStore）",
@@ -12278,7 +12330,7 @@
       "test": [
         "src/pages/SettingsPage/settingsPage/SettingsPageViews.test.ts"
       ],
-      "budget": 200
+      "budget": 203
     },
     {
       "module": "src/features/settings/SettingsWorkflowTestRun.tsx",

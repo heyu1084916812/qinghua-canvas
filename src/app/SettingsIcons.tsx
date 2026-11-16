@@ -18,6 +18,8 @@ import {
   Download,
   Droplet,
   EllipsisVertical,
+  Eye,
+  EyeOff,
   Funnel,
   GripVertical,
   History,
@@ -189,4 +191,14 @@ export function IconGear({ size = 'md' }: IconProps) {
 /** 关闭浮层。 */
 export function IconClose({ size = 'md' }: IconProps) {
   return <Icon icon={X} size={size} />
+}
+
+/** 显示当前输入框中的密钥。 */
+export function IconEye({ size = 'md' }: IconProps) {
+  return <Icon icon={Eye} size={size} />
+}
+
+/** 隐藏当前输入框中的密钥。 */
+export function IconEyeOff({ size = 'md' }: IconProps) {
+  return <Icon icon={EyeOff} size={size} />
 }

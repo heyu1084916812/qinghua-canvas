@@ -51,7 +51,12 @@ describe('modelMappingActionCoordinator', () => {
     await actions.flush('GPT Image 2', 'gpt-image-2')
     expect(ports.clearTimeout).toHaveBeenCalledWith(77)
     expect(ports.timers.has('GPT Image 2')).toBe(false)
-    expect(channels.setModelMapping).toHaveBeenCalledWith('c1', 'GPT Image 2', 'gpt-image-2')
+    expect(channels.setModelMapping).toHaveBeenCalledWith(
+      'c1',
+      'GPT Image 2',
+      'gpt-image-2',
+      'g1',
+    )
     expect(drafts()).toEqual({})
     expect(ports.setMapSaveNotice).toHaveBeenCalledWith({
       id: 'GPT Image 2',

@@ -50,6 +50,30 @@ describe('logicalNames', () => {
     expect(out).toEqual(['我的主力模型'])
   })
 
+  it('★★ 分组映射也贡献同一个前端模型，并保留同渠道不同真实 ID', () => {
+    const channel = ch({
+      id: 'A',
+      modelMap: { Gemini: 'gemini-standard' },
+      models: [cap('gemini-standard')],
+      credentialGroups: [
+        {
+          priority: 10,
+          models: [cap('gemini-premium')],
+          modelMap: { Gemini: 'gemini-premium' },
+        },
+        {
+          priority: 0,
+          models: [cap('gemini-standard')],
+          modelMap: { Gemini: 'gemini-standard' },
+        },
+      ],
+    })
+
+    expect(logicalNames([channel])).toContain('Gemini')
+    expect(channelIdForLogical([channel], 'Gemini')).toBe('A')
+    expect(categoryOfLogical([channel], 'Gemini')).toBe('image')
+  })
+
   it('空渠道不炸', () => {
     expect(logicalNames([])).toEqual([])
   })

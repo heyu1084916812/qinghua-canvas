@@ -12,7 +12,7 @@ const ACTION_NAMES = [
   'removeToken', 'addCredentialGroup', 'renameCredentialGroup',
   'setCredentialGroupPriority', 'removeCredentialGroup', 'saveCredentialGroupToken',
   'loadCredentialGroupToken', 'removeCredentialGroupToken', 'setEnabled', 'setModels',
-  'setModelCategory', 'setModelMapping', 'setRouteTuning', 'setRouteStrategy',
+  'setModelCategory', 'setModelMapping', 'setModelBinding', 'setRouteTuning', 'setRouteStrategy',
   'setRoutingPolicy', 'planGenerationRoute', 'hasToken', 'verify', 'detectProtocol',
   'refreshModels', 'enabledChannels', 'rememberRecipe', 'setRecipeMemory',
   'setDefaultRecipe', 'defaultForNewNode', 'completeWithTools', 'generateSpeech',

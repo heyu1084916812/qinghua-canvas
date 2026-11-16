@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
 import { maskTokenTail } from '../../domain/project/channel'
 import { useChannels } from '../../app/providers/ChannelStoreProvider'
-import styles from './SettingsPage.module.css'
+import { IconEye, IconEyeOff } from '../../app/SettingsIcons'
+import { settingsPageStyles as styles } from './settingsPage/settingsPageStyles'
 
 export function ChannelTokenField({
   channels,
@@ -101,19 +102,6 @@ export function ChannelTokenField({
       setBusy(false)
     }
   }
-  const remove = async () => {
-    setBusy(true)
-    try {
-      if (groupId) await channels.removeCredentialGroupToken(channelId, groupId)
-      else await channels.removeToken(channelId, slot)
-      setToken('')
-      setShow(false)
-      setRevealed(null)
-    } finally {
-      setBusy(false)
-    }
-  }
-
   return (
     <div className={styles.field} data-settings-token-row={groupId ?? slot}>
       <span className={styles.labelRow}>
@@ -121,6 +109,37 @@ export function ChannelTokenField({
           {label}
           {required && <span className={styles.tokenRequired}>必填</span>}
         </span>
+      </span>
+      <div className={styles.tokenRow}>
+        <div className={styles.tokenInputWrap}>
+          <input
+            className={styles.input}
+            data-settings-token-tail={groupId ?? slot}
+            type={show ? 'text' : 'password'}
+            placeholder={saved ? savedText : '粘贴 API Key'}
+            value={shownValue}
+            onChange={(e) => onTokenChange(e.target.value)}
+          />
+          <button
+            type="button"
+            className={styles.tokenEye}
+            data-settings-token-reveal={groupId ?? slot}
+            aria-label={show ? '隐藏 API Key' : '显示 API Key'}
+            title={show ? '隐藏 API Key' : '显示 API Key'}
+            disabled={busy || (!saved && !token)}
+            onClick={() => void toggleShow()}
+          >
+            {show ? <IconEyeOff size="sm" /> : <IconEye size="sm" />}
+          </button>
+        </div>
+        <button
+          className={styles.ghostBtn}
+          data-settings-token-save={groupId ?? slot}
+          disabled={!token || busy}
+          onClick={() => void save()}
+        >
+          保存
+        </button>
         {docUrl && (
           <a
             className={styles.docLink}
@@ -132,47 +151,10 @@ export function ChannelTokenField({
             去官网获取令牌
           </a>
         )}
-      </span>
-      <div className={styles.tokenRow}>
-        <input
-          className={styles.input}
-          data-settings-token-tail={groupId ?? slot}
-          type={show ? 'text' : 'password'}
-          /**
-           * 已存过时，输入框**直接显示存好的那一把（中间打码）**（用户第 19 批 #3、
-           * 参考图五 `••••••••Sm3a`）。用 `placeholder` 不是 `value`：整串明文不进界面，
-           * 放进 value 的话用户一按保存就会把那串圆点当成新令牌存进去。
-           */
-          placeholder={saved ? savedText : '粘贴 API Key'}
-          value={shownValue}
-          onChange={(e) => onTokenChange(e.target.value)}
-        />
-        <button
-          className={styles.ghostBtn}
-          data-settings-token-reveal={groupId ?? slot}
-          /* 既没存过、输入框也是空的 ⇒ 没有东西可显示（不给"按下去没反应"的按钮） */
-          disabled={busy || (!saved && !token)}
-          onClick={() => void toggleShow()}
-        >
-          {show ? '隐藏' : '显示'}
-        </button>
-        <button
-          className={styles.ghostBtn}
-          data-settings-token-save={groupId ?? slot}
-          disabled={!token || busy}
-          onClick={() => void save()}
-        >
-          保存
-        </button>
-        <button
-          className={styles.ghostBtn}
-          data-settings-token-remove={groupId ?? slot}
-          disabled={!saved || busy}
-          onClick={() => void remove()}
-        >
-          删除
-        </button>
       </div>
+      <span className={saved ? styles.saved : styles.cardSub}>
+        {saved ? '已保存' : '未保存'}
+      </span>
       {hint && <span className={styles.cardSub}>{hint}</span>}
     </div>
   )

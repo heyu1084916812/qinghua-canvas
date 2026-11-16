@@ -146,6 +146,8 @@ export interface ChannelCredentialGroup {
   models: ModelCapability[]
   /** 该 Key 拉回的全部模型 */
   modelCache: ModelCapability[]
+  /** 该 Key 分组自己的“前端模型 → 上游真实 ID”映射。 */
+  modelMap: ModelMap
   createdAt: number
 }
 

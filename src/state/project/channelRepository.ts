@@ -64,6 +64,7 @@ const toChannel = (row: Record<string, unknown>): Channel => {
   const rawGroups = Array.isArray(row.credentialGroups)
     ? (row.credentialGroups as ChannelCredentialGroup[])
     : []
+  const channelModelMap = normalizeModelMap(row.modelMap)
   const credentialGroups =
     rawGroups.length > 0
       ? rawGroups.map((group) => ({
@@ -75,6 +76,9 @@ const toChannel = (row: Record<string, unknown>): Channel => {
             (selected) => cacheById.get(selected.id) ?? selected,
           ),
           modelCache: group.modelCache ?? [],
+          modelMap: normalizeModelMap(
+            (group as Partial<ChannelCredentialGroup>).modelMap ?? channelModelMap,
+          ),
           createdAt: group.createdAt ?? 0,
         }))
       : credentialRef
@@ -94,6 +98,7 @@ const toChannel = (row: Record<string, unknown>): Channel => {
                 protocol === '65535'
                   ? modelCache.filter((model) => model.category === 'chat')
                   : modelCache,
+              modelMap: channelModelMap,
               createdAt: (row.createdAt as number) ?? 0,
             },
             ...(altCredentialRef
@@ -113,6 +118,7 @@ const toChannel = (row: Record<string, unknown>): Channel => {
                       protocol === '65535'
                         ? modelCache.filter((model) => model.category !== 'chat')
                         : [],
+                    modelMap: channelModelMap,
                     createdAt: (row.createdAt as number) ?? 0,
                   },
                 ]
@@ -160,7 +166,7 @@ const toChannel = (row: Record<string, unknown>): Channel => {
      * 即老渠道读回后，选路结果不变、行为不变。
      * 口径同 `models`：**只补不删**。
      */
-    modelMap: normalizeModelMap(row.modelMap),
+    modelMap: channelModelMap,
     priority: (row.priority as number) ?? 0,
     weight: (row.weight as number) ?? 0,
     // 未知策略值回落 'priority'：宁可退到「手工排的优先度」，
@@ -189,6 +195,7 @@ function initialCredentialGroup(
     priority: 0,
     models: channel.models,
     modelCache: channel.modelCache,
+    modelMap: {},
     createdAt,
   }
 }
@@ -208,6 +215,14 @@ function withGroupAggregates(channel: Channel): Channel {
   }
   const [primary, alt] = groups
   const syncAltSlot = channel.protocol === '65535' || channel.protocol === 'runninghub-api'
+  const mergedModelMap: Record<string, string> = {}
+  for (const group of groups) {
+    for (const [logicalName, upstreamId] of Object.entries(group.modelMap)) {
+      if (mergedModelMap[logicalName] === undefined) {
+        mergedModelMap[logicalName] = upstreamId
+      }
+    }
+  }
   return {
     ...channel,
     credentialGroups: groups,
@@ -221,6 +236,7 @@ function withGroupAggregates(channel: Channel): Channel {
     hasAltToken: syncAltSlot ? (alt?.hasToken ?? false) : channel.hasAltToken,
     models: merge('models'),
     modelCache: merge('modelCache'),
+    modelMap: mergedModelMap,
   }
 }
 

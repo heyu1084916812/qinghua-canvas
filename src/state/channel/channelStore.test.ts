@@ -166,6 +166,41 @@ describe('channelStore', () => {
     expect(store.getState().channels.find((c) => c.id === ch.id)!.modelMap).toEqual({})
   })
 
+  it('★★ setModelMapping 写入选中的 Key 分组；同一渠道的不同分组可映射不同真实 ID', async () => {
+    const p = createMemoryPlatform()
+    const store = createChannelStore(p, { seedBuiltins: false })
+    const ch = await store.create({ name: 'A', protocol: 'mock', baseUrl: '' })
+    const premium = await store.addCredentialGroup(ch.id, '优质分组')
+    const standard = ch.credentialGroups[0]!
+
+    await store.setModelMapping(ch.id, 'Gemini', 'gemini-standard', standard.id)
+    await store.setModelMapping(ch.id, 'Gemini', 'gemini-premium', premium.id)
+    await store.setCredentialGroupPriority(ch.id, premium.id, 20)
+
+    const saved = store.getState().channels.find((c) => c.id === ch.id)!
+    expect(
+      saved.credentialGroups.find((group) => group.id === standard.id)?.modelMap,
+    ).toEqual({ Gemini: 'gemini-standard' })
+    expect(
+      saved.credentialGroups.find((group) => group.id === premium.id)?.modelMap,
+    ).toEqual({ Gemini: 'gemini-premium' })
+    expect(saved.modelMap).toEqual({ Gemini: 'gemini-premium' })
+  })
+
+  it('★★ setModelBinding 把当前真实模型移动到新前端模型，不留下重复旧映射', async () => {
+    const p = createMemoryPlatform()
+    const store = createChannelStore(p, { seedBuiltins: false })
+    const ch = await store.create({ name: 'A', protocol: 'mock', baseUrl: '' })
+    const groupId = ch.credentialGroups[0]!.id
+    await store.setModelMapping(ch.id, 'Old Name', 'upstream-image', groupId)
+
+    await store.setModelBinding(ch.id, 'upstream-image', 'New Name', groupId)
+
+    expect(
+      store.getState().channels[0]?.credentialGroups[0]?.modelMap,
+    ).toEqual({ 'New Name': 'upstream-image' })
+  })
+
   it('★ setRouteTuning：优先度取整、权重取整且不为负（档位靠相等比较，小数会分出无数档）', async () => {
     const p = createMemoryPlatform()
     const store = createChannelStore(p)
@@ -723,6 +758,43 @@ describe('channelStore', () => {
     await reloaded.removeGlobalModel('My Image Pro')
     expect(reloaded.globalModelOf('My Image Pro')).toBeUndefined()
     await expect(reloaded.removeGlobalModel('GPT Image 2')).rejects.toThrow()
+  })
+
+  it('★★ 不常用前端模型立即停止生成路由，但分组映射仍保留', async () => {
+    const p = createMemoryPlatform()
+    const store = createChannelStore(p, { seedBuiltins: false })
+    await store.load()
+    await store.addGlobalModel({
+      name: 'Test Image',
+      category: 'image',
+      vendor: 'openai',
+    })
+    const ch = await store.create({ name: 'A', protocol: 'mock', baseUrl: '' })
+    const groupId = ch.credentialGroups[0]!.id
+    await store.setModels(
+      ch.id,
+      [{ id: 'upstream-image', category: 'image', inputTypes: ['text'] }],
+      groupId,
+    )
+    await store.setModelMapping(ch.id, 'Test Image', 'upstream-image', groupId)
+
+    expect(
+      await store.planGenerationRoute({
+        category: 'image',
+        logicalModel: 'Test Image',
+      }),
+    ).toMatchObject({ ok: true })
+
+    await store.setModelUncommon('Test Image', true)
+    expect(
+      await store.planGenerationRoute({
+        category: 'image',
+        logicalModel: 'Test Image',
+      }),
+    ).toEqual({ ok: false, reason: 'model_missing' })
+    expect(
+      store.getState().channels[0]?.credentialGroups[0]?.modelMap,
+    ).toEqual({ 'Test Image': 'upstream-image' })
   })
 
   it('★ 映射测试只查模型目录：命中为 ok，目录缺项为 missing，不触发生成', async () => {

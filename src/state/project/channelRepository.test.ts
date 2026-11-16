@@ -109,6 +109,58 @@ describe('channelRepository', () => {
     expect(upd.enabled).toBe(true)
   })
 
+  it('★★ 老渠道的渠道级映射读回时迁移到每个分组，新分组映射保持独立', async () => {
+    const p = createMemoryPlatform()
+    const repo = createChannelRepository(p.storage, p.credentials)
+    await p.storage.put('channels', {
+      id: 'legacy-group-map',
+      name: '老渠道',
+      protocol: 'openai-compatible',
+      baseUrl: 'https://legacy.example.com',
+      enabled: true,
+      hasToken: true,
+      hasAltToken: false,
+      models: [],
+      modelCache: [],
+      modelMap: { Gemini: 'gemini-default' },
+      credentialGroups: [
+        {
+          id: 'standard',
+          name: '默认分组',
+          credentialRef: 'cred-standard',
+          tokenTail: null,
+          hasToken: true,
+          priority: 10,
+          models: [],
+          modelCache: [],
+          createdAt: 1,
+        },
+        {
+          id: 'premium',
+          name: '优质分组',
+          credentialRef: 'cred-premium',
+          tokenTail: null,
+          hasToken: true,
+          priority: 20,
+          models: [],
+          modelCache: [],
+          modelMap: { Gemini: 'gemini-premium' },
+          createdAt: 2,
+        },
+      ],
+      order: 0,
+      createdAt: 1,
+    })
+
+    const loaded = await repo.get('legacy-group-map')
+    expect(
+      loaded?.credentialGroups.find((group) => group.id === 'standard')?.modelMap,
+    ).toEqual({ Gemini: 'gemini-default' })
+    expect(
+      loaded?.credentialGroups.find((group) => group.id === 'premium')?.modelMap,
+    ).toEqual({ Gemini: 'gemini-premium' })
+  })
+
   it('内置渠道按固定顺序置顶，重排把 order 打平后也不会乱序', async () => {
     const p = createMemoryPlatform()
     const repo = createChannelRepository(p.storage, p.credentials)
@@ -163,6 +215,7 @@ describe('channelRepository', () => {
           priority: -2,
           models: [],
           modelCache: [],
+          modelMap: {},
           createdAt: 2,
         },
       ],

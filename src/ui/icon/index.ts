@@ -54,6 +54,7 @@ export {
   Expand,
   ExternalLink,
   Eye,
+  EyeOff,
   FileSearch,
   FileText,
   FlipHorizontal2,

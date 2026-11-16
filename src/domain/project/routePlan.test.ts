@@ -59,6 +59,48 @@ describe('RoutePlan', () => {
     ])
   })
 
+  it('★★ 同一前端模型按分组映射到不同真实 ID，候选保留各自的真实 ID', () => {
+    const result = buildRoutePlan({
+      channels: [
+        channel({
+          id: 'relay',
+          modelMap: { Gemini: 'gemini-default' },
+          credentialGroups: [
+            {
+              id: 'premium',
+              hasToken: true,
+              priority: 20,
+              models: [{ id: 'gemini-premium', category: 'chat' }],
+              modelMap: { Gemini: 'gemini-premium' },
+            },
+            {
+              id: 'standard',
+              hasToken: true,
+              priority: 10,
+              models: [{ id: 'gemini-default', category: 'chat' }],
+              modelMap: { Gemini: 'gemini-default' },
+            },
+          ],
+        }),
+      ],
+      logicalModel: 'Gemini',
+      capability: 'chat',
+      policy: { strategy: 'priority', maxAttempts: 2 },
+    })
+
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(
+      result.plan.candidates.map((candidate) => ({
+        group: candidate.credentialGroupId,
+        upstream: candidate.upstreamModel,
+      })),
+    ).toEqual([
+      { group: 'premium', upstream: 'gemini-premium' },
+      { group: 'standard', upstream: 'gemini-default' },
+    ])
+  })
+
   it('★★ 用户勾选分组后只允许勾选项参与，不静默回落到其他分组', () => {
     const source = channel({
       id: 'relay',

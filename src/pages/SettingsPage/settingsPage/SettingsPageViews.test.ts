@@ -10,6 +10,7 @@ import { SettingsChannelRouteView } from './SettingsChannelRouteView'
 import { SettingsChannelSidebarView } from './SettingsChannelSidebarView'
 import { SettingsConnectionView } from './SettingsConnectionView'
 import { SettingsGlobalRouteView } from './SettingsGlobalRouteView'
+import { SettingsKeyGroupView } from './SettingsKeyGroupView'
 import { SettingsModelsView } from './SettingsModelsView'
 import { SettingsProfileDrawerView } from './SettingsProfileDrawerView'
 import { SettingsProtocolDetailsView } from './SettingsProtocolDetailsView'
@@ -85,8 +86,12 @@ describe('SettingsPage 视图拆分', () => {
       name: '服务商',
       ariaName: '服务商',
       enabled: true,
+      priority: 0,
+      weight: 0,
       onEditProfile: () => {},
       onEnabledChange: () => {},
+      onPriorityChange: () => {},
+      onWeightChange: () => {},
     })
     expect(headerHtml).toMatch(/^<div /)
     expect(headerHtml).toContain('data-settings-provider-head')
@@ -94,21 +99,8 @@ describe('SettingsPage 视图拆分', () => {
     expect(headerHtml).toContain('data-channel-enabled="channel-1"')
 
     const connectionHtml = render(SettingsConnectionView, {
-      channels: {} as ChannelStore,
-      selected: {
-        id: 'channel-1',
-        icon: null,
-        tokenTail: null,
-        altTokenTail: null,
-        hasToken: false,
-        hasAltToken: false,
-      } as Channel,
       baseUrl: '',
       busy: false,
-      activeGroup: null,
-      selectedKeyGroups: [],
-      credentialSlots: [],
-      docUrl: '',
       protocol: 'openai',
       builtinSelected: false,
       visibleProtocolOptions: [],
@@ -128,17 +120,11 @@ describe('SettingsPage 视图拆分', () => {
       npError: '',
       onBaseUrlChange: () => {},
       onPersistForm: () => {},
-      onAddKeyGroup: async () => {},
-      onRemoveKeyGroup: async () => {},
-      onActiveGroupChange: () => {},
-      onRenameKeyGroup: () => {},
-      onSetKeyGroupPriority: () => {},
       onProtocolChange: () => {},
       onDownloadProtocol: () => {},
       onRemoveProtocol: () => {},
       onDetect: () => {},
       onVerify: () => {},
-      onRefreshModels: () => {},
       onOpenWorkflowManager: () => {},
       onToggleNewProtocol: () => {},
       onRestoreBuiltinProtocols: () => {},
@@ -153,7 +139,6 @@ describe('SettingsPage 视图拆分', () => {
     expect(connectionHtml).toMatch(/^<section /)
     expect(connectionHtml).toContain('data-settings-connection')
     expect(connectionHtml).toContain('data-settings-baseurl')
-    expect(connectionHtml).toContain('data-settings-token-row="primary"')
     expect(connectionHtml).toContain('data-settings-status')
   })
 
@@ -200,14 +185,12 @@ describe('SettingsPage 视图拆分', () => {
       selectedGroups: [],
       panelOpen: false,
       draftCategory: 'all',
-      draftKeyword: '',
       draftChecked: new Set<string>(),
       draftList: [],
       onRefresh: () => {},
       onOpenPanel: () => {},
       onClosePanel: () => {},
       onDraftCategoryChange: () => {},
-      onDraftKeywordChange: () => {},
       onToggleDraft: () => {},
       onModelCategoryChange: () => {},
       onDropSelectedModel: () => {},
@@ -220,45 +203,30 @@ describe('SettingsPage 视图拆分', () => {
     expect(modelsHtml).toContain('选择模型')
 
     const routeHtml = render(SettingsChannelRouteView, {
-      priority: 0,
-      weight: 1,
       allGlobalModels: [],
       customModels: [],
       uncommonModelIds: [],
       activeModels: [],
-      activeModelCache: [],
       modelAddOpen: false,
       newModelName: '',
       newModelCategory: 'image',
       newModelVendor: 'openai',
       showUncommonModels: false,
-      mapCategory: 'image',
       modelMap: {},
-      mapDrafts: {},
       mapSaveNotice: null,
-      mapTests: {},
-      onPriorityChange: () => {},
-      onWeightChange: () => {},
       onModelAddOpenChange: () => {},
       onNewModelNameChange: () => {},
       onNewModelCategoryChange: () => {},
       onNewModelVendorChange: () => {},
       onAddGlobalModel: () => {},
-      onMapCategoryChange: () => {},
       onShowUncommonModelsChange: () => {},
-      onDraftChange: () => {},
-      onScheduleModelMapping: () => {},
-      onFlushModelMapping: () => {},
-      onTestModelMapping: () => {},
+      onBindModel: () => {},
       onModelUncommonChange: () => {},
       onRemoveGlobalModel: () => {},
     })
     expect(routeHtml).toMatch(/^<section /)
     expect(routeHtml).toContain('data-settings-channel-route')
-    expect(routeHtml).toContain('data-route-priority')
-    expect(routeHtml).toContain('data-route-weight')
-    expect(routeHtml).toContain('data-route-map-filter="image"')
-    expect(routeHtml).toContain('data-route-map-empty="image"')
+    expect(routeHtml).toContain('data-route-map-empty')
   })
 
   it('资料抽屉与渠道菜单保留原 portal 根节点和交互锚点', () => {
@@ -348,44 +316,10 @@ describe('SettingsPage 视图拆分', () => {
     expect(html).toContain('data-channel-state-dot="ch_custom"')
   })
 
-  it('连接区覆盖 Key 分组、恢复协议、管理提示与错误分支', () => {
-    const group = {
-      id: 'primary',
-      name: '主分组',
-      credentialRef: 'credential-primary',
-      tokenTail: '1234',
-      hasToken: true,
-      priority: 10,
-      models: [],
-      modelCache: [],
-      createdAt: 1,
-    } satisfies ChannelCredentialGroup
+  it('连接区覆盖恢复协议、管理提示与错误分支', () => {
     const html = render(SettingsConnectionView, {
-      channels: {} as ChannelStore,
-      selected: {
-        id: 'channel-1',
-        icon: null,
-        tokenTail: '1234',
-        altTokenTail: null,
-        hasToken: true,
-        hasAltToken: false,
-      } as Channel,
       baseUrl: 'https://relay.example.com/v1',
       busy: true,
-      activeGroup: group,
-      selectedKeyGroups: [
-        group,
-        {
-          ...group,
-          id: 'backup',
-          name: '备用分组',
-          hasToken: false,
-          tokenTail: null,
-          priority: 0,
-        },
-      ],
-      credentialSlots: [],
-      docUrl: 'https://docs.example.com',
       protocol: 'openai-compatible',
       builtinSelected: false,
       visibleProtocolOptions: [],
@@ -405,17 +339,11 @@ describe('SettingsPage 视图拆分', () => {
       npError: '',
       onBaseUrlChange: () => {},
       onPersistForm: () => {},
-      onAddKeyGroup: async () => {},
-      onRemoveKeyGroup: async () => {},
-      onActiveGroupChange: () => {},
-      onRenameKeyGroup: () => {},
-      onSetKeyGroupPriority: () => {},
       onProtocolChange: () => {},
       onDownloadProtocol: () => {},
       onRemoveProtocol: () => {},
       onDetect: () => {},
       onVerify: () => {},
-      onRefreshModels: () => {},
       onOpenWorkflowManager: () => {},
       onToggleNewProtocol: () => {},
       onRestoreBuiltinProtocols: () => {},
@@ -428,14 +356,66 @@ describe('SettingsPage 视图拆分', () => {
       onSaveImportedProtocol: () => {},
     })
 
-    expect(html).toContain('data-key-groups')
-    expect(html).toContain('data-key-group-tab="primary"')
-    expect(html).toContain('data-key-group-tab="backup"')
-    expect(html).toContain('data-key-group-editor="primary"')
     expect(html).toContain('data-proto-restore')
     expect(html).toContain('协议管理提示')
     expect(html).toContain('当前协议仍在使用')
     expect(html).toContain('data-status-tone="error"')
+  })
+
+  it('Key 分组只显示名称与状态点，当前分组直接承载 Key 和属性编辑', () => {
+    const group = {
+      id: 'primary',
+      name: '主分组',
+      credentialRef: 'credential-primary',
+      tokenTail: '1234',
+      hasToken: true,
+      priority: 10,
+      models: [],
+      modelCache: [],
+      modelMap: {},
+      createdAt: 1,
+    } satisfies ChannelCredentialGroup
+    const html = render(SettingsKeyGroupView, {
+      channels: {} as ChannelStore,
+      selected: {
+        id: 'channel-1',
+        icon: null,
+        tokenTail: '1234',
+        altTokenTail: null,
+        hasToken: true,
+        hasAltToken: false,
+      } as Channel,
+      activeGroup: group,
+      selectedKeyGroups: [
+        group,
+        {
+          ...group,
+          id: 'backup',
+          name: '备用分组',
+          hasToken: false,
+          tokenTail: null,
+          priority: 0,
+        },
+      ],
+      credentialSlots: [],
+      busy: false,
+      docUrl: 'https://docs.example.com',
+      onAddKeyGroup: async () => {},
+      onRemoveKeyGroup: async () => {},
+      onActiveGroupChange: () => {},
+      onRenameKeyGroup: () => {},
+      onSetKeyGroupPriority: () => {},
+    })
+
+    expect(html).toContain('data-key-group-switcher')
+    expect(html).toContain('data-key-group-tab="primary"')
+    expect(html).toContain('data-key-group-tab="backup"')
+    expect(html).not.toContain('优先级 10')
+    expect(html).not.toContain('3 个模型')
+    expect(html).toContain('data-key-group-editor="primary"')
+    expect(html).toContain('data-settings-token-tail="primary"')
+    expect(html).toContain('data-key-group-name')
+    expect(html).toContain('data-key-group-priority')
   })
 
   it('模型面板覆盖已选模型、缓存模型和草稿切换结构', () => {
@@ -455,6 +435,7 @@ describe('SettingsPage 视图拆分', () => {
         priority: 0,
         models: [imageModel],
         modelCache: [imageModel],
+        modelMap: {},
         createdAt: 1,
       },
       activeModelCache: [imageModel],
@@ -463,14 +444,12 @@ describe('SettingsPage 视图拆分', () => {
       ],
       panelOpen: true,
       draftCategory: 'image',
-      draftKeyword: 'image',
       draftChecked: new Set(['image-pro']),
       draftList: [imageModel],
       onRefresh: () => {},
       onOpenPanel: () => {},
       onClosePanel: () => {},
       onDraftCategoryChange: () => {},
-      onDraftKeywordChange: () => {},
       onToggleDraft: () => {},
       onModelCategoryChange: () => {},
       onDropSelectedModel: () => {},
@@ -481,7 +460,7 @@ describe('SettingsPage 视图拆分', () => {
     expect(html).toContain('data-model-remove="image-pro"')
     expect(html).toContain('data-model-panel')
     expect(html).toContain('data-model-tab="image"')
-    expect(html).toContain('data-model-search')
+    expect(html).not.toContain('data-model-search')
     expect(html).toContain('data-model-option="image-pro"')
     expect(html).toContain('data-model-apply')
   })
@@ -489,47 +468,35 @@ describe('SettingsPage 视图拆分', () => {
   it('渠道路由覆盖添加模型表单、映射行、测试态和删除入口', () => {
     const preset = { id: 'My Image', category: 'image', vendor: 'openai' } as const
     const html = render(SettingsChannelRouteView, {
-      priority: 10,
-      weight: 2,
       allGlobalModels: [preset],
       customModels: [{ id: 'My Image' }],
       uncommonModelIds: [],
-      activeModels: [{ id: 'image-pro', category: 'image', inputTypes: ['text'] }],
-      activeModelCache: [{ id: 'image-upstream', category: 'image', inputTypes: ['image'] }],
+      activeModels: [
+        { id: 'image-upstream', category: 'image', inputTypes: ['text'] },
+      ],
       modelAddOpen: true,
       newModelName: 'My Image',
       newModelCategory: 'image',
       newModelVendor: 'openai',
       showUncommonModels: true,
-      mapCategory: 'image',
       modelMap: { 'My Image': 'image-upstream' },
-      mapDrafts: { 'My Image': 'image-upstream' },
       mapSaveNotice: { id: 'My Image', tone: 'error', text: '保存失败' },
-      mapTests: { 'My Image': { status: 'checking', message: '' } },
-      onPriorityChange: () => {},
-      onWeightChange: () => {},
       onModelAddOpenChange: () => {},
       onNewModelNameChange: () => {},
       onNewModelCategoryChange: () => {},
       onNewModelVendorChange: () => {},
       onAddGlobalModel: () => {},
-      onMapCategoryChange: () => {},
       onShowUncommonModelsChange: () => {},
-      onDraftChange: () => {},
-      onScheduleModelMapping: () => {},
-      onFlushModelMapping: () => {},
-      onTestModelMapping: () => {},
+      onBindModel: () => {},
       onModelUncommonChange: () => {},
       onRemoveGlobalModel: () => {},
     })
 
     expect(html).toContain('data-global-model-form')
-    expect(html).toContain('data-global-model-category="image"')
-    expect(html).toContain('data-route-map-row="My Image"')
-    expect(html).toContain('data-route-map-save-state="error"')
-    expect(html).toContain('data-route-map-test-state="checking"')
+    expect(html).toContain('data-route-map-row="image-upstream"')
+    expect(html).toContain('data-route-map-frontend="image-upstream"')
+    expect(html).toContain('data-route-map-uncommon="My Image"')
     expect(html).toContain('data-global-model-remove="My Image"')
-    expect(html).toContain('测试中')
     expect(html).toContain('保存失败')
   })
 

@@ -158,13 +158,23 @@ function tiers(
   }
 
   // priority：数值降序
-  const groups = new Map<number, RouteCandidate[]>()
+  const groups = new Map<
+    string,
+    { priority: number; groupPriority: number; list: RouteCandidate[] }
+  >()
   for (const c of candidates) {
-    const list = groups.get(c.priority)
-    if (list) list.push(c)
-    else groups.set(c.priority, [c])
+    const groupPriority = c.groupPriority ?? 0
+    const key = `${c.priority}\u0000${groupPriority}`
+    const group = groups.get(key)
+    if (group) group.list.push(c)
+    else groups.set(key, { priority: c.priority, groupPriority, list: [c] })
   }
-  return [...groups.entries()].sort((a, b) => b[0] - a[0]).map(([, list]) => list)
+  return [...groups.values()]
+    .sort(
+      (a, b) =>
+        b.priority - a.priority || b.groupPriority - a.groupPriority,
+    )
+    .map((group) => group.list)
 }
 
 /**
@@ -236,6 +246,7 @@ export interface RouteChannelSource {
     hasToken: boolean
     priority: number
     modelIds: readonly string[]
+    modelMap?: Readonly<Record<string, string>>
   }[]
 }
 
@@ -263,8 +274,6 @@ export function routeCandidatesFor(
         modelIds.includes(name) ||
         Boolean((c.modelMap ?? {})[name]?.trim()) ||
         upstreamAliasesOf(name).some((alias) => modelIds.includes(alias))
-      const mapped = (c.modelMap ?? {})[name]?.trim()
-      const mappedAliases = mapped ? upstreamAliasesOf(mapped) : []
       /**
        * 分组是否提供这个模型，必须看**该分组自己的模型目录**。
        *
@@ -273,39 +282,49 @@ export function routeCandidatesFor(
        * `credentialGroupIds`；执行器为每个 fallback 分组预建适配器时，备用分组没 Key，
        * 整条请求就被误判为 missingKey，即使主分组完全可用。
        */
-      const supportsGroup = (modelIds: readonly string[]) =>
-        modelIds.includes(name) ||
-        Boolean(mapped && modelIds.includes(mapped)) ||
-        upstreamAliasesOf(name).some((alias) => modelIds.includes(alias)) ||
-        mappedAliases.some((alias) => modelIds.includes(alias))
+      const mapForGroup = (group: NonNullable<typeof c.credentialGroups>[number]) => {
+        const groupMap = { ...(c.modelMap ?? {}), ...(group.modelMap ?? {}) }
+        const mapped = groupMap[name]?.trim()
+        const mappedAliases = mapped ? upstreamAliasesOf(mapped) : []
+        return { mapped, mappedAliases, groupMap }
+      }
+      const supportsGroup = (group: NonNullable<typeof c.credentialGroups>[number]) => {
+        const { mapped, mappedAliases } = mapForGroup(group)
+        return (
+          group.modelIds.includes(name) ||
+          Boolean(mapped && group.modelIds.includes(mapped)) ||
+          upstreamAliasesOf(name).some((alias) => group.modelIds.includes(alias)) ||
+          mappedAliases.some((alias) => group.modelIds.includes(alias))
+        )
+      }
       const groups = [...(c.credentialGroups ?? [])]
-        .filter((group) => supportsGroup(group.modelIds))
+        .filter(supportsGroup)
         .sort((a, b) => b.priority - a.priority)
 
       if (groups.length > 0) {
-        /**
-         * 降级链里只保留**确实有令牌**的分组；一个空备用分组不该拖垮主分组。
-         * 若所有分组都还没有令牌，仍保留原列表，让选路如实报告缺 Key。
-         */
-        const usableGroups = groups.filter((group) => group.hasToken)
-        const groupChoices = usableGroups.length > 0 ? usableGroups : groups
-        const group = groupChoices[0]!
-        const direct = group.modelIds.includes(name) ? name : undefined
-        const alias = upstreamAliasesOf(name).find((item) => group.modelIds.includes(item))
-        return [
-          {
+        return groups.map((group) => {
+          const groupMapping = mapForGroup(group)
+          const direct = group.modelIds.includes(name) ? name : undefined
+          const alias = upstreamAliasesOf(name).find((item) =>
+            group.modelIds.includes(item),
+          )
+          return {
             channelId: c.id,
             credentialGroupId: group.id,
-            credentialGroupIds: groupChoices.map((item) => item.id),
+            credentialGroupIds: [group.id],
             groupPriority: group.priority,
             enabled: c.enabled,
             hasToken: group.hasToken,
             priority: c.priority,
             weight: c.weight,
             latencyMs: c.lastTestLatency,
-            upstreamModel: mapped || direct || alias || resolve(c.modelMap, name),
-          },
-        ]
+            upstreamModel:
+              groupMapping.mapped ||
+              direct ||
+              alias ||
+              resolve(groupMapping.groupMap, name),
+          }
+        })
       }
 
       if ((c.credentialGroups?.length ?? 0) > 0) return []
@@ -390,12 +409,14 @@ export function resolveRouteForChannel(
   const source = channels.find((channel) => channel.id === channelId)
   if (!source) return { ok: false, reason: 'channel_missing' }
   if (!source.enabled) return { ok: false, reason: 'channel_disabled' }
-  const candidate = routeCandidatesFor([source], logicalModel, resolve)[0]
-  if (!candidate) {
+  const candidates = routeCandidatesFor([source], logicalModel, resolve)
+  if (candidates.length === 0) {
     return { ok: false, reason: source.hasToken ? 'model_missing' : 'channel_no_token' }
   }
-  // 渠道级 hasToken 只是聚合值；显式渠道的可用性必须服从实际命中的 Key 分组。
-  if (!candidate.hasToken) return { ok: false, reason: 'channel_no_token' }
+  const candidate = selectRoute(candidates, 'priority')
+  if (!candidate) {
+    return { ok: false, reason: 'channel_no_token' }
+  }
   if (!candidate.upstreamModel) return { ok: false, reason: 'model_missing' }
   return {
     ok: true,

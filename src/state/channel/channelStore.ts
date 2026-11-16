@@ -154,7 +154,18 @@ export interface ChannelStoreActions {
     category: ModelCapability['category'],
     groupId?: string,
   ): Promise<void>
-  setModelMapping(id: string, logicalName: string, upstreamId: string): Promise<void>
+  setModelMapping(
+    id: string,
+    logicalName: string,
+    upstreamId: string,
+    groupId?: string,
+  ): Promise<void>
+  setModelBinding(
+    id: string,
+    upstreamId: string,
+    logicalName: string,
+    groupId?: string,
+  ): Promise<void>
   setRouteTuning(id: string, patch: { priority?: number; weight?: number }): Promise<void>
   setRouteStrategy(strategy: RouteStrategy): Promise<void>
   setRoutingPolicy(patch: Partial<RoutePolicy>): Promise<void>
@@ -581,13 +592,43 @@ export function createChannelStore(
     id,
     logicalName,
     upstreamId,
+    groupId,
   ) => {
     const ch = await repo.get(id)
     if (!ch) throw new Error(`[channelStore] 渠道不存在：${id}`)
     // 传**当前整张表**进去，由纯函数产出新表：
     // 「空值即删除 / 只补不删 / 去空白」这些口径只有一份实现（domain），
     // 这里再写一遍必然漂移。
+    if (ch.credentialGroups.length > 0) {
+      const group = credentialGroupOf(ch, groupId)
+      await patchCredentialGroup(id, group.id, {
+        modelMap: setModelMapping(group.modelMap, logicalName, upstreamId),
+      })
+      return
+    }
     await update(id, { modelMap: setModelMapping(ch.modelMap, logicalName, upstreamId) })
+  }
+
+  const setModelBinding: ChannelStoreActions['setModelBinding'] = async (
+    id,
+    upstreamId,
+    logicalName,
+    groupId,
+  ) => {
+    const ch = await repo.get(id)
+    if (!ch) throw new Error(`[channelStore] 渠道不存在：${id}`)
+    const group =
+      ch.credentialGroups.length > 0 ? credentialGroupOf(ch, groupId) : undefined
+    const currentMap = group?.modelMap ?? ch.modelMap
+    const cleared = Object.fromEntries(
+      Object.entries(currentMap).filter(([, value]) => value !== upstreamId),
+    )
+    const nextMap = setModelMapping(cleared, logicalName, upstreamId)
+    if (group) {
+      await patchCredentialGroup(id, group.id, { modelMap: nextMap })
+    } else {
+      await update(id, { modelMap: nextMap })
+    }
   }
 
   const setRouteTuning: ChannelStoreActions['setRouteTuning'] = async (id, patch) => {
@@ -617,6 +658,9 @@ export function createChannelStore(
 
   const planGenerationRoute: ChannelStoreActions['planGenerationRoute'] = async (opts) => {
     const state = store.getState()
+    if (state.uncommonModelIds.includes(opts.logicalModel.trim())) {
+      return { ok: false, reason: 'model_missing' }
+    }
     const hasLocalCli = platform.cli != null
     const channels = tokenlessRoutableChannels(
       state.channels,
@@ -904,6 +948,7 @@ export function createChannelStore(
     setModels,
     setModelCategory,
     setModelMapping: setModelMappingAction,
+    setModelBinding,
     setRouteTuning,
     setRouteStrategy,
     setRoutingPolicy,

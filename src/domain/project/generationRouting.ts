@@ -11,6 +11,7 @@ import { resolveUpstreamModel } from './modelMapping'
 import {
   resolveRouteFor,
   routeCandidatesFor,
+  selectRoute,
   type RouteChannelSource,
   type RouteStrategy,
 } from './modelRouting'
@@ -172,6 +173,7 @@ function sourceOf(channel: Channel): RouteChannelSource {
       hasToken: group.hasToken,
       priority: group.priority,
       modelIds: group.models.map((model) => model.id),
+      modelMap: group.modelMap,
     })),
   }
 }
@@ -205,12 +207,13 @@ function directTarget(
   channel: Channel,
   logicalModel: string,
 ): GenerationRoutingTarget | null {
-  const candidate = routeCandidatesFor(
+  const candidates = routeCandidatesFor(
     [sourceOf(channel)],
     logicalModel,
     resolveUpstreamModel,
-  )[0]
-  if (!candidate?.enabled || !candidate.hasToken || !candidate.upstreamModel) return null
+  )
+  const candidate = selectRoute(candidates, 'priority')
+  if (!candidate?.upstreamModel) return null
   return {
     channelId: channel.id,
     ...(candidate.credentialGroupId

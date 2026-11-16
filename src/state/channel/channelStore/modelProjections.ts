@@ -130,6 +130,7 @@ export function projectRefreshModels(args: {
   pulled: readonly ModelCapability[]
 }): RefreshModelsProjection {
   const { channel, group, pulled } = args
+  const currentModelMap = group?.modelMap ?? channel.modelMap
   const manualById = new Map(
     [...(group?.modelCache ?? channel.modelCache), ...(group?.models ?? channel.models)]
       .filter((model) => model.categoryManual)
@@ -158,12 +159,21 @@ export function projectRefreshModels(args: {
   const nextGroups = group
     ? channel.credentialGroups.map((item) =>
         item.id === group.id
-          ? { ...item, modelCache: models, models: refreshedSelection }
+          ? {
+              ...item,
+              modelCache: models,
+              models: refreshedSelection,
+              modelMap: buildDefaultModelMap(
+                item.modelMap,
+                logicalNames,
+                models.map((model) => model.id),
+              ),
+            }
           : item,
       )
     : channel.credentialGroups
   const modelMap = buildDefaultModelMap(
-    channel.modelMap,
+    currentModelMap,
     logicalNames,
     models.map((model) => model.id),
   )
@@ -176,8 +186,7 @@ export function projectRefreshModels(args: {
     update: {
       ...(group
         ? { credentialGroups: nextGroups }
-        : { modelCache: models, models: refreshedSelection }),
-      modelMap,
+        : { modelCache: models, models: refreshedSelection, modelMap }),
     },
     statusModelCount: models.length,
   }

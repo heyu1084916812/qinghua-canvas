@@ -17,14 +17,12 @@ export type SettingsModelsViewProps = {
   selectedGroups: SelectedModelGroup[]
   panelOpen: boolean
   draftCategory: CategoryFilter
-  draftKeyword: string
   draftChecked: ReadonlySet<string>
   draftList: ModelCapability[]
   onRefresh: () => void
   onOpenPanel: () => void
   onClosePanel: () => void
   onDraftCategoryChange: (category: CategoryFilter) => void
-  onDraftKeywordChange: (keyword: string) => void
   onToggleDraft: (modelId: string, checked: boolean) => void
   onModelCategoryChange: (modelId: string, category: ModelCapability['category']) => void
   onDropSelectedModel: (modelId: string) => void
@@ -38,14 +36,12 @@ export function SettingsModelsView({
   selectedGroups,
   panelOpen,
   draftCategory,
-  draftKeyword,
   draftChecked,
   draftList,
   onRefresh,
   onOpenPanel,
   onClosePanel,
   onDraftCategoryChange,
-  onDraftKeywordChange,
   onToggleDraft,
   onModelCategoryChange,
   onDropSelectedModel,
@@ -62,7 +58,12 @@ export function SettingsModelsView({
               : '从上游 api 自动拉取所有可用模型'}
           </span>
         </div>
-        <button className={styles.ghostBtn} disabled={busy} onClick={onRefresh}>
+        <button
+          className={styles.ghostBtn}
+          data-settings-refresh-models
+          disabled={busy}
+          onClick={onRefresh}
+        >
           拉取模型
         </button>
         <button
@@ -142,13 +143,6 @@ export function SettingsModelsView({
                 </button>
               ))}
             </div>
-            <input
-              className={`${styles.input} ${styles.search}`}
-              data-model-search
-              placeholder="搜索模型名称"
-              value={draftKeyword}
-              onChange={(event) => onDraftKeywordChange(event.target.value)}
-            />
           </div>
 
           <ul className={styles.optionList}>

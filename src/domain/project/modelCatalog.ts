@@ -31,6 +31,33 @@ export interface CatalogChannelLike {
   /** 拉取回来的全部 */
   modelCache?: readonly ModelCapability[]
   modelMap: Readonly<Record<string, string>> | null | undefined
+  credentialGroups?: readonly {
+    priority: number
+    models: readonly ModelCapability[]
+    modelCache?: readonly ModelCapability[]
+    modelMap: Readonly<Record<string, string>> | null | undefined
+  }[]
+}
+
+function catalogSources(channel: CatalogChannelLike): {
+  priority: number
+  models: readonly ModelCapability[]
+  modelCache?: readonly ModelCapability[]
+  modelMap: Readonly<Record<string, string>> | null | undefined
+}[] {
+  return channel.credentialGroups?.length
+    ? [...channel.credentialGroups]
+        .sort((a, b) => b.priority - a.priority)
+        .map((group) => ({
+          ...group,
+          modelMap: { ...(channel.modelMap ?? {}), ...(group.modelMap ?? {}) },
+        }))
+    : [{
+        priority: channel.priority ?? 0,
+        models: channel.models,
+        modelCache: channel.modelCache,
+        modelMap: channel.modelMap,
+      }]
 }
 
 /**
@@ -43,9 +70,10 @@ export interface CatalogChannelLike {
 export function aliasTargets(channels: readonly CatalogChannelLike[]): Set<string> {
   const out = new Set<string>()
   for (const c of channels) {
-    for (const [logical, v] of Object.entries(c.modelMap ?? {})) {
-      const t = v.trim()
-      const key = logical.trim()
+    for (const source of catalogSources(c)) {
+      for (const [logical, v] of Object.entries(source.modelMap ?? {})) {
+        const t = v.trim()
+        const key = logical.trim()
       /**
        * 只把「**被别的名字**映射走」的目标排除。
        *
@@ -53,7 +81,8 @@ export function aliasTargets(channels: readonly CatalogChannelLike[]): Set<strin
        * 否则一个只是登记过恒等映射的模型会凭空从目录里消失
        * （G46 回归的直接原因：chip 取不到能力 ⇒ 视频参数不出现、旧模型清不掉）。
        */
-      if (t && t !== key) out.add(t)
+        if (t && t !== key) out.add(t)
+      }
     }
   }
   return out
@@ -73,9 +102,10 @@ export function logicalNames(channels: readonly CatalogChannelLike[]): string[] 
   const targets = aliasTargets(channels)
   const out = new Set<string>()
   for (const c of channels) {
-    for (const k of Object.keys(c.modelMap ?? {})) {
-      const key = k.trim()
-      if (!key) continue
+    for (const source of catalogSources(c)) {
+      for (const k of Object.keys(source.modelMap ?? {})) {
+        const key = k.trim()
+        if (!key) continue
       /**
        * ⚠️ **恒等映射（`agnes-2.5-pro → agnes-2.5-pro`）不贡献逻辑名**。
        *
@@ -91,9 +121,10 @@ export function logicalNames(channels: readonly CatalogChannelLike[]): string[] 
        * 恒等映射本身不携带任何信息（键与值同名），模型一定由第二个循环覆盖；
        * 跳过它不丢任何模型，只堵掉这条后门。
        */
-      const value = (c.modelMap?.[k] ?? '').trim()
-      if (value === key) continue
-      out.add(key)
+        const value = (source.modelMap?.[k] ?? '').trim()
+        if (value === key) continue
+        out.add(key)
+      }
     }
   }
   for (const c of channels) {
@@ -106,10 +137,12 @@ export function logicalNames(channels: readonly CatalogChannelLike[]): string[] 
      * 回落本身是必要的（「拉取了但还没勾」的渠道不该是空下拉），
      * 但它只在**勾选为空**时生效 —— 与 `generationPreset.pickModel` 同一条口径。
      */
-    const selectable = c.models.length > 0 ? c.models : (c.modelCache ?? [])
-    for (const m of selectable) {
-      const id = m.id.trim()
-      if (!id || targets.has(id)) continue
+    for (const source of catalogSources(c)) {
+      const selectable =
+        source.models.length > 0 ? source.models : (source.modelCache ?? [])
+      for (const m of selectable) {
+        const id = m.id.trim()
+        if (!id || targets.has(id)) continue
       /**
        * 已知的上游 ID 先归一成**显示名**（用户 2026-09-27 第 8 轮）。
        *
@@ -118,7 +151,8 @@ export function logicalNames(channels: readonly CatalogChannelLike[]): string[] 
        * 看起来像两个模型（正是用户报「id 格式不一样」的现象）。
        * 认不出来的 ID 原样保留，不猜。
        */
-      out.add(presetIdForUpstream(id))
+        out.add(presetIdForUpstream(id))
+      }
     }
   }
   return [...out]
@@ -144,8 +178,9 @@ function findProvider(
       (a.id === channelId ? -1 : b.id === channelId ? 1 : 0),
   )
   for (const c of ordered) {
-    const upstream = resolveUpstreamModel(c.modelMap, name)
-    if (!upstream) continue
+    for (const source of catalogSources(c)) {
+      const upstream = resolveUpstreamModel(source.modelMap, name)
+      if (!upstream) continue
     /**
      * 名称匹配允许两种：**上游 ID**（常态）与**逻辑名本身**。
      *
@@ -159,35 +194,40 @@ function findProvider(
      * 不能在这里把未勾选的模型重新算成“当前渠道可用”。否则父级 `preferChannelId`
      * 会让一个仅缓存过该模型的渠道抢走选路，最终请求被上游以“模型未启用”拒绝。
      */
-    const selectable = c.models.length > 0 ? c.models : (c.modelCache ?? [])
-    const hit = selectable.find(
-      (m) => m.id === upstream || m.id === name || aliases.includes(m.id),
-    )
-    if (hit) return { channelId: c.id, capability: hit }
+      const selectable =
+        source.models.length > 0 ? source.models : (source.modelCache ?? [])
+      const hit = selectable.find(
+        (m) => m.id === upstream || m.id === name || aliases.includes(m.id),
+      )
+      if (hit) return { channelId: c.id, capability: hit }
     /**
      * 映射行本身就是**可路由声明**（与 `routeCandidatesFor` 同一口径）。
      * 固定显示名常常还没进渠道的 `models` 列表，但用户已经在设置里填了
      * 映射；此时选模型仍要同步到这条渠道，否则节点会保留创建时的旧渠道。
      */
-    if ((c.modelMap ?? {})[name]?.trim()) {
-      const preset = presetOf(name)
-      if (preset) {
-        return {
-          channelId: c.id,
-          capability: {
-            id: upstream,
-            category: preset.category,
-            inputTypes: preset.category === 'video' ? ['text', 'image', 'video'] : ['text', 'image'],
-          },
+      if ((source.modelMap ?? {})[name]?.trim()) {
+        const preset = presetOf(name)
+        if (preset) {
+          return {
+            channelId: c.id,
+            capability: {
+              id: upstream,
+              category: preset.category,
+              inputTypes: preset.category === 'video' ? ['text', 'image', 'video'] : ['text', 'image'],
+            },
+          }
         }
       }
     }
   }
   // 没有映射（恒等）时按同名直配找
   for (const c of ordered) {
-    const selectable = c.models.length > 0 ? c.models : (c.modelCache ?? [])
-    const hit = selectable.find((m) => m.id === name)
-    if (hit) return { channelId: c.id, capability: hit }
+    for (const source of catalogSources(c)) {
+      const selectable =
+        source.models.length > 0 ? source.models : (source.modelCache ?? [])
+      const hit = selectable.find((m) => m.id === name)
+      if (hit) return { channelId: c.id, capability: hit }
+    }
   }
   return undefined
 }
@@ -308,9 +348,10 @@ export function toLogicalName(
   if (!name) return ''
   if (logicalNames(channels).includes(name)) return name
   for (const c of channels) {
-    for (const [logical, upstream] of Object.entries(c.modelMap ?? {})) {
-      const key = logical.trim()
-      const target = upstream.trim()
+    for (const source of catalogSources(c)) {
+      for (const [logical, upstream] of Object.entries(source.modelMap ?? {})) {
+        const key = logical.trim()
+        const target = upstream.trim()
       /**
        * 只认**真的重命名**那一行（键 ≠ 值）。
        *
@@ -319,7 +360,8 @@ export function toLogicalName(
        * 「已知上游 ID → 显示名」的兜底就永远走不到 —— 用户在老会话 / 老节点上
        * 看到的仍是裸 ID，而同一下拉里列的是 `Agnes 2.5 Pro`，看起来像两个模型。
        */
-      if (target === name && key !== target) return key
+        if (target === name && key !== target) return key
+      }
     }
   }
   /**

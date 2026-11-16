@@ -59,11 +59,9 @@ export interface ChannelActionPorts {
   setPanelOpen(value: boolean): void
   setDraftChecked(update: (previous: ReadonlySet<string>) => ReadonlySet<string>): void
   setDraftCategory(value: 'all' | ModelCapability['category']): void
-  setDraftKeyword(value: string): void
   setDragId(value: string | null): void
   setNewModelName(value: string): void
   setModelAddOpen(value: boolean): void
-  setMapCategory(value: 'image' | 'chat' | 'video' | 'audio'): void
   alert(message: string): void
   confirm(message: string): boolean
 }
@@ -271,14 +269,13 @@ export function createChannelActions(ports: ChannelActionPorts) {
     },
     addGlobalModel: async (state: ChannelActionState) => {
       try {
-        const model = await ports.channels.addGlobalModel({
+        await ports.channels.addGlobalModel({
           name: state.newModelName,
           category: state.newModelCategory,
           vendor: state.newModelVendor,
         })
         ports.setNewModelName('')
         ports.setModelAddOpen(false)
-        ports.setMapCategory(model.category as 'image' | 'chat' | 'video' | 'audio')
       } catch (error) {
         ports.alert(rawErrorMessage(error))
       }
@@ -295,7 +292,6 @@ export function createChannelActions(ports: ChannelActionPorts) {
       if (!state.selected) return
       ports.setDraftChecked(() => initialChecked(state.activeModels))
       ports.setDraftCategory('all')
-      ports.setDraftKeyword('')
       ports.setPanelOpen(true)
     },
     toggleDraft: (_state: ChannelActionState, modelId: string, on: boolean) => {

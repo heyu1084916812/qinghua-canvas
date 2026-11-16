@@ -169,6 +169,7 @@
   --success: #2f7d5a;
   --warn: #9a6424;
   --danger: #b4473a;
+  --status-off-dot: #9a9a9a;
   /* 收藏爱心：独立黄色，不跟随警告色（用户明确“收藏的是黄色填充”）。 */
   --favorite: #f6c945;
   /**
@@ -442,6 +443,7 @@
   --success: #57c08a;
   --warn: #d8a44c;
   --danger: #e8776a;
+  --status-off-dot: #555555;
   --success-soft: #17342a;
 
   /* 叠在素材上的浮层：反过来成「浅底深字」，压在亮图上照样读得清 */

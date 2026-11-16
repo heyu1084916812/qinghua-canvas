@@ -1,0 +1,213 @@
+.modelManagerLayer {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: grid;
+  place-items: center;
+}
+
+.modelManagerBackdrop {
+  position: absolute;
+  inset: 0;
+  border: 0;
+  background: var(--overlay-scrim);
+  cursor: default;
+}
+
+.modelManagerPanel {
+  position: relative;
+  width: min(560px, calc(100vw - 48px));
+  max-height: min(680px, calc(100vh - 48px));
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: var(--border);
+  border-radius: 8px;
+  background: var(--bg-surface);
+  box-shadow: var(--shadow-float);
+}
+
+.modelManagerHead {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.modelManagerPanel .modelAddForm {
+  padding: 0;
+  background: transparent;
+}
+
+.modelAddFormHead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.customModelList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+
+.customModelChip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-height: 26px;
+  padding: 0 var(--space-2);
+  border-radius: 6px;
+  background: var(--bg-hover);
+  color: var(--text-2);
+  font-size: var(--fs-label);
+}
+
+.customModelChip button {
+  border: 0;
+  background: transparent;
+  color: var(--text-3);
+  padding: 0;
+  cursor: pointer;
+}
+
+.customModelChip button:hover {
+  color: var(--danger);
+}
+
+.mappingTable {
+  display: flex;
+  flex-direction: column;
+  border-top: var(--border);
+}
+
+.mappingTableHead,
+.mappingRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.mappingTableHead {
+  min-height: 30px;
+  padding: 0 var(--space-2);
+  color: var(--text-3);
+  font-size: var(--fs-chip);
+}
+
+.mappingRow {
+  min-height: 48px;
+  padding: var(--space-1) var(--space-2);
+  border-top: var(--border);
+}
+
+.mappingRow:hover {
+  background: var(--bg-hover);
+}
+
+.mappingRealModel {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.mappingRealModel > span {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.mappingRealModel b {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text-1);
+  font-size: var(--fs-label);
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mappingRealModel small {
+  color: var(--text-3);
+  font-size: var(--fs-chip);
+}
+
+.mappingFrontend {
+  min-width: 0;
+}
+
+.mappingFrontend > * {
+  width: 100%;
+}
+
+.globalCommonButton {
+  min-width: 88px;
+  min-height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-1);
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-2);
+  padding: 0 var(--space-1);
+  font: inherit;
+  font-size: var(--fs-label);
+  cursor: pointer;
+}
+
+.globalCommonButton span {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--success);
+}
+
+.globalCommonButton:hover:not(:disabled) {
+  background: var(--bg-surface);
+  color: var(--text-1);
+}
+
+.globalCommonButtonOff {
+  color: var(--text-3);
+}
+
+.globalCommonButtonOff span {
+  background: var(--text-3);
+}
+
+.globalCommonButton:disabled {
+  justify-content: flex-end;
+  opacity: 0.55;
+  cursor: default;
+}
+
+.mappingInlineError {
+  grid-column: 1 / -1;
+  margin: 0 0 var(--space-1);
+  color: var(--danger);
+  font-size: var(--fs-label);
+  line-height: 1.5;
+}
+
+@media (max-width: 1100px) {
+  .mappingTableHead {
+    display: none;
+  }
+
+  .mappingRow {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+
+  .globalCommonButton {
+    grid-column: 2;
+    justify-self: end;
+    min-height: 24px;
+  }
+}

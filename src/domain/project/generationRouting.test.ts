@@ -132,6 +132,7 @@ describe('resolveGenerationTarget', () => {
               priority: 2,
               models: [image('gpt-image')],
               modelCache: [],
+              modelMap: {},
               createdAt: 0,
             },
             {
@@ -143,6 +144,7 @@ describe('resolveGenerationTarget', () => {
               priority: 1,
               models: [image('gpt-image')],
               modelCache: [],
+              modelMap: {},
               createdAt: 1,
             },
           ],

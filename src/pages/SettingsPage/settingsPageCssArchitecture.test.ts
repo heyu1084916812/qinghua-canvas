@@ -4,6 +4,8 @@ const PART_NAMES = [
   'SettingsChannelListDetails',
   'SettingsRoutePolicy',
   'SettingsChannelForm',
+  'SettingsChannelWorkspace',
+  'SettingsModelBinding',
   'SettingsModelMapping',
   'SettingsAppearanceSystem',
 ] as const
@@ -50,8 +52,8 @@ describe('SettingsPage CSS 模块结构护栏', () => {
     }
   })
 
-  it('组件样式拆成五份且每份不超过预算', () => {
-    expect(Object.keys(PART_SOURCES)).toHaveLength(6)
+  it('组件样式拆成八份且每份不超过预算', () => {
+    expect(Object.keys(PART_SOURCES)).toHaveLength(8)
     for (const [path, source] of Object.entries(PART_SOURCES)) {
       expect(source, path).toBeTypeOf('string')
       if (source) {

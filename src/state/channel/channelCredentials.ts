@@ -103,6 +103,7 @@ export function createChannelCredentials(
           priority: 0,
           models: [],
           modelCache: [],
+          modelMap: {},
           createdAt: Date.now(),
         }
         await update(id, { credentialGroups: [...channel.credentialGroups, group] })
@@ -159,6 +160,7 @@ export function createChannelCredentials(
         priority: 0,
         models: [],
         modelCache: [],
+        modelMap: {},
         createdAt: Date.now(),
       }
       await update(id, { credentialGroups: [...channel.credentialGroups, group] })

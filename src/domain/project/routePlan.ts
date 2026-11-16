@@ -31,6 +31,7 @@ export interface RoutePlanGroup {
   hasToken: boolean
   priority: number
   models: readonly RoutePlanModel[]
+  modelMap?: Readonly<Record<string, string>>
 }
 
 /**
@@ -154,11 +155,11 @@ function supportsModel(
 }
 
 function upstreamOf(
-  channel: RoutePlanChannel,
+  map: Readonly<Record<string, string>> | null | undefined,
   models: readonly RoutePlanModel[],
   logicalModel: string,
 ): string | null {
-  const mapped = channel.modelMap?.[logicalModel]?.trim()
+  const mapped = map?.[logicalModel]?.trim()
   if (mapped) return mapped
   if (models.some((model) => model.id === logicalModel)) return logicalModel
   return upstreamAliasesOf(logicalModel).find((alias) =>
@@ -239,21 +240,24 @@ export function buildRoutePlan(opts: {
       hasToken: boolean
       priority: number
       models: readonly RoutePlanModel[]
+      modelMap: Readonly<Record<string, string>> | null | undefined
     }> = channel.credentialGroups.length > 0
       ? channel.credentialGroups.map((group) => ({
           id: group.id,
           hasToken: group.hasToken,
           priority: group.priority,
           models: group.models,
+          modelMap: { ...(channel.modelMap ?? {}), ...(group.modelMap ?? {}) },
         }))
       : [{
           hasToken: channel.hasToken,
           priority: 0,
           models: channel.models,
+          modelMap: channel.modelMap,
         }]
 
     return groupSources.flatMap((group): RoutePlanCandidate[] => {
-      const mapped = channel.modelMap?.[logicalModel]?.trim()
+      const mapped = group.modelMap?.[logicalModel]?.trim()
       const supportsMapped = mapped
         ? (!group.id && group.models.length === 0) ||
           group.models.some(
@@ -273,7 +277,7 @@ export function buildRoutePlan(opts: {
       const key = routeCandidateKey(ref)
       if (useAllowList && !allowed.has(key)) return []
       sawAllowed = true
-      const upstreamModel = upstreamOf(channel, group.models, logicalModel)
+      const upstreamModel = upstreamOf(group.modelMap, group.models, logicalModel)
       if (!upstreamModel) return []
       return [{
         ...ref,

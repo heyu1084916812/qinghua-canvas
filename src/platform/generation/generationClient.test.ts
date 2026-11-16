@@ -36,6 +36,7 @@ function group(
       inputTypes: ['text'],
     })),
     modelCache: [],
+    modelMap: {},
     createdAt: priority,
   }
 }

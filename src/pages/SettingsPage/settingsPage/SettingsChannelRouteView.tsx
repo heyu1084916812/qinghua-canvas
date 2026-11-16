@@ -1,22 +1,11 @@
-import {
-  categoryLabel,
-  routeMapOptions,
-} from '../../../domain/project/modelSelection'
+import { useEffect, useRef } from 'react'
 import type { ModelCapability } from '../../../domain/shared/capability'
 import type { PresetModel, PresetVendor } from '../../../domain/project/modelPresets'
-import {
-  GLOBAL_MODEL_VENDORS,
-  MAP_FILTERS,
-  type MapFilterKey,
-} from '../settingsPageConstants'
+import { categoryLabel } from '../../../domain/project/modelSelection'
+import { GLOBAL_MODEL_VENDORS } from '../settingsPageConstants'
 import { ModelIcon } from '../../../features/shared/modelIcon/ModelIcon'
-import { ModelMapCombo } from '../SettingsPicker'
+import { ChoicePicker } from '../../../features/shared/choicePicker/ChoicePicker'
 import { settingsPageStyles as styles } from './settingsPageStyles'
-
-type MapTest = {
-  status: 'checking' | 'ok' | 'missing' | 'error'
-  message: string
-}
 
 type MapSaveNotice = {
   id: string
@@ -27,225 +16,246 @@ type MapSaveNotice = {
 type NewModelCategory = Exclude<PresetModel['category'], 'unknown'>
 
 export type SettingsChannelRouteViewProps = {
-  priority: number
-  weight: number
   allGlobalModels: PresetModel[]
   customModels: readonly { id: string }[]
   uncommonModelIds: readonly string[]
   activeModels: readonly ModelCapability[]
-  activeModelCache: readonly ModelCapability[]
   modelAddOpen: boolean
   newModelName: string
   newModelCategory: PresetModel['category']
   newModelVendor: PresetVendor
   showUncommonModels: boolean
-  mapCategory: MapFilterKey
   modelMap: Record<string, string>
-  mapDrafts: Record<string, string>
   mapSaveNotice: MapSaveNotice | null
-  mapTests: Record<string, MapTest>
-  onPriorityChange: (value: number) => void
-  onWeightChange: (value: number) => void
   onModelAddOpenChange: (open: boolean) => void
   onNewModelNameChange: (name: string) => void
   onNewModelCategoryChange: (category: NewModelCategory) => void
   onNewModelVendorChange: (vendor: PresetVendor) => void
   onAddGlobalModel: () => void
-  onMapCategoryChange: (category: MapFilterKey) => void
   onShowUncommonModelsChange: (show: boolean) => void
-  onDraftChange: (id: string, value: string) => void
-  onScheduleModelMapping: (id: string, value: string) => void
-  onFlushModelMapping: (id: string, value: string) => void
-  onTestModelMapping: (id: string, value: string) => void
+  onBindModel: (upstreamId: string, logicalName: string) => void
   onModelUncommonChange: (id: string, uncommon: boolean) => void
   onRemoveGlobalModel: (id: string) => void
 }
 
 export function SettingsChannelRouteView({
-  priority,
-  weight,
   allGlobalModels,
   customModels,
   uncommonModelIds,
   activeModels,
-  activeModelCache,
   modelAddOpen,
   newModelName,
   newModelCategory,
   newModelVendor,
   showUncommonModels,
-  mapCategory,
   modelMap,
-  mapDrafts,
   mapSaveNotice,
-  mapTests,
-  onPriorityChange,
-  onWeightChange,
   onModelAddOpenChange,
   onNewModelNameChange,
   onNewModelCategoryChange,
   onNewModelVendorChange,
   onAddGlobalModel,
-  onMapCategoryChange,
   onShowUncommonModelsChange,
-  onDraftChange,
-  onScheduleModelMapping,
-  onFlushModelMapping,
-  onTestModelMapping,
+  onBindModel,
   onModelUncommonChange,
   onRemoveGlobalModel,
 }: SettingsChannelRouteViewProps) {
-  const presetIds = allGlobalModels.map((model) => model.id)
-  const rows = allGlobalModels.map((model) => ({
-    key: model.id,
-    label: model.id,
-    category: model.category,
-    vendor: model.vendor,
-  }))
+  const managerRef = useRef<HTMLElement | null>(null)
   const uncommon = new Set(uncommonModelIds)
-  const allGroupRows = rows.filter((row) => String(row.category) === mapCategory)
-  const groupRows = allGroupRows.filter(
-    (row) => showUncommonModels || !uncommon.has(row.key),
-  )
-  const options = routeMapOptions(
-    mapCategory,
-    activeModels,
-    activeModelCache,
-  )
+  const rows = activeModels.map((model) => {
+    const savedLogical =
+      Object.entries(modelMap).find(([, upstream]) => upstream === model.id)?.[0] ?? ''
+    const logicalName = savedLogical
+    const isGlobalLogical = allGlobalModels.some(
+      (preset) => preset.id === logicalName,
+    )
+    const options = allGlobalModels
+      .filter(
+        (preset) =>
+          (model.category === 'unknown' || preset.category === model.category) &&
+          (showUncommonModels ||
+            !uncommon.has(preset.id) ||
+            preset.id === logicalName),
+      )
+      .map((preset) => ({
+        value: preset.id,
+        label: preset.id,
+        group: categoryLabel(preset.category),
+      }))
+    if (logicalName && !options.some((option) => option.value === logicalName)) {
+      options.unshift({
+        value: logicalName,
+        label: logicalName,
+        group: '当前映射',
+      })
+    }
+    return { model, logicalName, options, isGlobalLogical }
+  })
+
+  useEffect(() => {
+    if (!modelAddOpen) return
+    const previous = document.activeElement instanceof HTMLElement
+      ? document.activeElement
+      : null
+    const input = managerRef.current?.querySelector<HTMLInputElement>(
+      '[data-global-model-name]',
+    )
+    input?.focus()
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return
+      event.preventDefault()
+      onModelAddOpenChange(false)
+    }
+    document.addEventListener('keydown', onKeyDown)
+    return () => {
+      document.removeEventListener('keydown', onKeyDown)
+      previous?.focus()
+    }
+  }, [modelAddOpen, onModelAddOpenChange])
 
   return (
     <section className={styles.editorSection} data-settings-channel-route>
       <div className={styles.modelsHead}>
         <div className={styles.modelsTitleBox}>
-          <span className={styles.cardTitle}>渠道权重与模型映射</span>
-          <span className={styles.cardSub}>仅作用于当前渠道。</span>
+          <span className={styles.cardTitle}>模型映射</span>
+          <span className={styles.cardSub}>
+            将当前分组的真实模型绑定到画布使用的全局前端模型
+          </span>
         </div>
-      </div>
-
-      <div className={styles.fieldRow}>
-        <label className={styles.field}>
-          <span className={styles.label}>优先度（越大越先）</span>
-          <input
-            className={`${styles.input} ${styles.numInput}`}
-            type="number"
-            data-route-priority
-            value={priority}
-            onChange={(event) => onPriorityChange(Number(event.target.value))}
-          />
-        </label>
-        <label className={styles.field}>
-          <span className={styles.label}>权重（同档均摊）</span>
-          <input
-            className={`${styles.input} ${styles.numInput}`}
-            type="number"
-            min={0}
-            data-route-weight
-            value={weight}
-            onChange={(event) => onWeightChange(Number(event.target.value))}
-          />
-        </label>
-      </div>
-
-      <div className={styles.mapHead}>
-        <span className={styles.label}>模型映射（前端显示名 → 本站点真实 ID）</span>
         <button
           className={styles.ghostBtn}
           data-global-model-add-toggle
           onClick={() => onModelAddOpenChange(!modelAddOpen)}
         >
-          {modelAddOpen ? '收起' : '+ 添加前端模型'}
+          {modelAddOpen ? '收起管理' : '管理前端模型'}
         </button>
       </div>
 
       {modelAddOpen && (
-        <div className={styles.modelAddForm} data-global-model-form>
-          <label className={styles.field}>
-            <span className={styles.label}>前端显示名</span>
-            <input
-              className={styles.input}
-              data-global-model-name
-              value={newModelName}
-              placeholder="例如：My Image Pro"
-              onChange={(event) => onNewModelNameChange(event.target.value)}
-            />
-          </label>
-          <div className={styles.modelAddRow}>
-            <span className={styles.label}>分类</span>
-            <div className={styles.mapFilters}>
-              {(['image', 'chat', 'video', 'audio'] as const).map((category) => (
-                <button
-                  key={category}
-                  type="button"
-                  className={
-                    newModelCategory === category
-                      ? `${styles.mapFilter} ${styles.mapFilterOn}`
-                      : styles.mapFilter
-                  }
-                  data-global-model-category={category}
-                  onClick={() => onNewModelCategoryChange(category)}
-                >
-                  {categoryLabel(category)}
-                </button>
-              ))}
+        <div className={styles.modelManagerLayer}>
+          <button
+            type="button"
+            className={styles.modelManagerBackdrop}
+            aria-label="关闭前端模型目录"
+            onClick={() => onModelAddOpenChange(false)}
+          />
+          <section
+            ref={managerRef}
+            className={styles.modelManagerPanel}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="settings-global-model-title"
+          >
+            <div className={styles.modelManagerHead}>
+              <div className={styles.modelAddFormHead}>
+                <span className={styles.label} id="settings-global-model-title">
+                  前端模型目录
+                </span>
+                <span className={styles.cardSub}>全局模型，在各分组之间共享</span>
+              </div>
+              <button
+                type="button"
+                className={styles.ghostBtn}
+                onClick={() => onModelAddOpenChange(false)}
+              >
+                完成
+              </button>
             </div>
-          </div>
-          <div className={styles.modelAddRow}>
-            <span className={styles.label}>图标</span>
-            <div className={styles.vendorGrid}>
-              {GLOBAL_MODEL_VENDORS.map((vendor) => (
+            <div className={styles.modelAddForm} data-global-model-form>
+              <div className={styles.fieldRow}>
+                <label className={`${styles.field} ${styles.grow}`}>
+                  <span className={styles.label}>显示名称</span>
+                  <input
+                    className={styles.input}
+                    data-global-model-name
+                    value={newModelName}
+                    placeholder="例如：My Image Pro"
+                    onChange={(event) => onNewModelNameChange(event.target.value)}
+                  />
+                </label>
+                <label className={styles.field}>
+                  <span className={styles.label}>分类</span>
+                  <ChoicePicker
+                    name="new-global-model-category"
+                    value={newModelCategory}
+                    ariaLabel="前端模型分类"
+                    options={(['image', 'chat', 'video', 'audio'] as const).map(
+                      (category) => ({
+                        value: category,
+                        label: categoryLabel(category),
+                      }),
+                    )}
+                    onChange={(value) =>
+                      onNewModelCategoryChange(value as NewModelCategory)
+                    }
+                  />
+                </label>
+              </div>
+              <div className={styles.modelAddRow}>
+                <span className={styles.label}>图标</span>
+                <div className={styles.vendorGrid}>
+                  {GLOBAL_MODEL_VENDORS.map((vendor) => (
+                    <button
+                      key={vendor.value}
+                      type="button"
+                      className={
+                        newModelVendor === vendor.value
+                          ? `${styles.vendorOption} ${styles.vendorOptionOn}`
+                          : styles.vendorOption
+                      }
+                      data-global-model-vendor={vendor.value}
+                      onClick={() => onNewModelVendorChange(vendor.value)}
+                    >
+                      <ModelIcon vendor={vendor.value} size={18} />
+                      <span>{vendor.label}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+              {customModels.length > 0 ? (
+                <div className={styles.customModelList}>
+                  {customModels.map((model) => (
+                    <span key={model.id} className={styles.customModelChip}>
+                      {model.id}
+                      <button
+                        type="button"
+                        aria-label={`删除前端模型 ${model.id}`}
+                        data-global-model-remove={model.id}
+                        onClick={() => onRemoveGlobalModel(model.id)}
+                      >
+                        ×
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              ) : null}
+              <div className={styles.modelAddActions}>
                 <button
-                  key={vendor.value}
-                  type="button"
-                  className={
-                    newModelVendor === vendor.value
-                      ? `${styles.vendorOption} ${styles.vendorOptionOn}`
-                      : styles.vendorOption
-                  }
-                  data-global-model-vendor={vendor.value}
-                  onClick={() => onNewModelVendorChange(vendor.value)}
+                  className={styles.ghostBtn}
+                  onClick={() => onModelAddOpenChange(false)}
                 >
-                  <ModelIcon vendor={vendor.value} size={18} />
-                  <span>{vendor.label}</span>
+                  取消
                 </button>
-              ))}
+                <button
+                  className={styles.primary}
+                  data-global-model-add
+                  disabled={!newModelName.trim()}
+                  onClick={onAddGlobalModel}
+                >
+                  添加
+                </button>
+              </div>
             </div>
-          </div>
-          <div className={styles.modelAddActions}>
-            <button className={styles.ghostBtn} onClick={() => onModelAddOpenChange(false)}>
-              取消
-            </button>
-            <button
-              className={styles.primary}
-              data-global-model-add
-              disabled={!newModelName.trim()}
-              onClick={onAddGlobalModel}
-            >
-              添加
-            </button>
-          </div>
+          </section>
         </div>
       )}
 
       <div className={styles.mapToolbar}>
-        <div className={styles.mapFilters} role="tablist" aria-label="模型映射分类">
-          {MAP_FILTERS.map((filter) => (
-            <button
-              key={filter.key}
-              type="button"
-              role="tab"
-              aria-selected={mapCategory === filter.key}
-              data-route-map-filter={filter.key}
-              className={
-                mapCategory === filter.key
-                  ? `${styles.mapFilter} ${styles.mapFilterOn}`
-                  : styles.mapFilter
-              }
-              onClick={() => onMapCategoryChange(filter.key)}
-            >
-              {filter.title}
-            </button>
-          ))}
-        </div>
+        <span className={styles.cardSub}>
+          {rows.length > 0
+            ? `${rows.filter((row) => row.isGlobalLogical).length}/${rows.length} 个真实模型已绑定前端模型`
+            : '当前分组还没有选择模型'}
+        </span>
         <label className={styles.showUncommonToggle}>
           <input
             type="checkbox"
@@ -257,112 +267,79 @@ export function SettingsChannelRouteView({
         </label>
       </div>
 
-      {groupRows.length === 0 ? (
-        <p className={styles.modelsEmpty} data-route-map-empty={mapCategory}>
-          {allGroupRows.length > 0
-            ? '这一类的模型都已标为不常用。勾选“显示不常用模型”可恢复为常用。'
-            : '这一类的模型列表目前为空。'}
+      {rows.length === 0 ? (
+        <p className={styles.modelsEmpty} data-route-map-empty>
+          先在上方选择当前分组可用的真实模型，再回来绑定前端模型。
         </p>
       ) : (
-        <div className={styles.mapGroup} data-route-map-group={mapCategory}>
-          <div className={styles.mapList}>
-            {groupRows.map(({ key: id, label, vendor }) => {
-              const saved = modelMap[id] ?? ''
-              const draft = mapDrafts[id]
-              const value = draft ?? saved
-              const isPreset = presetIds.includes(id)
-              const isUncommon = uncommonModelIds.includes(id)
-              const test = mapTests[id]
-              return (
-                <div
-                  key={id}
-                  className={styles.mapRow}
-                  data-route-map-row={id}
-                  data-route-map-preset={isPreset ? '1' : '0'}
-                >
-                  <span className={styles.mapName} title={id} data-route-map-label>
-                    <ModelIcon vendor={vendor} size={19} />
-                    <span className={styles.mapLabelText}>{label}</span>
-                  </span>
-                  <ModelMapCombo
-                    rowId={id}
-                    category={mapCategory}
-                    value={value}
-                    options={options}
-                    placeholder="留空 = 按原名发送"
-                    emptyHint="该渠道还没勾选同类模型"
-                    ariaLabel={`${MAP_FILTERS.find((filter) => filter.key === mapCategory)?.title ?? ''} ${label} 对应的本站模型 ID`}
-                    onChange={(next) => {
-                      onDraftChange(id, next)
-                      onScheduleModelMapping(id, next)
-                    }}
-                    onBlur={() => onFlushModelMapping(id, value)}
-                  />
-                  <span
-                    className={
-                      mapSaveNotice?.tone === 'error'
-                        ? `${styles.mapSaveState} ${styles.mapSaveError}`
-                        : styles.mapSaveState
-                    }
-                    data-route-map-save-state={
-                      mapSaveNotice?.id === id ? mapSaveNotice.tone : undefined
-                    }
-                    aria-live="polite"
-                  >
-                    {mapSaveNotice?.id === id ? mapSaveNotice.text : ''}
-                  </span>
-                  <label
-                    className={styles.mapUncommonToggle}
-                    title="勾选后从画布、Agent、默认参数和电商模型中隐藏"
-                  >
-                    <input
-                      type="checkbox"
-                      checked={isUncommon}
-                      data-route-map-uncommon={id}
-                      onChange={(event) =>
-                        onModelUncommonChange(id, event.target.checked)
-                      }
-                    />
-                    <span>不常用</span>
-                  </label>
-                  <button
-                    type="button"
-                    className={styles.mapTestButton}
-                    data-route-map-test={id}
-                    disabled={test?.status === 'checking'}
-                    onClick={() => onTestModelMapping(id, value)}
-                  >
-                    {test?.status === 'checking' ? '测试中' : '测试'}
-                  </button>
-                  {customModels.some((model) => model.id === id) && (
-                    <button
-                      className={styles.chipX}
-                      aria-label={`删除前端模型 ${id}`}
-                      data-global-model-remove={id}
-                      onClick={() => onRemoveGlobalModel(id)}
-                    >
-                      ×
-                    </button>
-                  )}
-                  <span
-                    className={
-                      test?.status === 'ok'
-                        ? `${styles.mapTestState} ${styles.mapTestOk}`
-                        : test?.status === 'missing'
-                          ? `${styles.mapTestState} ${styles.mapTestMissing}`
-                          : test?.status === 'error'
-                            ? `${styles.mapTestState} ${styles.mapTestError}`
-                            : styles.mapTestState
-                    }
-                    data-route-map-test-state={test?.status}
-                    aria-live="polite"
-                  >
-                    {test?.message ?? ''}
+        <div className={styles.mappingTable} data-route-map-table>
+          <div className={styles.mappingTableHead} aria-hidden>
+            <span>真实模型</span>
+            <span>对应前端模型</span>
+            <span>常用状态</span>
+          </div>
+          {rows.map(({ model, logicalName, options, isGlobalLogical }) => {
+            const save = mapSaveNotice?.id === logicalName ? mapSaveNotice : null
+            const isUncommon = Boolean(logicalName && uncommon.has(logicalName))
+            const modelIcon = allGlobalModels.find(
+              (preset) => preset.id === logicalName,
+            )?.vendor
+            return (
+              <div
+                key={model.id}
+                className={styles.mappingRow}
+                data-route-map-row={model.id}
+                data-route-map-category={model.category}
+              >
+                <div className={styles.mappingRealModel} title={model.id}>
+                  {modelIcon ? <ModelIcon vendor={modelIcon} size={18} /> : null}
+                  <span>
+                    <b data-route-map-label>{model.id}</b>
+                    <small>{categoryLabel(model.category)}</small>
                   </span>
                 </div>
-              )
-            })}
-          </div>
+                <div className={styles.mappingFrontend} data-route-map-frontend={model.id}>
+                  <ChoicePicker
+                    name={`mapping-${model.id}`}
+                    value={logicalName}
+                    ariaLabel={`${model.id} 对应的前端模型`}
+                    placeholder="未映射"
+                    onChange={(value) => onBindModel(model.id, value)}
+                    options={options}
+                  />
+                </div>
+                <button
+                  type="button"
+                  className={
+                    logicalName && !isUncommon
+                      ? styles.globalCommonButton
+                      : `${styles.globalCommonButton} ${styles.globalCommonButtonOff}`
+                  }
+                  data-route-map-uncommon={logicalName || undefined}
+                  disabled={!logicalName || !isGlobalLogical}
+                  title="全局设置，影响所有分组和前端模型选择"
+                  onClick={() =>
+                    logicalName &&
+                    onModelUncommonChange(logicalName, !isUncommon)
+                  }
+                >
+                  <span aria-hidden />
+                  {logicalName && !isGlobalLogical
+                    ? '待绑定 · 全局'
+                    : logicalName
+                    ? isUncommon
+                      ? '不常用 · 全局'
+                      : '常用 · 全局'
+                    : '未映射'}
+                </button>
+                {save?.tone === 'error' ? (
+                  <p className={styles.mappingInlineError} role="alert">
+                    {save.text}
+                  </p>
+                ) : null}
+              </div>
+            )
+          })}
         </div>
       )}
     </section>

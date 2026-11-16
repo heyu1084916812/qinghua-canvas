@@ -21,7 +21,6 @@ import {
 import {
   measureProfileDrawerBounds,
   type ChannelFilterKey,
-  type MapFilterKey,
   type PresetModel,
   type PresetVendor,
 } from './settingsPageConstants'
@@ -53,6 +52,7 @@ import { SettingsChannelSidebarView } from './settingsPage/SettingsChannelSideba
 import { SettingsProviderHeaderView } from './settingsPage/SettingsProviderHeaderView'
 import { SettingsConnectionView } from './settingsPage/SettingsConnectionView'
 import { SettingsModelsView } from './settingsPage/SettingsModelsView'
+import { SettingsKeyGroupView } from './settingsPage/SettingsKeyGroupView'
 import { SettingsWorkflowManager } from '../../features/settings/SettingsWorkflowManager'
 import { SettingsChannelQuickTest } from '../../features/settings/SettingsChannelQuickTest'
 import { runninghubSiteNote } from '../../domain/project/runninghubSite'
@@ -239,20 +239,14 @@ export function SettingsPage({ embedded = false }: { embedded?: boolean } = {}) 
   /** 「AI 应用和工作流」由连接区的动作按钮控制展开（图一的按钮位） */
   const [draftChecked, setDraftChecked] = useState<ReadonlySet<string>>(new Set())
   const [draftCategory, setDraftCategory] = useState<CategoryFilter>('all')
-  const [draftKeyword, setDraftKeyword] = useState('')
 
   /** 正在被拖动的渠道 id（§7.2 拖动排序） */
   const [dragId, setDragId] = useState<string | null>(null)
-  /**
-   * 映射表的草稿（M7-2）：`逻辑名 → 输入框里的值`。
-   *
-   * 为什么是草稿而不是「改一个存一个」：映射是**按渠道**的一整张表，
-   * 逐条落库会让「改到一半」的状态被持久化（用户还没决定，库里已经变了）。
-   * 与本页既有的渠道表单、模型选择面板同一口径（中途反悔不该留下半份改动）。
-   * 切渠道时清空，避免把 A 站的上游 ID 带到 B 站。
-   */
-  const [mapDrafts, setMapDrafts] = useState<Record<string, string>>({})
   const mapSaveTimersRef = useRef(new Map<string, number>())
+  const [, setMapDrafts] = useState<Record<string, string>>({})
+  const [, setMapTests] = useState<
+    Record<string, { status: 'checking' | 'ok' | 'missing' | 'error'; message: string }>
+  >({})
   const [mapSaveNotice, setMapSaveNotice] = useState<{
     id: string
     tone: 'ok' | 'error'
@@ -264,16 +258,6 @@ export function SettingsPage({ embedded = false }: { embedded?: boolean } = {}) 
     useState<PresetModel['category']>('image')
   const [newModelVendor, setNewModelVendor] = useState<PresetVendor>('openai')
   const [showUncommonModels, setShowUncommonModels] = useState(false)
-  const [mapTests, setMapTests] = useState<
-    Record<string, { status: 'checking' | 'ok' | 'missing' | 'error'; message: string }>
-  >({})
-
-  /**
-   * 映射区当前看的**哪一类**（用户 2026-10-08 第 1 条：五个筛选）。
-   * 默认「生图」——绝大多数人第一条渠道就是为了出图。
-   * 刻意**不随切渠道复位**：用户在比对两条渠道的同一类映射时，来回切渠道不必重新点筛选项。
-   */
-  const [mapCategory, setMapCategory] = useState<MapFilterKey>('image')
 
   /**
    * 协议目录版本号。`protocolCatalog()` 每次返回**新对象**，但 useSyncExternalStore
@@ -369,6 +353,7 @@ export function SettingsPage({ embedded = false }: { embedded?: boolean } = {}) 
   const activeGroup = channelPresentation.activeCredentialGroupFor(selectedKeyGroups, activeGroupId)
   const activeModels = activeGroup?.models ?? selected?.models ?? []
   const activeModelCache = activeGroup?.modelCache ?? selected?.modelCache ?? []
+  const activeModelMap = activeGroup?.modelMap ?? selected?.modelMap ?? {}
 
   // 选中变化 → 同步表单。依赖刻意只放 selectedId；store 回写对象不能重置表单草稿。
   useEffect(() => {
@@ -473,11 +458,9 @@ export function SettingsPage({ embedded = false }: { embedded?: boolean } = {}) 
     setPanelOpen,
     setDraftChecked,
     setDraftCategory,
-    setDraftKeyword,
     setDragId,
     setNewModelName,
     setModelAddOpen,
-    setMapCategory,
     alert: (message) => window.alert(message),
     confirm: (message) => window.confirm(message),
   }
@@ -543,8 +526,8 @@ export function SettingsPage({ embedded = false }: { embedded?: boolean } = {}) 
     handleCreate, handleEnableChange, handleProfileIconFile, saveProfileDrawer,
     persistForm, handleVerify, handleDetect, handleRefresh,
     openChannelMenu, openChannelMenuFromButton, editChannel, handleRemove, handleConfirmRemove,
-    handleAddKeyGroup, handleRemoveKeyGroup, flushModelMapping, scheduleModelMapping,
-    testModelMapping, handleAddGlobalModel, handleRemoveGlobalModel, openPanel,
+    handleAddKeyGroup, handleRemoveKeyGroup,
+    handleAddGlobalModel, handleRemoveGlobalModel, openPanel,
     toggleDraft, applyDraft, dropSelectedModel, dropOnChannel,
     handleProtocolChange, checkImportedProtocol, handleImportProtocolFile,
     handleSaveImportedProtocol, downloadProtocolTemplate, downloadProtocol,
@@ -560,9 +543,28 @@ export function SettingsPage({ embedded = false }: { embedded?: boolean } = {}) 
     selected,
     activeModelCache,
     draftCategory,
-    draftKeyword,
+    '',
   )
   const selectedGroups = channelPresentation.selectedModelGroupsFor(activeModels)
+  const handleBindModel = async (upstreamId: string, logicalName: string) => {
+    if (!selectedId) return
+    setMapSaveNotice(null)
+    try {
+      await channels.setModelBinding(
+        selectedId,
+        upstreamId,
+        logicalName,
+        activeGroup?.id,
+      )
+      setMapSaveNotice({ id: logicalName, tone: 'ok', text: '已保存' })
+    } catch (error) {
+      setMapSaveNotice({
+        id: logicalName,
+        tone: 'error',
+        text: error instanceof Error ? error.message : '保存失败',
+      })
+    }
+  }
   const action = verifiedFor?.channelId === selectedId ? verifiedFor.source : null
 
   const {
@@ -622,6 +624,22 @@ export function SettingsPage({ embedded = false }: { embedded?: boolean } = {}) 
       */}
       {(
       <div className={embedded ? styles.layoutEmbedded : styles.layout} data-settings-card>
+        <div className={styles.pageUtilityBar}>
+          {!embedded ? (
+            <span className={styles.pageUtilityCopy}>配置模型服务与密钥。</span>
+          ) : <span />}
+          <button
+            type="button"
+            className={styles.ghostBtn}
+            data-global-model-manager-open
+            onClick={() => setModelAddOpen(true)}
+          >
+            管理前端模型
+            <span className={styles.pageUtilityCount}>
+              {allGlobalModels.length - uncommonModelIds.length}/{allGlobalModels.length}
+            </span>
+          </button>
+        </div>
         {/*
           **选路策略默认收起**（用户 2026-11-15：「后台渠道的位置不要全部塞在一起了」）：
           它是**全局**设置，不是这条渠道的字段，常驻展开会把渠道页顶掉半屏。
@@ -682,18 +700,20 @@ export function SettingsPage({ embedded = false }: { embedded?: boolean } = {}) 
                 name={name}
                 ariaName={selected.name}
                 enabled={enabled}
+                priority={selected.priority}
+                weight={selected.weight}
                 onEditProfile={editChannel}
                 onEnabledChange={(next) => void handleEnableChange(next)}
+                onPriorityChange={(priority) =>
+                  void channels.setRouteTuning(selected.id, { priority })
+                }
+                onWeightChange={(weight) =>
+                  void channels.setRouteTuning(selected.id, { weight })
+                }
               />
               <SettingsConnectionView
-                channels={channels}
-                selected={selected}
                 baseUrl={baseUrl}
                 busy={busy}
-                activeGroup={activeGroup}
-                selectedKeyGroups={selectedKeyGroups}
-                credentialSlots={credentialSlots}
-                docUrl={docUrl}
                 protocol={protocol}
                 builtinSelected={builtinSelected}
                 visibleProtocolOptions={visibleProtocolOptions}
@@ -713,15 +733,6 @@ export function SettingsPage({ embedded = false }: { embedded?: boolean } = {}) 
                 npError={npError}
                 onBaseUrlChange={setBaseUrl}
                 onPersistForm={persistForm}
-                onAddKeyGroup={handleAddKeyGroup}
-                onRemoveKeyGroup={handleRemoveKeyGroup}
-                onActiveGroupChange={setActiveGroupId}
-                onRenameKeyGroup={(groupId, nextName) =>
-                  void channels.renameCredentialGroup(selected.id, groupId, nextName)
-                }
-                onSetKeyGroupPriority={(groupId, priority) =>
-                  void channels.setCredentialGroupPriority(selected.id, groupId, priority)
-                }
                 onProtocolChange={handleProtocolChange}
                 onDownloadProtocol={downloadProtocol}
                 onRemoveProtocol={(protocolOption) => void handleRemoveProtocol(protocolOption)}
@@ -740,8 +751,26 @@ export function SettingsPage({ embedded = false }: { embedded?: boolean } = {}) 
                 onClearImportError={() => setNpError('')}
                 onCheckImportedProtocol={checkImportedProtocol}
                 onSaveImportedProtocol={handleSaveImportedProtocol}
-                onRefreshModels={() => void handleRefresh()}
                 onOpenWorkflowManager={() => openWorkflowsPage(selected.id)}
+              />
+
+              <SettingsKeyGroupView
+                channels={channels}
+                selected={selected}
+                activeGroup={activeGroup}
+                selectedKeyGroups={selectedKeyGroups}
+                credentialSlots={credentialSlots}
+                busy={busy}
+                docUrl={docUrl}
+                onAddKeyGroup={handleAddKeyGroup}
+                onRemoveKeyGroup={handleRemoveKeyGroup}
+                onActiveGroupChange={setActiveGroupId}
+                onRenameKeyGroup={(groupId, nextName) =>
+                  void channels.renameCredentialGroup(selected.id, groupId, nextName)
+                }
+                onSetKeyGroupPriority={(groupId, priority) =>
+                  void channels.setCredentialGroupPriority(selected.id, groupId, priority)
+                }
               />
 
               {/* AI 应用 / 工作流在独立页管理（#1131）：渠道页只留连接、Key 和这条入口 */}
@@ -756,73 +785,51 @@ export function SettingsPage({ embedded = false }: { embedded?: boolean } = {}) 
                 selectedGroups={selectedGroups}
                 panelOpen={panelOpen}
                 draftCategory={draftCategory}
-                draftKeyword={draftKeyword}
                 draftChecked={draftChecked}
                 draftList={draftList}
                 onRefresh={() => void handleRefresh()}
                 onOpenPanel={() => void openPanel()}
                 onClosePanel={() => setPanelOpen(false)}
                 onDraftCategoryChange={setDraftCategory}
-                onDraftKeywordChange={setDraftKeyword}
                 onToggleDraft={toggleDraft}
                 onModelCategoryChange={(modelId, category) => void channels.setModelCategory(selected.id, modelId, category, activeGroup?.id)}
                 onDropSelectedModel={(modelId) => void dropSelectedModel(modelId)}
                 onApplyDraft={() => void applyDraft()}
               />
 
-              {/* 参考图一的顺序：模型在上、快速测试在下 */}
-              <SettingsChannelQuickTest channel={selected} groupId={activeGroup?.id} channels={channels} platform={platform} />
-
-              {/* 路由 / 权重 / 模型映射是**高级**设置：默认收起，渠道页不再一路铺到底 */}
-              <details className={styles.disclosure} data-settings-advanced-disclosure>
-                <summary>高级设置 · 渠道权重与模型映射</summary>
               <SettingsChannelRouteView
-                priority={selected.priority}
-                weight={selected.weight}
                 allGlobalModels={allGlobalModels}
                 customModels={customModels}
                 uncommonModelIds={uncommonModelIds}
                 activeModels={activeModels}
-                activeModelCache={activeModelCache}
                 modelAddOpen={modelAddOpen}
                 newModelName={newModelName}
                 newModelCategory={newModelCategory}
                 newModelVendor={newModelVendor}
                 showUncommonModels={showUncommonModels}
-                mapCategory={mapCategory}
-                modelMap={selected.modelMap}
-                mapDrafts={mapDrafts}
+                modelMap={activeModelMap}
                 mapSaveNotice={mapSaveNotice}
-                mapTests={mapTests}
-                onPriorityChange={(priority) =>
-                  void channels.setRouteTuning(selectedId!, { priority })
-                }
-                onWeightChange={(weight) =>
-                  void channels.setRouteTuning(selectedId!, { weight })
-                }
-                onModelAddOpenChange={(open) => { setNewModelCategory(open ? mapCategory : newModelCategory); setModelAddOpen(open) }}
+                onModelAddOpenChange={setModelAddOpen}
                 onNewModelNameChange={setNewModelName}
                 onNewModelCategoryChange={setNewModelCategory}
                 onNewModelVendorChange={setNewModelVendor}
                 onAddGlobalModel={() => void handleAddGlobalModel()}
-                onMapCategoryChange={(category) => { setMapCategory(category); if (modelAddOpen) setNewModelCategory(category) }}
                 onShowUncommonModelsChange={setShowUncommonModels}
-                onDraftChange={(id, value) =>
-                  setMapDrafts((previous) => ({ ...previous, [id]: value }))
-                }
-                onScheduleModelMapping={scheduleModelMapping}
-                onFlushModelMapping={(id, value) =>
-                  void flushModelMapping(id, value)
-                }
-                onTestModelMapping={(id, value) =>
-                  void testModelMapping(id, value)
+                onBindModel={(upstreamId, logicalName) =>
+                  void handleBindModel(upstreamId, logicalName)
                 }
                 onModelUncommonChange={(id, uncommon) =>
                   void channels.setModelUncommon(id, uncommon)
                 }
                 onRemoveGlobalModel={(id) => void handleRemoveGlobalModel(id)}
               />
-              </details>
+
+              <SettingsChannelQuickTest
+                channel={selected}
+                groupId={activeGroup?.id}
+                channels={channels}
+                platform={platform}
+              />
               <SettingsChannelActionBar busy={busy} canDelete={!builtinSelected} onSave={() => void persistForm()} onDelete={() => void handleConfirmRemove(selected.id, selected.name)} />
             </div>
           )}

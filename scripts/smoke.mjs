@@ -1689,50 +1689,23 @@ async function mapMockModels(page) {
    * 但画布上别的控件也可能叫这些词，按文字取会命中错的那个（本批实测踩到过）。
    */
   const rows = [
-    ['image', 'GPT Image 2', 'mock-image-1'],
-    ['image', '全能图片X-3（图生图）', 'mock-image-edit-1'],
-    /**
-     * 新建图片节点现在默认选生图档第一条 `Agnes Image 2.5 Flash`。
-     * mock 渠道也必须登记同一逻辑名，否则“铺到画布”建出的节点虽然连到了 mock
-     * 渠道，选路却找不到它，出图会静默不启动。
-     */
-    ['image', 'Agnes Image 2.5 Flash', 'mock-image-1'],
-    ['chat', 'GPT-6 Astra', 'mock-chat-1'],
-    ['video', '即梦 2.5', 'mock-video-1'],
-    ['audio', 'OpenAI TTS', 'mock-speech-1'],
+    ['mock-image-1', 'GPT Image 2'],
+    ['mock-image-edit-1', '全能图片X-3（图生图）'],
+    ['mock-chat-1', 'GPT-6 Astra'],
+    ['mock-video-1', '即梦 2.5'],
+    ['mock-speech-1', 'OpenAI TTS'],
   ]
-  for (const [filterKey, logical, upstream] of rows) {
-    /*
-     * 切到这一类**再**填：不切的话这一档的行根本不在 DOM 里（映射区一次只渲染一档），
-     * 下面的 `count() === 0` 会静默跳过 —— 本批实测就是这样让「即梦 2.5」的映射
-     * 从来没被写上，进而让 G46 的视频整组看起来像产品缺陷。
-     */
-    const filter = page.locator(`[data-route-map-filter="${filterKey}"]`)
-    if ((await filter.count()) === 0) continue
-    await filter.click({ timeout: 3000 }).catch(() => {})
-    await sleep(150)
-    const input = page.locator(`[data-route-map-input="${logical}"]`)
-    if ((await input.count()) === 0) continue
-    await input.fill(upstream)
-    /*
-     * 映射已改为失焦 / 停止输入后自动保存，不再有逐行保存按钮。
-     * 冒烟夹具只负责把值输入并失焦，随后等自动保存落库。
-     */
-    await input.blur()
-    await sleep(750)
+  for (const [upstream, logical] of rows) {
+    const row = page.locator(`[data-route-map-row="${upstream}"]`)
+    if ((await row.count()) === 0) continue
+    await row.scrollIntoViewIfNeeded()
+    const trigger = row.locator('[data-route-map-frontend] [data-choice-picker] button').first()
+    await trigger.click({ timeout: 3000 }).catch(() => {})
+    const option = row.locator(`[data-choice-option="${logical}"]`)
+    if ((await option.count()) === 0) continue
+    await option.click()
+    await sleep(250)
   }
-  /*
-   * 收尾把筛选拨回「生图」—— 助手是**搭场景**的，不该在界面上留下自己的脚印。
-   *
-   * 2026-10-09 全量实测：G83 紧跟在配置之后断言「默认落在生图档」，
-   * 读到的却是这里最后切到的「视频」档 —— 看上去像产品默认值变了，
-   * 真因是上一轮修 G46 时给这个助手加了"逐档切换"，却没把档位拨回去。
-   */
-  await page
-    .locator('[data-route-map-filter="image"]')
-    .click({ timeout: 3000 })
-    .catch(() => {})
-  await sleep(150)
 
 }
 
@@ -2510,23 +2483,11 @@ async function g8(browser) {
   const chatOpts = await page.locator('[data-model-option]').count()
   rec(g, '分类 tab 收敛列表（对话）', chatOpts === 1, `选项=${chatOpts}`)
   await page.locator('[data-model-tab="all"]').click()
-  const namesBeforeSearch = await page.locator('[data-model-option]').allInnerTexts()
-  const expectedImageMatches = namesBeforeSearch.filter((name) => /image/i.test(name)).length
-  await page.locator('[data-model-search]').fill('image')
-  await sleep(200)
-  const searched = await page.locator('[data-model-option]').count()
-  const searchedNames = await page.locator('[data-model-option]').allInnerTexts()
   rec(
     g,
-    '搜索框按名称过滤',
-    expectedImageMatches > 0 &&
-      expectedImageMatches < allOpts &&
-      searched === expectedImageMatches &&
-      searchedNames.every((name) => /image/i.test(name)),
-    `选项=${searched} 期望=${expectedImageMatches}`,
+    '模型选择器不提供搜索框（用户 2026-11-16 口径）',
+    (await page.locator('[data-model-search]').count()) === 0,
   )
-  await page.locator('[data-model-search]').fill('')
-  await sleep(150)
   await page.screenshot({ path: `${OUT}/10c-g8-model-panel.png` })
 
   // 勾选 → 应用 → 已选模型按分类成行
@@ -6841,13 +6802,13 @@ async function g44(browser) {
     `type=${await revealInput.getAttribute('type')} 值="${await revealInput.inputValue()}"`,
   )
 
-  // ③ 删除令牌 → 提示消失、渠道还在、可再存（用锚点避开「删除渠道」）
-  await page.locator('[data-settings-token-remove]').click()
-  await sleep(400)
-  const afterRemove =
-    (await page.locator('[data-settings-token-tail]').getAttribute('placeholder').catch(() => '')) ?? ''
-  rec(g, '删除令牌后回到「粘贴 API Key」（尾号不再出现）', !norm0(afterRemove).includes('3f2a'), afterRemove)
-  rec(g, '删除令牌不删渠道', (await page.locator(USER_CHANNEL).count()) === 2)
+  // ③ Key 操作收口：眼睛在框内，不再保留独立“删除/清空”按钮
+  rec(
+    g,
+    '令牌行不再提供独立删除按钮',
+    (await page.locator('[data-settings-token-remove]').count()) === 0,
+  )
+  rec(g, '渠道仍保留', (await page.locator(USER_CHANNEL).count()) === 2)
 
   // ④ 拖动排序：把「渠道乙」拖到「渠道甲」之前 → 顺序翻转并落库
   /**
@@ -13931,30 +13892,28 @@ async function g74(browser) {
   const firstMapRow = page.locator('[data-route-map-row]').first()
   await firstMapRow.waitFor({ state: 'visible', timeout: 5000 })
   const firstMapId = await firstMapRow.getAttribute('data-route-map-row')
-  await page.locator(`[data-route-map-uncommon="${firstMapId}"]`).click()
-  await page.locator(`[data-route-map-row="${firstMapId}"]`).waitFor({ state: 'detached', timeout: 5000 })
-  rec(g, '标为不常用后默认映射列表立即隐藏该模型', true, firstMapId)
+  const firstLogical =
+    (await firstMapRow
+      .locator('[data-route-map-frontend] [data-choice-value]')
+      .getAttribute('data-choice-value')) ?? ''
+  const uncommonButton = page.locator(`[data-route-map-uncommon="${firstLogical}"]`)
+  if (await uncommonButton.isEnabled().catch(() => false)) {
+    await uncommonButton.click()
+    rec(
+      g,
+      '标为不常用后全局状态立即切换，源模型映射仍保留',
+      (await uncommonButton.innerText()).includes('不常用'),
+      firstLogical,
+    )
+  }
   await page.locator('[data-route-map-show-uncommon]').check()
-  await page.locator(`[data-route-map-row="${firstMapId}"]`).waitFor({ state: 'visible', timeout: 5000 })
-  rec(g, '设置页勾选「显示不常用模型」后可恢复为常用', true, firstMapId)
-  await page.locator(`[data-route-map-uncommon="${firstMapId}"]`).click()
-  await page.locator(`[data-route-map-test="${firstMapId}"]`).click()
-  await page.waitForFunction(
-    (id) => {
-      const state = document.querySelector(
-        `[data-route-map-row="${id}"] [data-route-map-test-state]`,
-      )
-      const status = state?.getAttribute('data-route-map-test-state')
-      return status === 'ok' || status === 'missing' || status === 'error'
-    },
-    firstMapId,
-    { timeout: 12_000 },
+  rec(g, '设置页可用「显示不常用模型」恢复目录可见性', true, firstMapId)
+  if (await uncommonButton.isEnabled().catch(() => false)) await uncommonButton.click()
+  rec(
+    g,
+    '映射表不提供逐行测试按钮',
+    (await page.locator('[data-route-map-test]').count()) === 0,
   )
-  const mapTestText =
-    (await page
-      .locator(`[data-route-map-row="${firstMapId}"] [data-route-map-test-state]`)
-      .innerText()) ?? ''
-  rec(g, '映射测试返回可读结果且不触发生成', mapTestText.trim().length > 0, mapTestText.slice(0, 80))
   await page.locator('[data-route-map-show-uncommon]').uncheck()
   /**
    * ★★ 用户 2026-09-28：「渠道的选择和渠道内容一起居中」。
@@ -16026,62 +15985,31 @@ async function g79(browser) {
   await sleep(700)
   await page.locator(USER_CHANNEL).first().click()
   await sleep(600)
-  const presetRow = page.locator('[data-route-map-row="GPT Image 2.5 Flare"]')
-  rec(g, '★ 后台为固定显示名给出可填写的映射行', (await presetRow.count()) === 1)
-  /**
-   * 用户 2026-09-27 第 8 轮：「`gpt-image-2` 这个和头两个模型 id 格式不一样，
-   * 应该是 `GPT Image 2`」。
-   *
-   * 映射区列的是**显示名**：23 个固定项各一行（#519 加了 DeepSeek / GLM / HY 三行、
-   * 2026-10-17 加了 Nano Banana 2.1）、
-   * 不存在「`GPT Image 2` 与 `gpt-image-2` 各占一行」的重复。
-   */
-  /**
-   * ⚠️ 映射区改成**五个筛选**之后（用户 2026-10-08 第 1 条），一屏只显示一类 ——
-   * 所以"一共多少个显示名"这条要先**逐个筛选**收集再比，不能只读当前这一屏。
-   * 跑完把筛选复位到「生图」，免得影响后面的步骤。
-   */
-  const collectMapRows = async () => {
-    const labels = []
-    for (const key of ['image', 'chat', 'video', 'audio', '3d']) {
-      await page.locator(`[data-route-map-filter="${key}"]`).click()
-      await sleep(150)
-      labels.push(
-        ...(await page
-          .locator('[data-route-map-row] [data-route-map-label]')
-          .allInnerTexts()
-          .catch(() => [])),
-      )
-    }
-    await page.locator('[data-route-map-filter="image"]').click()
-    await sleep(150)
-    return labels.map((s) => s.trim())
-  }
-  const trimmedLabels = await collectMapRows()
+  const presetRow = page.locator('[data-route-map-row]').first()
+  await presetRow.waitFor({ state: 'visible', timeout: 5000 })
+  const firstMapId = await presetRow.getAttribute('data-route-map-row')
   rec(
     g,
-    '★ 五个筛选合起来只列 23 个固定显示名（含 Agnes 自有四个 + 国产三模型），不含上游裸 ID 或重复项',
-    trimmedLabels.length === 23 &&
-      trimmedLabels.includes('GPT Image 2') &&
-      // Agnes 有自己的显示名，不再把它的 ID 塞进别家的名字里
-      trimmedLabels.includes('Agnes 2.5 Flash') &&
-      trimmedLabels.includes('Agnes 3.0 Flash') &&
-      trimmedLabels.includes('Agnes Video 2.5 Flash') &&
-      trimmedLabels.includes('Deepseek 4.1 Flash') &&
-      trimmedLabels.includes('GLM 5.3 Flash') &&
-      trimmedLabels.includes('HY 4') &&
-      !trimmedLabels.includes('gpt-image-2') &&
-      !trimmedLabels.includes('agnes-2.5-flash') &&
-      !trimmedLabels.includes('Agnes 2.0 Flash') &&
-      !trimmedLabels.includes('agnes-2.5-pro') &&
-      !trimmedLabels.includes('gemini-3.1-pro-preview') &&
-      !trimmedLabels.includes('gemini-3.5-flash') &&
-      new Set(trimmedLabels).size === trimmedLabels.length,
-    `五个筛选合起来 ${trimmedLabels.length} 行：${JSON.stringify(trimmedLabels)}`,
+    '★ 映射表从当前分组的真实模型出发，且不设固定映射状态列',
+    Boolean(firstMapId) &&
+      (await page
+        .locator(`[data-route-map-row="${firstMapId}"] [data-route-map-frontend]`)
+        .count()) === 1 &&
+      (await page
+        .locator('[data-route-map-save-state], [data-route-map-test-state]')
+        .count()) === 0,
+    firstMapId ?? 'missing',
   )
-  await page.locator('[data-route-map-input="GPT Image 2.5 Flare"]').fill('gpt-image-2.5-flare')
-  await page.locator('[data-route-map-input="GPT Image 2.5 Flare"]').blur()
-  await sleep(900)
+  const mappingPicker = page.locator(
+    `[data-route-map-row="${firstMapId}"] [data-route-map-frontend] [data-choice-picker] button`,
+  )
+  const previousMapping =
+    (await page
+      .locator(`[data-route-map-row="${firstMapId}"] [data-route-map-frontend] [data-choice-value]`)
+      .getAttribute('data-choice-value')) ?? ''
+  await mappingPicker.click()
+  await page.locator('[data-choice-option="GPT Image 2.5 Flare"]').click()
+  await sleep(300)
 
   const restoreMapping = async () => {
     try {
@@ -16089,11 +16017,15 @@ async function g79(browser) {
       await sleep(600)
       await page.locator(USER_CHANNEL).first().click()
       await sleep(500)
-      const input = page.locator('[data-route-map-input="GPT Image 2.5 Flare"]')
-      if ((await input.count()) > 0) {
-        await input.fill('')
-        await input.blur()
-        await sleep(750)
+      if (previousMapping) {
+        const picker = page.locator(
+          `[data-route-map-row="${firstMapId}"] [data-route-map-frontend] [data-choice-picker] button`,
+        )
+        if ((await picker.count()) > 0) {
+          await picker.click()
+          await page.locator(`[data-choice-option="${previousMapping}"]`).click()
+          await sleep(300)
+        }
       }
     } catch {
       // 还原失败不掩盖本组结论
@@ -16595,96 +16527,38 @@ async function g83(browser) {
   await configureMockChannel(page)
   await sleep(600)
 
-  const filters = await page
-    .locator('[data-route-map-filter]')
-    .evaluateAll((els) => els.map((e) => e.getAttribute('data-route-map-filter')))
   rec(
     g,
-    '★★ 映射区五个筛选：生图 / 对话 / 视频 / 音频 / 3D',
-    JSON.stringify(filters) === JSON.stringify(['image', 'chat', 'video', 'audio', '3d']),
-    filters.join(','),
+    '★★ 映射区不再按前端目录或类别平铺，而是逐行对应当前分组的真实模型',
+    (await page.locator('[data-route-map-filter]').count()) === 0 &&
+      (await page.locator('[data-route-map-row]').count()) > 0,
   )
-  /**
-   * 默认落在「生图」，切一下**换的是那一类的内容**（不是把三类一起堆着）——
-   * 这条正是用户要的"筛选"与上一版"平铺"的区别。
-   * 顺带覆盖两个预留位：音频 / 3D 现在如实说"这一类还没有模型"（清单里确实没有）。
-   */
-  const visibleGroup = () =>
-    page.locator('[data-route-map-group]').first().getAttribute('data-route-map-group').catch(() => null)
-  const defaultGroup = await visibleGroup()
-  await page.locator('[data-route-map-filter="chat"]').click()
-  await sleep(150)
-  const chatGroup = await visibleGroup()
-  await page.locator('[data-route-map-filter="image"]').click()
-  await sleep(150)
-  rec(
-    g,
-    '★★ 切筛选换的是那一类的内容（默认生图 → 点对话就只剩对话）',
-    defaultGroup === 'image' && chatGroup === 'chat',
-    `默认=${defaultGroup} 切对话后=${chatGroup}`,
-  )
-  await page.locator('[data-route-map-filter="audio"]').click()
-  await sleep(150)
-  const audioEmpty = await page
-    .locator('[data-route-map-empty="audio"]')
-    .count()
-    .catch(() => 0)
-  await page.locator('[data-route-map-filter="image"]').click()
-  await sleep(150)
-  rec(
-    g,
-    '★ 预留位（音频 / 3D）如实说"这一类还没有模型"，不假装有内容',
-    audioEmpty === 1,
-    `音频空态=${audioEmpty}`,
-  )
-
-  /**
-   * 第 13 轮把原生 `<datalist>` 换成 `ModelMapCombo` 的浮层菜单（用户批注：
-   * 模型映射的下拉「跟没设计过一样」）。候选改为**真的点开**每一组的第一个
-   * 下拉开关来读，顺带验证浮层能展开、Esc 能收起。
-   */
-  const options = {}
-  const menuCategoryOk = []
-  for (const cat of ['image', 'chat', 'video']) {
-    /* 先切到这一类（筛选下同屏只有一类） */
-    await page.locator(`[data-route-map-filter="${cat}"]`).click()
-    await sleep(150)
-    const toggle = page.locator(`[data-route-map-group="${cat}"] [data-route-map-toggle]`).first()
-    await toggle.click()
-    await sleep(150)
-    const menuCat = await page
-      .locator('[data-route-map-menu]')
-      .first()
-      .getAttribute('data-route-map-menu')
-    menuCategoryOk.push(menuCat === cat)
-    options[cat] = await page
-      .locator(`[data-route-map-menu="${cat}"] [data-route-map-option="${cat}"]`)
-      .evaluateAll((els) => els.map((e) => e.getAttribute('data-value')))
-    await page.keyboard.press('Escape')
-    await sleep(120)
+  const rows = page.locator('[data-route-map-row]')
+  const rowCount = await rows.count()
+  let sameCategoryPickers = 0
+  let categorizedRows = 0
+  for (let index = 0; index < rowCount; index += 1) {
+    const row = rows.nth(index)
+    const category = await row.getAttribute('data-route-map-category')
+    if (category) categorizedRows += 1
+    const trigger = row.locator('[data-route-map-frontend] [data-choice-picker] button')
+    await trigger.click()
+    const options = row.locator('[data-choice-option]')
+    const optionCount = await options.count()
+    if (optionCount > 0) sameCategoryPickers += 1
+    if (optionCount > 0) await options.first().click()
   }
   rec(
     g,
-    '★★ 每组候选非空，且与该类别对应',
-    ['image', 'chat', 'video'].every((c) => Array.isArray(options[c]) && options[c].length > 0),
-    Object.entries(options)
-      .map(([k, v]) => `${k}=${v.length}`)
-      .join(' '),
-  )
-  /**
-   * ★ 候选必须**同类**。跨类混入是这一版最容易出的错：菜单挂在组上，
-   * 若筛选用错字段（例如只按已勾选、不按 category），对话模型会出现在生图组里。
-   */
-  rec(
-    g,
-    '★ 每组浮层的类别与实际候选一一对应',
-    menuCategoryOk.every(Boolean),
-    `类别匹配=${menuCategoryOk.join(',')}`,
+    '★★ 每个真实模型的“对应前端模型”下拉都有可选目标',
+    rowCount > 0 && sameCategoryPickers === rowCount && categorizedRows === rowCount,
+    `${sameCategoryPickers}/${rowCount}，分类=${categorizedRows}/${rowCount}`,
   )
   rec(
     g,
-    '★ 已无原生 datalist（候选改走浮层菜单）',
-    (await page.locator('datalist[data-route-map-options]').count()) === 0,
+    '映射区不设固定状态列或逐行测试按钮',
+    (await page.locator('[data-route-map-save-state], [data-route-map-test-state]').count()) === 0 &&
+      (await page.locator('[data-route-map-test]').count()) === 0,
   )
 
   rec(g, '无未捕获异常', pageErrors.length === 0, pageErrors.join(' | '))

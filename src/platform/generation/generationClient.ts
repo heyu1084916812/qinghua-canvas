@@ -150,19 +150,26 @@ function groupsByPriority(channel: Channel): ChannelCredentialGroup[] {
 }
 
 function modelIdsOf(
-  channel: Channel,
+  modelMap: Readonly<Record<string, string>> | null | undefined,
   requestedModel: string,
   modelIsUpstream: boolean,
 ): string[] {
   const mapped = modelIsUpstream
     ? requestedModel
-    : (resolveUpstreamModel(channel.modelMap, requestedModel) ?? requestedModel)
+    : (resolveUpstreamModel(modelMap, requestedModel) ?? requestedModel)
   return [
     requestedModel,
     mapped,
     ...upstreamAliasesOf(requestedModel),
     ...upstreamAliasesOf(mapped),
   ].filter((value, index, all) => value.trim() !== '' && all.indexOf(value) === index)
+}
+
+function modelMapFor(
+  group: ChannelCredentialGroup | null | undefined,
+  channel: Channel,
+): Readonly<Record<string, string>> {
+  return { ...(channel.modelMap ?? {}), ...(group?.modelMap ?? {}) }
 }
 
 function groupSupportsModel(
@@ -238,11 +245,6 @@ export function createGenerationClient(
     if (!channel.id.trim()) throw missingChannel()
     if (!channel.enabled) throw unavailableChannel(channel)
 
-    const modelIds = modelIdsOf(
-      channel,
-      requestedModel,
-      hints?.modelIsUpstream === true,
-    )
     const groups = groupsByPriority(channel)
     const legacyAltToken = channel.altCredentialRef
       ? await deps.loadToken(channel.altCredentialRef)
@@ -285,6 +287,11 @@ export function createGenerationClient(
       ? await deps.loadToken(channel.credentialRef)
       : null
     for (const group of groups) {
+      const modelIds = modelIdsOf(
+        modelMapFor(group, channel),
+        requestedModel,
+        hints?.modelIsUpstream === true,
+      )
       if (!groupSupportsModel(group, modelIds)) continue
       const token = await deps.loadToken(group.credentialRef)
       if (!token && !tokenAllowsMissing(channel)) continue
@@ -303,7 +310,16 @@ export function createGenerationClient(
     if (
       groups.length > 0 &&
       groups.some((group) => group.models.length > 0) &&
-      !groups.some((group) => groupSupportsModel(group, modelIds))
+      !groups.some((group) =>
+        groupSupportsModel(
+          group,
+          modelIdsOf(
+            modelMapFor(group, channel),
+            requestedModel,
+            hints?.modelIsUpstream === true,
+          ),
+        ),
+      )
     ) {
       throw missingModel()
     }
@@ -313,7 +329,16 @@ export function createGenerationClient(
     }
     if (
       groups.length > 0 &&
-      !groups.some((group) => groupSupportsModel(group, modelIds))
+      !groups.some((group) =>
+        groupSupportsModel(
+          group,
+          modelIdsOf(
+            modelMapFor(group, channel),
+            requestedModel,
+            hints?.modelIsUpstream === true,
+          ),
+        ),
+      )
     ) {
       throw missingModel()
     }
@@ -331,7 +356,10 @@ export function createGenerationClient(
     const upstreamModel =
       hints?.modelIsUpstream === true
         ? request.model.trim()
-        : (resolveUpstreamModel(channel.modelMap, request.model) ?? request.model.trim())
+        : (resolveUpstreamModel(
+            modelMapFor(selected.group, channel),
+            request.model,
+          ) ?? request.model.trim())
 
     const ordinaryPrimaryKey = selected.token
 
