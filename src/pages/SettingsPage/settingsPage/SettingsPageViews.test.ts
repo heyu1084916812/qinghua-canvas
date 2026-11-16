@@ -97,6 +97,8 @@ describe('SettingsPage 视图拆分', () => {
     expect(headerHtml).toContain('data-settings-provider-head')
     expect(headerHtml).toContain('data-settings-profile-edit')
     expect(headerHtml).toContain('data-channel-enabled="channel-1"')
+    expect(headerHtml).toContain('data-settings-channel-routing-panel')
+    expect(headerHtml).not.toContain('data-settings-channel-routing=')
 
     const connectionHtml = render(SettingsConnectionView, {
       baseUrl: '',
@@ -125,7 +127,6 @@ describe('SettingsPage 视图拆分', () => {
       onRemoveProtocol: () => {},
       onDetect: () => {},
       onVerify: () => {},
-      onOpenWorkflowManager: () => {},
       onToggleNewProtocol: () => {},
       onRestoreBuiltinProtocols: () => {},
       onDownloadProtocolTemplate: () => {},
@@ -140,6 +141,7 @@ describe('SettingsPage 视图拆分', () => {
     expect(connectionHtml).toContain('data-settings-connection')
     expect(connectionHtml).toContain('data-settings-baseurl')
     expect(connectionHtml).toContain('data-settings-status')
+    expect(connectionHtml).not.toContain('AI 应用和工作流')
   })
 
   it('协议详情保持导入、待支持和说明的原始顺序', () => {
@@ -344,7 +346,6 @@ describe('SettingsPage 视图拆分', () => {
       onRemoveProtocol: () => {},
       onDetect: () => {},
       onVerify: () => {},
-      onOpenWorkflowManager: () => {},
       onToggleNewProtocol: () => {},
       onRestoreBuiltinProtocols: () => {},
       onDownloadProtocolTemplate: () => {},
@@ -493,11 +494,68 @@ describe('SettingsPage 视图拆分', () => {
     })
 
     expect(html).toContain('data-global-model-form')
-    expect(html).toContain('data-route-map-row="image-upstream"')
-    expect(html).toContain('data-route-map-frontend="image-upstream"')
+    expect(html).toContain('data-global-model-close')
+    expect(html).toContain('data-route-map-row="My Image"')
+    expect(html).toContain('data-route-map-frontend="My Image"')
+    expect(html).toContain('data-route-map-real="My Image"')
+    expect(html.indexOf('data-route-map-frontend="My Image"')).toBeLessThan(
+      html.indexOf('data-route-map-real="My Image"'),
+    )
     expect(html).toContain('data-route-map-uncommon="My Image"')
     expect(html).toContain('data-global-model-remove="My Image"')
     expect(html).toContain('保存失败')
+
+    const hidden = render(SettingsChannelRouteView, {
+      allGlobalModels: [preset],
+      customModels: [{ id: 'My Image' }],
+      uncommonModelIds: ['My Image'],
+      activeModels: [
+        { id: 'image-upstream', category: 'image', inputTypes: ['text'] },
+      ],
+      modelAddOpen: false,
+      newModelName: '',
+      newModelCategory: 'image',
+      newModelVendor: 'openai',
+      showUncommonModels: false,
+      modelMap: { 'My Image': 'image-upstream' },
+      mapSaveNotice: null,
+      onModelAddOpenChange: () => {},
+      onNewModelNameChange: () => {},
+      onNewModelCategoryChange: () => {},
+      onNewModelVendorChange: () => {},
+      onAddGlobalModel: () => {},
+      onShowUncommonModelsChange: () => {},
+      onBindModel: () => {},
+      onModelUncommonChange: () => {},
+      onRemoveGlobalModel: () => {},
+    })
+    expect(hidden).not.toContain('data-route-map-row="My Image"')
+
+    const irrelevantCategory = render(SettingsChannelRouteView, {
+      allGlobalModels: [preset],
+      customModels: [{ id: 'My Image' }],
+      uncommonModelIds: [],
+      activeModels: [
+        { id: 'video-upstream', category: 'video', inputTypes: ['text'] },
+      ],
+      modelAddOpen: false,
+      newModelName: '',
+      newModelCategory: 'image',
+      newModelVendor: 'openai',
+      showUncommonModels: true,
+      modelMap: {},
+      mapSaveNotice: null,
+      onModelAddOpenChange: () => {},
+      onNewModelNameChange: () => {},
+      onNewModelCategoryChange: () => {},
+      onNewModelVendorChange: () => {},
+      onAddGlobalModel: () => {},
+      onShowUncommonModelsChange: () => {},
+      onBindModel: () => {},
+      onModelUncommonChange: () => {},
+      onRemoveGlobalModel: () => {},
+    })
+    expect(irrelevantCategory).not.toContain('data-route-map-row="My Image"')
   })
 
   it('渠道菜单覆盖内置渠道无删除与删除二次确认', () => {

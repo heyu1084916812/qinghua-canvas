@@ -1,46 +1,7 @@
-.pageUtilityBar {
-  width: 100%;
-  max-width: 1344px;
-  min-height: 32px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-3);
-}
-
-.pageUtilityCopy {
-  color: var(--text-2);
-  font-size: var(--fs-label);
-}
-
-.pageUtilityCount {
-  margin-left: var(--space-2);
-  color: var(--text-3);
-  font-variant-numeric: tabular-nums;
-}
-
-.pageUtilityBar .ghostBtn {
-  border-color: transparent;
-  background: transparent;
-  color: var(--text-2);
-}
-
-.pageUtilityBar .ghostBtn:hover,
-.pageUtilityBar .ghostBtn:focus-visible {
-  border-color: var(--stroke);
-  background: var(--bg-hover);
-  color: var(--text-1);
-}
-
 .providerEditorBlock {
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
-}
-
-.providerGearOn {
-  background: var(--bg-hover);
-  color: var(--text-1);
 }
 
 .providerRouteStrip {
@@ -65,7 +26,7 @@
   min-height: 30px;
   box-sizing: border-box;
   border: 1px solid transparent;
-  border-radius: 6px;
+  border-radius: var(--radius-control);
   background: transparent;
   color: var(--text-1);
   padding: 0 var(--space-2);
@@ -75,7 +36,7 @@
 .providerRouteField input:hover,
 .providerRouteField input:focus {
   border-color: var(--stroke);
-  background: var(--bg-surface);
+  background: var(--bg-hover);
   outline: none;
 }
 
@@ -94,15 +55,15 @@
   justify-content: flex-end;
 }
 
-.connectionActions .ghostBtn,
+.connectionActionButton,
 .mutedAction {
   border-color: transparent;
   background: transparent;
   color: var(--text-2);
 }
 
-.connectionActions .ghostBtn:hover,
-.connectionActions .ghostBtn:focus-visible {
+.connectionActionButton:hover,
+.connectionActionButton:focus-visible {
   border-color: var(--stroke);
   background: var(--bg-hover);
   color: var(--text-1);
@@ -116,10 +77,13 @@
   position: relative;
   flex: 1;
   min-width: 0;
+  overflow: hidden;
 }
 
-.tokenInputWrap .input {
+.tokenInput {
   width: 100%;
+  min-height: 32px;
+  height: 32px;
   padding-right: 34px;
 }
 
@@ -134,7 +98,7 @@
   justify-content: center;
   padding: 0;
   border: 0;
-  border-radius: 5px;
+  border-radius: var(--radius-control);
   background: transparent;
   color: var(--text-3);
   transform: translateY(-50%);
@@ -185,7 +149,7 @@
   gap: var(--space-2);
   padding: 0 var(--space-3);
   border: 1px solid transparent;
-  border-radius: 6px;
+  border-radius: var(--radius-control);
   background: transparent;
   color: var(--text-2);
   font: inherit;
@@ -248,7 +212,7 @@
   box-sizing: border-box;
   padding: 0 var(--space-2);
   border: 1px solid transparent;
-  border-radius: 6px;
+  border-radius: var(--radius-control);
   background: transparent;
   color: var(--text-1);
   font: inherit;
@@ -261,7 +225,7 @@
 .groupPropertyField input:hover,
 .groupPropertyField input:focus {
   border-color: var(--stroke);
-  background: var(--bg-surface);
+  background: var(--bg-hover);
   outline: none;
 }
 
@@ -277,7 +241,7 @@
 .dangerTextButton {
   min-height: 28px;
   border: 0;
-  border-radius: 6px;
+  border-radius: var(--radius-control);
   background: transparent;
   color: var(--danger);
   padding: 0 var(--space-2);

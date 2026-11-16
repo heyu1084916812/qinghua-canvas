@@ -1,0 +1,339 @@
+{
+  "capturedAt": "2026-11-16T14:04:11.582Z",
+  "groups": [
+    {
+      "theme": "dark",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "checks": {
+        "token": {
+          "input": {
+            "left": 382.5,
+            "right": 1152.453125,
+            "top": 534.59375,
+            "bottom": 566.59375,
+            "width": 769.953125,
+            "height": 32
+          },
+          "wrap": {
+            "left": 382.5,
+            "right": 1152.453125,
+            "top": 534.59375,
+            "bottom": 566.59375,
+            "width": 769.953125,
+            "height": 32
+          },
+          "eye": {
+            "left": 1120.453125,
+            "right": 1148.453125,
+            "top": 537.59375,
+            "bottom": 563.59375,
+            "width": 28,
+            "height": 26
+          },
+          "save": {
+            "left": 1160.453125,
+            "right": 1213.578125,
+            "top": 534.59375,
+            "bottom": 566.59375,
+            "width": 53.125,
+            "height": 32
+          },
+          "doc": {
+            "left": 1221.578125,
+            "right": 1342.5,
+            "top": 537.59375,
+            "bottom": 563.59375,
+            "width": 120.921875,
+            "height": 26
+          },
+          "eyeRadius": "10px",
+          "inputRadius": "10px",
+          "saveCoveredByInput": false,
+          "eyeInsideInput": true,
+          "saveSeparated": true,
+          "docSeparated": true
+        },
+        "mapping": {
+          "rows": 9,
+          "frontLeft": 390.5,
+          "realLeft": 864.71875,
+          "commonRadius": "10px",
+          "buttonRadii": [
+            "10px"
+          ],
+          "horizontalOverflow": false
+        },
+        "addToggles": 1,
+        "routingButtons": 0,
+        "routingPanels": 1,
+        "errors": []
+      }
+    },
+    {
+      "theme": "dark",
+      "viewport": {
+        "width": 1024,
+        "height": 700
+      },
+      "checks": {
+        "token": {
+          "input": {
+            "left": 348,
+            "right": 770.953125,
+            "top": 543.59375,
+            "bottom": 575.59375,
+            "width": 422.953125,
+            "height": 32
+          },
+          "wrap": {
+            "left": 348,
+            "right": 770.953125,
+            "top": 543.59375,
+            "bottom": 575.59375,
+            "width": 422.953125,
+            "height": 32
+          },
+          "eye": {
+            "left": 738.953125,
+            "right": 766.953125,
+            "top": 546.59375,
+            "bottom": 572.59375,
+            "width": 28,
+            "height": 26
+          },
+          "save": {
+            "left": 778.953125,
+            "right": 832.078125,
+            "top": 543.59375,
+            "bottom": 575.59375,
+            "width": 53.125,
+            "height": 32
+          },
+          "doc": {
+            "left": 840.078125,
+            "right": 961,
+            "top": 546.59375,
+            "bottom": 572.59375,
+            "width": 120.921875,
+            "height": 26
+          },
+          "eyeRadius": "10px",
+          "inputRadius": "10px",
+          "saveCoveredByInput": false,
+          "eyeInsideInput": true,
+          "saveSeparated": true,
+          "docSeparated": true
+        },
+        "mapping": {
+          "rows": 9,
+          "frontLeft": 356,
+          "realLeft": 660.5,
+          "commonRadius": "10px",
+          "buttonRadii": [
+            "10px"
+          ],
+          "horizontalOverflow": false
+        },
+        "addToggles": 1,
+        "routingButtons": 0,
+        "routingPanels": 1,
+        "errors": []
+      }
+    },
+    {
+      "theme": "light",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "checks": {
+        "token": {
+          "input": {
+            "left": 382.5,
+            "right": 1152.453125,
+            "top": 534.59375,
+            "bottom": 566.59375,
+            "width": 769.953125,
+            "height": 32
+          },
+          "wrap": {
+            "left": 382.5,
+            "right": 1152.453125,
+            "top": 534.59375,
+            "bottom": 566.59375,
+            "width": 769.953125,
+            "height": 32
+          },
+          "eye": {
+            "left": 1120.453125,
+            "right": 1148.453125,
+            "top": 537.59375,
+            "bottom": 563.59375,
+            "width": 28,
+            "height": 26
+          },
+          "save": {
+            "left": 1160.453125,
+            "right": 1213.578125,
+            "top": 534.59375,
+            "bottom": 566.59375,
+            "width": 53.125,
+            "height": 32
+          },
+          "doc": {
+            "left": 1221.578125,
+            "right": 1342.5,
+            "top": 537.59375,
+            "bottom": 563.59375,
+            "width": 120.921875,
+            "height": 26
+          },
+          "eyeRadius": "10px",
+          "inputRadius": "10px",
+          "saveCoveredByInput": false,
+          "eyeInsideInput": true,
+          "saveSeparated": true,
+          "docSeparated": true
+        },
+        "mapping": {
+          "rows": 9,
+          "frontLeft": 390.5,
+          "realLeft": 864.71875,
+          "commonRadius": "10px",
+          "buttonRadii": [
+            "10px"
+          ],
+          "horizontalOverflow": false
+        },
+        "addToggles": 1,
+        "routingButtons": 0,
+        "routingPanels": 1,
+        "errors": []
+      }
+    },
+    {
+      "theme": "light",
+      "viewport": {
+        "width": 1024,
+        "height": 700
+      },
+      "checks": {
+        "token": {
+          "input": {
+            "left": 348,
+            "right": 770.953125,
+            "top": 543.59375,
+            "bottom": 575.59375,
+            "width": 422.953125,
+            "height": 32
+          },
+          "wrap": {
+            "left": 348,
+            "right": 770.953125,
+            "top": 543.59375,
+            "bottom": 575.59375,
+            "width": 422.953125,
+            "height": 32
+          },
+          "eye": {
+            "left": 738.953125,
+            "right": 766.953125,
+            "top": 546.59375,
+            "bottom": 572.59375,
+            "width": 28,
+            "height": 26
+          },
+          "save": {
+            "left": 778.953125,
+            "right": 832.078125,
+            "top": 543.59375,
+            "bottom": 575.59375,
+            "width": 53.125,
+            "height": 32
+          },
+          "doc": {
+            "left": 840.078125,
+            "right": 961,
+            "top": 546.59375,
+            "bottom": 572.59375,
+            "width": 120.921875,
+            "height": 26
+          },
+          "eyeRadius": "10px",
+          "inputRadius": "10px",
+          "saveCoveredByInput": false,
+          "eyeInsideInput": true,
+          "saveSeparated": true,
+          "docSeparated": true
+        },
+        "mapping": {
+          "rows": 9,
+          "frontLeft": 356,
+          "realLeft": 660.5,
+          "commonRadius": "10px",
+          "buttonRadii": [
+            "10px"
+          ],
+          "horizontalOverflow": false
+        },
+        "addToggles": 1,
+        "routingButtons": 0,
+        "routingPanels": 1,
+        "errors": []
+      }
+    }
+  ],
+  "workflowByChannel": [
+    {
+      "name": "ModelScope 魔搭",
+      "workflowEntries": 0
+    },
+    {
+      "name": "Agnes",
+      "workflowEntries": 0
+    },
+    {
+      "name": "国内站 · RunningHub",
+      "workflowEntries": 1
+    },
+    {
+      "name": "国际站 · RunningHub",
+      "workflowEntries": 1
+    },
+    {
+      "name": "SoonStudio",
+      "workflowEntries": 0
+    },
+    {
+      "name": "65535",
+      "workflowEntries": 0
+    },
+    {
+      "name": "workbuddy",
+      "workflowEntries": 0
+    },
+    {
+      "name": "Chat2api",
+      "workflowEntries": 0
+    }
+  ],
+  "checks": {
+    "hoverToken": "#2a2a2a",
+    "hoverCandidates": [
+      {
+        "selector": "[data-route-map-uncommon]",
+        "background": "rgb(42, 42, 42)"
+      },
+      {
+        "selector": "[data-route-map-real] [data-choice-picker] > button",
+        "background": "rgb(42, 42, 42)"
+      }
+    ],
+    "hiddenByUncommon": true,
+    "restoredByToggle": true,
+    "uncommonLabel": "不常用 · 全局"
+  }
+}

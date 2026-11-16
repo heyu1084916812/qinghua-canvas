@@ -38,8 +38,6 @@ export type SettingsConnectionViewProps = {
   onRemoveProtocol: (protocol: ProtocolDefinition) => void
   onDetect: () => void
   onVerify: () => void
-  /** 打开「AI 应用和工作流」管理页 */
-  onOpenWorkflowManager: () => void
   onToggleNewProtocol: () => void
   onRestoreBuiltinProtocols: () => void
   onDownloadProtocolTemplate: () => void
@@ -78,7 +76,6 @@ export function SettingsConnectionView({
   onRemoveProtocol,
   onDetect,
   onVerify,
-  onOpenWorkflowManager,
   onToggleNewProtocol,
   onRestoreBuiltinProtocols,
   onDownloadProtocolTemplate,
@@ -143,7 +140,7 @@ export function SettingsConnectionView({
         </div>
         <div className={styles.connectionActions}>
           <button
-            className={styles.ghostBtn}
+            className={`${styles.ghostBtn} ${styles.connectionActionButton}`}
             data-settings-detect
             disabled={busy}
             onClick={onDetect}
@@ -152,7 +149,7 @@ export function SettingsConnectionView({
             验证协议
           </button>
           <button
-            className={styles.ghostBtn}
+            className={`${styles.ghostBtn} ${styles.connectionActionButton}`}
             data-settings-verify
             disabled={busy}
             onClick={onVerify}
@@ -160,7 +157,7 @@ export function SettingsConnectionView({
             验证地址
           </button>
           <button
-            className={styles.ghostBtn}
+            className={`${styles.ghostBtn} ${styles.connectionActionButton}`}
             data-proto-add-toggle
             onClick={onToggleNewProtocol}
           >
@@ -212,17 +209,6 @@ export function SettingsConnectionView({
         onCheckImportedProtocol={onCheckImportedProtocol}
         onSaveImportedProtocol={onSaveImportedProtocol}
       />
-
-      <div className={styles.protocolRow} data-settings-actions>
-        <button
-          className={styles.ghostBtn}
-          data-settings-open-workflows
-          onClick={onOpenWorkflowManager}
-        >
-          AI 应用和工作流
-        </button>
-        <span className={styles.mutedAction}>模型在当前 Key 分组中拉取和选择</span>
-      </div>
 
       <div
         className={styles.status}

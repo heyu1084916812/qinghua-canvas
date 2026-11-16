@@ -624,22 +624,6 @@ export function SettingsPage({ embedded = false }: { embedded?: boolean } = {}) 
       */}
       {(
       <div className={embedded ? styles.layoutEmbedded : styles.layout} data-settings-card>
-        <div className={styles.pageUtilityBar}>
-          {!embedded ? (
-            <span className={styles.pageUtilityCopy}>配置模型服务与密钥。</span>
-          ) : <span />}
-          <button
-            type="button"
-            className={styles.ghostBtn}
-            data-global-model-manager-open
-            onClick={() => setModelAddOpen(true)}
-          >
-            管理前端模型
-            <span className={styles.pageUtilityCount}>
-              {allGlobalModels.length - uncommonModelIds.length}/{allGlobalModels.length}
-            </span>
-          </button>
-        </div>
         {/*
           **选路策略默认收起**（用户 2026-11-15：「后台渠道的位置不要全部塞在一起了」）：
           它是**全局**设置，不是这条渠道的字段，常驻展开会把渠道页顶掉半屏。
@@ -751,7 +735,6 @@ export function SettingsPage({ embedded = false }: { embedded?: boolean } = {}) 
                 onClearImportError={() => setNpError('')}
                 onCheckImportedProtocol={checkImportedProtocol}
                 onSaveImportedProtocol={handleSaveImportedProtocol}
-                onOpenWorkflowManager={() => openWorkflowsPage(selected.id)}
               />
 
               <SettingsKeyGroupView

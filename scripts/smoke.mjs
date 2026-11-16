@@ -6739,13 +6739,15 @@ async function g44(browser) {
     capKeys.length > 0 && capKeys.every((k) => ['chat', 'image', 'video'].includes(k)),
     capKeys.join(','),
   )
-  // 模型映射行也要带厂商图标（与画布那边的模型下拉同源，一份实现两处引用）
-  const mapRowLogo = await page
-    .locator('[data-route-map-row] [data-model-icon]')
-    .first()
-    .getAttribute('data-model-icon')
-    .catch(() => null)
-  rec(g, '★★ 模型映射行带厂商图标', !!mapRowLogo, mapRowLogo ?? '未找到图标')
+  // 新分组映射只从当前分组的真实模型分类出发；这条新建渠道尚无真实模型，不应平铺全局目录。
+  const emptyMappingRows = await page.locator('[data-route-map-row]').count()
+  const emptyMappingHint = await page.locator('[data-route-map-empty]').count()
+  rec(
+    g,
+    '★★ 空分组不铺全局前端模型目录',
+    emptyMappingRows === 0 && emptyMappingHint === 1,
+    `行=${emptyMappingRows} 空态=${emptyMappingHint}`,
+  )
   await page.screenshot({ path: `${OUT}/44-a-channels.png` })
 
   // ② 选渠道乙 → 存令牌 → 尾 4 位可见（脱敏显示）
@@ -13870,12 +13872,17 @@ async function g74(browser) {
   await page.locator('[data-settings-profile-name]').fill(originalHeaderName)
   await page.locator('[data-settings-profile-save]').click()
   await page.locator('[data-settings-profile-drawer]').waitFor({ state: 'detached', timeout: 5000 })
+  await page.locator(USER_CHANNEL).first().click()
+  await sleep(300)
   await page.locator('[data-global-model-add-toggle]').click()
   await page.locator('[data-global-model-form]').waitFor({ state: 'visible', timeout: 5000 })
   const vendorCount = await page.locator('[data-global-model-vendor]').count()
-  const categoryValues = await page
-    .locator('[data-global-model-category]')
-    .evaluateAll((els) => els.map((el) => el.getAttribute('data-global-model-category')))
+  const categoryPicker = page.locator('[data-choice-picker="new-global-model-category"]')
+  await categoryPicker.locator(':scope > button').click()
+  const categoryValues = await categoryPicker
+    .locator('[data-choice-option]')
+    .evaluateAll((els) => els.map((el) => el.getAttribute('data-choice-option')))
+  await categoryPicker.locator(':scope > button').click()
   const hasUnknownCategory = await page
     .locator('[data-settings-card]')
     .getByText('未分类', { exact: true })
@@ -13888,25 +13895,29 @@ async function g74(browser) {
       JSON.stringify(categoryValues) === JSON.stringify(['image', 'chat', 'video', 'audio']),
     `图标厂商=${vendorCount} 分类=${categoryValues.join(',')} 未分类=${hasUnknownCategory}`,
   )
-  await page.locator('[data-global-model-add-toggle]').click()
+  await page.locator('[data-global-model-close]').first().click()
+  await page.locator('[data-global-model-form]').waitFor({ state: 'detached', timeout: 5000 })
   const firstMapRow = page.locator('[data-route-map-row]').first()
   await firstMapRow.waitFor({ state: 'visible', timeout: 5000 })
   const firstMapId = await firstMapRow.getAttribute('data-route-map-row')
-  const firstLogical =
-    (await firstMapRow
-      .locator('[data-route-map-frontend] [data-choice-value]')
-      .getAttribute('data-choice-value')) ?? ''
+  const firstLogical = firstMapId ?? ''
   const uncommonButton = page.locator(`[data-route-map-uncommon="${firstLogical}"]`)
   if (await uncommonButton.isEnabled().catch(() => false)) {
     await uncommonButton.click()
+    await page
+      .locator(`[data-route-map-row="${firstMapId}"]`)
+      .waitFor({ state: 'detached', timeout: 5000 })
     rec(
       g,
-      '标为不常用后全局状态立即切换，源模型映射仍保留',
-      (await uncommonButton.innerText()).includes('不常用'),
+      '标为不常用后默认映射列表立即隐藏该前端模型',
+      (await page.locator(`[data-route-map-row="${firstMapId}"]`).count()) === 0,
       firstLogical,
     )
   }
   await page.locator('[data-route-map-show-uncommon]').check()
+  await page
+    .locator(`[data-route-map-row="${firstMapId}"]`)
+    .waitFor({ state: 'visible', timeout: 5000 })
   rec(g, '设置页可用「显示不常用模型」恢复目录可见性', true, firstMapId)
   if (await uncommonButton.isEnabled().catch(() => false)) await uncommonButton.click()
   rec(
@@ -15288,14 +15299,13 @@ async function g75(browser) {
   if (rowCount > 0) {
     const firstRow = page.locator('[data-route-map-row]').first()
     const logical = await firstRow.getAttribute('data-route-map-row')
-    const input = page.locator(`[data-route-map-input="${logical}"]`)
-    rec(
-      g,
-      '★ 映射改为自动保存，不再出现逐行保存按钮',
-      (await page.locator(`[data-route-map-save="${logical}"]`).count()) === 0,
+    const picker = page.locator(
+      `[data-route-map-row="${logical}"] [data-route-map-real] [data-choice-picker] button`,
     )
-    await input.fill('upstream-renamed-by-smoke')
-    await input.blur()
+    await picker.click()
+    const firstReal = page.locator('[data-choice-option]:not([data-choice-option=""])').first()
+    const chosen = await firstReal.getAttribute('data-choice-option')
+    await firstReal.click()
     await sleep(700)
     await page.reload({ waitUntil: 'networkidle' })
     await sleep(700)
@@ -15304,13 +15314,17 @@ async function g75(browser) {
     rec(
       g,
       '★ 映射保存后刷新仍在（真的落库）',
-      (await page.locator(`[data-route-map-input="${logical}"]`).inputValue()) === 'upstream-renamed-by-smoke',
-      await page.locator(`[data-route-map-input="${logical}"]`).inputValue(),
+      (await page
+        .locator(`[data-route-map-row="${logical}"] [data-route-map-real] [data-choice-value]`)
+        .getAttribute('data-choice-value')) === chosen,
+      `前端=${logical} 真实=${chosen}`,
     )
 
-    // ④ 清空 = 删除该条映射，回到「按原名发送」
-    await page.locator(`[data-route-map-input="${logical}"]`).fill('')
-    await page.locator(`[data-route-map-input="${logical}"]`).blur()
+    // ④ 选择“未映射” = 删除该条前端模型绑定
+    await page
+      .locator(`[data-route-map-row="${logical}"] [data-route-map-real] [data-choice-picker] button`)
+      .click()
+    await page.locator('[data-choice-option=""]').click()
     await sleep(700)
     await page.reload({ waitUntil: 'networkidle' })
     await sleep(700)
@@ -15318,9 +15332,10 @@ async function g75(browser) {
     await sleep(600)
     rec(
       g,
-      '★ 清空并保存 → 该条映射被删除（回到恒等，不存空串）',
-      (await page.locator(`[data-route-map-input="${logical}"]`).inputValue()) === '',
-      `值="${await page.locator(`[data-route-map-input="${logical}"]`).inputValue()}"`,
+      '★ 选择未映射 → 该前端模型绑定被删除',
+      (await page
+        .locator(`[data-route-map-row="${logical}"] [data-route-map-real] [data-choice-value]`)
+        .getAttribute('data-choice-value')) === '',
     )
   }
 
@@ -15384,11 +15399,25 @@ async function g76(browser) {
    * 若这里取到对话模型（mock 清单里两种都有），后面 `pickParam('model')`
    * 会找不到选项而超时 —— 那是测试选错了对象，不是功能缺陷。
    */
-  const rows = await page.locator('[data-route-map-row]').evaluateAll((els) =>
-    els.map((e) => e.getAttribute('data-route-map-row')),
+  const rows = await page
+    .locator('[data-route-map-row][data-route-map-category="image"]')
+    .evaluateAll((els) => els.map((e) => e.getAttribute('data-route-map-row')))
+  const logical = rows[0]
+  const mappingRow = page.locator(`[data-route-map-row="${logical}"]`)
+  const mappingPicker = mappingRow.locator(
+    '[data-route-map-real] [data-choice-picker] button',
   )
-  const logical = rows.find((id) => id && id.includes('image')) ?? rows[0]
-  const MARK = 'upstream-applied-by-g76'
+  const previousMapping =
+    (await mappingRow
+      .locator('[data-route-map-real] [data-choice-value]')
+      .getAttribute('data-choice-value')) ?? ''
+  await mappingPicker.click()
+  const firstRealOption = page
+    .locator('[data-choice-option]:not([data-choice-option=""])')
+    .first()
+  const MARK = (await firstRealOption.getAttribute('data-choice-option')) ?? ''
+  await firstRealOption.click()
+  await sleep(500)
   /**
    * 收尾：把这条映射**清空还原**。
    *
@@ -15401,20 +15430,20 @@ async function g76(browser) {
       await sleep(600)
       await page.locator(USER_CHANNEL).first().click()
       await sleep(500)
-      const input = page.locator(`[data-route-map-input="${logical}"]`)
-      if ((await input.count()) > 0) {
-        await input.fill('')
-        await input.blur()
-        await sleep(750)
+      const picker = page.locator(
+        `[data-route-map-row="${logical}"] [data-route-map-real] [data-choice-picker] button`,
+      )
+      if ((await picker.count()) > 0) {
+        await picker.click()
+        const option = page.locator(`[data-choice-option="${previousMapping}"]`)
+        if ((await option.count()) > 0) await option.click()
+        await sleep(350)
       }
     } catch {
       // 还原失败不掩盖本组结论，也不该让整轮冒烟崩掉
     }
   }
-  await page.locator(`[data-route-map-input="${logical}"]`).fill(MARK)
-  await page.locator(`[data-route-map-input="${logical}"]`).blur()
-  await sleep(900)
-  rec(g, '★ 后台已写入上游 ID 映射', true, `逻辑名=${logical} → ${MARK}`)
+  rec(g, '★ 后台已把前端模型绑定到真实模型', Boolean(MARK), `前端=${logical} → ${MARK}`)
 
   // ② 画布：跑一次生成
   await gotoProjects(page)
@@ -15985,15 +16014,15 @@ async function g79(browser) {
   await sleep(700)
   await page.locator(USER_CHANNEL).first().click()
   await sleep(600)
-  const presetRow = page.locator('[data-route-map-row]').first()
+  const presetRow = page.locator('[data-route-map-row="GPT Image 2.5 Flare"]')
   await presetRow.waitFor({ state: 'visible', timeout: 5000 })
   const firstMapId = await presetRow.getAttribute('data-route-map-row')
   rec(
     g,
-    '★ 映射表从当前分组的真实模型出发，且不设固定映射状态列',
+    '★ 映射表把前端显示模型放在前面，真实模型由右侧下拉选择，且不设固定状态列',
     Boolean(firstMapId) &&
       (await page
-        .locator(`[data-route-map-row="${firstMapId}"] [data-route-map-frontend]`)
+        .locator(`[data-route-map-row="${firstMapId}"] [data-route-map-real]`)
         .count()) === 1 &&
       (await page
         .locator('[data-route-map-save-state], [data-route-map-test-state]')
@@ -16001,14 +16030,17 @@ async function g79(browser) {
     firstMapId ?? 'missing',
   )
   const mappingPicker = page.locator(
-    `[data-route-map-row="${firstMapId}"] [data-route-map-frontend] [data-choice-picker] button`,
+    `[data-route-map-row="${firstMapId}"] [data-route-map-real] [data-choice-picker] button`,
   )
   const previousMapping =
     (await page
-      .locator(`[data-route-map-row="${firstMapId}"] [data-route-map-frontend] [data-choice-value]`)
+      .locator(`[data-route-map-row="${firstMapId}"] [data-route-map-real] [data-choice-value]`)
       .getAttribute('data-choice-value')) ?? ''
   await mappingPicker.click()
-  await page.locator('[data-choice-option="GPT Image 2.5 Flare"]').click()
+  await page
+    .locator('[data-choice-option]:not([data-choice-option=""])')
+    .first()
+    .click()
   await sleep(300)
 
   const restoreMapping = async () => {
@@ -16017,15 +16049,14 @@ async function g79(browser) {
       await sleep(600)
       await page.locator(USER_CHANNEL).first().click()
       await sleep(500)
-      if (previousMapping) {
-        const picker = page.locator(
-          `[data-route-map-row="${firstMapId}"] [data-route-map-frontend] [data-choice-picker] button`,
-        )
-        if ((await picker.count()) > 0) {
-          await picker.click()
-          await page.locator(`[data-choice-option="${previousMapping}"]`).click()
-          await sleep(300)
-        }
+      const picker = page.locator(
+        `[data-route-map-row="${firstMapId}"] [data-route-map-real] [data-choice-picker] button`,
+      )
+      if ((await picker.count()) > 0) {
+        await picker.click()
+        const restore = page.locator(`[data-choice-option="${previousMapping}"]`)
+        if ((await restore.count()) > 0) await restore.click()
+        await sleep(300)
       }
     } catch {
       // 还原失败不掩盖本组结论
@@ -16529,7 +16560,7 @@ async function g83(browser) {
 
   rec(
     g,
-    '★★ 映射区不再按前端目录或类别平铺，而是逐行对应当前分组的真实模型',
+    '★★ 映射区以前端显示模型为行，真实模型收在右侧下拉',
     (await page.locator('[data-route-map-filter]').count()) === 0 &&
       (await page.locator('[data-route-map-row]').count()) > 0,
   )
@@ -16541,7 +16572,7 @@ async function g83(browser) {
     const row = rows.nth(index)
     const category = await row.getAttribute('data-route-map-category')
     if (category) categorizedRows += 1
-    const trigger = row.locator('[data-route-map-frontend] [data-choice-picker] button')
+    const trigger = row.locator('[data-route-map-real] [data-choice-picker] button')
     await trigger.click()
     const options = row.locator('[data-choice-option]')
     const optionCount = await options.count()
@@ -16550,7 +16581,7 @@ async function g83(browser) {
   }
   rec(
     g,
-    '★★ 每个真实模型的“对应前端模型”下拉都有可选目标',
+    '★★ 每个前端模型的真实模型下拉都有可选目标',
     rowCount > 0 && sameCategoryPickers === rowCount && categorizedRows === rowCount,
     `${sameCategoryPickers}/${rowCount}，分类=${categorizedRows}/${rowCount}`,
   )

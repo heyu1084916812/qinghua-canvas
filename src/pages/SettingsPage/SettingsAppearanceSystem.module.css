@@ -20,7 +20,7 @@
   width: 100%;
   padding: 0 var(--space-2);
   border: 0;
-  border-radius: 6px;
+  border-radius: calc(var(--radius-control) - 4px);
   background: transparent;
   color: var(--text-1);
   font: inherit;
@@ -108,7 +108,7 @@
   justify-content: center;
   padding: 0;
   border: 0;
-  border-radius: 6px;
+  border-radius: var(--radius-control);
   background: transparent;
   color: var(--text-3);
   cursor: pointer;

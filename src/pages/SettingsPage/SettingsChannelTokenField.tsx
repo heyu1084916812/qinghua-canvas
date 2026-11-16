@@ -113,7 +113,7 @@ export function ChannelTokenField({
       <div className={styles.tokenRow}>
         <div className={styles.tokenInputWrap}>
           <input
-            className={styles.input}
+            className={`${styles.input} ${styles.tokenInput}`}
             data-settings-token-tail={groupId ?? slot}
             type={show ? 'text' : 'password'}
             placeholder={saved ? savedText : '粘贴 API Key'}

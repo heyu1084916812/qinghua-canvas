@@ -1,5 +1,4 @@
-import { useState } from 'react'
-import { IconDefaults, IconGear } from '../../../app/SettingsIcons'
+import { IconGear } from '../../../app/SettingsIcons'
 import { SettingsChannelAvatar } from '../SettingsChannelAvatar'
 import { settingsPageStyles as styles } from './settingsPageStyles'
 
@@ -32,8 +31,6 @@ export function SettingsProviderHeaderView({
   onPriorityChange,
   onWeightChange,
 }: SettingsProviderHeaderViewProps) {
-  const [routeOpen, setRouteOpen] = useState(false)
-
   return (
     <div className={styles.providerEditorBlock} data-settings-provider-head>
       <div className={styles.providerEditorHead}>
@@ -52,21 +49,6 @@ export function SettingsProviderHeaderView({
           >
             <IconGear size="md" />
           </button>
-          <button
-            type="button"
-            className={
-              routeOpen
-                ? `${styles.providerGear} ${styles.providerGearOn}`
-                : styles.providerGear
-            }
-            data-settings-channel-routing
-            aria-label="编辑渠道优先级与权重"
-            title="渠道优先级与权重"
-            aria-expanded={routeOpen}
-            onClick={() => setRouteOpen((open) => !open)}
-          >
-            <IconDefaults size="md" />
-          </button>
         </div>
         <label className={styles.switch} title={enabled ? '停用模型服务' : '启用模型服务'}>
           <input
@@ -80,8 +62,7 @@ export function SettingsProviderHeaderView({
           <span className={styles.switchTrack} aria-hidden="true" />
         </label>
       </div>
-      {routeOpen ? (
-        <div className={styles.providerRouteStrip} data-settings-channel-routing-panel>
+      <div className={styles.providerRouteStrip} data-settings-channel-routing-panel>
           <label className={styles.providerRouteField}>
             <span>渠道优先级</span>
             <input
@@ -104,8 +85,7 @@ export function SettingsProviderHeaderView({
           <span className={styles.cardSub}>
             仅影响不同渠道之间的竞争，不覆盖 Key 分组优先级。
           </span>
-        </div>
-      ) : null}
+      </div>
     </div>
   )
 }

@@ -61,36 +61,50 @@ export function SettingsChannelRouteView({
   onRemoveGlobalModel,
 }: SettingsChannelRouteViewProps) {
   const managerRef = useRef<HTMLElement | null>(null)
+  const closeManagerRef = useRef(onModelAddOpenChange)
+  closeManagerRef.current = onModelAddOpenChange
   const uncommon = new Set(uncommonModelIds)
-  const rows = activeModels.map((model) => {
-    const savedLogical =
-      Object.entries(modelMap).find(([, upstream]) => upstream === model.id)?.[0] ?? ''
-    const logicalName = savedLogical
-    const isGlobalLogical = allGlobalModels.some(
-      (preset) => preset.id === logicalName,
-    )
-    const options = allGlobalModels
-      .filter(
-        (preset) =>
-          (model.category === 'unknown' || preset.category === model.category) &&
-          (showUncommonModels ||
-            !uncommon.has(preset.id) ||
-            preset.id === logicalName),
-      )
-      .map((preset) => ({
-        value: preset.id,
-        label: preset.id,
-        group: categoryLabel(preset.category),
-      }))
-    if (logicalName && !options.some((option) => option.value === logicalName)) {
+  const activeCategories = new Set(activeModels.map((model) => model.category))
+  const rows = allGlobalModels
+    .filter((preset) => {
+      const upstream = modelMap[preset.id]?.trim()
+      const relevantToGroup =
+        Boolean(upstream) ||
+        activeCategories.has('unknown') ||
+        activeCategories.has(preset.category)
+      return relevantToGroup && (showUncommonModels || !uncommon.has(preset.id))
+    })
+    .map((preset) => {
+      const upstream = modelMap[preset.id]?.trim() ?? ''
+      const options = activeModels
+        .filter(
+          (model) =>
+            model.category === 'unknown' || model.category === preset.category,
+        )
+        .map((model) => ({
+          value: model.id,
+          label: model.id,
+          group: categoryLabel(model.category),
+        }))
       options.unshift({
-        value: logicalName,
-        label: logicalName,
-        group: '当前映射',
+        value: '',
+        label: '未映射',
+        group: '映射状态',
       })
-    }
-    return { model, logicalName, options, isGlobalLogical }
-  })
+      if (upstream && !options.some((option) => option.value === upstream)) {
+        options.splice(1, 0, {
+          value: upstream,
+          label: `${upstream}（当前值）`,
+          group: '当前映射',
+        })
+      }
+      return {
+        preset,
+        upstream,
+        options,
+        isUncommon: uncommon.has(preset.id),
+      }
+    })
 
   useEffect(() => {
     if (!modelAddOpen) return
@@ -103,15 +117,20 @@ export function SettingsChannelRouteView({
     input?.focus()
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key !== 'Escape') return
+      const picker =
+        event.target instanceof Element
+          ? event.target.closest('[data-choice-picker]')
+          : null
+      if (picker?.querySelector('[role="listbox"]')) return
       event.preventDefault()
-      onModelAddOpenChange(false)
+      closeManagerRef.current(false)
     }
     document.addEventListener('keydown', onKeyDown)
     return () => {
       document.removeEventListener('keydown', onKeyDown)
       previous?.focus()
     }
-  }, [modelAddOpen, onModelAddOpenChange])
+  }, [modelAddOpen])
 
   return (
     <section className={styles.editorSection} data-settings-channel-route>
@@ -156,12 +175,16 @@ export function SettingsChannelRouteView({
               <button
                 type="button"
                 className={styles.ghostBtn}
+                data-global-model-close
                 onClick={() => onModelAddOpenChange(false)}
               >
                 完成
               </button>
             </div>
-            <div className={styles.modelAddForm} data-global-model-form>
+            <div
+              className={`${styles.modelAddForm} ${styles.modelManagerForm}`}
+              data-global-model-form
+            >
               <div className={styles.fieldRow}>
                 <label className={`${styles.field} ${styles.grow}`}>
                   <span className={styles.label}>显示名称</span>
@@ -232,6 +255,7 @@ export function SettingsChannelRouteView({
               <div className={styles.modelAddActions}>
                 <button
                   className={styles.ghostBtn}
+                  data-global-model-close
                   onClick={() => onModelAddOpenChange(false)}
                 >
                   取消
@@ -253,8 +277,8 @@ export function SettingsChannelRouteView({
       <div className={styles.mapToolbar}>
         <span className={styles.cardSub}>
           {rows.length > 0
-            ? `${rows.filter((row) => row.isGlobalLogical).length}/${rows.length} 个真实模型已绑定前端模型`
-            : '当前分组还没有选择模型'}
+            ? `${rows.filter((row) => row.upstream).length}/${rows.length} 个前端模型已绑定真实模型`
+            : '前端模型目录为空'}
         </span>
         <label className={styles.showUncommonToggle}>
           <input
@@ -274,63 +298,53 @@ export function SettingsChannelRouteView({
       ) : (
         <div className={styles.mappingTable} data-route-map-table>
           <div className={styles.mappingTableHead} aria-hidden>
+            <span>前端显示模型</span>
             <span>真实模型</span>
-            <span>对应前端模型</span>
             <span>常用状态</span>
           </div>
-          {rows.map(({ model, logicalName, options, isGlobalLogical }) => {
-            const save = mapSaveNotice?.id === logicalName ? mapSaveNotice : null
-            const isUncommon = Boolean(logicalName && uncommon.has(logicalName))
-            const modelIcon = allGlobalModels.find(
-              (preset) => preset.id === logicalName,
-            )?.vendor
+          {rows.map(({ preset, upstream, options, isUncommon }) => {
+            const save = mapSaveNotice?.id === preset.id ? mapSaveNotice : null
             return (
               <div
-                key={model.id}
+                key={preset.id}
                 className={styles.mappingRow}
-                data-route-map-row={model.id}
-                data-route-map-category={model.category}
+                data-route-map-row={preset.id}
+                data-route-map-category={preset.category}
               >
-                <div className={styles.mappingRealModel} title={model.id}>
-                  {modelIcon ? <ModelIcon vendor={modelIcon} size={18} /> : null}
+                <div
+                  className={styles.mappingFrontendModel}
+                  title={preset.id}
+                  data-route-map-frontend={preset.id}
+                >
+                  <ModelIcon vendor={preset.vendor} size={18} />
                   <span>
-                    <b data-route-map-label>{model.id}</b>
-                    <small>{categoryLabel(model.category)}</small>
+                    <b data-route-map-label>{preset.id}</b>
+                    <small>{categoryLabel(preset.category)}</small>
                   </span>
                 </div>
-                <div className={styles.mappingFrontend} data-route-map-frontend={model.id}>
+                <div className={styles.mappingRealModel} data-route-map-real={preset.id}>
                   <ChoicePicker
-                    name={`mapping-${model.id}`}
-                    value={logicalName}
-                    ariaLabel={`${model.id} 对应的前端模型`}
+                    name={`mapping-${preset.id}`}
+                    value={upstream}
+                    ariaLabel={`${preset.id} 对应的真实模型`}
                     placeholder="未映射"
-                    onChange={(value) => onBindModel(model.id, value)}
+                    onChange={(value) => onBindModel(value, preset.id)}
                     options={options}
                   />
                 </div>
                 <button
                   type="button"
                   className={
-                    logicalName && !isUncommon
+                    !isUncommon
                       ? styles.globalCommonButton
                       : `${styles.globalCommonButton} ${styles.globalCommonButtonOff}`
                   }
-                  data-route-map-uncommon={logicalName || undefined}
-                  disabled={!logicalName || !isGlobalLogical}
+                  data-route-map-uncommon={preset.id}
                   title="全局设置，影响所有分组和前端模型选择"
-                  onClick={() =>
-                    logicalName &&
-                    onModelUncommonChange(logicalName, !isUncommon)
-                  }
+                  onClick={() => onModelUncommonChange(preset.id, !isUncommon)}
                 >
                   <span aria-hidden />
-                  {logicalName && !isGlobalLogical
-                    ? '待绑定 · 全局'
-                    : logicalName
-                    ? isUncommon
-                      ? '不常用 · 全局'
-                      : '常用 · 全局'
-                    : '未映射'}
+                  {isUncommon ? '不常用 · 全局' : '常用 · 全局'}
                 </button>
                 {save?.tone === 'error' ? (
                   <p className={styles.mappingInlineError} role="alert">

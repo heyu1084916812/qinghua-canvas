@@ -70,4 +70,12 @@ describe('SettingsPage CSS 模块结构护栏', () => {
       expect(STYLE_FACADE, name).toContain(`${name[0].toLowerCase()}${name.slice(1)}Styles`)
     }
   })
+
+  it('uses global color and control-radius tokens', () => {
+    for (const [path, source] of Object.entries(PART_SOURCES)) {
+      const declarations = source.replace(/\/\*[\s\S]*?\*\//g, '')
+      expect(declarations, path).not.toMatch(/#[0-9a-f]{3,8}\b|\brgba?\(|\bhsla?\(/i)
+      expect(declarations, path).not.toMatch(/border-radius:\s*\d+px\b/)
+    }
+  })
 })
