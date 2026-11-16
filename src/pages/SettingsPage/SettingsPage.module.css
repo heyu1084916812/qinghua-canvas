@@ -177,7 +177,6 @@
 .mapList { composes: mapList from './SettingsModelMapping.module.css'; }
 .mapGroup { composes: mapGroup from './SettingsModelMapping.module.css'; }
 .mapFilters { composes: mapFilters from './SettingsModelMapping.module.css'; }
-.mapToolbar { composes: mapToolbar from './SettingsModelMapping.module.css'; }
 .showUncommonToggle { composes: showUncommonToggle from './SettingsModelMapping.module.css'; }
 .mapUncommonToggle { composes: mapUncommonToggle from './SettingsModelMapping.module.css'; }
 .mapFilter { composes: mapFilter from './SettingsModelMapping.module.css'; }

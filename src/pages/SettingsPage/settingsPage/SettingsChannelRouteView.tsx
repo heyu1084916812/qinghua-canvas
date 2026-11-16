@@ -16,9 +16,20 @@ type MapSaveNotice = {
 }
 
 type NewModelCategory = Exclude<PresetModel['category'], 'unknown'>
+type MappingCategory = 'chat' | 'image' | 'video'
 
-const MODEL_CATEGORY_ORDER = ['image', 'chat', 'video', 'audio'] as const
+const MODEL_CATEGORY_ORDER = ['chat', 'image', 'video'] as const
+const MODEL_CATEGORY_LABELS: Record<MappingCategory, string> = {
+  chat: '对话',
+  image: '图片',
+  video: '视频',
+}
 const MODEL_CATEGORY_PANEL_ID = 'settings-model-category-panel'
+
+const isMappingCategory = (
+  category: PresetModel['category'],
+): category is MappingCategory =>
+  MODEL_CATEGORY_ORDER.some((item) => item === category)
 
 export type SettingsChannelRouteViewProps = {
   allGlobalModels: PresetModel[]
@@ -68,7 +79,7 @@ export function SettingsChannelRouteView({
   const managerRef = useRef<HTMLElement | null>(null)
   const closeManagerRef = useRef(onModelAddOpenChange)
   closeManagerRef.current = onModelAddOpenChange
-  const [activeCategory, setActiveCategory] = useState<PresetModel['category'] | null>(null)
+  const [activeCategory, setActiveCategory] = useState<MappingCategory | null>(null)
   const uncommon = new Set(uncommonModelIds)
   // `unknown` 可映射到任意前端模型，但不能因此把全部分类都显示出来。
   const activeCategories = new Set(
@@ -78,6 +89,7 @@ export function SettingsChannelRouteView({
   )
   const rows = allGlobalModels
     .filter((preset) => {
+      if (!isMappingCategory(preset.category)) return false
       const upstream = modelMap[preset.id]?.trim()
       const relevantToGroup = Boolean(upstream) || activeCategories.has(preset.category)
       return relevantToGroup && (showUncommonModels || !uncommon.has(preset.id))
@@ -115,10 +127,13 @@ export function SettingsChannelRouteView({
     })
   const groups = MODEL_CATEGORY_ORDER.map((category) => ({
     category,
-    label: categoryLabel(category),
+    label: MODEL_CATEGORY_LABELS[category],
     rows: rows.filter((row) => row.preset.category === category),
-  })).filter((group) => group.rows.length > 0)
-  const activeGroup = groups.find((group) => group.category === activeCategory) ?? groups[0] ?? null
+  }))
+  const activeGroup =
+    groups.find((group) => group.category === activeCategory) ??
+    groups.find((group) => group.rows.length > 0) ??
+    groups[0]
   const activeRows = activeGroup?.rows ?? []
 
   useEffect(() => {
@@ -289,7 +304,18 @@ export function SettingsChannelRouteView({
         </div>
       )}
 
-      <div className={styles.mapToolbar}>
+      <div className={styles.modelCategoryControls}>
+        <SettingsModelCategoryTabs
+          tabs={groups.map((group) => ({
+            category: group.category,
+            label: group.label,
+            count: group.rows.length,
+          }))}
+          activeCategory={activeGroup.category}
+          onChange={(category) => {
+            if (isMappingCategory(category)) setActiveCategory(category)
+          }}
+        />
         <label className={styles.showUncommonToggle}>
           <input
             type="checkbox"
@@ -301,21 +327,11 @@ export function SettingsChannelRouteView({
         </label>
       </div>
 
-      {groups.length > 0 ? (
-        <SettingsModelCategoryTabs
-          tabs={groups.map((group) => ({
-            category: group.category,
-            label: group.label,
-            count: group.rows.length,
-          }))}
-          activeCategory={activeGroup?.category ?? null}
-          onChange={setActiveCategory}
-        />
-      ) : null}
-
-      {rows.length === 0 ? (
+      {activeRows.length === 0 ? (
         <p className={styles.modelsEmpty} data-route-map-empty>
-          先在上方选择当前分组可用的真实模型，再回来绑定前端模型。
+          {rows.length === 0
+            ? '先在上方选择当前分组可用的真实模型，再回来绑定前端模型。'
+            : '当前分类没有可映射的前端模型。'}
         </p>
       ) : (
         <div
@@ -323,7 +339,7 @@ export function SettingsChannelRouteView({
           data-route-map-table
           id={MODEL_CATEGORY_PANEL_ID}
           role="tabpanel"
-          aria-labelledby={`settings-model-category-tab-${activeGroup?.category ?? ''}`}
+          aria-labelledby={`settings-model-category-tab-${activeGroup.category}`}
         >
           <div className={styles.mappingTableHead} aria-hidden>
             <span>前端显示模型</span>

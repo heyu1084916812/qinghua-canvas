@@ -277,14 +277,6 @@
   gap: var(--space-1);
 }
 
-.mapToolbar {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: var(--space-3);
-  flex-wrap: wrap;
-}
-
 .showUncommonToggle,
 .mapUncommonToggle {
   display: inline-flex;
