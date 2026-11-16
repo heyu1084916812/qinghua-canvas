@@ -108,6 +108,31 @@ describe('模型菜单（内嵌来源切换）', () => {
     expect(onFooter).toHaveBeenCalledWith('channels')
   })
 
+  it('API 行只显示模型名（不写「图片」这类类别）；只有「还没有渠道提供」这种有用的话才两行', () => {
+    const api = tabs().slice()
+    api[0] = {
+      ...api[0]!,
+      groups: [
+        ...api[0]!.groups,
+        { label: '未配置渠道', rows: [{ value: 'api::Midjourney', label: 'Midjourney', hint: '还没有渠道提供', icon: { kind: 'model', name: 'Midjourney' }, pick: { source: 'api', model: 'Midjourney', channelId: '' } }] },
+      ],
+    }
+    const { find } = mount({ tabs: api })
+    const texts = (value: string) =>
+      find('data-source-option', value)[0]!.findAll((node) => typeof node.type === 'string' && typeof node.props.children === 'string').map((node) => node.props.children)
+    expect(texts('api::GPT Image 2')).toEqual(['GPT Image 2', '✓'])
+    /** 单行：名字直接挂在行上，不包两行容器（不触发 `.row:has(> .rowBody)` 的 56px） */
+    const plain = find('data-source-option', 'api::GPT Image 2')[0]!
+    expect(plain.findAll((node) => node.type === 'span' && Array.isArray(node.props.children))).toHaveLength(0)
+    expect(texts('api::Midjourney')).toEqual(['Midjourney', '还没有渠道提供'])
+  })
+
+  it('工作流 / CLI 行的副标题保留', () => {
+    const { find } = mount({ source: 'cli', selected: {} })
+    const hint = find('data-source-option', 'cli::jimeng')[0]!.findAll((node) => node.props.children === '本机账号额度 · 出图 / 出视频')
+    expect(hint.length).toBeGreaterThan(0)
+  })
+
   it('chip 前有当前来源角标', () => {
     const { find } = mount({ source: 'workflow', open: false })
     expect(find('data-source-badge', 'workflow')).toHaveLength(1)

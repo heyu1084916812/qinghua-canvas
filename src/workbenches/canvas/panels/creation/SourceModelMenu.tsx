@@ -140,10 +140,15 @@ export function SourceModelMenu(props: SourceModelMenuProps) {
                     onClick={() => pick(row)}
                   >
                     <span className={picker.rowIcon}>{props.iconFor(row.icon)}</span>
-                    <span className={picker.rowBody}>
+                    {/* 有话说才两行（「还没有渠道提供」/ 站点·参数）；否则只有名字，回到 46px 单行高 */}
+                    {row.hint ? (
+                      <span className={picker.rowBody}>
+                        <span className={picker.rowText}>{row.label}</span>
+                        <span className={picker.rowHint}>{row.hint}</span>
+                      </span>
+                    ) : (
                       <span className={picker.rowText}>{row.label}</span>
-                      {row.hint ? <span className={picker.rowHint}>{row.hint}</span> : null}
-                    </span>
+                    )}
                     {row.status ? (
                       <span className={styles.status} data-cli-status={row.status}>
                         <span className={styles.dot} aria-hidden="true" />
