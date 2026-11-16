@@ -40,6 +40,8 @@ describe('渠道快速测试块', () => {
     expect(html).toContain('会调用正式生成接口并产生费用')
     expect(html).toContain('data-quick-test-input')
     expect(html).toContain('data-quick-test-model')
+    expect(html).toContain('data-choice-picker="channel-quick-test-model"')
+    expect(html).not.toContain('<select')
     expect(html).toContain('data-quick-test-run')
   })
 

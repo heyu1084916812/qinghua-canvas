@@ -152,9 +152,6 @@ export function ChannelTokenField({
           </a>
         )}
       </div>
-      <span className={saved ? styles.saved : styles.cardSub}>
-        {saved ? '已保存' : '未保存'}
-      </span>
       {hint && <span className={styles.cardSub}>{hint}</span>}
     </div>
   )

@@ -13874,6 +13874,110 @@ async function g74(browser) {
   await page.locator('[data-settings-profile-drawer]').waitFor({ state: 'detached', timeout: 5000 })
   await page.locator(USER_CHANNEL).first().click()
   await sleep(300)
+  const channelPolish = await page.evaluate(() => {
+    const text = (selector) =>
+      document.querySelector(selector)?.textContent?.replace(/\s+/g, ' ').trim() ?? ''
+    const rect = (selector) => {
+      const node = document.querySelector(selector)
+      return node ? node.getBoundingClientRect() : null
+    }
+    const name = rect('[data-settings-name]')
+    const priority = rect('[data-route-priority]')
+    const weight = rect('[data-route-weight]')
+    const address = rect('[data-settings-baseurl]')
+    const protocol = rect('[data-choice-picker="settings-protocol"] > button')
+    const quickTrigger = rect('[data-quick-test-model] [data-choice-picker] > button')
+    const quickRun = rect('[data-quick-test-run]')
+    const quickChevron = quickTrigger
+      ? document
+          .querySelector('[data-quick-test-model] [data-choice-picker] > button svg')
+          ?.getBoundingClientRect()
+      : null
+    const centerY = (box) => (box ? Math.round(box.top + box.height / 2) : -999)
+    return {
+      routeInline: document.querySelectorAll('[data-settings-provider-route-inline]').length,
+      nameCenter: centerY(name),
+      priorityCenter: centerY(priority),
+      weightCenter: centerY(weight),
+      routeExplanationRemoved: !text('[data-settings-provider-head]').includes(
+        '仅影响不同渠道之间的竞争',
+      ),
+      addressHeight: address ? Math.round(address.height) : 0,
+      protocolHeight: protocol ? Math.round(protocol.height) : 0,
+      quickTriggerHeight: quickTrigger ? Math.round(quickTrigger.height) : 0,
+      quickRunHeight: quickRun ? Math.round(quickRun.height) : 0,
+      quickChevronRightGap:
+        quickTrigger && quickChevron
+          ? Math.round(quickTrigger.right - quickChevron.right)
+          : -1,
+      quickNativeSelects:
+        document.querySelector('[data-channel-quick-test]')?.querySelectorAll('select')
+          .length ?? -1,
+      savedStatusVisible: Array.from(
+        document.querySelectorAll('[data-settings-token-row] > span'),
+      ).some((node) => node.textContent?.trim() === '已保存'),
+      genericProtocolNote:
+        document.querySelectorAll('[data-settings-proto-note]').length,
+    }
+  })
+  rec(
+    g,
+    '渠道优先级与权重收进名称同排，解释文案移除',
+    channelPolish.routeInline === 1 &&
+      Math.abs(channelPolish.nameCenter - channelPolish.priorityCenter) <= 4 &&
+      Math.abs(channelPolish.nameCenter - channelPolish.weightCenter) <= 4 &&
+      channelPolish.routeExplanationRemoved,
+    JSON.stringify(channelPolish),
+  )
+  rec(
+    g,
+    '地址与协议控件等高，Key 下方不再重复显示已保存',
+    channelPolish.addressHeight === channelPolish.protocolHeight &&
+      channelPolish.addressHeight >= 34 &&
+      !channelPolish.savedStatusVisible &&
+      channelPolish.genericProtocolNote === 0,
+    JSON.stringify(channelPolish),
+  )
+  rec(
+    g,
+    '快速测试使用项目下拉且选择器与运行按钮等高',
+    channelPolish.quickNativeSelects === 0 &&
+      channelPolish.quickTriggerHeight === channelPolish.quickRunHeight &&
+      channelPolish.quickTriggerHeight >= 34 &&
+      channelPolish.quickChevronRightGap >= 10,
+    JSON.stringify(channelPolish),
+  )
+  const quickInput = page.locator('[data-channel-quick-test] [data-quick-test-input]')
+  const quickTrigger = page.locator(
+    '[data-quick-test-model] [data-choice-picker] > button',
+  )
+  await quickInput.focus()
+  await page.keyboard.press('Tab')
+  const quickFocus = await quickTrigger.evaluate((trigger) => {
+    const style = getComputedStyle(trigger)
+    return {
+      focused: document.activeElement === trigger,
+      outlineStyle: style.outlineStyle,
+      outlineWidth: style.outlineWidth,
+    }
+  })
+  await quickTrigger.click()
+  const quickPopup = page.locator('[data-channel-quick-test] [role="listbox"]')
+  await quickPopup.waitFor({ state: 'visible', timeout: 5000 })
+  const quickPopupStyle = await quickPopup.evaluate((popup) => {
+    const style = getComputedStyle(popup)
+    return { background: style.backgroundColor, borderRadius: style.borderRadius }
+  })
+  await page.keyboard.press('Escape')
+  rec(
+    g,
+    '快速测试焦点环与下拉菜单沿用全局设计',
+    quickFocus.focused &&
+      quickFocus.outlineStyle !== 'none' &&
+      parseFloat(quickFocus.outlineWidth) >= 2 &&
+      parseFloat(quickPopupStyle.borderRadius) >= 8,
+    JSON.stringify({ quickFocus, quickPopupStyle }),
+  )
   await page.locator('[data-global-model-add-toggle]').click()
   await page.locator('[data-global-model-form]').waitFor({ state: 'visible', timeout: 5000 })
   const vendorCount = await page.locator('[data-global-model-vendor]').count()
@@ -13897,15 +14001,54 @@ async function g74(browser) {
   )
   await page.locator('[data-global-model-close]').first().click()
   await page.locator('[data-global-model-form]').waitFor({ state: 'detached', timeout: 5000 })
-  const mapGroups = await page
-    .locator('[data-route-map-group]')
-    .evaluateAll((els) => els.map((el) => el.getAttribute('data-route-map-group')))
+  const mapFilters = await page
+    .locator('[data-route-map-filter]')
+    .evaluateAll((els) => els.map((el) => el.getAttribute('data-route-map-filter')))
   rec(
     g,
-    '映射表按模型分类分组',
-    mapGroups.length >= 2 && new Set(mapGroups).size === mapGroups.length,
-    mapGroups.join(','),
+    '映射表提供模型分类切换',
+    mapFilters.length >= 2 && new Set(mapFilters).size === mapFilters.length,
+    mapFilters.join(','),
   )
+  const initialCategories = await page
+    .locator('[data-route-map-row]')
+    .evaluateAll((els) => els.map((el) => el.getAttribute('data-route-map-category')))
+  rec(
+    g,
+    '默认只显示一个模型分类',
+    initialCategories.length > 0 &&
+      new Set(initialCategories).size === 1 &&
+      initialCategories[0] === mapFilters[0],
+    initialCategories.join(','),
+  )
+  await page.locator('[data-route-map-filter="chat"]').click()
+  await sleep(200)
+  const chatCategories = await page
+    .locator('[data-route-map-row]')
+    .evaluateAll((els) => els.map((el) => el.getAttribute('data-route-map-category')))
+  rec(
+    g,
+    '切到对话后只显示对话模型',
+    chatCategories.length > 0 && chatCategories.every((category) => category === 'chat'),
+    chatCategories.join(','),
+  )
+  await page.locator('[data-route-map-filter="image"]').focus()
+  await page.keyboard.press('ArrowRight')
+  await sleep(200)
+  const keyboardCategory = await page
+    .locator('[data-route-map-filter][aria-selected="true"]')
+    .getAttribute('data-route-map-filter')
+  const keyboardRows = await page
+    .locator('[data-route-map-row]')
+    .evaluateAll((els) => els.map((el) => el.getAttribute('data-route-map-category')))
+  rec(
+    g,
+    '键盘左右键可切换映射分类',
+    keyboardCategory === 'chat' && keyboardRows.every((category) => category === keyboardCategory),
+    `${keyboardCategory}: ${keyboardRows.join(',')}`,
+  )
+  await page.locator('[data-route-map-filter="image"]').click()
+  await sleep(200)
   const firstMapRow = page.locator('[data-route-map-row]').first()
   await firstMapRow.waitFor({ state: 'visible', timeout: 5000 })
   const firstMapId = await firstMapRow.getAttribute('data-route-map-row')
@@ -16575,14 +16718,23 @@ async function g83(browser) {
   await page.locator(USER_CHANNEL).first().click()
   await sleep(300)
 
-  rec(
-    g,
-    '★★ 映射区以前端显示模型为行，真实模型收在右侧下拉',
-    (await page.locator('[data-route-map-filter]').count()) === 0 &&
-      (await page.locator('[data-route-map-row]').count()) > 0,
-  )
+  const filterCount = await page.locator('[data-route-map-filter]').count()
+  const activeFilter = await page
+    .locator('[data-route-map-filter][aria-selected="true"]')
+    .getAttribute('data-route-map-filter')
   const rows = page.locator('[data-route-map-row]')
   const rowCount = await rows.count()
+  const visibleCategories = await rows.evaluateAll((els) =>
+    els.map((el) => el.getAttribute('data-route-map-category')),
+  )
+  rec(
+    g,
+    '★★ 映射区按当前分类只显示该类前端模型',
+    filterCount > 0 &&
+      rowCount > 0 &&
+      visibleCategories.every((category) => category === activeFilter),
+    `${activeFilter}: ${visibleCategories.join(',')}`,
+  )
   let sameCategoryPickers = 0
   let categorizedRows = 0
   for (let index = 0; index < rowCount; index += 1) {

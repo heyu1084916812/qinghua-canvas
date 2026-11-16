@@ -35,7 +35,7 @@ export function SettingsProviderHeaderView({
     <div className={styles.providerEditorBlock} data-settings-provider-head>
       <div className={styles.providerEditorHead}>
         <SettingsChannelAvatar protocol={protocol} icon={icon} name={name} size={34} />
-        <div className={styles.providerNameGroup}>
+        <div className={styles.providerNameGroup} data-settings-provider-name-row>
           <span className={styles.providerNameText} data-settings-name>
             {name}
           </span>
@@ -49,6 +49,33 @@ export function SettingsProviderHeaderView({
           >
             <IconGear size="md" />
           </button>
+          <div
+            className={styles.providerRouteInline}
+            data-settings-channel-routing-panel
+            data-settings-provider-route-inline
+          >
+            <label className={styles.providerRouteField}>
+              <span>优先级</span>
+              <input
+                type="number"
+                value={priority}
+                aria-label="渠道优先级"
+                data-route-priority
+                onChange={(event) => onPriorityChange(Number(event.target.value))}
+              />
+            </label>
+            <label className={styles.providerRouteField}>
+              <span>权重</span>
+              <input
+                type="number"
+                min={0}
+                value={weight}
+                aria-label="渠道权重"
+                data-route-weight
+                onChange={(event) => onWeightChange(Number(event.target.value))}
+              />
+            </label>
+          </div>
         </div>
         <label className={styles.switch} title={enabled ? '停用模型服务' : '启用模型服务'}>
           <input
@@ -61,30 +88,6 @@ export function SettingsProviderHeaderView({
           />
           <span className={styles.switchTrack} aria-hidden="true" />
         </label>
-      </div>
-      <div className={styles.providerRouteStrip} data-settings-channel-routing-panel>
-          <label className={styles.providerRouteField}>
-            <span>渠道优先级</span>
-            <input
-              type="number"
-              value={priority}
-              data-route-priority
-              onChange={(event) => onPriorityChange(Number(event.target.value))}
-            />
-          </label>
-          <label className={styles.providerRouteField}>
-            <span>渠道权重</span>
-            <input
-              type="number"
-              min={0}
-              value={weight}
-              data-route-weight
-              onChange={(event) => onWeightChange(Number(event.target.value))}
-            />
-          </label>
-          <span className={styles.cardSub}>
-            仅影响不同渠道之间的竞争，不覆盖 Key 分组优先级。
-          </span>
       </div>
     </div>
   )

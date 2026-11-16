@@ -23,21 +23,28 @@
 
 .row {
   display: flex;
-  align-items: center;
+  align-items: stretch;
   gap: var(--space-2);
 }
 
-.select {
+.modelPicker {
   flex: 1 1 auto;
   min-width: 0;
   max-width: 320px;
-  padding: 4px var(--space-2);
-  border: var(--border);
-  border-radius: var(--radius-control);
-  background: var(--bg-surface);
-  color: var(--text-1);
-  font-family: var(--font-sans);
-  font-size: var(--fs-label);
+}
+
+.modelPicker > div {
+  width: 100%;
+}
+
+.run {
+  min-height: 34px;
+  height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 var(--space-3);
+  line-height: 1;
 }
 
 /* 结果区：文本 / 图 / 视频都走「卡面 + 1px 描边」，与设置页其它块一致（不用投影） */

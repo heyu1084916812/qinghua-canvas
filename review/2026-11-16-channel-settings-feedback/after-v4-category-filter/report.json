@@ -1,0 +1,773 @@
+{
+  "capturedAt": "2026-11-16T15:40:40.872Z",
+  "cases": [
+    {
+      "width": 1440,
+      "height": 900,
+      "theme": "light",
+      "initial": {
+        "active": "image",
+        "filters": [
+          {
+            "category": "image",
+            "selected": "true",
+            "label": "生图7"
+          },
+          {
+            "category": "chat",
+            "selected": "false",
+            "label": "对话4"
+          },
+          {
+            "category": "audio",
+            "selected": "false",
+            "label": "配音1"
+          }
+        ],
+        "rows": [
+          {
+            "id": "Agnes Image 2.5 Flash",
+            "category": "image"
+          },
+          {
+            "id": "GPT Image 2.5 Flare",
+            "category": "image"
+          },
+          {
+            "id": "GPT Image 2.5 Sunburst",
+            "category": "image"
+          },
+          {
+            "id": "GPT Image 2",
+            "category": "image"
+          },
+          {
+            "id": "Nano Banana Pro",
+            "category": "image"
+          },
+          {
+            "id": "Nano Banana 2.1",
+            "category": "image"
+          },
+          {
+            "id": "Midjourney",
+            "category": "image"
+          }
+        ],
+        "overflow": false,
+        "sectionWidth": 960
+      },
+      "clickedChat": {
+        "active": "chat",
+        "filters": [
+          {
+            "category": "image",
+            "selected": "false",
+            "label": "生图7"
+          },
+          {
+            "category": "chat",
+            "selected": "true",
+            "label": "对话4"
+          },
+          {
+            "category": "audio",
+            "selected": "false",
+            "label": "配音1"
+          }
+        ],
+        "rows": [
+          {
+            "id": "Gemini 3.8 Flash",
+            "category": "chat"
+          },
+          {
+            "id": "Deepseek 4.1 Flash",
+            "category": "chat"
+          },
+          {
+            "id": "GLM 5.3 Flash",
+            "category": "chat"
+          },
+          {
+            "id": "HY 4",
+            "category": "chat"
+          }
+        ],
+        "overflow": false,
+        "sectionWidth": 960
+      },
+      "keyboardNext": {
+        "active": "audio",
+        "filters": [
+          {
+            "category": "image",
+            "selected": "false",
+            "label": "生图7"
+          },
+          {
+            "category": "chat",
+            "selected": "false",
+            "label": "对话4"
+          },
+          {
+            "category": "audio",
+            "selected": "true",
+            "label": "配音1"
+          }
+        ],
+        "rows": [
+          {
+            "id": "OpenAI TTS",
+            "category": "audio"
+          }
+        ],
+        "overflow": false,
+        "sectionWidth": 960
+      },
+      "restoredImage": {
+        "active": "image",
+        "filters": [
+          {
+            "category": "image",
+            "selected": "true",
+            "label": "生图7"
+          },
+          {
+            "category": "chat",
+            "selected": "false",
+            "label": "对话4"
+          },
+          {
+            "category": "audio",
+            "selected": "false",
+            "label": "配音1"
+          }
+        ],
+        "rows": [
+          {
+            "id": "Agnes Image 2.5 Flash",
+            "category": "image"
+          },
+          {
+            "id": "GPT Image 2.5 Flare",
+            "category": "image"
+          },
+          {
+            "id": "GPT Image 2.5 Sunburst",
+            "category": "image"
+          },
+          {
+            "id": "GPT Image 2",
+            "category": "image"
+          },
+          {
+            "id": "Nano Banana Pro",
+            "category": "image"
+          },
+          {
+            "id": "Nano Banana 2.1",
+            "category": "image"
+          },
+          {
+            "id": "Midjourney",
+            "category": "image"
+          }
+        ],
+        "overflow": false,
+        "sectionWidth": 960
+      },
+      "focusStyle": {
+        "outlineStyle": "none",
+        "outlineWidth": "3px",
+        "outlineColor": "rgb(23, 23, 23)"
+      },
+      "activeStyle": {
+        "background": "rgb(236, 236, 236)",
+        "borderColor": "rgb(23, 23, 22)",
+        "borderRadius": "10px"
+      },
+      "hoverStyle": {
+        "background": "rgb(236, 236, 236)",
+        "color": "rgb(23, 23, 23)"
+      },
+      "errors": []
+    },
+    {
+      "width": 1440,
+      "height": 900,
+      "theme": "dark",
+      "initial": {
+        "active": "image",
+        "filters": [
+          {
+            "category": "image",
+            "selected": "true",
+            "label": "生图7"
+          },
+          {
+            "category": "chat",
+            "selected": "false",
+            "label": "对话4"
+          },
+          {
+            "category": "audio",
+            "selected": "false",
+            "label": "配音1"
+          }
+        ],
+        "rows": [
+          {
+            "id": "Agnes Image 2.5 Flash",
+            "category": "image"
+          },
+          {
+            "id": "GPT Image 2.5 Flare",
+            "category": "image"
+          },
+          {
+            "id": "GPT Image 2.5 Sunburst",
+            "category": "image"
+          },
+          {
+            "id": "GPT Image 2",
+            "category": "image"
+          },
+          {
+            "id": "Nano Banana Pro",
+            "category": "image"
+          },
+          {
+            "id": "Nano Banana 2.1",
+            "category": "image"
+          },
+          {
+            "id": "Midjourney",
+            "category": "image"
+          }
+        ],
+        "overflow": false,
+        "sectionWidth": 960
+      },
+      "clickedChat": {
+        "active": "chat",
+        "filters": [
+          {
+            "category": "image",
+            "selected": "false",
+            "label": "生图7"
+          },
+          {
+            "category": "chat",
+            "selected": "true",
+            "label": "对话4"
+          },
+          {
+            "category": "audio",
+            "selected": "false",
+            "label": "配音1"
+          }
+        ],
+        "rows": [
+          {
+            "id": "Gemini 3.8 Flash",
+            "category": "chat"
+          },
+          {
+            "id": "Deepseek 4.1 Flash",
+            "category": "chat"
+          },
+          {
+            "id": "GLM 5.3 Flash",
+            "category": "chat"
+          },
+          {
+            "id": "HY 4",
+            "category": "chat"
+          }
+        ],
+        "overflow": false,
+        "sectionWidth": 960
+      },
+      "keyboardNext": {
+        "active": "audio",
+        "filters": [
+          {
+            "category": "image",
+            "selected": "false",
+            "label": "生图7"
+          },
+          {
+            "category": "chat",
+            "selected": "false",
+            "label": "对话4"
+          },
+          {
+            "category": "audio",
+            "selected": "true",
+            "label": "配音1"
+          }
+        ],
+        "rows": [
+          {
+            "id": "OpenAI TTS",
+            "category": "audio"
+          }
+        ],
+        "overflow": false,
+        "sectionWidth": 960
+      },
+      "restoredImage": {
+        "active": "image",
+        "filters": [
+          {
+            "category": "image",
+            "selected": "true",
+            "label": "生图7"
+          },
+          {
+            "category": "chat",
+            "selected": "false",
+            "label": "对话4"
+          },
+          {
+            "category": "audio",
+            "selected": "false",
+            "label": "配音1"
+          }
+        ],
+        "rows": [
+          {
+            "id": "Agnes Image 2.5 Flash",
+            "category": "image"
+          },
+          {
+            "id": "GPT Image 2.5 Flare",
+            "category": "image"
+          },
+          {
+            "id": "GPT Image 2.5 Sunburst",
+            "category": "image"
+          },
+          {
+            "id": "GPT Image 2",
+            "category": "image"
+          },
+          {
+            "id": "Nano Banana Pro",
+            "category": "image"
+          },
+          {
+            "id": "Nano Banana 2.1",
+            "category": "image"
+          },
+          {
+            "id": "Midjourney",
+            "category": "image"
+          }
+        ],
+        "overflow": false,
+        "sectionWidth": 960
+      },
+      "focusStyle": {
+        "outlineStyle": "none",
+        "outlineWidth": "3px",
+        "outlineColor": "rgb(239, 239, 239)"
+      },
+      "activeStyle": {
+        "background": "rgb(42, 42, 42)",
+        "borderColor": "rgb(239, 239, 239)",
+        "borderRadius": "10px"
+      },
+      "hoverStyle": {
+        "background": "rgb(42, 42, 42)",
+        "color": "rgb(239, 239, 239)"
+      },
+      "errors": []
+    },
+    {
+      "width": 1024,
+      "height": 700,
+      "theme": "light",
+      "initial": {
+        "active": "image",
+        "filters": [
+          {
+            "category": "image",
+            "selected": "true",
+            "label": "生图7"
+          },
+          {
+            "category": "chat",
+            "selected": "false",
+            "label": "对话4"
+          },
+          {
+            "category": "audio",
+            "selected": "false",
+            "label": "配音1"
+          }
+        ],
+        "rows": [
+          {
+            "id": "Agnes Image 2.5 Flash",
+            "category": "image"
+          },
+          {
+            "id": "GPT Image 2.5 Flare",
+            "category": "image"
+          },
+          {
+            "id": "GPT Image 2.5 Sunburst",
+            "category": "image"
+          },
+          {
+            "id": "GPT Image 2",
+            "category": "image"
+          },
+          {
+            "id": "Nano Banana Pro",
+            "category": "image"
+          },
+          {
+            "id": "Nano Banana 2.1",
+            "category": "image"
+          },
+          {
+            "id": "Midjourney",
+            "category": "image"
+          }
+        ],
+        "overflow": false,
+        "sectionWidth": 613
+      },
+      "clickedChat": {
+        "active": "chat",
+        "filters": [
+          {
+            "category": "image",
+            "selected": "false",
+            "label": "生图7"
+          },
+          {
+            "category": "chat",
+            "selected": "true",
+            "label": "对话4"
+          },
+          {
+            "category": "audio",
+            "selected": "false",
+            "label": "配音1"
+          }
+        ],
+        "rows": [
+          {
+            "id": "Gemini 3.8 Flash",
+            "category": "chat"
+          },
+          {
+            "id": "Deepseek 4.1 Flash",
+            "category": "chat"
+          },
+          {
+            "id": "GLM 5.3 Flash",
+            "category": "chat"
+          },
+          {
+            "id": "HY 4",
+            "category": "chat"
+          }
+        ],
+        "overflow": false,
+        "sectionWidth": 613
+      },
+      "keyboardNext": {
+        "active": "audio",
+        "filters": [
+          {
+            "category": "image",
+            "selected": "false",
+            "label": "生图7"
+          },
+          {
+            "category": "chat",
+            "selected": "false",
+            "label": "对话4"
+          },
+          {
+            "category": "audio",
+            "selected": "true",
+            "label": "配音1"
+          }
+        ],
+        "rows": [
+          {
+            "id": "OpenAI TTS",
+            "category": "audio"
+          }
+        ],
+        "overflow": false,
+        "sectionWidth": 613
+      },
+      "restoredImage": {
+        "active": "image",
+        "filters": [
+          {
+            "category": "image",
+            "selected": "true",
+            "label": "生图7"
+          },
+          {
+            "category": "chat",
+            "selected": "false",
+            "label": "对话4"
+          },
+          {
+            "category": "audio",
+            "selected": "false",
+            "label": "配音1"
+          }
+        ],
+        "rows": [
+          {
+            "id": "Agnes Image 2.5 Flash",
+            "category": "image"
+          },
+          {
+            "id": "GPT Image 2.5 Flare",
+            "category": "image"
+          },
+          {
+            "id": "GPT Image 2.5 Sunburst",
+            "category": "image"
+          },
+          {
+            "id": "GPT Image 2",
+            "category": "image"
+          },
+          {
+            "id": "Nano Banana Pro",
+            "category": "image"
+          },
+          {
+            "id": "Nano Banana 2.1",
+            "category": "image"
+          },
+          {
+            "id": "Midjourney",
+            "category": "image"
+          }
+        ],
+        "overflow": false,
+        "sectionWidth": 613
+      },
+      "focusStyle": {
+        "outlineStyle": "none",
+        "outlineWidth": "3px",
+        "outlineColor": "rgb(23, 23, 23)"
+      },
+      "activeStyle": {
+        "background": "rgb(236, 236, 236)",
+        "borderColor": "rgb(23, 23, 22)",
+        "borderRadius": "10px"
+      },
+      "hoverStyle": {
+        "background": "rgb(236, 236, 236)",
+        "color": "rgb(23, 23, 23)"
+      },
+      "errors": []
+    },
+    {
+      "width": 1024,
+      "height": 700,
+      "theme": "dark",
+      "initial": {
+        "active": "image",
+        "filters": [
+          {
+            "category": "image",
+            "selected": "true",
+            "label": "生图7"
+          },
+          {
+            "category": "chat",
+            "selected": "false",
+            "label": "对话4"
+          },
+          {
+            "category": "audio",
+            "selected": "false",
+            "label": "配音1"
+          }
+        ],
+        "rows": [
+          {
+            "id": "Agnes Image 2.5 Flash",
+            "category": "image"
+          },
+          {
+            "id": "GPT Image 2.5 Flare",
+            "category": "image"
+          },
+          {
+            "id": "GPT Image 2.5 Sunburst",
+            "category": "image"
+          },
+          {
+            "id": "GPT Image 2",
+            "category": "image"
+          },
+          {
+            "id": "Nano Banana Pro",
+            "category": "image"
+          },
+          {
+            "id": "Nano Banana 2.1",
+            "category": "image"
+          },
+          {
+            "id": "Midjourney",
+            "category": "image"
+          }
+        ],
+        "overflow": false,
+        "sectionWidth": 613
+      },
+      "clickedChat": {
+        "active": "chat",
+        "filters": [
+          {
+            "category": "image",
+            "selected": "false",
+            "label": "生图7"
+          },
+          {
+            "category": "chat",
+            "selected": "true",
+            "label": "对话4"
+          },
+          {
+            "category": "audio",
+            "selected": "false",
+            "label": "配音1"
+          }
+        ],
+        "rows": [
+          {
+            "id": "Gemini 3.8 Flash",
+            "category": "chat"
+          },
+          {
+            "id": "Deepseek 4.1 Flash",
+            "category": "chat"
+          },
+          {
+            "id": "GLM 5.3 Flash",
+            "category": "chat"
+          },
+          {
+            "id": "HY 4",
+            "category": "chat"
+          }
+        ],
+        "overflow": false,
+        "sectionWidth": 613
+      },
+      "keyboardNext": {
+        "active": "audio",
+        "filters": [
+          {
+            "category": "image",
+            "selected": "false",
+            "label": "生图7"
+          },
+          {
+            "category": "chat",
+            "selected": "false",
+            "label": "对话4"
+          },
+          {
+            "category": "audio",
+            "selected": "true",
+            "label": "配音1"
+          }
+        ],
+        "rows": [
+          {
+            "id": "OpenAI TTS",
+            "category": "audio"
+          }
+        ],
+        "overflow": false,
+        "sectionWidth": 613
+      },
+      "restoredImage": {
+        "active": "image",
+        "filters": [
+          {
+            "category": "image",
+            "selected": "true",
+            "label": "生图7"
+          },
+          {
+            "category": "chat",
+            "selected": "false",
+            "label": "对话4"
+          },
+          {
+            "category": "audio",
+            "selected": "false",
+            "label": "配音1"
+          }
+        ],
+        "rows": [
+          {
+            "id": "Agnes Image 2.5 Flash",
+            "category": "image"
+          },
+          {
+            "id": "GPT Image 2.5 Flare",
+            "category": "image"
+          },
+          {
+            "id": "GPT Image 2.5 Sunburst",
+            "category": "image"
+          },
+          {
+            "id": "GPT Image 2",
+            "category": "image"
+          },
+          {
+            "id": "Nano Banana Pro",
+            "category": "image"
+          },
+          {
+            "id": "Nano Banana 2.1",
+            "category": "image"
+          },
+          {
+            "id": "Midjourney",
+            "category": "image"
+          }
+        ],
+        "overflow": false,
+        "sectionWidth": 613
+      },
+      "focusStyle": {
+        "outlineStyle": "none",
+        "outlineWidth": "3px",
+        "outlineColor": "rgb(239, 239, 239)"
+      },
+      "activeStyle": {
+        "background": "rgb(42, 42, 42)",
+        "borderColor": "rgb(239, 239, 239)",
+        "borderRadius": "10px"
+      },
+      "hoverStyle": {
+        "background": "rgb(42, 42, 42)",
+        "color": "rgb(239, 239, 239)"
+      },
+      "errors": []
+    }
+  ]
+}

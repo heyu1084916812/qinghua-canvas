@@ -1,0 +1,137 @@
+{
+  "capturedAt": "2026-11-16T15:52:43.801Z",
+  "cases": [
+    {
+      "width": 1440,
+      "height": 900,
+      "theme": "light",
+      "geometry": {
+        "routeInline": 1,
+        "sameRow": true,
+        "nameCenter": -638,
+        "priorityCenter": -638,
+        "weightCenter": -638,
+        "addressHeight": 34,
+        "protocolHeight": 34,
+        "quickTriggerHeight": 34,
+        "quickRunHeight": 34,
+        "chevronRightGap": 13,
+        "nativeSelects": 0,
+        "genericProtocolNote": 0,
+        "savedStatusVisible": false,
+        "overflow": false
+      },
+      "focus": {
+        "focused": true,
+        "outlineStyle": "solid",
+        "outlineWidth": "2px",
+        "outlineColor": "rgb(91, 103, 214)"
+      },
+      "popupStyle": {
+        "background": "rgb(255, 255, 255)",
+        "borderRadius": "10px",
+        "borderColor": "rgb(226, 226, 226)"
+      },
+      "errors": []
+    },
+    {
+      "width": 1440,
+      "height": 900,
+      "theme": "dark",
+      "geometry": {
+        "routeInline": 1,
+        "sameRow": true,
+        "nameCenter": -638,
+        "priorityCenter": -638,
+        "weightCenter": -638,
+        "addressHeight": 34,
+        "protocolHeight": 34,
+        "quickTriggerHeight": 34,
+        "quickRunHeight": 34,
+        "chevronRightGap": 13,
+        "nativeSelects": 0,
+        "genericProtocolNote": 0,
+        "savedStatusVisible": false,
+        "overflow": false
+      },
+      "focus": {
+        "focused": true,
+        "outlineStyle": "solid",
+        "outlineWidth": "2px",
+        "outlineColor": "rgb(143, 155, 245)"
+      },
+      "popupStyle": {
+        "background": "rgb(34, 34, 34)",
+        "borderRadius": "10px",
+        "borderColor": "rgb(58, 58, 58)"
+      },
+      "errors": []
+    },
+    {
+      "width": 1024,
+      "height": 700,
+      "theme": "light",
+      "geometry": {
+        "routeInline": 1,
+        "sameRow": true,
+        "nameCenter": -962,
+        "priorityCenter": -962,
+        "weightCenter": -962,
+        "addressHeight": 34,
+        "protocolHeight": 34,
+        "quickTriggerHeight": 34,
+        "quickRunHeight": 34,
+        "chevronRightGap": 13,
+        "nativeSelects": 0,
+        "genericProtocolNote": 0,
+        "savedStatusVisible": false,
+        "overflow": false
+      },
+      "focus": {
+        "focused": true,
+        "outlineStyle": "solid",
+        "outlineWidth": "2px",
+        "outlineColor": "rgb(91, 103, 214)"
+      },
+      "popupStyle": {
+        "background": "rgb(255, 255, 255)",
+        "borderRadius": "10px",
+        "borderColor": "rgb(226, 226, 226)"
+      },
+      "errors": []
+    },
+    {
+      "width": 1024,
+      "height": 700,
+      "theme": "dark",
+      "geometry": {
+        "routeInline": 1,
+        "sameRow": true,
+        "nameCenter": -962,
+        "priorityCenter": -962,
+        "weightCenter": -962,
+        "addressHeight": 34,
+        "protocolHeight": 34,
+        "quickTriggerHeight": 34,
+        "quickRunHeight": 34,
+        "chevronRightGap": 13,
+        "nativeSelects": 0,
+        "genericProtocolNote": 0,
+        "savedStatusVisible": false,
+        "overflow": false
+      },
+      "focus": {
+        "focused": true,
+        "outlineStyle": "solid",
+        "outlineWidth": "2px",
+        "outlineColor": "rgb(143, 155, 245)"
+      },
+      "popupStyle": {
+        "background": "rgb(34, 34, 34)",
+        "borderRadius": "10px",
+        "borderColor": "rgb(58, 58, 58)"
+      },
+      "errors": []
+    }
+  ]
+}

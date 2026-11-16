@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { ModelCapability } from '../../../domain/shared/capability'
 import type { PresetModel, PresetVendor } from '../../../domain/project/modelPresets'
 import { categoryLabel } from '../../../domain/project/modelSelection'
@@ -6,6 +6,7 @@ import { GLOBAL_MODEL_VENDORS } from '../settingsPageConstants'
 import { ModelIcon } from '../../../features/shared/modelIcon/ModelIcon'
 import { ChoicePicker } from '../../../features/shared/choicePicker/ChoicePicker'
 import { settingsPageStyles as styles } from './settingsPageStyles'
+import { SettingsModelCategoryTabs } from './SettingsModelCategoryTabs'
 
 type MapSaveNotice = {
   id: string
@@ -16,6 +17,7 @@ type MapSaveNotice = {
 type NewModelCategory = Exclude<PresetModel['category'], 'unknown'>
 
 const MODEL_CATEGORY_ORDER = ['image', 'chat', 'video', 'audio'] as const
+const MODEL_CATEGORY_PANEL_ID = 'settings-model-category-panel'
 
 export type SettingsChannelRouteViewProps = {
   allGlobalModels: PresetModel[]
@@ -65,6 +67,7 @@ export function SettingsChannelRouteView({
   const managerRef = useRef<HTMLElement | null>(null)
   const closeManagerRef = useRef(onModelAddOpenChange)
   closeManagerRef.current = onModelAddOpenChange
+  const [activeCategory, setActiveCategory] = useState<PresetModel['category'] | null>(null)
   const uncommon = new Set(uncommonModelIds)
   const activeCategories = new Set(activeModels.map((model) => model.category))
   const rows = allGlobalModels
@@ -112,6 +115,8 @@ export function SettingsChannelRouteView({
     label: categoryLabel(category),
     rows: rows.filter((row) => row.preset.category === category),
   })).filter((group) => group.rows.length > 0)
+  const activeGroup = groups.find((group) => group.category === activeCategory) ?? groups[0] ?? null
+  const activeRows = activeGroup?.rows ?? []
 
   useEffect(() => {
     if (!modelAddOpen) return
@@ -278,8 +283,8 @@ export function SettingsChannelRouteView({
 
       <div className={styles.mapToolbar}>
         <span className={styles.cardSub}>
-          {rows.length > 0
-            ? `${rows.filter((row) => row.upstream).length}/${rows.length} 个前端模型已绑定真实模型`
+          {activeRows.length > 0
+            ? `${activeRows.filter((row) => row.upstream).length}/${activeRows.length} 个前端模型已绑定真实模型`
             : '前端模型目录为空'}
         </span>
         <label className={styles.showUncommonToggle}>
@@ -293,24 +298,36 @@ export function SettingsChannelRouteView({
         </label>
       </div>
 
+      {groups.length > 0 ? (
+        <SettingsModelCategoryTabs
+          tabs={groups.map((group) => ({
+            category: group.category,
+            label: group.label,
+            count: group.rows.length,
+          }))}
+          activeCategory={activeGroup?.category ?? null}
+          onChange={setActiveCategory}
+        />
+      ) : null}
+
       {rows.length === 0 ? (
         <p className={styles.modelsEmpty} data-route-map-empty>
           先在上方选择当前分组可用的真实模型，再回来绑定前端模型。
         </p>
       ) : (
-        <div className={styles.mappingTable} data-route-map-table>
+        <div
+          className={styles.mappingTable}
+          data-route-map-table
+          id={MODEL_CATEGORY_PANEL_ID}
+          role="tabpanel"
+          aria-labelledby={`settings-model-category-tab-${activeGroup?.category ?? ''}`}
+        >
           <div className={styles.mappingTableHead} aria-hidden>
             <span>前端显示模型</span>
             <span>真实模型</span>
             <span>常用设置</span>
           </div>
-          {groups.map((group) => (
-            <div key={group.category} className={styles.mappingGroup} data-route-map-group={group.category}>
-              <div className={styles.mappingGroupHead}>
-                <span>{group.label}</span>
-                <span className={styles.mappingGroupCount}>{group.rows.length}</span>
-              </div>
-              {group.rows.map(({ preset, upstream, options, isUncommon }) => {
+          {activeRows.map(({ preset, upstream, options, isUncommon }) => {
                 const save = mapSaveNotice?.id === preset.id ? mapSaveNotice : null
                 return (
                   <div key={preset.id} className={styles.mappingRow} data-route-map-row={preset.id} data-route-map-category={preset.category}>
@@ -352,9 +369,7 @@ export function SettingsChannelRouteView({
                     ) : null}
                   </div>
                 )
-              })}
-            </div>
-          ))}
+          })}
         </div>
       )}
     </section>

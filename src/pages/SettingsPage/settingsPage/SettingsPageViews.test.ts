@@ -98,6 +98,8 @@ describe('SettingsPage 视图拆分', () => {
     expect(headerHtml).toContain('data-settings-profile-edit')
     expect(headerHtml).toContain('data-channel-enabled="channel-1"')
     expect(headerHtml).toContain('data-settings-channel-routing-panel')
+    expect(headerHtml).toContain('data-settings-provider-route-inline')
+    expect(headerHtml).not.toContain('仅影响不同渠道之间的竞争')
     expect(headerHtml).not.toContain('data-settings-channel-routing=')
 
     const connectionHtml = render(SettingsConnectionView, {
@@ -360,6 +362,7 @@ describe('SettingsPage 视图拆分', () => {
     expect(html).toContain('data-proto-restore')
     expect(html).toContain('协议管理提示')
     expect(html).toContain('当前协议仍在使用')
+    expect(html).not.toContain('data-settings-proto-note')
     expect(html).toContain('data-status-tone="error"')
   })
 
@@ -498,7 +501,7 @@ describe('SettingsPage 视图拆分', () => {
     expect(html).toContain('data-route-map-row="My Image"')
     expect(html).toContain('data-route-map-frontend="My Image"')
     expect(html).toContain('data-route-map-real="My Image"')
-    expect(html).toContain('data-route-map-group="image"')
+    expect(html).toContain('data-route-map-filter="image"')
     expect(html).toContain('role="switch"')
     expect(html).toContain('aria-checked="true"')
     expect(html.indexOf('data-route-map-frontend="My Image"')).toBeLessThan(
@@ -564,17 +567,15 @@ describe('SettingsPage 视图拆分', () => {
       onModelUncommonChange: () => {},
       onRemoveGlobalModel: () => {},
     })
-    expect(grouped).toContain('data-route-map-group="image"')
-    expect(grouped).toContain('data-route-map-group="chat"')
-    expect(grouped.indexOf('data-route-map-group="image"')).toBeLessThan(
-      grouped.indexOf('data-route-map-row="My Image"'),
-    )
-    expect(grouped.indexOf('data-route-map-row="My Image"')).toBeLessThan(
-      grouped.indexOf('data-route-map-group="chat"'),
-    )
-    expect(grouped.indexOf('data-route-map-group="chat"')).toBeLessThan(
-      grouped.indexOf('data-route-map-row="My Chat"'),
-    )
+    expect(grouped).toContain('role="tablist"')
+    expect(grouped).toContain('data-route-map-filter="image"')
+    expect(grouped).toContain('data-route-map-filter="chat"')
+    expect(grouped).toContain('aria-selected="true"')
+    expect(grouped).toContain('aria-controls="settings-model-category-panel"')
+    expect(grouped).toContain('role="tabpanel"')
+    expect(grouped).toContain('id="settings-model-category-panel"')
+    expect(grouped).toContain('data-route-map-row="My Image"')
+    expect(grouped).not.toContain('data-route-map-row="My Chat"')
 
     const irrelevantCategory = render(SettingsChannelRouteView, {
       allGlobalModels: [preset],

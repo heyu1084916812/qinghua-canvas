@@ -37,6 +37,11 @@ export function SettingsProtocolDetailsView({
   onCheckImportedProtocol,
   onSaveImportedProtocol,
 }: SettingsProtocolDetailsViewProps) {
+  const showProtocolNote =
+    selectedProtocolNote !== '' &&
+    protocol !== 'mock' &&
+    protocol !== 'openai-compatible'
+
   return (
     <>
       {newProtoOpen && (
@@ -140,7 +145,7 @@ export function SettingsProtocolDetailsView({
           或者直接点「验证协议」让它自己认。
         </p>
       )}
-      {selectedProtocolNote && protocol !== 'mock' && (
+      {showProtocolNote && (
         <p className={styles.offlineNote} data-settings-proto-note>
           {selectedProtocolNote}
         </p>

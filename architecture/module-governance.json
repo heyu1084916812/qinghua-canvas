@@ -3412,7 +3412,7 @@
         "CSS_CLASS:keyGroupSwitcher",
         "CSS_CLASS:keyGroupTab",
         "CSS_CLASS:groupPropertyStrip",
-        "CSS_CLASS:providerRouteStrip"
+        "CSS_CLASS:providerRouteInline"
       ],
       "test": [
         "src/pages/SettingsPage/settingsPageCssArchitecture.test.ts"
@@ -3549,9 +3549,9 @@
     {
       "module": "src/pages/SettingsPage/SettingsModelCategory.module.css",
       "owner": "settings-ui",
-      "responsibility": "Defines category group headings and the global common-model switch in the channel model mapping surface.",
+      "responsibility": "Defines category filter tabs and the global common-model switch in the channel model mapping surface.",
       "owns": [
-        "category group headings and counts",
+        "category filter tabs and counts",
         "common and uncommon switch states",
         "responsive placement of the common-model switch"
       ],
@@ -3562,14 +3562,38 @@
       ],
       "publicApi": [
         "CSS_MODULE:SettingsModelCategory category and common-switch styles",
-        "CSS_CLASS:mappingGroup",
-        "CSS_CLASS:mappingGroupHead",
+        "CSS_CLASS:mappingFilters",
+        "CSS_CLASS:mappingFilter",
         "CSS_CLASS:globalCommonButton",
         "CSS_CLASS:globalCommonSwitch"
       ],
       "test": [
         "src/pages/SettingsPage/settingsPageCssArchitecture.test.ts",
-        "scripts/smoke.mjs#映射表按模型分类分组"
+        "scripts/smoke.mjs#映射表提供模型分类切换"
+      ],
+      "budget": 160
+    },
+    {
+      "module": "src/pages/SettingsPage/settingsPage/SettingsModelCategoryTabs.tsx",
+      "owner": "settings-ui",
+      "responsibility": "Renders accessible category tabs for channel model mappings and handles keyboard navigation.",
+      "owns": [
+        "category tab selection and counts",
+        "left and right arrow keyboard navigation",
+        "focus movement between model categories"
+      ],
+      "doesNotOwn": [
+        "model mapping persistence",
+        "mapping row rendering",
+        "common-model preference storage"
+      ],
+      "publicApi": [
+        "SettingsModelCategoryTabs",
+        "ModelCategoryTab"
+      ],
+      "test": [
+        "src/pages/SettingsPage/settingsPage/SettingsPageViews.test.ts",
+        "scripts/smoke.mjs#键盘左右键可切换映射分类"
       ],
       "budget": 120
     },
@@ -7202,7 +7226,7 @@
       "test": [
         "src/pages/SettingsPage/settingsPage/SettingsPageViews.test.ts"
       ],
-      "budget": 150
+      "budget": 160
     },
     {
       "module": "src/pages/SettingsPage/settingsPage/SettingsModelsView.tsx",
@@ -7244,7 +7268,7 @@
       "test": [
         "src/pages/SettingsPage/settingsPage/SettingsPageViews.test.ts"
       ],
-      "budget": 370
+      "budget": 380
     },
     {
       "module": "src/pages/SettingsPage/settingsPage/SettingsProfileDrawerView.tsx",
@@ -12280,7 +12304,7 @@
         "分区外壳样式（SettingsWorkflowEntries）"
       ],
       "publicApi": [
-        "CSS_MODULE:快速测试（input / row / select / text / media / error）"
+        "CSS_MODULE:快速测试（input / row / modelPicker / run / text / media / error）"
       ],
       "test": [
         "src/features/settings/SettingsChannelQuickTest.test.ts"

@@ -146,7 +146,7 @@
 }
 
 .input {
-  min-height: 32px;
+  min-height: 34px;
   box-sizing: border-box;
   border: var(--border);
   border-radius: var(--radius-control);
@@ -168,6 +168,10 @@
   display: flex;
   gap: var(--space-2);
   align-items: center;
+}
+
+.tokenRow .ghostBtn {
+  min-height: 34px;
 }
 
 .saved {

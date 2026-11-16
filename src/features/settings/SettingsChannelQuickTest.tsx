@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react'
 import { protocolNeedsNoToken, type Channel, type ChannelCredentialGroup } from '../../domain/project/channel'
 import type { ChannelStore } from '../../state/channel/channelStore'
 import type { PlatformKit } from '../../platform/ports'
+import { ChoicePicker } from '../shared/choicePicker/ChoicePicker'
 import { quickTestCategory, runChannelQuickTest } from '../../state/channel/channelQuickTest'
 import shell from './SettingsWorkflowEntries.module.css'
 import styles from './SettingsChannelQuickTest.module.css'
@@ -157,21 +158,21 @@ export function SettingsChannelQuickTest({
             data-quick-test-input
           />
           <div className={styles.row}>
-            <select
-              className={styles.select}
-              value={model}
-              onChange={(event) => setModel(event.target.value)}
-              data-quick-test-model
-            >
-              {models.map((item) => (
-                <option key={item.id} value={item.id}>
-                  {item.id}
-                </option>
-              ))}
-            </select>
+            <div className={styles.modelPicker} data-quick-test-model>
+              <ChoicePicker
+                name="channel-quick-test-model"
+                value={model}
+                ariaLabel="快速测试模型"
+                options={models.map((item) => ({
+                  value: item.id,
+                  label: item.id,
+                }))}
+                onChange={setModel}
+              />
+            </div>
             <button
               type="button"
-              className={shell.btnPrimary}
+              className={`${shell.btnPrimary} ${styles.run}`}
               disabled={running}
               onClick={() => void run()}
               data-quick-test-run

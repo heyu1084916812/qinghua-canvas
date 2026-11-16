@@ -1,28 +1,44 @@
-.mappingGroup {
+.mappingFilters {
   display: flex;
-  flex-direction: column;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1);
+  padding-bottom: var(--space-2);
 }
 
-.mappingGroup + .mappingGroup {
-  margin-top: var(--space-2);
-}
-
-.mappingGroupHead {
-  min-height: 34px;
-  display: flex;
+.mappingFilter {
+  min-height: 30px;
+  display: inline-flex;
   align-items: center;
   gap: var(--space-2);
-  padding: 0 var(--space-2);
+  padding: 0 var(--space-3);
+  border: 1px solid transparent;
+  border-radius: var(--radius-control);
+  background: transparent;
   color: var(--text-2);
+  font: inherit;
   font-size: var(--fs-label);
-  font-weight: var(--fw-title);
+  cursor: pointer;
 }
 
-.mappingGroup + .mappingGroup .mappingGroupHead {
-  border-top: var(--border);
+.mappingFilter:hover {
+  background: var(--bg-hover);
+  color: var(--text-1);
 }
 
-.mappingGroupCount {
+.mappingFilter:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.mappingFilterOn {
+  border-color: var(--stroke-focus);
+  background: var(--bg-surface);
+  color: var(--text-1);
+  font-weight: var(--fw-chip);
+}
+
+.mappingFilterCount {
   min-width: 20px;
   min-height: 20px;
   display: inline-flex;
@@ -35,6 +51,10 @@
   font-size: var(--fs-chip);
   font-weight: 400;
   font-variant-numeric: tabular-nums;
+}
+
+.mappingFilterOn .mappingFilterCount {
+  color: var(--text-2);
 }
 
 .globalCommonButton {
