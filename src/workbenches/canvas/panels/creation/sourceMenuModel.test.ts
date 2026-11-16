@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import { defaultCliTools } from '../../../../domain/shared/cliTools'
 import type { WorkflowEntry } from '../../../../domain/project/workflowParams'
-import { buildSourceMenu, cliCapabilityText, cliProtocolOf, cliStatusText, filterGroups, type SourceMenuInput } from './sourceMenuModel'
+import { buildSourceMenu, cliCapabilityText, cliProtocolOf, cliStatusText, type SourceMenuInput } from './sourceMenuModel'
 import { workflowSourceRows } from './workflowPanelSources'
 
 /**
  * 模型菜单「API · 工作流 · CLI」三个标签的数据（对账 #1133，设计稿 work/source-mock）。
- * 钉：标签顺序与计数、API 平铺去重（不按渠道分组）+ 搜索、工作流分「AI 应用 / 工作流」两组与副标题、
- * CLI 状态 / 能力置灰 / 网页版锁住、每行点了切成什么（`pick`）、末行设置入口。
+ * 钉：标签顺序与计数、API 平铺去重（不按渠道分组）、工作流 AI 应用分组与副标题、
+ * CLI 状态 / 能力置灰 / 网页版锁住、每行点了切成什么（`pick`）、跟随当前标签的设置动作。
  */
 const FLOW: WorkflowEntry = {
   id: 'w1', title: '视频超分', provider: 'runninghub', fetchedAt: 0, kind: 'workflow',
@@ -52,11 +52,11 @@ describe('标签', () => {
     ])
   })
 
-  it('每个标签末行是自己的设置入口', () => {
-    expect(buildSourceMenu(input()).map((tab) => tab.footer)).toEqual([
-      { label: '渠道设置…', action: 'channels' },
-      { label: '管理 AI 应用 / 工作流…', action: 'workflows' },
-      { label: '本机 CLI 设置…', action: 'cli' },
+  it('每个标签带自己的设置目标，供顶部第四枚动作跟随切换', () => {
+    expect(buildSourceMenu(input()).map((tab) => tab.settings)).toEqual([
+      { label: '渠道设置', action: 'channels' },
+      { label: '工作流设置', action: 'workflows' },
+      { label: 'CLI 设置', action: 'cli' },
     ])
   })
 
@@ -94,19 +94,12 @@ describe('API 标签', () => {
     expect(api.groups[1]!.rows[0]!.hint).toBe('还没有渠道提供')
   })
 
-  it('搜索：只按模型名，忽略大小写；空查询原样；没匹配的分组去掉', () => {
-    const groups = buildSourceMenu(input())[0]!.groups
-    expect(filterGroups(groups, '  ')).toEqual(groups)
-    expect(filterGroups(groups, 'flux').flatMap((group) => group.rows.map((row) => row.label))).toEqual(['Flux Pro'])
-    expect(filterGroups(groups, '渠道')).toEqual([])
-    expect(filterGroups(groups, '不存在')).toEqual([])
-  })
 })
 
 describe('工作流标签', () => {
-  it('分「AI 应用 / 工作流」两组，副标题 站点 · 参数数 · 实例；AI 应用不写 24G', () => {
+  it('保留 AI 应用分组，普通工作流前不再重复「工作流」标题；副标题仍完整', () => {
     const flow = buildSourceMenu(input())[1]!
-    expect(flow.groups.map((group) => group.label)).toEqual(['AI 应用', '工作流'])
+    expect(flow.groups.map((group) => group.label)).toEqual(['AI 应用', ''])
     const [app] = flow.groups[0]!.rows
     const [wf] = flow.groups[1]!.rows
     expect(app!.hint).toBe('国际站 · 0 个参数')

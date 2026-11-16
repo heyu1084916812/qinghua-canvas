@@ -13,7 +13,7 @@ import { clampDuration } from '../../../domain/shared/capability'
 import { CreationPanel } from './CreationPanel'
 import { useWorkflowPanelSources } from './creation/useWorkflowPanelSources'
 import { EmotionPanel } from './EmotionPanel'
-import type { PanelEvent, PanelModel, PanelThumb, RecipeSnapshot } from './panelModel'
+import { promptReferenceThumb, type PanelEvent, type PanelModel, type PanelThumb, type RecipeSnapshot } from './panelModel'
 import type { MentionCandidate } from '../text/mentionValue'
 import { useGraph, useViewportStateWhen, useCanvasStore, useSelection } from '../storeContext'
 import { useCanvasExecution } from '../execution/CanvasExecutionProvider'
@@ -373,7 +373,6 @@ function buildPanelModel(node: NodeSnapshot, graph: ReturnType<typeof useGraph>)
       collections: [],
       emptyHint: b.contentType === 'prompt' ? '拖入提示词节点，批量文生图' : '拖入图片 / 视频素材，批量套图',
       prompt: data.prompt,
-      linkedPromptCount: 0,
       promptToggle: null,
       mentionCandidates: upstreamMentionCandidates(node, graph),
       ...presetFieldsOf(data),
@@ -384,19 +383,18 @@ function buildPanelModel(node: NodeSnapshot, graph: ReturnType<typeof useGraph>)
   const upstreamHidden = new Set(data.upstreamHidden ?? [])
   const thumbs: PanelThumb[] = []
   const collections: PanelModel['collections'] = []
-  /**
-   * 上游提示词节点数量（§6.7 / §6.8 第二部分「上游已链接提示词节点 {n}」）。
-   *
-   * 此前恒为 0——于是这个胶囊在生成 / 提示词节点上**从来没出现过**，而它正是
-   * 「提示词节点的内容不会自动带进下游」这件事唯一的界面说明。被隐藏的节点
-   * （小眼睛关掉）不计入：它不参与本次生成。
-   */
-  let linkedPromptCount = 0
   for (const id of directUpstream(node.id, graph.edges)) {
     const up = index.get(id)
     if (!up) continue
     if (up.type === 'prompt') {
-      if (!upstreamHidden.has(up.id)) linkedPromptCount += 1
+      thumbs.push(
+        promptReferenceThumb({
+          id: up.id,
+          text: String((up.data as PromptData).text ?? ''),
+          edgeId: graph.edges.find((e) => e.source === up.id && e.target === node.id)?.id,
+          visible: !upstreamHidden.has(up.id),
+        }),
+      )
       continue
     }
     if (up.type === 'batch') {
@@ -464,7 +462,6 @@ function buildPanelModel(node: NodeSnapshot, graph: ReturnType<typeof useGraph>)
       node.type === 'prompt'
         ? ((node.data as PromptData).draft ?? '')
         : data.prompt,
-    linkedPromptCount,
     promptToggle: null,
     /**
      * 已选技能（用户 2026-09-24）：技能是「设定」，面板要显示**选了哪一条**，
@@ -793,6 +790,9 @@ function handlePanelEvent(
     }
     case 'togglePrompt':
       toggleGroupPrompt(node, store)
+      break
+    case 'focusNode':
+      store.setSelection([event.id])
       break
     case 'reorderThumbs':
       reorderThumbs(event.owner, event.order, node, store)

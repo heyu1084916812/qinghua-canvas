@@ -543,6 +543,32 @@
   "moduleMoves": [],
   "modules": [
     {
+      "module": "src/app/providers/SkillStoreContext.tsx",
+      "owner": "app-providers",
+      "responsibility": "技能库的轻量共享 Context 与读取 hook，供面板和执行宿主消费当前技能状态，不负责技能仓储或内置目录加载。",
+      "owns": [
+        "SkillStoreApi 契约",
+        "SkillStoreContext",
+        "useSkills / useSkillsOptional"
+      ],
+      "doesNotOwn": [
+        "技能 IndexedDB 读写",
+        "内置技能 Markdown 装载",
+        "技能编辑流程"
+      ],
+      "publicApi": [
+        "SkillStoreApi",
+        "SkillStoreContext",
+        "useSkills",
+        "useSkillsOptional"
+      ],
+      "test": [
+        "src/workbenches/canvas/panels/CreationPanel.test.ts",
+        "src/workbenches/canvas/execution/CanvasExecutionProvider.runPreflight.test.ts"
+      ],
+      "budget": 60
+    },
+    {
       "module": "src/ui/icon/Icon.tsx",
       "owner": "ui-icon",
       "responsibility": "全站唯一图标出口组件：三档尺寸、按屏幕像素换算的固定线宽、currentColor 与默认装饰性无障碍属性。",
@@ -4548,6 +4574,31 @@
       "budget": 378
     },
     {
+      "module": "src/workbenches/canvas/panels/creation/PromptReferenceThumb.module.css",
+      "owner": "canvas-creation-ui",
+      "responsibility": "定义创作面板素材条里上游提示词 TXT 图标的外观与焦点态。",
+      "owns": [
+        "TXT 图标排版与明暗主题下的表面色",
+        "提示词图标悬停和键盘焦点反馈"
+      ],
+      "doesNotOwn": [
+        "缩略图尺寸与编号角标（CreationPanelAssets）",
+        "提示词数据与连线语义",
+        "面板几何"
+      ],
+      "publicApi": [
+        "CSS_MODULE:PromptReferenceThumb 的页面局部样式域",
+        "CSS_CLASS:frame",
+        "CSS_CLASS:label",
+        "CSS_CLASS:rule",
+        "CSS_CLASS:ruleShort"
+      ],
+      "test": [
+        "src/workbenches/canvas/panels/creation/CreationPanelViews.test.ts"
+      ],
+      "budget": 50
+    },
+    {
       "module": "src/workbenches/canvas/panels/creation/CreationPanelBase.module.css",
       "owner": "canvas-creation-ui",
       "responsibility": "定义创作面板基础分区、提示词、素材和参数区块布局样式。",
@@ -4641,10 +4692,7 @@
       "publicApi": [
         "CSS_MODULE:CreationPanelPrompt 的页面局部样式域",
         "CSS_CLASS:promptRow",
-        "CSS_CLASS:linked",
-        "CSS_CLASS:linkedRow",
-        "CSS_CLASS:linkedIcon",
-        "CSS_CLASS:linkedMeta"
+        "CSS_CLASS:promptBox"
       ],
       "test": [
         "src/workbenches/canvas/panels/creation/creationStyles.test.ts"
@@ -12495,11 +12543,11 @@
     {
       "module": "src/workbenches/canvas/panels/creation/sourceMenuModel.ts",
       "owner": "canvas-creation-ui",
-      "responsibility": "模型菜单「API · 工作流 · CLI」三个标签的纯数据投影：API 按渠道分组与搜索、工作流分 AI 应用 / 工作流两组并写站点 · 参数数 · 实例副标题、CLI 行状态与能力置灰、网页版锁住，每行带好点了要切成什么（SourcePick）。",
+      "responsibility": "模型菜单「API · 工作流 · CLI」三个标签的纯数据投影：API 按全局模型名扁平去重、工作流分 AI 应用 / 普通条目并写站点 · 参数数 · 实例副标题、CLI 行状态与能力置灰、网页版锁住，每行带好点了要切成什么（SourcePick）和当前标签对应的设置动作。",
       "owns": [
         "标签 / 分组 / 行的数据与计数",
         "每行的切换目标",
-        "API 搜索过滤"
+        "当前标签对应的设置动作"
       ],
       "doesNotOwn": [
         "菜单渲染",
@@ -12508,7 +12556,6 @@
       ],
       "publicApi": [
         "buildSourceMenu",
-        "filterGroups",
         "cliStatusText",
         "cliCapabilityText",
         "cliProtocolOf",
@@ -12517,7 +12564,7 @@
         "SourceMenuGroup",
         "CliPanelSources",
         "CliPanelTool",
-        "SourceFooterAction"
+        "SourceSettingsAction"
       ],
       "test": [
         "src/workbenches/canvas/panels/creation/sourceMenuModel.test.ts"
@@ -12552,11 +12599,11 @@
     {
       "module": "src/workbenches/canvas/panels/creation/SourceModelMenu.tsx",
       "owner": "canvas-creation-ui",
-      "responsibility": "模型菜单（内嵌来源切换）组件：顶部 API · 工作流 · CLI 分段标签，只切标签不改节点、点一行才回调切换；API 搜索、空标签一句话加去设置、CLI 状态点、网页版锁住、末行设置入口、chip 前来源角标。",
+      "responsibility": "模型菜单（内嵌来源切换）组件：顶部 API · 工作流 · CLI 三个来源标签加第四枚跟随当前标签的设置动作，只切标签不改节点、点一行才回调切换；空标签一句话加去设置、CLI 状态点、网页版锁住。",
       "owns": [
         "标签切换的本地状态",
-        "菜单行与末行渲染",
-        "来源角标"
+        "菜单行渲染",
+        "第四枚设置动作"
       ],
       "doesNotOwn": [
         "菜单数据（sourceMenuModel）",
@@ -12566,7 +12613,6 @@
       "publicApi": [
         "SourceModelMenu",
         "SourceModelMenuProps",
-        "SourceBadge",
         "channelIconFor"
       ],
       "test": [
@@ -12577,11 +12623,11 @@
     {
       "module": "src/workbenches/canvas/panels/creation/SourceModelMenu.module.css",
       "owner": "canvas-creation-ui",
-      "responsibility": "模型菜单的分段标签、计数、搜索框、分组、空态与去设置、CLI 状态点、末行与来源角标样式，只用现有视觉令牌，明暗自动跟随。",
+      "responsibility": "模型菜单的四项顶部动作、计数、分组、空态与去设置、CLI 状态点和参数模板样式，只用现有视觉令牌，明暗自动跟随。",
       "owns": [
         "分段标签与计数外观",
         "CLI 状态点与未检测到行",
-        "来源角标与 CLI 参数模板外观"
+        "第四枚设置动作与 CLI 参数模板外观"
       ],
       "doesNotOwn": [
         "ParamPicker 浮层与行样式",
@@ -12593,8 +12639,9 @@
         "CSS_CLASS:tabs",
         "CSS_CLASS:tab",
         "CSS_CLASS:tabOn",
+        "CSS_CLASS:tabList",
+        "CSS_CLASS:settings",
         "CSS_CLASS:count",
-        "CSS_CLASS:search",
         "CSS_CLASS:groups",
         "CSS_CLASS:group",
         "CSS_CLASS:empty",
@@ -12602,9 +12649,6 @@
         "CSS_CLASS:status",
         "CSS_CLASS:dot",
         "CSS_CLASS:rowMissing",
-        "CSS_CLASS:footer",
-        "CSS_CLASS:badge",
-        "CSS_CLASS:trigger",
         "CSS_CLASS:template"
       ],
       "test": [

@@ -1412,7 +1412,8 @@ async function seedIsolatedMockChannel(page) {
     credentialRef: null,
     credentialGroups: [],
     altCredentialRef: null,
-    hasToken: false,
+    /** 离线 mock 不读真实 Key；渠道/选路仍把它视为已就绪，避免夹具在预检前被当成空渠道。 */
+    hasToken: true,
     hasAltToken: false,
     tokenTail: null,
     altTokenTail: null,
@@ -1606,6 +1607,8 @@ async function configureMockChannel(
       await sharedPut(page, 'channels', {
         ...mock,
         enabled: true,
+        hasToken: true,
+        credentialGroups: [],
         models,
         modelCache: models,
         modelMap: {
@@ -7322,20 +7325,6 @@ async function g46(browser) {
   await sleep(700)
   const panel = await genPanel(page)
 
-  // ❿ 上游提示词胶囊（§6.8 第二部分）：文生图模板里提示词 → 生成 本就连着，
-  //     而 `linkedPromptCount` 此前恒为 0 ⇒ 这个胶囊**从来没出现过**。
-  //     它是「上游提示词不会自动带进下游」这件事唯一的界面说明。
-  const linkedText = await page
-    .locator('[data-panel-linked-prompt]')
-    .innerText()
-    .catch(() => '')
-  rec(
-    g,
-    '生成节点面板显示“提示词 / 已链接”状态',
-    linkedText.includes('提示词') && linkedText.includes('已链接'),
-    linkedText,
-  )
-
   // ① 上拉浮层（§3.3 / §6.8）
   /**
    * 用户 2026-09-27：「生图节点的平台选中都不需要了」。
@@ -7784,6 +7773,22 @@ async function g46(browser) {
     hasVideo,
     hasVideo ? 'video 元素已出现' : '未出现 video 元素',
   )
+
+  // ❿ 上游提示词图标（§6.8 / #1136）：文生图模板里提示词 → 生成 本就连着，
+  //     它现在与上游图片同列，显示为 TXT 素材块；点击后切到该提示词节点的面板。
+  await page.locator('[data-node-type="generation"]').first().click()
+  await sleep(250)
+  const promptThumb = page.locator('[data-panel-prompt-thumb]').first()
+  const promptThumbText = await promptThumb.innerText().catch(() => '')
+  rec(
+    g,
+    '生成节点素材条显示上游提示词 TXT 图标',
+    (await page.locator('[data-panel-prompt-thumb]').count()) === 1 && promptThumbText.includes('TXT'),
+    promptThumbText,
+  )
+  await promptThumb.click()
+  await page.locator('[data-panel-prompt-count]').waitFor({ timeout: 10_000 })
+  rec(g, '点击提示词图标切到提示词节点面板', (await page.locator('[data-panel-prompt-count]').count()) === 1)
 
   rec(g, '无未捕获异常', pageErrors.length === 0, pageErrors[0] ?? '')
   await ctx.close()

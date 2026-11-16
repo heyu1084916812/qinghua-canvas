@@ -17,6 +17,33 @@ import pkg from './package.json' with { type: 'json' }
 export default defineConfig({
   define: { __APP_VERSION__: JSON.stringify(pkg.version) },
   plugins: [react()],
+  optimizeDeps: {
+    /**
+     * 只让开发优化器扫描真正的页面入口。
+     *
+     * 默认扫描会把 `src-tauri/target` 里的 Tauri codegen HTML、临时 Chrome profile
+     * 和测试夹具全部当成入口；本机这些目录一多，Vite 会在依赖预构建阶段持续高 CPU，
+     * 1420 端口虽然监听但不响应。这里显式收口，不改变生产构建。
+     */
+    entries: ['index.html', 'dev/**/*.html'],
+    /** 依赖按首屏真实请求即时优化，避免把测试夹具 / 生成物当入口预扫。 */
+    noDiscovery: true,
+    include: [
+      'react',
+      'react-dom/client',
+      'react-router-dom',
+      '@xyflow/react',
+      'dexie',
+      'lucide-react',
+      'zustand',
+      '@tauri-apps/api',
+      '@tauri-apps/plugin-dialog',
+      '@tauri-apps/plugin-fs',
+      '@tauri-apps/plugin-notification',
+      '@tauri-apps/plugin-opener',
+      'pdfjs-dist',
+    ],
+  },
   server: {
     host: '127.0.0.1',
     port: 1420,

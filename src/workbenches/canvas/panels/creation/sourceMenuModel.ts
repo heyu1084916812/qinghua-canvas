@@ -48,7 +48,7 @@ export interface SourceMenuGroup {
   rows: SourceMenuRow[]
 }
 
-export type SourceFooterAction = 'channels' | 'workflows' | 'cli'
+export type SourceSettingsAction = 'channels' | 'workflows' | 'cli'
 
 export interface SourceMenuTab {
   source: GenerationSource
@@ -58,7 +58,7 @@ export interface SourceMenuTab {
   locked?: string
   groups: SourceMenuGroup[]
   empty: string
-  footer: { label: string; action: SourceFooterAction }
+  settings: { label: string; action: SourceSettingsAction }
 }
 
 export interface ApiModelOption {
@@ -124,7 +124,7 @@ function apiTab(input: SourceMenuInput): SourceMenuTab {
       ...(missing.length ? [{ label: '未配置', rows: missing }] : []),
     ],
     empty: '还没有可用的 API 模型：先去渠道设置里配好 Key 并勾选模型。',
-    footer: { label: '渠道设置…', action: 'channels' },
+    settings: { label: '渠道设置', action: 'channels' },
   }
 }
 
@@ -154,10 +154,10 @@ function workflowTab(input: SourceMenuInput): SourceMenuTab {
     count: apps.length + flows.length,
     groups: [
       ...(apps.length ? [{ label: 'AI 应用', rows: apps }] : []),
-      ...(flows.length ? [{ label: '工作流', rows: flows }] : []),
+      ...(flows.length ? [{ label: '', rows: flows }] : []),
     ],
     empty: '还没有导入 AI 应用或工作流：去管理页贴一个 RunningHub 链接就能导入。',
-    footer: { label: '管理 AI 应用 / 工作流…', action: 'workflows' },
+    settings: { label: '工作流设置', action: 'workflows' },
   }
 }
 
@@ -183,22 +183,10 @@ function cliTab(input: SourceMenuInput): SourceMenuTab {
     ...(cli?.desktop ? {} : { locked: '本机 CLI 需要桌面版：网页版没有起本机命令的能力' }),
     groups: rows.length ? [{ label: '', rows }] : [],
     empty: '还没有本机 CLI 工具：去本机 CLI 设置里装好并登录。',
-    footer: { label: '本机 CLI 设置…', action: 'cli' },
+    settings: { label: 'CLI 设置', action: 'cli' },
   }
 }
 
 export function buildSourceMenu(input: SourceMenuInput): SourceMenuTab[] {
   return [apiTab(input), workflowTab(input), cliTab(input)]
-}
-
-/** API 标签的搜索：按模型名包含，忽略大小写；空查询原样返回 */
-export function filterGroups(groups: readonly SourceMenuGroup[], query: string): SourceMenuGroup[] {
-  const needle = query.trim().toLowerCase()
-  if (!needle) return [...groups]
-  return groups
-    .map((group) => ({
-      ...group,
-      rows: group.rows.filter((row) => row.label.toLowerCase().includes(needle)),
-    }))
-    .filter((group) => group.rows.length > 0)
 }

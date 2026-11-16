@@ -1,13 +1,14 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
+import { AssetPlatformProvider } from '../../features/shared/assets/AssetPlatformContext'
 import { ChannelStoreContext } from '../../app/providers/ChannelStoreProvider'
-import { SkillStoreContext } from '../../app/providers/SkillStoreProvider'
+import { SkillStoreContext } from '../../app/providers/SkillStoreContext'
 import { createMemoryPlatform } from '../../platform/memory'
 import { createChannelStore } from '../../state/channel/channelStore'
 import { generationSpec } from '../../domain/canvas/nodeSpecs/generation'
 import { workflowEntriesRowId, type WorkflowEntry } from '../../domain/project/workflowParams'
 import { CreationPanel } from '../../workbenches/canvas/panels/CreationPanel'
-import type { PanelModel } from '../../workbenches/canvas/panels/panelModel'
+import { promptReferenceThumb, type PanelModel } from '../../workbenches/canvas/panels/panelModel'
 import type { WorkflowPanelSources } from '../../workbenches/canvas/panels/creation/workflowPanelSources'
 import '../../ui/tokens.css'
 import '../../ui/base.css'
@@ -106,11 +107,17 @@ const emptySkills = {
 }
 
 const panelModel: PanelModel = {
-  thumbs: [],
+  thumbs: [
+    promptReferenceThumb({
+      id: 'prompt-demo',
+      text: '把这段视频提升到 4K，并补到 60 帧',
+      edgeId: 'edge-demo',
+      visible: true,
+    }),
+  ],
   collections: [],
   emptyHint: '连线上游节点，或拖入素材',
   prompt: '把这段视频提升到 4K，并补到 60 帧',
-  linkedPromptCount: 0,
   promptToggle: null,
   mentionCandidates: [],
   preset: null,
@@ -153,28 +160,30 @@ async function boot() {
   const container = document.getElementById('root')!
   createRoot(container).render(
     <StrictMode>
-      <ChannelStoreContext.Provider value={channels}>
-        <SkillStoreContext.Provider value={emptySkills}>
-          <div className="demo-stage">
-            <div className="demo-col">
-              <h2 className="demo-caption">创作面板 · 工作流模式（真实组件）</h2>
-              <div className="demo-panel">
-                <CreationPanel
-                  data={workflowData}
-                  model={panelModel}
-                  running={false}
-                  globalRunning={false}
-                  error={null}
-                  onEvent={() => {}}
-                  onClose={() => {}}
-                  showCategoryToggle
-                  workflowSources={workflowSources}
-                />
+      <AssetPlatformProvider platform={platform}>
+        <ChannelStoreContext.Provider value={channels}>
+          <SkillStoreContext.Provider value={emptySkills}>
+            <div className="demo-stage">
+              <div className="demo-col">
+                <h2 className="demo-caption">创作面板 · 工作流模式（真实组件）</h2>
+                <div className="demo-panel">
+                  <CreationPanel
+                    data={workflowData}
+                    model={panelModel}
+                    running={false}
+                    globalRunning={false}
+                    error={null}
+                    onEvent={() => {}}
+                    onClose={() => {}}
+                    showCategoryToggle
+                    workflowSources={workflowSources}
+                  />
+                </div>
               </div>
             </div>
-          </div>
-        </SkillStoreContext.Provider>
-      </ChannelStoreContext.Provider>
+          </SkillStoreContext.Provider>
+        </ChannelStoreContext.Provider>
+      </AssetPlatformProvider>
     </StrictMode>,
   )
 }

@@ -1,8 +1,10 @@
 import { createElement, type MutableRefObject } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
+import { AssetPlatformProvider } from '../../../../features/shared/assets/AssetPlatformContext'
+import { createMemoryPlatform } from '../../../../platform/memory'
 import type { MentionEditorHandle } from '../../text/MentionEditor'
-import type { PanelModel } from '../panelModel'
+import { promptReferenceThumb, type PanelModel } from '../panelModel'
 import { CreationAssetsView } from './CreationAssetsView'
 import { CreationParameterControls } from './CreationParameterControls'
 import { CreationPromptView } from './CreationPromptView'
@@ -14,7 +16,6 @@ const model: PanelModel = {
   collections: [],
   emptyHint: '连线上游节点，或拖入素材',
   prompt: '',
-  linkedPromptCount: 0,
   promptToggle: null,
   selectedSkillId: null,
   mentionCandidates: [],
@@ -22,6 +23,7 @@ const model: PanelModel = {
   presetOptions: {},
   emotion: null,
 }
+const platform = createMemoryPlatform()
 
 describe('CreationPanel 视图拆分', () => {
   it('素材视图直接返回原 section，并保持图片/视频按钮顺序', () => {
@@ -39,6 +41,7 @@ describe('CreationPanel 视图拆分', () => {
         onToggleCollection: () => {},
         onToggleThumb: () => {},
         onRemoveThumb: () => {},
+        onFocusThumb: () => {},
         onModeChange: () => {},
       }),
     )
@@ -53,6 +56,43 @@ describe('CreationPanel 视图拆分', () => {
     )
   })
 
+  it('上游提示词在素材条里渲染为 TXT 图标，而不是另一行提示词状态', () => {
+    const html = renderToStaticMarkup(
+      createElement(
+        AssetPlatformProvider,
+        { platform },
+        createElement(CreationAssetsView, {
+          assetsEmpty: false,
+          emptyHint: model.emptyHint,
+          collections: [],
+          thumbs: [
+            promptReferenceThumb({
+              id: 'prompt-1',
+              text: '一只猫',
+              edgeId: 'edge-1',
+              visible: true,
+            }),
+          ],
+          dragIndex: null,
+          mode: 'image',
+          showCategoryToggle: true,
+          onDragStart: () => {},
+          onDrop: () => {},
+          onToggleCollection: () => {},
+          onToggleThumb: () => {},
+          onRemoveThumb: () => {},
+          onFocusThumb: () => {},
+          onModeChange: () => {},
+        }),
+      ),
+    )
+
+    expect(html).toContain('data-panel-prompt-thumb="prompt-1"')
+    expect(html).toContain('TXT')
+    expect(html).toContain('aria-label="打开上游提示词：一只猫"')
+    expect(html).not.toContain('data-panel-linked-prompt')
+  })
+
   it('提示词视图保留编辑器锚点、字数和原始 section 层级', () => {
     const promptBoxRef: MutableRefObject<HTMLDivElement | null> = { current: null }
     const promptEditorRef: MutableRefObject<MentionEditorHandle | null> = {
@@ -62,7 +102,6 @@ describe('CreationPanel 视图拆分', () => {
       createElement(CreationPromptView, {
         promptExpanded: false,
         promptOverflow: false,
-        linkedPromptCount: 0,
         promptBoxRef,
         promptEditorRef,
         promptValue: '',
@@ -97,6 +136,7 @@ describe('CreationPanel 视图拆分', () => {
     expect(html).toContain('role="textbox"')
     expect(html).toContain('data-panel-prompt-count')
     expect(html).toContain('0 字')
+    expect(html).not.toContain('data-panel-linked-prompt')
   })
 
   it('参数控件不增加包裹层，模型 chip 位于参数 section 首位', () => {

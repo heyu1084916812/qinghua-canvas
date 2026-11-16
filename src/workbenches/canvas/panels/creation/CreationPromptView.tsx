@@ -5,11 +5,7 @@ import {
   type MentionRef,
 } from '../../text/MentionEditor'
 import type { MentionCandidate } from '../../text/mentionValue'
-import {
-  IconChevronDown,
-  IconChevronUp,
-  IconPrompt,
-} from '../../toolbar/icons'
+import { IconChevronDown, IconChevronUp } from '../../toolbar/icons'
 import { MentionThumb, MentionThumbProbe } from './CreationAssetViews'
 import { creationStyles as styles } from './creationStyles'
 
@@ -26,7 +22,6 @@ interface PromptToggle {
 interface CreationPromptViewProps {
   promptExpanded: boolean
   promptOverflow: boolean
-  linkedPromptCount: number
   promptBoxRef: MutableRefObject<HTMLDivElement | null>
   promptEditorRef: MutableRefObject<MentionEditorHandle | null>
   promptValue: string
@@ -56,7 +51,6 @@ interface CreationPromptViewProps {
 export function CreationPromptView({
   promptExpanded,
   promptOverflow,
-  linkedPromptCount,
   promptBoxRef,
   promptEditorRef,
   promptValue,
@@ -89,19 +83,6 @@ export function CreationPromptView({
       data-panel-prompt-comfort="fixed"
     >
       <div className={styles.promptRow}>
-        {linkedPromptCount > 0 && (
-          <div className={styles.promptHead}>
-            <span className={styles.linkedRow} data-panel-linked-prompt>
-              <span className={styles.linked}>
-                <span className={styles.linkedIcon} aria-hidden="true">
-                  <IconPrompt size={14} />
-                </span>
-                <span>提示词</span>
-              </span>
-              <span className={styles.linkedMeta}>已链接 {linkedPromptCount} 个</span>
-            </span>
-          </div>
-        )}
         <div
           className={`${styles.promptBox} ${styles.promptBoxComfort}`}
           ref={promptBoxRef}

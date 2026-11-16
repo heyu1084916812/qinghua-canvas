@@ -1,6 +1,6 @@
 /*
  * 模型菜单（内嵌来源切换，对账 #1133）。行 / 分组标题 / 勾 复用 ParamPicker.module.css，
- * 这里只有：顶部分段标签、搜索框、CLI 状态点、末行设置入口、空态、chip 前的来源角标。
+ * 这里只有：顶部分段标签、第四枚设置动作、CLI 状态点、空态。
  * 尺寸都是面板内部单位（创作面板整体 zoom 0.75），与 ParamPicker 同一套口径。
  */
 .menu {
@@ -17,11 +17,15 @@
   top: -14px;
   z-index: 1;
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 3px;
   padding: 3px;
   border-radius: var(--radius-control);
   background: var(--bg-subtle);
+}
+
+.tabList {
+  display: contents;
 }
 
 .tab {
@@ -38,6 +42,10 @@
   font-size: var(--picker-option-fs, 16px);
   font-weight: 500;
   cursor: pointer;
+}
+
+.settings {
+  gap: 4px;
 }
 
 .tab:hover:not(:disabled) {
@@ -63,28 +71,6 @@
 .count {
   color: var(--text-3);
   font-weight: 500;
-}
-
-.search {
-  box-sizing: border-box;
-  width: 100%;
-  height: 40px;
-  padding: 0 12px;
-  border: 1px solid var(--stroke);
-  border-radius: var(--radius-control);
-  background: var(--bg-surface);
-  color: var(--text-1);
-  font-family: var(--font-sans);
-  font-size: var(--picker-option-fs, 16px);
-}
-
-.search::placeholder {
-  color: var(--text-3);
-}
-
-.search:focus-visible {
-  outline: none;
-  border-color: var(--text-2);
 }
 
 .groups {
@@ -133,13 +119,6 @@
   color: var(--text-2);
 }
 
-.footer {
-  border-top: 1px solid var(--stroke);
-  border-radius: 0;
-  margin-top: 2px;
-  justify-content: flex-start;
-}
-
 .empty {
   display: flex;
   flex-direction: column;
@@ -167,33 +146,6 @@
 
 .emptyGo:hover {
   background: var(--bg-hover);
-}
-
-/* chip 前的来源角标（API / 工作流 / CLI）：小号反色胶囊 */
-.trigger {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
-}
-
-.badge {
-  display: inline-flex;
-  align-items: center;
-  height: 20px;
-  padding: 0 6px;
-  border-radius: 5px;
-  background: var(--control-inverse-bg);
-  color: var(--control-inverse-text);
-  font-family: var(--font-sans);
-  font-size: 12px;
-  font-weight: 600;
-  line-height: 1;
-  white-space: nowrap;
-}
-
-.badge[data-source-badge='workflow'] {
-  background: var(--success);
-  color: var(--accent-text);
 }
 
 /* CLI 参数模板（只读）：等宽、可换行，长模板不撑宽浮层 */

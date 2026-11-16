@@ -7,7 +7,7 @@ import { openGlobalSettings } from '../../../../state/ui/globalSettings'
 import type { PanelEvent, RecipeSnapshot } from '../panelModel'
 import { creationSourceState } from './creationSourceState'
 import { channelIconFor, SourceModelMenu } from './SourceModelMenu'
-import { buildSourceMenu, cliProtocolOf, type SourceFooterAction, type SourceMenuRow } from './sourceMenuModel'
+import { buildSourceMenu, cliProtocolOf, type SourceSettingsAction, type SourceMenuRow } from './sourceMenuModel'
 import { useCliPanelSources } from './useCliPanelSources'
 import { useOpenWorkflowsPage } from './useOpenWorkflowsPage'
 import { findWorkflowSourceRow, runninghubSiteOf, workflowSourceRows, type WorkflowPanelSources } from './workflowPanelSources'
@@ -96,7 +96,7 @@ export function useCreationSourceMenu(input: CreationSourceMenuInput) {
   }
   const current = state.source === 'workflow' ? findWorkflowSourceRow(workflowSources, data.model, data.channelId) : null
   /** 「管理…」落在当前条目上（#1131 口径）；不在工作流来源时打开管理页首页 */
-  const footer = (action: SourceFooterAction) => {
+  const openSettings = (action: SourceSettingsAction) => {
     if (action === 'channels') onEvent({ type: 'openSettings' })
     else if (action === 'workflows')
       openWorkflows(current ? { channelId: current.channelId, tab: current.entry.kind === 'app' ? 'app' : 'workflow', entryId: current.entry.id } : {})
@@ -128,7 +128,7 @@ export function useCreationSourceMenu(input: CreationSourceMenuInput) {
       onToggle={() => input.onTogglePicker('model')}
       onClose={input.onClosePicker}
       onPick={pick}
-      onFooter={footer}
+      onSettings={openSettings}
       disabled={input.disabled}
     />
   ) : null

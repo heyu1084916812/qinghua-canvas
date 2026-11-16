@@ -35,7 +35,8 @@ body {
   border: var(--border);
   border-radius: var(--radius-control);
   background: var(--bg-surface);
-  overflow: hidden;
+  /* 参数浮层会向上探出面板；演示页必须放行，否则按钮看得见但点不到。 */
+  overflow: visible;
 }
 
 /* 面板自带的外层定位（画布上的绝对定位与阴影）在演示里不需要 */

@@ -11,7 +11,7 @@ import type { WorkflowPanelSources } from './workflowPanelSources'
 
 ;(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
-/** 创作面板 → 「AI 应用 / 工作流」页的入口（#1131）：模型菜单「工作流」标签末行「管理…」（#1133 起入口 chip 并入菜单） */
+/** 创作面板 → 「AI 应用 / 工作流」页的入口（#1131 / #1134）：第四枚设置动作跟随「工作流」标签 */
 const ENTRY: WorkflowEntry = {
   id: '1997246493079834625',
   title: '视频超分与补帧',
@@ -82,17 +82,17 @@ function manage(data: GenerationData) {
   })
   const menu = renderer.root.findByType(SourceModelMenu)
   const tab = menu.props.tabs.find((item: { source: string }) => item.source === 'workflow')
-  expect(tab.footer).toEqual({ label: '管理 AI 应用 / 工作流…', action: 'workflows' })
-  act(() => menu.props.onFooter('workflows'))
+  expect(tab.settings).toEqual({ label: '工作流设置', action: 'workflows' })
+  act(() => menu.props.onSettings('workflows'))
   return seen
 }
 
-describe('创作面板里的「管理 AI 应用 / 工作流…」（#1131 / #1133）', () => {
-  it('★ 工作流来源：菜单末行 → 跳到管理页并落在当前条目', () => {
+describe('创作面板里的「工作流设置」（#1131 / #1134）', () => {
+  it('★ 工作流来源：第四枚设置动作 → 跳到管理页并落在当前条目', () => {
     const data = { ...generationSpec.createDefaultData(), model: `workflow:${ENTRY.id}`, channelId: 'ch-rh' }
     expect(manage(data)).toBe(`/workflows?channel=ch-rh&tab=workflow&entry=${ENTRY.id}`)
   })
-  it('★ API 来源：菜单「工作流」标签末行 → 跳到管理页首页', () => {
+  it('★ API 来源：切到「工作流」标签后使用工作流设置 → 跳到管理页首页', () => {
     const data = { ...generationSpec.createDefaultData(), model: 'GPT Image 2', channelId: 'ch-x' }
     expect(manage(data)).toBe('/workflows')
   })

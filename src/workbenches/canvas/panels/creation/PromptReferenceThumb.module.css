@@ -1,0 +1,39 @@
+/* 上游提示词在素材条里的 TXT 块；几何由 CreationPanelAssets 的 .thumbFrame 提供。 */
+.frame {
+  padding: 7px 9px;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: flex-start;
+  gap: 4px;
+  background: var(--bg-subtle);
+  color: var(--text-1);
+  font-family: var(--font-sans);
+  cursor: pointer;
+}
+
+.frame:hover {
+  background: var(--bg-hover);
+}
+
+.frame:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -3px;
+}
+
+.label {
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.rule {
+  width: 100%;
+  height: 2px;
+  border-radius: 999px;
+  background: currentColor;
+  opacity: 0.62;
+}
+
+.ruleShort {
+  width: 70%;
+}

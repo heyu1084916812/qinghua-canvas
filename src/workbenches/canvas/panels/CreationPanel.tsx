@@ -12,7 +12,7 @@ import type { GenerationData } from '../../../domain/canvas/model/node'
 import type { RecipeSnapshot } from './panelModel'
 import { moveInOrder } from './panelModel'
 import { useChannels } from '../../../app/providers/ChannelStoreProvider'
-import { useSkills } from '../../../app/providers/SkillStoreProvider'
+import { useSkills } from '../../../app/providers/SkillStoreContext'
 import {
   mentionToken,
   parseMentions,
@@ -869,13 +869,13 @@ export function CreationPanel(props: CreationPanelProps) {
         onToggleCollection={(id) => onEvent({ type: 'toggleCollection', id })}
         onToggleThumb={(owner, id) => onEvent({ type: 'toggleThumb', owner, id })}
         onRemoveThumb={(owner, id) => onEvent({ type: 'removeThumb', owner, id })}
+        onFocusThumb={(id) => onEvent({ type: 'focusNode', id })}
         onModeChange={changeMode}
       />
 
       <CreationPromptView
         promptExpanded={promptExpanded}
         promptOverflow={promptOverflow}
-        linkedPromptCount={model.linkedPromptCount}
         promptBoxRef={promptBoxRef}
         promptEditorRef={promptEditorRef}
         promptValue={promptValue}

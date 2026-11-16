@@ -20,6 +20,8 @@ export interface PanelThumb {
   id: string
   /** 预览用素材 hash；提示词项没有 hash */
   assetHash?: string
+  /** 提示词引用用与图片同一套缩略图几何，但画 TXT 图示而不是正文摘要 */
+  kind?: 'media' | 'prompt'
   /** 提示词项：显示文本摘要而非图片 */
   text?: string
   /** 是否参与本次生成（小眼睛状态） */
@@ -45,6 +47,24 @@ export interface PanelThumb {
   edgeId?: string
 }
 
+/** 上游提示词转成素材条里的一枚引用图标；编号 / 小眼睛 / 删除连线复用图片缩略图。 */
+export function promptReferenceThumb(input: {
+  id: string
+  text: string
+  edgeId?: string
+  visible: boolean
+}): PanelThumb {
+  return {
+    owner: 'upstream',
+    id: input.id,
+    kind: 'prompt',
+    text: input.text,
+    visible: input.visible,
+    removable: true,
+    edgeId: input.edgeId,
+  }
+}
+
 export interface PanelModel {
   /** 第一部分：缩略图（按展示顺序） */
   thumbs: PanelThumb[]
@@ -58,8 +78,6 @@ export interface PanelModel {
   emptyHint: string
   /** 第二部分：面板输入文本（提示词节点读 `draft`，其他节点读 `prompt`） */
   prompt: string
-  /** 提示词下方的上游提示词胶囊（§6.7「上游已链接提示词节点 {n}」） */
-  linkedPromptCount: number
   /** 提示词容器右侧的小眼睛（§6.11「组内若有提示词节点…提供小眼睛」） */
   promptToggle: { visible: boolean; title: string } | null
   /**
@@ -193,6 +211,8 @@ export type PanelEvent =
   | { type: 'removeThumb'; owner: PanelThumb['owner']; id: string }
   | { type: 'toggleCollection'; id: string }
   | { type: 'togglePrompt' }
+  /** 点击上游提示词图标：选中该节点，面板随之切到它的提示词编辑视图。 */
+  | { type: 'focusNode'; id: string }
   | { type: 'reorderThumbs'; owner: PanelThumb['owner']; order: string[] }
   | { type: 'optimize' }
   | { type: 'translate' }

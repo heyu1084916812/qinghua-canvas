@@ -1,0 +1,254 @@
+[
+  {
+    "variant": {
+      "name": "1440x900-light",
+      "width": 1440,
+      "height": 900,
+      "theme": "light"
+    },
+    "pageErrors": [],
+    "workflow": {
+      "theme": "light",
+      "tabs": 3,
+      "tabLabels": [
+        "API6",
+        "工作流1",
+        "CLI"
+      ],
+      "search": 0,
+      "footer": "管理 AI 应用 / 工作流…",
+      "sourceBadges": 1,
+      "workflowGroup": true,
+      "menuRect": {
+        "x": 318.109375,
+        "y": 124.875,
+        "width": 285,
+        "height": 146.625
+      },
+      "chipRect": {
+        "x": 373,
+        "y": 287.5,
+        "width": 175.21875,
+        "height": 34.5
+      },
+      "menuOverflow": false,
+      "bodyOverflow": false
+    },
+    "api": {
+      "theme": "light",
+      "tabs": 3,
+      "tabLabels": [
+        "API6",
+        "工作流1",
+        "CLI"
+      ],
+      "search": 1,
+      "footer": "渠道设置…",
+      "sourceBadges": 1,
+      "workflowGroup": false,
+      "menuRect": {
+        "x": 318.109375,
+        "y": 25.25,
+        "width": 285,
+        "height": 420.75
+      },
+      "chipRect": {
+        "x": 373,
+        "y": 287.5,
+        "width": 175.21875,
+        "height": 34.5
+      },
+      "menuOverflow": false,
+      "bodyOverflow": false
+    }
+  },
+  {
+    "variant": {
+      "name": "1440x900-dark",
+      "width": 1440,
+      "height": 900,
+      "theme": "dark"
+    },
+    "pageErrors": [],
+    "workflow": {
+      "theme": "dark",
+      "tabs": 3,
+      "tabLabels": [
+        "API6",
+        "工作流1",
+        "CLI"
+      ],
+      "search": 0,
+      "footer": "管理 AI 应用 / 工作流…",
+      "sourceBadges": 1,
+      "workflowGroup": true,
+      "menuRect": {
+        "x": 318.109375,
+        "y": 124.875,
+        "width": 285,
+        "height": 146.625
+      },
+      "chipRect": {
+        "x": 373,
+        "y": 287.5,
+        "width": 175.21875,
+        "height": 34.5
+      },
+      "menuOverflow": false,
+      "bodyOverflow": false
+    },
+    "api": {
+      "theme": "dark",
+      "tabs": 3,
+      "tabLabels": [
+        "API6",
+        "工作流1",
+        "CLI"
+      ],
+      "search": 1,
+      "footer": "渠道设置…",
+      "sourceBadges": 1,
+      "workflowGroup": false,
+      "menuRect": {
+        "x": 318.109375,
+        "y": 25.25,
+        "width": 285,
+        "height": 420.75
+      },
+      "chipRect": {
+        "x": 373,
+        "y": 287.5,
+        "width": 175.21875,
+        "height": 34.5
+      },
+      "menuOverflow": false,
+      "bodyOverflow": false
+    }
+  },
+  {
+    "variant": {
+      "name": "1024x700-light",
+      "width": 1024,
+      "height": 700,
+      "theme": "light"
+    },
+    "pageErrors": [],
+    "workflow": {
+      "theme": "light",
+      "tabs": 3,
+      "tabLabels": [
+        "API6",
+        "工作流1",
+        "CLI"
+      ],
+      "search": 0,
+      "footer": "管理 AI 应用 / 工作流…",
+      "sourceBadges": 1,
+      "workflowGroup": true,
+      "menuRect": {
+        "x": 110.109375,
+        "y": 124.875,
+        "width": 285,
+        "height": 146.625
+      },
+      "chipRect": {
+        "x": 165,
+        "y": 287.5,
+        "width": 175.21875,
+        "height": 34.5
+      },
+      "menuOverflow": false,
+      "bodyOverflow": false
+    },
+    "api": {
+      "theme": "light",
+      "tabs": 3,
+      "tabLabels": [
+        "API6",
+        "工作流1",
+        "CLI"
+      ],
+      "search": 1,
+      "footer": "渠道设置…",
+      "sourceBadges": 1,
+      "workflowGroup": false,
+      "menuRect": {
+        "x": 110.109375,
+        "y": 25.25,
+        "width": 285,
+        "height": 420.75
+      },
+      "chipRect": {
+        "x": 165,
+        "y": 287.5,
+        "width": 175.21875,
+        "height": 34.5
+      },
+      "menuOverflow": false,
+      "bodyOverflow": false
+    }
+  },
+  {
+    "variant": {
+      "name": "1024x700-dark",
+      "width": 1024,
+      "height": 700,
+      "theme": "dark"
+    },
+    "pageErrors": [],
+    "workflow": {
+      "theme": "dark",
+      "tabs": 3,
+      "tabLabels": [
+        "API6",
+        "工作流1",
+        "CLI"
+      ],
+      "search": 0,
+      "footer": "管理 AI 应用 / 工作流…",
+      "sourceBadges": 1,
+      "workflowGroup": true,
+      "menuRect": {
+        "x": 110.109375,
+        "y": 124.875,
+        "width": 285,
+        "height": 146.625
+      },
+      "chipRect": {
+        "x": 165,
+        "y": 287.5,
+        "width": 175.21875,
+        "height": 34.5
+      },
+      "menuOverflow": false,
+      "bodyOverflow": false
+    },
+    "api": {
+      "theme": "dark",
+      "tabs": 3,
+      "tabLabels": [
+        "API6",
+        "工作流1",
+        "CLI"
+      ],
+      "search": 1,
+      "footer": "渠道设置…",
+      "sourceBadges": 1,
+      "workflowGroup": false,
+      "menuRect": {
+        "x": 110.109375,
+        "y": 25.25,
+        "width": 285,
+        "height": 420.75
+      },
+      "chipRect": {
+        "x": 165,
+        "y": 287.5,
+        "width": 175.21875,
+        "height": 34.5
+      },
+      "menuOverflow": false,
+      "bodyOverflow": false
+    }
+  }
+]

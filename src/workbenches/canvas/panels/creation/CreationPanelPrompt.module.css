@@ -10,52 +10,6 @@
   gap: var(--space-2);
 }
 
-.linked {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.2em;
-  height: 1.72em;
-  box-sizing: border-box;
-  padding: 0 3px;
-  border: 1px solid var(--stroke);
-  border-radius: 6px;
-  background: transparent;
-  color: var(--text-1);
-  font-size: inherit;
-  line-height: 1;
-  white-space: nowrap;
-}
-
-.linkedRow {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35em;
-  min-width: 0;
-  color: var(--text-2);
-}
-
-.linkedIcon {
-  display: inline-flex;
-  flex: none;
-  align-items: center;
-  color: var(--text-2);
-}
-
-.linkedIcon svg {
-  width: 0.95em;
-  height: 0.95em;
-}
-
-.linkedMeta {
-  min-width: 0;
-  overflow: hidden;
-  color: var(--text-3);
-  font-size: var(--fs-chip);
-  font-weight: var(--fw-chip);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 .prompt {
   --prompt-scrollbar-size: 6px;
   width: 100%;
@@ -117,18 +71,6 @@
 }
 
 /* ── 提示词框：`@` 引用（用户 2026-10-05 第 15 条） ── */
-/*
- * 提示词行那一行的头：左「上游已链接提示词节点」、右 `@`。
- * 没有头那一行时整块不渲染（空行会在面板里多出 20 多像素的空白）。
- */
-.promptHead {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-2);
-  min-height: 22px;
-}
-
 /* 提示词框本体：预设 chip 与正文都在里面（chip 不再单独占一行） */
 .promptBox {
   position: relative;

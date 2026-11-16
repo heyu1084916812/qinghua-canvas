@@ -3,9 +3,6 @@ import type { PanelModel } from '../panelModel'
 import { CATEGORY_OPTIONS } from './creationCatalog'
 import { creationStyles as styles } from './creationStyles'
 import { CollectionCard, Thumb } from './CreationAssetViews'
-
-type CategoryMode = 'image' | 'video'
-
 interface CreationAssetsViewProps {
   assetsEmpty: boolean
   emptyHint: string
@@ -19,7 +16,8 @@ interface CreationAssetsViewProps {
   onToggleCollection: (id: string) => void
   onToggleThumb: (owner: PanelModel['thumbs'][number]['owner'], id: string) => void
   onRemoveThumb: (owner: PanelModel['thumbs'][number]['owner'], id: string) => void
-  onModeChange: (mode: CategoryMode) => void
+  onFocusThumb: (id: string) => void
+  onModeChange: (mode: 'image' | 'video') => void
 }
 
 export function CreationAssetsView({
@@ -35,6 +33,7 @@ export function CreationAssetsView({
   onToggleCollection,
   onToggleThumb,
   onRemoveThumb,
+  onFocusThumb,
   onModeChange,
 }: CreationAssetsViewProps) {
   return (
@@ -63,6 +62,7 @@ export function CreationAssetsView({
                 onDrop={() => onDrop(index)}
                 onToggle={() => onToggleThumb(thumb.owner, thumb.id)}
                 onRemove={() => onRemoveThumb(thumb.owner, thumb.id)}
+                onFocus={() => onFocusThumb(thumb.id)}
               />
             ))}
           </div>

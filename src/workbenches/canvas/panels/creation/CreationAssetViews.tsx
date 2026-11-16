@@ -4,6 +4,7 @@ import { useAsset } from '../../../../features/shared/assets/index'
 import { IconClose } from '../../toolbar/icons'
 import type { PanelCollection, PanelThumb } from '../panelModel'
 import { creationStyles as styles } from './creationStyles'
+import promptThumbStyles from './PromptReferenceThumb.module.css'
 
 export function MentionThumb({ hash }: { hash: string | undefined }) {
   const url = useAsset(hash)
@@ -38,6 +39,7 @@ export function Thumb({
   onDrop,
   onToggle,
   onRemove,
+  onFocus,
 }: {
   thumb: PanelThumb
   index: number
@@ -46,8 +48,10 @@ export function Thumb({
   onDrop: () => void
   onToggle: () => void
   onRemove: () => void
+  onFocus: () => void
 }) {
   const url = useAsset(thumb.assetHash)
+  const promptTitle = thumb.text?.trim() ? thumb.text : '空提示词'
   return (
     <div
       className={[styles.thumb, dragging ? styles.thumbDragging : '', thumb.visible ? '' : styles.thumbHidden]
@@ -59,15 +63,30 @@ export function Thumb({
       onDrop={onDrop}
       data-panel-thumb={thumb.id}
     >
-      <span className={styles.thumbFrame}>
-        {url ? (
-          <img src={url} alt="" draggable={false} />
-        ) : (
-          <span className={styles.thumbText} title={thumb.text}>
-            {thumb.text?.trim() ? thumb.text : '空提示词'}
-          </span>
-        )}
-      </span>
+      {thumb.kind === 'prompt' ? (
+        <button
+          type="button"
+          className={`${styles.thumbFrame} ${promptThumbStyles.frame}`}
+          data-panel-prompt-thumb={thumb.id}
+          title={promptTitle}
+          aria-label={`打开上游提示词：${promptTitle}`}
+          onClick={onFocus}
+        >
+          <span className={promptThumbStyles.label}>TXT</span>
+          <span className={promptThumbStyles.rule} aria-hidden="true" />
+          <span className={`${promptThumbStyles.rule} ${promptThumbStyles.ruleShort}`} aria-hidden="true" />
+        </button>
+      ) : (
+        <span className={styles.thumbFrame}>
+          {url ? (
+            <img src={url} alt="" draggable={false} />
+          ) : (
+            <span className={styles.thumbText} title={thumb.text}>
+              {thumb.text?.trim() ? thumb.text : '空提示词'}
+            </span>
+          )}
+        </span>
+      )}
       <span className={styles.badge}>{index + 1}</span>
       <button
         type="button"

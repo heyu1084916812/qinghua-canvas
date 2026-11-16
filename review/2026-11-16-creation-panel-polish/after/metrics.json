@@ -1,0 +1,270 @@
+[
+  {
+    "variant": {
+      "name": "1440x900-light",
+      "width": 1440,
+      "height": 900,
+      "theme": "light"
+    },
+    "pageErrors": [],
+    "workflow": {
+      "theme": "light",
+      "tabs": 3,
+      "tabLabels": [
+        "API6",
+        "工作流1",
+        "CLI"
+      ],
+      "headerActions": 4,
+      "search": 0,
+      "settings": "workflows",
+      "settingsLabel": "工作流设置",
+      "sourceBadges": 0,
+      "workflowGroup": false,
+      "menuRect": {
+        "x": 296.46875,
+        "y": 184.875,
+        "width": 285,
+        "height": 86.625
+      },
+      "chipRect": {
+        "x": 373,
+        "y": 287.5,
+        "width": 131.953125,
+        "height": 34.5
+      },
+      "menuOverflow": false,
+      "bodyOverflow": false
+    },
+    "api": {
+      "theme": "light",
+      "tabs": 3,
+      "tabLabels": [
+        "API6",
+        "工作流1",
+        "CLI"
+      ],
+      "headerActions": 4,
+      "search": 0,
+      "settings": "channels",
+      "settingsLabel": "渠道设置",
+      "sourceBadges": 0,
+      "workflowGroup": false,
+      "menuRect": {
+        "x": 296.46875,
+        "y": 25.25,
+        "width": 285,
+        "height": 342.75
+      },
+      "chipRect": {
+        "x": 373,
+        "y": 287.5,
+        "width": 131.953125,
+        "height": 34.5
+      },
+      "menuOverflow": false,
+      "bodyOverflow": false
+    }
+  },
+  {
+    "variant": {
+      "name": "1440x900-dark",
+      "width": 1440,
+      "height": 900,
+      "theme": "dark"
+    },
+    "pageErrors": [],
+    "workflow": {
+      "theme": "dark",
+      "tabs": 3,
+      "tabLabels": [
+        "API6",
+        "工作流1",
+        "CLI"
+      ],
+      "headerActions": 4,
+      "search": 0,
+      "settings": "workflows",
+      "settingsLabel": "工作流设置",
+      "sourceBadges": 0,
+      "workflowGroup": false,
+      "menuRect": {
+        "x": 296.46875,
+        "y": 184.875,
+        "width": 285,
+        "height": 86.625
+      },
+      "chipRect": {
+        "x": 373,
+        "y": 287.5,
+        "width": 131.953125,
+        "height": 34.5
+      },
+      "menuOverflow": false,
+      "bodyOverflow": false
+    },
+    "api": {
+      "theme": "dark",
+      "tabs": 3,
+      "tabLabels": [
+        "API6",
+        "工作流1",
+        "CLI"
+      ],
+      "headerActions": 4,
+      "search": 0,
+      "settings": "channels",
+      "settingsLabel": "渠道设置",
+      "sourceBadges": 0,
+      "workflowGroup": false,
+      "menuRect": {
+        "x": 296.46875,
+        "y": 25.25,
+        "width": 285,
+        "height": 342.75
+      },
+      "chipRect": {
+        "x": 373,
+        "y": 287.5,
+        "width": 131.953125,
+        "height": 34.5
+      },
+      "menuOverflow": false,
+      "bodyOverflow": false
+    }
+  },
+  {
+    "variant": {
+      "name": "1024x700-light",
+      "width": 1024,
+      "height": 700,
+      "theme": "light"
+    },
+    "pageErrors": [],
+    "workflow": {
+      "theme": "light",
+      "tabs": 3,
+      "tabLabels": [
+        "API6",
+        "工作流1",
+        "CLI"
+      ],
+      "headerActions": 4,
+      "search": 0,
+      "settings": "workflows",
+      "settingsLabel": "工作流设置",
+      "sourceBadges": 0,
+      "workflowGroup": false,
+      "menuRect": {
+        "x": 88.46875,
+        "y": 184.875,
+        "width": 285,
+        "height": 86.625
+      },
+      "chipRect": {
+        "x": 165,
+        "y": 287.5,
+        "width": 131.953125,
+        "height": 34.5
+      },
+      "menuOverflow": false,
+      "bodyOverflow": false
+    },
+    "api": {
+      "theme": "light",
+      "tabs": 3,
+      "tabLabels": [
+        "API6",
+        "工作流1",
+        "CLI"
+      ],
+      "headerActions": 4,
+      "search": 0,
+      "settings": "channels",
+      "settingsLabel": "渠道设置",
+      "sourceBadges": 0,
+      "workflowGroup": false,
+      "menuRect": {
+        "x": 88.46875,
+        "y": 25.25,
+        "width": 285,
+        "height": 342.75
+      },
+      "chipRect": {
+        "x": 165,
+        "y": 287.5,
+        "width": 131.953125,
+        "height": 34.5
+      },
+      "menuOverflow": false,
+      "bodyOverflow": false
+    }
+  },
+  {
+    "variant": {
+      "name": "1024x700-dark",
+      "width": 1024,
+      "height": 700,
+      "theme": "dark"
+    },
+    "pageErrors": [],
+    "workflow": {
+      "theme": "dark",
+      "tabs": 3,
+      "tabLabels": [
+        "API6",
+        "工作流1",
+        "CLI"
+      ],
+      "headerActions": 4,
+      "search": 0,
+      "settings": "workflows",
+      "settingsLabel": "工作流设置",
+      "sourceBadges": 0,
+      "workflowGroup": false,
+      "menuRect": {
+        "x": 88.46875,
+        "y": 184.875,
+        "width": 285,
+        "height": 86.625
+      },
+      "chipRect": {
+        "x": 165,
+        "y": 287.5,
+        "width": 131.953125,
+        "height": 34.5
+      },
+      "menuOverflow": false,
+      "bodyOverflow": false
+    },
+    "api": {
+      "theme": "dark",
+      "tabs": 3,
+      "tabLabels": [
+        "API6",
+        "工作流1",
+        "CLI"
+      ],
+      "headerActions": 4,
+      "search": 0,
+      "settings": "channels",
+      "settingsLabel": "渠道设置",
+      "sourceBadges": 0,
+      "workflowGroup": false,
+      "menuRect": {
+        "x": 88.46875,
+        "y": 25.25,
+        "width": 285,
+        "height": 342.75
+      },
+      "chipRect": {
+        "x": 165,
+        "y": 287.5,
+        "width": 131.953125,
+        "height": 34.5
+      },
+      "menuOverflow": false,
+      "bodyOverflow": false
+    }
+  }
+]

@@ -15,7 +15,7 @@ afterAll(() => vi.unstubAllGlobals())
 
 /**
  * 模型菜单交互（对账 #1133）：**只切标签不改节点、点了一行才切**；打开时停在节点当前来源；
- * 网页版 CLI 锁住；空标签一句话 + 去设置；chip 前有来源角标。
+ * 网页版 CLI 锁住；空标签一句话 + 去设置；第四枚设置动作跟随当前标签。
  */
 const rect = { top: 0, left: 0, right: 0, bottom: 0, width: 0, height: 0, x: 0, y: 0 }
 const fakeNode = () => ({
@@ -45,7 +45,7 @@ function tabs(desktop = true, empty = false) {
 
 function mount(over: Partial<SourceModelMenuProps> = {}) {
   const onPick = vi.fn()
-  const onFooter = vi.fn()
+  const onSettings = vi.fn()
   const onClose = vi.fn()
   const props: SourceModelMenuProps = {
     tabs: tabs(),
@@ -57,7 +57,7 @@ function mount(over: Partial<SourceModelMenuProps> = {}) {
     onToggle: () => {},
     onClose,
     onPick,
-    onFooter,
+    onSettings,
     ...over,
   }
   let renderer!: TestRenderer.ReactTestRenderer
@@ -66,7 +66,7 @@ function mount(over: Partial<SourceModelMenuProps> = {}) {
   })
   const find = (attr: string, value?: string) =>
     renderer.root.findAll((node) => typeof node.type === 'string' && node.props[attr] !== undefined && (value === undefined || node.props[attr] === value))
-  return { renderer, find, onPick, onFooter, onClose }
+  return { renderer, find, onPick, onSettings, onClose }
 }
 
 describe('模型菜单（内嵌来源切换）', () => {
@@ -88,10 +88,17 @@ describe('模型菜单（内嵌来源切换）', () => {
     expect(onClose).toHaveBeenCalled()
   })
 
-  it('API 标签有搜索；没匹配时说一句', () => {
-    const { find } = mount()
-    act(() => find('data-source-search')[0]!.props.onChange({ target: { value: 'zzz' } }))
-    expect(find('data-source-empty', 'search')).toHaveLength(1)
+  it('没有搜索框；顶部第四枚设置动作跟随当前标签', () => {
+    const { find, onSettings, onClose } = mount()
+    expect(find('data-source-search')).toHaveLength(0)
+    expect(find('data-source-settings', 'channels')).toHaveLength(1)
+    act(() => find('data-source-tab', 'workflow')[0]!.props.onClick())
+    expect(find('data-source-settings', 'workflows')).toHaveLength(1)
+    act(() => find('data-source-settings', 'workflows')[0]!.props.onClick())
+    expect(onSettings).toHaveBeenCalledWith('workflows')
+    expect(onClose).toHaveBeenCalled()
+    act(() => find('data-source-tab', 'cli')[0]!.props.onClick())
+    expect(find('data-source-settings', 'cli')).toHaveLength(1)
   })
 
   it('网页版：CLI 标签置灰锁住并给原因', () => {
@@ -102,10 +109,10 @@ describe('模型菜单（内嵌来源切换）', () => {
   })
 
   it('空标签：一句话 + 去设置（走该标签的设置入口）', () => {
-    const { find, onFooter } = mount({ tabs: tabs(true, true), selected: {} })
+    const { find, onSettings } = mount({ tabs: tabs(true, true), selected: {} })
     expect(find('data-source-empty', 'api')).toHaveLength(1)
     act(() => find('data-source-empty-go', 'channels')[0]!.props.onClick())
-    expect(onFooter).toHaveBeenCalledWith('channels')
+    expect(onSettings).toHaveBeenCalledWith('channels')
   })
 
   it('API 行只显示模型名（不写「图片」这类类别）；只有「还没有渠道提供」这种有用的话才两行', () => {
@@ -154,8 +161,9 @@ describe('模型菜单（内嵌来源切换）', () => {
     expect(hint.length).toBeGreaterThan(0)
   })
 
-  it('chip 前有当前来源角标', () => {
+  it('chip 不再渲染来源文字角标，只保留传入的品牌图标和模型名', () => {
     const { find } = mount({ source: 'workflow', open: false })
-    expect(find('data-source-badge', 'workflow')).toHaveLength(1)
+    expect(find('data-source-badge')).toHaveLength(0)
+    expect(find('data-param-chip', 'model')).toHaveLength(1)
   })
 })

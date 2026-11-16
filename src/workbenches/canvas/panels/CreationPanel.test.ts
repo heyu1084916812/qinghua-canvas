@@ -29,7 +29,6 @@ const emptyModel: PanelModel = {
   collections: [],
   emptyHint: '连线上游节点，或拖入素材',
   prompt: '',
-  linkedPromptCount: 0,
   promptToggle: null,
   mentionCandidates: [],
   preset: null,
