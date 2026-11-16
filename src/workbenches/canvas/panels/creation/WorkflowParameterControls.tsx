@@ -74,6 +74,8 @@ export function workflowSummaryLabel(
   return parts.join(' · ')
 }
 
+const MISSING_HINT = '这个条目已被删除或不在当前渠道，换一个条目再生成'
+
 export function WorkflowParameterControls({
   data,
   sources,
@@ -160,8 +162,8 @@ export function WorkflowParameterControls({
     <>
       {modelPicker}
       {!current ? (
-        <span className={creationStyles.paramHint} data-workflow-missing>
-          这个条目已被删除或不在当前渠道，换一个条目再生成
+        <span className={creationStyles.paramHint} data-workflow-missing title={MISSING_HINT}>
+          {MISSING_HINT}
         </span>
       ) : null}
       {/* AI 应用的提交体不吃实例规格：只给工作流显示（#1127 M1） */}

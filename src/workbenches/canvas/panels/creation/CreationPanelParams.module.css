@@ -28,14 +28,24 @@
   background: var(--stroke);
 }
 
-/* 工作流条目已不在时的一句说明（#1128 H3）：与 chip 同一行、次级文字色，不抢生成按钮 */
+/*
+ * 参数行里的一句说明（#1128 H3 条目已不在 / #1133 网页版 CLI 被拦）：与 chip 同一行、次级文字色，不抢生成按钮。
+ * 按剩余宽度伸缩、最多两行：nowrap 时整句的宽度会把生成按钮挤到下一行（#1133 目检 1440 / 1024 都复现）。
+ */
 .paramHint {
+  flex: 1 1 160px;
   min-width: 0;
+  display: -webkit-box;
   overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
   color: var(--text-2);
   font-size: var(--fs-chip);
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  line-height: 1.4;
+  /* 两行时上下均分、只在标点 / 空格处折（不留「源」孤字，也不把「不能」拆开）；实在放不下才逐字折 */
+  text-wrap: balance;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
 }
 
 /*

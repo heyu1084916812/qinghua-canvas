@@ -100,6 +100,16 @@ describe('CreationPanel CSS 组件域拆分', () => {
     expect(editor).toMatch(/overflow-y:\s*auto\s*;/)
   })
 
+  it('参数行说明按剩余宽度伸缩、最多两行，不把生成按钮挤到下一行（#1133 目检）', () => {
+    const hint = ruleBody(sources.params, '.paramHint')
+    expect(hint).toMatch(/flex:\s*1\s+1\s+\d+px\s*;/)
+    expect(hint).toMatch(/min-width:\s*0\s*;/)
+    expect(hint).toMatch(/-webkit-line-clamp:\s*2\s*;/)
+    expect(hint).not.toMatch(/white-space:\s*nowrap/)
+    expect(hint, '两行时不留单字孤行').toMatch(/text-wrap:\s*balance\s*;/)
+    expect(hint, '只在标点 / 空格处折行').toMatch(/word-break:\s*keep-all\s*;/)
+  })
+
   it('不再使用 field-sizing 让编辑器内容反向撑高固定面板', () => {
     expect(sources.prompt).not.toContain('field-sizing')
   })

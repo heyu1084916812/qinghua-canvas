@@ -38,7 +38,9 @@ describe('CLI 参数行', () => {
   })
 
   it('被拦时就地写原因', () => {
-    expect(render({ blockedReason: '本机未检测到「即梦」' })).toContain('data-source-blocked="cli"')
+    const html = render({ blockedReason: '本机未检测到「即梦」' })
+    expect(html).toContain('data-source-blocked="cli"')
+    expect(html, '两行截断时悬停能看全句').toContain('title="本机未检测到「即梦」"')
     expect(render()).not.toContain('data-source-blocked')
   })
 })

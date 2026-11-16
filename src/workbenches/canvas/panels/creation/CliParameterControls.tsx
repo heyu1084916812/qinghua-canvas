@@ -52,7 +52,7 @@ export function CliParameterControls({ tool, blockedReason, open, onToggle, onCl
         disabled={disabled === true}
       />
       {blockedReason ? (
-        <span className={creationStyles.paramHint} data-source-blocked="cli">
+        <span className={creationStyles.paramHint} data-source-blocked="cli" title={blockedReason}>
           {blockedReason}
         </span>
       ) : null}

@@ -149,6 +149,7 @@ describe('#1128 条目下拉 / 找不到条目', () => {
     const html = render({ ...workflowData(), model: 'workflow:404' })
     expect(html).toContain('data-workflow-missing')
     expect(html).toContain('这个条目已被删除或不在当前渠道')
+    expect(html).toContain('title="这个条目已被删除或不在当前渠道，换一个条目再生成"')
     expect(html).not.toContain('视频超分与补帧</')
     expect(html).not.toContain('data-param-chip="workflowParams"')
     expect(findWorkflowSourceRow(BOTH, 'workflow:404', 'ch-rh')).toBeNull()
