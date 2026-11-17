@@ -2,6 +2,7 @@ import {
   useCallback,
   useEffect,
   useLayoutEffect,
+  useMemo,
   useRef,
   useState,
   type MouseEvent as ReactMouseEvent,
@@ -46,8 +47,8 @@ export function SettingsKeyGroupView({
   const [priorityId, setPriorityId] = useState<string | null>(null)
   const [menu, setMenu] = useState<GroupMenuState | null>(null)
   const [menuConfirm, setMenuConfirm] = useState(false)
-  /* 选中态的梯形跟着选中的标题走：位置与宽度从真实 DOM 量出来，再靠 transform 滑动过去。 */
-  const [indicator, setIndicator] = useState<{ left: number; width: number } | null>(null)
+  /* 选中态尺寸从真实 DOM 量：标签宽度随文字变，切换分组时让它平滑过渡到新宽度。 */
+  const [indicator, setIndicator] = useState<{ width: number } | null>(null)
   const [indicatorReady, setIndicatorReady] = useState(false)
 
   const tabsRef = useRef<HTMLDivElement | null>(null)
@@ -76,12 +77,7 @@ export function SettingsKeyGroupView({
       setIndicator(null)
       return
     }
-    const containerRect = container.getBoundingClientRect()
-    const activeRect = active.getBoundingClientRect()
-    setIndicator({
-      left: activeRect.left - containerRect.left + container.scrollLeft,
-      width: activeRect.width,
-    })
+    setIndicator({ width: active.getBoundingClientRect().width })
   }, [])
 
   useLayoutEffect(() => {
@@ -209,6 +205,17 @@ export function SettingsKeyGroupView({
       </span>
     )
 
+  /* 选中的分组永远排第一列（像文件夹那样），其余保持原来的相对顺序。 */
+  const orderedKeyGroups = useMemo(() => {
+    const activeId = activeGroup?.id
+    const index = activeId ? selectedKeyGroups.findIndex((group) => group.id === activeId) : -1
+    if (index <= 0) return selectedKeyGroups
+    return [
+      selectedKeyGroups[index],
+      ...selectedKeyGroups.filter((group) => group.id !== activeId),
+    ]
+  }, [selectedKeyGroups, activeGroup?.id])
+
   return (
     <section className={styles.keyGroupTabsBar} data-key-groups>
       <div className={styles.keyGroupSwitcher} data-key-group-switcher>
@@ -219,10 +226,7 @@ export function SettingsKeyGroupView({
               aria-hidden
               data-key-group-indicator
               data-ready={indicatorReady ? 'true' : 'false'}
-              style={{
-                width: `${indicator.width}px`,
-                transform: `translateX(${indicator.left}px)`,
-              }}
+              style={{ width: `${indicator.width}px` }}
             />
           ) : null}
 
@@ -235,7 +239,7 @@ export function SettingsKeyGroupView({
               <span className={styles.keyGroupTabName}>默认分组</span>
             </div>
           ) : (
-            selectedKeyGroups.map((group) => {
+            orderedKeyGroups.map((group) => {
               const selected = group.id === activeGroup?.id
               return (
                 <div

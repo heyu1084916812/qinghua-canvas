@@ -74,6 +74,17 @@ describe('SettingsKeyGroupView 文件夹标签', () => {
     expect(props.onActiveGroupChange).toHaveBeenCalledWith('backup')
   })
 
+  it('选中的分组排在第一个标签位，其余保持原顺序', () => {
+    const { renderer } = mount({ activeGroup: backup })
+    const order = renderer.root
+      .findAll((node) => typeof node.props['data-key-group-tab'] === 'string')
+      .map((node) => node.props['data-key-group-tab'] as string)
+    expect(order).toEqual(['backup', 'primary'])
+    expect(renderer.root.findByProps({ 'data-key-group-tab': 'backup' }).props['aria-selected']).toBe(
+      true,
+    )
+  })
+
   it('双击标题进入改名，失焦后按新名字回写', () => {
     const { renderer, props } = mount()
     const activeTab = renderer.root.findByProps({ 'data-key-group-tab': 'primary' })
