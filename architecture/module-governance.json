@@ -3419,7 +3419,7 @@
       "test": [
         "src/pages/SettingsPage/settingsPageCssArchitecture.test.ts"
       ],
-      "budget": 362
+      "budget": 395
     },
     {
       "module": "src/pages/SettingsPage/SettingsChannelList.module.css",

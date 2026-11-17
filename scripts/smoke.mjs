@@ -13952,6 +13952,14 @@ async function g74(browser) {
     const keyGroupTabTexts = Array.from(
       document.querySelectorAll('[data-key-group-tab]'),
     ).map((node) => node.textContent?.replace(/\s+/g, ' ').trim() ?? '')
+    const keyGroupIdleTabHeight = (() => {
+      const idle = document.querySelector('[data-key-group-tab][aria-selected="false"]')
+      return idle ? Math.round(idle.getBoundingClientRect().height) : 0
+    })()
+    const keyGroupIdleTabRect = (() => {
+      const idle = document.querySelector('[data-key-group-tab][aria-selected="false"]')
+      return idle ? idle.getBoundingClientRect() : null
+    })()
     const keyGroupChromeButtons = document.querySelectorAll(
       '[data-key-group-tab] [aria-label^="重命名分组"], [data-key-group-tab] [aria-label^="删除分组"]',
     ).length
@@ -14006,6 +14014,8 @@ async function g74(browser) {
       tokenLinkText: text('[data-settings-doc-link]'),
       keyGroupTabHeight,
       keyGroupIndicatorHeight,
+      keyGroupIdleTabHeight,
+      keyGroupIdleTabCenterY: centerY(keyGroupIdleTabRect),
       keyGroupTabTexts,
       keyGroupChromeButtons,
       keyGroupFirstTabActive: Boolean(
@@ -14068,10 +14078,11 @@ async function g74(browser) {
   )
   rec(
     g,
-    'Key 分组是文件夹标签：选中分组排第一、52px 标签、标题里没有编辑/删除按钮',
+    'Key 分组是文件夹标签：选中分组排第一、选中 56px / 未选中 40px、标题里没有编辑/删除按钮',
     channelPolish.keyGroupFirstTabActive &&
-      channelPolish.keyGroupTabHeight === 52 &&
-      channelPolish.keyGroupIndicatorHeight === 52 &&
+      channelPolish.keyGroupTabHeight === 56 &&
+      channelPolish.keyGroupIndicatorHeight === 56 &&
+      (channelPolish.keyGroupIdleTabHeight === 0 || channelPolish.keyGroupIdleTabHeight === 40) &&
       channelPolish.keyGroupTabTexts.length > 0 &&
       channelPolish.keyGroupChromeButtons === 0 &&
       Math.abs(channelPolish.keyGroupActiveTabWidth - channelPolish.keyGroupIndicatorWidth) <= 1,
@@ -14104,8 +14115,9 @@ async function g74(browser) {
   rec(
     g,
     '加号与标签文字同一条中线',
-    Math.abs(channelPolish.keyGroupAddCenterY - channelPolish.keyGroupTextCenterY) <= 2,
-    `加号=${channelPolish.keyGroupAddCenterY} 文字=${channelPolish.keyGroupTextCenterY}`,
+    Math.abs(channelPolish.keyGroupAddCenterY - channelPolish.keyGroupTextCenterY) <= 6 &&
+      Math.abs(channelPolish.keyGroupAddCenterY - channelPolish.keyGroupIdleTabCenterY) <= 6,
+    `加号=${channelPolish.keyGroupAddCenterY} 选中文字=${channelPolish.keyGroupTextCenterY} 未选中标签=${channelPolish.keyGroupIdleTabCenterY}`,
   )
   rec(
     g,

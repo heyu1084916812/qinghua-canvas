@@ -150,8 +150,8 @@
   min-width: 0;
   display: flex;
   align-items: flex-end;
-  /* 标签之间留出内凹圆弧的宽度，别让下一枚标签盖住那条弧 */
-  gap: 10px;
+  /* 标签之间留出两侧内凹圆弧的宽度（各 8px），两弧相接才是参考图里那种窄缺口 */
+  gap: 16px;
   padding: 0;
   overflow-x: auto;
   overflow-y: hidden;
@@ -163,7 +163,8 @@
   z-index: 1;
   flex: 0 0 auto;
   max-width: 220px;
-  height: 52px;
+  /* 未选中比选中矮一档：选中标签"立"起来，才像压在前面的文件夹标签 */
+  height: 40px;
   box-sizing: border-box;
   display: inline-flex;
   align-items: center;
@@ -180,6 +181,30 @@
   transition: color 180ms ease-out;
 }
 
+/*
+ * 每枚未选中标签左右各带一条内凹圆弧：两块拼在一起就是参考图里那个窄缺口。
+ * 圆心落在「标签竖边 × 卡片顶边」的交点上，所以左边用 100% 100%、右边用 0 100%。
+ */
+.keyGroupTab::before,
+.keyGroupTab::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  width: 8px;
+  height: 8px;
+  background: radial-gradient(circle at 100% 100%, transparent 8px, var(--bg-tab-idle) 8.5px);
+  pointer-events: none;
+}
+
+.keyGroupTab::before {
+  left: -8px;
+}
+
+.keyGroupTab::after {
+  right: -8px;
+  background: radial-gradient(circle at 0 100%, transparent 8px, var(--bg-tab-idle) 8.5px);
+}
+
 .keyGroupTab:hover,
 .keyGroupTabOn {
   z-index: 2;
@@ -188,7 +213,14 @@
 
 /* 选中态背景由指示器统一画（它要和下方卡片同色并无缝相接） */
 .keyGroupTabOn {
+  height: 56px;
   background: transparent;
+}
+
+/* 选中标签永远排第一列、贴在卡片左边缘：左边不画圆弧，右边那条由指示器给 */
+.keyGroupTabOn::before,
+.keyGroupTabOn::after {
+  content: none;
 }
 
 .keyGroupTab:focus-visible {
@@ -205,7 +237,7 @@
   position: absolute;
   bottom: 0;
   left: 0;
-  height: 52px;
+  height: 56px;
   border-radius: 12px 12px 0 0;
   background: var(--bg-subtle);
   opacity: 0;
@@ -226,11 +258,12 @@
 .keyGroupIndicator::after {
   content: '';
   position: absolute;
-  right: -10px;
+  right: -16px;
   bottom: 0;
-  width: 10px;
-  height: 10px;
-  background: radial-gradient(circle at 0 100%, transparent 10px, var(--bg-subtle) 10.5px);
+  width: 16px;
+  height: 16px;
+  /* 椭圆圆心落在"标签右切线 × 卡片顶边"的交点，右下角甩出一段内凹圆弧 */
+  background: radial-gradient(ellipse 16px 16px at 0 100%, transparent 99%, var(--bg-subtle) 100%);
   pointer-events: none;
 }
 
@@ -330,8 +363,8 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  /* 与标签文字同一条中线：标签 52px 居中、按钮 34px 抬高 9px */
-  margin: 0 0 9px;
+  /* 与标签文字同一条中线：选中文字中心 28、未选中标签中心 20，按钮 34px 抬到中点 24（margin 7 + 半高 17） */
+  margin: 0 0 7px;
   padding: 0;
   border: 0;
   border-radius: var(--radius-control);
