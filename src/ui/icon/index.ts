@@ -123,6 +123,7 @@ export {
   Search,
   Send,
   Settings,
+  Settings2,
   Shirt,
   ShoppingBag,
   SlidersHorizontal,

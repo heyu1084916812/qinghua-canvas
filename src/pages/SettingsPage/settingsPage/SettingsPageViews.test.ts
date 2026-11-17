@@ -149,7 +149,7 @@ describe('SettingsPage 视图拆分', () => {
 
   it('协议详情保持导入、待支持和说明的原始顺序', () => {
     const html = render(SettingsProtocolDetailsView, {
-      protocol: 'openai',
+      protocol: 'runninghub-api',
       pendingProtocols: [
         {
           id: 'pending',
@@ -231,7 +231,9 @@ describe('SettingsPage 视图拆分', () => {
     })
     expect(routeHtml).toMatch(/^<section /)
     expect(routeHtml).toContain('data-settings-channel-route')
-    expect(routeHtml).toContain('data-route-map-empty')
+    /* #1144 起空分类不再出提示条：没有前端模型时整张映射表不渲染。 */
+    expect(routeHtml).not.toContain('data-route-map-table')
+    expect(routeHtml).not.toContain('data-route-map-row=')
   })
 
   it('资料抽屉与渠道菜单保留原 portal 根节点和交互锚点', () => {
@@ -367,7 +369,7 @@ describe('SettingsPage 视图拆分', () => {
     expect(html).toContain('data-status-tone="error"')
   })
 
-  it('Key 分组只显示名称与状态点，当前分组直接承载 Key 和属性编辑', () => {
+  it('Key 分组是文件夹标签：选中态只有名称与优先级，没有圆点与编辑/删除按钮', () => {
     const group = {
       id: 'primary',
       name: '主分组',
@@ -381,15 +383,6 @@ describe('SettingsPage 视图拆分', () => {
       createdAt: 1,
     } satisfies ChannelCredentialGroup
     const html = render(SettingsKeyGroupView, {
-      channels: {} as ChannelStore,
-      selected: {
-        id: 'channel-1',
-        icon: null,
-        tokenTail: '1234',
-        altTokenTail: null,
-        hasToken: true,
-        hasAltToken: false,
-      } as Channel,
       activeGroup: group,
       selectedKeyGroups: [
         group,
@@ -402,9 +395,7 @@ describe('SettingsPage 视图拆分', () => {
           priority: 0,
         },
       ],
-      credentialSlots: [],
       busy: false,
-      docUrl: 'https://docs.example.com',
       onAddKeyGroup: async () => {},
       onRemoveKeyGroup: async () => {},
       onActiveGroupChange: () => {},
@@ -415,12 +406,16 @@ describe('SettingsPage 视图拆分', () => {
     expect(html).toContain('data-key-group-switcher')
     expect(html).toContain('data-key-group-tab="primary"')
     expect(html).toContain('data-key-group-tab="backup"')
-    expect(html).not.toContain('优先级 10')
-    expect(html).not.toContain('3 个模型')
     expect(html).toContain('data-key-group-editor="primary"')
-    expect(html).toContain('data-settings-token-tail="primary"')
-    expect(html).toContain('data-key-group-name')
-    expect(html).toContain('data-key-group-priority')
+    /* 选中态：名称 + 优先级；未选中：只有名称 */
+    expect(html).toContain('主分组')
+    expect(html).toContain('P10')
+    expect(html).toContain('备用分组')
+    expect(html).not.toContain('P0<')
+    /* 标题里不再挂状态点、编辑、删除按钮 */
+    expect(html).not.toContain('重命名分组')
+    expect(html).not.toContain('删除分组')
+    expect(html).not.toContain('data-key-group-name="')
   })
 
   it('Key 分组官网入口使用短文案', () => {
@@ -591,8 +586,9 @@ describe('SettingsPage 视图拆分', () => {
     expect(grouped).toContain('aria-controls="settings-model-category-panel"')
     expect(grouped).toContain('role="tabpanel"')
     expect(grouped).toContain('id="settings-model-category-panel"')
-    expect(grouped).toContain('data-route-map-row="My Image"')
-    expect(grouped).not.toContain('data-route-map-row="My Chat"')
+    /* 三分类固定顺序（对话 → 图片 → 视频），默认落在「对话」。 */
+    expect(grouped).toContain('data-route-map-row="My Chat"')
+    expect(grouped).not.toContain('data-route-map-row="My Image"')
 
     const irrelevantCategory = render(SettingsChannelRouteView, {
       allGlobalModels: [preset],
@@ -618,7 +614,9 @@ describe('SettingsPage 视图拆分', () => {
       onModelUncommonChange: () => {},
       onRemoveGlobalModel: () => {},
     })
-    expect(irrelevantCategory).not.toContain('data-route-map-row="My Image"')
+    /* #1144 起映射固定展示「实际配置的全部前端模型」：上游只有视频模型也照样列出这条图片映射。 */
+    expect(irrelevantCategory).toContain('data-route-map-row="My Image"')
+    expect(irrelevantCategory).toContain('data-route-map-filter="image"')
   })
 
   it('渠道菜单覆盖内置渠道无删除与删除二次确认', () => {

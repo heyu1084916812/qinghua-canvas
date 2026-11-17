@@ -3392,16 +3392,16 @@
       "test": [
         "src/pages/SettingsPage/settingsPageCssArchitecture.test.ts"
       ],
-      "budget": 571
+      "budget": 585
     },
     {
       "module": "src/pages/SettingsPage/SettingsChannelWorkspace.module.css",
       "owner": "settings-ui",
-      "responsibility": "定义渠道头部路由属性、连接工具、Key 分组切换器和当前分组编辑条样式。",
+      "responsibility": "定义渠道头部路由属性、连接工具、Key 分组文件夹标签（选中梯形、重命名输入框）样式。",
       "owns": [
         "渠道头部的悬停型路由设置",
-        "Key 分组切换器与状态点",
-        "当前分组 Key、名称、优先级与删除布局"
+        "Key 分组文件夹标签：选中梯形、滑动过渡、优先级徽标",
+        "Key 分组重命名输入框的自适应宽度"
       ],
       "doesNotOwn": [
         "渠道或分组状态写入",
@@ -3412,13 +3412,14 @@
         "CSS_MODULE:SettingsChannelWorkspace 的渠道工作区样式域",
         "CSS_CLASS:keyGroupSwitcher",
         "CSS_CLASS:keyGroupTab",
-        "CSS_CLASS:groupPropertyStrip",
+        "CSS_CLASS:keyGroupIndicator",
+        "CSS_CLASS:keyGroupNameField",
         "CSS_CLASS:providerRouteInline"
       ],
       "test": [
         "src/pages/SettingsPage/settingsPageCssArchitecture.test.ts"
       ],
-      "budget": 296
+      "budget": 334
     },
     {
       "module": "src/pages/SettingsPage/SettingsChannelList.module.css",
@@ -3521,7 +3522,7 @@
       "test": [
         "src/pages/SettingsPage/settingsPageCssArchitecture.test.ts"
       ],
-      "budget": 433
+      "budget": 439
     },
     {
       "module": "src/pages/SettingsPage/SettingsModelBinding.module.css",
@@ -6029,7 +6030,7 @@
       "test": [
         "src/pages/SettingsPage/settingsPage/channelActionCoordinator.test.ts"
       ],
-      "budget": 350
+      "budget": 352
     },
     {
       "module": "src/pages/SettingsPage/settingsPage/modelMappingActionCoordinator.ts",
@@ -7269,7 +7270,7 @@
       "test": [
         "src/pages/SettingsPage/settingsPage/SettingsPageViews.test.ts"
       ],
-      "budget": 380
+      "budget": 382
     },
     {
       "module": "src/pages/SettingsPage/settingsPage/SettingsProfileDrawerView.tsx",
@@ -12364,13 +12365,16 @@
     {
       "module": "src/pages/SettingsPage/settingsPage/SettingsKeyGroupView.tsx",
       "owner": "settings-ui",
-      "responsibility": "渠道 Key 分组切换器与当前分组编辑区：状态点、令牌、名称、优先级和删除确认。",
+      "responsibility": "渠道 Key 分组的文件夹标签：选中梯形跟着标题滑动，标题里只有名称与优先级，双击改名、右键出菜单。",
       "owns": [
         "Key 分组的展示与切换",
-        "当前分组属性的就地编辑"
+        "选中梯形的位置/宽度测量与滑动过渡",
+        "标题双击改名（输入框随文字自适应）与右键菜单",
+        "标题上的优先级就地编辑"
       ],
       "doesNotOwn": [
         "凭据读写（ChannelTokenField / channelStore）",
+        "右键菜单的条目渲染（SettingsKeyGroupMenuView）",
         "渠道页布局",
         "协议选择"
       ],
@@ -12379,9 +12383,53 @@
         "SettingsKeyGroupViewProps"
       ],
       "test": [
+        "src/pages/SettingsPage/settingsPage/SettingsKeyGroupView.test.ts",
         "src/pages/SettingsPage/settingsPage/SettingsPageViews.test.ts"
       ],
-      "budget": 203
+      "budget": 361
+    },
+    {
+      "module": "src/pages/SettingsPage/settingsPage/SettingsKeyGroupMenuView.tsx",
+      "owner": "settings-ui",
+      "responsibility": "Key 分组标题的右键菜单：编辑（改名）与删除分组，删除前在菜单内二次确认。",
+      "owns": [
+        "菜单条目与确认态文案",
+        "只剩一组时禁用删除"
+      ],
+      "doesNotOwn": [
+        "菜单定位与开关（SettingsKeyGroupView）",
+        "分组删除动作（channelActionCoordinator）"
+      ],
+      "publicApi": [
+        "SettingsKeyGroupMenuView",
+        "SettingsKeyGroupMenuViewProps",
+        "KEY_GROUP_MENU_WIDTH"
+      ],
+      "test": [
+        "src/pages/SettingsPage/settingsPage/SettingsKeyGroupView.test.ts"
+      ],
+      "budget": 94
+    },
+    {
+      "module": "src/pages/SettingsPage/settingsPage/SettingsCredentialFieldView.tsx",
+      "owner": "settings-ui",
+      "responsibility": "按当前 Key 分组渲染 API Key 输入：有分组时写分组 Key，没有分组时回落到渠道自带凭据槽。",
+      "owns": [
+        "分组 Key 与渠道凭据槽的取舍",
+        "令牌字段的插槽顺序"
+      ],
+      "doesNotOwn": [
+        "令牌读写（ChannelTokenField / channelStore）",
+        "分组增删改",
+        "页面布局"
+      ],
+      "publicApi": [
+        "SettingsCredentialFieldView"
+      ],
+      "test": [
+        "src/pages/SettingsPage/settingsPage/SettingsPageViews.test.ts"
+      ],
+      "budget": 63
     },
     {
       "module": "src/features/settings/SettingsWorkflowTestRun.tsx",
@@ -12427,26 +12475,6 @@
         "src/features/settings/SettingsWorkflowTestRun.test.ts"
       ],
       "budget": 60
-    },
-    {
-      "module": "src/pages/SettingsPage/settingsPage/SettingsChannelActionBar.tsx",
-      "owner": "settings-ui",
-      "responsibility": "渠道页底部的删除 / 保存操作条（参考图一），让页面有头有尾、删除不必翻右键菜单。",
-      "owns": [
-        "底部操作条的展示与禁用态"
-      ],
-      "doesNotOwn": [
-        "保存逻辑（persistForm）",
-        "删除逻辑（handleRemove）",
-        "渠道列表"
-      ],
-      "publicApi": [
-        "SettingsChannelActionBar"
-      ],
-      "test": [
-        "src/pages/SettingsPage/settingsPage/SettingsPageViews.test.ts"
-      ],
-      "budget": 90
     },
     {
       "module": "src/pages/SettingsPage/settingsPage/workflowsPageLink.ts",

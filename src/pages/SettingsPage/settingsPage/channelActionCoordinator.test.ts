@@ -181,6 +181,27 @@ describe('channelActionCoordinator', () => {
     expect(ports.setBusy).toHaveBeenLastCalledWith(false)
   })
 
+  it('右键菜单删非当前分组：按 groupId 精确删除，已确认过就不再弹系统确认', async () => {
+    const groups = [
+      { id: 'g1', name: '主 Key', priority: 1, createdAt: 1, models: [], modelCache: [] },
+      { id: 'g2', name: '备用 Key', priority: 0, createdAt: 2, models: [], modelCache: [] },
+    ] as unknown as ChannelCredentialGroup[]
+    const { actions, state, ports, channels } = harness({
+      selectedKeyGroups: groups,
+      activeGroup: groups[1],
+    })
+    await actions.removeKeyGroup(state, { groupId: 'g2', skipConfirm: true })
+    expect(ports.confirm).not.toHaveBeenCalled()
+    expect(channels.removeCredentialGroup).toHaveBeenCalledWith('c1', 'g2')
+    /* 删的正是当前分组时才换选中；删别的分组不动当前选择。 */
+    expect(ports.setActiveGroupId).toHaveBeenCalledWith('g1')
+
+    ports.setActiveGroupId = vi.fn()
+    await actions.removeKeyGroup(state, { groupId: 'g1', skipConfirm: true })
+    expect(channels.removeCredentialGroup).toHaveBeenLastCalledWith('c1', 'g1')
+    expect(ports.setActiveGroupId).toHaveBeenCalledWith('g2')
+  })
+
   it('新增前端模型按表单当前分类保存', async () => {
     const { actions, state, ports, channels } = harness({
       newModelName: '6.1',

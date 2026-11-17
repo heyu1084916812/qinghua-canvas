@@ -253,14 +253,26 @@ export function createChannelActions(ports: ChannelActionPorts) {
         ports.setBusy(false)
       }
     },
-    removeKeyGroup: async (state: ChannelActionState) => {
-      if (!state.selectedId || !state.activeGroup) return
-      if (!ports.confirm(`删除 Key 分组「${state.activeGroup.name}」？这会同时删除该组 Key。`)) return
+    removeKeyGroup: async (
+      state: ChannelActionState,
+      options: { groupId?: string; skipConfirm?: boolean } = {},
+    ) => {
+      if (!state.selectedId) return
+      /* 右键菜单先挑明确认，再按 groupId 精确删除；老调用不带参数时仍删当前分组。 */
+      const target = options.groupId
+        ? state.selectedKeyGroups.find((group) => group.id === options.groupId)
+        : state.activeGroup
+      if (!target) return
+      if (!options.skipConfirm && !ports.confirm(`删除 Key 分组「${target.name}」？这会同时删除该组 Key。`)) return
       ports.setBusy(true)
       try {
-        await ports.channels.removeCredentialGroup(state.selectedId, state.activeGroup.id)
-        const rest = state.selectedKeyGroups.filter((group) => group.id !== state.activeGroup?.id)
-        ports.setActiveGroupId(rest[0]?.id ?? null)
+        await ports.channels.removeCredentialGroup(state.selectedId, target.id)
+        if (state.activeGroup?.id !== target.id) {
+          ports.setActiveGroupId(state.activeGroup?.id ?? null)
+        } else {
+          const rest = state.selectedKeyGroups.filter((group) => group.id !== target.id)
+          ports.setActiveGroupId(rest[0]?.id ?? null)
+        }
       } catch (error) {
         ports.alert(rawErrorMessage(error))
       } finally {

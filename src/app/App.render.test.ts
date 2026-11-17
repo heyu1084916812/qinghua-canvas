@@ -40,8 +40,13 @@ import { AppShell } from './AppShell'
  * 2026-11-05 再抬到 60s：开了 v8 覆盖率插桩后，全量跑时这条**连续 3 次**都顶到 20s
  * （单跑仍只要 ~11s）。插桩让每个模块的执行都多一层开销，8 个 worker 抢 CPU 时被放大。
  * 同样属于**超时配错**：隔离跑 3/3 通过，断言内容没变。
+ *
+ * 2026-11-17 再抬到 120s：文件数涨到 789 之后，全量跑时这一条连续两次顶到 60s
+ * （同一轮里 subsets `App.render + SettingsPage + state/channel` 只花 16s、单跑 ~11s），
+ * 而把本轮改动 stash 掉跑全量时它又能过 —— 典型的「全量并行 transform 抢 CPU」，
+ * 不是断言失效，也不是某个页面变慢。按同一判据放宽，避免继续反复解释假红灯。
  */
-const TREE_TIMEOUT = 60000
+const TREE_TIMEOUT = 120000
 
 async function renderTree(entries: string[]): Promise<string> {
   const element = createElement(

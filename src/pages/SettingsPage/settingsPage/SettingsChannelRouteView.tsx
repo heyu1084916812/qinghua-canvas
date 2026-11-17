@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Settings2 } from 'lucide-react'
+import { Icon, Settings2 } from '../../../ui/icon'
 import type { ModelCapability } from '../../../domain/shared/capability'
 import type { PresetModel, PresetVendor } from '../../../domain/project/modelPresets'
 import { categoryLabel } from '../../../domain/project/modelSelection'
@@ -167,7 +167,7 @@ export function SettingsChannelRouteView({
           title="管理前端模型"
           onClick={() => onModelAddOpenChange(!modelAddOpen)}
         >
-          <Settings2 size={17} strokeWidth={1.8} aria-hidden />
+          <Icon icon={Settings2} size="md" />
         </button>
       </div>
 

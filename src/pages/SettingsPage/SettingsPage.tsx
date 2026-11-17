@@ -695,7 +695,7 @@ export function SettingsPage({ embedded = false }: { embedded?: boolean } = {}) 
                   void channels.setRouteTuning(selected.id, { weight })
                 }
               />
-              <div className={styles.settingsCard} data-settings-card="connection">
+              <div className={styles.settingsCard} data-settings-section="connection">
                 <SettingsConnectionView
                   baseUrl={baseUrl}
                   busy={busy}
@@ -755,7 +755,9 @@ export function SettingsPage({ embedded = false }: { embedded?: boolean } = {}) 
                   selectedKeyGroups={selectedKeyGroups}
                   busy={busy}
                   onAddKeyGroup={handleAddKeyGroup}
-                  onRemoveKeyGroup={handleRemoveKeyGroup}
+                  onRemoveKeyGroup={(groupId) =>
+                    handleRemoveKeyGroup({ groupId, skipConfirm: true })
+                  }
                   onActiveGroupChange={setActiveGroupId}
                   onRenameKeyGroup={(groupId, nextName) =>
                     void channels.renameCredentialGroup(selected.id, groupId, nextName)
@@ -790,7 +792,7 @@ export function SettingsPage({ embedded = false }: { embedded?: boolean } = {}) 
                 <SettingsWorkflowManager channel={selected} platform={platform} onOpen={() => openWorkflowsPage(selected.id)} />
               ) : null}
 
-              <div className={styles.settingsCard} data-settings-card="mapping">
+              <div className={styles.settingsCard} data-settings-section="mapping">
                 <SettingsChannelRouteView
                   allGlobalModels={allGlobalModels}
                   customModels={customModels}

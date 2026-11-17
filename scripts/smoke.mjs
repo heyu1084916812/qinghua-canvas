@@ -6739,13 +6739,17 @@ async function g44(browser) {
     capKeys.length > 0 && capKeys.every((k) => ['chat', 'image', 'video'].includes(k)),
     capKeys.join(','),
   )
-  // 新分组映射只从当前分组的真实模型分类出发；这条新建渠道尚无真实模型，不应平铺全局目录。
+  /**
+   * ⚠️ 口径改过（#1144，用户 2026-11-17）：映射区改为**固定展示实际配置的全部前端模型**，
+   * 不再按「当前分组有没有可用真实模型」把目录藏起来，也没有「空态」提示条。
+   * 这条断言守的是：新建渠道也能看到已配置的前端模型，且不出现旧空态。
+   */
   const emptyMappingRows = await page.locator('[data-route-map-row]').count()
   const emptyMappingHint = await page.locator('[data-route-map-empty]').count()
   rec(
     g,
-    '★★ 空分组不铺全局前端模型目录',
-    emptyMappingRows === 0 && emptyMappingHint === 1,
+    '★★ 映射固定展示已配置的前端模型（空分组也列出，不再有空态）',
+    emptyMappingRows > 0 && emptyMappingHint === 0,
     `行=${emptyMappingRows} 空态=${emptyMappingHint}`,
   )
   await page.screenshot({ path: `${OUT}/44-a-channels.png` })
@@ -6756,14 +6760,21 @@ async function g44(browser) {
   const tokenInput = page.locator('input[type="password"]').first()
   await tokenInput.fill('sk-1234567890abcdef3f2a')
   /**
-   * 用 `data-settings-save` 锚点而不是文案。
-   *
-   * 原来靠 `保存` 精确匹配区分「保存配置」；但映射区（§7.4.1）每个显示名
-   * 也各有一个「保存」按钮，文案撞车后 `exact` 也照样命中多个。
-   * 锚点是稳定标识，不随按钮文案变化。
+   * ⚠️ #1144 起 Key 不再有「保存」按钮：失焦 / Enter 即自动保存。
+   * 这里用 blur 触发同一条保存路径。
    */
-  await page.locator('[data-settings-token-save]').click()
-  await sleep(400)
+  await tokenInput.blur()
+  /* 自动保存是按失焦触发的异步写入，等占位符真的换成尾号再断言（不靠固定 sleep 碰运气）。 */
+  await page
+    .waitForFunction(
+      () =>
+        (document
+          .querySelector('[data-settings-token-tail]')
+          ?.getAttribute('placeholder') ?? '').includes('3f2a'),
+      null,
+      { timeout: 8000 },
+    )
+    .catch(() => {})
   /**
    * 用户第 19 批 #3 改了口径：**输入框里直接显示存好的令牌（中间打码）**，
    * 原来那行「令牌已加密保存 · ••••••••3f2a」小字已删。
@@ -13900,14 +13911,11 @@ async function g74(browser) {
       '[data-proto-add-toggle]',
       '[data-settings-baseurl]',
       '[data-choice-picker="settings-protocol"] > button',
-      '[data-key-group-tab]',
       '[data-key-group-add]',
       '[data-settings-token-tail]',
-      '[data-settings-token-save]',
       '[data-settings-doc-link]',
       '[data-key-group-name]',
       '[data-key-group-priority]',
-      '[data-key-group-remove]',
       '[data-settings-refresh-models]',
       '[data-global-model-add-toggle]',
       '[data-route-map-filter]',
@@ -13915,8 +13923,6 @@ async function g74(browser) {
       '[data-route-map-uncommon]',
       '[data-quick-test-model] [data-choice-picker] > button',
       '[data-quick-test-run]',
-      '[data-settings-delete]',
-      '[data-settings-save]',
       '[data-channel-add]',
     ]
     const standardHeights = standardSelectors.flatMap((selector) =>
@@ -13936,6 +13942,19 @@ async function g74(browser) {
     const commonTrackHeight =
       controlRect('[data-route-map-uncommon] span:first-child')?.height ?? 0
     const quickInputHeight = controlRect('[data-quick-test-input]')?.height ?? 0
+    /* Key 分组标题是文件夹标签（梯形），自成一档，不并入 34px 标准控件。 */
+    const keyGroupTabRect = controlRect('[data-key-group-tab]')
+    const keyGroupIndicatorRect = controlRect('[data-key-group-indicator]')
+    const keyGroupTabHeight = keyGroupTabRect ? Math.round(keyGroupTabRect.height) : 0
+    const keyGroupIndicatorHeight = keyGroupIndicatorRect
+      ? Math.round(keyGroupIndicatorRect.height)
+      : 0
+    const keyGroupTabTexts = Array.from(
+      document.querySelectorAll('[data-key-group-tab]'),
+    ).map((node) => node.textContent?.replace(/\s+/g, ' ').trim() ?? '')
+    const keyGroupChromeButtons = document.querySelectorAll(
+      '[data-key-group-tab] [aria-label^="重命名分组"], [data-key-group-tab] [aria-label^="删除分组"]',
+    ).length
     const centerY = (box) => (box ? Math.round(box.top + box.height / 2) : -999)
     return {
       routeInline: document.querySelectorAll('[data-settings-provider-route-inline]').length,
@@ -13970,6 +13989,10 @@ async function g74(browser) {
       commonTrackHeight: Math.round(commonTrackHeight),
       quickInputHeight: Math.round(quickInputHeight),
       tokenLinkText: text('[data-settings-doc-link]'),
+      keyGroupTabHeight,
+      keyGroupIndicatorHeight,
+      keyGroupTabTexts,
+      keyGroupChromeButtons,
     }
   })
   rec(
@@ -14008,6 +14031,20 @@ async function g74(browser) {
       count: channelPolish.standardCount,
       heights: [...new Set(channelPolish.standardHeights)],
       outliers: channelPolish.nonStandardHeights,
+    }),
+  )
+  rec(
+    g,
+    'Key 分组标题是文件夹标签：52px 标题 + 48px 选中梯形，标题里没有编辑/删除按钮',
+    channelPolish.keyGroupTabHeight === 52 &&
+      channelPolish.keyGroupIndicatorHeight === 48 &&
+      channelPolish.keyGroupTabTexts.length > 0 &&
+      channelPolish.keyGroupChromeButtons === 0,
+    JSON.stringify({
+      tab: channelPolish.keyGroupTabHeight,
+      indicator: channelPolish.keyGroupIndicatorHeight,
+      tabs: channelPolish.keyGroupTabTexts,
+      chromeButtons: channelPolish.keyGroupChromeButtons,
     }),
   )
   rec(
@@ -14127,11 +14164,15 @@ async function g74(browser) {
   const keyboardRows = await page
     .locator('[data-route-map-row]')
     .evaluateAll((els) => els.map((el) => el.getAttribute('data-route-map-category')))
+  /* 分类顺序固定（对话 → 图片 → 视频），"下一档"按实际顺序取，不写死名字。 */
+  const nextCategory = mapFilters[mapFilters.indexOf('image') + 1]
   rec(
     g,
     '键盘左右键可切换映射分类',
-    keyboardCategory === 'chat' && keyboardRows.every((category) => category === keyboardCategory),
-    `${keyboardCategory}: ${keyboardRows.join(',')}`,
+    nextCategory !== undefined &&
+      keyboardCategory === nextCategory &&
+      keyboardRows.every((category) => category === keyboardCategory),
+    `${keyboardCategory}（期望 ${nextCategory}）: ${keyboardRows.join(',')}`,
   )
   await page.locator('[data-route-map-filter="image"]').click()
   await sleep(200)

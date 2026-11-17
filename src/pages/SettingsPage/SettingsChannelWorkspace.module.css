@@ -137,17 +137,20 @@
 }
 
 .keyGroupSwitcher {
+  flex: 1 1 auto;
   min-width: 0;
   display: flex;
   align-items: flex-end;
 }
 
 .keyGroupTabs {
-  min-width: max-content;
+  position: relative;
+  flex: 1 1 auto;
+  min-width: 0;
   display: flex;
   align-items: flex-end;
   gap: 2px;
-  padding: var(--space-2) var(--space-2) 0 10px;
+  padding: var(--space-2) 0 0 10px;
   overflow-x: auto;
   overflow-y: hidden;
   scrollbar-width: thin;
@@ -155,133 +158,87 @@
 
 .keyGroupTab {
   position: relative;
-  flex: 0 0 156px;
+  z-index: 1;
+  flex: 0 0 auto;
+  max-width: 220px;
   height: 52px;
-  display: flex;
-  align-items: flex-end;
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 4px var(--space-3) 0;
   color: var(--text-2);
   font-size: var(--fs-label);
+  font-weight: var(--fw-title);
   cursor: pointer;
   outline: none;
-  transition:
-    flex-basis 220ms ease-out,
-    color 220ms ease-out;
+  transition: color 180ms ease-out;
 }
 
+.keyGroupTab:hover,
 .keyGroupTabOn {
-  flex-basis: 320px;
   z-index: 2;
   color: var(--text-1);
 }
 
 .keyGroupTab:focus-visible {
   outline: 2px solid var(--focus-ring);
-  outline-offset: 3px;
+  outline-offset: -2px;
+  border-radius: calc(var(--radius-control) - 2px);
 }
 
-.keyGroupTabShape {
-  position: absolute;
-  inset: 14px 0 0;
-  border-radius: var(--radius-control) var(--radius-control) 0 0;
-  background: color-mix(in srgb, var(--bg-subtle) 82%, var(--bg-surface));
-  clip-path: polygon(10px 0, calc(100% - 10px) 0, 100% 100%, 0 100%);
-  transition:
-    inset 220ms ease-out,
-    background-color 220ms ease-out;
-}
-
-.keyGroupTabOn .keyGroupTabShape {
-  inset: 4px 0 0;
-  background: var(--bg-subtle);
-}
-
-.keyGroupTabOn::before,
-.keyGroupTabOn::after {
-  content: '';
+/* 选中态只有一块梯形：位置与宽度由 title 栏里量出来的 transform / width 决定，切换分组时滑过去。 */
+.keyGroupIndicator {
   position: absolute;
   bottom: 0;
-  width: 10px;
-  height: 14px;
+  left: 0;
+  height: 48px;
+  background: var(--bg-subtle);
+  clip-path: polygon(10px 0, calc(100% - 10px) 0, 100% 100%, 0 100%);
+  opacity: 0;
   pointer-events: none;
+  transition:
+    transform 220ms ease-out,
+    width 220ms ease-out,
+    opacity 160ms ease-out;
 }
 
-.keyGroupTabOn::before {
-  left: -10px;
-  background: radial-gradient(circle at 0 0, transparent 0 10px, var(--bg-subtle) 10.5px);
-}
-
-.keyGroupTabOn::after {
-  right: -10px;
-  background: radial-gradient(circle at 100% 0, transparent 0 10px, var(--bg-subtle) 10.5px);
-}
-
-.keyGroupTabContent {
-  position: relative;
-  z-index: 2;
-  width: 100%;
-  min-width: 0;
-  height: 100%;
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  padding: 0 var(--space-3) 9px;
+.keyGroupIndicator[data-ready='true'] {
+  opacity: 1;
 }
 
 .keyGroupTabName {
-  flex: 1 1 auto;
   min-width: 0;
   overflow: hidden;
-  font-weight: var(--fw-title);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.keyGroupDotOn,
-.keyGroupDotOff {
-  width: 7px;
-  height: 7px;
-  flex: 0 0 7px;
-  border-radius: 50%;
+/* 重命名输入框按文字长度撑开，最多 160px，不会拉出一条长条。 */
+.keyGroupNameField {
+  position: relative;
+  flex: 0 1 auto;
+  min-width: 40px;
+  max-width: 160px;
+  display: inline-block;
 }
 
-.keyGroupDotOn {
-  background: var(--success);
-}
-
-.keyGroupDotOff {
-  background: var(--status-off-dot);
-}
-
-.keyGroupTabMeta {
-  flex: 0 0 auto;
-  max-width: 0;
-  display: inline-flex;
-  align-items: center;
-  gap: 2px;
+.keyGroupNameMirror {
+  display: block;
+  max-width: 160px;
   overflow: hidden;
-  opacity: 0;
-  pointer-events: none;
-  transform: translateX(-4px) scale(0.96);
-  transform-origin: left center;
-  transition:
-    max-width 220ms ease-out,
-    opacity 180ms ease-out,
-    transform 220ms ease-out;
-}
-
-.keyGroupTabMetaOn {
-  max-width: 190px;
-  opacity: 1;
-  pointer-events: auto;
-  transform: none;
+  padding: 0 6px;
+  white-space: pre;
+  visibility: hidden;
 }
 
 .keyGroupNameInput {
-  min-width: 80px;
-  width: 132px;
+  position: absolute;
+  inset: 0;
+  width: 100%;
   height: 26px;
   box-sizing: border-box;
-  padding: 0 var(--space-2);
+  padding: 0 6px;
   border: var(--border);
   border-radius: calc(var(--radius-control) - 2px);
   background: var(--bg-surface);
@@ -289,10 +246,16 @@
   font: inherit;
 }
 
+.keyGroupNameInput:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 1px;
+}
+
 .keyGroupPriorityBadge,
 .keyGroupPriorityInput {
   min-width: 32px;
   height: 24px;
+  flex: 0 0 auto;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -304,6 +267,7 @@
   padding: 0 var(--space-2);
   font: inherit;
   font-size: var(--fs-chip);
+  font-weight: 500;
   white-space: nowrap;
 }
 
@@ -332,63 +296,6 @@
   -webkit-appearance: none;
 }
 
-.keyGroupIconButton,
-.keyGroupDangerButton {
-  width: 28px;
-  height: 28px;
-  flex: 0 0 28px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0;
-  border: 0;
-  border-radius: var(--radius-control);
-  background: transparent;
-  color: var(--text-2);
-  cursor: pointer;
-}
-
-.keyGroupIconButton:hover {
-  background: var(--bg-hover);
-  color: var(--text-1);
-}
-
-.keyGroupDangerButton {
-  color: var(--danger);
-}
-
-.keyGroupDangerButton:hover:not(:disabled) {
-  background: var(--bg-hover);
-}
-
-.keyGroupIconButton:disabled,
-.keyGroupDangerButton:disabled {
-  opacity: 0.45;
-  cursor: default;
-}
-
-.keyGroupDeleteConfirm {
-  display: inline-flex;
-  align-items: center;
-  gap: 2px;
-}
-
-.keyGroupDeleteConfirm button {
-  height: 24px;
-  padding: 0 6px;
-  border: 0;
-  border-radius: calc(var(--radius-control) - 2px);
-  background: var(--bg-selected);
-  color: var(--text-2);
-  font: inherit;
-  font-size: var(--fs-chip);
-  cursor: pointer;
-}
-
-.keyGroupDeleteConfirm button:first-child {
-  color: var(--danger);
-}
-
 .keyGroupAddTab {
   width: 34px;
   height: 34px;
@@ -396,7 +303,7 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  margin: 0 0 5px 6px;
+  margin: 0 0 15px 6px;
   padding: 0;
   border: 0;
   border-radius: var(--radius-control);
@@ -420,8 +327,7 @@
 
 @media (prefers-reduced-motion: reduce) {
   .keyGroupTab,
-  .keyGroupTabShape,
-  .keyGroupTabMeta,
+  .keyGroupIndicator,
   .keyGroupAddTab {
     transition: none;
   }
