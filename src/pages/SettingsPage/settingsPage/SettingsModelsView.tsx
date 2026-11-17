@@ -52,14 +52,9 @@ export function SettingsModelsView({
       <div className={styles.modelsHead}>
         <div className={styles.modelsTitleBox}>
           <span className={styles.cardTitle}>模型列表</span>
-          <span className={styles.cardSub}>
-            {activeGroup
-              ? `当前分组：${activeGroup.name}`
-              : '从上游 api 自动拉取所有可用模型'}
-          </span>
         </div>
         <button
-          className={styles.ghostBtn}
+          className={`${styles.ghostBtn} ${styles.connectionActionButton}`}
           data-settings-refresh-models
           disabled={busy}
           onClick={onRefresh}
@@ -67,7 +62,7 @@ export function SettingsModelsView({
           拉取模型
         </button>
         <button
-          className={styles.ghostBtn}
+          className={`${styles.ghostBtn} ${styles.connectionActionButton}`}
           disabled={busy || activeModelCache.length === 0}
           onClick={onOpenPanel}
         >
@@ -85,7 +80,11 @@ export function SettingsModelsView({
           点「选择模型」去挑。
         </p>
       ) : (
-        <div className={styles.selectedGroups}>
+        <div
+          key={activeGroup?.id ?? 'legacy'}
+          className={styles.selectedGroups}
+          data-model-group-content={activeGroup?.id ?? 'legacy'}
+        >
           {selectedGroups.map((group) => (
             <div key={group.category} className={styles.selectedRow}>
               <span className={styles.selectedLabel}>{group.label}模型</span>

@@ -53,6 +53,7 @@ import { SettingsProviderHeaderView } from './settingsPage/SettingsProviderHeade
 import { SettingsConnectionView } from './settingsPage/SettingsConnectionView'
 import { SettingsModelsView } from './settingsPage/SettingsModelsView'
 import { SettingsKeyGroupView } from './settingsPage/SettingsKeyGroupView'
+import { SettingsCredentialFieldView } from './settingsPage/SettingsCredentialFieldView'
 import { SettingsWorkflowManager } from '../../features/settings/SettingsWorkflowManager'
 import { SettingsChannelQuickTest } from '../../features/settings/SettingsChannelQuickTest'
 import { runninghubSiteNote } from '../../domain/project/runninghubSite'
@@ -707,6 +708,16 @@ export function SettingsPage({ embedded = false }: { embedded?: boolean } = {}) 
                   statusTone={statusTone}
                   showMockNote={showMockNote}
                   selectedProtocolNote={runninghubSiteNote(selected, selectedProtocolNote)}
+                  credentialField={
+                    <SettingsCredentialFieldView
+                      channels={channels}
+                      selected={selected}
+                      activeGroup={activeGroup}
+                      selectedKeyGroups={selectedKeyGroups}
+                      credentialSlots={credentialSlots}
+                      docUrl={docUrl}
+                    />
+                  }
                   newProtoOpen={newProtoOpen}
                   hiddenBuiltinProtocolCount={hiddenBuiltinProtocolIds.length}
                   npNotice={npNotice}
@@ -736,15 +747,13 @@ export function SettingsPage({ embedded = false }: { embedded?: boolean } = {}) 
                   onCheckImportedProtocol={checkImportedProtocol}
                   onSaveImportedProtocol={handleSaveImportedProtocol}
                 />
+              </div>
 
+              <div className={styles.groupWorkspaceCard} data-settings-group-workspace>
                 <SettingsKeyGroupView
-                  channels={channels}
-                  selected={selected}
                   activeGroup={activeGroup}
                   selectedKeyGroups={selectedKeyGroups}
-                  credentialSlots={credentialSlots}
                   busy={busy}
-                  docUrl={docUrl}
                   onAddKeyGroup={handleAddKeyGroup}
                   onRemoveKeyGroup={handleRemoveKeyGroup}
                   onActiveGroupChange={setActiveGroupId}

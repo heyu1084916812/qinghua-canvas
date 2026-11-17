@@ -45,14 +45,17 @@ export function ChannelTokenField({
    */
   const [revealed, setRevealed] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  const [dirty, setDirty] = useState(false)
   const masked = savedTail ? maskTokenTail(savedTail) : ''
   /** 存过但没尾号时也要给一句看得见的确认，不能看起来像没保存 */
   const savedText = masked || (saved ? '已保存' : '')
 
   /** 换了渠道 / 换了槽位：把"已显示"这件事清掉，免得上一条的明文挂在新渠道上 */
   useEffect(() => {
+    setToken('')
     setShow(false)
     setRevealed(null)
+    setDirty(false)
   }, [channelId, slot, groupId])
 
   /**
@@ -85,16 +88,19 @@ export function ChannelTokenField({
   const shownValue = show ? (revealed ?? token) : token
   const onTokenChange = (next: string) => {
     setToken(next)
+    setDirty(true)
     if (show) setRevealed(next)
   }
 
   const save = async () => {
-    if (!token) return
+    const next = show ? (revealed ?? token) : token
+    if (!dirty || !next.trim()) return
     setBusy(true)
     try {
-      if (groupId) await channels.saveCredentialGroupToken(channelId, groupId, token)
-      else await channels.saveToken(channelId, token, slot)
+      if (groupId) await channels.saveCredentialGroupToken(channelId, groupId, next)
+      else await channels.saveToken(channelId, next, slot)
       setToken('')
+      setDirty(false)
       /* 存完回到"打码占位"的常态：明文不再留在界面上 */
       setShow(false)
       setRevealed(null)
@@ -119,6 +125,10 @@ export function ChannelTokenField({
             placeholder={saved ? savedText : '粘贴 API Key'}
             value={shownValue}
             onChange={(e) => onTokenChange(e.target.value)}
+            onBlur={() => void save()}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter') event.currentTarget.blur()
+            }}
           />
           <button
             type="button"
@@ -127,19 +137,12 @@ export function ChannelTokenField({
             aria-label={show ? '隐藏 API Key' : '显示 API Key'}
             title={show ? '隐藏 API Key' : '显示 API Key'}
             disabled={busy || (!saved && !token)}
+            onMouseDown={(event) => event.preventDefault()}
             onClick={() => void toggleShow()}
           >
             {show ? <IconEyeOff size="sm" /> : <IconEye size="sm" />}
           </button>
         </div>
-        <button
-          className={styles.ghostBtn}
-          data-settings-token-save={groupId ?? slot}
-          disabled={!token || busy}
-          onClick={() => void save()}
-        >
-          保存
-        </button>
         {docUrl && (
           <a
             className={styles.docLink}

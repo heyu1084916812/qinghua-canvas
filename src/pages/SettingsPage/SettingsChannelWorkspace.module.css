@@ -115,57 +115,125 @@
   cursor: default;
 }
 
-.keyGroupSurface {
+.groupWorkspaceCard {
+  min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: var(--space-4);
-  padding-bottom: var(--space-5);
-  border-bottom: var(--border);
+}
+
+.groupWorkspaceCard > section {
+  padding: 0;
+  border-bottom: 0;
+}
+
+.groupWorkspaceCard > [data-settings-models] {
+  padding: var(--space-4);
+  border-radius: 0 0 var(--radius-control) var(--radius-control);
+  background: var(--bg-subtle);
+}
+
+.keyGroupTabsBar {
+  min-width: 0;
 }
 
 .keyGroupSwitcher {
   min-width: 0;
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-3);
+  align-items: flex-end;
 }
 
 .keyGroupTabs {
-  min-width: 0;
+  min-width: max-content;
   display: flex;
-  align-items: center;
-  gap: var(--space-1);
+  align-items: flex-end;
+  gap: 2px;
+  padding: var(--space-2) var(--space-2) 0 10px;
   overflow-x: auto;
+  overflow-y: hidden;
   scrollbar-width: thin;
 }
 
 .keyGroupTab {
-  flex: 0 0 auto;
-  height: var(--settings-control-height, 34px);
-  min-height: var(--settings-control-height, 34px);
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
-  padding: 0 var(--space-3);
-  border: 1px solid transparent;
-  border-radius: var(--radius-control);
-  background: transparent;
+  position: relative;
+  flex: 0 0 156px;
+  height: 52px;
+  display: flex;
+  align-items: flex-end;
   color: var(--text-2);
-  font: inherit;
   font-size: var(--fs-label);
   cursor: pointer;
-}
-
-.keyGroupTab:hover {
-  background: var(--bg-hover);
-  color: var(--text-1);
+  outline: none;
+  transition:
+    flex-basis 220ms ease-out,
+    color 220ms ease-out;
 }
 
 .keyGroupTabOn {
-  border-color: var(--stroke);
-  background: var(--bg-hover);
+  flex-basis: 320px;
+  z-index: 2;
   color: var(--text-1);
+}
+
+.keyGroupTab:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 3px;
+}
+
+.keyGroupTabShape {
+  position: absolute;
+  inset: 14px 0 0;
+  border-radius: var(--radius-control) var(--radius-control) 0 0;
+  background: color-mix(in srgb, var(--bg-subtle) 82%, var(--bg-surface));
+  clip-path: polygon(10px 0, calc(100% - 10px) 0, 100% 100%, 0 100%);
+  transition:
+    inset 220ms ease-out,
+    background-color 220ms ease-out;
+}
+
+.keyGroupTabOn .keyGroupTabShape {
+  inset: 4px 0 0;
+  background: var(--bg-subtle);
+}
+
+.keyGroupTabOn::before,
+.keyGroupTabOn::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  width: 10px;
+  height: 14px;
+  pointer-events: none;
+}
+
+.keyGroupTabOn::before {
+  left: -10px;
+  background: radial-gradient(circle at 0 0, transparent 0 10px, var(--bg-subtle) 10.5px);
+}
+
+.keyGroupTabOn::after {
+  right: -10px;
+  background: radial-gradient(circle at 100% 0, transparent 0 10px, var(--bg-subtle) 10.5px);
+}
+
+.keyGroupTabContent {
+  position: relative;
+  z-index: 2;
+  width: 100%;
+  min-width: 0;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 0 var(--space-3) 9px;
+}
+
+.keyGroupTabName {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  font-weight: var(--fw-title);
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .keyGroupDotOn,
@@ -184,82 +252,177 @@
   background: var(--status-off-dot);
 }
 
-.keyGroupBody {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-}
-
-.groupPropertyStrip {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  min-height: var(--settings-control-height, 34px);
-}
-
-.groupPropertyField {
-  min-width: 0;
+.keyGroupTabMeta {
+  flex: 0 0 auto;
+  max-width: 0;
   display: inline-flex;
   align-items: center;
-  gap: var(--space-2);
-  color: var(--text-3);
-  font-size: var(--fs-label);
+  gap: 2px;
+  overflow: hidden;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateX(-4px) scale(0.96);
+  transform-origin: left center;
+  transition:
+    max-width 220ms ease-out,
+    opacity 180ms ease-out,
+    transform 220ms ease-out;
 }
 
-.groupPropertyField input {
-  width: 140px;
-  height: var(--settings-control-height, 34px);
-  min-height: var(--settings-control-height, 34px);
+.keyGroupTabMetaOn {
+  max-width: 190px;
+  opacity: 1;
+  pointer-events: auto;
+  transform: none;
+}
+
+.keyGroupNameInput {
+  min-width: 80px;
+  width: 132px;
+  height: 26px;
   box-sizing: border-box;
   padding: 0 var(--space-2);
-  border: 1px solid transparent;
-  border-radius: var(--radius-control);
-  background: transparent;
+  border: var(--border);
+  border-radius: calc(var(--radius-control) - 2px);
+  background: var(--bg-surface);
   color: var(--text-1);
   font: inherit;
 }
 
-.groupPriorityField input {
-  width: 64px;
-}
-
-.groupPropertyField input:hover,
-.groupPropertyField input:focus {
-  border-color: var(--stroke);
-  background: var(--bg-hover);
-  outline: none;
-}
-
-.groupDanger {
-  margin-left: auto;
+.keyGroupPriorityBadge,
+.keyGroupPriorityInput {
+  min-width: 32px;
+  height: 24px;
   display: inline-flex;
   align-items: center;
-  gap: var(--space-2);
-  color: var(--text-3);
-  font-size: var(--fs-label);
-}
-
-.dangerTextButton {
-  height: var(--settings-control-height, 34px);
-  min-height: var(--settings-control-height, 34px);
-  display: inline-flex;
-  align-items: center;
+  justify-content: center;
   box-sizing: border-box;
   border: 0;
-  border-radius: var(--radius-control);
-  background: transparent;
-  color: var(--danger);
+  border-radius: var(--radius-pill);
+  background: var(--bg-selected);
+  color: var(--text-2);
   padding: 0 var(--space-2);
   font: inherit;
-  font-size: var(--fs-label);
+  font-size: var(--fs-chip);
+  white-space: nowrap;
+}
+
+.keyGroupPriorityBadge {
   cursor: pointer;
 }
 
-.dangerTextButton:hover:not(:disabled) {
+.keyGroupPriorityBadge:hover {
+  color: var(--text-1);
+}
+
+.keyGroupPriorityInput input {
+  width: 20px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: center;
+  -moz-appearance: textfield;
+}
+
+.keyGroupPriorityInput input::-webkit-inner-spin-button,
+.keyGroupPriorityInput input::-webkit-outer-spin-button {
+  margin: 0;
+  -webkit-appearance: none;
+}
+
+.keyGroupIconButton,
+.keyGroupDangerButton {
+  width: 28px;
+  height: 28px;
+  flex: 0 0 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--text-2);
+  cursor: pointer;
+}
+
+.keyGroupIconButton:hover {
+  background: var(--bg-hover);
+  color: var(--text-1);
+}
+
+.keyGroupDangerButton {
+  color: var(--danger);
+}
+
+.keyGroupDangerButton:hover:not(:disabled) {
   background: var(--bg-hover);
 }
 
-.dangerTextButton:disabled {
+.keyGroupIconButton:disabled,
+.keyGroupDangerButton:disabled {
   opacity: 0.45;
   cursor: default;
+}
+
+.keyGroupDeleteConfirm {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.keyGroupDeleteConfirm button {
+  height: 24px;
+  padding: 0 6px;
+  border: 0;
+  border-radius: calc(var(--radius-control) - 2px);
+  background: var(--bg-selected);
+  color: var(--text-2);
+  font: inherit;
+  font-size: var(--fs-chip);
+  cursor: pointer;
+}
+
+.keyGroupDeleteConfirm button:first-child {
+  color: var(--danger);
+}
+
+.keyGroupAddTab {
+  width: 34px;
+  height: 34px;
+  flex: 0 0 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 0 5px 6px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--text-2);
+  cursor: pointer;
+  transition:
+    background-color 220ms ease-out,
+    color 220ms ease-out;
+}
+
+.keyGroupAddTab:hover:not(:disabled) {
+  background: var(--bg-hover);
+  color: var(--text-1);
+}
+
+.keyGroupAddTab:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .keyGroupTab,
+  .keyGroupTabShape,
+  .keyGroupTabMeta,
+  .keyGroupAddTab {
+    transition: none;
+  }
 }

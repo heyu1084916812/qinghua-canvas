@@ -185,6 +185,12 @@
   align-items: center;
 }
 
+.credentialFieldStack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
 .tokenRow .ghostBtn { height: var(--settings-control-height, 34px); min-height: var(--settings-control-height, 34px); }
 
 .saved {
