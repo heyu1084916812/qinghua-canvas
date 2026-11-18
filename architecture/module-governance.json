@@ -292,7 +292,7 @@
       "test": [
         "src/pages/SettingsPage/customProtocolDraft.test.ts"
       ],
-      "budget": 882
+      "budget": 800
     },
     {
       "module": "src/pages/SkillsPage/SkillsPage.module.css",
@@ -12921,6 +12921,44 @@
         "src/pages/SettingsPage/settingsPage/SettingsKeyGroupView.test.ts"
       ],
       "budget": 49
+    },
+    {
+      "module": "src/pages/SettingsPage/settingsPage/SettingsChannelConnectionCard.tsx",
+      "owner": "settings-ui",
+      "responsibility": "渠道页「服务资料头 + 连接与鉴权」整块装配，含协议下拉、Key 槽位与协议导入面板。",
+      "owns": [
+        "连接卡的渲染树与协议下拉选项"
+      ],
+      "doesNotOwn": [
+        "协议导入导出的领域规则",
+        "渠道仓储写入"
+      ],
+      "publicApi": [
+        "SettingsChannelConnectionCard"
+      ],
+      "test": [
+        "src/pages/SettingsPage/settingsPage/useChannelProtocolDraft.test.ts"
+      ],
+      "budget": 220
+    },
+    {
+      "module": "src/pages/SettingsPage/settingsPage/useChannelProtocolDraft.ts",
+      "owner": "settings-ui",
+      "responsibility": "连接卡的协议草稿态：导入面板开合、解析结果、错误与下载回执，并绑定协议动作。",
+      "owns": [
+        "协议草稿态与回执自动消失"
+      ],
+      "doesNotOwn": [
+        "协议目录持久化",
+        "渠道表单字段"
+      ],
+      "publicApi": [
+        "useChannelProtocolDraft"
+      ],
+      "test": [
+        "src/pages/SettingsPage/settingsPage/useChannelProtocolDraft.test.ts"
+      ],
+      "budget": 130
     }
   ]
 }

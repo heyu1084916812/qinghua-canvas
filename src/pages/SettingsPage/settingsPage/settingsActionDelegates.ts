@@ -1,26 +1,24 @@
 import type { ChannelActions, ChannelActionState } from './channelActionCoordinator'
 import type { ModelMappingActions } from './modelMappingActionCoordinator'
-import type {
-  ProtocolActions,
-  ProtocolActionState,
-} from './protocolActionCoordinator'
 
 export interface SettingsActionDelegateSources {
   channelActions: ChannelActions
   mappingActions: ModelMappingActions
-  protocolActions: ProtocolActions
   channelState(): ChannelActionState
-  protocolState(): ProtocolActionState
 }
 
+/**
+ * 渠道 / 映射两类动作的「取当前快照再执行」委托。
+ *
+ * 协议动作（导入 / 导出 / 删除 / 恢复）已随连接卡搬进 `useChannelProtocolDraft`
+ * （2026-11-18「从连接卡开始」）——它们的草稿态就在那张卡里，留在这里只会
+ * 让页面继续持有 7 份没人读的 state。
+ */
 export function createSettingsActionDelegates(sources: SettingsActionDelegateSources) {
-  const { channelActions, mappingActions, protocolActions } = sources
+  const { channelActions, mappingActions } = sources
   const fromChannel = <Args extends unknown[], Result>(
     action: (state: ChannelActionState, ...args: Args) => Result,
   ) => (...args: Args) => action(sources.channelState(), ...args)
-  const fromProtocol = <Args extends unknown[], Result>(
-    action: (state: ProtocolActionState, ...args: Args) => Result,
-  ) => (...args: Args) => action(sources.protocolState(), ...args)
   return {
     handleCreate: fromChannel(channelActions.create),
     handleEnableChange: fromChannel(channelActions.setEnabled),
@@ -49,15 +47,5 @@ export function createSettingsActionDelegates(sources: SettingsActionDelegateSou
     applyDraft: fromChannel(channelActions.applyDraft),
     dropSelectedModel: fromChannel(channelActions.dropSelectedModel),
     dropOnChannel: fromChannel(channelActions.dropOnChannel),
-    handleProtocolChange: fromProtocol(protocolActions.handleProtocolChange),
-    checkImportedProtocol: fromProtocol(protocolActions.checkImportedProtocol),
-    handleImportProtocolFile: async (file: File | undefined) =>
-      protocolActions.importProtocolFile(file),
-    handleSaveImportedProtocol: fromProtocol(protocolActions.saveImportedProtocol),
-    downloadProtocolTemplate: protocolActions.downloadProtocolTemplate,
-    downloadProtocol: protocolActions.downloadProtocol,
-    toggleNewProtocol: fromProtocol(protocolActions.toggleNewProtocol),
-    handleRemoveProtocol: fromProtocol(protocolActions.removeProtocol),
-    handleRestoreBuiltinProtocols: protocolActions.restoreBuiltinProtocols,
   }
 }

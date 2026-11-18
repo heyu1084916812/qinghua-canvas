@@ -9,7 +9,6 @@ import {
 } from 'react'
 import { createPortal } from 'react-dom'
 import { useChannels } from '../../app/providers/ChannelStoreProvider'
-import type { DeclarativeProtocolPackage } from '../../domain/project/protocolRecipe'
 import {
   type CategoryFilter,
 } from '../../domain/project/modelSelection'
@@ -36,11 +35,6 @@ import {
   createModelMappingActions,
   type ModelMappingPorts,
 } from './settingsPage/modelMappingActionCoordinator'
-import {
-  createProtocolActions,
-  type ProtocolActionPorts,
-  type ProtocolActionState,
-} from './settingsPage/protocolActionCoordinator'
 import * as actionDelegates from './settingsPage/settingsActionDelegates'
 import * as channelPresentation from './settingsPage/settingsChannelPresentation'
 import * as interactionLifecycle from './settingsPage/settingsInteractionLifecycle'
@@ -49,11 +43,9 @@ import * as statusPresentation from './settingsPage/settingsStatusPresentation'
 import { settingsPageStyles as styles } from './settingsPage/settingsPageStyles'
 import { SettingsGlobalRouteView } from './settingsPage/SettingsGlobalRouteView'
 import { SettingsChannelSidebarView } from './settingsPage/SettingsChannelSidebarView'
-import { SettingsProviderHeaderView } from './settingsPage/SettingsProviderHeaderView'
-import { SettingsConnectionView } from './settingsPage/SettingsConnectionView'
+import { SettingsChannelConnectionCard } from './settingsPage/SettingsChannelConnectionCard'
 import { SettingsModelsView } from './settingsPage/SettingsModelsView'
 import { SettingsKeyGroupView } from './settingsPage/SettingsKeyGroupView'
-import { SettingsCredentialFieldView } from './settingsPage/SettingsCredentialFieldView'
 import { SettingsWorkflowManager } from '../../features/settings/SettingsWorkflowManager'
 import { SettingsChannelQuickTest } from '../../features/settings/SettingsChannelQuickTest'
 import { initialSelectedChannelId, useWorkflowsPageOpener } from './settingsPage/workflowsPageLink'
@@ -294,48 +286,16 @@ export function SettingsPage({ embedded = false }: { embedded?: boolean } = {}) 
     )
   }
   /** 抓站点图标要原生 HTTP（对账 #396）：浏览器里跨域读不到，按钮据此如实禁用 */
-  /** 下拉里的全部协议（含 pending：它们显示为“待支持”且不可选，见协议区渲染） */
-  const { credentials: credentialSlots = [], docUrl = '' } =
-    channelPresentation.protocolUsageFor(protocol, catalog)
   /**
-   * 旧协议（`openai-images` / `openai-chat`）**只在当前渠道本身就是它时才出现**（用户 2026-09-29「不要重复的东西」）。
-   *
-   * 这两个 id 不能从目录里删：老渠道存的就是它们，删了会变成「未知协议」、
-   * 适配器也认不出族（`registry.ts` 的 `LEGACY_FAMILY` 正是靠它们兜底）。
-   * 但新渠道不该再选到 —— 它们与「OpenAI 兼容」是同一套适配器，只是能力被写死成单项。
+   * 协议下拉、Key 槽位与协议草稿态（导入面板 / 回执）都随连接卡一起搬进了
+   * `SettingsChannelConnectionCard`（2026-11-18「从连接卡开始」）。
+   * 旧协议（`openai-images` / `openai-chat`）的过滤规则仍在
+   * `settingsChannelPresentation.protocolOptionsFor`：它们只在渠道本身就是它时才出现。
    */
-  const {
-    visible: visibleProtocolOptions,
-    pending: pendingProtocols,
-  } = channelPresentation.protocolOptionsFor({
-    catalog,
-    currentProtocol: protocol,
-    hiddenBuiltinProtocolIds: hiddenBuiltinProtocolSet,
-  })
-
-  // —— 添加自定义协议（用户 2026-09-28）：只开放 OpenAI 兼容族的对话 / 生图声明 ——
-  const [newProtoOpen, setNewProtoOpen] = useState(false)
-  const [npImportText, setNpImportText] = useState('')
-  const [npImported, setNpImported] = useState<DeclarativeProtocolPackage | null>(null)
-  const [npError, setNpError] = useState('')
-  const [npNotice, setNpNotice] = useState('')
-  const [protoRemoveError, setProtoRemoveError] = useState('')
-  const [protoManageNotice, setProtoManageNotice] = useState('')
 
   useEffect(() => {
     void channels.load()
   }, [channels])
-
-  useEffect(
-    () =>
-      interactionLifecycle.clearTimedNotice(
-        Boolean(protoManageNotice),
-        2600,
-        () => setProtoManageNotice(''),
-        settingsTimerPorts,
-      ),
-    [protoManageNotice],
-  )
 
   const selected = channelsList.find((channel) => channel.id === selectedId) ?? null
   const visibleChannels = useMemo(
@@ -495,30 +455,6 @@ export function SettingsPage({ embedded = false }: { embedded?: boolean } = {}) 
     clearTimeout: (timer) => window.clearTimeout(timer),
   }
   const mappingActions = createModelMappingActions(mappingPorts)
-  const protocolPorts: ProtocolActionPorts = {
-    channels,
-    platform,
-    setCatalogVersion,
-    setProtocol,
-    setBaseUrl,
-    setNpImportText,
-    setNpImported,
-    setNpError,
-    setNpNotice,
-    setProtoRemoveError,
-    setProtoManageNotice,
-    setNewProtoOpen,
-  }
-  const protocolState = (): ProtocolActionState => ({
-    selectedId,
-    protocol,
-    baseUrl,
-    catalog,
-    npImportText,
-    npImported,
-    newProtoOpen,
-  })
-  const protocolActions = createProtocolActions(protocolPorts)
 
   const {
     handleCreate, handleEnableChange, handleProfileIconFile, saveProfileDrawer,
@@ -527,15 +463,10 @@ export function SettingsPage({ embedded = false }: { embedded?: boolean } = {}) 
     handleAddKeyGroup, handleRemoveKeyGroup,
     handleAddGlobalModel, handleRemoveGlobalModel, openPanel,
     toggleDraft, applyDraft, dropSelectedModel, dropOnChannel,
-    handleProtocolChange, checkImportedProtocol, handleImportProtocolFile,
-    handleSaveImportedProtocol, downloadProtocolTemplate, downloadProtocol,
-    toggleNewProtocol, handleRemoveProtocol, handleRestoreBuiltinProtocols,
   } = actionDelegates.createSettingsActionDelegates({
     channelActions,
     mappingActions,
-    protocolActions,
     channelState,
-    protocolState,
   })
   const draftList = channelPresentation.draftModelsFor(
     selected,
@@ -675,76 +606,37 @@ export function SettingsPage({ embedded = false }: { embedded?: boolean } = {}) 
             <div className={styles.placeholder}>从左侧选择，或新增一个模型服务</div>
           ) : (
             <div className={styles.form} data-settings-form>
-              <SettingsProviderHeaderView
-                channelId={selected.id}
-                protocol={protocol}
-                icon={selected.icon}
+              <SettingsChannelConnectionCard
+                channel={selected}
                 name={name}
-                ariaName={selected.name}
+                protocol={protocol}
+                baseUrl={baseUrl}
                 enabled={enabled}
-                priority={selected.priority}
-                weight={selected.weight}
-                onEditProfile={editChannel}
+                busy={busy}
+                builtinSelected={builtinSelected}
+                catalog={catalog}
+                hiddenBuiltinProtocolIds={hiddenBuiltinProtocolIds}
+                referencedProtocolIds={referencedProtocolIds}
+                activeGroup={activeGroup}
+                selectedKeyGroups={selectedKeyGroups}
+                statusLine={statusLine}
+                statusTone={statusTone}
+                showMockNote={showMockNote}
+                setProtocol={setProtocol}
+                setBaseUrl={setBaseUrl}
+                setCatalogVersion={setCatalogVersion}
+                onPersistForm={persistForm}
                 onEnabledChange={(next) => void handleEnableChange(next)}
+                onEditProfile={editChannel}
                 onPriorityChange={(priority) =>
                   void channels.setRouteTuning(selected.id, { priority })
                 }
                 onWeightChange={(weight) =>
                   void channels.setRouteTuning(selected.id, { weight })
                 }
+                onDetect={handleDetect}
+                onVerify={handleVerify}
               />
-              <div className={styles.settingsCard} data-settings-section="connection">
-                <SettingsConnectionView
-                  baseUrl={baseUrl}
-                  busy={busy}
-                  protocol={protocol}
-                  builtinSelected={builtinSelected}
-                  visibleProtocolOptions={visibleProtocolOptions}
-                  pendingProtocols={pendingProtocols}
-                  referencedProtocolIds={referencedProtocolIds}
-                  statusLine={statusLine}
-                  statusTone={statusTone}
-                  showMockNote={showMockNote}
-                  credentialField={
-                    <SettingsCredentialFieldView
-                      channels={channels}
-                      selected={selected}
-                      activeGroup={activeGroup}
-                      selectedKeyGroups={selectedKeyGroups}
-                      credentialSlots={credentialSlots}
-                      docUrl={docUrl}
-                    />
-                  }
-                  newProtoOpen={newProtoOpen}
-                  hiddenBuiltinProtocolCount={hiddenBuiltinProtocolIds.length}
-                  npNotice={npNotice}
-                  protoManageNotice={protoManageNotice}
-                  protoRemoveError={protoRemoveError}
-                  npImportText={npImportText}
-                  npImported={npImported}
-                  npError={npError}
-                  onBaseUrlChange={setBaseUrl}
-                  onPersistForm={persistForm}
-                  onProtocolChange={handleProtocolChange}
-                  onDownloadProtocol={downloadProtocol}
-                  onRemoveProtocol={(protocolOption) => void handleRemoveProtocol(protocolOption)}
-                  onDetect={handleDetect}
-                  onVerify={handleVerify}
-                  onToggleNewProtocol={toggleNewProtocol}
-                  onRestoreBuiltinProtocols={() =>
-                    void handleRestoreBuiltinProtocols()
-                  }
-                  onDownloadProtocolTemplate={downloadProtocolTemplate}
-                  onImportProtocolFile={(file) =>
-                    void handleImportProtocolFile(file)
-                  }
-                  onImportTextChange={setNpImportText}
-                  onClearImported={() => setNpImported(null)}
-                  onClearImportError={() => setNpError('')}
-                  onCheckImportedProtocol={checkImportedProtocol}
-                  onSaveImportedProtocol={handleSaveImportedProtocol}
-                />
-              </div>
 
               <div className={styles.groupWorkspaceCard} data-settings-group-workspace>
                 <SettingsKeyGroupView

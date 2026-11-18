@@ -27,18 +27,6 @@ describe('设置页动作委托', () => {
       dropSelectedModel: vi.fn(async () => undefined),
       dropOnChannel: vi.fn(async () => undefined),
     }
-    const protocolState = vi.fn(() => ({ selectedId: 'a' }))
-    const protocolActions = {
-      handleProtocolChange: vi.fn(() => 'changed'),
-      checkImportedProtocol: vi.fn(() => 'checked'),
-      importProtocolFile: vi.fn(async () => undefined),
-      saveImportedProtocol: vi.fn(async () => undefined),
-      downloadProtocolTemplate: vi.fn(async () => undefined),
-      downloadProtocol: vi.fn(async () => undefined),
-      toggleNewProtocol: vi.fn(() => 'toggled'),
-      removeProtocol: vi.fn(async () => undefined),
-      restoreBuiltinProtocols: vi.fn(async () => undefined),
-    }
     const mappingActions = {
       flush: vi.fn(async () => undefined),
       schedule: vi.fn(),
@@ -47,18 +35,26 @@ describe('设置页动作委托', () => {
     const actions = createSettingsActionDelegates({
       channelActions: channelActions as never,
       mappingActions,
-      protocolActions: protocolActions as never,
       channelState: channelState as never,
-      protocolState: protocolState as never,
     })
 
     expect(actions.editChannel('b')).toBe('edited')
     expect(actions.openPanel()).toBe('opened')
     expect(actions.toggleDraft('m', true)).toBe('toggled')
-    expect(actions.handleProtocolChange('openai-compatible')).toBe('changed')
     expect(channelState).toHaveBeenCalledTimes(3)
-    expect(protocolState).toHaveBeenCalledOnce()
     expect(channelActions.editChannel).toHaveBeenCalledWith({ selectedId: 'a' }, 'b')
     expect(actions.flushModelMapping).toBe(mappingActions.flush)
+  })
+
+  it('协议动作不再由页面委托：它们随连接卡走 useChannelProtocolDraft', async () => {
+    const actions = createSettingsActionDelegates({
+      channelActions: {} as never,
+      mappingActions: {} as never,
+      channelState: (() => ({ selectedId: 'a' })) as never,
+    })
+    expect(Object.keys(actions)).not.toContain('handleProtocolChange')
+    expect(Object.keys(actions)).not.toContain('downloadProtocol')
+    const { useChannelProtocolDraft } = await import('./useChannelProtocolDraft')
+    expect(useChannelProtocolDraft).toBeTypeOf('function')
   })
 })

@@ -38,12 +38,25 @@ const STYLE_FACADE = (
 )['./settingsPage/settingsPageStyles.ts']
 
 const VIEW_SOURCES = Object.values(
-  import.meta.glob('./settingsPage/Settings*View.tsx', {
+  import.meta.glob('./settingsPage/Settings*{,View,Card}.tsx', {
     eager: true,
     query: '?raw',
     import: 'default',
   }) as Record<string, string>,
 ).join('\n')
+
+/**
+ * 连接卡的协议草稿态（导入 / 导出 / 删除 / 恢复）在 2026-11-18 随卡片一起
+ * 从页面搬进了这个 hook —— 端口装配的断言要跟着搬到这边，否则「页面真的接上了
+ * 协议动作」这条护栏会退化成永远为真。
+ */
+const PROTOCOL_DRAFT_SOURCE = (
+  import.meta.glob('./settingsPage/useChannelProtocolDraft.ts', {
+    eager: true,
+    query: '?raw',
+    import: 'default',
+  }) as Record<string, string>
+)['./settingsPage/useChannelProtocolDraft.ts']
 
 const CHANNEL_ACTION_KEYS: readonly (keyof ChannelActions)[] = [
   'create',
@@ -112,7 +125,7 @@ describe('SettingsPage 公共导出与页面锚点', () => {
   it('页面真实装配三组动作端口，并保留 CSS Module 回归修复', () => {
     expect(SETTINGS_SOURCE).toContain('const channelActions = createChannelActions(channelPorts)')
     expect(SETTINGS_SOURCE).toContain('const mappingActions = createModelMappingActions(mappingPorts)')
-    expect(SETTINGS_SOURCE).toContain('const protocolActions = createProtocolActions(protocolPorts)')
+    expect(PROTOCOL_DRAFT_SOURCE).toContain('createProtocolActions({')
     expect(STYLE_FACADE).toContain('item: baseStyles.item')
   })
 

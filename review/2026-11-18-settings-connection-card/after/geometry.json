@@ -1,0 +1,1086 @@
+[
+  {
+    "tag": "1440x900-dark",
+    "childOrder": [
+      "data-settings-provider-head",
+      "connection",
+      "data-settings-group-workspace",
+      "mapping",
+      "SECTION"
+    ],
+    "elements": {
+      "[data-settings-form]": {
+        "rect": {
+          "x": 524,
+          "y": 230.8,
+          "w": 844,
+          "h": 843.47
+        },
+        "background": "rgba(0, 0, 0, 0)",
+        "borderRadius": "0px",
+        "borderTop": "0px none rgb(239, 239, 239)",
+        "padding": "0px",
+        "gap": "24px",
+        "fontSize": "13px",
+        "fontWeight": "400",
+        "overflowX": 0
+      },
+      "[data-settings-provider-head]": {
+        "rect": {
+          "x": 524,
+          "y": 230.8,
+          "w": 844,
+          "h": 38
+        },
+        "background": "rgba(0, 0, 0, 0)",
+        "borderRadius": "0px",
+        "borderTop": "0px none rgb(239, 239, 239)",
+        "padding": "0px",
+        "gap": "normal",
+        "fontSize": "13px",
+        "fontWeight": "400",
+        "overflowX": 0
+      },
+      "[data-settings-provider-name-row]": {
+        "rect": {
+          "x": 566,
+          "y": 230.8,
+          "w": 758,
+          "h": 34
+        },
+        "background": "rgba(0, 0, 0, 0)",
+        "borderRadius": "0px",
+        "borderTop": "0px none rgb(239, 239, 239)",
+        "padding": "0px",
+        "gap": "8px",
+        "fontSize": "13px",
+        "fontWeight": "400",
+        "overflowX": 0
+      },
+      "[data-settings-name]": {
+        "rect": {
+          "x": 566,
+          "y": 238.7,
+          "w": 85.42,
+          "h": 18.19
+        },
+        "background": "rgba(0, 0, 0, 0)",
+        "borderRadius": "0px",
+        "borderTop": "0px none rgb(239, 239, 239)",
+        "padding": "0px",
+        "gap": "normal",
+        "fontSize": "14px",
+        "fontWeight": "600",
+        "overflowX": 0
+      },
+      "[data-settings-profile-edit]": {
+        "rect": {
+          "x": 659.42,
+          "y": 233.8,
+          "w": 28,
+          "h": 28
+        },
+        "background": "rgba(0, 0, 0, 0)",
+        "borderRadius": "10px",
+        "borderTop": "0px none rgb(118, 118, 118)",
+        "padding": "0px",
+        "gap": "normal",
+        "fontSize": "13px",
+        "fontWeight": "500",
+        "overflowX": 0
+      },
+      "[data-settings-section=\"connection\"]": {
+        "rect": {
+          "x": 524,
+          "y": 292.8,
+          "w": 844,
+          "h": 219.48
+        },
+        "background": "rgb(31, 31, 31)",
+        "borderRadius": "10px",
+        "borderTop": "0px none rgb(239, 239, 239)",
+        "padding": "16px",
+        "gap": "20px",
+        "fontSize": "13px",
+        "fontWeight": "400",
+        "overflowX": 0
+      },
+      "[data-settings-connection]": {
+        "rect": {
+          "x": 540,
+          "y": 308.8,
+          "w": 812,
+          "h": 187.48
+        },
+        "background": "rgba(0, 0, 0, 0)",
+        "borderRadius": "0px",
+        "borderTop": "0px none rgb(239, 239, 239)",
+        "padding": "0px",
+        "gap": "12px",
+        "fontSize": "13px",
+        "fontWeight": "400",
+        "overflowX": 0
+      },
+      "[data-settings-baseurl]": {
+        "rect": {
+          "x": 540,
+          "y": 389.44,
+          "w": 673.86,
+          "h": 34
+        },
+        "background": "rgb(34, 34, 34)",
+        "borderRadius": "10px",
+        "borderTop": "1px solid rgb(58, 58, 58)",
+        "padding": "8px 12px",
+        "gap": "normal",
+        "fontSize": "13px",
+        "fontWeight": "400",
+        "overflowX": 0
+      },
+      "[data-settings-credential-fields]": {
+        "rect": {
+          "x": 540,
+          "y": 435.44,
+          "w": 812,
+          "h": 60.84
+        },
+        "background": "rgba(0, 0, 0, 0)",
+        "borderRadius": "0px",
+        "borderTop": "0px none rgb(239, 239, 239)",
+        "padding": "0px",
+        "gap": "12px",
+        "fontSize": "13px",
+        "fontWeight": "400",
+        "overflowX": 0
+      },
+      "[data-settings-token-row]": {
+        "rect": {
+          "x": 540,
+          "y": 435.44,
+          "w": 812,
+          "h": 60.84
+        },
+        "background": "rgba(0, 0, 0, 0)",
+        "borderRadius": "0px",
+        "borderTop": "0px none rgb(239, 239, 239)",
+        "padding": "0px",
+        "gap": "8px",
+        "fontSize": "13px",
+        "fontWeight": "400",
+        "overflowX": 0
+      },
+      "[data-settings-status]": {
+        "rect": {
+          "x": 0,
+          "y": 0,
+          "w": 0,
+          "h": 0
+        },
+        "background": "rgba(0, 0, 0, 0)",
+        "borderRadius": "0px",
+        "borderTop": "0px none rgb(162, 162, 162)",
+        "padding": "0px",
+        "gap": "normal",
+        "fontSize": "13px",
+        "fontWeight": "400",
+        "overflowX": 0
+      },
+      "[data-settings-detect]": {
+        "rect": {
+          "x": 1103.25,
+          "y": 308.8,
+          "w": 80.25,
+          "h": 34
+        },
+        "background": "rgba(0, 0, 0, 0)",
+        "borderRadius": "10px",
+        "borderTop": "1px solid rgba(0, 0, 0, 0)",
+        "padding": "0px 12px",
+        "gap": "normal",
+        "fontSize": "13px",
+        "fontWeight": "500",
+        "overflowX": 0
+      },
+      "[data-settings-verify]": {
+        "rect": {
+          "x": 1187.5,
+          "y": 308.8,
+          "w": 80.25,
+          "h": 34
+        },
+        "background": "rgba(0, 0, 0, 0)",
+        "borderRadius": "10px",
+        "borderTop": "1px solid rgba(0, 0, 0, 0)",
+        "padding": "0px 12px",
+        "gap": "normal",
+        "fontSize": "13px",
+        "fontWeight": "500",
+        "overflowX": 0
+      },
+      "[data-proto-add-toggle]": {
+        "rect": {
+          "x": 1271.75,
+          "y": 308.8,
+          "w": 80.25,
+          "h": 34
+        },
+        "background": "rgba(0, 0, 0, 0)",
+        "borderRadius": "10px",
+        "borderTop": "1px solid rgba(0, 0, 0, 0)",
+        "padding": "0px 12px",
+        "gap": "normal",
+        "fontSize": "13px",
+        "fontWeight": "500",
+        "overflowX": 0
+      },
+      "[data-settings-group-workspace]": {
+        "rect": {
+          "x": 524,
+          "y": 536.28,
+          "w": 844,
+          "h": 144.8
+        },
+        "background": "rgba(0, 0, 0, 0)",
+        "borderRadius": "0px",
+        "borderTop": "0px none rgb(239, 239, 239)",
+        "padding": "0px",
+        "gap": "normal",
+        "fontSize": "13px",
+        "fontWeight": "400",
+        "overflowX": 0
+      },
+      "[data-settings-section=\"mapping\"]": {
+        "rect": {
+          "x": 524,
+          "y": 705.08,
+          "w": 844,
+          "h": 226
+        },
+        "background": "rgba(0, 0, 0, 0)",
+        "borderRadius": "0px",
+        "borderTop": "0px none rgb(239, 239, 239)",
+        "padding": "0px",
+        "gap": "normal",
+        "fontSize": "13px",
+        "fontWeight": "400",
+        "overflowX": 0
+      }
+    },
+    "docOverflow": 0,
+    "formOverflow": 0,
+    "pageErrors": []
+  },
+  {
+    "tag": "1440x900-light",
+    "childOrder": [
+      "data-settings-provider-head",
+      "connection",
+      "data-settings-group-workspace",
+      "mapping",
+      "SECTION"
+    ],
+    "elements": {
+      "[data-settings-form]": {
+        "rect": {
+          "x": 524,
+          "y": 230.8,
+          "w": 844,
+          "h": 843.47
+        },
+        "background": "rgba(0, 0, 0, 0)",
+        "borderRadius": "0px",
+        "borderTop": "0px none rgb(23, 23, 23)",
+        "padding": "0px",
+        "gap": "24px",
+        "fontSize": "13px",
+        "fontWeight": "400",
+        "overflowX": 0
+      },
+      "[data-settings-provider-head]": {
+        "rect": {
+          "x": 524,
+          "y": 230.8,
+          "w": 844,
+          "h": 38
+        },
+        "background": "rgba(0, 0, 0, 0)",
+        "borderRadius": "0px",
+        "borderTop": "0px none rgb(23, 23, 23)",
+        "padding": "0px",
+        "gap": "normal",
+        "fontSize": "13px",
+        "fontWeight": "400",
+        "overflowX": 0
+      },
+      "[data-settings-provider-name-row]": {
+        "rect": {
+          "x": 566,
+          "y": 230.8,
+          "w": 758,
+          "h": 34
+        },
+        "background": "rgba(0, 0, 0, 0)",
+        "borderRadius": "0px",
+        "borderTop": "0px none rgb(23, 23, 23)",
+        "padding": "0px",
+        "gap": "8px",
+        "fontSize": "13px",
+        "fontWeight": "400",
+        "overflowX": 0
+      },
+      "[data-settings-name]": {
+        "rect": {
+          "x": 566,
+          "y": 238.7,
+          "w": 85.42,
+          "h": 18.19
+        },
+        "background": "rgba(0, 0, 0, 0)",
+        "borderRadius": "0px",
+        "borderTop": "0px none rgb(23, 23, 23)",
+        "padding": "0px",
+        "gap": "normal",
+        "fontSize": "14px",
+        "fontWeight": "600",
+        "overflowX": 0
+      },
+      "[data-settings-profile-edit]": {
+        "rect": {
+          "x": 659.42,
+          "y": 233.8,
+          "w": 28,
+          "h": 28
+        },
+        "background": "rgba(0, 0, 0, 0)",
+        "borderRadius": "10px",
+        "borderTop": "0px none rgb(154, 154, 154)",
+        "padding": "0px",
+        "gap": "normal",
+        "fontSize": "13px",
+        "fontWeight": "500",
+        "overflowX": 0
+      },
+      "[data-settings-section=\"connection\"]": {
+        "rect": {
+          "x": 524,
+          "y": 292.8,
+          "w": 844,
+          "h": 219.48
+        },
+        "background": "rgb(245, 245, 245)",
+        "borderRadius": "10px",
+        "borderTop": "0px none rgb(23, 23, 23)",
+        "padding": "16px",
+        "gap": "20px",
+        "fontSize": "13px",
+        "fontWeight": "400",
+        "overflowX": 0
+      },
+      "[data-settings-connection]": {
+        "rect": {
+          "x": 540,
+          "y": 308.8,
+          "w": 812,
+          "h": 187.48
+        },
+        "background": "rgba(0, 0, 0, 0)",
+        "borderRadius": "0px",
+        "borderTop": "0px none rgb(23, 23, 23)",
+        "padding": "0px",
+        "gap": "12px",
+        "fontSize": "13px",
+        "fontWeight": "400",
+        "overflowX": 0
+      },
+      "[data-settings-baseurl]": {
+        "rect": {
+          "x": 540,
+          "y": 389.44,
+          "w": 673.86,
+          "h": 34
+        },
+        "background": "rgb(255, 255, 255)",
+        "borderRadius": "10px",
+        "borderTop": "1px solid rgb(226, 226, 226)",
+        "padding": "8px 12px",
+        "gap": "normal",
+        "fontSize": "13px",
+        "fontWeight": "400",
+        "overflowX": 0
+      },
+      "[data-settings-credential-fields]": {
+        "rect": {
+          "x": 540,
+          "y": 435.44,
+          "w": 812,
+          "h": 60.84
+        },
+        "background": "rgba(0, 0, 0, 0)",
+        "borderRadius": "0px",
+        "borderTop": "0px none rgb(23, 23, 23)",
+        "padding": "0px",
+        "gap": "12px",
+        "fontSize": "13px",
+        "fontWeight": "400",
+        "overflowX": 0
+      },
+      "[data-settings-token-row]": {
+        "rect": {
+          "x": 540,
+          "y": 435.44,
+          "w": 812,
+          "h": 60.84
+        },
+        "background": "rgba(0, 0, 0, 0)",
+        "borderRadius": "0px",
+        "borderTop": "0px none rgb(23, 23, 23)",
+        "padding": "0px",
+        "gap": "8px",
+        "fontSize": "13px",
+        "fontWeight": "400",
+        "overflowX": 0
+      },
+      "[data-settings-status]": {
+        "rect": {
+          "x": 0,
+          "y": 0,
+          "w": 0,
+          "h": 0
+        },
+        "background": "rgba(0, 0, 0, 0)",
+        "borderRadius": "0px",
+        "borderTop": "0px none rgb(111, 111, 111)",
+        "padding": "0px",
+        "gap": "normal",
+        "fontSize": "13px",
+        "fontWeight": "400",
+        "overflowX": 0
+      },
+      "[data-settings-detect]": {
+        "rect": {
+          "x": 1103.25,
+          "y": 308.8,
+          "w": 80.25,
+          "h": 34
+        },
+        "background": "rgba(0, 0, 0, 0)",
+        "borderRadius": "10px",
+        "borderTop": "1px solid rgba(0, 0, 0, 0)",
+        "padding": "0px 12px",
+        "gap": "normal",
+        "fontSize": "13px",
+        "fontWeight": "500",
+        "overflowX": 0
+      },
+      "[data-settings-verify]": {
+        "rect": {
+          "x": 1187.5,
+          "y": 308.8,
+          "w": 80.25,
+          "h": 34
+        },
+        "background": "rgba(0, 0, 0, 0)",
+        "borderRadius": "10px",
+        "borderTop": "1px solid rgba(0, 0, 0, 0)",
+        "padding": "0px 12px",
+        "gap": "normal",
+        "fontSize": "13px",
+        "fontWeight": "500",
+        "overflowX": 0
+      },
+      "[data-proto-add-toggle]": {
+        "rect": {
+          "x": 1271.75,
+          "y": 308.8,
+          "w": 80.25,
+          "h": 34
+        },
+        "background": "rgba(0, 0, 0, 0)",
+        "borderRadius": "10px",
+        "borderTop": "1px solid rgba(0, 0, 0, 0)",
+        "padding": "0px 12px",
+        "gap": "normal",
+        "fontSize": "13px",
+        "fontWeight": "500",
+        "overflowX": 0
+      },
+      "[data-settings-group-workspace]": {
+        "rect": {
+          "x": 524,
+          "y": 536.28,
+          "w": 844,
+          "h": 144.8
+        },
+        "background": "rgba(0, 0, 0, 0)",
+        "borderRadius": "0px",
+        "borderTop": "0px none rgb(23, 23, 23)",
+        "padding": "0px",
+        "gap": "normal",
+        "fontSize": "13px",
+        "fontWeight": "400",
+        "overflowX": 0
+      },
+      "[data-settings-section=\"mapping\"]": {
+        "rect": {
+          "x": 524,
+          "y": 705.08,
+          "w": 844,
+          "h": 226
+        },
+        "background": "rgba(0, 0, 0, 0)",
+        "borderRadius": "0px",
+        "borderTop": "0px none rgb(23, 23, 23)",
+        "padding": "0px",
+        "gap": "normal",
+        "fontSize": "13px",
+        "fontWeight": "400",
+        "overflowX": 0
+      }
+    },
+    "docOverflow": 0,
+    "formOverflow": 0,
+    "pageErrors": []
+  },
+  {
+    "tag": "1024x700-dark",
+    "childOrder": [
+      "data-settings-provider-head",
+      "connection",
+      "data-settings-group-workspace",
+      "mapping",
+      "SECTION"
+    ],
+    "elements": {
+      "[data-settings-form]": {
+        "rect": {
+          "x": 476,
+          "y": 222.8,
+          "w": 492,
+          "h": 878.27
+        },
+        "background": "rgba(0, 0, 0, 0)",
+        "borderRadius": "0px",
+        "borderTop": "0px none rgb(239, 239, 239)",
+        "padding": "0px",
+        "gap": "24px",
+        "fontSize": "13px",
+        "fontWeight": "400",
+        "overflowX": 0
+      },
+      "[data-settings-provider-head]": {
+        "rect": {
+          "x": 476,
+          "y": 222.8,
+          "w": 492,
+          "h": 38
+        },
+        "background": "rgba(0, 0, 0, 0)",
+        "borderRadius": "0px",
+        "borderTop": "0px none rgb(239, 239, 239)",
+        "padding": "0px",
+        "gap": "normal",
+        "fontSize": "13px",
+        "fontWeight": "400",
+        "overflowX": 0
+      },
+      "[data-settings-provider-name-row]": {
+        "rect": {
+          "x": 518,
+          "y": 222.8,
+          "w": 406,
+          "h": 34
+        },
+        "background": "rgba(0, 0, 0, 0)",
+        "borderRadius": "0px",
+        "borderTop": "0px none rgb(239, 239, 239)",
+        "padding": "0px",
+        "gap": "8px",
+        "fontSize": "13px",
+        "fontWeight": "400",
+        "overflowX": 0
+      },
+      "[data-settings-name]": {
+        "rect": {
+          "x": 518,
+          "y": 230.7,
+          "w": 85.42,
+          "h": 18.19
+        },
+        "background": "rgba(0, 0, 0, 0)",
+        "borderRadius": "0px",
+        "borderTop": "0px none rgb(239, 239, 239)",
+        "padding": "0px",
+        "gap": "normal",
+        "fontSize": "14px",
+        "fontWeight": "600",
+        "overflowX": 0
+      },
+      "[data-settings-profile-edit]": {
+        "rect": {
+          "x": 611.42,
+          "y": 225.8,
+          "w": 28,
+          "h": 28
+        },
+        "background": "rgba(0, 0, 0, 0)",
+        "borderRadius": "10px",
+        "borderTop": "0px none rgb(118, 118, 118)",
+        "padding": "0px",
+        "gap": "normal",
+        "fontSize": "13px",
+        "fontWeight": "500",
+        "overflowX": 0
+      },
+      "[data-settings-section=\"connection\"]": {
+        "rect": {
+          "x": 476,
+          "y": 284.8,
+          "w": 492,
+          "h": 219.48
+        },
+        "background": "rgb(31, 31, 31)",
+        "borderRadius": "10px",
+        "borderTop": "0px none rgb(239, 239, 239)",
+        "padding": "16px",
+        "gap": "20px",
+        "fontSize": "13px",
+        "fontWeight": "400",
+        "overflowX": 0
+      },
+      "[data-settings-connection]": {
+        "rect": {
+          "x": 492,
+          "y": 300.8,
+          "w": 460,
+          "h": 187.48
+        },
+        "background": "rgba(0, 0, 0, 0)",
+        "borderRadius": "0px",
+        "borderTop": "0px none rgb(239, 239, 239)",
+        "padding": "0px",
+        "gap": "12px",
+        "fontSize": "13px",
+        "fontWeight": "400",
+        "overflowX": 0
+      },
+      "[data-settings-baseurl]": {
+        "rect": {
+          "x": 492,
+          "y": 381.44,
+          "w": 321.86,
+          "h": 34
+        },
+        "background": "rgb(34, 34, 34)",
+        "borderRadius": "10px",
+        "borderTop": "1px solid rgb(58, 58, 58)",
+        "padding": "8px 12px",
+        "gap": "normal",
+        "fontSize": "13px",
+        "fontWeight": "400",
+        "overflowX": 0
+      },
+      "[data-settings-credential-fields]": {
+        "rect": {
+          "x": 492,
+          "y": 427.44,
+          "w": 460,
+          "h": 60.84
+        },
+        "background": "rgba(0, 0, 0, 0)",
+        "borderRadius": "0px",
+        "borderTop": "0px none rgb(239, 239, 239)",
+        "padding": "0px",
+        "gap": "12px",
+        "fontSize": "13px",
+        "fontWeight": "400",
+        "overflowX": 0
+      },
+      "[data-settings-token-row]": {
+        "rect": {
+          "x": 492,
+          "y": 427.44,
+          "w": 460,
+          "h": 60.84
+        },
+        "background": "rgba(0, 0, 0, 0)",
+        "borderRadius": "0px",
+        "borderTop": "0px none rgb(239, 239, 239)",
+        "padding": "0px",
+        "gap": "8px",
+        "fontSize": "13px",
+        "fontWeight": "400",
+        "overflowX": 0
+      },
+      "[data-settings-status]": {
+        "rect": {
+          "x": 0,
+          "y": 0,
+          "w": 0,
+          "h": 0
+        },
+        "background": "rgba(0, 0, 0, 0)",
+        "borderRadius": "0px",
+        "borderTop": "0px none rgb(162, 162, 162)",
+        "padding": "0px",
+        "gap": "normal",
+        "fontSize": "13px",
+        "fontWeight": "400",
+        "overflowX": 0
+      },
+      "[data-settings-detect]": {
+        "rect": {
+          "x": 703.25,
+          "y": 300.8,
+          "w": 80.25,
+          "h": 34
+        },
+        "background": "rgba(0, 0, 0, 0)",
+        "borderRadius": "10px",
+        "borderTop": "1px solid rgba(0, 0, 0, 0)",
+        "padding": "0px 12px",
+        "gap": "normal",
+        "fontSize": "13px",
+        "fontWeight": "500",
+        "overflowX": 0
+      },
+      "[data-settings-verify]": {
+        "rect": {
+          "x": 787.5,
+          "y": 300.8,
+          "w": 80.25,
+          "h": 34
+        },
+        "background": "rgba(0, 0, 0, 0)",
+        "borderRadius": "10px",
+        "borderTop": "1px solid rgba(0, 0, 0, 0)",
+        "padding": "0px 12px",
+        "gap": "normal",
+        "fontSize": "13px",
+        "fontWeight": "500",
+        "overflowX": 0
+      },
+      "[data-proto-add-toggle]": {
+        "rect": {
+          "x": 871.75,
+          "y": 300.8,
+          "w": 80.25,
+          "h": 34
+        },
+        "background": "rgba(0, 0, 0, 0)",
+        "borderRadius": "10px",
+        "borderTop": "1px solid rgba(0, 0, 0, 0)",
+        "padding": "0px 12px",
+        "gap": "normal",
+        "fontSize": "13px",
+        "fontWeight": "500",
+        "overflowX": 0
+      },
+      "[data-settings-group-workspace]": {
+        "rect": {
+          "x": 476,
+          "y": 528.28,
+          "w": 492,
+          "h": 165.59
+        },
+        "background": "rgba(0, 0, 0, 0)",
+        "borderRadius": "0px",
+        "borderTop": "0px none rgb(239, 239, 239)",
+        "padding": "0px",
+        "gap": "normal",
+        "fontSize": "13px",
+        "fontWeight": "400",
+        "overflowX": 0
+      },
+      "[data-settings-section=\"mapping\"]": {
+        "rect": {
+          "x": 476,
+          "y": 717.88,
+          "w": 492,
+          "h": 240
+        },
+        "background": "rgba(0, 0, 0, 0)",
+        "borderRadius": "0px",
+        "borderTop": "0px none rgb(239, 239, 239)",
+        "padding": "0px",
+        "gap": "normal",
+        "fontSize": "13px",
+        "fontWeight": "400",
+        "overflowX": 0
+      }
+    },
+    "docOverflow": 0,
+    "formOverflow": 0,
+    "pageErrors": []
+  },
+  {
+    "tag": "1024x700-light",
+    "childOrder": [
+      "data-settings-provider-head",
+      "connection",
+      "data-settings-group-workspace",
+      "mapping",
+      "SECTION"
+    ],
+    "elements": {
+      "[data-settings-form]": {
+        "rect": {
+          "x": 476,
+          "y": 222.8,
+          "w": 492,
+          "h": 878.27
+        },
+        "background": "rgba(0, 0, 0, 0)",
+        "borderRadius": "0px",
+        "borderTop": "0px none rgb(23, 23, 23)",
+        "padding": "0px",
+        "gap": "24px",
+        "fontSize": "13px",
+        "fontWeight": "400",
+        "overflowX": 0
+      },
+      "[data-settings-provider-head]": {
+        "rect": {
+          "x": 476,
+          "y": 222.8,
+          "w": 492,
+          "h": 38
+        },
+        "background": "rgba(0, 0, 0, 0)",
+        "borderRadius": "0px",
+        "borderTop": "0px none rgb(23, 23, 23)",
+        "padding": "0px",
+        "gap": "normal",
+        "fontSize": "13px",
+        "fontWeight": "400",
+        "overflowX": 0
+      },
+      "[data-settings-provider-name-row]": {
+        "rect": {
+          "x": 518,
+          "y": 222.8,
+          "w": 406,
+          "h": 34
+        },
+        "background": "rgba(0, 0, 0, 0)",
+        "borderRadius": "0px",
+        "borderTop": "0px none rgb(23, 23, 23)",
+        "padding": "0px",
+        "gap": "8px",
+        "fontSize": "13px",
+        "fontWeight": "400",
+        "overflowX": 0
+      },
+      "[data-settings-name]": {
+        "rect": {
+          "x": 518,
+          "y": 230.7,
+          "w": 85.42,
+          "h": 18.19
+        },
+        "background": "rgba(0, 0, 0, 0)",
+        "borderRadius": "0px",
+        "borderTop": "0px none rgb(23, 23, 23)",
+        "padding": "0px",
+        "gap": "normal",
+        "fontSize": "14px",
+        "fontWeight": "600",
+        "overflowX": 0
+      },
+      "[data-settings-profile-edit]": {
+        "rect": {
+          "x": 611.42,
+          "y": 225.8,
+          "w": 28,
+          "h": 28
+        },
+        "background": "rgba(0, 0, 0, 0)",
+        "borderRadius": "10px",
+        "borderTop": "0px none rgb(154, 154, 154)",
+        "padding": "0px",
+        "gap": "normal",
+        "fontSize": "13px",
+        "fontWeight": "500",
+        "overflowX": 0
+      },
+      "[data-settings-section=\"connection\"]": {
+        "rect": {
+          "x": 476,
+          "y": 284.8,
+          "w": 492,
+          "h": 219.48
+        },
+        "background": "rgb(245, 245, 245)",
+        "borderRadius": "10px",
+        "borderTop": "0px none rgb(23, 23, 23)",
+        "padding": "16px",
+        "gap": "20px",
+        "fontSize": "13px",
+        "fontWeight": "400",
+        "overflowX": 0
+      },
+      "[data-settings-connection]": {
+        "rect": {
+          "x": 492,
+          "y": 300.8,
+          "w": 460,
+          "h": 187.48
+        },
+        "background": "rgba(0, 0, 0, 0)",
+        "borderRadius": "0px",
+        "borderTop": "0px none rgb(23, 23, 23)",
+        "padding": "0px",
+        "gap": "12px",
+        "fontSize": "13px",
+        "fontWeight": "400",
+        "overflowX": 0
+      },
+      "[data-settings-baseurl]": {
+        "rect": {
+          "x": 492,
+          "y": 381.44,
+          "w": 321.86,
+          "h": 34
+        },
+        "background": "rgb(255, 255, 255)",
+        "borderRadius": "10px",
+        "borderTop": "1px solid rgb(226, 226, 226)",
+        "padding": "8px 12px",
+        "gap": "normal",
+        "fontSize": "13px",
+        "fontWeight": "400",
+        "overflowX": 0
+      },
+      "[data-settings-credential-fields]": {
+        "rect": {
+          "x": 492,
+          "y": 427.44,
+          "w": 460,
+          "h": 60.84
+        },
+        "background": "rgba(0, 0, 0, 0)",
+        "borderRadius": "0px",
+        "borderTop": "0px none rgb(23, 23, 23)",
+        "padding": "0px",
+        "gap": "12px",
+        "fontSize": "13px",
+        "fontWeight": "400",
+        "overflowX": 0
+      },
+      "[data-settings-token-row]": {
+        "rect": {
+          "x": 492,
+          "y": 427.44,
+          "w": 460,
+          "h": 60.84
+        },
+        "background": "rgba(0, 0, 0, 0)",
+        "borderRadius": "0px",
+        "borderTop": "0px none rgb(23, 23, 23)",
+        "padding": "0px",
+        "gap": "8px",
+        "fontSize": "13px",
+        "fontWeight": "400",
+        "overflowX": 0
+      },
+      "[data-settings-status]": {
+        "rect": {
+          "x": 0,
+          "y": 0,
+          "w": 0,
+          "h": 0
+        },
+        "background": "rgba(0, 0, 0, 0)",
+        "borderRadius": "0px",
+        "borderTop": "0px none rgb(111, 111, 111)",
+        "padding": "0px",
+        "gap": "normal",
+        "fontSize": "13px",
+        "fontWeight": "400",
+        "overflowX": 0
+      },
+      "[data-settings-detect]": {
+        "rect": {
+          "x": 703.25,
+          "y": 300.8,
+          "w": 80.25,
+          "h": 34
+        },
+        "background": "rgba(0, 0, 0, 0)",
+        "borderRadius": "10px",
+        "borderTop": "1px solid rgba(0, 0, 0, 0)",
+        "padding": "0px 12px",
+        "gap": "normal",
+        "fontSize": "13px",
+        "fontWeight": "500",
+        "overflowX": 0
+      },
+      "[data-settings-verify]": {
+        "rect": {
+          "x": 787.5,
+          "y": 300.8,
+          "w": 80.25,
+          "h": 34
+        },
+        "background": "rgba(0, 0, 0, 0)",
+        "borderRadius": "10px",
+        "borderTop": "1px solid rgba(0, 0, 0, 0)",
+        "padding": "0px 12px",
+        "gap": "normal",
+        "fontSize": "13px",
+        "fontWeight": "500",
+        "overflowX": 0
+      },
+      "[data-proto-add-toggle]": {
+        "rect": {
+          "x": 871.75,
+          "y": 300.8,
+          "w": 80.25,
+          "h": 34
+        },
+        "background": "rgba(0, 0, 0, 0)",
+        "borderRadius": "10px",
+        "borderTop": "1px solid rgba(0, 0, 0, 0)",
+        "padding": "0px 12px",
+        "gap": "normal",
+        "fontSize": "13px",
+        "fontWeight": "500",
+        "overflowX": 0
+      },
+      "[data-settings-group-workspace]": {
+        "rect": {
+          "x": 476,
+          "y": 528.28,
+          "w": 492,
+          "h": 165.59
+        },
+        "background": "rgba(0, 0, 0, 0)",
+        "borderRadius": "0px",
+        "borderTop": "0px none rgb(23, 23, 23)",
+        "padding": "0px",
+        "gap": "normal",
+        "fontSize": "13px",
+        "fontWeight": "400",
+        "overflowX": 0
+      },
+      "[data-settings-section=\"mapping\"]": {
+        "rect": {
+          "x": 476,
+          "y": 717.88,
+          "w": 492,
+          "h": 240
+        },
+        "background": "rgba(0, 0, 0, 0)",
+        "borderRadius": "0px",
+        "borderTop": "0px none rgb(23, 23, 23)",
+        "padding": "0px",
+        "gap": "normal",
+        "fontSize": "13px",
+        "fontWeight": "400",
+        "overflowX": 0
+      }
+    },
+    "docOverflow": 0,
+    "formOverflow": 0,
+    "pageErrors": []
+  }
+]
