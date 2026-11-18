@@ -27,9 +27,11 @@ describe('folderTabGeometry（文件夹标签几何）', () => {
     expect(atLeft.startsWith(`M 0,${TAB_HEADER_HEIGHT} L 0,`)).toBe(true)
   })
 
-  it('选中标签滑到中间时，左侧带斜边和小圆角', () => {
+  it('选中标签滑到中间时，左侧带斜边和小圆角，并向左多让出 12px', () => {
     const middle = morphingTabPath({ x: 200, w: 120, h: TAB_ACTIVE_HEIGHT, vx: 0 })
-    expect(middle.startsWith('M 200,46 Q ')).toBe(true)
+    /* 左边再往外长 12px：文字与数量作为整体时，左右的可见留白才对得上
+       （用户 2026-11-18：「左边文字太靠边了，可以把梯形朝左边拉大」） */
+    expect(middle.startsWith('M 188,46 Q ')).toBe(true)
   })
 
   it('水平速度带来顶部倾斜，但限幅在 ±6.5px', () => {

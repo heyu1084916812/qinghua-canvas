@@ -18,6 +18,17 @@ export const TAB_ACTIVE_HEIGHT = 44
 const SLOPE = 15
 const TOP_RADIUS = 12
 const BOTTOM_RADIUS = 11
+/**
+ * 选中形状**向左侧额外长出的一截**（用户 2026-11-18：「文字和右边的数量作为整体，
+ * 和梯形的边距不一致，左边文字太靠边了，可以把梯形朝左边拉大」）。
+ *
+ * 只加在左边：标签盒本身的左右内距是 26 / 28，看起来差不多，但左侧是斜边 ——
+ * 在文字基线上，斜边比盒左沿还要往右约 16px，右边同理；两边的"看得见的留白"因此
+ * 被斜边吃掉一截，左边更明显。往左补 12px 后，文字与数量的左右留白才真正对得上。
+ *
+ * 第一枚（`leftMorph` ≈ 0）不补：它的左边要与下方卡片左沿垂直对齐，是直角。
+ */
+const LEFT_EXTEND = 12
 
 const round = (value: number) => Math.round(value * 100) / 100
 
@@ -84,7 +95,7 @@ export function morphingTabPath(
   const leftSlope = SLOPE * leftMorph
   const leftBottomRadius = BOTTOM_RADIUS * leftMorph
   const lean = Math.max(-6.5, Math.min(6.5, frame.vx * 0.0075))
-  const left = frame.x
+  const left = frame.x - LEFT_EXTEND * leftMorph
   const right = frame.x + Math.max(frame.w, 64)
 
   const leftBottom = left + leftBottomRadius

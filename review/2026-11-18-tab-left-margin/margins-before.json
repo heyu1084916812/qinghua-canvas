@@ -1,0 +1,374 @@
+[
+  {
+    "tag": "1440x900-dark",
+    "rows": [
+      {
+        "category": "chat",
+        "tab": {
+          "left": 524,
+          "right": 635.13,
+          "width": 111.13
+        },
+        "inner": {
+          "left": 544,
+          "right": 607.13,
+          "width": 63.13
+        },
+        "shape": {
+          "left": 524,
+          "right": 635
+        },
+        "leftGap": 20,
+        "rightGap": 27.88,
+        "visibleLeftGap": 20,
+        "visibleRightGap": 9.71,
+        "midY": 729.58
+      },
+      {
+        "category": "image",
+        "tab": {
+          "left": 617.13,
+          "right": 734.25,
+          "width": 117.13
+        },
+        "inner": {
+          "left": 643.13,
+          "right": 706.25,
+          "width": 63.13
+        },
+        "shape": {
+          "left": 617,
+          "right": 734
+        },
+        "leftGap": 26.13,
+        "rightGap": 27.75,
+        "visibleLeftGap": 7.89,
+        "visibleRightGap": 9.47,
+        "midY": 729.58
+      },
+      {
+        "category": "video",
+        "tab": {
+          "left": 716.25,
+          "right": 833.38,
+          "width": 117.13
+        },
+        "inner": {
+          "left": 742.25,
+          "right": 805.38,
+          "width": 63.13
+        },
+        "shape": {
+          "left": 716,
+          "right": 833
+        },
+        "leftGap": 26.25,
+        "rightGap": 27.63,
+        "visibleLeftGap": 8.02,
+        "visibleRightGap": 9.35,
+        "midY": 729.58
+      },
+      {
+        "category": "audio",
+        "tab": {
+          "left": 815.38,
+          "right": 932.5,
+          "width": 117.13
+        },
+        "inner": {
+          "left": 841.38,
+          "right": 904.5,
+          "width": 63.13
+        },
+        "shape": {
+          "left": 815,
+          "right": 932
+        },
+        "leftGap": 26.38,
+        "rightGap": 27.5,
+        "visibleLeftGap": 8.14,
+        "visibleRightGap": 9.22,
+        "midY": 729.58
+      }
+    ]
+  },
+  {
+    "tag": "1440x900-light",
+    "rows": [
+      {
+        "category": "chat",
+        "tab": {
+          "left": 524,
+          "right": 635.13,
+          "width": 111.13
+        },
+        "inner": {
+          "left": 544,
+          "right": 607.13,
+          "width": 63.13
+        },
+        "shape": {
+          "left": 524,
+          "right": 635
+        },
+        "leftGap": 20,
+        "rightGap": 27.88,
+        "visibleLeftGap": 20,
+        "visibleRightGap": 9.71,
+        "midY": 729.58
+      },
+      {
+        "category": "image",
+        "tab": {
+          "left": 617.13,
+          "right": 734.25,
+          "width": 117.13
+        },
+        "inner": {
+          "left": 643.13,
+          "right": 706.25,
+          "width": 63.13
+        },
+        "shape": {
+          "left": 617,
+          "right": 734
+        },
+        "leftGap": 26.13,
+        "rightGap": 27.75,
+        "visibleLeftGap": 7.89,
+        "visibleRightGap": 9.47,
+        "midY": 729.58
+      },
+      {
+        "category": "video",
+        "tab": {
+          "left": 716.25,
+          "right": 833.38,
+          "width": 117.13
+        },
+        "inner": {
+          "left": 742.25,
+          "right": 805.38,
+          "width": 63.13
+        },
+        "shape": {
+          "left": 716,
+          "right": 833
+        },
+        "leftGap": 26.25,
+        "rightGap": 27.63,
+        "visibleLeftGap": 8.02,
+        "visibleRightGap": 9.35,
+        "midY": 729.58
+      },
+      {
+        "category": "audio",
+        "tab": {
+          "left": 815.38,
+          "right": 932.5,
+          "width": 117.13
+        },
+        "inner": {
+          "left": 841.38,
+          "right": 904.5,
+          "width": 63.13
+        },
+        "shape": {
+          "left": 815,
+          "right": 932
+        },
+        "leftGap": 26.38,
+        "rightGap": 27.5,
+        "visibleLeftGap": 8.14,
+        "visibleRightGap": 9.22,
+        "midY": 729.58
+      }
+    ]
+  },
+  {
+    "tag": "1024x700-dark",
+    "rows": [
+      {
+        "category": "chat",
+        "tab": {
+          "left": 476,
+          "right": 587.13,
+          "width": 111.13
+        },
+        "inner": {
+          "left": 496,
+          "right": 559.13,
+          "width": 63.13
+        },
+        "shape": {
+          "left": 476,
+          "right": 587
+        },
+        "leftGap": 20,
+        "rightGap": 27.88,
+        "visibleLeftGap": 20,
+        "visibleRightGap": 9.71,
+        "midY": 440.38
+      },
+      {
+        "category": "image",
+        "tab": {
+          "left": 569.13,
+          "right": 686.25,
+          "width": 117.13
+        },
+        "inner": {
+          "left": 595.13,
+          "right": 658.25,
+          "width": 63.13
+        },
+        "shape": {
+          "left": 569,
+          "right": 686
+        },
+        "leftGap": 26.13,
+        "rightGap": 27.75,
+        "visibleLeftGap": 7.89,
+        "visibleRightGap": 9.47,
+        "midY": 440.38
+      },
+      {
+        "category": "video",
+        "tab": {
+          "left": 668.25,
+          "right": 785.38,
+          "width": 117.13
+        },
+        "inner": {
+          "left": 694.25,
+          "right": 757.38,
+          "width": 63.13
+        },
+        "shape": {
+          "left": 668,
+          "right": 785
+        },
+        "leftGap": 26.25,
+        "rightGap": 27.63,
+        "visibleLeftGap": 8.02,
+        "visibleRightGap": 9.35,
+        "midY": 440.38
+      },
+      {
+        "category": "audio",
+        "tab": {
+          "left": 710.38,
+          "right": 827.5,
+          "width": 117.13
+        },
+        "inner": {
+          "left": 736.38,
+          "right": 799.5,
+          "width": 63.13
+        },
+        "shape": {
+          "left": 710,
+          "right": 827
+        },
+        "leftGap": 26.38,
+        "rightGap": 27.5,
+        "visibleLeftGap": 8.14,
+        "visibleRightGap": 9.22,
+        "midY": 440.38
+      }
+    ]
+  },
+  {
+    "tag": "1024x700-light",
+    "rows": [
+      {
+        "category": "chat",
+        "tab": {
+          "left": 476,
+          "right": 587.13,
+          "width": 111.13
+        },
+        "inner": {
+          "left": 496,
+          "right": 559.13,
+          "width": 63.13
+        },
+        "shape": {
+          "left": 476,
+          "right": 587
+        },
+        "leftGap": 20,
+        "rightGap": 27.88,
+        "visibleLeftGap": 20,
+        "visibleRightGap": 9.71,
+        "midY": 440.38
+      },
+      {
+        "category": "image",
+        "tab": {
+          "left": 569.13,
+          "right": 686.25,
+          "width": 117.13
+        },
+        "inner": {
+          "left": 595.13,
+          "right": 658.25,
+          "width": 63.13
+        },
+        "shape": {
+          "left": 569,
+          "right": 686
+        },
+        "leftGap": 26.13,
+        "rightGap": 27.75,
+        "visibleLeftGap": 7.89,
+        "visibleRightGap": 9.47,
+        "midY": 440.38
+      },
+      {
+        "category": "video",
+        "tab": {
+          "left": 668.25,
+          "right": 785.38,
+          "width": 117.13
+        },
+        "inner": {
+          "left": 694.25,
+          "right": 757.38,
+          "width": 63.13
+        },
+        "shape": {
+          "left": 668,
+          "right": 785
+        },
+        "leftGap": 26.25,
+        "rightGap": 27.63,
+        "visibleLeftGap": 8.02,
+        "visibleRightGap": 9.35,
+        "midY": 440.38
+      },
+      {
+        "category": "audio",
+        "tab": {
+          "left": 710.38,
+          "right": 827.5,
+          "width": 117.13
+        },
+        "inner": {
+          "left": 736.38,
+          "right": 799.5,
+          "width": 63.13
+        },
+        "shape": {
+          "left": 710,
+          "right": 827
+        },
+        "leftGap": 26.38,
+        "rightGap": 27.5,
+        "visibleLeftGap": 8.14,
+        "visibleRightGap": 9.22,
+        "midY": 440.38
+      }
+    ]
+  }
+]
