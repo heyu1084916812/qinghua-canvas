@@ -45705,7 +45705,150 @@ async function g865(browser) {
   }
 }
 
-const ALL_GROUPS = [g1, g2, g3, g4, g5, g6, g7, g8, g9, g10, g11, g12, g13, g14, g15, g16, g17, g18, g19, g23, g24, g37, g42, g43, g44, g45, g46, g47, g48, g49, g51, g52, g53, g55, g56, g57, g58, g59, g60, g61, g62, g63, g64, g65, g66, g67, g68, g69, g70, g71, g72, g73, g74, g75, g76, g77, g78, g79, g80, g81, g82, g83, g84, g85, g86, g87, g88, g89, g90, g91, g92, g93, g94, g95, g96, g97, g98, g99, g100, g101, g102, g103, g104, g105, g106, g107, g108, g109, g110, g111, g112, g113, g114, g115, g116, g117, g118, g119, g120, g121, g122, g123, g125, g126, g127, g128, g129, g130, g131, g132, g133, g134, g135, g136, g137, g138, g139, g140, g141, g142, g143, g144, g145, g146, g147, g148, g149, g150, g151, g152, g153, g154, g155, g156, g157, g158, g159, g160, g161, g162, g164, g165, g166, g167, g168, g735, g769, g795, g798, g800, g865]
+const ALL_GROUPS = [g1, g2, g3, g4, g5, g6, g7, g8, g9, g10, g11, g12, g13, g14, g15, g16, g17, g18, g19, g23, g24, g37, g42, g43, g44, g45, g46, g47, g48, g49, g51, g52, g53, g55, g56, g57, g58, g59, g60, g61, g62, g63, g64, g65, g66, g67, g68, g69, g70, g71, g72, g73, g74, g75, g76, g77, g78, g79, g80, g81, g82, g83, g84, g85, g86, g87, g88, g89, g90, g91, g92, g93, g94, g95, g96, g97, g98, g99, g100, g101, g102, g103, g104, g105, g106, g107, g108, g109, g110, g111, g112, g113, g114, g115, g116, g117, g118, g119, g120, g121, g122, g123, g125, g126, g127, g128, g129, g130, g131, g132, g133, g134, g135, g136, g137, g138, g139, g140, g141, g142, g143, g144, g145, g146, g147, g148, g149, g150, g151, g152, g153, g154, g155, g156, g157, g158, g159, g160, g161, g162, g164, g165, g166, g167, g168, g169, g735, g769, g795, g798, g800, g865]
+// ────────────────────────────────────────────────────────────
+// G169 框选多节点拖动：**松手那一刻不许再有人挪**（用户 2026-11-18 偶发：
+//      「框选多个节点，移动的时候松开鼠标会有一张图片移动了位置，好像多了一个步骤」）
+// ────────────────────────────────────────────────────────────
+async function g169(browser) {
+  const g = 'G169 框选拖动松手不再跳'
+  const ctx = await newCtx(browser)
+  const page = await ctx.newPage()
+  page.on('pageerror', (e) => rec(g, 'no pageerror', false, String(e).slice(0, 120)))
+  /** `createProject()` 2026-11-18 已失效（#1147），走模板再清场 */
+  await gotoProjects(page)
+  await page.locator('[data-template="text2img"]').click()
+  await page.waitForURL(/\/canvas\//)
+  await page.locator('[data-node-id]').first().waitFor({ state: 'attached', timeout: 20000 })
+  await sleep(900)
+  for (const id of await page
+    .locator('[data-node-id]')
+    .evaluateAll((els) => els.map((el) => el.getAttribute('data-node-id')))) {
+    await page.locator('[data-node-id="' + id + '"]').click({ position: { x: 40, y: 10 } })
+    await sleep(250)
+    await page.keyboard.press('Delete')
+    await sleep(250)
+  }
+
+  const posOf = async (id) => {
+    const box = await page.locator('[data-node-id="' + id + '"]').boundingBox()
+    return box ? { x: Math.round(box.x), y: Math.round(box.y) } : null
+  }
+
+  /* 2×2 紧挨的四张（截图那种二十来像素的缝，拖动会触发吸附）+ 一张「半进框」的邻居 */
+  const ids = []
+  let cell = { w: 260, h: 170 }
+  for (let i = 0; i < 4; i += 1) {
+    await addNodeViaToolbar(page, 'prompt')
+    await sleep(350)
+    const id = await page.locator('[data-node-type="prompt"]').last().getAttribute('data-node-id')
+    ids.push(id)
+    const box = await page.locator('[data-node-id="' + id + '"]').boundingBox()
+    cell = { w: Math.round(box.width), h: Math.round(box.height) }
+    await moveNode(page, id, 250 + (i % 2) * (cell.w + 20), 140 + Math.floor(i / 2) * (cell.h + 20))
+  }
+  await addNodeViaToolbar(page, 'prompt')
+  await sleep(350)
+  const neighbour = await page.locator('[data-node-type="prompt"]').last().getAttribute('data-node-id')
+  await moveNode(page, neighbour, 250 + cell.w + 20 + cell.w + 40, 140)
+  await clickBlankCanvas(page)
+  await sleep(300)
+
+  const read = async () => {
+    const out = []
+    for (const id of ids) out.push(await posOf(id))
+    out.push(await posOf(neighbour))
+    return out
+  }
+
+  const marquee = async (x2, y2) => {
+    await page.keyboard.down('Control')
+    await page.mouse.move(170, 100)
+    await page.mouse.down()
+    await page.mouse.move(x2, y2, { steps: 16 })
+    await page.mouse.up()
+    await page.keyboard.up('Control')
+  }
+
+  /** 一轮：框选 →（可选停顿）→ 拖 → 鼠标还按着量一次 → 松手再量一次 */
+  const runVariant = async (label, { settle = 400, marqueeTo, drag }) => {
+    await clickBlankCanvas(page)
+    await sleep(250)
+    await marquee(marqueeTo.x, marqueeTo.y)
+    if (settle) await sleep(settle)
+    const before = await read()
+    const grab = await page.locator('[data-node-id="' + ids[0] + '"]').boundingBox()
+    const from = { x: Math.round(grab.x) + 60, y: Math.round(grab.y) + 10 }
+    await page.mouse.move(from.x, from.y)
+    await page.mouse.down()
+    await page.mouse.move(from.x + drag.dx, from.y + drag.dy, { steps: 14 })
+    await sleep(280)
+    const during = await read()
+    await page.mouse.up()
+    await sleep(500)
+    const after = await read()
+    const moveDeltas = during.map((point, index) => ({
+      dx: point.x - before[index].x,
+      dy: point.y - before[index].y,
+    }))
+    const releaseJumps = after.map((point, index) => ({
+      dx: point.x - during[index].x,
+      dy: point.y - during[index].y,
+    }))
+    rec(
+      g,
+      label + '：四张同步位移',
+      moveDeltas.slice(0, 4).every((delta) => Math.abs(delta.dx) > 60) &&
+        new Set(moveDeltas.slice(0, 4).map((delta) => delta.dx + ',' + delta.dy)).size === 1,
+      JSON.stringify(moveDeltas),
+    )
+    rec(
+      g,
+      '★★ ' + label + '：松手那一刻谁都不许再动',
+      releaseJumps.every((jump) => Math.abs(jump.dx) <= 1 && Math.abs(jump.dy) <= 1),
+      JSON.stringify(releaseJumps),
+    )
+    return { moveDeltas, releaseJumps, after }
+  }
+
+  const insideRight = 250 + (cell.w + 20) * 2 - 30
+  const insideBottom = 140 + (cell.h + 20) * 2 - 30
+
+  /* V1：框完立刻拖（用户最常干的事） */
+  await runVariant('V1 框完立刻拖', {
+    settle: 0,
+    marqueeTo: { x: insideRight, y: insideBottom },
+    drag: { dx: 150, dy: 110 },
+  })
+
+  /* V2：框完停一下再拖（对照组） */
+  await runVariant('V2 停顿后拖', {
+    settle: 1200,
+    marqueeTo: { x: insideRight, y: insideBottom },
+    drag: { dx: -120, dy: -90 },
+  })
+
+  /* V3：框压住右邻居**一半**再拖 —— 邻居没被选中就必须一动不动 */
+  const partialRight = 250 + cell.w + 20 + Math.round(cell.w / 2)
+  const partial = await runVariant('V3 框压住半张邻居', {
+    settle: 400,
+    marqueeTo: { x: partialRight, y: insideBottom },
+    drag: { dx: 140, dy: 100 },
+  })
+  rec(
+    g,
+    '★★ V3：只压住一半的邻居不许被带走',
+    Math.abs(partial.moveDeltas[4].dx) <= 1 &&
+      Math.abs(partial.moveDeltas[4].dy) <= 1 &&
+      Math.abs(partial.releaseJumps[4].dx) <= 1 &&
+      Math.abs(partial.releaseJumps[4].dy) <= 1,
+    JSON.stringify({ during: partial.moveDeltas[4], release: partial.releaseJumps[4] }),
+  )
+
+  await page.screenshot({ path: OUT + '/g169-release-jump.png' })
+  await ctx.close()
+}
+
 const skippedGroups = new Set(
   [
     String(process.env.SMOKE_SKIP ?? ''),
