@@ -129,15 +129,7 @@ export function planNodeSelection(input: {
   baseline: readonly string[]
 }): NodeSelectionPlan {
   const rfIds = new Set(topLevelNodes(input.graph).map((node) => node.id))
-  const byId = new Map(input.graph.nodes.map((node) => [node.id, node]))
   const selected = new Set(input.selection.filter((id) => rfIds.has(id)))
-  /**
-   * 容器里的子节点不归 React Flow 管：点组内子节点时 RF 只把**容器**报成选中，
-   * 旧实现按「只留顶层」重建集合，会把刚攒起来的子节点多选抹掉（多选栏不出现、
-   * 拖动只动一张 —— 用户 2026-11-18 的 bug）。所以子节点按「容器还在选中集合里」保留，
-   * 容器掉出集合（点空白 / 改选别的顶层节点）时一起掉。
-   */
-  const droppedChildren = new Set<string>()
   const insideMarquee = input.marquee
     ? new Set(nodesIntersectingMarquee(input.graph, input.marquee, input.baseline))
     : null
@@ -149,18 +141,10 @@ export function planNodeSelection(input: {
       selected.add(change.id)
     } else {
       selected.delete(change.id)
-      for (const id of input.selection) {
-        if (byId.get(id)?.parentId === change.id) droppedChildren.add(id)
-      }
     }
     changed = true
   }
-  const keptChildren = input.selection.filter((id) => {
-    if (rfIds.has(id) || droppedChildren.has(id)) return false
-    const parentId = byId.get(id)?.parentId
-    return !!parentId && selected.has(parentId)
-  })
-  return { selection: [...selected, ...keptChildren], changed }
+  return { selection: [...selected], changed }
 }
 
 export function planChildNodeSelection(input: {
