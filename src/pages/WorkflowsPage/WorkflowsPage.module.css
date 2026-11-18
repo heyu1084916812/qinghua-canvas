@@ -81,39 +81,11 @@
   font-weight: 500;
 }
 
-/* 站点切换：分段按钮，与标签同一行靠右，下沿对齐标签基线 */
+/* 站点切换：项目统一选择器（ChoicePicker，对账 #1152），与标签同一行靠右，下沿对齐标签基线 */
 .sites {
   display: inline-flex;
+  align-items: center;
   margin-bottom: var(--space-2);
-  padding: 2px;
-  border: var(--border);
-  border-radius: var(--radius-control);
-  background: var(--bg-subtle);
-}
-
-.site,
-.siteOn {
-  height: 28px;
-  padding: 0 var(--space-3);
-  border: none;
-  border-radius: var(--radius-control);
-  background: transparent;
-  color: var(--text-2);
-  font-family: var(--font-sans);
-  font-size: var(--fs-chip);
-  font-weight: 600;
-  white-space: nowrap;
-  cursor: pointer;
-}
-
-.site:hover {
-  color: var(--text-1);
-}
-
-.siteOn {
-  background: var(--bg-surface);
-  color: var(--text-1);
-  box-shadow: 0 0 0 1px var(--stroke);
 }
 
 .toolbar {

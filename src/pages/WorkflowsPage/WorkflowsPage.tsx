@@ -8,7 +8,9 @@ import { parseWorkflowsPageQuery, workflowsPagePath, type WorkflowsTab } from '.
 import { noticeA11y } from '../../domain/ui/notice'
 import { SettingsWorkflowEntryPage } from '../../features/settings/SettingsWorkflowEntryPage'
 import { useWorkflowEntries } from '../../features/settings/useWorkflowEntries'
+import { ChoicePicker } from '../../features/shared/choicePicker/ChoicePicker'
 import type { WorkflowEntry } from '../../domain/project/workflowParams'
+import { openChannelSettings } from '../../state/ui/globalSettings'
 import { WorkflowEntryGrid } from './WorkflowEntryGrid'
 import styles from './WorkflowsPage.module.css'
 
@@ -67,7 +69,7 @@ export function WorkflowsPage() {
       onTab={(next) => go({ tab: next, entryId: null })}
       onChannel={(id) => go({ channelId: id, entryId: null })}
       onEntry={(entry) => go({ entryId: entry?.id ?? null, ...(entry ? { tab: entry.kind === 'app' ? 'app' : 'workflow' } : {}) })}
-      onOpenSettings={() => navigate(`/settings?channel=${encodeURIComponent(channel.id)}`)}
+      onOpenSettings={() => openChannelSettings(channel.id)}
       channels={channels}
       platform={platform}
     />
@@ -152,29 +154,25 @@ function WorkflowsChannelView({
                 </button>
               ))}
             </div>
-            <div className={styles.sites} role="radiogroup" aria-label="RunningHub 站点">
-              {options.map((item) => (
-                <button
-                  key={item.id}
-                  type="button"
-                  role="radio"
-                  aria-checked={item.id === channel.id}
-                  className={item.id === channel.id ? styles.siteOn : styles.site}
-                  onClick={() => onChannel(item.id)}
-                  data-workflows-site={item.id}
-                >
-                  {workflowChannelLabel(item)}
-                </button>
-              ))}
+            {/* 站点切换用项目统一的选择器（对账 #1152：原来那对分段按钮是自己画的，不是项目控件） */}
+            <div className={styles.sites} data-workflows-sites>
+              <ChoicePicker
+                name="workflows-site"
+                compact
+                alignEnd
+                ariaLabel="RunningHub 站点"
+                value={channel.id}
+                options={options.map((item) => ({ value: item.id, label: workflowChannelLabel(item) }))}
+                onChange={(id) => onChannel(id)}
+              />
             </div>
           </div>
 
           {!hasKey ? (
             <div className={styles.banner} data-workflows-no-key {...noticeA11y('info')}>
-              <span>{workflowChannelLabel(channel)}还没填 API Key —— 导入要用它拉参数，测试运行也要用它。</span>
-              <button type="button" className={styles.ghost} onClick={onOpenSettings}>
-                去填 Key
-              </button>
+              <span>
+                {workflowChannelLabel(channel)}还没填 API Key —— 导入要用它拉参数，测试运行也要用它。点右边「渠道与 Key」去填。
+              </span>
             </div>
           ) : null}
 

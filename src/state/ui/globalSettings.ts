@@ -96,6 +96,17 @@ export interface GlobalSettingsState {
   section: GlobalSettingsSection
   /** Agent 设置页内部的页签；其他设置栏目保留该值，重新进入 Agent 时回到原页签。 */
   agentTab: AgentSettingsTab
+  /**
+   * 本次打开要**落在哪条渠道**（对账 #1152）。
+   *
+   * `/workflows` 的「渠道与 Key」以前是 `navigate('/settings?channel=…')` —— 跳到
+   * **整页设置路由**，用户看到的是另一套壳（侧栏 + 独立路由页），和平时点的设置浮层
+   * 不是同一个东西。现在改成直接开浮层并带上目标渠道。
+   *
+   * 只在「本次打开」有效：`closeGlobalSettings` 会清空，避免下次从侧栏打开设置时
+   * 又莫名其妙跳到那条渠道。
+   */
+  channelId: string | null
 }
 
 /** 子菜单（浮层内那一排标签）。**标签与内容一处定义**，免得"标签写 A、内容是 B"。 */
@@ -277,7 +288,7 @@ export function matchSettingsSections(query: string): GlobalSettingsEntry[] {
   return GLOBAL_SETTINGS_SECTIONS.filter((entry) => searchableText(entry).includes(needle))
 }
 
-let state: GlobalSettingsState = { open: false, section: 'channels', agentTab: 'basic' }
+let state: GlobalSettingsState = { open: false, section: 'channels', agentTab: 'basic', channelId: null }
 const listeners = new Set<() => void>()
 
 function notify(): void {
@@ -288,22 +299,39 @@ export function getGlobalSettings(): GlobalSettingsState {
   return state
 }
 
-/** 打开（默认落在「模型服务」）。已经开着且栏目没变时不通知 —— 免得白重渲。 */
+/**
+ * 打开（默认落在「模型服务」）。已经开着、栏目与目标渠道都没变时不通知 —— 免得白重渲。
+ *
+ * `channelId` 只在「模型服务」栏有意义：浮层里的渠道视图必须落在那条渠道上
+ * （见 `openChannelSettings`）。其他栏目传了也不消费，留着不影响下次。
+ */
 export function openGlobalSettings(
   section: GlobalSettingsSection = 'channels',
   agentTab?: AgentSettingsTab,
+  channelId: string | null = null,
 ): void {
   const normalizedSection: GlobalSettingsSection = section === 'agentMemory' ? 'agent' : section
   const normalizedTab = section === 'agentMemory' ? 'memory' : agentTab ?? state.agentTab
   if (
     state.open &&
     state.section === normalizedSection &&
-    state.agentTab === normalizedTab
+    state.agentTab === normalizedTab &&
+    state.channelId === channelId
   ) {
     return
   }
-  state = { open: true, section: normalizedSection, agentTab: normalizedTab }
+  state = { open: true, section: normalizedSection, agentTab: normalizedTab, channelId }
   notify()
+}
+
+/**
+ * 直接开在「模型服务 → 某条渠道」（对账 #1152）。
+ *
+ * `/workflows` 的「渠道与 Key」走这条：用户要的是**平时那个设置浮层**，不是 `/settings`
+ * 独立路由页。浮层里的渠道视图读 `initialSelectedChannelId()`，这里把目标渠道带过去。
+ */
+export function openChannelSettings(channelId: string): void {
+  openGlobalSettings('channels', undefined, channelId)
 }
 
 export function openAgentSettings(tab: AgentSettingsTab = 'basic'): void {
@@ -312,7 +340,7 @@ export function openAgentSettings(tab: AgentSettingsTab = 'basic'): void {
 
 export function closeGlobalSettings(): void {
   if (!state.open) return
-  state = { ...state, open: false }
+  state = { ...state, open: false, channelId: null }
   notify()
 }
 
@@ -328,6 +356,6 @@ export const GLOBAL_SETTINGS_BRIDGE_KEY = '__QINGHUA_OPEN_SETTINGS__'
 
 /** 仅供测试：复位成「关着 + 模型服务」。 */
 export function __resetGlobalSettingsForTest(): void {
-  state = { open: false, section: 'channels', agentTab: 'basic' }
+  state = { open: false, section: 'channels', agentTab: 'basic', channelId: null }
   notify()
 }

@@ -6,6 +6,7 @@ import {
   closeGlobalSettings,
   getGlobalSettings,
   matchSettingsSections,
+  openChannelSettings,
   openGlobalSettings,
   subscribeGlobalSettings,
 } from './globalSettings'
@@ -45,6 +46,7 @@ describe('globalSettings · 全局设置浮层', () => {
       open: true,
       section: 'channels',
       agentTab: 'basic',
+      channelId: null,
     })
   })
 
@@ -58,6 +60,7 @@ describe('globalSettings · 全局设置浮层', () => {
       open: true,
       section: 'hosting',
       agentTab: 'basic',
+      channelId: null,
     })
   })
 
@@ -67,12 +70,14 @@ describe('globalSettings · 全局设置浮层', () => {
       open: true,
       section: 'agent',
       agentTab: 'memory',
+      channelId: null,
     })
     openGlobalSettings('agent', 'tools')
     expect(getGlobalSettings()).toEqual({
       open: true,
       section: 'agent',
       agentTab: 'tools',
+      channelId: null,
     })
     openGlobalSettings('storage')
     openGlobalSettings('agent')
@@ -93,6 +98,37 @@ describe('globalSettings · 全局设置浮层', () => {
     expect(hits).toBe(2)
     closeGlobalSettings() // 已经关着 ⇒ 不通知
     expect(hits).toBe(2)
+    off()
+  })
+
+  /**
+   * 对账 #1152（用户 2026-11-18 图四）：`/workflows` 的「渠道与 Key」以前是
+   * `navigate('/settings?channel=…')`，跳到**整页设置路由** —— 那是另一套壳，
+   * 不是用户平时点的设置浮层。现在改成开浮层并带上目标渠道。
+   */
+  it('★★ openChannelSettings：开「模型服务」并带上目标渠道；关掉即清空', () => {
+    openChannelSettings('ch_builtin_runninghub_global')
+    expect(getGlobalSettings()).toEqual({
+      open: true,
+      section: 'channels',
+      agentTab: 'basic',
+      channelId: 'ch_builtin_runninghub_global',
+    })
+    closeGlobalSettings()
+    // 目标渠道只在「本次打开」有效：否则下次从侧栏打开设置会莫名跳到那条渠道
+    expect(getGlobalSettings().channelId).toBeNull()
+  })
+
+  it('★ 换一条渠道要通知（同一个栏目、不同目标渠道不是"无事发生"）', () => {
+    openChannelSettings('a')
+    let hits = 0
+    const off = subscribeGlobalSettings(() => {
+      hits += 1
+    })
+    openChannelSettings('a') // 同栏同渠道 ⇒ 不通知
+    expect(hits).toBe(0)
+    openChannelSettings('b') // 换渠道 ⇒ 要通知
+    expect(hits).toBe(1)
     off()
   })
 

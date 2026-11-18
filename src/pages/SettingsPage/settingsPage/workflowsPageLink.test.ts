@@ -2,7 +2,12 @@ import { createElement } from 'react'
 import TestRenderer, { act } from 'react-test-renderer'
 import { MemoryRouter, useLocation } from 'react-router-dom'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { __resetGlobalSettingsForTest, getGlobalSettings, openGlobalSettings } from '../../../state/ui/globalSettings'
+import {
+  __resetGlobalSettingsForTest,
+  getGlobalSettings,
+  openChannelSettings,
+  openGlobalSettings,
+} from '../../../state/ui/globalSettings'
 import { initialSelectedChannelId, useWorkflowsPageOpener } from './workflowsPageLink'
 
 ;(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true
@@ -53,5 +58,12 @@ describe('workflowsPageLink（#1131）', () => {
     expect(initialSelectedChannelId()).toBe('ch_builtin_runninghub_global')
     vi.stubGlobal('window', { location: { search: '' } })
     expect(initialSelectedChannelId()).toBeNull()
+  })
+
+  /** 对账 #1152：`/workflows` 的「渠道与 Key」改成开浮层后，目标渠道走状态而不是 URL */
+  it('★★ 浮层带过来的目标渠道优先于 URL 参数', () => {
+    openChannelSettings('ch_wf_target')
+    vi.stubGlobal('window', { location: { search: '?channel=ch_from_url' } })
+    expect(initialSelectedChannelId()).toBe('ch_wf_target')
   })
 })
