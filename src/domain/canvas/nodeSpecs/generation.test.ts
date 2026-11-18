@@ -42,6 +42,41 @@ describe('生成节点规格 / 输入收集（M6-12）', () => {
     ])
   })
 
+  /**
+   * 用户 2026-11-19：有功能预设（或情绪）时，**只吃本节点自己的素材** ——
+   * 上游的图片不参与本次生成；上游提示词节点的文字照旧合并。
+   * 关掉预设后再收一次，上游图片必须自己回来（没有额外状态，全从节点数据现算）。
+   */
+  it('有预设时只切掉上游图片，保留上游文字；关掉预设后上游图片自动回来', () => {
+    const build = (preset: string | null) =>
+      graph(
+        [
+          node({
+            id: 'down',
+            type: 'generation',
+            data: { mode: 'image', preset } as never,
+          }),
+          node({ id: 'up-img', type: 'generation', data: { mode: 'image', assetHash: 'h-up' } as never }),
+          node({ id: 'up-text', type: 'prompt', data: { text: '图一穿红色衣服' } as never }),
+        ],
+        [
+          { id: 'e1', projectId: 'p1', source: 'up-img', target: 'down' },
+          { id: 'e2', projectId: 'p1', source: 'up-text', target: 'down' },
+        ],
+      )
+
+    const withPreset = getSpec('generation')!.collectInputs({ node: build('storyboard').nodes[0]!, graph: build('storyboard') })
+    expect(withPreset).toEqual([
+      { kind: 'text', nodeId: 'up-text', text: '图一穿红色衣服' },
+    ])
+
+    const withoutPreset = getSpec('generation')!.collectInputs({ node: build(null).nodes[0]!, graph: build(null) })
+    expect(withoutPreset.map((input) => `${input.kind}:${input.nodeId}`)).toEqual([
+      'asset:up-img',
+      'text:up-text',
+    ])
+  })
+
   it('视频上游保留真实 MIME；老视频没有 assetMime 时按 video/mp4 回落', () => {
     const g = graph(
       [

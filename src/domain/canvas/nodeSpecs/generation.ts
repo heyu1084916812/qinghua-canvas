@@ -56,6 +56,16 @@ export const generationSpec: NodeSpec<GenerationData> = {
   collectInputs({ node, graph }: InputContext<GenerationData>): NodeInput[] {
     const index = indexNodes(graph.nodes)
     const hidden = new Set(node.data.upstreamHidden ?? [])
+    /**
+     * **有功能预设（或情绪调节）时，上游的「图」不参与本次生成**（用户 2026-11-19）：
+     * 「有功能预设的时候只对本节点上的素材生效，当本节点有上游的时候上游不参与生成」
+     * 「只对上游的图片节点不参与」。
+     *
+     * 注意只切**图片输入**，不切文字：上游提示词节点的文字本来就会合并到下游
+     * （`collectInputs` 的 `kind: 'text'` 分支），那是全局口径，预设不该动它。
+     * 关掉预设 / 换回无预设时这里自动恢复——每次生成都从节点数据现算，没有额外状态。
+     */
+    const presetOn = presetPromptSuffix(node.data).trim().length > 0
     let inputs: NodeInput[] = []
     const seenAssetHashes = new Set<string>()
     /**
@@ -76,6 +86,7 @@ export const generationSpec: NodeSpec<GenerationData> = {
       // 批量节点作为上游 → 集合卡（§6.12）：下游遍历集合内每项各生成一次，
       // 因此这里包成一个 collection 项，展开发生在执行计划阶段（domain/execution）。
       if (upstream.type === 'batch') {
+        if (presetOn) continue
         const items = batchItemsOf(upstream as NodeSnapshot<BatchData>, graph)
         if (items.length > 0) inputs.push({ kind: 'collection', nodeId: upstream.id, items })
         continue
@@ -103,6 +114,7 @@ export const generationSpec: NodeSpec<GenerationData> = {
         if (round.__roundPrompt) {
           inputs.push({ kind: 'text', nodeId: upstream.id, text: round.__roundPrompt })
         }
+        if (presetOn) continue
         for (const hash of round.__roundAssets ?? []) {
           if (seenAssetHashes.has(hash)) continue
           seenAssetHashes.add(hash)
@@ -116,7 +128,7 @@ export const generationSpec: NodeSpec<GenerationData> = {
       // 这里补上后，上游重生成会改变 assetHash → 下游指纹随之变化 → 自动判定陈旧。
       const upData = upstream.data as GenerationData
       const hash = upData.assetHash
-      if (hash) {
+      if (hash && !presetOn) {
         if (seenAssetHashes.has(hash)) continue
         seenAssetHashes.add(hash)
         inputs.push({
