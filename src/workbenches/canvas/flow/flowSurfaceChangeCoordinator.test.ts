@@ -91,6 +91,56 @@ describe('FlowSurface 节点/连线变更协调器', () => {
     expect(plan).toEqual({ selection: ['top-1'], changed: true })
   })
 
+  it('点组内子节点时 RF 把容器报成选中：已选中的子节点不能被顺手抹掉', () => {
+    const snapshot = graph([
+      node('top-1', 0, 0),
+      node('group', 300, 0, { type: 'group' }),
+      node('child-a', 0, 0, { parentId: 'group' }),
+      node('child-b', 120, 0, { parentId: 'group' }),
+    ])
+    const plan = planNodeSelection({
+      graph: snapshot,
+      selection: ['child-a', 'child-b'],
+      changes: [{ type: 'select', id: 'group', selected: true }],
+      marquee: null,
+      baseline: [],
+    })
+    /* 容器进选中（随后的 click 会把它摘掉），两个子节点必须原样留着 */
+    expect(plan.selection).toEqual(['group', 'child-a', 'child-b'])
+  })
+
+  it('取消容器时它的子节点一起取消（点空白不能留下还亮着的组内子节点）', () => {
+    const snapshot = graph([
+      node('group', 300, 0, { type: 'group' }),
+      node('child-a', 0, 0, { parentId: 'group' }),
+      node('child-b', 120, 0, { parentId: 'group' }),
+    ])
+    const plan = planNodeSelection({
+      graph: snapshot,
+      selection: ['group', 'child-a', 'child-b'],
+      changes: [{ type: 'select', id: 'group', selected: false }],
+      marquee: null,
+      baseline: [],
+    })
+    expect(plan.selection).toEqual([])
+  })
+
+  it('选中别的顶层节点时，组内子节点跟着掉（不留孤立选中项）', () => {
+    const snapshot = graph([
+      node('top-1', 0, 0),
+      node('group', 300, 0, { type: 'group' }),
+      node('child-a', 0, 0, { parentId: 'group' }),
+    ])
+    const plan = planNodeSelection({
+      graph: snapshot,
+      selection: ['child-a'],
+      changes: [{ type: 'select', id: 'top-1', selected: true }],
+      marquee: null,
+      baseline: [],
+    })
+    expect(plan.selection).toEqual(['top-1'])
+  })
+
   it('框选未命中的节点选择不加入，全部过滤时不算改变', () => {
     const snapshot = graph([
       node('inside', 10, 10),

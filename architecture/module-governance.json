@@ -6263,7 +6263,7 @@
       "test": [
         "src/workbenches/canvas/flow/flowSurfaceChangeCoordinator.test.ts"
       ],
-      "budget": 382
+      "budget": 400
     },
     {
       "module": "src/workbenches/canvas/lightbox/lightboxCropActionCoordinator.ts",

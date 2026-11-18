@@ -45705,7 +45705,242 @@ async function g865(browser) {
   }
 }
 
-const ALL_GROUPS = [g1, g2, g3, g4, g5, g6, g7, g8, g9, g10, g11, g12, g13, g14, g15, g16, g17, g18, g19, g23, g24, g37, g42, g43, g44, g45, g46, g47, g48, g49, g51, g52, g53, g55, g56, g57, g58, g59, g60, g61, g62, g63, g64, g65, g66, g67, g68, g69, g70, g71, g72, g73, g74, g75, g76, g77, g78, g79, g80, g81, g82, g83, g84, g85, g86, g87, g88, g89, g90, g91, g92, g93, g94, g95, g96, g97, g98, g99, g100, g101, g102, g103, g104, g105, g106, g107, g108, g109, g110, g111, g112, g113, g114, g115, g116, g117, g118, g119, g120, g121, g122, g123, g125, g126, g127, g128, g129, g130, g131, g132, g133, g134, g135, g136, g137, g138, g139, g140, g141, g142, g143, g144, g145, g146, g147, g148, g149, g150, g151, g152, g153, g154, g155, g156, g157, g158, g159, g160, g161, g162, g164, g165, g166, g167, g168, g735, g769, g795, g798, g800, g865]
+const ALL_GROUPS = [g1, g2, g3, g4, g5, g6, g7, g8, g9, g10, g11, g12, g13, g14, g15, g16, g17, g18, g19, g23, g24, g37, g42, g43, g44, g45, g46, g47, g48, g49, g51, g52, g53, g55, g56, g57, g58, g59, g60, g61, g62, g63, g64, g65, g66, g67, g68, g69, g70, g71, g72, g73, g74, g75, g76, g77, g78, g79, g80, g81, g82, g83, g84, g85, g86, g87, g88, g89, g90, g91, g92, g93, g94, g95, g96, g97, g98, g99, g100, g101, g102, g103, g104, g105, g106, g107, g108, g109, g110, g111, g112, g113, g114, g115, g116, g117, g118, g119, g120, g121, g122, g123, g125, g126, g127, g128, g129, g130, g131, g132, g133, g134, g135, g136, g137, g138, g139, g140, g141, g142, g143, g144, g145, g146, g147, g148, g149, g150, g151, g152, g153, g154, g155, g156, g157, g158, g159, g160, g161, g162, g164, g165, g166, g167, g168, g169, g735, g769, g795, g798, g800, g865]
+// ────────────────────────────────────────────────────────────
+// G169 多选拖动只该移动选中的节点（用户 2026-11-18：多选图片移动时，另一张图被自动带走）
+// ────────────────────────────────────────────────────────────
+async function g169(browser) {
+  const g = 'G169 多选拖动不带走别的节点'
+  const ctx = await newCtx(browser)
+  const page = await ctx.newPage()
+  page.on('pageerror', (e) => rec(g, 'no pageerror', false, String(e).slice(0, 120)))
+  /**
+   * 用模板建项目再删掉预置节点，拿一块干净画布。
+   *
+   * 不走 `createProject()`（新卡片 → 工作台选择器）：2026-11-18 本机矩阵里那条路径
+   * 已经点不出 `[data-new-workbench="canvas"]`（G17 同样卡在这），属另一件事。
+   */
+  await gotoProjects(page)
+  await page.locator('[data-template="text2img"]').click()
+  await page.waitForURL(/\/canvas\//)
+  await page.locator('[data-node-id]').first().waitFor({ state: 'attached', timeout: 20000 })
+  await sleep(900)
+  const templateIds = await page
+    .locator('[data-node-id]')
+    .evaluateAll((els) => els.map((el) => el.getAttribute('data-node-id')))
+  for (const id of templateIds) {
+    await page.locator('[data-node-id="' + id + '"]').click({ position: { x: 40, y: 10 } })
+    await sleep(250)
+    await page.keyboard.press('Delete')
+    await sleep(250)
+  }
+  const leftover = await page.locator('[data-node-id]').count()
+  rec(g, '清场：模板预置节点已删空', leftover === 0, '剩 ' + leftover + ' 个')
+
+  const posOf = async (id) => {
+    const box = await page.locator('[data-node-id="' + id + '"]').boundingBox()
+    return box ? { x: Math.round(box.x), y: Math.round(box.y) } : null
+  }
+
+  /**
+   * 2×2 四张（和用户截图同一构图），框外再放一个「旁观节点」。
+   * 三条判据缺一不可：选中的四张位移**完全一致**、一张都没被单独带走、
+   * 框外的旁观节点**一动不动**（后者是这次 bug 的直接反面）。
+   */
+  const ids = []
+  for (let i = 0; i < 4; i += 1) {
+    await addNodeViaToolbar(page, 'prompt')
+    await sleep(350)
+    const id = await page.locator('[data-node-type="prompt"]').last().getAttribute('data-node-id')
+    ids.push(id)
+    await moveNode(page, id, 260 + (i % 2) * 300, 170 + Math.floor(i / 2) * 250)
+  }
+  await addNodeViaToolbar(page, 'prompt')
+  await sleep(350)
+  const bystander = await page.locator('[data-node-type="prompt"]').last().getAttribute('data-node-id')
+  await moveNode(page, bystander, 1060, 200)
+  await clickBlankCanvas(page)
+  await sleep(250)
+
+  const before = []
+  for (const id of ids) before.push(await posOf(id))
+  const bystanderBefore = await posOf(bystander)
+
+  /* Ctrl + 空白拖拽框选：只圈住 2×2 那四张 */
+  await page.keyboard.down('Control')
+  await page.mouse.move(180, 100)
+  await page.mouse.down()
+  await page.mouse.move(940, 800, { steps: 18 })
+  await page.mouse.up()
+  await page.keyboard.up('Control')
+  await sleep(400)
+  rec(
+    g,
+    '框选命中后排列按钮可用（选中 ≥ 2）',
+    await page.locator('[data-toolbar-arrange-modes]').isEnabled(),
+  )
+
+  /* 按住第一张整体拖动 */
+  const grab = await page.locator('[data-node-id="' + ids[0] + '"]').boundingBox()
+  await page.mouse.move(grab.x + 60, grab.y + 10)
+  await page.mouse.down()
+  await page.mouse.move(grab.x + 60 + 150, grab.y + 10 + 110, { steps: 14 })
+  await page.mouse.up()
+  await sleep(500)
+
+  const after = []
+  for (const id of ids) after.push(await posOf(id))
+  const deltas = after.map((point, index) => ({
+    dx: point.x - before[index].x,
+    dy: point.y - before[index].y,
+  }))
+  const shapes = new Set(deltas.map((delta) => delta.dx + ',' + delta.dy))
+  rec(
+    g,
+    '★★ 四张一起走，位移完全一致（谁也没被单独带走）',
+    deltas.every((delta) => Math.abs(delta.dx) > 40) && shapes.size === 1,
+    JSON.stringify(deltas),
+  )
+
+  const bystanderAfter = await posOf(bystander)
+  const bystanderDx = bystanderAfter.x - bystanderBefore.x
+  const bystanderDy = bystanderAfter.y - bystanderBefore.y
+  rec(
+    g,
+    '★★ 框外的旁观节点一动不动',
+    Math.abs(bystanderDx) <= 1 && Math.abs(bystanderDy) <= 1,
+    'dx=' + bystanderDx + ' dy=' + bystanderDy,
+  )
+
+  await page.screenshot({ path: OUT + '/g169-multi-drag.png' })
+
+  /**
+   * 第二段：**Shift+单击**选出三张再拖（用户真实路径之一）。
+   *
+   * 与框选的区别在于：Shift 点选时 React Flow 自己也会改一次它的内部选中表，
+   * 而我们的 store 选中是 `planNodeSelection` / `planSurfaceClick` 另算的 ——
+   * 两份表一旦不一致，拖动时就会多带一个「只有 RF 认为选中」的节点。
+   */
+  await clickBlankCanvas(page)
+  await sleep(300)
+  for (let i = 0; i < 3; i += 1) {
+    await page
+      .locator('[data-node-id="' + ids[i] + '"]')
+      .click({ position: { x: 60, y: 10 }, modifiers: i === 0 ? [] : ['Shift'] })
+    await sleep(220)
+  }
+  const shiftBefore = []
+  for (const id of ids) shiftBefore.push(await posOf(id))
+  const shiftBystanderBefore = await posOf(bystander)
+
+  const shiftGrab = await page.locator('[data-node-id="' + ids[0] + '"]').boundingBox()
+  await page.mouse.move(shiftGrab.x + 60, shiftGrab.y + 10)
+  await page.mouse.down()
+  await page.mouse.move(shiftGrab.x + 60 + 130, shiftGrab.y + 10 + 90, { steps: 14 })
+  await page.mouse.up()
+  await sleep(500)
+
+  const shiftAfter = []
+  for (const id of ids) shiftAfter.push(await posOf(id))
+  const shiftDeltas = shiftAfter.map((point, index) => ({
+    dx: point.x - shiftBefore[index].x,
+    dy: point.y - shiftBefore[index].y,
+  }))
+  const selectedDeltas = shiftDeltas.slice(0, 3)
+  const selectedShapes = new Set(selectedDeltas.map((delta) => delta.dx + ',' + delta.dy))
+  rec(
+    g,
+    '★★ Shift 点选三张后拖动：三张位移一致',
+    selectedDeltas.every((delta) => Math.abs(delta.dx) > 30) && selectedShapes.size === 1,
+    JSON.stringify(shiftDeltas),
+  )
+  rec(
+    g,
+    '★★ Shift 点选路径下，没被选中的第四张也不许动',
+    Math.abs(shiftDeltas[3].dx) <= 1 && Math.abs(shiftDeltas[3].dy) <= 1,
+    JSON.stringify(shiftDeltas[3]),
+  )
+  const shiftBystanderAfter = await posOf(bystander)
+  rec(
+    g,
+    '★★ Shift 点选路径下，框外旁观节点也不许动',
+    Math.abs(shiftBystanderAfter.x - shiftBystanderBefore.x) <= 1 &&
+      Math.abs(shiftBystanderAfter.y - shiftBystanderBefore.y) <= 1,
+    'dx=' + (shiftBystanderAfter.x - shiftBystanderBefore.x) +
+      ' dy=' + (shiftBystanderAfter.y - shiftBystanderBefore.y),
+  )
+
+  await page.screenshot({ path: OUT + '/g169-shift-drag.png' })
+
+  /**
+   * 第三段：四张**打成组**，再选组里的四个子节点拖动。
+   *
+   * 组内子节点走的是另一条拖动链路（`onChildPointerDown` → `useNodeDrag`），
+   * 与顶层节点的 React Flow 拖动完全不是同一段代码；用户素材常年在组里，这段必须覆盖。
+   */
+  await clickBlankCanvas(page)
+  await sleep(250)
+  for (let i = 0; i < 4; i += 1) {
+    await page
+      .locator('[data-node-id="' + ids[i] + '"]')
+      .click({ position: { x: 60, y: 10 }, modifiers: i === 0 ? [] : ['Shift'] })
+    await sleep(200)
+  }
+  await page.locator('[data-multi-action="group"]').click()
+  await sleep(700)
+  const groupCount = await page.locator('[data-node-type="group"]').count()
+  rec(g, '第三段：四张已打组', groupCount === 1, '分组=' + groupCount)
+  if (groupCount === 1) {
+    await clickBlankCanvas(page)
+    await sleep(250)
+    for (let i = 0; i < 4; i += 1) {
+      /* 点子节点**中上部**（避开分组板的内边距与标题条），否则点到的其实是组板 */
+      const childEl = page.locator('[data-node-id="' + ids[i] + '"]')
+      const childBox = await childEl.boundingBox()
+      await childEl.click({
+        position: { x: Math.round(childBox.width / 2), y: 14 },
+        modifiers: i === 0 ? [] : ['Shift'],
+      })
+      await sleep(220)
+    }
+    const inGroupBefore = []
+    for (const id of ids) inGroupBefore.push(await posOf(id))
+    /**
+     * 组内 Shift 点选必须能攒成多选（2026-11-18 修）：旧实现里 React Flow 把容器
+     * 报成选中时会按「只留顶层」重建集合，把刚攒起来的子节点全抹掉 —— 多选栏因此
+     * 不出现，接着拖动就只有被按住的那一张会动（用户报的「另一张图被自动带走」）。
+     */
+    const multiSelVisible = await page
+      .locator('[data-multi-action="group"]')
+      .isVisible()
+      .catch(() => false)
+    rec(g, '★★ 组内 Shift 点选能攒成多选（多选栏出现）', multiSelVisible)
+
+    const childGrab = await page.locator('[data-node-id="' + ids[0] + '"]').boundingBox()
+    await page.mouse.move(childGrab.x + 40, childGrab.y + 12)
+    await page.mouse.down()
+    await page.mouse.move(childGrab.x + 40 + 120, childGrab.y + 12 + 80, { steps: 14 })
+    await page.mouse.up()
+    await sleep(500)
+
+    const inGroupAfter = []
+    for (const id of ids) inGroupAfter.push(await posOf(id))
+    const inGroupDeltas = inGroupAfter.map((point, index) => ({
+      dx: point.x - inGroupBefore[index].x,
+      dy: point.y - inGroupBefore[index].y,
+    }))
+    const inGroupShapes = new Set(inGroupDeltas.map((delta) => delta.dx + ',' + delta.dy))
+    rec(
+      g,
+      '★★ 组内四个子节点一起走，位移完全一致',
+      inGroupDeltas.every((delta) => Math.abs(delta.dx) > 30) && inGroupShapes.size === 1,
+      JSON.stringify(inGroupDeltas),
+    )
+    await page.screenshot({ path: OUT + '/g169-group-drag.png' })
+  }
+  await ctx.close()
+}
+
 const skippedGroups = new Set(
   [
     String(process.env.SMOKE_SKIP ?? ''),
