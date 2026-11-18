@@ -3412,7 +3412,7 @@
         "CSS_MODULE:SettingsChannelWorkspace 的渠道工作区样式域",
         "CSS_CLASS:keyGroupSwitcher",
         "CSS_CLASS:keyGroupTab",
-        "CSS_CLASS:keyGroupIndicator",
+        "CSS_CLASS:keyGroupAddTab",
         "CSS_CLASS:keyGroupNameField",
         "CSS_CLASS:providerRouteInline"
       ],

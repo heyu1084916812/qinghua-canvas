@@ -145,13 +145,17 @@
 }
 
 .keyGroupTabs {
+  /* 两枚标签之间只留一道窄缝，顶部再用半径 R 的内凹弧把缝撑开成 V（参考图口径） */
+  --key-group-tab-seam: 6px;
+  --key-group-tab-seam-radius: 16px;
+  /* 弧高 ≈ 整枚标签：从顶边一路削到卡片顶边，才是参考图那种贯穿到底的削边 */
+  --key-group-tab-seam-height: 44px;
   position: relative;
   flex: 1 1 auto;
   min-width: 0;
   display: flex;
   align-items: flex-end;
-  /* 标签之间留出两侧内凹圆弧的宽度（各 8px），两弧相接才是参考图里那种窄缺口 */
-  gap: 16px;
+  gap: var(--key-group-tab-seam);
   padding: 0;
   overflow-x: auto;
   overflow-y: hidden;
@@ -159,50 +163,59 @@
 }
 
 .keyGroupTab {
+  --tab-bg: var(--bg-tab-idle);
   position: relative;
   z-index: 1;
   flex: 0 0 auto;
   max-width: 220px;
-  /* 未选中比选中矮一档：选中标签"立"起来，才像压在前面的文件夹标签 */
-  height: 40px;
+  height: 44px;
   box-sizing: border-box;
   display: inline-flex;
   align-items: center;
   gap: var(--space-2);
-  padding: 0 var(--space-4);
-  /* 未选中标签也有完整的标签页底：比选中态（= 卡片底）暗一档 */
+  padding: 0 18px;
   border-radius: 12px 12px 0 0;
-  background: var(--bg-tab-idle);
+  background: var(--tab-bg);
   color: var(--text-2);
   font-size: var(--fs-label);
   font-weight: var(--fw-title);
   cursor: pointer;
   outline: none;
-  transition: color 180ms ease-out;
+  transition:
+    background-color 180ms ease-out,
+    color 180ms ease-out;
 }
 
 /*
- * 每枚未选中标签左右各带一条内凹圆弧：两块拼在一起就是参考图里那个窄缺口。
- * 圆心落在「标签竖边 × 卡片顶边」的交点上，所以左边用 100% 100%、右边用 0 100%。
+ * 相邻两枚标签只隔一道窄缝，再用一块「页面底色 + 1/4 椭圆」把角啃掉：
+ * 啃出来的弧从标签顶边一路削到卡片顶边，两枚标签的弧拼成参考图里那个 V 形缺口。
  */
 .keyGroupTab::before,
 .keyGroupTab::after {
   content: '';
   position: absolute;
-  bottom: 0;
-  width: 8px;
-  height: 8px;
-  background: radial-gradient(circle at 100% 100%, transparent 8px, var(--bg-tab-idle) 8.5px);
+  top: 0;
+  width: var(--key-group-tab-seam-radius);
+  height: var(--key-group-tab-seam-height);
   pointer-events: none;
 }
 
 .keyGroupTab::before {
-  left: -8px;
+  left: 0;
+  background: radial-gradient(
+    ellipse var(--key-group-tab-seam-radius) var(--key-group-tab-seam-height) at 100% 100%,
+    transparent 99%,
+    var(--bg-canvas) 100%
+  );
 }
 
 .keyGroupTab::after {
-  right: -8px;
-  background: radial-gradient(circle at 0 100%, transparent 8px, var(--bg-tab-idle) 8.5px);
+  right: 0;
+  background: radial-gradient(
+    ellipse var(--key-group-tab-seam-radius) var(--key-group-tab-seam-height) at 0 100%,
+    transparent 99%,
+    var(--bg-canvas) 100%
+  );
 }
 
 .keyGroupTab:hover,
@@ -211,15 +224,12 @@
   color: var(--text-1);
 }
 
-/* 选中态背景由指示器统一画（它要和下方卡片同色并无缝相接） */
+/* 选中标签与下方卡片同底色、无缝相接；它永远排第一列、贴在卡片左边缘，所以左边不画圆弧 */
 .keyGroupTabOn {
-  height: 56px;
-  background: transparent;
+  --tab-bg: var(--bg-subtle);
 }
 
-/* 选中标签永远排第一列、贴在卡片左边缘：左边不画圆弧，右边那条由指示器给 */
-.keyGroupTabOn::before,
-.keyGroupTabOn::after {
+.keyGroupTabOn::before {
   content: none;
 }
 
@@ -227,44 +237,6 @@
   outline: 2px solid var(--focus-ring);
   outline-offset: -2px;
   border-radius: 12px 12px 0 0;
-}
-
-/*
- * 选中标签 = 下方卡片的「凸起」：同底色、圆角、无缝相接。
- * 选中分组永远排第一，故它固定贴左边，只需要宽度跟着文字变（切换时一起过渡）。
- */
-.keyGroupIndicator {
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  height: 56px;
-  border-radius: 12px 12px 0 0;
-  background: var(--bg-subtle);
-  opacity: 0;
-  pointer-events: none;
-  transition:
-    width 220ms ease-out,
-    opacity 160ms ease-out;
-}
-
-.keyGroupIndicator[data-ready='true'] {
-  opacity: 1;
-}
-
-/*
- * 底部外撇内凹圆角：在选中标签右下方补一小块卡片色、挖掉一个 1/4 圆，
- * 让标签右边切线平滑过渡到卡片顶边。左边不画 —— 标签就在卡片左边缘上。
- */
-.keyGroupIndicator::after {
-  content: '';
-  position: absolute;
-  right: -16px;
-  bottom: 0;
-  width: 16px;
-  height: 16px;
-  /* 椭圆圆心落在"标签右切线 × 卡片顶边"的交点，右下角甩出一段内凹圆弧 */
-  background: radial-gradient(ellipse 16px 16px at 0 100%, transparent 99%, var(--bg-subtle) 100%);
-  pointer-events: none;
 }
 
 .keyGroupTabName {
@@ -363,8 +335,8 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  /* 与标签文字同一条中线：选中文字中心 28、未选中标签中心 20，按钮 34px 抬到中点 24（margin 7 + 半高 17） */
-  margin: 0 0 7px;
+  /* 与标签文字同一条中线：标签 44px、按钮 34px，抬高 (44-34)/2 = 5px */
+  margin: 0 0 5px;
   padding: 0;
   border: 0;
   border-radius: var(--radius-control);
@@ -388,7 +360,6 @@
 
 @media (prefers-reduced-motion: reduce) {
   .keyGroupTab,
-  .keyGroupIndicator,
   .keyGroupAddTab {
     transition: none;
   }

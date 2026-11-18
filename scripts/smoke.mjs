@@ -13942,13 +13942,9 @@ async function g74(browser) {
     const commonTrackHeight =
       controlRect('[data-route-map-uncommon] span:first-child')?.height ?? 0
     const quickInputHeight = controlRect('[data-quick-test-input]')?.height ?? 0
-    /* Key 分组标题是文件夹标签（梯形），自成一档，不并入 34px 标准控件。 */
+    /* Key 分组标题是文件夹标签，自成一档，不并入 34px 标准控件。 */
     const keyGroupTabRect = controlRect('[data-key-group-tab]')
-    const keyGroupIndicatorRect = controlRect('[data-key-group-indicator]')
     const keyGroupTabHeight = keyGroupTabRect ? Math.round(keyGroupTabRect.height) : 0
-    const keyGroupIndicatorHeight = keyGroupIndicatorRect
-      ? Math.round(keyGroupIndicatorRect.height)
-      : 0
     const keyGroupTabTexts = Array.from(
       document.querySelectorAll('[data-key-group-tab]'),
     ).map((node) => node.textContent?.replace(/\s+/g, ' ').trim() ?? '')
@@ -13964,14 +13960,10 @@ async function g74(browser) {
       '[data-key-group-tab] [aria-label^="重命名分组"], [data-key-group-tab] [aria-label^="删除分组"]',
     ).length
     const firstKeyGroupTab = document.querySelector('[data-key-group-tab]')
-    const activeKeyGroupTab = document.querySelector('[data-key-group-tab][aria-selected="true"]')
-    const keyGroupIndicatorNode = document.querySelector('[data-key-group-indicator]')
     const firstKeyGroupStyle = firstKeyGroupTab ? getComputedStyle(firstKeyGroupTab) : null
-    const keyGroupIndicatorStyle = keyGroupIndicatorNode
-      ? getComputedStyle(keyGroupIndicatorNode)
-      : null
-    const keyGroupFilletStyle = keyGroupIndicatorNode
-      ? getComputedStyle(keyGroupIndicatorNode, '::after')
+    /* 缺口由标签二侧「页面色 + 1/4 椭圆」啃出来，量伪元素就是量这条弧 */
+    const keyGroupSeamStyle = firstKeyGroupTab
+      ? getComputedStyle(firstKeyGroupTab, '::after')
       : null
     const keyGroupCardStyle = document.querySelector('[data-settings-models]')
       ? getComputedStyle(document.querySelector('[data-settings-models]'))
@@ -14013,7 +14005,6 @@ async function g74(browser) {
       quickInputHeight: Math.round(quickInputHeight),
       tokenLinkText: text('[data-settings-doc-link]'),
       keyGroupTabHeight,
-      keyGroupIndicatorHeight,
       keyGroupIdleTabHeight,
       keyGroupIdleTabCenterY: centerY(keyGroupIdleTabRect),
       keyGroupTabTexts,
@@ -14023,19 +14014,14 @@ async function g74(browser) {
       ),
       keyGroupTabRadius: firstKeyGroupStyle?.borderTopLeftRadius ?? '',
       keyGroupTabBg: firstKeyGroupStyle?.backgroundColor ?? '',
-      keyGroupIndicatorBg: keyGroupIndicatorStyle?.backgroundColor ?? '',
-      keyGroupFillet: keyGroupFilletStyle?.content ?? '',
+      keyGroupSeamWidth: keyGroupSeamStyle?.width ?? '',
+      keyGroupSeamBg: keyGroupSeamStyle?.backgroundImage ?? '',
       keyGroupAddCenterY: centerY(keyGroupAddRect),
       keyGroupTextCenterY: centerY(keyGroupNameRect),
       keyGroupCardRadius: keyGroupCardStyle
         ? `${keyGroupCardStyle.borderTopLeftRadius} ${keyGroupCardStyle.borderTopRightRadius}`
         : '',
-      keyGroupActiveTabWidth: activeKeyGroupTab
-        ? Math.round(activeKeyGroupTab.getBoundingClientRect().width)
-        : 0,
-      keyGroupIndicatorWidth: keyGroupIndicatorNode
-        ? Math.round(keyGroupIndicatorNode.getBoundingClientRect().width)
-        : 0,
+      keyGroupCardBg: keyGroupCardStyle?.backgroundColor ?? '',
     }
   })
   rec(
@@ -14078,45 +14064,43 @@ async function g74(browser) {
   )
   rec(
     g,
-    'Key 分组是文件夹标签：选中分组排第一、选中 56px / 未选中 40px、标题里没有编辑/删除按钮',
+    'Key 分组是文件夹标签：选中分组排第一、44px 标签、标题里没有编辑/删除按钮',
     channelPolish.keyGroupFirstTabActive &&
-      channelPolish.keyGroupTabHeight === 56 &&
-      channelPolish.keyGroupIndicatorHeight === 56 &&
-      (channelPolish.keyGroupIdleTabHeight === 0 || channelPolish.keyGroupIdleTabHeight === 40) &&
+      channelPolish.keyGroupTabHeight === 44 &&
+      (channelPolish.keyGroupIdleTabHeight === 0 || channelPolish.keyGroupIdleTabHeight === 44) &&
       channelPolish.keyGroupTabTexts.length > 0 &&
-      channelPolish.keyGroupChromeButtons === 0 &&
-      Math.abs(channelPolish.keyGroupActiveTabWidth - channelPolish.keyGroupIndicatorWidth) <= 1,
+      channelPolish.keyGroupChromeButtons === 0,
     JSON.stringify({
       firstActive: channelPolish.keyGroupFirstTabActive,
       tab: channelPolish.keyGroupTabHeight,
-      indicator: channelPolish.keyGroupIndicatorHeight,
-      activeWidth: channelPolish.keyGroupActiveTabWidth,
-      indicatorWidth: channelPolish.keyGroupIndicatorWidth,
+      idleTab: channelPolish.keyGroupIdleTabHeight,
       tabs: channelPolish.keyGroupTabTexts,
       chromeButtons: channelPolish.keyGroupChromeButtons,
     }),
   )
   rec(
     g,
-    '文件夹标签造型：12px 圆角、选中块与卡片同色、底部内凹圆弧、卡片左上直角',
+    '文件夹标签造型：12px 顶角、选中标签与卡片同色、两枚标签之间是页面色的 V 形缺口、卡片左上直角',
     channelPolish.keyGroupTabRadius === '12px' &&
-      channelPolish.keyGroupIndicatorBg !== '' &&
-      channelPolish.keyGroupIndicatorBg !== 'rgba(0, 0, 0, 0)' &&
-      channelPolish.keyGroupFillet !== 'none' &&
+      channelPolish.keyGroupTabBg !== '' &&
+      channelPolish.keyGroupTabBg === channelPolish.keyGroupCardBg &&
+      channelPolish.keyGroupSeamWidth === '16px' &&
+      channelPolish.keyGroupSeamBg.includes('radial-gradient') &&
       channelPolish.keyGroupCardRadius === '0px 10px',
     JSON.stringify({
       radius: channelPolish.keyGroupTabRadius,
       tabBg: channelPolish.keyGroupTabBg,
-      indicatorBg: channelPolish.keyGroupIndicatorBg,
-      fillet: channelPolish.keyGroupFillet,
+      cardBg: channelPolish.keyGroupCardBg,
+      seam: channelPolish.keyGroupSeamWidth,
+      seamBg: channelPolish.keyGroupSeamBg.slice(0, 60),
       cardRadius: channelPolish.keyGroupCardRadius,
     }),
   )
   rec(
     g,
     '加号与标签文字同一条中线',
-    Math.abs(channelPolish.keyGroupAddCenterY - channelPolish.keyGroupTextCenterY) <= 6 &&
-      Math.abs(channelPolish.keyGroupAddCenterY - channelPolish.keyGroupIdleTabCenterY) <= 6,
+    Math.abs(channelPolish.keyGroupAddCenterY - channelPolish.keyGroupTextCenterY) <= 2 &&
+      Math.abs(channelPolish.keyGroupAddCenterY - channelPolish.keyGroupIdleTabCenterY) <= 2,
     `加号=${channelPolish.keyGroupAddCenterY} 选中文字=${channelPolish.keyGroupTextCenterY} 未选中标签=${channelPolish.keyGroupIdleTabCenterY}`,
   )
   rec(

@@ -1,7 +1,5 @@
 import {
-  useCallback,
   useEffect,
-  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -47,11 +45,7 @@ export function SettingsKeyGroupView({
   const [priorityId, setPriorityId] = useState<string | null>(null)
   const [menu, setMenu] = useState<GroupMenuState | null>(null)
   const [menuConfirm, setMenuConfirm] = useState(false)
-  /* 选中态尺寸从真实 DOM 量：标签宽度随文字变，切换分组时让它平滑过渡到新宽度。 */
-  const [indicator, setIndicator] = useState<{ width: number } | null>(null)
-  const [indicatorReady, setIndicatorReady] = useState(false)
 
-  const tabsRef = useRef<HTMLDivElement | null>(null)
   const tabRefs = useRef(new Map<string, HTMLDivElement>())
   const menuRef = useRef<HTMLDivElement | null>(null)
   /* 双击还没选中的标题时，先切组再进编辑：这次 activeGroup 变化不能把刚打开的输入框关掉。 */
@@ -68,46 +62,6 @@ export function SettingsKeyGroupView({
     setMenu(null)
     setMenuConfirm(false)
   }, [activeGroup?.id])
-
-  const measureIndicator = useCallback(() => {
-    const container = tabsRef.current
-    if (!container) return
-    const active = container.querySelector<HTMLElement>('[role="tab"][aria-selected="true"]')
-    if (!active) {
-      setIndicator(null)
-      return
-    }
-    setIndicator({ width: active.getBoundingClientRect().width })
-  }, [])
-
-  useLayoutEffect(() => {
-    measureIndicator()
-    const container = tabsRef.current
-    if (!container || typeof ResizeObserver === 'undefined') return
-    const observer = new ResizeObserver(() => measureIndicator())
-    observer.observe(container)
-    const active = container.querySelector<HTMLElement>('[role="tab"][aria-selected="true"]')
-    if (active) observer.observe(active)
-    return () => observer.disconnect()
-  }, [measureIndicator, activeGroup?.id, selectedKeyGroups, renameId, priorityId])
-
-  /* 首帧量完再打开过渡，避免梯形从 0 宽度滑进场。 */
-  useEffect(() => {
-    if (!indicator || indicatorReady) return
-    const frame = requestAnimationFrame(() => setIndicatorReady(true))
-    return () => cancelAnimationFrame(frame)
-  }, [indicator, indicatorReady])
-
-  useEffect(() => {
-    if (typeof document === 'undefined' || !document.fonts) return
-    let cancelled = false
-    void document.fonts.ready.then(() => {
-      if (!cancelled) measureIndicator()
-    })
-    return () => {
-      cancelled = true
-    }
-  }, [measureIndicator])
 
   useEffect(() => {
     if (!menu) return
@@ -219,17 +173,7 @@ export function SettingsKeyGroupView({
   return (
     <section className={styles.keyGroupTabsBar} data-key-groups>
       <div className={styles.keyGroupSwitcher} data-key-group-switcher>
-        <div className={styles.keyGroupTabs} role="tablist" aria-label="Key 分组" ref={tabsRef}>
-          {indicator ? (
-            <span
-              className={styles.keyGroupIndicator}
-              aria-hidden
-              data-key-group-indicator
-              data-ready={indicatorReady ? 'true' : 'false'}
-              style={{ width: `${indicator.width}px` }}
-            />
-          ) : null}
-
+        <div className={styles.keyGroupTabs} role="tablist" aria-label="Key 分组">
           {selectedKeyGroups.length === 0 ? (
             <div
               className={`${styles.keyGroupTab} ${styles.keyGroupTabOn}`}
