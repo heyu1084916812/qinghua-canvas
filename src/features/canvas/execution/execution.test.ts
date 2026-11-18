@@ -211,8 +211,8 @@ describe('buildRunPlan（单点生成）', () => {
     expect(plan.tasks[0]!.slot.kind).toBe('new')
   })
 
-  it('★★ 自动标题会使用上游素材文件名与节点预设', () => {
-    const { store, genId } = setup()
+  /** 上游放一张「素材图片节点」（只有图、没有提示词），供下面两条用例共用 */
+  function withMaterialUpstream(store: CanvasStore, genId: string): void {
     const materialId = 'n-material'
     store.dispatch({
       kind: 'node.create',
@@ -233,12 +233,63 @@ describe('buildRunPlan（单点生成）', () => {
       },
     })
     store.dispatch({ kind: 'edge.connect', source: materialId, target: genId })
-    store.dispatch({ kind: 'node.updateData', id: genId, patch: { preset: 'product-sheet' } })
+  }
+
+  it('★★ 自动标题会使用上游素材文件名（无预设）', () => {
+    const { store, genId } = setup()
+    withMaterialUpstream(store, genId)
 
     const plan = buildRunPlan('node', { originNodeId: genId }, store.getSnapshot(), 'single')
     expect(plan.tasks[0]!.materialTitle).toBe('婴儿奶瓶.png')
-    expect(plan.tasks[0]!.presetName).toBe('产品设定图')
-    expect(plan.tasks[0]!.autoTitle).toBe('婴儿奶瓶-产品设定')
+    expect(plan.tasks[0]!.autoTitle).toBe('婴儿奶瓶')
+    expect(plan.tasks[0]!.request.inputs.filter((i) => i.kind === 'asset')).toHaveLength(1)
+  })
+
+  /**
+   * #1154 口径（用户 2026-11-19）：「有功能预设时只对本节点素材生效，上游不参与生成」。
+   *
+   * 直接后果：预设开着时上游那张图**不进请求**，于是 `materialTitle` 拿不到素材名，
+   * 自动标题退化成「图片-产品设定」。这是新口径本身的结果，不是回归。
+   *
+   * 同一条用例顺带钉住「**关掉预设 / 换回无预设 → 上游立刻恢复参与**」：
+   * 预设是靠每次计划期现算的（`generationSpec.collectInputs` 里的 `presetOn`），
+   * 没有任何额外状态，所以把 `preset` 清空后重算，图就自己回来了。
+   */
+  it('★★ 有预设时上游素材不参与、关掉预设立刻恢复', () => {
+    const { store, genId } = setup()
+    withMaterialUpstream(store, genId)
+    store.dispatch({ kind: 'node.updateData', id: genId, patch: { preset: 'product-sheet' } })
+
+    const withPreset = buildRunPlan('node', { originNodeId: genId }, store.getSnapshot(), 'single')
+    expect(withPreset.tasks[0]!.presetName).toBe('产品设定图')
+    expect(withPreset.tasks[0]!.materialTitle).toBe('')
+    // 素材名这一半拿不到 → 标题退回「提示词节点那句 + 预设名」
+    expect(withPreset.tasks[0]!.autoTitle).toBe('一只在屋顶的猫-产品设定')
+    expect(withPreset.tasks[0]!.request.inputs.some((i) => i.kind === 'asset')).toBe(false)
+
+    store.dispatch({ kind: 'node.updateData', id: genId, patch: { preset: '' } })
+    const withoutPreset = buildRunPlan('node', { originNodeId: genId }, store.getSnapshot(), 'single')
+    expect(withoutPreset.tasks[0]!.presetName).toBe('')
+    expect(withoutPreset.tasks[0]!.materialTitle).toBe('婴儿奶瓶.png')
+    expect(withoutPreset.tasks[0]!.request.inputs.filter((i) => i.kind === 'asset')).toHaveLength(1)
+  })
+
+  /**
+   * 用户 2026-11-19 图五：「隐藏素材功能没完全生效（需要对当前节点的素材也能进行隐藏）」。
+   *
+   * 本节点自己的素材不走 `collectInputs`，而是这里「自注入」进请求的（见 `withSourceImage`），
+   * 所以隐藏必须在**这一层**也生效 —— 否则面板上的眼睛闭上了，发出去的请求里那张图还在。
+   */
+  it('★★ 本节点素材被隐藏时不再自注入请求', () => {
+    const { store, genId } = setup()
+    store.dispatch({ kind: 'node.updateData', id: genId, patch: { assetHash: 'h-self' } })
+
+    const shown = buildRunPlan('node', { originNodeId: genId }, store.getSnapshot(), 'single')
+    expect(shown.tasks[0]!.request.inputs.filter((i) => i.kind === 'asset')).toHaveLength(1)
+
+    store.dispatch({ kind: 'node.updateData', id: genId, patch: { hiddenIds: [genId] } })
+    const hiddenPlan = buildRunPlan('node', { originNodeId: genId }, store.getSnapshot(), 'single')
+    expect(hiddenPlan.tasks[0]!.request.inputs.filter((i) => i.kind === 'asset')).toHaveLength(0)
   })
 
   it('渠道或模型未配置的节点不入计划', () => {

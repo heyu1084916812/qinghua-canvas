@@ -86,8 +86,18 @@ export const generationSpec: NodeSpec<GenerationData> = {
       // 批量节点作为上游 → 集合卡（§6.12）：下游遍历集合内每项各生成一次，
       // 因此这里包成一个 collection 项，展开发生在执行计划阶段（domain/execution）。
       if (upstream.type === 'batch') {
-        if (presetOn) continue
         const items = batchItemsOf(upstream as NodeSnapshot<BatchData>, graph)
+        /**
+         * 有预设时**只切图片**，批量里夹着的提示词照旧参与（与上游提示词节点同口径）。
+         * 此时集合卡（逐项展开）没有意义——素材都被切掉了，只剩文字，
+         * 于是直接当普通文字输入推上去，避免退化成「一张只含文字的集合卡」。
+         */
+        if (presetOn) {
+          for (const item of items) {
+            if (item.kind === 'text') inputs.push(item)
+          }
+          continue
+        }
         if (items.length > 0) inputs.push({ kind: 'collection', nodeId: upstream.id, items })
         continue
       }
@@ -195,6 +205,29 @@ export const generationSpec: NodeSpec<GenerationData> = {
       emittedTexts.add(text)
       return true
     })
+    /**
+     * 图片顺序 = 面板里缩略图的顺序（用户 2026-11-19：拖动排序后「图一/图二」要跟着换）。
+     * 只**在图片之间**换位，文字项的位置不动 —— 提示词是整段合并的，换位没有意义还容易打乱拼接顺序。
+     */
+    const inputOrder = (node.data as { inputOrder?: string[] }).inputOrder ?? []
+    if (inputOrder.length > 1) {
+      const rank = new Map(inputOrder.map((id, index) => [id, index]))
+      const assetSlots = inputs
+        .map((input, index) => ({ input, index }))
+        .filter((slot) => slot.input.kind === 'asset')
+      if (assetSlots.length > 1) {
+        const sorted = [...assetSlots].sort(
+          (a, b) =>
+            (rank.get(a.input.nodeId) ?? Number.MAX_SAFE_INTEGER) -
+            (rank.get(b.input.nodeId) ?? Number.MAX_SAFE_INTEGER),
+        )
+        const reordered = [...inputs]
+        assetSlots.forEach((slot, index) => {
+          reordered[slot.index] = sorted[index]!.input
+        })
+        inputs = reordered
+      }
+    }
     return inputs
   },
 

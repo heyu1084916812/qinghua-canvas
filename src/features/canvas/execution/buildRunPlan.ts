@@ -383,9 +383,17 @@ export function buildRunPlan(
          */
         const sourceData = node.data as GenerationData
         const sourceAsset = sourceData.assetHash
+        /**
+         * 本节点素材被「小眼睛」隐藏时**不再自注入**（用户 2026-11-19：
+         * 「隐藏素材功能没完全生效，需要对当前节点的素材也能进行隐藏」）。
+         * 隐藏集合是 `hiddenIds`，与上游同一个口径。
+         */
+        const selfHidden = new Set(
+          (sourceData as { hiddenIds?: string[] }).hiddenIds ?? [],
+        ).has(node.id)
         const targetIsSelf = slot.kind === 'reuse' && slot.nodeId === node.id
         const withSourceImage: NodeInput[] =
-          !targetIsSelf && sourceAsset && !expansion.inputs.some((i) => i.kind === 'asset')
+          !targetIsSelf && !selfHidden && sourceAsset && !expansion.inputs.some((i) => i.kind === 'asset')
             ? [
                 ...expansion.inputs,
                 {

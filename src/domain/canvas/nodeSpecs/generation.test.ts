@@ -77,6 +77,93 @@ describe('生成节点规格 / 输入收集（M6-12）', () => {
     ])
   })
 
+  /**
+   * 同上口径的一个边界：上游是**批量节点**时，它的子项也分图 / 文字。
+   * 有预设只切图，批量里夹着的提示词照旧参与（否则「只切图片」就会变成「整块都不参与」）。
+   */
+  it('有预设时批量上游只丢图，里面的提示词照旧参与', () => {
+    const build = (preset: string) =>
+      graph(
+        [
+          node({ id: 'down', type: 'generation', data: { mode: 'image', preset } as never }),
+          node({ id: 'bt', type: 'batch', data: { childIds: ['b-img', 'b-txt'] } as never }),
+          node({ id: 'b-img', parentId: 'bt', type: 'generation', data: { mode: 'image', assetHash: 'h-b' } as never }),
+          node({ id: 'b-txt', parentId: 'bt', type: 'prompt', data: { text: '图一穿红色衣服' } as never }),
+        ],
+        [{ id: 'e1', projectId: 'p1', source: 'bt', target: 'down' }],
+      )
+
+    const withPreset = getSpec('generation')!.collectInputs({ node: build('storyboard').nodes[0]!, graph: build('storyboard') })
+    expect(withPreset).toEqual([{ kind: 'text', nodeId: 'b-txt', text: '图一穿红色衣服' }])
+
+    const withoutPreset = getSpec('generation')!.collectInputs({ node: build('').nodes[0]!, graph: build('') })
+    expect(withoutPreset).toHaveLength(1)
+    expect(withoutPreset[0]!.kind).toBe('collection')
+  })
+
+  /**
+   * 用户 2026-11-19：拖动缩略图改顺序 = 改「喂给模型的图片顺序」（图一/图二跟着换），
+   * 但**只在图片之间换位**，提示词文字的位置不动。
+   */
+  it('缩略图顺序（inputOrder）决定图片输入顺序，文字项位置不动', () => {
+    const g = graph(
+      [
+        node({ id: 'down', type: 'generation', data: { mode: 'image', inputOrder: ['up-dog', 'up-cat'] } as never }),
+        node({ id: 'up-cat', type: 'generation', data: { mode: 'image', assetHash: 'h-cat' } as never }),
+        node({ id: 'up-dog', type: 'generation', data: { mode: 'image', assetHash: 'h-dog' } as never }),
+        node({ id: 'up-text', type: 'prompt', data: { text: '图一穿红色衣服，图二穿白色衣服' } as never }),
+      ],
+      [
+        { id: 'e1', projectId: 'p1', source: 'up-cat', target: 'down' },
+        { id: 'e2', projectId: 'p1', source: 'up-dog', target: 'down' },
+        { id: 'e3', projectId: 'p1', source: 'up-text', target: 'down' },
+      ],
+    )
+    const inputs = getSpec('generation')!.collectInputs({ node: g.nodes[0]!, graph: g })
+    expect(inputs.map((input) => input.kind === 'asset' ? `asset:${input.assetHash}` : `text:${input.nodeId}`)).toEqual([
+      'asset:h-dog',
+      'asset:h-cat',
+      'text:up-text',
+    ])
+  })
+
+  /**
+   * 用户 2026-11-19 问：「上游图片节点内的提示词应该全局都不参与生成的吧？」
+   *
+   * 现状：**不参与**。上游生成节点交出去的只有它的**图**（`assetHash` + `naturalSize`
+   * + `mime`），它自己那句 `prompt` 既不在 `collectInputs` 的结果里，也不会被
+   * `toRunRequest` 拼进下游请求。会合并进下游的文字只有两类：
+   * 提示词节点（`kind: 'text'`）与循环节点本轮的 `__roundPrompt`。
+   *
+   * 这条用例把「下游没写正文时也不会去蹭上游那句」也钉住了（请求为 null）。
+   */
+  it('上游生成节点自带的 prompt 不参与下游（只交图）', () => {
+    const g = graph(
+      [
+        node({
+          id: 'down',
+          type: 'generation',
+          data: { mode: 'image', channelId: 'c', model: 'm', prompt: '' } as never,
+        }),
+        node({
+          id: 'up',
+          type: 'generation',
+          data: { mode: 'image', assetHash: 'h-up', prompt: '一只橘猫在码头上钓鱼' } as never,
+        }),
+      ],
+      [{ id: 'e1', projectId: 'p1', source: 'up', target: 'down' }],
+    )
+    const inputs = getSpec('generation')!.collectInputs({ node: g.nodes[0]!, graph: g })
+    expect(inputs).toEqual([{ kind: 'asset', nodeId: 'up', assetHash: 'h-up', mime: 'image/png' }])
+    const req = getSpec('generation')!.toRunRequest!({
+      node: g.nodes[0]!,
+      inputs,
+      params: g.nodes[0]!.data,
+      graph: g,
+    })
+    expect(req).toBeNull()
+  })
+
   it('视频上游保留真实 MIME；老视频没有 assetMime 时按 video/mp4 回落', () => {
     const g = graph(
       [
