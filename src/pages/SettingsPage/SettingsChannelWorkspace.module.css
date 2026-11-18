@@ -137,6 +137,43 @@
   min-width: 0;
 }
 
+/* 模型映射沿用 Key 分组那套三段式：标题 → 标签栏（页面底） → 表格面板（卡片底） */
+.mappingWorkspaceCard {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.mappingWorkspaceCard > section {
+  padding: 0;
+  border-bottom: 0;
+}
+
+.mappingSection {
+  gap: 0;
+}
+
+.mappingHead {
+  padding: 0;
+}
+
+.mappingTabsRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding-right: var(--space-4);
+}
+
+.mappingPanel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--space-4);
+  /* 选中标签永远贴左边，故左上角直角、其余圆角，与标签底边无缝 */
+  border-radius: 0 var(--radius-control) var(--radius-control) var(--radius-control);
+  background: var(--bg-subtle);
+}
+
 .keyGroupSwitcher {
   flex: 1 1 auto;
   min-width: 0;

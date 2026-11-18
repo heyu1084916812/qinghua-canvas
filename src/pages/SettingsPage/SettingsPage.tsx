@@ -792,7 +792,7 @@ export function SettingsPage({ embedded = false }: { embedded?: boolean } = {}) 
                 <SettingsWorkflowManager channel={selected} platform={platform} onOpen={() => openWorkflowsPage(selected.id)} />
               ) : null}
 
-              <div className={styles.settingsCard} data-settings-section="mapping">
+              <div className={styles.mappingWorkspaceCard} data-settings-section="mapping">
                 <SettingsChannelRouteView
                   allGlobalModels={allGlobalModels}
                   customModels={customModels}

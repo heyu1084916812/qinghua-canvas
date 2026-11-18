@@ -3419,7 +3419,7 @@
       "test": [
         "src/pages/SettingsPage/settingsPageCssArchitecture.test.ts"
       ],
-      "budget": 401
+      "budget": 438
     },
     {
       "module": "src/pages/SettingsPage/SettingsChannelList.module.css",
@@ -7268,7 +7268,7 @@
       "test": [
         "src/pages/SettingsPage/settingsPage/SettingsPageViews.test.ts"
       ],
-      "budget": 384
+      "budget": 391
     },
     {
       "module": "src/pages/SettingsPage/settingsPage/SettingsProfileDrawerView.tsx",

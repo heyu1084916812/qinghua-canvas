@@ -152,8 +152,36 @@ export function SettingsChannelRouteView({
   }, [modelAddOpen])
 
   return (
-    <section className={styles.editorSection} data-settings-channel-route>
-      <div className={`${styles.modelsHead} ${styles.modelMappingHead}`}>
+    <section
+      className={`${styles.editorSection} ${styles.mappingSection}`}
+      data-settings-channel-route
+    >
+      {/* 标签栏贴在表格面板顶边、背后是页面底色：和 Key 分组同一套三段式（标题 / 标签 / 面板） */}
+      <div className={styles.mappingTabsRow}>
+        <SettingsModelCategoryTabs
+          tabs={groups.map((group) => ({
+            category: group.category,
+            label: group.label,
+            count: group.rows.length,
+          }))}
+          activeCategory={activeGroup.category}
+          onChange={(category) => {
+            if (isMappingCategory(category)) setActiveCategory(category)
+          }}
+        />
+        <label className={styles.showUncommonToggle}>
+          <input
+            type="checkbox"
+            checked={showUncommonModels}
+            data-route-map-show-uncommon
+            onChange={(event) => onShowUncommonModelsChange(event.target.checked)}
+          />
+          <span>显示不常用模型</span>
+        </label>
+      </div>
+
+      <div className={styles.mappingPanel}>
+      <div className={`${styles.modelsHead} ${styles.modelMappingHead} ${styles.mappingHead}`}>
         <span className={styles.cardTitle}>模型映射</span>
         <button
           type="button"
@@ -298,32 +326,10 @@ export function SettingsChannelRouteView({
         </div>
       )}
 
-      <div className={styles.modelCategoryControls}>
-        <SettingsModelCategoryTabs
-          tabs={groups.map((group) => ({
-            category: group.category,
-            label: group.label,
-            count: group.rows.length,
-          }))}
-          activeCategory={activeGroup.category}
-          onChange={(category) => {
-            if (isMappingCategory(category)) setActiveCategory(category)
-          }}
-        />
-        <label className={styles.showUncommonToggle}>
-          <input
-            type="checkbox"
-            checked={showUncommonModels}
-            data-route-map-show-uncommon
-            onChange={(event) => onShowUncommonModelsChange(event.target.checked)}
-          />
-          <span>显示不常用模型</span>
-        </label>
-      </div>
 
       {activeRows.length > 0 ? (
         <div
-          className={styles.mappingTable}
+          className={`${styles.mappingTable} ${styles.mappingPanel}`}
           data-route-map-table
           id={MODEL_CATEGORY_PANEL_ID}
           role="tabpanel"
@@ -379,6 +385,7 @@ export function SettingsChannelRouteView({
           })}
         </div>
       ) : null}
+      </div>
     </section>
   )
 }
