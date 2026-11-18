@@ -58,6 +58,9 @@ function mount(overrides: Partial<Parameters<typeof SettingsKeyGroupView>[0]> = 
         scrollIntoView: () => {},
         getBoundingClientRect: () => ({ left: 0, top: 0, width: 0, height: 0 }),
         scrollLeft: 0,
+        style: {},
+        setAttribute: () => {},
+        getAttribute: () => null,
       }),
     })
   })
@@ -74,12 +77,12 @@ describe('SettingsKeyGroupView 文件夹标签', () => {
     expect(props.onActiveGroupChange).toHaveBeenCalledWith('backup')
   })
 
-  it('选中的分组排在第一个标签位，其余保持原顺序', () => {
+  it('标签保持分组原有顺序（切换靠形变层滑过去，不重排）', () => {
     const { renderer } = mount({ activeGroup: backup })
     const order = renderer.root
       .findAll((node) => typeof node.props['data-key-group-tab'] === 'string')
       .map((node) => node.props['data-key-group-tab'] as string)
-    expect(order).toEqual(['backup', 'primary'])
+    expect(order).toEqual(['primary', 'backup'])
     expect(renderer.root.findByProps({ 'data-key-group-tab': 'backup' }).props['aria-selected']).toBe(
       true,
     )

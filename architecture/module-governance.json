@@ -3419,7 +3419,7 @@
       "test": [
         "src/pages/SettingsPage/settingsPageCssArchitecture.test.ts"
       ],
-      "budget": 395
+      "budget": 401
     },
     {
       "module": "src/pages/SettingsPage/SettingsChannelList.module.css",
@@ -12386,7 +12386,7 @@
         "src/pages/SettingsPage/settingsPage/SettingsKeyGroupView.test.ts",
         "src/pages/SettingsPage/settingsPage/SettingsPageViews.test.ts"
       ],
-      "budget": 365
+      "budget": 319
     },
     {
       "module": "src/pages/SettingsPage/settingsPage/SettingsKeyGroupMenuView.tsx",
@@ -12850,6 +12850,80 @@
         "src/workbenches/canvas/panels/creation/CliParameterControls.test.ts"
       ],
       "budget": 80
+    },
+    {
+      "module": "src/pages/SettingsPage/settingsPage/keyGroupTabsShape.ts",
+      "owner": "settings-ui",
+      "responsibility": "Key 分组文件夹标签的几何与弹簧：静止梯形路径、选中标签的形变路径、阻尼弹簧步进（移植自 folder_tabs_ui.html）。",
+      "owns": [
+        "斜边 + 圆角的梯形路径生成",
+        "选中标签随 x/w/h/vx 的形变路径",
+        "阻尼弹簧步进与收敛判定"
+      ],
+      "doesNotOwn": [
+        "React 生命周期与 rAF 调度（useKeyGroupTabMorph）",
+        "标签 DOM 结构与交互",
+        "CSS 与主题令牌"
+      ],
+      "publicApi": [
+        "inactiveTabPath",
+        "morphingTabPath",
+        "stepSpring",
+        "isSpringSettled",
+        "TAB_HEADER_HEIGHT",
+        "TAB_ACTIVE_HEIGHT",
+        "TAB_INACTIVE_HEIGHT",
+        "MorphFrame",
+        "SpringValue"
+      ],
+      "test": [
+        "src/pages/SettingsPage/settingsPage/keyGroupTabsShape.test.ts"
+      ],
+      "budget": 135
+    },
+    {
+      "module": "src/pages/SettingsPage/settingsPage/useKeyGroupTabMorph.ts",
+      "owner": "settings-ui",
+      "responsibility": "把标签弹簧接到 React：量真实宽高、逐帧写 SVG 路径、切组时给回弹初速度，并处理 resize 与 StrictMode 重挂载。",
+      "owns": [
+        "标签尺寸测量与 tabSizes",
+        "弹簧状态与 rAF 循环",
+        "切组回弹与 resize 重算"
+      ],
+      "doesNotOwn": [
+        "路径几何（keyGroupTabsShape）",
+        "标签结构与交互",
+        "CSS 与主题令牌"
+      ],
+      "publicApi": [
+        "useKeyGroupTabMorph"
+      ],
+      "test": [
+        "src/pages/SettingsPage/settingsPage/SettingsKeyGroupView.test.ts"
+      ],
+      "budget": 180
+    },
+    {
+      "module": "src/pages/SettingsPage/settingsPage/SettingsKeyGroupTabShape.tsx",
+      "owner": "settings-ui",
+      "responsibility": "渲染 Key 分组标签的几何层：每枚标签一张静止梯形 SVG，选中态一块共享形变层。",
+      "owns": [
+        "静止梯形 SVG 的 viewBox 与路径",
+        "形变层 SVG 的 ref 挂载点"
+      ],
+      "doesNotOwn": [
+        "路径算法（keyGroupTabsShape）",
+        "弹簧驱动（useKeyGroupTabMorph）",
+        "标签文字与交互"
+      ],
+      "publicApi": [
+        "KeyGroupTabShape",
+        "KeyGroupMorphLayer"
+      ],
+      "test": [
+        "src/pages/SettingsPage/settingsPage/SettingsKeyGroupView.test.ts"
+      ],
+      "budget": 49
     }
   ]
 }

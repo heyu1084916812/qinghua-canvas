@@ -2,162 +2,129 @@
   {
     "case": "1440x900-dark",
     "first": {
-      "active": {
-        "x": 524,
-        "w": 132.25,
-        "h": 44
-      },
       "tabs": [
         {
           "name": "备用 Key P2",
           "selected": true,
-          "x": 524,
-          "w": 132.25,
-          "h": 44,
+          "left": 0,
+          "width": 146,
+          "height": 40,
           "clipped": false,
-          "radius": "12px",
-          "bg": "rgb(31, 31, 31)"
+          "shape": "M 0,40 L 0,12 Q 0,0 12,0 L 108,0 Q 120,0 124.21,"
         },
         {
           "name": "默认分组",
           "selected": false,
-          "x": 662.25,
-          "w": 90.25,
-          "h": 44,
+          "left": 128,
+          "width": 108,
+          "height": 40,
           "clipped": false,
-          "radius": "12px",
-          "bg": "rgb(30, 30, 30)"
+          "shape": "M 0,40 Q 11,40 14.86,29.7 L 21.79,11.24 Q 26,0 3"
         },
         {
           "name": "Key 分组 3",
           "selected": false,
-          "x": 758.5,
-          "w": 104.13,
-          "h": 44,
+          "left": 218,
+          "width": 122,
+          "height": 40,
           "clipped": false,
-          "radius": "12px",
-          "bg": "rgb(30, 30, 30)"
+          "shape": "M 0,40 Q 11,40 14.86,29.7 L 21.79,11.24 Q 26,0 3"
         },
         {
           "name": "Key 分组 4",
           "selected": false,
-          "x": 868.63,
-          "w": 104.13,
-          "h": 44,
+          "left": 322,
+          "width": 122,
+          "height": 40,
           "clipped": false,
-          "radius": "12px",
-          "bg": "rgb(30, 30, 30)"
+          "shape": "M 0,40 Q 11,40 14.86,29.7 L 21.79,11.24 Q 26,0 3"
         },
         {
           "name": "Key 分组 5",
           "selected": false,
-          "x": 978.75,
-          "w": 104.13,
-          "h": 44,
+          "left": 426,
+          "width": 122,
+          "height": 40,
           "clipped": false,
-          "radius": "12px",
-          "bg": "rgb(30, 30, 30)"
+          "shape": "M 0,40 Q 11,40 14.86,29.7 L 21.79,11.24 Q 26,0 3"
         }
       ],
-      "container": {
-        "x": 524,
-        "w": 844,
-        "h": 44,
-        "scrollLeft": 0
-      },
+      "morph": "M 0,46 L 0,14 Q 0,2 12,2 L 108,2 Q 120,2 123.87,13.36 L 131.45,3",
       "card": {
         "radius": "0px 10px",
         "bg": "rgb(31, 31, 31)"
       },
-      "seam": {
-        "width": "16px",
-        "height": "44px",
-        "background": "radial-gradient(16px 44px at 0px 100%, rgba(0, 0, 0, 0) 99%, rgb(22, 2"
-      },
-      "addCenterY": 621.28,
-      "textCenterY": 621.28,
-      "idleTabCenterY": 621.28,
+      "addCenterY": 625.28,
+      "textCenterY": 623.78,
+      "idleTabCenterY": 625.28,
       "docOverflow": 0
     },
     "second": {
-      "active": {
-        "x": 524,
-        "w": 130.95,
-        "h": 44
-      },
       "tabs": [
-        {
-          "name": "默认分组 P0",
-          "selected": true,
-          "x": 524,
-          "w": 130.95,
-          "h": 44,
-          "clipped": false,
-          "radius": "12px",
-          "bg": "rgb(31, 31, 31)"
-        },
         {
           "name": "备用 Key",
           "selected": false,
-          "x": 660.95,
-          "w": 91.55,
-          "h": 44,
+          "left": 0,
+          "width": 104,
+          "height": 40,
           "clipped": false,
-          "radius": "12px",
-          "bg": "rgb(30, 30, 30)"
+          "shape": "M 0,40 L 0,12 Q 0,0 12,0 L 66,0 Q 78,0 82.21,11."
+        },
+        {
+          "name": "默认分组 P0",
+          "selected": true,
+          "left": 86,
+          "width": 149,
+          "height": 40,
+          "clipped": false,
+          "shape": "M 0,40 Q 11,40 14.86,29.7 L 21.79,11.24 Q 26,0 3"
         },
         {
           "name": "Key 分组 3",
           "selected": false,
-          "x": 758.5,
-          "w": 104.13,
-          "h": 44,
+          "left": 217,
+          "width": 122,
+          "height": 40,
           "clipped": false,
-          "radius": "12px",
-          "bg": "rgb(30, 30, 30)"
+          "shape": "M 0,40 Q 11,40 14.86,29.7 L 21.79,11.24 Q 26,0 3"
         },
         {
           "name": "Key 分组 4",
           "selected": false,
-          "x": 868.63,
-          "w": 104.13,
-          "h": 44,
+          "left": 321,
+          "width": 122,
+          "height": 40,
           "clipped": false,
-          "radius": "12px",
-          "bg": "rgb(30, 30, 30)"
+          "shape": "M 0,40 Q 11,40 14.86,29.7 L 21.79,11.24 Q 26,0 3"
         },
         {
           "name": "Key 分组 5",
           "selected": false,
-          "x": 978.75,
-          "w": 104.13,
-          "h": 44,
+          "left": 425,
+          "width": 122,
+          "height": 40,
           "clipped": false,
-          "radius": "12px",
-          "bg": "rgb(30, 30, 30)"
+          "shape": "M 0,40 Q 11,40 14.86,29.7 L 21.79,11.24 Q 26,0 3"
         }
       ],
-      "container": {
-        "x": 524,
-        "w": 844,
-        "h": 44,
-        "scrollLeft": 0
-      },
+      "morph": "M 86,46 Q 97,46 100.55,35.59 L 108.13,13.36 Q 112,2 124,2 L 197,",
       "card": {
         "radius": "0px 10px",
         "bg": "rgb(31, 31, 31)"
       },
-      "seam": {
-        "width": "16px",
-        "height": "44px",
-        "background": "radial-gradient(16px 44px at 0px 100%, rgba(0, 0, 0, 0) 99%, rgb(22, 2"
-      },
-      "addCenterY": 621.28,
-      "textCenterY": 621.28,
-      "idleTabCenterY": 621.28,
+      "addCenterY": 625.28,
+      "textCenterY": 623.78,
+      "idleTabCenterY": 625.28,
       "docOverflow": 0
     },
-    "clickedName": "默认分组",
+    "spring": {
+      "frames": 80,
+      "startRight": 146,
+      "endRight": 234.87,
+      "peakRight": 242.81,
+      "topMin": 1.83,
+      "topMax": 3.24
+    },
     "rename": {
       "name": "默认分组",
       "afterRenameName": "默认分组",
@@ -165,15 +132,12 @@
       "inputHeight": 26
     },
     "menu": {
-      "left": 589,
-      "top": 621,
       "labels": [
         "编辑",
         "删除分组"
       ]
     },
     "longName": {
-      "textWidth": 143,
       "tabWidth": 220,
       "ellipsized": true
     },
@@ -182,162 +146,129 @@
   {
     "case": "1440x900-light",
     "first": {
-      "active": {
-        "x": 524,
-        "w": 132.25,
-        "h": 44
-      },
       "tabs": [
         {
           "name": "备用 Key P2",
           "selected": true,
-          "x": 524,
-          "w": 132.25,
-          "h": 44,
+          "left": 0,
+          "width": 146,
+          "height": 40,
           "clipped": false,
-          "radius": "12px",
-          "bg": "rgb(245, 245, 245)"
+          "shape": "M 0,40 L 0,12 Q 0,0 12,0 L 108,0 Q 120,0 124.21,"
         },
         {
           "name": "默认分组",
           "selected": false,
-          "x": 662.25,
-          "w": 90.25,
-          "h": 44,
+          "left": 128,
+          "width": 108,
+          "height": 40,
           "clipped": false,
-          "radius": "12px",
-          "bg": "rgb(242, 242, 242)"
+          "shape": "M 0,40 Q 11,40 14.86,29.7 L 21.79,11.24 Q 26,0 3"
         },
         {
           "name": "Key 分组 3",
           "selected": false,
-          "x": 758.5,
-          "w": 104.13,
-          "h": 44,
+          "left": 218,
+          "width": 122,
+          "height": 40,
           "clipped": false,
-          "radius": "12px",
-          "bg": "rgb(242, 242, 242)"
+          "shape": "M 0,40 Q 11,40 14.86,29.7 L 21.79,11.24 Q 26,0 3"
         },
         {
           "name": "Key 分组 4",
           "selected": false,
-          "x": 868.63,
-          "w": 104.13,
-          "h": 44,
+          "left": 322,
+          "width": 122,
+          "height": 40,
           "clipped": false,
-          "radius": "12px",
-          "bg": "rgb(242, 242, 242)"
+          "shape": "M 0,40 Q 11,40 14.86,29.7 L 21.79,11.24 Q 26,0 3"
         },
         {
           "name": "Key 分组 5",
           "selected": false,
-          "x": 978.75,
-          "w": 104.13,
-          "h": 44,
+          "left": 426,
+          "width": 122,
+          "height": 40,
           "clipped": false,
-          "radius": "12px",
-          "bg": "rgb(242, 242, 242)"
+          "shape": "M 0,40 Q 11,40 14.86,29.7 L 21.79,11.24 Q 26,0 3"
         }
       ],
-      "container": {
-        "x": 524,
-        "w": 844,
-        "h": 44,
-        "scrollLeft": 0
-      },
+      "morph": "M 0,46 L 0,14 Q 0,2 12,2 L 108,2 Q 120,2 123.87,13.36 L 131.45,3",
       "card": {
         "radius": "0px 10px",
         "bg": "rgb(245, 245, 245)"
       },
-      "seam": {
-        "width": "16px",
-        "height": "44px",
-        "background": "radial-gradient(16px 44px at 0px 100%, rgba(0, 0, 0, 0) 99%, rgb(255, "
-      },
-      "addCenterY": 621.28,
-      "textCenterY": 621.28,
-      "idleTabCenterY": 621.28,
+      "addCenterY": 625.28,
+      "textCenterY": 623.78,
+      "idleTabCenterY": 625.28,
       "docOverflow": 0
     },
     "second": {
-      "active": {
-        "x": 524,
-        "w": 130.95,
-        "h": 44
-      },
       "tabs": [
-        {
-          "name": "默认分组 P0",
-          "selected": true,
-          "x": 524,
-          "w": 130.95,
-          "h": 44,
-          "clipped": false,
-          "radius": "12px",
-          "bg": "rgb(245, 245, 245)"
-        },
         {
           "name": "备用 Key",
           "selected": false,
-          "x": 660.95,
-          "w": 91.55,
-          "h": 44,
+          "left": 0,
+          "width": 104,
+          "height": 40,
           "clipped": false,
-          "radius": "12px",
-          "bg": "rgb(242, 242, 242)"
+          "shape": "M 0,40 L 0,12 Q 0,0 12,0 L 66,0 Q 78,0 82.21,11."
+        },
+        {
+          "name": "默认分组 P0",
+          "selected": true,
+          "left": 86,
+          "width": 149,
+          "height": 40,
+          "clipped": false,
+          "shape": "M 0,40 Q 11,40 14.86,29.7 L 21.79,11.24 Q 26,0 3"
         },
         {
           "name": "Key 分组 3",
           "selected": false,
-          "x": 758.5,
-          "w": 104.13,
-          "h": 44,
+          "left": 217,
+          "width": 122,
+          "height": 40,
           "clipped": false,
-          "radius": "12px",
-          "bg": "rgb(242, 242, 242)"
+          "shape": "M 0,40 Q 11,40 14.86,29.7 L 21.79,11.24 Q 26,0 3"
         },
         {
           "name": "Key 分组 4",
           "selected": false,
-          "x": 868.63,
-          "w": 104.13,
-          "h": 44,
+          "left": 321,
+          "width": 122,
+          "height": 40,
           "clipped": false,
-          "radius": "12px",
-          "bg": "rgb(242, 242, 242)"
+          "shape": "M 0,40 Q 11,40 14.86,29.7 L 21.79,11.24 Q 26,0 3"
         },
         {
           "name": "Key 分组 5",
           "selected": false,
-          "x": 978.75,
-          "w": 104.13,
-          "h": 44,
+          "left": 425,
+          "width": 122,
+          "height": 40,
           "clipped": false,
-          "radius": "12px",
-          "bg": "rgb(242, 242, 242)"
+          "shape": "M 0,40 Q 11,40 14.86,29.7 L 21.79,11.24 Q 26,0 3"
         }
       ],
-      "container": {
-        "x": 524,
-        "w": 844,
-        "h": 44,
-        "scrollLeft": 0
-      },
+      "morph": "M 86,46 Q 97,46 100.55,35.59 L 108.13,13.36 Q 112,2 124,2 L 197,",
       "card": {
         "radius": "0px 10px",
         "bg": "rgb(245, 245, 245)"
       },
-      "seam": {
-        "width": "16px",
-        "height": "44px",
-        "background": "radial-gradient(16px 44px at 0px 100%, rgba(0, 0, 0, 0) 99%, rgb(255, "
-      },
-      "addCenterY": 621.28,
-      "textCenterY": 621.28,
-      "idleTabCenterY": 621.28,
+      "addCenterY": 625.28,
+      "textCenterY": 623.78,
+      "idleTabCenterY": 625.28,
       "docOverflow": 0
     },
-    "clickedName": "默认分组",
+    "spring": {
+      "frames": 80,
+      "startRight": 146,
+      "endRight": 234.61,
+      "peakRight": 242.26,
+      "topMin": 1.8,
+      "topMax": 3.46
+    },
     "rename": {
       "name": "默认分组",
       "afterRenameName": "默认分组",
@@ -345,15 +276,12 @@
       "inputHeight": 26
     },
     "menu": {
-      "left": 589,
-      "top": 621,
       "labels": [
         "编辑",
         "删除分组"
       ]
     },
     "longName": {
-      "textWidth": 143,
       "tabWidth": 220,
       "ellipsized": true
     },
@@ -362,162 +290,129 @@
   {
     "case": "1024x700-dark",
     "first": {
-      "active": {
-        "x": 476,
-        "w": 132.25,
-        "h": 44
-      },
       "tabs": [
         {
           "name": "备用 Key P2",
           "selected": true,
-          "x": 476,
-          "w": 132.25,
-          "h": 44,
+          "left": 0,
+          "width": 146,
+          "height": 40,
           "clipped": false,
-          "radius": "12px",
-          "bg": "rgb(31, 31, 31)"
+          "shape": "M 0,40 L 0,12 Q 0,0 12,0 L 108,0 Q 120,0 124.21,"
         },
         {
           "name": "默认分组",
           "selected": false,
-          "x": 614.25,
-          "w": 90.25,
-          "h": 44,
+          "left": 128,
+          "width": 108,
+          "height": 40,
           "clipped": false,
-          "radius": "12px",
-          "bg": "rgb(30, 30, 30)"
+          "shape": "M 0,40 Q 11,40 14.86,29.7 L 21.79,11.24 Q 26,0 3"
         },
         {
           "name": "Key 分组 3",
           "selected": false,
-          "x": 710.5,
-          "w": 104.13,
-          "h": 44,
+          "left": 218,
+          "width": 122,
+          "height": 40,
           "clipped": false,
-          "radius": "12px",
-          "bg": "rgb(30, 30, 30)"
+          "shape": "M 0,40 Q 11,40 14.86,29.7 L 21.79,11.24 Q 26,0 3"
         },
         {
           "name": "Key 分组 4",
           "selected": false,
-          "x": 820.63,
-          "w": 104.13,
-          "h": 44,
+          "left": 322,
+          "width": 122,
+          "height": 40,
           "clipped": false,
-          "radius": "12px",
-          "bg": "rgb(30, 30, 30)"
+          "shape": "M 0,40 Q 11,40 14.86,29.7 L 21.79,11.24 Q 26,0 3"
         },
         {
           "name": "Key 分组 5",
           "selected": false,
-          "x": 930.75,
-          "w": 104.13,
-          "h": 44,
+          "left": 426,
+          "width": 122,
+          "height": 40,
           "clipped": false,
-          "radius": "12px",
-          "bg": "rgb(30, 30, 30)"
+          "shape": "M 0,40 Q 11,40 14.86,29.7 L 21.79,11.24 Q 26,0 3"
         }
       ],
-      "container": {
-        "x": 476,
-        "w": 492,
-        "h": 44,
-        "scrollLeft": 0
-      },
+      "morph": "M 0,46 L 0,14 Q 0,2 12,2 L 108,2 Q 120,2 123.87,13.36 L 131.45,3",
       "card": {
         "radius": "0px 10px",
         "bg": "rgb(31, 31, 31)"
       },
-      "seam": {
-        "width": "16px",
-        "height": "44px",
-        "background": "radial-gradient(16px 44px at 0px 100%, rgba(0, 0, 0, 0) 99%, rgb(22, 2"
-      },
-      "addCenterY": 613.28,
-      "textCenterY": 613.28,
-      "idleTabCenterY": 613.28,
+      "addCenterY": 520.28,
+      "textCenterY": 518.78,
+      "idleTabCenterY": 520.28,
       "docOverflow": 0
     },
     "second": {
-      "active": {
-        "x": 476,
-        "w": 130.95,
-        "h": 44
-      },
       "tabs": [
-        {
-          "name": "默认分组 P0",
-          "selected": true,
-          "x": 476,
-          "w": 130.95,
-          "h": 44,
-          "clipped": false,
-          "radius": "12px",
-          "bg": "rgb(31, 31, 31)"
-        },
         {
           "name": "备用 Key",
           "selected": false,
-          "x": 612.95,
-          "w": 91.55,
-          "h": 44,
+          "left": 0,
+          "width": 104,
+          "height": 40,
           "clipped": false,
-          "radius": "12px",
-          "bg": "rgb(30, 30, 30)"
+          "shape": "M 0,40 L 0,12 Q 0,0 12,0 L 66,0 Q 78,0 82.21,11."
+        },
+        {
+          "name": "默认分组 P0",
+          "selected": true,
+          "left": 86,
+          "width": 149,
+          "height": 40,
+          "clipped": false,
+          "shape": "M 0,40 Q 11,40 14.86,29.7 L 21.79,11.24 Q 26,0 3"
         },
         {
           "name": "Key 分组 3",
           "selected": false,
-          "x": 710.5,
-          "w": 104.13,
-          "h": 44,
+          "left": 217,
+          "width": 122,
+          "height": 40,
           "clipped": false,
-          "radius": "12px",
-          "bg": "rgb(30, 30, 30)"
+          "shape": "M 0,40 Q 11,40 14.86,29.7 L 21.79,11.24 Q 26,0 3"
         },
         {
           "name": "Key 分组 4",
           "selected": false,
-          "x": 820.63,
-          "w": 104.13,
-          "h": 44,
+          "left": 321,
+          "width": 122,
+          "height": 40,
           "clipped": false,
-          "radius": "12px",
-          "bg": "rgb(30, 30, 30)"
+          "shape": "M 0,40 Q 11,40 14.86,29.7 L 21.79,11.24 Q 26,0 3"
         },
         {
           "name": "Key 分组 5",
           "selected": false,
-          "x": 930.75,
-          "w": 104.13,
-          "h": 44,
+          "left": 425,
+          "width": 122,
+          "height": 40,
           "clipped": false,
-          "radius": "12px",
-          "bg": "rgb(30, 30, 30)"
+          "shape": "M 0,40 Q 11,40 14.86,29.7 L 21.79,11.24 Q 26,0 3"
         }
       ],
-      "container": {
-        "x": 476,
-        "w": 492,
-        "h": 44,
-        "scrollLeft": 0
-      },
+      "morph": "M 86,46 Q 97,46 100.55,35.59 L 108.13,13.36 Q 112,2 124,2 L 197,",
       "card": {
         "radius": "0px 10px",
         "bg": "rgb(31, 31, 31)"
       },
-      "seam": {
-        "width": "16px",
-        "height": "44px",
-        "background": "radial-gradient(16px 44px at 0px 100%, rgba(0, 0, 0, 0) 99%, rgb(22, 2"
-      },
-      "addCenterY": 613.28,
-      "textCenterY": 613.28,
-      "idleTabCenterY": 613.28,
+      "addCenterY": 520.28,
+      "textCenterY": 518.78,
+      "idleTabCenterY": 520.28,
       "docOverflow": 0
     },
-    "clickedName": "默认分组",
+    "spring": {
+      "frames": 80,
+      "startRight": 146,
+      "endRight": 234.76,
+      "peakRight": 243.42,
+      "topMin": 1.86,
+      "topMax": 3.06
+    },
     "rename": {
       "name": "默认分组",
       "afterRenameName": "默认分组",
@@ -525,15 +420,12 @@
       "inputHeight": 26
     },
     "menu": {
-      "left": 541,
-      "top": 560,
       "labels": [
         "编辑",
         "删除分组"
       ]
     },
     "longName": {
-      "textWidth": 143,
       "tabWidth": 220,
       "ellipsized": true
     },
@@ -542,162 +434,129 @@
   {
     "case": "1024x700-light",
     "first": {
-      "active": {
-        "x": 476,
-        "w": 132.25,
-        "h": 44
-      },
       "tabs": [
         {
           "name": "备用 Key P2",
           "selected": true,
-          "x": 476,
-          "w": 132.25,
-          "h": 44,
+          "left": 0,
+          "width": 146,
+          "height": 40,
           "clipped": false,
-          "radius": "12px",
-          "bg": "rgb(245, 245, 245)"
+          "shape": "M 0,40 L 0,12 Q 0,0 12,0 L 108,0 Q 120,0 124.21,"
         },
         {
           "name": "默认分组",
           "selected": false,
-          "x": 614.25,
-          "w": 90.25,
-          "h": 44,
+          "left": 128,
+          "width": 108,
+          "height": 40,
           "clipped": false,
-          "radius": "12px",
-          "bg": "rgb(242, 242, 242)"
+          "shape": "M 0,40 Q 11,40 14.86,29.7 L 21.79,11.24 Q 26,0 3"
         },
         {
           "name": "Key 分组 3",
           "selected": false,
-          "x": 710.5,
-          "w": 104.13,
-          "h": 44,
+          "left": 218,
+          "width": 122,
+          "height": 40,
           "clipped": false,
-          "radius": "12px",
-          "bg": "rgb(242, 242, 242)"
+          "shape": "M 0,40 Q 11,40 14.86,29.7 L 21.79,11.24 Q 26,0 3"
         },
         {
           "name": "Key 分组 4",
           "selected": false,
-          "x": 820.63,
-          "w": 104.13,
-          "h": 44,
+          "left": 322,
+          "width": 122,
+          "height": 40,
           "clipped": false,
-          "radius": "12px",
-          "bg": "rgb(242, 242, 242)"
+          "shape": "M 0,40 Q 11,40 14.86,29.7 L 21.79,11.24 Q 26,0 3"
         },
         {
           "name": "Key 分组 5",
           "selected": false,
-          "x": 930.75,
-          "w": 104.13,
-          "h": 44,
+          "left": 426,
+          "width": 122,
+          "height": 40,
           "clipped": false,
-          "radius": "12px",
-          "bg": "rgb(242, 242, 242)"
+          "shape": "M 0,40 Q 11,40 14.86,29.7 L 21.79,11.24 Q 26,0 3"
         }
       ],
-      "container": {
-        "x": 476,
-        "w": 492,
-        "h": 44,
-        "scrollLeft": 0
-      },
+      "morph": "M 0,46 L 0,14 Q 0,2 12,2 L 108,2 Q 120,2 123.87,13.36 L 131.45,3",
       "card": {
         "radius": "0px 10px",
         "bg": "rgb(245, 245, 245)"
       },
-      "seam": {
-        "width": "16px",
-        "height": "44px",
-        "background": "radial-gradient(16px 44px at 0px 100%, rgba(0, 0, 0, 0) 99%, rgb(255, "
-      },
-      "addCenterY": 613.28,
-      "textCenterY": 613.28,
-      "idleTabCenterY": 613.28,
+      "addCenterY": 520.28,
+      "textCenterY": 518.78,
+      "idleTabCenterY": 520.28,
       "docOverflow": 0
     },
     "second": {
-      "active": {
-        "x": 476,
-        "w": 130.95,
-        "h": 44
-      },
       "tabs": [
-        {
-          "name": "默认分组 P0",
-          "selected": true,
-          "x": 476,
-          "w": 130.95,
-          "h": 44,
-          "clipped": false,
-          "radius": "12px",
-          "bg": "rgb(245, 245, 245)"
-        },
         {
           "name": "备用 Key",
           "selected": false,
-          "x": 612.95,
-          "w": 91.55,
-          "h": 44,
+          "left": 0,
+          "width": 104,
+          "height": 40,
           "clipped": false,
-          "radius": "12px",
-          "bg": "rgb(242, 242, 242)"
+          "shape": "M 0,40 L 0,12 Q 0,0 12,0 L 66,0 Q 78,0 82.21,11."
+        },
+        {
+          "name": "默认分组 P0",
+          "selected": true,
+          "left": 86,
+          "width": 149,
+          "height": 40,
+          "clipped": false,
+          "shape": "M 0,40 Q 11,40 14.86,29.7 L 21.79,11.24 Q 26,0 3"
         },
         {
           "name": "Key 分组 3",
           "selected": false,
-          "x": 710.5,
-          "w": 104.13,
-          "h": 44,
+          "left": 217,
+          "width": 122,
+          "height": 40,
           "clipped": false,
-          "radius": "12px",
-          "bg": "rgb(242, 242, 242)"
+          "shape": "M 0,40 Q 11,40 14.86,29.7 L 21.79,11.24 Q 26,0 3"
         },
         {
           "name": "Key 分组 4",
           "selected": false,
-          "x": 820.63,
-          "w": 104.13,
-          "h": 44,
+          "left": 321,
+          "width": 122,
+          "height": 40,
           "clipped": false,
-          "radius": "12px",
-          "bg": "rgb(242, 242, 242)"
+          "shape": "M 0,40 Q 11,40 14.86,29.7 L 21.79,11.24 Q 26,0 3"
         },
         {
           "name": "Key 分组 5",
           "selected": false,
-          "x": 930.75,
-          "w": 104.13,
-          "h": 44,
+          "left": 425,
+          "width": 122,
+          "height": 40,
           "clipped": false,
-          "radius": "12px",
-          "bg": "rgb(242, 242, 242)"
+          "shape": "M 0,40 Q 11,40 14.86,29.7 L 21.79,11.24 Q 26,0 3"
         }
       ],
-      "container": {
-        "x": 476,
-        "w": 492,
-        "h": 44,
-        "scrollLeft": 0
-      },
+      "morph": "M 86,46 Q 97,46 100.55,35.59 L 108.13,13.36 Q 112,2 124,2 L 197,",
       "card": {
         "radius": "0px 10px",
         "bg": "rgb(245, 245, 245)"
       },
-      "seam": {
-        "width": "16px",
-        "height": "44px",
-        "background": "radial-gradient(16px 44px at 0px 100%, rgba(0, 0, 0, 0) 99%, rgb(255, "
-      },
-      "addCenterY": 613.28,
-      "textCenterY": 613.28,
-      "idleTabCenterY": 613.28,
+      "addCenterY": 520.28,
+      "textCenterY": 518.78,
+      "idleTabCenterY": 520.28,
       "docOverflow": 0
     },
-    "clickedName": "默认分组",
+    "spring": {
+      "frames": 80,
+      "startRight": 146,
+      "endRight": 234.54,
+      "peakRight": 242.49,
+      "topMin": 1.78,
+      "topMax": 3.55
+    },
     "rename": {
       "name": "默认分组",
       "afterRenameName": "默认分组",
@@ -705,15 +564,12 @@
       "inputHeight": 26
     },
     "menu": {
-      "left": 541,
-      "top": 560,
       "labels": [
         "编辑",
         "删除分组"
       ]
     },
     "longName": {
-      "textWidth": 143,
       "tabWidth": 220,
       "ellipsized": true
     },

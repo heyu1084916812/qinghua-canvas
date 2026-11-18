@@ -28,6 +28,9 @@ const ICON_KEEP = [
   // 两种形态逐字一致的测试）；其余图标已全部走 Lucide。
   'src/workbenches/canvas/toolbar/icons.tsx',
   'src/workbenches/canvas/panels/presetIcons.tsx',
+  // Key 分组文件夹标签的几何层：路径按标签真实像素宽高生成（斜边 + 圆角 + 底部基线），
+  // 是形状而不是图标，换图标库也不会改变它。
+  'src/pages/SettingsPage/settingsPage/SettingsKeyGroupTabShape.tsx',
 ]
 
 

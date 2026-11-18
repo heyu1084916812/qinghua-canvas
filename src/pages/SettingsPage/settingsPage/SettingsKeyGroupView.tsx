@@ -1,6 +1,5 @@
 import {
   useEffect,
-  useMemo,
   useRef,
   useState,
   type MouseEvent as ReactMouseEvent,
@@ -10,6 +9,8 @@ import { createPortal } from 'react-dom'
 import type { ChannelCredentialGroup } from '../../../domain/project/channel'
 import { IconPlus } from '../../../app/ProjectTreeIcons'
 import { KEY_GROUP_MENU_WIDTH, SettingsKeyGroupMenuView } from './SettingsKeyGroupMenuView'
+import { KeyGroupMorphLayer, KeyGroupTabShape } from './SettingsKeyGroupTabShape'
+import { useKeyGroupTabMorph } from './useKeyGroupTabMorph'
 import { settingsPageStyles as styles } from './settingsPageStyles'
 
 export type SettingsKeyGroupViewProps = {
@@ -46,10 +47,12 @@ export function SettingsKeyGroupView({
   const [menu, setMenu] = useState<GroupMenuState | null>(null)
   const [menuConfirm, setMenuConfirm] = useState(false)
 
-  const tabRefs = useRef(new Map<string, HTMLDivElement>())
   const menuRef = useRef<HTMLDivElement | null>(null)
   /* 双击还没选中的标题时，先切组再进编辑：这次 activeGroup 变化不能把刚打开的输入框关掉。 */
   const renameTargetRef = useRef<string | null>(null)
+  const { tabRefs, tabsHostRef, morphSvgRef, morphPathRef, tabSizes } = useKeyGroupTabMorph(
+    activeGroup?.id,
+  )
 
   useEffect(() => {
     if (renameTargetRef.current && renameTargetRef.current === activeGroup?.id) {
@@ -159,32 +162,28 @@ export function SettingsKeyGroupView({
       </span>
     )
 
-  /* 选中的分组永远排第一列（像文件夹那样），其余保持原来的相对顺序。 */
-  const orderedKeyGroups = useMemo(() => {
-    const activeId = activeGroup?.id
-    const index = activeId ? selectedKeyGroups.findIndex((group) => group.id === activeId) : -1
-    if (index <= 0) return selectedKeyGroups
-    return [
-      selectedKeyGroups[index],
-      ...selectedKeyGroups.filter((group) => group.id !== activeId),
-    ]
-  }, [selectedKeyGroups, activeGroup?.id])
-
   return (
     <section className={styles.keyGroupTabsBar} data-key-groups>
       <div className={styles.keyGroupSwitcher} data-key-group-switcher>
-        <div className={styles.keyGroupTabs} role="tablist" aria-label="Key 分组">
+        <div className={styles.keyGroupTabs} role="tablist" aria-label="Key 分组" ref={tabsHostRef}>
           {selectedKeyGroups.length === 0 ? (
             <div
               className={`${styles.keyGroupTab} ${styles.keyGroupTabOn}`}
               role="tab"
               aria-selected="true"
+              data-key-group-placeholder
             >
-              <span className={styles.keyGroupTabName}>默认分组</span>
+              <KeyGroupTabShape width={140} height={40} first />
+              <span className={styles.keyGroupTabInner}>
+                <span className={styles.keyGroupTabName}>默认分组</span>
+              </span>
             </div>
           ) : (
-            orderedKeyGroups.map((group) => {
+            selectedKeyGroups.map((group, index) => {
               const selected = group.id === activeGroup?.id
+              const size = tabSizes[group.id]
+              const shapeWidth = size?.w ?? 140
+              const shapeHeight = size?.h ?? 40
               return (
                 <div
                   key={group.id}
@@ -202,6 +201,7 @@ export function SettingsKeyGroupView({
                   tabIndex={selected ? 0 : -1}
                   data-key-group-tab={group.id}
                   data-key-group-editor={selected ? group.id : undefined}
+                  data-key-group-first={index === 0 ? 'true' : undefined}
                   onClick={() => selectGroup(group.id)}
                   onDoubleClick={(event) => {
                     stop(event)
@@ -216,10 +216,16 @@ export function SettingsKeyGroupView({
                     selectGroup(group.id)
                   }}
                 >
-                  {renderName(group, selected)}
+                  <KeyGroupTabShape
+                    width={shapeWidth}
+                    height={shapeHeight}
+                    first={index === 0}
+                  />
+                  <span className={styles.keyGroupTabInner}>
+                    {renderName(group, selected)}
 
-                  {selected ? (
-                    priorityId === group.id ? (
+                    {selected ? (
+                      priorityId === group.id ? (
                       <label className={styles.keyGroupPriorityInput}>
                         <span>P</span>
                         <input
@@ -258,6 +264,7 @@ export function SettingsKeyGroupView({
                       </button>
                     )
                   ) : null}
+                  </span>
                 </div>
               )
             })
@@ -274,6 +281,9 @@ export function SettingsKeyGroupView({
           >
             <IconPlus size="sm" />
           </button>
+
+          {/* 选中标签的形变层：位置 / 宽度 / 高度都由弹簧实时驱动，画在静止梯形之上、文字之下 */}
+          <KeyGroupMorphLayer svgRef={morphSvgRef} pathRef={morphPathRef} />
         </div>
       </div>
 

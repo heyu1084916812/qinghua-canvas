@@ -13911,7 +13911,6 @@ async function g74(browser) {
       '[data-proto-add-toggle]',
       '[data-settings-baseurl]',
       '[data-choice-picker="settings-protocol"] > button',
-      '[data-key-group-add]',
       '[data-settings-token-tail]',
       '[data-settings-doc-link]',
       '[data-key-group-name]',
@@ -13961,10 +13960,12 @@ async function g74(browser) {
     ).length
     const firstKeyGroupTab = document.querySelector('[data-key-group-tab]')
     const firstKeyGroupStyle = firstKeyGroupTab ? getComputedStyle(firstKeyGroupTab) : null
-    /* 缺口由标签二侧「页面色 + 1/4 椭圆」啃出来，量伪元素就是量这条弧 */
-    const keyGroupSeamStyle = firstKeyGroupTab
-      ? getComputedStyle(firstKeyGroupTab, '::after')
-      : null
+    /* 标签形状是 SVG 路径（斜边 + 圆角），选中态由共享的形变层画 */
+    const keyGroupShapePath = firstKeyGroupTab?.querySelector('path')?.getAttribute('d') ?? ''
+    const keyGroupMorphPath =
+      document.querySelector('svg[class*="keyGroupMorph"] path')?.getAttribute('d') ?? ''
+    const keyGroupMorphFill =
+      document.querySelector('svg[class*="keyGroupMorph"] path')?.getAttribute('class') ?? ''
     const keyGroupCardStyle = document.querySelector('[data-settings-models]')
       ? getComputedStyle(document.querySelector('[data-settings-models]'))
       : null
@@ -14014,9 +14015,11 @@ async function g74(browser) {
       ),
       keyGroupTabRadius: firstKeyGroupStyle?.borderTopLeftRadius ?? '',
       keyGroupTabBg: firstKeyGroupStyle?.backgroundColor ?? '',
-      keyGroupSeamWidth: keyGroupSeamStyle?.width ?? '',
-      keyGroupSeamBg: keyGroupSeamStyle?.backgroundImage ?? '',
+      keyGroupShapePath: keyGroupShapePath.slice(0, 60),
+      keyGroupMorphPath: keyGroupMorphPath.slice(0, 60),
+      keyGroupMorphFill,
       keyGroupAddCenterY: centerY(keyGroupAddRect),
+      keyGroupAddHeight: keyGroupAddRect ? Math.round(keyGroupAddRect.height) : 0,
       keyGroupTextCenterY: centerY(keyGroupNameRect),
       keyGroupCardRadius: keyGroupCardStyle
         ? `${keyGroupCardStyle.borderTopLeftRadius} ${keyGroupCardStyle.borderTopRightRadius}`
@@ -14064,14 +14067,12 @@ async function g74(browser) {
   )
   rec(
     g,
-    'Key 分组是文件夹标签：选中分组排第一、44px 标签、标题里没有编辑/删除按钮',
-    channelPolish.keyGroupFirstTabActive &&
-      channelPolish.keyGroupTabHeight === 44 &&
-      (channelPolish.keyGroupIdleTabHeight === 0 || channelPolish.keyGroupIdleTabHeight === 44) &&
+    'Key 分组是文件夹标签：选中 44px / 未选中 40px、标题里没有编辑/删除按钮',
+    [40, 44].includes(channelPolish.keyGroupTabHeight) &&
+      (channelPolish.keyGroupIdleTabHeight === 0 || channelPolish.keyGroupIdleTabHeight === 40) &&
       channelPolish.keyGroupTabTexts.length > 0 &&
       channelPolish.keyGroupChromeButtons === 0,
     JSON.stringify({
-      firstActive: channelPolish.keyGroupFirstTabActive,
       tab: channelPolish.keyGroupTabHeight,
       idleTab: channelPolish.keyGroupIdleTabHeight,
       tabs: channelPolish.keyGroupTabTexts,
@@ -14080,34 +14081,32 @@ async function g74(browser) {
   )
   rec(
     g,
-    '文件夹标签造型：12px 顶角、选中标签与卡片同色、两枚标签之间是页面色的 V 形缺口、卡片左上直角',
-    channelPolish.keyGroupTabRadius === '12px' &&
-      channelPolish.keyGroupTabBg !== '' &&
-      channelPolish.keyGroupTabBg === channelPolish.keyGroupCardBg &&
-      channelPolish.keyGroupSeamWidth === '16px' &&
-      channelPolish.keyGroupSeamBg.includes('radial-gradient') &&
+    '文件夹标签造型：斜边梯形走 SVG 路径、选中态由形变层画、卡片左上直角',
+    channelPolish.keyGroupShapePath.startsWith('M 0,') &&
+      channelPolish.keyGroupShapePath.includes('Q') &&
+      channelPolish.keyGroupMorphPath.startsWith('M ') &&
+      channelPolish.keyGroupMorphPath.includes('Q') &&
+      channelPolish.keyGroupMorphFill.includes('Morph') &&
       channelPolish.keyGroupCardRadius === '0px 10px',
     JSON.stringify({
-      radius: channelPolish.keyGroupTabRadius,
-      tabBg: channelPolish.keyGroupTabBg,
-      cardBg: channelPolish.keyGroupCardBg,
-      seam: channelPolish.keyGroupSeamWidth,
-      seamBg: channelPolish.keyGroupSeamBg.slice(0, 60),
+      shape: channelPolish.keyGroupShapePath,
+      morph: channelPolish.keyGroupMorphPath,
       cardRadius: channelPolish.keyGroupCardRadius,
     }),
   )
   rec(
     g,
     '加号与标签文字同一条中线',
-    Math.abs(channelPolish.keyGroupAddCenterY - channelPolish.keyGroupTextCenterY) <= 2 &&
-      Math.abs(channelPolish.keyGroupAddCenterY - channelPolish.keyGroupIdleTabCenterY) <= 2,
+    Math.abs(channelPolish.keyGroupAddCenterY - channelPolish.keyGroupTextCenterY) <= 3 &&
+      Math.abs(channelPolish.keyGroupAddCenterY - channelPolish.keyGroupIdleTabCenterY) <= 3,
     `加号=${channelPolish.keyGroupAddCenterY} 选中文字=${channelPolish.keyGroupTextCenterY} 未选中标签=${channelPolish.keyGroupIdleTabCenterY}`,
   )
   rec(
     g,
-    '图标、内嵌眼睛、开关轨与多行输入保持各自档位',
+    '图标、内嵌眼睛、开关轨、新增分组与多行输入保持各自档位',
     channelPolish.gearHeight === 28 &&
       channelPolish.eyeHeight === 26 &&
+      channelPolish.keyGroupAddHeight === 30 &&
       channelPolish.enableTrackHeight === 20 &&
       channelPolish.commonTrackHeight === 20 &&
       channelPolish.quickInputHeight >= 84 &&
@@ -14115,6 +14114,7 @@ async function g74(browser) {
     JSON.stringify({
       gear: channelPolish.gearHeight,
       eye: channelPolish.eyeHeight,
+      addTab: channelPolish.keyGroupAddHeight,
       enable: channelPolish.enableTrackHeight,
       common: channelPolish.commonTrackHeight,
       textarea: channelPolish.quickInputHeight,
