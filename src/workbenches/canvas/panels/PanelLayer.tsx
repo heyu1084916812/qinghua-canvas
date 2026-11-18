@@ -437,18 +437,24 @@ function buildPanelModel(node: NodeSnapshot, graph: ReturnType<typeof useGraph>)
   }
   if (data.assetHash) {
     /*
-     * 节点自身内容：删除动作是**清空本节点的素材**，节点回到「没上传图片」状态。
-     *
-     * 提示词节点此处只会是历史遗留素材，不给删除入口以免误伤正文语义
-     * （它的正文才是内容，素材不是）。
+     * 节点自身内容：删除 = **清空本节点的素材**（提示词节点这里只是历史遗留素材，
+     * 不给删除入口，它的正文才是内容）。隐藏走 `hiddenIds`，与上游同一口径
+     * （用户 2026-11-19：本节点素材也要能隐藏，`buildRunPlan` 据此跳过自注入）。
      */
+    const selfHidden = new Set((data as { hiddenIds?: string[] }).hiddenIds ?? [])
     thumbs.unshift({
       owner: 'self',
       id: node.id,
       assetHash: data.assetHash,
-      visible: true,
+      visible: !selfHidden.has(node.id),
       removable: node.type === 'generation',
     })
+  }
+  /* 缩略图顺序 = 喂给模型的图片顺序（用户 2026-11-19）；`inputOrder` 没列到的按原相对顺序排末尾，不丢项 */
+  const inputOrder = (data as { inputOrder?: string[] }).inputOrder ?? []
+  if (inputOrder.length > 0 && thumbs.length > 1) {
+    const rank = new Map(inputOrder.map((id, index) => [id, index]))
+    thumbs.sort((a, b) => (rank.get(a.id) ?? Number.MAX_SAFE_INTEGER) - (rank.get(b.id) ?? Number.MAX_SAFE_INTEGER))
   }
   return {
     thumbs,
@@ -967,21 +973,26 @@ function toggleGroupPrompt(node: NodeSnapshot, store: ReturnType<typeof useCanva
   })
 }
 
-/** 面板内拖动缩略图排序（§6.11 / §6.12「缩略图排序与节点顺序双向同步」）。
- * 容器内部素材改 childIds（`container.reorder`）；上游缩略图改 `upstreamHidden` 的展示顺序
- * ——上游顺序由连线顺序决定，M3 只同步容器内部排序（外部上游顺序调整留待后续）。
- */
+/** 面板内拖动缩略图排序（§6.11 / §6.12）：容器改 childIds，生成 / 提示词节点只改 `inputOrder` */
 function reorderThumbs(
   owner: PanelThumb['owner'],
   order: string[],
   node: NodeSnapshot,
   store: ReturnType<typeof useCanvasStore>,
 ): void {
-  if (owner !== 'self') return
-  if (node.type !== 'group' && node.type !== 'batch') return
-  // order 只含被展示的缩略图；容器 childIds 里可能还有未出现在面板的项，追加在尾部
-  const current = childIdsOf(node as NodeSnapshot<GroupData>, store.getSnapshot())
-  const ordered = new Set(order)
-  const merged = [...order, ...current.filter((id) => !ordered.has(id))]
-  store.dispatch({ kind: 'container.reorder', containerId: node.id, orderedChildIds: merged })
+  if (node.type === 'group' || node.type === 'batch') {
+    if (owner !== 'self') return
+    // order 只含被展示的缩略图；容器 childIds 里可能还有未出现在面板的项，追加在尾部
+    const current = childIdsOf(node as NodeSnapshot<GroupData>, store.getSnapshot())
+    const ordered = new Set(order)
+    const merged = [...order, ...current.filter((id) => !ordered.has(id))]
+    store.dispatch({ kind: 'container.reorder', containerId: node.id, orderedChildIds: merged })
+    return
+  }
+  /* 生成 / 提示词节点：只改喂给模型的图片顺序（用户 2026-11-19）；不碰连线、位置、节点顺序 */
+  store.dispatch({
+    kind: 'node.updateData',
+    id: node.id,
+    patch: { inputOrder: order },
+  })
 }
