@@ -292,7 +292,7 @@
       "test": [
         "src/pages/SettingsPage/customProtocolDraft.test.ts"
       ],
-      "budget": 800
+      "budget": 760
     },
     {
       "module": "src/pages/SkillsPage/SkillsPage.module.css",
@@ -12957,6 +12957,25 @@
       ],
       "test": [
         "src/pages/SettingsPage/settingsPage/useChannelProtocolDraft.test.ts"
+      ],
+      "budget": 130
+    },
+    {
+      "module": "src/pages/SettingsPage/settingsPage/SettingsChannelGroupWorkspaceCard.tsx",
+      "owner": "settings-ui",
+      "responsibility": "渠道页「Key 分组 + 模型列表」整块装配，含这两块共用的草稿列表与分组推导。",
+      "owns": [
+        "分组卡的渲染树与列表推导"
+      ],
+      "doesNotOwn": [
+        "Key 分组标签的几何与动效",
+        "模型勾选面板的草稿状态"
+      ],
+      "publicApi": [
+        "SettingsChannelGroupWorkspaceCard"
+      ],
+      "test": [
+        "src/pages/SettingsPage/settingsPage/SettingsPageViews.test.ts"
       ],
       "budget": 130
     }

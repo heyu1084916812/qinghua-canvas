@@ -44,8 +44,7 @@ import { settingsPageStyles as styles } from './settingsPage/settingsPageStyles'
 import { SettingsGlobalRouteView } from './settingsPage/SettingsGlobalRouteView'
 import { SettingsChannelSidebarView } from './settingsPage/SettingsChannelSidebarView'
 import { SettingsChannelConnectionCard } from './settingsPage/SettingsChannelConnectionCard'
-import { SettingsModelsView } from './settingsPage/SettingsModelsView'
-import { SettingsKeyGroupView } from './settingsPage/SettingsKeyGroupView'
+import { SettingsChannelGroupWorkspaceCard } from './settingsPage/SettingsChannelGroupWorkspaceCard'
 import { SettingsWorkflowManager } from '../../features/settings/SettingsWorkflowManager'
 import { SettingsChannelQuickTest } from '../../features/settings/SettingsChannelQuickTest'
 import { initialSelectedChannelId, useWorkflowsPageOpener } from './settingsPage/workflowsPageLink'
@@ -468,13 +467,6 @@ export function SettingsPage({ embedded = false }: { embedded?: boolean } = {}) 
     mappingActions,
     channelState,
   })
-  const draftList = channelPresentation.draftModelsFor(
-    selected,
-    activeModelCache,
-    draftCategory,
-    '',
-  )
-  const selectedGroups = channelPresentation.selectedModelGroupsFor(activeModels)
   const handleBindModel = async (upstreamId: string, logicalName: string) => {
     if (!selectedId) return
     setMapSaveNotice(null)
@@ -638,43 +630,29 @@ export function SettingsPage({ embedded = false }: { embedded?: boolean } = {}) 
                 onVerify={handleVerify}
               />
 
-              <div className={styles.groupWorkspaceCard} data-settings-group-workspace>
-                <SettingsKeyGroupView
-                  activeGroup={activeGroup}
-                  selectedKeyGroups={selectedKeyGroups}
-                  busy={busy}
-                  onAddKeyGroup={handleAddKeyGroup}
-                  onRemoveKeyGroup={(groupId) =>
-                    handleRemoveKeyGroup({ groupId, skipConfirm: true })
-                  }
-                  onActiveGroupChange={setActiveGroupId}
-                  onRenameKeyGroup={(groupId, nextName) =>
-                    void channels.renameCredentialGroup(selected.id, groupId, nextName)
-                  }
-                  onSetKeyGroupPriority={(groupId, priority) =>
-                    void channels.setCredentialGroupPriority(selected.id, groupId, priority)
-                  }
-                />
-
-                <SettingsModelsView
-                  busy={busy}
-                  activeGroup={activeGroup}
-                  activeModelCache={activeModelCache}
-                  selectedGroups={selectedGroups}
-                  panelOpen={panelOpen}
-                  draftCategory={draftCategory}
-                  draftChecked={draftChecked}
-                  draftList={draftList}
-                  onRefresh={() => void handleRefresh()}
-                  onOpenPanel={() => void openPanel()}
-                  onClosePanel={() => setPanelOpen(false)}
-                  onDraftCategoryChange={setDraftCategory}
-                  onToggleDraft={toggleDraft}
-                  onModelCategoryChange={(modelId, category) => void channels.setModelCategory(selected.id, modelId, category, activeGroup?.id)}
-                  onDropSelectedModel={(modelId) => void dropSelectedModel(modelId)}
-                  onApplyDraft={() => void applyDraft()}
-                />
-              </div>
+              <SettingsChannelGroupWorkspaceCard
+                channel={selected}
+                activeGroup={activeGroup}
+                selectedKeyGroups={selectedKeyGroups}
+                busy={busy}
+                activeModelCache={activeModelCache}
+                panelOpen={panelOpen}
+                draftCategory={draftCategory}
+                draftChecked={draftChecked}
+                onAddKeyGroup={handleAddKeyGroup}
+                onRemoveKeyGroup={(groupId) => handleRemoveKeyGroup({ groupId, skipConfirm: true })}
+                onActiveGroupChange={setActiveGroupId}
+                onRenameKeyGroup={(groupId, nextName) => void channels.renameCredentialGroup(selected.id, groupId, nextName)}
+                onSetKeyGroupPriority={(groupId, priority) => void channels.setCredentialGroupPriority(selected.id, groupId, priority)}
+                onRefresh={() => void handleRefresh()}
+                onOpenPanel={() => void openPanel()}
+                onClosePanel={() => setPanelOpen(false)}
+                onDraftCategoryChange={setDraftCategory}
+                onToggleDraft={toggleDraft}
+                onModelCategoryChange={(modelId, category) => void channels.setModelCategory(selected.id, modelId, category, activeGroup?.id)}
+                onDropSelectedModel={(modelId) => void dropSelectedModel(modelId)}
+                onApplyDraft={() => void applyDraft()}
+              />
 
               {/* AI 应用 / 工作流在独立页管理（#1131）：渠道页只留连接、Key 和这条入口 */}
               {selected.protocol === 'runninghub-api' ? (

@@ -6,6 +6,7 @@ import type { ProtocolCatalog, ProtocolDefinition } from '../../../domain/projec
 import type { ModelCapability } from '../../../domain/shared/capability'
 import type { ChannelStore } from '../../../state/channel/channelStore'
 import { ChannelTokenField } from '../SettingsChannelTokenField'
+import { SettingsChannelGroupWorkspaceCard } from './SettingsChannelGroupWorkspaceCard'
 import { SettingsChannelContextMenuView } from './SettingsChannelContextMenuView'
 import { SettingsChannelRouteView } from './SettingsChannelRouteView'
 import { SettingsChannelSidebarView } from './SettingsChannelSidebarView'
@@ -412,6 +413,64 @@ describe('SettingsPage 视图拆分', () => {
     expect(html).not.toContain('重命名分组')
     expect(html).not.toContain('删除分组')
     expect(html).not.toContain('data-key-group-name="')
+  })
+
+  it('分组卡只加一层 groupWorkspace 壳：Key 分组与模型列表仍是它下面的一对兄弟', () => {
+    const group = {
+      id: 'primary',
+      name: '主分组',
+      credentialRef: 'credential-primary',
+      tokenTail: '1234',
+      hasToken: true,
+      priority: 10,
+      models: [],
+      modelCache: [],
+      modelMap: {},
+      createdAt: 1,
+    } satisfies ChannelCredentialGroup
+    const html = render(SettingsChannelGroupWorkspaceCard, {
+      channel: {
+        id: 'channel-1',
+        name: '渠道一',
+        protocol: 'mock',
+        baseUrl: '',
+        enabled: true,
+        priority: 0,
+        weight: 1,
+        models: [],
+        modelCache: [],
+        modelMap: {},
+        credentialGroups: [group],
+      } as unknown as Channel,
+      activeGroup: group,
+      selectedKeyGroups: [group],
+      busy: false,
+      activeModelCache: [],
+      panelOpen: false,
+      draftCategory: 'all',
+      draftChecked: new Set<string>(),
+      onAddKeyGroup: async () => {},
+      onRemoveKeyGroup: async () => {},
+      onActiveGroupChange: () => {},
+      onRenameKeyGroup: () => {},
+      onSetKeyGroupPriority: () => {},
+      onRefresh: () => {},
+      onOpenPanel: () => {},
+      onClosePanel: () => {},
+      onDraftCategoryChange: () => {},
+      onToggleDraft: () => {},
+      onModelCategoryChange: () => {},
+      onDropSelectedModel: () => {},
+      onApplyDraft: () => {},
+    })
+
+    /* 唯一的壳：data-settings-group-workspace 只出现一次，且直接包住两块内容 */
+    expect(html.match(/data-settings-group-workspace/g) ?? []).toHaveLength(1)
+    expect(html).toContain('data-key-groups')
+    expect(html).toContain('data-settings-models')
+    expect(html).toContain('data-key-group-tab="primary"')
+    /* 推导值在卡内算：没有任何模型时不渲染空分组标题 */
+    expect(html).not.toContain('data-settings-model-group=')
   })
 
   it('Key 分组官网入口使用短文案', () => {
