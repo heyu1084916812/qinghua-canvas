@@ -45734,6 +45734,11 @@ async function g169(browser) {
     const box = await page.locator('[data-node-id="' + id + '"]').boundingBox()
     return box ? { x: Math.round(box.x), y: Math.round(box.y) } : null
   }
+  /**
+   * 抖动（`SMOKE_JITTER=1` 才开）：偶发问题常躲在"恰好某个像素/某个时序"上。
+   * 每次跑随一点位移，20 次连跑就等于扫一片几何 + 时序的组合；断言全是相对量，不受影响。
+   */
+  const jitter = () => (process.env.SMOKE_JITTER === '1' ? Math.round((Math.random() - 0.5) * 40) : 0)
 
   /* 2×2 紧挨的四张（截图那种二十来像素的缝，拖动会触发吸附）+ 一张「半进框」的邻居 */
   const ids = []
@@ -45754,10 +45759,10 @@ async function g169(browser) {
   await clickBlankCanvas(page)
   await sleep(300)
 
-  const read = async () => {
+  const read = async (nodeIds = ids, sideId = neighbour) => {
     const out = []
-    for (const id of ids) out.push(await posOf(id))
-    out.push(await posOf(neighbour))
+    for (const id of nodeIds) out.push(await posOf(id))
+    if (sideId) out.push(await posOf(sideId))
     return out
   }
 
@@ -45771,22 +45776,27 @@ async function g169(browser) {
   }
 
   /** 一轮：框选 →（可选停顿）→ 拖 → 鼠标还按着量一次 → 松手再量一次 */
-  const runVariant = async (label, { settle = 400, marqueeTo, drag }) => {
+  const runVariant = async (
+    label,
+    { settle = 400, marqueeTo, drag, nodeIds = ids, sideId = neighbour },
+  ) => {
     await clickBlankCanvas(page)
     await sleep(250)
-    await marquee(marqueeTo.x, marqueeTo.y)
+    await marquee(marqueeTo.x + jitter(), marqueeTo.y + jitter())
     if (settle) await sleep(settle)
-    const before = await read()
-    const grab = await page.locator('[data-node-id="' + ids[0] + '"]').boundingBox()
+    const before = await read(nodeIds, sideId)
+    const grab = await page.locator('[data-node-id="' + nodeIds[0] + '"]').boundingBox()
     const from = { x: Math.round(grab.x) + 60, y: Math.round(grab.y) + 10 }
     await page.mouse.move(from.x, from.y)
     await page.mouse.down()
-    await page.mouse.move(from.x + drag.dx, from.y + drag.dy, { steps: 14 })
+    const dragDx = drag.dx + jitter()
+    const dragDy = drag.dy + jitter()
+    await page.mouse.move(from.x + dragDx, from.y + dragDy, { steps: 14 })
     await sleep(280)
-    const during = await read()
+    const during = await read(nodeIds, sideId)
     await page.mouse.up()
     await sleep(500)
-    const after = await read()
+    const after = await read(nodeIds, sideId)
     const moveDeltas = during.map((point, index) => ({
       dx: point.x - before[index].x,
       dy: point.y - before[index].y,
@@ -45844,6 +45854,98 @@ async function g169(browser) {
       Math.abs(partial.releaseJumps[4].dy) <= 1,
     JSON.stringify({ during: partial.moveDeltas[4], release: partial.releaseJumps[4] }),
   )
+
+  /**
+   * ── 第二段：换成**真图片节点**（用户那批是 1672×941 的图）再走一遍 ──
+   * 提示词节点是"标准件"，图片节点的尺寸/渲染/解码时机都不一样，偶发问题常藏在这儿。
+   */
+  /* 先点空白清掉多选（多选浮层的 selection-rect 会拦住节点点击） */
+  await clickBlankCanvas(page)
+  await sleep(300)
+  for (const id of [...ids, neighbour]) {
+    await page.locator('[data-node-id="' + id + '"]').click({ position: { x: 40, y: 10 } })
+    await sleep(200)
+    await page.keyboard.press('Delete')
+    await sleep(200)
+  }
+  await clickBlankCanvas(page)
+  await sleep(250)
+
+  const surface = page.locator('[data-canvas-surface]')
+  const dropImage = async (screenX, screenY, color) => {
+    const beforeIds = await page
+      .locator('[data-node-id]')
+      .evaluateAll((els) => els.map((el) => el.getAttribute('data-node-id')))
+    const dt = await page.evaluateHandle(
+      ({ b64 }) => {
+        const d = new DataTransfer()
+        const bin = atob(b64)
+        const bytes = new Uint8Array(bin.length)
+        for (let i = 0; i < bin.length; i += 1) bytes[i] = bin.charCodeAt(i)
+        d.items.add(new File([bytes], 'src.png', { type: 'image/png' }))
+        return d
+      },
+      { b64: solidPngBuffer(1672, 941, color).toString('base64') },
+    )
+    const sbox = await surface.boundingBox()
+    await surface.dispatchEvent('dragover', { dataTransfer: dt })
+    await surface.dispatchEvent('drop', {
+      dataTransfer: dt,
+      clientX: Math.round(sbox.x) + screenX,
+      clientY: Math.round(sbox.y) + screenY,
+    })
+    await sleep(1700)
+    const afterIds = await page
+      .locator('[data-node-id]')
+      .evaluateAll((els) => els.map((el) => el.getAttribute('data-node-id')))
+    const fresh = afterIds.filter((id) => !beforeIds.includes(id))
+    return fresh[fresh.length - 1]
+  }
+
+  const imageIds = []
+  const colors = [
+    [210, 90, 70],
+    [70, 120, 210],
+    [90, 180, 120],
+    [200, 160, 70],
+  ]
+  for (let i = 0; i < 4; i += 1) {
+    const id = await dropImage(300 + (i % 2) * 360, 200 + Math.floor(i / 2) * 280, colors[i])
+    imageIds.push(id)
+  }
+  rec(g, '第二段：四张真图片节点已就位', imageIds.every(Boolean), JSON.stringify(imageIds))
+  if (imageIds.every(Boolean)) {
+    /* 摆成 2×2 紧挨（和用户截图一致） */
+    let imageCell = { w: 320, h: 220 }
+    for (let i = 0; i < 4; i += 1) {
+      const box = await page.locator('[data-node-id="' + imageIds[i] + '"]').boundingBox()
+      imageCell = { w: Math.round(box.width), h: Math.round(box.height) }
+      await moveNode(
+        page,
+        imageIds[i],
+        230 + (i % 2) * (imageCell.w + 18),
+        140 + Math.floor(i / 2) * (imageCell.h + 18),
+      )
+    }
+    await clickBlankCanvas(page)
+    await sleep(300)
+    const imageRight = 230 + (imageCell.w + 18) * 2 - 30
+    const imageBottom = 140 + (imageCell.h + 18) * 2 - 30
+    await runVariant('图片 V1 框完立刻拖', {
+      settle: 0,
+      marqueeTo: { x: imageRight, y: imageBottom },
+      drag: { dx: 150, dy: 110 },
+      nodeIds: imageIds,
+      sideId: null,
+    })
+    await runVariant('图片 V2 停顿后拖', {
+      settle: 1000,
+      marqueeTo: { x: imageRight, y: imageBottom },
+      drag: { dx: -120, dy: -90 },
+      nodeIds: imageIds,
+      sideId: null,
+    })
+  }
 
   await page.screenshot({ path: OUT + '/g169-release-jump.png' })
   await ctx.close()
