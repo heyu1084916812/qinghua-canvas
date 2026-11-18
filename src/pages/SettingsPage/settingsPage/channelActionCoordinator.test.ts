@@ -57,8 +57,6 @@ function harness(overrides: Partial<ChannelActionState> = {}) {
     setDraftChecked: vi.fn(),
     setDraftCategory: vi.fn(),
     setDragId: vi.fn(),
-    setNewModelName: vi.fn(),
-    setModelAddOpen: vi.fn(),
     alert: vi.fn(),
     confirm: vi.fn(() => true),
   } as unknown as ChannelActionPorts
@@ -84,9 +82,6 @@ function harness(overrides: Partial<ChannelActionState> = {}) {
     dragId: 'c1',
     profileNameDraft: '新名称',
     profileIconDraft: 'data:image/png;base64,x',
-    newModelName: '模型',
-    newModelCategory: 'image',
-    newModelVendor: 'openai',
     platform: {} as ChannelActionState['platform'],
     ...overrides,
   }
@@ -153,15 +148,13 @@ describe('channelActionCoordinator', () => {
     expect(calls).toEqual(['saving:true', 'saving:false'])
   })
 
-  it('内置渠道不删除；确认取消不删 Key 分组或模型', async () => {
+  it('内置渠道不删除；确认取消不删 Key 分组', async () => {
     const { actions, state, ports, channels } = harness()
     ports.confirm = vi.fn(() => false)
     await actions.remove(state, 'ch_builtin_runninghub')
     await actions.removeKeyGroup(state)
-    await actions.removeGlobalModel('模型')
     expect(channels.remove).not.toHaveBeenCalled()
     expect(channels.removeCredentialGroup).not.toHaveBeenCalled()
-    expect(channels.removeGlobalModel).not.toHaveBeenCalled()
   })
 
   it('Key 分组删除成功选中下一组，失败仍解锁并提示', async () => {
@@ -200,22 +193,6 @@ describe('channelActionCoordinator', () => {
     await actions.removeKeyGroup(state, { groupId: 'g1', skipConfirm: true })
     expect(channels.removeCredentialGroup).toHaveBeenLastCalledWith('c1', 'g1')
     expect(ports.setActiveGroupId).toHaveBeenCalledWith('g2')
-  })
-
-  it('新增前端模型按表单当前分类保存', async () => {
-    const { actions, state, ports, channels } = harness({
-      newModelName: '6.1',
-      newModelCategory: 'chat',
-      newModelVendor: 'openai',
-    })
-    await actions.addGlobalModel(state)
-    expect(channels.addGlobalModel).toHaveBeenCalledWith({
-      name: '6.1',
-      category: 'chat',
-      vendor: 'openai',
-    })
-    expect(ports.setNewModelName).toHaveBeenCalledWith('')
-    expect(ports.setModelAddOpen).toHaveBeenCalledWith(false)
   })
 
   it('模型应用和渠道拖动保留既有排序与 busy/finally 顺序', async () => {

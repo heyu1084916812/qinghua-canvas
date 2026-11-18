@@ -39,9 +39,6 @@ export function createSettingsActionDelegates(sources: SettingsActionDelegateSou
     flushModelMapping: mappingActions.flush,
     scheduleModelMapping: mappingActions.schedule,
     testModelMapping: mappingActions.test,
-    handleAddGlobalModel: fromChannel(channelActions.addGlobalModel),
-    handleRemoveGlobalModel: async (name: string) =>
-      await channelActions.removeGlobalModel(name),
     openPanel: fromChannel(channelActions.openPanel),
     toggleDraft: fromChannel(channelActions.toggleDraft),
     applyDraft: fromChannel(channelActions.applyDraft),

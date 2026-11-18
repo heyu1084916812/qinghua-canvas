@@ -1,7 +1,6 @@
 import type { PointerEvent as ReactPointerEvent } from 'react'
 import type { Channel, ChannelCredentialGroup } from '../../../domain/project/channel'
 import type { ProtocolCatalog } from '../../../domain/project/protocol'
-import type { PresetModel, PresetVendor } from '../../../domain/project/modelPresets'
 import type { ModelCapability } from '../../../domain/shared/capability'
 import type { PlatformKit } from '../../../platform/ports'
 import type { ChannelStore } from '../../../state/channel/channelStore'
@@ -32,9 +31,6 @@ export interface ChannelActionState {
   dragId: string | null
   profileNameDraft: string
   profileIconDraft: string | null
-  newModelName: string
-  newModelCategory: PresetModel['category']
-  newModelVendor: PresetVendor
   platform: PlatformKit
 }
 
@@ -60,8 +56,6 @@ export interface ChannelActionPorts {
   setDraftChecked(update: (previous: ReadonlySet<string>) => ReadonlySet<string>): void
   setDraftCategory(value: 'all' | ModelCapability['category']): void
   setDragId(value: string | null): void
-  setNewModelName(value: string): void
-  setModelAddOpen(value: boolean): void
   alert(message: string): void
   confirm(message: string): boolean
 }
@@ -277,27 +271,6 @@ export function createChannelActions(ports: ChannelActionPorts) {
         ports.alert(rawErrorMessage(error))
       } finally {
         ports.setBusy(false)
-      }
-    },
-    addGlobalModel: async (state: ChannelActionState) => {
-      try {
-        await ports.channels.addGlobalModel({
-          name: state.newModelName,
-          category: state.newModelCategory,
-          vendor: state.newModelVendor,
-        })
-        ports.setNewModelName('')
-        ports.setModelAddOpen(false)
-      } catch (error) {
-        ports.alert(rawErrorMessage(error))
-      }
-    },
-    removeGlobalModel: async (name: string) => {
-      if (!ports.confirm(`删除前端模型「${name}」？各渠道里的同名映射会保留。`)) return
-      try {
-        await ports.channels.removeGlobalModel(name)
-      } catch (error) {
-        ports.alert(rawErrorMessage(error))
       }
     },
     openPanel: (state: ChannelActionState) => {

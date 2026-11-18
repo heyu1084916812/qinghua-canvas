@@ -292,7 +292,7 @@
       "test": [
         "src/pages/SettingsPage/customProtocolDraft.test.ts"
       ],
-      "budget": 760
+      "budget": 700
     },
     {
       "module": "src/pages/SkillsPage/SkillsPage.module.css",
@@ -12978,6 +12978,44 @@
         "src/pages/SettingsPage/settingsPage/SettingsPageViews.test.ts"
       ],
       "budget": 130
+    },
+    {
+      "module": "src/pages/SettingsPage/settingsPage/SettingsChannelMappingCard.tsx",
+      "owner": "settings-ui",
+      "responsibility": "渠道页「模型映射」整块装配：前端模型目录、映射行与保存回执的接线。",
+      "owns": [
+        "映射卡的渲染树与目录装配"
+      ],
+      "doesNotOwn": [
+        "前端模型目录的仓储规则",
+        "映射行的分类与排序"
+      ],
+      "publicApi": [
+        "SettingsChannelMappingCard"
+      ],
+      "test": [
+        "src/pages/SettingsPage/settingsPage/useChannelMappingDraft.test.ts"
+      ],
+      "budget": 110
+    },
+    {
+      "module": "src/pages/SettingsPage/settingsPage/useChannelMappingDraft.ts",
+      "owner": "settings-ui",
+      "responsibility": "模型映射卡的草稿与动作：前端模型增删、映射绑定、常用开关与目录聚合。",
+      "owns": [
+        "映射表单状态与绑定回执"
+      ],
+      "doesNotOwn": [
+        "切渠道清场（mapSaveNotice 归页面）",
+        "渠道表单字段"
+      ],
+      "publicApi": [
+        "useChannelMappingDraft"
+      ],
+      "test": [
+        "src/pages/SettingsPage/settingsPage/useChannelMappingDraft.test.ts"
+      ],
+      "budget": 140
     }
   ]
 }

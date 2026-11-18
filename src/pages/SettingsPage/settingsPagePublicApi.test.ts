@@ -58,6 +58,15 @@ const PROTOCOL_DRAFT_SOURCE = (
   }) as Record<string, string>
 )['./settingsPage/useChannelProtocolDraft.ts']
 
+/** 模型映射卡的草稿态（前端模型增删 / 映射绑定），2026-11-18 从渠道动作搬进这张卡。 */
+const MAPPING_DRAFT_SOURCE = (
+  import.meta.glob('./settingsPage/useChannelMappingDraft.ts', {
+    eager: true,
+    query: '?raw',
+    import: 'default',
+  }) as Record<string, string>
+)['./settingsPage/useChannelMappingDraft.ts']
+
 const CHANNEL_ACTION_KEYS: readonly (keyof ChannelActions)[] = [
   'create',
   'setEnabled',
@@ -74,8 +83,6 @@ const CHANNEL_ACTION_KEYS: readonly (keyof ChannelActions)[] = [
   'remove',
   'addKeyGroup',
   'removeKeyGroup',
-  'addGlobalModel',
-  'removeGlobalModel',
   'openPanel',
   'toggleDraft',
   'applyDraft',
@@ -127,6 +134,14 @@ describe('SettingsPage 公共导出与页面锚点', () => {
     expect(SETTINGS_SOURCE).toContain('const mappingActions = createModelMappingActions(mappingPorts)')
     expect(PROTOCOL_DRAFT_SOURCE).toContain('createProtocolActions({')
     expect(STYLE_FACADE).toContain('item: baseStyles.item')
+  })
+
+  it('前端模型的增删随映射卡搬进 useChannelMappingDraft，渠道动作不再持有它们', () => {
+    expect(MAPPING_DRAFT_SOURCE).toContain('addGlobalModel')
+    expect(MAPPING_DRAFT_SOURCE).toContain('removeGlobalModel')
+    expect(MAPPING_DRAFT_SOURCE).toContain('setModelBinding')
+    expect(SETTINGS_SOURCE).not.toContain('handleRemoveGlobalModel')
+    expect(SETTINGS_SOURCE).not.toContain('handleAddGlobalModel')
   })
 
   it('保留渠道表单、Token、模型映射、路由策略与资料抽屉锚点', () => {

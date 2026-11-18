@@ -20,8 +20,6 @@ import {
 import {
   measureProfileDrawerBounds,
   type ChannelFilterKey,
-  type PresetModel,
-  type PresetVendor,
 } from './settingsPageConstants'
 import { isBuiltinChannelId } from '../../domain/project/builtinChannels'
 import { usePlatform } from '../../app/providers/PlatformProvider'
@@ -48,7 +46,7 @@ import { SettingsChannelGroupWorkspaceCard } from './settingsPage/SettingsChanne
 import { SettingsWorkflowManager } from '../../features/settings/SettingsWorkflowManager'
 import { SettingsChannelQuickTest } from '../../features/settings/SettingsChannelQuickTest'
 import { initialSelectedChannelId, useWorkflowsPageOpener } from './settingsPage/workflowsPageLink'
-import { SettingsChannelRouteView } from './settingsPage/SettingsChannelRouteView'
+import { SettingsChannelMappingCard } from './settingsPage/SettingsChannelMappingCard'
 import { SettingsProfileDrawerView } from './settingsPage/SettingsProfileDrawerView'
 import { SettingsChannelContextMenuView } from './settingsPage/SettingsChannelContextMenuView'
 
@@ -132,13 +130,7 @@ export function SettingsPage({ embedded = false }: { embedded?: boolean } = {}) 
     () => channels.getState().uncommonModelIds,
     () => channels.getState().uncommonModelIds,
   )
-  const allGlobalModels = useMemo(
-    () =>
-      (['image', 'chat', 'video', 'audio'] as const).flatMap((category) =>
-        channels.globalModelsOf(category, true),
-      ),
-    [channels, customModels, uncommonModelIds],
-  )
+  /** 前端模型目录在映射卡里现算（`useChannelMappingDraft`），页面只用这两个源数据。 */
   const verify = useSyncExternalStore(
     channels.subscribe,
     () => channels.getState().verify,
@@ -242,13 +234,6 @@ export function SettingsPage({ embedded = false }: { embedded?: boolean } = {}) 
     tone: 'ok' | 'error'
     text: string
   } | null>(null)
-  const [modelAddOpen, setModelAddOpen] = useState(false)
-  const [newModelName, setNewModelName] = useState('')
-  const [newModelCategory, setNewModelCategory] =
-    useState<PresetModel['category']>('image')
-  const [newModelVendor, setNewModelVendor] = useState<PresetVendor>('openai')
-  const [showUncommonModels, setShowUncommonModels] = useState(false)
-
   /**
    * 协议目录版本号。`protocolCatalog()` 每次返回**新对象**，但 useSyncExternalStore
    * 只在 store 快照变化时重渲染；自建协议增删后靠这个计数把目录重算一遍，
@@ -416,8 +401,6 @@ export function SettingsPage({ embedded = false }: { embedded?: boolean } = {}) 
     setDraftChecked,
     setDraftCategory,
     setDragId,
-    setNewModelName,
-    setModelAddOpen,
     alert: (message) => window.alert(message),
     confirm: (message) => window.confirm(message),
   }
@@ -436,9 +419,6 @@ export function SettingsPage({ embedded = false }: { embedded?: boolean } = {}) 
     dragId,
     profileNameDraft,
     profileIconDraft,
-    newModelName,
-    newModelCategory,
-    newModelVendor,
     platform,
   })
   const channelActions = createChannelActions(channelPorts)
@@ -460,32 +440,13 @@ export function SettingsPage({ embedded = false }: { embedded?: boolean } = {}) 
     persistForm, handleVerify, handleDetect, handleRefresh,
     openChannelMenu, openChannelMenuFromButton, editChannel, handleRemove,
     handleAddKeyGroup, handleRemoveKeyGroup,
-    handleAddGlobalModel, handleRemoveGlobalModel, openPanel,
+    openPanel,
     toggleDraft, applyDraft, dropSelectedModel, dropOnChannel,
   } = actionDelegates.createSettingsActionDelegates({
     channelActions,
     mappingActions,
     channelState,
   })
-  const handleBindModel = async (upstreamId: string, logicalName: string) => {
-    if (!selectedId) return
-    setMapSaveNotice(null)
-    try {
-      await channels.setModelBinding(
-        selectedId,
-        upstreamId,
-        logicalName,
-        activeGroup?.id,
-      )
-      setMapSaveNotice({ id: logicalName, tone: 'ok', text: '已保存' })
-    } catch (error) {
-      setMapSaveNotice({
-        id: logicalName,
-        tone: 'error',
-        text: error instanceof Error ? error.message : '保存失败',
-      })
-    }
-  }
   const action = verifiedFor?.channelId === selectedId ? verifiedFor.source : null
 
   const {
@@ -659,34 +620,16 @@ export function SettingsPage({ embedded = false }: { embedded?: boolean } = {}) 
                 <SettingsWorkflowManager channel={selected} platform={platform} onOpen={() => openWorkflowsPage(selected.id)} />
               ) : null}
 
-              <div className={styles.mappingWorkspaceCard} data-settings-section="mapping">
-                <SettingsChannelRouteView
-                  allGlobalModels={allGlobalModels}
-                  customModels={customModels}
-                  uncommonModelIds={uncommonModelIds}
-                  activeModels={activeModels}
-                  modelAddOpen={modelAddOpen}
-                  newModelName={newModelName}
-                  newModelCategory={newModelCategory}
-                  newModelVendor={newModelVendor}
-                  showUncommonModels={showUncommonModels}
-                  modelMap={activeModelMap}
-                  mapSaveNotice={mapSaveNotice}
-                  onModelAddOpenChange={setModelAddOpen}
-                  onNewModelNameChange={setNewModelName}
-                  onNewModelCategoryChange={setNewModelCategory}
-                  onNewModelVendorChange={setNewModelVendor}
-                  onAddGlobalModel={() => void handleAddGlobalModel()}
-                  onShowUncommonModelsChange={setShowUncommonModels}
-                  onBindModel={(upstreamId, logicalName) =>
-                    void handleBindModel(upstreamId, logicalName)
-                  }
-                  onModelUncommonChange={(id, uncommon) =>
-                    void channels.setModelUncommon(id, uncommon)
-                  }
-                  onRemoveGlobalModel={(id) => void handleRemoveGlobalModel(id)}
-                />
-              </div>
+              <SettingsChannelMappingCard
+                channel={selected}
+                activeGroup={activeGroup}
+                activeModels={activeModels}
+                customModels={customModels}
+                uncommonModelIds={uncommonModelIds}
+                modelMap={activeModelMap}
+                mapSaveNotice={mapSaveNotice}
+                setMapSaveNotice={setMapSaveNotice}
+              />
 
               <SettingsChannelQuickTest
                 channel={selected}
