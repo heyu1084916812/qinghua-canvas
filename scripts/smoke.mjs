@@ -45786,7 +45786,11 @@ async function g169(browser) {
     if (settle) await sleep(settle)
     const before = await read(nodeIds, sideId)
     const grab = await page.locator('[data-node-id="' + nodeIds[0] + '"]').boundingBox()
-    const from = { x: Math.round(grab.x) + 60, y: Math.round(grab.y) + 10 }
+    /* 抓点按节点尺寸取比例：低缩放下节点可能只有几十像素宽，写死 60 会落到节点外面 */
+    const from = {
+      x: Math.round(grab.x + grab.width / 2),
+      y: Math.round(grab.y + Math.min(14, grab.height * 0.35)),
+    }
     await page.mouse.move(from.x, from.y)
     await page.mouse.down()
     const dragDx = drag.dx + jitter()
@@ -45872,6 +45876,17 @@ async function g169(browser) {
   await sleep(250)
 
   const surface = page.locator('[data-canvas-surface]')
+  /**
+   * 真图：用**用户给的那张截图**（真实 PNG 字节、真实纹理与尺寸）当素材丢进画布，
+   * 而不是脚本画的纯色块 —— 解码耗时、纹理、宽高比都跟真实现场一致。
+   * 找不到文件时退回纯色 PNG，保证组不会因为缺文件而假绿/假红。
+   */
+  /** 仓库内固定素材（用户给的那张书法图，已随 review 目录入库），换机器也跑得出来 */
+  const REAL_IMAGE_FIXTURE = resolvePath('review/2026-11-18-multi-drag-release/fixture-calligraphy.png')
+  const realImageB64 = existsSync(REAL_IMAGE_FIXTURE)
+    ? readFileSync(REAL_IMAGE_FIXTURE).toString('base64')
+    : null
+  rec(g, '第二段：真图素材来源', true, realImageB64 ? REAL_IMAGE_FIXTURE : '退化为纯色 PNG')
   const dropImage = async (screenX, screenY, color) => {
     const beforeIds = await page
       .locator('[data-node-id]')
@@ -45885,7 +45900,9 @@ async function g169(browser) {
         d.items.add(new File([bytes], 'src.png', { type: 'image/png' }))
         return d
       },
-      { b64: solidPngBuffer(1672, 941, color).toString('base64') },
+      {
+        b64: realImageB64 ?? solidPngBuffer(1672, 941, color).toString('base64'),
+      },
     )
     const sbox = await surface.boundingBox()
     await surface.dispatchEvent('dragover', { dataTransfer: dt })
@@ -45946,6 +45963,7 @@ async function g169(browser) {
       sideId: null,
     })
   }
+
 
   await page.screenshot({ path: OUT + '/g169-release-jump.png' })
   await ctx.close()
