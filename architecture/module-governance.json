@@ -292,7 +292,7 @@
       "test": [
         "src/pages/SettingsPage/customProtocolDraft.test.ts"
       ],
-      "budget": 700
+      "budget": 670
     },
     {
       "module": "src/pages/SkillsPage/SkillsPage.module.css",
@@ -13014,6 +13014,26 @@
       ],
       "test": [
         "src/pages/SettingsPage/settingsPage/useChannelMappingDraft.test.ts"
+      ],
+      "budget": 140
+    },
+    {
+      "module": "src/pages/SettingsPage/settingsPage/SettingsChannelOverlays.tsx",
+      "owner": "settings-ui",
+      "responsibility": "渠道页两块 portal 浮层（服务资料抽屉 / 渠道右键菜单）的装配与菜单位置计算。",
+      "owns": [
+        "两处 createPortal 与菜单位置计算"
+      ],
+      "doesNotOwn": [
+        "浮层开关状态（归页面生命周期）",
+        "抽屉与菜单自身的样式"
+      ],
+      "publicApi": [
+        "SettingsChannelOverlays"
+      ],
+      "test": [
+        "src/pages/SettingsPage/settingsPage/SettingsChannelOverlays.test.ts",
+        "scripts/smoke.mjs#g74"
       ],
       "budget": 140
     }

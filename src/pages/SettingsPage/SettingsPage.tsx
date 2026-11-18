@@ -7,7 +7,6 @@ import {
   type Dispatch,
   type SetStateAction,
 } from 'react'
-import { createPortal } from 'react-dom'
 import { useChannels } from '../../app/providers/ChannelStoreProvider'
 import {
   type CategoryFilter,
@@ -47,8 +46,7 @@ import { SettingsWorkflowManager } from '../../features/settings/SettingsWorkflo
 import { SettingsChannelQuickTest } from '../../features/settings/SettingsChannelQuickTest'
 import { initialSelectedChannelId, useWorkflowsPageOpener } from './settingsPage/workflowsPageLink'
 import { SettingsChannelMappingCard } from './settingsPage/SettingsChannelMappingCard'
-import { SettingsProfileDrawerView } from './settingsPage/SettingsProfileDrawerView'
-import { SettingsChannelContextMenuView } from './settingsPage/SettingsChannelContextMenuView'
+import { SettingsChannelOverlays } from './settingsPage/SettingsChannelOverlays'
 
 type SettingsSetter<T> = Dispatch<SetStateAction<T>>
 
@@ -478,18 +476,6 @@ export function SettingsPage({ embedded = false }: { embedded?: boolean } = {}) 
    * 所以"禁不掉"这件事不靠界面自觉。
    */
   const builtinSelected = !!selectedId && isBuiltinChannelId(selectedId)
-  const {
-    channel: menuChannel,
-    builtin: menuBuiltin,
-    width: menuWidth,
-    left: menuLeft,
-    top: menuTop,
-  } = channelPresentation.channelMenuPresentationFor(
-    channelsList,
-    channelMenu,
-    { width: window.innerWidth, height: window.innerHeight },
-    menuConfirmDelete,
-  )
   return (
     <div className={styles.page} data-settings-page>
       {/*
@@ -643,44 +629,30 @@ export function SettingsPage({ embedded = false }: { embedded?: boolean } = {}) 
         </div>
       </div>
       )}
-      {profileDrawerOpen && selected && profileDrawerBounds
-        ? createPortal(
-            <SettingsProfileDrawerView
-              protocol={selected.protocol}
-              icon={profileIconDraft}
-              name={profileNameDraft}
-              saving={profileSaving}
-              bounds={profileDrawerBounds}
-              fileInputRef={profileFileRef}
-              onBackdropClose={() => setProfileDrawerOpen(false)}
-              onClose={() => setProfileDrawerOpen(false)}
-              onIconFile={(file) => void handleProfileIconFile(file)} onUseBuiltin={() => setProfileIconDraft(null)}
-              onResetIcon={() => setProfileIconDraft(selected.icon)} onNameChange={setProfileNameDraft}
-              onSave={() => void saveProfileDrawer()}
-            />,
-            document.body,
-          )
-        : null}
-      {channelMenu && menuChannel
-        ? createPortal(
-            <SettingsChannelContextMenuView
-              menuRef={channelMenuRef}
-              channelId={menuChannel.id}
-              channelName={menuChannel.name}
-              builtin={menuBuiltin}
-              confirmDelete={menuConfirmDelete}
-              busy={busy}
-              left={menuLeft}
-              top={menuTop}
-              width={menuWidth}
-              onEdit={editChannel}
-              onRequestDelete={() => setMenuConfirmDelete(true)}
-              onConfirmDelete={(channelId) => void handleRemove(channelId)}
-              onCancelDelete={() => setMenuConfirmDelete(false)}
-            />,
-            document.body,
-          )
-        : null}
+      <SettingsChannelOverlays
+        channel={selected}
+        channelsList={channelsList}
+        profileDrawerOpen={profileDrawerOpen}
+        profileDrawerBounds={profileDrawerBounds}
+        profileNameDraft={profileNameDraft}
+        profileIconDraft={profileIconDraft}
+        profileSaving={profileSaving}
+        profileFileRef={profileFileRef}
+        channelMenu={channelMenu}
+        channelMenuRef={channelMenuRef}
+        menuConfirmDelete={menuConfirmDelete}
+        busy={busy}
+        onProfileClose={() => setProfileDrawerOpen(false)}
+        onProfileIconFile={(file) => void handleProfileIconFile(file)}
+        onProfileUseBuiltin={() => setProfileIconDraft(null)}
+        onProfileResetIcon={() => setProfileIconDraft(selected?.icon ?? null)}
+        onProfileNameChange={setProfileNameDraft}
+        onProfileSave={() => void saveProfileDrawer()}
+        onMenuEdit={editChannel}
+        onMenuRequestDelete={() => setMenuConfirmDelete(true)}
+        onMenuConfirmDelete={(channelId) => void handleRemove(channelId)}
+        onMenuCancelDelete={() => setMenuConfirmDelete(false)}
+      />
     </div>
   )
 }
