@@ -17,9 +17,9 @@
    * ⚠️ 创作面板整体挂 `zoom: 0.75`，所以这里要写**设计值**（屏幕 ÷ 0.75）：
    * 692 / 58 / 20 / 17。写屏幕值的话渲染出来只有四分之三，正是「太小」的原因。
    */
-  width: 692px;
+  width: 520px;
   box-sizing: border-box;
-  padding: var(--space-8);
+  padding: var(--space-3);
   /**
    * 两栏由 TSX 显式分好（`MENU_COLUMNS`）：左「分镜叙事 + 质感调节」、
    * 右「空间与机位 + 设定图」，与参考图一致。**不用 `column-count`** ——
@@ -28,9 +28,9 @@
    */
   display: flex;
   align-items: flex-start;
-  gap: var(--space-8);
+  gap: var(--space-5);
   background: var(--bg-surface);
-  border: 1px solid var(--stroke);
+  border: var(--border);
   border-radius: var(--radius-control);
   box-shadow: var(--shadow-float);
   animation: menuInkIn var(--dur-menu) var(--ease-panel);
@@ -44,31 +44,31 @@
 }
 
 .group {
-  margin-bottom: var(--space-5);
+  margin-bottom: var(--space-3);
 }
 
 .groupLabel {
-  padding: 0 6px 6px;
+  padding: 0 var(--space-2) var(--space-1);
   color: var(--text-3);
-  /* 屏幕 12.75px */
-  font-size: 17px;
+  font-size: var(--fs-chip);
 }
 
 .item {
   display: flex;
   align-items: center;
-  gap: 13px;
+  gap: var(--space-2);
   width: 100%;
-  /* 屏幕 ≈ 43.5px */
-  height: 58px;
-  padding: 0 14px;
+  /* 与其它参数面板同一档控件高度（创作面板挂 zoom 0.75，这里写设计值） */
+  height: var(--settings-control-height, 34px);
+  min-height: var(--settings-control-height, 34px);
+  box-sizing: border-box;
+  padding: 0 var(--space-2);
   border: 0;
   border-radius: var(--radius-control);
   background: transparent;
   color: var(--text-1);
   font-family: var(--font-sans);
-  /* 屏幕 15px */
-  font-size: 20px;
+  font-size: var(--fs-label);
   text-align: left;
   cursor: pointer;
 }
@@ -89,10 +89,10 @@
   color: var(--text-1);
 }
 
-/** 图标统一 32px 设计值（屏幕 24px；各图标自带 16 的默认值，这里按参考图放大一档） */
+/** 图标统一走 `ui/icon` 的 16px（用户 2026-11-18：原来逐条手绘，大小参差） */
 .itemIcon svg {
-  width: 32px;
-  height: 32px;
+  width: 16px;
+  height: 16px;
 }
 
 .itemName {
@@ -120,11 +120,11 @@
    * 行高 / 字号也同步到菜单那一档（58 / 20 设计 = 屏幕 43.5 / 15）——
    * 两块是同一族的东西，尺寸差一档看着就像两套 UI。
    */
-  width: 692px;
+  width: 520px;
   box-sizing: border-box;
-  padding: var(--space-8);
+  padding: var(--space-3);
   background: var(--bg-surface);
-  border: 1px solid var(--stroke);
+  border: var(--border);
   border-radius: var(--radius-control);
   box-shadow: var(--shadow-float);
 }
@@ -140,10 +140,12 @@
 
 .choice {
   flex: 1 1 0;
-  /* 与预设菜单的行同档：屏幕 ≈ 43.5px */
-  height: 58px;
-  padding: 0 10px;
-  border: 1px solid var(--stroke);
+  /* 与预设菜单的行同档（34 设计值 = 屏幕 25.5，和参数面板其它控件一致） */
+  height: var(--settings-control-height, 34px);
+  min-height: var(--settings-control-height, 34px);
+  box-sizing: border-box;
+  padding: 0 var(--space-2);
+  border: var(--border);
   border-radius: var(--radius-control);
   background: var(--bg-surface);
   color: var(--text-1);

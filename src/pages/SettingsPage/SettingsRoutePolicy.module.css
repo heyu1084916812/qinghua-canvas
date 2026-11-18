@@ -31,6 +31,8 @@
   flex-direction: column;
   gap: 2px;
   min-width: 0;
+  /* 连点两下展开/收起时，第二下会落在刚展开的这块标题上被浏览器当双击选中（用户 2026-11-18 图三） */
+  user-select: none;
 }
 
 .globalRouteControls {

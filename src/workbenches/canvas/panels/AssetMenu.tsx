@@ -11,7 +11,7 @@
  * （由父级持有 `openId` 保证，不在这里各自为政）。
  */
 import { useEffect, useRef } from 'react'
-import { History, Icon, LayoutGrid, Upload, X } from '../../../ui/icon'
+import { History, Icon, LayoutGrid, Replace, Upload, X } from '../../../ui/icon'
 import styles from './AssetMenu.module.css'
 
 export interface AssetMenuItem {
@@ -30,7 +30,8 @@ export interface AssetMenuItem {
    * `library` 是用户 2026-10-03 要的「素材库添加」那一项：画布 Agent 的 `+`
    * 要分成本地上传与素材库两条路，两项都得带图标（参考产品图一）。
    */
-  icon?: 'upload' | 'clear' | 'history' | 'library'
+  /** `replace` = 换一张素材（两条箭头），与 `upload` 的本地上传入口区分开 */
+  icon?: 'upload' | 'replace' | 'clear' | 'history' | 'library'
   onSelect: () => void
 }
 
@@ -39,6 +40,8 @@ function MenuIcon({ name }: { name: AssetMenuItem['icon'] }) {
   const glyph =
     name === 'upload'
       ? Upload
+      : name === 'replace'
+        ? Replace
       : name === 'history'
         ? History
         : name === 'clear'

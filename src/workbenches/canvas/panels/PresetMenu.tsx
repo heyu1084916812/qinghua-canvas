@@ -1,6 +1,7 @@
 import { PRESETS, PRESET_CATEGORIES, presetById } from '../../../domain/canvas/layout/presets'
 import type { PresetCategoryId } from '../../../domain/canvas/layout/presets'
-import { IconCheck, IconEmotion } from '../toolbar/icons'
+import { Icon } from '../../../ui/icon'
+import { IconCheck } from '../toolbar/icons'
 import { PRESET_ICON } from './presetIcons'
 import styles from './PresetMenu.module.css'
 
@@ -62,8 +63,8 @@ export function PresetMenu({
                     onClick={() => onPick(preset.id)}
                   >
                     <span className={styles.itemIcon} aria-hidden="true">
-                      {/* 每条预设自己的矢量图（用户第 8 条），见 presetIcons.tsx */}
-                      {PRESET_ICON[preset.id]}
+                      {/* 统一图标库（`ui/icon`），一条菜单里同一尺寸 */}
+                      <Icon icon={PRESET_ICON[preset.id]} size="md" />
                     </span>
                     <span className={styles.itemName}>{preset.name}</span>
                     {on && (
@@ -89,7 +90,7 @@ export function PresetMenu({
                   onClick={onPickEmotion}
                 >
                   <span className={styles.itemIcon} aria-hidden="true">
-                    <IconEmotion size={16} />
+                    <Icon icon={PRESET_ICON.emotion} size="md" />
                   </span>
                   <span className={styles.itemName}>情绪调节</span>
                   {emotionOn && (

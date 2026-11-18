@@ -1,0 +1,74 @@
+[
+  {
+    "tag": "1440x900-dark",
+    "menu": {
+      "w": 390,
+      "h": 303.5,
+      "left": 618.66,
+      "right": 1008.66
+    },
+    "itemHeights": [
+      25.5
+    ],
+    "iconSizes": [
+      "12x12"
+    ],
+    "itemCount": 15,
+    "overflowX": 0,
+    "pageErrors": []
+  },
+  {
+    "tag": "1440x900-light",
+    "menu": {
+      "w": 390,
+      "h": 303.5,
+      "left": 618.66,
+      "right": 1008.66
+    },
+    "itemHeights": [
+      25.5
+    ],
+    "iconSizes": [
+      "12x12"
+    ],
+    "itemCount": 15,
+    "overflowX": 0,
+    "pageErrors": []
+  },
+  {
+    "tag": "1024x700-dark",
+    "menu": {
+      "w": 390,
+      "h": 303.5,
+      "left": 410.66,
+      "right": 800.66
+    },
+    "itemHeights": [
+      25.5
+    ],
+    "iconSizes": [
+      "12x12"
+    ],
+    "itemCount": 15,
+    "overflowX": 0,
+    "pageErrors": []
+  },
+  {
+    "tag": "1024x700-light",
+    "menu": {
+      "w": 390,
+      "h": 303.5,
+      "left": 410.66,
+      "right": 800.66
+    },
+    "itemHeights": [
+      25.5
+    ],
+    "iconSizes": [
+      "12x12"
+    ],
+    "itemCount": 15,
+    "overflowX": 0,
+    "pageErrors": []
+  }
+]

@@ -297,7 +297,7 @@ export function GenerationNodeView(props: NodeViewProps) {
                   id: 'replace',
                   label: '替换',
                   hint: '换一张素材',
-                  icon: 'upload',
+                  icon: 'replace',
                   onSelect: () => props.emit({ type: 'requestUpload' }),
                 },
               ]}
