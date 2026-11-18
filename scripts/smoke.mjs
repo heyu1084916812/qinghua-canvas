@@ -16952,6 +16952,33 @@ async function g83(browser) {
       visibleCategories.every((category) => category === activeFilter),
     `${activeFilter}: ${visibleCategories.join(',')}`,
   )
+  /**
+   * ★★ 空档不留空长表（#1150，用户截图：整块 460px 的空白表单）。
+   * 找不到 0 行的分类就跳过（不同数据下可能每档都有模型）。
+   */
+  const tabLabels = await page
+    .locator('[data-route-map-filter]')
+    .evaluateAll((els) => els.map((el) => el.innerText.replace(/\s+/g, ' ').trim()))
+  const tabCounts = tabLabels.map((label) => Number(label.replace(/[^\d]/g, '') || 0))
+  const emptyIndex = tabCounts.findIndex((count) => count === 0)
+  if (emptyIndex >= 0) {
+    await page.locator('[data-route-map-filter]').nth(emptyIndex).click()
+    await sleep(450)
+    const emptyHeight = await page
+      .locator('[data-route-map-table]')
+      .evaluate((el) => Math.round(el.getBoundingClientRect().height))
+    const hasHint = (await page.locator('[data-route-map-category-empty]').count()) === 1
+    rec(
+      g,
+      '★★ 空档不留空长表（面板塌成一行提示）',
+      emptyHeight <= 120 && hasHint,
+      `${tabLabels[emptyIndex]} → 面板高 ${emptyHeight}px，提示=${hasHint}`,
+    )
+    await page.locator('[data-route-map-filter]').first().click()
+    await sleep(350)
+  } else {
+    rec(g, '★★ 空档不留空长表（本组没有空档，跳过）', true, tabLabels.join(' | '))
+  }
   let sameCategoryPickers = 0
   let categorizedRows = 0
   for (let index = 0; index < rowCount; index += 1) {

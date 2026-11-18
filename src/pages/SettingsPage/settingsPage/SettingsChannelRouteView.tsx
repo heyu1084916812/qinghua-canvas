@@ -325,20 +325,28 @@ export function SettingsChannelRouteView({
           </section>
         </div>
       )}
-      {/* 面板始终渲染 + 行区固定高度：分类行数不同，随内容伸缩会让滚动位置被夹紧、页面跳一截 */}
+      {/* 面板始终渲染 + 行区固定高度（行数不同也不跳）；但一条都没有时塌成一行提示，不留空长表 */}
       <div
-        className={`${styles.mappingTable} ${styles.mappingPanel}`}
+        className={`${styles.mappingTable} ${styles.mappingPanel}${activeRows.length === 0 ? ` ${styles.mappingPanelEmpty}` : ''}`}
         data-route-map-table
         id={MODEL_CATEGORY_PANEL_ID}
         role="tabpanel"
         aria-labelledby={`settings-model-category-tab-${activeGroup.category}`}
       >
-        <div className={styles.mappingTableHead} aria-hidden>
-          <span>前端显示模型</span>
-          <span>真实模型</span>
-          <span>常用设置</span>
-        </div>
-        <div className={styles.mappingRows} data-route-map-rows>
+        {activeRows.length > 0 ? (
+          <div className={styles.mappingTableHead} aria-hidden>
+            <span>前端显示模型</span>
+            <span>真实模型</span>
+            <span>常用设置</span>
+          </div>
+        ) : null}
+        <div
+          className={`${styles.mappingRows}${activeRows.length === 0 ? ` ${styles.mappingRowsEmpty}` : ''}`}
+          data-route-map-rows
+        >
+          {activeRows.length === 0 ? (
+            <p className={styles.mappingEmptyHint} data-route-map-category-empty>这一类还没有前端模型</p>
+          ) : null}
           {activeRows.map(({ preset, upstream, options, isUncommon }) => {
                 const save = mapSaveNotice?.id === preset.id ? mapSaveNotice : null
                 return (

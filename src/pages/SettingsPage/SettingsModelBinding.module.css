@@ -139,6 +139,11 @@
   overflow-anchor: none;
 }
 
+/* 空档不留空长表（#1150）：行区塌成一行提示，表头一起收掉 */
+.mappingPanelEmpty { padding-block: var(--space-3); }
+.mappingRowsEmpty { height: auto; min-height: 0; overflow-y: visible; }
+.mappingEmptyHint { margin: 0; color: var(--text-3); font-size: var(--fs-label); line-height: 1.6; }
+
 .mappingRow {
   min-height: 38px;
   padding: 2px var(--space-2);

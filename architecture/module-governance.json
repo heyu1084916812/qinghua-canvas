@@ -7270,7 +7270,7 @@
       "test": [
         "src/pages/SettingsPage/settingsPage/SettingsPageViews.test.ts"
       ],
-      "budget": 391
+      "budget": 400
     },
     {
       "module": "src/pages/SettingsPage/settingsPage/SettingsProfileDrawerView.tsx",
