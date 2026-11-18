@@ -3531,7 +3531,8 @@
       "owns": [
         "模型绑定表三列布局",
         "映射行悬停与错误提示",
-        "全局常用状态按钮和 1024px 重排"
+        "全局常用状态按钮和 1024px 重排",
+        "映射行区的固定高度与内部滚动"
       ],
       "doesNotOwn": [
         "模型映射持久化",
@@ -3541,7 +3542,8 @@
       "publicApi": [
         "CSS_MODULE:SettingsModelBinding 的模型绑定样式域",
         "CSS_CLASS:mappingTable",
-        "CSS_CLASS:mappingRow"
+        "CSS_CLASS:mappingRow",
+        "CSS_CLASS:mappingRows"
       ],
       "test": [
         "src/pages/SettingsPage/settingsPageCssArchitecture.test.ts"

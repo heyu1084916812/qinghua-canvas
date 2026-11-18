@@ -325,21 +325,20 @@ export function SettingsChannelRouteView({
           </section>
         </div>
       )}
-
-
-      {activeRows.length > 0 ? (
-        <div
-          className={`${styles.mappingTable} ${styles.mappingPanel}`}
-          data-route-map-table
-          id={MODEL_CATEGORY_PANEL_ID}
-          role="tabpanel"
-          aria-labelledby={`settings-model-category-tab-${activeGroup.category}`}
-        >
-          <div className={styles.mappingTableHead} aria-hidden>
-            <span>前端显示模型</span>
-            <span>真实模型</span>
-            <span>常用设置</span>
-          </div>
+      {/* 面板始终渲染 + 行区固定高度：分类行数不同，随内容伸缩会让滚动位置被夹紧、页面跳一截 */}
+      <div
+        className={`${styles.mappingTable} ${styles.mappingPanel}`}
+        data-route-map-table
+        id={MODEL_CATEGORY_PANEL_ID}
+        role="tabpanel"
+        aria-labelledby={`settings-model-category-tab-${activeGroup.category}`}
+      >
+        <div className={styles.mappingTableHead} aria-hidden>
+          <span>前端显示模型</span>
+          <span>真实模型</span>
+          <span>常用设置</span>
+        </div>
+        <div className={styles.mappingRows} data-route-map-rows>
           {activeRows.map(({ preset, upstream, options, isUncommon }) => {
                 const save = mapSaveNotice?.id === preset.id ? mapSaveNotice : null
                 return (
@@ -384,7 +383,7 @@ export function SettingsChannelRouteView({
                 )
           })}
         </div>
-      ) : null}
+      </div>
       </div>
     </section>
   )

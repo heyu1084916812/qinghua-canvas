@@ -15565,7 +15565,19 @@ async function g75(browser) {
    * 第 13 轮把原生 `<select>` 换成 chip + 浮层（用户批注「跟没设计过一样」）。
    * 于是这里不能再 `selectOption()` / `inputValue()`，得**真的点开菜单**：
    * 这同时验证了浮层能展开、选项能点、点完会收起。
+   *
+   * ⚠️ 2026-11-15 起「选路策略」整块默认收进 `<details>`（用户：「后台渠道的位置不要
+   * 全部塞在一起了」），直接点里面的 chip 只会拿到 `element is not visible`。
+   * 先展开 —— 展开本身也是用户要走的路径。
    */
+  const routingDisclosure = page.locator('[data-settings-routing-disclosure]')
+  if (
+    (await routingDisclosure.count()) > 0 &&
+    !(await routingDisclosure.evaluate((element) => element.open))
+  ) {
+    await routingDisclosure.locator('summary').first().click()
+    await sleep(250)
+  }
   await strategyBtn.click()
   await sleep(200)
   const options = await page.locator('[data-route-strategy-option]').allTextContents()
@@ -15747,11 +15759,25 @@ async function g76(browser) {
    * 必须挑一个**生图模型**：生成节点的模型下拉只列图片类模型，
    * 若这里取到对话模型（mock 清单里两种都有），后面 `pickParam('model')`
    * 会找不到选项而超时 —— 那是测试选错了对象，不是功能缺陷。
+   *
+   * ⚠️ 2026-11-17 起映射区**一次只显示一个分类**（文件夹标签，默认停第一个有内容的分类，
+   * 通常是「对话」）。不先切到「图片」档，`[data-route-map-row][data-route-map-category="image"]`
+   * 会是空列表，`logical` 变成 undefined，后面等 `[data-route-map-row="undefined"]` 必超时。
    */
+  const imageCategoryTab = page.locator('[data-route-map-filter="image"]')
+  if ((await imageCategoryTab.count()) > 0) {
+    await imageCategoryTab.click()
+    await sleep(350)
+  }
   const rows = await page
     .locator('[data-route-map-row][data-route-map-category="image"]')
     .evaluateAll((els) => els.map((e) => e.getAttribute('data-route-map-row')))
   const logical = rows[0]
+  if (!logical) {
+    throw new Error(
+      'G76 前置失败：图片分类下没有任何前端模型行（检查「拉取模型 / 选择模型」是否真的落库）',
+    )
+  }
   const mappingRow = page.locator(`[data-route-map-row="${logical}"]`)
   const mappingPicker = mappingRow.locator(
     '[data-route-map-real] [data-choice-picker] button',

@@ -1,4 +1,13 @@
+// @ts-expect-error -- 项目刻意不引入 @types/node；CSS 源码静态取证只属于测试。
+import { readFileSync } from 'node:fs'
+// @ts-expect-error -- 同上：path 仅用于把源码路径锚定到仓库根。
+import { dirname, resolve } from 'node:path'
+// @ts-expect-error -- 同上：url 用于把测试文件 URL 转成源码根路径。
+import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
+
+const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../../..')
+const readSource = (file: string) => readFileSync(resolve(repoRoot, file), 'utf8')
 const PART_NAMES = [
   'SettingsChannelList',
   'SettingsChannelListDetails',
@@ -63,6 +72,18 @@ describe('SettingsPage CSS 模块结构护栏', () => {
         expect(source).not.toContain('System.Object[]')
       }
     }
+  })
+
+  it('映射行区高度固定：切分类时卡片不伸缩（用户 2026-11-18「不要把我鼠标正在点的位置变动了」）', () => {
+    /* CSS 模块在 vitest 里是映射对象，`?inline` / `?raw` 都拿不到原文；直接读磁盘 */
+    const source = readSource('src/pages/SettingsPage/SettingsModelBinding.module.css')
+    const block = source.match(/\.mappingRows\s*\{([\s\S]*?)\}/)?.[1] ?? ''
+    expect(block, '缺少 .mappingRows 规则').toBeTruthy()
+    /* 必须是固定 height；写成 min-height / max-height 就又回到「高度跟内容走」 */
+    expect(block).toMatch(/(^|\s)height:\s*clamp\(/)
+    expect(block).not.toMatch(/(^|\s)(min-height|max-height):/)
+    /* 行多的分类在自己的滚动区里滚，不把页面顶长 */
+    expect(block).toContain('overflow-y: auto')
   })
 
   it('样式门面继续合并全部组件样式模块', () => {

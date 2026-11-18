@@ -122,6 +122,23 @@
   font-size: var(--fs-chip);
 }
 
+/*
+ * 行区**固定高度 + 内部滚动**（用户 2026-11-18：「切分类时不要把我鼠标正在点的位置变动了」）。
+ * 分类之间行数不同，若让高度跟着内容走，用户在滚动区底部切分类时外层滚动位置会被夹紧，
+ * 屏幕上的内容整体跳一截（实测 1440 跳 264px、1024 跳 675px）。
+ * `clamp` 的上下限只跟视口走，不用 `vh` 之外的运行时测量 —— 同一视口内切分类高度恒定。
+ */
+.mappingRows {
+  height: clamp(248px, 36vh, 336px);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  /* 切分类会换掉整批行：禁止浏览器「滚动锚定」替用户调整外层滚动位置 */
+  overflow-anchor: none;
+}
+
 .mappingRow {
   min-height: 38px;
   padding: 2px var(--space-2);

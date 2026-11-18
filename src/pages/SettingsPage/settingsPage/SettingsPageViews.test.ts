@@ -229,8 +229,14 @@ describe('SettingsPage 视图拆分', () => {
     })
     expect(routeHtml).toMatch(/^<section /)
     expect(routeHtml).toContain('data-settings-channel-route')
-    /* #1144 起空分类不再出提示条：没有前端模型时整张映射表不渲染。 */
-    expect(routeHtml).not.toContain('data-route-map-table')
+    /**
+     * 空分类**仍然渲染表壳**（2026-11-18）：分类之间行数不同，若让表壳随行数伸缩，
+     * 用户在滚动区底部切分类时页面会跳。表壳高度固定、行区自己滚，所以这里只剩
+     * 「没有行、也没有空态提示条」两条：`data-route-map-empty` 依旧不许出现（#1144 口径）。
+     */
+    expect(routeHtml).toContain('data-route-map-table')
+    expect(routeHtml).toContain('data-route-map-rows')
+    expect(routeHtml).not.toContain('data-route-map-empty')
     expect(routeHtml).not.toContain('data-route-map-row=')
   })
 

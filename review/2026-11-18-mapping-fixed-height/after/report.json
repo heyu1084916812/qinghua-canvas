@@ -1,0 +1,890 @@
+[
+  {
+    "viewport": "1440x900-dark",
+    "tabCount": 4,
+    "steps": [
+      {
+        "step": "initial",
+        "tabBar": {
+          "x": 524,
+          "y": 705.08,
+          "w": 703.08,
+          "h": 46
+        },
+        "table": {
+          "x": 540,
+          "y": 813.08,
+          "w": 812,
+          "h": 384
+        },
+        "rowCount": 1,
+        "rowHeights": [
+          42
+        ],
+        "activeTab": "chat",
+        "scrollY": 0,
+        "docHeight": 900,
+        "scrollerTop": 0,
+        "scrollerClientH": 621,
+        "scrollerScrollH": 1145,
+        "scrollerClass": "SECTION._editor_1ackt_1",
+        "scrollerRectH": 621.2,
+        "scrollerRectY": 230.8,
+        "formScrollH": 1125,
+        "rowsScrollH": "324/324"
+      },
+      {
+        "step": "click:chat",
+        "tabBar": {
+          "x": 524,
+          "y": 705.08,
+          "w": 703.08,
+          "h": 46
+        },
+        "table": {
+          "x": 540,
+          "y": 813.08,
+          "w": 812,
+          "h": 384
+        },
+        "rowCount": 1,
+        "rowHeights": [
+          42
+        ],
+        "activeTab": "chat",
+        "scrollY": 0,
+        "docHeight": 900,
+        "scrollerTop": 0,
+        "scrollerClientH": 621,
+        "scrollerScrollH": 1145,
+        "scrollerClass": "SECTION._editor_1ackt_1",
+        "scrollerRectH": 621.2,
+        "scrollerRectY": 230.8,
+        "formScrollH": 1125,
+        "rowsScrollH": "324/324"
+      },
+      {
+        "step": "click:image",
+        "tabBar": {
+          "x": 524,
+          "y": 705.08,
+          "w": 703.08,
+          "h": 46
+        },
+        "table": {
+          "x": 540,
+          "y": 813.08,
+          "w": 812,
+          "h": 384
+        },
+        "rowCount": 7,
+        "rowHeights": [
+          42,
+          42,
+          42
+        ],
+        "activeTab": "image",
+        "scrollY": 0,
+        "docHeight": 900,
+        "scrollerTop": 0,
+        "scrollerClientH": 621,
+        "scrollerScrollH": 1145,
+        "scrollerClass": "SECTION._editor_1ackt_1",
+        "scrollerRectH": 621.2,
+        "scrollerRectY": 230.8,
+        "formScrollH": 1125,
+        "rowsScrollH": "324/324"
+      },
+      {
+        "step": "click:video",
+        "tabBar": {
+          "x": 524,
+          "y": 705.08,
+          "w": 703.08,
+          "h": 46
+        },
+        "table": {
+          "x": 540,
+          "y": 813.08,
+          "w": 812,
+          "h": 384
+        },
+        "rowCount": 0,
+        "rowHeights": [],
+        "activeTab": "video",
+        "scrollY": 0,
+        "docHeight": 900,
+        "scrollerTop": 0,
+        "scrollerClientH": 621,
+        "scrollerScrollH": 1145,
+        "scrollerClass": "SECTION._editor_1ackt_1",
+        "scrollerRectH": 621.2,
+        "scrollerRectY": 230.8,
+        "formScrollH": 1125,
+        "rowsScrollH": "324/324"
+      },
+      {
+        "step": "click:audio",
+        "tabBar": {
+          "x": 524,
+          "y": 705.08,
+          "w": 703.08,
+          "h": 46
+        },
+        "table": {
+          "x": 540,
+          "y": 813.08,
+          "w": 812,
+          "h": 384
+        },
+        "rowCount": 1,
+        "rowHeights": [
+          42
+        ],
+        "activeTab": "audio",
+        "scrollY": 0,
+        "docHeight": 900,
+        "scrollerTop": 0,
+        "scrollerClientH": 621,
+        "scrollerScrollH": 1145,
+        "scrollerClass": "SECTION._editor_1ackt_1",
+        "scrollerRectH": 621.2,
+        "scrollerRectY": 230.8,
+        "formScrollH": 1125,
+        "rowsScrollH": "324/324"
+      },
+      {
+        "step": "bottom:image",
+        "tabBar": {
+          "x": 524,
+          "y": 181.08,
+          "w": 703.08,
+          "h": 46
+        },
+        "table": {
+          "x": 540,
+          "y": 289.08,
+          "w": 812,
+          "h": 384
+        },
+        "rowCount": 7,
+        "rowHeights": [
+          42,
+          42,
+          42
+        ],
+        "activeTab": "image",
+        "scrollY": 0,
+        "docHeight": 900,
+        "scrollerTop": 524,
+        "scrollerClientH": 621,
+        "scrollerScrollH": 1145,
+        "scrollerClass": "SECTION._editor_1ackt_1",
+        "scrollerRectH": 621.2,
+        "scrollerRectY": 230.8,
+        "formScrollH": 1125,
+        "rowsScrollH": "324/324"
+      },
+      {
+        "step": "bottom→End",
+        "tabBar": {
+          "x": 524,
+          "y": 181.08,
+          "w": 703.08,
+          "h": 46
+        },
+        "table": {
+          "x": 540,
+          "y": 289.08,
+          "w": 812,
+          "h": 384
+        },
+        "rowCount": 1,
+        "rowHeights": [
+          42
+        ],
+        "activeTab": "audio",
+        "scrollY": 0,
+        "docHeight": 900,
+        "scrollerTop": 524,
+        "scrollerClientH": 621,
+        "scrollerScrollH": 1145,
+        "scrollerClass": "SECTION._editor_1ackt_1",
+        "scrollerRectH": 621.2,
+        "scrollerRectY": 230.8,
+        "formScrollH": 1125,
+        "rowsScrollH": "324/324"
+      },
+      {
+        "step": "scrollLog",
+        "scrollLog": []
+      }
+    ]
+  },
+  {
+    "viewport": "1440x900-light",
+    "tabCount": 4,
+    "steps": [
+      {
+        "step": "initial",
+        "tabBar": {
+          "x": 524,
+          "y": 705.08,
+          "w": 703.08,
+          "h": 46
+        },
+        "table": {
+          "x": 540,
+          "y": 813.08,
+          "w": 812,
+          "h": 384
+        },
+        "rowCount": 1,
+        "rowHeights": [
+          42
+        ],
+        "activeTab": "chat",
+        "scrollY": 0,
+        "docHeight": 900,
+        "scrollerTop": 0,
+        "scrollerClientH": 621,
+        "scrollerScrollH": 1145,
+        "scrollerClass": "SECTION._editor_1ackt_1",
+        "scrollerRectH": 621.2,
+        "scrollerRectY": 230.8,
+        "formScrollH": 1125,
+        "rowsScrollH": "324/324"
+      },
+      {
+        "step": "click:chat",
+        "tabBar": {
+          "x": 524,
+          "y": 705.08,
+          "w": 703.08,
+          "h": 46
+        },
+        "table": {
+          "x": 540,
+          "y": 813.08,
+          "w": 812,
+          "h": 384
+        },
+        "rowCount": 1,
+        "rowHeights": [
+          42
+        ],
+        "activeTab": "chat",
+        "scrollY": 0,
+        "docHeight": 900,
+        "scrollerTop": 0,
+        "scrollerClientH": 621,
+        "scrollerScrollH": 1145,
+        "scrollerClass": "SECTION._editor_1ackt_1",
+        "scrollerRectH": 621.2,
+        "scrollerRectY": 230.8,
+        "formScrollH": 1125,
+        "rowsScrollH": "324/324"
+      },
+      {
+        "step": "click:image",
+        "tabBar": {
+          "x": 524,
+          "y": 705.08,
+          "w": 703.08,
+          "h": 46
+        },
+        "table": {
+          "x": 540,
+          "y": 813.08,
+          "w": 812,
+          "h": 384
+        },
+        "rowCount": 7,
+        "rowHeights": [
+          42,
+          42,
+          42
+        ],
+        "activeTab": "image",
+        "scrollY": 0,
+        "docHeight": 900,
+        "scrollerTop": 0,
+        "scrollerClientH": 621,
+        "scrollerScrollH": 1145,
+        "scrollerClass": "SECTION._editor_1ackt_1",
+        "scrollerRectH": 621.2,
+        "scrollerRectY": 230.8,
+        "formScrollH": 1125,
+        "rowsScrollH": "324/324"
+      },
+      {
+        "step": "click:video",
+        "tabBar": {
+          "x": 524,
+          "y": 705.08,
+          "w": 703.08,
+          "h": 46
+        },
+        "table": {
+          "x": 540,
+          "y": 813.08,
+          "w": 812,
+          "h": 384
+        },
+        "rowCount": 0,
+        "rowHeights": [],
+        "activeTab": "video",
+        "scrollY": 0,
+        "docHeight": 900,
+        "scrollerTop": 0,
+        "scrollerClientH": 621,
+        "scrollerScrollH": 1145,
+        "scrollerClass": "SECTION._editor_1ackt_1",
+        "scrollerRectH": 621.2,
+        "scrollerRectY": 230.8,
+        "formScrollH": 1125,
+        "rowsScrollH": "324/324"
+      },
+      {
+        "step": "click:audio",
+        "tabBar": {
+          "x": 524,
+          "y": 705.08,
+          "w": 703.08,
+          "h": 46
+        },
+        "table": {
+          "x": 540,
+          "y": 813.08,
+          "w": 812,
+          "h": 384
+        },
+        "rowCount": 1,
+        "rowHeights": [
+          42
+        ],
+        "activeTab": "audio",
+        "scrollY": 0,
+        "docHeight": 900,
+        "scrollerTop": 0,
+        "scrollerClientH": 621,
+        "scrollerScrollH": 1145,
+        "scrollerClass": "SECTION._editor_1ackt_1",
+        "scrollerRectH": 621.2,
+        "scrollerRectY": 230.8,
+        "formScrollH": 1125,
+        "rowsScrollH": "324/324"
+      },
+      {
+        "step": "bottom:image",
+        "tabBar": {
+          "x": 524,
+          "y": 181.08,
+          "w": 703.08,
+          "h": 46
+        },
+        "table": {
+          "x": 540,
+          "y": 289.08,
+          "w": 812,
+          "h": 384
+        },
+        "rowCount": 7,
+        "rowHeights": [
+          42,
+          42,
+          42
+        ],
+        "activeTab": "image",
+        "scrollY": 0,
+        "docHeight": 900,
+        "scrollerTop": 524,
+        "scrollerClientH": 621,
+        "scrollerScrollH": 1145,
+        "scrollerClass": "SECTION._editor_1ackt_1",
+        "scrollerRectH": 621.2,
+        "scrollerRectY": 230.8,
+        "formScrollH": 1125,
+        "rowsScrollH": "324/324"
+      },
+      {
+        "step": "bottom→End",
+        "tabBar": {
+          "x": 524,
+          "y": 181.08,
+          "w": 703.08,
+          "h": 46
+        },
+        "table": {
+          "x": 540,
+          "y": 289.08,
+          "w": 812,
+          "h": 384
+        },
+        "rowCount": 1,
+        "rowHeights": [
+          42
+        ],
+        "activeTab": "audio",
+        "scrollY": 0,
+        "docHeight": 900,
+        "scrollerTop": 524,
+        "scrollerClientH": 621,
+        "scrollerScrollH": 1145,
+        "scrollerClass": "SECTION._editor_1ackt_1",
+        "scrollerRectH": 621.2,
+        "scrollerRectY": 230.8,
+        "formScrollH": 1125,
+        "rowsScrollH": "324/324"
+      },
+      {
+        "step": "scrollLog",
+        "scrollLog": []
+      }
+    ]
+  },
+  {
+    "viewport": "1024x700-dark",
+    "tabCount": 4,
+    "steps": [
+      {
+        "step": "initial",
+        "tabBar": {
+          "x": 476,
+          "y": 575.88,
+          "w": 351.08,
+          "h": 46
+        },
+        "table": {
+          "x": 492,
+          "y": 683.88,
+          "w": 460,
+          "h": 284
+        },
+        "rowCount": 1,
+        "rowHeights": [
+          84
+        ],
+        "activeTab": "chat",
+        "scrollY": 0,
+        "docHeight": 700,
+        "scrollerTop": 142,
+        "scrollerClientH": 437,
+        "scrollerScrollH": 1066,
+        "scrollerClass": "SECTION._editor_1ackt_1",
+        "scrollerRectH": 437.2,
+        "scrollerRectY": 222.8,
+        "formScrollH": 1046,
+        "rowsScrollH": "252/252"
+      },
+      {
+        "step": "click:chat",
+        "tabBar": {
+          "x": 476,
+          "y": 575.88,
+          "w": 351.08,
+          "h": 46
+        },
+        "table": {
+          "x": 492,
+          "y": 683.88,
+          "w": 460,
+          "h": 284
+        },
+        "rowCount": 1,
+        "rowHeights": [
+          84
+        ],
+        "activeTab": "chat",
+        "scrollY": 0,
+        "docHeight": 700,
+        "scrollerTop": 142,
+        "scrollerClientH": 437,
+        "scrollerScrollH": 1066,
+        "scrollerClass": "SECTION._editor_1ackt_1",
+        "scrollerRectH": 437.2,
+        "scrollerRectY": 222.8,
+        "formScrollH": 1046,
+        "rowsScrollH": "252/252"
+      },
+      {
+        "step": "click:image",
+        "tabBar": {
+          "x": 476,
+          "y": 575.88,
+          "w": 351.08,
+          "h": 46
+        },
+        "table": {
+          "x": 492,
+          "y": 683.88,
+          "w": 460,
+          "h": 284
+        },
+        "rowCount": 7,
+        "rowHeights": [
+          42,
+          42,
+          42
+        ],
+        "activeTab": "image",
+        "scrollY": 0,
+        "docHeight": 700,
+        "scrollerTop": 142,
+        "scrollerClientH": 437,
+        "scrollerScrollH": 1066,
+        "scrollerClass": "SECTION._editor_1ackt_1",
+        "scrollerRectH": 437.2,
+        "scrollerRectY": 222.8,
+        "formScrollH": 1046,
+        "rowsScrollH": "346/252"
+      },
+      {
+        "step": "click:video",
+        "tabBar": {
+          "x": 476,
+          "y": 575.88,
+          "w": 351.08,
+          "h": 46
+        },
+        "table": {
+          "x": 492,
+          "y": 683.88,
+          "w": 460,
+          "h": 284
+        },
+        "rowCount": 0,
+        "rowHeights": [],
+        "activeTab": "video",
+        "scrollY": 0,
+        "docHeight": 700,
+        "scrollerTop": 142,
+        "scrollerClientH": 437,
+        "scrollerScrollH": 1066,
+        "scrollerClass": "SECTION._editor_1ackt_1",
+        "scrollerRectH": 437.2,
+        "scrollerRectY": 222.8,
+        "formScrollH": 1046,
+        "rowsScrollH": "252/252"
+      },
+      {
+        "step": "click:audio",
+        "tabBar": {
+          "x": 476,
+          "y": 575.88,
+          "w": 351.08,
+          "h": 46
+        },
+        "table": {
+          "x": 492,
+          "y": 683.88,
+          "w": 460,
+          "h": 284
+        },
+        "rowCount": 1,
+        "rowHeights": [
+          84
+        ],
+        "activeTab": "audio",
+        "scrollY": 0,
+        "docHeight": 700,
+        "scrollerTop": 142,
+        "scrollerClientH": 437,
+        "scrollerScrollH": 1066,
+        "scrollerClass": "SECTION._editor_1ackt_1",
+        "scrollerRectH": 437.2,
+        "scrollerRectY": 222.8,
+        "formScrollH": 1046,
+        "rowsScrollH": "252/252"
+      },
+      {
+        "step": "bottom:image",
+        "tabBar": {
+          "x": 476,
+          "y": 88.88,
+          "w": 351.08,
+          "h": 46
+        },
+        "table": {
+          "x": 492,
+          "y": 196.88,
+          "w": 460,
+          "h": 284
+        },
+        "rowCount": 7,
+        "rowHeights": [
+          42,
+          42,
+          42
+        ],
+        "activeTab": "image",
+        "scrollY": 0,
+        "docHeight": 700,
+        "scrollerTop": 629,
+        "scrollerClientH": 437,
+        "scrollerScrollH": 1066,
+        "scrollerClass": "SECTION._editor_1ackt_1",
+        "scrollerRectH": 437.2,
+        "scrollerRectY": 222.8,
+        "formScrollH": 1046,
+        "rowsScrollH": "346/252"
+      },
+      {
+        "step": "bottom→End",
+        "tabBar": {
+          "x": 476,
+          "y": 88.88,
+          "w": 351.08,
+          "h": 46
+        },
+        "table": {
+          "x": 492,
+          "y": 196.88,
+          "w": 460,
+          "h": 284
+        },
+        "rowCount": 1,
+        "rowHeights": [
+          84
+        ],
+        "activeTab": "audio",
+        "scrollY": 0,
+        "docHeight": 700,
+        "scrollerTop": 629,
+        "scrollerClientH": 437,
+        "scrollerScrollH": 1066,
+        "scrollerClass": "SECTION._editor_1ackt_1",
+        "scrollerRectH": 437.2,
+        "scrollerRectY": 222.8,
+        "formScrollH": 1046,
+        "rowsScrollH": "252/252"
+      },
+      {
+        "step": "scrollLog",
+        "scrollLog": []
+      }
+    ]
+  },
+  {
+    "viewport": "1024x700-light",
+    "tabCount": 4,
+    "steps": [
+      {
+        "step": "initial",
+        "tabBar": {
+          "x": 476,
+          "y": 575.88,
+          "w": 351.08,
+          "h": 46
+        },
+        "table": {
+          "x": 492,
+          "y": 683.88,
+          "w": 460,
+          "h": 284
+        },
+        "rowCount": 1,
+        "rowHeights": [
+          84
+        ],
+        "activeTab": "chat",
+        "scrollY": 0,
+        "docHeight": 700,
+        "scrollerTop": 142,
+        "scrollerClientH": 437,
+        "scrollerScrollH": 1066,
+        "scrollerClass": "SECTION._editor_1ackt_1",
+        "scrollerRectH": 437.2,
+        "scrollerRectY": 222.8,
+        "formScrollH": 1046,
+        "rowsScrollH": "252/252"
+      },
+      {
+        "step": "click:chat",
+        "tabBar": {
+          "x": 476,
+          "y": 575.88,
+          "w": 351.08,
+          "h": 46
+        },
+        "table": {
+          "x": 492,
+          "y": 683.88,
+          "w": 460,
+          "h": 284
+        },
+        "rowCount": 1,
+        "rowHeights": [
+          84
+        ],
+        "activeTab": "chat",
+        "scrollY": 0,
+        "docHeight": 700,
+        "scrollerTop": 142,
+        "scrollerClientH": 437,
+        "scrollerScrollH": 1066,
+        "scrollerClass": "SECTION._editor_1ackt_1",
+        "scrollerRectH": 437.2,
+        "scrollerRectY": 222.8,
+        "formScrollH": 1046,
+        "rowsScrollH": "252/252"
+      },
+      {
+        "step": "click:image",
+        "tabBar": {
+          "x": 476,
+          "y": 575.88,
+          "w": 351.08,
+          "h": 46
+        },
+        "table": {
+          "x": 492,
+          "y": 683.88,
+          "w": 460,
+          "h": 284
+        },
+        "rowCount": 7,
+        "rowHeights": [
+          42,
+          42,
+          42
+        ],
+        "activeTab": "image",
+        "scrollY": 0,
+        "docHeight": 700,
+        "scrollerTop": 142,
+        "scrollerClientH": 437,
+        "scrollerScrollH": 1066,
+        "scrollerClass": "SECTION._editor_1ackt_1",
+        "scrollerRectH": 437.2,
+        "scrollerRectY": 222.8,
+        "formScrollH": 1046,
+        "rowsScrollH": "346/252"
+      },
+      {
+        "step": "click:video",
+        "tabBar": {
+          "x": 476,
+          "y": 575.88,
+          "w": 351.08,
+          "h": 46
+        },
+        "table": {
+          "x": 492,
+          "y": 683.88,
+          "w": 460,
+          "h": 284
+        },
+        "rowCount": 0,
+        "rowHeights": [],
+        "activeTab": "video",
+        "scrollY": 0,
+        "docHeight": 700,
+        "scrollerTop": 142,
+        "scrollerClientH": 437,
+        "scrollerScrollH": 1066,
+        "scrollerClass": "SECTION._editor_1ackt_1",
+        "scrollerRectH": 437.2,
+        "scrollerRectY": 222.8,
+        "formScrollH": 1046,
+        "rowsScrollH": "252/252"
+      },
+      {
+        "step": "click:audio",
+        "tabBar": {
+          "x": 476,
+          "y": 575.88,
+          "w": 351.08,
+          "h": 46
+        },
+        "table": {
+          "x": 492,
+          "y": 683.88,
+          "w": 460,
+          "h": 284
+        },
+        "rowCount": 1,
+        "rowHeights": [
+          84
+        ],
+        "activeTab": "audio",
+        "scrollY": 0,
+        "docHeight": 700,
+        "scrollerTop": 142,
+        "scrollerClientH": 437,
+        "scrollerScrollH": 1066,
+        "scrollerClass": "SECTION._editor_1ackt_1",
+        "scrollerRectH": 437.2,
+        "scrollerRectY": 222.8,
+        "formScrollH": 1046,
+        "rowsScrollH": "252/252"
+      },
+      {
+        "step": "bottom:image",
+        "tabBar": {
+          "x": 476,
+          "y": 88.88,
+          "w": 351.08,
+          "h": 46
+        },
+        "table": {
+          "x": 492,
+          "y": 196.88,
+          "w": 460,
+          "h": 284
+        },
+        "rowCount": 7,
+        "rowHeights": [
+          42,
+          42,
+          42
+        ],
+        "activeTab": "image",
+        "scrollY": 0,
+        "docHeight": 700,
+        "scrollerTop": 629,
+        "scrollerClientH": 437,
+        "scrollerScrollH": 1066,
+        "scrollerClass": "SECTION._editor_1ackt_1",
+        "scrollerRectH": 437.2,
+        "scrollerRectY": 222.8,
+        "formScrollH": 1046,
+        "rowsScrollH": "346/252"
+      },
+      {
+        "step": "bottom→End",
+        "tabBar": {
+          "x": 476,
+          "y": 88.88,
+          "w": 351.08,
+          "h": 46
+        },
+        "table": {
+          "x": 492,
+          "y": 196.88,
+          "w": 460,
+          "h": 284
+        },
+        "rowCount": 1,
+        "rowHeights": [
+          84
+        ],
+        "activeTab": "audio",
+        "scrollY": 0,
+        "docHeight": 700,
+        "scrollerTop": 629,
+        "scrollerClientH": 437,
+        "scrollerScrollH": 1066,
+        "scrollerClass": "SECTION._editor_1ackt_1",
+        "scrollerRectH": 437.2,
+        "scrollerRectY": 222.8,
+        "formScrollH": 1046,
+        "rowsScrollH": "252/252"
+      },
+      {
+        "step": "scrollLog",
+        "scrollLog": []
+      }
+    ]
+  }
+]
