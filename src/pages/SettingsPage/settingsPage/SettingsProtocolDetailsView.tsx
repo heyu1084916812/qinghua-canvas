@@ -3,10 +3,8 @@ import type { DeclarativeProtocolPackage } from '../../../domain/project/protoco
 import { settingsPageStyles as styles } from './settingsPageStyles'
 
 export type SettingsProtocolDetailsViewProps = {
-  protocol: string
   pendingProtocols: ProtocolDefinition[]
   showMockNote: boolean
-  selectedProtocolNote: string
   newProtoOpen: boolean
   npImportText: string
   npImported: DeclarativeProtocolPackage | null
@@ -21,10 +19,8 @@ export type SettingsProtocolDetailsViewProps = {
 }
 
 export function SettingsProtocolDetailsView({
-  protocol,
   pendingProtocols,
   showMockNote,
-  selectedProtocolNote,
   newProtoOpen,
   npImportText,
   npImported,
@@ -37,9 +33,6 @@ export function SettingsProtocolDetailsView({
   onCheckImportedProtocol,
   onSaveImportedProtocol,
 }: SettingsProtocolDetailsViewProps) {
-  const showProtocolNote =
-    selectedProtocolNote !== '' && protocol === 'runninghub-api'
-
   return (
     <>
       {newProtoOpen && (
@@ -141,11 +134,6 @@ export function SettingsProtocolDetailsView({
           Mock 是离线协议：不发任何网络请求、也不会去访问上面填的地址，所以验证必然通过。
           要联调真实中转，把「协议」切到「OpenAI 兼容（对话 + 生图）」后再点一次「验证地址」，
           或者直接点「验证协议」让它自己认。
-        </p>
-      )}
-      {showProtocolNote && (
-        <p className={styles.offlineNote} data-settings-proto-note>
-          {selectedProtocolNote}
         </p>
       )}
     </>

@@ -56,6 +56,7 @@ function mount(overrides: Partial<Parameters<typeof SettingsKeyGroupView>[0]> = 
       createNodeMock: () => ({
         querySelector: () => null,
         scrollIntoView: () => {},
+        scrollTo: () => {},
         getBoundingClientRect: () => ({ left: 0, top: 0, width: 0, height: 0 }),
         scrollLeft: 0,
         style: {},

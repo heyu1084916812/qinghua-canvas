@@ -22,7 +22,6 @@ export type SettingsConnectionViewProps = {
   statusLine: ReactNode
   statusTone: Parameters<typeof noticeA11y>[0]
   showMockNote: boolean
-  selectedProtocolNote: string
   credentialField?: ReactNode
   newProtoOpen: boolean
   hiddenBuiltinProtocolCount: number
@@ -61,7 +60,6 @@ export function SettingsConnectionView({
   statusLine,
   statusTone,
   showMockNote,
-  selectedProtocolNote,
   credentialField,
   newProtoOpen,
   hiddenBuiltinProtocolCount,
@@ -198,10 +196,8 @@ export function SettingsConnectionView({
       {credentialField}
 
       <SettingsProtocolDetailsView
-        protocol={protocol}
         pendingProtocols={pendingProtocols}
         showMockNote={showMockNote}
-        selectedProtocolNote={selectedProtocolNote}
         newProtoOpen={newProtoOpen}
         npImportText={npImportText}
         npImported={npImported}

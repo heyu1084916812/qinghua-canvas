@@ -56,7 +56,6 @@ import { SettingsKeyGroupView } from './settingsPage/SettingsKeyGroupView'
 import { SettingsCredentialFieldView } from './settingsPage/SettingsCredentialFieldView'
 import { SettingsWorkflowManager } from '../../features/settings/SettingsWorkflowManager'
 import { SettingsChannelQuickTest } from '../../features/settings/SettingsChannelQuickTest'
-import { runninghubSiteNote } from '../../domain/project/runninghubSite'
 import { initialSelectedChannelId, useWorkflowsPageOpener } from './settingsPage/workflowsPageLink'
 import { SettingsChannelRouteView } from './settingsPage/SettingsChannelRouteView'
 import { SettingsProfileDrawerView } from './settingsPage/SettingsProfileDrawerView'
@@ -296,9 +295,8 @@ export function SettingsPage({ embedded = false }: { embedded?: boolean } = {}) 
   }
   /** 抓站点图标要原生 HTTP（对账 #396）：浏览器里跨域读不到，按钮据此如实禁用 */
   /** 下拉里的全部协议（含 pending：它们显示为“待支持”且不可选，见协议区渲染） */
-  const {
-    note: selectedProtocolNote = '', credentials: credentialSlots = [], docUrl = '',
-  } = channelPresentation.protocolUsageFor(protocol, catalog)
+  const { credentials: credentialSlots = [], docUrl = '' } =
+    channelPresentation.protocolUsageFor(protocol, catalog)
   /**
    * 旧协议（`openai-images` / `openai-chat`）**只在当前渠道本身就是它时才出现**（用户 2026-09-29「不要重复的东西」）。
    *
@@ -707,7 +705,6 @@ export function SettingsPage({ embedded = false }: { embedded?: boolean } = {}) 
                   statusLine={statusLine}
                   statusTone={statusTone}
                   showMockNote={showMockNote}
-                  selectedProtocolNote={runninghubSiteNote(selected, selectedProtocolNote)}
                   credentialField={
                     <SettingsCredentialFieldView
                       channels={channels}

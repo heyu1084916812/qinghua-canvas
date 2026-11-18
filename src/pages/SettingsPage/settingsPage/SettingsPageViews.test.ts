@@ -114,7 +114,6 @@ describe('SettingsPage 视图拆分', () => {
       statusLine: '就绪',
       statusTone: 'info',
       showMockNote: false,
-      selectedProtocolNote: '',
       newProtoOpen: false,
       hiddenBuiltinProtocolCount: 0,
       npNotice: '',
@@ -158,7 +157,6 @@ describe('SettingsPage 视图拆分', () => {
         } as ProtocolDefinition,
       ],
       showMockNote: true,
-      selectedProtocolNote: '需要令牌',
       newProtoOpen: true,
       npImportText: '',
       npImported: null,
@@ -177,9 +175,8 @@ describe('SettingsPage 视图拆分', () => {
     expect(html.indexOf('data-proto-pending')).toBeLessThan(
       html.indexOf('data-settings-mock-note'),
     )
-    expect(html.indexOf('data-settings-mock-note')).toBeLessThan(
-      html.indexOf('data-settings-proto-note'),
-    )
+    /* 站点说明文案已按用户要求整体撤掉，不再渲染 data-settings-proto-note */
+    expect(html).not.toContain('data-settings-proto-note')
   })
 
   it('模型列表与渠道路由直接返回原 section，并保留关键操作锚点', () => {
@@ -335,7 +332,6 @@ describe('SettingsPage 视图拆分', () => {
       statusLine: '验证失败',
       statusTone: 'error',
       showMockNote: true,
-      selectedProtocolNote: '需要 Key',
       newProtoOpen: false,
       hiddenBuiltinProtocolCount: 2,
       npNotice: '导入成功',

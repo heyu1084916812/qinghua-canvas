@@ -12326,7 +12326,6 @@
       ],
       "publicApi": [
         "runninghubSiteOf",
-        "runninghubSiteNote",
         "RunningHubSite",
         "RUNNINGHUB_SITES"
       ],
@@ -12384,7 +12383,7 @@
         "src/pages/SettingsPage/settingsPage/SettingsKeyGroupView.test.ts",
         "src/pages/SettingsPage/settingsPage/SettingsPageViews.test.ts"
       ],
-      "budget": 319
+      "budget": 329
     },
     {
       "module": "src/pages/SettingsPage/settingsPage/SettingsKeyGroupMenuView.tsx",

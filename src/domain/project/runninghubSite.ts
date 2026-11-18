@@ -30,24 +30,3 @@ export function runninghubSiteOf(baseUrl: string): RunningHubSite {
   if (host === 'runninghub.ai' || host.endsWith('.runninghub.ai')) return 'global'
   return 'unknown'
 }
-
-const SITE_NOTE: Record<RunningHubSite, string> = {
-  cn: 'RunningHub 国内站（runninghub.cn）：与国际站是两个账号、两把 Key，模型与工作流各自独立。AI 应用 / 自建工作流用这把 Key；标准模型 API 只对企业级-共享 Key 开放（消费级 Key 会回 1014）。',
-  global: 'RunningHub 国际站（runninghub.ai）：与国内站是两个账号、两把 Key，模型与工作流各自独立。标准模型 API、AI 应用、自建工作流都在这一站，调用不会走国内站。',
-  unknown: '自定义地址：按 RunningHub 的 OpenAPI 打（提交任务 + 轮询取结果）。地址指向哪一站，就用哪一站的账号与余额。',
-}
-
-/**
- * 协议说明按站点改写。
- *
- * 协议本身只有一条（`runninghub-api`），但**能力不一样**：国内站的标准模型 API
- * 只对企业级共享 Key 开放，拿消费级 Key 去调会回 1014；国际站没有这条限制。
- * 同一句说明挂到两条渠道上必然有一句是错的，所以在渲染前按站点换词。
- */
-export function runninghubSiteNote(
-  channel: { protocol: string; baseUrl: string } | null | undefined,
-  fallback: string,
-): string {
-  if (!channel || channel.protocol !== 'runninghub-api') return fallback
-  return SITE_NOTE[runninghubSiteOf(channel.baseUrl)]
-}
