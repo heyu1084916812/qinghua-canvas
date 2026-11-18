@@ -3392,7 +3392,7 @@
       "test": [
         "src/pages/SettingsPage/settingsPageCssArchitecture.test.ts"
       ],
-      "budget": 585
+      "budget": 596
     },
     {
       "module": "src/pages/SettingsPage/SettingsChannelWorkspace.module.css",
@@ -3564,8 +3564,6 @@
       ],
       "publicApi": [
         "CSS_MODULE:SettingsModelCategory category and common-switch styles",
-        "CSS_CLASS:mappingFilters",
-        "CSS_CLASS:mappingFilter",
         "CSS_CLASS:globalCommonButton",
         "CSS_CLASS:globalCommonSwitch"
       ],
@@ -7270,7 +7268,7 @@
       "test": [
         "src/pages/SettingsPage/settingsPage/SettingsPageViews.test.ts"
       ],
-      "budget": 382
+      "budget": 384
     },
     {
       "module": "src/pages/SettingsPage/settingsPage/SettingsProfileDrawerView.tsx",
@@ -12852,7 +12850,7 @@
       "budget": 80
     },
     {
-      "module": "src/pages/SettingsPage/settingsPage/keyGroupTabsShape.ts",
+      "module": "src/pages/SettingsPage/settingsPage/folderTabGeometry.ts",
       "owner": "settings-ui",
       "responsibility": "Key 分组文件夹标签的几何与弹簧：静止梯形路径、选中标签的形变路径、阻尼弹簧步进（移植自 folder_tabs_ui.html）。",
       "owns": [
@@ -12877,12 +12875,12 @@
         "SpringValue"
       ],
       "test": [
-        "src/pages/SettingsPage/settingsPage/keyGroupTabsShape.test.ts"
+        "src/pages/SettingsPage/settingsPage/folderTabGeometry.test.ts"
       ],
       "budget": 135
     },
     {
-      "module": "src/pages/SettingsPage/settingsPage/useKeyGroupTabMorph.ts",
+      "module": "src/pages/SettingsPage/settingsPage/useFolderTabMorph.ts",
       "owner": "settings-ui",
       "responsibility": "把标签弹簧接到 React：量真实宽高、逐帧写 SVG 路径、切组时给回弹初速度，并处理 resize 与 StrictMode 重挂载。",
       "owns": [
@@ -12896,7 +12894,7 @@
         "CSS 与主题令牌"
       ],
       "publicApi": [
-        "useKeyGroupTabMorph"
+        "useFolderTabMorph"
       ],
       "test": [
         "src/pages/SettingsPage/settingsPage/SettingsKeyGroupView.test.ts"
@@ -12904,7 +12902,7 @@
       "budget": 180
     },
     {
-      "module": "src/pages/SettingsPage/settingsPage/SettingsKeyGroupTabShape.tsx",
+      "module": "src/pages/SettingsPage/settingsPage/FolderTabShape.tsx",
       "owner": "settings-ui",
       "responsibility": "渲染 Key 分组标签的几何层：每枚标签一张静止梯形 SVG，选中态一块共享形变层。",
       "owns": [
@@ -12917,8 +12915,8 @@
         "标签文字与交互"
       ],
       "publicApi": [
-        "KeyGroupTabShape",
-        "KeyGroupMorphLayer"
+        "FolderTabShape",
+        "FolderTabMorphLayer"
       ],
       "test": [
         "src/pages/SettingsPage/settingsPage/SettingsKeyGroupView.test.ts"

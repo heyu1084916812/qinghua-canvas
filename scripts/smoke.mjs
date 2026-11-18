@@ -13917,7 +13917,6 @@ async function g74(browser) {
       '[data-key-group-priority]',
       '[data-settings-refresh-models]',
       '[data-global-model-add-toggle]',
-      '[data-route-map-filter]',
       '[data-route-map-real] [data-choice-picker] > button',
       '[data-route-map-uncommon]',
       '[data-quick-test-model] [data-choice-picker] > button',
@@ -14020,6 +14019,8 @@ async function g74(browser) {
       keyGroupMorphFill,
       keyGroupAddCenterY: centerY(keyGroupAddRect),
       keyGroupAddHeight: keyGroupAddRect ? Math.round(keyGroupAddRect.height) : 0,
+      mappingFilterHeights: [...document.querySelectorAll('[data-route-map-filter]')].map((n) => Math.round(n.getBoundingClientRect().height)),
+      mappingFilterCount: document.querySelectorAll('[data-route-map-filter]').length,
       keyGroupTextCenterY: centerY(keyGroupNameRect),
       keyGroupCardRadius: keyGroupCardStyle
         ? `${keyGroupCardStyle.borderTopLeftRadius} ${keyGroupCardStyle.borderTopRightRadius}`
@@ -14078,6 +14079,13 @@ async function g74(browser) {
       tabs: channelPolish.keyGroupTabTexts,
       chromeButtons: channelPolish.keyGroupChromeButtons,
     }),
+  )
+  rec(
+    g,
+    '模型映射分类也用文件夹标签（40px、数量徽章、至少三档）',
+    channelPolish.mappingFilterCount >= 3 &&
+      channelPolish.mappingFilterHeights.every((height) => height === 40),
+    JSON.stringify({ count: channelPolish.mappingFilterCount, heights: channelPolish.mappingFilterHeights }),
   )
   rec(
     g,

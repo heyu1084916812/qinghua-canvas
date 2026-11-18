@@ -6,9 +6,9 @@ import {
   isSpringSettled,
   morphingTabPath,
   stepSpring,
-} from './keyGroupTabsShape'
+} from './folderTabGeometry'
 
-describe('keyGroupTabsShape（文件夹标签几何）', () => {
+describe('folderTabGeometry（文件夹标签几何）', () => {
   it('第一枚标签左边是竖边（和卡片左上直角对齐），其余左边带斜边', () => {
     const first = inactiveTabPath(120, 40, true)
     const other = inactiveTabPath(120, 40, false)

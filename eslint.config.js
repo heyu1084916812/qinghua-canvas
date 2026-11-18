@@ -30,7 +30,7 @@ const ICON_KEEP = [
   'src/workbenches/canvas/panels/presetIcons.tsx',
   // Key 分组文件夹标签的几何层：路径按标签真实像素宽高生成（斜边 + 圆角 + 底部基线），
   // 是形状而不是图标，换图标库也不会改变它。
-  'src/pages/SettingsPage/settingsPage/SettingsKeyGroupTabShape.tsx',
+  'src/pages/SettingsPage/settingsPage/FolderTabShape.tsx',
 ]
 
 

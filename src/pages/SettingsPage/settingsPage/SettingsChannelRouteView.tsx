@@ -16,13 +16,15 @@ type MapSaveNotice = {
 }
 
 type NewModelCategory = Exclude<PresetModel['category'], 'unknown'>
-type MappingCategory = 'chat' | 'image' | 'video'
+type MappingCategory = 'chat' | 'image' | 'video' | 'audio'
 
-const MODEL_CATEGORY_ORDER = ['chat', 'image', 'video'] as const
+/** 映射分类固定四档（与模型能力对齐；`unknown` 只作为行内可选值，不单独成档） */
+const MODEL_CATEGORY_ORDER = ['chat', 'image', 'video', 'audio'] as const
 const MODEL_CATEGORY_LABELS: Record<MappingCategory, string> = {
   chat: '对话',
   image: '图片',
   video: '视频',
+  audio: '音频',
 }
 const MODEL_CATEGORY_PANEL_ID = 'settings-model-category-panel'
 

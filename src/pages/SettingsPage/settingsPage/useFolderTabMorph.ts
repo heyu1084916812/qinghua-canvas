@@ -7,7 +7,7 @@ import {
   stepSpring,
   type MorphFrame,
   type SpringValue,
-} from './keyGroupTabsShape'
+} from './folderTabGeometry'
 
 type MorphSpringState = {
   x: SpringValue
@@ -39,7 +39,7 @@ const createSpringState = (): MorphSpringState => ({
  *
  * 组件只负责渲染结构；这里拿到的 ref 直接挂到 tabs 容器与形变层上。
  */
-export function useKeyGroupTabMorph(activeGroupId: string | null | undefined) {
+export function useFolderTabMorph(activeGroupId: string | null | undefined) {
   const tabRefs = useRef(new Map<string, HTMLDivElement>())
   const tabsHostRef = useRef<HTMLDivElement | null>(null)
   const morphSvgRef = useRef<SVGSVGElement | null>(null)

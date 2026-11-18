@@ -1,12 +1,12 @@
 import type { MutableRefObject } from 'react'
-import { TAB_HEADER_HEIGHT, inactiveTabPath } from './keyGroupTabsShape'
+import { TAB_HEADER_HEIGHT, inactiveTabPath } from './folderTabGeometry'
 import { settingsPageStyles as styles } from './settingsPageStyles'
 
 /**
  * Key 分组标签的几何层（不是图标，故保留手写 `<svg>`）：
  * 每枚标签一张静止梯形，选中态另有一块共享形变层，路径随真实像素宽高生成。
  */
-export function KeyGroupTabShape({
+export function FolderTabShape({
   width,
   height,
   first,
@@ -28,7 +28,7 @@ export function KeyGroupTabShape({
 }
 
 /** 选中标签的形变层：位置 / 宽度 / 高度由父组件的弹簧逐帧写进 path。 */
-export function KeyGroupMorphLayer({
+export function FolderTabMorphLayer({
   svgRef,
   pathRef,
 }: {

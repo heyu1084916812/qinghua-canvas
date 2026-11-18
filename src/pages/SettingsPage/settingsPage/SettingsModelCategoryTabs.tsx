@@ -1,5 +1,7 @@
 import { useRef, type KeyboardEvent } from 'react'
 import type { PresetModel } from '../../../domain/project/modelPresets'
+import { FolderTabMorphLayer, FolderTabShape } from './FolderTabShape'
+import { useFolderTabMorph } from './useFolderTabMorph'
 import { settingsPageStyles as styles } from './settingsPageStyles'
 
 export type ModelCategoryTab = {
@@ -10,6 +12,10 @@ export type ModelCategoryTab = {
 
 const MODEL_CATEGORY_PANEL_ID = 'settings-model-category-panel'
 
+/**
+ * 模型映射的分类标签：和 Key 分组同一套文件夹标签（SVG 斜边 + 弹簧形变 + 文字上抬），
+ * 只是每枚标签后面多一个数量徽章（数量常显，不是选中态专属）。
+ */
 export function SettingsModelCategoryTabs({
   tabs,
   activeCategory,
@@ -19,9 +25,12 @@ export function SettingsModelCategoryTabs({
   activeCategory: PresetModel['category'] | null
   onChange: (category: PresetModel['category']) => void
 }) {
+  const { tabRefs, tabsHostRef, morphSvgRef, morphPathRef, tabSizes } = useFolderTabMorph(
+    activeCategory ?? null,
+  )
   const listRef = useRef<HTMLDivElement | null>(null)
 
-  const onKeyDown = (event: KeyboardEvent<HTMLButtonElement>, index: number) => {
+  const onKeyDown = (event: KeyboardEvent<HTMLDivElement>, index: number) => {
     let next: number | null = null
     if (event.key === 'ArrowLeft') next = (index - 1 + tabs.length) % tabs.length
     if (event.key === 'ArrowRight') next = (index + 1) % tabs.length
@@ -34,40 +43,53 @@ export function SettingsModelCategoryTabs({
     onChange(category)
     requestAnimationFrame(() => {
       listRef.current
-        ?.querySelector<HTMLButtonElement>(`[data-route-map-filter="${category}"]`)
+        ?.querySelector<HTMLElement>(`[data-route-map-filter="${category}"]`)
         ?.focus()
     })
   }
 
   return (
     <div
-      ref={listRef}
-      className={styles.mappingFilters}
+      ref={(element) => {
+        listRef.current = element
+        tabsHostRef.current = element
+      }}
+      className={styles.keyGroupTabs}
       role="tablist"
       aria-label="模型分类"
       data-route-map-filters
     >
       {tabs.map((tab, index) => {
         const selected = tab.category === activeCategory
+        const size = tabSizes[tab.category]
         return (
-          <button
+          <div
             key={tab.category}
-            type="button"
             id={`settings-model-category-tab-${tab.category}`}
+            ref={(element) => {
+              if (element) tabRefs.current.set(tab.category, element)
+              else tabRefs.current.delete(tab.category)
+            }}
             role="tab"
             aria-selected={selected}
             aria-controls={MODEL_CATEGORY_PANEL_ID}
             tabIndex={selected ? 0 : -1}
-            className={selected ? `${styles.mappingFilter} ${styles.mappingFilterOn}` : styles.mappingFilter}
+            className={
+              selected ? `${styles.keyGroupTab} ${styles.keyGroupTabOn}` : styles.keyGroupTab
+            }
             data-route-map-filter={tab.category}
             onClick={() => onChange(tab.category)}
             onKeyDown={(event) => onKeyDown(event, index)}
           >
-            <span>{tab.label}</span>
-            <span className={styles.mappingFilterCount}>{tab.count}</span>
-          </button>
+            <FolderTabShape width={size?.w ?? 120} height={size?.h ?? 40} first={index === 0} />
+            <span className={styles.keyGroupTabInner}>
+              <span>{tab.label}</span>
+              <span className={styles.mappingFilterCount}>{tab.count}</span>
+            </span>
+          </div>
         )
       })}
+      <FolderTabMorphLayer svgRef={morphSvgRef} pathRef={morphPathRef} />
     </div>
   )
 }

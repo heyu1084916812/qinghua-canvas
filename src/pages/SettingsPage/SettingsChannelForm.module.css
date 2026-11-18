@@ -39,8 +39,9 @@
   grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
   gap: var(--space-2);
-  min-height: 52px;
-  padding-bottom: var(--space-3);
+  /* 头部只占控件高度：头像下沿到卡片的距离 = 卡片到标签栏的距离（24 + 6） */
+  min-height: var(--settings-control-height, 34px);
+  padding-bottom: var(--space-1);
 }
 
 .providerNameGroup {
@@ -300,6 +301,11 @@
   align-items: center;
   gap: var(--space-3);
   flex-wrap: wrap;
+}
+
+/* 没有任何按钮 / 提示时不留空行，否则会再叠加一段 gap */
+.protoTools:empty {
+  display: none;
 }
 
 .protoForm {
@@ -567,6 +573,11 @@
   font-size: var(--fs-label);
   min-height: var(--fs-label);
   color: var(--text-2);
+}
+
+/* 没有状态文案时不占一行：否则卡片底部会凭空多出一条空行 + 两段 gap */
+.status:empty {
+  display: none;
 }
 
 .offlineNote {

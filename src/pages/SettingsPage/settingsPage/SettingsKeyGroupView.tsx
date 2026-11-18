@@ -9,8 +9,8 @@ import { createPortal } from 'react-dom'
 import type { ChannelCredentialGroup } from '../../../domain/project/channel'
 import { IconPlus } from '../../../app/ProjectTreeIcons'
 import { KEY_GROUP_MENU_WIDTH, SettingsKeyGroupMenuView } from './SettingsKeyGroupMenuView'
-import { KeyGroupMorphLayer, KeyGroupTabShape } from './SettingsKeyGroupTabShape'
-import { useKeyGroupTabMorph } from './useKeyGroupTabMorph'
+import { FolderTabMorphLayer, FolderTabShape } from './FolderTabShape'
+import { useFolderTabMorph } from './useFolderTabMorph'
 import { settingsPageStyles as styles } from './settingsPageStyles'
 
 export type SettingsKeyGroupViewProps = {
@@ -50,7 +50,7 @@ export function SettingsKeyGroupView({
   const menuRef = useRef<HTMLDivElement | null>(null)
   /* 双击还没选中的标题时，先切组再进编辑：这次 activeGroup 变化不能把刚打开的输入框关掉。 */
   const renameTargetRef = useRef<string | null>(null)
-  const { tabRefs, tabsHostRef, morphSvgRef, morphPathRef, tabSizes } = useKeyGroupTabMorph(
+  const { tabRefs, tabsHostRef, morphSvgRef, morphPathRef, tabSizes } = useFolderTabMorph(
     activeGroup?.id,
   )
 
@@ -173,7 +173,7 @@ export function SettingsKeyGroupView({
               aria-selected="true"
               data-key-group-placeholder
             >
-              <KeyGroupTabShape width={140} height={40} first />
+              <FolderTabShape width={140} height={40} first />
               <span className={styles.keyGroupTabInner}>
                 <span className={styles.keyGroupTabName}>默认分组</span>
               </span>
@@ -216,7 +216,7 @@ export function SettingsKeyGroupView({
                     selectGroup(group.id)
                   }}
                 >
-                  <KeyGroupTabShape
+                  <FolderTabShape
                     width={shapeWidth}
                     height={shapeHeight}
                     first={index === 0}
@@ -283,7 +283,7 @@ export function SettingsKeyGroupView({
           </button>
 
           {/* 选中标签的形变层：位置 / 宽度 / 高度都由弹簧实时驱动，画在静止梯形之上、文字之下 */}
-          <KeyGroupMorphLayer svgRef={morphSvgRef} pathRef={morphPathRef} />
+          <FolderTabMorphLayer svgRef={morphSvgRef} pathRef={morphPathRef} />
         </div>
       </div>
 
