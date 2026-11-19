@@ -4,7 +4,7 @@ import {
   isKnifeOn,
   setKnife,
   subscribeKnife,
-  toggleKnife,
+  toggleKnifePinned,
 } from './knifeMode'
 
 /**
@@ -20,10 +20,23 @@ describe('knifeMode', () => {
     expect(isKnifeOn()).toBe(false)
   })
 
-  it('★★ 空格点一下开、再点一下关', () => {
-    toggleKnife()
+  it('★★ 工具栏按钮点一下开、再点一次关（pinned）', () => {
+    toggleKnifePinned()
     expect(isKnifeOn()).toBe(true)
-    toggleKnife()
+    toggleKnifePinned()
+    expect(isKnifeOn()).toBe(false)
+  })
+
+  it('★ 按住空格（held）与按钮常驻（pinned）互不干扰', () => {
+    setKnife(true)
+    expect(isKnifeOn()).toBe(true)
+    setKnife(false)
+    expect(isKnifeOn()).toBe(false)
+    toggleKnifePinned()
+    setKnife(true)
+    setKnife(false)
+    expect(isKnifeOn()).toBe(true) // 松手不该把常驻关掉
+    toggleKnifePinned()
     expect(isKnifeOn()).toBe(false)
   })
 

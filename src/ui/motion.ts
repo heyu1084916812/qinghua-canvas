@@ -6,9 +6,9 @@
 
 export const DURATION = {
   hover: 120,
-  panel: 140,
-  menu: 120,
-  lightbox: 180,
+  panel: 200,
+  menu: 180,
+  lightbox: 240,
   edge: 100,
   select: 0,
   cut: 260,

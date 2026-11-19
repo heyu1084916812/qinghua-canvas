@@ -6,6 +6,9 @@ import { canArrange } from '../../../domain/canvas/layout/arrange'
 import { ARRANGE_MODES, type ArrangeMode } from '../../../domain/canvas/layout/arrangeModes'
 import type { NodeType } from '../../../domain/canvas/model/node'
 import { fitCanvasView } from '../surface/fitView'
+import { Slice } from '../../../ui/icon'
+import { toggleKnifePinned } from '../../../features/canvas/knifeMode'
+import { useKnifeOn } from '../../../features/canvas/useKnifeMode'
 import styles from './CanvasToolbar.module.css'
 import {
   IconBatch,
@@ -100,6 +103,8 @@ export function CanvasToolbar({
   const store = useCanvasStore()
   const selection = useSelection()
   const { arrange, arrangeMode } = useArrangeTools(store)
+  /** 美工刀是否开着（空格按住 **或** 这枚按钮常驻）—— 按钮要显示开关态 */
+  const knifeOn = useKnifeOn()
   /**
    * 浮层改由**鼠标进入按钮范围**驱动（用户 2026-09-19），不再要求点击。
    *
@@ -194,6 +199,8 @@ export function CanvasToolbar({
     disabled?: boolean
     /** 是否有常驻实色（只有第一个「新建节点」是） */
     solid?: boolean
+    /** 开关型按钮的当前状态（画到 `aria-pressed` 与 `data-pressed` 上） */
+    pressed?: boolean
     attr?: string
   }[] = [
     /**
@@ -229,6 +236,18 @@ export function CanvasToolbar({
     { key: 'reset', icon: <IconReset size={ICON_SIZE} />, label: '重置视图', onClick: () => fitCanvasView(store), attr: 'data-toolbar-reset' },
     { key: 'undo', icon: <IconUndo size={ICON_SIZE} />, label: '撤销', onClick: () => store.undo(), disabled: !canUndo, attr: 'data-toolbar-undo' },
     { key: 'redo', icon: <IconRedo size={ICON_SIZE} />, label: '重做', onClick: () => store.redo(), disabled: !canRedo, attr: 'data-toolbar-redo' },
+    /**
+     * 美工刀常驻开关（对账 #1159，用户给的注意事项第 6 条：兼容触屏 / 单手只用鼠标）。
+     * 与"按住空格"是两条独立通道：这里点一下常驻，再点一下退出。
+     */
+    {
+      key: 'knife',
+      icon: <Slice size={ICON_SIZE} />,
+      label: knifeOn ? '美工刀（开）' : '美工刀',
+      onClick: () => toggleKnifePinned(),
+      pressed: knifeOn,
+      attr: 'data-toolbar-knife',
+    },
     ...(onImportAsset
       ? [
           {
@@ -269,9 +288,11 @@ export function CanvasToolbar({
           >
             <button
               type="button"
-              className={`${styles.iconBtn} ${t.solid ? styles.solid : ''}`}
+              className={`${styles.iconBtn} ${t.solid ? styles.solid : ''} ${t.pressed ? styles.pressed : ''}`}
               aria-label={t.label}
               aria-expanded={t.menu ? open : undefined}
+              aria-pressed={t.pressed}
+              data-pressed={t.pressed ? 'true' : undefined}
               disabled={t.disabled}
               data-toolbar-icon
               {...{ [t.attr!]: '' }}

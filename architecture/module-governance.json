@@ -424,7 +424,7 @@
       "test": [
         "src/workbenches/canvas/flow/flowGraph.test.ts"
       ],
-      "budget": 1040
+      "budget": 1060
     },
     {
       "module": "src/workbenches/canvas/lightbox/LightboxLayer.tsx",
@@ -567,7 +567,7 @@
       "owner": "canvas-flow-ui",
       "responsibility": "美工刀模式（当前工具）的模块级瞬态：开关、订阅与复位。",
       "owns": [
-        "刀具开关状态",
+        "刀具的按住态 / 常驻态",
         "subscribers 通知"
       ],
       "doesNotOwn": [
@@ -577,9 +577,9 @@
       "publicApi": [
         "isKnifeOn",
         "setKnife",
-        "toggleKnife",
-        "subscribeKnife",
-        "__resetKnifeForTest"
+        "setKnifePinned",
+        "toggleKnifePinned",
+        "subscribeKnife"
       ],
       "test": [
         "src/features/canvas/knifeMode.test.ts"
@@ -627,7 +627,7 @@
       "test": [
         "src/workbenches/canvas/flow/edgeCutGeometry.test.ts"
       ],
-      "budget": 80
+      "budget": 130
     },
     {
       "module": "src/workbenches/canvas/flow/useEdgeCut.ts",
@@ -647,7 +647,7 @@
       "test": [
         "src/workbenches/canvas/flow/edgeCutGeometry.test.ts"
       ],
-      "budget": 90
+      "budget": 130
     },
     {
       "module": "src/workbenches/canvas/flow/FlowEdgeCutLayer.tsx",
@@ -13202,6 +13202,69 @@
         "scripts/smoke.mjs#g74"
       ],
       "budget": 140
+    },
+    {
+      "module": "src/workbenches/canvas/flow/knifeFx.ts",
+      "owner": "canvas-flow-ui",
+      "responsibility": "美工刀瞬态特效的数据与衰减（刀光轨迹、火花），供 canvas 层按帧绘制。",
+      "owns": [
+        "trail / sparks 数据",
+        "tickFx 衰减与重力"
+      ],
+      "doesNotOwn": [
+        "绘制（见 KnifeFxLayer）",
+        "切割命中判定"
+      ],
+      "publicApi": [
+        "pushTrail",
+        "spawnSparks",
+        "tickFx",
+        "hasFx",
+        "clearFx",
+        "fxSnapshot"
+      ],
+      "test": [
+        "src/workbenches/canvas/flow/edgeCutGeometry.test.ts"
+      ],
+      "budget": 110
+    },
+    {
+      "module": "src/workbenches/canvas/flow/KnifeFxLayer.tsx",
+      "owner": "canvas-flow-ui",
+      "responsibility": "刀光与火花的独立 canvas 覆盖层，自有 rAF 循环，避免高频瞬态驱动 React 重渲染。",
+      "owns": [
+        "canvas 尺寸与 DPR 同步",
+        "rAF 绘制循环"
+      ],
+      "doesNotOwn": [
+        "特效数据（见 knifeFx）",
+        "切割逻辑"
+      ],
+      "publicApi": [
+        "KnifeFxLayer"
+      ],
+      "test": [
+        "src/workbenches/canvas/flow/edgeCutGeometry.test.ts"
+      ],
+      "budget": 120
+    },
+    {
+      "module": "src/workbenches/canvas/flow/KnifeFxLayer.module.css",
+      "owner": "canvas-flow-ui",
+      "responsibility": "刀光/火花 canvas 层的定位样式（铺满画布、不吃指针）。",
+      "owns": [
+        "CSS_MODULE:刀光与火花画布层"
+      ],
+      "doesNotOwn": [
+        "主题令牌"
+      ],
+      "publicApi": [
+        "CSS_MODULE:刀光与火花画布层"
+      ],
+      "test": [
+        "src/workbenches/canvas/flow/edgeCutGeometry.test.ts"
+      ],
+      "budget": 40
     }
   ]
 }

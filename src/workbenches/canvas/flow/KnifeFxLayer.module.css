@@ -1,0 +1,10 @@
+/*
+ * 刀光 / 火花绘制层（对账 #1159）：铺满画布、不吃指针、压在节点与连线之上。
+ * 它只画"瞬态反馈"，不参与任何布局与命中。
+ */
+.layer {
+  position: absolute;
+  inset: 0;
+  z-index: 25;
+  pointer-events: none;
+}

@@ -27,8 +27,8 @@
   position: absolute;
   left: 50%;
   transform: translateX(-50%);
-  /* 入场（#1161）：居中浮层必须用 `menuInkInCentered`，否则动画结束会丢掉 translateX(-50%) */
-  animation: menuInkInCentered var(--dur-panel) var(--ease-panel);
+  /* 入场（#1161）：与跟随栏一样**只淡入** —— 它也跟随选区矩形，位移/缩放会和 left/top 打架 */
+  animation: barFadeIn var(--dur-panel) var(--ease-out);
   display: flex;
   align-items: center;
   gap: 6px;
@@ -137,16 +137,12 @@
  * 见 MultiSelectBar.tsx，这里不再写死。
  */
 
-/* 居中浮层版（保留 translateX(-50%)，否则动画结束会跳位）。 */
-@keyframes menuInkInCentered {
+/* 多选栏入场（#1161）：只淡入，保留 `.bar` 自己的 `translateX(-50%)`。 */
+@keyframes barFadeIn {
   from {
     opacity: 0;
-    filter: blur(3px);
-    transform: translateX(-50%) translateY(4px) scale(0.985);
   }
   to {
     opacity: 1;
-    filter: blur(0);
-    transform: translateX(-50%) translateY(0) scale(1);
   }
 }

@@ -63,3 +63,63 @@ export function distanceToPolyline(points: readonly ScreenPoint[], pointer: Scre
   }
   return best
 }
+
+export interface SegmentHit {
+  point: ScreenPoint
+  /** 命中点落在这段折线的第几段（points[index] → points[index+1]） */
+  index: number
+}
+
+/**
+ * **刀锋扫过**的求交（对账 #1159 第二轮）：把上一帧到这一帧的鼠标轨迹当成一条线段，
+ * 与折线逐段做 2D 跨立相交。
+ *
+ * 为什么不能只测"当前点是否在线上"：快速挥刀时相邻两帧可能隔上百像素，
+ * 连线正好从两点之间穿过去 —— 点检测会整刀漏切（用户实测"切不了线条"）。
+ */
+export function segmentHitsPolyline(
+  points: readonly ScreenPoint[],
+  from: ScreenPoint,
+  to: ScreenPoint,
+): SegmentHit | null {
+  if (points.length < 2) return null
+  const rx = to.x - from.x
+  const ry = to.y - from.y
+  if (rx === 0 && ry === 0) return null
+  for (let i = 0; i < points.length - 1; i += 1) {
+    const a = points[i]!
+    const b = points[i + 1]!
+    const sx = b.x - a.x
+    const sy = b.y - a.y
+    const denom = rx * sy - ry * sx
+    if (Math.abs(denom) < 1e-9) continue
+    const qx = a.x - from.x
+    const qy = a.y - from.y
+    const t = (qx * sy - qy * sx) / denom
+    const u = (qx * ry - qy * rx) / denom
+    if (t < 0 || t > 1 || u < 0 || u > 1) continue
+    return { point: { x: from.x + t * rx, y: from.y + t * ry }, index: i }
+  }
+  return null
+}
+
+export interface Box {
+  minX: number
+  minY: number
+  maxX: number
+  maxY: number
+}
+
+/** 屏幕线段的包围盒（"先粗筛再细算"用；`pad` 是容差） */
+export function segmentBox(from: ScreenPoint, to: ScreenPoint, pad = 0): Box {
+  return {
+    minX: Math.min(from.x, to.x) - pad,
+    minY: Math.min(from.y, to.y) - pad,
+    maxX: Math.max(from.x, to.x) + pad,
+    maxY: Math.max(from.y, to.y) + pad,
+  }
+}
+
+export function boxesOverlap(a: Box, b: Box): boolean {
+  return !(a.maxX < b.minX || a.minX > b.maxX || a.maxY < b.minY || a.minY > b.maxY)
+}

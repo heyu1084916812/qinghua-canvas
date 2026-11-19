@@ -141,6 +141,19 @@
 }
 
 /*
+ * 开关型按钮的「已按下」态（美工刀常驻开关，#1159）。
+ * 用浅底 + 内描边表示，不抢 `.solid`（新建节点）那一档实色。
+ */
+.pressed {
+  background: var(--bg-subtle);
+  box-shadow: inset 0 0 0 1px var(--stroke);
+}
+
+.pressed:hover:not(:disabled) {
+  background: var(--bg-hover);
+}
+
+/*
  * 常驻实色（只有第一个「新建节点」）：
  * 走 `--accent` / `--accent-text`——这对 token 在两套主题下整体反转，
  * 写死深色的话暗色主题里会糊进节点面，失去「唯一主操作」的辨识度。

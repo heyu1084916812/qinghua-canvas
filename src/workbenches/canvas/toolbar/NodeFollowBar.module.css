@@ -13,8 +13,14 @@
 .bar {
   position: absolute;
   z-index: 19;
-  /* 入场（#1161）：以前是"啪"地出现，用户 2026-11-19 说太生硬 */
-  animation: menuInkIn var(--dur-panel) var(--ease-panel);
+  /*
+   * 入场（#1161）：**只淡入、不做位移/缩放**。
+   *
+   * 这根栏是"跟着节点走"的（left/top 每帧由 JS 算），再叠一个 translateY/scale 会与
+   * 跟随位移打架 —— 用户看到的就是"开的时候先跳一下再回来"。面板那种不跟随的浮层才用
+   * `menuInkIn`（带位移）。
+   */
+  animation: barFadeIn var(--dur-panel) var(--ease-out);
   display: flex;
   align-items: center;
   gap: 6px;
@@ -280,16 +286,12 @@
   background: var(--accent);
 }
 
-/* 入场动画（#1161）：CSS Modules 会给 animation-name 加哈希，故必须在本模块定义同名 keyframes。 */
-@keyframes menuInkIn {
+/* 跟随栏入场（#1161）：只淡入 —— 位移/缩放会和"跟随节点"的 left/top 打架（见 `.bar` 的说明） */
+@keyframes barFadeIn {
   from {
     opacity: 0;
-    filter: blur(3px);
-    transform: translateY(4px) scale(0.985);
   }
   to {
     opacity: 1;
-    filter: blur(0);
-    transform: translateY(0) scale(1);
   }
 }

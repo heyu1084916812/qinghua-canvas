@@ -25,9 +25,13 @@ export function KnifeCursor({ active }: { active: boolean }) {
       if (el) el.style.transform = `translate3d(${x}px, ${y}px, 0)`
     }
     const move = (e: PointerEvent) => {
-      /* +4px 让刀尖落在指针位置上（视觉热点），而不是让图标压住指针 */
-      x = e.clientX + 4
-      y = e.clientY + 4
+      /*
+       * **刀尖 = 指针**（用户注意事项 2）：`Slice` 的刃尖在 24 格视图里约 (3,3)，
+       * 20px 显示时约 (2.5,2.5) —— 所以整块往左上挪 2px，刃尖正好压在鼠标坐标上。
+       * 上一版是 +4（让图标中心避开指针），视觉上会"明明划过了线却没切到"。
+       */
+      x = e.clientX - 2
+      y = e.clientY - 2
       if (!frame) frame = window.requestAnimationFrame(paint)
     }
     window.addEventListener('pointermove', move, { passive: true })

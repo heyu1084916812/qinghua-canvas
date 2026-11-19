@@ -70,6 +70,7 @@ import { useKnifeOn, useKnifeShortcut } from '../../../features/canvas/useKnifeM
 import { FlowEdgeCutLayer } from './FlowEdgeCutLayer'
 import { useEdgeCut } from './useEdgeCut'
 import { KnifeCursor } from './KnifeCursor'
+import { KnifeFxLayer } from './KnifeFxLayer'
 import { useViewport as useCanvasViewport } from '../../../features/canvas/useViewport'
 import { useNodeDownload } from '../../../features/canvas/useNodeDownload'
 import { clipboardMediaFiles, importDroppedFiles } from '../../../features/canvas/dropImport'
@@ -274,8 +275,6 @@ function FlowSurfaceInner({
   // Ctrl/Cmd + C/V（§4.2）：剪贴板是模块级单例、不订阅，故不参与本组件重渲染
   useClipboardHotkeys(store)
   useCanvasKeyboard(store)
-  /** 美工刀（#1159）：空格切换 / Esc 退出。口径与实现见 `useKnifeMode` 与 `useEdgeCut` */
-  useKnifeShortcut()
   const knifeOn = useKnifeOn()
   const { beginPan } = useCanvasViewport(store)
   const [importHover, setImportHover] = useState(false)
@@ -283,6 +282,8 @@ function FlowSurfaceInner({
   /** 锚点必须在 pointerdown 记录；RF 的 dragStart 已晚一步，会导致终点对齐偏移。 */
   const dragAnchorRef = useRef<FlowDragAnchor | null>(null)
   const pressAtRef = useRef<{ x: number; y: number } | null>(null)
+  /** 指针是否正按着（拖节点 / 框选 / 拉线中）—— 只给美工刀的互斥锁用，与 `pressAtRef` 无关 */
+  const interactingRef = useRef(false)
   const nodeSelectStampRef = useRef(false)
   /** 框选矩形（世界坐标）；结束时用 store 真实矩形兜底裁剪。 */
   const selectionMarqueeRef = useRef<MarqueeRect | null>(null)
@@ -322,9 +323,22 @@ function FlowSurfaceInner({
     () => document.querySelector<HTMLElement>('[data-canvas-surface]'),
     [],
   )
-  const { edgeCut, cutAt } = useEdgeCut({
+  /**
+   * 空格 = 美工刀（#1159）。**互斥锁**：指针正处于按下状态（拖节点 / 框选 / 拉线）
+   * 时不切工具 —— 否则半路换手势，节点会停在半空、线会断得莫名其妙。
+   */
+  useKnifeShortcut({ canEnter: () => !interactingRef.current })
+  /**
+   * 挥刀切割（#1159 第二轮）：一次按下→抬起是**一个事务**，
+   * 挥刀中切掉的每条线都用同一个 `planId` 派发 —— Ctrl+Z 一次全回来。
+   */
+  const { cuts, begin: beginSlice, move: moveSlice, end: endSlice } = useEdgeCut({
     surfaceEl,
-    removeEdge: (id) => store.dispatch({ kind: 'edge.remove', id }),
+    removeEdges: (ids, planId) => {
+      for (const id of ids) {
+        store.dispatch({ kind: 'edge.remove', id }, { mode: 'multi-step', planId, label: '切断连线' })
+      }
+    },
   })
   const drag = useNodeDrag(store, surfaceEl)
   const edgeDrag = useEdgeDrag(store)
@@ -394,10 +408,11 @@ function FlowSurfaceInner({
       if (knifeOn && e.button === 0) {
         e.preventDefault()
         e.stopPropagation()
-        cutAt(e.clientX, e.clientY)
+        beginSlice(e.clientX, e.clientY)
         return
       }
       pressAtRef.current = { x: e.clientX, y: e.clientY }
+      interactingRef.current = true
       const nodeId =
         (e.target as HTMLElement)
           .closest('[data-node-id]')
@@ -451,7 +466,7 @@ function FlowSurfaceInner({
         dragAnchorRef.current = plan.anchor
       }
     },
-    [store, knifeOn, cutAt, beginPan],
+    [store, knifeOn, beginSlice, beginPan],
   )
 
   const importFiles = useCallback(
@@ -810,7 +825,19 @@ function FlowSurfaceInner({
       onClick={onSurfaceClick}
       // 只记坐标、不 setState：粘贴落点要用「当前鼠标位置」（§4.2）
       onPointerMove={(e) => rememberPointer({ x: e.clientX, y: e.clientY })}
-      onPointerMoveCapture={updateSelectionMarquee}
+      onPointerMoveCapture={(e) => {
+        /* 刀具模式下这条指针流归"挥刀"用：只更新刀光轨迹与切割判定，不再更新框选 */
+        if (knifeOn) {
+          moveSlice(e.clientX, e.clientY)
+          return
+        }
+        updateSelectionMarquee(e)
+      }}
+      /* 松开左键 = 这次挥刀结束（Undo 已按 planId 合并，不需要再做别的） */
+      onPointerUpCapture={() => {
+        if (knifeOn) endSlice()
+        interactingRef.current = false
+      }}
       // 按下阶段：清「拖动后不弹面板」标记 + 记拖动起点锚（见 onSurfacePointerDown）
       onPointerDownCapture={onSurfacePointerDown}
       onContextMenu={onContextMenu}
@@ -832,7 +859,9 @@ function FlowSurfaceInner({
       {/* 吸附提示（对账 #257）：参考线 + 间距数字。屏幕空间、不吃指针，拖动结束即消失 */}
       <FlowSnapLayer />
       {/* 切断动画（#1159）：被切的那条线在删除前的 260ms 里由这一层"顶着"播分离淡出 */}
-      <FlowEdgeCutLayer cut={edgeCut} />
+      <FlowEdgeCutLayer cuts={cuts} />
+      {/* 刀光与火花（#1159）：独立 canvas + rAF，高频瞬态不进 React */}
+      <KnifeFxLayer surfaceEl={surfaceEl} active={knifeOn} />
       <ReactFlow
         className={styles.flow}
         nodes={nodes}
