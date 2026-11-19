@@ -26,6 +26,7 @@ export function derivedPropsFor(
     hasRunnableDownstream: derived.runnableDownstream.get(id),
     upstreamImageInputs: derived.upstreamImageInputs.get(id),
     inputPortAssets: derived.inputPortAssets.get(id),
+    excluded: derived.excluded.has(id),
   }
 }
 

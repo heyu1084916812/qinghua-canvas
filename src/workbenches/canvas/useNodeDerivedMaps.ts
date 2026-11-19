@@ -6,6 +6,7 @@ import { indexEdgesByTarget, upstreamsFrom } from '../../domain/canvas/graph/ups
 import { upstreamImagesOf } from '../../domain/canvas/graph/resultImages'
 import { resultImagesOf } from '../../domain/canvas/graph/resultImages'
 import { targetPortOf } from '../../domain/canvas/model/edge'
+import { excludedNodeIds } from '../../domain/canvas/graph/excludedNodes'
 import { promptSpec } from '../../domain/canvas/nodeSpecs/prompt'
 import { portDeclsOf } from '../../domain/canvas/nodeSpecs/ports'
 import { getSpec } from '../../domain/canvas/nodeSpecs/registry'
@@ -67,6 +68,8 @@ export interface NodeDerivedMaps {
   runnableDownstream: Map<string, boolean>
   upstreamImageInputs: Map<string, NodeInput[]>
   inputPortAssets: Map<string, Record<string, InputPortAsset[]>>
+  /** 被某个消费者排除在本次输入之外的节点（对账 #1160；画布上按「未参与」置灰） */
+  excluded: Set<string>
 }
 
 export function useNodeDerivedMaps(graph: GraphSnapshot): NodeDerivedMaps {
@@ -176,5 +179,14 @@ export function useNodeDerivedMaps(graph: GraphSnapshot): NodeDerivedMaps {
     return out
   })
 
-  return { upstreamHashes, upstreamPromptCounts, runnableDownstream, upstreamImageInputs, inputPortAssets }
+  const excluded = useStableGraphMemo(graph, (g) => excludedNodeIds(g))
+
+  return {
+    upstreamHashes,
+    upstreamPromptCounts,
+    runnableDownstream,
+    upstreamImageInputs,
+    inputPortAssets,
+    excluded,
+  }
 }

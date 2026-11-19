@@ -61,6 +61,14 @@ export interface NodeFrameProps {
    * 都只按右下角推导，多给几只角会给出没被验证过的矩形）。
    */
   resizeCorners?: readonly ResizeCorner[]
+  /**
+   * 「未参与」——被某个消费者（下游的眼睛 / 容器的眼睛）排除在本次输入之外（#1160）。
+   *
+   * 视觉与 `node.disabled` **完全一致**（用户 2026-11-19：「这两种显示的效果都是一样的，
+   * 可以统一一下」）：同一档透明度、同一颗角标位置，只有文案不同（已禁用 / 未参与）。
+   * 差别只在语义与来源：禁用是用户自己关掉的，未参与是被别人关了眼睛。
+   */
+  excluded?: boolean
   /** 在节点任意位置按下：选中 + 发起拖动（由父层接线） */
   onFramePointerDown: (e: ReactPointerEvent) => void
   /**
@@ -214,7 +222,7 @@ export function NodeFrame(props: NodeFrameProps) {
        * 不需要 RF 插手。
        */
       className={`${styles.frame} ${selected ? styles.selected : ''} ${
-        node.disabled ? styles.disabled : ''
+        node.disabled || props.excluded ? styles.disabled : ''
       } ${inContainer ? 'nodrag' : ''}`}
       style={{
         left: props.selfPositioned === false ? 0 : node.x,
@@ -225,6 +233,8 @@ export function NodeFrame(props: NodeFrameProps) {
       data-node-id={node.id}
       data-node-type={node.type}
       data-node-disabled={node.disabled ? 'true' : undefined}
+      /* 未参与（被下游 / 容器关掉眼睛）：与禁用同款视觉，靠这个锚点分开断言 */
+      data-node-excluded={!node.disabled && props.excluded ? 'true' : undefined}
       /**
        * **落库的模型**（不是面板兜底显示的那个）。
        *
@@ -266,6 +276,12 @@ export function NodeFrame(props: NodeFrameProps) {
       {node.disabled && (
         <span className={styles.disabledBadge} data-node-disabled-badge>
           已禁用
+        </span>
+      )}
+      {/* 未参与与禁用同一个徽标槽位：两种状态不会同时出现（禁用优先） */}
+      {!node.disabled && props.excluded && (
+        <span className={styles.disabledBadge} data-node-excluded-badge>
+          未参与
         </span>
       )}
 

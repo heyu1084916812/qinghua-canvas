@@ -37,6 +37,7 @@ function derived(): NodeDerivedMaps {
     runnableDownstream: new Map([['n1', true]]),
     upstreamImageInputs: new Map(),
     inputPortAssets: new Map(),
+    excluded: new Set(),
   }
 }
 
@@ -65,6 +66,7 @@ describe('FlowSurface render model', () => {
       hasRunnableDownstream: true,
       upstreamImageInputs: undefined,
       inputPortAssets: undefined,
+      excluded: false,
     })
   })
 
