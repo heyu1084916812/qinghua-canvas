@@ -39,6 +39,8 @@ export async function knifePhotoBench(page,pid,out,releasePut=null) {
     for(let j=0;j<edgeCount;j++)await db.put('edges',{projectId:pid,id:`${pid}-bench-${j}`,source:left[j%left.length],target:right[(Math.floor(j/left.length)+j%left.length)%right.length]})
   },{nodes,pid,edgeCount}); await page.goto(canvasUrl); await page.locator(`[data-edge="${pid}-bench-${edgeCount-1}"]`).waitFor({state:'attached'})
   await page.waitForFunction(nodes=>nodes.every(id=>{const i=document.querySelector(`[data-node-id="${id}"] img`);return i?.complete&&i.naturalWidth>0}),nodes)
+  const zoomProbe=process.env.KNIFE_GPU_ZOOM==='1';let zoomEvidence
+  if(zoomProbe){const scale=()=>page.locator('.react-flow__viewport').evaluate(el=>new DOMMatrix(getComputedStyle(el).transform).a);const before=await scale();await page.mouse.move(1160,710);await page.mouse.wheel(0,180);await page.waitForTimeout(500);const after=await scale();assert(after<before);zoomEvidence={before,after}}
   const evidence=await page.evaluate(nodes=>nodes.map(id=>{const i=document.querySelector(`[data-node-id="${id}"] img`),r=i.getBoundingClientRect();return {x:r.x,y:r.y,w:r.width,h:r.height,width:i.naturalWidth,height:i.naturalHeight,visible:document.elementFromPoint(r.x+r.width/2,r.y+r.height/2)?.closest('[data-node-id]')?.dataset.nodeId===id}}),nodes)
   assert(evidence.every(i=>i.visible),JSON.stringify(evidence));const ids=()=>page.locator('[data-edge]').evaluateAll(es=>es.map(e=>e.dataset.edge).sort());const baseline=await ids();assert.equal(baseline.length,edgeCount)
   const b=await page.locator('[data-edge]').evaluateAll(es=>{const rs=es.map(e=>e.getBoundingClientRect());return {x:(Math.max(...rs.map(r=>r.left))+Math.min(...rs.map(r=>r.right)))/2,top:Math.min(...rs.map(r=>r.top)),bottom:Math.max(...rs.map(r=>r.bottom))}})
@@ -59,10 +61,12 @@ export async function knifePhotoBench(page,pid,out,releasePut=null) {
   const batchSize=Number(process.env.KNIFE_BATCH_SIZE??edgeCount);assert(Number.isInteger(batchSize)&&batchSize>0)
   const lazy=process.env.KNIFE_BATCH_LAZY==='1'
   const spatial=process.env.KNIFE_BATCH_SPATIAL==='1'
-  const raster=process.env.KNIFE_RASTER==='1';if(raster && process.env.KNIFE_GPU==='1'){await page.evaluate((await import('./knifeGpuProbe.mjs')).installKnifeGpuProbe)} else if(raster){assert(batchBase && lazy);await page.evaluate((await import('./knifeRasterProbe.mjs')).installKnifeRasterProbe)}
+  const startTiming=process.env.KNIFE_START_TIMING==='1';if(startTiming)await page.evaluate((await import('./knifeStartTiming.mjs')).installKnifeStartTiming)
+  const gpuFallback=process.env.KNIFE_GPU_FALLBACK==='1'
+  const raster=process.env.KNIFE_RASTER==='1';if(raster && process.env.KNIFE_GPU==='1'){await page.evaluate((await import('./knifeGpuProbe.mjs')).installKnifeGpuProbe,gpuFallback)} else if(raster){assert(batchBase && lazy);await page.evaluate((await import('./knifeRasterProbe.mjs')).installKnifeRasterProbe)}
   else if(batchBase) await page.evaluate((await import('./knifeBatchProbe.mjs')).installKnifeBatchProbe,{chunkSize:batchSize,lazy,spatial})
   const dirtyClear=process.env.KNIFE_DIRTY_CLEAR==='1';if(dirtyClear) await page.evaluate((await import('./knifeDirtyClear.mjs')).installKnifeDirtyClear)
-  const report={gpu:process.env.KNIFE_GPU==='1',raster,dirtyClear,spatial,lazy,batchSize,batchBase,omitHitPaths,skipEdgeHit,hideBaseEdges,hideCutPreview,timing:"from before pointerdown through two post-pointerup animation frames",edgeCount,sourceHashes:[...hashes],evidence,b,rounds:[]};const save=()=>writeFileSync(out,JSON.stringify(report,null,2))
+  const report={zoomEvidence,gpuFallback,gpu:process.env.KNIFE_GPU==='1',raster,dirtyClear,spatial,lazy,batchSize,batchBase,omitHitPaths,skipEdgeHit,hideBaseEdges,hideCutPreview,timing:"from before pointerdown through two post-pointerup animation frames",edgeCount,sourceHashes:[...hashes],evidence,b,rounds:[]};const save=()=>writeFileSync(out,JSON.stringify(report,null,2))
   for(let round=1;round<=3;round++)for(const mode of ['miss','hit']){
     if(tracing) await page.evaluate(()=>{window.knifeMoves=[];window.pointerTrace=[];window.knifeListener=e=>window.pointerTrace.push([e.type,e.clientX,e.clientY,e.buttons]); for(const name of ['pointerdown','pointermove','pointerup']) window.addEventListener(name,window.knifeListener,true)})
     const x=b.x,y=b.top-20;await page.mouse.move(x,y);await page.keyboard.down('Space');await page.locator('[data-knife-cursor]').waitFor({state:'attached'})
@@ -88,7 +92,7 @@ export async function knifePhotoBench(page,pid,out,releasePut=null) {
     if(mode==='hit'){await page.keyboard.press('Control+z');await page.waitForTimeout(400);assert.deepEqual(await ids(),baseline)}
   }
   assert(report.rounds.every(r=>r.mode!=='hit'||r.remaining.length===0),'挥刀后仍有预期命中边残留，见报告')
-  if(batchBase){report.batchEvidence=await page.evaluate(()=>window.knifeBatchEvidence);save();assert.equal(report.batchEvidence.length,6);assert(report.batchEvidence.every((r,i)=>(!lazy || r.activated===Boolean(i%2)) && r.visible && r.initial===edgeCount && r.minimum===(i%2?0:edgeCount)))}
+  if(batchBase){report.batchEvidence=await page.evaluate(()=>window.knifeBatchEvidence);save();assert.equal(report.batchEvidence.length,6);assert(report.batchEvidence.every((r,i)=>(!lazy || (gpuFallback ? !r.activated && (i%2===0||!!r.fallback) : r.activated===Boolean(i%2))) && r.visible && r.initial===edgeCount && r.minimum===(i%2?0:edgeCount)))}
   if(batchBase && process.env.KNIFE_BATCH_CANCEL==='1'){
     if(report.gpu) await page.evaluate(()=>window.knifeCheckPixels=true)
     await page.mouse.move(b.x,b.top-20);await page.keyboard.down('Space');await page.mouse.down();await page.mouse.move(b.x,(b.top+b.bottom)/2,{steps:24})
@@ -98,7 +102,8 @@ export async function knifePhotoBench(page,pid,out,releasePut=null) {
     const survivors=baseline.filter(id=>!pending.includes(id));assert.deepEqual(await ids(),survivors)
     assert.equal(await page.locator('[data-edge]').evaluateAll(es=>es.filter(e=>getComputedStyle(e).visibility==='visible').length),survivors.length)
     const end=await page.evaluate(()=>window.knifeBatchEvidence.at(-1).end);assert.equal(end,'pointercancel')
-    await page.keyboard.press('Control+z');await page.waitForTimeout(400);assert.deepEqual(await ids(),baseline);report.cancel={pending,survivors,end,undo:baseline.length};if(report.gpu){report.cancel.pixel=await page.evaluate(()=>window.knifeBatchEvidence.at(-1).pixelCheck);assert(report.cancel.pixel?.maxAlpha>0)}save()
+    await page.keyboard.press('Control+z');await page.waitForTimeout(400);assert.deepEqual(await ids(),baseline);report.cancel={pending,survivors,end,undo:baseline.length};if(report.gpu && !gpuFallback){report.cancel.pixel=await page.evaluate(()=>window.knifeBatchEvidence.at(-1).pixelCheck);assert(report.cancel.pixel?.maxAlpha>0)}save()
   }
+  if(startTiming){report.startTiming=await page.evaluate(()=>window.knifeStartTiming);save()}
   console.log('real-photo benchmark',report.rounds.map(({mode,p95,max})=>({mode,p95,max})))
 }
