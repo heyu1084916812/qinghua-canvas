@@ -45785,7 +45785,72 @@ async function g865(browser) {
   }
 }
 
-const ALL_GROUPS = [g1, g2, g3, g4, g5, g6, g7, g8, g9, g10, g11, g12, g13, g14, g15, g16, g17, g18, g19, g23, g24, g37, g42, g43, g44, g45, g46, g47, g48, g49, g51, g52, g53, g55, g56, g57, g58, g59, g60, g61, g62, g63, g64, g65, g66, g67, g68, g69, g70, g71, g72, g73, g74, g75, g76, g77, g78, g79, g80, g81, g82, g83, g84, g85, g86, g87, g88, g89, g90, g91, g92, g93, g94, g95, g96, g97, g98, g99, g100, g101, g102, g103, g104, g105, g106, g107, g108, g109, g110, g111, g112, g113, g114, g115, g116, g117, g118, g119, g120, g121, g122, g123, g125, g126, g127, g128, g129, g130, g131, g132, g133, g134, g135, g136, g137, g138, g139, g140, g141, g142, g143, g144, g145, g146, g147, g148, g149, g150, g151, g152, g153, g154, g155, g156, g157, g158, g159, g160, g161, g162, g164, g165, g166, g167, g168, g169, g735, g769, g795, g798, g800, g865]
+async function g170(browser) {
+  const g = 'G170 平移缩放后挥刀'
+  const ctx = await newCtx(browser, { viewport: { width: 1440, height: 900 } })
+  try {
+    const page = await ctx.newPage()
+    await gotoProjects(page)
+    await page.locator('[data-template="text2img"]').click()
+    await page.waitForURL(/\/canvas\//)
+    await page.locator('[data-node-id]').first().waitFor()
+    const pid = page.url().split('/canvas/')[1]
+    await page.evaluate(async pid => {
+      const { createSharedStorage } = await import('/src/platform/web/sharedStorage.ts')
+      const db = createSharedStorage()
+      const prefix = `${pid}-knife-`
+      for (let i = 0; i < 4; i++) {
+        for (const [side, x] of [['a', 150], ['b', 750]]) {
+          await db.put('nodes', { id: prefix + side + i, projectId: pid, type: 'prompt', parentId: null,
+            x, y: 60 + 170 * i, w: 200, h: 120, title: side + i, disabled: false, data: { text: 'test' } })
+        }
+        await db.put('edges', { id: prefix + i, projectId: pid, source: prefix + 'a' + i, target: prefix + 'b' + i })
+      }
+    }, pid)
+    await page.reload()
+    await page.locator(`[data-edge="${pid}-knife-3"]`).waitFor({ state: 'attached' })
+    const ids = () => page.locator('[data-edge]').evaluateAll(es => es.map(e => e.dataset.edge).sort())
+    const initial = await ids()
+    const v0 = await readViewport(page)
+    await page.mouse.move(680, 420)
+    await page.mouse.wheel(0, 260)
+    await sleep(350)
+    const v1 = await readViewport(page)
+    await page.mouse.move(460, 160)
+    await page.mouse.down({ button: 'middle' })
+    await page.mouse.move(530, 195, { steps: 8 })
+    await page.mouse.up({ button: 'middle' })
+    await sleep(250)
+    const v2 = await readViewport(page)
+    rec(g, '滚轮真实缩小且中键平移', v1.zoom < v0.zoom && Math.abs(v2.x-v1.x)>30 && Math.abs(v2.y-v1.y)>15, JSON.stringify([v0,v1,v2]))
+    const points = await page.locator(`[data-edge^="${pid}-knife-"]`).evaluateAll(es => es.map(e => {
+      const p = e.getPointAtLength(e.getTotalLength()/2).matrixTransform(e.getScreenCTM())
+      return { x:p.x, y:p.y, id:e.dataset.edge }
+    }).sort((a,b) => a.y-b.y))
+    const [first,,third] = points
+    const hit = new Set(points.slice(0,3).map(p => p.id))
+    const remaining = initial.filter(id => !hit.has(id))
+    await page.mouse.move(first.x, first.y-18)
+    await page.keyboard.down('Space')
+    await page.locator('[data-knife-cursor]').waitFor({state:'attached'})
+    await page.mouse.down()
+    await page.mouse.move(third.x, third.y+18, { steps: 5 })
+    await page.mouse.up()
+    await page.keyboard.up('Space')
+    const check = async (label, expected) => {
+      await sleep(350)
+      const actual = await ids()
+      rec(g, label, JSON.stringify(actual) === JSON.stringify(expected), JSON.stringify(actual))
+    }
+    await check('一刀只命中前三条', remaining)
+    await page.keyboard.press('Control+z')
+    await check('一次撤销恢复全部原线', initial)
+    await page.keyboard.press('Control+Shift+z')
+    await check('一次重做仍保留原第四条', remaining)
+  } finally { await ctx.close() }
+}
+
+const ALL_GROUPS = [g1, g2, g3, g4, g5, g6, g7, g8, g9, g10, g11, g12, g13, g14, g15, g16, g17, g18, g19, g23, g24, g37, g42, g43, g44, g45, g46, g47, g48, g49, g51, g52, g53, g55, g56, g57, g58, g59, g60, g61, g62, g63, g64, g65, g66, g67, g68, g69, g70, g71, g72, g73, g74, g75, g76, g77, g78, g79, g80, g81, g82, g83, g84, g85, g86, g87, g88, g89, g90, g91, g92, g93, g94, g95, g96, g97, g98, g99, g100, g101, g102, g103, g104, g105, g106, g107, g108, g109, g110, g111, g112, g113, g114, g115, g116, g117, g118, g119, g120, g121, g122, g123, g125, g126, g127, g128, g129, g130, g131, g132, g133, g134, g135, g136, g137, g138, g139, g140, g141, g142, g143, g144, g145, g146, g147, g148, g149, g150, g151, g152, g153, g154, g155, g156, g157, g158, g159, g160, g161, g162, g164, g165, g166, g167, g168, g169, g170, g735, g769, g795, g798, g800, g865]
 // ────────────────────────────────────────────────────────────
 // G169 框选多节点拖动：**松手那一刻不许再有人挪**（用户 2026-11-18 偶发：
 //      「框选多个节点，移动的时候松开鼠标会有一张图片移动了位置，好像多了一个步骤」）
