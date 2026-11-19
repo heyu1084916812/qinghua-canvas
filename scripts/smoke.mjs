@@ -45795,6 +45795,12 @@ async function g170(browser) {
     await page.waitForURL(/\/canvas\//)
     await page.locator('[data-node-id]').first().waitFor()
     const pid = page.url().split('/canvas/')[1]
+    if (process.env.KNIFE_PHOTO_BENCH) {
+      const { knifePhotoBench } = await import('./knifePhotoBench.mjs')
+      await knifePhotoBench(page, pid, process.env.KNIFE_PHOTO_BENCH)
+      rec(g, '16 张不同真图 + 50 条线：三轮空划、命中与撤销', true)
+      return
+    }
     await page.evaluate(async pid => {
       const { createSharedStorage } = await import('/src/platform/web/sharedStorage.ts')
       const db = createSharedStorage()

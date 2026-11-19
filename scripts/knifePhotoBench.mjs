@@ -1,0 +1,46 @@
+import {readFileSync, writeFileSync} from 'node:fs'
+import {join} from 'node:path'
+import {createHash} from 'node:crypto'
+import assert from 'node:assert/strict'
+
+// Opt-in fixture: locally installed Windows wallpaper files; never copy them into Git.
+export async function knifePhotoBench(page,pid,out) {
+  await page.setViewportSize({width:2400,height:1500}); const nodes=[], hashes=new Set(), files=[]
+  for(let n=20;n<36;n++) files.push(join(process.env.SystemRoot,'Web','Wallpaper','Theme'+'ABCD'[Math.floor((n-20)/4)],`img${n}.jpg`))
+  const canvasUrl=page.url(); await page.goto(new URL('/projects',canvasUrl).href)
+  for(const [i,file] of files.entries()){
+    const bytes=readFileSync(file), hash=createHash('sha1').update(bytes).digest('hex'); hashes.add(hash)
+    const id=`${pid}-photo-${i}`; nodes.push(id)
+    await page.evaluate(async ({b64,hash,id,i,pid})=>{
+      const {createSharedStorage}=await import('/src/platform/web/sharedStorage.ts');const db=createSharedStorage()
+      const bytes=Uint8Array.from(atob(b64),c=>c.charCodeAt(0)), image=await createImageBitmap(new Blob([bytes],{type:'image/jpeg'}))
+      const canvas=document.createElement('canvas');canvas.width=640;canvas.height=Math.round(640*image.height/image.width)
+      canvas.getContext('2d').drawImage(image,0,0,canvas.width,canvas.height)
+      const thumb=new Uint8Array(await (await new Promise(ok=>canvas.toBlob(ok,'image/webp',0.86))).arrayBuffer())
+      const h=hash.slice(0,16),size={width:image.width,height:image.height};image.close()
+      await db.put('assets',{id:h,hash:h,projectId:pid,mime:'image/jpeg',thumbMime:'image/webp',...size,bytesLength:bytes.length,thumbLength:thumb.length,contentSha1:hash,bytes,thumb,createdAt:Date.now(),updatedAt:Date.now()})
+      await db.put('nodes',{id,projectId:pid,type:'generation',parentId:null,x:[200,620,1220,1640][Math.floor(i/4)],y:130+(i%4)*270,w:320,h:200,title:`photo ${i}`,disabled:false,data:{mode:'image',prompt:'',channelId:'',model:'',linkedPromptNodeIds:[],assetHash:h,assetMime:'image/jpeg',naturalSize:size,thumbOrder:[h],upstreamHidden:[]}})
+    },{b64:bytes.toString('base64'),hash,id,i,pid})
+  }
+  assert.equal(hashes.size,16)
+  await page.evaluate(async ({nodes,pid})=>{
+    const {createSharedStorage}=await import('/src/platform/web/sharedStorage.ts');const db=createSharedStorage()
+    for(const e of await db.query('edges',{projectId:pid}))await db.delete('edges',e.id)
+    for(const n of await db.query('nodes',{projectId:pid}))if(!nodes.includes(n.id)) await db.delete('nodes',n.id)
+    for(let j=0;j<50;j++)await db.put('edges',{projectId:pid,id:`${pid}-bench-${j}`,source:nodes[j%8],target:nodes[8+(Math.floor(j/8)+j%8)%8]})
+  },{nodes,pid}); await page.goto(canvasUrl); await page.locator(`[data-edge="${pid}-bench-49"]`).waitFor({state:'attached'})
+  await page.waitForFunction(nodes=>nodes.every(id=>{const i=document.querySelector(`[data-node-id="${id}"] img`);return i?.complete&&i.naturalWidth>0}),nodes)
+  const evidence=await page.evaluate(nodes=>nodes.map(id=>{const i=document.querySelector(`[data-node-id="${id}"] img`),r=i.getBoundingClientRect();return {x:r.x,y:r.y,w:r.width,h:r.height,width:i.naturalWidth,height:i.naturalHeight,visible:document.elementFromPoint(r.x+r.width/2,r.y+r.height/2)?.closest('[data-node-id]')?.dataset.nodeId===id}}),nodes)
+  assert(evidence.every(i=>i.visible),JSON.stringify(evidence));const ids=()=>page.locator('[data-edge]').evaluateAll(es=>es.map(e=>e.dataset.edge).sort());const baseline=await ids();assert.equal(baseline.length,50)
+  const b=await page.locator('[data-edge]').evaluateAll(es=>{const rs=es.map(e=>e.getBoundingClientRect());return {x:(Math.max(...rs.map(r=>r.left))+Math.min(...rs.map(r=>r.right)))/2,top:Math.min(...rs.map(r=>r.top)),bottom:Math.max(...rs.map(r=>r.bottom))}})
+  const report={sourceHashes:[...hashes],evidence,b,rounds:[]};const save=()=>writeFileSync(out,JSON.stringify(report,null,2))
+  for(let round=1;round<=3;round++)for(const mode of ['miss','hit']){
+    const x=b.x,y=b.top-20;await page.mouse.move(x,y);await page.keyboard.down('Space');await page.locator('[data-knife-cursor]').waitFor({state:'attached'});await page.mouse.down()
+    await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(t=>{window.samples=[];let last=t;const tick=n=>{window.samples.push(n-last);last=n;window.frame=requestAnimationFrame(tick)};window.frame=requestAnimationFrame(tick);resolve()})))
+    await page.mouse.move(mode==='miss'?x+120:x,mode==='miss'?y:b.bottom+20,{steps:48});await page.mouse.up();const ms=await page.evaluate(()=>{cancelAnimationFrame(window.frame);return window.samples});await page.keyboard.up('Space');await page.waitForTimeout(300)
+    const after=await ids(),sorted=[...ms].sort((a,b)=>a-b);report.rounds.push({round,mode,ms,p95:sorted[Math.ceil(.95*ms.length)-1],max:sorted.at(-1),remaining:after});save();assert(ms.length>=10);if(mode==='miss') assert.deepEqual(after,baseline)
+    if(mode==='hit'){await page.keyboard.press('Control+z');await page.waitForTimeout(400);assert.deepEqual(await ids(),baseline)}
+  }
+  assert(report.rounds.every(r=>r.mode!=='hit'||r.remaining.length===0),'挥刀后仍有预期命中边残留，见报告')
+  console.log('real-photo benchmark',report.rounds.map(({mode,p95,max})=>({mode,p95,max})))
+}
