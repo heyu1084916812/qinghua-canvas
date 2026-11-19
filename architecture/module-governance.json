@@ -13034,6 +13034,7 @@
         "stepSpring",
         "isSpringSettled",
         "TAB_HEADER_HEIGHT",
+        "TAB_LEFT_EXTEND",
         "TAB_ACTIVE_HEIGHT",
         "TAB_INACTIVE_HEIGHT",
         "MorphFrame",
@@ -13045,13 +13046,24 @@
       "budget": 135
     },
     {
+      "module": "src/pages/SettingsPage/settingsPage/folderTabVisibility.ts",
+      "owner": "settings-ui",
+      "responsibility": "选中标题宽度变化后只横向滚动文件夹标签栏，保证文字、数字及左扩轮廓可见。",
+      "owns": ["按标签新宽度计算可见范围", "标签栏横向滚动"],
+      "doesNotOwn": ["外层纵向锚点", "SVG 路径和弹簧动画", "渠道数据修改"],
+      "publicApi": ["revealFolderTab"],
+      "test": ["src/pages/SettingsPage/settingsPage/folderTabVisibility.test.ts", "scripts/smoke.mjs"],
+      "budget": 20
+    },
+    {
       "module": "src/pages/SettingsPage/settingsPage/useFolderTabMorph.ts",
       "owner": "settings-ui",
       "responsibility": "把标签弹簧接到 React：量真实宽高、逐帧写 SVG 路径、切组时给回弹初速度，并处理 resize 与 StrictMode 重挂载。",
       "owns": [
         "标签尺寸测量与 tabSizes",
         "弹簧状态与 rAF 循环",
-        "切组回弹与 resize 重算"
+        "切组回弹与 resize 重算",
+        "布局更新后保证选中标签横向完整可见"
       ],
       "doesNotOwn": [
         "路径几何（keyGroupTabsShape）",

@@ -1,0 +1,954 @@
+[
+  {
+    "tag": "1440-dark",
+    "rows": [
+      {
+        "label": "这是一个用于验证省略号和优先级留白的超长分组标题 P100",
+        "selected": true,
+        "left": 15,
+        "right": 14.67,
+        "difference": 0.33,
+        "clipped": false,
+        "focused": true,
+        "focusVisible": false,
+        "focusPainted": false,
+        "scrollLeft": 0,
+        "tabTop": 542.28,
+        "box": [
+          524,
+          744
+        ],
+        "viewport": [
+          524,
+          1368
+        ]
+      },
+      {
+        "label": "默认分组 P0",
+        "selected": true,
+        "left": 14.67,
+        "right": 14.72,
+        "difference": 0.05,
+        "clipped": false,
+        "focused": true,
+        "focusVisible": false,
+        "focusPainted": false,
+        "scrollLeft": 0,
+        "tabTop": 542.28,
+        "box": [
+          726,
+          874.95
+        ],
+        "viewport": [
+          524,
+          1368
+        ]
+      },
+      {
+        "label": "Key 分组 3 P0",
+        "selected": true,
+        "left": 14.92,
+        "right": 14.57,
+        "difference": 0.34,
+        "clipped": false,
+        "focused": true,
+        "focusVisible": false,
+        "focusPainted": false,
+        "scrollLeft": 0,
+        "tabTop": 542.28,
+        "box": [
+          816.25,
+          981.09
+        ],
+        "viewport": [
+          524,
+          1368
+        ]
+      },
+      {
+        "label": "对话 9",
+        "selected": true,
+        "left": 15,
+        "right": 14.54,
+        "difference": 0.46,
+        "clipped": false,
+        "focused": true,
+        "focusVisible": false,
+        "focusPainted": false,
+        "scrollLeft": 0,
+        "tabTop": 711.08,
+        "box": [
+          524,
+          635.13
+        ],
+        "viewport": [
+          524,
+          1227.08
+        ]
+      },
+      {
+        "label": "图片 8",
+        "selected": true,
+        "left": 14.79,
+        "right": 14.42,
+        "difference": 0.38,
+        "clipped": false,
+        "focused": true,
+        "focusVisible": false,
+        "focusPainted": false,
+        "scrollLeft": 0,
+        "tabTop": 711.08,
+        "box": [
+          617.13,
+          734.25
+        ],
+        "viewport": [
+          524,
+          1227.08
+        ]
+      },
+      {
+        "label": "视频 6",
+        "selected": true,
+        "left": 14.92,
+        "right": 14.29,
+        "difference": 0.63,
+        "clipped": false,
+        "focused": true,
+        "focusVisible": false,
+        "focusPainted": false,
+        "scrollLeft": 0,
+        "tabTop": 711.08,
+        "box": [
+          716.25,
+          833.38
+        ],
+        "viewport": [
+          524,
+          1227.08
+        ]
+      },
+      {
+        "label": "音频 1",
+        "selected": true,
+        "left": 15.04,
+        "right": 14.17,
+        "difference": 0.88,
+        "clipped": false,
+        "focused": true,
+        "focusVisible": false,
+        "focusPainted": false,
+        "scrollLeft": 0,
+        "tabTop": 711.08,
+        "box": [
+          815.38,
+          932.5
+        ],
+        "viewport": [
+          524,
+          1227.08
+        ]
+      }
+    ],
+    "focus": [
+      {
+        "label": "音频 1",
+        "selected": true,
+        "left": 15.04,
+        "right": 14.17,
+        "difference": 0.88,
+        "clipped": false,
+        "focused": true,
+        "focusVisible": true,
+        "focusPainted": true,
+        "scrollLeft": 0,
+        "tabTop": 711.08,
+        "box": [
+          815.38,
+          932.5
+        ],
+        "viewport": [
+          524,
+          1227.08
+        ]
+      },
+      {
+        "label": "对话 9",
+        "selected": true,
+        "left": 15,
+        "right": 14.54,
+        "difference": 0.46,
+        "clipped": false,
+        "focused": true,
+        "focusVisible": true,
+        "focusPainted": true,
+        "scrollLeft": 0,
+        "tabTop": 711.08,
+        "box": [
+          524,
+          635.13
+        ],
+        "viewport": [
+          524,
+          1227.08
+        ]
+      },
+      {
+        "label": "音频 1",
+        "selected": true,
+        "left": 15.04,
+        "right": 14.17,
+        "difference": 0.88,
+        "clipped": false,
+        "focused": true,
+        "focusVisible": true,
+        "focusPainted": true,
+        "scrollLeft": 0,
+        "tabTop": 711.08,
+        "box": [
+          815.38,
+          932.5
+        ],
+        "viewport": [
+          524,
+          1227.08
+        ]
+      },
+      {
+        "label": "对话 9",
+        "selected": true,
+        "left": 15,
+        "right": 14.54,
+        "difference": 0.46,
+        "clipped": false,
+        "focused": true,
+        "focusVisible": true,
+        "focusPainted": true,
+        "scrollLeft": 0,
+        "tabTop": 711.08,
+        "box": [
+          524,
+          635.13
+        ],
+        "viewport": [
+          524,
+          1227.08
+        ]
+      }
+    ]
+  },
+  {
+    "tag": "1440-light",
+    "rows": [
+      {
+        "label": "这是一个用于验证省略号和优先级留白的超长分组标题 P100",
+        "selected": true,
+        "left": 15,
+        "right": 14.67,
+        "difference": 0.33,
+        "clipped": false,
+        "focused": true,
+        "focusVisible": false,
+        "focusPainted": false,
+        "scrollLeft": 0,
+        "tabTop": 231.28,
+        "box": [
+          524,
+          744
+        ],
+        "viewport": [
+          524,
+          1368
+        ]
+      },
+      {
+        "label": "默认分组 P0",
+        "selected": true,
+        "left": 14.67,
+        "right": 14.72,
+        "difference": 0.05,
+        "clipped": false,
+        "focused": true,
+        "focusVisible": false,
+        "focusPainted": false,
+        "scrollLeft": 0,
+        "tabTop": 231.28,
+        "box": [
+          726,
+          874.95
+        ],
+        "viewport": [
+          524,
+          1368
+        ]
+      },
+      {
+        "label": "Key 分组 3 P0",
+        "selected": true,
+        "left": 14.92,
+        "right": 14.57,
+        "difference": 0.34,
+        "clipped": false,
+        "focused": true,
+        "focusVisible": false,
+        "focusPainted": false,
+        "scrollLeft": 0,
+        "tabTop": 231.28,
+        "box": [
+          816.25,
+          981.09
+        ],
+        "viewport": [
+          524,
+          1368
+        ]
+      },
+      {
+        "label": "对话 9",
+        "selected": true,
+        "left": 15,
+        "right": 14.54,
+        "difference": 0.46,
+        "clipped": false,
+        "focused": true,
+        "focusVisible": false,
+        "focusPainted": false,
+        "scrollLeft": 0,
+        "tabTop": 400.08,
+        "box": [
+          524,
+          635.13
+        ],
+        "viewport": [
+          524,
+          1227.08
+        ]
+      },
+      {
+        "label": "图片 8",
+        "selected": true,
+        "left": 14.79,
+        "right": 14.42,
+        "difference": 0.38,
+        "clipped": false,
+        "focused": true,
+        "focusVisible": false,
+        "focusPainted": false,
+        "scrollLeft": 0,
+        "tabTop": 400.08,
+        "box": [
+          617.13,
+          734.25
+        ],
+        "viewport": [
+          524,
+          1227.08
+        ]
+      },
+      {
+        "label": "视频 6",
+        "selected": true,
+        "left": 14.92,
+        "right": 14.29,
+        "difference": 0.63,
+        "clipped": false,
+        "focused": true,
+        "focusVisible": false,
+        "focusPainted": false,
+        "scrollLeft": 0,
+        "tabTop": 400.08,
+        "box": [
+          716.25,
+          833.38
+        ],
+        "viewport": [
+          524,
+          1227.08
+        ]
+      },
+      {
+        "label": "音频 1",
+        "selected": true,
+        "left": 15.04,
+        "right": 14.17,
+        "difference": 0.88,
+        "clipped": false,
+        "focused": true,
+        "focusVisible": false,
+        "focusPainted": false,
+        "scrollLeft": 0,
+        "tabTop": 400.08,
+        "box": [
+          815.38,
+          932.5
+        ],
+        "viewport": [
+          524,
+          1227.08
+        ]
+      }
+    ],
+    "focus": [
+      {
+        "label": "音频 1",
+        "selected": true,
+        "left": 15.04,
+        "right": 14.17,
+        "difference": 0.88,
+        "clipped": false,
+        "focused": true,
+        "focusVisible": true,
+        "focusPainted": true,
+        "scrollLeft": 0,
+        "tabTop": 400.08,
+        "box": [
+          815.38,
+          932.5
+        ],
+        "viewport": [
+          524,
+          1227.08
+        ]
+      },
+      {
+        "label": "对话 9",
+        "selected": true,
+        "left": 15,
+        "right": 14.54,
+        "difference": 0.46,
+        "clipped": false,
+        "focused": true,
+        "focusVisible": true,
+        "focusPainted": true,
+        "scrollLeft": 0,
+        "tabTop": 400.08,
+        "box": [
+          524,
+          635.13
+        ],
+        "viewport": [
+          524,
+          1227.08
+        ]
+      },
+      {
+        "label": "音频 1",
+        "selected": true,
+        "left": 15.04,
+        "right": 14.17,
+        "difference": 0.88,
+        "clipped": false,
+        "focused": true,
+        "focusVisible": true,
+        "focusPainted": true,
+        "scrollLeft": 0,
+        "tabTop": 400.08,
+        "box": [
+          815.38,
+          932.5
+        ],
+        "viewport": [
+          524,
+          1227.08
+        ]
+      },
+      {
+        "label": "对话 9",
+        "selected": true,
+        "left": 15,
+        "right": 14.54,
+        "difference": 0.46,
+        "clipped": false,
+        "focused": true,
+        "focusVisible": true,
+        "focusPainted": true,
+        "scrollLeft": 0,
+        "tabTop": 400.08,
+        "box": [
+          524,
+          635.13
+        ],
+        "viewport": [
+          524,
+          1227.08
+        ]
+      }
+    ]
+  },
+  {
+    "tag": "1024-dark",
+    "rows": [
+      {
+        "label": "这是一个用于验证省略号和优先级留白的超长分组标题 P100",
+        "selected": true,
+        "left": 15,
+        "right": 14.67,
+        "difference": 0.33,
+        "clipped": false,
+        "focused": true,
+        "focusVisible": false,
+        "focusPainted": false,
+        "scrollLeft": 0,
+        "tabTop": 223.28,
+        "box": [
+          476,
+          696
+        ],
+        "viewport": [
+          476,
+          968
+        ]
+      },
+      {
+        "label": "默认分组 P0",
+        "selected": true,
+        "left": 14.67,
+        "right": 14.72,
+        "difference": 0.05,
+        "clipped": false,
+        "focused": true,
+        "focusVisible": false,
+        "focusPainted": false,
+        "scrollLeft": 0,
+        "tabTop": 223.28,
+        "box": [
+          678,
+          826.95
+        ],
+        "viewport": [
+          476,
+          968
+        ]
+      },
+      {
+        "label": "Key 分组 3 P0",
+        "selected": true,
+        "left": 14.92,
+        "right": 14.57,
+        "difference": 0.34,
+        "clipped": false,
+        "focused": true,
+        "focusVisible": false,
+        "focusPainted": false,
+        "scrollLeft": 0,
+        "tabTop": 223.28,
+        "box": [
+          768.25,
+          933.09
+        ],
+        "viewport": [
+          476,
+          968
+        ]
+      },
+      {
+        "label": "对话 9",
+        "selected": true,
+        "left": 15,
+        "right": 14.54,
+        "difference": 0.46,
+        "clipped": false,
+        "focused": true,
+        "focusVisible": false,
+        "focusPainted": false,
+        "scrollLeft": 0,
+        "tabTop": 412.88,
+        "box": [
+          476,
+          587.13
+        ],
+        "viewport": [
+          476,
+          827.08
+        ]
+      },
+      {
+        "label": "图片 8",
+        "selected": true,
+        "left": 14.79,
+        "right": 14.42,
+        "difference": 0.38,
+        "clipped": false,
+        "focused": true,
+        "focusVisible": false,
+        "focusPainted": false,
+        "scrollLeft": 0,
+        "tabTop": 412.88,
+        "box": [
+          569.13,
+          686.25
+        ],
+        "viewport": [
+          476,
+          827.08
+        ]
+      },
+      {
+        "label": "视频 6",
+        "selected": true,
+        "left": 14.92,
+        "right": 14.29,
+        "difference": 0.63,
+        "clipped": false,
+        "focused": true,
+        "focusVisible": false,
+        "focusPainted": false,
+        "scrollLeft": 0,
+        "tabTop": 412.88,
+        "box": [
+          668.25,
+          785.38
+        ],
+        "viewport": [
+          476,
+          827.08
+        ]
+      },
+      {
+        "label": "音频 1",
+        "selected": true,
+        "left": 15.04,
+        "right": 14.17,
+        "difference": 0.88,
+        "clipped": false,
+        "focused": true,
+        "focusVisible": false,
+        "focusPainted": false,
+        "scrollLeft": 57,
+        "tabTop": 412.88,
+        "box": [
+          710.38,
+          827.5
+        ],
+        "viewport": [
+          476,
+          827.08
+        ]
+      }
+    ],
+    "focus": [
+      {
+        "label": "音频 1",
+        "selected": true,
+        "left": 15.04,
+        "right": 14.17,
+        "difference": 0.88,
+        "clipped": false,
+        "focused": true,
+        "focusVisible": true,
+        "focusPainted": true,
+        "scrollLeft": 57,
+        "tabTop": 412.88,
+        "box": [
+          710.38,
+          827.5
+        ],
+        "viewport": [
+          476,
+          827.08
+        ]
+      },
+      {
+        "label": "对话 9",
+        "selected": true,
+        "left": 15,
+        "right": 14.54,
+        "difference": 0.46,
+        "clipped": false,
+        "focused": true,
+        "focusVisible": true,
+        "focusPainted": true,
+        "scrollLeft": 0,
+        "tabTop": 412.88,
+        "box": [
+          476,
+          587.13
+        ],
+        "viewport": [
+          476,
+          827.08
+        ]
+      },
+      {
+        "label": "音频 1",
+        "selected": true,
+        "left": 15.04,
+        "right": 14.17,
+        "difference": 0.88,
+        "clipped": false,
+        "focused": true,
+        "focusVisible": true,
+        "focusPainted": true,
+        "scrollLeft": 57,
+        "tabTop": 412.88,
+        "box": [
+          710.38,
+          827.5
+        ],
+        "viewport": [
+          476,
+          827.08
+        ]
+      },
+      {
+        "label": "对话 9",
+        "selected": true,
+        "left": 15,
+        "right": 14.54,
+        "difference": 0.46,
+        "clipped": false,
+        "focused": true,
+        "focusVisible": true,
+        "focusPainted": true,
+        "scrollLeft": 0,
+        "tabTop": 412.88,
+        "box": [
+          476,
+          587.13
+        ],
+        "viewport": [
+          476,
+          827.08
+        ]
+      }
+    ]
+  },
+  {
+    "tag": "1024-light",
+    "rows": [
+      {
+        "label": "这是一个用于验证省略号和优先级留白的超长分组标题 P100",
+        "selected": true,
+        "left": 15,
+        "right": 14.67,
+        "difference": 0.33,
+        "clipped": false,
+        "focused": true,
+        "focusVisible": false,
+        "focusPainted": false,
+        "scrollLeft": 0,
+        "tabTop": 223.28,
+        "box": [
+          476,
+          696
+        ],
+        "viewport": [
+          476,
+          968
+        ]
+      },
+      {
+        "label": "默认分组 P0",
+        "selected": true,
+        "left": 14.67,
+        "right": 14.72,
+        "difference": 0.05,
+        "clipped": false,
+        "focused": true,
+        "focusVisible": false,
+        "focusPainted": false,
+        "scrollLeft": 0,
+        "tabTop": 223.28,
+        "box": [
+          678,
+          826.95
+        ],
+        "viewport": [
+          476,
+          968
+        ]
+      },
+      {
+        "label": "Key 分组 3 P0",
+        "selected": true,
+        "left": 14.92,
+        "right": 14.57,
+        "difference": 0.34,
+        "clipped": false,
+        "focused": true,
+        "focusVisible": false,
+        "focusPainted": false,
+        "scrollLeft": 0,
+        "tabTop": 223.28,
+        "box": [
+          768.25,
+          933.09
+        ],
+        "viewport": [
+          476,
+          968
+        ]
+      },
+      {
+        "label": "对话 9",
+        "selected": true,
+        "left": 15,
+        "right": 14.54,
+        "difference": 0.46,
+        "clipped": false,
+        "focused": true,
+        "focusVisible": false,
+        "focusPainted": false,
+        "scrollLeft": 0,
+        "tabTop": 412.88,
+        "box": [
+          476,
+          587.13
+        ],
+        "viewport": [
+          476,
+          827.08
+        ]
+      },
+      {
+        "label": "图片 8",
+        "selected": true,
+        "left": 14.79,
+        "right": 14.42,
+        "difference": 0.38,
+        "clipped": false,
+        "focused": true,
+        "focusVisible": false,
+        "focusPainted": false,
+        "scrollLeft": 0,
+        "tabTop": 412.88,
+        "box": [
+          569.13,
+          686.25
+        ],
+        "viewport": [
+          476,
+          827.08
+        ]
+      },
+      {
+        "label": "视频 6",
+        "selected": true,
+        "left": 14.92,
+        "right": 14.29,
+        "difference": 0.63,
+        "clipped": false,
+        "focused": true,
+        "focusVisible": false,
+        "focusPainted": false,
+        "scrollLeft": 0,
+        "tabTop": 412.88,
+        "box": [
+          668.25,
+          785.38
+        ],
+        "viewport": [
+          476,
+          827.08
+        ]
+      },
+      {
+        "label": "音频 1",
+        "selected": true,
+        "left": 15.04,
+        "right": 14.17,
+        "difference": 0.88,
+        "clipped": false,
+        "focused": true,
+        "focusVisible": false,
+        "focusPainted": false,
+        "scrollLeft": 57,
+        "tabTop": 412.88,
+        "box": [
+          710.38,
+          827.5
+        ],
+        "viewport": [
+          476,
+          827.08
+        ]
+      }
+    ],
+    "focus": [
+      {
+        "label": "音频 1",
+        "selected": true,
+        "left": 15.04,
+        "right": 14.17,
+        "difference": 0.88,
+        "clipped": false,
+        "focused": true,
+        "focusVisible": true,
+        "focusPainted": true,
+        "scrollLeft": 57,
+        "tabTop": 412.88,
+        "box": [
+          710.38,
+          827.5
+        ],
+        "viewport": [
+          476,
+          827.08
+        ]
+      },
+      {
+        "label": "对话 9",
+        "selected": true,
+        "left": 15,
+        "right": 14.54,
+        "difference": 0.46,
+        "clipped": false,
+        "focused": true,
+        "focusVisible": true,
+        "focusPainted": true,
+        "scrollLeft": 0,
+        "tabTop": 412.88,
+        "box": [
+          476,
+          587.13
+        ],
+        "viewport": [
+          476,
+          827.08
+        ]
+      },
+      {
+        "label": "音频 1",
+        "selected": true,
+        "left": 15.04,
+        "right": 14.17,
+        "difference": 0.88,
+        "clipped": false,
+        "focused": true,
+        "focusVisible": true,
+        "focusPainted": true,
+        "scrollLeft": 57,
+        "tabTop": 412.88,
+        "box": [
+          710.38,
+          827.5
+        ],
+        "viewport": [
+          476,
+          827.08
+        ]
+      },
+      {
+        "label": "对话 9",
+        "selected": true,
+        "left": 15,
+        "right": 14.54,
+        "difference": 0.46,
+        "clipped": false,
+        "focused": true,
+        "focusVisible": true,
+        "focusPainted": true,
+        "scrollLeft": 0,
+        "tabTop": 412.88,
+        "box": [
+          476,
+          587.13
+        ],
+        "viewport": [
+          476,
+          827.08
+        ]
+      }
+    ]
+  }
+]

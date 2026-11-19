@@ -1,0 +1,60 @@
+{
+  "date": "2026-11-19",
+  "requirement": "#1149",
+  "scope": "UI",
+  "realPage": {
+    "cases": 4,
+    "measurements": 44,
+    "maxDifferenceBeforePx": 10.88,
+    "maxDifferenceAfterPx": 0.95,
+    "clippedBefore": 2,
+    "clippedAfter": 0,
+    "pageErrors": 0
+  },
+  "validation": [
+    {
+      "command": "npm test -- src/pages/SettingsPage/settingsPage --maxWorkers=2",
+      "passed": 108,
+      "failed": 0
+    },
+    {
+      "command": "npm run smoke:matrix -- g74 g83",
+      "group": "g74",
+      "passed": 59,
+      "failed": 0,
+      "run": "2026-11-19T07-15-57"
+    },
+    {
+      "command": "npm run smoke:matrix -- g83",
+      "group": "g83",
+      "passed": 19,
+      "failed": 0,
+      "run": "2026-11-19T07-27-28"
+    },
+    {
+      "command": "npm run check",
+      "exitCode": 0
+    },
+    {
+      "command": "node scripts/verify-folder-tabs.mjs review/2026-11-19-folder-tabs/after --check",
+      "exitCode": 0
+    }
+  ],
+  "reviewedUiFiles": [
+    "SettingsChannelWorkspace.module.css",
+    "SettingsKeyGroupView.tsx",
+    "SettingsModelCategoryTabs.tsx",
+    "folderTabGeometry.ts",
+    "useFolderTabMorph.ts",
+    "folderTabVisibility.ts"
+  ],
+  "retainedBehavior": [
+    "fixed group order",
+    "SVG shape and spring",
+    "selected text lift",
+    "first-tab/card alignment",
+    "rename/context menu/inline add",
+    "mapping vertical anchor"
+  ],
+  "remainingIssue": "#1165 narrow mapping rows overlap; unchanged in this step"
+}

@@ -1,0 +1,1030 @@
+[
+  {
+    "tag": "1440x900-dark",
+    "rows": [
+      {
+        "name": "keys",
+        "i": 0,
+        "mode": "mouse",
+        "label": "备用 Key P2",
+        "left": 15,
+        "right": 14.84,
+        "difference": 0.16,
+        "clipped": false,
+        "focused": true,
+        "focusVisible": false,
+        "focusPainted": false,
+        "scrollLeft": 0,
+        "tabTop": 542.28,
+        "box": [
+          524,
+          669.83
+        ],
+        "viewport": [
+          524,
+          1368
+        ]
+      },
+      {
+        "name": "keys",
+        "i": 1,
+        "mode": "mouse",
+        "label": "默认分组 P0",
+        "left": 14.22,
+        "right": 15.17,
+        "difference": 0.95,
+        "clipped": false,
+        "focused": true,
+        "focusVisible": false,
+        "focusPainted": false,
+        "scrollLeft": 0,
+        "tabTop": 542.28,
+        "box": [
+          609.55,
+          758.5
+        ],
+        "viewport": [
+          524,
+          1368
+        ]
+      },
+      {
+        "name": "keys",
+        "i": 2,
+        "mode": "mouse",
+        "label": "Key 分组 3 P0",
+        "left": 14.5,
+        "right": 14.99,
+        "difference": 0.49,
+        "clipped": false,
+        "focused": true,
+        "focusVisible": false,
+        "focusPainted": false,
+        "scrollLeft": 0,
+        "tabTop": 542.28,
+        "box": [
+          699.8,
+          864.64
+        ],
+        "viewport": [
+          524,
+          1368
+        ]
+      },
+      {
+        "name": "keys",
+        "i": 3,
+        "mode": "mouse",
+        "label": "Key 分组 4 P0",
+        "left": 14.59,
+        "right": 14.9,
+        "difference": 0.31,
+        "clipped": false,
+        "focused": true,
+        "focusVisible": false,
+        "focusPainted": false,
+        "scrollLeft": 0,
+        "tabTop": 542.28,
+        "box": [
+          803.92,
+          968.77
+        ],
+        "viewport": [
+          524,
+          1368
+        ]
+      },
+      {
+        "name": "keys",
+        "i": 4,
+        "mode": "mouse",
+        "label": "Key 分组 5 P0",
+        "left": 14.72,
+        "right": 14.78,
+        "difference": 0.06,
+        "clipped": false,
+        "focused": true,
+        "focusVisible": false,
+        "focusPainted": false,
+        "scrollLeft": 0,
+        "tabTop": 542.28,
+        "box": [
+          908.05,
+          1072.89
+        ],
+        "viewport": [
+          524,
+          1368
+        ]
+      },
+      {
+        "name": "mapping",
+        "i": 0,
+        "mode": "mouse",
+        "label": "对话 1",
+        "left": 15,
+        "right": 14.54,
+        "difference": 0.46,
+        "clipped": false,
+        "focused": true,
+        "focusVisible": false,
+        "focusPainted": false,
+        "scrollLeft": 0,
+        "tabTop": 711.08,
+        "box": [
+          524,
+          635.13
+        ],
+        "viewport": [
+          524,
+          1227.08
+        ]
+      },
+      {
+        "name": "mapping",
+        "i": 1,
+        "mode": "mouse",
+        "label": "图片 8",
+        "left": 14.79,
+        "right": 14.42,
+        "difference": 0.38,
+        "clipped": false,
+        "focused": true,
+        "focusVisible": false,
+        "focusPainted": false,
+        "scrollLeft": 0,
+        "tabTop": 711.08,
+        "box": [
+          617.13,
+          734.25
+        ],
+        "viewport": [
+          524,
+          1227.08
+        ]
+      },
+      {
+        "name": "mapping",
+        "i": 2,
+        "mode": "mouse",
+        "label": "视频 0",
+        "left": 14.92,
+        "right": 14.29,
+        "difference": 0.63,
+        "clipped": false,
+        "focused": true,
+        "focusVisible": false,
+        "focusPainted": false,
+        "scrollLeft": 0,
+        "tabTop": 711.08,
+        "box": [
+          716.25,
+          833.38
+        ],
+        "viewport": [
+          524,
+          1227.08
+        ]
+      },
+      {
+        "name": "mapping",
+        "i": 3,
+        "mode": "mouse",
+        "label": "音频 1",
+        "left": 15.04,
+        "right": 14.17,
+        "difference": 0.88,
+        "clipped": false,
+        "focused": true,
+        "focusVisible": false,
+        "focusPainted": false,
+        "scrollLeft": 0,
+        "tabTop": 711.08,
+        "box": [
+          815.38,
+          932.5
+        ],
+        "viewport": [
+          524,
+          1227.08
+        ]
+      },
+      {
+        "name": "mapping",
+        "mode": "keyboard-end",
+        "label": "音频 1",
+        "left": 15.04,
+        "right": 14.17,
+        "difference": 0.88,
+        "clipped": false,
+        "focused": true,
+        "focusVisible": true,
+        "focusPainted": true,
+        "scrollLeft": 0,
+        "tabTop": 711.08,
+        "box": [
+          815.38,
+          932.5
+        ],
+        "viewport": [
+          524,
+          1227.08
+        ]
+      },
+      {
+        "name": "mapping",
+        "mode": "keyboard-home",
+        "label": "对话 1",
+        "left": 15,
+        "right": 14.54,
+        "difference": 0.46,
+        "clipped": false,
+        "focused": true,
+        "focusVisible": true,
+        "focusPainted": true,
+        "scrollLeft": 0,
+        "tabTop": 711.08,
+        "box": [
+          524,
+          635.13
+        ],
+        "viewport": [
+          524,
+          1227.08
+        ]
+      }
+    ],
+    "errors": []
+  },
+  {
+    "tag": "1440x900-light",
+    "rows": [
+      {
+        "name": "keys",
+        "i": 0,
+        "mode": "mouse",
+        "label": "备用 Key P2",
+        "left": 15,
+        "right": 14.84,
+        "difference": 0.16,
+        "clipped": false,
+        "focused": true,
+        "focusVisible": false,
+        "focusPainted": false,
+        "scrollLeft": 0,
+        "tabTop": 542.28,
+        "box": [
+          524,
+          669.83
+        ],
+        "viewport": [
+          524,
+          1368
+        ]
+      },
+      {
+        "name": "keys",
+        "i": 1,
+        "mode": "mouse",
+        "label": "默认分组 P0",
+        "left": 14.22,
+        "right": 15.17,
+        "difference": 0.95,
+        "clipped": false,
+        "focused": true,
+        "focusVisible": false,
+        "focusPainted": false,
+        "scrollLeft": 0,
+        "tabTop": 542.28,
+        "box": [
+          609.55,
+          758.5
+        ],
+        "viewport": [
+          524,
+          1368
+        ]
+      },
+      {
+        "name": "keys",
+        "i": 2,
+        "mode": "mouse",
+        "label": "Key 分组 3 P0",
+        "left": 14.47,
+        "right": 15.03,
+        "difference": 0.56,
+        "clipped": false,
+        "focused": true,
+        "focusVisible": false,
+        "focusPainted": false,
+        "scrollLeft": 0,
+        "tabTop": 542.28,
+        "box": [
+          699.8,
+          864.64
+        ],
+        "viewport": [
+          524,
+          1368
+        ]
+      },
+      {
+        "name": "keys",
+        "i": 3,
+        "mode": "mouse",
+        "label": "Key 分组 4 P0",
+        "left": 14.59,
+        "right": 14.9,
+        "difference": 0.31,
+        "clipped": false,
+        "focused": true,
+        "focusVisible": false,
+        "focusPainted": false,
+        "scrollLeft": 0,
+        "tabTop": 542.28,
+        "box": [
+          803.92,
+          968.77
+        ],
+        "viewport": [
+          524,
+          1368
+        ]
+      },
+      {
+        "name": "keys",
+        "i": 4,
+        "mode": "mouse",
+        "label": "Key 分组 5 P0",
+        "left": 14.72,
+        "right": 14.78,
+        "difference": 0.06,
+        "clipped": false,
+        "focused": true,
+        "focusVisible": false,
+        "focusPainted": false,
+        "scrollLeft": 0,
+        "tabTop": 542.28,
+        "box": [
+          908.05,
+          1072.89
+        ],
+        "viewport": [
+          524,
+          1368
+        ]
+      },
+      {
+        "name": "mapping",
+        "i": 0,
+        "mode": "mouse",
+        "label": "对话 1",
+        "left": 15,
+        "right": 14.54,
+        "difference": 0.46,
+        "clipped": false,
+        "focused": true,
+        "focusVisible": false,
+        "focusPainted": false,
+        "scrollLeft": 0,
+        "tabTop": 711.08,
+        "box": [
+          524,
+          635.13
+        ],
+        "viewport": [
+          524,
+          1227.08
+        ]
+      },
+      {
+        "name": "mapping",
+        "i": 1,
+        "mode": "mouse",
+        "label": "图片 8",
+        "left": 14.79,
+        "right": 14.42,
+        "difference": 0.38,
+        "clipped": false,
+        "focused": true,
+        "focusVisible": false,
+        "focusPainted": false,
+        "scrollLeft": 0,
+        "tabTop": 711.08,
+        "box": [
+          617.13,
+          734.25
+        ],
+        "viewport": [
+          524,
+          1227.08
+        ]
+      },
+      {
+        "name": "mapping",
+        "i": 2,
+        "mode": "mouse",
+        "label": "视频 0",
+        "left": 14.92,
+        "right": 14.29,
+        "difference": 0.63,
+        "clipped": false,
+        "focused": true,
+        "focusVisible": false,
+        "focusPainted": false,
+        "scrollLeft": 0,
+        "tabTop": 711.08,
+        "box": [
+          716.25,
+          833.38
+        ],
+        "viewport": [
+          524,
+          1227.08
+        ]
+      },
+      {
+        "name": "mapping",
+        "i": 3,
+        "mode": "mouse",
+        "label": "音频 1",
+        "left": 15.04,
+        "right": 14.17,
+        "difference": 0.88,
+        "clipped": false,
+        "focused": true,
+        "focusVisible": false,
+        "focusPainted": false,
+        "scrollLeft": 0,
+        "tabTop": 711.08,
+        "box": [
+          815.38,
+          932.5
+        ],
+        "viewport": [
+          524,
+          1227.08
+        ]
+      },
+      {
+        "name": "mapping",
+        "mode": "keyboard-end",
+        "label": "音频 1",
+        "left": 15.04,
+        "right": 14.17,
+        "difference": 0.88,
+        "clipped": false,
+        "focused": true,
+        "focusVisible": true,
+        "focusPainted": true,
+        "scrollLeft": 0,
+        "tabTop": 711.08,
+        "box": [
+          815.38,
+          932.5
+        ],
+        "viewport": [
+          524,
+          1227.08
+        ]
+      },
+      {
+        "name": "mapping",
+        "mode": "keyboard-home",
+        "label": "对话 1",
+        "left": 15,
+        "right": 14.54,
+        "difference": 0.46,
+        "clipped": false,
+        "focused": true,
+        "focusVisible": true,
+        "focusPainted": true,
+        "scrollLeft": 0,
+        "tabTop": 711.08,
+        "box": [
+          524,
+          635.13
+        ],
+        "viewport": [
+          524,
+          1227.08
+        ]
+      }
+    ],
+    "errors": []
+  },
+  {
+    "tag": "1024x700-dark",
+    "rows": [
+      {
+        "name": "keys",
+        "i": 0,
+        "mode": "mouse",
+        "label": "备用 Key P2",
+        "left": 15,
+        "right": 14.84,
+        "difference": 0.16,
+        "clipped": false,
+        "focused": true,
+        "focusVisible": false,
+        "focusPainted": false,
+        "scrollLeft": 0,
+        "tabTop": 534.28,
+        "box": [
+          476,
+          621.83
+        ],
+        "viewport": [
+          476,
+          968
+        ]
+      },
+      {
+        "name": "keys",
+        "i": 1,
+        "mode": "mouse",
+        "label": "默认分组 P0",
+        "left": 14.22,
+        "right": 15.17,
+        "difference": 0.95,
+        "clipped": false,
+        "focused": true,
+        "focusVisible": false,
+        "focusPainted": false,
+        "scrollLeft": 0,
+        "tabTop": 534.28,
+        "box": [
+          561.55,
+          710.5
+        ],
+        "viewport": [
+          476,
+          968
+        ]
+      },
+      {
+        "name": "keys",
+        "i": 2,
+        "mode": "mouse",
+        "label": "Key 分组 3 P0",
+        "left": 14.47,
+        "right": 15.03,
+        "difference": 0.56,
+        "clipped": false,
+        "focused": true,
+        "focusVisible": false,
+        "focusPainted": false,
+        "scrollLeft": 0,
+        "tabTop": 534.28,
+        "box": [
+          651.8,
+          816.64
+        ],
+        "viewport": [
+          476,
+          968
+        ]
+      },
+      {
+        "name": "keys",
+        "i": 3,
+        "mode": "mouse",
+        "label": "Key 分组 4 P0",
+        "left": 14.59,
+        "right": 14.9,
+        "difference": 0.31,
+        "clipped": false,
+        "focused": true,
+        "focusVisible": false,
+        "focusPainted": false,
+        "scrollLeft": 0,
+        "tabTop": 534.28,
+        "box": [
+          755.92,
+          920.77
+        ],
+        "viewport": [
+          476,
+          968
+        ]
+      },
+      {
+        "name": "keys",
+        "i": 4,
+        "mode": "mouse",
+        "label": "Key 分组 5 P0",
+        "left": 14.72,
+        "right": 14.78,
+        "difference": 0.06,
+        "clipped": false,
+        "focused": true,
+        "focusVisible": false,
+        "focusPainted": false,
+        "scrollLeft": 57,
+        "tabTop": 534.28,
+        "box": [
+          803.05,
+          967.89
+        ],
+        "viewport": [
+          476,
+          968
+        ]
+      },
+      {
+        "name": "mapping",
+        "i": 0,
+        "mode": "mouse",
+        "label": "对话 1",
+        "left": 15,
+        "right": 14.54,
+        "difference": 0.46,
+        "clipped": false,
+        "focused": true,
+        "focusVisible": false,
+        "focusPainted": false,
+        "scrollLeft": 0,
+        "tabTop": 421.88,
+        "box": [
+          476,
+          587.13
+        ],
+        "viewport": [
+          476,
+          827.08
+        ]
+      },
+      {
+        "name": "mapping",
+        "i": 1,
+        "mode": "mouse",
+        "label": "图片 8",
+        "left": 14.79,
+        "right": 14.42,
+        "difference": 0.38,
+        "clipped": false,
+        "focused": true,
+        "focusVisible": false,
+        "focusPainted": false,
+        "scrollLeft": 0,
+        "tabTop": 421.88,
+        "box": [
+          569.13,
+          686.25
+        ],
+        "viewport": [
+          476,
+          827.08
+        ]
+      },
+      {
+        "name": "mapping",
+        "i": 2,
+        "mode": "mouse",
+        "label": "视频 0",
+        "left": 14.92,
+        "right": 14.29,
+        "difference": 0.63,
+        "clipped": false,
+        "focused": true,
+        "focusVisible": false,
+        "focusPainted": false,
+        "scrollLeft": 0,
+        "tabTop": 421.88,
+        "box": [
+          668.25,
+          785.38
+        ],
+        "viewport": [
+          476,
+          827.08
+        ]
+      },
+      {
+        "name": "mapping",
+        "i": 3,
+        "mode": "mouse",
+        "label": "音频 1",
+        "left": 15.04,
+        "right": 14.17,
+        "difference": 0.88,
+        "clipped": false,
+        "focused": true,
+        "focusVisible": false,
+        "focusPainted": false,
+        "scrollLeft": 57,
+        "tabTop": 421.88,
+        "box": [
+          710.38,
+          827.5
+        ],
+        "viewport": [
+          476,
+          827.08
+        ]
+      },
+      {
+        "name": "mapping",
+        "mode": "keyboard-end",
+        "label": "音频 1",
+        "left": 15.04,
+        "right": 14.17,
+        "difference": 0.88,
+        "clipped": false,
+        "focused": true,
+        "focusVisible": true,
+        "focusPainted": true,
+        "scrollLeft": 57,
+        "tabTop": 421.88,
+        "box": [
+          710.38,
+          827.5
+        ],
+        "viewport": [
+          476,
+          827.08
+        ]
+      },
+      {
+        "name": "mapping",
+        "mode": "keyboard-home",
+        "label": "对话 1",
+        "left": 15,
+        "right": 14.54,
+        "difference": 0.46,
+        "clipped": false,
+        "focused": true,
+        "focusVisible": true,
+        "focusPainted": true,
+        "scrollLeft": 0,
+        "tabTop": 421.88,
+        "box": [
+          476,
+          587.13
+        ],
+        "viewport": [
+          476,
+          827.08
+        ]
+      }
+    ],
+    "errors": []
+  },
+  {
+    "tag": "1024x700-light",
+    "rows": [
+      {
+        "name": "keys",
+        "i": 0,
+        "mode": "mouse",
+        "label": "备用 Key P2",
+        "left": 15,
+        "right": 14.84,
+        "difference": 0.16,
+        "clipped": false,
+        "focused": true,
+        "focusVisible": false,
+        "focusPainted": false,
+        "scrollLeft": 0,
+        "tabTop": 534.28,
+        "box": [
+          476,
+          621.83
+        ],
+        "viewport": [
+          476,
+          968
+        ]
+      },
+      {
+        "name": "keys",
+        "i": 1,
+        "mode": "mouse",
+        "label": "默认分组 P0",
+        "left": 14.22,
+        "right": 15.17,
+        "difference": 0.95,
+        "clipped": false,
+        "focused": true,
+        "focusVisible": false,
+        "focusPainted": false,
+        "scrollLeft": 0,
+        "tabTop": 534.28,
+        "box": [
+          561.55,
+          710.5
+        ],
+        "viewport": [
+          476,
+          968
+        ]
+      },
+      {
+        "name": "keys",
+        "i": 2,
+        "mode": "mouse",
+        "label": "Key 分组 3 P0",
+        "left": 14.47,
+        "right": 15.03,
+        "difference": 0.56,
+        "clipped": false,
+        "focused": true,
+        "focusVisible": false,
+        "focusPainted": false,
+        "scrollLeft": 0,
+        "tabTop": 534.28,
+        "box": [
+          651.8,
+          816.64
+        ],
+        "viewport": [
+          476,
+          968
+        ]
+      },
+      {
+        "name": "keys",
+        "i": 3,
+        "mode": "mouse",
+        "label": "Key 分组 4 P0",
+        "left": 14.59,
+        "right": 14.9,
+        "difference": 0.31,
+        "clipped": false,
+        "focused": true,
+        "focusVisible": false,
+        "focusPainted": false,
+        "scrollLeft": 0,
+        "tabTop": 534.28,
+        "box": [
+          755.92,
+          920.77
+        ],
+        "viewport": [
+          476,
+          968
+        ]
+      },
+      {
+        "name": "keys",
+        "i": 4,
+        "mode": "mouse",
+        "label": "Key 分组 5 P0",
+        "left": 14.72,
+        "right": 14.78,
+        "difference": 0.06,
+        "clipped": false,
+        "focused": true,
+        "focusVisible": false,
+        "focusPainted": false,
+        "scrollLeft": 57,
+        "tabTop": 534.28,
+        "box": [
+          803.05,
+          967.89
+        ],
+        "viewport": [
+          476,
+          968
+        ]
+      },
+      {
+        "name": "mapping",
+        "i": 0,
+        "mode": "mouse",
+        "label": "对话 1",
+        "left": 15,
+        "right": 14.54,
+        "difference": 0.46,
+        "clipped": false,
+        "focused": true,
+        "focusVisible": false,
+        "focusPainted": false,
+        "scrollLeft": 0,
+        "tabTop": 421.88,
+        "box": [
+          476,
+          587.13
+        ],
+        "viewport": [
+          476,
+          827.08
+        ]
+      },
+      {
+        "name": "mapping",
+        "i": 1,
+        "mode": "mouse",
+        "label": "图片 8",
+        "left": 14.79,
+        "right": 14.42,
+        "difference": 0.38,
+        "clipped": false,
+        "focused": true,
+        "focusVisible": false,
+        "focusPainted": false,
+        "scrollLeft": 0,
+        "tabTop": 421.88,
+        "box": [
+          569.13,
+          686.25
+        ],
+        "viewport": [
+          476,
+          827.08
+        ]
+      },
+      {
+        "name": "mapping",
+        "i": 2,
+        "mode": "mouse",
+        "label": "视频 0",
+        "left": 14.92,
+        "right": 14.29,
+        "difference": 0.63,
+        "clipped": false,
+        "focused": true,
+        "focusVisible": false,
+        "focusPainted": false,
+        "scrollLeft": 0,
+        "tabTop": 421.88,
+        "box": [
+          668.25,
+          785.38
+        ],
+        "viewport": [
+          476,
+          827.08
+        ]
+      },
+      {
+        "name": "mapping",
+        "i": 3,
+        "mode": "mouse",
+        "label": "音频 1",
+        "left": 15.04,
+        "right": 14.17,
+        "difference": 0.88,
+        "clipped": false,
+        "focused": true,
+        "focusVisible": false,
+        "focusPainted": false,
+        "scrollLeft": 57,
+        "tabTop": 421.88,
+        "box": [
+          710.38,
+          827.5
+        ],
+        "viewport": [
+          476,
+          827.08
+        ]
+      },
+      {
+        "name": "mapping",
+        "mode": "keyboard-end",
+        "label": "音频 1",
+        "left": 15.04,
+        "right": 14.17,
+        "difference": 0.88,
+        "clipped": false,
+        "focused": true,
+        "focusVisible": true,
+        "focusPainted": true,
+        "scrollLeft": 57,
+        "tabTop": 421.88,
+        "box": [
+          710.38,
+          827.5
+        ],
+        "viewport": [
+          476,
+          827.08
+        ]
+      },
+      {
+        "name": "mapping",
+        "mode": "keyboard-home",
+        "label": "对话 1",
+        "left": 15,
+        "right": 14.54,
+        "difference": 0.46,
+        "clipped": false,
+        "focused": true,
+        "focusVisible": true,
+        "focusPainted": true,
+        "scrollLeft": 0,
+        "tabTop": 421.88,
+        "box": [
+          476,
+          587.13
+        ],
+        "viewport": [
+          476,
+          827.08
+        ]
+      }
+    ],
+    "errors": []
+  }
+]

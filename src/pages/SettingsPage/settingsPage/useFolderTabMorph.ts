@@ -8,6 +8,7 @@ import {
   type MorphFrame,
   type SpringValue,
 } from './folderTabGeometry'
+import { revealFolderTab } from './folderTabVisibility'
 
 type MorphSpringState = {
   x: SpringValue
@@ -34,9 +35,7 @@ const createSpringState = (): MorphSpringState => ({
 })
 
 /**
- * Key 分组标签的弹簧形变：负责量每枚标签的真实宽高、把选中标签的位置/宽度/高度用
- * 阻尼谐振子逐帧写成 SVG 路径，并在切组时给一点向下的初速度做回弹。
- *
+ * 文件夹标签形变：量真实宽高、逐帧绘制 x/w/h 弹簧，并在切组时给向下的初速度做回弹。
  * 组件只负责渲染结构；这里拿到的 ref 直接挂到 tabs 容器与形变层上。
  */
 export function useFolderTabMorph(activeGroupId: string | null | undefined) {
@@ -103,6 +102,7 @@ export function useFolderTabMorph(activeGroupId: string | null | undefined) {
       if (!tab) return
       const x = tab.offsetLeft
       const w = tab.offsetWidth
+      revealFolderTab(tabsHostRef.current, tab)
       const unchanged =
         spring.initialized &&
         !bounce &&

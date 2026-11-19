@@ -128,7 +128,7 @@
 
 .groupWorkspaceCard > [data-settings-models] {
   padding: var(--space-4);
-  /* 选中标签永远排第一、左边与卡片左边对齐，故左上角是直角（不另露一截圆角）。 */
+  /* 第一枚标签的竖边与卡片左边对齐，故卡片左上角保持直角。 */
   border-radius: 0 var(--radius-control) var(--radius-control) var(--radius-control);
   background: var(--bg-subtle);
 }
@@ -169,7 +169,7 @@
   flex-direction: column;
   gap: var(--space-3);
   padding: var(--space-4);
-  /* 选中标签永远贴左边，故左上角直角、其余圆角，与标签底边无缝 */
+  /* 第一枚标签左边贴卡片，左上角直角、其余圆角，标签底边无缝 */
   border-radius: 0 var(--radius-control) var(--radius-control) var(--radius-control);
   background: var(--bg-subtle);
 }
@@ -184,7 +184,6 @@
 .keyGroupTabs {
   /* 标签栏高度 = 弹簧形变层的底边基线（46px），下方卡片顶边跟着它，切换时绝不动 */
   --key-group-tab-header-h: 46px;
-  --key-group-tab-radius: 12px;
   position: relative;
   flex: 1 1 auto;
   min-width: 0;
@@ -280,10 +279,11 @@
 }
 
 .keyGroupTabOn .keyGroupTabInner {
-  transform: translateY(-1.5px);
+  /* 名称+数字整体左移，将中线轮廓处原约 20/10px 的留白平衡为约 15/15px。 */
+  transform: translate(-5px, -1.5px);
 }
 
-/* 共享形变层：画在静止梯形（1）之上、文字（10）之下 */
+/* 共享形变层在静止梯形之上、文字与焦点（10）之下 */
 .keyGroupMorph {
   position: absolute;
   top: 0;
@@ -297,10 +297,10 @@
   fill: var(--bg-subtle);
 }
 
-.keyGroupTab:focus-visible {
+.keyGroupTab:focus-visible .keyGroupTabInner {
   outline: 2px solid var(--focus-ring);
-  outline-offset: -3px;
-  border-radius: var(--key-group-tab-radius);
+  outline-offset: 3px;
+  border-radius: calc(var(--radius-control) - 2px);
 }
 
 .keyGroupTabName {

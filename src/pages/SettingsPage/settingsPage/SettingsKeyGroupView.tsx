@@ -93,17 +93,6 @@ export function SettingsKeyGroupView({
 
   const selectGroup = (groupId: string) => {
     if (groupId !== activeGroup?.id) onActiveGroupChange(groupId)
-    /* 只横向滚动标签栏自身：scrollIntoView 在窄视口会把整个设置页一起滚 */
-    const tab = tabRefs.current.get(groupId)
-    const host = tabsHostRef.current
-    if (!tab || !host) return
-    const left = tab.offsetLeft
-    const right = left + tab.offsetWidth
-    if (left < host.scrollLeft) {
-      host.scrollTo({ left, behavior: 'smooth' })
-    } else if (right > host.scrollLeft + host.clientWidth) {
-      host.scrollTo({ left: right - host.clientWidth, behavior: 'smooth' })
-    }
   }
 
   const beginRename = (group: ChannelCredentialGroup) => {

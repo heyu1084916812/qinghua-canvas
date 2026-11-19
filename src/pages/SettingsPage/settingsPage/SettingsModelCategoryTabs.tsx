@@ -44,7 +44,7 @@ export function SettingsModelCategoryTabs({
     requestAnimationFrame(() => {
       listRef.current
         ?.querySelector<HTMLElement>(`[data-route-map-filter="${category}"]`)
-        ?.focus()
+        ?.focus({ preventScroll: true })
     })
   }
 

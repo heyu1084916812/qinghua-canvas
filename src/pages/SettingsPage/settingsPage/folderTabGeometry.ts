@@ -16,8 +16,8 @@ export const TAB_ACTIVE_HEIGHT = 44
 const SLOPE = 15
 const TOP_RADIUS = 12
 const BOTTOM_RADIUS = 11
-/** 选中形状向左多长的一截：左边是斜边，字的上半截会被吃掉留白，补 12px 左右才对称（用户 2026-11-18）。第一枚不补 —— 它要和卡片左沿垂直对齐。 */
-const LEFT_EXTEND = 12
+/** 非首枚的选中轮廓向左延伸；滚动可见范围也必须包含这截。文字居中由共享 CSS 校正。 */
+export const TAB_LEFT_EXTEND = 12
 
 const round = (value: number) => Math.round(value * 100) / 100
 
@@ -84,7 +84,7 @@ export function morphingTabPath(
   const leftSlope = SLOPE * leftMorph
   const leftBottomRadius = BOTTOM_RADIUS * leftMorph
   const lean = Math.max(-6.5, Math.min(6.5, frame.vx * 0.0075))
-  const left = frame.x - LEFT_EXTEND * leftMorph
+  const left = frame.x - TAB_LEFT_EXTEND * leftMorph
   const right = frame.x + Math.max(frame.w, 64)
 
   const leftBottom = left + leftBottomRadius

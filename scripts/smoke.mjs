@@ -9,6 +9,7 @@ import { deflateSync, crc32 } from 'node:zlib'
 /* CDP 的 `dragData.files` **只认绝对路径**（相对路径会以 NotReadableError 抛成页面异常） */
 import { resolve as resolvePath } from 'node:path'
 import { assertIsolatedStore } from './storeIsolation.mjs'
+import { checkFolderTabs } from './folderTabChecks.mjs'
 
 const BASE = process.env.SMOKE_BASE ?? 'http://127.0.0.1:1420'
 const STORE_BASE = String(process.env.SMOKE_STORE_BASE ?? 'http://127.0.0.1:18765').replace(
@@ -17053,6 +17054,9 @@ async function g83(browser) {
   await page.waitForFunction(() => !document.querySelector('[data-settings-editor]')?.style.getPropertyValue('--mapping-scroll-reserve'))
   const afterWheel = await editor.evaluate((el) => el.scrollTop)
   rec(g, '★★ 切档后滚轮仍滚动，滚回正常范围撤掉余量', afterWheel < anchor.top, `${anchor.top}→${afterWheel}`)
+
+  const folderTabs = await checkFolderTabs(page, rec, g, OUT)
+  writeFileSync(`${OUT}/g83-folder-tabs.json`, JSON.stringify(folderTabs, null, 2))
 
   rec(g, '无未捕获异常', pageErrors.length === 0, pageErrors.join(' | '))
   await ctx.close()
