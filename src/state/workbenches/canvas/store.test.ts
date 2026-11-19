@@ -45,6 +45,33 @@ describe('canvas store / 基本变更', () => {
 })
 
 describe('canvas store / 撤销与重做', () => {
+  it('#1159 一刀切三线：撤销和重做各一次，未命中的边始终保留', async () => {
+    const store = createCanvasStore({ platform, projectId: 'p1' })
+    const sources = ['a', 'b', 'c', 'uncut']
+    for (const id of [...sources, 'target']) {
+      store.dispatch({ kind: 'node.create', projectId: 'p1', id, type: id === 'target' ? 'generation' : 'prompt', at: { x: 0, y: 0 } })
+    }
+    for (const source of sources) store.dispatch({ kind: 'edge.connect', source, target: 'target' })
+    const original = [...store.getSnapshot().edges]
+    expect(original).toHaveLength(4)
+    const kept = original.filter(e => e.source === 'uncut')
+    expect(kept).toHaveLength(1)
+    const check = async (expected: typeof original) => {
+      const ids = expected.map(e => e.id).sort()
+      expect(store.getSnapshot().edges.map(e => e.id).sort()).toEqual(ids)
+      await store.flush()
+      expect((await platform.storage.query('edges', { projectId: 'p1' })).map(e => e.id).sort()).toEqual(ids)
+    }
+    for (const edge of original.filter(e => e.source !== 'uncut')) {
+      store.dispatch({ kind: 'edge.remove', id: edge.id }, { mode: 'multi-step', planId: 'knife:test', label: '切断连线' })
+    }
+    await check(kept)
+    store.undo()
+    await check(original)
+    store.redo()
+    await check(kept)
+  })
+
   /**
    * ★★ 这条是 2026-10-12 实修的那条真缺陷（对账 #449）：
    *
