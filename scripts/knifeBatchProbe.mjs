@@ -24,12 +24,12 @@ export function installKnifeBatchProbe({chunkSize,lazy,spatial}) {
       const chunk={path,edges:data.slice(i,i+chunkSize),previous:-1};chunks.push(chunk)
       for(const [p] of chunk.edges)owner.set(p,chunk)
     }
-    const refresh=(dirty=chunks)=>{
+    record.refreshIntervals=[];const refresh=(dirty=chunks)=>{const begin=performance.now()
       for(const chunk of dirty){record.visited+=chunk.edges.length
         const alive=chunk.edges.filter(([p])=>p.isConnected&&!p.hasAttribute('data-knife-pending'))
         if(alive.length!==chunk.previous){count+=alive.length-(chunk.previous<0?chunk.edges.length:chunk.previous);record.rewritten+=alive.length;chunk.path.setAttribute('d',alive.map(([,d])=>d).join(' '));chunk.previous=alive.length}
       }
-      if(count<record.minimum)record.lastCutObserved=performance.now();record.minimum=Math.min(record.minimum,count);record.updates++
+      if(count<record.minimum)record.lastCutObserved=performance.now();record.minimum=Math.min(record.minimum,count);record.updates++;record.refreshIntervals.push([begin,performance.now()])
     }
     const parent=first.ownerSVGElement.parentElement
     const style=document.createElement('style');style.textContent='.react-flow__edges{visibility:hidden!important}'

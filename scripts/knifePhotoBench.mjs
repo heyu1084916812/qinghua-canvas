@@ -60,7 +60,8 @@ export async function knifePhotoBench(page,pid,out,releasePut=null) {
   const lazy=process.env.KNIFE_BATCH_LAZY==='1'
   const spatial=process.env.KNIFE_BATCH_SPATIAL==='1'
   if(batchBase) await page.evaluate((await import('./knifeBatchProbe.mjs')).installKnifeBatchProbe,{chunkSize:batchSize,lazy,spatial})
-  const report={spatial,lazy,batchSize,batchBase,omitHitPaths,skipEdgeHit,hideBaseEdges,hideCutPreview,timing:"from before pointerdown through two post-pointerup animation frames",edgeCount,sourceHashes:[...hashes],evidence,b,rounds:[]};const save=()=>writeFileSync(out,JSON.stringify(report,null,2))
+  const dirtyClear=process.env.KNIFE_DIRTY_CLEAR==='1';if(dirtyClear) await page.evaluate((await import('./knifeDirtyClear.mjs')).installKnifeDirtyClear)
+  const report={dirtyClear,spatial,lazy,batchSize,batchBase,omitHitPaths,skipEdgeHit,hideBaseEdges,hideCutPreview,timing:"from before pointerdown through two post-pointerup animation frames",edgeCount,sourceHashes:[...hashes],evidence,b,rounds:[]};const save=()=>writeFileSync(out,JSON.stringify(report,null,2))
   for(let round=1;round<=3;round++)for(const mode of ['miss','hit']){
     if(tracing) await page.evaluate(()=>{window.knifeMoves=[];window.pointerTrace=[];window.knifeListener=e=>window.pointerTrace.push([e.type,e.clientX,e.clientY,e.buttons]); for(const name of ['pointerdown','pointermove','pointerup']) window.addEventListener(name,window.knifeListener,true)})
     const x=b.x,y=b.top-20;await page.mouse.move(x,y);await page.keyboard.down('Space');await page.locator('[data-knife-cursor]').waitFor({state:'attached'})
