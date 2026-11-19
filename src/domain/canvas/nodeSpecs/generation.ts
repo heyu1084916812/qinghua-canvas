@@ -236,21 +236,33 @@ export const generationSpec: NodeSpec<GenerationData> = {
     const data = node.data
     if (!data.channelId || !data.model) return null
 
-    const upstreamText = [
+    const upstreamBlocks = [
       ...new Set(
         inputs
           .filter((i): i is Extract<NodeInput, { kind: 'text' }> => i.kind === 'text')
           .map((i) => i.text.trim())
           .filter(Boolean),
       ),
-    ].join('\n')
+    ]
+    /**
+     * **真合并**（对账 #1156，用户 2026-11-19 拍板）：本节点面板写的正文 + 换行 + 上游提示词。
+     *
+     * 旧口径是 `data.prompt || upstreamText` —— 本节点一写正文，上游提示词节点那句就**整句作废**，
+     * 用户以为"两个都参与"，实际只有一句生效。现在两段都在，顺序是：本节点正文在前
+     *（它是对这次生成的直接指令），上游按连线顺序在后。
+     *
+     * 去重只做**段落级完全相等**：上游几个节点写同一句只留一次，且与本节点正文完全相同的那段
+     * 不重复拼进去。不做行级去重 —— 正文里故意重复的词句是用户的表达，不该被"优化"掉。
+     */
+    const ownBlock = data.prompt.trim()
+    const promptBlocks = [...new Set([ownBlock, ...upstreamBlocks].filter(Boolean))]
     /**
      * 「预设 / 情绪」（用户 2026-10-05 第 14 条）拼在提示词**后面**：
      * 先描述画面，再给输出规格 —— 与批量节点「统一要求在尾部」同一条读法。
      * 拼接规则只有 `presets.ts` 一处，三种生成节点类型共用。
      */
     const prompt = [
-      data.prompt.trim() || upstreamText.trim(),
+      promptBlocks.join('\n'),
       presetPromptSuffix(data),
       contextAssetRolePrompt(data.contextAssets, inputs),
     ]

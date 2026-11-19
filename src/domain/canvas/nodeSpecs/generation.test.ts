@@ -164,6 +164,57 @@ describe('生成节点规格 / 输入收集（M6-12）', () => {
     expect(req).toBeNull()
   })
 
+  /**
+   * 对账 #1156（用户 2026-11-19 拍板）：**真合并** =
+   * 本节点面板正文 + 换行 + 上游提示词节点正文。
+   *
+   * 旧口径 `data.prompt || upstreamText` 会在本节点写了正文时把上游整句作废，
+   * 用户以为两段都参与、实际只有一句生效。这条把「两段都在、顺序是自家在前」钉住。
+   */
+  it('★★ 本节点正文与上游提示词**真合并**（自家在前，换行分隔）', () => {
+    const g = graph(
+      [
+        node({
+          id: 'down',
+          type: 'generation',
+          data: { mode: 'image', channelId: 'c', model: 'm', prompt: '一只橘猫在窗台上' } as never,
+        }),
+        node({ id: 'up-text', type: 'prompt', data: { text: '背景是午后的阳光' } as never }),
+      ],
+      [{ id: 'e1', projectId: 'p1', source: 'up-text', target: 'down' }],
+    )
+    const inputs = getSpec('generation')!.collectInputs({ node: g.nodes[0]!, graph: g })
+    const req = getSpec('generation')!.toRunRequest!({
+      node: g.nodes[0]!,
+      inputs,
+      params: g.nodes[0]!.data,
+      graph: g,
+    })
+    expect(req!.prompt).toBe('一只橘猫在窗台上\n背景是午后的阳光')
+  })
+
+  it('★ 合并时段落级去重：上游与本节点正文一模一样只留一份', () => {
+    const g = graph(
+      [
+        node({
+          id: 'down',
+          type: 'generation',
+          data: { mode: 'image', channelId: 'c', model: 'm', prompt: '同一句话' } as never,
+        }),
+        node({ id: 'up-text', type: 'prompt', data: { text: '同一句话' } as never }),
+      ],
+      [{ id: 'e1', projectId: 'p1', source: 'up-text', target: 'down' }],
+    )
+    const inputs = getSpec('generation')!.collectInputs({ node: g.nodes[0]!, graph: g })
+    const req = getSpec('generation')!.toRunRequest!({
+      node: g.nodes[0]!,
+      inputs,
+      params: g.nodes[0]!.data,
+      graph: g,
+    })
+    expect(req!.prompt).toBe('同一句话')
+  })
+
   it('视频上游保留真实 MIME；老视频没有 assetMime 时按 video/mp4 回落', () => {
     const g = graph(
       [
