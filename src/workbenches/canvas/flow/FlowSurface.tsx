@@ -66,7 +66,14 @@ import { useTheme } from '../../../app/ThemeProvider'
 import { canvasTonePair } from '../../../domain/project/canvasStyle'
 import { useFonts } from '../../../app/providers/FontProvider'
 import { useEdgeDrag } from '../../../features/canvas/useEdgeDrag'
-import { useSpaceHeld } from '../../../features/canvas/useSpaceHeld'
+import {
+  useKnifeOn,
+  useKnifePointer,
+  useKnifeShortcut,
+} from '../../../features/canvas/useKnifeMode'
+import { Slice } from '../../../ui/icon'
+import { FlowEdgeCutLayer, type ActiveEdgeCut } from './FlowEdgeCutLayer'
+import { cutPolylineAt, distanceToPolyline, type ScreenPoint } from './edgeCutGeometry'
 import { useViewport as useCanvasViewport } from '../../../features/canvas/useViewport'
 import { useNodeDownload } from '../../../features/canvas/useNodeDownload'
 import { clipboardMediaFiles, importDroppedFiles } from '../../../features/canvas/dropImport'
@@ -271,7 +278,17 @@ function FlowSurfaceInner({
   // Ctrl/Cmd + C/V（§4.2）：剪贴板是模块级单例、不订阅，故不参与本组件重渲染
   useClipboardHotkeys(store)
   useCanvasKeyboard(store)
-  const spaceHeld = useSpaceHeld()
+  /**
+   * 美工刀（对账 #1159，用户 2026-11-19 拍板 A）：**空格切换**、Esc 退出。
+   *
+   * ⚠️ 口径变更：空格以前是"按住 = 平移画布"（`useSpaceHeld`）。现在空格专给道具，
+   * 平移交给**中键拖拽**（`panOnDrag={[0,1]}` 本来就支持，用户："平移中键可以进行拖，
+   * 不需要改"）。右键仍是菜单，不动。
+   */
+  useKnifeShortcut()
+  const knifeOn = useKnifeOn()
+  const knifeAt = useKnifePointer(knifeOn)
+  const [edgeCut, setEdgeCut] = useState<ActiveEdgeCut | null>(null)
   const { beginPan } = useCanvasViewport(store)
   const [importHover, setImportHover] = useState(false)
   const dragMovedRef = useRef(false)
@@ -374,9 +391,84 @@ function FlowSurfaceInner({
     [store],
   )
 
-  /** 捕获 pointerdown：处理空格平移 / Alt 复制，记录显式选中与终点对齐锚。 */
+  /**
+   * 切一刀（对账 #1159）：找最近的连线 → 采样成屏幕折线 → 播两段分离淡出 → **动画结束才删边**。
+   *
+   * 为什么用几何距离找线、而不是 `elementFromPoint` 找命中区：
+   * 粗视口（`FlowCoarseEdge`）那一档**没有加宽的透明命中区**，靠命中区会有"近处能切、远处切不动"；
+   * 按折线距离找（阈值 14px，与命中区宽度同量级）在两种视口下一致。
+   */
+  const cutEdgeAt = useCallback(
+    (clientX: number, clientY: number) => {
+      const surface = surfaceEl()
+      if (!surface) return
+      /**
+       * ⚠️ **不能在 pointerdown 那一拍读 DOM**：实测那一刻 `.react-flow__edges` 的
+       * `childElementCount = 0`、`[data-edge]` 一个都不在（React Flow 正在为这次按下重渲染），
+       * 要过一两帧才回来。所以这里**逐帧重试**，最多等到 ~200ms：
+       * 有边就量、量完就播动画；一直没有就放弃（用户也不会觉得点了没反应太久）。
+       */
+      const MAX_FRAMES = 12
+      const attempt = (frame: number) => {
+        const paths = Array.from(document.querySelectorAll<SVGPathElement>('[data-edge]'))
+        if (paths.length === 0) {
+          if (frame < MAX_FRAMES) window.requestAnimationFrame(() => attempt(frame + 1))
+          return
+        }
+        const rect = surface.getBoundingClientRect()
+        const pointer = { x: clientX - rect.left, y: clientY - rect.top }
+        let picked: { id: string; points: ScreenPoint[] } | null = null
+        let bestDistance = 14
+        for (const path of paths) {
+          const ctm = path.getScreenCTM()
+          if (!ctm) continue
+          const total = path.getTotalLength()
+          if (!(total > 0)) continue
+          const steps = 40
+          const points: ScreenPoint[] = []
+          for (let i = 0; i <= steps; i += 1) {
+            const at = path.getPointAtLength((total * i) / steps).matrixTransform(ctm)
+            points.push({ x: at.x - rect.left, y: at.y - rect.top })
+          }
+          const distance = distanceToPolyline(points, pointer)
+          if (distance > bestDistance) continue
+          bestDistance = distance
+          picked = { id: path.getAttribute('data-edge') ?? '', points }
+        }
+        if (!picked) return
+        const id = picked.id
+        const halves = cutPolylineAt(picked.points, pointer)
+        if (!id || !halves) return
+        setEdgeCut({ id, top: halves.top, bottom: halves.bottom })
+        const raw = getComputedStyle(document.documentElement).getPropertyValue('--dur-cut').trim()
+        const ms = Number.parseFloat(raw)
+        window.setTimeout(
+          () => {
+            store.dispatch({ kind: 'edge.remove', id })
+            setEdgeCut(null)
+          },
+          Number.isFinite(ms) ? ms : 260,
+        )
+      }
+      attempt(0)
+    },
+    [store, surfaceEl],
+  )
+
+  /** 捕获 pointerdown：处理美工刀 / Alt 复制，记录显式选中与终点对齐锚。 */
   const onSurfacePointerDown = useCallback(
     (e: ReactPointerEvent<HTMLDivElement>) => {
+      /**
+       * 美工刀开着时，左键**什么都不该做**（不选中、不拖节点、不开框选），只切连线。
+       * 放在捕获阶段最先处理并 `stopPropagation`：RF 的节点拖动 / 框选都挂在更内层，
+       * 晚一步就会被它们先接走。
+       */
+      if (knifeOn && e.button === 0) {
+        e.preventDefault()
+        e.stopPropagation()
+        cutEdgeAt(e.clientX, e.clientY)
+        return
+      }
       pressAtRef.current = { x: e.clientX, y: e.clientY }
       const nodeId =
         (e.target as HTMLElement)
@@ -387,7 +479,8 @@ function FlowSurfaceInner({
       const selection = store.getSelection()
       const plan = planSurfacePointerDown({
         button: e.button,
-        spaceHeld,
+        /* 空格已改作美工刀（#1159），这里不再有"按住空格平移"；平移走中键 */
+        spaceHeld: false,
         altKey: e.altKey,
         nodeId,
         selection,
@@ -430,7 +523,7 @@ function FlowSurfaceInner({
         dragAnchorRef.current = plan.anchor
       }
     },
-    [store, spaceHeld, beginPan],
+    [store, knifeOn, cutEdgeAt, beginPan],
   )
 
   const importFiles = useCallback(
@@ -727,7 +820,7 @@ function FlowSurfaceInner({
   return (
     <div
       ref={surfaceRef}
-      className={spaceHeld ? `${styles.surface} ${styles.spaceMode}` : styles.surface}
+      className={knifeOn ? `${styles.surface} ${styles.knifeMode}` : styles.surface}
       data-canvas-surface
       data-canvas-engine="rf"
       /* 背景样式与色调：CSS 只认这两个属性（见 FlowSurface.module.css 里的六条映射），
@@ -810,6 +903,8 @@ function FlowSurfaceInner({
       <FlowDraftLayer draft={edgeDrag.draft} />
       {/* 吸附提示（对账 #257）：参考线 + 间距数字。屏幕空间、不吃指针，拖动结束即消失 */}
       <FlowSnapLayer />
+      {/* 切断动画（#1159）：被切的那条线在删除前的 260ms 里由这一层"顶着"播分离淡出 */}
+      <FlowEdgeCutLayer cut={edgeCut} />
       <ReactFlow
         className={styles.flow}
         nodes={nodes}
@@ -826,6 +921,8 @@ function FlowSurfaceInner({
          * - Shift = 增/减选中（默认是 ⌘/Ctrl，这里改掉）
          */
         selectionKeyCode={['Control', 'Meta']}
+        /* 空格已归美工刀（#1159）：不让 RF 也把空格当"按住平移"，否则按一下空格就开始平移 */
+        panActivationKeyCode={null}
         multiSelectionKeyCode={['Shift']}
         /*
          * 框选「碰到就选中」（用户 2026-10-06 第 13 批第 10 条：「多选功能不需要把节点全部选中，
@@ -944,6 +1041,17 @@ function FlowSurfaceInner({
       <FlowPortLayer onPortDown={beginEdgeDrag} coarse={detailMode === 'coarse'} />
       {/* 子节点连线的**命中区**（双击删线）：必须在最上层才收得到指针，视觉是透明的 */}
       <FlowChildEdgeLayer hitOnly />
+      {/* 美工刀光标（#1159）：原生指针已被 `.knifeMode` 隐藏，这把刀就是指针本身 */}
+      {knifeOn && (
+        <div
+          className={styles.knifeCursor}
+          data-knife-cursor
+          style={{ left: knifeAt.x, top: knifeAt.y }}
+          aria-hidden
+        >
+          <Slice size={18} />
+        </div>
+      )}
     </div>
   )
 }

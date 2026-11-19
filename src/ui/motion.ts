@@ -11,6 +11,7 @@ export const DURATION = {
   lightbox: 180,
   edge: 100,
   select: 0,
+  cut: 260,
 } as const
 
 export type MotionName = keyof typeof DURATION
@@ -22,7 +23,10 @@ export const EASING = {
 
 /** 返回 CSS transition 字符串，用于 JS 驱动的动画（如 element.animate 之外的内联样式） */
 export function transition(name: MotionName): string {
-  const easing = name === 'menu' || name === 'hover' || name === 'edge' ? EASING.out : EASING.panel
+  const easing =
+    name === 'menu' || name === 'hover' || name === 'edge' || name === 'cut'
+      ? EASING.out
+      : EASING.panel
   return `${DURATION[name]}ms ${easing}`
 }
 

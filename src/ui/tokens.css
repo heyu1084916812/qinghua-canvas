@@ -40,6 +40,7 @@
   --dur-lightbox: 0ms;
   --dur-edge: 0ms;
   --dur-select: 0ms;
+  --dur-cut: 0ms;
 }
 
 :root {
@@ -293,6 +294,8 @@
   --dur-lightbox: 180ms;
   --dur-edge: 100ms;
   --dur-select: 0ms;
+  /* 切断连线时两段"分开 + 淡出"的时长：比 hover 慢一档，看得清是"切开"而不是"消失" */
+  --dur-cut: 260ms;
   --ease-out: ease-out;
   --ease-panel: cubic-bezier(0.2, 0.8, 0.2, 1);
 }
@@ -331,6 +334,7 @@
 @media (prefers-reduced-motion: reduce) {
   :root {
     --dur-menu: 0ms;
+    --dur-cut: 0ms;
   }
 }
 

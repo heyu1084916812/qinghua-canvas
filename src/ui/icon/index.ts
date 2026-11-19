@@ -126,6 +126,7 @@ export {
   Settings2,
   Shirt,
   ShoppingBag,
+  Slice,
   SlidersHorizontal,
   Smile,
   Sparkles,

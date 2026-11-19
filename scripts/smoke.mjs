@@ -2155,7 +2155,13 @@ async function g4(browser) {
     await sleep(300)
   }
 
-  // 空格 + 拖拽平移（点过工具栏后焦点不应滞留按钮，否则空格会被按钮吃掉）
+  /*
+   * 空格 = 美工刀（对账 #1159，用户 2026-11-19 拍板 A）。
+   *
+   * ⚠️ **口径变更**：以前这里是「空格 + 拖拽 = 平移画布」，现在空格专给刀具，
+   * 平移交给中键（下面那条）。所以这一条从「断言平移」改成「断言不再平移 + 刀具出现」，
+   * 免得哪天有人把空格又接回平移却没人发现。
+   */
   await resetView(page)
   await sleep(200)
   // 先把焦点从提示词 textarea 移回画布（文本框内空格属于输入，这是正确行为）
@@ -2165,15 +2171,26 @@ async function g4(browser) {
   })
   await sleep(150)
   const p0 = await readViewport(page)
-  await page.keyboard.down('Space')
+  await page.keyboard.press('Space')
+  await sleep(250)
+  const knifeCursor = await page.locator('[data-knife-cursor]').count()
+  rec(g, '空格 → 美工刀光标出现', knifeCursor === 1, `cursor=${knifeCursor}`)
   await page.mouse.move(cx, cy)
   await page.mouse.down()
   await page.mouse.move(cx + 120, cy + 80, { steps: 8 })
   await page.mouse.up()
-  await page.keyboard.up('Space')
   await sleep(250)
   const p1 = await readViewport(page)
-  rec(g, '空格 + 拖拽平移', p1.x !== p0.x || p1.y !== p0.y, `(${p0.x},${p0.y}) → (${p1.x},${p1.y})`)
+  rec(
+    g,
+    '空格开着时拖拽不再平移画布（平移已改中键）',
+    p1.x === p0.x && p1.y === p0.y,
+    `(${p0.x},${p0.y}) → (${p1.x},${p1.y})`,
+  )
+  await page.keyboard.press('Escape')
+  await sleep(200)
+  const knifeOff = await page.locator('[data-knife-cursor]').count()
+  rec(g, 'Esc 退出美工刀', knifeOff === 0, `cursor=${knifeOff}`)
 
   // 中键拖拽平移（无视选中）
   await resetView(page)
@@ -5966,13 +5983,11 @@ async function g24(browser) {
   const gapX = box.x + 215
   const gapY = box.y + 100
 
-  // 3) 平移后挂载数仍受限（空格 + 拖拽平移，落点不依赖空白命中）
-  await page.keyboard.down('Space')
+  // 3) 平移后挂载数仍受限（**中键**拖拽平移；空格已改作美工刀，见 #1159）
   await page.mouse.move(gapX, gapY)
-  await page.mouse.down()
+  await page.mouse.down({ button: 'middle' })
   await page.mouse.move(gapX - 420, gapY - 260, { steps: 12 })
-  await page.mouse.up()
-  await page.keyboard.up('Space')
+  await page.mouse.up({ button: 'middle' })
   await sleep(400)
   const mounted1 = await nodeCount(page)
   rec(g, '平移后节点仍全部在 DOM 里', mounted1 >= 300, `mounted=${mounted1}`)
@@ -5992,19 +6007,17 @@ async function g24(browser) {
   const fpsFloor = devTier ? 8 : 45
   const fpsTier = devTier ? '开发版地板 8fps（生产门槛 45fps 见 #240）' : '生产门槛 45fps'
 
-  // 4) 平移帧率：空格 + 拖拽往复 ~1.4s，rAF 采样 1s
+  // 4) 平移帧率：**中键**拖拽往复 ~1.4s，rAF 采样 1s（空格已改作美工刀，见 #1159）
   const panFps = await sampleFpsDuring(page, async () => {
-    await page.keyboard.down('Space')
     await page.mouse.move(gapX, gapY)
-    await page.mouse.down()
+    await page.mouse.down({ button: 'middle' })
     for (let i = 0; i < 14; i++) {
       const dx = i % 2 === 0 ? 220 : 40
       const dy = i % 2 === 0 ? 80 : 20
       await page.mouse.move(gapX - 200 + dx, gapY - 200 + dy, { steps: 4 })
       await sleep(55)
     }
-    await page.mouse.up()
-    await page.keyboard.up('Space')
+    await page.mouse.up({ button: 'middle' })
   })
   rec(g, `平移帧率 ≥ ${fpsFloor}fps｜${fpsTier}`, panFps >= fpsFloor, `${panFps}fps`)
 

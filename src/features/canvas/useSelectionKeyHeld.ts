@@ -10,7 +10,7 @@ import { useEffect, useState } from 'react'
  *
  * 解法：按住选择键时让命中层**整层不吃指针**（`data-port-selecting` → CSS 里
  * `pointer-events: none`），框选于是处处起得来 —— 与"按住空格 = 平移"同一类
- * "修饰键改手势语义"的处理（见 `useSpaceHeld`）。
+ * "修饰键改手势语义"的处理（空格那条已改作美工刀，见 `useKnifeMode`）。
  *
  * 文本输入框里按住 Ctrl（复制粘贴）与控件上的修饰键手势不接管，避免抢键。
  */
@@ -28,7 +28,7 @@ export function useSelectionKeyHeld(): boolean {
       if (e.key !== 'Control' && e.key !== 'Meta') return
       setHeld(false)
     }
-    /** 切走窗口 / 失焦时松开：否则回来时命中层一直不吃指针（与 `useSpaceHeld` 同一处理） */
+    /** 切走窗口 / 失焦时松开：否则回来时命中层一直不吃指针 */
     const reset = () => setHeld(false)
     window.addEventListener('keydown', down)
     window.addEventListener('keyup', up)
