@@ -2156,11 +2156,11 @@ async function g4(browser) {
   }
 
   /*
-   * 空格 = 美工刀（对账 #1159，用户 2026-11-19 拍板 A）。
+   * 空格 = 美工刀（对账 #1159，用户 2026-11-19 拍板 A；第二轮改成**按住式**）。
    *
-   * ⚠️ **口径变更**：以前这里是「空格 + 拖拽 = 平移画布」，现在空格专给刀具，
-   * 平移交给中键（下面那条）。所以这一条从「断言平移」改成「断言不再平移 + 刀具出现」，
-   * 免得哪天有人把空格又接回平移却没人发现。
+   * ⚠️ **口径变更史**：以前这里是「空格 + 拖拽 = 平移画布」，现在空格专给刀具、
+   * 平移交给中键（下面那条）；按下空格入刀具、**松开即恢复**。所以这一条从「断言平移」
+   * 改成「断言按住时不再平移 + 刀具出现 + 松开消失」，免得哪天有人把空格又接回平移。
    */
   await resetView(page)
   await sleep(200)
@@ -2171,10 +2171,10 @@ async function g4(browser) {
   })
   await sleep(150)
   const p0 = await readViewport(page)
-  await page.keyboard.press('Space')
+  await page.keyboard.down('Space')
   await sleep(250)
   const knifeCursor = await page.locator('[data-knife-cursor]').count()
-  rec(g, '空格 → 美工刀光标出现', knifeCursor === 1, `cursor=${knifeCursor}`)
+  rec(g, '按住空格 → 美工刀光标出现', knifeCursor === 1, `cursor=${knifeCursor}`)
   await page.mouse.move(cx, cy)
   await page.mouse.down()
   await page.mouse.move(cx + 120, cy + 80, { steps: 8 })
@@ -2187,10 +2187,10 @@ async function g4(browser) {
     p1.x === p0.x && p1.y === p0.y,
     `(${p0.x},${p0.y}) → (${p1.x},${p1.y})`,
   )
-  await page.keyboard.press('Escape')
+  await page.keyboard.up('Space')
   await sleep(200)
   const knifeOff = await page.locator('[data-knife-cursor]').count()
-  rec(g, 'Esc 退出美工刀', knifeOff === 0, `cursor=${knifeOff}`)
+  rec(g, '松开空格自动退出美工刀', knifeOff === 0, `cursor=${knifeOff}`)
 
   // 中键拖拽平移（无视选中）
   await resetView(page)

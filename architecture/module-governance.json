@@ -592,8 +592,7 @@
       "responsibility": "美工刀模式的 React 接线：订阅开关、空格/Esc 快捷键、跟随指针的坐标。",
       "owns": [
         "useKnifeOn",
-        "useKnifeShortcut",
-        "useKnifePointer"
+        "useKnifeShortcut"
       ],
       "doesNotOwn": [
         "切割命中计算",
@@ -601,8 +600,7 @@
       ],
       "publicApi": [
         "useKnifeOn",
-        "useKnifeShortcut",
-        "useKnifePointer"
+        "useKnifeShortcut"
       ],
       "test": [
         "src/features/canvas/knifeMode.test.ts"
@@ -706,7 +704,7 @@
       "test": [
         "src/features/canvas/knifeMode.test.ts"
       ],
-      "budget": 30
+      "budget": 50
     },
     {
       "module": "src/app/providers/SkillStoreContext.tsx",

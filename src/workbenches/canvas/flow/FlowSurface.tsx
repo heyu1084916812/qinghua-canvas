@@ -66,11 +66,7 @@ import { useTheme } from '../../../app/ThemeProvider'
 import { canvasTonePair } from '../../../domain/project/canvasStyle'
 import { useFonts } from '../../../app/providers/FontProvider'
 import { useEdgeDrag } from '../../../features/canvas/useEdgeDrag'
-import {
-  useKnifeOn,
-  useKnifePointer,
-  useKnifeShortcut,
-} from '../../../features/canvas/useKnifeMode'
+import { useKnifeOn, useKnifeShortcut } from '../../../features/canvas/useKnifeMode'
 import { FlowEdgeCutLayer } from './FlowEdgeCutLayer'
 import { useEdgeCut } from './useEdgeCut'
 import { KnifeCursor } from './KnifeCursor'
@@ -281,7 +277,6 @@ function FlowSurfaceInner({
   /** 美工刀（#1159）：空格切换 / Esc 退出。口径与实现见 `useKnifeMode` 与 `useEdgeCut` */
   useKnifeShortcut()
   const knifeOn = useKnifeOn()
-  const knifeAt = useKnifePointer(knifeOn)
   const { beginPan } = useCanvasViewport(store)
   const [importHover, setImportHover] = useState(false)
   const dragMovedRef = useRef(false)
@@ -975,9 +970,7 @@ function FlowSurfaceInner({
       {/* 子节点连线的**命中区**（双击删线）：必须在最上层才收得到指针，视觉是透明的 */}
       <FlowChildEdgeLayer hitOnly />
       {/* 美工刀光标（#1159）：原生指针已被 `.knifeMode` 隐藏，这把刀就是指针本身 */}
-      {knifeOn && (
-        <KnifeCursor x={knifeAt.x} y={knifeAt.y} />
-      )}
+      {knifeOn && <KnifeCursor active />}
     </div>
   )
 }
