@@ -276,6 +276,7 @@ function FlowSurfaceInner({
   useClipboardHotkeys(store)
   useCanvasKeyboard(store)
   const knifeOn = useKnifeOn()
+  const knifeClickPending = useRef(false)
   const { beginPan } = useCanvasViewport(store)
   const [importHover, setImportHover] = useState(false)
   const dragMovedRef = useRef(false)
@@ -403,7 +404,8 @@ function FlowSurfaceInner({
        * 放在捕获阶段最先处理并 `stopPropagation`：RF 的节点拖动 / 框选都挂在更内层，
        * 晚一步就会被它们先接走。
        */
-      if (knifeOn && e.button === 0) {
+      knifeClickPending.current = knifeOn && e.button === 0
+      if (knifeClickPending.current) {
         e.preventDefault()
         e.stopPropagation()
         beginSlice(e.clientX, e.clientY)
@@ -838,6 +840,12 @@ function FlowSurfaceInner({
       }}
       // 按下阶段：清「拖动后不弹面板」标记 + 记拖动起点锚（见 onSurfacePointerDown）
       onPointerDownCapture={onSurfacePointerDown}
+      onClickCapture={e => {
+        // Ignore only the physical click emitted after this stroke.
+        if (!knifeClickPending.current || e.detail === 0) return
+        knifeClickPending.current = false; e.preventDefault()
+        e.stopPropagation()
+      }}
       onContextMenu={onContextMenu}
     >
       {/* 拖线草稿（§6.14）：画在节点层**下面**（与老表面 EdgeLayer 同序），层本身不吃指针 */}
