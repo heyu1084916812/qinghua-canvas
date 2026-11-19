@@ -212,8 +212,7 @@ describe('buildRunPlan（单点生成）', () => {
   })
 
   /** 上游放一张「素材图片节点」（只有图、没有提示词），供下面两条用例共用 */
-  function withMaterialUpstream(store: CanvasStore, genId: string): void {
-    const materialId = 'n-material'
+  function withMaterialUpstream(store: CanvasStore, genId: string, materialId = 'n-material', hash = 'h-material'): void {
     store.dispatch({
       kind: 'node.create',
       projectId: 'p1',
@@ -223,12 +222,12 @@ describe('buildRunPlan（单点生成）', () => {
       title: '婴儿奶瓶.png',
       data: {
         mode: 'image',
-        assetHash: 'h-material',
+        assetHash: hash,
         prompt: '',
         linkedPromptNodeIds: [],
         channelId: 'ch-mock',
         model: 'mock-image-1',
-        thumbOrder: ['h-material'],
+        thumbOrder: [hash],
         upstreamHidden: [],
       },
     })
@@ -290,6 +289,30 @@ describe('buildRunPlan（单点生成）', () => {
     store.dispatch({ kind: 'node.updateData', id: genId, patch: { hiddenIds: [genId] } })
     const hiddenPlan = buildRunPlan('node', { originNodeId: genId }, store.getSnapshot(), 'single')
     expect(hiddenPlan.tasks[0]!.request.inputs.filter((i) => i.kind === 'asset')).toHaveLength(0)
+  })
+
+  it('#1155 本节点与上游图片按可见缩略图顺序进入最终请求，不动连线或节点位置', () => {
+    const { store, genId } = setup()
+    withMaterialUpstream(store, genId, 'a', 'cat')
+    withMaterialUpstream(store, genId, 'b', 'dog')
+    const hashes = () => buildRunPlan('node', { originNodeId: genId }, store.getSnapshot(), 'single')
+      .tasks[0]!.request.inputs.filter(i => i.kind === 'asset').map(i => i.assetHash)
+    const geometry = () => JSON.stringify(store.getSnapshot().nodes.map(({ id, parentId, x, y }) => [id, parentId, x, y]))
+    const edges = JSON.stringify(store.getSnapshot().edges)
+    const positions = geometry()
+    const patch = (data: Record<string, unknown>) => store.dispatch({ kind: 'node.updateData', id: genId, patch: data })
+    patch({ assetHash: 'self' })
+    expect(hashes()).toEqual(['self', 'cat', 'dog'])
+    patch({ inputOrder: ['b', genId, 'a'] })
+    expect(hashes()).toEqual(['dog', 'self', 'cat'])
+    patch({ hiddenIds: [genId] })
+    expect(hashes()).toEqual(['dog', 'cat'])
+    patch({ hiddenIds: [], upstreamHidden: ['b'] })
+    expect(hashes()).toEqual(['self', 'cat'])
+    patch({ upstreamHidden: [] })
+    expect(hashes()).toEqual(['dog', 'self', 'cat'])
+    expect(JSON.stringify(store.getSnapshot().edges)).toBe(edges)
+    expect(geometry()).toBe(positions)
   })
 
   it('渠道或模型未配置的节点不入计划', () => {

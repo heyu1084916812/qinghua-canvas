@@ -210,7 +210,7 @@ export const generationSpec: NodeSpec<GenerationData> = {
      * 只**在图片之间**换位，文字项的位置不动 —— 提示词是整段合并的，换位没有意义还容易打乱拼接顺序。
      */
     const inputOrder = (node.data as { inputOrder?: string[] }).inputOrder ?? []
-    if (inputOrder.length > 1) {
+    if (inputOrder.length > 0) {
       const rank = new Map(inputOrder.map((id, index) => [id, index]))
       const assetSlots = inputs
         .map((input, index) => ({ input, index }))

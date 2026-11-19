@@ -392,36 +392,20 @@ export function buildRunPlan(
           (sourceData as { hiddenIds?: string[] }).hiddenIds ?? [],
         ).has(node.id)
         const targetIsSelf = slot.kind === 'reuse' && slot.nodeId === node.id
-        const withSourceImage: NodeInput[] =
-          !targetIsSelf && !selfHidden && sourceAsset && !expansion.inputs.some((i) => i.kind === 'asset')
-            ? [
-                ...expansion.inputs,
-                {
-                  kind: 'asset',
-                  nodeId: node.id,
-                  assetHash: sourceAsset,
-                  mime: GENERATION_ASSET_MIME,
-                  /**
-                   * ⚠️ **必须带上 `naturalSize`**（用户 2026-10-17 报的融合 bug 的根，
-                   * 对账 #556）。
-                   *
-                   * 下面那段「跟随素材」是**按参考图 1 的 `naturalSize`** 定比例的：
-                   * 字段缺席 ⇒ `followed` 为 null ⇒ `ratio` 被写成 null ⇒
-                   * **请求里一个比例都不发** ⇒ 模型按自己的默认比例出图（多半 1:1）。
-                   *
-                   * 而这个分支恰好是"局部图 / 裁剪图"唯一的进图通道 ——
-                   * 它们是**浮动节点**（`extractSelection` 只建节点、不建边），
-                   * 没有上游可收集，图只能从这里注入。少了尺寸，
-                   * 「提取选区 → 改图 → 融合」这条主链路就会在最后一步被
-                   * `ratioMatches` 挡下，报的还是那句没法下手的"比例不一致"。
-                   *
-                   * 上游那条路（`generationSpec.collectInputs`）早就带着这个字段，
-                   * 两条路径必须一致 —— 否则"同一张图，连过去有比例、放在节点里有没比例"。
-                   */
-                  ...(sourceData.naturalSize ? { naturalSize: sourceData.naturalSize } : {}),
-                },
-              ]
-            : expansion.inputs
+        const withSourceImage = [...expansion.inputs]
+        const hasAsset = withSourceImage.some(i => i.kind === 'asset')
+        // 混排只用于用户发起生成的素材节点，不把下游重跑节点的旧产物变成参考图。
+        if (!targetIsSelf && !selfHidden && sourceAsset && (!hasAsset || (node.type === 'generation' && node.id === originNodeId))) {
+          const order = (sourceData as { inputOrder?: string[] }).inputOrder ?? []
+          const rank = new Map(order.map((id, i) => [id, i]))
+          const selfRank = rank.get(node.id) ?? Infinity
+          // 同为未排序项时，本节点在上游之前；套件参考图保留原有优先级。
+          const at = withSourceImage.findIndex(i => i.kind === 'asset' && !i.nodeId.startsWith('context-kit:') && (rank.get(i.nodeId) ?? Infinity) >= selfRank)
+          withSourceImage.splice(at < 0 ? withSourceImage.length : at, 0, {
+            kind: 'asset', nodeId: node.id, assetHash: sourceAsset, mime: GENERATION_ASSET_MIME,
+            ...(sourceData.naturalSize ? { naturalSize: sourceData.naturalSize } : {}),
+          })
+        }
 
         /**
          * 「跟随素材」比例 = **参考图 1 的原始比例**（用户 2026-09-24 放全局并定稿）。
