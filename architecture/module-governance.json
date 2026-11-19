@@ -13067,6 +13067,16 @@
       "budget": 180
     },
     {
+      "module": "src/pages/SettingsPage/settingsPage/useMappingTabAnchor.ts",
+      "owner": "settings-ui",
+      "responsibility": "模型映射类别切换时在绘制前保住标签的屏幕纵坐标，必要时只临时保留外层底部滚动范围。",
+      "owns": ["分类切换前后的滚动锚点", "渠道切换与滚回正常范围时释放底部余量"],
+      "doesNotOwn": ["标签几何", "表格高度和模型映射数据"],
+      "publicApi": ["useMappingTabAnchor"],
+      "test": ["scripts/smoke.mjs"],
+      "budget": 85
+    },
+    {
       "module": "src/pages/SettingsPage/settingsPage/FolderTabShape.tsx",
       "owner": "settings-ui",
       "responsibility": "渲染 Key 分组标签的几何层：每枚标签一张静止梯形 SVG，选中态一块共享形变层。",

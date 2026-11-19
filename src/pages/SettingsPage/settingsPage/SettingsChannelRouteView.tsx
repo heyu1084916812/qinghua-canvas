@@ -8,7 +8,7 @@ import { ModelIcon } from '../../../features/shared/modelIcon/ModelIcon'
 import { ChoicePicker } from '../../../features/shared/choicePicker/ChoicePicker'
 import { settingsPageStyles as styles } from './settingsPageStyles'
 import { SettingsModelCategoryTabs } from './SettingsModelCategoryTabs'
-
+import { useMappingTabAnchor } from './useMappingTabAnchor'
 type MapSaveNotice = {
   id: string
   tone: 'ok' | 'error'
@@ -34,6 +34,7 @@ const isMappingCategory = (
   MODEL_CATEGORY_ORDER.some((item) => item === category)
 
 export type SettingsChannelRouteViewProps = {
+  scrollScope?: string
   allGlobalModels: PresetModel[]
   customModels: readonly { id: string }[]
   uncommonModelIds: readonly string[]
@@ -57,6 +58,7 @@ export type SettingsChannelRouteViewProps = {
 }
 
 export function SettingsChannelRouteView({
+  scrollScope,
   allGlobalModels,
   customModels,
   uncommonModelIds,
@@ -129,7 +131,7 @@ export function SettingsChannelRouteView({
     groups.find((group) => group.rows.length > 0) ??
     groups[0]
   const activeRows = activeGroup?.rows ?? []
-
+  const { sectionRef, capture } = useMappingTabAnchor(activeGroup.category, scrollScope)
   useEffect(() => {
     if (!modelAddOpen) return
     const previous = document.activeElement instanceof HTMLElement
@@ -152,10 +154,7 @@ export function SettingsChannelRouteView({
   }, [modelAddOpen])
 
   return (
-    <section
-      className={`${styles.editorSection} ${styles.mappingSection}`}
-      data-settings-channel-route
-    >
+    <section ref={sectionRef} className={`${styles.editorSection} ${styles.mappingSection}`} data-settings-channel-route>
       {/* 标签栏贴在表格面板顶边、背后是页面底色：和 Key 分组同一套三段式（标题 / 标签 / 面板） */}
       <div className={styles.mappingTabsRow}>
         <SettingsModelCategoryTabs
@@ -166,7 +165,9 @@ export function SettingsChannelRouteView({
           }))}
           activeCategory={activeGroup.category}
           onChange={(category) => {
-            if (isMappingCategory(category)) setActiveCategory(category)
+            if (!isMappingCategory(category)) return
+            if (category !== activeGroup.category) capture()
+            setActiveCategory(category)
           }}
         />
         <label className={styles.showUncommonToggle}>

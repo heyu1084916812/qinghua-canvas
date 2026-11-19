@@ -17018,6 +17018,42 @@ async function g83(browser) {
       (await page.locator('[data-route-map-test]').count()) === 0,
   )
 
+  // #1146: click the short category with the real pointer, high enough in the
+  // viewport that shortening the form used to clamp the outer scroll position.
+  const tabs = page.locator('[data-route-map-filter]')
+  const longIndex = tabCounts.indexOf(Math.max(...tabCounts))
+  const shortIndex = tabCounts.indexOf(Math.min(...tabCounts))
+  await tabs.nth(longIndex).click()
+  const table = page.locator('[data-route-map-table]')
+  const longHeight = await table.evaluate((el) => el.getBoundingClientRect().height)
+  const shortTab = tabs.nth(shortIndex)
+  const anchor = await shortTab.evaluate((el) => {
+    const editor = el.closest('[data-settings-editor]')
+    editor.scrollTop += el.getBoundingClientRect().top - editor.getBoundingClientRect().top - 12
+    const rect = el.getBoundingClientRect()
+    return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2, top: editor.scrollTop }
+  })
+  await page.mouse.click(anchor.x, anchor.y)
+  await shortTab.locator('xpath=self::*[@aria-selected="true"]').waitFor()
+  const settledY = await shortTab.evaluate((el) => {
+    const rect = el.getBoundingClientRect()
+    return rect.top + rect.height / 2
+  })
+  const shortHeight = await table.evaluate((el) => el.getBoundingClientRect().height)
+  const editor = page.locator('[data-settings-editor]')
+  const reserve = await editor.evaluate((el) => parseFloat(el.style.getPropertyValue('--mapping-scroll-reserve')) || 0)
+  rec(
+    g,
+    '★★ 长分类切短：标签位置不跳、短表仍收起',
+    longIndex !== shortIndex && reserve > 0 && Math.abs(settledY - anchor.y) <= 1 && shortHeight < longHeight,
+    `标签 ${anchor.y}→${settledY}，表高 ${longHeight}→${shortHeight}，临时余量 ${reserve}`,
+  )
+  await table.hover()
+  await page.mouse.wheel(0, -(reserve + 60))
+  await page.waitForFunction(() => !document.querySelector('[data-settings-editor]')?.style.getPropertyValue('--mapping-scroll-reserve'))
+  const afterWheel = await editor.evaluate((el) => el.scrollTop)
+  rec(g, '★★ 切档后滚轮仍滚动，滚回正常范围撤掉余量', afterWheel < anchor.top, `${anchor.top}→${afterWheel}`)
+
   rec(g, '无未捕获异常', pageErrors.length === 0, pageErrors.join(' | '))
   await ctx.close()
 }

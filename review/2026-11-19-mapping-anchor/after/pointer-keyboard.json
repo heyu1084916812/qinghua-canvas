@@ -1,0 +1,342 @@
+[
+  {
+    "tag": "1440x900-dark",
+    "key": "audio",
+    "from": {
+      "x": 873.9375,
+      "y": 266.078125,
+      "tableHeight": 366,
+      "outer": 465,
+      "reserve": 0,
+      "focus": "image",
+      "under": "audio"
+    },
+    "to": {
+      "x": 873.9375,
+      "y": 266.078125,
+      "tableHeight": 102,
+      "outer": 465,
+      "reserve": 223,
+      "focus": "audio",
+      "under": "audio"
+    },
+    "wheeled": {
+      "x": 873.9375,
+      "y": 554.078125,
+      "tableHeight": 102,
+      "outer": 177,
+      "reserve": 0,
+      "focus": "audio",
+      "under": "audio"
+    }
+  },
+  {
+    "tag": "1440x900-dark",
+    "key": "video",
+    "from": {
+      "x": 774.8125,
+      "y": 266.078125,
+      "tableHeight": 366,
+      "outer": 465,
+      "reserve": 0,
+      "focus": "image",
+      "under": "video"
+    },
+    "to": {
+      "x": 774.8125,
+      "y": 266.078125,
+      "tableHeight": 44.796875,
+      "outer": 465,
+      "reserve": 280,
+      "focus": "video",
+      "under": "video"
+    },
+    "wheeled": {
+      "x": 774.8125,
+      "y": 611.078125,
+      "tableHeight": 44.796875,
+      "outer": 120,
+      "reserve": 0,
+      "focus": "video",
+      "under": "video"
+    }
+  },
+  {
+    "tag": "1440x900-dark",
+    "key": "keyboard:End",
+    "from": {
+      "x": 873.9375,
+      "y": 266.078125,
+      "tableHeight": 366,
+      "outer": 465,
+      "reserve": 0,
+      "focus": "image",
+      "under": "audio"
+    },
+    "to": {
+      "x": 873.9375,
+      "y": 266.078125,
+      "tableHeight": 102,
+      "outer": 465,
+      "reserve": 223,
+      "focus": "audio",
+      "under": "audio"
+    },
+    "errors": []
+  },
+  {
+    "tag": "1440x900-light",
+    "key": "audio",
+    "from": {
+      "x": 873.9375,
+      "y": 266.078125,
+      "tableHeight": 366,
+      "outer": 465,
+      "reserve": 0,
+      "focus": "image",
+      "under": "audio"
+    },
+    "to": {
+      "x": 873.9375,
+      "y": 266.078125,
+      "tableHeight": 102,
+      "outer": 465,
+      "reserve": 223,
+      "focus": "audio",
+      "under": "audio"
+    },
+    "wheeled": {
+      "x": 873.9375,
+      "y": 554.078125,
+      "tableHeight": 102,
+      "outer": 177,
+      "reserve": 0,
+      "focus": "audio",
+      "under": "audio"
+    }
+  },
+  {
+    "tag": "1440x900-light",
+    "key": "video",
+    "from": {
+      "x": 774.8125,
+      "y": 266.078125,
+      "tableHeight": 366,
+      "outer": 465,
+      "reserve": 0,
+      "focus": "image",
+      "under": "video"
+    },
+    "to": {
+      "x": 774.8125,
+      "y": 266.078125,
+      "tableHeight": 44.796875,
+      "outer": 465,
+      "reserve": 280,
+      "focus": "video",
+      "under": "video"
+    },
+    "wheeled": {
+      "x": 774.8125,
+      "y": 611.078125,
+      "tableHeight": 44.796875,
+      "outer": 120,
+      "reserve": 0,
+      "focus": "video",
+      "under": "video"
+    }
+  },
+  {
+    "tag": "1440x900-light",
+    "key": "keyboard:End",
+    "from": {
+      "x": 873.9375,
+      "y": 266.078125,
+      "tableHeight": 366,
+      "outer": 465,
+      "reserve": 0,
+      "focus": "image",
+      "under": "audio"
+    },
+    "to": {
+      "x": 873.9375,
+      "y": 266.078125,
+      "tableHeight": 102,
+      "outer": 465,
+      "reserve": 223,
+      "focus": "audio",
+      "under": "audio"
+    },
+    "errors": []
+  },
+  {
+    "tag": "1024x700-dark",
+    "key": "audio",
+    "from": {
+      "x": 825.9375,
+      "y": 257.875,
+      "tableHeight": 438,
+      "outer": 486,
+      "reserve": 0,
+      "focus": "image",
+      "under": "audio"
+    },
+    "to": {
+      "x": 825.9375,
+      "y": 257.875,
+      "tableHeight": 116,
+      "outer": 486,
+      "reserve": 25,
+      "focus": "audio",
+      "under": "audio"
+    },
+    "wheeled": {
+      "x": 825.9375,
+      "y": 347.875,
+      "tableHeight": 116,
+      "outer": 396,
+      "reserve": 0,
+      "focus": "audio",
+      "under": "audio"
+    }
+  },
+  {
+    "tag": "1024x700-dark",
+    "key": "video",
+    "from": {
+      "x": 726.8125,
+      "y": 257.875,
+      "tableHeight": 438,
+      "outer": 486,
+      "reserve": 0,
+      "focus": "image",
+      "under": "video"
+    },
+    "to": {
+      "x": 726.8125,
+      "y": 257.875,
+      "tableHeight": 44.796875,
+      "outer": 486,
+      "reserve": 96,
+      "focus": "video",
+      "under": "video"
+    },
+    "wheeled": {
+      "x": 726.8125,
+      "y": 418.875,
+      "tableHeight": 44.796875,
+      "outer": 325,
+      "reserve": 0,
+      "focus": "video",
+      "under": "video"
+    }
+  },
+  {
+    "tag": "1024x700-dark",
+    "key": "keyboard:End",
+    "from": {
+      "x": 825.9375,
+      "y": 257.875,
+      "tableHeight": 438,
+      "outer": 486,
+      "reserve": 0,
+      "focus": "image",
+      "under": "audio"
+    },
+    "to": {
+      "x": 825.9375,
+      "y": 257.875,
+      "tableHeight": 116,
+      "outer": 486,
+      "reserve": 25,
+      "focus": "audio",
+      "under": "audio"
+    },
+    "errors": []
+  },
+  {
+    "tag": "1024x700-light",
+    "key": "audio",
+    "from": {
+      "x": 825.9375,
+      "y": 257.875,
+      "tableHeight": 438,
+      "outer": 486,
+      "reserve": 0,
+      "focus": "image",
+      "under": "audio"
+    },
+    "to": {
+      "x": 825.9375,
+      "y": 257.875,
+      "tableHeight": 116,
+      "outer": 486,
+      "reserve": 25,
+      "focus": "audio",
+      "under": "audio"
+    },
+    "wheeled": {
+      "x": 825.9375,
+      "y": 347.875,
+      "tableHeight": 116,
+      "outer": 396,
+      "reserve": 0,
+      "focus": "audio",
+      "under": "audio"
+    }
+  },
+  {
+    "tag": "1024x700-light",
+    "key": "video",
+    "from": {
+      "x": 726.8125,
+      "y": 257.875,
+      "tableHeight": 438,
+      "outer": 486,
+      "reserve": 0,
+      "focus": "image",
+      "under": "video"
+    },
+    "to": {
+      "x": 726.8125,
+      "y": 257.875,
+      "tableHeight": 44.796875,
+      "outer": 486,
+      "reserve": 96,
+      "focus": "video",
+      "under": "video"
+    },
+    "wheeled": {
+      "x": 726.8125,
+      "y": 418.875,
+      "tableHeight": 44.796875,
+      "outer": 325,
+      "reserve": 0,
+      "focus": "video",
+      "under": "video"
+    }
+  },
+  {
+    "tag": "1024x700-light",
+    "key": "keyboard:End",
+    "from": {
+      "x": 825.9375,
+      "y": 257.875,
+      "tableHeight": 438,
+      "outer": 486,
+      "reserve": 0,
+      "focus": "image",
+      "under": "audio"
+    },
+    "to": {
+      "x": 825.9375,
+      "y": 257.875,
+      "tableHeight": 116,
+      "outer": 486,
+      "reserve": 25,
+      "focus": "audio",
+      "under": "audio"
+    },
+    "errors": []
+  }
+]

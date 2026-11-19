@@ -8,7 +8,7 @@
    * 于是上面留出一条"空着的白带"。去掉上内距后，第一张卡与左栏**同一条顶线**。
    * 左右 24px 与底部 20px 保持不变（卡片仍不贴边）。
    */
-  padding: 0 var(--space-6) var(--space-5);
+  padding: 0 var(--space-6) calc(var(--space-5) + var(--mapping-scroll-reserve, 0px));
   overflow: auto;
   min-height: 0;
 }

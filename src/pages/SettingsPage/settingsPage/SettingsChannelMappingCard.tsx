@@ -49,6 +49,7 @@ export function SettingsChannelMappingCard({
   return (
     <div className={styles.mappingWorkspaceCard} data-settings-section="mapping">
       <SettingsChannelRouteView
+        scrollScope={channel.id}
         allGlobalModels={draft.allGlobalModels}
         customModels={customModels}
         uncommonModelIds={uncommonModelIds}
