@@ -55,7 +55,10 @@ export async function knifePhotoBench(page,pid,out,releasePut=null) {
     await page.addStyleTag({content:'[data-edge-hit]{display:none!important}'})
     assert.equal(await page.locator('[data-edge-hit]').evaluateAll(es=>es.filter(e=>getComputedStyle(e).display==='none').length),edgeCount)
   }
-  const report={omitHitPaths,skipEdgeHit,hideBaseEdges,hideCutPreview,timing:"from before pointerdown through two post-pointerup animation frames",edgeCount,sourceHashes:[...hashes],evidence,b,rounds:[]};const save=()=>writeFileSync(out,JSON.stringify(report,null,2))
+  const batchBase=process.env.KNIFE_BATCH_BASE==='1'
+  const batchSize=Number(process.env.KNIFE_BATCH_SIZE??edgeCount);assert(Number.isInteger(batchSize)&&batchSize>0)
+  if(batchBase) await page.evaluate((await import('./knifeBatchProbe.mjs')).installKnifeBatchProbe,batchSize)
+  const report={batchSize,batchBase,omitHitPaths,skipEdgeHit,hideBaseEdges,hideCutPreview,timing:"from before pointerdown through two post-pointerup animation frames",edgeCount,sourceHashes:[...hashes],evidence,b,rounds:[]};const save=()=>writeFileSync(out,JSON.stringify(report,null,2))
   for(let round=1;round<=3;round++)for(const mode of ['miss','hit']){
     if(tracing) await page.evaluate(()=>{window.knifeMoves=[];window.pointerTrace=[];window.knifeListener=e=>window.pointerTrace.push([e.type,e.clientX,e.clientY,e.buttons]); for(const name of ['pointerdown','pointermove','pointerup']) window.addEventListener(name,window.knifeListener,true)})
     const x=b.x,y=b.top-20;await page.mouse.move(x,y);await page.keyboard.down('Space');await page.locator('[data-knife-cursor]').waitFor({state:'attached'})
@@ -81,5 +84,6 @@ export async function knifePhotoBench(page,pid,out,releasePut=null) {
     if(mode==='hit'){await page.keyboard.press('Control+z');await page.waitForTimeout(400);assert.deepEqual(await ids(),baseline)}
   }
   assert(report.rounds.every(r=>r.mode!=='hit'||r.remaining.length===0),'挥刀后仍有预期命中边残留，见报告')
+  if(batchBase){report.batchEvidence=await page.evaluate(()=>window.knifeBatchEvidence);save();assert.equal(report.batchEvidence.length,6);assert(report.batchEvidence.every((r,i)=>r.visible && r.initial===edgeCount && r.minimum===(i%2?0:edgeCount)))}
   console.log('real-photo benchmark',report.rounds.map(({mode,p95,max})=>({mode,p95,max})))
 }
