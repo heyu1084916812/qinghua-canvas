@@ -7,6 +7,7 @@ import assert from 'node:assert/strict'
 export async function knifePhotoBench(page,pid,out) {
   await page.setViewportSize({width:2400,height:1500}); const nodes=[], hashes=new Set(), files=[]
   for(let n=20;n<36;n++) files.push(join(process.env.SystemRoot,'Web','Wallpaper','Theme'+'ABCD'[Math.floor((n-20)/4)],`img${n}.jpg`))
+  const edgeCount=Number(process.env.KNIFE_EDGE_COUNT ?? 50); assert([50,200,500].includes(edgeCount))
   const tracing=process.env.KNIFE_TRACE==='1'; if(tracing) await (await import('./knifeTrace.mjs')).installKnifeTrace(page)
   const canvasUrl=page.url(); await page.goto(new URL('/projects',canvasUrl).href)
   for(const [i,file] of files.entries()){
@@ -24,17 +25,23 @@ export async function knifePhotoBench(page,pid,out) {
     },{b64:bytes.toString('base64'),hash,id,i,pid})
   }
   assert.equal(hashes.size,16)
-  await page.evaluate(async ({nodes,pid})=>{
+  await page.evaluate(async ({nodes,pid,edgeCount})=>{
     const {createSharedStorage}=await import('/src/platform/web/sharedStorage.ts');const db=createSharedStorage()
     for(const e of await db.query('edges',{projectId:pid}))await db.delete('edges',e.id)
     for(const n of await db.query('nodes',{projectId:pid}))if(!nodes.includes(n.id)) await db.delete('nodes',n.id)
-    for(let j=0;j<50;j++)await db.put('edges',{projectId:pid,id:`${pid}-bench-${j}`,source:nodes[j%8],target:nodes[8+(Math.floor(j/8)+j%8)%8]})
-  },{nodes,pid}); await page.goto(canvasUrl); await page.locator(`[data-edge="${pid}-bench-49"]`).waitFor({state:'attached'})
+    const left=nodes.slice(0,8),right=nodes.slice(8)
+    // 23x23 unique directed pairs; all cross the same clear centre corridor.
+    if(edgeCount>50) for(let i=0;i<15;i++) for(const [side,bank,x] of [['left',left,8],['right',right,2020]]){
+      const id=`${pid}-${side}-${i}`;bank.push(id)
+      await db.put('nodes',{id,projectId:pid,type:'prompt',parentId:null,x,y:150+i*65,w:100,h:50,title:side+i,disabled:false,data:{text:'test'}})
+    }
+    for(let j=0;j<edgeCount;j++)await db.put('edges',{projectId:pid,id:`${pid}-bench-${j}`,source:left[j%left.length],target:right[(Math.floor(j/left.length)+j%left.length)%right.length]})
+  },{nodes,pid,edgeCount}); await page.goto(canvasUrl); await page.locator(`[data-edge="${pid}-bench-${edgeCount-1}"]`).waitFor({state:'attached'})
   await page.waitForFunction(nodes=>nodes.every(id=>{const i=document.querySelector(`[data-node-id="${id}"] img`);return i?.complete&&i.naturalWidth>0}),nodes)
   const evidence=await page.evaluate(nodes=>nodes.map(id=>{const i=document.querySelector(`[data-node-id="${id}"] img`),r=i.getBoundingClientRect();return {x:r.x,y:r.y,w:r.width,h:r.height,width:i.naturalWidth,height:i.naturalHeight,visible:document.elementFromPoint(r.x+r.width/2,r.y+r.height/2)?.closest('[data-node-id]')?.dataset.nodeId===id}}),nodes)
-  assert(evidence.every(i=>i.visible),JSON.stringify(evidence));const ids=()=>page.locator('[data-edge]').evaluateAll(es=>es.map(e=>e.dataset.edge).sort());const baseline=await ids();assert.equal(baseline.length,50)
+  assert(evidence.every(i=>i.visible),JSON.stringify(evidence));const ids=()=>page.locator('[data-edge]').evaluateAll(es=>es.map(e=>e.dataset.edge).sort());const baseline=await ids();assert.equal(baseline.length,edgeCount)
   const b=await page.locator('[data-edge]').evaluateAll(es=>{const rs=es.map(e=>e.getBoundingClientRect());return {x:(Math.max(...rs.map(r=>r.left))+Math.min(...rs.map(r=>r.right)))/2,top:Math.min(...rs.map(r=>r.top)),bottom:Math.max(...rs.map(r=>r.bottom))}})
-  const report={sourceHashes:[...hashes],evidence,b,rounds:[]};const save=()=>writeFileSync(out,JSON.stringify(report,null,2))
+  const report={edgeCount,sourceHashes:[...hashes],evidence,b,rounds:[]};const save=()=>writeFileSync(out,JSON.stringify(report,null,2))
   for(let round=1;round<=3;round++)for(const mode of ['miss','hit']){
     if(tracing) await page.evaluate(()=>{window.knifeMoves=[];window.pointerTrace=[];window.knifeListener=e=>window.pointerTrace.push([e.type,e.clientX,e.clientY,e.buttons]); for(const name of ['pointerdown','pointermove','pointerup']) window.addEventListener(name,window.knifeListener,true)})
     const x=b.x,y=b.top-20;await page.mouse.move(x,y);await page.keyboard.down('Space');await page.locator('[data-knife-cursor]').waitFor({state:'attached'});await page.mouse.down()

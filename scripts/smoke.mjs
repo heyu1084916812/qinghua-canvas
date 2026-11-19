@@ -45799,7 +45799,7 @@ async function g170(browser) {
     if (process.env.KNIFE_PHOTO_BENCH) {
       const { knifePhotoBench } = await import('./knifePhotoBench.mjs')
       await knifePhotoBench(page, pid, process.env.KNIFE_PHOTO_BENCH)
-      rec(g, '16 张不同真图 + 50 条线：三轮空划、命中与撤销', true)
+      rec(g, `16 张不同真图 + ${process.env.KNIFE_EDGE_COUNT ?? 50} 条线：三轮空划、命中与撤销`, true)
       return
     }
     await page.evaluate(async pid => {
