@@ -315,6 +315,23 @@ describe('buildRunPlan（单点生成）', () => {
     expect(geometry()).toBe(positions)
   })
 
+  it('#1155 四个独立上游：重排、混入本图及隐藏恢复不丢编号', () => {
+    const { store, genId } = setup()
+    for (const id of ['cat', 'dog', 'chair', 'sofa']) withMaterialUpstream(store, genId, id, `img-${id}`)
+    const patch = (data: Record<string, unknown>) => store.dispatch({ kind: 'node.updateData', id: genId, patch: data })
+    const images = () => buildRunPlan('node', { originNodeId: genId }, store.getSnapshot(), 'single')
+      .tasks[0]!.request.inputs.filter(i => i.kind === 'asset').map(i => i.assetHash)
+    expect(images()).toEqual(['img-cat', 'img-dog', 'img-chair', 'img-sofa'])
+    patch({ inputOrder: ['sofa', 'chair', 'dog', 'cat'] })
+    expect(images()).toEqual(['img-sofa', 'img-chair', 'img-dog', 'img-cat'])
+    patch({ assetHash: 'self', inputOrder: ['sofa', 'chair', genId, 'dog', 'cat'] })
+    expect(images()).toEqual(['img-sofa', 'img-chair', 'self', 'img-dog', 'img-cat'])
+    patch({ upstreamHidden: ['chair', 'cat'] })
+    expect(images()).toEqual(['img-sofa', 'self', 'img-dog'])
+    patch({ upstreamHidden: [] })
+    expect(images()).toEqual(['img-sofa', 'img-chair', 'self', 'img-dog', 'img-cat'])
+  })
+
   it('渠道或模型未配置的节点不入计划', () => {
     const { store, promptId } = setup()
     store.dispatch({
