@@ -7,6 +7,7 @@ import assert from 'node:assert/strict'
 export async function knifePhotoBench(page,pid,out) {
   await page.setViewportSize({width:2400,height:1500}); const nodes=[], hashes=new Set(), files=[]
   for(let n=20;n<36;n++) files.push(join(process.env.SystemRoot,'Web','Wallpaper','Theme'+'ABCD'[Math.floor((n-20)/4)],`img${n}.jpg`))
+  const tracing=process.env.KNIFE_TRACE==='1'; if(tracing) await (await import('./knifeTrace.mjs')).installKnifeTrace(page)
   const canvasUrl=page.url(); await page.goto(new URL('/projects',canvasUrl).href)
   for(const [i,file] of files.entries()){
     const bytes=readFileSync(file), hash=createHash('sha1').update(bytes).digest('hex'); hashes.add(hash)
@@ -35,10 +36,14 @@ export async function knifePhotoBench(page,pid,out) {
   const b=await page.locator('[data-edge]').evaluateAll(es=>{const rs=es.map(e=>e.getBoundingClientRect());return {x:(Math.max(...rs.map(r=>r.left))+Math.min(...rs.map(r=>r.right)))/2,top:Math.min(...rs.map(r=>r.top)),bottom:Math.max(...rs.map(r=>r.bottom))}})
   const report={sourceHashes:[...hashes],evidence,b,rounds:[]};const save=()=>writeFileSync(out,JSON.stringify(report,null,2))
   for(let round=1;round<=3;round++)for(const mode of ['miss','hit']){
+    if(tracing) await page.evaluate(()=>{window.knifeMoves=[];window.pointerTrace=[];window.knifeListener=e=>window.pointerTrace.push([e.type,e.clientX,e.clientY,e.buttons]); for(const name of ['pointerdown','pointermove','pointerup']) window.addEventListener(name,window.knifeListener,true)})
     const x=b.x,y=b.top-20;await page.mouse.move(x,y);await page.keyboard.down('Space');await page.locator('[data-knife-cursor]').waitFor({state:'attached'});await page.mouse.down()
     await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(t=>{window.samples=[];let last=t;const tick=n=>{window.samples.push(n-last);last=n;window.frame=requestAnimationFrame(tick)};window.frame=requestAnimationFrame(tick);resolve()})))
     await page.mouse.move(mode==='miss'?x+120:x,mode==='miss'?y:b.bottom+20,{steps:48});await page.mouse.up();const ms=await page.evaluate(()=>{cancelAnimationFrame(window.frame);return window.samples});await page.keyboard.up('Space');await page.waitForTimeout(300)
-    const after=await ids(),sorted=[...ms].sort((a,b)=>a-b);report.rounds.push({round,mode,ms,p95:sorted[Math.ceil(.95*ms.length)-1],max:sorted.at(-1),remaining:after});save();assert(ms.length>=10);if(mode==='miss') assert.deepEqual(after,baseline)
+    const after=await ids(),sorted=[...ms].sort((a,b)=>a-b);report.rounds.push({round,mode,ms,p95:sorted[Math.ceil(.95*ms.length)-1],max:sorted.at(-1),remaining:after});if(tracing){
+      const trace=await page.evaluate(()=>{for(const name of ['pointerdown','pointermove','pointerup'])window.removeEventListener(name,window.knifeListener,true);return {moves:window.knifeMoves,pointer:window.pointerTrace}})
+      assert(trace.moves.length>0,'instrumented module not active');report.rounds.at(-1).trace=trace
+    }save();assert(ms.length>=10);if(mode==='miss') assert.deepEqual(after,baseline)
     if(mode==='hit'){await page.keyboard.press('Control+z');await page.waitForTimeout(400);assert.deepEqual(await ids(),baseline)}
   }
   assert(report.rounds.every(r=>r.mode!=='hit'||r.remaining.length===0),'挥刀后仍有预期命中边残留，见报告')
