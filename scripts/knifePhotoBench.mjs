@@ -55,12 +55,14 @@ export async function knifePhotoBench(page,pid,out) {
       const tick=n=>{window.samples.push(n-last);last=n;window.frame=requestAnimationFrame(tick)}
       window.frame=requestAnimationFrame(tick);resolve()
     })))
+    const stopProfile=round===2 && mode==='hit' && process.env.KNIFE_PROFILE ? await (await import('./knifeProfile.mjs')).startKnifeProfile(page,process.env.KNIFE_PROFILE) : null
+    if(stopProfile) await page.evaluate(()=>performance.mark('knife-profile-start'))
     await page.mouse.down();await page.mouse.move(mode==='miss'?x+120:x,mode==='miss'?y:b.bottom+20,{steps:48});await page.mouse.up()
     const {ms,phase}=await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(()=>{
       cancelAnimationFrame(window.frame)
       for(const name of ['pointerdown','pointermove','pointerup']) window.removeEventListener(name,window.phaseListener,true)
       resolve({ms:window.samples,phase:window.knifePhase})
-    }))));await page.keyboard.up('Space');await page.waitForTimeout(300)
+    }))));if(stopProfile){await page.evaluate(()=>performance.mark('knife-profile-end'));await stopProfile()}await page.keyboard.up('Space');await page.waitForTimeout(300)
     const after=await ids(),sorted=[...ms].sort((a,b)=>a-b);report.rounds.push({round,mode,ms,phase,p95:sorted[Math.ceil(.95*ms.length)-1],max:sorted.at(-1),remaining:after});if(tracing){
       const trace=await page.evaluate(()=>{for(const name of ['pointerdown','pointermove','pointerup'])window.removeEventListener(name,window.knifeListener,true);return {moves:window.knifeMoves,pointer:window.pointerTrace}})
       assert(trace.moves.length>0,'instrumented module not active');report.rounds.at(-1).trace=trace

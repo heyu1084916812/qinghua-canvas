@@ -1,0 +1,396 @@
+{
+  "wallMs": 5880,
+  "main": "21168:41000",
+  "threads": [
+    {
+      "id": "42300:19528",
+      "thread": "GpuVSyncThread",
+      "totalMs": 5874,
+      "top": [
+        [
+          "ThreadControllerImpl::RunTask",
+          5863
+        ],
+        [
+          "RunTask",
+          11
+        ]
+      ]
+    },
+    {
+      "id": "42300:39492",
+      "thread": "CrGpuMain",
+      "totalMs": 4812,
+      "top": [
+        [
+          "GPUTask",
+          4132
+        ],
+        [
+          "ThreadControllerImpl::RunTask",
+          673
+        ],
+        [
+          "RunTask",
+          8
+        ],
+        [
+          "Receive mojo message",
+          0
+        ],
+        [
+          "SimpleWatcher::OnHandleReady",
+          0
+        ]
+      ]
+    },
+    {
+      "id": "21168:41000",
+      "thread": "CrRendererMain",
+      "totalMs": 3689,
+      "top": [
+        [
+          "Layerize",
+          1014
+        ],
+        [
+          "ThreadControllerImpl::RunTask",
+          558
+        ],
+        [
+          "FunctionCall",
+          513
+        ],
+        [
+          "UpdateLayoutTree",
+          480
+        ],
+        [
+          "HitTest",
+          365
+        ],
+        [
+          "Commit",
+          156
+        ],
+        [
+          "Paint",
+          134
+        ],
+        [
+          "PrePaint",
+          116
+        ]
+      ]
+    },
+    {
+      "id": "21168:30260",
+      "thread": "Compositor",
+      "totalMs": 1205,
+      "top": [
+        [
+          "ThreadControllerImpl::RunTask",
+          964
+        ],
+        [
+          "Receive mojo message",
+          174
+        ],
+        [
+          "SimpleWatcher::OnHandleReady",
+          26
+        ],
+        [
+          "IOHandler::OnIOCompleted",
+          23
+        ],
+        [
+          "RunTask",
+          15
+        ],
+        [
+          "cc::TaskGraphWorkQueue::ScheduleTasks",
+          2
+        ]
+      ]
+    },
+    {
+      "id": "21168:11280",
+      "thread": "ThreadPoolForegroundWorker",
+      "totalMs": 722,
+      "top": [
+        [
+          "RasterTask",
+          353
+        ],
+        [
+          "ThreadPool_RunTask",
+          331
+        ],
+        [
+          "TaskGraphRunner::RunTask",
+          27
+        ],
+        [
+          "V8.GC_SCAVENGER_BACKGROUND_SCAVENGE_PARALLEL",
+          9
+        ],
+        [
+          "V8.GC_SCAVENGER_BACKGROUND_TRACED_HANDLES_COMPUTE_WEAKNESS_PARALLEL",
+          2
+        ],
+        [
+          "cc::TaskGraphWorkQueue::ScheduleTasks",
+          0
+        ]
+      ]
+    },
+    {
+      "id": "42300:12156",
+      "thread": "VizCompositorThread",
+      "totalMs": 516,
+      "top": [
+        [
+          "ThreadControllerImpl::RunTask",
+          401
+        ],
+        [
+          "Receive mojo message",
+          73
+        ],
+        [
+          "SimpleWatcher::OnHandleReady",
+          28
+        ],
+        [
+          "RunTask",
+          14
+        ]
+      ]
+    },
+    {
+      "id": "43852:27484",
+      "thread": "DevToolsPipeHandlerWriteThread",
+      "totalMs": 175,
+      "top": [
+        [
+          "ThreadControllerImpl::RunTask",
+          171
+        ],
+        [
+          "RunTask",
+          4
+        ]
+      ]
+    },
+    {
+      "id": "21168:22524",
+      "thread": "ThreadPoolForegroundWorker",
+      "totalMs": 130,
+      "top": [
+        [
+          "ThreadPool_RunTask",
+          105
+        ],
+        [
+          "V8.GC_SCAVENGER_BACKGROUND_SCAVENGE_PARALLEL",
+          12
+        ],
+        [
+          "RasterTask",
+          11
+        ],
+        [
+          "V8.GC_SCAVENGER_BACKGROUND_TRACED_HANDLES_COMPUTE_WEAKNESS_PARALLEL",
+          2
+        ],
+        [
+          "TaskGraphRunner::RunTask",
+          0
+        ],
+        [
+          "V8.GC_SCAVENGER_BACKGROUND_TRACED_HANDLES_RESET_PARALLEL",
+          0
+        ],
+        [
+          "cc::TaskGraphWorkQueue::ScheduleTasks",
+          0
+        ]
+      ]
+    },
+    {
+      "id": "21168:43472",
+      "thread": "PerfettoTrace",
+      "totalMs": 116,
+      "top": [
+        [
+          "ThreadControllerImpl::RunTask",
+          115
+        ],
+        [
+          "SimpleWatcher::OnHandleReady",
+          1
+        ],
+        [
+          "RunTask",
+          0
+        ],
+        [
+          "Receive mojo message",
+          0
+        ],
+        [
+          "Receive mojo reply",
+          0
+        ]
+      ]
+    },
+    {
+      "id": "43852:36268",
+      "thread": "CrBrowserMain",
+      "totalMs": 101,
+      "top": [
+        [
+          "ThreadControllerImpl::RunTask",
+          61
+        ],
+        [
+          "Receive mojo message",
+          16
+        ],
+        [
+          "RunTask",
+          10
+        ],
+        [
+          "SimpleWatcher::OnHandleReady",
+          8
+        ],
+        [
+          "Receive mojo reply",
+          5
+        ],
+        [
+          "UkmRecorderImpl::NotifyObserversWithNewEntry",
+          0
+        ],
+        [
+          "Closed mojo endpoint",
+          0
+        ]
+      ]
+    },
+    {
+      "id": "42300:25336",
+      "thread": "Chrome_ChildIOThread",
+      "totalMs": 72,
+      "top": [
+        [
+          "IOHandler::OnIOCompleted",
+          54
+        ],
+        [
+          "Receive mojo message",
+          10
+        ],
+        [
+          "SimpleWatcher::OnHandleReady",
+          7
+        ],
+        [
+          "ThreadControllerImpl::RunTask",
+          0
+        ],
+        [
+          "RunTask",
+          0
+        ]
+      ]
+    },
+    {
+      "id": "21168:19796",
+      "thread": "Chrome_ChildIOThread",
+      "totalMs": 47,
+      "top": [
+        [
+          "IOHandler::OnIOCompleted",
+          21
+        ],
+        [
+          "ThreadControllerImpl::RunTask",
+          19
+        ],
+        [
+          "RunTask",
+          3
+        ],
+        [
+          "SimpleWatcher::OnHandleReady",
+          2
+        ],
+        [
+          "Receive mojo reply",
+          1
+        ]
+      ]
+    },
+    {
+      "id": "21168:35028",
+      "thread": "ThreadPoolForegroundWorker",
+      "totalMs": 28,
+      "top": [
+        [
+          "ThreadPool_RunTask",
+          16
+        ],
+        [
+          "V8.GC_SCAVENGER_BACKGROUND_SCAVENGE_PARALLEL",
+          12
+        ],
+        [
+          "V8.GC_SCAVENGER_BACKGROUND_TRACED_HANDLES_RESET_PARALLEL",
+          0
+        ],
+        [
+          "RasterTask",
+          0
+        ],
+        [
+          "TaskGraphRunner::RunTask",
+          0
+        ],
+        [
+          "cc::TaskGraphWorkQueue::ScheduleTasks",
+          0
+        ]
+      ]
+    },
+    {
+      "id": "43852:36880",
+      "thread": "Chrome_IOThread",
+      "totalMs": 27,
+      "top": [
+        [
+          "IOHandler::OnIOCompleted",
+          16
+        ],
+        [
+          "ThreadControllerImpl::RunTask",
+          7
+        ],
+        [
+          "SimpleWatcher::OnHandleReady",
+          3
+        ],
+        [
+          "RunTask",
+          2
+        ],
+        [
+          "Receive mojo message",
+          1
+        ]
+      ]
+    }
+  ]
+}
