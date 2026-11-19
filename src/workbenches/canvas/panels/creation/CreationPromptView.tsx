@@ -34,6 +34,8 @@ interface CreationPromptViewProps {
   mentionThumbRef: MutableRefObject<Map<string, string>>
   mentionThumbVersion: number
   mentionThumbOf: (id: string) => string | null
+  /** 本次"未参与"的节点 id：引用到它们的 @ 胶囊要跟着置灰（#1160 第二轮） */
+  dimmedNodeIds?: ReadonlySet<string>
   promptToggle?: PromptToggle | null
   promptMode: boolean
   promptLength: number
@@ -63,6 +65,7 @@ export function CreationPromptView({
   mentionThumbRef,
   mentionThumbVersion,
   mentionThumbOf,
+  dimmedNodeIds,
   promptToggle,
   promptMode,
   promptLength,
@@ -114,6 +117,7 @@ export function CreationPromptView({
             onChipClick={onChipClick}
             thumbOf={mentionThumbOf}
             thumbVersion={mentionThumbVersion}
+            dimmedIds={dimmedNodeIds}
             onBlur={onPromptBlur}
           />
           {mentionOpen && (

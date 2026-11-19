@@ -894,6 +894,7 @@ export function CreationPanel(props: CreationPanelProps) {
         mentionThumbRef={mentionThumbRef}
         mentionThumbVersion={mentionThumbVersion}
         mentionThumbOf={mentionThumbOf}
+        dimmedNodeIds={model.offNodeIds}
         promptToggle={model.promptToggle}
         promptMode={promptMode}
         promptLength={model.prompt.length}

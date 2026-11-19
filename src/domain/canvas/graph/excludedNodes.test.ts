@@ -38,12 +38,12 @@ describe('excludedNodeIds · 画布「未参与」集合（#1160）', () => {
   })
 
   /**
-   * ⚠️ 生成 / 提示词节点自己的 `hiddenIds` 装的是**它自己**（自家素材被隐藏）——
-   * 那只是"这次不拿自己的素材当输入"，节点照常跑。错把它当"未参与"会让节点莫名变灰。
+   * 用户 2026-11-19 看图一后纠正：**自家缩略图被隐藏，节点也要置灰**
+   * （生成 / 提示词节点把自己的 id 写进 `hiddenIds`）。
    */
-  it('★ 生成节点隐藏自家素材 ≠ 节点未参与（不许置灰）', () => {
+  it('★ 生成节点隐藏自家素材 → 该节点进集合（自家素材也算未参与）', () => {
     const g = graph([node({ id: 'gen', type: 'generation', data: { hiddenIds: ['gen'] } as never })])
-    expect(excludedNodeIds(g).size).toBe(0)
+    expect([...excludedNodeIds(g)]).toEqual(['gen'])
   })
 
   it('多个消费者：任意一个隐藏它就算（B1）', () => {

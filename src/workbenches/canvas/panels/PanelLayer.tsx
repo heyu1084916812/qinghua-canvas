@@ -2,6 +2,7 @@ import { useMemo, useSyncExternalStore } from 'react'
 import type { NodeSnapshot, GenerationData, GroupData, BatchData, PromptData } from '../../../domain/canvas/model/node'
 import { directUpstream } from '../../../domain/canvas/graph/upstreamOf'
 import { indexNodes } from '../../../domain/canvas/model/graph'
+import { excludedNodeIds } from '../../../domain/canvas/graph/excludedNodes'
 import { toWorldRectInGraph } from '../../../domain/canvas/geometry/coords'
 import { childIdsOf } from '../../../domain/canvas/nodeSpecs/group'
 import { batchItemsOf, externalInputsOf } from '../../../domain/canvas/nodeSpecs/batch'
@@ -436,11 +437,8 @@ function buildPanelModel(node: NodeSnapshot, graph: ReturnType<typeof useGraph>)
     }
   }
   if (data.assetHash) {
-    /*
-     * 节点自身内容：删除 = **清空本节点的素材**（提示词节点这里只是历史遗留素材，
-     * 不给删除入口，它的正文才是内容）。隐藏走 `hiddenIds`，与上游同一口径
-     * （用户 2026-11-19：本节点素材也要能隐藏，`buildRunPlan` 据此跳过自注入）。
-     */
+    /* 节点自身内容：删除 = 清空本节点素材（提示词节点不给删除入口，正文才是内容）；
+       隐藏走 `hiddenIds`（用户 2026-11-19），`buildRunPlan` 据此跳过自注入 */
     const selfHidden = new Set((data as { hiddenIds?: string[] }).hiddenIds ?? [])
     thumbs.unshift({
       owner: 'self',
@@ -459,6 +457,7 @@ function buildPanelModel(node: NodeSnapshot, graph: ReturnType<typeof useGraph>)
   return {
     thumbs,
     collections,
+    offNodeIds: excludedNodeIds(graph),
     emptyHint: '连线上游节点，或拖入素材',
     /**
      * 提示词节点：面板只绑定**输入草稿**（`draft`），节点正文是结果（`text`）。

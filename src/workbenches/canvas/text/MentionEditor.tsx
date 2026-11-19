@@ -322,6 +322,11 @@ export const MentionEditor = forwardRef<
     thumbOf?: (nodeId: string) => string | null
     /** 缩略图缓存版本号：变了就把已有的槽位**就地**补一遍图 */
     thumbVersion?: number
+    /**
+     * 本次「未参与」的节点 id（对账 #1160 第二轮，用户 2026-11-19）：
+     * 正文里那些引用到它们的 `@` 胶囊要跟着置灰 —— 否则缩略图已经灰了、正文里的胶囊还亮着。
+     */
+    dimmedIds?: ReadonlySet<string>
   }
 >(function MentionEditor(
   {
@@ -338,6 +343,7 @@ export const MentionEditor = forwardRef<
     anchorAttr,
     thumbOf,
     thumbVersion,
+    dimmedIds,
   },
   handleRef,
 ) {
@@ -398,6 +404,25 @@ export const MentionEditor = forwardRef<
     }
     // `value` 也要进依赖：新插进来的 chip 可能带着还没填的槽
   }, [thumbVersion, thumbOf, value])
+
+  /**
+   * 「未参与」的引用胶囊置灰（#1160 第二轮）。
+   *
+   * 与 `fillThumbs` 同一套路子：**就地改属性**，不重建 DOM（重建会吃掉光标）。
+   * `value` 进依赖是因为插入/删除 chip 会换一茬 DOM；`dimmedIds` 进依赖是因为
+   * 面板上点一下眼睛、正文一个字都没变，但胶囊得立刻跟着灰。
+   */
+  useEffect(() => {
+    const el = ref.current
+    if (!el) return
+    for (const chip of el.querySelectorAll<HTMLElement>('[data-token]')) {
+      const token = chip.getAttribute('data-token') ?? ''
+      const id = /^@\[[^\]]*\]\(node:([^)]*)\)/.exec(token)?.[1] ?? ''
+      if (!id) continue
+      if (dimmedIds?.has(id)) chip.setAttribute('data-mention-off', '')
+      else chip.removeAttribute('data-mention-off')
+    }
+  }, [dimmedIds, value])
 
   const focusEnd = () => {
     const el = ref.current

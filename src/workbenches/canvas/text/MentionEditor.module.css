@@ -84,6 +84,15 @@
   white-space: nowrap;
 }
 
+/*
+ * 「未参与」的引用胶囊（#1160 第二轮，用户 2026-11-19）：
+ * 被关掉眼睛的节点，正文里引用它的 `@` 胶囊跟画布上的节点框**同一档**置灰（0.6），
+ * 只降透明度、不加删除线 —— 它仍然是正文的一部分，只是这次不参与。
+ */
+.chip[data-mention-off] {
+  opacity: 0.6;
+}
+
 .chipIcon {
   display: inline-flex;
   flex: 0 0 auto;
