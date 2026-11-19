@@ -45811,6 +45811,27 @@ async function g170(browser) {
     await page.locator(`[data-edge="${pid}-knife-3"]`).waitFor({ state: 'attached' })
     const ids = () => page.locator('[data-edge]').evaluateAll(es => es.map(e => e.dataset.edge).sort())
     const initial = await ids()
+    const realLoad = process.env.KNIFE_REAL_IMAGES === '1'
+    const imported = []
+    if (realLoad) {
+      const surface = page.locator('[data-canvas-surface]')
+      for (const [file, mime, y] of [
+        ['scripts/fixtures/mediapipe-portrait.jpg', 'image/jpeg', 160],
+        ['review/2026-11-18-multi-drag-release/fixture-calligraphy.png', 'image/png', 480],
+      ]) {
+        const before = await page.locator('[data-node-id]').evaluateAll(es => es.map(e => e.dataset.nodeId))
+        const dt = await page.evaluateHandle(({b64, mime, file}) => {
+          const d = new DataTransfer()
+          d.items.add(new File([Uint8Array.from(atob(b64), c => c.charCodeAt(0))], file, {type:mime}))
+          return d
+        }, {b64:readFileSync(file).toString('base64'), mime, file:file.split('/').pop()})
+        await surface.dispatchEvent('drop', { dataTransfer:dt, clientX:1060, clientY:y })
+        await dt.dispose()
+        const img = await page.waitForFunction(before => [...document.querySelectorAll('[data-node-id] img')].find(i =>
+          !before.includes(i.closest('[data-node-id]').dataset.nodeId) && i.complete && i.naturalWidth > 0), before)
+        imported.push(await img.evaluate(i => i.closest('[data-node-id]').dataset.nodeId))
+      }
+    }
     const v0 = await readViewport(page)
     await page.mouse.move(680, 420)
     await page.mouse.wheel(0, 260)
@@ -45830,6 +45851,34 @@ async function g170(browser) {
     const [first,,third] = points
     const hit = new Set(points.slice(0,3).map(p => p.id))
     const remaining = initial.filter(id => !hit.has(id))
+    if (realLoad) {
+      const evidence = await page.evaluate(ids => ids.map(id => {
+        const img = document.querySelector(`[data-node-id="${id}"] img`)
+        const r = img.getBoundingClientRect()
+        return { width:img.naturalWidth, height:img.naturalHeight, visible: img.complete && r.width>0 && r.height>0 &&
+          document.elementFromPoint(r.x+r.width/2,r.y+r.height/2)?.closest('[data-node-id]')?.dataset.nodeId===id }
+      }), imported)
+      rec(g,'两张不同真实素材均解码且中心可见', evidence.length===2 && evidence.every(i=>i.visible && i.width>0), JSON.stringify(evidence))
+      for (let round=1; round<=3; round++) {
+        await page.mouse.move(first.x, first.y-18)
+        await page.keyboard.down('Space')
+        await page.mouse.down()
+        await page.evaluate(() => new Promise(resolve => requestAnimationFrame(t => {
+          window.knifeFrames = []; let last=t
+          const tick = now => { window.knifeFrames.push(now-last); last=now; window.knifeRaf=requestAnimationFrame(tick) }
+          window.knifeRaf=requestAnimationFrame(tick); resolve()
+        })))
+        await page.mouse.move(third.x, third.y+18, {steps:48})
+        await page.mouse.up()
+        const ms = await page.evaluate(() => { cancelAnimationFrame(window.knifeRaf); return window.knifeFrames })
+        await page.keyboard.up('Space')
+        const sorted=[...ms].sort((a,b)=>a-b)
+        const actual=await ids()
+        rec(g,`真图挥刀第 ${round} 轮：采样且只切三线`,ms.length>=10 && JSON.stringify(actual)===JSON.stringify(remaining),
+          JSON.stringify({frames:ms.length,p95:sorted[Math.ceil(ms.length*.95)-1],max:sorted.at(-1),ms}))
+        await page.keyboard.press('Control+z'); await sleep(350)
+      }
+    }
     await page.mouse.move(first.x, first.y-18)
     await page.keyboard.down('Space')
     await page.locator('[data-knife-cursor]').waitFor({state:'attached'})
