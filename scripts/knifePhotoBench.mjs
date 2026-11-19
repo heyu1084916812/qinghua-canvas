@@ -57,8 +57,9 @@ export async function knifePhotoBench(page,pid,out,releasePut=null) {
   }
   const batchBase=process.env.KNIFE_BATCH_BASE==='1'
   const batchSize=Number(process.env.KNIFE_BATCH_SIZE??edgeCount);assert(Number.isInteger(batchSize)&&batchSize>0)
-  if(batchBase) await page.evaluate((await import('./knifeBatchProbe.mjs')).installKnifeBatchProbe,batchSize)
-  const report={batchSize,batchBase,omitHitPaths,skipEdgeHit,hideBaseEdges,hideCutPreview,timing:"from before pointerdown through two post-pointerup animation frames",edgeCount,sourceHashes:[...hashes],evidence,b,rounds:[]};const save=()=>writeFileSync(out,JSON.stringify(report,null,2))
+  const lazy=process.env.KNIFE_BATCH_LAZY==='1'
+  if(batchBase) await page.evaluate((await import('./knifeBatchProbe.mjs')).installKnifeBatchProbe,{chunkSize:batchSize,lazy})
+  const report={lazy,batchSize,batchBase,omitHitPaths,skipEdgeHit,hideBaseEdges,hideCutPreview,timing:"from before pointerdown through two post-pointerup animation frames",edgeCount,sourceHashes:[...hashes],evidence,b,rounds:[]};const save=()=>writeFileSync(out,JSON.stringify(report,null,2))
   for(let round=1;round<=3;round++)for(const mode of ['miss','hit']){
     if(tracing) await page.evaluate(()=>{window.knifeMoves=[];window.pointerTrace=[];window.knifeListener=e=>window.pointerTrace.push([e.type,e.clientX,e.clientY,e.buttons]); for(const name of ['pointerdown','pointermove','pointerup']) window.addEventListener(name,window.knifeListener,true)})
     const x=b.x,y=b.top-20;await page.mouse.move(x,y);await page.keyboard.down('Space');await page.locator('[data-knife-cursor]').waitFor({state:'attached'})
@@ -80,10 +81,20 @@ export async function knifePhotoBench(page,pid,out,releasePut=null) {
     const after=await ids(),sorted=[...ms].sort((a,b)=>a-b);report.rounds.push({round,mode,ms,phase,p95:sorted[Math.ceil(.95*ms.length)-1],max:sorted.at(-1),remaining:after});if(tracing){
       const trace=await page.evaluate(()=>{for(const name of ['pointerdown','pointermove','pointerup'])window.removeEventListener(name,window.knifeListener,true);return {moves:window.knifeMoves,pointer:window.pointerTrace}})
       assert(trace.moves.length>0,'instrumented module not active');report.rounds.at(-1).trace=trace
-    }save();assert(ms.length>=10);if(mode==='miss') assert.deepEqual(after,baseline)
+    }if(batchBase){report.batchEvidence=await page.evaluate(()=>window.knifeBatchEvidence);report.url=page.url()}save();assert(ms.length>=10);if(mode==='miss') assert.deepEqual(after,baseline)
     if(mode==='hit'){await page.keyboard.press('Control+z');await page.waitForTimeout(400);assert.deepEqual(await ids(),baseline)}
   }
   assert(report.rounds.every(r=>r.mode!=='hit'||r.remaining.length===0),'挥刀后仍有预期命中边残留，见报告')
-  if(batchBase){report.batchEvidence=await page.evaluate(()=>window.knifeBatchEvidence);save();assert.equal(report.batchEvidence.length,6);assert(report.batchEvidence.every((r,i)=>r.visible && r.initial===edgeCount && r.minimum===(i%2?0:edgeCount)))}
+  if(batchBase){report.batchEvidence=await page.evaluate(()=>window.knifeBatchEvidence);save();assert.equal(report.batchEvidence.length,6);assert(report.batchEvidence.every((r,i)=>(!lazy || r.activated===Boolean(i%2)) && r.visible && r.initial===edgeCount && r.minimum===(i%2?0:edgeCount)))}
+  if(batchBase && process.env.KNIFE_BATCH_CANCEL==='1'){
+    await page.mouse.move(b.x,b.top-20);await page.keyboard.down('Space');await page.mouse.down();await page.mouse.move(b.x,(b.top+b.bottom)/2,{steps:24})
+    const pending=await page.locator('[data-edge][data-knife-pending]').evaluateAll(es=>es.map(e=>e.dataset.edge))
+    assert(pending.length>0 && pending.length<edgeCount)
+    await page.evaluate(()=>window.dispatchEvent(new PointerEvent('pointercancel',{bubbles:true})));await page.mouse.up();await page.keyboard.up('Space');await page.waitForTimeout(400)
+    const survivors=baseline.filter(id=>!pending.includes(id));assert.deepEqual(await ids(),survivors)
+    assert.equal(await page.locator('[data-edge]').evaluateAll(es=>es.filter(e=>getComputedStyle(e).visibility==='visible').length),survivors.length)
+    const end=await page.evaluate(()=>window.knifeBatchEvidence.at(-1).end);assert.equal(end,'pointercancel')
+    await page.keyboard.press('Control+z');await page.waitForTimeout(400);assert.deepEqual(await ids(),baseline);report.cancel={pending,survivors,end,undo:baseline.length};save()
+  }
   console.log('real-photo benchmark',report.rounds.map(({mode,p95,max})=>({mode,p95,max})))
 }
