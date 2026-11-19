@@ -118,6 +118,7 @@ export type Command =
    */
   | { kind: 'edge.connect'; source: string; target: string; sourcePort?: string; targetPort?: string }
   | { kind: 'edge.remove'; id: string }
+  | { kind: 'edge.removeMany'; ids: readonly string[] }
   | { kind: 'container.reorder'; containerId: string; orderedChildIds: string[] }
   /**
    * Agent 落计划：**多节点 + 连线一次落地**（设计文档 §3 / §5）。

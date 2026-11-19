@@ -719,6 +719,13 @@ function handle(cmd: Command, graph: GraphSnapshot): Handled {
       }
     }
 
+    case 'edge.removeMany': {
+      return {
+        patches: [...new Set(cmd.ids)].map(id => ({ op: 'delete', table: 'edges', id })),
+        transaction: { mode: 'standalone', label: '切断连线' },
+      }
+    }
+
     case 'edge.remove': {
       return {
         patches: [{ op: 'delete', table: 'edges', id: cmd.id }],

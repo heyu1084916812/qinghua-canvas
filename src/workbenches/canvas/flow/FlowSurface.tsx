@@ -335,9 +335,7 @@ function FlowSurfaceInner({
   const { cuts, begin: beginSlice, move: moveSlice, end: endSlice } = useEdgeCut({
     surfaceEl,
     removeEdges: (ids, planId) => {
-      for (const id of ids) {
-        store.dispatch({ kind: 'edge.remove', id }, { mode: 'multi-step', planId, label: '切断连线' })
-      }
+      store.dispatch({ kind: 'edge.removeMany', ids }, { mode: 'multi-step', planId, label: '切断连线' })
     },
   })
   const drag = useNodeDrag(store, surfaceEl)

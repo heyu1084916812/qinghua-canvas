@@ -62,9 +62,11 @@ describe('canvas store / 撤销与重做', () => {
       await store.flush()
       expect((await platform.storage.query('edges', { projectId: 'p1' })).map(e => e.id).sort()).toEqual(ids)
     }
-    for (const edge of original.filter(e => e.source !== 'uncut')) {
-      store.dispatch({ kind: 'edge.remove', id: edge.id }, { mode: 'multi-step', planId: 'knife:test', label: '切断连线' })
-    }
+    const hit = original.filter(e => e.source !== 'uncut').map(e => e.id)
+    const tx = { mode: 'multi-step', planId: 'knife:test', label: '切断连线' } as const
+    // 同一刀的两次命中，第一批的重复 ID 只入栈一次。
+    store.dispatch({ kind: 'edge.removeMany', ids: [hit[0]!, hit[1]!, hit[0]!] }, tx)
+    store.dispatch({ kind: 'edge.removeMany', ids: hit.slice(2) }, tx)
     await check(kept)
     store.undo()
     await check(original)
