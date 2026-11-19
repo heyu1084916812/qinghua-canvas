@@ -45,7 +45,9 @@ export async function knifePhotoBench(page,pid,out,releasePut=null) {
   // Diagnostic control only: same hit tests, graph and FX, skip rasterizing the severed-line SVG.
   const hideCutPreview=process.env.KNIFE_NO_PREVIEW_PAINT==='1'
   if(hideCutPreview) await page.addStyleTag({content:'svg[data-edge-cut]{display:none!important}'})
-  const report={hideCutPreview,timing:"from before pointerdown through two post-pointerup animation frames",edgeCount,sourceHashes:[...hashes],evidence,b,rounds:[]};const save=()=>writeFileSync(out,JSON.stringify(report,null,2))
+  const hideBaseEdges=process.env.KNIFE_NO_BASE_PAINT==='1'
+  if(hideBaseEdges) await page.addStyleTag({content:'.react-flow__edges{visibility:hidden!important}'} )
+  const report={hideBaseEdges,hideCutPreview,timing:"from before pointerdown through two post-pointerup animation frames",edgeCount,sourceHashes:[...hashes],evidence,b,rounds:[]};const save=()=>writeFileSync(out,JSON.stringify(report,null,2))
   for(let round=1;round<=3;round++)for(const mode of ['miss','hit']){
     if(tracing) await page.evaluate(()=>{window.knifeMoves=[];window.pointerTrace=[];window.knifeListener=e=>window.pointerTrace.push([e.type,e.clientX,e.clientY,e.buttons]); for(const name of ['pointerdown','pointermove','pointerup']) window.addEventListener(name,window.knifeListener,true)})
     const x=b.x,y=b.top-20;await page.mouse.move(x,y);await page.keyboard.down('Space');await page.locator('[data-knife-cursor]').waitFor({state:'attached'})
