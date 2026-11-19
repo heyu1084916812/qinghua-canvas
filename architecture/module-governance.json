@@ -630,9 +630,19 @@
       "budget": 130
     },
     {
+      "module": "src/workbenches/canvas/flow/knifeSnapshot.ts",
+      "owner": "canvas-flow-ui",
+      "responsibility": "冻结一次挥刀的可见路径、局部折线与包围盒。",
+      "owns": ["实际 SVG 路径到局部采样点的转换"],
+      "doesNotOwn": ["命中判定、预览和撤销事务"],
+      "publicApi": ["snapshotEdges"],
+      "test": ["scripts/smoke.mjs"],
+      "budget": 50
+    },
+    {
       "module": "src/workbenches/canvas/flow/useEdgeCut.ts",
       "owner": "canvas-flow-ui",
-      "responsibility": "美工刀手势：按下时冻结当前画布曲线，移动时用折线检测扫掠命中，派发同一事务删除并播放断线动画。",
+      "responsibility": "美工刀手势：按下时冻结当前画布曲线，移动时用折线检测扫掠命中，即时播放命中预览，手势结束批量提交。",
       "owns": [
         "切割时序与重试",
         "setEdgeCut 状态"

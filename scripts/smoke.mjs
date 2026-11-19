@@ -45920,7 +45920,8 @@ async function g170(browser) {
       await page.locator('[data-knife-cursor]').waitFor({state:'attached'})
       await page.mouse.down()
       await page.mouse.move(first.x, first.y+18, {steps:3})
-      await check(reason + '前确实已切第一条', initial.filter(id => id !== first.id))
+      const pending = page.locator(`[data-edge="${first.id}"][data-knife-pending]`)
+      rec(g,reason+'前原边保留但预览已隐藏',await pending.count()===1 && !(await pending.isVisible()) && (await ids()).length===initial.length)
       if (reason === '松开空格') await page.keyboard.up('Space')
       else if (reason === '指针取消') await page.locator('[data-canvas-surface]').dispatchEvent('pointercancel', {pointerId:1, pointerType:'mouse'})
       else if (reason === '真实切窗') {

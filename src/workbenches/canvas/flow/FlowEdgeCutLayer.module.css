@@ -67,3 +67,6 @@
   transform: translate3d(-200px, -200px, 0);
   filter: drop-shadow(0 1px 1.5px var(--bg-canvas));
 }
+
+/* 未松手前只隐藏命中的原线，数据仍在图里。 */
+:global([data-edge][data-knife-pending]) { visibility: hidden; }

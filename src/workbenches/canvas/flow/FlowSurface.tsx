@@ -332,7 +332,7 @@ function FlowSurfaceInner({
    * 挥刀切割（#1159 第二轮）：一次按下→抬起是**一个事务**，
    * 挥刀中切掉的每条线都用同一个 `planId` 派发 —— Ctrl+Z 一次全回来。
    */
-  const { cuts, begin: beginSlice, move: moveSlice, end: endSlice } = useEdgeCut({
+  const { preview, begin: beginSlice, move: moveSlice, end: endSlice } = useEdgeCut({
     surfaceEl,
     removeEdges: (ids, planId) => {
       store.dispatch({ kind: 'edge.removeMany', ids }, { mode: 'multi-step', planId, label: '切断连线' })
@@ -857,7 +857,7 @@ function FlowSurfaceInner({
       {/* 吸附提示（对账 #257）：参考线 + 间距数字。屏幕空间、不吃指针，拖动结束即消失 */}
       <FlowSnapLayer />
       {/* 切断动画（#1159）：被切的那条线在删除前的 260ms 里由这一层"顶着"播分离淡出 */}
-      <FlowEdgeCutLayer cuts={cuts} />
+      <FlowEdgeCutLayer ref={preview} />
       {/* 刀光与火花（#1159）：独立 canvas + rAF，高频瞬态不进 React */}
       <KnifeFxLayer surfaceEl={surfaceEl} active={knifeOn} />
       <ReactFlow
