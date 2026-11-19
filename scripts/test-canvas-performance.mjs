@@ -606,6 +606,23 @@ async function main() {
       thumbnail: null,
       extra: {},
     })
+    if (process.env.KNIFE_PHOTO_BENCH) {
+      await waitForHttp(`http://127.0.0.1:${cdpPort}/json/version`, 30_000)
+      browser = await chromium.connectOverCDP(`http://127.0.0.1:${cdpPort}`)
+      const ctx = browser.contexts()[0]
+      const page = ctx.pages()[0] ?? await ctx.waitForEvent('page')
+      await page.waitForURL(/tauri\.localhost/)
+      await page.evaluate(() => {
+        localStorage.setItem('flow:onboarded', '1')
+        localStorage.setItem('flow:canvasGuideDismissed', '1')
+        localStorage.setItem('flow:theme', 'light')
+      })
+      await page.goto(`http://tauri.localhost/canvas/${PERFORMANCE_PROJECT_ID}`)
+      const {knifePhotoBench} = await import('./knifePhotoBench.mjs')
+      await knifePhotoBench(page, PERFORMANCE_PROJECT_ID, process.env.KNIFE_PHOTO_BENCH,
+        (table,row) => put(storePort,table,row))
+      return
+    }
     await bulkPut(storePort, 'assets', seeded.assets)
     await bulkPut(storePort, 'nodes', seeded.nodes)
     await bulkPut(storePort, 'edges', seeded.edges)

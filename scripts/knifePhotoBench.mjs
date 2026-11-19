@@ -4,31 +4,32 @@ import {createHash} from 'node:crypto'
 import assert from 'node:assert/strict'
 
 // Opt-in fixture: locally installed Windows wallpaper files; never copy them into Git.
-export async function knifePhotoBench(page,pid,out) {
+export async function knifePhotoBench(page,pid,out,releasePut=null) {
   await page.setViewportSize({width:2400,height:1500}); const nodes=[], hashes=new Set(), files=[]
   for(let n=20;n<36;n++) files.push(join(process.env.SystemRoot,'Web','Wallpaper','Theme'+'ABCD'[Math.floor((n-20)/4)],`img${n}.jpg`))
   const edgeCount=Number(process.env.KNIFE_EDGE_COUNT ?? 50); assert([50,200,500].includes(edgeCount))
   const tracing=process.env.KNIFE_TRACE==='1'; if(tracing) await (await import('./knifeTrace.mjs')).installKnifeTrace(page)
+  if(releasePut) await page.exposeFunction('knifeFixturePut',releasePut)
   const canvasUrl=page.url(); await page.goto(new URL('/projects',canvasUrl).href)
   for(const [i,file] of files.entries()){
     const bytes=readFileSync(file), hash=createHash('sha1').update(bytes).digest('hex'); hashes.add(hash)
     const id=`${pid}-photo-${i}`; nodes.push(id)
     await page.evaluate(async ({b64,hash,id,i,pid})=>{
-      const {createSharedStorage}=await import('/src/platform/web/sharedStorage.ts');const db=createSharedStorage()
+      const db=window.knifeFixturePut ? {put:window.knifeFixturePut} : (await import('/src/platform/web/sharedStorage.ts')).createSharedStorage()
       const bytes=Uint8Array.from(atob(b64),c=>c.charCodeAt(0)), image=await createImageBitmap(new Blob([bytes],{type:'image/jpeg'}))
       const canvas=document.createElement('canvas');canvas.width=640;canvas.height=Math.round(640*image.height/image.width)
       canvas.getContext('2d').drawImage(image,0,0,canvas.width,canvas.height)
       const thumb=new Uint8Array(await (await new Promise(ok=>canvas.toBlob(ok,'image/webp',0.86))).arrayBuffer())
       const h=hash.slice(0,16),size={width:image.width,height:image.height};image.close()
-      await db.put('assets',{id:h,hash:h,projectId:pid,mime:'image/jpeg',thumbMime:'image/webp',...size,bytesLength:bytes.length,thumbLength:thumb.length,contentSha1:hash,bytes,thumb,createdAt:Date.now(),updatedAt:Date.now()})
+      await db.put('assets',{id:h,hash:h,projectId:pid,mime:'image/jpeg',thumbMime:'image/webp',...size,bytesLength:bytes.length,thumbLength:thumb.length,contentSha1:hash,bytes:window.knifeFixturePut?{__qhType:'u8',base64:b64}:bytes,thumb:window.knifeFixturePut?{__qhType:'u8',base64:btoa(Array.from(thumb,c=>String.fromCharCode(c)).join(''))}:thumb,createdAt:Date.now(),updatedAt:Date.now()})
       await db.put('nodes',{id,projectId:pid,type:'generation',parentId:null,x:[200,620,1220,1640][Math.floor(i/4)],y:130+(i%4)*270,w:320,h:200,title:`photo ${i}`,disabled:false,data:{mode:'image',prompt:'',channelId:'',model:'',linkedPromptNodeIds:[],assetHash:h,assetMime:'image/jpeg',naturalSize:size,thumbOrder:[h],upstreamHidden:[]}})
     },{b64:bytes.toString('base64'),hash,id,i,pid})
   }
   assert.equal(hashes.size,16)
   await page.evaluate(async ({nodes,pid,edgeCount})=>{
-    const {createSharedStorage}=await import('/src/platform/web/sharedStorage.ts');const db=createSharedStorage()
-    for(const e of await db.query('edges',{projectId:pid}))await db.delete('edges',e.id)
-    for(const n of await db.query('nodes',{projectId:pid}))if(!nodes.includes(n.id)) await db.delete('nodes',n.id)
+    const db=window.knifeFixturePut ? {put:window.knifeFixturePut} : (await import('/src/platform/web/sharedStorage.ts')).createSharedStorage()
+    if(!window.knifeFixturePut) for(const e of await db.query('edges',{projectId:pid}))await db.delete('edges',e.id)
+    if(!window.knifeFixturePut) for(const n of await db.query('nodes',{projectId:pid}))if(!nodes.includes(n.id)) await db.delete('nodes',n.id)
     const left=nodes.slice(0,8),right=nodes.slice(8)
     // 23x23 unique directed pairs; all cross the same clear centre corridor.
     if(edgeCount>50) for(let i=0;i<15;i++) for(const [side,bank,x] of [['left',left,8],['right',right,2020]]){
