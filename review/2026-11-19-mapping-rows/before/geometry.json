@@ -1,0 +1,46 @@
+[
+  {
+    "tag": "1440x900-light",
+    "count": 8,
+    "minGap": 18,
+    "overhang": -4,
+    "height": 350,
+    "scroll": 0,
+    "lastVisible": true,
+    "shift": 0,
+    "shortHeight": 42
+  },
+  {
+    "tag": "1440x900-dark",
+    "count": 8,
+    "minGap": 18,
+    "overhang": -4,
+    "height": 350,
+    "scroll": 0,
+    "lastVisible": true,
+    "shift": 0,
+    "shortHeight": 42
+  },
+  {
+    "tag": "1024x700-light",
+    "count": 8,
+    "minGap": -21,
+    "overhang": 33,
+    "height": 406,
+    "scroll": 33,
+    "lastVisible": true,
+    "shift": 0,
+    "shortHeight": 84
+  },
+  {
+    "tag": "1024x700-dark",
+    "count": 8,
+    "minGap": -21,
+    "overhang": 33,
+    "height": 406,
+    "scroll": 33,
+    "lastVisible": true,
+    "shift": 0,
+    "shortHeight": 84
+  }
+]
