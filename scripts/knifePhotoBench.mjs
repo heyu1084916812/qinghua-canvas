@@ -59,9 +59,10 @@ export async function knifePhotoBench(page,pid,out,releasePut=null) {
   const batchSize=Number(process.env.KNIFE_BATCH_SIZE??edgeCount);assert(Number.isInteger(batchSize)&&batchSize>0)
   const lazy=process.env.KNIFE_BATCH_LAZY==='1'
   const spatial=process.env.KNIFE_BATCH_SPATIAL==='1'
-  if(batchBase) await page.evaluate((await import('./knifeBatchProbe.mjs')).installKnifeBatchProbe,{chunkSize:batchSize,lazy,spatial})
+  const raster=process.env.KNIFE_RASTER==='1';if(raster && process.env.KNIFE_GPU==='1'){await page.evaluate((await import('./knifeGpuProbe.mjs')).installKnifeGpuProbe)} else if(raster){assert(batchBase && lazy);await page.evaluate((await import('./knifeRasterProbe.mjs')).installKnifeRasterProbe)}
+  else if(batchBase) await page.evaluate((await import('./knifeBatchProbe.mjs')).installKnifeBatchProbe,{chunkSize:batchSize,lazy,spatial})
   const dirtyClear=process.env.KNIFE_DIRTY_CLEAR==='1';if(dirtyClear) await page.evaluate((await import('./knifeDirtyClear.mjs')).installKnifeDirtyClear)
-  const report={dirtyClear,spatial,lazy,batchSize,batchBase,omitHitPaths,skipEdgeHit,hideBaseEdges,hideCutPreview,timing:"from before pointerdown through two post-pointerup animation frames",edgeCount,sourceHashes:[...hashes],evidence,b,rounds:[]};const save=()=>writeFileSync(out,JSON.stringify(report,null,2))
+  const report={gpu:process.env.KNIFE_GPU==='1',raster,dirtyClear,spatial,lazy,batchSize,batchBase,omitHitPaths,skipEdgeHit,hideBaseEdges,hideCutPreview,timing:"from before pointerdown through two post-pointerup animation frames",edgeCount,sourceHashes:[...hashes],evidence,b,rounds:[]};const save=()=>writeFileSync(out,JSON.stringify(report,null,2))
   for(let round=1;round<=3;round++)for(const mode of ['miss','hit']){
     if(tracing) await page.evaluate(()=>{window.knifeMoves=[];window.pointerTrace=[];window.knifeListener=e=>window.pointerTrace.push([e.type,e.clientX,e.clientY,e.buttons]); for(const name of ['pointerdown','pointermove','pointerup']) window.addEventListener(name,window.knifeListener,true)})
     const x=b.x,y=b.top-20;await page.mouse.move(x,y);await page.keyboard.down('Space');await page.locator('[data-knife-cursor]').waitFor({state:'attached'})
@@ -89,6 +90,7 @@ export async function knifePhotoBench(page,pid,out,releasePut=null) {
   assert(report.rounds.every(r=>r.mode!=='hit'||r.remaining.length===0),'挥刀后仍有预期命中边残留，见报告')
   if(batchBase){report.batchEvidence=await page.evaluate(()=>window.knifeBatchEvidence);save();assert.equal(report.batchEvidence.length,6);assert(report.batchEvidence.every((r,i)=>(!lazy || r.activated===Boolean(i%2)) && r.visible && r.initial===edgeCount && r.minimum===(i%2?0:edgeCount)))}
   if(batchBase && process.env.KNIFE_BATCH_CANCEL==='1'){
+    if(report.gpu) await page.evaluate(()=>window.knifeCheckPixels=true)
     await page.mouse.move(b.x,b.top-20);await page.keyboard.down('Space');await page.mouse.down();await page.mouse.move(b.x,(b.top+b.bottom)/2,{steps:24})
     const pending=await page.locator('[data-edge][data-knife-pending]').evaluateAll(es=>es.map(e=>e.dataset.edge))
     assert(pending.length>0 && pending.length<edgeCount)
@@ -96,7 +98,7 @@ export async function knifePhotoBench(page,pid,out,releasePut=null) {
     const survivors=baseline.filter(id=>!pending.includes(id));assert.deepEqual(await ids(),survivors)
     assert.equal(await page.locator('[data-edge]').evaluateAll(es=>es.filter(e=>getComputedStyle(e).visibility==='visible').length),survivors.length)
     const end=await page.evaluate(()=>window.knifeBatchEvidence.at(-1).end);assert.equal(end,'pointercancel')
-    await page.keyboard.press('Control+z');await page.waitForTimeout(400);assert.deepEqual(await ids(),baseline);report.cancel={pending,survivors,end,undo:baseline.length};save()
+    await page.keyboard.press('Control+z');await page.waitForTimeout(400);assert.deepEqual(await ids(),baseline);report.cancel={pending,survivors,end,undo:baseline.length};if(report.gpu){report.cancel.pixel=await page.evaluate(()=>window.knifeBatchEvidence.at(-1).pixelCheck);assert(report.cancel.pixel?.maxAlpha>0)}save()
   }
   console.log('real-photo benchmark',report.rounds.map(({mode,p95,max})=>({mode,p95,max})))
 }
