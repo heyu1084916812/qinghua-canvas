@@ -1,0 +1,7395 @@
+{
+  "skipCursorRule": false,
+  "forceSvg": false,
+  "product": true,
+  "gpuFallback": false,
+  "gpu": false,
+  "raster": false,
+  "dirtyClear": false,
+  "spatial": false,
+  "lazy": false,
+  "batchSize": 500,
+  "batchBase": false,
+  "omitHitPaths": false,
+  "skipEdgeHit": false,
+  "hideBaseEdges": false,
+  "hideCutPreview": false,
+  "timing": "from before pointerdown through two post-pointerup animation frames",
+  "edgeCount": 500,
+  "sourceHashes": [
+    "75fac2956852c4176f1a463aeb436451e3c40bfb",
+    "c809e56abdffcb05a9c7ccd3f2d799a31a3224d1",
+    "17ce11114e33885d912921725d9b685e21fc9ee4",
+    "cd64aea41606415a1cb84f2df8ad4859238a1eb0",
+    "527f2837d2b855c78cbdebbbf890ec6dee02ffbf",
+    "77fb2ddc905e15f116767b9d5e9d2a0ca3d17645",
+    "6f0c104a3a8ec03485c6eab47501e86424980c87",
+    "6ec209861753e250d823f638265ce670a92d76ec",
+    "f67349c5ae2745b15f4f021f25089a14f7cdfeaf",
+    "b6e1a2fef583f6ba4969bddf0f9da07da90117e1",
+    "3ce4dded2212c087f2448a43ba17b47f5318f88e",
+    "2270a6ae29e7ccdc290afbdca7c08ad6b6af4b6e",
+    "25c38389df45c00b48b77f5b4510fb7aa081b3ce",
+    "580fb2738cb5b4f7f05586f6e1e3cad75112b0da",
+    "89c3f37dd0a41d50f97d90ccc0d8d6abc3f5e786",
+    "c65f48ef2f41e3fd1d1961bfe017813df005aa47"
+  ],
+  "evidence": [
+    {
+      "x": 265,
+      "y": 179,
+      "w": 318,
+      "h": 198,
+      "width": 640,
+      "height": 400,
+      "visible": true
+    },
+    {
+      "x": 265,
+      "y": 449,
+      "w": 318,
+      "h": 198,
+      "width": 640,
+      "height": 400,
+      "visible": true
+    },
+    {
+      "x": 265,
+      "y": 719,
+      "w": 318,
+      "h": 198,
+      "width": 640,
+      "height": 400,
+      "visible": true
+    },
+    {
+      "x": 265,
+      "y": 989,
+      "w": 318,
+      "h": 198,
+      "width": 640,
+      "height": 400,
+      "visible": true
+    },
+    {
+      "x": 685,
+      "y": 179,
+      "w": 318,
+      "h": 198,
+      "width": 640,
+      "height": 400,
+      "visible": true
+    },
+    {
+      "x": 685,
+      "y": 449,
+      "w": 318,
+      "h": 198,
+      "width": 640,
+      "height": 400,
+      "visible": true
+    },
+    {
+      "x": 685,
+      "y": 719,
+      "w": 318,
+      "h": 198,
+      "width": 640,
+      "height": 400,
+      "visible": true
+    },
+    {
+      "x": 685,
+      "y": 989,
+      "w": 318,
+      "h": 198,
+      "width": 640,
+      "height": 400,
+      "visible": true
+    },
+    {
+      "x": 1285,
+      "y": 179,
+      "w": 318,
+      "h": 198,
+      "width": 640,
+      "height": 400,
+      "visible": true
+    },
+    {
+      "x": 1285,
+      "y": 449,
+      "w": 318,
+      "h": 198,
+      "width": 640,
+      "height": 400,
+      "visible": true
+    },
+    {
+      "x": 1285,
+      "y": 719,
+      "w": 318,
+      "h": 198,
+      "width": 640,
+      "height": 400,
+      "visible": true
+    },
+    {
+      "x": 1285,
+      "y": 989,
+      "w": 318,
+      "h": 198,
+      "width": 640,
+      "height": 400,
+      "visible": true
+    },
+    {
+      "x": 1705,
+      "y": 179,
+      "w": 318,
+      "h": 198,
+      "width": 640,
+      "height": 400,
+      "visible": true
+    },
+    {
+      "x": 1705,
+      "y": 449,
+      "w": 318,
+      "h": 198,
+      "width": 640,
+      "height": 400,
+      "visible": true
+    },
+    {
+      "x": 1705,
+      "y": 719,
+      "w": 318,
+      "h": 198,
+      "width": 640,
+      "height": 400,
+      "visible": true
+    },
+    {
+      "x": 1705,
+      "y": 989,
+      "w": 318,
+      "h": 198,
+      "width": 640,
+      "height": 400,
+      "visible": true
+    }
+  ],
+  "b": {
+    "x": 1144,
+    "top": 223,
+    "bottom": 1133
+  },
+  "rounds": [
+    {
+      "round": 1,
+      "mode": "miss",
+      "ms": [
+        127.70000000000005,
+        130,
+        16,
+        24,
+        8,
+        32,
+        8.100000000000136,
+        7.899999999999864,
+        15.799999999999955,
+        7.900000000000091,
+        8,
+        15.200000000000045,
+        8.099999999999909,
+        8,
+        16,
+        8,
+        7.900000000000091,
+        8.099999999999909,
+        7.2999999999999545,
+        14.700000000000045,
+        7.900000000000091,
+        8,
+        8,
+        8,
+        8,
+        7.899999999999864,
+        7.900000000000091,
+        8,
+        8,
+        8.099999999999909,
+        8,
+        7.900000000000091,
+        8.099999999999909,
+        7.900000000000091,
+        9,
+        8.099999999999909,
+        9,
+        7.900000000000091,
+        8,
+        7.900000000000091,
+        8,
+        7.599999999999909,
+        7.5,
+        7.699999999999818,
+        7.800000000000182,
+        7.900000000000091,
+        8.099999999999909,
+        7.900000000000091,
+        8.099999999999909,
+        8,
+        7.900000000000091,
+        8.099999999999909,
+        8,
+        16,
+        8,
+        7.900000000000091,
+        8.099999999999909,
+        8,
+        7.900000000000091,
+        8.099999999999909,
+        8,
+        8,
+        7.900000000000091,
+        7.199999999999818,
+        8,
+        8.5,
+        7.5,
+        8,
+        8,
+        8,
+        8,
+        8,
+        8,
+        7.700000000000273,
+        8.099999999999909,
+        7.900000000000091,
+        8.099999999999909,
+        7.900000000000091,
+        8,
+        8,
+        8,
+        8,
+        8.099999999999909,
+        8,
+        8,
+        8,
+        8.099999999999909,
+        8.099999999999909,
+        7.900000000000091,
+        8,
+        8.099999999999909,
+        8,
+        8,
+        7.900000000000091
+      ],
+      "phase": {
+        "start": 1468.1,
+        "events": [
+          {
+            "type": "pointerdown",
+            "t": 1519.7999999821186
+          },
+          {
+            "type": "pointermove",
+            "t": 1599.2999999821186
+          },
+          {
+            "type": "pointermove",
+            "t": 1728.2999999821186
+          },
+          {
+            "type": "pointermove",
+            "t": 1776.5999999940395
+          },
+          {
+            "type": "pointermove",
+            "t": 1807.5
+          },
+          {
+            "type": "pointermove",
+            "t": 1823.5999999940395
+          },
+          {
+            "type": "pointermove",
+            "t": 1839.5999999940395
+          },
+          {
+            "type": "pointermove",
+            "t": 1855.199999988079
+          },
+          {
+            "type": "pointermove",
+            "t": 1870.5
+          },
+          {
+            "type": "pointermove",
+            "t": 1886.5
+          },
+          {
+            "type": "pointermove",
+            "t": 1902.5999999940395
+          },
+          {
+            "type": "pointermove",
+            "t": 1918.199999988079
+          },
+          {
+            "type": "pointermove",
+            "t": 1933.5
+          },
+          {
+            "type": "pointermove",
+            "t": 1948.2999999821186
+          },
+          {
+            "type": "pointermove",
+            "t": 1964.0999999940395
+          },
+          {
+            "type": "pointermove",
+            "t": 1980.2999999821186
+          },
+          {
+            "type": "pointermove",
+            "t": 1995.7999999821186
+          },
+          {
+            "type": "pointermove",
+            "t": 2011.9000000059605
+          },
+          {
+            "type": "pointermove",
+            "t": 2028.5999999940395
+          },
+          {
+            "type": "pointermove",
+            "t": 2052.199999988079
+          },
+          {
+            "type": "pointermove",
+            "t": 2069
+          },
+          {
+            "type": "pointermove",
+            "t": 2085.9000000059605
+          },
+          {
+            "type": "pointermove",
+            "t": 2101.7999999821186
+          },
+          {
+            "type": "pointermove",
+            "t": 2118.199999988079
+          },
+          {
+            "type": "pointermove",
+            "t": 2133.199999988079
+          },
+          {
+            "type": "pointermove",
+            "t": 2157.5999999940395
+          },
+          {
+            "type": "pointermove",
+            "t": 2176.9000000059605
+          },
+          {
+            "type": "pointermove",
+            "t": 2196.699999988079
+          },
+          {
+            "type": "pointermove",
+            "t": 2212.5999999940395
+          },
+          {
+            "type": "pointermove",
+            "t": 2236.5999999940395
+          },
+          {
+            "type": "pointermove",
+            "t": 2252.199999988079
+          },
+          {
+            "type": "pointermove",
+            "t": 2260.2999999821186
+          },
+          {
+            "type": "pointermove",
+            "t": 2276.5
+          },
+          {
+            "type": "pointermove",
+            "t": 2292.5
+          },
+          {
+            "type": "pointermove",
+            "t": 2307.5999999940395
+          },
+          {
+            "type": "pointermove",
+            "t": 2324.0999999940395
+          },
+          {
+            "type": "pointermove",
+            "t": 2339.4000000059605
+          },
+          {
+            "type": "pointermove",
+            "t": 2355.5999999940395
+          },
+          {
+            "type": "pointermove",
+            "t": 2363.4000000059605
+          },
+          {
+            "type": "pointermove",
+            "t": 2379.7999999821186
+          },
+          {
+            "type": "pointermove",
+            "t": 2395.7999999821186
+          },
+          {
+            "type": "pointermove",
+            "t": 2411.2999999821186
+          },
+          {
+            "type": "pointermove",
+            "t": 2419.2999999821186
+          },
+          {
+            "type": "pointermove",
+            "t": 2435.5
+          },
+          {
+            "type": "pointermove",
+            "t": 2451.699999988079
+          },
+          {
+            "type": "pointermove",
+            "t": 2468.5999999940395
+          },
+          {
+            "type": "pointermove",
+            "t": 2484.199999988079
+          },
+          {
+            "type": "pointermove",
+            "t": 2499.9000000059605
+          },
+          {
+            "type": "pointermove",
+            "t": 2516.4000000059605
+          },
+          {
+            "type": "pointerup",
+            "t": 2532.0999999940395
+          }
+        ]
+      },
+      "entry": {
+        "frames": [
+          [
+            1468.1,
+            1468.7999999821186
+          ],
+          [
+            1595.8,
+            1600.9000000059605
+          ],
+          [
+            1725.8,
+            1729
+          ],
+          [
+            1741.8,
+            1743.7999999821186
+          ],
+          [
+            1765.8,
+            1767.2999999821186
+          ],
+          [
+            1773.8,
+            1777
+          ],
+          [
+            1805.8,
+            1808.0999999940395
+          ],
+          [
+            1813.9,
+            1814.199999988079
+          ],
+          [
+            1821.8,
+            1824.199999988079
+          ],
+          [
+            1837.6,
+            1840.199999988079
+          ],
+          [
+            1845.5,
+            1845.699999988079
+          ],
+          [
+            1853.5,
+            1855.7999999821186
+          ],
+          [
+            1868.7,
+            1871
+          ],
+          [
+            1876.8,
+            1877.5999999940395
+          ],
+          [
+            1884.8,
+            1887.0999999940395
+          ],
+          [
+            1900.8,
+            1903.0999999940395
+          ],
+          [
+            1908.8,
+            1909.199999988079
+          ],
+          [
+            1916.7,
+            1918.699999988079
+          ],
+          [
+            1924.8,
+            1927.0999999940395
+          ],
+          [
+            1932.1,
+            1934.199999988079
+          ],
+          [
+            1946.8,
+            1948.7999999821186
+          ],
+          [
+            1954.7,
+            1954.9000000059605
+          ],
+          [
+            1962.7,
+            1964.5
+          ],
+          [
+            1970.7,
+            1970.9000000059605
+          ],
+          [
+            1978.7,
+            1980.9000000059605
+          ],
+          [
+            1986.7,
+            1987
+          ],
+          [
+            1994.6,
+            1996.2999999821186
+          ],
+          [
+            2002.5,
+            2002.7999999821186
+          ],
+          [
+            2010.5,
+            2012.4000000059605
+          ],
+          [
+            2018.5,
+            2018.699999988079
+          ],
+          [
+            2026.6,
+            2029.199999988079
+          ],
+          [
+            2034.6,
+            2035.199999988079
+          ],
+          [
+            2042.5,
+            2042.7999999821186
+          ],
+          [
+            2050.6,
+            2052.699999988079
+          ],
+          [
+            2058.5,
+            2058.7999999821186
+          ],
+          [
+            2067.5,
+            2069.5
+          ],
+          [
+            2075.6,
+            2076.2999999821186
+          ],
+          [
+            2084.6,
+            2086.5999999940395
+          ],
+          [
+            2092.5,
+            2092.9000000059605
+          ],
+          [
+            2100.5,
+            2102.0999999940395
+          ],
+          [
+            2108.4,
+            2108.5999999940395
+          ],
+          [
+            2116.4,
+            2118.7999999821186
+          ],
+          [
+            2124,
+            2125.0999999940395
+          ],
+          [
+            2131.5,
+            2134
+          ],
+          [
+            2139.2,
+            2141
+          ],
+          [
+            2147,
+            2147.5999999940395
+          ],
+          [
+            2154.9,
+            2158
+          ],
+          [
+            2163,
+            2163.199999988079
+          ],
+          [
+            2170.9,
+            2177.199999988079
+          ],
+          [
+            2179,
+            2181.699999988079
+          ],
+          [
+            2187,
+            2187.4000000059605
+          ],
+          [
+            2194.9,
+            2197.2999999821186
+          ],
+          [
+            2203,
+            2203.5
+          ],
+          [
+            2211,
+            2213.0999999940395
+          ],
+          [
+            2227,
+            2227.2999999821186
+          ],
+          [
+            2235,
+            2237.199999988079
+          ],
+          [
+            2242.9,
+            2244.2999999821186
+          ],
+          [
+            2251,
+            2252.7999999821186
+          ],
+          [
+            2259,
+            2260.7999999821186
+          ],
+          [
+            2266.9,
+            2267.2999999821186
+          ],
+          [
+            2275,
+            2277
+          ],
+          [
+            2283,
+            2283.2999999821186
+          ],
+          [
+            2291,
+            2293
+          ],
+          [
+            2298.9,
+            2299.2999999821186
+          ],
+          [
+            2306.1,
+            2308
+          ],
+          [
+            2314.1,
+            2314.4000000059605
+          ],
+          [
+            2322.6,
+            2324.4000000059605
+          ],
+          [
+            2330.1,
+            2330.5999999940395
+          ],
+          [
+            2338.1,
+            2339.9000000059605
+          ],
+          [
+            2346.1,
+            2346.9000000059605
+          ],
+          [
+            2354.1,
+            2356
+          ],
+          [
+            2362.1,
+            2364
+          ],
+          [
+            2370.1,
+            2370.5
+          ],
+          [
+            2378.1,
+            2380.4000000059605
+          ],
+          [
+            2385.8,
+            2386.2999999821186
+          ],
+          [
+            2393.9,
+            2396.5
+          ],
+          [
+            2401.8,
+            2402.199999988079
+          ],
+          [
+            2409.9,
+            2411.699999988079
+          ],
+          [
+            2417.8,
+            2419.7999999821186
+          ],
+          [
+            2425.8,
+            2426.199999988079
+          ],
+          [
+            2433.8,
+            2436.199999988079
+          ],
+          [
+            2441.8,
+            2442.2999999821186
+          ],
+          [
+            2449.8,
+            2452.199999988079
+          ],
+          [
+            2457.9,
+            2458.2999999821186
+          ],
+          [
+            2465.9,
+            2469.0999999940395
+          ],
+          [
+            2473.9,
+            2474.5
+          ],
+          [
+            2481.9,
+            2485
+          ],
+          [
+            2490,
+            2491.5999999940395
+          ],
+          [
+            2498.1,
+            2500.4000000059605
+          ],
+          [
+            2506,
+            2508
+          ],
+          [
+            2514,
+            2517.0999999940395
+          ],
+          [
+            2522.1,
+            2524.5
+          ],
+          [
+            2530.1,
+            2532.9000000059605
+          ],
+          [
+            2538.1,
+            2539.699999988079
+          ],
+          [
+            2546,
+            2546.4000000059605
+          ],
+          [
+            2556,
+            2574.9000000059605
+          ],
+          [
+            2604,
+            2605.4000000059605
+          ],
+          [
+            2612,
+            2612.5999999940395
+          ],
+          [
+            2756.3,
+            2760.5999999940395
+          ],
+          [
+            2787.9,
+            2788.199999988079
+          ],
+          [
+            2796,
+            2796.699999988079
+          ],
+          [
+            2803.9,
+            2804.4000000059605
+          ],
+          [
+            2811.9,
+            2812.4000000059605
+          ],
+          [
+            2819.9,
+            2820.2999999821186
+          ],
+          [
+            2827.8,
+            2828.4000000059605
+          ],
+          [
+            2835.8,
+            2836.199999988079
+          ],
+          [
+            2843.9,
+            2844.7999999821186
+          ],
+          [
+            2851.9,
+            2852.2999999821186
+          ],
+          [
+            2859.9,
+            2860.4000000059605
+          ],
+          [
+            2867.9,
+            2868.2999999821186
+          ],
+          [
+            2875.8,
+            2876.199999988079
+          ],
+          [
+            2883.9,
+            2884.4000000059605
+          ],
+          [
+            2891.9,
+            2892.5999999940395
+          ],
+          [
+            2899.8,
+            2900.199999988079
+          ]
+        ],
+        "events": [
+          [
+            "keydown",
+            1290.2999999821186,
+            1290.7999999821186
+          ],
+          [
+            "pointerdown",
+            1475.4000000059605,
+            1519.5999999940395
+          ],
+          [
+            "pointerup",
+            2529.0999999940395,
+            2532
+          ]
+        ]
+      },
+      "p95": 16,
+      "max": 130,
+      "remaining": [
+        "perf-release-300-500-bench-0",
+        "perf-release-300-500-bench-1",
+        "perf-release-300-500-bench-10",
+        "perf-release-300-500-bench-100",
+        "perf-release-300-500-bench-101",
+        "perf-release-300-500-bench-102",
+        "perf-release-300-500-bench-103",
+        "perf-release-300-500-bench-104",
+        "perf-release-300-500-bench-105",
+        "perf-release-300-500-bench-106",
+        "perf-release-300-500-bench-107",
+        "perf-release-300-500-bench-108",
+        "perf-release-300-500-bench-109",
+        "perf-release-300-500-bench-11",
+        "perf-release-300-500-bench-110",
+        "perf-release-300-500-bench-111",
+        "perf-release-300-500-bench-112",
+        "perf-release-300-500-bench-113",
+        "perf-release-300-500-bench-114",
+        "perf-release-300-500-bench-115",
+        "perf-release-300-500-bench-116",
+        "perf-release-300-500-bench-117",
+        "perf-release-300-500-bench-118",
+        "perf-release-300-500-bench-119",
+        "perf-release-300-500-bench-12",
+        "perf-release-300-500-bench-120",
+        "perf-release-300-500-bench-121",
+        "perf-release-300-500-bench-122",
+        "perf-release-300-500-bench-123",
+        "perf-release-300-500-bench-124",
+        "perf-release-300-500-bench-125",
+        "perf-release-300-500-bench-126",
+        "perf-release-300-500-bench-127",
+        "perf-release-300-500-bench-128",
+        "perf-release-300-500-bench-129",
+        "perf-release-300-500-bench-13",
+        "perf-release-300-500-bench-130",
+        "perf-release-300-500-bench-131",
+        "perf-release-300-500-bench-132",
+        "perf-release-300-500-bench-133",
+        "perf-release-300-500-bench-134",
+        "perf-release-300-500-bench-135",
+        "perf-release-300-500-bench-136",
+        "perf-release-300-500-bench-137",
+        "perf-release-300-500-bench-138",
+        "perf-release-300-500-bench-139",
+        "perf-release-300-500-bench-14",
+        "perf-release-300-500-bench-140",
+        "perf-release-300-500-bench-141",
+        "perf-release-300-500-bench-142",
+        "perf-release-300-500-bench-143",
+        "perf-release-300-500-bench-144",
+        "perf-release-300-500-bench-145",
+        "perf-release-300-500-bench-146",
+        "perf-release-300-500-bench-147",
+        "perf-release-300-500-bench-148",
+        "perf-release-300-500-bench-149",
+        "perf-release-300-500-bench-15",
+        "perf-release-300-500-bench-150",
+        "perf-release-300-500-bench-151",
+        "perf-release-300-500-bench-152",
+        "perf-release-300-500-bench-153",
+        "perf-release-300-500-bench-154",
+        "perf-release-300-500-bench-155",
+        "perf-release-300-500-bench-156",
+        "perf-release-300-500-bench-157",
+        "perf-release-300-500-bench-158",
+        "perf-release-300-500-bench-159",
+        "perf-release-300-500-bench-16",
+        "perf-release-300-500-bench-160",
+        "perf-release-300-500-bench-161",
+        "perf-release-300-500-bench-162",
+        "perf-release-300-500-bench-163",
+        "perf-release-300-500-bench-164",
+        "perf-release-300-500-bench-165",
+        "perf-release-300-500-bench-166",
+        "perf-release-300-500-bench-167",
+        "perf-release-300-500-bench-168",
+        "perf-release-300-500-bench-169",
+        "perf-release-300-500-bench-17",
+        "perf-release-300-500-bench-170",
+        "perf-release-300-500-bench-171",
+        "perf-release-300-500-bench-172",
+        "perf-release-300-500-bench-173",
+        "perf-release-300-500-bench-174",
+        "perf-release-300-500-bench-175",
+        "perf-release-300-500-bench-176",
+        "perf-release-300-500-bench-177",
+        "perf-release-300-500-bench-178",
+        "perf-release-300-500-bench-179",
+        "perf-release-300-500-bench-18",
+        "perf-release-300-500-bench-180",
+        "perf-release-300-500-bench-181",
+        "perf-release-300-500-bench-182",
+        "perf-release-300-500-bench-183",
+        "perf-release-300-500-bench-184",
+        "perf-release-300-500-bench-185",
+        "perf-release-300-500-bench-186",
+        "perf-release-300-500-bench-187",
+        "perf-release-300-500-bench-188",
+        "perf-release-300-500-bench-189",
+        "perf-release-300-500-bench-19",
+        "perf-release-300-500-bench-190",
+        "perf-release-300-500-bench-191",
+        "perf-release-300-500-bench-192",
+        "perf-release-300-500-bench-193",
+        "perf-release-300-500-bench-194",
+        "perf-release-300-500-bench-195",
+        "perf-release-300-500-bench-196",
+        "perf-release-300-500-bench-197",
+        "perf-release-300-500-bench-198",
+        "perf-release-300-500-bench-199",
+        "perf-release-300-500-bench-2",
+        "perf-release-300-500-bench-20",
+        "perf-release-300-500-bench-200",
+        "perf-release-300-500-bench-201",
+        "perf-release-300-500-bench-202",
+        "perf-release-300-500-bench-203",
+        "perf-release-300-500-bench-204",
+        "perf-release-300-500-bench-205",
+        "perf-release-300-500-bench-206",
+        "perf-release-300-500-bench-207",
+        "perf-release-300-500-bench-208",
+        "perf-release-300-500-bench-209",
+        "perf-release-300-500-bench-21",
+        "perf-release-300-500-bench-210",
+        "perf-release-300-500-bench-211",
+        "perf-release-300-500-bench-212",
+        "perf-release-300-500-bench-213",
+        "perf-release-300-500-bench-214",
+        "perf-release-300-500-bench-215",
+        "perf-release-300-500-bench-216",
+        "perf-release-300-500-bench-217",
+        "perf-release-300-500-bench-218",
+        "perf-release-300-500-bench-219",
+        "perf-release-300-500-bench-22",
+        "perf-release-300-500-bench-220",
+        "perf-release-300-500-bench-221",
+        "perf-release-300-500-bench-222",
+        "perf-release-300-500-bench-223",
+        "perf-release-300-500-bench-224",
+        "perf-release-300-500-bench-225",
+        "perf-release-300-500-bench-226",
+        "perf-release-300-500-bench-227",
+        "perf-release-300-500-bench-228",
+        "perf-release-300-500-bench-229",
+        "perf-release-300-500-bench-23",
+        "perf-release-300-500-bench-230",
+        "perf-release-300-500-bench-231",
+        "perf-release-300-500-bench-232",
+        "perf-release-300-500-bench-233",
+        "perf-release-300-500-bench-234",
+        "perf-release-300-500-bench-235",
+        "perf-release-300-500-bench-236",
+        "perf-release-300-500-bench-237",
+        "perf-release-300-500-bench-238",
+        "perf-release-300-500-bench-239",
+        "perf-release-300-500-bench-24",
+        "perf-release-300-500-bench-240",
+        "perf-release-300-500-bench-241",
+        "perf-release-300-500-bench-242",
+        "perf-release-300-500-bench-243",
+        "perf-release-300-500-bench-244",
+        "perf-release-300-500-bench-245",
+        "perf-release-300-500-bench-246",
+        "perf-release-300-500-bench-247",
+        "perf-release-300-500-bench-248",
+        "perf-release-300-500-bench-249",
+        "perf-release-300-500-bench-25",
+        "perf-release-300-500-bench-250",
+        "perf-release-300-500-bench-251",
+        "perf-release-300-500-bench-252",
+        "perf-release-300-500-bench-253",
+        "perf-release-300-500-bench-254",
+        "perf-release-300-500-bench-255",
+        "perf-release-300-500-bench-256",
+        "perf-release-300-500-bench-257",
+        "perf-release-300-500-bench-258",
+        "perf-release-300-500-bench-259",
+        "perf-release-300-500-bench-26",
+        "perf-release-300-500-bench-260",
+        "perf-release-300-500-bench-261",
+        "perf-release-300-500-bench-262",
+        "perf-release-300-500-bench-263",
+        "perf-release-300-500-bench-264",
+        "perf-release-300-500-bench-265",
+        "perf-release-300-500-bench-266",
+        "perf-release-300-500-bench-267",
+        "perf-release-300-500-bench-268",
+        "perf-release-300-500-bench-269",
+        "perf-release-300-500-bench-27",
+        "perf-release-300-500-bench-270",
+        "perf-release-300-500-bench-271",
+        "perf-release-300-500-bench-272",
+        "perf-release-300-500-bench-273",
+        "perf-release-300-500-bench-274",
+        "perf-release-300-500-bench-275",
+        "perf-release-300-500-bench-276",
+        "perf-release-300-500-bench-277",
+        "perf-release-300-500-bench-278",
+        "perf-release-300-500-bench-279",
+        "perf-release-300-500-bench-28",
+        "perf-release-300-500-bench-280",
+        "perf-release-300-500-bench-281",
+        "perf-release-300-500-bench-282",
+        "perf-release-300-500-bench-283",
+        "perf-release-300-500-bench-284",
+        "perf-release-300-500-bench-285",
+        "perf-release-300-500-bench-286",
+        "perf-release-300-500-bench-287",
+        "perf-release-300-500-bench-288",
+        "perf-release-300-500-bench-289",
+        "perf-release-300-500-bench-29",
+        "perf-release-300-500-bench-290",
+        "perf-release-300-500-bench-291",
+        "perf-release-300-500-bench-292",
+        "perf-release-300-500-bench-293",
+        "perf-release-300-500-bench-294",
+        "perf-release-300-500-bench-295",
+        "perf-release-300-500-bench-296",
+        "perf-release-300-500-bench-297",
+        "perf-release-300-500-bench-298",
+        "perf-release-300-500-bench-299",
+        "perf-release-300-500-bench-3",
+        "perf-release-300-500-bench-30",
+        "perf-release-300-500-bench-300",
+        "perf-release-300-500-bench-301",
+        "perf-release-300-500-bench-302",
+        "perf-release-300-500-bench-303",
+        "perf-release-300-500-bench-304",
+        "perf-release-300-500-bench-305",
+        "perf-release-300-500-bench-306",
+        "perf-release-300-500-bench-307",
+        "perf-release-300-500-bench-308",
+        "perf-release-300-500-bench-309",
+        "perf-release-300-500-bench-31",
+        "perf-release-300-500-bench-310",
+        "perf-release-300-500-bench-311",
+        "perf-release-300-500-bench-312",
+        "perf-release-300-500-bench-313",
+        "perf-release-300-500-bench-314",
+        "perf-release-300-500-bench-315",
+        "perf-release-300-500-bench-316",
+        "perf-release-300-500-bench-317",
+        "perf-release-300-500-bench-318",
+        "perf-release-300-500-bench-319",
+        "perf-release-300-500-bench-32",
+        "perf-release-300-500-bench-320",
+        "perf-release-300-500-bench-321",
+        "perf-release-300-500-bench-322",
+        "perf-release-300-500-bench-323",
+        "perf-release-300-500-bench-324",
+        "perf-release-300-500-bench-325",
+        "perf-release-300-500-bench-326",
+        "perf-release-300-500-bench-327",
+        "perf-release-300-500-bench-328",
+        "perf-release-300-500-bench-329",
+        "perf-release-300-500-bench-33",
+        "perf-release-300-500-bench-330",
+        "perf-release-300-500-bench-331",
+        "perf-release-300-500-bench-332",
+        "perf-release-300-500-bench-333",
+        "perf-release-300-500-bench-334",
+        "perf-release-300-500-bench-335",
+        "perf-release-300-500-bench-336",
+        "perf-release-300-500-bench-337",
+        "perf-release-300-500-bench-338",
+        "perf-release-300-500-bench-339",
+        "perf-release-300-500-bench-34",
+        "perf-release-300-500-bench-340",
+        "perf-release-300-500-bench-341",
+        "perf-release-300-500-bench-342",
+        "perf-release-300-500-bench-343",
+        "perf-release-300-500-bench-344",
+        "perf-release-300-500-bench-345",
+        "perf-release-300-500-bench-346",
+        "perf-release-300-500-bench-347",
+        "perf-release-300-500-bench-348",
+        "perf-release-300-500-bench-349",
+        "perf-release-300-500-bench-35",
+        "perf-release-300-500-bench-350",
+        "perf-release-300-500-bench-351",
+        "perf-release-300-500-bench-352",
+        "perf-release-300-500-bench-353",
+        "perf-release-300-500-bench-354",
+        "perf-release-300-500-bench-355",
+        "perf-release-300-500-bench-356",
+        "perf-release-300-500-bench-357",
+        "perf-release-300-500-bench-358",
+        "perf-release-300-500-bench-359",
+        "perf-release-300-500-bench-36",
+        "perf-release-300-500-bench-360",
+        "perf-release-300-500-bench-361",
+        "perf-release-300-500-bench-362",
+        "perf-release-300-500-bench-363",
+        "perf-release-300-500-bench-364",
+        "perf-release-300-500-bench-365",
+        "perf-release-300-500-bench-366",
+        "perf-release-300-500-bench-367",
+        "perf-release-300-500-bench-368",
+        "perf-release-300-500-bench-369",
+        "perf-release-300-500-bench-37",
+        "perf-release-300-500-bench-370",
+        "perf-release-300-500-bench-371",
+        "perf-release-300-500-bench-372",
+        "perf-release-300-500-bench-373",
+        "perf-release-300-500-bench-374",
+        "perf-release-300-500-bench-375",
+        "perf-release-300-500-bench-376",
+        "perf-release-300-500-bench-377",
+        "perf-release-300-500-bench-378",
+        "perf-release-300-500-bench-379",
+        "perf-release-300-500-bench-38",
+        "perf-release-300-500-bench-380",
+        "perf-release-300-500-bench-381",
+        "perf-release-300-500-bench-382",
+        "perf-release-300-500-bench-383",
+        "perf-release-300-500-bench-384",
+        "perf-release-300-500-bench-385",
+        "perf-release-300-500-bench-386",
+        "perf-release-300-500-bench-387",
+        "perf-release-300-500-bench-388",
+        "perf-release-300-500-bench-389",
+        "perf-release-300-500-bench-39",
+        "perf-release-300-500-bench-390",
+        "perf-release-300-500-bench-391",
+        "perf-release-300-500-bench-392",
+        "perf-release-300-500-bench-393",
+        "perf-release-300-500-bench-394",
+        "perf-release-300-500-bench-395",
+        "perf-release-300-500-bench-396",
+        "perf-release-300-500-bench-397",
+        "perf-release-300-500-bench-398",
+        "perf-release-300-500-bench-399",
+        "perf-release-300-500-bench-4",
+        "perf-release-300-500-bench-40",
+        "perf-release-300-500-bench-400",
+        "perf-release-300-500-bench-401",
+        "perf-release-300-500-bench-402",
+        "perf-release-300-500-bench-403",
+        "perf-release-300-500-bench-404",
+        "perf-release-300-500-bench-405",
+        "perf-release-300-500-bench-406",
+        "perf-release-300-500-bench-407",
+        "perf-release-300-500-bench-408",
+        "perf-release-300-500-bench-409",
+        "perf-release-300-500-bench-41",
+        "perf-release-300-500-bench-410",
+        "perf-release-300-500-bench-411",
+        "perf-release-300-500-bench-412",
+        "perf-release-300-500-bench-413",
+        "perf-release-300-500-bench-414",
+        "perf-release-300-500-bench-415",
+        "perf-release-300-500-bench-416",
+        "perf-release-300-500-bench-417",
+        "perf-release-300-500-bench-418",
+        "perf-release-300-500-bench-419",
+        "perf-release-300-500-bench-42",
+        "perf-release-300-500-bench-420",
+        "perf-release-300-500-bench-421",
+        "perf-release-300-500-bench-422",
+        "perf-release-300-500-bench-423",
+        "perf-release-300-500-bench-424",
+        "perf-release-300-500-bench-425",
+        "perf-release-300-500-bench-426",
+        "perf-release-300-500-bench-427",
+        "perf-release-300-500-bench-428",
+        "perf-release-300-500-bench-429",
+        "perf-release-300-500-bench-43",
+        "perf-release-300-500-bench-430",
+        "perf-release-300-500-bench-431",
+        "perf-release-300-500-bench-432",
+        "perf-release-300-500-bench-433",
+        "perf-release-300-500-bench-434",
+        "perf-release-300-500-bench-435",
+        "perf-release-300-500-bench-436",
+        "perf-release-300-500-bench-437",
+        "perf-release-300-500-bench-438",
+        "perf-release-300-500-bench-439",
+        "perf-release-300-500-bench-44",
+        "perf-release-300-500-bench-440",
+        "perf-release-300-500-bench-441",
+        "perf-release-300-500-bench-442",
+        "perf-release-300-500-bench-443",
+        "perf-release-300-500-bench-444",
+        "perf-release-300-500-bench-445",
+        "perf-release-300-500-bench-446",
+        "perf-release-300-500-bench-447",
+        "perf-release-300-500-bench-448",
+        "perf-release-300-500-bench-449",
+        "perf-release-300-500-bench-45",
+        "perf-release-300-500-bench-450",
+        "perf-release-300-500-bench-451",
+        "perf-release-300-500-bench-452",
+        "perf-release-300-500-bench-453",
+        "perf-release-300-500-bench-454",
+        "perf-release-300-500-bench-455",
+        "perf-release-300-500-bench-456",
+        "perf-release-300-500-bench-457",
+        "perf-release-300-500-bench-458",
+        "perf-release-300-500-bench-459",
+        "perf-release-300-500-bench-46",
+        "perf-release-300-500-bench-460",
+        "perf-release-300-500-bench-461",
+        "perf-release-300-500-bench-462",
+        "perf-release-300-500-bench-463",
+        "perf-release-300-500-bench-464",
+        "perf-release-300-500-bench-465",
+        "perf-release-300-500-bench-466",
+        "perf-release-300-500-bench-467",
+        "perf-release-300-500-bench-468",
+        "perf-release-300-500-bench-469",
+        "perf-release-300-500-bench-47",
+        "perf-release-300-500-bench-470",
+        "perf-release-300-500-bench-471",
+        "perf-release-300-500-bench-472",
+        "perf-release-300-500-bench-473",
+        "perf-release-300-500-bench-474",
+        "perf-release-300-500-bench-475",
+        "perf-release-300-500-bench-476",
+        "perf-release-300-500-bench-477",
+        "perf-release-300-500-bench-478",
+        "perf-release-300-500-bench-479",
+        "perf-release-300-500-bench-48",
+        "perf-release-300-500-bench-480",
+        "perf-release-300-500-bench-481",
+        "perf-release-300-500-bench-482",
+        "perf-release-300-500-bench-483",
+        "perf-release-300-500-bench-484",
+        "perf-release-300-500-bench-485",
+        "perf-release-300-500-bench-486",
+        "perf-release-300-500-bench-487",
+        "perf-release-300-500-bench-488",
+        "perf-release-300-500-bench-489",
+        "perf-release-300-500-bench-49",
+        "perf-release-300-500-bench-490",
+        "perf-release-300-500-bench-491",
+        "perf-release-300-500-bench-492",
+        "perf-release-300-500-bench-493",
+        "perf-release-300-500-bench-494",
+        "perf-release-300-500-bench-495",
+        "perf-release-300-500-bench-496",
+        "perf-release-300-500-bench-497",
+        "perf-release-300-500-bench-498",
+        "perf-release-300-500-bench-499",
+        "perf-release-300-500-bench-5",
+        "perf-release-300-500-bench-50",
+        "perf-release-300-500-bench-51",
+        "perf-release-300-500-bench-52",
+        "perf-release-300-500-bench-53",
+        "perf-release-300-500-bench-54",
+        "perf-release-300-500-bench-55",
+        "perf-release-300-500-bench-56",
+        "perf-release-300-500-bench-57",
+        "perf-release-300-500-bench-58",
+        "perf-release-300-500-bench-59",
+        "perf-release-300-500-bench-6",
+        "perf-release-300-500-bench-60",
+        "perf-release-300-500-bench-61",
+        "perf-release-300-500-bench-62",
+        "perf-release-300-500-bench-63",
+        "perf-release-300-500-bench-64",
+        "perf-release-300-500-bench-65",
+        "perf-release-300-500-bench-66",
+        "perf-release-300-500-bench-67",
+        "perf-release-300-500-bench-68",
+        "perf-release-300-500-bench-69",
+        "perf-release-300-500-bench-7",
+        "perf-release-300-500-bench-70",
+        "perf-release-300-500-bench-71",
+        "perf-release-300-500-bench-72",
+        "perf-release-300-500-bench-73",
+        "perf-release-300-500-bench-74",
+        "perf-release-300-500-bench-75",
+        "perf-release-300-500-bench-76",
+        "perf-release-300-500-bench-77",
+        "perf-release-300-500-bench-78",
+        "perf-release-300-500-bench-79",
+        "perf-release-300-500-bench-8",
+        "perf-release-300-500-bench-80",
+        "perf-release-300-500-bench-81",
+        "perf-release-300-500-bench-82",
+        "perf-release-300-500-bench-83",
+        "perf-release-300-500-bench-84",
+        "perf-release-300-500-bench-85",
+        "perf-release-300-500-bench-86",
+        "perf-release-300-500-bench-87",
+        "perf-release-300-500-bench-88",
+        "perf-release-300-500-bench-89",
+        "perf-release-300-500-bench-9",
+        "perf-release-300-500-bench-90",
+        "perf-release-300-500-bench-91",
+        "perf-release-300-500-bench-92",
+        "perf-release-300-500-bench-93",
+        "perf-release-300-500-bench-94",
+        "perf-release-300-500-bench-95",
+        "perf-release-300-500-bench-96",
+        "perf-release-300-500-bench-97",
+        "perf-release-300-500-bench-98",
+        "perf-release-300-500-bench-99"
+      ]
+    },
+    {
+      "round": 1,
+      "mode": "hit",
+      "ms": [
+        143.5,
+        7.5,
+        8,
+        8,
+        96.20000000000027,
+        8,
+        7.299999999999727,
+        8,
+        8,
+        8,
+        8,
+        8,
+        8,
+        8,
+        7.900000000000091,
+        16.09999999999991,
+        8,
+        7.400000000000091,
+        8.099999999999909,
+        8,
+        8,
+        8,
+        8,
+        8,
+        8,
+        7.900000000000091,
+        8.099999999999909,
+        8,
+        8,
+        8,
+        8,
+        8,
+        8,
+        8.099999999999909,
+        15.200000000000273,
+        8,
+        8,
+        8,
+        8,
+        8.099999999999909,
+        8,
+        7.900000000000091,
+        8.099999999999909,
+        15.900000000000091,
+        8,
+        8,
+        8.099999999999909,
+        15.900000000000091,
+        8.099999999999909,
+        8,
+        7.900000000000091,
+        16,
+        8,
+        16,
+        8,
+        16.199999999999818,
+        7.900000000000091,
+        15.900000000000091,
+        15.900000000000091,
+        8,
+        16,
+        8,
+        16,
+        8,
+        16,
+        8,
+        15.899999999999636,
+        8.100000000000364,
+        16,
+        7.899999999999636,
+        16.100000000000364,
+        16,
+        8,
+        16,
+        24,
+        7.899999999999636,
+        16.200000000000273,
+        7.699999999999818,
+        7.599999999999909,
+        15.900000000000091,
+        8.099999999999909,
+        15.900000000000091,
+        8,
+        16.09999999999991,
+        7.900000000000091,
+        8.000000000000455,
+        8,
+        16.099999999999454,
+        7.900000000000546,
+        16,
+        16.399999999999636,
+        16.100000000000364,
+        16,
+        16,
+        7.899999999999636,
+        16.100000000000364,
+        16,
+        15.899999999999636,
+        16.100000000000364,
+        16.099999999999454,
+        7.800000000000182,
+        8.100000000000364,
+        15.899999999999636,
+        8.5,
+        15.899999999999636,
+        8.100000000000364,
+        8,
+        15.699999999999818,
+        16,
+        8,
+        7.900000000000546,
+        8,
+        8,
+        16,
+        8,
+        8.099999999999454,
+        8,
+        8,
+        16.100000000000364,
+        8,
+        7.199999999999818,
+        7.899999999999636,
+        8,
+        8,
+        8,
+        16.100000000000364,
+        7.899999999999636,
+        16.100000000000364,
+        7.899999999999636,
+        8,
+        8.100000000000364,
+        7.899999999999636,
+        8,
+        8.100000000000364,
+        31.899999999999636,
+        15.300000000000182
+      ],
+      "phase": {
+        "start": 3004.1,
+        "events": [
+          {
+            "type": "pointerdown",
+            "t": 3018.699999988079
+          },
+          {
+            "type": "pointermove",
+            "t": 3151.199999988079
+          },
+          {
+            "type": "pointermove",
+            "t": 3173.9000000059605
+          },
+          {
+            "type": "pointermove",
+            "t": 3283.5
+          },
+          {
+            "type": "pointermove",
+            "t": 3299.4000000059605
+          },
+          {
+            "type": "pointermove",
+            "t": 3323.5
+          },
+          {
+            "type": "pointermove",
+            "t": 3347.5999999940395
+          },
+          {
+            "type": "pointermove",
+            "t": 3379
+          },
+          {
+            "type": "pointermove",
+            "t": 3403.0999999940395
+          },
+          {
+            "type": "pointermove",
+            "t": 3427.0999999940395
+          },
+          {
+            "type": "pointermove",
+            "t": 3459.0999999940395
+          },
+          {
+            "type": "pointermove",
+            "t": 3483.0999999940395
+          },
+          {
+            "type": "pointermove",
+            "t": 3507.2999999821186
+          },
+          {
+            "type": "pointermove",
+            "t": 3522.4000000059605
+          },
+          {
+            "type": "pointermove",
+            "t": 3546.7999999821186
+          },
+          {
+            "type": "pointermove",
+            "t": 3570.4000000059605
+          },
+          {
+            "type": "pointermove",
+            "t": 3602.5999999940395
+          },
+          {
+            "type": "pointermove",
+            "t": 3628
+          },
+          {
+            "type": "pointermove",
+            "t": 3659.7999999821186
+          },
+          {
+            "type": "pointermove",
+            "t": 3683.199999988079
+          },
+          {
+            "type": "pointermove",
+            "t": 3706.4000000059605
+          },
+          {
+            "type": "pointermove",
+            "t": 3741.5999999940395
+          },
+          {
+            "type": "pointermove",
+            "t": 3770.9000000059605
+          },
+          {
+            "type": "pointermove",
+            "t": 3805.2999999821186
+          },
+          {
+            "type": "pointermove",
+            "t": 3843
+          },
+          {
+            "type": "pointermove",
+            "t": 3874.7999999821186
+          },
+          {
+            "type": "pointermove",
+            "t": 3899.9000000059605
+          },
+          {
+            "type": "pointermove",
+            "t": 3941.7999999821186
+          },
+          {
+            "type": "pointermove",
+            "t": 3988.7999999821186
+          },
+          {
+            "type": "pointermove",
+            "t": 4043
+          },
+          {
+            "type": "pointermove",
+            "t": 4067.199999988079
+          },
+          {
+            "type": "pointermove",
+            "t": 4097.5999999940395
+          },
+          {
+            "type": "pointermove",
+            "t": 4131.299999982119
+          },
+          {
+            "type": "pointermove",
+            "t": 4178.9000000059605
+          },
+          {
+            "type": "pointermove",
+            "t": 4220.5999999940395
+          },
+          {
+            "type": "pointermove",
+            "t": 4269.4000000059605
+          },
+          {
+            "type": "pointermove",
+            "t": 4306.4000000059605
+          },
+          {
+            "type": "pointermove",
+            "t": 4341.5
+          },
+          {
+            "type": "pointermove",
+            "t": 4372.9000000059605
+          },
+          {
+            "type": "pointermove",
+            "t": 4410.9000000059605
+          },
+          {
+            "type": "pointermove",
+            "t": 4437.0999999940395
+          },
+          {
+            "type": "pointermove",
+            "t": 4449.9000000059605
+          },
+          {
+            "type": "pointermove",
+            "t": 4474.5
+          },
+          {
+            "type": "pointermove",
+            "t": 4498.0999999940395
+          },
+          {
+            "type": "pointermove",
+            "t": 4522.5
+          },
+          {
+            "type": "pointermove",
+            "t": 4545.5
+          },
+          {
+            "type": "pointermove",
+            "t": 4561.5
+          },
+          {
+            "type": "pointermove",
+            "t": 4593.0999999940395
+          },
+          {
+            "type": "pointermove",
+            "t": 4617.299999982119
+          },
+          {
+            "type": "pointerup",
+            "t": 4656.9000000059605
+          }
+        ]
+      },
+      "entry": {
+        "frames": [
+          [
+            2931.9,
+            2933.699999988079
+          ],
+          [
+            2940.1,
+            2966.699999988079
+          ],
+          [
+            2988.1,
+            2996.5999999940395
+          ],
+          [
+            3004.1,
+            3004.5999999940395
+          ],
+          [
+            3147.6,
+            3152.2999999821186
+          ],
+          [
+            3155.1,
+            3160.2999999821186
+          ],
+          [
+            3163.1,
+            3163.5999999940395
+          ],
+          [
+            3171.1,
+            3265.7999999821186
+          ],
+          [
+            3267.3,
+            3270
+          ],
+          [
+            3275.3,
+            3275.5
+          ],
+          [
+            3282.6,
+            3285.5
+          ],
+          [
+            3290.6,
+            3290.9000000059605
+          ],
+          [
+            3298.6,
+            3301.9000000059605
+          ],
+          [
+            3306.6,
+            3309
+          ],
+          [
+            3314.6,
+            3315.0999999940395
+          ],
+          [
+            3322.6,
+            3327.0999999940395
+          ],
+          [
+            3330.6,
+            3334
+          ],
+          [
+            3338.6,
+            3339.199999988079
+          ],
+          [
+            3346.5,
+            3355.7999999821186
+          ],
+          [
+            3362.6,
+            3364.699999988079
+          ],
+          [
+            3370.6,
+            3371.0999999940395
+          ],
+          [
+            3378,
+            3380.699999988079
+          ],
+          [
+            3386.1,
+            3386.9000000059605
+          ],
+          [
+            3394.1,
+            3394.699999988079
+          ],
+          [
+            3402.1,
+            3404.699999988079
+          ],
+          [
+            3410.1,
+            3413.4000000059605
+          ],
+          [
+            3418.1,
+            3419
+          ],
+          [
+            3426.1,
+            3429.0999999940395
+          ],
+          [
+            3434.1,
+            3435.0999999940395
+          ],
+          [
+            3442,
+            3442.9000000059605
+          ],
+          [
+            3450.1,
+            3451
+          ],
+          [
+            3458.1,
+            3460.9000000059605
+          ],
+          [
+            3466.1,
+            3468.7999999821186
+          ],
+          [
+            3474.1,
+            3475.0999999940395
+          ],
+          [
+            3482.1,
+            3485.2999999821186
+          ],
+          [
+            3490.1,
+            3494.5
+          ],
+          [
+            3498.1,
+            3502.0999999940395
+          ],
+          [
+            3506.2,
+            3509.699999988079
+          ],
+          [
+            3521.4,
+            3524.5999999940395
+          ],
+          [
+            3529.4,
+            3533.7999999821186
+          ],
+          [
+            3537.4,
+            3540
+          ],
+          [
+            3545.4,
+            3548.9000000059605
+          ],
+          [
+            3553.4,
+            3556.7999999821186
+          ],
+          [
+            3561.5,
+            3564
+          ],
+          [
+            3569.5,
+            3572.199999988079
+          ],
+          [
+            3577.4,
+            3583.2999999821186
+          ],
+          [
+            3585.5,
+            3592.199999988079
+          ],
+          [
+            3601.4,
+            3605.0999999940395
+          ],
+          [
+            3609.4,
+            3614.7999999821186
+          ],
+          [
+            3617.4,
+            3621
+          ],
+          [
+            3625.5,
+            3630.2999999821186
+          ],
+          [
+            3641.4,
+            3642.7999999821186
+          ],
+          [
+            3649.5,
+            3653.0999999940395
+          ],
+          [
+            3657.5,
+            3661.9000000059605
+          ],
+          [
+            3665.4,
+            3672.0999999940395
+          ],
+          [
+            3681.4,
+            3685.7999999821186
+          ],
+          [
+            3689.4,
+            3696.199999988079
+          ],
+          [
+            3705.4,
+            3708.699999988079
+          ],
+          [
+            3713.4,
+            3720.199999988079
+          ],
+          [
+            3729.6,
+            3734.0999999940395
+          ],
+          [
+            3737.5,
+            3743.699999988079
+          ],
+          [
+            3753.4,
+            3757.699999988079
+          ],
+          [
+            3769.3,
+            3773.199999988079
+          ],
+          [
+            3777.3,
+            3785
+          ],
+          [
+            3793.3,
+            3797.699999988079
+          ],
+          [
+            3801.3,
+            3807.5
+          ],
+          [
+            3817.3,
+            3820.9000000059605
+          ],
+          [
+            3825.3,
+            3831.2999999821186
+          ],
+          [
+            3841.3,
+            3845.7999999821186
+          ],
+          [
+            3849.3,
+            3859.0999999940395
+          ],
+          [
+            3865.2,
+            3869
+          ],
+          [
+            3873.3,
+            3878
+          ],
+          [
+            3889.3,
+            3891.699999988079
+          ],
+          [
+            3897.2,
+            3901.5999999940395
+          ],
+          [
+            3913.3,
+            3916.0999999940395
+          ],
+          [
+            3929.3,
+            3931.5
+          ],
+          [
+            3937.3,
+            3944.7999999821186
+          ],
+          [
+            3953.3,
+            3961.0999999940395
+          ],
+          [
+            3977.3,
+            3979.5999999940395
+          ],
+          [
+            3985.2,
+            3991.0999999940395
+          ],
+          [
+            4001.4,
+            4002.7999999821186
+          ],
+          [
+            4009.1,
+            4011.9000000059605
+          ],
+          [
+            4016.7,
+            4020.5
+          ],
+          [
+            4032.6,
+            4034.199999988079
+          ],
+          [
+            4040.7,
+            4045.199999988079
+          ],
+          [
+            4056.6,
+            4058.0999999940395
+          ],
+          [
+            4064.6,
+            4070
+          ],
+          [
+            4080.7,
+            4082
+          ],
+          [
+            4088.6,
+            4091.0999999940395
+          ],
+          [
+            4096.6,
+            4099.5999999940395
+          ],
+          [
+            4104.6,
+            4111.199999988079
+          ],
+          [
+            4120.7,
+            4122.0999999940395
+          ],
+          [
+            4128.6,
+            4133.699999988079
+          ],
+          [
+            4144.6,
+            4147.799999982119
+          ],
+          [
+            4161,
+            4164.199999988079
+          ],
+          [
+            4177.1,
+            4181.799999982119
+          ],
+          [
+            4193.1,
+            4197.4000000059605
+          ],
+          [
+            4209.1,
+            4211.9000000059605
+          ],
+          [
+            4217,
+            4222.299999982119
+          ],
+          [
+            4233.1,
+            4235.799999982119
+          ],
+          [
+            4249.1,
+            4256.5999999940395
+          ],
+          [
+            4265,
+            4272.5
+          ],
+          [
+            4281.1,
+            4288.299999982119
+          ],
+          [
+            4297.2,
+            4299.699999988079
+          ],
+          [
+            4305,
+            4309.0999999940395
+          ],
+          [
+            4313.1,
+            4321.9000000059605
+          ],
+          [
+            4329,
+            4332.299999982119
+          ],
+          [
+            4337.5,
+            4343.9000000059605
+          ],
+          [
+            4353.4,
+            4357.799999982119
+          ],
+          [
+            4361.5,
+            4365.799999982119
+          ],
+          [
+            4369.5,
+            4374.9000000059605
+          ],
+          [
+            4385.2,
+            4390.4000000059605
+          ],
+          [
+            4401.2,
+            4402.299999982119
+          ],
+          [
+            4409.2,
+            4412.5
+          ],
+          [
+            4417.1,
+            4421.4000000059605
+          ],
+          [
+            4425.1,
+            4429.199999988079
+          ],
+          [
+            4433.1,
+            4438.4000000059605
+          ],
+          [
+            4449.1,
+            4451.199999988079
+          ],
+          [
+            4457.1,
+            4460.5999999940395
+          ],
+          [
+            4465.2,
+            4468.5
+          ],
+          [
+            4473.2,
+            4476.4000000059605
+          ],
+          [
+            4481.2,
+            4486.9000000059605
+          ],
+          [
+            4497.3,
+            4499.9000000059605
+          ],
+          [
+            4505.3,
+            4508.5999999940395
+          ],
+          [
+            4512.5,
+            4516.5999999940395
+          ],
+          [
+            4520.4,
+            4524.299999982119
+          ],
+          [
+            4528.4,
+            4532.799999982119
+          ],
+          [
+            4536.4,
+            4539.0999999940395
+          ],
+          [
+            4544.4,
+            4547.299999982119
+          ],
+          [
+            4560.5,
+            4562.9000000059605
+          ],
+          [
+            4568.4,
+            4573.199999988079
+          ],
+          [
+            4584.5,
+            4585.799999982119
+          ],
+          [
+            4592.4,
+            4594.5
+          ],
+          [
+            4600.4,
+            4604.0999999940395
+          ],
+          [
+            4608.5,
+            4610
+          ],
+          [
+            4616.4,
+            4618.699999988079
+          ],
+          [
+            4624.4,
+            4627.199999988079
+          ],
+          [
+            4632.5,
+            4658.5999999940395
+          ],
+          [
+            4664.4,
+            4668.5
+          ],
+          [
+            4679.7,
+            4680.299999982119
+          ],
+          [
+            4687.7,
+            4697.299999982119
+          ],
+          [
+            4703.7,
+            4708.299999982119
+          ],
+          [
+            4711.6,
+            4713.0999999940395
+          ],
+          [
+            4719.7,
+            4723.4000000059605
+          ],
+          [
+            4727.7,
+            4737.5
+          ],
+          [
+            4743.7,
+            4748.9000000059605
+          ],
+          [
+            4759.2,
+            4764.5999999940395
+          ],
+          [
+            4767.2,
+            4779
+          ],
+          [
+            4783.2,
+            4787.4000000059605
+          ],
+          [
+            4799.1,
+            4802.0999999940395
+          ],
+          [
+            4806.7,
+            4813.299999982119
+          ],
+          [
+            4813.9,
+            4818.5
+          ],
+          [
+            4821.8,
+            4826.5999999940395
+          ],
+          [
+            4829.9,
+            4836.4000000059605
+          ],
+          [
+            4845.9,
+            4847.0999999940395
+          ],
+          [
+            4853.9,
+            4854.5999999940395
+          ],
+          [
+            4861.9,
+            4862.799999982119
+          ],
+          [
+            4869.9,
+            4870.799999982119
+          ],
+          [
+            4877.8,
+            4878.699999988079
+          ],
+          [
+            4878.9,
+            4881.5999999940395
+          ],
+          [
+            4886.9,
+            4887.5999999940395
+          ],
+          [
+            4894.9,
+            4895.199999988079
+          ],
+          [
+            4902.9,
+            4903.199999988079
+          ],
+          [
+            4910.9,
+            4911.199999988079
+          ],
+          [
+            4918.9,
+            4919.0999999940395
+          ],
+          [
+            4926.9,
+            4928.199999988079
+          ],
+          [
+            4934.8,
+            4935
+          ],
+          [
+            4943,
+            4943.299999982119
+          ],
+          [
+            4950.9,
+            4951.199999988079
+          ],
+          [
+            4958.9,
+            4959.0999999940395
+          ],
+          [
+            4966.4,
+            4966.5999999940395
+          ],
+          [
+            4974.4,
+            4974.5999999940395
+          ],
+          [
+            4981.8,
+            4982
+          ],
+          [
+            4989.8,
+            4990.0999999940395
+          ],
+          [
+            4997.8,
+            4997.9000000059605
+          ],
+          [
+            5005.3,
+            5005.4000000059605
+          ]
+        ],
+        "events": [
+          [
+            "keydown",
+            2938.4000000059605,
+            2939.199999988079
+          ],
+          [
+            "pointerdown",
+            3015.4000000059605,
+            3018.5999999940395
+          ],
+          [
+            "pointerup",
+            4629.9000000059605,
+            4656.9000000059605
+          ]
+        ]
+      },
+      "p95": 16.199999999999818,
+      "max": 143.5,
+      "remaining": []
+    },
+    {
+      "round": 2,
+      "mode": "miss",
+      "ms": [
+        134.69999999999982,
+        24,
+        8,
+        8.100000000000364,
+        8,
+        8,
+        7.899999999999636,
+        8,
+        8,
+        8,
+        8,
+        8.100000000000364,
+        8,
+        8,
+        7.899999999999636,
+        8,
+        8,
+        8,
+        7.800000000000182,
+        8,
+        8,
+        8,
+        8,
+        7.400000000000546,
+        8,
+        8,
+        7.899999999999636,
+        8.100000000000364,
+        8,
+        8,
+        7.899999999999636,
+        8,
+        8.100000000000364,
+        8,
+        8,
+        8,
+        8,
+        7.899999999999636,
+        7.600000000000364,
+        7.899999999999636,
+        8,
+        8,
+        8,
+        8,
+        8,
+        8,
+        8,
+        8,
+        8,
+        8,
+        8,
+        8,
+        8,
+        8,
+        8,
+        8,
+        8,
+        8,
+        8,
+        7.899999999999636,
+        8.100000000000364,
+        8,
+        8,
+        8,
+        7.100000000000364,
+        7.299999999999272,
+        8,
+        8,
+        8,
+        8,
+        8,
+        8,
+        8,
+        8,
+        8,
+        8,
+        8,
+        7.900000000000546,
+        8.099999999999454,
+        7.900000000000546,
+        8.099999999999454,
+        8,
+        8,
+        8,
+        8,
+        8,
+        7.600000000000364,
+        8.100000000000364,
+        8,
+        8,
+        8,
+        8,
+        7.899999999999636,
+        8.100000000000364,
+        7.699999999999818,
+        8
+      ],
+      "phase": {
+        "start": 5547.7,
+        "events": [
+          {
+            "type": "pointerdown",
+            "t": 5564.699999988079
+          },
+          {
+            "type": "pointermove",
+            "t": 5687.5999999940395
+          },
+          {
+            "type": "pointermove",
+            "t": 5708.0999999940395
+          },
+          {
+            "type": "pointermove",
+            "t": 5723.799999982119
+          },
+          {
+            "type": "pointermove",
+            "t": 5739.799999982119
+          },
+          {
+            "type": "pointermove",
+            "t": 5755.5
+          },
+          {
+            "type": "pointermove",
+            "t": 5771.5999999940395
+          },
+          {
+            "type": "pointermove",
+            "t": 5788.199999988079
+          },
+          {
+            "type": "pointermove",
+            "t": 5804.9000000059605
+          },
+          {
+            "type": "pointermove",
+            "t": 5819.9000000059605
+          },
+          {
+            "type": "pointermove",
+            "t": 5836.299999982119
+          },
+          {
+            "type": "pointermove",
+            "t": 5859.5999999940395
+          },
+          {
+            "type": "pointermove",
+            "t": 5876
+          },
+          {
+            "type": "pointermove",
+            "t": 5891.5999999940395
+          },
+          {
+            "type": "pointermove",
+            "t": 5906.9000000059605
+          },
+          {
+            "type": "pointermove",
+            "t": 5922.799999982119
+          },
+          {
+            "type": "pointermove",
+            "t": 5938.5999999940395
+          },
+          {
+            "type": "pointermove",
+            "t": 5946.799999982119
+          },
+          {
+            "type": "pointermove",
+            "t": 5963.0999999940395
+          },
+          {
+            "type": "pointermove",
+            "t": 5986.9000000059605
+          },
+          {
+            "type": "pointermove",
+            "t": 6002.299999982119
+          },
+          {
+            "type": "pointermove",
+            "t": 6018.799999982119
+          },
+          {
+            "type": "pointermove",
+            "t": 6034.5999999940395
+          },
+          {
+            "type": "pointermove",
+            "t": 6050.5999999940395
+          },
+          {
+            "type": "pointermove",
+            "t": 6066.4000000059605
+          },
+          {
+            "type": "pointermove",
+            "t": 6082.199999988079
+          },
+          {
+            "type": "pointermove",
+            "t": 6098.199999988079
+          },
+          {
+            "type": "pointermove",
+            "t": 6114.5
+          },
+          {
+            "type": "pointermove",
+            "t": 6130.5999999940395
+          },
+          {
+            "type": "pointermove",
+            "t": 6157.699999988079
+          },
+          {
+            "type": "pointermove",
+            "t": 6171
+          },
+          {
+            "type": "pointermove",
+            "t": 6186.5999999940395
+          },
+          {
+            "type": "pointermove",
+            "t": 6202.699999988079
+          },
+          {
+            "type": "pointermove",
+            "t": 6216.9000000059605
+          },
+          {
+            "type": "pointermove",
+            "t": 6233.4000000059605
+          },
+          {
+            "type": "pointermove",
+            "t": 6248.9000000059605
+          },
+          {
+            "type": "pointermove",
+            "t": 6265.0999999940395
+          },
+          {
+            "type": "pointermove",
+            "t": 6280.799999982119
+          },
+          {
+            "type": "pointermove",
+            "t": 6297.299999982119
+          },
+          {
+            "type": "pointermove",
+            "t": 6312.699999988079
+          },
+          {
+            "type": "pointermove",
+            "t": 6320.5
+          },
+          {
+            "type": "pointermove",
+            "t": 6328.5999999940395
+          },
+          {
+            "type": "pointermove",
+            "t": 6336.5
+          },
+          {
+            "type": "pointermove",
+            "t": 6344.799999982119
+          },
+          {
+            "type": "pointermove",
+            "t": 6360.799999982119
+          },
+          {
+            "type": "pointermove",
+            "t": 6368.799999982119
+          },
+          {
+            "type": "pointermove",
+            "t": 6385.0999999940395
+          },
+          {
+            "type": "pointermove",
+            "t": 6401.0999999940395
+          },
+          {
+            "type": "pointermove",
+            "t": 6427.199999988079
+          },
+          {
+            "type": "pointerup",
+            "t": 6439.5999999940395
+          }
+        ]
+      },
+      "entry": {
+        "frames": [
+          [
+            5508.866,
+            5519.9000000059605
+          ],
+          [
+            5540.2,
+            5543.5
+          ],
+          [
+            5547.7,
+            5548
+          ],
+          [
+            5682.4,
+            5688.4000000059605
+          ],
+          [
+            5706.4,
+            5708.5
+          ],
+          [
+            5714.4,
+            5714.699999988079
+          ],
+          [
+            5722.5,
+            5724.4000000059605
+          ],
+          [
+            5730.5,
+            5730.799999982119
+          ],
+          [
+            5738.5,
+            5740.299999982119
+          ],
+          [
+            5746.4,
+            5746.699999988079
+          ],
+          [
+            5754.4,
+            5755.9000000059605
+          ],
+          [
+            5762.4,
+            5762.5999999940395
+          ],
+          [
+            5770.4,
+            5772
+          ],
+          [
+            5778.4,
+            5778.5999999940395
+          ],
+          [
+            5786.5,
+            5788.5999999940395
+          ],
+          [
+            5794.5,
+            5794.799999982119
+          ],
+          [
+            5802.5,
+            5805.199999988079
+          ],
+          [
+            5810.4,
+            5810.5999999940395
+          ],
+          [
+            5818.4,
+            5820.4000000059605
+          ],
+          [
+            5826.4,
+            5826.9000000059605
+          ],
+          [
+            5834.4,
+            5836.799999982119
+          ],
+          [
+            5842.2,
+            5842.4000000059605
+          ],
+          [
+            5850.2,
+            5850.699999988079
+          ],
+          [
+            5858.2,
+            5860
+          ],
+          [
+            5866.2,
+            5866.4000000059605
+          ],
+          [
+            5874.2,
+            5876.5999999940395
+          ],
+          [
+            5881.6,
+            5882.0999999940395
+          ],
+          [
+            5889.6,
+            5892.299999982119
+          ],
+          [
+            5897.6,
+            5897.799999982119
+          ],
+          [
+            5905.5,
+            5907.299999982119
+          ],
+          [
+            5913.6,
+            5914.4000000059605
+          ],
+          [
+            5921.6,
+            5923.299999982119
+          ],
+          [
+            5929.6,
+            5929.799999982119
+          ],
+          [
+            5937.5,
+            5939
+          ],
+          [
+            5945.5,
+            5947.199999988079
+          ],
+          [
+            5953.6,
+            5953.799999982119
+          ],
+          [
+            5961.6,
+            5963.5999999940395
+          ],
+          [
+            5969.6,
+            5969.9000000059605
+          ],
+          [
+            5977.6,
+            5977.9000000059605
+          ],
+          [
+            5985.6,
+            5987.299999982119
+          ],
+          [
+            5993.5,
+            5993.799999982119
+          ],
+          [
+            6001.1,
+            6002.9000000059605
+          ],
+          [
+            6009,
+            6009.4000000059605
+          ],
+          [
+            6017,
+            6019.199999988079
+          ],
+          [
+            6025,
+            6025.199999988079
+          ],
+          [
+            6033,
+            6035
+          ],
+          [
+            6041,
+            6041.0999999940395
+          ],
+          [
+            6049,
+            6051
+          ],
+          [
+            6057,
+            6057.199999988079
+          ],
+          [
+            6065,
+            6067
+          ],
+          [
+            6073,
+            6073.799999982119
+          ],
+          [
+            6081,
+            6082.5999999940395
+          ],
+          [
+            6089,
+            6089.5999999940395
+          ],
+          [
+            6097,
+            6098.5
+          ],
+          [
+            6105,
+            6105.199999988079
+          ],
+          [
+            6113,
+            6114.9000000059605
+          ],
+          [
+            6121,
+            6121.199999988079
+          ],
+          [
+            6129,
+            6131.299999982119
+          ],
+          [
+            6137,
+            6139.299999982119
+          ],
+          [
+            6145,
+            6145.4000000059605
+          ],
+          [
+            6153,
+            6158.199999988079
+          ],
+          [
+            6161,
+            6163.5
+          ],
+          [
+            6168.9,
+            6171.299999982119
+          ],
+          [
+            6177,
+            6177.199999988079
+          ],
+          [
+            6185,
+            6186.9000000059605
+          ],
+          [
+            6193,
+            6193.199999988079
+          ],
+          [
+            6201,
+            6203
+          ],
+          [
+            6208.1,
+            6208.4000000059605
+          ],
+          [
+            6215.4,
+            6217.4000000059605
+          ],
+          [
+            6223.4,
+            6223.5999999940395
+          ],
+          [
+            6231.4,
+            6233.799999982119
+          ],
+          [
+            6239.4,
+            6239.799999982119
+          ],
+          [
+            6247.4,
+            6249.299999982119
+          ],
+          [
+            6255.4,
+            6255.699999988079
+          ],
+          [
+            6263.4,
+            6265.5
+          ],
+          [
+            6271.4,
+            6271.5999999940395
+          ],
+          [
+            6279.4,
+            6281.299999982119
+          ],
+          [
+            6287.4,
+            6287.699999988079
+          ],
+          [
+            6295.4,
+            6297.699999988079
+          ],
+          [
+            6303.4,
+            6303.5999999940395
+          ],
+          [
+            6311.3,
+            6313.199999988079
+          ],
+          [
+            6319.4,
+            6320.799999982119
+          ],
+          [
+            6327.3,
+            6328.9000000059605
+          ],
+          [
+            6335.4,
+            6336.9000000059605
+          ],
+          [
+            6343.4,
+            6345.199999988079
+          ],
+          [
+            6351.4,
+            6356.199999988079
+          ],
+          [
+            6359.4,
+            6361.299999982119
+          ],
+          [
+            6367.4,
+            6369.199999988079
+          ],
+          [
+            6375.4,
+            6375.699999988079
+          ],
+          [
+            6383,
+            6385.5
+          ],
+          [
+            6391.1,
+            6394.299999982119
+          ],
+          [
+            6399.1,
+            6401.5
+          ],
+          [
+            6407.1,
+            6410
+          ],
+          [
+            6415.1,
+            6415.4000000059605
+          ],
+          [
+            6423.1,
+            6427.799999982119
+          ],
+          [
+            6431,
+            6434.0999999940395
+          ],
+          [
+            6439.1,
+            6441.5999999940395
+          ],
+          [
+            6446.8,
+            6447.0999999940395
+          ],
+          [
+            6454.8,
+            6459.5999999940395
+          ],
+          [
+            6462.8,
+            6463.0999999940395
+          ],
+          [
+            6470.9,
+            6489.0999999940395
+          ],
+          [
+            6510.8,
+            6513.5999999940395
+          ],
+          [
+            6518.9,
+            6519.199999988079
+          ],
+          [
+            6678.1,
+            6682.5999999940395
+          ],
+          [
+            6718.1,
+            6718.5
+          ],
+          [
+            6726,
+            6726.5
+          ],
+          [
+            6734.1,
+            6736.4000000059605
+          ],
+          [
+            6750.1,
+            6753.299999982119
+          ],
+          [
+            6766.1,
+            6767.5
+          ],
+          [
+            6774,
+            6774.5999999940395
+          ],
+          [
+            6782.1,
+            6782.799999982119
+          ],
+          [
+            6790.1,
+            6790.5999999940395
+          ],
+          [
+            6798,
+            6798.5
+          ],
+          [
+            6806.1,
+            6806.4000000059605
+          ],
+          [
+            6814.3,
+            6815.4000000059605
+          ],
+          [
+            6822,
+            6822.4000000059605
+          ],
+          [
+            6829.6,
+            6830.0999999940395
+          ],
+          [
+            6837.6,
+            6837.9000000059605
+          ],
+          [
+            6845.6,
+            6846.0999999940395
+          ]
+        ],
+        "events": [
+          [
+            "keydown",
+            5498,
+            5498.4000000059605
+          ],
+          [
+            "pointerdown",
+            5561,
+            5564.5999999940395
+          ],
+          [
+            "pointerup",
+            6437.799999982119,
+            6439.5999999940395
+          ]
+        ]
+      },
+      "p95": 8.100000000000364,
+      "max": 134.69999999999982,
+      "remaining": [
+        "perf-release-300-500-bench-0",
+        "perf-release-300-500-bench-1",
+        "perf-release-300-500-bench-10",
+        "perf-release-300-500-bench-100",
+        "perf-release-300-500-bench-101",
+        "perf-release-300-500-bench-102",
+        "perf-release-300-500-bench-103",
+        "perf-release-300-500-bench-104",
+        "perf-release-300-500-bench-105",
+        "perf-release-300-500-bench-106",
+        "perf-release-300-500-bench-107",
+        "perf-release-300-500-bench-108",
+        "perf-release-300-500-bench-109",
+        "perf-release-300-500-bench-11",
+        "perf-release-300-500-bench-110",
+        "perf-release-300-500-bench-111",
+        "perf-release-300-500-bench-112",
+        "perf-release-300-500-bench-113",
+        "perf-release-300-500-bench-114",
+        "perf-release-300-500-bench-115",
+        "perf-release-300-500-bench-116",
+        "perf-release-300-500-bench-117",
+        "perf-release-300-500-bench-118",
+        "perf-release-300-500-bench-119",
+        "perf-release-300-500-bench-12",
+        "perf-release-300-500-bench-120",
+        "perf-release-300-500-bench-121",
+        "perf-release-300-500-bench-122",
+        "perf-release-300-500-bench-123",
+        "perf-release-300-500-bench-124",
+        "perf-release-300-500-bench-125",
+        "perf-release-300-500-bench-126",
+        "perf-release-300-500-bench-127",
+        "perf-release-300-500-bench-128",
+        "perf-release-300-500-bench-129",
+        "perf-release-300-500-bench-13",
+        "perf-release-300-500-bench-130",
+        "perf-release-300-500-bench-131",
+        "perf-release-300-500-bench-132",
+        "perf-release-300-500-bench-133",
+        "perf-release-300-500-bench-134",
+        "perf-release-300-500-bench-135",
+        "perf-release-300-500-bench-136",
+        "perf-release-300-500-bench-137",
+        "perf-release-300-500-bench-138",
+        "perf-release-300-500-bench-139",
+        "perf-release-300-500-bench-14",
+        "perf-release-300-500-bench-140",
+        "perf-release-300-500-bench-141",
+        "perf-release-300-500-bench-142",
+        "perf-release-300-500-bench-143",
+        "perf-release-300-500-bench-144",
+        "perf-release-300-500-bench-145",
+        "perf-release-300-500-bench-146",
+        "perf-release-300-500-bench-147",
+        "perf-release-300-500-bench-148",
+        "perf-release-300-500-bench-149",
+        "perf-release-300-500-bench-15",
+        "perf-release-300-500-bench-150",
+        "perf-release-300-500-bench-151",
+        "perf-release-300-500-bench-152",
+        "perf-release-300-500-bench-153",
+        "perf-release-300-500-bench-154",
+        "perf-release-300-500-bench-155",
+        "perf-release-300-500-bench-156",
+        "perf-release-300-500-bench-157",
+        "perf-release-300-500-bench-158",
+        "perf-release-300-500-bench-159",
+        "perf-release-300-500-bench-16",
+        "perf-release-300-500-bench-160",
+        "perf-release-300-500-bench-161",
+        "perf-release-300-500-bench-162",
+        "perf-release-300-500-bench-163",
+        "perf-release-300-500-bench-164",
+        "perf-release-300-500-bench-165",
+        "perf-release-300-500-bench-166",
+        "perf-release-300-500-bench-167",
+        "perf-release-300-500-bench-168",
+        "perf-release-300-500-bench-169",
+        "perf-release-300-500-bench-17",
+        "perf-release-300-500-bench-170",
+        "perf-release-300-500-bench-171",
+        "perf-release-300-500-bench-172",
+        "perf-release-300-500-bench-173",
+        "perf-release-300-500-bench-174",
+        "perf-release-300-500-bench-175",
+        "perf-release-300-500-bench-176",
+        "perf-release-300-500-bench-177",
+        "perf-release-300-500-bench-178",
+        "perf-release-300-500-bench-179",
+        "perf-release-300-500-bench-18",
+        "perf-release-300-500-bench-180",
+        "perf-release-300-500-bench-181",
+        "perf-release-300-500-bench-182",
+        "perf-release-300-500-bench-183",
+        "perf-release-300-500-bench-184",
+        "perf-release-300-500-bench-185",
+        "perf-release-300-500-bench-186",
+        "perf-release-300-500-bench-187",
+        "perf-release-300-500-bench-188",
+        "perf-release-300-500-bench-189",
+        "perf-release-300-500-bench-19",
+        "perf-release-300-500-bench-190",
+        "perf-release-300-500-bench-191",
+        "perf-release-300-500-bench-192",
+        "perf-release-300-500-bench-193",
+        "perf-release-300-500-bench-194",
+        "perf-release-300-500-bench-195",
+        "perf-release-300-500-bench-196",
+        "perf-release-300-500-bench-197",
+        "perf-release-300-500-bench-198",
+        "perf-release-300-500-bench-199",
+        "perf-release-300-500-bench-2",
+        "perf-release-300-500-bench-20",
+        "perf-release-300-500-bench-200",
+        "perf-release-300-500-bench-201",
+        "perf-release-300-500-bench-202",
+        "perf-release-300-500-bench-203",
+        "perf-release-300-500-bench-204",
+        "perf-release-300-500-bench-205",
+        "perf-release-300-500-bench-206",
+        "perf-release-300-500-bench-207",
+        "perf-release-300-500-bench-208",
+        "perf-release-300-500-bench-209",
+        "perf-release-300-500-bench-21",
+        "perf-release-300-500-bench-210",
+        "perf-release-300-500-bench-211",
+        "perf-release-300-500-bench-212",
+        "perf-release-300-500-bench-213",
+        "perf-release-300-500-bench-214",
+        "perf-release-300-500-bench-215",
+        "perf-release-300-500-bench-216",
+        "perf-release-300-500-bench-217",
+        "perf-release-300-500-bench-218",
+        "perf-release-300-500-bench-219",
+        "perf-release-300-500-bench-22",
+        "perf-release-300-500-bench-220",
+        "perf-release-300-500-bench-221",
+        "perf-release-300-500-bench-222",
+        "perf-release-300-500-bench-223",
+        "perf-release-300-500-bench-224",
+        "perf-release-300-500-bench-225",
+        "perf-release-300-500-bench-226",
+        "perf-release-300-500-bench-227",
+        "perf-release-300-500-bench-228",
+        "perf-release-300-500-bench-229",
+        "perf-release-300-500-bench-23",
+        "perf-release-300-500-bench-230",
+        "perf-release-300-500-bench-231",
+        "perf-release-300-500-bench-232",
+        "perf-release-300-500-bench-233",
+        "perf-release-300-500-bench-234",
+        "perf-release-300-500-bench-235",
+        "perf-release-300-500-bench-236",
+        "perf-release-300-500-bench-237",
+        "perf-release-300-500-bench-238",
+        "perf-release-300-500-bench-239",
+        "perf-release-300-500-bench-24",
+        "perf-release-300-500-bench-240",
+        "perf-release-300-500-bench-241",
+        "perf-release-300-500-bench-242",
+        "perf-release-300-500-bench-243",
+        "perf-release-300-500-bench-244",
+        "perf-release-300-500-bench-245",
+        "perf-release-300-500-bench-246",
+        "perf-release-300-500-bench-247",
+        "perf-release-300-500-bench-248",
+        "perf-release-300-500-bench-249",
+        "perf-release-300-500-bench-25",
+        "perf-release-300-500-bench-250",
+        "perf-release-300-500-bench-251",
+        "perf-release-300-500-bench-252",
+        "perf-release-300-500-bench-253",
+        "perf-release-300-500-bench-254",
+        "perf-release-300-500-bench-255",
+        "perf-release-300-500-bench-256",
+        "perf-release-300-500-bench-257",
+        "perf-release-300-500-bench-258",
+        "perf-release-300-500-bench-259",
+        "perf-release-300-500-bench-26",
+        "perf-release-300-500-bench-260",
+        "perf-release-300-500-bench-261",
+        "perf-release-300-500-bench-262",
+        "perf-release-300-500-bench-263",
+        "perf-release-300-500-bench-264",
+        "perf-release-300-500-bench-265",
+        "perf-release-300-500-bench-266",
+        "perf-release-300-500-bench-267",
+        "perf-release-300-500-bench-268",
+        "perf-release-300-500-bench-269",
+        "perf-release-300-500-bench-27",
+        "perf-release-300-500-bench-270",
+        "perf-release-300-500-bench-271",
+        "perf-release-300-500-bench-272",
+        "perf-release-300-500-bench-273",
+        "perf-release-300-500-bench-274",
+        "perf-release-300-500-bench-275",
+        "perf-release-300-500-bench-276",
+        "perf-release-300-500-bench-277",
+        "perf-release-300-500-bench-278",
+        "perf-release-300-500-bench-279",
+        "perf-release-300-500-bench-28",
+        "perf-release-300-500-bench-280",
+        "perf-release-300-500-bench-281",
+        "perf-release-300-500-bench-282",
+        "perf-release-300-500-bench-283",
+        "perf-release-300-500-bench-284",
+        "perf-release-300-500-bench-285",
+        "perf-release-300-500-bench-286",
+        "perf-release-300-500-bench-287",
+        "perf-release-300-500-bench-288",
+        "perf-release-300-500-bench-289",
+        "perf-release-300-500-bench-29",
+        "perf-release-300-500-bench-290",
+        "perf-release-300-500-bench-291",
+        "perf-release-300-500-bench-292",
+        "perf-release-300-500-bench-293",
+        "perf-release-300-500-bench-294",
+        "perf-release-300-500-bench-295",
+        "perf-release-300-500-bench-296",
+        "perf-release-300-500-bench-297",
+        "perf-release-300-500-bench-298",
+        "perf-release-300-500-bench-299",
+        "perf-release-300-500-bench-3",
+        "perf-release-300-500-bench-30",
+        "perf-release-300-500-bench-300",
+        "perf-release-300-500-bench-301",
+        "perf-release-300-500-bench-302",
+        "perf-release-300-500-bench-303",
+        "perf-release-300-500-bench-304",
+        "perf-release-300-500-bench-305",
+        "perf-release-300-500-bench-306",
+        "perf-release-300-500-bench-307",
+        "perf-release-300-500-bench-308",
+        "perf-release-300-500-bench-309",
+        "perf-release-300-500-bench-31",
+        "perf-release-300-500-bench-310",
+        "perf-release-300-500-bench-311",
+        "perf-release-300-500-bench-312",
+        "perf-release-300-500-bench-313",
+        "perf-release-300-500-bench-314",
+        "perf-release-300-500-bench-315",
+        "perf-release-300-500-bench-316",
+        "perf-release-300-500-bench-317",
+        "perf-release-300-500-bench-318",
+        "perf-release-300-500-bench-319",
+        "perf-release-300-500-bench-32",
+        "perf-release-300-500-bench-320",
+        "perf-release-300-500-bench-321",
+        "perf-release-300-500-bench-322",
+        "perf-release-300-500-bench-323",
+        "perf-release-300-500-bench-324",
+        "perf-release-300-500-bench-325",
+        "perf-release-300-500-bench-326",
+        "perf-release-300-500-bench-327",
+        "perf-release-300-500-bench-328",
+        "perf-release-300-500-bench-329",
+        "perf-release-300-500-bench-33",
+        "perf-release-300-500-bench-330",
+        "perf-release-300-500-bench-331",
+        "perf-release-300-500-bench-332",
+        "perf-release-300-500-bench-333",
+        "perf-release-300-500-bench-334",
+        "perf-release-300-500-bench-335",
+        "perf-release-300-500-bench-336",
+        "perf-release-300-500-bench-337",
+        "perf-release-300-500-bench-338",
+        "perf-release-300-500-bench-339",
+        "perf-release-300-500-bench-34",
+        "perf-release-300-500-bench-340",
+        "perf-release-300-500-bench-341",
+        "perf-release-300-500-bench-342",
+        "perf-release-300-500-bench-343",
+        "perf-release-300-500-bench-344",
+        "perf-release-300-500-bench-345",
+        "perf-release-300-500-bench-346",
+        "perf-release-300-500-bench-347",
+        "perf-release-300-500-bench-348",
+        "perf-release-300-500-bench-349",
+        "perf-release-300-500-bench-35",
+        "perf-release-300-500-bench-350",
+        "perf-release-300-500-bench-351",
+        "perf-release-300-500-bench-352",
+        "perf-release-300-500-bench-353",
+        "perf-release-300-500-bench-354",
+        "perf-release-300-500-bench-355",
+        "perf-release-300-500-bench-356",
+        "perf-release-300-500-bench-357",
+        "perf-release-300-500-bench-358",
+        "perf-release-300-500-bench-359",
+        "perf-release-300-500-bench-36",
+        "perf-release-300-500-bench-360",
+        "perf-release-300-500-bench-361",
+        "perf-release-300-500-bench-362",
+        "perf-release-300-500-bench-363",
+        "perf-release-300-500-bench-364",
+        "perf-release-300-500-bench-365",
+        "perf-release-300-500-bench-366",
+        "perf-release-300-500-bench-367",
+        "perf-release-300-500-bench-368",
+        "perf-release-300-500-bench-369",
+        "perf-release-300-500-bench-37",
+        "perf-release-300-500-bench-370",
+        "perf-release-300-500-bench-371",
+        "perf-release-300-500-bench-372",
+        "perf-release-300-500-bench-373",
+        "perf-release-300-500-bench-374",
+        "perf-release-300-500-bench-375",
+        "perf-release-300-500-bench-376",
+        "perf-release-300-500-bench-377",
+        "perf-release-300-500-bench-378",
+        "perf-release-300-500-bench-379",
+        "perf-release-300-500-bench-38",
+        "perf-release-300-500-bench-380",
+        "perf-release-300-500-bench-381",
+        "perf-release-300-500-bench-382",
+        "perf-release-300-500-bench-383",
+        "perf-release-300-500-bench-384",
+        "perf-release-300-500-bench-385",
+        "perf-release-300-500-bench-386",
+        "perf-release-300-500-bench-387",
+        "perf-release-300-500-bench-388",
+        "perf-release-300-500-bench-389",
+        "perf-release-300-500-bench-39",
+        "perf-release-300-500-bench-390",
+        "perf-release-300-500-bench-391",
+        "perf-release-300-500-bench-392",
+        "perf-release-300-500-bench-393",
+        "perf-release-300-500-bench-394",
+        "perf-release-300-500-bench-395",
+        "perf-release-300-500-bench-396",
+        "perf-release-300-500-bench-397",
+        "perf-release-300-500-bench-398",
+        "perf-release-300-500-bench-399",
+        "perf-release-300-500-bench-4",
+        "perf-release-300-500-bench-40",
+        "perf-release-300-500-bench-400",
+        "perf-release-300-500-bench-401",
+        "perf-release-300-500-bench-402",
+        "perf-release-300-500-bench-403",
+        "perf-release-300-500-bench-404",
+        "perf-release-300-500-bench-405",
+        "perf-release-300-500-bench-406",
+        "perf-release-300-500-bench-407",
+        "perf-release-300-500-bench-408",
+        "perf-release-300-500-bench-409",
+        "perf-release-300-500-bench-41",
+        "perf-release-300-500-bench-410",
+        "perf-release-300-500-bench-411",
+        "perf-release-300-500-bench-412",
+        "perf-release-300-500-bench-413",
+        "perf-release-300-500-bench-414",
+        "perf-release-300-500-bench-415",
+        "perf-release-300-500-bench-416",
+        "perf-release-300-500-bench-417",
+        "perf-release-300-500-bench-418",
+        "perf-release-300-500-bench-419",
+        "perf-release-300-500-bench-42",
+        "perf-release-300-500-bench-420",
+        "perf-release-300-500-bench-421",
+        "perf-release-300-500-bench-422",
+        "perf-release-300-500-bench-423",
+        "perf-release-300-500-bench-424",
+        "perf-release-300-500-bench-425",
+        "perf-release-300-500-bench-426",
+        "perf-release-300-500-bench-427",
+        "perf-release-300-500-bench-428",
+        "perf-release-300-500-bench-429",
+        "perf-release-300-500-bench-43",
+        "perf-release-300-500-bench-430",
+        "perf-release-300-500-bench-431",
+        "perf-release-300-500-bench-432",
+        "perf-release-300-500-bench-433",
+        "perf-release-300-500-bench-434",
+        "perf-release-300-500-bench-435",
+        "perf-release-300-500-bench-436",
+        "perf-release-300-500-bench-437",
+        "perf-release-300-500-bench-438",
+        "perf-release-300-500-bench-439",
+        "perf-release-300-500-bench-44",
+        "perf-release-300-500-bench-440",
+        "perf-release-300-500-bench-441",
+        "perf-release-300-500-bench-442",
+        "perf-release-300-500-bench-443",
+        "perf-release-300-500-bench-444",
+        "perf-release-300-500-bench-445",
+        "perf-release-300-500-bench-446",
+        "perf-release-300-500-bench-447",
+        "perf-release-300-500-bench-448",
+        "perf-release-300-500-bench-449",
+        "perf-release-300-500-bench-45",
+        "perf-release-300-500-bench-450",
+        "perf-release-300-500-bench-451",
+        "perf-release-300-500-bench-452",
+        "perf-release-300-500-bench-453",
+        "perf-release-300-500-bench-454",
+        "perf-release-300-500-bench-455",
+        "perf-release-300-500-bench-456",
+        "perf-release-300-500-bench-457",
+        "perf-release-300-500-bench-458",
+        "perf-release-300-500-bench-459",
+        "perf-release-300-500-bench-46",
+        "perf-release-300-500-bench-460",
+        "perf-release-300-500-bench-461",
+        "perf-release-300-500-bench-462",
+        "perf-release-300-500-bench-463",
+        "perf-release-300-500-bench-464",
+        "perf-release-300-500-bench-465",
+        "perf-release-300-500-bench-466",
+        "perf-release-300-500-bench-467",
+        "perf-release-300-500-bench-468",
+        "perf-release-300-500-bench-469",
+        "perf-release-300-500-bench-47",
+        "perf-release-300-500-bench-470",
+        "perf-release-300-500-bench-471",
+        "perf-release-300-500-bench-472",
+        "perf-release-300-500-bench-473",
+        "perf-release-300-500-bench-474",
+        "perf-release-300-500-bench-475",
+        "perf-release-300-500-bench-476",
+        "perf-release-300-500-bench-477",
+        "perf-release-300-500-bench-478",
+        "perf-release-300-500-bench-479",
+        "perf-release-300-500-bench-48",
+        "perf-release-300-500-bench-480",
+        "perf-release-300-500-bench-481",
+        "perf-release-300-500-bench-482",
+        "perf-release-300-500-bench-483",
+        "perf-release-300-500-bench-484",
+        "perf-release-300-500-bench-485",
+        "perf-release-300-500-bench-486",
+        "perf-release-300-500-bench-487",
+        "perf-release-300-500-bench-488",
+        "perf-release-300-500-bench-489",
+        "perf-release-300-500-bench-49",
+        "perf-release-300-500-bench-490",
+        "perf-release-300-500-bench-491",
+        "perf-release-300-500-bench-492",
+        "perf-release-300-500-bench-493",
+        "perf-release-300-500-bench-494",
+        "perf-release-300-500-bench-495",
+        "perf-release-300-500-bench-496",
+        "perf-release-300-500-bench-497",
+        "perf-release-300-500-bench-498",
+        "perf-release-300-500-bench-499",
+        "perf-release-300-500-bench-5",
+        "perf-release-300-500-bench-50",
+        "perf-release-300-500-bench-51",
+        "perf-release-300-500-bench-52",
+        "perf-release-300-500-bench-53",
+        "perf-release-300-500-bench-54",
+        "perf-release-300-500-bench-55",
+        "perf-release-300-500-bench-56",
+        "perf-release-300-500-bench-57",
+        "perf-release-300-500-bench-58",
+        "perf-release-300-500-bench-59",
+        "perf-release-300-500-bench-6",
+        "perf-release-300-500-bench-60",
+        "perf-release-300-500-bench-61",
+        "perf-release-300-500-bench-62",
+        "perf-release-300-500-bench-63",
+        "perf-release-300-500-bench-64",
+        "perf-release-300-500-bench-65",
+        "perf-release-300-500-bench-66",
+        "perf-release-300-500-bench-67",
+        "perf-release-300-500-bench-68",
+        "perf-release-300-500-bench-69",
+        "perf-release-300-500-bench-7",
+        "perf-release-300-500-bench-70",
+        "perf-release-300-500-bench-71",
+        "perf-release-300-500-bench-72",
+        "perf-release-300-500-bench-73",
+        "perf-release-300-500-bench-74",
+        "perf-release-300-500-bench-75",
+        "perf-release-300-500-bench-76",
+        "perf-release-300-500-bench-77",
+        "perf-release-300-500-bench-78",
+        "perf-release-300-500-bench-79",
+        "perf-release-300-500-bench-8",
+        "perf-release-300-500-bench-80",
+        "perf-release-300-500-bench-81",
+        "perf-release-300-500-bench-82",
+        "perf-release-300-500-bench-83",
+        "perf-release-300-500-bench-84",
+        "perf-release-300-500-bench-85",
+        "perf-release-300-500-bench-86",
+        "perf-release-300-500-bench-87",
+        "perf-release-300-500-bench-88",
+        "perf-release-300-500-bench-89",
+        "perf-release-300-500-bench-9",
+        "perf-release-300-500-bench-90",
+        "perf-release-300-500-bench-91",
+        "perf-release-300-500-bench-92",
+        "perf-release-300-500-bench-93",
+        "perf-release-300-500-bench-94",
+        "perf-release-300-500-bench-95",
+        "perf-release-300-500-bench-96",
+        "perf-release-300-500-bench-97",
+        "perf-release-300-500-bench-98",
+        "perf-release-300-500-bench-99"
+      ]
+    },
+    {
+      "round": 2,
+      "mode": "hit",
+      "ms": [
+        151,
+        16,
+        7.900000000000546,
+        57,
+        8.099999999999454,
+        8,
+        8,
+        8,
+        8,
+        7.900000000000546,
+        8,
+        8,
+        8,
+        8,
+        8,
+        8.099999999999454,
+        7.900000000000546,
+        7.599999999999454,
+        7.5,
+        7.300000000000182,
+        7.900000000000546,
+        8.099999999999454,
+        8.100000000000364,
+        8,
+        8,
+        7.300000000000182,
+        8.099999999999454,
+        7.900000000000546,
+        7.5,
+        7.399999999999636,
+        8,
+        7.5,
+        16,
+        7.899999999999636,
+        8,
+        16.100000000000364,
+        8,
+        8,
+        16,
+        8,
+        8,
+        16,
+        7.899999999999636,
+        16.100000000000364,
+        7.899999999999636,
+        16.100000000000364,
+        8,
+        16,
+        16,
+        8,
+        16,
+        16,
+        24,
+        8,
+        16,
+        16,
+        8,
+        16,
+        8,
+        15.899999999999636,
+        8.100000000000364,
+        16,
+        7.899999999999636,
+        16.100000000000364,
+        7.899999999999636,
+        16.100000000000364,
+        16,
+        15.899999999999636,
+        16.100000000000364,
+        15.399999999999636,
+        8,
+        15.900000000000546,
+        8.099999999999454,
+        7.900000000000546,
+        8,
+        16.099999999999454,
+        7.900000000000546,
+        16,
+        8,
+        8,
+        16,
+        8,
+        8.099999999999454,
+        8,
+        16,
+        15.900000000000546,
+        8,
+        16,
+        16.099999999999454,
+        7.900000000000546,
+        8,
+        16,
+        8.099999999999454,
+        16,
+        7.900000000000546,
+        8,
+        16.099999999999454,
+        7.899999999999636,
+        8,
+        16.100000000000364,
+        7.899999999999636,
+        16,
+        8.100000000000364,
+        7.899999999999636,
+        16,
+        8,
+        16,
+        8,
+        16.100000000000364,
+        8,
+        15.700000000000728,
+        15.199999999998909,
+        7.600000000000364,
+        8.100000000000364,
+        16,
+        8,
+        8,
+        8,
+        15.5,
+        7.899999999999636,
+        8.100000000000364,
+        16,
+        17,
+        16,
+        16.100000000000364,
+        15.899999999999636,
+        8,
+        16,
+        8,
+        8,
+        40.29999999999927,
+        7.800000000001091
+      ],
+      "phase": {
+        "start": 6955.4,
+        "events": [
+          {
+            "type": "pointerdown",
+            "t": 7032.5999999940395
+          },
+          {
+            "type": "pointermove",
+            "t": 7112.199999988079
+          },
+          {
+            "type": "pointermove",
+            "t": 7133.0999999940395
+          },
+          {
+            "type": "pointermove",
+            "t": 7204.199999988079
+          },
+          {
+            "type": "pointermove",
+            "t": 7220.5
+          },
+          {
+            "type": "pointermove",
+            "t": 7244.199999988079
+          },
+          {
+            "type": "pointermove",
+            "t": 7268.699999988079
+          },
+          {
+            "type": "pointermove",
+            "t": 7292.5999999940395
+          },
+          {
+            "type": "pointermove",
+            "t": 7314.5999999940395
+          },
+          {
+            "type": "pointermove",
+            "t": 7338.799999982119
+          },
+          {
+            "type": "pointermove",
+            "t": 7362.299999982119
+          },
+          {
+            "type": "pointermove",
+            "t": 7385.5999999940395
+          },
+          {
+            "type": "pointermove",
+            "t": 7408.5999999940395
+          },
+          {
+            "type": "pointermove",
+            "t": 7434.299999982119
+          },
+          {
+            "type": "pointermove",
+            "t": 7464.5999999940395
+          },
+          {
+            "type": "pointermove",
+            "t": 7496.799999982119
+          },
+          {
+            "type": "pointermove",
+            "t": 7520.5999999940395
+          },
+          {
+            "type": "pointermove",
+            "t": 7546
+          },
+          {
+            "type": "pointermove",
+            "t": 7571.199999988079
+          },
+          {
+            "type": "pointermove",
+            "t": 7608.799999982119
+          },
+          {
+            "type": "pointermove",
+            "t": 7649.799999982119
+          },
+          {
+            "type": "pointermove",
+            "t": 7673.0999999940395
+          },
+          {
+            "type": "pointermove",
+            "t": 7712.799999982119
+          },
+          {
+            "type": "pointermove",
+            "t": 7746.299999982119
+          },
+          {
+            "type": "pointermove",
+            "t": 7769.699999988079
+          },
+          {
+            "type": "pointermove",
+            "t": 7809.0999999940395
+          },
+          {
+            "type": "pointermove",
+            "t": 7848.799999982119
+          },
+          {
+            "type": "pointermove",
+            "t": 7895.699999988079
+          },
+          {
+            "type": "pointermove",
+            "t": 7927.699999988079
+          },
+          {
+            "type": "pointermove",
+            "t": 7960
+          },
+          {
+            "type": "pointermove",
+            "t": 7993.699999988079
+          },
+          {
+            "type": "pointermove",
+            "t": 8032.0999999940395
+          },
+          {
+            "type": "pointermove",
+            "t": 8072.199999988079
+          },
+          {
+            "type": "pointermove",
+            "t": 8098.299999982119
+          },
+          {
+            "type": "pointermove",
+            "t": 8128.299999982119
+          },
+          {
+            "type": "pointermove",
+            "t": 8153.699999988079
+          },
+          {
+            "type": "pointermove",
+            "t": 8186.0999999940395
+          },
+          {
+            "type": "pointermove",
+            "t": 8216
+          },
+          {
+            "type": "pointermove",
+            "t": 8232.09999999404
+          },
+          {
+            "type": "pointermove",
+            "t": 8265
+          },
+          {
+            "type": "pointermove",
+            "t": 8288
+          },
+          {
+            "type": "pointermove",
+            "t": 8321.799999982119
+          },
+          {
+            "type": "pointermove",
+            "t": 8360.699999988079
+          },
+          {
+            "type": "pointermove",
+            "t": 8390.799999982119
+          },
+          {
+            "type": "pointermove",
+            "t": 8423.799999982119
+          },
+          {
+            "type": "pointermove",
+            "t": 8454.199999988079
+          },
+          {
+            "type": "pointermove",
+            "t": 8497.40000000596
+          },
+          {
+            "type": "pointermove",
+            "t": 8543.299999982119
+          },
+          {
+            "type": "pointermove",
+            "t": 8567.09999999404
+          },
+          {
+            "type": "pointerup",
+            "t": 8608.299999982119
+          }
+        ]
+      },
+      "entry": {
+        "frames": [
+          [
+            6892.7,
+            6893
+          ],
+          [
+            6900.7,
+            6918.199999988079
+          ],
+          [
+            6939.4,
+            6947.0999999940395
+          ],
+          [
+            6955.4,
+            6955.799999982119
+          ],
+          [
+            7106.4,
+            7113
+          ],
+          [
+            7122.4,
+            7122.9000000059605
+          ],
+          [
+            7130.3,
+            7183.199999988079
+          ],
+          [
+            7187.3,
+            7191
+          ],
+          [
+            7195.4,
+            7195.9000000059605
+          ],
+          [
+            7203.4,
+            7205.299999982119
+          ],
+          [
+            7211.4,
+            7212.0999999940395
+          ],
+          [
+            7219.4,
+            7223.0999999940395
+          ],
+          [
+            7227.4,
+            7230.9000000059605
+          ],
+          [
+            7235.3,
+            7236.0999999940395
+          ],
+          [
+            7243.3,
+            7245.799999982119
+          ],
+          [
+            7251.3,
+            7253.299999982119
+          ],
+          [
+            7259.3,
+            7260.299999982119
+          ],
+          [
+            7267.3,
+            7270.9000000059605
+          ],
+          [
+            7275.3,
+            7279
+          ],
+          [
+            7283.4,
+            7284.799999982119
+          ],
+          [
+            7291.3,
+            7294.299999982119
+          ],
+          [
+            7298.9,
+            7303.5999999940395
+          ],
+          [
+            7306.4,
+            7309.699999988079
+          ],
+          [
+            7313.7,
+            7316.199999988079
+          ],
+          [
+            7321.6,
+            7325.9000000059605
+          ],
+          [
+            7329.7,
+            7332.199999988079
+          ],
+          [
+            7337.8,
+            7340.5
+          ],
+          [
+            7345.8,
+            7349
+          ],
+          [
+            7353.8,
+            7356.4000000059605
+          ],
+          [
+            7361.1,
+            7364.0999999940395
+          ],
+          [
+            7369.2,
+            7373.4000000059605
+          ],
+          [
+            7377.1,
+            7379.799999982119
+          ],
+          [
+            7384.6,
+            7387.199999988079
+          ],
+          [
+            7392,
+            7396.799999982119
+          ],
+          [
+            7400,
+            7404
+          ],
+          [
+            7407.5,
+            7411.9000000059605
+          ],
+          [
+            7423.5,
+            7425.699999988079
+          ],
+          [
+            7431.4,
+            7436
+          ],
+          [
+            7439.4,
+            7447.0999999940395
+          ],
+          [
+            7455.5,
+            7456.5999999940395
+          ],
+          [
+            7463.5,
+            7466.799999982119
+          ],
+          [
+            7471.5,
+            7478.5
+          ],
+          [
+            7487.5,
+            7490.299999982119
+          ],
+          [
+            7495.5,
+            7499.5999999940395
+          ],
+          [
+            7503.5,
+            7510.299999982119
+          ],
+          [
+            7519.5,
+            7523.199999988079
+          ],
+          [
+            7527.4,
+            7532.799999982119
+          ],
+          [
+            7543.5,
+            7547.5999999940395
+          ],
+          [
+            7551.4,
+            7557.299999982119
+          ],
+          [
+            7567.5,
+            7572.199999988079
+          ],
+          [
+            7575.5,
+            7582.5
+          ],
+          [
+            7591.5,
+            7596
+          ],
+          [
+            7607.5,
+            7611.0999999940395
+          ],
+          [
+            7615.5,
+            7622.0999999940395
+          ],
+          [
+            7631.5,
+            7635.9000000059605
+          ],
+          [
+            7647.5,
+            7652.5
+          ],
+          [
+            7671.5,
+            7675.299999982119
+          ],
+          [
+            7679.5,
+            7688
+          ],
+          [
+            7695.5,
+            7699.699999988079
+          ],
+          [
+            7711.5,
+            7714.799999982119
+          ],
+          [
+            7719.5,
+            7725.5999999940395
+          ],
+          [
+            7735.5,
+            7738.199999988079
+          ],
+          [
+            7743.5,
+            7748.199999988079
+          ],
+          [
+            7759.4,
+            7761.0999999940395
+          ],
+          [
+            7767.5,
+            7772.9000000059605
+          ],
+          [
+            7783.5,
+            7787.5999999940395
+          ],
+          [
+            7791.4,
+            7796.5
+          ],
+          [
+            7807.5,
+            7811.0999999940395
+          ],
+          [
+            7815.4,
+            7822.199999988079
+          ],
+          [
+            7831.5,
+            7835
+          ],
+          [
+            7847.5,
+            7851.0999999940395
+          ],
+          [
+            7863.4,
+            7867.199999988079
+          ],
+          [
+            7879.5,
+            7884.5999999940395
+          ],
+          [
+            7894.9,
+            7897.9000000059605
+          ],
+          [
+            7902.9,
+            7909.799999982119
+          ],
+          [
+            7918.8,
+            7920.699999988079
+          ],
+          [
+            7926.9,
+            7929.699999988079
+          ],
+          [
+            7934.8,
+            7939.199999988079
+          ],
+          [
+            7942.8,
+            7948.4000000059605
+          ],
+          [
+            7958.9,
+            7962.299999982119
+          ],
+          [
+            7966.8,
+            7972.9000000059605
+          ],
+          [
+            7982.8,
+            7983.699999988079
+          ],
+          [
+            7990.8,
+            7995.699999988079
+          ],
+          [
+            7998.8,
+            8004
+          ],
+          [
+            8014.8,
+            8015.699999988079
+          ],
+          [
+            8022.8,
+            8024.5999999940395
+          ],
+          [
+            8030.9,
+            8034
+          ],
+          [
+            8038.9,
+            8047
+          ],
+          [
+            8054.9,
+            8059.5999999940395
+          ],
+          [
+            8070.8,
+            8074.199999988079
+          ],
+          [
+            8078.8,
+            8084.9000000059605
+          ],
+          [
+            8094.8,
+            8101.199999988079
+          ],
+          [
+            8110.9,
+            8113.799999982119
+          ],
+          [
+            8118.8,
+            8121.9000000059605
+          ],
+          [
+            8126.8,
+            8130
+          ],
+          [
+            8142.8,
+            8144.199999988079
+          ],
+          [
+            8150.9,
+            8154.9000000059605
+          ],
+          [
+            8166.9,
+            8168.199999988079
+          ],
+          [
+            8174.8,
+            8177.5
+          ],
+          [
+            8182.8,
+            8188.299999982119
+          ],
+          [
+            8198.9,
+            8202.40000000596
+          ],
+          [
+            8206.8,
+            8209.90000000596
+          ],
+          [
+            8214.8,
+            8218.09999999404
+          ],
+          [
+            8230.9,
+            8233.90000000596
+          ],
+          [
+            8238.8,
+            8243.699999988079
+          ],
+          [
+            8254.8,
+            8256.199999988079
+          ],
+          [
+            8262.9,
+            8266.299999982119
+          ],
+          [
+            8270.8,
+            8276.699999988079
+          ],
+          [
+            8286.8,
+            8290.199999988079
+          ],
+          [
+            8294.8,
+            8302.799999982119
+          ],
+          [
+            8310.8,
+            8313.5
+          ],
+          [
+            8318.8,
+            8324.09999999404
+          ],
+          [
+            8334.9,
+            8338
+          ],
+          [
+            8342.9,
+            8348.09999999404
+          ],
+          [
+            8358.6,
+            8362.40000000596
+          ],
+          [
+            8373.8,
+            8375.799999982119
+          ],
+          [
+            8381.4,
+            8384.59999999404
+          ],
+          [
+            8389.5,
+            8393
+          ],
+          [
+            8405.5,
+            8407.5
+          ],
+          [
+            8413.5,
+            8416
+          ],
+          [
+            8421.5,
+            8425.90000000596
+          ],
+          [
+            8429.5,
+            8436.799999982119
+          ],
+          [
+            8445,
+            8446.799999982119
+          ],
+          [
+            8452.9,
+            8456
+          ],
+          [
+            8461,
+            8467
+          ],
+          [
+            8477,
+            8484.5
+          ],
+          [
+            8494,
+            8501.09999999404
+          ],
+          [
+            8510,
+            8516.90000000596
+          ],
+          [
+            8526.1,
+            8530.40000000596
+          ],
+          [
+            8542,
+            8544.90000000596
+          ],
+          [
+            8550,
+            8555.40000000596
+          ],
+          [
+            8566,
+            8568.09999999404
+          ],
+          [
+            8574,
+            8575.799999982119
+          ],
+          [
+            8582,
+            8609.699999988079
+          ],
+          [
+            8622.3,
+            8623.90000000596
+          ],
+          [
+            8630.1,
+            8631.799999982119
+          ],
+          [
+            8638.2,
+            8639.299999982119
+          ],
+          [
+            8646.1,
+            8648.199999988079
+          ],
+          [
+            8654.2,
+            8670.799999982119
+          ],
+          [
+            8678.3,
+            8682.299999982119
+          ],
+          [
+            8686.3,
+            8688.5
+          ],
+          [
+            8694.3,
+            8697.299999982119
+          ],
+          [
+            8702.4,
+            8704.799999982119
+          ],
+          [
+            8710.3,
+            8717.90000000596
+          ],
+          [
+            8726.3,
+            8730.90000000596
+          ],
+          [
+            8734.3,
+            8737.5
+          ],
+          [
+            8742.3,
+            8746.5
+          ],
+          [
+            8750.4,
+            8757.59999999404
+          ],
+          [
+            8767.5,
+            8770
+          ],
+          [
+            8775.4,
+            8777.40000000596
+          ],
+          [
+            8783.4,
+            8785.799999982119
+          ],
+          [
+            8791.4,
+            8792.40000000596
+          ],
+          [
+            8799.4,
+            8800.299999982119
+          ],
+          [
+            8807.4,
+            8808.40000000596
+          ],
+          [
+            8815.4,
+            8816.299999982119
+          ],
+          [
+            8823.4,
+            8824.199999988079
+          ],
+          [
+            8831.4,
+            8832.40000000596
+          ],
+          [
+            8839.4,
+            8840.299999982119
+          ],
+          [
+            8847.4,
+            8847.699999988079
+          ],
+          [
+            8855.4,
+            8856.09999999404
+          ],
+          [
+            8863.4,
+            8863.59999999404
+          ],
+          [
+            8871.4,
+            8872.59999999404
+          ],
+          [
+            8879.4,
+            8879.799999982119
+          ],
+          [
+            8887.4,
+            8887.799999982119
+          ],
+          [
+            8895.4,
+            8895.799999982119
+          ],
+          [
+            8903.5,
+            8903.799999982119
+          ],
+          [
+            8911.5,
+            8911.699999988079
+          ],
+          [
+            8919.6,
+            8919.90000000596
+          ],
+          [
+            8927.5,
+            8927.799999982119
+          ],
+          [
+            8935.6,
+            8935.799999982119
+          ],
+          [
+            8943.6,
+            8944
+          ],
+          [
+            8951.6,
+            8951.90000000596
+          ],
+          [
+            8959.6,
+            8959.90000000596
+          ],
+          [
+            8967.6,
+            8967.90000000596
+          ],
+          [
+            8975.6,
+            8975.90000000596
+          ],
+          [
+            8983.6,
+            8983.90000000596
+          ],
+          [
+            8991.6,
+            8991.799999982119
+          ]
+        ],
+        "events": [
+          [
+            "keydown",
+            6892.699999988079,
+            6893.699999988079
+          ],
+          [
+            "pointerdown",
+            7028.5999999940395,
+            7032.5999999940395
+          ],
+          [
+            "pointerup",
+            8579,
+            8608.299999982119
+          ]
+        ]
+      },
+      "p95": 16.100000000000364,
+      "max": 151,
+      "remaining": []
+    },
+    {
+      "round": 3,
+      "mode": "miss",
+      "ms": [
+        120,
+        23.900000000001455,
+        8,
+        8,
+        16.099999999998545,
+        7.900000000001455,
+        8,
+        8,
+        8.099999999998545,
+        7.900000000001455,
+        8,
+        8,
+        8,
+        8,
+        8.099999999998545,
+        7.900000000001455,
+        8,
+        8,
+        8.099999999998545,
+        8,
+        7.900000000001455,
+        8,
+        16.099999999998545,
+        8,
+        7.900000000001455,
+        8,
+        8.099999999998545,
+        7.900000000001455,
+        8,
+        8.099999999998545,
+        7.900000000001455,
+        8.099999999998545,
+        7.900000000001455,
+        7.599999999998545,
+        8,
+        8,
+        8,
+        7.900000000001455,
+        8,
+        8.099999999998545,
+        7.900000000001455,
+        8.099999999998545,
+        8,
+        15.900000000001455,
+        8.099999999998545,
+        8,
+        16,
+        8,
+        8,
+        7.900000000001455,
+        8.099999999998545,
+        7.900000000001455,
+        8,
+        8.099999999998545,
+        8,
+        7.900000000001455,
+        16.099999999998545,
+        8,
+        7.900000000001455,
+        8.099999999998545,
+        8,
+        7.900000000001455,
+        8,
+        8.099999999998545,
+        8,
+        8,
+        7.900000000001455,
+        8,
+        8.099999999998545,
+        7.900000000001455,
+        8.099999999998545,
+        8,
+        8,
+        7.900000000001455,
+        8.099999999998545,
+        7.900000000001455,
+        8,
+        8.099999999998545,
+        7.900000000001455,
+        8,
+        8.099999999998545,
+        8,
+        7.800000000001091,
+        8,
+        8,
+        8.100000000000364,
+        7.899999999999636,
+        16,
+        8.100000000000364,
+        7.899999999999636,
+        8,
+        8,
+        8,
+        8,
+        8,
+        8.100000000000364,
+        8,
+        7.899999999999636,
+        8,
+        8
+      ],
+      "phase": {
+        "start": 9550.3,
+        "events": [
+          {
+            "type": "pointerdown",
+            "t": 9562.699999988079
+          },
+          {
+            "type": "pointermove",
+            "t": 9674.90000000596
+          },
+          {
+            "type": "pointermove",
+            "t": 9696.40000000596
+          },
+          {
+            "type": "pointermove",
+            "t": 9712.09999999404
+          },
+          {
+            "type": "pointermove",
+            "t": 9727
+          },
+          {
+            "type": "pointermove",
+            "t": 9735.299999982119
+          },
+          {
+            "type": "pointermove",
+            "t": 9751.699999988079
+          },
+          {
+            "type": "pointermove",
+            "t": 9767.299999982119
+          },
+          {
+            "type": "pointermove",
+            "t": 9780.5
+          },
+          {
+            "type": "pointermove",
+            "t": 9799.299999982119
+          },
+          {
+            "type": "pointermove",
+            "t": 9807.199999988079
+          },
+          {
+            "type": "pointermove",
+            "t": 9821
+          },
+          {
+            "type": "pointermove",
+            "t": 9831.699999988079
+          },
+          {
+            "type": "pointermove",
+            "t": 9848.40000000596
+          },
+          {
+            "type": "pointermove",
+            "t": 9863.299999982119
+          },
+          {
+            "type": "pointermove",
+            "t": 9879.299999982119
+          },
+          {
+            "type": "pointermove",
+            "t": 9896
+          },
+          {
+            "type": "pointermove",
+            "t": 9911.199999988079
+          },
+          {
+            "type": "pointermove",
+            "t": 9927.5
+          },
+          {
+            "type": "pointermove",
+            "t": 9943.799999982119
+          },
+          {
+            "type": "pointermove",
+            "t": 9966.90000000596
+          },
+          {
+            "type": "pointermove",
+            "t": 9991.5
+          },
+          {
+            "type": "pointermove",
+            "t": 10007.199999988079
+          },
+          {
+            "type": "pointermove",
+            "t": 10023.59999999404
+          },
+          {
+            "type": "pointermove",
+            "t": 10039.59999999404
+          },
+          {
+            "type": "pointermove",
+            "t": 10055.299999982119
+          },
+          {
+            "type": "pointermove",
+            "t": 10103.5
+          },
+          {
+            "type": "pointermove",
+            "t": 10127.5
+          },
+          {
+            "type": "pointermove",
+            "t": 10143.5
+          },
+          {
+            "type": "pointermove",
+            "t": 10175.40000000596
+          },
+          {
+            "type": "pointermove",
+            "t": 10191.299999982119
+          },
+          {
+            "type": "pointermove",
+            "t": 10207.299999982119
+          },
+          {
+            "type": "pointermove",
+            "t": 10223.199999988079
+          },
+          {
+            "type": "pointermove",
+            "t": 10239
+          },
+          {
+            "type": "pointermove",
+            "t": 10255.09999999404
+          },
+          {
+            "type": "pointermove",
+            "t": 10271.299999982119
+          },
+          {
+            "type": "pointermove",
+            "t": 10287.09999999404
+          },
+          {
+            "type": "pointermove",
+            "t": 10303.40000000596
+          },
+          {
+            "type": "pointermove",
+            "t": 10319.699999988079
+          },
+          {
+            "type": "pointermove",
+            "t": 10335.09999999404
+          },
+          {
+            "type": "pointermove",
+            "t": 10350.699999988079
+          },
+          {
+            "type": "pointermove",
+            "t": 10367.299999982119
+          },
+          {
+            "type": "pointermove",
+            "t": 10382.90000000596
+          },
+          {
+            "type": "pointermove",
+            "t": 10398.5
+          },
+          {
+            "type": "pointermove",
+            "t": 10415.699999988079
+          },
+          {
+            "type": "pointermove",
+            "t": 10431.40000000596
+          },
+          {
+            "type": "pointermove",
+            "t": 10446.699999988079
+          },
+          {
+            "type": "pointermove",
+            "t": 10471.299999982119
+          },
+          {
+            "type": "pointermove",
+            "t": 10487.59999999404
+          },
+          {
+            "type": "pointerup",
+            "t": 10507.799999982119
+          }
+        ]
+      },
+      "entry": {
+        "frames": [
+          [
+            9510.966,
+            9520.299999982119
+          ],
+          [
+            9542.3,
+            9545.299999982119
+          ],
+          [
+            9550.3,
+            9550.5
+          ],
+          [
+            9670.3,
+            9675.90000000596
+          ],
+          [
+            9694.2,
+            9696.799999982119
+          ],
+          [
+            9702.2,
+            9703
+          ],
+          [
+            9710.2,
+            9712.59999999404
+          ],
+          [
+            9726.3,
+            9727.5
+          ],
+          [
+            9734.2,
+            9735.799999982119
+          ],
+          [
+            9742.2,
+            9742.5
+          ],
+          [
+            9750.2,
+            9752.09999999404
+          ],
+          [
+            9758.3,
+            9758.699999988079
+          ],
+          [
+            9766.2,
+            9767.699999988079
+          ],
+          [
+            9774.2,
+            9780.799999982119
+          ],
+          [
+            9782.2,
+            9785.5
+          ],
+          [
+            9790.2,
+            9790.5
+          ],
+          [
+            9798.2,
+            9799.59999999404
+          ],
+          [
+            9806.3,
+            9807.59999999404
+          ],
+          [
+            9814.2,
+            9821.299999982119
+          ],
+          [
+            9822.2,
+            9826.90000000596
+          ],
+          [
+            9830.2,
+            9832.09999999404
+          ],
+          [
+            9838.3,
+            9838.699999988079
+          ],
+          [
+            9846.3,
+            9848.90000000596
+          ],
+          [
+            9854.2,
+            9855.40000000596
+          ],
+          [
+            9862.2,
+            9863.699999988079
+          ],
+          [
+            9878.3,
+            9879.799999982119
+          ],
+          [
+            9886.3,
+            9886.699999988079
+          ],
+          [
+            9894.2,
+            9896.5
+          ],
+          [
+            9902.2,
+            9902.40000000596
+          ],
+          [
+            9910.3,
+            9911.699999988079
+          ],
+          [
+            9918.2,
+            9918.699999988079
+          ],
+          [
+            9926.2,
+            9928
+          ],
+          [
+            9934.3,
+            9934.5
+          ],
+          [
+            9942.2,
+            9944.299999982119
+          ],
+          [
+            9950.3,
+            9950.59999999404
+          ],
+          [
+            9958.2,
+            9958.699999988079
+          ],
+          [
+            9965.8,
+            9967.40000000596
+          ],
+          [
+            9973.8,
+            9974.09999999404
+          ],
+          [
+            9981.8,
+            9982
+          ],
+          [
+            9989.8,
+            9991.90000000596
+          ],
+          [
+            9997.7,
+            9997.90000000596
+          ],
+          [
+            10005.7,
+            10007.59999999404
+          ],
+          [
+            10013.8,
+            10014.09999999404
+          ],
+          [
+            10021.7,
+            10024
+          ],
+          [
+            10029.8,
+            10030
+          ],
+          [
+            10037.8,
+            10040
+          ],
+          [
+            10053.7,
+            10055.90000000596
+          ],
+          [
+            10061.8,
+            10062.799999982119
+          ],
+          [
+            10069.8,
+            10070
+          ],
+          [
+            10085.8,
+            10086
+          ],
+          [
+            10093.8,
+            10094.199999988079
+          ],
+          [
+            10101.8,
+            10104
+          ],
+          [
+            10109.7,
+            10110.09999999404
+          ],
+          [
+            10117.8,
+            10117.90000000596
+          ],
+          [
+            10125.7,
+            10127.90000000596
+          ],
+          [
+            10133.7,
+            10134
+          ],
+          [
+            10141.8,
+            10144
+          ],
+          [
+            10149.8,
+            10150.09999999404
+          ],
+          [
+            10157.7,
+            10158.09999999404
+          ],
+          [
+            10173.8,
+            10176.09999999404
+          ],
+          [
+            10181.8,
+            10182.199999988079
+          ],
+          [
+            10189.7,
+            10191.799999982119
+          ],
+          [
+            10197.8,
+            10198
+          ],
+          [
+            10205.8,
+            10207.799999982119
+          ],
+          [
+            10213.7,
+            10214
+          ],
+          [
+            10221.7,
+            10223.799999982119
+          ],
+          [
+            10229.8,
+            10230
+          ],
+          [
+            10237.8,
+            10239.5
+          ],
+          [
+            10245.8,
+            10246.09999999404
+          ],
+          [
+            10253.7,
+            10255.699999988079
+          ],
+          [
+            10261.7,
+            10262
+          ],
+          [
+            10269.8,
+            10271.90000000596
+          ],
+          [
+            10277.7,
+            10278
+          ],
+          [
+            10285.8,
+            10287.699999988079
+          ],
+          [
+            10293.8,
+            10294
+          ],
+          [
+            10301.8,
+            10304
+          ],
+          [
+            10309.7,
+            10310
+          ],
+          [
+            10317.8,
+            10320.199999988079
+          ],
+          [
+            10325.7,
+            10326
+          ],
+          [
+            10333.7,
+            10335.699999988079
+          ],
+          [
+            10341.8,
+            10342
+          ],
+          [
+            10349.7,
+            10351.199999988079
+          ],
+          [
+            10357.7,
+            10358
+          ],
+          [
+            10365.8,
+            10367.799999982119
+          ],
+          [
+            10373.8,
+            10373.90000000596
+          ],
+          [
+            10381.6,
+            10383.40000000596
+          ],
+          [
+            10389.6,
+            10390
+          ],
+          [
+            10397.6,
+            10399
+          ],
+          [
+            10405.7,
+            10405.90000000596
+          ],
+          [
+            10413.6,
+            10416.09999999404
+          ],
+          [
+            10429.6,
+            10431.799999982119
+          ],
+          [
+            10437.7,
+            10438
+          ],
+          [
+            10445.6,
+            10447.199999988079
+          ],
+          [
+            10453.6,
+            10454
+          ],
+          [
+            10461.6,
+            10462
+          ],
+          [
+            10469.6,
+            10471.799999982119
+          ],
+          [
+            10477.6,
+            10478
+          ],
+          [
+            10485.6,
+            10488.09999999404
+          ],
+          [
+            10493.7,
+            10494.40000000596
+          ],
+          [
+            10501.7,
+            10501.90000000596
+          ],
+          [
+            10509.6,
+            10509.90000000596
+          ],
+          [
+            10517.6,
+            10517.799999982119
+          ],
+          [
+            10525.6,
+            10525.799999982119
+          ],
+          [
+            10533.6,
+            10553.5
+          ],
+          [
+            10584.7,
+            10586.299999982119
+          ],
+          [
+            10592.6,
+            10593
+          ],
+          [
+            10753.1,
+            10753.59999999404
+          ],
+          [
+            10785.1,
+            10786.90000000596
+          ],
+          [
+            10793.1,
+            10793.59999999404
+          ],
+          [
+            10801.2,
+            10805.90000000596
+          ],
+          [
+            10826.4,
+            10827.699999988079
+          ],
+          [
+            10834.3,
+            10834.699999988079
+          ],
+          [
+            10842.3,
+            10843.199999988079
+          ],
+          [
+            10850.3,
+            10850.90000000596
+          ],
+          [
+            10858.3,
+            10858.699999988079
+          ],
+          [
+            10866.2,
+            10866.59999999404
+          ],
+          [
+            10874.2,
+            10874.799999982119
+          ],
+          [
+            10882.3,
+            10882.59999999404
+          ],
+          [
+            10890.2,
+            10890.5
+          ]
+        ],
+        "events": [
+          [
+            "keydown",
+            9501,
+            9501.199999988079
+          ],
+          [
+            "pointerdown",
+            9559.199999988079,
+            9562.59999999404
+          ],
+          [
+            "pointerup",
+            10506.09999999404,
+            10507.799999982119
+          ]
+        ]
+      },
+      "p95": 16,
+      "max": 120,
+      "remaining": [
+        "perf-release-300-500-bench-0",
+        "perf-release-300-500-bench-1",
+        "perf-release-300-500-bench-10",
+        "perf-release-300-500-bench-100",
+        "perf-release-300-500-bench-101",
+        "perf-release-300-500-bench-102",
+        "perf-release-300-500-bench-103",
+        "perf-release-300-500-bench-104",
+        "perf-release-300-500-bench-105",
+        "perf-release-300-500-bench-106",
+        "perf-release-300-500-bench-107",
+        "perf-release-300-500-bench-108",
+        "perf-release-300-500-bench-109",
+        "perf-release-300-500-bench-11",
+        "perf-release-300-500-bench-110",
+        "perf-release-300-500-bench-111",
+        "perf-release-300-500-bench-112",
+        "perf-release-300-500-bench-113",
+        "perf-release-300-500-bench-114",
+        "perf-release-300-500-bench-115",
+        "perf-release-300-500-bench-116",
+        "perf-release-300-500-bench-117",
+        "perf-release-300-500-bench-118",
+        "perf-release-300-500-bench-119",
+        "perf-release-300-500-bench-12",
+        "perf-release-300-500-bench-120",
+        "perf-release-300-500-bench-121",
+        "perf-release-300-500-bench-122",
+        "perf-release-300-500-bench-123",
+        "perf-release-300-500-bench-124",
+        "perf-release-300-500-bench-125",
+        "perf-release-300-500-bench-126",
+        "perf-release-300-500-bench-127",
+        "perf-release-300-500-bench-128",
+        "perf-release-300-500-bench-129",
+        "perf-release-300-500-bench-13",
+        "perf-release-300-500-bench-130",
+        "perf-release-300-500-bench-131",
+        "perf-release-300-500-bench-132",
+        "perf-release-300-500-bench-133",
+        "perf-release-300-500-bench-134",
+        "perf-release-300-500-bench-135",
+        "perf-release-300-500-bench-136",
+        "perf-release-300-500-bench-137",
+        "perf-release-300-500-bench-138",
+        "perf-release-300-500-bench-139",
+        "perf-release-300-500-bench-14",
+        "perf-release-300-500-bench-140",
+        "perf-release-300-500-bench-141",
+        "perf-release-300-500-bench-142",
+        "perf-release-300-500-bench-143",
+        "perf-release-300-500-bench-144",
+        "perf-release-300-500-bench-145",
+        "perf-release-300-500-bench-146",
+        "perf-release-300-500-bench-147",
+        "perf-release-300-500-bench-148",
+        "perf-release-300-500-bench-149",
+        "perf-release-300-500-bench-15",
+        "perf-release-300-500-bench-150",
+        "perf-release-300-500-bench-151",
+        "perf-release-300-500-bench-152",
+        "perf-release-300-500-bench-153",
+        "perf-release-300-500-bench-154",
+        "perf-release-300-500-bench-155",
+        "perf-release-300-500-bench-156",
+        "perf-release-300-500-bench-157",
+        "perf-release-300-500-bench-158",
+        "perf-release-300-500-bench-159",
+        "perf-release-300-500-bench-16",
+        "perf-release-300-500-bench-160",
+        "perf-release-300-500-bench-161",
+        "perf-release-300-500-bench-162",
+        "perf-release-300-500-bench-163",
+        "perf-release-300-500-bench-164",
+        "perf-release-300-500-bench-165",
+        "perf-release-300-500-bench-166",
+        "perf-release-300-500-bench-167",
+        "perf-release-300-500-bench-168",
+        "perf-release-300-500-bench-169",
+        "perf-release-300-500-bench-17",
+        "perf-release-300-500-bench-170",
+        "perf-release-300-500-bench-171",
+        "perf-release-300-500-bench-172",
+        "perf-release-300-500-bench-173",
+        "perf-release-300-500-bench-174",
+        "perf-release-300-500-bench-175",
+        "perf-release-300-500-bench-176",
+        "perf-release-300-500-bench-177",
+        "perf-release-300-500-bench-178",
+        "perf-release-300-500-bench-179",
+        "perf-release-300-500-bench-18",
+        "perf-release-300-500-bench-180",
+        "perf-release-300-500-bench-181",
+        "perf-release-300-500-bench-182",
+        "perf-release-300-500-bench-183",
+        "perf-release-300-500-bench-184",
+        "perf-release-300-500-bench-185",
+        "perf-release-300-500-bench-186",
+        "perf-release-300-500-bench-187",
+        "perf-release-300-500-bench-188",
+        "perf-release-300-500-bench-189",
+        "perf-release-300-500-bench-19",
+        "perf-release-300-500-bench-190",
+        "perf-release-300-500-bench-191",
+        "perf-release-300-500-bench-192",
+        "perf-release-300-500-bench-193",
+        "perf-release-300-500-bench-194",
+        "perf-release-300-500-bench-195",
+        "perf-release-300-500-bench-196",
+        "perf-release-300-500-bench-197",
+        "perf-release-300-500-bench-198",
+        "perf-release-300-500-bench-199",
+        "perf-release-300-500-bench-2",
+        "perf-release-300-500-bench-20",
+        "perf-release-300-500-bench-200",
+        "perf-release-300-500-bench-201",
+        "perf-release-300-500-bench-202",
+        "perf-release-300-500-bench-203",
+        "perf-release-300-500-bench-204",
+        "perf-release-300-500-bench-205",
+        "perf-release-300-500-bench-206",
+        "perf-release-300-500-bench-207",
+        "perf-release-300-500-bench-208",
+        "perf-release-300-500-bench-209",
+        "perf-release-300-500-bench-21",
+        "perf-release-300-500-bench-210",
+        "perf-release-300-500-bench-211",
+        "perf-release-300-500-bench-212",
+        "perf-release-300-500-bench-213",
+        "perf-release-300-500-bench-214",
+        "perf-release-300-500-bench-215",
+        "perf-release-300-500-bench-216",
+        "perf-release-300-500-bench-217",
+        "perf-release-300-500-bench-218",
+        "perf-release-300-500-bench-219",
+        "perf-release-300-500-bench-22",
+        "perf-release-300-500-bench-220",
+        "perf-release-300-500-bench-221",
+        "perf-release-300-500-bench-222",
+        "perf-release-300-500-bench-223",
+        "perf-release-300-500-bench-224",
+        "perf-release-300-500-bench-225",
+        "perf-release-300-500-bench-226",
+        "perf-release-300-500-bench-227",
+        "perf-release-300-500-bench-228",
+        "perf-release-300-500-bench-229",
+        "perf-release-300-500-bench-23",
+        "perf-release-300-500-bench-230",
+        "perf-release-300-500-bench-231",
+        "perf-release-300-500-bench-232",
+        "perf-release-300-500-bench-233",
+        "perf-release-300-500-bench-234",
+        "perf-release-300-500-bench-235",
+        "perf-release-300-500-bench-236",
+        "perf-release-300-500-bench-237",
+        "perf-release-300-500-bench-238",
+        "perf-release-300-500-bench-239",
+        "perf-release-300-500-bench-24",
+        "perf-release-300-500-bench-240",
+        "perf-release-300-500-bench-241",
+        "perf-release-300-500-bench-242",
+        "perf-release-300-500-bench-243",
+        "perf-release-300-500-bench-244",
+        "perf-release-300-500-bench-245",
+        "perf-release-300-500-bench-246",
+        "perf-release-300-500-bench-247",
+        "perf-release-300-500-bench-248",
+        "perf-release-300-500-bench-249",
+        "perf-release-300-500-bench-25",
+        "perf-release-300-500-bench-250",
+        "perf-release-300-500-bench-251",
+        "perf-release-300-500-bench-252",
+        "perf-release-300-500-bench-253",
+        "perf-release-300-500-bench-254",
+        "perf-release-300-500-bench-255",
+        "perf-release-300-500-bench-256",
+        "perf-release-300-500-bench-257",
+        "perf-release-300-500-bench-258",
+        "perf-release-300-500-bench-259",
+        "perf-release-300-500-bench-26",
+        "perf-release-300-500-bench-260",
+        "perf-release-300-500-bench-261",
+        "perf-release-300-500-bench-262",
+        "perf-release-300-500-bench-263",
+        "perf-release-300-500-bench-264",
+        "perf-release-300-500-bench-265",
+        "perf-release-300-500-bench-266",
+        "perf-release-300-500-bench-267",
+        "perf-release-300-500-bench-268",
+        "perf-release-300-500-bench-269",
+        "perf-release-300-500-bench-27",
+        "perf-release-300-500-bench-270",
+        "perf-release-300-500-bench-271",
+        "perf-release-300-500-bench-272",
+        "perf-release-300-500-bench-273",
+        "perf-release-300-500-bench-274",
+        "perf-release-300-500-bench-275",
+        "perf-release-300-500-bench-276",
+        "perf-release-300-500-bench-277",
+        "perf-release-300-500-bench-278",
+        "perf-release-300-500-bench-279",
+        "perf-release-300-500-bench-28",
+        "perf-release-300-500-bench-280",
+        "perf-release-300-500-bench-281",
+        "perf-release-300-500-bench-282",
+        "perf-release-300-500-bench-283",
+        "perf-release-300-500-bench-284",
+        "perf-release-300-500-bench-285",
+        "perf-release-300-500-bench-286",
+        "perf-release-300-500-bench-287",
+        "perf-release-300-500-bench-288",
+        "perf-release-300-500-bench-289",
+        "perf-release-300-500-bench-29",
+        "perf-release-300-500-bench-290",
+        "perf-release-300-500-bench-291",
+        "perf-release-300-500-bench-292",
+        "perf-release-300-500-bench-293",
+        "perf-release-300-500-bench-294",
+        "perf-release-300-500-bench-295",
+        "perf-release-300-500-bench-296",
+        "perf-release-300-500-bench-297",
+        "perf-release-300-500-bench-298",
+        "perf-release-300-500-bench-299",
+        "perf-release-300-500-bench-3",
+        "perf-release-300-500-bench-30",
+        "perf-release-300-500-bench-300",
+        "perf-release-300-500-bench-301",
+        "perf-release-300-500-bench-302",
+        "perf-release-300-500-bench-303",
+        "perf-release-300-500-bench-304",
+        "perf-release-300-500-bench-305",
+        "perf-release-300-500-bench-306",
+        "perf-release-300-500-bench-307",
+        "perf-release-300-500-bench-308",
+        "perf-release-300-500-bench-309",
+        "perf-release-300-500-bench-31",
+        "perf-release-300-500-bench-310",
+        "perf-release-300-500-bench-311",
+        "perf-release-300-500-bench-312",
+        "perf-release-300-500-bench-313",
+        "perf-release-300-500-bench-314",
+        "perf-release-300-500-bench-315",
+        "perf-release-300-500-bench-316",
+        "perf-release-300-500-bench-317",
+        "perf-release-300-500-bench-318",
+        "perf-release-300-500-bench-319",
+        "perf-release-300-500-bench-32",
+        "perf-release-300-500-bench-320",
+        "perf-release-300-500-bench-321",
+        "perf-release-300-500-bench-322",
+        "perf-release-300-500-bench-323",
+        "perf-release-300-500-bench-324",
+        "perf-release-300-500-bench-325",
+        "perf-release-300-500-bench-326",
+        "perf-release-300-500-bench-327",
+        "perf-release-300-500-bench-328",
+        "perf-release-300-500-bench-329",
+        "perf-release-300-500-bench-33",
+        "perf-release-300-500-bench-330",
+        "perf-release-300-500-bench-331",
+        "perf-release-300-500-bench-332",
+        "perf-release-300-500-bench-333",
+        "perf-release-300-500-bench-334",
+        "perf-release-300-500-bench-335",
+        "perf-release-300-500-bench-336",
+        "perf-release-300-500-bench-337",
+        "perf-release-300-500-bench-338",
+        "perf-release-300-500-bench-339",
+        "perf-release-300-500-bench-34",
+        "perf-release-300-500-bench-340",
+        "perf-release-300-500-bench-341",
+        "perf-release-300-500-bench-342",
+        "perf-release-300-500-bench-343",
+        "perf-release-300-500-bench-344",
+        "perf-release-300-500-bench-345",
+        "perf-release-300-500-bench-346",
+        "perf-release-300-500-bench-347",
+        "perf-release-300-500-bench-348",
+        "perf-release-300-500-bench-349",
+        "perf-release-300-500-bench-35",
+        "perf-release-300-500-bench-350",
+        "perf-release-300-500-bench-351",
+        "perf-release-300-500-bench-352",
+        "perf-release-300-500-bench-353",
+        "perf-release-300-500-bench-354",
+        "perf-release-300-500-bench-355",
+        "perf-release-300-500-bench-356",
+        "perf-release-300-500-bench-357",
+        "perf-release-300-500-bench-358",
+        "perf-release-300-500-bench-359",
+        "perf-release-300-500-bench-36",
+        "perf-release-300-500-bench-360",
+        "perf-release-300-500-bench-361",
+        "perf-release-300-500-bench-362",
+        "perf-release-300-500-bench-363",
+        "perf-release-300-500-bench-364",
+        "perf-release-300-500-bench-365",
+        "perf-release-300-500-bench-366",
+        "perf-release-300-500-bench-367",
+        "perf-release-300-500-bench-368",
+        "perf-release-300-500-bench-369",
+        "perf-release-300-500-bench-37",
+        "perf-release-300-500-bench-370",
+        "perf-release-300-500-bench-371",
+        "perf-release-300-500-bench-372",
+        "perf-release-300-500-bench-373",
+        "perf-release-300-500-bench-374",
+        "perf-release-300-500-bench-375",
+        "perf-release-300-500-bench-376",
+        "perf-release-300-500-bench-377",
+        "perf-release-300-500-bench-378",
+        "perf-release-300-500-bench-379",
+        "perf-release-300-500-bench-38",
+        "perf-release-300-500-bench-380",
+        "perf-release-300-500-bench-381",
+        "perf-release-300-500-bench-382",
+        "perf-release-300-500-bench-383",
+        "perf-release-300-500-bench-384",
+        "perf-release-300-500-bench-385",
+        "perf-release-300-500-bench-386",
+        "perf-release-300-500-bench-387",
+        "perf-release-300-500-bench-388",
+        "perf-release-300-500-bench-389",
+        "perf-release-300-500-bench-39",
+        "perf-release-300-500-bench-390",
+        "perf-release-300-500-bench-391",
+        "perf-release-300-500-bench-392",
+        "perf-release-300-500-bench-393",
+        "perf-release-300-500-bench-394",
+        "perf-release-300-500-bench-395",
+        "perf-release-300-500-bench-396",
+        "perf-release-300-500-bench-397",
+        "perf-release-300-500-bench-398",
+        "perf-release-300-500-bench-399",
+        "perf-release-300-500-bench-4",
+        "perf-release-300-500-bench-40",
+        "perf-release-300-500-bench-400",
+        "perf-release-300-500-bench-401",
+        "perf-release-300-500-bench-402",
+        "perf-release-300-500-bench-403",
+        "perf-release-300-500-bench-404",
+        "perf-release-300-500-bench-405",
+        "perf-release-300-500-bench-406",
+        "perf-release-300-500-bench-407",
+        "perf-release-300-500-bench-408",
+        "perf-release-300-500-bench-409",
+        "perf-release-300-500-bench-41",
+        "perf-release-300-500-bench-410",
+        "perf-release-300-500-bench-411",
+        "perf-release-300-500-bench-412",
+        "perf-release-300-500-bench-413",
+        "perf-release-300-500-bench-414",
+        "perf-release-300-500-bench-415",
+        "perf-release-300-500-bench-416",
+        "perf-release-300-500-bench-417",
+        "perf-release-300-500-bench-418",
+        "perf-release-300-500-bench-419",
+        "perf-release-300-500-bench-42",
+        "perf-release-300-500-bench-420",
+        "perf-release-300-500-bench-421",
+        "perf-release-300-500-bench-422",
+        "perf-release-300-500-bench-423",
+        "perf-release-300-500-bench-424",
+        "perf-release-300-500-bench-425",
+        "perf-release-300-500-bench-426",
+        "perf-release-300-500-bench-427",
+        "perf-release-300-500-bench-428",
+        "perf-release-300-500-bench-429",
+        "perf-release-300-500-bench-43",
+        "perf-release-300-500-bench-430",
+        "perf-release-300-500-bench-431",
+        "perf-release-300-500-bench-432",
+        "perf-release-300-500-bench-433",
+        "perf-release-300-500-bench-434",
+        "perf-release-300-500-bench-435",
+        "perf-release-300-500-bench-436",
+        "perf-release-300-500-bench-437",
+        "perf-release-300-500-bench-438",
+        "perf-release-300-500-bench-439",
+        "perf-release-300-500-bench-44",
+        "perf-release-300-500-bench-440",
+        "perf-release-300-500-bench-441",
+        "perf-release-300-500-bench-442",
+        "perf-release-300-500-bench-443",
+        "perf-release-300-500-bench-444",
+        "perf-release-300-500-bench-445",
+        "perf-release-300-500-bench-446",
+        "perf-release-300-500-bench-447",
+        "perf-release-300-500-bench-448",
+        "perf-release-300-500-bench-449",
+        "perf-release-300-500-bench-45",
+        "perf-release-300-500-bench-450",
+        "perf-release-300-500-bench-451",
+        "perf-release-300-500-bench-452",
+        "perf-release-300-500-bench-453",
+        "perf-release-300-500-bench-454",
+        "perf-release-300-500-bench-455",
+        "perf-release-300-500-bench-456",
+        "perf-release-300-500-bench-457",
+        "perf-release-300-500-bench-458",
+        "perf-release-300-500-bench-459",
+        "perf-release-300-500-bench-46",
+        "perf-release-300-500-bench-460",
+        "perf-release-300-500-bench-461",
+        "perf-release-300-500-bench-462",
+        "perf-release-300-500-bench-463",
+        "perf-release-300-500-bench-464",
+        "perf-release-300-500-bench-465",
+        "perf-release-300-500-bench-466",
+        "perf-release-300-500-bench-467",
+        "perf-release-300-500-bench-468",
+        "perf-release-300-500-bench-469",
+        "perf-release-300-500-bench-47",
+        "perf-release-300-500-bench-470",
+        "perf-release-300-500-bench-471",
+        "perf-release-300-500-bench-472",
+        "perf-release-300-500-bench-473",
+        "perf-release-300-500-bench-474",
+        "perf-release-300-500-bench-475",
+        "perf-release-300-500-bench-476",
+        "perf-release-300-500-bench-477",
+        "perf-release-300-500-bench-478",
+        "perf-release-300-500-bench-479",
+        "perf-release-300-500-bench-48",
+        "perf-release-300-500-bench-480",
+        "perf-release-300-500-bench-481",
+        "perf-release-300-500-bench-482",
+        "perf-release-300-500-bench-483",
+        "perf-release-300-500-bench-484",
+        "perf-release-300-500-bench-485",
+        "perf-release-300-500-bench-486",
+        "perf-release-300-500-bench-487",
+        "perf-release-300-500-bench-488",
+        "perf-release-300-500-bench-489",
+        "perf-release-300-500-bench-49",
+        "perf-release-300-500-bench-490",
+        "perf-release-300-500-bench-491",
+        "perf-release-300-500-bench-492",
+        "perf-release-300-500-bench-493",
+        "perf-release-300-500-bench-494",
+        "perf-release-300-500-bench-495",
+        "perf-release-300-500-bench-496",
+        "perf-release-300-500-bench-497",
+        "perf-release-300-500-bench-498",
+        "perf-release-300-500-bench-499",
+        "perf-release-300-500-bench-5",
+        "perf-release-300-500-bench-50",
+        "perf-release-300-500-bench-51",
+        "perf-release-300-500-bench-52",
+        "perf-release-300-500-bench-53",
+        "perf-release-300-500-bench-54",
+        "perf-release-300-500-bench-55",
+        "perf-release-300-500-bench-56",
+        "perf-release-300-500-bench-57",
+        "perf-release-300-500-bench-58",
+        "perf-release-300-500-bench-59",
+        "perf-release-300-500-bench-6",
+        "perf-release-300-500-bench-60",
+        "perf-release-300-500-bench-61",
+        "perf-release-300-500-bench-62",
+        "perf-release-300-500-bench-63",
+        "perf-release-300-500-bench-64",
+        "perf-release-300-500-bench-65",
+        "perf-release-300-500-bench-66",
+        "perf-release-300-500-bench-67",
+        "perf-release-300-500-bench-68",
+        "perf-release-300-500-bench-69",
+        "perf-release-300-500-bench-7",
+        "perf-release-300-500-bench-70",
+        "perf-release-300-500-bench-71",
+        "perf-release-300-500-bench-72",
+        "perf-release-300-500-bench-73",
+        "perf-release-300-500-bench-74",
+        "perf-release-300-500-bench-75",
+        "perf-release-300-500-bench-76",
+        "perf-release-300-500-bench-77",
+        "perf-release-300-500-bench-78",
+        "perf-release-300-500-bench-79",
+        "perf-release-300-500-bench-8",
+        "perf-release-300-500-bench-80",
+        "perf-release-300-500-bench-81",
+        "perf-release-300-500-bench-82",
+        "perf-release-300-500-bench-83",
+        "perf-release-300-500-bench-84",
+        "perf-release-300-500-bench-85",
+        "perf-release-300-500-bench-86",
+        "perf-release-300-500-bench-87",
+        "perf-release-300-500-bench-88",
+        "perf-release-300-500-bench-89",
+        "perf-release-300-500-bench-9",
+        "perf-release-300-500-bench-90",
+        "perf-release-300-500-bench-91",
+        "perf-release-300-500-bench-92",
+        "perf-release-300-500-bench-93",
+        "perf-release-300-500-bench-94",
+        "perf-release-300-500-bench-95",
+        "perf-release-300-500-bench-96",
+        "perf-release-300-500-bench-97",
+        "perf-release-300-500-bench-98",
+        "perf-release-300-500-bench-99"
+      ]
+    },
+    {
+      "round": 3,
+      "mode": "hit",
+      "ms": [
+        8.099999999998545,
+        14.800000000001091,
+        31.899999999999636,
+        7.299999999999272,
+        8.200000000000728,
+        8,
+        23.799999999999272,
+        8.100000000000364,
+        7.5,
+        8,
+        8,
+        8.100000000000364,
+        8,
+        7.899999999999636,
+        8,
+        8,
+        8,
+        8.100000000000364,
+        8,
+        7.899999999999636,
+        8.600000000000364,
+        8.100000000000364,
+        7.899999999999636,
+        7.799999999999272,
+        8,
+        7.900000000001455,
+        16.099999999998545,
+        7.600000000000364,
+        15.899999999999636,
+        7.800000000001091,
+        8,
+        7.399999999999636,
+        7.200000000000728,
+        8.099999999998545,
+        7.200000000000728,
+        16,
+        8.100000000000364,
+        7.899999999999636,
+        16,
+        8.100000000000364,
+        8,
+        7.899999999999636,
+        8.200000000000728,
+        7.899999999999636,
+        7.899999999999636,
+        16,
+        7.799999999999272,
+        8,
+        7.5,
+        16.100000000000364,
+        8,
+        16,
+        8,
+        8,
+        8,
+        16,
+        8,
+        16,
+        7.899999999999636,
+        8.100000000000364,
+        15.5,
+        15.899999999999636,
+        14.800000000001091,
+        7.399999999999636,
+        7.899999999999636,
+        16,
+        8,
+        8,
+        16,
+        8.100000000000364,
+        7.899999999999636,
+        15.5,
+        16.100000000000364,
+        15.100000000000364,
+        7.899999999999636,
+        15.799999999999272,
+        15.300000000001091,
+        16,
+        7.899999999999636,
+        15.700000000000728,
+        15.099999999998545,
+        8.100000000000364,
+        15.899999999999636,
+        8,
+        8,
+        8.100000000000364,
+        15.899999999999636,
+        8.100000000000364,
+        8,
+        7.600000000000364,
+        16,
+        8,
+        15.5,
+        16.100000000000364,
+        16,
+        15.899999999999636,
+        16.100000000000364,
+        25.899999999999636,
+        8,
+        16,
+        16,
+        16,
+        8,
+        16,
+        8,
+        16.600000000000364,
+        15.100000000000364,
+        15.899999999999636,
+        8,
+        15.799999999999272,
+        8,
+        15.600000000000364,
+        16,
+        8,
+        16,
+        8,
+        7.899999999999636,
+        8.200000000000728,
+        16,
+        8,
+        8,
+        8,
+        8,
+        8,
+        8.199999999998909,
+        7.400000000001455,
+        8.099999999998545,
+        8,
+        7.900000000001455,
+        8.099999999998545,
+        7.900000000001455,
+        16.099999999998545,
+        16,
+        8,
+        16,
+        7.900000000001455,
+        8,
+        16,
+        8,
+        8,
+        8,
+        32,
+        7.899999999999636
+      ],
+      "phase": {
+        "start": 11155.2,
+        "events": [
+          {
+            "type": "pointerdown",
+            "t": 11170.40000000596
+          },
+          {
+            "type": "pointermove",
+            "t": 11214.299999982119
+          },
+          {
+            "type": "pointermove",
+            "t": 11237.09999999404
+          },
+          {
+            "type": "pointermove",
+            "t": 11273.699999988079
+          },
+          {
+            "type": "pointermove",
+            "t": 11289.59999999404
+          },
+          {
+            "type": "pointermove",
+            "t": 11306.09999999404
+          },
+          {
+            "type": "pointermove",
+            "t": 11329.90000000596
+          },
+          {
+            "type": "pointermove",
+            "t": 11362.199999988079
+          },
+          {
+            "type": "pointermove",
+            "t": 11410.5
+          },
+          {
+            "type": "pointermove",
+            "t": 11435.199999988079
+          },
+          {
+            "type": "pointermove",
+            "t": 11465.40000000596
+          },
+          {
+            "type": "pointermove",
+            "t": 11488
+          },
+          {
+            "type": "pointermove",
+            "t": 11521.09999999404
+          },
+          {
+            "type": "pointermove",
+            "t": 11543.40000000596
+          },
+          {
+            "type": "pointermove",
+            "t": 11567.299999982119
+          },
+          {
+            "type": "pointermove",
+            "t": 11595.699999988079
+          },
+          {
+            "type": "pointermove",
+            "t": 11624.90000000596
+          },
+          {
+            "type": "pointermove",
+            "t": 11649.90000000596
+          },
+          {
+            "type": "pointermove",
+            "t": 11670.5
+          },
+          {
+            "type": "pointermove",
+            "t": 11696.799999982119
+          },
+          {
+            "type": "pointermove",
+            "t": 11734.699999988079
+          },
+          {
+            "type": "pointermove",
+            "t": 11767.09999999404
+          },
+          {
+            "type": "pointermove",
+            "t": 11805.09999999404
+          },
+          {
+            "type": "pointermove",
+            "t": 11837.199999988079
+          },
+          {
+            "type": "pointermove",
+            "t": 11869.699999988079
+          },
+          {
+            "type": "pointermove",
+            "t": 11908.5
+          },
+          {
+            "type": "pointermove",
+            "t": 11949.5
+          },
+          {
+            "type": "pointermove",
+            "t": 11988.5
+          },
+          {
+            "type": "pointermove",
+            "t": 12026.90000000596
+          },
+          {
+            "type": "pointermove",
+            "t": 12057.199999988079
+          },
+          {
+            "type": "pointermove",
+            "t": 12088.699999988079
+          },
+          {
+            "type": "pointermove",
+            "t": 12120.59999999404
+          },
+          {
+            "type": "pointermove",
+            "t": 12160.799999982119
+          },
+          {
+            "type": "pointermove",
+            "t": 12214.90000000596
+          },
+          {
+            "type": "pointermove",
+            "t": 12258.90000000596
+          },
+          {
+            "type": "pointermove",
+            "t": 12299
+          },
+          {
+            "type": "pointermove",
+            "t": 12339.09999999404
+          },
+          {
+            "type": "pointermove",
+            "t": 12379.199999988079
+          },
+          {
+            "type": "pointermove",
+            "t": 12404
+          },
+          {
+            "type": "pointermove",
+            "t": 12443.59999999404
+          },
+          {
+            "type": "pointermove",
+            "t": 12481.699999988079
+          },
+          {
+            "type": "pointermove",
+            "t": 12505.5
+          },
+          {
+            "type": "pointermove",
+            "t": 12529.59999999404
+          },
+          {
+            "type": "pointermove",
+            "t": 12552.799999982119
+          },
+          {
+            "type": "pointermove",
+            "t": 12577.40000000596
+          },
+          {
+            "type": "pointermove",
+            "t": 12609.199999988079
+          },
+          {
+            "type": "pointermove",
+            "t": 12624.90000000596
+          },
+          {
+            "type": "pointermove",
+            "t": 12656.90000000596
+          },
+          {
+            "type": "pointermove",
+            "t": 12688.699999988079
+          },
+          {
+            "type": "pointerup",
+            "t": 12724.199999988079
+          }
+        ]
+      },
+      "entry": {
+        "frames": [
+          [
+            10930.2,
+            10931.40000000596
+          ],
+          [
+            10938.2,
+            10939.09999999404
+          ],
+          [
+            10946.2,
+            10952.299999982119
+          ],
+          [
+            10954.2,
+            10955
+          ],
+          [
+            10962.2,
+            10962.5
+          ],
+          [
+            10970.2,
+            10988.90000000596
+          ],
+          [
+            11010.3,
+            11015.199999988079
+          ],
+          [
+            11018.2,
+            11018.59999999404
+          ],
+          [
+            11155.2,
+            11158.699999988079
+          ],
+          [
+            11163.3,
+            11175
+          ],
+          [
+            11178.1,
+            11178.40000000596
+          ],
+          [
+            11210,
+            11214.90000000596
+          ],
+          [
+            11217.3,
+            11221.09999999404
+          ],
+          [
+            11225.5,
+            11226
+          ],
+          [
+            11233.5,
+            11254.799999982119
+          ],
+          [
+            11257.3,
+            11259.199999988079
+          ],
+          [
+            11265.4,
+            11265.699999988079
+          ],
+          [
+            11272.9,
+            11274.699999988079
+          ],
+          [
+            11280.9,
+            11281.5
+          ],
+          [
+            11288.9,
+            11291.199999988079
+          ],
+          [
+            11297,
+            11298.199999988079
+          ],
+          [
+            11305,
+            11308.699999988079
+          ],
+          [
+            11312.9,
+            11316.59999999404
+          ],
+          [
+            11320.9,
+            11322.199999988079
+          ],
+          [
+            11328.9,
+            11334.299999982119
+          ],
+          [
+            11336.9,
+            11339.59999999404
+          ],
+          [
+            11345,
+            11345.5
+          ],
+          [
+            11353,
+            11353.40000000596
+          ],
+          [
+            11360.9,
+            11364
+          ],
+          [
+            11369.5,
+            11371.699999988079
+          ],
+          [
+            11377.6,
+            11381.59999999404
+          ],
+          [
+            11385.5,
+            11388.699999988079
+          ],
+          [
+            11393.3,
+            11394.199999988079
+          ],
+          [
+            11401.3,
+            11402.299999982119
+          ],
+          [
+            11409.2,
+            11412.40000000596
+          ],
+          [
+            11425.3,
+            11426.40000000596
+          ],
+          [
+            11432.9,
+            11438.59999999404
+          ],
+          [
+            11448.8,
+            11450.799999982119
+          ],
+          [
+            11456.6,
+            11458.299999982119
+          ],
+          [
+            11464.6,
+            11466.699999988079
+          ],
+          [
+            11472,
+            11475.299999982119
+          ],
+          [
+            11479.2,
+            11481.90000000596
+          ],
+          [
+            11487.3,
+            11489.5
+          ],
+          [
+            11494.5,
+            11502.799999982119
+          ],
+          [
+            11510.5,
+            11513.90000000596
+          ],
+          [
+            11518.6,
+            11523
+          ],
+          [
+            11526.5,
+            11533.09999999404
+          ],
+          [
+            11542.5,
+            11544.90000000596
+          ],
+          [
+            11550.6,
+            11554.09999999404
+          ],
+          [
+            11558.6,
+            11560.40000000596
+          ],
+          [
+            11566.5,
+            11568.90000000596
+          ],
+          [
+            11574.7,
+            11578
+          ],
+          [
+            11582.6,
+            11588.5
+          ],
+          [
+            11590.5,
+            11597.5
+          ],
+          [
+            11606.5,
+            11607.199999988079
+          ],
+          [
+            11614.3,
+            11618.199999988079
+          ],
+          [
+            11622.3,
+            11626.90000000596
+          ],
+          [
+            11629.8,
+            11637.59999999404
+          ],
+          [
+            11645.9,
+            11651.90000000596
+          ],
+          [
+            11653.9,
+            11660.5
+          ],
+          [
+            11669.9,
+            11672.5
+          ],
+          [
+            11677.9,
+            11682.90000000596
+          ],
+          [
+            11685.9,
+            11689.40000000596
+          ],
+          [
+            11693.9,
+            11702.299999982119
+          ],
+          [
+            11709.9,
+            11714.799999982119
+          ],
+          [
+            11717.9,
+            11722.59999999404
+          ],
+          [
+            11733.9,
+            11736.5
+          ],
+          [
+            11741.8,
+            11748.09999999404
+          ],
+          [
+            11749.9,
+            11755.90000000596
+          ],
+          [
+            11765.4,
+            11770.299999982119
+          ],
+          [
+            11781.3,
+            11785.90000000596
+          ],
+          [
+            11796.1,
+            11797.59999999404
+          ],
+          [
+            11803.5,
+            11808
+          ],
+          [
+            11811.4,
+            11818
+          ],
+          [
+            11827.4,
+            11828.90000000596
+          ],
+          [
+            11835.4,
+            11839.299999982119
+          ],
+          [
+            11843.4,
+            11849.09999999404
+          ],
+          [
+            11859.4,
+            11860.199999988079
+          ],
+          [
+            11867.5,
+            11871.5
+          ],
+          [
+            11875.4,
+            11880.5
+          ],
+          [
+            11890.9,
+            11895.199999988079
+          ],
+          [
+            11907,
+            11911.199999988079
+          ],
+          [
+            11922.1,
+            11924
+          ],
+          [
+            11930,
+            11935.5
+          ],
+          [
+            11945.8,
+            11951.40000000596
+          ],
+          [
+            11961.1,
+            11965.699999988079
+          ],
+          [
+            11977.1,
+            11980.699999988079
+          ],
+          [
+            11985,
+            11991.90000000596
+          ],
+          [
+            12000.7,
+            12004.59999999404
+          ],
+          [
+            12015.8,
+            12018.199999988079
+          ],
+          [
+            12023.9,
+            12029.199999988079
+          ],
+          [
+            12039.8,
+            12041.90000000596
+          ],
+          [
+            12047.8,
+            12049.799999982119
+          ],
+          [
+            12055.8,
+            12058.90000000596
+          ],
+          [
+            12063.9,
+            12069.5
+          ],
+          [
+            12079.8,
+            12081
+          ],
+          [
+            12087.9,
+            12090.699999988079
+          ],
+          [
+            12095.9,
+            12099.40000000596
+          ],
+          [
+            12103.5,
+            12109.299999982119
+          ],
+          [
+            12119.5,
+            12122.40000000596
+          ],
+          [
+            12127.5,
+            12133.59999999404
+          ],
+          [
+            12143,
+            12144.90000000596
+          ],
+          [
+            12159.1,
+            12163.299999982119
+          ],
+          [
+            12175.1,
+            12179.90000000596
+          ],
+          [
+            12191,
+            12195
+          ],
+          [
+            12207.1,
+            12218.299999982119
+          ],
+          [
+            12233,
+            12236.40000000596
+          ],
+          [
+            12241,
+            12246.199999988079
+          ],
+          [
+            12257,
+            12261.199999988079
+          ],
+          [
+            12273,
+            12276.40000000596
+          ],
+          [
+            12289,
+            12290.699999988079
+          ],
+          [
+            12297,
+            12301.5
+          ],
+          [
+            12313,
+            12315
+          ],
+          [
+            12321,
+            12327.199999988079
+          ],
+          [
+            12337.6,
+            12342.5
+          ],
+          [
+            12352.7,
+            12356.09999999404
+          ],
+          [
+            12368.6,
+            12370.299999982119
+          ],
+          [
+            12376.6,
+            12381.40000000596
+          ],
+          [
+            12392.4,
+            12393.90000000596
+          ],
+          [
+            12400.4,
+            12407.199999988079
+          ],
+          [
+            12416,
+            12420.5
+          ],
+          [
+            12432,
+            12436.09999999404
+          ],
+          [
+            12440,
+            12446
+          ],
+          [
+            12456,
+            12459.299999982119
+          ],
+          [
+            12464,
+            12468.199999988079
+          ],
+          [
+            12471.9,
+            12473
+          ],
+          [
+            12480.1,
+            12484.199999988079
+          ],
+          [
+            12496.1,
+            12497.09999999404
+          ],
+          [
+            12504.1,
+            12507.299999982119
+          ],
+          [
+            12512.1,
+            12515.299999982119
+          ],
+          [
+            12520.1,
+            12522.699999988079
+          ],
+          [
+            12528.1,
+            12531.199999988079
+          ],
+          [
+            12536.1,
+            12540.40000000596
+          ],
+          [
+            12544.3,
+            12546.699999988079
+          ],
+          [
+            12551.7,
+            12554.699999988079
+          ],
+          [
+            12559.8,
+            12563.09999999404
+          ],
+          [
+            12567.8,
+            12570.09999999404
+          ],
+          [
+            12575.7,
+            12579
+          ],
+          [
+            12583.8,
+            12588.199999988079
+          ],
+          [
+            12591.7,
+            12598
+          ],
+          [
+            12607.8,
+            12610.90000000596
+          ],
+          [
+            12623.8,
+            12626.09999999404
+          ],
+          [
+            12631.8,
+            12637.59999999404
+          ],
+          [
+            12647.8,
+            12649.199999988079
+          ],
+          [
+            12655.7,
+            12658.699999988079
+          ],
+          [
+            12663.7,
+            12669.59999999404
+          ],
+          [
+            12679.7,
+            12680.799999982119
+          ],
+          [
+            12687.7,
+            12689.699999988079
+          ],
+          [
+            12695.7,
+            12697.199999988079
+          ],
+          [
+            12703.7,
+            12725.799999982119
+          ],
+          [
+            12735.7,
+            12737.799999982119
+          ],
+          [
+            12743.6,
+            12746.5
+          ],
+          [
+            12751.7,
+            12753.59999999404
+          ],
+          [
+            12759.6,
+            12770.09999999404
+          ],
+          [
+            12783.7,
+            12786.199999988079
+          ],
+          [
+            12791.6,
+            12795.90000000596
+          ],
+          [
+            12807.7,
+            12815.09999999404
+          ],
+          [
+            12823.7,
+            12828.799999982119
+          ],
+          [
+            12831.8,
+            12835.40000000596
+          ],
+          [
+            12839.8,
+            12843.59999999404
+          ],
+          [
+            12847.8,
+            12853.5
+          ],
+          [
+            12855.8,
+            12857.5
+          ],
+          [
+            12863.7,
+            12867.5
+          ],
+          [
+            12879.7,
+            12885.299999982119
+          ],
+          [
+            12887.8,
+            12889.5
+          ],
+          [
+            12895.8,
+            12897.199999988079
+          ],
+          [
+            12903.5,
+            12905.199999988079
+          ],
+          [
+            12911.5,
+            12912.5
+          ],
+          [
+            12919,
+            12920
+          ],
+          [
+            12926.5,
+            12927.59999999404
+          ],
+          [
+            12934.5,
+            12935.5
+          ],
+          [
+            12942.5,
+            12943.799999982119
+          ],
+          [
+            12950.6,
+            12951.59999999404
+          ],
+          [
+            12958.6,
+            12959.5
+          ],
+          [
+            12966.6,
+            12966.90000000596
+          ],
+          [
+            12974.6,
+            12974.799999982119
+          ],
+          [
+            12982.6,
+            12983.199999988079
+          ],
+          [
+            12990.6,
+            12991.5
+          ],
+          [
+            12998.6,
+            12998.799999982119
+          ],
+          [
+            13006.6,
+            13006.799999982119
+          ],
+          [
+            13014.6,
+            13015
+          ],
+          [
+            13022.4,
+            13022.699999988079
+          ],
+          [
+            13030.5,
+            13030.799999982119
+          ],
+          [
+            13038.4,
+            13038.699999988079
+          ],
+          [
+            13046.4,
+            13046.699999988079
+          ],
+          [
+            13054.7,
+            13055
+          ],
+          [
+            13062.4,
+            13062.59999999404
+          ],
+          [
+            13070.4,
+            13070.59999999404
+          ],
+          [
+            13078.4,
+            13078.799999982119
+          ],
+          [
+            13086.4,
+            13086.799999982119
+          ],
+          [
+            13094.4,
+            13094.59999999404
+          ]
+        ],
+        "events": [
+          [
+            "keydown",
+            10969.40000000596,
+            10969.90000000596
+          ],
+          [
+            "pointerdown",
+            11163.699999988079,
+            11170.40000000596
+          ],
+          [
+            "pointerup",
+            12699.299999982119,
+            12724.09999999404
+          ]
+        ]
+      },
+      "p95": 16.100000000000364,
+      "max": 32,
+      "remaining": []
+    }
+  ],
+  "productActivations": 3,
+  "productStroke": {
+    "picked": "perf-release-300-500-bench-22",
+    "active": 1,
+    "cut": 249,
+    "restored": 500
+  }
+}

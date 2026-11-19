@@ -68,10 +68,16 @@ export async function knifePhotoBench(page,pid,out,releasePut=null) {
   const dirtyClear=process.env.KNIFE_DIRTY_CLEAR==='1';if(dirtyClear) await page.evaluate((await import('./knifeDirtyClear.mjs')).installKnifeDirtyClear)
   const forceSvg=process.env.KNIFE_PRODUCT_FALLBACK==='1';if(forceSvg) await page.evaluate(()=>{const orig=HTMLCanvasElement.prototype.getContext;HTMLCanvasElement.prototype.getContext=function(kind,...args){if(kind==='webgl2' && this.hasAttribute('data-knife-edge-overlay'))return null;return orig.call(this,kind,...args)}})
   const product=process.env.KNIFE_PRODUCT_GPU==='1';if(product){assert(!batchBase && !raster);await page.evaluate(()=>{window.productKnifeActivations=0;new MutationObserver(records=>{for(const r of records)if(r.oldValue===null)window.productKnifeActivations++}).observe(document.querySelector('.react-flow__edges'),{attributes:true,attributeOldValue:true,attributeFilter:['data-knife-gpu']})})}
-  const report={forceSvg,product,zoomEvidence,gpuFallback,gpu:process.env.KNIFE_GPU==='1',raster,dirtyClear,spatial,lazy,batchSize,batchBase,omitHitPaths,skipEdgeHit,hideBaseEdges,hideCutPreview,timing:"from before pointerdown through two post-pointerup animation frames",edgeCount,sourceHashes:[...hashes],evidence,b,rounds:[]};const save=()=>writeFileSync(out,JSON.stringify(report,null,2))
+  const skipCursorRule=process.env.KNIFE_SKIP_CURSOR_RULE==='1'
+  if(skipCursorRule){const changed=await page.evaluate(()=>{let n=0;for(const sheet of document.styleSheets){for(const rule of sheet.cssRules){if(rule.selectorText?.includes('knifeMode') && rule.selectorText.includes('*') && rule.style.cursor==='none'){rule.selectorText=rule.selectorText.split(',').filter(s=>!s.includes('*')).join(',');n++}}}return n});assert.equal(changed,1)}
+  const report={skipCursorRule,forceSvg,product,zoomEvidence,gpuFallback,gpu:process.env.KNIFE_GPU==='1',raster,dirtyClear,spatial,lazy,batchSize,batchBase,omitHitPaths,skipEdgeHit,hideBaseEdges,hideCutPreview,timing:"from before pointerdown through two post-pointerup animation frames",edgeCount,sourceHashes:[...hashes],evidence,b,rounds:[]};const save=()=>writeFileSync(out,JSON.stringify(report,null,2))
   for(let round=1;round<=3;round++)for(const mode of ['miss','hit']){
     if(tracing) await page.evaluate(()=>{window.knifeMoves=[];window.pointerTrace=[];window.knifeListener=e=>window.pointerTrace.push([e.type,e.clientX,e.clientY,e.buttons]); for(const name of ['pointerdown','pointermove','pointerup']) window.addEventListener(name,window.knifeListener,true)})
-    const x=b.x,y=b.top-20;await page.mouse.move(x,y);await page.keyboard.down('Space');await page.locator('[data-knife-cursor]').waitFor({state:'attached'})
+    const x=b.x,y=b.top-20;await page.mouse.move(x,y);const entry=process.env.KNIFE_ENTRY_TIMING==='1';if(entry)await page.evaluate(()=>{
+      const e=window.knifeEntry={frames:[],events:[]};let id;const tick=t=>{e.frames.push([t,performance.now()]);id=requestAnimationFrame(tick)};id=requestAnimationFrame(tick)
+      const event=ev=>e.events.push([ev.type,ev.timeStamp,performance.now()]);for(const k of ['keydown','pointerdown','pointerup'])window.addEventListener(k,event,true)
+      window.stopKnifeEntry=()=>{cancelAnimationFrame(id);for(const k of ['keydown','pointerdown','pointerup'])window.removeEventListener(k,event,true);return e}
+    });await page.keyboard.down('Space');await page.locator('[data-knife-cursor]').waitFor({state:'attached'})
     await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(t=>{
       window.samples=[];window.knifePhase={start:t,events:[]};let last=t
       window.phaseListener=e=>window.knifePhase.events.push({type:e.type,t:performance.now()})
@@ -79,6 +85,7 @@ export async function knifePhotoBench(page,pid,out,releasePut=null) {
       const tick=n=>{window.samples.push(n-last);last=n;window.frame=requestAnimationFrame(tick)}
       window.frame=requestAnimationFrame(tick);resolve()
     })))
+    if(process.env.KNIFE_HOLD_MS)await page.waitForTimeout(Number(process.env.KNIFE_HOLD_MS))
     const stopProfile=round===2 && mode==='hit' && process.env.KNIFE_PROFILE ? await (await import('./knifeProfile.mjs')).startKnifeProfile(page,process.env.KNIFE_PROFILE) : null
     if(stopProfile) await page.evaluate(()=>performance.mark('knife-profile-start'))
     await page.mouse.down();await page.mouse.move(mode==='miss'?x+120:x,mode==='miss'?y:b.bottom+20,{steps:48});await page.mouse.up()
@@ -87,7 +94,7 @@ export async function knifePhotoBench(page,pid,out,releasePut=null) {
       for(const name of ['pointerdown','pointermove','pointerup']) window.removeEventListener(name,window.phaseListener,true)
       resolve({ms:window.samples,phase:window.knifePhase})
     }))));if(stopProfile){await page.evaluate(()=>performance.mark('knife-profile-end'));await stopProfile()}await page.keyboard.up('Space');await page.waitForTimeout(300)
-    const after=await ids(),sorted=[...ms].sort((a,b)=>a-b);report.rounds.push({round,mode,ms,phase,p95:sorted[Math.ceil(.95*ms.length)-1],max:sorted.at(-1),remaining:after});if(tracing){
+    const after=await ids(),sorted=[...ms].sort((a,b)=>a-b);report.rounds.push({round,mode,ms,phase,entry:entry?await page.evaluate(()=>window.stopKnifeEntry()):undefined,p95:sorted[Math.ceil(.95*ms.length)-1],max:sorted.at(-1),remaining:after});if(tracing){
       const trace=await page.evaluate(()=>{for(const name of ['pointerdown','pointermove','pointerup'])window.removeEventListener(name,window.knifeListener,true);return {moves:window.knifeMoves,pointer:window.pointerTrace}})
       assert(trace.moves.length>0,'instrumented module not active');report.rounds.at(-1).trace=trace
     }if(batchBase){report.batchEvidence=await page.evaluate(()=>window.knifeBatchEvidence);report.url=page.url()}save();assert(ms.length>=10);if(mode==='miss') assert.deepEqual(after,baseline)
