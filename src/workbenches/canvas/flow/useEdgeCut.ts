@@ -1,6 +1,7 @@
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { cutPolylineAt, segmentBox, boxesOverlap, segmentHitsPolyline, type ScreenPoint } from './edgeCutGeometry'
 import type { ActiveEdgeCut } from './FlowEdgeCutLayer'
+import { isKnifeOn, subscribeKnife } from '../../../features/canvas/knifeMode'
 import { pushTrail, spawnSparks } from './knifeFx'
 
 /** RF 普通/粗略边均由一个 M + C 构成。复用实际绘制的控制点，不重复调用昂贵的 SVG 长度 API。 */
@@ -109,6 +110,20 @@ export function useEdgeCut(options: {
   const end = useCallback(() => {
     sessionRef.current = null
   }, [])
+
+  // 中断的是这一刀，不是已提交的切线；重新启用工具必须等待新的 pointerdown。
+  useEffect(() => {
+    const unsubscribe = subscribeKnife(() => { if (!isKnifeOn()) end() })
+    const hide = () => { if (document.hidden) end() }
+    const events = ['blur', 'pointercancel', 'pointerup'] as const
+    for (const event of events) window.addEventListener(event, end, true)
+    document.addEventListener('visibilitychange', hide)
+    return () => {
+      unsubscribe()
+      for (const event of events) window.removeEventListener(event, end, true)
+      document.removeEventListener('visibilitychange', hide)
+    }
+  }, [end])
 
   return { cuts, begin, move, end }
 }

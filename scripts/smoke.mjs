@@ -8967,6 +8967,7 @@ function norm0(s) {
 await assertIsolatedStore(STORE_BASE)
 
 const browser = await chromium.launch({
+  headless: process.env.KNIFE_WINDOW_CHECK !== '1',
   channel: 'chrome',
   args: ['--no-proxy-server'],
 })
@@ -45912,7 +45913,7 @@ async function g170(browser) {
     await check('一次撤销恢复全部原线', initial)
     await page.keyboard.press('Control+Shift+z')
     await check('一次重做仍保留原第四条', remaining)
-    for (const reason of ['松开空格', '窗口失焦事件']) {
+    for (const reason of ['松开空格', '窗口失焦事件', '指针取消', ...(process.env.KNIFE_WINDOW_CHECK === '1' ? ['真实切窗'] : [])]) {
       await page.keyboard.press('Control+z')
       await page.mouse.move(first.x, first.y-18)
       await page.keyboard.down('Space')
@@ -45921,13 +45922,32 @@ async function g170(browser) {
       await page.mouse.move(first.x, first.y+18, {steps:3})
       await check(reason + '前确实已切第一条', initial.filter(id => id !== first.id))
       if (reason === '松开空格') await page.keyboard.up('Space')
+      else if (reason === '指针取消') await page.locator('[data-canvas-surface]').dispatchEvent('pointercancel', {pointerId:1, pointerType:'mouse'})
+      else if (reason === '真实切窗') {
+        const pageCDP=await ctx.newCDPSession(page)
+        await pageCDP.send('Emulation.setFocusEmulationEnabled',{enabled:false}); await page.bringToFront()
+        await page.waitForFunction(()=>document.hasFocus(),null,{timeout:5000})
+        await page.evaluate(() => { window.knifeTrustedBlur=false; window.addEventListener('blur',e=>{window.knifeTrustedBlur=e.isTrusted},{once:true}) })
+        const cdp=await browser.newBrowserCDPSession()
+        const {targetId}=await cdp.send('Target.createTarget',{url:'about:blank',newWindow:true})
+        try {
+          await cdp.send('Target.activateTarget',{targetId})
+          await page.waitForFunction(()=>window.knifeTrustedBlur && !document.hasFocus(),null,{timeout:8000})
+          rec(g,'切换到独立窗口产生可信失焦',true)
+        } finally { await cdp.send('Target.closeTarget',{targetId}); await cdp.detach(); await page.bringToFront(); await pageCDP.detach() }
+      }
       else await page.evaluate(() => window.dispatchEvent(new Event('blur')))
-      await page.locator('[data-knife-cursor]').waitFor({state:'detached'})
+      if (reason !== '指针取消') await page.locator('[data-knife-cursor]').waitFor({state:'detached'})
       await page.mouse.move(third.x, third.y+18, {steps:5})
       await page.mouse.up()
       await page.keyboard.up('Space')
       const onlyFirst = initial.filter(id => id !== first.id)
       await check(reason + '后按住鼠标划过其它线不继续切', onlyFirst)
+      await page.keyboard.down('Space')
+      await page.locator('[data-knife-cursor]').waitFor({state:'attached'})
+      await page.mouse.move(first.x,first.y-18,{steps:8})
+      await page.keyboard.up('Space')
+      await check(reason + '后不按左键重新拿刀不能误切',onlyFirst)
       await page.keyboard.press('Control+z')
       await check(reason + '前的切线可一次撤销', initial)
       // 恢复本轮中断前的历史状态，下一轮再次从完整夹具开始。
