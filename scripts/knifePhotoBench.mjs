@@ -47,7 +47,15 @@ export async function knifePhotoBench(page,pid,out,releasePut=null) {
   if(hideCutPreview) await page.addStyleTag({content:'svg[data-edge-cut]{display:none!important}'})
   const hideBaseEdges=process.env.KNIFE_NO_BASE_PAINT==='1'
   if(hideBaseEdges) await page.addStyleTag({content:'.react-flow__edges{visibility:hidden!important}'} )
-  const report={hideBaseEdges,hideCutPreview,timing:"from before pointerdown through two post-pointerup animation frames",edgeCount,sourceHashes:[...hashes],evidence,b,rounds:[]};const save=()=>writeFileSync(out,JSON.stringify(report,null,2))
+  const skipEdgeHit=process.env.KNIFE_SKIP_EDGE_HIT==='1'
+  if(skipEdgeHit) await page.addStyleTag({content:'.react-flow__edges,.react-flow__edges *{pointer-events:none!important}'})
+  if(skipEdgeHit) assert.equal(await page.locator('.react-flow__edges [data-edge]').evaluateAll(es=>es.filter(e=>getComputedStyle(e).pointerEvents==='none' && getComputedStyle(e).visibility==='visible').length),edgeCount)
+  const omitHitPaths=process.env.KNIFE_OMIT_HIT_PATHS==='1'
+  if(omitHitPaths){
+    await page.addStyleTag({content:'[data-edge-hit]{display:none!important}'})
+    assert.equal(await page.locator('[data-edge-hit]').evaluateAll(es=>es.filter(e=>getComputedStyle(e).display==='none').length),edgeCount)
+  }
+  const report={omitHitPaths,skipEdgeHit,hideBaseEdges,hideCutPreview,timing:"from before pointerdown through two post-pointerup animation frames",edgeCount,sourceHashes:[...hashes],evidence,b,rounds:[]};const save=()=>writeFileSync(out,JSON.stringify(report,null,2))
   for(let round=1;round<=3;round++)for(const mode of ['miss','hit']){
     if(tracing) await page.evaluate(()=>{window.knifeMoves=[];window.pointerTrace=[];window.knifeListener=e=>window.pointerTrace.push([e.type,e.clientX,e.clientY,e.buttons]); for(const name of ['pointerdown','pointermove','pointerup']) window.addEventListener(name,window.knifeListener,true)})
     const x=b.x,y=b.top-20;await page.mouse.move(x,y);await page.keyboard.down('Space');await page.locator('[data-knife-cursor]').waitFor({state:'attached'})
