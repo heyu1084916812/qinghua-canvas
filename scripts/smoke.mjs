@@ -45824,7 +45824,12 @@ async function g170(browser) {
         await page.setViewportSize({width,height}); await page.evaluate(t=>localStorage.setItem('flow:theme',t),theme)
         await page.reload(); await page.locator(`[data-edge="${pid}-knife-0"]`).waitFor({state:'attached'})
         await page.mouse.move(610,320);await page.keyboard.down('Space');await page.locator('[data-knife-cursor]').waitFor({state:'attached'})
-        await page.screenshot({path:`${dir}/${width}-${theme}.png`});await page.keyboard.up('Space')
+        const bounds=await page.locator(`[data-edge^="${pid}-knife-"]`).evaluateAll(es=>es.map(e=>e.getBoundingClientRect().top).sort((a,b)=>a-b))
+        await page.mouse.move(650,bounds[0]-8);await page.mouse.down();await page.mouse.move(650,bounds[2]+8,{steps:1})
+        const layer=page.locator('[data-edge-cut]');await layer.waitFor({state:'attached'})
+        const preview=await layer.evaluate(el=>({cuts:Number(el.dataset.edgeCut), paths:el.querySelectorAll('path').length, subpaths:[...el.querySelectorAll('path')].reduce((n,p)=>n+(p.getAttribute('d').match(/M/g)||[]).length,0)}))
+        rec(g,'三条线保留六段残影 '+width+theme,preview.cuts===3 && preview.subpaths===6,JSON.stringify(preview))
+        await page.screenshot({path:`${dir}/${width}-${theme}.png`});await page.mouse.up();await page.keyboard.up('Space');await page.keyboard.press('Control+z');await sleep(600)
       }
       rec(g,'四种视口/主题刀具态留证',true);return
     }
