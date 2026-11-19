@@ -4940,7 +4940,7 @@
       "test": [
         "src/workbenches/canvas/panels/creation/creationStyles.test.ts"
       ],
-      "budget": 414
+      "budget": 430
     },
     {
       "module": "src/workbenches/canvas/panels/creation/CreationPanelPrompt.module.css",
@@ -13265,6 +13265,26 @@
         "src/workbenches/canvas/flow/edgeCutGeometry.test.ts"
       ],
       "budget": 40
+    },
+    {
+      "module": "src/workbenches/canvas/lightbox/useLightboxFlip.ts",
+      "owner": "canvas-lightbox-ui",
+      "responsibility": "灯箱打开与关闭的 FLIP 动画时序（从节点矩形放大进入、反向缩回退出）。",
+      "owns": [
+        "打开 FLIP（等尺寸稳定后量起点）",
+        "关闭 FLIP 后再真正关闭"
+      ],
+      "doesNotOwn": [
+        "灯箱布局与缩放手势",
+        "节点几何"
+      ],
+      "publicApi": [
+        "useLightboxFlip"
+      ],
+      "test": [
+        "src/workbenches/canvas/lightbox/lightboxEditorProjection.test.ts"
+      ],
+      "budget": 120
     }
   ]
 }

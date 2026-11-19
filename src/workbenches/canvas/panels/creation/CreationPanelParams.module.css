@@ -394,10 +394,17 @@
  */
 :global([data-panel-prompt-box]) [data-token] {
   height: 38px;
-  padding: 0 10px;
+  /* 内距对齐缩略图（#1160 五轮）：左 5 + 缩略图 28（38−上下各 5）→ 左/上/下同档，右留 10 给文字 */
+  padding: 0 10px 0 4px;
   gap: 8px;
   border-radius: 8px;
   font-size: 20px;
+}
+
+:global([data-panel-prompt-box]) [data-token] [data-mention-thumb-slot] {
+  width: 28px;
+  height: 28px;
+  border-radius: 4px;
 }
 
 :global([data-panel-prompt-box]) [data-token] svg {

@@ -4,6 +4,7 @@ import type {
   WheelEvent as ReactWheelEvent,
 } from 'react'
 import { useCanvasStore } from '../storeContext'
+import { useLightboxFlip } from './useLightboxFlip'
 import { useAssetMeta } from '../../../features/shared/assets/index'
 import { usePlatform } from '../../../app/providers/PlatformProvider'
 import type { Rect } from '../../../domain/canvas/geometry/rect'
@@ -154,6 +155,9 @@ export function LightboxLayer() {
   const { view, splitActive, showSecondOnly, compareViews, compareLeftHash, compareRightHash,
     primaryUrl, primaryIsVideo, compareClipPath, box, normalizedAngle, mediaStyle, cropBox, canConfirm,
   } = mediaProjection
+
+  /* 打开 / 关闭的 FLIP 时序见 `useLightboxFlip`（这里是 1040 行预算，逻辑已抽出） */
+  const { requestClose } = useLightboxFlip({ stageRef, store, assetHash, open: !!lightbox })
   /** 标注画布覆盖在媒体矩形上，累积原图像素动作；左键绘制，其余指针手势留给舞台。 */
   const [annTool, setAnnTool] = useState<AnnotateTool>('brush')
   const [annColor, setAnnColor] = useState<string>(ANNOTATE_COLORS[0])
@@ -188,7 +192,7 @@ export function LightboxLayer() {
         const node = graph.nodes.find((candidate) => candidate.id === nodeId)
         return node ? saveAnnotatedAsset({ store, graph, node, url, ops: [...ops], textItems: [...textItems] }) : null
       },
-      close: () => store.closeLightbox(),
+      close: requestClose,
     }),
   )
   useEffect(() => () => annActions.dispose(), [annActions])
@@ -211,7 +215,7 @@ export function LightboxLayer() {
   /** 下载反馈、键盘导航和旋转 / 标注保存由命令生命周期编排。 */
   const [downloaded, setDownloaded] = useState(false)
   const [commands] = useState(() => createLightboxCommandLifecycle({
-    close: () => store.closeLightbox(),
+    close: requestClose,
     navigateGallery: (delta) => store.navigateLightbox(delta),
     download: (hash, title) => downloadAsset({ assets: platform.assets, files: platform.files }, hash, title),
     setDownloaded,
@@ -283,57 +287,6 @@ export function LightboxLayer() {
   useEffect(() => viewportGestures.resetCompareView(!!lightbox?.compareWith), [assetHash, lightbox?.compareWith, compareKind, viewportGestures])
   useEffect(() => viewportGestures.watchStage(assetHash), [assetHash, viewportGestures])
   useEffect(() => viewportGestures.fitInitialViewport(natural, stage, vp), [natural, stage, vp, viewportGestures])
-  /**
-   * 打开动画（#1161 第三轮，用户："从原始图片放大到灯箱，别先变黑再渐显"）。
-   *
-   * FLIP：起点 = **画布上那个节点**的矩形，终点 = media 自己落位后的矩形，
-   * 中间只动 `transform`（平移 + 缩放），不改布局、不重新排版。
-   * 同一次打开只播一次（按 assetHash 去重），切图时不重播。
-   */
-  const flippedRef = useRef<string | null>(null)
-  useEffect(() => {
-    if (!assetHash || flippedRef.current === assetHash) return
-    if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
-      flippedRef.current = assetHash
-      return
-    }
-    /**
-     * ⚠️ 必须**等 media 有真实尺寸**再量 FLIP 起点：图片刚挂载时宽度可能只有几像素，
-     * 那时算出来的缩放是 100 倍（实测首帧 `scale(100)`，看着像闪一下白）。
-     * 这里逐帧重试（最多 ~600ms），量到 >= 48px 才播。
-     */
-    let frames = 0
-    let raf = 0
-    const attempt = () => {
-      const media = stageRef.current?.querySelector<HTMLElement>('[data-lightbox-media]')
-      const to = media?.getBoundingClientRect()
-      if (!media || !to || to.width < 48 || to.height < 48) {
-        frames += 1
-        if (frames < 40) raf = window.requestAnimationFrame(attempt)
-        return
-      }
-      flippedRef.current = assetHash
-      const sourceId =
-        gallery?.[galleryIndex ?? 0]?.nodeId ??
-        store.getSnapshot().nodes.find((n) => (n.data as { assetHash?: string }).assetHash === assetHash)?.id
-      const from = sourceId
-        ? document.querySelector<HTMLElement>(`[data-node-id="${sourceId}"]`)?.getBoundingClientRect()
-        : null
-      if (!from || !from.width) return
-      const scale = Math.max(0.05, Math.min(2.5, Math.min(from.width / to.width, from.height / to.height)))
-      const dx = from.left + from.width / 2 - (to.left + to.width / 2)
-      const dy = from.top + from.height / 2 - (to.top + to.height / 2)
-      media.animate(
-        [
-          { transform: `translate(${dx}px, ${dy}px) scale(${scale})`, opacity: 0.6 },
-          { transform: 'translate(0, 0) scale(1)', opacity: 1 },
-        ],
-        { duration: 260, easing: 'cubic-bezier(0.2, 0.8, 0.2, 1)' },
-      )
-    }
-    raf = window.requestAnimationFrame(attempt)
-    return () => window.cancelAnimationFrame(raf)
-  }, [assetHash, gallery, galleryIndex, store])
   useEffect(() => () => viewportGestures.dispose(), [viewportGestures])
 
   const onAnnDown = (e: ReactPointerEvent<HTMLCanvasElement>) => annActions.pointerDown(e, annotationCanvasBox(e.currentTarget), redrawAnn)
