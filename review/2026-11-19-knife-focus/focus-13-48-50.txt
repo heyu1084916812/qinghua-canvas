@@ -1,0 +1,18 @@
+PASS | G170 平移缩放后挥刀 | 滚轮真实缩小且中键平移 | [{"x":0,"y":0,"zoom":1},{"x":186.419,"y":122.564,"zoom":0.697372},{"x":256.419,"y":157.564,"zoom":0.697372}]
+PASS | G170 平移缩放后挥刀 | 挥刀期间焦点在同一窗口内移动
+FAIL | G170 平移缩放后挥刀 | 一刀只命中前三条 | ["edge_d7e03a18-cfe9-48aa-bdde-a5c32a05c0f9","proj_eb0023ab-5301-4f6b-8853-340bd294529e-knife-0","proj_eb0023ab-5301-4f6b-8853-340bd294529e-knife-1","proj_eb0023ab-5301-4f6b-8853-340bd294529e-knife-2","proj_eb0023ab-5301-4f6b-8853-340bd294529e-knife-3"]
+PASS | G170 平移缩放后挥刀 | 一次撤销恢复全部原线 | ["edge_d7e03a18-cfe9-48aa-bdde-a5c32a05c0f9","proj_eb0023ab-5301-4f6b-8853-340bd294529e-knife-0","proj_eb0023ab-5301-4f6b-8853-340bd294529e-knife-1","proj_eb0023ab-5301-4f6b-8853-340bd294529e-knife-2","proj_eb0023ab-5301-4f6b-8853-340bd294529e-knife-3"]
+FAIL | G170 平移缩放后挥刀 | 一次重做仍保留原第四条 | ["edge_d7e03a18-cfe9-48aa-bdde-a5c32a05c0f9","proj_eb0023ab-5301-4f6b-8853-340bd294529e-knife-0","proj_eb0023ab-5301-4f6b-8853-340bd294529e-knife-1","proj_eb0023ab-5301-4f6b-8853-340bd294529e-knife-2","proj_eb0023ab-5301-4f6b-8853-340bd294529e-knife-3"]
+FAIL | g170 | ★ 组内异常（该组没跑完 → 结果不算数） | locator.waitFor: Timeout 30000ms exceeded.
+Call log:
+[2m  - waiting for locator('[data-knife-cursor]')[22m
+
+
+===== 3 passed / 3 failed / 6 total / 0 external skipped =====
+
+失败项：
+ - [G170 平移缩放后挥刀] 一刀只命中前三条 ["edge_d7e03a18-cfe9-48aa-bdde-a5c32a05c0f9","proj_eb0023ab-5301-4f6b-8853-340bd294529e-knife-0","proj_eb0023ab-5301-4f6b-8853-340bd294529e-knife-1","proj_eb0023ab-5301-4f6b-8853-340bd294529e-knife-2","proj_eb0023ab-5301-4f6b-8853-340bd294529e-knife-3"]
+ - [G170 平移缩放后挥刀] 一次重做仍保留原第四条 ["edge_d7e03a18-cfe9-48aa-bdde-a5c32a05c0f9","proj_eb0023ab-5301-4f6b-8853-340bd294529e-knife-0","proj_eb0023ab-5301-4f6b-8853-340bd294529e-knife-1","proj_eb0023ab-5301-4f6b-8853-340bd294529e-knife-2","proj_eb0023ab-5301-4f6b-8853-340bd294529e-knife-3"]
+ - [g170] ★ 组内异常（该组没跑完 → 结果不算数） locator.waitFor: Timeout 30000ms exceeded.
+Call log:
+[2m  - waiting for locator('[data-knife-cursor]')[22m

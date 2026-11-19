@@ -99,11 +99,14 @@ export function useEdgeCut(options: {
   useEffect(() => {
     const unsubscribe = subscribeKnife(() => { if (!isKnifeOn()) end() })
     const hide = () => { if (document.hidden) end() }
-    const events = ['blur', 'pointercancel', 'pointerup'] as const
+    // Element blur does not bubble, but a capturing window listener sees it.
+    window.addEventListener('blur', end)
+    const events = ['pointercancel', 'pointerup'] as const
     for (const event of events) window.addEventListener(event, end, true)
     document.addEventListener('visibilitychange', hide)
     return () => {
       sessionRef.current?.overlay?.dispose()
+      window.removeEventListener('blur', end)
       unsubscribe()
       for (const event of events) window.removeEventListener(event, end, true)
       document.removeEventListener('visibilitychange', hide)

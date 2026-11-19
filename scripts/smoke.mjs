@@ -45905,6 +45905,9 @@ async function g170(browser) {
     await page.keyboard.down('Space')
     await page.locator('[data-knife-cursor]').waitFor({state:'attached'})
     await page.mouse.down()
+    // Moving focus between controls in this document is not leaving the window.
+    const focusMoved=await page.evaluate(()=>{const buttons=[...document.querySelectorAll('button:not(:disabled)')].filter(el=>el.getClientRects().length>0);buttons[0].focus({preventScroll:true});buttons[1].focus({preventScroll:true});const moved=document.activeElement===buttons[1] && document.hasFocus();buttons[1].blur();return moved})
+    rec(g,'挥刀期间焦点在同一窗口内移动',focusMoved)
     await page.mouse.move(third.x, third.y+18, { steps: 5 })
     await page.mouse.up()
     await page.keyboard.up('Space')

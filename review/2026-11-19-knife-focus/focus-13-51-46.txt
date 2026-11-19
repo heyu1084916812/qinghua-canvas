@@ -1,0 +1,24 @@
+PASS | G170 平移缩放后挥刀 | 滚轮真实缩小且中键平移 | [{"x":0,"y":0,"zoom":1},{"x":186.419,"y":122.564,"zoom":0.697372},{"x":256.419,"y":157.564,"zoom":0.697372}]
+PASS | G170 平移缩放后挥刀 | 挥刀期间焦点在同一窗口内移动
+PASS | G170 平移缩放后挥刀 | 一刀只命中前三条 | ["edge_19ed16ad-b80d-473b-b042-e5300ed2b3f9","proj_6ca3f953-dd62-4919-bd3f-c3849abee8d9-knife-3"]
+PASS | G170 平移缩放后挥刀 | 一次撤销恢复全部原线 | ["edge_19ed16ad-b80d-473b-b042-e5300ed2b3f9","proj_6ca3f953-dd62-4919-bd3f-c3849abee8d9-knife-0","proj_6ca3f953-dd62-4919-bd3f-c3849abee8d9-knife-1","proj_6ca3f953-dd62-4919-bd3f-c3849abee8d9-knife-2","proj_6ca3f953-dd62-4919-bd3f-c3849abee8d9-knife-3"]
+PASS | G170 平移缩放后挥刀 | 一次重做仍保留原第四条 | ["edge_19ed16ad-b80d-473b-b042-e5300ed2b3f9","proj_6ca3f953-dd62-4919-bd3f-c3849abee8d9-knife-3"]
+PASS | G170 平移缩放后挥刀 | 松开空格前原边保留但预览已隐藏
+PASS | G170 平移缩放后挥刀 | 松开空格后按住鼠标划过其它线不继续切 | ["edge_19ed16ad-b80d-473b-b042-e5300ed2b3f9","proj_6ca3f953-dd62-4919-bd3f-c3849abee8d9-knife-1","proj_6ca3f953-dd62-4919-bd3f-c3849abee8d9-knife-2","proj_6ca3f953-dd62-4919-bd3f-c3849abee8d9-knife-3"]
+PASS | G170 平移缩放后挥刀 | 松开空格后不按左键重新拿刀不能误切 | ["edge_19ed16ad-b80d-473b-b042-e5300ed2b3f9","proj_6ca3f953-dd62-4919-bd3f-c3849abee8d9-knife-1","proj_6ca3f953-dd62-4919-bd3f-c3849abee8d9-knife-2","proj_6ca3f953-dd62-4919-bd3f-c3849abee8d9-knife-3"]
+PASS | G170 平移缩放后挥刀 | 松开空格前的切线可一次撤销 | ["edge_19ed16ad-b80d-473b-b042-e5300ed2b3f9","proj_6ca3f953-dd62-4919-bd3f-c3849abee8d9-knife-0","proj_6ca3f953-dd62-4919-bd3f-c3849abee8d9-knife-1","proj_6ca3f953-dd62-4919-bd3f-c3849abee8d9-knife-2","proj_6ca3f953-dd62-4919-bd3f-c3849abee8d9-knife-3"]
+PASS | G170 平移缩放后挥刀 | 窗口失焦事件前原边保留但预览已隐藏
+PASS | G170 平移缩放后挥刀 | 窗口失焦事件后按住鼠标划过其它线不继续切 | ["edge_19ed16ad-b80d-473b-b042-e5300ed2b3f9","proj_6ca3f953-dd62-4919-bd3f-c3849abee8d9-knife-1","proj_6ca3f953-dd62-4919-bd3f-c3849abee8d9-knife-2","proj_6ca3f953-dd62-4919-bd3f-c3849abee8d9-knife-3"]
+PASS | G170 平移缩放后挥刀 | 窗口失焦事件后不按左键重新拿刀不能误切 | ["edge_19ed16ad-b80d-473b-b042-e5300ed2b3f9","proj_6ca3f953-dd62-4919-bd3f-c3849abee8d9-knife-1","proj_6ca3f953-dd62-4919-bd3f-c3849abee8d9-knife-2","proj_6ca3f953-dd62-4919-bd3f-c3849abee8d9-knife-3"]
+PASS | G170 平移缩放后挥刀 | 窗口失焦事件前的切线可一次撤销 | ["edge_19ed16ad-b80d-473b-b042-e5300ed2b3f9","proj_6ca3f953-dd62-4919-bd3f-c3849abee8d9-knife-0","proj_6ca3f953-dd62-4919-bd3f-c3849abee8d9-knife-1","proj_6ca3f953-dd62-4919-bd3f-c3849abee8d9-knife-2","proj_6ca3f953-dd62-4919-bd3f-c3849abee8d9-knife-3"]
+PASS | G170 平移缩放后挥刀 | 指针取消前原边保留但预览已隐藏
+PASS | G170 平移缩放后挥刀 | 指针取消后按住鼠标划过其它线不继续切 | ["edge_19ed16ad-b80d-473b-b042-e5300ed2b3f9","proj_6ca3f953-dd62-4919-bd3f-c3849abee8d9-knife-1","proj_6ca3f953-dd62-4919-bd3f-c3849abee8d9-knife-2","proj_6ca3f953-dd62-4919-bd3f-c3849abee8d9-knife-3"]
+PASS | G170 平移缩放后挥刀 | 指针取消后不按左键重新拿刀不能误切 | ["edge_19ed16ad-b80d-473b-b042-e5300ed2b3f9","proj_6ca3f953-dd62-4919-bd3f-c3849abee8d9-knife-1","proj_6ca3f953-dd62-4919-bd3f-c3849abee8d9-knife-2","proj_6ca3f953-dd62-4919-bd3f-c3849abee8d9-knife-3"]
+PASS | G170 平移缩放后挥刀 | 指针取消前的切线可一次撤销 | ["edge_19ed16ad-b80d-473b-b042-e5300ed2b3f9","proj_6ca3f953-dd62-4919-bd3f-c3849abee8d9-knife-0","proj_6ca3f953-dd62-4919-bd3f-c3849abee8d9-knife-1","proj_6ca3f953-dd62-4919-bd3f-c3849abee8d9-knife-2","proj_6ca3f953-dd62-4919-bd3f-c3849abee8d9-knife-3"]
+PASS | G170 平移缩放后挥刀 | 真实切窗前原边保留但预览已隐藏
+PASS | G170 平移缩放后挥刀 | 切换到独立窗口产生可信失焦
+PASS | G170 平移缩放后挥刀 | 真实切窗后按住鼠标划过其它线不继续切 | ["edge_19ed16ad-b80d-473b-b042-e5300ed2b3f9","proj_6ca3f953-dd62-4919-bd3f-c3849abee8d9-knife-1","proj_6ca3f953-dd62-4919-bd3f-c3849abee8d9-knife-2","proj_6ca3f953-dd62-4919-bd3f-c3849abee8d9-knife-3"]
+PASS | G170 平移缩放后挥刀 | 真实切窗后不按左键重新拿刀不能误切 | ["edge_19ed16ad-b80d-473b-b042-e5300ed2b3f9","proj_6ca3f953-dd62-4919-bd3f-c3849abee8d9-knife-1","proj_6ca3f953-dd62-4919-bd3f-c3849abee8d9-knife-2","proj_6ca3f953-dd62-4919-bd3f-c3849abee8d9-knife-3"]
+PASS | G170 平移缩放后挥刀 | 真实切窗前的切线可一次撤销 | ["edge_19ed16ad-b80d-473b-b042-e5300ed2b3f9","proj_6ca3f953-dd62-4919-bd3f-c3849abee8d9-knife-0","proj_6ca3f953-dd62-4919-bd3f-c3849abee8d9-knife-1","proj_6ca3f953-dd62-4919-bd3f-c3849abee8d9-knife-2","proj_6ca3f953-dd62-4919-bd3f-c3849abee8d9-knife-3"]
+
+===== 22 passed / 0 failed / 22 total / 0 external skipped =====
