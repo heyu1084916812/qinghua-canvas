@@ -94,16 +94,23 @@ export async function knifePhotoBench(page,pid,out,releasePut=null) {
   assert(report.rounds.every(r=>r.mode!=='hit'||r.remaining.length===0),'挥刀后仍有预期命中边残留，见报告')
   if(batchBase){report.batchEvidence=await page.evaluate(()=>window.knifeBatchEvidence);save();assert.equal(report.batchEvidence.length,6);assert(report.batchEvidence.every((r,i)=>(!lazy || (gpuFallback ? !r.activated && (i%2===0||!!r.fallback) : r.activated===Boolean(i%2))) && r.visible && r.initial===edgeCount && r.minimum===(i%2?0:edgeCount)))}
   if(batchBase && process.env.KNIFE_BATCH_CANCEL==='1'){
+    const readStyles=()=>page.locator('[data-edge]').evaluateAll(es=>Object.fromEntries(es.map(e=>[e.dataset.edge,[getComputedStyle(e).stroke,getComputedStyle(e).strokeWidth]])));let beforeStyles
+    const mixed=process.env.KNIFE_MIXED_STYLE==='1';if(mixed){
+      await page.locator(`[data-node-id="${nodes[3]}"]`).click({position:{x:14,y:40}});await page.waitForTimeout(500)
+      const styles=await page.locator('[data-edge]').evaluateAll(es=>[...new Set(es.map(e=>getComputedStyle(e).strokeWidth))]);assert(styles.length>=2,JSON.stringify(styles));beforeStyles=await readStyles();report.theme=await page.evaluate(()=>document.documentElement.dataset.theme);assert.equal(report.theme,process.env.KNIFE_THEME??'light')
+    }
     if(report.gpu) await page.evaluate(()=>window.knifeCheckPixels=true)
     await page.mouse.move(b.x,b.top-20);await page.keyboard.down('Space');await page.mouse.down();await page.mouse.move(b.x,(b.top+b.bottom)/2,{steps:24})
     const pending=await page.locator('[data-edge][data-knife-pending]').evaluateAll(es=>es.map(e=>e.dataset.edge))
     assert(pending.length>0 && pending.length<edgeCount)
-    await page.evaluate(()=>window.dispatchEvent(new PointerEvent('pointercancel',{bubbles:true})));await page.mouse.up();await page.keyboard.up('Space');await page.waitForTimeout(400)
+    await page.evaluate(()=>window.dispatchEvent(new PointerEvent('pointercancel',{bubbles:true})));if(mixed){await page.waitForTimeout(400);const current=await readStyles();report.afterCancelBeforeMouseUp=Object.keys(current).filter(id=>JSON.stringify(current[id])!==JSON.stringify(beforeStyles[id]));assert.equal(report.afterCancelBeforeMouseUp.length,0);await page.mouse.move(1,1)}await page.mouse.up();await page.keyboard.up('Space');await page.waitForTimeout(400)
     const survivors=baseline.filter(id=>!pending.includes(id));assert.deepEqual(await ids(),survivors)
     assert.equal(await page.locator('[data-edge]').evaluateAll(es=>es.filter(e=>getComputedStyle(e).visibility==='visible').length),survivors.length)
+    if(mixed){const current=await readStyles();report.styleAudit={cancelChanged:survivors.filter(id=>JSON.stringify(current[id])!==JSON.stringify(beforeStyles[id]))};save()}
     const end=await page.evaluate(()=>window.knifeBatchEvidence.at(-1).end);assert.equal(end,'pointercancel')
-    await page.keyboard.press('Control+z');await page.waitForTimeout(400);assert.deepEqual(await ids(),baseline);report.cancel={pending,survivors,end,undo:baseline.length};if(report.gpu && !gpuFallback){report.cancel.pixel=await page.evaluate(()=>window.knifeBatchEvidence.at(-1).pixelCheck);assert(report.cancel.pixel?.maxAlpha>0)}save()
+    await page.keyboard.press('Control+z');await page.waitForTimeout(400);assert.deepEqual(await ids(),baseline);report.cancel={pending,survivors,end,undo:baseline.length};if(report.gpu && !gpuFallback){report.cancel.pixel=await page.evaluate(()=>window.knifeBatchEvidence.at(-1).pixelCheck);assert(report.cancel.pixel?.maxAlpha>0);if(mixed){const current=await readStyles();report.styleAudit.undoChanged=baseline.filter(id=>JSON.stringify(current[id])!==JSON.stringify(beforeStyles[id]));report.cancel.stylePixels=await page.evaluate(()=>window.knifeBatchEvidence.at(-1).stylePixels);save();assert(report.cancel.stylePixels.every(Boolean));report.cancel.palette=await page.evaluate(()=>window.knifeBatchEvidence.at(-1).palette);assert(new Set(report.cancel.palette.map(v=>v[4])).size>=2)}}save()
   }
+  if(report.styleAudit){assert.equal(report.styleAudit.cancelChanged.length,0,'surviving edge style changed on cancel');assert.equal(report.styleAudit.undoChanged.length,0,'edge style changed after undo')}
   if(startTiming){report.startTiming=await page.evaluate(()=>window.knifeStartTiming);save()}
   console.log('real-photo benchmark',report.rounds.map(({mode,p95,max})=>({mode,p95,max})))
 }

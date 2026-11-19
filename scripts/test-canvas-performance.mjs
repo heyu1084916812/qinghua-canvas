@@ -612,11 +612,11 @@ async function main() {
       const ctx = browser.contexts()[0]
       const page = ctx.pages()[0] ?? await ctx.waitForEvent('page')
       await page.waitForURL(/tauri\.localhost/)
-      await page.evaluate(() => {
+      await page.evaluate(theme => {
         localStorage.setItem('flow:onboarded', '1')
         localStorage.setItem('flow:canvasGuideDismissed', '1')
-        localStorage.setItem('flow:theme', 'light')
-      })
+        localStorage.setItem('flow:theme', theme)
+      },process.env.KNIFE_THEME??'light')
       await page.goto(`http://tauri.localhost/canvas/${PERFORMANCE_PROJECT_ID}`)
       const {knifePhotoBench} = await import('./knifePhotoBench.mjs')
       await knifePhotoBench(page, PERFORMANCE_PROJECT_ID, process.env.KNIFE_PHOTO_BENCH,
