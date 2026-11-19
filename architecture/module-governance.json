@@ -632,7 +632,7 @@
     {
       "module": "src/workbenches/canvas/flow/useEdgeCut.ts",
       "owner": "canvas-flow-ui",
-      "responsibility": "「切一刀」的交互时序：逐帧等连线出现 → 找最近的线 → 播两段分离淡出 → 动画结束再删边。",
+      "responsibility": "美工刀手势：按下时冻结当前画布曲线，移动时用折线检测扫掠命中，派发同一事务删除并播放断线动画。",
       "owns": [
         "切割时序与重试",
         "setEdgeCut 状态"

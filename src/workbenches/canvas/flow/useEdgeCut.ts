@@ -3,7 +3,30 @@ import { cutPolylineAt, segmentBox, boxesOverlap, segmentHitsPolyline, type Scre
 import type { ActiveEdgeCut } from './FlowEdgeCutLayer'
 import { pushTrail, spawnSparks } from './knifeFx'
 
+/** RF 普通/粗略边均由一个 M + C 构成。复用实际绘制的控制点，不重复调用昂贵的 SVG 长度 API。 */
+function snapshotEdges(surface: HTMLElement, rect: DOMRect) {
+  return Array.from(surface.querySelectorAll<SVGPathElement>('[data-edge]')).flatMap(path => {
+    const id = path.dataset.edge, d = path.getAttribute('d') ?? '', matrix = path.getScreenCTM()
+    if (!id || !matrix) return []
+    const nums = d.match(/[-+]?(?:\d*\.\d+|\d+)(?:e[-+]?\d+)?/gi)?.map(Number)
+    const pts: ScreenPoint[] = []
+    const add = (x: number, y: number) => pts.push({ x: matrix.a*x + matrix.c*y + matrix.e - rect.left, y: matrix.b*x + matrix.d*y + matrix.f - rect.top })
+    if (nums?.length === 8 && /^M[^a-z]*C/i.test(d.replace(/e[-+]?\d+/gi,''))) {
+      for (let i=0;i<=20;i++) {
+        const t=i/20, u=1-t, blend=(a:number,b:number,c:number,d:number)=>u*u*u*a+3*u*u*t*b+3*u*t*t*c+t*t*t*d
+        add(blend(nums[0]!,nums[2]!,nums[4]!,nums[6]!),blend(nums[1]!,nums[3]!,nums[5]!,nums[7]!))
+      }
+    } else {
+      const len=path.getTotalLength(); if (!(len>0)) return []
+      for(let i=0;i<=20;i++){const p=path.getPointAtLength(i*len/20);add(p.x,p.y)}
+    }
+    const xs=pts.map(p=>p.x), ys=pts.map(p=>p.y)
+    return [{ id, points:pts, box:{minX:Math.min(...xs),maxX:Math.max(...xs),minY:Math.min(...ys),maxY:Math.max(...ys)} }]
+  })
+}
+
 interface SliceSession {
+  edges: ReturnType<typeof snapshotEdges>
   /** 这一次挥刀共用一个 undo key：8 条线也只算一条历史 */
   planId: string
   last: ScreenPoint | null
@@ -15,8 +38,7 @@ interface SliceSession {
  *
  * 三条硬要求（用户给的工程注意事项）：
  * 1. **防漏切**：上一帧 → 这一帧的鼠标轨迹当成线段，与连线逐段求交（点检测会漏）；
- * 2. **防掉帧**：先用 DOM 的 `getBoundingClientRect()` 做包围盒粗筛，命中才把这条线
- *    采样成 24 段折线细算 —— 几百条线时每帧只细算极少数；
+ * 2. **防掉帧**：按下时冻结可见边的折线与包围盒，每次移动只在内存中检测；
  * 3. **一次挥刀 = 一条 Undo**：`pointerdown` 建一个 `planId`，挥刀过程中所有删除都用它
  *    派发（`multi-step` 事务），松手即合并成一条历史，不用连按 8 次 Ctrl+Z。
  *
@@ -36,18 +58,11 @@ export function useEdgeCut(options: {
   const [cuts, setCuts] = useState<ActiveEdgeCut[]>([])
   const sessionRef = useRef<SliceSession | null>(null)
 
-  const localOf = (clientX: number, clientY: number): ScreenPoint | null => {
-    const surface = surfaceEl()
-    if (!surface) return null
-    const rect = surface.getBoundingClientRect()
-    return { x: clientX - rect.left, y: clientY - rect.top }
-  }
-
   const begin = useCallback(
     (clientX: number, clientY: number) => {
-      const local = localOf(clientX, clientY)
-      if (!local) return
-      sessionRef.current = { planId: `knife:${Date.now()}:${Math.random().toString(36).slice(2, 6)}`, last: local, cut: new Set() }
+      const surface=surfaceEl(); if (!surface) return
+      const rect=surface.getBoundingClientRect(), local={x:clientX-rect.left,y:clientY-rect.top}
+      sessionRef.current = { edges:snapshotEdges(surface,rect), planId: `knife:${Date.now()}:${Math.random().toString(36).slice(2, 6)}`, last: local, cut: new Set() }
       pushTrail(local.x, local.y)
     },
     [surfaceEl],
@@ -64,36 +79,11 @@ export function useEdgeCut(options: {
       session.last = to
       pushTrail(to.x, to.y)
 
-      /* 粗筛用的包围盒在**屏幕坐标**里算（与 getBoundingClientRect 同一坐标系） */
-      const screenFrom = { x: from.x + rect.left, y: from.y + rect.top }
-      const screenTo = { x: to.x + rect.left, y: to.y + rect.top }
-      const sweep = segmentBox(screenFrom, screenTo, 8)
-
+      const sweep = segmentBox(from, to, 8)
       const hitIds: string[] = []
       const spawned: ActiveEdgeCut[] = []
-      for (const path of Array.from(document.querySelectorAll<SVGPathElement>('[data-edge]'))) {
-        const id = path.getAttribute('data-edge') ?? ''
-        if (!id || session.cut.has(id)) continue
-        const box = path.getBoundingClientRect()
-        if (
-          !boxesOverlap(sweep, {
-            minX: box.left - 6,
-            minY: box.top - 6,
-            maxX: box.right + 6,
-            maxY: box.bottom + 6,
-          })
-        ) {
-          continue
-        }
-        const ctm = path.getScreenCTM()
-        const total = path.getTotalLength()
-        if (!ctm || !(total > 0)) continue
-        const steps = 24
-        const points: ScreenPoint[] = []
-        for (let i = 0; i <= steps; i += 1) {
-          const at = path.getPointAtLength((total * i) / steps).matrixTransform(ctm)
-          points.push({ x: at.x - rect.left, y: at.y - rect.top })
-        }
+      for (const {id, points, box} of session.edges) {
+        if (session.cut.has(id) || !boxesOverlap(sweep,box)) continue
         const hit = segmentHitsPolyline(points, from, to)
         if (!hit) continue
         session.cut.add(id)

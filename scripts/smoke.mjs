@@ -45817,6 +45817,16 @@ async function g170(browser) {
     await page.locator(`[data-edge="${pid}-knife-3"]`).waitFor({ state: 'attached' })
     const ids = () => page.locator('[data-edge]').evaluateAll(es => es.map(e => e.dataset.edge).sort())
     const initial = await ids()
+    if (process.env.KNIFE_UI_EVIDENCE) {
+      const dir=process.env.KNIFE_UI_EVIDENCE; mkdirSync(dir,{recursive:true})
+      for(const [width,height] of [[1440,900],[1024,700]]) for(const theme of ['light','dark']) {
+        await page.setViewportSize({width,height}); await page.evaluate(t=>localStorage.setItem('flow:theme',t),theme)
+        await page.reload(); await page.locator(`[data-edge="${pid}-knife-0"]`).waitFor({state:'attached'})
+        await page.mouse.move(610,320);await page.keyboard.down('Space');await page.locator('[data-knife-cursor]').waitFor({state:'attached'})
+        await page.screenshot({path:`${dir}/${width}-${theme}.png`});await page.keyboard.up('Space')
+      }
+      rec(g,'四种视口/主题刀具态留证',true);return
+    }
     const realLoad = process.env.KNIFE_REAL_IMAGES === '1'
     const imported = []
     if (realLoad) {
