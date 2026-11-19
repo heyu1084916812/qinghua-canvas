@@ -13,7 +13,7 @@ export function installKnifeBatchProbe({chunkSize,lazy}) {
     const data=originals.map(p=>[p,p.getAttribute('d')]); const record={initial:data.length,minimum:data.length,updates:0};window.knifeBatchEvidence.push(record)
     const chunks=[]
     for(let i=0;i<data.length;i+=chunkSize){const path=i===0?merged:merged.cloneNode(false);if(i)group.append(path);chunks.push({path,edges:data.slice(i,i+chunkSize),previous:-1})}
-    const refresh=()=>{let count=0;for(const chunk of chunks){const alive=chunk.edges.filter(([p])=>p.isConnected&&!p.hasAttribute('data-knife-pending'));count+=alive.length;if(alive.length!==chunk.previous){chunk.path.setAttribute('d',alive.map(([,d])=>d).join(' '));chunk.previous=alive.length}}record.minimum=Math.min(record.minimum,count);record.updates++}
+    const refresh=()=>{let count=0;for(const chunk of chunks){const alive=chunk.edges.filter(([p])=>p.isConnected&&!p.hasAttribute('data-knife-pending'));count+=alive.length;if(alive.length!==chunk.previous){chunk.path.setAttribute('d',alive.map(([,d])=>d).join(' '));chunk.previous=alive.length}}if(count<record.minimum)record.lastCutObserved=performance.now();record.minimum=Math.min(record.minimum,count);record.updates++}
     const parent=first.ownerSVGElement.parentElement
     const style=document.createElement('style');style.textContent='.react-flow__edges{visibility:hidden!important}'
     function activate(){
@@ -24,7 +24,7 @@ export function installKnifeBatchProbe({chunkSize,lazy}) {
     if(!lazy)activate()
     const obs=new MutationObserver(()=>{if(record.activated)refresh();else activate()});obs.observe(parent,{attributes:true,subtree:true,attributeFilter:['data-knife-pending']})
     const events=['pointerup','pointercancel','blur','keyup']
-    function end(e){if(e.type==='keyup' && e.code!=='Space')return;refresh();obs.disconnect();style.remove();svg.remove();record.end=e.type;for(const type of events)window.removeEventListener(type,end,true);document.removeEventListener('visibilitychange',hide)}
+    function end(e){if(e.type==='keyup' && e.code!=='Space')return;record.endStarted=performance.now();obs.disconnect();svg.remove();record.overlayRemoved=performance.now();style.remove();record.originalsEnabled=performance.now();requestAnimationFrame(()=>{record.firstFrameCallback=performance.now();requestAnimationFrame(()=>{record.secondFrameCallback=performance.now()})});record.end=e.type;for(const type of events)window.removeEventListener(type,end,true);document.removeEventListener('visibilitychange',hide)}
     function hide(){if(document.hidden)end({type:'visibilitychange'})}
     for(const type of events)window.addEventListener(type,end,true);document.addEventListener('visibilitychange',hide)
   },true)
