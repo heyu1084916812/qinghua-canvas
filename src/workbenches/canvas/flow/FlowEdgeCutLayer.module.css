@@ -70,3 +70,6 @@
 
 /* 未松手前只隐藏命中的原线，数据仍在图里。 */
 :global([data-edge][data-knife-pending]) { visibility: hidden; }
+
+:global([data-knife-gpu]) { visibility: hidden; }
+:global([data-knife-gpu] [data-edge-delete]) { visibility: visible; }

@@ -18,6 +18,6 @@ export function snapshotEdges(surface: HTMLElement, rect: DOMRect) {
       for(let i=0;i<=20;i++){const p=path.getPointAtLength(i*len/20);add(p.x,p.y)}
     }
     const xs=pts.map(p=>p.x), ys=pts.map(p=>p.y)
-    return [{ id, path, points:pts, box:{minX:Math.min(...xs),maxX:Math.max(...xs),minY:Math.min(...ys),maxY:Math.max(...ys)} }]
+    return [{ id, path, matrix, points:pts, box:{minX:Math.min(...xs),maxX:Math.max(...xs),minY:Math.min(...ys),maxY:Math.max(...ys)} }]
   })
 }

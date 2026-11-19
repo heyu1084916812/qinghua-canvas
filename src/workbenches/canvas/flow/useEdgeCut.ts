@@ -4,11 +4,13 @@ import type { ActiveEdgeCut, CutPreview } from './FlowEdgeCutLayer'
 import { isKnifeOn, subscribeKnife } from '../../../features/canvas/knifeMode'
 import { pushTrail, spawnSparks } from './knifeFx'
 
+import { createKnifeEdgeOverlay, type KnifeEdgeOverlay } from './knifeEdgeOverlay'
 import { snapshotEdges } from './knifeSnapshot'
 
 interface SliceSession {
   edges: ReturnType<typeof snapshotEdges>
   /** 这一次挥刀共用一个 undo key：8 条线也只算一条历史 */
+  overlay?: KnifeEdgeOverlay | null
   planId: string
   last: ScreenPoint | null
   cut: Set<string>
@@ -44,6 +46,7 @@ export function useEdgeCut(options: {
     (clientX: number, clientY: number) => {
       const surface=surfaceEl(); if (!surface) return
       const rect=surface.getBoundingClientRect(), local={x:clientX-rect.left,y:clientY-rect.top}
+      sessionRef.current?.overlay?.dispose()
       sessionRef.current = { edges:snapshotEdges(surface,rect), planId: `knife:${Date.now()}:${Math.random().toString(36).slice(2, 6)}`, last: local, cut: new Set() }
       pushTrail(local.x, local.y)
     },
@@ -74,7 +77,11 @@ export function useEdgeCut(options: {
         path.setAttribute('data-knife-pending','')
       }
 
-      if (spawned.length) preview.current?.show(spawned)
+      if (spawned.length) {
+        if (session.overlay === undefined) session.overlay = createKnifeEdgeOverlay(surface, session.edges)
+        session.overlay?.draw(session.cut)
+        preview.current?.show(spawned)
+      }
     },
     [surfaceEl],
   )
@@ -82,6 +89,7 @@ export function useEdgeCut(options: {
   const end = useCallback(() => {
     const session = sessionRef.current
     sessionRef.current = null
+    session?.overlay?.dispose()
     if (!session?.cut.size) return
     for (const {path,id} of session.edges) if (session.cut.has(id)) path.removeAttribute('data-knife-pending')
     removeRef.current([...session.cut],session.planId)
@@ -95,6 +103,7 @@ export function useEdgeCut(options: {
     for (const event of events) window.addEventListener(event, end, true)
     document.addEventListener('visibilitychange', hide)
     return () => {
+      sessionRef.current?.overlay?.dispose()
       unsubscribe()
       for (const event of events) window.removeEventListener(event, end, true)
       document.removeEventListener('visibilitychange', hide)

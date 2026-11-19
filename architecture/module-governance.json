@@ -633,10 +633,18 @@
       "module": "src/workbenches/canvas/flow/knifeSnapshot.ts",
       "owner": "canvas-flow-ui",
       "responsibility": "冻结一次挥刀的可见路径、局部折线与包围盒。",
-      "owns": ["实际 SVG 路径到局部采样点的转换"],
-      "doesNotOwn": ["命中判定、预览和撤销事务"],
-      "publicApi": ["snapshotEdges"],
-      "test": ["scripts/smoke.mjs"],
+      "owns": [
+        "实际 SVG 路径到局部采样点的转换"
+      ],
+      "doesNotOwn": [
+        "命中判定、预览和撤销事务"
+      ],
+      "publicApi": [
+        "snapshotEdges"
+      ],
+      "test": [
+        "scripts/smoke.mjs"
+      ],
       "budget": 50
     },
     {
@@ -13059,10 +13067,22 @@
       "module": "src/pages/SettingsPage/settingsPage/folderTabVisibility.ts",
       "owner": "settings-ui",
       "responsibility": "选中标题宽度变化后只横向滚动文件夹标签栏，保证文字、数字及左扩轮廓可见。",
-      "owns": ["按标签新宽度计算可见范围", "标签栏横向滚动"],
-      "doesNotOwn": ["外层纵向锚点", "SVG 路径和弹簧动画", "渠道数据修改"],
-      "publicApi": ["revealFolderTab"],
-      "test": ["src/pages/SettingsPage/settingsPage/folderTabVisibility.test.ts", "scripts/smoke.mjs"],
+      "owns": [
+        "按标签新宽度计算可见范围",
+        "标签栏横向滚动"
+      ],
+      "doesNotOwn": [
+        "外层纵向锚点",
+        "SVG 路径和弹簧动画",
+        "渠道数据修改"
+      ],
+      "publicApi": [
+        "revealFolderTab"
+      ],
+      "test": [
+        "src/pages/SettingsPage/settingsPage/folderTabVisibility.test.ts",
+        "scripts/smoke.mjs"
+      ],
       "budget": 20
     },
     {
@@ -13092,10 +13112,20 @@
       "module": "src/pages/SettingsPage/settingsPage/useMappingTabAnchor.ts",
       "owner": "settings-ui",
       "responsibility": "模型映射类别切换时在绘制前保住标签的屏幕纵坐标，必要时只临时保留外层底部滚动范围。",
-      "owns": ["分类切换前后的滚动锚点", "渠道切换与滚回正常范围时释放底部余量"],
-      "doesNotOwn": ["标签几何", "表格高度和模型映射数据"],
-      "publicApi": ["useMappingTabAnchor"],
-      "test": ["scripts/smoke.mjs"],
+      "owns": [
+        "分类切换前后的滚动锚点",
+        "渠道切换与滚回正常范围时释放底部余量"
+      ],
+      "doesNotOwn": [
+        "标签几何",
+        "表格高度和模型映射数据"
+      ],
+      "publicApi": [
+        "useMappingTabAnchor"
+      ],
+      "test": [
+        "scripts/smoke.mjs"
+      ],
       "budget": 85
     },
     {
@@ -13317,6 +13347,44 @@
         "src/workbenches/canvas/lightbox/lightboxEditorProjection.test.ts"
       ],
       "budget": 120
+    },
+    {
+      "module": "src/workbenches/canvas/flow/knifeEdgeOverlay.ts",
+      "owner": "canvas-flow",
+      "responsibility": "管理高密度挥刀期间的实例化连线绘制和 SVG 回退。",
+      "owns": [
+        "显存缓冲区、临时画布与上下文清理"
+      ],
+      "doesNotOwn": [
+        "连线命中与撤销事务"
+      ],
+      "publicApi": [
+        "createKnifeEdgeOverlay",
+        "KnifeEdgeOverlay"
+      ],
+      "test": [
+        "scripts/knifeProductStroke.mjs"
+      ],
+      "budget": 150
+    },
+    {
+      "module": "src/workbenches/canvas/flow/knifeEdgeShaders.ts",
+      "owner": "canvas-flow",
+      "responsibility": "定义三次曲线实例的几何展开和逐线颜色的着色程序。",
+      "owns": [
+        "曲线切向量、屏幕线宽和存活标志"
+      ],
+      "doesNotOwn": [
+        "连线命中与撤销事务"
+      ],
+      "publicApi": [
+        "knifeVertex",
+        "knifeFragment"
+      ],
+      "test": [
+        "scripts/knifeProductStroke.mjs"
+      ],
+      "budget": 150
     }
   ]
 }

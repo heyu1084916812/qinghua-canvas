@@ -1,0 +1,2014 @@
+{
+  "forceSvg": false,
+  "product": true,
+  "gpuFallback": false,
+  "gpu": false,
+  "raster": false,
+  "dirtyClear": false,
+  "spatial": false,
+  "lazy": false,
+  "batchSize": 50,
+  "batchBase": false,
+  "omitHitPaths": false,
+  "skipEdgeHit": false,
+  "hideBaseEdges": false,
+  "hideCutPreview": false,
+  "timing": "from before pointerdown through two post-pointerup animation frames",
+  "edgeCount": 50,
+  "sourceHashes": [
+    "75fac2956852c4176f1a463aeb436451e3c40bfb",
+    "c809e56abdffcb05a9c7ccd3f2d799a31a3224d1",
+    "17ce11114e33885d912921725d9b685e21fc9ee4",
+    "cd64aea41606415a1cb84f2df8ad4859238a1eb0",
+    "527f2837d2b855c78cbdebbbf890ec6dee02ffbf",
+    "77fb2ddc905e15f116767b9d5e9d2a0ca3d17645",
+    "6f0c104a3a8ec03485c6eab47501e86424980c87",
+    "6ec209861753e250d823f638265ce670a92d76ec",
+    "f67349c5ae2745b15f4f021f25089a14f7cdfeaf",
+    "b6e1a2fef583f6ba4969bddf0f9da07da90117e1",
+    "3ce4dded2212c087f2448a43ba17b47f5318f88e",
+    "2270a6ae29e7ccdc290afbdca7c08ad6b6af4b6e",
+    "25c38389df45c00b48b77f5b4510fb7aa081b3ce",
+    "580fb2738cb5b4f7f05586f6e1e3cad75112b0da",
+    "89c3f37dd0a41d50f97d90ccc0d8d6abc3f5e786",
+    "c65f48ef2f41e3fd1d1961bfe017813df005aa47"
+  ],
+  "evidence": [
+    {
+      "x": 265,
+      "y": 179,
+      "w": 318,
+      "h": 198,
+      "width": 640,
+      "height": 400,
+      "visible": true
+    },
+    {
+      "x": 265,
+      "y": 449,
+      "w": 318,
+      "h": 198,
+      "width": 640,
+      "height": 400,
+      "visible": true
+    },
+    {
+      "x": 265,
+      "y": 719,
+      "w": 318,
+      "h": 198,
+      "width": 640,
+      "height": 400,
+      "visible": true
+    },
+    {
+      "x": 265,
+      "y": 989,
+      "w": 318,
+      "h": 198,
+      "width": 640,
+      "height": 400,
+      "visible": true
+    },
+    {
+      "x": 685,
+      "y": 179,
+      "w": 318,
+      "h": 198,
+      "width": 640,
+      "height": 400,
+      "visible": true
+    },
+    {
+      "x": 685,
+      "y": 449,
+      "w": 318,
+      "h": 198,
+      "width": 640,
+      "height": 400,
+      "visible": true
+    },
+    {
+      "x": 685,
+      "y": 719,
+      "w": 318,
+      "h": 198,
+      "width": 640,
+      "height": 400,
+      "visible": true
+    },
+    {
+      "x": 685,
+      "y": 989,
+      "w": 318,
+      "h": 198,
+      "width": 640,
+      "height": 400,
+      "visible": true
+    },
+    {
+      "x": 1285,
+      "y": 179,
+      "w": 318,
+      "h": 198,
+      "width": 640,
+      "height": 400,
+      "visible": true
+    },
+    {
+      "x": 1285,
+      "y": 449,
+      "w": 318,
+      "h": 198,
+      "width": 640,
+      "height": 400,
+      "visible": true
+    },
+    {
+      "x": 1285,
+      "y": 719,
+      "w": 318,
+      "h": 198,
+      "width": 640,
+      "height": 400,
+      "visible": true
+    },
+    {
+      "x": 1285,
+      "y": 989,
+      "w": 318,
+      "h": 198,
+      "width": 640,
+      "height": 400,
+      "visible": true
+    },
+    {
+      "x": 1705,
+      "y": 179,
+      "w": 318,
+      "h": 198,
+      "width": 640,
+      "height": 400,
+      "visible": true
+    },
+    {
+      "x": 1705,
+      "y": 449,
+      "w": 318,
+      "h": 198,
+      "width": 640,
+      "height": 400,
+      "visible": true
+    },
+    {
+      "x": 1705,
+      "y": 719,
+      "w": 318,
+      "h": 198,
+      "width": 640,
+      "height": 400,
+      "visible": true
+    },
+    {
+      "x": 1705,
+      "y": 989,
+      "w": 318,
+      "h": 198,
+      "width": 640,
+      "height": 400,
+      "visible": true
+    }
+  ],
+  "b": {
+    "x": 1144,
+    "top": 278,
+    "bottom": 1088
+  },
+  "rounds": [
+    {
+      "round": 1,
+      "mode": "miss",
+      "ms": [
+        7.900000000000091,
+        8.099999999999909,
+        8.100000000000023,
+        8.899999999999977,
+        8,
+        8,
+        23.90000000000009,
+        8.099999999999909,
+        8,
+        8,
+        7.900000000000091,
+        8,
+        8,
+        8.099999999999909,
+        7.400000000000091,
+        8.099999999999909,
+        7.900000000000091,
+        8.099999999999909,
+        7.900000000000091,
+        8.099999999999909,
+        8,
+        8,
+        7.900000000000091,
+        8,
+        8,
+        8,
+        8,
+        8,
+        8,
+        8,
+        8,
+        8,
+        8,
+        8,
+        8,
+        8.099999999999909,
+        8,
+        8,
+        8,
+        8.100000000000136,
+        1.2999999999999545,
+        7.5,
+        8,
+        8.099999999999909,
+        7.900000000000091,
+        8.099999999999909,
+        7.900000000000091,
+        7.099999999999909,
+        7.100000000000136,
+        8,
+        7.899999999999864,
+        8.100000000000136,
+        8,
+        7.899999999999864,
+        8.100000000000136,
+        8,
+        9,
+        8,
+        8,
+        8
+      ],
+      "phase": {
+        "start": 847.3,
+        "events": [
+          {
+            "type": "pointerdown",
+            "t": 851.1999999880791
+          },
+          {
+            "type": "pointermove",
+            "t": 860.3999999761581
+          },
+          {
+            "type": "pointermove",
+            "t": 884.8999999761581
+          },
+          {
+            "type": "pointermove",
+            "t": 897.1999999880791
+          },
+          {
+            "type": "pointermove",
+            "t": 922.3999999761581
+          },
+          {
+            "type": "pointermove",
+            "t": 928.7999999821186
+          },
+          {
+            "type": "pointermove",
+            "t": 936.8999999761581
+          },
+          {
+            "type": "pointermove",
+            "t": 945
+          },
+          {
+            "type": "pointermove",
+            "t": 952.8999999761581
+          },
+          {
+            "type": "pointermove",
+            "t": 960.7999999821186
+          },
+          {
+            "type": "pointermove",
+            "t": 969.1999999880791
+          },
+          {
+            "type": "pointermove",
+            "t": 977
+          },
+          {
+            "type": "pointermove",
+            "t": 984.3999999761581
+          },
+          {
+            "type": "pointermove",
+            "t": 992.5
+          },
+          {
+            "type": "pointermove",
+            "t": 1000.5
+          },
+          {
+            "type": "pointermove",
+            "t": 1008.2999999821186
+          },
+          {
+            "type": "pointermove",
+            "t": 1016.5999999940395
+          },
+          {
+            "type": "pointermove",
+            "t": 1024.699999988079
+          },
+          {
+            "type": "pointermove",
+            "t": 1032.5999999940395
+          },
+          {
+            "type": "pointermove",
+            "t": 1040.2999999821186
+          },
+          {
+            "type": "pointermove",
+            "t": 1048.5999999940395
+          },
+          {
+            "type": "pointermove",
+            "t": 1056.2999999821186
+          },
+          {
+            "type": "pointermove",
+            "t": 1064.2999999821186
+          },
+          {
+            "type": "pointermove",
+            "t": 1072.5
+          },
+          {
+            "type": "pointermove",
+            "t": 1080.5
+          },
+          {
+            "type": "pointermove",
+            "t": 1088.3999999761581
+          },
+          {
+            "type": "pointermove",
+            "t": 1096.2999999821186
+          },
+          {
+            "type": "pointermove",
+            "t": 1104.3999999761581
+          },
+          {
+            "type": "pointermove",
+            "t": 1112.199999988079
+          },
+          {
+            "type": "pointermove",
+            "t": 1120.199999988079
+          },
+          {
+            "type": "pointermove",
+            "t": 1128.5
+          },
+          {
+            "type": "pointermove",
+            "t": 1136.5999999940395
+          },
+          {
+            "type": "pointermove",
+            "t": 1152.5
+          },
+          {
+            "type": "pointermove",
+            "t": 1169.0999999940395
+          },
+          {
+            "type": "pointermove",
+            "t": 1176.2999999821186
+          },
+          {
+            "type": "pointermove",
+            "t": 1184.5
+          },
+          {
+            "type": "pointermove",
+            "t": 1193.2999999821186
+          },
+          {
+            "type": "pointermove",
+            "t": 1201.199999988079
+          },
+          {
+            "type": "pointermove",
+            "t": 1209.2999999821186
+          },
+          {
+            "type": "pointermove",
+            "t": 1217.5999999940395
+          },
+          {
+            "type": "pointermove",
+            "t": 1225.5
+          },
+          {
+            "type": "pointermove",
+            "t": 1240.699999988079
+          },
+          {
+            "type": "pointermove",
+            "t": 1247.2999999821186
+          },
+          {
+            "type": "pointermove",
+            "t": 1255.5
+          },
+          {
+            "type": "pointermove",
+            "t": 1263.5
+          },
+          {
+            "type": "pointermove",
+            "t": 1279.699999988079
+          },
+          {
+            "type": "pointermove",
+            "t": 1288.199999988079
+          },
+          {
+            "type": "pointermove",
+            "t": 1304.199999988079
+          },
+          {
+            "type": "pointermove",
+            "t": 1312.5
+          },
+          {
+            "type": "pointerup",
+            "t": 1319.2999999821186
+          }
+        ]
+      },
+      "p95": 8.100000000000136,
+      "max": 23.90000000000009,
+      "remaining": [
+        "perf-release-300-500-bench-0",
+        "perf-release-300-500-bench-1",
+        "perf-release-300-500-bench-10",
+        "perf-release-300-500-bench-11",
+        "perf-release-300-500-bench-12",
+        "perf-release-300-500-bench-13",
+        "perf-release-300-500-bench-14",
+        "perf-release-300-500-bench-15",
+        "perf-release-300-500-bench-16",
+        "perf-release-300-500-bench-17",
+        "perf-release-300-500-bench-18",
+        "perf-release-300-500-bench-19",
+        "perf-release-300-500-bench-2",
+        "perf-release-300-500-bench-20",
+        "perf-release-300-500-bench-21",
+        "perf-release-300-500-bench-22",
+        "perf-release-300-500-bench-23",
+        "perf-release-300-500-bench-24",
+        "perf-release-300-500-bench-25",
+        "perf-release-300-500-bench-26",
+        "perf-release-300-500-bench-27",
+        "perf-release-300-500-bench-28",
+        "perf-release-300-500-bench-29",
+        "perf-release-300-500-bench-3",
+        "perf-release-300-500-bench-30",
+        "perf-release-300-500-bench-31",
+        "perf-release-300-500-bench-32",
+        "perf-release-300-500-bench-33",
+        "perf-release-300-500-bench-34",
+        "perf-release-300-500-bench-35",
+        "perf-release-300-500-bench-36",
+        "perf-release-300-500-bench-37",
+        "perf-release-300-500-bench-38",
+        "perf-release-300-500-bench-39",
+        "perf-release-300-500-bench-4",
+        "perf-release-300-500-bench-40",
+        "perf-release-300-500-bench-41",
+        "perf-release-300-500-bench-42",
+        "perf-release-300-500-bench-43",
+        "perf-release-300-500-bench-44",
+        "perf-release-300-500-bench-45",
+        "perf-release-300-500-bench-46",
+        "perf-release-300-500-bench-47",
+        "perf-release-300-500-bench-48",
+        "perf-release-300-500-bench-49",
+        "perf-release-300-500-bench-5",
+        "perf-release-300-500-bench-6",
+        "perf-release-300-500-bench-7",
+        "perf-release-300-500-bench-8",
+        "perf-release-300-500-bench-9"
+      ]
+    },
+    {
+      "round": 1,
+      "mode": "hit",
+      "ms": [
+        8,
+        7.899999999999864,
+        8.100000000000136,
+        7.899999999999864,
+        8,
+        8,
+        8.100000000000136,
+        8,
+        7.899999999999864,
+        8.100000000000136,
+        7.899999999999864,
+        7.2999999999999545,
+        7.7000000000000455,
+        8,
+        8,
+        7.900000000000091,
+        8.099999999999909,
+        8,
+        8.100000000000136,
+        7.899999999999864,
+        8,
+        7.900000000000091,
+        8.200000000000045,
+        7.7999999999999545,
+        8.200000000000045,
+        7.7999999999999545,
+        8,
+        8,
+        8,
+        8,
+        8,
+        8,
+        8,
+        8.099999999999909,
+        8,
+        7.900000000000091,
+        8,
+        7.999999999999773,
+        8,
+        8,
+        8,
+        8,
+        8,
+        9,
+        8,
+        8.100000000000364,
+        7.899999999999636,
+        8,
+        8,
+        8,
+        8,
+        8,
+        8,
+        8,
+        8,
+        8,
+        8,
+        7.700000000000273,
+        7.900000000000091,
+        8,
+        8.099999999999909,
+        8,
+        8,
+        8,
+        8,
+        8,
+        8,
+        7.900000000000091,
+        8.099999999999909,
+        7.900000000000091,
+        8,
+        8,
+        8
+      ],
+      "phase": {
+        "start": 1752.4,
+        "events": [
+          {
+            "type": "pointerdown",
+            "t": 1756.5
+          },
+          {
+            "type": "pointermove",
+            "t": 1769.3999999761581
+          },
+          {
+            "type": "pointermove",
+            "t": 1777.7999999821186
+          },
+          {
+            "type": "pointermove",
+            "t": 1793.5
+          },
+          {
+            "type": "pointermove",
+            "t": 1804
+          },
+          {
+            "type": "pointermove",
+            "t": 1825.699999988079
+          },
+          {
+            "type": "pointermove",
+            "t": 1841.3999999761581
+          },
+          {
+            "type": "pointermove",
+            "t": 1856.5999999940395
+          },
+          {
+            "type": "pointermove",
+            "t": 1872.699999988079
+          },
+          {
+            "type": "pointermove",
+            "t": 1887.8999999761581
+          },
+          {
+            "type": "pointermove",
+            "t": 1905.0999999940395
+          },
+          {
+            "type": "pointermove",
+            "t": 1912
+          },
+          {
+            "type": "pointermove",
+            "t": 1920.0999999940395
+          },
+          {
+            "type": "pointermove",
+            "t": 1928.0999999940395
+          },
+          {
+            "type": "pointermove",
+            "t": 1936.3999999761581
+          },
+          {
+            "type": "pointermove",
+            "t": 1944.199999988079
+          },
+          {
+            "type": "pointermove",
+            "t": 1952.5
+          },
+          {
+            "type": "pointermove",
+            "t": 1960.199999988079
+          },
+          {
+            "type": "pointermove",
+            "t": 1976.5999999940395
+          },
+          {
+            "type": "pointermove",
+            "t": 1992.5999999940395
+          },
+          {
+            "type": "pointermove",
+            "t": 2008
+          },
+          {
+            "type": "pointermove",
+            "t": 2016.3999999761581
+          },
+          {
+            "type": "pointermove",
+            "t": 2024.0999999940395
+          },
+          {
+            "type": "pointermove",
+            "t": 2040.0999999940395
+          },
+          {
+            "type": "pointermove",
+            "t": 2048
+          },
+          {
+            "type": "pointermove",
+            "t": 2063.899999976158
+          },
+          {
+            "type": "pointermove",
+            "t": 2072.2999999821186
+          },
+          {
+            "type": "pointermove",
+            "t": 2087.7999999821186
+          },
+          {
+            "type": "pointermove",
+            "t": 2096.2999999821186
+          },
+          {
+            "type": "pointermove",
+            "t": 2105.0999999940395
+          },
+          {
+            "type": "pointermove",
+            "t": 2113.699999988079
+          },
+          {
+            "type": "pointermove",
+            "t": 2129.0999999940395
+          },
+          {
+            "type": "pointermove",
+            "t": 2145
+          },
+          {
+            "type": "pointermove",
+            "t": 2161.0999999940395
+          },
+          {
+            "type": "pointermove",
+            "t": 2177.199999988079
+          },
+          {
+            "type": "pointermove",
+            "t": 2185
+          },
+          {
+            "type": "pointermove",
+            "t": 2192.899999976158
+          },
+          {
+            "type": "pointermove",
+            "t": 2201.0999999940395
+          },
+          {
+            "type": "pointermove",
+            "t": 2209
+          },
+          {
+            "type": "pointermove",
+            "t": 2217
+          },
+          {
+            "type": "pointermove",
+            "t": 2232.5999999940395
+          },
+          {
+            "type": "pointermove",
+            "t": 2240.899999976158
+          },
+          {
+            "type": "pointermove",
+            "t": 2249
+          },
+          {
+            "type": "pointermove",
+            "t": 2264.7999999821186
+          },
+          {
+            "type": "pointermove",
+            "t": 2272.7999999821186
+          },
+          {
+            "type": "pointermove",
+            "t": 2280.7999999821186
+          },
+          {
+            "type": "pointermove",
+            "t": 2289.0999999940395
+          },
+          {
+            "type": "pointermove",
+            "t": 2296.699999988079
+          },
+          {
+            "type": "pointermove",
+            "t": 2304.699999988079
+          },
+          {
+            "type": "pointerup",
+            "t": 2316.699999988079
+          }
+        ]
+      },
+      "p95": 8.100000000000364,
+      "max": 9,
+      "remaining": []
+    },
+    {
+      "round": 2,
+      "mode": "miss",
+      "ms": [
+        8,
+        8,
+        8,
+        7.799999999999727,
+        8.100000000000364,
+        8,
+        8,
+        8,
+        7.899999999999636,
+        8.100000000000364,
+        8,
+        8,
+        7.399999999999636,
+        8.5,
+        8,
+        7.900000000000091,
+        8,
+        8,
+        8,
+        8,
+        8,
+        8,
+        8.099999999999909,
+        8.100000000000364,
+        7.899999999999636,
+        8,
+        7.900000000000091,
+        8,
+        8,
+        8,
+        8,
+        8,
+        8,
+        8.099999999999909,
+        7.900000000000091,
+        8.099999999999909,
+        7.700000000000273,
+        8,
+        8,
+        8,
+        7.099999999999909,
+        8,
+        8,
+        7.699999999999818,
+        8,
+        8,
+        8,
+        8,
+        8,
+        8,
+        8,
+        8,
+        8,
+        8,
+        8,
+        8,
+        8,
+        8,
+        8
+      ],
+      "phase": {
+        "start": 3141.9,
+        "events": [
+          {
+            "type": "pointerdown",
+            "t": 3146.2999999821186
+          },
+          {
+            "type": "pointermove",
+            "t": 3158.699999988079
+          },
+          {
+            "type": "pointermove",
+            "t": 3166.7999999821186
+          },
+          {
+            "type": "pointermove",
+            "t": 3174.5999999940395
+          },
+          {
+            "type": "pointermove",
+            "t": 3182.5999999940395
+          },
+          {
+            "type": "pointermove",
+            "t": 3190.699999988079
+          },
+          {
+            "type": "pointermove",
+            "t": 3198.699999988079
+          },
+          {
+            "type": "pointermove",
+            "t": 3206.5
+          },
+          {
+            "type": "pointermove",
+            "t": 3214.699999988079
+          },
+          {
+            "type": "pointermove",
+            "t": 3222.5
+          },
+          {
+            "type": "pointermove",
+            "t": 3230.2999999821186
+          },
+          {
+            "type": "pointermove",
+            "t": 3238.5999999940395
+          },
+          {
+            "type": "pointermove",
+            "t": 3246
+          },
+          {
+            "type": "pointermove",
+            "t": 3254.5999999940395
+          },
+          {
+            "type": "pointermove",
+            "t": 3262.399999976158
+          },
+          {
+            "type": "pointermove",
+            "t": 3270.5999999940395
+          },
+          {
+            "type": "pointermove",
+            "t": 3278.5999999940395
+          },
+          {
+            "type": "pointermove",
+            "t": 3286.199999988079
+          },
+          {
+            "type": "pointermove",
+            "t": 3294.199999988079
+          },
+          {
+            "type": "pointermove",
+            "t": 3302.5
+          },
+          {
+            "type": "pointermove",
+            "t": 3310.199999988079
+          },
+          {
+            "type": "pointermove",
+            "t": 3318.399999976158
+          },
+          {
+            "type": "pointermove",
+            "t": 3326.199999988079
+          },
+          {
+            "type": "pointermove",
+            "t": 3334.5999999940395
+          },
+          {
+            "type": "pointermove",
+            "t": 3342.2999999821186
+          },
+          {
+            "type": "pointermove",
+            "t": 3350.399999976158
+          },
+          {
+            "type": "pointermove",
+            "t": 3358.199999988079
+          },
+          {
+            "type": "pointermove",
+            "t": 3366.399999976158
+          },
+          {
+            "type": "pointermove",
+            "t": 3374.2999999821186
+          },
+          {
+            "type": "pointermove",
+            "t": 3390.5
+          },
+          {
+            "type": "pointermove",
+            "t": 3398.2999999821186
+          },
+          {
+            "type": "pointermove",
+            "t": 3414.5999999940395
+          },
+          {
+            "type": "pointermove",
+            "t": 3422.5999999940395
+          },
+          {
+            "type": "pointermove",
+            "t": 3430.5999999940395
+          },
+          {
+            "type": "pointermove",
+            "t": 3438
+          },
+          {
+            "type": "pointermove",
+            "t": 3454
+          },
+          {
+            "type": "pointermove",
+            "t": 3462
+          },
+          {
+            "type": "pointermove",
+            "t": 3469
+          },
+          {
+            "type": "pointermove",
+            "t": 3485.0999999940395
+          },
+          {
+            "type": "pointermove",
+            "t": 3525.0999999940395
+          },
+          {
+            "type": "pointermove",
+            "t": 3532.5999999940395
+          },
+          {
+            "type": "pointermove",
+            "t": 3541
+          },
+          {
+            "type": "pointermove",
+            "t": 3548.5999999940395
+          },
+          {
+            "type": "pointermove",
+            "t": 3556.699999988079
+          },
+          {
+            "type": "pointermove",
+            "t": 3564.699999988079
+          },
+          {
+            "type": "pointermove",
+            "t": 3572.5999999940395
+          },
+          {
+            "type": "pointermove",
+            "t": 3581
+          },
+          {
+            "type": "pointermove",
+            "t": 3588.899999976158
+          },
+          {
+            "type": "pointermove",
+            "t": 3596.5999999940395
+          },
+          {
+            "type": "pointerup",
+            "t": 3602
+          }
+        ]
+      },
+      "p95": 8.100000000000364,
+      "max": 8.5,
+      "remaining": [
+        "perf-release-300-500-bench-0",
+        "perf-release-300-500-bench-1",
+        "perf-release-300-500-bench-10",
+        "perf-release-300-500-bench-11",
+        "perf-release-300-500-bench-12",
+        "perf-release-300-500-bench-13",
+        "perf-release-300-500-bench-14",
+        "perf-release-300-500-bench-15",
+        "perf-release-300-500-bench-16",
+        "perf-release-300-500-bench-17",
+        "perf-release-300-500-bench-18",
+        "perf-release-300-500-bench-19",
+        "perf-release-300-500-bench-2",
+        "perf-release-300-500-bench-20",
+        "perf-release-300-500-bench-21",
+        "perf-release-300-500-bench-22",
+        "perf-release-300-500-bench-23",
+        "perf-release-300-500-bench-24",
+        "perf-release-300-500-bench-25",
+        "perf-release-300-500-bench-26",
+        "perf-release-300-500-bench-27",
+        "perf-release-300-500-bench-28",
+        "perf-release-300-500-bench-29",
+        "perf-release-300-500-bench-3",
+        "perf-release-300-500-bench-30",
+        "perf-release-300-500-bench-31",
+        "perf-release-300-500-bench-32",
+        "perf-release-300-500-bench-33",
+        "perf-release-300-500-bench-34",
+        "perf-release-300-500-bench-35",
+        "perf-release-300-500-bench-36",
+        "perf-release-300-500-bench-37",
+        "perf-release-300-500-bench-38",
+        "perf-release-300-500-bench-39",
+        "perf-release-300-500-bench-4",
+        "perf-release-300-500-bench-40",
+        "perf-release-300-500-bench-41",
+        "perf-release-300-500-bench-42",
+        "perf-release-300-500-bench-43",
+        "perf-release-300-500-bench-44",
+        "perf-release-300-500-bench-45",
+        "perf-release-300-500-bench-46",
+        "perf-release-300-500-bench-47",
+        "perf-release-300-500-bench-48",
+        "perf-release-300-500-bench-49",
+        "perf-release-300-500-bench-5",
+        "perf-release-300-500-bench-6",
+        "perf-release-300-500-bench-7",
+        "perf-release-300-500-bench-8",
+        "perf-release-300-500-bench-9"
+      ]
+    },
+    {
+      "round": 2,
+      "mode": "hit",
+      "ms": [
+        8,
+        8,
+        8,
+        8,
+        8.099999999999909,
+        7.900000000000091,
+        8.099999999999909,
+        7.900000000000091,
+        8,
+        8,
+        8,
+        8,
+        8,
+        8,
+        8,
+        8.100000000000364,
+        7.899999999999636,
+        8,
+        8.100000000000364,
+        7.899999999999636,
+        8,
+        8,
+        8.100000000000364,
+        8.099999999999454,
+        7.900000000000546,
+        8.099999999999454,
+        7.199999999999818,
+        8.100000000000364,
+        8,
+        8.100000000000364,
+        7.699999999999818,
+        8,
+        8.099999999999454,
+        7.700000000000728,
+        7.699999999999818,
+        7.899999999999636,
+        8,
+        8,
+        8.100000000000364,
+        7.899999999999636,
+        8,
+        8,
+        8,
+        8,
+        8.100000000000364,
+        8,
+        8,
+        7.399999999999636,
+        7.900000000000546,
+        8.099999999999454,
+        7.900000000000546,
+        8,
+        8.099999999999454,
+        8,
+        8,
+        7.900000000000546,
+        8.199999999999818,
+        7.899999999999636,
+        8.100000000000364,
+        8,
+        8,
+        8.099999999999454,
+        8,
+        8.100000000000364,
+        7.899999999999636
+      ],
+      "phase": {
+        "start": 3970.5,
+        "events": [
+          {
+            "type": "pointerdown",
+            "t": 3974.5999999940395
+          },
+          {
+            "type": "pointermove",
+            "t": 3979.699999988079
+          },
+          {
+            "type": "pointermove",
+            "t": 3987.5
+          },
+          {
+            "type": "pointermove",
+            "t": 3995.899999976158
+          },
+          {
+            "type": "pointermove",
+            "t": 4019.899999976158
+          },
+          {
+            "type": "pointermove",
+            "t": 4027.5999999940395
+          },
+          {
+            "type": "pointermove",
+            "t": 4043.399999976158
+          },
+          {
+            "type": "pointermove",
+            "t": 4051.2999999821186
+          },
+          {
+            "type": "pointermove",
+            "t": 4059.5
+          },
+          {
+            "type": "pointermove",
+            "t": 4067.399999976158
+          },
+          {
+            "type": "pointermove",
+            "t": 4083.7999999821186
+          },
+          {
+            "type": "pointermove",
+            "t": 4091.2999999821186
+          },
+          {
+            "type": "pointermove",
+            "t": 4099.699999988079
+          },
+          {
+            "type": "pointermove",
+            "t": 4107.399999976158
+          },
+          {
+            "type": "pointermove",
+            "t": 4115.5
+          },
+          {
+            "type": "pointermove",
+            "t": 4123.799999982119
+          },
+          {
+            "type": "pointermove",
+            "t": 4131.699999988079
+          },
+          {
+            "type": "pointermove",
+            "t": 4139.699999988079
+          },
+          {
+            "type": "pointermove",
+            "t": 4155.899999976158
+          },
+          {
+            "type": "pointermove",
+            "t": 4171.899999976158
+          },
+          {
+            "type": "pointermove",
+            "t": 4179.5
+          },
+          {
+            "type": "pointermove",
+            "t": 4195.199999988079
+          },
+          {
+            "type": "pointermove",
+            "t": 4202.899999976158
+          },
+          {
+            "type": "pointermove",
+            "t": 4211.299999982119
+          },
+          {
+            "type": "pointermove",
+            "t": 4218.699999988079
+          },
+          {
+            "type": "pointermove",
+            "t": 4226.899999976158
+          },
+          {
+            "type": "pointermove",
+            "t": 4242.799999982119
+          },
+          {
+            "type": "pointermove",
+            "t": 4250.0999999940395
+          },
+          {
+            "type": "pointermove",
+            "t": 4258.799999982119
+          },
+          {
+            "type": "pointermove",
+            "t": 4266.199999988079
+          },
+          {
+            "type": "pointermove",
+            "t": 4282.5
+          },
+          {
+            "type": "pointermove",
+            "t": 4298.5999999940395
+          },
+          {
+            "type": "pointermove",
+            "t": 4314.299999982119
+          },
+          {
+            "type": "pointermove",
+            "t": 4322.5
+          },
+          {
+            "type": "pointermove",
+            "t": 4330.399999976158
+          },
+          {
+            "type": "pointermove",
+            "t": 4338.0999999940395
+          },
+          {
+            "type": "pointermove",
+            "t": 4346.199999988079
+          },
+          {
+            "type": "pointermove",
+            "t": 4353.5
+          },
+          {
+            "type": "pointermove",
+            "t": 4361.5
+          },
+          {
+            "type": "pointermove",
+            "t": 4369.799999982119
+          },
+          {
+            "type": "pointermove",
+            "t": 4385.799999982119
+          },
+          {
+            "type": "pointermove",
+            "t": 4393.899999976158
+          },
+          {
+            "type": "pointermove",
+            "t": 4401.5999999940395
+          },
+          {
+            "type": "pointermove",
+            "t": 4409.5
+          },
+          {
+            "type": "pointermove",
+            "t": 4417.699999988079
+          },
+          {
+            "type": "pointermove",
+            "t": 4426
+          },
+          {
+            "type": "pointermove",
+            "t": 4442.199999988079
+          },
+          {
+            "type": "pointermove",
+            "t": 4449.799999982119
+          },
+          {
+            "type": "pointermove",
+            "t": 4466.399999976158
+          },
+          {
+            "type": "pointerup",
+            "t": 4477.0999999940395
+          }
+        ]
+      },
+      "p95": 8.100000000000364,
+      "max": 8.199999999999818,
+      "remaining": []
+    },
+    {
+      "round": 3,
+      "mode": "miss",
+      "ms": [
+        7.900000000000546,
+        8.099999999999454,
+        8,
+        8,
+        7.900000000000546,
+        8.099999999999454,
+        8,
+        8.100000000000364,
+        8,
+        8,
+        8.099999999999454,
+        8,
+        7.900000000000546,
+        7.800000000000182,
+        7.899999999999636,
+        7.399999999999636,
+        8,
+        7.900000000000546,
+        8.099999999999454,
+        7.300000000000182,
+        7.199999999999818,
+        8,
+        8,
+        8.100000000000364,
+        7.899999999999636,
+        8,
+        8.100000000000364,
+        7.899999999999636,
+        8.100000000000364,
+        8,
+        8,
+        1.199999999999818,
+        7.800000000000182,
+        7.899999999999636,
+        8.100000000000364,
+        8,
+        8.100000000000364,
+        7.899999999999636,
+        8,
+        8.100000000000364,
+        7.899999999999636,
+        8.199999999999818,
+        7.300000000000182,
+        8,
+        8,
+        8,
+        8.100000000000364,
+        8,
+        8,
+        8.099999999999454,
+        7.900000000000546,
+        8,
+        8,
+        8
+      ],
+      "phase": {
+        "start": 5317.2,
+        "events": [
+          {
+            "type": "pointerdown",
+            "t": 5321.299999982119
+          },
+          {
+            "type": "pointermove",
+            "t": 5334.0999999940395
+          },
+          {
+            "type": "pointermove",
+            "t": 5342
+          },
+          {
+            "type": "pointermove",
+            "t": 5350.0999999940395
+          },
+          {
+            "type": "pointermove",
+            "t": 5358.0999999940395
+          },
+          {
+            "type": "pointermove",
+            "t": 5366.0999999940395
+          },
+          {
+            "type": "pointermove",
+            "t": 5374
+          },
+          {
+            "type": "pointermove",
+            "t": 5382.0999999940395
+          },
+          {
+            "type": "pointermove",
+            "t": 5390.299999982119
+          },
+          {
+            "type": "pointermove",
+            "t": 5398.199999988079
+          },
+          {
+            "type": "pointermove",
+            "t": 5406.0999999940395
+          },
+          {
+            "type": "pointermove",
+            "t": 5414.0999999940395
+          },
+          {
+            "type": "pointermove",
+            "t": 5422.199999988079
+          },
+          {
+            "type": "pointermove",
+            "t": 5429.799999982119
+          },
+          {
+            "type": "pointermove",
+            "t": 5437.799999982119
+          },
+          {
+            "type": "pointermove",
+            "t": 5453.0999999940395
+          },
+          {
+            "type": "pointermove",
+            "t": 5461
+          },
+          {
+            "type": "pointermove",
+            "t": 5469
+          },
+          {
+            "type": "pointermove",
+            "t": 5476.5999999940395
+          },
+          {
+            "type": "pointermove",
+            "t": 5483.699999988079
+          },
+          {
+            "type": "pointermove",
+            "t": 5491.699999988079
+          },
+          {
+            "type": "pointermove",
+            "t": 5499.5999999940395
+          },
+          {
+            "type": "pointermove",
+            "t": 5507.5999999940395
+          },
+          {
+            "type": "pointermove",
+            "t": 5515.5999999940395
+          },
+          {
+            "type": "pointermove",
+            "t": 5523.5999999940395
+          },
+          {
+            "type": "pointermove",
+            "t": 5531.699999988079
+          },
+          {
+            "type": "pointermove",
+            "t": 5539.5999999940395
+          },
+          {
+            "type": "pointermove",
+            "t": 5547.699999988079
+          },
+          {
+            "type": "pointermove",
+            "t": 5555.5999999940395
+          },
+          {
+            "type": "pointermove",
+            "t": 5563.5999999940395
+          },
+          {
+            "type": "pointermove",
+            "t": 5572.5999999940395
+          },
+          {
+            "type": "pointermove",
+            "t": 5580.5999999940395
+          },
+          {
+            "type": "pointermove",
+            "t": 5596.799999982119
+          },
+          {
+            "type": "pointermove",
+            "t": 5605.0999999940395
+          },
+          {
+            "type": "pointermove",
+            "t": 5612.5999999940395
+          },
+          {
+            "type": "pointermove",
+            "t": 5620.5999999940395
+          },
+          {
+            "type": "pointermove",
+            "t": 5628.5999999940395
+          },
+          {
+            "type": "pointermove",
+            "t": 5636.5
+          },
+          {
+            "type": "pointermove",
+            "t": 5644.699999988079
+          },
+          {
+            "type": "pointermove",
+            "t": 5652.0999999940395
+          },
+          {
+            "type": "pointermove",
+            "t": 5660
+          },
+          {
+            "type": "pointermove",
+            "t": 5668.399999976158
+          },
+          {
+            "type": "pointermove",
+            "t": 5676.0999999940395
+          },
+          {
+            "type": "pointermove",
+            "t": 5684.199999988079
+          },
+          {
+            "type": "pointermove",
+            "t": 5692.0999999940395
+          },
+          {
+            "type": "pointermove",
+            "t": 5700.0999999940395
+          },
+          {
+            "type": "pointermove",
+            "t": 5708.699999988079
+          },
+          {
+            "type": "pointermove",
+            "t": 5716.299999982119
+          },
+          {
+            "type": "pointermove",
+            "t": 5724.199999988079
+          },
+          {
+            "type": "pointerup",
+            "t": 5728.5999999940395
+          }
+        ]
+      },
+      "p95": 8.100000000000364,
+      "max": 8.199999999999818,
+      "remaining": [
+        "perf-release-300-500-bench-0",
+        "perf-release-300-500-bench-1",
+        "perf-release-300-500-bench-10",
+        "perf-release-300-500-bench-11",
+        "perf-release-300-500-bench-12",
+        "perf-release-300-500-bench-13",
+        "perf-release-300-500-bench-14",
+        "perf-release-300-500-bench-15",
+        "perf-release-300-500-bench-16",
+        "perf-release-300-500-bench-17",
+        "perf-release-300-500-bench-18",
+        "perf-release-300-500-bench-19",
+        "perf-release-300-500-bench-2",
+        "perf-release-300-500-bench-20",
+        "perf-release-300-500-bench-21",
+        "perf-release-300-500-bench-22",
+        "perf-release-300-500-bench-23",
+        "perf-release-300-500-bench-24",
+        "perf-release-300-500-bench-25",
+        "perf-release-300-500-bench-26",
+        "perf-release-300-500-bench-27",
+        "perf-release-300-500-bench-28",
+        "perf-release-300-500-bench-29",
+        "perf-release-300-500-bench-3",
+        "perf-release-300-500-bench-30",
+        "perf-release-300-500-bench-31",
+        "perf-release-300-500-bench-32",
+        "perf-release-300-500-bench-33",
+        "perf-release-300-500-bench-34",
+        "perf-release-300-500-bench-35",
+        "perf-release-300-500-bench-36",
+        "perf-release-300-500-bench-37",
+        "perf-release-300-500-bench-38",
+        "perf-release-300-500-bench-39",
+        "perf-release-300-500-bench-4",
+        "perf-release-300-500-bench-40",
+        "perf-release-300-500-bench-41",
+        "perf-release-300-500-bench-42",
+        "perf-release-300-500-bench-43",
+        "perf-release-300-500-bench-44",
+        "perf-release-300-500-bench-45",
+        "perf-release-300-500-bench-46",
+        "perf-release-300-500-bench-47",
+        "perf-release-300-500-bench-48",
+        "perf-release-300-500-bench-49",
+        "perf-release-300-500-bench-5",
+        "perf-release-300-500-bench-6",
+        "perf-release-300-500-bench-7",
+        "perf-release-300-500-bench-8",
+        "perf-release-300-500-bench-9"
+      ]
+    },
+    {
+      "round": 3,
+      "mode": "hit",
+      "ms": [
+        8.099999999999454,
+        7.900000000000546,
+        7.899999999999636,
+        7.600000000000364,
+        8.099999999999454,
+        7.900000000000546,
+        8.099999999999454,
+        7.400000000000546,
+        8,
+        7.699999999999818,
+        8.100000000000364,
+        8,
+        7.899999999999636,
+        7.800000000000182,
+        7.800000000000182,
+        7.899999999999636,
+        8.100000000000364,
+        8,
+        7.899999999999636,
+        8,
+        8,
+        8,
+        8,
+        8,
+        8,
+        8.100000000000364,
+        8,
+        7.5,
+        8,
+        8,
+        8,
+        8,
+        8,
+        8,
+        8,
+        8,
+        8,
+        8,
+        8,
+        8.099999999999454,
+        7.900000000000546,
+        7.699999999999818,
+        8,
+        8,
+        7.199999999999818,
+        8,
+        8,
+        7.899999999999636,
+        8,
+        8.100000000000364,
+        8,
+        8,
+        8,
+        7.899999999999636,
+        8.100000000000364,
+        8,
+        7.899999999999636,
+        8,
+        8.100000000000364,
+        8,
+        7.899999999999636,
+        8.100000000000364,
+        8,
+        7.899999999999636,
+        7.300000000000182,
+        8,
+        8,
+        8,
+        8
+      ],
+      "phase": {
+        "start": 6121.8,
+        "events": [
+          {
+            "type": "pointerdown",
+            "t": 6126.899999976158
+          },
+          {
+            "type": "pointermove",
+            "t": 6139
+          },
+          {
+            "type": "pointermove",
+            "t": 6147.0999999940395
+          },
+          {
+            "type": "pointermove",
+            "t": 6154.0999999940395
+          },
+          {
+            "type": "pointermove",
+            "t": 6162.699999988079
+          },
+          {
+            "type": "pointermove",
+            "t": 6178.399999976158
+          },
+          {
+            "type": "pointermove",
+            "t": 6185.699999988079
+          },
+          {
+            "type": "pointermove",
+            "t": 6193.699999988079
+          },
+          {
+            "type": "pointermove",
+            "t": 6201.399999976158
+          },
+          {
+            "type": "pointermove",
+            "t": 6209.5
+          },
+          {
+            "type": "pointermove",
+            "t": 6217.399999976158
+          },
+          {
+            "type": "pointermove",
+            "t": 6225.299999982119
+          },
+          {
+            "type": "pointermove",
+            "t": 6233.0999999940395
+          },
+          {
+            "type": "pointermove",
+            "t": 6240.799999982119
+          },
+          {
+            "type": "pointermove",
+            "t": 6248.699999988079
+          },
+          {
+            "type": "pointermove",
+            "t": 6257.399999976158
+          },
+          {
+            "type": "pointermove",
+            "t": 6265.699999988079
+          },
+          {
+            "type": "pointermove",
+            "t": 6281.399999976158
+          },
+          {
+            "type": "pointermove",
+            "t": 6297.0999999940395
+          },
+          {
+            "type": "pointermove",
+            "t": 6313.0999999940395
+          },
+          {
+            "type": "pointermove",
+            "t": 6329.0999999940395
+          },
+          {
+            "type": "pointermove",
+            "t": 6344.799999982119
+          },
+          {
+            "type": "pointermove",
+            "t": 6352.5
+          },
+          {
+            "type": "pointermove",
+            "t": 6360.699999988079
+          },
+          {
+            "type": "pointermove",
+            "t": 6368.399999976158
+          },
+          {
+            "type": "pointermove",
+            "t": 6384.5999999940395
+          },
+          {
+            "type": "pointermove",
+            "t": 6393.0999999940395
+          },
+          {
+            "type": "pointermove",
+            "t": 6400.5
+          },
+          {
+            "type": "pointermove",
+            "t": 6408.899999976158
+          },
+          {
+            "type": "pointermove",
+            "t": 6416.799999982119
+          },
+          {
+            "type": "pointermove",
+            "t": 6433.0999999940395
+          },
+          {
+            "type": "pointermove",
+            "t": 6456.699999988079
+          },
+          {
+            "type": "pointermove",
+            "t": 6472.5999999940395
+          },
+          {
+            "type": "pointermove",
+            "t": 6496
+          },
+          {
+            "type": "pointermove",
+            "t": 6511.5999999940395
+          },
+          {
+            "type": "pointermove",
+            "t": 6519.199999988079
+          },
+          {
+            "type": "pointermove",
+            "t": 6527.299999982119
+          },
+          {
+            "type": "pointermove",
+            "t": 6535.199999988079
+          },
+          {
+            "type": "pointermove",
+            "t": 6543.199999988079
+          },
+          {
+            "type": "pointermove",
+            "t": 6551.399999976158
+          },
+          {
+            "type": "pointermove",
+            "t": 6559.5
+          },
+          {
+            "type": "pointermove",
+            "t": 6575.5
+          },
+          {
+            "type": "pointermove",
+            "t": 6583
+          },
+          {
+            "type": "pointermove",
+            "t": 6591.399999976158
+          },
+          {
+            "type": "pointermove",
+            "t": 6599.699999988079
+          },
+          {
+            "type": "pointermove",
+            "t": 6615.699999988079
+          },
+          {
+            "type": "pointermove",
+            "t": 6623.5
+          },
+          {
+            "type": "pointermove",
+            "t": 6631.5
+          },
+          {
+            "type": "pointermove",
+            "t": 6646.799999982119
+          },
+          {
+            "type": "pointerup",
+            "t": 6655.799999982119
+          }
+        ]
+      },
+      "p95": 8.100000000000364,
+      "max": 8.100000000000364,
+      "remaining": []
+    }
+  ],
+  "productActivations": 0,
+  "productStroke": {
+    "picked": "perf-release-300-500-bench-7",
+    "active": 0,
+    "cut": 28,
+    "restored": 50,
+    "deleteTest": "covered by dense fixtures"
+  }
+}
