@@ -70,8 +70,14 @@ export function createSharedCredentials(): CredentialPort {
     },
 
     async load(ref) {
-      const stored = await sharedKvGet<StoredCredential>(REF_PREFIX + ref)
+      const stored = await sharedKvGet<StoredCredential | { v: 2; dpapi: string }>(REF_PREFIX + ref)
       if (!stored) return null
+      if ('dpapi' in stored) {
+        if (stored.v === 2 && typeof stored.dpapi === 'string') {
+          throw new Error('这个 Key 由桌面应用保存，只能在桌面应用中使用。请打开轻画桌面版后重试。')
+        }
+        throw new Error('无法识别凭据格式。')
+      }
       const key = await deriveKey()
       const plain = await subtle!.decrypt(
         { name: 'AES-GCM', iv: decode(stored.iv) as BufferSource },
