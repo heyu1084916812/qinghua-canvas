@@ -264,6 +264,7 @@ const workflowSources = useWorkflowPanelSources()
        */}
       {panelModel.emotion ? (
         <EmotionPanel
+          key={selectedNode.id}
           model={panelModel}
           data={selectedNode.data as GenerationData}
           running={running}
@@ -272,6 +273,8 @@ const workflowSources = useWorkflowPanelSources()
         />
       ) : (
       <CreationPanel
+        /* 按节点 id 重挂载：切换节点时入场动画才会重新播（同一个 DOM 复用会"没有动画"） */
+        key={selectedNode.id}
         nodeId={selectedNode.id}
         data={selectedNode.data as GenerationData}
         model={panelModel}

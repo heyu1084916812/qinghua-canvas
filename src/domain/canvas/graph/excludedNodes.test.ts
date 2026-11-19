@@ -38,11 +38,16 @@ describe('excludedNodeIds · 画布「未参与」集合（#1160）', () => {
   })
 
   /**
-   * 用户 2026-11-19 看图一后定稿：自家素材隐藏 **不等于** 节点未参与 ——
-   * 节点照常跑、照常出图，标成「未参与」会让人以为它没参与本次生成。
+   * 用户 2026-11-19 最终口径：自家缩略图被关掉，节点**也要**跟着置灰
+   * （面板眼睛闭上、画布上那张图必须一起灰；再把眼睛打开要立刻恢复）。
    */
-  it('★ 生成节点隐藏自家素材 ≠ 节点未参与（不许置灰）', () => {
+  it('★★ 生成节点隐藏自家素材 → 该节点进「未参与」集合', () => {
     const g = graph([node({ id: 'gen', type: 'generation', data: { hiddenIds: ['gen'] } as never })])
+    expect([...excludedNodeIds(g)]).toEqual(['gen'])
+  })
+
+  it('★ 取消隐藏（hiddenIds 清空）后立刻不在集合里', () => {
+    const g = graph([node({ id: 'gen', type: 'generation', data: { hiddenIds: [] } as never })])
     expect(excludedNodeIds(g).size).toBe(0)
   })
 

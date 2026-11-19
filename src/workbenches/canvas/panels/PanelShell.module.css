@@ -15,7 +15,13 @@
    * （`_menuInkIn_xxx`），而全局 `tokens.css` 里的那份叫 `menuInkIn` —— 对不上就**静默不播**
    * （本轮实测：`animationName` 有值、`getAnimations()` 为空）。这与"菜单很生硬"是同一根因。
    */
-  animation: menuInkIn var(--dur-panel) var(--ease-panel);
+  /*
+   * 入场（#1161 第三轮，用户："稍微小一点点到正常大小 + 渐显，从节点出发那种"）：
+   * 锚点放在**顶边中点**（面板挂在节点下方），缩放时看起来是从节点"长出来"。
+   * 只动 scale + opacity —— 面板位置由 JS 用 left/top 给的，别再叠 translate。
+   */
+  animation: panelRise var(--dur-panel) var(--ease-panel);
+  transform-origin: top center;
   /*
    * 面板整体缩到一半（用户 2026-09-16）：宽 840 → 420，内部字号与间距
    * 不动 token 全局值（那是全应用共享的），面板内用 `zoom` 做等比缩放。
@@ -159,5 +165,17 @@
     opacity: 1;
     filter: blur(0);
     transform: translateY(0) scale(1);
+  }
+}
+
+/* 创作 / 情绪面板入场（#1161）：从节点方向"长出来" —— 小 4% + 渐显，锚点在顶边中点 */
+@keyframes panelRise {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
   }
 }

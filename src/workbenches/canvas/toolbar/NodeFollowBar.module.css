@@ -21,6 +21,8 @@
    * `menuInkIn`（带位移）。
    */
   animation: barFadeIn var(--dur-panel) var(--ease-out);
+  /* 从节点方向长出来（#1161）：锚点在底边中点（栏在节点上方）；只缩不放位移，避免和跟随 left/top 打架 */
+  transform-origin: bottom center;
   display: flex;
   align-items: center;
   gap: 6px;

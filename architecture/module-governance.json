@@ -442,7 +442,7 @@
       "test": [
         "scripts/smoke.mjs#G795"
       ],
-      "budget": 1040
+      "budget": 1060
     },
     {
       "module": "src/workbenches/canvas/panels/CreationPanel.module.css",

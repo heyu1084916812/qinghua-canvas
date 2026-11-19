@@ -71,7 +71,15 @@
    * 外框与图标按 `em` 放大。写死 px 的话，同一个组件在对话窗里会变成巨块。
    */
   height: 1.72em;
-  padding: 0 3px;
+  /**
+   * 内距按"缩略图到边框"对齐（用户 2026-11-19 第四轮：左边距很大、上下很小）。
+   *
+   * 旧值是 `0 3px`：水平方向贴着 3px，竖直方向却由 `align-items:center` 让 0.9em 高的
+   * 缩略图上下各留 ~0.4em —— 同一个小方块左右与上下的留白差一倍，看着就"偏"。
+   * 现在改成：缩略图 1.34em 高（两侧各剩 ~0.19em ≈ 4px@20px），左内距也取 4px，
+   * 右侧留给文字 8px。这样左/上/下三边视觉一致，右边多一点让文字不贴线。
+   */
+  padding: 0 8px 0 4px;
   margin: 0 1px;
   border: 1px solid var(--stroke);
   border-radius: 6px;
@@ -113,9 +121,9 @@
 .chipThumb {
   display: none;
   flex: 0 0 auto;
-  width: 1.25em;
-  height: 0.9em;
-  border-radius: 2px;
+  width: 1.34em;
+  height: 1.34em;
+  border-radius: 3px;
   overflow: hidden;
 }
 .chip[data-has-thumb='true'] .chipThumb {

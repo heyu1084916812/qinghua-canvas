@@ -137,12 +137,18 @@
  * 见 MultiSelectBar.tsx，这里不再写死。
  */
 
-/* 多选栏入场（#1161）：只淡入，保留 `.bar` 自己的 `translateX(-50%)`。 */
+/*
+ * 多选栏入场（#1161）：小 4% + 渐显。
+ * ⚠️ `.bar` 自己靠 `translateX(-50%)` 居中，所以关键帧里**必须把这段平移带上** ——
+ * 否则动画一播就把居中覆盖掉，播完再跳回去（用户报的"弹一下"）。
+ */
 @keyframes barFadeIn {
   from {
     opacity: 0;
+    transform: translateX(-50%) scale(0.96);
   }
   to {
     opacity: 1;
+    transform: translateX(-50%) scale(1);
   }
 }
