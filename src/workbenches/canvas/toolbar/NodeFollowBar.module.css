@@ -13,6 +13,8 @@
 .bar {
   position: absolute;
   z-index: 19;
+  /* 入场（#1161）：以前是"啪"地出现，用户 2026-11-19 说太生硬 */
+  animation: menuInkIn var(--dur-panel) var(--ease-panel);
   display: flex;
   align-items: center;
   gap: 6px;
@@ -77,7 +79,13 @@
   cursor: pointer;
   transition:
     background var(--dur-hover) var(--ease-out),
-    border-color var(--dur-hover) var(--ease-out);
+    border-color var(--dur-hover) var(--ease-out),
+    /* 按下反馈（#1161 / 用户第 6 条）：以前点功能只有 hover 变色，按下去毫无反馈 */
+    transform var(--dur-hover) var(--ease-out);
+}
+
+.btn:active {
+  transform: scale(0.96);
 }
 
 /*
@@ -270,4 +278,18 @@
 .splitCellOn {
   border-color: var(--accent);
   background: var(--accent);
+}
+
+/* 入场动画（#1161）：CSS Modules 会给 animation-name 加哈希，故必须在本模块定义同名 keyframes。 */
+@keyframes menuInkIn {
+  from {
+    opacity: 0;
+    filter: blur(3px);
+    transform: translateY(4px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    filter: blur(0);
+    transform: translateY(0) scale(1);
+  }
 }

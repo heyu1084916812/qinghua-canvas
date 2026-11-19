@@ -6,6 +6,8 @@
   z-index: 30;
   display: flex;
   justify-content: flex-end;
+  /* 入场（#1161）：遮罩只淡入，抽屉从右侧滑进来 */
+  animation: scrimIn var(--dur-panel) var(--ease-out);
 }
 
 .panel {
@@ -17,6 +19,18 @@
   display: flex;
   flex-direction: column;
   box-sizing: border-box;
+  animation: logDrawerIn var(--dur-panel) var(--ease-panel);
+}
+
+@keyframes logDrawerIn {
+  from {
+    opacity: 0;
+    transform: translateX(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
 }
 
 .header {
@@ -210,4 +224,14 @@
   /* 走 --success 而不是字面量：上一轮主题化漏掉的就是这一处（同文件同色却只改了另外三处），
      深色下 #16a34a 压在深底上对比度不够。 */
   color: var(--success);
+}
+
+/* 遮罩淡入（#1161）：只改透明度，不缩放。 */
+@keyframes scrimIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }

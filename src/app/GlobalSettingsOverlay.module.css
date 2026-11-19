@@ -13,11 +13,14 @@
   justify-content: center;
   /* 遮罩色走令牌：亮色 18% / 暗色 52%（与其它浮层同一来源） */
   background: var(--scrim);
+  /* 入场（#1161）：以前整套设置是"啪"地出现；遮罩淡入、面板跟上 */
+  animation: scrimIn var(--dur-lightbox) var(--ease-out);
 }
 
 .panel {
   display: flex;
   flex-direction: column;
+  animation: menuInkIn var(--dur-panel) var(--ease-panel);
   /*
    * 面板尺寸：留出四周的呼吸（与壳层留白同族），并给上下限 ——
    * 小窗不至于把面板挤扁、大屏不至于铺成整屏（那就不像"浮层"了）。
@@ -450,5 +453,28 @@
   .sectionBody {
     padding-left: var(--space-4);
     padding-right: var(--space-4);
+  }
+}
+
+/* 入场动画（#1161）：CSS Modules 会给 animation-name 加哈希，故必须在本模块定义同名 keyframes。 */
+@keyframes menuInkIn {
+  from {
+    opacity: 0;
+    filter: blur(3px);
+    transform: translateY(4px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    filter: blur(0);
+    transform: translateY(0) scale(1);
+  }
+}
+/* 遮罩淡入（#1161）：只改透明度，不缩放。 */
+@keyframes scrimIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
   }
 }

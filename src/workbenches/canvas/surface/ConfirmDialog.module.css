@@ -6,6 +6,8 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  /* 入场（#1161）：遮罩淡入、卡片按全站同一节奏"墨迹初显" */
+  animation: scrimIn var(--dur-panel) var(--ease-out);
 }
 
 .card {
@@ -20,6 +22,7 @@
   border: var(--border);
   border-radius: var(--radius-node);
   box-shadow: var(--shadow-float);
+  animation: menuInkIn var(--dur-panel) var(--ease-panel);
 }
 
 .title {
@@ -70,4 +73,27 @@
 
 .confirm:hover {
   background: var(--text-1);
+}
+
+/* 入场动画（#1161）：CSS Modules 会给 animation-name 加哈希，故必须在本模块定义同名 keyframes。 */
+@keyframes menuInkIn {
+  from {
+    opacity: 0;
+    filter: blur(3px);
+    transform: translateY(4px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    filter: blur(0);
+    transform: translateY(0) scale(1);
+  }
+}
+/* 遮罩淡入（#1161）：只改透明度，不缩放。 */
+@keyframes scrimIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }

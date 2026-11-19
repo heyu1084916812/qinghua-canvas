@@ -370,3 +370,17 @@
     z-index: 19;
   }
 }
+
+/* 入场动画（#1161）：CSS Modules 会给 animation-name 加哈希，故必须在本模块定义同名 keyframes。 */
+@keyframes menuInkIn {
+  from {
+    opacity: 0;
+    filter: blur(3px);
+    transform: translateY(4px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    filter: blur(0);
+    transform: translateY(0) scale(1);
+  }
+}

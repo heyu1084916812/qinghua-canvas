@@ -27,6 +27,8 @@
   position: absolute;
   left: 50%;
   transform: translateX(-50%);
+  /* 入场（#1161）：居中浮层必须用 `menuInkInCentered`，否则动画结束会丢掉 translateX(-50%) */
+  animation: menuInkInCentered var(--dur-panel) var(--ease-panel);
   display: flex;
   align-items: center;
   gap: 6px;
@@ -134,3 +136,17 @@
  * 左右端点的水平位置由 `MULTI_BOX_INSET` 算出来（居中到虚线框的左右沿）——
  * 见 MultiSelectBar.tsx，这里不再写死。
  */
+
+/* 居中浮层版（保留 translateX(-50%)，否则动画结束会跳位）。 */
+@keyframes menuInkInCentered {
+  from {
+    opacity: 0;
+    filter: blur(3px);
+    transform: translateX(-50%) translateY(4px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    filter: blur(0);
+    transform: translateX(-50%) translateY(0) scale(1);
+  }
+}

@@ -317,6 +317,16 @@
   }
 }
 
+/* 遮罩 / 全屏层只淡入：缩放会把整片底色一起缩，看起来像闪了一下。 */
+@keyframes scrimIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
 /* 水平居中的浮层必须保留 translateX(-50%)，否则动画结束会跳位。 */
 @keyframes menuInkInCentered {
   from {

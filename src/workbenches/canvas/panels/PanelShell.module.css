@@ -8,6 +8,15 @@
 
 .panel {
   /*
+   * 入场（#1161）：与下拉浮层同一个「墨迹初显」节奏。动画只持续 140ms，结束后 transform 回到
+   * none，不会留下 transform 影响 ParamPicker 的测量（它读的是 getBoundingClientRect）。
+   *
+   * ⚠️ `@keyframes` 必须**写在模块里**：CSS Modules 会把 `animation-name` 改写成哈希名
+   * （`_menuInkIn_xxx`），而全局 `tokens.css` 里的那份叫 `menuInkIn` —— 对不上就**静默不播**
+   * （本轮实测：`animationName` 有值、`getAnimations()` 为空）。这与"菜单很生硬"是同一根因。
+   */
+  animation: menuInkIn var(--dur-panel) var(--ease-panel);
+  /*
    * 面板整体缩到一半（用户 2026-09-16）：宽 840 → 420，内部字号与间距
    * 不动 token 全局值（那是全应用共享的），面板内用 `zoom` 做等比缩放。
    * `zoom` 在 Chromium / Firefox / Safari 都已标准化，比 transform 更好——
@@ -134,4 +143,21 @@
 .panelExpanded {
   height: min(640px, var(--panel-available-h, 480px));
   min-height: min(360px, var(--panel-available-h, 480px));
+}
+
+/*
+ * 入场动画（#1161）。CSS Modules 会给 `animation-name` 加哈希前缀，所以**必须在本模块里定义**
+ * 同名 `@keyframes` —— 写在全局主题里的那份对不上名，动画会静默不播。
+ */
+@keyframes menuInkIn {
+  from {
+    opacity: 0;
+    filter: blur(3px);
+    transform: translateY(4px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    filter: blur(0);
+    transform: translateY(0) scale(1);
+  }
 }
