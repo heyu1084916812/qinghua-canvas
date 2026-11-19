@@ -45847,6 +45847,28 @@ async function g170(browser) {
     await check('一次撤销恢复全部原线', initial)
     await page.keyboard.press('Control+Shift+z')
     await check('一次重做仍保留原第四条', remaining)
+    for (const reason of ['松开空格', '窗口失焦事件']) {
+      await page.keyboard.press('Control+z')
+      await page.mouse.move(first.x, first.y-18)
+      await page.keyboard.down('Space')
+      await page.locator('[data-knife-cursor]').waitFor({state:'attached'})
+      await page.mouse.down()
+      await page.mouse.move(first.x, first.y+18, {steps:3})
+      await check(reason + '前确实已切第一条', initial.filter(id => id !== first.id))
+      if (reason === '松开空格') await page.keyboard.up('Space')
+      else await page.evaluate(() => window.dispatchEvent(new Event('blur')))
+      await page.locator('[data-knife-cursor]').waitFor({state:'detached'})
+      await page.mouse.move(third.x, third.y+18, {steps:5})
+      await page.mouse.up()
+      await page.keyboard.up('Space')
+      const onlyFirst = initial.filter(id => id !== first.id)
+      await check(reason + '后按住鼠标划过其它线不继续切', onlyFirst)
+      await page.keyboard.press('Control+z')
+      await check(reason + '前的切线可一次撤销', initial)
+      // 恢复本轮中断前的历史状态，下一轮再次从完整夹具开始。
+      await page.keyboard.press('Control+Shift+z')
+    }
+
   } finally { await ctx.close() }
 }
 
