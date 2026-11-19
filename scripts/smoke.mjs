@@ -45846,9 +45846,9 @@ async function g169(browser) {
     return out
   }
 
-  const marquee = async (x2, y2) => {
+  const marquee = async (x2, y2, from = { x: 170, y: 100 }) => {
     await page.keyboard.down('Control')
-    await page.mouse.move(170, 100)
+    await page.mouse.move(from.x, from.y)
     await page.mouse.down()
     await page.mouse.move(x2, y2, { steps: 16 })
     await page.mouse.up()
@@ -45858,11 +45858,11 @@ async function g169(browser) {
   /** 一轮：框选 →（可选停顿）→ 拖 → 鼠标还按着量一次 → 松手再量一次 */
   const runVariant = async (
     label,
-    { settle = 400, marqueeTo, drag, nodeIds = ids, sideId = neighbour },
+    { settle = 400, marqueeTo, marqueeFrom, drag, nodeIds = ids, sideId = neighbour },
   ) => {
     await clickBlankCanvas(page)
     await sleep(250)
-    await marquee(marqueeTo.x + jitter(), marqueeTo.y + jitter())
+    await marquee(marqueeTo.x + jitter(), marqueeTo.y + jitter(), marqueeFrom)
     if (settle) await sleep(settle)
     const before = await read(nodeIds, sideId)
     const grab = await page.locator('[data-node-id="' + nodeIds[0] + '"]').boundingBox()
@@ -46041,6 +46041,23 @@ async function g169(browser) {
       drag: { dx: -120, dy: -90 },
       nodeIds: imageIds,
       sideId: null,
+    })
+    // Scale around the selection, then measure the actual screen bounds rather than reusing 1x coordinates.
+    await clickBlankCanvas(page)
+    const boxes = () => Promise.all(imageIds.map(id => page.locator(`[data-node-id="${id}"]`).boundingBox()))
+    const initial = await boxes()
+    await page.mouse.move(initial[0].x + initial[0].width, initial[0].y + initial[0].height)
+    for (let i = 0; i < 12 && (await boxes())[0].width > initial[0].width * 0.45; i++) {
+      await page.mouse.wheel(0, 200)
+      await sleep(150)
+    }
+    const small = await boxes()
+    const ratio = small[0].width / initial[0].width
+    rec(g, '图片 V3：真实素材且已缩至原宽 45% 以下', Boolean(realImageB64) && ratio <= 0.45, String(ratio))
+    await runVariant('图片 V3 低缩放', {
+      marqueeFrom: { x: Math.min(...small.map(b => b.x)) - 15, y: Math.min(...small.map(b => b.y)) - 15 },
+      marqueeTo: { x: Math.max(...small.map(b => b.x + b.width)) + 25, y: Math.max(...small.map(b => b.y + b.height)) + 25 },
+      drag: { dx: 130, dy: 80 }, nodeIds: imageIds, sideId: null,
     })
   }
 
