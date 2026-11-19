@@ -424,7 +424,7 @@
       "test": [
         "src/workbenches/canvas/flow/flowGraph.test.ts"
       ],
-      "budget": 999
+      "budget": 1040
     },
     {
       "module": "src/workbenches/canvas/lightbox/LightboxLayer.tsx",
@@ -442,7 +442,7 @@
       "test": [
         "scripts/smoke.mjs#G795"
       ],
-      "budget": 999
+      "budget": 1040
     },
     {
       "module": "src/workbenches/canvas/panels/CreationPanel.module.css",
@@ -538,10 +538,176 @@
     }
   ],
   "removedModules": [
-    "src/pages/CanvasPage/clipper/ClipperBrowser.tsx"
+    "src/pages/CanvasPage/clipper/ClipperBrowser.tsx",
+    "src/features/canvas/useSpaceHeld.ts"
   ],
   "moduleMoves": [],
   "modules": [
+    {
+      "module": "src/domain/canvas/graph/excludedNodes.ts",
+      "owner": "canvas-domain-graph",
+      "responsibility": "从图快照推导「被某个消费者排除在本次输入之外」的节点集合，供画布置灰使用。",
+      "owns": [
+        "excludedNodeIds 纯函数（upstreamHidden 并集 + 容器的 hiddenIds）"
+      ],
+      "doesNotOwn": [
+        "隐藏动作本身（面板写 hiddenIds / upstreamHidden）",
+        "执行期输入收集"
+      ],
+      "publicApi": [
+        "excludedNodeIds"
+      ],
+      "test": [
+        "src/domain/canvas/graph/excludedNodes.test.ts"
+      ],
+      "budget": 45
+    },
+    {
+      "module": "src/features/canvas/knifeMode.ts",
+      "owner": "canvas-flow-ui",
+      "responsibility": "美工刀模式（当前工具）的模块级瞬态：开关、订阅与复位。",
+      "owns": [
+        "刀具开关状态",
+        "subscribers 通知"
+      ],
+      "doesNotOwn": [
+        "切割几何与动画",
+        "画布选中态"
+      ],
+      "publicApi": [
+        "isKnifeOn",
+        "setKnife",
+        "toggleKnife",
+        "subscribeKnife",
+        "__resetKnifeForTest"
+      ],
+      "test": [
+        "src/features/canvas/knifeMode.test.ts"
+      ],
+      "budget": 55
+    },
+    {
+      "module": "src/features/canvas/useKnifeMode.ts",
+      "owner": "canvas-flow-ui",
+      "responsibility": "美工刀模式的 React 接线：订阅开关、空格/Esc 快捷键、跟随指针的坐标。",
+      "owns": [
+        "useKnifeOn",
+        "useKnifeShortcut",
+        "useKnifePointer"
+      ],
+      "doesNotOwn": [
+        "切割命中计算",
+        "画布渲染"
+      ],
+      "publicApi": [
+        "useKnifeOn",
+        "useKnifeShortcut",
+        "useKnifePointer"
+      ],
+      "test": [
+        "src/features/canvas/knifeMode.test.ts"
+      ],
+      "budget": 70
+    },
+    {
+      "module": "src/workbenches/canvas/flow/edgeCutGeometry.ts",
+      "owner": "canvas-flow-ui",
+      "responsibility": "把连线采样成屏幕折线并在最近处切成两段，以及点到折线的距离判定。",
+      "owns": [
+        "cutPolylineAt / distanceToPolyline"
+      ],
+      "doesNotOwn": [
+        "DOM 读取",
+        "删除连线"
+      ],
+      "publicApi": [
+        "cutPolylineAt",
+        "distanceToPolyline",
+        "ScreenPoint",
+        "CutHalves"
+      ],
+      "test": [
+        "src/workbenches/canvas/flow/edgeCutGeometry.test.ts"
+      ],
+      "budget": 80
+    },
+    {
+      "module": "src/workbenches/canvas/flow/useEdgeCut.ts",
+      "owner": "canvas-flow-ui",
+      "responsibility": "「切一刀」的交互时序：逐帧等连线出现 → 找最近的线 → 播两段分离淡出 → 动画结束再删边。",
+      "owns": [
+        "切割时序与重试",
+        "setEdgeCut 状态"
+      ],
+      "doesNotOwn": [
+        "折线几何（见 edgeCutGeometry）",
+        "连线的增删命令"
+      ],
+      "publicApi": [
+        "useEdgeCut"
+      ],
+      "test": [
+        "src/workbenches/canvas/flow/edgeCutGeometry.test.ts"
+      ],
+      "budget": 90
+    },
+    {
+      "module": "src/workbenches/canvas/flow/FlowEdgeCutLayer.tsx",
+      "owner": "canvas-flow-ui",
+      "responsibility": "切断动画层：删除发生前用两段屏幕折线顶替被切掉的连线并播放分离淡出。",
+      "owns": [
+        "ActiveEdgeCut 契约",
+        "切断动画 SVG 层"
+      ],
+      "doesNotOwn": [
+        "切割命中与时序",
+        "连线的删除命令"
+      ],
+      "publicApi": [
+        "FlowEdgeCutLayer",
+        "ActiveEdgeCut"
+      ],
+      "test": [
+        "src/workbenches/canvas/flow/edgeCutGeometry.test.ts"
+      ],
+      "budget": 40
+    },
+    {
+      "module": "src/workbenches/canvas/flow/FlowEdgeCutLayer.module.css",
+      "owner": "canvas-flow-ui",
+      "responsibility": "切断动画层与美工刀光标的局部样式（两段上下分离淡出、跟随指针的刀身）。",
+      "owns": [
+        "CSS_MODULE:切断动画与刀具光标"
+      ],
+      "doesNotOwn": [
+        "画布主题令牌"
+      ],
+      "publicApi": [
+        "CSS_MODULE:切断动画层与刀具光标"
+      ],
+      "test": [
+        "src/workbenches/canvas/flow/edgeCutGeometry.test.ts"
+      ],
+      "budget": 90
+    },
+    {
+      "module": "src/workbenches/canvas/flow/KnifeCursor.tsx",
+      "owner": "canvas-flow-ui",
+      "responsibility": "跟随指针的美工刀光标（公共图标库的 Slice + 浅底胶囊）。",
+      "owns": [
+        "刀具光标局部视图"
+      ],
+      "doesNotOwn": [
+        "刀具开关状态"
+      ],
+      "publicApi": [
+        "KnifeCursor"
+      ],
+      "test": [
+        "src/features/canvas/knifeMode.test.ts"
+      ],
+      "budget": 30
+    },
     {
       "module": "src/app/providers/SkillStoreContext.tsx",
       "owner": "app-providers",

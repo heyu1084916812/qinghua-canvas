@@ -89,26 +89,6 @@
   cursor: none !important;
 }
 
-/*
- * 跟着指针走的美工刀（图案来自项目公共图标库的 `Slice`）。
- * 用一枚浅底胶囊托着刀身：深浅主题下都看得清，且不需要任何字面量颜色 / 阴影。
- */
-.knifeCursor {
-  position: fixed;
-  z-index: 60;
-  display: flex;
-  width: 28px;
-  height: 28px;
-  align-items: center;
-  justify-content: center;
-  box-sizing: border-box;
-  border: 1px solid var(--stroke);
-  border-radius: var(--radius-pill);
-  background: var(--bg-surface);
-  color: var(--text-1);
-  pointer-events: none;
-  transform: translate(6px, 6px) rotate(-12deg);
-}
 
 /* 拖入素材时的落点提示（与老表面同一套：1px 虚线内描边，无投影、不改底色） */
 .surface[data-import-hover='true']::after {

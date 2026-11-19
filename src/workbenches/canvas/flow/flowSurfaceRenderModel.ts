@@ -16,10 +16,7 @@ import {
 import type { CanvasDetailMode } from './detailMode'
 import type { NodeDerivedMaps } from '../useNodeDerivedMaps'
 
-export function derivedPropsFor(
-  derived: NodeDerivedMaps,
-  id: string,
-): FlowNodeDerivedProps {
+export function derivedPropsFor(derived: NodeDerivedMaps, id: string): FlowNodeDerivedProps {
   return {
     upstreamAssetHashes: derived.upstreamHashes.get(id),
     upstreamPromptCount: derived.upstreamPromptCounts.get(id),
