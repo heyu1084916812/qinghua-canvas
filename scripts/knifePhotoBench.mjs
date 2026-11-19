@@ -41,13 +41,27 @@ export async function knifePhotoBench(page,pid,out) {
   const evidence=await page.evaluate(nodes=>nodes.map(id=>{const i=document.querySelector(`[data-node-id="${id}"] img`),r=i.getBoundingClientRect();return {x:r.x,y:r.y,w:r.width,h:r.height,width:i.naturalWidth,height:i.naturalHeight,visible:document.elementFromPoint(r.x+r.width/2,r.y+r.height/2)?.closest('[data-node-id]')?.dataset.nodeId===id}}),nodes)
   assert(evidence.every(i=>i.visible),JSON.stringify(evidence));const ids=()=>page.locator('[data-edge]').evaluateAll(es=>es.map(e=>e.dataset.edge).sort());const baseline=await ids();assert.equal(baseline.length,edgeCount)
   const b=await page.locator('[data-edge]').evaluateAll(es=>{const rs=es.map(e=>e.getBoundingClientRect());return {x:(Math.max(...rs.map(r=>r.left))+Math.min(...rs.map(r=>r.right)))/2,top:Math.min(...rs.map(r=>r.top)),bottom:Math.max(...rs.map(r=>r.bottom))}})
-  const report={timing:"from before pointerdown through two post-pointerup animation frames",edgeCount,sourceHashes:[...hashes],evidence,b,rounds:[]};const save=()=>writeFileSync(out,JSON.stringify(report,null,2))
+  // Diagnostic control only: same hit tests, graph and FX, skip rasterizing the severed-line SVG.
+  const hideCutPreview=process.env.KNIFE_NO_PREVIEW_PAINT==='1'
+  if(hideCutPreview) await page.addStyleTag({content:'svg[data-edge-cut]{display:none!important}'})
+  const report={hideCutPreview,timing:"from before pointerdown through two post-pointerup animation frames",edgeCount,sourceHashes:[...hashes],evidence,b,rounds:[]};const save=()=>writeFileSync(out,JSON.stringify(report,null,2))
   for(let round=1;round<=3;round++)for(const mode of ['miss','hit']){
     if(tracing) await page.evaluate(()=>{window.knifeMoves=[];window.pointerTrace=[];window.knifeListener=e=>window.pointerTrace.push([e.type,e.clientX,e.clientY,e.buttons]); for(const name of ['pointerdown','pointermove','pointerup']) window.addEventListener(name,window.knifeListener,true)})
     const x=b.x,y=b.top-20;await page.mouse.move(x,y);await page.keyboard.down('Space');await page.locator('[data-knife-cursor]').waitFor({state:'attached'})
-    await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(t=>{window.samples=[];let last=t;const tick=n=>{window.samples.push(n-last);last=n;window.frame=requestAnimationFrame(tick)};window.frame=requestAnimationFrame(tick);resolve()})))
-    await page.mouse.down();await page.mouse.move(mode==='miss'?x+120:x,mode==='miss'?y:b.bottom+20,{steps:48});await page.mouse.up();const ms=await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(()=>{cancelAnimationFrame(window.frame);resolve(window.samples)}))));await page.keyboard.up('Space');await page.waitForTimeout(300)
-    const after=await ids(),sorted=[...ms].sort((a,b)=>a-b);report.rounds.push({round,mode,ms,p95:sorted[Math.ceil(.95*ms.length)-1],max:sorted.at(-1),remaining:after});if(tracing){
+    await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(t=>{
+      window.samples=[];window.knifePhase={start:t,events:[]};let last=t
+      window.phaseListener=e=>window.knifePhase.events.push({type:e.type,t:performance.now()})
+      for(const name of ['pointerdown','pointermove','pointerup']) window.addEventListener(name,window.phaseListener,true)
+      const tick=n=>{window.samples.push(n-last);last=n;window.frame=requestAnimationFrame(tick)}
+      window.frame=requestAnimationFrame(tick);resolve()
+    })))
+    await page.mouse.down();await page.mouse.move(mode==='miss'?x+120:x,mode==='miss'?y:b.bottom+20,{steps:48});await page.mouse.up()
+    const {ms,phase}=await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(()=>{
+      cancelAnimationFrame(window.frame)
+      for(const name of ['pointerdown','pointermove','pointerup']) window.removeEventListener(name,window.phaseListener,true)
+      resolve({ms:window.samples,phase:window.knifePhase})
+    }))));await page.keyboard.up('Space');await page.waitForTimeout(300)
+    const after=await ids(),sorted=[...ms].sort((a,b)=>a-b);report.rounds.push({round,mode,ms,phase,p95:sorted[Math.ceil(.95*ms.length)-1],max:sorted.at(-1),remaining:after});if(tracing){
       const trace=await page.evaluate(()=>{for(const name of ['pointerdown','pointermove','pointerup'])window.removeEventListener(name,window.knifeListener,true);return {moves:window.knifeMoves,pointer:window.pointerTrace}})
       assert(trace.moves.length>0,'instrumented module not active');report.rounds.at(-1).trace=trace
     }save();assert(ms.length>=10);if(mode==='miss') assert.deepEqual(after,baseline)

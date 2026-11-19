@@ -1,0 +1,45 @@
+1 miss {
+  'before→down': { n: 1, max: 48.4, over50: 0 },
+  'down→move': { n: 1, max: 30.2, over50: 0 },
+  move: { n: 147, max: 60.6, over50: 1 },
+  'move→release': { n: 1, max: 18, over50: 0 },
+  release: { n: 1, max: 24.2, over50: 0 }
+}
+1 hit {
+  'before→down': { n: 1, max: 84.9, over50: 1 },
+  'down→move': { n: 1, max: 30.5, over50: 0 },
+  move: { n: 179, max: 272.7, over50: 14 },
+  'move→release': { n: 1, max: 66.6, over50: 1 },
+  release: { n: 3, max: 12.1, over50: 0 }
+}
+2 miss {
+  'before→down': { n: 1, max: 24.2, over50: 0 },
+  'down→move': { n: 1, max: 66.6, over50: 1 },
+  move: { n: 210, max: 60.6, over50: 1 },
+  'move→release': { n: 1, max: 30.3, over50: 0 },
+  release: { n: 2, max: 6.1, over50: 0 }
+}
+2 hit {
+  before: { n: 1, max: 6.1, over50: 0 },
+  'before→down': { n: 1, max: 78.6, over50: 1 },
+  'down→move': { n: 1, max: 30.3, over50: 0 },
+  move: { n: 203, max: 272.8, over50: 17 },
+  'move→release': { n: 1, max: 72.7, over50: 1 },
+  release: { n: 1, max: 12.2, over50: 0 }
+}
+3 miss {
+  'before→down': { n: 1, max: 48, over50: 0 },
+  down: { n: 1, max: 36.3, over50: 0 },
+  'down→move': { n: 1, max: 30.3, over50: 0 },
+  move: { n: 202, max: 36.3, over50: 0 },
+  'move→release': { n: 1, max: 18.2, over50: 0 },
+  release: { n: 3, max: 18.2, over50: 0 }
+}
+3 hit {
+  'before→down': { n: 1, max: 84.6, over50: 1 },
+  down: { n: 6, max: 30.3, over50: 0 },
+  'down→move': { n: 1, max: 30.3, over50: 0 },
+  move: { n: 281, max: 206.1, over50: 19 },
+  'move→release': { n: 1, max: 78.8, over50: 1 },
+  release: { n: 1, max: 6.1, over50: 0 }
+}
