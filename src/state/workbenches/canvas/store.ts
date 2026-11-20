@@ -239,11 +239,19 @@ interface CanvasState {
    * 这里存一份副本就会出现「两份真相」。
    */
   textEditor: { nodeId: string } | null
+  /** 正在为某个节点挑选新的上游；纯瞬态，不落库。 */
+  upstreamPick: string | null
+  selectionMode: 'single' | 'multi'
 }
 
 export interface CanvasStore extends AppStore<GraphSnapshot, Command> {
   setSelection(ids: string[]): void
   getSelection(): string[]
+  setSelectionAsMulti(ids: string[]): void
+  getSelectionMode(): 'single' | 'multi'
+  beginUpstreamPick(nodeId: string): void
+  endUpstreamPick(): void
+  getUpstreamPick(): string | null
   /** 选中连线（清空节点选择，二者互斥，§6.14） */
   setEdgeSelection(ids: string[]): void
   getEdgeSelection(): string[]
@@ -580,6 +588,8 @@ export function createCanvasStore(opts: CanvasStoreOptions): CanvasStore {
     undoBar: null,
     lightbox: null,
     textEditor: null,
+    upstreamPick: null,
+    selectionMode: 'single',
   }))
 
   const semanticListeners = new Set<() => void>()
@@ -705,9 +715,15 @@ export function createCanvasStore(opts: CanvasStoreOptions): CanvasStore {
     },
     // 节点选择与连线选择互斥（§6.14 / §6.15）：选节点即清空连线选择，反之亦然
     setSelection: (ids) =>
-      store.setState({ selection: ids, selectedEdgeIds: [], panelDismissed: false }),
+      store.setState({ selection: ids, selectionMode: 'single', selectedEdgeIds: [], panelDismissed: false }),
+    setSelectionAsMulti: (ids) =>
+      store.setState({ selection: ids, selectionMode: 'multi', selectedEdgeIds: [], panelDismissed: false }),
     getSelection: () => store.getState().selection,
-    setEdgeSelection: (ids) => store.setState({ selectedEdgeIds: ids, selection: [] }),
+    getSelectionMode: () => store.getState().selectionMode,
+    beginUpstreamPick: (nodeId) => store.setState({ upstreamPick: nodeId }),
+    endUpstreamPick: () => store.setState({ upstreamPick: null }),
+    getUpstreamPick: () => store.getState().upstreamPick,
+    setEdgeSelection: (ids) => store.setState({ selectedEdgeIds: ids, selection: [], selectionMode: 'single' }),
     getEdgeSelection: () => store.getState().selectedEdgeIds,
     setViewport: (vp) => {
       viewportUpdate = true
@@ -787,6 +803,7 @@ export function createCanvasStore(opts: CanvasStoreOptions): CanvasStore {
           ...(opts?.compareKind ? { compareKind: opts.compareKind } : {}),
         },
         textEditor: null,
+    upstreamPick: null,
         menu: null,
       }),
     openLightboxGallery: (nodeIds) => {
@@ -805,6 +822,7 @@ export function createCanvasStore(opts: CanvasStoreOptions): CanvasStore {
       store.setState({
         lightbox: { assetHash: first.assetHash, gallery, galleryIndex: 0 },
         textEditor: null,
+    upstreamPick: null,
         menu: null,
       })
     },
@@ -842,6 +860,7 @@ export function createCanvasStore(opts: CanvasStoreOptions): CanvasStore {
           ...(opts?.plain ? { cropPlain: true } : {}),
         },
         textEditor: null,
+    upstreamPick: null,
         menu: null,
       })
     },
@@ -858,6 +877,7 @@ export function createCanvasStore(opts: CanvasStoreOptions): CanvasStore {
       store.setState({
         lightbox: { assetHash: hash, faceFor: nodeId },
         textEditor: null,
+    upstreamPick: null,
         menu: null,
       })
     },
@@ -877,6 +897,7 @@ export function createCanvasStore(opts: CanvasStoreOptions): CanvasStore {
       store.setState({
         lightbox: { assetHash: hash, rotateFor: nodeId },
         textEditor: null,
+    upstreamPick: null,
         menu: null,
       })
     },
@@ -897,6 +918,7 @@ export function createCanvasStore(opts: CanvasStoreOptions): CanvasStore {
       store.setState({
         lightbox: { assetHash: hash, annotateFor: nodeId },
         textEditor: null,
+    upstreamPick: null,
         menu: null,
       })
     },

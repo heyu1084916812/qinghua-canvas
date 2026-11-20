@@ -35,6 +35,8 @@ export interface FlowNodeDerivedProps {
   inputPortAssets?: Record<string, InputPortAsset[]>
   /** 被某个消费者排除在本次输入之外（#1160）：画布上按「未参与」置灰，与禁用同款 */
   excluded?: boolean
+  /** 正在挑选上游时，非当前节点和既有上游节点置灰。 */
+  upstreamPickDimmed?: boolean
 }
 
 export interface FlowNodeData extends FlowNodeDerivedProps, Record<string, unknown> {
@@ -141,6 +143,7 @@ function FlowNodeInner({ data, selected }: NodeProps) {
       selected={!!selected}
       minSize={minSize}
       excluded={derived.excluded}
+      dimmed={derived.upstreamPickDimmed}
       resizeLock={resizeLockOf(node)}
       /**
        * **批量的框永远等于网格 × 一个等比系数**（用户第 17 批 #3）：
@@ -182,11 +185,12 @@ export const FlowCoarseNode = memo(function FlowCoarseNode({
 }: NodeProps) {
   const node = (data as unknown as FlowNodeData).node
   const excluded = (data as unknown as FlowNodeData).excluded === true
+  const dimmed = (data as unknown as FlowNodeData).upstreamPickDimmed === true
   const className = [
     coarseStyles.node,
     isContainerType(node.type) ? coarseStyles.group : '',
     selected ? coarseStyles.selected : '',
-    node.disabled || excluded ? coarseStyles.disabled : '',
+    node.disabled || excluded || dimmed ? coarseStyles.disabled : '',
   ]
     .filter(Boolean)
     .join(' ')
@@ -199,6 +203,7 @@ export const FlowCoarseNode = memo(function FlowCoarseNode({
       data-node-selected={selected ? '' : undefined}
       data-node-disabled={node.disabled ? 'true' : undefined}
       data-node-excluded={!node.disabled && excluded ? 'true' : undefined}
+      data-node-dim={dimmed ? 'true' : undefined}
       data-node-model={
         typeof (node.data as { model?: unknown }).model === 'string'
           ? ((node.data as { model?: string }).model ?? '')

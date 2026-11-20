@@ -17,6 +17,7 @@ interface CreationAssetsViewProps {
   onToggleThumb: (owner: PanelModel['thumbs'][number]['owner'], id: string) => void
   onRemoveThumb: (owner: PanelModel['thumbs'][number]['owner'], id: string) => void
   onFocusThumb: (id: string) => void
+  onBeginUpstreamPick: () => void
   onModeChange: (mode: 'image' | 'video') => void
 }
 
@@ -34,6 +35,7 @@ export function CreationAssetsView({
   onToggleThumb,
   onRemoveThumb,
   onFocusThumb,
+  onBeginUpstreamPick,
   onModeChange,
 }: CreationAssetsViewProps) {
   return (
@@ -65,6 +67,16 @@ export function CreationAssetsView({
                 onFocus={() => onFocusThumb(thumb.id)}
               />
             ))}
+            <button
+              type="button"
+              className={styles.addUpstream}
+              data-upstream-pick
+              aria-label="添加上游节点"
+              title="添加上游节点"
+              onClick={onBeginUpstreamPick}
+            >
+              +
+            </button>
           </div>
         )}
         {showCategoryToggle && (

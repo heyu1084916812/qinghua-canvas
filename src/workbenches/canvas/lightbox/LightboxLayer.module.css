@@ -484,7 +484,7 @@
   flex: none;
   width: 1px;
   height: 20px;
-  margin: 0 2px;
+  margin: 0;
   background: var(--stroke);
 }
 

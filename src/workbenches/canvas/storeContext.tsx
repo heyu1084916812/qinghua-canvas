@@ -40,6 +40,17 @@ export function useSelection(): string[] {
   return useSyncExternalStore(store.subscribe, store.getSelection, store.getSelection)
 }
 
+/** 当前是否处于「为节点挑选上游」的瞬态。 */
+export function useSelectionMode(): 'single' | 'multi' {
+  const store = useCanvasStore()
+  return useSyncExternalStore(store.subscribe, store.getSelectionMode, store.getSelectionMode)
+}
+
+export function useUpstreamPick(): string | null {
+  const store = useCanvasStore()
+  return useSyncExternalStore(store.subscribe, store.getUpstreamPick, store.getUpstreamPick)
+}
+
 /**
  * 正在被拖的那个节点 id（没有在拖就是 null）。
  *

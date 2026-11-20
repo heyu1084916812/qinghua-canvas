@@ -15,7 +15,7 @@
  */
 import { useEffect, useState, useSyncExternalStore } from 'react'
 import type { MouseEvent as ReactMouseEvent, ReactNode } from 'react'
-import { useCanvasStore, useGraph, useSelection, useViewportStateWhen } from '../storeContext'
+import { useCanvasStore, useGraph, useSelection, useSelectionMode, useViewportStateWhen } from '../storeContext'
 import { toWorldRectInGraph } from '../../../domain/canvas/geometry/coords'
 import { useCanvasExecution } from '../execution/CanvasExecutionProvider'
 import { GROUP_BG_TONES } from '../../../domain/canvas/model/node'
@@ -93,6 +93,7 @@ export function NodeFollowBar({ onClose, onOpenSettings, onDownload }: NodeFollo
   const store = useCanvasStore()
   const graph = useGraph()
   const selection = useSelection()
+  const selectionMode = useSelectionMode()
   const exec = useCanvasExecution()
 
   // §6.15：拖动期间立即隐藏；**真实位移**的拖动松手后保持隐藏，直到下一次显式选中
@@ -147,7 +148,7 @@ export function NodeFollowBar({ onClose, onOpenSettings, onDownload }: NodeFollo
 
   // 与创作面板同款：拖动中 / 刚拖完（未重新选中）/ 多选（归属有歧义）都不显示
   if (dragging || dismissed) return null
-  if (selection.length !== 1) return null
+  if (selectionMode === 'multi' || selection.length !== 1) return null
   if (!node || !FOLLOW_TYPES.has(node.type)) return null
 
   // 结果组子节点的父不在 nodes 表，必须走「图内」世界矩形（否则锚点飞到左上角）

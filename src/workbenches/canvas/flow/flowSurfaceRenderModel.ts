@@ -16,7 +16,7 @@ import {
 import type { CanvasDetailMode } from './detailMode'
 import type { NodeDerivedMaps } from '../useNodeDerivedMaps'
 
-export function derivedPropsFor(derived: NodeDerivedMaps, id: string): FlowNodeDerivedProps {
+export function derivedPropsFor(derived: NodeDerivedMaps, id: string, upstreamPickDimmed = false): FlowNodeDerivedProps {
   return {
     upstreamAssetHashes: derived.upstreamHashes.get(id),
     upstreamPromptCount: derived.upstreamPromptCounts.get(id),
@@ -24,6 +24,7 @@ export function derivedPropsFor(derived: NodeDerivedMaps, id: string): FlowNodeD
     upstreamImageInputs: derived.upstreamImageInputs.get(id),
     inputPortAssets: derived.inputPortAssets.get(id),
     excluded: derived.excluded.has(id),
+    upstreamPickDimmed,
   }
 }
 
@@ -55,6 +56,7 @@ export interface FlowNodeProjectionInput {
     phase: Parameters<FlowNodeData['resize']>[1],
   ) => void
   renderChild?: FlowNodeData['renderChild']
+  upstreamPick?: { nodeId: string; allowedIds: ReadonlySet<string> } | null
 }
 
 export function flowNodesFor(input: FlowNodeProjectionInput): RFNode<FlowNodeData>[] {
@@ -74,7 +76,7 @@ export function flowNodesFor(input: FlowNodeProjectionInput): RFNode<FlowNodeDat
         ...run,
         emit: input.emitFor(node.id),
         resize: (rect, phase) => input.resize(node.id, rect, phase),
-        ...derivedPropsFor(input.derived, node.id),
+        ...derivedPropsFor(input.derived, node.id, Boolean(input.upstreamPick && !input.upstreamPick.allowedIds.has(node.id))),
         ...(isContainerType(node.type)
           ? {
               childNodes: children,

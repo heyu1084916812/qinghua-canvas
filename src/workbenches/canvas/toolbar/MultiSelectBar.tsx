@@ -9,7 +9,7 @@ import { saveAssetToLibrary } from '../../../features/canvas/saveAssetToLibrary'
 import { noOverlapDelta } from '../../../features/canvas/duplicatePlacement'
 import { sendSelectionToAgent } from '../../../features/canvas/agentHandoff'
 import { createId } from '../../../shared/id'
-import { useCanvasStore, useGraph, useSelection, useViewportStateWhen } from '../storeContext'
+import { useCanvasStore, useGraph, useSelection, useSelectionMode, useViewportStateWhen } from '../storeContext'
 import { FOLLOW_BAR_HEIGHT } from './followBarAnchor'
 import {
   IconDownload,
@@ -76,6 +76,7 @@ export function MultiSelectBar({
   const store = useCanvasStore()
   const graph = useGraph()
   const selection = useSelection()
+  const selectionMode = useSelectionMode()
   const platform = usePlatform()
   const { arrange, arrangeMode } = useArrangeTools(store)
   const [menuOpen, setMenuOpen] = useState(false)
@@ -83,7 +84,7 @@ export function MultiSelectBar({
   const nodes = selection
     .map((id) => graph.nodes.find((n) => n.id === id))
     .filter((n): n is NonNullable<typeof n> => Boolean(n))
-  const viewport = useViewportStateWhen(nodes.length >= 2)
+  const viewport = useViewportStateWhen(selectionMode === 'multi' && nodes.length >= 1)
 
   /**
    * 选中集合一变就把展开的菜单收掉（用户 2026-10-06 第 13 批第 8 条：
@@ -172,7 +173,7 @@ export function MultiSelectBar({
     store.openLightboxGallery(mediaIds)
   }, [nodes, store])
 
-  if (nodes.length < 2) return null
+  if (selectionMode !== 'multi' || nodes.length < 1) return null
 
   /** 选区在**屏幕坐标**下的外框（与跟随栏同一套换算：屏幕 =（世界 − 视口）× zoom） */
   const minX = Math.min(...nodes.map((n) => n.x))

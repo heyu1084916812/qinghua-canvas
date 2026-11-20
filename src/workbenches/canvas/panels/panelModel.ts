@@ -218,6 +218,7 @@ export type PanelEvent =
   | { type: 'togglePrompt' }
   /** 点击上游提示词图标：选中该节点，面板随之切到它的提示词编辑视图。 */
   | { type: 'focusNode'; id: string }
+  | { type: 'beginUpstreamPick'; nodeId: string }
   | { type: 'reorderThumbs'; owner: PanelThumb['owner']; order: string[] }
   | { type: 'optimize' }
   | { type: 'translate' }

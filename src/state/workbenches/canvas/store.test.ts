@@ -44,6 +44,19 @@ describe('canvas store / 基本变更', () => {
   })
 })
 
+describe('canvas store / 选择来源', () => {
+  it('普通单选保持单选来源，Shift/Ctrl 选择一项也保持多选来源', () => {
+    const store = createCanvasStore({ platform, projectId: 'p1' })
+    store.setSelection(['a'])
+    expect(store.getSelectionMode()).toBe('single')
+    store.setSelectionAsMulti(['a'])
+    expect(store.getSelectionMode()).toBe('multi')
+    expect(store.getSelection()).toEqual(['a'])
+    store.setSelection(['b'])
+    expect(store.getSelectionMode()).toBe('single')
+  })
+})
+
 describe('canvas store / 撤销与重做', () => {
   it('#1159 一刀切三线：撤销和重做各一次，未命中的边始终保留', async () => {
     const store = createCanvasStore({ platform, projectId: 'p1' })

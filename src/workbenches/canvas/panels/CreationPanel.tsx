@@ -870,6 +870,9 @@ export function CreationPanel(props: CreationPanelProps) {
         onToggleThumb={(owner, id) => onEvent({ type: 'toggleThumb', owner, id })}
         onRemoveThumb={(owner, id) => onEvent({ type: 'removeThumb', owner, id })}
         onFocusThumb={(id) => onEvent({ type: 'focusNode', id })}
+        onBeginUpstreamPick={() => {
+          if (nodeId) onEvent({ type: 'beginUpstreamPick', nodeId })
+        }}
         onModeChange={changeMode}
       />
 

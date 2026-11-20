@@ -850,7 +850,7 @@ export function LightboxLayer() {
            */
           <div className={styles.cropBar} data-lightbox-crop-bar>
             {!faceFor && (
-              <>
+              <div className={styles.cropOptions} data-lightbox-crop-options>
                 <span className={styles.ratioLabel}>比例</span>
                 {RATIO_CHOICES.map((c) => (
                   <button
@@ -862,55 +862,56 @@ export function LightboxLayer() {
                     onClick={() => {
                       setCropRatio(c.value)
                       const v = ratioValueOf(c.value)
-                      // 已经画好的框跟着新比例**就地吸附**（只缩不放），不用重画
                       if (cropRect) setCropRect(lockCrop(v ? fitRectToRatio(cropRect, v) : cropRect))
                     }}
                   >
                     {c.label}
                   </button>
                 ))}
-                <span className={styles.barDivider} />
-              </>
+                {plainCrop && (
+                  <span className={styles.cropHint} data-lightbox-crop-hint>
+                    裁剪不带选区上下文，融不回原图
+                  </span>
+                )}
+              </div>
             )}
-            {plainCrop && !faceFor && (
-              <span className={styles.cropHint} data-lightbox-crop-hint>
-                裁剪不带选区上下文，融不回原图
-              </span>
-            )}
-            <button
-              type="button"
-              className={styles.editorClose}
-              data-lightbox-crop-cancel
-              onClick={() => setMode('view')}
-            >
-              取消
-            </button>
-            <button
-              type="button"
-              className={styles.editorSave}
-              data-lightbox-crop-apply
-              disabled={!canConfirm || busy}
-              title={
-                canConfirm
-                  ? faceFor
-                    ? '用这个框当这张脸的位置，回到面板点「生成」'
+            {!faceFor && <span className={styles.barDivider} data-lightbox-crop-divider />}
+            <div className={styles.cropActions} data-lightbox-crop-actions>
+              <button
+                type="button"
+                className={styles.editorClose}
+                data-lightbox-crop-cancel
+                onClick={() => setMode('view')}
+              >
+                取消
+              </button>
+              <button
+                type="button"
+                className={styles.editorSave}
+                data-lightbox-crop-apply
+                disabled={!canConfirm || busy}
+                title={
+                  canConfirm
+                    ? faceFor
+                      ? '用这个框当这张脸的位置，回到面板点「生成」'
+                      : plainCrop
+                        ? '按当前框裁下这一块（不带选区上下文，不能当融合节点的局部修改图）'
+                        : '按当前框提取局部图，并保留上下文'
+                    : `先在图上拖一个框（短边至少 ${FUSION_MIN_EDGE}px）`
+                }
+                onClick={() => void confirmCrop()}
+              >
+                {busy
+                  ? plainCrop
+                    ? '裁剪中…'
+                    : '提取中…'
+                  : faceFor
+                    ? '用这个框'
                     : plainCrop
-                      ? '按当前框裁下这一块（不带选区上下文，不能当融合节点的局部修改图）'
-                      : '按当前框提取局部图，并保留上下文'
-                  : `先在图上拖一个框（短边至少 ${FUSION_MIN_EDGE}px）`
-              }
-              onClick={() => void confirmCrop()}
-            >
-              {busy
-                ? plainCrop
-                  ? '裁剪中…'
-                  : '提取中…'
-                : faceFor
-                  ? '用这个框'
-                  : plainCrop
-                    ? '裁剪'
-                    : '提取选区'}
-            </button>
+                      ? '裁剪'
+                      : '提取选区'}
+              </button>
+            </div>
           </div>
         ) : null}
       </div>

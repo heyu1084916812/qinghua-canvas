@@ -16,7 +16,7 @@ import { useWorkflowPanelSources } from './creation/useWorkflowPanelSources'
 import { EmotionPanel } from './EmotionPanel'
 import { promptReferenceThumb, type PanelEvent, type PanelModel, type PanelThumb, type RecipeSnapshot } from './panelModel'
 import type { MentionCandidate } from '../text/mentionValue'
-import { useGraph, useViewportStateWhen, useCanvasStore, useSelection } from '../storeContext'
+import { useGraph, useViewportStateWhen, useCanvasStore, useSelection, useSelectionMode } from '../storeContext'
 import { useCanvasExecution } from '../execution/CanvasExecutionProvider'
 import { usePromptTools } from '../../../features/shared/promptTools/usePromptTools'
 import { useChannels } from '../../../app/providers/ChannelStoreProvider'
@@ -78,6 +78,7 @@ export function PanelLayer({
 }) {
   const graph = useGraph()
   const selection = useSelection()
+  const selectionMode = useSelectionMode()
   const store = useCanvasStore()
   const exec = useCanvasExecution()
   /** 情绪那条流水线要读素材字节（裁局部）——平台端口在这一层拿 */
@@ -100,10 +101,10 @@ const workflowSources = useWorkflowPanelSources()
   // 多选不显示面板（§6.15）；单选且类型适用才显示；拖动中 / 拖过后（未重新选中）同样隐藏
   const selectedNode = useMemo(() => {
     if (dragging || panelDismissed) return null
-    if (selection.length !== 1) return null
+    if (selectionMode === 'multi' || selection.length !== 1) return null
     const n = graph.nodes.find((x) => x.id === selection[0])
     return n && PANEL_TYPES.has(n.type) ? n : null
-  }, [graph.nodes, selection, dragging, panelDismissed])
+  }, [graph.nodes, selection, selectionMode, dragging, panelDismissed])
   const viewport = useViewportStateWhen(selectedNode !== null)
 
   // 提示词节点的「优化 / 翻译」工具（§6.7）：面板是纯视图，状态由本层持有
@@ -801,6 +802,9 @@ function handlePanelEvent(
       break
     case 'focusNode':
       store.setSelection([event.id])
+      break
+    case 'beginUpstreamPick':
+      if (event.nodeId) store.beginUpstreamPick(event.nodeId)
       break
     case 'reorderThumbs':
       reorderThumbs(event.owner, event.order, node, store)

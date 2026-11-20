@@ -67,6 +67,7 @@ describe('FlowSurface render model', () => {
       upstreamImageInputs: undefined,
       inputPortAssets: undefined,
       excluded: false,
+      upstreamPickDimmed: false,
     })
   })
 
@@ -90,6 +91,32 @@ describe('FlowSurface render model', () => {
     expect(nodes[0].data.childNodes).toEqual([child])
     expect(nodes[0].data.renderChild).toBe(renderChild)
     expect(nodes[1].selected).toBe(true)
+  })
+
+  it('dims nodes outside the current node and its direct upstream set', () => {
+    const nodes = flowNodesFor({
+      graph: graph(
+        [
+          node('current', { type: 'prompt', x: 0, y: 0 }),
+          node('upstream', { type: 'prompt', x: 200, y: 0 }),
+          node('other', { type: 'prompt', x: 400, y: 0 }),
+        ],
+        [{ id: 'edge', source: 'upstream', target: 'current' }] as GraphSnapshot['edges'],
+      ),
+      selection: ['current'],
+      detailMode: 'full',
+      derived: derived(),
+      childIndex: new Map(),
+      nodeStateOf: () => undefined,
+      emitFor: () => vi.fn(),
+      resize: vi.fn(),
+      upstreamPick: { nodeId: 'current', allowedIds: new Set(['current', 'upstream']) },
+    })
+    expect(nodes.map((entry) => [entry.id, entry.data.upstreamPickDimmed])).toEqual([
+      ['current', false],
+      ['upstream', false],
+      ['other', true],
+    ])
   })
 
   it('filters child edges and removes all RF edges in coarse mode', () => {

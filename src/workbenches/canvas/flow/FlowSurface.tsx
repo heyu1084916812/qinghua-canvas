@@ -29,6 +29,7 @@ import {
   useEdgeSelection,
   useGraph,
   useSelection,
+  useUpstreamPick,
 } from '../storeContext'
 import { useCanvasExecution } from '../execution/CanvasExecutionProvider'
 import { useCanvasPageEvents } from '../../../features/canvas/useCanvasPageEvents'
@@ -43,6 +44,7 @@ import {
   type MarqueeRect,
 } from './flowGraph'
 import type { NodeSnapshot } from '../../../domain/canvas/model/node'
+import { directUpstream } from '../../../domain/canvas/graph/upstreamOf'
 import type { NodeViewEvent } from '../nodes/registry'
 import { useNodeDerivedMaps } from '../useNodeDerivedMaps'
 import { QhCoarseEdge, QhEdge } from './FlowEdge'
@@ -224,6 +226,7 @@ function FlowSurfaceInner({
   const detailMode = useCanvasDetailMode(store)
   const graph = useGraph()
   const selection = useSelection()
+  const upstreamPick = useUpstreamPick()
   const edgeSelection = useEdgeSelection()
   const initialFlowViewport = useRef(storeViewportToFlow(store.getViewport())).current
   const handleViewportChange = useCallback(
@@ -359,7 +362,10 @@ function FlowSurfaceInner({
         shiftKey: e.shiftKey,
         batchSlot: batchSlotOf(childId, store.getSnapshot()),
       })
-      if (plan.selection) store.setSelection(plan.selection)
+      if (plan.selection) {
+        if (e.shiftKey) store.setSelectionAsMulti(plan.selection)
+        else store.setSelection(plan.selection)
+      }
       if (plan.reparent) {
         store.dispatch(
           {
@@ -391,7 +397,12 @@ function FlowSurfaceInner({
         selection: store.getSelection(),
         shiftKey: e.shiftKey,
       })
-      if (plan.kind !== 'none') store.setSelection(plan.selection)
+      if (plan.kind !== 'none') {
+        if (plan.selection) {
+          if (e.shiftKey && plan.selection.length === 1) store.setSelectionAsMulti(plan.selection)
+          else store.setSelection(plan.selection)
+        }
+      }
     },
     [store],
   )
@@ -561,6 +572,27 @@ function FlowSurfaceInner({
   )
 
   const nodeStateOf = useCallback((id: string) => exec.nodeStateOf(id), [exec])
+  const upstreamPickConfig = useMemo(() => {
+    if (!upstreamPick) return null
+    const allowedIds = new Set([upstreamPick, ...directUpstream(upstreamPick, graph.edges)])
+    return { nodeId: upstreamPick, allowedIds }
+  }, [graph.edges, upstreamPick])
+
+  const handlePickNode = useCallback(
+    (nodeId: string) => {
+      if (!upstreamPick || nodeId === upstreamPick) return
+      try {
+        store.dispatch({ kind: 'edge.connect', source: nodeId, target: upstreamPick })
+        store.endUpstreamPick()
+        store.setSelection([upstreamPick])
+      } catch {
+        store.setSelection([upstreamPick])
+        store.notify('这个节点不能作为当前节点的上游', 'error')
+      }
+    },
+    [store, upstreamPick],
+  )
+
   const nodes = useMemo<RFNode<FlowNodeData>[]>(
     () =>
       flowNodesFor({
@@ -573,8 +605,11 @@ function FlowSurfaceInner({
         emitFor: makeEmit,
         resize: (id, rect, phase) => store.dispatch({ kind: 'node.resize', id, rect, phase }),
         renderChild: renderFlowChild,
+        upstreamPick: upstreamPickConfig,
       }),
-    [graph, selection, nodeStateOf, makeEmit, childIndex, renderFlowChild, derived, store, detailMode],
+    [
+      graph, selection, nodeStateOf, makeEmit, childIndex, renderFlowChild, derived, store, detailMode, upstreamPickConfig,
+    ],
   )
 
   const edges = useMemo(
@@ -728,6 +763,11 @@ function FlowSurfaceInner({
   /** Del / Backspace 的按键守卫与删除顺序归 flowSurfaceChangeCoordinator。 */
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && store.getUpstreamPick()) {
+        store.endUpstreamPick()
+        e.preventDefault()
+        return
+      }
       const handled = applyFlowDeleteKey(
         {
           key: e.key,
@@ -841,6 +881,15 @@ function FlowSurfaceInner({
       // 按下阶段：清「拖动后不弹面板」标记 + 记拖动起点锚（见 onSurfacePointerDown）
       onPointerDownCapture={onSurfacePointerDown}
       onClickCapture={e => {
+        if (upstreamPick) {
+          const nodeId = (e.target as HTMLElement).closest('[data-node-id]')?.getAttribute('data-node-id')
+          if (nodeId) {
+            e.preventDefault()
+            e.stopPropagation()
+            handlePickNode(nodeId)
+            return
+          }
+        }
         // Ignore only the physical click emitted after this stroke.
         if (!knifeClickPending.current || e.detail === 0) return
         knifeClickPending.current = false; e.preventDefault()
@@ -914,6 +963,10 @@ function FlowSurfaceInner({
         autoPanOnSelection={false}
         onSelectionStart={onSelectionStart}
         onSelectionEnd={onSelectionEnd}
+        onNodeClick={(_event, node) => handlePickNode(node.id)}
+        onPaneClick={() => {
+          if (store.getUpstreamPick()) store.endUpstreamPick()
+        }}
         defaultViewport={initialFlowViewport}
         onViewportChange={handleViewportChange}
         onNodesChange={onNodesChange}

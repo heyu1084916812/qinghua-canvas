@@ -146,13 +146,13 @@ const HeaderLabel = memo(function HeaderLabel({
     event.stopPropagation()
     const selection = store.getSelection()
     const additive = event.shiftKey || event.ctrlKey || event.metaKey
-    store.setSelection(
-      additive
-        ? selection.includes(label.id)
-          ? selection.filter((id) => id !== label.id)
-          : [...selection, label.id]
-        : [label.id],
-    )
+    const next = additive
+      ? selection.includes(label.id)
+        ? selection.filter((id) => id !== label.id)
+        : [...selection, label.id]
+      : [label.id]
+    if (additive) store.setSelectionAsMulti(next)
+    else store.setSelection(next)
   }
 
   const commit = () => {

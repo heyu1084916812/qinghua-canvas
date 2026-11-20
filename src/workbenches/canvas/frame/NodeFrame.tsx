@@ -69,6 +69,8 @@ export interface NodeFrameProps {
    * 差别只在语义与来源：禁用是用户自己关掉的，未参与是被别人关了眼睛。
    */
   excluded?: boolean
+  /** 选上游时的候选过滤态：仅复用禁用透明度，不显示「未参与」语义徽标。 */
+  dimmed?: boolean
   /** 在节点任意位置按下：选中 + 发起拖动（由父层接线） */
   onFramePointerDown: (e: ReactPointerEvent) => void
   /**
@@ -222,7 +224,7 @@ export function NodeFrame(props: NodeFrameProps) {
        * 不需要 RF 插手。
        */
       className={`${styles.frame} ${selected ? styles.selected : ''} ${
-        node.disabled || props.excluded ? styles.disabled : ''
+        node.disabled || props.excluded || props.dimmed ? styles.disabled : ''
       } ${inContainer ? 'nodrag' : ''}`}
       style={{
         left: props.selfPositioned === false ? 0 : node.x,
@@ -235,6 +237,7 @@ export function NodeFrame(props: NodeFrameProps) {
       data-node-disabled={node.disabled ? 'true' : undefined}
       /* 未参与（被下游 / 容器关掉眼睛）：与禁用同款视觉，靠这个锚点分开断言 */
       data-node-excluded={!node.disabled && props.excluded ? 'true' : undefined}
+      data-node-dim={props.dimmed ? 'true' : undefined}
       /**
        * **落库的模型**（不是面板兜底显示的那个）。
        *

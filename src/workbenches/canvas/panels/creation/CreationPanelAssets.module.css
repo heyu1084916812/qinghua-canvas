@@ -355,3 +355,23 @@
     top: auto;
     bottom: 1px;
   }
+
+
+.addUpstream {
+  width: 52px;
+  height: 52px;
+  flex: 0 0 52px;
+  border: 1px dashed var(--stroke);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-2);
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.addUpstream:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+

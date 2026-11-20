@@ -42,6 +42,7 @@ describe('CreationPanel 视图拆分', () => {
         onToggleThumb: () => {},
         onRemoveThumb: () => {},
         onFocusThumb: () => {},
+        onBeginUpstreamPick: () => {},
         onModeChange: () => {},
       }),
     )
@@ -82,6 +83,7 @@ describe('CreationPanel 视图拆分', () => {
           onToggleThumb: () => {},
           onRemoveThumb: () => {},
           onFocusThumb: () => {},
+        onBeginUpstreamPick: () => {},
           onModeChange: () => {},
         }),
       ),
