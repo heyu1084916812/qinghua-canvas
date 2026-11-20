@@ -20,6 +20,7 @@ import { noOverlapDelta } from '../../../features/canvas/duplicatePlacement'
 import { saveAssetToLibrary } from '../../../features/canvas/saveAssetToLibrary'
 import { Download, Icon } from '../../../ui/icon'
 import styles from './ContextMenu.module.css'
+import { useOverlayExit } from '../overlay/useOverlayExit'
 import {
   IconBatch,
   IconCompare,
@@ -104,7 +105,9 @@ export function ContextMenu() {
   const ref = useRef<HTMLDivElement>(null)
   const [size, setSize] = useState({ w: 180, h: 0 })
 
-  const menu = useSyncExternalStore(store.subscribe, store.getMenu, store.getMenu)
+  const activeMenu = useSyncExternalStore(store.subscribe, store.getMenu, store.getMenu)
+  const menuExit = useOverlayExit(activeMenu, true, 120)
+  const menu = menuExit.value
 
   // 菜单打开时挂全局关闭监听：Esc / 点外部 / 滚轮 / 平移
   useEffect(() => {
@@ -279,7 +282,7 @@ export function ContextMenu() {
   return (
     <div
       ref={ref}
-      className={styles.menu}
+      className={`${styles.menu} ${menuExit.closing ? styles.menuClosing : ""}`}
       role="menu"
       data-context-menu
       style={{ left, top }}
@@ -313,3 +316,6 @@ export function ContextMenu() {
     </div>
   )
 }
+
+
+

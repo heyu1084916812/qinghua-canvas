@@ -1,0 +1,17 @@
+{
+  "open": {
+    "mounted": true,
+    "duration": 180,
+    "from": "translateY(4px) scale(0.985)",
+    "to": "translateY(0px) scale(1)"
+  },
+  "closing": {
+    "mounted": true,
+    "closing": true,
+    "duration": 120,
+    "from": "translateY(0px) scale(1)",
+    "to": "translateY(3px) scale(0.985)"
+  },
+  "gone": 0,
+  "errors": []
+}

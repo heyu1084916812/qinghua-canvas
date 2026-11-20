@@ -74,3 +74,28 @@
     transform: translateY(0) scale(1);
   }
 }
+.menuClosing {
+  animation: menuInkOut 120ms var(--ease-panel) forwards;
+  pointer-events: none;
+}
+
+@keyframes menuInkOut {
+  from {
+    opacity: 1;
+    filter: blur(0);
+    transform: translateY(0) scale(1);
+  }
+  to {
+    opacity: 0;
+    filter: blur(2px);
+    transform: translateY(3px) scale(0.985);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .menu,
+  .menuClosing {
+    animation: none;
+  }
+}
+

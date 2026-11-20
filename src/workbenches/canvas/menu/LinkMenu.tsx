@@ -17,6 +17,7 @@ import {
   IconPrompt,
 } from '../toolbar/icons'
 import styles from './LinkMenu.module.css'
+import { useOverlayExit } from '../overlay/useOverlayExit'
 
 /**
  * 菜单项图标（用户 2026-09-19 第 5 条：拉线后的这个菜单也要有图标，与工具栏同一套）。
@@ -64,7 +65,9 @@ export function LinkMenu() {
   /** 已经"把焦点收进去"的那一次打开（对象身份会随 setState 变，用它挡住重复收焦） */
   const openedRef = useRef<unknown>(null)
   const [size, setSize] = useState({ w: 180, h: 0 })
-  const menu = useSyncExternalStore(store.subscribe, store.getLinkMenu, store.getLinkMenu)
+  const activeMenu = useSyncExternalStore(store.subscribe, store.getLinkMenu, store.getLinkMenu)
+  const menuExit = useOverlayExit(activeMenu, true, 120)
+  const menu = menuExit.value
 
   // 渲染后量自身尺寸做边界翻转（与右键菜单同一套做法）
   useEffect(() => {
@@ -221,7 +224,7 @@ export function LinkMenu() {
   return (
     <div
       ref={ref}
-      className={styles.menu}
+      className={`${styles.menu} ${menuExit.closing ? styles.menuClosing : ""}`}
       role="menu"
       data-link-menu
       data-link-menu-side={menu.side}
@@ -255,3 +258,6 @@ export function LinkMenu() {
     </div>
   )
 }
+
+
+
