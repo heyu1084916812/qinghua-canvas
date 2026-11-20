@@ -27,10 +27,8 @@ import { defaultPresetOptions, emotionById, presetById } from '../../../domain/c
 import { hasRunnableDownstream } from '../../../features/canvas/execution/loopRun'
 import { resolveFaceBox } from '../../../features/canvas/emotionEdit'
 import { useOverlayExit } from '../overlay/useOverlayExit'
-
 /** 面板与节点底边的间距 */
 const PANEL_GAP = 12
-
 /**
  * 创作面板的缩放（`.panel` 的 `zoom`）。
  *
@@ -56,10 +54,8 @@ const PANEL_GAP = 12
  * 于是屏幕上：面板尺寸不变、字变大。
  */
 const PANEL_ZOOM = 0.75
-
 /** 出现创作参数面板的节点类型（§6.1「单选提示词 / 生成 / 分组 / 批量节点时出现」） */
 const PANEL_TYPES = new Set<NodeSnapshot['type']>(['prompt', 'generation', 'batch'])
-
 /**
  * 创作参数面板层（架构 §4.7）。
  *
@@ -98,7 +94,6 @@ const workflowSources = useWorkflowPanelSources()
     store.isPanelDismissed,
     store.isPanelDismissed,
   )
-
   // 多选不显示面板（§6.15）；单选且类型适用才显示；拖动中 / 拖过后（未重新选中）同样隐藏
   const selectedNode = useMemo(() => {
     if (dragging || panelDismissed) return null
@@ -109,7 +104,6 @@ const workflowSources = useWorkflowPanelSources()
   const { value: exitingNode, closing } = useOverlayExit(selectedNode, selection.length === 0)
   const visibleNode = selectedNode ?? exitingNode
   const viewport = useViewportStateWhen(selectedNode !== null)
-
   // 提示词节点的「优化 / 翻译」工具（§6.7）：面板是纯视图，状态由本层持有
   const promptData = selectedNode?.type === 'prompt' ? (selectedNode.data as PromptData) : null
   /**
@@ -161,9 +155,7 @@ const workflowSources = useWorkflowPanelSources()
       if (text.length >= 200) store.openTextEditor(selectedNode.id)
     },
   })
-
   if (!visibleNode) return null
-
   /**
    * 面板模型（缩略图 / 集合卡）。
    *
@@ -171,7 +163,6 @@ const workflowSources = useWorkflowPanelSources()
    * （见 `hasSourceImage`）——两处各算一遍迟早漂移。
    */
   const panelModel = buildPanelModel(visibleNode, graph)
-
   /**
    * 两种面板共用的**唯一出口**：面板只 emit 语义事件，由 `handlePanelEvent` 翻成命令
    * （架构 §4.7 ①）。情绪面板与创作面板走同一个函数，因为它们的参数事件完全同源

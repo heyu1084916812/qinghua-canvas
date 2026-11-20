@@ -13385,6 +13385,27 @@
         "scripts/knifeProductStroke.mjs"
       ],
       "budget": 150
+    },
+    {
+      "module": "src/workbenches/canvas/overlay/useOverlayExit.ts",
+      "owner": "canvas-overlay-motion",
+      "responsibility": "画布选择浮层的退场保留时序，避免面板和节点功能栏在清选中时立即卸载。",
+      "owns": [
+        "选择消失后的短暂快照与定时清理",
+        "退场态的 closing 判定"
+      ],
+      "doesNotOwn": [
+        "画布选择命令",
+        "具体面板与功能栏样式",
+        "灯箱 FLIP"
+      ],
+      "publicApi": [
+        "useOverlayExit"
+      ],
+      "test": [
+        "src/workbenches/canvas/overlay/useOverlayExit.test.ts"
+      ],
+      "budget": 80
     }
   ]
 }
