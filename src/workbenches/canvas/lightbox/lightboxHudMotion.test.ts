@@ -1,3 +1,4 @@
+// @ts-expect-error -- tests read source CSS/TS without adding Node types to the app
 import fs from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
@@ -17,3 +18,4 @@ describe('lightbox HUD mode motion', () => {
     expect(css).toContain('  .hud {\n    animation: none;')
   })
 })
+
