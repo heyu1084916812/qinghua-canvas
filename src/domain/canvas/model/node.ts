@@ -148,6 +148,10 @@ export interface GenerationData {
   workflowJson?: Record<string, unknown>
   /** RunningHub 实例规格（24G / 48G）；缺省 = default */
   workflowInstance?: 'default' | 'plus'
+  /** 本地 ComfyUI 可选媒体无上游素材时的处理：skip 保留默认值，prune-workflow 删除输入。 */
+  workflowMediaPolicy?: 'skip' | 'prune-workflow'
+  /** 可选媒体字段 id；仅供 prune-workflow 判断哪些输入可以删除。 */
+  workflowOptionalMediaIds?: string[]
   /**
    * 生成来源（API / 工作流 / 本机 CLI，对账 #1133）。缺省 = 老节点，按模型前缀 / 渠道协议推断
    * （`generationSource.inferSource`）；新节点默认 API。

@@ -146,6 +146,8 @@ function workflowTab(input: SourceMenuInput): SourceMenuTab {
           workflowNodeInfoList: workflowSubmitList(row.entry, {}),
           ...(row.entry.provider === 'comfyui-local' && row.entry.workflowJson ? { workflowJson: row.entry.workflowJson } : {}),
           workflowInstance: 'default',
+          ...(row.entry.mediaPolicy ? { workflowMediaPolicy: row.entry.mediaPolicy } : {}),
+          ...(row.entry.mediaPolicy === 'prune-workflow' ? { workflowOptionalMediaIds: row.entry.fields.filter((field) => !field.required && ['image', 'video', 'audio'].includes(field.type)).map((field) => field.id) } : {}),
         },
       },
     }

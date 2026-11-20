@@ -9,6 +9,9 @@ export { isWorkflowLinkValue }
 /** 执行端：先只支持云端 RunningHub，本地 ComfyUI 留同构的口子（用户 2026-11-14 口径） */
 export type WorkflowProviderKind = 'runninghub' | 'comfyui-local'
 
+/** 可选媒体没有上游素材时的提交口径。skip 保留节点默认值；prune-workflow 删除该输入。 */
+export type WorkflowMediaPolicy = 'skip' | 'prune-workflow'
+
 export interface WorkflowProviderSpec {
   id: WorkflowProviderKind
   label: string
@@ -112,6 +115,8 @@ export interface WorkflowEntry {
   graph?: WorkflowGraph
   /** ComfyUI 执行所需的原始 prompt graph；只对本地 ComfyUI 条目保存。 */
   workflowJson?: Record<string, unknown>
+  /** 可选媒体没有上游素材时的提交口径；老条目默认 skip。 */
+  mediaPolicy?: WorkflowMediaPolicy
   /** 最近一次拉到参数的时间（毫秒）；0 = 从没拉过 */
   fetchedAt: number
   /**
@@ -385,6 +390,7 @@ export function normalizeWorkflowEntries(raw: unknown): WorkflowEntry[] {
     const note = str(record.note).trim()
     const kind = record.kind === 'app' ? 'app' : 'workflow'
     const outputKind = record.outputKind === 'video' ? 'video' : record.outputKind === 'image' ? 'image' : undefined
+    const mediaPolicy = record.mediaPolicy === 'prune-workflow' ? 'prune-workflow' : 'skip'
     const graph = normalizeWorkflowGraph(record.graph)
     const workflowJson = normalizeComfyWorkflowJson(record.workflowJson)
     out.push({
@@ -394,6 +400,7 @@ export function normalizeWorkflowEntries(raw: unknown): WorkflowEntry[] {
       kind,
       ...(note ? { note } : {}),
       ...(outputKind ? { outputKind } : {}),
+      ...(mediaPolicy === 'prune-workflow' ? { mediaPolicy } : {}),
       fields,
       ...(graph ? { graph } : {}),
       ...(workflowJson ? { workflowJson } : {}),

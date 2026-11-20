@@ -46,18 +46,23 @@ async function graphOf(request: ImageRunRequest | VideoRunRequest, deps: Channel
     return typeof v.nodeId === 'string' && typeof v.fieldName === 'string' && (typeof v.fieldValue === 'string' || typeof v.fieldValue === 'number')
   }).map((item) => ({ nodeId: item.nodeId, fieldName: item.fieldName, fieldValue: String(item.fieldValue) })) : []
   const uploaded: { nodeId: string; fieldName: string; fieldValue: string }[] = []
+  const missingOptionalMedia: string[] = []
   let assetIndex = 0
   for (const item of normalized) {
     if (item.fieldValue !== '__upstream__') { uploaded.push(item); continue }
     const source = assets[assetIndex++]
-    if (!source) continue
+    if (!source) {
+      const id = `${item.nodeId}::${item.fieldName}`
+      if ((request.params.workflowOptionalMediaIds as unknown[] | undefined)?.includes(id)) missingOptionalMedia.push(id)
+      continue
+    }
     const payload = await deps.assets.read(source.assetHash)
     if (!payload) throw new ChannelError({ kind: 'channel', detail: 'unsupported' })
     const extension = payload.mime.split('/')[1]?.replace(/[^a-z0-9]/gi, '') || 'bin'
     const fileName = await uploadComfyImage(deps.network, endpoint, { bytes: payload.bytes, mime: payload.mime, name: `${source.assetHash}.${extension}` }, signal)
     uploaded.push({ ...item, fieldValue: fileName })
   }
-  return applyWorkflowNodeInfo(graph, uploaded)
+  return applyWorkflowNodeInfo(graph, uploaded, request.params.workflowMediaPolicy === 'prune-workflow' ? missingOptionalMedia : [])
 }
 
 function contentTypeOf(headers: Record<string, string>, fallback: string): string {

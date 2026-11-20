@@ -27,6 +27,8 @@ export function generationParams(data: GenerationData): Record<string, unknown> 
     ? {
         ...(data.workflowNodeInfoList?.length ? { workflow: data.workflowNodeInfoList } : {}),
         ...(data.workflowJson ? { workflowJson: data.workflowJson } : {}),
+        ...(data.workflowMediaPolicy ? { workflowMediaPolicy: data.workflowMediaPolicy } : {}),
+        ...(data.workflowOptionalMediaIds?.length ? { workflowOptionalMediaIds: data.workflowOptionalMediaIds } : {}),
       }
     : {}
   const instanceType = entryModel && data.workflowInstance === 'plus' ? { instanceType: 'plus' } : {}
