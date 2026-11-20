@@ -147,6 +147,48 @@ describe('SettingsPage 视图拆分', () => {
     expect(connectionHtml).not.toContain('AI 应用和工作流')
   })
 
+  it('本地 ComfyUI 连接区显示专用启动与工作流引导', () => {
+    const html = render(SettingsConnectionView, {
+      baseUrl: 'http://127.0.0.1:8188',
+      busy: false,
+      protocol: 'comfyui-local',
+      builtinSelected: false,
+      visibleProtocolOptions: [],
+      pendingProtocols: [],
+      referencedProtocolIds: new Set<string>(),
+      statusLine: '就绪',
+      statusTone: 'info',
+      showMockNote: false,
+      newProtoOpen: false,
+      hiddenBuiltinProtocolCount: 0,
+      npNotice: '',
+      protoManageNotice: '',
+      protoRemoveError: '',
+      npImportText: '',
+      npImported: null,
+      npError: '',
+      onBaseUrlChange: () => {},
+      onPersistForm: () => {},
+      onProtocolChange: () => {},
+      onDownloadProtocol: () => {},
+      onRemoveProtocol: () => {},
+      onDetect: () => {},
+      onVerify: () => {},
+      onToggleNewProtocol: () => {},
+      onRestoreBuiltinProtocols: () => {},
+      onDownloadProtocolTemplate: () => {},
+      onImportProtocolFile: () => {},
+      onImportTextChange: () => {},
+      onClearImported: () => {},
+      onClearImportError: () => {},
+      onCheckImportedProtocol: () => {},
+      onSaveImportedProtocol: () => {},
+    })
+    expect(html).toContain('data-comfyui-guide')
+    expect(html).toContain('不需要 API Key')
+    expect(html).toContain('prompt graph JSON')
+  })
+
   it('协议详情保持导入、待支持和说明的原始顺序', () => {
     const html = render(SettingsProtocolDetailsView, {
       protocol: 'runninghub-api',

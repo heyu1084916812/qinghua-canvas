@@ -193,6 +193,15 @@ export function SettingsConnectionView({
         </label>
       </div>
 
+      {protocol === 'comfyui-local' && (
+        <div className={styles.offlineNote} data-comfyui-guide>
+          <strong>本地 ComfyUI</strong>
+          <br />
+          先启动 ComfyUI，并确认它监听在上面的地址（默认 `http://127.0.0.1:8188`）。
+          不需要 API Key；再到「工作流」页导入 API 格式的 prompt graph JSON，保存后即可在创作节点里选择本地工作流。
+        </div>
+      )}
+
       {credentialField}
 
       <SettingsProtocolDetailsView

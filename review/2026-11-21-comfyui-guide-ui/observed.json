@@ -1,0 +1,8 @@
+{
+  "viewport": "1440x900",
+  "theme": "dark",
+  "page": "settings/model-services",
+  "before": "current settings card and protocol picker observed in desktop development build",
+  "after": "code change is hot-reloadable; local ComfyUI guide is covered by SettingsPageViews.test; live local protocol selection was not completed because the menu extends below the desktop viewport",
+  "errors": 0
+}

@@ -8,7 +8,7 @@ import { readFileSync } from 'node:fs'
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
-import { Icon, iconSvgString, ICON_GAP_PX, ICON_SIZE_PX, ICON_STROKE, Search, X } from './index'
+import { FollowSource, Icon, iconSvgString, ICON_GAP_PX, ICON_SIZE_PX, ICON_STROKE, Search, X } from './index'
 import { gridStrokeWidth, type IconSize } from './iconTokens'
 
 const render = (size?: IconSize, label?: string) =>
@@ -66,6 +66,12 @@ describe('iconSvgString', () => {
       expect(attr(str, 'width')).toBe('14')
       expect(attr(str, 'aria-hidden')).toBe('true')
     }
+  })
+
+  it('自绘图标也通过统一出口保留叠纸几何', () => {
+    const markup = renderToStaticMarkup(createElement(Icon, { icon: FollowSource, size: 'md' }))
+    expect(markup.match(/<rect/g)).toHaveLength(2)
+    expect(attr(markup, 'stroke-width')).toBe(String(gridStrokeWidth(ICON_SIZE_PX.md)))
   })
 
   it('不是图标组件时报错而不是静默输出空图形', () => {

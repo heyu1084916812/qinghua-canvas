@@ -7,6 +7,7 @@
  */
 export { Icon, type IconProps } from './Icon'
 export { iconSvgString } from './svgString'
+export { FollowSource } from './custom/FollowSource'
 export {
   ICON_GAP_PX,
   ICON_SIZE_PX,

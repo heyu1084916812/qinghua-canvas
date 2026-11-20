@@ -1,7 +1,8 @@
-import { useEffect, useLayoutEffect, useRef, useState, type ReactNode, type SVGProps } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 
 import styles from './ParamPicker.module.css'
 import { RATIO_FOLLOW_SOURCE } from '../../../domain/canvas/layout/constants'
+import { FollowSource, Icon } from '../../../ui/icon'
 
 /** 参数选项：`value` 落到节点数据，`label` 只用于展示 */
 export interface ParamOption {
@@ -828,21 +829,16 @@ function ParamOptionButton(props: {
  * 每格画一个与 `w:h` 同比例的小矩形，长边固定 18px。解析不出比例时退回方块——
  * 不猜一个假比例出来，宁可画成 1:1。
  */
-function FollowSourceGlyph(props: SVGProps<SVGSVGElement>) {
+function FollowSourceGlyph({ ratio }: { ratio: string }) {
   return (
-    <svg
-      {...props}
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.7"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <rect x="3.5" y="6.5" width="11" height="13" rx="1.5" />
-      <rect x="9.5" y="3.5" width="11" height="13" rx="1.5" />
-    </svg>
+    <Icon
+      icon={FollowSource}
+      size="md"
+      className={styles.ratioGlyph}
+      data-ratio-glyph={ratio}
+      width={18}
+      height={18}
+    />
   )
 }
 
@@ -854,12 +850,7 @@ function RatioGlyph({ ratio }: { ratio: string }) {
    */
   if (ratio === RATIO_FOLLOW_SOURCE) {
     return (
-      <FollowSourceGlyph
-        className={styles.ratioGlyph}
-        data-ratio-glyph={ratio}
-        width={18}
-        height={18}
-      />
+      <FollowSourceGlyph ratio={ratio} />
     )
   }
   /**

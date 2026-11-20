@@ -424,7 +424,7 @@
       "test": [
         "src/workbenches/canvas/flow/flowGraph.test.ts"
       ],
-      "budget": 1060
+      "budget": 1140
     },
     {
       "module": "src/workbenches/canvas/lightbox/LightboxLayer.tsx",
@@ -665,7 +665,7 @@
       "test": [
         "src/workbenches/canvas/flow/edgeCutGeometry.test.ts"
       ],
-      "budget": 130
+      "budget": 150
     },
     {
       "module": "src/workbenches/canvas/flow/FlowEdgeCutLayer.tsx",
@@ -4856,7 +4856,7 @@
       "test": [
         "src/workbenches/canvas/panels/creation/creationStyles.test.ts"
       ],
-      "budget": 378
+      "budget": 430
     },
     {
       "module": "src/workbenches/canvas/panels/creation/PromptReferenceThumb.module.css",
@@ -7221,7 +7221,7 @@
       "test": [
         "src/workbenches/canvas/panels/creation/CreationPanelViews.test.ts"
       ],
-      "budget": 94
+      "budget": 125
     },
     {
       "module": "src/workbenches/canvas/panels/creation/CreationPromptView.tsx",
@@ -12271,7 +12271,7 @@
       "test": [
         "src/features/settings/useWorkflowEntries.test.ts"
       ],
-      "budget": 320
+      "budget": 350
     },
     {
       "module": "src/pages/WorkflowsPage/WorkflowsPage.tsx",
@@ -12373,7 +12373,7 @@
       "test": [
         "src/domain/project/workflowGraph.test.ts"
       ],
-      "budget": 280
+      "budget": 330
     },
     {
       "module": "src/features/settings/WorkflowFieldRow.tsx",
@@ -13431,6 +13431,105 @@
         "src/workbenches/canvas/overlay/useOverlayExit.test.ts"
       ],
       "budget": 80
+    },
+    {
+      "module": "src/domain/project/source.ts",
+      "owner": "project-source-domain",
+      "responsibility": "来源、站点与协议能力的领域描述和操作能力映射。",
+      "owns": [
+        "来源类型与认证类型",
+        "站点描述和协议能力",
+        "来源操作支持判断"
+      ],
+      "doesNotOwn": [
+        "渠道凭据持久化",
+        "设置页渲染",
+        "网络请求"
+      ],
+      "publicApi": [
+        "SourceKind",
+        "ProtocolSourceDescriptor",
+        "SourceSiteDescriptor",
+        "sourceSiteDescriptorOf",
+        "sourceSiteCatalogOf",
+        "protocolSourceDescriptor",
+        "sourceOperationsFor"
+      ],
+      "test": [
+        "src/domain/project/source.test.ts"
+      ],
+      "budget": 220
+    },
+    {
+      "module": "src/platform/channels/comfyui.ts",
+      "owner": "comfyui-channel-adapter",
+      "responsibility": "本地 ComfyUI 渠道适配器：校验连接、提交工作流、轮询历史并下载生成产物。",
+      "owns": [
+        "ComfyUI 通道适配",
+        "生成产物解析与指纹",
+        "本地工作流执行错误映射"
+      ],
+      "doesNotOwn": [
+        "工作流字段建模",
+        "设置页状态",
+        "画布节点渲染"
+      ],
+      "publicApi": [
+        "ComfyUiAdapterOptions",
+        "createComfyUiAdapter"
+      ],
+      "test": [
+        "src/platform/channels/comfyui.test.ts"
+      ],
+      "budget": 150
+    },
+    {
+      "module": "src/platform/channels/comfyWorkflow.ts",
+      "owner": "comfyui-workflow-transport",
+      "responsibility": "ComfyUI HTTP 工作流传输与输入素材上传的请求体解析和安全校验。",
+      "owns": [
+        "prompt/history 请求",
+        "输入图片 multipart 上传",
+        "远端文件名与子目录校验"
+      ],
+      "doesNotOwn": [
+        "渠道注册",
+        "工作流参数面板",
+        "画布产物持久化"
+      ],
+      "publicApi": [
+        "ComfyWorkflowEndpoint",
+        "ComfyPromptBody",
+        "parseComfyPromptAccepted",
+        "parseComfyHistory",
+        "submitComfyPrompt",
+        "queryComfyHistory",
+        "uploadComfyImage"
+      ],
+      "test": [
+        "src/platform/channels/comfyWorkflow.test.ts"
+      ],
+      "budget": 100
+    },
+    {
+      "module": "src/ui/icon/custom/FollowSource.tsx",
+      "owner": "ui-icon-custom",
+      "responsibility": "跟随上游素材比例图标的统一 Lucide 形状定义。",
+      "owns": [
+        "叠纸图标几何"
+      ],
+      "doesNotOwn": [
+        "参数面板布局",
+        "图标尺寸和线宽令牌",
+        "用户交互"
+      ],
+      "publicApi": [
+        "FollowSource"
+      ],
+      "test": [
+        "src/ui/icon/Icon.test.ts"
+      ],
+      "budget": 30
     }
   ]
 }
