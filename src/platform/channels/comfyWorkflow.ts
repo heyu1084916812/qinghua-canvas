@@ -61,6 +61,7 @@ export async function uploadComfyImage(network: NetworkPort, endpoint: ComfyWork
   form.append('type', 'input')
   form.append('overwrite', 'true')
   const response = await network.request({ url: urlOf(endpoint, '/upload/image'), method: 'POST', headers: {}, body: form, timeoutMs: 30_000, publicOnly: false }, signal)
+  if (response.status < 200 || response.status >= 300) throw new ChannelError({ kind: 'http', status: response.status, body: await response.text().catch(() => '') })
   const raw = await response.json()
   if (!raw || typeof raw !== 'object') throw new ChannelError({ kind: 'parse', raw: 'ComfyUI /upload/image 返回不是对象' })
   const value = raw as Record<string, unknown>

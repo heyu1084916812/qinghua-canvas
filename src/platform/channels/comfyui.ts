@@ -2,6 +2,7 @@ import { fingerprintBytes } from '../../domain/shared/hash'
 import { imageSizeFromHeader } from '../../domain/shared/imageSize'
 import type { ModelCapability } from '../../domain/shared/capability'
 import type { SafeChannelConfig } from '../ports'
+import { asAppError } from '../../shared/result'
 import { ChannelError, type ChannelAdapter, type ChannelDeps, type GeneratedAsset, type ImageRunRequest, type VideoRunRequest, type VerifyResult } from './types'
 import { applyWorkflowNodeInfo } from '../../domain/project/workflowGraph'
 import { submitComfyPrompt, queryComfyHistory, uploadComfyImage, type ComfyWorkflowEndpoint, type ComfyPromptBody } from './comfyWorkflow'
@@ -78,7 +79,8 @@ export function createComfyUiAdapter(config: SafeChannelConfig, deps: ChannelDep
       return { ok: true, models: [], note: 'ComfyUI 本地服务已连接；模型目录由工作流决定。' }
     } catch (error) {
       if (error instanceof ChannelError) return { ok: false, error: error.appError }
-      return { ok: false, error: { kind: 'network', detail: 'dns' } }
+      const appError = asAppError(error)
+      return { ok: false, error: appError ?? { kind: 'network', detail: 'dns' } }
     }
   }
 
