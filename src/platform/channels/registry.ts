@@ -12,6 +12,7 @@ import { createS65535CombinedAdapter } from './s65535Combined'
 import { createCliGatewayAdapter } from './cliGateway'
 import { createCliRunAdapter } from './cliRun'
 import { createDeclarativeHttpAdapter } from './declarativeHttp'
+import { createComfyUiAdapter } from './comfyui'
 
 /** 调用前由凭据层注入明文令牌的渠道配置（业务代码与 UI 全程不接触明文） */
 export interface ResolvedChannelConfig extends SafeChannelConfig {
@@ -144,6 +145,8 @@ export function createChannelAdapter(
      */
     case 'cli-gateway':
       return deps.cli ? createCliRunAdapter(config, deps) : createCliGatewayAdapter(config, deps)
+    case 'comfyui-local':
+      return createComfyUiAdapter(config, deps)
     case 'declarative-http': {
       const recipe = config.protocolDefinition?.recipe
       if (!recipe) throw new ChannelError({ kind: 'channel', detail: 'unsupported' })

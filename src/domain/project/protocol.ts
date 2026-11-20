@@ -489,6 +489,17 @@ export const BUILTIN_PROTOCOLS: ProtocolDefinition[] = [
        * `POST /openapi/v2/query`（body 给 taskId），结果字段是 `results[]`，
        * 与 APIMART 那套 `/tasks/{id}` + `result.images[].url` 完全不通用。
        */
+      id: 'comfyui-local',
+      name: 'ComfyUI（本地工作流）',
+      short: 'COMFY',
+      family: 'comfyui-local',
+      kind: 'public',
+      status: 'ready',
+      capabilities: ['image', 'video'],
+      note: '连接本机或局域网 ComfyUI；模型目录不从节点 schema 猜测，需在工作流条目中提供 prompt graph。',
+      credentials: [],
+    },
+    {
       id: 'runninghub-api',
       name: 'RunningHub（API）',
       short: 'RH+',
