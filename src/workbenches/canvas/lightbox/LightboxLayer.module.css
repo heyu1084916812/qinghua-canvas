@@ -100,8 +100,20 @@
   }
 }
 
+@keyframes hudContentIn {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -4px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .overlay {
+  .overlay,
+  .hud {
     animation: none;
   }
 }
@@ -189,7 +201,7 @@
   top: 24px;
   left: 50%;
   /* 参数栏与图片一起进场（#1161）：用户要"参数同步渐显"，不再等图片先就位 */
-  animation: fadeIn var(--dur-lightbox) var(--ease-panel);
+  animation: hudContentIn 180ms var(--ease-panel);
   z-index: 6;
   display: flex;
   align-items: center;
@@ -846,3 +858,7 @@
   font-size: var(--fs-chip);
   font-variant-numeric: tabular-nums;
 }
+
+
+
+

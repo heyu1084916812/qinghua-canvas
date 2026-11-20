@@ -1,0 +1,13 @@
+{
+  "viewport": {
+    "width": 1440,
+    "height": 900
+  },
+  "hud": {
+    "mode": "crop",
+    "duration": 180,
+    "from": "translate(-50%, -4px)",
+    "to": "translate(-50%)"
+  },
+  "errors": []
+}

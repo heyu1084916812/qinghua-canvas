@@ -599,7 +599,7 @@ export function LightboxLayer() {
         </>
       ) : null}
       {mode !== 'view' ? (
-      <div className={styles.hud}>
+      <div key={`${mode}-${view}`} className={styles.hud} data-lightbox-hud>
         {/*
           * 对比三档：first / split / second 并排；标签由 compareKind 决定
           * （融合结果 = 结果/对比/原图，对比节点 = A·左/对比/B·右）。
@@ -1003,3 +1003,4 @@ export function LightboxLayer() {
     </div>
   )
 }
+
