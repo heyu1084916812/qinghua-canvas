@@ -16,10 +16,11 @@ import styles from './WorkflowsPage.module.css'
 
 /** 能管 AI 应用 / 工作流的渠道：RunningHub 协议（国内站 / 国际站各一条，用户也可能自建） */
 export function workflowChannelsOf(channels: readonly Channel[]): Channel[] {
-  return channels.filter((channel) => channel.protocol === 'runninghub-api')
+  return channels.filter((channel) => channel.protocol === 'runninghub-api' || channel.protocol === 'comfyui-local')
 }
 
 export function workflowChannelLabel(channel: Channel): string {
+  if (channel.protocol === 'comfyui-local') return '本地 ComfyUI'
   const site = runninghubSiteOf(channel.baseUrl)
   return site === 'cn' ? '国内站' : site === 'global' ? '国际站' : channel.name
 }
@@ -108,7 +109,8 @@ function WorkflowsChannelView({
     if (state.ready && entryId && !editing) onEntry(null)
   }, [editing, entryId, onEntry, state.ready])
 
-  const hasKey = channel.hasToken || channel.credentialGroups.some((group) => group.hasToken)
+  const isComfyUi = channel.protocol === 'comfyui-local'
+  const hasKey = isComfyUi || channel.hasToken || channel.credentialGroups.some((group) => group.hasToken)
   const list = tab === 'app' ? state.apps : state.workflows
 
   return (
@@ -160,7 +162,7 @@ function WorkflowsChannelView({
                 name="workflows-site"
                 compact
                 alignEnd
-                ariaLabel="RunningHub 站点"
+                ariaLabel={isComfyUi ? '工作流来源' : 'RunningHub 站点'}
                 value={channel.id}
                 options={options.map((item) => ({ value: item.id, label: workflowChannelLabel(item) }))}
                 onChange={(id) => onChannel(id)}
@@ -168,7 +170,7 @@ function WorkflowsChannelView({
             </div>
           </div>
 
-          {!hasKey ? (
+          {!hasKey && !isComfyUi ? (
             <div className={styles.banner} data-workflows-no-key {...noticeA11y('info')}>
               <span>
                 {workflowChannelLabel(channel)}还没填 API Key —— 导入要用它拉参数，测试运行也要用它。点右边「渠道与 Key」去填。
@@ -180,7 +182,7 @@ function WorkflowsChannelView({
             <input
               className={styles.importInput}
               value={input}
-              placeholder={tab === 'app' ? '粘贴 /ai-detail/…、/run/ai-app/… 链接或应用 id' : '粘贴 /run/workflow/… 链接或工作流 id'}
+              placeholder={isComfyUi ? '粘贴 ComfyUI prompt graph JSON（支持 {prompt:{…}}）' : tab === 'app' ? '粘贴 /ai-detail/…、/run/ai-app/… 链接或应用 id' : '粘贴 /run/workflow/… 链接或工作流 id'}
               onChange={(event) => setInput(event.target.value)}
               onKeyDown={(event) => {
                 if (event.key === 'Enter' && input.trim() && state.ready && !state.busy) void state.importRef(input).then((entry) => entry && setInput(''))
@@ -197,7 +199,7 @@ function WorkflowsChannelView({
               {state.busy ? '导入中…' : '导入'}
             </button>
             <span className={styles.toolbarSpacer} />
-            {tab === 'workflow' ? (
+            {tab === 'workflow' && !isComfyUi ? (
               <button type="button" className={styles.ghost} disabled={state.busy || !state.ready} onClick={() => void state.openMarket()} data-workflows-market-open>
                 从市场导入
               </button>

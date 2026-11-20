@@ -23,6 +23,7 @@ describe('AI 应用 / 工作流页（#1131）', () => {
     ])
     expect(list.map((item) => item.id)).toEqual(['ch_builtin_runninghub', 'ch_builtin_runninghub_global', 'mine'])
     expect(list.map(workflowChannelLabel)).toEqual(['国内站', '国际站', '我的反代'])
+    expect(workflowChannelsOf([ch('local', 'http://127.0.0.1:8188', 'comfyui-local', '本机 ComfyUI')]).map(workflowChannelLabel)).toEqual(['本地 ComfyUI'])
   })
 
   it('卡片：名称 / 备注（无备注写路由）/ 参数计数 / 删除；空列表给导入引导', () => {
@@ -55,6 +56,12 @@ describe('渠道入口与站点控件（#1152）', () => {
   it('★★ 「渠道与 Key」直接开设置浮层并落在该渠道，不再跳 /settings 整页路由', () => {
     expect(source).toContain('openChannelSettings(channel.id)')
     expect(source).not.toContain('/settings?channel=')
+  })
+
+  it('★ ComfyUI 入口使用 prompt graph JSON，不显示 RunningHub 市场按钮', () => {
+    expect(source).toContain("channel.protocol === 'comfyui-local'")
+    expect(source).toContain('粘贴 ComfyUI prompt graph JSON')
+    expect(source).toContain("tab === 'workflow' && !isComfyUi")
   })
 
   it('★★ 只剩一个 Key 入口：横幅不再带按钮，工具条那枚仍常驻', () => {

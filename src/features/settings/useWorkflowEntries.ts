@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { parseWorkflowEntryRef } from '../../domain/project/workflowEntryRef'
+import { buildWorkflowGraph } from '../../domain/project/workflowGraph'
 import type { Channel } from '../../domain/project/channel'
 import type { ChannelStore } from '../../state/channel/channelStore'
 import type { PlatformKit } from '../../platform/ports'
 import {
   mergeRefetchedFields,
+  parseWorkflowJsonToFields,
   workflowModelId,
   type WorkflowEntry,
   type WorkflowParamField,
@@ -111,6 +113,7 @@ export function useWorkflowEntries({ channel, groupId, channels, platform }: Use
   )
 
   const host = channel.baseUrl || RH_MARKET_DEFAULT_HOST
+  const isComfyUi = channel.protocol === 'comfyui-local'
 
   const pullFields = useCallback(
     async (id: string, kind: Kind) => {
@@ -126,11 +129,11 @@ export function useWorkflowEntries({ channel, groupId, channels, platform }: Use
       const signal = AbortSignal.timeout(30_000)
       if (kind === 'app') {
         const bundle = await fetchAppBundle({ network: platform.network }, endpoint, id, signal)
-        return { fields: bundle.fields, title: bundle.meta.title, coverUrl: bundle.meta.coverUrl, graph: undefined }
+        return { fields: bundle.fields, title: bundle.meta.title, coverUrl: bundle.meta.coverUrl, graph: undefined, workflowJson: undefined }
       }
       /** 工作流一次拿齐字段 + 节点图（同一个响应里都有，别请求两遍） */
       const bundle = await fetchWorkflowBundle({ network: platform.network }, endpoint, id, signal)
-      return { fields: bundle.fields, title: '', coverUrl: undefined, graph: bundle.graph }
+      return { fields: bundle.fields, title: '', coverUrl: undefined, graph: bundle.graph, workflowJson: undefined }
     },
     [channel.id, channels, groupId, host, platform.network],
   )
@@ -149,6 +152,36 @@ export function useWorkflowEntries({ channel, groupId, channels, platform }: Use
     }
   }, [])
 
+  const addComfyEntry = useCallback(
+    (rawText: string) =>
+      run(async () => {
+        let parsed: unknown
+        try { parsed = JSON.parse(rawText) as unknown } catch { throw new Error('ComfyUI 工作流必须是有效 JSON（粘贴 API prompt graph，不是任意本地路径）') }
+        const candidate = parsed && typeof parsed === 'object' && !Array.isArray(parsed) && 'prompt' in parsed
+          ? (parsed as { prompt?: unknown }).prompt
+          : parsed
+        if (!candidate || typeof candidate !== 'object' || Array.isArray(candidate)) throw new Error('ComfyUI 工作流 JSON 必须是 prompt graph 对象')
+        const fields = parseWorkflowJsonToFields(candidate)
+        if (fields.length === 0) throw new Error('这个 ComfyUI 工作流没有可编辑的普通输入')
+        const id = `comfy-${Date.now()}`
+        const entry: WorkflowEntry = {
+          id,
+          kind: 'workflow',
+          title: `ComfyUI 工作流 ${new Date().toLocaleString()}`,
+          provider: 'comfyui-local',
+          fields,
+          graph: buildWorkflowGraph(candidate),
+          workflowJson: candidate as Record<string, unknown>,
+          fetchedAt: Date.now(),
+        }
+        await apply((list) => [...list.filter((item) => !sameEntry(item, entry)), entry])
+        await registerModel(entry)
+        setNotice(`已导入「${entry.title}」：${fields.length} 个可改参数`)
+        return entry
+      }),
+    [apply, registerModel, run],
+  )
+
   const addEntry = useCallback(
     (id: string, kind: Kind, extra: { title?: string; coverUrl?: string; note?: string } = {}, quiet = false) =>
       run(async () => {
@@ -157,9 +190,10 @@ export function useWorkflowEntries({ channel, groupId, channels, platform }: Use
           id,
           kind,
           title: extra.title || pulled.title || `${kind === 'app' ? 'AI 应用' : '工作流'} ${id}`,
-          provider: 'runninghub',
+          provider: isComfyUi ? 'comfyui-local' : 'runninghub',
           fields: pulled.fields,
           ...(pulled.graph ? { graph: pulled.graph } : {}),
+          ...(pulled.workflowJson ? { workflowJson: pulled.workflowJson } : {}),
           fetchedAt: Date.now(),
           ...(extra.note ? { note: extra.note } : {}),
           ...(extra.coverUrl || pulled.coverUrl ? { coverUrl: extra.coverUrl ?? pulled.coverUrl } : {}),
@@ -175,6 +209,7 @@ export function useWorkflowEntries({ channel, groupId, channels, platform }: Use
   /** 粘贴的链接 / id → 导入；纯数字 id 种类不定：先按工作流拉，拉不到再按应用试（#1128 L4） */
   const importRef = useCallback(
     async (input: string) => {
+      if (isComfyUi) return addComfyEntry(input.trim())
       const parsed = parseWorkflowEntryRef(input)
       if (!parsed) {
         setError('认不出这个链接：要 /ai-detail/…、/run/ai-app/… 或 /run/workflow/…，或纯数字 id')
@@ -183,7 +218,7 @@ export function useWorkflowEntries({ channel, groupId, channels, platform }: Use
       if (parsed.kind) return addEntry(parsed.id, parsed.kind)
       return (await addEntry(parsed.id, 'workflow', {}, true)) ?? addEntry(parsed.id, 'app')
     },
-    [addEntry],
+    [addComfyEntry, addEntry, isComfyUi],
   )
 
   const removeEntry = useCallback(
@@ -246,6 +281,7 @@ export function useWorkflowEntries({ channel, groupId, channels, platform }: Use
   )
 
   const openMarket = useCallback(async () => {
+    if (isComfyUi) return
     setMarket([])
     setError('')
     try {
@@ -254,7 +290,7 @@ export function useWorkflowEntries({ channel, groupId, channels, platform }: Use
     } catch (e) {
       if (alive.current) setError(errorTextOf(e))
     }
-  }, [host, platform])
+  }, [host, isComfyUi, platform])
 
   const addFromMarket = useCallback(
     async (item: RhMarketEntry) => {

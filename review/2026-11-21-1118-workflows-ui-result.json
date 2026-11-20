@@ -1,0 +1,10 @@
+{
+  "surface": "workflows",
+  "route": "/workflows?channel=ch_builtin_runninghub",
+  "desktop": "qinghua.exe development build",
+  "observed": [
+    {"viewport":"1440x900","theme":"dark","pageerror":0,"overflow":"not observed"},
+    {"viewport":"1440x900","theme":"light","pageerror":0,"overflow":"not observed"}
+  ],
+  "missing": ["1024x700 dark", "1024x700 light", "local ComfyUI channel with real prompt execution"]
+}
