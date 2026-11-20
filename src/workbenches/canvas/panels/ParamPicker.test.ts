@@ -167,6 +167,19 @@ describe('ParamPicker · 多组模式', () => {
   })
 })
 
+describe('ParamPicker · 跟随素材图标', () => {
+  it('用两张叠放的纸区分跟随素材，而不是普通比例矩形', () => {
+    const html = render({
+      open: true,
+      variant: 'ratioGrid',
+      options: [{ value: '跟随素材', label: '跟随素材' }],
+      value: '跟随素材',
+    })
+    expect((html.match(/<rect /g) ?? []).length).toBe(2)
+    expect(html).toContain('data-ratio-glyph="跟随素材"')
+  })
+})
+
 describe('ParamPicker · 图标与文字的比例', () => {
   it('★★ 列表项带厂商图标时，渲染成 <svg data-model-icon>（尺寸交给 CSS 按 18px 字取 21px）', () => {
     const html = renderToString(
