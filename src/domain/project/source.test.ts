@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { protocolById } from './protocol'
-import { protocolSourceDescriptor, sourceOperationsFor } from './source'
+import { protocolSourceDescriptor, sourceOperationsFor, sourceSiteDescriptorOf } from './source'
 
 function definition(id: string) {
   const result = protocolById(id)
@@ -81,6 +81,33 @@ describe('sourceOperationsFor', () => {
       status: true,
       quickTest: true,
       cancel: true,
+    })
+  })
+})
+
+
+describe('sourceSiteDescriptorOf', () => {
+  it('把同一个 CLI 站点的协议稳定归并到站点层', () => {
+    expect(sourceSiteDescriptorOf(definition('jimeng-cli'))).toMatchObject({
+      siteId: 'jimeng',
+      label: '即梦',
+      iconKey: 'jimeng',
+      protocolIds: ['jimeng-cli'],
+      sourceKind: 'cli',
+      authKind: 'cli-session',
+      operations: { login: true, logout: true },
+    })
+  })
+
+  it('不把 API 协议的展示名当作站点身份，也不伪造登录能力', () => {
+    expect(sourceSiteDescriptorOf(definition('openai-compatible'))).toMatchObject({
+      siteId: 'openai-compatible',
+      label: 'openai-compatible',
+      iconKey: 'openai-compatible',
+      protocolIds: ['openai-compatible'],
+      sourceKind: 'api',
+      authKind: 'api-key',
+      operations: { login: false, logout: false },
     })
   })
 })

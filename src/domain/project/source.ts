@@ -19,6 +19,52 @@ export interface ProtocolSourceDescriptor {
   authKind: AuthKind
 }
 
+/**
+ * #1118 P2：站点层的稳定元数据。
+ *
+ * 协议是“怎么调用”，站点是“调用谁”。两者不能继续用协议 id 充当同一个
+ * 标识，否则同一站点的 API / CLI / 本地入口会被 UI 和设置页拆成互不相干的服务。
+ * 这里仍是纯领域数据；图标和具体动作由上层按 `iconKey` / `operations` 接入。
+ */
+export interface SourceSiteDescriptor extends ProtocolSourceDescriptor {
+  label: string
+  iconKey: string
+  protocolIds: readonly string[]
+  operations: SourceOperationSupport
+}
+
+const SITE_OVERRIDES: Readonly<Record<string, Pick<SourceSiteDescriptor, 'siteId' | 'label' | 'iconKey'>>> = {
+  'jimeng-cli': { siteId: 'jimeng', label: '即梦', iconKey: 'jimeng' },
+  'gemini-cli': { siteId: 'gemini', label: 'Gemini', iconKey: 'gemini' },
+  'gpt-cli': { siteId: 'codex', label: 'Codex', iconKey: 'codex' },
+  'jimeng-cli-gateway': { siteId: 'jimeng', label: '即梦', iconKey: 'jimeng' },
+}
+
+function defaultSiteLabel(definition: Pick<ProtocolDefinition, 'id'>): string {
+  return definition.id
+}
+
+function defaultIconKey(definition: Pick<ProtocolDefinition, 'id'>): string {
+  return definition.id
+}
+
+/** 从协议目录生成站点视图；同站点协议共享 siteId，协议本身仍保持独立。 */
+export function sourceSiteDescriptorOf(
+  definition: Pick<ProtocolDefinition, 'id' | 'family' | 'credentials'>,
+): SourceSiteDescriptor {
+  const protocol = protocolSourceDescriptor(definition)
+  const override = SITE_OVERRIDES[definition.id]
+  const siteId = override?.siteId ?? protocol.siteId
+  return {
+    ...protocol,
+    siteId,
+    label: override?.label ?? defaultSiteLabel(definition),
+    iconKey: override?.iconKey ?? defaultIconKey(definition),
+    protocolIds: [definition.id],
+    operations: sourceOperationsFor(protocol),
+  }
+}
+
 function sourceKindForFamily(family: ProtocolFamily, protocolId: string): SourceKind {
   if (family === 'cli-gateway') return 'cli'
   if (family === 'mock' || protocolId === 'mock') return 'local-model'
