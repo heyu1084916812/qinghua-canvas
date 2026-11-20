@@ -1,0 +1,248 @@
+{
+  "cases": [
+    {
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "theme": "dark",
+      "observedTheme": "dark",
+      "results": [
+        {
+          "id": "lb-a",
+          "nodeRect": {
+            "x": 324,
+            "y": 275,
+            "width": 320,
+            "height": 200
+          },
+          "mediaRect": {
+            "x": 325,
+            "y": 276,
+            "width": 318,
+            "height": 198
+          },
+          "open": {
+            "dur": 260,
+            "from": "translate(-237px, -76px) scale(0.655629)",
+            "to": "translate(0px, 0px) scale(1)"
+          },
+          "close": {
+            "dur": 220,
+            "from": "translate(0px, 0px) scale(1)",
+            "to": "translate(-237px, -76px) scale(0.655629)"
+          }
+        },
+        {
+          "id": "lb-b",
+          "nodeRect": {
+            "x": 824,
+            "y": 275,
+            "width": 320,
+            "height": 200
+          },
+          "mediaRect": {
+            "x": 825,
+            "y": 276,
+            "width": 318,
+            "height": 198
+          },
+          "open": {
+            "dur": 260,
+            "from": "translate(263px, -76px) scale(0.655629)",
+            "to": "translate(0px, 0px) scale(1)"
+          },
+          "close": {
+            "dur": 220,
+            "from": "translate(0px, 0px) scale(1)",
+            "to": "translate(263px, -76px) scale(0.655629)"
+          }
+        }
+      ],
+      "errors": []
+    },
+    {
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "theme": "light",
+      "observedTheme": "light",
+      "results": [
+        {
+          "id": "lb-a",
+          "nodeRect": {
+            "x": 324,
+            "y": 275,
+            "width": 320,
+            "height": 200
+          },
+          "mediaRect": {
+            "x": 325,
+            "y": 276,
+            "width": 318,
+            "height": 198
+          },
+          "open": {
+            "dur": 260,
+            "from": "translate(-237px, -76px) scale(0.655629)",
+            "to": "translate(0px, 0px) scale(1)"
+          },
+          "close": {
+            "dur": 220,
+            "from": "translate(0px, 0px) scale(1)",
+            "to": "translate(-237px, -76px) scale(0.655629)"
+          }
+        },
+        {
+          "id": "lb-b",
+          "nodeRect": {
+            "x": 824,
+            "y": 275,
+            "width": 320,
+            "height": 200
+          },
+          "mediaRect": {
+            "x": 825,
+            "y": 276,
+            "width": 318,
+            "height": 198
+          },
+          "open": {
+            "dur": 260,
+            "from": "translate(263px, -76px) scale(0.655629)",
+            "to": "translate(0px, 0px) scale(1)"
+          },
+          "close": {
+            "dur": 220,
+            "from": "translate(0px, 0px) scale(1)",
+            "to": "translate(263px, -76px) scale(0.655629)"
+          }
+        }
+      ],
+      "errors": []
+    },
+    {
+      "viewport": {
+        "width": 1024,
+        "height": 700
+      },
+      "theme": "dark",
+      "observedTheme": "dark",
+      "results": [
+        {
+          "id": "lb-a",
+          "nodeRect": {
+            "x": 324,
+            "y": 275,
+            "width": 320,
+            "height": 200
+          },
+          "mediaRect": {
+            "x": 325,
+            "y": 276,
+            "width": 318,
+            "height": 198
+          },
+          "open": {
+            "dur": 260,
+            "from": "translate(-29px, 24px) scale(0.655629)",
+            "to": "translate(0px, 0px) scale(1)"
+          },
+          "close": {
+            "dur": 220,
+            "from": "translate(0px, 0px) scale(1)",
+            "to": "translate(-29px, 24px) scale(0.655629)"
+          }
+        },
+        {
+          "id": "lb-b",
+          "nodeRect": {
+            "x": 824,
+            "y": 275,
+            "width": 320,
+            "height": 200
+          },
+          "mediaRect": {
+            "x": 825,
+            "y": 276,
+            "width": 318,
+            "height": 198
+          },
+          "open": {
+            "dur": 260,
+            "from": "translate(471px, 24px) scale(0.655629)",
+            "to": "translate(0px, 0px) scale(1)"
+          },
+          "close": {
+            "dur": 220,
+            "from": "translate(0px, 0px) scale(1)",
+            "to": "translate(471px, 24px) scale(0.655629)"
+          }
+        }
+      ],
+      "errors": []
+    },
+    {
+      "viewport": {
+        "width": 1024,
+        "height": 700
+      },
+      "theme": "light",
+      "observedTheme": "light",
+      "results": [
+        {
+          "id": "lb-a",
+          "nodeRect": {
+            "x": 324,
+            "y": 275,
+            "width": 320,
+            "height": 200
+          },
+          "mediaRect": {
+            "x": 325,
+            "y": 276,
+            "width": 318,
+            "height": 198
+          },
+          "open": {
+            "dur": 260,
+            "from": "translate(-29px, 24px) scale(0.655629)",
+            "to": "translate(0px, 0px) scale(1)"
+          },
+          "close": {
+            "dur": 220,
+            "from": "translate(0px, 0px) scale(1)",
+            "to": "translate(-29px, 24px) scale(0.655629)"
+          }
+        },
+        {
+          "id": "lb-b",
+          "nodeRect": {
+            "x": 824,
+            "y": 275,
+            "width": 320,
+            "height": 200
+          },
+          "mediaRect": {
+            "x": 825,
+            "y": 276,
+            "width": 318,
+            "height": 198
+          },
+          "open": {
+            "dur": 260,
+            "from": "translate(471px, 24px) scale(0.655629)",
+            "to": "translate(0px, 0px) scale(1)"
+          },
+          "close": {
+            "dur": 220,
+            "from": "translate(0px, 0px) scale(1)",
+            "to": "translate(471px, 24px) scale(0.655629)"
+          }
+        }
+      ],
+      "errors": []
+    }
+  ]
+}
