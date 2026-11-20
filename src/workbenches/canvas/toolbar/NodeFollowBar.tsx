@@ -54,6 +54,7 @@ import {
   IconUngroup,
 } from './icons'
 import { sendSelectionToAgent } from '../../../features/canvas/agentHandoff'
+import { useOverlayExit } from '../overlay/useOverlayExit'
 
 /**
  * 出现跟随栏的节点类型。
@@ -139,16 +140,21 @@ export function NodeFollowBar({ onClose, onOpenSettings, onDownload }: NodeFollo
     return () => window.removeEventListener('keydown', onKey)
   }, [store, selection.length])
 
-  const node = selection.length === 1
+  const selectedNode = selection.length === 1
     ? graph.nodes.find((candidate) => candidate.id === selection[0])
     : undefined
+  const { value: exitingNode, closing } = useOverlayExit(
+    selectedNode ?? null,
+    selection.length === 0,
+  )
+  const node = selectedNode ?? exitingNode ?? undefined
   const viewport = useViewportStateWhen(
-    !dragging && !dismissed && !!node && FOLLOW_TYPES.has(node.type),
+    !dragging && !dismissed && !!selectedNode && FOLLOW_TYPES.has(selectedNode.type),
   )
 
   // 与创作面板同款：拖动中 / 刚拖完（未重新选中）/ 多选（归属有歧义）都不显示
-  if (dragging || dismissed) return null
-  if (selectionMode === 'multi' || selection.length !== 1) return null
+  if (!closing && (dragging || dismissed)) return null
+  if (!closing && (selectionMode === 'multi' || selection.length !== 1)) return null
   if (!node || !FOLLOW_TYPES.has(node.type)) return null
 
   // 结果组子节点的父不在 nodes 表，必须走「图内」世界矩形（否则锚点飞到左上角）
@@ -163,6 +169,7 @@ export function NodeFollowBar({ onClose, onOpenSettings, onDownload }: NodeFollo
       className={styles.bar}
       style={{ left: anchor.centerX, top: anchor.top, transform: 'translateX(-50%)' }}
       data-node-follow-bar={node.id}
+      data-follow-closing={closing ? 'true' : undefined}
       // 栏上的点击/拖动不该被画布当成「点空白取消选中」或发起平移
       onPointerDown={(e) => e.stopPropagation()}
       onWheel={(e) => e.stopPropagation()}

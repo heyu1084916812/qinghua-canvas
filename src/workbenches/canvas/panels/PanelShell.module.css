@@ -179,3 +179,28 @@
     transform: scale(1);
   }
 }
+
+/* 点空白后的短暂退场（#1161）：选择已清掉，但外壳保留一个节拍完成收缩淡出。 */
+:global([data-panel-closing='true']) .panel {
+  animation: panelExit 160ms var(--ease-panel) forwards;
+  pointer-events: none;
+}
+
+@keyframes panelExit {
+  from {
+    opacity: 1;
+    filter: blur(0);
+    transform: scale(1);
+  }
+  to {
+    opacity: 0;
+    filter: blur(2px);
+    transform: scale(0.975);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :global([data-panel-closing='true']) .panel {
+    animation-duration: 1ms;
+  }
+}

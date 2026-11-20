@@ -297,3 +297,20 @@
     opacity: 1;
   }
 }
+
+/* 点空白后的跟随栏退场：不位移，避免与节点跟随定位发生冲突。 */
+.bar[data-follow-closing='true'] {
+  animation: barFadeOut 160ms var(--ease-out) forwards;
+  pointer-events: none;
+}
+
+@keyframes barFadeOut {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bar[data-follow-closing='true'] {
+    animation-duration: 1ms;
+  }
+}

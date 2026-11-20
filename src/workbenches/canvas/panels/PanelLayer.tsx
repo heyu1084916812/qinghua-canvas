@@ -26,6 +26,7 @@ import { isRecipeEdit } from '../../../domain/project/generationPreset'
 import { defaultPresetOptions, emotionById, presetById } from '../../../domain/canvas/layout/presets'
 import { hasRunnableDownstream } from '../../../features/canvas/execution/loopRun'
 import { resolveFaceBox } from '../../../features/canvas/emotionEdit'
+import { useOverlayExit } from '../overlay/useOverlayExit'
 
 /** 面板与节点底边的间距 */
 const PANEL_GAP = 12
@@ -105,6 +106,8 @@ const workflowSources = useWorkflowPanelSources()
     const n = graph.nodes.find((x) => x.id === selection[0])
     return n && PANEL_TYPES.has(n.type) ? n : null
   }, [graph.nodes, selection, selectionMode, dragging, panelDismissed])
+  const { value: exitingNode, closing } = useOverlayExit(selectedNode, selection.length === 0)
+  const visibleNode = selectedNode ?? exitingNode
   const viewport = useViewportStateWhen(selectedNode !== null)
 
   // 提示词节点的「优化 / 翻译」工具（§6.7）：面板是纯视图，状态由本层持有
@@ -159,7 +162,7 @@ const workflowSources = useWorkflowPanelSources()
     },
   })
 
-  if (!selectedNode) return null
+  if (!visibleNode) return null
 
   /**
    * 面板模型（缩略图 / 集合卡）。
@@ -167,7 +170,7 @@ const workflowSources = useWorkflowPanelSources()
    * 提到这里算一次，因为「跟随素材」这一档的开放条件要从**同一份**结果读
    * （见 `hasSourceImage`）——两处各算一遍迟早漂移。
    */
-  const panelModel = buildPanelModel(selectedNode, graph)
+  const panelModel = buildPanelModel(visibleNode, graph)
 
   /**
    * 两种面板共用的**唯一出口**：面板只 emit 语义事件，由 `handlePanelEvent` 翻成命令
@@ -177,7 +180,7 @@ const workflowSources = useWorkflowPanelSources()
   const emitPanelEvent = (ev: PanelEvent) =>
     handlePanelEvent(
       ev,
-      selectedNode,
+      visibleNode,
       store,
       exec,
       promptTools,
@@ -189,14 +192,14 @@ const workflowSources = useWorkflowPanelSources()
       },
     )
 
-  const state = exec.nodeStateOf(selectedNode.id)
+  const state = exec.nodeStateOf(visibleNode.id)
   const running = state?.kind === 'queued' || state?.kind === 'running'
   const error = state?.kind === 'failed' ? describeError(state.error) : null
 
   // 用 `toWorldRectInGraph` 而非 `toWorldRect`：选中的可能是**结果组子节点**，
   // 它的父不在 nodes 表，直接查会把 local 坐标当世界坐标——面板飞到画布左上角
   // （M6-25：组内子结果成为可交互节点后，创作面板能力随之打通，§6.9）。
-  const rect = toWorldRectInGraph(selectedNode, graph)
+  const rect = toWorldRectInGraph(visibleNode, graph)
   // world → screen：屏幕 = (世界 - 视口平移) × zoom（与画布视口的 transform 互逆）
   const screenX = (rect.x + rect.w / 2 - viewport.x) * viewport.zoom
   const screenY = (rect.y + rect.h - viewport.y) * viewport.zoom + PANEL_GAP
@@ -254,7 +257,8 @@ const workflowSources = useWorkflowPanelSources()
          */
         ['--panel-available-h' as string]: `${availableHeight / PANEL_ZOOM}px`,
       }}
-      data-panel-anchor={selectedNode.id}
+      data-panel-anchor={visibleNode.id}
+      data-panel-closing={closing ? 'true' : undefined}
     >
       {/**
        * 节点下方这块浮层有**两种模式**（用户 2026-10-05 第 1 条）：
@@ -265,9 +269,9 @@ const workflowSources = useWorkflowPanelSources()
        */}
       {panelModel.emotion ? (
         <EmotionPanel
-          key={selectedNode.id}
+          key={visibleNode.id}
           model={panelModel}
-          data={selectedNode.data as GenerationData}
+          data={visibleNode.data as GenerationData}
           running={running}
           onEvent={emitPanelEvent}
           onClose={() => emitPanelEvent({ type: 'setEmotion', emotion: null })}
@@ -275,19 +279,19 @@ const workflowSources = useWorkflowPanelSources()
       ) : (
       <CreationPanel
         /* 按节点 id 重挂载：切换节点时入场动画才会重新播（同一个 DOM 复用会"没有动画"） */
-        key={selectedNode.id}
-        nodeId={selectedNode.id}
-        data={selectedNode.data as GenerationData}
+        key={visibleNode.id}
+        nodeId={visibleNode.id}
+        data={visibleNode.data as GenerationData}
         model={panelModel}
-        disabled={selectedNode.disabled}
+        disabled={visibleNode.disabled}
         running={running}
         globalRunning={exec.isRunning && !running}
         error={error}
         onEvent={emitPanelEvent}
         onClose={() => store.setSelection([])}
-        mode={selectedNode.type === 'prompt' ? 'prompt' : 'generation'}
+        mode={visibleNode.type === 'prompt' ? 'prompt' : 'generation'}
         // 功能类别切换只给生成节点（§6.8）：分组 / 批量共用同一面板，但类别由内容决定
-        showCategoryToggle={selectedNode.type === 'generation'}
+        showCategoryToggle={visibleNode.type === 'generation'}
         /**
          * 「跟随素材」这一档的开放条件：这次生成**有图片参考**（用户 2026-09-24）。
          *
@@ -304,7 +308,7 @@ const workflowSources = useWorkflowPanelSources()
          * 面板上的「生成」按钮实际跑的是**下游节点**（用它的参数）——
          * 与循环节点、提示词节点同一条语义，文案要说清是「生成下游节点」。
          */
-        runsDownstream={selectedNode.type === 'batch' && hasRunnableDownstream(selectedNode, graph)}
+        runsDownstream={visibleNode.type === 'batch' && hasRunnableDownstream(visibleNode, graph)}
         promptTools={promptTools}
         onOpenSkills={onOpenSkills}
         promptImageCount={promptImageInputs.length}
