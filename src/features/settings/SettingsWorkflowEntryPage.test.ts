@@ -21,6 +21,18 @@ describe('条目设置页 · 重新拉取后编辑器重挂（#1129 H2）', () =
     expect(fieldEditorKey({ id: 'w', fetchedAt: 1 })).not.toBe(fieldEditorKey({ id: 'w', fetchedAt: 2 }))
   })
 
+
+  it('ComfyUI 工作流显示可选媒体缺失策略，默认 skip', () => {
+    const comfy = { ...entry('comfy'), provider: 'comfyui-local' as const }
+    const renderer = TestRenderer.create(createElement(SettingsWorkflowEntryPage, {
+      entry: comfy, busy: false, channel, channels: {} as ChannelStore, platform: createMemoryPlatform(),
+      onBack: () => {}, onRefetch: () => {}, onPatch: () => {}, onSaveFields: () => {},
+    }))
+    const select = renderer.root.findAll((node) => node.type === 'select' && node.props.value === 'skip')[0]
+    expect(select).toBeDefined()
+    expect(select.props.children.map((child: { props: { value: string } }) => child.props.value)).toEqual(['skip', 'prune-workflow'])
+  })
+
   it('★ 拉取到新字段表后点「保存参数」→ 存的是新字段表，不是旧 draft', () => {
     const onSaveFields = vi.fn()
     const props = (value: WorkflowEntry) => ({

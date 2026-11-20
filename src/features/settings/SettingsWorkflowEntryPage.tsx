@@ -108,6 +108,19 @@ export function SettingsWorkflowEntryPage({
               </select>
             </label>
           ) : null}
+          {entry.provider === 'comfyui-local' && entry.kind !== 'app' ? (
+            <label className={styles.field}>
+              <span className={styles.label}>可选媒体缺失</span>
+              <select
+                className={styles.selectSm}
+                value={entry.mediaPolicy ?? 'skip'}
+                onChange={(event) => void onPatch(entry, { mediaPolicy: event.target.value === 'prune-workflow' ? 'prune-workflow' : 'skip' })}
+              >
+                <option value="skip">保留工作流默认值</option>
+                <option value="prune-workflow">删除该输入（prune-workflow）</option>
+              </select>
+            </label>
+          ) : null}
           <SettingsWorkflowTestRun channel={channel} entry={entry} groupId={groupId} channels={channels} platform={platform} />
         </div>
         <div className={styles.fieldPane}>
