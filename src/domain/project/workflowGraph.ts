@@ -268,3 +268,36 @@ export function normalizeWorkflowGraph(raw: unknown): WorkflowGraph | undefined 
   }
   return { nodes, edges }
 }
+
+
+/**
+ * ComfyUI prompt JSON + 轻画下发的字段三元组 → 可直接交给 `/prompt` 的 graph。
+ * 只改已存在的普通 input；连接值（`[nodeId, slot]`）和未知节点/字段保持不动。
+ */
+export function applyWorkflowNodeInfo(
+  workflowJson: unknown,
+  values: readonly { nodeId: string; fieldName: string; fieldValue: string }[],
+): Record<string, { class_type: string; inputs: Record<string, unknown>; _meta?: unknown }> {
+  if (!workflowJson || typeof workflowJson !== 'object' || Array.isArray(workflowJson)) return {}
+  const source = workflowJson as Record<string, unknown>
+  const output: Record<string, { class_type: string; inputs: Record<string, unknown>; _meta?: unknown }> = {}
+  for (const [nodeId, rawNode] of Object.entries(source)) {
+    if (!rawNode || typeof rawNode !== 'object' || Array.isArray(rawNode)) continue
+    const node = rawNode as Record<string, unknown>
+    const rawInputs = node.inputs
+    const inputs = rawInputs && typeof rawInputs === 'object' && !Array.isArray(rawInputs)
+      ? { ...(rawInputs as Record<string, unknown>) }
+      : {}
+    for (const item of values) {
+      if (item.nodeId !== nodeId || !Object.prototype.hasOwnProperty.call(inputs, item.fieldName)) continue
+      if (isWorkflowLinkValue(inputs[item.fieldName])) continue
+      inputs[item.fieldName] = item.fieldValue
+    }
+    output[nodeId] = {
+      class_type: typeof node.class_type === 'string' ? node.class_type : '',
+      inputs,
+      ...(node._meta !== undefined ? { _meta: node._meta } : {}),
+    }
+  }
+  return output
+}

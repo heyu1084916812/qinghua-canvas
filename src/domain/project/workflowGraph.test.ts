@@ -1,3 +1,4 @@
+import { applyWorkflowNodeInfo } from './workflowGraph'
 import { describe, expect, it } from 'vitest'
 import {
   buildWorkflowGraph,
@@ -82,5 +83,27 @@ describe('工作流节点图', () => {
       edges: [{ from: '1', to: '2' }, 'nope'],
     })
     expect(graph).toEqual({ nodes: [{ id: '1', title: 'A', classType: 'X', fieldIds: ['1::a'] }], edges: [] })
+  })
+})
+
+
+describe('applyWorkflowNodeInfo', () => {
+  it('只覆盖已存在的普通字段，不破坏连接和未知字段', () => {
+    const graph = applyWorkflowNodeInfo({
+      '1': { class_type: 'KSampler', inputs: { seed: 1, model: ['2', 0] } },
+      '2': { class_type: 'CheckpointLoaderSimple', inputs: { ckpt_name: 'base.safetensors' } },
+    }, [
+      { nodeId: '1', fieldName: 'seed', fieldValue: '99' },
+      { nodeId: '1', fieldName: 'model', fieldValue: 'bad' },
+      { nodeId: '1', fieldName: 'missing', fieldValue: 'ignored' },
+      { nodeId: '3', fieldName: 'seed', fieldValue: 'ignored' },
+    ])
+    expect(graph['1']?.inputs).toEqual({ seed: '99', model: ['2', 0] })
+    expect(graph['2']?.inputs).toEqual({ ckpt_name: 'base.safetensors' })
+  })
+
+  it('输入非法时返回空 prompt graph，不把任意对象透传给 ComfyUI', () => {
+    expect(applyWorkflowNodeInfo(null, [])).toEqual({})
+    expect(applyWorkflowNodeInfo([], [])).toEqual({})
   })
 })
