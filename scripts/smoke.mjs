@@ -1089,26 +1089,16 @@ async function createProject(page) {
     await page.goto(`${BASE}/projects`, { waitUntil: 'networkidle' }).catch(() => {})
     await sleep(400)
   }
-  const card = page.locator('[data-new-card]')
-  const hasGrid = await card
-    .waitFor({ state: 'visible', timeout: 8000 })
-    .then(() => true)
-    .catch(() => false)
-
-  if (hasGrid) {
-    await card.click()
-    await page.locator('[data-new-workbench="canvas"]').click()
-  } else {
-    const emptyBtn = page.locator('[data-new-project]').first()
-    try {
-      await emptyBtn.waitFor({ state: 'visible', timeout: 10000 })
-    } catch (e) {
-      const body = await page.locator('body').innerText().catch(() => '<no body>')
-      console.log('  [diag] url=' + page.url() + '\n  [diag] body=' + body.slice(0, 300).replace(/\n/g, ' | '))
-      await page.screenshot({ path: `${OUT}/diag-createproject.png` }).catch(() => {})
-      throw e
-    }
-    await emptyBtn.click()
+  const entry = page.locator('[data-new-card], [data-new-project]').first()
+  try {
+    await entry.click({ timeout: 10000 })
+    /* 网格卡片和空态按钮共用 NewProjectChoice；不是标题栏的工作区菜单。 */
+    await page.locator('[data-new-project-choice="canvas"]').click({ timeout: 10000 })
+  } catch (error) {
+    const body = await page.locator('body').innerText().catch(() => '<no body>')
+    console.log('  [diag] url=' + page.url() + '\n  [diag] body=' + body.slice(0, 300).replace(/\n/g, ' | '))
+    await page.screenshot({ path: `${OUT}/diag-createproject.png` }).catch(() => {})
+    throw error
   }
   await page.waitForURL(/\/canvas\//)
   /* URL 切过去不等于 lazy chunk 已挂载；所有 createProject 调用方都要一块真画布。 */
@@ -3853,7 +3843,10 @@ async function g15(browser) {
   rec(g, '★★ 组有常显背景板（默认档 slate）', groupBg === 'slate', `档位=${groupBg}`)
   const bgColor = await board.evaluate((el) => getComputedStyle(el).backgroundColor)
   rec(g, '背景真的画出来了（不是 transparent）', !/rgba?\(0, 0, 0, 0\)/.test(bgColor), bgColor)
-  rec(g, '组标题在（§6.6 标题浮在框外左上）', (await group.locator('[class*="title"]').count()) >= 1)
+  const groupTitle = page.locator(`[data-flow-node-header="${groupId}"] [data-node-title]`)
+  const titleBox = await groupTitle.boundingBox()
+  const frameBox = await group.boundingBox()
+  rec(g, '组标题在（§6.6 标题浮在框外左上）', Boolean(titleBox && frameBox && titleBox.y < frameBox.y))
   /**
    * 组框四边到「组内成员包围盒」的留白（世界单位，与 §6.11 的 `CONTAINER_PADDING = 20` 同口径）。
    * 用**几何**判：DOM 的框与子节点都换算回世界坐标再相减，不依赖任何实现细节。
@@ -4147,14 +4140,9 @@ async function g15(browser) {
    * ⚠️ 拖出子节点之后**选中集合已经变了**（那次拖动选了子节点）⇒ 组的功能栏不在，
    *    必须先重新选中组（点它左内边距那一带：8px 处还在 padding 里，不会落在子节点上）。
    */
-  {
-    /**
-     * 点**标题**重新选中组（`data-node-title` 是组自己的 DOM，一定命中）。
-     * 别点左内边距那一带：左端点正好在左边框中点，点上去会落在端点上、选中不了。
-     */
-    await page.locator(`[data-node-id="${groupId}"] [data-node-title]`).first().click()
-    await sleep(400)
-  }
+  /* 点框内留白，避开子节点、框角缩放手柄和侧边端点。 */
+  await group.click({ position: { x: 10, y: 32 } })
+  await sleep(400)
   rec(g, '★ 重新点选后组的功能栏回来了', (await page.locator('[data-group-actions]').count()) === 1)
   await page.locator('[data-follow-action="group-ungroup"]').click()
   await sleep(700)
