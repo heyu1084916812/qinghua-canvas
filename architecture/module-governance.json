@@ -10369,6 +10369,31 @@
       "budget": 110
     },
     {
+      "module": "src/workbenches/canvas/agent/agentGenerationFlow.ts",
+      "owner": "canvas-agent-generation-flow",
+      "responsibility": "按当前请求的引用、套件、调研和续跑事实选择六类生图流程策略，供提示词与请求装配复用。",
+      "owns": [
+        "六类生图流程分类及优先级",
+        "流程策略标签"
+      ],
+      "doesNotOwn": [
+        "真实工具阶段事件",
+        "参考或套件卡片的界面交互",
+        "模型请求执行"
+      ],
+      "publicApi": [
+        "AGENT_GENERATION_FLOWS",
+        "AgentGenerationFlow",
+        "AgentGenerationFlowSignals",
+        "agentGenerationFlowLabel",
+        "classifyAgentGenerationFlow"
+      ],
+      "test": [
+        "src/workbenches/canvas/agent/agentGenerationFlow.test.ts"
+      ],
+      "budget": 100
+    },
+    {
       "module": "src/workbenches/canvas/agent/agentResultClaimGuard.ts",
       "owner": "canvas-agent-claim-guard",
       "responsibility": "完成说明核对：从本轮 runNode outcomes 与运行后 readResult 提取真实尺寸、张数与出图模型，判定回答里的说法是否属实并给出事实行。",
