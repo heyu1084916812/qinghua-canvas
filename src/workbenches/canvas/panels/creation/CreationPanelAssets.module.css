@@ -1,4 +1,17 @@
 /* CreationPanel component-domain styles */
+/* 素材卡 / 集合卡：从稍小的静止态回到正常尺寸，避免列表瞬间“蹦出”。 */
+@keyframes assetCardIn {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+
 /* ── 第一部分：缩略图 ── */
 /* 功能类别切换（§6.8「右上角为图片 / 视频功能类别切换（显性边框）」） */
 /*
@@ -100,6 +113,7 @@
   align-items: center;
   gap: 5px;
   cursor: grab;
+  animation: assetCardIn 180ms var(--ease-panel) both;
 }
 
 .collectionBadge {
@@ -138,6 +152,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  animation: assetCardIn 180ms var(--ease-panel) both;
 }
 
 /*
@@ -375,3 +390,10 @@
   color: var(--accent);
 }
 
+
+@media (prefers-reduced-motion: reduce) {
+  .thumb,
+  .collection {
+    animation: none;
+  }
+}
