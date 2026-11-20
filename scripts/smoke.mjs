@@ -18188,7 +18188,7 @@ async function g89(browser) {
   const cliStates = await page.evaluate(() => {
     const sel = document.querySelector('[data-settings-protocol]')
     const out = {}
-    for (const id of ['jimeng-cli', 'gpt-cli', 'gemini-cli', 'runninghub']) {
+    for (const id of ['jimeng-cli', 'gpt-cli', 'gemini-cli']) {
       const opt = sel?.querySelector(`option[value="${id}"]`)
       out[id] = opt
         ? {
@@ -18200,7 +18200,7 @@ async function g89(browser) {
     }
     return out
   })
-  for (const id of ['jimeng-cli', 'gpt-cli', 'gemini-cli', 'runninghub']) {
+  for (const id of ['jimeng-cli', 'gpt-cli', 'gemini-cli']) {
     const st = cliStates[id]
     rec(
       g,
@@ -23238,7 +23238,7 @@ async function g97(browser) {
    * **就在渠道配置的下面**，重新设计界面……当前是在每个渠道的页面里面」+「需要真的能跑本机的 cli」。
    *
    * 这里钉三件**浏览器里能验的**事：① 栏目紧跟在渠道配置后面（顺序即口径）；
-   * ② 四个工具都在；③ 浏览器里**如实**说"只在桌面应用里可用"、两个按钮都禁用
+   * ② 三个当前工具都在；③ 浏览器里**如实**说"只在桌面应用里可用"、两个按钮都禁用
    * （不假装能跑 —— "桌面专属也要显示出来"与"不许假装"这两条同时成立）。
    * "真的能跑"那一条浏览器里验不了，由桌面壳的 CDP 探针负责（见对账 #308 的证据列）。
    */
@@ -23260,8 +23260,8 @@ async function g97(browser) {
   )
   rec(
     g,
-    '★★ CLI 栏四个工具都在（Codex / 即梦 / Gemini / RunningHub）',
-    JSON.stringify(cliTools) === JSON.stringify(['codex', 'jimeng', 'gemini', 'runninghub']),
+    '★★ CLI 栏三个当前工具都在（Codex / 即梦 / Gemini）',
+    JSON.stringify(cliTools) === JSON.stringify(['codex', 'jimeng', 'gemini']),
     JSON.stringify(cliTools),
   )
   rec(
@@ -23277,7 +23277,7 @@ async function g97(browser) {
    * 没有可查命令的不摆不可操作控件，但必须写明额度去哪儿看（`quotaWhere`）。
    */
   const cliRoutes = await page.evaluate(() =>
-    ['codex', 'jimeng', 'gemini', 'runninghub'].map((id) => ({
+    ['codex', 'jimeng', 'gemini'].map((id) => ({
       id,
       detect: document.querySelectorAll(`[data-cli-detect="${id}"]`).length,
       login: document.querySelectorAll(`[data-cli-login="${id}"]`).length,
@@ -23306,20 +23306,13 @@ async function g97(browser) {
     ),
     JSON.stringify(cliRoutes),
   )
-  rec(
-    g,
-    '★★ RunningHub 不摆"打开窗口登录"那个假按钮（它没有登录子命令），改给密钥格',
-    cliRoutes.find((t) => t.id === 'runninghub')?.login === 0 &&
-      cliRoutes.find((t) => t.id === 'runninghub')?.keyInput === 1,
-    JSON.stringify(cliRoutes.find((t) => t.id === 'runninghub')),
-  )
   /**
    * ★★ **CLI 面板的介绍文字全部撤掉**（用户 2026-10-08 第 3 条：「cli 面板那边的介绍内容
    * 太多了，用户是不会去看的，反而影响排版，不需要文字介绍，只需要按钮」）。
    *
    * 判据分两层：① 老那段导语与每卡 `note` 都不在了（`desc` / `note` 两档计数为 0，
    * 且旧句子一个字都搜不到）；② 每张卡的文案体积有上限 —— 按钮标签 + 一行额度提示，
-   * 实测四张卡分别是 104 / 91 / 99 / 116 字，门槛取 130。
+   * 实测三张卡均在同一字数门槛内。
    */
   const cliProse = await page.evaluate(() => {
     const panel = document.querySelector('[data-cli-panel]')
@@ -23361,7 +23354,7 @@ async function g97(browser) {
   )
   rec(
     g,
-    '★★ 登录方式收进「更多操作」且默认收起（四张卡各一个，说明仍只有一行）',
+    '★★ 登录方式收进「更多操作」且默认收起（三张卡各一个，说明仍只有一行）',
     cliProse.loginBoxes === 4 &&
       cliProse.loginCollapsed === 4 &&
       cliProse.loginHints.length === 4 &&
@@ -23373,15 +23366,6 @@ async function g97(browser) {
     '★★ 无可查状态的工具不再在主操作行摆不可操作胶囊，更多操作里仍有额度去处说明',
     (await page.locator('[data-cli-status-none="jimeng"]').count()) === 0 &&
       (await page.locator('[data-cli-status="jimeng"]').count()) === 0 &&
-      /**
-       * ⚠️ 口径**反转**（2026-10-08）：RunningHub 以前被归在"没有官方 CLI"那一档，
-       * 实测推翻 —— 官方有 `HM-RunningHub/RH_CLI`（装完注册 `rh`），而且
-       * `rh --json check` 是四个工具里**唯一真能读到额度**的（余额 + RH 币）。
-       * 所以它不再显示"没有可查命令"，而是挂着查额度命令那一档；
-       * 操作行不再自己摆一颗无状态胶囊，说明仍由下面那一行完成。
-       */
-      (await page.locator('[data-cli-status-none="runninghub"]').count()) === 0 &&
-      (await page.locator('[data-cli-status="runninghub"]').count()) === 1 &&
       (await page.locator('[data-cli-status-none="codex"]').count()) === 0 &&
       (await page.locator('[data-cli-quota-where="jimeng"]').count()) === 1,
   )
