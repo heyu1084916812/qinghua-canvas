@@ -57,6 +57,26 @@ describe('canvas store / 选择来源', () => {
   })
 })
 
+describe('canvas store / 上游选择模式', () => {
+  it('进入、完成和取消上游选择都只改变瞬态，不污染普通选中来源', () => {
+    const store = createCanvasStore({ platform, projectId: 'p1' })
+
+    store.setSelection(['current'])
+    store.beginUpstreamPick('current')
+    expect(store.getUpstreamPick()).toBe('current')
+    expect(store.getSelection()).toEqual(['current'])
+    expect(store.getSelectionMode()).toBe('single')
+
+    store.endUpstreamPick()
+    expect(store.getUpstreamPick()).toBeNull()
+
+    store.setSelectionAsMulti(['current'])
+    store.beginUpstreamPick('current')
+    store.endUpstreamPick()
+    expect(store.getSelectionMode()).toBe('multi')
+    expect(store.getSelection()).toEqual(['current'])
+  })
+})
 describe('canvas store / 撤销与重做', () => {
   it('#1159 一刀切三线：撤销和重做各一次，未命中的边始终保留', async () => {
     const store = createCanvasStore({ platform, projectId: 'p1' })
