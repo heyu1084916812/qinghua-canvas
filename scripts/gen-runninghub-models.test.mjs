@@ -73,6 +73,39 @@ async function synthesizeCatalog() {
 }
 
 describe('gen-runninghub-models.mjs', () => {
+  it('accepts the public developer-kit registry schema', async () => {
+    const before = snapshot()
+    const legacy = await synthesizeCatalog()
+    const registry = {
+      version: legacy.version,
+      model_count: legacy.total,
+      models: legacy.endpoints.map((endpoint) => ({
+        endpoint: endpoint.endpoint,
+        output_type: endpoint.output_type,
+        name_cn: endpoint.name_cn,
+        name_en: endpoint.name_en,
+        params: (endpoint.params ?? []).map((param) => ({
+          fieldKey: param.key,
+          type: param.type,
+          required: param.required,
+          defaultValue: param.default,
+          options: param.options,
+        })),
+      })),
+    }
+    const registryPath = path.join(root, '.probe-tmp/rh-public-registry.json')
+    fs.mkdirSync(path.dirname(registryPath), { recursive: true })
+    fs.writeFileSync(registryPath, JSON.stringify(registry), 'utf8')
+    try {
+      expect(run([registryPath])).toContain('已写出 7 个文件')
+    } finally {
+      for (const [file, contents] of Object.entries(before)) {
+        fs.writeFileSync(path.join(root, file), contents)
+      }
+    }
+    expect(snapshot()).toEqual(before)
+  })
+
   it('replays committed generated files from the committed catalog data', async () => {
     const before = snapshot()
     fs.mkdirSync(path.dirname(fixtureCatalog), { recursive: true })

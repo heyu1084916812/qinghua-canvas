@@ -440,7 +440,47 @@ const DRIVEN = {
 }
 const MEDIA_TYPES = new Set(['IMAGE', 'VIDEO', 'AUDIO'])
 
-const catalog = JSON.parse(readFileSync(resolve(root, catalogPath), 'utf8'))
+/**
+ * 官方 developer-kit 使用 model-registry.public.json，而旧 CLI 使用
+ * capabilities.json。两者都描述同一组 endpoint，但字段名和 LIST 选项
+ * 形状不同；先在生成器边界归一化，后面的精选模型规则保持单一实现。
+ */
+function parsePublicOption(option) {
+  if (option && typeof option === 'object' && 'value' in option) return option.value
+  if (typeof option !== 'string') return option
+  const match = option.match(/^@\{value=([^;}]*)/)
+  return match ? match[1] : option
+}
+
+function normalizeCatalog(raw) {
+  if (Array.isArray(raw.endpoints)) return raw
+  if (!Array.isArray(raw.models)) {
+    throw new Error('目录必须包含 endpoints 或 models')
+  }
+  return {
+    version: raw.version,
+    total: raw.model_count ?? raw.models.length,
+    endpoints: raw.models.map((model) => ({
+      endpoint: model.endpoint,
+      output_type: model.output_type,
+      task: model.task ?? model.endpoint,
+      name_cn: model.name_cn,
+      name_en: model.name_en,
+      params: (model.params ?? []).map((param) => ({
+        key: param.fieldKey,
+        type: param.type,
+        required: param.required,
+        multiple: param.multiple ?? param.multipleInputs,
+        default: param.defaultValue,
+        options: Array.isArray(param.options)
+          ? param.options.map(parsePublicOption)
+          : param.options,
+      })),
+    })),
+  }
+}
+
+const catalog = normalizeCatalog(JSON.parse(readFileSync(resolve(root, catalogPath), 'utf8')))
 const byId = new Map((catalog.endpoints ?? []).map((e) => [e.endpoint, e]))
 
 const wanted = new Set()
@@ -500,7 +540,7 @@ function specOf(id) {
    * `scale` 不是通用生成参数：只有 image-upscale 端点里的同名参数才是放大倍数。
    * 如果只按键名扫，即梦等普通生图里恰好叫 scale 的参数会被误当成 2x/4x/6x。
    */
-  if (e.task === 'image-upscale') {
+  if (e.task === 'image-upscale' || /upscale/i.test(e.endpoint)) {
     const p = params.find((x) => DRIVEN[x.key] === 'scale')
     if (p) spec.scale = { key: p.key, ...(p.options ? { options: p.options } : {}) }
   }
