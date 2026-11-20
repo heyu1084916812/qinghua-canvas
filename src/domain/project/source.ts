@@ -51,3 +51,60 @@ export function protocolSourceDescriptor(
     authKind,
   }
 }
+
+
+/** #1118 P1：所有来源对外暴露同一组生命周期动作；实现可以明确声明不支持。 */
+export type SourceOperation =
+  | 'verify'
+  | 'listModels'
+  | 'login'
+  | 'logout'
+  | 'status'
+  | 'quickTest'
+  | 'cancel'
+
+export type SourceOperationSupport = Readonly<Record<SourceOperation, boolean>>
+
+const API_KEY_OPERATIONS: SourceOperationSupport = {
+  verify: true,
+  listModels: true,
+  login: false,
+  logout: false,
+  status: true,
+  quickTest: true,
+  cancel: true,
+}
+
+const CLI_OPERATIONS: SourceOperationSupport = {
+  verify: true,
+  listModels: true,
+  login: true,
+  logout: true,
+  status: true,
+  quickTest: true,
+  cancel: true,
+}
+
+const LOCAL_OPERATIONS: SourceOperationSupport = {
+  verify: true,
+  listModels: true,
+  login: false,
+  logout: false,
+  status: true,
+  quickTest: true,
+  cancel: true,
+}
+
+/**
+ * 只描述能力，不伪造具体适配器：调用方仍需从 platform registry 取实现。
+ * `api-key` 没有 login/logout 是有意的，填 Key 不是 OAuth 登录。
+ */
+export function sourceOperationsFor(
+  descriptor: Pick<ProtocolSourceDescriptor, 'sourceKind' | 'authKind'>,
+): SourceOperationSupport {
+  if (descriptor.sourceKind === 'cli' || descriptor.authKind === 'cli-session') {
+    return CLI_OPERATIONS
+  }
+  if (descriptor.sourceKind === 'local-model') return LOCAL_OPERATIONS
+  return API_KEY_OPERATIONS
+}

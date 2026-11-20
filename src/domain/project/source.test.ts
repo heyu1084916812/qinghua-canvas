@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { protocolById } from './protocol'
-import { protocolSourceDescriptor } from './source'
+import { protocolSourceDescriptor, sourceOperationsFor } from './source'
 
 function definition(id: string) {
   const result = protocolById(id)
@@ -54,5 +54,33 @@ describe('protocolSourceDescriptor', () => {
         credentials: [],
       }),
     ).toMatchObject({ sourceKind: 'api', authKind: 'none' })
+  })
+})
+
+
+describe('sourceOperationsFor', () => {
+  it('does not confuse API-key configuration with login/logout', () => {
+    const operations = sourceOperationsFor({ sourceKind: 'api', authKind: 'api-key' })
+    expect(operations).toMatchObject({
+      verify: true,
+      listModels: true,
+      login: false,
+      logout: false,
+      status: true,
+      quickTest: true,
+      cancel: true,
+    })
+  })
+
+  it('gives CLI sources the full session lifecycle', () => {
+    expect(sourceOperationsFor({ sourceKind: 'cli', authKind: 'cli-session' })).toEqual({
+      verify: true,
+      listModels: true,
+      login: true,
+      logout: true,
+      status: true,
+      quickTest: true,
+      cancel: true,
+    })
   })
 })
