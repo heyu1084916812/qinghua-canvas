@@ -97,6 +97,7 @@ import {
 } from '../../../../domain/agent/seriesOrchestration'
 import { referenceReviewPrompt } from '../../../../domain/agent/referenceReview'
 import { reviewTurnReferences } from './agentTurnReferenceReview'
+import { classifyAgentGenerationFlow } from '../../agent/agentGenerationFlow'
 
 export interface AgentTurnContextTrace {
   digest: string
@@ -185,6 +186,8 @@ export interface PreparedAgentTurnRequest {
   explicitMediaModels: ExplicitMediaModels
   perImage: boolean
   requestMode: AgentRequestMode
+  /** #989：本轮按事实信号选择的六类生图流程。 */
+  generationFlow: import('../../agent/agentGenerationFlow').AgentGenerationFlow
   /** 参考台账 usage 的任务键（按任务，不按请求模式）。 */
   taskKey: string
   /** 本轮判定后的任务；调用方据此刷新会话快照。 */
@@ -765,6 +768,14 @@ export async function prepareAgentTurnRequest(
     lastAssistantTextForTask,
   )
   const promptProfile = promptProfileForMode(requestMode)
+  const generationFlow = classifyAgentGenerationFlow({
+    text: plainText,
+    requestMode,
+    hasReference: referenceIds.length > 0 || mentionedImageIds.length > 0,
+    hasKit: rawMentions.some((mention) => mention.kind === 'kit') || (input.session.kitRefs?.length ?? 0) > 0,
+    continued: taskDecision.continued,
+    hasTaskPlan: Boolean(activeTaskPlanForTask),
+  })
   const sessionBrief = requestMode === 'complex_plan'
     ? sessionBriefForContinuation({
         messages: previousMessages,
@@ -806,6 +817,7 @@ export async function prepareAgentTurnRequest(
     { model: chatRoute.logicalModel },
     {
       requestMode,
+      generationFlow,
       promptProfile,
       canvasReviewEnabled: input.canvasReviewEnabled,
       webResearchEnabled,
@@ -866,6 +878,7 @@ export async function prepareAgentTurnRequest(
     explicitMediaModels,
     perImage,
     requestMode,
+    generationFlow,
     taskKey,
     agentTask,
     agentTaskReason: taskDecision.reason,

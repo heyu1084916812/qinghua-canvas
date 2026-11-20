@@ -652,6 +652,18 @@ describe('运行确认由程序负责（A6）', () => {
   })
 })
 
+describe('#989 六类生图流程策略', () => {
+  it('把事实分类注入 system prompt，而不是声称阶段已经执行', () => {
+    const prompt = buildAgentSystemPromptWithContext(summarizeForPrompt([]), undefined, {
+      generationFlow: 'reference',
+    })
+    expect(prompt).toContain('## 本轮生图流程策略')
+    expect(prompt).toContain('流程类型：reference')
+    expect(prompt).toContain('按参考驱动处理')
+    expect(prompt).not.toContain('参考已经分析完成')
+  })
+})
+
 describe('完成说明核对（A7）', () => {
   it('★ 完整档与轻量档都要求按 readResult 真实结果报尺寸 / 张数 / 模型', () => {
     for (const prompt of [

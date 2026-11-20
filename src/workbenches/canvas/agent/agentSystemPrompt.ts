@@ -5,6 +5,7 @@ import { summarizeGraph, type GraphSummary } from './tools'
 import type { ToolDeclaration } from '../../../domain/shared/execution/types'
 import type { GenerationAvailability } from '../../../domain/project/generationRouting'
 import type { AgentPromptProfile, AgentRequestMode } from './agentContextPolicy'
+import type { AgentGenerationFlow } from './agentGenerationFlow'
 
 /**
  * Agent 的系统提示词（设计文档 §4.1 的四段）。
@@ -574,6 +575,8 @@ export function buildLightAgentSystemPrompt(
 export interface AgentPromptExtras {
   /** 本轮请求分类；轻量档只用于 simple_generate / reference_edit。 */
   requestMode?: AgentRequestMode
+  /** #989：六类生图流程策略，由当前请求事实分类。 */
+  generationFlow?: AgentGenerationFlow
   /** 检查点续跑的结构化复原摘要；只补一条 system 事实，不改轻量/完整档选择。 */
   sessionBrief?: string
   /** full 保留完整规则和词表；light 只带本次相关节点。 */
@@ -689,6 +692,22 @@ export function buildAgentSystemPromptWithContext(
       ? buildLightAgentSystemPrompt(summary, inherited, extras.requestMode)
       : buildAgentSystemPrompt(summary, inherited),
   ]
+
+  if (extras.generationFlow) {
+    const guidance: Record<AgentGenerationFlow, string> = {
+      direct: '按一次性直接生成处理：先确认必要参数，再调用生成工具。',
+      reference: '按参考驱动处理：只使用本轮明确引用或任务筛选命中的参考，不把无关素材混入。',
+      brandSeries: '按品牌一致性系列处理：先锁定 Logo/主体/颜色/字体等身份锚点，再延展尺寸和物料。',
+      research: '按调研与搜索参考处理：先收集并核实公开参考，再进入生成，不把搜索结果伪装成已生成产物。',
+      iterate: '按多轮迭代处理：继承上一轮成品与明确约束，只修改用户要求的部分。',
+      suite: '按长流程套装处理：先拆分交付物并建立计划，按阶段推进并在阶段完成后汇报事实。',
+    }
+    parts.push([
+      '## 本轮生图流程策略',
+      `流程类型：${extras.generationFlow}`,
+      guidance[extras.generationFlow],
+    ].join('\\n'))
+  }
 
   if (extras.autoRun === true) {
     parts.push(
