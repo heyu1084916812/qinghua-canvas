@@ -4,7 +4,7 @@ import type { ModelCapability } from '../../domain/shared/capability'
 import type { SafeChannelConfig } from '../ports'
 import { ChannelError, type ChannelAdapter, type ChannelDeps, type GeneratedAsset, type ImageRunRequest, type VideoRunRequest, type VerifyResult } from './types'
 import { applyWorkflowNodeInfo } from '../../domain/project/workflowGraph'
-import { submitComfyPrompt, queryComfyHistory, type ComfyWorkflowEndpoint, type ComfyPromptBody } from './comfyWorkflow'
+import { submitComfyPrompt, queryComfyHistory, uploadComfyImage, type ComfyWorkflowEndpoint, type ComfyPromptBody } from './comfyWorkflow'
 
 export interface ComfyUiAdapterOptions {
   pollIntervalMs?: number
@@ -31,18 +31,32 @@ function jsonOf(raw: unknown): unknown {
   try { return JSON.parse(raw) as unknown } catch { return undefined }
 }
 
-function graphOf(request: ImageRunRequest | VideoRunRequest): Record<string, unknown> {
+async function graphOf(request: ImageRunRequest | VideoRunRequest, deps: ChannelDeps, endpoint: ComfyWorkflowEndpoint, signal: AbortSignal): Promise<Record<string, unknown>> {
   const raw = request.params.workflowJson ?? request.params.workflow
   const graph = jsonOf(raw)
   if (!graph || typeof graph !== 'object' || Array.isArray(graph)) {
     throw new ChannelError({ kind: 'channel', detail: 'missingModel' })
   }
   const values = request.params.workflowNodeInfoList ?? (Array.isArray(request.params.workflow) ? request.params.workflow : [])
-  return applyWorkflowNodeInfo(graph, Array.isArray(values) ? values.filter((item): item is { nodeId: string; fieldName: string; fieldValue: string } => {
+  const assets = request.inputs.filter((input): input is Extract<typeof input, { kind: 'asset' }> => input.kind === 'asset')
+  const normalized = Array.isArray(values) ? values.filter((item): item is { nodeId: string; fieldName: string; fieldValue: string | number } => {
     if (!item || typeof item !== 'object') return false
     const v = item as Record<string, unknown>
     return typeof v.nodeId === 'string' && typeof v.fieldName === 'string' && (typeof v.fieldValue === 'string' || typeof v.fieldValue === 'number')
-  }).map((item) => ({ nodeId: item.nodeId, fieldName: item.fieldName, fieldValue: String(item.fieldValue) })) : [])
+  }).map((item) => ({ nodeId: item.nodeId, fieldName: item.fieldName, fieldValue: String(item.fieldValue) })) : []
+  const uploaded: { nodeId: string; fieldName: string; fieldValue: string }[] = []
+  let assetIndex = 0
+  for (const item of normalized) {
+    if (item.fieldValue !== '__upstream__') { uploaded.push(item); continue }
+    const source = assets[assetIndex++]
+    if (!source) continue
+    const payload = await deps.assets.read(source.assetHash)
+    if (!payload) throw new ChannelError({ kind: 'channel', detail: 'unsupported' })
+    const extension = payload.mime.split('/')[1]?.replace(/[^a-z0-9]/gi, '') || 'bin'
+    const fileName = await uploadComfyImage(deps.network, endpoint, { bytes: payload.bytes, mime: payload.mime, name: `${source.assetHash}.${extension}` }, signal)
+    uploaded.push({ ...item, fieldValue: fileName })
+  }
+  return applyWorkflowNodeInfo(graph, uploaded)
 }
 
 function contentTypeOf(headers: Record<string, string>, fallback: string): string {
@@ -71,10 +85,7 @@ export function createComfyUiAdapter(config: SafeChannelConfig, deps: ChannelDep
   const listModels = async (): Promise<ModelCapability[]> => []
 
   const generate = async (request: ImageRunRequest | VideoRunRequest, signal: AbortSignal): Promise<GeneratedAsset[]> => {
-    if (request.inputs.some((input) => input.kind === 'asset')) {
-      throw new ChannelError({ kind: 'channel', detail: 'unsupported' })
-    }
-    const prompt = graphOf(request)
+    const prompt = await graphOf(request, deps, endpoint, signal)
     const accepted = await submitComfyPrompt(deps.network, endpoint, { prompt: prompt as ComfyPromptBody['prompt'], client_id: endpoint.clientId }, signal)
     const deadline = now() + Math.max(1, request.timeoutMs ?? pollTimeout)
     let history = await queryComfyHistory(deps.network, endpoint, accepted.promptId, signal)

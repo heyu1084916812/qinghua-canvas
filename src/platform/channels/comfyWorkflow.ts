@@ -52,3 +52,20 @@ export async function queryComfyHistory(network: NetworkPort, endpoint: ComfyWor
   const response = await network.request({ url: urlOf(endpoint, `/history/${encodeURIComponent(promptId)}`), method: 'GET', headers: {}, timeoutMs: 30_000, publicOnly: false }, signal)
   return parseComfyHistory(await response.json(), promptId, endpoint)
 }
+
+/** ComfyUI `/upload/image` 的返回文件名；只接受相对文件名，避免把服务端响应变成任意路径。 */
+export async function uploadComfyImage(network: NetworkPort, endpoint: ComfyWorkflowEndpoint, file: { bytes: Uint8Array; mime: string; name: string }, signal: AbortSignal): Promise<string> {
+  const name = file.name.split('').map((char) => { const code = char.charCodeAt(0); return code < 32 || '\\/:*?"<>|'.includes(char) ? '_' : char }).join('').trim() || 'input.bin'
+  const form = new FormData()
+  form.append('image', new Blob([file.bytes.buffer as ArrayBuffer], { type: file.mime || 'application/octet-stream' }), name)
+  form.append('type', 'input')
+  form.append('overwrite', 'true')
+  const response = await network.request({ url: urlOf(endpoint, '/upload/image'), method: 'POST', headers: {}, body: form, timeoutMs: 30_000, publicOnly: false }, signal)
+  const raw = await response.json()
+  if (!raw || typeof raw !== 'object') throw new ChannelError({ kind: 'parse', raw: 'ComfyUI /upload/image 返回不是对象' })
+  const value = raw as Record<string, unknown>
+  const uploaded = textOf(value.name).trim()
+  const subfolder = textOf(value.subfolder).trim()
+  if (!uploaded || uploaded.includes('..') || [...uploaded].some((char) => char.charCodeAt(0) < 32 || char === '\\')) throw new ChannelError({ kind: 'parse', raw: 'ComfyUI /upload/image 返回了非法文件名' })
+  return subfolder ? `${subfolder.replace(/^\/+|\/+$/g, '')}/${uploaded}` : uploaded
+}

@@ -40,8 +40,19 @@ describe('ComfyUI adapter', () => {
     expect(assets[0]?.mime).toBe('image/png')
   })
 
-  it('rejects asset inputs until the upload step is wired', async () => {
-    const adapter = createComfyUiAdapter(cfg, deps(networkOf(() => response({ prompt_id: 'never' }))))
-    await expect(adapter.generateImage({ kind: 'image', channelId: 'c', model: 'workflow:w1', prompt: '', inputs: [{ kind: 'asset', nodeId: 'n', assetHash: 'h', mime: 'image/png' }], params: {} }, signal)).rejects.toMatchObject({ appError: { kind: 'channel', detail: 'unsupported' } })
+  it('uploads an upstream asset and backfills the workflow field', async () => {
+    const calls: { url: string; body: unknown }[] = []
+    const adapter = createComfyUiAdapter(cfg, { ...deps(networkOf((url, body) => {
+      calls.push({ url, body })
+      if (url.endsWith('/upload/image')) return response({ name: 'input.png', subfolder: 'sub', type: 'input' })
+      if (url.endsWith('/prompt')) return response({ prompt_id: 'p1' })
+      if (url.endsWith('/history/p1')) return response({ p1: { status: { status_str: 'success' }, outputs: {} } })
+      throw new Error(url)
+    })), assets: { async read() { return { bytes: new Uint8Array([1, 2, 3]), mime: 'image/png' } }, async readUrl() { return null } } }, { pollIntervalMs: 0 })
+    await adapter.generateImage({ kind: 'image', channelId: 'c', model: 'workflow:w1', prompt: '', inputs: [{ kind: 'asset', nodeId: 'n', assetHash: 'h', mime: 'image/png' }], params: { workflowJson: { '1': { class_type: 'LoadImage', inputs: { image: 'old.png' } } }, workflow: [{ nodeId: '1', fieldName: 'image', fieldValue: '__upstream__' }] } }, signal)
+    expect(calls[0]?.url).toBe('http://127.0.0.1:8188/upload/image')
+    const form = calls[0]?.body as FormData
+    expect(form.get('type')).toBe('input')
+    expect((calls.find((x) => x.url.endsWith('/prompt'))?.body as { prompt: Record<string, { inputs: Record<string, unknown> }> }).prompt['1']?.inputs.image).toBe('sub/input.png')
   })
 })
