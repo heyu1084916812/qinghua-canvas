@@ -23,7 +23,7 @@
   outline: none;
 }
 
-.frame.selected::after {
+.frame::after {
   position: absolute;
   inset: 0;
   z-index: 4;
@@ -31,7 +31,13 @@
   border: 2px solid var(--stroke-focus);
   border-radius: inherit;
   content: "";
+  opacity: 0;
   pointer-events: none;
+  transition: opacity 160ms var(--ease-panel);
+}
+
+.frame.selected::after {
+  opacity: 1;
 }
 
 /*
@@ -223,3 +229,9 @@
   border-top-left-radius: var(--radius-node);
 }
 
+
+@media (prefers-reduced-motion: reduce) {
+  .frame::after {
+    transition-duration: 1ms;
+  }
+}

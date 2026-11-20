@@ -1,0 +1,37 @@
+{
+  "feature": "NodeFrame selection chrome fade",
+  "rows": [
+    {
+      "viewport": "1440x900",
+      "theme": "dark",
+      "earlyOpacity": "0.985515",
+      "duration": "0.16s",
+      "settled": "1",
+      "errors": []
+    },
+    {
+      "viewport": "1440x900",
+      "theme": "light",
+      "earlyOpacity": "0.989963",
+      "duration": "0.16s",
+      "settled": "1",
+      "errors": []
+    },
+    {
+      "viewport": "1024x700",
+      "theme": "dark",
+      "earlyOpacity": "0.972653",
+      "duration": "0.16s",
+      "settled": "1",
+      "errors": []
+    },
+    {
+      "viewport": "1024x700",
+      "theme": "light",
+      "earlyOpacity": "0.995927",
+      "duration": "0.16s",
+      "settled": "1",
+      "errors": []
+    }
+  ]
+}
