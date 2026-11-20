@@ -212,6 +212,9 @@ describe('classifyPageWall', () => {
     expect(classifyPageWall({ ...base, url: 'https://a.com/accounts/login/?next=/search' }, { requestedUrl: base.url, itemCount: 0 }).kind).toBe('login')
     expect(classifyPageWall({ ...base, signals: { ...base.signals, passwordField: true } }, { requestedUrl: base.url, itemCount: 0 }).kind).toBe('login')
     expect(classifyPageWall(base, { requestedUrl: base.url, itemCount: 0 }).kind).toBe('none')
+    expect(classifyPageWall({ ...base, title: '', signals: { ...base.signals, textLength: 0 } }, { requestedUrl: base.url, itemCount: 0, blankPageMeansChallenge: true }).kind).toBe('challenge')
+    expect(classifyPageWall({ ...base, title: '', signals: { ...base.signals, textLength: 80 } }, { requestedUrl: base.url, itemCount: 0, blankPageMeansChallenge: true }).kind).toBe('none')
+    expect(classifyPageWall({ ...base, title: '', signals: { ...base.signals, textLength: 0 } }, { requestedUrl: base.url, itemCount: 1, blankPageMeansChallenge: true }).kind).toBe('none')
   })
   it('页面只有「登录」链接（The Dieline 收藏按钮指向 /wp-login.php）不算登录墙', () => {
     expect(classifyPageWall(base, { requestedUrl: base.url, itemCount: 6 }).kind).toBe('none')

@@ -33,6 +33,8 @@ export interface BrowserSiteSpec {
   requireLink?: boolean
   /** 结果卡被「门」挡住即视为登录墙（Pinterest）。 */
   gatedMeansLogin?: boolean
+  /** 某些站点空白挑战页不带标题/标记；仅在页面几乎为空时按验证页处理。 */
+  blankPageMeansChallenge?: boolean
   /** 往下滚几屏。 */
   scrollSteps?: number
 }
@@ -54,6 +56,7 @@ export const BROWSER_SITE_SPECS: readonly BrowserSiteSpec[] = [
     imagePattern: /^https:\/\/cdn\.dribbble\.com\/userupload\//i,
     linkPattern: /^https:\/\/dribbble\.com\/shots\/\d+/i,
     requireLink: true,
+    blankPageMeansChallenge: true,
   },
   {
     id: 'thedieline',

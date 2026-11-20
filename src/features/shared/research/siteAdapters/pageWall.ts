@@ -41,6 +41,8 @@ export interface PageWallInput {
   itemCount: number
   /** 站点声明：`gatedCount > 0` 即视为登录墙（Pinterest）。 */
   gatedMeansLogin?: boolean
+  /** 站点已知会返回无标题、近乎空白的 JS/WAF 挑战页。 */
+  blankPageMeansChallenge?: boolean
 }
 
 export function classifyPageWall(snapshot: PageSnapshot, input: PageWallInput): PageWall {
@@ -59,5 +61,8 @@ export function classifyPageWall(snapshot: PageSnapshot, input: PageWallInput): 
     return { kind: 'login', reason: '跳到了登录页' }
   }
   if (signals.passwordField) return { kind: 'login', reason: '需要登录' }
+  if (input.blankPageMeansChallenge && !snapshot.title.trim() && signals.textLength < 40) {
+    return { kind: 'challenge', reason: '页面仍在进行人机验证' }
+  }
   return { kind: 'none', reason: '' }
 }

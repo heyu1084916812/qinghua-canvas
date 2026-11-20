@@ -156,6 +156,7 @@ async function runUnlocked(
       requestedUrl: url,
       itemCount: items.length,
       ...(spec.gatedMeansLogin ? { gatedMeansLogin: true } : {}),
+      ...(spec.blankPageMeansChallenge ? { blankPageMeansChallenge: true } : {}),
     })
     return { snapshot: parsed, items, wall }
   }
