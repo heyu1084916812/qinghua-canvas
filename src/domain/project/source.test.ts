@@ -124,3 +124,20 @@ describe('sourceSiteCatalogOf', () => {
     ])
   })
 })
+
+
+describe('ComfyUI source classification', () => {
+  it('recognizes a future local ComfyUI protocol without inventing auth', () => {
+    const site = sourceSiteDescriptorOf({
+      id: 'comfyui-local',
+      family: 'comfyui-local',
+      credentials: [],
+    })
+    expect(site).toMatchObject({
+      siteId: 'comfyui-local',
+      sourceKind: 'comfyui',
+      authKind: 'none',
+      operations: { verify: true, listModels: true, login: false, logout: false },
+    })
+  })
+})

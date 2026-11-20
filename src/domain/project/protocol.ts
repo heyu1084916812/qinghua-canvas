@@ -73,6 +73,7 @@ export type ProtocolFamily =
   | 'openai-compatible'
   | 'async-task'
   | 'cli-gateway'
+  | 'comfyui-local'
   | 'declarative-http'
 
 /**

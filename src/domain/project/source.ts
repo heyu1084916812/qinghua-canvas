@@ -99,6 +99,7 @@ export function sourceSiteCatalogOf(
 
 function sourceKindForFamily(family: ProtocolFamily, protocolId: string): SourceKind {
   if (family === 'cli-gateway') return 'cli'
+  if (family === 'comfyui-local') return 'comfyui'
   if (family === 'mock' || protocolId === 'mock') return 'local-model'
   return 'api'
 }
@@ -183,6 +184,6 @@ export function sourceOperationsFor(
   if (descriptor.sourceKind === 'cli' || descriptor.authKind === 'cli-session') {
     return CLI_OPERATIONS
   }
-  if (descriptor.sourceKind === 'local-model') return LOCAL_OPERATIONS
+  if (descriptor.sourceKind === 'local-model' || descriptor.sourceKind === 'comfyui') return LOCAL_OPERATIONS
   return API_KEY_OPERATIONS
 }
