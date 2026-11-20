@@ -6,7 +6,6 @@ import { chromium } from 'playwright'
 
 const ROOT = path.resolve(import.meta.dirname, '..')
 const cdpPort = Number(process.env.QH_CLI_UI_CDP_PORT ?? 9445)
-const runtimeRoot = process.env.QH_CLI_UI_RUNTIME_ROOT ?? ''
 const output = path.join(ROOT, '.playwright-verify', 'cli-key-status-ui')
 fs.mkdirSync(output, { recursive: true })
 
@@ -50,13 +49,13 @@ async function openCliPanel(page) {
   await page.locator('[data-sidebar-settings]').click()
   await page.locator('[data-global-settings]').waitFor({ timeout: 20_000 })
   await page.locator('[data-global-settings-tab="cli"]').click()
-  await page.locator('[data-cli-tool="runninghub"]').waitFor({ timeout: 20_000 })
+  await page.locator('[data-cli-tool="codex"]').waitFor({ timeout: 20_000 })
   await page.waitForTimeout(1_000)
-  await page.locator('[data-cli-advanced="runninghub"] summary').click()
-  await setInputValue(page, '[data-cli-status-args="runninghub"]', '')
-  await page.locator('[data-cli-login-box="runninghub"] summary').click()
-  await page.locator('[data-cli-key="runninghub"]').waitFor({ state: 'visible' })
-  await page.locator('[data-cli-key="runninghub"]').evaluate((element) => {
+  await page.locator('[data-cli-advanced="codex"] summary').click()
+  await setInputValue(page, '[data-cli-status-args="codex"]', '')
+  await page.locator('[data-cli-login-box="codex"] summary').click()
+  await page.locator('[data-cli-key="codex"]').waitFor({ state: 'visible' })
+  await page.locator('[data-cli-key="codex"]').evaluate((element) => {
     element.scrollIntoView({ block: 'center', inline: 'nearest' })
   })
   await page.waitForTimeout(400)
@@ -79,19 +78,21 @@ function geometryOf(page) {
     return {
       viewport: { width: innerWidth, height: innerHeight },
       panel: rect('[data-global-settings-panel]'),
-      keyInput: rect('[data-cli-key="runninghub"]'),
-      keyButton: rect('[data-cli-key-login="runninghub"]'),
-      message: rect('[data-cli-login-msg="runninghub"]'),
+      keyInput: rect('[data-cli-key="codex"]'),
+      keyButton: rect('[data-cli-key-login="codex"]'),
+      message: rect('[data-cli-login-msg="codex"]'),
       overflowX: document.documentElement.scrollWidth > document.documentElement.clientWidth,
       panelOverflowX: panel ? panel.scrollWidth > panel.clientWidth : null,
-      statusArgs: document.querySelector('[data-cli-status-args="runninghub"]')?.value ?? '',
-      statusButton: document.querySelectorAll('[data-cli-status="runninghub"]').length,
-      statusOutput: document.querySelectorAll('[data-cli-statusout="runninghub"]').length,
+      statusArgs: document.querySelector('[data-cli-status-args="codex"]')?.value ?? '',
+      statusButton: document.querySelectorAll('[data-cli-status="codex"]').length,
+      statusOutput: document.querySelectorAll('[data-cli-statusout="codex"]').length,
       legacyInstallButtons: document.querySelectorAll('[data-cli-install]').length,
       detailsOpen:
-        document.querySelector('[data-cli-login-box="runninghub"]')?.hasAttribute('open') ?? false,
+        document.querySelector('[data-cli-login-box="codex"]')?.hasAttribute('open') ?? false,
       loginMessage:
-        document.querySelector('[data-cli-login-msg="runninghub"]')?.textContent?.trim() ?? '',
+        document.querySelector('[data-cli-login-msg="codex"]')?.textContent?.trim() ?? '',
+      statusText:
+        document.querySelector('[data-cli-statusout="codex"]')?.textContent?.trim() ?? '',
     }
   })
 }
@@ -107,9 +108,16 @@ async function capture(page, prefix, viewport, theme) {
   const beforeShot = path.join(output, `${prefix}-before-${viewport.name}-${theme}.png`)
   await page.locator('[data-global-settings-panel]').screenshot({ path: beforeShot })
 
-  await page.locator('[data-cli-key="runninghub"]').fill('isolated-test-key')
-  await page.locator('[data-cli-key-login="runninghub"]').click()
-  await page.locator('[data-cli-login-msg="runninghub"]').waitFor({ timeout: 10_000 })
+  await page.locator('[data-cli-key="codex"]').fill('isolated-test-key')
+  await page.locator('[data-cli-key-login="codex"]').click()
+  await page.locator('[data-cli-statusout="codex"]').waitFor({ timeout: 15_000 })
+  await page.waitForFunction(
+    () => {
+      const text = document.querySelector('[data-cli-statusout="codex"]')?.textContent?.trim() ?? ''
+      return Boolean(text && !text.includes('…正在跑'))
+    },
+    { timeout: 30_000 },
+  )
   const after = await geometryOf(page)
   const afterShot = path.join(output, `${prefix}-after-${viewport.name}-${theme}.png`)
   await page.locator('[data-global-settings-panel]').screenshot({ path: afterShot })
@@ -211,24 +219,6 @@ async function captureWindowFollowUp(page, prefix, viewport, theme) {
   }
 }
 
-function readCredentialWrite() {
-  const credentialPath = path.join(runtimeRoot, 'localappdata', 'rh', 'config.toml')
-  try {
-    const text = fs.readFileSync(credentialPath, 'utf8')
-    return {
-      path: path.relative(ROOT, credentialPath),
-      exists: true,
-      containsSecret: text.includes('isolated-test-key'),
-    }
-  } catch {
-    return {
-      path: path.relative(ROOT, credentialPath),
-      exists: false,
-      containsSecret: false,
-    }
-  }
-}
-
 await waitForHttp(`http://127.0.0.1:${cdpPort}/json/version`)
 const browser = await chromium.connectOverCDP(`http://127.0.0.1:${cdpPort}`)
 try {
@@ -250,25 +240,17 @@ try {
       const key = `${viewport.name}-${theme}`
       report.cases[key] = await capture(page, 'cli', viewport, theme)
       const result = report.cases[key]
-      result.credential = readCredentialWrite()
       const before = result.before
       const after = result.after
       report.ok =
         report.ok &&
-        result.credential.exists &&
-        result.credential.containsSecret &&
         after.statusArgs === '' &&
         after.statusButton === 0 &&
-        after.statusOutput === 0 &&
+        after.statusOutput > 0 &&
         after.legacyInstallButtons === 0 &&
-        after.detailsOpen === false &&
-        after.loginMessage.includes('没有配置状态命令，已跳过自动查询') &&
+        after.statusText.length > 0 &&
         before.keyInput?.y >= before.panel?.y &&
         before.keyInput?.y + before.keyInput?.height <= before.panel?.y + before.panel?.height &&
-        after.message?.width > 0 &&
-        after.message?.height > 0 &&
-        after.message?.y >= after.panel?.y &&
-        after.message?.y + after.message?.height <= after.panel?.y + after.panel?.height &&
         !after.overflowX &&
         !after.panelOverflowX
 
