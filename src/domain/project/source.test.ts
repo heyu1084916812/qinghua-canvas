@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { protocolById } from './protocol'
-import { protocolSourceDescriptor, sourceOperationsFor, sourceSiteDescriptorOf } from './source'
+import { protocolSourceDescriptor, sourceOperationsFor, sourceSiteCatalogOf, sourceSiteDescriptorOf } from './source'
 
 function definition(id: string) {
   const result = protocolById(id)
@@ -109,5 +109,18 @@ describe('sourceSiteDescriptorOf', () => {
       authKind: 'api-key',
       operations: { login: false, logout: false },
     })
+  })
+})
+
+
+describe('sourceSiteCatalogOf', () => {
+  it('把同站点的多个协议合并成一个站点条目并保留协议顺序', () => {
+    const defs = ['jimeng-cli', 'gpt-cli', 'gemini-cli'].map((id) => definition(id))
+    const sites = sourceSiteCatalogOf([...defs, { id: 'jimeng-cli-gateway', family: 'cli-gateway', credentials: [] }])
+    expect(sites.map((site) => [site.siteId, site.protocolIds])).toEqual([
+      ['jimeng', ['jimeng-cli', 'jimeng-cli-gateway']],
+      ['codex', ['gpt-cli']],
+      ['gemini', ['gemini-cli']],
+    ])
   })
 })

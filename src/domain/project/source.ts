@@ -65,6 +65,38 @@ export function sourceSiteDescriptorOf(
   }
 }
 
+/**
+ * 把协议目录投影为站点目录；同一站点的多条协议只出现一次，协议顺序保持输入顺序。
+ * 这是设置页 / 来源选择器后续应消费的唯一聚合入口。
+ */
+export function sourceSiteCatalogOf(
+  definitions: readonly Pick<ProtocolDefinition, 'id' | 'family' | 'credentials'>[],
+): SourceSiteDescriptor[] {
+  const sites = new Map<string, SourceSiteDescriptor>()
+  for (const definition of definitions) {
+    const next = sourceSiteDescriptorOf(definition)
+    const current = sites.get(next.siteId)
+    if (!current) {
+      sites.set(next.siteId, next)
+      continue
+    }
+    sites.set(next.siteId, {
+      ...current,
+      protocolIds: [...current.protocolIds, definition.id],
+      operations: {
+        verify: current.operations.verify || next.operations.verify,
+        listModels: current.operations.listModels || next.operations.listModels,
+        login: current.operations.login || next.operations.login,
+        logout: current.operations.logout || next.operations.logout,
+        status: current.operations.status || next.operations.status,
+        quickTest: current.operations.quickTest || next.operations.quickTest,
+        cancel: current.operations.cancel || next.operations.cancel,
+      },
+    })
+  }
+  return [...sites.values()]
+}
+
 function sourceKindForFamily(family: ProtocolFamily, protocolId: string): SourceKind {
   if (family === 'cli-gateway') return 'cli'
   if (family === 'mock' || protocolId === 'mock') return 'local-model'
