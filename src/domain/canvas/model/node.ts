@@ -144,6 +144,8 @@ export interface GenerationData {
    * 面板改值时正好握着字段表与值，一次落库，执行期只做转发（`generationParams`）。
    */
   workflowNodeInfoList?: { nodeId: string; fieldName: string; fieldValue: string }[]
+  /** 本地 ComfyUI 工作流的原始 prompt graph；RunningHub 条目不需要此字段。 */
+  workflowJson?: Record<string, unknown>
   /** RunningHub 实例规格（24G / 48G）；缺省 = default */
   workflowInstance?: 'default' | 'plus'
   /**

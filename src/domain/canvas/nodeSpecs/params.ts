@@ -23,7 +23,12 @@ export function generationParams(data: GenerationData): Record<string, unknown> 
    * 两种前缀都认（#1127 H1：上一版只认 `workflow:`，应用参数在面板上改了也发不出去）。
    */
   const entryModel = /^(workflow|app):/.test(data.model ?? '')
-  const workflow = entryModel && data.workflowNodeInfoList?.length ? { workflow: data.workflowNodeInfoList } : {}
+  const workflow = entryModel
+    ? {
+        ...(data.workflowNodeInfoList?.length ? { workflow: data.workflowNodeInfoList } : {}),
+        ...(data.workflowJson ? { workflowJson: data.workflowJson } : {}),
+      }
+    : {}
   const instanceType = entryModel && data.workflowInstance === 'plus' ? { instanceType: 'plus' } : {}
   /**
    * 按来源只发**这个来源自己的**参数（对账 #1133 逻辑 3）：

@@ -328,6 +328,18 @@ describe('条目与模型 id', () => {
     expect(workflowEntriesRowId('ch_1')).toBe('workflow:entries:ch_1')
   })
 
+  it('normalizeWorkflowEntries：保留 ComfyUI prompt graph，丢弃坏节点', () => {
+    const [entry] = normalizeWorkflowEntries([{
+      id: 'local', title: '本地', provider: 'comfyui-local', fields: [], fetchedAt: 1,
+      workflowJson: {
+        '1': { class_type: 'LoadImage', inputs: { image: 'a.png' }, _meta: { title: '图' } },
+        bad: { inputs: { ignored: true } },
+      },
+    }])
+    expect(entry?.provider).toBe('comfyui-local')
+    expect(entry?.workflowJson).toEqual({ '1': { class_type: 'LoadImage', inputs: { image: 'a.png' }, _meta: { title: '图' } } })
+  })
+
   it('normalizeWorkflowEntries：去重、坏字段丢弃、provider 坏值回落 runninghub', () => {
     const entries = normalizeWorkflowEntries([
       { id: 'w1', title: '我的工作流', provider: '胡说', fields: [{ nodeId: '1', fieldName: 'a' }, {}] },

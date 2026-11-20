@@ -44,7 +44,7 @@ export const API_PARAM_KEYS = [
 ] as const satisfies readonly (keyof GenerationData)[]
 
 /** 工作流来源独有的参数：暴露字段提交体 + 实例规格 */
-export const WORKFLOW_PARAM_KEYS = ['workflowNodeInfoList', 'workflowInstance'] as const satisfies readonly (keyof GenerationData)[]
+export const WORKFLOW_PARAM_KEYS = ['workflowNodeInfoList', 'workflowJson', 'workflowInstance'] as const satisfies readonly (keyof GenerationData)[]
 
 /** CLI 来源的参数就是本机工具的参数模板（存在全局 CLI 设置里），节点上不另存 */
 const SOURCE_PARAM_KEYS: Record<GenerationSource, readonly (keyof GenerationData)[]> = {

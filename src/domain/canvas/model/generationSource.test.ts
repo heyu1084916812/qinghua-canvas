@@ -48,6 +48,19 @@ describe('来源判定（#1133 逻辑 1 / 5）', () => {
 })
 
 describe('切换来源（#1133 逻辑 1 / 2 / 3）', () => {
+  it('工作流来源保留 ComfyUI 原始 graph，并在生成参数中一并下发', () => {
+    const graph = { '1': { class_type: 'LoadImage', inputs: { image: 'old.png' } } }
+    const data = apply(API, switchSourcePatch(API, {
+      source: 'workflow', model: 'workflow:comfy', channelId: 'local',
+      defaults: { workflowJson: graph, workflowNodeInfoList: ENTRY_LIST, workflowInstance: 'default' },
+    }))
+    expect(data.workflowJson).toEqual(graph)
+    expect(generationParams(data as GenerationData)).toEqual({ workflow: ENTRY_LIST, workflowJson: graph })
+    const back = apply(data, switchSourcePatch(data, { source: 'api', model: API.model, channelId: API.channelId }))
+    const again = apply(back, switchSourcePatch(back, { source: 'workflow', model: 'workflow:comfy', channelId: 'local' }))
+    expect(again.workflowJson).toEqual(graph)
+  })
+
   it('API → 工作流：API 参数收进存档、顶层清掉，提交体只剩工作流的', () => {
     const patch = switchSourcePatch(API, {
       source: 'workflow', model: 'workflow:9', channelId: 'rh',

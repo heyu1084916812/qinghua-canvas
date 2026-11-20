@@ -132,6 +132,8 @@ export interface WorkflowEntry {
    * 老条目没有这一份时退回「按节点分组的参数清单」—— 不因为缺图就整块不能编辑。
    */
   graph?: WorkflowGraph
+  /** ComfyUI 执行所需的原始 prompt graph；只对本地 ComfyUI 条目保存。 */
+  workflowJson?: Record<string, unknown>
   /** 最近一次拉到参数的时间（毫秒）；0 = 从没拉过 */
   fetchedAt: number
   /**
@@ -371,6 +373,20 @@ function isWorkflowParamType(value: string): value is WorkflowParamType {
   return (WORKFLOW_PARAM_TYPES as readonly string[]).includes(value)
 }
 
+function normalizeComfyWorkflowJson(raw: unknown): Record<string, unknown> | undefined {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return undefined
+  const out: Record<string, unknown> = {}
+  for (const [id, value] of Object.entries(raw)) {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) continue
+    const node = value as Record<string, unknown>
+    const inputs = node.inputs && typeof node.inputs === 'object' && !Array.isArray(node.inputs) ? { ...(node.inputs as Record<string, unknown>) } : {}
+    const classType = typeof node.class_type === 'string' ? node.class_type : ''
+    if (!classType) continue
+    out[id] = { class_type: classType, inputs, ...(node._meta !== undefined ? { _meta: node._meta } : {}) }
+  }
+  return Object.keys(out).length ? out : undefined
+}
+
 export function normalizeWorkflowEntries(raw: unknown): WorkflowEntry[] {
   if (!Array.isArray(raw)) return []
   const out: WorkflowEntry[] = []
@@ -392,6 +408,7 @@ export function normalizeWorkflowEntries(raw: unknown): WorkflowEntry[] {
     const kind = record.kind === 'app' ? 'app' : 'workflow'
     const outputKind = record.outputKind === 'video' ? 'video' : record.outputKind === 'image' ? 'image' : undefined
     const graph = normalizeWorkflowGraph(record.graph)
+    const workflowJson = normalizeComfyWorkflowJson(record.workflowJson)
     out.push({
       id,
       title: str(record.title).trim() || id,
@@ -401,6 +418,7 @@ export function normalizeWorkflowEntries(raw: unknown): WorkflowEntry[] {
       ...(outputKind ? { outputKind } : {}),
       fields,
       ...(graph ? { graph } : {}),
+      ...(workflowJson ? { workflowJson } : {}),
       fetchedAt: Number.isFinite(Number(record.fetchedAt)) ? Number(record.fetchedAt) : 0,
       ...(coverUrl ? { coverUrl } : {}),
     })

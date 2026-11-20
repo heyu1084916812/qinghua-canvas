@@ -142,7 +142,11 @@ function workflowTab(input: SourceMenuInput): SourceMenuTab {
         source: 'workflow',
         model,
         channelId: row.channelId,
-        defaults: { workflowNodeInfoList: workflowSubmitList(row.entry, {}), workflowInstance: 'default' },
+        defaults: {
+          workflowNodeInfoList: workflowSubmitList(row.entry, {}),
+          ...(row.entry.provider === 'comfyui-local' && row.entry.workflowJson ? { workflowJson: row.entry.workflowJson } : {}),
+          workflowInstance: 'default',
+        },
       },
     }
   }
