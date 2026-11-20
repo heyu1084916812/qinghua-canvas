@@ -3733,8 +3733,3 @@ React 端口 → `invoke` → Rust `check_update` → updater 插件读配置 �
   空数组是**真的**（它自己确实什么都不吃），比删字段更不容易被当成"忘了实现"。
 - 判据：能力入口（`toRunRequest` / `generate` / `ports.input`）缺失 = 不能做；
   数据字段（`collectInputs` 返回什么）如实给。两者别混着用。
-
-### ★ #989 六类生图流程先做事实分类，再谈阶段执行（2026-11-20）
-- 六类流程策略落在 `agentGenerationFlow.ts`，输入只接受当前请求文本、引用/套件信号、任务续跑与计划事实；分类不等于已执行，system prompt 必须用“按……处理”而不是“已完成”。
-- 优先级固定为 `suite → research → brandSeries → reference → iterate → direct`：长流程和调研不能被系列/迭代词抢走；普通参考编辑不能被“再改亮一点”误分为 iterate；无套件不能伪造 brandSeries。
-- `prepareAgentTurnRequest` 同时把分类注入模型提示和 ready 返回值，便于调用方记录；新增字段必须补请求装配与 system prompt 定向测试。
