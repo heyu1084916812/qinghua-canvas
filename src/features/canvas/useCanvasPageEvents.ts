@@ -78,12 +78,11 @@ export function useCanvasPageEvents(store: CanvasStore, onOpenSettings?: () => v
         case 'openLightbox':
           store.openLightbox(
             event.assetHash,
-            event.compareWith
-              ? {
-                  compareWith: event.compareWith,
-                  ...(event.compareKind ? { compareKind: event.compareKind } : {}),
-                }
-              : undefined,
+            {
+              sourceNodeId: nodeId,
+              ...(event.compareWith ? { compareWith: event.compareWith } : {}),
+              ...(event.compareKind ? { compareKind: event.compareKind } : {}),
+            },
           )
           break
         // 以下属于执行引擎 / 上游开关，由各自的接线方接住（执行宿主 / 画布表面 / PanelLayer）

@@ -489,7 +489,7 @@ function NodeActions({
           action="preview"
           icon={<IconExpand />}
           label="预览"
-          onClick={() => assetHash && store.openLightbox(assetHash)}
+          onClick={() => assetHash && store.openLightbox(assetHash, { sourceNodeId: node.id })}
         />
       )}
       {/*

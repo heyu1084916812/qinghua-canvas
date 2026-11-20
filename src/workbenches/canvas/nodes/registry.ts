@@ -136,7 +136,8 @@ export type NodeViewEvent =
   | {
       type: 'openLightbox'
       assetHash: string
-      compareWith?: string
+            sourceNodeId?: string
+compareWith?: string
       compareKind?: 'result' | 'pair'
     }
   /**

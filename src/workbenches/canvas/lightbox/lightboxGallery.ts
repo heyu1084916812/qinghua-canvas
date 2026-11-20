@@ -9,6 +9,7 @@ export interface LightboxGalleryItem {
 
 export interface LightboxStateLike {
   assetHash?: string
+  sourceNodeId?: string
   gallery?: readonly LightboxGalleryItem[]
   galleryIndex?: number
   cropFor?: string

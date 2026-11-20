@@ -13,20 +13,35 @@ import type { CanvasStore } from '../../../state/workbenches/canvas/store'
  *
  * 抽成 hook 的原因：`LightboxLayer` 已经顶到 1040 行预算，这段是自成一体的时序。
  */
+
+export function sourceNodeIdOf(nodes: readonly { id: string; data?: unknown }[], hash: string, preferredNodeId?: string) {
+  if (preferredNodeId && nodes.some((node) => node.id === preferredNodeId && (node.data as { assetHash?: string } | undefined)?.assetHash === hash)) return preferredNodeId
+  return nodes.find((node) => (node.data as { assetHash?: string } | undefined)?.assetHash === hash)?.id ?? null
+}
+
 export function useLightboxFlip(options: {
   stageRef: React.RefObject<HTMLElement | null>
   store: CanvasStore
   assetHash: string | undefined
+  sourceNodeId?: string
   open: boolean
 }): { requestClose: () => void } {
-  const { stageRef, store, assetHash, open } = options
+  const { stageRef, store, assetHash, sourceNodeId, open } = options
   const flippedRef = useRef<string | null>(null)
   const closingRef = useRef(false)
 
-  const sourceRectOf = (hash: string) => {
-    const node = store.getSnapshot().nodes.find((n) => (n.data as { assetHash?: string }).assetHash === hash)
-    if (!node) return null
-    return document.querySelector<HTMLElement>(`[data-node-id="${node.id}"]`)?.getBoundingClientRect() ?? null
+  const sourceRectOf = (hash: string, preferredNodeId?: string) => {
+    const nodes = store.getSnapshot().nodes
+    const ownerId = sourceNodeIdOf(nodes, hash)
+    const candidateIds = [preferredNodeId, ownerId].filter(
+      (id, index, ids): id is string => !!id && ids.indexOf(id) === index,
+    )
+    for (const nodeId of candidateIds) {
+      const frame = document.querySelector<HTMLElement>(`[data-node-id="${nodeId}"]`)
+      const rect = frame?.querySelector<HTMLElement>('[data-node-asset]')?.getBoundingClientRect() ?? frame?.getBoundingClientRect()
+      if (rect?.width) return rect
+    }
+    return null
   }
 
   useEffect(() => {
@@ -53,7 +68,7 @@ export function useLightboxFlip(options: {
         return
       }
       flippedRef.current = assetHash
-      const from = sourceRectOf(assetHash)
+      const from = sourceRectOf(assetHash, sourceNodeId)
       if (!from || !from.width) return
       const scale = Math.max(0.05, Math.min(2.5, Math.min(from.width / to.width, from.height / to.height)))
       const dx = from.left + from.width / 2 - (to.left + to.width / 2)
@@ -68,13 +83,13 @@ export function useLightboxFlip(options: {
     }
     raf = window.requestAnimationFrame(attempt)
     return () => window.cancelAnimationFrame(raf)
-  }, [assetHash, open, stageRef, store])
+  }, [assetHash, open, sourceNodeId, stageRef, store])
 
   const requestClose = useCallback(() => {
     if (closingRef.current) return
     const media = stageRef.current?.querySelector<HTMLElement>('[data-lightbox-media]')
     const hash = store.getLightbox()?.assetHash
-    const from = hash ? sourceRectOf(hash) : null
+    const from = hash ? sourceRectOf(hash, store.getLightbox()?.sourceNodeId) : null
     const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
     if (!media || !from || !from.width || reduced) {
       store.closeLightbox()

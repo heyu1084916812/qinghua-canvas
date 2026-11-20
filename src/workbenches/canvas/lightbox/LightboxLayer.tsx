@@ -110,6 +110,7 @@ export function LightboxLayer() {
   const platform = usePlatform()
   const lightbox = useSyncExternalStore(store.subscribe, store.getLightbox, store.getLightbox)
   const assetHash = lightbox?.assetHash
+  const sourceNodeId = lightbox?.sourceNodeId
   const { gallery, galleryIndex, galleryItem, hasGalleryNavigation } = galleryViewOf(lightbox)
   const { url, mime } = useAssetMeta(assetHash)
   const isVideo = (mime ?? '').startsWith('video/')
@@ -157,7 +158,7 @@ export function LightboxLayer() {
   } = mediaProjection
 
   /* 打开 / 关闭的 FLIP 时序见 `useLightboxFlip`（这里是 1040 行预算，逻辑已抽出） */
-  const { requestClose } = useLightboxFlip({ stageRef, store, assetHash, open: !!lightbox })
+  const { requestClose } = useLightboxFlip({ stageRef, store, assetHash, sourceNodeId, open: !!lightbox })
   /** 标注画布覆盖在媒体矩形上，累积原图像素动作；左键绘制，其余指针手势留给舞台。 */
   const [annTool, setAnnTool] = useState<AnnotateTool>('brush')
   const [annColor, setAnnColor] = useState<string>(ANNOTATE_COLORS[0])

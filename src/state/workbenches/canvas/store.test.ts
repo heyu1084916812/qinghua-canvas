@@ -314,6 +314,12 @@ describe('canvas store / 素材灯箱（§6.17）', () => {
     expect(store.getLightbox()).toBeNull()
   })
 
+  it('记录触发节点，供同素材多节点 FLIP 选择当前原图', () => {
+    const store = createCanvasStore({ platform, projectId: 'p1' })
+    store.openLightbox('hash-1', { sourceNodeId: 'node-b' })
+    expect(store.getLightbox()).toEqual({ assetHash: 'hash-1', sourceNodeId: 'node-b' })
+  })
+
   it('打开灯箱顺手关掉右键菜单（两个浮层不并存）', () => {
     const store = createCanvasStore({ platform, projectId: 'p1' })
     store.setMenu(10, 20, { kind: 'canvas' })
