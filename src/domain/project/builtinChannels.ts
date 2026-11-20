@@ -25,6 +25,8 @@ export const BUILTIN_CHANNEL_IDS = [
   'ch_builtin_agnes',
   'ch_builtin_runninghub',
   'ch_builtin_runninghub_global',
+  'ch_builtin_runninghub_llm',
+  'ch_builtin_runninghub_llm_global',
   'ch_builtin_soonstudio',
   'ch_builtin_65535_chat',
 ] as const
@@ -89,6 +91,17 @@ export const BUILTIN_CHANNELS: readonly BuiltinChannelSpec[] = [
     name: '国际站 · RunningHub',
     protocol: 'runninghub-api',
     baseUrl: 'https://www.runninghub.ai',
+  },
+  {
+    id: 'ch_builtin_runninghub_llm',
+    name: '国内站 · RunningHub LLM',
+    protocol: 'runninghub-llm',
+  },
+  {
+    id: 'ch_builtin_runninghub_llm_global',
+    name: '国际站 · RunningHub LLM',
+    protocol: 'runninghub-llm',
+    baseUrl: 'https://llm.runninghub.ai',
   },
   { id: 'ch_builtin_soonstudio', name: 'SoonStudio', protocol: 'soonstudio' },
   /** id 沿用旧的 `_chat`，只为让已存在的内置行原地升级成合并协议 */

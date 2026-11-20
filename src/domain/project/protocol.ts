@@ -452,6 +452,31 @@ export const BUILTIN_PROTOCOLS: ProtocolDefinition[] = [
     },
     {
       /**
+       * RunningHub LLM：官方 OpenAI-compatible 对话入口（#1112）。
+       * 单列协议让用户不必猜 llm.runninghub.cn 的地址，也不把 LLM 模型混进
+       * 图片 / 视频的任务渠道；请求仍复用 OpenAI 兼容适配器。
+       */
+      id: 'runninghub-llm',
+      name: 'RunningHub LLM',
+      short: 'RH-LLM',
+      family: 'openai-compatible',
+      kind: 'station',
+      status: 'ready',
+      capabilities: ['chat'],
+      defaultBaseUrl: 'https://llm.runninghub.cn',
+      alternateBaseUrls: ['https://llm.runninghub.ai'],
+      versionPath: '/v1',
+      docUrl: 'https://llm.runninghub.cn/v1/models',
+      note: 'RunningHub 的 OpenAI 兼容对话入口；模型目录与 chat/completions 走 LLM 站点，计费按 token。需要有额度的 RunningHub Key。',
+      credentials: [{
+        id: 'balance',
+        label: 'API Key',
+        hint: 'RunningHub LLM 专用 Key；按 token 计费',
+        required: true,
+      }],
+    },
+    {
+      /**
        * RunningHub 的 **HTTP API**（用户第 20 批：「runninghub它也有api」）。
        *
        * 与上面那条 `runninghub`（本机 CLI）**并存**、各管一种用法：

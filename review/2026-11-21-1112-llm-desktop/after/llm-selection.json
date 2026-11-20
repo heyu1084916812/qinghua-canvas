@@ -1,0 +1,26 @@
+[
+  {
+    "tag": "1440x900-dark",
+    "name": "国内站 · RunningHub LLM",
+    "base": "https://llm.runninghub.cn",
+    "errors": []
+  },
+  {
+    "tag": "1440x900-light",
+    "name": "国内站 · RunningHub LLM",
+    "base": "https://llm.runninghub.cn",
+    "errors": []
+  },
+  {
+    "tag": "1024x700-dark",
+    "name": "国内站 · RunningHub LLM",
+    "base": "https://llm.runninghub.cn",
+    "errors": []
+  },
+  {
+    "tag": "1024x700-light",
+    "name": "国内站 · RunningHub LLM",
+    "base": "https://llm.runninghub.cn",
+    "errors": []
+  }
+]

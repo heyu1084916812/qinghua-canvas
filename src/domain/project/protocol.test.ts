@@ -98,6 +98,21 @@ describe('能力查询', () => {
     expect(JSON.stringify(rh?.credentials)).not.toContain('币 Key')
   })
 
+  it('★ RunningHub LLM 是独立的 OpenAI 兼容对话协议', () => {
+    const llm = protocolById('runninghub-llm')
+    expect(llm).toMatchObject({
+      family: 'openai-compatible',
+      capabilities: ['chat'],
+      defaultBaseUrl: 'https://llm.runninghub.cn',
+      versionPath: '/v1',
+      status: 'ready',
+    })
+    expect(llm?.alternateBaseUrls).toContain('https://llm.runninghub.ai')
+    expect(protocolSupports('runninghub-llm', 'chat')).toBe(true)
+    expect(protocolSupports('runninghub-llm', 'image')).toBe(false)
+    expect(llm?.credentials?.map((item) => item.id)).toEqual(['balance'])
+  })
+
   it('65535 拆成对话与任务两条协议，能力不互相冒充', () => {    expect(protocolSupports('65535', 'chat')).toBe(true)
     expect(protocolSupports('65535', 'image')).toBe(true)
     expect(protocolById('65535')?.credentials?.map((item) => item.id)).toEqual([

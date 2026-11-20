@@ -24,7 +24,7 @@ describe('channelRepository', () => {
     await repo.seedBuiltins()
     const rows = await repo.list()
     const soon = rows.find((channel) => channel.id === 'ch_builtin_soonstudio')
-    expect(rows.filter((channel) => channel.id.startsWith('ch_builtin_'))).toHaveLength(6)
+    expect(rows.filter((channel) => channel.id.startsWith('ch_builtin_'))).toHaveLength(8)
     expect(soon?.name).toBe('SoonStudio')
     expect(soon?.protocol).toBe('soonstudio')
     expect(soon?.baseUrl).toBe('https://soonstudio.ai')
@@ -33,7 +33,7 @@ describe('channelRepository', () => {
     expect(combined?.protocol).toBe('65535')
     expect(combined?.baseUrl).toBe('https://api2.65535.space')
     /**
-     * RunningHub 两条站（国内 / 国际）：同一条协议、两个地址、两把 Key（用户 2026-11-14）。
+     * RunningHub API 两条站（国内 / 国际）：同一条协议、两个地址、各自配置（用户 2026-11-14）。
      * 幂等靠 id，所以跑两遍仍然是这两条。
      */
     const rhCn = rows.find((channel) => channel.id === 'ch_builtin_runninghub')
@@ -42,6 +42,14 @@ describe('channelRepository', () => {
     expect(rhGlobal?.baseUrl).toBe('https://www.runninghub.ai')
     expect(rhGlobal?.protocol).toBe('runninghub-api')
     expect(rows.some((channel) => channel.id === 'ch_builtin_65535_task')).toBe(false)
+    expect(rows.find((channel) => channel.id === 'ch_builtin_runninghub_llm')).toMatchObject({
+      protocol: 'runninghub-llm',
+      baseUrl: 'https://llm.runninghub.cn',
+    })
+    expect(rows.find((channel) => channel.id === 'ch_builtin_runninghub_llm_global')).toMatchObject({
+      protocol: 'runninghub-llm',
+      baseUrl: 'https://llm.runninghub.ai',
+    })
   })
 
   it('内置渠道可由资料抽屉改名，重新 seed 后名称不会被覆盖', async () => {
