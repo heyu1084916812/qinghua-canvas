@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { sourceNodeIdOf, sourceRectFromFrame } from './useLightboxFlip'
+import { rectStyle, sourceNodeIdOf, sourceRectFromFrame } from './useLightboxFlip'
 
 describe('sourceNodeIdOf', () => {
   const nodes = [
@@ -15,7 +15,6 @@ describe('sourceNodeIdOf', () => {
     expect(sourceNodeIdOf(nodes, 'same')).toBe('a')
   })
 })
-
 
 describe('sourceRectFromFrame', () => {
   const rect = (width: number, height: number, left = 0, top = 0) => ({
@@ -33,5 +32,13 @@ describe('sourceRectFromFrame', () => {
     const image = { getBoundingClientRect: () => rect(0, 0) }
     const frame = { querySelector: () => image, getBoundingClientRect: () => rect(420, 320, 10, 20) }
     expect(sourceRectFromFrame(frame as unknown as HTMLElement)).toMatchObject({ width: 420, height: 320, left: 10, top: 20 })
+  })
+})
+
+describe('rectStyle', () => {
+  it('serializes a viewport rect for a fixed-position FLIP clone', () => {
+    expect(rectStyle({ left: 12, top: 34, width: 56, height: 78 })).toEqual({
+      left: '12px', top: '34px', width: '56px', height: '78px',
+    })
   })
 })

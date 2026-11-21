@@ -1,125 +1,74 @@
 import { useCallback, useEffect, useRef } from 'react'
 import type { CanvasStore } from '../../../state/workbenches/canvas/store'
 
-/** Lightbox open/close FLIP; the source rect is captured before target layout settles. */
-
 export function sourceNodeIdOf(nodes: readonly { id: string; data?: unknown }[], hash: string, preferredNodeId?: string) {
-  if (preferredNodeId && nodes.some((node) => node.id === preferredNodeId && (node.data as { assetHash?: string } | undefined)?.assetHash === hash)) return preferredNodeId
-  return nodes.find((node) => (node.data as { assetHash?: string } | undefined)?.assetHash === hash)?.id ?? null
+  if (preferredNodeId && nodes.some((n) => n.id === preferredNodeId && (n.data as { assetHash?: string } | undefined)?.assetHash === hash)) return preferredNodeId
+  return nodes.find((n) => (n.data as { assetHash?: string } | undefined)?.assetHash === hash)?.id ?? null
 }
 
-/** Prefer the actual visible asset box; fall back to the frame for non-media nodes. */
 export function sourceRectFromFrame(frame: HTMLElement | null): DOMRect | null {
-  const media = frame?.querySelector<HTMLElement>('img, video')
-  const mediaRect = media?.getBoundingClientRect()
+  const media = frame?.querySelector<HTMLElement>('img, video'), mediaRect = media?.getBoundingClientRect()
   if (mediaRect && mediaRect.width > 0 && mediaRect.height > 0) return mediaRect
-  const frameRect = frame?.getBoundingClientRect()
-  return frameRect && frameRect.width > 0 && frameRect.height > 0 ? frameRect : null
+  const rect = frame?.getBoundingClientRect()
+  return rect && rect.width > 0 && rect.height > 0 ? rect : null
 }
 
-export function useLightboxFlip(options: {
-  stageRef: React.RefObject<HTMLElement | null>
-  store: CanvasStore
-  assetHash: string | undefined
-  sourceNodeId?: string
-  open: boolean
-}): { requestClose: () => void } {
-  const { stageRef, store, assetHash, sourceNodeId, open } = options
-  const flippedRef = useRef<string | null>(null)
-  const closingRef = useRef(false)
+export function rectStyle(rect: Pick<DOMRect, 'left' | 'top' | 'width' | 'height'>): Record<string, string> {
+  return { left: `${rect.left}px`, top: `${rect.top}px`, width: `${rect.width}px`, height: `${rect.height}px` }
+}
 
-  const sourceRectOf = (hash: string, preferredNodeId?: string) => {
-    const nodes = store.getSnapshot().nodes
-    const preferred = preferredNodeId
-      ? sourceNodeIdOf(nodes, hash, preferredNodeId)
-      : null
-    const candidateIds = preferred
-      ? [preferred]
-      : [sourceNodeIdOf(nodes, hash)].filter((id): id is string => Boolean(id))
-    for (const nodeId of candidateIds) {
-      const frame = document.querySelector<HTMLElement>(`[data-node-id="${nodeId}"]`)
-      const rect = sourceRectFromFrame(frame)
-      if (rect) return rect
-    }
-    return null
-  }
+const snapshot = (r: DOMRect) => ({ ...r, toJSON: () => ({}) }) as DOMRect
+const mediaOf = (id?: string) => id && typeof document !== 'undefined'
+  ? document.querySelector<HTMLElement>(`[data-node-id="${CSS.escape(id)}"] img, [data-node-id="${CSS.escape(id)}"] video`)
+  : null
+const rectOf = (id?: string) => { const r = mediaOf(id)?.getBoundingClientRect(); return r && r.width > 0 && r.height > 0 ? snapshot(r) : null }
+
+function cloneOf(source: HTMLElement, rect: DOMRect) {
+  const clone = source.cloneNode(true) as HTMLElement
+  clone.removeAttribute('data-node-asset')
+  clone.setAttribute('data-lightbox-flip-clone', '')
+  Object.assign(clone.style, { position: 'fixed', zIndex: '9999', margin: '0', pointerEvents: 'none', objectFit: 'cover', transform: 'none', opacity: '1', willChange: 'left, top, width, height, border-radius, opacity', ...rectStyle(rect) })
+  return clone
+}
+
+export function useLightboxFlip({ stageRef, store, assetHash, sourceNodeId, open }: {
+  stageRef: React.RefObject<HTMLElement | null>; store: CanvasStore; assetHash?: string; sourceNodeId?: string; open: boolean
+}) {
+  const clone = useRef<HTMLElement | null>(null), source = useRef<HTMLElement | null>(null), first = useRef<DOMRect | null>(null), animation = useRef<Animation | null>(null), closing = useRef(false)
+  const cleanup = useCallback(() => { animation.current?.cancel(); animation.current = null; if (source.current) source.current.style.visibility = ''; source.current = null; first.current = null; clone.current?.remove(); clone.current = null }, [])
 
   useEffect(() => {
-    if (!open) {
-      flippedRef.current = null
-      return
+    if (!open || !assetHash) { if (!open) { cleanup(); closing.current = false }; return }
+    if (clone.current || window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return
+    const sourceEl = mediaOf(sourceNodeId), sourceRect = sourceEl?.getBoundingClientRect()
+    if (!sourceEl || !sourceRect || sourceRect.width <= 0 || sourceRect.height <= 0) return
+    source.current = sourceEl; first.current = snapshot(sourceRect)
+    const floating = cloneOf(sourceEl, sourceRect); document.body.appendChild(floating); clone.current = floating; sourceEl.style.visibility = 'hidden'
+    let frames = 0, raf = 0
+    const play = () => {
+      const target = stageRef.current?.querySelector<HTMLElement>('[data-lightbox-media]'), to = target?.getBoundingClientRect()
+      if (!target || !to || to.width < 48 || to.height < 48) { if (++frames < 60) raf = requestAnimationFrame(play); return }
+      target.style.opacity = '0'
+      const anim = floating.animate([
+        { ...rectStyle(first.current!), borderRadius: getComputedStyle(sourceEl).borderRadius, opacity: 1 },
+        { ...rectStyle(to), borderRadius: getComputedStyle(target).borderRadius, opacity: 1 },
+      ], { duration: 440, easing: 'cubic-bezier(0.22, 1, 0.36, 1)', fill: 'forwards' })
+      animation.current = anim
+      anim.finished.then(() => { if (animation.current !== anim) return; Object.assign(floating.style, rectStyle(to)); target.style.opacity = ''; animation.current = null }, () => undefined)
     }
-    if (!assetHash || flippedRef.current === assetHash) return
-    if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
-      flippedRef.current = assetHash
-      return
-    }
-    let frames = 0
-    let raf = 0
-    let last = { w: 0, h: 0 }
-    const first = sourceRectOf(assetHash, sourceNodeId)
-    const attempt = () => {
-      const media = stageRef.current?.querySelector<HTMLElement>('[data-lightbox-media]')
-      const to = media?.getBoundingClientRect()
-      const stable = !!to && Math.abs(to.width - last.w) < 1 && Math.abs(to.height - last.h) < 1
-      if (!media || !to || to.width < 48 || to.height < 48 || !stable) {
-        if (to) last = { w: to.width, h: to.height }
-        frames += 1
-        if (frames < 40) raf = window.requestAnimationFrame(attempt)
-        return
-      }
-      const from = first ?? sourceRectOf(assetHash, sourceNodeId)
-      if (!from || !from.width) {
-        frames += 1
-        if (frames < 40) raf = window.requestAnimationFrame(attempt)
-        return
-      }
-      flippedRef.current = assetHash
-      const scale = Math.max(0.05, Math.min(2.5, Math.min(from.width / to.width, from.height / to.height)))
-      const dx = from.left + from.width / 2 - (to.left + to.width / 2)
-      const dy = from.top + from.height / 2 - (to.top + to.height / 2)
-      media.animate(
-        [
-          { transform: `translate(${dx}px, ${dy}px) scale(${scale})`, opacity: 0.6 },
-          { transform: 'translate(0, 0) scale(1)', opacity: 1 },
-        ],
-        { duration: 440, easing: 'cubic-bezier(0.22, 1, 0.36, 1)', fill: 'both' },
-      )
-    }
-    raf = window.requestAnimationFrame(attempt)
-    return () => window.cancelAnimationFrame(raf)
-  }, [assetHash, open, sourceNodeId, stageRef, store])
+    raf = requestAnimationFrame(play)
+    return () => { cancelAnimationFrame(raf); cleanup() }
+  }, [assetHash, cleanup, open, sourceNodeId, stageRef])
 
   const requestClose = useCallback(() => {
-    if (closingRef.current) return
-    const media = stageRef.current?.querySelector<HTMLElement>('[data-lightbox-media]')
-    const hash = store.getLightbox()?.assetHash
-    const from = hash ? sourceRectOf(hash, store.getLightbox()?.sourceNodeId) : null
-    const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
-    if (!media || !from || !from.width || reduced) {
-      store.closeLightbox()
-      return
-    }
-    closingRef.current = true
-    const to = media.getBoundingClientRect()
-    const scale = Math.max(0.05, Math.min(2.5, Math.min(from.width / to.width, from.height / to.height)))
-    const dx = from.left + from.width / 2 - (to.left + to.width / 2)
-    const dy = from.top + from.height / 2 - (to.top + to.height / 2)
-    const done = () => {
-      if (!closingRef.current) return
-      closingRef.current = false
-      store.closeLightbox()
-    }
-    const anim = media.animate(
-      [
-        { transform: 'translate(0, 0) scale(1)', opacity: 1 },
-        { transform: `translate(${dx}px, ${dy}px) scale(${scale})`, opacity: 0.35 },
-      ],
-      { duration: 400, easing: 'cubic-bezier(0.22, 1, 0.36, 1)', fill: 'forwards' },
-    )
-    anim.finished.then(done, done)
-    window.setTimeout(done, 420)
-  }, [stageRef, store])
-
+    if (closing.current) return
+    const target = stageRef.current?.querySelector<HTMLElement>('[data-lightbox-media]'), floating = clone.current, destination = rectOf(store.getLightbox()?.sourceNodeId ?? sourceNodeId) ?? first.current
+    if (!target || !floating || !destination || window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) { cleanup(); store.closeLightbox(); return }
+    closing.current = true; animation.current?.cancel(); target.style.opacity = '0'
+    const anim = floating.animate([{ ...rectStyle(floating.getBoundingClientRect()), opacity: 1 }, { ...rectStyle(destination), opacity: 1 }], { duration: 380, easing: 'cubic-bezier(0.22, 1, 0.36, 1)', fill: 'forwards' })
+    animation.current = anim
+    const done = () => { if (!closing.current) return; cleanup(); closing.current = false; store.closeLightbox() }
+    anim.finished.then(done, done); window.setTimeout(done, 420)
+  }, [cleanup, sourceNodeId, stageRef, store])
   return { requestClose }
 }

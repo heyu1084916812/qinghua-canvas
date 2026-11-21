@@ -1,0 +1,10 @@
+{
+  "ticket": "1168",
+  "date": "2026-11-21",
+  "scope": "UI",
+  "desktopOnly": true,
+  "browserOpened": false,
+  "changes": ["useOverlayExit uses layout effect and render-time previous snapshot", "useLightboxFlip uses a source-node fixed clone FLIP for open and close"],
+  "tests": {"targeted": "2 files, 7 passed", "vitest": "808 files passed, 1 skipped; 6585 passed, 1 skipped", "tsc": "passed", "build": "passed", "check": "passed"},
+  "desktopVerification": {"status": "blocked", "reason": "The existing qinghua.exe window handle returned an unavailable AX tree and a screenshot of Explorer instead of the canvas; required desktop interaction matrix could not be observed."}
+}
