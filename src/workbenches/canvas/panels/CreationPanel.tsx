@@ -111,14 +111,15 @@ export function CreationPanel(props: CreationPanelProps) {
   const { data, model, onEvent } = props
   const nodeId = props.nodeId ?? ''
   const channels = useChannels()
-  const enabled = channels.enabledChannels()
   // 订阅「全量渠道」：设置页改完（新增 / 启用）立刻反映到面板——渠道是应用级单例，
-  // 不需要重挂页面。`enabled` 是派生值，每次渲染按最新 state 重算。
+  // 不需要重挂页面。`enabled` 只在渠道数组变化时重算，避免每次渲染都生成新数组，
+  // 触发来源菜单和默认渠道 effect 的重复目录投影。
   const allChannels = useSyncExternalStore(
     channels.subscribe,
     () => channels.getState().channels,
     () => channels.getState().channels,
   )
+  const enabled = useMemo(() => allChannels.filter((channel) => channel.enabled), [allChannels])
   const customModels = useSyncExternalStore(
     channels.subscribe,
     () => channels.getState().customModels,
