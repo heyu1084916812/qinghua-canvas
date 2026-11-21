@@ -73,6 +73,7 @@ import { FlowEdgeCutLayer } from './FlowEdgeCutLayer'
 import { useEdgeCut } from './useEdgeCut'
 import { KnifeCursor } from './KnifeCursor'
 import { KnifeFxLayer } from './KnifeFxLayer'
+import { FlowNodeViewportCulling } from './FlowNodeViewportCulling'
 import { useViewport as useCanvasViewport } from '../../../features/canvas/useViewport'
 import { useNodeDownload } from '../../../features/canvas/useNodeDownload'
 import { clipboardMediaFiles, importDroppedFiles } from '../../../features/canvas/dropImport'
@@ -910,6 +911,7 @@ function FlowSurfaceInner({
       */}
       <FlowGroupBoardLayer />
       <FlowViewportController />
+      <FlowNodeViewportCulling />
       {/*
         牵涉容器子节点的边（视觉层）：与 RF 自带边同一层序（节点之下），
         命中区在下面单独再画一层（`hitOnly`）。

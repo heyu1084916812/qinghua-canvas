@@ -78,6 +78,14 @@
   content-visibility: visible;
 }
 
+.flow :global(.react-flow__node[data-node-viewport-culled='visible']) {
+  content-visibility: visible;
+}
+
+.flow :global(.react-flow__node[data-node-viewport-culled='hidden']) {
+  content-visibility: hidden;
+}
+
 /*
  * 美工刀模式（对账 #1159 / #1174）：直接换 Windows 原生光标图像，而不是用 DOM 跟随鼠标。
  *

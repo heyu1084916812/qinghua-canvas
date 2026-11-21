@@ -13581,6 +13581,54 @@
         "src/ui/icon/Icon.test.ts"
       ],
       "budget": 30
+    },
+    {
+      "module": "src/workbenches/canvas/flow/FlowNodeViewportCulling.tsx",
+      "owner": "canvas-flow-ui",
+      "responsibility": "按画布视口命令式标记常见节点的内容渲染状态，保留 React Flow 节点挂载并避免高频 React 重渲。",
+      "owns": [
+        "节点 wrapper 与图快照的映射",
+        "requestAnimationFrame 视口同步",
+        "MutationObserver 节点新增与移除刷新"
+      ],
+      "doesNotOwn": [
+        "世界坐标与预热边距计算",
+        "节点真实卸载",
+        "画布视口状态变更"
+      ],
+      "publicApi": [
+        "FlowNodeViewportCulling"
+      ],
+      "test": [
+        "src/workbenches/canvas/flow/nodeViewportCulling.test.ts",
+        "scripts/test-canvas-performance.mjs#QH_PERF_UI_MATRIX"
+      ],
+      "budget": 100
+    },
+    {
+      "module": "src/workbenches/canvas/flow/nodeViewportCulling.ts",
+      "owner": "canvas-flow-ui",
+      "responsibility": "计算提示词和生成节点是否完全离开带预热边距的世界视口，并声明可参与内容跳过的节点范围。",
+      "owns": [
+        "320px 屏幕预热边距",
+        "视口内外纯函数判定",
+        "常见叶子节点白名单"
+      ],
+      "doesNotOwn": [
+        "DOM 属性写入",
+        "React 生命周期与调度",
+        "节点绘制和图片解码"
+      ],
+      "publicApi": [
+        "NODE_VIEWPORT_CULL_MARGIN_PX",
+        "CullableNode",
+        "shouldCullCanvasNode",
+        "nodeOutsideViewport"
+      ],
+      "test": [
+        "src/workbenches/canvas/flow/nodeViewportCulling.test.ts"
+      ],
+      "budget": 70
     }
   ]
 }

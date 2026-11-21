@@ -9,11 +9,18 @@ import {
   buildPerformanceReport,
   bytesFromMarker,
   seedGraph,
+  summarizeFrames,
+  viewportRoundMovement,
 } from './test-canvas-performance.mjs'
 
 const seed = seedGraph()
 
 function passingInput() {
+  const viewport = (x, y, zoom) => ({
+    domViewport: { x, y, zoom },
+    rfViewport: `${Math.round(x)},${Math.round(y)}@${zoom.toFixed(2)}`,
+    storeViewport: `${Math.round(x)},${Math.round(y)}@${zoom.toFixed(2)}`,
+  })
   return {
     environment: { built: 'test' },
     graph: {
@@ -29,8 +36,16 @@ function passingInput() {
       thumbnailImages: GENERATION_NODE_COUNT,
       expectedWidthImages: GENERATION_NODE_COUNT,
     },
-    panRounds: [18, 19, 20].map((p95Ms) => ({ p95Ms })),
-    zoomRounds: [17, 18, 19].map((p95Ms) => ({ p95Ms })),
+    panRounds: [18, 19, 20].map((p95Ms, index) => ({
+      p95Ms,
+      before: viewport(-index * 260, -index * 90, 1),
+      after: viewport(-(index + 1) * 260, -(index + 1) * 90, 1),
+    })),
+    zoomRounds: [17, 18, 19].map((p95Ms, index) => ({
+      p95Ms,
+      before: viewport(0, 0, 0.8),
+      after: viewport(0, 0, 0.84 + index * 0.02),
+    })),
     pageErrors: [],
     consoleErrors: [],
     evidence: { canvasScreenshot: 'canvas.png' },
@@ -130,5 +145,54 @@ describe('canvas performance report gate', () => {
       maximumMs: 20,
       pass: false,
     })
+  })
+
+  it('fails when a pan round leaves the viewport stationary', () => {
+    const stalled = passingInput()
+    stalled.panRounds[1] = {
+      ...stalled.panRounds[1],
+      after: stalled.panRounds[1].before,
+    }
+    const report = buildPerformanceReport(stalled)
+    expect(report.ok).toBe(false)
+    expect(report.assertions.panMovement.pass).toBe(false)
+    expect(viewportRoundMovement(stalled.panRounds[1], 'pan')).toEqual({
+      dom: false,
+      store: false,
+      pass: false,
+    })
+  })
+
+  it('fails when a zoom round ends at the same scale', () => {
+    const stalled = passingInput()
+    stalled.zoomRounds[0] = {
+      ...stalled.zoomRounds[0],
+      after: stalled.zoomRounds[0].before,
+    }
+    const report = buildPerformanceReport(stalled)
+    expect(report.ok).toBe(false)
+    expect(report.assertions.zoomMovement.pass).toBe(false)
+  })
+
+  it('reports tail-frame diagnostics without relaxing the P95 gate', () => {
+    const stats = summarizeFrames([16.7, 17.1, 19.5, 21, 34])
+    expect(stats).toMatchObject({
+      frames: 5,
+      over20Frames: 2,
+      over33Frames: 1,
+      maxMs: 34,
+    })
+    expect(stats.p95Ms).toBe(34)
+  })
+
+  it('fails the gate when the culling UI matrix differs from the old rendering', () => {
+    const changed = passingInput()
+    changed.uiMatrix = {
+      pass: false,
+      rounds: [{ viewport: '1440x900-light', pass: false }],
+    }
+    const report = buildPerformanceReport(changed)
+    expect(report.ok).toBe(false)
+    expect(report.assertions.uiMatrix).toEqual({ rounds: 1, pass: false })
   })
 })
