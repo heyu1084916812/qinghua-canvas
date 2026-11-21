@@ -582,7 +582,8 @@
         "subscribeKnife"
       ],
       "test": [
-        "src/features/canvas/knifeMode.test.ts"
+        "src/features/canvas/knifeMode.test.ts",
+        "src/workbenches/canvas/flow/KnifeCursor.test.ts"
       ],
       "budget": 55
     },
@@ -717,12 +718,13 @@
         "刀具开关状态"
       ],
       "publicApi": [
-        "KnifeCursor"
+        "KnifeCursor",
+        "knifeCursorTransform"
       ],
       "test": [
         "src/features/canvas/knifeMode.test.ts"
       ],
-      "budget": 50
+      "budget": 80
     },
     {
       "module": "src/app/providers/SkillStoreContext.tsx",

@@ -17,6 +17,15 @@
 }
 
 /*
+ * During FLIP there must be exactly one visible image: the body-level clone.
+ * The real media may mount later than the clone, so an inline opacity on the
+ * target is not enough; the overlay attribute covers late mounts too.
+ */
+.overlay[data-lightbox-flipping] [data-lightbox-media] {
+  opacity: 0;
+}
+
+/*
  * 固定底栏（用户 2026-10-16）：像素 / 缩放靠左，能力切换居中，下载 / 关闭靠右。
  * 上方浮条只负责当前编辑器的完整工具，因此固定信息与编辑动作不再混在一排。
  */

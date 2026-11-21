@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import {
   LIGHTBOX_MOTION,
-  predictedMediaRect,
   rectStyle,
   settledMediaRect,
   snapshotRect,
   sourceNodeIdOf,
   sourceRectFromFrame,
 } from './lightboxFlipController'
+import { predictedMediaRect } from './lightboxViewportMath'
 
 describe('sourceNodeIdOf', () => {
   const nodes = [

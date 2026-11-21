@@ -1,14 +1,12 @@
 import { useCallback, useLayoutEffect, useRef } from 'react'
 import type { CanvasStore } from '../../../state/workbenches/canvas/store'
 import { predictedMediaRect } from './lightboxViewportMath'
-export { predictedMediaRect } from './lightboxViewportMath'
 export const LIGHTBOX_MOTION = {
   enterMs: 440,
   exitMs: 400,
   overlayMs: 360,
   easing: 'cubic-bezier(0.22, 1, 0.36, 1)',
 } as const
-
 const SOURCE_SHADOW = '0 8px 24px rgba(0,0,0,.18)'
 const TARGET_SHADOW = '0 30px 70px -12px rgba(0,0,0,.65)'
 
@@ -28,10 +26,7 @@ export function rectStyle(rect: Pick<DOMRect, 'left' | 'top' | 'width' | 'height
   return { left: `${rect.left}px`, top: `${rect.top}px`, width: `${rect.width}px`, height: `${rect.height}px` }
 }
 
-/**
- * DOMRect's geometry lives on the prototype, so object spread produces `{}`.
- * Copy every consumed field explicitly and keep a plain serializable rect.
- */
+/** DOMRect geometry lives on the prototype; copy every consumed field explicitly. */
 export function snapshotRect(rect: Pick<DOMRect, 'left' | 'top' | 'width' | 'height'>): DOMRect {
   const left = Number.isFinite(rect.left) ? rect.left : 0
   const top = Number.isFinite(rect.top) ? rect.top : 0
@@ -131,6 +126,7 @@ export function useLightboxFlipController({ stageRef, store, assetHash, sourceNo
     clone.current = null
     const overlay = stageRef.current?.closest<HTMLElement>('[data-lightbox]')
     if (overlay) {
+      overlay.setAttribute('data-lightbox-flipping', '')
       overlay.style.opacity = ''
       overlay.style.pointerEvents = ''
     }
@@ -166,6 +162,7 @@ export function useLightboxFlipController({ stageRef, store, assetHash, sourceNo
     clone.current = floating
     if (sourceEl) sourceEl.style.visibility = 'hidden'
     const overlay = stageRef.current?.closest<HTMLElement>('[data-lightbox]')
+    overlay?.setAttribute('data-lightbox-flipping', '')
     if (overlay) {
       const overlayIn = overlay.animate(
         [{ opacity: '0' }, { opacity: '1' }],
@@ -204,6 +201,7 @@ export function useLightboxFlipController({ stageRef, store, assetHash, sourceNo
         const latestTarget = stageRef.current?.querySelector<HTMLElement>('[data-lightbox-media]')
         if (!latestTarget?.isConnected) return
         latestTarget.style.opacity = ''
+        overlay?.removeAttribute('data-lightbox-flipping')
         floating.remove()
         clone.current = null
       }, LIGHTBOX_MOTION.enterMs + 80)
@@ -218,6 +216,7 @@ export function useLightboxFlipController({ stageRef, store, assetHash, sourceNo
         anim.cancel()
         if (latestTarget?.isConnected) {
           latestTarget.style.opacity = ''
+          overlay?.removeAttribute('data-lightbox-flipping')
           floating.remove()
           if (clone.current === floating) clone.current = null
         } else {
@@ -229,8 +228,8 @@ export function useLightboxFlipController({ stageRef, store, assetHash, sourceNo
         animation.current = null
       }, () => undefined)
     }
-    if (predictedMediaRect(stageRef.current, naturalRef.current)) play()
-    else raf = requestAnimationFrame(play)
+    // One frame lets the overlay stage settle; the clone already shows First.
+    raf = requestAnimationFrame(play)
     return () => { cancelAnimationFrame(raf); cleanup() }
   }, [assetHash, cleanup, open, sourceNodeId, stageRef, store])
 
@@ -261,6 +260,7 @@ export function useLightboxFlipController({ stageRef, store, assetHash, sourceNo
       return
     }
     closing.current = true
+    overlay?.setAttribute('data-lightbox-flipping', '')
     overlay?.style.setProperty('pointer-events', 'none')
     target.style.opacity = '0'
     const overlayStart = overlay ? getComputedStyle(overlay).opacity : '1'

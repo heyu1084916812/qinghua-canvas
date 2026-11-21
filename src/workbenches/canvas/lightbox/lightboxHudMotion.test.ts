@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest'
 
 const css = fs.readFileSync(new URL('./LightboxLayer.module.css', import.meta.url), 'utf8').replaceAll('\r\n', '\n')
 const tsx = fs.readFileSync(new URL('./LightboxLayer.tsx', import.meta.url), 'utf8')
+const flip = fs.readFileSync(new URL('./lightboxFlipController.ts', import.meta.url), 'utf8')
 
 describe('lightbox HUD mode motion', () => {
   it('remounts HUD content when the mode or comparison view changes', () => {
@@ -16,6 +17,12 @@ describe('lightbox HUD mode motion', () => {
     expect(css).toContain('@keyframes hudContentIn')
     expect(css).toContain('transform: translate(-50%, -4px);')
     expect(css).toContain('  .hud {\n    animation: none;')
+  })
+
+  it('keeps the real media hidden while the FLIP clone owns the frame', () => {
+    expect(css).toContain('.overlay[data-lightbox-flipping] [data-lightbox-media]')
+    expect(flip).toContain("setAttribute('data-lightbox-flipping', '')")
+    expect(flip).toContain("removeAttribute('data-lightbox-flipping')")
   })
 })
 

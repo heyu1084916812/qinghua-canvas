@@ -8147,8 +8147,38 @@ async function g49(browser) {
     !!enterFlip && enterFlip.toWidth > 1 && enterFlip.duration === 440,
     JSON.stringify(enterFlip),
   )
+  const exclusiveFlip = await page.waitForFunction(() => {
+    const overlay = document.querySelector('[data-lightbox]')
+    const clone = document.querySelector('[data-lightbox-flip-clone]')
+    const media = document.querySelector('[data-lightbox-media]')
+    if (!overlay || !clone || !media || !overlay.hasAttribute('data-lightbox-flipping')) return null
+    const opacity = getComputedStyle(media).opacity
+    return opacity === '0'
+      ? { flipping: true, mediaOpacity: opacity, clone: true }
+      : null
+  }, { timeout: 1200 }).then((handle) => handle.jsonValue()).catch(() => null)
+  rec(
+    g,
+    '★★ FLIP 期间真实媒体隐藏，只显示浮动克隆',
+    !!exclusiveFlip,
+    JSON.stringify(exclusiveFlip),
+  )
   await sleep(500)
   rec(g, '双击素材打开灯箱（§6.8 已挂的动线终于有人接）', (await page.locator('[data-lightbox]').count()) === 1)
+  const settledVisibility = await page.locator('[data-lightbox]').evaluate((overlay) => {
+    const media = overlay.querySelector('[data-lightbox-media]')
+    return {
+      flipping: overlay.hasAttribute('data-lightbox-flipping'),
+      mediaOpacity: media ? getComputedStyle(media).opacity : null,
+      clone: !!overlay.ownerDocument.querySelector('[data-lightbox-flip-clone]'),
+    }
+  })
+  rec(
+    g,
+    'FLIP 结束后真实媒体接管且克隆已清理',
+    !settledVisibility.flipping && settledVisibility.mediaOpacity === '1' && !settledVisibility.clone,
+    JSON.stringify(settledVisibility),
+  )
   const lightboxModes = await page
     .locator('[data-lightbox-mode-bar] [data-lightbox-mode-button]')
     .evaluateAll((els) => els.map((e) => e.getAttribute('data-lightbox-mode-button')))
