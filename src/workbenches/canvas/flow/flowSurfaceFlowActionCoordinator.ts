@@ -24,6 +24,7 @@ import {
 
 export interface FlowNodeChangePorts {
   setSelection: (ids: string[]) => void
+  setSelectionAsMulti: (ids: string[]) => void
   stampNodeSelection: () => void
   setSnapHints: (hints: FlowSnapHints | null) => void
   markDragMoved: (moved: boolean) => void
@@ -48,7 +49,11 @@ export function applyFlowNodeChanges(
 ): void {
   const selectionPlan = planNodeSelection(input)
   if (selectionPlan.changed) {
-    ports.setSelection(selectionPlan.selection)
+    // RF emits selection changes before the final marquee callback. Keep any
+    // multi-node result in the store's multi mode so the multi-select HUD can
+    // render instead of being downgraded to a single selection.
+    if (selectionPlan.selection.length > 1) ports.setSelectionAsMulti(selectionPlan.selection)
+    else ports.setSelection(selectionPlan.selection)
     ports.stampNodeSelection()
   }
   const positionPlan = planNodePositionChanges(input)

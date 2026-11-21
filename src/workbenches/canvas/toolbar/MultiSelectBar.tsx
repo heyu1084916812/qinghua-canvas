@@ -24,16 +24,10 @@ import {
 import styles from './MultiSelectBar.module.css'
 
 /**
- * 虚线框相对选区**往外扩多少**（屏幕 px）——用户 2026-10-05 第 6 条：
- * 「虚线框要大一点，不要遮住节点的名称还有左右的端点」。
+ * 多选 HUD 与节点内容之间的留白（屏幕 px）。
  *
- * - 上边 30：让出节点标题带（节点框上方那 24px 的标题 + 读数，理由与跟随栏同一条，
- *   见 `followBarAnchor.NODE_TITLE_BAND`）；
- * - 左右下 22：把框整体推离节点内容，左右端点也随之落到框沿上，
- *   不再压在节点自己的端口上。
- *
- * **这是唯一来源**：框的 `inset`、端点位置、功能栏的高度偏移都由它算出来，
- * 不写进 CSS（散成两处就会出现「框放大了、端点还留在原地」）。
+ * 上边 30：让出节点标题带；左右下 22：让出节点内容与共有端点。
+ * 功能栏和端点共用这组几何偏移，避免各自漂移。
  */
 export const MULTI_BOX_INSET = { top: 30, side: 22, bottom: 22 } as const
 /** 端点直径（与 `.endpoint` 的 width/height 一致）：居中到框沿要用它的一半 */
@@ -47,16 +41,11 @@ const ENDPOINT_SIZE = 14
 const ENDPOINT_TOP_OFFSET = (MULTI_BOX_INSET.bottom - MULTI_BOX_INSET.top) / 2
 
 /**
- * **多选浮层**：虚线框 + 上方功能栏 + 左右两个「共有端点」（用户 2026-10-05 第 11 / 12 条，
- * 参考图四）。
+ * **多选浮层**：上方功能栏 + 左右两个「共有端点」（用户 2026-10-05 第 11 / 12 条，
+ * 参考图四）。虚线框已按最终确认移除。
  *
- * 三个部分的职责与交互边界写在这里，别在别处再实现一遍：
- * ① **虚线框**只是指示「这一圈是选中的」，`pointer-events: none` —— 框内还要能继续
- *    框选 / 点节点，浮层不能把画布手势吃掉；
- * ② **功能栏**（六个动作）与单选时的跟随栏同一套视觉与锚点口径（屏幕坐标、挂在选区
- *    上沿之上）；
- * ③ **左右端点**是「一次连多个」的入口：拖出去落在一个节点上 = 把**每个**选中节点都
- *    连到它（右侧 = 连下游、左侧 = 连上游）。参考图四只有右侧一只，按用户要求补左侧。
+ * 功能栏与端点各自接管自己的交互；端点拖出去落在一个节点上 = 把**每个**选中节点都
+ * 连到它（右侧 = 连下游、左侧 = 连上游）。
  */
 
 export function MultiSelectBar({
@@ -193,25 +182,15 @@ export function MultiSelectBar({
       className={styles.wrap}
       data-multi-select
       style={{ left, top, width, height }}
-      /** 浮层本体不吃画布手势（框 / 端点 / 功能栏各自显式接管） */
+      /** 浮层本体不吃画布手势（端点 / 功能栏各自显式接管） */
       onPointerDown={(e) => e.stopPropagation()}
       onWheel={(e) => e.stopPropagation()}
     >
       <div
-        className={styles.box}
-        data-multi-select-box
-        /** 外扩量来自上面那个常量（框 / 端点 / 功能栏三者共用一份） */
-        style={{
-          inset: `-${MULTI_BOX_INSET.top}px -${MULTI_BOX_INSET.side}px -${MULTI_BOX_INSET.bottom}px`,
-        }}
-      />
-
-      <div
         className={styles.bar}
         data-multi-select-bar
         /**
-         * 功能栏挂在**虚线框上沿之上**再留 6px —— 原先只按「选区上沿」算，
-         * 框一放大，栏的底边就压在虚线上（用户 2026-10-05 第 6 条）。
+         * 功能栏挂在选区上沿之上再留 6px，避免压住节点内容。
          */
         style={{ top: -(MULTI_BOX_INSET.top + FOLLOW_BAR_HEIGHT + 6) }}
       >

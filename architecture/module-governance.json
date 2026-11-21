@@ -6905,7 +6905,7 @@
       "test": [
         "src/workbenches/canvas/flow/flowSurfaceFlowActionCoordinator.test.ts"
       ],
-      "budget": 271
+      "budget": 276
     },
     {
       "module": "src/workbenches/canvas/flow/flowSurfaceRenderModel.ts",
@@ -13371,7 +13371,7 @@
       "test": [
         "src/workbenches/canvas/lightbox/lightboxEditorProjection.test.ts"
       ],
-      "budget": 120
+      "budget": 130
     },
     {
       "module": "src/workbenches/canvas/flow/knifeEdgeOverlay.ts",

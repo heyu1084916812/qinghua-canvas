@@ -296,6 +296,7 @@ function FlowSurfaceInner({
   const actionPorts = useMemo(
     () => ({
       setSelection: (ids: string[]) => store.setSelection(ids),
+      setSelectionAsMulti: (ids: string[]) => store.setSelectionAsMulti(ids),
       stampNodeSelection: () => {
         nodeSelectStampRef.current = true
         queueMicrotask(() => {
@@ -337,7 +338,7 @@ function FlowSurfaceInner({
    * 挥刀中切掉的每条线都用同一个 `planId` 派发 —— Ctrl+Z 一次全回来。
    */
   const { preview, begin: beginSlice, move: moveSlice, end: endSlice } = useEdgeCut({
-    surfaceEl,
+    surfaceEl, initialIds: () => store.getSnapshot().edges.map(edge => edge.id),
     removeEdges: (ids, planId) => {
       store.dispatch({ kind: 'edge.removeMany', ids }, { mode: 'multi-step', planId, label: '切断连线' })
     },
@@ -399,7 +400,7 @@ function FlowSurfaceInner({
       })
       if (plan.kind !== 'none') {
         if (plan.selection) {
-          if (e.shiftKey && plan.selection.length === 1) store.setSelectionAsMulti(plan.selection)
+          if (e.shiftKey) store.setSelectionAsMulti(plan.selection)
           else store.setSelection(plan.selection)
         }
       }
@@ -524,6 +525,7 @@ function FlowSurfaceInner({
         nodeId,
         selection: store.getSelection(),
       })
+      if (store.getUpstreamPick()) store.endUpstreamPick()
       if (plan.selection) store.setSelection(plan.selection)
       store.setMenu(plan.menu.x, plan.menu.y, plan.menu.target)
     },
@@ -583,7 +585,9 @@ function FlowSurfaceInner({
       if (!upstreamPick || nodeId === upstreamPick) return
       try {
         store.dispatch({ kind: 'edge.connect', source: nodeId, target: upstreamPick })
-        store.endUpstreamPick()
+        // Picking upstream nodes is a session, not a one-shot action. Keep the
+        // dashed add slot active until the user clicks the pane, right-clicks,
+        // or presses Escape.
         store.setSelection([upstreamPick])
       } catch {
         store.setSelection([upstreamPick])
@@ -673,9 +677,9 @@ function FlowSurfaceInner({
       if (!marquee) return
       /** 等 RF 的 select change 落完，再按 store 几何裁掉框外节点。 */
       window.requestAnimationFrame(() => {
-        store.setSelection(
-          selectionFromMarquee({ graph: store.getSnapshot(), marquee, baseline }),
-        )
+        const ids = selectionFromMarquee({ graph: store.getSnapshot(), marquee, baseline })
+        if (ids.length > 0) store.setSelectionAsMulti(ids)
+        else store.setSelection(ids)
         selectionMarqueeRef.current = null
         selectionBaselineRef.current = []
       })
@@ -963,7 +967,14 @@ function FlowSurfaceInner({
         autoPanOnSelection={false}
         onSelectionStart={onSelectionStart}
         onSelectionEnd={onSelectionEnd}
-        onNodeClick={(_event, node) => handlePickNode(node.id)}
+        onNodeClick={(event, node) => {
+          if (!upstreamPick && event.shiftKey) {
+            // Preserve multi-selection mode for a Shift click even when only
+            // one node remains selected.
+            store.setSelectionAsMulti(store.getSelection())
+          }
+          handlePickNode(node.id)
+        }}
         onPaneClick={() => {
           if (store.getUpstreamPick()) store.endUpstreamPick()
         }}

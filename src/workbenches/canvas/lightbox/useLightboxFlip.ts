@@ -32,13 +32,21 @@ export function useLightboxFlip(options: {
 
   const sourceRectOf = (hash: string, preferredNodeId?: string) => {
     const nodes = store.getSnapshot().nodes
-    const ownerId = sourceNodeIdOf(nodes, hash)
-    const candidateIds = [preferredNodeId, ownerId].filter(
-      (id, index, ids): id is string => !!id && ids.indexOf(id) === index,
-    )
+    const preferred = preferredNodeId
+      ? sourceNodeIdOf(nodes, hash, preferredNodeId)
+      : null
+    // When the caller opened the lightbox from a specific node, never silently
+    // fall back to another node carrying the same hash. That made duplicate
+    // references animate from the wrong canvas position.
+    const candidateIds = preferred
+      ? [preferred]
+      : [sourceNodeIdOf(nodes, hash)].filter((id): id is string => Boolean(id))
     for (const nodeId of candidateIds) {
       const frame = document.querySelector<HTMLElement>(`[data-node-id="${nodeId}"]`)
-      const rect = frame?.querySelector<HTMLElement>('[data-node-asset]')?.getBoundingClientRect() ?? frame?.getBoundingClientRect()
+      // The requested origin is the node's boxed position, not the inner
+      // image element. The inner image can be letterboxed or smaller than the
+      // selected frame, which makes the zoom visibly start from an offset.
+      const rect = frame?.getBoundingClientRect()
       if (rect?.width) return rect
     }
     return null
@@ -67,9 +75,11 @@ export function useLightboxFlip(options: {
         if (frames < 40) raf = window.requestAnimationFrame(attempt)
         return
       }
-      flippedRef.current = assetHash
       const from = sourceRectOf(assetHash, sourceNodeId)
+      // Keep retrying if the exact source node has not mounted yet. Marking it
+      // flipped before this check would permanently skip the opening animation.
       if (!from || !from.width) return
+      flippedRef.current = assetHash
       const scale = Math.max(0.05, Math.min(2.5, Math.min(from.width / to.width, from.height / to.height)))
       const dx = from.left + from.width / 2 - (to.left + to.width / 2)
       const dy = from.top + from.height / 2 - (to.top + to.height / 2)

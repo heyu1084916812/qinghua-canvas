@@ -24349,7 +24349,7 @@ async function g99(browser) {
 
 // ────────────────────────────────────────────────────────────
 // G103 多选浮层（用户 2026-10-05 第 11 / 12 条，参考图四）：
-// 虚线框 + 上方六枚动作 + 左右两个「共有端点」（拖一次把每个选中节点都连上）
+// 上方六枚动作 + 左右两个「共有端点」（拖一次把每个选中节点都连上）
 // ────────────────────────────────────────────────────────────
 async function g103(browser) {
   const g = 'G103 多选浮层'
@@ -24428,7 +24428,6 @@ async function g103(browser) {
 
   const overlay = page.locator('[data-multi-select]')
   const bar = page.locator('[data-multi-select-bar]')
-  const box = page.locator('[data-multi-select-box]')
   /**
    * ⚠️ 只认**根层**节点：容器（分组 / 批量）的子节点也带 `[data-node-type]`，
    * 但它们在 DOM 里排在容器的框里、位置由容器决定 —— 拿它们凑"两个提示词"会点到
@@ -24469,14 +24468,14 @@ async function g103(browser) {
   rec(g, 'Shift+点击加选成两个', selCount >= 2, `selected=${selCount}`)
   rec(
     g,
-    '★★ 多选出现浮层：虚线框 + 功能栏 + 左右端点',
+    '★★ 多选出现功能栏 + 左右端点（不再显示虚线框）',
     (await overlay.count()) === 1 &&
-      (await box.count()) === 1 &&
+      (await page.locator('[data-multi-select-box]').count()) === 0 &&
       (await bar.count()) === 1 &&
       (await page.locator('[data-multi-endpoint="input"]').count()) === 1 &&
       (await page.locator('[data-multi-endpoint="output"]').count()) === 1 &&
       (await page.locator('[data-node-follow-bar]').count()) === 0,
-    `overlay=${await overlay.count()} box=${await box.count()} bar=${await bar.count()}`,
+    `overlay=${await overlay.count()} box=${await page.locator('[data-multi-select-box]').count()} bar=${await bar.count()}`,
   )
 
   const actions = await page
@@ -24512,10 +24511,10 @@ async function g103(browser) {
   )
 
   /**
-   * 几何：虚线框**包住整个选区**（不是只框住其中一个节点），
+   * 几何：多选 HUD 的容器覆盖整个选区（不是只覆盖其中一个节点），
    * 两个端点落在选区左右外沿的纵向中点。
    */
-  const boxGeom = await box.boundingBox()
+  const boxGeom = await overlay.boundingBox()
   const p0 = await prompts.nth(0).boundingBox()
   const p1 = await prompts.nth(1).boundingBox()
   const union = {
@@ -24526,7 +24525,7 @@ async function g103(browser) {
   }
   rec(
     g,
-    '★★ 虚线框包住整个选区（两个节点都在框内）',
+    '★★ 多选 HUD 覆盖整个选区（两个节点都在范围内）',
     !!boxGeom &&
       boxGeom.x <= union.left + 1 &&
       boxGeom.y <= union.top + 1 &&

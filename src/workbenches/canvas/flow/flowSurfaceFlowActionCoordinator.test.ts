@@ -48,6 +48,7 @@ describe('FlowSurface flow action coordinator', () => {
   it('applies selection changes and node moves with the existing decision plans', () => {
     const ports = {
       setSelection: vi.fn(),
+      setSelectionAsMulti: vi.fn(),
       stampNodeSelection: vi.fn(),
       setSnapHints: vi.fn(),
       markDragMoved: vi.fn(),
@@ -71,6 +72,33 @@ describe('FlowSurface flow action coordinator', () => {
     expect(ports.stampNodeSelection).toHaveBeenCalledOnce()
     expect(ports.moveNodes).toHaveBeenCalledWith(['a'], 4, 6, 'move')
     expect(ports.markDragMoved).toHaveBeenCalledWith(true)
+  })
+
+  it('keeps a multi-node React Flow selection in multi mode', () => {
+    const ports = {
+      setSelection: vi.fn(),
+      setSelectionAsMulti: vi.fn(),
+      stampNodeSelection: vi.fn(),
+      setSnapHints: vi.fn(),
+      markDragMoved: vi.fn(),
+      moveNodes: vi.fn(),
+    }
+    applyFlowNodeChanges(
+      {
+        graph: snapshot(),
+        selection: [],
+        changes: [
+          { type: 'select', id: 'a', selected: true },
+          { type: 'select', id: 'b', selected: true },
+        ],
+        marquee: null,
+        baseline: [],
+        anchor: null,
+      },
+      ports,
+    )
+    expect(ports.setSelectionAsMulti).toHaveBeenCalledWith(['a', 'b'])
+    expect(ports.setSelection).not.toHaveBeenCalled()
   })
 
   it('keeps begin, final alignment, end, release and reparent order', () => {
