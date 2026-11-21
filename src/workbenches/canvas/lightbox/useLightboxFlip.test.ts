@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   LIGHTBOX_MOTION,
+  predictedMediaRect,
   rectStyle,
   settledMediaRect,
   snapshotRect,
@@ -97,6 +98,23 @@ describe('settledMediaRect', () => {
       width: 720,
       height: 480,
     })
+  })
+})
+
+describe('predictedMediaRect', () => {
+  it('computes the target box before the original asset finishes decoding', () => {
+    const stage = {
+      getBoundingClientRect: () => ({
+        left: 64,
+        top: 33,
+        width: 1376,
+        height: 810,
+      }) as DOMRect,
+    }
+    const rect = predictedMediaRect(stage as unknown as HTMLElement, { w: 720, h: 480 })
+    expect(rect).toMatchObject({ width: expect.any(Number), height: expect.any(Number) })
+    expect(rect!.width).toBeGreaterThan(100)
+    expect(rect!.height).toBeGreaterThan(100)
   })
 })
 

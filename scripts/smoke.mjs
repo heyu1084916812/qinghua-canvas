@@ -45968,7 +45968,103 @@ async function g170(browser) {
   } finally { await ctx.close() }
 }
 
-const ALL_GROUPS = [g1, g2, g3, g4, g5, g6, g7, g8, g9, g10, g11, g12, g13, g14, g15, g16, g17, g18, g19, g23, g24, g37, g42, g43, g44, g45, g46, g47, g48, g49, g51, g52, g53, g55, g56, g57, g58, g59, g60, g61, g62, g63, g64, g65, g66, g67, g68, g69, g70, g71, g72, g73, g74, g75, g76, g77, g78, g79, g80, g81, g82, g83, g84, g85, g86, g87, g88, g89, g90, g91, g92, g93, g94, g95, g96, g97, g98, g99, g100, g101, g102, g103, g104, g105, g106, g107, g108, g109, g110, g111, g112, g113, g114, g115, g116, g117, g118, g119, g120, g121, g122, g123, g125, g126, g127, g128, g129, g130, g131, g132, g133, g134, g135, g136, g137, g138, g139, g140, g141, g142, g143, g144, g145, g146, g147, g148, g149, g150, g151, g152, g153, g154, g155, g156, g157, g158, g159, g160, g161, g162, g164, g165, g166, g167, g168, g169, g170, g735, g769, g795, g798, g800, g865]
+async function g171(browser) {
+  const g = 'G171 美工刀切容器子边'
+  const ctx = await newCtx(browser, { viewport: { width: 1440, height: 900 } })
+  const page = await ctx.newPage()
+  const errors = []
+  page.on('pageerror', (error) => errors.push(String(error)))
+  try {
+    await gotoProjects(page)
+    await page.locator('[data-new-card]').first().click()
+    await page.locator('[data-new-project-choice="canvas"]').first().click()
+    await page.waitForURL(/\/canvas\//)
+    await page.locator('[data-canvas-hydrated="true"]').waitFor({ state: 'attached', timeout: 20_000 })
+    const pid = page.url().split('/canvas/')[1]
+    await page.evaluate(async (projectId) => {
+      const { createSharedStorage } = await import('/src/platform/web/sharedStorage.ts')
+      const db = createSharedStorage()
+      await db.put('nodes', {
+        id: 'knife-group', projectId, type: 'group', parentId: null,
+        x: 180, y: 200, w: 500, h: 300, title: 'Group', disabled: false, data: { label: 'Group' },
+      })
+      await db.put('nodes', {
+        id: 'knife-child', projectId, type: 'generation', parentId: 'knife-group',
+        x: 24, y: 24, w: 260, h: 200, title: 'Child', disabled: false,
+        data: { mode: 'image', prompt: 'child', linkedPromptNodeIds: [], channelId: 'mock', model: 'mock-image' },
+      })
+      await db.put('nodes', {
+        id: 'knife-external', projectId, type: 'generation', parentId: null,
+        x: 920, y: 320, w: 260, h: 200, title: 'External', disabled: false,
+        data: { mode: 'image', prompt: 'external', linkedPromptNodeIds: [], channelId: 'mock', model: 'mock-image' },
+      })
+      await db.put('edges', {
+        id: 'edge-child-external', projectId, source: 'knife-child', target: 'knife-external',
+        sourcePort: 'output', targetPort: 'input',
+      })
+    }, pid)
+    await page.reload({ waitUntil: 'domcontentloaded' })
+    const childEdge = page.locator('[data-child-edge="edge-child-external"]')
+    await childEdge.waitFor({ state: 'attached', timeout: 20_000 })
+    rec(g, '子边视觉路径携带真实边 ID', (await childEdge.getAttribute('data-edge')) === 'edge-child-external')
+
+    const cut = await page.evaluate(() => {
+      const path = document.querySelector('[data-child-edge="edge-child-external"]')
+      if (!(path instanceof SVGPathElement)) return null
+      const matrix = path.getScreenCTM()
+      if (!matrix) return null
+      const total = path.getTotalLength()
+      for (let index = 3; index < 18; index += 1) {
+        const t = index / 20
+        const point = path.getPointAtLength(total * t)
+        const nearby = path.getPointAtLength(total * Math.min(0.99, t + 0.01))
+        const screen = {
+          x: matrix.a * point.x + matrix.c * point.y + matrix.e,
+          y: matrix.b * point.x + matrix.d * point.y + matrix.f,
+        }
+        const next = {
+          x: matrix.a * nearby.x + matrix.c * nearby.y + matrix.e,
+          y: matrix.b * nearby.x + matrix.d * nearby.y + matrix.f,
+        }
+        if (document.elementFromPoint(screen.x, screen.y)?.closest('[data-node-id]')) continue
+        const dx = next.x - screen.x
+        const dy = next.y - screen.y
+        const length = Math.hypot(dx, dy) || 1
+        const nx = -dy / length
+        const ny = dx / length
+        return {
+          start: { x: screen.x - nx * 38, y: screen.y - ny * 38 },
+          end: { x: screen.x + nx * 38, y: screen.y + ny * 38 },
+        }
+      }
+      return null
+    })
+    if (!cut) {
+      rec(g, '找到未被节点覆盖的子边横切位置', false)
+    } else {
+      await page.mouse.move(cut.start.x, cut.start.y)
+      await page.keyboard.down('Space')
+      await page.locator('[data-knife-cursor]').waitFor({ state: 'attached', timeout: 5000 })
+      await page.mouse.down()
+      await page.mouse.move(cut.end.x, cut.end.y, { steps: 18 })
+      const pending = await page.locator('[data-edge="edge-child-external"][data-knife-pending]').count()
+      const preview = await page.locator('[data-edge-cut-id="edge-child-external"]').count()
+      rec(g, '子边进入美工刀命中与断线预览', pending === 1 && preview === 1, JSON.stringify({ pending, preview }))
+      await page.mouse.up()
+      await page.keyboard.up('Space')
+      await sleep(450)
+      rec(g, '松开后真实删除子边', (await page.locator('[data-child-edge="edge-child-external"]').count()) === 0)
+      await page.keyboard.press('Control+z')
+      await sleep(450)
+      rec(g, '一次撤销恢复子边', (await page.locator('[data-child-edge="edge-child-external"]').count()) === 1)
+    }
+    rec(g, '无未捕获异常', errors.length === 0, errors.join(' | '))
+  } finally {
+    await ctx.close()
+  }
+}
+
+const ALL_GROUPS = [g1, g2, g3, g4, g5, g6, g7, g8, g9, g10, g11, g12, g13, g14, g15, g16, g17, g18, g19, g23, g24, g37, g42, g43, g44, g45, g46, g47, g48, g49, g51, g52, g53, g55, g56, g57, g58, g59, g60, g61, g62, g63, g64, g65, g66, g67, g68, g69, g70, g71, g72, g73, g74, g75, g76, g77, g78, g79, g80, g81, g82, g83, g84, g85, g86, g87, g88, g89, g90, g91, g92, g93, g94, g95, g96, g97, g98, g99, g100, g101, g102, g103, g104, g105, g106, g107, g108, g109, g110, g111, g112, g113, g114, g115, g116, g117, g118, g119, g120, g121, g122, g123, g125, g126, g127, g128, g129, g130, g131, g132, g133, g134, g135, g136, g137, g138, g139, g140, g141, g142, g143, g144, g145, g146, g147, g148, g149, g150, g151, g152, g153, g154, g155, g156, g157, g158, g159, g160, g161, g162, g164, g165, g166, g167, g168, g169, g170, g171, g735, g769, g795, g798, g800, g865]
 // ────────────────────────────────────────────────────────────
 // G169 框选多节点拖动：**松手那一刻不许再有人挪**（用户 2026-11-18 偶发：
 //      「框选多个节点，移动的时候松开鼠标会有一张图片移动了位置，好像多了一个步骤」）

@@ -1,6 +1,7 @@
 import { useCallback, useLayoutEffect, useRef } from 'react'
 import type { CanvasStore } from '../../../state/workbenches/canvas/store'
-
+import { predictedMediaRect } from './lightboxViewportMath'
+export { predictedMediaRect } from './lightboxViewportMath'
 export const LIGHTBOX_MOTION = {
   enterMs: 440,
   exitMs: 400,
@@ -78,7 +79,7 @@ function computedShadow(element: HTMLElement | null, fallback: string) {
   return shadow && shadow !== 'none' ? shadow : fallback
 }
 
-function motionFrame(rect: DOMRect, borderRadius: string, boxShadow: string) {
+function motionFrame(rect: Pick<DOMRect, 'left' | 'top' | 'width' | 'height'>, borderRadius: string, boxShadow: string) {
   return {
     ...rectStyle(rect),
     borderRadius,
@@ -89,6 +90,7 @@ function motionFrame(rect: DOMRect, borderRadius: string, boxShadow: string) {
 
 function cloneOf(source: HTMLElement, rect: DOMRect, borderRadius: string, boxShadow: string) {
   const clone = source.cloneNode(true) as HTMLElement
+  const objectFit = getComputedStyle(source).objectFit || 'cover'
   clone.removeAttribute('data-node-asset')
   clone.setAttribute('data-lightbox-flip-clone', '')
   Object.assign(clone.style, {
@@ -96,7 +98,7 @@ function cloneOf(source: HTMLElement, rect: DOMRect, borderRadius: string, boxSh
     zIndex: '9999',
     margin: '0',
     pointerEvents: 'none',
-    objectFit: 'cover',
+    objectFit,
     transform: 'none',
     opacity: '1',
     willChange: 'left, top, width, height, border-radius, box-shadow, opacity',
@@ -107,13 +109,17 @@ function cloneOf(source: HTMLElement, rect: DOMRect, borderRadius: string, boxSh
   return clone
 }
 
-export function useLightboxFlipController({ stageRef, store, assetHash, sourceNodeId, open }: {
-  stageRef: React.RefObject<HTMLElement | null>; store: CanvasStore; assetHash?: string; sourceNodeId?: string; open: boolean
+export function useLightboxFlipController({ stageRef, store, assetHash, sourceNodeId, natural, open }: {
+  stageRef: React.RefObject<HTMLElement | null>; store: CanvasStore; assetHash?: string; sourceNodeId?: string; natural?: { w: number; h: number } | null; open: boolean
 }) {
-  const clone = useRef<HTMLElement | null>(null), source = useRef<HTMLElement | null>(null), first = useRef<DOMRect | null>(null), animation = useRef<Animation | null>(null), overlayAnimation = useRef<Animation | null>(null), closing = useRef(false), completionTimer = useRef<number | null>(null)
+  const clone = useRef<HTMLElement | null>(null), source = useRef<HTMLElement | null>(null), first = useRef<DOMRect | null>(null), animation = useRef<Animation | null>(null), overlayAnimation = useRef<Animation | null>(null), closing = useRef(false), completionTimer = useRef<number | null>(null), enterTimer = useRef<number | null>(null)
+  const naturalRef = useRef(natural)
+  naturalRef.current = natural
   const cleanup = useCallback(() => {
     if (completionTimer.current !== null) window.clearTimeout(completionTimer.current)
     completionTimer.current = null
+    if (enterTimer.current !== null) window.clearTimeout(enterTimer.current)
+    enterTimer.current = null
     animation.current?.cancel()
     overlayAnimation.current?.cancel()
     animation.current = null
@@ -176,8 +182,8 @@ export function useLightboxFlipController({ stageRef, store, assetHash, sourceNo
     const play = () => {
       const target = stageRef.current?.querySelector<HTMLElement>('[data-lightbox-media]')
       if (target) target.style.opacity = '0'
-      const to = settledMediaRect(target ?? null)
-      if (!target || !to) {
+      const to = settledMediaRect(target ?? null) ?? predictedMediaRect(stageRef.current, naturalRef.current)
+      if (!to) {
         if (++frames < 120) {
           raf = requestAnimationFrame(play)
         } else {
@@ -185,29 +191,69 @@ export function useLightboxFlipController({ stageRef, store, assetHash, sourceNo
         }
         return
       }
-      const targetRadius = computedRadius(target) ?? '0px'
-      target.style.opacity = '0'
+      const targetRadius = computedRadius(target ?? null) ?? '0px'
       const anim = floating.animate([
         motionFrame(first.current!, sourceRadius, sourceShadow),
         motionFrame(to, targetRadius, TARGET_SHADOW),
       ], { duration: LIGHTBOX_MOTION.enterMs, easing: LIGHTBOX_MOTION.easing, fill: 'forwards' })
       animation.current = anim
+      if (enterTimer.current !== null) window.clearTimeout(enterTimer.current)
+      enterTimer.current = window.setTimeout(() => {
+        enterTimer.current = null
+        if (closing.current || clone.current !== floating) return
+        const latestTarget = stageRef.current?.querySelector<HTMLElement>('[data-lightbox-media]')
+        if (!latestTarget?.isConnected) return
+        latestTarget.style.opacity = ''
+        floating.remove()
+        clone.current = null
+      }, LIGHTBOX_MOTION.enterMs + 80)
       anim.finished.then(() => {
-        if (animation.current !== anim) return
-        Object.assign(floating.style, rectStyle(to), { borderRadius: targetRadius, boxShadow: TARGET_SHADOW })
+        if (clone.current !== floating) return
+        const latestTarget = stageRef.current?.querySelector<HTMLElement>('[data-lightbox-media]')
+        const settledTarget =
+          usableRect(latestTarget?.isConnected ? latestTarget.getBoundingClientRect() : null) ??
+          settledMediaRect(latestTarget?.isConnected ? latestTarget : null) ??
+          to
+        const settledRadius = computedRadius(latestTarget?.isConnected ? latestTarget : null) ?? targetRadius
         anim.cancel()
-        target.style.opacity = ''
+        if (latestTarget?.isConnected) {
+          latestTarget.style.opacity = ''
+          floating.remove()
+          if (clone.current === floating) clone.current = null
+        } else {
+          Object.assign(floating.style, rectStyle(settledTarget), {
+            borderRadius: settledRadius,
+            boxShadow: TARGET_SHADOW,
+          })
+        }
         animation.current = null
       }, () => undefined)
     }
-    raf = requestAnimationFrame(play)
+    if (predictedMediaRect(stageRef.current, naturalRef.current)) play()
+    else raf = requestAnimationFrame(play)
     return () => { cancelAnimationFrame(raf); cleanup() }
   }, [assetHash, cleanup, open, sourceNodeId, stageRef, store])
 
   const requestClose = useCallback(() => {
     if (closing.current) return
     const lightbox = store.getLightbox()
-    const target = stageRef.current?.querySelector<HTMLElement>('[data-lightbox-media]'), floating = clone.current, destination = rectOf(lightbox?.sourceNodeId ?? sourceNodeId) ?? rectFromSnapshot(lightbox?.sourceRect) ?? first.current
+    const target = stageRef.current?.querySelector<HTMLElement>('[data-lightbox-media]')
+    let floating = clone.current
+    if (!floating && target?.isConnected) {
+      const current = usableRect(target.getBoundingClientRect())
+      if (current) {
+        floating = cloneOf(
+          target,
+          current,
+          computedRadius(target) ?? '0px',
+          computedShadow(target, TARGET_SHADOW),
+        )
+        document.body.appendChild(floating)
+        clone.current = floating
+        target.style.opacity = '0'
+      }
+    }
+    const destination = rectOf(lightbox?.sourceNodeId ?? sourceNodeId) ?? rectFromSnapshot(lightbox?.sourceRect) ?? first.current
     const overlay = stageRef.current?.closest<HTMLElement>('[data-lightbox]')
     if (!target || !floating || !destination || window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
       cleanup()

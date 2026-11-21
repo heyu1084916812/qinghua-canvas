@@ -46,8 +46,8 @@ const ChildEdgeViewport = memo(function ChildEdgeViewport({ hitOnly }: { hitOnly
               className={p.related ? `${styles.edge} ${styles.edgeActive}` : styles.edge}
               d={p.d}
               vectorEffect="non-scaling-stroke"
-              data-edge
-              data-child-edge
+              data-edge={p.id}
+              data-child-edge={p.id}
             />
           )}
           {hitOnly && (
@@ -55,7 +55,7 @@ const ChildEdgeViewport = memo(function ChildEdgeViewport({ hitOnly }: { hitOnly
             className={styles.hit}
             d={p.d}
             vectorEffect="non-scaling-stroke"
-            data-child-edge-hit
+            data-child-edge-hit={p.id}
             onDoubleClick={() => store.dispatch({ kind: 'edge.remove', id: p.id })}
           />
           )}

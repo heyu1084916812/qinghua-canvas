@@ -37,6 +37,23 @@ export function mediaBoxOf(natural: { w: number; h: number }, viewport: Viewport
   }
 }
 
+export function predictedMediaRect(
+  stage: HTMLElement | null,
+  natural: { w: number; h: number } | null | undefined,
+): Pick<DOMRect, 'left' | 'top' | 'width' | 'height'> | null {
+  if (!stage || !natural || natural.w <= 0 || natural.h <= 0) return null
+  const stageRect = stage.getBoundingClientRect()
+  if (stageRect.width <= 0 || stageRect.height <= 0) return null
+  const viewport = fitMediaViewport(natural, { x: 0, y: 0, w: stageRect.width, h: stageRect.height })
+  const box = mediaBoxOf(natural, viewport)
+  return {
+    left: stageRect.left + box.left,
+    top: stageRect.top + box.top,
+    width: box.width,
+    height: box.height,
+  }
+}
+
 export function imagePointAt(
   clientX: number,
   clientY: number,

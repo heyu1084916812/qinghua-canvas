@@ -1,9 +1,5 @@
 import type { LightboxEditorMode } from './lightboxKeyboard'
-import {
-  availableEditorModes,
-  ownerNodeOf,
-  type LightboxStateLike,
-} from './lightboxGallery'
+import { availableEditorModes, naturalHintOf, ownerNodeOf, type LightboxStateLike } from './lightboxGallery'
 import { EDITOR_MODES } from './lightboxCatalog'
 
 type LightboxNodeLike = Parameters<typeof ownerNodeOf>[0][number]
@@ -22,6 +18,8 @@ export function lightboxEditorProjectionOf(input: LightboxEditorProjectionInput)
   const faceFor = input.lightbox?.faceFor
   const cropPlainRequested = input.lightbox?.cropPlain === true
   const ownerNode = ownerNodeOf(input.nodes, input.assetHash)
+  const sourceRect = input.lightbox?.sourceRect
+  const naturalHint = naturalHintOf(ownerNode, sourceRect)
   const ownerNodeId = ownerNode?.id ?? ''
   const cropNodeId = cropFor ?? faceFor ?? ownerNodeId
   const rotateNodeId = input.lightbox?.rotateFor ?? ownerNodeId
@@ -49,6 +47,7 @@ export function lightboxEditorProjectionOf(input: LightboxEditorProjectionInput)
     faceFor,
     cropPlainRequested,
     ownerNode,
+    naturalHint,
     ownerNodeId,
     cropNodeId,
     rotateNodeId,

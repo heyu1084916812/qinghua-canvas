@@ -39,6 +39,16 @@ export interface CatalogChannelLike {
   }[]
 }
 
+/**
+ * The channel array is replaced on store writes, so its identity is a safe
+ * cache key here. A single panel mount normalizes the same model several
+ * times through the source menu and the capability lookup; without this,
+ * each lookup rebuilds the full logical-name catalog.
+ */
+const logicalNamesCache = new WeakMap<readonly CatalogChannelLike[], string[]>()
+const aliasTargetsCache = new WeakMap<readonly CatalogChannelLike[], Set<string>>()
+const logicalNameCache = new WeakMap<readonly CatalogChannelLike[], Map<string, string>>()
+
 function catalogSources(channel: CatalogChannelLike): {
   priority: number
   models: readonly ModelCapability[]
@@ -68,6 +78,8 @@ function catalogSources(channel: CatalogChannelLike): {
  * `gpt-image-2` 两个名字，而用户眼里那是同一个模型）。
  */
 export function aliasTargets(channels: readonly CatalogChannelLike[]): Set<string> {
+  const cached = aliasTargetsCache.get(channels)
+  if (cached) return new Set(cached)
   const out = new Set<string>()
   for (const c of channels) {
     for (const source of catalogSources(c)) {
@@ -85,6 +97,7 @@ export function aliasTargets(channels: readonly CatalogChannelLike[]): Set<strin
       }
     }
   }
+  aliasTargetsCache.set(channels, out)
   return out
 }
 
@@ -99,6 +112,8 @@ export function aliasTargets(channels: readonly CatalogChannelLike[]): Set<strin
  * 逻辑名 = 上游 ID，下拉与以前**一字不差**（老项目零迁移）。
  */
 export function logicalNames(channels: readonly CatalogChannelLike[]): string[] {
+  const cached = logicalNamesCache.get(channels)
+  if (cached) return cached
   const targets = aliasTargets(channels)
   const out = new Set<string>()
   for (const c of channels) {
@@ -155,7 +170,9 @@ export function logicalNames(channels: readonly CatalogChannelLike[]): string[] 
       }
     }
   }
-  return [...out]
+  const names = [...out]
+  logicalNamesCache.set(channels, names)
+  return names
 }
 
 /**
@@ -346,7 +363,18 @@ export function toLogicalName(
 ): string {
   const name = modelName.trim()
   if (!name) return ''
-  if (logicalNames(channels).includes(name)) return name
+  let names = logicalNameCache.get(channels)
+  if (!names) {
+    names = new Map()
+    logicalNameCache.set(channels, names)
+  }
+  const cached = names.get(name)
+  if (cached !== undefined) return cached
+  const finish = (result: string) => {
+    names!.set(name, result)
+    return result
+  }
+  if (logicalNames(channels).includes(name)) return finish(name)
   for (const c of channels) {
     for (const source of catalogSources(c)) {
       for (const [logical, upstream] of Object.entries(source.modelMap ?? {})) {
@@ -360,7 +388,7 @@ export function toLogicalName(
        * 「已知上游 ID → 显示名」的兜底就永远走不到 —— 用户在老会话 / 老节点上
        * 看到的仍是裸 ID，而同一下拉里列的是 `Agnes 2.5 Pro`，看起来像两个模型。
        */
-        if (target === name && key !== target) return key
+        if (target === name && key !== target) return finish(key)
       }
     }
   }
@@ -371,5 +399,5 @@ export function toLogicalName(
    * 拉回来的 ID），而用户要看到的是 `GPT Image 2`。上面两道都认不出来时，
    * 用固定清单里登记的别名兜底 —— 认不出来才原样返回，不硬塞。
    */
-  return presetIdForUpstream(name)
+  return finish(presetIdForUpstream(name))
 }

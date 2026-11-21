@@ -12,6 +12,7 @@ import { fitCanvasView, focusCanvasNode } from '../../workbenches/canvas/surface
 import { CanvasExecutionProvider } from '../../workbenches/canvas/execution/CanvasExecutionProvider'
 import { CanvasGatewayBridge } from '../../workbenches/canvas/agent/CanvasGatewayBridge'
 import { CanvasToolbar } from '../../workbenches/canvas/toolbar/CanvasToolbar'
+import { logicalNames } from '../../domain/project/modelCatalog'
 import { AgentBrowserWallPrompt } from './AgentBrowserWallPrompt'
 import { screenToWorld } from '../../domain/canvas/geometry/coords'
 import { NODE_MINIMUMS } from '../../domain/canvas/layout/constants'
@@ -39,8 +40,9 @@ import {
 import { CanvasSkillLibraryHost } from './CanvasSkillLibraryHost'
 import styles from './CanvasPage.module.css'
 
+const loadLightboxLayer = () => import('../../workbenches/canvas/lightbox/LightboxLayer')
 const LightboxLayer = lazy(() =>
-  import('../../workbenches/canvas/lightbox/LightboxLayer').then((module) => ({
+  loadLightboxLayer().then((module) => ({
     default: module.LightboxLayer,
   })),
 )
@@ -179,6 +181,29 @@ function CanvasProject({ projectId }: { projectId: string }) {
   const store = cached.store
   const channels = useChannels()
   const { style: canvasStyle } = useCanvasStyle()
+
+  /**
+   * Warm the first selection and lightbox open after the canvas has painted.
+   *
+   * The panel's model catalog is expensive enough in the dev bundle that a
+   * first click can otherwise spend a long task rebuilding it before the HUD
+   * gets a second frame. Keep the projection warm; channel subscriptions
+   * rebuild it only when the channel array really changes.
+   */
+  useEffect(() => {
+    let alive = true
+    const warm = () => {
+      if (!alive) return
+      logicalNames(channels.getState().channels)
+      void loadLightboxLayer().catch(() => undefined)
+    }
+    warm()
+    const unsubscribe = channels.subscribe(warm)
+    return () => {
+      alive = false
+      unsubscribe()
+    }
+  }, [channels])
 
   /**
    * 新节点默认尺寸（项目偏好 #379 C5）：把档位换算成系数交给 store，

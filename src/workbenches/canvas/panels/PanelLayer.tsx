@@ -106,7 +106,8 @@ const workflowSources = useWorkflowPanelSources()
   const { value: exitingNode, closing } = useOverlayExit(selectedNode, selection.length === 0 && !marqueeActive, 240)
   const visibleNode = selectedNode ?? exitingNode
   const panelRef = useRef<HTMLDivElement>(null)
-  useHudMotion(panelRef, 'panel', closing, visibleNode?.id ?? '')
+  const panelMotionRef = useRef<HTMLDivElement>(null)
+  useHudMotion(panelMotionRef, 'panel', closing, visibleNode?.id ?? '')
   const viewport = useViewportStateWhen(visibleNode !== null)
   // 提示词节点的「优化 / 翻译」工具（§6.7）：面板是纯视图，状态由本层持有
   const promptData = selectedNode?.type === 'prompt' ? (selectedNode.data as PromptData) : null
@@ -253,6 +254,7 @@ const workflowSources = useWorkflowPanelSources()
       data-panel-closing={closing ? 'true' : undefined}
       ref={panelRef}
     >
+      <div ref={panelMotionRef} data-hud-motion-layer="panel">
       {/**
        * 节点下方这块浮层有**两种模式**（用户 2026-10-05 第 1 条）：
        * - 选了情绪 → **情绪面板**（独立一块，头排带生图模型 / 比例 / 张数 / 生成）；
@@ -308,6 +310,7 @@ const workflowSources = useWorkflowPanelSources()
         workflowSources={workflowSources}
       />
       )}
+      </div>
     </div>
   )
 }

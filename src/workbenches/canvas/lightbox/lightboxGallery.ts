@@ -10,6 +10,7 @@ export interface LightboxGalleryItem {
 export interface LightboxStateLike {
   assetHash?: string
   sourceNodeId?: string
+  sourceRect?: { left: number; top: number; width: number; height: number }
   gallery?: readonly LightboxGalleryItem[]
   galleryIndex?: number
   cropFor?: string
@@ -35,12 +36,23 @@ export function galleryViewOf(lightbox: LightboxStateLike | null) {
 export function ownerNodeOf(
   nodes: readonly { id: string; title?: string; data?: unknown }[],
   assetHash: string | undefined,
-): { id: string; title?: string } | undefined {
+): { id: string; title?: string; data?: unknown } | undefined {
   if (!assetHash) return undefined
   return nodes.find((node) => {
     const data = node.data as { assetHash?: unknown } | undefined
     return data?.assetHash === assetHash
   })
+}
+
+export function naturalHintOf(
+  ownerNode: { data?: unknown } | undefined,
+  sourceRect?: { width: number; height: number },
+): { w: number; h: number } | null {
+  const natural = (ownerNode?.data as { naturalSize?: { width?: number; height?: number } } | undefined)?.naturalSize
+  if (natural?.width && natural.height) return { w: natural.width, h: natural.height }
+  return sourceRect && sourceRect.width > 0 && sourceRect.height > 0
+    ? { w: sourceRect.width, h: sourceRect.height }
+    : null
 }
 
 export function compareHashOf(

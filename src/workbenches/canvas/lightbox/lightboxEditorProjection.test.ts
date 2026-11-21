@@ -77,4 +77,29 @@ describe('lightboxEditorProjectionOf', () => {
     expect(result.cropping).toBe(true)
     expect(result.availableModes.map((mode) => mode.id)).toContain('face')
   })
+
+  it('uses the owner natural size or the pointer-time source rect as an early layout hint', () => {
+    const fromNode = lightboxEditorProjectionOf({
+      nodes: [{ id: 'owner', data: { assetHash: 'asset-a', naturalSize: { width: 720, height: 480 } } }],
+      assetHash: 'asset-a',
+      isVideo: false,
+      mode: 'view',
+      lightbox: { assetHash: 'asset-a' },
+      compareAvailable: false,
+    })
+    expect(fromNode.naturalHint).toEqual({ w: 720, h: 480 })
+
+    const fromRect = lightboxEditorProjectionOf({
+      nodes: [{ id: 'owner', data: { assetHash: 'asset-a' } }],
+      assetHash: 'asset-a',
+      isVideo: false,
+      mode: 'view',
+      lightbox: {
+        assetHash: 'asset-a',
+        sourceRect: { left: 20, top: 30, width: 360, height: 240 },
+      },
+      compareAvailable: false,
+    })
+    expect(fromRect.naturalHint).toEqual({ w: 360, h: 240 })
+  })
 })

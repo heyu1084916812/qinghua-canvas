@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import type {
   PointerEvent as ReactPointerEvent,
   WheelEvent as ReactWheelEvent,
@@ -143,11 +143,17 @@ export function LightboxLayer() {
   const compareIsVideo = (compareAsset.mime ?? '').startsWith('video/')
   const compareAvailable = lightboxCompareAvailableOf({ compareHash: compareSource.compareHash, compareUrl: compareAsset.url, isVideo, compareIsVideo })
   const editorProjection = lightboxEditorProjectionOf({ nodes, assetHash, isVideo, mode, lightbox, compareAvailable })
+  const naturalHintW = editorProjection.naturalHint?.w ?? 0
+  const naturalHintH = editorProjection.naturalHint?.h ?? 0
+  const layoutNatural = useMemo(
+    () => natural ?? (naturalHintW > 0 && naturalHintH > 0 ? { w: naturalHintW, h: naturalHintH } : null),
+    [natural, naturalHintH, naturalHintW],
+  )
   const mediaProjection = lightboxMediaProjectionOf({
     assetHash, url, isVideo, compareHash: compareSource.compareHash, compareUrl: compareAsset.url,
     compareIsVideo, compareKind: compareSource.compareKind, compareView, splitRatio, mode,
     rotating: editorProjection.rotating, cropping: editorProjection.cropping,
-    angle, mirrorH, mirrorV, cropRect, natural, viewport: vp,
+    angle, mirrorH, mirrorV, cropRect, natural: layoutNatural, viewport: vp,
   })
   const {
     cropFor, faceFor, cropPlainRequested: cropPlain, ownerNode, ownerNodeId, rotateNodeId,
@@ -158,7 +164,7 @@ export function LightboxLayer() {
   } = mediaProjection
 
   /* 打开 / 关闭的 FLIP 时序见 `useLightboxFlip`（这里是 1040 行预算，逻辑已抽出） */
-  const { requestClose } = useLightboxFlip({ stageRef, store, assetHash, sourceNodeId, open: !!lightbox })
+  const { requestClose } = useLightboxFlip({ stageRef, store, assetHash, sourceNodeId, natural: layoutNatural, open: !!lightbox })
   /** 标注画布覆盖在媒体矩形上，累积原图像素动作；左键绘制，其余指针手势留给舞台。 */
   const [annTool, setAnnTool] = useState<AnnotateTool>('brush')
   const [annColor, setAnnColor] = useState<string>(ANNOTATE_COLORS[0])
@@ -251,7 +257,7 @@ export function LightboxLayer() {
 
   const cropStateRef = useRef<LightboxCropState | null>(null)
   cropStateRef.current = {
-    cropRect, cropRatio, ratioValue, natural, viewport: vp, faceFor, cropFor, ownerNodeId, plainCrop,
+    cropRect, cropRatio, ratioValue, natural: layoutNatural, viewport: vp, faceFor, cropFor, ownerNodeId, plainCrop,
   }
   const [cropActions] = useState(() =>
     createLightboxCropActions({
@@ -287,7 +293,7 @@ export function LightboxLayer() {
   useEffect(() => viewportGestures.prepareAssetSwitch(assetHash, hasGalleryNavigation), [assetHash, hasGalleryNavigation, viewportGestures])
   useEffect(() => viewportGestures.resetCompareView(!!lightbox?.compareWith), [assetHash, lightbox?.compareWith, compareKind, viewportGestures])
   useEffect(() => viewportGestures.watchStage(assetHash), [assetHash, viewportGestures])
-  useEffect(() => viewportGestures.fitInitialViewport(natural, stage, vp), [natural, stage, vp, viewportGestures])
+  useEffect(() => viewportGestures.fitInitialViewport(layoutNatural, stage, vp), [layoutNatural, stage, vp, viewportGestures])
   useEffect(() => () => viewportGestures.dispose(), [viewportGestures])
 
   const onAnnDown = (e: ReactPointerEvent<HTMLCanvasElement>) => annActions.pointerDown(e, annotationCanvasBox(e.currentTarget), redrawAnn)
@@ -302,7 +308,7 @@ export function LightboxLayer() {
 
   if (!lightbox) return null
 
-  const placed = natural !== null && vp !== null
+  const placed = layoutNatural !== null && vp !== null
   const settleNaturalSize = (w: number, h: number) => viewportGestures.settleMediaSize(w, h, vp)
 
   const saveRotation = () => commands.saveRotation({ nodeId: rotateNodeId, url: primaryUrl ?? undefined, busy: rotating2, angle, mirrorH, mirrorV })
