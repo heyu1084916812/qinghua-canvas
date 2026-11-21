@@ -11,10 +11,10 @@ describe('KnifeCursor pointer tracking', () => {
     expect(knifeCursorTransform(140, 130)).toBe('translate3d(138px, 128px, 0)')
   })
 
-  it('paints raw pointer updates without rAF coalescing', () => {
-    expect(source).toContain("'pointerrawupdate'")
-    expect(source).toContain("'pointermove'")
+  it('follows standard pointer updates without raw-event lead or rAF lag', () => {
+    expect(source).toContain("addEventListener('pointermove'")
     expect(source).toContain('capture: true')
+    expect(source).not.toContain("addEventListener('pointerrawupdate'")
     expect(source).not.toContain('requestAnimationFrame')
   })
 })

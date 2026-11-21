@@ -2144,6 +2144,10 @@ async function g4(browser) {
     // 关掉灯箱再继续：后面几组要操作画布，留着它会把点击全吃掉
     await page.keyboard.press('Escape')
     await sleep(300)
+    await page.keyboard.press('Escape')
+    // 指针离开节点，等功能栏退场后再点视口工具，避免悬停层挡住测试目标
+    await page.mouse.move(10, 10)
+    await sleep(250)
   }
 
   /*
