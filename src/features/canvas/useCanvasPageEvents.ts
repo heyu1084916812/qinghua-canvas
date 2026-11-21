@@ -5,6 +5,15 @@ import type { NodeViewEvent } from '../../workbenches/canvas/nodes/registry'
 import { importAssetFile } from './importAsset'
 import { assetNodeSize } from '../../domain/canvas/layout/assetNodeSize'
 
+function sourceRectForNode(nodeId: string) {
+  const media = document.querySelector<HTMLElement>(`[data-node-id="${CSS.escape(nodeId)}"] img, [data-node-id="${CSS.escape(nodeId)}"] video`)
+  const rect = media?.getBoundingClientRect()
+  if (!media || !rect || rect.width <= 0 || rect.height <= 0) return undefined
+  const style = getComputedStyle(media)
+  return { left: rect.left, top: rect.top, width: rect.width, height: rect.height, borderRadius: style.borderRadius, src: media instanceof HTMLImageElement ? media.currentSrc || media.src : media.getAttribute('src') ?? undefined }
+}
+
+
 /**
  * 视图事件 → 命令 的翻译层（架构 §4.7 ①）。
  * 节点视图只 emit 语义事件，由这里翻译成 dispatch(command)。
@@ -75,16 +84,16 @@ export function useCanvasPageEvents(store: CanvasStore, onOpenSettings?: () => v
           break
         // 素材灯箱（§6.17）：只记「要看哪个素材」，不派发命令 —— 纯展示态，
         // 本体由灯箱自己按 hash 从 assets 表读回（架构 §4.7：视图不认识存储）
-        case 'openLightbox':
-          store.openLightbox(
-            event.assetHash,
-            {
-              sourceNodeId: nodeId,
-              ...(event.compareWith ? { compareWith: event.compareWith } : {}),
-              ...(event.compareKind ? { compareKind: event.compareKind } : {}),
-            },
-          )
+        case 'openLightbox': {
+          const sourceRect = sourceRectForNode(nodeId)
+          store.openLightbox(event.assetHash, {
+            sourceNodeId: nodeId,
+            ...(sourceRect ? { sourceRect } : {}),
+            ...(event.compareWith ? { compareWith: event.compareWith } : {}),
+            ...(event.compareKind ? { compareKind: event.compareKind } : {}),
+          })
           break
+        }
         // 以下属于执行引擎 / 上游开关，由各自的接线方接住（执行宿主 / 画布表面 / PanelLayer）
         case 'requestRun':
         case 'requestRunCancel':
@@ -103,3 +112,4 @@ export function useCanvasPageEvents(store: CanvasStore, onOpenSettings?: () => v
 
   return { emitNodeEvent }
 }
+

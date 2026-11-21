@@ -204,6 +204,8 @@ interface CanvasState {
     assetHash: string
     /** 当前触发灯箱的节点；同一素材被多个节点复用时优先用于 FLIP 起点。 */
     sourceNodeId?: string
+    /** Pointer-time snapshot captured before opening React state changes. */
+    sourceRect?: { left: number; top: number; width: number; height: number; borderRadius?: string; src?: string }
     /**
      * 多选灯箱的完整序列。`assetHash` 始终是当前项；切图时同时更新
      * `galleryIndex`，因此 LightboxLayer 现有的取图 / 缩放逻辑不需要另起一份。
@@ -350,7 +352,7 @@ export interface CanvasStore extends AppStore<GraphSnapshot, Command> {
    */
   openLightbox: (
     assetHash: string,
-    opts?: { compareWith?: string; compareKind?: 'result' | 'pair'; sourceNodeId?: string },
+    opts?: { compareWith?: string; compareKind?: 'result' | 'pair'; sourceNodeId?: string; sourceRect?: { left: number; top: number; width: number; height: number; borderRadius?: string; src?: string } },
   ) => void
   /** 打开多选灯箱；只收集有素材的图片 / 视频节点。 */
   openLightboxGallery: (nodeIds: readonly string[]) => void
@@ -370,6 +372,7 @@ export interface CanvasStore extends AppStore<GraphSnapshot, Command> {
   getLightbox: () => {
     assetHash: string
     sourceNodeId?: string
+    sourceRect?: { left: number; top: number; width: number; height: number; borderRadius?: string; src?: string }
     gallery?: {
       assetHash: string
       nodeId: string
@@ -810,6 +813,7 @@ export function createCanvasStore(opts: CanvasStoreOptions): CanvasStore {
         lightbox: {
           assetHash,
           ...(opts?.sourceNodeId ? { sourceNodeId: opts.sourceNodeId } : {}),
+          ...(opts?.sourceRect ? { sourceRect: opts.sourceRect } : {}),
           ...(opts?.compareWith ? { compareWith: opts.compareWith } : {}),
           ...(opts?.compareKind ? { compareKind: opts.compareKind } : {}),
         },

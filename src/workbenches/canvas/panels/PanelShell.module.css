@@ -7,20 +7,7 @@
  */
 
 .panel {
-  /*
-   * 入场（#1161）：与下拉浮层同一个「墨迹初显」节奏。动画只持续 140ms，结束后 transform 回到
-   * none，不会留下 transform 影响 ParamPicker 的测量（它读的是 getBoundingClientRect）。
-   *
-   * ⚠️ `@keyframes` 必须**写在模块里**：CSS Modules 会把 `animation-name` 改写成哈希名
-   * （`_menuInkIn_xxx`），而全局 `tokens.css` 里的那份叫 `menuInkIn` —— 对不上就**静默不播**
-   * （本轮实测：`animationName` 有值、`getAnimations()` 为空）。这与"菜单很生硬"是同一根因。
-   */
-  /*
-   * 入场（#1161 第三轮，用户："稍微小一点点到正常大小 + 渐显，从节点出发那种"）：
-   * 锚点放在**顶边中点**（面板挂在节点下方），缩放时看起来是从节点"长出来"。
-   * 只动 scale + opacity —— 面板位置由 JS 用 left/top 给的，别再叠 translate。
-   */
-  animation: panelLightboxIn 320ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  /* Motion is owned by useHudMotion.ts; keep this shell layout-only. */
   transform-origin: top center;
   /*
    * 面板整体缩到一半（用户 2026-09-16）：宽 840 → 420，内部字号与间距
@@ -151,50 +138,4 @@
   min-height: min(360px, var(--panel-available-h, 480px));
 }
 
-/*
- * 入场动画（#1161）。CSS Modules 会给 `animation-name` 加哈希前缀，所以**必须在本模块里定义**
- * 同名 `@keyframes` —— 写在全局主题里的那份对不上名，动画会静默不播。
- */
-@keyframes menuInkIn {
-  from {
-    opacity: 0;
-    filter: blur(3px);
-    transform: translateY(4px) scale(0.985);
-  }
-  to {
-    opacity: 1;
-    filter: blur(0);
-    transform: translateY(0) scale(1);
-  }
-}
-
-/* 创作 / 情绪面板入场（#1161）：从节点方向"长出来" —— 小 4% + 渐显，锚点在顶边中点 */
-@keyframes panelLightboxIn {
-  from { opacity: 0; transform: scale(0.94); filter: blur(5px); }
-  to { opacity: 1; transform: scale(1); filter: blur(0); }
-}
-
-/* 点空白后的短暂退场（#1161）：选择已清掉，但外壳保留一个节拍完成收缩淡出。 */
-:global([data-panel-closing='true']) .panel {
-  animation: panelLightboxOut 240ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
-  pointer-events: none;
-}
-
-@keyframes panelLightboxOut {
-  from { opacity: 1; transform: scale(1); filter: blur(0); }
-  to { opacity: 0; transform: scale(0.94); filter: blur(4px); }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .panel, :global([data-panel-closing='true']) .panel {
-    animation-duration: 1ms;
-  }
-}
-
-@media (prefers-reduced-motion: no-preference) {
-  .panel [data-panel-part] { animation: partIn 220ms cubic-bezier(.22,1,.36,1) backwards; }
-  :global([data-panel-closing='true']) .panel [data-panel-part] { animation: none; }
-  .panel [data-panel-part='prompt'] { animation-delay: 55ms; }
-  .panel [data-panel-part='params'] { animation-delay: 110ms; }
-}
-@keyframes partIn { from { opacity: 0; transform: translateY(8px); } }
+/* Motion is owned by useHudMotion.ts so the shell remains layout-only. */

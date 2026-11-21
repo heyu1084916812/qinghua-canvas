@@ -13,7 +13,7 @@
  * 差别只有纵向位置：面板在节点**下方**，本栏在节点**上方**（标题之上），
  * 即纵向锚点 = 节点顶边再上移「栏高 + 间距」（用户 2026-09-17 起不再翻转到下方）。
  */
-import { useEffect, useState, useSyncExternalStore } from 'react'
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import type { MouseEvent as ReactMouseEvent, ReactNode } from 'react'
 import { useCanvasStore, useGraph, useSelection, useSelectionMode, useViewportStateWhen } from '../storeContext'
 import { toWorldRectInGraph } from '../../../domain/canvas/geometry/coords'
@@ -55,6 +55,7 @@ import {
 } from './icons'
 import { sendSelectionToAgent } from '../../../features/canvas/agentHandoff'
 import { useOverlayExit } from '../overlay/useOverlayExit'
+import { useHudMotion } from '../overlay/useHudMotion'
 
 /**
  * 出现跟随栏的节点类型。
@@ -75,6 +76,13 @@ const GROUP_BG_LABEL: Record<GroupBgTone, string> = {
 
 /** 鼠标按下时阻止默认聚焦：按钮点击后不滞留焦点，否则空格会被按钮吃掉（§6.3） */
 const keepCanvasFocus = { onMouseDown: (e: ReactMouseEvent) => e.preventDefault() }
+const sourceRectForNode = (nodeId: string) => {
+  const media = document.querySelector<HTMLElement>(`[data-node-id="${CSS.escape(nodeId)}"] img, [data-node-id="${CSS.escape(nodeId)}"] video`)
+  const rect = media?.getBoundingClientRect()
+  if (!media || !rect || rect.width <= 0 || rect.height <= 0) return undefined
+  const style = getComputedStyle(media)
+  return { left: rect.left, top: rect.top, width: rect.width, height: rect.height, borderRadius: style.borderRadius, src: media instanceof HTMLImageElement ? media.currentSrc || media.src : media.getAttribute('src') ?? undefined }
+}
 
 export interface NodeFollowBarProps {
   /** 关闭（= 取消选中，与创作面板「点面板外关闭」同一语义） */
@@ -149,6 +157,8 @@ export function NodeFollowBar({ onClose, onOpenSettings, onDownload }: NodeFollo
     selection.length === 0 && !marqueeActive, 220,
   )
   const node = selectedNode ?? exitingNode ?? undefined
+  const barRef = useRef<HTMLDivElement>(null)
+  useHudMotion(barRef, 'bar', closing, node?.id ?? '')
   const viewport = useViewportStateWhen(
     !!node && FOLLOW_TYPES.has(node.type),
   )
@@ -168,14 +178,14 @@ export function NodeFollowBar({ onClose, onOpenSettings, onDownload }: NodeFollo
   return (
     <div
       className={styles.position}
-      style={{ left: anchor.centerX, top: anchor.top }}
+      style={{ left: anchor.centerX, top: anchor.top, pointerEvents: closing ? 'none' : 'auto' }}
       data-node-follow-bar={node.id}
       data-follow-closing={closing ? 'true' : undefined}
       // 栏上的点击/拖动不该被画布当成「点空白取消选中」或发起平移
       onPointerDown={(e) => e.stopPropagation()}
       onWheel={(e) => e.stopPropagation()}
     >
-      <div className={styles.bar}>
+      <div ref={barRef} className={styles.bar}>
 
       <NodeActions
         node={node}
@@ -493,7 +503,7 @@ function NodeActions({
           action="preview"
           icon={<IconExpand />}
           label="预览"
-          onClick={() => assetHash && store.openLightbox(assetHash, { sourceNodeId: node.id })}
+          onClick={() => assetHash && store.openLightbox(assetHash, { sourceNodeId: node.id, sourceRect: sourceRectForNode(node.id) })}
         />
       )}
       {/*
@@ -794,3 +804,4 @@ function FollowButton({
     </button>
   )
 }
+

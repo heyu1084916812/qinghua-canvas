@@ -13412,6 +13412,28 @@
       "budget": 150
     },
     {
+      "module": "src/workbenches/canvas/overlay/useHudMotion.ts",
+      "owner": "canvas-overlay-motion",
+      "responsibility": "画布功能栏与创作面板的单一 WAAPI 动画控制器，负责可取消的入场、退场和面板内部级联。",
+      "owns": [
+        "HUD enter/exit keyframes",
+        "动画取消与 reduced-motion 分支",
+        "面板内部 stagger"
+      ],
+      "doesNotOwn": [
+        "浮层定位",
+        "节点选择状态",
+        "灯箱 FLIP"
+      ],
+      "publicApi": [
+        "useHudMotion"
+      ],
+      "test": [
+        "src/workbenches/canvas/overlay/useOverlayExit.test.ts"
+      ],
+      "budget": 120
+    },
+    {
       "module": "src/workbenches/canvas/overlay/useOverlayExit.ts",
       "owner": "canvas-overlay-motion",
       "responsibility": "画布选择浮层的退场保留时序，避免面板和节点功能栏在清选中时立即卸载。",

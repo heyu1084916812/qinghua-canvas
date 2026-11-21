@@ -1,4 +1,4 @@
-import { useMemo, useSyncExternalStore } from 'react'
+import { useMemo, useRef, useSyncExternalStore } from 'react'
 import type { NodeSnapshot, GenerationData, GroupData, BatchData, PromptData } from '../../../domain/canvas/model/node'
 import { directUpstream } from '../../../domain/canvas/graph/upstreamOf'
 import { indexNodes } from '../../../domain/canvas/model/graph'
@@ -27,6 +27,7 @@ import { defaultPresetOptions, emotionById, presetById } from '../../../domain/c
 import { hasRunnableDownstream } from '../../../features/canvas/execution/loopRun'
 import { resolveFaceBox } from '../../../features/canvas/emotionEdit'
 import { useOverlayExit } from '../overlay/useOverlayExit'
+import { useHudMotion } from '../overlay/useHudMotion'
 /** 面板与节点底边的间距 */
 const PANEL_GAP = 12
 /**
@@ -104,6 +105,8 @@ const workflowSources = useWorkflowPanelSources()
   }, [graph.nodes, selection, selectionMode, dragging, marqueeActive, panelDismissed])
   const { value: exitingNode, closing } = useOverlayExit(selectedNode, selection.length === 0 && !marqueeActive, 240)
   const visibleNode = selectedNode ?? exitingNode
+  const panelRef = useRef<HTMLDivElement>(null)
+  useHudMotion(panelRef, 'panel', closing, visibleNode?.id ?? '')
   const viewport = useViewportStateWhen(visibleNode !== null)
   // 提示词节点的「优化 / 翻译」工具（§6.7）：面板是纯视图，状态由本层持有
   const promptData = selectedNode?.type === 'prompt' ? (selectedNode.data as PromptData) : null
@@ -183,11 +186,9 @@ const workflowSources = useWorkflowPanelSources()
         void channels.rememberRecipe(channelId, model, params)
       },
     )
-
   const state = exec.nodeStateOf(visibleNode.id)
   const running = state?.kind === 'queued' || state?.kind === 'running'
   const error = state?.kind === 'failed' ? describeError(state.error) : null
-
   // 用 `toWorldRectInGraph` 而非 `toWorldRect`：选中的可能是**结果组子节点**，
   // 它的父不在 nodes 表，直接查会把 local 坐标当世界坐标——面板飞到画布左上角
   // （M6-25：组内子结果成为可交互节点后，创作面板能力随之打通，§6.9）。
@@ -195,7 +196,6 @@ const workflowSources = useWorkflowPanelSources()
   // world → screen：屏幕 = (世界 - 视口平移) × zoom（与画布视口的 transform 互逆）
   const screenX = (rect.x + rect.w / 2 - viewport.x) * viewport.zoom
   const screenY = (rect.y + rect.h - viewport.y) * viewport.zoom + PANEL_GAP
-
   /**
    * 面板可用的竖向空间 = 视口高度 − 锚点位置 − 底部留白（用户 2026-09-24 第 1 条）。
    *
@@ -232,7 +232,6 @@ const workflowSources = useWorkflowPanelSources()
     220,
     surfaceHeight - screenY - PANEL_GAP,
   )
-
   return (
     <div
       className="panel-anchor"
@@ -248,9 +247,11 @@ const workflowSources = useWorkflowPanelSources()
          * 见 `PANEL_ZOOM` 的说明：不换算就等于把预算打了七五折。
          */
         ['--panel-available-h' as string]: `${availableHeight / PANEL_ZOOM}px`,
+        pointerEvents: closing ? 'none' : 'auto',
       }}
       data-panel-anchor={visibleNode.id}
       data-panel-closing={closing ? 'true' : undefined}
+      ref={panelRef}
     >
       {/**
        * 节点下方这块浮层有**两种模式**（用户 2026-10-05 第 1 条）：
@@ -310,7 +311,6 @@ const workflowSources = useWorkflowPanelSources()
     </div>
   )
 }
-
 /**
  * 创作面板里 `@` 能引用谁（用户 2026-10-05 第 15 条）：**本节点上游里带素材的节点**。
  *
@@ -335,12 +335,10 @@ function upstreamMentionCandidates(
   }
   return out
 }
-
 /** 组装面板数据：缩略图来源按节点类型分流（§6.8 / §6.11 / §6.12） */
 function buildPanelModel(node: NodeSnapshot, graph: ReturnType<typeof useGraph>): PanelModel {
   const index = indexNodes(graph.nodes)
   const data = node.data as GenerationData
-
   /**
    * ⚠️ 组**没有创作面板**（用户 2026-10-06 第 13 批第 5 条：「就不是把他当成生成节点了」）。
    * 面板的意义是"配参数然后生成"，而组不生成 —— 它的操作全在功能栏上
@@ -348,8 +346,6 @@ function buildPanelModel(node: NodeSnapshot, graph: ReturnType<typeof useGraph>)
    * 老工程里组的 data 字段（channelId / model / hiddenIds…）原样留着不动：
    * 认识旧数据，但不给它们任何入口。
    */
-
-
   if (node.type === 'batch') {
     const b = node.data as BatchData
     const hidden = new Set(b.hiddenIds ?? [])
@@ -379,7 +375,6 @@ function buildPanelModel(node: NodeSnapshot, graph: ReturnType<typeof useGraph>)
       ...presetFieldsOf(data),
     }
   }
-
   // 生成 / 提示词节点：上游素材。批量上游折叠为集合卡（§6.12「作为上游：集合卡」）
   const upstreamHidden = new Set(data.upstreamHidden ?? [])
   const thumbs: PanelThumb[] = []
