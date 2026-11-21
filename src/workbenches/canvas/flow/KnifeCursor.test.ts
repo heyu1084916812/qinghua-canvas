@@ -6,9 +6,9 @@ import { knifeCursorTransform } from './KnifeCursor'
 const source = fs.readFileSync(new URL('./KnifeCursor.tsx', import.meta.url), 'utf8')
 
 describe('KnifeCursor pointer tracking', () => {
-  it('keeps one CSS pixel of pointer travel as one CSS pixel of blade travel', () => {
-    expect(knifeCursorTransform(100, 80)).toBe('translate3d(98px, 78px, 0)')
-    expect(knifeCursorTransform(140, 130)).toBe('translate3d(138px, 128px, 0)')
+  it('aligns the visible blade tip with the pointer hotspot', () => {
+    expect(knifeCursorTransform(100, 80)).toBe('translate3d(98px, 63px, 0)')
+    expect(knifeCursorTransform(140, 130)).toBe('translate3d(138px, 113px, 0)')
   })
 
   it('follows standard pointer updates without raw-event lead or rAF lag', () => {

@@ -2,9 +2,15 @@ import { useEffect, useLayoutEffect, useRef } from 'react'
 import { Slice } from '../../../ui/icon'
 import styles from './FlowEdgeCutLayer.module.css'
 
-/** Keep the blade tip on the pointer without scaling or frame-based lag. */
+/*
+ * Lucide `Slice` 的 sharp point 在 24 格视图里是 (2,20)。
+ * 图标显示为 20px 时约为 (1.67,16.67)，取整后把刀尖锚到指针上。
+ */
+const KNIFE_TIP_OFFSET = { x: 2, y: 17 } as const
+
+/** Keep the visible blade tip on the pointer without scaling or frame-based lag. */
 export function knifeCursorTransform(clientX: number, clientY: number): string {
-  return `translate3d(${clientX - 2}px, ${clientY - 2}px, 0)`
+  return `translate3d(${clientX - KNIFE_TIP_OFFSET.x}px, ${clientY - KNIFE_TIP_OFFSET.y}px, 0)`
 }
 
 /**
@@ -16,7 +22,8 @@ export function knifeCursorTransform(clientX: number, clientY: number): string {
  * 现在坐标**完全不进 React**：这个小组件自己在 window 上听标准指针事件，
  * 每个事件直接写 `transform: translate3d(...)`（合成层，不触发布局）。
  * 不再等 rAF；也不听 `pointerrawupdate`，因为原始指针采样会比系统光标先投递，
- * 自绘刀尖会看起来比鼠标快。标准 `pointermove` 与系统光标保持同一更新节奏。
+ * 自绘刀尖会看起来比鼠标快。除了事件节奏，锚点必须是刀尖而不是图标左上角，
+ * 否则整把刀会恒定偏移，水平/垂直移动时同样会被看成“抢在鼠标前面”。
  */
 export function KnifeCursor({ active }: { active: boolean }) {
   const ref = useRef<HTMLDivElement>(null)
