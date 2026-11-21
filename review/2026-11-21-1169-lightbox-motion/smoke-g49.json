@@ -1,0 +1,10 @@
+{
+  "group": "g49",
+  "isolatedSharedStore": true,
+  "passed": 18,
+  "failed": 0,
+  "total": 18,
+  "externalSkipped": 0,
+  "elapsedMs": 75575,
+  "sourceRun": ".playwright-verify/smoke-matrix/2026-11-21T08-56-02/summary.json"
+}

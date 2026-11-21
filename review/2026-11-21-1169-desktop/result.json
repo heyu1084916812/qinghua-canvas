@@ -2,9 +2,26 @@
   "ticket": "1169",
   "date": "2026-11-21",
   "scope": "UI",
-  "browserOpened": false,
-  "status": "implemented_pending_desktop_reverification",
-  "changes": ["pointer-time lightbox sourceRect snapshot", "layout-effect fixed clone FLIP", "single WAAPI HUD controller", "exit pointer-events freeze", "overlay fade and clone close timing aligned to reference"],
-  "targetedTests": "3 files, 39 passed",
-  "desktopMatrix": "pending: 1440x900 / 1024x700 x light/dark"
+  "browserOpened": true,
+  "status": "lightbox_motion_aligned",
+  "changes": [
+    "explicit DOMRect geometry snapshots",
+    "wait for the settled lightbox media box before FLIP",
+    "shared enter/exit radius and shadow frames",
+    "overlay fade-in and fade-out on one controller",
+    "exit pointer-events freeze and single cleanup",
+    "interrupting entry reverses from the current rendered frame"
+  ],
+  "targetedTests": "4 files, 29 passed",
+  "fullTests": "808 files passed, 1 skipped; 6590 passed, 1 skipped",
+  "build": "passed",
+  "check": "passed",
+  "smoke": "g49 18/18 passed on isolated shared-store",
+  "browserMatrix": {
+    "viewportTheme": ["1440x900-light", "1440x900-dark", "1024x700-light", "1024x700-dark"],
+    "pageErrors": 0,
+    "overflowX": false,
+    "evidence": "review/2026-11-21-1169-lightbox-motion/report.json"
+  },
+  "remaining": "Desktop Tauri visual reverification remains pending for the wider HUD/panel scope."
 }

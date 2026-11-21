@@ -13356,12 +13356,12 @@
     {
       "module": "src/workbenches/canvas/lightbox/useLightboxFlip.ts",
       "owner": "canvas-lightbox-ui",
-      "responsibility": "灯箱打开与关闭的 FLIP 动画时序（从节点矩形放大进入、反向缩回退出）。",
+      "responsibility": "灯箱 FLIP 的稳定入口，只负责把宿主参数交给独立动画控制器。",
       "owns": [
-        "打开 FLIP（等尺寸稳定后量起点）",
-        "关闭 FLIP 后再真正关闭"
+        "保持 LightboxLayer 的既有调用入口"
       ],
       "doesNotOwn": [
+        "FLIP 几何与动画时序",
         "灯箱布局与缩放手势",
         "节点几何"
       ],
@@ -13369,9 +13369,36 @@
         "useLightboxFlip"
       ],
       "test": [
-        "src/workbenches/canvas/lightbox/lightboxEditorProjection.test.ts"
+        "src/workbenches/canvas/lightbox/useLightboxFlip.test.ts"
       ],
-      "budget": 130
+      "budget": 20
+    },
+    {
+      "module": "src/workbenches/canvas/lightbox/lightboxFlipController.ts",
+      "owner": "canvas-lightbox-ui",
+      "responsibility": "灯箱打开与关闭的固定克隆 FLIP 控制器，统一入场、出场、遮罩淡变和退场指针冻结。",
+      "owns": [
+        "媒体框稳定后的首次矩形测量",
+        "克隆层入场与出场的 WAAPI 时序",
+        "退场完成后的单次清理与关闭"
+      ],
+      "doesNotOwn": [
+        "灯箱布局与缩放手势",
+        "节点几何与画布变换"
+      ],
+      "publicApi": [
+        "LIGHTBOX_MOTION",
+        "sourceNodeIdOf",
+        "sourceRectFromFrame",
+        "rectStyle",
+        "snapshotRect",
+        "settledMediaRect",
+        "useLightboxFlipController"
+      ],
+      "test": [
+        "src/workbenches/canvas/lightbox/useLightboxFlip.test.ts"
+      ],
+      "budget": 300
     },
     {
       "module": "src/workbenches/canvas/flow/knifeEdgeOverlay.ts",

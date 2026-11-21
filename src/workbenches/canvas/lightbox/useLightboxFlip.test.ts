@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import { rectStyle, sourceNodeIdOf, sourceRectFromFrame } from './useLightboxFlip'
+import {
+  LIGHTBOX_MOTION,
+  rectStyle,
+  settledMediaRect,
+  snapshotRect,
+  sourceNodeIdOf,
+  sourceRectFromFrame,
+} from './lightboxFlipController'
 
 describe('sourceNodeIdOf', () => {
   const nodes = [
@@ -40,5 +47,65 @@ describe('rectStyle', () => {
     expect(rectStyle({ left: 12, top: 34, width: 56, height: 78 })).toEqual({
       left: '12px', top: '34px', width: '56px', height: '78px',
     })
+  })
+})
+
+describe('snapshotRect', () => {
+  it('copies DOMRect prototype geometry into a plain snapshot', () => {
+    const liveRect = {
+      left: 12,
+      top: 34,
+      width: 56,
+      height: 78,
+      get right() { return 68 },
+      get bottom() { return 112 },
+      toJSON: () => ({}),
+    } as DOMRect
+    expect(snapshotRect(liveRect)).toMatchObject({
+      left: 12,
+      top: 34,
+      width: 56,
+      height: 78,
+      right: 68,
+      bottom: 112,
+    })
+  })
+})
+
+describe('settledMediaRect', () => {
+  it('waits until the lightbox media has its final inline box', () => {
+    const target = {
+      style: { width: '', height: '' },
+      getBoundingClientRect: () => ({ left: 0, top: 0, width: 2, height: 2 }) as DOMRect,
+    }
+    expect(settledMediaRect(target as unknown as HTMLElement)).toBeNull()
+  })
+
+  it('returns the settled lightbox box after layout', () => {
+    const target = {
+      style: { width: '720px', height: '480px' },
+      getBoundingClientRect: () => ({
+        left: 360,
+        top: 210,
+        width: 720,
+        height: 480,
+      }) as DOMRect,
+    }
+    expect(settledMediaRect(target as unknown as HTMLElement)).toMatchObject({
+      left: 360,
+      top: 210,
+      width: 720,
+      height: 480,
+    })
+  })
+})
+
+describe('lightbox motion contract', () => {
+  it('fades the overlay for the same duration on enter and exit', () => {
+    expect(LIGHTBOX_MOTION.overlayMs).toBe(360)
+  })
+
+  it('keeps the exit slightly faster than the entrance', () => {
+    expect(LIGHTBOX_MOTION.exitMs).toBeLessThan(LIGHTBOX_MOTION.enterMs)
   })
 })

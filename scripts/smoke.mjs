@@ -8132,6 +8132,21 @@ async function g49(browser) {
   await sleep(200)
   rec(g, '双击前画布上没有灯箱', (await page.locator('[data-lightbox]').count()) === 0)
   await genNode.locator('[data-node-asset]').first().dblclick()
+  const enterFlip = await page.waitForFunction(() => {
+    const clone = document.querySelector('[data-lightbox-flip-clone]')
+    const keyframes = clone?.getAnimations()[0]?.effect?.getKeyframes() ?? []
+    const fromWidth = Number.parseFloat(String(keyframes[0]?.width ?? ''))
+    const toWidth = Number.parseFloat(String(keyframes[1]?.width ?? ''))
+    return fromWidth > 0 && toWidth > 0
+      ? { fromWidth, toWidth, duration: clone?.getAnimations()[0]?.effect?.getTiming().duration }
+      : null
+  }, { timeout: 2500 }).then((handle) => handle.jsonValue()).catch(() => null)
+  rec(
+    g,
+    '★★ 入场 FLIP 使用真实画布矩形与已布局灯箱尺寸',
+    !!enterFlip && enterFlip.toWidth > 1 && enterFlip.duration === 440,
+    JSON.stringify(enterFlip),
+  )
   await sleep(500)
   rec(g, '双击素材打开灯箱（§6.8 已挂的动线终于有人接）', (await page.locator('[data-lightbox]').count()) === 1)
   const lightboxModes = await page
@@ -8200,7 +8215,23 @@ async function g49(browser) {
 
   // ⑤ Esc 关闭
   await page.keyboard.press('Escape')
-  await sleep(300)
+  const exitFlip = await page.waitForFunction(() => {
+    const overlay = document.querySelector('[data-lightbox]')
+    const clone = document.querySelector('[data-lightbox-flip-clone]')
+    const keyframes = clone?.getAnimations()[0]?.effect?.getKeyframes() ?? []
+    const fromWidth = Number.parseFloat(String(keyframes[0]?.width ?? ''))
+    const toWidth = Number.parseFloat(String(keyframes[1]?.width ?? ''))
+    return overlay?.style.pointerEvents === 'none' && fromWidth > 0 && toWidth > 0
+      ? { fromWidth, toWidth, duration: clone?.getAnimations()[0]?.effect?.getTiming().duration }
+      : null
+  }, { timeout: 2500 }).then((handle) => handle.jsonValue()).catch(() => null)
+  rec(
+    g,
+    '★★ 出场 FLIP 从灯箱反向回原图且退场期间冻结指针',
+    !!exitFlip && exitFlip.toWidth > 1 && exitFlip.duration === 400,
+    JSON.stringify(exitFlip),
+  )
+  await page.locator('[data-lightbox]').waitFor({ state: 'detached', timeout: 2000 }).catch(() => {})
   rec(g, 'Esc 关闭灯箱', (await page.locator('[data-lightbox]').count()) === 0)
 
   // ⑥ 日志缩略图也能打开（§6.18「缩略图交互：点击进入灯箱」）
@@ -8216,7 +8247,7 @@ async function g49(browser) {
     // ⑦ 点击空白关闭
     const st = await page.locator('[data-lightbox-stage]').boundingBox()
     await page.mouse.click(st.x + 40, st.y + 40)
-    await sleep(300)
+    await page.locator('[data-lightbox]').waitFor({ state: 'detached', timeout: 2000 }).catch(() => {})
     rec(g, '点击空白关闭灯箱', (await page.locator('[data-lightbox]').count()) === 0)
   }
 
