@@ -1,3 +1,5 @@
+// @ts-expect-error -- tests read source files without adding Node types to the app
+import fs from 'node:fs'
 import { createElement, type MutableRefObject } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
@@ -24,6 +26,10 @@ const model: PanelModel = {
   emotion: null,
 }
 const platform = createMemoryPlatform()
+const paramsCss = fs.readFileSync(
+  new URL('./CreationPanelParams.module.css', import.meta.url),
+  'utf8',
+)
 
 describe('CreationPanel 视图拆分', () => {
   it('素材视图直接返回原 section，并保持图片/视频按钮顺序', () => {
@@ -235,5 +241,38 @@ describe('CreationPanel 视图拆分', () => {
     expect(html).toContain('data-panel-run')
     expect(html).toContain('aria-label="生成下游节点"')
     expect(html).not.toContain('data-panel-preset')
+  })
+
+  it('生成中按钮用实心方块，不再输出线性方框', () => {
+    const html = renderToStaticMarkup(
+      createElement(CreationRunActionsView, {
+        promptMode: true,
+        activePreset: undefined,
+        presetOptionsAvailable: false,
+        presetOpen: false,
+        presetOptionsOpen: false,
+        model,
+        emotionOn: false,
+        running: true,
+        busyGlobal: false,
+        runDisabled: false,
+        runLabel: '取消当前生成',
+        runTitle: '取消当前生成',
+        blockedReason: null,
+        disabled: false,
+        error: null,
+        onTogglePreset: () => {},
+        onPickPreset: () => {},
+        onPickEmotion: () => {},
+        onPickPresetOption: () => {},
+        onRunAction: () => {},
+      }),
+    )
+
+    expect(html).toContain('<rect')
+    expect(html).toContain('fill="currentColor"')
+    expect(html).toContain('stroke="none"')
+    expect(html).toContain('aria-label="取消当前生成"')
+    expect(paramsCss).toMatch(/\.runCancel\s*\{[^}]*border:\s*none;/s)
   })
 })

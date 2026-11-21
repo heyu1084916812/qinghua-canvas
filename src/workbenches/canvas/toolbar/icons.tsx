@@ -284,9 +284,13 @@ export function IconPause({ size = 16, ...props }: IconProps) {
   return <Icon icon={Pause} px={size} {...props} />
 }
 
-/** 停止 / 取消生成：方块 */
+/** 停止 / 取消生成：实心方块（用户 2026-11-22：不要白描边） */
 export function IconStop({ size = 16, ...props }: IconProps) {
-  return <Icon icon={Square} px={size} {...props} />
+  return (
+    <Svg size={size} {...props}>
+      <rect x="5" y="5" width="14" height="14" rx="1.5" fill="currentColor" stroke="none" />
+    </Svg>
+  )
 }
 
 /** 重命名：铅笔 */

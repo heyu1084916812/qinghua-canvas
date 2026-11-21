@@ -12,6 +12,7 @@ import { createChannel } from '../../domain/project/channel'
 import {
   BUILTIN_CHANNEL_IDS,
   BUILTIN_CHANNELS,
+  FORCED_RETIRED_BUILTIN_CHANNEL_IDS,
   LEGACY_BUILTIN_NAMES,
   RETIRED_BUILTIN_CHANNEL_IDS,
   createBuiltinChannel,
@@ -283,14 +284,31 @@ export function createChannelRepository(storage: StoragePort, credentials: Crede
   const seedBuiltins = async (): Promise<Channel[]> => {
     let current = await list()
     let changed = false
-    const retired = new Set<string>(RETIRED_BUILTIN_CHANNEL_IDS)
+    const forcedRetired = new Set<string>(FORCED_RETIRED_BUILTIN_CHANNEL_IDS)
+    const retired = new Set<string>([
+      ...RETIRED_BUILTIN_CHANNEL_IDS,
+      ...FORCED_RETIRED_BUILTIN_CHANNEL_IDS,
+    ])
     for (const channel of current) {
       if (!retired.has(channel.id)) continue
       /**
        * 只清「从未配置过」的退役内置行。用户存过任意一把 Key、或勾过模型，
        * 都说明这条渠道已经参与过真实工作，升级时不能替他删掉。
        */
-      if (channel.hasToken || channel.hasAltToken || channel.models.length > 0) continue
+      if (
+        !forcedRetired.has(channel.id) &&
+        (channel.hasToken || channel.hasAltToken || channel.models.length > 0)
+      ) {
+        continue
+      }
+      const refs = new Set(
+        [
+          channel.credentialRef,
+          channel.altCredentialRef,
+          ...channel.credentialGroups.map((group) => group.credentialRef),
+        ].filter((ref): ref is string => Boolean(ref)),
+      )
+      for (const ref of refs) await credentialAccess.remove(ref)
       await storage.delete('channels', channel.id)
       changed = true
     }

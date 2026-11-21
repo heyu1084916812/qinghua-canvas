@@ -25,8 +25,6 @@ export const BUILTIN_CHANNEL_IDS = [
   'ch_builtin_agnes',
   'ch_builtin_runninghub',
   'ch_builtin_runninghub_global',
-  'ch_builtin_runninghub_llm',
-  'ch_builtin_runninghub_llm_global',
   'ch_builtin_soonstudio',
   'ch_builtin_65535_chat',
 ] as const
@@ -39,6 +37,15 @@ export const BUILTIN_CHANNEL_IDS = [
  * 避免升级时抹掉用户已有工作。
  */
 export const RETIRED_BUILTIN_CHANNEL_IDS = ['ch_builtin_65535_task'] as const
+
+/**
+ * 用户确认删除的内置渠道：与上面的「未配置才退场」不同，这两条**无条件清理**，
+ * 包括已保存的 Key、模型选择和渠道行。清理只针对固定内置 id，不影响用户自建渠道。
+ */
+export const FORCED_RETIRED_BUILTIN_CHANNEL_IDS = [
+  'ch_builtin_runninghub_llm',
+  'ch_builtin_runninghub_llm_global',
+] as const
 
 /** 内置渠道的排序位基准（实际用 `BASE + 序号`，越小越靠前） */
 export const BUILTIN_ORDER_BASE = -1000
@@ -91,17 +98,6 @@ export const BUILTIN_CHANNELS: readonly BuiltinChannelSpec[] = [
     name: '国际站 · RunningHub',
     protocol: 'runninghub-api',
     baseUrl: 'https://www.runninghub.ai',
-  },
-  {
-    id: 'ch_builtin_runninghub_llm',
-    name: '国内站 · RunningHub LLM',
-    protocol: 'runninghub-llm',
-  },
-  {
-    id: 'ch_builtin_runninghub_llm_global',
-    name: '国际站 · RunningHub LLM',
-    protocol: 'runninghub-llm',
-    baseUrl: 'https://llm.runninghub.ai',
   },
   { id: 'ch_builtin_soonstudio', name: 'SoonStudio', protocol: 'soonstudio' },
   /** id 沿用旧的 `_chat`，只为让已存在的内置行原地升级成合并协议 */

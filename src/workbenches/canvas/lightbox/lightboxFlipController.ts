@@ -9,23 +9,24 @@ export const LIGHTBOX_MOTION = {
 } as const
 const SOURCE_SHADOW = '0 8px 24px rgba(0,0,0,.18)'
 const TARGET_SHADOW = '0 30px 70px -12px rgba(0,0,0,.65)'
-
+export function lightboxEntryMode(entered?: string, next?: string): 'none' | 'enter' | 'switch' {
+  if (!next) return 'none'
+  if (!entered) return 'enter'
+  return entered === next ? 'none' : 'switch'
+}
 export function sourceNodeIdOf(nodes: readonly { id: string; data?: unknown }[], hash: string, preferredNodeId?: string) {
   if (preferredNodeId && nodes.some((n) => n.id === preferredNodeId && (n.data as { assetHash?: string } | undefined)?.assetHash === hash)) return preferredNodeId
   return nodes.find((n) => (n.data as { assetHash?: string } | undefined)?.assetHash === hash)?.id ?? null
 }
-
 export function sourceRectFromFrame(frame: HTMLElement | null): DOMRect | null {
   const media = frame?.querySelector<HTMLElement>('img, video'), mediaRect = media?.getBoundingClientRect()
   if (mediaRect && mediaRect.width > 0 && mediaRect.height > 0) return mediaRect
   const rect = frame?.getBoundingClientRect()
   return rect && rect.width > 0 && rect.height > 0 ? rect : null
 }
-
 export function rectStyle(rect: Pick<DOMRect, 'left' | 'top' | 'width' | 'height'>): Record<string, string> {
   return { left: `${rect.left}px`, top: `${rect.top}px`, width: `${rect.width}px`, height: `${rect.height}px` }
 }
-
 /** DOMRect geometry lives on the prototype; copy every consumed field explicitly. */
 export function snapshotRect(rect: Pick<DOMRect, 'left' | 'top' | 'width' | 'height'>): DOMRect {
   const left = Number.isFinite(rect.left) ? rect.left : 0
@@ -44,11 +45,9 @@ export function snapshotRect(rect: Pick<DOMRect, 'left' | 'top' | 'width' | 'hei
     toJSON: () => ({ left, top, width, height }),
   } as DOMRect
 }
-
 function usableRect(rect: Pick<DOMRect, 'left' | 'top' | 'width' | 'height'> | null): DOMRect | null {
   return rect && rect.width > 0 && rect.height > 0 ? snapshotRect(rect) : null
 }
-
 export function settledMediaRect(
   target: Pick<HTMLElement, 'style' | 'getBoundingClientRect'> | null,
 ): DOMRect | null {
@@ -58,22 +57,18 @@ export function settledMediaRect(
   if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) return null
   return usableRect(target.getBoundingClientRect())
 }
-
 const mediaOf = (id?: string) => id && typeof document !== 'undefined'
   ? document.querySelector<HTMLElement>(`[data-node-id="${CSS.escape(id)}"] img, [data-node-id="${CSS.escape(id)}"] video`)
   : null
 const rectOf = (id?: string) => usableRect(mediaOf(id)?.getBoundingClientRect() ?? null)
 const rectFromSnapshot = (value?: { left: number; top: number; width: number; height: number }) => usableRect(value ?? null)
-
 function computedRadius(element: HTMLElement | null) {
   return element ? getComputedStyle(element).borderRadius : null
 }
-
 function computedShadow(element: HTMLElement | null, fallback: string) {
   const shadow = element ? getComputedStyle(element).boxShadow : ''
   return shadow && shadow !== 'none' ? shadow : fallback
 }
-
 function motionFrame(rect: Pick<DOMRect, 'left' | 'top' | 'width' | 'height'>, borderRadius: string, boxShadow: string) {
   return {
     ...rectStyle(rect),
@@ -82,7 +77,6 @@ function motionFrame(rect: Pick<DOMRect, 'left' | 'top' | 'width' | 'height'>, b
     opacity: '1',
   }
 }
-
 function cloneOf(source: HTMLElement, rect: DOMRect, borderRadius: string, boxShadow: string) {
   const clone = source.cloneNode(true) as HTMLElement
   const objectFit = getComputedStyle(source).objectFit || 'cover'
@@ -103,11 +97,10 @@ function cloneOf(source: HTMLElement, rect: DOMRect, borderRadius: string, boxSh
   })
   return clone
 }
-
 export function useLightboxFlipController({ stageRef, store, assetHash, sourceNodeId, natural, open }: {
   stageRef: React.RefObject<HTMLElement | null>; store: CanvasStore; assetHash?: string; sourceNodeId?: string; natural?: { w: number; h: number } | null; open: boolean
 }) {
-  const clone = useRef<HTMLElement | null>(null), source = useRef<HTMLElement | null>(null), first = useRef<DOMRect | null>(null), animation = useRef<Animation | null>(null), overlayAnimation = useRef<Animation | null>(null), closing = useRef(false), completionTimer = useRef<number | null>(null), enterTimer = useRef<number | null>(null)
+  const clone = useRef<HTMLElement | null>(null), source = useRef<HTMLElement | null>(null), first = useRef<DOMRect | null>(null), animation = useRef<Animation | null>(null), overlayAnimation = useRef<Animation | null>(null), closing = useRef(false), completionTimer = useRef<number | null>(null), enterTimer = useRef<number | null>(null), enteredAsset = useRef<string | undefined>(undefined)
   const naturalRef = useRef(natural)
   naturalRef.current = natural
   const cleanup = useCallback(() => {
@@ -126,14 +119,17 @@ export function useLightboxFlipController({ stageRef, store, assetHash, sourceNo
     clone.current = null
     const overlay = stageRef.current?.closest<HTMLElement>('[data-lightbox]')
     if (overlay) {
-      overlay.setAttribute('data-lightbox-flipping', '')
+      overlay.removeAttribute('data-lightbox-flipping')
       overlay.style.opacity = ''
       overlay.style.pointerEvents = ''
     }
   }, [stageRef])
 
   useLayoutEffect(() => {
-    if (!open || !assetHash) { if (!open) { cleanup(); closing.current = false }; return }
+    if (!open || !assetHash) { if (!open) { cleanup(); closing.current = false; enteredAsset.current = undefined }; return }
+    const mode = lightboxEntryMode(enteredAsset.current, assetHash)
+    enteredAsset.current = assetHash
+    if (mode !== 'enter') return
     if (clone.current || window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return
     const lightbox = store.getLightbox()
     const sourceEl = mediaOf(sourceNodeId), storedRect = rectFromSnapshot(lightbox?.sourceRect), sourceRect = storedRect ?? usableRect(sourceEl?.getBoundingClientRect() ?? null)

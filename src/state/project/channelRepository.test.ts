@@ -24,7 +24,7 @@ describe('channelRepository', () => {
     await repo.seedBuiltins()
     const rows = await repo.list()
     const soon = rows.find((channel) => channel.id === 'ch_builtin_soonstudio')
-    expect(rows.filter((channel) => channel.id.startsWith('ch_builtin_'))).toHaveLength(8)
+    expect(rows.filter((channel) => channel.id.startsWith('ch_builtin_'))).toHaveLength(6)
     expect(soon?.name).toBe('SoonStudio')
     expect(soon?.protocol).toBe('soonstudio')
     expect(soon?.baseUrl).toBe('https://soonstudio.ai')
@@ -42,14 +42,37 @@ describe('channelRepository', () => {
     expect(rhGlobal?.baseUrl).toBe('https://www.runninghub.ai')
     expect(rhGlobal?.protocol).toBe('runninghub-api')
     expect(rows.some((channel) => channel.id === 'ch_builtin_65535_task')).toBe(false)
-    expect(rows.find((channel) => channel.id === 'ch_builtin_runninghub_llm')).toMatchObject({
-      protocol: 'runninghub-llm',
-      baseUrl: 'https://llm.runninghub.cn',
-    })
-    expect(rows.find((channel) => channel.id === 'ch_builtin_runninghub_llm_global')).toMatchObject({
-      protocol: 'runninghub-llm',
-      baseUrl: 'https://llm.runninghub.ai',
-    })
+    expect(rows.some((channel) => channel.id === 'ch_builtin_runninghub_llm')).toBe(false)
+    expect(rows.some((channel) => channel.id === 'ch_builtin_runninghub_llm_global')).toBe(false)
+  })
+
+  it('强制删除两条 RunningHub LLM 内置行，即使已经保存令牌和模型', async () => {
+    const p = createMemoryPlatform()
+    const repo = createChannelRepository(p.storage, p.credentials)
+    const ids = ['ch_builtin_runninghub_llm', 'ch_builtin_runninghub_llm_global']
+    for (const [index, id] of ids.entries()) {
+      const credentialRef = `cred-llm-${index}`
+      await p.storage.put('channels', {
+        id,
+        name: index === 0 ? '国内站 · RunningHub LLM' : '国际站 · RunningHub LLM',
+        protocol: 'runninghub-llm',
+        baseUrl: index === 0 ? 'https://llm.runninghub.cn' : 'https://llm.runninghub.ai',
+        credentialRef,
+        hasToken: true,
+        models: [{ id: 'llm-model', category: 'chat', inputTypes: ['text'] }],
+        modelCache: [],
+        order: -996 + index,
+        createdAt: 1,
+      } as never)
+      await repo.saveToken(credentialRef, `sk-llm-${index}`)
+    }
+
+    await repo.seedBuiltins()
+
+    for (const [index, id] of ids.entries()) {
+      expect(await repo.get(id)).toBeNull()
+      expect(await repo.loadToken(`cred-llm-${index}`)).toBeNull()
+    }
   })
 
   it('内置渠道可由资料抽屉改名，重新 seed 后名称不会被覆盖', async () => {

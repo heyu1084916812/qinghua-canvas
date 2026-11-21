@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   LIGHTBOX_MOTION,
+  lightboxEntryMode,
   rectStyle,
   settledMediaRect,
   snapshotRect,
@@ -119,6 +120,13 @@ describe('predictedMediaRect', () => {
 })
 
 describe('lightbox motion contract', () => {
+  it('runs entry FLIP only for a newly opened asset, not gallery switches', () => {
+    expect(lightboxEntryMode(undefined, 'a')).toBe('enter')
+    expect(lightboxEntryMode('a', 'b')).toBe('switch')
+    expect(lightboxEntryMode('b', 'b')).toBe('none')
+    expect(lightboxEntryMode('a', undefined)).toBe('none')
+  })
+
   it('fades the overlay for the same duration on enter and exit', () => {
     expect(LIGHTBOX_MOTION.overlayMs).toBe(360)
   })

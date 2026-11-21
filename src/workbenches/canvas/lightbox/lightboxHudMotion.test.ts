@@ -24,5 +24,12 @@ describe('lightbox HUD mode motion', () => {
     expect(flip).toContain("setAttribute('data-lightbox-flipping', '')")
     expect(flip).toContain("removeAttribute('data-lightbox-flipping')")
   })
+
+  it('uses a short clip fade for gallery switches instead of replaying entry FLIP', () => {
+    expect(tsx).toContain('gallerySwitchPendingRef')
+    expect(tsx).toContain("clipPath: 'inset(0 0 0 8%)'")
+    expect(tsx).toContain('GALLERY_SWITCH_MS')
+    expect(flip).toContain('lightboxEntryMode')
+  })
 })
 

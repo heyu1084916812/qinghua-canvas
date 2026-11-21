@@ -195,7 +195,7 @@
 .runCancel {
   background: var(--bg-surface);
   color: var(--text-1);
-  border: 1px solid var(--stroke);
+  border: none;
 }
 
 .runBusy {

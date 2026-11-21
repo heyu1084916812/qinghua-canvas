@@ -38238,6 +38238,27 @@ async function g154(browser) {
     .then(() => true)
     .catch(() => false)
   rec(g, '★ 生成中：按钮变成「取消当前生成」（唯一的取消入口）', becameCancel)
+  const runningLook = await runBtn.evaluate((element) => {
+    const style = getComputedStyle(element)
+    const stop = element.querySelector('svg rect')
+    return {
+      background: style.backgroundColor,
+      border: style.borderTopWidth,
+      iconFill: stop?.getAttribute('fill') ?? null,
+      iconStroke: stop?.getAttribute('stroke') ?? null,
+    }
+  })
+  rec(
+    g,
+    '生成中按钮为实色背景，停止方块无白描边',
+    runningLook.border === '0px' &&
+      runningLook.background !== 'rgba(0, 0, 0, 0)' &&
+      runningLook.iconFill === 'currentColor' &&
+      runningLook.iconStroke === 'none',
+    JSON.stringify(runningLook),
+  )
+  const shotSuffix = `${process.env.SMOKE_DARK === '1' ? 'dark' : 'light'}-${process.env.SMOKE_VIEWPORT === '1024' ? '1024' : '1440'}`
+  await page.screenshot({ path: `${OUT}/154-g154-running-${shotSuffix}.png` })
 
   // ② 点取消 → 立刻回到空闲态
   await runBtn.click()
@@ -43715,6 +43736,11 @@ async function g795(browser) {
                 width: rect.width,
                 height: rect.height,
                 position: getComputedStyle(media).position,
+                flipping: document
+                  .querySelector('[data-lightbox]')
+                  ?.hasAttribute('data-lightbox-flipping') ?? false,
+                clone: !!document.querySelector('[data-lightbox-flip-clone]'),
+                animations: media.getAnimations().length,
               })
             }
             return samples
@@ -43722,6 +43748,8 @@ async function g795(browser) {
         : []
     const maxSampleWidth = Math.max(0, ...sizeSamples.map((sample) => sample.width))
     const maxSampleHeight = Math.max(0, ...sizeSamples.map((sample) => sample.height))
+    const switchHadEntryClone = sizeSamples.some((sample) => sample.clone || sample.flipping)
+    const switchHadMotion = sizeSamples.some((sample) => sample.animations > 0)
     rec(
       g,
       '★ 切换缩略图过程中旧图不会先被放大',
@@ -43730,6 +43758,12 @@ async function g795(browser) {
         maxSampleWidth <= beforeMedia.width * 1.15 &&
         maxSampleHeight <= beforeMedia.height * 1.15,
       `before=${beforeMedia?.width ?? 0}x${beforeMedia?.height ?? 0} max=${maxSampleWidth}x${maxSampleHeight}`,
+    )
+    rec(
+      g,
+      '★★ 灯箱内切图不再重播入场 FLIP，改用局部切换动效',
+      !switchHadEntryClone && switchHadMotion,
+      JSON.stringify({ switchHadEntryClone, switchHadMotion }),
     )
     const switched = await page
       .waitForFunction(

@@ -75,6 +75,8 @@ import {
   lightboxMediaProjectionOf,
 } from './lightboxMediaProjection'
 
+const GALLERY_SWITCH_MS = 180
+
 function annotationCanvasBox(canvas: HTMLCanvasElement): LightboxAnnotationCanvas {
   const { left, top, width, height } = canvas.getBoundingClientRect()
   return { left, top, width, height, pixelWidth: canvas.width, pixelHeight: canvas.height }
@@ -123,6 +125,8 @@ export function LightboxLayer() {
   const [mode, setMode] = useState<LightboxEditorMode>('view')
   const previousAssetHashRef = useRef<string | undefined>(undefined)
   const preserveViewportAfterMediaLoadRef = useRef(false)
+  const shownGalleryAssetRef = useRef<string | undefined>(undefined)
+  const gallerySwitchPendingRef = useRef(false)
 
   const [cropRect, setCropRect] = useState<FusionRect | null>(null)
   const [cropRatio, setCropRatio] = useState('')
@@ -291,6 +295,17 @@ export function LightboxLayer() {
     }),
   )
   useEffect(() => viewportGestures.prepareAssetSwitch(assetHash, hasGalleryNavigation), [assetHash, hasGalleryNavigation, viewportGestures])
+  useEffect(() => {
+    if (!lightbox) {
+      shownGalleryAssetRef.current = undefined
+      gallerySwitchPendingRef.current = false
+      return
+    }
+    const previous = shownGalleryAssetRef.current
+    if (previous && assetHash && previous !== assetHash && hasGalleryNavigation) {
+      gallerySwitchPendingRef.current = true
+    }
+  }, [assetHash, hasGalleryNavigation, lightbox])
   useEffect(() => viewportGestures.resetCompareView(!!lightbox?.compareWith), [assetHash, lightbox?.compareWith, compareKind, viewportGestures])
   useEffect(() => viewportGestures.watchStage(assetHash), [assetHash, viewportGestures])
   useEffect(() => viewportGestures.fitInitialViewport(layoutNatural, stage, vp), [layoutNatural, stage, vp, viewportGestures])
@@ -310,6 +325,19 @@ export function LightboxLayer() {
 
   const placed = layoutNatural !== null && vp !== null
   const settleNaturalSize = (w: number, h: number) => viewportGestures.settleMediaSize(w, h, vp)
+  const settleGallerySwitch = (element: HTMLElement) => {
+    shownGalleryAssetRef.current = assetHash
+    if (!gallerySwitchPendingRef.current) return
+    gallerySwitchPendingRef.current = false
+    if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return
+    element.animate(
+      [
+        { opacity: 0, clipPath: 'inset(0 0 0 8%)' },
+        { opacity: 1, clipPath: 'inset(0)' },
+      ],
+      { duration: GALLERY_SWITCH_MS, easing: 'cubic-bezier(0.16, 1, 0.3, 1)' },
+    )
+  }
 
   const saveRotation = () => commands.saveRotation({ nodeId: rotateNodeId, url: primaryUrl ?? undefined, busy: rotating2, angle, mirrorH, mirrorV })
   const saveAnnotation = () => commands.saveAnnotation(annotateNodeId, url ?? undefined)
@@ -362,6 +390,7 @@ export function LightboxLayer() {
         {primaryUrl &&
           (primaryIsVideo ? (
             <video
+              key={assetHash}
               className={placed ? styles.media : styles.mediaPlain}
               data-lightbox-media
               src={primaryUrl}
@@ -372,6 +401,7 @@ export function LightboxLayer() {
               style={mediaStyle}
               onLoadedMetadata={(e) => {
                 settleNaturalSize(e.currentTarget.videoWidth, e.currentTarget.videoHeight)
+                settleGallerySwitch(e.currentTarget)
               }}
               /**
                * ⚠️ **`pointerdown` 一律放行给舞台**（用户 2026-10-16：「拖动无法进行拖动图片」）。
@@ -386,6 +416,7 @@ export function LightboxLayer() {
             />
           ) : (
             <img
+              key={assetHash}
               className={placed ? styles.media : styles.mediaPlain}
               data-lightbox-media
               src={primaryUrl}
@@ -403,6 +434,7 @@ export function LightboxLayer() {
                     e.currentTarget.naturalHeight,
                   )
                 }
+                settleGallerySwitch(e.currentTarget)
               }}
               /** 同上：`pointerdown` 让给舞台起手平移（框选模式下本来就是让的） */
               onClick={(e) => {
