@@ -2,7 +2,7 @@
 import fs from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
-const css = fs.readFileSync(new URL('./LightboxLayer.module.css', import.meta.url), 'utf8')
+const css = fs.readFileSync(new URL('./LightboxLayer.module.css', import.meta.url), 'utf8').replaceAll('\r\n', '\n')
 const tsx = fs.readFileSync(new URL('./LightboxLayer.tsx', import.meta.url), 'utf8')
 
 describe('lightbox HUD mode motion', () => {

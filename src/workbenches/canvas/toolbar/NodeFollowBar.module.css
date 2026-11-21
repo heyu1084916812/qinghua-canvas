@@ -10,9 +10,15 @@
  *
  * 尺寸不随画布缩放（挂在 [data-world] 之外，屏幕坐标系）。
  */
-.bar {
+.position {
   position: absolute;
   z-index: 19;
+  transform: translateX(-50%);
+  pointer-events: auto;
+}
+
+.bar {
+  position: relative;
   /*
    * 入场（#1161）：**只淡入、不做位移/缩放**。
    *
@@ -290,23 +296,23 @@
 
 /* 跟随栏入场（#1161）：只淡入 —— 位移/缩放会和"跟随节点"的 left/top 打架（见 `.bar` 的说明） */
 @keyframes barLightboxIn {
-  from { opacity: 0; transform: translate(-50%, 14px) scale(.92); filter: blur(4px); }
-  to { opacity: 1; transform: translateX(-50%); filter: blur(0); }
+  from { opacity: 0; transform: translateY(10px) scale(.94); filter: blur(4px); }
+  to { opacity: 1; transform: translateY(0) scale(1); filter: blur(0); }
 }
 
 /* 点空白后的跟随栏退场：不位移，避免与节点跟随定位发生冲突。 */
-.bar[data-follow-closing='true'] {
+.position[data-follow-closing='true'] .bar {
   animation: barLightboxOut 220ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
   pointer-events: none;
 }
 
 @keyframes barLightboxOut {
-  from { opacity: 1; transform: translateX(-50%) translate3d(0, 0, 0) scale(1); filter: blur(0); }
-  to { opacity: 0; transform: translateX(-50%) translate3d(0, 12px, 0) scale(0.92); filter: blur(4px); }
+  from { opacity: 1; transform: translateY(0) scale(1); filter: blur(0); }
+  to { opacity: 0; transform: translateY(12px) scale(0.92); filter: blur(4px); }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .bar, .bar[data-follow-closing='true'] {
+  .bar, .position[data-follow-closing='true'] .bar {
     animation-duration: 1ms;
   }
 }

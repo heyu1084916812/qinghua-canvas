@@ -170,8 +170,8 @@
 
 /* 创作 / 情绪面板入场（#1161）：从节点方向"长出来" —— 小 4% + 渐显，锚点在顶边中点 */
 @keyframes panelLightboxIn {
-  from { opacity: 0; transform: translate3d(0, -16px, 0) scale(0.94); filter: blur(5px); }
-  to { opacity: 1; transform: translate3d(0, 0, 0) scale(1); filter: blur(0); }
+  from { opacity: 0; transform: scale(0.94); filter: blur(5px); }
+  to { opacity: 1; transform: scale(1); filter: blur(0); }
 }
 
 /* 点空白后的短暂退场（#1161）：选择已清掉，但外壳保留一个节拍完成收缩淡出。 */
@@ -181,8 +181,8 @@
 }
 
 @keyframes panelLightboxOut {
-  from { opacity: 1; transform: translate3d(0, 0, 0) scale(1); filter: blur(0); }
-  to { opacity: 0; transform: translate3d(0, -14px, 0) scale(0.94); filter: blur(4px); }
+  from { opacity: 1; transform: scale(1); filter: blur(0); }
+  to { opacity: 0; transform: scale(0.94); filter: blur(4px); }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -193,6 +193,7 @@
 
 @media (prefers-reduced-motion: no-preference) {
   .panel [data-panel-part] { animation: partIn 220ms cubic-bezier(.22,1,.36,1) backwards; }
+  :global([data-panel-closing='true']) .panel [data-panel-part] { animation: none; }
   .panel [data-panel-part='prompt'] { animation-delay: 55ms; }
   .panel [data-panel-part='params'] { animation-delay: 110ms; }
 }

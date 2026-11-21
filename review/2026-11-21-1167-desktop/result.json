@@ -1,0 +1,28 @@
+{
+  "ticket": "1167",
+  "date": "2026-11-21",
+  "scope": "desktop development build only; browser not used",
+  "window": "qinghua.exe",
+  "observed": [
+    "Desktop dev build loaded at http://127.0.0.1:1420 inside qinghua.exe with no Vite error overlay after CSS fix.",
+    "Lightbox opened from the selected canvas image and remained visible with the canvas behind it; AX tree exposed the lightbox dialog and close action.",
+    "Canvas screenshot at the desktop window size showed the selected image node, creation panel, and no CSS compile error.",
+    "Baseline and post-fix visual checks were performed in the desktop app; exact 1440x900 and 1024x700 resize matrix was not available from this window session."
+  ],
+  "tests": {
+    "targeted": "21 passed",
+    "tsc": "passed",
+    "build": "passed",
+    "check": "passed"
+  },
+  "changed": [
+    "src/workbenches/canvas/lightbox/useLightboxFlip.ts",
+    "src/workbenches/canvas/lightbox/useLightboxFlip.test.ts",
+    "src/workbenches/canvas/lightbox/LightboxLayer.module.css",
+    "src/workbenches/canvas/lightbox/lightboxHudMotion.test.ts",
+    "src/workbenches/canvas/toolbar/NodeFollowBar.tsx",
+    "src/workbenches/canvas/toolbar/NodeFollowBar.module.css",
+    "src/workbenches/canvas/panels/PanelShell.module.css",
+    "src/workbenches/canvas/frame/NodeFrame.module.css"
+  ]
+}

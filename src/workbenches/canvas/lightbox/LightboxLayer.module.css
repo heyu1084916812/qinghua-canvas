@@ -112,7 +112,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .overlay,
+  .overlay { animation: none; }
   .hud {
     animation: none;
   }
@@ -212,7 +212,8 @@
    * 让它在不超屏的前提下按真实内容宽度完整铺开（旧版居中工具条也是这个观感）。
    */
   width: max-content;
-  max-width: calc(100% - 32px);\n  will-change: transform, opacity, filter;
+  max-width: calc(100% - 32px);
+  will-change: transform, opacity, filter;
   padding: 6px 8px;
   overflow-x: auto;
   box-sizing: border-box;

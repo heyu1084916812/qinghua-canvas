@@ -1,22 +1,20 @@
 import { useCallback, useEffect, useRef } from 'react'
 import type { CanvasStore } from '../../../state/workbenches/canvas/store'
 
-/**
- * 灯箱的打开 / 关闭 FLIP（#1161 第三、四轮）。
- *
- * - **打开**：media 从"画布上那个节点"的矩形平移+缩放到自己的落位（260ms）；
- *   必须**等 media 尺寸稳定**再量 —— 图片刚挂载时又小又会被重新 fit，
- *   拿中间态去算会出现"起点不是当前视图中的节点位置"（用户实测）。
- * - **关闭**：同一段动画反着播（220ms），播完才真正 `closeLightbox()` ——
- *   所以不需要"延迟卸载"那种额外状态，灯箱在动画期间仍然开着。
- * - 每次打开都要重播：关掉时清掉"已播过"的记号（否则第二次打开没有动画）。
- *
- * 抽成 hook 的原因：`LightboxLayer` 已经顶到 1040 行预算，这段是自成一体的时序。
- */
+/** Lightbox open/close FLIP; the source rect is captured before target layout settles. */
 
 export function sourceNodeIdOf(nodes: readonly { id: string; data?: unknown }[], hash: string, preferredNodeId?: string) {
   if (preferredNodeId && nodes.some((node) => node.id === preferredNodeId && (node.data as { assetHash?: string } | undefined)?.assetHash === hash)) return preferredNodeId
   return nodes.find((node) => (node.data as { assetHash?: string } | undefined)?.assetHash === hash)?.id ?? null
+}
+
+/** Prefer the actual visible asset box; fall back to the frame for non-media nodes. */
+export function sourceRectFromFrame(frame: HTMLElement | null): DOMRect | null {
+  const media = frame?.querySelector<HTMLElement>('img, video')
+  const mediaRect = media?.getBoundingClientRect()
+  if (mediaRect && mediaRect.width > 0 && mediaRect.height > 0) return mediaRect
+  const frameRect = frame?.getBoundingClientRect()
+  return frameRect && frameRect.width > 0 && frameRect.height > 0 ? frameRect : null
 }
 
 export function useLightboxFlip(options: {
@@ -35,19 +33,13 @@ export function useLightboxFlip(options: {
     const preferred = preferredNodeId
       ? sourceNodeIdOf(nodes, hash, preferredNodeId)
       : null
-    // When the caller opened the lightbox from a specific node, never silently
-    // fall back to another node carrying the same hash. That made duplicate
-    // references animate from the wrong canvas position.
     const candidateIds = preferred
       ? [preferred]
       : [sourceNodeIdOf(nodes, hash)].filter((id): id is string => Boolean(id))
     for (const nodeId of candidateIds) {
       const frame = document.querySelector<HTMLElement>(`[data-node-id="${nodeId}"]`)
-      // The requested origin is the node's boxed position, not the inner
-      // image element. The inner image can be letterboxed or smaller than the
-      // selected frame, which makes the zoom visibly start from an offset.
-      const rect = frame?.getBoundingClientRect()
-      if (rect?.width) return rect
+      const rect = sourceRectFromFrame(frame)
+      if (rect) return rect
     }
     return null
   }
@@ -65,6 +57,7 @@ export function useLightboxFlip(options: {
     let frames = 0
     let raf = 0
     let last = { w: 0, h: 0 }
+    const first = sourceRectOf(assetHash, sourceNodeId)
     const attempt = () => {
       const media = stageRef.current?.querySelector<HTMLElement>('[data-lightbox-media]')
       const to = media?.getBoundingClientRect()
@@ -75,10 +68,12 @@ export function useLightboxFlip(options: {
         if (frames < 40) raf = window.requestAnimationFrame(attempt)
         return
       }
-      const from = sourceRectOf(assetHash, sourceNodeId)
-      // Keep retrying if the exact source node has not mounted yet. Marking it
-      // flipped before this check would permanently skip the opening animation.
-      if (!from || !from.width) return
+      const from = first ?? sourceRectOf(assetHash, sourceNodeId)
+      if (!from || !from.width) {
+        frames += 1
+        if (frames < 40) raf = window.requestAnimationFrame(attempt)
+        return
+      }
       flippedRef.current = assetHash
       const scale = Math.max(0.05, Math.min(2.5, Math.min(from.width / to.width, from.height / to.height)))
       const dx = from.left + from.width / 2 - (to.left + to.width / 2)

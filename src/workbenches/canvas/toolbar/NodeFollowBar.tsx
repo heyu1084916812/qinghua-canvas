@@ -167,14 +167,16 @@ export function NodeFollowBar({ onClose, onOpenSettings, onDownload }: NodeFollo
 
   return (
     <div
-      className={styles.bar}
-      style={{ left: anchor.centerX, top: anchor.top, transform: 'translateX(-50%)' }}
+      className={styles.position}
+      style={{ left: anchor.centerX, top: anchor.top }}
       data-node-follow-bar={node.id}
       data-follow-closing={closing ? 'true' : undefined}
       // 栏上的点击/拖动不该被画布当成「点空白取消选中」或发起平移
       onPointerDown={(e) => e.stopPropagation()}
       onWheel={(e) => e.stopPropagation()}
     >
+      <div className={styles.bar}>
+
       <NodeActions
         node={node}
         running={exec.isRunning}
@@ -182,6 +184,7 @@ export function NodeFollowBar({ onClose, onOpenSettings, onDownload }: NodeFollo
         onOpenSettings={onOpenSettings}
         onDownload={onDownload}
       />
+      </div>
     </div>
   )
 }
