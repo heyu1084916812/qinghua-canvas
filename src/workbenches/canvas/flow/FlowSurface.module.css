@@ -78,15 +78,16 @@
   content-visibility: visible;
 }
 
-/* 空格按住 = 平移模式（§6.3，与老表面同一套光标反馈） */
 /*
- * 美工刀模式（对账 #1159）：原生指针**整个藏起来**，由 `.knifeCursor` 这把小刀代替。
- * `!important` 是必要的 —— 节点、连线、缩略图各自都有 `cursor: grab/pointer`，
- * 不压过它们就会出现"大多数地方是刀、个别地方变回手"。
+ * 美工刀模式（对账 #1159 / #1174）：直接换 Windows 原生光标图像，而不是用 DOM 跟随鼠标。
+ *
+ * 这样美工刀和普通鼠标共用同一条系统光标通道，位移距离、刷新率和 DPI 缩放天然一致。
+ * SVG 的 sharp point 位于 (2,20)，cursor hotspot 也用 `2 20`，不再依赖 JS transform。
+ * 白描边 + 黑刀身在明暗主题都能读清；不支持 SVG cursor 时回落到系统十字光标。
  */
 .knifeMode,
 .knifeMode * {
-  cursor: none !important;
+  cursor: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2224%22%20height%3D%2224%22%20viewBox%3D%220%200%2024%2024%22%3E%3Cpath%20d%3D%22M11%2016.586V19a1%201%200%200%201-1%201H2L18.37%203.63a1%201%200%201%201%203%203l-9.663%209.663a1%201%200%200%201-1.414%200L8%2014%22%20fill%3D%22none%22%20stroke%3D%22%23fff%22%20stroke-width%3D%224.5%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%2F%3E%3Cpath%20d%3D%22M11%2016.586V19a1%201%200%200%201-1%201H2L18.37%203.63a1%201%200%201%201%203%203l-9.663%209.663a1%201%200%200%201-1.414%200L8%2014%22%20fill%3D%22none%22%20stroke%3D%22%23111%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%2F%3E%3C%2Fsvg%3E") 2 20, crosshair !important;
 }
 
 

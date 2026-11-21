@@ -44,30 +44,6 @@
   }
 }
 
-/*
- * 跟着指针走的美工刀本体（图案来自公共图标库的 `Slice`，见 `KnifeCursor.tsx`）。
- *
- * 用户 2026-11-19 第二轮：「不要外面那个圆」—— 所以**只有刀身**、没有胶囊底与描边。
- * 深浅主题下的可读性靠一圈 `--bg-canvas` 的投影把刀从底图里"托"出来（仍只用令牌）。
- * 坐标由 `KnifeCursor` 用 `transform: translate3d` 直接写，这里只给基线位置。
- */
-.knifeCursor {
-  position: fixed;
-  top: 0;
-  left: 0;
-  z-index: 60;
-  display: flex;
-  width: 20px;
-  height: 20px;
-  align-items: center;
-  justify-content: center;
-  color: var(--text-1);
-  pointer-events: none;
-  will-change: transform;
-  transform: translate3d(-200px, -200px, 0);
-  filter: drop-shadow(0 1px 1.5px var(--bg-canvas));
-}
-
 /* 未松手前只隐藏命中的原线，数据仍在图里。 */
 :global([data-edge][data-knife-pending]) { visibility: hidden; }
 

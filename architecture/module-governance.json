@@ -582,8 +582,7 @@
         "subscribeKnife"
       ],
       "test": [
-        "src/features/canvas/knifeMode.test.ts",
-        "src/workbenches/canvas/flow/KnifeCursor.test.ts"
+        "src/features/canvas/knifeMode.test.ts"
       ],
       "budget": 55
     },
@@ -692,15 +691,15 @@
     {
       "module": "src/workbenches/canvas/flow/FlowEdgeCutLayer.module.css",
       "owner": "canvas-flow-ui",
-      "responsibility": "切断动画层与美工刀光标的局部样式（两段上下分离淡出、跟随指针的刀身）。",
+      "responsibility": "切断动画层的局部样式（两段上下分离淡出）。",
       "owns": [
-        "CSS_MODULE:切断动画与刀具光标"
+        "CSS_MODULE:FlowEdgeCutLayer 的切断动画样式域"
       ],
       "doesNotOwn": [
         "画布主题令牌"
       ],
       "publicApi": [
-        "CSS_MODULE:切断动画层与刀具光标"
+        "CSS_MODULE:FlowEdgeCutLayer 的切断动画层样式域"
       ],
       "test": [
         "src/workbenches/canvas/flow/edgeCutGeometry.test.ts"
@@ -710,21 +709,21 @@
     {
       "module": "src/workbenches/canvas/flow/KnifeCursor.tsx",
       "owner": "canvas-flow-ui",
-      "responsibility": "跟随指针的美工刀光标（公共图标库的 Slice + 浅底胶囊）。",
+      "responsibility": "美工刀原生 CSS cursor 的隐藏状态锚点，供既有探针判断刀具是否开启。",
       "owns": [
-        "刀具光标局部视图"
+        "刀具状态锚点"
       ],
       "doesNotOwn": [
-        "刀具开关状态"
+        "光标绘制与移动",
+        "切割命中"
       ],
       "publicApi": [
-        "KnifeCursor",
-        "knifeCursorTransform"
+        "KnifeCursor"
       ],
       "test": [
-        "src/features/canvas/knifeMode.test.ts"
+        "src/workbenches/canvas/flow/KnifeCursor.test.ts"
       ],
-      "budget": 80
+      "budget": 20
     },
     {
       "module": "src/app/providers/SkillStoreContext.tsx",

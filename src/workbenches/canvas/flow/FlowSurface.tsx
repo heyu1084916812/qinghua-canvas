@@ -1070,7 +1070,7 @@ function FlowSurfaceInner({
       <FlowPortLayer onPortDown={beginEdgeDrag} coarse={detailMode === 'coarse'} />
       {/* 子节点连线的**命中区**（双击删线）：必须在最上层才收得到指针，视觉是透明的 */}
       <FlowChildEdgeLayer hitOnly />
-      {/* 美工刀光标（#1159）：原生指针已被 `.knifeMode` 隐藏，这把刀就是指针本身 */}
+      {/* 原生 CSS cursor 的实际绘制交给系统；这个隐藏锚点只供工具状态探针使用 */}
       <KnifeCursor active={knifeOn} />
     </div>
   )
