@@ -285,6 +285,7 @@
   --border-width: 1px;
   --border: var(--border-width) solid var(--stroke);
   --shadow-float: 0 2px 8px rgba(23, 23, 22, 0.06);
+  --shadow-node-drag: 0 28px 52px -12px rgba(15,23,42,.32);
 
   /* —— 动效时长（§3.4，CSS 侧；JS 侧见 ui/motion.ts） —— */
   --dur-hover: 120ms;
@@ -481,4 +482,5 @@
 
   /* 投影在暗底上几乎不可见，加深并加大模糊才能撑开浮层的层次（§3.3） */
   --shadow-float: 0 2px 10px rgba(0, 0, 0, 0.45);
+  --shadow-node-drag: 0 28px 52px -12px rgba(0,0,0,.65);
 }

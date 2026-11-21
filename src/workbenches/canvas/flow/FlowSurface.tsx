@@ -661,6 +661,7 @@ function FlowSurfaceInner({
         selection: store.getSelection(),
         shiftKey: event.shiftKey,
       })
+      store.setSelectionMarqueeActive(true)
       selectionStartRef.current = session.start
       selectionBaselineRef.current = session.baseline
       selectionMarqueeRef.current = session.marquee
@@ -674,7 +675,7 @@ function FlowSurfaceInner({
       const marquee = selectionMarqueeRef.current
       const baseline = selectionBaselineRef.current
       selectionStartRef.current = null
-      if (!marquee) return
+      if (!marquee) { store.setSelectionMarqueeActive(false); return }
       /** 等 RF 的 select change 落完，再按 store 几何裁掉框外节点。 */
       window.requestAnimationFrame(() => {
         const ids = selectionFromMarquee({ graph: store.getSnapshot(), marquee, baseline })
@@ -682,6 +683,7 @@ function FlowSurfaceInner({
         else store.setSelection(ids)
         selectionMarqueeRef.current = null
         selectionBaselineRef.current = []
+        store.setSelectionMarqueeActive(false)
       })
     },
     [store, updateSelectionMarquee],

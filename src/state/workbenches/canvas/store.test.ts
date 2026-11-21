@@ -45,6 +45,15 @@ describe('canvas store / 基本变更', () => {
 })
 
 describe('canvas store / 选择来源', () => {
+  it('框选进行中有独立瞬态标记，结束后可恢复 HUD', () => {
+    const store = createCanvasStore({ platform, projectId: 'p1' })
+    expect(store.isSelectionMarqueeActive()).toBe(false)
+    store.setSelectionMarqueeActive(true)
+    expect(store.isSelectionMarqueeActive()).toBe(true)
+    store.setSelectionMarqueeActive(false)
+    expect(store.isSelectionMarqueeActive()).toBe(false)
+  })
+
   it('普通单选保持单选来源，Shift/Ctrl 选择一项也保持多选来源', () => {
     const store = createCanvasStore({ platform, projectId: 'p1' })
     store.setSelection(['a'])

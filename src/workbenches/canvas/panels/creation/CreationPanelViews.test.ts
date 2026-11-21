@@ -49,7 +49,8 @@ describe('CreationPanel 视图拆分', () => {
 
     expect(html).toMatch(/^<section /)
     expect(html).toContain('data-panel-part="assets"')
-    expect(html).toContain('data-panel-asset-empty')
+    expect(html).not.toContain('data-panel-asset-empty')
+    expect(html).toContain('data-upstream-pick')
     expect(html).toContain('data-param-mode="image"')
     expect(html).toContain('data-param-mode="video"')
     expect(html.indexOf('data-param-mode="image"')).toBeLessThan(

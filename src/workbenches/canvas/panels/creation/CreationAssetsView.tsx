@@ -41,44 +41,42 @@ export function CreationAssetsView({
   return (
     <section className={`${styles.section} ${styles.assetsSection}`} data-panel-part="assets">
       <div className={styles.assetsHead} data-panel-assets-head>
-        {assetsEmpty ? (
-          <div className={styles.assetEmpty} data-panel-asset-empty>
-            {emptyHint}
-          </div>
-        ) : (
-          <div className={styles.thumbs}>
-            {collections.map((collection) => (
-              <CollectionCard
-                key={`collection:${collection.id}`}
-                collection={collection}
-                onToggle={() => onToggleCollection(collection.id)}
-              />
-            ))}
-            {thumbs.map((thumb, index) => (
-              <Thumb
-                key={`${thumb.owner}:${thumb.id}`}
-                thumb={thumb}
-                index={index}
-                dragging={dragIndex === index}
-                onDragStart={() => onDragStart(index)}
-                onDrop={() => onDrop(index)}
-                onToggle={() => onToggleThumb(thumb.owner, thumb.id)}
-                onRemove={() => onRemoveThumb(thumb.owner, thumb.id)}
-                onFocus={() => onFocusThumb(thumb.id)}
-              />
-            ))}
-            <button
-              type="button"
-              className={styles.addUpstream}
-              data-upstream-pick
-              aria-label="添加上游节点"
-              title="添加上游节点"
-              onClick={onBeginUpstreamPick}
-            >
-              +
-            </button>
-          </div>
-        )}
+        <div className={styles.thumbs}>
+          {!assetsEmpty && (
+            <>
+              {collections.map((collection) => (
+                <CollectionCard
+                  key={`collection:${collection.id}`}
+                  collection={collection}
+                  onToggle={() => onToggleCollection(collection.id)}
+                />
+              ))}
+              {thumbs.map((thumb, index) => (
+                <Thumb
+                  key={`${thumb.owner}:${thumb.id}`}
+                  thumb={thumb}
+                  index={index}
+                  dragging={dragIndex === index}
+                  onDragStart={() => onDragStart(index)}
+                  onDrop={() => onDrop(index)}
+                  onToggle={() => onToggleThumb(thumb.owner, thumb.id)}
+                  onRemove={() => onRemoveThumb(thumb.owner, thumb.id)}
+                  onFocus={() => onFocusThumb(thumb.id)}
+                />
+              ))}
+            </>
+          )}
+          <button
+            type="button"
+            className={styles.addUpstream}
+            data-upstream-pick
+            aria-label="添加上游节点"
+            title={assetsEmpty ? emptyHint : "添加上游节点"}
+            onClick={onBeginUpstreamPick}
+          >
+            +
+          </button>
+        </div>
         {showCategoryToggle && (
           <div className={styles.category} role="group" aria-label="功能类别">
             {CATEGORY_OPTIONS.map((category) => (

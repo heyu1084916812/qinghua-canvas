@@ -100,6 +100,7 @@ export function NodeFollowBar({ onClose, onOpenSettings, onDownload }: NodeFollo
   // §6.15：拖动期间立即隐藏；**真实位移**的拖动松手后保持隐藏，直到下一次显式选中
   // （`setSelection` 会复位 panelDismissed）。普通单击（无位移）不算拖动，照常出现。
   const dragging = useSyncExternalStore(store.subscribe, store.isDragging, store.isDragging)
+  const marqueeActive = useSyncExternalStore(store.subscribe, store.isSelectionMarqueeActive, store.isSelectionMarqueeActive)
   const dismissed = useSyncExternalStore(
     store.subscribe,
     store.isPanelDismissed,
@@ -140,20 +141,20 @@ export function NodeFollowBar({ onClose, onOpenSettings, onDownload }: NodeFollo
     return () => window.removeEventListener('keydown', onKey)
   }, [store, selection.length])
 
-  const selectedNode = selection.length === 1
+  const selectedNode = !dragging && !marqueeActive && !dismissed && selectionMode === 'single' && selection.length === 1
     ? graph.nodes.find((candidate) => candidate.id === selection[0])
     : undefined
   const { value: exitingNode, closing } = useOverlayExit(
     selectedNode ?? null,
-    selection.length === 0,
+    selection.length === 0 && !marqueeActive, 220,
   )
   const node = selectedNode ?? exitingNode ?? undefined
   const viewport = useViewportStateWhen(
-    !dragging && !dismissed && !!selectedNode && FOLLOW_TYPES.has(selectedNode.type),
+    !!node && FOLLOW_TYPES.has(node.type),
   )
 
   // 与创作面板同款：拖动中 / 刚拖完（未重新选中）/ 多选（归属有歧义）都不显示
-  if (!closing && (dragging || dismissed)) return null
+  if (!closing && (dragging || marqueeActive || dismissed)) return null
   if (!closing && (selectionMode === 'multi' || selection.length !== 1)) return null
   if (!node || !FOLLOW_TYPES.has(node.type)) return null
 

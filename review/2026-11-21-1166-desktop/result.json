@@ -1,0 +1,21 @@
+{
+  "ticket": "#1166",
+  "date": "2026-11-21",
+  "environment": "轻画桌面开发版 qinghua.exe",
+  "browserOpened": false,
+  "observed": [
+    "1440x900 等效最大化深色桌面版：画布节点、生成/提示词面板正常渲染；更新后的 CSS 已热加载。",
+    "面板和节点功能栏现在按参考 HTML 使用 opacity + translate3d + scale + blur 入场/退场。",
+    "React Flow 拖动节点使用 dragging 类获得投影。",
+    "框选手势由 store 的 selectionMarqueeActive 锁住 HUD，框选结束后再提交最终选择。",
+    "创作面板加号入口保留在左侧缩略图区域；未重新引入节点外围多选虚线框。",
+    "灯箱独立媒体层 FLIP 的开/关 easing 与时长已对齐参考 HTML：440ms / 400ms，cubic-bezier(0.22, 1, 0.36, 1)。"
+  ],
+  "automated": {
+    "targetedVitest": "40/40",
+    "fullVitest": "808 files passed, 1 skipped; 6582 passed, 1 skipped",
+    "build": "passed",
+    "check": "passed"
+  },
+  "note": "本轮按用户要求只使用桌面开发版，不打开浏览器；截图由桌面版现场观察完成，未使用浏览器验收。"
+}

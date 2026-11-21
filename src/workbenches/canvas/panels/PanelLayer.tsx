@@ -89,6 +89,7 @@ const workflowSources = useWorkflowPanelSources()
   // 直到下一次显式选中（setSelection 复位 panelDismissed）——节点已被挪走，
   // 面板再弹回来只会「追着节点跑」。普通单击（无位移）不算拖动，面板照常出现。
   const dragging = useSyncExternalStore(store.subscribe, store.isDragging, store.isDragging)
+  const marqueeActive = useSyncExternalStore(store.subscribe, store.isSelectionMarqueeActive, store.isSelectionMarqueeActive)
   const panelDismissed = useSyncExternalStore(
     store.subscribe,
     store.isPanelDismissed,
@@ -96,14 +97,14 @@ const workflowSources = useWorkflowPanelSources()
   )
   // 多选不显示面板（§6.15）；单选且类型适用才显示；拖动中 / 拖过后（未重新选中）同样隐藏
   const selectedNode = useMemo(() => {
-    if (dragging || panelDismissed) return null
+    if (dragging || marqueeActive || panelDismissed) return null
     if (selectionMode === 'multi' || selection.length !== 1) return null
     const n = graph.nodes.find((x) => x.id === selection[0])
     return n && PANEL_TYPES.has(n.type) ? n : null
-  }, [graph.nodes, selection, selectionMode, dragging, panelDismissed])
-  const { value: exitingNode, closing } = useOverlayExit(selectedNode, selection.length === 0)
+  }, [graph.nodes, selection, selectionMode, dragging, marqueeActive, panelDismissed])
+  const { value: exitingNode, closing } = useOverlayExit(selectedNode, selection.length === 0 && !marqueeActive, 240)
   const visibleNode = selectedNode ?? exitingNode
-  const viewport = useViewportStateWhen(selectedNode !== null)
+  const viewport = useViewportStateWhen(visibleNode !== null)
   // 提示词节点的「优化 / 翻译」工具（§6.7）：面板是纯视图，状态由本层持有
   const promptData = selectedNode?.type === 'prompt' ? (selectedNode.data as PromptData) : null
   /**

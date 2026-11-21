@@ -88,7 +88,7 @@ export function useLightboxFlip(options: {
           { transform: `translate(${dx}px, ${dy}px) scale(${scale})`, opacity: 0.6 },
           { transform: 'translate(0, 0) scale(1)', opacity: 1 },
         ],
-        { duration: 260, easing: 'cubic-bezier(0.2, 0.8, 0.2, 1)' },
+        { duration: 440, easing: 'cubic-bezier(0.22, 1, 0.36, 1)', fill: 'both' },
       )
     }
     raf = window.requestAnimationFrame(attempt)
@@ -120,7 +120,7 @@ export function useLightboxFlip(options: {
         { transform: 'translate(0, 0) scale(1)', opacity: 1 },
         { transform: `translate(${dx}px, ${dy}px) scale(${scale})`, opacity: 0.35 },
       ],
-      { duration: 220, easing: 'cubic-bezier(0.4, 0, 0.6, 1)', fill: 'forwards' },
+      { duration: 400, easing: 'cubic-bezier(0.22, 1, 0.36, 1)', fill: 'forwards' },
     )
     anim.finished.then(done, done)
     window.setTimeout(done, 420)

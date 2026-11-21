@@ -244,6 +244,8 @@ interface CanvasState {
   /** 正在为某个节点挑选新的上游；纯瞬态，不落库。 */
   upstreamPick: string | null
   selectionMode: 'single' | 'multi'
+  /** 框选手势进行中：屏蔽 RF 临时单选状态，避免 HUD 闪现。 */
+  selectionMarqueeActive: boolean
 }
 
 export interface CanvasStore extends AppStore<GraphSnapshot, Command> {
@@ -251,6 +253,8 @@ export interface CanvasStore extends AppStore<GraphSnapshot, Command> {
   getSelection(): string[]
   setSelectionAsMulti(ids: string[]): void
   getSelectionMode(): 'single' | 'multi'
+  setSelectionMarqueeActive(active: boolean): void
+  isSelectionMarqueeActive(): boolean
   beginUpstreamPick(nodeId: string): void
   endUpstreamPick(): void
   getUpstreamPick(): string | null
@@ -593,6 +597,7 @@ export function createCanvasStore(opts: CanvasStoreOptions): CanvasStore {
     textEditor: null,
     upstreamPick: null,
     selectionMode: 'single',
+    selectionMarqueeActive: false,
   }))
 
   const semanticListeners = new Set<() => void>()
@@ -723,6 +728,8 @@ export function createCanvasStore(opts: CanvasStoreOptions): CanvasStore {
       store.setState({ selection: ids, selectionMode: 'multi', selectedEdgeIds: [], panelDismissed: false }),
     getSelection: () => store.getState().selection,
     getSelectionMode: () => store.getState().selectionMode,
+    setSelectionMarqueeActive: (active) => store.setState({ selectionMarqueeActive: active }),
+    isSelectionMarqueeActive: () => store.getState().selectionMarqueeActive,
     beginUpstreamPick: (nodeId) => store.setState({ upstreamPick: nodeId }),
     endUpstreamPick: () => store.setState({ upstreamPick: null }),
     getUpstreamPick: () => store.getState().upstreamPick,

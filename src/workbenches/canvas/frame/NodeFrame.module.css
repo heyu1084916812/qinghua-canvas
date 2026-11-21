@@ -5,6 +5,7 @@
   background: var(--node-fill);
   border: 1px solid var(--node-border);
   border-radius: var(--radius-node);
+  transition: box-shadow 250ms cubic-bezier(.22,1,.36,1);
   /* 画布浮层无投影（产品文档 §3.3），层级靠描边与背景明度区分 */
   overflow: visible;
   box-sizing: border-box;
@@ -233,5 +234,19 @@
 @media (prefers-reduced-motion: reduce) {
   .frame::after {
     transition-duration: 1ms;
+  }
+}
+
+/* 参考 ai.html：拖动时节点脱离画布表面，投影随抓取反馈增强。 */
+:global(.react-flow__node.dragging) > .frame {
+  z-index: 50;
+  cursor: grabbing;
+  box-shadow: var(--shadow-node-drag);
+
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .frame {
+    transition: none;
   }
 }
