@@ -1,6 +1,7 @@
 import { memo, useEffect, useRef } from 'react'
 import { useCanvasStore } from '../storeContext'
 import styles from './FlowViewportBackground.module.css'
+import { viewportBackgroundMetrics, viewportDotPattern } from './viewportBackground'
 
 export type ViewportBackgroundVariant = 'dots' | 'grid'
 
@@ -16,20 +17,25 @@ export const FlowViewportBackground = memo(function FlowViewportBackground({
 }) {
   const store = useCanvasStore()
   const ref = useRef<HTMLDivElement>(null)
+  const dotPatternRef = useRef<string | null>(null)
 
   useEffect(() => {
     const apply = () => {
       const viewport = store.getViewport()
-      const zoom = viewport.zoom || 1
       const element = ref.current
       if (!element) return
-      const size = `${22 * zoom}px ${22 * zoom}px`
-      element.style.backgroundSize = size
-      element.style.backgroundPosition = `${-viewport.x * zoom}px ${-viewport.y * zoom}px`
+      if (variant === 'dots' && dotPatternRef.current === null) {
+        const color = getComputedStyle(element).getPropertyValue('--canvas-grid-line')
+        dotPatternRef.current = viewportDotPattern(color)
+        element.style.backgroundImage = dotPatternRef.current
+      }
+      const metrics = viewportBackgroundMetrics(viewport)
+      element.style.setProperty('--viewport-pattern-size', metrics.size)
+      element.style.setProperty('--viewport-pattern-position', metrics.position)
     }
     apply()
     return store.subscribeViewport(apply)
-  }, [store])
+  }, [store, variant])
 
   return (
     <div

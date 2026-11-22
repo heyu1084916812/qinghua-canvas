@@ -4,14 +4,8 @@
   z-index: 0;
   pointer-events: none;
   background-repeat: repeat;
-}
-
-.layer[data-viewport-background='dots'] {
-  background-image: radial-gradient(
-    circle,
-    var(--canvas-grid-line) 0 1.4px,
-    transparent 1.4px
-  );
+  background-size: var(--viewport-pattern-size, 22px 22px);
+  background-position: var(--viewport-pattern-position, 0px 0px);
 }
 
 .layer[data-viewport-background='grid'] {

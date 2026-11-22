@@ -13704,14 +13704,41 @@
       "budget": 80
     },
     {
+      "module": "src/workbenches/canvas/flow/viewportBackground.ts",
+      "owner": "canvas-flow-ui",
+      "responsibility": "按 React Flow 的缩放公式计算手势 CSS 背景的间距、位移与点半径。",
+      "owns": [
+        "22px 基准点阵间距",
+        "1.4px 基准点直径",
+        "缩放后的 CSS pattern size / position"
+      ],
+      "doesNotOwn": [
+        "React Flow 视口状态",
+        "画布颜色令牌",
+        "手势生命周期"
+      ],
+      "publicApi": [
+        "VIEWPORT_BACKGROUND_GAP_PX",
+        "VIEWPORT_BACKGROUND_DOT_DIAMETER_PX",
+        "viewportBackgroundMetrics",
+        "viewportDotPattern"
+      ],
+      "test": [
+        "src/workbenches/canvas/flow/viewportBackground.test.ts"
+      ],
+      "budget": 50
+    },
+    {
       "module": "src/workbenches/canvas/flow/FlowViewportBackground.tsx",
       "owner": "canvas-flow-ui",
       "responsibility": "在平移手势期间用 CSS 图案替代 React Flow 的大型 SVG 背景，并跟随逻辑视口更新。",
       "owns": [
         "手势背景图案渲染",
-        "视口到 CSS background-position / size 的命令式同步"
+        "从画布令牌生成 SVG 点阵",
+        "视口到 CSS pattern size / position 的命令式同步"
       ],
       "doesNotOwn": [
+        "图案缩放公式",
         "React Flow 视口状态",
         "画布主题令牌",
         "节点与连线绘制"
@@ -13721,7 +13748,8 @@
         "ViewportBackgroundVariant"
       ],
       "test": [
-        "src/workbenches/canvas/flow/flowSurfacePerformance.test.ts"
+        "src/workbenches/canvas/flow/flowSurfacePerformance.test.ts",
+        "src/workbenches/canvas/flow/viewportBackground.test.ts"
       ],
       "budget": 60
     },
@@ -13741,7 +13769,8 @@
         "CSS_MODULE: gesture background patterns"
       ],
       "test": [
-        "src/workbenches/canvas/flow/flowSurfacePerformance.test.ts"
+        "src/workbenches/canvas/flow/flowSurfacePerformance.test.ts",
+        "src/workbenches/canvas/flow/viewportBackground.test.ts"
       ],
       "budget": 40
     }

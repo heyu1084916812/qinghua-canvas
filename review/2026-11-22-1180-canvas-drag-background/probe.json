@@ -1,0 +1,38 @@
+{
+  "url": "http://127.0.0.1:1420/canvas/probe-1180-canvas-background",
+  "before": {
+    "theme": "dark",
+    "moving": null,
+    "backgroundMode": "dots",
+    "tone": "slate",
+    "surfaceBackground": "rgb(22, 22, 22)",
+    "surfaceDot": "#303030",
+    "viewportTransform": "transform: translate(0px, 0px) scale(1);",
+    "backgroundDisplay": "block",
+    "dotRadius": "0.7",
+    "dotFill": "rgb(48, 48, 48)"
+  },
+  "pan": {
+    "moving": true,
+    "fastBackground": "dots",
+    "fastBackgroundSize": "22px 22px",
+    "fastBackgroundPosition": "180px 90px",
+    "fastBackgroundImage": "radial-gradient(circle, rgb(48, 48, 48) 0px, rgb(48, 48, 48) 1.4px, rgba(0, 0, 0, 0) 1.4px)",
+    "fastDotRadius": "",
+    "normalBackgroundDisplay": "none",
+    "viewportTransform": "transform: translate(180px, 90px) scale(1);",
+    "mountedNodes": 20
+  },
+  "drag": {
+    "moving": false,
+    "fastBackground": null,
+    "fastBackgroundSize": null,
+    "fastBackgroundPosition": null,
+    "fastBackgroundImage": null,
+    "fastDotRadius": null,
+    "normalBackgroundDisplay": "block",
+    "viewportTransform": "transform: translate(180px, 90px) scale(1);",
+    "mountedNodes": 12
+  },
+  "errors": []
+}
