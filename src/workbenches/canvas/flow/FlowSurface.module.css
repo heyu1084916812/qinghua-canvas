@@ -40,6 +40,38 @@
 }
 
 /*
+ * During a viewport gesture the normal per-edge React Flow layer is kept
+ * mounted but excluded from paint and hit testing. FlowViewportEdgeLayer paints
+ * the same strokes as one combined path, then the full layer returns on
+ * onMoveEnd. This avoids unmounting nodes or losing edge state.
+ */
+.surface[data-viewport-moving='true'] .flow :global(.react-flow__edges) {
+  display: none;
+}
+
+.surface[data-viewport-moving='true'] .flow :global(.react-flow__background) {
+  display: none;
+}
+
+/*
+ * Viewport gestures do not need per-node hit testing. Let the pane receive the
+ * pointer and isolate node layout/style trees so the browser does not walk all
+ * 300 mounted node subtrees on every move. Loop nodes keep their popover
+ * semantics and are intentionally excluded.
+ */
+.surface[data-viewport-moving='true'] .flow :global(.react-flow__node) {
+  pointer-events: none;
+}
+
+.surface[data-viewport-moving='true'] .flow :global(.react-flow__node:not(:has([data-loop-node]))) {
+  contain: layout style;
+}
+
+.surface[data-viewport-moving='true'] .flow :global(.react-flow__pane) {
+  pointer-events: auto;
+}
+
+/*
  * 平移 / 缩放只改 React Flow 节点外层 transform。300 节点 + 真实缩略图大画布的
  * release 诊断显示，让视口外节点跳过内容布局与绘制可把 P95 压到约 14ms；
  * 不隐藏图片、不删节点、不改节点结构或可见样式。

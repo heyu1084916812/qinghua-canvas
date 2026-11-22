@@ -16,4 +16,19 @@ describe('canvas detail virtualization', () => {
     expect(frameCss).not.toMatch(/data-node-header-inside/)
     expect(frameCss).not.toMatch(/\.body\s*\{[^}]*content-visibility:/s)
   })
+
+  it('replaces the heavy edge and background layers during viewport gestures', () => {
+    expect(flowCss).toMatch(
+      /\.surface\[data-viewport-moving='true'\] \.flow :global\(\.react-flow__edges\)\s*\{[^}]*display:\s*none;/s,
+    )
+    expect(flowCss).toMatch(
+      /\.surface\[data-viewport-moving='true'\] \.flow :global\(\.react-flow__background\)\s*\{[^}]*display:\s*none;/s,
+    )
+    expect(flowCss).toMatch(
+      /\.surface\[data-viewport-moving='true'\] \.flow :global\(\.react-flow__node\)\s*\{[^}]*pointer-events:\s*none;/s,
+    )
+    expect(flowCss).toMatch(
+      /\.surface\[data-viewport-moving='true'\] \.flow :global\(\.react-flow__node:not\(:has\(\[data-loop-node\]\)\)\)\s*\{[^}]*contain:\s*layout style;/s,
+    )
+  })
 })

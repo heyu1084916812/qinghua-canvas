@@ -1,0 +1,21 @@
+.layer {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background-repeat: repeat;
+}
+
+.layer[data-viewport-background='dots'] {
+  background-image: radial-gradient(
+    circle,
+    var(--canvas-grid-line) 0 1.4px,
+    transparent 1.4px
+  );
+}
+
+.layer[data-viewport-background='grid'] {
+  background-image:
+    linear-gradient(to right, var(--canvas-grid-line) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--canvas-grid-line) 1px, transparent 1px);
+}

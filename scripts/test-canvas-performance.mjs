@@ -567,7 +567,7 @@ async function blankPointerPoint(page, surface) {
   return point
 }
 
-async function panRound(page) {
+async function panRound(page, options = {}) {
   const surface = await page.locator('[data-canvas-surface]').boundingBox()
   if (!surface) throw new Error('canvas surface has no bounding box')
   const { x, y } = await blankPointerPoint(page, surface)
@@ -580,8 +580,35 @@ async function panRound(page) {
       await new Promise((resolve) => setTimeout(resolve, 50))
     }
   })
+  const gesture = await page.evaluate(() => {
+    const surface = document.querySelector('[data-canvas-surface]')
+    const edges = document.querySelector('.react-flow__edges')
+    const background = document.querySelector('.react-flow__background')
+    const fastLayer = document.querySelector('[data-flow-viewport-edge-layer]')
+    const fastBackground = document.querySelector('[data-viewport-background]')
+    return {
+      moving: surface?.getAttribute('data-viewport-moving') === 'true',
+      edgeDisplay: edges ? getComputedStyle(edges).display : null,
+      backgroundDisplay: background ? getComputedStyle(background).display : null,
+      fastLayer: Boolean(fastLayer),
+      fastPaths: fastLayer?.querySelectorAll('path').length ?? 0,
+      fastBackground: fastBackground?.getAttribute('data-viewport-background') ?? null,
+      mountedNodes: document.querySelectorAll('.react-flow__node[data-id]').length,
+    }
+  })
+  let screenshot = null
+  if (options.screenshotPath) {
+    await page.screenshot({ path: options.screenshotPath })
+    screenshot = path.relative(ROOT, options.screenshotPath)
+  }
   await page.mouse.up({ button: 'middle' })
-  return intervals
+  await page.waitForFunction(
+    (expected) => document.querySelectorAll('.react-flow__node[data-id]').length === expected,
+    PERFORMANCE_NODE_COUNT,
+    { timeout: 10_000 },
+  )
+  gesture.restoredNodes = await page.locator('.react-flow__node[data-id]').count()
+  return { intervals, gesture, screenshot }
 }
 
 async function zoomRound(page) {
@@ -589,7 +616,7 @@ async function zoomRound(page) {
   if (!surface) throw new Error('canvas surface has no bounding box')
   const { x, y } = await blankPointerPoint(page, surface)
   await page.mouse.move(x, y)
-  return sampleFrames(page, async () => {
+  const intervals = await sampleFrames(page, async () => {
     for (let index = 0; index < 24; index += 1) {
       // A small net zoom-in per round keeps every measured round below maxZoom
       // while still exercising both wheel directions.
@@ -597,6 +624,18 @@ async function zoomRound(page) {
       await new Promise((resolve) => setTimeout(resolve, 50))
     }
   })
+  const gesture = await page.evaluate(() => {
+    const surface = document.querySelector('[data-canvas-surface]')
+    return {
+      moving: surface?.getAttribute('data-viewport-moving') === 'true',
+      background: document.querySelector('[data-viewport-background]')?.getAttribute(
+        'data-viewport-background',
+      ) ?? null,
+      fastLayer: Boolean(document.querySelector('[data-flow-viewport-edge-layer]')),
+      mountedEdges: document.querySelectorAll('.react-flow__edge').length,
+    }
+  })
+  return { intervals, gesture }
 }
 
 async function settleZoomAt(page, targetZoom = 0.8) {
@@ -1112,6 +1151,7 @@ async function main() {
   const markdownPath = path.join(runRoot, 'REPORT.md')
   const screenshotPath = path.join(runRoot, 'canvas.png')
   const panTracePath = path.join(runRoot, 'pan.trace.json')
+  const panScreenshotPath = path.join(runRoot, 'pan-active.png')
   const dragTracePath = path.join(runRoot, 'drag.trace.json')
 
   if (!fs.existsSync(dist)) {
@@ -1288,7 +1328,13 @@ async function main() {
         round === 0 && process.env.QH_PERF_TRACE === '1'
           ? await beginPerformanceTrace(cdp)
           : null
-      const intervals = await panRound(page)
+      const result = await panRound(page, {
+        screenshotPath:
+          round === 0 && process.env.QH_PERF_PAN_SCREENSHOT === '1'
+            ? panScreenshotPath
+            : undefined,
+      })
+      const { intervals } = result
       const after = await viewportState(page)
       const performanceAfter = await readPerformanceMetrics(cdp)
       if (stopTrace) {
@@ -1299,6 +1345,8 @@ async function main() {
       panRounds.push({
         ...summarizeFrames(intervals),
         frameIntervalsMs: intervals,
+        gesture: result.gesture,
+        screenshot: result.screenshot,
         before,
         after,
         performanceMetrics: performanceMetricsDelta(performanceBefore, performanceAfter),
@@ -1343,12 +1391,14 @@ async function main() {
       await settleZoomAt(page)
       const before = await viewportState(page)
       const performanceBefore = await readPerformanceMetrics(cdp)
-      const intervals = await zoomRound(page)
+      const result = await zoomRound(page)
+      const { intervals } = result
       const after = await viewportState(page)
       const performanceAfter = await readPerformanceMetrics(cdp)
       zoomRounds.push({
         ...summarizeFrames(intervals),
         frameIntervalsMs: intervals,
+        gesture: result.gesture,
         before,
         after,
         performanceMetrics: performanceMetricsDelta(performanceBefore, performanceAfter),
@@ -1397,6 +1447,9 @@ async function main() {
         canvasScreenshot: screenshot,
         appLog: path.relative(ROOT, appLogPath),
         performanceTrace,
+        panScreenshot: fs.existsSync(panScreenshotPath)
+          ? path.relative(ROOT, panScreenshotPath)
+          : null,
         dragPerformanceTrace,
         uiMatrix,
       },

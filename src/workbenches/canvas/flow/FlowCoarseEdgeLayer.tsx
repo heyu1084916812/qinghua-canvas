@@ -1,4 +1,10 @@
-import { memo, useMemo, type MouseEvent as ReactMouseEvent } from 'react'
+import {
+  memo,
+  useEffect,
+  useMemo,
+  useRef,
+  type MouseEvent as ReactMouseEvent,
+} from 'react'
 import {
   useCanvasStore,
   useEdgeSelection,
@@ -6,7 +12,11 @@ import {
   useSelection,
   useViewportState,
 } from '../storeContext'
-import { coarseEdgePaths, type CoarseEdgePath } from './coarseEdges'
+import {
+  coarseEdgePaths,
+  viewportEdgePaths,
+  type CoarseEdgePath,
+} from './coarseEdges'
 import styles from './FlowCoarseEdgeLayer.module.css'
 
 export function FlowCoarseEdgeLayer() {
@@ -81,6 +91,63 @@ const CoarseEdgePaths = memo(function CoarseEdgePaths({
         </g>
       ))}
     </>
+  )
+})
+
+/**
+ * Gesture-only edge layer. The normal React Flow edges stay mounted but are
+ * hidden by CSS while the viewport moves; this layer paints the same graph as
+ * one combined path plus the few highlighted edges. It never receives pointer
+ * events, so the expensive per-edge hit targets stay out of the gesture path.
+ */
+export const FlowViewportEdgeLayer = memo(function FlowViewportEdgeLayer() {
+  const graph = useGraph()
+  const selection = useSelection()
+  const edgeSelection = useEdgeSelection()
+  const store = useCanvasStore()
+  const groupRef = useRef<SVGGElement>(null)
+  const paths = useMemo(
+    () => viewportEdgePaths(coarseEdgePaths(graph, selection, edgeSelection)),
+    [edgeSelection, graph, selection],
+  )
+
+  useEffect(() => {
+    const applyTransform = () => {
+      const viewport = store.getViewport()
+      const zoom = viewport.zoom || 1
+      groupRef.current?.setAttribute(
+        'transform',
+        `translate(${-viewport.x * zoom} ${-viewport.y * zoom}) scale(${zoom})`,
+      )
+    }
+    applyTransform()
+    return store.subscribeViewport(applyTransform)
+  }, [store])
+
+  return (
+    <svg
+      className={styles.svg}
+      aria-hidden
+      data-flow-viewport-edge-layer
+    >
+      <g ref={groupRef}>
+        {paths.base ? (
+          <path
+            className={styles.edge}
+            d={paths.base}
+            vectorEffect="non-scaling-stroke"
+          />
+        ) : null}
+        {paths.active.map((path) => (
+          <path
+            key={path.id}
+            className={`${styles.edge} ${styles.edgeActive}`}
+            d={path.d}
+            vectorEffect="non-scaling-stroke"
+          />
+        ))}
+      </g>
+    </svg>
   )
 })
 

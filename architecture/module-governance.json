@@ -13652,6 +13652,48 @@
         "src/workbenches/canvas/flow/flowNodePositionBatcher.test.ts"
       ],
       "budget": 80
+    },
+    {
+      "module": "src/workbenches/canvas/flow/FlowViewportBackground.tsx",
+      "owner": "canvas-flow-ui",
+      "responsibility": "在平移手势期间用 CSS 图案替代 React Flow 的大型 SVG 背景，并跟随逻辑视口更新。",
+      "owns": [
+        "手势背景图案渲染",
+        "视口到 CSS background-position / size 的命令式同步"
+      ],
+      "doesNotOwn": [
+        "React Flow 视口状态",
+        "画布主题令牌",
+        "节点与连线绘制"
+      ],
+      "publicApi": [
+        "FlowViewportBackground",
+        "ViewportBackgroundVariant"
+      ],
+      "test": [
+        "src/workbenches/canvas/flow/flowSurfacePerformance.test.ts"
+      ],
+      "budget": 60
+    },
+    {
+      "module": "src/workbenches/canvas/flow/FlowViewportBackground.module.css",
+      "owner": "canvas-flow-ui",
+      "responsibility": "定义手势专用点阵与网格背景图案，颜色只消费画布 CSS 令牌。",
+      "owns": [
+        "手势背景图案视觉",
+        "背景层定位与重复"
+      ],
+      "doesNotOwn": [
+        "视口动画调度",
+        "节点与连线样式"
+      ],
+      "publicApi": [
+        "CSS_MODULE: gesture background patterns"
+      ],
+      "test": [
+        "src/workbenches/canvas/flow/flowSurfacePerformance.test.ts"
+      ],
+      "budget": 40
     }
   ]
 }

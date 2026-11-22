@@ -2,7 +2,8 @@ import { beforeAll, describe, expect, it } from 'vitest'
 import type { GraphSnapshot } from '../../../domain/canvas/model/graph'
 import type { NodeSnapshot } from '../../../domain/canvas/model/node'
 import { registerAllSpecs } from '../../../domain/canvas/nodeSpecs'
-import { coarseEdgePaths } from './coarseEdges'
+import { coarseEdgePaths, viewportEdgePaths } from './coarseEdges'
+import type { CoarseEdgePath } from './coarseEdges'
 
 const node = (id: string, x: number, parentId: string | null = null): NodeSnapshot =>
   ({
@@ -55,5 +56,32 @@ describe('coarseEdgePaths', () => {
       selected: true,
     })
     expect(paths[0]?.d).toMatch(/^M /)
+  })
+
+  it('merges inactive edges while keeping highlighted edges separate', () => {
+    const path = (
+      id: string,
+      d: string,
+      related = false,
+      selected = false,
+    ): CoarseEdgePath => ({
+      id,
+      source: id,
+      target: `${id}-target`,
+      sourcePort: 'output',
+      targetPort: 'input',
+      d,
+      related,
+      selected,
+    })
+    const paths = [
+      path('plain-a', 'M 0 0 C 1 0 2 0 3 0'),
+      path('selected', 'M 3 0 C 4 0 5 0 6 0', false, true),
+      path('related', 'M 6 0 C 7 0 8 0 9 0', true),
+      path('plain-b', 'M 9 0 C 10 0 11 0 12 0'),
+    ]
+    const merged = viewportEdgePaths(paths)
+    expect(merged.base).toBe('M 0 0 C 1 0 2 0 3 0 M 9 0 C 10 0 11 0 12 0')
+    expect(merged.active.map((path) => path.id)).toEqual(['selected', 'related'])
   })
 })

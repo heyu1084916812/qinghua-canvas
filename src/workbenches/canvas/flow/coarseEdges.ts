@@ -18,6 +18,25 @@ export interface CoarseEdgePath {
   selected: boolean
 }
 
+export interface ViewportEdgePaths {
+  base: string
+  active: CoarseEdgePath[]
+}
+
+/**
+ * Viewport gestures only need the visible stroke, not per-edge interaction.
+ * Merge inactive edges into one path and keep highlighted edges separate.
+ */
+export function viewportEdgePaths(paths: readonly CoarseEdgePath[]): ViewportEdgePaths {
+  const base: string[] = []
+  const active: CoarseEdgePath[] = []
+  for (const path of paths) {
+    if (path.related || path.selected) active.push(path)
+    else base.push(path.d)
+  }
+  return { base: base.join(' '), active }
+}
+
 export function coarseEdgePaths(
   graph: GraphSnapshot,
   selection: readonly string[],
