@@ -269,6 +269,20 @@ export function viewportRoundMovement(round, mode) {
   return { dom, store, pass: dom && store }
 }
 
+export function nodeDragRoundMovement(round) {
+  const movedPx = Number(round?.movement?.movedPx)
+  const finalDeltaPx = Number(round?.movement?.finalDeltaPx)
+  return {
+    movedPx,
+    finalDeltaPx,
+    pass:
+      Number.isFinite(movedPx) &&
+      movedPx >= 80 &&
+      Number.isFinite(finalDeltaPx) &&
+      finalDeltaPx <= 2,
+  }
+}
+
 export function evaluatePerformanceGate(input) {
   const roundsPass = (rounds, mode) =>
     rounds.length === 3 &&
@@ -297,6 +311,16 @@ export function evaluatePerformanceGate(input) {
     zoomMovement:
       input.zoomRounds?.length === 3 &&
       input.zoomRounds.every((round) => viewportRoundMovement(round, 'zoom').pass),
+    dragP95:
+      input.dragRounds?.length === 3 &&
+      input.dragRounds.every(
+        (round) =>
+          Number(round.p95Ms) <= MAX_P95_MS &&
+          nodeDragRoundMovement(round).pass,
+      ),
+    dragMovement:
+      input.dragRounds?.length === 3 &&
+      input.dragRounds.every((round) => nodeDragRoundMovement(round).pass),
   }
 }
 
@@ -372,6 +396,15 @@ export function buildPerformanceReport(input) {
       rounds: input.zoomRounds.map((round) => viewportRoundMovement(round, 'zoom')),
       pass: assertionChecks.zoomMovement,
     },
+    dragP95: {
+      maximumMs: MAX_P95_MS,
+      actualMs: input.dragRounds.map((round) => round.p95Ms),
+      pass: assertionChecks.dragP95,
+    },
+    dragMovement: {
+      rounds: input.dragRounds.map((round) => nodeDragRoundMovement(round)),
+      pass: assertionChecks.dragMovement,
+    },
     ...(input.uiMatrix
       ? {
           uiMatrix: {
@@ -389,6 +422,7 @@ export function buildPerformanceReport(input) {
     images: input.imageEvidence,
     panRounds: input.panRounds,
     zoomRounds: input.zoomRounds,
+    dragRounds: input.dragRounds,
     pageErrors: input.pageErrors,
     consoleErrors: input.consoleErrors,
     assertions,
@@ -577,6 +611,87 @@ async function settleZoomAt(page, targetZoom = 0.8) {
     await page.mouse.move(x, y)
     await page.mouse.wheel(0, zoom < targetZoom ? -160 : 160)
     await page.waitForTimeout(60)
+  }
+}
+
+async function findDraggableGenerationNode(page) {
+  const surface = await page.locator('[data-canvas-surface]').boundingBox()
+  if (!surface) throw new Error('canvas surface has no bounding box')
+  const candidate = await page.evaluate((bounds) => {
+    const candidates = []
+    for (const wrapper of document.querySelectorAll('.react-flow__node[data-id]')) {
+      if (!wrapper.querySelector('[data-node-type="generation"]')) continue
+      const rect = wrapper.getBoundingClientRect()
+      if (
+        rect.left < bounds.x + 80 ||
+        rect.right > bounds.x + bounds.width - 80 ||
+        rect.top < bounds.y + 80 ||
+        rect.bottom > bounds.y + bounds.height - 120
+      ) {
+        continue
+      }
+      const x = rect.left + rect.width / 2
+      const y = rect.top + rect.height / 2
+      const target = document.elementFromPoint(x, y)
+      if (target?.closest('[data-node-id]') !== wrapper.querySelector('[data-node-id]')) {
+        continue
+      }
+      candidates.push({
+        id: wrapper.getAttribute('data-id'),
+        x,
+        y,
+        left: rect.left,
+        top: rect.top,
+        right: rect.right,
+        bottom: rect.bottom,
+      })
+    }
+    return candidates[0] ?? null
+  }, surface)
+  if (!candidate) throw new Error('no fully visible generation node to drag')
+  return candidate
+}
+
+async function nodeDragRound(page) {
+  const node = await findDraggableGenerationNode(page)
+  const start = { x: node.x, y: node.y }
+  const out = { x: start.x + 110, y: start.y + 55 }
+  await page.mouse.move(start.x, start.y)
+  await page.mouse.down()
+  let midRect = null
+  const intervals = await sampleFrames(page, async () => {
+    try {
+      for (let cycle = 0; cycle < 6; cycle += 1) {
+        await page.mouse.move(out.x, out.y, { steps: 12 })
+        await page.waitForTimeout(80)
+        if (cycle === 0) {
+          midRect = await page
+            .locator(`.react-flow__node[data-id="${node.id}"]`)
+            .boundingBox()
+        }
+        await page.mouse.move(start.x, start.y, { steps: 12 })
+        await page.waitForTimeout(80)
+      }
+    } finally {
+      await page.mouse.up()
+    }
+  })
+  const finalRect = await page
+    .locator(`.react-flow__node[data-id="${node.id}"]`)
+    .boundingBox()
+  const movedPx = midRect
+    ? Math.hypot(midRect.x - node.left, midRect.y - node.top)
+    : 0
+  const finalDeltaPx = finalRect
+    ? Math.hypot(finalRect.x - node.left, finalRect.y - node.top)
+    : Number.POSITIVE_INFINITY
+  return {
+    intervals,
+    movement: {
+      nodeId: node.id,
+      movedPx,
+      finalDeltaPx,
+    },
   }
 }
 
@@ -772,6 +887,7 @@ async function captureCullingUiMatrix(page, runRoot) {
       height: combination.height,
     })
     await page.evaluate((theme) => localStorage.setItem('flow:theme', theme), combination.theme)
+    await page.waitForTimeout(900)
     await page.goto(`http://tauri.localhost/canvas/${PERFORMANCE_PROJECT_ID}`, {
       waitUntil: 'domcontentloaded',
       timeout: 60_000,
@@ -838,6 +954,40 @@ async function captureCullingUiMatrix(page, runRoot) {
     }))
     await baselineStyle.evaluate((element) => element.remove())
     const pixelDiff = await compareScreenshots(page, beforeBuffer, afterBuffer)
+    const dragNode = await findDraggableGenerationNode(page)
+    const dragStartRect = await page
+      .locator(`.react-flow__node[data-id="${dragNode.id}"]`)
+      .boundingBox()
+    await page.mouse.move(dragNode.x, dragNode.y)
+    await page.mouse.down()
+    await page.mouse.move(dragNode.x + 80, dragNode.y + 40, { steps: 8 })
+    await page.waitForTimeout(120)
+    const dragMidRect = await page
+      .locator(`.react-flow__node[data-id="${dragNode.id}"]`)
+      .boundingBox()
+    const dragPath = path.join(output, `drag-${name}.png`)
+    await page.screenshot({ path: dragPath })
+    await page.mouse.move(dragNode.x, dragNode.y, { steps: 8 })
+    await page.mouse.up()
+    await page.waitForTimeout(250)
+    const dragFinalRect = await page
+      .locator(`.react-flow__node[data-id="${dragNode.id}"]`)
+      .boundingBox()
+    const nodesAfterDrag = await page.locator('.react-flow__node').count()
+    const dragMovedPx =
+      dragStartRect && dragMidRect
+        ? Math.hypot(
+            dragMidRect.x - dragStartRect.x,
+            dragMidRect.y - dragStartRect.y,
+          )
+        : 0
+    const dragReturnedPx =
+      dragStartRect && dragFinalRect
+        ? Math.hypot(
+            dragFinalRect.x - dragStartRect.x,
+            dragFinalRect.y - dragStartRect.y,
+          )
+        : Number.POSITIVE_INFINITY
     const geometryStable =
       afterGeometry.nodes.length === PERFORMANCE_NODE_COUNT &&
       beforeGeometry.nodes.length === PERFORMANCE_NODE_COUNT &&
@@ -862,6 +1012,13 @@ async function captureCullingUiMatrix(page, runRoot) {
       geometryStable,
       overflowX: afterGeometry.overflowX || beforeGeometry.overflowX,
       pixelDiff,
+      drag: {
+        nodeId: dragNode.id,
+        movedPx: dragMovedPx,
+        returnedPx: dragReturnedPx,
+        nodesAfter: nodesAfterDrag,
+        screenshot: path.relative(ROOT, dragPath),
+      },
       screenshots: {
         before: path.relative(ROOT, beforePath),
         after: path.relative(ROOT, afterPath),
@@ -876,7 +1033,10 @@ async function captureCullingUiMatrix(page, runRoot) {
         !afterGeometry.overflowX &&
         !beforeGeometry.overflowX &&
         pixelDiff.sameSize &&
-        pixelDiff.ratio <= 0.02,
+        pixelDiff.ratio <= 0.02 &&
+        dragMovedPx >= 60 &&
+        dragReturnedPx <= 2 &&
+        nodesAfterDrag === PERFORMANCE_NODE_COUNT,
     })
   }
   return {
@@ -938,7 +1098,7 @@ async function main() {
   const diagnosticCss = process.env.QH_PERF_DIAGNOSTIC_CSS ?? null
   const configuredRounds = Number(process.env.QH_PERF_DIAGNOSTIC_ROUNDS ?? '')
   const measurementRounds =
-    diagnosticCss && Number.isInteger(configuredRounds) && configuredRounds > 0
+    Number.isInteger(configuredRounds) && configuredRounds > 0
       ? Math.min(configuredRounds, 3)
       : 3
   const runRoot = path.join(
@@ -951,7 +1111,8 @@ async function main() {
   const reportPath = path.join(runRoot, 'report.json')
   const markdownPath = path.join(runRoot, 'REPORT.md')
   const screenshotPath = path.join(runRoot, 'canvas.png')
-  const tracePath = path.join(runRoot, 'pan.trace.json')
+  const panTracePath = path.join(runRoot, 'pan.trace.json')
+  const dragTracePath = path.join(runRoot, 'drag.trace.json')
 
   if (!fs.existsSync(dist)) {
     throw new Error('dist/index.html missing; run npm run build before the release performance gate')
@@ -1117,7 +1278,9 @@ async function main() {
 
     const panRounds = []
     const zoomRounds = []
+    const dragRounds = []
     let performanceTrace = null
+    let dragPerformanceTrace = null
     for (let round = 0; round < measurementRounds; round += 1) {
       const before = await viewportState(page)
       const performanceBefore = await readPerformanceMetrics(cdp)
@@ -1130,8 +1293,8 @@ async function main() {
       const performanceAfter = await readPerformanceMetrics(cdp)
       if (stopTrace) {
         const events = await stopTrace()
-        fs.writeFileSync(tracePath, JSON.stringify({ traceEvents: events }))
-        performanceTrace = path.relative(ROOT, tracePath)
+        fs.writeFileSync(panTracePath, JSON.stringify({ traceEvents: events }))
+        performanceTrace = path.relative(ROOT, panTracePath)
       }
       panRounds.push({
         ...summarizeFrames(intervals),
@@ -1141,6 +1304,34 @@ async function main() {
         performanceMetrics: performanceMetricsDelta(performanceBefore, performanceAfter),
       })
       await page.waitForTimeout(250)
+    }
+
+    await settleZoomAt(page, 1)
+    const warmupDrag = await nodeDragRound(page)
+    if (!nodeDragRoundMovement({ movement: warmupDrag.movement }).pass) {
+      throw new Error('node drag warmup did not move and return the node')
+    }
+    await page.waitForTimeout(900)
+    for (let round = 0; round < measurementRounds; round += 1) {
+      const performanceBefore = await readPerformanceMetrics(cdp)
+      const stopDragTrace =
+        round === 0 && process.env.QH_PERF_DRAG_TRACE === '1'
+          ? await beginPerformanceTrace(cdp)
+          : null
+      const result = await nodeDragRound(page)
+      const performanceAfter = await readPerformanceMetrics(cdp)
+      if (stopDragTrace) {
+        const events = await stopDragTrace()
+        fs.writeFileSync(dragTracePath, JSON.stringify({ traceEvents: events }))
+        dragPerformanceTrace = path.relative(ROOT, dragTracePath)
+      }
+      dragRounds.push({
+        ...summarizeFrames(result.intervals),
+        frameIntervalsMs: result.intervals,
+        movement: result.movement,
+        performanceMetrics: performanceMetricsDelta(performanceBefore, performanceAfter),
+      })
+      await page.waitForTimeout(900)
     }
 
     // Pan leaves the viewport at a different origin. Precondition the zoom path
@@ -1198,6 +1389,7 @@ async function main() {
       imageEvidence,
       panRounds,
       zoomRounds,
+      dragRounds,
       pageErrors,
       consoleErrors,
       uiMatrix,
@@ -1205,6 +1397,7 @@ async function main() {
         canvasScreenshot: screenshot,
         appLog: path.relative(ROOT, appLogPath),
         performanceTrace,
+        dragPerformanceTrace,
         uiMatrix,
       },
     })
@@ -1228,6 +1421,9 @@ async function main() {
         `- zoom worst frame: ${zoomRounds.map((round) => round.maxMs.toFixed(2) + 'ms').join(' / ')}`,
         `- pan main-thread task: ${panRounds.map((round) => `${((round.performanceMetrics?.TaskDuration ?? 0) * 1000).toFixed(1)}ms`).join(' / ')}`,
         `- zoom main-thread task: ${zoomRounds.map((round) => `${((round.performanceMetrics?.TaskDuration ?? 0) * 1000).toFixed(1)}ms`).join(' / ')}`,
+        `- drag P95: ${dragRounds.map((round) => round.p95Ms.toFixed(2) + 'ms').join(' / ')}`,
+        `- drag movement: ${report.assertions.dragMovement.rounds.map((round) => round.pass ? 'PASS' : 'FAIL').join(' / ')}`,
+        `- drag worst frame: ${dragRounds.map((round) => round.maxMs.toFixed(2) + 'ms').join(' / ')}`,
         `- culling UI matrix: ${uiMatrix ? (uiMatrix.pass ? 'PASS' : 'FAIL') : 'not requested'}`,
         `- errors: page ${pageErrors.length} / console ${consoleErrors.length}`,
         `- screenshot: ${screenshot}`,

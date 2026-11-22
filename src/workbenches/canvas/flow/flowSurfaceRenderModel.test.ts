@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import type { GraphSnapshot } from '../../../domain/canvas/model/graph'
 import type { NodeSnapshot } from '../../../domain/canvas/model/node'
 import type { NodeDerivedMaps } from '../useNodeDerivedMaps'
+import type { FlowNodeData } from './FlowNode'
 import {
   derivedPropsFor,
   flowEdgesFor,
@@ -131,7 +132,8 @@ describe('FlowSurface render model', () => {
       ] as GraphSnapshot['edges'],
     )
     const edges = flowEdgesFor({
-      graph: snapshot,
+      edges: snapshot.edges,
+      childEdgeIds: new Set(['child-edge']),
       selection: ['top'],
       edgeSelection: ['top-edge'],
       detailMode: 'full',
@@ -142,13 +144,86 @@ describe('FlowSurface render model', () => {
     expect(edges[0].data?.related).toBe(true)
     expect(
       flowEdgesFor({
-        graph: snapshot,
+        edges: snapshot.edges,
+        childEdgeIds: new Set(['child-edge']),
         selection: [],
         edgeSelection: [],
         detailMode: 'coarse',
         removeEdge: vi.fn(),
       }),
     ).toEqual([])
+  })
+
+  it('reuses unchanged node and edge projections while another node moves', () => {
+    const stable = node('stable', { type: 'generation', x: 0, y: 0 })
+    const moving = node('moving', { type: 'generation', x: 200, y: 0 })
+    const emits = new Map<string, FlowNodeData['emit']>()
+    const emitFor = (id: string) => {
+      const existing = emits.get(id)
+      if (existing) return existing
+      const emit: FlowNodeData['emit'] = () => {}
+      emits.set(id, emit)
+      return emit
+    }
+    const baseInput = {
+      selection: ['moving'],
+      detailMode: 'full' as const,
+      derived: derived(),
+      childIndex: new Map<string, NodeSnapshot[]>(),
+      nodeStateOf: () => undefined,
+      emitFor,
+      resize: vi.fn(),
+    }
+    const first = flowNodesFor({
+      ...baseInput,
+      graph: graph([stable, moving]),
+    })
+    const moved = { ...moving, x: 260 }
+    const second = flowNodesFor(
+      {
+        ...baseInput,
+        graph: graph([stable, moved]),
+      },
+      first,
+    )
+    expect(second[0]).toBe(first[0])
+    expect(second[1]).not.toBe(first[1])
+    expect(second[1].data.node).toBe(moved)
+
+    const duringDrag = flowNodesFor(
+      {
+        ...baseInput,
+        graph: graph([stable, moved]),
+        optimisticDrag: true,
+      },
+      first,
+    )
+    expect(duringDrag[1]).not.toBe(first[1])
+    expect(duringDrag[1].position).toEqual({ x: 260, y: 0 })
+    expect(duringDrag[1].data).toBe(first[1].data)
+
+    const removeEdge = vi.fn()
+    const edges = [{ id: 'edge', source: 'stable', target: 'moving' }] as GraphSnapshot['edges']
+    const firstEdges = flowEdgesFor({
+      edges,
+      childEdgeIds: new Set(),
+      selection: ['moving'],
+      edgeSelection: [],
+      detailMode: 'full',
+      removeEdge,
+    })
+    const secondEdges = flowEdgesFor(
+      {
+        edges,
+        childEdgeIds: new Set(),
+        selection: ['moving'],
+        edgeSelection: [],
+        detailMode: 'full',
+        removeEdge,
+      },
+      firstEdges,
+    )
+    expect(secondEdges[0]).toBe(firstEdges[0])
   })
 
   it('measurement key changes when endpoints or ports change', () => {

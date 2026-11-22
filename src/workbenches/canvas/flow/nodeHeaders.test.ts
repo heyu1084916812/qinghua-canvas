@@ -163,4 +163,15 @@ describe('node header overlay', () => {
     expect(sameHeaderLabels(first, same)).toBe(true)
     expect(sameHeaderLabels(first, changed)).toBe(false)
   })
+
+  it('reuses unchanged top-level labels while one dragged node gets a new label', () => {
+    const stable = node({ id: 'stable', x: 0, y: 0 })
+    const moving = node({ id: 'moving', x: 200, y: 0 })
+    const first = nodeHeaderLabels([stable, moving])
+    const moved = { ...moving, x: 260 }
+    const second = nodeHeaderLabels([stable, moved], [stable, moving], first)
+    expect(second[0]).toBe(first[0])
+    expect(second[1]).not.toBe(first[1])
+    expect(second[1].x).toBe(260)
+  })
 })

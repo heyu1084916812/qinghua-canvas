@@ -5,7 +5,6 @@ import { sourcePortOf, targetPortOf } from '../../../domain/canvas/model/edge'
 import type { RunMode } from '../../../domain/canvas/model/runRecord'
 import type { RunTaskState } from '../../../features/shared/execution/runEngine'
 import { describeError } from '../../../shared/result'
-import { childEdgeIdSet } from './childEdges'
 import type { QhEdgeData } from './FlowEdge'
 import type { FlowNodeData, FlowNodeDerivedProps } from './FlowNode'
 import {
@@ -57,26 +56,108 @@ export interface FlowNodeProjectionInput {
   ) => void
   renderChild?: FlowNodeData['renderChild']
   upstreamPick?: { nodeId: string; allowedIds: ReadonlySet<string> } | null
+  /** During a drag React Flow already moves the wrapper; node content can stay stable. */
+  optimisticDrag?: boolean
 }
 
-export function flowNodesFor(input: FlowNodeProjectionInput): RFNode<FlowNodeData>[] {
+function sameDerivedProjection(
+  previous: FlowNodeData,
+  next: FlowNodeDerivedProps,
+): boolean {
+  return (
+    previous.upstreamAssetHashes === next.upstreamAssetHashes &&
+    previous.upstreamPromptCount === next.upstreamPromptCount &&
+    previous.hasRunnableDownstream === next.hasRunnableDownstream &&
+    previous.upstreamImageInputs === next.upstreamImageInputs &&
+    previous.inputPortAssets === next.inputPortAssets &&
+    previous.excluded === next.excluded &&
+    previous.upstreamPickDimmed === next.upstreamPickDimmed
+  )
+}
+
+export function flowNodesFor(
+  input: FlowNodeProjectionInput,
+  previous: readonly RFNode<FlowNodeData>[] = [],
+): RFNode<FlowNodeData>[] {
+  const previousById = new Map(previous.map((node) => [node.id, node]))
   return topLevelNodes(input.graph).map((node) => {
+    const type = input.detailMode === 'coarse' ? 'coarse' : 'qh'
+    const selected = input.selection.includes(node.id)
     const run = flowRunPresentationOf(input.nodeStateOf(node.id))
     const children = input.childIndex.get(node.id) ?? []
+    const derived = derivedPropsFor(
+      input.derived,
+      node.id,
+      Boolean(
+        input.upstreamPick &&
+          !input.upstreamPick.allowedIds.has(node.id),
+      ),
+    )
+    const emit = input.emitFor(node.id)
+    const old = previousById.get(node.id)
+    const sameRenderContent =
+      old &&
+      old.type === type &&
+      old.width === node.w &&
+      old.height === node.h &&
+      old.selected === selected &&
+      old.data.node.id === node.id &&
+      old.data.node.type === node.type &&
+      old.data.node.parentId === node.parentId &&
+      old.data.node.w === node.w &&
+      old.data.node.h === node.h &&
+      old.data.node.title === node.title &&
+      old.data.node.disabled === node.disabled &&
+      old.data.node.data === node.data &&
+      old.data.running === run.running &&
+      old.data.error === run.error &&
+      old.data.runMode === run.runMode &&
+      old.data.emit === emit &&
+      sameDerivedProjection(old.data, derived)
+    if (
+      old &&
+      !isContainerType(node.type) &&
+      old.type === type &&
+      old.position.x === node.x &&
+      old.position.y === node.y &&
+      old.width === node.w &&
+      old.height === node.h &&
+      old.selected === selected &&
+      old.data.node === node &&
+      old.data.running === run.running &&
+      old.data.error === run.error &&
+      old.data.runMode === run.runMode &&
+      old.data.emit === emit &&
+      sameDerivedProjection(old.data, derived)
+    ) {
+      return old
+    }
+    if (
+      old &&
+      sameRenderContent &&
+      input.optimisticDrag &&
+      !isContainerType(node.type) &&
+      (old.position.x !== node.x || old.position.y !== node.y)
+    ) {
+      return {
+        ...old,
+        position: { x: node.x, y: node.y },
+      }
+    }
     return {
       id: node.id,
-      type: input.detailMode === 'coarse' ? 'coarse' : 'qh',
+      type,
       position: { x: node.x, y: node.y },
       width: node.w,
       height: node.h,
-      selected: input.selection.includes(node.id),
+      selected,
       style: { width: node.w, height: node.h },
       data: {
         node,
         ...run,
-        emit: input.emitFor(node.id),
+        emit,
         resize: (rect, phase) => input.resize(node.id, rect, phase),
-        ...derivedPropsFor(input.derived, node.id, Boolean(input.upstreamPick && !input.upstreamPick.allowedIds.has(node.id))),
+        ...derived,
         ...(isContainerType(node.type)
           ? {
               childNodes: children,
@@ -89,34 +170,61 @@ export function flowNodesFor(input: FlowNodeProjectionInput): RFNode<FlowNodeDat
 }
 
 export interface FlowEdgeProjectionInput {
-  graph: GraphSnapshot
+  edges: GraphSnapshot['edges']
+  childEdgeIds: ReadonlySet<string>
   selection: readonly string[]
   edgeSelection: readonly string[]
   detailMode: CanvasDetailMode
   removeEdge: (id: string) => void
 }
 
-export function flowEdgesFor(input: FlowEdgeProjectionInput): RFEdge<QhEdgeData>[] {
+export function flowEdgesFor(
+  input: FlowEdgeProjectionInput,
+  previous: readonly RFEdge<QhEdgeData>[] = [],
+): RFEdge<QhEdgeData>[] {
   if (input.detailMode === 'coarse') return []
   const selectedNodes = new Set(input.selection)
-  const childEdgeIds = childEdgeIdSet(input.graph)
-  return input.graph.edges
-    .filter((edge) => !childEdgeIds.has(edge.id))
-    .map((edge) => ({
-      id: edge.id,
-      type: 'qh',
-      source: edge.source,
-      target: edge.target,
-      sourceHandle: sourcePortOf(edge),
-      targetHandle: targetPortOf(edge),
-      selected: input.edgeSelection.includes(edge.id),
-      data: {
-        sourcePort: sourcePortOf(edge),
-        targetPort: targetPortOf(edge),
-        related: selectedNodes.has(edge.source) || selectedNodes.has(edge.target),
-        onDelete: input.removeEdge,
-      } satisfies QhEdgeData,
-    }))
+  const previousById = new Map(previous.map((edge) => [edge.id, edge]))
+  return input.edges
+    .filter((edge) => !input.childEdgeIds.has(edge.id))
+    .map((edge) => {
+      const sourcePort = sourcePortOf(edge)
+      const targetPort = targetPortOf(edge)
+      const selected = input.edgeSelection.includes(edge.id)
+      const related =
+        selectedNodes.has(edge.source) || selectedNodes.has(edge.target)
+      const old = previousById.get(edge.id)
+      if (
+        old &&
+        old.type === 'qh' &&
+        old.source === edge.source &&
+        old.target === edge.target &&
+        old.sourceHandle === sourcePort &&
+        old.targetHandle === targetPort &&
+        old.selected === selected &&
+        old.data?.sourcePort === sourcePort &&
+        old.data?.targetPort === targetPort &&
+        old.data?.related === related &&
+        old.data?.onDelete === input.removeEdge
+      ) {
+        return old
+      }
+      return {
+        id: edge.id,
+        type: 'qh',
+        source: edge.source,
+        target: edge.target,
+        sourceHandle: sourcePort,
+        targetHandle: targetPort,
+        selected,
+        data: {
+          sourcePort,
+          targetPort,
+          related,
+          onDelete: input.removeEdge,
+        } satisfies QhEdgeData,
+      }
+    })
 }
 
 export function flowMeasurementKey(graph: GraphSnapshot): string {

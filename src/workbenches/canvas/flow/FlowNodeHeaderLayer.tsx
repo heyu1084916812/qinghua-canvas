@@ -23,7 +23,19 @@ import styles from './FlowNodeHeaderLayer.module.css'
 export function FlowNodeHeaderLayer({ coarse = false }: { coarse?: boolean }) {
   const graph = useGraph()
   const store = useCanvasStore()
-  const labels = useMemo(() => nodeHeaderLabels(graph.nodes), [graph])
+  const labelCache = useRef<{
+    nodes: typeof graph.nodes
+    labels: ReturnType<typeof nodeHeaderLabels>
+  }>({ nodes: [], labels: [] })
+  const labels = useMemo(() => {
+    const next = nodeHeaderLabels(
+      graph.nodes,
+      labelCache.current.nodes,
+      labelCache.current.labels,
+    )
+    labelCache.current = { nodes: graph.nodes, labels: next }
+    return next
+  }, [graph])
   useEffect(() => {
     const counts = new Map<string, number>()
     for (const node of graph.nodes) {

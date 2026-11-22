@@ -8,6 +8,7 @@ import {
   THUMB_SIZE,
   buildPerformanceReport,
   bytesFromMarker,
+  nodeDragRoundMovement,
   seedGraph,
   summarizeFrames,
   viewportRoundMovement,
@@ -45,6 +46,10 @@ function passingInput() {
       p95Ms,
       before: viewport(0, 0, 0.8),
       after: viewport(0, 0, 0.84 + index * 0.02),
+    })),
+    dragRounds: [18, 19, 20].map((p95Ms) => ({
+      p95Ms,
+      movement: { nodeId: 'perf-node-001', movedPx: 123, finalDeltaPx: 0.2 },
     })),
     pageErrors: [],
     consoleErrors: [],
@@ -172,6 +177,30 @@ describe('canvas performance report gate', () => {
     const report = buildPerformanceReport(stalled)
     expect(report.ok).toBe(false)
     expect(report.assertions.zoomMovement.pass).toBe(false)
+  })
+
+  it('fails when node dragging does not move the node', () => {
+    const stalled = passingInput()
+    stalled.dragRounds[1] = {
+      ...stalled.dragRounds[1],
+      movement: { nodeId: 'perf-node-001', movedPx: 0, finalDeltaPx: 0 },
+    }
+    const report = buildPerformanceReport(stalled)
+    expect(report.ok).toBe(false)
+    expect(report.assertions.dragMovement.pass).toBe(false)
+    expect(nodeDragRoundMovement(stalled.dragRounds[1])).toEqual({
+      movedPx: 0,
+      finalDeltaPx: 0,
+      pass: false,
+    })
+  })
+
+  it('fails when a node drag round exceeds 20ms P95', () => {
+    const slow = passingInput()
+    slow.dragRounds[2].p95Ms = 20.01
+    const report = buildPerformanceReport(slow)
+    expect(report.ok).toBe(false)
+    expect(report.assertions.dragP95.pass).toBe(false)
   })
 
   it('reports tail-frame diagnostics without relaxing the P95 gate', () => {

@@ -5,6 +5,7 @@ import {
   portHitAcceptsPointer,
   portHitsInView,
   portHitsOf,
+  portHitsOfNode,
   portInverseScale,
 } from './portHits'
 import {
@@ -182,5 +183,15 @@ describe('端点命中层几何', () => {
   it('每个端点的 key 唯一（同一节点多口也不撞）', () => {
     const hits = portHitsOf(graphOf([node('f', 0, 0, 280, 420, 'fusion')]))
     expect(new Set(hits.map((h) => h.key)).size).toBe(hits.length)
+  })
+
+  it('单个节点端口计算与整图计算保持同一份几何', () => {
+    const snapshot = graphOf([
+      node('a', 100, 200, 240, 160),
+      node('b', 500, 200, 240, 160),
+    ])
+    expect(portHitsOfNode(snapshot.nodes[0], snapshot)).toEqual(
+      portHitsOf(snapshot).filter((hit) => hit.nodeId === 'a'),
+    )
   })
 })

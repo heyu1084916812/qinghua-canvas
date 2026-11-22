@@ -129,47 +129,51 @@ export function portHitsOf(
 ): PortHit[] {
   const out: PortHit[] = []
   for (const node of graph.nodes) {
-    if (node.parentId && !selection.includes(node.id)) continue
-    const spec = getSpec(node.type)
-    if (!spec) continue
-    /**
-     * 子节点的 `x / y` 是**相对父容器**的局部坐标 ⇒ 先换算成世界矩形再算端点。
-     * 顶层节点走同一条换算（父为空时是恒等），于是只有一份坐标口径，
-     * 不会出现「顶层对、组内偏一截」。
-     */
-    const rect = toWorldRectInGraph(node, graph)
-    for (const decl of portDeclsOf(spec.ports)) {
-      const edgeX = decl.side === 'left' ? rect.x : rect.x + rect.w
-      const outward = decl.side === 'left' ? -1 : 1
-      const cx = edgeX + outward * PORT_CENTER_OFFSET
-      const cy = rect.y + rect.h * decl.y
-      /**
-       * 命中块：从节点边缘**内侧** `PORT_HIT_INNER_PAD` 铺到圆点外沿（见 `PORT_HIT_SIZE`）——
-       * 于是"按住节点边缘往外拖"与"按住圆点往外拖"是同一条手势。
-       */
-      const inner = -outward * PORT_HIT_INNER_PAD
-      const hitX = edgeX + (inner + outward * PORT_HIT_REACH) / 2
-      out.push({
-        key: `${node.id}:${decl.id}`,
-        nodeId: node.id,
-        portId: decl.id,
-        label: decl.label ?? '拖出连线',
-        side: decl.side,
-        kind: decl.kind,
-        x: cx,
-        y: cy,
-        hitX,
-        hitY: cy,
-        edgeX,
-        nodeLeft: rect.x,
-        nodeRight: rect.x + rect.w,
-        nodeTop: rect.y,
-        nodeBottom: rect.y + rect.h,
-        size: PORT_HIT_SIZE,
-      })
-    }
+    out.push(...portHitsOfNode(node, graph, selection))
   }
   return out
+}
+
+export function portHitsOfNode(
+  node: GraphSnapshot['nodes'][number],
+  graph: GraphSnapshot,
+  selection: readonly string[] = [],
+): PortHit[] {
+  if (node.parentId && !selection.includes(node.id)) return []
+  const spec = getSpec(node.type)
+  if (!spec) return []
+  /**
+   * 子节点的 `x / y` 是**相对父容器**的局部坐标 ⇒ 先换算成世界矩形再算端点。
+   * 顶层节点走同一条换算（父为空时是恒等），于是只有一份坐标口径，
+   * 不会出现「顶层对、组内偏一截」。
+   */
+  const rect = toWorldRectInGraph(node, graph)
+  return portDeclsOf(spec.ports).map((decl) => {
+    const edgeX = decl.side === 'left' ? rect.x : rect.x + rect.w
+    const outward = decl.side === 'left' ? -1 : 1
+    const cx = edgeX + outward * PORT_CENTER_OFFSET
+    const cy = rect.y + rect.h * decl.y
+    const inner = -outward * PORT_HIT_INNER_PAD
+    const hitX = edgeX + (inner + outward * PORT_HIT_REACH) / 2
+    return {
+      key: `${node.id}:${decl.id}`,
+      nodeId: node.id,
+      portId: decl.id,
+      label: decl.label ?? '拖出连线',
+      side: decl.side,
+      kind: decl.kind,
+      x: cx,
+      y: cy,
+      hitX,
+      hitY: cy,
+      edgeX,
+      nodeLeft: rect.x,
+      nodeRight: rect.x + rect.w,
+      nodeTop: rect.y,
+      nodeBottom: rect.y + rect.h,
+      size: PORT_HIT_SIZE,
+    }
+  })
 }
 
 export function portHitsInView(

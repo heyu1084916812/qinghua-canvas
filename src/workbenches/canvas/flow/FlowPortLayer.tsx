@@ -2,6 +2,7 @@ import { memo, useCallback, useEffect, useMemo, useRef, useSyncExternalStore } f
 import type { CSSProperties, PointerEvent as ReactPointerEvent } from 'react'
 import { useStore } from '@xyflow/react'
 import { useCanvasStore, useGraph, useSelection } from '../storeContext'
+import type { NodeSnapshot } from '../../../domain/canvas/model/node'
 import {
   PORT_EDGE_GAP,
   PORT_MIN_SCALE,
@@ -17,7 +18,7 @@ import { IconPlus } from '../toolbar/icons'
 import {
   portHitAcceptsPointer,
   portHitsInView,
-  portHitsOf,
+  portHitsOfNode,
   portInverseScale,
   type PortHit,
 } from './portHits'
@@ -25,6 +26,12 @@ import styles from './FlowPortLayer.module.css'
 import { coalescePointerMove } from '../../../shared/rafThrottle'
 
 type PortDown = (e: ReactPointerEvent, nodeId: string, portId: string) => void
+interface PortHitCacheEntry {
+  node: NodeSnapshot
+  parent: NodeSnapshot | null
+  selected: boolean
+  hits: PortHit[]
+}
 
 /**
  * 端点命中层（见 `.module.css` 里的长注释：为什么不能让 RF 的 `Handle` 收手势）。
@@ -46,11 +53,27 @@ export function FlowPortLayer({
   /** 容器子节点的端点只在选中时出现（理由见 `portHitsOf` 的 `selection` 参数） */
   const selection = useSelection()
   /** 端点在世界坐标里是常量（节点不动就不动）⇒ 只跟图走，**不跟视口走** */
+  const hitCache = useRef<Map<string, PortHitCacheEntry>>(new Map())
   const hits = useMemo<PortHit[]>(() => {
-    const all = portHitsOf(graph, selection)
-    if (!coarse) return all
-    const selected = new Set(selection)
-    return all.filter((hit) => selected.has(hit.nodeId))
+    const byId = new Map(graph.nodes.map((node) => [node.id, node]))
+    const nextCache = new Map<string, PortHitCacheEntry>()
+    const all: PortHit[] = []
+    for (const node of graph.nodes) {
+      const selected = selection.includes(node.id)
+      if (coarse && !selected) continue
+      const parent = node.parentId ? (byId.get(node.parentId) ?? null) : null
+      const previous = hitCache.current.get(node.id)
+      const nodeHits =
+        previous?.node === node &&
+        previous.parent === parent &&
+        previous.selected === selected
+          ? previous.hits
+          : portHitsOfNode(node, graph, selection)
+      nextCache.set(node.id, { node, parent, selected, hits: nodeHits })
+      all.push(...nodeHits)
+    }
+    hitCache.current = nextCache
+    return all
   }, [coarse, graph, selection])
   return <PortHitViewport hits={hits} onPortDown={onPortDown} />
 }
@@ -194,6 +217,19 @@ const PortDots = memo(function PortDots({
   onPortDown: PortDown
 }) {
   const refs = useRef(new Map<string, HTMLSpanElement | null>())
+  const hitsRef = useRef(hits)
+  hitsRef.current = hits
+  const hitsByNodeRef = useRef<Map<string, PortHit[]>>(new Map())
+
+  useEffect(() => {
+    const byNode = new Map<string, PortHit[]>()
+    for (const hit of hits) {
+      const bucket = byNode.get(hit.nodeId)
+      if (bucket) bucket.push(hit)
+      else byNode.set(hit.nodeId, [hit])
+    }
+    hitsByNodeRef.current = byNode
+  }, [hits])
 
   /**
    * 指针这一点上**该算哪只端点**。
@@ -212,7 +248,7 @@ const PortDots = memo(function PortDots({
     (x: number, y: number): PortHit | null => {
       let best: PortHit | null = null
       let bestDist = Infinity
-      for (const hit of hits) {
+      for (const hit of hitsRef.current) {
         const el = refs.current.get(hit.key)
         if (!el) continue
         const r = el.getBoundingClientRect()
@@ -235,16 +271,10 @@ const PortDots = memo(function PortDots({
       }
       return best
     },
-    [hits],
+    [],
   )
 
   useEffect(() => {
-    const hitsByNode = new Map<string, PortHit[]>()
-    for (const hit of hits) {
-      const bucket = hitsByNode.get(hit.nodeId)
-      if (bucket) bucket.push(hit)
-      else hitsByNode.set(hit.nodeId, [hit])
-    }
     let lastActiveNodeId: string | null = null
 
     const reset = () => {
@@ -270,6 +300,7 @@ const PortDots = memo(function PortDots({
       const box = layer.getBoundingClientRect()
       /** `clientWidth` 是**布局**宽度（不含 transform）⇒ 比值就是 zoom，不必再从 store 传一个进来 */
       const zoom = layer.clientWidth > 0 ? box.width / layer.clientWidth || 1 : 1
+      const currentHits = hitsRef.current
 
       /**
        * ★★ 先定出**唯一的活动节点**（用户 2026-10-07 图二：「我选择悬停左边的节点的时候，
@@ -277,7 +308,7 @@ const PortDots = memo(function PortDots({
        * 就会一起冒端点；定了活动节点，其余节点一律不露。
        */
       const rects = new Map<string, PortNodeRect>()
-      for (const hit of hits) {
+      for (const hit of currentHits) {
         if (rects.has(hit.nodeId)) continue
         rects.set(hit.nodeId, {
           id: hit.nodeId,
@@ -298,7 +329,7 @@ const PortDots = memo(function PortDots({
          *（实测：下游节点压在端点上时，`activePortNode` 选了压在下面的那个，
          *  这只口于是**不展开**（`pointer-events: none`），整段拖线手势静默失效）。
          */
-        hits.map((h) => ({
+        currentHits.map((h) => ({
           nodeId: h.nodeId,
           x: box.left + h.edgeX * zoom,
           y: box.top + h.y * zoom,
@@ -311,7 +342,7 @@ const PortDots = memo(function PortDots({
       }
       if (!active) return
 
-      for (const hit of hitsByNode.get(active) ?? []) {
+      for (const hit of hitsByNodeRef.current.get(active) ?? []) {
         const el = map.get(hit.key)
         if (!el) continue
         const reveal =
@@ -376,7 +407,7 @@ const PortDots = memo(function PortDots({
       window.removeEventListener('pointerleave', reset)
       window.removeEventListener('blur', reset)
     }
-  }, [hits])
+  }, [])
 
   return (
     <>

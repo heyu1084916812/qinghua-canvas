@@ -424,7 +424,7 @@
       "test": [
         "src/workbenches/canvas/flow/flowGraph.test.ts"
       ],
-      "budget": 1140
+      "budget": 1220
     },
     {
       "module": "src/workbenches/canvas/lightbox/LightboxLayer.tsx",
@@ -1401,7 +1401,7 @@
       "test": [
         "src/workbenches/canvas/flow/nodeHeaders.test.ts"
       ],
-      "budget": 220
+      "budget": 240
     },
     {
       "module": "src/workbenches/canvas/flow/FlowNodeHeaderLayer.module.css",
@@ -1440,7 +1440,7 @@
       "test": [
         "src/workbenches/canvas/flow/nodeHeaders.test.ts"
       ],
-      "budget": 160
+      "budget": 170
     },
     {
       "module": "src/domain/inspiration/pinterest.ts",
@@ -4404,7 +4404,7 @@
       "test": [
         "src/state/project/ecommerceTaskRepository/rowMappers.test.ts"
       ],
-      "budget": 132
+      "budget": 260
     },
     {
       "module": "src/state/project/ecommerceTaskRepository/types.ts",
@@ -6934,7 +6934,7 @@
       "test": [
         "src/workbenches/canvas/flow/flowSurfaceRenderModel.test.ts"
       ],
-      "budget": 132
+      "budget": 260
     },
     {
       "module": "src/workbenches/canvas/flow/useCanvasDetailMode.ts",
@@ -13629,6 +13629,29 @@
         "src/workbenches/canvas/flow/nodeViewportCulling.test.ts"
       ],
       "budget": 70
+    },
+    {
+      "module": "src/workbenches/canvas/flow/flowNodePositionBatcher.ts",
+      "owner": "canvas-flow-ui",
+      "responsibility": "把 React Flow 的节点位置变更合并为每动画帧一次图提交，并在拖动结束前强制刷新。",
+      "owns": [
+        "位置变更按节点 id 去重",
+        "animation frame 调度与取消",
+        "拖动结束同步 flush"
+      ],
+      "doesNotOwn": [
+        "节点位置补丁计算",
+        "React Flow 内部拖动",
+        "选择与撤销事务"
+      ],
+      "publicApi": [
+        "FlowNodePositionBatcher",
+        "createFlowNodePositionBatcher"
+      ],
+      "test": [
+        "src/workbenches/canvas/flow/flowNodePositionBatcher.test.ts"
+      ],
+      "budget": 80
     }
   ]
 }

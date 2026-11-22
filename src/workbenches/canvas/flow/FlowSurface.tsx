@@ -26,6 +26,7 @@ import '@xyflow/react/dist/style.css'
 import styles from './FlowSurface.module.css'
 import {
   useCanvasStore,
+  useDraggingId,
   useEdgeSelection,
   useGraph,
   useSelection,
@@ -47,7 +48,7 @@ import type { NodeSnapshot } from '../../../domain/canvas/model/node'
 import { directUpstream } from '../../../domain/canvas/graph/upstreamOf'
 import type { NodeViewEvent } from '../nodes/registry'
 import { useNodeDerivedMaps } from '../useNodeDerivedMaps'
-import { QhCoarseEdge, QhEdge } from './FlowEdge'
+import { QhCoarseEdge, QhEdge, type QhEdgeData } from './FlowEdge'
 import { FlowChildEdgeLayer } from './FlowChildEdgeLayer'
 import { FlowCoarseEdgeLayer } from './FlowCoarseEdgeLayer'
 import { FlowGroupBoardLayer } from './FlowGroupBoardLayer'
@@ -138,6 +139,9 @@ import {
   flowNodesFor,
   flowRunPresentationOf,
 } from './flowSurfaceRenderModel'
+import { childEdgeIdSet } from './childEdges'
+import { useStableGraphMemo } from '../useNodeDerivedMaps'
+import { createFlowNodePositionBatcher } from './flowNodePositionBatcher'
 
 /** React Flow 只渲染真实图；store 是位置、连线与选中的唯一真相。 */
 export function FlowSurface({
@@ -227,6 +231,7 @@ function FlowSurfaceInner({
   const detailMode = useCanvasDetailMode(store)
   const graph = useGraph()
   const selection = useSelection()
+  const draggingId = useDraggingId()
   const upstreamPick = useUpstreamPick()
   const edgeSelection = useEdgeSelection()
   const initialFlowViewport = useRef(storeViewportToFlow(store.getViewport())).current
@@ -283,6 +288,7 @@ function FlowSurfaceInner({
   const knifeClickPending = useRef(false)
   const { beginPan } = useCanvasViewport(store)
   const [importHover, setImportHover] = useState(false)
+  const [singleNodeDragging, setSingleNodeDragging] = useState(false)
   const dragMovedRef = useRef(false)
   /** 锚点必须在 pointerdown 记录；RF 的 dragStart 已晚一步，会导致终点对齐偏移。 */
   const dragAnchorRef = useRef<FlowDragAnchor | null>(null)
@@ -324,6 +330,27 @@ function FlowSurfaceInner({
     }),
     [store],
   )
+  const positionBatcher = useMemo(
+    () =>
+      createFlowNodePositionBatcher({
+        requestFrame: (callback) => requestAnimationFrame(callback),
+        cancelFrame: (id) => cancelAnimationFrame(id),
+        apply: (changes) =>
+          applyFlowNodeChanges(
+            {
+              graph: store.getSnapshot(),
+              selection: store.getSelection(),
+              changes,
+              marquee: selectionMarqueeRef.current,
+              baseline: selectionBaselineRef.current,
+              anchor: dragAnchorRef.current,
+            },
+            actionPorts,
+          ),
+      }),
+    [actionPorts, store],
+  )
+  useEffect(() => () => positionBatcher.cancel(), [positionBatcher])
 
   const surfaceEl = useCallback(
     () => document.querySelector<HTMLElement>('[data-canvas-surface]'),
@@ -544,6 +571,16 @@ function FlowSurfaceInner({
       }),
     [exec, emitNodeEvent],
   )
+  const emitForNode = useMemo(() => {
+    const cache = new Map<string, FlowNodeData['emit']>()
+    return (nodeId: string) => {
+      const existing = cache.get(nodeId)
+      if (existing) return existing
+      const emit = makeEmit(nodeId)
+      cache.set(nodeId, emit)
+      return emit
+    }
+  }, [makeEmit])
 
   const childIndex = useMemo(() => childrenByParent(graph), [graph])
 
@@ -564,14 +601,14 @@ function FlowSurfaceInner({
           running={run.running}
           error={run.error}
           runMode={run.runMode}
-          emit={makeEmit(child.id)}
+          emit={emitForNode(child.id)}
           resize={(rect, phase) => store.dispatch({ kind: 'node.resize', id: child.id, rect, phase })}
           onFramePointerDown={(e) => onChildPointerDown(e, child.id)}
           derived={derivedFor(child.id)}
         />
       )
     },
-    [exec, selection, makeEmit, derivedFor, store, onChildPointerDown],
+    [exec, selection, emitForNode, derivedFor, store, onChildPointerDown],
   )
 
   const nodeStateOf = useCallback((id: string) => exec.nodeStateOf(id), [exec])
@@ -598,35 +635,54 @@ function FlowSurfaceInner({
     [store, upstreamPick],
   )
 
-  const nodes = useMemo<RFNode<FlowNodeData>[]>(
-    () =>
-      flowNodesFor({
+  const previousNodesRef = useRef<RFNode<FlowNodeData>[]>([])
+  const nodes = useMemo<RFNode<FlowNodeData>[]>(() => {
+    const next = flowNodesFor(
+      {
         graph,
         selection,
         detailMode,
         derived,
         childIndex,
         nodeStateOf,
-        emitFor: makeEmit,
+        emitFor: emitForNode,
         resize: (id, rect, phase) => store.dispatch({ kind: 'node.resize', id, rect, phase }),
         renderChild: renderFlowChild,
         upstreamPick: upstreamPickConfig,
-      }),
-    [
-      graph, selection, nodeStateOf, makeEmit, childIndex, renderFlowChild, derived, store, detailMode, upstreamPickConfig,
-    ],
-  )
+        optimisticDrag: draggingId !== null,
+      },
+      previousNodesRef.current,
+    )
+    previousNodesRef.current = next
+    return next
+  }, [
+    graph, selection, draggingId, nodeStateOf, emitForNode, childIndex, renderFlowChild, derived, store, detailMode, upstreamPickConfig,
+  ])
 
+  const childEdgeIds = useStableGraphMemo(graph, childEdgeIdSet)
+  const removeEdge = useCallback(
+    (id: string) => store.dispatch({ kind: 'edge.remove', id }),
+    [store],
+  )
+  const previousEdgesRef = useRef<RFEdge<QhEdgeData>[]>([])
   const edges = useMemo(
     () =>
-      flowEdgesFor({
-        graph,
-        selection,
-        edgeSelection,
-        detailMode,
-        removeEdge: (id) => store.dispatch({ kind: 'edge.remove', id }),
-      }),
-    [graph, selection, edgeSelection, store, detailMode],
+      {
+        const next = flowEdgesFor(
+          {
+            edges: graph.edges,
+            childEdgeIds,
+            selection,
+            edgeSelection,
+            detailMode,
+            removeEdge,
+          },
+          previousEdgesRef.current,
+        )
+        previousEdgesRef.current = next
+        return next
+      },
+    [graph.edges, childEdgeIds, selection, edgeSelection, detailMode, removeEdge],
   )
 
   /** RF 首帧可能漏测节点导致边不显示；双 rAF 后补一次 updateNodeInternals。 */
@@ -692,23 +748,28 @@ function FlowSurfaceInner({
 
   const onNodesChange = useCallback(
     (changes: NodeChange<RFNode<FlowNodeData>>[]) => {
-      applyFlowNodeChanges(
-        {
-          graph: store.getSnapshot(),
-          selection: store.getSelection(),
-          changes,
-          marquee: selectionMarqueeRef.current,
-          baseline: selectionBaselineRef.current,
-          anchor: dragAnchorRef.current,
-        },
-        actionPorts,
-      )
+      const immediate = changes.filter((change) => change.type !== 'position')
+      if (immediate.length > 0) {
+        applyFlowNodeChanges(
+          {
+            graph: store.getSnapshot(),
+            selection: store.getSelection(),
+            changes: immediate,
+            marquee: selectionMarqueeRef.current,
+            baseline: selectionBaselineRef.current,
+            anchor: dragAnchorRef.current,
+          },
+          actionPorts,
+        )
+      }
+      positionBatcher.queue(changes)
     },
-    [store, actionPorts],
+    [store, actionPorts, positionBatcher],
   )
 
   const onNodeDragStart = useCallback(
     (_e: MouseEvent | TouchEvent, _n: RFNode, dragged: RFNode[]) => {
+      setSingleNodeDragging(dragged.length === 1)
       beginFlowNodeDrag(
         { mainId: _n.id, draggedIds: dragged.map((node) => node.id) },
         actionPorts,
@@ -719,6 +780,8 @@ function FlowSurfaceInner({
 
   const onNodeDragStop = useCallback(
     (e: MouseEvent | TouchEvent, _n: RFNode, dragged: RFNode[]) => {
+      setSingleNodeDragging(false)
+      positionBatcher.flush()
       finishFlowNodeDrag(
         {
           mainId: _n.id,
@@ -734,7 +797,7 @@ function FlowSurfaceInner({
         actionPorts,
       )
     },
-    [store, actionPorts],
+    [store, actionPorts, positionBatcher],
   )
 
   /** 不用 RF 的连接手势；命中、语义、草稿统一走 FlowPortLayer + useEdgeDrag。 */
@@ -969,6 +1032,7 @@ function FlowSurfaceInner({
         autoPanOnConnect={false}
         autoPanOnNodeDrag={false}
         autoPanOnSelection={false}
+        onlyRenderVisibleElements={singleNodeDragging}
         onSelectionStart={onSelectionStart}
         onSelectionEnd={onSelectionEnd}
         onNodeClick={(event, node) => {
@@ -1069,9 +1133,11 @@ function FlowSurfaceInner({
       {/* 小地图显示开关（本机偏好）：关掉只是少一个导航控件，画布本身不受影响 */}
       {appearance.showMinimap ? <Minimap /> : null}
       {/* 端点命中层：在所有节点之上收拖线手势（见 FlowPortLayer 里的长注释） */}
-      <FlowPortLayer onPortDown={beginEdgeDrag} coarse={detailMode === 'coarse'} />
+      {singleNodeDragging ? null : (
+        <FlowPortLayer onPortDown={beginEdgeDrag} coarse={detailMode === 'coarse'} />
+      )}
       {/* 子节点连线的**命中区**（双击删线）：必须在最上层才收得到指针，视觉是透明的 */}
-      <FlowChildEdgeLayer hitOnly />
+      {singleNodeDragging ? null : <FlowChildEdgeLayer hitOnly />}
       {/* 原生 CSS cursor 的实际绘制交给系统；这个隐藏锚点只供工具状态探针使用 */}
       <KnifeCursor active={knifeOn} />
     </div>

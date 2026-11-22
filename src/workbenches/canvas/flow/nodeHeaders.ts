@@ -21,8 +21,18 @@ export interface NodeHeaderLabel {
   gap: number
 }
 
-export function nodeHeaderLabels(nodes: readonly NodeSnapshot[]): NodeHeaderLabel[] {
+export function nodeHeaderLabels(
+  nodes: readonly NodeSnapshot[],
+  previousNodes: readonly NodeSnapshot[] = [],
+  previousLabels: readonly NodeHeaderLabel[] = [],
+): NodeHeaderLabel[] {
   const byId = new Map(nodes.map((node) => [node.id, node]))
+  const previousById = new Map(
+    previousNodes.map((node, index) => [
+      node.id,
+      { node, label: previousLabels[index] },
+    ]),
+  )
   const children = new Map<string, NodeSnapshot[]>()
   for (const node of nodes) {
     if (!node.parentId) continue
@@ -53,6 +63,8 @@ export function nodeHeaderLabels(nodes: readonly NodeSnapshot[]): NodeHeaderLabe
   }
 
   return nodes.map((node) => {
+    const previous = !node.parentId ? previousById.get(node.id) : null
+    if (previous?.node === node && previous.label) return previous.label
     const pixels = assetPixelsOf(node)
     const parent = node.parentId ? byId.get(node.parentId) : null
     const batchRect = batchRects.get(node.id)
