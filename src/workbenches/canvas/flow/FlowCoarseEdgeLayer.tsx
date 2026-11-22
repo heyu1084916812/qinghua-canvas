@@ -95,10 +95,11 @@ const CoarseEdgePaths = memo(function CoarseEdgePaths({
 })
 
 /**
- * Gesture-only edge layer. The normal React Flow edges stay mounted but are
- * hidden by CSS while the viewport moves; this layer paints the same graph as
- * one combined path plus the few highlighted edges. It never receives pointer
- * events, so the expensive per-edge hit targets stay out of the gesture path.
+ * Gesture-only edge layer. The normal React Flow edge components are removed
+ * from the active tree while the viewport moves; this layer paints the same
+ * graph as one combined path plus the few highlighted edges. It never receives
+ * pointer events, so the expensive per-edge hit targets stay out of the
+ * gesture path.
  */
 export const FlowViewportEdgeLayer = memo(function FlowViewportEdgeLayer() {
   const graph = useGraph()

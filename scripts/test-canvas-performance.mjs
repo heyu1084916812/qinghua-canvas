@@ -308,9 +308,37 @@ export function evaluatePerformanceGate(input) {
     panMovement:
       input.panRounds?.length === 3 &&
       input.panRounds.every((round) => viewportRoundMovement(round, 'pan').pass),
+    panFastPath:
+      input.panRounds?.length === 3 &&
+      input.panRounds.every((round) => {
+        const gesture = round.gesture
+        return (
+          gesture?.moving === true &&
+          gesture.edgeDisplay === 'none' &&
+          gesture.backgroundDisplay === 'none' &&
+          gesture.fastLayer === true &&
+          Number(gesture.fastPaths) > 0 &&
+          Boolean(gesture.fastBackground) &&
+          Number(gesture.mountedNodes) < PERFORMANCE_NODE_COUNT &&
+          Number(gesture.restoredNodes) === PERFORMANCE_NODE_COUNT
+        )
+      }),
     zoomMovement:
       input.zoomRounds?.length === 3 &&
       input.zoomRounds.every((round) => viewportRoundMovement(round, 'zoom').pass),
+    zoomFastPath:
+      input.zoomRounds?.length === 3 &&
+      input.zoomRounds.every((round) => {
+        const gesture = round.gesture
+        return (
+          gesture?.moving === true &&
+          gesture.fastLayer === true &&
+          Boolean(gesture.background) &&
+          gesture.mountedEdges === 0 &&
+          Number(gesture.mountedNodes) < PERFORMANCE_NODE_COUNT &&
+          Number(gesture.restoredNodes) === PERFORMANCE_NODE_COUNT
+        )
+      }),
     dragP95:
       input.dragRounds?.length === 3 &&
       input.dragRounds.every(
@@ -387,6 +415,10 @@ export function buildPerformanceReport(input) {
       rounds: input.panRounds.map((round) => viewportRoundMovement(round, 'pan')),
       pass: assertionChecks.panMovement,
     },
+    panFastPath: {
+      rounds: input.panRounds.map((round) => round.gesture ?? null),
+      pass: assertionChecks.panFastPath,
+    },
     zoomP95: {
       maximumMs: MAX_P95_MS,
       actualMs: input.zoomRounds.map((round) => round.p95Ms),
@@ -395,6 +427,10 @@ export function buildPerformanceReport(input) {
     zoomMovement: {
       rounds: input.zoomRounds.map((round) => viewportRoundMovement(round, 'zoom')),
       pass: assertionChecks.zoomMovement,
+    },
+    zoomFastPath: {
+      rounds: input.zoomRounds.map((round) => round.gesture ?? null),
+      pass: assertionChecks.zoomFastPath,
     },
     dragP95: {
       maximumMs: MAX_P95_MS,
@@ -633,8 +669,15 @@ async function zoomRound(page) {
       ) ?? null,
       fastLayer: Boolean(document.querySelector('[data-flow-viewport-edge-layer]')),
       mountedEdges: document.querySelectorAll('.react-flow__edge').length,
+      mountedNodes: document.querySelectorAll('.react-flow__node[data-id]').length,
     }
   })
+  await page.waitForFunction(
+    (expected) => document.querySelectorAll('.react-flow__node[data-id]').length === expected,
+    PERFORMANCE_NODE_COUNT,
+    { timeout: 10_000 },
+  )
+  gesture.restoredNodes = await page.locator('.react-flow__node[data-id]').count()
   return { intervals, gesture }
 }
 

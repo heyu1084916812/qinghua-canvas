@@ -9,7 +9,7 @@ const CULL_ATTRIBUTE = 'data-node-viewport-culled'
  * wrappers skip content rendering. Updating the attribute imperatively avoids a
  * React render for every viewport frame.
  */
-export function FlowNodeViewportCulling() {
+export function FlowNodeViewportCulling({ paused = false }: { paused?: boolean }) {
   const store = useCanvasStore()
 
   useEffect(() => {
@@ -63,6 +63,21 @@ export function FlowNodeViewportCulling() {
     }
 
     refreshElements()
+    if (paused) {
+      if (frame) {
+        cancelAnimationFrame(frame)
+        frame = 0
+      }
+      for (const element of elements.values()) {
+        if (element.getAttribute(CULL_ATTRIBUTE) !== 'visible') {
+          element.setAttribute(CULL_ATTRIBUTE, 'visible')
+        }
+      }
+      return () => {
+        observer?.disconnect()
+        if (frame) cancelAnimationFrame(frame)
+      }
+    }
     const unsubscribeGraph = store.subscribe(schedule)
     const unsubscribeViewport = store.subscribeViewport(schedule)
     window.addEventListener('resize', schedule)
@@ -73,7 +88,7 @@ export function FlowNodeViewportCulling() {
       observer?.disconnect()
       if (frame) cancelAnimationFrame(frame)
     }
-  }, [store])
+  }, [paused, store])
 
   return null
 }

@@ -41,11 +41,29 @@ function passingInput() {
       p95Ms,
       before: viewport(-index * 260, -index * 90, 1),
       after: viewport(-(index + 1) * 260, -(index + 1) * 90, 1),
+      gesture: {
+        moving: true,
+        edgeDisplay: 'none',
+        backgroundDisplay: 'none',
+        fastLayer: true,
+        fastPaths: 1,
+        fastBackground: 'dots',
+        mountedNodes: 63,
+        restoredNodes: PERFORMANCE_NODE_COUNT,
+      },
     })),
     zoomRounds: [17, 18, 19].map((p95Ms, index) => ({
       p95Ms,
       before: viewport(0, 0, 0.8),
       after: viewport(0, 0, 0.84 + index * 0.02),
+      gesture: {
+        moving: true,
+        background: 'dots',
+        fastLayer: true,
+        mountedEdges: 0,
+        mountedNodes: 63,
+        restoredNodes: PERFORMANCE_NODE_COUNT,
+      },
     })),
     dragRounds: [18, 19, 20].map((p95Ms) => ({
       p95Ms,
@@ -152,6 +170,18 @@ describe('canvas performance report gate', () => {
     })
   })
 
+  it('fails when the pan fast path never replaces layers or windows nodes', () => {
+    const missingFastPath = passingInput()
+    missingFastPath.panRounds[1].gesture = {
+      ...missingFastPath.panRounds[1].gesture,
+      fastLayer: false,
+      mountedNodes: PERFORMANCE_NODE_COUNT,
+    }
+    const report = buildPerformanceReport(missingFastPath)
+    expect(report.ok).toBe(false)
+    expect(report.assertions.panFastPath.pass).toBe(false)
+  })
+
   it('fails when a pan round leaves the viewport stationary', () => {
     const stalled = passingInput()
     stalled.panRounds[1] = {
@@ -177,6 +207,19 @@ describe('canvas performance report gate', () => {
     const report = buildPerformanceReport(stalled)
     expect(report.ok).toBe(false)
     expect(report.assertions.zoomMovement.pass).toBe(false)
+  })
+
+  it('fails when zoom never enters the windowed fast path', () => {
+    const missingFastPath = passingInput()
+    missingFastPath.zoomRounds[1].gesture = {
+      ...missingFastPath.zoomRounds[1].gesture,
+      fastLayer: false,
+      mountedEdges: PERFORMANCE_EDGE_COUNT,
+      mountedNodes: PERFORMANCE_NODE_COUNT,
+    }
+    const report = buildPerformanceReport(missingFastPath)
+    expect(report.ok).toBe(false)
+    expect(report.assertions.zoomFastPath.pass).toBe(false)
   })
 
   it('fails when node dragging does not move the node', () => {

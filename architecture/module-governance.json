@@ -13589,7 +13589,8 @@
       "owns": [
         "节点 wrapper 与图快照的映射",
         "requestAnimationFrame 视口同步",
-        "MutationObserver 节点新增与移除刷新"
+        "MutationObserver 节点新增与移除刷新",
+        "手势窗口期间暂停裁剪并让挂载节点保持可见"
       ],
       "doesNotOwn": [
         "世界坐标与预热边距计算",
@@ -13650,6 +13651,55 @@
       ],
       "test": [
         "src/workbenches/canvas/flow/flowNodePositionBatcher.test.ts"
+      ],
+      "budget": 80
+    },
+    {
+      "module": "src/workbenches/canvas/flow/flowGestureWindow.ts",
+      "owner": "canvas-flow-ui",
+      "responsibility": "在平移开始时按视口与屏幕预热边距计算固定节点窗口，避免手势期间反复挂载视口边缘节点。",
+      "owns": [
+        "屏幕边距到世界坐标换算",
+        "React Flow 节点窗口过滤",
+        "平移手势节点窗口常量"
+      ],
+      "doesNotOwn": [
+        "节点投影与内容渲染",
+        "视口状态变更",
+        "松手后的节点恢复"
+      ],
+      "publicApi": [
+        "PAN_NODE_WINDOW_MARGIN_PX",
+        "PositionedFlowNode",
+        "nodesInGestureWindow"
+      ],
+      "test": [
+        "src/workbenches/canvas/flow/flowGestureWindow.test.ts"
+      ],
+      "budget": 60
+    },
+    {
+      "module": "src/workbenches/canvas/flow/useFlowGestureWindow.ts",
+      "owner": "canvas-flow-ui",
+      "responsibility": "把平移开始时的节点窗口、手势标记和松手恢复封装成独立 hook。",
+      "owns": [
+        "平移 / 滚轮缩放手势窗口节点集合",
+        "视口移动根属性",
+        "滚轮结束 180ms 防抖",
+        "松手恢复完整节点集合"
+      ],
+      "doesNotOwn": [
+        "React Flow 边组件轻量化",
+        "节点投影算法",
+        "图数据持久化"
+      ],
+      "publicApi": [
+        "useFlowGestureWindow"
+      ],
+      "test": [
+        "scripts/test-canvas-performance.test.mjs",
+        "src/workbenches/canvas/flow/flowGestureWindow.test.ts",
+        "src/workbenches/canvas/flow/useFlowGestureWindow.test.ts"
       ],
       "budget": 80
     },

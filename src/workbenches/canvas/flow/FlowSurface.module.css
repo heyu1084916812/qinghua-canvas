@@ -40,10 +40,9 @@
 }
 
 /*
- * During a viewport gesture the normal per-edge React Flow layer is kept
- * mounted but excluded from paint and hit testing. FlowViewportEdgeLayer paints
- * the same strokes as one combined path, then the full layer returns on
- * onMoveEnd. This avoids unmounting nodes or losing edge state.
+ * During a pan the 500 React Flow edge components leave the active tree.
+ * FlowViewportEdgeLayer paints the same strokes as one combined path, then the
+ * full edge layer returns on onMoveEnd. Nodes stay mounted throughout.
  */
 .surface[data-viewport-moving='true'] .flow :global(.react-flow__edges) {
   display: none;

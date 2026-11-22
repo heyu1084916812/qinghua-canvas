@@ -143,6 +143,7 @@ import {
 import { childEdgeIdSet } from './childEdges'
 import { useStableGraphMemo } from '../useNodeDerivedMaps'
 import { createFlowNodePositionBatcher } from './flowNodePositionBatcher'
+import { useFlowGestureWindow } from './useFlowGestureWindow'
 
 /** React Flow 只渲染真实图；store 是位置、连线与选中的唯一真相。 */
 export function FlowSurface({
@@ -236,7 +237,6 @@ function FlowSurfaceInner({
   const draggingId = useDraggingId()
   const upstreamPick = useUpstreamPick()
   const edgeSelection = useEdgeSelection()
-  const [viewportMoving, setViewportMoving] = useState(false)
   const initialFlowViewport = useRef(storeViewportToFlow(store.getViewport())).current
   const handleViewportChange = useCallback(
     (next: FlowViewport) => {
@@ -661,6 +661,7 @@ function FlowSurfaceInner({
   }, [
     graph, selection, draggingId, nodeStateOf, emitForNode, childIndex, renderFlowChild, derived, store, detailMode, upstreamPickConfig,
   ])
+  const gesture = useFlowGestureWindow({ nodes, store, surfaceRef })
 
   const childEdgeIds = useStableGraphMemo(graph, childEdgeIdSet)
   const removeEdge = useCallback(
@@ -886,7 +887,7 @@ function FlowSurfaceInner({
       data-canvas-custom-hex={customCanvasColor ?? undefined}
       data-canvas-custom-dot-hex={customDotColor ?? undefined}
       data-canvas-node-hex={customNodeColor ?? undefined}
-      data-viewport-moving={viewportMoving ? 'true' : undefined}
+      data-viewport-moving={gesture.moving ? 'true' : undefined}
       /* 节点内容字号：挂在**画布根**上，节点自己的 CSS 用 var(..., 兜底) 取。
          兜底值让单测 / SSR 这些"没有画布根"的场景仍然拿得到原来的字号。 */
       style={
@@ -971,7 +972,7 @@ function FlowSurfaceInner({
       }}
       onContextMenu={onContextMenu}
     >
-      {viewportMoving && canvasStyle.background !== 'solid' ? (
+      {gesture.moving && canvasStyle.background !== 'solid' ? (
         <FlowViewportBackground variant={canvasStyle.background} />
       ) : null}
       {/* 拖线草稿（§6.14）：画在节点层**下面**（与老表面 EdgeLayer 同序），层本身不吃指针 */}
@@ -981,8 +982,8 @@ function FlowSurfaceInner({
       */}
       <FlowGroupBoardLayer />
       <FlowViewportController />
-      <FlowNodeViewportCulling />
-      {viewportMoving && detailMode === 'full' ? <FlowViewportEdgeLayer /> : null}
+      <FlowNodeViewportCulling paused={gesture.moving} />
+      {gesture.moving && detailMode === 'full' ? <FlowViewportEdgeLayer /> : null}
       {/*
         牵涉容器子节点的边（视觉层）：与 RF 自带边同一层序（节点之下），
         命中区在下面单独再画一层（`hitOnly`）。
@@ -998,8 +999,8 @@ function FlowSurfaceInner({
       <KnifeFxLayer surfaceEl={surfaceEl} active={knifeOn} />
       <ReactFlow
         className={styles.flow}
-        nodes={nodes}
-        edges={viewportMoving ? NO_EDGES : edges}
+        nodes={gesture.renderedNodes}
+        edges={gesture.moving ? NO_EDGES : edges}
         nodeTypes={NODE_TYPES}
         edgeTypes={EDGE_TYPES}
         defaultEdgeOptions={EDGE_OPTIONS}
@@ -1055,18 +1056,8 @@ function FlowSurfaceInner({
           if (store.getUpstreamPick()) store.endUpstreamPick()
         }}
         defaultViewport={initialFlowViewport}
-        onMoveStart={(event) => {
-          // Wheel zoom keeps its full edge layer; pan is the dense gesture that
-          // benefits from removing 500 edge components from the active tree.
-          if (event?.type !== 'wheel') {
-            surfaceRef.current?.setAttribute('data-viewport-moving', 'true')
-            setViewportMoving(true)
-          }
-        }}
-        onMoveEnd={() => {
-          surfaceRef.current?.removeAttribute('data-viewport-moving')
-          setViewportMoving(false)
-        }}
+        onMoveStart={gesture.beginMove}
+        onMoveEnd={gesture.endMove}
         onViewportChange={handleViewportChange}
         onNodesChange={onNodesChange}
         onNodeDragStart={onNodeDragStart}
