@@ -113,6 +113,29 @@ describe('SkillStore · 内置与用户分表', () => {
     }
   })
 
+  it('★★ 外部 Skill 包的核心四项已改造成轻画版', async () => {
+    const s = createSkillStore(createMemoryPlatform().storage)
+    const byName = new Map((await s.loadBuiltin()).map((x) => [x.name, x]))
+    const expected = [
+      ['画面生成导演', 'any', ['参考图', '最终生图提示词']],
+      ['视频生成导演', 'any', ['唯一锚点', '完整视频提示词']],
+      ['音频生成导演', 'text', ['朗读正文', '控制要求']],
+      ['剧情宫格导演', 'any', ['剧情推演', '多机位展示']],
+    ] as const
+    for (const [name, inputMode, keywords] of expected) {
+      const skill = byName.get(name)
+      expect(skill, `缺少轻画版技能「${name}」`).toBeTruthy()
+      expect(skill!.source).toBe('builtin')
+      expect(skill!.inputMode).toBe(inputMode)
+      for (const keyword of keywords) {
+        expect(skill!.content, `${name} 缺少「${keyword}」`).toContain(keyword)
+      }
+      expect(skill!.content).not.toContain('hubcli')
+      expect(skill!.content).not.toContain('generate_image')
+      expect(skill!.content).not.toContain('jyhub_aigc_')
+    }
+  })
+
   it('★★ 创作分镜 / TVC 两个技能已带上 references 全文（运行时只吃一份正文）', async () => {
     const s = createSkillStore(createMemoryPlatform().storage)
     const byName = new Map((await s.loadBuiltin()).map((x) => [x.name, x]))
