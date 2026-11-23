@@ -42,7 +42,7 @@ vi.mock('../storeContext', () => ({
   useGraph: () => fixture.graph,
   useSelection: () => [],
   useViewportState: () => ({ x: 0, y: 0, zoom: 1 }),
-  useCanvasStore: () => ({ dispatch: vi.fn() }),
+  useCanvasStore: () => ({ dispatch: vi.fn(), getDraggingId: () => null }),
 }))
 
 import { FlowChildEdgeLayer } from './FlowChildEdgeLayer'

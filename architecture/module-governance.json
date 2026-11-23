@@ -13704,6 +13704,141 @@
       "budget": 80
     },
     {
+      "module": "src/workbenches/canvas/flow/flowDragDomFollower.ts",
+      "owner": "canvas-flow-ui",
+      "responsibility": "在拖动指针帧内直接更新节点 transform 与相连贝塞尔线，避免等待受控 store 提交。",
+      "owns": [
+        "拖动节点 wrapper 的即时 transform",
+        "相连边路径的位移与命中线同步",
+        "贝塞尔路径位移计算"
+      ],
+      "doesNotOwn": [
+        "拖动手势生命周期",
+        "store 位置提交",
+        "吸附与归属判定"
+      ],
+      "publicApi": [
+        "captureFlowDragEdgePaths",
+        "writeFlowDragEdgePaths",
+        "writeFlowNodeDragDomPositions",
+        "shiftFlowEdgePath"
+      ],
+      "test": [
+        "src/workbenches/canvas/flow/flowDragDomFollower.test.ts",
+        "scripts/test-canvas-performance.test.mjs"
+      ],
+      "budget": 160
+    },
+    {
+      "module": "src/workbenches/canvas/flow/useFlowNodeDragDomFollow.ts",
+      "owner": "canvas-flow-ui",
+      "responsibility": "封装高密度节点拖动的指针直写、帧兜底、松手末坐标和清理生命周期。",
+      "owns": [
+        "拖动 DOM 跟随状态",
+        "pointermove / pointerup 生命周期",
+        "松手末坐标读取"
+      ],
+      "doesNotOwn": [
+        "节点图数据提交",
+        "拖后选中语义",
+        "贝塞尔路径格式"
+      ],
+      "publicApi": [
+        "useFlowNodeDragDomFollow"
+      ],
+      "test": [
+        "scripts/test-canvas-performance.test.mjs",
+        "src/workbenches/canvas/flow/flowDragDomFollower.test.ts"
+      ],
+      "budget": 180
+    },
+    {
+      "module": "src/workbenches/canvas/flow/flowSurfacePointerDom.ts",
+      "owner": "canvas-flow-ui",
+      "responsibility": "画布指针 DOM 适配：阻止原生节点拖拽并把屏幕坐标换算到世界坐标。",
+      "owns": [
+        "原生 nodrag 标记维护",
+        "surface 屏幕坐标到世界坐标"
+      ],
+      "doesNotOwn": [
+        "指针操作计划",
+        "节点拖动提交",
+        "视口状态存储"
+      ],
+      "publicApi": [
+        "blockNativeNodeDrag",
+        "pointerWorldPointDom"
+      ],
+      "test": [
+        "src/workbenches/canvas/flow/flowSurfacePointer.test.ts",
+        "scripts/test-canvas-performance.test.mjs"
+      ],
+      "budget": 60
+    },
+    {
+      "module": "src/workbenches/canvas/flow/FlowViewportController.tsx",
+      "owner": "canvas-flow-ui",
+      "responsibility": "把外部 store 视口命令同步给 React Flow，同时避免回写手势帧。",
+      "owns": [
+        "store 视口到 React Flow 的命令式同步",
+        "同步循环保护"
+      ],
+      "doesNotOwn": [
+        "React Flow 手势处理",
+        "画布视口语义",
+        "节点投影"
+      ],
+      "publicApi": [
+        "FlowViewportController"
+      ],
+      "test": [
+        "src/workbenches/canvas/flow/flowSurfaceViewport.test.ts",
+        "src/workbenches/canvas/flow/viewportBridge.test.ts"
+      ],
+      "budget": 40
+    },
+    {
+      "module": "src/workbenches/canvas/flow/flowNodeDomPositions.ts",
+      "owner": "canvas-flow-ui",
+      "responsibility": "把 React Flow 的指针帧 position change 立即写到节点 wrapper，store 提交仍按帧合并。",
+      "owns": [
+        "position change 到 DOM transform"
+      ],
+      "doesNotOwn": [
+        "图数据提交",
+        "拖动指针跟随",
+        "吸附几何",
+        "节点投影复用"
+      ],
+      "publicApi": [
+        "writeFlowNodeDomPositions"
+      ],
+      "test": [
+        "src/workbenches/canvas/flow/flowNodeDomPositions.test.ts"
+      ],
+      "budget": 40
+    },
+    {
+      "module": "src/workbenches/canvas/flow/flowSnapHints.ts",
+      "owner": "canvas-flow-ui",
+      "responsibility": "比较逐帧吸附提示，避免相同 guides / gaps 触发无意义 store 通知。",
+      "owns": [
+        "吸附参考线与间距读数相等判断"
+      ],
+      "doesNotOwn": [
+        "吸附几何计算",
+        "节点位置提交",
+        "图数据持久化"
+      ],
+      "publicApi": [
+        "sameFlowSnapHints"
+      ],
+      "test": [
+        "src/workbenches/canvas/flow/flowSnapHints.test.ts"
+      ],
+      "budget": 40
+    },
+    {
       "module": "src/workbenches/canvas/flow/viewportBackground.ts",
       "owner": "canvas-flow-ui",
       "responsibility": "按 React Flow 的缩放公式计算手势 CSS 背景的间距、位移与点半径。",

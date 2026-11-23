@@ -70,6 +70,36 @@
   pointer-events: auto;
 }
 
+.surface[data-node-dragging='true'] [data-flow-port-layer],
+.surface[data-node-dragging='true'] [data-flow-child-edge-hit-layer='1'] {
+  visibility: hidden;
+  pointer-events: none;
+}
+
+/*
+ * Dense low-zoom canvases can keep hundreds of real thumbnails in the active
+ * viewport. While one node moves, its full content must stay visible, but the
+ * stationary nodes only need their footprint. Keeping those wrappers and their
+ * pointer geometry intact avoids remount/measure work at drag start and end.
+ */
+.surface[data-node-dragging='true'] .flow
+  :global(.react-flow__node:not(.dragging) > [data-node-id]) {
+  visibility: hidden;
+}
+
+.surface[data-node-dragging='true']
+  .flow
+  :global(.react-flow__node:not(.dragging)) {
+  overflow: hidden;
+  border-radius: var(--radius-node);
+  background: var(--node-fill);
+  box-shadow: inset 0 0 0 1px var(--node-border);
+}
+
+.surface[data-node-dragging='true'] [data-flow-node-header-layer] {
+  visibility: hidden;
+}
+
 /*
  * 平移 / 缩放只改 React Flow 节点外层 transform。300 节点 + 真实缩略图大画布的
  * release 诊断显示，让视口外节点跳过内容布局与绘制可把 P95 压到约 14ms；

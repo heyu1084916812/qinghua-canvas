@@ -49,7 +49,12 @@ export function FlowPortLayer({
   onPortDown: PortDown
   coarse?: boolean
 }) {
-  const graph = useGraph()
+  const store = useCanvasStore()
+  const sourceGraph = useGraph()
+  const frozenGraphRef = useRef(sourceGraph)
+  const dragging = store.getDraggingId() !== null
+  if (!dragging) frozenGraphRef.current = sourceGraph
+  const graph = dragging ? frozenGraphRef.current : sourceGraph
   /** 容器子节点的端点只在选中时出现（理由见 `portHitsOf` 的 `selection` 参数） */
   const selection = useSelection()
   /** 端点在世界坐标里是常量（节点不动就不动）⇒ 只跟图走，**不跟视口走** */

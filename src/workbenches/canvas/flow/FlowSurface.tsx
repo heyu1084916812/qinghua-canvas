@@ -14,7 +14,6 @@ import {
   ReactFlow,
   ReactFlowProvider,
   SelectionMode,
-  useReactFlow,
   useViewport,
   useUpdateNodeInternals,
   type Edge as RFEdge,
@@ -26,7 +25,6 @@ import '@xyflow/react/dist/style.css'
 import styles from './FlowSurface.module.css'
 import {
   useCanvasStore,
-  useDraggingId,
   useEdgeSelection,
   useGraph,
   useSelection,
@@ -89,7 +87,6 @@ import {
 import { isTextEntryElement } from '../../../features/shared/textTarget'
 import { useCanvasKeyboard } from '../useCanvasKeyboard'
 import { IMPORT_ACCEPT } from '../../../features/canvas/importAsset'
-import type { CanvasStore } from '../../../state/workbenches/canvas/store'
 import type { Point } from '../../../domain/canvas/geometry/rect'
 import { PanelLayer } from '../panels/PanelLayer'
 import { NodeFollowBar } from '../toolbar/NodeFollowBar'
@@ -99,13 +96,17 @@ import { CanvasNotice } from '../surface/CanvasNotice'
 import { Minimap } from '../surface/Minimap'
 import { UndoBar } from '../surface/UndoBar'
 import { useCanvasDetailMode } from './useCanvasDetailMode'
+import { shouldCoarsenGestureNodes } from './detailMode'
 import { FlowViewportBackground } from './FlowViewportBackground'
-import { shouldSyncStoreViewport, VIEWPORT_EPSILON } from './flowSurfaceViewport'
+import { VIEWPORT_EPSILON } from './flowSurfaceViewport'
 import {
   FLOATING_SELECTORS,
   marqueeBetween,
-  pointerWorldPoint as pointerWorldPointPure,
 } from './flowSurfacePointer'
+import {
+  blockNativeNodeDrag,
+  pointerWorldPointDom,
+} from './flowSurfacePointerDom'
 import { shouldPasteMediaFiles } from './flowSurfaceImport'
 import { installCanvasDomAnchors } from './flowSurfaceDomAnchors'
 import {
@@ -113,6 +114,7 @@ import {
   deleteFlowNodeIds,
   type FlowDragAnchor,
 } from './flowSurfaceChangeCoordinator'
+import { sameFlowSnapHints } from './flowSnapHints'
 import {
   importSurfaceFiles,
   planChildPointerDown,
@@ -143,7 +145,10 @@ import {
 import { childEdgeIdSet } from './childEdges'
 import { useStableGraphMemo } from '../useNodeDerivedMaps'
 import { createFlowNodePositionBatcher } from './flowNodePositionBatcher'
+import { writeFlowNodeDomPositions } from './flowNodeDomPositions'
 import { useFlowGestureWindow } from './useFlowGestureWindow'
+import { useFlowNodeDragDomFollow } from './useFlowNodeDragDomFollow'
+import { FlowViewportController } from './FlowViewportController'
 
 /** React Flow 只渲染真实图；store 是位置、连线与选中的唯一真相。 */
 export function FlowSurface({
@@ -166,61 +171,6 @@ const NODE_TYPES = { qh: FlowFlowNode, coarse: FlowCoarseNode }
 const EDGE_TYPES = { qh: QhEdge, coarse: QhCoarseEdge }
 const EDGE_OPTIONS = { type: 'default' } as const
 const NO_EDGES = [] as RFEdge<QhEdgeData>[]
-function FlowViewportController() {
-  const store = useCanvasStore()
-  const flow = useReactFlow()
-
-  useEffect(() => {
-    const sync = () => {
-      const target = storeViewportToFlow(store.getViewport())
-      if (!shouldSyncStoreViewport(flow.getViewport(), target)) return
-      // 缩放手势期间 RF 自己就在改 transform；这里只跟随外部逻辑视口变化，
-      // 避免 onViewportChange → setViewport → setViewport 的回写循环。
-      void flow.setViewport(target)
-    }
-    sync()
-    return store.subscribeViewport(sync)
-  }, [flow, store])
-
-  return null
-}
-
-/** RF 的 d3-drag 只认原生 `nodrag`；React 提交会重写 className，所以松手前要持续补回。 */
-function blockNativeNodeDrag(target: EventTarget | null): void {
-  const frame = target instanceof Element ? target.closest<HTMLElement>('[data-node-id]') : null
-  if (!frame) return
-  const ensure = () => {
-    if (!frame.classList.contains('nodrag')) frame.classList.add('nodrag')
-  }
-  ensure()
-  const observer = new MutationObserver(ensure)
-  observer.observe(frame, { attributes: true, attributeFilter: ['class'] })
-  const cleanup = () => {
-    observer.disconnect()
-    frame.classList.remove('nodrag')
-    window.removeEventListener('pointerup', cleanup)
-    window.removeEventListener('pointercancel', cleanup)
-  }
-  window.addEventListener('pointerup', cleanup)
-  window.addEventListener('pointercancel', cleanup)
-}
-
-/** 指针屏幕坐标 → 世界坐标；缺事件或 surface 时返回 null，不猜落点。 */
-function pointerWorldPointDom(
-  ev: MouseEvent | TouchEvent | ReactPointerEvent | null | undefined,
-  store: CanvasStore,
-): Point | null {
-  const el = document.querySelector<HTMLElement>('[data-canvas-surface]')
-  if (!el) return null
-  const r = el.getBoundingClientRect()
-  return pointerWorldPointPure(ev, store.getViewport(), {
-    x: r.left,
-    y: r.top,
-    w: r.width,
-    h: r.height,
-  })
-}
-
 function FlowSurfaceInner({
   projectId,
   onOpenSettings,
@@ -234,7 +184,7 @@ function FlowSurfaceInner({
   const detailMode = useCanvasDetailMode(store)
   const graph = useGraph()
   const selection = useSelection()
-  const draggingId = useDraggingId()
+  const draggingRef = useRef<string | null>(null)
   const upstreamPick = useUpstreamPick()
   const edgeSelection = useEdgeSelection()
   const initialFlowViewport = useRef(storeViewportToFlow(store.getViewport())).current
@@ -291,10 +241,14 @@ function FlowSurfaceInner({
   const knifeClickPending = useRef(false)
   const { beginPan } = useCanvasViewport(store)
   const [importHover, setImportHover] = useState(false)
-  const [singleNodeDragging, setSingleNodeDragging] = useState(false)
   const dragMovedRef = useRef(false)
   /** 锚点必须在 pointerdown 记录；RF 的 dragStart 已晚一步，会导致终点对齐偏移。 */
   const dragAnchorRef = useRef<FlowDragAnchor | null>(null)
+  const dragSelectionRef = useRef<string[]>([])
+  const {
+    begin: beginNodeDragDom, move: moveNodeDragDom, isActive: isNodeDragDomActive,
+    moved: didNodeDragDomMove, lastPointer: lastNodeDragDomPointer,
+  } = useFlowNodeDragDomFollow({ store, surfaceRef })
   const pressAtRef = useRef<{ x: number; y: number } | null>(null)
   /** 指针是否正按着（拖节点 / 框选 / 拉线中）—— 只给美工刀的互斥锁用，与 `pressAtRef` 无关 */
   const interactingRef = useRef(false)
@@ -313,7 +267,10 @@ function FlowSurfaceInner({
           nodeSelectStampRef.current = false
         })
       },
-      setSnapHints: (hints: Parameters<typeof store.setSnapHints>[0]) => store.setSnapHints(hints),
+      setSnapHints: (hints: Parameters<typeof store.setSnapHints>[0]) => {
+        if (sameFlowSnapHints(store.getSnapHints(), hints)) return
+        store.setSnapHints(hints)
+      },
       markDragMoved: (moved: boolean) => { dragMovedRef.current = moved },
       moveNodes: (ids: string[], dx: number, dy: number, phase: 'begin' | 'move' | 'end') => {
         store.dispatch({ kind: 'node.move', ids, dx, dy, phase })
@@ -507,9 +464,23 @@ function FlowSurfaceInner({
         drag.begin(e, plan.nodeId)
       } else if (plan.kind === 'anchor') {
         dragAnchorRef.current = plan.anchor
+        dragSelectionRef.current =
+          nodeId && selection.length > 1 && selection.includes(nodeId)
+            ? [...selection]
+            : nodeId
+              ? [nodeId]
+              : []
+        beginNodeDragDom(plan.anchor, e.clientX, e.clientY)
       }
     },
-    [store, knifeOn, beginSlice, beginPan],
+    [store, knifeOn, beginSlice, beginPan, beginNodeDragDom],
+  )
+
+  const onSurfaceMouseMove = useCallback(
+    (e: ReactMouseEvent<HTMLDivElement>) => {
+      moveNodeDragDom(e.clientX, e.clientY)
+    },
+    [moveNodeDragDom],
   )
 
   const importFiles = useCallback(
@@ -652,16 +623,27 @@ function FlowSurfaceInner({
         resize: (id, rect, phase) => store.dispatch({ kind: 'node.resize', id, rect, phase }),
         renderChild: renderFlowChild,
         upstreamPick: upstreamPickConfig,
-        optimisticDrag: draggingId !== null,
+        optimisticDrag: draggingRef.current !== null,
       },
       previousNodesRef.current,
     )
     previousNodesRef.current = next
     return next
   }, [
-    graph, selection, draggingId, nodeStateOf, emitForNode, childIndex, renderFlowChild, derived, store, detailMode, upstreamPickConfig,
+    graph, selection, nodeStateOf, emitForNode, childIndex, renderFlowChild, derived, store, detailMode, upstreamPickConfig,
   ])
   const gesture = useFlowGestureWindow({ nodes, store, surfaceRef })
+  const renderedNodes = useMemo(
+    () =>
+      shouldCoarsenGestureNodes({
+        moving: gesture.moving,
+        detailMode,
+        renderedNodeCount: gesture.renderedNodes.length,
+      })
+        ? gesture.renderedNodes.map((node) => ({ ...node, type: 'coarse' }))
+        : gesture.renderedNodes,
+    [detailMode, gesture.moving, gesture.renderedNodes],
+  )
 
   const childEdgeIds = useStableGraphMemo(graph, childEdgeIdSet)
   const removeEdge = useCallback(
@@ -766,25 +748,41 @@ function FlowSurfaceInner({
           actionPorts,
         )
       }
-      positionBatcher.queue(changes)
+      writeFlowNodeDomPositions(document, changes)
+      if (draggingRef.current === null && !isNodeDragDomActive()) {
+        positionBatcher.queue(changes)
+      }
     },
-    [store, actionPorts, positionBatcher],
+    [store, actionPorts, positionBatcher, isNodeDragDomActive],
   )
 
   const onNodeDragStart = useCallback(
     (_e: MouseEvent | TouchEvent, _n: RFNode, dragged: RFNode[]) => {
-      setSingleNodeDragging(dragged.length === 1)
+      if (!isNodeDragDomActive() && dragAnchorRef.current) {
+        const anchor = dragAnchorRef.current
+        beginNodeDragDom(anchor, anchor.clientX, anchor.clientY, true)
+      }
+      surfaceRef.current?.setAttribute('data-node-dragging', 'true')
+      draggingRef.current = _n.id
       beginFlowNodeDrag(
         { mainId: _n.id, draggedIds: dragged.map((node) => node.id) },
         actionPorts,
       )
     },
-    [actionPorts],
+    [actionPorts, isNodeDragDomActive, beginNodeDragDom],
   )
 
   const onNodeDragStop = useCallback(
     (e: MouseEvent | TouchEvent, _n: RFNode, dragged: RFNode[]) => {
-      setSingleNodeDragging(false)
+      const movedByPointer = didNodeDragDomMove()
+      const lastPointer = lastNodeDragDomPointer()
+      const stopPointer =
+        movedByPointer && lastPointer
+          ? lastPointer
+          : 'clientX' in e
+            ? { clientX: e.clientX, clientY: e.clientY }
+            : null
+      surfaceRef.current?.removeAttribute('data-node-dragging')
       positionBatcher.flush()
       finishFlowNodeDrag(
         {
@@ -792,20 +790,30 @@ function FlowSurfaceInner({
           draggedIds: dragged.map((node) => node.id),
           moved: dragMovedRef.current,
           anchor: dragAnchorRef.current,
-          pointer:
-            'clientX' in e
-              ? { clientX: e.clientX, clientY: e.clientY }
-              : null,
-          pointerWorld: () => pointerWorldPointDom(e, store),
+          pointer: stopPointer,
+          pointerWorld: () => pointerWorldPointDom(stopPointer, store),
         },
         actionPorts,
       )
+      if (movedByPointer) {
+        const nextSelection =
+          dragSelectionRef.current.length > 1
+            ? dragSelectionRef.current
+            : [_n.id]
+        const currentSelection = store.getSelection()
+        if (
+          currentSelection.length !== nextSelection.length ||
+          nextSelection.some((id, index) => currentSelection[index] !== id)
+        ) {
+          store.setSelectionAfterDrag(nextSelection)
+        }
+      }
+      draggingRef.current = null
     },
-    [store, actionPorts, positionBatcher],
+    [store, actionPorts, positionBatcher, didNodeDragDomMove, lastNodeDragDomPointer],
   )
 
   /** 不用 RF 的连接手势；命中、语义、草稿统一走 FlowPortLayer + useEdgeDrag。 */
-
   const deletionPorts = useMemo(
     () => ({
       removeEdge: (id: string) => store.dispatch({ kind: 'edge.remove' as const, id }),
@@ -939,7 +947,11 @@ function FlowSurfaceInner({
        */
       onClick={onSurfaceClick}
       // 只记坐标、不 setState：粘贴落点要用「当前鼠标位置」（§4.2）
-      onPointerMove={(e) => rememberPointer({ x: e.clientX, y: e.clientY })}
+      onPointerMove={(e) => {
+        rememberPointer({ x: e.clientX, y: e.clientY })
+        moveNodeDragDom(e.clientX, e.clientY)
+      }}
+      onMouseMove={onSurfaceMouseMove}
       onPointerMoveCapture={(e) => {
         /* 刀具模式下这条指针流归"挥刀"用：只更新刀光轨迹与切割判定，不再更新框选 */
         if (knifeOn) {
@@ -999,7 +1011,7 @@ function FlowSurfaceInner({
       <KnifeFxLayer surfaceEl={surfaceEl} active={knifeOn} />
       <ReactFlow
         className={styles.flow}
-        nodes={gesture.renderedNodes}
+        nodes={renderedNodes}
         edges={gesture.moving ? NO_EDGES : edges}
         nodeTypes={NODE_TYPES}
         edgeTypes={EDGE_TYPES}
@@ -1025,6 +1037,7 @@ function FlowSurfaceInner({
          * 包不严 = 没选中，与"有没有下游连线"无关）。
          */
         selectionMode={SelectionMode.Partial}
+        selectNodesOnDrag={false}
         /* §6.3：中键拖拽也平移（左键拖拽是默认行为，空格 + 拖拽由 React Flow 自带） */
         panOnDrag={[0, 1]}
         /*
@@ -1041,7 +1054,6 @@ function FlowSurfaceInner({
         autoPanOnConnect={false}
         autoPanOnNodeDrag={false}
         autoPanOnSelection={false}
-        onlyRenderVisibleElements={singleNodeDragging}
         onSelectionStart={onSelectionStart}
         onSelectionEnd={onSelectionEnd}
         onNodeClick={(event, node) => {
@@ -1144,11 +1156,9 @@ function FlowSurfaceInner({
       {/* 小地图显示开关（本机偏好）：关掉只是少一个导航控件，画布本身不受影响 */}
       {appearance.showMinimap ? <Minimap /> : null}
       {/* 端点命中层：在所有节点之上收拖线手势（见 FlowPortLayer 里的长注释） */}
-      {singleNodeDragging ? null : (
-        <FlowPortLayer onPortDown={beginEdgeDrag} coarse={detailMode === 'coarse'} />
-      )}
+      <FlowPortLayer onPortDown={beginEdgeDrag} coarse={detailMode === 'coarse'} />
       {/* 子节点连线的**命中区**（双击删线）：必须在最上层才收得到指针，视觉是透明的 */}
-      {singleNodeDragging ? null : <FlowChildEdgeLayer hitOnly />}
+      <FlowChildEdgeLayer hitOnly />
       {/* 原生 CSS cursor 的实际绘制交给系统；这个隐藏锚点只供工具状态探针使用 */}
       <KnifeCursor active={knifeOn} />
     </div>

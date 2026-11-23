@@ -1,4 +1,4 @@
-import { memo, useMemo } from 'react'
+import { memo, useMemo, useRef } from 'react'
 import { useGraph, useSelection, useViewportState } from '../storeContext'
 import { useCanvasStore } from '../storeContext'
 import { childEdgeIdSet, childEdgePaths } from './childEdges'
@@ -15,16 +15,32 @@ import styles from './FlowChildEdgeLayer.module.css'
  * 分两段算（与 `FlowPortLayer` 同一条手法）：**路径只跟图与选中走**，
  * 视口换算挂在一个 `transform` 上 —— 平移 / 缩放帧只改一个属性，子树的 props 不变。
  */
-export function FlowChildEdgeLayer({ hitOnly = false }: { hitOnly?: boolean }) {
-  const graph = useGraph()
+export function FlowChildEdgeLayer({
+  hitOnly = false,
+}: {
+  hitOnly?: boolean
+}) {
+  const store = useCanvasStore()
+  const sourceGraph = useGraph()
+  const frozenGraphRef = useRef(sourceGraph)
+  const dragging = store.getDraggingId() !== null
+  if (!dragging) frozenGraphRef.current = sourceGraph
+  const graph = dragging ? frozenGraphRef.current : sourceGraph
+  const selection = useSelection()
   const hasChildEdges = useMemo(() => childEdgeIdSet(graph).size > 0, [graph])
   if (!hasChildEdges) return null
-  return <ChildEdgeViewport hitOnly={hitOnly} />
+  return <ChildEdgeViewport graph={graph} selection={selection} hitOnly={hitOnly} />
 }
 
-const ChildEdgeViewport = memo(function ChildEdgeViewport({ hitOnly }: { hitOnly: boolean }) {
-  const graph = useGraph()
-  const selection = useSelection()
+const ChildEdgeViewport = memo(function ChildEdgeViewport({
+  graph,
+  selection,
+  hitOnly,
+}: {
+  graph: ReturnType<typeof useGraph>
+  selection: ReturnType<typeof useSelection>
+  hitOnly: boolean
+}) {
   const viewport = useViewportState()
   const store = useCanvasStore()
   const drawn = useMemo(
@@ -33,7 +49,11 @@ const ChildEdgeViewport = memo(function ChildEdgeViewport({ hitOnly }: { hitOnly
   )
   if (drawn.length === 0) return null
   return (
-    <svg className={styles.svg} aria-hidden={hitOnly}>
+    <svg
+      className={styles.svg}
+      aria-hidden={hitOnly}
+      data-flow-child-edge-hit-layer={hitOnly ? '1' : undefined}
+    >
       {drawn.map((p) => (
         <g key={p.id}>
           {/*

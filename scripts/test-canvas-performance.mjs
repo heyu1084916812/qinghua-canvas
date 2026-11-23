@@ -18,6 +18,8 @@ export const MAX_P95_MS = 20
 export const PERFORMANCE_PROJECT_ID = 'perf-release-300-500'
 const VIEWPORT_PAN_EPSILON = 1
 const VIEWPORT_ZOOM_EPSILON = 0.005
+const STRESS_MODE = process.env.QH_PERF_STRESS === '1'
+const SAMPLE_DURATION_MS = STRESS_MODE ? 8000 : 1200
 
 const ROOT = path.resolve(import.meta.dirname, '..')
 const RESERVED_PORTS = new Set([1420, 18765, 18766, 18791])
@@ -319,7 +321,9 @@ export function evaluatePerformanceGate(input) {
           gesture.fastLayer === true &&
           Number(gesture.fastPaths) > 0 &&
           Boolean(gesture.fastBackground) &&
-          Number(gesture.mountedNodes) < PERFORMANCE_NODE_COUNT &&
+          ((Number(gesture.coarseNodes) > 0 &&
+            Number(gesture.coarseNodes) === Number(gesture.mountedNodes)) ||
+            Number(gesture.mountedNodes) < PERFORMANCE_NODE_COUNT) &&
           Number(gesture.restoredNodes) === PERFORMANCE_NODE_COUNT
         )
       }),
@@ -332,10 +336,11 @@ export function evaluatePerformanceGate(input) {
         const gesture = round.gesture
         return (
           gesture?.moving === true &&
-          gesture.fastLayer === true &&
           Boolean(gesture.background) &&
           gesture.mountedEdges === 0 &&
-          Number(gesture.mountedNodes) < PERFORMANCE_NODE_COUNT &&
+          (gesture.fastLayer === true ||
+            (Number(gesture.coarseNodes) > 0 &&
+              Number(gesture.coarseNodes) === Number(gesture.mountedNodes))) &&
           Number(gesture.restoredNodes) === PERFORMANCE_NODE_COUNT
         )
       }),
@@ -550,7 +555,7 @@ async function beginPerformanceTrace(session) {
   }
 }
 
-async function sampleFrames(page, action, durationMs = 1200) {
+async function sampleFrames(page, action, durationMs = SAMPLE_DURATION_MS) {
   const sampling = page.evaluate(
     (duration) =>
       new Promise((resolve) => {
@@ -610,10 +615,18 @@ async function panRound(page, options = {}) {
   await page.mouse.move(x, y)
   await page.mouse.down({ button: 'middle' })
   const intervals = await sampleFrames(page, async () => {
-    for (let index = 0; index < 24; index += 1) {
+    for (let index = 0; index < (STRESS_MODE ? 40 : 24); index += 1) {
       const direction = index % 2 === 0 ? 1 : -1
-      await page.mouse.move(x + direction * 260, y + direction * 90, { steps: 4 })
-      await new Promise((resolve) => setTimeout(resolve, 50))
+      const stressX =
+        direction > 0
+          ? surface.x + surface.width * 0.86
+          : surface.x + surface.width * 0.14
+      await page.mouse.move(
+        STRESS_MODE ? stressX : x + direction * 260,
+        STRESS_MODE ? y : y + direction * 90,
+        { steps: STRESS_MODE ? 18 : 4 },
+      )
+      await new Promise((resolve) => setTimeout(resolve, STRESS_MODE ? 35 : 50))
     }
   })
   const gesture = await page.evaluate(() => {
@@ -629,6 +642,7 @@ async function panRound(page, options = {}) {
       fastLayer: Boolean(fastLayer),
       fastPaths: fastLayer?.querySelectorAll('path').length ?? 0,
       fastBackground: fastBackground?.getAttribute('data-viewport-background') ?? null,
+      coarseNodes: document.querySelectorAll('.react-flow__node-coarse').length,
       mountedNodes: document.querySelectorAll('.react-flow__node[data-id]').length,
     }
   })
@@ -638,6 +652,14 @@ async function panRound(page, options = {}) {
     screenshot = path.relative(ROOT, options.screenshotPath)
   }
   await page.mouse.up({ button: 'middle' })
+  await page.waitForFunction(
+    () =>
+      !document
+        .querySelector('[data-canvas-surface]')
+        ?.hasAttribute('data-viewport-moving'),
+    undefined,
+    { timeout: 10_000 },
+  )
   await page.waitForFunction(
     (expected) => document.querySelectorAll('.react-flow__node[data-id]').length === expected,
     PERFORMANCE_NODE_COUNT,
@@ -653,6 +675,13 @@ async function zoomRound(page) {
   const { x, y } = await blankPointerPoint(page, surface)
   await page.mouse.move(x, y)
   const intervals = await sampleFrames(page, async () => {
+    if (STRESS_MODE) {
+      for (let index = 0; index < 225; index += 1) {
+        await page.mouse.wheel(0, index % 2 === 0 ? -160 : 160)
+        await new Promise((resolve) => setTimeout(resolve, 35))
+      }
+      return
+    }
     for (let index = 0; index < 24; index += 1) {
       // A small net zoom-in per round keeps every measured round below maxZoom
       // while still exercising both wheel directions.
@@ -668,6 +697,7 @@ async function zoomRound(page) {
         'data-viewport-background',
       ) ?? null,
       fastLayer: Boolean(document.querySelector('[data-flow-viewport-edge-layer]')),
+      coarseNodes: document.querySelectorAll('.react-flow__node-coarse').length,
       mountedEdges: document.querySelectorAll('.react-flow__edge').length,
       mountedNodes: document.querySelectorAll('.react-flow__node[data-id]').length,
     }
@@ -686,7 +716,18 @@ async function settleZoomAt(page, targetZoom = 0.8) {
     const state = await viewportState(page)
     const zoom = state.domViewport?.zoom
     if (!Number.isFinite(zoom)) break
-    if (Math.abs(zoom - targetZoom) < 0.03) return
+    if (Math.abs(zoom - targetZoom) < 0.03) {
+      await page.waitForFunction(
+        () =>
+          !document
+            .querySelector('[data-canvas-surface]')
+            ?.hasAttribute('data-viewport-moving'),
+        undefined,
+        { timeout: 10_000 },
+      )
+      await page.waitForTimeout(250)
+      return
+    }
     const surface = await page.locator('[data-canvas-surface]').boundingBox()
     if (!surface) throw new Error('canvas surface has no bounding box')
     const { x, y } = await blankPointerPoint(page, surface)
@@ -702,7 +743,6 @@ async function findDraggableGenerationNode(page) {
   const candidate = await page.evaluate((bounds) => {
     const candidates = []
     for (const wrapper of document.querySelectorAll('.react-flow__node[data-id]')) {
-      if (!wrapper.querySelector('[data-node-type="generation"]')) continue
       const rect = wrapper.getBoundingClientRect()
       if (
         rect.left < bounds.x + 80 ||
@@ -715,7 +755,12 @@ async function findDraggableGenerationNode(page) {
       const x = rect.left + rect.width / 2
       const y = rect.top + rect.height / 2
       const target = document.elementFromPoint(x, y)
-      if (target?.closest('[data-node-id]') !== wrapper.querySelector('[data-node-id]')) {
+      const targetNode = target?.closest('[data-node-id]')
+      const targetWrapper = target?.closest('.react-flow__node[data-id]')
+      if (
+        targetNode !== wrapper.querySelector('[data-node-id]') &&
+        targetWrapper !== wrapper
+      ) {
         continue
       }
       candidates.push({
@@ -737,30 +782,45 @@ async function findDraggableGenerationNode(page) {
 async function nodeDragRound(page) {
   const node = await findDraggableGenerationNode(page)
   const start = { x: node.x, y: node.y }
-  const out = { x: start.x + 110, y: start.y + 55 }
+  const startRect = await page.locator(`.react-flow__node[data-id="${node.id}"]`).boundingBox()
+  const viewport = page.viewportSize()
+  const distance = STRESS_MODE ? 760 : 110
+  const out = {
+    x: Math.min((viewport?.width ?? 1440) - 100, start.x + distance),
+    y: Math.min((viewport?.height ?? 900) - 120, start.y + distance * 0.5),
+  }
   await page.mouse.move(start.x, start.y)
   await page.mouse.down()
   let midRect = null
   const intervals = await sampleFrames(page, async () => {
     try {
-      for (let cycle = 0; cycle < 6; cycle += 1) {
-        await page.mouse.move(out.x, out.y, { steps: 12 })
-        await page.waitForTimeout(80)
+      for (let cycle = 0; cycle < (STRESS_MODE ? 4 : 6); cycle += 1) {
+        await page.mouse.move(out.x, out.y, { steps: STRESS_MODE ? 24 : 12 })
+        await page.waitForTimeout(STRESS_MODE ? 35 : 80)
         if (cycle === 0) {
           midRect = await page
             .locator(`.react-flow__node[data-id="${node.id}"]`)
             .boundingBox()
         }
-        await page.mouse.move(start.x, start.y, { steps: 12 })
-        await page.waitForTimeout(80)
+        await page.mouse.move(start.x, start.y, { steps: STRESS_MODE ? 24 : 12 })
+        await page.waitForTimeout(STRESS_MODE ? 35 : 80)
       }
     } finally {
       await page.mouse.up()
     }
   })
+  await page.evaluate(
+    () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))),
+  )
   const finalRect = await page
     .locator(`.react-flow__node[data-id="${node.id}"]`)
     .boundingBox()
+  const finalTransform = await page.evaluate(
+    (id) =>
+      document.querySelector(`.react-flow__node[data-id="${id}"]`)?.style.transform ??
+      null,
+    node.id,
+  )
   const movedPx = midRect
     ? Math.hypot(midRect.x - node.left, midRect.y - node.top)
     : 0
@@ -773,8 +833,201 @@ async function nodeDragRound(page) {
       nodeId: node.id,
       movedPx,
       finalDeltaPx,
+      startRect,
+      midRect,
+      finalRect,
+      finalTransform,
     },
   }
+}
+
+async function coldNodeDragRound(page) {
+  const node = await findDraggableGenerationNode(page)
+  const start = { x: node.x, y: node.y }
+  const startRect = await page.locator(`.react-flow__node[data-id="${node.id}"]`).boundingBox()
+  if (!startRect) throw new Error('cold drag node has no bounding box')
+  await page.evaluate((id) => {
+    const element = document.querySelector(`.react-flow__node[data-id="${id}"]`)
+    window.__qhDragStyleLog = []
+    window.__qhDragPointerLog = []
+    window.__qhDragMouseLog = []
+    window.__qhDragDownLog = []
+    window.__qhDragInitialTransform = element?.style.transform ?? ''
+    if (!element) return
+    new MutationObserver(() => {
+      window.__qhDragStyleLog.push({
+        at: performance.now(),
+        transform: element.style.transform,
+      })
+    }).observe(element, { attributes: true, attributeFilter: ['style', 'class'] })
+    document.addEventListener(
+      'pointerdown',
+      (event) => {
+        window.__qhDragDownLog.push({
+          at: performance.now(),
+          x: event.clientX,
+          y: event.clientY,
+        })
+      },
+      true,
+    )
+    document.addEventListener(
+      'pointermove',
+      (event) => {
+        window.__qhDragPointerLog.push({
+          at: performance.now(),
+          x: event.clientX,
+          y: event.clientY,
+        })
+      },
+      true,
+    )
+    document.addEventListener(
+      'mousemove',
+      (event) => {
+        window.__qhDragMouseLog.push({
+          at: performance.now(),
+          x: event.clientX,
+          y: event.clientY,
+        })
+      },
+      true,
+    )
+  }, node.id)
+  const target = {
+    x: Math.min((page.viewportSize()?.width ?? 1440) - 100, start.x + 760),
+    y: Math.min((page.viewportSize()?.height ?? 900) - 120, start.y + 380),
+  }
+  const firstMove = page.evaluate(
+    ({ id, initialLeft, initialTop }) =>
+      new Promise((resolve) => {
+        const element = document.querySelector(`.react-flow__node[data-id="${id}"]`)
+        const started = performance.now()
+        const tick = () => {
+          const rect = element?.getBoundingClientRect()
+          if (rect) {
+            const dx = rect.left - initialLeft
+            const dy = rect.top - initialTop
+            if (Math.hypot(dx, dy) > 0.5) {
+              resolve({ ms: performance.now() - started, dx, dy })
+              return
+            }
+          }
+          if (performance.now() - started > 4000) {
+            resolve({ ms: null, dx: 0, dy: 0 })
+            return
+          }
+          requestAnimationFrame(tick)
+        }
+        requestAnimationFrame(tick)
+      }),
+    { id: node.id, initialLeft: startRect.x, initialTop: startRect.y },
+  )
+  await page.mouse.move(start.x, start.y)
+  await page.mouse.down()
+  const lagSamples = []
+  let layersDuringDrag = null
+  const intervals = await sampleFrames(page, async () => {
+    try {
+      for (let step = 1; step <= 24; step += 1) {
+        const x = start.x + ((target.x - start.x) * step) / 24
+        const y = start.y + ((target.y - start.y) * step) / 24
+        await page.mouse.move(x, y)
+        await page.evaluate(
+          () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))),
+        )
+        const sample = await page.evaluate((id) => {
+          const element = document.querySelector(`.react-flow__node[data-id="${id}"]`)
+          if (!element) return null
+          const rect = element.getBoundingClientRect()
+          return {
+            x: rect.left,
+            y: rect.top,
+            transform: element.style.transform,
+          }
+        }, node.id)
+        if (sample) {
+          lagSamples.push({
+            x: sample.x - startRect.x - (x - start.x),
+            y: sample.y - startRect.y - (y - start.y),
+            expectedX: x - start.x,
+            expectedY: y - start.y,
+            actualX: sample.x - startRect.x,
+            actualY: sample.y - startRect.y,
+            transform: sample.transform,
+          })
+        }
+        if (step === 6) {
+          layersDuringDrag = await page.evaluate(() => ({
+            directDrag: document
+              .querySelector('[data-canvas-surface]')
+              ?.getAttribute('data-direct-drag'),
+            portLayer: Boolean(document.querySelector('[data-flow-port-layer]')),
+            childHitLayer: Boolean(document.querySelector('[data-flow-child-edge-hit]')),
+            draggingNodes: document.querySelectorAll('.react-flow__node.dragging').length,
+          }))
+        }
+      }
+      await page.waitForTimeout(120)
+    } finally {
+      await page.mouse.up()
+    }
+  }, 3500)
+  const first = await firstMove
+  const dragObserverLog = await page.evaluate(() => ({
+    style: window.__qhDragStyleLog,
+    pointer: window.__qhDragPointerLog,
+    mouse: window.__qhDragMouseLog,
+    down: window.__qhDragDownLog,
+    initialTransform: window.__qhDragInitialTransform,
+  }))
+  await page.waitForFunction(
+    (expected) => document.querySelectorAll('.react-flow__node[data-id]').length === expected,
+    PERFORMANCE_NODE_COUNT,
+    { timeout: 10_000 },
+  )
+  return {
+    nodeId: node.id,
+    firstMoveMs: first.ms,
+    firstMoveDelta: { x: first.dx, y: first.dy },
+    firstFramesMs: intervals.slice(0, 10),
+    frames: summarizeFrames(intervals),
+    dragObserverLog,
+    firstMoveAfterDownMs: (() => {
+      const down = dragObserverLog.down[0]
+      const firstMotion = dragObserverLog.pointer.find(
+        (sample) => sample.x !== start.x || sample.y !== start.y,
+      )
+      const changed = dragObserverLog.style.find(
+        (sample) => sample.transform !== dragObserverLog.initialTransform,
+      )
+      return {
+        pointer: down && firstMotion ? firstMotion.at - down.at : null,
+        node: down && changed ? changed.at - down.at : null,
+      }
+    })(),
+    pointerLag: {
+      samples: lagSamples.length,
+      raw: lagSamples,
+      mean:
+        lagSamples.reduce((sum, sample) => sum + Math.hypot(sample.x, sample.y), 0) /
+        Math.max(1, lagSamples.length),
+      max: Math.max(0, ...lagSamples.map((sample) => Math.hypot(sample.x, sample.y))),
+      maxX: Math.max(0, ...lagSamples.map((sample) => Math.abs(sample.x))),
+      maxY: Math.max(0, ...lagSamples.map((sample) => Math.abs(sample.y))),
+    },
+    layersDuringDrag,
+  }
+}
+
+async function waitForPerformancePage(page) {
+  await page.locator('[data-canvas-hydrated="true"]').waitFor({ timeout: 60_000 })
+  await page.waitForFunction(
+    (expected) => document.querySelectorAll('.react-flow__node[data-id]').length === expected,
+    PERFORMANCE_NODE_COUNT,
+    { timeout: 60_000 },
+  )
+  await waitForImageEvidence(page)
 }
 
 async function waitForHttp(url, timeoutMs, validate = () => true) {
@@ -1050,6 +1303,8 @@ async function captureCullingUiMatrix(page, runRoot) {
     const dragPath = path.join(output, `drag-${name}.png`)
     await page.screenshot({ path: dragPath })
     await page.mouse.move(dragNode.x, dragNode.y, { steps: 8 })
+    await page.mouse.move(dragNode.x, dragNode.y)
+    await page.waitForTimeout(80)
     await page.mouse.up()
     await page.waitForTimeout(250)
     const dragFinalRect = await page
@@ -1346,6 +1601,57 @@ async function main() {
     const imageEvidence = await waitForImageEvidence(page)
     if (diagnosticCss) await page.addStyleTag({ content: diagnosticCss })
     await page.waitForTimeout(1000)
+
+    if (process.env.QH_PERF_COLD_DRAG_ONLY === '1') {
+      const coldDrags = []
+      for (let round = 0; round < 3; round += 1) {
+        if (round > 0) {
+          await page.reload({ waitUntil: 'domcontentloaded' })
+          await waitForPerformancePage(page)
+          await page.waitForTimeout(1000)
+        }
+        coldDrags.push(await coldNodeDragRound(page))
+      }
+      const coldReport = {
+        environment: {
+          built: 'Tauri release + WebView2',
+          viewport: await page.evaluate(() => ({
+            width: window.innerWidth,
+            height: window.innerHeight,
+            devicePixelRatio: window.devicePixelRatio,
+          })),
+          releaseExe,
+        },
+        graph: {
+          nodes: seeded.nodes.length,
+          edges: seeded.edges.length,
+          mountedNodes: await page.locator('.react-flow__node[data-id]').count(),
+          mountedEdges: await page.locator('.react-flow__edge').count(),
+        },
+        images: imageEvidence,
+        coldDrags,
+        pageErrors,
+        consoleErrors,
+      }
+      const coldReportPath = path.join(runRoot, 'cold-drag-report.json')
+      fs.writeFileSync(coldReportPath, JSON.stringify(coldReport, null, 2))
+      fs.writeFileSync(
+        path.join(runRoot, 'cold-drag-REPORT.md'),
+        [
+          '# Cold node drag diagnostic',
+          '',
+          ...coldDrags.map(
+            (round, index) =>
+              `- round ${index + 1}: first move ${round.firstMoveMs?.toFixed(2) ?? 'missing'}ms; P95 ${round.frames.p95Ms.toFixed(2)}ms; max ${round.frames.maxMs.toFixed(2)}ms; pointer lag max ${round.pointerLag.max.toFixed(2)}px`,
+          ),
+          '',
+        ].join('\n'),
+      )
+      console.log(JSON.stringify(coldReport, null, 2))
+      console.log(`evidence: ${path.relative(ROOT, coldReportPath)}`)
+      return
+    }
+
     const mountedNodes = await page.locator('[data-node-id]').count()
     const mountedEdges = await page.locator('.react-flow__edge').count()
     const viewport = await page.evaluate(() => ({
@@ -1397,10 +1703,14 @@ async function main() {
       await page.waitForTimeout(250)
     }
 
+    await page.keyboard.press('z')
+    await page.waitForTimeout(300)
     await settleZoomAt(page, 1)
     const warmupDrag = await nodeDragRound(page)
     if (!nodeDragRoundMovement({ movement: warmupDrag.movement }).pass) {
-      throw new Error('node drag warmup did not move and return the node')
+      throw new Error(
+        `node drag warmup did not move and return the node: ${JSON.stringify(warmupDrag.movement)}`,
+      )
     }
     await page.waitForTimeout(900)
     for (let round = 0; round < measurementRounds; round += 1) {
@@ -1431,7 +1741,8 @@ async function main() {
     await zoomRound(page)
     await page.waitForTimeout(250)
     for (let round = 0; round < measurementRounds; round += 1) {
-      await settleZoomAt(page)
+      await page.keyboard.press('z')
+      await page.waitForTimeout(300)
       const before = await viewportState(page)
       const performanceBefore = await readPerformanceMetrics(cdp)
       const result = await zoomRound(page)

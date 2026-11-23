@@ -59,7 +59,11 @@ export function useUpstreamPick(): string | null {
  */
 export function useDraggingId(): string | null {
   const store = useCanvasStore()
-  return useSyncExternalStore(store.subscribe, store.getDraggingId, store.getDraggingId)
+  return useSyncExternalStore(
+    store.subscribeDragging,
+    store.getDraggingId,
+    store.getDraggingId,
+  )
 }
 
 /** 当前选中的连线 id 列表（§6.14） */

@@ -72,12 +72,6 @@ export function applyFlowNodeChanges(
 export interface FlowNodeDragStartPorts {
   setDragging: (active: boolean, nodeId: string | null) => void
   markDragMoved: (moved: boolean) => void
-  moveNodes: (
-    ids: string[],
-    dx: number,
-    dy: number,
-    phase: 'begin' | 'move' | 'end',
-  ) => void
 }
 
 export function beginFlowNodeDrag(
@@ -87,7 +81,6 @@ export function beginFlowNodeDrag(
   const ids = dragIdsOf(input.mainId, input.draggedIds)
   ports.markDragMoved(false)
   ports.setDragging(true, ids[0] ?? null)
-  ports.moveNodes(ids, 0, 0, 'begin')
 }
 
 export interface FlowNodeDragEndInput {

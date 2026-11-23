@@ -101,15 +101,13 @@ describe('FlowSurface flow action coordinator', () => {
     expect(ports.setSelection).not.toHaveBeenCalled()
   })
 
-  it('keeps begin, final alignment, end, release and reparent order', () => {
+  it('starts without a zero-move graph commit, then keeps end and reparent order', () => {
     const calls: string[] = []
     beginFlowNodeDrag(
       { mainId: 'a', draggedIds: ['a'] },
       {
         markDragMoved: (value) => calls.push(`moved:${value}`),
         setDragging: (active, id) => calls.push(`dragging:${active}:${id}`),
-        moveNodes: (ids, dx, dy, phase) =>
-          calls.push(`move:${ids.join(',')}:${dx}:${dy}:${phase}`),
       },
     )
     finishFlowNodeDrag(
@@ -139,7 +137,6 @@ describe('FlowSurface flow action coordinator', () => {
     expect(calls).toEqual([
       'moved:false',
       'dragging:true:a',
-      'move:a:0:0:begin',
       'reset',
       'move:a:0:0:end',
       'dragging:false',

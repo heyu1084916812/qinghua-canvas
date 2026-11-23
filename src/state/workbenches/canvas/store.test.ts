@@ -280,6 +280,31 @@ describe('canvas store / 瞬态状态', () => {
     expect(viewportFired).toBe(2)
   })
 
+  it('拖动开始只通知拖动订阅者，拖动结束再结算语义视图', () => {
+    const store = createCanvasStore({ platform, projectId: 'p1' })
+    let semanticFired = 0
+    let draggingFired = 0
+    const unsub = store.subscribe(() => {
+      semanticFired += 1
+    })
+    const unsubDragging = store.subscribeDragging(() => {
+      draggingFired += 1
+    })
+
+    store.setDragging(true, 'n1')
+    expect(semanticFired).toBe(0)
+    expect(draggingFired).toBe(1)
+    expect(store.getDraggingId()).toBe('n1')
+
+    store.setDragging(false)
+    expect(semanticFired).toBe(1)
+    expect(draggingFired).toBe(2)
+    expect(store.isDragging()).toBe(false)
+
+    unsub()
+    unsubDragging()
+  })
+
   it('选中与视口走独立 API，不进 dispatch / undo / 持久化', () => {
     const store = createCanvasStore({ platform, projectId: 'p1' })
     store.setSelection(['a', 'b'])
@@ -317,6 +342,17 @@ describe('canvas store / 瞬态状态', () => {
     store.setSelection([])
     expect(store.getSelection()).toEqual([])
     expect(store.getEdgeSelection()).toEqual([])
+  })
+
+  it('拖动后选中保持创作面板关闭', () => {
+    const store = createCanvasStore({ platform, projectId: 'p1' })
+    store.setSelection(['before'])
+    store.setSelectionAfterDrag(['after'])
+    expect(store.getSelection()).toEqual(['after'])
+    expect(store.isPanelDismissed()).toBe(true)
+    store.setSelectionAfterDrag(['a', 'b'])
+    expect(store.getSelectionMode()).toBe('multi')
+    expect(store.isPanelDismissed()).toBe(true)
   })
 
   it('连线选择不进撤销栈', () => {

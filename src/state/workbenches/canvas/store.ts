@@ -254,6 +254,8 @@ export interface CanvasStore extends AppStore<GraphSnapshot, Command> {
   setSelection(ids: string[]): void
   getSelection(): string[]
   setSelectionAsMulti(ids: string[]): void
+  /** 拖动结束后选中节点，但保持创作面板关闭，避免松手时重建重面板。 */
+  setSelectionAfterDrag(ids: string[]): void
   getSelectionMode(): 'single' | 'multi'
   setSelectionMarqueeActive(active: boolean): void
   isSelectionMarqueeActive(): boolean
@@ -270,6 +272,8 @@ export interface CanvasStore extends AppStore<GraphSnapshot, Command> {
   getSurfaceSize(): Size | null
   /** 只订阅视口变化；平移 / 缩放帧不唤醒全量的视图订阅者。 */
   subscribeViewport(listener: () => void): () => void
+  /** 只订阅拖动开始 / 结束；开始拖动不唤醒整张画布。 */
+  subscribeDragging(listener: () => void): () => void
   /** 测试与卸载时手动冲刷防抖持久化 */
   flush(): Promise<void>
   /**
@@ -605,7 +609,9 @@ export function createCanvasStore(opts: CanvasStoreOptions): CanvasStore {
 
   const semanticListeners = new Set<() => void>()
   const viewportListeners = new Set<() => void>()
+  const draggingListeners = new Set<() => void>()
   let viewportUpdate = false
+  let draggingUpdate = false
 
   /**
    * 视口是每帧变化的高频值。把它从 vanilla store 的全量订阅里拆出来，
@@ -616,6 +622,16 @@ export function createCanvasStore(opts: CanvasStoreOptions): CanvasStore {
     if (viewportUpdate) {
       if (state.viewport === previous.viewport) return
       for (const listener of viewportListeners) listener()
+      return
+    }
+    if (draggingUpdate) {
+      if (
+        state.dragging === previous.dragging &&
+        state.draggingId === previous.draggingId
+      ) {
+        return
+      }
+      for (const listener of draggingListeners) listener()
       return
     }
     for (const listener of semanticListeners) listener()
@@ -724,11 +740,19 @@ export function createCanvasStore(opts: CanvasStoreOptions): CanvasStore {
         viewportListeners.delete(listener)
       }
     },
+    subscribeDragging: (listener) => {
+      draggingListeners.add(listener)
+      return () => {
+        draggingListeners.delete(listener)
+      }
+    },
     // 节点选择与连线选择互斥（§6.14 / §6.15）：选节点即清空连线选择，反之亦然
     setSelection: (ids) =>
       store.setState({ selection: ids, selectionMode: 'single', selectedEdgeIds: [], panelDismissed: false }),
     setSelectionAsMulti: (ids) =>
       store.setState({ selection: ids, selectionMode: 'multi', selectedEdgeIds: [], panelDismissed: false }),
+    setSelectionAfterDrag: (ids) =>
+      store.setState({ selection: ids, selectionMode: ids.length > 1 ? 'multi' : 'single', selectedEdgeIds: [], panelDismissed: true }),
     getSelection: () => store.getState().selection,
     getSelectionMode: () => store.getState().selectionMode,
     setSelectionMarqueeActive: (active) => store.setState({ selectionMarqueeActive: active }),
@@ -777,7 +801,22 @@ export function createCanvasStore(opts: CanvasStoreOptions): CanvasStore {
     clearUndoBar: (id) => {
       store.setState((s) => (id && s.undoBar?.id !== id ? {} : { undoBar: null }))
     },
-    setDragging: (on, id) => store.setState({ dragging: on, draggingId: on ? id ?? null : null }),
+    setDragging: (on, id) => {
+      const current = store.getState()
+      const nextId = on ? id ?? null : null
+      if (current.dragging === on && current.draggingId === nextId) return
+      if (on) {
+        draggingUpdate = true
+        try {
+          store.setState({ dragging: true, draggingId: nextId })
+        } finally {
+          draggingUpdate = false
+        }
+        return
+      }
+      store.setState({ dragging: false, draggingId: null })
+      for (const listener of draggingListeners) listener()
+    },
     isDragging: () => store.getState().dragging,
     getDraggingId: () => store.getState().draggingId,
     setPanelDismissed: (on) => store.setState({ panelDismissed: on }),
