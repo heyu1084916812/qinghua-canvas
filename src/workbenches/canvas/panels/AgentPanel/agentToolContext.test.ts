@@ -18,6 +18,7 @@ const ALWAYS_KEYS = [
   'rememberMemory',
   'researchDesign',
   'readPage',
+  'readOperation',
   'resolveNodeIds',
   'runNodes',
   'selectedIds',
@@ -68,6 +69,7 @@ function harness(
     sliceImage: vi.fn(),
     splitGrid: vi.fn(),
   }
+  const safety = { readOperation: vi.fn() }
   const plan = { get: vi.fn(), save: vi.fn() }
   const aliases = { current: new Map<string, string>() }
   const ctx = composeAgentToolContext({
@@ -78,6 +80,7 @@ function harness(
     research,
     defaults,
     canvasOps,
+    safety,
   })
   return {
     ctx,
@@ -90,13 +93,14 @@ function harness(
     research,
     defaults,
     canvasOps,
+    safety,
     plan,
     aliases,
   }
 }
 
 describe('composeAgentToolContext / 键集合', () => {
-  it('22 个键一个不多一个不少（条件键全开）', () => {
+  it('23 个键一个不多一个不少（条件键全开）', () => {
     const { ctx } = harness()
 
     expect(Object.keys(ctx).sort()).toEqual(

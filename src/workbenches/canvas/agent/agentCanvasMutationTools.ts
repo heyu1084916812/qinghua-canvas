@@ -22,6 +22,28 @@ function selectedNodes(store: CanvasStore, ids: readonly string[]) {
   }
 }
 
+export function expectedModelCategoryOfNode(
+  node: { type: string; data: unknown },
+): 'image' | 'video' | 'chat' | undefined {
+  if (node.type === 'prompt') return 'chat'
+  if (node.type !== 'generation' && node.type !== 'batch') return undefined
+  return asRecord(node.data).mode === 'video' ? 'video' : 'image'
+}
+
+export async function renameNodeInStore(store: CanvasStore, args: Record<string, unknown>) {
+  const nodeId = typeof args.nodeId === 'string' ? args.nodeId.trim() : ''
+  const title = typeof args.title === 'string' ? args.title.trim() : ''
+  if (!nodeId) return { ok: false, problems: ['renameNode 缺少 nodeId'] }
+  if (!title) return { ok: false, problems: ['节点名称不能为空'] }
+  if (title.length > 120) return { ok: false, problems: ['节点名称最多 120 字'] }
+  const node = store.getSnapshot().nodes.find((item) => item.id === nodeId)
+  if (!node) return { ok: false, problems: ['节点不存在'] }
+  if (node.title === title) return { ok: true, nodeId, title, unchanged: true }
+  store.dispatch({ kind: 'node.rename', id: nodeId, title })
+  await store.flush()
+  return { ok: true, nodeId, title, previousTitle: node.title }
+}
+
 export async function moveNodesInStore(store: CanvasStore, args: Record<string, unknown>) {
   const ids = asStringArray(args.nodeIds)
   if (ids.length === 0) return { ok: false, problems: ['没有指定要移动的节点'] }

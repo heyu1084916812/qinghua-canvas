@@ -150,7 +150,12 @@ export interface AgentLoopDeps {
    * 为什么放在循环里而不是每个调用点自己记得：确认卡是**这里**弹的，
    * 预检就该和它挨着；散在调用点迟早有一条路径漏掉。
    */
-  precheck?: (name: string, args: unknown) => { ok: true } | { ok: false; result: unknown }
+  precheck?: (
+    name: string,
+    args: unknown,
+  ) =>
+    | { ok: true; args?: unknown }
+    | { ok: false; result: unknown }
   /**
    * 取出在下一次模型调用前应插入的运行中引导。实现方必须按 id 去重；
    * 循环会在每个工具批次结束后再次调用，不会中断已经发出的模型请求。
@@ -515,7 +520,7 @@ export async function runAgentTurn(
         handledCallIds.add(call.id)
         continue
       }
-      const args = parseArgs(call.args)
+      let args = parseArgs(call.args)
       if (args === PARSE_FAILED) {
         messages.push(
           toolResult(call.id, call.name, {
@@ -613,17 +618,15 @@ export async function runAgentTurn(
         continue
       }
 
+      /** 写操作与确认操作共用预检；返回的 args 会携带隐藏的前置条件。 */
+      const pre = deps.precheck?.(call.name, args)
+      if (pre && pre.ok === false) {
+        messages.push(toolResult(call.id, call.name, pre.result))
+        handledCallIds.add(call.id)
+        continue
+      }
+      if (pre?.ok === true && pre.args !== undefined) args = pre.args
       if (CONFIRM_TOOLS.has(call.name)) {
-        /**
-         * 先过预检：不合法的就**别让用户点**（见 `precheck` 的说明）。
-         * 预检只挡「根本落不了地」的请求；能落地的一律照常弹确认卡。
-         */
-        const pre = deps.precheck?.(call.name, args)
-        if (pre && pre.ok === false) {
-          messages.push(toolResult(call.id, call.name, pre.result))
-          handledCallIds.add(call.id)
-          continue
-        }
         // 写 / 花钱：跳出循环，交界面等确认（§9）
         /**
          * 当前调用要等用户批准，后面同批调用也还没有开始。

@@ -2,6 +2,7 @@ import { describe, expect, it, vi, beforeEach } from 'vitest'
 import { registerAllSpecs } from '../../../domain/canvas/nodeSpecs'
 import type { AgentNodeType, AgentPlan } from '../../../domain/agent/plan'
 import { AGENT_TOOL_DEFINITIONS } from '../../../domain/agent/toolRegistry'
+import { prepareMutationCall } from '../../../domain/agent/mutationSafety'
 import { createMemoryPlatform } from '../../../platform/memory'
 import { createCanvasStore, type CanvasStore } from '../../../state/workbenches/canvas/store'
 import {
@@ -72,6 +73,7 @@ describe('工具声明', () => {
 
   it('★ 读图、运行、空间操作和现有图像能力都在，且都带参数 schema', () => {
     expect(AGENT_TOOLS.map((t) => t.name).sort()).toEqual([
+      'applyCanvasBatch',
       'applyPlan',
       'arrangeNodes',
       'askQuestions',
@@ -84,9 +86,11 @@ describe('工具声明', () => {
       'readAsset',
       'readCapabilities',
       'readGraph',
+      'readOperation',
       'readPage',
       'readResult',
       'rememberMemory',
+      'renameNode',
       'requestTaskConfirmation',
       'researchDesign',
       'resizeNodes',
@@ -190,6 +194,7 @@ describe('工具声明', () => {
       'curateReferences',
       'readCapabilities',
       'readGraph',
+      'readOperation',
       'readResult',
       'rememberMemory',
       'runNode',
@@ -206,6 +211,8 @@ describe('工具声明', () => {
       webResearch: false,
     }).map((tool) => tool.name)
     expect(operation).toContain('moveNodes')
+    expect(operation).toContain('renameNode')
+    expect(operation).toContain('applyCanvasBatch')
     expect(operation).toContain('rememberMemory')
     expect(operation).not.toContain('researchDesign')
   })
@@ -226,7 +233,7 @@ describe('工具声明', () => {
     })
   })
 
-  it('★★ 改名 / 改标题查询不返回 updateNode，而是明确的“没有该能力”', () => {
+  it('★★ 改名 / 改标题查询只加载 renameNode，不混入 updateNode', () => {
     for (const query of [
       '改节点标题',
       'rename node title',
@@ -240,11 +247,19 @@ describe('工具声明', () => {
         query,
         agentToolsForCapabilities({ canvasReview: false }),
       )
-      expect(found.tools).toEqual([])
-      expect(found.result).toMatchObject({ ok: false, supported: false })
-      expect(String(found.result.error)).toContain('没有改名')
-      expect(found.result.loaded).toEqual([])
+      expect(found.tools.map((tool) => tool.name), query).toContain('renameNode')
+      expect(found.tools.map((tool) => tool.name)).not.toContain('updateNode')
+      expect(found.result).toMatchObject({ ok: true })
+      expect(found.result.loaded).toContain('renameNode')
     }
+  })
+
+  it('★★ 批量画布修改与超时恢复都能从能力索引按需加载', () => {
+    const batch = discoverAgentTools('一次批量改名、移动和删除多个节点')
+    expect(batch.tools.map((tool) => tool.name)).toContain('applyCanvasBatch')
+
+    const operation = discoverAgentTools('请求超时，查询 requestId 的操作状态')
+    expect(operation.tools.map((tool) => tool.name)).toContain('readOperation')
   })
 
   it('★ 移动 / 删除 / 运行的能力匹配不被改名规则误伤', () => {
@@ -610,6 +625,22 @@ describe('读类工具', () => {
     const out = readResults(store, [ok, empty, 'gone'])
     expect(out.map((r) => r.status)).toEqual(['ok', 'empty', 'missing'])
     expect(out[0]).toMatchObject({ title: '三视图设定' })
+  })
+
+  it('★ readOperation 只把 requestId 交给持久账本查询端口', async () => {
+    const { ctx } = setup()
+    const readOperation = vi.fn(async () => ({
+      ok: true,
+      requestId: 'agent:job:step:call',
+      status: 'pending',
+    }))
+    const result = await executeReadTool(
+      'readOperation',
+      { requestId: 'agent:job:step:call' },
+      { ...ctx, readOperation },
+    )
+    expect(result).toMatchObject({ ok: true, status: 'pending' })
+    expect(readOperation).toHaveBeenCalledWith('agent:job:step:call')
   })
 
   it('readAsset/readResult 使用真实 assetMime，readResult 返回已知失败原因', () => {
@@ -1205,6 +1236,64 @@ describe('写 / 花钱的工具（只由确认后调用）', () => {
       ok: boolean
     }
     expect(r.ok).toBe(false)
+  })
+
+  it('★ renameNode 只改标题，并返回改前名称', async () => {
+    const { store, ctx } = setup()
+    const id = addNode(store, 'prompt', {}, '旧标题')
+    const result = await executeConfirmedTool(
+      'renameNode',
+      { nodeId: id, title: '新标题' },
+      ctx,
+    )
+    expect(result).toMatchObject({
+      ok: true,
+      nodeId: id,
+      title: '新标题',
+      previousTitle: '旧标题',
+    })
+    expect(store.getSnapshot().nodes.find((node) => node.id === id)?.title).toBe('新标题')
+    expect(store.getSnapshot().nodes.find((node) => node.id === id)?.data).toMatchObject({})
+  })
+
+  it('★★ 用户确认后目标节点已变化 → 版本保护拒绝旧操作', async () => {
+    const { store, ctx } = setup()
+    const id = addNode(store, 'prompt', {}, '原名称')
+    const prepared = prepareMutationCall({
+      name: 'renameNode',
+      args: { nodeId: id, title: 'Agent 想改的名称' },
+      graph: store.getSnapshot(),
+      revision: store.getRevision?.() ?? 0,
+    })
+    expect(prepared.ok).toBe(true)
+    if (!prepared.ok) return
+    store.dispatch({ kind: 'node.rename', id, title: '用户刚改的名称' })
+    const result = await executeConfirmedTool('renameNode', prepared.args, ctx)
+    expect(result).toMatchObject({ ok: false })
+    expect(String((result as { problems?: string[] }).problems?.[0])).toContain(
+      '确认后发生了变化',
+    )
+    expect(store.getSnapshot().nodes.find((node) => node.id === id)?.title).toBe(
+      '用户刚改的名称',
+    )
+  })
+
+  it('★ applyCanvasBatch 经确认工具入口整体执行', async () => {
+    const { store, ctx } = setup()
+    const a = addNode(store, 'prompt', {}, 'A')
+    const b = addNode(store, 'prompt', {}, 'B')
+    const result = await executeConfirmedTool(
+      'applyCanvasBatch',
+      {
+        steps: [
+          { op: 'rename', nodeId: a, title: '批量后的 A' },
+          { op: 'move', nodeIds: [b], dx: 30, dy: 20 },
+        ],
+      },
+      ctx,
+    )
+    expect(result).toMatchObject({ ok: true, appliedSteps: 2 })
+    expect(store.getSnapshot().nodes.find((node) => node.id === a)?.title).toBe('批量后的 A')
   })
 
   it('★★ updateNode 只认模型，渠道由系统反查并覆盖模型自己的错误 channelId', async () => {

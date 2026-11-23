@@ -13773,6 +13773,78 @@
         "src/workbenches/canvas/flow/viewportBackground.test.ts"
       ],
       "budget": 40
+    },
+    {
+      "module": "src/domain/agent/mutationSafety.ts",
+      "owner": "agent-mutation-safety",
+      "responsibility": "为 Agent 写操作生成可持久化的目标版本凭证、校验确认后是否过期，并规范化已有节点的批量事务步骤。",
+      "owns": [
+        "节点与连线状态摘要",
+        "写操作隐藏前置条件",
+        "确认后版本校验",
+        "批量画布步骤归一化"
+      ],
+      "doesNotOwn": [
+        "画布命令执行",
+        "工具账本持久化",
+        "Agent 提示词与 UI"
+      ],
+      "publicApi": [
+        "MUTATION_PRECONDITION_KEY",
+        "MUTATION_PRECONDITION_TOOLS",
+        "normalizeCanvasBatchSteps",
+        "prepareMutationCall",
+        "verifyMutationPrecondition"
+      ],
+      "test": [
+        "src/domain/agent/mutationSafety.test.ts"
+      ],
+      "budget": 360
+    },
+    {
+      "module": "src/workbenches/canvas/agent/agentBatchMutationTools.ts",
+      "owner": "canvas-agent",
+      "responsibility": "把多个已有节点的改名、移动和删除操作校验后放入同一个画布事务。",
+      "owns": [
+        "批量步骤画布预检",
+        "同一 multi-step 事务派发",
+        "失败整批回滚"
+      ],
+      "doesNotOwn": [
+        "批量步骤 schema",
+        "版本凭证生成",
+        "新建节点与连线"
+      ],
+      "publicApi": [
+        "applyCanvasBatchInStore"
+      ],
+      "test": [
+        "src/workbenches/canvas/agent/agentBatchMutationTools.test.ts"
+      ],
+      "budget": 130
+    },
+    {
+      "module": "src/workbenches/canvas/panels/AgentPanel/agentToolSafety.ts",
+      "owner": "agent-panel",
+      "responsibility": "按 requestId 从当前会话的持久工具账本查询原操作状态，不重新执行工具。",
+      "owns": [
+        "会话内 Job 查找",
+        "requestId 到工具效果查询",
+        "pending / completed / failed 状态投影"
+      ],
+      "doesNotOwn": [
+        "工具效果写入",
+        "画布命令执行",
+        "UI 提示"
+      ],
+      "publicApi": [
+        "AgentToolSafety",
+        "createAgentToolSafety"
+      ],
+      "test": [
+        "src/workbenches/canvas/panels/AgentPanel/agentToolSafety.test.ts"
+      ],
+      "budget": 90
     }
   ]
 }

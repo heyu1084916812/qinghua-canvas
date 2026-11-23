@@ -30,6 +30,7 @@ import { runAgentCanvasNodes } from './agentCanvasRun'
 import { originOf, viewportWorldOf } from './agentPanelViewHelpers'
 import type { AgentPanelRefs } from './useAgentPanelRefs'
 import type { AgentPanelSessionModel } from './useAgentPanelSessionModel'
+import { createAgentToolSafety } from './agentToolSafety'
 
 /**
  * 工具领域：**工具上下文（`toolCtx`）+ 执行账本**。
@@ -170,6 +171,7 @@ export function useAgentPanelToolModel({
         getContextAssets: () =>
           contextTraceRef.current.get(sessionId)?.assetRefs,
       })
+      const safety = createAgentToolSafety({ sessionId, jobs })
       return composeAgentToolContext({
         base: {
           store,
@@ -200,6 +202,7 @@ export function useAgentPanelToolModel({
         research: toolResearch,
         defaults: toolDefaults,
         canvasOps,
+        safety,
       })
     },
     /**
@@ -221,6 +224,7 @@ export function useAgentPanelToolModel({
       inspirationRepository,
       memory,
       viewport,
+      jobs,
       runTrackedDetached,
     ],
   )

@@ -174,7 +174,7 @@ describe('executeWithLedger', () => {
       async () => 'ignored',
     )
 
-    expect(result).toEqual({ written: 2 })
+    expect(result).toEqual({ written: 2, requestId: 'effect-1' })
     expect(notifications).toEqual([])
   })
 
@@ -190,7 +190,7 @@ describe('executeWithLedger', () => {
       async () => 'ignored',
     )
 
-    expect(result).toBe('cached')
+    expect(result).toEqual({ ok: true, requestId: 'effect-1', result: 'cached' })
     expect(notifications).toEqual([
       {
         message: '已复用这次工具调用的持久结果，没有重复执行或扣费',
@@ -213,7 +213,7 @@ describe('executeWithLedger', () => {
 
     expect(error).toBeInstanceOf(AgentToolEffectBlockedError)
     const blocked = error as AgentToolEffectBlockedError
-    expect(blocked.message).toBe('上一次还没回来')
+    expect(blocked.message).toBe('上一次还没回来 请求编号：effect-1')
     expect(blocked.status).toBe('needs_attention')
     expect(blocked.outcome).toBe(outcome)
   })
@@ -232,7 +232,7 @@ describe('executeWithLedger', () => {
 
     const blocked = error as AgentToolEffectBlockedError
     expect(blocked).toBeInstanceOf(AgentToolEffectBlockedError)
-    expect(blocked.message).toBe('同样 callId 换了参数')
+    expect(blocked.message).toBe('同样 callId 换了参数 请求编号：effect-1')
     expect(blocked.status).toBe('failed')
     expect(blocked.outcome).toBe(outcome)
   })
@@ -251,7 +251,7 @@ describe('executeWithLedger', () => {
     )
 
     const blocked = error as AgentToolEffectBlockedError
-    expect(blocked.message).toBe('上游 500')
+    expect(blocked.message).toBe('上游 500 请求编号：effect-1')
     expect(blocked.status).toBe('failed')
     expect(blocked.outcome).toBe(outcome)
   })
@@ -301,7 +301,7 @@ describe('executeConfirmedWithLedger', () => {
       },
     )
 
-    expect(result).toBe('confirmed')
+    expect(result).toEqual({ ok: true, requestId: 'effect-1', result: 'confirmed' })
     expect(seen).toEqual([session])
     expect(runInputs[0].jobId).toBe('job-9')
     expect(runInputs[0].stepId).toBe('step-2')

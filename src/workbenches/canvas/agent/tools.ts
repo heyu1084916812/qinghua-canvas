@@ -20,9 +20,13 @@ import {
   compareNodesInStore,
   deleteEdgesInStore,
   deleteNodesInStore,
+  expectedModelCategoryOfNode,
   moveNodesInStore,
+  renameNodeInStore,
   resizeNodesInStore,
 } from './agentCanvasMutationTools'
+import { applyCanvasBatchInStore } from './agentBatchMutationTools'
+import { verifyMutationPrecondition } from '../../../domain/agent/mutationSafety'
 import { planProblems } from './agentPlanGate'
 import {
   memoryCandidateProblems,
@@ -39,15 +43,14 @@ import {
   updateAgentTaskPlanStep,
   type AgentTaskPlan,
 } from '../../../domain/agent/taskPlan'
-
 import {
   asRecord,
   asStringArray,
   readAssetInfo,
   readGraphSummary,
+  readOperationResult,
   readResults,
 } from './canvasReadTools'
-
 export {
   AGENT_TOOLS,
   agentToolsForCapabilities,
@@ -55,7 +58,6 @@ export {
   discoverAgentTools,
   type AgentCapabilityDiscovery,
 } from './toolCatalog'
-
 export {
   summarizeGraph,
   readGraphSummary,
@@ -63,7 +65,6 @@ export {
   readResults,
   type GraphSummary,
 } from './canvasReadTools'
-
 export {
   planProblems,
   promptlessGenerationProblems,
@@ -195,6 +196,8 @@ export interface AgentToolContext {
   nodeRunStateOf?: (
     nodeId: string,
   ) => { kind: 'failed'; error?: AppError; reason?: string } | undefined
+  /** 超时恢复：按 requestId 只查持久工具账本，不重新执行。 */
+  readOperation?: (requestId: string) => Promise<unknown>
   /** 设计调研；由界面层注入网络与灵感库读取能力。 */
   researchDesign?: (input: {
     topic: string
@@ -296,6 +299,8 @@ export async function executeReadTool(
     }
     case 'readResult':
       return { results: readResults(ctx.store, a.nodeIds, ctx.nodeRunStateOf) }
+    case 'readOperation':
+      return readOperationResult(a, ctx.readOperation)
     case 'researchDesign': {
       const input = researchDesignArgsOf(a)
       if (!input) return { ok: false, error: '设计调研缺少 topic' }
@@ -339,15 +344,6 @@ export async function executeReadTool(
  * 与读类分开导出，是为了让「循环里偷偷写」在代码结构上就写不出来。
  */
 
-function expectedModelCategoryOfNode(
-  node: { type: string; data: unknown },
-): 'image' | 'video' | 'chat' | undefined {
-  if (node.type === 'prompt') return 'chat'
-  if (node.type !== 'generation' && node.type !== 'batch') return undefined
-  return asRecord(node.data).mode === 'video' ? 'video' : 'image'
-}
-
-
 async function markCurrentPlanResultsReady(
   ctx: AgentToolContext,
   plan: AgentTaskPlan | undefined,
@@ -381,6 +377,8 @@ export async function executeConfirmedTool(
       ],
     }
   }
+  const staleProblems = verifyMutationPrecondition(a, ctx.store.getSnapshot())
+  if (staleProblems.length > 0) return { ok: false, problems: staleProblems }
   switch (name) {
     case 'proposeTaskPlan': {
       if (!ctx.taskPlan) {
@@ -690,6 +688,8 @@ export async function executeConfirmedTool(
       await ctx.store.flush()
       return { ok: true }
     }
+    case 'renameNode':
+      return renameNodeInStore(ctx.store, a)
     case 'runNode': {
       const rawIds = asStringArray(a.nodeIds)
       const ids = ctx.resolveNodeIds ? ctx.resolveNodeIds(rawIds) : rawIds
@@ -740,6 +740,8 @@ export async function executeConfirmedTool(
     }
     case 'moveNodes':
       return moveNodesInStore(ctx.store, a)
+    case 'applyCanvasBatch':
+      return applyCanvasBatchInStore(ctx.store, a)
     case 'arrangeNodes':
       return arrangeNodesInStore(ctx.store, a)
     case 'resizeNodes':

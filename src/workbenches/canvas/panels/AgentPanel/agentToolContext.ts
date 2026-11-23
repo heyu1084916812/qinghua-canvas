@@ -6,6 +6,7 @@ import type { AgentNodeDefaults } from './agentToolDefaults'
 import type { AgentToolPlanPorts } from './agentToolPlanPorts'
 import type { AgentToolRecipeContext } from './agentToolRecipeContext'
 import type { AgentToolResearch } from './agentToolResearch'
+import type { AgentToolSafety } from './agentToolSafety'
 
 /** `createAgentToolDefaults` 的返回形状（结构对位，不反向依赖工厂）。 */
 export interface AgentToolDefaults {
@@ -47,6 +48,7 @@ export interface ComposeAgentToolContextInput {
   research: AgentToolResearch
   defaults: AgentToolDefaults
   canvasOps: AgentToolCanvasOps
+  safety: AgentToolSafety
 }
 
 /**
@@ -81,6 +83,7 @@ export function composeAgentToolContext(
       return ids.map((id) => aliases?.get(id) ?? id)
     },
     ...input.canvasOps,
+    ...input.safety,
     defaultsForNewNode: input.defaults.defaultsForNewNode,
     ...input.recipe,
     rememberMemory: input.research.rememberMemory,

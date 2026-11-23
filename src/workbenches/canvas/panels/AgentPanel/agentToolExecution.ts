@@ -61,6 +61,13 @@ export interface AgentToolExecution<
   ) => Promise<unknown>
 }
 
+function resultWithRequestId(result: unknown, requestId: string): unknown {
+  if (result && typeof result === 'object' && !Array.isArray(result)) {
+    return { ...(result as Record<string, unknown>), requestId }
+  }
+  return { ok: true, requestId, result }
+}
+
 /**
  * 确认型工具只执行一次。
  *
@@ -105,17 +112,18 @@ export function createAgentToolExecution<
           'info',
         )
       }
-      return outcome.result
+      return resultWithRequestId(outcome.result, outcome.effect.effectKey)
     }
     if (outcome.kind === 'pending') {
       throw new ports.createBlockedError(
-        outcome.reason,
+        `${outcome.reason} 请求编号：${outcome.effect.effectKey}`,
         'needs_attention',
         outcome,
       )
     }
     throw new ports.createBlockedError(
-      outcome.kind === 'conflict' ? outcome.reason : outcome.error,
+      `${outcome.kind === 'conflict' ? outcome.reason : outcome.error}` +
+        ` 请求编号：${outcome.effect.effectKey}`,
       'failed',
       outcome,
     )

@@ -251,6 +251,12 @@ interface CanvasState {
 }
 
 export interface CanvasStore extends AppStore<GraphSnapshot, Command> {
+  /**
+   * 图语义版本。只在节点 / 连线真正变化、撤销重做或 hydrate 时递增；
+   * 选中、视口、菜单和提示等瞬态不计入。Agent 的确认后执行用它判断
+   * “用户是否在看结果与点批准之间改过画布”。
+   */
+  getRevision?(): number
   setSelection(ids: string[]): void
   getSelection(): string[]
   setSelectionAsMulti(ids: string[]): void
@@ -578,6 +584,7 @@ export function createCanvasStore(opts: CanvasStoreOptions): CanvasStore {
   const initialGraph: GraphSnapshot =
     opts.initial ?? { projectId: opts.projectId, nodes: [], edges: [] }
   const persister = createPersister(opts.platform, opts.debounceMs ?? 800)
+  let graphRevision = 1
 
   // zustand vanilla store（不依赖 React，可在 node 下单测）
   const store = createVanillaStore<CanvasState>(() => ({
@@ -641,7 +648,9 @@ export function createCanvasStore(opts: CanvasStoreOptions): CanvasStore {
       cmd.kind === 'node.create' && cmd.size === undefined && nodeScale !== 1
         ? { ...cmd, size: scaledNodeSize(cmd.type, nodeScale) }
         : cmd
-    const { result, next } = reduce(effective, store.getState().graph)
+    const currentGraph = store.getState().graph
+    const { result, next } = reduce(effective, currentGraph)
+    if (next !== currentGraph) graphRevision += 1
     // 事务边界可由调用方覆盖（runEngine 的 multi-step 计划），缺省用命令自带边界
     const t: TransactionBoundary = txOverride ?? result.transaction
     store.setState({ graph: next })
@@ -684,6 +693,7 @@ export function createCanvasStore(opts: CanvasStoreOptions): CanvasStore {
       const stacks = st.undoStack.slice()
       const group = stacks.pop()!
       const nextGraph = applyGraphPatches(st.graph, [...group.inverse].reverse())
+      if (nextGraph !== st.graph) graphRevision += 1
       persister.schedule(toPersistPlan(group.inverse, nextGraph))
       return { graph: nextGraph, undoStack: stacks, redoStack: [...st.redoStack, group] }
     })
@@ -696,6 +706,7 @@ export function createCanvasStore(opts: CanvasStoreOptions): CanvasStore {
       const stacks = st.redoStack.slice()
       const group = stacks.pop()!
       const nextGraph = applyGraphPatches(st.graph, group.forward)
+      if (nextGraph !== st.graph) graphRevision += 1
       persister.schedule(toPersistPlan(group.forward, nextGraph))
       return { graph: nextGraph, redoStack: stacks, undoStack: [...st.undoStack, group] }
     })
@@ -704,6 +715,7 @@ export function createCanvasStore(opts: CanvasStoreOptions): CanvasStore {
   return {
     workbench: 'canvas',
     getSnapshot: () => store.getState().graph,
+    getRevision: () => graphRevision,
     dispatch,
     setNodeScale: (factor) => {
       nodeScale = Number.isFinite(factor) && factor > 0 ? factor : 1
@@ -759,6 +771,7 @@ export function createCanvasStore(opts: CanvasStoreOptions): CanvasStore {
     getSurfaceSize: () => surfaceSize,
     flush: () => persister.flush(),
     hydrate: (snapshot) => {
+      if (snapshot !== store.getState().graph) graphRevision += 1
       store.setState({ graph: snapshot })
     },
     notify: (text, tone = 'info') => {

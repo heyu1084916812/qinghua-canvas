@@ -30,6 +30,12 @@ export const AGENT_TOOLS: readonly ToolDeclaration[] = [
     },
   },
   {
+    name: 'readOperation',
+    description:
+      '按 requestId 查询一次写操作的真实状态。用于请求超时、结果未知或应用重启后恢复；只查询原操作，绝不重新执行或重新扣费。',
+    parameters: { type: 'object', properties: { requestId: { type: 'string' } }, required: ['requestId'] },
+  },
+  {
     name: 'readGraph',
     description: '看当前画布上有什么节点、怎么连的、哪些已经出过图。问「现在有什么」时用它。',
     parameters: {
@@ -255,6 +261,35 @@ export const AGENT_TOOLS: readonly ToolDeclaration[] = [
         data: { type: 'object' },
       },
       required: ['data'],
+    },
+  },
+  {
+    name: 'renameNode',
+    description: '修改一个节点的显示名称。会先让用户确认；只改标题，不改参数。',
+    parameters: { type: 'object', properties: { nodeId: { type: 'string' }, title: { type: 'string' } }, required: ['nodeId', 'title'] },
+  },
+  {
+    name: 'applyCanvasBatch',
+    description:
+      '用一个事务修改多个已有节点：可组合改名、平移、删除连线和删除节点。系统会先整体检查，任一步不合法就整批不执行；成功后一次撤销可全部回退。新建节点与连线仍使用 applyPlan。',
+    parameters: {
+      type: 'object',
+      properties: {
+        steps: {
+          type: 'array',
+          minItems: 1,
+          maxItems: 20,
+          description: '按顺序执行的操作。后一步不能引用前面已经删除的节点或连线。',
+          items: { type: 'object', properties: {
+            op: { type: 'string', enum: ['rename', 'move', 'deleteEdges', 'deleteNodes'] },
+            nodeId: { type: 'string' }, title: { type: 'string' },
+            nodeIds: { type: 'array', items: { type: 'string' } },
+            edgeIds: { type: 'array', items: { type: 'string' } },
+            dx: { type: 'number' }, dy: { type: 'number' },
+          }, required: ['op'] },
+        },
+      },
+      required: ['steps'],
     },
   },
   {
@@ -657,22 +692,7 @@ const CAPABILITY_QUERY_GROUPS: readonly {
   names: readonly AgentToolName[]
 }[] = [
   {
-    terms: [
-      '移动',
-      '挪动',
-      '拖动',
-      '拖到',
-      '摆放',
-      '排列',
-      '排成',
-      '重排',
-      '位移',
-      '整理',
-      '对齐',
-      '布局',
-      '空位置',
-      '空白处',
-    ],
+    terms: ['移动', '挪动', '拖动', '拖到', '摆放', '排列', '排成', '重排', '位移', '整理', '对齐', '布局', '空位置', '空白处'],
     names: ['moveNodes', 'arrangeNodes', 'resizeNodes'],
   },
   {
@@ -688,10 +708,29 @@ const CAPABILITY_QUERY_GROUPS: readonly {
     names: ['applyPlan', 'proposeTaskPlan'],
   },
   {
-    // ⚠️ `updateNode` 执行的是 `node.updateData`，**改不了 title**。
-    // 「改名 / 改标题」属于下面 UNSUPPORTED 那一类，绝不能在这里就近匹配到 updateNode。
     terms: ['修改', '参数', '模型', '提示词'],
     names: ['updateNode'],
+  },
+  {
+    terms: [
+      '改名',
+      '重命名',
+      '改标题',
+      '换标题',
+      '节点名称',
+      '节点标题',
+      '改名字',
+      '设置名称',
+      '标题改成',
+      '名称改成',
+      'rename',
+      'retitle',
+    ],
+    names: ['renameNode'],
+  },
+  {
+    terms: ['批量修改', '一次改多个', '批量改名', '批量移动', '批量删除', '多步事务'],
+    names: ['applyCanvasBatch'],
   },
   {
     terms: ['删除', '移除', '断线', '取消连线'],
@@ -730,6 +769,10 @@ const CAPABILITY_QUERY_GROUPS: readonly {
     names: ['rememberMemory'],
   },
   {
+    terms: ['超时', '结果未知', '请求编号', 'requestId', '操作状态', '恢复查询'],
+    names: ['readOperation'],
+  },
+  {
     terms: ['计划', '步骤', '确认'],
     names: ['proposeTaskPlan', 'updateTaskStep', 'requestTaskConfirmation'],
   },
@@ -749,32 +792,7 @@ const UNSUPPORTED_CAPABILITY_QUERIES: readonly {
   terms: readonly string[]
   capability: string
   error: string
-}[] = [
-  {
-    terms: [
-      '改名',
-      '重命名',
-      '改标题',
-      '换标题',
-      '改节点标题',
-      '改节点名字',
-      '改名字',
-      '节点名称',
-      '修改节点名称',
-      '改名称',
-      '名称改成',
-      '设置名称',
-      '标题改成',
-      'rename',
-      'retitle',
-    ],
-    capability: 'rename',
-    error:
-      '当前没有改名 / 重命名节点的工具（supported: false）。' +
-      '`updateNode` 只能改节点参数（提示词、模型等），不能改节点标题；' +
-      '请如实告诉用户「当前没有改名能力」，不要假装已经改好。',
-  },
-]
+}[] = []
 
 export interface AgentCapabilityDiscovery {
   result: Record<string, unknown>
@@ -830,6 +848,11 @@ export function discoverAgentTools(
       for (const name of group.names) wanted.add(name)
     }
   }
+  /**
+   * “修改节点名称”同时含水词“修改”和改名词“节点名称”。
+   * 用户意图明确是改标题时，只加载 renameNode，不能把 updateNode（改生成参数）也塞进来。
+   */
+  if (wanted.has('renameNode')) wanted.delete('updateNode')
   if (wanted.size === 0) {
     for (const tool of candidates) {
       if (
@@ -870,6 +893,7 @@ export function discoverAgentTools(
 
 const SIMPLE_GENERATE_TOOLS = new Set([
   'readGraph',
+  'readOperation',
   'askQuestions',
   'curateReferences',
   'applyPlan',
@@ -880,6 +904,7 @@ const SIMPLE_GENERATE_TOOLS = new Set([
 
 const REFERENCE_EDIT_TOOLS = new Set([
   'readGraph',
+  'readOperation',
   'askQuestions',
   'readAsset',
   'curateReferences',
@@ -891,6 +916,7 @@ const REFERENCE_EDIT_TOOLS = new Set([
 
 const DESIGN_RESEARCH_TOOLS = new Set([
   'readGraph',
+  'readOperation',
   'askQuestions',
   'researchDesign',
   'readPage',
@@ -903,10 +929,13 @@ const DESIGN_RESEARCH_TOOLS = new Set([
 
 const CANVAS_OPERATION_TOOLS = new Set([
   'readGraph',
+  'readOperation',
   'readAsset',
   'readResult',
   'visualReview',
   'updateNode',
+  'renameNode',
+  'applyCanvasBatch',
   'runNode',
   'runFrom',
   'moveNodes',

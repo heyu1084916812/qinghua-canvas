@@ -188,6 +188,62 @@ export function previewOf(
       action: '应用改动',
     }
   }
+  if (name === 'renameNode') {
+    const nodeId = typeof a.nodeId === 'string' ? a.nodeId : ''
+    const title = typeof a.title === 'string' ? a.title.trim() : ''
+    const node = store.getSnapshot().nodes.find((item) => item.id === nodeId)
+    return {
+      tool: name,
+      title: title ? `要把节点改名为「${title}」？` : '要修改节点名称？',
+      lines: [
+        `节点：${node?.title || nodeId || '未指定'}`,
+        title ? `新名称：${title}` : '没有提供新名称',
+      ],
+      action: '确认改名',
+    }
+  }
+  if (name === 'applyCanvasBatch') {
+    const graph = store.getSnapshot()
+    const titleOf = (id: string) => graph.nodes.find((node) => node.id === id)?.title || id
+    const steps = Array.isArray(a.steps) ? a.steps : []
+    const lines = steps.flatMap((value) => {
+      if (!value || typeof value !== 'object') return []
+      const row = value as Record<string, unknown>
+      if (row.op === 'rename') {
+        const nodeId = typeof row.nodeId === 'string' ? row.nodeId : ''
+        const title = typeof row.title === 'string' ? row.title.trim() : ''
+        return [`改名：${titleOf(nodeId)} → 「${title || '未命名'}」`]
+      }
+      if (row.op === 'move') {
+        const ids = Array.isArray(row.nodeIds)
+          ? row.nodeIds.filter((id): id is string => typeof id === 'string')
+          : []
+        return [`移动：${ids.map(titleOf).join('、')}`]
+      }
+      if (row.op === 'deleteEdges') {
+        const ids = Array.isArray(row.edgeIds)
+          ? row.edgeIds.filter((id): id is string => typeof id === 'string')
+          : []
+        return [`断线：${ids.map((id) => {
+          const edge = graph.edges.find((item) => item.id === id)
+          return edge ? `${titleOf(edge.source)} → ${titleOf(edge.target)}` : id
+        }).join('、')}`]
+      }
+      if (row.op === 'deleteNodes') {
+        const ids = Array.isArray(row.nodeIds)
+          ? row.nodeIds.filter((id): id is string => typeof id === 'string')
+          : []
+        return [`删除节点：${ids.map(titleOf).join('、')}`]
+      }
+      return []
+    })
+    return {
+      tool: name,
+      title: `要一次修改 ${steps.length} 项画布内容？`,
+      lines: [...lines, '整批检查通过后才会执行；成功后可以一次撤销全部改动。'],
+      action: '批量执行',
+    }
+  }
   if (name === 'deleteEdges') {
     const graph = store.getSnapshot()
     const ids = Array.isArray(a.edgeIds)
