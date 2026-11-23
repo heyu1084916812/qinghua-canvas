@@ -30,13 +30,15 @@ export function useEdgeCut(options: {
   surfaceEl: () => HTMLElement | null
   /** 一次挥刀内可能删多条；调用方按 planId 把它们合成一条 Undo */
   removeEdges: (ids: readonly string[], planId: string) => void
+  /** pointerdown 时 store 中已存在的边；DOM 暂时未恢复时仍不会冻结成空集。 */
+  initialIds?: () => readonly string[]
 }): {
   preview: React.RefObject<CutPreview>
   begin: (clientX: number, clientY: number) => void
   move: (clientX: number, clientY: number) => void
   end: () => void
 } {
-  const { surfaceEl, removeEdges } = options
+  const { surfaceEl, removeEdges, initialIds } = options
   const preview = useRef<CutPreview>(null)
   const removeRef = useRef(removeEdges)
   removeRef.current = removeEdges
@@ -47,10 +49,10 @@ export function useEdgeCut(options: {
       const surface=surfaceEl(); if (!surface) return
       const rect=surface.getBoundingClientRect(), local={x:clientX-rect.left,y:clientY-rect.top}
       sessionRef.current?.overlay?.dispose()
-      sessionRef.current = { edges:snapshotEdges(surface,rect), planId: `knife:${Date.now()}:${Math.random().toString(36).slice(2, 6)}`, last: local, cut: new Set() }
+      sessionRef.current = { edges:snapshotEdges(surface,rect,initialIds?.()), planId: `knife:${Date.now()}:${Math.random().toString(36).slice(2, 6)}`, last: local, cut: new Set() }
       pushTrail(local.x, local.y)
     },
-    [surfaceEl],
+    [initialIds, surfaceEl],
   )
 
   const move = useCallback(
