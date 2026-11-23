@@ -16634,6 +16634,12 @@ async function g82(browser) {
   const pageErrors = []
   page.on('pageerror', (e) => pageErrors.push(String(e).slice(0, 160)))
 
+  /**
+   * 隔离矩阵里每组从空库开始；“添加到 Agent”需要已有画布宿主接收技能。
+   * 先建项目再回技能库，避免本组依赖前一组恰好留下一个画布。
+   */
+  await createProject(page)
+  const skillTargetCanvasUrl = page.url()
   await page.goto(`${BASE}/skills`, { waitUntil: 'networkidle' })
   await sleep(700)
   await page.setViewportSize({ width: 1440, height: 900 })
@@ -16673,6 +16679,30 @@ async function g82(browser) {
     .locator('[data-skills-source-tab]')
     .evaluateAll((els) => els.map((e) => e.getAttribute('data-skills-source-tab')))
   rec(g, '★ 一级分 LibTV / 即梦 / 我的', JSON.stringify(sources) === JSON.stringify(['libtv', 'jimeng', 'mine']), sources.join(','))
+
+  await page.locator('[data-skills-source-tab="mine"]').click()
+  await sleep(400)
+  const mineCardText = await page
+    .locator('[data-skill-item]')
+    .evaluateAll((els) => els.map((el) => el.textContent ?? ''))
+  const externalDirectorSkills = [
+    '画面生成导演',
+    '视频生成导演',
+    '音频生成导演',
+    '剧情宫格导演',
+  ]
+  rec(
+    g,
+    '★★ 外部 Skill 核心四项已落为轻画内置技能',
+    externalDirectorSkills.every((name) =>
+      mineCardText.some((text) => text.includes(name)),
+    ),
+    externalDirectorSkills
+      .filter((name) => !mineCardText.some((text) => text.includes(name)))
+      .join(',') || externalDirectorSkills.join(','),
+  )
+  await page.locator('[data-skills-source-tab="libtv"]').click()
+  await sleep(350)
 
   const categories = await page
     .locator('[data-skills-filter]')
@@ -16819,8 +16849,10 @@ async function g82(browser) {
   await sleep(1000)
   rec(
     g,
-    '★★ 添加到 Agent 后按需落成用户技能并给出回执',
-    /设为 Agent 技能/.test(await page.locator('[data-skills-action-notice]').innerText()),
+    '★★ 添加到 Agent 后按需落成用户技能并交给当前画布',
+    /已将「分镜升镜师」交给 Agent/.test(
+      await page.locator('[data-skills-action-notice]').innerText(),
+    ),
     await page.locator('[data-skills-action-notice]').innerText().catch(() => '无提示'),
   )
   await page.locator('[data-skill-detail-close]').click()
@@ -16938,29 +16970,34 @@ async function g82(browser) {
   }))
   rec(
     g,
-    '★ 1024 宽回落两列且无横向溢出',
-    responsive.noOverflow && responsive.y.length >= 3 && responsive.y[0] === responsive.y[1] && responsive.y[2] > responsive.y[1],
+    '★ 1024 宽保持三列且无横向溢出',
+    responsive.noOverflow &&
+      responsive.y.length >= 3 &&
+      new Set(responsive.y.slice(0, 3)).size === 1,
     JSON.stringify(responsive),
   )
   await page.setViewportSize({ width: 1280, height: 800 })
   await sleep(300)
 
   /**
-   * 单技能接入的终点不是「复制成功」，而是**新 Agent 会话真的带着这条技能**。
-   * 这里用刚添加的「分镜升镜师」验证默认技能从技能库一路进入 Agent 会话。
+   * 单技能接入的终点不是「复制成功」，而是**回到原画布后 Agent 输入框
+   * 真的出现这条技能 chip**。不能新建项目，否则 handoff 会被留给另一个 projectId。
    */
-  await createProject(page)
+  await page.locator('[data-sidebar-item="/canvas"]').click()
+  await page.waitForURL(skillTargetCanvasUrl)
+  await page
+    .waitForSelector('[data-canvas-hydrated="true"]', { state: 'attached', timeout: 20000 })
+    .catch(() => {})
   await page.locator('[data-canvas-agent]').click()
   await sleep(800)
-  const agentSkillTitle = await page.locator('[data-agent-skill-open]').getAttribute('title')
   const restoredSkillChips = await page
     .locator('[data-agent-input] [data-mention-kind="skill"]')
     .count()
   rec(
     g,
-    '★★ 默认技能生效，但重新打开 Agent 不把它自动塞进输入框',
-    !!agentSkillTitle && agentSkillTitle.includes('分镜升镜师') && restoredSkillChips === 0,
-    `${agentSkillTitle ?? '无标题'} / skillChips=${restoredSkillChips}`,
+    '★★ 技能 handoff 只在回到原画布后进入 Agent 输入框',
+    restoredSkillChips === 1,
+    `skillChips=${restoredSkillChips}`,
   )
 
   // 冒烟库是组间共享的：把本组创建的默认技能、收藏和用户技能恢复原状。
@@ -46132,7 +46169,69 @@ async function g171(browser) {
   }
 }
 
-const ALL_GROUPS = [g1, g2, g3, g4, g5, g6, g7, g8, g9, g10, g11, g12, g13, g14, g15, g16, g17, g18, g19, g23, g24, g37, g42, g43, g44, g45, g46, g47, g48, g49, g51, g52, g53, g55, g56, g57, g58, g59, g60, g61, g62, g63, g64, g65, g66, g67, g68, g69, g70, g71, g72, g73, g74, g75, g76, g77, g78, g79, g80, g81, g82, g83, g84, g85, g86, g87, g88, g89, g90, g91, g92, g93, g94, g95, g96, g97, g98, g99, g100, g101, g102, g103, g104, g105, g106, g107, g108, g109, g110, g111, g112, g113, g114, g115, g116, g117, g118, g119, g120, g121, g122, g123, g125, g126, g127, g128, g129, g130, g131, g132, g133, g134, g135, g136, g137, g138, g139, g140, g141, g142, g143, g144, g145, g146, g147, g148, g149, g150, g151, g152, g153, g154, g155, g156, g157, g158, g159, g160, g161, g162, g164, g165, g166, g167, g168, g169, g170, g171, g735, g769, g795, g798, g800, g865]
+/** #1182–#1186：外部 Skill 四项与 Agent 新增安全工具的自包含 UI 冒烟。 */
+async function g1182(browser) {
+  const g = 'G1182 外部 Skill 与 Agent 安全工具'
+  const ctx = await newCtx(browser)
+  const page = await ctx.newPage()
+  const pageErrors = []
+  page.on('pageerror', (e) => pageErrors.push(String(e).slice(0, 160)))
+  page.on('console', (message) => {
+    if (message.type() === 'error') pageErrors.push(message.text().slice(0, 160))
+  })
+
+  try {
+    await page.goto(`${BASE}/skills`, { waitUntil: 'networkidle' })
+    await page.locator('[data-skills-source-tab="mine"]').click()
+    await page.locator('[data-skills-browser]').waitFor({ state: 'visible' })
+    await sleep(400)
+    const cardText = await page
+      .locator('[data-skill-item]')
+      .evaluateAll((els) => els.map((el) => el.textContent ?? ''))
+    const expectedSkills = [
+      '画面生成导演',
+      '视频生成导演',
+      '音频生成导演',
+      '剧情宫格导演',
+    ]
+    rec(
+      g,
+      '★★ 外部 Skill 核心四项可从“我的技能”直接使用',
+      expectedSkills.every((name) => cardText.some((text) => text.includes(name))),
+      expectedSkills
+        .filter((name) => !cardText.some((text) => text.includes(name)))
+        .join(',') || expectedSkills.join(','),
+    )
+
+    await page.evaluate(() => {
+      window.__QINGHUA_OPEN_SETTINGS__?.('agent', 'tools')
+    })
+    await page.locator('[data-agent-settings-tools]').waitFor({ state: 'visible' })
+    await sleep(300)
+    const toolState = await page.evaluate(() => {
+      const section = document.querySelector('[data-agent-settings-tools]')
+      return {
+        tools: [...(section?.querySelectorAll('code') ?? [])].map(
+          (item) => item.textContent?.trim() ?? '',
+        ),
+        overflowX: document.documentElement.scrollWidth > window.innerWidth,
+      }
+    })
+    const expectedTools = ['renameNode', 'applyCanvasBatch', 'readOperation']
+    rec(
+      g,
+      '★★ Agent 工具清单含改名、批量事务与超时状态查询',
+      expectedTools.every((name) => toolState.tools.includes(name)),
+      `count=${toolState.tools.length}`,
+    )
+    rec(g, '技能与工具设置页无横向溢出', !toolState.overflowX)
+    rec(g, '无未捕获异常或 console error', pageErrors.length === 0, pageErrors.join(' | '))
+  } finally {
+    await ctx.close()
+  }
+}
+
+const ALL_GROUPS = [g1, g2, g3, g4, g5, g6, g7, g8, g9, g10, g11, g12, g13, g14, g15, g16, g17, g18, g19, g23, g24, g37, g42, g43, g44, g45, g46, g47, g48, g49, g51, g52, g53, g55, g56, g57, g58, g59, g60, g61, g62, g63, g64, g65, g66, g67, g68, g69, g70, g71, g72, g73, g74, g75, g76, g77, g78, g79, g80, g81, g82, g83, g84, g85, g86, g87, g88, g89, g90, g91, g92, g93, g94, g95, g96, g97, g98, g99, g100, g101, g102, g103, g104, g105, g106, g107, g108, g109, g110, g111, g112, g113, g114, g115, g116, g117, g118, g119, g120, g121, g122, g123, g125, g126, g127, g128, g129, g130, g131, g132, g133, g134, g135, g136, g137, g138, g139, g140, g141, g142, g143, g144, g145, g146, g147, g148, g149, g150, g151, g152, g153, g154, g155, g156, g157, g158, g159, g160, g161, g162, g164, g165, g166, g167, g168, g169, g170, g171, g735, g769, g795, g798, g800, g865, g1182]
 // ────────────────────────────────────────────────────────────
 // G169 框选多节点拖动：**松手那一刻不许再有人挪**（用户 2026-11-18 偶发：
 //      「框选多个节点，移动的时候松开鼠标会有一张图片移动了位置，好像多了一个步骤」）
