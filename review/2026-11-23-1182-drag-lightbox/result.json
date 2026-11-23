@@ -1,0 +1,97 @@
+{
+  "drag": {
+    "projectNodes": 332,
+    "visibleImagesAt45Percent": 21,
+    "actualMouseRounds": 4,
+    "firstFrameDirect": true,
+    "maxRoundedDragErrorPx": 0.2992,
+    "pointerLagMaxPx": 0.000427,
+    "rounds": [
+      {
+        "distancePx": 1002
+      },
+      {
+        "distancePx": 1351
+      },
+      {
+        "distancePx": 1750
+      },
+      {
+        "distancePx": 1343
+      }
+    ]
+  },
+  "lightbox": {
+    "trials": 8,
+    "mediaPresentAt520ms": 8,
+    "closeAnimated": 8,
+    "closeDurationMs": {
+      "min": 402.1,
+      "max": 417.1
+    },
+    "entryMediaAt120ms": true
+  },
+  "referenceLines": {
+    "pointerEvents": "none",
+    "dragDependsOnHints": false
+  },
+  "uiGate": [
+    {
+      "w": 1440,
+      "h": 900,
+      "theme": "light",
+      "overlay": true,
+      "media": true,
+      "pageOverflowX": false,
+      "mediaRect": {
+        "x": 467.625,
+        "y": 112,
+        "w": 506.734375,
+        "h": 678
+      }
+    },
+    {
+      "w": 1440,
+      "h": 900,
+      "theme": "dark",
+      "overlay": true,
+      "media": true,
+      "pageOverflowX": false,
+      "mediaRect": {
+        "x": 467.625,
+        "y": 112,
+        "w": 506.734375,
+        "h": 678
+      }
+    },
+    {
+      "w": 1024,
+      "h": 700,
+      "theme": "light",
+      "overlay": true,
+      "media": true,
+      "pageOverflowX": false,
+      "mediaRect": {
+        "x": 332.796875,
+        "y": 110,
+        "w": 360.390625,
+        "h": 482
+      }
+    },
+    {
+      "w": 1024,
+      "h": 700,
+      "theme": "dark",
+      "overlay": true,
+      "media": true,
+      "pageOverflowX": false,
+      "mediaRect": {
+        "x": 332.796875,
+        "y": 110,
+        "w": 360.390625,
+        "h": 482
+      }
+    }
+  ],
+  "errors": []
+}

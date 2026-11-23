@@ -398,7 +398,7 @@ function FlowSurfaceInner({
 
   /** 捕获 pointerdown：处理美工刀 / Alt 复制，记录显式选中与终点对齐锚。 */
   const onSurfacePointerDown = useCallback(
-    (e: ReactPointerEvent<HTMLDivElement>) => {
+    (e: PointerEvent) => {
       /**
        * 美工刀开着时，左键**什么都不该做**（不选中、不拖节点、不开框选），只切连线。
        * 放在捕获阶段最先处理并 `stopPropagation`：RF 的节点拖动 / 框选都挂在更内层，
@@ -414,11 +414,13 @@ function FlowSurfaceInner({
       pressAtRef.current = { x: e.clientX, y: e.clientY }
       interactingRef.current = true
       const nodeId =
-        (e.target as HTMLElement)
-          .closest('[data-node-id]')
+        (e.target instanceof Element ? e.target : null)
+          ?.closest('[data-node-id]')
           ?.getAttribute('data-node-id') ?? null
       const vp = store.getViewport()
-      const surface = e.currentTarget.getBoundingClientRect()
+      const surfaceEl = surfaceRef.current
+      if (!surfaceEl) return
+      const surface = surfaceEl.getBoundingClientRect()
       const selection = store.getSelection()
       const plan = planSurfacePointerDown({
         button: e.button,
@@ -454,7 +456,7 @@ function FlowSurfaceInner({
         e.preventDefault()
         e.stopPropagation()
         blockNativeNodeDrag(e.target)
-        beginPan(e)
+        beginPan(e as unknown as ReactPointerEvent<HTMLDivElement>)
         return
       }
       if (plan.dismissPanel && store.isPanelDismissed()) store.setPanelDismissed(false)
@@ -476,6 +478,10 @@ function FlowSurfaceInner({
     [store, knifeOn, beginSlice, beginPan, beginNodeDragDom],
   )
 
+  useEffect(() => {
+    surfaceRef.current?.addEventListener('pointerdown', onSurfacePointerDown, true)
+    return () => surfaceRef.current?.removeEventListener('pointerdown', onSurfacePointerDown, true)
+  }, [onSurfacePointerDown])
   const onSurfaceMouseMove = useCallback(
     (e: ReactMouseEvent<HTMLDivElement>) => {
       moveNodeDragDom(e.clientX, e.clientY)
@@ -966,7 +972,6 @@ function FlowSurfaceInner({
         interactingRef.current = false
       }}
       // 按下阶段：清「拖动后不弹面板」标记 + 记拖动起点锚（见 onSurfacePointerDown）
-      onPointerDownCapture={onSurfacePointerDown}
       onClickCapture={e => {
         if (upstreamPick) {
           const nodeId = (e.target as HTMLElement).closest('[data-node-id]')?.getAttribute('data-node-id')

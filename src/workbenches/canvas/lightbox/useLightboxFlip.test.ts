@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   LIGHTBOX_MOTION,
   lightboxEntryMode,
+  lightboxPrimarySource,
   rectStyle,
   settledMediaRect,
   snapshotRect,
@@ -71,6 +72,41 @@ describe('snapshotRect', () => {
       right: 68,
       bottom: 112,
     })
+  })
+})
+
+describe('lightboxPrimarySource', () => {
+  it('uses the already-decoded source image while the full asset is loading', () => {
+    expect(
+      lightboxPrimarySource({
+        fullUrl: null,
+        sourceSrc: 'blob:thumbnail',
+        sourceKind: 'image',
+        mime: null,
+      }),
+    ).toBe('blob:thumbnail')
+  })
+
+  it('never renders a video thumbnail as an image fallback', () => {
+    expect(
+      lightboxPrimarySource({
+        fullUrl: null,
+        sourceSrc: 'blob:poster',
+        sourceKind: 'video',
+        mime: 'video/mp4',
+      }),
+    ).toBeNull()
+  })
+
+  it('prefers the full asset as soon as it is available', () => {
+    expect(
+      lightboxPrimarySource({
+        fullUrl: 'blob:full',
+        sourceSrc: 'blob:thumbnail',
+        sourceKind: 'image',
+        mime: 'image/png',
+      }),
+    ).toBe('blob:full')
   })
 })
 

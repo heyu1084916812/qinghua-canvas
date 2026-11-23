@@ -981,6 +981,16 @@ async function coldNodeDragRound(page) {
     down: window.__qhDragDownLog,
     initialTransform: window.__qhDragInitialTransform,
   }))
+  const pointerLagMax = Math.max(
+    0,
+    ...lagSamples.map((sample) => Math.hypot(sample.x, sample.y)),
+  )
+  if (layersDuringDrag?.directDrag !== 'true') {
+    throw new Error('node drag did not enter the direct DOM-follow path')
+  }
+  if (pointerLagMax > 4) {
+    throw new Error(`node drag exceeded 4px pointer lag: ${pointerLagMax.toFixed(2)}px`)
+  }
   await page.waitForFunction(
     (expected) => document.querySelectorAll('.react-flow__node[data-id]').length === expected,
     PERFORMANCE_NODE_COUNT,
@@ -1012,7 +1022,7 @@ async function coldNodeDragRound(page) {
       mean:
         lagSamples.reduce((sum, sample) => sum + Math.hypot(sample.x, sample.y), 0) /
         Math.max(1, lagSamples.length),
-      max: Math.max(0, ...lagSamples.map((sample) => Math.hypot(sample.x, sample.y))),
+      max: pointerLagMax,
       maxX: Math.max(0, ...lagSamples.map((sample) => Math.abs(sample.x))),
       maxY: Math.max(0, ...lagSamples.map((sample) => Math.abs(sample.y))),
     },

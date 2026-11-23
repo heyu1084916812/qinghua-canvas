@@ -74,6 +74,7 @@ import {
   lightboxCompareSourceOf,
   lightboxMediaProjectionOf,
 } from './lightboxMediaProjection'
+import { lightboxPrimarySource } from './lightboxFlipController'
 
 const GALLERY_SWITCH_MS = 180
 
@@ -116,6 +117,13 @@ export function LightboxLayer() {
   const { gallery, galleryIndex, galleryItem, hasGalleryNavigation } = galleryViewOf(lightbox)
   const { url, mime } = useAssetMeta(assetHash)
   const isVideo = (mime ?? '').startsWith('video/')
+  const sourceMedia = lightbox?.sourceRect
+  const primarySource = lightboxPrimarySource({
+    fullUrl: url,
+    sourceSrc: sourceMedia?.assetHash === assetHash ? sourceMedia?.src : undefined,
+    sourceKind: sourceMedia?.assetHash === assetHash ? sourceMedia?.kind : undefined,
+    mime,
+  })
   const stageRef = useRef<HTMLDivElement>(null)
   const closeRef = useRef<HTMLButtonElement>(null)
   const movedRef = useRef(false)
@@ -154,7 +162,7 @@ export function LightboxLayer() {
     [natural, naturalHintH, naturalHintW],
   )
   const mediaProjection = lightboxMediaProjectionOf({
-    assetHash, url, isVideo, compareHash: compareSource.compareHash, compareUrl: compareAsset.url,
+    assetHash, url: primarySource, isVideo, compareHash: compareSource.compareHash, compareUrl: compareAsset.url,
     compareIsVideo, compareKind: compareSource.compareKind, compareView, splitRatio, mode,
     rotating: editorProjection.rotating, cropping: editorProjection.cropping,
     angle, mirrorH, mirrorV, cropRect, natural: layoutNatural, viewport: vp,
@@ -428,7 +436,7 @@ export function LightboxLayer() {
                  * 切到第二张时**不改** `natural`：box / 选区 / 分割线全部按
                  * assetHash 那张的尺寸算，两张尺寸万一不同也不会让整块视图跳一下。
                  */
-                if (!showSecondOnly) {
+                if (!showSecondOnly && url) {
                   settleNaturalSize(
                     e.currentTarget.naturalWidth,
                     e.currentTarget.naturalHeight,

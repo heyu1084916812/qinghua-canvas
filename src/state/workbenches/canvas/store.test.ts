@@ -381,8 +381,8 @@ describe('canvas store / 素材灯箱（§6.17）', () => {
 
   it('记录触发节点与指针时刻的 FLIP 起点快照', () => {
     const store = createCanvasStore({ platform, projectId: 'p1' })
-    store.openLightbox('hash-1', { sourceNodeId: 'node-b', sourceRect: { left: 12, top: 24, width: 160, height: 90, borderRadius: '12px', src: 'blob:test' } })
-    expect(store.getLightbox()).toMatchObject({ assetHash: 'hash-1', sourceNodeId: 'node-b', sourceRect: { left: 12, top: 24, width: 160, height: 90, src: 'blob:test' } })
+    store.openLightbox('hash-1', { sourceNodeId: 'node-b', sourceRect: { left: 12, top: 24, width: 160, height: 90, borderRadius: '12px', src: 'blob:test', kind: 'image', assetHash: 'hash-1' } })
+    expect(store.getLightbox()).toMatchObject({ assetHash: 'hash-1', sourceNodeId: 'node-b', sourceRect: { left: 12, top: 24, width: 160, height: 90, src: 'blob:test', kind: 'image', assetHash: 'hash-1' } })
   })
 
   it('打开灯箱顺手关掉右键菜单（两个浮层不并存）', () => {

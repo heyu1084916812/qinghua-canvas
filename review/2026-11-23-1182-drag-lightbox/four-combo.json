@@ -1,0 +1,58 @@
+[
+  {
+    "w": 1440,
+    "h": 900,
+    "theme": "light",
+    "overlay": true,
+    "media": true,
+    "pageOverflowX": false,
+    "mediaRect": {
+      "x": 467.625,
+      "y": 112,
+      "w": 506.734375,
+      "h": 678
+    }
+  },
+  {
+    "w": 1440,
+    "h": 900,
+    "theme": "dark",
+    "overlay": true,
+    "media": true,
+    "pageOverflowX": false,
+    "mediaRect": {
+      "x": 467.625,
+      "y": 112,
+      "w": 506.734375,
+      "h": 678
+    }
+  },
+  {
+    "w": 1024,
+    "h": 700,
+    "theme": "light",
+    "overlay": true,
+    "media": true,
+    "pageOverflowX": false,
+    "mediaRect": {
+      "x": 332.796875,
+      "y": 110,
+      "w": 360.390625,
+      "h": 482
+    }
+  },
+  {
+    "w": 1024,
+    "h": 700,
+    "theme": "dark",
+    "overlay": true,
+    "media": true,
+    "pageOverflowX": false,
+    "mediaRect": {
+      "x": 332.796875,
+      "y": 110,
+      "w": 360.390625,
+      "h": 482
+    }
+  }
+]

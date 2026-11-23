@@ -18,6 +18,10 @@ export function sourceNodeIdOf(nodes: readonly { id: string; data?: unknown }[],
   if (preferredNodeId && nodes.some((n) => n.id === preferredNodeId && (n.data as { assetHash?: string } | undefined)?.assetHash === hash)) return preferredNodeId
   return nodes.find((n) => (n.data as { assetHash?: string } | undefined)?.assetHash === hash)?.id ?? null
 }
+export function lightboxPrimarySource(input: { fullUrl: string | null; sourceSrc?: string; sourceKind?: 'image' | 'video'; mime: string | null }): string | null {
+  const video = input.sourceKind === 'video' || (input.mime ?? '').startsWith('video/')
+  return input.fullUrl ?? (video ? null : input.sourceSrc || null)
+}
 export function sourceRectFromFrame(frame: HTMLElement | null): DOMRect | null {
   const media = frame?.querySelector<HTMLElement>('img, video'), mediaRect = media?.getBoundingClientRect()
   if (mediaRect && mediaRect.width > 0 && mediaRect.height > 0) return mediaRect
@@ -250,7 +254,7 @@ export function useLightboxFlipController({ stageRef, store, assetHash, sourceNo
     }
     const destination = rectOf(lightbox?.sourceNodeId ?? sourceNodeId) ?? rectFromSnapshot(lightbox?.sourceRect) ?? first.current
     const overlay = stageRef.current?.closest<HTMLElement>('[data-lightbox]')
-    if (!target || !floating || !destination || window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
+    if (!floating || !destination || window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
       cleanup()
       store.closeLightbox()
       return
@@ -258,7 +262,7 @@ export function useLightboxFlipController({ stageRef, store, assetHash, sourceNo
     closing.current = true
     overlay?.setAttribute('data-lightbox-flipping', '')
     overlay?.style.setProperty('pointer-events', 'none')
-    target.style.opacity = '0'
+    if (target) target.style.opacity = '0'
     const overlayStart = overlay ? getComputedStyle(overlay).opacity : '1'
     overlayAnimation.current?.cancel()
     if (overlay) overlay.style.opacity = overlayStart
