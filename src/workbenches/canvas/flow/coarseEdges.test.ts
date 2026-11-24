@@ -55,7 +55,9 @@ describe('coarseEdgePaths', () => {
       related: true,
       selected: true,
     })
-    expect(paths[0]?.d).toMatch(/^M /)
+    // Same solver as QhEdge (RF getBezierPath): switching layers never changes the curve
+    expect(paths[0]?.d).toBe('M240,96 C370,96 370,96 500,96')
+    expect(paths[0]?.d).toMatch(/^M-?\d[\d.]*,-?\d[\d.]* C/)
   })
 
   it('merges inactive edges while keeping highlighted edges separate', () => {

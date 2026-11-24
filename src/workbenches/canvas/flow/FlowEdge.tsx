@@ -55,6 +55,8 @@ function QhEdgeInner(props: EdgeProps) {
         data-edge-target={props.target}
         data-edge-source-port={data?.sourcePort}
         data-edge-target-port={data?.targetPort}
+        data-edge-source-position={props.sourcePosition}
+        data-edge-target-position={props.targetPosition}
       />
       {/* 命中区：不是自己接点击，而是让 `<g>` 上那两个 RF 处理器收得到（点 = 选中，双击 = 删） */}
       <path

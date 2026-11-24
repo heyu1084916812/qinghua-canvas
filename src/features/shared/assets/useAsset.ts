@@ -13,11 +13,12 @@ export { loadAssetUrl, type AssetMeta } from './assetReader'
  */
 export function useAssetMeta(
   hash: string | undefined,
-  opts: { preferThumb?: boolean; preferPreview?: boolean } = {},
+  opts: { preferThumb?: boolean; preferPreview?: boolean; preferSource?: boolean } = {},
 ): AssetMeta {
   const platform = useAssetPlatform()
   const preferThumb = opts.preferThumb === true
   const preferPreview = opts.preferPreview === true
+  const preferSource = opts.preferSource === true
   const [meta, setMeta] = useState<AssetMeta>({ url: null, mime: null })
 
   useEffect(() => {
@@ -43,7 +44,7 @@ export function useAssetMeta(
     const load = async (attempt: number) => {
       let meta: AssetMeta
       try {
-        meta = await loadAssetUrl(platform, hash, { preferThumb, preferPreview })
+        meta = await loadAssetUrl(platform, hash, { preferThumb, preferPreview, preferSource })
       } catch {
         /*
          * 共享存储写新素材时会极短地出现“行还没落盘”。`loadAssetUrl` 的查询
@@ -97,7 +98,7 @@ export function useAssetMeta(
     // effect 每帧重跑 —— 旧 URL 被 revoke、重查库建新 URL，<img> 每帧换 src
     // 触发重新解码，用户看到的就是「拖动时图片一闪一闪」。
     // 素材落库的时差由上面的退避重试兜住，不需要借 graph 变更来触发。
-  }, [hash, platform, preferThumb, preferPreview])
+  }, [hash, platform, preferThumb, preferPreview, preferSource])
 
   return meta
 }

@@ -5,9 +5,41 @@ import { toWorldRectInGraph } from '../../../domain/canvas/geometry/coords'
 import { getSpec } from '../../../domain/canvas/nodeSpecs/registry'
 import { portDeclOf } from '../../../domain/canvas/nodeSpecs/ports'
 import { portAnchorWorld } from '../../../features/canvas/useEdgeDrag'
+import { getBezierPath, Position } from '@xyflow/react'
+
+/**
+ * 所有自绘连线（手势层 / 容器子边）都走 RF 的 `getBezierPath`：与 `QhEdge` 逐字同一条曲线，
+ * 切层（单击、平移起止）时形状和端点都不跳。返回 RF 格式 `M x,y C x,y x,y x,y`（世界坐标）。
+ */
+export function flowEdgeBezierPath(
+  from: { x: number; y: number },
+  to: { x: number; y: number },
+  fromSide: 'left' | 'right' = 'right',
+  toSide: 'left' | 'right' = 'left',
+): string {
+  return getBezierPath({
+    sourceX: from.x,
+    sourceY: from.y,
+    sourcePosition: fromSide === 'left' ? Position.Left : Position.Right,
+    targetX: to.x,
+    targetY: to.y,
+    targetPosition: toSide === 'right' ? Position.Right : Position.Left,
+  })[0]
+}
+
+/** 世界坐标路径 → 屏幕坐标（`(v - viewport) * zoom`） */
+export function toScreenPath(d: string, viewport: { x: number; y: number }, zoom: number): string {
+  let index = 0
+  return d.replace(/-?\d*\.?\d+(?:e[-+]?\d+)?/gi, (raw) => {
+    const offset = index++ % 2 === 0 ? viewport.x : viewport.y
+    return String(Math.round((Number(raw) - offset) * zoom * 1000) / 1000)
+  })
+}
 
 export interface ChildEdgePath {
   id: string
+  source: string
+  target: string
   /** SVG path（**屏幕坐标**，与 `FlowDraftLayer` 同一套换算） */
   d: string
   /** 两端里有被选中的节点（与 RF 边的 `related` 高亮同一条判据） */
@@ -85,13 +117,11 @@ export function childEdgePaths(
      */
     const from = portAnchorWorld(toWorldRectInGraph(src, graph), srcDecl)
     const to = portAnchorWorld(toWorldRectInGraph(tgt, graph), tgtDecl)
-    const a = { x: (from.x - viewport.x) * zoom, y: (from.y - viewport.y) * zoom }
-    const b = { x: (to.x - viewport.x) * zoom, y: (to.y - viewport.y) * zoom }
-    /** 曲线形状与 `FlowDraftLayer.draftPath` / `FlowEdge` 同一套：两端横向延展 */
-    const dx = Math.max(40 * zoom, Math.abs(b.x - a.x) / 2)
     out.push({
       id: e.id,
-      d: `M ${a.x} ${a.y} C ${a.x + dx} ${a.y}, ${b.x - dx} ${b.y}, ${b.x} ${b.y}`,
+      source: e.source,
+      target: e.target,
+      d: toScreenPath(flowEdgeBezierPath(from, to, srcDecl.side, tgtDecl.side), viewport, zoom),
       related: selection.includes(e.source) || selection.includes(e.target),
     })
   }

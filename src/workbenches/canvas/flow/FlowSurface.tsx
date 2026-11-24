@@ -1,6 +1,7 @@
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -245,9 +246,10 @@ function FlowSurfaceInner({
   const dragAnchorRef = useRef<FlowDragAnchor | null>(null)
   const dragSelectionRef = useRef<string[]>([])
   const {
-    begin: beginNodeDragDom, move: moveNodeDragDom, isActive: isNodeDragDomActive,
+    begin: beginNodeDragDom, move: moveNodeDragDom, settle: settleNodeDragDom, isActive: isNodeDragDomActive,
     moved: didNodeDragDomMove, lastPointer: lastNodeDragDomPointer,
   } = useFlowNodeDragDomFollow({ store, surfaceRef })
+  useLayoutEffect(() => settleNodeDragDom(), [graph, settleNodeDragDom])
   const pressAtRef = useRef<{ x: number; y: number } | null>(null)
   /** 指针是否正按着（拖节点 / 框选 / 拉线中）—— 只给美工刀的互斥锁用，与 `pressAtRef` 无关 */
   const interactingRef = useRef(false)
@@ -743,7 +745,8 @@ function FlowSurfaceInner({
           actionPorts,
         )
       }
-      writeFlowNodeDomPositions(document, changes)
+      // Direct drag owns the node transform; a second writer one frame behind jitters it.
+      if (!isNodeDragDomActive()) writeFlowNodeDomPositions(document, changes)
       if (draggingRef.current === null && !isNodeDragDomActive()) {
         positionBatcher.queue(changes)
       }
@@ -1065,6 +1068,7 @@ function FlowSurfaceInner({
         }}
         defaultViewport={initialFlowViewport}
         onMoveStart={gesture.beginMove}
+        onMove={gesture.move}
         onMoveEnd={gesture.endMove}
         onViewportChange={handleViewportChange}
         onNodesChange={onNodesChange}

@@ -1,5 +1,5 @@
 /** 多选灯箱缩略图：局部读取素材元信息，不拥有画廊导航状态。 */
-import { useAssetMeta } from '../../../features/shared/assets/index'
+import { useAssetThumb } from '../../../features/shared/assets/index'
 import { IconImage } from '../toolbar/icons'
 import styles from './LightboxLayer.module.css'
 
@@ -14,7 +14,8 @@ export function GalleryThumb({
   active: boolean
   onSelect: (index: number) => void
 }) {
-  const { url, mime } = useAssetMeta(item.assetHash)
+  // thumbnails only: the strip must not fight the main image for bandwidth / decode
+  const { url, mime } = useAssetThumb(item.assetHash)
   const video = (mime ?? '').startsWith('video/')
   return (
     <button

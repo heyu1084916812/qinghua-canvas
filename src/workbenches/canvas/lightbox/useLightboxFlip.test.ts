@@ -108,6 +108,13 @@ describe('lightboxPrimarySource', () => {
       }),
     ).toBe('blob:full')
   })
+
+  it('steps thumbnail → decoded preview → original', () => {
+    const base = { sourceSrc: 'http://s/thumb/a', sourceKind: 'image' as const, mime: 'image/png' }
+    expect(lightboxPrimarySource({ ...base, fullUrl: null, previewUrl: null })).toBe('http://s/thumb/a')
+    expect(lightboxPrimarySource({ ...base, fullUrl: null, previewUrl: 'http://s/preview/a' })).toBe('http://s/preview/a')
+    expect(lightboxPrimarySource({ ...base, fullUrl: 'http://s/asset/a', previewUrl: 'http://s/preview/a' })).toBe('http://s/asset/a')
+  })
 })
 
 describe('settledMediaRect', () => {

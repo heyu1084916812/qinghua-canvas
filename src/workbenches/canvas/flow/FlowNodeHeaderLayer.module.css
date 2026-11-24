@@ -13,8 +13,15 @@
   top: 0;
   transform-origin: 0 0;
   pointer-events: none;
+}
+
+/*
+ * will-change only while the viewport gesture runs: a permanent will-change
+ * layer keeps its first raster scale, so labels blur at 300% (Chromium does
+ * not re-raster it on zoom). Dropping it on gesture end re-rasters crisp.
+ */
+:global([data-canvas-surface][data-viewport-moving='true']) .layer {
   will-change: transform;
-  backface-visibility: hidden;
 }
 
 .header {

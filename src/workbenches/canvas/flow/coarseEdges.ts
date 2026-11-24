@@ -5,7 +5,7 @@ import { toWorldRectInGraph } from '../../../domain/canvas/geometry/coords'
 import { getSpec } from '../../../domain/canvas/nodeSpecs/registry'
 import { portDeclOf } from '../../../domain/canvas/nodeSpecs/ports'
 import { portAnchorWorld } from '../../../features/canvas/useEdgeDrag'
-import { childEdgeIdSet } from './childEdges'
+import { childEdgeIdSet, flowEdgeBezierPath } from './childEdges'
 
 export interface CoarseEdgePath {
   id: string
@@ -68,14 +68,13 @@ export function coarseEdgePaths(
 
     const from = portAnchorWorld(toWorldRectInGraph(source, graph), sourceDecl)
     const to = portAnchorWorld(toWorldRectInGraph(target, graph), targetDecl)
-    const dx = Math.max(40, Math.abs(to.x - from.x) / 2)
     out.push({
       id: edge.id,
       source: edge.source,
       target: edge.target,
       sourcePort,
       targetPort,
-      d: `M ${from.x} ${from.y} C ${from.x + dx} ${from.y}, ${to.x - dx} ${to.y}, ${to.x} ${to.y}`,
+      d: flowEdgeBezierPath(from, to, sourceDecl.side, targetDecl.side),
       related: selected.has(edge.source) || selected.has(edge.target),
       selected: selectedEdges.has(edge.id),
     })

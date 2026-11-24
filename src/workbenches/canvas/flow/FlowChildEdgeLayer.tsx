@@ -68,6 +68,8 @@ const ChildEdgeViewport = memo(function ChildEdgeViewport({
               vectorEffect="non-scaling-stroke"
               data-edge={p.id}
               data-child-edge={p.id}
+              data-edge-source={p.source}
+              data-edge-target={p.target}
             />
           )}
           {hitOnly && (

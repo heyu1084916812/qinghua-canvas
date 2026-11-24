@@ -3,15 +3,24 @@ import type { CanvasStore } from '../../../state/workbenches/canvas/store'
 import type { FlowDragAnchor } from './flowSurfaceChangeCoordinator'
 import {
   captureFlowDragEdgePaths,
+  captureFlowDragFollowers,
+  clearFlowDragFollowers,
   writeFlowNodeDragDomPositions,
   writeFlowDragEdgePaths,
+  writeFlowDragFollowers,
   type FlowDragEdgePathSnapshot,
+  type FlowDragFollowers,
 } from './flowDragDomFollower'
 
 interface DirectDragState {
   anchor: FlowDragAnchor
   movingIds: Set<string>
+  /** moving nodes plus their container descendants (their labels / ports / child edges follow too) */
+  affectedIds: Set<string>
   edges: FlowDragEdgePathSnapshot[]
+  followers: FlowDragFollowers
+  released: boolean
+  settled: boolean
   lastClientX: number
   lastClientY: number
   moved: boolean
@@ -54,10 +63,15 @@ export function useFlowNodeDragDomFollow({
       moved = false,
     ) => {
       const movingIds = new Set(anchor.nodes.keys())
+      const affectedIds = withDescendants(store.getSnapshot().nodes, movingIds)
       stateRef.current = {
         anchor,
         movingIds,
+        affectedIds,
         edges: captureEdges(movingIds),
+        followers: captureFlowDragFollowers(document, affectedIds, anchor.zoom || 1),
+        released: false,
+        settled: false,
         lastClientX: clientX,
         lastClientY: clientY,
         moved,
@@ -65,7 +79,7 @@ export function useFlowNodeDragDomFollow({
       }
       surfaceRef.current?.setAttribute('data-direct-drag', 'true')
     },
-    [captureEdges, surfaceRef],
+    [captureEdges, store, surfaceRef],
   )
 
   const move = useCallback((clientX: number, clientY: number) => {
@@ -85,8 +99,10 @@ export function useFlowNodeDragDomFollow({
       y: position.y,
     }))
     const write = () => {
+      if (state.settled) return
       writeFlowNodeDragDomPositions(document, starts, dx, dy)
       writeFlowDragEdgePaths(state.edges, state.movingIds, dx, dy)
+      writeFlowDragFollowers(state.followers, state.affectedIds, dx, dy)
     }
     write()
     if (state.frame) cancelAnimationFrame(state.frame)
@@ -95,6 +111,20 @@ export function useFlowNodeDragDomFollow({
       state.frame = null
       write()
     })
+  }, [])
+
+  /**
+   * Called from the surface's layout effect when a new graph commits: the
+   * committed positions are in the DOM this frame, so the drag offsets go now
+   * (before paint) — no double offset, no jump back.
+   */
+  const settle = useCallback(() => {
+    const state = stateRef.current
+    if (!state?.released || !state.moved || state.settled) return
+    if (state.frame) cancelAnimationFrame(state.frame)
+    state.frame = null
+    clearFlowDragFollowers(state.followers, state.edges, false)
+    state.settled = true
   }, [])
 
   const isActive = useCallback(() => stateRef.current !== null, [])
@@ -111,6 +141,11 @@ export function useFlowNodeDragDomFollow({
     const clear = () => {
       const state = stateRef.current
       if (state?.frame) cancelAnimationFrame(state.frame)
+      // No graph commit settled it (no move, rejected drop): restore what we wrote.
+      if (state && !state.settled) {
+        clearFlowDragFollowers(state.followers, state.edges, state.moved)
+        if (state.moved) writeFlowNodeDragDomPositions(document, [...state.anchor.nodes].map(([id, p]) => ({ id, ...p })), 0, 0)
+      }
       stateRef.current = null
       surfaceRef.current?.removeAttribute('data-direct-drag')
     }
@@ -126,6 +161,7 @@ export function useFlowNodeDragDomFollow({
     }
     const onUp = (event: PointerEvent) => {
       move(event.clientX, event.clientY)
+      if (stateRef.current) stateRef.current.released = true
       clearAfterDragEnd()
     }
     window.addEventListener('pointermove', onMove)
@@ -142,5 +178,23 @@ export function useFlowNodeDragDomFollow({
     }
   }, [move, surfaceRef])
 
-  return { begin, move, isActive, moved, lastPointer }
+  return { begin, move, settle, isActive, moved, lastPointer }
+}
+
+function withDescendants(
+  nodes: readonly { id: string; parentId?: string | null }[],
+  roots: ReadonlySet<string>,
+): Set<string> {
+  const out = new Set(roots)
+  let grew = true
+  while (grew) {
+    grew = false
+    for (const node of nodes) {
+      if (node.parentId && out.has(node.parentId) && !out.has(node.id)) {
+        out.add(node.id)
+        grew = true
+      }
+    }
+  }
+  return out
 }

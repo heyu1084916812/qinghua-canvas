@@ -180,3 +180,34 @@ describe('刚导入的素材直通车（对账 #408）', () => {
     expect(meta.mime).toBe('image/png')
   })
 })
+
+/** 灯箱原图直出：有 `/asset/<hash>` 就不走「整行 JSON + base64」慢路 */
+describe('preferSource：原图直出', () => {
+  const sourceKit = (folder = createMemoryAssetFolder()) => {
+    const kit = kitWithFolder(folder)
+    const queries: unknown[] = []
+    kit.storage.query = (async (_table: string, filter: { id?: string }, options?: unknown) => {
+      queries.push(options)
+      return filter.id === 'big' ? [{ id: 'big', mime: 'image/png', bytesLength: 42_000_000 }] : []
+    }) as PlatformKit['storage']['query']
+    kit.assets = { ...kit.assets, sourceUrl: (hash: string) => `http://store/asset/${hash}` }
+    return { kit, queries }
+  }
+
+  it('returns the direct streaming URL and only reads metadata', async () => {
+    const { kit, queries } = sourceKit()
+    const meta = await loadAssetUrl(kit, 'big', { preferSource: true })
+    expect(meta.url).toBe('http://store/asset/big')
+    expect(meta.thumb).toBeFalsy()
+    expect(meta.preview).toBeFalsy()
+    expect(queries).toEqual([{ includePayload: false, fields: ['id', 'mime', 'url', 'bytesLength'] }])
+  })
+
+  it('keeps the asset-folder path when a folder is authorised (disk is the truth)', async () => {
+    const folder = createMemoryAssetFolder()
+    await folder.pick()
+    const { kit } = sourceKit(folder)
+    const meta = await loadAssetUrl(kit, 'big', { preferSource: true })
+    expect(meta.url).not.toBe('http://store/asset/big')
+  })
+})

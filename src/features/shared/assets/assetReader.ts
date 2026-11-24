@@ -60,7 +60,7 @@ export interface AssetMeta {
 export async function loadAssetUrl(
   platform: PlatformKit,
   hash: string,
-  opts: { preferThumb?: boolean; preferPreview?: boolean } = {},
+  opts: { preferThumb?: boolean; preferPreview?: boolean; preferSource?: boolean } = {},
 ): Promise<AssetMeta> {
   /**
    * **刚导入的那一份直接在内存里命中**（对账 #408 的优化；判据与数据见 `freshAssets.ts` 的表）。
@@ -111,6 +111,26 @@ export async function loadAssetUrl(
       mime,
       expectedPath: expectedAssetPath(platform.assetFolder?.current()?.name, hash, mime),
     }
+  }
+  /**
+   * **原图直出**（灯箱）：`/asset/<hash>` 让浏览器流式下载、原生解码、可缓存；
+   * 不走「整行 JSON + base64 → Blob」那条慢路（几十 MB 大图要等好几秒，期间灯箱一直是缩略图）。
+   * 素材文件夹授权时以磁盘为准，仍走下面的老路。
+   */
+  const directSourceUrl =
+    opts.preferSource === true && !platform.assetFolder?.current()
+      ? platform.assets.sourceUrl?.(hash)
+      : null
+  if (directSourceUrl) {
+    const [metadata] = await platform.storage.query('assets', { id: hash }, {
+      includePayload: false,
+      fields: ['id', 'mime', 'url', 'bytesLength'],
+    })
+    const meta = metadata as { mime?: string; url?: string; bytesLength?: unknown } | undefined
+    const mime = meta?.mime ?? null
+    const expectedPath = expectedAssetPath(platform.assetFolder?.current()?.name, hash, mime)
+    if (meta?.url) return { url: meta.url, mime, expectedPath }
+    if (Number(meta?.bytesLength) > 0) return { url: directSourceUrl, mime, expectedPath }
   }
   const preferThumb = opts.preferThumb === true
   const preferPreview = opts.preferPreview === true
