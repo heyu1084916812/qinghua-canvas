@@ -1,0 +1,71 @@
+{
+  "issue": 1190,
+  "capturedAt": "2026-11-24",
+  "runtime": {
+    "desktop": "Tauri debug",
+    "webview2": "157.0.4341.60",
+    "vite": "8.2.2"
+  },
+  "watchdog": {
+    "productionInitialGraceSeconds": 20,
+    "developmentInitialGraceSeconds": 90,
+    "developmentLog": "[ui] 白屏看门狗已启动；首次检查宽限 90 秒",
+    "reloadsDuringObservedColdStart": 0
+  },
+  "oldFailureLog": [
+    "[ui] 20 秒无心跳，WebView 可能白屏，执行第 1 次重载",
+    "[ui] 20 秒无心跳，WebView 可能白屏，执行第 2 次重载"
+  ],
+  "coldStartObservation": {
+    "sec0To26": {
+      "readyState": "interactive",
+      "rootChildren": 0,
+      "appShell": 0,
+      "platform": null
+    },
+    "sec28": {
+      "readyState": "complete",
+      "rootChildren": 1,
+      "appShell": 1,
+      "platform": "desktop"
+    }
+  },
+  "uiMatrix": [
+    {
+      "width": 1440,
+      "height": 900,
+      "theme": "light",
+      "rootChildren": 1,
+      "appShell": 1,
+      "overflowX": false,
+      "pageErrors": []
+    },
+    {
+      "width": 1440,
+      "height": 900,
+      "theme": "dark",
+      "rootChildren": 1,
+      "appShell": 1,
+      "overflowX": false,
+      "pageErrors": []
+    },
+    {
+      "width": 1024,
+      "height": 700,
+      "theme": "light",
+      "rootChildren": 1,
+      "appShell": 1,
+      "overflowX": false,
+      "pageErrors": []
+    },
+    {
+      "width": 1024,
+      "height": 700,
+      "theme": "dark",
+      "rootChildren": 1,
+      "appShell": 1,
+      "overflowX": false,
+      "pageErrors": []
+    }
+  ]
+}

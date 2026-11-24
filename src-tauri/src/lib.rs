@@ -4045,6 +4045,20 @@ struct UiHealth {
     reloads: AtomicUsize,
 }
 
+const UI_WATCHDOG_POLL: Duration = Duration::from_secs(5);
+const UI_WATCHDOG_STALE: Duration = Duration::from_secs(20);
+const UI_WATCHDOG_DEV_INITIAL_GRACE: Duration = Duration::from_secs(90);
+
+/// 开发壳首次加载要等 Vite 冷转换；过早 reload 会把本可成功的启动打断。
+/// 生产包加载内嵌资源，仍沿用原来的 20 秒恢复窗口。
+fn ui_watchdog_initial_grace(debug_build: bool) -> Duration {
+    if debug_build {
+        UI_WATCHDOG_DEV_INITIAL_GRACE
+    } else {
+        UI_WATCHDOG_STALE
+    }
+}
+
 impl Default for UiHealth {
     fn default() -> Self {
         Self {
@@ -4110,9 +4124,14 @@ fn start_ui_watchdog(app: &tauri::AppHandle) {
     }
     let app = app.clone();
     std::thread::spawn(move || {
-        std::thread::sleep(Duration::from_secs(20));
+        let initial_grace = ui_watchdog_initial_grace(cfg!(debug_assertions));
+        eprintln!(
+            "[ui] 白屏看门狗已启动；首次检查宽限 {} 秒",
+            initial_grace.as_secs()
+        );
+        std::thread::sleep(initial_grace);
         loop {
-            std::thread::sleep(Duration::from_secs(5));
+            std::thread::sleep(UI_WATCHDOG_POLL);
             let Some(window) = app.get_webview_window("main") else {
                 continue;
             };
@@ -4125,7 +4144,7 @@ fn start_ui_watchdog(app: &tauri::AppHandle) {
                 .lock()
                 .map(|last| last.elapsed())
                 .unwrap_or_default();
-            if elapsed < Duration::from_secs(20) {
+            if elapsed < UI_WATCHDOG_STALE {
                 continue;
             }
             let attempts = app
@@ -4145,6 +4164,21 @@ fn start_ui_watchdog(app: &tauri::AppHandle) {
             }
         }
     });
+}
+
+#[cfg(test)]
+mod ui_watchdog_tests {
+    use super::*;
+
+    #[test]
+    fn dev_build_waits_for_cold_vite_transform() {
+        assert_eq!(ui_watchdog_initial_grace(true), Duration::from_secs(90));
+    }
+
+    #[test]
+    fn release_build_keeps_the_existing_recovery_window() {
+        assert_eq!(ui_watchdog_initial_grace(false), Duration::from_secs(20));
+    }
 }
 
 /// 节流用的时钟：拖动窗口时 `Resized` / `Moved` 每帧都来，不能每帧写一次盘。
