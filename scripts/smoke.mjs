@@ -9888,13 +9888,28 @@ async function g58(browser) {
    * 若哪天只有一个隐藏，用户会看到「面板没了但按钮条还在」的割裂感。
    */
   const creationPanel = page.locator('[data-creation-panel]')
+  const sourceNode = page.locator('[data-node-type="prompt"]').first()
+  const sourceId = await sourceNode.getAttribute('data-node-id')
+  const genId = await gen.getAttribute('data-node-id')
+  await sourceNode.click({ position: { x: 30, y: 30 } })
+  await sleep(250)
+  const edgePathSelector = `path[data-edge][data-edge-source="${sourceId}"][data-edge-target="${genId}"]`
+  const edgeBeforeDrag = await page.locator(edgePathSelector).getAttribute('d')
   const grab = { x: Math.round(n1.x + 14), y: Math.round(n1.y + n1.height - 14) }
   await page.mouse.move(grab.x, grab.y)
   await page.mouse.down()
   await page.mouse.move(grab.x + 80, grab.y + 30, { steps: 10 })
   await sleep(200)
+  const edgeDuringDrag = await page.locator(edgePathSelector).getAttribute('d')
   rec(g, '★ 拖动中跟随栏隐藏（与创作面板同款）', (await bar.count()) === 0, `count=${await bar.count()}`)
   rec(g, '拖动中创作面板也隐藏（两者同源）', (await creationPanel.count()) === 0, `count=${await creationPanel.count()}`)
+  rec(
+    g,
+    '★★ 选中上游后拖动下游，连接线路径同帧更新',
+    !!edgeBeforeDrag && !!edgeDuringDrag && edgeBeforeDrag !== edgeDuringDrag,
+    `before=${edgeBeforeDrag?.slice(0, 36) ?? '无'} during=${edgeDuringDrag?.slice(0, 36) ?? '无'}`,
+  )
+  await page.screenshot({ path: `${OUT}/1194-edge-follow-${evidenceSuffix}.png` })
   await page.mouse.up()
   await sleep(300)
   rec(g, '★ 拖动结束后仍不显示（等下一次显式选中）', (await bar.count()) === 0, `count=${await bar.count()}`)
@@ -9902,9 +9917,9 @@ async function g58(browser) {
   await page.screenshot({ path: `${OUT}/73-g58-follow-bar-drag.png` })
 
   // 拖后首次点击另一个节点：旧节点浮层不得借 pointerdown 复活一帧
-  const draggedId = await gen.getAttribute('data-node-id')
-  const otherNode = page.locator('[data-node-type="prompt"]').first()
-  const otherId = await otherNode.getAttribute('data-node-id')
+  const draggedId = genId
+  const otherNode = sourceNode
+  const otherId = sourceId
   rec(g, '拖动后存在另一个可点击的节点', !!draggedId && !!otherId && draggedId !== otherId, `${draggedId} → ${otherId}`)
   await page.evaluate(() => {
     window.__g58CrossNodeSamples = []
@@ -9967,6 +9982,8 @@ async function g58(browser) {
     JSON.stringify({ finalBar: crossNodeTrace.finalBar, finalPanel: crossNodeTrace.finalPanel }),
   )
   await page.screenshot({ path: `${OUT}/73-g58-cross-node-final-${evidenceSuffix}.png` })
+  await page.keyboard.press('Escape')
+  await sleep(240)
 
   // 再次点击节点 → 两者一起回来
   const nAgain = await gen.boundingBox()
@@ -41459,6 +41476,7 @@ async function g168(browser) {
  */
 async function g735(browser) {
   const g = 'G735 常用模型与 Agent 定位'
+  const evidenceSuffix = `${process.env.SMOKE_DARK === '1' ? 'dark' : 'light'}-${process.env.SMOKE_VIEWPORT === '1024' ? '1024x700' : '1440x900'}`
   const ctx = await newCtx(browser)
   const page = await ctx.newPage()
   const pageErrors = []
@@ -41571,6 +41589,69 @@ async function g735(browser) {
   if ((await orb.getAttribute('data-agent-expanded')) !== 'true') await orb.click()
   await floating.waitFor({ state: 'visible', timeout: 5000 })
   await sleep(300)
+  const welcome = page.locator('[data-agent-welcome]')
+  const welcomeAudit = await welcome.evaluate((node) => {
+    const title = node.querySelector('[data-agent-welcome-title]')
+    const actions = [...node.querySelectorAll('[data-agent-welcome-suggestion]')]
+    const capabilities = node.querySelector('[data-agent-welcome-capabilities]')
+    return {
+      title: title?.textContent?.trim() ?? '',
+      titleSize: title ? Number.parseFloat(getComputedStyle(title).fontSize) : 0,
+      actions: actions.map((action) =>
+        action.getAttribute('data-agent-welcome-suggestion'),
+      ),
+      minActionHeight: Math.min(
+        ...actions.map((action) => action.getBoundingClientRect().height),
+      ),
+      capabilities: capabilities?.textContent?.replace(/\s+/g, ' ').trim() ?? '',
+      overflowX: node.scrollWidth > node.clientWidth + 1,
+    }
+  })
+  rec(
+    g,
+    '★★ Agent 空会话显示主标题、能力说明与三类起稿建议',
+    welcomeAudit.title === '从一句话，到一张画布' &&
+      welcomeAudit.titleSize >= 18 &&
+      ['image', 'workflow', 'skill'].every((id) =>
+        welcomeAudit.actions.includes(id),
+      ) &&
+      welcomeAudit.capabilities.includes('Skill') &&
+      welcomeAudit.capabilities.includes('自动执行'),
+    JSON.stringify(welcomeAudit),
+  )
+  rec(
+    g,
+    '★ Agent 首屏建议卡命中区足够且无横向溢出',
+    welcomeAudit.minActionHeight >= 44 && !welcomeAudit.overflowX,
+    JSON.stringify(welcomeAudit),
+  )
+  await page.screenshot({
+    path: `${OUT}/735-agent-welcome-${evidenceSuffix}.png`,
+  })
+  await page.locator('[data-agent-welcome-suggestion="image"]').click()
+  await sleep(100)
+  const suggestionState = await page.evaluate(() => {
+    const editor = document.querySelector(
+      '[data-agent-composer] [contenteditable="true"]',
+    )
+    return {
+      text: editor?.textContent?.trim() ?? '',
+      focused: document.activeElement === editor,
+    }
+  })
+  rec(
+    g,
+    '★★ 点击起稿建议会写入输入框并聚焦，不直接发送',
+    suggestionState.text.includes('帮我生成一张图片') && suggestionState.focused,
+    JSON.stringify(suggestionState),
+  )
+  await page.locator('[data-agent-composer] [contenteditable="true"]').press(
+    'Control+A',
+  )
+  await page.locator('[data-agent-composer] [contenteditable="true"]').press(
+    'Backspace',
+  )
+  await sleep(80)
   const panelBox = await floating.boundingBox()
   const workspaceAfterOpen = await page.locator('[data-canvas-surface]').boundingBox()
   const shellSlotBox = await page.locator('[data-agent-shell-slot]').evaluate((node) => {
@@ -46322,7 +46403,210 @@ async function g1182(browser) {
   }
 }
 
-const ALL_GROUPS = [g1, g2, g3, g4, g5, g6, g7, g8, g9, g10, g11, g12, g13, g14, g15, g16, g17, g18, g19, g23, g24, g37, g42, g43, g44, g45, g46, g47, g48, g49, g51, g52, g53, g55, g56, g57, g58, g59, g60, g61, g62, g63, g64, g65, g66, g67, g68, g69, g70, g71, g72, g73, g74, g75, g76, g77, g78, g79, g80, g81, g82, g83, g84, g85, g86, g87, g88, g89, g90, g91, g92, g93, g94, g95, g96, g97, g98, g99, g100, g101, g102, g103, g104, g105, g106, g107, g108, g109, g110, g111, g112, g113, g114, g115, g116, g117, g118, g119, g120, g121, g122, g123, g125, g126, g127, g128, g129, g130, g131, g132, g133, g134, g135, g136, g137, g138, g139, g140, g141, g142, g143, g144, g145, g146, g147, g148, g149, g150, g151, g152, g153, g154, g155, g156, g157, g158, g159, g160, g161, g162, g164, g165, g166, g167, g168, g169, g170, g171, g735, g769, g795, g798, g800, g865, g1182]
+async function g1195(browser) {
+  const g = 'G1195 灯箱双入口动画一致'
+  const suffix = `${process.env.SMOKE_DARK === '1' ? 'dark' : 'light'}-${process.env.SMOKE_VIEWPORT === '1024' ? '1024x700' : '1440x900'}`
+  const ctx = await newCtx(browser)
+  const page = await ctx.newPage()
+  const errors = []
+  page.on('pageerror', (error) => errors.push(String(error).slice(0, 200)))
+
+  try {
+    await configureMockChannel(page)
+    await gotoProjects(page)
+    await page.locator('[data-template="text2img"]').click()
+    await page.waitForURL(/\/canvas\//)
+    await page.locator('[data-canvas-hydrated="true"]').waitFor({ state: 'visible', timeout: 20_000 })
+    const source = page.locator('[data-node-type="generation"]').first()
+    const panel = await genPanel(page, source)
+    await configureGenPanel(page, panel, '灯箱入口动画测试')
+    await panel.locator('[data-panel-run]').click()
+    for (let i = 0; i < 80; i += 1) {
+      if ((await source.locator('[data-node-asset]').count()) > 0) break
+      await sleep(250)
+    }
+    const asset = source.locator('[data-node-asset]').first()
+    const sourceBox = await asset.boundingBox()
+    rec(g, '源节点已出图', !!sourceBox)
+
+    const capture = async (mode) => {
+      if (mode === 'toolbar') await genPanel(page, source)
+      await page.evaluate(() => {
+        window.__lightboxEntrySamples = []
+        const startedAt = performance.now()
+        const read = (element) => {
+          if (!(element instanceof HTMLElement)) return null
+          const rect = element.getBoundingClientRect()
+          return {
+            left: rect.left,
+            top: rect.top,
+            width: rect.width,
+            height: rect.height,
+            src: element instanceof HTMLImageElement ? element.currentSrc || element.src : '',
+          }
+        }
+        const tick = () => {
+          const clone = document.querySelector('[data-lightbox-flip-clone]')
+          const media = document.querySelector('[data-lightbox-media]')
+          window.__lightboxEntrySamples.push({
+            t: performance.now() - startedAt,
+            clone: read(clone),
+            media: read(media),
+          })
+          if (performance.now() - startedAt < 900) requestAnimationFrame(tick)
+        }
+        requestAnimationFrame(tick)
+      })
+      if (mode === 'toolbar') {
+        await page.locator('[data-follow-action="preview"]').click()
+      } else {
+        await asset.dblclick()
+      }
+      await page.locator('[data-lightbox]').waitFor({ state: 'visible', timeout: 5000 })
+      await sleep(200)
+      await page.screenshot({ path: `${OUT}/1195-lightbox-${mode}-${suffix}.png` })
+      await sleep(800)
+      const result = await page.evaluate(() => {
+        const samples = window.__lightboxEntrySamples ?? []
+        const firstClone = samples.find((sample) => sample.clone)
+        const lastClone = [...samples].reverse().find((sample) => sample.clone)
+        const settled = [...samples].reverse().find((sample) => sample.media)
+        return { samples, firstClone, lastClone, settled }
+      })
+      await page.locator('[data-lightbox-close]').click({ timeout: 3000 }).catch(() => {})
+      await page.locator('[data-lightbox]').waitFor({ state: 'detached', timeout: 5000 }).catch(() => {})
+      await sleep(150)
+      return result
+    }
+
+    const toolbar = await capture('toolbar')
+    const dblclick = await capture('dblclick')
+    const close = (a, b) =>
+      a && b &&
+      Math.abs(a.left - b.left) <= 2 &&
+      Math.abs(a.top - b.top) <= 2 &&
+      Math.abs(a.width - b.width) <= 2 &&
+      Math.abs(a.height - b.height) <= 2
+    rec(
+      g,
+      '★★ 功能栏与双击都从同一素材矩形开始',
+      !!sourceBox &&
+        close(toolbar.firstClone?.clone, {
+          left: sourceBox.x,
+          top: sourceBox.y,
+          width: sourceBox.width,
+          height: sourceBox.height,
+        }) &&
+        close(dblclick.firstClone?.clone, {
+          left: sourceBox.x,
+          top: sourceBox.y,
+          width: sourceBox.width,
+          height: sourceBox.height,
+        }) &&
+        close(toolbar.firstClone?.clone, dblclick.firstClone?.clone),
+      JSON.stringify({
+        sourceBox,
+        toolbar: toolbar.firstClone?.clone,
+        dblclick: dblclick.firstClone?.clone,
+      }),
+    )
+    rec(
+      g,
+      '★★ 两个入口首帧都复用节点当前图片',
+      !!toolbar.firstClone?.clone?.src &&
+        toolbar.firstClone.clone.src === dblclick.firstClone?.clone?.src,
+      JSON.stringify({
+        toolbar: toolbar.firstClone?.clone?.src,
+        dblclick: dblclick.firstClone?.clone?.src,
+      }),
+    )
+    rec(
+      g,
+      '★★ 两个入口落点与动画时长一致',
+      close(toolbar.settled?.media, dblclick.settled?.media) &&
+        Math.abs((toolbar.lastClone?.t ?? 0) - (dblclick.lastClone?.t ?? 0)) <= 120,
+      JSON.stringify({
+        toolbarSettled: toolbar.settled?.media,
+        dblclickSettled: dblclick.settled?.media,
+        toolbarCloneEnd: toolbar.lastClone?.t,
+        dblclickCloneEnd: dblclick.lastClone?.t,
+      }),
+    )
+    rec(g, '无未捕获异常', errors.length === 0, errors.join(' | '))
+  } finally {
+    await ctx.close()
+  }
+}
+
+async function g1196(browser) {
+  const g = 'G1196 Agent 空会话首屏'
+  const compact = process.env.SMOKE_VIEWPORT === '1024'
+  const viewport = compact ? { width: 1024, height: 700 } : { width: 1440, height: 900 }
+  const theme = process.env.SMOKE_DARK === '1' ? 'dark' : 'light'
+  const ctx = await newCtx(browser, { viewport })
+  const page = await ctx.newPage()
+  const errors = []
+  page.on('pageerror', (error) => errors.push(String(error).slice(0, 200)))
+
+  try {
+    await gotoProjects(page)
+    await page.locator('[data-template="text2img"]').click()
+    await page.waitForURL(/\/canvas\//)
+    await page.locator('[data-canvas-hydrated="true"]').waitFor({ state: 'visible', timeout: 20_000 })
+    await page.locator('[data-agent-orb]').click()
+    const panel = page.locator('[data-agent-floating-panel]')
+    await panel.waitFor({ state: 'visible', timeout: 5000 })
+    await sleep(300)
+    await page.mouse.move(10, 10)
+    await sleep(100)
+
+    const welcome = page.locator('[data-agent-welcome]')
+    const audit = await welcome.evaluate((node) => {
+      const title = node.querySelector('[data-agent-welcome-title]')
+      const actions = [...node.querySelectorAll('[data-agent-welcome-suggestion]')]
+      const capabilities = node.querySelector('[data-agent-welcome-capabilities]')
+      return {
+        title: title?.textContent?.trim() ?? '',
+        actions: actions.map((action) => action.getAttribute('data-agent-welcome-suggestion')),
+        minHeight: Math.min(...actions.map((action) => action.getBoundingClientRect().height)),
+        capabilities: capabilities?.textContent?.replace(/\s+/g, ' ').trim() ?? '',
+        overflowX: node.scrollWidth > node.clientWidth + 1,
+      }
+    })
+    rec(
+      g,
+      '★★ 空会话显示主标题、能力说明和三类起稿建议',
+      audit.title === '从一句话，到一张画布' &&
+        ['image', 'workflow', 'skill'].every((id) => audit.actions.includes(id)) &&
+        audit.capabilities.includes('Skill') &&
+        audit.capabilities.includes('自动执行'),
+      JSON.stringify(audit),
+    )
+    rec(g, '★ 建议卡高度与横向布局稳定', audit.minHeight >= 44 && !audit.overflowX, JSON.stringify(audit))
+    await page.screenshot({ path: `${OUT}/1196-agent-welcome-${theme}-${viewport.width}.png` })
+
+    await page.locator('[data-agent-welcome-suggestion="workflow"]').click()
+    await sleep(100)
+    const draft = await page.evaluate(() => {
+      const editor = document.querySelector('[data-agent-composer] [contenteditable="true"]')
+      return {
+        text: editor?.textContent?.trim() ?? '',
+        focused: document.activeElement === editor,
+      }
+    })
+    rec(
+      g,
+      '★★ 点击建议只填入草稿并聚焦输入框',
+      draft.text.includes('帮我把这个想法搭成画布工作流') && draft.focused,
+      JSON.stringify(draft),
+    )
+    rec(g, '无未捕获异常', errors.length === 0, errors.join(' | '))
+  } finally {
+    await ctx.close()
+  }
+}
+
+const ALL_GROUPS = [g1, g2, g3, g4, g5, g6, g7, g8, g9, g10, g11, g12, g13, g14, g15, g16, g17, g18, g19, g23, g24, g37, g42, g43, g44, g45, g46, g47, g48, g49, g51, g52, g53, g55, g56, g57, g58, g59, g60, g61, g62, g63, g64, g65, g66, g67, g68, g69, g70, g71, g72, g73, g74, g75, g76, g77, g78, g79, g80, g81, g82, g83, g84, g85, g86, g87, g88, g89, g90, g91, g92, g93, g94, g95, g96, g97, g98, g99, g100, g101, g102, g103, g104, g105, g106, g107, g108, g109, g110, g111, g112, g113, g114, g115, g116, g117, g118, g119, g120, g121, g122, g123, g125, g126, g127, g128, g129, g130, g131, g132, g133, g134, g135, g136, g137, g138, g139, g140, g141, g142, g143, g144, g145, g146, g147, g148, g149, g150, g151, g152, g153, g154, g155, g156, g157, g158, g159, g160, g161, g162, g164, g165, g166, g167, g168, g169, g170, g171, g735, g769, g795, g798, g800, g865, g1182, g1195, g1196]
 // ────────────────────────────────────────────────────────────
 // G169 框选多节点拖动：**松手那一刻不许再有人挪**（用户 2026-11-18 偶发：
 //      「框选多个节点，移动的时候松开鼠标会有一张图片移动了位置，好像多了一个步骤」）

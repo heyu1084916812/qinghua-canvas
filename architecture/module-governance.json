@@ -4732,6 +4732,30 @@
       "budget": 110
     },
     {
+      "module": "src/workbenches/canvas/panels/AgentPanel/AgentWelcome.tsx",
+      "owner": "canvas-agent-welcome",
+      "responsibility": "在 Agent 新会话空态展示画布能力、Skill 数量和可点击起稿建议。",
+      "owns": [
+        "Agent 首屏主标题与能力说明",
+        "生图 / 工作流 / Skill 三类起稿入口",
+        "能力标签与建议按钮 DOM"
+      ],
+      "doesNotOwn": [
+        "Agent 会话、模型和技能数据",
+        "草稿写入、发送与工具执行",
+        "输入框布局"
+      ],
+      "publicApi": [
+        "AgentWelcome"
+      ],
+      "test": [
+        "src/workbenches/canvas/panels/AgentPanel/AgentWelcome.test.ts",
+        "src/workbenches/canvas/panels/AgentPanel/AgentConversationPane.test.ts",
+        "src/workbenches/canvas/panels/AgentPanel/AgentPanelView.test.ts"
+      ],
+      "budget": 90
+    },
+    {
       "module": "src/workbenches/canvas/panels/AgentPanel/agentSessionBrief.ts",
       "owner": "agent-context",
       "responsibility": "为续跑生成紧凑会话摘要，并从持久消息校验可恢复的续跑上下文。",
@@ -8264,6 +8288,29 @@
         "src/app/uiSevenPoints.test.ts"
       ],
       "budget": 120
+    },
+    {
+      "module": "src/features/canvas/lightboxSourceRect.ts",
+      "owner": "canvas-lightbox-source",
+      "responsibility": "为双击、功能栏预览和节点事件生成同一份灯箱源媒体快照。",
+      "owns": [
+        "源媒体矩形、圆角、图片 / 视频类型与 hash 快照",
+        "灯箱首帧复用同源 URL 的契约"
+      ],
+      "doesNotOwn": [
+        "灯箱开闭动画与视口",
+        "素材仓储与解码",
+        "节点 JSX 结构"
+      ],
+      "publicApi": [
+        "LightboxSourceRect",
+        "lightboxSourceRectFromMedia",
+        "lightboxSourceRectForNode"
+      ],
+      "test": [
+        "src/features/canvas/lightboxSourceRect.test.ts"
+      ],
+      "budget": 70
     },
     {
       "module": "src/pages/CanvasPage/ReferenceMedia.tsx",
@@ -13697,6 +13744,7 @@
       "owns": [
         "拖动节点 wrapper 的即时 transform",
         "相连边路径按 RF getBezierPath 重算与命中线 / 删除按钮同步",
+        "选中态重渲染替换边 DOM 后按 edge id 重新绑定当前 path",
         "标题层、端口层、容器子边的同帧跟随与清理"
       ],
       "doesNotOwn": [
@@ -13717,7 +13765,7 @@
         "src/workbenches/canvas/flow/flowDragDomFollower.test.ts",
         "scripts/test-canvas-performance.test.mjs"
       ],
-      "budget": 210
+      "budget": 270
     },
     {
       "module": "src/workbenches/canvas/flow/useFlowNodeDragDomFollow.ts",

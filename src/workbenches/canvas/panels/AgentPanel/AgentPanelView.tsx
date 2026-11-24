@@ -50,7 +50,17 @@ export function AgentPanelView({
       }}
     >
       <AgentPanelHeader {...headerProps} />
-      <AgentConversationPane {...conversationProps} />
+      <AgentConversationPane
+        {...conversationProps}
+        skillCount={
+          composerProps.skills.builtinSkills.length +
+          composerProps.skills.userSkills.length
+        }
+        onUseSuggestion={(text) => {
+          composerProps.setDraft(text)
+          composerProps.editorRef.current?.focus()
+        }}
+      />
       <AgentComposerPane {...composerProps} />
     </aside>
   )

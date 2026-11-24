@@ -10,7 +10,7 @@ vi.mock('./AgentPanelHeader', async () => {
 })
 vi.mock('./AgentConversationPane', async () => {
   const { createElement } = await import('react')
-  return { AgentConversationPane: () => createElement('main') }
+  return { AgentConversationPane: (props: object) => createElement('main', props) }
 })
 vi.mock('./AgentComposerPane', async () => {
   const { createElement } = await import('react')
@@ -41,7 +41,11 @@ function renderView(overrides: Partial<{
     openPicker: 'agent-model',
     headerProps: {} as never,
     conversationProps: {} as never,
-    composerProps: {} as never,
+    composerProps: {
+      skills: { builtinSkills: [], userSkills: [] },
+      setDraft: vi.fn(),
+      editorRef: { current: { focus: vi.fn() } },
+    } as never,
     onDismissPicker: vi.fn(),
     onDropFiles: vi.fn(),
     ...overrides,
@@ -79,6 +83,21 @@ describe('AgentPanelView', () => {
 
     expect(event.preventDefault).toHaveBeenCalledTimes(1)
     expect(onDismissPicker).toHaveBeenCalledTimes(1)
+  })
+
+  it('点击空状态建议会填入草稿并把焦点交给输入框', () => {
+    const { renderer, props } = renderView()
+    const composer = props.composerProps as unknown as {
+      setDraft: ReturnType<typeof vi.fn>
+      editorRef: { current: { focus: ReturnType<typeof vi.fn> } }
+    }
+
+    act(() => {
+      renderer.root.findByType('main').props.onUseSuggestion('帮我生成一张图片：')
+    })
+
+    expect(composer.setDraft).toHaveBeenCalledWith('帮我生成一张图片：')
+    expect(composer.editorRef.current.focus).toHaveBeenCalledOnce()
   })
 
   it('没有浮层时 Esc 不拦截下游快捷键', () => {

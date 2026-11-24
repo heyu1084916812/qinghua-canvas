@@ -56,6 +56,7 @@ import {
 import { sendSelectionToAgent } from '../../../features/canvas/agentHandoff'
 import { useOverlayExit } from '../overlay/useOverlayExit'
 import { useHudMotion } from '../overlay/useHudMotion'
+import { lightboxSourceRectForNode } from '../../../features/canvas/lightboxSourceRect'
 
 /**
  * 出现跟随栏的节点类型。
@@ -76,14 +77,6 @@ const GROUP_BG_LABEL: Record<GroupBgTone, string> = {
 
 /** 鼠标按下时阻止默认聚焦：按钮点击后不滞留焦点，否则空格会被按钮吃掉（§6.3） */
 const keepCanvasFocus = { onMouseDown: (e: ReactMouseEvent) => e.preventDefault() }
-const sourceRectForNode = (nodeId: string) => {
-  const media = document.querySelector<HTMLElement>(`[data-node-id="${CSS.escape(nodeId)}"] img, [data-node-id="${CSS.escape(nodeId)}"] video`)
-  const rect = media?.getBoundingClientRect()
-  if (!media || !rect || rect.width <= 0 || rect.height <= 0) return undefined
-  const style = getComputedStyle(media)
-  return { left: rect.left, top: rect.top, width: rect.width, height: rect.height, borderRadius: style.borderRadius, src: media instanceof HTMLImageElement ? media.currentSrc || media.src : media.getAttribute('src') ?? undefined }
-}
-
 export interface NodeFollowBarProps {
   /** 关闭（= 取消选中，与创作面板「点面板外关闭」同一语义） */
   onClose?: () => void
@@ -503,7 +496,7 @@ function NodeActions({
           action="preview"
           icon={<IconExpand />}
           label="预览"
-          onClick={() => assetHash && store.openLightbox(assetHash, { sourceNodeId: node.id, sourceRect: sourceRectForNode(node.id) })}
+          onClick={() => assetHash && store.openLightbox(assetHash, { sourceNodeId: node.id, sourceRect: lightboxSourceRectForNode(node.id, assetHash) })}
         />
       )}
       {/*

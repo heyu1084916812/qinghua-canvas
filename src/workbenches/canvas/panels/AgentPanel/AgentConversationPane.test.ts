@@ -60,6 +60,8 @@ function renderPane(
       hashOfNode: new Map<string, string>(),
       thumbOf: () => null,
       currentTurnHasProcess: false,
+      skillCount: 12,
+      onUseSuggestion: vi.fn(),
       pendingPlan: null,
       advancingTaskPlan: false,
       scrollRef: createRef<HTMLDivElement>(),
@@ -76,13 +78,18 @@ function renderPane(
 }
 
 describe('AgentConversationPane', () => {
-  it('保留滚动、消息与空态锚点', () => {
+  it('空会话显示 Agent 能力和可点击起稿建议', () => {
     const html = renderPane()
 
     expect(html).toContain('data-agent-scroll-wrap')
     expect(html).toContain('data-agent-content')
     expect(html).toContain('data-agent-messages')
-    expect(html).toContain('说一句你想要什么')
+    expect(html).toContain('data-agent-welcome')
+    expect(html).toContain('从一句话，到一张画布')
+    expect(html).toContain('data-agent-welcome-suggestion="image"')
+    expect(html).toContain('data-agent-welcome-suggestion="workflow"')
+    expect(html).toContain('data-agent-welcome-suggestion="skill"')
+    expect(html).toContain('Skill 12')
   })
 
   it('确认卡仍在对话流内，并保留批准与取消语义', () => {

@@ -21,6 +21,8 @@ interface PathTarget {
  * (world coordinates) and the zoom for container child edges (screen coordinates).
  */
 export interface FlowDragEdgePathSnapshot {
+  edgeId?: string
+  childEdge?: boolean
   source: string
   target: string
   sourcePosition: Position
@@ -92,7 +94,13 @@ export function rebuildFlowEdgePath(
   return { path: toScreenPath(d, { x: 0, y: 0 }, scale), midX: midX * scale, midY: midY * scale }
 }
 
-function snapshotOf(visual: Element, group: Element | null, scale: number): FlowDragEdgePathSnapshot | null {
+function snapshotOf(
+  visual: Element,
+  group: Element | null,
+  scale: number,
+  edgeId?: string,
+  childEdge = false,
+): FlowDragEdgePathSnapshot | null {
   const source = visual.getAttribute('data-edge-source')
   const target = visual.getAttribute('data-edge-target')
   if (!source || !target) return null
@@ -106,6 +114,8 @@ function snapshotOf(visual: Element, group: Element | null, scale: number): Flow
   })
   const deleteEl = group?.querySelector('[data-edge-delete]') ?? null
   return {
+    edgeId,
+    childEdge,
     source,
     target,
     sourcePosition: positionOf(visual.getAttribute('data-edge-source-position'), Position.Right),
@@ -125,7 +135,7 @@ export function captureFlowDragEdgePaths(
   for (const id of edgeIds) {
     const visual = host.querySelector(`.react-flow__edge [data-edge="${esc(id)}"]:not([data-child-edge])`)
     if (!visual) continue
-    const snapshot = snapshotOf(visual, visual.closest('.react-flow__edge'), 1)
+    const snapshot = snapshotOf(visual, visual.closest('.react-flow__edge'), 1, id)
     if (snapshot && (movingIds.has(snapshot.source) || movingIds.has(snapshot.target))) out.push(snapshot)
   }
   return out
@@ -142,9 +152,9 @@ export function captureFlowDragFollowers(
     layers.push(...Array.from(host.querySelectorAll<HTMLElement>(`[data-flow-port-hit^="${esc(id)}:"]`)))
   }
   const childEdges = Array.from(host.querySelectorAll('path[data-child-edge][data-edge-source]')).flatMap((visual) => {
-    const snapshot = snapshotOf(visual, null, zoom || 1)
-    if (!snapshot || (!affectedIds.has(snapshot.source) && !affectedIds.has(snapshot.target))) return []
     const id = visual.getAttribute('data-child-edge') ?? ''
+    const snapshot = snapshotOf(visual, null, zoom || 1, id, true)
+    if (!snapshot || (!affectedIds.has(snapshot.source) && !affectedIds.has(snapshot.target))) return []
     for (const hit of Array.from(host.querySelectorAll(`[data-child-edge-hit="${esc(id)}"]`))) {
       const d = hit.getAttribute('d')
       if (d) snapshot.paths.push({ element: hit, d })
@@ -158,6 +168,39 @@ export function captureFlowDragFollowers(
   }
 }
 
+function currentPathsOf(s: FlowDragEdgePathSnapshot): PathTarget[] {
+  if (!s.edgeId || typeof document === 'undefined') return s.paths
+  if (s.paths.every((path) => path.element.isConnected)) return s.paths
+  if (s.childEdge) {
+    const visual = document.querySelector(`path[data-child-edge="${esc(s.edgeId)}"][data-edge-source]`)
+    if (!visual) return s.paths
+    const out = [{ element: visual, d: visual.getAttribute('d') ?? '' }]
+    for (const hit of Array.from(document.querySelectorAll(`[data-child-edge-hit="${esc(s.edgeId)}"]`))) {
+      out.push({ element: hit, d: hit.getAttribute('d') ?? '' })
+    }
+    return out
+  }
+  const visual = document.querySelector(
+    `.react-flow__edge [data-edge="${esc(s.edgeId)}"]:not([data-child-edge])`,
+  )
+  const group = visual?.closest('.react-flow__edge') ?? null
+  if (!visual || !group) return s.paths
+  return Array.from(group.querySelectorAll('path[data-edge], path[data-edge-hit]')).map((element) => ({
+    element,
+    d: element.getAttribute('d') ?? '',
+  }))
+}
+
+function currentDeleteOf(s: FlowDragEdgePathSnapshot) {
+  if (!s.edgeId || s.childEdge || typeof document === 'undefined') return s.deleteButton
+  const visual = document.querySelector(
+    `.react-flow__edge [data-edge="${esc(s.edgeId)}"]:not([data-child-edge])`,
+  )
+  const element = visual?.closest('.react-flow__edge')?.querySelector('[data-edge-delete]')
+  if (!element) return s.deleteButton
+  return { element, transform: element.getAttribute('transform') ?? '' }
+}
+
 export function writeFlowDragEdgePaths(
   snapshots: readonly FlowDragEdgePathSnapshot[],
   movingIds: ReadonlySet<string>,
@@ -166,13 +209,22 @@ export function writeFlowDragEdgePaths(
 ): number {
   let written = 0
   for (const s of snapshots) {
-    const next = rebuildFlowEdgePath(s.paths[0]?.d ?? '', movingIds.has(s.source), movingIds.has(s.target), dx, dy, s)
+    const paths = currentPathsOf(s)
+    const next = rebuildFlowEdgePath(paths[0]?.d ?? '', movingIds.has(s.source), movingIds.has(s.target), dx, dy, s)
     if (!next) continue
-    for (const path of s.paths) path.element.setAttribute('d', next.path)
-    if (s.deleteButton) {
-      const base = s.deleteButton.transform
+    for (const path of paths) path.element.setAttribute('d', next.path)
+    s.paths = paths
+    const deleteButton = currentDeleteOf(s)
+    if (deleteButton) {
+      const base = deleteButton.transform
       const translate = `translate(${next.midX}, ${next.midY})`
-      s.deleteButton.element.setAttribute('transform', /translate\([^)]*\)/.test(base) ? base.replace(/translate\([^)]*\)/, translate) : translate)
+      deleteButton.element.setAttribute(
+        'transform',
+        /translate\([^)]*\)/.test(base)
+          ? base.replace(/translate\([^)]*\)/, translate)
+          : translate,
+      )
+      s.deleteButton = deleteButton
     }
     written += 1
   }

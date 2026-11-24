@@ -264,6 +264,7 @@ function buildFragment(text: string, doc: Document): DocumentFragment {
 export interface MentionEditorHandle {
   /** 在**光标处**插入一个引用芯片（宿主在 @ 菜单里选完之后调它） */
   insertMention(token: string): void
+  focus(): void
 }
 
 export function syncMentionEditorHeight(
@@ -556,6 +557,17 @@ export const MentionEditor = forwardRef<
   }
 
   useImperativeHandle(handleRef, () => ({
+    focus() {
+      const el = ref.current
+      if (!el) return
+      el.focus()
+      const selection = window.getSelection()
+      const range = document.createRange()
+      range.selectNodeContents(el)
+      range.collapse(false)
+      selection?.removeAllRanges()
+      selection?.addRange(range)
+    },
     insertMention(token: string) {
       const el = ref.current
       if (!el) return

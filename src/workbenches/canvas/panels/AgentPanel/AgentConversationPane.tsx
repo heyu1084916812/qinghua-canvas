@@ -35,6 +35,7 @@ import {
   type AgentQueueMenuPosition,
 } from './AgentQueuePanel'
 import { AgentStepIcon } from './AgentStepIcon'
+import { AgentWelcome } from './AgentWelcome'
 import {
   pendingQuestionCard,
   processBefore,
@@ -68,6 +69,7 @@ export interface AgentConversationPaneProps {
   hashOfNode: ReadonlyMap<string, string>
   thumbOf(id: string): string | null
   currentTurnHasProcess: boolean
+  skillCount?: number
   latestUserStartedAt?: number
   pendingPlan: AgentConfirmationPreview | null
   pendingTaskStepId?: string
@@ -97,6 +99,7 @@ export interface AgentConversationPaneProps {
   onEditingQueueIdChange(id: string | null): void
   onEditingQueueTextChange(value: string): void
   onResumeQueue(): void
+  onUseSuggestion?(text: string): void
   onAddResearchReference?(
     item: ConversationResearchItem,
   ): Promise<{ ok: boolean; message: string }>
@@ -122,6 +125,7 @@ export function AgentConversationPane({
   hashOfNode,
   thumbOf,
   currentTurnHasProcess,
+  skillCount = 0,
   latestUserStartedAt,
   pendingPlan,
   pendingTaskStepId,
@@ -151,6 +155,7 @@ export function AgentConversationPane({
   onEditingQueueIdChange,
   onEditingQueueTextChange,
   onResumeQueue,
+  onUseSuggestion,
   onAddResearchReference,
   onDownloadResearchImage,
   onAnswerQuestionCard,
@@ -195,11 +200,16 @@ export function AgentConversationPane({
         data-agent-content
         onScroll={onConversationScroll}
       >
-        <div className={styles.messages} data-agent-messages>
+        <div
+          className={styles.messages}
+          data-agent-messages
+          data-agent-messages-empty={visibleItems.length === 0 ? 'true' : undefined}
+        >
           {visibleItems.length === 0 && (
-            <p className={styles.hint}>
-              说一句你想要什么，我会把它建成画布上的工作流。
-            </p>
+            <AgentWelcome
+              skillCount={skillCount}
+              onUseSuggestion={onUseSuggestion ?? (() => undefined)}
+            />
           )}
           {visibleItems.map((item, index) => {
             if (item.kind === 'user' && item.questionAnswers) {
