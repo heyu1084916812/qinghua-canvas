@@ -4720,14 +4720,16 @@
         "wheelZoom",
         "dragPan",
         "fitMediaViewport",
+        "gallerySwitchViewport",
         "mediaBoxOf",
         "imagePointAt",
         "cropBoxOf"
       ],
       "test": [
-        "src/workbenches/canvas/lightbox/lightboxPublicApi.test.ts"
+        "src/workbenches/canvas/lightbox/lightboxPublicApi.test.ts",
+        "src/workbenches/canvas/lightbox/lightboxViewportMath.test.ts"
       ],
-      "budget": 86
+      "budget": 110
     },
     {
       "module": "src/workbenches/canvas/panels/AgentPanel/agentSessionBrief.ts",
@@ -13388,6 +13390,30 @@
         "src/workbenches/canvas/lightbox/useLightboxFlip.test.ts"
       ],
       "budget": 350
+    },
+    {
+      "module": "src/workbenches/canvas/lightbox/galleryCrossfade.ts",
+      "owner": "canvas-lightbox-ui",
+      "responsibility": "灯箱多选画廊切换的预解码双层交叉淡化；旧媒体保留到新媒体可绘制后再渐变交接。",
+      "owns": [
+        "旧媒体克隆层与临时切换属性",
+        "160ms 双层 opacity 交叉淡化",
+        "减少动效模式的直接替换"
+      ],
+      "doesNotOwn": [
+        "灯箱开闭 FLIP",
+        "缩放和平移视口",
+        "素材取图与解码策略"
+      ],
+      "publicApi": [
+        "GALLERY_CROSSFADE_MS",
+        "createGalleryCrossfadeController",
+        "useGalleryCrossfade"
+      ],
+      "test": [
+        "src/workbenches/canvas/lightbox/galleryCrossfade.test.ts"
+      ],
+      "budget": 180
     },
     {
       "module": "src/workbenches/canvas/flow/knifeEdgeOverlay.ts",

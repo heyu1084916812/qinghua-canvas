@@ -26,6 +26,23 @@
 }
 
 /*
+ * Gallery navigation keeps the previous media visible in an imperative fx
+ * layer until the incoming image decodes. The incoming real media stays hidden
+ * until its load event starts the crossfade, so there is never an empty frame.
+ */
+.galleryFx {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.overlay[data-lightbox-gallery-switching] [data-lightbox-media] {
+  opacity: 0;
+}
+
+/*
  * 固定底栏（用户 2026-10-16）：像素 / 缩放靠左，能力切换居中，下载 / 关闭靠右。
  * 上方浮条只负责当前编辑器的完整工具，因此固定信息与编辑动作不再混在一排。
  */

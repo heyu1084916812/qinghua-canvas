@@ -1,0 +1,170 @@
+[
+  {
+    "width": 1440,
+    "height": 900,
+    "theme": "light",
+    "state": {
+      "hash": "40fdfc85226cb2e5",
+      "theme": "light",
+      "incoming": {
+        "opacity": 0.150944,
+        "rect": [
+          268.96875,
+          112,
+          904.046875,
+          678
+        ],
+        "center": [
+          720.9921875,
+          451
+        ]
+      },
+      "outgoing": {
+        "opacity": 0.849056,
+        "rect": [
+          268.96875,
+          112,
+          904.046875,
+          678
+        ],
+        "center": [
+          720.9921875,
+          451
+        ]
+      },
+      "centerError": [
+        0,
+        0
+      ],
+      "overflowX": false
+    },
+    "errors": [],
+    "file": ".playwright-verify/1192-crossfade-matrix-v2/real-1440x900-light-crossfade.png"
+  },
+  {
+    "width": 1440,
+    "height": 900,
+    "theme": "dark",
+    "state": {
+      "hash": "40fdfc85226cb2e5",
+      "theme": "dark",
+      "incoming": {
+        "opacity": 0.151063,
+        "rect": [
+          327.796875,
+          188.53125,
+          786.390625,
+          524.921875
+        ],
+        "center": [
+          720.9921875,
+          450.9921875
+        ]
+      },
+      "outgoing": {
+        "opacity": 0.848938,
+        "rect": [
+          268.96875,
+          112,
+          904.046875,
+          678
+        ],
+        "center": [
+          720.9921875,
+          451
+        ]
+      },
+      "centerError": [
+        0,
+        0.0078125
+      ],
+      "overflowX": false
+    },
+    "errors": [],
+    "file": ".playwright-verify/1192-crossfade-matrix-v2/real-1440x900-dark-crossfade.png"
+  },
+  {
+    "width": 1024,
+    "height": 700,
+    "theme": "light",
+    "state": {
+      "hash": "40fdfc85226cb2e5",
+      "theme": "light",
+      "incoming": {
+        "opacity": 0.151556,
+        "rect": [
+          235.828125,
+          165.875,
+          554.328125,
+          370.21875
+        ],
+        "center": [
+          512.9921875,
+          350.984375
+        ]
+      },
+      "outgoing": {
+        "opacity": 0.848444,
+        "rect": [
+          194.40625,
+          112,
+          637.171875,
+          478
+        ],
+        "center": [
+          512.9921875,
+          351
+        ]
+      },
+      "centerError": [
+        0,
+        0.015625
+      ],
+      "overflowX": false
+    },
+    "errors": [],
+    "file": ".playwright-verify/1192-crossfade-matrix-v2/real-1024x700-light-crossfade.png"
+  },
+  {
+    "width": 1024,
+    "height": 700,
+    "theme": "dark",
+    "state": {
+      "hash": "40fdfc85226cb2e5",
+      "theme": "dark",
+      "incoming": {
+        "opacity": 0.151156,
+        "rect": [
+          235.828125,
+          165.875,
+          554.328125,
+          370.21875
+        ],
+        "center": [
+          512.9921875,
+          350.984375
+        ]
+      },
+      "outgoing": {
+        "opacity": 0.848844,
+        "rect": [
+          194.40625,
+          112,
+          637.171875,
+          478
+        ],
+        "center": [
+          512.9921875,
+          351
+        ]
+      },
+      "centerError": [
+        0,
+        0.015625
+      ],
+      "overflowX": false
+    },
+    "errors": [],
+    "file": ".playwright-verify/1192-crossfade-matrix-v2/real-1024x700-dark-crossfade.png"
+  }
+]

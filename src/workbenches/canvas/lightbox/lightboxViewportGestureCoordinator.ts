@@ -10,6 +10,7 @@ import {
   DRAG_SLOP,
   dragPan,
   fitMediaViewport,
+  gallerySwitchViewport,
   wheelZoom,
   type MediaBox,
 } from './lightboxViewportMath'
@@ -34,14 +35,12 @@ export interface LightboxViewportPointerDragHandlers {
   onUp(): void
 }
 
-interface MediaSize {
-  w: number
-  h: number
-}
+type MediaSize = { w: number; h: number }
 
 export interface LightboxViewportGesturePorts {
   stageRect(): Rect | null
   setStage(stage: Rect | null): void
+  natural(): MediaSize | null
   setNatural(natural: MediaSize | null): void
   setViewport(viewport: Viewport | null): void
   setCompareView(view: CompareView): void
@@ -175,14 +174,13 @@ export function createLightboxViewportGestureCoordinator(
     height: number,
     viewport: Viewport | null,
   ) => {
+    const previous = ports.natural()
     const natural = { w: width, h: height }
     ports.setNatural(natural)
     if (!ports.preserveViewportAfterMediaLoad()) return
     ports.clearPreserveViewportAfterMediaLoad()
-    if (viewport) return
-    const stage = ports.stageRect()
-    if (!stage) return
-    ports.setViewport(fitMediaViewport(natural, stage))
+    const next = gallerySwitchViewport(previous, natural, viewport, ports.stageRect())
+    if (next) ports.setViewport(next)
   }
 
   const startSplitDrag = (

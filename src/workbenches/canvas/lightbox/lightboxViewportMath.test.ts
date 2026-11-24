@@ -6,6 +6,7 @@ import {
   cropBoxOf,
   dragPan,
   fitMediaViewport,
+  gallerySwitchViewport,
   imagePointAt,
   mediaBoxOf,
   wheelZoom,
@@ -48,5 +49,46 @@ describe('Lightbox 缩放平移数学', () => {
     expect(imagePointAt(100, 120, null, viewport, stage)).toBeNull()
     const fitted = fitMediaViewport({ w: 320, h: 240 }, stage)
     expect(fitted.zoom).toBeGreaterThan(0)
+  })
+
+  it('切换不同尺寸媒体时保持中心与缩放不变', () => {
+    const previous = { w: 640, h: 480 }
+    const next = { w: 1280, h: 720 }
+    const shifted = gallerySwitchViewport(previous, next, viewport, stage)
+
+    expect(shifted).toEqual({ x: 330, y: 140, zoom: 2 })
+    expect((next.w / 2 - shifted!.x) * shifted!.zoom).toBeCloseTo(
+      (previous.w / 2 - viewport.x) * viewport.zoom,
+    )
+    expect((next.h / 2 - shifted!.y) * shifted!.zoom).toBeCloseTo(
+      (previous.h / 2 - viewport.y) * viewport.zoom,
+    )
+  })
+
+  it('未手动缩放时每个画廊媒体按自身尺寸重新适配', () => {
+    const previous = { w: 1672, h: 941 }
+    const next = { w: 1086, h: 1448 }
+    const previousFit = fitMediaViewport(previous, stage)
+
+    expect(gallerySwitchViewport(previous, next, previousFit, stage)).toEqual(
+      fitMediaViewport(next, stage),
+    )
+  })
+
+  it('切图视口纯函数覆盖新灯箱落位、自动 fit 与保持中心', () => {
+    const previous = { w: 640, h: 480 }
+    const next = { w: 1280, h: 720 }
+
+    expect(gallerySwitchViewport(previous, next, null, stage)).toEqual(
+      fitMediaViewport(next, stage),
+    )
+    expect(gallerySwitchViewport(previous, next, null, null)).toBeNull()
+    expect(gallerySwitchViewport(null, next, viewport, stage)).toBeNull()
+    expect(gallerySwitchViewport(previous, previous, viewport, stage)).toBeNull()
+    expect(gallerySwitchViewport(previous, next, viewport, null)).toEqual({
+      x: 330,
+      y: 140,
+      zoom: 2,
+    })
   })
 })

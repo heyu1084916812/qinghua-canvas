@@ -75,8 +75,7 @@ import {
   lightboxMediaProjectionOf,
 } from './lightboxMediaProjection'
 import { useLightboxSources } from './lightboxFlipController'
-
-const GALLERY_SWITCH_MS = 180
+import { useGalleryCrossfade } from './galleryCrossfade'
 
 function annotationCanvasBox(canvas: HTMLCanvasElement): LightboxAnnotationCanvas {
   const { left, top, width, height } = canvas.getBoundingClientRect()
@@ -119,15 +118,25 @@ export function LightboxLayer() {
   const { url, pixelUrl, mime, primary: primarySource } = useLightboxSources(assetHash, mode !== 'view' && mode !== 'compare', lightbox?.sourceRect)
   const isVideo = (mime ?? '').startsWith('video/')
   const stageRef = useRef<HTMLDivElement>(null)
+  const {
+    hostRef: galleryFxRef,
+    begin: beginGalleryCrossfade,
+    settle: settleGalleryCrossfade,
+  } = useGalleryCrossfade({
+    active: !!lightbox && mode === 'view' && hasGalleryNavigation,
+    stageRef,
+  })
   const closeRef = useRef<HTMLButtonElement>(null)
   const movedRef = useRef(false)
   const [stage, setStage] = useState<Rect | null>(null)
   const [natural, setNatural] = useState<{ w: number; h: number } | null>(null)
+  const naturalRef = useRef(natural)
+  naturalRef.current = natural
   const [vp, setVp] = useState<Viewport | null>(null)
   const previousAssetHashRef = useRef<string | undefined>(undefined)
   const preserveViewportAfterMediaLoadRef = useRef(false)
-  const shownGalleryAssetRef = useRef<string | undefined>(undefined)
-  const gallerySwitchPendingRef = useRef(false)
+  const beginGalleryCrossfadeRef = useRef(beginGalleryCrossfade)
+  beginGalleryCrossfadeRef.current = beginGalleryCrossfade
 
   const [cropRect, setCropRect] = useState<FusionRect | null>(null)
   const [cropRatio, setCropRatio] = useState('')
@@ -225,10 +234,18 @@ export function LightboxLayer() {
   }, [redrawAnn, natural, annotating])
 
   /** 下载反馈、键盘导航和旋转 / 标注保存由命令生命周期编排。 */
+  const navigateGallery = useCallback((delta: number) => {
+    beginGalleryCrossfadeRef.current()
+    store.navigateLightbox(delta)
+  }, [store])
+  const selectGalleryIndex = useCallback((index: number) => {
+    beginGalleryCrossfadeRef.current()
+    store.selectLightboxIndex(index)
+  }, [store])
   const [downloaded, setDownloaded] = useState(false)
   const [commands] = useState(() => createLightboxCommandLifecycle({
     close: requestClose,
-    navigateGallery: (delta) => store.navigateLightbox(delta),
+    navigateGallery,
     download: (hash, title) => downloadAsset({ assets: platform.assets, files: platform.files }, hash, title),
     setDownloaded,
     schedule: (callback, delay) => window.setTimeout(callback, delay),
@@ -247,7 +264,7 @@ export function LightboxLayer() {
     saveAnnotation: (nodeId, url) => annActions.saveAnnotation(nodeId, url),
     deleteSelectedTextForKey: (key) => annActions.deleteSelectedTextForKey(key),
   }))
-  const { close, navigateGallery } = commands
+  const { close } = commands
   useEffect(() => commands.initializeMode({ assetHash, faceFor, cropFor, cropPlain, rotateFor: lightbox?.rotateFor, annotateFor: lightbox?.annotateFor, compareWith: lightbox?.compareWith }), [assetHash, commands, cropFor, cropPlain, faceFor, lightbox?.annotateFor, lightbox?.compareWith, lightbox?.rotateFor])
   useEffect(() => commands.resetRotationEditor(lightbox?.rotateFor), [commands, lightbox?.rotateFor])
   useEffect(() => commands.resetAnnotation(assetHash), [assetHash, commands, lightbox?.annotateFor])
@@ -285,6 +302,7 @@ export function LightboxLayer() {
   const [viewportGestures] = useState(() =>
     createLightboxViewportGestureCoordinator({
       stageRect: rectNow, setStage, setNatural, setViewport: setVp, setCompareView, setSplitRatio,
+      natural: () => naturalRef.current,
       setMoved: (value) => { movedRef.current = value },
       previousAssetHash: () => previousAssetHashRef.current,
       setPreviousAssetHash: (value) => { previousAssetHashRef.current = value },
@@ -296,17 +314,6 @@ export function LightboxLayer() {
     }),
   )
   useEffect(() => viewportGestures.prepareAssetSwitch(assetHash, hasGalleryNavigation), [assetHash, hasGalleryNavigation, viewportGestures])
-  useEffect(() => {
-    if (!lightbox) {
-      shownGalleryAssetRef.current = undefined
-      gallerySwitchPendingRef.current = false
-      return
-    }
-    const previous = shownGalleryAssetRef.current
-    if (previous && assetHash && previous !== assetHash && hasGalleryNavigation) {
-      gallerySwitchPendingRef.current = true
-    }
-  }, [assetHash, hasGalleryNavigation, lightbox])
   useEffect(() => viewportGestures.resetCompareView(!!lightbox?.compareWith), [assetHash, lightbox?.compareWith, compareKind, viewportGestures])
   useEffect(() => viewportGestures.watchStage(assetHash), [assetHash, viewportGestures])
   useEffect(() => viewportGestures.fitInitialViewport(layoutNatural, stage, vp), [layoutNatural, stage, vp, viewportGestures])
@@ -327,17 +334,7 @@ export function LightboxLayer() {
   const placed = layoutNatural !== null && vp !== null
   const settleNaturalSize = (w: number, h: number) => viewportGestures.settleMediaSize(w, h, vp)
   const settleGallerySwitch = (element: HTMLElement) => {
-    shownGalleryAssetRef.current = assetHash
-    if (!gallerySwitchPendingRef.current) return
-    gallerySwitchPendingRef.current = false
-    if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return
-    element.animate(
-      [
-        { opacity: 0, clipPath: 'inset(0 0 0 8%)' },
-        { opacity: 1, clipPath: 'inset(0)' },
-      ],
-      { duration: GALLERY_SWITCH_MS, easing: 'cubic-bezier(0.16, 1, 0.3, 1)' },
-    )
+    settleGalleryCrossfade(element)
   }
 
   const saveRotation = () => commands.saveRotation({ nodeId: rotateNodeId, url: pixelUrl ?? primaryUrl ?? undefined, busy: rotating2, angle, mirrorH, mirrorV })
@@ -388,6 +385,7 @@ export function LightboxLayer() {
           close()
         }}
       >
+        <div ref={galleryFxRef} className={styles.galleryFx} data-lightbox-gallery-fx />
         {primaryUrl &&
           (primaryIsVideo ? (
             <video
@@ -402,6 +400,8 @@ export function LightboxLayer() {
               style={mediaStyle}
               onLoadedMetadata={(e) => {
                 settleNaturalSize(e.currentTarget.videoWidth, e.currentTarget.videoHeight)
+              }}
+              onLoadedData={(e) => {
                 settleGallerySwitch(e.currentTarget)
               }}
               /**
@@ -426,8 +426,8 @@ export function LightboxLayer() {
               style={mediaStyle}
               onLoad={(e) => {
                 /**
-                 * 切到第二张时**不改** `natural`：box / 选区 / 分割线全部按
-                 * assetHash 那张的尺寸算，两张尺寸万一不同也不会让整块视图跳一下。
+                 * 每次画廊切图都按新媒体尺寸结算：未手动操作时重新 fit；
+                 * 用户已缩放 / 平移时保留 zoom 并保持媒体中心。
                  */
                 if (!showSecondOnly && url) {
                   settleNaturalSize(
@@ -968,7 +968,7 @@ export function LightboxLayer() {
               item={item}
               index={index}
               active={index === galleryIndex}
-              onSelect={store.selectLightboxIndex}
+              onSelect={selectGalleryIndex}
             />
           ))}
         </div>

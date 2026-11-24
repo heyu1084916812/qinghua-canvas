@@ -28,6 +28,29 @@ export function fitMediaViewport(natural: { w: number; h: number }, stage: Rect)
   return fitViewport([{ x: 0, y: 0, w: natural.w, h: natural.h }], stage, FIT_PADDING)
 }
 
+/** Untouched frames fit independently; manually adjusted frames keep zoom and center. */
+export function gallerySwitchViewport(
+  previous: { w: number; h: number } | null,
+  next: { w: number; h: number },
+  viewport: Viewport | null,
+  stage: Rect | null,
+): Viewport | null {
+  if (!viewport) return stage ? fitMediaViewport(next, stage) : null
+  if (!previous) return null
+  if (stage) {
+    const previousFit = fitMediaViewport(previous, stage)
+    const untouched =
+      Math.abs(viewport.x - previousFit.x) <= 0.001 &&
+      Math.abs(viewport.y - previousFit.y) <= 0.001 &&
+      Math.abs(viewport.zoom - previousFit.zoom) <= 0.001
+    if (untouched) return fitMediaViewport(next, stage)
+  }
+  const dx = (next.w - previous.w) / 2
+  const dy = (next.h - previous.h) / 2
+  if (Math.abs(dx) <= 0.001 && Math.abs(dy) <= 0.001) return null
+  return { x: viewport.x + dx, y: viewport.y + dy, zoom: viewport.zoom }
+}
+
 export function mediaBoxOf(natural: { w: number; h: number }, viewport: Viewport): MediaBox {
   return {
     left: -viewport.x * viewport.zoom,

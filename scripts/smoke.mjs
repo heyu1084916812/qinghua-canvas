@@ -43656,6 +43656,7 @@ async function g769(browser) {
  * 用户实测缩略图看起来可点但主画面不跳，且旋转绕左上角。这里不直接调 store：
  * 两张不同颜色的 PNG 先真实拖入画布，再 Shift 多选、点工具栏“灯箱”，
  * 最后点第二张缩略图并检查 hash / active index / 主图 transform-origin 全链路。
+ * 两张素材使用横 / 竖不同尺寸，另验未操作切图按自身比例 fit、已操作切图保中心。
  */
 async function g795(browser) {
   const g = 'G795 灯箱缩略图点击与旋转中心'
@@ -43677,7 +43678,7 @@ async function g795(browser) {
     projectId = page.url().split('/canvas/')[1] ?? ''
 
     const surface = page.locator('[data-canvas-surface]')
-    const dropPng = async (dx, dy, color) => {
+    const dropPng = async (dx, dy, color, width = 320, height = 240) => {
       const before = new Set(
         await page
           .locator('[data-node-type="generation"]')
@@ -43692,7 +43693,7 @@ async function g795(browser) {
           transfer.items.add(new File([bytes], 'gallery.png', { type: 'image/png' }))
           return transfer
         },
-        { b64: solidPngBuffer(320, 240, color).toString('base64') },
+        { b64: solidPngBuffer(width, height, color).toString('base64') },
       )
       const box = await surface.boundingBox()
       await surface.dispatchEvent('dragover', { dataTransfer })
@@ -43709,8 +43710,8 @@ async function g795(browser) {
       return page.locator(`[data-node-id="${fresh.at(-1)}"]`)
     }
 
-    const first = await dropPng(180, 160, [220, 70, 70])
-    const second = await dropPng(520, 210, [70, 90, 220])
+    const first = await dropPng(180, 160, [220, 70, 70], 1672, 941)
+    const second = await dropPng(520, 210, [70, 90, 220], 1086, 1448)
     const firstId = await first.getAttribute('data-node-id')
     const secondId = await second.getAttribute('data-node-id')
     if (!(await placeNode(page, firstId, 80, 120))) {
@@ -43816,6 +43817,34 @@ async function g795(browser) {
       .catch(() => false)
     rec(g, '★★ 点击第二张缩略图，灯箱主素材与选中态一起切换', switched)
 
+    await sleep(350)
+    const untouchedFit = await page.evaluate(() => {
+      const stage = document.querySelector('[data-lightbox-stage]')
+      const media = document.querySelector('[data-lightbox-media]')
+      if (!(stage instanceof HTMLElement) || !(media instanceof HTMLImageElement)) return null
+      const stageRect = stage.getBoundingClientRect()
+      const zoom = Math.min(
+        (stageRect.width - 224) / media.naturalWidth,
+        (stageRect.height - 224) / media.naturalHeight,
+        1,
+      )
+      return {
+        actual: [Number.parseFloat(media.style.width), Number.parseFloat(media.style.height)],
+        expected: [media.naturalWidth * zoom, media.naturalHeight * zoom],
+      }
+    })
+    rec(
+      g,
+      '★★ 未手动缩放时，不同比例图片切换后按自身尺寸重新适配',
+      !!untouchedFit &&
+        Math.abs(untouchedFit.actual[0] - untouchedFit.expected[0]) < 1 &&
+        Math.abs(untouchedFit.actual[1] - untouchedFit.expected[1]) < 1,
+      JSON.stringify(untouchedFit),
+    )
+    await page.screenshot({
+      path: `${OUT}/795-lightbox-refit-${theme}-${viewport.width}.png`,
+    })
+
     const stageBox = await page.locator('[data-lightbox-stage]').boundingBox()
     if (stageBox) {
       await page.mouse.move(
@@ -43836,12 +43865,10 @@ async function g795(browser) {
     const viewportBeforeSwitch = await page.evaluate(() => {
       const media = document.querySelector('[data-lightbox-media]')
       if (!(media instanceof HTMLElement)) return null
+      const rect = media.getBoundingClientRect()
       return {
         zoom: document.querySelector('[data-lightbox-zoom]')?.textContent ?? '',
-        left: media.style.left,
-        top: media.style.top,
-        width: media.style.width,
-        height: media.style.height,
+        center: [rect.left + rect.width / 2, rect.top + rect.height / 2],
       }
     })
     const hashBeforePreserveSwitch = await root.getAttribute('data-lightbox-hash')
@@ -43859,24 +43886,20 @@ async function g795(browser) {
     const viewportAfterSwitch = await page.evaluate(() => {
       const media = document.querySelector('[data-lightbox-media]')
       if (!(media instanceof HTMLElement)) return null
+      const rect = media.getBoundingClientRect()
       return {
         zoom: document.querySelector('[data-lightbox-zoom]')?.textContent ?? '',
-        left: media.style.left,
-        top: media.style.top,
-        width: media.style.width,
-        height: media.style.height,
+        center: [rect.left + rect.width / 2, rect.top + rect.height / 2],
       }
     })
     rec(
       g,
-      '★★ 灯箱已放大并平移后切图，缩放与视图位置保持不变',
+      '★★ 灯箱已放大并平移后切图，缩放与媒体中心保持不变',
       !!viewportBeforeSwitch &&
         !!viewportAfterSwitch &&
         viewportAfterSwitch.zoom === viewportBeforeSwitch.zoom &&
-        viewportAfterSwitch.left === viewportBeforeSwitch.left &&
-        viewportAfterSwitch.top === viewportBeforeSwitch.top &&
-        viewportAfterSwitch.width === viewportBeforeSwitch.width &&
-        viewportAfterSwitch.height === viewportBeforeSwitch.height,
+        Math.abs(viewportAfterSwitch.center[0] - viewportBeforeSwitch.center[0]) < 1 &&
+        Math.abs(viewportAfterSwitch.center[1] - viewportBeforeSwitch.center[1]) < 1,
       JSON.stringify({ before: viewportBeforeSwitch, after: viewportAfterSwitch }),
     )
 

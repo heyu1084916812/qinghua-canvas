@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { useAssetMeta, useAssetPreview } from '../../../features/shared/assets/index'
+import { useLightboxAssetMeta } from './galleryCrossfade'
 import type { CanvasStore } from '../../../state/workbenches/canvas/store'
 import { predictedMediaRect } from './lightboxViewportMath'
 export const LIGHTBOX_MOTION = {
@@ -24,6 +24,7 @@ export function lightboxPrimarySource(input: { fullUrl: string | null; previewUr
   if (video) return input.fullUrl
   return input.fullUrl ?? input.previewUrl ?? (input.sourceSrc || null)
 }
+
 /** Resolves to `url` only once the browser has decoded it, so a swap never flashes a half-loaded image. */
 export function useDecodedUrl(url: string | null, skip = false): string | null {
   const [decoded, setDecoded] = useState<string | null>(null)
@@ -45,10 +46,10 @@ export function useDecodedUrl(url: string | null, skip = false): string | null {
  * also load the same-origin blob copy, so canvas reads never hit a cross-origin image.
  */
 export function useLightboxSources(assetHash: string | undefined, pixelMode: boolean, source?: { assetHash?: string; src?: string; kind?: 'image' | 'video' }) {
-  const direct = useAssetMeta(assetHash, { preferSource: true })
+  const direct = useLightboxAssetMeta(assetHash, { preferSource: true })
   const isVideo = (direct.mime ?? '').startsWith('video/') || (source?.assetHash === assetHash && source?.kind === 'video')
-  const preview = useAssetPreview(isVideo || pixelMode ? undefined : assetHash)
-  const pixels = useAssetMeta(pixelMode ? assetHash : undefined)
+  const preview = useLightboxAssetMeta(isVideo || pixelMode ? undefined : assetHash, { preferPreview: true })
+  const pixels = useLightboxAssetMeta(pixelMode ? assetHash : undefined)
   const full = useDecodedUrl(direct.url, isVideo)
   const previewReady = useDecodedUrl(preview.url && preview.url !== direct.url ? preview.url : null)
   const fullUrl = (pixelMode ? pixels.url : null) ?? full

@@ -43,6 +43,7 @@ function wheelEvent(overrides: Partial<LightboxViewportWheel> = {}): LightboxVie
 
 function harness(overrides: Partial<LightboxViewportGesturePorts> = {}) {
   let currentStage: Rect | null = stage
+  let currentNatural: { w: number; h: number } | null = null
   let previousHash: string | undefined
   let preserve = false
   const resizeListeners = new Set<() => void>()
@@ -55,7 +56,10 @@ function harness(overrides: Partial<LightboxViewportGesturePorts> = {}) {
     setStage: vi.fn((next) => {
       currentStage = next
     }),
-    setNatural: vi.fn(),
+    natural: () => currentNatural,
+    setNatural: vi.fn((next) => {
+      currentNatural = next
+    }),
     setViewport: vi.fn(),
     setCompareView: vi.fn(),
     setSplitRatio: vi.fn(),
@@ -195,7 +199,7 @@ describe('lightboxViewportGestureCoordinator', () => {
     expect(drag.release).toHaveBeenCalledOnce()
   })
 
-  it('settles media size without fitting when a viewport is already preserved', () => {
+  it('keeps the current media center when a gallery frame changes aspect ratio', () => {
     const test = harness()
     test.setPreserveForTest(false)
     test.actions.settleMediaSize(640, 480, null)
@@ -206,12 +210,35 @@ describe('lightboxViewportGestureCoordinator', () => {
     test.actions.settleMediaSize(1280, 720, viewport)
     expect(test.ports.clearPreserveViewportAfterMediaLoad).toHaveBeenCalledOnce()
     expect(test.ports.setNatural).toHaveBeenLastCalledWith({ w: 1280, h: 720 })
-    expect(test.ports.setViewport).not.toHaveBeenCalled()
+    expect(test.ports.setViewport).toHaveBeenCalledWith({
+      x: viewport.x + 320,
+      y: viewport.y + 120,
+      zoom: viewport.zoom,
+    })
 
     test.setPreserveForTest(true)
     test.actions.settleMediaSize(320, 240, null)
     expect(test.ports.setViewport).toHaveBeenCalledWith(
       fitMediaViewport({ w: 320, h: 240 }, stage),
+    )
+  })
+
+  it('refits an untouched gallery frame instead of carrying the previous zoom', () => {
+    const test = harness()
+    const previous = { w: 1672, h: 941 }
+    const next = { w: 1086, h: 1448 }
+    test.actions.prepareAssetSwitch('asset-a', true)
+    test.actions.settleMediaSize(previous.w, previous.h, null)
+    test.actions.prepareAssetSwitch('asset-b', true)
+
+    test.actions.settleMediaSize(
+      next.w,
+      next.h,
+      fitMediaViewport(previous, stage),
+    )
+
+    expect(test.ports.setViewport).toHaveBeenLastCalledWith(
+      fitMediaViewport(next, stage),
     )
   })
 

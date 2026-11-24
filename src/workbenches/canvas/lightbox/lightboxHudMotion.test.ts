@@ -25,10 +25,12 @@ describe('lightbox HUD mode motion', () => {
     expect(flip).toContain("removeAttribute('data-lightbox-flipping')")
   })
 
-  it('uses a short clip fade for gallery switches instead of replaying entry FLIP', () => {
-    expect(tsx).toContain('gallerySwitchPendingRef')
-    expect(tsx).toContain("clipPath: 'inset(0 0 0 8%)'")
-    expect(tsx).toContain('GALLERY_SWITCH_MS')
+  it('keeps the outgoing media until the incoming gallery frame decodes', () => {
+    expect(tsx).toContain('data-lightbox-gallery-fx')
+    expect(tsx).toContain('beginGalleryCrossfadeRef.current()')
+    expect(tsx).toContain('settleGalleryCrossfade')
+    expect(css).toContain('.overlay[data-lightbox-gallery-switching] [data-lightbox-media]')
+    expect(tsx).not.toContain("clipPath: 'inset(0 0 0 8%)'")
     expect(flip).toContain('lightboxEntryMode')
   })
 })
