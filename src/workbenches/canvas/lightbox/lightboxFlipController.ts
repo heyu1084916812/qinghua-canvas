@@ -1,4 +1,5 @@
-import { useCallback, useLayoutEffect, useRef } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useAssetMeta, useAssetPreview } from '../../../features/shared/assets/index'
 import type { CanvasStore } from '../../../state/workbenches/canvas/store'
 import { predictedMediaRect } from './lightboxViewportMath'
 export const LIGHTBOX_MOTION = {
@@ -18,9 +19,47 @@ export function sourceNodeIdOf(nodes: readonly { id: string; data?: unknown }[],
   if (preferredNodeId && nodes.some((n) => n.id === preferredNodeId && (n.data as { assetHash?: string } | undefined)?.assetHash === hash)) return preferredNodeId
   return nodes.find((n) => (n.data as { assetHash?: string } | undefined)?.assetHash === hash)?.id ?? null
 }
-export function lightboxPrimarySource(input: { fullUrl: string | null; sourceSrc?: string; sourceKind?: 'image' | 'video'; mime: string | null }): string | null {
+export function lightboxPrimarySource(input: { fullUrl: string | null; previewUrl?: string | null; sourceSrc?: string; sourceKind?: 'image' | 'video'; mime: string | null }): string | null {
   const video = input.sourceKind === 'video' || (input.mime ?? '').startsWith('video/')
-  return input.fullUrl ?? (video ? null : input.sourceSrc || null)
+  if (video) return input.fullUrl
+  return input.fullUrl ?? input.previewUrl ?? (input.sourceSrc || null)
+}
+/** Resolves to `url` only once the browser has decoded it, so a swap never flashes a half-loaded image. */
+export function useDecodedUrl(url: string | null, skip = false): string | null {
+  const [decoded, setDecoded] = useState<string | null>(null)
+  useEffect(() => {
+    if (!url || skip) return
+    let alive = true
+    const img = new Image()
+    img.decoding = 'async'
+    img.src = url
+    const done = () => { if (alive) setDecoded(url) }
+    void img.decode().then(done, done)
+    return () => { alive = false }
+  }, [url, skip])
+  return skip ? url : decoded === url ? url : null
+}
+/**
+ * Lightbox sources: node thumbnail → 1600 preview → original (direct `/asset/<hash>`),
+ * each swapped in after decode. Editing modes that read pixels (rotate / annotate …)
+ * also load the same-origin blob copy, so canvas reads never hit a cross-origin image.
+ */
+export function useLightboxSources(assetHash: string | undefined, pixelMode: boolean, source?: { assetHash?: string; src?: string; kind?: 'image' | 'video' }) {
+  const direct = useAssetMeta(assetHash, { preferSource: true })
+  const isVideo = (direct.mime ?? '').startsWith('video/') || (source?.assetHash === assetHash && source?.kind === 'video')
+  const preview = useAssetPreview(isVideo || pixelMode ? undefined : assetHash)
+  const pixels = useAssetMeta(pixelMode ? assetHash : undefined)
+  const full = useDecodedUrl(direct.url, isVideo)
+  const previewReady = useDecodedUrl(preview.url && preview.url !== direct.url ? preview.url : null)
+  const fullUrl = (pixelMode ? pixels.url : null) ?? full
+  const primary = lightboxPrimarySource({
+    fullUrl,
+    previewUrl: previewReady,
+    sourceSrc: source?.assetHash === assetHash ? source?.src : undefined,
+    sourceKind: source?.assetHash === assetHash ? source?.kind : undefined,
+    mime: direct.mime,
+  })
+  return { url: fullUrl, pixelUrl: pixels.url ?? fullUrl, mime: direct.mime, primary }
 }
 export function sourceRectFromFrame(frame: HTMLElement | null): DOMRect | null {
   const media = frame?.querySelector<HTMLElement>('img, video'), mediaRect = media?.getBoundingClientRect()

@@ -83,6 +83,6 @@ describe('childEdges', () => {
     const paths = childEdgePaths(graph, { x: 0, y: 0, zoom: 1 }, ['child'])
     expect(paths.map((path) => path.id)).toEqual(['e-child'])
     expect(paths[0]?.related).toBe(true)
-    expect(paths[0]?.d).toMatch(/^M /)
+    expect(paths[0]?.d).toMatch(/^M-?\d[\d.]*,-?\d[\d.]* C/)
   })
 })

@@ -74,7 +74,7 @@ import {
   lightboxCompareSourceOf,
   lightboxMediaProjectionOf,
 } from './lightboxMediaProjection'
-import { lightboxPrimarySource } from './lightboxFlipController'
+import { useLightboxSources } from './lightboxFlipController'
 
 const GALLERY_SWITCH_MS = 180
 
@@ -115,22 +115,15 @@ export function LightboxLayer() {
   const assetHash = lightbox?.assetHash
   const sourceNodeId = lightbox?.sourceNodeId
   const { gallery, galleryIndex, galleryItem, hasGalleryNavigation } = galleryViewOf(lightbox)
-  const { url, mime } = useAssetMeta(assetHash)
+  const [mode, setMode] = useState<LightboxEditorMode>('view')
+  const { url, pixelUrl, mime, primary: primarySource } = useLightboxSources(assetHash, mode !== 'view' && mode !== 'compare', lightbox?.sourceRect)
   const isVideo = (mime ?? '').startsWith('video/')
-  const sourceMedia = lightbox?.sourceRect
-  const primarySource = lightboxPrimarySource({
-    fullUrl: url,
-    sourceSrc: sourceMedia?.assetHash === assetHash ? sourceMedia?.src : undefined,
-    sourceKind: sourceMedia?.assetHash === assetHash ? sourceMedia?.kind : undefined,
-    mime,
-  })
   const stageRef = useRef<HTMLDivElement>(null)
   const closeRef = useRef<HTMLButtonElement>(null)
   const movedRef = useRef(false)
   const [stage, setStage] = useState<Rect | null>(null)
   const [natural, setNatural] = useState<{ w: number; h: number } | null>(null)
   const [vp, setVp] = useState<Viewport | null>(null)
-  const [mode, setMode] = useState<LightboxEditorMode>('view')
   const previousAssetHashRef = useRef<string | undefined>(undefined)
   const preserveViewportAfterMediaLoadRef = useRef(false)
   const shownGalleryAssetRef = useRef<string | undefined>(undefined)
@@ -347,8 +340,8 @@ export function LightboxLayer() {
     )
   }
 
-  const saveRotation = () => commands.saveRotation({ nodeId: rotateNodeId, url: primaryUrl ?? undefined, busy: rotating2, angle, mirrorH, mirrorV })
-  const saveAnnotation = () => commands.saveAnnotation(annotateNodeId, url ?? undefined)
+  const saveRotation = () => commands.saveRotation({ nodeId: rotateNodeId, url: pixelUrl ?? primaryUrl ?? undefined, busy: rotating2, angle, mirrorH, mirrorV })
+  const saveAnnotation = () => commands.saveAnnotation(annotateNodeId, pixelUrl ?? undefined)
   const download = () => commands.download(assetHash, ownerNode?.title)
 
   const startSplitDrag = (e: ReactPointerEvent) => viewportGestures.startSplitDrag(e, { mediaBox: box, splitRatio })

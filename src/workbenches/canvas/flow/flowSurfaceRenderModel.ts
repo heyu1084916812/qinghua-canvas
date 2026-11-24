@@ -12,7 +12,6 @@ import {
   nodeMeasurementKey,
   topLevelNodes,
 } from './flowGraph'
-import type { CanvasDetailMode } from './detailMode'
 import type { NodeDerivedMaps } from '../useNodeDerivedMaps'
 
 export function derivedPropsFor(derived: NodeDerivedMaps, id: string, upstreamPickDimmed = false): FlowNodeDerivedProps {
@@ -44,7 +43,6 @@ export function flowRunPresentationOf(state: RunTaskState | undefined): {
 export interface FlowNodeProjectionInput {
   graph: GraphSnapshot
   selection: readonly string[]
-  detailMode: CanvasDetailMode
   derived: NodeDerivedMaps
   childIndex: ReadonlyMap<string, NodeSnapshot[]>
   nodeStateOf: (id: string) => RunTaskState | undefined
@@ -81,7 +79,7 @@ export function flowNodesFor(
 ): RFNode<FlowNodeData>[] {
   const previousById = new Map(previous.map((node) => [node.id, node]))
   return topLevelNodes(input.graph).map((node) => {
-    const type = input.detailMode === 'coarse' ? 'coarse' : 'qh'
+    const type = 'qh'
     const selected = input.selection.includes(node.id)
     const run = flowRunPresentationOf(input.nodeStateOf(node.id))
     const children = input.childIndex.get(node.id) ?? []
@@ -174,7 +172,6 @@ export interface FlowEdgeProjectionInput {
   childEdgeIds: ReadonlySet<string>
   selection: readonly string[]
   edgeSelection: readonly string[]
-  detailMode: CanvasDetailMode
   removeEdge: (id: string) => void
 }
 
@@ -182,7 +179,6 @@ export function flowEdgesFor(
   input: FlowEdgeProjectionInput,
   previous: readonly RFEdge<QhEdgeData>[] = [],
 ): RFEdge<QhEdgeData>[] {
-  if (input.detailMode === 'coarse') return []
   const selectedNodes = new Set(input.selection)
   const previousById = new Map(previous.map((edge) => [edge.id, edge]))
   return input.edges

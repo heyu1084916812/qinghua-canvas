@@ -44,10 +44,8 @@ interface PortHitCacheEntry {
  */
 export function FlowPortLayer({
   onPortDown,
-  coarse = false,
 }: {
   onPortDown: PortDown
-  coarse?: boolean
 }) {
   const store = useCanvasStore()
   const sourceGraph = useGraph()
@@ -65,7 +63,6 @@ export function FlowPortLayer({
     const all: PortHit[] = []
     for (const node of graph.nodes) {
       const selected = selection.includes(node.id)
-      if (coarse && !selected) continue
       const parent = node.parentId ? (byId.get(node.parentId) ?? null) : null
       const previous = hitCache.current.get(node.id)
       const nodeHits =
@@ -79,7 +76,7 @@ export function FlowPortLayer({
     }
     hitCache.current = nextCache
     return all
-  }, [coarse, graph, selection])
+  }, [graph, selection])
   return <PortHitViewport hits={hits} onPortDown={onPortDown} />
 }
 

@@ -3,7 +3,7 @@ import { createElement } from 'react'
 import TestRenderer, { act } from 'react-test-renderer'
 import type { Node as RFNode } from '@xyflow/react'
 import type { FlowNodeData } from './FlowNode'
-import { useFlowGestureWindow } from './useFlowGestureWindow'
+import { PAN_ACTIVATE_PX, useFlowGestureWindow } from './useFlowGestureWindow'
 
 type Gesture = ReturnType<typeof useFlowGestureWindow>
 
@@ -117,5 +117,21 @@ describe('useFlowGestureWindow', () => {
     ])
     expect(surface.removeAttribute).toHaveBeenCalledWith('data-viewport-moving')
     expect(surface.removeAttribute).toHaveBeenCalledWith('data-viewport-mode')
+  })
+  it('does not enter the gesture fast path for a click without real movement', () => {
+    stubBrowserWindow()
+    const { result, surface } = renderGesture()
+    const vp = { x: 10, y: 20, zoom: 1 }
+    act(() => result.current.beginMove({ type: 'mousedown' } as MouseEvent, vp))
+    act(() => result.current.move(null, { x: 12, y: 21, zoom: 1 }))
+    expect(surface.setAttribute).not.toHaveBeenCalled()
+    act(() => result.current.endMove())
+    expect(surface.removeAttribute).not.toHaveBeenCalled()
+
+    act(() => result.current.beginMove({ type: 'mousedown' } as MouseEvent, vp))
+    act(() => result.current.move(null, { x: 10 + PAN_ACTIVATE_PX, y: 20, zoom: 1 }))
+    expect(surface.setAttribute).toHaveBeenCalledWith('data-viewport-mode', 'pan')
+    act(() => result.current.endMove())
+    expect(surface.removeAttribute).toHaveBeenCalledWith('data-viewport-moving')
   })
 })

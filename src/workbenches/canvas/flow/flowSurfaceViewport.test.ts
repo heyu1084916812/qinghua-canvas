@@ -21,8 +21,8 @@ describe('FlowSurface 视口同步', () => {
   })
 
   it('节点 / 连线类型与默认边配置保持装配常量', () => {
-    expect(FLOW_NODE_TYPES).toEqual({ qh: 'qh', coarse: 'coarse' })
-    expect(FLOW_EDGE_TYPES).toEqual({ qh: 'qh', coarse: 'coarse' })
+    expect(FLOW_NODE_TYPES).toEqual({ qh: 'qh' })
+    expect(FLOW_EDGE_TYPES).toEqual({ qh: 'qh' })
     expect(FLOW_EDGE_OPTIONS).toEqual({ type: 'default' })
   })
 })

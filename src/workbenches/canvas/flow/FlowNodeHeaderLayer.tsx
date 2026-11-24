@@ -17,7 +17,7 @@ import {
   type NodeHeaderLabel,
 } from './nodeHeaders'
 import styles from './FlowNodeHeaderLayer.module.css'
-export function FlowNodeHeaderLayer({ coarse = false }: { coarse?: boolean }) {
+export function FlowNodeHeaderLayer() {
   const graph = useGraph()
   const store = useCanvasStore()
   const labelCache = useRef<{
@@ -47,7 +47,6 @@ export function FlowNodeHeaderLayer({ coarse = false }: { coarse?: boolean }) {
       store.dispatch({ kind: 'node.refitContainer', id: node.id, mode: 'hug', transient: true })
     }
   }, [graph, store])
-  if (coarse) return null
   return <HeaderViewport labels={labels} />
 }
 

@@ -39,20 +39,10 @@
   height: 100%;
 }
 
-/*
- * During a pan the 500 React Flow edge components leave the active tree.
- * FlowViewportEdgeLayer paints the same strokes as one combined path, then the
- * full edge layer returns on onMoveEnd. Nodes stay mounted throughout.
- */
-.surface[data-viewport-moving='true'] .flow :global(.react-flow__edges) {
-  display: none;
-}
-
 .surface[data-viewport-moving='true'] .flow :global(.react-flow__background) {
   display: none;
 }
 
-.surface:not([data-viewport-moving='true']) [data-flow-viewport-edge-layer],
 .surface:not([data-viewport-moving='true']) [data-viewport-background] {
   visibility: hidden;
 }
@@ -67,20 +57,8 @@
   pointer-events: none;
 }
 
-.surface[data-viewport-moving='true'][data-viewport-mode='pan']
-  .flow
-  :global(.react-flow__node)
-  [data-node-frame][data-node-type='prompt'] {
-  visibility: hidden;
-}
-
 .surface[data-viewport-moving='true'] .flow :global(.react-flow__node:not(:has([data-loop-node]))) {
   contain: layout style;
-}
-
-.surface[data-viewport-moving='true'] .flow :global(.react-flow__viewport) {
-  will-change: transform;
-  backface-visibility: hidden;
 }
 
 .surface[data-viewport-moving='true'] .flow :global(.react-flow__pane) {

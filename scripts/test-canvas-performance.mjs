@@ -316,10 +316,9 @@ export function evaluatePerformanceGate(input) {
         const gesture = round.gesture
         return (
           gesture?.moving === true &&
-          gesture.edgeDisplay === 'none' &&
+          gesture.edgeDisplay !== 'none' &&
           gesture.backgroundDisplay === 'none' &&
-          gesture.fastLayer === true &&
-          Number(gesture.fastPaths) > 0 &&
+          gesture.fastLayer === false &&
           Boolean(gesture.fastBackground) &&
           Number(gesture.coarseNodes) === 0 &&
           Number(gesture.visibleImages) > 0 &&
@@ -350,8 +349,7 @@ export function evaluatePerformanceGate(input) {
           Number(gesture.coarseNodes) === 0 &&
           Number(gesture.hiddenImages) === 0 &&
           Number(gesture.visibleImages) >= GENERATION_NODE_COUNT * 0.9 &&
-          gesture.promptCanvasVisible === true &&
-          Number(gesture.hiddenPromptBodies) > 0 &&
+          Number(gesture.hiddenPromptBodies) === 0 &&
           Number(gesture.mountedNodes) === PERFORMANCE_NODE_COUNT &&
           Number(gesture.restoredNodes) === PERFORMANCE_NODE_COUNT
         )
@@ -366,10 +364,9 @@ export function evaluatePerformanceGate(input) {
         return (
           gesture?.moving === true &&
           Boolean(gesture.background) &&
-          gesture.edgeDisplay === 'none' &&
-          (gesture.fastLayer === true ||
-            (Number(gesture.coarseNodes) > 0 &&
-              Number(gesture.coarseNodes) === Number(gesture.mountedNodes))) &&
+          gesture.edgeDisplay !== 'none' &&
+          gesture.fastLayer === false &&
+          Number(gesture.coarseNodes ?? 0) === 0 &&
           Number(gesture.restoredNodes) === PERFORMANCE_NODE_COUNT
         )
       }),
@@ -711,7 +708,6 @@ async function panRound(page, options = {}) {
       edgeDisplay: edges ? getComputedStyle(edges).display : null,
       backgroundDisplay: background ? getComputedStyle(background).display : null,
       fastLayer: Boolean(fastLayer),
-      fastPaths: fastLayer?.querySelectorAll('path').length ?? 0,
       fastBackground: fastBackground?.getAttribute('data-viewport-background') ?? null,
       coarseNodes: document.querySelectorAll('.react-flow__node-coarse').length,
       mountedNodes: document.querySelectorAll('.react-flow__node[data-id]').length,
@@ -807,9 +803,6 @@ async function lowZoomPanRound(page) {
       hiddenImages: images.filter(
         (image) => getComputedStyle(image).visibility === 'hidden',
       ).length,
-      promptCanvasVisible:
-        getComputedStyle(document.querySelector('[data-prompt-gesture-canvas]')).display !==
-        'none',
       hiddenPromptBodies: [...document.querySelectorAll(
         '[data-node-type="prompt"] [data-node-body]',
       )].filter((body) => getComputedStyle(body).visibility === 'hidden').length,

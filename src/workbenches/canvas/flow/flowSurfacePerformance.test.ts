@@ -17,10 +17,14 @@ describe('canvas detail virtualization', () => {
     expect(frameCss).not.toMatch(/\.body\s*\{[^}]*content-visibility:/s)
   })
 
-  it('replaces the heavy edge and background layers during viewport gestures', () => {
-    expect(flowCss).toMatch(
-      /\.surface\[data-viewport-moving='true'\] \.flow :global\(\.react-flow__edges\)\s*\{[^}]*display:\s*none;/s,
-    )
+  it('keeps the normal React Flow edges and drops gesture-only layer swaps', () => {
+    expect(flowCss).not.toMatch(/:global\(\.react-flow__edges\)/)
+    expect(flowCss).not.toMatch(/data-flow-viewport-edge-layer/)
+    expect(flowCss).not.toMatch(/data-node-type='prompt'/)
+    expect(flowCss).not.toMatch(/:global\(\.react-flow__viewport\)\s*\{[^}]*will-change/s)
+  })
+
+  it('replaces only the background layer during viewport gestures', () => {
     expect(flowCss).toMatch(
       /\.surface\[data-viewport-moving='true'\] \.flow :global\(\.react-flow__background\)\s*\{[^}]*display:\s*none;/s,
     )
