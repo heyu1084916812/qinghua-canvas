@@ -89,7 +89,7 @@ const workflowSources = useWorkflowPanelSources()
   // §6.15：拖动期间面板立即隐藏；发生**真实位移**的拖动，松手后保持隐藏，
   // 直到下一次显式选中（setSelection 复位 panelDismissed）——节点已被挪走，
   // 面板再弹回来只会「追着节点跑」。普通单击（无位移）不算拖动，面板照常出现。
-  const dragging = useSyncExternalStore(store.subscribe, store.isDragging, store.isDragging)
+  const dragging = useSyncExternalStore(store.subscribeDragging, store.isDragging, store.isDragging)
   const marqueeActive = useSyncExternalStore(store.subscribe, store.isSelectionMarqueeActive, store.isSelectionMarqueeActive)
   const panelDismissed = useSyncExternalStore(
     store.subscribe,

@@ -103,6 +103,8 @@ const PortHitViewport = memo(function PortHitViewport({
   const surfaceW = useStore((state) => state.width)
   const surfaceH = useStore((state) => state.height)
   const layerRef = useRef<HTMLDivElement>(null)
+  const surfaceRef = useRef<HTMLElement | null>(null)
+  const listenersRef = useRef(new Set<() => void>())
   const sourceHits = useRef(hits)
   const visibleCache = useRef<PortHit[]>(
     portHitsInView(hits, viewport, surfaceW, surfaceH),
@@ -121,14 +123,36 @@ const PortHitViewport = memo(function PortHitViewport({
   const visibleStore = useMemo(
     () => ({
       subscribe(listener: () => void) {
-        applyTransform()
+        const surface =
+          layerRef.current?.closest<HTMLElement>('[data-canvas-surface]') ?? null
+        surfaceRef.current = surface
+        listenersRef.current.add(listener)
+        const resume = () => {
+          if (surface?.hasAttribute('data-viewport-moving')) return
+          applyTransform()
+          listener()
+        }
+        const observer = surface ? new MutationObserver(resume) : null
+        observer?.observe(surface!, {
+          attributes: true,
+          attributeFilter: ['data-viewport-moving'],
+        })
+        if (!surface?.hasAttribute('data-viewport-moving')) applyTransform()
         const unsubscribe = store.subscribeViewport(() => {
+          if (surface?.hasAttribute('data-viewport-moving')) return
           applyTransform()
           listener()
         })
-        return unsubscribe
+        return () => {
+          listenersRef.current.delete(listener)
+          unsubscribe()
+          observer?.disconnect()
+        }
       },
       getSnapshot() {
+        if (surfaceRef.current?.hasAttribute('data-viewport-moving')) {
+          return visibleCache.current
+        }
         const next = portHitsInView(hits, store.getViewport(), surfaceW, surfaceH)
         if (
           sourceHits.current !== hits ||

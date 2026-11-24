@@ -153,7 +153,6 @@ export function NodeFrame(props: NodeFrameProps) {
    */
   // 容器（分组 / 批量）的子节点：缩放手柄不渲染（尺寸由容器布局决定），标题仍保留。
   const inContainer = node.parentId !== null
-
   // 右键菜单「重命名」（§4.1）/ 标题单击进入编辑：store 置 renamingId 时本节点切入编辑态
   const onResizePointerDown = (e: ReactPointerEvent, corner: ResizeCorner) => {
     e.stopPropagation()
@@ -259,6 +258,7 @@ export function NodeFrame(props: NodeFrameProps) {
           ? ((node.data as { channelId?: string }).channelId ?? '')
           : undefined
       }
+      data-node-frame
       /**
        * 选中态也落到 data 属性上，供**节点内部**（如生成节点的素材操作入口）
        * 用纯 CSS 判断「这个节点被选中了吗」。
@@ -288,7 +288,9 @@ export function NodeFrame(props: NodeFrameProps) {
         </span>
       )}
 
-      <div className={styles.body}>{props.children}</div>
+      <div className={styles.body} data-node-body>
+        {props.children}
+      </div>
 
       {props.overlay}
 

@@ -11,6 +11,10 @@ import { IconPrompt, IconStop } from '../../toolbar/icons'
 import { resolveTextRoute } from '../../execution/textRoute'
 import styles from './PromptNodeView.module.css'
 
+export function promptOwnsWheel(renderedHeight: number, overflowing: boolean): boolean {
+  return renderedHeight >= 80 && overflowing
+}
+
 /**
  * 提示词节点视图（M0-5 全链路的核心节点）。
  *
@@ -68,7 +72,9 @@ export function PromptNodeView(props: NodeViewProps) {
     const onWheel = (event: WheelEvent) => {
       if (event.deltaY === 0) return
       const scroller = editing ? editRef.current : bodyRef.current
-      if (!scroller || scroller.scrollHeight <= scroller.clientHeight + 1) return
+      if (!scroller) return
+      const overflowing = scroller.scrollHeight > scroller.clientHeight + 1
+      if (!promptOwnsWheel(root.getBoundingClientRect().height, overflowing)) return
 
       event.preventDefault()
       event.stopPropagation()

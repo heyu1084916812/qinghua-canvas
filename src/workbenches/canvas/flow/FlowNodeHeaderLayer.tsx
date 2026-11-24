@@ -8,15 +8,12 @@ import {
   useSyncExternalStore,
 } from 'react'
 import type { CSSProperties, PointerEvent as ReactPointerEvent } from 'react'
-import { useStore } from '@xyflow/react'
 import { useCanvasStore, useGraph } from '../storeContext'
 import { containerMinSize } from '../../../domain/canvas/layout/packContainer'
 import {
   NODE_HEADER_HEIGHT,
   NODE_HEADER_SIDE_INSET,
   nodeHeaderLabels,
-  nodeHeadersInView,
-  sameHeaderLabels,
   type NodeHeaderLabel,
 } from './nodeHeaders'
 import styles from './FlowNodeHeaderLayer.module.css'
@@ -60,13 +57,7 @@ const HeaderViewport = memo(function HeaderViewport({
   labels: readonly NodeHeaderLabel[]
 }) {
   const store = useCanvasStore()
-  const surfaceW = useStore((state) => state.width)
-  const surfaceH = useStore((state) => state.height)
   const layerRef = useRef<HTMLDivElement>(null)
-  const source = useRef(labels)
-  const visibleCache = useRef(
-    nodeHeadersInView(labels, store.getViewport(), { w: surfaceW, h: surfaceH }),
-  )
 
   const applyTransform = useCallback(() => {
     const viewport = store.getViewport()
@@ -81,30 +72,6 @@ const HeaderViewport = memo(function HeaderViewport({
     return store.subscribeViewport(applyTransform)
   }, [applyTransform, store])
 
-  const visibleStore = useMemo(
-    () => ({
-      subscribe(listener: () => void) {
-        return store.subscribeViewport(listener)
-      },
-      getSnapshot() {
-        const next = nodeHeadersInView(labels, store.getViewport(), {
-          w: surfaceW,
-          h: surfaceH,
-        })
-        if (source.current !== labels || !sameHeaderLabels(visibleCache.current, next)) {
-          source.current = labels
-          visibleCache.current = next
-        }
-        return visibleCache.current
-      },
-    }),
-    [labels, store, surfaceH, surfaceW],
-  )
-  const visible = useSyncExternalStore(
-    visibleStore.subscribe,
-    visibleStore.getSnapshot,
-    visibleStore.getSnapshot,
-  )
   const renamingId = useSyncExternalStore(
     store.subscribe,
     store.getRenamingId,
@@ -122,7 +89,7 @@ const HeaderViewport = memo(function HeaderViewport({
           transform: `translate(${-viewport.x * zoom}px, ${-viewport.y * zoom}px) scale(${zoom})`,
         } as CSSProperties}
       >
-        {visible.map((label) => (
+        {labels.map((label) => (
           <HeaderLabel
             key={label.id}
             label={label}

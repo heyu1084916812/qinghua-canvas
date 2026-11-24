@@ -1,0 +1,17 @@
+.canvas {
+  position: absolute;
+  inset: 0;
+  z-index: 11;
+  display: none;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  transform-origin: 0 0;
+  will-change: transform;
+  backface-visibility: hidden;
+}
+
+:global([data-canvas-surface][data-viewport-moving='true'][data-viewport-mode='pan'])
+  .canvas {
+  display: block;
+}

@@ -1404,6 +1404,44 @@
       "budget": 240
     },
     {
+      "module": "src/workbenches/canvas/flow/FlowPromptGestureCanvas.tsx",
+      "owner": "canvas-flow-ui",
+      "responsibility": "Paints low-zoom prompt cards into a single gesture canvas so panning keeps their appearance without editing DOM.",
+      "owns": [
+        "Prompt card gesture snapshot painting",
+        "Canvas pan translation"
+      ],
+      "doesNotOwn": [
+        "Prompt node editing state",
+        "Node geometry persistence"
+      ],
+      "publicApi": [
+        "FlowPromptGestureCanvas"
+      ],
+      "test": [
+        "scripts/test-canvas-performance.test.mjs"
+      ],
+      "budget": 260
+    },
+    {
+      "module": "src/workbenches/canvas/flow/FlowPromptGestureCanvas.module.css",
+      "owner": "canvas-flow-ui",
+      "responsibility": "Styles and positions the prompt gesture canvas above nodes but below port and header overlays.",
+      "owns": [
+        "Prompt gesture canvas layer"
+      ],
+      "doesNotOwn": [
+        "Prompt card rendering logic"
+      ],
+      "publicApi": [
+        "CSS_MODULE: prompt gesture canvas layer"
+      ],
+      "test": [
+        "scripts/test-canvas-performance.test.mjs"
+      ],
+      "budget": 80
+    },
+    {
       "module": "src/workbenches/canvas/flow/FlowNodeHeaderLayer.module.css",
       "owner": "canvas-flow-ui",
       "responsibility": "Styles the external node header overlay without covering node content.",

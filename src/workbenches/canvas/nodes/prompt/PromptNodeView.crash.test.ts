@@ -7,7 +7,7 @@ import { CanvasStoreProvider } from '../../storeContext'
 import { PlatformProvider } from '../../../../app/providers/PlatformProvider'
 import { ChannelStoreProvider } from '../../../../app/providers/ChannelStoreProvider'
 import { registerAllSpecs } from '../../../../domain/canvas/nodeSpecs'
-import { PromptNodeView } from './PromptNodeView'
+import { PromptNodeView, promptOwnsWheel } from './PromptNodeView'
 import { CanvasExecutionProvider } from '../../execution/CanvasExecutionProvider'
 import type { NodeViewProps } from '../registry'
 import type { PromptData } from '../../../../domain/canvas/model/node'
@@ -103,5 +103,13 @@ describe('PromptNodeView · 数据缺字段不许崩（黑屏回归）', () => {
     // 三个工具按钮都会读 data.text 来判禁用，缺字段时不该抛
     const html = render({ upstreamPromptLinked: false, draft: '' } as Partial<PromptData>)
     expect(html).toContain('data-prompt-tool')
+  })
+})
+
+describe('PromptNodeView · 小倍率滚轮交还画布', () => {
+  it('只让可见尺寸足够、内容确实溢出的提示词节点占用滚轮', () => {
+    expect(promptOwnsWheel(160, true)).toBe(true)
+    expect(promptOwnsWheel(160, false)).toBe(false)
+    expect(promptOwnsWheel(26, true)).toBe(false)
   })
 })

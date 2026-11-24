@@ -9,11 +9,7 @@ const CULL_ATTRIBUTE = 'data-node-viewport-culled'
  * wrappers skip content rendering. Updating the attribute imperatively avoids a
  * React render for every viewport frame.
  */
-export function FlowNodeViewportCulling({
-  paused = false,
-}: {
-  paused?: boolean
-}) {
+export function FlowNodeViewportCulling() {
   const store = useCanvasStore()
 
   useEffect(() => {
@@ -21,6 +17,8 @@ export function FlowNodeViewportCulling({
     let graph = store.getSnapshot()
     let elements = new Map<string, HTMLElement>()
     let observer: MutationObserver | null = null
+    let surfaceObserver: MutationObserver | null = null
+    const surface = document.querySelector<HTMLElement>('[data-canvas-surface]')
 
     const refreshElements = () => {
       elements = new Map(
@@ -33,18 +31,32 @@ export function FlowNodeViewportCulling({
         observer = new MutationObserver(refreshElements)
         observer.observe(host, { childList: true })
       }
+      if (surface && !surfaceObserver) {
+        surfaceObserver = new MutationObserver(schedule)
+        surfaceObserver.observe(surface, {
+          attributes: true,
+          attributeFilter: ['data-viewport-mode'],
+        })
+      }
       schedule()
     }
 
     const sync = () => {
       frame = 0
+      /**
+       * Let native `content-visibility:auto` carry viewport gestures, then
+       * restore the imperative 320px warm window once the gesture settles.
+       * Rewriting hundreds of culling attributes while the viewport moves
+       * causes periodic long frames.
+       */
+      if (surface?.hasAttribute('data-viewport-moving')) return
       const snapshot = store.getSnapshot()
       if (snapshot !== graph) {
         graph = snapshot
         refreshElements()
         return
       }
-      const surface = store.getSurfaceSize()
+      const surfaceSize = store.getSurfaceSize()
       const viewport = store.getViewport()
       for (const node of graph.nodes) {
         const element = elements.get(node.id)
@@ -53,7 +65,7 @@ export function FlowNodeViewportCulling({
           element.removeAttribute(CULL_ATTRIBUTE)
           continue
         }
-        const hidden = nodeOutsideViewport(node, viewport, surface)
+        const hidden = nodeOutsideViewport(node, viewport, surfaceSize)
         const next = hidden ? 'hidden' : 'visible'
         if (element.getAttribute(CULL_ATTRIBUTE) !== next) {
           element.setAttribute(CULL_ATTRIBUTE, next)
@@ -68,21 +80,6 @@ export function FlowNodeViewportCulling({
     }
 
     refreshElements()
-    if (paused) {
-      if (frame) {
-        cancelAnimationFrame(frame)
-        frame = 0
-      }
-      for (const element of elements.values()) {
-        if (element.getAttribute(CULL_ATTRIBUTE) !== 'visible') {
-          element.setAttribute(CULL_ATTRIBUTE, 'visible')
-        }
-      }
-      return () => {
-        observer?.disconnect()
-        if (frame) cancelAnimationFrame(frame)
-      }
-    }
     const unsubscribeGraph = store.subscribe(schedule)
     const unsubscribeViewport = store.subscribeViewport(schedule)
     window.addEventListener('resize', schedule)
@@ -91,9 +88,10 @@ export function FlowNodeViewportCulling({
       unsubscribeViewport()
       window.removeEventListener('resize', schedule)
       observer?.disconnect()
+      surfaceObserver?.disconnect()
       if (frame) cancelAnimationFrame(frame)
     }
-  }, [paused, store])
+  }, [store])
 
   return null
 }

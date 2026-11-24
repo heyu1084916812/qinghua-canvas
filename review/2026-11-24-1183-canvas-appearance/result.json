@@ -1,0 +1,78 @@
+{
+  "issue": 1183,
+  "scope": "canvas viewport pan, node drag appearance, low-zoom prompt rendering and transient overlays",
+  "rootCauses": [
+    "Dense pan gestures replaced 332 real nodes with 144 coarse gray cards.",
+    "Node drag hid every non-active node content and the node header layer.",
+    "The moving flag was React state, so gesture start and end repainted the surface once.",
+    "At low zoom, 150 editable prompt cards made viewport pan write hundreds of culling attributes and repaint full editing DOM.",
+    "The function bar and creation panel subscribed to semantic store changes instead of subscribeDragging, so they stayed visible until a later node update."
+  ],
+  "fixes": [
+    "Keep all React Flow node shells and real thumbnails mounted during gestures.",
+    "Pause imperative culling writes while the viewport moves and restore the 320px warm window after release.",
+    "Render low-zoom prompt cards in one world-space canvas snapshot during pan; images and all other nodes remain DOM.",
+    "Pause port hit-layer updates and hide its transient hit boxes during viewport motion.",
+    "Use subscribeDragging in the function bar and creation panel; hide both through data-viewport-moving during canvas pan or zoom.",
+    "Keep lightweight edge/background layers permanent and toggle visibility from native viewport attributes."
+  ],
+  "realProject": {
+    "viewport": { "width": 2560, "height": 1440 },
+    "nodes": 332,
+    "zoomDuringPan": 0.194531,
+    "visibleRealImagesDuringPan": [95, 104],
+    "coarseNodes": 0,
+    "grayImages": 0,
+    "hiddenImages": 0,
+    "pointerDelta": { "x": 240, "y": 140 },
+    "firstFrameViewportDelta": { "x": 240, "y": 140.0004 },
+    "nodeDragFirstDelta": { "x": 120, "y": 60 },
+    "nodeDragMaxLagPx": 0.0005,
+    "overlayMotion": {
+      "selected": { "panel": 1, "bar": 1 },
+      "draggingNode": { "panel": 0, "bar": 0 },
+      "afterDrag": { "panel": 0, "bar": 0 },
+      "afterReselect": { "panel": 1, "bar": 1 },
+      "panningCanvas": { "panelDisplay": "none", "barDisplay": "none" },
+      "afterPan": { "panelDisplay": "block", "barDisplay": "block" }
+    },
+    "evidence": [
+      "review/2026-11-24-1183-canvas-appearance/dev-full-node-drag-final.json",
+      "review/2026-11-24-1183-canvas-appearance/dev-overlay-motion.json",
+      "review/2026-11-24-1183-canvas-appearance/dev-full-2560x1440-pan-canvas-final.png",
+      "review/2026-11-24-1183-canvas-appearance/dev-full-node-drag-no-overlays.png",
+      "review/2026-11-24-1183-canvas-appearance/dev-full-pan-no-overlays.png"
+    ]
+  },
+  "formalPerformance": {
+    "report": ".playwright-verify/canvas-perf-release-2026-11-24T02-36-18-462/report.json",
+    "nodes": 300,
+    "edges": 500,
+    "decodedImages": 150,
+    "panP95Ms": [12.1, 12.1, 12.2],
+    "lowZoomPanP95Ms": [12.2, 12.2, 12.2],
+    "zoomP95Ms": [12.1, 12.2, 12.1],
+    "dragP95Ms": [6.2, 6.2, 6.2],
+    "lowZoomFirstFrameDeltas": [
+      { "x": 240, "y": 140.0004 },
+      { "x": 240, "y": 140.0004 },
+      { "x": 240, "y": 140.0004 }
+    ],
+    "visibleImagesAtLowZoom": [140, 140, 140],
+    "coarseNodes": [0, 0, 0],
+    "hiddenImageNodesDuringDrag": [0, 0, 0],
+    "pass": true
+  },
+  "tests": {
+    "check": "pass",
+    "vitest": {
+      "filesPassed": 819,
+      "filesSkipped": 1,
+      "testsPassed": 6644,
+      "testsSkipped": 1
+    },
+    "releaseBuild": "pass",
+    "tauriNoBundle": "pass"
+  },
+  "errors": []
+}

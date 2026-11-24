@@ -321,9 +321,38 @@ export function evaluatePerformanceGate(input) {
           gesture.fastLayer === true &&
           Number(gesture.fastPaths) > 0 &&
           Boolean(gesture.fastBackground) &&
-          ((Number(gesture.coarseNodes) > 0 &&
-            Number(gesture.coarseNodes) === Number(gesture.mountedNodes)) ||
-            Number(gesture.mountedNodes) < PERFORMANCE_NODE_COUNT) &&
+          Number(gesture.coarseNodes) === 0 &&
+          Number(gesture.visibleImages) > 0 &&
+          Number(gesture.mountedNodes) === PERFORMANCE_NODE_COUNT &&
+          Number(gesture.cullingVisibleNodes) < Number(gesture.mountedNodes) &&
+          Number(gesture.restoredNodes) === PERFORMANCE_NODE_COUNT
+        )
+      }),
+    lowZoomPanP95:
+      input.lowZoomPanRounds?.length === 3 &&
+      input.lowZoomPanRounds.every(
+        (round) => Number(round.p95Ms) <= MAX_P95_MS,
+      ),
+    lowZoomPanFirstFrame:
+      input.lowZoomPanRounds?.length === 3 &&
+      input.lowZoomPanRounds.every(
+        (round) =>
+          Math.abs(Number(round.firstFrameDelta?.x) - round.expectedFirstDelta.x) <= 1 &&
+          Math.abs(Number(round.firstFrameDelta?.y) - round.expectedFirstDelta.y) <= 1,
+      ),
+    lowZoomPanAppearance:
+      input.lowZoomPanRounds?.length === 3 &&
+      input.lowZoomPanRounds.every((round) => {
+        const gesture = round.gesture
+        return (
+          gesture?.moving === true &&
+          gesture.mode === 'pan' &&
+          Number(gesture.coarseNodes) === 0 &&
+          Number(gesture.hiddenImages) === 0 &&
+          Number(gesture.visibleImages) >= GENERATION_NODE_COUNT * 0.9 &&
+          gesture.promptCanvasVisible === true &&
+          Number(gesture.hiddenPromptBodies) > 0 &&
+          Number(gesture.mountedNodes) === PERFORMANCE_NODE_COUNT &&
           Number(gesture.restoredNodes) === PERFORMANCE_NODE_COUNT
         )
       }),
@@ -337,7 +366,7 @@ export function evaluatePerformanceGate(input) {
         return (
           gesture?.moving === true &&
           Boolean(gesture.background) &&
-          gesture.mountedEdges === 0 &&
+          gesture.edgeDisplay === 'none' &&
           (gesture.fastLayer === true ||
             (Number(gesture.coarseNodes) > 0 &&
               Number(gesture.coarseNodes) === Number(gesture.mountedNodes))) &&
@@ -354,6 +383,13 @@ export function evaluatePerformanceGate(input) {
     dragMovement:
       input.dragRounds?.length === 3 &&
       input.dragRounds.every((round) => nodeDragRoundMovement(round).pass),
+    dragPreservesAppearance:
+      input.dragRounds?.length === 3 &&
+      input.dragRounds.every(
+        (round) =>
+          Number(round.dragObserverLog?.layersDuringDrag?.coarseNodes ?? 0) === 0 &&
+          Number(round.dragObserverLog?.layersDuringDrag?.hiddenImageNodes ?? 0) === 0,
+      ),
   }
 }
 
@@ -424,6 +460,20 @@ export function buildPerformanceReport(input) {
       rounds: input.panRounds.map((round) => round.gesture ?? null),
       pass: assertionChecks.panFastPath,
     },
+    lowZoomPanP95: {
+      maximumMs: MAX_P95_MS,
+      actualMs: input.lowZoomPanRounds.map((round) => round.p95Ms),
+      pass: assertionChecks.lowZoomPanP95,
+    },
+    lowZoomPanFirstFrame: {
+      expectedDelta: input.lowZoomPanRounds[0]?.expectedFirstDelta ?? null,
+      actualDeltas: input.lowZoomPanRounds.map((round) => round.firstFrameDelta),
+      pass: assertionChecks.lowZoomPanFirstFrame,
+    },
+    lowZoomPanAppearance: {
+      rounds: input.lowZoomPanRounds.map((round) => round.gesture ?? null),
+      pass: assertionChecks.lowZoomPanAppearance,
+    },
     zoomP95: {
       maximumMs: MAX_P95_MS,
       actualMs: input.zoomRounds.map((round) => round.p95Ms),
@@ -462,6 +512,7 @@ export function buildPerformanceReport(input) {
     assets: input.assets,
     images: input.imageEvidence,
     panRounds: input.panRounds,
+    lowZoomPanRounds: input.lowZoomPanRounds,
     zoomRounds: input.zoomRounds,
     dragRounds: input.dragRounds,
     pageErrors: input.pageErrors,
@@ -580,8 +631,13 @@ async function blankPointerPoint(page, surface) {
   const point = await page.evaluate((bounds) => {
     const targetX = bounds.x + bounds.width * 0.55
     const targetY = bounds.y + bounds.height * 0.55
+    const portHitRects = [...document.querySelectorAll('[data-flow-port-hit]')].map(
+      (element) => element.getBoundingClientRect(),
+    )
     let best = null
+    let fallback = null
     let bestDistance = Number.POSITIVE_INFINITY
+    let fallbackDistance = Number.POSITIVE_INFINITY
     for (let row = 0; row <= 24; row += 1) {
       for (let column = 0; column <= 32; column += 1) {
         const x = bounds.x + bounds.width * ((column + 0.5) / 33)
@@ -596,13 +652,28 @@ async function blankPointerPoint(page, surface) {
           continue
         }
         const distance = Math.hypot(x - targetX, y - targetY)
+        if (distance < fallbackDistance) {
+          fallback = { x, y }
+          fallbackDistance = distance
+        }
+        if (
+          portHitRects.some(
+            (rect) =>
+              x >= rect.left - 4 &&
+              x <= rect.right + 4 &&
+              y >= rect.top - 4 &&
+              y <= rect.bottom + 4,
+          )
+        ) {
+          continue
+        }
         if (distance < bestDistance) {
           best = { x, y }
           bestDistance = distance
         }
       }
     }
-    return best
+    return best ?? fallback
   }, surface)
   if (!point) throw new Error('canvas has no unobstructed React Flow pane point')
   return point
@@ -644,6 +715,20 @@ async function panRound(page, options = {}) {
       fastBackground: fastBackground?.getAttribute('data-viewport-background') ?? null,
       coarseNodes: document.querySelectorAll('.react-flow__node-coarse').length,
       mountedNodes: document.querySelectorAll('.react-flow__node[data-id]').length,
+      cullingVisibleNodes: document.querySelectorAll(
+        '.react-flow__node[data-node-viewport-culled="visible"]',
+      ).length,
+      visibleImages: [...document.querySelectorAll('[data-node-type="generation"] img')]
+        .filter((image) => {
+          const rect = image.getBoundingClientRect()
+          return (
+            getComputedStyle(image).visibility !== 'hidden' &&
+            rect.right > 0 &&
+            rect.bottom > 0 &&
+            rect.left < innerWidth &&
+            rect.top < innerHeight
+          )
+        }).length,
     }
   })
   let screenshot = null
@@ -667,6 +752,96 @@ async function panRound(page, options = {}) {
   )
   gesture.restoredNodes = await page.locator('.react-flow__node[data-id]').count()
   return { intervals, gesture, screenshot }
+}
+
+async function settleLowZoomPan(page, targetZoom = 0.2) {
+  await page.keyboard.press('z')
+  await page.waitForTimeout(300)
+  await settleZoomAt(page, targetZoom)
+  await page.waitForTimeout(350)
+}
+
+async function lowZoomPanRound(page) {
+  const surface = await page.locator('[data-canvas-surface]').boundingBox()
+  if (!surface) throw new Error('canvas surface has no bounding box')
+  const { x, y } = await blankPointerPoint(page, surface)
+  await page.mouse.move(x, y)
+  const before = await viewportState(page)
+  await page.mouse.down({ button: 'middle' })
+  const expectedFirstDelta = { x: 240, y: 140 }
+  let firstFrame = null
+  const intervals = await sampleFrames(page, async () => {
+    await page.mouse.move(x + expectedFirstDelta.x, y + expectedFirstDelta.y, {
+      steps: 1,
+    })
+    await page.evaluate(
+      () => new Promise((resolve) => requestAnimationFrame(() => resolve(null))),
+    )
+    firstFrame = await viewportState(page)
+    for (let index = 0; index < 24; index += 1) {
+      const direction = index % 2 === 0 ? 1 : -1
+      await page.mouse.move(x + direction * 260, y + direction * 90, {
+        steps: 4,
+      })
+      await new Promise((resolve) => setTimeout(resolve, 50))
+    }
+  })
+  const gesture = await page.evaluate(() => {
+    const surface = document.querySelector('[data-canvas-surface]')
+    const images = [...document.querySelectorAll('[data-node-type="generation"] img')]
+    return {
+      moving: surface?.getAttribute('data-viewport-moving') === 'true',
+      mode: surface?.getAttribute('data-viewport-mode') ?? null,
+      coarseNodes: document.querySelectorAll('.react-flow__node-coarse').length,
+      mountedNodes: document.querySelectorAll('.react-flow__node[data-id]').length,
+      visibleImages: images.filter((image) => {
+        const rect = image.getBoundingClientRect()
+        return (
+          getComputedStyle(image).visibility !== 'hidden' &&
+          rect.right > 0 &&
+          rect.bottom > 0 &&
+          rect.left < innerWidth &&
+          rect.top < innerHeight
+        )
+      }).length,
+      hiddenImages: images.filter(
+        (image) => getComputedStyle(image).visibility === 'hidden',
+      ).length,
+      promptCanvasVisible:
+        getComputedStyle(document.querySelector('[data-prompt-gesture-canvas]')).display !==
+        'none',
+      hiddenPromptBodies: [...document.querySelectorAll(
+        '[data-node-type="prompt"] [data-node-body]',
+      )].filter((body) => getComputedStyle(body).visibility === 'hidden').length,
+    }
+  })
+  await page.mouse.up({ button: 'middle' })
+  await page.waitForFunction(
+    () =>
+      !document
+        .querySelector('[data-canvas-surface]')
+        ?.hasAttribute('data-viewport-moving'),
+    undefined,
+    { timeout: 10_000 },
+  )
+  gesture.restoredNodes = await page.locator('.react-flow__node[data-id]').count()
+  const after = await viewportState(page)
+  const firstFrameDelta =
+    firstFrame?.domViewport && before.domViewport
+      ? {
+          x: firstFrame.domViewport.x - before.domViewport.x,
+          y: firstFrame.domViewport.y - before.domViewport.y,
+        }
+      : null
+  return {
+    ...summarizeFrames(intervals),
+    before,
+    after,
+    firstFrame,
+    expectedFirstDelta,
+    firstFrameDelta,
+    gesture,
+  }
 }
 
 async function zoomRound(page) {
@@ -699,6 +874,7 @@ async function zoomRound(page) {
       fastLayer: Boolean(document.querySelector('[data-flow-viewport-edge-layer]')),
       coarseNodes: document.querySelectorAll('.react-flow__node-coarse').length,
       mountedEdges: document.querySelectorAll('.react-flow__edge').length,
+      edgeDisplay: getComputedStyle(document.querySelector('.react-flow__edges')).display,
       mountedNodes: document.querySelectorAll('.react-flow__node[data-id]').length,
     }
   })
@@ -732,9 +908,18 @@ async function settleZoomAt(page, targetZoom = 0.8) {
     if (!surface) throw new Error('canvas surface has no bounding box')
     const { x, y } = await blankPointerPoint(page, surface)
     await page.mouse.move(x, y)
-    await page.mouse.wheel(0, zoom < targetZoom ? -160 : 160)
+    const ratio = targetZoom / zoom
+    const wheelMagnitude = Math.max(
+      8,
+      Math.min(160, Math.abs((160 * Math.log(ratio)) / Math.log(1.248))),
+    )
+    await page.mouse.wheel(0, zoom < targetZoom ? -wheelMagnitude : wheelMagnitude)
     await page.waitForTimeout(60)
   }
+  const state = await viewportState(page)
+  throw new Error(
+    `zoom warmup did not reach ${targetZoom}: ${state.domViewport?.zoom ?? 'unknown'}`,
+  )
 }
 
 async function findDraggableGenerationNode(page) {
@@ -965,6 +1150,9 @@ async function coldNodeDragRound(page) {
             portLayer: Boolean(document.querySelector('[data-flow-port-layer]')),
             childHitLayer: Boolean(document.querySelector('[data-flow-child-edge-hit]')),
             draggingNodes: document.querySelectorAll('.react-flow__node.dragging').length,
+            coarseNodes: document.querySelectorAll('.react-flow__node-coarse').length,
+            hiddenImageNodes: [...document.querySelectorAll('[data-node-type="generation"] img')]
+              .filter((image) => getComputedStyle(image).visibility === 'hidden').length,
           }))
         }
       }
@@ -1713,6 +1901,22 @@ async function main() {
       await page.waitForTimeout(250)
     }
 
+    await settleLowZoomPan(page)
+    await lowZoomPanRound(page)
+    await page.waitForTimeout(350)
+    const lowZoomPanRounds = []
+    for (let round = 0; round < measurementRounds; round += 1) {
+      await settleLowZoomPan(page)
+      const performanceBefore = await readPerformanceMetrics(cdp)
+      const result = await lowZoomPanRound(page)
+      const performanceAfter = await readPerformanceMetrics(cdp)
+      lowZoomPanRounds.push({
+        ...result,
+        performanceMetrics: performanceMetricsDelta(performanceBefore, performanceAfter),
+      })
+      await page.waitForTimeout(250)
+    }
+
     await page.keyboard.press('z')
     await page.waitForTimeout(300)
     await settleZoomAt(page, 1)
@@ -1802,6 +2006,7 @@ async function main() {
       assets: assetEvidence,
       imageEvidence,
       panRounds,
+      lowZoomPanRounds,
       zoomRounds,
       dragRounds,
       pageErrors,
@@ -1837,6 +2042,9 @@ async function main() {
         `- pan worst frame: ${panRounds.map((round) => round.maxMs.toFixed(2) + 'ms').join(' / ')}`,
         `- zoom worst frame: ${zoomRounds.map((round) => round.maxMs.toFixed(2) + 'ms').join(' / ')}`,
         `- pan main-thread task: ${panRounds.map((round) => `${((round.performanceMetrics?.TaskDuration ?? 0) * 1000).toFixed(1)}ms`).join(' / ')}`,
+        `- low-zoom pan P95: ${lowZoomPanRounds.map((round) => round.p95Ms.toFixed(2) + 'ms').join(' / ')}`,
+        `- low-zoom pan first frame: ${report.assertions.lowZoomPanFirstFrame.pass ? 'PASS' : 'FAIL'}`,
+        `- low-zoom pan appearance: ${report.assertions.lowZoomPanAppearance.pass ? 'PASS' : 'FAIL'}`,
         `- zoom main-thread task: ${zoomRounds.map((round) => `${((round.performanceMetrics?.TaskDuration ?? 0) * 1000).toFixed(1)}ms`).join(' / ')}`,
         `- drag P95: ${dragRounds.map((round) => round.p95Ms.toFixed(2) + 'ms').join(' / ')}`,
         `- drag movement: ${report.assertions.dragMovement.rounds.map((round) => round.pass ? 'PASS' : 'FAIL').join(' / ')}`,

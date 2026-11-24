@@ -4,6 +4,7 @@
   z-index: 12;
   overflow: hidden;
   pointer-events: none;
+  contain: layout style paint;
 }
 
 .layer {
@@ -12,6 +13,8 @@
   top: 0;
   transform-origin: 0 0;
   pointer-events: none;
+  will-change: transform;
+  backface-visibility: hidden;
 }
 
 .header {

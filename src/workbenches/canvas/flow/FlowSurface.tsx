@@ -96,8 +96,8 @@ import { CanvasNotice } from '../surface/CanvasNotice'
 import { Minimap } from '../surface/Minimap'
 import { UndoBar } from '../surface/UndoBar'
 import { useCanvasDetailMode } from './useCanvasDetailMode'
-import { shouldCoarsenGestureNodes } from './detailMode'
 import { FlowViewportBackground } from './FlowViewportBackground'
+import { FlowPromptGestureCanvas } from './FlowPromptGestureCanvas'
 import { VIEWPORT_EPSILON } from './flowSurfaceViewport'
 import {
   FLOATING_SELECTORS,
@@ -170,7 +170,6 @@ export function FlowSurface({
 const NODE_TYPES = { qh: FlowFlowNode, coarse: FlowCoarseNode }
 const EDGE_TYPES = { qh: QhEdge, coarse: QhCoarseEdge }
 const EDGE_OPTIONS = { type: 'default' } as const
-const NO_EDGES = [] as RFEdge<QhEdgeData>[]
 function FlowSurfaceInner({
   projectId,
   onOpenSettings,
@@ -638,18 +637,8 @@ function FlowSurfaceInner({
   }, [
     graph, selection, nodeStateOf, emitForNode, childIndex, renderFlowChild, derived, store, detailMode, upstreamPickConfig,
   ])
-  const gesture = useFlowGestureWindow({ nodes, store, surfaceRef })
-  const renderedNodes = useMemo(
-    () =>
-      shouldCoarsenGestureNodes({
-        moving: gesture.moving,
-        detailMode,
-        renderedNodeCount: gesture.renderedNodes.length,
-      })
-        ? gesture.renderedNodes.map((node) => ({ ...node, type: 'coarse' }))
-        : gesture.renderedNodes,
-    [detailMode, gesture.moving, gesture.renderedNodes],
-  )
+  const gesture = useFlowGestureWindow({ nodes, surfaceRef })
+  const renderedNodes = gesture.renderedNodes
 
   const childEdgeIds = useStableGraphMemo(graph, childEdgeIdSet)
   const removeEdge = useCallback(
@@ -901,7 +890,6 @@ function FlowSurfaceInner({
       data-canvas-custom-hex={customCanvasColor ?? undefined}
       data-canvas-custom-dot-hex={customDotColor ?? undefined}
       data-canvas-node-hex={customNodeColor ?? undefined}
-      data-viewport-moving={gesture.moving ? 'true' : undefined}
       /* 节点内容字号：挂在**画布根**上，节点自己的 CSS 用 var(..., 兜底) 取。
          兜底值让单测 / SSR 这些"没有画布根"的场景仍然拿得到原来的字号。 */
       style={
@@ -989,8 +977,11 @@ function FlowSurfaceInner({
       }}
       onContextMenu={onContextMenu}
     >
-      {gesture.moving && canvasStyle.background !== 'solid' ? (
-        <FlowViewportBackground variant={canvasStyle.background} />
+      {canvasStyle.background !== 'solid' ? (
+        <FlowViewportBackground
+          key={`${theme}:${canvasStyle.tone}:${customDotColor ?? ''}`}
+          variant={canvasStyle.background}
+        />
       ) : null}
       {/* 拖线草稿（§6.14）：画在节点层**下面**（与老表面 EdgeLayer 同序），层本身不吃指针 */}
       {/*
@@ -999,8 +990,8 @@ function FlowSurfaceInner({
       */}
       <FlowGroupBoardLayer />
       <FlowViewportController />
-      <FlowNodeViewportCulling paused={gesture.moving} />
-      {gesture.moving && detailMode === 'full' ? <FlowViewportEdgeLayer /> : null}
+      <FlowNodeViewportCulling />
+      {detailMode === 'full' ? <FlowViewportEdgeLayer /> : null}
       {/*
         牵涉容器子节点的边（视觉层）：与 RF 自带边同一层序（节点之下），
         命中区在下面单独再画一层（`hitOnly`）。
@@ -1017,7 +1008,7 @@ function FlowSurfaceInner({
       <ReactFlow
         className={styles.flow}
         nodes={renderedNodes}
-        edges={gesture.moving ? NO_EDGES : edges}
+        edges={edges}
         nodeTypes={NODE_TYPES}
         edgeTypes={EDGE_TYPES}
         defaultEdgeOptions={EDGE_OPTIONS}
@@ -1139,6 +1130,7 @@ function FlowSurfaceInner({
           />
         )}
       </ReactFlow>
+      <FlowPromptGestureCanvas />
       <FlowNodeHeaderLayer coarse={detailMode === 'coarse'} />
       <Hud count={graph.nodes.length} ids={nodes.map((n) => n.id)} />
       {/* 空画布 + 还没看过新手引导时，给三个模板直达（对账 #388 / E7） */}

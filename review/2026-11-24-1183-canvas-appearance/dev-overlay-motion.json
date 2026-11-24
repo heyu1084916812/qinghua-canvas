@@ -1,0 +1,50 @@
+{
+  "selectedState": {
+    "panelCount": 1,
+    "barCount": 1,
+    "panelDisplay": "block",
+    "barDisplay": "block",
+    "dragging": null,
+    "moving": null
+  },
+  "dragState": {
+    "panelCount": 0,
+    "barCount": 0,
+    "panelDisplay": null,
+    "barDisplay": null,
+    "dragging": "true",
+    "moving": null
+  },
+  "afterDragState": {
+    "panelCount": 0,
+    "barCount": 0,
+    "panelDisplay": null,
+    "barDisplay": null,
+    "dragging": null,
+    "moving": null
+  },
+  "reselectedState": {
+    "panelCount": 1,
+    "barCount": 1,
+    "panelDisplay": "block",
+    "barDisplay": "block",
+    "dragging": null,
+    "moving": null
+  },
+  "panState": {
+    "panelCount": 1,
+    "barCount": 1,
+    "panelDisplay": "none",
+    "barDisplay": "none",
+    "dragging": null,
+    "moving": "true"
+  },
+  "afterPanState": {
+    "panelCount": 1,
+    "barCount": 1,
+    "panelDisplay": "block",
+    "barDisplay": "block",
+    "dragging": null,
+    "moving": null
+  }
+}

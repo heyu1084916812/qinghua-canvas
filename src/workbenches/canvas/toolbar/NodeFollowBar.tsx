@@ -107,7 +107,7 @@ export function NodeFollowBar({ onClose, onOpenSettings, onDownload }: NodeFollo
 
   // §6.15：拖动期间立即隐藏；**真实位移**的拖动松手后保持隐藏，直到下一次显式选中
   // （`setSelection` 会复位 panelDismissed）。普通单击（无位移）不算拖动，照常出现。
-  const dragging = useSyncExternalStore(store.subscribe, store.isDragging, store.isDragging)
+  const dragging = useSyncExternalStore(store.subscribeDragging, store.isDragging, store.isDragging)
   const marqueeActive = useSyncExternalStore(store.subscribe, store.isSelectionMarqueeActive, store.isSelectionMarqueeActive)
   const dismissed = useSyncExternalStore(
     store.subscribe,

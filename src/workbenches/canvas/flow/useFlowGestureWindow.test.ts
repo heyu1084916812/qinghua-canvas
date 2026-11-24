@@ -2,7 +2,6 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createElement } from 'react'
 import TestRenderer, { act } from 'react-test-renderer'
 import type { Node as RFNode } from '@xyflow/react'
-import type { CanvasStore } from '../../../state/workbenches/canvas/store'
 import type { FlowNodeData } from './FlowNode'
 import { useFlowGestureWindow } from './useFlowGestureWindow'
 
@@ -24,15 +23,11 @@ function renderGesture() {
     removeAttribute: vi.fn(),
   }
   const surfaceRef = { current: surface as unknown as HTMLDivElement }
-  const store = {
-    getViewport: vi.fn(() => ({ x: 0, y: 0, zoom: 1 })),
-    getSurfaceSize: vi.fn(() => ({ w: 1000, h: 800 })),
-  } as unknown as CanvasStore
   const nodes = [flowNode('center', 0, 0), flowNode('far', 5000, 5000)]
   const result: { current: Gesture } = { current: undefined as unknown as Gesture }
 
   function Probe() {
-    result.current = useFlowGestureWindow({ store, surfaceRef, nodes })
+    result.current = useFlowGestureWindow({ surfaceRef, nodes })
     return null
   }
 
@@ -45,7 +40,7 @@ function renderGesture() {
       root.update(createElement(Probe))
     })
 
-  return { result, rerender, store, surface }
+  return { result, rerender, surface }
 }
 
 function stubBrowserWindow() {
@@ -63,59 +58,64 @@ afterEach(() => {
 })
 
 describe('useFlowGestureWindow', () => {
-  it('windows nodes for pan and restores the full graph on release', () => {
+  it('keeps every node mounted while toggling the native pan marker', () => {
     stubBrowserWindow()
     const { result, rerender, surface } = renderGesture()
 
     act(() => result.current.beginMove({ type: 'mousedown' } as MouseEvent))
     rerender()
-    expect(result.current.moving).toBe(true)
-    expect(result.current.renderedNodes.map((node) => node.id)).toEqual(['center'])
+    expect(result.current.renderedNodes.map((node) => node.id)).toEqual([
+      'center',
+      'far',
+    ])
     expect(surface.setAttribute).toHaveBeenCalledWith('data-viewport-moving', 'true')
+    expect(surface.setAttribute).toHaveBeenCalledWith('data-viewport-mode', 'pan')
 
     act(() => result.current.endMove())
     rerender()
-    expect(result.current.moving).toBe(false)
     expect(result.current.renderedNodes.map((node) => node.id)).toEqual([
       'center',
       'far',
     ])
     expect(surface.removeAttribute).toHaveBeenCalledWith('data-viewport-moving')
+    expect(surface.removeAttribute).toHaveBeenCalledWith('data-viewport-mode')
   })
 
   it('keeps one wheel window across a burst and restores after 180ms idle', () => {
     vi.useFakeTimers()
     stubBrowserWindow()
-    const { result, rerender, store, surface } = renderGesture()
+    const { result, rerender, surface } = renderGesture()
 
     act(() => {
       result.current.beginMove({ type: 'wheel' } as MouseEvent)
       result.current.beginMove({ type: 'wheel' } as MouseEvent)
     })
     rerender()
-    expect(store.getViewport).toHaveBeenCalledTimes(1)
-    expect(result.current.renderedNodes.map((node) => node.id)).toEqual(['center'])
-    expect(surface.setAttribute).toHaveBeenCalledTimes(1)
+    expect(result.current.renderedNodes.map((node) => node.id)).toEqual([
+      'center',
+      'far',
+    ])
+    expect(surface.setAttribute).toHaveBeenCalledTimes(2)
+    expect(surface.setAttribute).toHaveBeenCalledWith('data-viewport-mode', 'wheel')
 
     act(() => result.current.endMove())
     rerender()
-    expect(result.current.moving).toBe(true)
 
     act(() => {
       vi.advanceTimersByTime(179)
     })
     rerender()
-    expect(result.current.moving).toBe(true)
+    expect(surface.removeAttribute).not.toHaveBeenCalled()
 
     act(() => {
       vi.advanceTimersByTime(1)
     })
     rerender()
-    expect(result.current.moving).toBe(false)
     expect(result.current.renderedNodes.map((node) => node.id)).toEqual([
       'center',
       'far',
     ])
     expect(surface.removeAttribute).toHaveBeenCalledWith('data-viewport-moving')
+    expect(surface.removeAttribute).toHaveBeenCalledWith('data-viewport-mode')
   })
 })
