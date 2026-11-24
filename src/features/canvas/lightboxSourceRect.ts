@@ -28,6 +28,23 @@ export function lightboxSourceRectFromMedia(
   }
 }
 
+/** Resolve the actual media inside a thumbnail button, not the button's larger hit box. */
+export function lightboxSourceRectForThumbnail(
+  host: HTMLElement,
+  assetHash: string,
+): LightboxSourceRect | undefined {
+  if (!assetHash) return undefined
+  const media = host.matches('img, video')
+    ? host
+    : host.querySelector<HTMLElement>('img, video')
+  if (!media) return undefined
+  return lightboxSourceRectFromMedia(
+    media,
+    assetHash,
+    getComputedStyle(media).borderRadius,
+  )
+}
+
 /** Same source snapshot for double-click, toolbar preview, and every node event entry. */
 export function lightboxSourceRectForNode(
   nodeId: string,
@@ -39,9 +56,5 @@ export function lightboxSourceRectForNode(
     `[data-node-id="${CSS.escape(nodeId)}"] img, [data-node-id="${CSS.escape(nodeId)}"] video`,
   )
   if (!media) return undefined
-  return lightboxSourceRectFromMedia(
-    media,
-    assetHash,
-    getComputedStyle(media).borderRadius,
-  )
+  return lightboxSourceRectForThumbnail(media, assetHash)
 }

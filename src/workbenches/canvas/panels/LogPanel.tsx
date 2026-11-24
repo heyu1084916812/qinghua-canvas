@@ -3,6 +3,7 @@ import { usePlatform } from '../../../app/providers/PlatformProvider'
 import { useChannels } from '../../../app/providers/ChannelStoreProvider'
 import { useCanvasStore } from '../storeContext'
 import { useAsset } from '../../../features/shared/assets/index'
+import { lightboxSourceRectForThumbnail } from '../../../features/canvas/lightboxSourceRect'
 import { subscribeRunRecordChanged } from '../execution/runRecordEvents'
 import type { RunRecord } from '../../../domain/canvas/model/runRecord'
 import { LOCAL_RUN_CHANNEL_ID } from '../../../domain/canvas/model/runRecord'
@@ -11,6 +12,7 @@ import {
   routeAttemptSummaryOf as routeAttemptSummary,
 } from '../../../domain/shared/execution/runRecord'
 import type { GenerationData } from '../../../domain/canvas/model/node'
+import type { CanvasStore } from '../../../state/workbenches/canvas/store'
 import { NODE_MINIMUMS } from '../../../domain/canvas/layout/constants'
 import { createId } from '../../../shared/id'
 import { createRunLogRepository } from '../../../state/shared/runLogRepository'
@@ -49,6 +51,16 @@ const RUN_RECORD_REFRESH_DELAY_MS = 50
 
 export function canvasLogRecordsOf(records: readonly RunRecord[]): RunRecord[] {
   return records.filter(shouldShowInCanvasLog)
+}
+
+export function openLogThumbnail(
+  store: Pick<CanvasStore, 'openLightbox'>,
+  hash: string,
+  host: HTMLElement,
+): void {
+  store.openLightbox(hash, {
+    sourceRect: lightboxSourceRectForThumbnail(host, hash),
+  })
 }
 
 /**
@@ -317,9 +329,9 @@ export function LogPanel({ onClose }: { onClose: () => void }) {
                 copied={copiedId === r.id}
                 onCopy={() => void copy(r.id, (r.params as GenerationData).prompt ?? '')}
                 onSend={() => sendToCanvas(r)}
-                onOpenThumb={() => {
+                onOpenThumb={(host) => {
                   const hash = r.outputHashes[0]
-                  if (hash) store.openLightbox(hash)
+                  if (hash) openLogThumbnail(store, hash, host)
                 }}
               />
             ))
@@ -345,7 +357,7 @@ function LogRow({
   copied: boolean
   onCopy: () => void
   onSend: () => void
-  onOpenThumb: () => void
+  onOpenThumb: (host: HTMLElement) => void
 }) {
   const params = record.params as GenerationData
   const thumbUrl = useAsset(record.outputHashes[0] ?? '')
@@ -437,7 +449,7 @@ function LogRow({
             data-log-thumb
             title="点击放大查看"
             aria-label="放大查看结果"
-            onClick={onOpenThumb}
+            onClick={(event) => onOpenThumb(event.currentTarget)}
           >
             <img src={thumbUrl} alt="" />
           </button>

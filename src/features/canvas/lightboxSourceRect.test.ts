@@ -1,5 +1,8 @@
-import { describe, expect, it } from 'vitest'
-import { lightboxSourceRectFromMedia } from './lightboxSourceRect'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import {
+  lightboxSourceRectFromMedia,
+  lightboxSourceRectForThumbnail,
+} from './lightboxSourceRect'
 
 function media(kind: 'image' | 'video', rect: Partial<DOMRect>) {
   return {
@@ -23,6 +26,10 @@ function media(kind: 'image' | 'video', rect: Partial<DOMRect>) {
 }
 
 describe('lightbox source rect', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
   it('keeps the same hash, kind and source for both lightbox entry paths', () => {
     expect(lightboxSourceRectFromMedia(media('image', {}), 'asset-a', '12px')).toMatchObject({
       left: 10,
@@ -45,5 +52,25 @@ describe('lightbox source rect', () => {
     expect(
       lightboxSourceRectFromMedia(media('image', { width: 0 }), 'asset-a', '12px'),
     ).toBeUndefined()
+  })
+
+  it('uses the image inside a thumbnail button as the FLIP source', () => {
+    const image = media('image', {})
+    const host = {
+      matches: () => false,
+      querySelector: () => image,
+    } as unknown as HTMLElement
+    vi.stubGlobal('getComputedStyle', () => ({ borderRadius: '10px' }))
+
+    expect(lightboxSourceRectForThumbnail(host, 'asset-thumb')).toMatchObject({
+      left: 10,
+      top: 20,
+      width: 320,
+      height: 180,
+      borderRadius: '10px',
+      src: 'blob:image',
+      kind: 'image',
+      assetHash: 'asset-thumb',
+    })
   })
 })

@@ -4,6 +4,7 @@ import type {
   AgentToolRequest,
 } from '../../agent/agentLoop'
 import { useAsset } from '../../../../features/shared/assets/index'
+import { lightboxSourceRectForThumbnail } from '../../../../features/canvas/lightboxSourceRect'
 import { useCanvasStore } from '../../storeContext'
 import {
   IconCheck,
@@ -509,7 +510,11 @@ export function StepThumb({ hash }: { hash: string }) {
     <button
       type="button"
       className={styles.thumbButton}
-      onClick={() => store.openLightbox(hash)}
+      onClick={(event) =>
+        store.openLightbox(hash, {
+          sourceRect: lightboxSourceRectForThumbnail(event.currentTarget, hash),
+        })
+      }
       title="放大查看这张图"
       aria-label="放大查看这张图"
       data-agent-thumb-open={hash}
