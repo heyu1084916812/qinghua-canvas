@@ -1,0 +1,250 @@
+[
+  {
+    "viewport": {
+      "width": 1440,
+      "height": 900
+    },
+    "theme": "light",
+    "skillMetrics": {
+      "cards": 13,
+      "names": [
+        "真实感人像生成器告别AI大众脸，生成高辨识度真实人像我的技能使用",
+        "技能yukioliam影视顶级分镜脚本生成融合三大顶级导演体系生成专业分镜脚本我的技能使用",
+        "技能SD2.5视频提示词助手将创意、剧本与素材转化为SD2.5视频提示词我的技能使用",
+        "技能通用详情页策划我的技能使用",
+        "生成角色三视图设定图一键生成纯白背景、左脸特写+右侧正/侧/背全身三视图我的技能使用",
+        "技能音频生成导演把旁白、对白、音效、环境声、配乐或歌曲整理成干净可执行的音频提示词轻画内置使用",
+        "技能电商详情页策划按商品卖点生成可直接排版的详情页结构轻画内置使用",
+        "技能画面生成导演把画面想法补全成可直接生图的中文提示词，并保护主体、文字、构图和参考图职责轻画内置使用",
+        "技能画面提示词导演把简短画面想法扩写成可控的生图提示词轻画内置使用",
+        "技能商品卖点提炼从原始资料中提炼主卖点、次卖点和购买理由轻画内置使用",
+        "技能剧情宫格导演根据剧情、连续动作或多机位需求设计四宫格或九宫格，并给出可直接生图的整图提示词轻画内置使用",
+        "技能分镜拆解把一段剧情拆成镜头、画面描述和节奏提示轻画内置使用",
+        "技能视频生成导演把视频需求整理成镜头、动作、运镜、一致性和声音都清楚的生成提示词轻画内置使用"
+      ],
+      "overflowX": false,
+      "pageWidth": 1361
+    },
+    "toolMetrics": {
+      "tools": [
+        "readCapabilities",
+        "readOperation",
+        "proposeTaskPlan",
+        "updateTaskStep",
+        "requestTaskConfirmation",
+        "askQuestions",
+        "readGraph",
+        "readAsset",
+        "readResult",
+        "visualReview",
+        "applyPlan",
+        "updateNode",
+        "renameNode",
+        "applyCanvasBatch",
+        "moveNodes",
+        "resizeNodes",
+        "deleteNodes",
+        "arrangeNodes",
+        "deleteEdges",
+        "compareNodes",
+        "sliceImage",
+        "splitGrid",
+        "runNode",
+        "runFrom",
+        "curateReferences",
+        "researchDesign",
+        "readPage",
+        "rememberMemory"
+      ],
+      "overflowX": false,
+      "sectionWidth": 980
+    },
+    "errors": []
+  },
+  {
+    "viewport": {
+      "width": 1440,
+      "height": 900
+    },
+    "theme": "dark",
+    "skillMetrics": {
+      "cards": 13,
+      "names": [
+        "真实感人像生成器告别AI大众脸，生成高辨识度真实人像我的技能使用",
+        "技能yukioliam影视顶级分镜脚本生成融合三大顶级导演体系生成专业分镜脚本我的技能使用",
+        "技能SD2.5视频提示词助手将创意、剧本与素材转化为SD2.5视频提示词我的技能使用",
+        "技能通用详情页策划我的技能使用",
+        "生成角色三视图设定图一键生成纯白背景、左脸特写+右侧正/侧/背全身三视图我的技能使用",
+        "技能音频生成导演把旁白、对白、音效、环境声、配乐或歌曲整理成干净可执行的音频提示词轻画内置使用",
+        "技能电商详情页策划按商品卖点生成可直接排版的详情页结构轻画内置使用",
+        "技能画面生成导演把画面想法补全成可直接生图的中文提示词，并保护主体、文字、构图和参考图职责轻画内置使用",
+        "技能画面提示词导演把简短画面想法扩写成可控的生图提示词轻画内置使用",
+        "技能商品卖点提炼从原始资料中提炼主卖点、次卖点和购买理由轻画内置使用",
+        "技能剧情宫格导演根据剧情、连续动作或多机位需求设计四宫格或九宫格，并给出可直接生图的整图提示词轻画内置使用",
+        "技能分镜拆解把一段剧情拆成镜头、画面描述和节奏提示轻画内置使用",
+        "技能视频生成导演把视频需求整理成镜头、动作、运镜、一致性和声音都清楚的生成提示词轻画内置使用"
+      ],
+      "overflowX": false,
+      "pageWidth": 1361
+    },
+    "toolMetrics": {
+      "tools": [
+        "readCapabilities",
+        "readOperation",
+        "proposeTaskPlan",
+        "updateTaskStep",
+        "requestTaskConfirmation",
+        "askQuestions",
+        "readGraph",
+        "readAsset",
+        "readResult",
+        "visualReview",
+        "applyPlan",
+        "updateNode",
+        "renameNode",
+        "applyCanvasBatch",
+        "moveNodes",
+        "resizeNodes",
+        "deleteNodes",
+        "arrangeNodes",
+        "deleteEdges",
+        "compareNodes",
+        "sliceImage",
+        "splitGrid",
+        "runNode",
+        "runFrom",
+        "curateReferences",
+        "researchDesign",
+        "readPage",
+        "rememberMemory"
+      ],
+      "overflowX": false,
+      "sectionWidth": 980
+    },
+    "errors": []
+  },
+  {
+    "viewport": {
+      "width": 1024,
+      "height": 700
+    },
+    "theme": "light",
+    "skillMetrics": {
+      "cards": 13,
+      "names": [
+        "真实感人像生成器告别AI大众脸，生成高辨识度真实人像我的技能使用",
+        "技能yukioliam影视顶级分镜脚本生成融合三大顶级导演体系生成专业分镜脚本我的技能使用",
+        "技能SD2.5视频提示词助手将创意、剧本与素材转化为SD2.5视频提示词我的技能使用",
+        "技能通用详情页策划我的技能使用",
+        "生成角色三视图设定图一键生成纯白背景、左脸特写+右侧正/侧/背全身三视图我的技能使用",
+        "技能音频生成导演把旁白、对白、音效、环境声、配乐或歌曲整理成干净可执行的音频提示词轻画内置使用",
+        "技能电商详情页策划按商品卖点生成可直接排版的详情页结构轻画内置使用",
+        "技能画面生成导演把画面想法补全成可直接生图的中文提示词，并保护主体、文字、构图和参考图职责轻画内置使用",
+        "技能画面提示词导演把简短画面想法扩写成可控的生图提示词轻画内置使用",
+        "技能商品卖点提炼从原始资料中提炼主卖点、次卖点和购买理由轻画内置使用",
+        "技能剧情宫格导演根据剧情、连续动作或多机位需求设计四宫格或九宫格，并给出可直接生图的整图提示词轻画内置使用",
+        "技能分镜拆解把一段剧情拆成镜头、画面描述和节奏提示轻画内置使用",
+        "技能视频生成导演把视频需求整理成镜头、动作、运镜、一致性和声音都清楚的生成提示词轻画内置使用"
+      ],
+      "overflowX": false,
+      "pageWidth": 945
+    },
+    "toolMetrics": {
+      "tools": [
+        "readCapabilities",
+        "readOperation",
+        "proposeTaskPlan",
+        "updateTaskStep",
+        "requestTaskConfirmation",
+        "askQuestions",
+        "readGraph",
+        "readAsset",
+        "readResult",
+        "visualReview",
+        "applyPlan",
+        "updateNode",
+        "renameNode",
+        "applyCanvasBatch",
+        "moveNodes",
+        "resizeNodes",
+        "deleteNodes",
+        "arrangeNodes",
+        "deleteEdges",
+        "compareNodes",
+        "sliceImage",
+        "splitGrid",
+        "runNode",
+        "runFrom",
+        "curateReferences",
+        "researchDesign",
+        "readPage",
+        "rememberMemory"
+      ],
+      "overflowX": false,
+      "sectionWidth": 772
+    },
+    "errors": []
+  },
+  {
+    "viewport": {
+      "width": 1024,
+      "height": 700
+    },
+    "theme": "dark",
+    "skillMetrics": {
+      "cards": 13,
+      "names": [
+        "真实感人像生成器告别AI大众脸，生成高辨识度真实人像我的技能使用",
+        "技能yukioliam影视顶级分镜脚本生成融合三大顶级导演体系生成专业分镜脚本我的技能使用",
+        "技能SD2.5视频提示词助手将创意、剧本与素材转化为SD2.5视频提示词我的技能使用",
+        "技能通用详情页策划我的技能使用",
+        "生成角色三视图设定图一键生成纯白背景、左脸特写+右侧正/侧/背全身三视图我的技能使用",
+        "技能音频生成导演把旁白、对白、音效、环境声、配乐或歌曲整理成干净可执行的音频提示词轻画内置使用",
+        "技能电商详情页策划按商品卖点生成可直接排版的详情页结构轻画内置使用",
+        "技能画面生成导演把画面想法补全成可直接生图的中文提示词，并保护主体、文字、构图和参考图职责轻画内置使用",
+        "技能画面提示词导演把简短画面想法扩写成可控的生图提示词轻画内置使用",
+        "技能商品卖点提炼从原始资料中提炼主卖点、次卖点和购买理由轻画内置使用",
+        "技能剧情宫格导演根据剧情、连续动作或多机位需求设计四宫格或九宫格，并给出可直接生图的整图提示词轻画内置使用",
+        "技能分镜拆解把一段剧情拆成镜头、画面描述和节奏提示轻画内置使用",
+        "技能视频生成导演把视频需求整理成镜头、动作、运镜、一致性和声音都清楚的生成提示词轻画内置使用"
+      ],
+      "overflowX": false,
+      "pageWidth": 945
+    },
+    "toolMetrics": {
+      "tools": [
+        "readCapabilities",
+        "readOperation",
+        "proposeTaskPlan",
+        "updateTaskStep",
+        "requestTaskConfirmation",
+        "askQuestions",
+        "readGraph",
+        "readAsset",
+        "readResult",
+        "visualReview",
+        "applyPlan",
+        "updateNode",
+        "renameNode",
+        "applyCanvasBatch",
+        "moveNodes",
+        "resizeNodes",
+        "deleteNodes",
+        "arrangeNodes",
+        "deleteEdges",
+        "compareNodes",
+        "sliceImage",
+        "splitGrid",
+        "runNode",
+        "runFrom",
+        "curateReferences",
+        "researchDesign",
+        "readPage",
+        "rememberMemory"
+      ],
+      "overflowX": false,
+      "sectionWidth": 772
+    },
+    "errors": []
+  }
+]

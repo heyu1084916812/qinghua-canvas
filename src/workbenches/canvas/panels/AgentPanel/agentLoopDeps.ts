@@ -46,6 +46,10 @@ import {
 } from './agentVisualReview'
 import { runAgentReferenceCuration } from './agentReferenceCuration'
 import { latestRunFailuresForNodes } from './agentRunState'
+import {
+  MUTATION_PRECONDITION_TOOLS,
+  prepareMutationCall,
+} from '../../../../domain/agent/mutationSafety'
 
 export interface AgentLoopAssemblyPorts {
   store: AgentToolContext['store']
@@ -373,34 +377,52 @@ export function assembleAgentLoopDeps(
               result: { ok: false, problems: normalized.problems },
             }
       }
-      if (name !== 'runNode' && name !== 'runFrom') {
+      const record =
+        args && typeof args === 'object' && !Array.isArray(args)
+          ? (args as Record<string, unknown>)
+          : {}
+      let preparedArgs: Record<string, unknown> = record
+      if (name === 'runNode' || name === 'runFrom') {
+        const aliases = ports.planAliasesFor(session.id)
+        const requested = (
+          Array.isArray(record.nodeIds) ? record.nodeIds.map(String) : []
+        ).map((id) => aliases?.get(id) ?? id)
+        const graph = ports.store.getSnapshot()
+        let targets = requested
+        if (name === 'runFrom') {
+          const resolved = runFromNodeIds(ports.store, requested)
+          if (!resolved.ok) {
+            return { ok: false as const, result: resolved }
+          }
+          targets = resolved.ids
+        }
+        const problems = runPreflightProblems(
+          targets,
+          graph,
+          ports.channels.getState().channels,
+          ports.channels.protocolCatalog(),
+        )
+        if (problems.length > 0) {
+          return { ok: false as const, result: { ok: false, problems } }
+        }
+        preparedArgs =
+          name === 'runFrom' ? { ...record, nodeIds: targets } : record
+      }
+      if (!MUTATION_PRECONDITION_TOOLS.has(name)) {
         return { ok: true as const }
       }
-      const args2 = (args ?? {}) as { nodeIds?: unknown }
-      const aliases = ports.planAliasesFor(session.id)
-      const requested = (
-        Array.isArray(args2.nodeIds)
-          ? args2.nodeIds.map(String)
-          : []
-      ).map((id) => aliases?.get(id) ?? id)
-      const graph = ports.store.getSnapshot()
-      let targets = requested
-      if (name === 'runFrom') {
-        const resolved = runFromNodeIds(ports.store, requested)
-        if (!resolved.ok) {
-          return { ok: false as const, result: resolved }
-        }
-        targets = resolved.ids
-      }
-      const problems = runPreflightProblems(
-        targets,
-        graph,
-        ports.channels.getState().channels,
-        ports.channels.protocolCatalog(),
-      )
-      return problems.length > 0
-        ? { ok: false as const, result: { ok: false, problems } }
-        : { ok: true as const }
+      const prepared = prepareMutationCall({
+        name,
+        args: preparedArgs,
+        graph: ports.store.getSnapshot(),
+        revision: ports.store.getRevision?.() ?? 0,
+      })
+      return prepared.ok
+        ? { ok: true as const, args: prepared.args }
+        : {
+            ok: false as const,
+            result: { ok: false, problems: prepared.problems },
+          }
     },
     executeWrite: async (name: string, args: unknown, callId: string) => {
       const result = await ports.executeToolWithLedger(

@@ -2,13 +2,16 @@ export type AgentToolCategory = 'agent-internal' | 'canvas' | 'host-service'
 export type AgentToolAccess = 'read' | 'write' | 'confirm'
 export type AgentToolName =
   | 'readCapabilities'
+  | 'readOperation'
   | 'readGraph'
   | 'readAsset'
   | 'curateReferences'
   | 'researchDesign'
   | 'readPage'
   | 'applyPlan'
+  | 'applyCanvasBatch'
   | 'updateNode'
+  | 'renameNode'
   | 'proposeTaskPlan'
   | 'updateTaskStep'
   | 'requestTaskConfirmation'
@@ -57,6 +60,7 @@ export const AGENT_TOOL_DEFINITIONS: readonly AgentToolDefinition[] = [
     access: 'read',
     sideEffect: 'none',
   },
+  { name: 'readOperation', category: 'agent-internal', access: 'read', sideEffect: 'none' },
   { name: 'readGraph', category: 'canvas', access: 'read', sideEffect: 'none' },
   { name: 'readAsset', category: 'canvas', access: 'read', sideEffect: 'none' },
   { name: 'readResult', category: 'canvas', access: 'read', sideEffect: 'none' },
@@ -87,6 +91,8 @@ export const AGENT_TOOL_DEFINITIONS: readonly AgentToolDefinition[] = [
   },
   { name: 'applyPlan', category: 'canvas', access: 'write', sideEffect: 'canvas' },
   { name: 'updateNode', category: 'canvas', access: 'confirm', sideEffect: 'canvas' },
+  { name: 'renameNode', category: 'canvas', access: 'confirm', sideEffect: 'canvas' },
+  { name: 'applyCanvasBatch', category: 'canvas', access: 'confirm', sideEffect: 'canvas' },
   { name: 'moveNodes', category: 'canvas', access: 'write', sideEffect: 'canvas' },
   { name: 'resizeNodes', category: 'canvas', access: 'write', sideEffect: 'canvas' },
   { name: 'deleteNodes', category: 'canvas', access: 'confirm', sideEffect: 'canvas' },

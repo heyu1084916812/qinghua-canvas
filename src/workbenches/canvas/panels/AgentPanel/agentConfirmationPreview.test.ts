@@ -110,6 +110,65 @@ describe('previewOf', () => {
     ])
   })
 
+  it('改名卡显示旧名和新名，不展示隐藏版本凭证', () => {
+    const preview = previewOf(
+      {
+        kind: 'awaitingConfirm',
+        request: {
+          callId: 'rename',
+          name: 'renameNode',
+          args: {
+            nodeId: 'a',
+            title: '新版主图',
+            __lightCanvasPrecondition: { targets: [{ id: 'secret' }] },
+          },
+        },
+      },
+      storeOf({ nodes: [{ id: 'a', title: '旧版主图', type: 'generation' }] }),
+    )
+    expect(preview).toMatchObject({
+      title: '要把节点改名为「新版主图」？',
+      lines: ['节点：旧版主图', '新名称：新版主图'],
+      action: '确认改名',
+    })
+    expect(JSON.stringify(preview)).not.toContain('secret')
+  })
+
+  it('批量卡用节点名说明改名、移动、断线和删除', () => {
+    const preview = previewOf(
+      {
+        kind: 'awaitingConfirm',
+        request: {
+          callId: 'batch',
+          name: 'applyCanvasBatch',
+          args: {
+            steps: [
+              { op: 'rename', nodeId: 'a', title: '新 A' },
+              { op: 'move', nodeIds: ['a', 'b'], dx: 10, dy: 20 },
+              { op: 'deleteEdges', edgeIds: ['e1'] },
+              { op: 'deleteNodes', nodeIds: ['b'] },
+            ],
+          },
+        },
+      },
+      storeOf({
+        nodes: [
+          { id: 'a', title: 'A', type: 'generation' },
+          { id: 'b', title: 'B', type: 'generation' },
+        ],
+        edges: [{ id: 'e1', source: 'a', target: 'b' }],
+      }),
+    )
+    expect(preview?.title).toBe('要一次修改 4 项画布内容？')
+    expect(preview?.lines).toEqual([
+      '改名：A → 「新 A」',
+      '移动：A、B',
+      '断线：A → B',
+      '删除节点：B',
+      '整批检查通过后才会执行；成功后可以一次撤销全部改动。',
+    ])
+  })
+
   it('没有待确认状态时不生成卡片', () => {
     expect(previewOf({ kind: 'idle' }, storeOf({}))).toBeNull()
   })

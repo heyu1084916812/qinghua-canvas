@@ -351,3 +351,14 @@ export function readResults(
         }
   })
 }
+
+/** 超时恢复只读原工具账本；没有接入账本时直接说明，不回落执行任何工具。 */
+export async function readOperationResult(
+  args: Record<string, unknown>,
+  readOperation?: (requestId: string) => Promise<unknown>,
+) {
+  const requestId = typeof args.requestId === 'string' ? args.requestId.trim() : ''
+  if (!requestId) return { ok: false, error: 'readOperation 缺少 requestId' }
+  if (!readOperation) return { ok: false, error: '当前会话没有接入工具操作账本' }
+  return readOperation(requestId)
+}

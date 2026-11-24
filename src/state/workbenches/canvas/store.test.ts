@@ -13,6 +13,23 @@ beforeEach(() => {
 })
 
 describe('canvas store / 基本变更', () => {
+  it('图语义版本只在图变化时递增，选中与视口不算', () => {
+    const store = createCanvasStore({ platform, projectId: 'p1' })
+    const start = store.getRevision!()
+    store.setSelection(['missing'])
+    store.setViewport({ zoom: 1.2 })
+    expect(store.getRevision!()).toBe(start)
+
+    store.dispatch({ kind: 'node.create', projectId: 'p1', type: 'prompt', at: { x: 0, y: 0 } })
+    const afterCreate = store.getRevision!()
+    expect(afterCreate).toBeGreaterThan(start)
+
+    store.dispatch({ kind: 'node.move', ids: [store.getSnapshot().nodes[0]!.id], dx: 10, dy: 0, phase: 'end' })
+    expect(store.getRevision!()).toBeGreaterThan(afterCreate)
+    store.undo()
+    expect(store.getRevision!()).toBeGreaterThan(afterCreate + 1)
+  })
+
   it('dispatch node.create 后快照含节点，且能落库', async () => {
     const store = createCanvasStore({ platform, projectId: 'p1' })
     const r = store.dispatch({ kind: 'node.create', projectId: 'p1', type: 'prompt', at: { x: 0, y: 0 } })

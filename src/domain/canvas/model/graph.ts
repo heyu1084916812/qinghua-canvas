@@ -7,6 +7,18 @@ export interface GraphSnapshot {
   edges: Edge[]
 }
 
+const graphRevisions = new WeakMap<GraphSnapshot, number>()
+let nextGraphRevision = 1
+
+/** 图对象身份版本；同一图对象稳定，新语义快照递增。 */
+export function graphRevisionOf(graph: GraphSnapshot): number {
+  const existing = graphRevisions.get(graph)
+  if (existing !== undefined) return existing
+  const revision = nextGraphRevision++
+  graphRevisions.set(graph, revision)
+  return revision
+}
+
 /** 图算法的最小依赖：只要 id / parentId / type，方便测试里造数据 */
 export interface NodeLike {
   id: string

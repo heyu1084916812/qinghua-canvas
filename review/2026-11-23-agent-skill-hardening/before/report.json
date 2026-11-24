@@ -1,0 +1,222 @@
+[
+  {
+    "viewport": {
+      "width": 1440,
+      "height": 900
+    },
+    "theme": "light",
+    "skillMetrics": {
+      "cards": 9,
+      "names": [
+        "真实感人像生成器告别AI大众脸，生成高辨识度真实人像我的技能使用",
+        "技能yukioliam影视顶级分镜脚本生成融合三大顶级导演体系生成专业分镜脚本我的技能使用",
+        "技能SD2.5视频提示词助手将创意、剧本与素材转化为SD2.5视频提示词我的技能使用",
+        "技能通用详情页策划我的技能使用",
+        "生成角色三视图设定图一键生成纯白背景、左脸特写+右侧正/侧/背全身三视图我的技能使用",
+        "技能电商详情页策划按商品卖点生成可直接排版的详情页结构轻画内置使用",
+        "技能画面提示词导演把简短画面想法扩写成可控的生图提示词轻画内置使用",
+        "技能商品卖点提炼从原始资料中提炼主卖点、次卖点和购买理由轻画内置使用",
+        "技能分镜拆解把一段剧情拆成镜头、画面描述和节奏提示轻画内置使用"
+      ],
+      "overflowX": false,
+      "pageWidth": 1361
+    },
+    "toolMetrics": {
+      "tools": [
+        "readCapabilities",
+        "proposeTaskPlan",
+        "updateTaskStep",
+        "requestTaskConfirmation",
+        "askQuestions",
+        "readGraph",
+        "readAsset",
+        "readResult",
+        "visualReview",
+        "applyPlan",
+        "updateNode",
+        "moveNodes",
+        "resizeNodes",
+        "deleteNodes",
+        "arrangeNodes",
+        "deleteEdges",
+        "compareNodes",
+        "sliceImage",
+        "splitGrid",
+        "runNode",
+        "runFrom",
+        "curateReferences",
+        "researchDesign",
+        "readPage",
+        "rememberMemory"
+      ],
+      "overflowX": false,
+      "sectionWidth": 980
+    },
+    "errors": []
+  },
+  {
+    "viewport": {
+      "width": 1440,
+      "height": 900
+    },
+    "theme": "dark",
+    "skillMetrics": {
+      "cards": 9,
+      "names": [
+        "真实感人像生成器告别AI大众脸，生成高辨识度真实人像我的技能使用",
+        "技能yukioliam影视顶级分镜脚本生成融合三大顶级导演体系生成专业分镜脚本我的技能使用",
+        "技能SD2.5视频提示词助手将创意、剧本与素材转化为SD2.5视频提示词我的技能使用",
+        "技能通用详情页策划我的技能使用",
+        "生成角色三视图设定图一键生成纯白背景、左脸特写+右侧正/侧/背全身三视图我的技能使用",
+        "技能电商详情页策划按商品卖点生成可直接排版的详情页结构轻画内置使用",
+        "技能画面提示词导演把简短画面想法扩写成可控的生图提示词轻画内置使用",
+        "技能商品卖点提炼从原始资料中提炼主卖点、次卖点和购买理由轻画内置使用",
+        "技能分镜拆解把一段剧情拆成镜头、画面描述和节奏提示轻画内置使用"
+      ],
+      "overflowX": false,
+      "pageWidth": 1361
+    },
+    "toolMetrics": {
+      "tools": [
+        "readCapabilities",
+        "proposeTaskPlan",
+        "updateTaskStep",
+        "requestTaskConfirmation",
+        "askQuestions",
+        "readGraph",
+        "readAsset",
+        "readResult",
+        "visualReview",
+        "applyPlan",
+        "updateNode",
+        "moveNodes",
+        "resizeNodes",
+        "deleteNodes",
+        "arrangeNodes",
+        "deleteEdges",
+        "compareNodes",
+        "sliceImage",
+        "splitGrid",
+        "runNode",
+        "runFrom",
+        "curateReferences",
+        "researchDesign",
+        "readPage",
+        "rememberMemory"
+      ],
+      "overflowX": false,
+      "sectionWidth": 979.7923583984375
+    },
+    "errors": []
+  },
+  {
+    "viewport": {
+      "width": 1024,
+      "height": 700
+    },
+    "theme": "light",
+    "skillMetrics": {
+      "cards": 9,
+      "names": [
+        "真实感人像生成器告别AI大众脸，生成高辨识度真实人像我的技能使用",
+        "技能yukioliam影视顶级分镜脚本生成融合三大顶级导演体系生成专业分镜脚本我的技能使用",
+        "技能SD2.5视频提示词助手将创意、剧本与素材转化为SD2.5视频提示词我的技能使用",
+        "技能通用详情页策划我的技能使用",
+        "生成角色三视图设定图一键生成纯白背景、左脸特写+右侧正/侧/背全身三视图我的技能使用",
+        "技能电商详情页策划按商品卖点生成可直接排版的详情页结构轻画内置使用",
+        "技能画面提示词导演把简短画面想法扩写成可控的生图提示词轻画内置使用",
+        "技能商品卖点提炼从原始资料中提炼主卖点、次卖点和购买理由轻画内置使用",
+        "技能分镜拆解把一段剧情拆成镜头、画面描述和节奏提示轻画内置使用"
+      ],
+      "overflowX": false,
+      "pageWidth": 945
+    },
+    "toolMetrics": {
+      "tools": [
+        "readCapabilities",
+        "proposeTaskPlan",
+        "updateTaskStep",
+        "requestTaskConfirmation",
+        "askQuestions",
+        "readGraph",
+        "readAsset",
+        "readResult",
+        "visualReview",
+        "applyPlan",
+        "updateNode",
+        "moveNodes",
+        "resizeNodes",
+        "deleteNodes",
+        "arrangeNodes",
+        "deleteEdges",
+        "compareNodes",
+        "sliceImage",
+        "splitGrid",
+        "runNode",
+        "runFrom",
+        "curateReferences",
+        "researchDesign",
+        "readPage",
+        "rememberMemory"
+      ],
+      "overflowX": false,
+      "sectionWidth": 771.7930908203125
+    },
+    "errors": []
+  },
+  {
+    "viewport": {
+      "width": 1024,
+      "height": 700
+    },
+    "theme": "dark",
+    "skillMetrics": {
+      "cards": 9,
+      "names": [
+        "真实感人像生成器告别AI大众脸，生成高辨识度真实人像我的技能使用",
+        "技能yukioliam影视顶级分镜脚本生成融合三大顶级导演体系生成专业分镜脚本我的技能使用",
+        "技能SD2.5视频提示词助手将创意、剧本与素材转化为SD2.5视频提示词我的技能使用",
+        "技能通用详情页策划我的技能使用",
+        "生成角色三视图设定图一键生成纯白背景、左脸特写+右侧正/侧/背全身三视图我的技能使用",
+        "技能电商详情页策划按商品卖点生成可直接排版的详情页结构轻画内置使用",
+        "技能画面提示词导演把简短画面想法扩写成可控的生图提示词轻画内置使用",
+        "技能商品卖点提炼从原始资料中提炼主卖点、次卖点和购买理由轻画内置使用",
+        "技能分镜拆解把一段剧情拆成镜头、画面描述和节奏提示轻画内置使用"
+      ],
+      "overflowX": false,
+      "pageWidth": 945
+    },
+    "toolMetrics": {
+      "tools": [
+        "readCapabilities",
+        "proposeTaskPlan",
+        "updateTaskStep",
+        "requestTaskConfirmation",
+        "askQuestions",
+        "readGraph",
+        "readAsset",
+        "readResult",
+        "visualReview",
+        "applyPlan",
+        "updateNode",
+        "moveNodes",
+        "resizeNodes",
+        "deleteNodes",
+        "arrangeNodes",
+        "deleteEdges",
+        "compareNodes",
+        "sliceImage",
+        "splitGrid",
+        "runNode",
+        "runFrom",
+        "curateReferences",
+        "researchDesign",
+        "readPage",
+        "rememberMemory"
+      ],
+      "overflowX": false,
+      "sectionWidth": 771.9451293945312
+    },
+    "errors": []
+  }
+]

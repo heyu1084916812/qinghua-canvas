@@ -66,14 +66,10 @@ export function claimsMissingCapability(text: string): boolean {
   })
 }
 
-/**
- * 每个类别需要哪种工具的**成功结果**才算证据。
- * `rename` 是空数组：仓库里没有暴露给 Agent 的改名工具，`updateNode`（改参数）不算。
- */
 const EVIDENCE_TOOL_NAMES: Record<CanvasActionCategory, readonly string[]> = {
-  rename: [],
-  delete: ['deleteNodes', 'deleteEdges'],
-  move: ['moveNodes', 'arrangeNodes', 'resizeNodes'],
+  rename: ['renameNode', 'applyCanvasBatch'],
+  delete: ['deleteNodes', 'deleteEdges', 'applyCanvasBatch'],
+  move: ['moveNodes', 'arrangeNodes', 'resizeNodes', 'applyCanvasBatch'],
   // applyPlan 只是建工作流，**不是真的生成**；"已生成/已出图"必须有 runNode / runFrom
   generate: ['runNode', 'runFrom'],
   connect: ['applyPlan'],

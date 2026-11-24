@@ -384,6 +384,24 @@ describe('assembleAgentLoopDeps', () => {
     })
     expect(plan?.ok).toBe(false)
     expect(h.deps.precheck?.('readGraph', {})).toEqual({ ok: true })
+    const rename = h.deps.precheck?.('renameNode', {
+      nodeId: 'img-1',
+      title: '新标题',
+    })
+    expect(rename?.ok).toBe(true)
+    if (rename?.ok) {
+      expect(rename.args).toMatchObject({
+        nodeId: 'img-1',
+        title: '新标题',
+        __lightCanvasPrecondition: {
+          schema: 'qinghua.mutation.v1',
+          targets: [expect.objectContaining({ kind: 'node', id: 'img-1' })],
+        },
+      })
+    }
+    expect(
+      h.deps.precheck?.('renameNode', { nodeId: 'missing', title: '新标题' })?.ok,
+    ).toBe(false)
   })
 
   it('★★ applyPlan 返回的 resolvedNodes 会写回 localId → nodeId 别名', async () => {

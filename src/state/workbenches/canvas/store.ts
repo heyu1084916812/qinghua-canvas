@@ -14,7 +14,7 @@ type MiniStore<T> = {
 type StoreFactory = <T>(init: () => T) => MiniStore<T>
 const createVanillaStore = createVanilla as unknown as StoreFactory
 import type { Command } from '../../commands'
-import type { GraphSnapshot } from '../../../domain/canvas/model/graph'
+import { graphRevisionOf, type GraphSnapshot } from '../../../domain/canvas/model/graph'
 import type { Patch, PersistPlan, TableName } from '../../../domain/patch/types'
 import type { Viewport } from '../../../domain/canvas/geometry/coords'
 import type { SnapGap, SnapGuide } from '../../../domain/canvas/layout/snap'
@@ -251,6 +251,8 @@ interface CanvasState {
 }
 
 export interface CanvasStore extends AppStore<GraphSnapshot, Command> {
+  /** 图语义版本；选中、视口、菜单和提示等瞬态不计入。 */
+  getRevision?(): number
   setSelection(ids: string[]): void
   getSelection(): string[]
   setSelectionAsMulti(ids: string[]): void
@@ -720,6 +722,7 @@ export function createCanvasStore(opts: CanvasStoreOptions): CanvasStore {
   return {
     workbench: 'canvas',
     getSnapshot: () => store.getState().graph,
+    getRevision: () => graphRevisionOf(store.getState().graph),
     dispatch,
     setNodeScale: (factor) => {
       nodeScale = Number.isFinite(factor) && factor > 0 ? factor : 1

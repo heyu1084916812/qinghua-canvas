@@ -1,10 +1,15 @@
 import type { ScreenPoint } from './edgeCutGeometry'
 
 /** RF 普通/粗略边均由一个 M + C 构成。复用实际绘制的控制点，不重复调用昂贵的 SVG 长度 API。 */
-export function snapshotEdges(surface: HTMLElement, rect: DOMRect) {
+export function snapshotEdges(
+  surface: HTMLElement,
+  rect: DOMRect,
+  onlyIds?: readonly string[],
+) {
+  const allowed = onlyIds ? new Set(onlyIds) : null
   return Array.from(surface.querySelectorAll<SVGPathElement>('[data-edge]')).flatMap(path => {
     const id = path.dataset.edge, d = path.getAttribute('d') ?? '', matrix = path.getScreenCTM()
-    if (!id || !matrix) return []
+    if (!id || !matrix || (allowed && !allowed.has(id))) return []
     const nums = d.match(/[-+]?(?:\d*\.\d+|\d+)(?:e[-+]?\d+)?/gi)?.map(Number)
     const pts: ScreenPoint[] = []
     const add = (x: number, y: number) => pts.push({ x: matrix.a*x + matrix.c*y + matrix.e - rect.left, y: matrix.b*x + matrix.d*y + matrix.f - rect.top })

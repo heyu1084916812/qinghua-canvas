@@ -913,6 +913,9 @@ describe('runAgentTurn · 基本往复', () => {
 
     const r = await runAgentTurn(user('把标题改成「封面」'), {
       ...deps,
+      tools: deps.tools.filter(
+        (tool) => tool.name !== 'renameNode' && tool.name !== 'applyCanvasBatch',
+      ),
       discoverCapabilities,
     })
 
