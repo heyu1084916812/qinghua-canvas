@@ -13,6 +13,7 @@ interface SliceSession {
   overlay?: KnifeEdgeOverlay | null
   planId: string
   last: ScreenPoint | null
+  waiting?: { ids: Set<string>; trail: ScreenPoint[] }
   cut: Set<string>
 }
 
@@ -38,8 +39,10 @@ export function useEdgeCut(options: {
   move: (clientX: number, clientY: number) => void
   end: () => void
 } {
-  const { surfaceEl, removeEdges, initialIds } = options
+  const { surfaceEl, removeEdges } = options
   const preview = useRef<CutPreview>(null)
+  const idsRef = useRef(options.initialIds)
+  idsRef.current = options.initialIds
   const removeRef = useRef(removeEdges)
   removeRef.current = removeEdges
   const sessionRef = useRef<SliceSession | null>(null)
@@ -49,23 +52,17 @@ export function useEdgeCut(options: {
       const surface=surfaceEl(); if (!surface) return
       const rect=surface.getBoundingClientRect(), local={x:clientX-rect.left,y:clientY-rect.top}
       sessionRef.current?.overlay?.dispose()
-      sessionRef.current = { edges:snapshotEdges(surface,rect,initialIds?.()), planId: `knife:${Date.now()}:${Math.random().toString(36).slice(2, 6)}`, last: local, cut: new Set() }
+      const ids=idsRef.current?.()??[], edges=snapshotEdges(surface,rect,ids.length?ids:undefined)
+      const waiting=ids.length&&!edges.length?{ids:new Set(ids),trail:[]}:undefined
+      sessionRef.current = { edges, waiting, planId: `knife:${Date.now()}:${Math.random().toString(36).slice(2, 6)}`, last: local, cut: new Set() }
       pushTrail(local.x, local.y)
     },
-    [initialIds, surfaceEl],
+    [surfaceEl],
   )
 
-  const move = useCallback(
-    (clientX: number, clientY: number) => {
-      const session = sessionRef.current
-      const surface = surfaceEl()
-      if (!session || !surface) return
-      const rect = surface.getBoundingClientRect()
-      const to: ScreenPoint = { x: clientX - rect.left, y: clientY - rect.top }
+  const scan = useCallback((session: SliceSession, surface: HTMLElement, to: ScreenPoint) => {
       const from = session.last ?? to
       session.last = to
-      pushTrail(to.x, to.y)
-
       const sweep = segmentBox(from, to, 8)
       const spawned: ActiveEdgeCut[] = []
       for (const {id, path, points, box} of session.edges) {
@@ -85,17 +82,35 @@ export function useEdgeCut(options: {
         preview.current?.show(spawned)
       }
     },
-    [surfaceEl],
+    [],
   )
+
+  // Only recover edges present at pointerdown. Replay the sampled polyline,
+  // not the straight chord from its first point to its last.
+  const recover = useCallback((session: SliceSession,surface: HTMLElement,rect: DOMRect) => {
+    const waiting=session.waiting
+    if (!waiting) return
+    const edges=snapshotEdges(surface,rect,[...waiting.ids])
+    if (!edges.length) return
+    session.edges=edges;session.waiting=undefined
+    for(const to of waiting.trail)scan(session,surface,to)
+  },[scan])
+  const move = useCallback((x:number,y:number)=>{
+    const session=sessionRef.current,surface=surfaceEl();if(!session || !surface)return
+    const rect=surface.getBoundingClientRect(),to={x:x-rect.left,y:y-rect.top};pushTrail(to.x,to.y)
+    if(session.waiting){session.waiting.trail.push(to);recover(session,surface,rect)}
+    else scan(session,surface,to)
+  },[surfaceEl,recover,scan])
 
   const end = useCallback(() => {
     const session = sessionRef.current
     sessionRef.current = null
+    if(session?.waiting?.trail.length){const surface=surfaceEl();if(surface)recover(session,surface,surface.getBoundingClientRect())}
     session?.overlay?.dispose()
     if (!session?.cut.size) return
     for (const {path,id} of session.edges) if (session.cut.has(id)) path.removeAttribute('data-knife-pending')
     removeRef.current([...session.cut],session.planId)
-  }, [])
+  }, [surfaceEl,recover])
 
   // 中断的是这一刀，不是已提交的切线；重新启用工具必须等待新的 pointerdown。
   useEffect(() => {
