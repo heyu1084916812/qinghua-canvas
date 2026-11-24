@@ -161,6 +161,39 @@ describe('FlowSurface interaction coordinator', () => {
       expect(plan.anchor.nodes.get('a')).toEqual({ x: 20, y: 30 })
       expect(plan.anchor.nodes.get('b')).toEqual({ x: 30, y: 40 })
     }
+
+    const switched = planSurfacePointerDown({
+      button: 0,
+      spaceHeld: false,
+      altKey: false,
+      nodeId: 'b',
+      selection: ['a'],
+      graph,
+      viewport: { x: 10, y: 20, zoom: 2 },
+      surface: { left: 10, top: 20, width: 800, height: 600 },
+      nodeRects: () => new Map([
+        ['a', { x: 30, y: 40 }],
+        ['b', { x: 50, y: 60 }],
+      ]),
+      clientX: 100,
+      clientY: 100,
+    })
+    expect(switched).toMatchObject({ kind: 'anchor', dismissPanel: false })
+
+    const repeated = planSurfacePointerDown({
+      button: 0,
+      spaceHeld: false,
+      altKey: false,
+      nodeId: 'b',
+      selection: ['b'],
+      graph,
+      viewport: { x: 10, y: 20, zoom: 2 },
+      surface: { left: 10, top: 20, width: 800, height: 600 },
+      nodeRects: () => new Map([['b', { x: 50, y: 60 }]]),
+      clientX: 100,
+      clientY: 100,
+    })
+    expect(repeated).toMatchObject({ kind: 'anchor', dismissPanel: true })
   })
 
   it('opens context menus in surface-local coordinates and selects unselected nodes', () => {

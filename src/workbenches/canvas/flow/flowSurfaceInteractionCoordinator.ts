@@ -80,7 +80,7 @@ export type SurfacePointerDownPlan =
   | {
       kind: 'anchor'
       anchor: FlowDragAnchor
-      dismissPanel: true
+      dismissPanel: boolean
     }
 
 export function planSurfacePointerDown(input: {
@@ -126,7 +126,7 @@ export function planSurfacePointerDown(input: {
       zoom: input.viewport.zoom || 1,
       nodes: anchor,
     },
-    dismissPanel: true,
+    dismissPanel: selected.length === 1 && selected[0] === input.nodeId,
   }
 }
 

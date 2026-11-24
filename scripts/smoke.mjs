@@ -9701,6 +9701,7 @@ async function g57(browser) {
 // ────────────────────────────────────────────────────────────
 async function g58(browser) {
   const g = 'G58 节点跟随栏'
+  const evidenceSuffix = `${process.env.SMOKE_DARK === '1' ? 'dark' : 'light'}-${process.env.SMOKE_VIEWPORT === '1024' ? '1024x700' : '1440x900'}`
   const ctx = await newCtx(browser)
   const page = await ctx.newPage()
   const pageErrors = []
@@ -9899,6 +9900,73 @@ async function g58(browser) {
   rec(g, '★ 拖动结束后仍不显示（等下一次显式选中）', (await bar.count()) === 0, `count=${await bar.count()}`)
   rec(g, '拖动结束后创作面板也不显示', (await creationPanel.count()) === 0, `count=${await creationPanel.count()}`)
   await page.screenshot({ path: `${OUT}/73-g58-follow-bar-drag.png` })
+
+  // 拖后首次点击另一个节点：旧节点浮层不得借 pointerdown 复活一帧
+  const draggedId = await gen.getAttribute('data-node-id')
+  const otherNode = page.locator('[data-node-type="prompt"]').first()
+  const otherId = await otherNode.getAttribute('data-node-id')
+  rec(g, '拖动后存在另一个可点击的节点', !!draggedId && !!otherId && draggedId !== otherId, `${draggedId} → ${otherId}`)
+  await page.evaluate(() => {
+    window.__g58CrossNodeSamples = []
+    window.__g58StopCrossNodeSampling = false
+    const sample = () => {
+      if (window.__g58StopCrossNodeSampling) return
+      window.__g58CrossNodeSamples.push({
+        bar: document.querySelector('[data-node-follow-bar]')?.getAttribute('data-node-follow-bar') ?? null,
+        panel: document.querySelector('[data-panel-anchor]')?.getAttribute('data-panel-anchor') ?? null,
+      })
+      requestAnimationFrame(sample)
+    }
+    requestAnimationFrame(sample)
+  })
+  const otherBox = await otherNode.boundingBox()
+  const otherClick = {
+    x: otherBox.x + Math.max(8, Math.min(48, otherBox.width / 2)),
+    y: otherBox.y + Math.max(8, Math.min(32, otherBox.height / 2)),
+  }
+  await page.mouse.move(otherClick.x, otherClick.y)
+  await page.mouse.down()
+  await sleep(120)
+  const duringCrossNodeDown = await page.evaluate(() => ({
+    bar: document.querySelector('[data-node-follow-bar]')?.getAttribute('data-node-follow-bar') ?? null,
+    panel: document.querySelector('[data-panel-anchor]')?.getAttribute('data-panel-anchor') ?? null,
+  }))
+  rec(
+    g,
+    '★ 跨节点按住期间旧浮层保持隐藏',
+    duringCrossNodeDown.bar !== draggedId && duringCrossNodeDown.panel !== draggedId,
+    JSON.stringify(duringCrossNodeDown),
+  )
+  await page.screenshot({ path: `${OUT}/73-g58-cross-node-down-${evidenceSuffix}.png` })
+  await page.mouse.up()
+  await sleep(500)
+  const crossNodeTrace = await page.evaluate(() => {
+    window.__g58StopCrossNodeSampling = true
+    return {
+      samples: window.__g58CrossNodeSamples ?? [],
+      finalBar: document.querySelector('[data-node-follow-bar]')?.getAttribute('data-node-follow-bar') ?? null,
+      finalPanel: document.querySelector('[data-panel-anchor]')?.getAttribute('data-panel-anchor') ?? null,
+    }
+  })
+  const oldOverlaySamples = crossNodeTrace.samples.filter(
+    (sample) => sample.bar === draggedId || sample.panel === draggedId,
+  )
+  rec(
+    g,
+    '★★ 拖动后点击另一个节点，旧节点浮层不会先闪出',
+    oldOverlaySamples.length === 0,
+    JSON.stringify({
+      oldOverlaySampleCount: oldOverlaySamples.length,
+      oldOverlaySampleHead: oldOverlaySamples.slice(0, 4),
+    }),
+  )
+  rec(
+    g,
+    '★ 跨节点点击结束后，功能栏与创作面板指向新节点',
+    crossNodeTrace.finalBar === otherId && crossNodeTrace.finalPanel === otherId,
+    JSON.stringify({ finalBar: crossNodeTrace.finalBar, finalPanel: crossNodeTrace.finalPanel }),
+  )
+  await page.screenshot({ path: `${OUT}/73-g58-cross-node-final-${evidenceSuffix}.png` })
 
   // 再次点击节点 → 两者一起回来
   const nAgain = await gen.boundingBox()
