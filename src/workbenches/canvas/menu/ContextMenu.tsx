@@ -18,6 +18,7 @@ import { createNodeWithDefaults } from '../../../features/canvas/createNodeWithD
 import { useAssetFolderActions } from '../../../features/canvas/useAssetFolderActions'
 import { noOverlapDelta } from '../../../features/canvas/duplicatePlacement'
 import { saveAssetToLibrary } from '../../../features/canvas/saveAssetToLibrary'
+import { lightboxSourceRectForNode } from '../../../features/canvas/lightboxSourceRect'
 import { Download, Icon } from '../../../ui/icon'
 import styles from './ContextMenu.module.css'
 import { useOverlayExit } from '../overlay/useOverlayExit'
@@ -166,6 +167,11 @@ export function ContextMenu() {
     if (target.kind === 'node') {
       const nodeId = target.nodeId
       const a = item.action
+      const assetHash = (node?.data as { assetHash?: unknown } | undefined)?.assetHash
+      const sourceRect =
+        typeof assetHash === 'string' && assetHash
+          ? lightboxSourceRectForNode(nodeId, assetHash)
+          : undefined
       if (a.kind === 'run') {
         void exec.runNode(nodeId)
       } else if (a.kind === 'duplicate') {
@@ -195,10 +201,10 @@ export function ContextMenu() {
         store.openTextEditor(nodeId)
       } else if (a.kind === 'extractSelection') {
         // 在素材灯箱里框选局部（§6.23）：入口只负责「以提取模式打开灯箱」
-        store.openCropLightbox(nodeId)
+        store.openCropLightbox(nodeId, { sourceRect })
       } else if (a.kind === 'crop') {
         // 裁剪（对账 #553）：同一个灯箱框选，但产出不带选区上下文
-        store.openCropLightbox(nodeId, { plain: true })
+        store.openCropLightbox(nodeId, { plain: true, sourceRect })
       } else if (a.kind === 'saveLibrary') {
         void saveAssetToLibrary({ platform, store }, nodeId).then((result) => {
           if (result.ok) {

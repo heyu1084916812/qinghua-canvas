@@ -18,6 +18,8 @@ import { graphRevisionOf, type GraphSnapshot } from '../../../domain/canvas/mode
 import type { Patch, PersistPlan, TableName } from '../../../domain/patch/types'
 import type { Viewport } from '../../../domain/canvas/geometry/coords'
 import type { SnapGap, SnapGuide } from '../../../domain/canvas/layout/snap'
+import type { LightboxSourceRectSnapshot } from '../../../domain/canvas/model/lightbox'
+import type { CanvasLightboxState } from './lightboxState'
 import type { LinkSide } from '../../../domain/canvas/menu/linkMenu'
 import { createId } from '../../../shared/id'
 import { reduce } from '../../commands/reducer'
@@ -173,58 +175,8 @@ interface CanvasState {
    * 提供「撤销 / 重做」入口。纯展示态：不进撤销栈、不落库，由 UI 侧计时自动清除。
    */
   undoBar: { id: string; text: string } | null
-  /**
-   * 素材灯箱（§6.17）。纯展示态：不进撤销栈、不落库。
-   *
-   * 放在 store 而不是组件本地 state：触发它的两处（节点双击、日志缩略图）在
-   * **不同的子树**里（画布表面 / 页面级日志面板），塞本地 state 就得把回调一路
-   * 透传。它是瞬时态——关掉即忘，与 menu / notice 同口径。
-   */
-  /**
-   * 灯箱的两种「框选模式」（值 = 发起它的那个节点 id；都不在 = 纯看图）：
-   *
-   * - `cropFor` = **提取选区**（§6.23）：框选 + 选比例 + 确认，确认后在原图**右侧**
-   *   生成带上下文的局部图。
-   * - `faceFor` = **给情绪调节框脸**（用户 2026-10-06）：框一块人脸 → 确认写进该节点的
-   *   `data.faceBox`（不建任何节点）。自动识别认不出来时由面板开它。
-   *
-   * 两者共用同一套框选交互（拖框 / 八向手柄 / 比例吸附），只有**确认之后干什么**不同 ——
-   * 所以是同一个模式的两种意图，而不是两套 UI。
-   */
-  /**
-   * `rotateFor`（2026-10-16）：**「旋转与镜像」已搬进灯箱当模式**（用户：「真正的操作组件区域
-   * 在灯箱里面进行，统一设计」）。它是 nodeId，不是 hash —— 保存时要写回那个节点的产物。
-   * 搬进来之后它自动继承了灯箱的**按住拖动平移 / 滚轮缩放**（这正是用户要的「交互不变」）。
-   *
-   * `annotateFor`（2026-10-16）：**「标注」同样搬进灯箱当模式**。理由与落点完全同源 ——
-   * 标注要「画在图上」，而灯箱本来就是那个「图在屏幕上」的坐标系（`box` + 缩放平移）。
-   * 两者都存 nodeId（保存时要写回 / 派生自那个节点），互斥（同时只可能有一个）。
-   */
-  lightbox: {
-    assetHash: string
-    /** 当前触发灯箱的节点；同一素材被多个节点复用时优先用于 FLIP 起点。 */
-    sourceNodeId?: string
-    /** Pointer-time snapshot captured before opening React state changes. */
-    sourceRect?: { left: number; top: number; width: number; height: number; borderRadius?: string; src?: string; kind?: 'image' | 'video'; assetHash?: string }
-    /**
-     * 多选灯箱的完整序列。`assetHash` 始终是当前项；切图时同时更新
-     * `galleryIndex`，因此 LightboxLayer 现有的取图 / 缩放逻辑不需要另起一份。
-     */
-    gallery?: {
-      assetHash: string
-      nodeId: string
-      title: string
-    }[]
-    galleryIndex?: number
-    cropFor?: string
-    /** `cropPlain`：这次框选是**裁剪**（按框原样切、不写上下文）而不是提取选区 */
-    cropPlain?: boolean
-    faceFor?: string
-    compareWith?: string
-    compareKind?: 'result' | 'pair'
-    rotateFor?: string
-    annotateFor?: string
-  } | null
+  /** Transient media / editor lightbox. See `CanvasLightboxState`. */
+  lightbox: CanvasLightboxState | null
   /*
    * 原先这里还有 `rotate` / `annotate` 两个平行的瞬时态。2026-10-16 两个编辑器
    * （旋转与镜像、标注）都搬进灯箱之后它们就成了**谁都不写的死字段**——留着只会让
@@ -358,10 +310,10 @@ export interface CanvasStore extends AppStore<GraphSnapshot, Command> {
    */
   openLightbox: (
     assetHash: string,
-    opts?: { compareWith?: string; compareKind?: 'result' | 'pair'; sourceNodeId?: string; sourceRect?: { left: number; top: number; width: number; height: number; borderRadius?: string; src?: string; kind?: 'image' | 'video'; assetHash?: string } },
+    opts?: { compareWith?: string; compareKind?: 'result' | 'pair'; sourceNodeId?: string; sourceRect?: LightboxSourceRectSnapshot },
   ) => void
   /** 打开多选灯箱；只收集有素材的图片 / 视频节点。 */
-  openLightboxGallery: (nodeIds: readonly string[]) => void
+  openLightboxGallery: (nodeIds: readonly string[], opts?: { sourceRect?: LightboxSourceRectSnapshot }) => void
   /** 在多选灯箱里切上一张 / 下一张（会循环）。普通素材灯箱下无操作。 */
   navigateLightbox: (delta: number) => void
   /** 多选灯箱：直接跳到指定缩略图。 */
@@ -372,34 +324,17 @@ export interface CanvasStore extends AppStore<GraphSnapshot, Command> {
    * `plain: true` = **裁剪**（按框原样切一块、不写选区上下文，对账 #553）；
    * 不给 = **提取选区**（外扩一圈 + 写上下文，能融回原图）。
    */
-  openCropLightbox: (nodeId: string, opts?: { plain?: boolean }) => void
-  openFaceLightbox: (nodeId: string) => void
+  openCropLightbox: (nodeId: string, opts?: { plain?: boolean; sourceRect?: LightboxSourceRectSnapshot }) => void
+  openFaceLightbox: (nodeId: string, opts?: { sourceRect?: LightboxSourceRectSnapshot }) => void
   closeLightbox: () => void
-  getLightbox: () => {
-    assetHash: string
-    sourceNodeId?: string
-    sourceRect?: { left: number; top: number; width: number; height: number; borderRadius?: string; src?: string; kind?: 'image' | 'video'; assetHash?: string }
-    gallery?: {
-      assetHash: string
-      nodeId: string
-      title: string
-    }[]
-    galleryIndex?: number
-    cropFor?: string
-    cropPlain?: boolean
-    faceFor?: string
-    compareWith?: string
-    compareKind?: 'result' | 'pair'
-    rotateFor?: string
-    annotateFor?: string
-  } | null
+  getLightbox: () => CanvasLightboxState | null
   /**
    * 打开 / 关闭「旋转与镜像」编辑（第 10 条）。
    *
    * ⚠️ 2026-10-16 起**它就是「开灯箱 + 进旋转模式」**（原来是一个独立的全屏层，
    * 与灯箱互斥）。名字与调用点保持不变，换的是落点 —— 工具条与预览现在住在灯箱里。
    */
-  openRotateEditor: (nodeId: string) => void
+  openRotateEditor: (nodeId: string, opts?: { sourceRect?: LightboxSourceRectSnapshot }) => void
   closeRotateEditor: () => void
   getRotate: () => { nodeId: string } | null
   /**
@@ -409,7 +344,7 @@ export interface CanvasStore extends AppStore<GraphSnapshot, Command> {
    * 名字与调用点不变，换的是落点 —— 画笔 / 矩形 / 文字那套工具条现在住在灯箱里，
    * 于是它天然继承了灯箱的**滚轮缩放 / 中键拖动平移**（用户要的「交互不变」）。
    */
-  openAnnotateEditor: (nodeId: string) => void
+  openAnnotateEditor: (nodeId: string, opts?: { sourceRect?: LightboxSourceRectSnapshot }) => void
   closeAnnotateEditor: () => void
   getAnnotate: () => { nodeId: string } | null
   /** 打开 / 关闭文本编辑灯箱（§6.7）。与素材灯箱互斥 */
@@ -863,7 +798,7 @@ export function createCanvasStore(opts: CanvasStoreOptions): CanvasStore {
     upstreamPick: null,
         menu: null,
       }),
-    openLightboxGallery: (nodeIds) => {
+    openLightboxGallery: (nodeIds, opts) => {
       const ids = new Set(nodeIds)
       const gallery = store
         .getState()
@@ -877,7 +812,13 @@ export function createCanvasStore(opts: CanvasStoreOptions): CanvasStore {
       const first = gallery[0]
       if (!first) return
       store.setState({
-        lightbox: { assetHash: first.assetHash, sourceNodeId: first.nodeId, gallery, galleryIndex: 0 },
+        lightbox: {
+          assetHash: first.assetHash,
+          sourceNodeId: first.nodeId,
+          ...(opts?.sourceRect ? { sourceRect: opts.sourceRect } : {}),
+          gallery,
+          galleryIndex: 0,
+        },
         textEditor: null,
     upstreamPick: null,
         menu: null,
@@ -913,8 +854,10 @@ export function createCanvasStore(opts: CanvasStoreOptions): CanvasStore {
       store.setState({
         lightbox: {
           assetHash: hash,
+          sourceNodeId: nodeId,
           cropFor: nodeId,
           ...(opts?.plain ? { cropPlain: true } : {}),
+          ...(opts?.sourceRect ? { sourceRect: opts.sourceRect } : {}),
         },
         textEditor: null,
     upstreamPick: null,
@@ -927,12 +870,17 @@ export function createCanvasStore(opts: CanvasStoreOptions): CanvasStore {
      * 与「提取选区」共用同一套框选交互，但**确认后不建任何节点** —— 只把这个框
      * 写进该节点的 `data.faceBox`（见 `LightboxLayer`）。
      */
-    openFaceLightbox: (nodeId) => {
+    openFaceLightbox: (nodeId, opts) => {
       const node = store.getState().graph.nodes.find((n) => n.id === nodeId)
       const hash = (node?.data as { assetHash?: string } | undefined)?.assetHash
       if (!hash) return
       store.setState({
-        lightbox: { assetHash: hash, sourceNodeId: nodeId, faceFor: nodeId },
+        lightbox: {
+          assetHash: hash,
+          sourceNodeId: nodeId,
+          faceFor: nodeId,
+          ...(opts?.sourceRect ? { sourceRect: opts.sourceRect } : {}),
+        },
         textEditor: null,
     upstreamPick: null,
         menu: null,
@@ -946,13 +894,18 @@ export function createCanvasStore(opts: CanvasStoreOptions): CanvasStore {
      * 只带 `lightbox` 这一个状态：不再单独维护 `rotate`，否则「灯箱关掉了但 rotate 还挂着」
      * 会留下一个看不见却生效的模式。`getRotate` 从灯箱反推，对外 API 不变。
      */
-    openRotateEditor: (nodeId) => {
+    openRotateEditor: (nodeId, opts) => {
       const node = store.getState().graph.nodes.find((n) => n.id === nodeId)
       const hash = (node?.data as { assetHash?: string } | undefined)?.assetHash
       /** 没图的节点没有可旋转的东西：不打开，而不是开一个空灯箱 */
       if (!hash) return
       store.setState({
-        lightbox: { assetHash: hash, sourceNodeId: nodeId, rotateFor: nodeId },
+        lightbox: {
+          assetHash: hash,
+          sourceNodeId: nodeId,
+          rotateFor: nodeId,
+          ...(opts?.sourceRect ? { sourceRect: opts.sourceRect } : {}),
+        },
         textEditor: null,
     upstreamPick: null,
         menu: null,
@@ -968,12 +921,17 @@ export function createCanvasStore(opts: CanvasStoreOptions): CanvasStore {
      *
      * 与 `openRotateEditor` 逐字同构：没图的节点不打开（而不是开一个空灯箱在那儿画空气）。
      */
-    openAnnotateEditor: (nodeId) => {
+    openAnnotateEditor: (nodeId, opts) => {
       const node = store.getState().graph.nodes.find((n) => n.id === nodeId)
       const hash = (node?.data as { assetHash?: string } | undefined)?.assetHash
       if (!hash) return
       store.setState({
-        lightbox: { assetHash: hash, sourceNodeId: nodeId, annotateFor: nodeId },
+        lightbox: {
+          assetHash: hash,
+          sourceNodeId: nodeId,
+          annotateFor: nodeId,
+          ...(opts?.sourceRect ? { sourceRect: opts.sourceRect } : {}),
+        },
         textEditor: null,
     upstreamPick: null,
         menu: null,

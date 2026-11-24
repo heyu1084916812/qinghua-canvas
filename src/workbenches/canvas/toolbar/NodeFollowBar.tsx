@@ -306,6 +306,7 @@ function NodeActions({
    */
   const onRotate = () => {
     if (!assetHash) return
+    const sourceRect = lightboxSourceRectForNode(node.id, assetHash)
     const id = createId('node')
     store.beginPlan(`rotate:${id}`, '旋转与镜像')
     store.dispatch({
@@ -324,7 +325,7 @@ function NodeActions({
       targetPort: 'input',
     })
     store.endPlan()
-    store.openRotateEditor(id)
+    store.openRotateEditor(id, { sourceRect })
   }
 
   return (
@@ -378,7 +379,13 @@ function NodeActions({
           action="extract"
           icon={<IconScan />}
           label="提取选区"
-          onClick={() => store.openCropLightbox(node.id)}
+          onClick={() =>
+            store.openCropLightbox(node.id, {
+              sourceRect: assetHash
+                ? lightboxSourceRectForNode(node.id, assetHash)
+                : undefined,
+            })
+          }
         />
       )}
       {/*
@@ -392,7 +399,14 @@ function NodeActions({
           action="crop"
           icon={<IconCrop />}
           label="裁剪"
-          onClick={() => store.openCropLightbox(node.id, { plain: true })}
+          onClick={() =>
+            store.openCropLightbox(node.id, {
+              plain: true,
+              sourceRect: assetHash
+                ? lightboxSourceRectForNode(node.id, assetHash)
+                : undefined,
+            })
+          }
         />
       )}
       {/*
@@ -485,7 +499,13 @@ function NodeActions({
           action="annotate"
           icon={<IconAnnotate />}
           label="标注"
-          onClick={() => store.openAnnotateEditor(node.id)}
+          onClick={() =>
+            store.openAnnotateEditor(node.id, {
+              sourceRect: assetHash
+                ? lightboxSourceRectForNode(node.id, assetHash)
+                : undefined,
+            })
+          }
         />
       )}
       {hasAsset && (

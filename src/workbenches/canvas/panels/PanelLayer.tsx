@@ -26,6 +26,7 @@ import { isRecipeEdit } from '../../../domain/project/generationPreset'
 import { defaultPresetOptions, emotionById, presetById } from '../../../domain/canvas/layout/presets'
 import { hasRunnableDownstream } from '../../../features/canvas/execution/loopRun'
 import { resolveFaceBox } from '../../../features/canvas/emotionEdit'
+import { lightboxSourceRectForNode } from '../../../features/canvas/lightboxSourceRect'
 import { useOverlayExit } from '../overlay/useOverlayExit'
 import { useHudMotion } from '../overlay/useHudMotion'
 /** 面板与节点底边的间距 */
@@ -859,7 +860,7 @@ function handlePanelEvent(
            * （用户 2026-10-06：「识别不了的话要手动框选」）。
            */
           store.notify(`${out.reason}。已在灯箱里打开这张图，框住脸再点「生成」`, 'error')
-          store.openFaceLightbox(node.id)
+          store.openFaceLightbox(node.id, { sourceRect: lightboxSourceRectForNode(node.id, (node.data as GenerationData).assetHash) })
           return
         }
         /** 认出脸 → 写进节点（提示词会带着它）→ 直接生成 */
@@ -920,7 +921,7 @@ function handlePanelEvent(
      * 开灯箱是**宿主**的事 —— 面板只上报意图，与其它面板事件同一条口径。
      */
     case 'reframeFace':
-      store.openFaceLightbox(node.id)
+      store.openFaceLightbox(node.id, { sourceRect: lightboxSourceRectForNode(node.id, (node.data as GenerationData).assetHash) })
       break
     case 'cancel':
       exec.cancel(node.id)

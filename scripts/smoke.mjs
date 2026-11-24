@@ -46404,7 +46404,7 @@ async function g1182(browser) {
 }
 
 async function g1195(browser) {
-  const g = 'G1195 灯箱双入口动画一致'
+  const g = 'G1195 灯箱六入口动画一致'
   const suffix = `${process.env.SMOKE_DARK === '1' ? 'dark' : 'light'}-${process.env.SMOKE_VIEWPORT === '1024' ? '1024x700' : '1440x900'}`
   const ctx = await newCtx(browser)
   const page = await ctx.newPage()
@@ -46430,7 +46430,7 @@ async function g1195(browser) {
     rec(g, '源节点已出图', !!sourceBox)
 
     const capture = async (mode) => {
-      if (mode === 'toolbar') await genPanel(page, source)
+      if (mode !== 'dblclick') await genPanel(page, source)
       await page.evaluate(() => {
         window.__lightboxEntrySamples = []
         const startedAt = performance.now()
@@ -46457,8 +46457,8 @@ async function g1195(browser) {
         }
         requestAnimationFrame(tick)
       })
-      if (mode === 'toolbar') {
-        await page.locator('[data-follow-action="preview"]').click()
+      if (mode !== 'dblclick') {
+        await page.locator(`[data-follow-action="${mode}"]`).click()
       } else {
         await asset.dblclick()
       }
@@ -46471,7 +46471,13 @@ async function g1195(browser) {
         const firstClone = samples.find((sample) => sample.clone)
         const lastClone = [...samples].reverse().find((sample) => sample.clone)
         const settled = [...samples].reverse().find((sample) => sample.media)
-        return { samples, firstClone, lastClone, settled }
+        return {
+          mode: document.querySelector('[data-lightbox]')?.getAttribute('data-lightbox-mode'),
+          samples,
+          firstClone,
+          lastClone,
+          settled,
+        }
       })
       await page.locator('[data-lightbox-close]').click({ timeout: 3000 }).catch(() => {})
       await page.locator('[data-lightbox]').waitFor({ state: 'detached', timeout: 5000 }).catch(() => {})
@@ -46479,58 +46485,65 @@ async function g1195(browser) {
       return result
     }
 
-    const toolbar = await capture('toolbar')
     const dblclick = await capture('dblclick')
+    const entries = [
+      dblclick,
+      await capture('preview'),
+      await capture('extract'),
+      await capture('crop'),
+      await capture('annotate'),
+      await capture('rotate'),
+    ]
     const close = (a, b) =>
       a && b &&
       Math.abs(a.left - b.left) <= 2 &&
       Math.abs(a.top - b.top) <= 2 &&
       Math.abs(a.width - b.width) <= 2 &&
       Math.abs(a.height - b.height) <= 2
+    const sourceGeometry = {
+      left: sourceBox.x,
+      top: sourceBox.y,
+      width: sourceBox.width,
+      height: sourceBox.height,
+    }
     rec(
       g,
-      '★★ 功能栏与双击都从同一素材矩形开始',
+      '★★ 预览 / 裁剪 / 提取 / 标注 / 旋转都与双击从同一素材矩形开始',
       !!sourceBox &&
-        close(toolbar.firstClone?.clone, {
-          left: sourceBox.x,
-          top: sourceBox.y,
-          width: sourceBox.width,
-          height: sourceBox.height,
-        }) &&
-        close(dblclick.firstClone?.clone, {
-          left: sourceBox.x,
-          top: sourceBox.y,
-          width: sourceBox.width,
-          height: sourceBox.height,
-        }) &&
-        close(toolbar.firstClone?.clone, dblclick.firstClone?.clone),
-      JSON.stringify({
-        sourceBox,
-        toolbar: toolbar.firstClone?.clone,
-        dblclick: dblclick.firstClone?.clone,
-      }),
+        entries.every((entry) => close(entry.firstClone?.clone, sourceGeometry)) &&
+        entries.every((entry) => close(entry.firstClone?.clone, dblclick.firstClone?.clone)),
+      JSON.stringify(entries.map((entry) => ({ mode: entry.mode, start: entry.firstClone?.clone }))),
     )
     rec(
       g,
-      '★★ 两个入口首帧都复用节点当前图片',
-      !!toolbar.firstClone?.clone?.src &&
-        toolbar.firstClone.clone.src === dblclick.firstClone?.clone?.src,
-      JSON.stringify({
-        toolbar: toolbar.firstClone?.clone?.src,
-        dblclick: dblclick.firstClone?.clone?.src,
-      }),
+      '★★ 所有入口首帧都复用节点当前图片',
+      !!dblclick.firstClone?.clone?.src &&
+        entries.every((entry) => entry.firstClone?.clone?.src === dblclick.firstClone.clone.src),
+      JSON.stringify(entries.map((entry) => ({ mode: entry.mode, src: entry.firstClone?.clone?.src }))),
     )
     rec(
       g,
-      '★★ 两个入口落点与动画时长一致',
-      close(toolbar.settled?.media, dblclick.settled?.media) &&
-        Math.abs((toolbar.lastClone?.t ?? 0) - (dblclick.lastClone?.t ?? 0)) <= 120,
-      JSON.stringify({
-        toolbarSettled: toolbar.settled?.media,
-        dblclickSettled: dblclick.settled?.media,
-        toolbarCloneEnd: toolbar.lastClone?.t,
-        dblclickCloneEnd: dblclick.lastClone?.t,
-      }),
+      '★★ 所有入口落点与动画时长一致',
+      entries.every((entry) => close(entry.settled?.media, dblclick.settled?.media)) &&
+        entries.every(
+          (entry) => Math.abs((entry.lastClone?.t ?? 0) - (dblclick.lastClone?.t ?? 0)) <= 120,
+        ),
+      JSON.stringify(entries.map((entry) => ({
+        mode: entry.mode,
+        settled: entry.settled?.media,
+        cloneEnd: entry.lastClone?.t,
+      }))),
+    )
+    rec(
+      g,
+      '★ 各入口仍进入正确灯箱模式',
+      entries[0]?.mode === 'view' &&
+        entries[1]?.mode === 'view' &&
+        entries[2]?.mode === 'extract' &&
+        entries[3]?.mode === 'crop' &&
+        entries[4]?.mode === 'annotate' &&
+        entries[5]?.mode === 'rotate',
+      JSON.stringify(entries.map((entry) => entry.mode)),
     )
     rec(g, '无未捕获异常', errors.length === 0, errors.join(' | '))
   } finally {

@@ -12855,6 +12855,46 @@
       "budget": 200
     },
     {
+      "module": "src/state/workbenches/canvas/lightboxState.ts",
+      "owner": "canvas-lightbox-state",
+      "responsibility": "定义画布灯箱在查看、框选、旋转、标注和对比模式间共享的瞬时状态。",
+      "owns": [
+        "灯箱源节点与 sourceRect 快照",
+        "多选画廊与编辑模式字段"
+      ],
+      "doesNotOwn": [
+        "灯箱 DOM、动画与视口",
+        "模式 UI 与编辑实现",
+        "Dexie 表结构与灯箱状态落库"
+      ],
+      "publicApi": [
+        "CanvasLightboxState"
+      ],
+      "test": [
+        "src/state/workbenches/canvas/store.test.ts"
+      ],
+      "budget": 40
+    },
+    {
+      "module": "src/domain/canvas/model/lightbox.ts",
+      "owner": "canvas-lightbox-model",
+      "responsibility": "定义灯箱打开时跨入口共享的源媒体快照契约。",
+      "owns": [
+        "源矩形、圆角、媒体类型、URL 与 hash 字段"
+      ],
+      "doesNotOwn": [
+        "DOM 读取与快照生成",
+        "灯箱动画、状态与视口"
+      ],
+      "publicApi": [
+        "LightboxSourceRectSnapshot"
+      ],
+      "test": [
+        "src/features/canvas/lightboxSourceRect.test.ts"
+      ],
+      "budget": 30
+    },
+    {
       "module": "src/domain/canvas/model/generationSource.ts",
       "owner": "canvas-domain",
       "responsibility": "生成节点来源（API / 工作流 / 本机 CLI）的判定、老节点推断、按来源分存参数与切换补丁（对账 #1133）。",

@@ -402,6 +402,38 @@ describe('canvas store / 素材灯箱（§6.17）', () => {
     expect(store.getLightbox()).toMatchObject({ assetHash: 'hash-1', sourceNodeId: 'node-b', sourceRect: { left: 12, top: 24, width: 160, height: 90, src: 'blob:test', kind: 'image', assetHash: 'hash-1' } })
   })
 
+  it('裁剪 / 框脸 / 旋转 / 标注都保留同一个 FLIP 起点快照', () => {
+    const store = createCanvasStore({ platform, projectId: 'p1' })
+    store.dispatch({
+      kind: 'node.create',
+      projectId: 'p1',
+      type: 'generation',
+      at: { x: 0, y: 0 },
+      title: '图片',
+      data: { mode: 'image', assetHash: 'hash-mode' },
+    })
+    const id = store.getSnapshot().nodes[0]!.id
+    const sourceRect = {
+      left: 10,
+      top: 20,
+      width: 240,
+      height: 180,
+      borderRadius: '12px',
+      src: 'blob:mode',
+      kind: 'image' as const,
+      assetHash: 'hash-mode',
+    }
+
+    store.openCropLightbox(id, { sourceRect })
+    expect(store.getLightbox()).toMatchObject({ sourceNodeId: id, cropFor: id, sourceRect })
+    store.openFaceLightbox(id, { sourceRect })
+    expect(store.getLightbox()).toMatchObject({ sourceNodeId: id, faceFor: id, sourceRect })
+    store.openRotateEditor(id, { sourceRect })
+    expect(store.getLightbox()).toMatchObject({ sourceNodeId: id, rotateFor: id, sourceRect })
+    store.openAnnotateEditor(id, { sourceRect })
+    expect(store.getLightbox()).toMatchObject({ sourceNodeId: id, annotateFor: id, sourceRect })
+  })
+
   it('打开灯箱顺手关掉右键菜单（两个浮层不并存）', () => {
     const store = createCanvasStore({ platform, projectId: 'p1' })
     store.setMenu(10, 20, { kind: 'canvas' })
@@ -430,9 +462,19 @@ describe('canvas store / 素材灯箱（§6.17）', () => {
       .filter((node) => node.title !== '无图节点')
       .map((node) => node.id)
 
-    store.openLightboxGallery(ids)
+    const sourceRect = {
+      left: 8,
+      top: 16,
+      width: 200,
+      height: 120,
+      src: 'blob:gallery',
+      kind: 'image' as const,
+      assetHash: 'h1',
+    }
+    store.openLightboxGallery(ids, { sourceRect })
     expect(store.getLightbox()).toMatchObject({
       assetHash: 'h1',
+      sourceRect,
       galleryIndex: 0,
       gallery: [
         { assetHash: 'h1', nodeId: ids[0], title: '主图' },

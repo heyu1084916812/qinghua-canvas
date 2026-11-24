@@ -10,6 +10,7 @@ import type { Rect } from '../../../domain/agent/landing'
 import type { AppError } from '../../../shared/result'
 import { downstreamOf } from '../../../domain/canvas/graph/upstreamOf'
 import { canBuildRequest } from '../../../features/canvas/execution/buildRunPlan'
+import { lightboxSourceRectForNode } from '../../../features/canvas/lightboxSourceRect'
 import { applyAgentPlan } from './applyAgentPlan'
 import { discoverAgentTools } from './toolCatalog'
 import type { AgentRunOutcome } from './runOutcome'
@@ -65,10 +66,7 @@ export {
   readResults,
   type GraphSummary,
 } from './canvasReadTools'
-export {
-  planProblems,
-  promptlessGenerationProblems,
-} from './agentPlanGate'
+export { planProblems, promptlessGenerationProblems } from './agentPlanGate'
 
 export interface AgentToolContext {
   store: CanvasStore
@@ -758,9 +756,8 @@ export async function executeConfirmedTool(
       if (!nodeId || !mode) return { ok: false, problems: ['需要 nodeId 与 extract / crop 模式'] }
       const node = ctx.store.getSnapshot().nodes.find((item) => item.id === nodeId)
       if (!node) return { ok: false, problems: ['节点不存在'] }
-      if (!(node.data as { assetHash?: unknown }).assetHash) {
-        return { ok: false, problems: ['这个节点还没有图片'] }
-      }
+      const assetHash = (node.data as { assetHash?: string } | undefined)?.assetHash
+      if (!assetHash) return { ok: false, problems: ['这个节点还没有图片'] }
       const rect = asRecord(a.rect)
       const x = Number(rect.x)
       const y = Number(rect.y)
@@ -781,7 +778,8 @@ export async function executeConfirmedTool(
         }
         return result
       }
-      ctx.store.openCropLightbox(nodeId, { plain: mode === 'crop' })
+      const sourceRect = lightboxSourceRectForNode(nodeId, assetHash)
+      ctx.store.openCropLightbox(nodeId, { plain: mode === 'crop', sourceRect })
       return {
         ok: true,
         waitingForSelection: true,

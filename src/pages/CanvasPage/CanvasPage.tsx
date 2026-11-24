@@ -4,6 +4,7 @@ import { usePlatform } from '../../app/providers/PlatformProvider'
 import { openGlobalSettings } from '../../state/ui/globalSettings'
 import { subscribeExternalWrites } from '../../app/session'
 import { useProjectWriteSafety } from '../../app/useProjectWriteSafety'
+import { lightboxSourceRectForNode } from '../../features/canvas/lightboxSourceRect'
 import { createStore } from '../../state/createStore'
 import { canvasStoreFor } from '../../state/workbenches/canvas/storeCache'
 import { CanvasStoreProvider } from '../../workbenches/canvas/storeContext'
@@ -289,10 +290,22 @@ function CanvasProject({ projectId }: { projectId: string }) {
     if (!focusId || projectId === 'demo' || !cached.hydrated) return
     if (focusCanvasNode(store, focusId)) {
       store.setSelection([focusId])
-      if (extractId === '1') store.openCropLightbox(focusId)
-      else if (cropId === '1') store.openCropLightbox(focusId, { plain: true })
-      else if (annotateId === '1') store.openAnnotateEditor(focusId)
-      else if (rotateId === '1') store.openRotateEditor(focusId)
+      const assetHash = (
+        store.getSnapshot().nodes.find((node) => node.id === focusId)?.data as
+          | { assetHash?: string }
+          | undefined
+      )?.assetHash
+      const sourceRect = assetHash
+        ? lightboxSourceRectForNode(focusId, assetHash)
+        : undefined
+      if (extractId === '1') store.openCropLightbox(focusId, { sourceRect })
+      else if (cropId === '1') {
+        store.openCropLightbox(focusId, { plain: true, sourceRect })
+      } else if (annotateId === '1') {
+        store.openAnnotateEditor(focusId, { sourceRect })
+      } else if (rotateId === '1') {
+        store.openRotateEditor(focusId, { sourceRect })
+      }
     }
   }, [focusId, extractId, cropId, annotateId, rotateId, projectId, store, cached, hydratedAt])
 

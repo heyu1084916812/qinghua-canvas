@@ -1,10 +1,7 @@
-export interface LightboxSourceRect {
-  left: number
-  top: number
-  width: number
-  height: number
+import type { LightboxSourceRectSnapshot } from '../../domain/canvas/model/lightbox'
+
+export interface LightboxSourceRect extends LightboxSourceRectSnapshot {
   borderRadius: string
-  src?: string
   kind: 'image' | 'video'
   assetHash: string
 }
@@ -34,9 +31,10 @@ export function lightboxSourceRectFromMedia(
 /** Same source snapshot for double-click, toolbar preview, and every node event entry. */
 export function lightboxSourceRectForNode(
   nodeId: string,
-  assetHash: string,
+  assetHash: string | undefined,
   root: ParentNode = document,
 ): LightboxSourceRect | undefined {
+  if (!assetHash) return undefined
   const media = root.querySelector<HTMLElement>(
     `[data-node-id="${CSS.escape(nodeId)}"] img, [data-node-id="${CSS.escape(nodeId)}"] video`,
   )

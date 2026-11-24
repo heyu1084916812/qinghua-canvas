@@ -8,6 +8,7 @@ import { batchNodes } from '../../../features/canvas/groupNodes'
 import { saveAssetToLibrary } from '../../../features/canvas/saveAssetToLibrary'
 import { noOverlapDelta } from '../../../features/canvas/duplicatePlacement'
 import { sendSelectionToAgent } from '../../../features/canvas/agentHandoff'
+import { lightboxSourceRectForNode } from '../../../features/canvas/lightboxSourceRect'
 import { createId } from '../../../shared/id'
 import { useCanvasStore, useGraph, useSelection, useSelectionMode, useViewportStateWhen } from '../storeContext'
 import { FOLLOW_BAR_HEIGHT } from './followBarAnchor'
@@ -159,7 +160,19 @@ export function MultiSelectBar({
       store.notify('选中的节点里至少要有两张图片或视频', 'error')
       return
     }
-    store.openLightboxGallery(mediaIds)
+    const first = nodes.find((node) => {
+      const hash = (node.data as { assetHash?: unknown }).assetHash
+      return typeof hash === 'string' && hash
+    })
+    const firstHash = (
+      first?.data as { assetHash?: string } | undefined
+    )?.assetHash
+    store.openLightboxGallery(mediaIds, {
+      sourceRect:
+        first && firstHash
+          ? lightboxSourceRectForNode(first.id, firstHash)
+          : undefined,
+    })
   }, [nodes, store])
 
   if (selectionMode !== 'multi' || nodes.length < 1) return null
