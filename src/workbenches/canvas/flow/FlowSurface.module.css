@@ -39,6 +39,16 @@
   height: 100%;
 }
 
+/*
+ * 多选框选后 React Flow 默认留下 nodesselection-rect，并让它接管下一次拖动。
+ * 本项目已有 MultiSelectBar，且多选虚线框已按产品口径移除；这层若保留，
+ * 指针会绕过节点自身 pointerdown / direct-drag，出现图片移动而标题与 store
+ * 留在旧位置。隐藏容器而不是只隐藏背景，确保不会抢走节点拖动。
+ */
+.flow :global(.react-flow__nodesselection) {
+  display: none;
+}
+
 .surface[data-viewport-moving='true'] .flow :global(.react-flow__background) {
   display: none;
 }

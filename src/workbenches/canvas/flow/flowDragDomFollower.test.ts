@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import { getBezierPath, Position } from '@xyflow/react'
 import {
+  clearFlowDragFollowers,
   rebuildFlowEdgePath,
   writeFlowDragEdgePaths,
+  writeFlowDragFollowers,
   writeFlowNodeDragDomPositions,
   type FlowDragEdgePathSnapshot,
 } from './flowDragDomFollower'
@@ -63,5 +65,22 @@ describe('flow drag DOM follower', () => {
       ),
     ).toBe(1)
     expect(style.transform).toBe('translate(75.5px, 48px)')
+  })
+
+  it('moves the multi-select bar and shared endpoints by the screen delta', () => {
+    const style = {
+      translate: '',
+      removeProperty(key: string) {
+        if (key === 'translate') this.translate = ''
+      },
+    }
+    const multiSelect = { style } as unknown as HTMLElement
+    const followers = { layers: [], multiSelect, childEdges: [] }
+
+    writeFlowDragFollowers(followers, new Set(), 100, 50, 72, 36)
+    expect(style.translate).toBe('72px 36px')
+
+    clearFlowDragFollowers(followers, [], false)
+    expect(style.translate).toBe('')
   })
 })

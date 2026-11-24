@@ -24,6 +24,12 @@ describe('canvas detail virtualization', () => {
     expect(flowCss).not.toMatch(/:global\(\.react-flow__viewport\)\s*\{[^}]*will-change/s)
   })
 
+  it('does not let the native group selection rectangle steal node drags', () => {
+    expect(flowCss).toMatch(
+      /\.flow :global\(\.react-flow__nodesselection\)\s*\{[^}]*display:\s*none;/s,
+    )
+  })
+
   it('replaces only the background layer during viewport gestures', () => {
     expect(flowCss).toMatch(
       /\.surface\[data-viewport-moving='true'\] \.flow :global\(\.react-flow__background\)\s*\{[^}]*display:\s*none;/s,

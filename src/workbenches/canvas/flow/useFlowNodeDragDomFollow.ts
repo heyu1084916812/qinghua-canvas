@@ -102,7 +102,14 @@ export function useFlowNodeDragDomFollow({
       if (state.settled) return
       writeFlowNodeDragDomPositions(document, starts, dx, dy)
       writeFlowDragEdgePaths(state.edges, state.movingIds, dx, dy)
-      writeFlowDragFollowers(state.followers, state.affectedIds, dx, dy)
+      writeFlowDragFollowers(
+        state.followers,
+        state.affectedIds,
+        dx,
+        dy,
+        screenDx,
+        screenDy,
+      )
     }
     write()
     if (state.frame) cancelAnimationFrame(state.frame)

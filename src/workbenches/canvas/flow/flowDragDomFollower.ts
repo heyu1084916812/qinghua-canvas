@@ -33,6 +33,7 @@ export interface FlowDragEdgePathSnapshot {
 /** Header labels and port hit blocks live in world-space layers: CSS `translate` stacks on their own transform. */
 export interface FlowDragFollowers {
   layers: HTMLElement[]
+  multiSelect: HTMLElement | null
   childEdges: FlowDragEdgePathSnapshot[]
 }
 
@@ -150,7 +151,11 @@ export function captureFlowDragFollowers(
     }
     return [snapshot]
   })
-  return { layers, childEdges }
+  return {
+    layers,
+    multiSelect: host.querySelector<HTMLElement>('[data-multi-select]'),
+    childEdges,
+  }
 }
 
 export function writeFlowDragEdgePaths(
@@ -174,9 +179,17 @@ export function writeFlowDragEdgePaths(
   return written
 }
 
-export function writeFlowDragFollowers(f: FlowDragFollowers, affectedIds: ReadonlySet<string>, dx: number, dy: number) {
+export function writeFlowDragFollowers(
+  f: FlowDragFollowers,
+  affectedIds: ReadonlySet<string>,
+  dx: number,
+  dy: number,
+  screenDx = dx,
+  screenDy = dy,
+) {
   const value = `${dx}px ${dy}px`
   for (const el of f.layers) el.style.translate = value
+  if (f.multiSelect) f.multiSelect.style.translate = `${screenDx}px ${screenDy}px`
   writeFlowDragEdgePaths(f.childEdges, affectedIds, dx, dy)
 }
 
@@ -187,6 +200,7 @@ export function clearFlowDragFollowers(
   restorePaths: boolean,
 ) {
   for (const el of f.layers) el.style.removeProperty('translate')
+  f.multiSelect?.style.removeProperty('translate')
   if (!restorePaths) return
   for (const s of [...edges, ...f.childEdges]) {
     for (const path of s.paths) if (path.element.isConnected) path.element.setAttribute('d', path.d)
