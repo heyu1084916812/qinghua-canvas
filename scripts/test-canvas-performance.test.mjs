@@ -43,10 +43,9 @@ function passingInput() {
       after: viewport(-(index + 1) * 260, -(index + 1) * 90, 1),
       gesture: {
         moving: true,
-        edgeDisplay: 'none',
+        edgeDisplay: 'block',
         backgroundDisplay: 'none',
-        fastLayer: true,
-        fastPaths: 1,
+        fastLayer: false,
         fastBackground: 'dots',
         coarseNodes: 0,
         cullingVisibleNodes: 35,
@@ -65,8 +64,7 @@ function passingInput() {
         coarseNodes: 0,
         hiddenImages: 0,
         visibleImages: GENERATION_NODE_COUNT,
-        promptCanvasVisible: true,
-        hiddenPromptBodies: 150,
+        hiddenPromptBodies: 0,
         mountedNodes: PERFORMANCE_NODE_COUNT,
         restoredNodes: PERFORMANCE_NODE_COUNT,
       },
@@ -78,9 +76,9 @@ function passingInput() {
       gesture: {
         moving: true,
         background: 'dots',
-        fastLayer: true,
+        fastLayer: false,
         mountedEdges: PERFORMANCE_EDGE_COUNT,
-        edgeDisplay: 'none',
+        edgeDisplay: 'block',
         mountedNodes: PERFORMANCE_NODE_COUNT,
         restoredNodes: PERFORMANCE_NODE_COUNT,
       },
@@ -193,11 +191,12 @@ describe('canvas performance report gate', () => {
     })
   })
 
-  it('fails when the pan fast path never replaces layers or windows nodes', () => {
+  it('fails when pan hides the React Flow edges behind a second edge layer', () => {
     const missingFastPath = passingInput()
     missingFastPath.panRounds[1].gesture = {
       ...missingFastPath.panRounds[1].gesture,
-      fastLayer: false,
+      edgeDisplay: 'none',
+      fastLayer: true,
       mountedNodes: PERFORMANCE_NODE_COUNT,
     }
     const report = buildPerformanceReport(missingFastPath)
@@ -232,11 +231,12 @@ describe('canvas performance report gate', () => {
     expect(report.assertions.zoomMovement.pass).toBe(false)
   })
 
-  it('fails when zoom never enters the windowed fast path', () => {
+  it('fails when zoom hides the React Flow edges behind a second edge layer', () => {
     const missingFastPath = passingInput()
     missingFastPath.zoomRounds[1].gesture = {
       ...missingFastPath.zoomRounds[1].gesture,
-      fastLayer: false,
+      edgeDisplay: 'none',
+      fastLayer: true,
       mountedEdges: PERFORMANCE_EDGE_COUNT,
       mountedNodes: PERFORMANCE_NODE_COUNT,
     }

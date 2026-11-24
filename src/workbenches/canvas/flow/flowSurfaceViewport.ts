@@ -18,6 +18,6 @@ export function shouldSyncStoreViewport(
   return !sameFlowViewport(current, next)
 }
 
-export const FLOW_NODE_TYPES = { qh: 'qh', coarse: 'coarse' } as const
-export const FLOW_EDGE_TYPES = { qh: 'qh', coarse: 'coarse' } as const
+export const FLOW_NODE_TYPES = { qh: 'qh' } as const
+export const FLOW_EDGE_TYPES = { qh: 'qh' } as const
 export const FLOW_EDGE_OPTIONS = { type: 'default' } as const

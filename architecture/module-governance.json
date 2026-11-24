@@ -539,7 +539,12 @@
   ],
   "removedModules": [
     "src/pages/CanvasPage/clipper/ClipperBrowser.tsx",
-    "src/features/canvas/useSpaceHeld.ts"
+    "src/features/canvas/useSpaceHeld.ts",
+    "src/workbenches/canvas/flow/FlowCoarseEdgeLayer.tsx",
+    "src/workbenches/canvas/flow/FlowCoarseEdgeLayer.module.css",
+    "src/workbenches/canvas/flow/FlowCoarseNode.module.css",
+    "src/workbenches/canvas/flow/coarseEdges.ts",
+    "src/workbenches/canvas/flow/detailMode.ts"
   ],
   "moduleMoves": [],
   "modules": [
@@ -1402,44 +1407,6 @@
         "src/workbenches/canvas/flow/nodeHeaders.test.ts"
       ],
       "budget": 240
-    },
-    {
-      "module": "src/workbenches/canvas/flow/FlowPromptGestureCanvas.tsx",
-      "owner": "canvas-flow-ui",
-      "responsibility": "Paints low-zoom prompt cards into a single gesture canvas so panning keeps their appearance without editing DOM.",
-      "owns": [
-        "Prompt card gesture snapshot painting",
-        "Canvas pan translation"
-      ],
-      "doesNotOwn": [
-        "Prompt node editing state",
-        "Node geometry persistence"
-      ],
-      "publicApi": [
-        "FlowPromptGestureCanvas"
-      ],
-      "test": [
-        "scripts/test-canvas-performance.test.mjs"
-      ],
-      "budget": 260
-    },
-    {
-      "module": "src/workbenches/canvas/flow/FlowPromptGestureCanvas.module.css",
-      "owner": "canvas-flow-ui",
-      "responsibility": "Styles and positions the prompt gesture canvas above nodes but below port and header overlays.",
-      "owns": [
-        "Prompt gesture canvas layer"
-      ],
-      "doesNotOwn": [
-        "Prompt card rendering logic"
-      ],
-      "publicApi": [
-        "CSS_MODULE: prompt gesture canvas layer"
-      ],
-      "test": [
-        "scripts/test-canvas-performance.test.mjs"
-      ],
-      "budget": 80
     },
     {
       "module": "src/workbenches/canvas/flow/FlowNodeHeaderLayer.module.css",
@@ -6973,28 +6940,6 @@
         "src/workbenches/canvas/flow/flowSurfaceRenderModel.test.ts"
       ],
       "budget": 260
-    },
-    {
-      "module": "src/workbenches/canvas/flow/useCanvasDetailMode.ts",
-      "owner": "canvas-flow-surface-detail-mode",
-      "responsibility": "根据稳定后的画布缩放决定 full/coarse 节点视图模式。",
-      "owns": [
-        "缩放档位的稳定窗口与取消",
-        "视口专属订阅到模式状态的映射"
-      ],
-      "doesNotOwn": [
-        "节点 JSX、CSS 和实际渲染",
-        "React Flow 视口实例与手势",
-        "画布图数据、选区和运行态"
-      ],
-      "publicApi": [
-        "useCanvasDetailMode"
-      ],
-      "test": [
-        "src/workbenches/canvas/flow/detailMode.test.ts",
-        "src/workbenches/canvas/flow/useCanvasDetailMode.test.ts"
-      ],
-      "budget": 68
     },
     {
       "module": "src/workbenches/ecommerce/studio/EcommerceStudioCategoryRail.tsx",
@@ -13697,39 +13642,13 @@
       "budget": 80
     },
     {
-      "module": "src/workbenches/canvas/flow/flowGestureWindow.ts",
-      "owner": "canvas-flow-ui",
-      "responsibility": "在平移开始时按视口与屏幕预热边距计算固定节点窗口，避免手势期间反复挂载视口边缘节点。",
-      "owns": [
-        "屏幕边距到世界坐标换算",
-        "React Flow 节点窗口过滤",
-        "平移手势节点窗口常量"
-      ],
-      "doesNotOwn": [
-        "节点投影与内容渲染",
-        "视口状态变更",
-        "松手后的节点恢复"
-      ],
-      "publicApi": [
-        "PAN_NODE_WINDOW_MARGIN_PX",
-        "PositionedFlowNode",
-        "nodesInGestureWindow"
-      ],
-      "test": [
-        "src/workbenches/canvas/flow/flowGestureWindow.test.ts"
-      ],
-      "budget": 60
-    },
-    {
       "module": "src/workbenches/canvas/flow/useFlowGestureWindow.ts",
       "owner": "canvas-flow-ui",
-      "responsibility": "把平移开始时的节点窗口、手势标记和松手恢复封装成独立 hook。",
+      "responsibility": "把平移/滚轮缩放的手势标记（data-viewport-moving）与松手恢复封装成独立 hook。",
       "owns": [
-        "平移 / 滚轮缩放手势窗口节点集合",
         "视口移动根属性",
         "滚轮结束 180ms 防抖",
-        "松手恢复完整节点集合",
-        "点击不进手势态：位移超过 4px 才激活平移快路径"
+        "点击不进手势态：位移超过 4px 才进入平移手势态"
       ],
       "doesNotOwn": [
         "React Flow 边组件轻量化",
@@ -13741,7 +13660,6 @@
       ],
       "test": [
         "scripts/test-canvas-performance.test.mjs",
-        "src/workbenches/canvas/flow/flowGestureWindow.test.ts",
         "src/workbenches/canvas/flow/useFlowGestureWindow.test.ts"
       ],
       "budget": 95

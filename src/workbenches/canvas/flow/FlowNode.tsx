@@ -13,7 +13,6 @@ import type { NodeViewEvent } from '../nodes/registry'
 import type { InputPortAsset } from '../nodes/registry'
 import type { NodeInput } from '../../../domain/shared/execution/types'
 import type { Rect } from '../../../domain/canvas/geometry/rect'
-import coarseStyles from './FlowCoarseNode.module.css'
 
 /**
  * React Flow 的自定义节点（引擎替换 P0）。
@@ -178,41 +177,6 @@ function FlowNodeInner({ data, selected }: NodeProps) {
 }
 
 export const FlowFlowNode = memo(FlowNodeInner)
-
-export const FlowCoarseNode = memo(function FlowCoarseNode({
-  data,
-  selected,
-}: NodeProps) {
-  const node = (data as unknown as FlowNodeData).node
-  const excluded = (data as unknown as FlowNodeData).excluded === true
-  const dimmed = (data as unknown as FlowNodeData).upstreamPickDimmed === true
-  const className = [
-    coarseStyles.node,
-    isContainerType(node.type) ? coarseStyles.group : '',
-    selected ? coarseStyles.selected : '',
-    node.disabled || excluded || dimmed ? coarseStyles.disabled : '',
-  ]
-    .filter(Boolean)
-    .join(' ')
-
-  return (
-    <div
-      className={className}
-      data-node-id={node.id}
-      data-node-type={node.type}
-      data-node-selected={selected ? '' : undefined}
-      data-node-disabled={node.disabled ? 'true' : undefined}
-      data-node-excluded={!node.disabled && excluded ? 'true' : undefined}
-      data-node-dim={dimmed ? 'true' : undefined}
-      data-node-model={
-        typeof (node.data as { model?: unknown }).model === 'string'
-          ? ((node.data as { model?: string }).model ?? '')
-          : undefined
-      }
-      data-coarse-node
-    />
-  )
-})
 
 /**
  * 容器（分组 / 批量）里的子节点：与顶层节点**共用同一个 `NodeFrame` + `def.View`**，

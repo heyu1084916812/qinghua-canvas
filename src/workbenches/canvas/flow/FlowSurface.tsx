@@ -35,7 +35,6 @@ import { useCanvasExecution } from '../execution/CanvasExecutionProvider'
 import { useCanvasPageEvents } from '../../../features/canvas/useCanvasPageEvents'
 import {
   FlowChildFrame,
-  FlowCoarseNode,
   FlowFlowNode,
   type FlowNodeData,
 } from './FlowNode'
@@ -47,9 +46,8 @@ import type { NodeSnapshot } from '../../../domain/canvas/model/node'
 import { directUpstream } from '../../../domain/canvas/graph/upstreamOf'
 import type { NodeViewEvent } from '../nodes/registry'
 import { useNodeDerivedMaps } from '../useNodeDerivedMaps'
-import { QhCoarseEdge, QhEdge, type QhEdgeData } from './FlowEdge'
+import { QhEdge, type QhEdgeData } from './FlowEdge'
 import { FlowChildEdgeLayer } from './FlowChildEdgeLayer'
-import { FlowCoarseEdgeLayer, FlowViewportEdgeLayer } from './FlowCoarseEdgeLayer'
 import { FlowGroupBoardLayer } from './FlowGroupBoardLayer'
 import { FlowPortLayer } from './FlowPortLayer'
 import { FlowNodeHeaderLayer } from './FlowNodeHeaderLayer'
@@ -96,9 +94,7 @@ import { LinkMenu } from '../menu/LinkMenu'
 import { CanvasNotice } from '../surface/CanvasNotice'
 import { Minimap } from '../surface/Minimap'
 import { UndoBar } from '../surface/UndoBar'
-import { useCanvasDetailMode } from './useCanvasDetailMode'
 import { FlowViewportBackground } from './FlowViewportBackground'
-import { FlowPromptGestureCanvas } from './FlowPromptGestureCanvas'
 import { VIEWPORT_EPSILON } from './flowSurfaceViewport'
 import {
   FLOATING_SELECTORS,
@@ -168,8 +164,8 @@ export function FlowSurface({
   )
 }
 
-const NODE_TYPES = { qh: FlowFlowNode, coarse: FlowCoarseNode }
-const EDGE_TYPES = { qh: QhEdge, coarse: QhCoarseEdge }
+const NODE_TYPES = { qh: FlowFlowNode }
+const EDGE_TYPES = { qh: QhEdge }
 const EDGE_OPTIONS = { type: 'default' } as const
 function FlowSurfaceInner({
   projectId,
@@ -181,7 +177,6 @@ function FlowSurfaceInner({
   onOpenSkills?: () => void
 }) {
   const store = useCanvasStore()
-  const detailMode = useCanvasDetailMode(store)
   const graph = useGraph()
   const selection = useSelection()
   const draggingRef = useRef<string | null>(null)
@@ -622,7 +617,6 @@ function FlowSurfaceInner({
       {
         graph,
         selection,
-        detailMode,
         derived,
         childIndex,
         nodeStateOf,
@@ -637,7 +631,7 @@ function FlowSurfaceInner({
     previousNodesRef.current = next
     return next
   }, [
-    graph, selection, nodeStateOf, emitForNode, childIndex, renderFlowChild, derived, store, detailMode, upstreamPickConfig,
+    graph, selection, nodeStateOf, emitForNode, childIndex, renderFlowChild, derived, store, upstreamPickConfig,
   ])
   const gesture = useFlowGestureWindow({ nodes, surfaceRef })
   const renderedNodes = gesture.renderedNodes
@@ -657,7 +651,6 @@ function FlowSurfaceInner({
             childEdgeIds,
             selection,
             edgeSelection,
-            detailMode,
             removeEdge,
           },
           previousEdgesRef.current,
@@ -665,7 +658,7 @@ function FlowSurfaceInner({
         previousEdgesRef.current = next
         return next
       },
-    [graph.edges, childEdgeIds, selection, edgeSelection, detailMode, removeEdge],
+    [graph.edges, childEdgeIds, selection, edgeSelection, removeEdge],
   )
 
   /** RF 首帧可能漏测节点导致边不显示；双 rAF 后补一次 updateNodeInternals。 */
@@ -994,13 +987,11 @@ function FlowSurfaceInner({
       <FlowGroupBoardLayer />
       <FlowViewportController />
       <FlowNodeViewportCulling />
-      {detailMode === 'full' ? <FlowViewportEdgeLayer /> : null}
       {/*
         牵涉容器子节点的边（视觉层）：与 RF 自带边同一层序（节点之下），
         命中区在下面单独再画一层（`hitOnly`）。
       */}
       <FlowChildEdgeLayer />
-      {detailMode === 'coarse' ? <FlowCoarseEdgeLayer /> : null}
       <FlowDraftLayer draft={edgeDrag.draft} />
       {/* 吸附提示（对账 #257）：参考线 + 间距数字。屏幕空间、不吃指针，拖动结束即消失 */}
       <FlowSnapLayer />
@@ -1134,8 +1125,7 @@ function FlowSurfaceInner({
           />
         )}
       </ReactFlow>
-      <FlowPromptGestureCanvas />
-      <FlowNodeHeaderLayer coarse={detailMode === 'coarse'} />
+      <FlowNodeHeaderLayer />
       <Hud count={graph.nodes.length} ids={nodes.map((n) => n.id)} />
       {/* 空画布 + 还没看过新手引导时，给三个模板直达（对账 #388 / E7） */}
       <EmptyCanvasGuide />
@@ -1157,7 +1147,7 @@ function FlowSurfaceInner({
       {/* 小地图显示开关（本机偏好）：关掉只是少一个导航控件，画布本身不受影响 */}
       {appearance.showMinimap ? <Minimap /> : null}
       {/* 端点命中层：在所有节点之上收拖线手势（见 FlowPortLayer 里的长注释） */}
-      <FlowPortLayer onPortDown={beginEdgeDrag} coarse={detailMode === 'coarse'} />
+      <FlowPortLayer onPortDown={beginEdgeDrag} />
       {/* 子节点连线的**命中区**（双击删线）：必须在最上层才收得到指针，视觉是透明的 */}
       <FlowChildEdgeLayer hitOnly />
       {/* 原生 CSS cursor 的实际绘制交给系统；这个隐藏锚点只供工具状态探针使用 */}

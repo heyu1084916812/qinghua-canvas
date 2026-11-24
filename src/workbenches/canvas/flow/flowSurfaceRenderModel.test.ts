@@ -80,7 +80,6 @@ describe('FlowSurface render model', () => {
     const nodes = flowNodesFor({
       graph: graph([group, child, top]),
       selection: ['top'],
-      detailMode: 'full',
       derived: derived(),
       childIndex: new Map([['group', [child]]]),
       nodeStateOf: () => undefined,
@@ -105,7 +104,6 @@ describe('FlowSurface render model', () => {
         [{ id: 'edge', source: 'upstream', target: 'current' }] as GraphSnapshot['edges'],
       ),
       selection: ['current'],
-      detailMode: 'full',
       derived: derived(),
       childIndex: new Map(),
       nodeStateOf: () => undefined,
@@ -120,7 +118,7 @@ describe('FlowSurface render model', () => {
     ])
   })
 
-  it('filters child edges and removes all RF edges in coarse mode', () => {
+  it('filters child edges out of the RF edge list', () => {
     const parent = node('parent', { type: 'group', x: 0, y: 0 })
     const child = node('child', { type: 'prompt', x: 0, y: 0, parentId: 'parent' })
     const top = node('top', { type: 'prompt', x: 200, y: 0 })
@@ -136,22 +134,11 @@ describe('FlowSurface render model', () => {
       childEdgeIds: new Set(['child-edge']),
       selection: ['top'],
       edgeSelection: ['top-edge'],
-      detailMode: 'full',
       removeEdge: vi.fn(),
     })
     expect(edges.map((edge) => edge.id)).toEqual(['top-edge'])
     expect(edges[0].selected).toBe(true)
     expect(edges[0].data?.related).toBe(true)
-    expect(
-      flowEdgesFor({
-        edges: snapshot.edges,
-        childEdgeIds: new Set(['child-edge']),
-        selection: [],
-        edgeSelection: [],
-        detailMode: 'coarse',
-        removeEdge: vi.fn(),
-      }),
-    ).toEqual([])
   })
 
   it('reuses unchanged node and edge projections while another node moves', () => {
@@ -167,7 +154,6 @@ describe('FlowSurface render model', () => {
     }
     const baseInput = {
       selection: ['moving'],
-      detailMode: 'full' as const,
       derived: derived(),
       childIndex: new Map<string, NodeSnapshot[]>(),
       nodeStateOf: () => undefined,
@@ -209,7 +195,6 @@ describe('FlowSurface render model', () => {
       childEdgeIds: new Set(),
       selection: ['moving'],
       edgeSelection: [],
-      detailMode: 'full',
       removeEdge,
     })
     const secondEdges = flowEdgesFor(
@@ -218,7 +203,6 @@ describe('FlowSurface render model', () => {
         childEdgeIds: new Set(),
         selection: ['moving'],
         edgeSelection: [],
-        detailMode: 'full',
         removeEdge,
       },
       firstEdges,

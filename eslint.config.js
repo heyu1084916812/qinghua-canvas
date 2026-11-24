@@ -16,7 +16,6 @@ const ICON_KEEP = [
   'src/features/shared/channelIcon/ChannelIcon.tsx',
   'src/features/shared/modelIcon/ModelIcon.tsx',
   'src/workbenches/canvas/flow/FlowChildEdgeLayer.tsx',
-  'src/workbenches/canvas/flow/FlowCoarseEdgeLayer.tsx',
   'src/workbenches/canvas/flow/FlowDraftLayer.tsx',
   'src/workbenches/canvas/flow/FlowSnapLayer.tsx',
   // 切断动画层：画的是「被切开的两段连线」（几何，不是图标），与上面几层同类
