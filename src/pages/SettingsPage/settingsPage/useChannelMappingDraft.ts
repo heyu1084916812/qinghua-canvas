@@ -61,7 +61,6 @@ export function useChannelMappingDraft(source: ChannelMappingDraftSource) {
         vendor: newModelVendor,
       })
       setNewModelName('')
-      setModelFormOpen(false)
     } catch (error) {
       alertMessage(errorMessage(error))
     }

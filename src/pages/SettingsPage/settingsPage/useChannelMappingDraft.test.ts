@@ -53,7 +53,7 @@ describe('模型映射卡的草稿态', () => {
     expect(channels.globalModelsOf).toHaveBeenCalledWith('audio', true)
   })
 
-  it('新增前端模型按表单当前分类保存，成功后清空名称并收起新增表单', async () => {
+  it('新增前端模型按表单当前分类保存，成功后只清空名称并保留表单', async () => {
     const { draft, rerender, channels } = renderDraft()
     act(() => {
       draft.current.setNewModelName('6.1')
@@ -73,7 +73,7 @@ describe('模型映射卡的草稿态', () => {
     })
     expect(draft.current.newModelName).toBe('')
     expect(draft.current.modelAddOpen).toBe(true)
-    expect(draft.current.modelFormOpen).toBe(false)
+    expect(draft.current.modelFormOpen).toBe(true)
   })
 
   it('关闭目录时收起新增表单，避免下次打开残留', () => {

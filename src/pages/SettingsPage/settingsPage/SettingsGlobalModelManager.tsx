@@ -341,7 +341,11 @@ export function SettingsGlobalModelManager({
                       return (
                         <div
                           key={model.id}
-                          className={styles.globalModelChip}
+                          className={
+                            custom
+                              ? `${styles.globalModelChip} ${styles.globalModelChipRemovable}`
+                              : styles.globalModelChip
+                          }
                           data-global-model-row={model.id}
                           data-global-model-kind={custom ? 'custom' : 'builtin'}
                         >

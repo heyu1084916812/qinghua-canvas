@@ -1,0 +1,23 @@
+{
+  "groups": [
+    "g74"
+  ],
+  "results": [
+    {
+      "group": "g74",
+      "ok": true,
+      "code": 0,
+      "timedOut": false,
+      "passed": 64,
+      "failed": 0,
+      "total": 64,
+      "externalSkipped": 0,
+      "elapsedMs": 87404,
+      "log": "E:\\软件\\无限画布\\轻画\\.playwright-verify\\smoke-matrix\\2026-11-25T11-39-39\\000-g74\\smoke.log",
+      "storeDir": "E:\\软件\\无限画布\\轻画\\.playwright-verify\\smoke-matrix\\2026-11-25T11-39-39\\000-g74\\localappdata\\com.qinghua.canvas\\shared-store-v1",
+      "port": 18800,
+      "dataDir": "E:\\软件\\无限画布\\轻画\\.playwright-verify\\smoke-matrix\\2026-11-25T11-39-39\\000-g74\\localappdata\\com.qinghua.canvas\\shared-store-v1",
+      "storeBase": "http://127.0.0.1:18800"
+    }
+  ]
+}

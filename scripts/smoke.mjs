@@ -46962,6 +46962,12 @@ async function g1203(browser) {
         catalogOverflowX: scroll
           ? Math.max(0, scroll.scrollWidth - scroll.clientWidth)
           : -1,
+        panelAnimation: dialog ? getComputedStyle(dialog).animationName : '',
+        groupAnimation: dialog
+          ? getComputedStyle(
+              dialog.querySelector('[data-global-model-group]'),
+            ).animationName
+          : '',
         title: dialog?.textContent ?? '',
       }
     })
@@ -47011,6 +47017,15 @@ async function g1203(browser) {
         catalogOverflowX: catalog.catalogOverflowX,
       }),
     )
+    rec(
+      g,
+      '★ 管理面板与分类内容有进入动画',
+      catalog.panelAnimation !== 'none' &&
+        catalog.panelAnimation !== '' &&
+        catalog.groupAnimation !== 'none' &&
+        catalog.groupAnimation !== '',
+      `panel=${catalog.panelAnimation} group=${catalog.groupAnimation}`,
+    )
     await page.screenshot({ path: `${OUT}/1203-catalog-${suffix}.png` })
 
     await page.locator('[data-global-model-create-toggle]').click()
@@ -47022,6 +47037,7 @@ async function g1203(browser) {
         exists: !!node,
         nameLabel: node?.textContent?.includes('前端模型名称') ?? false,
         vendors: node?.querySelectorAll('[data-global-model-vendor]').length ?? 0,
+      animationName: node ? getComputedStyle(node).animationName : '',
         width: box ? Math.round(box.width) : 0,
         overflowX: node ? Math.max(0, node.scrollWidth - node.clientWidth) : -1,
       }
@@ -47029,7 +47045,12 @@ async function g1203(browser) {
     rec(
       g,
       '★ 新增表单默认收起，展开后名称字段与图标库完整',
-      form.exists && form.nameLabel && form.vendors >= 36 && form.overflowX === 0,
+      form.exists &&
+        form.nameLabel &&
+        form.vendors >= 36 &&
+        form.overflowX === 0 &&
+        form.animationName !== 'none' &&
+        form.animationName !== '',
       JSON.stringify(form),
     )
     await page.screenshot({ path: `${OUT}/1203-create-${suffix}.png` })
@@ -47048,6 +47069,8 @@ async function g1203(browser) {
       const chipBox = chip.getBoundingClientRect()
       const nameBox = name?.getBoundingClientRect()
       const removeBox = remove?.getBoundingClientRect()
+      const outerCenterX = chipBox.right - chipBox.height / 2
+      const deleteCenterX = removeBox ? removeBox.left + removeBox.width / 2 : 0
       return {
         chipDisplay: getComputedStyle(chip).display,
         stackDisplay: stack ? getComputedStyle(stack).display : '',
@@ -47065,18 +47088,33 @@ async function g1203(browser) {
                 ),
               )
             : -1,
+        centerXDelta: removeBox
+          ? Math.round(Math.abs(outerCenterX - deleteCenterX) * 10) / 10
+          : -1,
+        deleteRadius: remove ? getComputedStyle(remove).borderRadius : '',
+        deleteWidth: removeBox ? Math.round(removeBox.width) : 0,
+        deleteHeight: removeBox ? Math.round(removeBox.height) : 0,
       }
     })
     rec(
       g,
-      '★★ 自定义模型是分类内堆叠块，X 在名称右侧同一中线',
+      '★★ 自定义模型是分类内堆叠块，X 容器为同心圆',
       (chipLayout.chipDisplay === 'flex' || chipLayout.chipDisplay === 'inline-flex') &&
         chipLayout.stackDisplay === 'flex' &&
         chipLayout.stackWrap === 'wrap' &&
         chipLayout.deletePosition === 'static' &&
         chipLayout.deleteRight >= chipLayout.chipRight - 12 &&
-        chipLayout.centerDelta <= 2,
+        chipLayout.centerDelta <= 2 &&
+        chipLayout.centerXDelta <= 1 &&
+        chipLayout.deleteWidth === chipLayout.deleteHeight &&
+        (chipLayout.deleteRadius === '50%' ||
+          parseFloat(chipLayout.deleteRadius) === chipLayout.deleteWidth / 2),
       JSON.stringify(chipLayout),
+    )
+    rec(
+      g,
+      '★★ 新增成功后表单保持展开，由用户手动关闭',
+      await page.locator('[data-global-model-form]').isVisible(),
     )
 
     const renamed = `${customName} 新名`
