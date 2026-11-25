@@ -84,6 +84,16 @@
   max-width: none;
 }
 
+.layoutEmbedded [data-settings-routing-disclosure] {
+  max-width: none;
+}
+
+[data-settings-routing-disclosure] {
+  width: 100%;
+  max-width: 1344px;
+  box-sizing: border-box;
+}
+
 /*
  * 全局选路策略（用户 2026-09-29 第 13 轮）。
  *

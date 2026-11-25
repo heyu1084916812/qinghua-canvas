@@ -1,0 +1,9 @@
+PASS | G1204 映射浮层与路由表单 | ★ 真实模型触发框与映射面板同底 | {"panel":"rgb(31, 31, 31)","trigger":"rgb(31, 31, 31)"}
+PASS | G1204 映射浮层与路由表单 | ★★ 模型下拉浮在最顶层，不被映射行区裁切 | {"popupAnimation":"_menuInkIn_be065_1","belowRows":false,"rowsOverflow":"visible","popupHeight":131,"popupScrollHeight":130,"onTop":true}
+PASS | G1204 映射浮层与路由表单 | ★★ 选路策略与下方工作区同宽，右侧不再留空 | {"routeWidth":895,"workareaWidth":897,"backgrounds":["rgb(34, 34, 34)","rgb(34, 34, 34)","rgb(34, 34, 34)"]}
+PASS | G1204 映射浮层与路由表单 | ★★ 策略 / 次数 / 路由范围三个触发器同底色 | ["rgb(34, 34, 34)","rgb(34, 34, 34)","rgb(34, 34, 34)"]
+PASS | G1204 映射浮层与路由表单 | ★★ 路由范围展开时面板与渠道卡有动画 | {"panel":"_routeScopePanelIn_pq1bh_1","channel":"_routeScopeChannelIn_pq1bh_1"}
+PASS | G1204 映射浮层与路由表单 | ★ 渠道分组展开内容也有动画
+PASS | G1204 映射浮层与路由表单 | 无未捕获异常
+
+===== 7 passed / 0 failed / 7 total / 0 external skipped =====

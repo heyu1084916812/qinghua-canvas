@@ -75,6 +75,7 @@
 }
 
 .mappingTable {
+  position: relative;
   display: flex;
   flex-direction: column;
   gap: 2px;
@@ -109,6 +110,18 @@
   overflow-y: auto;
   /* 切分类会换掉整批行：禁止浏览器「滚动锚定」替用户调整外层滚动位置 */
   overflow-anchor: none;
+}
+
+/*
+ * ChoicePicker 的候选浮层在触发器正下方。映射行区本身是滚动容器，
+ * 默认 overflow 会把菜单裁在行区里；展开时只放开溢出，不改变行区高度。
+ */
+.mappingRows:has([data-route-map-real] button[aria-expanded='true']) {
+  overflow-y: visible;
+}
+
+.mappingTable:has([data-route-map-real] button[aria-expanded='true']) {
+  z-index: 20;
 }
 
 /* 空档不留空长表（#1150）：行区塌成一行提示，表头一起收掉 */
@@ -151,6 +164,16 @@
 
 .mappingRealModel > * {
   width: 100%;
+}
+
+/* 真实模型下拉的触发框与映射面板同底；悬停 / 展开再抬一档。 */
+.mappingRealModel > [data-choice-picker] > button {
+  background: var(--bg-subtle);
+}
+
+.mappingRealModel > [data-choice-picker] > button:hover,
+.mappingRealModel > [data-choice-picker] > button[aria-expanded='true'] {
+  background: var(--bg-hover);
 }
 
 .mappingInlineError {

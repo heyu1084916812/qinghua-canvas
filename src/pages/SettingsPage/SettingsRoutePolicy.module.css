@@ -1,6 +1,6 @@
 .globalRoute {
   width: 100%;
-  max-width: 1120px;
+  max-width: 1344px;
   /**
    * ⚠️ **必须显式写 `border-box`**（用户第 19 批第 1 条：「最上方的比下方的宽，我要一样宽」）。
    *
@@ -43,6 +43,15 @@
   gap: var(--space-2);
 }
 
+.globalRouteControls [data-choice-picker] > button {
+  background: var(--bg-surface);
+}
+
+.globalRouteControls [data-choice-picker] > button:hover,
+.globalRouteControls [data-choice-picker] > button[aria-expanded='true'] {
+  background: var(--bg-hover);
+}
+
 .routeScopeButton,
 .routeScopeReset {
   min-height: 32px;
@@ -81,7 +90,7 @@
 
 .routeScopePanel {
   width: 100%;
-  max-width: 1120px;
+  max-width: 1344px;
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
@@ -89,6 +98,8 @@
   padding: var(--space-4);
   border-radius: var(--radius-node);
   background: var(--bg-subtle);
+  transform-origin: top center;
+  animation: routeScopePanelIn 200ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 .routeScopeHead {
@@ -109,6 +120,7 @@
   border: var(--border);
   border-radius: var(--radius-control);
   background: var(--bg-surface);
+  animation: routeScopeChannelIn 180ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 .routeScopeChannelHead {
@@ -178,6 +190,8 @@
   gap: var(--space-2);
   padding: var(--space-2) var(--space-3) var(--space-3) 48px;
   border-top: var(--border);
+  transform-origin: top center;
+  animation: routeScopeGridIn 180ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 .routeScopeOption {
@@ -324,4 +338,45 @@
 
 .fileInput {
   display: none;
+}
+
+@keyframes routeScopePanelIn {
+  from {
+    opacity: 0;
+    transform: translateY(-6px) scale(0.992);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes routeScopeChannelIn {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes routeScopeGridIn {
+  from {
+    opacity: 0;
+    transform: translateY(-3px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .routeScopePanel,
+  .routeScopeChannel,
+  .routeScopeGrid {
+    animation: none;
+  }
 }

@@ -47168,7 +47168,150 @@ async function g1203(browser) {
   }
 }
 
-const ALL_GROUPS = [g1, g2, g3, g4, g5, g6, g7, g8, g9, g10, g11, g12, g13, g14, g15, g16, g17, g18, g19, g23, g24, g37, g42, g43, g44, g45, g46, g47, g48, g49, g51, g52, g53, g55, g56, g57, g58, g59, g60, g61, g62, g63, g64, g65, g66, g67, g68, g69, g70, g71, g72, g73, g74, g75, g76, g77, g78, g79, g80, g81, g82, g83, g84, g85, g86, g87, g88, g89, g90, g91, g92, g93, g94, g95, g96, g97, g98, g99, g100, g101, g102, g103, g104, g105, g106, g107, g108, g109, g110, g111, g112, g113, g114, g115, g116, g117, g118, g119, g120, g121, g122, g123, g125, g126, g127, g128, g129, g130, g131, g132, g133, g134, g135, g136, g137, g138, g139, g140, g141, g142, g143, g144, g145, g146, g147, g148, g149, g150, g151, g152, g153, g154, g155, g156, g157, g158, g159, g160, g161, g162, g164, g165, g166, g167, g168, g169, g170, g171, g735, g769, g795, g798, g800, g865, g1182, g1195, g1196, g1201, g1203]
+/** G1204 映射浮层、选路表单宽度与路由范围动画。 */
+async function g1204(browser) {
+  const g = 'G1204 映射浮层与路由表单'
+  const compact = process.env.SMOKE_VIEWPORT === '1024'
+  const viewport = compact
+    ? { width: 1024, height: 700 }
+    : { width: 1440, height: 900 }
+  const suffix = `${process.env.SMOKE_DARK === '1' ? 'dark' : 'light'}-${compact ? '1024x700' : '1440x900'}`
+  const ctx = await newCtx(browser, { viewport })
+  const page = await ctx.newPage()
+  const pageErrors = []
+  page.on('pageerror', (error) => pageErrors.push(String(error).slice(0, 160)))
+
+  try {
+    await configureMockChannel(page)
+    await gotoSettings(page)
+    await page.locator(USER_CHANNEL).first().click()
+    const firstMapRow = page.locator('[data-route-map-row]').first()
+    await firstMapRow.waitFor({ state: 'visible', timeout: 5000 })
+
+    const fieldColors = await firstMapRow.evaluate((row) => {
+      const section = row.closest('[data-settings-section="mapping"]')
+      const panel = section?.querySelector('[class*="mappingPanel"]')
+      const trigger = row.querySelector('[data-route-map-real] [data-choice-picker] > button')
+      return {
+        panel: panel ? getComputedStyle(panel).backgroundColor : '',
+        trigger: trigger ? getComputedStyle(trigger).backgroundColor : '',
+      }
+    })
+    rec(
+      g,
+      '★ 真实模型触发框与映射面板同底',
+      !!fieldColors.panel && fieldColors.trigger === fieldColors.panel,
+      JSON.stringify(fieldColors),
+    )
+
+    await firstMapRow
+      .locator('[data-route-map-real] [data-choice-picker] > button')
+      .click()
+    const mapPopup = page.locator('[data-route-map-real] [role="listbox"]').first()
+    await mapPopup.waitFor({ state: 'visible', timeout: 5000 })
+    const layering = await mapPopup.evaluate((popup) => {
+      const rect = popup.getBoundingClientRect()
+      const rows = popup.closest('[data-route-map-rows]')
+      const rowsRect = rows?.getBoundingClientRect()
+      const point = document.elementFromPoint(
+        rect.left + Math.min(rect.width / 2, 80),
+        Math.min(rect.bottom - 4, rect.top + rect.height / 2),
+      )
+      return {
+        popupAnimation: getComputedStyle(popup).animationName,
+        belowRows: rowsRect ? rect.bottom > rowsRect.bottom : false,
+        rowsOverflow: rows ? getComputedStyle(rows).overflowY : '',
+        popupHeight: Math.round(rect.height),
+        popupScrollHeight: popup.scrollHeight,
+        onTop: !!point && popup.contains(point),
+      }
+    })
+    rec(
+      g,
+      '★★ 模型下拉浮在最顶层，不被映射行区裁切',
+      layering.onTop &&
+        layering.rowsOverflow === 'visible' &&
+        layering.popupHeight > 0,
+      JSON.stringify(layering),
+    )
+    await sleep(240)
+    await page.screenshot({ path: `${OUT}/1204-mapping-popup-${suffix}.png` })
+    await page.keyboard.press('Escape')
+    await mapPopup.waitFor({ state: 'detached', timeout: 5000 })
+    await page.screenshot({ path: `${OUT}/1204-mapping-${suffix}.png` })
+
+    const routingDisclosure = page.locator('[data-settings-routing-disclosure]')
+    if (!(await routingDisclosure.evaluate((node) => node.open))) {
+      await routingDisclosure.locator('summary').click()
+    }
+    const routeChrome = await page.evaluate(() => {
+      const route = document.querySelector('[data-settings-global-route]')
+      const workarea = document.querySelector('[data-settings-workarea]')
+      const strategy = document.querySelector('[data-route-strategy]')
+      const attempts = document.querySelector(
+        '[data-choice-picker="routing-max-attempts"] > button',
+      )
+      const scope = document.querySelector('[data-routing-scope-toggle]')
+      return {
+        routeWidth: route ? Math.round(route.getBoundingClientRect().width) : 0,
+        workareaWidth: workarea ? Math.round(workarea.getBoundingClientRect().width) : 0,
+        backgrounds: [strategy, attempts, scope].map((node) =>
+          node ? getComputedStyle(node).backgroundColor : '',
+        ),
+      }
+    })
+    rec(
+      g,
+      '★★ 选路策略与下方工作区同宽，右侧不再留空',
+      routeChrome.routeWidth > 0 &&
+        Math.abs(routeChrome.routeWidth - routeChrome.workareaWidth) <= 2,
+      JSON.stringify(routeChrome),
+    )
+    rec(
+      g,
+      '★★ 策略 / 次数 / 路由范围三个触发器同底色',
+      routeChrome.backgrounds.every(
+        (color) => color && color === routeChrome.backgrounds[0],
+      ),
+      JSON.stringify(routeChrome.backgrounds),
+    )
+
+    await page.locator('[data-routing-scope-toggle]').click()
+    const scopePanel = page.locator('[data-routing-scope]')
+    await scopePanel.waitFor({ state: 'visible', timeout: 5000 })
+    const scopeMotion = await scopePanel.evaluate((panel) => ({
+      panel: getComputedStyle(panel).animationName,
+      channel: getComputedStyle(
+        panel.querySelector('[data-routing-channel]'),
+      ).animationName,
+    }))
+    rec(
+      g,
+      '★★ 路由范围展开时面板与渠道卡有动画',
+      scopeMotion.panel !== 'none' &&
+        scopeMotion.panel !== '' &&
+        scopeMotion.channel !== 'none' &&
+        scopeMotion.channel !== '',
+      JSON.stringify(scopeMotion),
+    )
+
+    const firstExpand = page.locator('[data-routing-channel-expand]').first()
+    await firstExpand.click()
+    const scopeGrid = page.locator('[data-routing-channel-groups]').first()
+    await scopeGrid.waitFor({ state: 'visible', timeout: 5000 })
+    rec(
+      g,
+      '★ 渠道分组展开内容也有动画',
+      (await scopeGrid.evaluate((node) => getComputedStyle(node).animationName)) !== 'none',
+    )
+    await page.screenshot({ path: `${OUT}/1204-scope-${suffix}.png` })
+    rec(g, '无未捕获异常', pageErrors.length === 0, pageErrors.join(' | '))
+  } finally {
+    await ctx.close()
+  }
+}
+
+const ALL_GROUPS = [g1, g2, g3, g4, g5, g6, g7, g8, g9, g10, g11, g12, g13, g14, g15, g16, g17, g18, g19, g23, g24, g37, g42, g43, g44, g45, g46, g47, g48, g49, g51, g52, g53, g55, g56, g57, g58, g59, g60, g61, g62, g63, g64, g65, g66, g67, g68, g69, g70, g71, g72, g73, g74, g75, g76, g77, g78, g79, g80, g81, g82, g83, g84, g85, g86, g87, g88, g89, g90, g91, g92, g93, g94, g95, g96, g97, g98, g99, g100, g101, g102, g103, g104, g105, g106, g107, g108, g109, g110, g111, g112, g113, g114, g115, g116, g117, g118, g119, g120, g121, g122, g123, g125, g126, g127, g128, g129, g130, g131, g132, g133, g134, g135, g136, g137, g138, g139, g140, g141, g142, g143, g144, g145, g146, g147, g148, g149, g150, g151, g152, g153, g154, g155, g156, g157, g158, g159, g160, g161, g162, g164, g165, g166, g167, g168, g169, g170, g171, g735, g769, g795, g798, g800, g865, g1182, g1195, g1196, g1201, g1203, g1204]
 // ────────────────────────────────────────────────────────────
 // G169 框选多节点拖动：**松手那一刻不许再有人挪**（用户 2026-11-18 偶发：
 //      「框选多个节点，移动的时候松开鼠标会有一张图片移动了位置，好像多了一个步骤」）

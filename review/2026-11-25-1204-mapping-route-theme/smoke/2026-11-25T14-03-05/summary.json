@@ -1,0 +1,23 @@
+{
+  "groups": [
+    "g1204"
+  ],
+  "results": [
+    {
+      "group": "g1204",
+      "ok": true,
+      "code": 0,
+      "timedOut": false,
+      "passed": 7,
+      "failed": 0,
+      "total": 7,
+      "externalSkipped": 0,
+      "elapsedMs": 66729,
+      "log": "E:\\软件\\无限画布\\轻画\\.playwright-verify\\smoke-matrix\\2026-11-25T14-03-05\\000-g1204\\smoke.log",
+      "storeDir": "E:\\软件\\无限画布\\轻画\\.playwright-verify\\smoke-matrix\\2026-11-25T14-03-05\\000-g1204\\localappdata\\com.qinghua.canvas\\shared-store-v1",
+      "port": 18800,
+      "dataDir": "E:\\软件\\无限画布\\轻画\\.playwright-verify\\smoke-matrix\\2026-11-25T14-03-05\\000-g1204\\localappdata\\com.qinghua.canvas\\shared-store-v1",
+      "storeBase": "http://127.0.0.1:18800"
+    }
+  ]
+}

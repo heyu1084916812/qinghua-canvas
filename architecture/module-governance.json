@@ -3760,7 +3760,7 @@
       "test": [
         "src/pages/SettingsPage/settingsPageCssArchitecture.test.ts"
       ],
-      "budget": 213
+      "budget": 245
     },
     {
       "module": "src/pages/SettingsPage/SettingsModelCategory.module.css",
@@ -3919,7 +3919,7 @@
       "test": [
         "src/pages/SettingsPage/settingsPageCssArchitecture.test.ts"
       ],
-      "budget": 342
+      "budget": 390
     },
     {
       "module": "src/pages/SkillsPage/SkillsDetailEditor.module.css",
