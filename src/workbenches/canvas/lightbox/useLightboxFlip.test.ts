@@ -11,6 +11,7 @@ import {
 import {
   centerAnchoredFlipTransform,
   rectStyle,
+  resolveEntryTargetRect,
 } from './lightboxFlipFrame'
 import { predictedMediaRect } from './lightboxViewportMath'
 
@@ -64,6 +65,12 @@ describe('centerAnchoredFlipTransform', () => {
         { left: 200, top: 100, width: 300, height: 150 },
       ),
     ).toBe('translate(-290px, -130px) scale(0.3333333333333333, 0.3333333333333333)')
+  })
+
+  it('waits for a mounted media element to receive its final settled box', () => {
+    const predicted = snapshotRect({ left: 0, top: 0, width: 320, height: 180 })
+    expect(resolveEntryTargetRect(null, predicted, true)).toBeNull()
+    expect(resolveEntryTargetRect(null, predicted, false)).toBe(predicted)
   })
 })
 

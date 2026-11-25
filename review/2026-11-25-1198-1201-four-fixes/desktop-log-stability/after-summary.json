@@ -1,0 +1,41 @@
+{
+  "chosen": {
+    "index": 0,
+    "src": "http://127.0.0.1:18765/thumb/cd722635ea797b3e",
+    "naturalWidth": 640,
+    "naturalHeight": 640,
+    "width": 62,
+    "height": 62
+  },
+  "thumbBox": {
+    "x": 951.984375,
+    "y": 265.9375,
+    "width": 62,
+    "height": 62
+  },
+  "firstSettledAt": 123.8,
+  "firstCloneAt": 139.3,
+  "firstOverlayAt": 144.8,
+  "settledRects": [
+    "382px:112px:676px:676px"
+  ],
+  "finalMedia": {
+    "left": 382,
+    "top": 112,
+    "width": 678,
+    "height": 678,
+    "style": {
+      "left": "382px",
+      "top": "112px",
+      "width": "676px",
+      "height": "676px",
+      "transform": "",
+      "opacity": ""
+    },
+    "computed": {
+      "transform": "none",
+      "visibility": "visible",
+      "opacity": "1"
+    }
+  }
+}

@@ -8282,6 +8282,24 @@ async function g49(browser) {
   rec(g, '日志里有结果缩略图', hasThumb)
   if (hasThumb) {
     const thumbBox = await thumb.locator('img').boundingBox()
+    await page.evaluate(() => {
+      window.__logFlipStability = []
+      const startedAt = performance.now()
+      const tick = () => {
+        const overlay = document.querySelector('[data-lightbox]')
+        const media = document.querySelector('[data-lightbox-media]')
+        const style = media instanceof HTMLElement ? media.style : null
+        window.__logFlipStability.push({
+          t: performance.now() - startedAt,
+          overlayOpacity: overlay ? Number.parseFloat(getComputedStyle(overlay).opacity) : 0,
+          media: style
+            ? { left: style.left, top: style.top, width: style.width, height: style.height }
+            : null,
+        })
+        if (performance.now() - startedAt < 1200) requestAnimationFrame(tick)
+      }
+      requestAnimationFrame(tick)
+    })
     await thumb.click()
     const logFlip = await page.waitForFunction(() => {
       const clone = document.querySelector('[data-lightbox-flip-clone]')
@@ -8316,6 +8334,31 @@ async function g49(browser) {
         Math.abs(logFlip.center.y - (thumbBox.y + thumbBox.height / 2)) <= 1.5 &&
         logFlip.to.includes('scale(1, 1)'),
       JSON.stringify({ thumbBox, logFlip }),
+    )
+    const stability = await page.evaluate(() => {
+      const samples = window.__logFlipStability ?? []
+      const firstVisible = samples.find((sample) => sample.overlayOpacity > 0.01)
+      if (!firstVisible) return null
+      const settledRects = samples
+        .filter((sample) => sample.t <= firstVisible.t && sample.media?.width && sample.media?.height)
+        .map((sample) => `${sample.media.left}:${sample.media.top}:${sample.media.width}:${sample.media.height}`)
+      const finalMedia = [...samples].reverse().find((sample) => sample.media?.width)?.media ?? null
+      const finalKey = finalMedia
+        ? `${finalMedia.left}:${finalMedia.top}:${finalMedia.width}:${finalMedia.height}`
+        : null
+      return {
+        firstVisibleAt: firstVisible.t,
+        settledRects: [...new Set(settledRects)],
+        finalMedia: finalKey,
+      }
+    })
+    rec(
+      g,
+      '★★ 灯箱目标框稳定后才开始淡入与缩放',
+      !!stability &&
+        stability.settledRects.length === 1 &&
+        stability.finalMedia === stability.settledRects[0],
+      JSON.stringify(stability),
     )
     // ⑦ 点击空白关闭
     const st = await page.locator('[data-lightbox-stage]').boundingBox()

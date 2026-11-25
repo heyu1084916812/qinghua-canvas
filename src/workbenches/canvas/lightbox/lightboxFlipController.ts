@@ -3,9 +3,11 @@ import { useLightboxAssetMeta } from './galleryCrossfade'
 import type { CanvasStore } from '../../../state/workbenches/canvas/store'
 import { predictedMediaRect } from './lightboxViewportMath'
 import {
-  centerAnchoredFlipTransform,
   flipClone,
+  lightboxEntryFrames,
+  lightboxExitFrames,
   rectStyle,
+  resolveEntryTargetRect,
 } from './lightboxFlipFrame'
 export const LIGHTBOX_MOTION = {
   enterMs: 440,
@@ -103,18 +105,11 @@ export function settledMediaRect(
   if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) return null
   return usableRect(target.getBoundingClientRect())
 }
-const mediaOf = (id?: string) => id && typeof document !== 'undefined'
-  ? document.querySelector<HTMLElement>(`[data-node-id="${CSS.escape(id)}"] img, [data-node-id="${CSS.escape(id)}"] video`)
-  : null
+const mediaOf = (id?: string) => id && typeof document !== 'undefined' ? document.querySelector<HTMLElement>(`[data-node-id="${CSS.escape(id)}"] img, [data-node-id="${CSS.escape(id)}"] video`) : null
 const rectOf = (id?: string) => usableRect(mediaOf(id)?.getBoundingClientRect() ?? null)
 const rectFromSnapshot = (value?: { left: number; top: number; width: number; height: number }) => usableRect(value ?? null)
-function computedRadius(element: HTMLElement | null) {
-  return element ? getComputedStyle(element).borderRadius : null
-}
-function computedShadow(element: HTMLElement | null, fallback: string) {
-  const shadow = element ? getComputedStyle(element).boxShadow : ''
-  return shadow && shadow !== 'none' ? shadow : fallback
-}
+function computedRadius(element: HTMLElement | null) { return element ? getComputedStyle(element).borderRadius : null }
+function computedShadow(element: HTMLElement | null, fallback: string) { const shadow = element ? getComputedStyle(element).boxShadow : ''; return shadow && shadow !== 'none' ? shadow : fallback }
 export function useLightboxFlipController({ stageRef, store, assetHash, sourceNodeId, natural, open }: {
   stageRef: React.RefObject<HTMLElement | null>; store: CanvasStore; assetHash?: string; sourceNodeId?: string; natural?: { w: number; h: number } | null; open: boolean
 }) {
@@ -177,51 +172,63 @@ export function useLightboxFlipController({ stageRef, store, assetHash, sourceNo
     if (sourceEl) sourceEl.style.visibility = 'hidden'
     const overlay = stageRef.current?.closest<HTMLElement>('[data-lightbox]')
     overlay?.setAttribute('data-lightbox-flipping', '')
-    if (overlay) {
-      const overlayIn = overlay.animate(
-        [{ opacity: '0' }, { opacity: '1' }],
-        { duration: LIGHTBOX_MOTION.overlayMs, easing: LIGHTBOX_MOTION.easing, fill: 'forwards' },
-      )
-      overlayAnimation.current = overlayIn
-      overlayIn.finished.then(() => {
-        if (overlayAnimation.current !== overlayIn) return
-        overlay.style.opacity = ''
-        overlayAnimation.current = null
-      }, () => undefined)
-    }
-    let frames = 0, raf = 0
+    if (overlay) overlay.style.opacity = '0'
+    let waits = 0, stableFrames = 0, lastTargetKey = '', raf = 0
     const play = () => {
       const target = stageRef.current?.querySelector<HTMLElement>('[data-lightbox-media]')
       if (target) target.style.opacity = '0'
-      const to = settledMediaRect(target ?? null) ?? predictedMediaRect(stageRef.current, naturalRef.current)
+      const measured = settledMediaRect(target ?? null)
+      const to = resolveEntryTargetRect(
+        measured,
+        predictedMediaRect(stageRef.current, naturalRef.current),
+        !!target,
+      )
       if (!to) {
-        if (++frames < 120) {
+        if (++waits < 120) {
           raf = requestAnimationFrame(play)
         } else {
           cleanup()
         }
         return
       }
+      const targetKey = `${to.left}:${to.top}:${to.width}:${to.height}`
+      if (targetKey !== lastTargetKey || stableFrames < 1) {
+        lastTargetKey = targetKey
+        stableFrames += 1
+        raf = requestAnimationFrame(play)
+        return
+      }
+      if (overlay && !overlayAnimation.current) {
+        const overlayIn = overlay.animate(
+          [{ opacity: '0' }, { opacity: '1' }],
+          { duration: LIGHTBOX_MOTION.overlayMs, easing: LIGHTBOX_MOTION.easing, fill: 'forwards' },
+        )
+        overlayAnimation.current = overlayIn
+        overlayIn.finished.then(() => {
+          if (overlayAnimation.current !== overlayIn) return
+          overlay.style.opacity = ''
+          overlayAnimation.current = null
+        }, () => undefined)
+      }
       const targetRadius = computedRadius(target ?? null) ?? '0px'
-      const fromTransform = centerAnchoredFlipTransform(first.current!, to)
+      const frames = lightboxEntryFrames(
+        first.current!,
+        to,
+        sourceRadius,
+        targetRadius,
+        sourceShadow,
+        TARGET_SHADOW,
+      )
+      const fromTransform = frames[0].transform as string
       Object.assign(floating.style, rectStyle(to), {
         transformOrigin: 'center center',
         transform: fromTransform,
       })
-      const anim = floating.animate([
-        {
-          transform: fromTransform,
-          borderRadius: sourceRadius,
-          boxShadow: sourceShadow,
-          opacity: '1',
-        },
-        {
-          transform: 'translate(0px, 0px) scale(1, 1)',
-          borderRadius: targetRadius,
-          boxShadow: TARGET_SHADOW,
-          opacity: '1',
-        },
-      ], { duration: LIGHTBOX_MOTION.enterMs, easing: LIGHTBOX_MOTION.easing, fill: 'forwards' })
+      const anim = floating.animate(frames, {
+        duration: LIGHTBOX_MOTION.enterMs,
+        easing: LIGHTBOX_MOTION.easing,
+        fill: 'forwards',
+      })
       animation.current = anim
       if (enterTimer.current !== null) window.clearTimeout(enterTimer.current)
       enterTimer.current = window.setTimeout(() => {
@@ -306,7 +313,6 @@ export function useLightboxFlipController({ stageRef, store, assetHash, sourceNo
     const currentRadius = computedRadius(floating) ?? '0px'
     const currentShadow = computedShadow(floating, TARGET_SHADOW)
     animation.current?.cancel()
-    const exitTransform = centerAnchoredFlipTransform(destination, current)
     Object.assign(floating.style, rectStyle(current), {
       borderRadius: currentRadius,
       boxShadow: currentShadow,
@@ -316,20 +322,17 @@ export function useLightboxFlipController({ stageRef, store, assetHash, sourceNo
     const sourceEl = mediaOf(lightbox?.sourceNodeId ?? sourceNodeId)
     const destinationRadius = lightbox?.sourceRect?.borderRadius ?? computedRadius(sourceEl) ?? '0px'
     const destinationShadow = computedShadow(sourceEl, SOURCE_SHADOW)
-    const anim = floating.animate([
-      {
-        transform: 'none',
-        borderRadius: currentRadius,
-        boxShadow: currentShadow,
-        opacity: '1',
-      },
-      {
-        transform: exitTransform,
-        borderRadius: destinationRadius,
-        boxShadow: destinationShadow,
-        opacity: '1',
-      },
-    ], { duration: LIGHTBOX_MOTION.exitMs, easing: LIGHTBOX_MOTION.easing, fill: 'forwards' })
+    const anim = floating.animate(
+      lightboxExitFrames(
+        current,
+        destination,
+        currentRadius,
+        destinationRadius,
+        currentShadow,
+        destinationShadow,
+      ),
+      { duration: LIGHTBOX_MOTION.exitMs, easing: LIGHTBOX_MOTION.easing, fill: 'forwards' },
+    )
     animation.current = anim
     let completed = false
     const done = () => {

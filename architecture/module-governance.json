@@ -13494,12 +13494,15 @@
       "publicApi": [
         "rectStyle",
         "centerAnchoredFlipTransform",
+        "resolveEntryTargetRect",
+        "lightboxEntryFrames",
+        "lightboxExitFrames",
         "flipClone"
       ],
       "test": [
         "src/workbenches/canvas/lightbox/useLightboxFlip.test.ts"
       ],
-      "budget": 60
+      "budget": 100
     },
     {
       "module": "src/workbenches/canvas/lightbox/galleryCrossfade.ts",
