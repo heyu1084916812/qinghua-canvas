@@ -3,12 +3,15 @@ import {
   LIGHTBOX_MOTION,
   lightboxEntryMode,
   lightboxPrimarySource,
-  rectStyle,
   settledMediaRect,
   snapshotRect,
   sourceNodeIdOf,
   sourceRectFromFrame,
 } from './lightboxFlipController'
+import {
+  centerAnchoredFlipTransform,
+  rectStyle,
+} from './lightboxFlipFrame'
 import { predictedMediaRect } from './lightboxViewportMath'
 
 describe('sourceNodeIdOf', () => {
@@ -50,6 +53,17 @@ describe('rectStyle', () => {
     expect(rectStyle({ left: 12, top: 34, width: 56, height: 78 })).toEqual({
       left: '12px', top: '34px', width: '56px', height: '78px',
     })
+  })
+})
+
+describe('centerAnchoredFlipTransform', () => {
+  it('maps a source rect onto the target around their shared center', () => {
+    expect(
+      centerAnchoredFlipTransform(
+        { left: 10, top: 20, width: 100, height: 50 },
+        { left: 200, top: 100, width: 300, height: 150 },
+      ),
+    ).toBe('translate(-290px, -130px) scale(0.3333333333333333, 0.3333333333333333)')
   })
 })
 

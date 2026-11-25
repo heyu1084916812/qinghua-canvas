@@ -8139,16 +8139,19 @@ async function g49(browser) {
   const enterFlip = await page.waitForFunction(() => {
     const clone = document.querySelector('[data-lightbox-flip-clone]')
     const keyframes = clone?.getAnimations()[0]?.effect?.getKeyframes() ?? []
-    const fromWidth = Number.parseFloat(String(keyframes[0]?.width ?? ''))
-    const toWidth = Number.parseFloat(String(keyframes[1]?.width ?? ''))
-    return fromWidth > 0 && toWidth > 0
-      ? { fromWidth, toWidth, duration: clone?.getAnimations()[0]?.effect?.getTiming().duration }
+    const fromTransform = String(keyframes[0]?.transform ?? '')
+    const toTransform = String(keyframes[1]?.transform ?? '')
+    return fromTransform && toTransform
+      ? { fromTransform, toTransform, duration: clone?.getAnimations()[0]?.effect?.getTiming().duration }
       : null
   }, { timeout: 2500 }).then((handle) => handle.jsonValue()).catch(() => null)
   rec(
     g,
-    '★★ 入场 FLIP 使用真实画布矩形与已布局灯箱尺寸',
-    !!enterFlip && enterFlip.toWidth > 1 && enterFlip.duration === 440,
+    '★★ 入场 FLIP 使用真实画布矩形并以图片中心为锚点',
+    !!enterFlip &&
+      enterFlip.fromTransform.includes('scale(') &&
+      enterFlip.toTransform.includes('scale(1, 1)') &&
+      enterFlip.duration === 440,
     JSON.stringify(enterFlip),
   )
   const exclusiveFlip = await page.waitForFunction(() => {
@@ -8253,16 +8256,19 @@ async function g49(browser) {
     const overlay = document.querySelector('[data-lightbox]')
     const clone = document.querySelector('[data-lightbox-flip-clone]')
     const keyframes = clone?.getAnimations()[0]?.effect?.getKeyframes() ?? []
-    const fromWidth = Number.parseFloat(String(keyframes[0]?.width ?? ''))
-    const toWidth = Number.parseFloat(String(keyframes[1]?.width ?? ''))
-    return overlay?.style.pointerEvents === 'none' && fromWidth > 0 && toWidth > 0
-      ? { fromWidth, toWidth, duration: clone?.getAnimations()[0]?.effect?.getTiming().duration }
+    const fromTransform = String(keyframes[0]?.transform ?? '')
+    const toTransform = String(keyframes[1]?.transform ?? '')
+    return overlay?.style.pointerEvents === 'none' && fromTransform && toTransform
+      ? { fromTransform, toTransform, duration: clone?.getAnimations()[0]?.effect?.getTiming().duration }
       : null
   }, { timeout: 2500 }).then((handle) => handle.jsonValue()).catch(() => null)
   rec(
     g,
-    '★★ 出场 FLIP 从灯箱反向回原图且退场期间冻结指针',
-    !!exitFlip && exitFlip.toWidth > 1 && exitFlip.duration === 400,
+    '★★ 出场 FLIP 以图片中心为锚点回原图且退场期间冻结指针',
+    !!exitFlip &&
+      exitFlip.fromTransform.includes('matrix') === false &&
+      exitFlip.toTransform.includes('scale(') &&
+      exitFlip.duration === 400,
     JSON.stringify(exitFlip),
   )
   await page.locator('[data-lightbox]').waitFor({ state: 'detached', timeout: 2000 }).catch(() => {})
@@ -8275,9 +8281,42 @@ async function g49(browser) {
   const hasThumb = (await thumb.count()) === 1
   rec(g, '日志里有结果缩略图', hasThumb)
   if (hasThumb) {
+    const thumbBox = await thumb.locator('img').boundingBox()
     await thumb.click()
+    const logFlip = await page.waitForFunction(() => {
+      const clone = document.querySelector('[data-lightbox-flip-clone]')
+      const animation = clone?.getAnimations()[0]
+      const frames = animation?.effect?.getKeyframes() ?? []
+      const from = String(frames[0]?.transform ?? '')
+      const to = String(frames[1]?.transform ?? '')
+      if (!clone || !from || !to) return null
+      const matrix = new DOMMatrixReadOnly(from)
+      const left = Number.parseFloat(clone.style.left)
+      const top = Number.parseFloat(clone.style.top)
+      const width = Number.parseFloat(clone.style.width)
+      const height = Number.parseFloat(clone.style.height)
+      return {
+        transformOrigin: clone.style.transformOrigin,
+        center: {
+          x: left + width / 2 + matrix.e,
+          y: top + height / 2 + matrix.f,
+        },
+        to,
+      }
+    }, { timeout: 2500 }).then((handle) => handle.jsonValue()).catch(() => null)
     await sleep(450)
     rec(g, '点击日志缩略图打开灯箱（§6.18）', (await page.locator('[data-lightbox]').count()) === 1)
+    rec(
+      g,
+      '★★ 日志缩略图入场统一从真实图片中心放大',
+      !!thumbBox &&
+        !!logFlip &&
+        logFlip.transformOrigin === 'center center' &&
+        Math.abs(logFlip.center.x - (thumbBox.x + thumbBox.width / 2)) <= 1.5 &&
+        Math.abs(logFlip.center.y - (thumbBox.y + thumbBox.height / 2)) <= 1.5 &&
+        logFlip.to.includes('scale(1, 1)'),
+      JSON.stringify({ thumbBox, logFlip }),
+    )
     // ⑦ 点击空白关闭
     const st = await page.locator('[data-lightbox-stage]').boundingBox()
     await page.mouse.click(st.x + 40, st.y + 40)
@@ -46431,6 +46470,9 @@ async function g1195(browser) {
 
     const capture = async (mode) => {
       if (mode !== 'dblclick') await genPanel(page, source)
+      const nodesBefore = mode === 'rotate'
+        ? await page.locator('.react-flow__node').count()
+        : null
       await page.evaluate(() => {
         window.__lightboxEntrySamples = []
         const startedAt = performance.now()
@@ -46466,19 +46508,23 @@ async function g1195(browser) {
       await sleep(200)
       await page.screenshot({ path: `${OUT}/1195-lightbox-${mode}-${suffix}.png` })
       await sleep(800)
-      const result = await page.evaluate(() => {
+      const result = await page.evaluate(({ before, mode }) => {
         const samples = window.__lightboxEntrySamples ?? []
         const firstClone = samples.find((sample) => sample.clone)
         const lastClone = [...samples].reverse().find((sample) => sample.clone)
         const settled = [...samples].reverse().find((sample) => sample.media)
         return {
           mode: document.querySelector('[data-lightbox]')?.getAttribute('data-lightbox-mode'),
+          nodesBefore: before,
+          nodesAfter: mode === 'rotate'
+            ? document.querySelectorAll('.react-flow__node').length
+            : null,
           samples,
           firstClone,
           lastClone,
           settled,
         }
-      })
+      }, { before: nodesBefore, mode })
       await page.locator('[data-lightbox-close]').click({ timeout: 3000 }).catch(() => {})
       await page.locator('[data-lightbox]').waitFor({ state: 'detached', timeout: 5000 }).catch(() => {})
       await sleep(150)
@@ -46544,6 +46590,117 @@ async function g1195(browser) {
         entries[4]?.mode === 'annotate' &&
         entries[5]?.mode === 'rotate',
       JSON.stringify(entries.map((entry) => entry.mode)),
+    )
+    rec(
+      g,
+      '★★ 旋转只打开当前图片，不提前创建节点',
+      entries[5]?.nodesBefore === entries[5]?.nodesAfter,
+      JSON.stringify({ before: entries[5]?.nodesBefore, after: entries[5]?.nodesAfter }),
+    )
+    const nodesBeforeSave = await page.locator('.react-flow__node').count()
+    await genPanel(page, source)
+    await page.locator('[data-follow-action="rotate"]').click()
+    await page.locator('[data-lightbox][data-lightbox-mode="rotate"]').waitFor({ state: 'visible', timeout: 5000 })
+    await page.locator('[data-rotate-right]').click()
+    await page.locator('[data-rotate-save]').click()
+    await page.locator('[data-lightbox]').waitFor({ state: 'detached', timeout: 15_000 })
+    const nodesAfterSave = await page.locator('.react-flow__node').count()
+    rec(
+      g,
+      '★★ 保存旋转结果后才创建新节点',
+      nodesAfterSave === nodesBeforeSave + 1,
+      JSON.stringify({ before: nodesBeforeSave, after: nodesAfterSave }),
+    )
+    rec(g, '无未捕获异常', errors.length === 0, errors.join(' | '))
+  } finally {
+    await ctx.close()
+  }
+}
+
+async function g1201(browser) {
+  const g = 'G1201 主题切换后的画布点阵'
+  const suffix = `${process.env.SMOKE_DARK === '1' ? 'dark' : 'light'}-${process.env.SMOKE_VIEWPORT === '1024' ? '1024x700' : '1440x900'}`
+  const ctx = await newCtx(browser)
+  const page = await ctx.newPage()
+  const errors = []
+  page.on('pageerror', (error) => errors.push(String(error).slice(0, 200)))
+
+  try {
+    await gotoProjects(page)
+    await page.locator('[data-template="text2img"]').click()
+    await page.waitForURL(/\/canvas\//)
+    await page.locator('[data-canvas-hydrated="true"]').waitFor({ state: 'visible', timeout: 20_000 })
+    const surface = page.locator('[data-canvas-surface]').first()
+
+    const setTheme = async (theme) => {
+      const toggle = page.locator('[data-theme-toggle]').first()
+      if ((await toggle.getAttribute('data-theme-setting')) !== theme) await toggle.click()
+      await page.waitForFunction(
+        (next) => document.documentElement.dataset.theme === next,
+        theme,
+        { timeout: 2000 },
+      )
+      await sleep(120)
+    }
+
+    const sampleZoomedPattern = async (theme, phase) => {
+      await setTheme(theme)
+      const box = await surface.boundingBox()
+      if (!box) return null
+      const pane = await page.locator('.react-flow__pane').first().boundingBox()
+      if (!pane) return null
+      await page.mouse.move(pane.x + pane.width - 80, pane.y + pane.height - 80)
+      await page.mouse.wheel(0, -240)
+      await page.waitForFunction(
+        () => document.querySelector('[data-canvas-surface]')?.getAttribute('data-viewport-moving') === 'true',
+        { timeout: 2000 },
+      ).catch(() => {})
+      await sleep(80)
+      const sample = await page.evaluate(() => {
+        const layer = document.querySelector('[data-viewport-background]')
+        if (!(layer instanceof HTMLElement)) return null
+        const color = getComputedStyle(layer).getPropertyValue('--canvas-grid-line').trim()
+        let fill = ''
+        try {
+          const image = layer.style.backgroundImage
+          fill = image ? (decodeURIComponent(image).match(/fill="([^"]+)"/)?.[1] ?? '') : ''
+        } catch {
+          fill = ''
+        }
+        return {
+          color,
+          fill,
+          pattern: layer.style.backgroundImage,
+          visibility: getComputedStyle(layer).visibility,
+          moving: layer.closest('[data-canvas-surface]')?.getAttribute('data-viewport-moving'),
+        }
+      })
+      await page.screenshot({ path: `${OUT}/1201-theme-pattern-${phase}-${suffix}.png` })
+      await page.waitForFunction(
+        () => document.querySelector('[data-canvas-surface]')?.getAttribute('data-viewport-moving') !== 'true',
+        { timeout: 3000 },
+      ).catch(() => {})
+      return sample
+    }
+
+    const dark1 = await sampleZoomedPattern('dark', 'dark-1')
+    const light = await sampleZoomedPattern('light', 'light')
+    const dark2 = await sampleZoomedPattern('dark', 'dark-2')
+    const valid = (sample) =>
+      !!sample &&
+      sample.moving === 'true' &&
+      sample.visibility === 'visible' &&
+      !!sample.color &&
+      sample.fill === sample.color
+    rec(g, '★★ 深色主题缩放点阵使用当前深色令牌', valid(dark1), JSON.stringify(dark1))
+    rec(g, '★★ 切到浅色后缩放点阵改用浅色令牌', valid(light), JSON.stringify(light))
+    rec(g, '★★ 再切回深色后不残留浅色或旧点阵', valid(dark2), JSON.stringify(dark2))
+    rec(
+      g,
+      '★ 三种主题阶段的 SVG 点阵实际重建',
+      !!dark1?.pattern && !!light?.pattern && !!dark2?.pattern &&
+        dark1.pattern !== light.pattern &&
+        light.pattern !== dark2.pattern,
     )
     rec(g, '无未捕获异常', errors.length === 0, errors.join(' | '))
   } finally {
@@ -46619,7 +46776,7 @@ async function g1196(browser) {
   }
 }
 
-const ALL_GROUPS = [g1, g2, g3, g4, g5, g6, g7, g8, g9, g10, g11, g12, g13, g14, g15, g16, g17, g18, g19, g23, g24, g37, g42, g43, g44, g45, g46, g47, g48, g49, g51, g52, g53, g55, g56, g57, g58, g59, g60, g61, g62, g63, g64, g65, g66, g67, g68, g69, g70, g71, g72, g73, g74, g75, g76, g77, g78, g79, g80, g81, g82, g83, g84, g85, g86, g87, g88, g89, g90, g91, g92, g93, g94, g95, g96, g97, g98, g99, g100, g101, g102, g103, g104, g105, g106, g107, g108, g109, g110, g111, g112, g113, g114, g115, g116, g117, g118, g119, g120, g121, g122, g123, g125, g126, g127, g128, g129, g130, g131, g132, g133, g134, g135, g136, g137, g138, g139, g140, g141, g142, g143, g144, g145, g146, g147, g148, g149, g150, g151, g152, g153, g154, g155, g156, g157, g158, g159, g160, g161, g162, g164, g165, g166, g167, g168, g169, g170, g171, g735, g769, g795, g798, g800, g865, g1182, g1195, g1196]
+const ALL_GROUPS = [g1, g2, g3, g4, g5, g6, g7, g8, g9, g10, g11, g12, g13, g14, g15, g16, g17, g18, g19, g23, g24, g37, g42, g43, g44, g45, g46, g47, g48, g49, g51, g52, g53, g55, g56, g57, g58, g59, g60, g61, g62, g63, g64, g65, g66, g67, g68, g69, g70, g71, g72, g73, g74, g75, g76, g77, g78, g79, g80, g81, g82, g83, g84, g85, g86, g87, g88, g89, g90, g91, g92, g93, g94, g95, g96, g97, g98, g99, g100, g101, g102, g103, g104, g105, g106, g107, g108, g109, g110, g111, g112, g113, g114, g115, g116, g117, g118, g119, g120, g121, g122, g123, g125, g126, g127, g128, g129, g130, g131, g132, g133, g134, g135, g136, g137, g138, g139, g140, g141, g142, g143, g144, g145, g146, g147, g148, g149, g150, g151, g152, g153, g154, g155, g156, g157, g158, g159, g160, g161, g162, g164, g165, g166, g167, g168, g169, g170, g171, g735, g769, g795, g798, g800, g865, g1182, g1195, g1196, g1201]
 // ────────────────────────────────────────────────────────────
 // G169 框选多节点拖动：**松手那一刻不许再有人挪**（用户 2026-11-18 偶发：
 //      「框选多个节点，移动的时候松开鼠标会有一张图片移动了位置，好像多了一个步骤」）

@@ -3,13 +3,15 @@ import type { NodeSnapshot } from '../../../domain/canvas/model/node'
 import { toWorldRectInGraph } from '../../../domain/canvas/geometry/coords'
 import { assetNodeSize } from '../../../domain/canvas/layout/assetNodeSize'
 import { fingerprintBytes } from '../../../domain/shared/hash'
+import { createId } from '../../../shared/id'
 import type { CanvasStore } from '../../../state/workbenches/canvas/store'
+import type { Command } from '../../../state/commands'
 
 /**
- * 把「旋转 + 镜像」**真画进像素**并写回节点（一步撤销）。
+ * 把「旋转 + 镜像」**真画进像素**并创建派生节点（一步撤销）。
  *
  * 从 `RotateLayer` 里搬出来的（2026-10-16）：旋转现在住在**灯箱**里，
- * 而这段「把结果算出来 + 落成新素材 + 写回节点 + 节点框跟着新比例走」
+ * 而这段「把结果算出来 + 落成新素材 + 创建副本与连线 + 节点框跟着新比例走」
  * 与 UI 无关 —— 留在组件里会让灯箱那侧再抄一份，迟早漂移（这个仓库的老毛病）。
  */
 export interface RotateSaveInput {
@@ -21,6 +23,76 @@ export interface RotateSaveInput {
   angle: number
   mirrorH: boolean
   mirrorV: boolean
+}
+
+export interface RotatedResultCommandsInput {
+  graph: GraphSnapshot
+  node: NodeSnapshot
+  newId: string
+  newHash: string
+  bytes: Uint8Array
+  width: number
+  height: number
+  createdAt: number
+}
+
+/** The whole rotation result is one undoable plan and never mutates the source node. */
+export function rotatedResultCommands(
+  input: RotatedResultCommandsInput,
+): Command[] {
+  const { graph, node, newId, newHash, bytes, width, height, createdAt } = input
+  const rect = toWorldRectInGraph(node, graph)
+  const size = assetNodeSize({ width, height })
+  const copyX = rect.x + node.w + 40
+  return [
+    {
+      kind: 'asset.put',
+      asset: {
+        hash: newHash,
+        mime: 'image/png',
+        bytes,
+        width,
+        height,
+        createdAt,
+        projectId: graph.projectId,
+      },
+    },
+    {
+      kind: 'node.duplicate',
+      ids: [node.id],
+      newIds: [newId],
+      dx: node.w + 40,
+      dy: 0,
+      rewire: false,
+    },
+    {
+      kind: 'edge.connect',
+      source: node.id,
+      target: newId,
+      sourcePort: 'output',
+      targetPort: 'input',
+    },
+    {
+      kind: 'node.updateData',
+      id: newId,
+      patch: {
+        assetHash: newHash,
+        naturalSize: { width, height },
+        thumbOrder: [newHash],
+      },
+    },
+    {
+      kind: 'node.resize',
+      id: newId,
+      rect: {
+        x: copyX + (rect.w - size.w) / 2,
+        y: rect.y + (rect.h - size.h) / 2,
+        w: size.w,
+        h: size.h,
+      },
+      phase: 'end',
+    },
+  ]
 }
 
 export async function saveRotatedAsset(input: RotateSaveInput): Promise<void> {
@@ -54,39 +126,21 @@ export async function saveRotatedAsset(input: RotateSaveInput): Promise<void> {
   const newHash = await fingerprintBytes(bytes)
 
   /** 字节与哈希都算完了才开事务（plan 之间不得 await） */
-  const size = assetNodeSize({ width: w, height: h })
-  const rect = toWorldRectInGraph(node, graph)
+  const newId = createId('node')
+  const commands = rotatedResultCommands({
+    graph,
+    node,
+    newId,
+    newHash,
+    bytes,
+    width: w,
+    height: h,
+    createdAt: Date.now(),
+  })
   store.beginPlan(`rotate-save:${node.id}`, '保存旋转结果')
-  store.dispatch({
-    kind: 'asset.put',
-    asset: {
-      hash: newHash,
-      mime: 'image/png',
-      bytes,
-      width: w,
-      height: h,
-      createdAt: Date.now(),
-      projectId: graph.projectId,
-    },
-  })
-  store.dispatch({
-    kind: 'node.updateData',
-    id: node.id,
-    patch: { assetHash: newHash, naturalSize: { width: w, height: h }, thumbOrder: [newHash] },
-  })
-  /** 节点框跟着新比例走（居中缩放，别让图从框里跳出去） */
-  store.dispatch({
-    kind: 'node.resize',
-    id: node.id,
-    rect: {
-      x: rect.x + (rect.w - size.w) / 2,
-      y: rect.y + (rect.h - size.h) / 2,
-      w: size.w,
-      h: size.h,
-    },
-    phase: 'end',
-  })
+  for (const command of commands) store.dispatch(command)
   store.endPlan()
+  store.setSelection([newId])
   await store.flush()
   store.showUndoBar('已保存旋转结果')
 }

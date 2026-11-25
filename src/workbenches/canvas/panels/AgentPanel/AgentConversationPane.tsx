@@ -480,7 +480,7 @@ export function AgentConversationPane({
             key={questionCard.stepId}
             cardId={questionCard.stepId}
             questions={questionCard.questions}
-            disabled={statusIsBusy(status)}
+            disabled={status.kind === 'awaitingConfirm'}
             onSubmit={onAnswerQuestionCard}
           />
         ) : null}

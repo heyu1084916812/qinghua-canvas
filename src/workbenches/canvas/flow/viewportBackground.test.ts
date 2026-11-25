@@ -7,6 +7,14 @@ const css = fs.readFileSync(
   new URL('./FlowViewportBackground.module.css', import.meta.url),
   'utf8',
 )
+const source = fs.readFileSync(
+  new URL('./FlowViewportBackground.tsx', import.meta.url),
+  'utf8',
+)
+const runtimeSource = fs.readFileSync(
+  new URL('./viewportBackgroundRuntime.ts', import.meta.url),
+  'utf8',
+)
 
 describe('viewport gesture background metrics', () => {
   it('matches React Flow dot geometry at 100%', () => {
@@ -55,5 +63,12 @@ describe('viewport gesture background metrics', () => {
     expect(decodeURIComponent(viewportDotPattern('url(javascript:bad)'))).toContain(
       'fill="transparent"',
     )
+  })
+
+  it('invalidates the cached SVG color when the theme changes', () => {
+    expect(runtimeSource).toContain("attributeFilter: ['data-theme']")
+    expect(runtimeSource).toContain('requestAnimationFrame(refresh)')
+    expect(source).toContain('dotPatternRef.current = null')
+    expect(source).toContain('watchViewportBackgroundTheme')
   })
 })

@@ -24,7 +24,6 @@ import { childIdsOf, groupBgOf } from '../../../domain/canvas/nodeSpecs/group'
 import { ARRANGE_MODES } from '../../../domain/canvas/layout/arrangeModes'
 import { arrangeGroupMembers, refitGroupBox, ungroupNodes } from '../../../features/canvas/ungroupNodes'
 import { useArrangeTools } from '../../../features/canvas/useArrangeTools'
-import { createId } from '../../../shared/id'
 import { usePlatform } from '../../../app/providers/PlatformProvider'
 import { GRID_CUSTOM_MAX, GRID_PRESETS, splitNodeToGrid } from '../../../features/canvas/splitToGrid'
 import { noOverlapDelta } from '../../../features/canvas/duplicatePlacement'
@@ -57,6 +56,7 @@ import { sendSelectionToAgent } from '../../../features/canvas/agentHandoff'
 import { useOverlayExit } from '../overlay/useOverlayExit'
 import { useHudMotion } from '../overlay/useHudMotion'
 import { lightboxSourceRectForNode } from '../../../features/canvas/lightboxSourceRect'
+import { createId } from '../../../shared/id'
 
 /**
  * 出现跟随栏的节点类型。
@@ -298,34 +298,13 @@ function NodeActions({
   }
 
   /**
-   * 旋转与镜像（用户 2026-10-05 第 10 条）：「点击后右边复制一个新的节点并且连接，
-   * 上方出现功能栏……最右边还有一个保存按钮」。
-   *
-   * 复制 + 连线走**一个 plan**（一步撤销）；复制的 `rewire: false` —— 旋转副本是
-   * 「这张图的又一版」，不该把原图的整条上游也复制一份。
+   * 旋转与镜像只先打开当前图片的编辑器。副本和连线必须等用户保存成功后再创建，
+   * 否则取消编辑也会在画布上留下一个节点。
    */
   const onRotate = () => {
     if (!assetHash) return
     const sourceRect = lightboxSourceRectForNode(node.id, assetHash)
-    const id = createId('node')
-    store.beginPlan(`rotate:${id}`, '旋转与镜像')
-    store.dispatch({
-      kind: 'node.duplicate',
-      ids: [node.id],
-      newIds: [id],
-      dx: node.w + 40,
-      dy: 0,
-      rewire: false,
-    })
-    store.dispatch({
-      kind: 'edge.connect',
-      source: node.id,
-      target: id,
-      sourcePort: 'output',
-      targetPort: 'input',
-    })
-    store.endPlan()
-    store.openRotateEditor(id, { sourceRect })
+    store.openRotateEditor(node.id, { sourceRect })
   }
 
   return (

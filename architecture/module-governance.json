@@ -13464,7 +13464,6 @@
         "LIGHTBOX_MOTION",
         "sourceNodeIdOf",
         "sourceRectFromFrame",
-        "rectStyle",
         "snapshotRect",
         "settledMediaRect",
         "lightboxEntryMode",
@@ -13477,6 +13476,30 @@
         "src/workbenches/canvas/lightbox/useLightboxFlip.test.ts"
       ],
       "budget": 350
+    },
+    {
+      "module": "src/workbenches/canvas/lightbox/lightboxFlipFrame.ts",
+      "owner": "canvas-lightbox-ui",
+      "responsibility": "定义灯箱 FLIP 的固定定位矩形、中心锚点变换与浮动媒体克隆。",
+      "owns": [
+        "视口矩形到 fixed 元素的样式序列化",
+        "源 / 目标矩形之间的中心锚点 transform",
+        "独立 FLIP 克隆元素"
+      ],
+      "doesNotOwn": [
+        "动画时序与生命周期",
+        "灯箱视口手势",
+        "节点几何"
+      ],
+      "publicApi": [
+        "rectStyle",
+        "centerAnchoredFlipTransform",
+        "flipClone"
+      ],
+      "test": [
+        "src/workbenches/canvas/lightbox/useLightboxFlip.test.ts"
+      ],
+      "budget": 60
     },
     {
       "module": "src/workbenches/canvas/lightbox/galleryCrossfade.ts",
@@ -13941,6 +13964,30 @@
         "src/workbenches/canvas/flow/viewportBackground.test.ts"
       ],
       "budget": 50
+    },
+    {
+      "module": "src/workbenches/canvas/flow/viewportBackgroundRuntime.ts",
+      "owner": "canvas-flow-ui",
+      "responsibility": "把视口手势背景同步到 DOM，并在根主题变化后使缓存的 SVG 点阵颜色失效。",
+      "owns": [
+        "CSS pattern size / position 的命令式同步",
+        "点阵 SVG 缓存的刷新",
+        "data-theme 变化监听与主题提交后的补刷"
+      ],
+      "doesNotOwn": [
+        "图案缩放公式",
+        "画布颜色令牌定义",
+        "节点与连线绘制"
+      ],
+      "publicApi": [
+        "ViewportBackgroundVariant",
+        "syncViewportBackground",
+        "watchViewportBackgroundTheme"
+      ],
+      "test": [
+        "src/workbenches/canvas/flow/viewportBackground.test.ts"
+      ],
+      "budget": 60
     },
     {
       "module": "src/workbenches/canvas/flow/FlowViewportBackground.tsx",

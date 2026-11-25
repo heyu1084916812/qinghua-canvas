@@ -228,6 +228,31 @@ describe('AgentConversationPane', () => {
     )
   })
 
+  it('运行状态残留时，已发出问题卡仍然可点；提交会进入现有排队路径', () => {
+    const step = {
+      kind: 'step' as const,
+      id: 'call-busy-q',
+      tool: 'askQuestions',
+      label: '问题卡已发出',
+      lines: ['1. 尺寸？'],
+      nodeIds: [],
+      failed: false,
+      questions: [
+        { id: 'size', question: '尺寸？', options: ['3:4'], multiple: false, allowFreeText: true },
+      ],
+    }
+    const html = renderPane({
+      items: [step],
+      visibleItems: [step],
+      status: { kind: 'thinking' },
+      onAnswerQuestionCard: vi.fn(),
+    })
+
+    expect(html).toContain('data-agent-question-option="size:3:4"')
+    expect(html).not.toMatch(/<button[^>]*disabled=""[^>]*data-agent-question-option/)
+    expect(html).not.toMatch(/<button[^>]*disabled=""[^>]*data-agent-question-skip/)
+  })
+
   it('问题卡回答 / 跳过的用户消息折成一行摘要，不再铺开整段「问题卡回答：…」气泡', () => {
     const answered = {
       kind: 'user' as const,

@@ -2,6 +2,11 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react
 import { useLightboxAssetMeta } from './galleryCrossfade'
 import type { CanvasStore } from '../../../state/workbenches/canvas/store'
 import { predictedMediaRect } from './lightboxViewportMath'
+import {
+  centerAnchoredFlipTransform,
+  flipClone,
+  rectStyle,
+} from './lightboxFlipFrame'
 export const LIGHTBOX_MOTION = {
   enterMs: 440,
   exitMs: 400,
@@ -68,9 +73,6 @@ export function sourceRectFromFrame(frame: HTMLElement | null): DOMRect | null {
   const rect = frame?.getBoundingClientRect()
   return rect && rect.width > 0 && rect.height > 0 ? rect : null
 }
-export function rectStyle(rect: Pick<DOMRect, 'left' | 'top' | 'width' | 'height'>): Record<string, string> {
-  return { left: `${rect.left}px`, top: `${rect.top}px`, width: `${rect.width}px`, height: `${rect.height}px` }
-}
 /** DOMRect geometry lives on the prototype; copy every consumed field explicitly. */
 export function snapshotRect(rect: Pick<DOMRect, 'left' | 'top' | 'width' | 'height'>): DOMRect {
   const left = Number.isFinite(rect.left) ? rect.left : 0
@@ -112,34 +114,6 @@ function computedRadius(element: HTMLElement | null) {
 function computedShadow(element: HTMLElement | null, fallback: string) {
   const shadow = element ? getComputedStyle(element).boxShadow : ''
   return shadow && shadow !== 'none' ? shadow : fallback
-}
-function motionFrame(rect: Pick<DOMRect, 'left' | 'top' | 'width' | 'height'>, borderRadius: string, boxShadow: string) {
-  return {
-    ...rectStyle(rect),
-    borderRadius,
-    boxShadow,
-    opacity: '1',
-  }
-}
-function cloneOf(source: HTMLElement, rect: DOMRect, borderRadius: string, boxShadow: string) {
-  const clone = source.cloneNode(true) as HTMLElement
-  const objectFit = getComputedStyle(source).objectFit || 'cover'
-  clone.removeAttribute('data-node-asset')
-  clone.setAttribute('data-lightbox-flip-clone', '')
-  Object.assign(clone.style, {
-    position: 'fixed',
-    zIndex: '9999',
-    margin: '0',
-    pointerEvents: 'none',
-    objectFit,
-    transform: 'none',
-    opacity: '1',
-    willChange: 'left, top, width, height, border-radius, box-shadow, opacity',
-    ...rectStyle(rect),
-    borderRadius,
-    boxShadow,
-  })
-  return clone
 }
 export function useLightboxFlipController({ stageRef, store, assetHash, sourceNodeId, natural, open }: {
   stageRef: React.RefObject<HTMLElement | null>; store: CanvasStore; assetHash?: string; sourceNodeId?: string; natural?: { w: number; h: number } | null; open: boolean
@@ -183,7 +157,7 @@ export function useLightboxFlipController({ stageRef, store, assetHash, sourceNo
     source.current = sourceEl
     first.current = sourceRect
     const floating = sourceEl
-      ? cloneOf(sourceEl, sourceRect, sourceRadius, sourceShadow)
+      ? flipClone(sourceEl, sourceRect, sourceRadius, sourceShadow)
       : document.createElement('img')
     if (!sourceEl) {
       floating.setAttribute('data-lightbox-flip-clone', '')
@@ -229,9 +203,24 @@ export function useLightboxFlipController({ stageRef, store, assetHash, sourceNo
         return
       }
       const targetRadius = computedRadius(target ?? null) ?? '0px'
+      const fromTransform = centerAnchoredFlipTransform(first.current!, to)
+      Object.assign(floating.style, rectStyle(to), {
+        transformOrigin: 'center center',
+        transform: fromTransform,
+      })
       const anim = floating.animate([
-        motionFrame(first.current!, sourceRadius, sourceShadow),
-        motionFrame(to, targetRadius, TARGET_SHADOW),
+        {
+          transform: fromTransform,
+          borderRadius: sourceRadius,
+          boxShadow: sourceShadow,
+          opacity: '1',
+        },
+        {
+          transform: 'translate(0px, 0px) scale(1, 1)',
+          borderRadius: targetRadius,
+          boxShadow: TARGET_SHADOW,
+          opacity: '1',
+        },
       ], { duration: LIGHTBOX_MOTION.enterMs, easing: LIGHTBOX_MOTION.easing, fill: 'forwards' })
       animation.current = anim
       if (enterTimer.current !== null) window.clearTimeout(enterTimer.current)
@@ -263,6 +252,7 @@ export function useLightboxFlipController({ stageRef, store, assetHash, sourceNo
           Object.assign(floating.style, rectStyle(settledTarget), {
             borderRadius: settledRadius,
             boxShadow: TARGET_SHADOW,
+            transform: 'none',
           })
         }
         animation.current = null
@@ -281,7 +271,7 @@ export function useLightboxFlipController({ stageRef, store, assetHash, sourceNo
     if (!floating && target?.isConnected) {
       const current = usableRect(target.getBoundingClientRect())
       if (current) {
-        floating = cloneOf(
+        floating = flipClone(
           target,
           current,
           computedRadius(target) ?? '0px',
@@ -316,13 +306,29 @@ export function useLightboxFlipController({ stageRef, store, assetHash, sourceNo
     const currentRadius = computedRadius(floating) ?? '0px'
     const currentShadow = computedShadow(floating, TARGET_SHADOW)
     animation.current?.cancel()
-    Object.assign(floating.style, rectStyle(current), { borderRadius: currentRadius, boxShadow: currentShadow })
+    const exitTransform = centerAnchoredFlipTransform(destination, current)
+    Object.assign(floating.style, rectStyle(current), {
+      borderRadius: currentRadius,
+      boxShadow: currentShadow,
+      transformOrigin: 'center center',
+      transform: 'none',
+    })
     const sourceEl = mediaOf(lightbox?.sourceNodeId ?? sourceNodeId)
     const destinationRadius = lightbox?.sourceRect?.borderRadius ?? computedRadius(sourceEl) ?? '0px'
     const destinationShadow = computedShadow(sourceEl, SOURCE_SHADOW)
     const anim = floating.animate([
-      motionFrame(current, currentRadius, currentShadow),
-      motionFrame(destination, destinationRadius, destinationShadow),
+      {
+        transform: 'none',
+        borderRadius: currentRadius,
+        boxShadow: currentShadow,
+        opacity: '1',
+      },
+      {
+        transform: exitTransform,
+        borderRadius: destinationRadius,
+        boxShadow: destinationShadow,
+        opacity: '1',
+      },
     ], { duration: LIGHTBOX_MOTION.exitMs, easing: LIGHTBOX_MOTION.easing, fill: 'forwards' })
     animation.current = anim
     let completed = false
