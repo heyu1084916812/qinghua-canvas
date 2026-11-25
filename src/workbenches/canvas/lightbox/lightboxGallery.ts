@@ -46,13 +46,10 @@ export function ownerNodeOf(
 
 export function naturalHintOf(
   ownerNode: { data?: unknown } | undefined,
-  sourceRect?: { width: number; height: number },
 ): { w: number; h: number } | null {
   const natural = (ownerNode?.data as { naturalSize?: { width?: number; height?: number } } | undefined)?.naturalSize
   if (natural?.width && natural.height) return { w: natural.width, h: natural.height }
-  return sourceRect && sourceRect.width > 0 && sourceRect.height > 0
-    ? { w: sourceRect.width, h: sourceRect.height }
-    : null
+  return null
 }
 
 export function compareHashOf(

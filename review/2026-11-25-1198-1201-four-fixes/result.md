@@ -22,5 +22,7 @@
 - 现在控制器在媒体元素已挂载时拒绝使用预测目标框，必须拿到 inline `width/height` 的稳定矩形，并连续两帧一致后才创建入场 WAAPI。遮罩同时保持 `opacity:0`，与 FLIP 同帧开始。
 - 修复后桌面采样中，`t≈123ms` 目标框已稳定，`t≈139ms` 才开始中心锚点 FLIP，`t≈145ms` 遮罩才淡入；目标框在动画期间不再变化。
 - 汇总逐帧数据在 `desktop-log-stability/after-summary.json`，截图在 `desktop-log-stability/after-entry-80ms.png` 与 `after-entry-800ms.png`。
+- 重启桌面开发壳后继续实测真实项目，发现第二类漏网：没有 owner node 的旧日志把缩略图显示尺寸 `62×62` 当成原图 `naturalSize`，同一轮又会从 `62×62` 变成真实内容框。`naturalHintOf()` 已取消 `sourceRect` 回退，只接受节点真实的 `naturalSize`。
+- `log-matrix-report.json` 覆盖真实桌面 14 个日志缩略图；修复后每一项都只有一组最终目标框，没有出现 `62×62 → 实际尺寸` 的二次换框。
 
 主四组合截图位于 `after-clean/`；问题卡用户现场截图位于 `before/question-card-disabled.png`。

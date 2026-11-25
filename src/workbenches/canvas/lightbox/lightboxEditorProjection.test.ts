@@ -78,7 +78,7 @@ describe('lightboxEditorProjectionOf', () => {
     expect(result.availableModes.map((mode) => mode.id)).toContain('face')
   })
 
-  it('uses the owner natural size or the pointer-time source rect as an early layout hint', () => {
+  it('uses only a real owner natural size as the early layout hint', () => {
     const fromNode = lightboxEditorProjectionOf({
       nodes: [{ id: 'owner', data: { assetHash: 'asset-a', naturalSize: { width: 720, height: 480 } } }],
       assetHash: 'asset-a',
@@ -100,6 +100,6 @@ describe('lightboxEditorProjectionOf', () => {
       },
       compareAvailable: false,
     })
-    expect(fromRect.naturalHint).toEqual({ w: 360, h: 240 })
+    expect(fromRect.naturalHint).toBeNull()
   })
 })

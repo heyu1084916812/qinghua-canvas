@@ -18,8 +18,7 @@ export function lightboxEditorProjectionOf(input: LightboxEditorProjectionInput)
   const faceFor = input.lightbox?.faceFor
   const cropPlainRequested = input.lightbox?.cropPlain === true
   const ownerNode = ownerNodeOf(input.nodes, input.assetHash)
-  const sourceRect = input.lightbox?.sourceRect
-  const naturalHint = naturalHintOf(ownerNode, sourceRect)
+  const naturalHint = naturalHintOf(ownerNode)
   const ownerNodeId = ownerNode?.id ?? ''
   const cropNodeId = cropFor ?? faceFor ?? ownerNodeId
   const rotateNodeId = input.lightbox?.rotateFor ?? ownerNodeId
