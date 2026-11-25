@@ -60,7 +60,6 @@ export function useChannelMappingDraft(source: ChannelMappingDraftSource) {
         vendor: newModelVendor,
       })
       setNewModelName('')
-      setModelAddOpen(false)
     } catch (error) {
       alertMessage(errorMessage(error))
     }
@@ -70,6 +69,14 @@ export function useChannelMappingDraft(source: ChannelMappingDraftSource) {
     if (!confirmMessage(`删除前端模型「${name}」？各渠道里的同名映射会保留。`)) return
     try {
       await channels.removeGlobalModel(name)
+    } catch (error) {
+      alertMessage(errorMessage(error))
+    }
+  }
+
+  const renameGlobalModel = async (name: string, nextLabel: string) => {
+    try {
+      await channels.renameGlobalModel(name, nextLabel)
     } catch (error) {
       alertMessage(errorMessage(error))
     }
@@ -104,6 +111,7 @@ export function useChannelMappingDraft(source: ChannelMappingDraftSource) {
     setShowUncommonModels,
     addGlobalModel,
     removeGlobalModel,
+    renameGlobalModel,
     bindModel,
     setModelUncommon: (id: string, uncommon: boolean) => {
       void channels.setModelUncommon(id, uncommon)

@@ -1,12 +1,16 @@
-import { useEffect, useRef, useState } from 'react'
+import { useState } from 'react'
 import { Icon, Settings2 } from '../../../ui/icon'
 import type { ModelCapability } from '../../../domain/shared/capability'
-import type { PresetModel, PresetVendor } from '../../../domain/project/modelPresets'
+import {
+  presetDisplayName,
+  type PresetModel,
+  type PresetVendor,
+} from '../../../domain/project/modelPresets'
 import { categoryLabel } from '../../../domain/project/modelSelection'
-import { GLOBAL_MODEL_VENDORS } from '../settingsPageConstants'
 import { ModelIcon } from '../../../features/shared/modelIcon/ModelIcon'
 import { ChoicePicker } from '../../../features/shared/choicePicker/ChoicePicker'
 import { settingsPageStyles as styles } from './settingsPageStyles'
+import { SettingsGlobalModelManager } from './SettingsGlobalModelManager'
 import { SettingsModelCategoryTabs } from './SettingsModelCategoryTabs'
 import { useMappingTabAnchor } from './useMappingTabAnchor'
 type MapSaveNotice = {
@@ -55,6 +59,7 @@ export type SettingsChannelRouteViewProps = {
   onBindModel: (upstreamId: string, logicalName: string) => void
   onModelUncommonChange: (id: string, uncommon: boolean) => void
   onRemoveGlobalModel: (id: string) => void
+  onRenameGlobalModel: (id: string, nextLabel: string) => void
 }
 
 export function SettingsChannelRouteView({
@@ -79,12 +84,15 @@ export function SettingsChannelRouteView({
   onBindModel,
   onModelUncommonChange,
   onRemoveGlobalModel,
+  onRenameGlobalModel,
 }: SettingsChannelRouteViewProps) {
-  const managerRef = useRef<HTMLElement | null>(null)
-  const closeManagerRef = useRef(onModelAddOpenChange)
-  closeManagerRef.current = onModelAddOpenChange
   const [activeCategory, setActiveCategory] = useState<MappingCategory | null>(null)
   const uncommon = new Set(uncommonModelIds)
+  const catalogGroups = MODEL_CATEGORY_ORDER.map((category) => ({
+    category,
+    label: MODEL_CATEGORY_LABELS[category],
+    models: allGlobalModels.filter((model) => model.category === category),
+  }))
   const rows = allGlobalModels
     .filter((preset) => {
       if (!isMappingCategory(preset.category)) return false
@@ -132,26 +140,6 @@ export function SettingsChannelRouteView({
     groups[0]
   const activeRows = activeGroup?.rows ?? []
   const { sectionRef, capture } = useMappingTabAnchor(activeGroup.category, scrollScope)
-  useEffect(() => {
-    if (!modelAddOpen) return
-    const previous = document.activeElement instanceof HTMLElement
-      ? document.activeElement
-      : null
-    const input = managerRef.current?.querySelector<HTMLInputElement>('[data-global-model-name]')
-    input?.focus()
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== 'Escape') return
-      const picker = event.target instanceof Element ? event.target.closest('[data-choice-picker]') : null
-      if (picker?.querySelector('[role="listbox"]')) return
-      event.preventDefault()
-      closeManagerRef.current(false)
-    }
-    document.addEventListener('keydown', onKeyDown)
-    return () => {
-      document.removeEventListener('keydown', onKeyDown)
-      previous?.focus()
-    }
-  }, [modelAddOpen])
 
   return (
     <section ref={sectionRef} className={`${styles.editorSection} ${styles.mappingSection}`} data-settings-channel-route>
@@ -202,130 +190,22 @@ export function SettingsChannelRouteView({
         </button>
       </div>
 
-      {modelAddOpen && (
-        <div className={styles.modelManagerLayer}>
-          <button
-            type="button"
-            className={styles.modelManagerBackdrop}
-            aria-label="关闭前端模型目录"
-            onClick={() => onModelAddOpenChange(false)}
-          />
-          <section
-            id="settings-global-model-dialog"
-            ref={managerRef}
-            className={styles.modelManagerPanel}
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="settings-global-model-title"
-          >
-            <div className={styles.modelManagerHead}>
-              <div className={styles.modelAddFormHead}>
-                <span className={styles.label} id="settings-global-model-title">
-                  前端模型目录
-                </span>
-                <span className={styles.cardSub}>全局模型，在各分组之间共享</span>
-              </div>
-              <button
-                type="button"
-                className={styles.ghostBtn}
-                data-global-model-close
-                onClick={() => onModelAddOpenChange(false)}
-              >
-                完成
-              </button>
-            </div>
-            <div
-              className={`${styles.modelAddForm} ${styles.modelManagerForm}`}
-              data-global-model-form
-            >
-              <div className={styles.fieldRow}>
-                <label className={`${styles.field} ${styles.grow}`}>
-                  <span className={styles.label}>显示名称</span>
-                  <input
-                    className={styles.input}
-                    data-global-model-name
-                    value={newModelName}
-                    placeholder="例如：My Image Pro"
-                    onChange={(event) => onNewModelNameChange(event.target.value)}
-                  />
-                </label>
-                <label className={styles.field}>
-                  <span className={styles.label}>分类</span>
-                  <ChoicePicker
-                    name="new-global-model-category"
-                    value={newModelCategory}
-                    ariaLabel="前端模型分类"
-                    options={(['image', 'chat', 'video', 'audio'] as const).map(
-                      (category) => ({
-                        value: category,
-                        label: categoryLabel(category),
-                      }),
-                    )}
-                    onChange={(value) =>
-                      onNewModelCategoryChange(value as NewModelCategory)
-                    }
-                  />
-                </label>
-              </div>
-              <div className={styles.modelAddRow}>
-                <span className={styles.label}>图标</span>
-                <div className={styles.vendorGrid}>
-                  {GLOBAL_MODEL_VENDORS.map((vendor) => (
-                    <button
-                      key={vendor.value}
-                      type="button"
-                      className={
-                        newModelVendor === vendor.value
-                          ? `${styles.vendorOption} ${styles.vendorOptionOn}`
-                          : styles.vendorOption
-                      }
-                      data-global-model-vendor={vendor.value}
-                      onClick={() => onNewModelVendorChange(vendor.value)}
-                    >
-                      <ModelIcon vendor={vendor.value} size={18} />
-                      <span>{vendor.label}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-              {customModels.length > 0 ? (
-                <div className={styles.customModelList}>
-                  {customModels.map((model) => (
-                    <span key={model.id} className={styles.customModelChip}>
-                      {model.id}
-                      <button
-                        type="button"
-                        aria-label={`删除前端模型 ${model.id}`}
-                        data-global-model-remove={model.id}
-                        onClick={() => onRemoveGlobalModel(model.id)}
-                      >
-                        ×
-                      </button>
-                    </span>
-                  ))}
-                </div>
-              ) : null}
-              <div className={styles.modelAddActions}>
-                <button
-                  className={styles.ghostBtn}
-                  data-global-model-close
-                  onClick={() => onModelAddOpenChange(false)}
-                >
-                  取消
-                </button>
-                <button
-                  className={styles.primary}
-                  data-global-model-add
-                  disabled={!newModelName.trim()}
-                  onClick={onAddGlobalModel}
-                >
-                  添加
-                </button>
-              </div>
-            </div>
-          </section>
-        </div>
-      )}
+      <SettingsGlobalModelManager
+        open={modelAddOpen}
+        groups={catalogGroups}
+        activeCategory={activeGroup.category}
+        customModels={customModels}
+        newModelName={newModelName}
+        newModelCategory={newModelCategory}
+        newModelVendor={newModelVendor}
+        onClose={() => onModelAddOpenChange(false)}
+        onNewModelNameChange={onNewModelNameChange}
+        onNewModelCategoryChange={onNewModelCategoryChange}
+        onNewModelVendorChange={onNewModelVendorChange}
+        onAddGlobalModel={onAddGlobalModel}
+        onRemoveGlobalModel={onRemoveGlobalModel}
+        onRenameGlobalModel={onRenameGlobalModel}
+      />
       {/* 面板始终渲染 + 行区固定高度（行数不同也不跳）；但一条都没有时塌成一行提示，不留空长表 */}
       <div
         className={`${styles.mappingTable} ${styles.mappingPanel}${activeRows.length === 0 ? ` ${styles.mappingPanelEmpty}` : ''}`}
@@ -352,15 +232,15 @@ export function SettingsChannelRouteView({
                 const save = mapSaveNotice?.id === preset.id ? mapSaveNotice : null
                 return (
                   <div key={preset.id} className={styles.mappingRow} data-route-map-row={preset.id} data-route-map-category={preset.category}>
-                    <div className={styles.mappingFrontendModel} title={preset.id} data-route-map-frontend={preset.id}>
+                    <div className={styles.mappingFrontendModel} title={presetDisplayName(preset)} data-route-map-frontend={preset.id}>
                       <ModelIcon vendor={preset.vendor} size={18} />
-                      <b data-route-map-label>{preset.id}</b>
+                      <b data-route-map-label>{presetDisplayName(preset)}</b>
                     </div>
                     <div className={styles.mappingRealModel} data-route-map-real={preset.id}>
                       <ChoicePicker
                         name={`mapping-${preset.id}`}
                         value={upstream}
-                        ariaLabel={`${preset.id} 对应的真实模型`}
+                        ariaLabel={`${presetDisplayName(preset)} 对应的真实模型`}
                         placeholder="未映射"
                         onChange={(value) => onBindModel(value, preset.id)}
                         options={options}
@@ -370,7 +250,7 @@ export function SettingsChannelRouteView({
                       type="button"
                       role="switch"
                       aria-checked={!isUncommon}
-                      aria-label={`${preset.id} · 常用模型`}
+                      aria-label={`${presetDisplayName(preset)} · 常用模型`}
                       className={
                         !isUncommon
                           ? styles.globalCommonButton

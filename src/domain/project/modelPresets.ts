@@ -5,7 +5,8 @@
  * 几十上百个 ID。这里就是那份「前端显示名」清单。
  *
  * 关键分工（与 M7-4 同一套机制，不是新机制）：
- *   - `id` = **逻辑名**：前端显示、节点存储、面板比对的都是它；
+ *   - `id` = **稳定逻辑名**：节点存储、映射键和路由比对都用它；
+ *   - `label` = 可编辑的前端显示名；缺省等于 `id`，改它不会挪动映射键；
  *   - 请求发出去时用渠道 `modelMap` 翻译出来的**上游真实 ID**
  *     （例如 `GPT Image 2.5 Flare → gpt-image-2.5-flare`）。
  *
@@ -55,8 +56,10 @@ export type PresetVendor =
   | 'jimeng'
 
 export interface PresetModel {
-  /** 前端显示名 = 逻辑名（跨站点稳定，请求时经 `modelMap` 翻译） */
+  /** 稳定逻辑名：节点、映射键和路由都用它，不能因改名而变化 */
   id: string
+  /** 自定义模型可重命名的前端显示名；缺省时等于稳定逻辑名 `id` */
+  label?: string
   category: 'image' | 'chat' | 'video' | 'audio'
   vendor: PresetVendor
   /**
@@ -70,6 +73,11 @@ export interface PresetModel {
    *     （它已经被 `GPT Image 2` 这一行代表了）。
    */
   aliases?: readonly string[]
+}
+
+/** 前端展示名：自定义模型可改 label，稳定 id 始终留给节点与映射。 */
+export function presetDisplayName(model: Pick<PresetModel, 'id' | 'label'>): string {
+  return model.label?.trim() || model.id
 }
 
 /**

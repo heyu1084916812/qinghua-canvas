@@ -496,6 +496,7 @@ export function CreationPanel(props: CreationPanelProps) {
           const preset = channels.globalModelOf(name)
           return preset ? <ModelIcon vendor={preset.vendor} /> : undefined
         },
+        labelFor: (name) => channels.globalModelOf(name)?.label?.trim() || name,
       }),
     [channels, globalModelIds],
   )

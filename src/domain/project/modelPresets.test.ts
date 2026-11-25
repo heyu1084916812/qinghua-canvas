@@ -8,6 +8,7 @@ import {
   isPresetModel,
   isPresetModelOfCategory,
   presetIdForUpstream,
+  presetDisplayName,
   presetModelsOf,
   upstreamAliasesOf,
 } from './modelPresets'
@@ -20,6 +21,12 @@ import {
  * 而不是悄悄多出一个用户从没见过、也没配过映射的名字。
  */
 describe('固定模型目录', () => {
+  it('自定义显示名缺省回落到稳定逻辑名', () => {
+    expect(presetDisplayName({ id: 'logic-id', label: '前端名称' })).toBe('前端名称')
+    expect(presetDisplayName({ id: 'logic-id', label: '   ' })).toBe('logic-id')
+    expect(presetDisplayName({ id: 'logic-id' })).toBe('logic-id')
+  })
+
   it('★ 生图七个：Nano Banana 2.1 要、Nano Banana 2 Lite 不要、GPT Image 2 要', () => {
     expect(PRESET_IMAGE_MODELS.map((m) => m.id)).toEqual([
       'GPT Image 2.5 Flare',

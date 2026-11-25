@@ -14,6 +14,7 @@ import {
   channelIdForLogical,
   toLogicalName,
 } from '../../domain/project/modelCatalog'
+import { presetDisplayName } from '../../domain/project/modelPresets'
 import type { AgentDeliveryMode } from '../../domain/agent/delivery'
 import {
   AGENT_TOOL_GROUP_LABELS,
@@ -265,10 +266,9 @@ function ReviewModelSettings() {
     const enabled = channelRows.filter((channel) => channel.enabled)
     return channels
       .globalModelsOf('chat')
-      .map((model) => model.id)
       .filter((model) => {
-        if (!channelIdForLogical(enabled, model)) return false
-        return capabilityOfLogical(channelRows, model)?.inputTypes.includes('image') === true
+        if (!channelIdForLogical(enabled, model.id)) return false
+        return capabilityOfLogical(channelRows, model.id)?.inputTypes.includes('image') === true
       })
   }, [channelRows, channels, customModels, uncommonModelIds])
 
@@ -299,7 +299,10 @@ function ReviewModelSettings() {
           placeholder="沿用 Agent 主模型（需支持看图）"
           options={[
             { value: '', label: '沿用 Agent 主模型' },
-            ...options.map((model) => ({ value: model, label: model })),
+            ...options.map((model) => ({
+              value: model.id,
+              label: presetDisplayName(model),
+            })),
           ]}
           onChange={(next) => void choose(next)}
         />

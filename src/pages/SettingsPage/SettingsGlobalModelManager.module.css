@@ -1,0 +1,178 @@
+.modelManagerActions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.globalModelCatalog {
+  display: flex;
+  min-height: 0;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.globalModelCatalogHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.globalModelCatalogScroll {
+  max-height: min(52vh, 500px);
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding-right: var(--space-1);
+}
+
+.globalModelCategoryTabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+
+.globalModelCategoryTab {
+  min-height: 30px;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--text-2);
+  padding: 0 var(--space-2);
+  font: inherit;
+  font-size: var(--fs-label);
+  cursor: pointer;
+}
+
+.globalModelCategoryTab:hover {
+  background: var(--bg-hover);
+}
+
+.globalModelCategoryTabOn {
+  background: var(--bg-selected);
+  color: var(--text-1);
+  font-weight: 600;
+}
+
+.globalModelCategoryTab:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 1px;
+}
+
+.globalModelGroup {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-2);
+  border-radius: var(--radius-control);
+  background: var(--bg-subtle);
+}
+
+.globalModelStack {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+
+.globalModelChip {
+  min-width: 0;
+  max-width: 100%;
+  height: var(--settings-control-height, 34px);
+  min-height: var(--settings-control-height, 34px);
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 0 4px 0 var(--space-3);
+  border: var(--border);
+  border-radius: var(--radius-pill);
+  background: var(--bg-surface);
+}
+
+.globalModelChip:hover {
+  background: var(--bg-hover);
+}
+
+.globalModelIdentity {
+  min-width: 0;
+  max-width: 220px;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.globalModelName,
+.globalModelNameButton {
+  min-width: 0;
+  overflow: hidden;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  color: var(--text-1);
+  font: inherit;
+  font-size: var(--fs-label);
+  font-weight: 500;
+  line-height: 1.4;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.globalModelNameButton {
+  cursor: text;
+}
+
+.globalModelNameButton:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+  border-radius: 3px;
+}
+
+.globalModelRenameInput {
+  width: 150px;
+  max-width: 190px;
+  min-height: 26px;
+  box-sizing: border-box;
+  border: var(--border);
+  border-radius: var(--radius-control);
+  background: var(--bg-surface);
+  color: var(--text-1);
+  padding: 2px var(--space-2);
+  font: inherit;
+  font-size: var(--fs-label);
+}
+
+.globalModelDelete {
+  width: 28px;
+  height: 28px;
+  flex: 0 0 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--text-3);
+  cursor: pointer;
+}
+
+.globalModelDelete:hover {
+  background: var(--bg-surface);
+  color: var(--danger);
+}
+
+.globalModelDelete:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 1px;
+}
+
+.globalModelEmpty {
+  margin: 0;
+  padding: var(--space-2);
+  color: var(--text-3);
+  font-size: var(--fs-label);
+  line-height: 1.5;
+}

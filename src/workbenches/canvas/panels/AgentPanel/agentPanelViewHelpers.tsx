@@ -12,13 +12,13 @@ import { ModelIcon } from '../../../../features/shared/modelIcon/ModelIcon'
 export function withModelIcons(
   names: readonly string[],
   selected?: ReadonlySet<string>,
-  modelOf: (name: string) => { vendor: PresetVendor } | undefined = presetOf,
+  modelOf: (name: string) => { vendor: PresetVendor; label?: string } | undefined = presetOf,
 ) {
   return names.map((name) => {
     const preset = modelOf(name)
     return {
       value: name,
-      label: name,
+      label: preset?.label?.trim() || name,
       ...(preset ? { icon: <ModelIcon vendor={preset.vendor} /> } : {}),
       ...(selected ? { selected: selected.has(name) } : {}),
     }

@@ -5,6 +5,7 @@ import settingsRoutePolicyStyles from '../SettingsRoutePolicy.module.css'
 import settingsChannelFormStyles from '../SettingsChannelForm.module.css'
 import settingsChannelWorkspaceStyles from '../SettingsChannelWorkspace.module.css'
 import settingsModelBindingStyles from '../SettingsModelBinding.module.css'
+import settingsGlobalModelManagerStyles from '../SettingsGlobalModelManager.module.css'
 import settingsModelMappingStyles from '../SettingsModelMapping.module.css'
 import settingsModelCategoryStyles from '../SettingsModelCategory.module.css'
 import settingsAppearanceSystemStyles from '../SettingsAppearanceSystem.module.css'
@@ -17,6 +18,7 @@ export const settingsPageStyles = {
   ...settingsChannelFormStyles,
   ...settingsChannelWorkspaceStyles,
   ...settingsModelBindingStyles,
+  ...settingsGlobalModelManagerStyles,
   ...settingsModelMappingStyles, ...settingsModelCategoryStyles,
   ...settingsAppearanceSystemStyles,
   // The facade composes both `.item` rules in CSS order; object spread would otherwise replace the details-row override.

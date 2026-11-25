@@ -14401,6 +14401,34 @@ async function g74(browser) {
     JSON.stringify({ quickFocus, quickPopupStyle }),
   )
   await page.locator('[data-global-model-add-toggle]').click()
+  await page.locator('[data-global-model-catalog]').waitFor({ state: 'visible', timeout: 5000 })
+  const catalogSummary = await page.evaluate(() => ({
+    tabs: document.querySelectorAll('[data-global-model-category-tab]').length,
+    groups: document.querySelectorAll('[data-global-model-group]').length,
+    rows: document.querySelectorAll('[data-global-model-row]').length,
+    builtins: document.querySelectorAll('[data-global-model-kind="builtin"]').length,
+    builtinDeletes: document.querySelectorAll(
+      '[data-global-model-kind="builtin"] [data-global-model-remove]',
+    ).length,
+    title: document.querySelector('[data-global-model-catalog]')?.textContent ?? '',
+  }))
+  rec(
+    g,
+    '前端模型目录先列已有模型：分组、内置标记和名称都在',
+    catalogSummary.tabs >= 3 &&
+      catalogSummary.groups === 1 &&
+      catalogSummary.rows > 0 &&
+      catalogSummary.builtins > 0 &&
+      catalogSummary.builtinDeletes === 0 &&
+      catalogSummary.title.includes('前端模型名称'),
+    JSON.stringify({
+      groups: catalogSummary.groups,
+      tabs: catalogSummary.tabs,
+      rows: catalogSummary.rows,
+      builtins: catalogSummary.builtins,
+      builtinDeletes: catalogSummary.builtinDeletes,
+    }),
+  )
   await page.locator('[data-global-model-form]').waitFor({ state: 'visible', timeout: 5000 })
   const vendorCount = await page.locator('[data-global-model-vendor]').count()
   const categoryPicker = page.locator('[data-choice-picker="new-global-model-category"]')
@@ -14421,8 +14449,63 @@ async function g74(browser) {
       JSON.stringify(categoryValues) === JSON.stringify(['image', 'chat', 'video', 'audio']),
     `图标厂商=${vendorCount} 分类=${categoryValues.join(',')} 未分类=${hasUnknownCategory}`,
   )
-  await page.locator('[data-global-model-close]').first().click()
-  await page.locator('[data-global-model-form]').waitFor({ state: 'detached', timeout: 5000 })
+  const catalogCustomName = `目录验证模型 ${Date.now()}`
+  await page.locator('[data-global-model-name]').fill(catalogCustomName)
+  await page.locator('[data-global-model-add]').click()
+  const catalogCustomRow = page.locator(
+    `[data-global-model-row="${catalogCustomName}"]`,
+  )
+  await catalogCustomRow.waitFor({ state: 'visible', timeout: 5000 })
+  rec(
+    g,
+    '自定义前端模型新增后留在目录中，并标记为自定义',
+    (await catalogCustomRow.getAttribute('data-global-model-kind')) === 'custom',
+    catalogCustomName,
+  )
+  const renamedCatalogName = `${catalogCustomName} 改名`
+  await catalogCustomRow
+    .locator(`[data-global-model-rename-trigger="${catalogCustomName}"]`)
+    .dblclick()
+  const renameInput = catalogCustomRow.locator(
+    `[data-global-model-rename-input="${catalogCustomName}"]`,
+  )
+  await renameInput.fill(renamedCatalogName)
+  await renameInput.press('Enter')
+  await catalogCustomRow
+    .locator(`[data-global-model-rename-trigger="${catalogCustomName}"]`)
+    .filter({ hasText: renamedCatalogName })
+    .waitFor({ state: 'visible', timeout: 5000 })
+  rec(
+    g,
+    '双击自定义模型可原位重命名，稳定 ID 不变',
+    (await catalogCustomRow.getAttribute('data-global-model-row')) === catalogCustomName &&
+      (await catalogCustomRow.innerText()).includes(renamedCatalogName),
+    renamedCatalogName,
+  )
+  rec(
+    g,
+    '重命名同步到模型映射区的显示名，映射键仍用稳定 ID',
+    (
+      await page
+        .locator(
+          `[data-route-map-row="${catalogCustomName}"] [data-route-map-label]`,
+        )
+        .innerText()
+    ) === renamedCatalogName,
+    renamedCatalogName,
+  )
+  page.once('dialog', (dialog) => void dialog.accept())
+  await catalogCustomRow
+    .locator(`[data-global-model-remove="${catalogCustomName}"]`)
+    .click()
+  await catalogCustomRow.waitFor({ state: 'detached', timeout: 5000 })
+  rec(
+    g,
+    '自定义前端模型可从目录删除，删除后行立即消失',
+    (await page.locator(`[data-global-model-row="${catalogCustomName}"]`).count()) === 0,
+  )
+  await page.locator('[data-global-model-close]').click()
+  await page.locator('[data-global-model-catalog]').waitFor({ state: 'detached', timeout: 5000 })
   const mapFilters = await page
     .locator('[data-route-map-filter]')
     .evaluateAll((els) => els.map((el) => el.getAttribute('data-route-map-filter')))
@@ -46819,7 +46902,233 @@ async function g1196(browser) {
   }
 }
 
-const ALL_GROUPS = [g1, g2, g3, g4, g5, g6, g7, g8, g9, g10, g11, g12, g13, g14, g15, g16, g17, g18, g19, g23, g24, g37, g42, g43, g44, g45, g46, g47, g48, g49, g51, g52, g53, g55, g56, g57, g58, g59, g60, g61, g62, g63, g64, g65, g66, g67, g68, g69, g70, g71, g72, g73, g74, g75, g76, g77, g78, g79, g80, g81, g82, g83, g84, g85, g86, g87, g88, g89, g90, g91, g92, g93, g94, g95, g96, g97, g98, g99, g100, g101, g102, g103, g104, g105, g106, g107, g108, g109, g110, g111, g112, g113, g114, g115, g116, g117, g118, g119, g120, g121, g122, g123, g125, g126, g127, g128, g129, g130, g131, g132, g133, g134, g135, g136, g137, g138, g139, g140, g141, g142, g143, g144, g145, g146, g147, g148, g149, g150, g151, g152, g153, g154, g155, g156, g157, g158, g159, g160, g161, g162, g164, g165, g166, g167, g168, g169, g170, g171, g735, g769, g795, g798, g800, g865, g1182, g1195, g1196, g1201]
+/**
+ * G1203 全局前端模型目录（#1203）。
+ *
+ * 目录是全局操作面，映射行属于当前渠道。本组只验目录自身的结构、内置模型
+ * 边界与窄屏 / 明暗主题几何；新增和删除的完整交互由 G74 覆盖。
+ */
+async function g1203(browser) {
+  const g = 'G1203 全局前端模型目录'
+  const compact = process.env.SMOKE_VIEWPORT === '1024'
+  const viewport = compact
+    ? { width: 1024, height: 700 }
+    : { width: 1440, height: 900 }
+  const suffix = `${process.env.SMOKE_DARK === '1' ? 'dark' : 'light'}-${compact ? '1024x700' : '1440x900'}`
+  const ctx = await newCtx(browser, { viewport })
+  const page = await ctx.newPage()
+  const pageErrors = []
+  page.on('pageerror', (error) => pageErrors.push(String(error).slice(0, 160)))
+
+  try {
+    await configureMockChannel(page)
+    await gotoSettings(page)
+    await page.locator(USER_CHANNEL).first().click()
+    await page.locator('[data-global-model-add-toggle]').click()
+    await page.locator('[data-global-model-catalog]').waitFor({ state: 'visible', timeout: 5000 })
+
+    const catalog = await page.evaluate(() => {
+      const dialog = document.querySelector('[data-global-model-catalog]')
+      const box = dialog?.getBoundingClientRect()
+      const scroll = dialog?.querySelector('[class*="globalModelCatalogScroll"]')
+      return {
+        tabs:
+          dialog?.querySelectorAll('[data-global-model-category-tab]').length ?? 0,
+        groups: dialog?.querySelectorAll('[data-global-model-group]').length ?? 0,
+        rows: dialog?.querySelectorAll('[data-global-model-row]').length ?? 0,
+        builtins:
+          dialog?.querySelectorAll('[data-global-model-kind="builtin"]').length ?? 0,
+        builtinDelete:
+          dialog?.querySelectorAll(
+            '[data-global-model-kind="builtin"] [data-global-model-remove]',
+          ).length ?? -1,
+        commonSwitches:
+          dialog?.querySelectorAll(
+            '[data-global-model-uncommon], [role="switch"]',
+          ).length ?? -1,
+        dialog: box
+          ? {
+              left: Math.round(box.left),
+              top: Math.round(box.top),
+              right: Math.round(box.right),
+              bottom: Math.round(box.bottom),
+              width: Math.round(box.width),
+              height: Math.round(box.height),
+            }
+          : null,
+        viewport: { width: window.innerWidth, height: window.innerHeight },
+        overflowX: Math.max(0, document.documentElement.scrollWidth - window.innerWidth),
+        catalogOverflowX: scroll
+          ? Math.max(0, scroll.scrollWidth - scroll.clientWidth)
+          : -1,
+        title: dialog?.textContent ?? '',
+      }
+    })
+    rec(
+      g,
+      '★★ 目录完整显示前端模型名称、分类和内置状态',
+      catalog.tabs >= 3 &&
+        catalog.groups === 1 &&
+        catalog.rows > 0 &&
+        catalog.builtins > 0 &&
+        catalog.builtinDelete === 0 &&
+        catalog.title.includes('前端模型名称'),
+      JSON.stringify({
+        groups: catalog.groups,
+        tabs: catalog.tabs,
+        rows: catalog.rows,
+        builtins: catalog.builtins,
+        builtinDelete: catalog.builtinDelete,
+      }),
+    )
+    rec(
+      g,
+      '★★ 内置模型没有删除入口',
+      catalog.builtinDelete === 0,
+      `内置删除入口=${catalog.builtinDelete}`,
+    )
+    rec(
+      g,
+      '★ 目录不重复提供常用开关，状态仍只由映射行管理',
+      catalog.commonSwitches === 0,
+      `目录内开关=${catalog.commonSwitches}`,
+    )
+    rec(
+      g,
+      '★★ 目录在当前视口内完整落位，无横向溢出',
+      !!catalog.dialog &&
+        catalog.dialog.left >= 23 &&
+        catalog.dialog.right <= catalog.viewport.width - 23 &&
+        catalog.dialog.top >= 23 &&
+        catalog.dialog.bottom <= catalog.viewport.height - 23 &&
+        catalog.overflowX === 0 &&
+        catalog.catalogOverflowX === 0,
+      JSON.stringify({
+        dialog: catalog.dialog,
+        viewport: catalog.viewport,
+        overflowX: catalog.overflowX,
+        catalogOverflowX: catalog.catalogOverflowX,
+      }),
+    )
+    await page.screenshot({ path: `${OUT}/1203-catalog-${suffix}.png` })
+
+    await page.locator('[data-global-model-form]').waitFor({ state: 'visible', timeout: 5000 })
+    const form = await page.evaluate(() => {
+      const node = document.querySelector('[data-global-model-form]')
+      const box = node?.getBoundingClientRect()
+      return {
+        exists: !!node,
+        nameLabel: node?.textContent?.includes('前端模型名称') ?? false,
+        vendors: node?.querySelectorAll('[data-global-model-vendor]').length ?? 0,
+        width: box ? Math.round(box.width) : 0,
+        overflowX: node ? Math.max(0, node.scrollWidth - node.clientWidth) : -1,
+      }
+    })
+    rec(
+      g,
+      '★ 新增表单常驻，名称字段与图标库完整',
+      form.exists && form.nameLabel && form.vendors >= 36 && form.overflowX === 0,
+      JSON.stringify(form),
+    )
+    await page.screenshot({ path: `${OUT}/1203-create-${suffix}.png` })
+
+    const customName = `目录堆叠验证 ${Date.now()}`
+    await page.locator('[data-global-model-name]').fill(customName)
+    await page.locator('[data-global-model-add]').click()
+    const customRow = page.locator(`[data-global-model-row="${customName}"]`)
+    await customRow.waitFor({ state: 'visible', timeout: 5000 })
+    await customRow.scrollIntoViewIfNeeded()
+    await page.screenshot({ path: `${OUT}/1203-custom-chip-${suffix}.png` })
+    const chipLayout = await customRow.evaluate((chip) => {
+      const stack = chip.parentElement
+      const name = chip.querySelector('[data-global-model-rename-trigger]')
+      const remove = chip.querySelector('[data-global-model-remove]')
+      const chipBox = chip.getBoundingClientRect()
+      const nameBox = name?.getBoundingClientRect()
+      const removeBox = remove?.getBoundingClientRect()
+      return {
+        chipDisplay: getComputedStyle(chip).display,
+        stackDisplay: stack ? getComputedStyle(stack).display : '',
+        stackWrap: stack ? getComputedStyle(stack).flexWrap : '',
+        deletePosition: remove ? getComputedStyle(remove).position : '',
+        deleteRight: removeBox ? Math.round(removeBox.right) : 0,
+        chipRight: Math.round(chipBox.right),
+        centerDelta:
+          nameBox && removeBox
+            ? Math.round(
+                Math.abs(
+                  nameBox.top +
+                    nameBox.height / 2 -
+                    (removeBox.top + removeBox.height / 2),
+                ),
+              )
+            : -1,
+      }
+    })
+    rec(
+      g,
+      '★★ 自定义模型是分类内堆叠块，X 在名称右侧同一中线',
+      (chipLayout.chipDisplay === 'flex' || chipLayout.chipDisplay === 'inline-flex') &&
+        chipLayout.stackDisplay === 'flex' &&
+        chipLayout.stackWrap === 'wrap' &&
+        chipLayout.deletePosition === 'static' &&
+        chipLayout.deleteRight >= chipLayout.chipRight - 6 &&
+        chipLayout.centerDelta <= 2,
+      JSON.stringify(chipLayout),
+    )
+
+    const renamed = `${customName} 新名`
+    await customRow
+      .locator(`[data-global-model-rename-trigger="${customName}"]`)
+      .dblclick()
+    const renameInput = customRow.locator(
+      `[data-global-model-rename-input="${customName}"]`,
+    )
+    await renameInput.fill(renamed)
+    await renameInput.press('Enter')
+    await customRow
+      .locator(`[data-global-model-rename-trigger="${customName}"]`)
+      .filter({ hasText: renamed })
+      .waitFor({ state: 'visible', timeout: 5000 })
+    rec(
+      g,
+      '★ 双击名称原位重命名，模型块位置与逻辑 ID 不变',
+      (await customRow.getAttribute('data-global-model-row')) === customName &&
+        (await customRow.innerText()).includes(renamed),
+      renamed,
+    )
+    page.once('dialog', (dialog) => void dialog.accept())
+    await customRow.locator(`[data-global-model-remove="${customName}"]`).click()
+    await customRow.waitFor({ state: 'detached', timeout: 5000 })
+    rec(
+      g,
+      '★ 点击模型块右侧 X 删除自定义模型',
+      (await page.locator(`[data-global-model-row="${customName}"]`).count()) === 0,
+    )
+    await page.locator('[data-global-model-category-tab="image"]').click()
+    const switched = await page.evaluate(() => ({
+      selected:
+        document
+          .querySelector('[data-global-model-category-tab][aria-selected="true"]')
+          ?.getAttribute('data-global-model-category-tab') ?? '',
+      group:
+        document
+          .querySelector('[data-global-model-group]')
+          ?.getAttribute('data-global-model-group') ?? '',
+    }))
+    rec(
+      g,
+      '★★ 模型分类通过切换只展示一类',
+      switched.selected === 'image' && switched.group === 'image',
+      JSON.stringify(switched),
+    )
+    rec(g, '无未捕获异常', pageErrors.length === 0, pageErrors.join(' | '))
+  } finally {
+    await ctx.close()
+  }
+}
+
+const ALL_GROUPS = [g1, g2, g3, g4, g5, g6, g7, g8, g9, g10, g11, g12, g13, g14, g15, g16, g17, g18, g19, g23, g24, g37, g42, g43, g44, g45, g46, g47, g48, g49, g51, g52, g53, g55, g56, g57, g58, g59, g60, g61, g62, g63, g64, g65, g66, g67, g68, g69, g70, g71, g72, g73, g74, g75, g76, g77, g78, g79, g80, g81, g82, g83, g84, g85, g86, g87, g88, g89, g90, g91, g92, g93, g94, g95, g96, g97, g98, g99, g100, g101, g102, g103, g104, g105, g106, g107, g108, g109, g110, g111, g112, g113, g114, g115, g116, g117, g118, g119, g120, g121, g122, g123, g125, g126, g127, g128, g129, g130, g131, g132, g133, g134, g135, g136, g137, g138, g139, g140, g141, g142, g143, g144, g145, g146, g147, g148, g149, g150, g151, g152, g153, g154, g155, g156, g157, g158, g159, g160, g161, g162, g164, g165, g166, g167, g168, g169, g170, g171, g735, g769, g795, g798, g800, g865, g1182, g1195, g1196, g1201, g1203]
 // ────────────────────────────────────────────────────────────
 // G169 框选多节点拖动：**松手那一刻不许再有人挪**（用户 2026-11-18 偶发：
 //      「框选多个节点，移动的时候松开鼠标会有一张图片移动了位置，好像多了一个步骤」）

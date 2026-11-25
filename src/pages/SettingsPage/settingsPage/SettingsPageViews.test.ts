@@ -268,6 +268,7 @@ describe('SettingsPage 视图拆分', () => {
       onBindModel: () => {},
       onModelUncommonChange: () => {},
       onRemoveGlobalModel: () => {},
+      onRenameGlobalModel: () => {},
     })
     expect(routeHtml).toMatch(/^<section /)
     expect(routeHtml).toContain('data-settings-channel-route')
@@ -611,9 +612,14 @@ describe('SettingsPage 视图拆分', () => {
       onBindModel: () => {},
       onModelUncommonChange: () => {},
       onRemoveGlobalModel: () => {},
+      onRenameGlobalModel: () => {},
     })
 
     expect(html).toContain('data-global-model-form')
+    expect(html).toContain('data-global-model-catalog')
+    expect(html).toContain('前端模型名称')
+    expect(html).toContain('data-global-model-row="My Image"')
+    expect(html).toContain('data-global-model-kind="custom"')
     expect(html).toContain('data-global-model-close')
     expect(html).toContain('data-route-map-row="My Image"')
     expect(html).toContain('data-route-map-frontend="My Image"')
@@ -651,6 +657,7 @@ describe('SettingsPage 视图拆分', () => {
       onBindModel: () => {},
       onModelUncommonChange: () => {},
       onRemoveGlobalModel: () => {},
+      onRenameGlobalModel: () => {},
     })
     expect(hidden).not.toContain('data-route-map-row="My Image"')
 
@@ -683,6 +690,7 @@ describe('SettingsPage 视图拆分', () => {
       onBindModel: () => {},
       onModelUncommonChange: () => {},
       onRemoveGlobalModel: () => {},
+      onRenameGlobalModel: () => {},
     })
     expect(grouped).toContain('role="tablist"')
     expect(grouped).toContain('data-route-map-filter="image"')
@@ -718,6 +726,7 @@ describe('SettingsPage 视图拆分', () => {
       onBindModel: () => {},
       onModelUncommonChange: () => {},
       onRemoveGlobalModel: () => {},
+      onRenameGlobalModel: () => {},
     })
     /* #1144 起映射固定展示「实际配置的全部前端模型」：上游只有视频模型也照样列出这条图片映射。 */
     expect(irrelevantCategory).toContain('data-route-map-row="My Image"')

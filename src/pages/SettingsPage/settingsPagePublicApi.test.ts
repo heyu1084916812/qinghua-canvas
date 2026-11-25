@@ -139,6 +139,7 @@ describe('SettingsPage 公共导出与页面锚点', () => {
   it('前端模型的增删随映射卡搬进 useChannelMappingDraft，渠道动作不再持有它们', () => {
     expect(MAPPING_DRAFT_SOURCE).toContain('addGlobalModel')
     expect(MAPPING_DRAFT_SOURCE).toContain('removeGlobalModel')
+    expect(MAPPING_DRAFT_SOURCE).toContain('renameGlobalModel')
     expect(MAPPING_DRAFT_SOURCE).toContain('setModelBinding')
     expect(SETTINGS_SOURCE).not.toContain('handleRemoveGlobalModel')
     expect(SETTINGS_SOURCE).not.toContain('handleAddGlobalModel')

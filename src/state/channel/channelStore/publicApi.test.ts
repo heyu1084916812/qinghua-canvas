@@ -7,7 +7,7 @@ import { initialChannelStoreState } from './contracts'
 const ACTION_NAMES = [
   'load', 'protocolCatalog', 'createCustomProtocol', 'removeCustomProtocol',
   'removeBuiltinProtocol', 'restoreBuiltinProtocols', 'create', 'update', 'remove',
-  'globalModelsOf', 'globalModelOf', 'addGlobalModel', 'removeGlobalModel',
+  'globalModelsOf', 'globalModelOf', 'addGlobalModel', 'removeGlobalModel', 'renameGlobalModel',
   'setModelUncommon', 'testModelMapping', 'reorder', 'saveToken', 'loadToken',
   'removeToken', 'addCredentialGroup', 'renameCredentialGroup',
   'setCredentialGroupPriority', 'removeCredentialGroup', 'saveCredentialGroupToken',

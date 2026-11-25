@@ -15,6 +15,7 @@ const PART_NAMES = [
   'SettingsChannelForm',
   'SettingsChannelWorkspace',
   'SettingsModelBinding',
+  'SettingsGlobalModelManager',
   'SettingsModelMapping',
   'SettingsModelCategory',
   'SettingsAppearanceSystem',
@@ -62,8 +63,8 @@ describe('SettingsPage CSS 模块结构护栏', () => {
     }
   })
 
-  it('组件样式拆成八份且每份不超过预算', () => {
-    expect(Object.keys(PART_SOURCES)).toHaveLength(9)
+  it('组件样式拆成九份且每份不超过预算', () => {
+    expect(Object.keys(PART_SOURCES)).toHaveLength(10)
     for (const [path, source] of Object.entries(PART_SOURCES)) {
       expect(source, path).toBeTypeOf('string')
       if (source) {

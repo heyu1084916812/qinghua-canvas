@@ -367,7 +367,7 @@
       "test": [
         "src/state/channel/channelStore.test.ts"
       ],
-      "budget": 969
+      "budget": 995
     },
     {
       "module": "src/state/project/ecommerceTaskRepository.ts",
@@ -478,7 +478,7 @@
       "test": [
         "src/workbenches/canvas/panels/CreationPanel.test.ts"
       ],
-      "budget": 981
+      "budget": 985
     },
     {
       "module": "src/workbenches/ecommerce/EcommerceStudio.module.css",
@@ -845,7 +845,7 @@
       "test": [
         "src/ui/icon/Icon.test.ts"
       ],
-      "budget": 160
+      "budget": 190
     },
     {
       "module": "src/ui/popoverPlacement.ts",
@@ -3713,6 +3713,30 @@
       "budget": 439
     },
     {
+      "module": "src/pages/SettingsPage/SettingsGlobalModelManager.module.css",
+      "owner": "settings-ui",
+      "responsibility": "定义全局前端模型目录的已有模型列表、分组、内置/自定义标记和删除入口。",
+      "owns": [
+        "目录列表与分组布局",
+        "内置 / 自定义模型行和删除按钮",
+        "长目录的内部滚动"
+      ],
+      "doesNotOwn": [
+        "ChannelStore 的模型 CRUD",
+        "模型映射行的渠道绑定",
+        "目录弹窗的焦点生命周期"
+      ],
+      "publicApi": [
+        "CSS_MODULE:SettingsGlobalModelManager 的前端模型目录样式域",
+        "CSS_CLASS:globalModelCatalog",
+        "CSS_CLASS:globalModelChip"
+      ],
+      "test": [
+        "src/pages/SettingsPage/settingsPageCssArchitecture.test.ts"
+      ],
+      "budget": 190
+    },
+    {
       "module": "src/pages/SettingsPage/SettingsModelBinding.module.css",
       "owner": "settings-ui",
       "responsibility": "定义当前分组真实模型到全局前端模型的绑定表、全局常用按钮与窄屏重排。",
@@ -5910,7 +5934,7 @@
       "test": [
         "src/state/channel/channelStore/modelProjections.test.ts"
       ],
-      "budget": 295
+      "budget": 325
     },
     {
       "module": "src/state/channel/channelStore/recipeCache.ts",
@@ -7444,6 +7468,27 @@
       "budget": 209
     },
     {
+      "module": "src/pages/SettingsPage/settingsPage/SettingsGlobalModelManager.tsx",
+      "owner": "pages-settings-global-model-manager",
+      "responsibility": "渲染全局前端模型目录、新增表单、常用状态和自定义模型删除入口。",
+      "owns": [
+        "目录弹窗、分组列表和内置/自定义模型行",
+        "新增前端模型表单与目录内焦点生命周期"
+      ],
+      "doesNotOwn": [
+        "ChannelStore 的持久化与内置模型保护",
+        "模型映射行的渠道绑定",
+        "CSS 与页面路由"
+      ],
+      "publicApi": [
+        "SettingsGlobalModelManager"
+      ],
+      "test": [
+        "src/pages/SettingsPage/settingsPage/SettingsGlobalModelManager.test.ts"
+      ],
+      "budget": 400
+    },
+    {
       "module": "src/pages/SettingsPage/settingsPage/SettingsChannelRouteView.tsx",
       "owner": "pages-settings-channel-route-view",
       "responsibility": "渲染渠道优先级、权重、前端模型映射和映射测试控件。",
@@ -7525,7 +7570,7 @@
       "test": [
         "src/pages/SettingsPage/settingsPageCssArchitecture.test.ts"
       ],
-      "budget": 24
+      "budget": 27
     },
     {
       "module": "src/features/settings/storageOverviewRefresh.ts",

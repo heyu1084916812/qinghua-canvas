@@ -9,6 +9,7 @@ import {
   loadedRoutingPolicy,
   projectRefreshModels,
   protocolDefinitionRows,
+  renamedCustomModels,
   routeTuningPatch,
   staleModelCachePatches,
   toCustomProtocolDefinition,
@@ -36,6 +37,19 @@ function channel(patch: Partial<Channel> = {}): Channel {
 }
 
 describe('channelStore/modelProjections', () => {
+  it('renames only a custom label and keeps the stable logical id', () => {
+    const builtins = [preset('builtin', 'chat')]
+    const custom = [preset('custom-id', 'chat'), preset('other-id', 'chat')]
+    const next = renamedCustomModels(builtins, custom, 'custom-id', 'Front Name')
+    expect(next[0]).toMatchObject({ id: 'custom-id', label: 'Front Name' })
+    expect(() =>
+      renamedCustomModels(builtins, custom, 'custom-id', 'builtin'),
+    ).toThrow('已经存在')
+    expect(() =>
+      renamedCustomModels(builtins, custom, 'builtin', 'Builtin Name'),
+    ).toThrow('内置前端模型不能重命名')
+  })
+
   it('filters global models by category and flags uncommon ids once', () => {
     const builtins = [preset('image-a', 'image'), preset('chat-a', 'chat')]
     const custom = [preset('rare', 'image'), preset('rare', 'image')]

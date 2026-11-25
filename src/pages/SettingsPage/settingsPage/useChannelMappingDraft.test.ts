@@ -13,6 +13,7 @@ function renderDraft(overrides: Partial<ChannelMappingDraftSource> = {}) {
     globalModelsOf: vi.fn((category: string) => [{ id: `${category}-model` }]),
     addGlobalModel: vi.fn(async () => ({ category: 'chat' })),
     removeGlobalModel: vi.fn(async () => {}),
+    renameGlobalModel: vi.fn(async () => {}),
     setModelBinding: vi.fn(async () => {}),
     setModelUncommon: vi.fn(async () => {}),
   }
@@ -52,7 +53,7 @@ describe('模型映射卡的草稿态', () => {
     expect(channels.globalModelsOf).toHaveBeenCalledWith('audio', true)
   })
 
-  it('新增前端模型按表单当前分类保存，成功后清空名称并收起表单', async () => {
+  it('新增前端模型按表单当前分类保存，成功后清空名称并收起新增表单', async () => {
     const { draft, rerender, channels } = renderDraft()
     act(() => {
       draft.current.setNewModelName('6.1')
@@ -70,7 +71,7 @@ describe('模型映射卡的草稿态', () => {
       vendor: 'openai',
     })
     expect(draft.current.newModelName).toBe('')
-    expect(draft.current.modelAddOpen).toBe(false)
+    expect(draft.current.modelAddOpen).toBe(true)
   })
 
   it('删除前端模型要先确认；取消就一个接口都不发', async () => {
@@ -81,6 +82,24 @@ describe('模型映射卡的草稿态', () => {
     })
     expect(confirmMessage).toHaveBeenCalledWith(expect.stringContaining('6.1'))
     expect(channels.removeGlobalModel).not.toHaveBeenCalled()
+  })
+
+  it('重命名只改自定义模型显示名，失败原文交给提示层', async () => {
+    const alertMessage = vi.fn()
+    const { draft, channels } = renderDraft({ alertMessage })
+    await act(async () => {
+      await draft.current.renameGlobalModel('custom-id', 'New Display Name')
+    })
+    expect(channels.renameGlobalModel).toHaveBeenCalledWith(
+      'custom-id',
+      'New Display Name',
+    )
+
+    channels.renameGlobalModel.mockRejectedValueOnce(new Error('名称重复'))
+    await act(async () => {
+      await draft.current.renameGlobalModel('custom-id', 'Duplicate')
+    })
+    expect(alertMessage).toHaveBeenCalledWith('名称重复')
   })
 
   it('绑定成功写「已保存」，失败写错误原文，都不会抛到界面外', async () => {

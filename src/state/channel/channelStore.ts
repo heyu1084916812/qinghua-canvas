@@ -128,6 +128,7 @@ export interface ChannelStoreActions {
     vendor: PresetVendor
   }): Promise<PresetModel>
   removeGlobalModel(name: string): Promise<void>
+  renameGlobalModel(name: string, nextLabel: string): Promise<void>
   setModelUncommon(name: string, uncommon: boolean): Promise<void>
   testModelMapping(
     id: string,
@@ -219,6 +220,7 @@ import {
   normalizedRoutingPolicy,
   projectRefreshModels,
   protocolDefinitionRows,
+  renamedCustomModels,
   routeTuningPatch,
   staleModelCachePatches,
   tokenlessRoutableChannels,
@@ -419,6 +421,7 @@ export function createChannelStore(
     if (globalModelOf(name)) throw new Error(`前端模型「${name}」已经存在`)
     const model: PresetModel = {
       id: name,
+      label: name,
       category: input.category,
       vendor: input.vendor,
     }
@@ -438,6 +441,21 @@ export function createChannelStore(
     const uncommonModelIds = store.getState().uncommonModelIds.filter((id) => id !== key)
     await presets.saveUncommonModels(uncommonModelIds)
     store.setState({ customModels: next, uncommonModelIds })
+  }
+
+  const renameGlobalModel: ChannelStoreActions['renameGlobalModel'] = async (
+    name,
+    nextLabel,
+  ) => {
+    const customModels = store.getState().customModels
+    const next = renamedCustomModels(
+      PRESET_MODELS,
+      customModels,
+      name,
+      nextLabel,
+    )
+    await presets.saveCustomModels(next)
+    store.setState({ customModels: next })
   }
 
   const setModelUncommon: ChannelStoreActions['setModelUncommon'] = async (name, uncommon) => {
@@ -931,6 +949,7 @@ export function createChannelStore(
     globalModelOf,
     addGlobalModel,
     removeGlobalModel,
+    renameGlobalModel,
     setModelUncommon,
     testModelMapping,
     reorder,

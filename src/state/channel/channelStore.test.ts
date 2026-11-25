@@ -755,6 +755,23 @@ describe('channelStore', () => {
       'My Image Pro',
     )
 
+    await reloaded.renameGlobalModel('My Image Pro', 'My Image Pro Renamed')
+    expect(reloaded.globalModelOf('My Image Pro')).toMatchObject({
+      id: 'My Image Pro',
+      label: 'My Image Pro Renamed',
+    })
+    const renamedReloaded = createChannelStore(p, { seedBuiltins: false })
+    await renamedReloaded.load()
+    expect(renamedReloaded.globalModelOf('My Image Pro')?.label).toBe(
+      'My Image Pro Renamed',
+    )
+    await expect(
+      reloaded.renameGlobalModel('My Image Pro', 'GPT Image 2'),
+    ).rejects.toThrow()
+    await expect(
+      reloaded.renameGlobalModel('GPT Image 2', 'Builtin Renamed'),
+    ).rejects.toThrow()
+
     await reloaded.removeGlobalModel('My Image Pro')
     expect(reloaded.globalModelOf('My Image Pro')).toBeUndefined()
     await expect(reloaded.removeGlobalModel('GPT Image 2')).rejects.toThrow()

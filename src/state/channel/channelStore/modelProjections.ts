@@ -1,6 +1,9 @@
 import type { Channel, ChannelCredentialGroup } from '../../../domain/project/channel'
 import type { ModelCapability } from '../../../domain/shared/capability'
-import type { PresetModel } from '../../../domain/project/modelPresets'
+import {
+  presetDisplayName,
+  type PresetModel,
+} from '../../../domain/project/modelPresets'
 import type { RouteStrategy } from '../../../domain/project/modelRouting'
 import type { ProtocolCatalog, ProtocolDefinition } from '../../../domain/project/protocol'
 import type { RoutePlanResult, RoutePolicy } from '../../../domain/project/routePlan'
@@ -56,6 +59,30 @@ export function findGlobalModel(
 ): PresetModel | undefined {
   const key = name.trim()
   return [...builtins, ...customModels].find((model) => model.id === key)
+}
+
+/** 自定义前端模型改名：只改 label，稳定 id 继续承载节点与映射键。 */
+export function renamedCustomModels(
+  builtins: readonly PresetModel[],
+  customModels: readonly PresetModel[],
+  name: string,
+  nextLabel: string,
+): PresetModel[] {
+  const key = name.trim()
+  const label = nextLabel.trim()
+  if (!label) throw new Error('前端模型名称不能为空')
+  if (!customModels.some((model) => model.id === key)) {
+    throw new Error('内置前端模型不能重命名')
+  }
+  const duplicate = [...builtins, ...customModels].some(
+    (model) =>
+      model.id !== key &&
+      (model.id === label || presetDisplayName(model) === label),
+  )
+  if (duplicate) throw new Error(`前端模型「${label}」已经存在`)
+  return customModels.map((model) =>
+    model.id === key ? { ...model, label } : model,
+  )
 }
 
 export function withManualCategory(

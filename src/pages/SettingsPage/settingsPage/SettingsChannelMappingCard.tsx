@@ -70,6 +70,7 @@ export function SettingsChannelMappingCard({
         onBindModel={(upstreamId, logicalName) => void draft.bindModel(upstreamId, logicalName)}
         onModelUncommonChange={draft.setModelUncommon}
         onRemoveGlobalModel={(id) => void draft.removeGlobalModel(id)}
+        onRenameGlobalModel={(id, name) => void draft.renameGlobalModel(id, name)}
       />
     </div>
   )

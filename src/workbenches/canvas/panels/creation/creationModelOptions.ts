@@ -11,6 +11,7 @@ export interface CreationModelOptionContext {
   wantedCategory: ModelCapability['category']
   globalModelIds: readonly string[]
   iconFor(name: string): React.ReactNode | undefined
+  labelFor?(name: string): string | undefined
 }
 
 export function creationModelNames(input: {
@@ -23,6 +24,10 @@ export function creationModelNames(input: {
 export function creationModelOptions(context: CreationModelOptionContext): CreationModelOption[] {
   return creationModelNames(context).map((name) => {
     const icon = context.iconFor(name)
-    return { value: name, label: name, ...(icon ? { icon } : {}) }
+    return {
+      value: name,
+      label: context.labelFor?.(name) ?? name,
+      ...(icon ? { icon } : {}),
+    }
   })
 }

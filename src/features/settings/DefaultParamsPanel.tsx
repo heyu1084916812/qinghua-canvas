@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 'react'
 import { useChannels } from '../../app/providers/ChannelStoreProvider'
 import { capabilityOfLogical } from '../../domain/project/modelCatalog'
+import { presetDisplayName } from '../../domain/project/modelPresets'
 import { RATIO_CHOICES } from '../../domain/canvas/layout/ratioChoices'
 import { ChoicePicker } from '../shared/choicePicker/ChoicePicker'
 import styles from './DefaultParamsPanel.module.css'
@@ -187,7 +188,10 @@ export function DefaultParamsPanel() {
               disabled={busy || options.length === 0}
               ariaLabel="默认模型"
               placeholder="（这个类别还没有模型）"
-              options={options.map((item) => ({ value: item.id, label: item.id }))}
+              options={options.map((item) => ({
+                value: item.id,
+                label: presetDisplayName(item),
+              }))}
               onChange={(next) => {
                 setModel(next)
                 setStatus('')
