@@ -57,7 +57,7 @@ describe('Agent 确认卡', () => {
     ])
   })
 
-  it('任务计划与中途确认只推进规划，且自动模式也必须让用户亲自确认', () => {
+  it('任务计划、步骤验收与中途确认都必须让用户亲自确认', () => {
     for (const name of ['proposeTaskPlan', 'requestTaskConfirmation']) {
       expect(confirmationRunsGeneration(name)).toBe(false)
       expect(confirmationApprovalSteps({ ...request, name })).toHaveLength(1)
@@ -77,7 +77,7 @@ describe('Agent 确认卡', () => {
       confirmationRequiresExplicitApproval('requestTaskConfirmation', {
         purpose: 'review',
       }),
-    ).toBe(false)
+    ).toBe(true)
     expect(confirmationRunsGeneration('runNode')).toBe(true)
     expect(confirmationRequiresExplicitApproval('runNode')).toBe(false)
   })

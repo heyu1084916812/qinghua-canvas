@@ -877,8 +877,8 @@
 - **内容滚动与固定 footer 分层**：任务计划、消息、确认卡、待引导和队列都属于
   `[data-agent-content]`；对话模型行与 composer 留在滚动区外并禁止收缩。
   动态内容只让内容区滚动，不能把输入框挤出 Agent 浮窗。
-- **自动模式只绕过生成结果确认**：`proposeTaskPlan` 永远人工确认；
-  `requestTaskConfirmation(review)` 自动通过；`clarification` 仍必须问用户。
+- **自动模式只绕过付费生成确认**：`proposeTaskPlan`、`requestTaskConfirmation(review)`
+  与 `clarification` 都必须由用户亲自确认；自动模式不能替用户验收步骤结果。
   达到自动执行上限时转检查点，不显示新的付费确认卡。
 - **计划一次只推进一步**：`done` 不自动启动下一步；跨步骤启动、未开始就完成都必须拒绝。
   旧坏顺序读回时收回后续 pending，进度卡不得同时出现多个进行中。

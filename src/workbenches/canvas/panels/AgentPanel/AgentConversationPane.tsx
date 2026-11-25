@@ -174,32 +174,32 @@ export function AgentConversationPane({
   const questionCard = onAnswerQuestionCard ? pendingQuestionCard(visibleItems) : null
   return (
     <div className={styles.contentWrap} data-agent-scroll-wrap>
-      {current?.taskPlan && (
-        <div className={styles.planDock} data-agent-task-plan-dock>
-          <TaskPlanCard
-            plan={current.taskPlan}
-            pendingConfirmationStepId={pendingTaskStepId}
-            advancing={advancingTaskPlan}
-            onAdvanceToNext={onAdvanceToNext}
-            currentActivity={
-              statusIsBusy(status) && current.taskPlan.currentStepId
-                ? {
-                    running: true,
-                    text:
-                      latestProcessLine(liveProcess) ||
-                      activityTextOf(status, 0, items, liveActivities),
-                  }
-                : undefined
-            }
-          />
-        </div>
-      )}
       <div
         className={styles.content}
         ref={scrollRef}
         data-agent-content
         onScroll={onConversationScroll}
       >
+        {current?.taskPlan && (
+          <div className={styles.planDock} data-agent-task-plan-dock>
+            <TaskPlanCard
+              plan={current.taskPlan}
+              pendingConfirmationStepId={pendingTaskStepId}
+              advancing={advancingTaskPlan}
+              onAdvanceToNext={onAdvanceToNext}
+              currentActivity={
+                statusIsBusy(status) && current.taskPlan.currentStepId
+                  ? {
+                      running: true,
+                      text:
+                        latestProcessLine(liveProcess) ||
+                        activityTextOf(status, 0, items, liveActivities),
+                    }
+                  : undefined
+              }
+            />
+          </div>
+        )}
         <div
           className={styles.messages}
           data-agent-messages

@@ -1,0 +1,6 @@
+PASS | G1205 Agent 计划验收与单层滚动 | ★★ 只有当前步骤显示“完成需验收”，未来步骤不提前显示 | current=状态：进行中 | 生成首屏主视觉 | 先检查主体、留白与包装结构，再交给你验收。 | 完成需验收 future=3 | 状态：待开始 | 生成卖点与口味分屏
+PASS | G1205 Agent 计划验收与单层滚动 | ★★ 计划卡进入内容滚动区，外层与步骤列表都不再滚 | {"contentOverflowY":"auto","planDockOverflowY":"visible","stepsOverflowY":"visible","contentScrollable":true,"planDockFits":true,"stepsFit":true,"planInsideContent":true}
+PASS | G1205 Agent 计划验收与单层滚动 | ★★ 视觉验收发现问题时不再显示“视觉验收完成”
+PASS | G1205 Agent 计划验收与单层滚动 | 无未捕获异常
+
+===== 4 passed / 0 failed / 4 total / 0 external skipped =====

@@ -259,34 +259,6 @@ export function displayNodeText(
 }
 
 /**
- * 确认卡正文 → 可读的短行。
- *
- * 模型有时把“确认 5 件事”塞进一个段落；直接塞进一条 `<li>` 会变成整屏灰墙。
- * 这里只做确定性的排版拆分：保留原文，在编号项和长句的分号 / 句号处换行。
- */
-export function readableConfirmationLines(text: string): string[] {
-  const source = text.replace(/\r\n?/g, '\n').trim()
-  if (!source) return []
-  const withListBreaks = source
-    .replace(/\s+(?=(?:\d{1,2}[.)、]|[①②③④⑤⑥⑦⑧⑨⑩]))/g, '\n')
-    .replace(/([；;])\s*(?=(?:\d{1,2}[.)、]|[①②③④⑤⑥⑦⑧⑨⑩]))/g, '$1\n')
-    .replace(/([：:])\s*(?=(?:\d{1,2}[.)、]|[①②③④⑤⑥⑦⑧⑨⑩]))/g, '$1\n')
-  return withListBreaks
-    .split(/\n+/)
-    .flatMap((part) => {
-      const line = part.trim()
-      if (!line) return []
-      if (line.length <= 96) return [line]
-      return line
-        .replace(/([。；;])(?=\S)/g, '$1\n')
-        .split(/\n+/)
-        .map((item) => item.trim())
-        .filter(Boolean)
-    })
-    .slice(0, 24)
-}
-
-/**
  * 工具结果 → 人能读的几行 + 涉及的节点 id。
  *
  * **解析不出来不吞**：把原文原样给出来（截断到一行），因为「看不懂的结果」
@@ -572,6 +544,14 @@ export function describeToolResult(
           )
           .map((item) => `未检查：${cleanVisible(item)}`),
       ]
+      const stepLabel =
+        r.ok === false
+          ? '视觉验收没完成'
+          : r.verdict === 'needs_changes'
+            ? '视觉验收需修改'
+            : r.verdict === 'pass'
+              ? '视觉验收通过'
+              : '视觉验收无法确认'
       return {
         lines,
         summaryLines,
@@ -579,6 +559,7 @@ export function describeToolResult(
           typeof issue.nodeId === 'string' ? [issue.nodeId] : [],
         ))],
         failed,
+        stepLabel,
         ...(reviewedNodeIds.length > 0
           ? {
               activityLabel: `已查看 ${reviewedNodeIds.length} 张图像`,
@@ -914,12 +895,14 @@ export function toConversation(
      * 才知道成没成。失败还顶着「工作流已创建」是最误导人的一处。
      */
     const { stepLabel, ...describedFields } = described
-    out[at] = { ...item, ...describedFields, label: stepLabel ?? toolLabelOf(item.tool, described.failed) }
+    const resolvedLabel =
+      stepLabel ?? toolLabelOf(item.tool, described.failed)
+    out[at] = { ...item, ...describedFields, label: resolvedLabel }
     const phase = item.phase
     if (phase) {
       ensureProcess(m).entries.push({
         id: `phase-${m.toolCallId ?? at}`,
-        ...agentPhaseStepLine(phase, toolLabelOf(item.tool, described.failed), described.failed),
+        ...agentPhaseStepLine(phase, resolvedLabel, described.failed),
         phase,
         ...timeOf(m),
       })

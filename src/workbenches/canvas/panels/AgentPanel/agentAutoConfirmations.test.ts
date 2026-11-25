@@ -91,6 +91,20 @@ describe('continueAgentAutoConfirmations', () => {
     }
   })
 
+  it('★★ 计划步骤结果验收在自动模式仍返回 confirm', async () => {
+    const initial = confirmOutcome('requestTaskConfirmation', {
+      purpose: 'review',
+      stepId: 'step-1',
+      question: '这版结果是否满意？',
+    })
+    const args = input(initial)
+    const result = await continueAgentAutoConfirmations(args)
+    expect(result).toBe(initial)
+    expect(args.transitionSessionJob).not.toHaveBeenCalled()
+    expect(args.executeConfirmedTool).not.toHaveBeenCalled()
+    expect(args.resumeAgentTurn).not.toHaveBeenCalled()
+  })
+
   it('★★ 生成工具保持 transition → execute → finish → resume 顺序', async () => {
     const order: string[] = []
     const initial = confirmOutcome('runNode', {
@@ -152,27 +166,13 @@ describe('continueAgentAutoConfirmations', () => {
     )
   })
 
-  it('★★ 非生成自动工具不转 waiting_generation，也不 finish', async () => {
-    const initial = confirmOutcome('requestTaskConfirmation', {
-      purpose: 'review',
-      stepId: 'step-1',
-    })
-    const args = input(initial)
-    const result = await continueAgentAutoConfirmations(args)
-    expect(result.kind).toBe('message')
-    expect(args.transitionSessionJob).not.toHaveBeenCalled()
-    expect(args.executeConfirmedTool).toHaveBeenCalledTimes(1)
-    expect(args.onMessages).toHaveBeenCalledWith(initial.messages)
-    expect(args.finishConfirmedTool).not.toHaveBeenCalled()
-  })
-
   it('★★ 达到 maxSteps 返回原安全的 max_steps 检查点文案', async () => {
-    const args = input(confirmOutcome('requestTaskConfirmation', {
-      purpose: 'review',
+    const args = input(confirmOutcome('runNode', {
+      nodeIds: ['node-1'],
     }), {
       maxSteps: 2,
       resumeAgentTurn: vi.fn(async () =>
-        confirmOutcome('requestTaskConfirmation', { purpose: 'review' })),
+        confirmOutcome('runNode', { nodeIds: ['node-1'] })),
     })
     const result = await continueAgentAutoConfirmations(args)
     expect(result).toMatchObject({
@@ -186,6 +186,7 @@ describe('continueAgentAutoConfirmations', () => {
       },
     })
     expect(args.executeConfirmedTool).toHaveBeenCalledTimes(2)
+    expect(args.finishConfirmedTool).toHaveBeenCalledTimes(2)
   })
 
   it('★★ 执行抛错原样抛出，不吞掉也不继续 resume', async () => {

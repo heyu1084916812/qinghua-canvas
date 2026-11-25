@@ -225,7 +225,7 @@ function StepRow({
         <span className={styles.confirmTag}>等待你确认</span>
       ) : awaitingReview ? (
         <span className={styles.confirmTag}>结果待验收</span>
-      ) : step.requiresConfirmation && !done ? (
+      ) : current && step.requiresConfirmation && !done ? (
         <span className={styles.softTag}>完成需验收</span>
       ) : null}
     </li>

@@ -43001,7 +43001,12 @@ async function g769(browser) {
             status: 'in_progress',
             requiresConfirmation: true,
           },
-          { id: 'deliver', title: '生成应用物料', status: 'pending' },
+            {
+              id: 'deliver',
+              title: '生成应用物料',
+              status: 'pending',
+              requiresConfirmation: true,
+            },
         ],
         currentStepId: 'visual',
         createdAt: now,
@@ -43474,6 +43479,10 @@ async function g769(browser) {
       const llmRow = document
         .querySelector('[data-agent-llm-row]')
         ?.getBoundingClientRect()
+      const planDock = document.querySelector('[data-agent-task-plan-dock]')
+      const planSteps = document.querySelector(
+        '[data-agent-task-plan] ol',
+      )
       return {
         overflow: document.documentElement.scrollWidth - innerWidth,
         planFitsWidth:
@@ -43495,6 +43504,11 @@ async function g769(browser) {
           composer.bottom <= panel.bottom + 1 &&
           llmRow.top >= panel.top - 1 &&
           llmRow.bottom <= panel.bottom + 1,
+        scrollOwners: {
+          content: content ? getComputedStyle(content).overflowY : '',
+          planDock: planDock ? getComputedStyle(planDock).overflowY : '',
+          planSteps: planSteps ? getComputedStyle(planSteps).overflowY : '',
+        },
       }
     })
     rec(
@@ -43503,7 +43517,10 @@ async function g769(browser) {
       narrowPlan.overflow <= 0 &&
         narrowPlan.planFitsWidth &&
         narrowPlan.contentSafe &&
-        narrowPlan.footerFits,
+        narrowPlan.footerFits &&
+        narrowPlan.scrollOwners.content === 'auto' &&
+        narrowPlan.scrollOwners.planDock === 'visible' &&
+        narrowPlan.scrollOwners.planSteps === 'visible',
       JSON.stringify(narrowPlan),
     )
     await page.screenshot({ path: `${OUT}/769-agent-task-plan-1024.png` })
@@ -44386,7 +44403,8 @@ async function g798(browser) {
 /**
  * G800 自动生成不能代点计划确认。
  *
- * 自动模式允许生成结果审核自动通过，但 `proposeTaskPlan` 永远保留给用户。
+ * 自动模式可以连续执行已授权步骤，但 `proposeTaskPlan` 与步骤结果验收
+ * 都必须保留给用户。
  */
 async function g800(browser) {
   const g = 'G800 自动生成保留计划确认'
@@ -44571,10 +44589,10 @@ async function g800(browser) {
     }
     rec(
       g,
-      '★★ 自动模式会直接通过生成结果 review',
+      '★★ 自动模式不会代点生成结果 review',
       reviewRow?.autoRun === true &&
-        reviewRow?.pendingConfirmation == null &&
-        typeof reviewStep?.reviewApprovedAt === 'number',
+        reviewRow?.pendingConfirmation?.callId === reviewCallId &&
+        reviewStep?.reviewApprovedAt == null,
       `auto=${reviewRow?.autoRun ?? false} pending=${reviewRow?.pendingConfirmation?.name ?? 'none'} approved=${reviewStep?.reviewApprovedAt ?? 'none'}`,
     )
     rec(g, '无未捕获异常', pageErrors.length === 0, pageErrors.join(' | '))
@@ -47311,7 +47329,186 @@ async function g1204(browser) {
   }
 }
 
-const ALL_GROUPS = [g1, g2, g3, g4, g5, g6, g7, g8, g9, g10, g11, g12, g13, g14, g15, g16, g17, g18, g19, g23, g24, g37, g42, g43, g44, g45, g46, g47, g48, g49, g51, g52, g53, g55, g56, g57, g58, g59, g60, g61, g62, g63, g64, g65, g66, g67, g68, g69, g70, g71, g72, g73, g74, g75, g76, g77, g78, g79, g80, g81, g82, g83, g84, g85, g86, g87, g88, g89, g90, g91, g92, g93, g94, g95, g96, g97, g98, g99, g100, g101, g102, g103, g104, g105, g106, g107, g108, g109, g110, g111, g112, g113, g114, g115, g116, g117, g118, g119, g120, g121, g122, g123, g125, g126, g127, g128, g129, g130, g131, g132, g133, g134, g135, g136, g137, g138, g139, g140, g141, g142, g143, g144, g145, g146, g147, g148, g149, g150, g151, g152, g153, g154, g155, g156, g157, g158, g159, g160, g161, g162, g164, g165, g166, g167, g168, g169, g170, g171, g735, g769, g795, g798, g800, g865, g1182, g1195, g1196, g1201, g1203, g1204]
+/** G1205：计划验收标签只属于当前步骤，整张计划卡只保留内容区一层滚动。 */
+async function g1205(browser) {
+  const g = 'G1205 Agent 计划验收与单层滚动'
+  const compact = process.env.SMOKE_VIEWPORT === '1024'
+  const viewport = compact
+    ? { width: 1024, height: 700 }
+    : { width: 1440, height: 900 }
+  const theme = process.env.SMOKE_DARK === '1' ? 'dark' : 'light'
+  const variant = `${theme}-${viewport.width}`
+  const ctx = await newCtx(browser, { viewport })
+  const page = await ctx.newPage()
+  const pageErrors = []
+  page.on('pageerror', (error) =>
+    pageErrors.push(String(error).slice(0, 200)),
+  )
+  const stamp = Date.now().toString(36)
+  const projectId = `p-g1205-${stamp}`
+  const sessionId = `chat-g1205-${stamp}`
+  const now = Date.now()
+  let planId = ''
+
+  try {
+    await page.goto(`${BASE}/projects`, { waitUntil: 'domcontentloaded' })
+    await sharedPut(page, 'projects', {
+      id: projectId,
+      name: 'Agent 计划验收与滚动',
+      workbench: 'canvas',
+      createdAt: now,
+      updatedAt: now,
+    })
+    planId = `task-plan-g1205-${stamp}`
+    const titles = [
+      '确认视觉方向',
+      '生成首屏主视觉',
+      '生成卖点与口味分屏',
+      '生成礼盒细节屏',
+      '生成送礼场景屏',
+      '生成规格收尾屏',
+      '整理详情页长图',
+      '导出电商主图',
+      '导出详情页切片',
+      '校验尺寸与命名',
+      '整理交付清单',
+      '完成最终验收',
+    ]
+    await sharedPut(page, 'agentSessions', {
+      id: sessionId,
+      projectId,
+      title: '计划验收诊断',
+      channelId: '',
+      model: 'GPT-6 Astra',
+      queuedTurns: [],
+      pendingSteers: [],
+      taskPlan: {
+        id: planId,
+        title: '月饼详情页整套视觉工作流',
+        steps: titles.map((title, index) => ({
+          id: `step-${index + 1}`,
+          title,
+          detail:
+            index === 1
+              ? '先检查主体、留白与包装结构，再交给你验收。'
+              : undefined,
+          status: index === 0 ? 'done' : index === 1 ? 'in_progress' : 'pending',
+          ...(index >= 1 ? { requiresConfirmation: true } : {}),
+        })),
+        currentStepId: 'step-2',
+        createdAt: now,
+        updatedAt: now,
+      },
+      messages: [
+        { role: 'user', content: '检查这轮主视觉结果。', createdAt: now },
+        {
+          role: 'assistant',
+          content: '',
+          createdAt: now + 1,
+          toolCalls: [{ id: 'review-g1205', name: 'visualReview', args: '{}' }],
+        },
+        {
+          role: 'tool',
+          toolCallId: 'review-g1205',
+          toolName: 'visualReview',
+          content: JSON.stringify({
+            ok: true,
+            verdict: 'needs_changes',
+            summary: '主视觉需要调整留白',
+            targetNodeIds: [],
+            issues: [
+              {
+                severity: 'warning',
+                category: 'layout',
+                problem: '右侧留白过大',
+                suggestion: '将主体整体右移',
+              },
+            ],
+            limitations: [],
+          }),
+        },
+      ],
+      createdAt: now,
+      updatedAt: now,
+    })
+
+    await page.goto(`${BASE}/canvas/${projectId}`, {
+      waitUntil: 'domcontentloaded',
+    })
+    await page
+      .locator('[data-canvas-hydrated="true"]')
+      .waitFor({ state: 'attached', timeout: 20000 })
+    await page.locator('[data-canvas-agent]').click()
+    await page
+      .locator(`[data-agent-task-plan="${planId}"]`)
+      .waitFor({ state: 'visible', timeout: 10000 })
+
+    const currentText = await page
+      .locator('[data-agent-task-step="step-2"]')
+      .innerText()
+    const futureText = await page
+      .locator('[data-agent-task-step="step-3"]')
+      .innerText()
+    rec(
+      g,
+      '★★ 只有当前步骤显示“完成需验收”，未来步骤不提前显示',
+      currentText.includes('完成需验收') &&
+        !futureText.includes('完成需验收') &&
+        !futureText.includes('结果待验收'),
+      `current=${currentText.replace(/\n/g, ' | ')} future=${futureText.replace(/\n/g, ' | ')}`,
+    )
+
+    const layout = await page.evaluate(() => {
+      const content = document.querySelector('[data-agent-content]')
+      const planDock = document.querySelector('[data-agent-task-plan-dock]')
+      const planSteps = document.querySelector('[data-agent-task-plan] ol')
+      if (!(content instanceof HTMLElement) || !(planDock instanceof HTMLElement) ||
+        !(planSteps instanceof HTMLElement)) {
+        return null
+      }
+      return {
+        contentOverflowY: getComputedStyle(content).overflowY,
+        planDockOverflowY: getComputedStyle(planDock).overflowY,
+        stepsOverflowY: getComputedStyle(planSteps).overflowY,
+        contentScrollable: content.scrollHeight > content.clientHeight + 1,
+        planDockFits: planDock.scrollHeight <= planDock.clientHeight + 1,
+        stepsFit: planSteps.scrollHeight <= planSteps.clientHeight + 1,
+        planInsideContent: content.contains(planDock),
+      }
+    })
+    rec(
+      g,
+      '★★ 计划卡进入内容滚动区，外层与步骤列表都不再滚',
+      !!layout &&
+        layout.contentOverflowY === 'auto' &&
+        layout.planDockOverflowY === 'visible' &&
+        layout.stepsOverflowY === 'visible' &&
+        layout.contentScrollable &&
+        layout.planDockFits &&
+        layout.stepsFit &&
+        layout.planInsideContent,
+      JSON.stringify(layout),
+    )
+
+    const agentText = await page.locator('[data-agent-panel]').innerText()
+    rec(
+      g,
+      '★★ 视觉验收发现问题时不再显示“视觉验收完成”',
+      agentText.includes('视觉验收需修改') &&
+        !agentText.includes('视觉验收完成'),
+    )
+    await page.screenshot({
+      path: `${OUT}/1205-agent-plan-${variant}.png`,
+    })
+    rec(g, '无未捕获异常', pageErrors.length === 0, pageErrors.join(' | '))
+  } finally {
+    await sharedDelete(page, 'agentSessions', sessionId).catch(() => {})
+    await sharedDelete(page, 'projects', projectId).catch(() => {})
+    await ctx.close()
+  }
+}
+
+const ALL_GROUPS = [g1, g2, g3, g4, g5, g6, g7, g8, g9, g10, g11, g12, g13, g14, g15, g16, g17, g18, g19, g23, g24, g37, g42, g43, g44, g45, g46, g47, g48, g49, g51, g52, g53, g55, g56, g57, g58, g59, g60, g61, g62, g63, g64, g65, g66, g67, g68, g69, g70, g71, g72, g73, g74, g75, g76, g77, g78, g79, g80, g81, g82, g83, g84, g85, g86, g87, g88, g89, g90, g91, g92, g93, g94, g95, g96, g97, g98, g99, g100, g101, g102, g103, g104, g105, g106, g107, g108, g109, g110, g111, g112, g113, g114, g115, g116, g117, g118, g119, g120, g121, g122, g123, g125, g126, g127, g128, g129, g130, g131, g132, g133, g134, g135, g136, g137, g138, g139, g140, g141, g142, g143, g144, g145, g146, g147, g148, g149, g150, g151, g152, g153, g154, g155, g156, g157, g158, g159, g160, g161, g162, g164, g165, g166, g167, g168, g169, g170, g171, g735, g769, g795, g798, g800, g865, g1182, g1195, g1196, g1201, g1203, g1204, g1205]
 // ────────────────────────────────────────────────────────────
 // G169 框选多节点拖动：**松手那一刻不许再有人挪**（用户 2026-11-18 偶发：
 //      「框选多个节点，移动的时候松开鼠标会有一张图片移动了位置，好像多了一个步骤」）

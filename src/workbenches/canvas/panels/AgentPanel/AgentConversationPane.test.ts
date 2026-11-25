@@ -92,6 +92,49 @@ describe('AgentConversationPane', () => {
     expect(html).toContain('Skill 12')
   })
 
+  it('★★ 计划卡位于唯一内容滚动区内，未来步骤不提前显示验收标签', () => {
+    const html = renderPane({
+      current: {
+        ...session,
+        taskPlan: {
+          id: 'plan-scroll',
+          title: '品牌视觉执行计划',
+          steps: [
+            {
+              id: 'current',
+              title: '生成首屏主视觉',
+              status: 'in_progress',
+              requiresConfirmation: true,
+            },
+            {
+              id: 'future',
+              title: '生成卖点分屏',
+              status: 'pending',
+              requiresConfirmation: true,
+            },
+          ],
+          currentStepId: 'current',
+          createdAt: 1,
+          updatedAt: 1,
+        },
+      },
+    })
+    const contentAt = html.indexOf('data-agent-content')
+    const dockAt = html.indexOf('data-agent-task-plan-dock')
+    const messagesAt = html.indexOf('data-agent-messages')
+    expect(contentAt).toBeGreaterThanOrEqual(0)
+    expect(contentAt).toBeLessThan(dockAt)
+    expect(dockAt).toBeLessThan(messagesAt)
+    expect(html).toContain('data-agent-task-step="current"')
+    expect(html).toContain('完成需验收')
+    expect(html).toMatch(
+      /data-agent-task-step="future"[\s\S]*?data-agent-task-step-status="pending"/,
+    )
+    expect(html).not.toMatch(
+      /data-agent-task-step="future"[\s\S]*?完成需验收/,
+    )
+  })
+
   it('确认卡仍在对话流内，并保留批准与取消语义', () => {
     const html = renderPane({
       status: {

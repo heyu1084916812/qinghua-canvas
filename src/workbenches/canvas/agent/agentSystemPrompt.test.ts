@@ -82,6 +82,7 @@ describe('画布词表', () => {
     expect(prompt).toContain('当前为自动执行模式')
     expect(prompt).toContain('计划确认必须由用户亲自完成')
     expect(prompt).toContain('自动模式不会代替用户点确认')
+    expect(prompt).toContain('标记了 `requiresConfirmation:true` 的步骤仍要')
     expect(prompt).toContain('破坏性或长期副作用仍必须等待用户亲自确认')
   })
 })

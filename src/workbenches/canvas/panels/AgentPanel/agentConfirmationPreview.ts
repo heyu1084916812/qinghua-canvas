@@ -5,7 +5,7 @@ import {
 import type { CanvasStore } from '../../../../state/workbenches/canvas/store'
 import { runFromNodeIds } from '../../agent/tools'
 import type { AgentPanelStatus } from './AgentActivityViews'
-import { readableConfirmationLines } from './conversation'
+import { readableConfirmationLines } from './agentConfirmationText'
 
 export interface AgentConfirmationPreview {
   tool: string

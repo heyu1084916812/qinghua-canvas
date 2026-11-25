@@ -182,6 +182,26 @@ describe('useAgentAutoRunController', () => {
     expect(viewRef.current!.autoRunFor('s1')).toBe(true)
   })
 
+  it('切到自动模式不会代点待验收的步骤结果', async () => {
+    const confirmLatest = vi.fn(async () => undefined)
+    const statusFor = vi.fn((): AgentPanelStatus => ({
+      kind: 'awaitingConfirm',
+      request: {
+        callId: 'call-review',
+        name: 'requestTaskConfirmation',
+        args: { purpose: 'review', stepId: 'step-1' },
+      },
+    }))
+    const { viewRef } = render(input({ statusFor, confirmLatest }))
+
+    await act(async () => {
+      await expect(viewRef.current!.setAutoRun(true)).resolves.toBe(true)
+    })
+    expect(statusFor).toHaveBeenCalledWith('s1')
+    expect(confirmLatest).not.toHaveBeenCalled()
+    expect(viewRef.current!.autoRunFor('s1')).toBe(true)
+  })
+
   it('非 awaitingConfirm 不自动确认', async () => {
     const confirmLatest = vi.fn(async () => undefined)
     const { viewRef } = render(
@@ -207,8 +227,8 @@ describe('useAgentAutoRunController', () => {
       kind: 'awaitingConfirm',
       request: {
         callId: 'call-review',
-        name: 'requestTaskConfirmation',
-        args: { purpose: 'review' },
+        name: 'runNode',
+        args: { nodeIds: ['node-1'] },
       },
     }))
     const { viewRef } = render(
@@ -244,8 +264,8 @@ describe('useAgentAutoRunController', () => {
       kind: 'awaitingConfirm',
       request: {
         callId: 'call-review',
-        name: 'requestTaskConfirmation',
-        args: { purpose: 'review' },
+        name: 'runNode',
+        args: { nodeIds: ['node-1'] },
       },
     }))
     let currentId = 'a'
@@ -282,8 +302,8 @@ describe('useAgentAutoRunController', () => {
         kind: 'awaitingConfirm',
         request: {
           callId: 'call-review',
-          name: 'requestTaskConfirmation',
-          args: { purpose: 'review' },
+          name: 'runNode',
+          args: { nodeIds: ['node-1'] },
         },
       })
       .mockReturnValueOnce(IDLE_STATUS)
@@ -348,12 +368,12 @@ describe('useAgentAutoRunController', () => {
 })
 
 describe('useAgentAutoRunController / 同会话并发串行化', () => {
-  const reviewStatus = (): AgentPanelStatus => ({
+  const autoConfirmStatus = (): AgentPanelStatus => ({
     kind: 'awaitingConfirm',
     request: {
       callId: 'call-review',
-      name: 'requestTaskConfirmation',
-      args: { purpose: 'review' },
+      name: 'runNode',
+      args: { nodeIds: ['node-1'] },
     },
   })
 
@@ -439,7 +459,7 @@ describe('useAgentAutoRunController / 同会话并发串行化', () => {
     )
     const confirmLatest = vi.fn(async () => undefined)
     const { viewRef } = render(
-      input({ patchSession, confirmLatest, statusFor: reviewStatus }),
+      input({ patchSession, confirmLatest, statusFor: autoConfirmStatus }),
     )
 
     let firstCall!: Promise<boolean>
@@ -453,7 +473,7 @@ describe('useAgentAutoRunController / 同会话并发串行化', () => {
       first.resolve(session('s1', true))
       await expect(firstCall).resolves.toBe(true)
     })
-    // 第一次成功照旧走自动确认（review 卡 + autoRun=true）
+    // 第一次成功照旧走付费生成确认（runNode + autoRun=true）
     expect(confirmLatest).toHaveBeenCalledTimes(1)
 
     await act(async () => {

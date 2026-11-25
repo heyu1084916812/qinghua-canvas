@@ -1,0 +1,7 @@
+PASS | G800 自动生成保留计划确认 | 自动生成菜单明确计划仍需用户确认 | 自动生成
+计划需你确认，之后自动执行并扣费
+PASS | G800 自动生成保留计划确认 | ★★ 切到自动生成后，计划确认仍然保留给用户 | {"autoRun":true,"pendingCall":"call-auto-plan-light-1024","preview":1,"confirm":1}
+PASS | G800 自动生成保留计划确认 | ★★ 自动模式不会代点生成结果 review | auto=true pending=requestTaskConfirmation approved=none
+PASS | G800 自动生成保留计划确认 | 无未捕获异常
+
+===== 4 passed / 0 failed / 4 total / 0 external skipped =====

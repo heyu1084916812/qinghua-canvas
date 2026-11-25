@@ -5,27 +5,11 @@ import {
   pendingQuestionCard,
   processBefore,
   processEntriesOf,
-  readableConfirmationLines,
   toConversation,
   toolLabel,
   toolLabelOf,
   type ConversationItem,
 } from './conversation'
-
-describe('确认卡长文分段', () => {
-  it('把挤在一段的编号项拆成可读行，并保留原文内容', () => {
-    const text =
-      '做 Logo 前确认 3 件事：1) 职业领域与目标受众：你目前是品牌设计；' +
-      '2) 沿用已经确认的品牌名 HE YU、黑白主色；' +
-      '3) 画布上的旧图保留不动。'
-    expect(readableConfirmationLines(text)).toEqual([
-      '做 Logo 前确认 3 件事：',
-      '1) 职业领域与目标受众：你目前是品牌设计；',
-      '2) 沿用已经确认的品牌名 HE YU、黑白主色；',
-      '3) 画布上的旧图保留不动。',
-    ])
-  })
-})
 
 /**
  * 对话流映射（设计文档 §8）。
@@ -176,6 +160,7 @@ describe('工具结果 → 人话', () => {
       }),
     )
     expect(toolLabel('visualReview')).toBe('视觉验收完成')
+    expect(d.stepLabel).toBe('视觉验收需修改')
     expect(d.failed).toBe(false)
     expect(d.activityKind).toBe('image')
     expect(d.activityLabel).toBe('已查看 4 张图像')
@@ -207,6 +192,41 @@ describe('工具结果 → 人话', () => {
     )
     expect(d.lines.join('\n')).not.toContain('套件参考素材为 0')
     expect(d.lines.join('\n')).not.toContain('品牌库')
+  })
+
+  it('★★ 视觉验收发现问题时过程标题不再写“验收完成”', () => {
+    const items = toConversation([
+      { role: 'user', content: '检查这张图' },
+      {
+        role: 'assistant',
+        content: '',
+        toolCalls: [{ id: 'review', name: 'visualReview', args: '{}' }],
+      },
+      {
+        role: 'tool',
+        toolCallId: 'review',
+        content: JSON.stringify({
+          ok: true,
+          verdict: 'needs_changes',
+          summary: '需要调整',
+          issues: [
+            {
+              severity: 'warning',
+              category: 'layout',
+              problem: '主体偏左',
+              suggestion: '向右调整',
+            },
+          ],
+        }),
+      },
+    ])
+    const step = items.find((item) => item.kind === 'step')
+    const process = items.find((item) => item.kind === 'process')
+    expect(step?.kind === 'step' ? step.label : '').toBe('视觉验收需修改')
+    expect(process?.kind === 'process' ? process.entries[0]?.text : '').toContain(
+      '视觉验收需修改',
+    )
+    expect(JSON.stringify(items)).not.toContain('视觉验收完成')
   })
 
   it('★ 没登记的工具给兜底标题，不假装认识', () => {

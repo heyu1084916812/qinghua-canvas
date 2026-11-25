@@ -25,12 +25,12 @@ export function confirmationRunsGeneration(name: string): boolean {
 /**
  * 自动生成模式下仍必须由用户亲自点的确认。
  *
- * 计划永远人工确认；真正缺信息的 clarification 也不能替用户猜答案。
- * 生成结果 review 属于自动执行链路，允许自动通过。
+ * 计划、步骤结果和真正缺信息的 clarification 都是用户授权边界：
+ * 自动模式可以连续执行已授权步骤，但不能替用户验收结果。
  */
 export function confirmationRequiresExplicitApproval(
   name: string,
-  args?: unknown,
+  _args?: unknown,
   _context: { autoRun?: boolean } = {},
 ): boolean {
   /**
@@ -38,13 +38,7 @@ export function confirmationRequiresExplicitApproval(
    * “不进入 waiting_generation”不等于“用户已经批准”：删除、改节点、写记忆
    * 即使不扣费，也必须在确认卡上由用户亲自点。
    */
-  if (name === 'requestTaskConfirmation') {
-    const purpose =
-      args && typeof args === 'object'
-        ? (args as { purpose?: unknown }).purpose
-        : undefined
-    if (purpose === 'review') return false
-  }
+  if (name === 'requestTaskConfirmation') return true
   // 计划是用户授权后续连续执行的边界；自动模式不能代点，否则提示词与确认卡会分叉。
   return !toolRunsGenerationInAutoMode(name)
 }

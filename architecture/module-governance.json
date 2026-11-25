@@ -1310,6 +1310,25 @@
         "stripQuestionCardEchoes"
       ],
       "test": [
+        "src/workbenches/canvas/panels/AgentPanel/agentConfirmationText.test.ts"
+      ],
+      "budget": 60
+    },
+    {
+      "module": "src/workbenches/canvas/panels/AgentPanel/agentConfirmationText.ts",
+      "owner": "agent-conversation-ui",
+      "responsibility": "把确认卡长正文确定性地拆成可读短行，供确认预览与对话展示共用。",
+      "owns": [
+        "编号项与长句换行规则"
+      ],
+      "doesNotOwn": [
+        "确认请求解析",
+        "确认卡渲染"
+      ],
+      "publicApi": [
+        "readableConfirmationLines"
+      ],
+      "test": [
         "src/workbenches/canvas/panels/AgentPanel/conversation.test.ts"
       ],
       "budget": 60

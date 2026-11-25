@@ -112,15 +112,12 @@
 
 .steps {
   min-width: 0;
-  max-height: 206px;
-  overflow-y: auto;
   display: flex;
   flex-direction: column;
   gap: 2px;
   margin: 0;
   padding: 0;
   list-style: none;
-  scrollbar-width: thin;
 }
 
 .step {
