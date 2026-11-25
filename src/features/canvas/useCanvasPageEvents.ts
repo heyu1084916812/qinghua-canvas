@@ -4,7 +4,7 @@ import type { CanvasStore } from '../../state/workbenches/canvas/store'
 import type { NodeViewEvent } from '../../workbenches/canvas/nodes/registry'
 import { importAssetFile } from './importAsset'
 import { assetNodeSize } from '../../domain/canvas/layout/assetNodeSize'
-import { lightboxSourceRectForNode } from './lightboxSourceRect'
+import { openNodeLightbox } from './lightboxOpen'
 
 
 /**
@@ -77,16 +77,12 @@ export function useCanvasPageEvents(store: CanvasStore, onOpenSettings?: () => v
           break
         // 素材灯箱（§6.17）：只记「要看哪个素材」，不派发命令 —— 纯展示态，
         // 本体由灯箱自己按 hash 从 assets 表读回（架构 §4.7：视图不认识存储）
-        case 'openLightbox': {
-          const sourceRect = lightboxSourceRectForNode(nodeId, event.assetHash)
-          store.openLightbox(event.assetHash, {
-            sourceNodeId: nodeId,
-            ...(sourceRect ? { sourceRect } : {}),
+        case 'openLightbox':
+          openNodeLightbox(store, nodeId, event.assetHash, {
             ...(event.compareWith ? { compareWith: event.compareWith } : {}),
             ...(event.compareKind ? { compareKind: event.compareKind } : {}),
           })
           break
-        }
         // 以下属于执行引擎 / 上游开关，由各自的接线方接住（执行宿主 / 画布表面 / PanelLayer）
         case 'requestRun':
         case 'requestRunCancel':

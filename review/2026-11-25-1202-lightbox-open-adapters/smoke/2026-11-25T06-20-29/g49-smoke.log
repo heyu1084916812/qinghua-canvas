@@ -1,0 +1,24 @@
+PASS | G49 素材灯箱 | 生成节点出图（灯箱的素材来源） | blob:http://127.0.0.1:14
+PASS | G49 素材灯箱 | 双击前画布上没有灯箱
+PASS | G49 素材灯箱 | ★★ 入场 FLIP 使用真实画布矩形并以图片中心为锚点 | {"fromTransform":"translate(183.5px, 23px) scale(3.60606, 3.60606)","toTransform":"translate(0px, 0px) scale(1, 1)","duration":440}
+PASS | G49 素材灯箱 | ★★ FLIP 期间真实媒体隐藏，只显示浮动克隆 | {"flipping":true,"mediaOpacity":"0","clone":true}
+PASS | G49 素材灯箱 | 双击素材打开灯箱（§6.8 已挂的动线终于有人接）
+PASS | G49 素材灯箱 | FLIP 结束后真实媒体接管且克隆已清理 | {"flipping":false,"mediaOpacity":"1","clone":false}
+PASS | G49 素材灯箱 | ★★ 双击进来先落在「查看」，顶部已列出图片可用的编辑功能 | 模式=view,extract,crop,annotate,rotate
+PASS | G49 素材灯箱 | 灯箱里是 img 且素材已解码 | {"tag":"IMG","w":64,"h":64}
+PASS | G49 素材灯箱 | 显示实际像素尺寸（§6.17） | label="64 × 64"
+PASS | G49 素材灯箱 | 初次落位为整图适配（小图按 100%，不放大到失真） | zoom=100%
+PASS | G49 素材灯箱 | 滚轮可放大 | zoom=176%
+PASS | G49 素材灯箱 | 缩放锚点固定在鼠标位置（§6.17） | 0.250 → 0.250
+PASS | G49 素材灯箱 | 缩放上限 500%（与画布同一 clamp） | zoom=500%
+PASS | G49 素材灯箱 | 素材真的画在屏幕上（像素级，非 DOM 计数） | 灰像素 101124
+PASS | G49 素材灯箱 | ★★ 出场 FLIP 以图片中心为锚点回原图且退场期间冻结指针 | {"fromTransform":"none","toTransform":"translate(147.906px, -12.5938px) scale(0.734568, 0.734568)","duration":400}
+PASS | G49 素材灯箱 | Esc 关闭灯箱
+PASS | G49 素材灯箱 | 日志里有结果缩略图
+PASS | G49 素材灯箱 | 点击日志缩略图打开灯箱（§6.18）
+PASS | G49 素材灯箱 | ★★ 日志缩略图入场统一从真实图片中心放大 | {"thumbBox":{"x":1171.09375,"y":92,"width":62,"height":62},"logFlip":{"transformOrigin":"center center","center":{"x":1202.093994140625,"y":123},"to":"translate(0px, 0px) scale(1, 1)"}}
+PASS | G49 素材灯箱 | ★★ 灯箱目标框稳定后才开始淡入与缩放 | {"firstVisibleAt":32.69999998807907,"settledRects":["608px:368px:64px:64px"],"finalMedia":"608px:368px:64px:64px"}
+PASS | G49 素材灯箱 | 点击空白关闭灯箱
+PASS | G49 素材灯箱 | 无未捕获异常
+
+===== 22 passed / 0 failed / 22 total / 0 external skipped =====

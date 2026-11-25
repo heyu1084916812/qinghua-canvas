@@ -8305,12 +8305,38 @@
       "publicApi": [
         "LightboxSourceRect",
         "lightboxSourceRectFromMedia",
-        "lightboxSourceRectForNode"
+        "lightboxSourceRectForNode",
+        "lightboxSourceRectForThumbnail"
       ],
       "test": [
         "src/features/canvas/lightboxSourceRect.test.ts"
       ],
       "budget": 70
+    },
+    {
+      "module": "src/features/canvas/lightboxOpen.ts",
+      "owner": "canvas-lightbox-source",
+      "responsibility": "把查看灯箱的生产打开动作收口为节点来源与缩略图来源两个公共适配器。",
+      "owns": [
+        "从节点 DOM 生成 sourceRect 并调用 store",
+        "从缩略图按钮内真实媒体生成 sourceRect 并调用 store",
+        "查看灯箱的公共 options 类型"
+      ],
+      "doesNotOwn": [
+        "灯箱动画调度与目标框稳定性",
+        "编辑模式动作",
+        "素材仓储与解码"
+      ],
+      "publicApi": [
+        "NodeLightboxOptions",
+        "ThumbnailLightboxOptions",
+        "openNodeLightbox",
+        "openThumbnailLightbox"
+      ],
+      "test": [
+        "src/features/canvas/lightboxOpen.test.ts"
+      ],
+      "budget": 60
     },
     {
       "module": "src/pages/CanvasPage/ReferenceMedia.tsx",

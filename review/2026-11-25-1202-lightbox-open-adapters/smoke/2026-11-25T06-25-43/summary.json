@@ -1,0 +1,40 @@
+{
+  "groups": [
+    "g49",
+    "g1195"
+  ],
+  "results": [
+    {
+      "group": "g49",
+      "ok": true,
+      "code": 0,
+      "timedOut": false,
+      "passed": 22,
+      "failed": 0,
+      "total": 22,
+      "externalSkipped": 0,
+      "elapsedMs": 73313,
+      "log": "E:\\软件\\无限画布\\轻画\\.playwright-verify\\smoke-matrix\\2026-11-25T06-25-43\\000-g49\\smoke.log",
+      "storeDir": "E:\\软件\\无限画布\\轻画\\.playwright-verify\\smoke-matrix\\2026-11-25T06-25-43\\000-g49\\localappdata\\com.qinghua.canvas\\shared-store-v1",
+      "port": 18800,
+      "dataDir": "E:\\软件\\无限画布\\轻画\\.playwright-verify\\smoke-matrix\\2026-11-25T06-25-43\\000-g49\\localappdata\\com.qinghua.canvas\\shared-store-v1",
+      "storeBase": "http://127.0.0.1:18800"
+    },
+    {
+      "group": "g1195",
+      "ok": true,
+      "code": 0,
+      "timedOut": false,
+      "passed": 8,
+      "failed": 0,
+      "total": 8,
+      "externalSkipped": 0,
+      "elapsedMs": 84223,
+      "log": "E:\\软件\\无限画布\\轻画\\.playwright-verify\\smoke-matrix\\2026-11-25T06-25-43\\001-g1195\\smoke.log",
+      "storeDir": "E:\\软件\\无限画布\\轻画\\.playwright-verify\\smoke-matrix\\2026-11-25T06-25-43\\001-g1195\\localappdata\\com.qinghua.canvas\\shared-store-v1",
+      "port": 18801,
+      "dataDir": "E:\\软件\\无限画布\\轻画\\.playwright-verify\\smoke-matrix\\2026-11-25T06-25-43\\001-g1195\\localappdata\\com.qinghua.canvas\\shared-store-v1",
+      "storeBase": "http://127.0.0.1:18801"
+    }
+  ]
+}

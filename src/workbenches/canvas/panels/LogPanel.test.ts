@@ -1,9 +1,8 @@
-import { afterEach, describe, it, expect, vi } from 'vitest'
+import { describe, it, expect } from 'vitest'
 import {
   canvasLogRecordsOf,
   formatLogTime,
   isLogBackdropPointerDown,
-  openLogThumbnail,
   routeAttemptSummary,
   shouldShowInCanvasLog,
   statusLabel,
@@ -14,10 +13,6 @@ import {
  * 上排胶囊状态文案与时间格式——这两项是记录排版里唯一的确定性映射，单独抽出便于单测。
  */
 describe('LogPanel / 展示逻辑', () => {
-  afterEach(() => {
-    vi.unstubAllGlobals()
-  })
-
   it('状态徽标：成功 / 失败 / 已取消 / 已中断', () => {
     expect(statusLabel('succeeded')).toBe('成功')
     expect(statusLabel('failed')).toBe('失败')
@@ -99,44 +94,4 @@ describe('LogPanel / 展示逻辑', () => {
     ).toEqual(['image', 'unknown'])
   })
 
-  it('日志缩略图打开灯箱时携带按钮内真实图片的 FLIP 快照', () => {
-    vi.stubGlobal('getComputedStyle', () => ({ borderRadius: '8px' }))
-    const image = {
-      tagName: 'IMG',
-      currentSrc: 'blob:log',
-      src: 'blob:log',
-      getAttribute: () => null,
-      getBoundingClientRect: () => ({
-        left: 12,
-        top: 34,
-        width: 96,
-        height: 72,
-        right: 108,
-        bottom: 106,
-        x: 12,
-        y: 34,
-        toJSON: () => ({}),
-      }),
-    } as unknown as HTMLImageElement
-    const host = {
-      matches: () => false,
-      querySelector: () => image,
-    } as unknown as HTMLElement
-    const openLightbox = vi.fn()
-
-    openLogThumbnail({ openLightbox }, 'hash-log', host)
-
-    expect(openLightbox).toHaveBeenCalledWith('hash-log', {
-      sourceRect: {
-        left: 12,
-        top: 34,
-        width: 96,
-        height: 72,
-        borderRadius: '8px',
-        src: 'blob:log',
-        kind: 'image',
-        assetHash: 'hash-log',
-      },
-    })
-  })
 })

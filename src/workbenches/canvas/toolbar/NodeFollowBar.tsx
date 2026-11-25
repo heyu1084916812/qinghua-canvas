@@ -56,6 +56,7 @@ import { sendSelectionToAgent } from '../../../features/canvas/agentHandoff'
 import { useOverlayExit } from '../overlay/useOverlayExit'
 import { useHudMotion } from '../overlay/useHudMotion'
 import { lightboxSourceRectForNode } from '../../../features/canvas/lightboxSourceRect'
+import { openNodeLightbox } from '../../../features/canvas/lightboxOpen'
 import { createId } from '../../../shared/id'
 
 /**
@@ -495,7 +496,7 @@ function NodeActions({
           action="preview"
           icon={<IconExpand />}
           label="预览"
-          onClick={() => assetHash && store.openLightbox(assetHash, { sourceNodeId: node.id, sourceRect: lightboxSourceRectForNode(node.id, assetHash) })}
+          onClick={() => openNodeLightbox(store, node.id, assetHash)}
         />
       )}
       {/*
