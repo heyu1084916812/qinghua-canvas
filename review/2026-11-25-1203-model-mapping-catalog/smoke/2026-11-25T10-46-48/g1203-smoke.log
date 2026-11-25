@@ -1,0 +1,12 @@
+PASS | G1203 全局前端模型目录 | ★★ 目录完整显示前端模型名称、分类和内置状态 | {"groups":1,"tabs":4,"rows":9,"builtins":9,"builtinDelete":0}
+PASS | G1203 全局前端模型目录 | ★★ 内置模型没有删除入口 | 内置删除入口=0
+PASS | G1203 全局前端模型目录 | ★ 目录不重复提供常用开关，状态仍只由映射行管理 | 目录内开关=0
+PASS | G1203 全局前端模型目录 | ★★ 目录在当前视口内完整落位，无横向溢出 | {"dialog":{"left":400,"top":315,"right":1040,"bottom":585,"width":640,"height":270},"viewport":{"width":1440,"height":900},"overflowX":0,"catalogOverflowX":0}
+PASS | G1203 全局前端模型目录 | ★ 新增表单默认收起，展开后名称字段与图标库完整 | {"exists":true,"nameLabel":true,"vendors":36,"width":608,"overflowX":0}
+PASS | G1203 全局前端模型目录 | ★★ 自定义模型是分类内堆叠块，X 在名称右侧同一中线 | {"chipDisplay":"flex","stackDisplay":"flex","stackWrap":"wrap","deletePosition":"static","deleteRight":755,"chipRight":764,"centerDelta":0}
+PASS | G1203 全局前端模型目录 | ★ 双击名称原位重命名，模型块位置与逻辑 ID 不变 | 目录堆叠验证 1795603663591 新名
+PASS | G1203 全局前端模型目录 | ★ 点击模型块右侧 X 删除自定义模型
+PASS | G1203 全局前端模型目录 | ★★ 模型分类通过切换只展示一类 | {"selected":"image","group":"image"}
+PASS | G1203 全局前端模型目录 | 无未捕获异常
+
+===== 10 passed / 0 failed / 10 total / 0 external skipped =====

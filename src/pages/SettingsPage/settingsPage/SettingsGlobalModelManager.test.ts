@@ -28,10 +28,12 @@ function props(
     ],
     activeCategory: 'chat',
     customModels: [{ id: custom.id }],
+    formOpen: false,
     newModelName: '',
     newModelCategory: 'image',
     newModelVendor: 'openai',
     onClose: vi.fn(),
+    onFormOpenChange: vi.fn(),
     onNewModelNameChange: vi.fn(),
     onNewModelCategoryChange: vi.fn(),
     onNewModelVendorChange: vi.fn(),
@@ -121,10 +123,20 @@ describe('SettingsGlobalModelManager', () => {
     expect(root.root.findAllByProps({ 'data-global-model-group': 'chat' })).toHaveLength(0)
   })
 
-  it('新增面板常驻，并继承当前映射分类', () => {
+  it('新增面板默认收起，展开时继承当前映射分类', () => {
+    const onFormOpenChange = vi.fn()
     const onNewModelCategoryChange = vi.fn()
-    const { root } = render({ onNewModelCategoryChange })
-    expect(root.root.findAllByProps({ 'data-global-model-form': true })).toHaveLength(1)
+    const { root } = render({
+      onFormOpenChange,
+      onNewModelCategoryChange,
+    })
+    expect(root.root.findAllByProps({ 'data-global-model-form': true })).toHaveLength(0)
+    act(() => {
+      root.root
+        .findByProps({ 'data-global-model-create-toggle': true })
+        .props.onClick()
+    })
     expect(onNewModelCategoryChange).toHaveBeenCalledWith('chat')
+    expect(onFormOpenChange).toHaveBeenCalledWith(true)
   })
 })

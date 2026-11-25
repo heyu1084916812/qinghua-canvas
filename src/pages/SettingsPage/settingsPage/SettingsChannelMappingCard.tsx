@@ -55,6 +55,7 @@ export function SettingsChannelMappingCard({
         uncommonModelIds={uncommonModelIds}
         activeModels={activeModels}
         modelAddOpen={draft.modelAddOpen}
+        modelFormOpen={draft.modelFormOpen}
         newModelName={draft.newModelName}
         newModelCategory={draft.newModelCategory}
         newModelVendor={draft.newModelVendor}
@@ -62,6 +63,7 @@ export function SettingsChannelMappingCard({
         modelMap={modelMap}
         mapSaveNotice={mapSaveNotice}
         onModelAddOpenChange={draft.setModelAddOpen}
+        onModelFormOpenChange={draft.setModelFormOpen}
         onNewModelNameChange={draft.setNewModelName}
         onNewModelCategoryChange={draft.setNewModelCategory}
         onNewModelVendorChange={draft.setNewModelVendor}

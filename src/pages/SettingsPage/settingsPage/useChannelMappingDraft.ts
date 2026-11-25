@@ -42,7 +42,8 @@ export function useChannelMappingDraft(source: ChannelMappingDraftSource) {
     source
   const alertMessage = source.alertMessage ?? ((message: string) => window.alert(message))
   const confirmMessage = source.confirmMessage ?? ((message: string) => window.confirm(message))
-  const [modelAddOpen, setModelAddOpen] = useState(false)
+  const [modelAddOpen, setModelAddOpenState] = useState(false)
+  const [modelFormOpen, setModelFormOpen] = useState(false)
   const [newModelName, setNewModelName] = useState('')
   const [newModelCategory, setNewModelCategory] = useState<PresetModel['category']>('image')
   const [newModelVendor, setNewModelVendor] = useState<PresetVendor>('openai')
@@ -60,6 +61,7 @@ export function useChannelMappingDraft(source: ChannelMappingDraftSource) {
         vendor: newModelVendor,
       })
       setNewModelName('')
+      setModelFormOpen(false)
     } catch (error) {
       alertMessage(errorMessage(error))
     }
@@ -100,7 +102,12 @@ export function useChannelMappingDraft(source: ChannelMappingDraftSource) {
   return {
     allGlobalModels,
     modelAddOpen,
-    setModelAddOpen,
+    setModelAddOpen: (open: boolean) => {
+      setModelAddOpenState(open)
+      if (!open) setModelFormOpen(false)
+    },
+    modelFormOpen,
+    setModelFormOpen,
     newModelName,
     setNewModelName,
     newModelCategory,

@@ -44,6 +44,7 @@ export type SettingsChannelRouteViewProps = {
   uncommonModelIds: readonly string[]
   activeModels: readonly ModelCapability[]
   modelAddOpen: boolean
+  modelFormOpen: boolean
   newModelName: string
   newModelCategory: PresetModel['category']
   newModelVendor: PresetVendor
@@ -51,6 +52,7 @@ export type SettingsChannelRouteViewProps = {
   modelMap: Record<string, string>
   mapSaveNotice: MapSaveNotice | null
   onModelAddOpenChange: (open: boolean) => void
+  onModelFormOpenChange: (open: boolean) => void
   onNewModelNameChange: (name: string) => void
   onNewModelCategoryChange: (category: NewModelCategory) => void
   onNewModelVendorChange: (vendor: PresetVendor) => void
@@ -69,6 +71,7 @@ export function SettingsChannelRouteView({
   uncommonModelIds,
   activeModels,
   modelAddOpen,
+  modelFormOpen,
   newModelName,
   newModelCategory,
   newModelVendor,
@@ -76,6 +79,7 @@ export function SettingsChannelRouteView({
   modelMap,
   mapSaveNotice,
   onModelAddOpenChange,
+  onModelFormOpenChange,
   onNewModelNameChange,
   onNewModelCategoryChange,
   onNewModelVendorChange,
@@ -195,10 +199,12 @@ export function SettingsChannelRouteView({
         groups={catalogGroups}
         activeCategory={activeGroup.category}
         customModels={customModels}
+        formOpen={modelFormOpen}
         newModelName={newModelName}
         newModelCategory={newModelCategory}
         newModelVendor={newModelVendor}
         onClose={() => onModelAddOpenChange(false)}
+        onFormOpenChange={onModelFormOpenChange}
         onNewModelNameChange={onNewModelNameChange}
         onNewModelCategoryChange={onNewModelCategoryChange}
         onNewModelVendorChange={onNewModelVendorChange}

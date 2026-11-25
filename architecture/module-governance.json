@@ -7486,7 +7486,7 @@
       "test": [
         "src/pages/SettingsPage/settingsPage/SettingsGlobalModelManager.test.ts"
       ],
-      "budget": 400
+      "budget": 425
     },
     {
       "module": "src/pages/SettingsPage/settingsPage/SettingsChannelRouteView.tsx",

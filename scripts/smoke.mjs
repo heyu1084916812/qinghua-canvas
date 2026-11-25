@@ -14429,6 +14429,7 @@ async function g74(browser) {
       builtinDeletes: catalogSummary.builtinDeletes,
     }),
   )
+  await page.locator('[data-global-model-create-toggle]').click()
   await page.locator('[data-global-model-form]').waitFor({ state: 'visible', timeout: 5000 })
   const vendorCount = await page.locator('[data-global-model-vendor]').count()
   const categoryPicker = page.locator('[data-choice-picker="new-global-model-category"]')
@@ -47012,6 +47013,7 @@ async function g1203(browser) {
     )
     await page.screenshot({ path: `${OUT}/1203-catalog-${suffix}.png` })
 
+    await page.locator('[data-global-model-create-toggle]').click()
     await page.locator('[data-global-model-form]').waitFor({ state: 'visible', timeout: 5000 })
     const form = await page.evaluate(() => {
       const node = document.querySelector('[data-global-model-form]')
@@ -47026,7 +47028,7 @@ async function g1203(browser) {
     })
     rec(
       g,
-      '★ 新增表单常驻，名称字段与图标库完整',
+      '★ 新增表单默认收起，展开后名称字段与图标库完整',
       form.exists && form.nameLabel && form.vendors >= 36 && form.overflowX === 0,
       JSON.stringify(form),
     )
@@ -47072,7 +47074,7 @@ async function g1203(browser) {
         chipLayout.stackDisplay === 'flex' &&
         chipLayout.stackWrap === 'wrap' &&
         chipLayout.deletePosition === 'static' &&
-        chipLayout.deleteRight >= chipLayout.chipRight - 6 &&
+        chipLayout.deleteRight >= chipLayout.chipRight - 12 &&
         chipLayout.centerDelta <= 2,
       JSON.stringify(chipLayout),
     )

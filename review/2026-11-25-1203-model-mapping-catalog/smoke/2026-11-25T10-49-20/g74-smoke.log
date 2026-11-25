@@ -1,0 +1,73 @@
+PASS | G74 模型服务页 | ★★ 设置页不再有页内二级菜单 | data-settings-section=0
+PASS | G74 模型服务页 | ★ 没有「后台设置」标题（用户：这几个字贴边，不需要）
+PASS | G74 模型服务页 | ★ 直接就是渠道配置（渠道卡片在）
+PASS | G74 模型服务页 | ★ 设置页不再展示功能预设词与技能库
+PASS | G74 模型服务页 | ★ 渠道区最外层容器没有描边 | border=0px
+PASS | G74 模型服务页 | ★★ 渠道卡片铺满工作区（不再被旧两栏外壳挤成 176px 窄条） | 卡片=1201px 工作区=1201px
+PASS | G74 模型服务页 | ★★ 渠道内容在编辑区水平居中 | 表单中心=783 工作区中心=783 宽=869px
+PASS | G74 模型服务页 | 左栏改为搜索 + 可滚动列表 + 固定底部添加 | {"search":1,"searchRadius":10,"ruleRadius":10,"filterInsideSearch":true,"groupLabels":0,"inListAdd":0,"fixedAdd":true,"listOverflow":"auto"}
+PASS | G74 模型服务页 | 搜索框按服务名称实时过滤 | 7 → 1
+PASS | G74 模型服务页 | 筛选只有全部 / 已启用 / 已禁用三项 | 全部服务商 · 仅已启用 · 仅已禁用
+PASS | G74 模型服务页 | 启用状态筛选正确，禁用服务不显示圆点 | 1/6 true/true
+PASS | G74 模型服务页 | 服务行改为紧凑单行，不再有多选删除 | {"height":42,"enabledState":"true","deleteCheckboxes":0,"dragHandle":1,"menuTrigger":1,"dot":1,"removeButton":0}
+PASS | G74 模型服务页 | 服务图标统一为 24px 圆角矩形，无图标时显示名称首字 | [{"kind":"image","width":24,"height":24,"radius":"10px","background":"rgba(0, 0, 0, 0)","borderWidth":1},{"kind":"image","width":24,"height":24,"radius":"10px","background":"rgba(0, 0, 0, 0)","borderWidth":1},{"kind":"image","width":24,"height":24,"radius":"10px","background":"rgba(0, 0, 0, 0)","borderWidth":1},{"kind":"image","width":24,"height":24,"radius":"10px","background":"rgba(0, 0, 0, 0)","borderWidth":1},{"kind":"monogram","width":24,"height":24,"radius":"10px","background":"rgb(47, 125, 90)","borderWidth":1},{"kind":"image","width":24,"height":24,"radius":"10px","background":"rgba(0, 0, 0, 0)","borderWidth":1}]
+PASS | G74 模型服务页 | 悬停时左侧出现拖动把手、右侧圆点变成三点按钮 | {"dragVisible":true,"menuVisible":true,"dragBackground":"rgba(0, 0, 0, 0)","iconLeft":19,"itemPaddingLeft":"0px"}
+PASS | G74 模型服务页 | 拖动图标无额外容器，拖动手柄 / 渠道图标整体左移 | {"dragVisible":true,"menuVisible":true,"dragBackground":"rgba(0, 0, 0, 0)","iconLeft":19,"itemPaddingLeft":"0px"}
+PASS | G74 模型服务页 | 自定义服务三点菜单有编辑和删除，删除二次确认 | {"edit":1,"delete":1,"deleteConfirmVisible":true}
+PASS | G74 模型服务页 | 内置服务右键菜单只有编辑 | {"edit":1,"delete":0}
+PASS | G74 模型服务页 | 菜单里的编辑会选中对应服务 | ch_builtin_modelscope
+PASS | G74 模型服务页 | 右键“编辑”打开右侧资料浮层
+PASS | G74 模型服务页 | 主编辑区名称放大并带设置齿轮，旧服务图标块已移除 | {"nameTag":"SPAN","fontSize":14,"titleSize":14,"gear":1,"legacyIconBlock":0,"basicsSection":0}
+PASS | G74 模型服务页 | 启用开关在右侧标题栏，左栏仅显示状态圆点 | {"rowSwitch":0,"headSwitch":1,"dot":0,"enabledState":"false","nativeSelects":0}
+PASS | G74 模型服务页 | 齿轮打开模型服务浮层，四周留距且宽度约为页面一半 | {"width":360,"leftGap":397,"rightGap":397,"topGap":143,"bottomGap":143,"workareaWidth":1153,"upload":1,"builtin":1,"reset":1,"save":1}
+PASS | G74 模型服务页 | 资料抽屉保存后主界面名称同步更新 | ModelScope 魔搭 编辑
+PASS | G74 模型服务页 | 渠道优先级与权重收进名称同排，解释文案移除 | {"routeInline":1,"nameCenter":102,"priorityCenter":102,"weightCenter":102,"routeExplanationRemoved":true,"addressHeight":34,"protocolHeight":34,"quickTriggerHeight":34,"quickRunHeight":34,"quickChevronRightGap":13,"quickNativeSelects":0,"savedStatusVisible":false,"genericProtocolNote":0,"standardHeights":[34,34,34,34,34,34,34,34,34,34,34,34,34,34,34,34,34,34,34,34,34,34,34,34,34,34,34,34,34,34],"standardCount":30,"nonStandardHeights":[],"gearHeight":28,"eyeHeight":26,"enableTrackHeight":20,"commonTrackHeight":20,"quickInputHeight":85,"tokenLinkText":"","keyGroupTabHeight":40,"keyGroupIdleTabHeight":40,"keyGroupIdleTabCenterY":409,"keyGroupTabTexts":["默认分组P0","备用 Key"],"keyGroupChromeButtons":0,"keyGroupFirstTabActive":true,"keyGroupTabRadius":"0px","keyGroupTabBg":"rgba(0, 0, 0, 0)","keyGroupShapePath":"M 0,40 L 0,12 Q 0,0 12,0 L 104,0 Q 116,0 120.21,11.24 L 127.","keyGroupMorphPath":"M 0,46 L 0,13.97 Q 0,1.97 12,1.97 L 104,1.97 Q 116,1.97 119.","keyGroupMorphFill":"_keyGroupMorphPath_jpgtc_591","keyGroupAddCenterY":409,"keyGroupAddHeight":30,"mappingFilterHeights":[40,40,40,40],"mappingFilterCount":4,"keyGroupTextCenterY":407,"keyGroupCardRadius":"0px 10px","keyGroupCardBg":"rgb(245, 245, 245)"}
+PASS | G74 模型服务页 | 地址与协议控件等高，Key 下方不再重复显示已保存 | {"routeInline":1,"nameCenter":102,"priorityCenter":102,"weightCenter":102,"routeExplanationRemoved":true,"addressHeight":34,"protocolHeight":34,"quickTriggerHeight":34,"quickRunHeight":34,"quickChevronRightGap":13,"quickNativeSelects":0,"savedStatusVisible":false,"genericProtocolNote":0,"standardHeights":[34,34,34,34,34,34,34,34,34,34,34,34,34,34,34,34,34,34,34,34,34,34,34,34,34,34,34,34,34,34],"standardCount":30,"nonStandardHeights":[],"gearHeight":28,"eyeHeight":26,"enableTrackHeight":20,"commonTrackHeight":20,"quickInputHeight":85,"tokenLinkText":"","keyGroupTabHeight":40,"keyGroupIdleTabHeight":40,"keyGroupIdleTabCenterY":409,"keyGroupTabTexts":["默认分组P0","备用 Key"],"keyGroupChromeButtons":0,"keyGroupFirstTabActive":true,"keyGroupTabRadius":"0px","keyGroupTabBg":"rgba(0, 0, 0, 0)","keyGroupShapePath":"M 0,40 L 0,12 Q 0,0 12,0 L 104,0 Q 116,0 120.21,11.24 L 127.","keyGroupMorphPath":"M 0,46 L 0,13.97 Q 0,1.97 12,1.97 L 104,1.97 Q 116,1.97 119.","keyGroupMorphFill":"_keyGroupMorphPath_jpgtc_591","keyGroupAddCenterY":409,"keyGroupAddHeight":30,"mappingFilterHeights":[40,40,40,40],"mappingFilterCount":4,"keyGroupTextCenterY":407,"keyGroupCardRadius":"0px 10px","keyGroupCardBg":"rgb(245, 245, 245)"}
+PASS | G74 模型服务页 | 快速测试使用项目下拉且选择器与运行按钮等高 | {"routeInline":1,"nameCenter":102,"priorityCenter":102,"weightCenter":102,"routeExplanationRemoved":true,"addressHeight":34,"protocolHeight":34,"quickTriggerHeight":34,"quickRunHeight":34,"quickChevronRightGap":13,"quickNativeSelects":0,"savedStatusVisible":false,"genericProtocolNote":0,"standardHeights":[34,34,34,34,34,34,34,34,34,34,34,34,34,34,34,34,34,34,34,34,34,34,34,34,34,34,34,34,34,34],"standardCount":30,"nonStandardHeights":[],"gearHeight":28,"eyeHeight":26,"enableTrackHeight":20,"commonTrackHeight":20,"quickInputHeight":85,"tokenLinkText":"","keyGroupTabHeight":40,"keyGroupIdleTabHeight":40,"keyGroupIdleTabCenterY":409,"keyGroupTabTexts":["默认分组P0","备用 Key"],"keyGroupChromeButtons":0,"keyGroupFirstTabActive":true,"keyGroupTabRadius":"0px","keyGroupTabBg":"rgba(0, 0, 0, 0)","keyGroupShapePath":"M 0,40 L 0,12 Q 0,0 12,0 L 104,0 Q 116,0 120.21,11.24 L 127.","keyGroupMorphPath":"M 0,46 L 0,13.97 Q 0,1.97 12,1.97 L 104,1.97 Q 116,1.97 119.","keyGroupMorphFill":"_keyGroupMorphPath_jpgtc_591","keyGroupAddCenterY":409,"keyGroupAddHeight":30,"mappingFilterHeights":[40,40,40,40],"mappingFilterCount":4,"keyGroupTextCenterY":407,"keyGroupCardRadius":"0px 10px","keyGroupCardBg":"rgb(245, 245, 245)"}
+PASS | G74 模型服务页 | 渠道设置全部标准矩形控件统一 34px | {"count":30,"heights":[34],"outliers":[]}
+PASS | G74 模型服务页 | Key 分组是文件夹标签：选中 44px / 未选中 40px、标题里没有编辑/删除按钮 | {"tab":40,"idleTab":40,"tabs":["默认分组P0","备用 Key"],"chromeButtons":0}
+PASS | G74 模型服务页 | 模型映射分类也用文件夹标签（40px、数量徽章、至少三档） | {"count":4,"heights":[40,40,40,40]}
+PASS | G74 模型服务页 | 文件夹标签造型：斜边梯形走 SVG 路径、选中态由形变层画、卡片左上直角 | {"shape":"M 0,40 L 0,12 Q 0,0 12,0 L 104,0 Q 116,0 120.21,11.24 L 127.","morph":"M 0,46 L 0,13.97 Q 0,1.97 12,1.97 L 104,1.97 Q 116,1.97 119.","cardRadius":"0px 10px"}
+PASS | G74 模型服务页 | 加号与标签文字同一条中线 | 加号=409 选中文字=407 未选中标签=409
+PASS | G74 模型服务页 | 图标、内嵌眼睛、开关轨、新增分组与多行输入保持各自档位 | {"gear":28,"eye":26,"addTab":30,"enable":20,"common":20,"textarea":85}
+PASS | G74 模型服务页 | Key 分组入口使用短文案“获取令牌”
+PASS | G74 模型服务页 | 快速测试焦点环与下拉菜单沿用全局设计 | {"quickFocus":{"focused":true,"outlineStyle":"solid","outlineWidth":"2px"},"quickPopupStyle":{"background":"rgb(255, 255, 255)","borderRadius":"10px"}}
+PASS | G74 模型服务页 | 前端模型目录先列已有模型：分组、内置标记和名称都在 | {"groups":1,"tabs":4,"rows":9,"builtins":9,"builtinDeletes":0}
+PASS | G74 模型服务页 | 前端模型图标库完整，不再出现未分类 | 图标厂商=36 分类=image,chat,video,audio 未分类=0
+PASS | G74 模型服务页 | 自定义前端模型新增后留在目录中，并标记为自定义 | 目录验证模型 1795603820767
+PASS | G74 模型服务页 | 双击自定义模型可原位重命名，稳定 ID 不变 | 目录验证模型 1795603820767 改名
+PASS | G74 模型服务页 | 重命名同步到模型映射区的显示名，映射键仍用稳定 ID | 目录验证模型 1795603820767 改名
+PASS | G74 模型服务页 | 自定义前端模型可从目录删除，删除后行立即消失
+PASS | G74 模型服务页 | 映射表提供模型分类切换 | chat,image,video,audio
+PASS | G74 模型服务页 | 默认只显示一个模型分类 | chat,chat,chat,chat,chat,chat,chat,chat,chat
+PASS | G74 模型服务页 | 切到对话后只显示对话模型 | chat,chat,chat,chat,chat,chat,chat,chat,chat
+PASS | G74 模型服务页 | 键盘左右键可切换映射分类 | video（期望 video）: video,video,video,video,video,video
+PASS | G74 模型服务页 | 常用状态是可操作的开关
+PASS | G74 模型服务页 | 标为不常用后默认映射列表立即隐藏该前端模型 | Agnes Image 2.5 Flash
+PASS | G74 模型服务页 | 设置页可用「显示不常用模型」恢复目录可见性 | Agnes Image 2.5 Flash
+PASS | G74 模型服务页 | 映射表不提供逐行测试按钮
+PASS | G74 模型服务页 | ★★ 渠道选择 + 内容整组在工作区水平居中 | 组合体中心=665 工作区中心=665 宽=1153px
+PASS | G74 模型服务页 | ★ 设置页不再有旧的三区外壳
+PASS | G74 模型服务页 | 搜索筛选固定在上、服务列表独立滚动、添加服务商固定在底部 | {"order":true,"addOutsideList":true,"listOverflow":"auto"}
+PASS | G74 模型服务页 | ★★ 模型服务分段（连接与鉴权 / 模型列表 / 渠道权重与模型映射） | 各卡片数=1,1,1 顺序正确=true
+PASS | G74 模型服务页 | ★★ 选路策略是全局顶栏：在两栏工作区之外、渠道表单之外（与选中渠道无关） | 全局条数=1 在layout=true workarea外=true 表单外=true 在workarea上方=true
+PASS | G74 模型服务页 | 拖动说明小字已移除，把手只在服务行悬停时出现
+PASS | G74 模型服务页 | ★ 技能库浏览层有「功能预设词」入口（预设词归这里）
+PASS | G74 模型服务页 | ★ 功能预设词在技能库第二层打开
+PASS | G74 模型服务页 | 三条内置动作各有一段可编辑的预设词 | optimize,translate,describe
+PASS | G74 模型服务页 | 未改过时不显示「已改」标记
+PASS | G74 模型服务页 | 保存后标为「已改」
+PASS | G74 模型服务页 | ★ 刷新后改过的预设词仍在（真的落库，不是内存态）
+PASS | G74 模型服务页 | ★★ 改过的预设词真的被发出去（mock 回显 prompt 里带上了它） | mock:MARKER_SYSTEM_INSTRUCTION
+
+
+原始正文
+36 字
+优化
+翻译
+反推
+PASS | G74 模型服务页 | ★ 恢复默认回到出厂值（且「已改」标记消失）
+PASS | G74 模型服务页 | ★ 从预设词可返回技能库浏览层
+PASS | G74 模型服务页 | 无未捕获异常
+
+===== 64 passed / 0 failed / 64 total / 0 external skipped =====

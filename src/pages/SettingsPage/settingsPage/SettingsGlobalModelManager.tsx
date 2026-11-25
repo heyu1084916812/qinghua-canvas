@@ -7,7 +7,7 @@ import {
 import { categoryLabel } from '../../../domain/project/modelSelection'
 import { ChoicePicker } from '../../../features/shared/choicePicker/ChoicePicker'
 import { ModelIcon } from '../../../features/shared/modelIcon/ModelIcon'
-import { Icon, X } from '../../../ui/icon'
+import { Icon, Plus, X } from '../../../ui/icon'
 import { GLOBAL_MODEL_VENDORS } from '../settingsPageConstants'
 import { settingsPageStyles as styles } from './settingsPageStyles'
 
@@ -22,10 +22,12 @@ export type SettingsGlobalModelManagerProps = {
   groups: readonly GlobalModelCatalogGroup[]
   activeCategory: PresetModel['category']
   customModels: readonly { id: string }[]
+  formOpen: boolean
   newModelName: string
   newModelCategory: PresetModel['category']
   newModelVendor: PresetVendor
   onClose: () => void
+  onFormOpenChange: (open: boolean) => void
   onNewModelNameChange: (name: string) => void
   onNewModelCategoryChange: (category: PresetModel['category']) => void
   onNewModelVendorChange: (vendor: PresetVendor) => void
@@ -46,10 +48,12 @@ export function SettingsGlobalModelManager({
   groups,
   activeCategory,
   customModels,
+  formOpen,
   newModelName,
   newModelCategory,
   newModelVendor,
   onClose,
+  onFormOpenChange,
   onNewModelNameChange,
   onNewModelCategoryChange,
   onNewModelVendorChange,
@@ -60,7 +64,11 @@ export function SettingsGlobalModelManager({
   const panelRef = useRef<HTMLElement | null>(null)
   const cancelRenameRef = useRef(false)
   const closeRef = useRef(onClose)
+  const formOpenRef = useRef(formOpen)
+  const formOpenChangeRef = useRef(onFormOpenChange)
   closeRef.current = onClose
+  formOpenRef.current = formOpen
+  formOpenChangeRef.current = onFormOpenChange
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editingName, setEditingName] = useState('')
   const [catalogCategory, setCatalogCategory] = useState(activeCategory)
@@ -77,7 +85,8 @@ export function SettingsGlobalModelManager({
         : null
       if (picker?.querySelector('[role="listbox"]')) return
       event.preventDefault()
-      closeRef.current()
+      if (formOpenRef.current) formOpenChangeRef.current(false)
+      else closeRef.current()
     }
     document.addEventListener('keydown', onKeyDown)
     return () => {
@@ -85,6 +94,13 @@ export function SettingsGlobalModelManager({
       previous?.focus()
     }
   }, [open])
+
+  useEffect(() => {
+    if (!open || !formOpen || typeof document === 'undefined') return
+    panelRef.current
+      ?.querySelector<HTMLInputElement>('[data-global-model-name]')
+      ?.focus()
+  }, [formOpen, open])
 
   useEffect(() => {
     if (
@@ -117,6 +133,11 @@ export function SettingsGlobalModelManager({
     cancelRenameRef.current = false
     setEditingId(model.id)
     setEditingName(presetDisplayName(model))
+  }
+
+  const toggleCreate = () => {
+    if (!formOpen) onNewModelCategoryChange(activeCategory)
+    onFormOpenChange(!formOpen)
   }
 
   const cancelRename = () => {
@@ -165,6 +186,17 @@ export function SettingsGlobalModelManager({
             <button
               type="button"
               className={styles.ghostBtn}
+              data-global-model-create-toggle
+              aria-expanded={formOpen}
+              aria-controls="settings-global-model-form"
+              onClick={toggleCreate}
+            >
+              <Icon icon={formOpen ? X : Plus} size="sm" />
+              {formOpen ? '收起新增' : '新增模型'}
+            </button>
+            <button
+              type="button"
+              className={styles.ghostBtn}
               data-global-model-close
               onClick={onClose}
             >
@@ -173,11 +205,12 @@ export function SettingsGlobalModelManager({
           </div>
         </div>
 
-        <div
-          id="settings-global-model-form"
-          className={`${styles.modelAddForm} ${styles.modelManagerForm}`}
-          data-global-model-form
-        >
+        {formOpen ? (
+          <div
+            id="settings-global-model-form"
+            className={`${styles.modelAddForm} ${styles.modelManagerForm}`}
+            data-global-model-form
+          >
             <div className={styles.fieldRow}>
               <label className={`${styles.field} ${styles.grow}`}>
                 <span className={styles.label}>前端模型名称</span>
@@ -231,6 +264,14 @@ export function SettingsGlobalModelManager({
             <div className={styles.modelAddActions}>
               <button
                 type="button"
+                className={styles.ghostBtn}
+                data-global-model-form-cancel
+                onClick={() => onFormOpenChange(false)}
+              >
+                取消
+              </button>
+              <button
+                type="button"
                 className={styles.primary}
                 data-global-model-add
                 disabled={!newModelName.trim()}
@@ -239,7 +280,8 @@ export function SettingsGlobalModelManager({
                 添加
               </button>
             </div>
-        </div>
+          </div>
+        ) : null}
 
         <div className={styles.globalModelCatalog}>
           <div className={styles.globalModelCatalogHead}>

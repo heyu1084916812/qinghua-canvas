@@ -59,6 +59,7 @@ describe('模型映射卡的草稿态', () => {
       draft.current.setNewModelName('6.1')
       draft.current.setNewModelCategory('chat')
       draft.current.setModelAddOpen(true)
+      draft.current.setModelFormOpen(true)
     })
     rerender()
     await act(async () => {
@@ -72,6 +73,24 @@ describe('模型映射卡的草稿态', () => {
     })
     expect(draft.current.newModelName).toBe('')
     expect(draft.current.modelAddOpen).toBe(true)
+    expect(draft.current.modelFormOpen).toBe(false)
+  })
+
+  it('关闭目录时收起新增表单，避免下次打开残留', () => {
+    const { draft, rerender } = renderDraft()
+    act(() => {
+      draft.current.setModelAddOpen(true)
+      draft.current.setModelFormOpen(true)
+    })
+    rerender()
+    expect(draft.current.modelFormOpen).toBe(true)
+
+    act(() => {
+      draft.current.setModelAddOpen(false)
+    })
+    rerender()
+    expect(draft.current.modelAddOpen).toBe(false)
+    expect(draft.current.modelFormOpen).toBe(false)
   })
 
   it('删除前端模型要先确认；取消就一个接口都不发', async () => {
