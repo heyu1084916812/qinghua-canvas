@@ -609,6 +609,30 @@ describe('openaiChat adapter / 多模态（上游图片送进 LLM）', () => {
       appError: { kind: 'http', status: 401 },
     })
   })
+
+  it('HTTP 429 保留明确拒绝，HTTP 500 标为提交后结果未知', async () => {
+    const rateLimited = createMemoryNetwork({
+      handler: async () => resp(429, { error: { message: 'rate limited' } }),
+    })
+    const a = createOpenAiChatAdapter(cfg, {
+      network: rateLimited,
+      assets: platformWith([]).assets,
+    })
+    await expect(a.completeText(request([]), signal)).rejects.toMatchObject({
+      appError: { kind: 'http', status: 429 },
+    })
+
+    const serverError = createMemoryNetwork({
+      handler: async () => resp(500, { error: { message: 'upstream failed' } }),
+    })
+    const b = createOpenAiChatAdapter(cfg, {
+      network: serverError,
+      assets: platformWith([]).assets,
+    })
+    await expect(b.completeText(request([]), signal)).rejects.toMatchObject({
+      appError: { kind: 'execution', detail: 'accepted' },
+    })
+  })
 })
 
 /**

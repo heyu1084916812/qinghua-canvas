@@ -88,6 +88,51 @@ describe('runEngine / 回调参数契约', () => {
     })
   })
 
+  it('★★ 多产物部分下载失败写入 RunRecord 三元账', async () => {
+    const plan = makePlan()
+    const summary = await runEngine(plan, {
+      signal: new AbortController().signal,
+      projectId: 'p1',
+      recordScope: scopeOf,
+      channelResolver: () =>
+        ({
+          protocol: 'mock',
+          async generateImage() {
+            return [
+              {
+                hash: 'h1',
+                mime: 'image/png',
+                bytes: new Uint8Array([1]),
+                materialization: {
+                  requested: 2,
+                  materialized: 1,
+                  failedItems: ['https://cdn.example/missing.png：network/timeout'],
+                },
+              },
+            ]
+          },
+        }) as never,
+      writeBack: () => {},
+      placement: {
+        begin: () => ({ targetId: CARRIER, commands: [] }),
+        commit: () => [],
+        shouldCollect: () => false,
+        record: () => null,
+        finalize: () => [],
+      },
+      now: () => 0,
+    })
+
+    expect(summary.records[0]).toMatchObject({
+      outputHashes: ['h1'],
+      requestedOutputs: 2,
+      materializedOutputs: 1,
+      failedOutputItems: [
+        'https://cdn.example/missing.png：network/timeout',
+      ],
+    })
+  })
+
   it('★★ 生图网络超时只调用一次，不自动重复提交付费请求', async () => {
     const plan = makePlan()
     let calls = 0

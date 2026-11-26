@@ -150,22 +150,51 @@ function latestUserImageNodeIds(
   return [...new Set(ids)]
 }
 
-function confirmedGenerationSucceeded(result: unknown): boolean {
+interface ConfirmedGenerationState {
+  requested: number
+  materialized: number
+  failedItems: string[]
+}
+
+function confirmedGenerationState(
+  result: unknown,
+): ConfirmedGenerationState | null {
   if (!result || typeof result !== 'object' || Array.isArray(result)) {
-    return false
+    return null
   }
   const outcomes = (result as { outcomes?: unknown }).outcomes
-  return (
-    Array.isArray(outcomes) &&
-    outcomes.length > 0 &&
-    outcomes.every(
-      (item) =>
-        Boolean(item) &&
-        typeof item === 'object' &&
-        !Array.isArray(item) &&
-        (item as { ok?: unknown }).ok !== false,
-    )
-  )
+  const rows =
+    Array.isArray(outcomes) && outcomes.length > 0
+      ? outcomes.filter(
+          (item): item is Record<string, unknown> =>
+            Boolean(item) &&
+            typeof item === 'object' &&
+            !Array.isArray(item),
+        )
+      : []
+  if (rows.length === 0 || rows.some((row) => row.ok === false)) {
+    return null
+  }
+  let requested = 0
+  let materialized = 0
+  const failedItems: string[] = []
+  for (const row of rows) {
+    if (
+      typeof row.requestedOutputs === 'number' &&
+      typeof row.materializedOutputs === 'number'
+    ) {
+      requested += row.requestedOutputs
+      materialized += row.materializedOutputs
+    }
+    if (Array.isArray(row.failedOutputItems)) {
+      failedItems.push(
+        ...row.failedOutputItems.filter(
+          (item): item is string => typeof item === 'string',
+        ),
+      )
+    }
+  }
+  return { requested, materialized, failedItems }
 }
 
 /**
@@ -285,8 +314,16 @@ export async function runAgentConfirmation(
       (input.request.name === 'runNode' ||
         input.request.name === 'runFrom') &&
       input.localGenerationSummary === true &&
-      confirmedGenerationSucceeded(confirmedResult)
+      confirmedGenerationState(confirmedResult)
     ) {
+      const state = confirmedGenerationState(confirmedResult)!
+      if (state.requested > 0 && state.materialized < state.requested) {
+        return settleMessage(
+          input.messages,
+          `生成已部分完成：${state.requested} 个产物中成功下载 ${state.materialized} 个；` +
+            '成功结果和失败明细已保留，本次不会重复执行。',
+        )
+      }
       return settleMessage(
         input.messages,
         '生成已完成，新图和运行记录已经保留；本次没有重复执行。',

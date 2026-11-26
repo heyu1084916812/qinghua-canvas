@@ -120,7 +120,7 @@ export async function generateImage(
   )
   if (res.status < 200 || res.status >= 300) {
     const detail = await readNetworkDetail(res)
-    if (res.status === 408 || res.status === 429 || res.status >= 500) {
+    if (res.status === 408 || res.status >= 500) {
       throw acceptedAfterSubmit(`生图提交结果未知：HTTP ${res.status} ${detail}`)
     }
     const { error } = classifyError(null, res.status, detail)

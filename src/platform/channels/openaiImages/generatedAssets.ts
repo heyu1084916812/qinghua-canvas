@@ -102,6 +102,16 @@ export function createGeneratedAssetFactory(core: AssetCore): AssetWriter {
         `图片已生成，但产物下载失败：${failures.slice(0, 3).join('；')}`,
       )
     }
+    if (assets.length > 0 && failures.length > 0) {
+      assets[0] = {
+        ...assets[0]!,
+        materialization: {
+          requested: items.length,
+          materialized: assets.length,
+          failedItems: failures,
+        },
+      }
+    }
     return assets
   }
 

@@ -710,6 +710,17 @@ export function createOpenAiChatAdapter(config: OpenAiChatConfig, deps: ChannelD
             retry = true
             break
           }
+          if (
+            config.protocol !== '65535' &&
+            appError?.kind === 'http' &&
+            (appError.status === 408 || appError.status >= 500)
+          ) {
+            throw new ChannelError({
+              kind: 'execution',
+              detail: 'accepted',
+              message: `对话请求已提交，但流式结果未知：HTTP ${appError.status}`,
+            })
+          }
           throw new ChannelError(
             appError ?? { kind: 'network', detail: 'dns', sendPhase: 'unknown' },
           )
@@ -864,6 +875,16 @@ export function createOpenAiChatAdapter(config: OpenAiChatConfig, deps: ChannelD
         geminiNativeRequired(res.status, detail)
       ) {
         return completeGeminiNative(request, signal)
+      }
+      if (
+        config.protocol !== '65535' &&
+        (res.status === 408 || res.status >= 500)
+      ) {
+        throw new ChannelError({
+          kind: 'execution',
+          detail: 'accepted',
+          message: `对话请求已提交，但结果未知：HTTP ${res.status}${detail ? ` ${detail}` : ''}`,
+        })
       }
       const { error } = classifyError(null, res.status, detail)
       throw new ChannelError(error)

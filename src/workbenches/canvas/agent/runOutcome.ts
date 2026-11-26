@@ -20,6 +20,10 @@ export interface AgentRunOutcome {
    */
   title?: string
   ok: boolean
+  partial?: boolean
+  requestedOutputs?: number
+  materializedOutputs?: number
+  failedOutputItems?: string[]
   error?: string
   status?: RunRecord['status']
   channelId?: string
@@ -54,6 +58,16 @@ export function agentRunOutcomeOf(
     ...(targetIds.length > 1 ? { targetNodeIds: targetIds } : {}),
     ok: fresh.status === 'succeeded',
     status: fresh.status,
+  }
+  if (
+    fresh.requestedOutputs !== undefined &&
+    fresh.materializedOutputs !== undefined &&
+    fresh.materializedOutputs < fresh.requestedOutputs
+  ) {
+    outcome.partial = true
+    outcome.requestedOutputs = fresh.requestedOutputs
+    outcome.materializedOutputs = fresh.materializedOutputs
+    outcome.failedOutputItems = fresh.failedOutputItems ?? []
   }
   if (fresh.errorText) outcome.error = fresh.errorText
   if (fresh.sentChannelId) outcome.channelId = fresh.sentChannelId

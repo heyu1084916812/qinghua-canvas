@@ -99,4 +99,53 @@ describe('openaiImages / generated asset writer', () => {
       appError: { kind: 'parse', raw: expect.stringContaining('region blocked') },
     })
   })
+
+  it('records requested / materialized / failedItems when one image download fails', async () => {
+    const ok = new Uint8Array([1, 2, 3])
+    const factory = createGeneratedAssetFactory({
+      config: cfg,
+      base: 'https://x/v1',
+      deps: {
+        network: createMemoryNetwork({
+          handler: async (req) => {
+            if (req.url === 'https://cdn.example/missing.png') {
+              throw { kind: 'network', detail: 'timeout' }
+            }
+            return {
+              status: 200,
+              headers: { 'content-type': 'image/png' },
+              async text() {
+                return ''
+              },
+              async json<T>() {
+                return {} as T
+              },
+              async arrayBuffer() {
+                return ok.buffer.slice(0) as ArrayBuffer
+              },
+            }
+          },
+        }),
+        assets: createMemoryPlatform().assets,
+      },
+    })
+
+    const assets = await factory.assetsFromItems(
+      [
+        { url: 'https://cdn.example/missing.png' },
+        { url: 'https://cdn.example/ok.png' },
+      ],
+      {},
+      signal,
+    )
+
+    expect(assets).toHaveLength(1)
+    expect(assets[0]!.materialization).toMatchObject({
+      requested: 2,
+      materialized: 1,
+      failedItems: [
+        expect.stringContaining('https://cdn.example/missing.png'),
+      ],
+    })
+  })
 })

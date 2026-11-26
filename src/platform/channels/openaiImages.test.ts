@@ -142,6 +142,16 @@ describe('openaiImages adapter / 基础契约', () => {
     })
   })
 
+  it('★ 生图 429 是明确拒绝，保留 HTTP 429 供安全换候选', async () => {
+    const net = createMemoryNetwork({
+      handler: async () => resp(429, { error: { message: 'rate limited' } }),
+    })
+    const a = createOpenAiImagesAdapter(cfg, { network: net, assets: platformWithAssets([]).assets })
+    await expect(a.generateImage(request([]), signal)).rejects.toMatchObject({
+      appError: { kind: 'http', status: 429 },
+    })
+  })
+
   it('verify：200 但不是模型列表（SPA 兜底页 / 登录页）→ 判失败，否则「任何地址都命中」', async () => {
     const htmlPage = {
       status: 200,

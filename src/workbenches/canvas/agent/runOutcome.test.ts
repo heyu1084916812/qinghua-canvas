@@ -112,4 +112,31 @@ describe('agentRunOutcomeOf', () => {
       model: 'gpt-image-2.6',
     })
   })
+
+  it('多图部分下载仍回报成功，但明确带 partial 与失败明细', () => {
+    expect(
+      agentRunOutcomeOf(
+        [
+          record({
+            id: 'partial',
+            requestedOutputs: 2,
+            materializedOutputs: 1,
+            failedOutputItems: ['https://cdn.example/missing.png：timeout'],
+          }),
+        ],
+        'n1',
+        new Set(),
+      ),
+    ).toMatchObject({
+      nodeId: 'n1',
+      ok: true,
+      status: 'succeeded',
+      partial: true,
+      requestedOutputs: 2,
+      materializedOutputs: 1,
+      failedOutputItems: [
+        'https://cdn.example/missing.png：timeout',
+      ],
+    })
+  })
 })

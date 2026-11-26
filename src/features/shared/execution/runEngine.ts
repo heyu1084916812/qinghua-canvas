@@ -725,6 +725,7 @@ function makeRecord(
 ): ScopedRunRecord {
   const lastAttempt = attempts.at(-1)
   const actualPrompt = actualPromptOf(task, task.request)
+  const materialization = assets[0]?.materialization
   return createRunRecord({
     id: createId('rec'),
     nodeId: targetId,
@@ -752,6 +753,13 @@ function makeRecord(
     ...(routePlanId ? { routePlanId } : {}),
     ...(attempts.length > 0 ? { routeAttempts: attempts } : {}),
     outputHashes: assets.map((a) => a.hash),
+    ...(materialization
+      ? {
+          requestedOutputs: materialization.requested,
+          materializedOutputs: materialization.materialized,
+          failedOutputItems: materialization.failedItems,
+        }
+      : {}),
     fingerprint: task.fingerprint,
     taskId: task.id,
     durationMs,

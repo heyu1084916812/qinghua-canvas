@@ -236,6 +236,41 @@ describe('runAgentConfirmation', () => {
     )
   })
 
+  it('★★ 多图部分下载时本地文案明确说部分完成', async () => {
+    const h = harness({
+      localGenerationSummary: true,
+      executeConfirmedTool: vi.fn(async () => ({
+        ok: true,
+        outcomes: [
+          {
+            nodeId: 'node-1',
+            ok: true,
+            status: 'succeeded',
+            partial: true,
+            requestedOutputs: 2,
+            materializedOutputs: 1,
+            failedOutputItems: ['https://cdn.example/missing.png：timeout'],
+          },
+        ],
+      })),
+    })
+
+    await runAgentConfirmation(h.input)
+
+    expect(h.input.handleOutcome).toHaveBeenCalledWith(
+      session,
+      expect.objectContaining({
+        kind: 'message',
+        text: expect.stringContaining(
+          '生成已部分完成：2 个产物中成功下载 1 个',
+        ),
+      }),
+      undefined,
+      h.controller,
+      origin,
+    )
+  })
+
   it('★★ 工具已成功后路由失效时保留结果并按部分成功收口', async () => {
     const h = harness({
       ensureRoute: vi.fn(async () => ({

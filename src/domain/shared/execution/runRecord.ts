@@ -100,6 +100,10 @@ export interface RunRecord<TParams = unknown> {
   inputs: NodeInput[]
   params: TParams
   outputHashes: string[]
+  /** 本次渠道承诺 / 返回的产物数与实际下载数；只有发生部分失败时记录。 */
+  requestedOutputs?: number
+  materializedOutputs?: number
+  failedOutputItems?: string[]
   fingerprint: string
   taskId: string
   durationMs: number

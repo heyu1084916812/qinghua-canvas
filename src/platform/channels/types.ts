@@ -51,6 +51,12 @@ export interface GeneratedAsset {
    */
   requestedWidth?: number
   requestedHeight?: number
+  /** 多产物下载对账；只挂在成功结果的第一项，避免重复同一份账单。 */
+  materialization?: {
+    requested: number
+    materialized: number
+    failedItems: string[]
+  }
 }
 
 export interface TextResult {
