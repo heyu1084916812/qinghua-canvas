@@ -122,6 +122,7 @@ function harness(
     beginConfirmation: vi.fn(async () => {}),
     finishConfirmedTool: vi.fn(async () => {}),
     executeConfirmedTool: vi.fn(async () => ({ ok: true })),
+    loadLatestRevision: vi.fn(async () => session.messageRevision),
     ensureRoute: vi.fn(async () => ({
       ok: true as const,
       route: {} as never,

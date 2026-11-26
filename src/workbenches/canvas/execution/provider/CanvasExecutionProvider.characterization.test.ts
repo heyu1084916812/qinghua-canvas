@@ -440,8 +440,8 @@ describe('CanvasExecutionProvider characterization', () => {
       },
     })
     const api = (await mountProvider(store))()
-    let firstRun!: Promise<void>
-    let secondRun!: Promise<void>
+    let firstRun!: ReturnType<CanvasExecutionApi['runNode']>
+    let secondRun!: ReturnType<CanvasExecutionApi['runNode']>
     await act(async () => {
       firstRun = api.runNode(first)
       secondRun = api.runNode(second)

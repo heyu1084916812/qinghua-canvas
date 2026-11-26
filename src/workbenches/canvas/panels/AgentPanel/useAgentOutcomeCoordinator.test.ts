@@ -39,6 +39,7 @@ function captureHook(input: {
     handles.push(useAgentOutcomeCoordinator({
       currentIdRef: { current: session.id },
       abortRefs: { current: input.abortRefs },
+      confirmingRef: { current: new Set() },
       deliveredSteersRef: { current: new Map() },
       turnToolsRef: { current: new Map() },
       sessions: {

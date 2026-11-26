@@ -8,6 +8,8 @@ import type { RunRecord } from '../../../domain/canvas/model/runRecord'
  */
 export interface AgentRunOutcome {
   nodeId: string
+  /** 计划实际触达的节点；重跑已有节点时会包含新承载节点。 */
+  targetNodeIds?: readonly string[]
   /**
    * 节点名（`data.title`）。
    *
@@ -29,9 +31,12 @@ export function agentRunOutcomeOf(
   nodeId: string,
   beforeIds: ReadonlySet<string>,
   fallbackError?: string,
+  targetNodeIds: readonly string[] = [],
 ): AgentRunOutcome {
+  const targetIds = [...new Set([nodeId, ...targetNodeIds])]
+  const targetSet = new Set(targetIds)
   const fresh = records
-    .filter((record) => record.nodeId === nodeId && !beforeIds.has(record.id))
+    .filter((record) => targetSet.has(record.nodeId) && !beforeIds.has(record.id))
     .sort((a, b) => b.createdAt - a.createdAt)[0]
 
   if (!fresh) {
@@ -46,6 +51,7 @@ export function agentRunOutcomeOf(
 
   const outcome: AgentRunOutcome = {
     nodeId,
+    ...(targetIds.length > 1 ? { targetNodeIds: targetIds } : {}),
     ok: fresh.status === 'succeeded',
     status: fresh.status,
   }

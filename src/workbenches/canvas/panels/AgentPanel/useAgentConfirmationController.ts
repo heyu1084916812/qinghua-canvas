@@ -48,6 +48,7 @@ export interface AgentConfirmationControllerInput {
   >
   runConfirmation: (input: AgentConfirmationRunInput) => Promise<unknown>
   executeConfirmedTool: AgentConfirmationRunInput['executeConfirmedTool']
+  loadLatestRevision: AgentConfirmationRunInput['loadLatestRevision']
   ensureRoute: AgentConfirmationRunInput['ensureRoute']
   loopDeps: (args: AgentConfirmationLoopDepsInput) => AgentLoopDeps
   toolModeRef: MutableRefObject<Map<string, 'native' | 'json'>>
@@ -116,6 +117,7 @@ export function useAgentConfirmationController(
           beginConfirmation: input.controller.beginConfirmation,
           finishConfirmedTool: input.controller.finishConfirmedTool,
           executeConfirmedTool: input.executeConfirmedTool,
+          loadLatestRevision: input.loadLatestRevision,
           ensureRoute: input.ensureRoute,
           createLoopDeps: (args) => input.loopDeps(args),
           toolMode: () =>
@@ -133,6 +135,7 @@ export function useAgentConfirmationController(
           isCurrentSession: () =>
             input.currentIdRef.current === target.id,
           setMessages: input.setMessages,
+          localGenerationSummary: !target.taskPlan,
         })
       } finally {
         input.confirmingRef.current.delete(target.id)
@@ -161,6 +164,7 @@ export function useAgentConfirmationController(
     input.handleOutcome,
     input.inFlightConfirmationRef,
     input.loopDeps,
+    input.loadLatestRevision,
     input.messages,
     input.runConfirmation,
     input.resumeAgentTurn,

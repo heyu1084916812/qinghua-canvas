@@ -2361,6 +2361,27 @@
       "budget": 140
     },
     {
+      "module": "src/workbenches/canvas/agent/agentRunObservation.ts",
+      "owner": "canvas-agent-run-observation",
+      "responsibility": "从本回合 runNode / runFrom 调用和工具结果中收集已提交及真实承载节点。",
+      "owns": [
+        "运行调用参数识别",
+        "工具结果 nodeId / targetNodeIds 提取"
+      ],
+      "doesNotOwn": [
+        "运行执行",
+        "确认卡构造",
+        "Agent Job 状态机"
+      ],
+      "publicApi": [
+        "observedRunNodeIds"
+      ],
+      "test": [
+        "src/workbenches/canvas/agent/agentRunConfirmationGuard.test.ts"
+      ],
+      "budget": 80
+    },
+    {
       "module": "src/workbenches/canvas/agent/agentRunConfirmationGuard.ts",
       "owner": "canvas-agent-run-confirmation",
       "responsibility": "回合收尾把本轮新建且未运行的生成节点收敛成程序发起的 runNode 确认请求，并从肯定回复恢复上一轮生成目标。",

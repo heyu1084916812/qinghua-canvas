@@ -25,6 +25,7 @@ import { activeQueueTurnOf } from '../../../../features/canvas/agent/sessionActi
 export interface AgentOutcomeCoordinatorHookInput {
   currentIdRef: MutableRefObject<string | null>
   abortRefs: MutableRefObject<Map<string, AbortController>>
+  confirmingRef: MutableRefObject<Set<string>>
   deliveredSteersRef: MutableRefObject<Map<string, Set<string>>>
   turnToolsRef: MutableRefObject<
     Map<string, readonly ToolDeclaration[]>
@@ -57,6 +58,7 @@ export function useAgentOutcomeCoordinator(
   const {
     currentIdRef,
     abortRefs,
+    confirmingRef,
     deliveredSteersRef,
     turnToolsRef,
     sessions,
@@ -78,24 +80,23 @@ export function useAgentOutcomeCoordinator(
       outcome: AgentLoopOutcome,
       persistedTurn: PersistedAgentUserTurn | undefined,
       outcomeController: AbortController,
+      origin?: AgentTurnOrigin,
     ) =>
       coordinateAgentOutcome({
         session,
         outcome,
         persistedTurn,
         outcomeController,
-        turnOrigin: turnOriginFor(session, persistedTurn),
+        turnOrigin:
+          origin ?? turnOriginFor(session, persistedTurn),
         currentOutcomeController: () =>
           abortRefs.current.get(session.id),
         currentSessionId: () => currentIdRef.current,
+        confirmationApprovalActive: () =>
+          confirmingRef.current.has(session.id),
         sessions: {
           applyOutcome: (sessionId, apply) =>
             sessions.applyAgentOutcome(sessionId, apply),
-          settleInterruptedConfirmation: (sessionId, request) =>
-            sessions.settleInterruptedConfirmation(
-              sessionId,
-              request,
-            ),
           refreshSession: async () => {
             await refresh()
           },
@@ -132,6 +133,7 @@ export function useAgentOutcomeCoordinator(
       }),
     [
       abortRefs,
+      confirmingRef,
       refresh,
       applySessionSnapshot,
       clearLiveActivitiesFor,

@@ -79,6 +79,7 @@ function harness(
       return 'done'
     }),
     executeConfirmedTool: vi.fn(async () => ({})),
+    loadLatestRevision: vi.fn(async () => 7),
     ensureRoute: vi.fn(async () => ({
       ok: true as const,
       route: {} as never,

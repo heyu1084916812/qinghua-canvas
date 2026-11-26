@@ -95,14 +95,14 @@ describe('openaiImages adapter / 基础契约', () => {
     if (r.ok) expect(r.models[0]?.id).toBe('gpt-image-2')
   })
 
-  it('verify 401 → channel missingKey 错误', async () => {
+  it('verify 401 → 保留 HTTP 401，不冒充本地未填 Key', async () => {
     const net = createMemoryNetwork({ handler: async () => resp(401, {}) })
     const a = createOpenAiImagesAdapter(cfg, { network: net, assets: platformWithAssets([]).assets })
     const r = await a.verify(cfg, signal)
     expect(r.ok).toBe(false)
     if (!r.ok) {
-      expect(r.error.kind).toBe('channel')
-      if (r.error.kind === 'channel') expect(r.error.detail).toBe('missingKey')
+      expect(r.error.kind).toBe('http')
+      if (r.error.kind === 'http') expect(r.error.status).toBe(401)
     }
   })
 
@@ -122,7 +122,7 @@ describe('openaiImages adapter / 基础契约', () => {
     const r = await a.verify(cfg, signal)
     expect(r.ok).toBe(false)
     if (!r.ok) {
-      // 不再被归成 missingKey —— 那是 401 的语义
+      // 403 与 401 都必须保留真实 HTTP 语义
       expect(r.error.kind).toBe('http')
       if (r.error.kind === 'http') {
         expect(r.error.status).toBe(403)

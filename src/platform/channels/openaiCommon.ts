@@ -109,11 +109,10 @@ export function statusToFailure(status: number, body?: string): { error: AppErro
   // 有服务端原因就把它附在后面：用户看到的先是「怎么回事」，再是「大概是哪一类」
   const message = reason ? `${base}｜服务端：${reason}` : base
   /**
-   * 401 仍然直接判为 missingKey（没带有效凭据，语义明确）；
-   * **403 不再预先断言是 Key 问题**——它可能是模型/额度/IP 任何一种，
-   * 归成 `http` 保留状态码与 body，让上层能如实展示。
+   * HTTP 401 说明请求已经发出且服务端拒绝了凭据，不能再说成“还没填 Key”。
+   * 本地无 Key 仍由 generationClient / 65535 等入口直接抛 missingKey；这里保留
+   * `http 401` 与 body，让“未配置”和“填错 / 过期 / 无权限”保持可区分。
    */
-  if (status === 401) return { error: { kind: 'channel', detail: 'missingKey' }, message }
   return { error: { kind: 'http', status, ...(body ? { body } : {}) }, message }
 }
 

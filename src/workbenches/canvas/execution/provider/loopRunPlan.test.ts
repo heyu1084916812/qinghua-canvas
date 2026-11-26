@@ -57,7 +57,11 @@ function graph(): GraphSnapshot {
 
 function setup() {
   const current = graph()
-  const launch = vi.fn(async () => ({ ok: true }) as const)
+  const launch = vi.fn(async () => ({
+    ok: true,
+    planId: 'plan-loop',
+    executedNodeIds: ['gen-1'],
+  }) as const)
   const ports = {
     graph: current,
     getSnapshot: () => current,
@@ -83,7 +87,11 @@ describe('canvas loop run plan', () => {
       ports,
     )
 
-    expect(result).toEqual({ ok: true })
+    expect(result).toEqual({
+      ok: true,
+      planId: 'plan-loop',
+      executedNodeIds: ['gen-1'],
+    })
     expect(launch).toHaveBeenCalledTimes(1)
     const [plan, originNodeId] = launch.mock.calls[0] as unknown as [
       { tasks: unknown[]; id: string; scope: string; mode: string },

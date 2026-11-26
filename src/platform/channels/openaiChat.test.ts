@@ -602,11 +602,11 @@ describe('openaiChat adapter / 多模态（上游图片送进 LLM）', () => {
     await expect(a.completeText(request([]), signal)).rejects.toBeInstanceOf(ChannelError)
   })
 
-  it('HTTP 401 → 归一为 missingKey（设置页能说清是密钥问题）', async () => {
+  it('HTTP 401 → 保留状态码，显示凭据无效而不是“还没填 Key”', async () => {
     const net = createMemoryNetwork({ handler: async () => resp(401, {}) })
     const a = createOpenAiChatAdapter(cfg, { network: net, assets: platformWith([]).assets })
     await expect(a.completeText(request([]), signal)).rejects.toMatchObject({
-      appError: { kind: 'channel', detail: 'missingKey' },
+      appError: { kind: 'http', status: 401 },
     })
   })
 })

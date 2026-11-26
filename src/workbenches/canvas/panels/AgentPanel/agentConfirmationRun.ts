@@ -52,6 +52,7 @@ export interface AgentConfirmationRunInput {
     session: AgentSession,
     request: AgentToolRequest,
   ) => Promise<unknown>
+  loadLatestRevision: (sessionId: string) => Promise<number | undefined>
   /**
    * 工具执行期间渠道表、模型选择或面板宿主都可能变化，发送开始时的路由缓存
    * 不能假设一定还在。续跑前必须重新确保对话路由，不能拿空 channelId 请求模型。
@@ -80,6 +81,7 @@ export interface AgentConfirmationRunInput {
     outcome: AgentLoopOutcome,
     persistedTurn: undefined,
     outcomeController: AbortController,
+    origin?: AgentTurnOrigin,
   ) => Promise<AgentOutcomeCoordinationResult>
   settleSessionOutcome: (
     sessionId: string,
@@ -92,6 +94,11 @@ export interface AgentConfirmationRunInput {
   isCurrentSession: () => boolean
   setMessages: (messages: ChatMessage[]) => void
   createAbortController?: () => AbortController
+  /** 测试可缩短；产品默认覆盖对话适配器 60s 超时。 */
+  routeTimeoutMs?: number
+  summaryTimeoutMs?: number
+  /** 无任务计划的单节点生成成功后，直接本地给出简洁完成语。 */
+  localGenerationSummary?: boolean
 }
 
 export type AgentConfirmationRunResult =
@@ -99,6 +106,38 @@ export type AgentConfirmationRunResult =
   | 'aborted'
   | 'needs_attention'
   | 'failed'
+
+const DEFAULT_ROUTE_TIMEOUT_MS = 30_000
+const DEFAULT_SUMMARY_TIMEOUT_MS = 90_000
+
+class AgentSummaryTimeoutError extends Error {
+  constructor(label: string, timeoutMs: number) {
+    super(`${label}超过 ${Math.round(timeoutMs / 1000)} 秒仍未返回`)
+    this.name = 'AgentSummaryTimeoutError'
+  }
+}
+
+async function withSummaryTimeout<T>(
+  promise: Promise<T>,
+  controller: AbortController,
+  timeoutMs: number,
+  label: string,
+): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(() => {
+          controller.abort()
+          reject(new AgentSummaryTimeoutError(label, timeoutMs))
+        }, timeoutMs)
+      }),
+    ])
+  } finally {
+    if (timer) clearTimeout(timer)
+  }
+}
 
 function latestUserImageNodeIds(
   messages: readonly ChatMessage[],
@@ -111,6 +150,24 @@ function latestUserImageNodeIds(
   return [...new Set(ids)]
 }
 
+function confirmedGenerationSucceeded(result: unknown): boolean {
+  if (!result || typeof result !== 'object' || Array.isArray(result)) {
+    return false
+  }
+  const outcomes = (result as { outcomes?: unknown }).outcomes
+  return (
+    Array.isArray(outcomes) &&
+    outcomes.length > 0 &&
+    outcomes.every(
+      (item) =>
+        Boolean(item) &&
+        typeof item === 'object' &&
+        !Array.isArray(item) &&
+        (item as { ok?: unknown }).ok !== false,
+    )
+  )
+}
+
 /**
  * 执行一张人工确认卡，并把工具结果续跑回模型。
  *
@@ -120,10 +177,81 @@ function latestUserImageNodeIds(
 export async function runAgentConfirmation(
   input: AgentConfirmationRunInput,
 ): Promise<AgentConfirmationRunResult> {
-  const confirmationAbort =
+  let confirmationAbort =
     input.createAbortController?.() ?? new AbortController()
   let confirmationOrigin: AgentTurnOrigin = {}
+  let confirmedResult: unknown
   input.setAbortController(confirmationAbort)
+  const messageOutcomeOf = (
+    messages: readonly ChatMessage[],
+    text: string,
+  ): AgentLoopOutcome => {
+    const hasToolResult = messages.some(
+      (message) =>
+        message.role === 'tool' &&
+        message.toolCallId === input.request.callId,
+    )
+    return {
+      kind: 'message',
+      text,
+      messages: [
+        ...messages,
+        ...(!hasToolResult
+          ? [
+              {
+                role: 'tool' as const,
+                toolCallId: input.request.callId,
+                toolName: input.request.name,
+                content: JSON.stringify(confirmedResult ?? {}),
+                createdAt: Date.now(),
+              },
+            ]
+          : []),
+        {
+          role: 'assistant',
+          content: text,
+          createdAt: Date.now(),
+        },
+      ],
+    }
+  }
+  const settleMessage = async (
+    messages: readonly ChatMessage[],
+    text: string,
+  ): Promise<AgentOutcomeCoordinationResult> => {
+    const outcome = messageOutcomeOf(messages, text)
+    if (confirmationAbort.signal.aborted) {
+      confirmationAbort =
+        input.createAbortController?.() ?? new AbortController()
+      input.setAbortController(confirmationAbort)
+    }
+    const applied = await input.handleOutcome(
+      input.session,
+      outcome,
+      undefined,
+      confirmationAbort,
+      confirmationOrigin,
+    )
+    await input.settleSessionOutcome(
+      input.session.id,
+      outcome,
+      confirmationOrigin,
+    )
+    return applied
+  }
+  const settlePartial = (
+    messages: readonly ChatMessage[],
+    reason: string,
+  ): Promise<AgentOutcomeCoordinationResult> => {
+    const label = confirmationRunsGeneration(input.request.name)
+      ? '生成'
+      : '操作'
+    return settleMessage(
+      messages,
+      `${label}已完成，但后续总结对话模型暂时不可用：${reason}。` +
+        '结果和运行记录已保留，本次不会重复执行。',
+    )
+  }
   try {
     confirmationOrigin = input.turnOrigin()
     await input.beginConfirmation(
@@ -131,16 +259,59 @@ export async function runAgentConfirmation(
       input.request,
       confirmationOrigin,
     )
+    const latestRevision = await input.loadLatestRevision(input.session.id)
+    if (latestRevision !== undefined) {
+      confirmationOrigin = {
+        ...confirmationOrigin,
+        messageRevision: latestRevision,
+      }
+    }
     input.setStatus({
       kind: 'executing',
       tool: input.request.name,
     })
-    const result = await input.executeConfirmedTool(
+    confirmedResult = await input.executeConfirmedTool(
       input.session,
       input.request,
     )
-    const route = await input.ensureRoute(input.session)
-    if (!route.ok) throw new Error(route.message)
+    if (confirmationRunsGeneration(input.request.name)) {
+      await input.finishConfirmedTool(
+        input.session.id,
+        input.request,
+        confirmationOrigin,
+      )
+    }
+    if (
+      (input.request.name === 'runNode' ||
+        input.request.name === 'runFrom') &&
+      input.localGenerationSummary === true &&
+      confirmedGenerationSucceeded(confirmedResult)
+    ) {
+      return settleMessage(
+        input.messages,
+        '生成已完成，新图和运行记录已经保留；本次没有重复执行。',
+      )
+    }
+    let route: ChatRoutePreparation
+    try {
+      route = await withSummaryTimeout(
+        input.ensureRoute(input.session),
+        confirmationAbort,
+        input.routeTimeoutMs ?? DEFAULT_ROUTE_TIMEOUT_MS,
+        '对话路由',
+      )
+    } catch (error) {
+      if (
+        confirmationAbort.signal.aborted &&
+        !(error instanceof AgentSummaryTimeoutError)
+      ) {
+        return 'aborted'
+      }
+      return settlePartial(input.messages, errText(error))
+    }
+    if (!route.ok) {
+      return settlePartial(input.messages, route.message)
+    }
     const currentLoopDeps = input.createLoopDeps({
       session: input.session,
       operationId: createId('op'),
@@ -150,34 +321,68 @@ export async function runAgentConfirmation(
       turnTools: input.turnTools(),
       turnController: confirmationAbort,
     })
-    if (confirmationRunsGeneration(input.request.name)) {
-      await input.finishConfirmedTool(
-        input.session.id,
-        input.request,
-        confirmationOrigin,
-      )
-    }
     input.setStatus({ kind: 'thinking' })
-    const resumed = await input.resumeAgentTurn(
-      input.messages,
-      input.request.callId,
-      result,
-      currentLoopDeps,
-      input.request.name,
-    )
-    const outcome = await input.continueAutoConfirmations(
-      input.session,
-      resumed,
-      currentLoopDeps,
-      (next) => {
-        if (input.isCurrentSession()) input.setMessages(next)
-      },
-    )
+    let resumed: AgentLoopOutcome
+    try {
+      resumed = await withSummaryTimeout(
+        input.resumeAgentTurn(
+          input.messages,
+          input.request.callId,
+          confirmedResult,
+          currentLoopDeps,
+          input.request.name,
+        ),
+        confirmationAbort,
+        input.summaryTimeoutMs ?? DEFAULT_SUMMARY_TIMEOUT_MS,
+        '总结对话',
+      )
+    } catch (error) {
+      if (
+        confirmationAbort.signal.aborted &&
+        !(error instanceof AgentSummaryTimeoutError)
+      ) {
+        return 'aborted'
+      }
+      return settlePartial(input.messages, errText(error))
+    }
+    if (resumed.kind === 'error') {
+      return settlePartial(resumed.messages, resumed.message)
+    }
+    let latestMessages = resumed.messages
+    let outcome: AgentLoopOutcome
+    try {
+      outcome = await withSummaryTimeout(
+        input.continueAutoConfirmations(
+          input.session,
+          resumed,
+          currentLoopDeps,
+          (next) => {
+            latestMessages = next
+            if (input.isCurrentSession()) input.setMessages(next)
+          },
+        ),
+        confirmationAbort,
+        input.summaryTimeoutMs ?? DEFAULT_SUMMARY_TIMEOUT_MS,
+        '自动续跑',
+      )
+    } catch (error) {
+      if (
+        confirmationAbort.signal.aborted &&
+        !(error instanceof AgentSummaryTimeoutError)
+      ) {
+        return 'aborted'
+      }
+      return settlePartial(latestMessages, errText(error))
+    }
+    if (outcome.kind === 'error') {
+      return settlePartial(outcome.messages, outcome.message)
+    }
     const applied = await input.handleOutcome(
       input.session,
       outcome,
       undefined,
       confirmationAbort,
+      confirmationOrigin,
     )
     await input.settleSessionOutcome(
       input.session.id,

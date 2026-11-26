@@ -86,4 +86,30 @@ describe('agentRunOutcomeOf', () => {
       error: '「婴童泳圈三视图」无法运行：所选渠道已停用',
     })
   })
+
+  it('重跑已有节点时按真实承载节点对账，不把成功图误判为没有记录', () => {
+    expect(
+      agentRunOutcomeOf(
+        [
+          record({
+            id: 'carrier-run',
+            nodeId: 'carrier-node',
+            sentChannelId: 'ch-a',
+            sentModel: 'gpt-image-2.6',
+          }),
+        ],
+        'source-node',
+        new Set(),
+        undefined,
+        ['carrier-node'],
+      ),
+    ).toEqual({
+      nodeId: 'source-node',
+      targetNodeIds: ['source-node', 'carrier-node'],
+      ok: true,
+      status: 'succeeded',
+      channelId: 'ch-a',
+      model: 'gpt-image-2.6',
+    })
+  })
 })

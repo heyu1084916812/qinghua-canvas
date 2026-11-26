@@ -1,7 +1,4 @@
 import type { ChatMessage } from '../../../../domain/shared/execution/types'
-import type {
-  ConfirmationRequestRef,
-} from '../../../../domain/agent/confirmation'
 import type { AgentToolName } from '../../../../domain/agent/toolRegistry'
 import type {
   AgentController,
@@ -37,11 +34,6 @@ export interface AgentOutcomeSessionPort {
     | { ok: true; session: AgentSession }
     | { ok: false; reason: 'missing' | 'conflict' }
   >
-  /** 迟到确认只在存储层原子合并缺失结果，不刷新界面。 */
-  settleInterruptedConfirmation: (
-    sessionId: string,
-    request: ConfirmationRequestRef,
-  ) => Promise<unknown>
   refreshSession: () => Promise<void>
 }
 
@@ -55,6 +47,7 @@ export interface CoordinateAgentOutcomeInput {
   turnOrigin: AgentTurnOrigin
   currentOutcomeController: () => AbortController | undefined
   currentSessionId: () => string | null
+  confirmationApprovalActive: () => boolean
   sessions: AgentOutcomeSessionPort
   transitionSessionJob: AgentController['transition']
   clearLiveActivities: () => void
@@ -79,7 +72,6 @@ export interface CoordinateAgentOutcomeInput {
 
 export type AgentOutcomeCoordinationResult =
   | 'ignored'
-  | 'stale_settled'
   | 'conflict'
   | 'applied'
 
@@ -118,22 +110,20 @@ export async function coordinateAgentOutcome(
   const full = persistedTurn
     ? composeAgentOutcomeMessages(persistedTurn, outcome.messages)
     : outcome.messages
-  const settleStaleOutcome = async () => {
-    if (outcome.kind === 'confirm') {
-      await input.sessions
-        .settleInterruptedConfirmation(
-          session.id,
-          outcome.request,
-        )
-        .catch(() => null)
-      return
-    }
+  if (
+    outcome.kind === 'confirm' &&
+    input.confirmationApprovalActive()
+  ) {
+    return 'ignored'
   }
 
   if (!outcomeIsCurrent()) {
-    if (outcome.kind !== 'confirm') return 'ignored'
-    await settleStaleOutcome()
-    return 'stale_settled'
+    /**
+     * 迟到确认只属于已经失去所有权的旧回合。停止 / 取消由各自的控制器
+     * 携带原确认请求收口；这里若再补 interrupted，会推进 messageRevision，
+     * 令真正生成结果按旧 revision 收口时冲突。
+     */
+    return 'ignored'
   }
 
   const pendingConfirmation =
@@ -173,7 +163,6 @@ export async function coordinateAgentOutcome(
       : {}),
   })
   if (!applied.ok) {
-    await settleStaleOutcome()
     return applied.reason === 'conflict' ? 'conflict' : 'ignored'
   }
   const latest = applied.session
@@ -200,8 +189,7 @@ export async function coordinateAgentOutcome(
   }
   await input.sessions.refreshSession()
   if (!outcomeIsCurrent()) {
-    await settleStaleOutcome()
-    return 'stale_settled'
+    return 'ignored'
   }
 
   if (outcome.kind === 'confirm') {
@@ -273,8 +261,7 @@ export async function coordinateAgentOutcome(
     )
   }
   if (!outcomeIsCurrent()) {
-    await settleStaleOutcome()
-    return 'stale_settled'
+    return 'ignored'
   }
 
   if (

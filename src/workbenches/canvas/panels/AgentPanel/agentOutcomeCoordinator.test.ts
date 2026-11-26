@@ -27,6 +27,7 @@ function harness(args: {
   controller?: AbortController
   currentController?: () => AbortController | undefined
   currentSessionId?: string | null
+  confirmationApprovalActive?: boolean
   toolNames?: readonly AgentToolName[]
   deliveredSteers?: readonly string[]
   activeQueuedTurnId?: string
@@ -35,15 +36,6 @@ function harness(args: {
 }) {
   const controller = args.controller ?? new AbortController()
   let currentController = controller
-  const settleInterruptedConfirmation = vi.fn(
-    async (
-      _sessionId: string,
-      _request: {
-        callId: string
-        name: string
-      },
-    ) => null,
-  )
   const applyOutcome =
     args.applyOutcome ??
     vi.fn(async () => ({
@@ -63,9 +55,10 @@ function harness(args: {
         ? args.currentController()
         : currentController,
     currentSessionId: () => args.currentSessionId ?? SESSION.id,
+    confirmationApprovalActive: () =>
+      args.confirmationApprovalActive ?? false,
     sessions: {
       applyOutcome,
-      settleInterruptedConfirmation,
       refreshSession: vi.fn(async () => {}),
     },
     transitionSessionJob:
@@ -92,7 +85,6 @@ function harness(args: {
     setCurrentController: (next: AbortController | undefined) => {
       currentController = next as AbortController
     },
-    settleInterruptedConfirmation,
     applyOutcome,
     transitionSessionJob: transitionMock,
     setMessageReveal: input.setMessageReveal as ReturnType<typeof vi.fn>,
@@ -129,7 +121,29 @@ describe('coordinateAgentOutcome', () => {
     expect(h.setStatusFor).not.toHaveBeenCalled()
   })
 
-  it('★★ controller 已被删除时，旧 confirm 仍原子补中断且不覆盖当前历史', async () => {
+  it('★★ 确认按钮已同步占锁时，旧 confirm 不得再写中断或确认卡', async () => {
+    const outcome: AgentLoopOutcome = {
+      kind: 'confirm',
+      request: {
+        callId: 'call-clicked',
+        name: 'runNode',
+        args: { nodeIds: ['node-1'] },
+      },
+      messages: [{ role: 'assistant', content: '旧确认' }],
+    }
+    const h = harness({
+      outcome,
+      confirmationApprovalActive: true,
+    })
+
+    const result = await coordinateAgentOutcome(h.input)
+
+    expect(result).toBe('ignored')
+    expect(h.applyOutcome).not.toHaveBeenCalled()
+    expect(h.transitionSessionJob).not.toHaveBeenCalled()
+  })
+
+  it('★★ controller 已删除但未 abort 时，旧 confirm 不冒充用户停止', async () => {
     const outcome: AgentLoopOutcome = {
       kind: 'confirm',
       request: {
@@ -146,11 +160,32 @@ describe('coordinateAgentOutcome', () => {
 
     const result = await coordinateAgentOutcome(h.input)
 
-    expect(result).toBe('stale_settled')
-    expect(h.settleInterruptedConfirmation).toHaveBeenCalledWith(
-      SESSION.id,
-      outcome.request,
-    )
+    expect(result).toBe('ignored')
+    expect(h.applyOutcome).not.toHaveBeenCalled()
+    expect(h.transitionSessionJob).not.toHaveBeenCalled()
+  })
+
+  it('★★ 原回合 abort 后，旧 confirm 也只忽略，由停止入口负责落中断', async () => {
+    const outcome: AgentLoopOutcome = {
+      kind: 'confirm',
+      request: {
+        callId: 'call-approved',
+        name: 'runNode',
+        args: { nodeIds: ['node-1'] },
+      },
+      messages: [{ role: 'assistant', content: '旧确认' }],
+    }
+    const oldController = new AbortController()
+    oldController.abort()
+    const h = harness({
+      outcome,
+      controller: oldController,
+      currentController: () => undefined,
+    })
+
+    const result = await coordinateAgentOutcome(h.input)
+
+    expect(result).toBe('ignored')
     expect(h.applyOutcome).not.toHaveBeenCalled()
     expect(h.transitionSessionJob).not.toHaveBeenCalled()
   })
@@ -387,11 +422,7 @@ describe('coordinateAgentOutcome', () => {
 
     const result = await coordinateAgentOutcome(h.input)
 
-    expect(result).toBe('stale_settled')
-    expect(h.settleInterruptedConfirmation).toHaveBeenCalledWith(
-      SESSION.id,
-      outcome.request,
-    )
+    expect(result).toBe('ignored')
     expect(h.applyOutcome).not.toHaveBeenCalled()
     expect(h.transitionSessionJob).not.toHaveBeenCalled()
     expect(h.setMessages).not.toHaveBeenCalled()

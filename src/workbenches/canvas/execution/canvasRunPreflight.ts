@@ -42,7 +42,12 @@ export type CanvasRunLaunchFailure = {
 }
 
 export type CanvasRunLaunchResult =
-  | { ok: true }
+  | {
+      ok: true
+      planId: string
+      /** 本次计划真实触达的节点；新建承载节点与原地复用节点都在这里。 */
+      executedNodeIds: readonly string[]
+    }
   | CanvasRunLaunchFailure
 
 export type CanvasRunPreflightResult =

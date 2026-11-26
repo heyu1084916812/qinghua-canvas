@@ -355,6 +355,8 @@ export function useAgentPanelTurnModel({
     controller,
     runConfirmation: runAgentConfirmation,
     executeConfirmedTool: executeConfirmedToolWithLedger,
+    loadLatestRevision: async (sessionId) =>
+      (await sessions.get(sessionId))?.messageRevision,
     ensureRoute: prepareChatRoute,
     loopDeps,
     toolModeRef,

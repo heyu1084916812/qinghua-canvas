@@ -2,6 +2,7 @@ import type { ChatMessage } from '../../../domain/shared/execution/types'
 import { createId } from '../../../shared/id'
 import { latestQuestionCard } from '../../../domain/agent/questionCard'
 import type { AgentLoopOutcome } from './agentLoop'
+import { observedRunNodeIds } from './agentRunObservation'
 
 const RUN_PERMISSION_QUESTION =
   /(?:你希望我|要不要我|需要我|要我|是否|可以帮你|可以给你).{0,48}(?:运行|执行|生成|出图|跑|继续)/
@@ -66,31 +67,6 @@ function applyPlanGenerationTargets(
 const USER_DEFERS_RUN =
   /(?:先?别|不要|不用|暂时不|暂不|先不)(?:跑|运行|生成|出图|执行)|只(?:建|搭|做)(?:好)?(?:流程|节点|工作流)/
 
-/** 本轮 [start, end) 内模型已经提交过运行的节点（runNode / runFrom 的 nodeIds） */
-function nodeIdsRunInRange(
-  messages: readonly ChatMessage[],
-  start: number,
-  end: number,
-): Set<string> {
-  const ran = new Set<string>()
-  for (let index = start; index < end; index += 1) {
-    const message = messages[index]!
-    if (message.role !== 'assistant') continue
-    for (const call of message.toolCalls ?? []) {
-      if (call.name !== 'runNode' && call.name !== 'runFrom') continue
-      try {
-        const args = JSON.parse(call.args || '{}') as { nodeIds?: unknown }
-        for (const id of Array.isArray(args.nodeIds) ? args.nodeIds : []) {
-          if (typeof id === 'string') ran.add(id)
-        }
-      } catch {
-        // 参数坏了的调用不算已运行
-      }
-    }
-  }
-  return ran
-}
-
 /**
  * 回合收尾的运行确认（Agent 实测 Bug A6，2026-11-11）：
  * 本轮 applyPlan 新建的生成节点只要还没被 runNode / runFrom 提交，就由**程序**
@@ -109,7 +85,7 @@ export function turnEndRunTargets(messages: readonly ChatMessage[]): string[] {
   if (USER_DEFERS_RUN.test(messages[lastUserIndex]!.content.replace(/\s+/g, ''))) return []
   const created = applyPlanGenerationTargets(messages, lastUserIndex + 1, messages.length)
   if (created.length === 0) return []
-  const ran = nodeIdsRunInRange(messages, lastUserIndex + 1, messages.length)
+  const ran = observedRunNodeIds(messages, lastUserIndex + 1, messages.length)
   return created.filter((id) => !ran.has(id))
 }
 

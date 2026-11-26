@@ -3,6 +3,7 @@ import type { AgentToolContext } from '../../agent/tools'
 import { errText } from '../../agent/agentLoop'
 import { agentRunOutcomeOf } from '../../agent/runOutcome'
 import { runPreflightProblems } from '../../agent/runPreflight'
+import { CanvasRunPreflightError } from '../../execution/canvasRunPreflight'
 import { runWaves } from '../../../../domain/canvas/graph/runWaves'
 import type { RunRecord } from '../../../../domain/canvas/model/runRecord'
 import type { GenerationContextAsset } from '../../../../domain/canvas/model/node'
@@ -105,7 +106,7 @@ export async function runAgentCanvasNodes(
           }
         }
         try {
-          await execution.runNode(id, {
+          const launched = await execution.runNode(id, {
             signal,
             ...(deps.contextAssets.length > 0
               ? { contextAssets: deps.contextAssets }
@@ -114,7 +115,11 @@ export async function runAgentCanvasNodes(
           setRunTasksFor(sessionId, (current) =>
             finishAgentRunTask(current, id, { ok: true }),
           )
-          return null
+          return {
+            nodeId: id,
+            targetNodeIds:
+              launched?.ok === true ? launched.executedNodeIds : [],
+          }
         } catch (error) {
           const message = agentCanvasFailureText(error)
           setRunTasksFor(sessionId, (current) =>
@@ -123,11 +128,11 @@ export async function runAgentCanvasNodes(
               error: message,
             }),
           )
-          return {
-            nodeId: id,
-            ok: false,
-            error: message,
+          if (error instanceof CanvasRunPreflightError) {
+            return { nodeId: id, error: message }
           }
+          // 付费执行已经可能开始时，未知异常不能吞成“确定失败”交给模型重试。
+          throw error
         }
       }),
     )
@@ -139,7 +144,12 @@ export async function runAgentCanvasNodes(
       })) as unknown as RunRecord[]
       outcomes = wave.map((id, index) => {
         const failure = thrown[index]
+        const launched =
+          failure && 'targetNodeIds' in failure
+            ? failure
+            : null
         const fallbackProblem = failure
+          && !('targetNodeIds' in failure)
           ? undefined
           : runPreflightProblems(
               [id],
@@ -148,7 +158,9 @@ export async function runAgentCanvasNodes(
               channels.protocolCatalog(),
             )[0]
         const base =
-          failure ??
+          (failure && !('targetNodeIds' in failure)
+            ? { nodeId: id, ok: false, error: failure.error }
+            : null) ??
           agentRunOutcomeOf(
             afterRows,
             id,
@@ -156,6 +168,7 @@ export async function runAgentCanvasNodes(
             fallbackProblem
               ? preflightFailureText(fallbackProblem)
               : undefined,
+            launched?.targetNodeIds,
           )
         const title = titleOf(id)
         return title ? { ...base, title } : base

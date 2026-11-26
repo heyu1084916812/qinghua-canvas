@@ -108,7 +108,7 @@ export interface CanvasExecutionApi {
       signal?: AbortSignal
       contextAssets?: readonly GenerationContextAsset[]
     },
-  ): Promise<void>
+  ): Promise<CanvasRunLaunchResult | undefined>
   /** 把一个分组的成员作为一个子图规划并运行；不会逐节点绕过上游依赖。 */
   runGroup(memberIds: readonly string[]): Promise<void>
   /** Cancel only the active plan(s) attached to this node. */
@@ -600,7 +600,7 @@ export function CanvasExecutionProvider({
         runtime.adapterMaps.delete(plan.id)
         runtime.taskToNodeMaps.delete(plan.id)
       }
-      return { ok: true } as const
+      return { ok: true, planId: plan.id, executedNodeIds: [...new Set(taskToNode.values())] } as const
     },
     [store, channels, repo, platform, generation, startRun, cancelRun, failPlan],
   )
@@ -725,7 +725,7 @@ export function CanvasExecutionProvider({
           signal,
         )
         throwPreflightForCaller(result, signal)
-        return
+        return result
       }
 
       /**
@@ -866,7 +866,7 @@ export function CanvasExecutionProvider({
           }
           const result = await launch(plan, target.id, signal)
           throwPreflightForCaller(result, signal)
-          return
+          return result
         }
       }
 
@@ -887,6 +887,7 @@ export function CanvasExecutionProvider({
       }
         const result = await launch(plan, nodeId, signal)
         throwPreflightForCaller(result, signal)
+        return result
       }).finally(linked.dispose)
     },
     [

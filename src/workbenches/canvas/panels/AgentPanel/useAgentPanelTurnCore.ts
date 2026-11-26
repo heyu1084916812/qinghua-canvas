@@ -96,6 +96,7 @@ export function useAgentPanelTurnCore({
     queuePumpRef,
     sessionRuntimeRef,
     abortRefs,
+    confirmingRef,
     toolModeRef,
     turnToolsRef,
     currentTurnIdRef,
@@ -170,6 +171,7 @@ export function useAgentPanelTurnCore({
   const handleOutcome = useAgentOutcomeCoordinator({
     currentIdRef,
     abortRefs,
+    confirmingRef,
     deliveredSteersRef,
     turnToolsRef,
     sessions,

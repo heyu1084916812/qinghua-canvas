@@ -214,7 +214,7 @@ describe('openaiImages public facade / split feature contract', () => {
     const result = await adapter.verify(cfg, signal)
     expect(result.ok).toBe(false)
     if (!result.ok) {
-      expect(result.error).toMatchObject({ kind: 'channel', detail: 'missingKey' })
+      expect(result.error).toMatchObject({ kind: 'http', status: 401 })
     }
     expect(calls).toBe(1)
   })

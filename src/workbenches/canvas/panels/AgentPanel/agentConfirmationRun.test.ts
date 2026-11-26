@@ -77,7 +77,11 @@ function harness(overrides: Partial<AgentConfirmationRunInput> = {}) {
     turnOrigin: vi.fn(() => origin),
     beginConfirmation: vi.fn(async () => {}),
     finishConfirmedTool: vi.fn(async () => {}),
-    executeConfirmedTool: vi.fn(async () => ({ ok: true })),
+    executeConfirmedTool: vi.fn(async () => ({
+      ok: true,
+      outcomes: [{ nodeId: 'node-1', ok: true, status: 'succeeded' }],
+    })),
+    loadLatestRevision: vi.fn(async () => session.messageRevision),
     ensureRoute: vi.fn(async () => ({
       ok: true as const,
       route: {} as never,
@@ -95,6 +99,7 @@ function harness(overrides: Partial<AgentConfirmationRunInput> = {}) {
     isCurrentSession: () => true,
     setMessages: vi.fn(),
     createAbortController: () => controller,
+    localGenerationSummary: false,
   }
   return {
     controller,
@@ -107,6 +112,16 @@ describe('runAgentConfirmation', () => {
   it('★★ 确认执行保持 begin → execute → finish → resume → outcome 收口顺序', async () => {
     const order: string[] = []
     const h = harness({
+      session: {
+        ...session,
+        taskPlan: {
+          id: 'plan-1',
+          title: '两步生成',
+          steps: [],
+          createdAt: 1,
+          updatedAt: 1,
+        },
+      },
       beginConfirmation: vi.fn(async () => {
         order.push('begin')
       }),
@@ -152,9 +167,9 @@ describe('runAgentConfirmation', () => {
       'begin',
       'status:executing',
       'execute',
+      'finish',
       'route',
       'deps',
-      'finish',
       'status:thinking',
       'resume',
       'auto',
@@ -171,9 +186,9 @@ describe('runAgentConfirmation', () => {
       request,
       origin,
     )
-    expect(h.input.ensureRoute).toHaveBeenCalledWith(session)
+    expect(h.input.ensureRoute).toHaveBeenCalledWith(h.input.session)
     expect(h.input.createLoopDeps).toHaveBeenCalledWith({
-      session,
+      session: h.input.session,
       operationId: expect.stringMatching(/^op_/),
       route: expect.any(Object),
       toolMode: 'native',
@@ -182,10 +197,11 @@ describe('runAgentConfirmation', () => {
       turnController: h.controller,
     })
     expect(h.input.handleOutcome).toHaveBeenCalledWith(
-      session,
+      h.input.session,
       resumed,
       undefined,
       h.controller,
+      origin,
     )
     expect(h.input.settleSessionOutcome).toHaveBeenCalledWith(
       session.id,
@@ -194,7 +210,33 @@ describe('runAgentConfirmation', () => {
     )
   })
 
-  it('★★ 确认执行后路由失效时先重建，不允许拿空渠道续跑', async () => {
+  it('★★ 无任务计划的单节点生成成功后直接本地收口，不再请求聊天模型', async () => {
+    const h = harness({ localGenerationSummary: true })
+
+    const result = await runAgentConfirmation(h.input)
+
+    expect(result).toBe('applied')
+    expect(h.input.ensureRoute).not.toHaveBeenCalled()
+    expect(h.input.resumeAgentTurn).not.toHaveBeenCalled()
+    expect(h.input.continueAutoConfirmations).not.toHaveBeenCalled()
+    expect(h.input.handleOutcome).toHaveBeenCalledWith(
+      session,
+      expect.objectContaining({
+        kind: 'message',
+        text: '生成已完成，新图和运行记录已经保留；本次没有重复执行。',
+      }),
+      undefined,
+      h.controller,
+      origin,
+    )
+    expect(h.input.settleSessionOutcome).toHaveBeenCalledWith(
+      session.id,
+      expect.objectContaining({ kind: 'message' }),
+      origin,
+    )
+  })
+
+  it('★★ 工具已成功后路由失效时保留结果并按部分成功收口', async () => {
     const h = harness({
       ensureRoute: vi.fn(async () => ({
         ok: false as const,
@@ -204,25 +246,152 @@ describe('runAgentConfirmation', () => {
 
     const result = await runAgentConfirmation(h.input)
 
-    expect(result).toBe('failed')
-    expect(h.input.ensureRoute).toHaveBeenCalledWith(session)
+    expect(result).toBe('applied')
+    expect(h.input.executeConfirmedTool).toHaveBeenCalledWith(session, request)
+    expect(h.input.finishConfirmedTool).toHaveBeenCalledWith(
+      session.id,
+      request,
+      origin,
+    )
     expect(h.input.createLoopDeps).not.toHaveBeenCalled()
     expect(h.input.resumeAgentTurn).not.toHaveBeenCalled()
-    expect(h.input.setStatus).toHaveBeenCalledWith({
-      kind: 'error',
-      message: '没有可用的模型服务提供「chat-model」',
+    const partial = (h.input.handleOutcome as ReturnType<typeof vi.fn>).mock
+      .calls[0]?.[1] as AgentLoopOutcome
+    expect(partial).toMatchObject({
+      kind: 'message',
+      text: expect.stringContaining('生成已完成，但后续总结对话模型暂时不可用'),
     })
-    expect(h.input.transitionSessionJob).toHaveBeenCalledWith(
+    expect(partial.kind === 'message' ? partial.messages : []).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          role: 'tool',
+          toolName: 'runNode',
+          toolCallId: 'call-run',
+        }),
+        expect.objectContaining({
+          role: 'assistant',
+          content: expect.stringContaining('结果和运行记录已保留'),
+        }),
+      ]),
+    )
+    expect(h.input.transitionSessionJob).not.toHaveBeenCalled()
+    expect(h.input.settleSessionOutcome).toHaveBeenCalledWith(
       session.id,
-      'failed',
-      'failed',
-      { lastError: '没有可用的模型服务提供「chat-model」' },
-      { phase: 'confirmed_tool' },
+      partial,
+      origin,
+    )
+  })
+
+  it('★★ 工具已成功但总结模型报错时仍按部分成功收口', async () => {
+    const h = harness({
+      resumeAgentTurn: vi.fn(async () => {
+        throw new Error('503 no_healthy_account')
+      }),
+    })
+
+    const result = await runAgentConfirmation(h.input)
+
+    expect(result).toBe('applied')
+    const partial = (h.input.handleOutcome as ReturnType<typeof vi.fn>).mock
+      .calls[0]?.[1] as AgentLoopOutcome
+    expect(partial).toMatchObject({
+      kind: 'message',
+      text: expect.stringContaining('503 no_healthy_account'),
+    })
+    expect(h.input.transitionSessionJob).not.toHaveBeenCalled()
+    expect(h.input.settleSessionOutcome).toHaveBeenCalledWith(
+      session.id,
+      partial,
+      origin,
+    )
+  })
+
+  it('★★ 总结模型超时时中止请求，并用新 controller 收口部分成功', async () => {
+    const first = new AbortController()
+    const recovery = new AbortController()
+    const createAbortController = vi
+      .fn()
+      .mockReturnValueOnce(first)
+      .mockReturnValueOnce(recovery)
+    const setAbortController = vi.fn()
+    const h = harness({
+      createAbortController,
+      setAbortController,
+      summaryTimeoutMs: 5,
+      resumeAgentTurn: vi.fn(
+        () => new Promise<AgentLoopOutcome>(() => {}),
+      ),
+      handleOutcome: vi.fn(async () => 'applied' as const),
+    })
+
+    const result = await runAgentConfirmation(h.input)
+
+    expect(result).toBe('applied')
+    expect(first.signal.aborted).toBe(true)
+    expect(setAbortController).toHaveBeenLastCalledWith(recovery)
+    expect(h.input.handleOutcome).toHaveBeenCalledWith(
+      session,
+      expect.objectContaining({
+        kind: 'message',
+        text: expect.stringContaining('总结对话超过'),
+      }),
+      undefined,
+      recovery,
       origin,
     )
     expect(h.input.settleSessionOutcome).toHaveBeenCalledWith(
       session.id,
-      { kind: 'error' },
+      expect.objectContaining({ kind: 'message' }),
+      origin,
+    )
+  })
+
+  it('★★ 自动续跑超时时保留已产生消息并按部分成功收口', async () => {
+    const first = new AbortController()
+    const recovery = new AbortController()
+    const createAbortController = vi
+      .fn()
+      .mockReturnValueOnce(first)
+      .mockReturnValueOnce(recovery)
+    const continuedMessages = [
+      ...messages,
+      {
+        role: 'tool' as const,
+        toolCallId: 'call-read',
+        toolName: 'readResult',
+        content: '{"ok":true}',
+      },
+    ]
+    const h = harness({
+      createAbortController,
+      summaryTimeoutMs: 5,
+      continueAutoConfirmations: vi.fn(
+        async (_session, _initial, _deps, onMessages) => {
+          onMessages(continuedMessages)
+          return new Promise<AgentLoopOutcome>(() => {})
+        },
+      ),
+      handleOutcome: vi.fn(async () => 'applied' as const),
+    })
+
+    const result = await runAgentConfirmation(h.input)
+
+    expect(result).toBe('applied')
+    expect(first.signal.aborted).toBe(true)
+    expect(h.input.handleOutcome).toHaveBeenCalledWith(
+      session,
+      expect.objectContaining({
+        kind: 'message',
+        messages: expect.arrayContaining([
+          expect.objectContaining({
+            role: 'tool',
+            toolName: 'readResult',
+          }),
+        ]),
+        text: expect.stringContaining('自动续跑超过'),
+      }),
+      undefined,
+      recovery,
       origin,
     )
   })
