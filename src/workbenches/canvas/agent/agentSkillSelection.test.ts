@@ -49,4 +49,29 @@ describe('Agent 自动选择 Skill', () => {
       requestMode: 'canvas_operation',
     })).toEqual([])
   })
+
+  it('简单生图不因“海报”等词自动加载重型技能', () => {
+    expect(chooseAgentSkillsForTurn({
+      skills,
+      text: '生成一张极简蓝橙咖啡海报，先不要建节点、不要生成',
+      requestMode: 'simple_generate',
+    })).toEqual([])
+  })
+
+  it('简单生图仍可使用用户显式加入的技能 chip', () => {
+    expect(chooseAgentSkillsForTurn({
+      skills,
+      text: '用这个技能生成一张极简蓝橙咖啡海报',
+      chipIds: ['builtin:image-poster'],
+      requestMode: 'simple_generate',
+    }).map((item) => item.id)).toEqual(['builtin:image-poster'])
+  })
+
+  it('复杂计划没有明确要求 Skill 时不凭业务关键词自动注入', () => {
+    expect(chooseAgentSkillsForTurn({
+      skills,
+      text: '做两张同品牌精品咖啡海报，一张蓝调冷光，一张暖橙灯光',
+      requestMode: 'complex_plan',
+    })).toEqual([])
+  })
 })

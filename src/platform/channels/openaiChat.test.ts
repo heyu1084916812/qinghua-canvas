@@ -640,6 +640,7 @@ describe('openaiChat adapter / 工具调用', () => {
     const a = createOpenAiChatAdapter(cfg, { network: net, assets: platformWith([]).assets })
     await a.completeText(request([]), signal)
     await a.completeText({ ...request([]), tools: [tool] }, signal)
+    await a.completeText({ ...request([]), tools: [tool], toolChoice: 'required' }, signal)
 
     // 不传 tools 时逐字节保持老样子（老路径不受影响）
     expect(bodies[0]!.tools).toBeUndefined()
@@ -655,6 +656,7 @@ describe('openaiChat adapter / 工具调用', () => {
       },
     ])
     expect(bodies[1]!.tool_choice).toBe('auto')
+    expect(bodies[2]!.tool_choice).toBe('required')
   })
 
   it('★★ 多轮工具请求把节点素材编码进 OpenAI user 消息，不是空 inputs', async () => {

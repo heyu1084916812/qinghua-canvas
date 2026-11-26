@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest'
+// @ts-expect-error -- 项目刻意不引入 @types/node；CSS 源码静态取证只属于测试。
+import { readFileSync } from 'node:fs'
 const rawModules = import.meta.glob('./*.module.css', {
   eager: true,
   query: '?inline',
@@ -50,5 +52,15 @@ describe('技能页 CSS 模块结构护栏', () => {
       './SkillsPage.module.css',
       ...PART_NAMES.map((name) => `./${name}.module.css`),
     ]))
+  })
+
+  it('卡片正文不拦截 hover 操作按钮的命中', () => {
+    const shell = readFileSync(
+      new URL('./SkillsPageShell.module.css', import.meta.url),
+      'utf8',
+    )
+    expect(shell).toMatch(/\.cardBody\s*\{[\s\S]*?pointer-events:\s*none;/)
+    expect(shell).toMatch(/\.cardShot\s*\{[\s\S]*?pointer-events:\s*none;/)
+    expect(shell).toMatch(/\.card:hover \.cardActions,[\s\S]*?pointer-events:\s*auto;/)
   })
 })

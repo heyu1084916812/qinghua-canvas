@@ -18,7 +18,10 @@ import {
   toolResultFailed as failedToolValue,
 } from './agentCanvasClaimGuard'
 import { confirmRunNodeFromFinalAnswer, recoverRunNodeConfirmation } from './agentRunConfirmationGuard'
-import { parseJsonAgentAction } from './jsonToolFallback'
+import {
+  parseEscapedAgentAction,
+  parseJsonAgentAction,
+} from './jsonToolFallback'
 import { lastBatchWasImageResearch, projectToolMessageForModel } from './agentResearchProjection'
 import { parseAgentToolArguments } from './agentToolArgs'
 import { reviewBeforeVisualDenial } from './agentVisualClaimGuard'
@@ -318,6 +321,11 @@ export async function runAgentTurn(
 
     let calls = result.toolCalls ?? []
     let showAssistantText = true
+    const escaped = calls.length === 0 ? parseEscapedAgentAction(result.text) : null
+    if (escaped && allowedToolNames.has(escaped.name)) {
+      calls = [{ id: createId('escapedcall'), name: escaped.name, args: JSON.stringify(escaped.args ?? {}) }]
+      showAssistantText = false
+    }
     /**
      * 路线 B：渠道不支持原生 tools 时，模型每次只输出一个 JSON 工具调用。
      * 解析不出来就如实拒绝，不让它把“我无法调用工具”当成最终回答。
@@ -354,28 +362,14 @@ export async function runAgentTurn(
         })
         return { kind: 'message', text: verified, messages }
       }
-      if (!action) {
-        messages.push({
-          role: 'assistant',
-          content: result.text,
-          ...(result.reasoning ? { reasoning: result.reasoning } : {}),
-          createdAt: Date.now(),
-        })
-        return {
-          kind: 'error',
-          message:
-            '这个对话模型不支持原生工具调用，也没有按要求输出 JSON 工具调用。请换一个支持 tools 的模型，或让它按 {"tool":"...","args":{...}} 输出。',
-          messages,
-        }
+      // 普通问答本来就可能不需要工具；有正文就交下方最终回答守卫。
+      if (!action && !result.text.trim()) {
+        return { kind: 'error', message: '这个对话模型没有返回可交付内容，也没有按要求输出 JSON 工具调用。请换一个支持 tools 的模型，或让它按 {"tool":"...","args":{...}} 输出。', messages }
       }
-      calls = [
-        {
-          id: createId('jsoncall'),
-          name: action.name,
-          args: JSON.stringify(action.args ?? {}),
-        },
-      ]
-      showAssistantText = false
+      if (action) {
+        calls = [{ id: createId('jsoncall'), name: action.name, args: JSON.stringify(action.args ?? {}) }]
+        showAssistantText = false
+      }
     }
     if (calls.length === 0) {
       if ((await pullSteering()) > 0) continue

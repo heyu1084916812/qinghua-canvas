@@ -237,7 +237,7 @@ describe('prepareAgentTurnRequest', () => {
       inputFor({
         sessions,
         session,
-        text: '做一张新品海报',
+        text: '用一个合适的 Skill 做一个多阶段海报',
       }),
     )
     expect(withoutChip.kind).toBe('ready')

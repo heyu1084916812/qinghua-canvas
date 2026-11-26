@@ -339,6 +339,7 @@
 
 .cardShot {
   position: relative;
+  pointer-events: none;
   flex: 0 0 43%;
   min-width: 0;
   overflow: hidden;
@@ -376,6 +377,7 @@
 }
 
 .cardBody {
+  pointer-events: none;
   flex: 1 1 auto;
   min-width: 0;
   display: flex;

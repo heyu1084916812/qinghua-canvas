@@ -89,7 +89,19 @@ export function chooseAgentSkillsForTurn(input: {
       .map((id) => byId.get(id))
       .filter((skill): skill is Skill => Boolean(skill))
   }
-  if (input.requestMode === 'canvas_operation') return []
+  if (
+    input.requestMode === 'canvas_operation' ||
+    input.requestMode === 'simple_generate' ||
+    input.requestMode === 'reference_edit'
+  ) {
+    return []
+  }
+  /**
+   * 自动匹配只在用户明确要求“用 Skill / 用技能”或加入 chip 时启用。
+   * 仅凭“海报 / 电商 / 视频”等业务词偷偷注入整份技能，会把普通任务
+   * 从几行系统提示放大到数万字符，并改变默认张数与流程。
+   */
+  if (!/(?:skill|技能)/i.test(input.text)) return []
 
   const ecommerce = isEcommerceImageTask(input.text)
   const ranked = input.skills

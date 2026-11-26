@@ -94,6 +94,7 @@ export async function probeToolCalling(
         inputs: [],
         params: {},
         tools: [PROBE_TOOL],
+        toolChoice: 'required',
         timeoutMs: PROBE_TIMEOUT_MS,
         /**
          * ⚠️ **必须给 `messages`，不能只给 `prompt`。**

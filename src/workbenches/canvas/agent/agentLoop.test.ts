@@ -1392,11 +1392,21 @@ describe('runAgentTurn · JSON 工具调用降级（路线 B）', () => {
     if (r.kind === 'confirm') expect(r.request.args).toEqual({ nodeIds: ['g1'] })
   })
 
-  it('模型连 JSON 都不给：如实报错，不把“无法调用工具”当最终回答', async () => {
-    const { deps } = depsWith([{ text: '我无法调用工具' }])
+  it('模型既没有 JSON 也没有正文：如实报错', async () => {
+    const { deps } = depsWith([{ text: '' }])
     const r = await runAgentTurn(user('建个流程'), { ...deps, toolMode: 'json' })
     expect(r.kind).toBe('error')
-    if (r.kind === 'error') expect(r.message).toContain('JSON')
+    if (r.kind === 'error') expect(r.message).toContain('没有返回可交付内容')
+  })
+
+  it('普通问答在 JSON 降级模式返回正文时正常收口', async () => {
+    const { deps } = depsWith([{ text: 'chat2api-ok' }])
+    const r = await runAgentTurn(user('只回复 chat2api-ok'), {
+      ...deps,
+      toolMode: 'json',
+    })
+    expect(r.kind).toBe('message')
+    if (r.kind === 'message') expect(r.text).toBe('chat2api-ok')
   })
 
   it('JSON 降级同样受本轮工具白名单约束', async () => {
@@ -1518,6 +1528,21 @@ describe('runAgentTurn · 刹车与失败回填', () => {
     })
     expect(first.completeText).toHaveBeenCalledTimes(2)
     expect(second.completeText).toHaveBeenCalledTimes(1)
+  })
+
+  it('<escape> 包裹的明确工具调用会执行，不把内部 JSON 当最终回答', async () => {
+    const { deps, executeRead } = depsWith([
+      { text: '<escape>{"tool":"readGraph","args":{"scope":"all"}}</escape>' },
+      { text: '已经读完画布' },
+    ])
+    const r = await runAgentTurn(user('看看画布'), deps)
+    expect(executeRead).toHaveBeenCalledWith(
+      'readGraph',
+      { scope: 'all' },
+      expect.stringMatching(/^escapedcall/),
+    )
+    expect(r.kind).toBe('message')
+    if (r.kind === 'message') expect(r.text).toBe('已经读完画布')
   })
 
   it('★★ 渠道报错 → 直接中止本轮，不回填（配置问题模型改不了）', async () => {

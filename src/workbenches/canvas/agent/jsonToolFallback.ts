@@ -48,3 +48,10 @@ export function parseJsonAgentAction(text: string): JsonAgentAction | null {
   }
   return null
 }
+
+/** 部分中转把工具调用包成 `<escape>{...}</escape>` 文本；只识别这种显式形态。 */
+export function parseEscapedAgentAction(text: string): JsonAgentAction | null {
+  return /<escape>\s*\{[\s\S]*\}\s*<\/escape>/i.test(text)
+    ? parseJsonAgentAction(text)
+    : null
+}

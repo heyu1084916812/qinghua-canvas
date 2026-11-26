@@ -50,6 +50,7 @@ describe('工具调用能力探测', () => {
     const messages = seen.messages as { content?: unknown }[] | undefined
     expect(messages?.length ?? 0).toBeGreaterThan(0)
     expect(String(messages?.[0]?.content ?? '')).toContain('agent_probe')
+    expect(seen.toolChoice).toBe('required')
   })
 
   it('★★ 收下工具却只回文字 → 不支持，且给出可读原因（而不是笼统失败）', async () => {

@@ -359,7 +359,11 @@ function geminiNativeBody(
               parameters: tool.parameters,
             })),
           }],
-          toolConfig: { functionCallingConfig: { mode: 'AUTO' } },
+          toolConfig: {
+            functionCallingConfig: {
+              mode: request.toolChoice === 'required' ? 'ANY' : 'AUTO',
+            },
+          },
         }
       : {}),
   }
@@ -659,7 +663,7 @@ export function createOpenAiChatAdapter(config: OpenAiChatConfig, deps: ChannelD
                   parameters: tool.parameters,
                 },
               })),
-              tool_choice: 'auto',
+              tool_choice: request.toolChoice ?? 'auto',
             }
           : {}),
       },
@@ -811,8 +815,8 @@ export function createOpenAiChatAdapter(config: OpenAiChatConfig, deps: ChannelD
          * 工具声明（Agent 用）。不传 tools 时不加任何字段 —— 与加这个能力之前
          * 的请求**逐字节一致**，老路径的行为不受影响。
          *
-         * `tool_choice: 'auto'`：让模型自己决定「这句话要不要动手」。
-         * 写 `required` 会逼它对「你好」这种纯聊天也去调工具。
+         * 默认 `tool_choice: 'auto'`：让模型自己决定「这句话要不要动手」。
+         * 只有 Agent 能力探测会显式传 `required`，避免把偶发回文字误判为不支持。
          */
         ...(request.tools?.length
           ? {
@@ -824,7 +828,7 @@ export function createOpenAiChatAdapter(config: OpenAiChatConfig, deps: ChannelD
                   parameters: t.parameters,
                 },
               })),
-              tool_choice: 'auto',
+              tool_choice: request.toolChoice ?? 'auto',
             }
           : {}),
       },

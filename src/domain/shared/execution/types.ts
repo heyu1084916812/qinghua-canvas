@@ -192,6 +192,13 @@ interface RunRequestBase {
    */
   tools?: readonly ToolDeclaration[]
   /**
+   * 工具选择策略。仅 Agent 能力探测需要 `required`；普通对话继续使用 `auto`。
+   *
+   * 探测请求的语义是“请证明你能返回 tool_calls”，让模型自由选择会把
+   * “支持工具调用但这次回了文字”误判成不支持。
+   */
+  toolChoice?: 'auto' | 'required'
+  /**
    * 完整消息历史（Agent 用）。给了它就以它为准，`prompt` 只作为「没有 messages 时」
    * 的老路径 —— 这样既有调用点（优化 / 翻译 / 反推）一个字都不用改。
    */
