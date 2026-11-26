@@ -1,22 +1,21 @@
 import { useState } from 'react'
 import { IconChevronRight, IconImage, IconLink } from '../../toolbar/icons'
 import { agentResearchSourceLabel } from './agentResearchSourceLabel'
-import type { ConversationResearchItem } from './conversation'
+import type { ConversationResearchItem, ConversationResearchStatus } from './conversation'
 import type { ResearchMode } from '../../../../domain/inspiration/designResearch'
 import { ResearchGalleryOverlay, type ResearchGallerySelection } from './ResearchGalleryOverlay'
 import { researchImageItems, researchPreviewItems, researchWebItems } from './researchGallery'
 import { ResearchSourcePreviewList } from './ResearchSourcePreviewList'
 import { ResearchSourcesDrawer } from './ResearchSourcesDrawer'
+import { ResearchStatusPanel } from './ResearchStatusPanel'
 import styles from './ResearchResultsPreview.module.css'
 
-interface ActionResult {
-  ok: boolean
-  message: string
-}
+interface ActionResult { ok: boolean; message: string }
 
 export function ResearchResultsPreview({
   items,
   researchMode,
+  researchStatus,
   onAdd,
   onDownload,
   selection,
@@ -25,6 +24,7 @@ export function ResearchResultsPreview({
   items: readonly ConversationResearchItem[]
   /** 旧会话没有模式时按 mixed 处理，保留原有网页来源入口。 */
   researchMode?: ResearchMode
+  researchStatus?: ConversationResearchStatus
   onAdd?: (item: ConversationResearchItem) => Promise<ActionResult>
   onDownload?: (item: ConversationResearchItem) => Promise<ActionResult>
   selection?: ResearchGallerySelection // G-R2：按会话分桶的勾选状态（researchSelection.ts）
@@ -39,8 +39,7 @@ export function ResearchResultsPreview({
   const mode = researchMode ?? 'mixed'
   const showWebSources = mode !== 'image' && webItems.length > 0
 
-  if (items.length === 0) return null
-
+  if (items.length === 0 && !researchStatus) return null
   return (
     <div
       className={styles.wrap}
@@ -48,6 +47,8 @@ export function ResearchResultsPreview({
       data-agent-research-count={items.length}
       data-agent-research-mode={mode}
     >
+      {researchStatus ? <ResearchStatusPanel status={researchStatus} /> : null}
+
       {showWebSources && sourcesExpanded ? (
         <ResearchSourcePreviewList items={webItems} onMore={() => setSourcesOpen(true)} />
       ) : null}

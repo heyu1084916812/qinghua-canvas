@@ -228,7 +228,7 @@ describe('prepareAgentTurnRequest', () => {
     clearToolSupportCache()
   })
 
-  it('★★ 技能只认当前正文 chip，不因会话残留 skillId 自动注入', async () => {
+  it('★★ 技能由当前正文自动匹配，会话残留 skillId 不会越权覆盖', async () => {
     const { sessions, session } = await createSession({
       skillId: 'skill-brand',
     })
@@ -243,7 +243,8 @@ describe('prepareAgentTurnRequest', () => {
     expect(withoutChip.kind).toBe('ready')
     if (withoutChip.kind === 'ready') {
       expect(withoutChip.systemPrompt).not.toContain('技能正文：保留品牌字形和主色。')
-      expect(withoutChip.contextTrace?.skillPhaseEvent).toBeUndefined()
+      expect(withoutChip.skill?.id).toBe('skill-poster')
+      expect(withoutChip.contextTrace?.skillPhaseEvent?.evidence).toEqual(['skill-poster'])
     }
 
     clearToolSupportCache()
@@ -492,8 +493,9 @@ describe('prepareAgentTurnRequest', () => {
     expect(result.kind).toBe('ready')
     if (result.kind !== 'ready') return
     expect(notifyContextError).toHaveBeenCalledWith(
-      '有 1 条参考没有完成自动分析，已按显式 chip 继续。',
+      '有 1 条显式参考没有完成自动分析，已暂停创建与生成。请重试，或回复「跳过参考分析继续」。',
     )
+    expect(result.agentTask.referenceReview?.blockedIds).toEqual(['kit-missing'])
     expect(result.contextTrace?.assetRefs.map((asset) => asset.hash))
       .toEqual(['image-ok'])
     expect(result.contextTrace?.referenceWarnings).toEqual(expect.arrayContaining([

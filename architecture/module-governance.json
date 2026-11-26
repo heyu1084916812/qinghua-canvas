@@ -1329,9 +1329,92 @@
         "readableConfirmationLines"
       ],
       "test": [
-        "src/workbenches/canvas/panels/AgentPanel/conversation.test.ts"
+        "src/workbenches/canvas/panels/AgentPanel/agentResearchConversation.test.ts"
       ],
       "budget": 60
+    },
+    {
+      "module": "src/domain/agent/outputConstraints.ts",
+      "owner": "agent-domain",
+      "responsibility": "从用户原话中提取整组图片统一比例，并生成模型可见的固定比例约束。",
+      "owns": [
+        "统一比例识别",
+        "固定比例提示词"
+      ],
+      "doesNotOwn": [
+        "生成计划校验",
+        "画布节点写入"
+      ],
+      "publicApi": [
+        "uniformImageRatioOf",
+        "uniformImageRatioPrompt"
+      ],
+      "test": [
+        "src/domain/agent/outputConstraints.test.ts"
+      ],
+      "budget": 80
+    },
+    {
+      "module": "src/workbenches/canvas/agent/agentGenerationConstraints.ts",
+      "owner": "canvas-agent",
+      "responsibility": "把用户明确要求的整组图片比例写入生成计划，并在付费运行前阻断不一致节点。",
+      "owns": [
+        "统一比例覆盖",
+        "生成前比例校验"
+      ],
+      "doesNotOwn": [
+        "比例识别",
+        "生成请求执行"
+      ],
+      "publicApi": [
+        "applyUniformGenerationRatio",
+        "generationRatioProblems"
+      ],
+      "test": [
+        "src/workbenches/canvas/agent/agentGenerationConstraints.test.ts"
+      ],
+      "budget": 110
+    },
+    {
+      "module": "src/workbenches/canvas/agent/agentPromptIntent.ts",
+      "owner": "canvas-agent",
+      "responsibility": "从用户原话提取保持、风格替换、合成与逐图拆分意图。",
+      "owns": [
+        "原话意图规则"
+      ],
+      "doesNotOwn": [
+        "画布命令",
+        "系统提示词拼接"
+      ],
+      "publicApi": [
+        "looksLikePreserveRequest",
+        "looksLikeStyleOnlyRequest",
+        "looksLikeCombineRequest",
+        "expectsPerImageFlows"
+      ],
+      "test": [
+        "src/workbenches/canvas/agent/agentPromptIntent.test.ts"
+      ],
+      "budget": 120
+    },
+    {
+      "module": "src/workbenches/canvas/agent/agentPlanLandingAudit.ts",
+      "owner": "canvas-agent",
+      "responsibility": "检查 Agent 新生成节点落地后的模型是否误写对话模型，以及用户明确模型是否真正生效。",
+      "owns": [
+        "生成节点落地模型自检"
+      ],
+      "doesNotOwn": [
+        "计划结构校验",
+        "渠道解析"
+      ],
+      "publicApi": [
+        "generationLandingProblems"
+      ],
+      "test": [
+        "src/workbenches/canvas/agent/agentPlanLandingAudit.test.ts"
+      ],
+      "budget": 120
     },
     {
       "module": "src/domain/agent/seriesAnchors.ts",
@@ -14199,6 +14282,138 @@
         "src/workbenches/canvas/panels/AgentPanel/agentToolSafety.test.ts"
       ],
       "budget": 90
+    },
+    {
+      "module": "src/domain/agent/ecommerceIntent.ts",
+      "owner": "agent-domain",
+      "responsibility": "识别电商图片交付任务，并在计划落地前检查统一锚点与文字层级。",
+      "owns": [
+        "电商图片意图判定",
+        "电商版式硬约束提示",
+        "计划锚点与排版检查"
+      ],
+      "doesNotOwn": [
+        "画布命令执行",
+        "生成渠道请求",
+        "UI 展示"
+      ],
+      "publicApi": [
+        "isEcommerceImageTask",
+        "requiresEcommerceTypography",
+        "ecommerceArtDirectionPrompt",
+        "ecommercePlanProblems"
+      ],
+      "test": [
+        "src/domain/agent/ecommerceIntent.test.ts"
+      ],
+      "budget": 130
+    },
+    {
+      "module": "src/workbenches/canvas/agent/agentSkillSelection.ts",
+      "owner": "canvas-agent",
+      "responsibility": "按本轮正文从用户 Skill 库确定性匹配技能，显式 chip 优先。",
+      "owns": [
+        "任务意图到技能画像的匹配",
+        "显式 Skill 优先级"
+      ],
+      "doesNotOwn": [
+        "Skill 持久化",
+        "模型请求",
+        "提示词正文渲染"
+      ],
+      "publicApi": [
+        "chooseAgentSkillsForTurn"
+      ],
+      "test": [
+        "src/workbenches/canvas/agent/agentSkillSelection.test.ts"
+      ],
+      "budget": 130
+    },
+    {
+      "module": "src/workbenches/canvas/agent/agentConfirmedPlanGuards.ts",
+      "owner": "canvas-agent",
+      "responsibility": "确认后的计划落地前门禁：参考分析阻塞、统一比例和电商视觉约束。",
+      "owns": [
+        "参考分析失败拒绝文案",
+        "生成计划比例与电商门禁编排"
+      ],
+      "doesNotOwn": [
+        "计划归一化",
+        "画布命令派发",
+        "工具确认 UI"
+      ],
+      "publicApi": [
+        "ConfirmedPlanConstraints",
+        "referenceAnalysisBlockedProblems",
+        "guardGenerationPlan"
+      ],
+      "test": [
+        "src/workbenches/canvas/agent/tools.test.ts"
+      ],
+      "budget": 70
+    },
+    {
+      "module": "src/workbenches/canvas/panels/AgentPanel/agentResearchConversation.ts",
+      "owner": "agent-panel",
+      "responsibility": "把调研工具结果投影为对话画廊条目、检索词和来源状态。",
+      "owns": [
+        "调研候选规范化",
+        "目标与实收数量",
+        "各来源状态"
+      ],
+      "doesNotOwn": [
+        "联网检索",
+        "调研持久化",
+        "画廊交互"
+      ],
+      "publicApi": [
+        "ConversationResearchItem",
+        "ConversationResearchStatus",
+        "projectResearchConversation"
+      ],
+      "test": [
+        "src/workbenches/canvas/panels/AgentPanel/conversation.test.ts"
+      ],
+      "budget": 120
+    },
+    {
+      "module": "src/workbenches/canvas/panels/AgentPanel/ResearchStatusPanel.tsx",
+      "owner": "agent-panel",
+      "responsibility": "展示调研目标、实收、检索词和各来源失败原因。",
+      "owns": [
+        "调研状态面板视图"
+      ],
+      "doesNotOwn": [
+        "调研结果解析",
+        "联网检索",
+        "参考入库"
+      ],
+      "publicApi": [
+        "ResearchStatusPanel"
+      ],
+      "test": [
+        "src/workbenches/canvas/panels/AgentPanel/ResearchResultsPreview.test.ts"
+      ],
+      "budget": 80
+    },
+    {
+      "module": "src/workbenches/canvas/panels/AgentPanel/ResearchStatusPanel.module.css",
+      "owner": "agent-panel",
+      "responsibility": "调研数量、检索词和来源状态的局部样式。",
+      "owns": [
+        "CSS_MODULE:ResearchStatusPanel 的调研状态样式域"
+      ],
+      "doesNotOwn": [
+        "主题令牌",
+        "调研数据"
+      ],
+      "publicApi": [
+        "CSS_MODULE:ResearchStatusPanel 的调研状态样式域"
+      ],
+      "test": [
+        "src/workbenches/canvas/panels/AgentPanel/ResearchResultsPreview.test.ts"
+      ],
+      "budget": 110
     }
   ]
 }

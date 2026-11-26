@@ -12,6 +12,7 @@ import { downstreamOf } from '../../../domain/canvas/graph/upstreamOf'
 import { canBuildRequest } from '../../../features/canvas/execution/buildRunPlan'
 import { lightboxSourceRectForNode } from '../../../features/canvas/lightboxSourceRect'
 import { applyAgentPlan } from './applyAgentPlan'
+import { generationLandingProblems } from './agentPlanLandingAudit'
 import { discoverAgentTools } from './toolCatalog'
 import type { AgentRunOutcome } from './runOutcome'
 import { createId } from '../../../shared/id'
@@ -29,6 +30,11 @@ import {
 import { applyCanvasBatchInStore } from './agentBatchMutationTools'
 import { verifyMutationPrecondition } from '../../../domain/agent/mutationSafety'
 import { planProblems } from './agentPlanGate'
+import { generationRatioProblems } from './agentGenerationConstraints'
+import {
+  guardGenerationPlan,
+  referenceAnalysisBlockedProblems,
+} from './agentConfirmedPlanGuards'
 import {
   memoryCandidateProblems,
   normalizeMemoryCandidate,
@@ -103,6 +109,14 @@ export interface AgentToolContext {
    * 提示词里已经写了硬约束，这里再做一道**确定性检查** —— 不靠模型自觉。
    */
   perImage?: boolean
+  /** 用户本轮明确要求整组图片统一使用的比例。 */
+  uniformImageRatio?: string
+  /** 本任务按电商视觉交付检查共同锚点与文字层级。 */
+  ecommerceArtDirection?: boolean
+  /** 用户明确要求电商文字排版。 */
+  ecommerceTypographyRequired?: boolean
+  /** 显式参考分析失败时禁止创建计划与运行生成。 */
+  referenceAnalysisBlockedIds?: readonly string[]
   /**
    * 新建节点要补的默认数据（渠道 + 模型 + 生成参数）。
    *
@@ -454,12 +468,16 @@ export async function executeConfirmedTool(
       }
     }
     case 'applyPlan': {
-      const existing = ctx.store.getSnapshot().nodes.map((n) => ({
-        id: n.id,
-        type: n.type,
-      }))
-      const { problems, plan } = planProblems(a, existing, ctx.resolveNodeIds)
-      if (!plan) return { ok: false, problems }
+      const blocked = referenceAnalysisBlockedProblems('applyPlan', ctx)
+      if (blocked.length > 0) return { ok: false, problems: blocked }
+      const existing = ctx.store.getSnapshot().nodes.map((n) => ({ id: n.id, type: n.type }))
+      const { problems, plan: validatedPlan } = planProblems(a, existing, ctx.resolveNodeIds)
+      if (!validatedPlan) return { ok: false, problems }
+      const guarded = guardGenerationPlan(validatedPlan, ctx)
+      if (guarded.problems.length > 0) {
+        return { ok: false, problems: guarded.problems }
+      }
+      const plan = guarded.plan
       /**
        * **「每张图各自一条流程」的确定性检查**（用户 2026-10-06 第七批 #183）。
        *
@@ -532,39 +550,14 @@ export async function executeConfirmedTool(
           : {}),
         ...(ctx.viewportWorld ? { viewportWorld: ctx.viewportWorld } : {}),
       })
-      const attachedLocalIds = new Set((finalPlan.attach ?? []).map((item) => item.localId))
-      const landingProblems = finalPlan.nodes.flatMap((node) => {
-        if (node.type !== 'generation' || attachedLocalIds.has(node.localId)) return []
-        const expected = ctx.explicitRecipeForGenerated?.(node.type, node)
-        const resolved = applied.resolvedNodes.find((item) => item.localId === node.localId)
-        const actualData = resolved
-          ? (ctx.store.getSnapshot().nodes.find((item) => item.id === resolved.nodeId)?.data as
-              | { model?: unknown; mode?: unknown }
-              | undefined)
-          : undefined
-        const actualModel = actualData?.model
-        const problems: string[] = []
-        if (
-          typeof actualModel === 'string' &&
-          ctx.categoryOfModel?.(actualModel) === 'chat'
-        ) {
-          problems.push(
-            `节点「${node.title ?? node.localId}」是生成节点，却写入了对话模型 ${actualModel}。`,
-          )
-        }
-        if (
-          expected &&
-          !(
-            typeof actualModel === 'string' &&
-            actualModel === expected.model
-          )
-        ) {
-          problems.push(
-              `节点「${node.title ?? node.localId}」明确要求使用 ${expected.model}，` +
-                `实际写入的是 ${typeof actualModel === 'string' && actualModel ? actualModel : '(空)'}。`,
-          )
-        }
-        return problems
+      const landingProblems = generationLandingProblems({
+        plan: finalPlan,
+        resolvedNodes: applied.resolvedNodes,
+        graphNodes: ctx.store.getSnapshot().nodes,
+        ...(ctx.explicitRecipeForGenerated
+          ? { explicitFor: ctx.explicitRecipeForGenerated }
+          : {}),
+        ...(ctx.categoryOfModel ? { categoryOfModel: ctx.categoryOfModel } : {}),
       })
       /**
        * 落地成功不等于已经安全：外层工具账本马上会把结果记成 finished。
@@ -572,12 +565,13 @@ export async function executeConfirmedTool(
        */
       await ctx.store.flush()
       // 自检结果整份回填：模型要靠它决定补连线还是改图（§6.1）
+      const notes = [...aligned.notes, ...guarded.notes]
       return {
         ok: applied.ok && landingProblems.length === 0,
         problems: [...applied.problems, ...landingProblems],
         createdNodeIds: applied.createdNodeIds,
         resolvedNodes: applied.resolvedNodes,
-        ...(aligned.notes.length > 0 ? { notes: aligned.notes } : {}),
+        ...(notes.length > 0 ? { notes } : {}),
       }
     }
     case 'updateNode': {
@@ -689,9 +683,13 @@ export async function executeConfirmedTool(
     case 'renameNode':
       return renameNodeInStore(ctx.store, a)
     case 'runNode': {
+      const blocked = referenceAnalysisBlockedProblems('runNode', ctx)
+      if (blocked.length > 0) return { ok: false, problems: blocked }
       const rawIds = asStringArray(a.nodeIds)
       const ids = ctx.resolveNodeIds ? ctx.resolveNodeIds(rawIds) : rawIds
       if (ids.length === 0) return { ok: false, problems: ['没有指定要跑的节点'] }
+      const ratioProblems = generationRatioProblems(ctx.store.getSnapshot().nodes, ids, ctx.uniformImageRatio)
+      if (ratioProblems.length > 0) return { ok: false, problems: ratioProblems }
       const outcomes = await ctx.runNodes(ids, ctx.signal)
       const savedPlan = outcomes.some((outcome) => outcome.ok)
         ? await markCurrentPlanResultsReady(ctx, activePlan)
@@ -703,10 +701,14 @@ export async function executeConfirmedTool(
       }
     }
     case 'runFrom': {
+      const blocked = referenceAnalysisBlockedProblems('runFrom', ctx)
+      if (blocked.length > 0) return { ok: false, problems: blocked }
       const rawIds = asStringArray(a.nodeIds)
       const ids = ctx.resolveNodeIds ? ctx.resolveNodeIds(rawIds) : rawIds
       const resolved = runFromNodeIds(ctx.store, ids)
       if (!resolved.ok) return resolved
+      const ratioProblems = generationRatioProblems(ctx.store.getSnapshot().nodes, resolved.ids, ctx.uniformImageRatio)
+      if (ratioProblems.length > 0) return { ok: false, problems: ratioProblems }
       const outcomes = await ctx.runNodes(resolved.ids, ctx.signal)
       const savedPlan = outcomes.some((outcome) => outcome.ok)
         ? await markCurrentPlanResultsReady(ctx, activePlan)

@@ -8,6 +8,7 @@ import {
   toConversation,
   toolLabel,
   toolLabelOf,
+  toolPendingLabel,
   type ConversationItem,
 } from './conversation'
 
@@ -233,6 +234,18 @@ describe('工具结果 → 人话', () => {
     expect(toolLabel('runNode')).toBe('已运行生成')
     expect(toolLabel('researchDesign')).toBe('联网调研完成')
     expect(toolLabel('someFutureTool')).toContain('someFutureTool')
+  })
+
+  it('★★ 只看到 runNode 工具调用、还没结果时显示等待确认，不提前说已运行', () => {
+    expect(toolPendingLabel('runNode')).toBe('等待确认后生成')
+    const items = toConversation([{
+      role: 'assistant',
+      content: '',
+      toolCalls: [{ id: 'run-1', name: 'runNode', args: '{"nodeIds":["n1"]}' }],
+    }])
+    const step = items.find((item) => item.kind === 'step')
+    expect(step?.kind === 'step' ? step.label : '').toBe('等待确认后生成')
+    expect(JSON.stringify(items)).not.toContain('已运行生成')
   })
 
   it('readPage 步骤：成功给标题与字数，失败如实给原因与退路', () => {

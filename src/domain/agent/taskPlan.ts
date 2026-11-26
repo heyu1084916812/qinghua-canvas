@@ -478,7 +478,7 @@ export function advanceAgentTaskPlanAfterReview(
         resultsReadyAt: step.resultsReadyAt ?? now,
         reviewApprovedAt: now,
         finishedAt: now,
-        note: step.note || '用户跳过本步验收，直接进入下一步',
+        note: step.note || '用户已验收通过，进入下一步',
       }
     }
     if (next && step.id === next.id) {

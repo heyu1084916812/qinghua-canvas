@@ -4,6 +4,14 @@ import { allSpecs } from '../../../domain/canvas/nodeSpecs/registry'
 import { summarizeGraph, type GraphSummary } from './tools'
 import type { ToolDeclaration } from '../../../domain/shared/execution/types'
 import type { GenerationAvailability } from '../../../domain/project/generationRouting'
+import { uniformImageRatioPrompt } from '../../../domain/agent/outputConstraints'
+import { ecommerceArtDirectionPrompt } from '../../../domain/agent/ecommerceIntent'
+export {
+  expectsPerImageFlows,
+  looksLikeCombineRequest,
+  looksLikePreserveRequest,
+  looksLikeStyleOnlyRequest,
+} from './agentPromptIntent'
 import type { AgentPromptProfile, AgentRequestMode } from './agentContextPolicy'
 import type { AgentGenerationFlow } from './agentGenerationFlow'
 
@@ -38,8 +46,8 @@ export const WEB_RESEARCH_ON_PROMPT = [
   '- 泛化或想象类场景（如「一只在月球钓鱼的猫」），或用户已经给了足够的参考素材时，不要搜索，直接做。',
   '',
   '### 如何调用 researchDesign',
-  '- `researchDesign.queries` 给 1–4 个覆盖不同角度的检索词（现状 / 风格趋势 / 同类案例 / 配色字体等）；主题有国际性时至少一条用英文。',
-  '- 找图片、照片、海报、风格参考、视觉灵感或 Moodboard 时传 `mode:"image"`；这是默认路径，并可用 `imageMaxResults` 给 30–50 的独立图片目标（默认 40）。',
+  '- `researchDesign.queries` 给 1–6 个覆盖不同角度的检索词（现状 / 风格趋势 / 同类案例 / 配色字体等）；主题有国际性时至少一条用英文。',
+  '- 找图片、照片、海报、风格参考、视觉灵感或 Moodboard 时传 `mode:"image"`；这是默认路径，并可用 `imageMaxResults` 给 100–120 的独立图片目标（默认 100）。',
   '- 只要网页资料、文章、报告、新闻或公开来源时传 `mode:"web"`；既要图片参考又要网页资料时传 `mode:"mixed"`。不要把所有调研都伪装成网页模式。',
   '- 用户给了网页链接时，用 `readPage` 读正文；需要深入时最多再读 1–2 个搜索到的关键来源。',
   '- `readPage` 返回 ok:false（要登录、验证码、打不开）时，如实说读不到，并建议改搜公开来源或请用户贴截图 / 文字；不要编造页面内容。',
@@ -55,7 +63,7 @@ export const WEB_RESEARCH_ON_PROMPT = [
   '### API Key 说明',
   '- 联网搜索默认免 Key：找图直接去设计站搜（花瓣 · 站酷 · Cosmos · The Dieline · BP&O · Lovely Package；桌面应用另用内置浏览器查 Dribbble / Packaging of the World / Pinterest；英文站只认英文词，queries 里至少给一条英文），网页资料用 Bing 结果页；结果为空时按 warnings 如实说明原因（限流、没有结果、连不上），可建议换角度或中英文关键词再搜，Tavily API Key 只是可选备用。',
   '- 说结果来自哪些站时以 `usedSources` 为准（如「花瓣 · 站酷」）；没在 usedSources 里的站（如 Behance，或这次被验证 / 登录挡住的站）不要说搜过。',
-  '- `siteStatuses` / `skippedSites` 写明了哪些站这次被验证或登录挡住（needs-login / blocked）、太慢或连不上；用户问起或结果偏少时如实说明，需要登录的站可提示「在画布浏览器里登录一次」。',
+  '- `searchQueries` 是实际检索词；`siteStatuses` / `skippedSites` 写明了各站实收数量和空结果 / 需登录 / 被验证 / 超时原因。用户问起或结果不足 100 张时必须如实说明，不得只说“没找到”。',
   '- 结果里 `needsTavilyKey` 为 true（已填的 Tavily API Key 被拒或额度用尽）时，直接告诉用户：到 设置 → Agent → 工具 → 联网调研 检查 Key。',
 ].join('\n')
 
@@ -93,8 +101,8 @@ const IDENTITY_AND_RULES = [
   '  - **禁止用于信息收集**：不要问「你想找什么风格」「什么品类」「用什么颜色」。信息不足时先调用 `researchDesign` 搜索，再根据结果决定。',
   '  - **纯搜索任务不发问题卡**：用户说「找/搜索/查找」设计、参考、灵感时，直接执行 `researchDesign`，不要先问。',
   '  - **只在有明确选项且无法推断时使用**：有多个明确的实施方案且上下文无法推断偏好时才发问题卡。',
-  '  发问题卡的回合，正文 / intro 只写**一句**引导（如「开工前先定几件事」），不要在正文里复述题目或列出选项',
-  '  （问题卡会展示它们，重复会被界面剥掉）。用户「跳过」问题卡时，按你自己的合理推断继续，同一任务不要再问这些题。',
+  '  发问题卡的回合不要在正文里复述题目、选项、题数或“答完就出 N 张”这类执行承诺；界面会按真实题数生成引导。',
+  '  用户「跳过」问题卡时，按你自己的合理推断继续，同一任务不要再问这些题。',
   '- 参考栏里当前任务还没有用法的图，系统会先自动分析并写入用法；能判断分工就直接按用法用，不要为它们发问题卡。',
   '  只有多张图的分工 / 组合有多种合理可能（上下文会列出）时，才用 `askQuestions` 问每张图怎么配合，',
   '  每题的 `referenceItemId` 填那张参考的 id。用户回答过的用法同一任务里沿用，不要再问。',
@@ -404,7 +412,7 @@ const LIGHT_IDENTITY_AND_RULES = [
   '  出图模型照 runNode outcomes 的 `model` 说；readResult 没给尺寸就不报尺寸，不要拿节点参数（如 2K）冒充结果。',
   '- 本档只带与当前请求相关的节点，不附完整画布词表；只有信息不足或请求转成画布操作时，才调用 readGraph。',
   '- 用户要联网调研、找参考、做 Moodboard 或收集公开 Pinterest / Behance / 网页案例时，调用 researchDesign；',
-  '  有公开 URL 就放进 urls；找图片/风格用 mode:"image"（默认，图片目标默认 40 且不受网页 12 条上限约束），',
+  '  有公开 URL 就放进 urls；找图片/风格用 mode:"image"（默认，图片目标默认 100 且不受网页 12 条上限约束），',
   '  查网页资料用 mode:"web"，两者都要用 mode:"mixed"。没有 URL 也会免 Key 搜索：图片来自花瓣 · 站酷（桌面应用另有 Dribbble 等浏览器站点），网页来自 Bing。',
   '  搜索结果只作为候选。mode:"image" 成功时结果卡就是回答，不写正文、不列链接；',
   '  web / mixed 才带来源链接，并说明私密内容和全站搜索没有执行。',
@@ -638,6 +646,14 @@ export interface AgentPromptExtras {
   skill?: { name: string; content: string }
   /** 本轮同时启用的多个技能（2026-11-12 技能浮层可加入多枚 chip）；给了就取代 `skill` */
   skills?: readonly { name: string; content: string }[]
+  /** 用户明确要求整组图片统一使用的比例。 */
+  uniformImageRatio?: string
+  /** 本任务按电商图片交付处理。 */
+  ecommerceArtDirection?: boolean
+  /** 用户明确要求电商文字排版。 */
+  ecommerceTypographyRequired?: boolean
+  /** 显式参考分析失败；存在时禁止创建计划与运行生成。 */
+  referenceAnalysisBlocked?: readonly string[]
   /**
    * 用户在这句话里 **@ 引用**到的画布节点 / 模型（用户 2026-10-02）。
    *
@@ -711,6 +727,26 @@ export function buildAgentSystemPromptWithContext(
       `流程类型：${extras.generationFlow}`,
       guidance[extras.generationFlow],
     ].join('\\n'))
+  }
+
+  if (extras.uniformImageRatio?.trim()) {
+    parts.push(uniformImageRatioPrompt(extras.uniformImageRatio))
+  }
+
+  if (extras.ecommerceArtDirection === true) {
+    parts.push(ecommerceArtDirectionPrompt({
+      typographyRequired: extras.ecommerceTypographyRequired === true,
+    }))
+  }
+
+  if ((extras.referenceAnalysisBlocked?.length ?? 0) > 0) {
+    parts.push([
+      '## 参考分析失败，禁止继续创建或生成',
+      `本轮有 ${extras.referenceAnalysisBlocked?.length ?? 0} 条显式参考没有完成自动分析。`,
+      '现在不得调用 `applyPlan`、`runNode`、`runFrom` 或任何付费 / 写画布工具。',
+      '先向用户说明失败原因，并让用户选择：重新分析参考，或明确回复「跳过参考分析继续」。',
+      '用户没有明确选择跳过前，不能把未分析成功的参考当成已确认视觉锚点。',
+    ].join('\n'))
   }
 
   if (extras.autoRun === true) {
@@ -930,67 +966,6 @@ export function buildAgentSystemPromptWithContext(
   }
 
   return parts.join('\n\n')
-}
-
-/**
- * 用户这句话是不是「只改一处、其余保持」那一类。
- *
- * 判据取用户**自己的原话**（调用方已经把 @ 引用标记还原成普通文字）。宁可多命中一点：
- * 多给模型一句「别的都不许变」没有副作用；漏掉的话，那句要求就只留在对话里、
- * 进不了提示词 —— 正是用户 2026-10-05 第五批第 2 条报的现象。
- */
-export function looksLikePreserveRequest(text: string): boolean {
-  const t = text.replace(/\s+/g, '')
-  if (!t) return false
-  return /保持不变|其余不变|其他(都)?不变|其他(都)?(别|不要)(动|改)|其余(都)?(照旧|保持)|只(改|换|替换|把)|其余的?不动/.test(
-    t,
-  )
-}
-
-/**
- * 用户这句话是不是「只换风格」那一类。
- *
- * 判据：**同时**出现「风格类词」与「改动类词」。
- * 只看其中一边都不够：「小猫钓鱼」这句画面描述里有「画」字但没有风格词；
- * 而「换个背景」有改动词却没有风格词 —— 那种属于 `preserve`（只改一处、其余不变）。
- *
- * 宁可多命中：多一段硬约束没有副作用；漏掉的话模型会拿节点名当内容重画一张。
- */
-export function looksLikeStyleOnlyRequest(text: string): boolean {
-  const t = text.replace(/\s+/g, '')
-  if (!t) return false
-  const styleWord = /风格|画风|质感|渲染|3d|三维|写实|卡通|动漫|水彩|油画|像素|赛博|国风|素描|手绘|黏土/i.test(
-    t,
-  )
-  const changeWord = /换|改|变|转|做成|弄成|调成/.test(t)
-  return styleWord && changeWord
-}
-
-/**
- * 用户这句话是不是「把多张图**合成一张**」那一类。
- *
- * 与 `expectsPerImageFlows` 成对：有合成意图才允许把多张图并进一条流程。
- */
-export function looksLikeCombineRequest(text: string): boolean {
-  const t = text.replace(/\s+/g, '')
-  if (!t) return false
-  return /合成|融合|拼成|拼在|组合|放在一起|放在同一张|同一张图|一张图里|一起生成|合起来/.test(t)
-}
-
-/**
- * 「多张图时该不该**一张一条流程**」。
- *
- * 用户 2026-10-06 第七批 #183 原话：「明明是单独的两个需求他给我替换成了一个需求」；
- * 图二里他写的是「把两张图片**单独**替换成 3d 材质」。
- *
- * 默认是**该拆**：@ 了几张图却只给「把图换成 X 材质」这种**逐张属性改动**时，
- * 用户要的通常是每张各改一张。只有他明说「合成 / 融合 / 放在一张图里」才不拆。
- *
- * 判据要的是 `imageCount`：**单张图无所谓拆不拆**，所以 < 2 直接 false。
- */
-export function expectsPerImageFlows(text: string, imageCount: number): boolean {
-  if (imageCount < 2) return false
-  return !looksLikeCombineRequest(text)
 }
 
 /** 供测试与诊断：把节点快照转成摘要（与 tools.readGraphSummary 同源语义） */

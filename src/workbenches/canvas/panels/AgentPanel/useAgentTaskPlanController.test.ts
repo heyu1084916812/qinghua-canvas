@@ -234,7 +234,7 @@ describe('useAgentTaskPlanController', () => {
   /**
    * #913：**推进途中切会话**。
    *
-   * 用户点了「跳过这一步的验收」，然后在「取消旧确认 → 等旧回合收尾」这几段 await
+   * 用户点了「验收通过」，然后在「取消旧确认 → 等旧回合收尾」这几段 await
    * 期间切到会话 B。切走之后必须整单退出：
    * - 不落计划（A 的 taskPlan 不许被这次点击悄悄改掉）；
    * - **不发那条隐藏控制消息** —— 它等于替用户开一次没人看着的付费回合；
@@ -534,7 +534,7 @@ describe('useAgentTaskPlanController', () => {
       ).resolves.toBe(true)
     })
     expect(notify).toHaveBeenCalledWith(
-      '已完成「整理输出」，整个计划已结束',
+      '已通过「整理输出」验收，整个计划已结束',
       'info',
     )
     expect(sendText).not.toHaveBeenCalled()

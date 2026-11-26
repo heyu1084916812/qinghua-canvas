@@ -135,6 +135,40 @@ describe('AgentConversationPane', () => {
     )
   })
 
+  it('★★ 生成结果就绪后直接出现“等你验收”，不依赖模型再发确认', () => {
+    const html = renderPane({
+      current: {
+        ...session,
+        taskPlan: {
+          id: 'plan-review',
+          title: '电商主图套图',
+          steps: [
+            {
+              id: 'hero',
+              title: '首屏主视觉',
+              status: 'in_progress',
+              requiresConfirmation: true,
+              resultsReadyAt: 20,
+            },
+            {
+              id: 'detail',
+              title: '详情页派生图',
+              status: 'pending',
+            },
+          ],
+          currentStepId: 'hero',
+          createdAt: 1,
+          updatedAt: 20,
+        },
+      },
+      onAdvanceToNext: vi.fn(),
+    })
+    expect(html).toContain('data-agent-task-review')
+    expect(html).toContain('结果已生成，正在等你验收')
+    expect(html).toContain('验收通过，继续')
+    expect(html).toContain('待你验收')
+  })
+
   it('确认卡仍在对话流内，并保留批准与取消语义', () => {
     const html = renderPane({
       status: {

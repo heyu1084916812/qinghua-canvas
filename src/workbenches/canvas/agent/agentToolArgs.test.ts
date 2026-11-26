@@ -46,10 +46,10 @@ describe('联网工具参数清洗', () => {
     ).toEqual({
       topic: '咖啡',
       mode: 'mixed',
-      queries: ['a', 'b', 'c', 'd'],
+      queries: ['a', 'b', 'c', 'd', 'e'],
       urls: ['https://a.example.com'],
       maxResults: 24,
-      imageMaxResults: 30,
+      imageMaxResults: 100,
     })
     expect(researchDesignArgsOf({ topic: 'x' })).toEqual({ topic: 'x', mode: 'image' })
   })

@@ -85,6 +85,42 @@ describe('画布词表', () => {
     expect(prompt).toContain('标记了 `requiresConfirmation:true` 的步骤仍要')
     expect(prompt).toContain('破坏性或长期副作用仍必须等待用户亲自确认')
   })
+
+  it('用户要求整组统一比例时，提示词要求每个生成节点写同一个 ratio', () => {
+    const prompt = buildAgentSystemPromptWithContext(
+      { nodes: [], edges: [] },
+      undefined,
+      { uniformImageRatio: '1:1' },
+    )
+    expect(prompt).toContain('本轮固定输出比例')
+    expect(prompt).toContain('整组图片统一为 1:1')
+    expect(prompt).toContain('所有新建生成节点的 `data.ratio` 必须写这个值')
+  })
+
+  it('电商图片任务写入统一锚点和文字排版硬约束', () => {
+    const prompt = buildAgentSystemPromptWithContext(
+      { nodes: [], edges: [] },
+      undefined,
+      {
+        ecommerceArtDirection: true,
+        ecommerceTypographyRequired: true,
+      },
+    )
+    expect(prompt).toContain('电商视觉硬约束')
+    expect(prompt).toContain('先建立产品锚点或首屏 KV')
+    expect(prompt).toContain('每个非白底 / 非抠图的生成提示词')
+  })
+
+  it('显式参考分析失败时禁止 applyPlan 与生成', () => {
+    const prompt = buildAgentSystemPromptWithContext(
+      { nodes: [], edges: [] },
+      undefined,
+      { referenceAnalysisBlocked: ['ref-1'] },
+    )
+    expect(prompt).toContain('参考分析失败，禁止继续创建或生成')
+    expect(prompt).toContain('不得调用 `applyPlan`、`runNode`、`runFrom`')
+    expect(prompt).toContain('跳过参考分析继续')
+  })
 })
 
 describe('本次现状', () => {
@@ -239,13 +275,13 @@ describe('素材段与技能段', () => {
     expect(p).toContain('真实品牌 / 产品 / 地标 / 人物')
     expect(p).toContain('「流行」「趋势」「最新」')
     expect(p).toContain('不要搜索，直接做')
-    expect(p).toContain('1–4 个覆盖不同角度')
+    expect(p).toContain('1–6 个覆盖不同角度')
     expect(p).toContain('英文')
     expect(p).toContain('mode:"image"')
     expect(p).toContain('mode:"web"')
     expect(p).toContain('mode:"mixed"')
-    expect(p).toContain('默认 40')
-    expect(p).toContain('30–50')
+    expect(p).toContain('默认 100')
+    expect(p).toContain('100–120')
     expect(p).toContain('`readPage`')
     expect(p).toContain('贴截图')
     expect(p).toContain('用户勾选并发送后才进入参考')

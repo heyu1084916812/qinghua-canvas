@@ -300,7 +300,7 @@ describe('工具声明', () => {
       mode: 'image',
       urls: ['https://www.pinterest.com/pin/42/'],
       maxResults: 24,
-      imageMaxResults: 50,
+      imageMaxResults: 100,
     })
   })
 
@@ -544,6 +544,61 @@ describe('工具声明', () => {
       ok: false,
       problems: expect.arrayContaining([expect.stringContaining('等用户验收')]),
     })
+  })
+})
+
+describe('统一输出比例约束', () => {
+  it('★★ applyPlan 在落地前把用户明确要求的比例写到全部生成节点', async () => {
+    const { store, ctx } = setup()
+    const result = await executeConfirmedTool(
+      'applyPlan',
+      {
+        summary: '五张电商主图',
+        nodes: [
+          {
+            localId: 'a',
+            type: 'generation',
+            data: { prompt: '白底主图', ratio: '16:9' },
+            order: 0,
+          },
+          {
+            localId: 'b',
+            type: 'generation',
+            data: { prompt: '截面主图' },
+            order: 0,
+          },
+        ],
+        edges: [],
+      },
+      { ...ctx, uniformImageRatio: '1:1' },
+    )
+    expect(result).toMatchObject({ ok: true })
+    expect(
+      store
+        .getSnapshot()
+        .nodes.filter((node) => node.type === 'generation')
+        .map((node) => (node.data as { ratio?: string }).ratio),
+    ).toEqual(['1:1', '1:1'])
+  })
+
+  it('★★ runNode 在付费前拦住比例不一致，不调用执行器', async () => {
+    const { store, ctx, runNodes } = setup()
+    const id = addNode(
+      store,
+      'generation',
+      { prompt: '白底主图', ratio: '16:9' },
+      '白底主图',
+    )
+    const result = await executeConfirmedTool(
+      'runNode',
+      { nodeIds: [id] },
+      { ...ctx, uniformImageRatio: '1:1' },
+    )
+    expect(result).toMatchObject({
+      ok: false,
+      problems: [expect.stringContaining('本轮要求整组统一为 1:1')],
+    })
+    expect(runNodes).not.toHaveBeenCalled()
   })
 })
 
@@ -2135,5 +2190,84 @@ describe('★★ applyPlan：整套任务先定锚点（G4）', () => {
       ctx,
     )) as { ok: boolean }
     expect(r.ok).toBe(true)
+  })
+})
+
+describe('电商 Agent 硬门禁', () => {
+  const ecommercePlan = (edges: AgentPlan['edges']): AgentPlan => ({
+    summary: '淘宝月饼主图套图',
+    nodes: [
+      {
+        localId: 'hero',
+        type: 'generation',
+        title: '首屏 KV',
+        data: {
+          prompt: '月饼礼盒首屏，主标题：月满楼，副标题：双黄白莲蓉，黑体，文字居左',
+          ratio: '1:1',
+        },
+        order: 0,
+      },
+      {
+        localId: 'selling',
+        type: 'generation',
+        title: '卖点图',
+        data: {
+          prompt: '古法饼皮卖点图，主标题：108g 大月饼，卖点文案居右，金色副标题',
+          ratio: '1:1',
+        },
+        order: 1,
+      },
+    ],
+    edges,
+  })
+
+  it('★★ 共用首屏锚点后放行，无连线则退回', async () => {
+    const pass = setup()
+    const ok = (await executeConfirmedTool(
+      'applyPlan',
+      ecommercePlan([{ source: 'hero', target: 'selling' }]),
+      {
+        ...pass.ctx,
+        ecommerceArtDirection: true,
+        ecommerceTypographyRequired: true,
+      },
+    )) as { ok: boolean }
+    expect(ok.ok).toBe(true)
+
+    const reject = setup()
+    const bad = (await executeConfirmedTool(
+      'applyPlan',
+      ecommercePlan([]),
+      {
+        ...reject.ctx,
+        ecommerceArtDirection: true,
+        ecommerceTypographyRequired: true,
+      },
+    )) as { ok: boolean; problems?: string[] }
+    expect(bad.ok).toBe(false)
+    expect(bad.problems?.join(' ')).toContain('没有共同锚点')
+  })
+
+  it('★★ 显式参考分析失败时，applyPlan 与 runNode 都不执行', async () => {
+    const { store, ctx } = setup()
+    const before = store.getSnapshot().nodes.length
+    const planResult = (await executeConfirmedTool(
+      'applyPlan',
+      ecommercePlan([{ source: 'hero', target: 'selling' }]),
+      { ...ctx, referenceAnalysisBlockedIds: ['ref-1'] },
+    )) as { ok: boolean; problems?: string[] }
+    expect(planResult.ok).toBe(false)
+    expect(planResult.problems?.join(' ')).toContain('跳过参考分析继续')
+    expect(store.getSnapshot().nodes.length).toBe(before)
+
+    const runNodes = vi.fn(async () => [])
+    const runResult = (await executeConfirmedTool(
+      'runNode',
+      { nodeIds: ['node-1'] },
+      { ...ctx, runNodes, referenceAnalysisBlockedIds: ['ref-1'] },
+    )) as { ok: boolean; problems?: string[] }
+    expect(runResult.ok).toBe(false)
+    expect(runResult.problems?.join(' ')).toContain('不能开始生成')
+    expect(runNodes).not.toHaveBeenCalled()
   })
 })

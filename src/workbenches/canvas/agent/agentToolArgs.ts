@@ -86,12 +86,12 @@ export interface ResearchDesignArgs {
   imageMaxResults?: number
 }
 
-/** `researchDesign` 参数清洗：topic 必填；queries ≤4、urls ≤8、mode 明确；图片目标独立夹到 30–50。 */
+/** `researchDesign` 参数清洗：topic 必填；queries ≤6、urls ≤8、mode 明确；图片目标独立夹到 100–120。 */
 export function researchDesignArgsOf(a: Record<string, unknown>): ResearchDesignArgs | null {
   const topic = typeof a.topic === 'string' ? a.topic.trim() : ''
   if (!topic) return null
   const urls = stringList(a.urls).filter((url) => /^https?:\/\//i.test(url)).slice(0, 8)
-  const queries = stringList(a.queries).slice(0, 4)
+  const queries = stringList(a.queries).slice(0, 6)
   const mode = inferResearchMode({ mode: a.mode, topic, queries })
   const maxResults =
     typeof a.maxResults === 'number' && Number.isFinite(a.maxResults)
@@ -99,7 +99,7 @@ export function researchDesignArgsOf(a: Record<string, unknown>): ResearchDesign
       : undefined
   const imageMaxResults =
     typeof a.imageMaxResults === 'number' && Number.isFinite(a.imageMaxResults)
-      ? normalizeResearchImageResults(a.imageMaxResults)
+      ? Math.max(100, normalizeResearchImageResults(a.imageMaxResults))
       : undefined
   return {
     topic,

@@ -73,16 +73,19 @@ describe('parseQuestionCardArgs', () => {
 
 describe('问题卡兜底文案与回答整理', () => {
   it('正文只留一句引导，不复述题目与选项（2026-11-12 问题卡 UI）', () => {
-    expect(questionCardText('', [size, refs])).toBe(QUESTION_CARD_DEFAULT_LEAD)
+    expect(questionCardText('', [size])).toBe(QUESTION_CARD_DEFAULT_LEAD)
     expect(questionCardText('画布上还没有素材，开工前先定 2 件事。', [size, refs])).toBe(
-      '画布上还没有素材，开工前先定 2 件事。',
+      '开工前先确认 2 个关键点。',
     )
     const echoed = questionCardText(
       '先确认：\n1. 尺寸？（3:4 / 9:16）\n2. 参考图怎么用？\n在下方问题卡里选择或填写后提交，我再接着做。',
       [size, refs],
     )
-    expect(echoed).toBe('先确认：')
+    expect(echoed).toBe('开工前先确认 2 个关键点。')
     expect(echoed).not.toContain('3:4')
+    expect(
+      questionCardText('两件事定了我就能一次出五张。', [size, refs]),
+    ).toBe('开工前先确认 2 个关键点。')
   })
 
   it('投影守卫剥掉与卡片重复的编号清单、选项子行和提交提示，保留其他正文', () => {

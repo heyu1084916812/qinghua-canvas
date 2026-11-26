@@ -29,9 +29,9 @@ export type ResearchMode = 'image' | 'web' | 'mixed'
 
 export const DEFAULT_RESEARCH_MODE: ResearchMode = 'image'
 export const DEFAULT_RESEARCH_MAX_RESULTS = 12
-export const DEFAULT_RESEARCH_IMAGE_RESULTS = 40
+export const DEFAULT_RESEARCH_IMAGE_RESULTS = 100
 export const MIN_RESEARCH_IMAGE_RESULTS = 30
-export const MAX_RESEARCH_IMAGE_RESULTS = 50
+export const MAX_RESEARCH_IMAGE_RESULTS = 120
 export const MIN_RESEARCH_MAX_RESULTS = 1
 export const MAX_RESEARCH_MAX_RESULTS = 100
 export const MAX_RESEARCH_URLS = 8

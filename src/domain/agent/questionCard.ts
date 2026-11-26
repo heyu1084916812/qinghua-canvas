@@ -1,5 +1,5 @@
 import type { ChatMessage } from '../shared/execution/types'
-import { QUESTION_CARD_ANSWER_HEADER, stripQuestionCardEcho } from './questionCardReply'
+import { QUESTION_CARD_ANSWER_HEADER } from './questionCardReply'
 
 export {
   formatQuestionSkip,
@@ -125,16 +125,16 @@ export function questionCardTurn(
   }
 }
 
-export const QUESTION_CARD_DEFAULT_LEAD = '开工前先定几件事。'
+export const QUESTION_CARD_DEFAULT_LEAD = '开工前先确认 1 个关键点。'
 
 /**
  * 本回合结束时显示的正文：**只留一句引导**（用户 2026-11-12：正文把问题与选项又写一遍，和问题卡重复）。
  * 问题与选项只在问题卡里出现；工具结果里仍有完整题目，模型下一回合照样看得到。
  * intro 若被模型写成了题目清单，先按卡片题目剥掉（stripQuestionCardEcho）。
  */
-export function questionCardText(intro: string, questions: readonly AgentQuestion[]): string {
-  const lead = stripQuestionCardEcho(intro, questions).replace(/\s+/g, ' ').trim()
-  return lead || QUESTION_CARD_DEFAULT_LEAD
+export function questionCardText(_intro: string, questions: readonly AgentQuestion[]): string {
+  const count = Math.max(1, questions.length)
+  return `开工前先确认 ${count} 个关键点。`
 }
 
 /** 把问题卡的回答整理成一条用户消息。没答的题写「未回答」，让 Agent 自行按默认处理或再问。 */

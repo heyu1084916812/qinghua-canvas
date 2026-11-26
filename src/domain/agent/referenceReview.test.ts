@@ -213,3 +213,42 @@ describe('G9：用户回答写回', () => {
     expect(prompt).not.toContain('askQuestions')
   })
 })
+
+describe('显式参考分析阻塞状态', () => {
+  it('失败后保留 blockedIds；用户跳过时清阻塞并记住 skippedIds', () => {
+    const previous = {
+      analyzedIds: [],
+      pendingIds: [],
+      blockedIds: ['ref-1'],
+    }
+    const skipped = nextReferenceReview(previous, {
+      attemptedIds: [],
+      ambiguousIds: [],
+      blockedIds: [],
+      skippedIds: ['ref-1'],
+    })
+    expect(skipped.blockedIds).toBeUndefined()
+    expect(skipped.skippedIds).toEqual(['ref-1'])
+
+    const retried = nextReferenceReview(skipped, {
+      attemptedIds: ['ref-1'],
+      ambiguousIds: [],
+    })
+    expect(retried.skippedIds).toBeUndefined()
+    expect(retried.analyzedIds).toEqual(['ref-1'])
+  })
+
+  it('normalize 保留 blockedIds / skippedIds', () => {
+    expect(normalizeReferenceReview({
+      analyzedIds: [],
+      pendingIds: [],
+      blockedIds: ['a'],
+      skippedIds: ['b'],
+    })).toEqual({
+      analyzedIds: [],
+      pendingIds: [],
+      blockedIds: ['a'],
+      skippedIds: ['b'],
+    })
+  })
+})

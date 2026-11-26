@@ -29,7 +29,7 @@ export interface DesignResearchRunnerInput {
   imageMaxResults?: number
   /** Clipper 等单页抓取只读用户给出的 URL，不额外做开放图片/百科搜索。 */
   includeOpenSearch?: boolean
-  /** 模型给出的 1–4 个检索角度（可含英文）；缺省时用 topic。 */
+  /** 模型给出的 1–6 个检索角度（可含英文）；缺省时用 topic。 */
   queries?: readonly string[]
 }
 
@@ -59,6 +59,8 @@ export interface DesignResearchResult extends DesignResearchReport {
    * 「Pinterest 需要登录 / The Dieline 被验证挡住」。网页模式或没联网搜索时缺省。
    */
   siteStatuses?: DesignResearchSiteStatus[]
+  /** 实际发给检索通道的关键词，便于结果卡与模型解释“搜了什么”。 */
+  searchQueries?: string[]
 }
 
 export interface DesignResearchSiteStatus {
@@ -69,15 +71,45 @@ export interface DesignResearchSiteStatus {
   note?: string
 }
 
-/** 规范化检索角度：去空、去重、最多 4 个；没有就用主题本身。 */
-export function researchQueriesOf(topic: string, queries?: readonly string[]): string[] {
+const ECOMMERCE_RESEARCH_INTENT =
+  /电商|淘宝|天猫|京东|拼多多|抖音商城|亚马逊|主图|套图|详情页|白底图|卖点图|商品图|产品图/i
+
+function addQuery(out: string[], value: string): void {
+  const query = value.replace(/\s+/g, ' ').trim().slice(0, 200)
+  if (!query || out.includes(query)) return
+  out.push(query)
+}
+
+/**
+ * 规范化检索角度：去空、去重、最多 6 个；没有就用主题本身。
+ *
+ * 电商图片任务不能只沿用模型临时写的泛词。这里确定性地补中文平台、主图排版、
+ * 套图锚点和详情页角度，让“为什么搜偏了”能从实际检索词直接复核。
+ */
+export function researchQueriesOf(
+  topic: string,
+  queries?: readonly string[],
+  mode: ResearchMode = 'image',
+): string[] {
   const out: string[] = []
   for (const raw of queries ?? []) {
-    const query = raw.replace(/\s+/g, ' ').trim().slice(0, 200)
-    if (query && !out.includes(query)) out.push(query)
-    if (out.length >= 4) break
+    addQuery(out, raw)
+    if (out.length >= 6) break
   }
-  return out.length > 0 ? out : [topic.trim()].filter(Boolean)
+  const cleanTopic = topic.replace(/\s+/g, ' ').trim()
+  const intentText = [cleanTopic, ...(queries ?? [])].join(' ')
+  if (mode !== 'web' && ECOMMERCE_RESEARCH_INTENT.test(intentText)) {
+    for (const query of [
+      `${cleanTopic} 电商主图 排版 文案`,
+      `${cleanTopic} 淘宝 京东 商品图 主图`,
+      `${cleanTopic} 详情页 卖点 视觉`,
+      `${cleanTopic} ecommerce product image layout typography`,
+    ]) {
+      addQuery(out, query)
+      if (out.length >= 6) break
+    }
+  }
+  return out.length > 0 ? out : [cleanTopic].filter(Boolean)
 }
 
 function providerOf(url: string): ResearchProvider {
@@ -202,11 +234,12 @@ export async function runDesignResearch(
   let needsTavilyKey = false
   let usedSources: string[] = []
   let siteStatuses: DesignResearchSiteStatus[] = []
+  const searchQueries = researchQueriesOf(request.topic, input.queries, request.mode)
   if (input.includeOpenSearch !== false) {
     const web = await searchFixedDesignSites(
       deps,
       {
-        queries: researchQueriesOf(request.topic, input.queries),
+        queries: searchQueries,
         maxResults: request.maxResults,
         mode: request.mode,
         imageMaxResults: request.imageMaxResults,
@@ -285,6 +318,7 @@ export async function runDesignResearch(
     warnings,
     ...(usedSources.length > 0 ? { usedSources } : {}),
     ...(siteStatuses.length > 0 ? { siteStatuses } : {}),
+    ...(searchQueries.length > 0 ? { searchQueries } : {}),
     ...(needsTavilyKey
       ? {
           needsTavilyKey: true,

@@ -49,7 +49,6 @@ import {
   classifyAgentRequest,
   imageNodeIdsAmong,
   promptProfileForMode,
-  resolveAgentSkillsForTurn,
   summaryForAgentRequest,
   type AgentPromptProfile,
   type AgentRequestMode,
@@ -96,6 +95,7 @@ import {
   withSeriesStage,
 } from '../../../../domain/agent/seriesOrchestration'
 import { referenceReviewPrompt } from '../../../../domain/agent/referenceReview'
+import { chooseAgentSkillsForTurn } from '../../agent/agentSkillSelection'
 import { reviewTurnReferences } from './agentTurnReferenceReview'
 import { classifyAgentGenerationFlow } from '../../agent/agentGenerationFlow'
 
@@ -380,6 +380,15 @@ export async function prepareAgentTurnRequest(
   })
   const taskKey = referenceTaskKey(stagedTask)
   const referenceIds = stagedTask.referenceIds
+  const compactPlainText = plainText.replace(/\s+/g, '')
+  const skipReferenceAnalysis =
+    /跳过.{0,8}(?:参考|素材)|不用.{0,8}(?:分析|参考)|按原图(?:继续|做)|直接继续/.test(
+      compactPlainText,
+    )
+  const retryReferenceAnalysis =
+    /重新.{0,8}(?:分析|解析).{0,8}(?:参考|素材)|重试.{0,8}(?:参考|素材).{0,8}分析/.test(
+      compactPlainText,
+    )
   await input.sessions.updateFields?.(input.session.id, { agentTask: stagedTask })
     .catch(() => null)
   // G5：显式参考 + 侧栏无用法的图先自动分析，拿不准分工的才进问题卡（agentTurnReferenceReview.ts）。
@@ -392,6 +401,8 @@ export async function prepareAgentTurnRequest(
     requestMode,
     internalControl: input.internalControl === true,
     answersQuestionCard,
+    skipReferenceAnalysis,
+    retryReferenceAnalysis,
     ...(answersQuestionCard && previousQuestionCard
       ? { questionCard: previousQuestionCard.questions }
       : {}),
@@ -427,7 +438,9 @@ export async function prepareAgentTurnRequest(
   const autoCurationWarnings = referenceReview.warnings
   if (referenceReview.failedCount > 0) {
     input.notifyContextError(
-      `有 ${referenceReview.failedCount} 条参考没有完成自动分析，已按显式 chip 继续。`,
+      referenceReview.blockedIds.length > 0
+        ? `有 ${referenceReview.blockedIds.length} 条显式参考没有完成自动分析，已暂停创建与生成。请重试，或回复「跳过参考分析继续」。`
+        : `有 ${referenceReview.failedCount} 条参考没有完成自动分析；本轮没有可安全沿用的显式参考。`,
     )
   }
   if (input.signal.aborted) {
@@ -728,20 +741,22 @@ export async function prepareAgentTurnRequest(
   const skillChipIds = rawMentions
     .filter((mention) => mention.kind === 'skill')
     .map((mention) => mention.id)
-  const turnSkills = resolveAgentSkillsForTurn(
-    skillChipIds,
-    input.session.skillId,
-  )
-    .map((id) => input.skills.find((item) => item.id === id))
-    .filter((item): item is Skill => item !== undefined)
+  const turnSkills = chooseAgentSkillsForTurn({
+    skills: input.skills,
+    text: plainText,
+    chipIds: skillChipIds,
+    selectedSkillId: input.session.skillId,
+    requestMode,
+  })
   const skill = turnSkills[0]
   if (contextTrace && skill) {
+    const autoMatched = skillChipIds.length === 0
     contextTrace.skillPhaseEvent = {
       phase: 'skillLoaded',
-      title: '技能加载完成',
+      title: autoMatched ? '已自动匹配技能' : '技能加载完成',
       detail: turnSkills.length > 1
-        ? `已加载 ${turnSkills.length} 个技能：${turnSkills.map((item) => `「${item.name}」`).join('、')}。`
-        : `已加载技能「${skill.name}」。`,
+        ? `${autoMatched ? '已从技能库匹配' : '已加载'} ${turnSkills.length} 个技能：${turnSkills.map((item) => `「${item.name}」`).join('、')}。`
+        : `${autoMatched ? '已从技能库匹配' : '已加载'}技能「${skill.name}」。`,
       evidence: turnSkills.map((item) => item.id),
     }
   }
@@ -843,6 +858,18 @@ export async function prepareAgentTurnRequest(
       assetIds: sentAssetIds,
       ...(skill
         ? { skill: { name: skill.name, content: skill.content } }
+        : {}),
+      ...(agentTask.uniformImageRatio
+        ? { uniformImageRatio: agentTask.uniformImageRatio }
+        : {}),
+      ...(agentTask.ecommerceArtDirection
+        ? { ecommerceArtDirection: true }
+        : {}),
+      ...(agentTask.ecommerceTypographyRequired
+        ? { ecommerceTypographyRequired: true }
+        : {}),
+      ...(agentTask.referenceReview?.blockedIds?.length
+        ? { referenceAnalysisBlocked: agentTask.referenceReview.blockedIds }
         : {}),
       ...(turnSkills.length > 1
         ? { skills: turnSkills.map((item) => ({ name: item.name, content: item.content })) }

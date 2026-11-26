@@ -86,7 +86,7 @@ export const AGENT_TOOLS: readonly ToolDeclaration[] = [
       '**用户说「找/搜/查」设计、灵感、参考、案例时，直接调用此工具，不要先发问题卡询问偏好。** ' +
       '必须按用户意图选择 mode：找图片、照片、海报、风格参考、灵感或 Moodboard 用 image（缺省也是 image）；' +
       '只要网页资料、文章、报告、新闻或公开来源用 web；既要参考图又要网页资料用 mixed。' +
-      'image 模式使用独立的 imageMaxResults 目标（默认 40，允许 30–50），不占用 maxResults 的网页条数。' +
+      'image 模式使用独立的 imageMaxResults 目标（默认 100，允许 100–120），不占用 maxResults 的网页条数。' +
       '也可从用户提供的公开网页、Pinterest Pin / Board 或 Behance 页面提取参考图与出处（要读正文请用 readPage）。' +
       '只读取公开页面，不使用任何账号 Cookie，不声称完成私密内容或无限制全站搜索。' +
       '搜索结果只是候选，不会自动加入项目参考、也不会喂给生图；保留原链接与来源。' +
@@ -107,10 +107,10 @@ export const AGENT_TOOLS: readonly ToolDeclaration[] = [
         queries: {
           type: 'array',
           minItems: 1,
-          maxItems: 4,
+          maxItems: 6,
           items: { type: 'string' },
           description:
-            '1–4 个覆盖不同角度的检索词（如品牌现状、风格趋势、同类案例、配色字体）。' +
+            '1–6 个覆盖不同角度的检索词（如品牌现状、风格趋势、同类案例、配色字体）。' +
             '主题有国际性时至少写一条英文检索词。省略时只用 topic 搜一次。',
         },
         urls: {
@@ -128,10 +128,10 @@ export const AGENT_TOOLS: readonly ToolDeclaration[] = [
         },
         imageMaxResults: {
           type: 'integer',
-          minimum: 30,
-          maximum: 50,
+          minimum: 100,
+          maximum: 120,
           description:
-            'image / mixed 模式的独立图片目标，默认 40；图片候选会合并各角度与网页首图并按原图去重。',
+            'image / mixed 模式的独立图片目标，默认 100；图片候选会合并各角度与网页首图并按原图去重。',
         },
       },
       required: ['topic'],
@@ -392,7 +392,7 @@ export const AGENT_TOOLS: readonly ToolDeclaration[] = [
     parameters: {
       type: 'object',
       properties: {
-        intro: { type: 'string', description: '可选：一句短引导（如「开工前先定几件事」）；不要在这里或正文里列题目与选项' },
+        intro: { type: 'string', description: '可选内部备注；用户可见引导由界面按真实题数生成。不要写题数、选项或执行数量承诺。' },
         questions: {
           type: 'array',
           minItems: 1,

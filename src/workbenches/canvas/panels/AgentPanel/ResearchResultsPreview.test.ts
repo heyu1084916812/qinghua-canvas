@@ -99,6 +99,45 @@ describe('ResearchResultsPreview', () => {
     ).toBeTruthy()
   })
 
+  it('shows target, actual, query terms and per-site failure reasons', () => {
+    let renderer!: TestRenderer.ReactTestRenderer
+    act(() => {
+      renderer = TestRenderer.create(
+        createElement(ResearchResultsPreview, {
+          researchMode: 'image',
+          items: [{
+            id: 'image:1',
+            title: '主图参考',
+            url: 'https://www.huaban.com/pins/1',
+            imageUrl: 'https://cdn.example.com/main.jpg',
+            source: '花瓣',
+          }],
+          researchStatus: {
+            target: 100,
+            actual: 42,
+            queries: ['月饼礼盒 电商主图 排版 文案'],
+            siteStatuses: [
+              { site: '花瓣', status: 'ok', itemCount: 30 },
+              { site: 'Pinterest', status: 'needs-login', itemCount: 0, note: '需要登录一次' },
+              { site: '站酷', status: 'empty', itemCount: 0 },
+            ],
+          },
+        }),
+      )
+    })
+    const status = renderer.root.findByProps({ 'data-agent-research-status': true })
+    expect(status.findAllByType('strong')[0]?.children.join('')).toContain('目标 100 张 · 实收 42 张')
+    expect(status.findAll((node) => node.children.includes('月饼礼盒 电商主图 排版 文案')).length)
+      .toBeGreaterThan(0)
+    expect(status.findAll((node) => node.children.includes('需要登录一次')).length)
+      .toBeGreaterThan(0)
+    expect(
+      renderer.root.findAll((node) =>
+        String(node.props['data-agent-research-site-status'] ?? '').length > 0,
+      ),
+    ).toHaveLength(3)
+  })
+
   it('web and mixed modes keep the web-source entry', () => {
     for (const researchMode of ['web', 'mixed'] as const) {
       let renderer!: TestRenderer.ReactTestRenderer

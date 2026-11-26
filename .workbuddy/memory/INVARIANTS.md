@@ -882,9 +882,9 @@
   达到自动执行上限时转检查点，不显示新的付费确认卡。
 - **计划一次只推进一步**：`done` 不自动启动下一步；跨步骤启动、未开始就完成都必须拒绝。
   旧坏顺序读回时收回后续 pending，进度卡不得同时出现多个进行中。
-- **结果待验收是硬门禁**：`runNode / runFrom` 成功后当前步骤写 `resultsReadyAt`；
-  未写 `reviewApprovedAt` 前禁止 `applyPlan / runNode / runFrom` 进入下一阶段。
-  验收确认必须带 `stepId` 且 `purpose=review`。
+- **结果待验收是硬门禁**：`runNode / runFrom` 成功后当前步骤写 `resultsReadyAt`；未写 `reviewApprovedAt` 前禁止
+  `applyPlan / runNode / runFrom` 进入下一阶段。计划卡必须由 `resultsReadyAt` 直接显示 sticky“正在等你验收”，
+  不能等模型补发确认。用户明确要求整组统一比例时，`applyPlan` 前写入全部新建图片生成节点，`runNode / runFrom` 前再校验。
 - **验收默认关闭，只有显式 true 才开启**：旧计划缺少 `requiresConfirmation` 时不得
   默认要求验收。用户确认 review 时允许同时补写 `resultsReadyAt` 与
   `reviewApprovedAt`，避免非生成步骤因缺少产出时间而永久卡住。

@@ -63,11 +63,14 @@ describe('G-R1 image research projection', () => {
     expect(body.usedSources).toEqual(['花瓣', '站酷', 'Dribbble'])
     expect(body.skippedSites).toEqual([
       'Pinterest需要登录后才能检索（可在画布浏览器里登录一次）',
+      'Packaging of the World没有找到相关结果',
       'The Dieline弹出了人机验证，这次没有通过',
     ])
     expect(String(body.summary)).toBe(
       '已找到 12 张参考图（来自 花瓣、站酷、Dribbble），已作为「查看图片搜索结果」卡片展示给用户。' +
-      '这次没搜成：Pinterest需要登录后才能检索（可在画布浏览器里登录一次）；The Dieline弹出了人机验证，这次没有通过。',
+        '这次没搜成：Pinterest需要登录后才能检索（可在画布浏览器里登录一次）；' +
+        'Packaging of the World没有找到相关结果；' +
+        'The Dieline弹出了人机验证，这次没有通过。',
     )
   })
 

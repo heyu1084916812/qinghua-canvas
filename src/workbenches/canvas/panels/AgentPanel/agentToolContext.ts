@@ -36,6 +36,14 @@ export interface AgentToolBase {
   abortSignal?: AbortSignal
   /** false 时**不出** `perImage` 键。 */
   perImage: boolean
+  /** 用户明确要求整组图片统一使用的比例；没有时不出键。 */
+  uniformImageRatio?: string
+  /** 电商图片交付：计划必须共享锚点并保留电商版式。 */
+  ecommerceArtDirection?: boolean
+  /** 用户明确要求文字排版。 */
+  ecommerceTypographyRequired?: boolean
+  /** 显式参考分析失败；存在时不出写画布 / 生成工具。 */
+  referenceAnalysisBlockedIds?: readonly string[]
 }
 
 export interface ComposeAgentToolContextInput {
@@ -78,6 +86,18 @@ export function composeAgentToolContext(
     selectedModelOf: base.selectedModelOf,
     ...(base.abortSignal ? { signal: base.abortSignal } : {}),
     ...(base.perImage ? { perImage: true } : {}),
+    ...(base.uniformImageRatio
+      ? { uniformImageRatio: base.uniformImageRatio }
+      : {}),
+    ...(base.ecommerceArtDirection
+      ? { ecommerceArtDirection: true }
+      : {}),
+    ...(base.ecommerceTypographyRequired
+      ? { ecommerceTypographyRequired: true }
+      : {}),
+    ...(base.referenceAnalysisBlockedIds?.length
+      ? { referenceAnalysisBlockedIds: base.referenceAnalysisBlockedIds }
+      : {}),
     resolveNodeIds: (ids) => {
       const aliases = input.resolveAliases()
       return ids.map((id) => aliases?.get(id) ?? id)

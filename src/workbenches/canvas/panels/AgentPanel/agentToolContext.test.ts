@@ -29,7 +29,15 @@ const ALWAYS_KEYS = [
   'viewportWorld',
 ]
 
-const CONDITIONAL_KEYS = ['perImage', 'signal', 'taskPlan']
+const CONDITIONAL_KEYS = [
+  'ecommerceArtDirection',
+  'ecommerceTypographyRequired',
+  'perImage',
+  'referenceAnalysisBlockedIds',
+  'signal',
+  'taskPlan',
+  'uniformImageRatio',
+]
 
 function harness(
   over: Partial<AgentToolBase> = {},
@@ -100,15 +108,20 @@ function harness(
 }
 
 describe('composeAgentToolContext / 键集合', () => {
-  it('23 个键一个不多一个不少（条件键全开）', () => {
-    const { ctx } = harness()
+  it('27 个键一个不多一个不少（条件键全开）', () => {
+    const { ctx } = harness({
+      uniformImageRatio: '1:1',
+      ecommerceArtDirection: true,
+      ecommerceTypographyRequired: true,
+      referenceAnalysisBlockedIds: ['ref-1'],
+    })
 
     expect(Object.keys(ctx).sort()).toEqual(
       [...ALWAYS_KEYS, ...CONDITIONAL_KEYS].sort(),
     )
   })
 
-  it('条件都不成立时只剩 19 个键，三个条件键连键都不存在', () => {
+  it('条件都不成立时只剩 20 个键，所有条件键连键都不存在', () => {
     const { ctx } = harness(
       {
         sessionId: '',
@@ -122,6 +135,10 @@ describe('composeAgentToolContext / 键集合', () => {
     expect('taskPlan' in ctx).toBe(false)
     expect('signal' in ctx).toBe(false)
     expect('perImage' in ctx).toBe(false)
+    expect('uniformImageRatio' in ctx).toBe(false)
+    expect('ecommerceArtDirection' in ctx).toBe(false)
+    expect('ecommerceTypographyRequired' in ctx).toBe(false)
+    expect('referenceAnalysisBlockedIds' in ctx).toBe(false)
   })
 })
 
@@ -182,6 +199,19 @@ describe('composeAgentToolContext / 条件键存在性', () => {
     const { ctx } = harness({ perImage: true })
 
     expect(ctx.perImage).toBe(true)
+  })
+
+  it('统一比例只在明确存在时出键', () => {
+    expect(harness().ctx).not.toHaveProperty('uniformImageRatio')
+    expect(harness({ uniformImageRatio: '1:1' }).ctx.uniformImageRatio).toBe('1:1')
+  })
+
+  it('电商与参考阻塞标记只在明确存在时出键', () => {
+    expect(harness().ctx).not.toHaveProperty('ecommerceArtDirection')
+    expect(harness({ ecommerceArtDirection: true }).ctx.ecommerceArtDirection).toBe(true)
+    expect(harness({ ecommerceTypographyRequired: true }).ctx.ecommerceTypographyRequired).toBe(true)
+    expect(harness({ referenceAnalysisBlockedIds: ['ref-1'] }).ctx.referenceAnalysisBlockedIds)
+      .toEqual(['ref-1'])
   })
 })
 

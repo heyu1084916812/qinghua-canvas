@@ -32,6 +32,10 @@ export function TaskPlanCard({
   const [expanded, setExpanded] = useState(true)
   const progress = agentTaskPlanProgress(plan)
   const completed = progress.status === 'completed'
+  const awaitingReview =
+    progress.current?.status === 'in_progress' &&
+    Boolean(progress.current.resultsReadyAt) &&
+    !progress.current.reviewApprovedAt
   return (
     <section
       className={styles.plan}
@@ -58,6 +62,8 @@ export function TaskPlanCard({
           <span className={styles.kicker}>
             {completed
               ? '本次创作已完成'
+              : awaitingReview
+                ? `执行计划 · 等待你验收：${progress.current?.title ?? ''}`
               : progress.current
                 ? `执行计划 · 当前：${progress.current.title}`
                 : '等待下一步开始'}
@@ -87,6 +93,29 @@ export function TaskPlanCard({
         />
       </div>
 
+      {awaitingReview ? (
+        <div className={styles.reviewPrompt} data-agent-task-review>
+          <div className={styles.reviewCopy}>
+            <span className={styles.reviewTitle}>结果已生成，正在等你验收</span>
+            <span className={styles.reviewHint}>
+              验收通过后才会进入下一步；需要修改就直接在下方输入要求。
+            </span>
+          </div>
+          {onAdvanceToNext ? (
+            <button
+              type="button"
+              className={styles.advanceButton}
+              disabled={advancing}
+              onClick={onAdvanceToNext}
+              data-agent-task-plan-next
+            >
+              <span>{advancing ? '正在确认验收' : '验收通过，继续'}</span>
+              <IconChevronDown size={14} className={styles.advanceIcon} />
+            </button>
+          ) : null}
+        </div>
+      ) : null}
+
       {expanded && (
         <ol className={styles.steps}>
           {plan.steps.map((step, index) => (
@@ -105,24 +134,6 @@ export function TaskPlanCard({
           ))}
         </ol>
       )}
-      {onAdvanceToNext &&
-      progress.status === 'active' &&
-      progress.current &&
-      (Boolean(progress.current.resultsReadyAt) ||
-        pendingConfirmationStepId === progress.current.id) ? (
-        <div className={styles.actions}>
-          <button
-            type="button"
-            className={styles.advanceButton}
-            disabled={advancing}
-            onClick={onAdvanceToNext}
-            data-agent-task-plan-next
-          >
-            <span>{advancing ? '正在进入下一步' : '直接下一步'}</span>
-            <IconChevronDown size={14} className={styles.advanceIcon} />
-          </button>
-        </div>
-      ) : null}
     </section>
   )
 }
@@ -196,7 +207,7 @@ function StepRow({
           {awaitingConfirmation
             ? '等待确认'
             : awaitingReview
-              ? '结果待验收'
+              ? '待你验收'
             : step.status === 'done'
               ? '已完成'
               : step.status === 'failed'
@@ -224,7 +235,7 @@ function StepRow({
       {awaitingConfirmation ? (
         <span className={styles.confirmTag}>等待你确认</span>
       ) : awaitingReview ? (
-        <span className={styles.confirmTag}>结果待验收</span>
+        <span className={styles.confirmTag}>待你验收</span>
       ) : current && step.requiresConfirmation && !done ? (
         <span className={styles.softTag}>完成需验收</span>
       ) : null}

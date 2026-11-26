@@ -25,6 +25,10 @@ export interface ReferenceReviewState {
   analyzedIds: string[]
   /** 本任务里判定有歧义、等待问题卡回答的参考。 */
   pendingIds: string[]
+  /** 显式参考自动分析失败、尚未由用户选择重试或跳过的参考。 */
+  blockedIds?: string[]
+  /** 用户明确选择跳过自动分析、同任务后续不再自动重试的参考。 */
+  skippedIds?: string[]
   /**
    * G9 回退：用户回答了、但按回答重写用法的分析失败的参考（itemId → 用户原话）。
    * 同任务每回合作为最高优先级约束提示给模型，不再追问。
@@ -116,15 +120,43 @@ export function nextReferenceReview(
     /** 本回合用户回答但重写失败的参考（原话）；重写成功的应从 answers 里去掉（confirmedIds）。 */
     fallbackAnswers?: Readonly<Record<string, string>>
     confirmedIds?: readonly string[]
+    /** 本回合显式参考分析失败，应阻止建流程 / 生成。 */
+    blockedIds?: readonly string[]
+    /** 用户明确跳过自动分析的参考。 */
+    skippedIds?: readonly string[]
   },
 ): ReferenceReviewState {
   const base = previous ?? emptyReferenceReview()
   const resolved = new Set(update.resolvedIds ?? [])
+  const skippedNow = new Set(update.skippedIds ?? [])
   const answers: Record<string, string> = { ...(base.answers ?? {}), ...(update.fallbackAnswers ?? {}) }
   for (const id of update.confirmedIds ?? []) delete answers[id]
+  const attempted = new Set(update.attemptedIds)
   return {
     analyzedIds: unique([...base.analyzedIds, ...update.attemptedIds]),
     pendingIds: unique([...base.pendingIds, ...update.ambiguousIds]).filter((id) => !resolved.has(id)),
+    ...(unique([
+      ...(base.blockedIds ?? []),
+      ...(update.blockedIds ?? []),
+    ]).filter((id) => !resolved.has(id) && !attempted.has(id) && !skippedNow.has(id)).length > 0
+      ? {
+          blockedIds: unique([
+            ...(base.blockedIds ?? []),
+            ...(update.blockedIds ?? []),
+          ]).filter((id) => !resolved.has(id) && !attempted.has(id) && !skippedNow.has(id)),
+        }
+      : {}),
+    ...(unique([
+      ...(base.skippedIds ?? []),
+      ...(update.skippedIds ?? []),
+    ]).filter((id) => !resolved.has(id) && !attempted.has(id)).length > 0
+      ? {
+          skippedIds: unique([
+            ...(base.skippedIds ?? []),
+            ...(update.skippedIds ?? []),
+          ]).filter((id) => !resolved.has(id) && !attempted.has(id)),
+        }
+      : {}),
     ...(Object.keys(answers).length > 0 ? { answers } : {}),
   }
 }
@@ -162,9 +194,17 @@ export function normalizeReferenceReview(value: unknown): ReferenceReviewState |
   const review: ReferenceReviewState = {
     analyzedIds: ids(row.analyzedIds),
     pendingIds: ids(row.pendingIds),
+    ...(ids(row.blockedIds).length > 0 ? { blockedIds: ids(row.blockedIds) } : {}),
+    ...(ids(row.skippedIds).length > 0 ? { skippedIds: ids(row.skippedIds) } : {}),
     ...(Object.keys(answers).length > 0 ? { answers } : {}),
   }
-  return review.analyzedIds.length > 0 || review.pendingIds.length > 0 || review.answers ? review : undefined
+  return review.analyzedIds.length > 0 ||
+    review.pendingIds.length > 0 ||
+    review.blockedIds ||
+    review.skippedIds ||
+    review.answers
+    ? review
+    : undefined
 }
 
 /**

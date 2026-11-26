@@ -540,8 +540,26 @@ describe('runDesignResearch', () => {
 })
 
 describe('researchQueriesOf', () => {
-  it('dedupes, trims and caps angles at four, falling back to the topic', () => {
-    expect(researchQueriesOf('主题', [' a ', 'a', 'b', '', 'c', 'd', 'e'])).toEqual(['a', 'b', 'c', 'd'])
+  it('dedupes, trims and caps angles at six, falling back to the topic', () => {
+    expect(researchQueriesOf('主题', [' a ', 'a', 'b', '', 'c', 'd', 'e', 'f', 'g'])).toEqual([
+      'a',
+      'b',
+      'c',
+      'd',
+      'e',
+      'f',
+    ])
     expect(researchQueriesOf(' 主题 ')).toEqual(['主题'])
+  })
+
+  it('电商图片任务确定性地补充主图、详情页、排版和英文角度', () => {
+    const queries = researchQueriesOf('月饼礼盒', ['淘宝电商主图视觉'], 'image')
+    expect(queries[0]).toBe('淘宝电商主图视觉')
+    expect(queries).toEqual(expect.arrayContaining([
+      '月饼礼盒 电商主图 排版 文案',
+      '月饼礼盒 淘宝 京东 商品图 主图',
+      '月饼礼盒 详情页 卖点 视觉',
+    ]))
+    expect(queries.some((query) => /ecommerce product image/i.test(query))).toBe(true)
   })
 })

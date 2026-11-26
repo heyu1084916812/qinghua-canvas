@@ -152,6 +152,50 @@ describe('reviewTurnReferences（G5 修订：先分析，拿不准才问）', ()
     expect(result.pendingIds).toEqual(['cup', 'mood'])
   })
 
+  it('★★ 显式参考分析失败会阻塞，且失败项不记成“已分析”以便重试', async () => {
+    const curate = vi.fn(async (): Promise<ReferenceCurationResult> => ({
+      ...curation([]),
+      ok: false,
+      failed: [{ itemId: 'a', title: 'a.jpg', reason: '视觉模型不可用' }],
+    }))
+    const result = await reviewTurnReferences(input({
+      curate,
+      task: task({ referenceIds: ['a'] }),
+      selectForTask: async () => selection([]),
+    }))
+    expect(result.blockedIds).toEqual(['a'])
+    expect(result.task.referenceReview?.blockedIds).toEqual(['a'])
+    expect(result.task.referenceReview?.analyzedIds).not.toContain('a')
+  })
+
+  it('★★ 用户明确跳过参考分析后不再调用分析，并跨回合记住跳过项', async () => {
+    const curate = vi.fn(async () => curation([]))
+    const skipped = await reviewTurnReferences(input({
+      curate,
+      task: task({
+        referenceIds: ['a'],
+        referenceReview: {
+          analyzedIds: [],
+          pendingIds: [],
+          blockedIds: ['a'],
+        },
+      }),
+      selectForTask: async () => selection([]),
+      skipReferenceAnalysis: true,
+    }))
+    expect(curate).not.toHaveBeenCalled()
+    expect(skipped.blockedIds).toEqual([])
+    expect(skipped.task.referenceReview?.blockedIds).toBeUndefined()
+    expect(skipped.task.referenceReview?.skippedIds).toEqual(['a'])
+
+    await reviewTurnReferences(input({
+      curate,
+      task: skipped.task,
+      selectForTask: async () => selection([]),
+    }))
+    expect(curate).not.toHaveBeenCalled()
+  })
+
   it('G9：回答问题卡 → 按 referenceItemId 把回答交给参考分析重写，写回后移出待确认', async () => {
     const curate = vi.fn(async () => curation([{ itemId: 'cup', usage: 'subject', confirmedByUser: true }]))
     const questions = [

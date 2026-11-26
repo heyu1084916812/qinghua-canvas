@@ -47393,6 +47393,7 @@ async function g1205(browser) {
               ? '先检查主体、留白与包装结构，再交给你验收。'
               : undefined,
           status: index === 0 ? 'done' : index === 1 ? 'in_progress' : 'pending',
+          ...(index === 1 ? { resultsReadyAt: now + 2 } : {}),
           ...(index >= 1 ? { requiresConfirmation: true } : {}),
         })),
         currentStepId: 'step-2',
@@ -47427,6 +47428,55 @@ async function g1205(browser) {
             limitations: [],
           }),
         },
+        {
+          role: 'user',
+          content: '再找 100 张淘宝电商主图参考。',
+          createdAt: now + 3,
+        },
+        {
+          role: 'assistant',
+          content: '',
+          createdAt: now + 4,
+          toolCalls: [{ id: 'research-g1205', name: 'researchDesign', args: '{}' }],
+        },
+        {
+          role: 'tool',
+          toolCallId: 'research-g1205',
+          toolName: 'researchDesign',
+          content: JSON.stringify({
+            ok: true,
+            mode: 'image',
+            request: { mode: 'image', imageMaxResults: 100, maxResults: 12 },
+            searchQueries: ['月饼礼盒 电商主图 排版 文案', '淘宝 京东 商品图 主图'],
+            items: [
+              {
+                id: 'r1',
+                title: '电商主图参考 1',
+                url: 'https://www.huaban.com/pins/1',
+                imageUrl: 'https://cdn.example.com/r1.jpg',
+                source: '花瓣',
+              },
+              {
+                id: 'r2',
+                title: '电商主图参考 2',
+                url: 'https://www.zcool.com.cn/work/2',
+                imageUrl: 'https://cdn.example.com/r2.jpg',
+                source: '站酷',
+              },
+            ],
+            usedSources: ['花瓣', '站酷'],
+            siteStatuses: [
+              { site: '花瓣', status: 'ok', itemCount: 48 },
+              { site: 'Pinterest', status: 'needs-login', itemCount: 0, note: '需要登录一次' },
+            ],
+          }),
+        },
+        {
+          role: 'assistant',
+          content: '',
+          createdAt: now + 5,
+          toolCalls: [{ id: 'run-g1205', name: 'runNode', args: '{"nodeIds":["n1"]}' }],
+        },
       ],
       createdAt: now,
       updatedAt: now,
@@ -47442,6 +47492,11 @@ async function g1205(browser) {
     await page
       .locator(`[data-agent-task-plan="${planId}"]`)
       .waitFor({ state: 'visible', timeout: 10000 })
+    await page.evaluate(() => {
+      document.querySelector('[data-agent-task-plan-dock]')
+        ?.scrollIntoView({ block: 'start' })
+    })
+    await sleep(120)
 
     const currentText = await page
       .locator('[data-agent-task-step="step-2"]')
@@ -47449,13 +47504,36 @@ async function g1205(browser) {
     const futureText = await page
       .locator('[data-agent-task-step="step-3"]')
       .innerText()
+    const reviewVisibility = await page.evaluate(() => {
+      const review = document
+        .querySelector('[data-agent-task-review]')
+        ?.getBoundingClientRect()
+      const panel = document
+        .querySelector('[data-agent-panel]')
+        ?.getBoundingClientRect()
+      return {
+        visible:
+          !!review &&
+          !!panel &&
+          review.top >= panel.top - 1 &&
+          review.bottom <= panel.bottom + 1 &&
+          review.height > 0,
+        reviewTop: review?.top ?? null,
+        panelTop: panel?.top ?? null,
+      }
+    })
     rec(
       g,
-      '★★ 只有当前步骤显示“完成需验收”，未来步骤不提前显示',
-      currentText.includes('完成需验收') &&
+      '★★ 结果就绪后直接显示“待你验收”，未来步骤不提前显示',
+      currentText.includes('待你验收') &&
         !futureText.includes('完成需验收') &&
-        !futureText.includes('结果待验收'),
-      `current=${currentText.replace(/\n/g, ' | ')} future=${futureText.replace(/\n/g, ' | ')}`,
+        !futureText.includes('待你验收') &&
+        (await page.locator('[data-agent-task-review]').count()) === 1 &&
+        (await page.locator('[data-agent-task-plan-next]').innerText()).includes(
+          '验收通过',
+        ) &&
+        reviewVisibility.visible,
+      `current=${currentText.replace(/\n/g, ' | ')} future=${futureText.replace(/\n/g, ' | ')} review=${JSON.stringify(reviewVisibility)}`,
     )
 
     const layout = await page.evaluate(() => {
@@ -47499,6 +47577,29 @@ async function g1205(browser) {
     )
     await page.screenshot({
       path: `${OUT}/1205-agent-plan-${variant}.png`,
+    })
+    const researchStatus = page.locator('[data-agent-research-status]')
+    await researchStatus.scrollIntoViewIfNeeded()
+    const researchText = await researchStatus.innerText()
+    rec(
+      g,
+      '★★ 调研卡显示目标 / 实收、真实检索词和各站原因',
+      researchText.includes('目标 100 张 · 实收 2 张') &&
+        researchText.includes('月饼礼盒 电商主图 排版 文案') &&
+        researchText.includes('需要登录一次') &&
+        (await page.locator('[data-agent-research-site-status]').count()) === 2,
+      researchText.replace(/\n/g, ' | '),
+    )
+    const pendingRun = page.locator('[data-agent-step="runNode"]')
+    await pendingRun.scrollIntoViewIfNeeded()
+    rec(
+      g,
+      '★★ 只看到 runNode 调用、还没结果时显示“等待确认后生成”',
+      (await pendingRun.innerText()).includes('等待确认后生成') &&
+        !(await pendingRun.innerText()).includes('已运行生成'),
+    )
+    await page.screenshot({
+      path: `${OUT}/1205-agent-research-${variant}.png`,
     })
     rec(g, '无未捕获异常', pageErrors.length === 0, pageErrors.join(' | '))
   } finally {

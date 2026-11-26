@@ -172,15 +172,15 @@ export function useAgentTaskPlanController(
             (step) => step.id === advanced.plan.currentStepId,
           )
           if (!next) {
-            input.notify(`已完成「${closed}」，整个计划已结束`, 'info')
+            input.notify(`已通过「${closed}」验收，整个计划已结束`, 'info')
             return true
           }
           input.notify(
-            `已跳过「${closed}」验收，进入「${next.title}」`,
+            `已通过「${closed}」验收，进入「${next.title}」`,
             'info',
           )
           await input.sendText(
-            `系统控制：用户已跳过「${closed}」的验收并确认直接进入下一步。` +
+            `系统控制：用户已通过「${closed}」的验收，确认进入下一步。` +
               `现在开始执行计划步骤「${next.title}」。` +
               `请沿用计划目标、已有画布产物和约束继续，不要再次询问是否进入下一步，` +
               `也不要把这句控制指令当成新的业务需求。`,

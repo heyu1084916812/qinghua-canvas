@@ -36,6 +36,10 @@ export interface TurnReferenceReviewInput {
   }) => Promise<ReferenceCurationResult>
   /** G-R4：真的要调参考分析前回调一次（界面显示「参考素材分析中」）；不分析就不调。 */
   onAnalysisStart?: () => void
+  /** 用户明确要求跳过参考自动分析。 */
+  skipReferenceAnalysis?: boolean
+  /** 用户明确要求重新分析参考，忽略本任务之前的跳过记录。 */
+  retryReferenceAnalysis?: boolean
 }
 
 export interface TurnReferenceReview {
@@ -52,13 +56,17 @@ export interface TurnReferenceReview {
   answers: Record<string, string>
   /** 本回合是否真的跑了参考分析（G-R4：决定是否显示「参考素材分析结束」）。 */
   analyzed: boolean
+  /** 显式参考分析失败，当前禁止创建流程 / 付费生成。 */
+  blockedIds: string[]
 }
 
 export async function reviewTurnReferences(
   input: TurnReferenceReviewInput,
 ): Promise<TurnReferenceReview> {
-  const explicitIds = input.task.referenceIds
   const previous = input.task.referenceReview
+  const retry = input.retryReferenceAnalysis === true
+  const skipped = new Set(retry ? [] : previous?.skippedIds ?? [])
+  const explicitIds = input.task.referenceIds.filter((id) => !skipped.has(id))
   const selection = input.selectForTask
     ? await input.selectForTask().catch(() => null)
     : null
@@ -80,7 +88,9 @@ export async function reviewTurnReferences(
     text: input.text,
   })
   const constraintIds = Object.keys(constraints)
-  const itemIds = [...new Set([...constraintIds, ...explicitIds, ...sidebarIds])]
+  const itemIds = input.skipReferenceAnalysis
+    ? [...constraintIds]
+    : [...new Set([...constraintIds, ...explicitIds, ...sidebarIds])]
   const warnings: string[] = []
   let reviewed: ReviewedReference[] = []
   let failedIds: string[] = []
@@ -104,16 +114,20 @@ export async function reviewTurnReferences(
       }))
       failedIds = curation.failed.map((row) => row.itemId)
       failedCount = curation.failed.length
-      attemptedIds = [...reviewed.map((row) => row.itemId), ...failedIds]
+      const explicitSet = new Set(explicitIds)
+      attemptedIds = [
+        ...reviewed.map((row) => row.itemId),
+        ...failedIds.filter((id) => !explicitSet.has(id)),
+      ]
       warnings.push(
         ...curation.failed.map((row) => `参考「${row.title}」自动分析失败：${row.reason}`),
         ...curation.limitations,
       )
     } catch (error) {
       warnings.push(`参考自动分析未完成：${errText(error)}`)
-      failedIds = sidebarIds
-      attemptedIds = sidebarIds
-      failedCount = Math.max(1, sidebarIds.length)
+      failedIds = itemIds
+      attemptedIds = input.skipReferenceAnalysis ? [] : [...sidebarIds]
+      failedCount = Math.max(1, itemIds.length)
     }
   } else if (sidebarIds.length > 0) {
     // 没有分析能力：退回「看不出就问」，侧栏图按分析失败处理。
@@ -132,20 +146,35 @@ export async function reviewTurnReferences(
     failedIds: failedIds.filter((id) => !constraintSet.has(id)),
     text: input.text,
   })
+  const explicitSet = new Set(explicitIds)
+  const blockedIds = input.skipReferenceAnalysis
+    ? []
+    : failedIds.filter((id) => explicitSet.has(id) && !constraintSet.has(id))
   const review = nextReferenceReview(previous, {
     attemptedIds,
     ambiguousIds,
     // 回答问题卡的回合：先前待确认的图视为已答，不再追问；按回答写回的图同样移出。
     resolvedIds: [
       ...constraintIds,
+      ...(retry ? input.task.referenceIds : []),
       ...(input.answersQuestionCard ? previous?.pendingIds ?? [] : []),
     ],
     fallbackAnswers,
     confirmedIds,
+    blockedIds,
+    ...(input.skipReferenceAnalysis
+      ? { skippedIds: input.task.referenceIds }
+      : {}),
   })
   const ambiguous = new Set(ambiguousIds)
   const task: AgentTaskRef = { ...input.task }
-  if (review.analyzedIds.length > 0 || review.pendingIds.length > 0 || review.answers) {
+  if (
+    review.analyzedIds.length > 0 ||
+    review.pendingIds.length > 0 ||
+    review.blockedIds ||
+    review.skippedIds ||
+    review.answers
+  ) {
     task.referenceReview = review
   }
   else delete task.referenceReview
@@ -159,5 +188,6 @@ export async function reviewTurnReferences(
     confirmedIds,
     answers: review.answers ?? {},
     analyzed,
+    blockedIds,
   }
 }

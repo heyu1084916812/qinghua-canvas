@@ -1,12 +1,21 @@
 import { publicProcessText, visibleAssistantReply } from './agentVisibleText'
 import { agentPhaseForTool, agentPhaseStepLine, agentPhaseTitle, isAgentPhase, type AgentPhase } from '../../../../domain/agent/phase'
 import type { ChatMessage } from '../../../../domain/shared/execution/types'
-import { isPublicHttpUrl } from '../../../../domain/shared/publicUrl'
 import { researchModeOf, type ResearchMode } from '../../../../domain/inspiration/designResearch'
 import { researchSiteCount, researchSourceHostCount, researchStepLabel, researchWebPageCount } from './agentResearchSourceLabel'
 import { parseQuestionCardArgs, type AgentQuestion } from '../../../../domain/agent/questionCard'
 import { parseQuestionCardAnswerMessage, type QuestionCardAnswerSummary } from '../../../../domain/agent/questionCardReply'
 import { stripQuestionCardEchoes } from './questionCardProjection'
+import {
+  projectResearchConversation,
+  type ConversationResearchItem,
+  type ConversationResearchStatus,
+} from './agentResearchConversation'
+export type {
+  ConversationResearchItem,
+  ConversationResearchSiteStatus,
+  ConversationResearchStatus,
+} from './agentResearchConversation'
 
 /**
  * 对话流（设计文档 §8「输出：计划预览 + 普通对话」）。
@@ -40,23 +49,13 @@ export interface ConversationStep {
   researchItems?: ConversationResearchItem[]
   /** 新调研结果携带；旧会话没有该字段时 UI 按 mixed 保留原入口。 */
   researchMode?: ResearchMode
+  /** 调研数量目标、检索词与各来源状态。 */
+  researchStatus?: ConversationResearchStatus
   /** askQuestions 成功时的问题卡（G5 / questions[]）。 */
   questions?: AgentQuestion[]
   failed: boolean
   /** 该步骤来自哪个真实阶段；旧消息可以没有。 */
   phase?: AgentPhase
-}
-
-export interface ConversationResearchItem {
-  id: string
-  title: string
-  url: string
-  imageUrl: string
-  source: string
-  description?: string
-  credit?: string
-  license?: string
-  licenseUrl?: string
 }
 
 export interface ConversationProcessEntry {
@@ -186,6 +185,19 @@ const TOOL_RUNNING_LABEL: Record<string, string> = {
   splitGrid: '正在切分宫格',
 }
 
+const TOOL_PENDING_LABEL: Record<string, string> = {
+  applyPlan: '准备创建节点和连线',
+  runNode: '等待确认后生成',
+  runFrom: '等待确认后运行下游链',
+  requestTaskConfirmation: '等待你确认',
+  askQuestions: '准备问题卡',
+}
+
+/** 还没有工具结果时的状态，不能说成“已完成”。 */
+export function toolPendingLabel(tool: string): string {
+  return TOOL_PENDING_LABEL[tool] ?? toolRunningLabel(tool)
+}
+
 /**
  * 失败时的标题。
  *
@@ -274,6 +286,7 @@ export function describeToolResult(
   nodeIds: string[]
   researchItems?: ConversationResearchItem[]
   researchMode?: ResearchMode
+  researchStatus?: ConversationResearchStatus
   questions?: AgentQuestion[]
   failed: boolean
   activityLabel?: string
@@ -344,28 +357,11 @@ export function describeToolResult(
       }
     }
     case 'researchDesign': {
-      const items = asArray(r.items).map(asRecord)
       const sources = asArray(r.sources).map(asRecord)
       const researchMode = researchModeOf(r.mode) ?? researchModeOf(asRecord(r.request).mode)
       const warnings = asArray(r.warnings).map((item) => clean(item))
-      const researchItems = items
-        .flatMap((item): ConversationResearchItem[] => {
-          const url = String(item.url ?? '')
-          if (!isPublicHttpUrl(url)) return []
-          const imageUrl = String(item.imageUrl ?? '')
-          return [{
-            id: String(item.id ?? url),
-            title: clean(String(item.title ?? url)),
-            url,
-            imageUrl: isPublicHttpUrl(imageUrl) ? imageUrl : '',
-            source: String(item.source ?? 'web'),
-            description: clean(String(item.description ?? '')),
-            credit: clean(String(item.credit ?? '')),
-            license: clean(String(item.license ?? '')),
-            licenseUrl: clean(String(item.licenseUrl ?? '')),
-          }]
-        })
-        .slice(0, researchMode === 'image' ? 50 : researchMode === 'mixed' ? 64 : 48)
+      const research = projectResearchConversation(r, researchMode, clean)
+      const researchItems = research.items
       // G-R1：图片模式数来源网站；G-R5：网页 / 混合模式数可打开的网页（与「N 个网页」展开列表一致）。
       const pageCount = r.ok === false
         ? 0
@@ -376,12 +372,13 @@ export function describeToolResult(
       return {
         ...(pageCount > 0 ? { stepLabel: researchStepLabel(r.usedSources, pageCount, researchMode === 'image' ? 'image' : researchMode === 'mixed' ? 'mixed' : 'web') } : {}),
         lines: [
-          `找到 ${items.length} 条参考，覆盖 ${sourceCount} 个来源`,
+          `找到 ${research.itemCount} 条参考，覆盖 ${sourceCount} 个来源`,
           ...warnings.slice(0, 2),
         ],
         nodeIds: [],
         researchItems,
         ...(researchMode ? { researchMode } : {}),
+        researchStatus: research.status,
         failed: r.ok === false,
       }
     }
@@ -874,7 +871,7 @@ export function toConversation(
           ...timeOf(m),
           id: call.id,
           tool: call.name,
-          label: toolLabel(call.name),
+          label: toolPendingLabel(call.name),
           lines: [],
           nodeIds: [],
           failed: false,

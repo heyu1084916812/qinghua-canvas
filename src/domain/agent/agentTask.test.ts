@@ -6,6 +6,7 @@ import {
   resolveAgentTask,
   type AgentTaskRef,
 } from './agentTask'
+import { uniformImageRatioOf } from './outputConstraints'
 
 const previous: AgentTaskRef = {
   id: 'task_a',
@@ -102,6 +103,30 @@ describe('agentTask 延续 vs 新任务', () => {
     expect(unrelated.task.referenceIds).toEqual([])
   })
 
+  it('★★ 只把“整组统一”的明确比例写进任务约束', () => {
+    expect(uniformImageRatioOf('主图都要统一成 1：1，并加文字排版')).toBe('1:1')
+    expect(uniformImageRatioOf('每张都用 16:9')).toBe('16:9')
+    expect(uniformImageRatioOf('主图 1:1，详情页 3:4')).toBeUndefined()
+    const continued = resolveAgentTask(
+      { ...previous, uniformImageRatio: '1:1' },
+      { text: '继续生成剩下的图' },
+      env(),
+    )
+    expect(continued.task.uniformImageRatio).toBe('1:1')
+    const replaced = resolveAgentTask(
+      { ...previous, uniformImageRatio: '1:1' },
+      { text: '全部改成 4:5' },
+      env(),
+    )
+    expect(replaced.task.uniformImageRatio).toBe('4:5')
+    const fresh = resolveAgentTask(
+      { ...previous, uniformImageRatio: '1:1' },
+      { text: '帮我设计一个奶茶店的 Logo' },
+      env('task_c'),
+    )
+    expect(fresh.task).not.toHaveProperty('uniformImageRatio')
+  })
+
   it('taskKey 按任务 id，而不是请求模式', () => {
     expect(referenceTaskKey(previous)).toBe('task:task_a')
   })
@@ -117,6 +142,39 @@ describe('agentTask 延续 vs 新任务', () => {
       turns: 1,
       referenceIds: [],
     })
+    expect(
+      normalizeAgentTaskRef({ id: 't2', uniformImageRatio: '1:1' }),
+    ).toMatchObject({ uniformImageRatio: '1:1' })
+    expect(
+      normalizeAgentTaskRef({
+        id: 't3',
+        ecommerceArtDirection: true,
+        ecommerceTypographyRequired: true,
+      }),
+    ).toMatchObject({
+      ecommerceArtDirection: true,
+      ecommerceTypographyRequired: true,
+    })
+  })
+})
+
+describe('AgentTaskRef.ecommerceArtDirection', () => {
+  it('电商图片任务跨回合保留；后续补充文字排版时升级为硬约束', async () => {
+    const { resolveAgentTask } = await import('./agentTask')
+    const env = { now: 2, newId: () => 't2' }
+    const first = resolveAgentTask(undefined, {
+      text: '帮我做一套淘宝月饼主图和详情页',
+    }, env)
+    expect(first.task.ecommerceArtDirection).toBe(true)
+    expect(first.task.uniformImageRatio).toBe('1:1')
+    expect(first.task.ecommerceTypographyRequired).toBeUndefined()
+    const next = resolveAgentTask(first.task, {
+      text: '再加文字排版，所有主图统一 1:1',
+    }, { now: 3, newId: () => 't3' })
+    expect(next.continued).toBe(true)
+    expect(next.task.ecommerceArtDirection).toBe(true)
+    expect(next.task.ecommerceTypographyRequired).toBe(true)
+    expect(next.task.uniformImageRatio).toBe('1:1')
   })
 })
 

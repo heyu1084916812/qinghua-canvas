@@ -423,10 +423,13 @@ export function AgentConversationPane({
                     ))}
                   </div>
                 ) : null}
-                {item.tool === 'researchDesign' && item.researchItems?.length ? (
+                {item.tool === 'researchDesign' &&
+                ((item.researchItems?.length ?? 0) > 0 ||
+                  Boolean(item.researchStatus)) ? (
                   <ResearchResultsPreview
-                    items={item.researchItems}
+                    items={item.researchItems ?? []}
                     researchMode={item.researchMode}
+                    researchStatus={item.researchStatus}
                     onAdd={onAddResearchReference}
                     onDownload={onDownloadResearchImage}
                     selection={researchSelection}

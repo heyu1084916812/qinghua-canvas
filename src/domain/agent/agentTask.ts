@@ -1,4 +1,9 @@
 import { normalizeReferenceReview, type ReferenceReviewState } from './referenceReview'
+import { ecommerceImageRatioOf, uniformImageRatioOf } from './outputConstraints'
+import {
+  isEcommerceImageTask,
+  requiresEcommerceTypography,
+} from './ecommerceIntent'
 
 /**
  * Agent 会话里的「任务」标识（参考用法按任务存，而不是按请求模式存）。
@@ -37,6 +42,12 @@ export interface AgentTaskRef {
    * 新任务从空开始：旧任务的参考只有被再次提到才会重新进入（并按新任务重新分析用法）。
    */
   referenceIds: string[]
+  /** 用户明确要求整组图片统一使用的比例，例如 `1:1`。 */
+  uniformImageRatio?: string
+  /** 本任务属于电商图片交付：计划落地前统一检查锚点与版式。 */
+  ecommerceArtDirection?: boolean
+  /** 用户明确要求文字排版；同一任务内继续保留。 */
+  ecommerceTypographyRequired?: boolean
   /**
    * 系列编排阶段（见 seriesOrchestration.ts）：用户说「先定 Logo」后为 logo_first，
    * 同一任务内跨回合保留，直到用户放行；新任务不继承。
@@ -156,6 +167,12 @@ export function resolveAgentTask(
 ): AgentTaskDecision {
   const reason = classifyAgentTaskTurn(Boolean(previous), signals)
   const mentioned = [...new Set(signals.referenceIds ?? [])]
+  const ecommerce = isEcommerceImageTask(signals.text)
+  const requestedRatio =
+    uniformImageRatioOf(signals.text) ??
+    (ecommerce ? ecommerceImageRatioOf(signals.text) : undefined)
+  const typographyRequested = requiresEcommerceTypography(signals.text)
+  const typography = (ecommerce || previous?.ecommerceArtDirection === true) && typographyRequested
   if (previous && !NEW_TASK_REASONS.has(reason)) {
     return {
       task: {
@@ -163,6 +180,15 @@ export function resolveAgentTask(
         updatedAt: env.now,
         turns: previous.turns + (signals.internalControl === true ? 0 : 1),
         referenceIds: [...new Set([...mentioned, ...previous.referenceIds])],
+        ...(requestedRatio || previous.uniformImageRatio
+          ? { uniformImageRatio: requestedRatio ?? previous.uniformImageRatio }
+          : {}),
+        ...(ecommerce || previous.ecommerceArtDirection
+          ? { ecommerceArtDirection: true }
+          : {}),
+        ...(typography || previous.ecommerceTypographyRequired
+          ? { ecommerceTypographyRequired: true }
+          : {}),
       },
       continued: true,
       reason,
@@ -176,6 +202,9 @@ export function resolveAgentTask(
       updatedAt: env.now,
       turns: 1,
       referenceIds: mentioned,
+      ...(requestedRatio ? { uniformImageRatio: requestedRatio } : {}),
+      ...(ecommerce ? { ecommerceArtDirection: true } : {}),
+      ...(typography ? { ecommerceTypographyRequired: true } : {}),
     },
     continued: false,
     reason,
@@ -202,6 +231,9 @@ export function normalizeAgentTaskRef(value: unknown): AgentTaskRef | undefined 
           (id): id is string => typeof id === 'string' && id.length > 0,
         ))]
       : [],
+    ...(typeof row.uniformImageRatio === 'string' && /^\d{1,2}:\d{1,2}$/.test(row.uniformImageRatio) ? { uniformImageRatio: row.uniformImageRatio } : {}),
+    ...(row.ecommerceArtDirection === true ? { ecommerceArtDirection: true } : {}),
+    ...(row.ecommerceTypographyRequired === true ? { ecommerceTypographyRequired: true } : {}),
     ...(row.seriesStage === 'logo_first' ? { seriesStage: 'logo_first' as const } : {}),
     ...(review ? { referenceReview: review } : {}),
   }

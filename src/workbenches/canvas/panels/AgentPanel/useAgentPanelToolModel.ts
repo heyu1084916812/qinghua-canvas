@@ -184,6 +184,21 @@ export function useAgentPanelToolModel({
           // 建 ctx 时现读：批准后才执行的工具要跟随**本回合**的停止信号。
           abortSignal: abortRefs.current.get(sessionId)?.signal,
           perImage: sessionRuntimeRef.current.isPerImage(sessionId),
+          ...(session?.agentTask?.uniformImageRatio
+            ? { uniformImageRatio: session.agentTask.uniformImageRatio }
+            : {}),
+          ...(session?.agentTask?.ecommerceArtDirection
+            ? { ecommerceArtDirection: true }
+            : {}),
+          ...(session?.agentTask?.ecommerceTypographyRequired
+            ? { ecommerceTypographyRequired: true }
+            : {}),
+          ...(session?.agentTask?.referenceReview?.blockedIds?.length
+            ? {
+                referenceAnalysisBlockedIds:
+                  session.agentTask.referenceReview.blockedIds,
+              }
+            : {}),
         },
         plan: sessionId
           ? createAgentToolPlanPorts({
