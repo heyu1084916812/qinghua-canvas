@@ -138,6 +138,25 @@ try {
     )
   }
   console.log(`storage table parity passed: ${tsTables.length} tables`)
+
+  // Rust 单体文件行数上限（只许下降，防再次膨胀回 5000 行巨文件）
+  const rustBudgets = [
+    ['src-tauri/src/lib.rs', 3680],
+    ['shared-store/src/lib.rs', 2420],
+    ['shared-store/src/sqlite.rs', 2015],
+  ]
+  const rustViolations = []
+  for (const [rel, maxLines] of rustBudgets) {
+    const content = readFileSync(path.join(root, rel), 'utf8')
+    const lineCount = content.split(/\r?\n/).length
+    if (lineCount > maxLines) {
+      rustViolations.push(`${rel}: ${lineCount} > ${maxLines}`)
+    }
+  }
+  if (rustViolations.length > 0) {
+    throw new Error(`Rust 文件行数超出冻结上限：${rustViolations.join('; ')}`)
+  }
+  console.log(`rust file-size budgets passed: ${rustBudgets.length} files`)
 } finally {
   rmSync(temp, { recursive: true, force: true })
 }

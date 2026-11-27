@@ -1,17 +1,6 @@
-use std::collections::HashSet;
-use std::net::{IpAddr, SocketAddr, ToSocketAddrs};
 use std::path::{Path, PathBuf};
-use std::sync::atomic::AtomicBool;
-use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::Arc;
-use std::sync::Mutex;
-use std::sync::OnceLock;
-use std::time::{Duration, Instant};
-use tauri::ipc::Channel;
-use tauri::menu::{Menu, MenuItem};
 use tauri::path::BaseDirectory;
-use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
-use tauri::{Manager, State};
+use tauri::Manager;
 /**
  * 轻画桌面壳（Tauri 2）的入口。
  *
@@ -27,7 +16,6 @@ use tauri::{Manager, State};
 use tauri_plugin_dialog::DialogExt;
 use tauri_plugin_fs::FsExt;
 use tauri_plugin_opener::OpenerExt;
-use tauri_plugin_updater::UpdaterExt;
 
 mod agent_browser;
 mod agent_browser_rules;
@@ -40,7 +28,10 @@ mod credential_vault;
 mod folder_grants;
 mod cli_output_tests;
 mod pinterest_oauth;
+mod network_fetch;
 mod system_proxy;
+mod updater;
+mod window_lifecycle;
 
 /// 「选一个目录当素材文件夹」：弹系统目录选择框 → 把该目录**递归**加进 fs 作用域 → 返回绝对路径。
 ///
@@ -157,95 +148,6 @@ async fn save_file_dialog(
     Some(file)
 }
 
-/// 「检查更新」后交给前端的**一份状态**（方案 §5 / 对账 #223）。
-///
-/// 为什么不让前端直接调 updater 的 JS API：那样"没配地址"和"网络不通"会糊成同一个异常串，
-/// 界面就只能说一句含糊的"检查失败"。这里把四档说清楚，前端照着显示，不解析错误文本。
-#[derive(serde::Serialize)]
-#[serde(rename_all = "camelCase")]
-struct UpdateStatus {
-    /// `not-configured` / `up-to-date` / `available` / `failed`
-    state: String,
-    /// 装在用户机器上的版本（不是清单上的）
-    current: String,
-    version: Option<String>,
-    notes: Option<String>,
-    /// 失败时的原话：**如实回**，不吞
-    error: Option<String>,
-}
-
-fn update_status(state: &str, current: String) -> UpdateStatus {
-    UpdateStatus {
-        state: state.into(),
-        current,
-        version: None,
-        notes: None,
-        error: None,
-    }
-}
-
-fn update_failed(current: String, error: String) -> UpdateStatus {
-    UpdateStatus {
-        state: "failed".into(),
-        current,
-        version: None,
-        notes: None,
-        error: Some(error),
-    }
-}
-
-/// 「没有配更新地址」要单独认出来（见 `check_update` 里的说明）
-fn is_not_configured(err: &tauri_plugin_updater::Error) -> bool {
-    matches!(err, tauri_plugin_updater::Error::EmptyEndpoints)
-}
-
-/// 检查有没有新版。
-///
-/// **没配更新地址时回 `not-configured`**：目标地址还没定（GitHub Releases 还是自有地址），
-/// 这时不能假装"已是最新"——用户会以为自动更新在守着，其实什么都没查。
-#[tauri::command]
-async fn check_update(app: tauri::AppHandle) -> UpdateStatus {
-    let current = app.package_info().version.to_string();
-    // ⚠️ 更新地址为空时，**`app.updater()` 这一步就报错**（`Error::EmptyEndpoints`），
-    // 根本走不到 `check()` —— 所以前后两处都要认这一档。少认一处，界面就会把
-    // 「还没接完」说成「检查失败」（真机上就是这么显示的，已修）。
-    let updater = match app.updater() {
-        Ok(updater) => updater,
-        Err(err) if is_not_configured(&err) => return update_status("not-configured", current),
-        Err(err) => return update_failed(current, err.to_string()),
-    };
-    match updater.check().await {
-        Ok(Some(update)) => UpdateStatus {
-            state: "available".into(),
-            current,
-            version: Some(update.version.clone()),
-            notes: update.body.clone(),
-            error: None,
-        },
-        Ok(None) => update_status("up-to-date", current),
-        Err(err) if is_not_configured(&err) => update_status("not-configured", current),
-        Err(err) => update_failed(current, err.to_string()),
-    }
-}
-
-/// 下载 → **验签**（公钥在 `tauri.conf.json`）→ 交给安装器。
-///
-/// Windows 上安装器一起来应用就会自己退出（NSIS 默认带 `/R` 重启），
-/// 所以这里**不**再调 `app.restart()` —— 那等于把应用启动两次。
-#[tauri::command]
-async fn install_update(app: tauri::AppHandle) -> Result<(), String> {
-    let updater = app.updater().map_err(|err| err.to_string())?;
-    let update = updater
-        .check()
-        .await
-        .map_err(|err| err.to_string())?
-        .ok_or_else(|| "没有可用的更新".to_string())?;
-    update
-        .download_and_install(|_, _| {}, || {})
-        .await
-        .map_err(|err| err.to_string())?;
-    Ok(())
-}
 
 // ─────────────────────────────────────────────────────────────
 // 数据目录：程序目录隔壁的 `data\`（方案 §5.11 / 对账 #248）
@@ -256,6 +158,7 @@ async fn install_update(app: tauri::AppHandle) -> Result<(), String> {
 ///
 /// 为什么要闸门：这条规则只对"用户自己挑的位置"成立。默认安装位置是 `%LOCALAPPDATA%\轻画`，
 /// 若不管它，数据就会跑到 `%LOCALAPPDATA%\data` —— 既污染上一层，也丢了"每个账户各自一份"。
+#[allow(dead_code)]
 fn decide_data_dir(
     exe_dir: &Path,
     system_roots: &[PathBuf],
@@ -314,6 +217,7 @@ fn dir_is_writable(dir: &Path) -> bool {
 }
 
 /// 系统目录清单：命中任何一条就说明程序装在"我们默认 / 系统给的位置"，数据不该跟过去
+#[allow(dead_code)]
 fn system_roots(app: &tauri::AppHandle) -> Vec<PathBuf> {
     let mut roots = Vec::new();
     if let Ok(p) = app.path().local_data_dir() {
@@ -338,6 +242,7 @@ fn system_roots(app: &tauri::AppHandle) -> Vec<PathBuf> {
 }
 
 /// 本次运行该用的数据目录（`None` = 交给 Tauri 的默认值）
+#[allow(dead_code)]
 fn resolve_data_dir(app: &tauri::AppHandle) -> Option<PathBuf> {
     let exe = std::env::current_exe().ok()?;
     let exe_dir = exe.parent()?;
@@ -349,6 +254,7 @@ fn resolve_data_dir(app: &tauri::AppHandle) -> Option<PathBuf> {
 /// 这是用户先前明确要过的 `轻画\{app,data}` 布局。安装在系统目录（例如默认
 /// `%LOCALAPPDATA%\轻画`）时，隔壁的 `%LOCALAPPDATA%\data` 会污染系统目录，故返回 `None`，
 /// 由 shared-store 回退到 `%LOCALAPPDATA%\com.qinghua.canvas\shared-store-v1`。
+#[allow(dead_code)]
 fn preferred_business_data_dir(
     exe: &Path,
     _system_roots: &[PathBuf],
@@ -458,6 +364,7 @@ fn shell_profile_dir_for(
 /// 只搬三样：`IndexedDB`（项目 / 素材 / 素材库）、`Local Storage`（令牌密文 + 设置）、`WebStorage`。
 /// 其余（`Cache` / `Code Cache` / `GPUCache` …）是网页缓存，几十 MB 且能重建，**不搬**。
 /// 目标已经有 `IndexedDB` 就整个跳过 —— 否则每次启动都会拿旧数据盖掉新数据。
+#[allow(dead_code)]
 fn migrate_profile(default_root: &Path, data_dir: &Path) {
     let src = default_root.join("EBWebView").join("Default");
     if !src.is_dir() {
@@ -491,6 +398,7 @@ fn migrate_profile(default_root: &Path, data_dir: &Path) {
 }
 
 /// 递归拷贝（只服务上面那条一次性迁移）
+#[allow(dead_code)]
 fn copy_dir(from: &Path, to: &Path) -> std::io::Result<()> {
     std::fs::create_dir_all(to)?;
     for entry in std::fs::read_dir(from)? {
@@ -509,6 +417,7 @@ fn copy_dir(from: &Path, to: &Path) -> std::io::Result<()> {
 ///
 /// 这样 GB 级素材库的启动备份不会每次重写一遍大文件；`MANIFEST` / `CURRENT` /
 /// `*.log` 仍然逐字节复制，所以副本引用到的表文件一定是齐的。
+#[allow(dead_code)]
 fn copy_profile_dir(from: &Path, to: &Path) -> std::io::Result<()> {
     std::fs::create_dir_all(to)?;
     for entry in std::fs::read_dir(from)? {
@@ -536,10 +445,14 @@ fn copy_profile_dir(from: &Path, to: &Path) -> std::io::Result<()> {
 ///
 /// 这里刻意只保留少量：IndexedDB 可能很大，多做几份会把磁盘吃掉；
 /// 真正兜底的是“至少有一份最近可用”，不是把历史全留下来。
+#[allow(dead_code)]
 const PROFILE_BACKUP_KEEP: usize = 3;
+#[allow(dead_code)]
 const PROFILE_BACKUP_DIR_NAME: &str = "qinghua-profile-backups";
+#[allow(dead_code)]
 const PROFILE_DATA_DIRS: [&str; 2] = ["IndexedDB", "Local Storage"];
 
+#[allow(dead_code)]
 fn profile_backup_root(data_dir: &Path) -> PathBuf {
     data_dir
         .parent()
@@ -547,6 +460,7 @@ fn profile_backup_root(data_dir: &Path) -> PathBuf {
         .unwrap_or_else(|| data_dir.join(PROFILE_BACKUP_DIR_NAME))
 }
 
+#[allow(dead_code)]
 fn profile_backup_name(at: std::time::SystemTime) -> String {
     let millis = at
         .duration_since(std::time::UNIX_EPOCH)
@@ -562,6 +476,7 @@ fn profile_backup_name(at: std::time::SystemTime) -> String {
 /// `Cache` / `Code Cache` / `GPUCache` 都能重建，抄进去只会让备份巨大。
 ///
 /// 先抄到 `.tmp-*` 再改名，半截失败不会留下一个看起来像备份、实际读不了的目录。
+#[allow(dead_code)]
 fn create_profile_backup(
     data_dir: &Path,
     at: std::time::SystemTime,
@@ -609,6 +524,7 @@ fn create_profile_backup(
 }
 
 /// 只清理本功能自己生成的 `profile-*` 目录；任何不认识的目录一律不动。
+#[allow(dead_code)]
 fn prune_profile_backups(root: &Path, keep: usize) -> std::io::Result<usize> {
     let mut entries: Vec<_> = std::fs::read_dir(root)?
         .flatten()
@@ -631,9 +547,11 @@ fn prune_profile_backups(root: &Path, keep: usize) -> std::io::Result<usize> {
     Ok(removed)
 }
 
+#[allow(dead_code)]
 static PROFILE_BACKUP_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
 /// 拍一份桌面数据副本；任何失败都只记日志，不挡启动 / 退出。
+#[allow(dead_code)]
 fn backup_profile(app: &tauri::AppHandle) {
     let Some(data_dir) = current_data_dir(app) else {
         return;
@@ -1458,7 +1376,7 @@ fn is_cache_dir_name(name: &str) -> bool {
 }
 
 /// 当前数据目录（与 #250 同一条规则：程序隔壁的 `data`，否则系统默认位置）。
-fn current_data_dir(_app: &tauri::AppHandle) -> Option<PathBuf> {
+pub(crate) fn current_data_dir(_app: &tauri::AppHandle) -> Option<PathBuf> {
     Some(qinghua_shared_store::default_data_dir())
 }
 
@@ -1552,830 +1470,6 @@ fn clear_cache(app: tauri::AppHandle) -> u64 {
     before.saturating_sub(cache_bytes(&app))
 }
 
-/// 取一个 URL 的字节（**只给"从网站抓站点图标"用**，对账 #396）。
-///
-/// 为什么必须放在 Rust 侧：前端那条 `fetch`（浏览器与壳里的 webview 用的是同一份实现，
-/// 见 `platform/desktop/index.ts` 的装配注释）受 **CORS** 限制 —— 站点不给
-/// `Access-Control-Allow-Origin` 时读不到 `favicon.ico`，而绝大多数站点都不给。
-/// 壳里用 reqwest 发这一条就没有这个限制。
-///
-/// 三条边界：
-/// 1. **只做 GET**，只认 http / https；
-/// 2. **超过 512KB 直接拒**（站点图标不该这么大，防止被当成下载器用）；
-/// 3. 状态码原样回给前端，由前端决定"算不算抓到"（这里不替它判断）。
-#[derive(serde::Serialize)]
-struct FetchedBytes {
-    status: u16,
-    content_type: Option<String>,
-    bytes: Vec<u8>,
-}
-
-#[tauri::command]
-async fn fetch_bytes(url: String, timeout_ms: Option<u64>) -> Result<FetchedBytes, String> {
-    if !(url.starts_with("https://") || url.starts_with("http://")) {
-        return Err("只支持 http / https 地址".into());
-    }
-    let client = system_proxy::apply_to_builder(reqwest::Client::builder())
-        .timeout(std::time::Duration::from_millis(timeout_ms.unwrap_or(8000)))
-        .build()
-        .map_err(|err| err.to_string())?;
-    let response = client
-        .get(&url)
-        .send()
-        .await
-        .map_err(|err| err.to_string())?;
-    let status = response.status().as_u16();
-    let content_type = response
-        .headers()
-        .get(reqwest::header::CONTENT_TYPE)
-        .and_then(|value| value.to_str().ok())
-        .map(|value| value.to_string());
-    let bytes = response.bytes().await.map_err(|err| err.to_string())?;
-    if bytes.len() > 512 * 1024 {
-        return Err("文件太大（超过 512KB），不像是站点图标".into());
-    }
-    Ok(FetchedBytes {
-        status,
-        content_type,
-        bytes: bytes.to_vec(),
-    })
-}
-
-/**
- * **通用 HTTP 请求**（对账 #518）：给"站点不给 CORS 头"的中转站用。
- *
- * 与 `fetch_bytes` 的分工：那个只做 GET、只取字节、有 512KB 上限，服务的是"抓站点图标"；
- * 这一条要能带上自定义头与请求体去打 `/v1/models` / `/v1/chat/completions`，
- * 所以支持 GET / POST / PUT / DELETE / HEAD，返回的是**文本 + 响应头**（渠道层要读 JSON）。
- *
- * 为什么需要它：壳里的 webview 与浏览器是同一份 `fetch` 实现，**同样受 CORS 限制**。
- * 实测（`154.19.242.25:7863`）`/v1/models` 返回 200，但响应头里**没有任何**
- * `access-control-*` ⇒ 页面侧请求被拦下，应用只看到"网络错误"，于是"验证协议"报
- * 「连不上这个地址（域名解析失败或连接被拒绝）」，而真实原因是跨域、不是地址不可达。
- * 别的客户端（cc switch / workbuddy）不走浏览器，所以它们能正常用同一地址。
- *
- * 边界：
- * 1. 只认 http / https；
- * 2. **不跟随重定向以外的魔法**：状态码与响应头原样回给前端，"算不算通过"由渠道层判断；
- * 3. 文本正文上限 8MB；图片 / 视频等二进制上限 64MB。
- *    前者覆盖模型列表与对话回包，后者只服务生成产物回落，不做通用下载器。
- */
-#[derive(serde::Serialize)]
-#[serde(rename_all = "camelCase")]
-struct FetchedText {
-    status: u16,
-    headers: std::collections::HashMap<String, String>,
-    text: String,
-    body_base64: String,
-    final_url: String,
-}
-
-#[derive(Default)]
-struct FetchStreamCancels(Mutex<std::collections::HashMap<String, Arc<AtomicBool>>>);
-
-#[derive(Clone, serde::Serialize)]
-#[serde(rename_all = "camelCase")]
-struct FetchStreamEvent {
-    kind: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    text: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    status: Option<u16>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    message: Option<String>,
-}
-
-fn emit_stream_text(
-    on_event: &Channel<FetchStreamEvent>,
-    bytes: &[u8],
-    pending: &mut Vec<u8>,
-) -> Result<(), String> {
-    pending.extend_from_slice(bytes);
-    let Some(last_newline) = pending.iter().rposition(|byte| *byte == b'\n') else {
-        return Ok(());
-    };
-    let complete = pending.drain(..=last_newline).collect::<Vec<_>>();
-    on_event
-        .send(FetchStreamEvent {
-            kind: "chunk".into(),
-            text: Some(String::from_utf8_lossy(&complete).to_string()),
-            status: None,
-            message: None,
-        })
-        .map_err(|err| err.to_string())
-}
-
-#[tauri::command]
-async fn cancel_fetch_stream(
-    stream_id: String,
-    state: State<'_, FetchStreamCancels>,
-) -> Result<(), String> {
-    let cancelled = state
-        .0
-        .lock()
-        .map_err(|_| "流式请求状态锁已损坏".to_string())?
-        .get(&stream_id)
-        .cloned();
-    if let Some(flag) = cancelled {
-        flag.store(true, Ordering::Relaxed);
-    }
-    Ok(())
-}
-
-#[tauri::command]
-async fn fetch_stream(
-    stream_id: String,
-    url: String,
-    method: Option<String>,
-    headers: Option<std::collections::HashMap<String, String>>,
-    body: Option<String>,
-    timeout_ms: Option<u64>,
-    on_event: Channel<FetchStreamEvent>,
-    state: State<'_, FetchStreamCancels>,
-) -> Result<(), String> {
-    if !(url.starts_with("https://") || url.starts_with("http://")) {
-        return Err("只支持 http / https 地址".into());
-    }
-    let cancelled = Arc::new(AtomicBool::new(false));
-    state
-        .0
-        .lock()
-        .map_err(|_| "流式请求状态锁已损坏".to_string())?
-        .insert(stream_id.clone(), cancelled.clone());
-
-    let client = system_proxy::apply_to_builder(reqwest::Client::builder())
-        .timeout(Duration::from_millis(timeout_ms.unwrap_or(180_000)))
-        .build()
-        .map_err(|err| err.to_string())?;
-    let verb = method.unwrap_or_else(|| "POST".into()).to_uppercase();
-    let mut req = match verb.as_str() {
-        "GET" => client.get(&url),
-        "POST" => client.post(&url),
-        other => return Err(format!("流式请求不支持的方法：{other}")),
-    };
-    if let Some(map) = headers {
-        for (key, value) in map {
-            req = req.header(key, value);
-        }
-    }
-    if let Some(payload) = body.filter(|value| !value.is_empty()) {
-        req = req.body(payload);
-    }
-
-    let result = async {
-        let mut response = req.send().await.map_err(|err| err.to_string())?;
-        let status = response.status().as_u16();
-        if !response.status().is_success() {
-            let text = response.text().await.unwrap_or_default();
-            on_event
-                .send(FetchStreamEvent {
-                    kind: "error".into(),
-                    text: Some(text.chars().take(500).collect()),
-                    status: Some(status),
-                    message: None,
-                })
-                .map_err(|err| err.to_string())?;
-            return Ok(());
-        }
-
-        let mut pending = Vec::<u8>::new();
-        loop {
-            if cancelled.load(Ordering::Relaxed) {
-                return Ok(());
-            }
-            let next = tokio::select! {
-                _ = tokio::time::sleep(Duration::from_millis(100)) => continue,
-                next = response.chunk() => next,
-            };
-            match next {
-                Ok(Some(bytes)) => emit_stream_text(&on_event, &bytes, &mut pending)?,
-                Ok(None) => break,
-                Err(err) => {
-                    if cancelled.load(Ordering::Relaxed) {
-                        return Ok(());
-                    }
-                    on_event
-                        .send(FetchStreamEvent {
-                            kind: "error".into(),
-                            text: None,
-                            status: None,
-                            message: Some(err.to_string()),
-                        })
-                        .map_err(|err| err.to_string())?;
-                    return Ok(());
-                }
-            }
-        }
-        if !pending.is_empty() {
-            on_event
-                .send(FetchStreamEvent {
-                    kind: "chunk".into(),
-                    text: Some(String::from_utf8_lossy(&pending).to_string()),
-                    status: None,
-                    message: None,
-                })
-                .map_err(|err| err.to_string())?;
-        }
-        on_event
-            .send(FetchStreamEvent {
-                kind: "done".into(),
-                text: None,
-                status: None,
-                message: None,
-            })
-            .map_err(|err| err.to_string())
-    }
-    .await;
-
-    if let Ok(mut map) = state.0.lock() {
-        map.remove(&stream_id);
-    }
-    result
-}
-
-#[derive(serde::Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct FetchMultipartPart {
-    name: String,
-    value: Option<String>,
-    data_base64: Option<String>,
-    file_name: Option<String>,
-    content_type: Option<String>,
-}
-
-fn quoted_param(value: &str) -> Result<String, String> {
-    if value.contains('\r') || value.contains('\n') {
-        return Err("multipart 字段名或文件名不能包含换行".into());
-    }
-    Ok(value.replace('\\', "\\\\").replace('"', "\\\""))
-}
-
-fn multipart_body(parts: Vec<FetchMultipartPart>) -> Result<(String, Vec<u8>), String> {
-    static SEQUENCE: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
-    let sequence = SEQUENCE.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-    let boundary = format!("----qinghua-form-{}-{sequence}", std::process::id());
-    let mut out = Vec::new();
-    for part in parts {
-        out.extend_from_slice(format!("--{boundary}\r\n").as_bytes());
-        let name = quoted_param(&part.name)?;
-        if let Some(data) = part.data_base64.filter(|value| !value.is_empty()) {
-            let file_name = quoted_param(
-                part.file_name
-                    .as_deref()
-                    .filter(|value| !value.is_empty())
-                    .unwrap_or(&part.name),
-            )?;
-            out.extend_from_slice(
-                format!(
-                    "Content-Disposition: form-data; name=\"{name}\"; filename=\"{file_name}\"\r\n"
-                )
-                .as_bytes(),
-            );
-            if let Some(content_type) = part.content_type.filter(|value| !value.is_empty()) {
-                if content_type.contains('\r') || content_type.contains('\n') {
-                    return Err("multipart 文件类型不能包含换行".into());
-                }
-                out.extend_from_slice(format!("Content-Type: {content_type}\r\n").as_bytes());
-            }
-            out.extend_from_slice(b"\r\n");
-            out.extend_from_slice(&base64_decode(&data)?);
-            out.extend_from_slice(b"\r\n");
-        } else {
-            out.extend_from_slice(
-                format!("Content-Disposition: form-data; name=\"{name}\"\r\n\r\n").as_bytes(),
-            );
-            out.extend_from_slice(part.value.unwrap_or_default().as_bytes());
-            out.extend_from_slice(b"\r\n");
-        }
-    }
-    out.extend_from_slice(format!("--{boundary}--\r\n").as_bytes());
-    Ok((format!("multipart/form-data; boundary={boundary}"), out))
-}
-
-fn is_textual_content_type(value: Option<&str>) -> bool {
-    let Some(value) = value else {
-        return false;
-    };
-    let lower = value.to_ascii_lowercase();
-    lower.starts_with("text/")
-        || lower.contains("json")
-        || lower.contains("xml")
-        || lower.contains("javascript")
-        || lower.contains("x-www-form-urlencoded")
-}
-
-static CANCELLED_FETCH_TEXTS: OnceLock<Mutex<HashSet<String>>> = OnceLock::new();
-
-fn cancelled_fetch_texts() -> &'static Mutex<HashSet<String>> {
-    CANCELLED_FETCH_TEXTS.get_or_init(|| Mutex::new(HashSet::new()))
-}
-
-fn fetch_text_is_cancelled(request_id: &str) -> bool {
-    cancelled_fetch_texts()
-        .lock()
-        .map(|items| items.contains(request_id))
-        .unwrap_or(false)
-}
-
-#[tauri::command]
-fn cancel_fetch_text(request_id: String) {
-    if let Ok(mut items) = cancelled_fetch_texts().lock() {
-        items.insert(request_id);
-    }
-}
-
-struct FetchTextCancelGuard(Option<String>);
-
-impl Drop for FetchTextCancelGuard {
-    fn drop(&mut self) {
-        if let Some(request_id) = self.0.as_ref() {
-            if let Ok(mut items) = cancelled_fetch_texts().lock() {
-                items.remove(request_id);
-            }
-        }
-    }
-}
-
-async fn wait_for_fetch_cancel(request_id: &str) {
-    loop {
-        if fetch_text_is_cancelled(request_id) {
-            return;
-        }
-        tokio::time::sleep(Duration::from_millis(80)).await;
-    }
-}
-
-async fn send_fetch_request(
-    request: reqwest::RequestBuilder,
-    request_id: Option<&str>,
-) -> Result<reqwest::Response, String> {
-    if let Some(request_id) = request_id {
-        if fetch_text_is_cancelled(request_id) {
-            return Err("请求已取消".into());
-        }
-        tokio::select! {
-            result = request.send() => result.map_err(|error| error.to_string()),
-            _ = wait_for_fetch_cancel(request_id) => Err("请求已取消".into()),
-        }
-    } else {
-        request.send().await.map_err(|error| error.to_string())
-    }
-}
-
-fn is_public_ip(ip: IpAddr) -> bool {
-    match ip {
-        IpAddr::V4(value) => {
-            let octets = value.octets();
-            let shared = octets[0] == 100 && (64..=127).contains(&octets[1]);
-            let reserved = octets[0] >= 240;
-            !(octets[0] == 0
-                || value.is_unspecified()
-                || value.is_private()
-                || value.is_loopback()
-                || value.is_link_local()
-                || value.is_broadcast()
-                || value.is_documentation()
-                || value.is_multicast()
-                || shared
-                || reserved
-                || (octets[0] == 198 && (octets[1] == 18 || octets[1] == 19))
-                || (octets[0] == 192 && octets[1] == 0 && octets[2] == 0))
-        }
-        IpAddr::V6(value) => {
-            if let Some(mapped) = value.to_ipv4_mapped() {
-                return is_public_ip(IpAddr::V4(mapped));
-            }
-            let first = value.segments()[0];
-            !(value.is_unspecified()
-                || value.is_loopback()
-                || value.is_multicast()
-                || value.is_unicast_link_local()
-                || (first == 0x2001 && value.segments()[1] == 0x0db8)
-                || (first & 0xfe00) == 0xfc00)
-        }
-    }
-}
-
-/// Clash / Surge 等代理的 fake-ip 段（RFC 2544 基准测试段 198.18.0.0/15）。
-/// 本地 DNS 被代理接管时，公网域名会解析成这里的地址；只有**走代理**时才放行，
-/// 因为真正的连接由代理按主机名建立，本机不会直连这个地址。
-fn is_proxy_fake_ip(ip: IpAddr) -> bool {
-    match ip {
-        IpAddr::V4(value) => {
-            let octets = value.octets();
-            octets[0] == 198 && (octets[1] == 18 || octets[1] == 19)
-        }
-        IpAddr::V6(value) => value
-            .to_ipv4_mapped()
-            .is_some_and(|mapped| is_proxy_fake_ip(IpAddr::V4(mapped))),
-    }
-}
-
-/// 公网校验通过的一跳目标。
-struct PublicTarget {
-    host: String,
-    addresses: Vec<SocketAddr>,
-    /// 按系统 / 环境代理设置，这一跳应走的代理；`None` 为直连（DNS 钉死到 `addresses`）。
-    proxy: Option<String>,
-}
-
-/**
- * publicOnly 的每一跳校验（对账：免 Key 联网 · 跟随系统代理）。
- *
- * - 直连：本机解析 DNS，所有地址必须是公网，然后 `resolve_to_addrs` 把连接钉死在这些地址上，
- *   杜绝「校验时公网、连接时内网」的 DNS rebinding。
- * - 走代理：仍然先在本机解析并要求公网（fake-ip 段除外），但连接由代理按主机名完成，
- *   **无法钉死 DNS**——代理端解析结果理论上可能与本机不同。这是跟随系统代理的已知取舍：
- *   字面 IP、localhost、内网后缀和本机解析到内网的域名照旧拒绝；本机与内网字面地址
- *   永远不走代理（见 `system_proxy::ProxySettings::proxy_for`）。
- */
-async fn validate_public_url(
-    raw: &str,
-    proxies: &system_proxy::ProxySettings,
-) -> Result<PublicTarget, String> {
-    let parsed = reqwest::Url::parse(raw).map_err(|error| error.to_string())?;
-    if parsed.scheme() != "http" && parsed.scheme() != "https" {
-        return Err("只支持 http / https 地址".into());
-    }
-    let host = parsed
-        .host_str()
-        .ok_or_else(|| "地址缺少主机名".to_string())?
-        .trim_end_matches('.')
-        .to_ascii_lowercase();
-    if host.is_empty()
-        || host == "localhost"
-        || host.ends_with(".localhost")
-        || host.ends_with(".local")
-        || host.ends_with(".internal")
-        || host.ends_with(".home.arpa")
-    {
-        return Err("设计调研只允许公开互联网地址".into());
-    }
-    let port = parsed
-        .port_or_known_default()
-        .ok_or_else(|| "无法确定目标端口".to_string())?;
-    let proxy = proxies.proxy_for(parsed.scheme(), &host).map(str::to_string);
-    if let Ok(ip) = host.parse::<IpAddr>() {
-        return if is_public_ip(ip) {
-            Ok(PublicTarget {
-                host,
-                addresses: vec![SocketAddr::new(ip, port)],
-                proxy,
-            })
-        } else {
-            Err("设计调研拒绝本机、内网或链路本地地址".into())
-        };
-    }
-    let lookup_host = host.clone();
-    let addresses = tauri::async_runtime::spawn_blocking(move || {
-        (lookup_host.as_str(), port)
-            .to_socket_addrs()
-            .map(|items| items.collect::<Vec<_>>())
-    })
-    .await
-    .map_err(|error| error.to_string())?
-    .map_err(|error| error.to_string())?;
-    if addresses.is_empty() {
-        return Err("目标域名没有解析到地址".into());
-    }
-    if !resolved_addresses_allowed(&addresses, proxy.is_some()) {
-        return Err("目标域名解析到了本机、内网或链路本地地址".into());
-    }
-    Ok(PublicTarget {
-        host,
-        addresses,
-        proxy,
-    })
-}
-
-/// 解析结果是否可用：全部公网；走代理时额外容忍代理 fake-ip 段。
-fn resolved_addresses_allowed(addresses: &[SocketAddr], proxied: bool) -> bool {
-    !addresses.is_empty()
-        && addresses
-            .iter()
-            .all(|address| is_public_ip(address.ip()) || (proxied && is_proxy_fake_ip(address.ip())))
-}
-
-#[tauri::command]
-async fn fetch_text(
-    url: String,
-    method: Option<String>,
-    headers: Option<std::collections::HashMap<String, String>>,
-    body: Option<String>,
-    body_base64: Option<String>,
-    content_type: Option<String>,
-    multipart: Option<Vec<FetchMultipartPart>>,
-    timeout_ms: Option<u64>,
-    public_only: Option<bool>,
-    max_response_bytes: Option<u64>,
-    request_id: Option<String>,
-) -> Result<FetchedText, String> {
-    if !(url.starts_with("https://") || url.starts_with("http://")) {
-        return Err("只支持 http / https 地址".into());
-    }
-    let verb = method.unwrap_or_else(|| "GET".into()).to_uppercase();
-    let _cancel_guard = FetchTextCancelGuard(request_id.clone());
-    if request_id.as_deref().is_some_and(fetch_text_is_cancelled) {
-        return Err("请求已取消".into());
-    }
-    let public_only = public_only.unwrap_or(false);
-    if public_only && verb != "GET" && verb != "HEAD" {
-        return Err("公开互联网请求只允许 GET / HEAD".into());
-    }
-    if public_only {
-        // 每次请求读一次代理设置（环境变量优先，其次 Windows 系统代理），用户开关代理即时生效。
-        let proxies = system_proxy::current();
-        let mut current = url.clone();
-        let mut response = None;
-        for _ in 0..=5 {
-            let target = if let Some(request_id) = request_id.as_deref() {
-                tokio::select! {
-                    resolved = validate_public_url(&current, &proxies) => resolved?,
-                    _ = wait_for_fetch_cancel(request_id) => return Err("请求已取消".into()),
-                }
-            } else {
-                validate_public_url(&current, &proxies).await?
-            };
-            let builder = reqwest::Client::builder()
-                .timeout(std::time::Duration::from_millis(
-                    timeout_ms.unwrap_or(10000),
-                ))
-                .redirect(reqwest::redirect::Policy::none());
-            let builder = match target.proxy.as_deref() {
-                Some(proxy_url) => builder.proxy(
-                    reqwest::Proxy::all(proxy_url).map_err(|err| format!("代理地址无效：{err}"))?,
-                ),
-                None => builder
-                    .no_proxy()
-                    .resolve_to_addrs(&target.host, &target.addresses),
-            };
-            let hop_client = builder.build().map_err(|err| err.to_string())?;
-            let mut request = if verb == "HEAD" {
-                hop_client.head(&current)
-            } else {
-                hop_client.get(&current)
-            };
-            if let Some(map) = headers.as_ref() {
-                for (key, value) in map {
-                    request = request.header(key, value);
-                }
-            }
-            let next = send_fetch_request(request, request_id.as_deref()).await?;
-            if next.status().is_redirection() {
-                let location = next
-                    .headers()
-                    .get(reqwest::header::LOCATION)
-                    .and_then(|value| value.to_str().ok())
-                    .ok_or_else(|| "公开页面重定向缺少 Location".to_string())?;
-                let base = reqwest::Url::parse(&current).map_err(|err| err.to_string())?;
-                current = base
-                    .join(location)
-                    .map_err(|err| err.to_string())?
-                    .to_string();
-                continue;
-            }
-            response = Some(next);
-            break;
-        }
-        let response = response.ok_or_else(|| "公开页面重定向次数过多".to_string())?;
-        return collect_fetched_text(response, max_response_bytes, request_id.as_deref()).await;
-    }
-
-    let client = system_proxy::apply_to_builder(reqwest::Client::builder())
-        .timeout(std::time::Duration::from_millis(
-            timeout_ms.unwrap_or(10000),
-        ))
-        .build()
-        .map_err(|err| err.to_string())?;
-
-    let mut req = match verb.as_str() {
-        "GET" => client.get(&url),
-        "POST" => client.post(&url),
-        "PUT" => client.put(&url),
-        "DELETE" => client.delete(&url),
-        "HEAD" => client.head(&url),
-        other => return Err(format!("不支持的请求方法：{other}")),
-    };
-    let has_multipart = multipart.as_ref().is_some_and(|parts| !parts.is_empty());
-    let has_binary_body = body_base64.as_ref().is_some_and(|value| !value.is_empty());
-    if let Some(map) = headers {
-        for (k, v) in map {
-            if (has_multipart || has_binary_body) && k.eq_ignore_ascii_case("content-type") {
-                continue;
-            }
-            req = req.header(k, v);
-        }
-    }
-    if has_multipart {
-        let (content_type, payload) = multipart_body(multipart.unwrap_or_default())?;
-        req = req.header("content-type", content_type).body(payload);
-    } else if let Some(payload) = body_base64.filter(|value| !value.is_empty()) {
-        if let Some(content_type) = content_type.filter(|value| !value.is_empty()) {
-            req = req.header("content-type", content_type);
-        }
-        req = req.body(base64_decode(&payload)?);
-    } else if let Some(payload) = body {
-        if !payload.is_empty() {
-            req = req.body(payload);
-        }
-    }
-
-    let response = send_fetch_request(req, request_id.as_deref()).await?;
-    collect_fetched_text(response, max_response_bytes, request_id.as_deref()).await
-}
-
-async fn collect_fetched_text(
-    mut response: reqwest::Response,
-    max_response_bytes: Option<u64>,
-    request_id: Option<&str>,
-) -> Result<FetchedText, String> {
-    let status = response.status().as_u16();
-    let mut out_headers = std::collections::HashMap::new();
-    for (name, value) in response.headers().iter() {
-        if let Ok(v) = value.to_str() {
-            out_headers.insert(name.as_str().to_string(), v.to_string());
-        }
-    }
-    let content_type = out_headers
-        .get("content-type")
-        .cloned()
-        .or_else(|| out_headers.get("Content-Type").cloned());
-    let textual = is_textual_content_type(content_type.as_deref());
-    let hard_limit = if textual {
-        8 * 1024 * 1024
-    } else {
-        64 * 1024 * 1024
-    };
-    let limit = max_response_bytes
-        .map(|value| (value as usize).min(hard_limit))
-        .unwrap_or(hard_limit);
-    let mut bytes = Vec::new();
-    loop {
-        let chunk = if let Some(request_id) = request_id {
-            tokio::select! {
-                chunk = response.chunk() => chunk.map_err(|error| error.to_string())?,
-                _ = wait_for_fetch_cancel(request_id) => return Err("请求已取消".into()),
-            }
-        } else {
-            response.chunk().await.map_err(|err| err.to_string())?
-        };
-        let Some(chunk) = chunk else { break };
-        if bytes.len().saturating_add(chunk.len()) > limit {
-            return Err(if textual {
-                format!("响应太大（文本上限 {} bytes）", limit)
-            } else {
-                format!("响应太大（二进制上限 {} bytes）", limit)
-            });
-        }
-        bytes.extend_from_slice(&chunk);
-    }
-    if bytes.len() > hard_limit {
-        return Err(if textual {
-            "响应太大（文本超过 8MB）".into()
-        } else {
-            "响应太大（二进制超过 64MB）".into()
-        });
-    }
-    Ok(FetchedText {
-        status,
-        headers: out_headers,
-        final_url: response.url().to_string(),
-        // 文本响应完整解码；二进制只留前 64KB 供 HTTP 错误文案使用，
-        // 不把几十 MB 的图片再复制成一份无意义字符串。
-        text: if textual {
-            String::from_utf8_lossy(&bytes).to_string()
-        } else {
-            String::from_utf8_lossy(&bytes[..bytes.len().min(64 * 1024)]).to_string()
-        },
-        // 文本响应不额外复制一份 base64；图片 / 视频等二进制必须走原始字节。
-        // 0x89 在 text 里会变成 U+FFFD，永远不能从 text 反推文件内容。
-        body_base64: if textual {
-            String::new()
-        } else {
-            base64_encode(&bytes)
-        },
-    })
-}
-
-/**
- * `fetch_text` 的输入校验（对账 #518）。
- *
- * 这几条锁的是**没发请求就该拒**的那部分：地址协议与方法白名单。
- * 真打真实站点的用例不写在这里 —— 单测不该依赖外网（本机到 Google 域就常年不通）。
- */
-#[cfg(test)]
-mod fetch_text_tests {
-    use super::{
-        cancel_fetch_text, fetch_text_is_cancelled, is_proxy_fake_ip, is_public_ip,
-        resolved_addresses_allowed, validate_public_url, FetchTextCancelGuard,
-    };
-    use crate::system_proxy::{from_windows_values, ProxySettings};
-    use std::net::{IpAddr, SocketAddr};
-
-    fn addr(value: &str) -> SocketAddr {
-        SocketAddr::new(value.parse().unwrap(), 443)
-    }
-
-    #[test]
-    fn proxied_targets_tolerate_fake_ip_but_never_private_ranges() {
-        let fake = [addr("198.18.0.7")];
-        let public = [addr("8.8.8.8")];
-        let private = [addr("8.8.8.8"), addr("192.168.1.2")];
-        assert!(is_proxy_fake_ip("198.19.255.1".parse().unwrap()));
-        assert!(!is_proxy_fake_ip("198.20.0.1".parse().unwrap()));
-        assert!(resolved_addresses_allowed(&public, false));
-        assert!(!resolved_addresses_allowed(&fake, false));
-        assert!(resolved_addresses_allowed(&fake, true));
-        assert!(!resolved_addresses_allowed(&private, true));
-        assert!(!resolved_addresses_allowed(&[], true));
-    }
-
-    #[test]
-    fn public_url_validation_keeps_rejecting_local_targets_when_proxied() {
-        let proxies = from_windows_values(1, "127.0.0.1:7890", "");
-        let block_on = |raw: &str| tauri::async_runtime::block_on(validate_public_url(raw, &proxies));
-        for raw in [
-            "http://127.0.0.1:18765/state",
-            "http://localhost/x",
-            "http://printer.local/",
-            "http://10.0.0.1/",
-            "http://[::1]/",
-        ] {
-            assert!(block_on(raw).is_err(), "{raw}");
-        }
-        let target = block_on("https://8.8.8.8/dns-query").expect("public literal");
-        assert_eq!(target.proxy.as_deref(), Some("http://127.0.0.1:7890"));
-        let direct = tauri::async_runtime::block_on(validate_public_url(
-            "https://8.8.8.8/dns-query",
-            &ProxySettings::default(),
-        ))
-        .expect("public literal");
-        assert_eq!(direct.proxy, None);
-        assert_eq!(direct.addresses, vec![SocketAddr::new("8.8.8.8".parse().unwrap(), 443)]);
-    }
-
-    #[test]
-    fn public_only_ip_guard_rejects_local_and_private_ranges() {
-        let public: IpAddr = "8.8.8.8".parse().unwrap();
-        let private: IpAddr = "192.168.1.20".parse().unwrap();
-        let loopback: IpAddr = "127.0.0.1".parse().unwrap();
-        let link_local: IpAddr = "169.254.169.254".parse().unwrap();
-        let mapped: IpAddr = "::ffff:7f00:1".parse().unwrap();
-        let zero_network: IpAddr = "0.1.2.3".parse().unwrap();
-        let shared: IpAddr = "100.64.0.1".parse().unwrap();
-        let benchmark: IpAddr = "198.18.0.1".parse().unwrap();
-
-        assert!(is_public_ip(public));
-        assert!(!is_public_ip(private));
-        assert!(!is_public_ip(loopback));
-        assert!(!is_public_ip(link_local));
-        assert!(!is_public_ip(mapped));
-        assert!(!is_public_ip(zero_network));
-        assert!(!is_public_ip(shared));
-        assert!(!is_public_ip(benchmark));
-    }
-
-    #[test]
-    fn fetch_text_cancel_guard_clears_the_request_id() {
-        let id = "cancel-test-request".to_string();
-        cancel_fetch_text(id.clone());
-        assert!(fetch_text_is_cancelled(&id));
-        {
-            let _guard = FetchTextCancelGuard(Some(id.clone()));
-        }
-        assert!(!fetch_text_is_cancelled(&id));
-    }
-
-    #[test]
-    fn rejects_non_http_url() {
-        assert!(!"ftp://x/y".starts_with("http://") && !"ftp://x/y".starts_with("https://"));
-        assert!("http://a/b".starts_with("http://"));
-        assert!("https://a/b".starts_with("https://"));
-    }
-
-    #[test]
-    fn method_allowlist_is_exactly_five() {
-        // 与 `fetch_text` 里 match 的分支逐字一致：加/改方法时必须同时改这里
-        for m in ["GET", "POST", "PUT", "DELETE", "HEAD"] {
-            assert!(matches!(m, "GET" | "POST" | "PUT" | "DELETE" | "HEAD"));
-        }
-        assert!(!matches!(
-            "PATCH",
-            "GET" | "POST" | "PUT" | "DELETE" | "HEAD"
-        ));
-    }
-
-    #[test]
-    fn content_type_splits_text_from_binary() {
-        assert!(super::is_textual_content_type(Some(
-            "application/json; charset=utf-8"
-        )));
-        assert!(super::is_textual_content_type(Some("text/event-stream")));
-        assert!(!super::is_textual_content_type(Some("image/png")));
-        assert!(!super::is_textual_content_type(Some("video/mp4")));
-        assert!(!super::is_textual_content_type(None));
-    }
-}
 
 #[cfg(test)]
 mod storage_tests {
@@ -3377,7 +2471,7 @@ const CLI_IN_DIR_NAME: &str = "cli-in";
 ///
 /// 手写而不引依赖：整个壳只有这一个用途，而它必须与前端
 /// `domain/shared/base64.ts` 的 `base64ToBytes` 精确对上（单测按 RFC 4648 的向量钉住）。
-fn base64_encode(bytes: &[u8]) -> String {
+pub(crate) fn base64_encode(bytes: &[u8]) -> String {
     const TABLE: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
     let mut out = String::with_capacity((bytes.len() + 2) / 3 * 4);
     for chunk in bytes.chunks(3) {
@@ -3401,7 +2495,7 @@ fn base64_encode(bytes: &[u8]) -> String {
     out
 }
 
-fn base64_decode(text: &str) -> Result<Vec<u8>, String> {
+pub(crate) fn base64_decode(text: &str) -> Result<Vec<u8>, String> {
     let clean = text.trim();
     if clean.len() % 4 != 0 {
         return Err("base64 长度不是 4 的倍数".into());
@@ -3735,15 +2829,15 @@ mod cli_out_tests {
 
     #[test]
     fn multipart_body_preserves_text_fields_and_file_bytes() {
-        let (content_type, body) = multipart_body(vec![
-            FetchMultipartPart {
+        let (content_type, body) = network_fetch::multipart_body(vec![
+            network_fetch::FetchMultipartPart {
                 name: "model".into(),
                 value: Some("gpt-image-2".into()),
                 data_base64: None,
                 file_name: None,
                 content_type: None,
             },
-            FetchMultipartPart {
+            network_fetch::FetchMultipartPart {
                 name: "image".into(),
                 value: None,
                 data_base64: Some(base64_encode(&[0x89, 0x50, 0x4e, 0x47])),
@@ -3838,479 +2932,6 @@ mod cli_out_tests {
 // （存什么、读什么、**这条几何还能不能用**），自己写反而更好测、也不用再加依赖。
 // 三条决策里的"还能不能用"写成纯函数 + 单测（见 `window_state_tests`）。
 
-/// 存盘用的窗口几何（物理像素）。
-///
-/// 位置取**外框**左上角、尺寸取**内尺寸** —— 两者在 `decorations: false` 下同一个矩形，
-/// 所以这里不用纠结"边框几个像素"，与 Tauri 的 `set_size`（设的是内尺寸）也自洽。
-#[derive(serde::Serialize, serde::Deserialize, Clone, Copy, PartialEq, Debug)]
-struct WindowGeometry {
-    x: i32,
-    y: i32,
-    w: u32,
-    h: u32,
-}
-
-#[derive(serde::Serialize, serde::Deserialize, Clone, Copy, PartialEq, Debug, Default)]
-struct SavedWindow {
-    #[serde(default)]
-    geometry: Option<WindowGeometry>,
-    /// 上次退出时是不是最大化（是的话下次直接最大化开）
-    #[serde(default)]
-    maximized: bool,
-}
-
-/// 最小可用尺寸（与 `tauri.conf.json` 的 `minWidth` / `minHeight` 一致）
-const WINDOW_MIN_W: u32 = 1024;
-const WINDOW_MIN_H: u32 = 700;
-
-/// 一块屏幕的可见区域（物理像素）
-#[derive(Clone, Copy, Debug)]
-struct MonitorRect {
-    x: i32,
-    y: i32,
-    w: u32,
-    h: u32,
-}
-
-/// **这条几何还能用吗**（纯函数）。
-///
-/// 场景：上次在副屏 / 大分辨率下用的窗口，这次副屏拔了 —— 直接照搬会把窗口放回一块
-/// 不存在的屏幕，用户看到的是"点了图标什么都没出现"（窗口在屏幕外）。所以：
-/// - 尺寸先夹到不小于最小可用尺寸、不大于那块屏幕；
-/// - **左上角（标题栏那一带）必须落在某块屏幕里**，且至少露出 `200 × 100` ——
-///   拖得回来、也点得到；
-/// - 一块都放不下就返回 `None`，调用方回落到"居中"。
-fn sanitize_geometry(geo: WindowGeometry, monitors: &[MonitorRect]) -> Option<WindowGeometry> {
-    let w = geo.w.max(WINDOW_MIN_W);
-    let h = geo.h.max(WINDOW_MIN_H);
-    for m in monitors {
-        let min_x = m.x - (w as i32 - 200);
-        let max_x = m.x + m.w as i32 - 200;
-        let min_y = m.y;
-        let max_y = m.y + m.h as i32 - 100;
-        if geo.x >= min_x && geo.x <= max_x && geo.y >= min_y && geo.y <= max_y {
-            return Some(WindowGeometry {
-                x: geo.x,
-                y: geo.y,
-                w: w.min(m.w),
-                h: h.min(m.h),
-            });
-        }
-    }
-    None
-}
-
-/// 存盘位置：与数据目录同一处（`<数据目录>/window.json`）——
-/// 用户 2026-10-06 要求"一个文件夹装数据"，窗口位置也是这份数据的一部分。
-fn window_state_file(app: &tauri::AppHandle) -> Option<PathBuf> {
-    Some(current_data_dir(app)?.join("window.json"))
-}
-
-fn read_window_state(app: &tauri::AppHandle) -> Option<SavedWindow> {
-    let text = std::fs::read_to_string(window_state_file(app)?).ok()?;
-    serde_json::from_str(&text).ok()
-}
-
-/// 落盘（`geometry = None` 表示"这次不要改几何"，只更新最大化的位）。
-fn write_window_state(app: &tauri::AppHandle, geometry: Option<WindowGeometry>, maximized: bool) {
-    let mut state = read_window_state(app).unwrap_or_default();
-    if let Some(geo) = geometry {
-        state.geometry = Some(geo);
-    }
-    state.maximized = maximized;
-    let Some(path) = window_state_file(app) else {
-        return;
-    };
-    match serde_json::to_string(&state) {
-        Ok(text) => {
-            if let Err(err) = std::fs::write(&path, text) {
-                eprintln!("[window] 记窗口位置失败：{err}");
-            }
-        }
-        Err(err) => eprintln!("[window] 序列化窗口位置失败：{err}"),
-    }
-}
-
-/// 把某块窗口的**当前**几何存下来（几何读不到时只更新最大化位）。
-fn remember_window(app: &tauri::AppHandle, win: &tauri::Window) {
-    /*
-     * ⚠️ **不可见 / 最小化时不记**（2026-10-06 实测踩到）：
-     * 窗口在启动时是 `visible: false`（先摆位置再露脸），而 `set_size` / `set_position`
-     * 同样会触发 `Resized` / `Moved` —— 那次记录读到的是"还没有内容的窗口"。
-     * 更糟的是最小化：Windows 把最小化窗口的坐标报成 **(-32000, -32000)**，尺寸也退化，
-     * 照记下去下次启动就把窗口丢到屏幕外（实测状态文件里出现过 `x:-32000,y:-32000,w:144,h:19`）。
-     */
-    if !win.is_visible().unwrap_or(false) || win.is_minimized().unwrap_or(false) {
-        return;
-    }
-    let maximized = win.is_maximized().unwrap_or(false);
-    let fullscreen = win.is_fullscreen().unwrap_or(false);
-    /*
-     * 最大化 / 全屏时**不记几何**：那时读到的尺寸是屏幕尺寸，记下去会把
-     * "还原后该多大"冲掉 —— 下次取消最大化就回不到用户原来拉的大小了。
-     */
-    let geometry = if maximized || fullscreen {
-        None
-    } else {
-        match (win.outer_position(), win.inner_size()) {
-            /* 坐标再兜一道：最小化的哨兵值 -32000 不该进状态文件 */
-            (Ok(pos), Ok(size)) if pos.x > -30000 && pos.y > -30000 => Some(WindowGeometry {
-                x: pos.x,
-                y: pos.y,
-                w: size.width,
-                h: size.height,
-            }),
-            _ => None,
-        }
-    };
-    write_window_state(app, geometry, maximized);
-}
-
-/// 起窗口时套用它：最大化过就直接最大化，否则设回尺寸 + 位置；
-/// 一条都不能用（或第一次启动）就居中。
-///
-/// `correct` = 是否做"显示后再量一次、把差值补掉"那一趟（见下面的说明）。
-fn apply_saved_window(app: &tauri::AppHandle, win: &tauri::WebviewWindow, correct: bool) {
-    let monitors: Vec<MonitorRect> = win
-        .available_monitors()
-        .map(|list| {
-            list.into_iter()
-                .map(|m| {
-                    let pos = m.position();
-                    let size = m.size();
-                    MonitorRect {
-                        x: pos.x,
-                        y: pos.y,
-                        w: size.width,
-                        h: size.height,
-                    }
-                })
-                .collect()
-        })
-        .unwrap_or_default();
-
-    let saved = read_window_state(app).unwrap_or_default();
-    if saved.maximized {
-        let _ = win.maximize();
-        return;
-    }
-    if let Some(geo) = saved.geometry.and_then(|g| sanitize_geometry(g, &monitors)) {
-        let _ = win.set_size(tauri::PhysicalSize::new(geo.w, geo.h));
-        let _ = win.set_position(tauri::PhysicalPosition::new(geo.x, geo.y));
-        /*
-         * ⚠️ **窗口还没显示时 `set_size` 量不准**（实测）：要 1264×811，显示后量到
-         * **1264×841**（高度差 30px、宽度却准）—— 系统对"还没显示 / 图标化"的窗口
-         * 另有一套非客户区算法。所以 `show()` 之后再量一次，把差值补掉。
-         * 只在这一趟做（`correct = true`），免得来回抖。
-         */
-        if correct {
-            if let Ok(actual) = win.inner_size() {
-                let dw = actual.width as i64 - geo.w as i64;
-                let dh = actual.height as i64 - geo.h as i64;
-                if dw != 0 || dh != 0 {
-                    let w = (geo.w as i64 - dw).max(WINDOW_MIN_W as i64) as u32;
-                    let h = (geo.h as i64 - dh).max(WINDOW_MIN_H as i64) as u32;
-                    let _ = win.set_size(tauri::PhysicalSize::new(w, h));
-                    let _ = win.set_position(tauri::PhysicalPosition::new(geo.x, geo.y));
-                }
-            }
-        }
-        return;
-    }
-    /* 第一次启动（或存的位置已经没用了）：居中 —— 与 `tauri.conf.json` 的 `center: true` 同义 */
-    let _ = win.center();
-}
-
-/// 恢复已有主窗口：show → unminimize → focus。
-///
-/// 第二实例回调里不能只按固定 label 找窗口：窗口 `create: false`、由 setup 手动构建，
-/// 版本变化或配置重载时 label 可能读不到。先找 `main`，再回落到应用当前唯一的 WebView。
-fn reveal_existing_window(app: &tauri::AppHandle) {
-    if let Ok(mut last) = app.state::<UiHealth>().last.lock() {
-        *last = Instant::now();
-    }
-    let window = app
-        .get_webview_window("main")
-        .or_else(|| app.webview_windows().into_values().next());
-    if let Some(window) = window {
-        let _ = window.show();
-        let _ = window.unminimize();
-        let _ = window.set_focus();
-    }
-}
-
-/// 前端存活心跳。窗口可见但 20 秒没有心跳，就认为 WebView 白屏 / 渲染进程卡死。
-struct UiHealth {
-    last: Mutex<Instant>,
-    reloads: AtomicUsize,
-}
-
-const UI_WATCHDOG_POLL: Duration = Duration::from_secs(5);
-const UI_WATCHDOG_STALE: Duration = Duration::from_secs(20);
-const UI_WATCHDOG_DEV_INITIAL_GRACE: Duration = Duration::from_secs(90);
-
-/// 开发壳首次加载要等 Vite 冷转换；过早 reload 会把本可成功的启动打断。
-/// 生产包加载内嵌资源，仍沿用原来的 20 秒恢复窗口。
-fn ui_watchdog_initial_grace(debug_build: bool) -> Duration {
-    if debug_build {
-        UI_WATCHDOG_DEV_INITIAL_GRACE
-    } else {
-        UI_WATCHDOG_STALE
-    }
-}
-
-impl Default for UiHealth {
-    fn default() -> Self {
-        Self {
-            last: Mutex::new(Instant::now()),
-            reloads: AtomicUsize::new(0),
-        }
-    }
-}
-
-#[tauri::command]
-fn ui_heartbeat(health: State<UiHealth>) {
-    if let Ok(mut last) = health.last.lock() {
-        *last = Instant::now();
-    }
-    health.reloads.store(0, Ordering::Relaxed);
-}
-
-/// 托盘：左键恢复窗口；菜单提供打开 / 重新加载 / 退出。
-fn setup_tray(app: &tauri::AppHandle) -> tauri::Result<()> {
-    let open = MenuItem::with_id(app, "tray_open", "打开轻画", true, None::<&str>)?;
-    let reload = MenuItem::with_id(app, "tray_reload", "重新加载界面", true, None::<&str>)?;
-    let quit = MenuItem::with_id(app, "tray_quit", "退出轻画", true, None::<&str>)?;
-    let menu = Menu::with_items(app, &[&open, &reload, &quit])?;
-    let mut builder = TrayIconBuilder::with_id("main")
-        .menu(&menu)
-        .tooltip("轻画")
-        .show_menu_on_left_click(false)
-        .on_menu_event(|app, event| match event.id().as_ref() {
-            "tray_open" => reveal_existing_window(app),
-            "tray_reload" => {
-                if let Some(window) = app.get_webview_window("main") {
-                    if let Ok(mut last) = app.state::<UiHealth>().last.lock() {
-                        *last = Instant::now();
-                    }
-                    let _ = window.eval("window.location.reload()");
-                }
-            }
-            "tray_quit" => app.exit(0),
-            _ => {}
-        })
-        .on_tray_icon_event(|tray, event| {
-            if let TrayIconEvent::Click {
-                button: MouseButton::Left,
-                button_state: MouseButtonState::Up,
-                ..
-            } = event
-            {
-                reveal_existing_window(tray.app_handle());
-            }
-        });
-    if let Some(icon) = app.default_window_icon() {
-        builder = builder.icon(icon.clone());
-    }
-    builder.build(app)?;
-    Ok(())
-}
-
-/// 白屏看门狗：只在窗口可见且未最小化时工作，托盘隐藏 / 正常最小化不会误重启。
-fn start_ui_watchdog(app: &tauri::AppHandle) {
-    if std::env::var_os("QINGHUA_DISABLE_UI_WATCHDOG").is_some() {
-        eprintln!("[ui] 已通过 QINGHUA_DISABLE_UI_WATCHDOG 暂停心跳看门狗");
-        return;
-    }
-    let app = app.clone();
-    std::thread::spawn(move || {
-        let initial_grace = ui_watchdog_initial_grace(cfg!(debug_assertions));
-        eprintln!(
-            "[ui] 白屏看门狗已启动；首次检查宽限 {} 秒",
-            initial_grace.as_secs()
-        );
-        std::thread::sleep(initial_grace);
-        loop {
-            std::thread::sleep(UI_WATCHDOG_POLL);
-            let Some(window) = app.get_webview_window("main") else {
-                continue;
-            };
-            if !window.is_visible().unwrap_or(false) || window.is_minimized().unwrap_or(false) {
-                continue;
-            }
-            let elapsed = app
-                .state::<UiHealth>()
-                .last
-                .lock()
-                .map(|last| last.elapsed())
-                .unwrap_or_default();
-            if elapsed < UI_WATCHDOG_STALE {
-                continue;
-            }
-            let attempts = app
-                .state::<UiHealth>()
-                .reloads
-                .fetch_add(1, Ordering::Relaxed);
-            eprintln!(
-                "[ui] 20 秒无心跳，WebView 可能白屏，执行第 {} 次重载",
-                attempts + 1
-            );
-            if let Ok(mut last) = app.state::<UiHealth>().last.lock() {
-                *last = Instant::now();
-            }
-            let _ = window.eval("window.location.reload()");
-            if attempts >= 1 && !cfg!(debug_assertions) {
-                app.restart();
-            }
-        }
-    });
-}
-
-#[cfg(test)]
-mod ui_watchdog_tests {
-    use super::*;
-
-    #[test]
-    fn dev_build_waits_for_cold_vite_transform() {
-        assert_eq!(ui_watchdog_initial_grace(true), Duration::from_secs(90));
-    }
-
-    #[test]
-    fn release_build_keeps_the_existing_recovery_window() {
-        assert_eq!(ui_watchdog_initial_grace(false), Duration::from_secs(20));
-    }
-}
-
-/// 节流用的时钟：拖动窗口时 `Resized` / `Moved` 每帧都来，不能每帧写一次盘。
-struct WindowSaveClock(std::sync::Mutex<std::time::Instant>);
-
-#[cfg(test)]
-mod window_state_tests {
-    use super::*;
-
-    fn monitor(x: i32, y: i32, w: u32, h: u32) -> MonitorRect {
-        MonitorRect { x, y, w, h }
-    }
-
-    #[test]
-    fn keeps_geometry_that_fits_a_monitor() {
-        let got = sanitize_geometry(
-            WindowGeometry {
-                x: 100,
-                y: 80,
-                w: 1440,
-                h: 900,
-            },
-            &[monitor(0, 0, 2560, 1440)],
-        );
-        assert_eq!(
-            got,
-            Some(WindowGeometry {
-                x: 100,
-                y: 80,
-                w: 1440,
-                h: 900
-            })
-        );
-    }
-
-    #[test]
-    fn keeps_a_window_on_a_negative_x_second_monitor() {
-        // 副屏在主屏左边 ⇒ 合法的 x 是负数，不能被当成"屏幕外"
-        let got = sanitize_geometry(
-            WindowGeometry {
-                x: -1800,
-                y: 40,
-                w: 1200,
-                h: 800,
-            },
-            &[monitor(0, 0, 2560, 1440), monitor(-1920, 0, 1920, 1080)],
-        );
-        assert!(got.is_some());
-    }
-
-    #[test]
-    fn drops_geometry_of_a_monitor_that_is_gone() {
-        // 副屏拔掉：x=-1800 那条现在哪块屏幕都不沾 ⇒ None（调用方居中）
-        let got = sanitize_geometry(
-            WindowGeometry {
-                x: -1800,
-                y: 40,
-                w: 1200,
-                h: 800,
-            },
-            &[monitor(0, 0, 2560, 1440)],
-        );
-        assert_eq!(got, None);
-    }
-
-    #[test]
-    fn bumps_a_too_small_size_to_the_minimum() {
-        let got = sanitize_geometry(
-            WindowGeometry {
-                x: 0,
-                y: 0,
-                w: 300,
-                h: 200,
-            },
-            &[monitor(0, 0, 2560, 1440)],
-        )
-        .unwrap();
-        assert_eq!((got.w, got.h), (WINDOW_MIN_W, WINDOW_MIN_H));
-    }
-
-    #[test]
-    fn clamps_a_size_larger_than_the_monitor() {
-        let got = sanitize_geometry(
-            WindowGeometry {
-                x: 0,
-                y: 0,
-                w: 5000,
-                h: 4000,
-            },
-            &[monitor(0, 0, 1920, 1080)],
-        )
-        .unwrap();
-        assert_eq!((got.w, got.h), (1920, 1080));
-    }
-
-    #[test]
-    fn rejects_a_window_whose_title_bar_is_above_the_screen() {
-        // y 在屏幕上方（拖不回来）⇒ None
-        let got = sanitize_geometry(
-            WindowGeometry {
-                x: 100,
-                y: -400,
-                w: 1200,
-                h: 800,
-            },
-            &[monitor(0, 0, 2560, 1440)],
-        );
-        assert_eq!(got, None);
-    }
-
-    #[test]
-    fn saved_state_round_trips_through_json() {
-        let state = SavedWindow {
-            geometry: Some(WindowGeometry {
-                x: 12,
-                y: 34,
-                w: 1440,
-                h: 900,
-            }),
-            maximized: true,
-        };
-        let text = serde_json::to_string(&state).unwrap();
-        assert_eq!(serde_json::from_str::<SavedWindow>(&text).unwrap(), state);
-        // 老文件（只有几何、没有 maximized）也要读得动
-        assert_eq!(
-            serde_json::from_str::<SavedWindow>("{\"geometry\":{\"x\":1,\"y\":2,\"w\":3,\"h\":4}}")
-                .unwrap()
-                .maximized,
-            false
-        );
-    }
-}
 
 #[cfg(test)]
 mod bundled_program_tests {
@@ -4354,7 +2975,7 @@ pub fn run() {
         builder
     } else {
         builder.plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
-            reveal_existing_window(app);
+            window_lifecycle::reveal_existing_window(app);
         }))
     };
     builder
@@ -4374,17 +2995,17 @@ pub fn run() {
          * 窗口几何的节流时钟（见 `WindowSaveClock`）。初值往回拨 10 秒，
          * 免得"启动后第一次微调尺寸"被节流吃掉。
          */
-        .manage(WindowSaveClock(std::sync::Mutex::new(
+        .manage(window_lifecycle::WindowSaveClock(std::sync::Mutex::new(
             std::time::Instant::now(),
         )))
-        .manage(UiHealth::default())
+        .manage(window_lifecycle::UiHealth::default())
         /*
          * 本机 CLI 的进程表（见上面「本机 CLI」那一段）。
          * 进的是 `AppHandle` 的受管状态，所以 `cli_run` 与 `cli_kill` 看到的是同一张表。
          */
         .manage(CliRegistry::default())
         .manage(CliWindowRegistry::default())
-        .manage(FetchStreamCancels::default())
+        .manage(network_fetch::FetchStreamCancels::default())
         /*
          * 窗口几何的自动记盘（用户 2026-10-06 第 11 批第 7 条："记住上次窗口尺寸和位置"）。
          *
@@ -4402,7 +3023,7 @@ pub fn run() {
             match event {
                 tauri::WindowEvent::Resized(_) | tauri::WindowEvent::Moved(_) => {
                     let app = window.app_handle();
-                    let clock_state = app.state::<WindowSaveClock>();
+                    let clock_state = app.state::<window_lifecycle::WindowSaveClock>();
                     let Ok(clock) = clock_state.0.lock() else {
                         return;
                     };
@@ -4413,10 +3034,10 @@ pub fn run() {
                     if let Ok(mut clock) = clock_state.0.lock() {
                         *clock = std::time::Instant::now();
                     }
-                    remember_window(app, window);
+                    window_lifecycle::remember_window(app, window);
                 }
                 tauri::WindowEvent::CloseRequested { api, .. } => {
-                    remember_window(window.app_handle(), window);
+                    window_lifecycle::remember_window(window.app_handle(), window);
                     /*
                      * 有托盘时关闭按钮只隐藏窗口：生成任务与系统通知继续运行。
                      * 真正退出走托盘菜单；托盘没建成功则保留系统默认关闭行为。
@@ -4434,8 +3055,8 @@ pub fn run() {
             grant_folder,
             pick_file,
             save_file_dialog,
-            check_update,
-            install_update,
+            updater::check_update,
+            updater::install_update,
             data_dir_path,
             pick_data_dir,
             set_data_dir,
@@ -4449,11 +3070,11 @@ pub fn run() {
             cache_usage,
             clear_cache,
             profile_backup_info,
-            fetch_bytes,
-            fetch_text,
-            cancel_fetch_text,
-            fetch_stream,
-            cancel_fetch_stream,
+            network_fetch::fetch_bytes,
+            network_fetch::fetch_text,
+            network_fetch::cancel_fetch_text,
+            network_fetch::fetch_stream,
+            network_fetch::cancel_fetch_stream,
             cli_which,
             cli_run,
             cli_kill,
@@ -4466,7 +3087,7 @@ pub fn run() {
             rh_set_api_key,
             credential_vault::credential_protect,
             credential_vault::credential_unprotect,
-            ui_heartbeat,
+            window_lifecycle::ui_heartbeat,
             canvas_gateway::canvas_gateway_info,
             canvas_gateway::canvas_gateway_respond,
             clipper_receiver::clipper_receiver_info,
@@ -4596,7 +3217,7 @@ pub fn run() {
              * "记住上次窗口尺寸和位置"）。`tauri.conf.json` 那条窗口因此配了 `visible: false`
              * —— 摆好位置再露脸，用户看不到"先居中、再跳到上次位置"那一下。
              */
-            apply_saved_window(app.handle(), &window, false);
+            window_lifecycle::apply_saved_window(app.handle(), &window, false);
             /*
              * 显式取消最小化再显示：Windows 对“图标化”的窗口只在任务栏留一个入口，
              * 而开发壳没有托盘图标，用户很容易把“最小化”理解成“挂了”。
@@ -4607,15 +3228,15 @@ pub fn run() {
                 eprintln!("[window] 显示主窗口失败：{err}");
             }
             let _ = window.set_focus();
-            if let Err(err) = setup_tray(app.handle()) {
+            if let Err(err) = window_lifecycle::setup_tray(app.handle()) {
                 eprintln!("[tray] 创建托盘失败（关闭按钮将退回直接退出）：{err}");
             }
-            start_ui_watchdog(app.handle());
+            window_lifecycle::start_ui_watchdog(app.handle());
             /*
              * 显示**之后**再套一次：窗口还没显示时系统对 `set_size` 另有一套算法
              * （实测差 30px 高），这一趟会量一次实际尺寸并把差值补掉（见 `apply_saved_window`）。
              */
-            apply_saved_window(app.handle(), &window, true);
+            window_lifecycle::apply_saved_window(app.handle(), &window, true);
             Ok(())
         })
         .build(tauri::generate_context!())
