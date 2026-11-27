@@ -75,8 +75,8 @@
   pointer-events: auto;
 }
 
-.surface[data-viewport-moving='true'] [data-panel-anchor],
-.surface[data-viewport-moving='true'] [data-node-follow-bar] {
+.surface[data-viewport-moving='true'] [data-panel-anchor]:not([data-panel-closing='true']),
+.surface[data-viewport-moving='true'] [data-node-follow-bar]:not([data-follow-closing='true']) {
   display: none;
 }
 
