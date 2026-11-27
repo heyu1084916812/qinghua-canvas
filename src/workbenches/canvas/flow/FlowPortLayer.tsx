@@ -50,9 +50,13 @@ export function FlowPortLayer({
   const store = useCanvasStore()
   const sourceGraph = useGraph()
   const frozenGraphRef = useRef(sourceGraph)
-  const dragging = store.getDraggingId() !== null
-  if (!dragging) frozenGraphRef.current = sourceGraph
-  const graph = dragging ? frozenGraphRef.current : sourceGraph
+  const draggingId = store.getDraggingId()
+  // 只有顶层拖动（由 DOM follower 接管端口层）时冻结图快照；分组内子节点拖动走 store 实时更新，不能冻结
+  const freezeForDirectDrag =
+    draggingId !== null &&
+    !sourceGraph.nodes.some((node) => node.id === draggingId && node.parentId != null)
+  if (!freezeForDirectDrag) frozenGraphRef.current = sourceGraph
+  const graph = freezeForDirectDrag ? frozenGraphRef.current : sourceGraph
   /** 容器子节点的端点只在选中时出现（理由见 `portHitsOf` 的 `selection` 参数） */
   const selection = useSelection()
   /** 端点在世界坐标里是常量（节点不动就不动）⇒ 只跟图走，**不跟视口走** */
