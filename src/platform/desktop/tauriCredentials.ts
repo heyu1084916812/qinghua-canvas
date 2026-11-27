@@ -30,22 +30,31 @@ export interface TauriCredentialDeps {
   legacy: Pick<CredentialPort, 'load' | 'save' | 'mask'>
 }
 
+function isUnsupportedPlatformError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error ?? '')
+  return /^unsupported(?::|\b)/i.test(message.trim())
+}
+
 /**
  * **桌面壳凭据端口**：API Key 交给 Windows DPAPI 加密（绑定当前 Windows 用户），
  * 共享存储里只留密文。
  *
  * 旧方案的口令写死在前端、盐与密文同库 ⇒ 拿到库就能解出全部 Key。
  * 这里读到旧格式时先用旧方式解开，再立刻以 DPAPI 重新写回（一次性迁移，用户无感）。
- * 壳不支持 DPAPI（非 Windows）时如实退回旧格式，不假装加密成功。
+ * 只有壳明确返回 `unsupported`（非 Windows）时才退回旧格式；Windows DPAPI 真实失败时
+ * 直接报错，绝不静默降级为弱加密。
  */
 export function createTauriCredentialsWith(deps: TauriCredentialDeps): CredentialPort {
   const save = async (ref: string, secret: string) => {
     let sealed: string
     try {
       sealed = await deps.seal(secret)
-    } catch {
-      await deps.legacy.save(ref, secret)
-      return
+    } catch (error) {
+      if (isUnsupportedPlatformError(error)) {
+        await deps.legacy.save(ref, secret)
+        return
+      }
+      throw error
     }
     const record: SealedCredential = { v: 2, dpapi: sealed }
     await deps.kvPut(REF_PREFIX + ref, record)

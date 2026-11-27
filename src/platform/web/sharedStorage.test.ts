@@ -1,5 +1,9 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { createSharedStorage, resolveSharedStoreUrl } from './sharedStorage'
+import {
+  createSharedStorage,
+  resolveSharedStoreToken,
+  resolveSharedStoreUrl,
+} from './sharedStorage'
 
 function response(value: unknown) {
   return {
@@ -27,6 +31,28 @@ describe('shared storage', () => {
     )
     expect(resolveSharedStoreUrl(undefined, '')).toBe('http://127.0.0.1:18765')
     expect(resolveSharedStoreUrl('0', '')).toBe('http://127.0.0.1:18765')
+  })
+
+  it('运行时会话令牌优先于构建时令牌，且自动附加到请求头', async () => {
+    expect(resolveSharedStoreToken('  rt-token  ', 'env-token')).toBe('rt-token')
+    expect(resolveSharedStoreToken(undefined, '  env-token  ')).toBe('env-token')
+    expect(resolveSharedStoreToken('', '   ')).toBeNull()
+
+    const capturedHeaders: Array<Record<string, string>> = []
+    vi.stubGlobal('window', { __QINGHUA_SHARED_STORE_TOKEN__: 'session-secret-1' })
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (_url: string, init?: RequestInit) => {
+        capturedHeaders.push((init?.headers ?? {}) as Record<string, string>)
+        return response({ ok: true })
+      }),
+    )
+
+    await createSharedStorage().put('nodes', { id: 'n1' })
+    expect(capturedHeaders[0]).toMatchObject({
+      'content-type': 'application/json',
+      'x-qinghua-token': 'session-secret-1',
+    })
   })
 
   it('open 接受当前共享存储协议', async () => {

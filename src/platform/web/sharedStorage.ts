@@ -24,6 +24,25 @@ export function resolveSharedStoreUrl(runtimePort: unknown, configuredUrl: unkno
   return explicit || DEFAULT_BASE_URL
 }
 
+export function resolveSharedStoreToken(
+  runtimeToken: unknown,
+  configuredToken: unknown,
+): string | null {
+  const runtime = typeof runtimeToken === 'string' ? runtimeToken.trim() : ''
+  if (runtime) return runtime
+  const configured = typeof configuredToken === 'string' ? configuredToken.trim() : ''
+  return configured || null
+}
+
+function currentSharedStoreToken(): string | null {
+  const runtimeToken =
+    typeof window === 'undefined'
+      ? undefined
+      : (window as Window & { __QINGHUA_SHARED_STORE_TOKEN__?: unknown })
+          .__QINGHUA_SHARED_STORE_TOKEN__
+  return resolveSharedStoreToken(runtimeToken, import.meta.env.VITE_SHARED_STORE_TOKEN)
+}
+
 const runtimeStorePort =
   typeof window === 'undefined'
     ? undefined
@@ -102,10 +121,12 @@ async function request(
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), timeoutMs)
   try {
+    const token = currentSharedStoreToken()
     const response = await fetch(`${SHARED_STORE_URL}${path}`, {
       ...init,
       headers: {
         'content-type': 'application/json',
+        ...(token ? { 'x-qinghua-token': token } : {}),
         ...(init.headers ?? {}),
       },
       signal: controller.signal,

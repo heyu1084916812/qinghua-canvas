@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import { createTauriCredentialsWith, type TauriCredentialDeps } from './tauriCredentials'
 
-function setup(options: { sealFails?: boolean } = {}) {
+function setup(options: { sealError?: string } = {}) {
   const kv = new Map<string, unknown>()
   const legacyStore = new Map<string, string>()
   const deps: TauriCredentialDeps = {
     seal: async (plain) => {
-      if (options.sealFails) throw new Error('unsupported')
+      if (options.sealError) throw new Error(options.sealError)
       return `SEALED(${btoa(plain)})`
     },
     unseal: async (sealed) => atob(sealed.slice('SEALED('.length, -1)),
@@ -48,11 +48,17 @@ describe('tauri DPAPI credentials', () => {
     expect(await port.load('old')).toBe('sk-old-key')
   })
 
-  it('falls back to the legacy format when DPAPI is unavailable', async () => {
-    const { kv, port } = setup({ sealFails: true })
+  it('falls back to the legacy format only when platform explicitly reports unsupported', async () => {
+    const { kv, port } = setup({ sealError: 'unsupported: 当前平台没有系统凭据加密' })
     await port.save('ch2', 'sk-x')
     expect(kv.get('qinghua.cred.ch2')).toEqual({ iv: [1], ciphertext: [2] })
     expect(await port.load('ch2')).toBe('sk-x')
+  })
+
+  it('rejects without silently downgrading when Windows DPAPI sealing fails', async () => {
+    const { kv, port } = setup({ sealError: 'DPAPI 加密失败：access denied' })
+    await expect(port.save('ch-dpapi-fail', 'sk-secret')).rejects.toThrow('DPAPI 加密失败')
+    expect(kv.has('qinghua.cred.ch-dpapi-fail')).toBe(false)
   })
 
   it('returns null for missing refs and removes records', async () => {

@@ -4499,8 +4499,24 @@ pub fn run() {
             /*
              * 权威数据从这里开始不再属于某个 WebView origin。
              * 调试壳、release 壳和浏览器都连同一个本地服务与同一份文件库。
+             * 正式桌面壳（非 debug / 非 release_gate）自动生成随机会话令牌并注入主窗口，
+             * 阻止本机其他无关进程直接读写 KV 与业务表。
              */
-            qinghua_shared_store::start_in_background_on(shared_store_port);
+            let shared_store_token = std::env::var(qinghua_shared_store::TOKEN_ENV)
+                .ok()
+                .map(|value| value.trim().to_string())
+                .filter(|value| !value.is_empty())
+                .or_else(|| {
+                    if !cfg!(debug_assertions) && !release_gate {
+                        Some(qinghua_shared_store::generate_session_token())
+                    } else {
+                        None
+                    }
+                });
+            qinghua_shared_store::start_in_background_on_with_token(
+                shared_store_port,
+                shared_store_token.clone(),
+            );
             if release_gate {
                 eprintln!(
                     "[shared-store] release gate 使用隔离端口 {shared_store_port}，单实例插件已跳过"
@@ -4551,6 +4567,13 @@ pub fn run() {
                     builder = builder.initialization_script(format!(
                         "Object.defineProperty(window, '__QINGHUA_SHARED_STORE_PORT__', {{ value: {shared_store_port}, configurable: false }});"
                     ));
+                }
+                if let Some(token) = &shared_store_token {
+                    if let Ok(quoted) = serde_json::to_string(token) {
+                        builder = builder.initialization_script(format!(
+                            "Object.defineProperty(window, '__QINGHUA_SHARED_STORE_TOKEN__', {{ value: {quoted}, configurable: false }});"
+                        ));
+                    }
                 }
                 if let Some(dir) = dir {
                     builder = builder.data_directory(dir);

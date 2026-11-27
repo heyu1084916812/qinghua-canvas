@@ -16,6 +16,8 @@ pub mod v2_admin;
 
 pub const PORT: u16 = 18765;
 pub const PORT_ENV: &str = "QINGHUA_SHARED_STORE_PORT";
+pub const TOKEN_ENV: &str = "QINGHUA_SHARED_STORE_TOKEN";
+pub const TOKEN_HEADER: &str = "x-qinghua-token";
 
 /// 解析显式端口；空值回退到默认值，`0` 和无符号范围外的值直接拒绝。
 ///
@@ -37,6 +39,79 @@ pub fn parse_port(raw: Option<&str>, fallback: u16) -> Result<u16, String> {
 static STARTED: OnceLock<()> = OnceLock::new();
 static TEMP_SEQUENCE: AtomicU64 = AtomicU64::new(1);
 static ACTIVE_BACKEND: OnceLock<Arc<RwLock<Arc<dyn StoreBackend>>>> = OnceLock::new();
+static AUTH_TOKEN: OnceLock<Option<String>> = OnceLock::new();
+
+fn normalize_token(raw: Option<&str>) -> Option<String> {
+    raw.map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(ToString::to_string)
+}
+
+fn configured_env_token() -> Option<String> {
+    normalize_token(std::env::var(TOKEN_ENV).ok().as_deref())
+}
+
+/// 生成 256-bit 随机会话令牌（64 位十六进制），不引入额外 crate。
+pub fn generate_session_token() -> String {
+    use std::collections::hash_map::RandomState;
+    use std::hash::{BuildHasher, Hasher};
+
+    let mut out = String::with_capacity(64);
+    let pid = std::process::id();
+    for round in 0..4u64 {
+        let state = RandomState::new();
+        let mut hasher = state.build_hasher();
+        let nanos = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_nanos())
+            .unwrap_or(0);
+        let seq = TEMP_SEQUENCE.fetch_add(1, Ordering::Relaxed);
+        hasher.write_u32(pid);
+        hasher.write_u64(round);
+        hasher.write_u64(seq);
+        hasher.write_u128(nanos);
+        out.push_str(&format!("{:016x}", hasher.finish()));
+    }
+    out
+}
+
+fn constant_time_eq(a: &[u8], b: &[u8]) -> bool {
+    if a.len() != b.len() {
+        return false;
+    }
+    let mut diff = 0u8;
+    for (x, y) in a.iter().zip(b.iter()) {
+        diff |= x ^ y;
+    }
+    diff == 0
+}
+
+fn token_exempt_path(method: &Method, path: &str) -> bool {
+    method == &Method::Get
+        && (path == "/health"
+            || path.starts_with("/asset/")
+            || path.starts_with("/thumb/")
+            || path.starts_with("/preview/"))
+}
+
+fn token_guard(
+    method: &Method,
+    path: &str,
+    expected: Option<&str>,
+    provided: Option<&str>,
+) -> Result<(), &'static str> {
+    let Some(expected) = expected.map(str::trim).filter(|v| !v.is_empty()) else {
+        return Ok(());
+    };
+    if token_exempt_path(method, path) {
+        return Ok(());
+    }
+    let provided = provided.map(str::trim).unwrap_or("");
+    if !constant_time_eq(provided.as_bytes(), expected.as_bytes()) {
+        return Err("unauthorized: missing or invalid shared-store token");
+    }
+    Ok(())
+}
 
 #[derive(Clone)]
 struct Store {
@@ -721,7 +796,10 @@ fn respond_json(
         .with_header(header("content-type", "application/json; charset=utf-8"))
         .with_header(header("cache-control", "no-store"))
         .with_header(header("access-control-allow-methods", "GET,POST,OPTIONS"))
-        .with_header(header("access-control-allow-headers", "content-type"));
+        .with_header(header(
+            "access-control-allow-headers",
+            "content-type, x-qinghua-token",
+        ));
     if let Some(origin) = origin.filter(|origin| origin_allowed(origin)) {
         response = response.with_header(header("access-control-allow-origin", origin));
     }
@@ -1276,7 +1354,10 @@ fn handle(backends: Arc<RwLock<Arc<dyn StoreBackend>>>, mut request: Request) {
         let _ = request.respond(
             Response::empty(StatusCode(204))
                 .with_header(header("access-control-allow-methods", "GET,POST,OPTIONS"))
-                .with_header(header("access-control-allow-headers", "content-type"))
+                .with_header(header(
+                    "access-control-allow-headers",
+                    "content-type, x-qinghua-token",
+                ))
                 .with_header(header(
                     "access-control-allow-origin",
                     origin
@@ -1300,6 +1381,22 @@ fn handle(backends: Arc<RwLock<Arc<dyn StoreBackend>>>, mut request: Request) {
                 .with_status_code(StatusCode(403))
                 .with_header(header("content-type", "application/json; charset=utf-8"))
                 .with_header(header("cache-control", "no-store")),
+        );
+        return;
+    }
+    let expected_token = AUTH_TOKEN.get().and_then(|value| value.as_deref());
+    let provided_token = request_header(&request, TOKEN_HEADER);
+    if let Err(reason) = token_guard(
+        request.method(),
+        &path,
+        expected_token,
+        provided_token.as_deref(),
+    ) {
+        let _ = respond_json(
+            request,
+            StatusCode(401),
+            json!({ "ok": false, "error": reason }),
+            origin.as_deref(),
         );
         return;
     }
@@ -1520,12 +1617,18 @@ pub fn default_data_dir() -> PathBuf {
 }
 
 pub fn start(data_dir: &Path, port: u16) -> Result<(), String> {
+    start_with_token(data_dir, port, configured_env_token())
+}
+
+pub fn start_with_token(data_dir: &Path, port: u16, token: Option<String>) -> Result<(), String> {
     fs::create_dir_all(data_dir).map_err(|error| format!("create data dir: {error}"))?;
     let server = Arc::new(
         Server::http(("127.0.0.1", port))
             .map_err(|error| format!("start shared store on {port}: {error}"))?,
     );
     let backend = select_backend(data_dir)?;
+    let normalized_token = normalize_token(token.as_deref());
+    let _ = AUTH_TOKEN.set(normalized_token);
     eprintln!(
         "[shared-store] backend={} data={}",
         backend.kind(),
@@ -1552,9 +1655,13 @@ pub fn start_in_background() {
 }
 
 pub fn start_in_background_on(port: u16) {
+    start_in_background_on_with_token(port, configured_env_token());
+}
+
+pub fn start_in_background_on_with_token(port: u16, token: Option<String>) {
     let _ = STARTED.get_or_init(|| {
         let data_dir = default_data_dir();
-        match start(&data_dir, port) {
+        match start_with_token(&data_dir, port, token) {
             Ok(()) => eprintln!(
                 "[shared-store] http://127.0.0.1:{port} {}",
                 data_dir.display()
@@ -2275,5 +2382,29 @@ mod request_guard_tests {
         assert!(request_guard(&Method::Post, host, None, None).is_err());
         assert!(request_guard(&Method::Post, host, None, Some("application/x-www-form-urlencoded")).is_err());
         assert!(request_guard(&Method::Post, host, None, Some("Application/JSON; charset=utf-8")).is_ok());
+    }
+
+    #[test]
+    fn token_guard_enforces_session_token_on_data_endpoints() {
+        let secret = Some("secret-token-123");
+        assert!(token_guard(&Method::Post, "/kv/get", None, None).is_ok());
+        assert!(token_guard(&Method::Post, "/kv/get", secret, None).is_err());
+        assert!(token_guard(&Method::Post, "/kv/get", secret, Some("wrong")).is_err());
+        assert!(token_guard(&Method::Get, "/rows?table=projects", secret, None).is_err());
+        assert!(token_guard(&Method::Post, "/kv/get", secret, Some("secret-token-123")).is_ok());
+        assert!(token_guard(&Method::Get, "/health", secret, None).is_ok());
+        assert!(token_guard(&Method::Get, "/thumb/abc", secret, None).is_ok());
+        assert!(token_guard(&Method::Get, "/asset/abc", secret, None).is_ok());
+        assert!(token_guard(&Method::Post, "/asset/abc", secret, None).is_err());
+    }
+
+    #[test]
+    fn generate_session_token_produces_distinct_64_hex_tokens() {
+        let a = generate_session_token();
+        let b = generate_session_token();
+        assert_eq!(a.len(), 64);
+        assert_eq!(b.len(), 64);
+        assert!(a.chars().all(|c| c.is_ascii_hexdigit()));
+        assert_ne!(a, b);
     }
 }
