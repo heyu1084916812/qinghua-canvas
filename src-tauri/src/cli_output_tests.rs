@@ -34,8 +34,18 @@ mod cli_output_tests {
     #[cfg(windows)]
     #[test]
     fn invalid_utf8_uses_system_ansi_codepage() {
-        let decoded = decode_cli_output(&[0xD6, 0xD0, 0xCE, 0xC4]); // GBK: 中文
-        assert_eq!(decoded, "中文");
+        #[link(name = "kernel32")]
+        extern "system" {
+            fn GetACP() -> u32;
+        }
+
+        let decoded = decode_cli_output(&[0xD6, 0xD0, 0xCE, 0xC4]); // CP936: 中文 / CP1252: ÖÐÎÄ
+        assert!(!decoded.is_empty());
         assert!(!decoded.contains('\u{FFFD}'));
+        match unsafe { GetACP() } {
+            936 => assert_eq!(decoded, "中文"),
+            1252 => assert_eq!(decoded, "ÖÐÎÄ"),
+            _ => {}
+        }
     }
 }
