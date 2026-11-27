@@ -43,8 +43,12 @@ function runInspector(args) {
     let stderr = ''
     const timer = setTimeout(() => {
       child.kill()
-      reject(new Error('MCP Inspector timed out after 120 seconds'))
-    }, 120_000)
+      reject(
+        new Error(
+          `MCP Inspector timed out after 240 seconds\nstderr: ${stderr.trim().slice(0, 500)}\nstdout: ${stdout.trim().slice(0, 500)}`,
+        ),
+      )
+    }, 240_000)
     child.stdout.on('data', (chunk) => {
       stdout += chunk
     })
@@ -77,6 +81,7 @@ function runInspector(args) {
 const serverCommand = [
   'powershell.exe',
   '-NoProfile',
+  '-NonInteractive',
   '-ExecutionPolicy',
   'Bypass',
   '-File',

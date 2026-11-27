@@ -48,4 +48,6 @@ jobs:
       - run: npm run prepare:ffmpeg
       - run: cargo test --manifest-path src-tauri/Cargo.toml
       - run: npm run test:canvas-mcp
+      - name: Warm up MCP Inspector CLI cache
+        run: npx -y @modelcontextprotocol/inspector --cli --help > $null
       - run: npm run test:canvas-mcp:inspector
