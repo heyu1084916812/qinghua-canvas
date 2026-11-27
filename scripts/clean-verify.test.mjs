@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { isRootTempFile, parseArgs, selectCleanTargets } from './clean-verify.mjs'
+import { isRootTempFile, isScriptTempFile, parseArgs, selectCleanTargets } from './clean-verify.mjs'
 
 describe('clean-verify', () => {
   it('identifies only local temp/probe/tauri/devserver files at repo root', () => {
@@ -10,6 +10,14 @@ describe('clean-verify', () => {
     expect(isRootTempFile('.gitignore')).toBe(false)
     expect(isRootTempFile('.env')).toBe(false)
     expect(isRootTempFile('README.md')).toBe(false)
+  })
+
+  it('identifies only gitignored probe/tmp scripts in scripts/', () => {
+    expect(isScriptTempFile('probe-knife.mjs')).toBe(true)
+    expect(isScriptTempFile('.tmp-14diag.mjs')).toBe(true)
+    expect(isScriptTempFile('__cleanup_db.html')).toBe(true)
+    expect(isScriptTempFile('clean-verify.mjs')).toBe(false)
+    expect(isScriptTempFile('check-doc-size.mjs')).toBe(false)
   })
 
   it('respects keep whitelist and maxAgeDays when selecting targets', () => {

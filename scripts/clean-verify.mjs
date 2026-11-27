@@ -10,10 +10,16 @@ import { fileURLToPath, pathToFileURL } from 'node:url'
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url))
 const ROOT_TEMP_FILE = /^\.(?:tmp-|probe-|tauri-dev|devserver)/
+const SCRIPT_TEMP_FILE = /^(?:probe-.*\.mjs|\.tmp-.*|__.*\.html)$/
 
 /** 判定根目录文件名是否属于可清理的本地临时转储 / 日志文件 */
 export function isRootTempFile(name) {
   return ROOT_TEMP_FILE.test(name)
+}
+
+/** 判定 scripts/ 下文件名是否属于已被 .gitignore 忽略的一次性探针 / 临时脚本 */
+export function isScriptTempFile(name) {
+  return SCRIPT_TEMP_FILE.test(name)
 }
 
 /**
@@ -98,11 +104,24 @@ function main() {
     }
   }
 
+  const scriptsDir = join(ROOT, 'scripts')
+  const scriptTempFiles = existsSync(scriptsDir)
+    ? readdirSync(scriptsDir, { withFileTypes: true })
+        .filter((entry) => entry.isFile() && isScriptTempFile(entry.name))
+        .map((entry) => entry.name)
+        .sort()
+    : []
+  if (!dryRun) {
+    for (const name of scriptTempFiles) {
+      rmSync(join(scriptsDir, name), { force: true })
+    }
+  }
+
   const prefix = dryRun ? '[dry-run] ' : ''
   console.log(
     `${prefix}✔ clean:verify 完成：.playwright-verify 清理 ${verifyTargets.length} 项` +
       `（保留 ${keep.length} 个白名单），.probe-tmp ${probeRemoved ? '已清理' : '不存在'}，` +
-      `根目录临时文件清理 ${rootTempFiles.length} 个`,
+      `根目录临时文件清理 ${rootTempFiles.length} 个，scripts 临时探针清理 ${scriptTempFiles.length} 个`,
   )
 }
 

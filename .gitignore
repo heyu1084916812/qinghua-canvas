@@ -82,6 +82,16 @@ yarn-error.log*
 # 发版出品：`scripts/release-desktop.mjs` 的产物（安装包 + latest.json），只在发布机上有
 /release/
 
+# 本地 UI 验收与探针过程产物（不入库，避免截图/trace 膨胀 Git 体积；已入库的历史文件不受影响）
+review/**/*.png
+review/**/*.jpg
+review/**/*.jpeg
+review/**/*.webp
+review/**/*.gz
+review/**/*.json
+review/**/probe-*.mjs
+review/**/*.patch
+
 # 开发版主库：项目安装目录旁的 data（真实素材可达数 GB，绝不入库）
 /data/
 /data-v2/
