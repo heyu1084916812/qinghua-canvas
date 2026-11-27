@@ -88,6 +88,8 @@ const common = [
   'json',
   '--transport',
   'stdio',
+  '--connect-timeout',
+  '60000',
   '--cwd',
   root,
   '-e',
