@@ -141,7 +141,7 @@ try {
 
   // Rust 单体文件行数上限（只许下降，防再次膨胀回 5000 行巨文件）
   const rustBudgets = [
-    ['src-tauri/src/lib.rs', 3680],
+    ['src-tauri/src/lib.rs', 2330],
     ['shared-store/src/lib.rs', 2420],
     ['shared-store/src/sqlite.rs', 2015],
   ]
