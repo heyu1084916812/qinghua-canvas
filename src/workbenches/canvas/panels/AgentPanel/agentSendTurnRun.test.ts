@@ -65,7 +65,7 @@ function ready(
     persistedTurn: persisted,
     visualNodeIds: ['node-1'],
     contextTrace: null,
-    explicitMediaModels: { image: 'm-img' },
+    explicitMediaModels: {},
     perImage: true,
     toolMode: 'native',
     turnTools: [],
@@ -292,7 +292,7 @@ describe('A-5 #3 / #4 / #5 / #6 / #9：保存与准备之间的顺序', () => {
     await runAgentSendTurn(h.input, h.ports)
 
     expect(seen.toolMode).toBe('native')
-    expect(seen.explicit).toEqual({ image: 'm-img' })
+    expect(seen.explicit).toEqual({})
     expect(seen.turnTools).toEqual([])
     // contextTrace 为 null 时显式 delete，读回来必须是 undefined
     expect(seen.trace).toBeUndefined()
@@ -334,6 +334,36 @@ describe('A-5 #3 / #4 / #5 / #6 / #9：保存与准备之间的顺序', () => {
       persisted,
       h.turnAbort,
     )
+  })
+
+  it('keeps an explicit frontend model for the next confirmation turn', async () => {
+    const h = harness()
+    h.ports.prepare = vi.fn(async ({ hooks }) => {
+      hooks.onPersisted(persisted)
+      await hooks.onRouteReady('op-1')
+      return ready({
+        explicitMediaModels: h.refs.explicitMediaModels.current.has('s1')
+          ? {}
+          : { image: 'GTP Image 2.6 pro' },
+      })
+    })
+    h.ports.updateSessionFields = vi.fn(async (id, patch) =>
+      session(id, patch),
+    )
+
+    await runAgentSendTurn(h.input, h.ports)
+    expect(h.ports.updateSessionFields).toHaveBeenCalledWith('s1', {
+      imageModel: 'GTP Image 2.6 pro',
+    })
+    expect(h.refs.explicitMediaModels.current.get('s1')).toEqual({
+      image: 'GTP Image 2.6 pro',
+    })
+
+    await runAgentSendTurn(h.input, h.ports)
+    expect(h.ports.updateSessionFields).toHaveBeenCalledTimes(1)
+    expect(h.refs.explicitMediaModels.current.get('s1')).toEqual({
+      image: 'GTP Image 2.6 pro',
+    })
   })
 
   it('#9 abortRefs.set 先于 setStatusFor(thinking)', async () => {

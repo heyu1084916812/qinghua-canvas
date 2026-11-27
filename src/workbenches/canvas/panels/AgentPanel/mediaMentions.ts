@@ -31,8 +31,8 @@ export function preferredGeneratedModel(layers: {
 }): string | undefined {
   return [
     layers.explicit,
-    layers.planned,
     layers.sessionPicked,
+    layers.planned,
     layers.sticky,
     layers.selected,
   ].find((value): value is string => typeof value === 'string' && value.trim() !== '')

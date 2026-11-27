@@ -771,6 +771,7 @@ export async function prepareAgentTurnRequest(
     ...(input.session.videoModel
       ? { video: input.session.videoModel }
       : {}),
+    ...explicitMediaModels,
   }
   const perImage = expectsPerImageFlows(
     plainText,

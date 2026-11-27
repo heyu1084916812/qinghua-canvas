@@ -87,8 +87,8 @@ export function createAgentToolRecipeContext(
       const stored = input.getStickyModels()[kind]
       const model = preferredGeneratedModel({
         explicit: apiModel(explicit),
-        planned: apiModel(planned),
         sessionPicked: apiModel(sessionPicked),
+        planned: apiModel(planned),
         sticky: apiModel(stored),
         selected: apiModel(input.selectedModelOf(kind)),
       })

@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { capabilityOfLogical } from '../../../../domain/project/modelCatalog'
 import {
   explicitMediaModelsFromMentions,
   preferredGeneratedModel,
@@ -37,6 +38,33 @@ describe('explicitMediaModelsFromMentions', () => {
     ).toEqual({})
   })
 
+  it('keeps an explicitly selected frontend image model even when its spelling differs from the upstream id', () => {
+    const channels = [
+      {
+        id: 'chat2api',
+        enabled: true,
+        models: [
+          {
+            id: 'gpt-image-2.6',
+            category: 'image' as const,
+            inputTypes: ['text' as const],
+          },
+        ],
+        modelCache: [],
+        modelMap: {
+          'GTP Image 2.6 pro': 'gpt-image-2.6',
+        },
+      },
+    ]
+
+    expect(
+      explicitMediaModelsFromMentions(
+        [{ kind: 'model', id: 'GTP Image 2.6 pro' }],
+        (model) => capabilityOfLogical(channels, model)?.category,
+      ),
+    ).toEqual({ image: 'GTP Image 2.6 pro' })
+  })
+
   it('lets this turn’s model chip beat inherited, sticky and selected-node models', () => {
     expect(
       preferredGeneratedModel({
@@ -56,5 +84,14 @@ describe('explicitMediaModelsFromMentions', () => {
         selected: 'Selected',
       }),
     ).toBe('Seedream 4')
+  })
+
+  it('keeps the frontend-selected session model above a model guessed by the agent plan', () => {
+    expect(
+      preferredGeneratedModel({
+        planned: 'GPT Image 2.6 pro',
+        sessionPicked: 'GTP Image 2.6 pro',
+      }),
+    ).toBe('GTP Image 2.6 pro')
   })
 })

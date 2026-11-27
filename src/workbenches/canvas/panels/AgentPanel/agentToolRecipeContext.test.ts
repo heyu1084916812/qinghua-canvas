@@ -138,14 +138,40 @@ describe('recipeForGenerated', () => {
       .toEqual({ channelId: 'ch-a', model: 'explicit-video' })
   })
 
-  it('计划里写的模型压过会话当前模型', () => {
+  it('会话当前的前端模型压过 Agent 计划里自行改写的模型名', () => {
     const { ctx } = harness({
       session,
       enabledChannels: [catalogChannel({ id: 'ch-a' })],
     })
 
     expect(ctx.recipeForGenerated('generation', genNode({ model: 'plan-img' })))
-      .toEqual({ channelId: 'ch-a', model: 'plan-img' })
+      .toEqual({ channelId: 'ch-a', model: 'session-img' })
+  })
+
+  it('★ 前端选择的模型名即使只差大小写顺序，也按渠道映射原样选路', () => {
+    const ch = catalogChannel({
+      id: 'chat2api',
+      models: [cap('gpt-image-2.6')],
+      modelMap: { 'GTP Image 2.6 pro': 'gpt-image-2.6' },
+    })
+    const { ctx } = harness({
+      session: {
+        id: 'session-a',
+        channelId: 'chat2api',
+        imageModel: 'GTP Image 2.6 pro',
+      },
+      enabledChannels: [ch],
+    })
+
+    expect(
+      ctx.recipeForGenerated(
+        'generation',
+        genNode({ model: 'GPT Image 2.6 pro' }),
+      ),
+    ).toEqual({
+      channelId: 'chat2api',
+      model: 'GTP Image 2.6 pro',
+    })
   })
 
   it('计划里的空串 / 空白回落到会话当前模型', () => {

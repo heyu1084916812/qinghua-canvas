@@ -3,7 +3,10 @@ import type { ChatMessage, ToolDeclaration } from '../../../../domain/shared/exe
 import type { AgentController } from '../../../../features/shared/agent/AgentController'
 import type { AgentToolMode } from '../../../../features/shared/agent/toolSupport'
 import type { TaskLifecycle } from '../../../../features/shared/lifecycle/taskLifecycle'
-import type { AgentSession } from '../../../../state/agent/sessionStore'
+import type {
+  AgentSession,
+  AgentSessionStore,
+} from '../../../../state/agent/sessionStore'
 import { errText, type AgentLoopDeps, type AgentLoopOutcome } from '../../agent/agentLoop'
 import type { AgentPanelStatus } from './AgentActivityViews'
 import { agentPhaseRunningTitle, agentPhaseTitle } from '../../../../domain/agent/phase'
@@ -104,10 +107,7 @@ export interface AgentSendTurnPorts {
     sessionId: string,
     messages: readonly ChatMessage[],
   ) => Promise<AgentSession | null>
-  updateSessionFields: (
-    sessionId: string,
-    patch: { taskPlan: undefined },
-  ) => Promise<AgentSession | null>
+  updateSessionFields: AgentSessionStore['updateFields']
   failTurn: AgentController['failTurn']
   /** 宿主侧把 prepareAgentTurnRequest 的静态入参接好，只把两个回调交回来。 */
   prepare: (args: AgentPrepareArgs) => Promise<AgentTurnRequestPreparation>
@@ -291,6 +291,15 @@ export async function runAgentSendTurn(
   const operationId = prepared.operationId
   const toolMode = prepared.toolMode
   const turnAgentTools = prepared.turnTools
+  /**
+   * 前端模型 chip 是当前会话的显式选择，不是只对一条消息有效。
+   * 中间插一句普通对话、随后再说“确认”时，后续回合没有 chip，
+   * 不能把上一轮的选择覆盖成空。
+   */
+  const explicitMediaModels = {
+    ...refs.explicitMediaModels.current.get(session.id),
+    ...prepared.explicitMediaModels,
+  }
   // A-5 #4：这五个 ref 必须在 loopDeps(...) 之前写好（loopDeps 按 ref 现取）。
   if (prepared.contextTrace) {
     refs.contextTrace.current.set(session.id, prepared.contextTrace)
@@ -298,10 +307,34 @@ export async function runAgentSendTurn(
     refs.contextTrace.current.delete(session.id)
   }
   refs.toolMode.current.set(session.id, toolMode)
-  refs.explicitMediaModels.current.set(
-    session.id,
-    prepared.explicitMediaModels,
-  )
+  refs.explicitMediaModels.current.set(session.id, explicitMediaModels)
+  /**
+   * chip 同步为会话当前模型：确认按钮、下一轮“确认”或页面刷新后，
+   * 落节点仍从同一份前端选择取值。只有本轮真的出现 chip 才写库。
+   */
+  if (prepared.explicitMediaModels.image || prepared.explicitMediaModels.video) {
+    const picked = {
+      ...(prepared.explicitMediaModels.image
+        ? { imageModel: prepared.explicitMediaModels.image }
+        : {}),
+      ...(prepared.explicitMediaModels.video
+        ? { videoModel: prepared.explicitMediaModels.video }
+        : {}),
+    }
+    const updatedSession = await ports.trackRun(() =>
+      ports.updateSessionFields(session.id, picked),
+    )
+    if (updatedSession) {
+      ui.setList((prev) =>
+        prev.map((item) =>
+          item.id === updatedSession.id ? updatedSession : item,
+        ),
+      )
+      if (ui.currentIdRef.current === updatedSession.id) {
+        ui.setCurrent(updatedSession)
+      }
+    }
+  }
   ui.setPerImage(session.id, prepared.perImage)
   refs.turnTools.current.set(session.id, turnAgentTools)
   // 任务判定已写库；回灌到面板快照，让确认 / 续跑入口读到同一个任务。

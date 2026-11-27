@@ -641,6 +641,61 @@ describe('prepareAgentTurnRequest', () => {
     expect(result.systemPrompt).toContain('验收一致性')
   })
 
+  it('★ 用户 @ 的前端图片模型压过会话默认模型并原样进入本轮提示词', async () => {
+    const { sessions, session } = await createSession({
+      imageModel: 'GPT Image 2.5 Sunburst',
+    })
+    const result = await prepareAgentTurnRequest({
+      ...inputFor({
+        sessions,
+        session,
+        text: `用 ${mentionToken(
+          'model',
+          'GTP Image 2.6 pro',
+          'GTP Image 2.6 pro',
+        )} 生成`,
+      }),
+      channels: [
+        {
+          id: 'channel-1',
+          enabled: true,
+          models: [
+            {
+              id: 'upstream-chat',
+              category: 'chat',
+              inputTypes: ['text'],
+            },
+          ],
+          modelMap: { 测试对话模型: 'upstream-chat' },
+        },
+        {
+          id: 'chat2api',
+          enabled: true,
+          models: [
+            {
+              id: 'gpt-image-2.6',
+              category: 'image',
+              inputTypes: ['text'],
+            },
+          ],
+          modelMap: { 'GTP Image 2.6 pro': 'gpt-image-2.6' },
+        },
+      ] as unknown as PrepareAgentTurnRequestInput['channels'],
+    })
+
+    expect(result.kind).toBe('ready')
+    if (result.kind !== 'ready') return
+    expect(result.explicitMediaModels).toEqual({
+      image: 'GTP Image 2.6 pro',
+    })
+    expect(result.systemPrompt).toContain(
+      '- 图片：GTP Image 2.6 pro',
+    )
+    expect(result.systemPrompt).not.toContain(
+      '- 图片：GPT Image 2.5 Sunburst',
+    )
+  })
+
   it('★★ @融合结果 这个图有什么：只把图片交给 chat，不产生 visualReview', async () => {
     const { sessions, session } = await createSession()
     const result = await prepareAgentTurnRequest({
