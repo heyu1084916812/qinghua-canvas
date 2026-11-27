@@ -27,7 +27,12 @@ import { useArrangeTools } from '../../../features/canvas/useArrangeTools'
 import { usePlatform } from '../../../app/providers/PlatformProvider'
 import { GRID_CUSTOM_MAX, GRID_PRESETS, splitNodeToGrid } from '../../../features/canvas/splitToGrid'
 import { noOverlapDelta } from '../../../features/canvas/duplicatePlacement'
-import { followBarAnchor } from './followBarAnchor'
+import {
+  avoidNeighborPorts,
+  DEFAULT_FOLLOW_BAR_WIDTH,
+  followBarAnchor,
+  neighborPortPoints,
+} from './followBarAnchor'
 import styles from './NodeFollowBar.module.css'
 import { FormatToolbar, type FormatAction } from '../text/FormatToolbar'
 import { applyInlineFormat, applyLineFormat, insertDivider, linePrefixOf } from '../../../domain/canvas/text/markdownFormat'
@@ -164,8 +169,12 @@ export function NodeFollowBar({ onClose, onOpenSettings, onDownload }: NodeFollo
 
   // 结果组子节点的父不在 nodes 表，必须走「图内」世界矩形（否则锚点飞到左上角）
   const rect = toWorldRectInGraph(node, graph)
-  // 锚点几何（含「上方装不下就翻到下方」）由纯函数给出，组件只负责用它
-  const anchor = followBarAnchor(rect, viewport)
+  // 锚点几何由纯函数给出；若压住邻节点端点则向上让位（#209）
+  const anchor = avoidNeighborPorts(
+    followBarAnchor(rect, viewport),
+    barRef.current?.offsetWidth || DEFAULT_FOLLOW_BAR_WIDTH,
+    neighborPortPoints(graph, node.id, viewport),
+  )
 
   const close = onClose ?? (() => store.setSelection([]))
 

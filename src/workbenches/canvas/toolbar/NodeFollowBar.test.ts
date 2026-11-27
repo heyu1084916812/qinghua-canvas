@@ -10,6 +10,7 @@ import { describe, it, expect } from 'vitest'
 import type { Viewport } from '../../../domain/canvas/geometry/coords'
 import type { Rect } from '../../../domain/canvas/geometry/rect'
 import {
+  avoidNeighborPorts,
   followBarAnchor,
   FOLLOW_BAR_HEIGHT,
   FOLLOW_BAR_GAP,
@@ -80,5 +81,17 @@ describe('followBarAnchor / 跟随栏锚点', () => {
     const a = followBarAnchor(r, vp(0, 0))
     /** 栏底（top + 栏高）落在标题带上沿之上 */
     expect(a.top + FOLLOW_BAR_HEIGHT).toBeLessThanOrEqual(r.y - NODE_TITLE_BAND)
+  })
+
+  it('#209 邻节点端点落在跟随栏矩形内时向上让位，未碰撞时保持原位', () => {
+    const base = followBarAnchor(rect(100, 200), vp(0, 0))
+    // 远处端点不碰撞 → 原样返回
+    expect(avoidNeighborPorts(base, 300, [{ x: 900, y: 150, radius: 25 }])).toEqual(base)
+
+    // 邻节点端点正好落在跟随栏正上方区域（centerX=220, top=134..170）
+    const shifted = avoidNeighborPorts(base, 300, [{ x: 260, y: 150, radius: 25 }])
+    expect(shifted.centerX).toBe(base.centerX)
+    expect(shifted.top + FOLLOW_BAR_HEIGHT).toBeLessThanOrEqual(150 - 25)
+    expect(shifted.top).toBeLessThan(base.top)
   })
 })

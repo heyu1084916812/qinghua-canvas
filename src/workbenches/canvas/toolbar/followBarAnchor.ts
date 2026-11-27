@@ -13,8 +13,12 @@
  * 栏一律保持在上方。翻转会让栏在节点上下横跳——同一个节点，用户只是往上拖了一点，
  * 栏就从上面跳到下面，比「暂时被顶栏压住」更难用。位置稳定优先于始终可见。
  */
-import type { Viewport } from '../../../domain/canvas/geometry/coords'
+import { toWorldRectInGraph, type Viewport } from '../../../domain/canvas/geometry/coords'
+import { PORT_EDGE_GAP, PORT_SIZE } from '../../../domain/canvas/geometry/portReveal'
 import type { Rect } from '../../../domain/canvas/geometry/rect'
+import type { GraphSnapshot } from '../../../domain/canvas/model/graph'
+import { portDeclsOf } from '../../../domain/canvas/nodeSpecs/ports'
+import { getSpec } from '../../../domain/canvas/nodeSpecs/registry'
 
 /**
  * 节点**标题带**的高度（屏幕 px）。
@@ -38,6 +42,18 @@ export const NODE_TITLE_BAND = 24
 export const FOLLOW_BAR_GAP = NODE_TITLE_BAND + 6
 /** 栏高（屏幕 px）：按钮 26 + 内距 4×2 + 描边 1×2 ≈ 36，取整以稳定翻转判定 */
 export const FOLLOW_BAR_HEIGHT = 36
+/** 首帧尚未测量宽度时的默认估宽（屏幕 px），用于邻节点端点让位判定 */
+export const DEFAULT_FOLLOW_BAR_WIDTH = 320
+/** 跟随栏避让邻节点端点时的安全间隙（屏幕 px） */
+const PORT_AVOID_MARGIN = 6
+/** 单次让位的最大上移距离（屏幕 px），防止密集画布下栏飞离节点过远 */
+const MAX_PORT_AVOID_LIFT = 120
+
+export interface PortScreenPoint {
+  x: number
+  y: number
+  radius: number
+}
 
 export interface FollowBarAnchor {
   /** 栏目水平中心（屏幕 x），由调用方 `translateX(-50%)` 居中使用 */
@@ -50,4 +66,64 @@ export function followBarAnchor(rect: Rect, viewport: Viewport): FollowBarAnchor
   const centerX = (rect.x + rect.w / 2 - viewport.x) * viewport.zoom
   const topEdge = (rect.y - viewport.y) * viewport.zoom
   return { centerX, top: topEdge - FOLLOW_BAR_HEIGHT - FOLLOW_BAR_GAP }
+}
+
+/** 收集除当前选中节点外，所有顶层邻节点的端点屏幕圆心与半径（用于 #209 让位）。 */
+export function neighborPortPoints(
+  graph: GraphSnapshot,
+  selectedNodeId: string,
+  viewport: Viewport,
+): PortScreenPoint[] {
+  const zoom = viewport.zoom || 1
+  const radius = PORT_SIZE / 2 + 4
+  const out: PortScreenPoint[] = []
+  for (const node of graph.nodes) {
+    if (node.id === selectedNodeId || node.parentId != null) continue
+    const spec = getSpec(node.type)
+    if (!spec) continue
+    const rect = toWorldRectInGraph(node, graph)
+    for (const port of portDeclsOf(spec.ports)) {
+      const edgeX = port.side === 'left' ? rect.x : rect.x + rect.w
+      const worldY = rect.y + rect.h * port.y
+      const screenX =
+        (edgeX - viewport.x) * zoom + (port.side === 'left' ? -PORT_EDGE_GAP : PORT_EDGE_GAP)
+      const screenY = (worldY - viewport.y) * zoom
+      out.push({ x: screenX, y: screenY, radius })
+    }
+  }
+  return out
+}
+
+/**
+ * #209：当跟随栏的屏幕矩形压住任一邻节点端点时，向上让位（保持水平居中且绝不翻到节点下方）。
+ * 未碰撞时原样返回，保持零位移。
+ */
+export function avoidNeighborPorts(
+  anchor: FollowBarAnchor,
+  barWidth: number,
+  neighborPorts: readonly PortScreenPoint[],
+): FollowBarAnchor {
+  if (neighborPorts.length === 0) return anchor
+  const halfW = Math.max(barWidth, 80) / 2
+  const left = anchor.centerX - halfW
+  const right = anchor.centerX + halfW
+  let top = anchor.top
+  const minTop = anchor.top - MAX_PORT_AVOID_LIFT
+
+  for (let pass = 0; pass < 3; pass += 1) {
+    let nextTop = top
+    for (const port of neighborPorts) {
+      if (port.x + port.radius <= left || port.x - port.radius >= right) continue
+      const portTop = port.y - port.radius
+      const portBottom = port.y + port.radius
+      if (portBottom <= top || portTop >= top + FOLLOW_BAR_HEIGHT) continue
+      const candidate = portTop - FOLLOW_BAR_HEIGHT - PORT_AVOID_MARGIN
+      if (candidate < nextTop) nextTop = candidate
+    }
+    if (nextTop === top) break
+    top = Math.max(nextTop, minTop)
+    if (top === minTop) break
+  }
+
+  return top === anchor.top ? anchor : { centerX: anchor.centerX, top }
 }
