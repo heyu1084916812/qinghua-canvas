@@ -8,18 +8,11 @@
 
 
 ## 项目与架构
-- React + Vite + TS 纯前端，IndexedDB（dexie）唯一主存储，无后端。七层：domain 纯函数 → platform ports → state commands → workbenches UI，depcruise 强制。唯一入口 `store.dispatch(command)`。
-- ⚠️ **代码里目前没有 Tauri**：无 `src-tauri/`、package.json 无 tauri 依赖，实为纯 Vite Web 应用（`npm run dev` → :1420）。「Tauri」只是规划，别再当现状写进文档。
-- 工作台：**现只有 `'canvas'`**。路由级 lazy。**新增架构约束必须同步落 depcruise 规则，否则静默失效。**
-  > ⚠️ **2026-09-25：comic（漫画剧）工作台已按用户要求整体移除。** 用户是设计师，该方向从来不是需求
-  > （「当时写出来是因为你判断错了」），真正想要的是**漫剧** —— 一个视频工作台
-  > （2026-09-11 只出过设计稿、从未写代码，仍待复起）。移除约 1 万行
-  > （`domain/comic` / `features/comic` / `state/workbenches/comic` / `workbenches/comic` /
-  > `pages/ComicPage`）+ 13 个冒烟组；`WorkbenchId` 收窄为 `'canvas'`。
-  > 回滚分支：`backup/comic-workbench-before-removal`。
-  > **但多工作台的骨架刻意保留**（`WORKBENCHES` 表 / `WORKBENCH_ORDER` / `projectRoute` /
-  > `createStore` 的 switch）—— 退化成单值会让「再开一个工作台」重新变成大改。
-- 持久化按数据形态选型：图结构 → 补丁流 `PersistPlan`；单聚合对象（comic）→ 防抖 800ms 整对象覆盖写一行。
+- React + Vite + TS 前端 + **Tauri 2 桌面壳（`src-tauri/`）+ Rust 共享存储服务（`shared-store/`，SQLite + 本地 HTTP）**；纯 Web 模式下回退 IndexedDB（Dexie）。七层：domain 纯函数 → platform ports → state commands → workbenches UI，depcruise 强制。唯一入口 `store.dispatch(command)`。
+- 桌面端（Windows）API 凭据通过 `src-tauri/src/credential_vault.rs` 走系统 DPAPI 加密；Web / 非 Windows 仍走固定口令 WebCrypto（详见对账清单 `S2`）。
+- 工作台：**现有 `canvas` / `ecommerce` / `storyboard` 三个工作台**（路由级 lazy，depcruise 强制 `ecommerce` 与 `storyboard` 不直接依赖画布运行时）。**新增架构约束必须同步落 depcruise 规则，否则静默失效。**
+  > ℹ️ 历史记录（2026-09-25）：早期误建的 `comic`（漫画剧）工作台已移除（回滚分支 `backup/comic-workbench-before-removal`），保留多工作台骨架后陆续落地了电商（`ecommerce`）与漫剧分镜（`storyboard`）工作台。
+- 持久化按数据形态选型：图结构 → 补丁流 `PersistPlan`；聚合对象 → 防抖整对象落库。
 
 ## 节奏与对账
 - 按「组」推进，每组完成停下汇报，等「继续」。收口：门禁（tsc/eslint/depcruise/vitest）+ 全量冒烟（`scripts/smoke.mjs`，:1420，chrome，`SMOKE_ONLY=<g>`）+ 提交 + 补记忆 + 同步文档。
