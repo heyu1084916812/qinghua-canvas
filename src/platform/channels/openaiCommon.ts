@@ -90,6 +90,19 @@ export function httpMessage(status: number): string {
   return `HTTP ${status}`
 }
 
+/** 部分网关把上游 401 包装成 503（常见 `no_healthy_account`），仍应按授权失败处理。 */
+export function upstreamAuthFailureOf(body?: string): boolean {
+  if (!body) return false
+  const text = body.toLowerCase()
+  return (
+    text.includes('no_healthy_account') ||
+    text.includes('invalid_api_key') ||
+    text.includes('401 authorization required') ||
+    text.includes('密钥无效') ||
+    /unauthori[sz]ed|authentication_error/.test(text)
+  )
+}
+
 /**
  * 已有 HTTP 状态码时的归一化（error 联合 + 可读文案）。
  *
@@ -97,6 +110,12 @@ export function httpMessage(status: number): string {
  * 否则上层（执行引擎 / 日志 / 界面）再怎么想显示细节也无从取起。
  */
 export function statusToFailure(status: number, body?: string): { error: AppError; message: string } {
+  if (upstreamAuthFailureOf(body)) {
+    return {
+      error: { kind: 'channel', detail: 'upstreamAuth' },
+      message: '上游没有可用授权账号；检查 Key 是否失效、额度用尽或分组无可用账号',
+    }
+  }
   const reason = serverReasonOf(body)
   const freeRateLimit =
     status === 429 &&
@@ -126,7 +145,11 @@ export function appErrorMessage(e: AppError): string {
       // 与 shared/result.describeError 同口径：拿到 body 就把服务端原话带上
       return e.body ? `${httpMessage(e.status)}｜服务端：${serverReasonOf(e.body) ?? e.body.slice(0, 200)}` : httpMessage(e.status)
     case 'channel':
-      return e.detail === 'missingKey' ? httpMessage(401) : `渠道不支持该能力（${e.detail}）`
+      return e.detail === 'missingKey'
+        ? httpMessage(401)
+        : e.detail === 'upstreamAuth'
+          ? '上游没有可用授权账号；检查 Key 是否失效、额度用尽或分组无可用账号'
+          : `渠道不支持该能力（${e.detail}）`
     case 'parse':
       return rawSnippetOf(e.raw)
         ? `响应不是合法 JSON：${rawSnippetOf(e.raw)}`

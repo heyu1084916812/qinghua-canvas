@@ -29,4 +29,22 @@ describe('statusToFailure · 429', () => {
     expect(out.error).toMatchObject({ kind: 'network', detail: 'dns' })
     expect(out.message).toContain('error sending request')
   })
+
+  it('detects an authorization failure nested inside a 503 body', () => {
+    const out = statusToFailure(
+      503,
+      JSON.stringify({
+        error: {
+          code: 'no_healthy_account',
+          message: '<html><title>401 Authorization Required</title></html>',
+        },
+      }),
+    )
+
+    expect(out.error).toEqual({
+      kind: 'channel',
+      detail: 'upstreamAuth',
+    })
+    expect(out.message).toContain('上游没有可用授权账号')
+  })
 })

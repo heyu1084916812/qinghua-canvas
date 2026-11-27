@@ -50,6 +50,12 @@ describe('路由候选降级', () => {
     expect(isRouteFallbackSafe({ kind: 'http', status: 429 })).toBe(true)
   })
 
+  it('网关包装成 503 的上游授权失败可安全换候选', () => {
+    expect(
+      isRouteFallbackSafe({ kind: 'channel', detail: 'upstreamAuth' }),
+    ).toBe(true)
+  })
+
   it('超时、408、响应丢失和内容错误不换候选', () => {
     expect(
       isRouteFallbackSafe({ kind: 'network', detail: 'timeout', sendPhase: 'unknown' }),

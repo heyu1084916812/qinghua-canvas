@@ -152,6 +152,24 @@ describe('openaiImages adapter / 基础契约', () => {
     })
   })
 
+  it('★ 生图 503 内嵌授权失败时不标记为已受理未知任务', async () => {
+    const net = createMemoryNetwork({
+      handler: async () => resp(503, {
+        error: {
+          code: 'no_healthy_account',
+          message: '<html><title>401 Authorization Required</title></html>',
+        },
+      }),
+    })
+    const a = createOpenAiImagesAdapter(cfg, {
+      network: net,
+      assets: platformWithAssets([]).assets,
+    })
+    await expect(a.generateImage(request([]), signal)).rejects.toMatchObject({
+      appError: { kind: 'channel', detail: 'upstreamAuth' },
+    })
+  })
+
   it('verify：200 但不是模型列表（SPA 兜底页 / 登录页）→ 判失败，否则「任何地址都命中」', async () => {
     const htmlPage = {
       status: 200,

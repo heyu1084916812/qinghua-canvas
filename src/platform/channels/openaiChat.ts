@@ -18,6 +18,7 @@ import {
   toModelCapability,
   CHAT_TIMEOUT_MS,
   VERIFY_TIMEOUT_MS,
+  upstreamAuthFailureOf,
 } from './openaiCommon'
 import { prepareModelImageInput } from './chatImageInput'
 
@@ -713,6 +714,7 @@ export function createOpenAiChatAdapter(config: OpenAiChatConfig, deps: ChannelD
           if (
             config.protocol !== '65535' &&
             appError?.kind === 'http' &&
+            !upstreamAuthFailureOf(appError.body) &&
             (appError.status === 408 || appError.status >= 500)
           ) {
             throw new ChannelError({
@@ -878,6 +880,7 @@ export function createOpenAiChatAdapter(config: OpenAiChatConfig, deps: ChannelD
       }
       if (
         config.protocol !== '65535' &&
+        !upstreamAuthFailureOf(detail) &&
         (res.status === 408 || res.status >= 500)
       ) {
         throw new ChannelError({

@@ -633,6 +633,24 @@ describe('openaiChat adapter / 多模态（上游图片送进 LLM）', () => {
       appError: { kind: 'execution', detail: 'accepted' },
     })
   })
+
+  it('503 内嵌 401 / no_healthy_account 时按上游授权失败展示', async () => {
+    const net = createMemoryNetwork({
+      handler: async () => resp(503, {
+        error: {
+          code: 'no_healthy_account',
+          message: '<html><title>401 Authorization Required</title></html>',
+        },
+      }),
+    })
+    const a = createOpenAiChatAdapter(cfg, {
+      network: net,
+      assets: platformWith([]).assets,
+    })
+    await expect(a.completeText(request([]), signal)).rejects.toMatchObject({
+      appError: { kind: 'channel', detail: 'upstreamAuth' },
+    })
+  })
 })
 
 /**

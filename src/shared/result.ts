@@ -19,7 +19,12 @@ export type AppError =
   | { kind: 'validation'; field: string; reason: string }
   | {
       kind: 'channel'
-      detail: 'missingChannel' | 'missingKey' | 'missingModel' | 'unsupported'
+      detail:
+        | 'missingChannel'
+        | 'missingKey'
+        | 'missingModel'
+        | 'unsupported'
+        | 'upstreamAuth'
     }
   /**
    * 上游已经受理任务，但后续轮询 / 取结果失败。
@@ -142,13 +147,18 @@ const STORAGE_TEXT: Record<'quota' | 'corrupt' | 'permission', string> = {
 }
 
 const CHANNEL_TEXT: Record<
-  'missingChannel' | 'missingKey' | 'missingModel' | 'unsupported',
+  | 'missingChannel'
+  | 'missingKey'
+  | 'missingModel'
+  | 'unsupported'
+  | 'upstreamAuth',
   string
 > = {
   missingChannel: '这个渠道已经删除，请重新选择平台',
   missingKey: '还没填令牌（API Key）',
   missingModel: '这个渠道里没有你选的那个模型',
   unsupported: '这个渠道不支持这次请求',
+  upstreamAuth: '上游没有可用的授权账号，检查 Key 是否失效、额度用尽或分组无可用账号',
 }
 
 const CLI_TEXT: Record<'notfound' | 'failed' | 'timeout' | 'canceled', string> = {

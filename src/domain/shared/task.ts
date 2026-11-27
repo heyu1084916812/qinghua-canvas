@@ -80,6 +80,7 @@ export function isRouteFallbackSafe(error: AppError): boolean {
    * 真正的本地“没填 Key”发生在发送前，同样不需要重发当前候选。
    */
   if (error.kind === 'channel' && error.detail === 'missingKey') return true
+  if (error.kind === 'channel' && error.detail === 'upstreamAuth') return true
   if (error.kind === 'http') {
     return (
       error.status === 401 ||

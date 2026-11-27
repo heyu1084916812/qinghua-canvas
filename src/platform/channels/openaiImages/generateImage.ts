@@ -1,5 +1,5 @@
 import { imageParamsFor } from '../../../domain/canvas/layout/imageParams'
-import { classifyError } from '../openaiCommon'
+import { classifyError, upstreamAuthFailureOf } from '../openaiCommon'
 import { ChannelError, type GeneratedAsset, type ImageRunRequest } from '../types'
 import type { AssetWriter, OpenAiImagesCore, SoonStudioSubmissionInput } from './contracts'
 import { generateChatImage } from './chatImageProtocol'
@@ -120,7 +120,12 @@ export async function generateImage(
   )
   if (res.status < 200 || res.status >= 300) {
     const detail = await readNetworkDetail(res)
-    if (res.status === 408 || res.status >= 500) {
+    if (
+      res.status !== 401 &&
+      res.status !== 403 &&
+      !upstreamAuthFailureOf(detail) &&
+      (res.status === 408 || res.status >= 500)
+    ) {
       throw acceptedAfterSubmit(`生图提交结果未知：HTTP ${res.status} ${detail}`)
     }
     const { error } = classifyError(null, res.status, detail)
