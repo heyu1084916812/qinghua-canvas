@@ -1529,6 +1529,26 @@
       "budget": 100
     },
     {
+      "module": "src/workbenches/canvas/flow/nodeHeaderOcclusion.ts",
+      "owner": "canvas-flow-ui",
+      "responsibility": "Computes stacking-order occlusion and local clip paths for external node headers.",
+      "owns": [
+        "Header stacking-order z-index",
+        "Header occlusion visibility and clip-path geometry"
+      ],
+      "doesNotOwn": [
+        "Node persistence",
+        "React rendering"
+      ],
+      "publicApi": [
+        "nodeHeaderOcclusions"
+      ],
+      "test": [
+        "src/workbenches/canvas/flow/nodeHeaderOcclusion.test.ts"
+      ],
+      "budget": 220
+    },
+    {
       "module": "src/workbenches/canvas/flow/nodeHeaders.ts",
       "owner": "canvas-flow-ui",
       "responsibility": "Projects graph nodes, container children and viewport visibility into label rows.",

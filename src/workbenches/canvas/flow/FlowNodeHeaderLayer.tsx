@@ -8,7 +8,7 @@ import {
   useSyncExternalStore,
 } from 'react'
 import type { CSSProperties, PointerEvent as ReactPointerEvent } from 'react'
-import { useCanvasStore, useGraph } from '../storeContext'
+import { useCanvasStore, useGraph, useSelection } from '../storeContext'
 import { containerMinSize } from '../../../domain/canvas/layout/packContainer'
 import {
   NODE_HEADER_HEIGHT,
@@ -16,9 +16,14 @@ import {
   nodeHeaderLabels,
   type NodeHeaderLabel,
 } from './nodeHeaders'
+import {
+  nodeHeaderOcclusions,
+  type NodeHeaderOcclusion,
+} from './nodeHeaderOcclusion'
 import styles from './FlowNodeHeaderLayer.module.css'
 export function FlowNodeHeaderLayer() {
   const graph = useGraph()
+  const selection = useSelection()
   const store = useCanvasStore()
   const labelCache = useRef<{
     nodes: typeof graph.nodes
@@ -33,6 +38,10 @@ export function FlowNodeHeaderLayer() {
     labelCache.current = { nodes: graph.nodes, labels: next }
     return next
   }, [graph])
+  const occlusions = useMemo(
+    () => nodeHeaderOcclusions(labels, graph.nodes, selection),
+    [labels, graph.nodes, selection],
+  )
   useEffect(() => {
     const counts = new Map<string, number>()
     for (const node of graph.nodes) {
@@ -47,13 +56,15 @@ export function FlowNodeHeaderLayer() {
       store.dispatch({ kind: 'node.refitContainer', id: node.id, mode: 'hug', transient: true })
     }
   }, [graph, store])
-  return <HeaderViewport labels={labels} />
+  return <HeaderViewport labels={labels} occlusions={occlusions} />
 }
 
 const HeaderViewport = memo(function HeaderViewport({
   labels,
+  occlusions,
 }: {
   labels: readonly NodeHeaderLabel[]
+  occlusions: ReadonlyMap<string, NodeHeaderOcclusion>
 }) {
   const store = useCanvasStore()
   const layerRef = useRef<HTMLDivElement>(null)
@@ -93,6 +104,7 @@ const HeaderViewport = memo(function HeaderViewport({
             key={label.id}
             label={label}
             editing={renamingId === label.id}
+            occlusion={occlusions.get(label.id)}
           />
         ))}
       </div>
@@ -103,9 +115,11 @@ const HeaderViewport = memo(function HeaderViewport({
 const HeaderLabel = memo(function HeaderLabel({
   label,
   editing,
+  occlusion,
 }: {
   label: NodeHeaderLabel
   editing: boolean
+  occlusion?: NodeHeaderOcclusion
 }) {
   const store = useCanvasStore()
   const [draft, setDraft] = useState(label.title)
@@ -158,6 +172,10 @@ const HeaderLabel = memo(function HeaderLabel({
         width: label.w / label.scale + NODE_HEADER_SIDE_INSET * 2,
         transform: `scale(${label.scale})`,
         transformOrigin: 'top left',
+        zIndex: occlusion?.zIndex,
+        visibility: occlusion?.hidden && !editing ? 'hidden' : undefined,
+        pointerEvents: occlusion?.hidden && !editing ? 'none' : undefined,
+        clipPath: !editing && occlusion?.clipPath ? occlusion.clipPath : undefined,
       }}
       data-flow-node-header={label.id}
     >
